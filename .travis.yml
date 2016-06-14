@@ -1,0 +1,19 @@
+language: go
+go:
+- 1.4.2
+- 1.5.4
+- 1.6.2
+install:
+- go get golang.org/x/tools/cmd/cover
+before_script: 
+script:
+- make travis-test-with-coverage
+after_success:
+- bash <(curl -s https://codecov.io/bash)
+env:
+  global:
+  - secure: U2U1AmkU4NJBgKR/uUAebQY87cNL0+1JHjnLOmmXwxYYyj5ralWb1aSuSH3qSXiT93qLBmtaUkuv9fberHVqrbAeVlztVdUsKAq7JMQH+M99iFkC9UiRMqHmtjWJ0ok4COD1sRYixxi21wb/JrMe3M1iL4QJVS61iltjHhVdM64=
+sudo: false
+notifications:
+  slack:
+    secure: DJjopLLeUnvQF6LnCjRF7drgTYp1N5LYj5a5/z8fk5783vnZzJufk/Zel0AEg/Igx9fNKV6PlEWXf9P6Do8cZDFHAvM4vgCTiBaLTo4WEhAl9D/SkyhxPdyBKjKEAO2cPUqCX4+qi23qoXNQnovWbROn6DQ1tZqWFs6xKoT5RQfxigoiQYGL+mUcCOfvTV9vLjeYn2YtFK2g/5lMOYap0Aj15Yo4pgAch6K+MAMzxspWAxj29QO6aZVhAaHMEY/wwARos69lzcD8IWDnHEbRc16bIMRoOdCFehXE8hfWqFDofNOZQXdl0M675UJnKtQvkB5TJgXnAu6QAeGWCkRJMUuHKexXjyd/fgx/Tz+y5zhySp3m9V8kbBOsnNMkOeWd3aFhbJxoWYHoPnH9dj3xbw6ZLH+D+gavXrnlkXSGPbdZ+2M1lTfXxoLV/jBJNb4xwmuFwDlLK34fabXmvcvaC5YFEktlj4Yobtc8/KSRyhjL5FXMi3Qe5px28mNnHejopgrHQoa+TbxbpUYdACFC/QPY5QcHMuIZKPF+arXR1/PU1pBVc17JjuoBd3hwTGMRQadFqsQSbVLx1ptHCYyZKdlmUXaOqg5eTcGR35h0fP8WF4Cqw94oN/tTiKUhkjAcs7qPXds5cbmpBtc7AgNrU6GuUE5cDr8u/+fsvpvLC74=
