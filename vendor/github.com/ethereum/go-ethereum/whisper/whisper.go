@@ -18,6 +18,7 @@ package whisper
 
 import (
 	"crypto/ecdsa"
+	"fmt"
 	"sync"
 	"time"
 
@@ -143,6 +144,20 @@ func (self *Whisper) HasIdentity(key *ecdsa.PublicKey) bool {
 // GetIdentity retrieves the private key of the specified public identity.
 func (self *Whisper) GetIdentity(key *ecdsa.PublicKey) *ecdsa.PrivateKey {
 	return self.keys[string(crypto.FromECDSAPub(key))]
+}
+
+// InjectIdentity injects a manually added identity/key pair into the whisper keys
+func (self *Whisper) InjectIdentity(key *ecdsa.PrivateKey) error {
+
+	identity := string(crypto.FromECDSAPub(&key.PublicKey))
+	self.keys[identity] = key
+	if _, ok := self.keys[identity]; !ok {
+		return fmt.Errorf("key insert into keys map failed")
+	}
+
+	identityString := common.ToHex(crypto.FromECDSAPub(&key.PublicKey))
+	fmt.Printf("Injected identity into whisper: %s\n", identityString)
+	return nil
 }
 
 // Watch installs a new message handler to run in case a matching packet arrives
@@ -302,11 +317,16 @@ func (self *Whisper) open(envelope *Envelope) *Message {
 	// Iterate over the keys and try to decrypt the message
 	for _, key := range self.keys {
 		message, err := envelope.Open(key)
-		if err == nil {
+		switch err {
+		case nil:
 			message.To = &key.PublicKey
 			return message
-		} else if err == ecies.ErrInvalidPublicKey {
-			return message
+		case ecies.ErrInvalidPublicKey:
+			origMessage, err := envelope.Open(nil)
+			if err != nil {
+				return nil
+			}
+			return origMessage
 		}
 	}
 	// Failed to decrypt, don't return anything
