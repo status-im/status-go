@@ -1,5 +1,5 @@
 {
-	"ImportPath": "github.com/status-im/status-go",
+	"ImportPath": "github.com/status-im/statusgo",
 	"GoVersion": "go1.6",
 	"GodepVersion": "v74",
 	"Packages": [
@@ -226,6 +226,11 @@
 		{
 			"ImportPath": "github.com/syndtr/goleveldb/leveldb/util",
 			"Rev": "cfa635847112c5dc4782e128fa7e0d05fdbfb394"
+		},
+		{
+			"ImportPath": "github.com/urfave/cli",
+			"Comment": "v1.17.0-67-ge5bef42",
+			"Rev": "e5bef42c62aa7d25aba4880dc02b7624f01e9e19"
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/pbkdf2",

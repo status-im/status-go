@@ -1,48 +1,27 @@
 package main
 
+// #ifdef __cplusplus
+// extern "C" {
+// #endif
+//
+// extern int runCreateAccount(const char*);
+//
+// #ifdef __cplusplus
+// }
+// #endif
+import "C"
 import (
 	"fmt"
-	"log"
-
-	"github.com/ethereum/go-ethereum/accounts"
-	"github.com/ethereum/go-ethereum/node"
+	"os"
+	"strings"
 )
 
-/*
-#include <stdio.h>
-int doNewAccount();
-*/
-import "C"
-
-var (
-	scryptN = 262144
-	scryptP = 1
-)
-
-func main() {
-	Example()
-}
-
-//export NewAccount
-func NewAccount(p, k *C.char) *C.char {
-
-	password := C.GoString(p)
-	keydir := C.GoString(k)
-
-	var sync *[]node.Service
-	w := true
-	accman := accounts.NewManager(keydir, scryptN, scryptP, sync)
-
-	account, err := accman.NewAccount(password, w)
-	if err != nil {
-		log.Fatal(err)
+//export doRunCreateAccount
+func doRunCreateAccount(args *C.char) C.int {
+	// This is equivalent to geth.main, just modified to handle the function arg passing
+	if err := app.Run(strings.Split("statusgo "+C.GoString(args), " ")); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return -1
 	}
-
-	address := fmt.Sprintf("{%x}", account.Address)
-	return C.CString(address)
-
-}
-
-func Example() {
-	C.doNewAccount()
+	return 0
 }
