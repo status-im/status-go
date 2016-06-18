@@ -7,7 +7,7 @@ statusgo:
 	@echo "Run \"build/bin/statusgo\" to view available commands"
 
 statusgo-android: xgo
-	build/env.sh $(GOBIN)/xgo --go=$(GO) --dest=$(GOBIN) --targets=android-16/aar ./src
+	build/env.sh $(GOBIN)/xgo --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=android-16/aar ./src
 	@echo "Android cross compilation done:"
 
 xgo:
