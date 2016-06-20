@@ -1,26 +1,16 @@
 package main
 
-// #ifdef __cplusplus
-// extern "C" {
-// #endif
-//
-// extern int runCreateAccount(const char*);
-//
-// #ifdef __cplusplus
-// }
-// #endif
 import "C"
 import (
 	"fmt"
 	"os"
-	"strings"
 )
 
-//export doRunCreateAccount
-func doRunCreateAccount(args *C.char) C.int {
+//export doCreateAccount
+func doCreateAccount(password, keydir *C.char) C.int {
 	// This is equivalent to creating an account from the command line,
 	// just modified to handle the function arg passing
-	if err := app.Run(strings.Split("statusgo "+C.GoString(args), " ")); err != nil {
+	if err := createAccount(C.GoString(password), C.GoString(keydir)); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return -1
 	}

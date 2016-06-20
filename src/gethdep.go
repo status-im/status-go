@@ -5,7 +5,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/node"
-	"github.com/urfave/cli"
 )
 
 var (
@@ -13,13 +12,13 @@ var (
 	scryptP = 1
 )
 
-func createAccount(c *cli.Context) error {
+func createAccount(password, keydir string) error {
 
 	var sync *[]node.Service
 	w := true
-	accman := accounts.NewManager(c.String("keydir"), scryptN, scryptP, sync)
+	accman := accounts.NewManager(keydir, scryptN, scryptP, sync)
 
-	account, err := accman.NewAccount(c.String("password"), w)
+	account, err := accman.NewAccount(password, w)
 	if err != nil {
 		return err
 	}
