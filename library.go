@@ -18,7 +18,8 @@ import (
 
 //export doRunCreateAccount
 func doRunCreateAccount(args *C.char) C.int {
-	// This is equivalent to geth.main, just modified to handle the function arg passing
+	// This is equivalent to creating an account from the command line,
+	// just modified to handle the function arg passing
 	if err := app.Run(strings.Split("statusgo "+C.GoString(args), " ")); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return -1
