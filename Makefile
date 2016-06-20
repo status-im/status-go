@@ -1,13 +1,14 @@
+GOBIN = build/bin
 GO ?= latest
 
 statusgo:
-	go install
-	@echo "Done installing status go."
-	@echo "Run \"statusgo\" to view available commands"
+	build/env.sh go build -i -o $(GOBIN)/statusgo ./src
+	@echo "status go compilation done."
+	@echo "Run \"build/bin/statusgo\" to view available commands"
 
 statusgo-android: xgo
-	xgo --go=$(GO) --targets=android-16/aar ./
+	build/env.sh $(GOBIN)/xgo --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=android-16/aar ./src
 	@echo "Android cross compilation done:"
 
 xgo:
-	go get github.com/karalabe/xgo
+	build/env.sh go get github.com/karalabe/xgo
