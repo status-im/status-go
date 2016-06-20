@@ -33,17 +33,20 @@ var (
 	c           *cli.Context
 )
 
-func init() {
+func main() {
+
+	// Placeholder for anything we want to run by default
+	fmt.Println("You are running statusgo!")
+
+}
+
+func MakeNode(datadir string) *node.Node {
 
 	set := flag.NewFlagSet("test", 0)
 	set.Bool("shh", true, "whisper")
 	set.Bool("noeth", true, "disable eth")
-	set.String("datadir", ".ethereum", "data directory for geth")
+	set.String("datadir", datadir, "data directory for geth")
 	c = cli.NewContext(nil, set, nil)
-
-}
-
-func main() {
 
 	// Construct the textual version string from the individual components
 	vString = fmt.Sprintf("%d.%d.%d", versionMajor, versionMinor, versionPatch)
@@ -56,7 +59,13 @@ func main() {
 	rConfig.Patch = uint32(versionPatch)
 
 	currentNode = utils.MakeSystemNode(clientIdentifier, vString, rConfig, makeDefaultExtra(), c)
-	fmt.Println(currentNode)
+	return currentNode
+
+}
+
+func StartNode(currentNode *node.Node) {
+	utils.StartNode(currentNode)
+	currentNode.Wait()
 }
 
 func makeDefaultExtra() []byte {

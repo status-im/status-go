@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/accounts"
@@ -26,5 +27,17 @@ func createAccount(password, keydir string) error {
 	address := fmt.Sprintf("{%x}", account.Address)
 	fmt.Println(address)
 	return nil
+
+}
+
+func createAndStartNode(datadir string) error {
+
+	currentNode := MakeNode(datadir)
+	if currentNode != nil {
+		StartNode(currentNode)
+		return nil
+	}
+
+	return errors.New("Could not create the in-memory node object")
 
 }
