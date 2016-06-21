@@ -40,6 +40,7 @@ func main() {
 
 }
 
+// MakeNode create a geth node entity
 func MakeNode(datadir string) *node.Node {
 
 	set := flag.NewFlagSet("test", 0)
@@ -63,6 +64,7 @@ func MakeNode(datadir string) *node.Node {
 
 }
 
+// StartNode starts a geth node entity
 func StartNode(currentNode *node.Node) {
 	utils.StartNode(currentNode)
 	currentNode.Wait()
