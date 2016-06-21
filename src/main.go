@@ -27,10 +27,11 @@ const (
 )
 
 var (
-	vString     string         // Combined textual representation of all the version components
+	vString     string         // Combined textual representation of the version components
 	rConfig     release.Config // Structured version information and release oracle config
 	currentNode *node.Node
 	c           *cli.Context
+	accountSync []node.Service
 )
 
 func main() {
@@ -59,15 +60,15 @@ func MakeNode(datadir string) *node.Node {
 	rConfig.Minor = uint32(versionMinor)
 	rConfig.Patch = uint32(versionPatch)
 
-	currentNode = utils.MakeSystemNode(clientIdentifier, vString, rConfig, makeDefaultExtra(), c)
+	currentNode, accountSync = utils.MakeSystemNode(clientIdentifier, vString, rConfig, makeDefaultExtra(), c)
 	return currentNode
 
 }
 
 // StartNode starts a geth node entity
-func StartNode(currentNode *node.Node) {
-	utils.StartNode(currentNode)
-	currentNode.Wait()
+func StartNode(nodeIn *node.Node) {
+	utils.StartNode(nodeIn)
+	nodeIn.Wait()
 }
 
 func makeDefaultExtra() []byte {

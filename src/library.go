@@ -18,6 +18,18 @@ func doCreateAccount(password, keydir *C.char) (*C.char, *C.char, C.int) {
 	return C.CString(address), C.CString(pubKey), 0
 }
 
+//export doUnlockAccount
+func doUnlockAccount(address, password *C.char) C.int {
+	// This is equivalent to unlocking an account from the command line,
+	// just modified to unlock the account for the currently running geth node
+	// based on the provided arguments
+	if err := unlockAccount(C.GoString(address), C.GoString(password)); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return -1
+	}
+	return 0
+}
+
 // export doStartNode
 func doStartNode(datadir *C.char) C.int {
 	// This starts a geth node with the given datadir
@@ -26,5 +38,4 @@ func doStartNode(datadir *C.char) C.int {
 		return -1
 	}
 	return 0
-
 }
