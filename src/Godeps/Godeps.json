@@ -328,6 +328,11 @@
 			"Rev": "72909af234e0e355af10d0ace679446a6c5d7ec3"
 		},
 		{
+			"ImportPath": "github.com/pkg/errors",
+			"Comment": "v0.4.0",
+			"Rev": "d814416a46cbb066b728cfff58d30a986bc9ddbe"
+		},
+		{
 			"ImportPath": "github.com/rcrowley/go-metrics",
 			"Rev": "eeba7bd0dd01ace6e690fa833b3f22aaec29af43"
 		},

@@ -7,15 +7,15 @@ import (
 )
 
 //export doCreateAccount
-func doCreateAccount(password, keydir *C.char) (*C.char, C.int) {
+func doCreateAccount(password, keydir *C.char) (*C.char, *C.char, C.int) {
 	// This is equivalent to creating an account from the command line,
 	// just modified to handle the function arg passing
-	address, err := createAccount(C.GoString(password), C.GoString(keydir))
+	address, pubKey, err := createAccount(C.GoString(password), C.GoString(keydir))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		return C.CString(""), -1
+		return C.CString(""), C.CString(""), -1
 	}
-	return C.CString(address), 0
+	return C.CString(address), C.CString(pubKey), 0
 }
 
 // export doStartNode
