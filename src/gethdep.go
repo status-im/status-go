@@ -13,7 +13,8 @@ var (
 	scryptP = 1
 )
 
-func createAccount(password, keydir string) error {
+// createAccount creates an internal geth account
+func createAccount(password, keydir string) (string, error) {
 
 	var sync *[]node.Service
 	w := true
@@ -21,15 +22,16 @@ func createAccount(password, keydir string) error {
 
 	account, err := accman.NewAccount(password, w)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	address := fmt.Sprintf("{%x}", account.Address)
-	fmt.Println(address)
-	return nil
+	return address, nil
 
 }
 
+// createAndStartNode creates a node entity and starts the
+// node running locally
 func createAndStartNode(datadir string) error {
 
 	currentNode := MakeNode(datadir)
