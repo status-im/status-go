@@ -18,7 +18,6 @@ func doCreateAccount(password, keydir *C.char) *C.char {
 	}`, address, pubKey, err.Error())
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		return C.CString(out)
 	}
 	return C.CString(out)
 }
@@ -32,7 +31,6 @@ func doUnlockAccount(address, password *C.char) *C.char {
 	out := fmt.Sprintf("{\"error\": %s}", err.Error())
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		return C.CString(out)
 	}
 	return C.CString(out)
 }
@@ -44,7 +42,6 @@ func doStartNode(datadir *C.char) *C.char {
 	out := fmt.Sprintf("{\"error\": %s}", err.Error())
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		return C.CString(out)
 	}
 	return C.CString(out)
 }
