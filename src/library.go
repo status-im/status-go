@@ -30,7 +30,7 @@ func doUnlockAccount(address, password *C.char) C.int {
 	return 0
 }
 
-// export doStartNode
+//export doStartNode
 func doStartNode(datadir *C.char) C.int {
 	// This starts a geth node with the given datadir
 	if err := createAndStartNode(C.GoString(datadir)); err != nil {
