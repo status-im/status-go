@@ -3,9 +3,12 @@ package main
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/cmd/utils"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/node"
 	errextra "github.com/pkg/errors"
@@ -23,17 +26,23 @@ func createAccount(password, keydir string) (string, string, error) {
 	w := true
 	accman := accounts.NewManager(keydir, scryptN, scryptP, sync)
 
+	// generate the account
 	account, err := accman.NewAccount(password, w)
 	if err != nil {
 		return "", "", errextra.Wrap(err, "Account manager could not create the account")
 	}
-
 	address := fmt.Sprintf("%x", account.Address)
-	key, err := crypto.LoadECDSA(account.File)
+
+	// recover the public key to return
+	keyContents, err := ioutil.ReadFile(account.File)
 	if err != nil {
-		return address, "", errextra.Wrap(err, "Could not load the key")
+		return address, "", errextra.Wrap(err, "Could not load the key contents")
 	}
-	pubKey := string(crypto.FromECDSAPub(&key.PublicKey))
+	key, err := accounts.DecryptKey(keyContents, password)
+	if err != nil {
+		return address, "", errextra.Wrap(err, "Could not recover the key")
+	}
+	pubKey := common.ToHex(crypto.FromECDSAPub(&key.PrivateKey.PublicKey))
 
 	return address, pubKey, nil
 
@@ -42,7 +51,7 @@ func createAccount(password, keydir string) (string, string, error) {
 // unlockAccount unlocks an existing account for a certain duration and
 // inject the account as a whisper identity if the account was created as
 // a whisper enabled account
-func unlockAccount(address, password string) error {
+func unlockAccount(address, password string, seconds int) error {
 
 	if currentNode != nil {
 
@@ -52,7 +61,7 @@ func unlockAccount(address, password string) error {
 			return errextra.Wrap(err, "Could not retrieve account from address")
 		}
 
-		err = accman.Unlock(account, password)
+		err = accman.TimedUnlock(account, password, time.Duration(seconds)*time.Second)
 		if err != nil {
 			return errextra.Wrap(err, "Could not decrypt account")
 		}
@@ -69,7 +78,7 @@ func unlockAccount(address, password string) error {
 // node running locally
 func createAndStartNode(datadir string) error {
 
-	currentNode := MakeNode(datadir)
+	currentNode = MakeNode(datadir)
 	if currentNode != nil {
 		StartNode(currentNode)
 		return nil
