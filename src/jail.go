@@ -37,7 +37,6 @@ func Parse(chatId string, js string) string {
 	vms[chatId] = vm
 	_, err := vm.Run(jjs)
 	res, _ := vm.Get("catalog")
-	err.Error()
 
 	return printResult(res.String(), err)
 }
