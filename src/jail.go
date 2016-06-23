@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/robertkrimen/otto"
 	"fmt"
+	"encoding/json"
 )
 
 var statusJs string
@@ -12,18 +13,23 @@ func Init(js string) {
 	statusJs = js
 }
 
+func printError(error string) string {
+	str := JSONError{
+		Error: error,
+	}
+	outBytes, _ := json.Marshal(&str)
+	return string(outBytes)
+}
+
 func printResult(res string, err error) string {
 	var out string
 	if err != nil {
-		out = fmt.Sprintf(`{
-		        "error": %s
-		        }`,
-			err.Error())
+		out = printError(err.Error())
 	} else {
-		out = fmt.Sprintf(`{
-		        "result": %s
-		        }`,
-			res)
+		if "undefined" == res {
+			res = "null";
+		}
+		out = fmt.Sprintf(`{"result": %s}`, res)
 	}
 
 	return out
@@ -44,9 +50,7 @@ func Parse(chatId string, js string) string {
 func Call(chatId string, path string, args string) string {
 	vm, ok := vms[chatId]
 	if !ok {
-		return fmt.Sprintf(
-			"{\"error\":\"Vm[%s] doesn't exist.\"}",
-			chatId)
+		return printError(fmt.Sprintf("Vm[%s] doesn't exist.", chatId))
 	}
 
 	res, err := vm.Call("call", nil, path, args)
