@@ -1,5 +1,15 @@
 package main
 
+// #ifdef __cplusplus
+// extern "C" {
+// #endif
+// #include <stdbool.h>
+//
+// extern bool GethServiceSignalEvent( const char *jsonEvent );
+//
+// #ifdef __cplusplus
+// }
+// #endif
 import "C"
 import (
 	"encoding/json"
@@ -53,4 +63,9 @@ func doStartNode(datadir *C.char) *C.char {
 	}
 	outBytes, _ := json.Marshal(&out)
 	return C.CString(string(outBytes))
+}
+
+//export testCallback
+func testCallback(){
+	C.GethServiceSignalEvent(C.CString(`{"ok":"boss"}`))
 }

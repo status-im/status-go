@@ -48,7 +48,7 @@ JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved)
 {
 	bool detach;
 	JNIEnv *env;
-	bool result = JNI_VERSION_1_6;
+	int result = JNI_VERSION_1_6;
 
 	gJavaVM = vm;
 
