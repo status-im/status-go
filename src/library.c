@@ -31,14 +31,14 @@ static bool JniAttach( JNIEnv **env )
 		// attach thread to JNI
 		//(*gJavaVM)->AttachCurrentThread( gJavaVM, (void **)env, NULL );		// Oracle JNI API
 		(*gJavaVM)->AttachCurrentThread( gJavaVM, env, NULL );			// Android JNI API
-		return false;
+		return true;
 	}
 	else if (status != JNI_OK)
 	{
 		return false;
 	}
 	
-	return true;
+	return false;
 }
 
 /*!
