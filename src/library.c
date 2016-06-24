@@ -1,7 +1,6 @@
-#include <jni.h>
-#include <stdint.h>
-#include <stdlib.h>
+#include <stddef.h>
 #include <stdbool.h>
+#include <jni.h>
 
 
 bool GethServiceSignalEvent( const char *jsonEvent );
@@ -30,7 +29,8 @@ static bool JniAttach( JNIEnv **env )
 	if (status == JNI_EDETACHED)
 	{
 		// attach thread to JNI
-		(*gJavaVM)->AttachCurrentThread( gJavaVM, (void **)env, NULL );
+		//(*gJavaVM)->AttachCurrentThread( gJavaVM, (void **)env, NULL );		// Oracle JNI API
+		(*gJavaVM)->AttachCurrentThread( gJavaVM, env, NULL );			// Android JNI API
 		return false;
 	}
 	else if (status != JNI_OK)
