@@ -1,3 +1,10 @@
+
+#ifdef __ANDROID__
+
+// ======================================================================================
+// Android NDK
+// ======================================================================================
+
 #include <stddef.h>
 #include <stdbool.h>
 #include <jni.h>
@@ -153,3 +160,55 @@ bool GethServiceSignalEvent( const char *jsonEvent )
 	
 	return true;
 }
+
+#elif defined( __APPLE__ )
+
+#include <stdbool.h>
+#include <stdlib.h>
+#include <objc/objc.h>
+#include <objc/runtime.h>
+#include <objc/message.h>
+
+// ======================================================================================
+// ObjectiveC
+// ======================================================================================
+
+static id gethServiceClassRef = nil;
+static SEL gethServiceSelector = nil;
+
+
+static bool initLibrary()
+{
+	if (gethServiceClassRef == nil)
+	{
+		gethServiceClassRef = objc_getClass("GethService");
+		if (gethServiceClassRef == nil) return false;
+	}
+
+	if (gethServiceSelector == nil)
+	{
+		gethServiceSelector = sel_getUid("signalEvent:");
+		if (gethServiceSelector == nil) return false;
+	}
+	
+	return true;
+}
+
+/*!
+ * @brief Calls static method signalEvent of class GethService.
+ *
+ * @param jsonEvent - UTF8 string
+ *
+ * @note Definition of signalEvent method.
+ *	+ (void)signalEvent:(const char *)json
+ */
+bool GethServiceSignalEvent( const char *jsonEvent )
+{
+	if (!initLibrary()) return false;
+	
+	objc_msgSend( gethServiceClassRef, gethServiceSelector, jsonEvent );
+	
+	return true;
+}
+
+#endif
