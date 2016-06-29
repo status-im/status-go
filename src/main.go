@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"os"
 	"runtime"
 
 	"github.com/codegangsta/cli"
@@ -28,12 +27,11 @@ const (
 )
 
 var (
-	vString        string         // Combined textual representation of the version
-	rConfig        release.Config // Structured version information and release oracle config
-	currentNode    *node.Node     // currently running geth node
-	c              *cli.Context   // the CLI context used to start the geth node
-	accountSync    []node.Service // the object used to sync accounts between geth services
-	MyTransactions chan TxRequest
+	vString     string         // Combined textual representation of the version
+	rConfig     release.Config // Structured version information and release oracle config
+	currentNode *node.Node     // currently running geth node
+	c           *cli.Context   // the CLI context used to start the geth node
+	accountSync []node.Service // the object used to sync accounts between geth services
 )
 
 func main() {
