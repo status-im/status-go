@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"os"
 	"runtime"
 
 	"github.com/codegangsta/cli"
@@ -27,11 +28,12 @@ const (
 )
 
 var (
-	vString     string         // Combined textual representation of the version components
-	rConfig     release.Config // Structured version information and release oracle config
-	currentNode *node.Node
-	c           *cli.Context
-	accountSync []node.Service
+	vString        string         // Combined textual representation of the version
+	rConfig        release.Config // Structured version information and release oracle config
+	currentNode    *node.Node     // currently running geth node
+	c              *cli.Context   // the CLI context used to start the geth node
+	accountSync    []node.Service // the object used to sync accounts between geth services
+	MyTransactions chan TxRequest
 )
 
 func main() {
@@ -66,7 +68,7 @@ func MakeNode(datadir string) *node.Node {
 }
 
 // StartNode starts a geth node entity
-func StartNode(nodeIn *node.Node) {
+func RunNode(nodeIn *node.Node) {
 	utils.StartNode(nodeIn)
 	nodeIn.Wait()
 }

@@ -7,8 +7,8 @@ import (
 	"os"
 )
 
-//export doCreateAccount
-func doCreateAccount(password, keydir *C.char) *C.char {
+//export CreateAccount
+func CreateAccount(password, keydir *C.char) *C.char {
 	// This is equivalent to creating an account from the command line,
 	// just modified to handle the function arg passing
 	address, pubKey, err := createAccount(C.GoString(password), C.GoString(keydir))
@@ -25,8 +25,16 @@ func doCreateAccount(password, keydir *C.char) *C.char {
 
 }
 
-//export doUnlockAccount
-func doUnlockAccount(address, password *C.char, seconds int) *C.char {
+//export Login
+func Login(address, password *C.char) *C.char {
+	// Equivalent to unlocking an account briefly, to inject a whisper identity,
+	// then locking the account again
+	out := UnlockAccount(address, password, 5)
+	return out
+}
+
+//export UnlockAccount
+func UnlockAccount(address, password *C.char, seconds int) *C.char {
 	// This is equivalent to unlocking an account from the command line,
 	// just modified to unlock the account for the currently running geth node
 	// based on the provided arguments
@@ -41,8 +49,8 @@ func doUnlockAccount(address, password *C.char, seconds int) *C.char {
 	return C.CString(string(outBytes))
 }
 
-//export doStartNode
-func doStartNode(datadir *C.char) *C.char {
+//export StartNode
+func StartNode(datadir *C.char) *C.char {
 	// This starts a geth node with the given datadir
 	err := createAndStartNode(C.GoString(datadir))
 	out := JSONError{
