@@ -39,6 +39,8 @@ func main() {
 	// Placeholder for anything we want to run by default
 	fmt.Println("You are running statusgo!")
 
+	createAndStartNode(".ethereum")
+
 }
 
 // MakeNode create a geth node entity
@@ -48,6 +50,7 @@ func MakeNode(datadir string) *node.Node {
 	set.Bool("shh", true, "whisper")
 	set.Bool("noeth", true, "disable eth")
 	set.String("datadir", datadir, "data directory for geth")
+	set.String("logdir", datadir, "log dir for glog")
 	c = cli.NewContext(nil, set, nil)
 
 	// Construct the textual version string from the individual components
@@ -60,6 +63,7 @@ func MakeNode(datadir string) *node.Node {
 	rConfig.Minor = uint32(versionMinor)
 	rConfig.Patch = uint32(versionPatch)
 
+	utils.DebugSetup(c)
 	currentNode, accountSync = utils.MakeSystemNode(clientIdentifier, vString, rConfig, makeDefaultExtra(), c)
 	return currentNode
 

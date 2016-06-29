@@ -84,6 +84,12 @@ func (*HandlerT) GcStats() *debug.GCStats {
 	return s
 }
 
+// SetLogDir overwrites the default log file utilized by glog
+func (h *HandlerT) SetLogDir(logDir string) error {
+	glog.SetLogDir(logDir)
+	return nil
+}
+
 // CpuProfile turns on CPU profiling for nsec seconds and writes
 // profile data to file.
 func (h *HandlerT) CpuProfile(file string, nsec uint) error {
