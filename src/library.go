@@ -9,20 +9,27 @@ import (
 
 //export CreateAccount
 func CreateAccount(password, keydir *C.char) *C.char {
+
 	// This is equivalent to creating an account from the command line,
 	// just modified to handle the function arg passing
 	address, pubKey, err := createAccount(C.GoString(password), C.GoString(keydir))
+
+	var errString string
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		errString = err.Error()
+	} else {
+		errString = ""
+	}
+
 	out := AccountInfo{
 		Address: address,
 		PubKey:  pubKey,
-		Error:   err.Error(),
-	}
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		Error:   errString,
 	}
 	outBytes, _ := json.Marshal(&out)
-	return C.CString(string(outBytes))
 
+	return C.CString(string(outBytes))
 }
 
 //export Login
@@ -35,30 +42,46 @@ func Login(address, password *C.char) *C.char {
 
 //export UnlockAccount
 func UnlockAccount(address, password *C.char, seconds int) *C.char {
+
 	// This is equivalent to unlocking an account from the command line,
 	// just modified to unlock the account for the currently running geth node
 	// based on the provided arguments
 	err := unlockAccount(C.GoString(address), C.GoString(password), seconds)
-	out := JSONError{
-		Error: err.Error(),
-	}
+
+	var errString string
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
+		errString = err.Error()
+	} else {
+		errString = ""
+	}
+
+	out := JSONError{
+		Error: errString,
 	}
 	outBytes, _ := json.Marshal(&out)
+
 	return C.CString(string(outBytes))
 }
 
 //export StartNode
 func StartNode(datadir *C.char) *C.char {
+
 	// This starts a geth node with the given datadir
 	err := createAndStartNode(C.GoString(datadir))
-	out := JSONError{
-		Error: err.Error(),
-	}
+
+	var errString string
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
+		errString = err.Error()
+	} else {
+		errString = ""
+	}
+
+	out := JSONError{
+		Error: errString,
 	}
 	outBytes, _ := json.Marshal(&out)
+
 	return C.CString(string(outBytes))
 }
