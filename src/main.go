@@ -47,6 +47,8 @@ func MakeNode(datadir string) *node.Node {
 	set := flag.NewFlagSet("test", 0)
 	set.Bool("shh", true, "whisper")
 	set.Bool("noeth", true, "disable eth")
+	set.Bool("rpc", true, "enable rpc")
+	set.String("rpcapi", "db,eth,net,web3,shh,admin", "rpc api(s)")
 	set.String("datadir", datadir, "data directory for geth")
 	set.String("logdir", datadir, "log dir for glog")
 	c = cli.NewContext(nil, set, nil)
