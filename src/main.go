@@ -39,6 +39,8 @@ func main() {
 	// Placeholder for anything we want to run by default
 	fmt.Println("You are running statusgo!")
 
+	createAndStartNode(".ethereum")
+
 }
 
 // MakeNode create a geth node entity
@@ -49,6 +51,8 @@ func MakeNode(datadir string) *node.Node {
 	set.Bool("shh", true, "whisper")
 	set.Bool("noeth", true, "disable eth")
 	set.Bool("rpc", true, "enable rpc")
+	set.String("rpcaddr", "localhost", "host for RPC")
+	set.String("rpcport", "8545", "rpc port")
 	set.String("rpcapi", "db,eth,net,web3,shh,admin", "rpc api(s)")
 	set.String("datadir", datadir, "data directory for geth")
 	set.String("logdir", datadir, "log dir for glog")
