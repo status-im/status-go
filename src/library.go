@@ -7,6 +7,8 @@ import (
 	"os"
 )
 
+var emptyError = ""
+
 //export CreateAccount
 func CreateAccount(password, keydir *C.char) *C.char {
 
@@ -14,12 +16,10 @@ func CreateAccount(password, keydir *C.char) *C.char {
 	// just modified to handle the function arg passing
 	address, pubKey, err := createAccount(C.GoString(password), C.GoString(keydir))
 
-	var errString string
+	errString := emptyError
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		errString = err.Error()
-	} else {
-		errString = ""
 	}
 
 	out := AccountInfo{
@@ -48,12 +48,10 @@ func UnlockAccount(address, password *C.char, seconds int) *C.char {
 	// based on the provided arguments
 	err := unlockAccount(C.GoString(address), C.GoString(password), seconds)
 
-	var errString string
+	errString := emptyError
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		errString = err.Error()
-	} else {
-		errString = ""
 	}
 
 	out := JSONError{
@@ -70,12 +68,10 @@ func StartNode(datadir *C.char) *C.char {
 	// This starts a geth node with the given datadir
 	err := createAndStartNode(C.GoString(datadir))
 
-	var errString string
+	errString := emptyError
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		errString = err.Error()
-	} else {
-		errString = ""
 	}
 
 	out := JSONError{
