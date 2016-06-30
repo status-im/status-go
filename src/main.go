@@ -39,8 +39,6 @@ func main() {
 	// Placeholder for anything we want to run by default
 	fmt.Println("You are running statusgo!")
 
-	createAndStartNode(".ethereum")
-
 }
 
 // MakeNode create a geth node entity

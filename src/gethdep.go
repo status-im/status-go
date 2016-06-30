@@ -15,8 +15,8 @@ import (
 )
 
 var (
-	scryptN = 262144
-	scryptP = 1
+	scryptN = 4096
+	scryptP = 6
 )
 
 // createAccount creates an internal geth account
