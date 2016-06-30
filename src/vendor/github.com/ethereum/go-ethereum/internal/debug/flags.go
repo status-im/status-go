@@ -43,6 +43,10 @@ var (
 		Usage: "Request a stack trace at a specific logging statement (e.g. \"block.go:271\")",
 		Value: glog.GetTraceLocation(),
 	}
+	logdirFlag = cli.StringFlag{
+		Name:  "logdir",
+		Usage: "Request that glog use the specified log dir location",
+	}
 	pprofFlag = cli.BoolFlag{
 		Name:  "pprof",
 		Usage: "Enable the pprof HTTP server",
@@ -73,7 +77,7 @@ var (
 
 // Flags holds all command-line flags required for debugging.
 var Flags = []cli.Flag{
-	verbosityFlag, vmoduleFlag, backtraceAtFlag,
+	verbosityFlag, vmoduleFlag, logdirFlag, backtraceAtFlag,
 	pprofFlag, pprofPortFlag,
 	memprofilerateFlag, blockprofilerateFlag, cpuprofileFlag, traceFlag,
 }
@@ -81,9 +85,17 @@ var Flags = []cli.Flag{
 // Setup initializes profiling and logging based on the CLI flags.
 // It should be called as early as possible in the program.
 func Setup(ctx *cli.Context) error {
+
 	// logging
+	if logDir := ctx.GlobalString(logdirFlag.Name); logDir != "" {
+		if err := Handler.SetLogDir(logDir); err != nil {
+			return err
+		}
+		glog.SetToStderr(false)
+	} else {
+		glog.SetToStderr(true)
+	}
 	glog.CopyStandardLogTo("INFO")
-	glog.SetToStderr(true)
 
 	// profiling, tracing
 	runtime.MemProfileRate = ctx.GlobalInt(memprofilerateFlag.Name)

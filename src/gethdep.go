@@ -15,36 +15,42 @@ import (
 )
 
 var (
-	scryptN = 262144
-	scryptP = 1
+	scryptN = 4096
+	scryptP = 6
 )
 
 // createAccount creates an internal geth account
 func createAccount(password, keydir string) (string, string, error) {
 
-	var sync *[]node.Service
-	w := true
-	accman := accounts.NewManager(keydir, scryptN, scryptP, sync)
+	if currentNode != nil {
 
-	// generate the account
-	account, err := accman.NewAccount(password, w)
-	if err != nil {
-		return "", "", errextra.Wrap(err, "Account manager could not create the account")
-	}
-	address := fmt.Sprintf("%x", account.Address)
+		var sync *[]node.Service
+		w := true
+		accman := accounts.NewManager(keydir, scryptN, scryptP, sync)
 
-	// recover the public key to return
-	keyContents, err := ioutil.ReadFile(account.File)
-	if err != nil {
-		return address, "", errextra.Wrap(err, "Could not load the key contents")
-	}
-	key, err := accounts.DecryptKey(keyContents, password)
-	if err != nil {
-		return address, "", errextra.Wrap(err, "Could not recover the key")
-	}
-	pubKey := common.ToHex(crypto.FromECDSAPub(&key.PrivateKey.PublicKey))
+		// generate the account
+		account, err := accman.NewAccount(password, w)
+		if err != nil {
+			return "", "", errextra.Wrap(err, "Account manager could not create the account")
+		}
+		address := fmt.Sprintf("%x", account.Address)
 
-	return address, pubKey, nil
+		// recover the public key to return
+		keyContents, err := ioutil.ReadFile(account.File)
+		if err != nil {
+			return address, "", errextra.Wrap(err, "Could not load the key contents")
+		}
+		key, err := accounts.DecryptKey(keyContents, password)
+		if err != nil {
+			return address, "", errextra.Wrap(err, "Could not recover the key")
+		}
+		pubKey := common.ToHex(crypto.FromECDSAPub(&key.PrivateKey.PublicKey))
+
+		return address, pubKey, nil
+
+	}
+
+	return "", "", errors.New("No running node detected for account creation")
 
 }
 
@@ -80,7 +86,7 @@ func createAndStartNode(datadir string) error {
 
 	currentNode = MakeNode(datadir)
 	if currentNode != nil {
-		StartNode(currentNode)
+		RunNode(currentNode)
 		return nil
 	}
 

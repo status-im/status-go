@@ -27,11 +27,11 @@ const (
 )
 
 var (
-	vString     string         // Combined textual representation of the version components
+	vString     string         // Combined textual representation of the version
 	rConfig     release.Config // Structured version information and release oracle config
-	currentNode *node.Node
-	c           *cli.Context
-	accountSync []node.Service
+	currentNode *node.Node     // currently running geth node
+	c           *cli.Context   // the CLI context used to start the geth node
+	accountSync []node.Service // the object used to sync accounts between geth services
 )
 
 func main() {
@@ -48,6 +48,7 @@ func MakeNode(datadir string) *node.Node {
 	set.Bool("shh", true, "whisper")
 	set.Bool("noeth", true, "disable eth")
 	set.String("datadir", datadir, "data directory for geth")
+	set.String("logdir", datadir, "log dir for glog")
 	c = cli.NewContext(nil, set, nil)
 
 	// Construct the textual version string from the individual components
@@ -60,13 +61,14 @@ func MakeNode(datadir string) *node.Node {
 	rConfig.Minor = uint32(versionMinor)
 	rConfig.Patch = uint32(versionPatch)
 
+	utils.DebugSetup(c)
 	currentNode, accountSync = utils.MakeSystemNode(clientIdentifier, vString, rConfig, makeDefaultExtra(), c)
 	return currentNode
 
 }
 
 // StartNode starts a geth node entity
-func StartNode(nodeIn *node.Node) {
+func RunNode(nodeIn *node.Node) {
 	utils.StartNode(nodeIn)
 	nodeIn.Wait()
 }

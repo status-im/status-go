@@ -11,18 +11,18 @@ import (
 // unlock that account
 func TestAccountBindings(t *testing.T) {
 
-	// create an account
-	address, _, err := createAccount("badpassword", ".ethereumtest/keystore")
-	if err != nil {
-		fmt.Println(err.Error())
-		t.Error("Test failed: could not create account")
-	}
-
 	// start geth node and wait for it to initialize
 	go createAndStartNode(".ethereumtest")
 	time.Sleep(5 * time.Second)
 	if currentNode == nil {
 		t.Error("Test failed: could not start geth node")
+	}
+
+	// create an account
+	address, _, err := createAccount("badpassword", ".ethereumtest/keystore")
+	if err != nil {
+		fmt.Println(err.Error())
+		t.Error("Test failed: could not create account")
 	}
 
 	// unlock the created account
