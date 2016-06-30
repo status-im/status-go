@@ -81,3 +81,20 @@ func StartNode(datadir *C.char) *C.char {
 
 	return C.CString(string(outBytes))
 }
+
+//export parse
+func parse(chatId *C.char, js *C.char) *C.char {
+	res := Parse(C.GoString(chatId), C.GoString(js))
+	return C.CString(res)
+}
+
+//export call
+func call(chatId *C.char, path *C.char, params *C.char) *C.char {
+	res := Call(C.GoString(chatId), C.GoString(path), C.GoString(params))
+	return C.CString(res)
+}
+
+//export initJail
+func initJail(js *C.char) {
+	Init(C.GoString(js))
+}
