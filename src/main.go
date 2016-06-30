@@ -44,6 +44,7 @@ func main() {
 // MakeNode create a geth node entity
 func MakeNode(datadir string) *node.Node {
 
+	// TODO remove admin rpcapi flag
 	set := flag.NewFlagSet("test", 0)
 	set.Bool("shh", true, "whisper")
 	set.Bool("noeth", true, "disable eth")
