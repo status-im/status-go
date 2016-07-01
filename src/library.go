@@ -10,11 +10,11 @@ import (
 var emptyError = ""
 
 //export CreateAccount
-func CreateAccount(password, keydir *C.char) *C.char {
+func CreateAccount(password *C.char) *C.char {
 
 	// This is equivalent to creating an account from the command line,
 	// just modified to handle the function arg passing
-	address, pubKey, err := createAccount(C.GoString(password), C.GoString(keydir))
+	address, pubKey, err := createAccount(C.GoString(password))
 
 	errString := emptyError
 	if err != nil {
