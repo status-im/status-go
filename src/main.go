@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"runtime"
+	"time"
 
 	"github.com/codegangsta/cli"
 	"github.com/ethereum/go-ethereum/cmd/utils"
@@ -27,20 +28,18 @@ const (
 )
 
 var (
-	vString     string         // Combined textual representation of the version
-	rConfig     release.Config // Structured version information and release oracle config
-	currentNode *node.Node     // currently running geth node
-	c           *cli.Context   // the CLI context used to start the geth node
-	accountSync []node.Service // the object used to sync accounts between geth services
-	datadir     string         // data directory for geth
+	vString     string          // Combined textual representation of the version
+	rConfig     release.Config  // Structured version information and release oracle config
+	currentNode *node.Node      // currently running geth node
+	c           *cli.Context    // the CLI context used to start the geth node
+	accountSync *[]node.Service // the object used to sync accounts between geth services
+	datadir     string          // data directory for geth
 )
 
 func main() {
 
 	// Placeholder for anything we want to run by default
 	fmt.Println("You are running statusgo!")
-
-	createAndStartNode(".ethereum")
 
 }
 
@@ -58,7 +57,7 @@ func MakeNode(inputDir string) *node.Node {
 	set.String("rpcport", "8545", "rpc port")
 	set.String("rpcapi", "db,eth,net,web3,shh,admin", "rpc api(s)")
 	set.String("datadir", datadir, "data directory for geth")
-	set.String("logdir", datadir, "log dir for glog")
+	//set.String("logdir", datadir, "log dir for glog")
 	c = cli.NewContext(nil, set, nil)
 
 	// Construct the textual version string from the individual components
@@ -73,6 +72,7 @@ func MakeNode(inputDir string) *node.Node {
 
 	utils.DebugSetup(c)
 	currentNode, accountSync = utils.MakeSystemNode(clientIdentifier, vString, rConfig, makeDefaultExtra(), c)
+	fmt.Println(accountSync)
 	return currentNode
 
 }

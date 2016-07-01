@@ -25,7 +25,7 @@ func createAccount(password string) (string, string, error) {
 
 		w := true
 		keydir := datadir + "/keystore"
-		accman := accounts.NewManager(keydir, scryptN, scryptP, &accountSync)
+		accman := accounts.NewManager(keydir, scryptN, scryptP, accountSync)
 
 		// generate the account
 		account, err := accman.NewAccount(password, w)
@@ -60,7 +60,7 @@ func unlockAccount(address, password string, seconds int) error {
 
 	if currentNode != nil {
 
-		accman := utils.MakeAccountManager(c, &accountSync)
+		accman := utils.MakeAccountManager(c, accountSync)
 		account, err := utils.MakeAddress(accman, address)
 		if err != nil {
 			return errextra.Wrap(err, "Could not retrieve account from address")
