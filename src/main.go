@@ -32,6 +32,7 @@ var (
 	currentNode *node.Node     // currently running geth node
 	c           *cli.Context   // the CLI context used to start the geth node
 	accountSync []node.Service // the object used to sync accounts between geth services
+	datadir     string         // data directory for geth
 )
 
 func main() {
@@ -44,7 +45,9 @@ func main() {
 }
 
 // MakeNode create a geth node entity
-func MakeNode(datadir string) *node.Node {
+func MakeNode(inputDir string) *node.Node {
+
+	datadir = inputDir
 
 	// TODO remove admin rpcapi flag
 	set := flag.NewFlagSet("test", 0)

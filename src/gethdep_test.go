@@ -19,7 +19,7 @@ func TestAccountBindings(t *testing.T) {
 	}
 
 	// create an account
-	address, _, err := createAccount("badpassword", ".ethereumtest/keystore")
+	address, _, err := createAccount("badpassword")
 	if err != nil {
 		fmt.Println(err.Error())
 		t.Error("Test failed: could not create account")
