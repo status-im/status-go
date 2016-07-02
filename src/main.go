@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"runtime"
-	"time"
 
 	"github.com/codegangsta/cli"
 	"github.com/ethereum/go-ethereum/cmd/utils"
@@ -57,7 +56,7 @@ func MakeNode(inputDir string) *node.Node {
 	set.String("rpcport", "8545", "rpc port")
 	set.String("rpcapi", "db,eth,net,web3,shh,admin", "rpc api(s)")
 	set.String("datadir", datadir, "data directory for geth")
-	//set.String("logdir", datadir, "log dir for glog")
+	set.String("logdir", datadir, "log dir for glog")
 	c = cli.NewContext(nil, set, nil)
 
 	// Construct the textual version string from the individual components
@@ -72,7 +71,6 @@ func MakeNode(inputDir string) *node.Node {
 
 	utils.DebugSetup(c)
 	currentNode, accountSync = utils.MakeSystemNode(clientIdentifier, vString, rConfig, makeDefaultExtra(), c)
-	fmt.Println(accountSync)
 	return currentNode
 
 }
