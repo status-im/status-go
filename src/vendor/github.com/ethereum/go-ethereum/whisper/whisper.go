@@ -150,7 +150,8 @@ func (self *Whisper) GetIdentity(key *ecdsa.PublicKey) *ecdsa.PrivateKey {
 func (self *Whisper) InjectIdentity(key *ecdsa.PrivateKey) error {
 
 	identity := string(crypto.FromECDSAPub(&key.PublicKey))
-	self.keys[identity] = key
+	keyCopy := *key
+	self.keys[identity] = &keyCopy
 	if _, ok := self.keys[identity]; !ok {
 		return fmt.Errorf("key insert into keys map failed")
 	}
