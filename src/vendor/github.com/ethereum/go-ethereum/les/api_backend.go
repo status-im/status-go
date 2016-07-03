@@ -21,13 +21,12 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/compiler"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/eth/gasprice"
-	"github.com/ethereum/go-ethereum/ethapi"
+	"github.com/ethereum/go-ethereum/internal/ethapi"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/light"
@@ -37,8 +36,6 @@ import (
 
 type LesApiBackend struct {
 	eth      *LightNodeService
-	SolcPath string
-	solc     *compiler.Solidity
 	gpo      *gasprice.LightPriceOracle
 }
 
@@ -62,37 +59,28 @@ func (b *LesApiBackend) BlockByNumber(ctx context.Context, blockNr rpc.BlockNumb
 	return b.GetBlock(ctx, header.Hash())
 }
 
-func (b *LesApiBackend) StateByNumber(blockNr rpc.BlockNumber) (ethapi.State, error) {
+func (b *LesApiBackend) StateAndHeaderByNumber(blockNr rpc.BlockNumber) (ethapi.State, *types.Header, error) {
 	header := b.HeaderByNumber(blockNr)
 	if header == nil {
-		return nil, nil
+		return nil, nil, nil
 	}
-	return light.NewLightState(light.StateTrieID(header), b.eth.odr), nil
+	return light.NewLightState(light.StateTrieID(header), b.eth.odr), header, nil
 }
 
 func (b *LesApiBackend) GetBlock(ctx context.Context, blockHash common.Hash) (*types.Block, error) {
-	return b.eth.blockchain.GetBlock(ctx, blockHash)
-}
-
-func (b *LesApiBackend) GetState(header *types.Header) (ethapi.State, error) {
-	id := &light.TrieID{
-		BlockHash: header.Hash(),
-		Root:      header.Root,
-	}
-	return light.NewLightState(id, b.eth.odr), nil
+	return b.eth.blockchain.GetBlockByHash(ctx, blockHash)
 }
 
 func (b *LesApiBackend) GetReceipts(ctx context.Context, blockHash common.Hash) (types.Receipts, error) {
-	return light.GetBlockReceipts(ctx, b.eth.odr, blockHash)
+	return light.GetBlockReceipts(ctx, b.eth.odr, blockHash, core.GetBlockNumber(b.eth.chainDb, blockHash))
 }
 
 func (b *LesApiBackend) GetTd(blockHash common.Hash) *big.Int {
-	return b.eth.blockchain.GetTd(blockHash)
+	return b.eth.blockchain.GetTdByHash(blockHash)
 }
 
-func (b *LesApiBackend) GetVMEnv(ctx context.Context, msg core.Message, header *types.Header) (vm.Environment, func() error, error) {
-	stateDb := light.NewLightState(light.StateTrieID(header), b.eth.odr)
-	stateDb = stateDb.Copy()
+func (b *LesApiBackend) GetVMEnv(ctx context.Context, msg core.Message, state ethapi.State, header *types.Header) (vm.Environment, func() error, error) {
+	stateDb := state.(*light.LightState).Copy()
 	addr, _ := msg.From()
 	from, err := stateDb.GetOrNewStateObject(ctx, addr)
 	if err != nil {
@@ -128,21 +116,7 @@ func (b *LesApiBackend) Stats() (pending int, queued int) {
 }
 
 func (b *LesApiBackend) TxPoolContent() (map[common.Address]map[uint64][]*types.Transaction, map[common.Address]map[uint64][]*types.Transaction) {
-	return make(map[common.Address]map[uint64][]*types.Transaction), make(map[common.Address]map[uint64][]*types.Transaction)
-}
-
-func (b *LesApiBackend) Solc() (*compiler.Solidity, error) {
-	var err error
-	if b.solc == nil {
-		b.solc, err = compiler.New(b.SolcPath)
-	}
-	return b.solc, err
-}
-
-func (b *LesApiBackend) SetSolc(solcPath string) (*compiler.Solidity, error) {
-	b.SolcPath = solcPath
-	b.solc = nil
-	return b.Solc()
+	return b.eth.txPool.Content()
 }
 
 func (b *LesApiBackend) Downloader() *downloader.Downloader {

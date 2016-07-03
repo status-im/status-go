@@ -72,7 +72,7 @@ func (v *BlockValidator) ValidateBlock(block *types.Block) error {
 			return &KnownBlockError{block.Number(), block.Hash()}
 		}
 	}
-	parent := v.bc.GetBlock(block.ParentHash())
+	parent := v.bc.GetBlock(block.ParentHash(), block.NumberU64()-1)
 	if parent == nil {
 		return ParentError(block.ParentHash())
 	}
@@ -292,7 +292,7 @@ func calcDifficultyHomestead(time, parentTime uint64, parentNumber, parentDiff *
 
 	// minimum difficulty can ever be (before exponential factor)
 	if x.Cmp(params.MinimumDifficulty) < 0 {
-		x = params.MinimumDifficulty
+		x.Set(params.MinimumDifficulty)
 	}
 
 	// for the exponential factor
@@ -325,7 +325,7 @@ func calcDifficultyFrontier(time, parentTime uint64, parentNumber, parentDiff *b
 		diff.Sub(parentDiff, adjust)
 	}
 	if diff.Cmp(params.MinimumDifficulty) < 0 {
-		diff = params.MinimumDifficulty
+		diff.Set(params.MinimumDifficulty)
 	}
 
 	periodCount := new(big.Int).Add(parentNumber, common.Big1)

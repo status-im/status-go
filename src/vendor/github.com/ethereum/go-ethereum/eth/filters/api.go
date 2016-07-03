@@ -30,6 +30,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/ethereum/go-ethereum/internal/ethapi"
 	"github.com/ethereum/go-ethereum/rpc"
 
 	"golang.org/x/net/context"
@@ -50,10 +51,11 @@ const (
 // PublicFilterAPI offers support to create and manage filters. This will allow external clients to retrieve various
 // information related to the Ethereum protocol such als blocks, transactions and logs.
 type PublicFilterAPI struct {
-	mux *event.TypeMux
+	apiBackend ethapi.Backend
 
 	quit    chan struct{}
 	chainDb ethdb.Database
+	mux     *event.TypeMux
 
 	filterManager *FilterSystem
 
@@ -73,11 +75,12 @@ type PublicFilterAPI struct {
 }
 
 // NewPublicFilterAPI returns a new PublicFilterAPI instance.
-func NewPublicFilterAPI(chainDb ethdb.Database, mux *event.TypeMux) *PublicFilterAPI {
+func NewPublicFilterAPI(apiBackend ethapi.Backend) *PublicFilterAPI {
 	svc := &PublicFilterAPI{
-		mux:              mux,
-		chainDb:          chainDb,
-		filterManager:    NewFilterSystem(mux),
+		apiBackend:       apiBackend,
+		mux:              apiBackend.EventMux(),
+		chainDb:          apiBackend.ChainDb(),
+		filterManager:    NewFilterSystem(apiBackend.EventMux()),
 		filterMapping:    make(map[string]int),
 		logQueue:         make(map[int]*logQueue),
 		blockQueue:       make(map[int]*hashQueue),
@@ -141,7 +144,7 @@ func (s *PublicFilterAPI) NewBlockFilter() (string, error) {
 	}
 
 	s.blockMu.Lock()
-	filter := New(s.chainDb)
+	filter := New(s.apiBackend)
 	id, err := s.filterManager.Add(filter, ChainFilter)
 	if err != nil {
 		return "", err
@@ -177,7 +180,7 @@ func (s *PublicFilterAPI) NewPendingTransactionFilter() (string, error) {
 	s.transactionMu.Lock()
 	defer s.transactionMu.Unlock()
 
-	filter := New(s.chainDb)
+	filter := New(s.apiBackend)
 	id, err := s.filterManager.Add(filter, PendingTxFilter)
 	if err != nil {
 		return "", err
@@ -206,7 +209,7 @@ func (s *PublicFilterAPI) newLogFilter(earliest, latest int64, addresses []commo
 	s.logMu.Lock()
 	defer s.logMu.Unlock()
 
-	filter := New(s.chainDb)
+	filter := New(s.apiBackend)
 	id, err := s.filterManager.Add(filter, LogFilter)
 	if err != nil {
 		return 0, err
@@ -233,6 +236,7 @@ func (s *PublicFilterAPI) newLogFilter(earliest, latest int64, addresses []commo
 	return id, nil
 }
 
+// Logs creates a subscription that fires for all new log that match the given filter criteria.
 func (s *PublicFilterAPI) Logs(ctx context.Context, args NewFilterArgs) (rpc.Subscription, error) {
 	notifier, supported := rpc.NotifierFromContext(ctx)
 	if !supported {
@@ -291,12 +295,13 @@ type NewFilterArgs struct {
 	Topics    [][]common.Hash
 }
 
+// UnmarshalJSON sets *args fields with given data.
 func (args *NewFilterArgs) UnmarshalJSON(data []byte) error {
 	type input struct {
 		From      *rpc.BlockNumber `json:"fromBlock"`
 		ToBlock   *rpc.BlockNumber `json:"toBlock"`
 		Addresses interface{}      `json:"address"`
-		Topics    interface{}      `json:"topics"`
+		Topics    []interface{}    `json:"topics"`
 	}
 
 	var raw input
@@ -321,7 +326,6 @@ func (args *NewFilterArgs) UnmarshalJSON(data []byte) error {
 	if raw.Addresses != nil {
 		// raw.Address can contain a single address or an array of addresses
 		var addresses []common.Address
-
 		if strAddrs, ok := raw.Addresses.([]interface{}); ok {
 			for i, addr := range strAddrs {
 				if strAddr, ok := addr.(string); ok {
@@ -352,56 +356,53 @@ func (args *NewFilterArgs) UnmarshalJSON(data []byte) error {
 		args.Addresses = addresses
 	}
 
+	// helper function which parses a string to a topic hash
 	topicConverter := func(raw string) (common.Hash, error) {
 		if len(raw) == 0 {
 			return common.Hash{}, nil
 		}
-
 		if len(raw) >= 2 && raw[0] == '0' && (raw[1] == 'x' || raw[1] == 'X') {
 			raw = raw[2:]
 		}
-
+		if len(raw) != 2*common.HashLength {
+			return common.Hash{}, errors.New("invalid topic(s)")
+		}
 		if decAddr, err := hex.DecodeString(raw); err == nil {
 			return common.BytesToHash(decAddr), nil
 		}
-
-		return common.Hash{}, errors.New("invalid topic given")
+		return common.Hash{}, errors.New("invalid topic(s)")
 	}
 
-	// topics is an array consisting of strings or arrays of strings
-	if raw.Topics != nil {
-		topics, ok := raw.Topics.([]interface{})
-		if ok {
-			parsedTopics := make([][]common.Hash, len(topics))
-			for i, topic := range topics {
-				if topic == nil {
-					parsedTopics[i] = []common.Hash{common.StringToHash("")}
-				} else if strTopic, ok := topic.(string); ok {
-					if t, err := topicConverter(strTopic); err != nil {
-						return fmt.Errorf("invalid topic on index %d", i)
-					} else {
-						parsedTopics[i] = []common.Hash{t}
-					}
-				} else if arrTopic, ok := topic.([]interface{}); ok {
-					parsedTopics[i] = make([]common.Hash, len(arrTopic))
-					for j := 0; j < len(parsedTopics[i]); i++ {
-						if arrTopic[j] == nil {
-							parsedTopics[i][j] = common.StringToHash("")
-						} else if str, ok := arrTopic[j].(string); ok {
-							if t, err := topicConverter(str); err != nil {
-								return fmt.Errorf("invalid topic on index %d", i)
-							} else {
-								parsedTopics[i] = []common.Hash{t}
-							}
-						} else {
-							return fmt.Errorf("topic[%d][%d] not a string", i, j)
-						}
-					}
-				} else {
-					return fmt.Errorf("topic[%d] invalid", i)
+	// topics is an array consisting of strings and/or arrays of strings.
+	// JSON null values are converted to common.Hash{} and ignored by the filter manager.
+	if len(raw.Topics) > 0 {
+		args.Topics = make([][]common.Hash, len(raw.Topics))
+		for i, t := range raw.Topics {
+			if t == nil { // ignore topic when matching logs
+				args.Topics[i] = []common.Hash{common.Hash{}}
+			} else if topic, ok := t.(string); ok { // match specific topic
+				top, err := topicConverter(topic)
+				if err != nil {
+					return err
 				}
+				args.Topics[i] = []common.Hash{top}
+			} else if topics, ok := t.([]interface{}); ok { // or case e.g. [null, "topic0", "topic1"]
+				for _, rawTopic := range topics {
+					if rawTopic == nil {
+						args.Topics[i] = append(args.Topics[i], common.Hash{})
+					} else if topic, ok := rawTopic.(string); ok {
+						parsed, err := topicConverter(topic)
+						if err != nil {
+							return err
+						}
+						args.Topics[i] = append(args.Topics[i], parsed)
+					} else {
+						return fmt.Errorf("invalid topic(s)")
+					}
+				}
+			} else {
+				return fmt.Errorf("invalid topic(s)")
 			}
-			args.Topics = parsedTopics
 		}
 	}
 
@@ -433,14 +434,15 @@ func (s *PublicFilterAPI) NewFilter(args NewFilterArgs) (string, error) {
 }
 
 // GetLogs returns the logs matching the given argument.
-func (s *PublicFilterAPI) GetLogs(args NewFilterArgs) []vmlog {
-	filter := New(s.chainDb)
+func (s *PublicFilterAPI) GetLogs(ctx context.Context, args NewFilterArgs) ([]vmlog, error) {
+	filter := New(s.apiBackend)
 	filter.SetBeginBlock(args.FromBlock.Int64())
 	filter.SetEndBlock(args.ToBlock.Int64())
 	filter.SetAddresses(args.Addresses)
 	filter.SetTopics(args.Topics)
 
-	return toRPCLogs(filter.Find(), false)
+	logs, err := filter.Find(ctx)
+	return toRPCLogs(logs, false), err
 }
 
 // UninstallFilter removes the filter with the given filter id.
@@ -497,7 +499,8 @@ func (s *PublicFilterAPI) blockFilterChanged(id int) []common.Hash {
 	defer s.blockMu.Unlock()
 
 	if s.blockQueue[id] != nil {
-		return s.blockQueue[id].get()
+		res := s.blockQueue[id].get()
+		return res
 	}
 	return nil
 }
@@ -526,17 +529,18 @@ func (s *PublicFilterAPI) logFilterChanged(id int) []vmlog {
 }
 
 // GetFilterLogs returns the logs for the filter with the given id.
-func (s *PublicFilterAPI) GetFilterLogs(filterId string) []vmlog {
+func (s *PublicFilterAPI) GetFilterLogs(ctx context.Context, filterId string) ([]vmlog, error) {
 	id, ok := s.filterMapping[filterId]
 	if !ok {
-		return toRPCLogs(nil, false)
+		return toRPCLogs(nil, false), nil
 	}
 
 	if filter := s.filterManager.Get(id); filter != nil {
-		return toRPCLogs(filter.Find(), false)
+		logs, err := filter.Find(ctx)
+		return toRPCLogs(logs, false), err
 	}
 
-	return toRPCLogs(nil, false)
+	return toRPCLogs(nil, false), nil
 }
 
 // GetFilterChanges returns the logs for the filter with the given id since last time is was called.

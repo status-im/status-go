@@ -24,7 +24,7 @@ func createAccount(password string) (string, string, error) {
 	if currentNode != nil {
 
 		w := true
-		keydir := datadir + "/keystore"
+		keydir := datadir + "/testnet/keystore"
 		accman := accounts.NewManager(keydir, scryptN, scryptP, accountSync)
 
 		// generate the account

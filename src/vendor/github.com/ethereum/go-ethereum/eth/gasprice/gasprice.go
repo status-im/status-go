@@ -53,9 +53,9 @@ type GpoParams struct {
 // GasPriceOracle recommends gas prices based on the content of recent
 // blocks.
 type GasPriceOracle struct {
-	chain		  *core.BlockChain
-	db ethdb.Database
-	evmux		 *event.TypeMux
+	chain         *core.BlockChain
+	db            ethdb.Database
+	evmux         *event.TypeMux
 	params        *GpoParams
 	initOnce      sync.Once
 	minPrice      *big.Int
@@ -79,9 +79,9 @@ func NewGasPriceOracle(chain *core.BlockChain, db ethdb.Database, evmux *event.T
 		minbase = minbase.Div(minbase, big.NewInt(int64(params.GpobaseCorrectionFactor)))
 	}
 	return &GasPriceOracle{
-		chain: chain,
-		db: db,
-		evmux: evmux,
+		chain:    chain,
+		db:       db,
+		evmux:    evmux,
 		params:   params,
 		blocks:   make(map[uint64]*blockPriceInfo),
 		minBase:  minbase,
@@ -183,7 +183,7 @@ func (self *GasPriceOracle) processBlock(block *types.Block) {
 func (self *GasPriceOracle) lowestPrice(block *types.Block) *big.Int {
 	gasUsed := big.NewInt(0)
 
-	receipts := core.GetBlockReceipts(self.db, block.Hash())
+	receipts := core.GetBlockReceipts(self.db, block.Hash(), block.NumberU64())
 	if len(receipts) > 0 {
 		if cgu := receipts[len(receipts)-1].CumulativeGasUsed; cgu != nil {
 			gasUsed = receipts[len(receipts)-1].CumulativeGasUsed

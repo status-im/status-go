@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"runtime"
 
-	"github.com/codegangsta/cli"
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/logger"
@@ -14,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/release"
 	"github.com/ethereum/go-ethereum/rlp"
+	"gopkg.in/urfave/cli.v1"
 )
 
 const (
@@ -50,7 +50,8 @@ func MakeNode(inputDir string) *node.Node {
 	// TODO remove admin rpcapi flag
 	set := flag.NewFlagSet("test", 0)
 	set.Bool("shh", true, "whisper")
-	set.Bool("noeth", true, "disable eth")
+	set.Bool("light", true, "disable eth")
+	set.Bool("testnet", true, "light test network")
 	set.Bool("rpc", true, "enable rpc")
 	set.String("rpcaddr", "localhost", "host for RPC")
 	set.String("rpcport", "8545", "rpc port")

@@ -24,14 +24,16 @@ import (
 
 	"github.com/ethereum/ethash"
 	"github.com/ethereum/go-ethereum/accounts"
+	"github.com/ethereum/go-ethereum/common/compiler"
 	"github.com/ethereum/go-ethereum/common/httpclient"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/eth/downloader"
+	"github.com/ethereum/go-ethereum/eth/filters"
 	"github.com/ethereum/go-ethereum/eth/gasprice"
-	"github.com/ethereum/go-ethereum/ethapi"
+	"github.com/ethereum/go-ethereum/internal/ethapi"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/light"
@@ -54,12 +56,14 @@ type LightNodeService struct {
 	chainDb ethdb.Database // Block chain database
 	dappDb  ethdb.Database // Dapp database
 
-	apiBackend *LesApiBackend
+	ApiBackend *LesApiBackend
 
 	eventMux       *event.TypeMux
 	pow            *ethash.Ethash
 	httpclient     *httpclient.HTTPClient
 	accountManager *accounts.Manager
+	solcPath     string
+	solc         *compiler.Solidity
 
 	NatSpec       bool
 	PowTest       bool
@@ -68,7 +72,7 @@ type LightNodeService struct {
 }
 
 func New(ctx *node.ServiceContext, config *eth.Config) (*LightNodeService, error) {
-	chainDb, dappDb, err := eth.CreateDBs(ctx, config)
+	chainDb, dappDb, err := eth.CreateDBs(ctx, config, "lightchaindata")
 	if err != nil {
 		return nil, err
 	}
@@ -95,6 +99,7 @@ func New(ctx *node.ServiceContext, config *eth.Config) (*LightNodeService, error
 		netVersionId:   config.NetworkId,
 		NatSpec:        config.NatSpec,
 		PowTest:        config.PowTest,
+		solcPath:       config.SolcPath,
 	}
 
 	if config.ChainConfig == nil {
@@ -117,21 +122,25 @@ func New(ctx *node.ServiceContext, config *eth.Config) (*LightNodeService, error
 	if eth.protocolManager, err = NewProtocolManager(eth.chainConfig, config.LightMode, config.NetworkId, eth.eventMux, eth.pow, eth.blockchain, nil, chainDb, odr, relay); err != nil {
 		return nil, err
 	}
-	odr.removePeer = eth.protocolManager.removePeer
 
-	eth.apiBackend = &LesApiBackend{eth, config.SolcPath, nil, nil}
-	eth.apiBackend.gpo = gasprice.NewLightPriceOracle(eth.apiBackend)
+	eth.ApiBackend = &LesApiBackend{eth, nil}
+	eth.ApiBackend.gpo = gasprice.NewLightPriceOracle(eth.ApiBackend)
 	return eth, nil
 }
 
 // APIs returns the collection of RPC services the ethereum package offers.
 // NOTE, some of these services probably need to be moved to somewhere else.
 func (s *LightNodeService) APIs() []rpc.API {
-	return append(ethapi.GetAPIs(s.apiBackend), []rpc.API{
+	return append(ethapi.GetAPIs(s.ApiBackend, &s.solcPath, &s.solc), []rpc.API{
 		{
 			Namespace: "eth",
 			Version:   "1.0",
 			Service:   downloader.NewPublicDownloaderAPI(s.protocolManager.downloader, s.eventMux),
+			Public:    true,
+		}, {
+			Namespace: "eth",
+			Version:   "1.0",
+			Service:   filters.NewPublicFilterAPI(s.ApiBackend),
 			Public:    true,
 		}, {
 			Namespace: "net",

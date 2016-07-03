@@ -25,6 +25,8 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/eth"
+	"github.com/ethereum/go-ethereum/internal/ethapi"
+	"github.com/ethereum/go-ethereum/les"
 	"github.com/ethereum/go-ethereum/logger"
 	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/ethereum/go-ethereum/node"
@@ -58,12 +60,20 @@ type ReleaseService struct {
 // releases and notify the user of such.
 func NewReleaseService(ctx *node.ServiceContext, config Config) (node.Service, error) {
 	// Retrieve the Ethereum service dependency to access the blockchain
+	var apiBackend ethapi.Backend
 	var ethereum *eth.FullNodeService
-	if err := ctx.Service(&ethereum); err != nil {
-		return nil, err
+	if err := ctx.Service(&ethereum); err == nil {
+		apiBackend = ethereum.ApiBackend
+	} else {
+		var ethereum *les.LightNodeService
+		if err := ctx.Service(&ethereum); err == nil {
+			apiBackend = ethereum.ApiBackend
+		} else {
+			return nil, err
+		}
 	}
 	// Construct the release service
-	contract, err := NewReleaseOracle(config.Oracle, eth.NewContractBackend(ethereum))
+	contract, err := NewReleaseOracle(config.Oracle, eth.NewContractBackend(apiBackend))
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +122,7 @@ func (r *ReleaseService) checker() {
 
 			// Retrieve the current version, and handle missing contracts gracefully
 			ctx, _ := context.WithTimeout(context.Background(), time.Second*5)
-			opts := &bind.CallOpts{Ctx: ctx}
+			opts := &bind.CallOpts{Context: ctx}
 			version, err := r.oracle.CurrentVersion(opts)
 			if err != nil {
 				if err == bind.ErrNoCode {

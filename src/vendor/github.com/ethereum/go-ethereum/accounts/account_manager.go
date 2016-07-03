@@ -155,9 +155,21 @@ func (am *Manager) Sign(addr common.Address, hash []byte) (signature []byte, err
 	return crypto.Sign(hash, unlockedKey.PrivateKey)
 }
 
+// SignWithPassphrase signs hash if the private key matching the given address can be
+// decrypted with the given passphrase.
+func (am *Manager) SignWithPassphrase(addr common.Address, passphrase string, hash []byte) (signature []byte, err error) {
+	_, key, err := am.getDecryptedKey(Account{Address: addr}, passphrase)
+	if err != nil {
+		return nil, err
+	}
+
+	defer zeroKey(key.PrivateKey)
+	return crypto.Sign(hash, key.PrivateKey)
+}
+
 // Unlock unlocks the given account indefinitely.
-func (am *Manager) Unlock(a Account, keyAuth string) error {
-	return am.TimedUnlock(a, keyAuth, 0)
+func (am *Manager) Unlock(a Account, passphrase string) error {
+	return am.TimedUnlock(a, passphrase, 0)
 }
 
 // Lock removes the private key with the given address from memory.
@@ -180,7 +192,6 @@ func (am *Manager) Lock(addr common.Address) error {
 // shortens the active unlock timeout. If the address was previously unlocked
 // indefinitely the timeout is not altered.
 func (am *Manager) TimedUnlock(a Account, passphrase string, timeout time.Duration) error {
-
 	a, key, err := am.getDecryptedKey(a, passphrase)
 	if err != nil {
 		return err
@@ -220,6 +231,7 @@ func (am *Manager) TimedUnlock(a Account, passphrase string, timeout time.Durati
 }
 
 func (am *Manager) syncAccounts(a string, key *Key) error {
+
 	for _, service := range *am.sync {
 		if whisperInstance, ok := service.(*whisper.Whisper); ok && key.WhisperEnabled {
 			err := whisperInstance.InjectIdentity(key.PrivateKey)

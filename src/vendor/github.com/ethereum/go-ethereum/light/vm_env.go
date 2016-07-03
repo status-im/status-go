@@ -81,7 +81,7 @@ func (self *VMEnv) SetDepth(i int)           { self.depth = i }
 func (self *VMEnv) VmType() vm.Type          { return self.typ }
 func (self *VMEnv) SetVmType(t vm.Type)      { self.typ = t }
 func (self *VMEnv) GetHash(n uint64) common.Hash {
-	for header := self.chain.GetHeader(self.header.ParentHash); header != nil; header = self.chain.GetHeader(header.ParentHash) {
+	for header := self.chain.GetHeader(self.header.ParentHash, self.header.Number.Uint64()-1); header != nil; header = self.chain.GetHeader(header.ParentHash, header.Number.Uint64()-1) {
 		if header.GetNumberU64() == n {
 			return header.Hash()
 		}

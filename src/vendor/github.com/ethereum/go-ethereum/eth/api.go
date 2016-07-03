@@ -1,18 +1,18 @@
 // Copyright 2015 The go-ethereum Authors
-// This file is part of go-ethereum.
+// This file is part of the go-ethereum library.
 //
-// go-ethereum is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
+// The go-ethereum library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// go-ethereum is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
+// GNU Lesser General Public License for more details.
 //
-// You should have received a copy of the GNU General Public License
-// along with go-ethereum. If not, see <http://www.gnu.org/licenses/>.
+// You should have received a copy of the GNU Lesser General Public License
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package eth
 
@@ -32,8 +32,8 @@ import (
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
-	"github.com/ethereum/go-ethereum/eth/gasprice"
-	"github.com/ethereum/go-ethereum/ethapi"
+	"github.com/ethereum/go-ethereum/internal/ethapi"
+	"github.com/ethereum/go-ethereum/logger"
 	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/ethereum/go-ethereum/miner"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -43,13 +43,12 @@ import (
 // PublicFullEthereumAPI provides an API to access Ethereum full node-related
 // information.
 type PublicFullEthereumAPI struct {
-	e   *FullNodeService
-	gpo *gasprice.GasPriceOracle
+	e *FullNodeService
 }
 
 // NewPublicFullEthereumAPI creates a new Etheruem protocol API for full nodes.
-func NewPublicFullEthereumAPI(e *FullNodeService, gpo *gasprice.GasPriceOracle) *PublicFullEthereumAPI {
-	return &PublicFullEthereumAPI{e, gpo}
+func NewPublicFullEthereumAPI(e *FullNodeService) *PublicFullEthereumAPI {
+	return &PublicFullEthereumAPI{e}
 }
 
 // Etherbase is the address that mining rewards will be send to
@@ -57,7 +56,7 @@ func (s *PublicFullEthereumAPI) Etherbase() (common.Address, error) {
 	return s.e.Etherbase()
 }
 
-// see Etherbase
+// Coinbase is the address that mining rewards will be send to (alias for Etherbase)
 func (s *PublicFullEthereumAPI) Coinbase() (common.Address, error) {
 	return s.Etherbase()
 }
@@ -97,18 +96,17 @@ func (s *PublicMinerAPI) SubmitWork(nonce rpc.HexNumber, solution, digest common
 // result[0], 32 bytes hex encoded current block header pow-hash
 // result[1], 32 bytes hex encoded seed hash used for DAG
 // result[2], 32 bytes hex encoded boundary condition ("target"), 2^256/difficulty
-func (s *PublicMinerAPI) GetWork() ([]string, error) {
+func (s *PublicMinerAPI) GetWork() (work [3]string, err error) {
 	if !s.e.IsMining() {
 		if err := s.e.StartMining(0, ""); err != nil {
-			return nil, err
+			return work, err
 		}
 	}
-	if work, err := s.agent.GetWork(); err == nil {
-		return work[:], nil
-	} else {
-		glog.Infof("%v\n", err)
+	if work, err = s.agent.GetWork(); err == nil {
+		return
 	}
-	return nil, fmt.Errorf("mining not ready")
+	glog.V(logger.Debug).Infof("%v", err)
+	return work, fmt.Errorf("mining not ready")
 }
 
 // SubmitHashrate can be used for remote miners to submit their hash rate. This enables the node to report the combined
@@ -298,41 +296,6 @@ func (api *PublicFullDebugAPI) DumpBlock(number uint64) (state.World, error) {
 	return stateDb.RawDump(), nil
 }
 
-// GetBlockRlp retrieves the RLP encoded for of a single block.
-func (api *PublicFullDebugAPI) GetBlockRlp(number uint64) (string, error) {
-	block := api.eth.BlockChain().GetBlockByNumber(number)
-	if block == nil {
-		return "", fmt.Errorf("block #%d not found", number)
-	}
-	encoded, err := rlp.EncodeToBytes(block)
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%x", encoded), nil
-}
-
-// PrintBlock retrieves a block and returns its pretty printed form.
-func (api *PublicFullDebugAPI) PrintBlock(number uint64) (string, error) {
-	block := api.eth.BlockChain().GetBlockByNumber(number)
-	if block == nil {
-		return "", fmt.Errorf("block #%d not found", number)
-	}
-	return fmt.Sprintf("%s", block), nil
-}
-
-// SeedHash retrieves the seed hash of a block.
-func (api *PublicFullDebugAPI) SeedHash(number uint64) (string, error) {
-	block := api.eth.BlockChain().GetBlockByNumber(number)
-	if block == nil {
-		return "", fmt.Errorf("block #%d not found", number)
-	}
-	hash, err := ethash.GetSeedHash(number)
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("0x%x", hash), nil
-}
-
 // PrivateFullDebugAPI is the collection of Etheruem full node APIs exposed over
 // the private debugging endpoint.
 type PrivateFullDebugAPI struct {
@@ -346,7 +309,7 @@ func NewPrivateFullDebugAPI(config *core.ChainConfig, eth *FullNodeService) *Pri
 	return &PrivateFullDebugAPI{config: config, eth: eth}
 }
 
-// BlockTraceResults is the returned value when replaying a block to check for
+// BlockTraceResult is the returned value when replaying a block to check for
 // consensus results and full VM trace logs for all included transactions.
 type BlockTraceResult struct {
 	Validated  bool                  `json:"validated"`
@@ -400,7 +363,7 @@ func (api *PrivateFullDebugAPI) TraceBlockByNumber(number uint64, config *vm.Con
 // TraceBlockByHash processes the block by hash.
 func (api *PrivateFullDebugAPI) TraceBlockByHash(hash common.Hash, config *vm.Config) BlockTraceResult {
 	// Fetch the block that we aim to reprocess
-	block := api.eth.BlockChain().GetBlock(hash)
+	block := api.eth.BlockChain().GetBlockByHash(hash)
 	if block == nil {
 		return BlockTraceResult{Error: fmt.Sprintf("block #%x not found", hash)}
 	}
@@ -440,10 +403,10 @@ func (api *PrivateFullDebugAPI) traceBlock(block *types.Block, config *vm.Config
 	config.Debug = true // make sure debug is set.
 	config.Logger.Collector = collector
 
-	if err := core.ValidateHeader(api.config, blockchain.AuxValidator(), block.Header(), blockchain.GetHeader(block.ParentHash()), true, false); err != nil {
+	if err := core.ValidateHeader(api.config, blockchain.AuxValidator(), block.Header(), blockchain.GetHeader(block.ParentHash(), block.NumberU64()-1), true, false); err != nil {
 		return false, collector.traces, err
 	}
-	statedb, err := state.New(blockchain.GetBlock(block.ParentHash()).Root(), api.eth.ChainDb())
+	statedb, err := state.New(blockchain.GetBlock(block.ParentHash(), block.NumberU64()-1).Root(), api.eth.ChainDb())
 	if err != nil {
 		return false, collector.traces, err
 	}
@@ -452,19 +415,10 @@ func (api *PrivateFullDebugAPI) traceBlock(block *types.Block, config *vm.Config
 	if err != nil {
 		return false, collector.traces, err
 	}
-	if err := validator.ValidateState(block, blockchain.GetBlock(block.ParentHash()), statedb, receipts, usedGas); err != nil {
+	if err := validator.ValidateState(block, blockchain.GetBlock(block.ParentHash(), block.NumberU64()-1), statedb, receipts, usedGas); err != nil {
 		return false, collector.traces, err
 	}
 	return true, collector.traces, nil
-}
-
-// VmLoggerOptions are the options used for debugging transactions and capturing
-// specific data.
-type VmLoggerOptions struct {
-	DisableMemory  bool // disable memory capture
-	DisableStack   bool // disable stack capture
-	DisableStorage bool // disable storage capture
-	FullStorage    bool // show full storage (slow)
 }
 
 // callmsg is the message type used for call transations.
@@ -498,25 +452,25 @@ func formatError(err error) string {
 
 // TraceTransaction returns the structured logs created during the execution of EVM
 // and returns them as a JSON object.
-func (s *PrivateFullDebugAPI) TraceTransaction(txHash common.Hash, logger *vm.LogConfig) (*ethapi.ExecutionResult, error) {
+func (api *PrivateFullDebugAPI) TraceTransaction(txHash common.Hash, logger *vm.LogConfig) (*ethapi.ExecutionResult, error) {
 	if logger == nil {
 		logger = new(vm.LogConfig)
 	}
 	// Retrieve the tx from the chain and the containing block
-	tx, blockHash, _, txIndex := core.GetTransaction(s.eth.ChainDb(), txHash)
+	tx, blockHash, _, txIndex := core.GetTransaction(api.eth.ChainDb(), txHash)
 	if tx == nil {
 		return nil, fmt.Errorf("transaction %x not found", txHash)
 	}
-	block := s.eth.BlockChain().GetBlock(blockHash)
+	block := api.eth.BlockChain().GetBlockByHash(blockHash)
 	if block == nil {
 		return nil, fmt.Errorf("block %x not found", blockHash)
 	}
 	// Create the state database to mutate and eventually trace
-	parent := s.eth.BlockChain().GetBlock(block.ParentHash())
+	parent := api.eth.BlockChain().GetBlock(block.ParentHash(), block.NumberU64()-1)
 	if parent == nil {
 		return nil, fmt.Errorf("block parent %x not found", block.ParentHash())
 	}
-	stateDb, err := state.New(parent.Root(), s.eth.ChainDb())
+	stateDb, err := state.New(parent.Root(), api.eth.ChainDb())
 	if err != nil {
 		return nil, err
 	}
@@ -537,7 +491,7 @@ func (s *PrivateFullDebugAPI) TraceTransaction(txHash common.Hash, logger *vm.Lo
 		}
 		// Mutate the state if we haven't reached the tracing transaction yet
 		if uint64(idx) < txIndex {
-			vmenv := core.NewEnv(stateDb, s.config, s.eth.BlockChain(), msg, block.Header(), vm.Config{})
+			vmenv := core.NewEnv(stateDb, api.config, api.eth.BlockChain(), msg, block.Header(), vm.Config{})
 			_, _, err := core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(tx.Gas()))
 			if err != nil {
 				return nil, fmt.Errorf("mutation failed: %v", err)
@@ -545,7 +499,7 @@ func (s *PrivateFullDebugAPI) TraceTransaction(txHash common.Hash, logger *vm.Lo
 			continue
 		}
 		// Otherwise trace the transaction and return
-		vmenv := core.NewEnv(stateDb, s.config, s.eth.BlockChain(), msg, block.Header(), vm.Config{Debug: true, Logger: *logger})
+		vmenv := core.NewEnv(stateDb, api.config, api.eth.BlockChain(), msg, block.Header(), vm.Config{Debug: true, Logger: *logger})
 		ret, gas, err := core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(tx.Gas()))
 		if err != nil {
 			return nil, fmt.Errorf("tracing failed: %v", err)

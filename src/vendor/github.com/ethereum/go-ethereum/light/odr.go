@@ -111,22 +111,24 @@ func (req *CodeRequest) StoreResult(db ethdb.Database) {
 type BlockRequest struct {
 	OdrRequest
 	Hash common.Hash
+	Number uint64
 	Rlp  []byte
 }
 
 // StoreResult stores the retrieved data in local database
 func (req *BlockRequest) StoreResult(db ethdb.Database) {
-	core.WriteBodyRLP(db, req.Hash, req.Rlp)
+	core.WriteBodyRLP(db, req.Hash, req.Number, req.Rlp)
 }
 
 // ReceiptsRequest is the ODR request type for retrieving block bodies
 type ReceiptsRequest struct {
 	OdrRequest
 	Hash     common.Hash
+	Number uint64
 	Receipts types.Receipts
 }
 
 // StoreResult stores the retrieved data in local database
 func (req *ReceiptsRequest) StoreResult(db ethdb.Database) {
-	core.WriteBlockReceipts(db, req.Hash, req.Receipts)
+	core.WriteBlockReceipts(db, req.Hash, req.Number, req.Receipts)
 }

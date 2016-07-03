@@ -19,6 +19,7 @@ package les
 import (
 	"time"
 
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/eth/downloader"
 )
 
@@ -44,11 +45,11 @@ func (pm *ProtocolManager) syncer() {
 			if pm.peers.Len() < minDesiredPeerCount {
 				break
 			}
-			go pm.synchronise(pm.peers.BestPeer(), false)
+			go pm.synchronise(pm.peers.BestPeer())
 
 		case <-forceSync:
 			// Force a sync even if not enough peers are present
-			go pm.synchronise(pm.peers.BestPeer(), false)
+			go pm.synchronise(pm.peers.BestPeer())
 
 		case <-pm.noMorePeers:
 			return
@@ -56,23 +57,66 @@ func (pm *ProtocolManager) syncer() {
 	}
 }
 
+func (pm *ProtocolManager) needToSync(peerHead blockInfo) bool {
+	head := pm.blockchain.CurrentHeader()
+	currentTd := core.GetTd(pm.chainDb, head.Hash(), head.Number.Uint64())
+	return currentTd != nil && peerHead.Td.Cmp(currentTd) > 0
+}
+
 // synchronise tries to sync up our local block chain with a remote peer.
-func (pm *ProtocolManager) synchronise(peer *peer, exit bool) {
+func (pm *ProtocolManager) synchronise(peer *peer) {
 	// Short circuit if no peers are available
 	if peer == nil {
 		return
 	}
+	
 	// Make sure the peer's TD is higher than our own.
-	td := pm.blockchain.GetTd(pm.blockchain.LastBlockHash())
-	if peer.Td().Cmp(td) > 0 {
-		for {
-			if pm.downloader.Synchronise(peer.id, peer.Head(), peer.Td(), downloader.LightSync) != nil {
-				return
-			}
-			if exit {
-				return
-			}
-			time.Sleep(time.Second * 5)
-		}
+	if !pm.needToSync(peer.headBlockInfo()) {
+		return
 	}
+
+	pm.waitSyncLock()
+	pm.syncWithLockAcquired(peer)
+}
+
+func (pm *ProtocolManager) waitSyncLock() {
+	for {
+		chn := pm.getSyncLock(true)
+		if chn == nil {
+			break
+		}
+		<-chn
+	}
+}
+
+// getSyncLock either acquires the sync lock and returns nil or returns a channel
+// which is closed when the lock is free again
+func (pm *ProtocolManager) getSyncLock(acquire bool) chan struct{} {
+	pm.syncMu.Lock()
+	defer pm.syncMu.Unlock()
+
+	if pm.syncing {
+		if pm.syncDone == nil {
+			pm.syncDone = make(chan struct{})
+		}
+		return pm.syncDone
+	} else {
+		pm.syncing = acquire
+		return nil
+	}	
+}
+
+func (pm *ProtocolManager) releaseSyncLock() {
+	pm.syncMu.Lock()
+	pm.syncing = false
+	if pm.syncDone != nil {
+		close(pm.syncDone)
+		pm.syncDone = nil
+	}
+	pm.syncMu.Unlock()
+}
+
+func (pm *ProtocolManager) syncWithLockAcquired(peer *peer) {
+	pm.downloader.Synchronise(peer.id, peer.Head(), peer.Td(), downloader.LightSync)
+	pm.releaseSyncLock()
 }

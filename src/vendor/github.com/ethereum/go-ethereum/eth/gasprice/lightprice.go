@@ -22,24 +22,24 @@ import (
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethapi"
+	"github.com/ethereum/go-ethereum/internal/ethapi"
 	"github.com/ethereum/go-ethereum/rpc"
 	"golang.org/x/net/context"
 )
 
 const (
-	LpoAvgCount = 5
-	LpoMinCount = 3
-	LpoMaxBlocks = 20
-	LpoSelect = 50
+	LpoAvgCount     = 5
+	LpoMinCount     = 3
+	LpoMaxBlocks    = 20
+	LpoSelect       = 50
 	LpoDefaultPrice = 20000000000
 )
 
 // LightPriceOracle recommends gas prices based on the content of recent
 // blocks. Suitable for both light and full clients.
 type LightPriceOracle struct {
-	backend ethapi.Backend
-	lastHead common.Hash
+	backend   ethapi.Backend
+	lastHead  common.Hash
 	lastPrice *big.Int
 	cacheLock sync.RWMutex
 	fetchLock sync.Mutex
@@ -48,7 +48,7 @@ type LightPriceOracle struct {
 // NewLightPriceOracle returns a new oracle.
 func NewLightPriceOracle(backend ethapi.Backend) *LightPriceOracle {
 	return &LightPriceOracle{
-		backend: backend,
+		backend:   backend,
 		lastPrice: big.NewInt(LpoDefaultPrice),
 	}
 }
@@ -59,13 +59,13 @@ func (self *LightPriceOracle) SuggestPrice(ctx context.Context) (*big.Int, error
 	lastHead := self.lastHead
 	lastPrice := self.lastPrice
 	self.cacheLock.RUnlock()
-		
+
 	head := self.backend.HeaderByNumber(rpc.LatestBlockNumber)
 	headHash := head.Hash()
 	if headHash == lastHead {
 		return lastPrice, nil
 	}
-	
+
 	self.fetchLock.Lock()
 	defer self.fetchLock.Unlock()
 
@@ -116,7 +116,7 @@ func (self *LightPriceOracle) SuggestPrice(ctx context.Context) (*big.Int, error
 		sort.Sort(lps)
 		price = lps[(len(lps)-1)*LpoSelect/100]
 	}
-	
+
 	self.cacheLock.Lock()
 	self.lastHead = headHash
 	self.lastPrice = price
@@ -126,7 +126,7 @@ func (self *LightPriceOracle) SuggestPrice(ctx context.Context) (*big.Int, error
 
 type lpResult struct {
 	price *big.Int
-	err error
+	err   error
 }
 
 // getLowestPrice calculates the lowest transaction gas price in a given block

@@ -30,7 +30,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/codegangsta/cli"
 	"github.com/ethereum/ethash"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
@@ -54,6 +53,7 @@ import (
 	"github.com/ethereum/go-ethereum/release"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/go-ethereum/whisper"
+	"gopkg.in/urfave/cli.v1"
 )
 
 func init() {
@@ -319,7 +319,7 @@ var (
 		Name:  "exec",
 		Usage: "Execute JavaScript statement (only in combination with console/attach)",
 	}
-	PreLoadJSFlag = cli.StringFlag{
+	PreloadJSFlag = cli.StringFlag{
 		Name:  "preload",
 		Usage: "Comma separated list of JavaScript files to preload into the console",
 	}
@@ -686,7 +686,7 @@ func MakeSystemNode(name, version string, relconf release.Config, extra []byte, 
 		DataDir:         MustMakeDataDir(ctx),
 		PrivateKey:      MakeNodeKey(ctx),
 		Name:            MakeNodeName(name, version, ctx),
-		NoDiscovery:     ctx.GlobalBool(NoDiscoverFlag.Name),
+		NoDiscovery:     ctx.GlobalBool(NoDiscoverFlag.Name) || ctx.GlobalBool(LightModeFlag.Name), // light client hack
 		BootstrapNodes:  MakeBootstrapNodes(ctx),
 		ListenAddr:      MakeListenAddress(ctx),
 		NAT:             MakeNAT(ctx),
@@ -745,7 +745,6 @@ func MakeSystemNode(name, version string, relconf release.Config, extra []byte, 
 		SolcPath:                ctx.GlobalString(SolcPathFlag.Name),
 		AutoDAG:                 ctx.GlobalBool(AutoDAGFlag.Name) || ctx.GlobalBool(MiningEnabledFlag.Name),
 	}
-
 	// Configure the Whisper service
 	shhEnable := ctx.GlobalBool(WhisperEnabledFlag.Name)
 
@@ -873,7 +872,7 @@ func MustMakeChainConfig(ctx *cli.Context) *core.ChainConfig {
 
 // MustMakeChainConfigFromDb reads the chain configuration from the given database.
 func MustMakeChainConfigFromDb(ctx *cli.Context, db ethdb.Database) *core.ChainConfig {
-	genesis := core.GetBlock(db, core.GetCanonicalHash(db, 0))
+	genesis := core.GetBlock(db, core.GetCanonicalHash(db, 0), 0)
 
 	if genesis != nil {
 		// Existing genesis block, use stored config if available.
@@ -893,15 +892,24 @@ func MustMakeChainConfigFromDb(ctx *cli.Context, db ethdb.Database) *core.ChainC
 	return &core.ChainConfig{HomesteadBlock: homesteadBlockNo}
 }
 
+func ChainDbName(ctx *cli.Context) string {
+	if ctx.GlobalBool(LightModeFlag.Name) {
+		return "lightchaindata"
+	} else {
+		return "chaindata"
+	}
+}
+
 // MakeChainDatabase open an LevelDB using the flags passed to the client and will hard crash if it fails.
 func MakeChainDatabase(ctx *cli.Context) ethdb.Database {
 	var (
 		datadir = MustMakeDataDir(ctx)
 		cache   = ctx.GlobalInt(CacheFlag.Name)
 		handles = MakeDatabaseHandles()
+		name    = ChainDbName(ctx)
 	)
 
-	chainDb, err := ethdb.NewLDBDatabase(filepath.Join(datadir, "chaindata"), cache, handles)
+	chainDb, err := ethdb.NewLDBDatabase(filepath.Join(datadir, name), cache, handles)
 	if err != nil {
 		Fatalf("Could not open database: %v", err)
 	}
@@ -930,4 +938,21 @@ func MakeChain(ctx *cli.Context) (chain *core.BlockChain, chainDb ethdb.Database
 		Fatalf("Could not start chainmanager: %v", err)
 	}
 	return chain, chainDb
+}
+
+// MakeConsolePreloads retrieves the absolute paths for the console JavaScript
+// scripts to preload before starting.
+func MakeConsolePreloads(ctx *cli.Context) []string {
+	// Skip preloading if there's nothing to preload
+	if ctx.GlobalString(PreloadJSFlag.Name) == "" {
+		return nil
+	}
+	// Otherwise resolve absolute paths and return them
+	preloads := []string{}
+
+	assets := ctx.GlobalString(JSpathFlag.Name)
+	for _, file := range strings.Split(ctx.GlobalString(PreloadJSFlag.Name), ",") {
+		preloads = append(preloads, common.AbsolutePath(assets, strings.TrimSpace(file)))
+	}
+	return preloads
 }

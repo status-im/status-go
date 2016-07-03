@@ -29,6 +29,14 @@ func TestAccountBindings(t *testing.T) {
 		t.Error("Test failed: could not create account")
 	}
 
+	// unlock the created account
+	err = unlockAccount(address, "badpassword", 3)
+	if err != nil {
+		fmt.Println(err)
+		t.Error("Test failed: could not unlock account")
+	}
+	time.Sleep(2 * time.Second)
+
 	// test to see if the account was injected in whisper
 	whisperInstance := (*accountSync)[0].(*whisper.Whisper)
 	identitySucess := whisperInstance.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubkey)))
@@ -48,13 +56,6 @@ func TestAccountBindings(t *testing.T) {
 	postSucess, err := whisperAPI.Post(postArgs)
 	if !postSucess || err != nil {
 		t.Error("Test failed: Could not post to whisper")
-	}
-
-	// unlock the created account
-	err = unlockAccount(address, "badpassword", 10)
-	if err != nil {
-		fmt.Println(err)
-		t.Error("Test failed: could not unlock account")
 	}
 
 	// clean up

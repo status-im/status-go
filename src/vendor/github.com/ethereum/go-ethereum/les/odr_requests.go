@@ -84,7 +84,7 @@ func (self *BlockRequest) Valid(db ethdb.Database, msg *Msg) bool {
 		return false
 	}
 	body := bodies[0]
-	header := core.GetHeader(db, self.Hash)
+	header := core.GetHeader(db, self.Hash, self.Number)
 	if header == nil {
 		glog.V(logger.Debug).Infof("ODR: header not found for block %08x", self.Hash[:4])
 		return false
@@ -139,7 +139,7 @@ func (self *ReceiptsRequest) Valid(db ethdb.Database, msg *Msg) bool {
 		return false
 	}
 	hash := types.DeriveSha(receipts[0])
-	header := core.GetHeader(db, self.Hash)
+	header := core.GetHeader(db, self.Hash, self.Number)
 	if header == nil {
 		glog.V(logger.Debug).Infof("ODR: header not found for block %08x", self.Hash[:4])
 		return false
@@ -156,6 +156,7 @@ func (self *ReceiptsRequest) Valid(db ethdb.Database, msg *Msg) bool {
 type ProofReq struct {
 	BHash       common.Hash
 	AccKey, Key []byte
+	FromLevel	uint
 }
 
 // ODR request type for state/storage trie entries, see LesOdrRequest interface

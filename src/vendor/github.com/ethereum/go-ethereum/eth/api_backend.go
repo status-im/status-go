@@ -21,26 +21,23 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/compiler"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/eth/gasprice"
-	"github.com/ethereum/go-ethereum/ethapi"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/ethereum/go-ethereum/internal/ethapi"
 	rpc "github.com/ethereum/go-ethereum/rpc"
 	"golang.org/x/net/context"
 )
 
 // EthApiBackend implements ethapi.Backend for full nodes
 type EthApiBackend struct {
-	eth      *FullNodeService
-	gpo      *gasprice.GasPriceOracle
-	SolcPath string
-	solc     *compiler.Solidity
+	eth *FullNodeService
+	gpo *gasprice.GasPriceOracle
 }
 
 func (b *EthApiBackend) SetHead(number uint64) {
@@ -73,44 +70,35 @@ func (b *EthApiBackend) BlockByNumber(ctx context.Context, blockNr rpc.BlockNumb
 	return b.eth.blockchain.GetBlockByNumber(uint64(blockNr)), nil
 }
 
-func (b *EthApiBackend) StateByNumber(blockNr rpc.BlockNumber) (ethapi.State, error) {
+func (b *EthApiBackend) StateAndHeaderByNumber(blockNr rpc.BlockNumber) (ethapi.State, *types.Header, error) {
 	// Pending state is only known by the miner
 	if blockNr == rpc.PendingBlockNumber {
-		_, state := b.eth.miner.Pending()
-		return &EthApiState{state}, nil
+		block, state := b.eth.miner.Pending()
+		return EthApiState{state}, block.Header(), nil
 	}
 	// Otherwise resolve the block number and return its state
 	header := b.HeaderByNumber(blockNr)
 	if header == nil {
-		return nil, nil
+		return nil, nil, nil
 	}
 	stateDb, err := state.New(header.Root, b.eth.chainDb)
-	return &EthApiState{stateDb}, err
+	return EthApiState{stateDb}, header, err
 }
 
 func (b *EthApiBackend) GetBlock(ctx context.Context, blockHash common.Hash) (*types.Block, error) {
-	return b.eth.blockchain.GetBlock(blockHash), nil
-}
-
-func (b *EthApiBackend) GetState(header *types.Header) (ethapi.State, error) {
-	stateDb, err := state.New(header.Root, b.eth.chainDb)
-	return &EthApiState{stateDb}, err
+	return b.eth.blockchain.GetBlockByHash(blockHash), nil
 }
 
 func (b *EthApiBackend) GetReceipts(ctx context.Context, blockHash common.Hash) (types.Receipts, error) {
-	return core.GetBlockReceipts(b.eth.chainDb, blockHash), nil
+	return core.GetBlockReceipts(b.eth.chainDb, blockHash, core.GetBlockNumber(b.eth.chainDb, blockHash)), nil
 }
 
 func (b *EthApiBackend) GetTd(blockHash common.Hash) *big.Int {
-	return b.eth.blockchain.GetTd(blockHash)
+	return b.eth.blockchain.GetTdByHash(blockHash)
 }
 
-func (b *EthApiBackend) GetVMEnv(ctx context.Context, msg core.Message, header *types.Header) (vm.Environment, func() error, error) {
-	stateDb, err := state.New(header.Root, b.eth.chainDb)
-	if err != nil {
-		return nil, nil, err
-	}
-	stateDb = stateDb.Copy()
+func (b *EthApiBackend) GetVMEnv(ctx context.Context, msg core.Message, state ethapi.State, header *types.Header) (vm.Environment, func() error, error) {
+	stateDb := state.(EthApiState).state.Copy()
 	addr, _ := msg.From()
 	from := stateDb.GetOrNewStateObject(addr)
 	from.SetBalance(common.MaxBig)
@@ -119,46 +107,53 @@ func (b *EthApiBackend) GetVMEnv(ctx context.Context, msg core.Message, header *
 }
 
 func (b *EthApiBackend) SendTx(ctx context.Context, signedTx *types.Transaction) error {
+	b.eth.txMu.Lock()
+	defer b.eth.txMu.Unlock()
+
 	b.eth.txPool.SetLocal(signedTx)
 	return b.eth.txPool.Add(signedTx)
 }
 
 func (b *EthApiBackend) RemoveTx(txHash common.Hash) {
+	b.eth.txMu.Lock()
+	defer b.eth.txMu.Unlock()
+
 	b.eth.txPool.RemoveTx(txHash)
 }
 
 func (b *EthApiBackend) GetPoolTransactions() types.Transactions {
+	b.eth.txMu.Lock()
+	defer b.eth.txMu.Unlock()
+
 	return b.eth.txPool.GetTransactions()
 }
 
 func (b *EthApiBackend) GetPoolTransaction(txHash common.Hash) *types.Transaction {
+	b.eth.txMu.Lock()
+	defer b.eth.txMu.Unlock()
+
 	return b.eth.txPool.GetTransaction(txHash)
 }
 
 func (b *EthApiBackend) GetPoolNonce(ctx context.Context, addr common.Address) (uint64, error) {
+	b.eth.txMu.Lock()
+	defer b.eth.txMu.Unlock()
+
 	return b.eth.txPool.State().GetNonce(addr), nil
 }
 
 func (b *EthApiBackend) Stats() (pending int, queued int) {
+	b.eth.txMu.Lock()
+	defer b.eth.txMu.Unlock()
+
 	return b.eth.txPool.Stats()
 }
 
 func (b *EthApiBackend) TxPoolContent() (map[common.Address]map[uint64][]*types.Transaction, map[common.Address]map[uint64][]*types.Transaction) {
+	b.eth.txMu.Lock()
+	defer b.eth.txMu.Unlock()
+
 	return b.eth.TxPool().Content()
-}
-
-func (b *EthApiBackend) Solc() (*compiler.Solidity, error) {
-	var err error
-	if b.solc == nil {
-		b.solc, err = compiler.New(b.SolcPath)
-	}
-	return b.solc, err
-}
-
-func (b *EthApiBackend) SetSolc(solcPath string) (*compiler.Solidity, error) {
-	b.SolcPath = solcPath
-	b.solc = nil
-	return b.Solc()
 }
 
 func (b *EthApiBackend) Downloader() *downloader.Downloader {
@@ -189,18 +184,18 @@ type EthApiState struct {
 	state *state.StateDB
 }
 
-func (s *EthApiState) GetBalance(ctx context.Context, addr common.Address) (*big.Int, error) {
+func (s EthApiState) GetBalance(ctx context.Context, addr common.Address) (*big.Int, error) {
 	return s.state.GetBalance(addr), nil
 }
 
-func (s *EthApiState) GetCode(ctx context.Context, addr common.Address) ([]byte, error) {
+func (s EthApiState) GetCode(ctx context.Context, addr common.Address) ([]byte, error) {
 	return s.state.GetCode(addr), nil
 }
 
-func (s *EthApiState) GetState(ctx context.Context, a common.Address, b common.Hash) (common.Hash, error) {
+func (s EthApiState) GetState(ctx context.Context, a common.Address, b common.Hash) (common.Hash, error) {
 	return s.state.GetState(a, b), nil
 }
 
-func (s *EthApiState) GetNonce(ctx context.Context, addr common.Address) (uint64, error) {
+func (s EthApiState) GetNonce(ctx context.Context, addr common.Address) (uint64, error) {
 	return s.state.GetNonce(addr), nil
 }

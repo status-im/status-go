@@ -19,10 +19,9 @@ package eth
 import (
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/ethapi"
+	"github.com/ethereum/go-ethereum/internal/ethapi"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
 	"golang.org/x/net/context"
@@ -43,12 +42,26 @@ type ContractBackend struct {
 
 // NewContractBackend creates a new native contract backend using an existing
 // Etheruem object.
-func NewContractBackend(eth *FullNodeService) *ContractBackend {
+func NewContractBackend(apiBackend ethapi.Backend) *ContractBackend {
 	return &ContractBackend{
-		eapi:  ethapi.NewPublicEthereumAPI(eth.apiBackend),
-		bcapi: ethapi.NewPublicBlockChainAPI(eth.apiBackend),
-		txapi: ethapi.NewPublicTransactionPoolAPI(eth.apiBackend),
+		eapi:  ethapi.NewPublicEthereumAPI(apiBackend, nil, nil),
+		bcapi: ethapi.NewPublicBlockChainAPI(apiBackend),
+		txapi: ethapi.NewPublicTransactionPoolAPI(apiBackend),
 	}
+}
+
+// HasCode implements bind.ContractVerifier.HasCode by retrieving any code associated
+// with the contract from the local API, and checking its size.
+func (b *ContractBackend) HasCode(ctx context.Context, contract common.Address, pending bool) (bool, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	block := rpc.LatestBlockNumber
+	if pending {
+		block = rpc.PendingBlockNumber
+	}
+	out, err := b.bcapi.GetCode(ctx, contract, block)
+	return len(common.FromHex(out)) > 0, err
 }
 
 // ContractCall implements bind.ContractCaller executing an Ethereum contract
@@ -69,9 +82,6 @@ func (b *ContractBackend) ContractCall(ctx context.Context, contract common.Addr
 	}
 	// Execute the call and convert the output back to Go types
 	out, err := b.bcapi.Call(ctx, args, block)
-	if err == ethapi.ErrNoCode {
-		err = bind.ErrNoCode
-	}
 	return common.FromHex(out), err
 }
 
@@ -109,9 +119,6 @@ func (b *ContractBackend) EstimateGasLimit(ctx context.Context, sender common.Ad
 		Value: *rpc.NewHexNumber(value),
 		Data:  common.ToHex(data),
 	})
-	if err == ethapi.ErrNoCode {
-		err = bind.ErrNoCode
-	}
 	return out.BigInt(), err
 }
 

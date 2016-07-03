@@ -39,6 +39,8 @@ func NewLesServer(eth *eth.FullNodeService, config *eth.Config) (*LesServer, err
 	if err != nil {
 		return nil, err
 	}
+	pm.broadcastBlockLoop()
+
 	srv := &LesServer{protocolManager: pm}
 	pm.server = srv
 
@@ -62,6 +64,9 @@ func (s *LesServer) Start() {
 func (s *LesServer) Stop() {
 	s.fcCostStats.store()
 	s.fcManager.Stop()
+	go func() {
+		<-s.protocolManager.noMorePeers
+	}()
 	s.protocolManager.Stop()
 }
 

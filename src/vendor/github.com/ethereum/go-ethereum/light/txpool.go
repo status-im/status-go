@@ -84,7 +84,7 @@ func NewTxPool(config *core.ChainConfig, eventMux *event.TypeMux, chain *LightCh
 		mined:    make(map[common.Hash][]*types.Transaction),
 		quit:     make(chan bool),
 		eventMux: eventMux,
-		events:   eventMux.Subscribe(LightChainHeadEvent{}),
+		events:   eventMux.Subscribe(core.ChainHeadEvent{}),
 		chain:    chain,
 		relay:    relay,
 		odr:      chain.Odr(),
@@ -128,12 +128,14 @@ type txBlockData struct {
 
 // storeTxBlockData stores the block position of a mined tx in the local db
 func (pool *TxPool) storeTxBlockData(txh common.Hash, tbd txBlockData) {
+//fmt.Println("storeTxBlockData", txh, tbd)
 	data, _ := rlp.EncodeToBytes(tbd)
 	pool.chainDb.Put(append(txh[:], byte(1)), data)
 }
 
 // removeTxBlockData removes the stored block position of a rolled back tx
 func (pool *TxPool) removeTxBlockData(txh common.Hash) {
+//fmt.Println("removeTxBlockData", txh)
 	pool.chainDb.Delete(append(txh[:], byte(1)))
 }
 
@@ -167,18 +169,38 @@ func (txc txStateChanges) getLists() (mined []common.Hash, rollback []common.Has
 // and marks them as mined if necessary. It also stores block position in the db
 // and adds them to the received txStateChanges map.
 func (pool *TxPool) checkMinedTxs(ctx context.Context, hash common.Hash, idx uint64, txc txStateChanges) error {
+//fmt.Println("checkMinedTxs")
 	if len(pool.pending) == 0 {
 		return nil
 	}
+//fmt.Println("len(pool) =", len(pool.pending))
 
-	receipts, err := GetBlockReceipts(ctx, pool.odr, hash)
+	block, err := GetBlock(ctx, pool.odr, hash, idx)
+	var receipts types.Receipts
 	if err != nil {
+//fmt.Println(err)
 		return err
 	}
+//fmt.Println("len(block.Transactions()) =", len(block.Transactions()))
+
 	list := pool.mined[hash]
-	for i, receipt := range receipts {
-		txHash := receipt.TxHash
+	for i, tx := range block.Transactions() {
+		txHash := tx.Hash()
+//fmt.Println(" txHash:", txHash)
 		if tx, ok := pool.pending[txHash]; ok {
+//fmt.Println("TX FOUND")
+			if receipts == nil {
+				receipts, err = GetBlockReceipts(ctx, pool.odr, hash, idx)
+				if err != nil {
+					return err
+				}
+				if len(receipts) != len(block.Transactions()) {
+					panic(nil) // should never happen if hashes did match
+				}
+				core.SetReceiptsData(block, receipts)
+			}
+//fmt.Println("WriteReceipt", receipts[i].TxHash)
+			core.WriteReceipt(pool.chainDb, receipts[i])
 			pool.storeTxBlockData(txHash, txBlockData{hash, idx, uint64(i)})
 			delete(pool.pending, txHash)
 			list = append(list, tx)
@@ -214,18 +236,18 @@ func (pool *TxPool) rollbackTxs(hash common.Hash, txc txStateChanges) {
 // possible to continue checking the missing blocks at the next chain head event
 func (pool *TxPool) setNewHead(ctx context.Context, newHeader *types.Header) (txStateChanges, error) {
 	txc := make(txStateChanges)
-	oldh := pool.chain.GetHeader(pool.head)
+	oldh := pool.chain.GetHeaderByHash(pool.head)
 	newh := newHeader
 	// find common ancestor, create list of rolled back and new block hashes
 	var oldHashes, newHashes []common.Hash
 	for oldh.Hash() != newh.Hash() {
 		if oldh.GetNumberU64() >= newh.GetNumberU64() {
 			oldHashes = append(oldHashes, oldh.Hash())
-			oldh = pool.chain.GetHeader(oldh.ParentHash)
+			oldh = pool.chain.GetHeader(oldh.ParentHash, oldh.Number.Uint64()-1)
 		}
 		if oldh.GetNumberU64() < newh.GetNumberU64() {
 			newHashes = append(newHashes, newh.Hash())
-			newh = pool.chain.GetHeader(newh.ParentHash)
+			newh = pool.chain.GetHeader(newh.ParentHash, newh.Number.Uint64()-1)
 		}
 	}
 	if oldh.GetNumberU64() < pool.clearIdx {
@@ -274,7 +296,7 @@ const blockCheckTimeout = time.Second * 3
 func (pool *TxPool) eventLoop() {
 	for ev := range pool.events.Chan() {
 		switch ev.Data.(type) {
-		case LightChainHeadEvent:
+		case core.ChainHeadEvent:
 			pool.mu.Lock()
 			ctx, _ := context.WithTimeout(context.Background(), blockCheckTimeout)
 			head := pool.chain.CurrentHeader()
@@ -339,7 +361,7 @@ func (pool *TxPool) validateTx(ctx context.Context, tx *types.Transaction) error
 
 	// Check the transaction doesn't exceed the current
 	// block limit gas.
-	header := pool.chain.GetHeader(pool.head)
+	header := pool.chain.GetHeaderByHash(pool.head)
 	if header.GasLimit.Cmp(tx.Gas()) < 0 {
 		return core.ErrGasLimit
 	}
@@ -428,6 +450,7 @@ func (self *TxPool) Add(ctx context.Context, tx *types.Transaction) error {
 	if err := self.add(ctx, tx); err != nil {
 		return err
 	}
+//fmt.Println("Send", tx.Hash())
 	self.relay.Send(types.Transactions{tx})
 
 	self.chainDb.Put(tx.Hash().Bytes(), data)
@@ -469,8 +492,8 @@ func (tp *TxPool) GetTransaction(hash common.Hash) *types.Transaction {
 // GetTransactions returns all currently processable transactions.
 // The returned slice may be modified by the caller.
 func (self *TxPool) GetTransactions() (txs types.Transactions) {
-	self.mu.Lock()
-	defer self.mu.Unlock()
+	self.mu.RLock()
+	defer self.mu.RUnlock()
 
 	txs = make(types.Transactions, len(self.pending))
 	i := 0
@@ -479,6 +502,29 @@ func (self *TxPool) GetTransactions() (txs types.Transactions) {
 		i++
 	}
 	return txs
+}
+
+// Content retrieves the data content of the transaction pool, returning all the
+// pending as well as queued transactions, grouped by account and nonce.
+func (self *TxPool) Content() (map[common.Address]map[uint64][]*types.Transaction, map[common.Address]map[uint64][]*types.Transaction) {
+	self.mu.RLock()
+	defer self.mu.RUnlock()
+
+	// Retrieve all the pending transactions and sort by account and by nonce
+	pending := make(map[common.Address]map[uint64][]*types.Transaction)
+	for _, tx := range self.pending {
+		account, _ := tx.From()
+
+		owned, ok := pending[account]
+		if !ok {
+			owned = make(map[uint64][]*types.Transaction)
+			pending[account] = owned
+		}
+		owned[tx.Nonce()] = append(owned[tx.Nonce()], tx)
+	}
+	// There are no queued transactions in a light pool, just return an empty map
+	queued := make(map[common.Address]map[uint64][]*types.Transaction)
+	return pending, queued
 }
 
 // RemoveTransactions removes all given transactions from the pool.
