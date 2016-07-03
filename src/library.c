@@ -48,7 +48,7 @@ JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved)
 {
 	bool detach;
 	JNIEnv *env;
-	bool result = JNI_VERSION_1_6;
+	int result = JNI_VERSION_1_6;
 
 	gJavaVM = vm;
 
@@ -88,7 +88,7 @@ bool JniLibraryInit( JNIEnv *env )
 {
 	int i;
 	
-	JavaClassPtr_GethService = (*env)->FindClass( env, "com/statusim/GethService" );
+	JavaClassPtr_GethService = (*env)->FindClass( env, "com/statusim/geth/service/GethService" );
 	if (JavaClassPtr_GethService == NULL) return false;
 	JavaClassPtr_GethService = (jclass)(*env)->NewGlobalRef( env, JavaClassPtr_GethService );
 	if (JavaClassPtr_GethService == NULL) return false;
