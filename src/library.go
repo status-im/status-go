@@ -97,6 +97,7 @@ func call(chatId *C.char, path *C.char, params *C.char) *C.char {
 //export initJail
 func initJail(js *C.char) {
 	Init(C.GoString(js))
+}
 
 //export addPeer
 func addPeer(url *C.char) *C.char {

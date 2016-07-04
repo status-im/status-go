@@ -8,8 +8,6 @@ import (
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/accounts"
-	"github.com/ethereum/go-ethereum/eth"
-	"github.com/ethereum/go-ethereum/les"
 	"github.com/ethereum/go-ethereum/logger"
 	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/ethereum/go-ethereum/node"
@@ -78,21 +76,6 @@ func MakeNode(inputDir string) *node.Node {
 	utils.DebugSetup(c)
 	currentNode, accountSync = utils.MakeSystemNode(clientIdentifier, vString, rConfig, makeDefaultExtra(), c)
 
-    // Retrieve the AccountManager
-    // doesn't work because node not started yet ... maybe use some kind of event when node started
-    // and then get account managet and also signal the event to the app
-	var ethereum *eth.FullNodeService
-	if err := currentNode.Service(&ethereum); err == nil {
-		accountManager = ethereum.ApiBackend.AccountManager()
-	} else {
-		var ethereum *les.LightNodeService
-		if err := currentNode.Service(&ethereum); err == nil {
-			accountManager = ethereum.ApiBackend.AccountManager()
-		} else {
-			glog.V(logger.Warn).Infoln("cannot get account manager:", err)
-		}
-	}
-
 	return currentNode
 
 }
@@ -100,6 +83,10 @@ func MakeNode(inputDir string) *node.Node {
 // StartNode starts a geth node entity
 func RunNode(nodeIn *node.Node) {
 	utils.StartNode(nodeIn)
+
+	if err := nodeIn.Service(&accountManager); err != nil {
+		glog.V(logger.Warn).Infoln("cannot get account manager:", err)
+    }
 	nodeIn.Wait()
 }
 

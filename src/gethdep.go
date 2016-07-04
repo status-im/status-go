@@ -9,10 +9,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/eth"
-	"github.com/ethereum/go-ethereum/les"
-	"github.com/ethereum/go-ethereum/logger"
-	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	errextra "github.com/pkg/errors"
@@ -29,20 +25,6 @@ func createAccount(password string) (string, string, error) {
 	if currentNode != nil {
 
 		w := true
-
-		// Retrieve the AccountManager
-		var ethereum *eth.FullNodeService
-		var accountManager *accounts.Manager
-		if err := currentNode.Service(&ethereum); err == nil {
-			accountManager = ethereum.ApiBackend.AccountManager()
-		} else {
-			var ethereum *les.LightNodeService
-			if err := currentNode.Service(&ethereum); err == nil {
-				accountManager = ethereum.ApiBackend.AccountManager()
-			} else {
-				glog.V(logger.Warn).Infoln("cannot get account manager:", err)
-			}
-		}
 
 		if accountManager != nil {
 			// generate the account
@@ -79,20 +61,6 @@ func createAccount(password string) (string, string, error) {
 func unlockAccount(address, password string, seconds int) error {
 
 	if currentNode != nil {
-
-		// Retrieve the AccountManager
-		var ethereum *eth.FullNodeService
-		var accountManager *accounts.Manager
-		if err := currentNode.Service(&ethereum); err == nil {
-			accountManager = ethereum.ApiBackend.AccountManager()
-		} else {
-			var ethereum *les.LightNodeService
-			if err := currentNode.Service(&ethereum); err == nil {
-				accountManager = ethereum.ApiBackend.AccountManager()
-			} else {
-				glog.V(logger.Warn).Infoln("cannot get account manager:", err)
-			}
-		}
 
 		if accountManager != nil {
 			account, err := utils.MakeAddress(accountManager, address)
