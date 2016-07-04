@@ -7,6 +7,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/accounts"
+	"github.com/ethereum/go-ethereum/eth"
+	"github.com/ethereum/go-ethereum/les"
 	"github.com/ethereum/go-ethereum/logger"
 	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/ethereum/go-ethereum/node"
@@ -27,12 +30,13 @@ const (
 )
 
 var (
-	vString     string          // Combined textual representation of the version
-	rConfig     release.Config  // Structured version information and release oracle config
-	currentNode *node.Node      // currently running geth node
-	c           *cli.Context    // the CLI context used to start the geth node
-	accountSync *[]node.Service // the object used to sync accounts between geth services
-	datadir     string          // data directory for geth
+	vString        string             // Combined textual representation of the version
+	rConfig        release.Config     // Structured version information and release oracle config
+	currentNode    *node.Node         // currently running geth node
+	c              *cli.Context       // the CLI context used to start the geth node
+	accountSync    *[]node.Service    // the object used to sync accounts between geth services
+	accountManager *accounts.Manager  // the account manager attached to the currentNode
+	datadir        string             // data directory for geth
 )
 
 func main() {
@@ -49,6 +53,7 @@ func MakeNode(inputDir string) *node.Node {
 
 	// TODO remove admin rpcapi flag
 	set := flag.NewFlagSet("test", 0)
+	set.Bool("lightkdf", true, "Reduce key-derivation RAM & CPU usage at some expense of KDF strength")
 	set.Bool("shh", true, "whisper")
 	set.Bool("light", true, "disable eth")
 	set.Bool("testnet", true, "light test network")
@@ -72,6 +77,22 @@ func MakeNode(inputDir string) *node.Node {
 
 	utils.DebugSetup(c)
 	currentNode, accountSync = utils.MakeSystemNode(clientIdentifier, vString, rConfig, makeDefaultExtra(), c)
+
+    // Retrieve the AccountManager
+    // doesn't work because node not started yet ... maybe use some kind of event when node started
+    // and then get account managet and also signal the event to the app
+	var ethereum *eth.FullNodeService
+	if err := currentNode.Service(&ethereum); err == nil {
+		accountManager = ethereum.ApiBackend.AccountManager()
+	} else {
+		var ethereum *les.LightNodeService
+		if err := currentNode.Service(&ethereum); err == nil {
+			accountManager = ethereum.ApiBackend.AccountManager()
+		} else {
+			glog.V(logger.Warn).Infoln("cannot get account manager:", err)
+		}
+	}
+
 	return currentNode
 
 }
