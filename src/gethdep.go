@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/logger"
 	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/p2p/discover"
 	errextra "github.com/pkg/errors"
 )
 
@@ -124,4 +125,19 @@ func createAndStartNode(inputDir string) error {
 
 	return errors.New("Could not create the in-memory node object")
 
+}
+
+
+func doAddPeer(url string) (bool, error) {
+	server := currentNode.Server()
+	if server == nil {
+		return false, errors.New("node not started")
+	}
+	// Try to add the url as a static peer and return
+	node, err := discover.ParseNode(url)
+	if err != nil {
+		return false, fmt.Errorf("invalid enode: %v", err)
+	}
+	server.AddPeer(node)
+	return true, nil
 }

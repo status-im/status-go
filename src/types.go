@@ -9,3 +9,8 @@ type AccountInfo struct {
 type JSONError struct {
 	Error string `json:"error"`
 }
+
+type AddPeerResult struct {
+    Success bool `json:"success"`
+    Error   string `json:"error"`
+}

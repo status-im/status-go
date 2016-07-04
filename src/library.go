@@ -36,7 +36,7 @@ func CreateAccount(password *C.char) *C.char {
 func Login(address, password *C.char) *C.char {
 	// Equivalent to unlocking an account briefly, to inject a whisper identity,
 	// then locking the account again
-	out := UnlockAccount(address, password, 5)
+	out := UnlockAccount(address, password, 1)
 	return out
 }
 
@@ -97,4 +97,21 @@ func call(chatId *C.char, path *C.char, params *C.char) *C.char {
 //export initJail
 func initJail(js *C.char) {
 	Init(C.GoString(js))
+
+//export addPeer
+func addPeer(url *C.char) *C.char {
+	success, err := doAddPeer(C.GoString(url))
+	errString := emptyError
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		errString = err.Error()
+	}
+
+	out := AddPeerResult{
+		Success: success,
+		Error:   errString,
+	}
+	outBytes, _ := json.Marshal(&out)
+
+	return C.CString(string(outBytes))
 }
