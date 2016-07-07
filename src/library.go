@@ -40,6 +40,26 @@ func Login(address, password *C.char) *C.char {
 	return out
 }
 
+//export Logout
+func Logout() *C.char {
+
+	// This is equivalent to clearing whisper identities
+	err := logout()
+
+	errString := emptyError
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		errString = err.Error()
+	}
+
+	out := JSONError{
+		Error: errString,
+	}
+	outBytes, _ := json.Marshal(&out)
+
+	return C.CString(string(outBytes))
+}
+
 //export UnlockAccount
 func UnlockAccount(address, password *C.char, seconds int) *C.char {
 

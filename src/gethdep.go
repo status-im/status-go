@@ -79,6 +79,22 @@ func unlockAccount(address, password string, seconds int) error {
 
 }
 
+// logout clears whisper identities
+func logout() error {
+
+	if currentNode != nil {
+		whisperInstance := (*accountSync)[0].(*whisper.Whisper)
+		err := whisperInstance.ClearIdentities()
+		if err != nil {
+			return errextra.Wrap(err, "Could not call clear identities whipser func")
+		}
+		return nil
+	}
+
+	return errors.New("No running node detected for logout")
+
+}
+
 // createAndStartNode creates a node entity and starts the
 // node running locally
 func createAndStartNode(inputDir string) error {
