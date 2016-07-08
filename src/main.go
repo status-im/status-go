@@ -50,7 +50,9 @@ func MakeNode(inputDir string) *node.Node {
 	// TODO remove admin rpcapi flag
 	set := flag.NewFlagSet("test", 0)
 	set.Bool("shh", true, "whisper")
-	set.Bool("noeth", true, "disable eth")
+	// set.Bool("noeth", true, "disable eth")
+	set.Bool("light", true, "enable light client")
+	set.Bool("testnet", true, "enable test network")
 	set.Bool("rpc", true, "enable rpc")
 	set.String("rpcaddr", "localhost", "host for RPC")
 	set.String("rpcport", "8545", "rpc port")
