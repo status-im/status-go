@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"path/filepath"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts"
@@ -24,7 +25,7 @@ func createAccount(password string) (string, string, error) {
 	if currentNode != nil {
 
 		w := true
-		keydir := datadir + "/keystore"
+		keydir := filepath.Join(datadir, "/keystore")
 		accman := accounts.NewManager(keydir, scryptN, scryptP, accountSync)
 
 		// generate the account
