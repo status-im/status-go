@@ -4,13 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"path/filepath"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/node"
 	errextra "github.com/pkg/errors"
 )
 
@@ -20,13 +20,13 @@ var (
 )
 
 // createAccount creates an internal geth account
-func createAccount(password, keydir string) (string, string, error) {
+func createAccount(password string) (string, string, error) {
 
 	if currentNode != nil {
 
-		var sync *[]node.Service
 		w := true
-		accman := accounts.NewManager(keydir, scryptN, scryptP, sync)
+		keydir := filepath.Join(datadir, "/keystore")
+		accman := accounts.NewManager(keydir, scryptN, scryptP, accountSync)
 
 		// generate the account
 		account, err := accman.NewAccount(password, w)
@@ -61,7 +61,7 @@ func unlockAccount(address, password string, seconds int) error {
 
 	if currentNode != nil {
 
-		accman := utils.MakeAccountManager(c, &accountSync)
+		accman := utils.MakeAccountManager(c, accountSync)
 		account, err := utils.MakeAddress(accman, address)
 		if err != nil {
 			return errextra.Wrap(err, "Could not retrieve account from address")
@@ -82,9 +82,9 @@ func unlockAccount(address, password string, seconds int) error {
 
 // createAndStartNode creates a node entity and starts the
 // node running locally
-func createAndStartNode(datadir string) error {
+func createAndStartNode(inputDir string) error {
 
-	currentNode = MakeNode(datadir)
+	currentNode = MakeNode(inputDir)
 	if currentNode != nil {
 		RunNode(currentNode)
 		return nil

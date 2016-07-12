@@ -27,11 +27,12 @@ const (
 )
 
 var (
-	vString     string         // Combined textual representation of the version
-	rConfig     release.Config // Structured version information and release oracle config
-	currentNode *node.Node     // currently running geth node
-	c           *cli.Context   // the CLI context used to start the geth node
-	accountSync []node.Service // the object used to sync accounts between geth services
+	vString     string          // Combined textual representation of the version
+	rConfig     release.Config  // Structured version information and release oracle config
+	currentNode *node.Node      // currently running geth node
+	c           *cli.Context    // the CLI context used to start the geth node
+	accountSync *[]node.Service // the object used to sync accounts between geth services
+	datadir     string          // data directory for geth
 )
 
 func main() {
@@ -39,17 +40,19 @@ func main() {
 	// Placeholder for anything we want to run by default
 	fmt.Println("You are running statusgo!")
 
-	createAndStartNode(".ethereum")
-
 }
 
 // MakeNode create a geth node entity
-func MakeNode(datadir string) *node.Node {
+func MakeNode(inputDir string) *node.Node {
+
+	datadir = inputDir
 
 	// TODO remove admin rpcapi flag
 	set := flag.NewFlagSet("test", 0)
 	set.Bool("shh", true, "whisper")
-	set.Bool("noeth", true, "disable eth")
+	// set.Bool("noeth", true, "disable eth")
+	set.Bool("light", true, "enable light client")
+	set.Bool("testnet", true, "enable test network")
 	set.Bool("rpc", true, "enable rpc")
 	set.String("rpcaddr", "localhost", "host for RPC")
 	set.String("rpcport", "8545", "rpc port")
