@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/release"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/ethereum/go-ethereum/whisper"
 	"gopkg.in/urfave/cli.v1"
 )
 
@@ -34,6 +35,7 @@ var (
 	c              *cli.Context       // the CLI context used to start the geth node
 	accountSync    *[]node.Service    // the object used to sync accounts between geth services
 	accountManager *accounts.Manager  // the account manager attached to the currentNode
+	whisperService *whisper.Whisper   // whisper service
 	datadir        string             // data directory for geth
 )
 
@@ -86,7 +88,10 @@ func RunNode(nodeIn *node.Node) {
 
 	if err := nodeIn.Service(&accountManager); err != nil {
 		glog.V(logger.Warn).Infoln("cannot get account manager:", err)
-    }
+	}
+	if err := nodeIn.Service(&whisperService); err != nil {
+		glog.V(logger.Warn).Infoln("cannot get whisper service:", err)
+	}
 	nodeIn.Wait()
 }
 

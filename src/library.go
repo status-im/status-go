@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"github.com/ethereum/go-ethereum/whisper"
 )
 
 var emptyError = ""
@@ -115,4 +116,43 @@ func addPeer(url *C.char) *C.char {
 	outBytes, _ := json.Marshal(&out)
 
 	return C.CString(string(outBytes))
+}
+
+//export addWhisperFilter
+func addWhisperFilter(filterJson *C.char) *C.char {
+
+    var id int
+    var filter whisper.NewFilterArgs
+
+    err := json.Unmarshal([]byte(C.GoString(filterJson)), &filter)
+    if err == nil {
+		id = doAddWhisperFilter(filter)
+	}
+
+	errString := emptyError
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		errString = err.Error()
+	}
+
+	out := AddWhisperFilterResult{
+		Id: id,
+		Error: errString,
+	}
+	outBytes, _ := json.Marshal(&out)
+
+	return C.CString(string(outBytes))
+	
+}
+
+//export removeWhisperFilter
+func removeWhisperFilter(idFilter int) {
+
+	doRemoveWhisperFilter(idFilter)
+}
+
+//export clearWhisperFilters
+func clearWhisperFilters() {
+
+    doClearWhisperFilters()
 }
