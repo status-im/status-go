@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"runtime"
 
+	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/logger"
 	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/ethereum/go-ethereum/node"
@@ -29,14 +29,14 @@ const (
 )
 
 var (
-	vString        string             // Combined textual representation of the version
-	rConfig        release.Config     // Structured version information and release oracle config
-	currentNode    *node.Node         // currently running geth node
-	c              *cli.Context       // the CLI context used to start the geth node
-	accountSync    *[]node.Service    // the object used to sync accounts between geth services
-	accountManager *accounts.Manager  // the account manager attached to the currentNode
-	whisperService *whisper.Whisper   // whisper service
-	datadir        string             // data directory for geth
+	vString        string            // Combined textual representation of the version
+	rConfig        release.Config    // Structured version information and release oracle config
+	currentNode    *node.Node        // currently running geth node
+	c              *cli.Context      // the CLI context used to start the geth node
+	accountSync    *[]node.Service   // the object used to sync accounts between geth services
+	accountManager *accounts.Manager // the account manager attached to the currentNode
+	whisperService *whisper.Whisper  // whisper service
+	datadir        string            // data directory for geth
 )
 
 func main() {

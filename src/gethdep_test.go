@@ -37,11 +37,14 @@ func TestAccountBindings(t *testing.T) {
 	}
 	time.Sleep(2 * time.Second)
 
-	// test to see if the account was injected in whisper
-	whisperInstance := (*accountSync)[0].(*whisper.Whisper)
-	identitySucess := whisperInstance.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubkey)))
-	if !identitySucess || err != nil {
-		t.Error("Test failed: identity not injected into whisper")
+	// test to see if the account was injected in whisqer
+	var whisperInstance *whisper.Whisper
+	if err := currentNode.Service(&whisperInstance); err != nil {
+		t.Errorf("whisper service not running: %v", err)
+	}
+	identitySucsess := whisperInstance.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubkey)))
+	if !identitySucsess || err != nil {
+		t.Errorf("Test failed: identity not injected into whisper: %v", err)
 	}
 
 	// test to see if we can post with the injected whisper identity
@@ -55,7 +58,7 @@ func TestAccountBindings(t *testing.T) {
 	whisperAPI := whisper.NewPublicWhisperAPI(whisperInstance)
 	postSucess, err := whisperAPI.Post(postArgs)
 	if !postSucess || err != nil {
-		t.Error("Test failed: Could not post to whisper")
+		t.Errorf("Test failed: Could not post to whisper: %v", err)
 	}
 
 	// clean up
@@ -63,5 +66,4 @@ func TestAccountBindings(t *testing.T) {
 	if err != nil {
 		t.Error("Test failed: could not clean up temporary datadir")
 	}
-
 }
