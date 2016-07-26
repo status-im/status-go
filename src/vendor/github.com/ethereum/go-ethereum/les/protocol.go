@@ -47,7 +47,7 @@ const (
 const (
 	// Protocol messages belonging to LPV1
 	StatusMsg          = 0x00
-	NewBlockHashesMsg  = 0x01
+	NewBlockHashMsg  = 0x01
 	GetBlockHeadersMsg = 0x02
 	BlockHeadersMsg    = 0x03
 	GetBlockBodiesMsg  = 0x04
@@ -59,8 +59,8 @@ const (
 	GetCodeMsg         = 0x0a
 	CodeMsg            = 0x0b
 	SendTxMsg          = 0x0c
-	GetTxHashesMsg     = 0x0d
-	TxHashesMsg        = 0x0e
+	GetHeaderProofsMsg = 0x0d
+	HeaderProofsMsg    = 0x0e
 )
 
 type errCode int
@@ -102,7 +102,7 @@ var errorToString = map[int]string{
 	ErrUnexpectedResponse:      "Unexpected response",
 	ErrInvalidResponse:         "Invalid response",
 	ErrTooManyTimeouts:         "Too many request timeouts",
-	ErrHandshakeMissingKey:		"Key missing from handshake message",
+	ErrHandshakeMissingKey:     "Key missing from handshake message",
 }
 
 type chainManager interface {
@@ -123,8 +123,18 @@ type statusData struct {
 	MRC             RequestCostList
 }
 
-// newBlockHashesData is the network packet for the block announcements.
-type newBlockHashesData []blockInfo
+// newBlockHashData is the network packet for the block announcements.
+type newBlockHashData struct{
+	Hash   common.Hash // Hash of one particular block being announced
+	Number uint64      // Number of one particular block being announced
+	Td     *big.Int    // Total difficulty of one particular block being announced
+	ReorgDepth uint64
+
+	haveHeaders uint64 // we have the headers of the remote peer's chain up to this number
+	headKnown bool
+	requested bool
+	next *newBlockHashData
+}
 type blockInfo struct {
 	Hash   common.Hash // Hash of one particular block being announced
 	Number uint64      // Number of one particular block being announced

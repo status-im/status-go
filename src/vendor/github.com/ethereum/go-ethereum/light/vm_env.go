@@ -32,15 +32,15 @@ import (
 // returns an error, the execution fails.
 type VMEnv struct {
 	vm.Environment
-	ctx    context.Context
+	ctx         context.Context
 	chainConfig *core.ChainConfig
-	evm    *vm.EVM
-	state  *VMState
-	header *types.Header
-	msg    core.Message
-	depth  int
-	chain  *LightChain
-	typ    vm.Type
+	evm         *vm.EVM
+	state       *VMState
+	header      *types.Header
+	msg         core.Message
+	depth       int
+	chain       *LightChain
+	typ         vm.Type
 	// structured logging
 	logs []vm.StructLog
 	err  error
@@ -50,10 +50,10 @@ type VMEnv struct {
 func NewEnv(ctx context.Context, state *LightState, chainConfig *core.ChainConfig, chain *LightChain, msg core.Message, header *types.Header, cfg vm.Config) *VMEnv {
 	env := &VMEnv{
 		chainConfig: chainConfig,
-		chain:  chain,
-		header: header,
-		msg:    msg,
-		typ:    vm.StdVmTy,
+		chain:       chain,
+		header:      header,
+		msg:         msg,
+		typ:         vm.StdVmTy,
 	}
 	env.state = &VMState{ctx: ctx, state: state, env: env}
 

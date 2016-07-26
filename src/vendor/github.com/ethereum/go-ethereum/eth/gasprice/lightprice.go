@@ -60,7 +60,7 @@ func (self *LightPriceOracle) SuggestPrice(ctx context.Context) (*big.Int, error
 	lastPrice := self.lastPrice
 	self.cacheLock.RUnlock()
 
-	head := self.backend.HeaderByNumber(rpc.LatestBlockNumber)
+	head, _ := self.backend.HeaderByNumber(ctx, rpc.LatestBlockNumber)
 	headHash := head.Hash()
 	if headHash == lastHead {
 		return lastPrice, nil
