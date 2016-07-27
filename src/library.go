@@ -4,8 +4,8 @@ import "C"
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"github.com/ethereum/go-ethereum/whisper"
+	"os"
 )
 
 var emptyError = ""
@@ -48,6 +48,24 @@ func UnlockAccount(address, password *C.char, seconds int) *C.char {
 	// just modified to unlock the account for the currently running geth node
 	// based on the provided arguments
 	err := unlockAccount(C.GoString(address), C.GoString(password), seconds)
+
+	errString := emptyError
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		errString = err.Error()
+	}
+
+	out := JSONError{
+		Error: errString,
+	}
+	outBytes, _ := json.Marshal(&out)
+
+	return C.CString(string(outBytes))
+}
+
+//export CompleteTransaction
+func CompleteTransaction(hash *C.char) *C.char {
+	err := completeTransaction(C.GoString(hash))
 
 	errString := emptyError
 	if err != nil {
@@ -121,11 +139,11 @@ func addPeer(url *C.char) *C.char {
 //export addWhisperFilter
 func addWhisperFilter(filterJson *C.char) *C.char {
 
-    var id int
-    var filter whisper.NewFilterArgs
+	var id int
+	var filter whisper.NewFilterArgs
 
-    err := json.Unmarshal([]byte(C.GoString(filterJson)), &filter)
-    if err == nil {
+	err := json.Unmarshal([]byte(C.GoString(filterJson)), &filter)
+	if err == nil {
 		id = doAddWhisperFilter(filter)
 	}
 
@@ -136,13 +154,13 @@ func addWhisperFilter(filterJson *C.char) *C.char {
 	}
 
 	out := AddWhisperFilterResult{
-		Id: id,
+		Id:    id,
 		Error: errString,
 	}
 	outBytes, _ := json.Marshal(&out)
 
 	return C.CString(string(outBytes))
-	
+
 }
 
 //export removeWhisperFilter
@@ -154,5 +172,5 @@ func removeWhisperFilter(idFilter int) {
 //export clearWhisperFilters
 func clearWhisperFilters() {
 
-    doClearWhisperFilters()
+	doClearWhisperFilters()
 }

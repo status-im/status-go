@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/les"
 	"github.com/ethereum/go-ethereum/logger"
 	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/ethereum/go-ethereum/node"
@@ -29,14 +30,15 @@ const (
 )
 
 var (
-	vString        string            // Combined textual representation of the version
-	rConfig        release.Config    // Structured version information and release oracle config
-	currentNode    *node.Node        // currently running geth node
-	c              *cli.Context      // the CLI context used to start the geth node
-	accountSync    *[]node.Service   // the object used to sync accounts between geth services
-	accountManager *accounts.Manager // the account manager attached to the currentNode
-	whisperService *whisper.Whisper  // whisper service
-	datadir        string            // data directory for geth
+	vString        string             // Combined textual representation of the version
+	rConfig        release.Config     // Structured version information and release oracle config
+	currentNode    *node.Node         // currently running geth node
+	c              *cli.Context       // the CLI context used to start the geth node
+	accountSync    *[]node.Service    // the object used to sync accounts between geth services
+	lightEthereum  *les.LightEthereum // LES service
+	accountManager *accounts.Manager  // the account manager attached to the currentNode
+	whisperService *whisper.Whisper   // whisper service
+	datadir        string             // data directory for geth
 )
 
 func main() {
@@ -60,7 +62,8 @@ func MakeNode(inputDir string) *node.Node {
 	set.Bool("rpc", true, "enable rpc")
 	set.String("rpcaddr", "localhost", "host for RPC")
 	set.String("rpcport", "8545", "rpc port")
-	set.String("rpcapi", "db,eth,net,web3,shh,admin", "rpc api(s)")
+	set.String("verbosity", "3", "verbosity level")
+	set.String("rpcapi", "db,eth,net,web3,shh,personal,admin", "rpc api(s)")
 	set.String("datadir", datadir, "data directory for geth")
 	set.String("logdir", datadir, "log dir for glog")
 	c = cli.NewContext(nil, set, nil)
@@ -92,6 +95,11 @@ func RunNode(nodeIn *node.Node) {
 	if err := nodeIn.Service(&whisperService); err != nil {
 		glog.V(logger.Warn).Infoln("cannot get whisper service:", err)
 	}
+	if err := nodeIn.Service(&lightEthereum); err != nil {
+		glog.V(logger.Warn).Infoln("cannot get light ethereum service:", err)
+	}
+	lightEthereum.StatusBackend.SetTransactionQueueHandler(onSendTransactionRequest)
+
 	nodeIn.Wait()
 }
 

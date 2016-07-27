@@ -1,15 +1,25 @@
 package main
 
+/*
+#include <stddef.h>
+#include <stdbool.h>
+#include <jni.h>
+extern bool GethServiceSignalEvent( const char *jsonEvent );
+*/
+import "C"
+
 import (
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"time"
 
+	"encoding/json"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/les"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	errextra "github.com/pkg/errors"
 )
@@ -95,7 +105,6 @@ func createAndStartNode(inputDir string) error {
 
 }
 
-
 func doAddPeer(url string) (bool, error) {
 	server := currentNode.Server()
 	if server == nil {
@@ -108,4 +117,30 @@ func doAddPeer(url string) (bool, error) {
 	}
 	server.AddPeer(node)
 	return true, nil
+}
+
+func onSendTransactionRequest(queuedTx les.QueuedTx) {
+	event := GethEvent{
+		Type: "sendTransactionQueued",
+		Event: SendTransactionEvent{
+			Hash: queuedTx.Hash.Hex(),
+			Args: queuedTx.Args,
+		},
+	}
+
+	body, _ := json.Marshal(&event)
+	C.GethServiceSignalEvent(C.CString(string(body)))
+}
+
+func completeTransaction(hash string) error {
+	if currentNode != nil {
+
+		if lightEthereum != nil {
+			backend := lightEthereum.StatusBackend
+			return backend.CompleteQueuedTransaction(les.QueuedTxHash(hash))
+		}
+		return errors.New("Could not retrieve light ethereum service")
+	}
+
+	return errors.New("No running node detected for account unlock")
 }

@@ -69,6 +69,8 @@ type LightEthereum struct {
 	PowTest       bool
 	netVersionId  int
 	netRPCService *ethapi.PublicNetAPI
+
+	StatusBackend *StatusBackend
 }
 
 func New(ctx *node.ServiceContext, config *eth.Config) (*LightEthereum, error) {
@@ -125,6 +127,10 @@ func New(ctx *node.ServiceContext, config *eth.Config) (*LightEthereum, error) {
 
 	eth.ApiBackend = &LesApiBackend{eth, nil}
 	eth.ApiBackend.gpo = gasprice.NewLightPriceOracle(eth.ApiBackend)
+
+	// inject status-im backend
+	eth.StatusBackend = NewStatusBackend(eth.ApiBackend)
+
 	return eth, nil
 }
 

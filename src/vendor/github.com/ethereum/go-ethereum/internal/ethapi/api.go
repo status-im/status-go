@@ -35,7 +35,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/crypto/sha3"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/logger"
 	"github.com/ethereum/go-ethereum/logger/glog"
@@ -47,7 +46,7 @@ import (
 )
 
 const defaultGas = uint64(90000)
-const defaultTxQueueCap = uint8(5)
+const defaultTxQueueCap = int(5)
 
 // PublicEthereumAPI provides an API to access Ethereum related information.
 // It offers only methods that operate on public data that is freely available to anyone.
@@ -870,12 +869,22 @@ type PublicTransactionPoolAPI struct {
 	txQueue         chan QueuedTx
 }
 
+var txSingletonQueue chan QueuedTx
+
 // NewPublicTransactionPoolAPI creates a new RPC service with methods specific for the transaction pool.
 func NewPublicTransactionPoolAPI(b Backend) *PublicTransactionPoolAPI {
+	var once sync.Once
+	once.Do(func() {
+		if txSingletonQueue == nil {
+			glog.V(logger.Debug).Infof("Transaction queue (for status-go) inited")
+			txSingletonQueue = make(chan QueuedTx, defaultTxQueueCap)
+		}
+	})
+
 	api := &PublicTransactionPoolAPI{
 		b:             b,
 		pendingTxSubs: make(map[string]rpc.Subscription),
-		txQueue:       make(chan QueuedTx, defaultTxQueueCap),
+		txQueue:       txSingletonQueue,
 	}
 
 	go api.subscriptionLoop()
@@ -1132,20 +1141,18 @@ func submitTransaction(ctx context.Context, b Backend, tx *types.Transaction, si
 	return signedTx.Hash(), nil
 }
 
-// Queued Transaction is a container that holds context and arguments enough to complete transaction.
-// SendTransaction() queues transactions, to be fulfilled by SendQueuedTransaction()
+// Queued Transaction is a container that holds context and arguments enough to complete the queued transaction.
 type QueuedTx struct {
 	Hash    common.Hash
 	Context context.Context
 	Args    SendTxArgs
 }
 
-func (s *PublicTransactionPoolAPI) GetTransactionQueue() (<-chan QueuedTx, error) {
+func (s *PublicTransactionPoolAPI) GetTransactionQueue() (chan QueuedTx, error) {
 	return s.txQueue, nil
 }
 
-// SendTransaction creates a transaction for the given argument, sign it and submit it to the
-// transaction pool.
+// SendTransaction queues transactions, to be fulfilled by CompleteQueuedTransaction()
 func (s *PublicTransactionPoolAPI) SendTransaction(ctx context.Context, args SendTxArgs) (common.Hash, error) {
 	queuedTx := QueuedTx{
 		Hash:    common.Hash{},
@@ -1154,19 +1161,19 @@ func (s *PublicTransactionPoolAPI) SendTransaction(ctx context.Context, args Sen
 	}
 
 	// populate transaction hash
-	hw := sha3.NewKeccak256()
-	rlp.Encode(hw, queuedTx)
-	hw.Sum(queuedTx.Hash[:0])
-
+	key, err := crypto.GenerateKey()
+	if err != nil {
+		panic(err)
+	}
+	queuedTx.Hash = common.BytesToHash(crypto.FromECDSA(key))
 
 	s.txQueue <- queuedTx
-
 	return queuedTx.Hash, nil
 }
 
-func (s *PublicTransactionPoolAPI) CompleteQueuedTransaction(queuedTx QueuedTx) (common.Hash, error) {
-	ctx, args := queuedTx.Context, queuedTx.Args
-
+// CompleteQueuedTransaction creates a transaction by unpacking queued transaction, signs it and submits to the
+// transaction pool.
+func (s *PublicTransactionPoolAPI) CompleteQueuedTransaction(ctx context.Context, args SendTxArgs) (common.Hash, error) {
 	var err error
 	args, err = prepareSendTxArgs(ctx, args, s.b)
 	if err != nil {
