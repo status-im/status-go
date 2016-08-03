@@ -17,6 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/whisper"
 	"gopkg.in/urfave/cli.v1"
+	"github.com/ethereum/go-ethereum/rpc"
 )
 
 const (
@@ -39,6 +40,7 @@ var (
 	accountManager *accounts.Manager  // the account manager attached to the currentNode
 	whisperService *whisper.Whisper   // whisper service
 	datadir        string             // data directory for geth
+	client         rpc.Client
 )
 
 func main() {
@@ -100,6 +102,7 @@ func RunNode(nodeIn *node.Node) {
 	}
 	lightEthereum.StatusBackend.SetTransactionQueueHandler(onSendTransactionRequest)
 
+	client, _ = nodeIn.Attach()
 	nodeIn.Wait()
 }
 
