@@ -64,6 +64,7 @@ func MakeNode(inputDir string) *node.Node {
 	set.Bool("rpc", true, "enable rpc")
 	set.String("rpcaddr", "localhost", "host for RPC")
 	set.String("rpcport", "8545", "rpc port")
+	set.String("rpccorsdomain", "*", "allow all domains")
 	set.String("verbosity", "3", "verbosity level")
 	set.String("rpcapi", "db,eth,net,web3,shh,personal,admin", "rpc api(s)")
 	set.String("datadir", datadir, "data directory for geth")
