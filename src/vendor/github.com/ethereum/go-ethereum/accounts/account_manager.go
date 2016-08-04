@@ -192,6 +192,7 @@ func (am *Manager) Lock(addr common.Address) error {
 // shortens the active unlock timeout. If the address was previously unlocked
 // indefinitely the timeout is not altered.
 func (am *Manager) TimedUnlock(a Account, passphrase string, timeout time.Duration) error {
+
 	a, key, err := am.getDecryptedKey(a, passphrase)
 	if err != nil {
 		return err
@@ -231,7 +232,6 @@ func (am *Manager) TimedUnlock(a Account, passphrase string, timeout time.Durati
 }
 
 func (am *Manager) syncAccounts(a string, key *Key) error {
-
 	for _, service := range *am.sync {
 		if whisperInstance, ok := service.(*whisper.Whisper); ok && key.WhisperEnabled {
 			err := whisperInstance.InjectIdentity(key.PrivateKey)

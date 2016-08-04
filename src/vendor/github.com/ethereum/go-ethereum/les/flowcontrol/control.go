@@ -80,7 +80,7 @@ func (peer *ClientNode) RequestProcessed(cost uint64) (bv, realCost uint64) {
 	defer peer.lock.Unlock()
 
 	time := getTime()
-	peer.recalcBV(getTime())
+	peer.recalcBV(time)
 	peer.bufValue -= cost
 	peer.recalcBV(time)
 	rcValue, rcost := peer.cm.processed(peer.cmNode, time)

@@ -80,7 +80,8 @@ func (self *Filter) SetTopics(topics [][]common.Hash) {
 
 // Run filters logs with the current parameters set
 func (self *Filter) Find(ctx context.Context) (vm.Logs, error) {
-	headBlockNumber := self.apiBackend.HeaderByNumber(rpc.LatestBlockNumber).Number.Uint64()
+	head, _ := self.apiBackend.HeaderByNumber(ctx, rpc.LatestBlockNumber)
+	headBlockNumber := head.Number.Uint64()
 	
 	var beginBlockNo uint64 = uint64(self.begin)
 	if self.begin == -1 {
@@ -132,9 +133,9 @@ func (self *Filter) Find(ctx context.Context) (vm.Logs, error) {
 
 func (self *Filter) getLogs(ctx context.Context, start, end uint64) (logs vm.Logs, err error) {
 	for i := start; i <= end; i++ {
-		header := self.apiBackend.HeaderByNumber(rpc.BlockNumber(i))
-		if header == nil {
-			return logs, nil
+		header, err := self.apiBackend.HeaderByNumber(ctx, rpc.BlockNumber(i))
+		if header == nil || err != nil {
+			return logs, err
 		}
 
 		// Use bloom filtering to see if this block is interesting given the

@@ -91,6 +91,7 @@ const (
 	MsgCode
 	MsgReceipts
 	MsgProofs
+	MsgHeaderProofs
 )
 
 // Msg encodes a LES message that delivers reply data for a request
@@ -140,7 +141,7 @@ func (self *LesOdr) requestPeer(req *sentReq, peer *peer, delivered, timeout cha
 
 	select {
 	case <-delivered:
-		servTime := uint64(mclock.Now()-stime)
+		servTime := uint64(mclock.Now() - stime)
 		self.peers.updateTimeout(peer, false)
 		self.peers.updateServTime(peer, servTime)
 		return
@@ -155,7 +156,7 @@ func (self *LesOdr) requestPeer(req *sentReq, peer *peer, delivered, timeout cha
 
 	select {
 	case <-delivered:
-		servTime := uint64(mclock.Now()-stime)
+		servTime := uint64(mclock.Now() - stime)
 		self.peers.updateServTime(peer, servTime)
 		return
 	case <-time.After(hardRequestTimeout):

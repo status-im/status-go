@@ -6,9 +6,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/les"
+	"github.com/ethereum/go-ethereum/logger"
+	"github.com/ethereum/go-ethereum/logger/glog"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/go-ethereum/whisper"
+	"math/big"
 )
 
 // TestAccountBindings makes sure we can create an account and subsequently
@@ -38,10 +44,13 @@ func TestAccountBindings(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	// test to see if the account was injected in whisper
-	whisperInstance := (*accountSync)[0].(*whisper.Whisper)
-	identitySucess := whisperInstance.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubkey)))
-	if !identitySucess || err != nil {
-		t.Error("Test failed: identity not injected into whisper")
+	var whisperInstance *whisper.Whisper
+	if err := currentNode.Service(&whisperInstance); err != nil {
+		t.Errorf("whisper service not running: %v", err)
+	}
+	identitySucsess := whisperInstance.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubkey)))
+	if !identitySucsess || err != nil {
+		t.Errorf("Test failed: identity not injected into whisper: %v", err)
 	}
 
 	// test to see if we can post with the injected whisper identity
@@ -53,9 +62,65 @@ func TestAccountBindings(t *testing.T) {
 		Payload: "test message",
 	}
 	whisperAPI := whisper.NewPublicWhisperAPI(whisperInstance)
-	postSucess, err := whisperAPI.Post(postArgs)
-	if !postSucess || err != nil {
-		t.Error("Test failed: Could not post to whisper")
+	postSuccess, err := whisperAPI.Post(postArgs)
+	if !postSuccess || err != nil {
+		t.Errorf("Test failed: Could not post to whisper: %v", err)
+	}
+
+	// create another account
+	address1, _, err := createAccount("badpassword")
+	if err != nil {
+		fmt.Println(err.Error())
+		t.Error("Test failed: could not create account")
+	}
+
+	// unlock the created account
+	err = unlockAccount(address1, "badpassword", 3)
+	if err != nil {
+		fmt.Println(err)
+		t.Error("Test failed: could not unlock account")
+	}
+	time.Sleep(2 * time.Second)
+
+	// test transaction queueing
+	var lightEthereum *les.LightEthereum
+	if err := currentNode.Service(&lightEthereum); err != nil {
+		t.Errorf("Test failed: LES service is not running: %v", err)
+	}
+	backend := lightEthereum.StatusBackend
+
+	// replace transaction notification hanlder
+	sentinel := 0
+	backend.SetTransactionQueueHandler(func(queuedTx les.QueuedTx) {
+		glog.V(logger.Info).Infof("[STATUS-GO] Tx queue value: %v\n", queuedTx.Hash.Hex())
+		if err := completeTransaction(queuedTx.Hash.Hex()); err != nil {
+			t.Errorf("Test failed: cannot complete queued transation[%s]: %v", queuedTx.Hash.Hex(), err)
+		}
+		sentinel = 1
+	})
+
+	from, err := utils.MakeAddress(accountManager, address1)
+	if err != nil {
+		t.Errorf("Test failed: Could not retrieve account from address: %v", err)
+	}
+
+	to, err := utils.MakeAddress(accountManager, address)
+	if err != nil {
+		t.Errorf("Test failed: Could not retrieve account from address: %v", err)
+	}
+
+	err = backend.SendTransaction(nil, les.SendTxArgs{
+		From:  from.Address,
+		To:    &to.Address,
+		Value: rpc.NewHexNumber(big.NewInt(1000000000000)),
+	})
+	if err != nil {
+		t.Errorf("Test failed: cannot send transaction: %v", err)
+	}
+
+	time.Sleep(5 * time.Second)
+	if sentinel != 1 {
+		t.Error("Test failed: transaction was never queued or completed")
 	}
 
 	// clean up
@@ -63,5 +128,4 @@ func TestAccountBindings(t *testing.T) {
 	if err != nil {
 		t.Error("Test failed: could not clean up temporary datadir")
 	}
-
 }
