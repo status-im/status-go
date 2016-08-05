@@ -20,6 +20,7 @@ import (
 // TestAccountBindings makes sure we can create an account and subsequently
 // unlock that account
 func TestAccountBindings(t *testing.T) {
+	rpcport = 8546 // in order to avoid conflicts with running react-native app
 
 	// start geth node and wait for it to initialize
 	go createAndStartNode(".ethereumtest")
@@ -99,6 +100,12 @@ func TestAccountBindings(t *testing.T) {
 		sentinel = 1
 	})
 
+	// try completing non-existing transaction
+	if err := completeTransaction("0x1234512345123451234512345123456123451234512345123451234512345123"); err == nil {
+		t.Errorf("Test failed: error expected and not recieved")
+	}
+
+	// send normal transaction
 	from, err := utils.MakeAddress(accountManager, address1)
 	if err != nil {
 		t.Errorf("Test failed: Could not retrieve account from address: %v", err)

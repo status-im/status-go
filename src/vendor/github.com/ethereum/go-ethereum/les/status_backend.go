@@ -9,11 +9,18 @@ import (
 	"github.com/ethereum/go-ethereum/logger"
 	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/ethereum/go-ethereum/rpc"
+	"errors"
 )
 
-const defaultTxQueueCap = int(5)
-const defaultEvictingTxQueueCap = int(20)
-const defaultEvictingTxQueueEvictionStep = int(5) // how many item to evict in a single run
+const (
+	defaultTxQueueCap                  = int(5)  // how many items can be passed to sendTransaction() w/o blocking
+	defaultEvictingTxQueueCap          = int(20) // how many items can be queued
+	defaultEvictingTxQueueEvictionStep = int(5)  // how many item to evict in a single run
+)
+
+var (
+	ErrQueuedTxHashNotFound = errors.New("Transaction hash not found")
+)
 
 // StatusBackend implements les.StatusBackend with direct calls to Ethereum
 // internals to support calls from status-go bindings (to internal packages e.g. ethapi)
@@ -113,7 +120,7 @@ func (b *StatusBackend) GetTransactionQueue() (chan QueuedTx, error) {
 func (b *StatusBackend) transactionQueueForwardingLoop() {
 	txQueue, err := b.txapi.GetTransactionQueue()
 	if err != nil {
-		glog.V(logger.Error).Infof("Cannot read from transaction queue")
+		glog.V(logger.Error).Infof("cannot read from transaction queue")
 		return
 	}
 
@@ -158,5 +165,5 @@ func (q *evictingTxQueue) getQueuedTransaction(hash QueuedTxHash) (*QueuedTx, er
 		return tx, nil
 	}
 
-	return nil, nil
+	return nil, ErrQueuedTxHashNotFound
 }

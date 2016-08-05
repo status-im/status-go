@@ -15,9 +15,9 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/release"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/go-ethereum/whisper"
 	"gopkg.in/urfave/cli.v1"
-	"github.com/ethereum/go-ethereum/rpc"
 )
 
 const (
@@ -31,15 +31,16 @@ const (
 )
 
 var (
-	vString        string             // Combined textual representation of the version
-	rConfig        release.Config     // Structured version information and release oracle config
-	currentNode    *node.Node         // currently running geth node
-	c              *cli.Context       // the CLI context used to start the geth node
-	accountSync    *[]node.Service    // the object used to sync accounts between geth services
-	lightEthereum  *les.LightEthereum // LES service
-	accountManager *accounts.Manager  // the account manager attached to the currentNode
-	whisperService *whisper.Whisper   // whisper service
-	datadir        string             // data directory for geth
+	vString        string                    // Combined textual representation of the version
+	rConfig        release.Config            // Structured version information and release oracle config
+	currentNode    *node.Node                // currently running geth node
+	c              *cli.Context              // the CLI context used to start the geth node
+	accountSync    *[]node.Service           // the object used to sync accounts between geth services
+	lightEthereum  *les.LightEthereum        // LES service
+	accountManager *accounts.Manager         // the account manager attached to the currentNode
+	whisperService *whisper.Whisper          // whisper service
+	datadir        string                    // data directory for geth
+	rpcport        int                = 8545 // RPC port (replaced in unit tests)
 	client         rpc.Client
 )
 
@@ -63,7 +64,7 @@ func MakeNode(inputDir string) *node.Node {
 	set.Bool("testnet", true, "light test network")
 	set.Bool("rpc", true, "enable rpc")
 	set.String("rpcaddr", "localhost", "host for RPC")
-	set.String("rpcport", "8545", "rpc port")
+	set.Int("rpcport", rpcport, "rpc port")
 	set.String("rpccorsdomain", "*", "allow all domains")
 	set.String("verbosity", "3", "verbosity level")
 	set.String("rpcapi", "db,eth,net,web3,shh,personal,admin", "rpc api(s)")
