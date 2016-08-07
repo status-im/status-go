@@ -1,10 +1,9 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
-	"runtime"
-
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/common"
@@ -18,6 +17,11 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/go-ethereum/whisper"
 	"gopkg.in/urfave/cli.v1"
+	"io"
+	"os"
+	"path"
+	"path/filepath"
+	"runtime"
 )
 
 const (
@@ -44,6 +48,10 @@ var (
 	client         rpc.Client
 )
 
+var (
+	ErrDataDirPreprocessingFailed = errors.New("Failed to pre-process data directory")
+)
+
 func main() {
 
 	// Placeholder for anything we want to run by default
@@ -54,7 +62,7 @@ func main() {
 // MakeNode create a geth node entity
 func MakeNode(inputDir string) *node.Node {
 
-	datadir = inputDir
+	datadir := inputDir
 
 	// TODO remove admin rpcapi flag
 	set := flag.NewFlagSet("test", 0)
@@ -126,4 +134,44 @@ func makeDefaultExtra() []byte {
 		return nil
 	}
 	return extra
+}
+
+func preprocessDataDir(dataDir string) (string, error) {
+	testDataDir := path.Join(dataDir, "testnet")
+	if _, err := os.Stat(testDataDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(testDataDir, 0755); err != nil {
+			return dataDir, ErrDataDirPreprocessingFailed
+		}
+	}
+
+	// copy over static peer nodes list (LES auto-discovery is not stable yet)
+	dst := filepath.Join(testDataDir, "static-nodes.json")
+	if _, err := os.Stat(dst); os.IsNotExist(err) {
+		src := filepath.Join("data", "static-nodes.json")
+		if err := copyFile(dst, src); err != nil {
+			return dataDir, err
+		}
+	}
+
+	return dataDir, nil
+}
+
+func copyFile(dst, src string) error {
+	s, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer s.Close()
+
+	d, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer d.Close()
+
+	if _, err := io.Copy(d, s); err != nil {
+		return err
+	}
+
+	return nil
 }

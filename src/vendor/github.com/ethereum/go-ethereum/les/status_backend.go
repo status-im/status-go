@@ -108,7 +108,7 @@ func (b *StatusBackend) CompleteQueuedTransaction(hash QueuedTxHash) error {
 		return err
 	}
 
-	_, err = b.txapi.CompleteQueuedTransaction(queuedTx.Context, ethapi.SendTxArgs(queuedTx.Args))
+	_, err = b.txapi.CompleteQueuedTransaction(context.Background(), ethapi.SendTxArgs(queuedTx.Args))
 	return err
 }
 

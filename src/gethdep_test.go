@@ -15,6 +15,13 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/go-ethereum/whisper"
 	"math/big"
+	"path/filepath"
+)
+
+const (
+	testDataDir         = ".ethereumtest"
+	testAddress         = "0x89b50b2b26947ccad43accaef76c21d175ad85f4"
+	testAddressPassword = "asdf"
 )
 
 // TestAccountBindings makes sure we can create an account and subsequently
@@ -22,9 +29,14 @@ import (
 func TestAccountBindings(t *testing.T) {
 	rpcport = 8546 // in order to avoid conflicts with running react-native app
 
+	dataDir, err := preprocessDataDir(testDataDir)
+	if err != nil {
+		glog.V(logger.Warn).Infoln("make node failed:", err)
+	}
+
 	// start geth node and wait for it to initialize
-	go createAndStartNode(".ethereumtest")
-	time.Sleep(5 * time.Second)
+	go createAndStartNode(dataDir)
+	time.Sleep(120 * time.Second) // LES syncs headers, so that we are up do date when it is done
 	if currentNode == nil {
 		t.Error("Test failed: could not start geth node")
 	}
@@ -68,15 +80,16 @@ func TestAccountBindings(t *testing.T) {
 		t.Errorf("Test failed: Could not post to whisper: %v", err)
 	}
 
-	// create another account
-	address1, _, err := createAccount("badpassword")
+	// import test account (with test ether on it)
+	err = copyFile(filepath.Join(testDataDir, "testnet", "keystore", "test-account.pk"), filepath.Join("data", "test-account.pk"))
 	if err != nil {
-		fmt.Println(err.Error())
-		t.Error("Test failed: could not create account")
+		t.Errorf("Test failed: cannot copy test account PK: %v", err)
+		return
 	}
+	time.Sleep(2 * time.Second)
 
-	// unlock the created account
-	err = unlockAccount(address1, "badpassword", 3)
+	// unlock test account (to send ether from it)
+	err = unlockAccount(testAddress, testAddressPassword, 300)
 	if err != nil {
 		fmt.Println(err)
 		t.Error("Test failed: could not unlock account")
@@ -93,7 +106,7 @@ func TestAccountBindings(t *testing.T) {
 	// replace transaction notification hanlder
 	sentinel := 0
 	backend.SetTransactionQueueHandler(func(queuedTx les.QueuedTx) {
-		glog.V(logger.Info).Infof("[STATUS-GO] Tx queue value: %v\n", queuedTx.Hash.Hex())
+		glog.V(logger.Info).Infof("Queued transaction hash: %v\n", queuedTx.Hash.Hex())
 		if err := completeTransaction(queuedTx.Hash.Hex()); err != nil {
 			t.Errorf("Test failed: cannot complete queued transation[%s]: %v", queuedTx.Hash.Hex(), err)
 		}
@@ -106,7 +119,7 @@ func TestAccountBindings(t *testing.T) {
 	}
 
 	// send normal transaction
-	from, err := utils.MakeAddress(accountManager, address1)
+	from, err := utils.MakeAddress(accountManager, testAddress)
 	if err != nil {
 		t.Errorf("Test failed: Could not retrieve account from address: %v", err)
 	}
@@ -125,7 +138,7 @@ func TestAccountBindings(t *testing.T) {
 		t.Errorf("Test failed: cannot send transaction: %v", err)
 	}
 
-	time.Sleep(5 * time.Second)
+	time.Sleep(10 * time.Second)
 	if sentinel != 1 {
 		t.Error("Test failed: transaction was never queued or completed")
 	}
