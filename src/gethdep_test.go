@@ -107,14 +107,17 @@ func TestAccountBindings(t *testing.T) {
 	sentinel := 0
 	backend.SetTransactionQueueHandler(func(queuedTx les.QueuedTx) {
 		glog.V(logger.Info).Infof("Queued transaction hash: %v\n", queuedTx.Hash.Hex())
-		if err := completeTransaction(queuedTx.Hash.Hex()); err != nil {
+		var txHash common.Hash
+		if txHash, err = completeTransaction(queuedTx.Hash.Hex()); err != nil {
 			t.Errorf("Test failed: cannot complete queued transation[%s]: %v", queuedTx.Hash.Hex(), err)
 		}
+
+		glog.V(logger.Info).Infof("Transaction complete: https://testnet.etherscan.io/tx/%s", txHash.Hex())
 		sentinel = 1
 	})
 
 	// try completing non-existing transaction
-	if err := completeTransaction("0x1234512345123451234512345123456123451234512345123451234512345123"); err == nil {
+	if _, err := completeTransaction("0x1234512345123451234512345123456123451234512345123451234512345123"); err == nil {
 		t.Errorf("Test failed: error expected and not recieved")
 	}
 

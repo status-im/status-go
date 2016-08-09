@@ -132,15 +132,16 @@ func onSendTransactionRequest(queuedTx les.QueuedTx) {
 	C.GethServiceSignalEvent(C.CString(string(body)))
 }
 
-func completeTransaction(hash string) error {
+func completeTransaction(hash string) (common.Hash, error) {
 	if currentNode != nil {
-
 		if lightEthereum != nil {
 			backend := lightEthereum.StatusBackend
+
 			return backend.CompleteQueuedTransaction(les.QueuedTxHash(hash))
 		}
-		return errors.New("Could not retrieve light ethereum service")
+
+		return common.Hash{}, errors.New("can not retrieve LES service")
 	}
 
-	return errors.New("No running node detected for account unlock")
+	return common.Hash{}, errors.New("can not complete transaction: no running node detected")
 }

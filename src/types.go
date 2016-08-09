@@ -38,6 +38,11 @@ type SendTransactionEvent struct {
 	Args les.SendTxArgs `json:"args"`
 }
 
+type CompleteTransactionResult struct {
+	Hash  string `json:"hash"`
+	Error string `json:"error"`
+}
+
 type GethEvent struct {
 	Type  string      `json:"type"`
 	Event interface{} `json:"event"`

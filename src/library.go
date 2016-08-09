@@ -65,7 +65,7 @@ func UnlockAccount(address, password *C.char, seconds int) *C.char {
 
 //export CompleteTransaction
 func CompleteTransaction(hash *C.char) *C.char {
-	err := completeTransaction(C.GoString(hash))
+	txHash, err := completeTransaction(C.GoString(hash))
 
 	errString := emptyError
 	if err != nil {
@@ -73,7 +73,8 @@ func CompleteTransaction(hash *C.char) *C.char {
 		errString = err.Error()
 	}
 
-	out := JSONError{
+	out := CompleteTransactionResult{
+		Hash:  txHash.Hex(),
 		Error: errString,
 	}
 	outBytes, _ := json.Marshal(&out)

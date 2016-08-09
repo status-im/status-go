@@ -4,12 +4,12 @@ import (
 	"golang.org/x/net/context"
 	"sync"
 
+	"errors"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/internal/ethapi"
 	"github.com/ethereum/go-ethereum/logger"
 	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/ethereum/go-ethereum/rpc"
-	"errors"
 )
 
 const (
@@ -102,14 +102,13 @@ func (b *StatusBackend) SendTransaction(ctx context.Context, args SendTxArgs) er
 }
 
 // CompleteQueuedTransaction wraps call to PublicTransactionPoolAPI.CompleteQueuedTransaction
-func (b *StatusBackend) CompleteQueuedTransaction(hash QueuedTxHash) error {
+func (b *StatusBackend) CompleteQueuedTransaction(hash QueuedTxHash) (common.Hash, error) {
 	queuedTx, err := b.txEvictingQueue.getQueuedTransaction(hash)
 	if err != nil {
-		return err
+		return common.Hash{}, err
 	}
 
-	_, err = b.txapi.CompleteQueuedTransaction(context.Background(), ethapi.SendTxArgs(queuedTx.Args))
-	return err
+	return b.txapi.CompleteQueuedTransaction(context.Background(), ethapi.SendTxArgs(queuedTx.Args))
 }
 
 // GetTransactionQueue wraps call to PublicTransactionPoolAPI.GetTransactionQueue
