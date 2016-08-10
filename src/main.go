@@ -1,21 +1,27 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
-	"runtime"
-
+	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/accounts"
+	"github.com/ethereum/go-ethereum/les"
 	"github.com/ethereum/go-ethereum/logger"
 	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/release"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/go-ethereum/whisper"
 	"gopkg.in/urfave/cli.v1"
+	"io"
+	"os"
+	"path"
+	"path/filepath"
+	"runtime"
 )
 
 const (
@@ -29,14 +35,21 @@ const (
 )
 
 var (
-	vString        string             // Combined textual representation of the version
-	rConfig        release.Config     // Structured version information and release oracle config
-	currentNode    *node.Node         // currently running geth node
-	c              *cli.Context       // the CLI context used to start the geth node
-	accountSync    *[]node.Service    // the object used to sync accounts between geth services
-	accountManager *accounts.Manager  // the account manager attached to the currentNode
-	whisperService *whisper.Whisper   // whisper service
-	datadir        string             // data directory for geth
+	vString        string                    // Combined textual representation of the version
+	rConfig        release.Config            // Structured version information and release oracle config
+	currentNode    *node.Node                // currently running geth node
+	c              *cli.Context              // the CLI context used to start the geth node
+	accountSync    *[]node.Service           // the object used to sync accounts between geth services
+	lightEthereum  *les.LightEthereum        // LES service
+	accountManager *accounts.Manager         // the account manager attached to the currentNode
+	whisperService *whisper.Whisper          // whisper service
+	datadir        string                    // data directory for geth
+	rpcport        int                = 8545 // RPC port (replaced in unit tests)
+	client         rpc.Client
+)
+
+var (
+	ErrDataDirPreprocessingFailed = errors.New("Failed to pre-process data directory")
 )
 
 func main() {
@@ -49,7 +62,7 @@ func main() {
 // MakeNode create a geth node entity
 func MakeNode(inputDir string) *node.Node {
 
-	datadir = inputDir
+	datadir := inputDir
 
 	// TODO remove admin rpcapi flag
 	set := flag.NewFlagSet("test", 0)
@@ -59,8 +72,10 @@ func MakeNode(inputDir string) *node.Node {
 	set.Bool("testnet", true, "light test network")
 	set.Bool("rpc", true, "enable rpc")
 	set.String("rpcaddr", "localhost", "host for RPC")
-	set.String("rpcport", "8545", "rpc port")
-	set.String("rpcapi", "db,eth,net,web3,shh,admin", "rpc api(s)")
+	set.Int("rpcport", rpcport, "rpc port")
+	set.String("rpccorsdomain", "*", "allow all domains")
+	set.String("verbosity", "3", "verbosity level")
+	set.String("rpcapi", "db,eth,net,web3,shh,personal,admin", "rpc api(s)")
 	set.String("datadir", datadir, "data directory for geth")
 	set.String("logdir", datadir, "log dir for glog")
 	c = cli.NewContext(nil, set, nil)
@@ -92,6 +107,12 @@ func RunNode(nodeIn *node.Node) {
 	if err := nodeIn.Service(&whisperService); err != nil {
 		glog.V(logger.Warn).Infoln("cannot get whisper service:", err)
 	}
+	if err := nodeIn.Service(&lightEthereum); err != nil {
+		glog.V(logger.Warn).Infoln("cannot get light ethereum service:", err)
+	}
+	lightEthereum.StatusBackend.SetTransactionQueueHandler(onSendTransactionRequest)
+
+	client, _ = nodeIn.Attach()
 	nodeIn.Wait()
 }
 
@@ -113,4 +134,44 @@ func makeDefaultExtra() []byte {
 		return nil
 	}
 	return extra
+}
+
+func preprocessDataDir(dataDir string) (string, error) {
+	testDataDir := path.Join(dataDir, "testnet")
+	if _, err := os.Stat(testDataDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(testDataDir, 0755); err != nil {
+			return dataDir, ErrDataDirPreprocessingFailed
+		}
+	}
+
+	// copy over static peer nodes list (LES auto-discovery is not stable yet)
+	dst := filepath.Join(testDataDir, "static-nodes.json")
+	if _, err := os.Stat(dst); os.IsNotExist(err) {
+		src := filepath.Join("data", "static-nodes.json")
+		if err := copyFile(dst, src); err != nil {
+			return dataDir, err
+		}
+	}
+
+	return dataDir, nil
+}
+
+func copyFile(dst, src string) error {
+	s, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer s.Close()
+
+	d, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer d.Close()
+
+	if _, err := io.Copy(d, s); err != nil {
+		return err
+	}
+
+	return nil
 }

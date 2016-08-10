@@ -33,3 +33,6 @@ profile.cov
 
 # vagrant
 .vagrant
+
+# tests
+src/.ethereumtest/

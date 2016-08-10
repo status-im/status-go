@@ -31,7 +31,6 @@ import (
 	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rlp"
-	"gopkg.in/fatih/set.v0"
 )
 
 var (
@@ -40,9 +39,7 @@ var (
 	errNotRegistered     = errors.New("peer is not registered")
 )
 
-const (
-	maxKnownBlocks = 1024 // Maximum block hashes to keep in the known list (prevent DOS)
-)
+const maxHeadInfoLen = 20
 
 type peer struct {
 	*p2p.Peer
@@ -54,15 +51,17 @@ type peer struct {
 
 	id string
 
-	headInfo blockInfo
-	number uint64
-	lock sync.RWMutex
+	
+	firstHeadInfo, headInfo *newBlockHashData
+	headInfoLen int
+	lock     sync.RWMutex
 
-	knownBlocks *set.Set // Set of block hashes known to be known by this peer
+	newBlockHashChn chan newBlockHashData
 
-	fcClient *flowcontrol.ClientNode // nil if the peer is server only
-	fcServer *flowcontrol.ServerNode // nil if the peer is client only
-	fcCosts  requestCostTable
+	fcClient       *flowcontrol.ClientNode // nil if the peer is server only
+	fcServer       *flowcontrol.ServerNode // nil if the peer is client only
+	fcServerParams *flowcontrol.ServerParams
+	fcCosts        requestCostTable
 }
 
 func newPeer(version, network int, p *p2p.Peer, rw p2p.MsgReadWriter) *peer {
@@ -74,7 +73,7 @@ func newPeer(version, network int, p *p2p.Peer, rw p2p.MsgReadWriter) *peer {
 		version:     version,
 		network:     network,
 		id:          fmt.Sprintf("%x", id[:8]),
-		knownBlocks: set.New(),
+		newBlockHashChn: make(chan newBlockHashData, 20),
 	}
 }
 
@@ -100,7 +99,66 @@ func (p *peer) headBlockInfo() blockInfo {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
-	return p.headInfo
+	return blockInfo{Hash: p.headInfo.Hash, Number: p.headInfo.Number, Td: p.headInfo.Td}
+}
+
+func (p *peer) addNotify(announce *newBlockHashData) bool {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	if announce.Td.Cmp(p.headInfo.Td) < 1 {
+		return false
+	}
+	if p.headInfoLen >= maxHeadInfoLen {
+		//return false
+		p.firstHeadInfo = p.firstHeadInfo.next
+		p.headInfoLen--
+	}
+	hh := p.headInfo.Number - announce.ReorgDepth
+	if p.headInfo.haveHeaders < hh {
+		hh = p.headInfo.haveHeaders
+	}
+	announce.haveHeaders = hh
+	p.headInfo.next = announce
+	p.headInfo = announce
+	p.headInfoLen++
+	return true
+}
+
+func (p *peer) gotHeader(hash common.Hash, number uint64, td *big.Int) bool {
+	h := p.firstHeadInfo
+	ptr := 0
+	for h != nil {
+		if h.Hash == hash {
+			if h.Number != number || h.Td.Cmp(td) != 0 {
+				return false
+			}
+			h.headKnown = true
+			h.haveHeaders = h.Number
+			p.firstHeadInfo = h
+			p.headInfoLen -= ptr
+			last := h
+			h = h.next
+			// propagate haveHeaders through the chain
+			for h != nil {
+				hh := last.Number-h.ReorgDepth
+				if last.haveHeaders < hh {
+					hh = last.haveHeaders
+				}
+				if hh > h.haveHeaders {
+					h.haveHeaders = hh
+				} else {
+					return true
+				}
+				last = h
+				h = h.next
+			}
+			return true
+		}
+		h = h.next
+		ptr++
+	}
+	return true
 }
 
 // Td retrieves the current total difficulty of a peer.
@@ -128,13 +186,17 @@ func sendResponse(w p2p.MsgWriter, msgcode, reqID, bv uint64, data interface{}) 
 }
 
 func (p *peer) GetRequestCost(msgcode uint64, amount int) uint64 {
-	return p.fcCosts[msgcode].baseCost + p.fcCosts[msgcode].reqCost*uint64(amount)
+	cost := p.fcCosts[msgcode].baseCost + p.fcCosts[msgcode].reqCost*uint64(amount)
+	if cost > p.fcServerParams.BufLimit {
+		cost = p.fcServerParams.BufLimit
+	}
+	return cost
 }
 
-// SendNewBlockHashes announces the availability of a number of blocks through
+// SendNewBlockHash announces the availability of a number of blocks through
 // a hash notification.
-func (p *peer) SendNewBlockHashes(request newBlockHashesData) error {
-	return p2p.Send(p.rw, NewBlockHashesMsg, request)
+func (p *peer) SendNewBlockHash(request newBlockHashData) error {
+	return p2p.Send(p.rw, NewBlockHashMsg, request)
 }
 
 // SendBlockHeaders sends a batch of block headers to the remote peer.
@@ -163,6 +225,11 @@ func (p *peer) SendReceiptsRLP(reqID, bv uint64, receipts []rlp.RawValue) error 
 // SendProofs sends a batch of merkle proofs, corresponding to the ones requested.
 func (p *peer) SendProofs(reqID, bv uint64, proofs proofsData) error {
 	return sendResponse(p.rw, ProofsMsg, reqID, bv, proofs)
+}
+
+// SendHeaderProofs sends a batch of header proofs, corresponding to the ones requested.
+func (p *peer) SendHeaderProofs(reqID, bv uint64, proofs []ChtResp) error {
+	return sendResponse(p.rw, HeaderProofsMsg, reqID, bv, proofs)
 }
 
 // RequestHeadersByHash fetches a batch of blocks' headers corresponding to the
@@ -205,14 +272,20 @@ func (p *peer) RequestProofs(reqID, cost uint64, reqs []*ProofReq) error {
 	return sendRequest(p.rw, GetProofsMsg, reqID, cost, reqs)
 }
 
+// RequestHeaderProofs fetches a batch of header merkle proofs from a remote node.
+func (p *peer) RequestHeaderProofs(reqID, cost uint64, reqs []*ChtReq) error {
+	glog.V(logger.Debug).Infof("%v fetching %v header proofs", p, len(reqs))
+	return sendRequest(p.rw, GetHeaderProofsMsg, reqID, cost, reqs)
+}
+
 func (p *peer) SendTxs(cost uint64, txs types.Transactions) error {
 	glog.V(logger.Debug).Infof("%v relaying %v txs", p, len(txs))
 	p.fcServer.SendRequest(0, cost)
 	return p2p.Send(p.rw, SendTxMsg, txs)
 }
 
-type keyValueEntry struct{
-	Key string
+type keyValueEntry struct {
+	Key   string
 	Value rlp.RawValue
 }
 type keyValueList []keyValueEntry
@@ -307,7 +380,7 @@ func (p *peer) Handshake(td *big.Int, head common.Hash, headNum uint64, genesis 
 		return err
 	}
 	recv := recvList.decode()
-	
+
 	var rGenesis, rHash common.Hash
 	var rVersion, rNetwork, rNum uint64
 	var rTd *big.Int
@@ -330,7 +403,7 @@ func (p *peer) Handshake(td *big.Int, head common.Hash, headNum uint64, genesis 
 	if err := recv.get("genesisHash", &rGenesis); err != nil {
 		return err
 	}
-	
+
 	if rGenesis != genesis {
 		return errResp(ErrGenesisBlockMismatch, "%x (!= %x)", rGenesis, genesis)
 	}
@@ -366,11 +439,15 @@ func (p *peer) Handshake(td *big.Int, head common.Hash, headNum uint64, genesis 
 		if err := recv.get("flowControl/MRC", &MRC); err != nil {
 			return err
 		}
+		p.fcServerParams = params
 		p.fcServer = flowcontrol.NewServerNode(params)
+		p.fcServerParams = params
 		p.fcCosts = MRC.decode()
 	}
-	// Configure the remote peer, and sanity check out handshake too
-	p.headInfo.Td, p.headInfo.Hash, p.headInfo.Number = rTd, rHash, rNum
+
+	p.firstHeadInfo = &newBlockHashData{Td: rTd, Hash: rHash, Number: rNum}
+	p.headInfo = p.firstHeadInfo
+	p.headInfoLen = 1
 	return nil
 }
 

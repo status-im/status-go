@@ -20,6 +20,7 @@ package les
 
 import (
 	"bytes"
+	"encoding/binary"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
@@ -49,6 +50,8 @@ func LesRequest(req light.OdrRequest) LesOdrRequest {
 		return (*TrieRequest)(r)
 	case *light.CodeRequest:
 		return (*CodeRequest)(r)
+	case *light.ChtRequest:
+		return (*ChtRequest)(r)
 	default:
 		return nil
 	}
@@ -156,7 +159,7 @@ func (self *ReceiptsRequest) Valid(db ethdb.Database, msg *Msg) bool {
 type ProofReq struct {
 	BHash       common.Hash
 	AccKey, Key []byte
-	FromLevel	uint
+	FromLevel   uint
 }
 
 // ODR request type for state/storage trie entries, see LesOdrRequest interface
@@ -249,6 +252,74 @@ func (self *CodeRequest) Valid(db ethdb.Database, msg *Msg) bool {
 		return false
 	}
 	self.Data = data
+	glog.V(logger.Debug).Infof("ODR: validation successful")
+	return true
+}
+
+type ChtReq struct {
+	ChtNum, BlockNum, FromLevel uint64
+}
+
+type ChtResp struct {
+	Header *types.Header
+	Proof  []rlp.RawValue
+}
+
+// ODR request type for requesting headers by Canonical Hash Trie, see LesOdrRequest interface
+type ChtRequest light.ChtRequest
+
+// GetCost returns the cost of the given ODR request according to the serving
+// peer's cost table (implementation of LesOdrRequest)
+func (self *ChtRequest) GetCost(peer *peer) uint64 {
+	return peer.GetRequestCost(GetHeaderProofsMsg, 1)
+}
+
+// Request sends an ODR request to the LES network (implementation of LesOdrRequest)
+func (self *ChtRequest) Request(reqID uint64, peer *peer) error {
+	glog.V(logger.Debug).Infof("ODR: requesting CHT #%d block #%d from peer %v", self.ChtNum, self.BlockNum, peer.id)
+	req := &ChtReq{
+		ChtNum:   self.ChtNum,
+		BlockNum: self.BlockNum,
+	}
+	return peer.RequestHeaderProofs(reqID, self.GetCost(peer), []*ChtReq{req})
+}
+
+// Valid processes an ODR request reply message from the LES network
+// returns true and stores results in memory if the message was a valid reply
+// to the request (implementation of LesOdrRequest)
+func (self *ChtRequest) Valid(db ethdb.Database, msg *Msg) bool {
+	glog.V(logger.Debug).Infof("ODR: validating CHT #%d block #%d", self.ChtNum, self.BlockNum)
+
+	if msg.MsgType != MsgHeaderProofs {
+		glog.V(logger.Debug).Infof("ODR: invalid message type")
+		return false
+	}
+	proofs := msg.Obj.([]ChtResp)
+	if len(proofs) != 1 {
+		glog.V(logger.Debug).Infof("ODR: invalid number of entries: %d", len(proofs))
+		return false
+	}
+	proof := proofs[0]
+	var encNumber [8]byte
+	binary.BigEndian.PutUint64(encNumber[:], self.BlockNum)
+	value, err := trie.VerifyProof(self.ChtRoot, encNumber[:], proof.Proof)
+	if err != nil {
+		glog.V(logger.Debug).Infof("ODR: CHT merkle proof verification error: %v", err)
+		return false
+	}
+	var node light.ChtNode
+	if err := rlp.DecodeBytes(value, &node); err != nil {
+		glog.V(logger.Debug).Infof("ODR: error decoding CHT node: %v", err)
+		return false
+	}
+	if node.Hash != proof.Header.Hash() {
+		glog.V(logger.Debug).Infof("ODR: CHT header hash does not match")
+		return false
+	}
+
+	self.Proof = proof.Proof
+	self.Header = proof.Header
+	self.Td = node.Td
 	glog.V(logger.Debug).Infof("ODR: validation successful")
 	return true
 }

@@ -625,3 +625,30 @@ func GetChainConfig(db ethdb.Database, hash common.Hash) (*ChainConfig, error) {
 
 	return &config, nil
 }
+
+// FindCommonAncestor returns the last common ancestor of two block headers
+func FindCommonAncestor(db ethdb.Database, a, b *types.Header) *types.Header {
+	for a.GetNumberU64() > b.GetNumberU64() {
+		a = GetHeader(db, a.ParentHash, a.GetNumberU64()-1)
+		if a == nil {
+			return nil
+		}
+	}
+	for a.GetNumberU64() < b.GetNumberU64() {
+		b = GetHeader(db, b.ParentHash, b.GetNumberU64()-1)
+		if b == nil {
+			return nil
+		}
+	}
+	for a.Hash() != b.Hash() {
+		a = GetHeader(db, a.ParentHash, a.GetNumberU64()-1)
+		if a == nil {
+			return nil
+		}
+		b = GetHeader(db, b.ParentHash, b.GetNumberU64()-1)
+		if b == nil {
+			return nil
+		}
+	}
+	return a
+}

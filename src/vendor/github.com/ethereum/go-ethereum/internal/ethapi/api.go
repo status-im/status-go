@@ -46,6 +46,7 @@ import (
 )
 
 const defaultGas = uint64(90000)
+const defaultTxQueueCap = int(5)
 
 // PublicEthereumAPI provides an API to access Ethereum related information.
 // It offers only methods that operate on public data that is freely available to anyone.
@@ -263,8 +264,8 @@ func (s *PrivateAccountAPI) ListAccounts() []common.Address {
 }
 
 // NewAccount will create a new account and returns the address for the new account.
-func (s *PrivateAccountAPI) NewAccount(password string) (common.Address, error) {
-	acc, err := s.am.NewAccount(password, true)
+func (s *PrivateAccountAPI) NewAccount(password string, w bool) (common.Address, error) {
+	acc, err := s.am.NewAccount(password, w)
 	if err == nil {
 		return acc.Address, nil
 	}
@@ -374,14 +375,15 @@ func (s *PublicBlockChainAPI) subscriptionLoop() {
 
 // BlockNumber returns the block number of the chain head.
 func (s *PublicBlockChainAPI) BlockNumber() *big.Int {
-	return s.b.HeaderByNumber(rpc.LatestBlockNumber).Number
+	header, _ := s.b.HeaderByNumber(context.Background(), rpc.LatestBlockNumber) // latest header should always be available
+	return header.Number
 }
 
 // GetBalance returns the amount of wei for the given address in the state of the
 // given block number. The rpc.LatestBlockNumber and rpc.PendingBlockNumber meta
 // block numbers are also allowed.
 func (s *PublicBlockChainAPI) GetBalance(ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (*big.Int, error) {
-	state, _, err := s.b.StateAndHeaderByNumber(blockNr)
+	state, _, err := s.b.StateAndHeaderByNumber(ctx, blockNr)
 	if state == nil || err != nil {
 		return nil, err
 	}
@@ -505,7 +507,7 @@ func (s *PublicBlockChainAPI) NewBlocks(ctx context.Context, args NewBlocksArgs)
 
 // GetCode returns the code stored at the given address in the state for the given block number.
 func (s *PublicBlockChainAPI) GetCode(ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (string, error) {
-	state, _, err := s.b.StateAndHeaderByNumber(blockNr)
+	state, _, err := s.b.StateAndHeaderByNumber(ctx, blockNr)
 	if state == nil || err != nil {
 		return "", err
 	}
@@ -520,7 +522,7 @@ func (s *PublicBlockChainAPI) GetCode(ctx context.Context, address common.Addres
 // block number. The rpc.LatestBlockNumber and rpc.PendingBlockNumber meta block
 // numbers are also allowed.
 func (s *PublicBlockChainAPI) GetStorageAt(ctx context.Context, address common.Address, key string, blockNr rpc.BlockNumber) (string, error) {
-	state, _, err := s.b.StateAndHeaderByNumber(blockNr)
+	state, _, err := s.b.StateAndHeaderByNumber(ctx, blockNr)
 	if state == nil || err != nil {
 		return "0x", err
 	}
@@ -534,7 +536,6 @@ func (s *PublicBlockChainAPI) GetStorageAt(ctx context.Context, address common.A
 // callmsg is the message type used for call transations.
 type callmsg struct {
 	addr          common.Address
-	nonce         uint64
 	to            *common.Address
 	gas, gasPrice *big.Int
 	value         *big.Int
@@ -544,7 +545,8 @@ type callmsg struct {
 // accessor boilerplate to implement core.Message
 func (m callmsg) From() (common.Address, error)         { return m.addr, nil }
 func (m callmsg) FromFrontier() (common.Address, error) { return m.addr, nil }
-func (m callmsg) Nonce() uint64                         { return m.nonce }
+func (m callmsg) Nonce() uint64                         { return 0 }
+func (m callmsg) CheckNonce() bool                      { return false }
 func (m callmsg) To() *common.Address                   { return m.to }
 func (m callmsg) GasPrice() *big.Int                    { return m.gasPrice }
 func (m callmsg) Gas() *big.Int                         { return m.gas }
@@ -562,7 +564,7 @@ type CallArgs struct {
 }
 
 func (s *PublicBlockChainAPI) doCall(ctx context.Context, args CallArgs, blockNr rpc.BlockNumber) (string, *big.Int, error) {
-	state, header, err := s.b.StateAndHeaderByNumber(blockNr)
+	state, header, err := s.b.StateAndHeaderByNumber(ctx, blockNr)
 	if state == nil || err != nil {
 		return "0x", common.Big0, err
 	}
@@ -579,15 +581,10 @@ func (s *PublicBlockChainAPI) doCall(ctx context.Context, args CallArgs, blockNr
 	} else {
 		addr = args.From
 	}
-	nonce, err := state.GetNonce(ctx, addr)
-	if err != nil {
-		return "0x", common.Big0, err
-	}
 
 	// Assemble the CALL invocation
 	msg := callmsg{
 		addr:     addr,
-		nonce:    nonce,
 		to:       args.To,
 		gas:      args.Gas.BigInt(),
 		gasPrice: args.GasPrice.BigInt(),
@@ -687,7 +684,7 @@ func FormatLogs(structLogs []vm.StructLog) []StructLogRes {
 
 // TraceCall executes a call and returns the amount of gas, created logs and optionally returned values.
 func (s *PublicBlockChainAPI) TraceCall(ctx context.Context, args CallArgs, blockNr rpc.BlockNumber) (*ExecutionResult, error) {
-	state, header, err := s.b.StateAndHeaderByNumber(blockNr)
+	state, header, err := s.b.StateAndHeaderByNumber(ctx, blockNr)
 	if state == nil || err != nil {
 		return nil, err
 	}
@@ -703,15 +700,10 @@ func (s *PublicBlockChainAPI) TraceCall(ctx context.Context, args CallArgs, bloc
 	} else {
 		addr = args.From
 	}
-	nonce, err := state.GetNonce(ctx, addr)
-	if err != nil {
-		return nil, err
-	}
 
 	// Assemble the CALL invocation
 	msg := callmsg{
 		addr:     addr,
-		nonce:    nonce,
 		to:       args.To,
 		gas:      args.Gas.BigInt(),
 		gasPrice: args.GasPrice.BigInt(),
@@ -874,13 +866,25 @@ type PublicTransactionPoolAPI struct {
 	b               Backend
 	muPendingTxSubs sync.Mutex
 	pendingTxSubs   map[string]rpc.Subscription
+	txQueue         chan QueuedTx
 }
+
+var txSingletonQueue chan QueuedTx
 
 // NewPublicTransactionPoolAPI creates a new RPC service with methods specific for the transaction pool.
 func NewPublicTransactionPoolAPI(b Backend) *PublicTransactionPoolAPI {
+	var once sync.Once
+	once.Do(func() {
+		if txSingletonQueue == nil {
+			glog.V(logger.Debug).Infof("Transaction queue (for status-go) inited")
+			txSingletonQueue = make(chan QueuedTx, defaultTxQueueCap)
+		}
+	})
+
 	api := &PublicTransactionPoolAPI{
 		b:             b,
 		pendingTxSubs: make(map[string]rpc.Subscription),
+		txQueue:       txSingletonQueue,
 	}
 
 	go api.subscriptionLoop()
@@ -959,7 +963,7 @@ func (s *PublicTransactionPoolAPI) GetTransactionByBlockHashAndIndex(ctx context
 
 // GetTransactionCount returns the number of transactions the given address has sent for the given block number
 func (s *PublicTransactionPoolAPI) GetTransactionCount(ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (*rpc.HexNumber, error) {
-	state, _, err := s.b.StateAndHeaderByNumber(blockNr)
+	state, _, err := s.b.StateAndHeaderByNumber(ctx, blockNr)
 	if state == nil || err != nil {
 		return nil, err
 	}
@@ -1137,9 +1141,39 @@ func submitTransaction(ctx context.Context, b Backend, tx *types.Transaction, si
 	return signedTx.Hash(), nil
 }
 
-// SendTransaction creates a transaction for the given argument, sign it and submit it to the
-// transaction pool.
+// Queued Transaction is a container that holds context and arguments enough to complete the queued transaction.
+type QueuedTx struct {
+	Hash    common.Hash
+	Context context.Context
+	Args    SendTxArgs
+}
+
+func (s *PublicTransactionPoolAPI) GetTransactionQueue() (chan QueuedTx, error) {
+	return s.txQueue, nil
+}
+
+// SendTransaction queues transactions, to be fulfilled by CompleteQueuedTransaction()
 func (s *PublicTransactionPoolAPI) SendTransaction(ctx context.Context, args SendTxArgs) (common.Hash, error) {
+	queuedTx := QueuedTx{
+		Hash:    common.Hash{},
+		Context: ctx,
+		Args:    args,
+	}
+
+	// populate transaction hash
+	key, err := crypto.GenerateKey()
+	if err != nil {
+		panic(err)
+	}
+	queuedTx.Hash = common.BytesToHash(crypto.FromECDSA(key))
+
+	s.txQueue <- queuedTx
+	return queuedTx.Hash, nil
+}
+
+// CompleteQueuedTransaction creates a transaction by unpacking queued transaction, signs it and submits to the
+// transaction pool.
+func (s *PublicTransactionPoolAPI) CompleteQueuedTransaction(ctx context.Context, args SendTxArgs) (common.Hash, error) {
 	var err error
 	args, err = prepareSendTxArgs(ctx, args, s.b)
 	if err != nil {

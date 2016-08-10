@@ -101,6 +101,27 @@ func NewLightChain(odr OdrBackend, config *core.ChainConfig, pow pow.PoW, mux *e
 		}
 		glog.V(logger.Info).Infoln("WARNING: Wrote default ethereum genesis block")
 	}
+
+	if bc.genesisBlock.Hash() == (common.Hash{212, 229, 103, 64, 248, 118, 174, 248, 192, 16, 184, 106, 64, 213, 245, 103, 69, 161, 24, 208, 144, 106, 52, 230, 154, 236, 140, 13, 177, 203, 143, 163}) {
+		// add trusted CHT
+		WriteTrustedCht(bc.chainDb, TrustedCht{
+			Number: 459,
+			Root:   common.HexToHash("9f14334360d1e48ed49a3d6b0b9e38a1706732cebc6a9c47bdde8d9824cd6d6b"),
+		})
+		glog.V(logger.Info).Infoln("Added trusted CHT for mainnet")
+	} else {
+		if bc.genesisBlock.Hash() == (common.Hash{12, 215, 134, 162, 66, 93, 22, 241, 82, 198, 88, 49, 108, 66, 62, 108, 225, 24, 30, 21, 195, 41, 88, 38, 215, 201, 144, 76, 186, 156, 227, 3}) {
+			// add trusted CHT for testnet
+			WriteTrustedCht(bc.chainDb, TrustedCht{
+				Number: 319,
+				Root:   common.HexToHash("43b679ff9b4918b0b19e6256f20e35877365ec3e20b38e3b2a02cef5606176dc"),
+			})
+			glog.V(logger.Info).Infoln("Added trusted CHT for testnet")
+		} else {
+			DeleteTrustedCht(bc.chainDb)
+		}
+	}
+
 	if err := bc.loadLastState(); err != nil {
 		return nil, err
 	}
@@ -298,9 +319,9 @@ func (self *LightChain) GetBlockByHash(ctx context.Context, hash common.Hash) (*
 // GetBlockByNumber retrieves a block from the database or ODR service by
 // number, caching it (associated with its hash) if found.
 func (self *LightChain) GetBlockByNumber(ctx context.Context, number uint64) (*types.Block, error) {
-	hash := core.GetCanonicalHash(self.chainDb, number)
-	if hash == (common.Hash{}) {
-		return nil, nil
+	hash, err := GetCanonicalHash(ctx, self.odr, number)
+	if hash == (common.Hash{}) || err != nil {
+		return nil, err
 	}
 	return self.GetBlock(ctx, hash, number)
 }
@@ -447,4 +468,31 @@ func (self *LightChain) GetBlockHashesFromHash(hash common.Hash, max uint64) []c
 // caching it (associated with its hash) if found.
 func (self *LightChain) GetHeaderByNumber(number uint64) *types.Header {
 	return self.hc.GetHeaderByNumber(number)
+}
+
+// GetHeaderByNumberOdr retrieves a block header from the database or network
+// by number, caching it (associated with its hash) if found.
+func (self *LightChain) GetHeaderByNumberOdr(ctx context.Context, number uint64) (*types.Header, error) {
+	if header := self.hc.GetHeaderByNumber(number); header != nil {
+		return header, nil
+	}
+	return GetHeaderByNumber(ctx, self.odr, number)
+}
+
+func (self *LightChain) SyncCht(ctx context.Context) bool {
+	headNum := self.CurrentHeader().Number.Uint64()
+	cht := GetTrustedCht(self.chainDb)
+	if headNum+1 < cht.Number*ChtFrequency {
+		num := cht.Number*ChtFrequency - 1
+		header, err := GetHeaderByNumber(ctx, self.odr, num)
+		if header != nil && err == nil {
+			self.mu.Lock()
+			if self.hc.CurrentHeader().Number.Uint64() < header.Number.Uint64() {
+				self.hc.SetCurrentHeader(header)
+			}
+			self.mu.Unlock()
+			return true
+		}
+	}
+	return false
 }

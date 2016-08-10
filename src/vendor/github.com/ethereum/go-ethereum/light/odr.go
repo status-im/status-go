@@ -19,6 +19,8 @@
 package light
 
 import (
+	"math/big"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -97,7 +99,7 @@ func storeProof(db ethdb.Database, proof []rlp.RawValue) {
 // CodeRequest is the ODR request type for retrieving contract code
 type CodeRequest struct {
 	OdrRequest
-	Id    *TrieID
+	Id   *TrieID
 	Hash common.Hash
 	Data []byte
 }
@@ -110,9 +112,9 @@ func (req *CodeRequest) StoreResult(db ethdb.Database) {
 // BlockRequest is the ODR request type for retrieving block bodies
 type BlockRequest struct {
 	OdrRequest
-	Hash common.Hash
+	Hash   common.Hash
 	Number uint64
-	Rlp  []byte
+	Rlp    []byte
 }
 
 // StoreResult stores the retrieved data in local database
@@ -124,11 +126,31 @@ func (req *BlockRequest) StoreResult(db ethdb.Database) {
 type ReceiptsRequest struct {
 	OdrRequest
 	Hash     common.Hash
-	Number uint64
+	Number   uint64
 	Receipts types.Receipts
 }
 
 // StoreResult stores the retrieved data in local database
 func (req *ReceiptsRequest) StoreResult(db ethdb.Database) {
 	core.WriteBlockReceipts(db, req.Hash, req.Number, req.Receipts)
+}
+
+// TrieRequest is the ODR request type for state/storage trie entries
+type ChtRequest struct {
+	OdrRequest
+	ChtNum, BlockNum uint64
+	ChtRoot          common.Hash
+	Header           *types.Header
+	Td               *big.Int
+	Proof            []rlp.RawValue
+}
+
+// StoreResult stores the retrieved data in local database
+func (req *ChtRequest) StoreResult(db ethdb.Database) {
+	// if there is a canonical hash, there is a header too
+	core.WriteHeader(db, req.Header)
+	hash, num := req.Header.Hash(), req.Header.Number.Uint64()
+	core.WriteTd(db, hash, num, req.Td)
+	core.WriteCanonicalHash(db, hash, num)
+	//storeProof(db, req.Proof)
 }

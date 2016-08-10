@@ -21,11 +21,13 @@ import (
 
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/eth/downloader"
+	"github.com/ethereum/go-ethereum/light"
+	"golang.org/x/net/context"
 )
 
 const (
-	forceSyncCycle      = 10 * time.Second // Time interval to force syncs, even if few peers are available
-	minDesiredPeerCount = 5                // Amount of peers desired to start syncing
+	//forceSyncCycle      = 10 * time.Second // Time interval to force syncs, even if few peers are available
+	minDesiredPeerCount = 5 // Amount of peers desired to start syncing
 )
 
 // syncer is responsible for periodically synchronising with the network, both
@@ -37,20 +39,20 @@ func (pm *ProtocolManager) syncer() {
 	defer pm.downloader.Terminate()
 
 	// Wait for different events to fire synchronisation operations
-	forceSync := time.Tick(forceSyncCycle)
+	//forceSync := time.Tick(forceSyncCycle)
 	for {
 		select {
 		case <-pm.newPeerCh:
-			// Make sure we have peers to select from, then sync
+/*			// Make sure we have peers to select from, then sync
 			if pm.peers.Len() < minDesiredPeerCount {
 				break
 			}
 			go pm.synchronise(pm.peers.BestPeer())
-
-		case <-forceSync:
-			// Force a sync even if not enough peers are present
-			go pm.synchronise(pm.peers.BestPeer())
-
+*/
+		/*case <-forceSync:
+		// Force a sync even if not enough peers are present
+		go pm.synchronise(pm.peers.BestPeer())
+		*/
 		case <-pm.noMorePeers:
 			return
 		}
@@ -69,54 +71,14 @@ func (pm *ProtocolManager) synchronise(peer *peer) {
 	if peer == nil {
 		return
 	}
-	
+
 	// Make sure the peer's TD is higher than our own.
 	if !pm.needToSync(peer.headBlockInfo()) {
 		return
 	}
 
-	pm.waitSyncLock()
-	pm.syncWithLockAcquired(peer)
-}
+	ctx, _ := context.WithTimeout(context.Background(), time.Second*5)
+	pm.blockchain.(*light.LightChain).SyncCht(ctx)
 
-func (pm *ProtocolManager) waitSyncLock() {
-	for {
-		chn := pm.getSyncLock(true)
-		if chn == nil {
-			break
-		}
-		<-chn
-	}
-}
-
-// getSyncLock either acquires the sync lock and returns nil or returns a channel
-// which is closed when the lock is free again
-func (pm *ProtocolManager) getSyncLock(acquire bool) chan struct{} {
-	pm.syncMu.Lock()
-	defer pm.syncMu.Unlock()
-
-	if pm.syncing {
-		if pm.syncDone == nil {
-			pm.syncDone = make(chan struct{})
-		}
-		return pm.syncDone
-	} else {
-		pm.syncing = acquire
-		return nil
-	}	
-}
-
-func (pm *ProtocolManager) releaseSyncLock() {
-	pm.syncMu.Lock()
-	pm.syncing = false
-	if pm.syncDone != nil {
-		close(pm.syncDone)
-		pm.syncDone = nil
-	}
-	pm.syncMu.Unlock()
-}
-
-func (pm *ProtocolManager) syncWithLockAcquired(peer *peer) {
 	pm.downloader.Synchronise(peer.id, peer.Head(), peer.Td(), downloader.LightSync)
-	pm.releaseSyncLock()
 }

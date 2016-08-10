@@ -18,6 +18,7 @@
 package les
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"math/big"
@@ -46,12 +47,14 @@ const (
 
 	ethVersion = 63 // equivalent eth version for the downloader
 
-	MaxHeaderFetch  = 192 // Amount of block headers to be fetched per retrieval request
-	MaxBodyFetch    = 32  // Amount of block bodies to be fetched per retrieval request
-	MaxReceiptFetch = 128 // Amount of transaction receipts to allow fetching per request
-	MaxCodeFetch    = 64  // Amount of contract codes to allow fetching per request
-	MaxProofsFetch  = 64  // Amount of merkle proofs to be fetched per retrieval request
-	
+	MaxHeaderFetch       = 192 // Amount of block headers to be fetched per retrieval request
+	MaxBodyFetch         = 32  // Amount of block bodies to be fetched per retrieval request
+	MaxReceiptFetch      = 128 // Amount of transaction receipts to allow fetching per request
+	MaxCodeFetch         = 64  // Amount of contract codes to allow fetching per request
+	MaxProofsFetch       = 64  // Amount of merkle proofs to be fetched per retrieval request
+	MaxHeaderProofsFetch = 64  // Amount of merkle proofs to be fetched per retrieval request
+	MaxTxSend            = 64  // Amount of transactions to be send per request
+
 	disableClientRemovePeer = true
 )
 
@@ -86,19 +89,19 @@ type txPool interface {
 }
 
 type ProtocolManager struct {
-	lightSync  bool
-	txpool     txPool
-	txrelay    *LesTxRelay
-	networkId  int
+	lightSync   bool
+	txpool      txPool
+	txrelay     *LesTxRelay
+	networkId   int
 	chainConfig *core.ChainConfig
-	blockchain BlockChain
-	chainDb    ethdb.Database
-	odr        *LesOdr
-	server     *LesServer
+	blockchain  BlockChain
+	chainDb     ethdb.Database
+	odr         *LesOdr
+	server      *LesServer
 
 	downloader *downloader.Downloader
 	fetcher    *lightFetcher
-	peers *peerSet
+	peers      *peerSet
 
 	SubProtocols []p2p.Protocol
 
@@ -109,9 +112,9 @@ type ProtocolManager struct {
 	quitSync    chan struct{}
 	noMorePeers chan struct{}
 
-	syncMu		sync.Mutex
-	syncing		bool
-	syncDone		chan struct{}
+	syncMu   sync.Mutex
+	syncing  bool
+	syncDone chan struct{}
 
 	// wait group is used for graceful shutdowns during downloading
 	// and processing
@@ -172,7 +175,7 @@ func NewProtocolManager(chainConfig *core.ChainConfig, lightSync bool, networkId
 		return nil, errIncompatibleConfig
 	}
 
-	removePeer := manager.removePeer	
+	removePeer := manager.removePeer
 	if disableClientRemovePeer {
 		removePeer = func(id string) {}
 	}
@@ -232,7 +235,8 @@ func (pm *ProtocolManager) Start() {
 		go pm.syncer()
 	} else {
 		go func() {
-			for range pm.newPeerCh {}
+			for range pm.newPeerCh {
+			}
 		}()
 	}
 }
@@ -316,20 +320,37 @@ func (pm *ProtocolManager) handle(p *peer) error {
 		if pm.txrelay != nil {
 			pm.txrelay.addPeer(p)
 		}
+
+		pm.fetcher.notify(p, nil)
 	}
+
+	stop := make(chan struct{})
+	defer close(stop)
+	go func() {
+		// new block announce loop
+		for {
+			select {
+			case announce := <- p.newBlockHashChn:
+				p.SendNewBlockHash(announce)
+				//fmt.Println("  BROADCAST sent")
+			case <-stop:
+				return
+			}			
+		}		
+	}()
 
 	// main loop. handle incoming messages.
 	for {
 		if err := pm.handleMsg(p); err != nil {
 			glog.V(logger.Debug).Infof("%v: message handling failed: %v", p, err)
-fmt.Println("handleMsg err:", err)
+			//fmt.Println("handleMsg err:", err)
 			return err
 		}
 	}
 	return nil
 }
 
-var reqList = []uint64{GetBlockHeadersMsg, GetBlockBodiesMsg, GetCodeMsg, GetReceiptsMsg, GetProofsMsg, SendTxMsg}
+var reqList = []uint64{GetBlockHeadersMsg, GetBlockBodiesMsg, GetCodeMsg, GetReceiptsMsg, GetProofsMsg, SendTxMsg, GetHeaderProofsMsg}
 
 // handleMsg is invoked whenever an inbound message is received from a remote
 // peer. The remote connection is torn down upon returning any error.
@@ -343,6 +364,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 	var costs *requestCosts
 	var reqCnt, maxReqs int
 
+	//fmt.Println("MSG", msg.Code, msg.Size)
 	if rc, ok := p.fcCosts[msg.Code]; ok { // check if msg is a supported request type
 		costs = rc
 		if p.fcClient == nil {
@@ -352,11 +374,12 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		if !ok || bv < costs.baseCost {
 			return errResp(ErrRequestRejected, "")
 		}
-		d := bv - costs.baseCost
-		if d/10000 < costs.reqCost {
-			maxReqs = int(d / costs.reqCost)
-		} else {
-			maxReqs = 10000
+		maxReqs = 10000
+		if bv < pm.server.defParams.BufLimit {
+			d := bv - costs.baseCost
+			if d/10000 < costs.reqCost {
+				maxReqs = int(d / costs.reqCost)
+			}
 		}
 	}
 
@@ -375,16 +398,14 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		return errResp(ErrExtraStatusMsg, "uncontrolled status message")
 
 	// Block header query, collect the requested headers and reply
-	case NewBlockHashesMsg:
-		var req newBlockHashesData
+	case NewBlockHashMsg:
+		var req newBlockHashData
 		if err := msg.Decode(&req); err != nil {
 			return errResp(ErrDecode, "%v: %v", msg, err)
 		}
-//fmt.Println("RECEIVED", req[0].Number, req[0].Hash, req[0].Td)
-		for _, r := range req {
-			pm.fetcher.notify(p, r)
-		}
-		
+		//fmt.Println("RECEIVED", req.Number, req.Hash, req.Td, req.ReorgDepth)
+		pm.fetcher.notify(p, &req)
+
 	case GetBlockHeadersMsg:
 		glog.V(logger.Debug).Infof("LES: received GetBlockHeadersMsg from peer %v", p.id)
 		// Decode the complex header query
@@ -395,7 +416,11 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		if err := msg.Decode(&req); err != nil {
 			return errResp(ErrDecode, "%v: %v", msg, err)
 		}
+
 		query := req.Query
+		if query.Amount > uint64(maxReqs) || query.Amount > MaxHeaderFetch {
+			return errResp(ErrRequestRejected, "")
+		}
 
 		hashMode := query.Origin.Hash != (common.Hash{})
 
@@ -405,7 +430,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			headers []*types.Header
 			unknown bool
 		)
-		for !unknown && len(headers) < int(query.Amount) && bytes < softResponseLimit && len(headers) < downloader.MaxHeaderFetch {
+		for !unknown && len(headers) < int(query.Amount) && bytes < softResponseLimit {
 			// Retrieve the next header satisfying the query
 			var origin *types.Header
 			if hashMode {
@@ -457,8 +482,8 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 				query.Origin.Number += (query.Skip + 1)
 			}
 		}
-		
-		bv, rcost := p.fcClient.RequestProcessed(costs.baseCost + query.Amount * costs.reqCost)
+
+		bv, rcost := p.fcClient.RequestProcessed(costs.baseCost + query.Amount*costs.reqCost)
 		pm.server.fcCostStats.update(msg.Code, query.Amount, rcost)
 		return p.SendBlockHeaders(req.ReqID, bv, headers)
 
@@ -502,11 +527,11 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			bodies []rlp.RawValue
 		)
 		reqCnt = len(req.Hashes)
-		if reqCnt > maxReqs {
+		if reqCnt > maxReqs || reqCnt > MaxBodyFetch {
 			return errResp(ErrRequestRejected, "")
 		}
 		for _, hash := range req.Hashes {
-			if bytes >= softResponseLimit || len(bodies) >= MaxBodyFetch {
+			if bytes >= softResponseLimit {
 				break
 			}
 			// Retrieve the requested block body, stopping if enough was found
@@ -556,13 +581,10 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			data  [][]byte
 		)
 		reqCnt = len(req.Reqs)
-		if reqCnt > maxReqs {
+		if reqCnt > maxReqs || reqCnt > MaxCodeFetch {
 			return errResp(ErrRequestRejected, "")
 		}
 		for _, req := range req.Reqs {
-			if len(data) >= MaxCodeFetch {
-				break
-			}
 			// Retrieve the requested state entry, stopping if enough was found
 			if header := core.GetHeader(pm.chainDb, req.BHash, core.GetBlockNumber(pm.chainDb, req.BHash)); header != nil {
 				if trie, _ := trie.New(header.Root, pm.chainDb); trie != nil {
@@ -619,11 +641,11 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			receipts []rlp.RawValue
 		)
 		reqCnt = len(req.Hashes)
-		if reqCnt > maxReqs {
+		if reqCnt > maxReqs || reqCnt > MaxReceiptFetch {
 			return errResp(ErrRequestRejected, "")
 		}
 		for _, hash := range req.Hashes {
-			if bytes >= softResponseLimit || len(receipts) >= MaxReceiptFetch {
+			if bytes >= softResponseLimit {
 				break
 			}
 			// Retrieve the requested block's receipts, skipping if unknown to us
@@ -682,11 +704,11 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			proofs proofsData
 		)
 		reqCnt = len(req.Reqs)
-		if reqCnt > maxReqs {
+		if reqCnt > maxReqs || reqCnt > MaxProofsFetch {
 			return errResp(ErrRequestRejected, "")
 		}
 		for _, req := range req.Reqs {
-			if bytes >= softResponseLimit || len(proofs) >= MaxProofsFetch {
+			if bytes >= softResponseLimit {
 				break
 			}
 			// Retrieve the requested state entry, stopping if enough was found
@@ -732,6 +754,66 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			Obj:     resp.Data,
 		}
 
+	case GetHeaderProofsMsg:
+		glog.V(logger.Debug).Infof("LES: received GetHeaderProofsMsg from peer %v", p.id)
+		// Decode the retrieval message
+		var req struct {
+			ReqID uint64
+			Reqs  []ChtReq
+		}
+		if err := msg.Decode(&req); err != nil {
+			return errResp(ErrDecode, "msg %v: %v", msg, err)
+		}
+		// Gather state data until the fetch or network limits is reached
+		var (
+			bytes  int
+			proofs []ChtResp
+		)
+		reqCnt = len(req.Reqs)
+		if reqCnt > maxReqs || reqCnt > MaxHeaderProofsFetch {
+			return errResp(ErrRequestRejected, "")
+		}
+		for _, req := range req.Reqs {
+			if bytes >= softResponseLimit {
+				break
+			}
+
+			if header := pm.blockchain.GetHeaderByNumber(req.BlockNum); header != nil {
+				if root := getChtRoot(pm.chainDb, req.ChtNum); root != (common.Hash{}) {
+					if tr, _ := trie.New(root, pm.chainDb); tr != nil {
+						var encNumber [8]byte
+						binary.BigEndian.PutUint64(encNumber[:], req.BlockNum)
+						proof := tr.Prove(encNumber[:])
+						proofs = append(proofs, ChtResp{Header: header, Proof: proof})
+						bytes += len(proof) + estHeaderRlpSize
+					}
+				}
+			}
+		}
+		bv, rcost := p.fcClient.RequestProcessed(costs.baseCost + uint64(reqCnt)*costs.reqCost)
+		pm.server.fcCostStats.update(msg.Code, uint64(reqCnt), rcost)
+		return p.SendHeaderProofs(req.ReqID, bv, proofs)
+
+	case HeaderProofsMsg:
+		if pm.odr == nil {
+			return errResp(ErrUnexpectedResponse, "")
+		}
+
+		glog.V(logger.Debug).Infof("LES: received HeaderProofsMsg from peer %v", p.id)
+		var resp struct {
+			ReqID, BV uint64
+			Data      []ChtResp
+		}
+		if err := msg.Decode(&resp); err != nil {
+			return errResp(ErrDecode, "msg %v: %v", msg, err)
+		}
+		p.fcServer.GotReply(resp.ReqID, resp.BV)
+		deliverMsg = &Msg{
+			MsgType: MsgHeaderProofs,
+			ReqID:   resp.ReqID,
+			Obj:     resp.Data,
+		}
+
 	case SendTxMsg:
 		if pm.txpool == nil {
 			return errResp(ErrUnexpectedResponse, "")
@@ -742,7 +824,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			return errResp(ErrDecode, "msg %v: %v", msg, err)
 		}
 		reqCnt = len(txs)
-		if reqCnt > maxReqs {
+		if reqCnt > maxReqs || reqCnt > MaxTxSend {
 			return errResp(ErrRequestRejected, "")
 		}
 		pm.txpool.AddTransactions(txs)
@@ -769,30 +851,4 @@ func (self *ProtocolManager) NodeInfo() *eth.EthNodeInfo {
 		Genesis:    self.blockchain.Genesis().Hash(),
 		Head:       self.blockchain.LastBlockHash(),
 	}
-}
-
-func (pm *ProtocolManager) broadcastBlockLoop() {
-	sub := pm.eventMux.Subscribe(	core.ChainHeadEvent{})
-	go func() {
-		for {
-			select {
-			case ev := <-sub.Chan():
-				peers := pm.peers.AllPeers()
-				if len(peers) > 0 {
-					header := ev.Data.(core.ChainHeadEvent).Block.Header()
-					hash := header.Hash()
-					number := header.Number.Uint64()
-					td := core.GetTd(pm.chainDb, hash, number)
-//fmt.Println("BROADCAST", number, hash, td)
-					announce := newBlockHashesData{{Hash: hash, Number: number, Td: td}}
-					for _, p := range peers {
-						p.SendNewBlockHashes(announce)
-					}
-				}
-			case <-pm.quitSync:
-				sub.Unsubscribe()
-				return
-			}
-		}
-	}()
 }
