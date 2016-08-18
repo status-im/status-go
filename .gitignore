@@ -36,3 +36,7 @@ profile.cov
 
 # tests
 src/.ethereumtest/
+#
+# golang
+cover.out
+cover.html

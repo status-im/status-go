@@ -15,7 +15,7 @@ func CreateAccount(password *C.char) *C.char {
 
 	// This is equivalent to creating an account from the command line,
 	// just modified to handle the function arg passing
-	address, pubKey, err := createAccount(C.GoString(password))
+	address, pubKey, mnemonic, err := createAccount(C.GoString(password))
 
 	errString := emptyError
 	if err != nil {
@@ -24,9 +24,32 @@ func CreateAccount(password *C.char) *C.char {
 	}
 
 	out := AccountInfo{
-		Address: address,
-		PubKey:  pubKey,
-		Error:   errString,
+		Address:  address,
+		PubKey:   pubKey,
+		Mnemonic: mnemonic,
+		Error:    errString,
+	}
+	outBytes, _ := json.Marshal(&out)
+
+	return C.CString(string(outBytes))
+}
+
+//export RemindAccountDetails
+func RemindAccountDetails(password, mnemonic *C.char) *C.char {
+
+	address, pubKey, err := remindAccountDetails(C.GoString(password), C.GoString(mnemonic))
+
+	errString := emptyError
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		errString = err.Error()
+	}
+
+	out := AccountInfo{
+		Address:  address,
+		PubKey:   pubKey,
+		Mnemonic: C.GoString(mnemonic),
+		Error:    errString,
 	}
 	outBytes, _ := json.Marshal(&out)
 

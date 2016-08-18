@@ -3,6 +3,9 @@ package main
 import (
 	"fmt"
 	"os"
+	"errors"
+	"math/big"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -14,38 +17,41 @@ import (
 	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/go-ethereum/whisper"
-	"math/big"
-	"path/filepath"
 )
 
 const (
 	testDataDir         = ".ethereumtest"
 	testAddress         = "0x89b50b2b26947ccad43accaef76c21d175ad85f4"
 	testAddressPassword = "asdf"
+	testNodeSyncSeconds = 180
+	testAccountPassword = "badpassword"
 )
 
-// TestAccountBindings makes sure we can create an account and subsequently
-// unlock that account
+// TestAccountBindings makes sure we can create an account and subsequently unlock that account
 func TestAccountBindings(t *testing.T) {
-	rpcport = 8546 // in order to avoid conflicts with running react-native app
-
-	dataDir, err := preprocessDataDir(testDataDir)
+	err := prepareTestNode()
 	if err != nil {
-		glog.V(logger.Warn).Infoln("make node failed:", err)
-	}
-
-	// start geth node and wait for it to initialize
-	go createAndStartNode(dataDir)
-	time.Sleep(120 * time.Second) // LES syncs headers, so that we are up do date when it is done
-	if currentNode == nil {
-		t.Error("Test failed: could not start geth node")
+		t.Error(err)
+		return
 	}
 
 	// create an account
-	address, pubkey, err := createAccount("badpassword")
+	address, pubKey, mnemonic, err := createAccount(testAccountPassword)
 	if err != nil {
 		fmt.Println(err.Error())
 		t.Error("Test failed: could not create account")
+		return
+	}
+	glog.V(logger.Info).Infof("Account created: {address: %s, key: %s, mnemonic:%s}", address, pubKey, mnemonic)
+
+	// try reminding using password + mnemonic
+	addressCheck, pubKeyCheck, err := remindAccountDetails(testAccountPassword, mnemonic)
+	if err != nil {
+		t.Errorf("remind details failed: %v", err)
+		return
+	}
+	if address != addressCheck || pubKey != pubKeyCheck {
+		t.Error("Test failed: remind account details failed to pull the correct details")
 	}
 
 	// unlock the created account
@@ -61,15 +67,15 @@ func TestAccountBindings(t *testing.T) {
 	if err := currentNode.Service(&whisperInstance); err != nil {
 		t.Errorf("whisper service not running: %v", err)
 	}
-	identitySucsess := whisperInstance.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubkey)))
+	identitySucsess := whisperInstance.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey)))
 	if !identitySucsess || err != nil {
 		t.Errorf("Test failed: identity not injected into whisper: %v", err)
 	}
 
 	// test to see if we can post with the injected whisper identity
 	postArgs := whisper.PostArgs{
-		From:    pubkey,
-		To:      pubkey,
+		From:    pubKey,
+		To:      pubKey,
 		TTL:     100,
 		Topics:  [][]byte{[]byte("test topic")},
 		Payload: "test message",
@@ -141,14 +147,43 @@ func TestAccountBindings(t *testing.T) {
 		t.Errorf("Test failed: cannot send transaction: %v", err)
 	}
 
-	time.Sleep(10 * time.Second)
+	time.Sleep(15 * time.Second)
 	if sentinel != 1 {
 		t.Error("Test failed: transaction was never queued or completed")
 	}
 
-	// clean up
-	err = os.RemoveAll(".ethereumtest")
-	if err != nil {
-		t.Error("Test failed: could not clean up temporary datadir")
+	//// clean up
+	//err = os.RemoveAll(".ethereumtest")
+	//if err != nil {
+	//	t.Error("Test failed: could not clean up temporary datadir")
+	//}
+}
+
+func prepareTestNode() error {
+	rpcport = 8546 // in order to avoid conflicts with running react-native app
+
+	syncRequired := false
+	if _, err := os.Stat(testDataDir); os.IsNotExist(err) {
+		syncRequired = true
 	}
+
+	dataDir, err := preprocessDataDir(testDataDir)
+	if err != nil {
+		glog.V(logger.Warn).Infoln("make node failed:", err)
+		return err
+	}
+
+	// start geth node and wait for it to initialize
+	go createAndStartNode(dataDir)
+	time.Sleep(5 * time.Second)
+	if currentNode == nil {
+		return errors.New("Test failed: could not start geth node")
+	}
+
+	if syncRequired {
+		glog.V(logger.Warn).Infof("Sync is required, it will take %d seconds", testNodeSyncSeconds)
+		time.Sleep(testNodeSyncSeconds * time.Second) // LES syncs headers, so that we are up do date when it is done
+	}
+
+	return nil
 }

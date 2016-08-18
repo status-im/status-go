@@ -38,6 +38,8 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/go-ethereum/whisper"
+	"github.com/pborman/uuid"
+	"github.com/status-im/status-go/src/extkeys"
 )
 
 var (
@@ -292,6 +294,43 @@ func (am *Manager) NewAccount(passphrase string, w bool) (Account, error) {
 	if am.sync != nil {
 		address := fmt.Sprintf("%x", account.Address)
 		err = am.syncAccounts(address, key)
+		if err != nil {
+			return account, fmt.Errorf("failed to sync accounts: %s", err.Error())
+		}
+	}
+
+	return account, nil
+}
+
+// NewAccount stores into key directory the provided extended key (see BIP32).
+// Provided key is encrypting with the passphrase.
+func (am *Manager) NewAccountUsingExtendedKey(k *extkeys.ExtendedKey, passphrase string, w bool) (Account, error) {
+	if !k.IsPrivate {
+		return Account{}, fmt.Errorf("failed creating account using public key")
+	}
+
+	privateKeyECDSA := k.ToECDSA()
+	key := &Key{
+		Id:         uuid.NewRandom(),
+		Address:    crypto.PubkeyToAddress(privateKeyECDSA.PublicKey),
+		PrivateKey: privateKeyECDSA,
+	}
+
+	key.WhisperEnabled = w
+	account := Account{Address: key.Address, File: am.keyStore.JoinPath(keyFileName(key.Address))}
+	if err := am.keyStore.StoreKey(account.File, key, passphrase); err != nil {
+		zeroKey(key.PrivateKey)
+		return Account{}, err
+	}
+
+	// Add the account to the cache immediately rather
+	// than waiting for file system notifications to pick it up.
+	am.cache.add(account)
+
+	// sync key to subprotocols (e.g., whisper identity)
+	if am.sync != nil {
+		address := fmt.Sprintf("%x", account.Address)
+		err := am.syncAccounts(address, key)
 		if err != nil {
 			return account, fmt.Errorf("failed to sync accounts: %s", err.Error())
 		}

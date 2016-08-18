@@ -22,6 +22,7 @@ import (
 	"github.com/ethereum/go-ethereum/les"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	errextra "github.com/pkg/errors"
+	"github.com/status-im/status-go/src/extkeys"
 )
 
 var (
@@ -30,39 +31,78 @@ var (
 )
 
 // createAccount creates an internal geth account
-func createAccount(password string) (string, string, error) {
+func createAccount(password string) (string, string, string, error) {
 
 	if currentNode != nil {
 
 		w := true
 
 		if accountManager != nil {
-			// generate the account
-			account, err := accountManager.NewAccount(password, w)
+			// generate mnemonic phrase
+			m := extkeys.NewMnemonic()
+			mnemonic, err := m.MnemonicPhrase(128, extkeys.EnglishLanguage)
 			if err != nil {
-				return "", "", errextra.Wrap(err, "Account manager could not create the account")
+				return "", "", "", errextra.Wrap(err, "Can not create mnemonic seed")
+			}
+
+			// generate extended key (see BIP32)
+			extKey, err := extkeys.NewMaster(m.MnemonicSeed(mnemonic, password), []byte(extkeys.Salt))
+			if err != nil {
+				return "", "", "", errextra.Wrap(err, "Can not create master extended key")
+			}
+
+			// generate the account
+			account, err := accountManager.NewAccountUsingExtendedKey(extKey, password, w)
+			if err != nil {
+				return "", "", "", errextra.Wrap(err, "Account manager could not create the account")
 			}
 			address := fmt.Sprintf("%x", account.Address)
 
 			// recover the public key to return
 			keyContents, err := ioutil.ReadFile(account.File)
 			if err != nil {
-				return address, "", errextra.Wrap(err, "Could not load the key contents")
+				return address, "", "", errextra.Wrap(err, "Could not load the key contents")
 			}
 			key, err := accounts.DecryptKey(keyContents, password)
 			if err != nil {
-				return address, "", errextra.Wrap(err, "Could not recover the key")
+				return address, "", "", errextra.Wrap(err, "Could not recover the key")
 			}
 			pubKey := common.ToHex(crypto.FromECDSAPub(&key.PrivateKey.PublicKey))
 
-			return address, pubKey, nil
+			return address, pubKey, mnemonic, nil
 		}
-		return "", "", errors.New("Could not retrieve account manager")
 
+		return "", "", "", errors.New("Could not retrieve account manager")
 	}
 
-	return "", "", errors.New("No running node detected for account creation")
+	return "", "", "", errors.New("No running node detected for account creation")
+}
 
+func remindAccountDetails(password, mnemonic string) (string, string, error) {
+
+	if currentNode != nil {
+
+		if accountManager != nil {
+			m := extkeys.NewMnemonic()
+			// re-create extended key (see BIP32)
+			extKey, err := extkeys.NewMaster(m.MnemonicSeed(mnemonic, password), []byte(extkeys.Salt))
+			if err != nil {
+				return "", "", errextra.Wrap(err, "Can not create master extended key")
+			}
+
+			privateKeyECDSA := extKey.ToECDSA()
+			address := fmt.Sprintf("%x", crypto.PubkeyToAddress(privateKeyECDSA.PublicKey))
+			pubKey := common.ToHex(crypto.FromECDSAPub(&privateKeyECDSA.PublicKey))
+
+			accountManager.ImportECDSA(privateKeyECDSA, password) // try caching key, ignore errors
+
+			return address, pubKey, nil
+		}
+
+		return "", "", errors.New("Could not retrieve account manager")
+	}
+
+	return "", "", errors.New("No running node detected for account unlock")
 }
 
 // unlockAccount unlocks an existing account for a certain duration and
