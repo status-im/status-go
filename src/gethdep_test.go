@@ -1,10 +1,10 @@
 package main
 
 import (
-	"fmt"
-	"os"
 	"errors"
+	"fmt"
 	"math/big"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -24,11 +24,16 @@ const (
 	testAddress         = "0x89b50b2b26947ccad43accaef76c21d175ad85f4"
 	testAddressPassword = "asdf"
 	testNodeSyncSeconds = 180
-	testAccountPassword = "badpassword"
+	newAccountPassword  = "badpassword"
+
+	whisperMessage1 = "test message 1 (K1 -> K1)"
+	whisperMessage2 = "test message 2 (K1 -> '')"
+	whisperMessage3 = "test message 3 ('' -> '')"
+	whisperMessage4 = "test message 4 ('' -> K1)"
+	whisperMessage5 = "test message 5 (K2 -> K1)"
 )
 
-// TestAccountBindings makes sure we can create an account and subsequently unlock that account
-func TestAccountBindings(t *testing.T) {
+func TestRemindAccountDetails(t *testing.T) {
 	err := prepareTestNode()
 	if err != nil {
 		t.Error(err)
@@ -36,16 +41,15 @@ func TestAccountBindings(t *testing.T) {
 	}
 
 	// create an account
-	address, pubKey, mnemonic, err := createAccount(testAccountPassword)
+	address, pubKey, mnemonic, err := createAccount(newAccountPassword)
 	if err != nil {
-		fmt.Println(err.Error())
-		t.Error("Test failed: could not create account")
+		t.Errorf("could not create account: %v", err)
 		return
 	}
 	glog.V(logger.Info).Infof("Account created: {address: %s, key: %s, mnemonic:%s}", address, pubKey, mnemonic)
 
 	// try reminding using password + mnemonic
-	addressCheck, pubKeyCheck, err := remindAccountDetails(testAccountPassword, mnemonic)
+	addressCheck, pubKeyCheck, err := remindAccountDetails(newAccountPassword, mnemonic)
 	if err != nil {
 		t.Errorf("remind details failed: %v", err)
 		return
@@ -53,54 +57,241 @@ func TestAccountBindings(t *testing.T) {
 	if address != addressCheck || pubKey != pubKeyCheck {
 		t.Error("Test failed: remind account details failed to pull the correct details")
 	}
+}
 
-	// unlock the created account
-	err = unlockAccount(address, "badpassword", 3)
+func TestAccountSelect(t *testing.T) {
+
+	err := prepareTestNode()
 	if err != nil {
-		fmt.Println(err)
-		t.Error("Test failed: could not unlock account")
+		t.Error(err)
+		return
 	}
-	time.Sleep(2 * time.Second)
 
 	// test to see if the account was injected in whisper
 	var whisperInstance *whisper.Whisper
 	if err := currentNode.Service(&whisperInstance); err != nil {
 		t.Errorf("whisper service not running: %v", err)
 	}
-	identitySucsess := whisperInstance.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey)))
-	if !identitySucsess || err != nil {
-		t.Errorf("Test failed: identity not injected into whisper: %v", err)
+
+	// create an accounts
+	address1, pubKey1, _, err := createAccount(newAccountPassword)
+	if err != nil {
+		fmt.Println(err.Error())
+		t.Error("Test failed: could not create account")
+		return
+	}
+	glog.V(logger.Info).Infof("Account created: {address: %s, key: %s}", address1, pubKey1)
+
+	address2, pubKey2, _, err := createAccount(newAccountPassword)
+	if err != nil {
+		fmt.Println(err.Error())
+		t.Error("Test failed: could not create account")
+		return
+	}
+	glog.V(logger.Info).Infof("Account created: {address: %s, key: %s}", address2, pubKey2)
+
+	// inject key of newly created account into Whisper, as identity
+	if whisperInstance.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey1))) {
+		t.Errorf("identity already present in whisper")
 	}
 
-	// test to see if we can post with the injected whisper identity
+	// try selecting with wrong password
+	err = selectAccount(address1, "wrongPassword")
+	if err == nil {
+		t.Errorf("select account is expected to throw error: wrong password used")
+		return
+	}
+	err = selectAccount(address1, newAccountPassword)
+	if err != nil {
+		t.Errorf("Test failed: could not select account: %v", err)
+		return
+	}
+	if !whisperInstance.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey1))) {
+		t.Errorf("identity not injected into whisper: %v", err)
+	}
+
+	// select another account, make sure that previous account is wiped out from Whisper cache
+	if whisperInstance.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey2))) {
+		t.Errorf("identity already present in whisper")
+	}
+	err = selectAccount(address2, newAccountPassword)
+	if err != nil {
+		t.Errorf("Test failed: could not select account: %v", err)
+		return
+	}
+	if !whisperInstance.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey2))) {
+		t.Errorf("identity not injected into whisper: %v", err)
+	}
+	if whisperInstance.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey1))) {
+		t.Errorf("identity should be removed, but it is still present in whisper")
+	}
+}
+
+func TestWhisperMessaging(t *testing.T) {
+	err := prepareTestNode()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	// test to see if the account was injected in whisper
+	var whisperInstance *whisper.Whisper
+	if err := currentNode.Service(&whisperInstance); err != nil {
+		t.Errorf("whisper service not running: %v", err)
+	}
+	whisperAPI := whisper.NewPublicWhisperAPI(whisperInstance)
+
+	// prepare message
 	postArgs := whisper.PostArgs{
-		From:    pubKey,
-		To:      pubKey,
-		TTL:     100,
+		From:    "",
+		To:      "",
+		TTL:     10,
 		Topics:  [][]byte{[]byte("test topic")},
 		Payload: "test message",
 	}
-	whisperAPI := whisper.NewPublicWhisperAPI(whisperInstance)
-	postSuccess, err := whisperAPI.Post(postArgs)
-	if !postSuccess || err != nil {
-		t.Errorf("Test failed: Could not post to whisper: %v", err)
-	}
 
-	// import test account (with test ether on it)
-	err = copyFile(filepath.Join(testDataDir, "testnet", "keystore", "test-account.pk"), filepath.Join("data", "test-account.pk"))
+	// create an accounts
+	address1, pubKey1, _, err := createAccount(newAccountPassword)
 	if err != nil {
-		t.Errorf("Test failed: cannot copy test account PK: %v", err)
+		fmt.Println(err.Error())
+		t.Error("Test failed: could not create account")
 		return
 	}
-	time.Sleep(2 * time.Second)
+	glog.V(logger.Info).Infof("Account created: {address: %s, key: %s}", address1, pubKey1)
 
-	// unlock test account (to send ether from it)
-	err = unlockAccount(testAddress, testAddressPassword, 300)
+	address2, pubKey2, _, err := createAccount(newAccountPassword)
 	if err != nil {
-		fmt.Println(err)
-		t.Error("Test failed: could not unlock account")
+		fmt.Println(err.Error())
+		t.Error("Test failed: could not create account")
+		return
 	}
-	time.Sleep(2 * time.Second)
+	glog.V(logger.Info).Infof("Account created: {address: %s, key: %s}", address2, pubKey2)
+
+	// start watchers
+	var receivedMessages = map[string]bool{
+		whisperMessage1: false,
+		whisperMessage2: false,
+		whisperMessage3: false,
+		whisperMessage4: false,
+		whisperMessage5: false,
+	}
+	whisperService.Watch(whisper.Filter{
+		//From: crypto.ToECDSAPub(common.FromHex(pubKey1)),
+		//To:   crypto.ToECDSAPub(common.FromHex(pubKey2)),
+		Fn: func(msg *whisper.Message) {
+			glog.V(logger.Info).Infof("Whisper message received: %s", msg.Payload)
+			receivedMessages[string(msg.Payload)] = true
+		},
+	})
+
+	// inject key of newly created account into Whisper, as identity
+	if whisperInstance.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey1))) {
+		t.Errorf("identity already present in whisper")
+	}
+	err = selectAccount(address1, newAccountPassword)
+	if err != nil {
+		t.Errorf("Test failed: could not select account: %v", err)
+		return
+	}
+	identitySucceess := whisperInstance.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey1)))
+	if !identitySucceess || err != nil {
+		t.Errorf("identity not injected into whisper: %v", err)
+	}
+	if whisperInstance.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey2))) { // ensure that second id is not injected
+		t.Errorf("identity already present in whisper")
+	}
+
+	// double selecting (shouldn't be a problem)
+	err = selectAccount(address1, newAccountPassword)
+	if err != nil {
+		t.Errorf("Test failed: could not select account: %v", err)
+		return
+	}
+
+	// TEST 0: From != nil && To != nil: encrypted signed message (but we cannot decrypt it - so watchers will not report this)
+	postArgs.From = pubKey1
+	postArgs.To = pubKey2 // owner of that public key will be able to decrypt it
+	postSuccess, err := whisperAPI.Post(postArgs)
+	if !postSuccess || err != nil {
+		t.Errorf("could not post to whisper: %v", err)
+	}
+
+	// TEST 1: From != nil && To != nil: encrypted signed message (to self)
+	postArgs.From = pubKey1
+	postArgs.To = pubKey1
+	postArgs.Payload = whisperMessage1
+	postSuccess, err = whisperAPI.Post(postArgs)
+	if !postSuccess || err != nil {
+		t.Errorf("could not post to whisper: %v", err)
+	}
+
+	// send from account that is not in Whisper identity list
+	postArgs.From = pubKey2
+	postSuccess, err = whisperAPI.Post(postArgs)
+	if err == nil || err.Error() != fmt.Sprintf("unknown identity to send from: %s", pubKey2) {
+		t.Errorf("expected error not voiced: we are sending from non-injected whisper identity")
+	}
+
+	// TEST 2: From != nil && To == nil: signed broadcast (known sender)
+	postArgs.From = pubKey1
+	postArgs.To = ""
+	postArgs.Payload = whisperMessage2
+	postSuccess, err = whisperAPI.Post(postArgs)
+	if !postSuccess || err != nil {
+		t.Errorf("could not post to whisper: %v", err)
+	}
+
+	// TEST 3: From == nil && To == nil: anonymous broadcast
+	postArgs.From = ""
+	postArgs.To = ""
+	postArgs.Payload = whisperMessage3
+	postSuccess, err = whisperAPI.Post(postArgs)
+	if !postSuccess || err != nil {
+		t.Errorf("could not post to whisper: %v", err)
+	}
+
+	// TEST 4: From == nil && To != nil: encrypted anonymous message
+	postArgs.From = ""
+	postArgs.To = pubKey1
+	postArgs.Payload = whisperMessage4
+	postSuccess, err = whisperAPI.Post(postArgs)
+	if !postSuccess || err != nil {
+		t.Errorf("could not post to whisper: %v", err)
+	}
+
+	// TEST 5: From != nil && To != nil: encrypted and signed response
+	postArgs.From = ""
+	postArgs.To = pubKey1
+	postArgs.Payload = whisperMessage5
+	postSuccess, err = whisperAPI.Post(postArgs)
+	if !postSuccess || err != nil {
+		t.Errorf("could not post to whisper: %v", err)
+	}
+
+	time.Sleep(2 * time.Second) // allow whisper to poll
+	for message, status := range receivedMessages {
+		if !status {
+			t.Errorf("Expected message not received: %s", message)
+		}
+	}
+
+}
+
+func TestQueuedTransactions(t *testing.T) {
+	err := prepareTestNode()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	// create an account
+	address, pubKey, mnemonic, err := createAccount(newAccountPassword)
+	if err != nil {
+		fmt.Println(err.Error())
+		t.Error("Test failed: could not create account")
+		return
+	}
+	glog.V(logger.Info).Infof("Account created: {address: %s, key: %s, mnemonic:%s}", address, pubKey, mnemonic)
 
 	// test transaction queueing
 	var lightEthereum *les.LightEthereum
@@ -114,8 +305,9 @@ func TestAccountBindings(t *testing.T) {
 	backend.SetTransactionQueueHandler(func(queuedTx les.QueuedTx) {
 		glog.V(logger.Info).Infof("Queued transaction hash: %v\n", queuedTx.Hash.Hex())
 		var txHash common.Hash
-		if txHash, err = completeTransaction(queuedTx.Hash.Hex()); err != nil {
+		if txHash, err = completeTransaction(queuedTx.Hash.Hex(), testAddressPassword); err != nil {
 			t.Errorf("Test failed: cannot complete queued transation[%s]: %v", queuedTx.Hash.Hex(), err)
+			return
 		}
 
 		glog.V(logger.Info).Infof("Transaction complete: https://testnet.etherscan.io/tx/%s", txHash.Hex())
@@ -123,7 +315,7 @@ func TestAccountBindings(t *testing.T) {
 	})
 
 	// try completing non-existing transaction
-	if _, err := completeTransaction("0x1234512345123451234512345123456123451234512345123451234512345123"); err == nil {
+	if _, err := completeTransaction("0x1234512345123451234512345123456123451234512345123451234512345123", testAddressPassword); err == nil {
 		t.Errorf("Test failed: error expected and not recieved")
 	}
 
@@ -152,14 +344,13 @@ func TestAccountBindings(t *testing.T) {
 		t.Error("Test failed: transaction was never queued or completed")
 	}
 
-	//// clean up
-	//err = os.RemoveAll(".ethereumtest")
-	//if err != nil {
-	//	t.Error("Test failed: could not clean up temporary datadir")
-	//}
 }
 
 func prepareTestNode() error {
+	if currentNode != nil {
+		return nil
+	}
+
 	rpcport = 8546 // in order to avoid conflicts with running react-native app
 
 	syncRequired := false
@@ -173,6 +364,13 @@ func prepareTestNode() error {
 		return err
 	}
 
+	// import test account (with test ether on it)
+	err = copyFile(filepath.Join(testDataDir, "testnet", "keystore", "test-account.pk"), filepath.Join("data", "test-account.pk"))
+	if err != nil {
+		glog.V(logger.Warn).Infof("Test failed: cannot copy test account PK: %v", err)
+		return err
+	}
+
 	// start geth node and wait for it to initialize
 	go createAndStartNode(dataDir)
 	time.Sleep(5 * time.Second)
@@ -183,7 +381,16 @@ func prepareTestNode() error {
 	if syncRequired {
 		glog.V(logger.Warn).Infof("Sync is required, it will take %d seconds", testNodeSyncSeconds)
 		time.Sleep(testNodeSyncSeconds * time.Second) // LES syncs headers, so that we are up do date when it is done
+	} else {
+		time.Sleep(10 * time.Second)
 	}
 
 	return nil
+}
+
+func cleanup() {
+	err := os.RemoveAll(testDataDir)
+	if err != nil {
+		glog.V(logger.Warn).Infof("Test failed: could not clean up temporary datadir")
+	}
 }

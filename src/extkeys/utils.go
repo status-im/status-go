@@ -14,9 +14,9 @@ var (
 )
 
 func splitHMAC(seed, salt []byte) (secretKey, chainCode []byte, err error) {
-	hmac := hmac.New(sha512.New, salt)
-	hmac.Write(seed)
-	I := hmac.Sum(nil)
+	data := hmac.New(sha512.New, salt)
+	data.Write(seed)
+	I := data.Sum(nil)
 
 	// Split I into two 32-byte sequences, IL and IR.
 	// IL = master secret key

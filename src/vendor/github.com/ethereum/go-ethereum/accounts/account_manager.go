@@ -123,6 +123,10 @@ func (am *Manager) Accounts() []Account {
 	return am.cache.accounts()
 }
 
+func (am *Manager) AccountDecryptedKey(a Account, auth string) (Account, *Key, error) {
+	return am.getDecryptedKey(a, auth)
+}
+
 // DeleteAccount deletes the key matched by account if the passphrase is correct.
 // If a contains no filename, the address must match a unique key.
 func (am *Manager) DeleteAccount(a Account, passphrase string) error {
@@ -326,15 +330,6 @@ func (am *Manager) NewAccountUsingExtendedKey(k *extkeys.ExtendedKey, passphrase
 	// Add the account to the cache immediately rather
 	// than waiting for file system notifications to pick it up.
 	am.cache.add(account)
-
-	// sync key to subprotocols (e.g., whisper identity)
-	if am.sync != nil {
-		address := fmt.Sprintf("%x", account.Address)
-		err := am.syncAccounts(address, key)
-		if err != nil {
-			return account, fmt.Errorf("failed to sync accounts: %s", err.Error())
-		}
-	}
 
 	return account, nil
 }

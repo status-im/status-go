@@ -12,7 +12,6 @@ import (
 )
 
 func TestBIP32Vectors(t *testing.T) {
-	hkStart := uint32(0x80000000)
 	tests := []struct {
 		name    string
 		seed    string
@@ -31,35 +30,35 @@ func TestBIP32Vectors(t *testing.T) {
 		{
 			"test vector 1 chain m/0H",
 			"000102030405060708090a0b0c0d0e0f",
-			[]uint32{hkStart},
+			[]uint32{extkeys.HardenedKeyStart},
 			"xpub68Gmy5EdvgibQVfPdqkBBCHxA5htiqg55crXYuXoQRKfDBFA1WEjWgP6LHhwBZeNK1VTsfTFUHCdrfp1bgwQ9xv5ski8PX9rL2dZXvgGDnw",
 			"xprv9uHRZZhk6KAJC1avXpDAp4MDc3sQKNxDiPvvkX8Br5ngLNv1TxvUxt4cV1rGL5hj6KCesnDYUhd7oWgT11eZG7XnxHrnYeSvkzY7d2bhkJ7",
 		},
 		{
 			"test vector 1 chain m/0H/1",
 			"000102030405060708090a0b0c0d0e0f",
-			[]uint32{hkStart, 1},
+			[]uint32{extkeys.HardenedKeyStart, 1},
 			"xpub6ASuArnXKPbfEwhqN6e3mwBcDTgzisQN1wXN9BJcM47sSikHjJf3UFHKkNAWbWMiGj7Wf5uMash7SyYq527Hqck2AxYysAA7xmALppuCkwQ",
 			"xprv9wTYmMFdV23N2TdNG573QoEsfRrWKQgWeibmLntzniatZvR9BmLnvSxqu53Kw1UmYPxLgboyZQaXwTCg8MSY3H2EU4pWcQDnRnrVA1xe8fs",
 		},
 		{
 			"test vector 1 chain m/0H/1/2H",
 			"000102030405060708090a0b0c0d0e0f",
-			[]uint32{hkStart, 1, hkStart + 2},
+			[]uint32{extkeys.HardenedKeyStart, 1, extkeys.HardenedKeyStart + 2},
 			"xpub6D4BDPcP2GT577Vvch3R8wDkScZWzQzMMUm3PWbmWvVJrZwQY4VUNgqFJPMM3No2dFDFGTsxxpG5uJh7n7epu4trkrX7x7DogT5Uv6fcLW5",
 			"xprv9z4pot5VBttmtdRTWfWQmoH1taj2axGVzFqSb8C9xaxKymcFzXBDptWmT7FwuEzG3ryjH4ktypQSAewRiNMjANTtpgP4mLTj34bhnZX7UiM",
 		},
 		{
 			"test vector 1 chain m/0H/1/2H/2",
 			"000102030405060708090a0b0c0d0e0f",
-			[]uint32{hkStart, 1, hkStart + 2, 2},
+			[]uint32{extkeys.HardenedKeyStart, 1, extkeys.HardenedKeyStart + 2, 2},
 			"xpub6FHa3pjLCk84BayeJxFW2SP4XRrFd1JYnxeLeU8EqN3vDfZmbqBqaGJAyiLjTAwm6ZLRQUMv1ZACTj37sR62cfN7fe5JnJ7dh8zL4fiyLHV",
 			"xprvA2JDeKCSNNZky6uBCviVfJSKyQ1mDYahRjijr5idH2WwLsEd4Hsb2Tyh8RfQMuPh7f7RtyzTtdrbdqqsunu5Mm3wDvUAKRHSC34sJ7in334",
 		},
 		{
 			"test vector 1 chain m/0H/1/2H/2/1000000000",
 			"000102030405060708090a0b0c0d0e0f",
-			[]uint32{hkStart, 1, hkStart + 2, 2, 1000000000},
+			[]uint32{extkeys.HardenedKeyStart, 1, extkeys.HardenedKeyStart + 2, 2, 1000000000},
 			"xpub6H1LXWLaKsWFhvm6RVpEL9P4KfRZSW7abD2ttkWP3SSQvnyA8FSVqNTEcYFgJS2UaFcxupHiYkro49S8yGasTvXEYBVPamhGW6cFJodrTHy",
 			"xprvA41z7zogVVwxVSgdKUHDy1SKmdb533PjDz7J6N6mV6uS3ze1ai8FHa8kmHScGpWmj4WggLyQjgPie1rFSruoUihUZREPSL39UNdE3BBDu76",
 		},
@@ -81,28 +80,28 @@ func TestBIP32Vectors(t *testing.T) {
 		{
 			"test vector 2 chain m/0/2147483647H",
 			"fffcf9f6f3f0edeae7e4e1dedbd8d5d2cfccc9c6c3c0bdbab7b4b1aeaba8a5a29f9c999693908d8a8784817e7b7875726f6c696663605d5a5754514e4b484542",
-			[]uint32{0, hkStart + 2147483647},
+			[]uint32{0, extkeys.HardenedKeyStart + 2147483647},
 			"xpub6ASAVgeehLbnwdqV6UKMHVzgqAG8Gr6riv3Fxxpj8ksbH9ebxaEyBLZ85ySDhKiLDBrQSARLq1uNRts8RuJiHjaDMBU4Zn9h8LZNnBC5y4a",
 			"xprv9wSp6B7kry3Vj9m1zSnLvN3xH8RdsPP1Mh7fAaR7aRLcQMKTR2vidYEeEg2mUCTAwCd6vnxVrcjfy2kRgVsFawNzmjuHc2YmYRmagcEPdU9",
 		},
 		{
 			"test vector 2 chain m/0/2147483647H/1",
 			"fffcf9f6f3f0edeae7e4e1dedbd8d5d2cfccc9c6c3c0bdbab7b4b1aeaba8a5a29f9c999693908d8a8784817e7b7875726f6c696663605d5a5754514e4b484542",
-			[]uint32{0, hkStart + 2147483647, 1},
+			[]uint32{0, extkeys.HardenedKeyStart + 2147483647, 1},
 			"xpub6DF8uhdarytz3FWdA8TvFSvvAh8dP3283MY7p2V4SeE2wyWmG5mg5EwVvmdMVCQcoNJxGoWaU9DCWh89LojfZ537wTfunKau47EL2dhHKon",
 			"xprv9zFnWC6h2cLgpmSA46vutJzBcfJ8yaJGg8cX1e5StJh45BBciYTRXSd25UEPVuesF9yog62tGAQtHjXajPPdbRCHuWS6T8XA2ECKADdw4Ef",
 		},
 		{
 			"test vector 2 chain m/0/2147483647H/1/2147483646H",
 			"fffcf9f6f3f0edeae7e4e1dedbd8d5d2cfccc9c6c3c0bdbab7b4b1aeaba8a5a29f9c999693908d8a8784817e7b7875726f6c696663605d5a5754514e4b484542",
-			[]uint32{0, hkStart + 2147483647, 1, hkStart + 2147483646},
+			[]uint32{0, extkeys.HardenedKeyStart + 2147483647, 1, extkeys.HardenedKeyStart + 2147483646},
 			"xpub6ERApfZwUNrhLCkDtcHTcxd75RbzS1ed54G1LkBUHQVHQKqhMkhgbmJbZRkrgZw4koxb5JaHWkY4ALHY2grBGRjaDMzQLcgJvLJuZZvRcEL",
 			"xprvA1RpRA33e1JQ7ifknakTFpgNXPmW2YvmhqLQYMmrj4xJXXWYpDPS3xz7iAxn8L39njGVyuoseXzU6rcxFLJ8HFsTjSyQbLYnMpCqE2VbFWc",
 		},
 		{
 			"test vector 2 chain m/0/2147483647H/1/2147483646H/2",
 			"fffcf9f6f3f0edeae7e4e1dedbd8d5d2cfccc9c6c3c0bdbab7b4b1aeaba8a5a29f9c999693908d8a8784817e7b7875726f6c696663605d5a5754514e4b484542",
-			[]uint32{0, hkStart + 2147483647, 1, hkStart + 2147483646, 2},
+			[]uint32{0, extkeys.HardenedKeyStart + 2147483647, 1, extkeys.HardenedKeyStart + 2147483646, 2},
 			"xpub6FnCn6nSzZAw5Tw7cgR9bi15UV96gLZhjDstkXXxvCLsUXBGXPdSnLFbdpq8p9HmGsApME5hQTZ3emM2rnY5agb9rXpVGyy3bdW6EEgAtqt",
 			"xprvA2nrNbFZABcdryreWet9Ea4LvTJcGsqrMzxHx98MMrotbir7yrKCEXw7nadnHM8Dq38EGfSh6dqA9QWTyefMLEcBYJUuekgW4BYPJcr9E7j",
 		},
@@ -127,12 +126,10 @@ tests:
 			continue
 		}
 
-		for _, ind := range test.path {
-			extKey, err = extKey.Child(ind)
-			if err != nil {
-				t.Errorf("cannot derive child: %v", err)
-				continue tests
-			}
+		extKey, err = extKey.Derive(test.path)
+		if err != nil {
+			t.Errorf("cannot derive child: %v", err)
+			continue tests
 		}
 
 		privKeyStr := extKey.String()
@@ -271,16 +268,10 @@ tests:
 			t.Errorf("NewKeyFromString #%d (%s): unexpected error creating extended key: %v", i, test.name, err)
 			continue
 		}
-
-		for _, childNum := range test.path {
-			var err error
-			extKey, err = extKey.Child(childNum)
-			if err != nil {
-				t.Errorf("err: %v", err)
-				continue tests
-			}
-
-			t.Logf("test %d (%s): %s", i, test.name, extKey.String())
+		extKey, err = extKey.Derive(test.path)
+		if err != nil {
+			t.Errorf("cannot derive child: %v", err)
+			continue tests
 		}
 
 		privStr := extKey.String()
@@ -288,6 +279,8 @@ tests:
 			t.Errorf("Child #%d (%s): mismatched serialized private extended key -- got: %s, want: %s",
 				i, test.name, privStr, test.wantPriv)
 			continue
+		} else {
+			t.Logf("test %d (%s): %s", i, test.name, extKey.String())
 		}
 	}
 
@@ -391,21 +384,18 @@ tests:
 			continue
 		}
 
-		for _, childNum := range test.path {
-			var err error
-			extKey, err = extKey.Child(childNum)
-			if err != nil {
-				t.Errorf("err: %v", err)
-				continue tests
-			}
-
-			t.Logf("test %d (%s): %s", i, test.name, extKey.String())
+		extKey, err = extKey.Derive(test.path)
+		if err != nil {
+			t.Errorf("cannot derive child: %v", err)
+			continue tests
 		}
 
 		pubStr := extKey.String()
 		if pubStr != test.wantPub {
 			t.Errorf("Child #%d (%s): mismatched serialized public extended key -- got: %s, want: %s", i, test.name, pubStr, test.wantPub)
 			continue
+		} else {
+			t.Logf("test %d (%s): %s", i, test.name, extKey.String())
 		}
 	}
 }
@@ -446,6 +436,17 @@ func TestErrors(t *testing.T) {
 	_, err = pubKey.Child(extkeys.HardenedKeyStart)
 	if err != extkeys.ErrDerivingHardenedFromPublic {
 		t.Errorf("Child: mismatched error -- got: %v, want: %v", err, extkeys.ErrDerivingHardenedFromPublic)
+	}
+
+	_, err = pubKey.BIP44Child(extkeys.CoinTypeETH, 0)
+	if err != extkeys.ErrInvalidMasterKey {
+		t.Errorf("BIP44Child: mistmatched error -- got: %v, want: %v", err, extkeys.ErrInvalidMasterKey)
+	}
+
+	childKey, _ := extKey.Child(extkeys.HardenedKeyStart + 1)
+	_, err = childKey.BIP44Child(extkeys.CoinTypeETH, 0) // this should be called from master only
+	if err != extkeys.ErrInvalidMasterKey {
+		t.Errorf("BIP44Child: mistmatched error -- got: %v, want: %v", err, extkeys.ErrInvalidMasterKey)
 	}
 
 	// NewKeyFromString failure tests.
@@ -495,6 +496,35 @@ func TestErrors(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestBIP44ChildDerivation(t *testing.T) {
+	keyString := "xprv9s21ZrQH143K3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPPqjiChkVvvNKmPGJxWUtg6LnF5kejMRNNU3TGtRBeJgk33yuGBxrMPHi"
+	derivedKey1String := "xprvA38t8tFW4vbuB7WJXEqMFmZqRrcZUKWqqMcGjjKjr2hbfvPhRtLLJGL4ayWG8shF1VkuUikVGodGshLiKRS7WrdsrGSVDQCY33qoPBxG2Kp"
+	derivedKey2String := "xprvA38t8tFW4vbuDgBNpekPnuMSfpWziDLdF7W9Zd3mPy6eDEkM5F17vk59RtVoFbNdBBq84EJf5CqdZhhEoBkAM4DXHQsDqvUxVnncfnDQEFg"
+
+	extKey, err := extkeys.NewKeyFromString(keyString)
+	if err != nil {
+		t.Errorf("NewKeyFromString: cannot create extended key")
+	}
+
+	accounKey1, err := extKey.BIP44Child(extkeys.CoinTypeETH, 0)
+	if err != nil {
+		t.Errorf("Error dering BIP44-compliant key")
+	}
+	if accounKey1.String() != derivedKey1String {
+		t.Errorf("BIP44Child: key mismatch -- got: %v, want: %v", accounKey1.String(), derivedKey1String)
+	}
+	t.Logf("Account 1 key: %s", accounKey1.String())
+
+	accounKey2, err := extKey.BIP44Child(extkeys.CoinTypeETH, 1)
+	if err != nil {
+		t.Errorf("Error dering BIP44-compliant key")
+	}
+	if accounKey2.String() != derivedKey2String {
+		t.Errorf("BIP44Child: key mismatch -- got: %v, want: %v", accounKey2.String(), derivedKey2String)
+	}
+	t.Logf("Account 1 key: %s", accounKey2.String())
 }
 
 //func TestNewKey(t *testing.T) {

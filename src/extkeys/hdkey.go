@@ -53,6 +53,11 @@ const (
 	// fingerprint, 4 bytes child number, 32 bytes chain code, and 33 bytes
 	// public/private key data.
 	serializedKeyLen = 4 + 1 + 4 + 4 + 32 + 33 // 78 bytes
+
+	CoinTypeBTC     = 0  // 0x80000000
+	CoinTypeTestNet = 1  // 0x80000001
+	CoinTypeETH     = 60 // 0x8000003c
+	CoinTypeETC     = 60 // 0x80000000
 )
 
 var (
@@ -63,10 +68,14 @@ var (
 	ErrDerivingHardenedFromPublic = errors.New("cannot derive a hardened key from public key")
 	ErrBadChecksum                = errors.New("bad extended key checksum")
 	ErrInvalidKeyLen              = errors.New("serialized extended key length is invalid")
+	ErrDerivingChild              = errors.New("error deriving child key")
+	ErrInvalidMasterKey           = errors.New("invalid master key supplied")
 
 	PrivateKeyVersion, _ = hex.DecodeString("0488ADE4")
 	PublicKeyVersion, _  = hex.DecodeString("0488B21E")
 )
+
+type CoinType int
 
 type ExtendedKey struct {
 	Version          []byte // 4 bytes, mainnet: 0x0488B21E public, 0x0488ADE4 private; testnet: 0x043587CF public, 0x04358394 private
@@ -182,6 +191,45 @@ func (parent *ExtendedKey) Child(i uint32) (*ExtendedKey, error) {
 		child.Version = PublicKeyVersion
 	}
 	return child, nil
+}
+
+// Child1 returns Status CKD#1 (used for ETH and SHH).
+// BIP44 format is used: m / purpose' / coin_type' / account' / change / address_index
+func (master *ExtendedKey) BIP44Child(coinType, i uint32) (*ExtendedKey, error) {
+	if !master.IsPrivate {
+		return nil, ErrInvalidMasterKey
+	}
+
+	if master.Depth != 0 {
+		return nil, ErrInvalidMasterKey
+	}
+
+	// m/44'/60'/0'/0/index
+	extKey, err := master.Derive([]uint32{
+		HardenedKeyStart + 44,       // purpose
+		HardenedKeyStart + coinType, // cointype
+		HardenedKeyStart + 0,        // account
+		0,                           // 0 - public, 1 - private
+		i,                           // index
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return extKey, nil
+}
+
+func (parent *ExtendedKey) Derive(path []uint32) (*ExtendedKey, error) {
+	var err error
+	extKey := parent
+	for _, i := range path {
+		extKey, err = extKey.Child(i)
+		if err != nil {
+			return nil, ErrDerivingChild
+		}
+	}
+
+	return extKey, nil
 }
 
 func (k *ExtendedKey) Neuter() (*ExtendedKey, error) {
