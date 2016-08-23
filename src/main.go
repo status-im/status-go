@@ -137,7 +137,7 @@ func makeDefaultExtra() []byte {
 }
 
 func preprocessDataDir(dataDir string) (string, error) {
-	testDataDir := path.Join(dataDir, "testnet")
+	testDataDir := path.Join(dataDir, "testnet", "keystore")
 	if _, err := os.Stat(testDataDir); os.IsNotExist(err) {
 		if err := os.MkdirAll(testDataDir, 0755); err != nil {
 			return dataDir, ErrDataDirPreprocessingFailed
@@ -145,7 +145,7 @@ func preprocessDataDir(dataDir string) (string, error) {
 	}
 
 	// copy over static peer nodes list (LES auto-discovery is not stable yet)
-	dst := filepath.Join(testDataDir, "static-nodes.json")
+	dst := filepath.Join(dataDir, "testnet", "static-nodes.json")
 	if _, err := os.Stat(dst); os.IsNotExist(err) {
 		src := filepath.Join("data", "static-nodes.json")
 		if err := copyFile(dst, src); err != nil {

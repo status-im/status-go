@@ -9,86 +9,149 @@ extern bool GethServiceSignalEvent( const char *jsonEvent );
 import "C"
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
-	"time"
 
-	"encoding/json"
-	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/les"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	errextra "github.com/pkg/errors"
+	"github.com/status-im/status-go/src/extkeys"
 )
 
 var (
-	scryptN = 4096
-	scryptP = 6
+	ErrInvalidGethNode                 = errors.New("no running node detected for account unlock")
+	ErrInvalidWhisperService           = errors.New("whisper service is unavailable")
+	ErrInvalidAccountManager           = errors.New("could not retrieve account manager")
+	ErrAddressToAccountMappingFailure  = errors.New("cannot retreive a valid account for a given address")
+	ErrAccountToKeyMappingFailure      = errors.New("cannot retreive a valid key for a given account")
+	ErrUnlockCalled                    = errors.New("no need to unlock accounts, use Login() instead")
+	ErrWhisperIdentityInjectionFailure = errors.New("failed to inject identity into Whisper")
 )
 
 // createAccount creates an internal geth account
-func createAccount(password string) (string, string, error) {
+func createAccount(password string) (string, string, string, error) {
 
 	if currentNode != nil {
 
 		w := true
 
 		if accountManager != nil {
-			// generate the account
-			account, err := accountManager.NewAccount(password, w)
+			// generate mnemonic phrase
+			m := extkeys.NewMnemonic()
+			mnemonic, err := m.MnemonicPhrase(128, extkeys.EnglishLanguage)
 			if err != nil {
-				return "", "", errextra.Wrap(err, "Account manager could not create the account")
+				return "", "", "", errextra.Wrap(err, "Can not create mnemonic seed")
+			}
+
+			// generate extended master key (see BIP32)
+			extKey, err := extkeys.NewMaster(m.MnemonicSeed(mnemonic, password), []byte(extkeys.Salt))
+			if err != nil {
+				return "", "", "", errextra.Wrap(err, "Can not create master extended key")
+			}
+
+			// derive hardened child (see BIP44)
+			extChild1, err := extKey.BIP44Child(extkeys.CoinTypeETH, 0)
+			if err != nil {
+				return "", "", "", errextra.Wrap(err, "Can not derive hardened child key (#1)")
+			}
+
+			// generate the account
+			account, err := accountManager.NewAccountUsingExtendedKey(extChild1, password, w)
+			if err != nil {
+				return "", "", "", errextra.Wrap(err, "Account manager could not create the account")
 			}
 			address := fmt.Sprintf("%x", account.Address)
 
 			// recover the public key to return
-			keyContents, err := ioutil.ReadFile(account.File)
+			account, key, err := accountManager.AccountDecryptedKey(account, password)
 			if err != nil {
-				return address, "", errextra.Wrap(err, "Could not load the key contents")
-			}
-			key, err := accounts.DecryptKey(keyContents, password)
-			if err != nil {
-				return address, "", errextra.Wrap(err, "Could not recover the key")
+				return address, "", "", errextra.Wrap(err, "Could not recover the key")
 			}
 			pubKey := common.ToHex(crypto.FromECDSAPub(&key.PrivateKey.PublicKey))
 
-			return address, pubKey, nil
+			return address, pubKey, mnemonic, nil
 		}
-		return "", "", errors.New("Could not retrieve account manager")
 
+		return "", "", "", errors.New("Could not retrieve account manager")
 	}
 
-	return "", "", errors.New("No running node detected for account creation")
+	return "", "", "", errors.New("No running node detected for account creation")
+}
 
+func remindAccountDetails(password, mnemonic string) (string, string, error) {
+
+	if currentNode != nil {
+
+		if accountManager != nil {
+			m := extkeys.NewMnemonic()
+			// re-create extended key (see BIP32)
+			extKey, err := extkeys.NewMaster(m.MnemonicSeed(mnemonic, password), []byte(extkeys.Salt))
+			if err != nil {
+				return "", "", errextra.Wrap(err, "Can not create master extended key")
+			}
+
+			// derive hardened child (see BIP44)
+			extChild1, err := extKey.BIP44Child(extkeys.CoinTypeETH, 0)
+			if err != nil {
+				return "", "", errextra.Wrap(err, "Can not derive hardened child key (#1)")
+			}
+
+			privateKeyECDSA := extChild1.ToECDSA()
+			address := fmt.Sprintf("%x", crypto.PubkeyToAddress(privateKeyECDSA.PublicKey))
+			pubKey := common.ToHex(crypto.FromECDSAPub(&privateKeyECDSA.PublicKey))
+
+			accountManager.ImportECDSA(privateKeyECDSA, password) // try caching key, ignore errors
+
+			return address, pubKey, nil
+		}
+
+		return "", "", errors.New("Could not retrieve account manager")
+	}
+
+	return "", "", errors.New("No running node detected for account unlock")
+}
+
+func selectAccount(address, password string) error {
+	if currentNode == nil {
+		return ErrInvalidGethNode
+	}
+
+	if accountManager == nil {
+		return ErrInvalidAccountManager
+	}
+	account, err := utils.MakeAddress(accountManager, address)
+	if err != nil {
+		return ErrAddressToAccountMappingFailure
+	}
+
+	account, accountKey, err := accountManager.AccountDecryptedKey(account, password)
+	if err != nil {
+		return fmt.Errorf("%s: %v", ErrAccountToKeyMappingFailure.Error(), err)
+	}
+
+	if whisperService == nil {
+		return ErrInvalidWhisperService
+	}
+	if err := whisperService.InjectIdentity(accountKey.PrivateKey); err != nil {
+		return ErrWhisperIdentityInjectionFailure
+	}
+
+	return nil
 }
 
 // unlockAccount unlocks an existing account for a certain duration and
 // inject the account as a whisper identity if the account was created as
 // a whisper enabled account
 func unlockAccount(address, password string, seconds int) error {
-
-	if currentNode != nil {
-
-		if accountManager != nil {
-			account, err := utils.MakeAddress(accountManager, address)
-			if err != nil {
-				return errextra.Wrap(err, "Could not retrieve account from address")
-			}
-
-			err = accountManager.TimedUnlock(account, password, time.Duration(seconds)*time.Second)
-			if err != nil {
-				return errextra.Wrap(err, "Could not decrypt account")
-			}
-			return nil
-		}
-		return errors.New("Could not retrieve account manager")
+	if currentNode == nil {
+		return ErrInvalidGethNode
 	}
 
-	return errors.New("No running node detected for account unlock")
-
+	return ErrUnlockCalled
 }
 
 // createAndStartNode creates a node entity and starts the
@@ -132,12 +195,12 @@ func onSendTransactionRequest(queuedTx les.QueuedTx) {
 	C.GethServiceSignalEvent(C.CString(string(body)))
 }
 
-func completeTransaction(hash string) (common.Hash, error) {
+func completeTransaction(hash, password string) (common.Hash, error) {
 	if currentNode != nil {
 		if lightEthereum != nil {
 			backend := lightEthereum.StatusBackend
 
-			return backend.CompleteQueuedTransaction(les.QueuedTxHash(hash))
+			return backend.CompleteQueuedTransaction(les.QueuedTxHash(hash), password)
 		}
 
 		return common.Hash{}, errors.New("can not retrieve LES service")

@@ -15,7 +15,7 @@ func CreateAccount(password *C.char) *C.char {
 
 	// This is equivalent to creating an account from the command line,
 	// just modified to handle the function arg passing
-	address, pubKey, err := createAccount(C.GoString(password))
+	address, pubKey, mnemonic, err := createAccount(C.GoString(password))
 
 	errString := emptyError
 	if err != nil {
@@ -24,9 +24,32 @@ func CreateAccount(password *C.char) *C.char {
 	}
 
 	out := AccountInfo{
-		Address: address,
-		PubKey:  pubKey,
-		Error:   errString,
+		Address:  address,
+		PubKey:   pubKey,
+		Mnemonic: mnemonic,
+		Error:    errString,
+	}
+	outBytes, _ := json.Marshal(&out)
+
+	return C.CString(string(outBytes))
+}
+
+//export RemindAccountDetails
+func RemindAccountDetails(password, mnemonic *C.char) *C.char {
+
+	address, pubKey, err := remindAccountDetails(C.GoString(password), C.GoString(mnemonic))
+
+	errString := emptyError
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		errString = err.Error()
+	}
+
+	out := AccountInfo{
+		Address:  address,
+		PubKey:   pubKey,
+		Mnemonic: C.GoString(mnemonic),
+		Error:    errString,
 	}
 	outBytes, _ := json.Marshal(&out)
 
@@ -35,10 +58,22 @@ func CreateAccount(password *C.char) *C.char {
 
 //export Login
 func Login(address, password *C.char) *C.char {
-	// Equivalent to unlocking an account briefly, to inject a whisper identity,
-	// then locking the account again
-	out := UnlockAccount(address, password, 1)
-	return out
+	// loads a key file (for a given address), tries to decrypt it using the password, to verify ownership
+	// if verified, purges all the previous identities from Whisper, and injects verified key as shh identity
+	err := selectAccount(C.GoString(address), C.GoString(password))
+
+	errString := emptyError
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		errString = err.Error()
+	}
+
+	out := JSONError{
+		Error: errString,
+	}
+	outBytes, _ := json.Marshal(&out)
+
+	return C.CString(string(outBytes))
 }
 
 //export UnlockAccount
@@ -64,8 +99,8 @@ func UnlockAccount(address, password *C.char, seconds int) *C.char {
 }
 
 //export CompleteTransaction
-func CompleteTransaction(hash *C.char) *C.char {
-	txHash, err := completeTransaction(C.GoString(hash))
+func CompleteTransaction(hash, password *C.char) *C.char {
+	txHash, err := completeTransaction(C.GoString(hash), C.GoString(password))
 
 	errString := emptyError
 	if err != nil {

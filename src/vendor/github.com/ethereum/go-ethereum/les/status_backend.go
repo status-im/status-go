@@ -102,13 +102,13 @@ func (b *StatusBackend) SendTransaction(ctx context.Context, args SendTxArgs) er
 }
 
 // CompleteQueuedTransaction wraps call to PublicTransactionPoolAPI.CompleteQueuedTransaction
-func (b *StatusBackend) CompleteQueuedTransaction(hash QueuedTxHash) (common.Hash, error) {
+func (b *StatusBackend) CompleteQueuedTransaction(hash QueuedTxHash, passphrase string) (common.Hash, error) {
 	queuedTx, err := b.txEvictingQueue.getQueuedTransaction(hash)
 	if err != nil {
 		return common.Hash{}, err
 	}
 
-	return b.txapi.CompleteQueuedTransaction(context.Background(), ethapi.SendTxArgs(queuedTx.Args))
+	return b.txapi.CompleteQueuedTransaction(context.Background(), ethapi.SendTxArgs(queuedTx.Args), passphrase)
 }
 
 // GetTransactionQueue wraps call to PublicTransactionPoolAPI.GetTransactionQueue

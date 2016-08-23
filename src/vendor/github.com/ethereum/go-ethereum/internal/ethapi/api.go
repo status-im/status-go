@@ -1173,7 +1173,7 @@ func (s *PublicTransactionPoolAPI) SendTransaction(ctx context.Context, args Sen
 
 // CompleteQueuedTransaction creates a transaction by unpacking queued transaction, signs it and submits to the
 // transaction pool.
-func (s *PublicTransactionPoolAPI) CompleteQueuedTransaction(ctx context.Context, args SendTxArgs) (common.Hash, error) {
+func (s *PublicTransactionPoolAPI) CompleteQueuedTransaction(ctx context.Context, args SendTxArgs, passphrase string) (common.Hash, error) {
 	var err error
 	args, err = prepareSendTxArgs(ctx, args, s.b)
 	if err != nil {
@@ -1195,7 +1195,7 @@ func (s *PublicTransactionPoolAPI) CompleteQueuedTransaction(ctx context.Context
 		tx = types.NewTransaction(args.Nonce.Uint64(), *args.To, args.Value.BigInt(), args.Gas.BigInt(), args.GasPrice.BigInt(), common.FromHex(args.Data))
 	}
 
-	signature, err := s.b.AccountManager().Sign(args.From, tx.SigHash().Bytes())
+	signature, err := s.b.AccountManager().SignWithPassphrase(args.From, passphrase, tx.SigHash().Bytes())
 	if err != nil {
 		return common.Hash{}, err
 	}

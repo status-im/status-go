@@ -5,9 +5,10 @@ import (
 )
 
 type AccountInfo struct {
-	Address string `json:"address"`
-	PubKey  string `json:"pubkey"`
-	Error   string `json:"error"`
+	Address  string `json:"address"`
+	PubKey   string `json:"pubkey"`
+	Mnemonic string `json:"mnemonic"`
+	Error    string `json:"error"`
 }
 
 type JSONError struct {
