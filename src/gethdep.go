@@ -82,7 +82,7 @@ func createAccount(password string) (string, string, string, error) {
 	return "", "", "", errors.New("No running node detected for account creation")
 }
 
-func remindAccountDetails(password, mnemonic string) (string, string, error) {
+func recoverAccount(password, mnemonic string) (string, string, error) {
 
 	if currentNode != nil {
 

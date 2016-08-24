@@ -33,7 +33,7 @@ const (
 	whisperMessage5 = "test message 5 (K2 -> K1)"
 )
 
-func TestRemindAccountDetails(t *testing.T) {
+func TestRecoverAccount(t *testing.T) {
 	err := prepareTestNode()
 	if err != nil {
 		t.Error(err)
@@ -48,14 +48,14 @@ func TestRemindAccountDetails(t *testing.T) {
 	}
 	glog.V(logger.Info).Infof("Account created: {address: %s, key: %s, mnemonic:%s}", address, pubKey, mnemonic)
 
-	// try reminding using password + mnemonic
-	addressCheck, pubKeyCheck, err := remindAccountDetails(newAccountPassword, mnemonic)
+	// try recovering using password + mnemonic
+	addressCheck, pubKeyCheck, err := recoverAccount(newAccountPassword, mnemonic)
 	if err != nil {
-		t.Errorf("remind details failed: %v", err)
+		t.Errorf("recover account failed: %v", err)
 		return
 	}
 	if address != addressCheck || pubKey != pubKeyCheck {
-		t.Error("Test failed: remind account details failed to pull the correct details")
+		t.Error("Test failed: recover account details failed to pull the correct details")
 	}
 }
 

@@ -34,10 +34,10 @@ func CreateAccount(password *C.char) *C.char {
 	return C.CString(string(outBytes))
 }
 
-//export RemindAccountDetails
-func RemindAccountDetails(password, mnemonic *C.char) *C.char {
+//export RecoverAccount
+func RecoverAccount(password, mnemonic *C.char) *C.char {
 
-	address, pubKey, err := remindAccountDetails(C.GoString(password), C.GoString(mnemonic))
+	address, pubKey, err := recoverAccount(C.GoString(password), C.GoString(mnemonic))
 
 	errString := emptyError
 	if err != nil {
