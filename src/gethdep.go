@@ -30,6 +30,7 @@ var (
 	ErrAccountToKeyMappingFailure      = errors.New("cannot retreive a valid key for a given account")
 	ErrUnlockCalled                    = errors.New("no need to unlock accounts, use Login() instead")
 	ErrWhisperIdentityInjectionFailure = errors.New("failed to inject identity into Whisper")
+	ErrWhisperClearIdentitiesFailure   = errors.New("failed to clear whisper identities")
 )
 
 // createAccount creates an internal geth account
@@ -138,6 +139,23 @@ func selectAccount(address, password string) error {
 	}
 	if err := whisperService.InjectIdentity(accountKey.PrivateKey); err != nil {
 		return ErrWhisperIdentityInjectionFailure
+	}
+
+	return nil
+}
+
+// logout clears whisper identities
+func logout() error {
+	if currentNode == nil {
+		return ErrInvalidGethNode
+	}
+	if whisperService == nil {
+		return ErrInvalidWhisperService
+	}
+
+	err := whisperService.ClearIdentities()
+	if err != nil {
+		return fmt.Errorf("%s: %v", ErrWhisperClearIdentitiesFailure, err)
 	}
 
 	return nil

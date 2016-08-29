@@ -127,6 +127,52 @@ func TestAccountSelect(t *testing.T) {
 	}
 }
 
+func TestAccountLogout(t *testing.T) {
+
+	err := prepareTestNode()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	var whisperInstance *whisper.Whisper
+	if err := currentNode.Service(&whisperInstance); err != nil {
+		t.Errorf("whisper service not running: %v", err)
+	}
+
+	// create an account
+	address, pubKey, _, err := createAccount(newAccountPassword)
+	if err != nil {
+		t.Errorf("could not create account: %v", err)
+		return
+	}
+
+	// make sure that identity doesn't exist (yet) in Whisper
+	if whisperInstance.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey))) {
+		t.Error("identity already present in whisper")
+	}
+
+	// select/login
+	err = selectAccount(address, newAccountPassword)
+	if err != nil {
+		t.Errorf("Test failed: could not select account: %v", err)
+		return
+	}
+	if !whisperInstance.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey))) {
+		t.Error("identity not injected into whisper")
+	}
+
+	err = logout()
+	if err != nil {
+		t.Errorf("cannot logout: %v", err)
+	}
+
+	// now, logout and check if identity is removed indeed
+	if whisperInstance.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey))) {
+		t.Error("identity not cleared from whisper")
+	}
+}
+
 func TestWhisperMessaging(t *testing.T) {
 	err := prepareTestNode()
 	if err != nil {

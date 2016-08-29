@@ -170,6 +170,19 @@ func (self *Whisper) InjectIdentity(key *ecdsa.PrivateKey) error {
 	return nil
 }
 
+// ClearIdentities clears the current whisper identities in memory
+func (self *Whisper) ClearIdentities() error {
+	self.keysMu.Lock()
+	defer self.keysMu.Unlock()
+
+	self.keys = make(map[string]*ecdsa.PrivateKey)
+	if len(self.keys) != 0 {
+		return fmt.Errorf("could not clear keys map")
+	}
+
+	return nil
+}
+
 // Watch installs a new message handler to run in case a matching packet arrives
 // from the whisper network.
 func (self *Whisper) Watch(options Filter) int {
