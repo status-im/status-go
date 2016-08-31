@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/ethereum/go-ethereum/les"
+	"github.com/ethereum/go-ethereum/les/status"
 )
 
 type AccountInfo struct {
@@ -35,8 +35,8 @@ type WhisperMessageEvent struct {
 }
 
 type SendTransactionEvent struct {
-	Hash string         `json:"hash"`
-	Args les.SendTxArgs `json:"args"`
+	Id   string            `json:"hash"`
+	Args status.SendTxArgs `json:"args"`
 }
 
 type CompleteTransactionResult struct {

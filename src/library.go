@@ -119,8 +119,8 @@ func UnlockAccount(address, password *C.char, seconds int) *C.char {
 }
 
 //export CompleteTransaction
-func CompleteTransaction(hash, password *C.char) *C.char {
-	txHash, err := completeTransaction(C.GoString(hash), C.GoString(password))
+func CompleteTransaction(id, password *C.char) *C.char {
+	txHash, err := completeTransaction(C.GoString(id), C.GoString(password))
 
 	errString := emptyError
 	if err != nil {
