@@ -16,7 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/les"
+	"github.com/ethereum/go-ethereum/les/status"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	errextra "github.com/pkg/errors"
 	"github.com/status-im/status-go/src/extkeys"
@@ -200,11 +200,11 @@ func doAddPeer(url string) (bool, error) {
 	return true, nil
 }
 
-func onSendTransactionRequest(queuedTx les.QueuedTx) {
+func onSendTransactionRequest(queuedTx status.QueuedTx) {
 	event := GethEvent{
 		Type: "sendTransactionQueued",
 		Event: SendTransactionEvent{
-			Hash: queuedTx.Hash.Hex(),
+			Id:   string(queuedTx.Id),
 			Args: queuedTx.Args,
 		},
 	}
@@ -213,12 +213,12 @@ func onSendTransactionRequest(queuedTx les.QueuedTx) {
 	C.GethServiceSignalEvent(C.CString(string(body)))
 }
 
-func completeTransaction(hash, password string) (common.Hash, error) {
+func completeTransaction(id, password string) (common.Hash, error) {
 	if currentNode != nil {
 		if lightEthereum != nil {
 			backend := lightEthereum.StatusBackend
 
-			return backend.CompleteQueuedTransaction(les.QueuedTxHash(hash), password)
+			return backend.CompleteQueuedTransaction(status.QueuedTxId(id), password)
 		}
 
 		return common.Hash{}, errors.New("can not retrieve LES service")
