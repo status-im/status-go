@@ -1,9 +1,23 @@
 #include <stddef.h>
 #include <stdbool.h>
+
+#ifdef IOS_DEPLOYMENT
+#else
 #include <jni.h>
+#endif
+
 
 
 bool GethServiceSignalEvent( const char *jsonEvent );
+
+#ifdef IOS_DEPLOYMENT
+
+bool GethServiceSignalEvent( const char *jsonEvent )
+{
+	return true;
+}
+
+#else
 
 static JavaVM *gJavaVM = NULL;
 static jclass JavaClassPtr_GethService = NULL;
@@ -153,3 +167,4 @@ bool GethServiceSignalEvent( const char *jsonEvent )
 	
 	return true;
 }
+#endif

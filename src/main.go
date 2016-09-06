@@ -46,6 +46,8 @@ var (
 	datadir        string                    // data directory for geth
 	rpcport        int                = 8545 // RPC port (replaced in unit tests)
 	client         rpc.Client
+	gitCommit      = "rely on linker: -ldflags -X main.GitCommit"
+	buildStamp     = "rely on linker: -ldflags -X main.buildStamp"
 )
 
 var (
@@ -53,10 +55,7 @@ var (
 )
 
 func main() {
-
-	// Placeholder for anything we want to run by default
-	fmt.Println("You are running statusgo!")
-
+	fmt.Printf("Status\nGit Commit: %s\nBuild Time: %s\n", gitCommit, buildStamp)
 }
 
 // MakeNode create a geth node entity

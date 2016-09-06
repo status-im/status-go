@@ -3,7 +3,6 @@ package main
 /*
 #include <stddef.h>
 #include <stdbool.h>
-#include <jni.h>
 extern bool GethServiceSignalEvent( const char *jsonEvent );
 */
 import "C"
