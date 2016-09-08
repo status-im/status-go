@@ -35,19 +35,20 @@ const (
 )
 
 var (
-	vString        string                    // Combined textual representation of the version
-	rConfig        release.Config            // Structured version information and release oracle config
-	currentNode    *node.Node                // currently running geth node
-	c              *cli.Context              // the CLI context used to start the geth node
-	accountSync    *[]node.Service           // the object used to sync accounts between geth services
-	lightEthereum  *les.LightEthereum        // LES service
-	accountManager *accounts.Manager         // the account manager attached to the currentNode
-	whisperService *whisper.Whisper          // whisper service
-	datadir        string                    // data directory for geth
-	rpcport        int                = 8545 // RPC port (replaced in unit tests)
-	client         rpc.Client
-	gitCommit      = "rely on linker: -ldflags -X main.GitCommit"
-	buildStamp     = "rely on linker: -ldflags -X main.buildStamp"
+	vString         string                    // Combined textual representation of the version
+	rConfig         release.Config            // Structured version information and release oracle config
+	currentNode     *node.Node                // currently running geth node
+	c               *cli.Context              // the CLI context used to start the geth node
+	accountSync     *[]node.Service           // the object used to sync accounts between geth services
+	lightEthereum   *les.LightEthereum        // LES service
+	accountManager  *accounts.Manager         // the account manager attached to the currentNode
+	selectedAddress string                    // address of the account that was processed during the last call to SelectAccount()
+	whisperService  *whisper.Whisper          // whisper service
+	datadir         string                    // data directory for geth
+	rpcport         int                = 8545 // RPC port (replaced in unit tests)
+	client          rpc.Client
+	gitCommit       = "rely on linker: -ldflags -X main.GitCommit"
+	buildStamp      = "rely on linker: -ldflags -X main.buildStamp"
 )
 
 var (

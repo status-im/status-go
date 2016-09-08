@@ -34,6 +34,27 @@ func CreateAccount(password *C.char) *C.char {
 	return C.CString(string(outBytes))
 }
 
+//export CreateChildAccount
+func CreateChildAccount(parentAddress, password *C.char) *C.char {
+
+	address, pubKey, err := createChildAccount(C.GoString(parentAddress), C.GoString(password))
+
+	errString := emptyError
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		errString = err.Error()
+	}
+
+	out := AccountInfo{
+		Address: address,
+		PubKey:  pubKey,
+		Error:   errString,
+	}
+	outBytes, _ := json.Marshal(&out)
+
+	return C.CString(string(outBytes))
+}
+
 //export RecoverAccount
 func RecoverAccount(password, mnemonic *C.char) *C.char {
 

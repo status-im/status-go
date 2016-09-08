@@ -27,94 +27,130 @@ var (
 	ErrInvalidAccountManager           = errors.New("could not retrieve account manager")
 	ErrAddressToAccountMappingFailure  = errors.New("cannot retreive a valid account for a given address")
 	ErrAccountToKeyMappingFailure      = errors.New("cannot retreive a valid key for a given account")
-	ErrUnlockCalled                    = errors.New("no need to unlock accounts, use Login() instead")
+	ErrUnlockCalled                    = errors.New("no need to unlock accounts, login instead")
 	ErrWhisperIdentityInjectionFailure = errors.New("failed to inject identity into Whisper")
 	ErrWhisperClearIdentitiesFailure   = errors.New("failed to clear whisper identities")
+	ErrWhisperNoIdentityFound          = errors.New("failed to locate identity previously injected into Whisper")
+	ErrNoAccountSelected               = errors.New("no account has been selected, please login")
 )
 
 // createAccount creates an internal geth account
-func createAccount(password string) (string, string, string, error) {
-
-	if currentNode != nil {
-
-		w := true
-
-		if accountManager != nil {
-			// generate mnemonic phrase
-			m := extkeys.NewMnemonic()
-			mnemonic, err := m.MnemonicPhrase(128, extkeys.EnglishLanguage)
-			if err != nil {
-				return "", "", "", errextra.Wrap(err, "Can not create mnemonic seed")
-			}
-
-			// generate extended master key (see BIP32)
-			extKey, err := extkeys.NewMaster(m.MnemonicSeed(mnemonic, password), []byte(extkeys.Salt))
-			if err != nil {
-				return "", "", "", errextra.Wrap(err, "Can not create master extended key")
-			}
-
-			// derive hardened child (see BIP44)
-			extChild1, err := extKey.BIP44Child(extkeys.CoinTypeETH, 0)
-			if err != nil {
-				return "", "", "", errextra.Wrap(err, "Can not derive hardened child key (#1)")
-			}
-
-			// generate the account
-			account, err := accountManager.NewAccountUsingExtendedKey(extChild1, password, w)
-			if err != nil {
-				return "", "", "", errextra.Wrap(err, "Account manager could not create the account")
-			}
-			address := fmt.Sprintf("%x", account.Address)
-
-			// recover the public key to return
-			account, key, err := accountManager.AccountDecryptedKey(account, password)
-			if err != nil {
-				return address, "", "", errextra.Wrap(err, "Could not recover the key")
-			}
-			pubKey := common.ToHex(crypto.FromECDSAPub(&key.PrivateKey.PublicKey))
-
-			return address, pubKey, mnemonic, nil
-		}
-
-		return "", "", "", errors.New("Could not retrieve account manager")
+// BIP44-compatible keys are generated: CKD#1 is stored as account key, CKD#2 stored as sub-account root
+// Public key of CKD#1 is returned, with CKD#2 securely encoded into account key file (to be used for
+// sub-account derivations)
+func createAccount(password string) (address, pubKey, mnemonic string, err error) {
+	if currentNode == nil {
+		return "", "", "", ErrInvalidGethNode
 	}
 
-	return "", "", "", errors.New("No running node detected for account creation")
-}
-
-func recoverAccount(password, mnemonic string) (string, string, error) {
-
-	if currentNode != nil {
-
-		if accountManager != nil {
-			m := extkeys.NewMnemonic()
-			// re-create extended key (see BIP32)
-			extKey, err := extkeys.NewMaster(m.MnemonicSeed(mnemonic, password), []byte(extkeys.Salt))
-			if err != nil {
-				return "", "", errextra.Wrap(err, "Can not create master extended key")
-			}
-
-			// derive hardened child (see BIP44)
-			extChild1, err := extKey.BIP44Child(extkeys.CoinTypeETH, 0)
-			if err != nil {
-				return "", "", errextra.Wrap(err, "Can not derive hardened child key (#1)")
-			}
-
-			privateKeyECDSA := extChild1.ToECDSA()
-			address := fmt.Sprintf("%x", crypto.PubkeyToAddress(privateKeyECDSA.PublicKey))
-			pubKey := common.ToHex(crypto.FromECDSAPub(&privateKeyECDSA.PublicKey))
-
-			accountManager.ImportECDSA(privateKeyECDSA, password) // try caching key, ignore errors
-
-			return address, pubKey, nil
-		}
-
-		return "", "", errors.New("Could not retrieve account manager")
+	if accountManager == nil {
+		return "", "", "", ErrInvalidAccountManager
 	}
 
-	return "", "", errors.New("No running node detected for account unlock")
+	// generate mnemonic phrase
+	m := extkeys.NewMnemonic()
+	mnemonic, err = m.MnemonicPhrase(128, extkeys.EnglishLanguage)
+	if err != nil {
+		return "", "", "", errextra.Wrap(err, "Can not create mnemonic seed")
+	}
+
+	// generate extended master key (see BIP32)
+	extKey, err := extkeys.NewMaster(m.MnemonicSeed(mnemonic, password), []byte(extkeys.Salt))
+	if err != nil {
+		return "", "", "", errextra.Wrap(err, "Can not create master extended key")
+	}
+
+	// import created key into account keystore
+	address, pubKey, err = importExtendedKey(extKey, password)
+	if err != nil {
+		return "", "", "", err
+	}
+
+	return address, pubKey, mnemonic, nil
 }
 
+// createChildAccount creates sub-account for an account identified by parent address.
+// CKD#2 is used as root for master accounts (when parentAddress is "").
+// Otherwise (when parentAddress != ""), child is derived directly from parent.
+func createChildAccount(parentAddress, password string) (address, pubKey string, err error) {
+	if currentNode == nil {
+		return "", "", ErrInvalidGethNode
+	}
+
+	if accountManager == nil {
+		return "", "", ErrInvalidAccountManager
+	}
+
+	if parentAddress == "" { // by default derive from currently selected account
+		parentAddress = selectedAddress
+	}
+
+	if parentAddress == "" {
+		return "", "", ErrNoAccountSelected
+	}
+
+	// make sure that given password can decrypt key associated with a given parent address
+	account, err := utils.MakeAddress(accountManager, parentAddress)
+	if err != nil {
+		return "", "", ErrAddressToAccountMappingFailure
+	}
+
+	account, accountKey, err := accountManager.AccountDecryptedKey(account, password)
+	if err != nil {
+		return "", "", fmt.Errorf("%s: %v", ErrAccountToKeyMappingFailure.Error(), err)
+	}
+
+	parentKey, err := extkeys.NewKeyFromString(accountKey.ExtendedKey.String())
+	if err != nil {
+		return "", "", err
+	}
+
+	// derive child key
+	childKey, err := parentKey.Child(accountKey.SubAccountIndex)
+	if err != nil {
+		return "", "", err
+	}
+	accountManager.IncSubAccountIndex(account, password)
+
+	// import derived key into account keystore
+	address, pubKey, err = importExtendedKey(childKey, password)
+	if err != nil {
+		return
+	}
+
+	return address, pubKey, nil
+}
+
+// recoverAccount re-creates master key using given details.
+// Once master key is re-generated, it is inserted into keystore (if not already there).
+func recoverAccount(password, mnemonic string) (address, pubKey string, err error) {
+	if currentNode == nil {
+		return "", "", ErrInvalidGethNode
+	}
+
+	if accountManager == nil {
+		return "", "", ErrInvalidAccountManager
+	}
+
+	// re-create extended key (see BIP32)
+	m := extkeys.NewMnemonic()
+	extKey, err := extkeys.NewMaster(m.MnemonicSeed(mnemonic, password), []byte(extkeys.Salt))
+	if err != nil {
+		return "", "", errextra.Wrap(err, "Can not create master extended key")
+	}
+
+	// import re-created key into account keystore
+	address, pubKey, err = importExtendedKey(extKey, password)
+	if err != nil {
+		return
+	}
+
+	return address, pubKey, nil
+}
+
+// selectAccount selects current account, by verifying that address has corresponding account which can be decrypted
+// using provided password. Once verification is done, decrypted key is injected into Whisper (as a single identity,
+// all previous identities are removed).
 func selectAccount(address, password string) error {
 	if currentNode == nil {
 		return ErrInvalidGethNode
@@ -140,6 +176,9 @@ func selectAccount(address, password string) error {
 		return ErrWhisperIdentityInjectionFailure
 	}
 
+	// persist address for easier recovery of currently selected key (from Whisper)
+	selectedAddress = address
+
 	return nil
 }
 
@@ -157,6 +196,8 @@ func logout() error {
 		return fmt.Errorf("%s: %v", ErrWhisperClearIdentitiesFailure, err)
 	}
 
+	selectedAddress = ""
+
 	return nil
 }
 
@@ -169,6 +210,26 @@ func unlockAccount(address, password string, seconds int) error {
 	}
 
 	return ErrUnlockCalled
+}
+
+// importExtendedKey processes incoming extended key, extracts required info and creates corresponding account key.
+// Once account key is formed, that key is put (if not already) into keystore i.e. key is *encoded* into key file.
+func importExtendedKey(extKey *extkeys.ExtendedKey, password string) (address, pubKey string, err error) {
+	// imports extended key, create key file (if necessary)
+	account, err := accountManager.ImportExtendedKey(extKey, password)
+	if err != nil {
+		return "", "", errextra.Wrap(err, "Account manager could not create the account")
+	}
+	address = fmt.Sprintf("%x", account.Address)
+
+	// obtain public key to return
+	account, key, err := accountManager.AccountDecryptedKey(account, password)
+	if err != nil {
+		return address, "", errextra.Wrap(err, "Could not recover the key")
+	}
+	pubKey = common.ToHex(crypto.FromECDSAPub(&key.PrivateKey.PublicKey))
+
+	return
 }
 
 // createAndStartNode creates a node entity and starts the

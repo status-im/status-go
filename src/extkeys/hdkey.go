@@ -16,7 +16,11 @@ import (
 	"github.com/btcsuite/btcutil/base58"
 )
 
-// Implementation of BIP32 https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki
+// Implementation of the following BIPs:
+//   - BIP32 (https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki)
+//   - BIP39 (https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki)
+//   - BIP44 (https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki)
+//
 // Referencing
 // https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki
 // https://bitcoin.org/en/developer-guide#hardened-keys
@@ -58,6 +62,8 @@ const (
 	CoinTypeTestNet = 1  // 0x80000001
 	CoinTypeETH     = 60 // 0x8000003c
 	CoinTypeETC     = 60 // 0x80000000
+
+	EmptyExtendedKeyString = "Zeroed extended key"
 )
 
 var (
@@ -193,7 +199,7 @@ func (parent *ExtendedKey) Child(i uint32) (*ExtendedKey, error) {
 	return child, nil
 }
 
-// Child1 returns Status CKD#1 (used for ETH and SHH).
+// BIP44Child returns Status CKD#i (where i is child index).
 // BIP44 format is used: m / purpose' / coin_type' / account' / change / address_index
 func (master *ExtendedKey) BIP44Child(coinType, i uint32) (*ExtendedKey, error) {
 	if !master.IsPrivate {
@@ -259,8 +265,8 @@ func (k *ExtendedKey) Neuter() (*ExtendedKey, error) {
 
 // String returns the extended key as a human-readable base58-encoded string.
 func (k *ExtendedKey) String() string {
-	if len(k.KeyData) == 0 {
-		return "zeroed extended key"
+	if k == nil || len(k.KeyData) == 0 {
+		return EmptyExtendedKeyString
 	}
 
 	var childNumBytes [4]byte
@@ -316,6 +322,10 @@ func (k *ExtendedKey) ToECDSA() *ecdsa.PrivateKey {
 // NewKeyFromString returns a new extended key instance from a base58-encoded
 // extended key.
 func NewKeyFromString(key string) (*ExtendedKey, error) {
+	if key == EmptyExtendedKeyString || len(key) == 0 {
+		return &ExtendedKey{}, nil
+	}
+
 	// The base58-decoded extended key must consist of a serialized payload
 	// plus an additional 4 bytes for the checksum.
 	decoded := base58.Decode(key)
