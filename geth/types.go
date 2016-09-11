@@ -1,4 +1,4 @@
-package common
+package geth
 
 import (
 	"github.com/ethereum/go-ethereum/les/status"
@@ -35,7 +35,7 @@ type WhisperMessageEvent struct {
 }
 
 type SendTransactionEvent struct {
-	Id   string            `json:"hash"`
+	Id   string            `json:"id"`
 	Args status.SendTxArgs `json:"args"`
 }
 

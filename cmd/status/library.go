@@ -1,29 +1,39 @@
 package main
 
+/*
+#include <stddef.h>
+#include <stdbool.h>
+extern bool StatusServiceSignalEvent(const char *jsonEvent);
+*/
 import "C"
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/ethereum/go-ethereum/whisper"
 	"os"
+
+	"github.com/ethereum/go-ethereum/whisper"
+	"github.com/status-im/status-go/geth"
+	"github.com/status-im/status-go/jail"
 )
 
-var emptyError = ""
+// export TriggerTestSignal
+func TriggerTestSignal() {
+	C.StatusServiceSignalEvent(C.CString(`{"answer": 42}`))
+}
 
 //export CreateAccount
 func CreateAccount(password *C.char) *C.char {
-
 	// This is equivalent to creating an account from the command line,
 	// just modified to handle the function arg passing
-	address, pubKey, mnemonic, err := createAccount(C.GoString(password))
+	address, pubKey, mnemonic, err := geth.CreateAccount(C.GoString(password))
 
-	errString := emptyError
+	errString := ""
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		errString = err.Error()
 	}
 
-	out := AccountInfo{
+	out := geth.AccountInfo{
 		Address:  address,
 		PubKey:   pubKey,
 		Mnemonic: mnemonic,
@@ -37,15 +47,15 @@ func CreateAccount(password *C.char) *C.char {
 //export CreateChildAccount
 func CreateChildAccount(parentAddress, password *C.char) *C.char {
 
-	address, pubKey, err := createChildAccount(C.GoString(parentAddress), C.GoString(password))
+	address, pubKey, err := geth.CreateChildAccount(C.GoString(parentAddress), C.GoString(password))
 
-	errString := emptyError
+	errString := ""
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		errString = err.Error()
 	}
 
-	out := AccountInfo{
+	out := geth.AccountInfo{
 		Address: address,
 		PubKey:  pubKey,
 		Error:   errString,
@@ -58,15 +68,15 @@ func CreateChildAccount(parentAddress, password *C.char) *C.char {
 //export RecoverAccount
 func RecoverAccount(password, mnemonic *C.char) *C.char {
 
-	address, pubKey, err := recoverAccount(C.GoString(password), C.GoString(mnemonic))
+	address, pubKey, err := geth.RecoverAccount(C.GoString(password), C.GoString(mnemonic))
 
-	errString := emptyError
+	errString := ""
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		errString = err.Error()
 	}
 
-	out := AccountInfo{
+	out := geth.AccountInfo{
 		Address:  address,
 		PubKey:   pubKey,
 		Mnemonic: C.GoString(mnemonic),
@@ -81,15 +91,15 @@ func RecoverAccount(password, mnemonic *C.char) *C.char {
 func Login(address, password *C.char) *C.char {
 	// loads a key file (for a given address), tries to decrypt it using the password, to verify ownership
 	// if verified, purges all the previous identities from Whisper, and injects verified key as shh identity
-	err := selectAccount(C.GoString(address), C.GoString(password))
+	err := geth.SelectAccount(C.GoString(address), C.GoString(password))
 
-	errString := emptyError
+	errString := ""
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		errString = err.Error()
 	}
 
-	out := JSONError{
+	out := geth.JSONError{
 		Error: errString,
 	}
 	outBytes, _ := json.Marshal(&out)
@@ -101,15 +111,15 @@ func Login(address, password *C.char) *C.char {
 func Logout() *C.char {
 
 	// This is equivalent to clearing whisper identities
-	err := logout()
+	err := geth.Logout()
 
-	errString := emptyError
+	errString := ""
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		errString = err.Error()
 	}
 
-	out := JSONError{
+	out := geth.JSONError{
 		Error: errString,
 	}
 	outBytes, _ := json.Marshal(&out)
@@ -123,15 +133,15 @@ func UnlockAccount(address, password *C.char, seconds int) *C.char {
 	// This is equivalent to unlocking an account from the command line,
 	// just modified to unlock the account for the currently running geth node
 	// based on the provided arguments
-	err := unlockAccount(C.GoString(address), C.GoString(password), seconds)
+	err := geth.UnlockAccount(C.GoString(address), C.GoString(password), seconds)
 
-	errString := emptyError
+	errString := ""
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		errString = err.Error()
 	}
 
-	out := JSONError{
+	out := geth.JSONError{
 		Error: errString,
 	}
 	outBytes, _ := json.Marshal(&out)
@@ -141,15 +151,15 @@ func UnlockAccount(address, password *C.char, seconds int) *C.char {
 
 //export CompleteTransaction
 func CompleteTransaction(id, password *C.char) *C.char {
-	txHash, err := completeTransaction(C.GoString(id), C.GoString(password))
+	txHash, err := geth.CompleteTransaction(C.GoString(id), C.GoString(password))
 
-	errString := emptyError
+	errString := ""
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		errString = err.Error()
 	}
 
-	out := CompleteTransactionResult{
+	out := geth.CompleteTransactionResult{
 		Hash:  txHash.Hex(),
 		Error: errString,
 	}
@@ -160,17 +170,16 @@ func CompleteTransaction(id, password *C.char) *C.char {
 
 //export StartNode
 func StartNode(datadir *C.char) *C.char {
-
 	// This starts a geth node with the given datadir
-	err := createAndStartNode(C.GoString(datadir))
+	err := geth.CreateAndRunNode(C.GoString(datadir), geth.RPCPort)
 
-	errString := emptyError
+	errString := ""
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		errString = err.Error()
 	}
 
-	out := JSONError{
+	out := geth.JSONError{
 		Error: errString,
 	}
 	outBytes, _ := json.Marshal(&out)
@@ -178,33 +187,33 @@ func StartNode(datadir *C.char) *C.char {
 	return C.CString(string(outBytes))
 }
 
-//export parse
-func parse(chatId *C.char, js *C.char) *C.char {
-	res := Parse(C.GoString(chatId), C.GoString(js))
+//export InitJail
+func InitJail(js *C.char) {
+	jail.Init(C.GoString(js))
+}
+
+//export Parse
+func Parse(chatId *C.char, js *C.char) *C.char {
+	res := jail.GetInstance().Parse(C.GoString(chatId), C.GoString(js))
 	return C.CString(res)
 }
 
-//export call
-func call(chatId *C.char, path *C.char, params *C.char) *C.char {
-	res := Call(C.GoString(chatId), C.GoString(path), C.GoString(params))
+//export Call
+func Call(chatId *C.char, path *C.char, params *C.char) *C.char {
+	res := jail.GetInstance().Call(C.GoString(chatId), C.GoString(path), C.GoString(params))
 	return C.CString(res)
 }
 
-//export initJail
-func initJail(js *C.char) {
-	Init(C.GoString(js))
-}
-
-//export addPeer
-func addPeer(url *C.char) *C.char {
-	success, err := doAddPeer(C.GoString(url))
-	errString := emptyError
+//export AddPeer
+func AddPeer(url *C.char) *C.char {
+	success, err := geth.GetNodeManager().AddPeer(C.GoString(url))
+	errString := ""
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		errString = err.Error()
 	}
 
-	out := AddPeerResult{
+	out := geth.AddPeerResult{
 		Success: success,
 		Error:   errString,
 	}
@@ -213,24 +222,24 @@ func addPeer(url *C.char) *C.char {
 	return C.CString(string(outBytes))
 }
 
-//export addWhisperFilter
-func addWhisperFilter(filterJson *C.char) *C.char {
+//export AddWhisperFilter
+func AddWhisperFilter(filterJson *C.char) *C.char {
 
 	var id int
 	var filter whisper.NewFilterArgs
 
 	err := json.Unmarshal([]byte(C.GoString(filterJson)), &filter)
 	if err == nil {
-		id = doAddWhisperFilter(filter)
+		id = geth.AddWhisperFilter(filter)
 	}
 
-	errString := emptyError
+	errString := ""
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		errString = err.Error()
 	}
 
-	out := AddWhisperFilterResult{
+	out := geth.AddWhisperFilterResult{
 		Id:    id,
 		Error: errString,
 	}
@@ -240,14 +249,12 @@ func addWhisperFilter(filterJson *C.char) *C.char {
 
 }
 
-//export removeWhisperFilter
-func removeWhisperFilter(idFilter int) {
-
-	doRemoveWhisperFilter(idFilter)
+//export RemoveWhisperFilter
+func RemoveWhisperFilter(idFilter int) {
+	geth.RemoveWhisperFilter(idFilter)
 }
 
-//export clearWhisperFilters
-func clearWhisperFilters() {
-
-	doClearWhisperFilters()
+//export ClearWhisperFilters
+func ClearWhisperFilters() {
+	geth.ClearWhisperFilters()
 }

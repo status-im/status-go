@@ -13,8 +13,6 @@
 .ethtest
 */**/*tx_database*
 */**/*dapps*
-Godeps/_workspace/pkg
-Godeps/_workspace/bin
 
 #*
 .#*
@@ -35,8 +33,9 @@ profile.cov
 .vagrant
 
 # tests
-src/.ethereumtest/
+.ethereumtest/
 #
 # golang
-cover.out
-cover.html
+coverage.out
+coverage-all.out
+coverage.html

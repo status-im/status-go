@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"testing"
+
 	"github.com/status-im/status-go/extkeys"
 )
 
