@@ -1,10 +1,5 @@
 package main
 
-/*
-#include <stddef.h>
-#include <stdbool.h>
-extern bool StatusServiceSignalEvent(const char *jsonEvent);
-*/
 import "C"
 import (
 	"encoding/json"
@@ -15,11 +10,6 @@ import (
 	"github.com/status-im/status-go/geth"
 	"github.com/status-im/status-go/jail"
 )
-
-// export TriggerTestSignal
-func TriggerTestSignal() {
-	C.StatusServiceSignalEvent(C.CString(`{"answer": 42}`))
-}
 
 //export CreateAccount
 func CreateAccount(password *C.char) *C.char {

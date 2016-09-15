@@ -46,11 +46,11 @@ func TestQueuedTransactions(t *testing.T) {
 
 	// make sure you panic if transaction complete doesn't return
 	completeQueuedTransaction := make(chan bool, 1)
-	geth.PanicAfter(20*time.Second, completeQueuedTransaction)
+	geth.PanicAfter(20*time.Second, completeQueuedTransaction, "TestQueuedTransactions")
 
 	// replace transaction notification handler
 	var txHash = common.Hash{}
-	geth.GetNodeManager().SetNotificationHandler(func(jsonEvent string) {
+	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var envelope geth.GethEvent
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)

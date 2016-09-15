@@ -1,6 +1,13 @@
 package geth
 
+/*
+#include <stddef.h>
+#include <stdbool.h>
+extern bool StatusServiceSignalEvent( const char *jsonEvent );
+*/
+import "C"
 import (
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -33,6 +40,8 @@ const (
 	versionOracle = "0xfa7b9770ca4cb04296cac84f37736d4041251cdf" // Ethereum address of the Geth release oracle
 
 	RPCPort = 8545 // RPC port (replaced in unit tests)
+
+	EventNodeStarted = "node.started"
 )
 
 var (
@@ -45,17 +54,15 @@ var (
 	ErrNodeStartFailure            = errors.New("could not create the in-memory node object")
 )
 
-type NodeNotificationHandler func(jsonEvent string)
-
 type NodeManager struct {
-	currentNode         *node.Node                // currently running geth node
-	ctx                 *cli.Context              // the CLI context used to start the geth node
-	lightEthereum       *les.LightEthereum        // LES service
-	accountManager      *accounts.Manager         // the account manager attached to the currentNode
-	SelectedAddress     string                    // address of the account that was processed during the last call to SelectAccount()
-	whisperService      *whisper.Whisper          // Whisper service
-	client              *rpc.ClientRestartWrapper // RPC client
-	notificationHandler NodeNotificationHandler   // internal signal handler (used in tests)
+	currentNode     *node.Node                // currently running geth node
+	ctx             *cli.Context              // the CLI context used to start the geth node
+	lightEthereum   *les.LightEthereum        // LES service
+	accountManager  *accounts.Manager         // the account manager attached to the currentNode
+	SelectedAddress string                    // address of the account that was processed during the last call to SelectAccount()
+	whisperService  *whisper.Whisper          // Whisper service
+	client          *rpc.ClientRestartWrapper // RPC client
+	nodeStarted     chan struct{}             // channel to wait for node to start
 }
 
 var (
@@ -67,9 +74,6 @@ func NewNodeManager(datadir string, rpcport int) *NodeManager {
 	createOnce.Do(func() {
 		nodeManagerInstance = &NodeManager{}
 		nodeManagerInstance.MakeNode(datadir, rpcport)
-		nodeManagerInstance.SetNotificationHandler(func(jsonEvent string) {
-			glog.V(logger.Info).Infof("internal notification received: %s\n", jsonEvent)
-		})
 	})
 
 	return nodeManagerInstance
@@ -80,12 +84,14 @@ func GetNodeManager() *NodeManager {
 }
 
 // createAndStartNode creates a node entity and starts the
-// node running locally
+// node running locally exposing given RPC port
 func CreateAndRunNode(datadir string, rpcport int) error {
 	nodeManager := NewNodeManager(datadir, rpcport)
 
 	if nodeManager.HasNode() {
 		nodeManager.RunNode()
+
+		<-nodeManager.nodeStarted // block until node is ready
 		return nil
 	}
 
@@ -135,33 +141,53 @@ func (m *NodeManager) MakeNode(datadir string, rpcport int) *node.Node {
 	}
 
 	m.accountManager = m.currentNode.AccountManager()
+	m.nodeStarted = make(chan struct{})
 
 	return m.currentNode
 }
 
 // StartNode starts a geth node entity
 func (m *NodeManager) RunNode() {
-	utils.StartNode(m.currentNode)
+	go func() {
+		utils.StartNode(m.currentNode)
 
-	if m.currentNode.AccountManager() == nil {
-		glog.V(logger.Warn).Infoln("cannot get account manager")
-	}
-	if err := m.currentNode.Service(&m.whisperService); err != nil {
-		glog.V(logger.Warn).Infoln("cannot get whisper service:", err)
-	}
-	if err := m.currentNode.Service(&m.lightEthereum); err != nil {
-		glog.V(logger.Warn).Infoln("cannot get light ethereum service:", err)
-	}
-	m.lightEthereum.StatusBackend.SetTransactionQueueHandler(onSendTransactionRequest)
-
-	m.client = rpc.NewClientRestartWrapper(func() *rpc.Client {
-		client, err := m.currentNode.Attach()
-		if err != nil {
-			return nil
+		if m.currentNode.AccountManager() == nil {
+			glog.V(logger.Warn).Infoln("cannot get account manager")
 		}
-		return client
-	})
-	m.currentNode.Wait()
+		if err := m.currentNode.Service(&m.whisperService); err != nil {
+			glog.V(logger.Warn).Infoln("cannot get whisper service:", err)
+		}
+		if err := m.currentNode.Service(&m.lightEthereum); err != nil {
+			glog.V(logger.Warn).Infoln("cannot get light ethereum service:", err)
+		}
+		m.lightEthereum.StatusBackend.SetTransactionQueueHandler(onSendTransactionRequest)
+
+		m.client = rpc.NewClientRestartWrapper(func() *rpc.Client {
+			client, err := m.currentNode.Attach()
+			if err != nil {
+				return nil
+			}
+			return client
+		})
+
+		m.onNodeStarted() // node started, notify listeners
+		m.currentNode.Wait()
+	}()
+}
+
+func (m *NodeManager) onNodeStarted() {
+	// notify local listener
+	m.nodeStarted <- struct{}{}
+	close(m.nodeStarted)
+
+	// send signal up to native app
+	event := GethEvent{
+		Type:  EventNodeStarted,
+		Event: struct{}{},
+	}
+
+	body, _ := json.Marshal(&event)
+	C.StatusServiceSignalEvent(C.CString(string(body)))
 }
 
 func (m *NodeManager) AddPeer(url string) (bool, error) {
@@ -249,14 +275,6 @@ func (m *NodeManager) ClientRestartWrapper() (*rpc.ClientRestartWrapper, error) 
 	}
 
 	return m.client, nil
-}
-
-func (m *NodeManager) SetNotificationHandler(fn NodeNotificationHandler) {
-	m.notificationHandler = fn
-}
-
-func (m *NodeManager) NotificationHandler() NodeNotificationHandler {
-	return m.notificationHandler
 }
 
 func makeDefaultExtra() []byte {

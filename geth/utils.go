@@ -1,5 +1,10 @@
 package geth
 
+/*
+#include <stddef.h>
+#include <stdbool.h>
+extern bool StatusServiceSignalEvent(const char *jsonEvent);
+*/
 import "C"
 import (
 	"bytes"
@@ -21,9 +26,24 @@ const (
 	testNodeSyncSeconds = 300
 )
 
+type NodeNotificationHandler func(jsonEvent string)
+
+var notificationHandler NodeNotificationHandler = func(jsonEvent string) { // internal signal handler (used in tests)
+	glog.V(logger.Info).Infof("notification received (default notification handler): %s\n", jsonEvent)
+}
+
+func SetDefaultNodeNotificationHandler(fn NodeNotificationHandler) {
+	notificationHandler = fn
+}
+
 //export NotifyNode
 func NotifyNode(jsonEvent *C.char) {
-	GetNodeManager().NotificationHandler()(C.GoString(jsonEvent))
+	notificationHandler(C.GoString(jsonEvent))
+}
+
+// export TriggerTestSignal
+func TriggerTestSignal() {
+	C.StatusServiceSignalEvent(C.CString(`{"answer": 42}`))
 }
 
 func CopyFile(dst, src string) error {
@@ -93,12 +113,20 @@ func PrepareTestNode() (err error) {
 
 	// start geth node and wait for it to initialize
 	// internally once.Do() is used, so call below is thread-safe
-	go CreateAndRunNode(dataDir, 8546) // to avoid conflicts with running react-native app, run on different port
-	time.Sleep(3 * time.Second)
+	CreateAndRunNode(dataDir, 8546) // to avoid conflicts with running react-native app, run on different port
 
 	manager = GetNodeManager()
 	if !manager.HasNode() {
-		panic("could not obtain geth node")
+		panic(ErrInvalidGethNode)
+	}
+	if !manager.HasClientRestartWrapper() {
+		panic(ErrInvalidGethNode)
+	}
+	if !manager.HasWhisperService() {
+		panic(ErrInvalidGethNode)
+	}
+	if !manager.HasLightEthereumService() {
+		panic(ErrInvalidGethNode)
 	}
 
 	manager.AddPeer("enode://409772c7dea96fa59a912186ad5bcdb5e51b80556b3fe447d940f99d9eaadb51d4f0ffedb68efad232b52475dd7bd59b51cee99968b3cc79e2d5684b33c4090c@139.162.166.59:30303")
@@ -141,7 +169,7 @@ func PreprocessDataDir(dataDir string) (string, error) {
 }
 
 // PanicAfter throws panic() after waitSeconds, unless abort channel receives notification
-func PanicAfter(waitSeconds time.Duration, abort chan bool) {
+func PanicAfter(waitSeconds time.Duration, abort chan bool, desc string) {
 	// panic if function takes too long
 	timeout := make(chan bool, 1)
 
@@ -155,7 +183,7 @@ func PanicAfter(waitSeconds time.Duration, abort chan bool) {
 		case <-abort:
 			return
 		case <-timeout:
-			panic("function takes to long, which generally means we are stuck")
+			panic("whatever you were doing takes toooo long: " + desc)
 		}
 	}()
 }
