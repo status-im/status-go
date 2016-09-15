@@ -16,7 +16,7 @@ WS2="$ROOT/build/_workspace/project"
 if [ ! -d "$WS1/src" ]; then
     mkdir -p "$WS1"
     cd "$WS1"
-    ln -s "$ROOT/src/vendor" src
+    ln -s "$ROOT/vendor" src
     cd "$ROOT"
 fi
 

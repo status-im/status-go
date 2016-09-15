@@ -159,6 +159,7 @@ for TARGET in $TARGETS; do
     if [ "$PLATFORM" == "" ] || [ "$PLATFORM" == "." ] || [ "$PLATFORM" == "android" ]; then
       PLATFORM=16 # Jelly Bean 4.0.0
     fi
+    CGO_STATUS_IM="-D ANDROID_DEPLOYMENT"
     if [ "$PLATFORM" -ge 16 ]; then
       CGO_CCPIE="-fPIE"
       CGO_LDPIE="-fPIE"
@@ -190,11 +191,11 @@ for TARGET in $TARGETS; do
 
         if [ $XGOARCH == "." ] || [ $XGOARCH == "arm" ]; then
           CC=arm-linux-androideabi-gcc CXX=arm-linux-androideabi-g++ GOOS=android GOARCH=arm GOARM=7 CGO_ENABLED=1 CGO_CFLAGS="$CGO_CCPIE" CGO_CXXFLAGS="$CGO_CCPIE" CGO_LDFLAGS="$CGO_LDPIE" go get $V $X "${T[@]}" --ldflags="$V $LD" -d ./$PACK
-          CC=arm-linux-androideabi-gcc CXX=arm-linux-androideabi-g++ GOOS=android GOARCH=arm GOARM=7 CGO_ENABLED=1 CGO_CFLAGS="$CGO_CCPIE" CGO_CXXFLAGS="$CGO_CCPIE" CGO_LDFLAGS="$CGO_LDPIE" go build $V $X "${T[@]}" --ldflags="$V $EXT_LDPIE $EXT_LDAMD $LD" $BM -o "/build/$NAME-android-$PLATFORM-arm`extension android`" ./$PACK
+          CGO_CFLAGS="-D ANDROID_DEPLOYMENT" CC=arm-linux-androideabi-gcc CXX=arm-linux-androideabi-g++ GOOS=android GOARCH=arm GOARM=7 CGO_ENABLED=1 CGO_CFLAGS="$CGO_CCPIE $CGO_STATUS_IM" CGO_CXXFLAGS="$CGO_CCPIE" CGO_LDFLAGS="$CGO_LDPIE" go build $V $X "${T[@]}" --ldflags="$V $EXT_LDPIE $EXT_LDAMD $LD" $BM -o "/build/$NAME-android-$PLATFORM-arm`extension android`" ./$PACK
         fi
         if [ $XGOARCH == "." ] || [ $XGOARCH == "aar" ]; then
           CC=arm-linux-androideabi-gcc CXX=arm-linux-androideabi-g++ GOOS=android GOARCH=arm GOARM=7 CGO_ENABLED=1 go get $V $X "${T[@]}" --ldflags="$V $LD" -d ./$PACK
-          CC=arm-linux-androideabi-gcc CXX=arm-linux-androideabi-g++ GOOS=android GOARCH=arm GOARM=7 CGO_ENABLED=1 go build $V $X "${T[@]}" --ldflags="$V $EXT_LDAMD $LD" --buildmode=c-shared -o "/build-android-aar/$NAME-android-$PLATFORM-arm.so" ./$PACK
+          CC=arm-linux-androideabi-gcc CXX=arm-linux-androideabi-g++ GOOS=android GOARCH=arm GOARM=7 CGO_ENABLED=1 CGO_CFLAGS="$CGO_STATUS_IM" go build $V $X "${T[@]}" --ldflags="$V $EXT_LDAMD $LD" --buildmode=c-shared -o "/build-android-aar/$NAME-android-$PLATFORM-arm.so" ./$PACK
         fi
       fi
     fi
@@ -214,11 +215,11 @@ for TARGET in $TARGETS; do
 
         if [ $XGOARCH == "." ] || [ $XGOARCH == "386" ]; then
           CC=i686-linux-android-gcc CXX=i686-linux-android-g++ GOOS=android GOARCH=386 CGO_ENABLED=1 CGO_CFLAGS="$CGO_CCPIE" CGO_CXXFLAGS="$CGO_CCPIE" CGO_LDFLAGS="$CGO_LDPIE" go get $V $X "${T[@]}" --ldflags="$V $LD" -d ./$PACK
-          CC=i686-linux-android-gcc CXX=i686-linux-android-g++ GOOS=android GOARCH=386 CGO_ENABLED=1 CGO_CFLAGS="$CGO_CCPIE" CGO_CXXFLAGS="$CGO_CCPIE" CGO_LDFLAGS="$CGO_LDPIE" go build $V $X "${T[@]}" --ldflags="$V $EXT_LDPIE $LD" $BM -o "/build/$NAME-android-$PLATFORM-386`extension android`" ./$PACK
+          CC=i686-linux-android-gcc CXX=i686-linux-android-g++ GOOS=android GOARCH=386 CGO_ENABLED=1 CGO_CFLAGS="$CGO_CCPIE $CGO_STATUS_IM" CGO_CXXFLAGS="$CGO_CCPIE" CGO_LDFLAGS="$CGO_LDPIE" go build $V $X "${T[@]}" --ldflags="$V $EXT_LDPIE $LD" $BM -o "/build/$NAME-android-$PLATFORM-386`extension android`" ./$PACK
         fi
         if [ $XGOARCH == "." ] || [ $XGOARCH == "aar" ]; then
           CC=i686-linux-android-gcc CXX=i686-linux-android-g++ GOOS=android GOARCH=386 CGO_ENABLED=1 go get $V $X "${T[@]}" --ldflags="$V $LD" -d ./$PACK
-          CC=i686-linux-android-gcc CXX=i686-linux-android-g++ GOOS=android GOARCH=386 CGO_ENABLED=1 go build $V $X "${T[@]}" --ldflags="$V $LD" --buildmode=c-shared -o "/build-android-aar/$NAME-android-$PLATFORM-386.so" ./$PACK
+          CC=i686-linux-android-gcc CXX=i686-linux-android-g++ GOOS=android GOARCH=386 CGO_ENABLED=1 CGO_CFLAGS="$CGO_STATUS_IM" go build $V $X "${T[@]}" --ldflags="$V $LD" --buildmode=c-shared -o "/build-android-aar/$NAME-android-$PLATFORM-386.so" ./$PACK
         fi
       fi
       if [ "$PLATFORM" -ge 21 ] && ([ $XGOARCH == "." ] || [ $XGOARCH == "arm64" ] || [ $XGOARCH == "aar" ]); then
@@ -234,14 +235,15 @@ for TARGET in $TARGETS; do
 
         if [ $XGOARCH == "." ] || [ $XGOARCH == "arm64" ]; then
           CC=aarch64-linux-android-gcc CXX=aarch64-linux-android-g++ GOOS=android GOARCH=arm64 CGO_ENABLED=1 CGO_CFLAGS="$CGO_CCPIE" CGO_CXXFLAGS="$CGO_CCPIE" CGO_LDFLAGS="$CGO_LDPIE" go get $V $X "${T[@]}" --ldflags="$V $LD" -d ./$PACK
-          CC=aarch64-linux-android-gcc CXX=aarch64-linux-android-g++ GOOS=android GOARCH=arm64 CGO_ENABLED=1 CGO_CFLAGS="$CGO_CCPIE" CGO_CXXFLAGS="$CGO_CCPIE" CGO_LDFLAGS="$CGO_LDPIE" go build $V $X "${T[@]}" --ldflags="$V $EXT_LDPIE $LD" $BM -o "/build/$NAME-android-$PLATFORM-arm64`extension android`" ./$PACK
+          CC=aarch64-linux-android-gcc CXX=aarch64-linux-android-g++ GOOS=android GOARCH=arm64 CGO_ENABLED=1 CGO_CFLAGS="$CGO_CCPIE $CGO_STATUS_IM" CGO_CXXFLAGS="$CGO_CCPIE" CGO_LDFLAGS="$CGO_LDPIE" go build $V $X "${T[@]}" --ldflags="$V $EXT_LDPIE $LD" $BM -o "/build/$NAME-android-$PLATFORM-arm64`extension android`" ./$PACK
         fi
         if [ $XGOARCH == "." ] || [ $XGOARCH == "aar" ]; then
           CC=aarch64-linux-android-gcc CXX=aarch64-linux-android-g++ GOOS=android GOARCH=arm64 CGO_ENABLED=1 go get $V $X "${T[@]}" --ldflags="$V $LD" -d ./$PACK
-          CC=aarch64-linux-android-gcc CXX=aarch64-linux-android-g++ GOOS=android GOARCH=arm64 CGO_ENABLED=1 go build $V $X "${T[@]}" --ldflags="$V $LD" --buildmode=c-shared -o "/build-android-aar/$NAME-android-$PLATFORM-arm64.so" ./$PACK
+          CC=aarch64-linux-android-gcc CXX=aarch64-linux-android-g++ GOOS=android GOARCH=arm64 CGO_ENABLED=1 CGO_CFLAGS="$CGO_STATUS_IM" go build $V $X "${T[@]}" --ldflags="$V $LD" --buildmode=c-shared -o "/build-android-aar/$NAME-android-$PLATFORM-arm64.so" ./$PACK
         fi
       fi
     fi
+    unset CGO_STATUS_IM # good to let that extra var go away
     # Assemble the Android Archive from the built shared libraries
     if [ $XGOARCH == "." ] || [ $XGOARCH == "aar" ]; then
       title=${NAME^}
@@ -491,7 +493,7 @@ for TARGET in $TARGETS; do
       if [ "$GO_VERSION" -lt 160 ]; then
         LDSTRIP="-s"
       fi
-      STATUS_IM_CFLAGS="-D IOS_DEPLOYMENT"
+      CGO_STATUS_IM="-D IOS_DEPLOYMENT"
       # Cross compile to all available iOS and simulator platforms
       if [ -d "$IOS_NDK_ARM_7" ] && ([ $XGOARCH == "." ] || [ $XGOARCH == "arm-7" ] || [ $XGOARCH == "framework" ]); then
         echo "Bootstrapping ios-$PLATFORM/arm-7..."
@@ -505,7 +507,7 @@ for TARGET in $TARGETS; do
           CC=arm-apple-darwin11-clang CXX=arm-apple-darwin11-clang++ GOOS=darwin GOARCH=arm GOARM=7 CGO_ENABLED=1 go build $V $X "${IOSTAGS[@]}" --ldflags="$LDSTRIP $V $LD" $BM -o "/build/$NAME-ios-$PLATFORM-armv7`extension darwin`" ./$PACK
         fi
         if [ $XGOARCH == "." ] || [ $XGOARCH == "framework" ]; then
-          CGO_CFLAGS="-D IOS_DEPLOYMENT" CC=arm-apple-darwin11-clang CXX=arm-apple-darwin11-clang++ GOOS=darwin GOARCH=arm GOARM=7 CGO_ENABLED=1 go build $V $X "${IOSTAGS[@]}" --ldflags="$V $LD" --buildmode=c-archive -o "/build-ios-fw/$NAME-ios-$PLATFORM-armv7.a" ./$PACK
+          CC=arm-apple-darwin11-clang CXX=arm-apple-darwin11-clang++ GOOS=darwin GOARCH=arm GOARM=7 CGO_ENABLED=1 CGO_CFLAGS="$CGO_STATUS_IM" go build $V $X "${IOSTAGS[@]}" --ldflags="$V $LD" --buildmode=c-archive -o "/build-ios-fw/$NAME-ios-$PLATFORM-armv7.a" ./$PACK
         fi
         echo "Cleaning up Go runtime for ios-$PLATFORM/arm-7..."
         rm -rf /usr/local/go/pkg/darwin_arm
@@ -519,10 +521,10 @@ for TARGET in $TARGETS; do
         CC=arm-apple-darwin11-clang CXX=arm-apple-darwin11-clang++ HOST=arm-apple-darwin11 PREFIX=/usr/local $BUILD_DEPS /deps ${DEPS_ARGS[@]}
         CC=arm-apple-darwin11-clang CXX=arm-apple-darwin11-clang++ GOOS=darwin GOARCH=arm64 CGO_ENABLED=1 go get $V $X "${IOSTAGS[@]}" --ldflags="$V $LD" -d ./$PACK
         if [ $XGOARCH == "." ] || [ $XGOARCH == "arm64" ]; then
-          CC=arm-apple-darwin11-clang CXX=arm-apple-darwin11-clang++ GOOS=darwin GOARCH=arm64 CGO_ENABLED=1 go build $V $X "${IOSTAGS[@]}" --ldflags="$LDSTRIP $V $LD" $BM -o "/build/$NAME-ios-$PLATFORM-arm64`extension darwin`" ./$PACK
+          CC=arm-apple-darwin11-clang CXX=arm-apple-darwin11-clang++ GOOS=darwin GOARCH=arm64 CGO_ENABLED=1 CGO_CFLAGS="$CGO_STATUS_IM" go build $V $X "${IOSTAGS[@]}" --ldflags="$LDSTRIP $V $LD" $BM -o "/build/$NAME-ios-$PLATFORM-arm64`extension darwin`" ./$PACK
         fi
         if [ $XGOARCH == "." ] || [ $XGOARCH == "framework" ]; then
-          CGO_CFLAGS="-D IOS_DEPLOYMENT" CC=arm-apple-darwin11-clang CXX=arm-apple-darwin11-clang++ GOOS=darwin GOARCH=arm64 CGO_ENABLED=1 go build $V $X "${IOSTAGS[@]}" --ldflags="$V $LD" --buildmode=c-archive -o "/build-ios-fw/$NAME-ios-$PLATFORM-arm64.a" ./$PACK
+          CC=arm-apple-darwin11-clang CXX=arm-apple-darwin11-clang++ GOOS=darwin GOARCH=arm64 CGO_ENABLED=1 CGO_CFLAGS="$CGO_STATUS_IM" go build $V $X "${IOSTAGS[@]}" --ldflags="$V $LD" --buildmode=c-archive -o "/build-ios-fw/$NAME-ios-$PLATFORM-arm64.a" ./$PACK
         fi
         echo "Cleaning up Go runtime for ios-$PLATFORM/arm64..."
         rm -rf /usr/local/go/pkg/darwin_arm64
@@ -537,15 +539,16 @@ for TARGET in $TARGETS; do
         CC=arm-apple-darwin11-clang CXX=arm-apple-darwin11-clang++ HOST=arm-apple-darwin11 PREFIX=/usr/local $BUILD_DEPS /deps ${DEPS_ARGS[@]}
         CC=arm-apple-darwin11-clang CXX=arm-apple-darwin11-clang++ GOOS=darwin GOARCH=amd64 CGO_ENABLED=1 go get $V $X "${IOSTAGS[@]}" --ldflags="$V $LD" -d ./$PACK
         if [ $XGOARCH == "." ] || [ $XGOARCH == "amd64" ]; then
-          CC=arm-apple-darwin11-clang CXX=arm-apple-darwin11-clang++ GOOS=darwin GOARCH=amd64 CGO_ENABLED=1 go build $V $X "${IOSTAGS[@]}" --ldflags="$LDSTRIP $V $LD" $BM -o "/build/$NAME-ios-$PLATFORM-x86_64`extension darwin`" ./$PACK
+          CC=arm-apple-darwin11-clang CXX=arm-apple-darwin11-clang++ GOOS=darwin GOARCH=amd64 CGO_ENABLED=1 CGO_CFLAGS="$CGO_STATUS_IM" go build $V $X "${IOSTAGS[@]}" --ldflags="$LDSTRIP $V $LD" $BM -o "/build/$NAME-ios-$PLATFORM-x86_64`extension darwin`" ./$PACK
         fi
         if [ $XGOARCH == "." ] || [ $XGOARCH == "framework" ]; then
-          CGO_CFLAGS="-D IOS_DEPLOYMENT" CC=arm-apple-darwin11-clang CXX=arm-apple-darwin11-clang++ GOOS=darwin GOARCH=amd64 CGO_ENABLED=1 go build $V $X "${IOSTAGS[@]}" --ldflags="$V $LD" --buildmode=c-archive -o "/build-ios-fw/$NAME-ios-$PLATFORM-x86_64.a" ./$PACK
+          CC=arm-apple-darwin11-clang CXX=arm-apple-darwin11-clang++ GOOS=darwin GOARCH=amd64 CGO_ENABLED=1 CGO_CFLAGS="$CGO_STATUS_IM" go build $V $X "${IOSTAGS[@]}" --ldflags="$V $LD" --buildmode=c-archive -o "/build-ios-fw/$NAME-ios-$PLATFORM-x86_64.a" ./$PACK
         fi
         echo "Cleaning up Go runtime for ios-$PLATFORM/amd64..."
         rm -rf /usr/local/go/pkg/darwin_amd64
         mv /usr/local/go/pkg/darwin_amd64_bak /usr/local/go/pkg/darwin_amd64
       fi
+      unset CGO_STATUS_IM
       # Assemble the iOS framework from the built binaries
       if [ $XGOARCH == "." ] || [ $XGOARCH == "framework" ]; then
         title=${NAME^}
