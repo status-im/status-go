@@ -13,8 +13,6 @@
 .ethtest
 */**/*tx_database*
 */**/*dapps*
-Godeps/_workspace/pkg
-Godeps/_workspace/bin
 
 #*
 .#*
@@ -33,3 +31,11 @@ profile.cov
 
 # vagrant
 .vagrant
+
+# tests
+.ethereumtest/
+#
+# golang
+coverage.out
+coverage-all.out
+coverage.html
