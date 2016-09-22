@@ -26,6 +26,7 @@ statusgo-ios-simulator: xgo
 	@echo "iOS framework cross compilation done:"
 
 xgo:
+	build/env.sh docker pull farazdagi/xgo
 	build/env.sh go get github.com/karalabe/xgo
 
 test-all:
