@@ -22,8 +22,8 @@ import (
 var muPrepareTestNode sync.Mutex
 
 const (
-	testDataDir         = "../.ethereumtest"
-	testNodeSyncSeconds = 300
+	TestDataDir         = "../.ethereumtest"
+	TestNodeSyncSeconds = 300
 )
 
 type NodeNotificationHandler func(jsonEvent string)
@@ -90,19 +90,19 @@ func PrepareTestNode() (err error) {
 	}
 
 	syncRequired := false
-	if _, err := os.Stat(testDataDir); os.IsNotExist(err) {
+	if _, err := os.Stat(TestDataDir); os.IsNotExist(err) {
 		syncRequired = true
 	}
 
 	// prepare node directory
-	dataDir, err := PreprocessDataDir(testDataDir)
+	dataDir, err := PreprocessDataDir(TestDataDir)
 	if err != nil {
 		glog.V(logger.Warn).Infoln("make node failed:", err)
 		return err
 	}
 
 	// import test account (with test ether on it)
-	dst := filepath.Join(testDataDir, "testnet", "keystore", "test-account.pk")
+	dst := filepath.Join(TestDataDir, "testnet", "keystore", "test-account.pk")
 	if _, err := os.Stat(dst); os.IsNotExist(err) {
 		err = CopyFile(dst, filepath.Join("../data", "test-account.pk"))
 		if err != nil {
@@ -132,8 +132,8 @@ func PrepareTestNode() (err error) {
 	manager.AddPeer("enode://409772c7dea96fa59a912186ad5bcdb5e51b80556b3fe447d940f99d9eaadb51d4f0ffedb68efad232b52475dd7bd59b51cee99968b3cc79e2d5684b33c4090c@139.162.166.59:30303")
 
 	if syncRequired {
-		glog.V(logger.Warn).Infof("Sync is required, it will take %d seconds", testNodeSyncSeconds)
-		time.Sleep(testNodeSyncSeconds * time.Second) // LES syncs headers, so that we are up do date when it is done
+		glog.V(logger.Warn).Infof("Sync is required, it will take %d seconds", TestNodeSyncSeconds)
+		time.Sleep(TestNodeSyncSeconds * time.Second) // LES syncs headers, so that we are up do date when it is done
 	} else {
 		time.Sleep(5 * time.Second)
 	}
@@ -142,7 +142,7 @@ func PrepareTestNode() (err error) {
 }
 
 func RemoveTestNode() {
-	err := os.RemoveAll(testDataDir)
+	err := os.RemoveAll(TestDataDir)
 	if err != nil {
 		glog.V(logger.Warn).Infof("could not clean up temporary datadir")
 	}

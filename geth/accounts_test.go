@@ -14,12 +14,124 @@ import (
 	"github.com/status-im/status-go/geth"
 )
 
+func TestAccountsList(t *testing.T) {
+	err := geth.PrepareTestNode()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	les, err := geth.GetNodeManager().LightEthereumService()
+	if err != nil {
+		t.Errorf("expected LES service: %v", err)
+	}
+	accounts := les.StatusBackend.AccountManager().Accounts()
+	geth.Logout()
+
+	// make sure that we start with empty accounts list (nobody has logged in yet)
+	if len(accounts) != 0 {
+		t.Error("accounts returned, while there should be none (we haven't logged in yet)")
+		return
+	}
+
+	// create an account
+	address, _, _, err := geth.CreateAccount(newAccountPassword)
+	if err != nil {
+		t.Errorf("could not create account: %v", err)
+		return
+	}
+
+	// ensure that there is still no accounts returned
+	accounts = les.StatusBackend.AccountManager().Accounts()
+	if len(accounts) != 0 {
+		t.Error("accounts returned, while there should be none (we haven't logged in yet)")
+		return
+	}
+
+	// select account (sub-accounts will be created for this key)
+	err = geth.SelectAccount(address, newAccountPassword)
+	if err != nil {
+		t.Errorf("Test failed: could not select account: %v", err)
+		return
+	}
+	// at this point main account should show up
+	accounts = les.StatusBackend.AccountManager().Accounts()
+	if len(accounts) != 1 {
+		t.Error("exactly single account is expected (main account)")
+		return
+	}
+	if string(accounts[0].Address.Hex()) != "0x"+address {
+		t.Errorf("main account is not retured as the first key: got %s, expected %s",
+			accounts[0].Address.Hex(), "0x"+address)
+		return
+	}
+
+	// create sub-account 1
+	subAccount1, subPubKey1, err := geth.CreateChildAccount("", newAccountPassword)
+	if err != nil {
+		t.Errorf("cannot create sub-account: %v", err)
+		return
+	}
+
+	// now we expect to see both main account and sub-account 1
+	accounts = les.StatusBackend.AccountManager().Accounts()
+	if len(accounts) != 2 {
+		t.Error("exactly 2 accounts are expected (main + sub-account 1)")
+		return
+	}
+	if string(accounts[0].Address.Hex()) != "0x"+address {
+		t.Errorf("main account is not retured as the first key: got %s, expected %s",
+			accounts[0].Address.Hex(), "0x"+address)
+		return
+	}
+	if string(accounts[1].Address.Hex()) != "0x"+subAccount1 {
+		t.Errorf("subAcount1 not returned: got %s, expected %s", accounts[1].Address.Hex(), "0x"+subAccount1)
+		return
+	}
+
+	// create sub-account 2, index automatically progresses
+	subAccount2, subPubKey2, err := geth.CreateChildAccount("", newAccountPassword)
+	if err != nil {
+		t.Errorf("cannot create sub-account: %v", err)
+	}
+	if subAccount1 == subAccount2 || subPubKey1 == subPubKey2 {
+		t.Error("sub-account index auto-increament failed")
+		return
+	}
+
+	// finally, all 3 accounts should show up (main account, sub-accounts 1 and 2)
+	accounts = les.StatusBackend.AccountManager().Accounts()
+	if len(accounts) != 3 {
+		t.Errorf("unexpected number of accounts: expected %d, got %d", 3, len(accounts))
+		return
+	}
+	if string(accounts[0].Address.Hex()) != "0x"+address {
+		t.Errorf("main account is not retured as the first key: got %s, expected %s",
+			accounts[0].Address.Hex(), "0x"+address)
+		return
+	}
+	subAccount1MatchesKey1 := string(accounts[1].Address.Hex()) != "0x"+subAccount1
+	subAccount1MatchesKey2 := string(accounts[2].Address.Hex()) != "0x"+subAccount1
+	if !subAccount1MatchesKey1 && !subAccount1MatchesKey2 {
+		t.Errorf("subAcount1 not returned: got %s, expected %s", accounts[1].Address.Hex(), "0x"+subAccount1)
+		return
+	}
+	subAccount2MatchesKey1 := string(accounts[1].Address.Hex()) != "0x"+subAccount2
+	subAccount2MatchesKey2 := string(accounts[2].Address.Hex()) != "0x"+subAccount2
+	if !subAccount2MatchesKey1 && !subAccount2MatchesKey2 {
+		t.Errorf("subAcount2 not returned: got %s, expected %s", accounts[2].Address.Hex(), "0x"+subAccount1)
+		return
+	}
+}
+
 func TestCreateChildAccount(t *testing.T) {
 	err := geth.PrepareTestNode()
 	if err != nil {
 		t.Error(err)
 		return
 	}
+
+	geth.Logout() // to make sure that we start with empty account (which might get populated during previous tests)
 
 	accountManager, err := geth.GetNodeManager().AccountManager()
 	if err != nil {

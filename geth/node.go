@@ -54,12 +54,18 @@ var (
 	ErrNodeStartFailure            = errors.New("could not create the in-memory node object")
 )
 
+type SelectedExtKey struct {
+	Address     common.Address
+	AccountKey  *accounts.Key
+	SubAccounts []accounts.Account
+}
+
 type NodeManager struct {
 	currentNode     *node.Node                // currently running geth node
 	ctx             *cli.Context              // the CLI context used to start the geth node
 	lightEthereum   *les.LightEthereum        // LES service
 	accountManager  *accounts.Manager         // the account manager attached to the currentNode
-	SelectedAddress string                    // address of the account that was processed during the last call to SelectAccount()
+	SelectedAccount *SelectedExtKey           // account that was processed during the last call to SelectAccount()
 	whisperService  *whisper.Whisper          // Whisper service
 	client          *rpc.ClientRestartWrapper // RPC client
 	nodeStarted     chan struct{}             // channel to wait for node to start
@@ -160,7 +166,10 @@ func (m *NodeManager) RunNode() {
 		if err := m.currentNode.Service(&m.lightEthereum); err != nil {
 			glog.V(logger.Warn).Infoln("cannot get light ethereum service:", err)
 		}
+
+		// setup handlers
 		m.lightEthereum.StatusBackend.SetTransactionQueueHandler(onSendTransactionRequest)
+		m.lightEthereum.StatusBackend.SetAccountsFilterHandler(onAccountsListRequest)
 
 		m.client = rpc.NewClientRestartWrapper(func() *rpc.Client {
 			client, err := m.currentNode.Attach()
