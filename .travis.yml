@@ -13,4 +13,4 @@ script:
 
 cache:
   directories:
-  - $HOME/.ethereumtest
+  - .ethereumtest
