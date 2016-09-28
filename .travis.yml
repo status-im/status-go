@@ -10,3 +10,7 @@ install:
 
 script:
   - make ci
+
+cache:
+  directories:
+  - $HOME/.ethereumtest
