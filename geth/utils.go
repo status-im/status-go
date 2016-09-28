@@ -23,7 +23,7 @@ var muPrepareTestNode sync.Mutex
 
 const (
 	TestDataDir         = "../.ethereumtest"
-	TestNodeSyncSeconds = 360
+	TestNodeSyncSeconds = 420
 )
 
 type NodeNotificationHandler func(jsonEvent string)
