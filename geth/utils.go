@@ -23,7 +23,7 @@ var muPrepareTestNode sync.Mutex
 
 const (
 	TestDataDir         = "../.ethereumtest"
-	TestNodeSyncSeconds = 30
+	TestNodeSyncSeconds = 45
 )
 
 type NodeNotificationHandler func(jsonEvent string)
@@ -90,7 +90,7 @@ func PrepareTestNode() (err error) {
 	}
 
 	syncRequired := false
-	if _, err := os.Stat(filepath.Join(TestDataDir, "nodes")); os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(TestDataDir, "testnet")); os.IsNotExist(err) {
 		syncRequired = true
 	}
 

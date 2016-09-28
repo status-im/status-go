@@ -23,7 +23,7 @@ const (
 
 func TestMain(m *testing.M) {
 	syncRequired := false
-	if _, err := os.Stat(filepath.Join(geth.TestDataDir, "nodes")); os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(geth.TestDataDir, "testnet")); os.IsNotExist(err) {
 		syncRequired = true
 	}
 	// make sure you panic if node start signal is not received
