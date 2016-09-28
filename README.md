@@ -1,3 +1,10 @@
+
+
+branch | build status
+-------|-------------
+master | [![Build Status](https://travis-ci.org/status-im/status-go.svg?branch=master)](https://github.com/status-im/status-go/tree/master)
+develop | [![Build Status](https://travis-ci.org/status-im/status-go.svg?branch=develop)](https://github.com/status-im/status-go/tree/develop)
+
 # Status bindings for go-ethereum
 
 - [How To Build](https://github.com/status-im/status-go/wiki/Build-Process-Explained)
