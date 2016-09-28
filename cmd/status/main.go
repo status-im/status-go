@@ -10,7 +10,7 @@ var (
 
 	versionMajor = 0          // Major version component of the current release
 	versionMinor = 9          // Minor version component of the current release
-	versionPatch = 0          // Patch version component of the current release
+	versionPatch = 1          // Patch version component of the current release
 	versionMeta  = "unstable" // Version metadata to append to the version string
 )
 
