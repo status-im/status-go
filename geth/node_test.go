@@ -22,7 +22,7 @@ const (
 
 func TestMain(m *testing.M) {
 	syncRequired := false
-	if _, err := os.Stat(geth.TestDataDir); os.IsNotExist(err) {
+	if _, err := os.Stat(geth.TestDataDir + "/keystore"); os.IsNotExist(err) {
 		syncRequired = true
 	}
 	// make sure you panic if node start signal is not received
