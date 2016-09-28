@@ -24,6 +24,7 @@
 # used by the Makefile
 /build/_workspace/
 /build/bin/
+/vendor/github.com/karalabe/xgo
 
 # travis
 profile.tmp

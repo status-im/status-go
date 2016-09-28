@@ -1,6 +1,8 @@
 package ethapi
 
 import (
+	"sync"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/les/status"
 	"github.com/ethereum/go-ethereum/logger"
@@ -8,29 +10,40 @@ import (
 	"golang.org/x/net/context"
 )
 
-// StatusBackend implements les.StatusBackend with direct calls to Ethereum
-// internals to support calls from status-go bindings (to internal packages e.g. ethapi)
+// StatusBackend exposes Ethereum internals to support custom semantics in status-go bindings
 type StatusBackend struct {
 	eapi  *PublicEthereumAPI        // Wrapper around the Ethereum object to access metadata
 	bcapi *PublicBlockChainAPI      // Wrapper around the blockchain to access chain data
 	txapi *PublicTransactionPoolAPI // Wrapper around the transaction pool to access transaction data
 
 	txQueue *status.TxQueue
+	am      *status.AccountManager
 }
+
+var statusBackend *StatusBackend
+var once sync.Once
 
 // NewStatusBackend creates a new backend using an existing Ethereum object.
 func NewStatusBackend(apiBackend Backend) *StatusBackend {
 	glog.V(logger.Info).Infof("Status backend service started")
-	backend := &StatusBackend{
-		eapi:    NewPublicEthereumAPI(apiBackend),
-		bcapi:   NewPublicBlockChainAPI(apiBackend),
-		txapi:   NewPublicTransactionPoolAPI(apiBackend),
-		txQueue: status.NewTransactionQueue(),
-	}
+	once.Do(func() {
+		statusBackend = &StatusBackend{
+			eapi:    NewPublicEthereumAPI(apiBackend),
+			bcapi:   NewPublicBlockChainAPI(apiBackend),
+			txapi:   NewPublicTransactionPoolAPI(apiBackend),
+			txQueue: status.NewTransactionQueue(),
+			am:      status.NewAccountManager(apiBackend.AccountManager()),
+		}
+	})
 
-	go backend.transactionQueueForwardingLoop()
+	go statusBackend.transactionQueueForwardingLoop()
 
-	return backend
+	return statusBackend
+}
+
+// GetStatusBackend exposes backend singleton instance
+func GetStatusBackend() *StatusBackend {
+	return statusBackend
 }
 
 func (b *StatusBackend) SetTransactionQueueHandler(fn status.EnqueuedTxHandler) {
@@ -39,6 +52,14 @@ func (b *StatusBackend) SetTransactionQueueHandler(fn status.EnqueuedTxHandler) 
 
 func (b *StatusBackend) TransactionQueue() *status.TxQueue {
 	return b.txQueue
+}
+
+func (b *StatusBackend) SetAccountsFilterHandler(fn status.AccountsFilterHandler) {
+	b.am.SetAccountsFilterHandler(fn)
+}
+
+func (b *StatusBackend) AccountManager() *status.AccountManager {
+	return b.am
 }
 
 // SendTransaction wraps call to PublicTransactionPoolAPI.SendTransaction

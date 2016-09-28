@@ -26,7 +26,13 @@ statusgo-ios-simulator: xgo
 	@echo "iOS framework cross compilation done:"
 
 xgo:
+	build/env.sh docker pull farazdagi/xgo
 	build/env.sh go get github.com/karalabe/xgo
+
+ci:
+	build/env.sh go test -v -cover ./geth
+	build/env.sh go test -v -cover ./jail
+	build/env.sh go test -v -cover ./extkeys
 
 test-all:
 	@build/env.sh echo "mode: set" > coverage-all.out
