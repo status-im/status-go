@@ -1,0 +1,13 @@
+language: go
+
+go:
+  - 1.7.1
+
+sudo: false
+
+install:
+  - go get golang.org/x/tools/cmd/cover
+
+script:
+  - go run build/ci.go install
+  - go run build/ci.go test -coverage -vet
