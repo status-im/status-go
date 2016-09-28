@@ -21,10 +21,18 @@ const (
 )
 
 func TestMain(m *testing.M) {
+	syncRequired := false
+	if _, err := os.Stat(geth.TestDataDir); os.IsNotExist(err) {
+		syncRequired = true
+	}
 	// make sure you panic if node start signal is not received
 	signalRecieved := make(chan struct{}, 1)
 	abortPanic := make(chan bool, 1)
-	geth.PanicAfter(10*time.Second, abortPanic, "TestNodeSetup")
+	if syncRequired {
+		geth.PanicAfter(geth.TestNodeSyncSeconds*time.Second, abortPanic, "TestNodeSetup")
+	} else {
+		geth.PanicAfter(10*time.Second, abortPanic, "TestNodeSetup")
+	}
 
 	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		if jsonEvent == `{"type":"node.started","event":{}}` {
