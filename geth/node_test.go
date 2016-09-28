@@ -4,6 +4,7 @@ import (
 	"os"
 	"testing"
 	"time"
+	"path/filepath"
 
 	"github.com/status-im/status-go/geth"
 )
@@ -22,7 +23,7 @@ const (
 
 func TestMain(m *testing.M) {
 	syncRequired := false
-	if _, err := os.Stat(geth.TestDataDir); os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(geth.TestDataDir, "testnet")); os.IsNotExist(err) {
 		syncRequired = true
 	}
 	// make sure you panic if node start signal is not received
