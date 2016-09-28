@@ -90,7 +90,7 @@ func PrepareTestNode() (err error) {
 	}
 
 	syncRequired := false
-	if _, err := os.Stat(TestDataDir); os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(TestDataDir, "keystore")); os.IsNotExist(err) {
 		syncRequired = true
 	}
 
