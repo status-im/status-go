@@ -23,7 +23,6 @@ import (
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/params"
-	"github.com/ethereum/go-ethereum/release"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/go-ethereum/whisper"
@@ -36,8 +35,6 @@ const (
 	versionMinor     = 5          // Minor version component of the current release
 	versionPatch     = 0          // Patch version component of the current release
 	versionMeta      = "unstable" // Version metadata to append to the version string
-
-	versionOracle = "0xfa7b9770ca4cb04296cac84f37736d4041251cdf" // Ethereum address of the Geth release oracle
 
 	RPCPort = 8545 // RPC port (replaced in unit tests)
 
@@ -122,22 +119,11 @@ func (m *NodeManager) MakeNode(datadir string, rpcport int) *node.Node {
 	set.String("logdir", datadir, "log dir for glog")
 	m.ctx = cli.NewContext(nil, set, nil)
 
-	// Construct the textual version string from the individual components
-	vString := fmt.Sprintf("%d.%d.%d", versionMajor, versionMinor, versionPatch)
-
-	// Construct the version release oracle configuration
-	var rConfig release.Config
-	rConfig.Oracle = common.HexToAddress(versionOracle)
-
-	rConfig.Major = uint32(versionMajor)
-	rConfig.Minor = uint32(versionMinor)
-	rConfig.Patch = uint32(versionPatch)
-
 	utils.DebugSetup(m.ctx)
 
 	// create node and start requested protocols
-	m.currentNode = utils.MakeNode(m.ctx, clientIdentifier, vString)
-	utils.RegisterEthService(m.ctx, m.currentNode, rConfig, makeDefaultExtra())
+	m.currentNode = utils.MakeNode(m.ctx, clientIdentifier, "")
+	utils.RegisterEthService(m.ctx, m.currentNode, makeDefaultExtra())
 
 	// Whisper must be explicitly enabled, but is auto-enabled in --dev mode.
 	shhEnabled := m.ctx.GlobalBool(utils.WhisperEnabledFlag.Name)

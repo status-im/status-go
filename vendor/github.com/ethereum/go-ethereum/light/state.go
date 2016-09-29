@@ -273,7 +273,9 @@ func (self *LightState) Copy() *LightState {
 	state.trie = self.trie
 	state.id = self.id
 	for k, stateObject := range self.stateObjects {
-		state.stateObjects[k] = stateObject.Copy()
+		if stateObject.dirty {
+			state.stateObjects[k] = stateObject.Copy()
+		}
 	}
 
 	state.refund.Set(self.refund)

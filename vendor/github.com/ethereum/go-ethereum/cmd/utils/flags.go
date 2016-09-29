@@ -50,7 +50,6 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/nat"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/pow"
-	"github.com/ethereum/go-ethereum/release"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/go-ethereum/whisper"
 	"gopkg.in/urfave/cli.v1"
@@ -83,13 +82,16 @@ OPTIONS:
 }
 
 // NewApp creates an app with sane defaults.
-func NewApp(version, usage string) *cli.App {
+func NewApp(gitCommit, usage string) *cli.App {
 	app := cli.NewApp()
 	app.Name = filepath.Base(os.Args[0])
 	app.Author = ""
 	//app.Authors = nil
 	app.Email = ""
-	app.Version = version
+	app.Version = Version
+	if gitCommit != "" {
+		app.Version += "-" + gitCommit[:8]
+	}
 	app.Usage = usage
 	return app
 }
@@ -146,11 +148,6 @@ var (
 		Name:  "cache",
 		Usage: "Megabytes of memory allocated to internal caching (min 16MB / database forced)",
 		Value: 128,
-	}
-	BlockchainVersionFlag = cli.IntFlag{
-		Name:  "blockchainversion",
-		Usage: "Blockchain version (integer)",
-		Value: core.BlockChainVersion,
 	}
 	FastSyncFlag = cli.BoolFlag{
 		Name:  "fast",
@@ -640,13 +637,18 @@ func MakePasswordList(ctx *cli.Context) []string {
 }
 
 // MakeNode configures a node with no services from command line flags.
-func MakeNode(ctx *cli.Context, name, version string) *node.Node {
+func MakeNode(ctx *cli.Context, name, gitCommit string) *node.Node {
+	vsn := Version
+	if gitCommit != "" {
+		vsn += "-" + gitCommit[:8]
+	}
+
 	config := &node.Config{
 		DataDir:           MustMakeDataDir(ctx),
 		KeyStoreDir:       ctx.GlobalString(KeyStoreDirFlag.Name),
 		UseLightweightKDF: ctx.GlobalBool(LightKDFFlag.Name),
 		PrivateKey:        MakeNodeKey(ctx),
-		Name:              MakeNodeName(name, version, ctx),
+		Name:              MakeNodeName(name, vsn, ctx),
 		NoDiscovery:       ctx.GlobalBool(NoDiscoverFlag.Name),
 		BootstrapNodes:    MakeBootstrapNodes(ctx),
 		ListenAddr:        MakeListenAddress(ctx),
@@ -680,7 +682,7 @@ func MakeNode(ctx *cli.Context, name, version string) *node.Node {
 
 // RegisterEthService configures eth.Ethereum from command line flags and adds it to the
 // given node.
-func RegisterEthService(ctx *cli.Context, stack *node.Node, relconf release.Config, extra []byte) {
+func RegisterEthService(ctx *cli.Context, stack *node.Node, extra []byte) {
 	ethDisabled := ctx.GlobalBool(NoEthFlag.Name)
 	if ethDisabled {
 		glog.V(logger.Info).Infof("Ethereum service registration by-passed (--%s flag used)\n", NoEthFlag.Name)
@@ -716,7 +718,6 @@ func RegisterEthService(ctx *cli.Context, stack *node.Node, relconf release.Conf
 		NoDefSrv:                ctx.GlobalBool(NoDefSrvFlag.Name),
 		LightServ:               ctx.GlobalInt(LightServFlag.Name),
 		LightPeers:              ctx.GlobalInt(LightPeersFlag.Name),
-		BlockChainVersion:       ctx.GlobalInt(BlockchainVersionFlag.Name),
 		DatabaseCache:           ctx.GlobalInt(CacheFlag.Name),
 		DatabaseHandles:         MakeDatabaseHandles(),
 		NetworkId:               ctx.GlobalInt(NetworkIdFlag.Name),
@@ -778,11 +779,6 @@ func RegisterEthService(ctx *cli.Context, stack *node.Node, relconf release.Conf
 		}); err != nil {
 			Fatalf("Failed to register the Ethereum full node service: %v", err)
 		}
-	}
-	if err := stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-		return release.NewReleaseService(ctx, relconf)
-	}); err != nil {
-		Fatalf("Failed to register the Geth release oracle service: %v", err)
 	}
 }
 
@@ -855,23 +851,6 @@ func MustMakeChainConfigFromDb(ctx *cli.Context, db ethdb.Database) *core.ChainC
 		config.DAOForkSupport = true
 	case ctx.GlobalBool(OpposeDAOFork.Name):
 		config.DAOForkSupport = false
-	}
-	// Temporarilly display a proper message so the user knows which fork its on
-	if !ctx.GlobalBool(TestNetFlag.Name) && (genesis == nil || genesis.Hash() == common.HexToHash("0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3")) {
-		choice := "SUPPORT"
-		if !config.DAOForkSupport {
-			choice = "OPPOSE"
-		}
-		current := fmt.Sprintf("Geth is currently configured to %s the DAO hard-fork!", choice)
-		howtoswap := fmt.Sprintf("You can change your choice prior to block #%v with --support-dao-fork or --oppose-dao-fork.", config.DAOForkBlock)
-		howtosync := fmt.Sprintf("After the hard-fork block #%v passed, changing chains requires a resync from scratch!", config.DAOForkBlock)
-		separator := strings.Repeat("-", len(howtoswap))
-
-		glog.V(logger.Warn).Info(separator)
-		glog.V(logger.Warn).Info(current)
-		glog.V(logger.Warn).Info(howtoswap)
-		glog.V(logger.Warn).Info(howtosync)
-		glog.V(logger.Warn).Info(separator)
 	}
 	return config
 }

@@ -106,8 +106,8 @@ func NewLightChain(odr OdrBackend, config *core.ChainConfig, pow pow.PoW, mux *e
 		// add trusted CHT
 		if config.DAOForkSupport {
 			WriteTrustedCht(bc.chainDb, TrustedCht{
-				Number: 523,
-				Root:   common.HexToHash("c9c3203ca7e58bf0ceaae50ed00c7ae234e7b3cc054aee086a1d0873f843df4e"),
+				Number: 564,
+				Root:   common.HexToHash("ee31f7fc21f627dc2b8d3ed8fed5b74dbc393d146a67249a656e163148e39016"),
 			})
 		} else {
 			WriteTrustedCht(bc.chainDb, TrustedCht{

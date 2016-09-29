@@ -463,7 +463,7 @@ func (self *TxPool) Add(ctx context.Context, tx *types.Transaction) error {
 
 // AddTransactions adds all valid transactions to the pool and passes them to
 // the tx relay backend
-func (self *TxPool) AddTransactions(ctx context.Context, txs []*types.Transaction) {
+func (self *TxPool) AddBatch(ctx context.Context, txs []*types.Transaction) {
 	self.mu.Lock()
 	defer self.mu.Unlock()
 	var sendTx types.Transactions
@@ -510,24 +510,18 @@ func (self *TxPool) GetTransactions() (txs types.Transactions) {
 
 // Content retrieves the data content of the transaction pool, returning all the
 // pending as well as queued transactions, grouped by account and nonce.
-func (self *TxPool) Content() (map[common.Address]map[uint64][]*types.Transaction, map[common.Address]map[uint64][]*types.Transaction) {
+func (self *TxPool) Content() (map[common.Address]types.Transactions, map[common.Address]types.Transactions) {
 	self.mu.RLock()
 	defer self.mu.RUnlock()
 
 	// Retrieve all the pending transactions and sort by account and by nonce
-	pending := make(map[common.Address]map[uint64][]*types.Transaction)
+	pending := make(map[common.Address]types.Transactions)
 	for _, tx := range self.pending {
 		account, _ := tx.From()
-
-		owned, ok := pending[account]
-		if !ok {
-			owned = make(map[uint64][]*types.Transaction)
-			pending[account] = owned
-		}
-		owned[tx.Nonce()] = append(owned[tx.Nonce()], tx)
+		pending[account] = append(pending[account], tx)
 	}
 	// There are no queued transactions in a light pool, just return an empty map
-	queued := make(map[common.Address]map[uint64][]*types.Transaction)
+	queued := make(map[common.Address]types.Transactions)
 	return pending, queued
 }
 

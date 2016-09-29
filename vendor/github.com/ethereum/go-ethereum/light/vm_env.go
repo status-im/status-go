@@ -57,11 +57,6 @@ func NewEnv(ctx context.Context, state *LightState, chainConfig *core.ChainConfi
 	}
 	env.state = &VMState{ctx: ctx, state: state, env: env}
 
-	// if no log collector is present set self as the collector
-	if cfg.Logger.Collector == nil {
-		cfg.Logger.Collector = env
-	}
-
 	env.evm = vm.New(env, cfg)
 	return env
 }

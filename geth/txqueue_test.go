@@ -101,7 +101,7 @@ func TestQueuedTransactions(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(txHash, txHashCheck) {
-		t.Error("Transaction hash returned from SendTransaction is invalid")
+		t.Errorf("Transaction hash returned from SendTransaction is invalid: expected %s, got %s", txHashCheck, txHash)
 		return
 	}
 
