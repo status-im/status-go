@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
+	"github.com/eapache/go-resiliency/semaphore"
 	"github.com/ethereum/go-ethereum/logger"
 	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -13,14 +15,25 @@ import (
 	"github.com/status-im/status-go/geth"
 )
 
+const (
+	JailedRuntimeRequestTimeout = time.Second * 60
+)
+
 var (
 	ErrInvalidJail = errors.New("jail environment is not properly initialized")
 )
 
 type Jail struct {
-	client   *rpc.ClientRestartWrapper // lazy inited on the first call to jail.ClientRestartWrapper()
-	VMs      map[string]*otto.Otto
-	statusJS string
+	client       *rpc.ClientRestartWrapper // lazy inited on the first call to jail.ClientRestartWrapper()
+	cells        map[string]*JailedRuntime // jail supports running many isolated instances of jailed runtime
+	statusJS     string
+	requestQueue *geth.JailedRequestQueue
+}
+
+type JailedRuntime struct {
+	id  string
+	vm  *otto.Otto
+	sem *semaphore.Semaphore
 }
 
 var jailInstance *Jail
@@ -29,7 +42,7 @@ var once sync.Once
 func New() *Jail {
 	once.Do(func() {
 		jailInstance = &Jail{
-			VMs: make(map[string]*otto.Otto),
+			cells: make(map[string]*JailedRuntime),
 		}
 	})
 
@@ -47,14 +60,23 @@ func GetInstance() *Jail {
 	return New() // singleton, we will always get the same reference
 }
 
+func NewJailedRuntime(id string) *JailedRuntime {
+	return &JailedRuntime{
+		id:  id,
+		vm:  otto.New(),
+		sem: semaphore.New(1, JailedRuntimeRequestTimeout),
+	}
+}
+
 func (jail *Jail) Parse(chatId string, js string) string {
 	if jail == nil {
 		return printError(ErrInvalidJail.Error())
 	}
 
-	vm := otto.New()
+	jail.cells[chatId] = NewJailedRuntime(chatId)
+	vm := jail.cells[chatId].vm
+
 	initJjs := jail.statusJS + ";"
-	jail.VMs[chatId] = vm
 	_, err := vm.Run(initJjs)
 	vm.Set("jeth", struct{}{})
 
@@ -83,12 +105,16 @@ func (jail *Jail) Call(chatId string, path string, args string) string {
 		return printError(err.Error())
 	}
 
-	vm, ok := jail.VMs[chatId]
+	cell, ok := jail.cells[chatId]
 	if !ok {
-		return printError(fmt.Sprintf("VM[%s] doesn't exist.", chatId))
+		return printError(fmt.Sprintf("Cell[%s] doesn't exist.", chatId))
 	}
 
-	res, err := vm.Call("call", nil, path, args)
+	// serialize requests to VM
+	cell.sem.Acquire()
+	defer cell.sem.Release()
+
+	res, err := cell.vm.Call("call", nil, path, args)
 
 	return printResult(res.String(), err)
 }
@@ -98,23 +124,22 @@ func (jail *Jail) GetVM(chatId string) (*otto.Otto, error) {
 		return nil, ErrInvalidJail
 	}
 
-	vm, ok := jail.VMs[chatId]
+	cell, ok := jail.cells[chatId]
 	if !ok {
-		return nil, fmt.Errorf("VM[%s] doesn't exist.", chatId)
+		return nil, fmt.Errorf("Cell[%s] doesn't exist.", chatId)
 	}
 
-	return vm, nil
-}
-
-type jsonrpcCall struct {
-	Id     int64
-	Method string
-	Params []interface{}
+	return cell.vm, nil
 }
 
 // Send will serialize the first argument, send it to the node and returns the response.
 func (jail *Jail) Send(call otto.FunctionCall) (response otto.Value) {
 	clientFactory, err := jail.ClientRestartWrapper()
+	if err != nil {
+		return newErrorResponse(call, -32603, err.Error(), nil)
+	}
+
+	requestQueue, err := jail.RequestQueue()
 	if err != nil {
 		return newErrorResponse(call, -32603, err.Error(), nil)
 	}
@@ -127,7 +152,7 @@ func (jail *Jail) Send(call otto.FunctionCall) (response otto.Value) {
 	}
 	var (
 		rawReq = []byte(reqVal.String())
-		reqs   []jsonrpcCall
+		reqs   []geth.RPCCall
 		batch  bool
 	)
 	if rawReq[0] == '[' {
@@ -135,7 +160,7 @@ func (jail *Jail) Send(call otto.FunctionCall) (response otto.Value) {
 		json.Unmarshal(rawReq, &reqs)
 	} else {
 		batch = false
-		reqs = make([]jsonrpcCall, 1)
+		reqs = make([]geth.RPCCall, 1)
 		json.Unmarshal(rawReq, &reqs[0])
 	}
 
@@ -145,6 +170,10 @@ func (jail *Jail) Send(call otto.FunctionCall) (response otto.Value) {
 		resp, _ := call.Otto.Object(`({"jsonrpc":"2.0"})`)
 		resp.Set("id", req.Id)
 		var result json.RawMessage
+
+		// do extra request pre and post processing (message id persisting, setting tx context)
+		requestQueue.PreProcessRequest(call.Otto, req)
+		defer requestQueue.PostProcessRequest(call.Otto, req)
 
 		client := clientFactory.Client()
 		errc := make(chan error, 1)
@@ -216,6 +245,29 @@ func (jail *Jail) ClientRestartWrapper() (*rpc.ClientRestartWrapper, error) {
 	jail.client = client
 
 	return jail.client, nil
+}
+
+func (jail *Jail) RequestQueue() (*geth.JailedRequestQueue, error) {
+	if jail == nil {
+		return nil, ErrInvalidJail
+	}
+
+	if jail.requestQueue != nil {
+		return jail.requestQueue, nil
+	}
+
+	nodeManager := geth.GetNodeManager()
+	if !nodeManager.HasNode() {
+		return nil, geth.ErrInvalidGethNode
+	}
+
+	requestQueue, err := nodeManager.JailedRequestQueue()
+	if err != nil {
+		return nil, err
+	}
+	jail.requestQueue = requestQueue
+
+	return jail.requestQueue, nil
 }
 
 func newErrorResponse(call otto.FunctionCall, code int, msg string, id interface{}) otto.Value {

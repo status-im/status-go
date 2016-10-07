@@ -50,6 +50,7 @@ var (
 	ErrInvalidWhisperService       = errors.New("whisper service is unavailable")
 	ErrInvalidLightEthereumService = errors.New("can not retrieve LES service")
 	ErrInvalidClient               = errors.New("RPC client is not properly initialized")
+	ErrInvalidJailedRequestQueue   = errors.New("Jailed request queue is not properly initialized")
 	ErrNodeStartFailure            = errors.New("could not create the in-memory node object")
 )
 
@@ -60,14 +61,15 @@ type SelectedExtKey struct {
 }
 
 type NodeManager struct {
-	currentNode     *node.Node                // currently running geth node
-	ctx             *cli.Context              // the CLI context used to start the geth node
-	lightEthereum   *les.LightEthereum        // LES service
-	accountManager  *accounts.Manager         // the account manager attached to the currentNode
-	SelectedAccount *SelectedExtKey           // account that was processed during the last call to SelectAccount()
-	whisperService  *whisper.Whisper          // Whisper service
-	client          *rpc.ClientRestartWrapper // RPC client
-	nodeStarted     chan struct{}             // channel to wait for node to start
+	currentNode        *node.Node                // currently running geth node
+	ctx                *cli.Context              // the CLI context used to start the geth node
+	lightEthereum      *les.LightEthereum        // LES service
+	accountManager     *accounts.Manager         // the account manager attached to the currentNode
+	jailedRequestQueue *JailedRequestQueue       // bridge via which jail notifies node of incoming requests
+	SelectedAccount    *SelectedExtKey           // account that was processed during the last call to SelectAccount()
+	whisperService     *whisper.Whisper          // Whisper service
+	client             *rpc.ClientRestartWrapper // RPC client
+	nodeStarted        chan struct{}             // channel to wait for node to start
 }
 
 var (
@@ -77,7 +79,9 @@ var (
 
 func NewNodeManager(datadir string, rpcport int) *NodeManager {
 	createOnce.Do(func() {
-		nodeManagerInstance = &NodeManager{}
+		nodeManagerInstance = &NodeManager{
+			jailedRequestQueue: NewJailedRequestsQueue(),
+		}
 		nodeManagerInstance.MakeNode(datadir, rpcport)
 	})
 
@@ -275,6 +279,22 @@ func (m *NodeManager) ClientRestartWrapper() (*rpc.ClientRestartWrapper, error) 
 	}
 
 	return m.client, nil
+}
+
+func (m *NodeManager) HasJailedRequestQueue() bool {
+	return m.jailedRequestQueue != nil
+}
+
+func (m *NodeManager) JailedRequestQueue() (*JailedRequestQueue, error) {
+	if m == nil || !m.HasNode() {
+		return nil, ErrInvalidGethNode
+	}
+
+	if !m.HasJailedRequestQueue() {
+		return nil, ErrInvalidJailedRequestQueue
+	}
+
+	return m.jailedRequestQueue, nil
 }
 
 func makeDefaultExtra() []byte {
