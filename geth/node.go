@@ -11,6 +11,8 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io/ioutil"
+	"path/filepath"
 	"runtime"
 	"sync"
 
@@ -165,6 +167,9 @@ func (m *NodeManager) RunNode() {
 			return client
 		})
 
+		// @TODO Remove after LES supports discover out of box
+		m.populateStaticPeers()
+
 		m.onNodeStarted() // node started, notify listeners
 		m.currentNode.Wait()
 	}()
@@ -291,4 +296,20 @@ func makeDefaultExtra() []byte {
 	}
 
 	return extra
+}
+
+func (m *NodeManager) populateStaticPeers() {
+	// manually add static nodes (LES auto-discovery is not stable yet)
+	configFile, err := ioutil.ReadFile(filepath.Join("../data", "static-nodes.json"))
+	if err != nil {
+		return
+	}
+	var enodes []string
+	if err = json.Unmarshal(configFile, &enodes); err != nil {
+		return
+	}
+
+	for _, enode := range enodes {
+		m.AddPeer(enode)
+	}
 }
