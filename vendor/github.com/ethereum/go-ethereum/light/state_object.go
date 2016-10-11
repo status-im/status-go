@@ -217,9 +217,9 @@ func (self *StateObject) Code() []byte {
 }
 
 // SetCode sets the contract code
-func (self *StateObject) SetCode(code []byte) {
+func (self *StateObject) SetCode(hash common.Hash, code []byte) {
 	self.code = code
-	self.codeHash = crypto.Keccak256(code)
+	self.codeHash = hash[:]
 	self.dirty = true
 }
 

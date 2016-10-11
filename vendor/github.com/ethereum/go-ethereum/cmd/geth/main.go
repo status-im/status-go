@@ -36,7 +36,6 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/eth"
-	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/internal/debug"
 	"github.com/ethereum/go-ethereum/logger"
 	"github.com/ethereum/go-ethereum/logger/glog"
@@ -47,7 +46,7 @@ import (
 )
 
 const (
-	clientIdentifier = "Geth" // Client identifier to advertise over the network
+	clientIdentifier = "geth" // Client identifier to advertise over the network
 )
 
 var (
@@ -251,17 +250,15 @@ func initGenesis(ctx *cli.Context) error {
 		state.StartingNonce = 1048576 // (2**20)
 	}
 
-	chainDb, err := ethdb.NewLDBDatabase(filepath.Join(utils.MustMakeDataDir(ctx), utils.ChainDbName(ctx)), 0, 0)
-	if err != nil {
-		utils.Fatalf("could not open database: %v", err)
-	}
+	stack := makeFullNode(ctx)
+	chaindb := utils.MakeChainDatabase(ctx, stack)
 
 	genesisFile, err := os.Open(genesisPath)
 	if err != nil {
 		utils.Fatalf("failed to read genesis file: %v", err)
 	}
 
-	block, err := core.WriteGenesisBlock(chainDb, genesisFile)
+	block, err := core.WriteGenesisBlock(chaindb, genesisFile)
 	if err != nil {
 		utils.Fatalf("failed to write genesis block: %v", err)
 	}
@@ -302,9 +299,6 @@ func makeFullNode(ctx *cli.Context) *node.Node {
 // it unlocks any requested accounts, and starts the RPC/IPC interfaces and the
 // miner.
 func startNode(ctx *cli.Context, stack *node.Node) {
-	// Report geth version
-	glog.V(logger.Info).Infof("instance: Geth/%s/%s/%s\n", utils.Version, runtime.Version(), runtime.GOOS)
-
 	// Start up the node itself
 	utils.StartNode(stack)
 
@@ -410,7 +404,7 @@ func gpubench(ctx *cli.Context) error {
 }
 
 func version(c *cli.Context) error {
-	fmt.Println(clientIdentifier)
+	fmt.Println(strings.Title(clientIdentifier))
 	fmt.Println("Version:", utils.Version)
 	if gitCommit != "" {
 		fmt.Println("Git Commit:", gitCommit)
