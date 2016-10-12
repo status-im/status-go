@@ -80,9 +80,13 @@ func (jail *Jail) Parse(chatId string, js string) string {
 	_, err := vm.Run(initJjs)
 	vm.Set("jeth", struct{}{})
 
+	sendHandler := func(call otto.FunctionCall) (response otto.Value) {
+		return jail.Send(chatId, call)
+	}
+
 	jethObj, _ := vm.Get("jeth")
-	jethObj.Object().Set("send", jail.Send)
-	jethObj.Object().Set("sendAsync", jail.Send)
+	jethObj.Object().Set("send", sendHandler)
+	jethObj.Object().Set("sendAsync", sendHandler)
 
 	jjs := Web3_JS + `
 	var Web3 = require('web3');
@@ -110,10 +114,6 @@ func (jail *Jail) Call(chatId string, path string, args string) string {
 		return printError(fmt.Sprintf("Cell[%s] doesn't exist.", chatId))
 	}
 
-	// serialize requests to VM
-	cell.sem.Acquire()
-	defer cell.sem.Release()
-
 	res, err := cell.vm.Call("call", nil, path, args)
 
 	return printResult(res.String(), err)
@@ -133,7 +133,12 @@ func (jail *Jail) GetVM(chatId string) (*otto.Otto, error) {
 }
 
 // Send will serialize the first argument, send it to the node and returns the response.
-func (jail *Jail) Send(call otto.FunctionCall) (response otto.Value) {
+func (jail *Jail) Send(chatId string, call otto.FunctionCall) (response otto.Value) {
+	cell, ok := jail.cells[chatId]
+	if !ok {
+		throwJSException(fmt.Errorf("Cell[%s] doesn't exist.", chatId))
+	}
+
 	clientFactory, err := jail.ClientRestartWrapper()
 	if err != nil {
 		return newErrorResponse(call, -32603, err.Error(), nil)
@@ -171,9 +176,13 @@ func (jail *Jail) Send(call otto.FunctionCall) (response otto.Value) {
 		resp.Set("id", req.Id)
 		var result json.RawMessage
 
-		// do extra request pre and post processing (message id persisting, setting tx context)
-		requestQueue.PreProcessRequest(call.Otto, req)
-		defer requestQueue.PostProcessRequest(call.Otto, req)
+		// do extra request pre processing (persist message id)
+		// within function semaphore will be acquired and released,
+		// so that no more than one client (per cell) can enter
+		err := requestQueue.PreProcessRequest(cell.sem, call.Otto, req)
+		if err != nil {
+			return newErrorResponse(call, -32603, err.Error(), nil)
+		}
 
 		client := clientFactory.Client()
 		errc := make(chan error, 1)
@@ -207,6 +216,9 @@ func (jail *Jail) Send(call otto.FunctionCall) (response otto.Value) {
 			resp = newErrorResponse(call, -32603, err.Error(), &req.Id).Object()
 		}
 		resps.Call("push", resp)
+
+		// do extra request post processing (setting back tx context)
+		requestQueue.PostProcessRequest(call.Otto, req)
 	}
 
 	// Return the responses either to the callback (if supplied)

@@ -4,7 +4,8 @@ var _status_catalog = {
 };
 
 var context = {};
-function addContext(key, value) {
+function addContext(ns, key, value) {
+    // we ignore ns here (as ns is message id, and in this UC we do not have one)
     context[key] = value;
 }
 

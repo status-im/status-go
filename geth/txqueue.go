@@ -8,12 +8,13 @@ extern bool StatusServiceSignalEvent( const char *jsonEvent );
 import "C"
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"bytes"
 
 	"github.com/cnf/structhash"
+	"github.com/eapache/go-resiliency/semaphore"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/les/status"
 	"github.com/robertkrimen/otto"
@@ -23,6 +24,7 @@ const (
 	EventTransactionQueued = "transaction.queued"
 	SendTransactionRequest = "eth_sendTransaction"
 	MessageIdKey           = "message_id"
+	CellTicketKey          = "cell_ticket"
 )
 
 func onSendTransactionRequest(queuedTx status.QueuedTx) {
@@ -32,12 +34,17 @@ func onSendTransactionRequest(queuedTx status.QueuedTx) {
 		requestCtx = requestQueue.PopQueuedTxContext(&queuedTx)
 	}
 
+	// request context obtained (if exists), safe to release the ticket
+	if ticket := cellTicketFromContext(requestCtx); ticket != nil {
+		ticket.Release()
+	}
+
 	event := GethEvent{
 		Type: EventTransactionQueued,
 		Event: SendTransactionEvent{
 			Id:        string(queuedTx.Id),
 			Args:      queuedTx.Args,
-			MessageId: fromContext(requestCtx, MessageIdKey),
+			MessageId: messageIdFromContext(requestCtx),
 		},
 	}
 
@@ -56,15 +63,26 @@ func CompleteTransaction(id, password string) (common.Hash, error) {
 	return backend.CompleteQueuedTransaction(status.QueuedTxId(id), password)
 }
 
-func fromContext(ctx context.Context, key string) string {
+func messageIdFromContext(ctx context.Context) string {
 	if ctx == nil {
 		return ""
 	}
-	if messageId, ok := ctx.Value(key).(string); ok {
+	if messageId, ok := ctx.Value(MessageIdKey).(string); ok {
 		return messageId
 	}
 
 	return ""
+}
+
+func cellTicketFromContext(ctx context.Context) *semaphore.Semaphore {
+	if ctx == nil {
+		return nil
+	}
+	if sem, ok := ctx.Value(CellTicketKey).(*semaphore.Semaphore); ok {
+		return sem
+	}
+
+	return nil
 }
 
 type JailedRequest struct {
@@ -83,7 +101,13 @@ func NewJailedRequestsQueue() *JailedRequestQueue {
 	}
 }
 
-func (q *JailedRequestQueue) PreProcessRequest(vm *otto.Otto, req RPCCall) {
+func (q *JailedRequestQueue) PreProcessRequest(ticket *semaphore.Semaphore, vm *otto.Otto, req RPCCall) error {
+	// serialize access
+	err := ticket.Acquire()
+	if err != nil {
+		return err
+	}
+
 	messageId := currentMessageId(vm.Context())
 
 	// save request context for reuse (by request handlers, such as queued transaction signal sender)
@@ -92,19 +116,28 @@ func (q *JailedRequestQueue) PreProcessRequest(vm *otto.Otto, req RPCCall) {
 	if len(messageId) > 0 {
 		ctx = context.WithValue(ctx, MessageIdKey, messageId)
 	}
+
+	// onSendTransactionRequest() will use context to obtain and release ticket
+	if req.Method == SendTransactionRequest {
+		ctx = context.WithValue(ctx, CellTicketKey, ticket)
+	} else {
+		ticket.Release()
+	}
 	q.saveRequestContext(vm, ctx, req)
+
+	return nil
 }
 
 func (q *JailedRequestQueue) PostProcessRequest(vm *otto.Otto, req RPCCall) {
 	// set message id (if present in context)
 	messageId := currentMessageId(vm.Context())
 	if len(messageId) > 0 {
-		vm.Call("addContext", nil, MessageIdKey, messageId)
+		vm.Call("addContext", nil, messageId, MessageIdKey, messageId)
 	}
 
 	// set extra markers for queued transaction requests
 	if req.Method == SendTransactionRequest {
-		vm.Call("addContext", nil, SendTransactionRequest, true)
+		vm.Call("addContext", nil, messageId, SendTransactionRequest, true)
 	}
 }
 
@@ -219,7 +252,7 @@ func hashFromQueuedTx(queuedTx *status.QueuedTx) string {
 		method: SendTransactionRequest,
 		from:   queuedTx.Args.From.Hex(),
 		to:     queuedTx.Args.To.Hex(),
-		value:  string(bytes.Replace(value, []byte(`"`),[]byte("") , 2)),
+		value:  string(bytes.Replace(value, []byte(`"`), []byte(""), 2)),
 		data:   queuedTx.Args.Data,
 	}
 

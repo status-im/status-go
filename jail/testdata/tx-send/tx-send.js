@@ -10,8 +10,11 @@ var _status_catalog = {
 };
 
 var context = {};
-function addContext(key, value) { // this function is expected to be present, as status-go uses it to set context
-    context[key] = value;
+function addContext(ns, key, value) { // this function is expected to be present, as status-go uses it to set context
+    if (!(ns in context)) {
+        context[ns] = {}
+    }
+    context[ns][key] = value;
 }
 
 function call(pathStr, paramsStr) {
@@ -19,6 +22,9 @@ function call(pathStr, paramsStr) {
         path = JSON.parse(pathStr),
         fn, res;
 
+    // Since we allow next request to proceed *immediately* after jail obtains message id
+    // we should be careful overwritting global context variable.
+    // We probably should limit/scope to context[message_id] = {}
     context = {};
 
     fn = path.reduce(function(catalog, name) {
@@ -36,9 +42,13 @@ function call(pathStr, paramsStr) {
     callResult = fn(params);
     res = {
         result: callResult,
-        // so context could contain {eth_transactionSend: true}
-        // additionally, context gets `message_id` as well
-        context: context
+        // So, context could contain {eth_transactionSend: true}
+        // additionally, context gets `message_id` as well.
+        // You can scope returned context by returning context[message_id],
+        // however since serialization guard will be released immediately after message id
+        // is obtained, you need to be careful if you use global message id (it
+        // works below, in test, it will not work as expected in highly concurrent environment)
+        context: context[status.message_id]
     };
 
     return JSON.stringify(res);
