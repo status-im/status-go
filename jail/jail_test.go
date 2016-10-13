@@ -214,10 +214,11 @@ func TestJailSendQueuedTransaction(t *testing.T) {
   		"value": "0.000001"
 	}`
 
-	transactionCompletedSuccessfully := make(chan bool)
+	txCompletedSuccessfully := make(chan struct{})
+	txCompletedCounter := make(chan struct{})
+	txHashes := make(chan common.Hash)
 
 	// replace transaction notification handler
-	var txHash = common.Hash{}
 	requireMessageId := false
 	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var envelope geth.GethEvent
@@ -246,34 +247,38 @@ func TestJailSendQueuedTransaction(t *testing.T) {
 			t.Logf("Transaction queued (will be completed in 5 secs): {id: %s}\n", event["id"].(string))
 			time.Sleep(5 * time.Second)
 
+			var txHash common.Hash
 			if txHash, err = geth.CompleteTransaction(event["id"].(string), TEST_ADDRESS_PASSWORD); err != nil {
 				t.Errorf("cannot complete queued transation[%v]: %v", event["id"], err)
-				return
+			} else {
+				t.Logf("Transaction complete: https://testnet.etherscan.io/tx/%s", txHash.Hex())
 			}
 
-			t.Logf("Transaction complete: https://testnet.etherscan.io/tx/%s", txHash.Hex())
-			transactionCompletedSuccessfully <- true // so that timeout is aborted
+			txCompletedSuccessfully <- struct{}{} // so that timeout is aborted
+			txHashes <- txHash
+			txCompletedCounter <- struct{}{}
 		}
 	})
 
-	type cmd struct {
+	type testCommand struct {
 		command          string
 		params           string
 		expectedResponse string
 	}
-
-	tests := []struct {
+	type testCase struct {
 		name             string
 		file             string
 		requireMessageId bool
-		commands         []cmd
-	}{
+		commands         []testCommand
+	}
+
+	tests := []testCase{
 		{
 			// no context or message id
 			name:             "Case 1: no message id or context in inited JS",
 			file:             "no-message-id-or-context.js",
 			requireMessageId: false,
-			commands: []cmd{
+			commands: []testCommand{
 				{
 					`["commands", "send"]`,
 					txParams,
@@ -291,7 +296,7 @@ func TestJailSendQueuedTransaction(t *testing.T) {
 			name:             "Case 2: context is present in inited JS (but no message id is there)",
 			file:             "context-no-message-id.js",
 			requireMessageId: false,
-			commands: []cmd{
+			commands: []testCommand{
 				{
 					`["commands", "send"]`,
 					txParams,
@@ -309,7 +314,7 @@ func TestJailSendQueuedTransaction(t *testing.T) {
 			name:             "Case 3: message id is present, context is not present",
 			file:             "message-id-no-context.js",
 			requireMessageId: true,
-			commands: []cmd{
+			commands: []testCommand{
 				{
 					`["commands", "send"]`,
 					txParams,
@@ -327,7 +332,7 @@ func TestJailSendQueuedTransaction(t *testing.T) {
 			name:             "Case 4: both message id and context are present",
 			file:             "tx-send.js",
 			requireMessageId: true,
-			commands: []cmd{
+			commands: []testCommand{
 				{
 					`["commands", "send"]`,
 					txParams,
@@ -336,29 +341,35 @@ func TestJailSendQueuedTransaction(t *testing.T) {
 				{
 					`["commands", "getBalance"]`,
 					`{"address": "` + TEST_ADDRESS + `"}`,
-					`{"result": {"context":{"message_id":"foobar"},"result":{"balance":42}}}`, // message id in context!
+					`{"result": {"context":{"message_id":"42"},"result":{"balance":42}}}`, // message id in context, but default one is used!
 				},
 			},
 		},
 	}
 
-	//var jailInstance *jail.Jail
 	for _, test := range tests {
 		jailInstance := jail.Init(geth.LoadFromFile(TESTDATA_TX_SEND_JS + test.file))
-		geth.PanicAfter(20*time.Second, transactionCompletedSuccessfully, test.name)
+		geth.PanicAfter(60*time.Second, txCompletedSuccessfully, test.name)
 		jailInstance.Parse(CHAT_ID_SEND, ``)
 
 		requireMessageId = test.requireMessageId
 
-		for _, cmd := range test.commands {
-			t.Logf("%s: %s", test.name, cmd.command)
-			response := jailInstance.Call(CHAT_ID_SEND, cmd.command, cmd.params)
-			expectedResponse := strings.Replace(cmd.expectedResponse, "TX_HASH", txHash.Hex(), 1)
-			if response != expectedResponse {
-				t.Errorf("expected response is not returned: expected %s, got %s", expectedResponse, response)
-				return
-			}
+		for _, command := range test.commands {
+			go func(jail *jail.Jail, test testCase, command testCommand) {
+				t.Logf("->%s: %s", test.name, command.command)
+				response := jail.Call(CHAT_ID_SEND, command.command, command.params)
+				var txHash common.Hash
+				if command.command == `["commands", "send"]` {
+					txHash = <-txHashes
+				}
+				expectedResponse := strings.Replace(command.expectedResponse, "TX_HASH", txHash.Hex(), 1)
+				if response != expectedResponse {
+					t.Errorf("expected response is not returned: expected %s, got %s", expectedResponse, response)
+					return
+				}
+			}(jailInstance, test, command)
 		}
+		<-txCompletedCounter
 	}
 }
 

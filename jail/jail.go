@@ -24,6 +24,7 @@ var (
 )
 
 type Jail struct {
+	sync.RWMutex
 	client       *rpc.ClientRestartWrapper // lazy inited on the first call to jail.ClientRestartWrapper()
 	cells        map[string]*JailedRuntime // jail supports running many isolated instances of jailed runtime
 	statusJS     string
@@ -73,6 +74,9 @@ func (jail *Jail) Parse(chatId string, js string) string {
 		return printError(ErrInvalidJail.Error())
 	}
 
+	jail.Lock()
+	defer jail.Unlock()
+
 	jail.cells[chatId] = NewJailedRuntime(chatId)
 	vm := jail.cells[chatId].vm
 
@@ -109,12 +113,16 @@ func (jail *Jail) Call(chatId string, path string, args string) string {
 		return printError(err.Error())
 	}
 
+	jail.RLock()
 	cell, ok := jail.cells[chatId]
 	if !ok {
+		jail.RUnlock()
 		return printError(fmt.Sprintf("Cell[%s] doesn't exist.", chatId))
 	}
+	jail.RUnlock()
 
-	res, err := cell.vm.Call("call", nil, path, args)
+	vm := cell.vm.Copy() // isolate VM to allow concurrent access
+	res, err := vm.Call("call", nil, path, args)
 
 	return printResult(res.String(), err)
 }
@@ -123,6 +131,9 @@ func (jail *Jail) GetVM(chatId string) (*otto.Otto, error) {
 	if jail == nil {
 		return nil, ErrInvalidJail
 	}
+
+	jail.RLock()
+	defer jail.RUnlock()
 
 	cell, ok := jail.cells[chatId]
 	if !ok {
@@ -134,11 +145,6 @@ func (jail *Jail) GetVM(chatId string) (*otto.Otto, error) {
 
 // Send will serialize the first argument, send it to the node and returns the response.
 func (jail *Jail) Send(chatId string, call otto.FunctionCall) (response otto.Value) {
-	cell, ok := jail.cells[chatId]
-	if !ok {
-		throwJSException(fmt.Errorf("Cell[%s] doesn't exist.", chatId))
-	}
-
 	clientFactory, err := jail.ClientRestartWrapper()
 	if err != nil {
 		return newErrorResponse(call, -32603, err.Error(), nil)
@@ -176,10 +182,21 @@ func (jail *Jail) Send(chatId string, call otto.FunctionCall) (response otto.Val
 		resp.Set("id", req.Id)
 		var result json.RawMessage
 
+		// execute directly w/o RPC call to node
+		if req.Method == geth.SendTransactionRequest {
+			txHash, err := requestQueue.ProcessSendTransactionRequest(call.Otto, req)
+			resp.Set("result", txHash.Hex())
+			if err != nil {
+				resp = newErrorResponse(call, -32603, err.Error(), &req.Id).Object()
+			}
+			resps.Call("push", resp)
+			continue
+		}
+
 		// do extra request pre processing (persist message id)
 		// within function semaphore will be acquired and released,
 		// so that no more than one client (per cell) can enter
-		err := requestQueue.PreProcessRequest(cell.sem, call.Otto, req)
+		messageId, err := requestQueue.PreProcessRequest(call.Otto, req)
 		if err != nil {
 			return newErrorResponse(call, -32603, err.Error(), nil)
 		}
@@ -218,7 +235,7 @@ func (jail *Jail) Send(chatId string, call otto.FunctionCall) (response otto.Val
 		resps.Call("push", resp)
 
 		// do extra request post processing (setting back tx context)
-		requestQueue.PostProcessRequest(call.Otto, req)
+		requestQueue.PostProcessRequest(call.Otto, req, messageId)
 	}
 
 	// Return the responses either to the callback (if supplied)

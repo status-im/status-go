@@ -167,20 +167,12 @@ func PreprocessDataDir(dataDir string) (string, error) {
 }
 
 // PanicAfter throws panic() after waitSeconds, unless abort channel receives notification
-func PanicAfter(waitSeconds time.Duration, abort chan bool, desc string) {
-	// panic if function takes too long
-	timeout := make(chan bool, 1)
-
-	go func() {
-		time.Sleep(waitSeconds)
-		timeout <- true
-	}()
-
+func PanicAfter(waitSeconds time.Duration, abort chan struct{}, desc string) {
 	go func() {
 		select {
 		case <-abort:
 			return
-		case <-timeout:
+		case <-time.After(waitSeconds):
 			panic("whatever you were doing takes toooo long: " + desc)
 		}
 	}()

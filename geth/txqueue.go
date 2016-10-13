@@ -8,15 +8,14 @@ extern bool StatusServiceSignalEvent( const char *jsonEvent );
 import "C"
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
+	"math/big"
+	"strconv"
 
-	"github.com/cnf/structhash"
-	"github.com/eapache/go-resiliency/semaphore"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/les/status"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/robertkrimen/otto"
 )
 
@@ -24,27 +23,15 @@ const (
 	EventTransactionQueued = "transaction.queued"
 	SendTransactionRequest = "eth_sendTransaction"
 	MessageIdKey           = "message_id"
-	CellTicketKey          = "cell_ticket"
 )
 
 func onSendTransactionRequest(queuedTx status.QueuedTx) {
-	requestCtx := context.Background()
-	requestQueue, err := GetNodeManager().JailedRequestQueue()
-	if err == nil {
-		requestCtx = requestQueue.PopQueuedTxContext(&queuedTx)
-	}
-
-	// request context obtained (if exists), safe to release the ticket
-	if ticket := cellTicketFromContext(requestCtx); ticket != nil {
-		ticket.Release()
-	}
-
 	event := GethEvent{
 		Type: EventTransactionQueued,
 		Event: SendTransactionEvent{
 			Id:        string(queuedTx.Id),
 			Args:      queuedTx.Args,
-			MessageId: messageIdFromContext(requestCtx),
+			MessageId: messageIdFromContext(queuedTx.Context),
 		},
 	}
 
@@ -74,63 +61,19 @@ func messageIdFromContext(ctx context.Context) string {
 	return ""
 }
 
-func cellTicketFromContext(ctx context.Context) *semaphore.Semaphore {
-	if ctx == nil {
-		return nil
-	}
-	if sem, ok := ctx.Value(CellTicketKey).(*semaphore.Semaphore); ok {
-		return sem
-	}
-
-	return nil
-}
-
-type JailedRequest struct {
-	method string
-	ctx    context.Context
-	vm     *otto.Otto
-}
-
-type JailedRequestQueue struct {
-	requests map[string]*JailedRequest
-}
+type JailedRequestQueue struct{}
 
 func NewJailedRequestsQueue() *JailedRequestQueue {
-	return &JailedRequestQueue{
-		requests: make(map[string]*JailedRequest),
-	}
+	return &JailedRequestQueue{}
 }
 
-func (q *JailedRequestQueue) PreProcessRequest(ticket *semaphore.Semaphore, vm *otto.Otto, req RPCCall) error {
-	// serialize access
-	err := ticket.Acquire()
-	if err != nil {
-		return err
-	}
-
+func (q *JailedRequestQueue) PreProcessRequest(vm *otto.Otto, req RPCCall) (string, error) {
 	messageId := currentMessageId(vm.Context())
 
-	// save request context for reuse (by request handlers, such as queued transaction signal sender)
-	ctx := context.Background()
-	ctx = context.WithValue(ctx, "method", req.Method)
-	if len(messageId) > 0 {
-		ctx = context.WithValue(ctx, MessageIdKey, messageId)
-	}
-
-	// onSendTransactionRequest() will use context to obtain and release ticket
-	if req.Method == SendTransactionRequest {
-		ctx = context.WithValue(ctx, CellTicketKey, ticket)
-	} else {
-		ticket.Release()
-	}
-	q.saveRequestContext(vm, ctx, req)
-
-	return nil
+	return messageId, nil
 }
 
-func (q *JailedRequestQueue) PostProcessRequest(vm *otto.Otto, req RPCCall) {
-	// set message id (if present in context)
-	messageId := currentMessageId(vm.Context())
+func (q *JailedRequestQueue) PostProcessRequest(vm *otto.Otto, req RPCCall, messageId string) {
 	if len(messageId) > 0 {
 		vm.Call("addContext", nil, messageId, MessageIdKey, messageId)
 	}
@@ -141,41 +84,32 @@ func (q *JailedRequestQueue) PostProcessRequest(vm *otto.Otto, req RPCCall) {
 	}
 }
 
-func (q *JailedRequestQueue) saveRequestContext(vm *otto.Otto, ctx context.Context, req RPCCall) {
-	hash := hashFromRPCCall(req)
+func (q *JailedRequestQueue) ProcessSendTransactionRequest(vm *otto.Otto, req RPCCall) (common.Hash, error) {
+	// obtain status backend from LES service
+	lightEthereum, err := GetNodeManager().LightEthereumService()
+	if err != nil {
+		return common.Hash{}, err
+	}
+	backend := lightEthereum.StatusBackend
 
-	if len(hash) == 0 { // no need to persist empty hash
-		return
+	messageId, err := q.PreProcessRequest(vm, req)
+	if err != nil {
+		return common.Hash{}, err
+	}
+	// onSendTransactionRequest() will use context to obtain and release ticket
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, MessageIdKey, messageId)
+
+	//  this call blocks, up until Complete Transaction is called
+	txHash, err := backend.SendTransaction(ctx, sendTxArgsFromRPCCall(req))
+	if err != nil {
+		return common.Hash{}, err
 	}
 
-	q.requests[hash] = &JailedRequest{
-		method: req.Method,
-		ctx:    ctx,
-		vm:     vm,
-	}
-}
+	// invoke post processing
+	q.PostProcessRequest(vm, req, messageId)
 
-func (q *JailedRequestQueue) GetQueuedTxContext(queuedTx *status.QueuedTx) context.Context {
-	hash := hashFromQueuedTx(queuedTx)
-
-	req, ok := q.requests[hash]
-	if ok {
-		return req.ctx
-	}
-
-	return context.Background()
-}
-
-func (q *JailedRequestQueue) PopQueuedTxContext(queuedTx *status.QueuedTx) context.Context {
-	hash := hashFromQueuedTx(queuedTx)
-
-	req, ok := q.requests[hash]
-	if ok {
-		delete(q.requests, hash)
-		return req.ctx
-	}
-
-	return context.Background()
+	return txHash, nil
 }
 
 // currentMessageId looks for `status.message_id` variable in current JS context
@@ -193,22 +127,14 @@ func currentMessageId(ctx otto.Context) string {
 	return ""
 }
 
-type HashableSendRequest struct {
-	method string
-	from   string
-	to     string
-	value  string
-	data   string
-}
-
-func hashFromRPCCall(req RPCCall) string {
+func sendTxArgsFromRPCCall(req RPCCall) status.SendTxArgs {
 	if req.Method != SendTransactionRequest { // no need to persist extra state for other requests
-		return ""
+		return status.SendTxArgs{}
 	}
 
 	params, ok := req.Params[0].(map[string]interface{})
 	if !ok {
-		return ""
+		return status.SendTxArgs{}
 	}
 
 	from, ok := params["from"].(string)
@@ -221,9 +147,13 @@ func hashFromRPCCall(req RPCCall) string {
 		to = ""
 	}
 
-	value, ok := params["value"].(string)
+	param, ok := params["value"].(string)
 	if !ok {
-		value = ""
+		param = "0x0"
+	}
+	value, err := strconv.ParseInt(param, 0, 64)
+	if err != nil {
+		return status.SendTxArgs{}
 	}
 
 	data, ok := params["data"].(string)
@@ -231,30 +161,11 @@ func hashFromRPCCall(req RPCCall) string {
 		data = ""
 	}
 
-	s := HashableSendRequest{
-		method: req.Method,
-		from:   from,
-		to:     to,
-		value:  value,
-		data:   data,
+	toAddress := common.HexToAddress(to)
+	return status.SendTxArgs{
+		From:  common.HexToAddress(from),
+		To:    &toAddress,
+		Value: rpc.NewHexNumber(big.NewInt(value)),
+		Data:  data,
 	}
-
-	return fmt.Sprintf("%x", structhash.Sha1(s, 1))
-}
-
-func hashFromQueuedTx(queuedTx *status.QueuedTx) string {
-	value, err := queuedTx.Args.Value.MarshalJSON()
-	if err != nil {
-		return ""
-	}
-
-	s := HashableSendRequest{
-		method: SendTransactionRequest,
-		from:   queuedTx.Args.From.Hex(),
-		to:     queuedTx.Args.To.Hex(),
-		value:  string(bytes.Replace(value, []byte(`"`), []byte(""), 2)),
-		data:   queuedTx.Args.Data,
-	}
-
-	return fmt.Sprintf("%x", structhash.Sha1(s, 1))
 }
