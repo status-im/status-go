@@ -71,6 +71,7 @@ type NodeManager struct {
 }
 
 var (
+	UseTestnet          = "true" // can be overridden via -ldflags '-X geth.UseTestnet'
 	nodeManagerInstance *NodeManager
 	createOnce          sync.Once
 )
@@ -110,7 +111,9 @@ func (m *NodeManager) MakeNode(datadir string, rpcport int) *node.Node {
 	set.Bool("lightkdf", true, "Reduce key-derivation RAM & CPU usage at some expense of KDF strength")
 	set.Bool("shh", true, "whisper")
 	set.Bool("light", true, "disable eth")
-	set.Bool("testnet", true, "light test network")
+	if UseTestnet == "true" {
+		set.Bool("testnet", true, "light test network")
+	}
 	set.Bool("rpc", true, "enable rpc")
 	set.String("rpcaddr", "localhost", "host for RPC")
 	set.Int("rpcport", rpcport, "rpc port")
