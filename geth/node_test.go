@@ -2,9 +2,9 @@ package geth_test
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
-	"path/filepath"
 
 	"github.com/status-im/status-go/geth"
 )
