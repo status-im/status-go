@@ -997,16 +997,10 @@ func (s *PublicTransactionPoolAPI) SendTransaction(ctx context.Context, args Sen
 	s.txQueue <- queuedTx
 
 	// now wait up until transaction is complete (via call to CompleteQueuedTransaction) or timeout occurs
-	timeout := make(chan struct{}, 1)
-	go func() {
-		time.Sleep(status.DefaultTxSendCompletionTimeout * time.Second)
-		timeout <- struct{}{}
-	}()
-
 	select {
 	case <-queuedTx.Done:
 		return queuedTx.Hash, queuedTx.Err
-	case <-timeout:
+	case <-time.After(status.DefaultTxSendCompletionTimeout * time.Second):
 		return common.Hash{}, errors.New("transaction sending timed out")
 	}
 

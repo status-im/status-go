@@ -1,20 +1,27 @@
 package jail_test
 
 import (
+	"encoding/json"
 	"reflect"
+	"strings"
 	"testing"
+	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/geth"
 	"github.com/status-im/status-go/jail"
 )
 
 const (
-	TEST_ADDRESS         = "0x89b50b2b26947ccad43accaef76c21d175ad85f4"
-	CHAT_ID_INIT         = "CHAT_ID_INIT_TEST"
-	CHAT_ID_CALL         = "CHAT_ID_CALL_TEST"
-	CHAT_ID_NON_EXISTENT = "CHAT_IDNON_EXISTENT"
+	TEST_ADDRESS          = "0x89b50b2b26947ccad43accaef76c21d175ad85f4"
+	TEST_ADDRESS_PASSWORD = "asdf"
+	CHAT_ID_INIT          = "CHAT_ID_INIT_TEST"
+	CHAT_ID_CALL          = "CHAT_ID_CALL_TEST"
+	CHAT_ID_SEND          = "CHAT_ID_CALL_SEND"
+	CHAT_ID_NON_EXISTENT  = "CHAT_IDNON_EXISTENT"
 
-	TESTDATA_STATUS_JS = "testdata/status.js"
+	TESTDATA_STATUS_JS  = "testdata/status.js"
+	TESTDATA_TX_SEND_JS = "testdata/tx-send/"
 )
 
 func TestJailUnInited(t *testing.T) {
@@ -128,7 +135,7 @@ func TestJailFunctionCall(t *testing.T) {
 
 	// call with wrong chat id
 	response := jailInstance.Call(CHAT_ID_NON_EXISTENT, "", "")
-	expectedError := `{"error":"VM[CHAT_IDNON_EXISTENT] doesn't exist."}`
+	expectedError := `{"error":"Cell[CHAT_IDNON_EXISTENT] doesn't exist."}`
 	if response != expectedError {
 		t.Errorf("expected error is not returned: expected %s, got %s", expectedError, response)
 		return
@@ -163,11 +170,11 @@ func TestJailRPCSend(t *testing.T) {
 		return
 	}
 
+	// internally (since we replaced `web3.send` with `jail.Send`)
+	// all requests to web3 are forwarded to `jail.Send`
 	_, err = vm.Run(`
-	    var data = {"jsonrpc":"2.0","method":"eth_getBalance","params":["` + TEST_ADDRESS + `", "latest"],"id":1};
-	    var sendResult = web3.currentProvider.send(data)
-		console.log(JSON.stringify(sendResult))
-		var sendResult = web3.fromWei(sendResult.result, "ether")
+	    var balance = web3.eth.getBalance("` + TEST_ADDRESS + `");
+		var sendResult = web3.fromWei(balance, "ether")
 	`)
 	if err != nil {
 		t.Errorf("cannot run custom code on VM: %v", err)
@@ -192,6 +199,178 @@ func TestJailRPCSend(t *testing.T) {
 	}
 
 	t.Logf("Balance of %.2f ETH found on '%s' account", balance, TEST_ADDRESS)
+}
+
+func TestJailSendQueuedTransaction(t *testing.T) {
+	err := geth.PrepareTestNode()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	txParams := `{
+  		"from": "` + TEST_ADDRESS + `",
+  		"to": "0xf82da7547534045b4e00442bc89e16186cf8c272",
+  		"value": "0.000001"
+	}`
+
+	txCompletedSuccessfully := make(chan struct{})
+	txCompletedCounter := make(chan struct{})
+	txHashes := make(chan common.Hash)
+
+	// replace transaction notification handler
+	requireMessageId := false
+	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+		var envelope geth.GethEvent
+		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
+			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
+			return
+		}
+		if envelope.Type == geth.EventTransactionQueued {
+			event := envelope.Event.(map[string]interface{})
+			messageId, ok := event["message_id"].(string)
+			if !ok {
+				t.Error("Message id is required, but not found")
+				return
+			}
+			if requireMessageId {
+				if len(messageId) == 0 {
+					t.Error("Message id is required, but not provided")
+					return
+				}
+			} else {
+				if len(messageId) != 0 {
+					t.Error("Message id is not required, but provided")
+					return
+				}
+			}
+			t.Logf("Transaction queued (will be completed in 5 secs): {id: %s}\n", event["id"].(string))
+			time.Sleep(5 * time.Second)
+
+			var txHash common.Hash
+			if txHash, err = geth.CompleteTransaction(event["id"].(string), TEST_ADDRESS_PASSWORD); err != nil {
+				t.Errorf("cannot complete queued transation[%v]: %v", event["id"], err)
+			} else {
+				t.Logf("Transaction complete: https://testnet.etherscan.io/tx/%s", txHash.Hex())
+			}
+
+			txCompletedSuccessfully <- struct{}{} // so that timeout is aborted
+			txHashes <- txHash
+			txCompletedCounter <- struct{}{}
+		}
+	})
+
+	type testCommand struct {
+		command          string
+		params           string
+		expectedResponse string
+	}
+	type testCase struct {
+		name             string
+		file             string
+		requireMessageId bool
+		commands         []testCommand
+	}
+
+	tests := []testCase{
+		{
+			// no context or message id
+			name:             "Case 1: no message id or context in inited JS",
+			file:             "no-message-id-or-context.js",
+			requireMessageId: false,
+			commands: []testCommand{
+				{
+					`["commands", "send"]`,
+					txParams,
+					`{"result": {"transaction-hash":"TX_HASH"}}`,
+				},
+				{
+					`["commands", "getBalance"]`,
+					`{"address": "` + TEST_ADDRESS + `"}`,
+					`{"result": {"balance":42}}`,
+				},
+			},
+		},
+		{
+			// context is present in inited JS (but no message id is there)
+			name:             "Case 2: context is present in inited JS (but no message id is there)",
+			file:             "context-no-message-id.js",
+			requireMessageId: false,
+			commands: []testCommand{
+				{
+					`["commands", "send"]`,
+					txParams,
+					`{"result": {"context":{"` + geth.SendTransactionRequest + `":true},"result":{"transaction-hash":"TX_HASH"}}}`,
+				},
+				{
+					`["commands", "getBalance"]`,
+					`{"address": "` + TEST_ADDRESS + `"}`,
+					`{"result": {"context":{},"result":{"balance":42}}}`, // note emtpy (but present) context!
+				},
+			},
+		},
+		{
+			// message id is present in inited JS, but no context is there
+			name:             "Case 3: message id is present, context is not present",
+			file:             "message-id-no-context.js",
+			requireMessageId: true,
+			commands: []testCommand{
+				{
+					`["commands", "send"]`,
+					txParams,
+					`{"result": {"transaction-hash":"TX_HASH"}}`,
+				},
+				{
+					`["commands", "getBalance"]`,
+					`{"address": "` + TEST_ADDRESS + `"}`,
+					`{"result": {"balance":42}}`, // note emtpy context!
+				},
+			},
+		},
+		{
+			// both message id and context are present in inited JS (this UC is what we normally expect to see)
+			name:             "Case 4: both message id and context are present",
+			file:             "tx-send.js",
+			requireMessageId: true,
+			commands: []testCommand{
+				{
+					`["commands", "send"]`,
+					txParams,
+					`{"result": {"context":{"eth_sendTransaction":true,"message_id":"foobar"},"result":{"transaction-hash":"TX_HASH"}}}`,
+				},
+				{
+					`["commands", "getBalance"]`,
+					`{"address": "` + TEST_ADDRESS + `"}`,
+					`{"result": {"context":{"message_id":"42"},"result":{"balance":42}}}`, // message id in context, but default one is used!
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		jailInstance := jail.Init(geth.LoadFromFile(TESTDATA_TX_SEND_JS + test.file))
+		geth.PanicAfter(60*time.Second, txCompletedSuccessfully, test.name)
+		jailInstance.Parse(CHAT_ID_SEND, ``)
+
+		requireMessageId = test.requireMessageId
+
+		for _, command := range test.commands {
+			go func(jail *jail.Jail, test testCase, command testCommand) {
+				t.Logf("->%s: %s", test.name, command.command)
+				response := jail.Call(CHAT_ID_SEND, command.command, command.params)
+				var txHash common.Hash
+				if command.command == `["commands", "send"]` {
+					txHash = <-txHashes
+				}
+				expectedResponse := strings.Replace(command.expectedResponse, "TX_HASH", txHash.Hex(), 1)
+				if response != expectedResponse {
+					t.Errorf("expected response is not returned: expected %s, got %s", expectedResponse, response)
+					return
+				}
+			}(jailInstance, test, command)
+		}
+		<-txCompletedCounter
+	}
 }
 
 func TestJailMultipleInitSingletonJail(t *testing.T) {
@@ -226,7 +405,7 @@ func TestJailGetVM(t *testing.T) {
 
 	jailInstance := jail.Init("")
 
-	expectedError := `VM[` + CHAT_ID_NON_EXISTENT + `] doesn't exist.`
+	expectedError := `Cell[` + CHAT_ID_NON_EXISTENT + `] doesn't exist.`
 	_, err = jailInstance.GetVM(CHAT_ID_NON_EXISTENT)
 	if err == nil || err.Error() != expectedError {
 		t.Error("expected error, but call succeeded")
