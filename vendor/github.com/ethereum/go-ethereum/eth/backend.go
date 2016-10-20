@@ -73,6 +73,7 @@ type Config struct {
 	NoDefSrv   bool   // No default LES server
 	LightServ  int    // Maximum percentage of time allowed for serving LES requests
 	LightPeers int    // Maximum number of LES client peers
+	MaxPeers   int    // Maximum number of global peers
 
 	SkipBcVersionCheck bool // e.g. blockchain export
 	DatabaseCache      int
@@ -121,7 +122,7 @@ type Ethereum struct {
 	txMu            sync.Mutex
 	blockchain      *core.BlockChain
 	protocolManager *ProtocolManager
-	ls              LesServer
+	lesServer       LesServer
 	// DB interfaces
 	chainDb ethdb.Database // Block chain database
 
@@ -147,7 +148,7 @@ type Ethereum struct {
 }
 
 func (s *Ethereum) AddLesServer(ls LesServer) {
-	s.ls = ls
+	s.lesServer = ls
 }
 
 // New creates a new Ethereum object (including the
@@ -232,7 +233,18 @@ func New(ctx *node.ServiceContext, config *Config) (*Ethereum, error) {
 	newPool := core.NewTxPool(eth.chainConfig, eth.EventMux(), eth.blockchain.State, eth.blockchain.GasLimit)
 	eth.txPool = newPool
 
-	if eth.protocolManager, err = NewProtocolManager(eth.chainConfig, config.FastSync, config.NetworkId, eth.eventMux, eth.txPool, eth.pow, eth.blockchain, chainDb); err != nil {
+	maxPeers := config.MaxPeers
+	if config.LightServ > 0 {
+		// if we are running a light server, limit the number of ETH peers so that we reserve some space for incoming LES connections
+		// temporary solution until the new peer connectivity API is finished
+		halfPeers := maxPeers / 2
+		maxPeers -= config.LightPeers
+		if maxPeers < halfPeers {
+			maxPeers = halfPeers
+		}
+	}
+
+	if eth.protocolManager, err = NewProtocolManager(eth.chainConfig, config.FastSync, config.NetworkId, maxPeers, eth.eventMux, eth.txPool, eth.pow, eth.blockchain, chainDb); err != nil {
 		return nil, err
 	}
 	eth.miner = miner.New(eth, eth.chainConfig, eth.EventMux(), eth.pow)
@@ -327,7 +339,7 @@ func (s *Ethereum) APIs() []rpc.API {
 		}, {
 			Namespace: "eth",
 			Version:   "1.0",
-			Service:   filters.NewPublicFilterAPI(s.ApiBackend),
+			Service:   filters.NewPublicFilterAPI(s.ApiBackend, true),
 			Public:    true,
 		}, {
 			Namespace: "admin",
@@ -395,10 +407,10 @@ func (s *Ethereum) Downloader() *downloader.Downloader { return s.protocolManage
 // Protocols implements node.Service, returning all the currently configured
 // network protocols to start.
 func (s *Ethereum) Protocols() []p2p.Protocol {
-	if s.ls == nil {
+	if s.lesServer == nil {
 		return s.protocolManager.SubProtocols
 	} else {
-		return append(s.protocolManager.SubProtocols, s.ls.Protocols()...)
+		return append(s.protocolManager.SubProtocols, s.lesServer.Protocols()...)
 	}
 }
 
@@ -410,8 +422,8 @@ func (s *Ethereum) Start(srvr *p2p.Server) error {
 		s.StartAutoDAG()
 	}
 	s.protocolManager.Start()
-	if s.ls != nil {
-		s.ls.Start()
+	if s.lesServer != nil {
+		s.lesServer.Start()
 	}
 	return nil
 }
@@ -424,8 +436,8 @@ func (s *Ethereum) Stop() error {
 	}
 	s.blockchain.Stop()
 	s.protocolManager.Stop()
-	if s.ls != nil {
-		s.ls.Stop()
+	if s.lesServer != nil {
+		s.lesServer.Stop()
 	}
 	s.txPool.Stop()
 	s.miner.Stop()

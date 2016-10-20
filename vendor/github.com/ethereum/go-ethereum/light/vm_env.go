@@ -204,12 +204,14 @@ func (s *VMState) GetCode(addr common.Address) []byte {
 	return res
 }
 
+// GetCodeHash returns the contract code hash at the given address
 func (s *VMState) GetCodeHash(addr common.Address) common.Hash {
 	res, err := s.state.GetCode(s.ctx, addr)
 	s.errHandler(err)
 	return crypto.Keccak256Hash(res)
 }
 
+// GetCodeSize returns the contract code size at the given address
 func (s *VMState) GetCodeSize(addr common.Address) int {
 	res, err := s.state.GetCode(s.ctx, addr)
 	s.errHandler(err)
@@ -246,9 +248,9 @@ func (s *VMState) SetState(addr common.Address, key common.Hash, value common.Ha
 	s.errHandler(err)
 }
 
-// Delete marks an account to be removed and clears its balance
+// Suicide marks an account to be removed and clears its balance
 func (s *VMState) Suicide(addr common.Address) bool {
-	res, err := s.state.Delete(s.ctx, addr)
+	res, err := s.state.Suicide(s.ctx, addr)
 	s.errHandler(err)
 	return res
 }
@@ -260,10 +262,10 @@ func (s *VMState) Exist(addr common.Address) bool {
 	return res
 }
 
-// IsDeleted returns true if the given account has been marked for deletion
+// HasSuicided returns true if the given account has been marked for deletion
 // or false if the account does not exist
 func (s *VMState) HasSuicided(addr common.Address) bool {
-	res, err := s.state.IsDeleted(s.ctx, addr)
+	res, err := s.state.HasSuicided(s.ctx, addr)
 	s.errHandler(err)
 	return res
 }

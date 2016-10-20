@@ -164,12 +164,12 @@ var (
 	LightServFlag = cli.IntFlag{
 		Name:  "lightserv",
 		Usage: "Maximum percentage of time allowed for serving LES requests (0-90)",
-		Value: 20,
+		Value: 80,
 	}
 	LightPeersFlag = cli.IntFlag{
 		Name:  "lightpeers",
 		Usage: "Maximum number of LES client peers",
-		Value: 10,
+		Value: 20,
 	}
 	LightKDFFlag = cli.BoolFlag{
 		Name:  "lightkdf",
@@ -346,6 +346,11 @@ var (
 		Usage: "Network listening port",
 		Value: 30303,
 	}
+	ListenPortV5Flag = cli.IntFlag{
+		Name:  "v5port",
+		Usage: "Experimental RLPx V5 (Topic Discovery) listening port",
+		Value: 30304,
+	}
 	BootnodesFlag = cli.StringFlag{
 		Name:  "bootnodes",
 		Usage: "Comma separated enode URLs for P2P discovery bootstrap",
@@ -367,6 +372,10 @@ var (
 	NoDiscoverFlag = cli.BoolFlag{
 		Name:  "nodiscover",
 		Usage: "Disables the peer discovery mechanism (manual peer addition)",
+	}
+	DiscoveryV5Flag = cli.BoolFlag{
+		Name:  "v5disc",
+		Usage: "Enables the experimental RLPx V5 (Topic Discovery) mechanism",
 	}
 	NoEthFlag = cli.BoolFlag{
 		Name:  "noeth",
@@ -522,6 +531,10 @@ func MakeListenAddress(ctx *cli.Context) string {
 	return fmt.Sprintf(":%d", ctx.GlobalInt(ListenPortFlag.Name))
 }
 
+func MakeListenAddressV5(ctx *cli.Context) string {
+	return fmt.Sprintf(":%d", ctx.GlobalInt(ListenPortV5Flag.Name))
+}
+
 // MakeNAT creates a port mapper from set command line flags.
 func MakeNAT(ctx *cli.Context) nat.Interface {
 	natif, err := nat.Parse(ctx.GlobalString(NATFlag.Name))
@@ -653,8 +666,10 @@ func MakeNode(ctx *cli.Context, name, gitCommit string) *node.Node {
 		Version:           vsn,
 		UserIdent:         makeNodeUserIdent(ctx),
 		NoDiscovery:       ctx.GlobalBool(NoDiscoverFlag.Name),
+		DiscoveryV5:       ctx.GlobalBool(DiscoveryV5Flag.Name),
 		BootstrapNodes:    MakeBootstrapNodes(ctx),
 		ListenAddr:        MakeListenAddress(ctx),
+		ListenAddrV5:      MakeListenAddressV5(ctx),
 		NAT:               MakeNAT(ctx),
 		MaxPeers:          ctx.GlobalInt(MaxPeersFlag.Name),
 		MaxPendingPeers:   ctx.GlobalInt(MaxPendingPeersFlag.Name),
@@ -721,6 +736,7 @@ func RegisterEthService(ctx *cli.Context, stack *node.Node, extra []byte) {
 		NoDefSrv:                ctx.GlobalBool(NoDefSrvFlag.Name),
 		LightServ:               ctx.GlobalInt(LightServFlag.Name),
 		LightPeers:              ctx.GlobalInt(LightPeersFlag.Name),
+		MaxPeers:                ctx.GlobalInt(MaxPeersFlag.Name),
 		DatabaseCache:           ctx.GlobalInt(CacheFlag.Name),
 		DatabaseHandles:         MakeDatabaseHandles(),
 		NetworkId:               ctx.GlobalInt(NetworkIdFlag.Name),
@@ -774,7 +790,7 @@ func RegisterEthService(ctx *cli.Context, stack *node.Node, extra []byte) {
 	} else {
 		if err := stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
 			fullNode, err := eth.New(ctx, ethConf)
-			if fullNode != nil {
+			if fullNode != nil && ethConf.LightServ > 0 {
 				ls, _ := les.NewLesServer(fullNode, ethConf)
 				fullNode.AddLesServer(ls)
 			}
@@ -847,6 +863,13 @@ func MakeChainConfigFromDb(ctx *cli.Context, db ethdb.Database) *core.ChainConfi
 			config.DAOForkBlock = params.MainNetDAOForkBlock
 		}
 		config.DAOForkSupport = true
+	}
+	if config.HomesteadGasRepriceBlock == nil {
+		if ctx.GlobalBool(TestNetFlag.Name) {
+			config.HomesteadGasRepriceBlock = params.TestNetHomesteadGasRepriceBlock
+		} else {
+			config.HomesteadGasRepriceBlock = params.MainNetHomesteadGasRepriceBlock
+		}
 	}
 	// Force override any existing configs if explicitly requested
 	switch {

@@ -28,6 +28,7 @@ import (
 	"github.com/ethereum/go-ethereum/logger"
 	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/ethereum/go-ethereum/p2p/discover"
+	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/p2p/nat"
 )
 
@@ -72,6 +73,8 @@ type Config struct {
 	// or not. Disabling is usually useful for protocol debugging (manual topology).
 	Discovery bool
 
+	DiscoveryV5 bool
+
 	// Name sets the node name of this server.
 	// Use common.MakeName to create a name that follows existing conventions.
 	Name string
@@ -104,6 +107,8 @@ type Config struct {
 	// ListenAddr field will be updated with the actual address when
 	// the server is started.
 	ListenAddr string
+
+	ListenAddrV5 string
 
 	// If set to a non-nil value, the given NAT port mapper
 	// is used to make the listening port available to the
@@ -350,6 +355,17 @@ func (srv *Server) Start() (err error) {
 			return err
 		}
 		srv.ntab = ntab
+	}
+
+	if srv.DiscoveryV5 {
+		ntab, err := discv5.ListenUDP(srv.PrivateKey, srv.ListenAddrV5, srv.NAT, "") //srv.NodeDatabase)
+		if err != nil {
+			return err
+		}
+		if err := ntab.SetFallbackNodes(discv5.BootNodes); err != nil {
+			return err
+		}
+		//srv.ntab = ntab
 	}
 
 	dynPeers := (srv.MaxPeers + 1) / 2

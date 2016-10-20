@@ -614,7 +614,7 @@ func (s *PublicBlockChainAPI) rpcOutputBlock(b *types.Block, inclTx bool, fullTx
 		"gasUsed":          rpc.NewHexNumber(head.GasUsed),
 		"timestamp":        rpc.NewHexNumber(head.Time),
 		"transactionsRoot": head.TxHash,
-		"receiptsRoot":      head.ReceiptHash,
+		"receiptsRoot":     head.ReceiptHash,
 	}
 
 	if inclTx {
@@ -716,6 +716,16 @@ func newRPCTransactionFromBlockIndex(b *types.Block, txIndex int) (*RPCTransacti
 	return nil, nil
 }
 
+// newRPCRawTransactionFromBlockIndex returns the bytes of a transaction given a block and a transaction index.
+func newRPCRawTransactionFromBlockIndex(b *types.Block, txIndex int) (rpc.HexBytes, error) {
+	if txIndex >= 0 && txIndex < len(b.Transactions()) {
+		tx := b.Transactions()[txIndex]
+		return rlp.EncodeToBytes(tx)
+	}
+
+	return nil, nil
+}
+
 // newRPCTransaction returns a transaction that will serialize to the RPC representation.
 func newRPCTransaction(b *types.Block, txHash common.Hash) (*RPCTransaction, error) {
 	for idx, tx := range b.Transactions() {
@@ -801,6 +811,22 @@ func (s *PublicTransactionPoolAPI) GetTransactionByBlockHashAndIndex(ctx context
 	return nil, nil
 }
 
+// GetRawTransactionByBlockNumberAndIndex returns the bytes of the transaction for the given block number and index.
+func (s *PublicTransactionPoolAPI) GetRawTransactionByBlockNumberAndIndex(ctx context.Context, blockNr rpc.BlockNumber, index rpc.HexNumber) (rpc.HexBytes, error) {
+	if block, _ := s.b.BlockByNumber(ctx, blockNr); block != nil {
+		return newRPCRawTransactionFromBlockIndex(block, index.Int())
+	}
+	return nil, nil
+}
+
+// GetRawTransactionByBlockHashAndIndex returns the bytes of the transaction for the given block hash and index.
+func (s *PublicTransactionPoolAPI) GetRawTransactionByBlockHashAndIndex(ctx context.Context, blockHash common.Hash, index rpc.HexNumber) (rpc.HexBytes, error) {
+	if block, _ := s.b.GetBlock(ctx, blockHash); block != nil {
+		return newRPCRawTransactionFromBlockIndex(block, index.Int())
+	}
+	return nil, nil
+}
+
 // GetTransactionCount returns the number of transactions the given address has sent for the given block number
 func (s *PublicTransactionPoolAPI) GetTransactionCount(ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (*rpc.HexNumber, error) {
 	state, _, err := s.b.StateAndHeaderByNumber(ctx, blockNr)
@@ -866,9 +892,23 @@ func (s *PublicTransactionPoolAPI) GetTransactionByHash(ctx context.Context, txH
 	return nil, nil
 }
 
+// GetRawTransactionByHash returns the bytes of the transaction for the given hash.
+func (s *PublicTransactionPoolAPI) GetRawTransactionByHash(ctx context.Context, txHash common.Hash) (rpc.HexBytes, error) {
+	var tx *types.Transaction
+	var err error
+
+	if tx, _, err = getTransaction(s.b.ChainDb(), s.b, txHash); err != nil {
+		glog.V(logger.Debug).Infof("%v\n", err)
+		return nil, nil
+	} else if tx == nil {
+		return nil, nil
+	}
+
+	return rlp.EncodeToBytes(tx)
+}
+
 // GetTransactionReceipt returns the transaction receipt for the given transaction hash.
 func (s *PublicTransactionPoolAPI) GetTransactionReceipt(txHash common.Hash) (map[string]interface{}, error) {
-	//fmt.Println("API GetTransactionReceipt", txHash)
 	receipt := core.GetReceipt(s.b.ChainDb(), txHash)
 	if receipt == nil {
 		glog.V(logger.Debug).Infof("receipt not found for transaction %s", txHash.Hex())
@@ -876,14 +916,12 @@ func (s *PublicTransactionPoolAPI) GetTransactionReceipt(txHash common.Hash) (ma
 	}
 
 	tx, _, err := getTransaction(s.b.ChainDb(), s.b, txHash)
-	//fmt.Println("getTransaction", err)
 	if err != nil {
 		glog.V(logger.Debug).Infof("%v\n", err)
 		return nil, nil
 	}
 
 	txBlock, blockIndex, index, err := getTransactionBlockData(s.b.ChainDb(), txHash)
-	//fmt.Println("getTransactionBlockData", txBlock, blockIndex, index, err)
 	if err != nil {
 		glog.V(logger.Debug).Infof("%v\n", err)
 		return nil, nil
