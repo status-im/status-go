@@ -11,6 +11,8 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io/ioutil"
+	"path/filepath"
 	"runtime"
 	"sync"
 
@@ -23,7 +25,6 @@ import (
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/params"
-	"github.com/ethereum/go-ethereum/release"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/go-ethereum/whisper"
@@ -37,8 +38,6 @@ const (
 	versionPatch     = 0          // Patch version component of the current release
 	versionMeta      = "unstable" // Version metadata to append to the version string
 
-	versionOracle = "0xfa7b9770ca4cb04296cac84f37736d4041251cdf" // Ethereum address of the Geth release oracle
-
 	RPCPort = 8545 // RPC port (replaced in unit tests)
 
 	EventNodeStarted = "node.started"
@@ -51,6 +50,7 @@ var (
 	ErrInvalidWhisperService       = errors.New("whisper service is unavailable")
 	ErrInvalidLightEthereumService = errors.New("can not retrieve LES service")
 	ErrInvalidClient               = errors.New("RPC client is not properly initialized")
+	ErrInvalidJailedRequestQueue   = errors.New("Jailed request queue is not properly initialized")
 	ErrNodeStartFailure            = errors.New("could not create the in-memory node object")
 )
 
@@ -61,24 +61,28 @@ type SelectedExtKey struct {
 }
 
 type NodeManager struct {
-	currentNode     *node.Node                // currently running geth node
-	ctx             *cli.Context              // the CLI context used to start the geth node
-	lightEthereum   *les.LightEthereum        // LES service
-	accountManager  *accounts.Manager         // the account manager attached to the currentNode
-	SelectedAccount *SelectedExtKey           // account that was processed during the last call to SelectAccount()
-	whisperService  *whisper.Whisper          // Whisper service
-	client          *rpc.ClientRestartWrapper // RPC client
-	nodeStarted     chan struct{}             // channel to wait for node to start
+	currentNode        *node.Node                // currently running geth node
+	ctx                *cli.Context              // the CLI context used to start the geth node
+	lightEthereum      *les.LightEthereum        // LES service
+	accountManager     *accounts.Manager         // the account manager attached to the currentNode
+	jailedRequestQueue *JailedRequestQueue       // bridge via which jail notifies node of incoming requests
+	SelectedAccount    *SelectedExtKey           // account that was processed during the last call to SelectAccount()
+	whisperService     *whisper.Whisper          // Whisper service
+	client             *rpc.ClientRestartWrapper // RPC client
+	nodeStarted        chan struct{}             // channel to wait for node to start
 }
 
 var (
+	UseTestnet          = "true" // can be overridden via -ldflags '-X geth.UseTestnet'
 	nodeManagerInstance *NodeManager
 	createOnce          sync.Once
 )
 
 func NewNodeManager(datadir string, rpcport int) *NodeManager {
 	createOnce.Do(func() {
-		nodeManagerInstance = &NodeManager{}
+		nodeManagerInstance = &NodeManager{
+			jailedRequestQueue: NewJailedRequestsQueue(),
+		}
 		nodeManagerInstance.MakeNode(datadir, rpcport)
 	})
 
@@ -111,7 +115,9 @@ func (m *NodeManager) MakeNode(datadir string, rpcport int) *node.Node {
 	set.Bool("lightkdf", true, "Reduce key-derivation RAM & CPU usage at some expense of KDF strength")
 	set.Bool("shh", true, "whisper")
 	set.Bool("light", true, "disable eth")
-	set.Bool("testnet", true, "light test network")
+	if UseTestnet == "true" {
+		set.Bool("testnet", true, "light test network")
+	}
 	set.Bool("rpc", true, "enable rpc")
 	set.String("rpcaddr", "localhost", "host for RPC")
 	set.Int("rpcport", rpcport, "rpc port")
@@ -122,22 +128,11 @@ func (m *NodeManager) MakeNode(datadir string, rpcport int) *node.Node {
 	set.String("logdir", datadir, "log dir for glog")
 	m.ctx = cli.NewContext(nil, set, nil)
 
-	// Construct the textual version string from the individual components
-	vString := fmt.Sprintf("%d.%d.%d", versionMajor, versionMinor, versionPatch)
-
-	// Construct the version release oracle configuration
-	var rConfig release.Config
-	rConfig.Oracle = common.HexToAddress(versionOracle)
-
-	rConfig.Major = uint32(versionMajor)
-	rConfig.Minor = uint32(versionMinor)
-	rConfig.Patch = uint32(versionPatch)
-
 	utils.DebugSetup(m.ctx)
 
 	// create node and start requested protocols
-	m.currentNode = utils.MakeNode(m.ctx, clientIdentifier, vString)
-	utils.RegisterEthService(m.ctx, m.currentNode, rConfig, makeDefaultExtra())
+	m.currentNode = utils.MakeNode(m.ctx, clientIdentifier, "")
+	utils.RegisterEthService(m.ctx, m.currentNode, makeDefaultExtra())
 
 	// Whisper must be explicitly enabled, but is auto-enabled in --dev mode.
 	shhEnabled := m.ctx.GlobalBool(utils.WhisperEnabledFlag.Name)
@@ -178,6 +173,9 @@ func (m *NodeManager) RunNode() {
 			}
 			return client
 		})
+
+		// @TODO Remove after LES supports discover out of box
+		m.populateStaticPeers()
 
 		m.onNodeStarted() // node started, notify listeners
 		m.currentNode.Wait()
@@ -286,6 +284,22 @@ func (m *NodeManager) ClientRestartWrapper() (*rpc.ClientRestartWrapper, error) 
 	return m.client, nil
 }
 
+func (m *NodeManager) HasJailedRequestQueue() bool {
+	return m.jailedRequestQueue != nil
+}
+
+func (m *NodeManager) JailedRequestQueue() (*JailedRequestQueue, error) {
+	if m == nil || !m.HasNode() {
+		return nil, ErrInvalidGethNode
+	}
+
+	if !m.HasJailedRequestQueue() {
+		return nil, ErrInvalidJailedRequestQueue
+	}
+
+	return m.jailedRequestQueue, nil
+}
+
 func makeDefaultExtra() []byte {
 	var clientInfo = struct {
 		Version   uint
@@ -305,4 +319,20 @@ func makeDefaultExtra() []byte {
 	}
 
 	return extra
+}
+
+func (m *NodeManager) populateStaticPeers() {
+	// manually add static nodes (LES auto-discovery is not stable yet)
+	configFile, err := ioutil.ReadFile(filepath.Join("../data", "static-nodes.json"))
+	if err != nil {
+		return
+	}
+	var enodes []string
+	if err = json.Unmarshal(configFile, &enodes); err != nil {
+		return
+	}
+
+	for _, enode := range enodes {
+		m.AddPeer(enode)
+	}
 }

@@ -77,19 +77,19 @@ func (s *PublicEthereumAPI) ProtocolVersion() *rpc.HexNumber {
 // - pulledStates:  number of state entries processed until now
 // - knownStates:   number of known state entries that still need to be pulled
 func (s *PublicEthereumAPI) Syncing() (interface{}, error) {
-	origin, current, height, pulled, known := s.b.Downloader().Progress()
+	progress := s.b.Downloader().Progress()
 
 	// Return not syncing if the synchronisation already completed
-	if current >= height {
+	if progress.CurrentBlock >= progress.HighestBlock {
 		return false, nil
 	}
 	// Otherwise gather the block sync stats
 	return map[string]interface{}{
-		"startingBlock": rpc.NewHexNumber(origin),
-		"currentBlock":  rpc.NewHexNumber(current),
-		"highestBlock":  rpc.NewHexNumber(height),
-		"pulledStates":  rpc.NewHexNumber(pulled),
-		"knownStates":   rpc.NewHexNumber(known),
+		"startingBlock": rpc.NewHexNumber(progress.StartingBlock),
+		"currentBlock":  rpc.NewHexNumber(progress.CurrentBlock),
+		"highestBlock":  rpc.NewHexNumber(progress.HighestBlock),
+		"pulledStates":  rpc.NewHexNumber(progress.PulledStates),
+		"knownStates":   rpc.NewHexNumber(progress.KnownStates),
 	}, nil
 }
 
@@ -104,32 +104,26 @@ func NewPublicTxPoolAPI(b Backend) *PublicTxPoolAPI {
 }
 
 // Content returns the transactions contained within the transaction pool.
-func (s *PublicTxPoolAPI) Content() map[string]map[string]map[string][]*RPCTransaction {
-	content := map[string]map[string]map[string][]*RPCTransaction{
-		"pending": make(map[string]map[string][]*RPCTransaction),
-		"queued":  make(map[string]map[string][]*RPCTransaction),
+func (s *PublicTxPoolAPI) Content() map[string]map[string]map[string]*RPCTransaction {
+	content := map[string]map[string]map[string]*RPCTransaction{
+		"pending": make(map[string]map[string]*RPCTransaction),
+		"queued":  make(map[string]map[string]*RPCTransaction),
 	}
 	pending, queue := s.b.TxPoolContent()
 
 	// Flatten the pending transactions
-	for account, batches := range pending {
-		dump := make(map[string][]*RPCTransaction)
-		for nonce, txs := range batches {
-			nonce := fmt.Sprintf("%d", nonce)
-			for _, tx := range txs {
-				dump[nonce] = append(dump[nonce], newRPCPendingTransaction(tx))
-			}
+	for account, txs := range pending {
+		dump := make(map[string]*RPCTransaction)
+		for nonce, tx := range txs {
+			dump[fmt.Sprintf("%d", nonce)] = newRPCPendingTransaction(tx)
 		}
 		content["pending"][account.Hex()] = dump
 	}
 	// Flatten the queued transactions
-	for account, batches := range queue {
-		dump := make(map[string][]*RPCTransaction)
-		for nonce, txs := range batches {
-			nonce := fmt.Sprintf("%d", nonce)
-			for _, tx := range txs {
-				dump[nonce] = append(dump[nonce], newRPCPendingTransaction(tx))
-			}
+	for account, txs := range queue {
+		dump := make(map[string]*RPCTransaction)
+		for nonce, tx := range txs {
+			dump[fmt.Sprintf("%d", nonce)] = newRPCPendingTransaction(tx)
 		}
 		content["queued"][account.Hex()] = dump
 	}
@@ -147,10 +141,10 @@ func (s *PublicTxPoolAPI) Status() map[string]*rpc.HexNumber {
 
 // Inspect retrieves the content of the transaction pool and flattens it into an
 // easily inspectable list.
-func (s *PublicTxPoolAPI) Inspect() map[string]map[string]map[string][]string {
-	content := map[string]map[string]map[string][]string{
-		"pending": make(map[string]map[string][]string),
-		"queued":  make(map[string]map[string][]string),
+func (s *PublicTxPoolAPI) Inspect() map[string]map[string]map[string]string {
+	content := map[string]map[string]map[string]string{
+		"pending": make(map[string]map[string]string),
+		"queued":  make(map[string]map[string]string),
 	}
 	pending, queue := s.b.TxPoolContent()
 
@@ -162,24 +156,18 @@ func (s *PublicTxPoolAPI) Inspect() map[string]map[string]map[string][]string {
 		return fmt.Sprintf("contract creation: %v wei + %v × %v gas", tx.Value(), tx.Gas(), tx.GasPrice())
 	}
 	// Flatten the pending transactions
-	for account, batches := range pending {
-		dump := make(map[string][]string)
-		for nonce, txs := range batches {
-			nonce := fmt.Sprintf("%d", nonce)
-			for _, tx := range txs {
-				dump[nonce] = append(dump[nonce], format(tx))
-			}
+	for account, txs := range pending {
+		dump := make(map[string]string)
+		for nonce, tx := range txs {
+			dump[fmt.Sprintf("%d", nonce)] = format(tx)
 		}
 		content["pending"][account.Hex()] = dump
 	}
 	// Flatten the queued transactions
-	for account, batches := range queue {
-		dump := make(map[string][]string)
-		for nonce, txs := range batches {
-			nonce := fmt.Sprintf("%d", nonce)
-			for _, tx := range txs {
-				dump[nonce] = append(dump[nonce], format(tx))
-			}
+	for account, txs := range queue {
+		dump := make(map[string]string)
+		for nonce, tx := range txs {
+			dump[fmt.Sprintf("%d", nonce)] = format(tx)
 		}
 		content["queued"][account.Hex()] = dump
 	}
@@ -483,6 +471,8 @@ type CallArgs struct {
 }
 
 func (s *PublicBlockChainAPI) doCall(ctx context.Context, args CallArgs, blockNr rpc.BlockNumber) (string, *big.Int, error) {
+	defer func(start time.Time) { glog.V(logger.Debug).Infof("call took %v", time.Since(start)) }(time.Now())
+
 	state, header, err := s.b.StateAndHeaderByNumber(ctx, blockNr)
 	if state == nil || err != nil {
 		return "0x", common.Big0, err
@@ -601,82 +591,30 @@ func FormatLogs(structLogs []vm.StructLog) []StructLogRes {
 	return formattedStructLogs
 }
 
-// TraceCall executes a call and returns the amount of gas, created logs and optionally returned values.
-func (s *PublicBlockChainAPI) TraceCall(ctx context.Context, args CallArgs, blockNr rpc.BlockNumber) (*ExecutionResult, error) {
-	state, header, err := s.b.StateAndHeaderByNumber(ctx, blockNr)
-	if state == nil || err != nil {
-		return nil, err
-	}
-
-	var addr common.Address
-	if args.From == (common.Address{}) {
-		accounts := s.b.AccountManager().Accounts()
-		if len(accounts) == 0 {
-			addr = common.Address{}
-		} else {
-			addr = accounts[0].Address
-		}
-	} else {
-		addr = args.From
-	}
-
-	// Assemble the CALL invocation
-	msg := callmsg{
-		addr:     addr,
-		to:       args.To,
-		gas:      args.Gas.BigInt(),
-		gasPrice: args.GasPrice.BigInt(),
-		value:    args.Value.BigInt(),
-		data:     common.FromHex(args.Data),
-	}
-
-	if msg.gas.Cmp(common.Big0) == 0 {
-		msg.gas = big.NewInt(50000000)
-	}
-
-	if msg.gasPrice.Cmp(common.Big0) == 0 {
-		msg.gasPrice = new(big.Int).Mul(big.NewInt(50), common.Shannon)
-	}
-
-	// Execute the call and return
-	vmenv, vmError, err := s.b.GetVMEnv(ctx, msg, state, header)
-	if err != nil {
-		return nil, err
-	}
-	gp := new(core.GasPool).AddGas(common.MaxBig)
-	ret, gas, err := core.ApplyMessage(vmenv, msg, gp)
-	if err := vmError(); err != nil {
-		return nil, err
-	}
-	return &ExecutionResult{
-		Gas:         gas,
-		ReturnValue: fmt.Sprintf("%x", ret),
-		StructLogs:  FormatLogs(vmenv.StructLogs()),
-	}, nil
-}
-
 // rpcOutputBlock converts the given block to the RPC output which depends on fullTx. If inclTx is true transactions are
 // returned. When fullTx is true the returned block contains full transaction details, otherwise it will only contain
 // transaction hashes.
 func (s *PublicBlockChainAPI) rpcOutputBlock(b *types.Block, inclTx bool, fullTx bool) (map[string]interface{}, error) {
+	head := b.Header() // copies the header once
 	fields := map[string]interface{}{
-		"number":           rpc.NewHexNumber(b.Number()),
+		"number":           rpc.NewHexNumber(head.Number),
 		"hash":             b.Hash(),
-		"parentHash":       b.ParentHash(),
-		"nonce":            b.Header().Nonce,
-		"sha3Uncles":       b.UncleHash(),
-		"logsBloom":        b.Bloom(),
-		"stateRoot":        b.Root(),
-		"miner":            b.Coinbase(),
-		"difficulty":       rpc.NewHexNumber(b.Difficulty()),
+		"parentHash":       head.ParentHash,
+		"nonce":            head.Nonce,
+		"mixHash":          head.MixDigest,
+		"sha3Uncles":       head.UncleHash,
+		"logsBloom":        head.Bloom,
+		"stateRoot":        head.Root,
+		"miner":            head.Coinbase,
+		"difficulty":       rpc.NewHexNumber(head.Difficulty),
 		"totalDifficulty":  rpc.NewHexNumber(s.b.GetTd(b.Hash())),
-		"extraData":        fmt.Sprintf("0x%x", b.Extra()),
+		"extraData":        rpc.HexBytes(head.Extra),
 		"size":             rpc.NewHexNumber(b.Size().Int64()),
-		"gasLimit":         rpc.NewHexNumber(b.GasLimit()),
-		"gasUsed":          rpc.NewHexNumber(b.GasUsed()),
-		"timestamp":        rpc.NewHexNumber(b.Time()),
-		"transactionsRoot": b.TxHash(),
-		"receiptRoot":      b.ReceiptHash(),
+		"gasLimit":         rpc.NewHexNumber(head.GasLimit),
+		"gasUsed":          rpc.NewHexNumber(head.GasUsed),
+		"timestamp":        rpc.NewHexNumber(head.Time),
+		"transactionsRoot": head.TxHash,
+		"receiptsRoot":      head.ReceiptHash,
 	}
 
 	if inclTx {
@@ -719,26 +657,32 @@ type RPCTransaction struct {
 	Gas              *rpc.HexNumber  `json:"gas"`
 	GasPrice         *rpc.HexNumber  `json:"gasPrice"`
 	Hash             common.Hash     `json:"hash"`
-	Input            string          `json:"input"`
+	Input            rpc.HexBytes    `json:"input"`
 	Nonce            *rpc.HexNumber  `json:"nonce"`
 	To               *common.Address `json:"to"`
 	TransactionIndex *rpc.HexNumber  `json:"transactionIndex"`
 	Value            *rpc.HexNumber  `json:"value"`
+	V                *rpc.HexNumber  `json:"v"`
+	R                *rpc.HexNumber  `json:"r"`
+	S                *rpc.HexNumber  `json:"s"`
 }
 
 // newRPCPendingTransaction returns a pending transaction that will serialize to the RPC representation
 func newRPCPendingTransaction(tx *types.Transaction) *RPCTransaction {
 	from, _ := tx.FromFrontier()
-
+	v, r, s := tx.SignatureValues()
 	return &RPCTransaction{
 		From:     from,
 		Gas:      rpc.NewHexNumber(tx.Gas()),
 		GasPrice: rpc.NewHexNumber(tx.GasPrice()),
 		Hash:     tx.Hash(),
-		Input:    fmt.Sprintf("0x%x", tx.Data()),
+		Input:    rpc.HexBytes(tx.Data()),
 		Nonce:    rpc.NewHexNumber(tx.Nonce()),
 		To:       tx.To(),
 		Value:    rpc.NewHexNumber(tx.Value()),
+		V:        rpc.NewHexNumber(v),
+		R:        rpc.NewHexNumber(r),
+		S:        rpc.NewHexNumber(s),
 	}
 }
 
@@ -750,7 +694,7 @@ func newRPCTransactionFromBlockIndex(b *types.Block, txIndex int) (*RPCTransacti
 		if err != nil {
 			return nil, err
 		}
-
+		v, r, s := tx.SignatureValues()
 		return &RPCTransaction{
 			BlockHash:        b.Hash(),
 			BlockNumber:      rpc.NewHexNumber(b.Number()),
@@ -758,11 +702,14 @@ func newRPCTransactionFromBlockIndex(b *types.Block, txIndex int) (*RPCTransacti
 			Gas:              rpc.NewHexNumber(tx.Gas()),
 			GasPrice:         rpc.NewHexNumber(tx.GasPrice()),
 			Hash:             tx.Hash(),
-			Input:            fmt.Sprintf("0x%x", tx.Data()),
+			Input:            rpc.HexBytes(tx.Data()),
 			Nonce:            rpc.NewHexNumber(tx.Nonce()),
 			To:               tx.To(),
 			TransactionIndex: rpc.NewHexNumber(txIndex),
 			Value:            rpc.NewHexNumber(tx.Value()),
+			V:                rpc.NewHexNumber(v),
+			R:                rpc.NewHexNumber(r),
+			S:                rpc.NewHexNumber(s),
 		}, nil
 	}
 
@@ -949,7 +896,7 @@ func (s *PublicTransactionPoolAPI) GetTransactionReceipt(txHash common.Hash) (ma
 	}
 
 	fields := map[string]interface{}{
-		"root":              common.Bytes2Hex(receipt.PostState),
+		"root":              rpc.HexBytes(receipt.PostState),
 		"blockHash":         txBlock,
 		"blockNumber":       rpc.NewHexNumber(blockIndex),
 		"transactionHash":   txHash,
@@ -960,17 +907,15 @@ func (s *PublicTransactionPoolAPI) GetTransactionReceipt(txHash common.Hash) (ma
 		"cumulativeGasUsed": rpc.NewHexNumber(receipt.CumulativeGasUsed),
 		"contractAddress":   nil,
 		"logs":              receipt.Logs,
+		"logsBloom":         receipt.Bloom,
 	}
-
 	if receipt.Logs == nil {
 		fields["logs"] = []vm.Logs{}
 	}
-
 	// If the ContractAddress is 20 0x0 bytes, assume it is not a contract creation
-	if bytes.Compare(receipt.ContractAddress.Bytes(), bytes.Repeat([]byte{0}, 20)) != 0 {
+	if receipt.ContractAddress != (common.Address{}) {
 		fields["contractAddress"] = receipt.ContractAddress
 	}
-
 	return fields, nil
 }
 
@@ -1052,16 +997,10 @@ func (s *PublicTransactionPoolAPI) SendTransaction(ctx context.Context, args Sen
 	s.txQueue <- queuedTx
 
 	// now wait up until transaction is complete (via call to CompleteQueuedTransaction) or timeout occurs
-	timeout := make(chan struct{}, 1)
-	go func() {
-		time.Sleep(status.DefaultTxSendCompletionTimeout * time.Second)
-		timeout <- struct{}{}
-	}()
-
 	select {
 	case <-queuedTx.Done:
 		return queuedTx.Hash, queuedTx.Err
-	case <-timeout:
+	case <-time.After(status.DefaultTxSendCompletionTimeout * time.Second):
 		return common.Hash{}, errors.New("transaction sending timed out")
 	}
 
@@ -1293,8 +1232,7 @@ func (s *PublicTransactionPoolAPI) PendingTransactions() []*RPCTransaction {
 
 // Resend accepts an existing transaction and a new gas price and limit. It will remove the given transaction from the
 // pool and reinsert it with the new gas price and limit.
-func (s *PublicTransactionPoolAPI) Resend(ctx context.Context, tx *Tx, gasPrice, gasLimit *rpc.HexNumber) (common.Hash, error) {
-
+func (s *PublicTransactionPoolAPI) Resend(ctx context.Context, tx Tx, gasPrice, gasLimit *rpc.HexNumber) (common.Hash, error) {
 	pending := s.b.GetPoolTransactions()
 	for _, p := range pending {
 		if pFrom, err := p.FromFrontier(); err == nil && pFrom == tx.From && p.SigHash() == tx.tx.SigHash() {
@@ -1307,9 +1245,9 @@ func (s *PublicTransactionPoolAPI) Resend(ctx context.Context, tx *Tx, gasPrice,
 
 			var newTx *types.Transaction
 			if tx.tx.To() == nil {
-				newTx = types.NewContractCreation(tx.tx.Nonce(), tx.tx.Value(), gasPrice.BigInt(), gasLimit.BigInt(), tx.tx.Data())
+				newTx = types.NewContractCreation(tx.tx.Nonce(), tx.tx.Value(), gasLimit.BigInt(), gasPrice.BigInt(), tx.tx.Data())
 			} else {
-				newTx = types.NewTransaction(tx.tx.Nonce(), *tx.tx.To(), tx.tx.Value(), gasPrice.BigInt(), gasLimit.BigInt(), tx.tx.Data())
+				newTx = types.NewTransaction(tx.tx.Nonce(), *tx.tx.To(), tx.tx.Value(), gasLimit.BigInt(), gasPrice.BigInt(), tx.tx.Data())
 			}
 
 			signedTx, err := s.sign(tx.From, newTx)
@@ -1405,8 +1343,8 @@ func (api *PrivateDebugAPI) ChaindbProperty(property string) (string, error) {
 }
 
 // SetHead rewinds the head of the blockchain to a previous block.
-func (api *PrivateDebugAPI) SetHead(number uint64) {
-	api.b.SetHead(number)
+func (api *PrivateDebugAPI) SetHead(number rpc.HexNumber) {
+	api.b.SetHead(uint64(number.Int64()))
 }
 
 // PublicNetAPI offers network related RPC methods

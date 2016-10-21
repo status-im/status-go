@@ -2,9 +2,9 @@ package geth_test
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
-	"path/filepath"
 
 	"github.com/status-im/status-go/geth"
 )
@@ -28,7 +28,7 @@ func TestMain(m *testing.M) {
 	}
 	// make sure you panic if node start signal is not received
 	signalRecieved := make(chan struct{}, 1)
-	abortPanic := make(chan bool, 1)
+	abortPanic := make(chan struct{}, 1)
 	if syncRequired {
 		geth.PanicAfter(geth.TestNodeSyncSeconds*time.Second, abortPanic, "TestNodeSetup")
 	} else {
@@ -48,7 +48,7 @@ func TestMain(m *testing.M) {
 	}
 
 	<-signalRecieved // block and wait for either panic or successful signal
-	abortPanic <- true
+	abortPanic <- struct{}{}
 
 	os.Exit(m.Run())
 }

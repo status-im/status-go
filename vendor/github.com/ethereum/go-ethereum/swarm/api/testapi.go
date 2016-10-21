@@ -14,6 +14,33 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-//go:generate abigen --sol ./contract.sol --pkg release --out ./contract.go
+package api
 
-package release
+import (
+	"github.com/ethereum/go-ethereum/swarm/network"
+)
+
+type Control struct {
+	api  *Api
+	hive *network.Hive
+}
+
+func NewControl(api *Api, hive *network.Hive) *Control {
+	return &Control{api, hive}
+}
+
+func (self *Control) BlockNetworkRead(on bool) {
+	self.hive.BlockNetworkRead(on)
+}
+
+func (self *Control) SyncEnabled(on bool) {
+	self.hive.SyncEnabled(on)
+}
+
+func (self *Control) SwapEnabled(on bool) {
+	self.hive.SwapEnabled(on)
+}
+
+func (self *Control) Hive() string {
+	return self.hive.String()
+}

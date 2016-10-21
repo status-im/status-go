@@ -20,6 +20,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/logger"
 	"github.com/ethereum/go-ethereum/logger/glog"
 	"golang.org/x/net/context"
@@ -156,7 +157,7 @@ func (self *LightState) SetNonce(ctx context.Context, addr common.Address, nonce
 func (self *LightState) SetCode(ctx context.Context, addr common.Address, code []byte) error {
 	stateObject, err := self.GetOrNewStateObject(ctx, addr)
 	if err == nil && stateObject != nil {
-		stateObject.SetCode(code)
+		stateObject.SetCode(crypto.Keccak256Hash(code), code)
 	}
 	return err
 }
@@ -273,7 +274,9 @@ func (self *LightState) Copy() *LightState {
 	state.trie = self.trie
 	state.id = self.id
 	for k, stateObject := range self.stateObjects {
-		state.stateObjects[k] = stateObject.Copy()
+		if stateObject.dirty {
+			state.stateObjects[k] = stateObject.Copy()
+		}
 	}
 
 	state.refund.Set(self.refund)

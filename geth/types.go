@@ -35,8 +35,9 @@ type WhisperMessageEvent struct {
 }
 
 type SendTransactionEvent struct {
-	Id   string            `json:"id"`
-	Args status.SendTxArgs `json:"args"`
+	Id        string            `json:"id"`
+	Args      status.SendTxArgs `json:"args"`
+	MessageId string            `json:"message_id"`
 }
 
 type CompleteTransactionResult struct {
@@ -47,4 +48,10 @@ type CompleteTransactionResult struct {
 type GethEvent struct {
 	Type  string      `json:"type"`
 	Event interface{} `json:"event"`
+}
+
+type RPCCall struct {
+	Id     int64
+	Method string
+	Params []interface{}
 }

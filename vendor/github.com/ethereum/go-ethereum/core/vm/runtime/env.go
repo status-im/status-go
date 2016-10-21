@@ -39,8 +39,6 @@ type Env struct {
 	difficulty *big.Int
 	gasLimit   *big.Int
 
-	logs []vm.StructLog
-
 	getHashFn func(uint64) common.Hash
 
 	evm *vm.EVM
@@ -62,21 +60,9 @@ func NewEnv(cfg *Config, state *state.StateDB) vm.Environment {
 		Debug:     cfg.Debug,
 		EnableJit: !cfg.DisableJit,
 		ForceJit:  !cfg.DisableJit,
-
-		Logger: vm.LogConfig{
-			Collector: env,
-		},
 	})
 
 	return env
-}
-
-func (self *Env) StructLogs() []vm.StructLog {
-	return self.logs
-}
-
-func (self *Env) AddStructLog(log vm.StructLog) {
-	self.logs = append(self.logs, log)
 }
 
 func (self *Env) RuleSet() vm.RuleSet      { return self.ruleSet }
@@ -100,11 +86,11 @@ func (self *Env) SetDepth(i int) { self.depth = i }
 func (self *Env) CanTransfer(from common.Address, balance *big.Int) bool {
 	return self.state.GetBalance(from).Cmp(balance) >= 0
 }
-func (self *Env) MakeSnapshot() vm.Database {
-	return self.state.Copy()
+func (self *Env) SnapshotDatabase() int {
+	return self.state.Snapshot()
 }
-func (self *Env) SetSnapshot(copy vm.Database) {
-	self.state.Set(copy.(*state.StateDB))
+func (self *Env) RevertToSnapshot(snapshot int) {
+	self.state.RevertToSnapshot(snapshot)
 }
 
 func (self *Env) Transfer(from, to vm.Account, amount *big.Int) {

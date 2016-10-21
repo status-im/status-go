@@ -45,7 +45,7 @@ func TestQueuedTransactions(t *testing.T) {
 	backend := lightEthereum.StatusBackend
 
 	// make sure you panic if transaction complete doesn't return
-	completeQueuedTransaction := make(chan bool, 1)
+	completeQueuedTransaction := make(chan struct{}, 1)
 	geth.PanicAfter(20*time.Second, completeQueuedTransaction, "TestQueuedTransactions")
 
 	// replace transaction notification handler
@@ -67,7 +67,7 @@ func TestQueuedTransactions(t *testing.T) {
 			}
 
 			glog.V(logger.Info).Infof("Transaction complete: https://testnet.etherscan.io/tx/%s", txHash.Hex())
-			completeQueuedTransaction <- true // so that timeout is aborted
+			completeQueuedTransaction <- struct{}{} // so that timeout is aborted
 		}
 	})
 
@@ -101,7 +101,7 @@ func TestQueuedTransactions(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(txHash, txHashCheck) {
-		t.Error("Transaction hash returned from SendTransaction is invalid")
+		t.Errorf("Transaction hash returned from SendTransaction is invalid: expected %s, got %s", txHashCheck, txHash)
 		return
 	}
 

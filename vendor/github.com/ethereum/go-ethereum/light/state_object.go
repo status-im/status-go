@@ -79,8 +79,6 @@ type StateObject struct {
 	codeHash []byte
 	// The code for this account
 	code Code
-	// Temporarily initialisation code
-	initCode Code
 	// Cached storage (flushed when updated)
 	storage Storage
 
@@ -190,8 +188,7 @@ func (self *StateObject) Copy() *StateObject {
 	stateObject.codeHash = common.CopyBytes(self.codeHash)
 	stateObject.nonce = self.nonce
 	stateObject.trie = self.trie
-	stateObject.code = common.CopyBytes(self.code)
-	stateObject.initCode = common.CopyBytes(self.initCode)
+	stateObject.code = self.code
 	stateObject.storage = self.storage.Copy()
 	stateObject.remove = self.remove
 	stateObject.dirty = self.dirty
@@ -220,9 +217,9 @@ func (self *StateObject) Code() []byte {
 }
 
 // SetCode sets the contract code
-func (self *StateObject) SetCode(code []byte) {
+func (self *StateObject) SetCode(hash common.Hash, code []byte) {
 	self.code = code
-	self.codeHash = crypto.Keccak256(code)
+	self.codeHash = hash[:]
 	self.dirty = true
 }
 

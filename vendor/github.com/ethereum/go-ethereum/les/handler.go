@@ -85,7 +85,7 @@ type BlockChain interface {
 
 type txPool interface {
 	// AddTransactions should add the given transactions to the pool.
-	AddTransactions([]*types.Transaction)
+	AddBatch([]*types.Transaction)
 }
 
 type ProtocolManager struct {
@@ -588,8 +588,9 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			if header := core.GetHeader(pm.chainDb, req.BHash, core.GetBlockNumber(pm.chainDb, req.BHash)); header != nil {
 				if trie, _ := trie.New(header.Root, pm.chainDb); trie != nil {
 					sdata := trie.Get(req.AccKey)
-					if so, err := state.DecodeObject(common.Address{}, pm.chainDb, sdata); err == nil {
-						entry := so.Code()
+					var acc state.Account
+					if err := rlp.DecodeBytes(sdata, &acc); err == nil {
+						entry, _ := pm.chainDb.Get(acc.CodeHash)
 						if bytes+len(entry) >= softResponseLimit {
 							break
 						}
@@ -714,10 +715,11 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			if header := core.GetHeader(pm.chainDb, req.BHash, core.GetBlockNumber(pm.chainDb, req.BHash)); header != nil {
 				if tr, _ := trie.New(header.Root, pm.chainDb); tr != nil {
 					if len(req.AccKey) > 0 {
-						data := tr.Get(req.AccKey)
+						sdata := tr.Get(req.AccKey)
 						tr = nil
-						if so, err := state.DecodeObject(common.Address{}, pm.chainDb, data); err == nil {
-							tr, _ = trie.New(common.BytesToHash(so.Root()), pm.chainDb)
+						var acc state.Account
+						if err := rlp.DecodeBytes(sdata, &acc); err == nil {
+							tr, _ = trie.New(acc.Root, pm.chainDb)
 						}
 					}
 					if tr != nil {
@@ -826,7 +828,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		if reqCnt > maxReqs || reqCnt > MaxTxSend {
 			return errResp(ErrRequestRejected, "")
 		}
-		pm.txpool.AddTransactions(txs)
+		pm.txpool.AddBatch(txs)
 		_, rcost := p.fcClient.RequestProcessed(costs.baseCost + uint64(reqCnt)*costs.reqCost)
 		pm.server.fcCostStats.update(msg.Code, uint64(reqCnt), rcost)
 

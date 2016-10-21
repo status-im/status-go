@@ -114,7 +114,7 @@ func remoteConsole(ctx *cli.Context) error {
 	})
 
 	config := console.Config{
-		DataDir: utils.MustMakeDataDir(ctx),
+		DataDir: utils.MakeDataDir(ctx),
 		DocRoot: ctx.GlobalString(utils.JSpathFlag.Name),
 		Client:  client,
 		Preload: utils.MakeConsolePreloads(ctx),
@@ -142,7 +142,7 @@ func remoteConsole(ctx *cli.Context) error {
 // for "geth attach" and "geth monitor" with no argument.
 func dialRPC(endpoint string) (*rpc.Client, error) {
 	if endpoint == "" {
-		endpoint = node.DefaultIPCEndpoint()
+		endpoint = node.DefaultIPCEndpoint(clientIdentifier)
 	} else if strings.HasPrefix(endpoint, "rpc:") || strings.HasPrefix(endpoint, "ipc:") {
 		// Backwards compatibility with geth < 1.5 which required
 		// these prefixes.

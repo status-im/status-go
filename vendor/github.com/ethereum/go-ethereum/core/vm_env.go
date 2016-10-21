@@ -49,7 +49,6 @@ type VMEnv struct {
 
 	header    *types.Header            // Header information
 	chain     *BlockChain              // Blockchain handle
-	logs      []vm.StructLog           // Logs for the custom structured logger
 	getHashFn func(uint64) common.Hash // getHashFn callback is used to retrieve block hashes
 }
 
@@ -61,11 +60,6 @@ func NewEnv(state *state.StateDB, chainConfig *ChainConfig, chain *BlockChain, m
 		header:      header,
 		msg:         msg,
 		getHashFn:   GetHashFn(header.ParentHash, chain),
-	}
-
-	// if no log collector is present set self as the collector
-	if cfg.Logger.Collector == nil {
-		cfg.Logger.Collector = env
 	}
 
 	env.evm = vm.New(env, cfg)
@@ -95,12 +89,12 @@ func (self *VMEnv) CanTransfer(from common.Address, balance *big.Int) bool {
 	return self.state.GetBalance(from).Cmp(balance) >= 0
 }
 
-func (self *VMEnv) MakeSnapshot() vm.Database {
-	return self.state.Copy()
+func (self *VMEnv) SnapshotDatabase() int {
+	return self.state.Snapshot()
 }
 
-func (self *VMEnv) SetSnapshot(copy vm.Database) {
-	self.state.Set(copy.(*state.StateDB))
+func (self *VMEnv) RevertToSnapshot(snapshot int) {
+	self.state.RevertToSnapshot(snapshot)
 }
 
 func (self *VMEnv) Transfer(from, to vm.Account, amount *big.Int) {
@@ -120,12 +114,4 @@ func (self *VMEnv) DelegateCall(me vm.ContractRef, addr common.Address, data []b
 
 func (self *VMEnv) Create(me vm.ContractRef, data []byte, gas, price, value *big.Int) ([]byte, common.Address, error) {
 	return Create(self, me, data, gas, price, value)
-}
-
-func (self *VMEnv) StructLogs() []vm.StructLog {
-	return self.logs
-}
-
-func (self *VMEnv) AddStructLog(log vm.StructLog) {
-	self.logs = append(self.logs, log)
 }

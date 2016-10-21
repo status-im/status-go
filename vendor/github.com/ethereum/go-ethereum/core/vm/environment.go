@@ -36,9 +36,9 @@ type Environment interface {
 	// The state database
 	Db() Database
 	// Creates a restorable snapshot
-	MakeSnapshot() Database
+	SnapshotDatabase() int
 	// Set database to previous snapshot
-	SetSnapshot(Database)
+	RevertToSnapshot(int)
 	// Address of the original invoker (first occurrence of the VM invoker)
 	Origin() common.Address
 	// The block number this VM is invoked on
@@ -73,8 +73,6 @@ type Environment interface {
 	DelegateCall(me ContractRef, addr common.Address, data []byte, gas, price *big.Int) ([]byte, error)
 	// Create a new contract
 	Create(me ContractRef, data []byte, gas, price, value *big.Int) ([]byte, common.Address, error)
-
-	StructLogs() []StructLog
 }
 
 // Vm is the basic interface for an implementation of the EVM.
@@ -96,6 +94,8 @@ type Database interface {
 	GetNonce(common.Address) uint64
 	SetNonce(common.Address, uint64)
 
+	GetCodeHash(common.Address) common.Hash
+	GetCodeSize(common.Address) int
 	GetCode(common.Address) []byte
 	SetCode(common.Address, []byte)
 
@@ -105,9 +105,12 @@ type Database interface {
 	GetState(common.Address, common.Hash) common.Hash
 	SetState(common.Address, common.Hash, common.Hash)
 
-	Delete(common.Address) bool
+	Suicide(common.Address) bool
+	HasSuicided(common.Address) bool
+
+	// Exist reports whether the given account exists in state.
+	// Notably this should also return true for suicided accounts.
 	Exist(common.Address) bool
-	IsDeleted(common.Address) bool
 }
 
 // Account represents a contract or basic ethereum account.
@@ -119,7 +122,7 @@ type Account interface {
 	Balance() *big.Int
 	Address() common.Address
 	ReturnGas(*big.Int, *big.Int)
-	SetCode([]byte)
+	SetCode(common.Hash, []byte)
 	ForEachStorage(cb func(key, value common.Hash) bool)
 	Value() *big.Int
 }
