@@ -25,7 +25,7 @@ var (
 
 type Jail struct {
 	sync.RWMutex
-	client       *rpc.ClientRestartWrapper // lazy inited on the first call to jail.ClientRestartWrapper()
+	client       *rpc.Client               // lazy inited on the first call
 	cells        map[string]*JailedRuntime // jail supports running many isolated instances of jailed runtime
 	statusJS     string
 	requestQueue *geth.JailedRequestQueue
@@ -108,7 +108,7 @@ func (jail *Jail) Parse(chatId string, js string) string {
 }
 
 func (jail *Jail) Call(chatId string, path string, args string) string {
-	_, err := jail.ClientRestartWrapper()
+	_, err := jail.RPCClient()
 	if err != nil {
 		return printError(err.Error())
 	}
@@ -145,7 +145,7 @@ func (jail *Jail) GetVM(chatId string) (*otto.Otto, error) {
 
 // Send will serialize the first argument, send it to the node and returns the response.
 func (jail *Jail) Send(chatId string, call otto.FunctionCall) (response otto.Value) {
-	clientFactory, err := jail.ClientRestartWrapper()
+	client, err := jail.RPCClient()
 	if err != nil {
 		return newErrorResponse(call, -32603, err.Error(), nil)
 	}
@@ -201,7 +201,6 @@ func (jail *Jail) Send(chatId string, call otto.FunctionCall) (response otto.Val
 			return newErrorResponse(call, -32603, err.Error(), nil)
 		}
 
-		client := clientFactory.Client()
 		errc := make(chan error, 1)
 		errc2 := make(chan error)
 		go func() {
@@ -252,7 +251,7 @@ func (jail *Jail) Send(chatId string, call otto.FunctionCall) (response otto.Val
 	return response
 }
 
-func (jail *Jail) ClientRestartWrapper() (*rpc.ClientRestartWrapper, error) {
+func (jail *Jail) RPCClient() (*rpc.Client, error) {
 	if jail == nil {
 		return nil, ErrInvalidJail
 	}
@@ -267,7 +266,7 @@ func (jail *Jail) ClientRestartWrapper() (*rpc.ClientRestartWrapper, error) {
 	}
 
 	// obtain RPC client from running node
-	client, err := nodeManager.ClientRestartWrapper()
+	client, err := nodeManager.RPCClient()
 	if err != nil {
 		return nil, err
 	}

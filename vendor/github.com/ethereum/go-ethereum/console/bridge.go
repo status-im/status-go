@@ -26,29 +26,23 @@ import (
 	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/robertkrimen/otto"
-	"golang.org/x/net/context"
 )
 
 // bridge is a collection of JavaScript utility methods to bride the .js runtime
 // environment and the Go RPC connection backing the remote method calls.
 type bridge struct {
-	client   *rpc.ClientRestartWrapper   // RPC client to execute Ethereum requests through
+	client   *rpc.Client  // RPC client to execute Ethereum requests through
 	prompter UserPrompter // Input prompter to allow interactive user feedback
 	printer  io.Writer    // Output writer to serialize any display strings to
-	ctx context.Context
 }
 
 // newBridge creates a new JavaScript wrapper around an RPC client.
-func newBridge(client *rpc.ClientRestartWrapper, prompter UserPrompter, printer io.Writer) *bridge {
+func newBridge(client *rpc.Client, prompter UserPrompter, printer io.Writer) *bridge {
 	return &bridge{
 		client:   client,
 		prompter: prompter,
 		printer:  printer,
 	}
-}
-
-func (b *bridge) setContext(ctx context.Context) {
-	b.ctx = ctx
 }
 
 // NewAccount is a wrapper around the personal.newAccount RPC method that uses a
@@ -228,26 +222,7 @@ func (b *bridge) Send(call otto.FunctionCall) (response otto.Value) {
 		resp, _ := call.Otto.Object(`({"jsonrpc":"2.0"})`)
 		resp.Set("id", req.Id)
 		var result json.RawMessage
-
-		client := b.client.Client()
-		errc := make(chan error, 1)
-		errc2 := make(chan error)
-		go func(){
-			if b.ctx != nil {
-				select {
-				case <-b.ctx.Done():
-					b.client.Restart()
-					errc2 <- b.ctx.Err()
-				case err := <-errc:
-					errc2 <- err
-				}
-			} else {
-				errc2 <- <-errc
-			}
-		}()
-		errc <- client.Call(&result, req.Method, req.Params...)
-		err = <-errc2
-
+		err = b.client.Call(&result, req.Method, req.Params...)
 		switch err := err.(type) {
 		case nil:
 			if result == nil {

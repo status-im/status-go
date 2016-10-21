@@ -121,9 +121,9 @@ func (self *LightState) GetState(ctx context.Context, a common.Address, b common
 	return common.Hash{}, err
 }
 
-// IsDeleted returns true if the given account has been marked for deletion
+// HasSuicided returns true if the given account has been marked for deletion
 // or false if the account does not exist
-func (self *LightState) IsDeleted(ctx context.Context, addr common.Address) (bool, error) {
+func (self *LightState) HasSuicided(ctx context.Context, addr common.Address) (bool, error) {
 	stateObject, err := self.GetStateObject(ctx, addr)
 	if err == nil && stateObject != nil {
 		return stateObject.remove, nil
@@ -172,7 +172,7 @@ func (self *LightState) SetState(ctx context.Context, addr common.Address, key c
 }
 
 // Delete marks an account to be removed and clears its balance
-func (self *LightState) Delete(ctx context.Context, addr common.Address) (bool, error) {
+func (self *LightState) Suicide(ctx context.Context, addr common.Address) (bool, error) {
 	stateObject, err := self.GetOrNewStateObject(ctx, addr)
 	if err == nil && stateObject != nil {
 		stateObject.MarkForDeletion()

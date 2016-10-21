@@ -448,7 +448,6 @@ func (p *peer) Handshake(td *big.Int, head common.Hash, headNum uint64, genesis 
 		}
 		p.fcServerParams = params
 		p.fcServer = flowcontrol.NewServerNode(params)
-		p.fcServerParams = params
 		p.fcCosts = MRC.decode()
 	}
 

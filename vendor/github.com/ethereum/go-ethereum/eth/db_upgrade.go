@@ -50,6 +50,8 @@ func upgradeSequentialKeys(db ethdb.Database) (stopFn func()) {
 		return nil // empty database, nothing to do
 	}
 
+	glog.V(logger.Info).Infof("Upgrading chain database to use sequential keys")
+
 	stopChn := make(chan struct{})
 	stoppedChn := make(chan struct{})
 

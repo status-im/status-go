@@ -61,15 +61,15 @@ type SelectedExtKey struct {
 }
 
 type NodeManager struct {
-	currentNode        *node.Node                // currently running geth node
-	ctx                *cli.Context              // the CLI context used to start the geth node
-	lightEthereum      *les.LightEthereum        // LES service
-	accountManager     *accounts.Manager         // the account manager attached to the currentNode
-	jailedRequestQueue *JailedRequestQueue       // bridge via which jail notifies node of incoming requests
-	SelectedAccount    *SelectedExtKey           // account that was processed during the last call to SelectAccount()
-	whisperService     *whisper.Whisper          // Whisper service
-	client             *rpc.ClientRestartWrapper // RPC client
-	nodeStarted        chan struct{}             // channel to wait for node to start
+	currentNode        *node.Node          // currently running geth node
+	ctx                *cli.Context        // the CLI context used to start the geth node
+	lightEthereum      *les.LightEthereum  // LES service
+	accountManager     *accounts.Manager   // the account manager attached to the currentNode
+	jailedRequestQueue *JailedRequestQueue // bridge via which jail notifies node of incoming requests
+	SelectedAccount    *SelectedExtKey     // account that was processed during the last call to SelectAccount()
+	whisperService     *whisper.Whisper    // Whisper service
+	client             *rpc.Client         // RPC client
+	nodeStarted        chan struct{}       // channel to wait for node to start
 }
 
 var (
@@ -166,13 +166,11 @@ func (m *NodeManager) RunNode() {
 		m.lightEthereum.StatusBackend.SetTransactionQueueHandler(onSendTransactionRequest)
 		m.lightEthereum.StatusBackend.SetAccountsFilterHandler(onAccountsListRequest)
 
-		m.client = rpc.NewClientRestartWrapper(func() *rpc.Client {
-			client, err := m.currentNode.Attach()
-			if err != nil {
-				return nil
-			}
-			return client
-		})
+		var err error
+		m.client, err = m.currentNode.Attach()
+		if err != nil {
+			glog.V(logger.Warn).Infoln("cannot get RPC client service:", ErrInvalidClient)
+		}
 
 		// @TODO Remove after LES supports discover out of box
 		m.populateStaticPeers()
@@ -268,16 +266,16 @@ func (m *NodeManager) LightEthereumService() (*les.LightEthereum, error) {
 	return m.lightEthereum, nil
 }
 
-func (m *NodeManager) HasClientRestartWrapper() bool {
+func (m *NodeManager) HasRPCClient() bool {
 	return m.client != nil
 }
 
-func (m *NodeManager) ClientRestartWrapper() (*rpc.ClientRestartWrapper, error) {
+func (m *NodeManager) RPCClient() (*rpc.Client, error) {
 	if m == nil || !m.HasNode() {
 		return nil, ErrInvalidGethNode
 	}
 
-	if !m.HasClientRestartWrapper() {
+	if !m.HasRPCClient() {
 		return nil, ErrInvalidClient
 	}
 
