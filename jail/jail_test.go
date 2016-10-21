@@ -47,7 +47,7 @@ func TestJailUnInited(t *testing.T) {
 		t.Errorf("error expected, but got: %v", err)
 	}
 
-	_, err = jailInstance.ClientRestartWrapper()
+	_, err = jailInstance.RPCClient()
 	if err != jail.ErrInvalidJail {
 		t.Errorf("error expected, but got: %v", err)
 	}

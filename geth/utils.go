@@ -23,7 +23,7 @@ var muPrepareTestNode sync.Mutex
 
 const (
 	TestDataDir         = "../.ethereumtest"
-	TestNodeSyncSeconds = 480
+	TestNodeSyncSeconds = 60
 )
 
 type NodeNotificationHandler func(jsonEvent string)
@@ -119,7 +119,7 @@ func PrepareTestNode() (err error) {
 	if !manager.HasNode() {
 		panic(ErrInvalidGethNode)
 	}
-	if !manager.HasClientRestartWrapper() {
+	if !manager.HasRPCClient() {
 		panic(ErrInvalidGethNode)
 	}
 	if !manager.HasWhisperService() {
