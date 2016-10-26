@@ -13,6 +13,7 @@ import (
 	"math/big"
 	"strconv"
 
+	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/les/status"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -21,8 +22,15 @@ import (
 
 const (
 	EventTransactionQueued = "transaction.queued"
+	EventTransactionFailed = "transaction.failed"
 	SendTransactionRequest = "eth_sendTransaction"
 	MessageIdKey           = "message_id"
+
+	// tx error codes
+	SendTransactionNoErrorCode       = "0"
+	SendTransactionDefaultErrorCode  = "1"
+	SendTransactionPasswordErrorCode = "2"
+	SendTransactionTimeoutErrorCode  = "3"
 )
 
 func onSendTransactionRequest(queuedTx status.QueuedTx) {
@@ -37,6 +45,43 @@ func onSendTransactionRequest(queuedTx status.QueuedTx) {
 
 	body, _ := json.Marshal(&event)
 	C.StatusServiceSignalEvent(C.CString(string(body)))
+}
+
+func onSendTransactionReturn(queuedTx status.QueuedTx, err error) {
+	if err == nil {
+		return
+	}
+
+	// error occurred, signal up to application
+	event := GethEvent{
+		Type: EventTransactionFailed,
+		Event: ReturnSendTransactionEvent{
+			Id:           string(queuedTx.Id),
+			Args:         queuedTx.Args,
+			MessageId:    messageIdFromContext(queuedTx.Context),
+			ErrorMessage: err.Error(),
+			ErrorCode:    sendTransactionErrorCode(err),
+		},
+	}
+
+	body, _ := json.Marshal(&event)
+	C.StatusServiceSignalEvent(C.CString(string(body)))
+}
+
+func sendTransactionErrorCode(err error) string {
+	if err == nil {
+		return SendTransactionNoErrorCode
+	}
+
+	if err == accounts.ErrDecrypt {
+		return SendTransactionPasswordErrorCode
+	}
+
+	if err == status.ErrQueuedTxTimedOut {
+		return SendTransactionTimeoutErrorCode
+	}
+
+	return SendTransactionDefaultErrorCode
 }
 
 func CompleteTransaction(id, password string) (common.Hash, error) {

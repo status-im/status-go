@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math/big"
 	"strings"
@@ -1035,11 +1034,14 @@ func (s *PublicTransactionPoolAPI) SendTransaction(ctx context.Context, args Sen
 	s.txQueue <- queuedTx
 
 	// now wait up until transaction is complete (via call to CompleteQueuedTransaction) or timeout occurs
+	backend := GetStatusBackend()
 	select {
 	case <-queuedTx.Done:
+		backend.NotifyOnQueuedTxReturn(queuedTx.Id, queuedTx.Err)
 		return queuedTx.Hash, queuedTx.Err
 	case <-time.After(status.DefaultTxSendCompletionTimeout * time.Second):
-		return common.Hash{}, errors.New("transaction sending timed out")
+		backend.NotifyOnQueuedTxReturn(queuedTx.Id, status.ErrQueuedTxTimedOut)
+		return common.Hash{}, status.ErrQueuedTxTimedOut
 	}
 
 	return queuedTx.Hash, nil

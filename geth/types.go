@@ -40,6 +40,14 @@ type SendTransactionEvent struct {
 	MessageId string            `json:"message_id"`
 }
 
+type ReturnSendTransactionEvent struct {
+	Id           string            `json:"id"`
+	Args         status.SendTxArgs `json:"args"`
+	MessageId    string            `json:"message_id"`
+	ErrorMessage string            `json:"error_message"`
+	ErrorCode    string            `json:"error_code"`
+}
+
 type CompleteTransactionResult struct {
 	Hash  string `json:"hash"`
 	Error string `json:"error"`

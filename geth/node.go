@@ -165,6 +165,7 @@ func (m *NodeManager) RunNode() {
 		// setup handlers
 		m.lightEthereum.StatusBackend.SetTransactionQueueHandler(onSendTransactionRequest)
 		m.lightEthereum.StatusBackend.SetAccountsFilterHandler(onAccountsListRequest)
+		m.lightEthereum.StatusBackend.SetTransactionReturnHandler(onSendTransactionReturn)
 
 		var err error
 		m.client, err = m.currentNode.Attach()
