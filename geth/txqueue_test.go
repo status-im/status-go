@@ -257,6 +257,147 @@ func TestDoubleCompleteQueuedTransactions(t *testing.T) {
 	time.Sleep(5 * time.Second)
 }
 
+func TestDiscardQueuedTransactions(t *testing.T) {
+	err := geth.PrepareTestNode()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	accountManager, err := geth.GetNodeManager().AccountManager()
+	if err != nil {
+		t.Errorf(err.Error())
+		return
+	}
+
+	// create an account
+	address, _, _, err := geth.CreateAccount(newAccountPassword)
+	if err != nil {
+		t.Errorf("could not create account: %v", err)
+		return
+	}
+
+	// obtain reference to status backend
+	lightEthereum, err := geth.GetNodeManager().LightEthereumService()
+	if err != nil {
+		t.Errorf("Test failed: LES service is not running: %v", err)
+		return
+	}
+	backend := lightEthereum.StatusBackend
+
+	// reset queue
+	backend.TransactionQueue().Reset()
+
+	// make sure you panic if transaction complete doesn't return
+	completeQueuedTransaction := make(chan struct{}, 1)
+	geth.PanicAfter(20*time.Second, completeQueuedTransaction, "TestDiscardQueuedTransactions")
+
+	// replace transaction notification handler
+	var txId string
+	txFailedEventCalled := false
+	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+		var envelope geth.GethEvent
+		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
+			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
+			return
+		}
+		if envelope.Type == geth.EventTransactionQueued {
+			event := envelope.Event.(map[string]interface{})
+			txId = event["id"].(string)
+			t.Logf("transaction queued (will be discarded soon): {id: %s}\n", txId)
+
+			if !backend.TransactionQueue().Has(status.QueuedTxId(txId)) {
+				t.Errorf("txqueue should still have test tx: %s", txId)
+				return
+			}
+
+			// discard
+			err := geth.DiscardTransaction(txId)
+			if err != nil {
+				t.Errorf("cannot discard tx: %v", err)
+				return
+			}
+
+			// try completing discarded transaction
+			_, err = geth.CompleteTransaction(txId, testAddressPassword)
+			if err.Error() != "transaction hash not found" {
+				t.Error("expects tx not found, but call to CompleteTransaction succeeded")
+				return
+			}
+
+			time.Sleep(1 * time.Second) // make sure that tx complete signal propagates
+			if backend.TransactionQueue().Has(status.QueuedTxId(txId)) {
+				t.Errorf("txqueue should not have test tx at this point (it should be discarded): %s", txId)
+				return
+			}
+
+			completeQueuedTransaction <- struct{}{} // so that timeout is aborted
+		}
+
+		if envelope.Type == geth.EventTransactionFailed {
+			event := envelope.Event.(map[string]interface{})
+			t.Logf("transaction return event received: {id: %s}\n", event["id"].(string))
+
+			receivedErrMessage := event["error_message"].(string)
+			expectedErrMessage := status.ErrQueuedTxDiscarded.Error()
+			if receivedErrMessage != expectedErrMessage {
+				t.Errorf("unexpected error message received: got %v", receivedErrMessage)
+				return
+			}
+
+			receivedErrCode := event["error_code"].(string)
+			if receivedErrCode != geth.SendTransactionDiscardedErrorCode {
+				t.Errorf("unexpected error code received: got %v", receivedErrCode)
+				return
+			}
+
+			txFailedEventCalled = true
+		}
+	})
+
+	// send from the same test account (which is guaranteed to have ether)
+	from, err := utils.MakeAddress(accountManager, testAddress)
+	if err != nil {
+		t.Errorf("could not retrieve account from address: %v", err)
+		return
+	}
+
+	to, err := utils.MakeAddress(accountManager, address)
+	if err != nil {
+		t.Errorf("could not retrieve account from address: %v", err)
+		return
+	}
+
+	//  this call blocks, and should return when DiscardQueuedTransaction() is called
+	txHashCheck, err := backend.SendTransaction(nil, status.SendTxArgs{
+		From:  from.Address,
+		To:    &to.Address,
+		Value: rpc.NewHexNumber(big.NewInt(1000000000000)),
+	})
+	if err != status.ErrQueuedTxDiscarded {
+		t.Errorf("expeced error not thrown: %v", err)
+		return
+	}
+
+	if !reflect.DeepEqual(txHashCheck, common.Hash{}) {
+		t.Error("transaction returned hash, while it shouldn't")
+		return
+	}
+
+	if backend.TransactionQueue().Count() != 0 {
+		t.Error("tx queue must be empty at this point")
+		return
+	}
+
+	if !txFailedEventCalled {
+		t.Error("expected tx failure signal is not received")
+		return
+	}
+
+	t.Log("sleep extra time, to allow sync")
+	time.Sleep(5 * time.Second)
+}
+
 func TestNonExistentQueuedTransactions(t *testing.T) {
 	err := geth.PrepareTestNode()
 	if err != nil {

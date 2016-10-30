@@ -158,6 +158,25 @@ func CompleteTransaction(id, password *C.char) *C.char {
 	return C.CString(string(outBytes))
 }
 
+//export DiscardTransaction
+func DiscardTransaction(id *C.char) *C.char {
+	err := geth.DiscardTransaction(C.GoString(id))
+
+	errString := ""
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		errString = err.Error()
+	}
+
+	out := geth.DiscardTransactionResult{
+		Id:    C.GoString(id),
+		Error: errString,
+	}
+	outBytes, _ := json.Marshal(&out)
+
+	return C.CString(string(outBytes))
+}
+
 //export StartNode
 func StartNode(datadir *C.char) *C.char {
 	// This starts a geth node with the given datadir

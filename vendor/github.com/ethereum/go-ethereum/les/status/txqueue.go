@@ -19,6 +19,7 @@ const (
 var (
 	ErrQueuedTxIdNotFound = errors.New("transaction hash not found")
 	ErrQueuedTxTimedOut   = errors.New("transaction sending timed out")
+	ErrQueuedTxDiscarded  = errors.New("transaction has been discarded")
 )
 
 // TxQueue is capped container that holds pending transactions
@@ -42,6 +43,7 @@ type QueuedTx struct {
 	Context context.Context
 	Args    SendTxArgs
 	Done    chan struct{}
+	Discard chan struct{}
 	Err     error
 }
 
@@ -51,7 +53,7 @@ type QueuedTxId string
 type EnqueuedTxHandler func(QueuedTx)
 
 // EnqueuedTxReturnHandler is a function that receives response when tx is complete (both on success and error)
-type EnqueuedTxReturnHandler func(queuedTx QueuedTx, err error)
+type EnqueuedTxReturnHandler func(queuedTx *QueuedTx, err error)
 
 // SendTxArgs represents the arguments to submbit a new transaction into the transaction pool.
 type SendTxArgs struct {
@@ -83,6 +85,15 @@ func (q *TxQueue) evictionLoop() {
 			q.enqueueTicker <- struct{}{} // in case we pulled already removed item
 		}
 	}
+}
+
+// Reset is to be used in tests only, as it simply creates new transaction map, w/o any cleanup of the previous one
+func (q *TxQueue) Reset() {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	q.transactions = make(map[QueuedTxId]*QueuedTx)
+	q.evictableIds = make(chan QueuedTxId, DefaultTxQueueCap)
 }
 
 func (q *TxQueue) Enqueue(tx *QueuedTx) error {
@@ -145,14 +156,19 @@ func (q *TxQueue) SetTxReturnHandler(fn EnqueuedTxReturnHandler) {
 	q.txReturnHandler = fn
 }
 
-func (q *TxQueue) NotifyOnQueuedTxReturn(id QueuedTxId, err error) {
+func (q *TxQueue) NotifyOnQueuedTxReturn(queuedTx *QueuedTx, err error) {
 	if q == nil {
+		return
+	}
+
+	// discard, if transaction is not found
+	if queuedTx == nil {
 		return
 	}
 
 	// on success, remove item from the queue and stop propagating
 	if err == nil {
-		q.Remove(id)
+		q.Remove(queuedTx.Id)
 		return
 	}
 
@@ -161,17 +177,11 @@ func (q *TxQueue) NotifyOnQueuedTxReturn(id QueuedTxId, err error) {
 		return
 	}
 
-	// discard, if transaction is not found
-	tx, _ := q.Get(id)
-	if tx == nil {
-		return
-	}
-
 	// remove from queue on any error (except for password related one) and propagate
 	if err != accounts.ErrDecrypt {
-		q.Remove(id)
+		q.Remove(queuedTx.Id)
 	}
 
 	// notify handler
-	q.txReturnHandler(*tx, err)
+	q.txReturnHandler(queuedTx, err)
 }

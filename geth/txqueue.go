@@ -27,10 +27,11 @@ const (
 	MessageIdKey           = "message_id"
 
 	// tx error codes
-	SendTransactionNoErrorCode       = "0"
-	SendTransactionDefaultErrorCode  = "1"
-	SendTransactionPasswordErrorCode = "2"
-	SendTransactionTimeoutErrorCode  = "3"
+	SendTransactionNoErrorCode        = "0"
+	SendTransactionDefaultErrorCode   = "1"
+	SendTransactionPasswordErrorCode  = "2"
+	SendTransactionTimeoutErrorCode   = "3"
+	SendTransactionDiscardedErrorCode = "4"
 )
 
 func onSendTransactionRequest(queuedTx status.QueuedTx) {
@@ -47,8 +48,13 @@ func onSendTransactionRequest(queuedTx status.QueuedTx) {
 	C.StatusServiceSignalEvent(C.CString(string(body)))
 }
 
-func onSendTransactionReturn(queuedTx status.QueuedTx, err error) {
+func onSendTransactionReturn(queuedTx *status.QueuedTx, err error) {
 	if err == nil {
+		return
+	}
+
+	// discard notifications with empty tx
+	if queuedTx == nil {
 		return
 	}
 
@@ -73,15 +79,16 @@ func sendTransactionErrorCode(err error) string {
 		return SendTransactionNoErrorCode
 	}
 
-	if err == accounts.ErrDecrypt {
+	switch err {
+	case accounts.ErrDecrypt:
 		return SendTransactionPasswordErrorCode
-	}
-
-	if err == status.ErrQueuedTxTimedOut {
+	case status.ErrQueuedTxTimedOut:
 		return SendTransactionTimeoutErrorCode
+	case status.ErrQueuedTxDiscarded:
+		return SendTransactionDiscardedErrorCode
+	default:
+		return SendTransactionDefaultErrorCode
 	}
-
-	return SendTransactionDefaultErrorCode
 }
 
 func CompleteTransaction(id, password string) (common.Hash, error) {
@@ -93,6 +100,17 @@ func CompleteTransaction(id, password string) (common.Hash, error) {
 	backend := lightEthereum.StatusBackend
 
 	return backend.CompleteQueuedTransaction(status.QueuedTxId(id), password)
+}
+
+func DiscardTransaction(id string) error {
+	lightEthereum, err := GetNodeManager().LightEthereumService()
+	if err != nil {
+		return err
+	}
+
+	backend := lightEthereum.StatusBackend
+
+	return backend.DiscardQueuedTransaction(status.QueuedTxId(id))
 }
 
 func messageIdFromContext(ctx context.Context) string {
