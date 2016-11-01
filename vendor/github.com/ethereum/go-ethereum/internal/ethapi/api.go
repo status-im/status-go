@@ -1028,19 +1028,26 @@ func (s *PublicTransactionPoolAPI) SendTransaction(ctx context.Context, args Sen
 		Context: ctx,
 		Args:    status.SendTxArgs(args),
 		Done:    make(chan struct{}, 1),
+		Discard: make(chan struct{}, 1),
 	}
 
 	// send transaction to pending pool
 	s.txQueue <- queuedTx
 
-	// now wait up until transaction is complete (via call to CompleteQueuedTransaction) or timeout occurs
+	// now wait up until transaction is:
+	// - completed (via CompleteQueuedTransaction),
+	// - discarded (via DiscardQueuedTransaction)
+	// - or times out
 	backend := GetStatusBackend()
 	select {
 	case <-queuedTx.Done:
-		backend.NotifyOnQueuedTxReturn(queuedTx.Id, queuedTx.Err)
+		backend.NotifyOnQueuedTxReturn(queuedTx, queuedTx.Err)
+		return queuedTx.Hash, queuedTx.Err
+	case <-queuedTx.Discard:
+		backend.NotifyOnQueuedTxReturn(queuedTx, status.ErrQueuedTxDiscarded)
 		return queuedTx.Hash, queuedTx.Err
 	case <-time.After(status.DefaultTxSendCompletionTimeout * time.Second):
-		backend.NotifyOnQueuedTxReturn(queuedTx.Id, status.ErrQueuedTxTimedOut)
+		backend.NotifyOnQueuedTxReturn(queuedTx, status.ErrQueuedTxTimedOut)
 		return common.Hash{}, status.ErrQueuedTxTimedOut
 	}
 

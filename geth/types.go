@@ -53,6 +53,11 @@ type CompleteTransactionResult struct {
 	Error string `json:"error"`
 }
 
+type DiscardTransactionResult struct {
+	Id    string `json:"id"`
+	Error string `json:"error"`
+}
+
 type GethEvent struct {
 	Type  string      `json:"type"`
 	Event interface{} `json:"event"`
