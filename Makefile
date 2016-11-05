@@ -59,6 +59,8 @@ test-all:
 	@build/env.sh tail -n +2 coverage.out >> coverage-all.out
 	build/env.sh go test -coverprofile=coverage.out -covermode=set ./extkeys
 	@build/env.sh tail -n +2 coverage.out >> coverage-all.out
+	build/env.sh go test -coverprofile=coverage.out -covermode=set ./cmd/status
+	@build/env.sh tail -n +2 coverage.out >> coverage-all.out
 	@build/env.sh go tool cover -html=coverage-all.out -o coverage.html
 	@build/env.sh go tool cover -func=coverage-all.out
 

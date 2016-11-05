@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/les/status"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -18,19 +17,6 @@ func TestQueuedTransactions(t *testing.T) {
 	err := geth.PrepareTestNode()
 	if err != nil {
 		t.Error(err)
-		return
-	}
-
-	accountManager, err := geth.GetNodeManager().AccountManager()
-	if err != nil {
-		t.Errorf(err.Error())
-		return
-	}
-
-	// create an account
-	address, _, _, err := geth.CreateAccount(newAccountPassword)
-	if err != nil {
-		t.Errorf("could not create account: %v", err)
 		return
 	}
 
@@ -69,23 +55,10 @@ func TestQueuedTransactions(t *testing.T) {
 		}
 	})
 
-	// send from the same test account (which is guaranteed to have ether)
-	from, err := utils.MakeAddress(accountManager, testAddress)
-	if err != nil {
-		t.Errorf("could not retrieve account from address: %v", err)
-		return
-	}
-
-	to, err := utils.MakeAddress(accountManager, address)
-	if err != nil {
-		t.Errorf("could not retrieve account from address: %v", err)
-		return
-	}
-
 	//  this call blocks, up until Complete Transaction is called
 	txHashCheck, err := backend.SendTransaction(nil, status.SendTxArgs{
-		From:  from.Address,
-		To:    &to.Address,
+		From:  geth.FromAddress(testAddress),
+		To:    geth.ToAddress(testAddress1),
 		Value: rpc.NewHexNumber(big.NewInt(1000000000000)),
 	})
 	if err != nil {
@@ -114,19 +87,6 @@ func TestDoubleCompleteQueuedTransactions(t *testing.T) {
 	err := geth.PrepareTestNode()
 	if err != nil {
 		t.Error(err)
-		return
-	}
-
-	accountManager, err := geth.GetNodeManager().AccountManager()
-	if err != nil {
-		t.Errorf(err.Error())
-		return
-	}
-
-	// create an account
-	address, _, _, err := geth.CreateAccount(newAccountPassword)
-	if err != nil {
-		t.Errorf("could not create account: %v", err)
 		return
 	}
 
@@ -209,23 +169,10 @@ func TestDoubleCompleteQueuedTransactions(t *testing.T) {
 		}
 	})
 
-	// send from the same test account (which is guaranteed to have ether)
-	from, err := utils.MakeAddress(accountManager, testAddress)
-	if err != nil {
-		t.Errorf("could not retrieve account from address: %v", err)
-		return
-	}
-
-	to, err := utils.MakeAddress(accountManager, address)
-	if err != nil {
-		t.Errorf("could not retrieve account from address: %v", err)
-		return
-	}
-
 	//  this call blocks, and should return on *second* attempt to CompleteTransaction (w/ the correct password)
 	txHashCheck, err := backend.SendTransaction(nil, status.SendTxArgs{
-		From:  from.Address,
-		To:    &to.Address,
+		From:  geth.FromAddress(testAddress),
+		To:    geth.ToAddress(testAddress1),
 		Value: rpc.NewHexNumber(big.NewInt(1000000000000)),
 	})
 	if err != nil {
@@ -261,19 +208,6 @@ func TestDiscardQueuedTransactions(t *testing.T) {
 	err := geth.PrepareTestNode()
 	if err != nil {
 		t.Error(err)
-		return
-	}
-
-	accountManager, err := geth.GetNodeManager().AccountManager()
-	if err != nil {
-		t.Errorf(err.Error())
-		return
-	}
-
-	// create an account
-	address, _, _, err := geth.CreateAccount(newAccountPassword)
-	if err != nil {
-		t.Errorf("could not create account: %v", err)
 		return
 	}
 
@@ -355,27 +289,14 @@ func TestDiscardQueuedTransactions(t *testing.T) {
 		}
 	})
 
-	// send from the same test account (which is guaranteed to have ether)
-	from, err := utils.MakeAddress(accountManager, testAddress)
-	if err != nil {
-		t.Errorf("could not retrieve account from address: %v", err)
-		return
-	}
-
-	to, err := utils.MakeAddress(accountManager, address)
-	if err != nil {
-		t.Errorf("could not retrieve account from address: %v", err)
-		return
-	}
-
 	//  this call blocks, and should return when DiscardQueuedTransaction() is called
 	txHashCheck, err := backend.SendTransaction(nil, status.SendTxArgs{
-		From:  from.Address,
-		To:    &to.Address,
+		From:  geth.FromAddress(testAddress),
+		To:    geth.ToAddress(testAddress1),
 		Value: rpc.NewHexNumber(big.NewInt(1000000000000)),
 	})
 	if err != status.ErrQueuedTxDiscarded {
-		t.Errorf("expeced error not thrown: %v", err)
+		t.Errorf("expected error not thrown: %v", err)
 		return
 	}
 
@@ -396,6 +317,286 @@ func TestDiscardQueuedTransactions(t *testing.T) {
 
 	t.Log("sleep extra time, to allow sync")
 	time.Sleep(5 * time.Second)
+}
+
+func TestCompleteMultipleQueuedTransactions(t *testing.T) {
+	err := geth.PrepareTestNode()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	// obtain reference to status backend
+	lightEthereum, err := geth.GetNodeManager().LightEthereumService()
+	if err != nil {
+		t.Errorf("Test failed: LES service is not running: %v", err)
+		return
+	}
+	backend := lightEthereum.StatusBackend
+
+	// reset queue
+	backend.TransactionQueue().Reset()
+
+	// make sure you panic if transaction complete doesn't return
+	testTxCount := 3
+	txIds := make(chan string, testTxCount)
+	allTestTxCompleted := make(chan struct{}, 1)
+
+	// replace transaction notification handler
+	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+		var txId string
+		var envelope geth.GethEvent
+		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
+			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
+			return
+		}
+		if envelope.Type == geth.EventTransactionQueued {
+			event := envelope.Event.(map[string]interface{})
+			txId = event["id"].(string)
+			t.Logf("transaction queued (will be completed in a single call, once aggregated): {id: %s}\n", txId)
+
+			txIds <- txId
+		}
+	})
+
+	//  this call blocks, and should return when DiscardQueuedTransaction() for a given tx id is called
+	sendTx := func() {
+		txHashCheck, err := backend.SendTransaction(nil, status.SendTxArgs{
+			From:  geth.FromAddress(testAddress),
+			To:    geth.ToAddress(testAddress1),
+			Value: rpc.NewHexNumber(big.NewInt(1000000000000)),
+		})
+		if err != nil {
+			t.Errorf("unexpected error thrown: %v", err)
+			return
+		}
+
+		if reflect.DeepEqual(txHashCheck, common.Hash{}) {
+			t.Error("transaction returned empty hash")
+			return
+		}
+	}
+
+	// wait for transactions, and complete them in a single call
+	completeTxs := func(txIdStrings string) {
+		var parsedIds []string
+		json.Unmarshal([]byte(txIdStrings), &parsedIds)
+
+		parsedIds = append(parsedIds, "invalid-tx-id")
+		updatedTxIdStrings, _ := json.Marshal(parsedIds)
+
+		// complete
+		results := geth.CompleteTransactions(string(updatedTxIdStrings), testAddressPassword)
+		if len(results) != (testTxCount+1) || results["invalid-tx-id"].Error.Error() != "transaction hash not found" {
+			t.Errorf("cannot complete txs: %v", results)
+			return
+		}
+		for txId, txResult := range results {
+			if txResult.Error != nil && txId != "invalid-tx-id" {
+				t.Errorf("invalid error for %s", txId)
+				return
+			}
+			if txResult.Hash.Hex() == "0x0000000000000000000000000000000000000000000000000000000000000000" && txId != "invalid-tx-id" {
+				t.Errorf("invalid hash (expected non empty hash): %s", txId)
+				return
+			}
+
+			if txResult.Hash.Hex() != "0x0000000000000000000000000000000000000000000000000000000000000000" {
+				t.Logf("transaction complete: https://testnet.etherscan.io/tx/%s", txResult.Hash.Hex())
+			}
+		}
+
+		time.Sleep(1 * time.Second) // make sure that tx complete signal propagates
+		for _, txId := range parsedIds {
+			if backend.TransactionQueue().Has(status.QueuedTxId(txId)) {
+				t.Errorf("txqueue should not have test tx at this point (it should be completed): %s", txId)
+				return
+			}
+		}
+	}
+	go func() {
+		var txIdStrings []string
+		for i := 0; i < testTxCount; i++ {
+			txIdStrings = append(txIdStrings, <-txIds)
+		}
+
+		txIdJSON, _ := json.Marshal(txIdStrings)
+		completeTxs(string(txIdJSON))
+		allTestTxCompleted <- struct{}{}
+	}()
+
+	// send multiple transactions
+	for i := 0; i < testTxCount; i++ {
+		go sendTx()
+	}
+
+	select {
+	case <-allTestTxCompleted:
+	// pass
+	case <-time.After(20 * time.Second):
+		t.Error("test timed out")
+		return
+	}
+
+	if backend.TransactionQueue().Count() != 0 {
+		t.Error("tx queue must be empty at this point")
+		return
+	}
+}
+
+func TestDiscardMultipleQueuedTransactions(t *testing.T) {
+	err := geth.PrepareTestNode()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	// obtain reference to status backend
+	lightEthereum, err := geth.GetNodeManager().LightEthereumService()
+	if err != nil {
+		t.Errorf("Test failed: LES service is not running: %v", err)
+		return
+	}
+	backend := lightEthereum.StatusBackend
+
+	// reset queue
+	backend.TransactionQueue().Reset()
+
+	// make sure you panic if transaction complete doesn't return
+	testTxCount := 3
+	txIds := make(chan string, testTxCount)
+	allTestTxDiscarded := make(chan struct{}, 1)
+
+	// replace transaction notification handler
+	txFailedEventCallCount := 0
+	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+		var txId string
+		var envelope geth.GethEvent
+		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
+			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
+			return
+		}
+		if envelope.Type == geth.EventTransactionQueued {
+			event := envelope.Event.(map[string]interface{})
+			txId = event["id"].(string)
+			t.Logf("transaction queued (will be discarded soon): {id: %s}\n", txId)
+
+			if !backend.TransactionQueue().Has(status.QueuedTxId(txId)) {
+				t.Errorf("txqueue should still have test tx: %s", txId)
+				return
+			}
+
+			txIds <- txId
+		}
+
+		if envelope.Type == geth.EventTransactionFailed {
+			event := envelope.Event.(map[string]interface{})
+			t.Logf("transaction return event received: {id: %s}\n", event["id"].(string))
+
+			receivedErrMessage := event["error_message"].(string)
+			expectedErrMessage := status.ErrQueuedTxDiscarded.Error()
+			if receivedErrMessage != expectedErrMessage {
+				t.Errorf("unexpected error message received: got %v", receivedErrMessage)
+				return
+			}
+
+			receivedErrCode := event["error_code"].(string)
+			if receivedErrCode != geth.SendTransactionDiscardedErrorCode {
+				t.Errorf("unexpected error code received: got %v", receivedErrCode)
+				return
+			}
+
+			txFailedEventCallCount++
+			if txFailedEventCallCount == testTxCount {
+				allTestTxDiscarded <- struct{}{}
+			}
+		}
+	})
+
+	//  this call blocks, and should return when DiscardQueuedTransaction() for a given tx id is called
+	sendTx := func() {
+		txHashCheck, err := backend.SendTransaction(nil, status.SendTxArgs{
+			From:  geth.FromAddress(testAddress),
+			To:    geth.ToAddress(testAddress1),
+			Value: rpc.NewHexNumber(big.NewInt(1000000000000)),
+		})
+		if err != status.ErrQueuedTxDiscarded {
+			t.Errorf("expected error not thrown: %v", err)
+			return
+		}
+
+		if !reflect.DeepEqual(txHashCheck, common.Hash{}) {
+			t.Error("transaction returned hash, while it shouldn't")
+			return
+		}
+	}
+
+	// wait for transactions, and discard immediately
+	discardTxs := func(txIdStrings string) {
+		var parsedIds []string
+		json.Unmarshal([]byte(txIdStrings), &parsedIds)
+
+		parsedIds = append(parsedIds, "invalid-tx-id")
+		updatedTxIdStrings, _ := json.Marshal(parsedIds)
+
+		// discard
+		discardResults := geth.DiscardTransactions(string(updatedTxIdStrings))
+		if len(discardResults) != 1 || discardResults["invalid-tx-id"].Error.Error() != "transaction hash not found" {
+			t.Errorf("cannot discard txs: %v", discardResults)
+			return
+		}
+
+		// try completing discarded transaction
+		completeResults := geth.CompleteTransactions(string(updatedTxIdStrings), testAddressPassword)
+		if len(completeResults) != (testTxCount + 1) {
+			t.Error("unexpected number of errors (call to CompleteTransaction should not succeed)")
+		}
+		for _, txResult := range completeResults {
+			if txResult.Error.Error() != "transaction hash not found" {
+				t.Errorf("invalid error for %s", txResult.Hash.Hex())
+				return
+			}
+			if txResult.Hash.Hex() != "0x0000000000000000000000000000000000000000000000000000000000000000" {
+				t.Errorf("invalid hash (expected zero): %s", txResult.Hash.Hex())
+				return
+			}
+		}
+
+		time.Sleep(1 * time.Second) // make sure that tx complete signal propagates
+		for _, txId := range parsedIds {
+			if backend.TransactionQueue().Has(status.QueuedTxId(txId)) {
+				t.Errorf("txqueue should not have test tx at this point (it should be discarded): %s", txId)
+				return
+			}
+		}
+	}
+	go func() {
+		var txIdStrings []string
+		for i := 0; i < testTxCount; i++ {
+			txIdStrings = append(txIdStrings, <-txIds)
+		}
+
+		txIdJSON, _ := json.Marshal(txIdStrings)
+		discardTxs(string(txIdJSON))
+	}()
+
+	// send multiple transactions
+	for i := 0; i < testTxCount; i++ {
+		go sendTx()
+	}
+
+	select {
+	case <-allTestTxDiscarded:
+		// pass
+	case <-time.After(20 * time.Second):
+		t.Error("test timed out")
+		return
+	}
+
+	if backend.TransactionQueue().Count() != 0 {
+		t.Error("tx queue must be empty at this point")
+		return
+	}
 }
 
 func TestNonExistentQueuedTransactions(t *testing.T) {

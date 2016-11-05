@@ -15,6 +15,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/cmd/utils"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/logger"
 	"github.com/ethereum/go-ethereum/logger/glog"
 )
@@ -23,7 +25,7 @@ var muPrepareTestNode sync.Mutex
 
 const (
 	TestDataDir         = "../.ethereumtest"
-	TestNodeSyncSeconds = 60
+	TestNodeSyncSeconds = 120
 )
 
 type NodeNotificationHandler func(jsonEvent string)
@@ -176,4 +178,32 @@ func PanicAfter(waitSeconds time.Duration, abort chan struct{}, desc string) {
 			panic("whatever you were doing takes toooo long: " + desc)
 		}
 	}()
+}
+
+func FromAddress(accountAddress string) common.Address {
+	accountManager, err := GetNodeManager().AccountManager()
+	if err != nil {
+		return common.Address{}
+	}
+
+	from, err := utils.MakeAddress(accountManager, accountAddress)
+	if err != nil {
+		return common.Address{}
+	}
+
+	return from.Address
+}
+
+func ToAddress(accountAddress string) *common.Address {
+	accountManager, err := GetNodeManager().AccountManager()
+	if err != nil {
+		return nil
+	}
+
+	to, err := utils.MakeAddress(accountManager, accountAddress)
+	if err != nil {
+		return nil
+	}
+
+	return &to.Address
 }

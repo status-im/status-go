@@ -13,6 +13,7 @@ const (
 	testAddress         = "0x89b50b2b26947ccad43accaef76c21d175ad85f4"
 	testAddressPassword = "asdf"
 	newAccountPassword  = "badpassword"
+	testAddress1        = "0xf82da7547534045b4e00442bc89e16186cf8c272"
 
 	whisperMessage1 = "test message 1 (K1 -> K1)"
 	whisperMessage2 = "test message 2 (K1 -> '')"
