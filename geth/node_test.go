@@ -45,7 +45,6 @@ func TestMain(m *testing.M) {
 	err := geth.PrepareTestNode()
 	if err != nil {
 		panic(err)
-		return
 	}
 
 	<-signalRecieved // block and wait for either panic or successful signal
