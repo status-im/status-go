@@ -150,8 +150,30 @@ func CompleteTransaction(id, password *C.char) *C.char {
 	}
 
 	out := geth.CompleteTransactionResult{
+		Id:    C.GoString(id),
 		Hash:  txHash.Hex(),
 		Error: errString,
+	}
+	outBytes, _ := json.Marshal(&out)
+
+	return C.CString(string(outBytes))
+}
+
+//export CompleteTransactions
+func CompleteTransactions(ids, password *C.char) *C.char {
+	out := geth.CompleteTransactionsResult{}
+	out.Results = make(map[string]geth.CompleteTransactionResult)
+
+	results := geth.CompleteTransactions(C.GoString(ids), C.GoString(password))
+	for txId, result := range results {
+		txResult := geth.CompleteTransactionResult{
+			Id:   txId,
+			Hash: result.Hash.Hex(),
+		}
+		if result.Error != nil {
+			txResult.Error = result.Error.Error()
+		}
+		out.Results[txId] = txResult
 	}
 	outBytes, _ := json.Marshal(&out)
 
@@ -171,6 +193,26 @@ func DiscardTransaction(id *C.char) *C.char {
 	out := geth.DiscardTransactionResult{
 		Id:    C.GoString(id),
 		Error: errString,
+	}
+	outBytes, _ := json.Marshal(&out)
+
+	return C.CString(string(outBytes))
+}
+
+//export DiscardTransactions
+func DiscardTransactions(ids *C.char) *C.char {
+	out := geth.DiscardTransactionsResult{}
+	out.Results = make(map[string]geth.DiscardTransactionResult)
+
+	results := geth.DiscardTransactions(C.GoString(ids))
+	for txId, result := range results {
+		txResult := geth.DiscardTransactionResult{
+			Id: txId,
+		}
+		if result.Error != nil {
+			txResult.Error = result.Error.Error()
+		}
+		out.Results[txId] = txResult
 	}
 	outBytes, _ := json.Marshal(&out)
 

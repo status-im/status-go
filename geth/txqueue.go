@@ -102,6 +102,28 @@ func CompleteTransaction(id, password string) (common.Hash, error) {
 	return backend.CompleteQueuedTransaction(status.QueuedTxId(id), password)
 }
 
+func CompleteTransactions(ids, password string) map[string]RawCompleteTransactionResult {
+	results := make(map[string]RawCompleteTransactionResult)
+
+	parsedIds, err := parseJSONArray(ids)
+	if err != nil {
+		results["none"] = RawCompleteTransactionResult{
+			Error: err,
+		}
+		return results
+	}
+
+	for _, txId := range parsedIds {
+		txHash, txErr := CompleteTransaction(txId, password)
+		results[txId] = RawCompleteTransactionResult{
+			Hash:  txHash,
+			Error: txErr,
+		}
+	}
+
+	return results
+}
+
 func DiscardTransaction(id string) error {
 	lightEthereum, err := GetNodeManager().LightEthereumService()
 	if err != nil {
@@ -111,6 +133,30 @@ func DiscardTransaction(id string) error {
 	backend := lightEthereum.StatusBackend
 
 	return backend.DiscardQueuedTransaction(status.QueuedTxId(id))
+}
+
+func DiscardTransactions(ids string) map[string]RawDiscardTransactionResult {
+	var parsedIds []string
+	results := make(map[string]RawDiscardTransactionResult)
+
+	parsedIds, err := parseJSONArray(ids)
+	if err != nil {
+		results["none"] = RawDiscardTransactionResult{
+			Error: err,
+		}
+		return results
+	}
+
+	for _, txId := range parsedIds {
+		err := DiscardTransaction(txId)
+		if err != nil {
+			results[txId] = RawDiscardTransactionResult{
+				Error: err,
+			}
+		}
+	}
+
+	return results
 }
 
 func messageIdFromContext(ctx context.Context) string {
@@ -231,4 +277,14 @@ func sendTxArgsFromRPCCall(req RPCCall) status.SendTxArgs {
 		Value: rpc.NewHexNumber(big.NewInt(value)),
 		Data:  data,
 	}
+}
+
+func parseJSONArray(items string) ([]string, error) {
+	var parsedItems []string
+	err := json.Unmarshal([]byte(items), &parsedItems)
+	if err != nil {
+		return nil, err
+	}
+
+	return parsedItems, nil
 }
