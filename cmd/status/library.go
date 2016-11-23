@@ -117,28 +117,6 @@ func Logout() *C.char {
 	return C.CString(string(outBytes))
 }
 
-//export UnlockAccount
-func UnlockAccount(address, password *C.char, seconds int) *C.char {
-
-	// This is equivalent to unlocking an account from the command line,
-	// just modified to unlock the account for the currently running geth node
-	// based on the provided arguments
-	err := geth.UnlockAccount(C.GoString(address), C.GoString(password), seconds)
-
-	errString := ""
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		errString = err.Error()
-	}
-
-	out := geth.JSONError{
-		Error: errString,
-	}
-	outBytes, _ := json.Marshal(&out)
-
-	return C.CString(string(outBytes))
-}
-
 //export CompleteTransaction
 func CompleteTransaction(id, password *C.char) *C.char {
 	txHash, err := geth.CompleteTransaction(C.GoString(id), C.GoString(password))

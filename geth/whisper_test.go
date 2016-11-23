@@ -7,8 +7,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/logger"
-	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/ethereum/go-ethereum/whisper"
 	"github.com/status-im/status-go/geth"
 )
@@ -43,7 +41,7 @@ func TestWhisperMessaging(t *testing.T) {
 		t.Error("Test failed: could not create account")
 		return
 	}
-	glog.V(logger.Info).Infof("Account created: {address: %s, key: %s}", address1, pubKey1)
+	t.Logf("Account created: {address: %s, key: %s}", address1, pubKey1)
 
 	address2, pubKey2, _, err := geth.CreateAccount(newAccountPassword)
 	if err != nil {
@@ -51,7 +49,7 @@ func TestWhisperMessaging(t *testing.T) {
 		t.Error("Test failed: could not create account")
 		return
 	}
-	glog.V(logger.Info).Infof("Account created: {address: %s, key: %s}", address2, pubKey2)
+	t.Logf("Account created: {address: %s, key: %s}", address2, pubKey2)
 
 	// start watchers
 	var receivedMessages = map[string]bool{
@@ -65,7 +63,7 @@ func TestWhisperMessaging(t *testing.T) {
 		//From: crypto.ToECDSAPub(common.FromHex(pubKey1)),
 		//To:   crypto.ToECDSAPub(common.FromHex(pubKey2)),
 		Fn: func(msg *whisper.Message) {
-			//glog.V(logger.Info).Infof("Whisper message received: %s", msg.Payload)
+			//t.Logf("Whisper message received: %s", msg.Payload)
 			receivedMessages[string(msg.Payload)] = true
 		},
 	})
