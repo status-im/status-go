@@ -10,10 +10,10 @@ import (
 )
 
 const (
-	testAddress         = "0x89b50b2b26947ccad43accaef76c21d175ad85f4"
-	testAddressPassword = "asdf"
+	testAddress         = "0xadaf150b905cf5e6a778e553e15a139b6618bbb7"
+	testAddressPassword = "asdfasdf"
 	newAccountPassword  = "badpassword"
-	testAddress1        = "0xf82da7547534045b4e00442bc89e16186cf8c272"
+	testAddress1        = "0xadd4d1d02e71c7360c53296968e59d57fd15e2ba"
 
 	whisperMessage1 = "test message 1 (K1 -> K1)"
 	whisperMessage2 = "test message 2 (K1 -> '')"
