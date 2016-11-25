@@ -21,6 +21,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 )
@@ -192,8 +193,8 @@ func opSmod(instr instruction, pc *uint64, env Environment, contract *Contract, 
 }
 
 func opExp(instr instruction, pc *uint64, env Environment, contract *Contract, memory *Memory, stack *Stack) {
-	x, y := stack.pop(), stack.pop()
-	stack.push(U256(x.Exp(x, y, Pow256)))
+	base, exponent := stack.pop(), stack.pop()
+	stack.push(math.Exp(base, exponent))
 }
 
 func opSignExtend(instr instruction, pc *uint64, env Environment, contract *Contract, memory *Memory, stack *Stack) {
@@ -514,7 +515,7 @@ func opCreate(instr instruction, pc *uint64, env Environment, contract *Contract
 		input        = memory.Get(offset.Int64(), size.Int64())
 		gas          = new(big.Int).Set(contract.Gas)
 	)
-	if env.RuleSet().GasTable(env.BlockNumber()).CreateBySuicide != nil {
+	if env.ChainConfig().IsEIP150(env.BlockNumber()) {
 		gas.Div(gas, n64)
 		gas = gas.Sub(contract.Gas, gas)
 	}
@@ -525,7 +526,7 @@ func opCreate(instr instruction, pc *uint64, env Environment, contract *Contract
 	// homestead we must check for CodeStoreOutOfGasError (homestead only
 	// rule) and treat as an error, if the ruleset is frontier we must
 	// ignore this error and pretend the operation was successful.
-	if env.RuleSet().IsHomestead(env.BlockNumber()) && suberr == CodeStoreOutOfGasError {
+	if env.ChainConfig().IsHomestead(env.BlockNumber()) && suberr == CodeStoreOutOfGasError {
 		stack.push(new(big.Int))
 	} else if suberr != nil && suberr != CodeStoreOutOfGasError {
 		stack.push(new(big.Int))

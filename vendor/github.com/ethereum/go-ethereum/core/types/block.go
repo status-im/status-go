@@ -79,7 +79,7 @@ func (n *BlockNonce) UnmarshalJSON(input []byte) error {
 	return nil
 }
 
-// Header represents Ethereum block headers.
+// Header represents a block header in the Ethereum blockchain.
 type Header struct {
 	ParentHash  common.Hash    // Hash to the previous block
 	UncleHash   common.Hash    // Uncles of this block
@@ -115,15 +115,6 @@ type jsonHeader struct {
 	MixDigest   *common.Hash    `json:"mixHash"`
 	Nonce       *BlockNonce     `json:"nonce"`
 }
-
-func (h *Header) GetNumber() *big.Int     { return new(big.Int).Set(h.Number) }
-func (h *Header) GetGasLimit() *big.Int   { return new(big.Int).Set(h.GasLimit) }
-func (h *Header) GetGasUsed() *big.Int    { return new(big.Int).Set(h.GasUsed) }
-func (h *Header) GetDifficulty() *big.Int { return new(big.Int).Set(h.Difficulty) }
-func (h *Header) GetTime() *big.Int       { return new(big.Int).Set(h.Time) }
-func (h *Header) GetNumberU64() uint64    { return h.Number.Uint64() }
-func (h *Header) GetNonce() uint64        { return binary.BigEndian.Uint64(h.Nonce[:]) }
-func (h *Header) GetExtra() []byte        { return common.CopyBytes(h.Extra) }
 
 // Hash returns the block hash of the header, which is simply the keccak256 hash of its
 // RLP encoding.
@@ -223,7 +214,7 @@ type Body struct {
 	Uncles       []*Header
 }
 
-// Block represents a block in the Ethereum blockchain.
+// Block represents an entire block in the Ethereum blockchain.
 type Block struct {
 	header       *Header
 	uncles       []*Header

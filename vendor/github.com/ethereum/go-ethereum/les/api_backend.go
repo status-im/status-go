@@ -1,18 +1,18 @@
-// Copyright 2015 The go-ethereum Authors
-// This file is part of go-ethereum.
+// Copyright 2016 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// go-ethereum is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
+// The go-ethereum library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// go-ethereum is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
+// GNU Lesser General Public License for more details.
 //
-// You should have received a copy of the GNU General Public License
-// along with go-ethereum. If not, see <http://www.gnu.org/licenses/>.
+// You should have received a copy of the GNU Lesser General Public License
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package les
 
@@ -30,6 +30,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/internal/ethapi"
 	"github.com/ethereum/go-ethereum/light"
+	"github.com/ethereum/go-ethereum/params"
 	rpc "github.com/ethereum/go-ethereum/rpc"
 	"golang.org/x/net/context"
 )
@@ -37,6 +38,14 @@ import (
 type LesApiBackend struct {
 	eth *LightEthereum
 	gpo *gasprice.LightPriceOracle
+}
+
+func (b *LesApiBackend) ChainConfig() *params.ChainConfig {
+	return b.eth.chainConfig
+}
+
+func (b *LesApiBackend) CurrentBlock() *types.Block {
+	return types.NewBlockWithHeader(b.eth.BlockChain().CurrentHeader())
 }
 
 func (b *LesApiBackend) SetHead(number uint64) {
@@ -81,13 +90,13 @@ func (b *LesApiBackend) GetTd(blockHash common.Hash) *big.Int {
 
 func (b *LesApiBackend) GetVMEnv(ctx context.Context, msg core.Message, state ethapi.State, header *types.Header) (vm.Environment, func() error, error) {
 	stateDb := state.(*light.LightState).Copy()
-	addr, _ := msg.From()
+	addr := msg.From()
 	from, err := stateDb.GetOrNewStateObject(ctx, addr)
 	if err != nil {
 		return nil, nil, err
 	}
 	from.SetBalance(common.MaxBig)
-	env := light.NewEnv(ctx, stateDb, b.eth.chainConfig, b.eth.blockchain, msg, header, b.eth.chainConfig.VmConfig)
+	env := light.NewEnv(ctx, stateDb, b.eth.chainConfig, b.eth.blockchain, msg, header, vm.Config{})
 	return env, env.Error, nil
 }
 

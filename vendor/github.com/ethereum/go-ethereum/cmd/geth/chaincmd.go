@@ -20,7 +20,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/cmd/utils"
@@ -31,41 +33,61 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/logger/glog"
+	"github.com/ethereum/go-ethereum/trie"
 	"github.com/syndtr/goleveldb/leveldb/util"
 	"gopkg.in/urfave/cli.v1"
 )
 
 var (
 	importCommand = cli.Command{
-		Action: importChain,
-		Name:   "import",
-		Usage:  `import a blockchain file`,
+		Action:    importChain,
+		Name:      "import",
+		Usage:     "Import a blockchain file",
+		ArgsUsage: "<filename>",
+		Category:  "BLOCKCHAIN COMMANDS",
+		Description: `
+TODO: Please write this
+`,
 	}
 	exportCommand = cli.Command{
-		Action: exportChain,
-		Name:   "export",
-		Usage:  `export blockchain into file`,
+		Action:    exportChain,
+		Name:      "export",
+		Usage:     "Export blockchain into file",
+		ArgsUsage: "<filename> [<blockNumFirst> <blockNumLast>]",
+		Category:  "BLOCKCHAIN COMMANDS",
 		Description: `
 Requires a first argument of the file to write to.
 Optional second and third arguments control the first and
 last block to write. In this mode, the file will be appended
 if already existing.
-		`,
+`,
 	}
 	upgradedbCommand = cli.Command{
-		Action: upgradeDB,
-		Name:   "upgradedb",
-		Usage:  "upgrade chainblock database",
+		Action:    upgradeDB,
+		Name:      "upgradedb",
+		Usage:     "Upgrade chainblock database",
+		ArgsUsage: " ",
+		Category:  "BLOCKCHAIN COMMANDS",
+		Description: `
+TODO: Please write this
+`,
 	}
 	removedbCommand = cli.Command{
-		Action: removeDB,
-		Name:   "removedb",
-		Usage:  "Remove blockchain and state databases",
+		Action:    removeDB,
+		Name:      "removedb",
+		Usage:     "Remove blockchain and state databases",
+		ArgsUsage: " ",
+		Category:  "BLOCKCHAIN COMMANDS",
+		Description: `
+TODO: Please write this
+`,
 	}
 	dumpCommand = cli.Command{
-		Action: dump,
-		Name:   "dump",
-		Usage:  `dump a specific block from storage`,
+		Action:    dump,
+		Name:      "dump",
+		Usage:     "Dump a specific block from storage",
+		ArgsUsage: "[<blockHash> | <blockNum>]...",
+		Category:  "BLOCKCHAIN COMMANDS",
 		Description: `
 The arguments are interpreted as block numbers or hashes.
 Use "ethereum dump 0" to dump the genesis block.
@@ -77,34 +99,66 @@ func importChain(ctx *cli.Context) error {
 	if len(ctx.Args()) != 1 {
 		utils.Fatalf("This command requires an argument.")
 	}
-	if ctx.GlobalBool(utils.TestNetFlag.Name) {
-		state.StartingNonce = 1048576 // (2**20)
-	}
 	stack := makeFullNode(ctx)
 	chain, chainDb := utils.MakeChain(ctx, stack)
 	defer chainDb.Close()
 
+	// Start periodically gathering memory profiles
+	var peakMemAlloc, peakMemSys uint64
+	go func() {
+		stats := new(runtime.MemStats)
+		for {
+			runtime.ReadMemStats(stats)
+			if atomic.LoadUint64(&peakMemAlloc) < stats.Alloc {
+				atomic.StoreUint64(&peakMemAlloc, stats.Alloc)
+			}
+			if atomic.LoadUint64(&peakMemSys) < stats.Sys {
+				atomic.StoreUint64(&peakMemSys, stats.Sys)
+			}
+			time.Sleep(5 * time.Second)
+		}
+	}()
 	// Import the chain
 	start := time.Now()
 	if err := utils.ImportChain(chain, ctx.Args().First()); err != nil {
 		utils.Fatalf("Import error: %v", err)
 	}
-	fmt.Printf("Import done in %v, compacting...\n", time.Since(start))
+	fmt.Printf("Import done in %v.\n\n", time.Since(start))
+
+	// Output pre-compaction stats mostly to see the import trashing
+	db := chainDb.(*ethdb.LDBDatabase)
+
+	stats, err := db.LDB().GetProperty("leveldb.stats")
+	if err != nil {
+		utils.Fatalf("Failed to read database stats: %v", err)
+	}
+	fmt.Println(stats)
+	fmt.Printf("Trie cache misses:  %d\n", trie.CacheMisses())
+	fmt.Printf("Trie cache unloads: %d\n\n", trie.CacheUnloads())
+
+	// Print the memory statistics used by the importing
+	mem := new(runtime.MemStats)
+	runtime.ReadMemStats(mem)
+
+	fmt.Printf("Object memory: %.3f MB current, %.3f MB peak\n", float64(mem.Alloc)/1024/1024, float64(atomic.LoadUint64(&peakMemAlloc))/1024/1024)
+	fmt.Printf("System memory: %.3f MB current, %.3f MB peak\n", float64(mem.Sys)/1024/1024, float64(atomic.LoadUint64(&peakMemSys))/1024/1024)
+	fmt.Printf("Allocations:   %.3f million\n", float64(mem.Mallocs)/1000000)
+	fmt.Printf("GC pause:      %v\n\n", time.Duration(mem.PauseTotalNs))
 
 	// Compact the entire database to more accurately measure disk io and print the stats
-	if db, ok := chainDb.(*ethdb.LDBDatabase); ok {
-		start = time.Now()
-		if err := db.LDB().CompactRange(util.Range{}); err != nil {
-			utils.Fatalf("Compaction failed: %v", err)
-		}
-		fmt.Printf("Compaction done in %v.\n", time.Since(start))
-
-		stats, err := db.LDB().GetProperty("leveldb.stats")
-		if err != nil {
-			utils.Fatalf("Failed to read database stats: %v", err)
-		}
-		fmt.Println(stats)
+	start = time.Now()
+	fmt.Println("Compacting entire database...")
+	if err = db.LDB().CompactRange(util.Range{}); err != nil {
+		utils.Fatalf("Compaction failed: %v", err)
 	}
+	fmt.Printf("Compaction done in %v.\n\n", time.Since(start))
+
+	stats, err = db.LDB().GetProperty("leveldb.stats")
+	if err != nil {
+		utils.Fatalf("Failed to read database stats: %v", err)
+	}
+	fmt.Println(stats)
+
 	return nil
 }
 

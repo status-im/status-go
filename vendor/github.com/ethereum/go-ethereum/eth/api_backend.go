@@ -1,18 +1,18 @@
 // Copyright 2015 The go-ethereum Authors
-// This file is part of go-ethereum.
+// This file is part of the go-ethereum library.
 //
-// go-ethereum is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
+// The go-ethereum library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// go-ethereum is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
+// GNU Lesser General Public License for more details.
 //
-// You should have received a copy of the GNU General Public License
-// along with go-ethereum. If not, see <http://www.gnu.org/licenses/>.
+// You should have received a copy of the GNU Lesser General Public License
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package eth
 
@@ -30,6 +30,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/internal/ethapi"
+	"github.com/ethereum/go-ethereum/params"
 	rpc "github.com/ethereum/go-ethereum/rpc"
 	"golang.org/x/net/context"
 )
@@ -38,6 +39,14 @@ import (
 type EthApiBackend struct {
 	eth *Ethereum
 	gpo *gasprice.GasPriceOracle
+}
+
+func (b *EthApiBackend) ChainConfig() *params.ChainConfig {
+	return b.eth.chainConfig
+}
+
+func (b *EthApiBackend) CurrentBlock() *types.Block {
+	return b.eth.blockchain.CurrentBlock()
 }
 
 func (b *EthApiBackend) SetHead(number uint64) {
@@ -99,11 +108,10 @@ func (b *EthApiBackend) GetTd(blockHash common.Hash) *big.Int {
 
 func (b *EthApiBackend) GetVMEnv(ctx context.Context, msg core.Message, state ethapi.State, header *types.Header) (vm.Environment, func() error, error) {
 	statedb := state.(EthApiState).state
-	addr, _ := msg.From()
-	from := statedb.GetOrNewStateObject(addr)
+	from := statedb.GetOrNewStateObject(msg.From())
 	from.SetBalance(common.MaxBig)
 	vmError := func() error { return nil }
-	return core.NewEnv(statedb, b.eth.chainConfig, b.eth.blockchain, msg, header, b.eth.chainConfig.VmConfig), vmError, nil
+	return core.NewEnv(statedb, b.eth.chainConfig, b.eth.blockchain, msg, header, vm.Config{}), vmError, nil
 }
 
 func (b *EthApiBackend) SendTx(ctx context.Context, signedTx *types.Transaction) error {

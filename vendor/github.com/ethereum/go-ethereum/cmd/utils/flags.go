@@ -22,13 +22,11 @@ import (
 	"io/ioutil"
 	"math"
 	"math/big"
-	"math/rand"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/ethereum/ethash"
 	"github.com/ethereum/go-ethereum/accounts"
@@ -41,17 +39,17 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/internal/debug"
 	"github.com/ethereum/go-ethereum/les"
-	"github.com/ethereum/go-ethereum/light"
 	"github.com/ethereum/go-ethereum/logger"
 	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/discover"
+	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/p2p/nat"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/pow"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/ethereum/go-ethereum/whisper"
+	whisper "github.com/ethereum/go-ethereum/whisper/whisperv2"
 	"gopkg.in/urfave/cli.v1"
 )
 
@@ -144,11 +142,6 @@ var (
 		Usage: "Document Root for HTTPClient file scheme",
 		Value: DirectoryString{homeDir()},
 	}
-	CacheFlag = cli.IntFlag{
-		Name:  "cache",
-		Usage: "Megabytes of memory allocated to internal caching (min 16MB / database forced)",
-		Value: 128,
-	}
 	FastSyncFlag = cli.BoolFlag{
 		Name:  "fast",
 		Usage: "Enable fast syncing through state downloads",
@@ -157,14 +150,10 @@ var (
 		Name:  "light",
 		Usage: "Enable light client mode",
 	}
-	NoDefSrvFlag = cli.BoolFlag{
-		Name:  "nodefsrv",
-		Usage: "Don't add default LES server (only for test version)",
-	}
 	LightServFlag = cli.IntFlag{
 		Name:  "lightserv",
 		Usage: "Maximum percentage of time allowed for serving LES requests (0-90)",
-		Value: 80,
+		Value: 0,
 	}
 	LightPeersFlag = cli.IntFlag{
 		Name:  "lightpeers",
@@ -174,6 +163,17 @@ var (
 	LightKDFFlag = cli.BoolFlag{
 		Name:  "lightkdf",
 		Usage: "Reduce key-derivation RAM & CPU usage at some expense of KDF strength",
+	}
+	// Performance tuning settings
+	CacheFlag = cli.IntFlag{
+		Name:  "cache",
+		Usage: "Megabytes of memory allocated to internal caching (min 16MB / database forced)",
+		Value: 128,
+	}
+	TrieCacheGenFlag = cli.IntFlag{
+		Name:  "trie-cache-gens",
+		Usage: "Number of trie node generations to keep in memory",
+		Value: int(state.MaxTrieCacheGen),
 	}
 	// Fork settings
 	SupportDAOFork = cli.BoolFlag{
@@ -185,7 +185,6 @@ var (
 		Usage: "Updates the chain rules to oppose the DAO hard-fork",
 	}
 	// Miner settings
-	// TODO: refactor CPU vs GPU mining flags
 	MiningEnabledFlag = cli.BoolFlag{
 		Name:  "mine",
 		Usage: "Enable mining",
@@ -194,10 +193,6 @@ var (
 		Name:  "minerthreads",
 		Usage: "Number of CPU threads to use for mining",
 		Value: runtime.NumCPU(),
-	}
-	MiningGPUFlag = cli.StringFlag{
-		Name:  "minergpus",
-		Usage: "List of GPUs to use for mining (e.g. '0,1' will use the first two GPUs found)",
 	}
 	TargetGasLimitFlag = cli.StringFlag{
 		Name:  "targetgaslimit",
@@ -345,11 +340,6 @@ var (
 		Name:  "port",
 		Usage: "Network listening port",
 		Value: 30303,
-	}
-	ListenPortV5Flag = cli.IntFlag{
-		Name:  "v5port",
-		Usage: "Experimental RLPx V5 (Topic Discovery) listening port",
-		Value: 30304,
 	}
 	BootnodesFlag = cli.StringFlag{
 		Name:  "bootnodes",
@@ -507,9 +497,9 @@ func MakeBootstrapNodes(ctx *cli.Context) []*discover.Node {
 	// Return pre-configured nodes if none were manually requested
 	if !ctx.GlobalIsSet(BootnodesFlag.Name) {
 		if ctx.GlobalBool(TestNetFlag.Name) {
-			return TestNetBootNodes
+			return params.TestnetBootnodes
 		}
-		return FrontierBootNodes
+		return params.MainnetBootnodes
 	}
 	// Otherwise parse and use the CLI bootstrap nodes
 	bootnodes := []*discover.Node{}
@@ -525,14 +515,37 @@ func MakeBootstrapNodes(ctx *cli.Context) []*discover.Node {
 	return bootnodes
 }
 
+// MakeBootstrapNodesV5 creates a list of bootstrap nodes from the command line
+// flags, reverting to pre-configured ones if none have been specified.
+func MakeBootstrapNodesV5(ctx *cli.Context) []*discv5.Node {
+	// Return pre-configured nodes if none were manually requested
+	if !ctx.GlobalIsSet(BootnodesFlag.Name) {
+		return params.DiscoveryV5Bootnodes
+	}
+	// Otherwise parse and use the CLI bootstrap nodes
+	bootnodes := []*discv5.Node{}
+
+	for _, url := range strings.Split(ctx.GlobalString(BootnodesFlag.Name), ",") {
+		node, err := discv5.ParseNode(url)
+		if err != nil {
+			glog.V(logger.Error).Infof("Bootstrap URL %s: %v\n", url, err)
+			continue
+		}
+		bootnodes = append(bootnodes, node)
+	}
+	return bootnodes
+}
+
 // MakeListenAddress creates a TCP listening address string from set command
 // line flags.
 func MakeListenAddress(ctx *cli.Context) string {
 	return fmt.Sprintf(":%d", ctx.GlobalInt(ListenPortFlag.Name))
 }
 
-func MakeListenAddressV5(ctx *cli.Context) string {
-	return fmt.Sprintf(":%d", ctx.GlobalInt(ListenPortV5Flag.Name))
+// MakeDiscoveryV5Address creates a UDP listening address string from set command
+// line flags for the V5 discovery protocol.
+func MakeDiscoveryV5Address(ctx *cli.Context) string {
+	return fmt.Sprintf(":%d", ctx.GlobalInt(ListenPortFlag.Name)+1)
 }
 
 // MakeNAT creates a port mapper from set command line flags.
@@ -665,11 +678,12 @@ func MakeNode(ctx *cli.Context, name, gitCommit string) *node.Node {
 		Name:              name,
 		Version:           vsn,
 		UserIdent:         makeNodeUserIdent(ctx),
-		NoDiscovery:       ctx.GlobalBool(NoDiscoverFlag.Name),
-		DiscoveryV5:       ctx.GlobalBool(DiscoveryV5Flag.Name),
+		NoDiscovery:       ctx.GlobalBool(NoDiscoverFlag.Name) || ctx.GlobalBool(LightModeFlag.Name),
+		DiscoveryV5:       ctx.GlobalBool(DiscoveryV5Flag.Name) || ctx.GlobalBool(LightModeFlag.Name) || ctx.GlobalInt(LightServFlag.Name) > 0,
+		DiscoveryV5Addr:   MakeDiscoveryV5Address(ctx),
 		BootstrapNodes:    MakeBootstrapNodes(ctx),
+		BootstrapNodesV5:  MakeBootstrapNodesV5(ctx),
 		ListenAddr:        MakeListenAddress(ctx),
-		ListenAddrV5:      MakeListenAddressV5(ctx),
 		NAT:               MakeNAT(ctx),
 		MaxPeers:          ctx.GlobalInt(MaxPeersFlag.Name),
 		MaxPendingPeers:   ctx.GlobalInt(MaxPendingPeersFlag.Name),
@@ -718,22 +732,11 @@ func RegisterEthService(ctx *cli.Context, stack *node.Node, extra []byte) {
 		Fatalf("The %v flags are mutually exclusive", netFlags)
 	}
 
-	// initialise new random number generator
-	rand := rand.New(rand.NewSource(time.Now().UnixNano()))
-	// get enabled jit flag
-	jitEnabled := ctx.GlobalBool(VMEnableJitFlag.Name)
-	// if the jit is not enabled enable it for 10 pct of the people
-	if !jitEnabled && rand.Float64() < 0.1 {
-		jitEnabled = true
-		glog.V(logger.Info).Infoln("You're one of the lucky few that will try out the JIT VM (random). If you get a consensus failure please be so kind to report this incident with the block hash that failed. You can switch to the regular VM by setting --jitvm=false")
-	}
-
 	ethConf := &eth.Config{
 		Etherbase:               MakeEtherbase(stack.AccountManager(), ctx),
 		ChainConfig:             MakeChainConfig(ctx, stack),
 		FastSync:                ctx.GlobalBool(FastSyncFlag.Name),
 		LightMode:               ctx.GlobalBool(LightModeFlag.Name),
-		NoDefSrv:                ctx.GlobalBool(NoDefSrvFlag.Name),
 		LightServ:               ctx.GlobalInt(LightServFlag.Name),
 		LightPeers:              ctx.GlobalInt(LightPeersFlag.Name),
 		MaxPeers:                ctx.GlobalInt(MaxPeersFlag.Name),
@@ -744,8 +747,6 @@ func RegisterEthService(ctx *cli.Context, stack *node.Node, extra []byte) {
 		ExtraData:               MakeMinerExtra(extra, ctx),
 		NatSpec:                 ctx.GlobalBool(NatspecEnabledFlag.Name),
 		DocRoot:                 ctx.GlobalString(DocRootFlag.Name),
-		EnableJit:               jitEnabled,
-		ForceJit:                ctx.GlobalBool(VMForceJitFlag.Name),
 		GasPrice:                common.String2Big(ctx.GlobalString(GasPriceFlag.Name)),
 		GpoMinGasPrice:          common.String2Big(ctx.GlobalString(GpoMinGasPriceFlag.Name)),
 		GpoMaxGasPrice:          common.String2Big(ctx.GlobalString(GpoMaxGasPriceFlag.Name)),
@@ -767,11 +768,9 @@ func RegisterEthService(ctx *cli.Context, stack *node.Node, extra []byte) {
 
 	case ctx.GlobalBool(TestNetFlag.Name):
 		if !ctx.GlobalIsSet(NetworkIdFlag.Name) {
-			ethConf.NetworkId = 2
+			ethConf.NetworkId = 3
 		}
-		ethConf.Genesis = core.TestNetGenesisBlock()
-		state.StartingNonce = 1048576 // (2**20)
-		light.StartingNonce = 1048576 // (2**20)
+		ethConf.Genesis = core.DefaultTestnetGenesisBlock()
 
 	case ctx.GlobalBool(DevModeFlag.Name):
 		ethConf.Genesis = core.OlympicGenesisBlock()
@@ -779,6 +778,10 @@ func RegisterEthService(ctx *cli.Context, stack *node.Node, extra []byte) {
 			ethConf.GasPrice = new(big.Int)
 		}
 		ethConf.PowTest = true
+	}
+	// Override any global options pertaining to the Ethereum protocol
+	if gen := ctx.GlobalInt(TrieCacheGenFlag.Name); gen > 0 {
+		state.MaxTrieCacheGen = uint16(gen)
 	}
 
 	if ethConf.LightMode {
@@ -824,7 +827,7 @@ func SetupNetwork(ctx *cli.Context) {
 }
 
 // MakeChainConfig reads the chain configuration from the database in ctx.Datadir.
-func MakeChainConfig(ctx *cli.Context, stack *node.Node) *core.ChainConfig {
+func MakeChainConfig(ctx *cli.Context, stack *node.Node) *params.ChainConfig {
 	db := MakeChainDatabase(ctx, stack)
 	defer db.Close()
 
@@ -832,9 +835,9 @@ func MakeChainConfig(ctx *cli.Context, stack *node.Node) *core.ChainConfig {
 }
 
 // MakeChainConfigFromDb reads the chain configuration from the given database.
-func MakeChainConfigFromDb(ctx *cli.Context, db ethdb.Database) *core.ChainConfig {
+func MakeChainConfigFromDb(ctx *cli.Context, db ethdb.Database) *params.ChainConfig {
 	// If the chain is already initialized, use any existing chain configs
-	config := new(core.ChainConfig)
+	config := new(params.ChainConfig)
 
 	genesis := core.GetBlock(db, core.GetCanonicalHash(db, 0), 0)
 	if genesis != nil {
@@ -848,27 +851,35 @@ func MakeChainConfigFromDb(ctx *cli.Context, db ethdb.Database) *core.ChainConfi
 			Fatalf("Could not make chain configuration: %v", err)
 		}
 	}
-	// Set any missing fields due to them being unset or system upgrade
-	if config.HomesteadBlock == nil {
+	// set chain id in case it's zero.
+	if config.ChainId == nil {
+		config.ChainId = new(big.Int)
+	}
+	// Check whether we are allowed to set default config params or not:
+	//  - If no genesis is set, we're running either mainnet or testnet (private nets use `geth init`)
+	//  - If a genesis is already set, ensure we have a configuration for it (mainnet or testnet)
+	defaults := genesis == nil ||
+		(genesis.Hash() == params.MainNetGenesisHash && !ctx.GlobalBool(TestNetFlag.Name)) ||
+		(genesis.Hash() == params.TestNetGenesisHash && ctx.GlobalBool(TestNetFlag.Name))
+
+	if defaults {
 		if ctx.GlobalBool(TestNetFlag.Name) {
-			config.HomesteadBlock = params.TestNetHomesteadBlock
+			config = params.TestnetChainConfig
 		} else {
+			// Homestead fork
 			config.HomesteadBlock = params.MainNetHomesteadBlock
-		}
-	}
-	if config.DAOForkBlock == nil {
-		if ctx.GlobalBool(TestNetFlag.Name) {
-			config.DAOForkBlock = params.TestNetDAOForkBlock
-		} else {
+			// DAO fork
 			config.DAOForkBlock = params.MainNetDAOForkBlock
-		}
-		config.DAOForkSupport = true
-	}
-	if config.HomesteadGasRepriceBlock == nil {
-		if ctx.GlobalBool(TestNetFlag.Name) {
-			config.HomesteadGasRepriceBlock = params.TestNetHomesteadGasRepriceBlock
-		} else {
-			config.HomesteadGasRepriceBlock = params.MainNetHomesteadGasRepriceBlock
+			config.DAOForkSupport = true
+
+			// DoS reprice fork
+			config.EIP150Block = params.MainNetHomesteadGasRepriceBlock
+			config.EIP150Hash = params.MainNetHomesteadGasRepriceHash
+
+			// DoS state cleanup fork
+			config.EIP155Block = params.MainNetSpuriousDragon
+			config.EIP158Block = params.MainNetSpuriousDragon
+			config.ChainId = params.MainNetChainID
 		}
 	}
 	// Force override any existing configs if explicitly requested

@@ -35,7 +35,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/registrar/ethreg"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/eth/filters"
 	"github.com/ethereum/go-ethereum/eth/gasprice"
@@ -47,6 +46,7 @@ import (
 	"github.com/ethereum/go-ethereum/miner"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
@@ -64,13 +64,12 @@ var (
 )
 
 type Config struct {
-	ChainConfig *core.ChainConfig // chain configuration
+	ChainConfig *params.ChainConfig // chain configuration
 
 	NetworkId  int    // Network ID to use for selecting peers to connect to
 	Genesis    string // Genesis JSON to seed the chain database with
 	FastSync   bool   // Enables the state download based fast synchronisation algorithm
 	LightMode  bool   // Running in light client mode
-	NoDefSrv   bool   // No default LES server
 	LightServ  int    // Maximum percentage of time allowed for serving LES requests
 	LightPeers int    // Maximum number of LES client peers
 	MaxPeers   int    // Maximum number of global peers
@@ -106,14 +105,14 @@ type Config struct {
 }
 
 type LesServer interface {
-	Start()
+	Start(srvr *p2p.Server)
 	Stop()
 	Protocols() []p2p.Protocol
 }
 
 // Ethereum implements the Ethereum full node service.
 type Ethereum struct {
-	chainConfig *core.ChainConfig
+	chainConfig *params.ChainConfig
 	// Channel for shutting down the service
 	shutdownChan  chan bool // Channel for shutting down the ethereum
 	stopDbUpgrade func()    // stop chain db sequential key upgrade
@@ -218,10 +217,8 @@ func New(ctx *node.ServiceContext, config *Config) (*Ethereum, error) {
 	core.WriteChainConfig(chainDb, genesis.Hash(), config.ChainConfig)
 
 	eth.chainConfig = config.ChainConfig
-	eth.chainConfig.VmConfig = vm.Config{
-		EnableJit: config.EnableJit,
-		ForceJit:  config.ForceJit,
-	}
+
+	glog.V(logger.Info).Infoln("Chain config:", eth.chainConfig)
 
 	eth.blockchain, err = core.NewBlockChain(chainDb, eth.chainConfig, eth.pow, eth.EventMux())
 	if err != nil {
@@ -339,7 +336,7 @@ func (s *Ethereum) APIs() []rpc.API {
 		}, {
 			Namespace: "eth",
 			Version:   "1.0",
-			Service:   filters.NewPublicFilterAPI(s.ApiBackend, true),
+			Service:   filters.NewPublicFilterAPI(s.ApiBackend, false),
 			Public:    true,
 		}, {
 			Namespace: "admin",
@@ -389,6 +386,17 @@ func (self *Ethereum) SetEtherbase(etherbase common.Address) {
 	self.miner.SetEtherbase(etherbase)
 }
 
+func (s *Ethereum) StartMining(threads int) error {
+	eb, err := s.Etherbase()
+	if err != nil {
+		err = fmt.Errorf("Cannot start mining without etherbase address: %v", err)
+		glog.V(logger.Error).Infoln(err)
+		return err
+	}
+	go s.miner.Start(eb, threads)
+	return nil
+}
+
 func (s *Ethereum) StopMining()         { s.miner.Stop() }
 func (s *Ethereum) IsMining() bool      { return s.miner.Mining() }
 func (s *Ethereum) Miner() *miner.Miner { return s.miner }
@@ -423,7 +431,7 @@ func (s *Ethereum) Start(srvr *p2p.Server) error {
 	}
 	s.protocolManager.Start()
 	if s.lesServer != nil {
-		s.lesServer.Start()
+		s.lesServer.Start(srvr)
 	}
 	return nil
 }

@@ -37,6 +37,7 @@ import (
 	"github.com/ethereum/go-ethereum/logger"
 	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/ethereum/go-ethereum/miner"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
 	"golang.org/x/net/context"
@@ -102,7 +103,7 @@ func (s *PublicMinerAPI) SubmitWork(nonce rpc.HexNumber, solution, digest common
 // result[2], 32 bytes hex encoded boundary condition ("target"), 2^256/difficulty
 func (s *PublicMinerAPI) GetWork() (work [3]string, err error) {
 	if !s.e.IsMining() {
-		if err := s.e.StartMining(0, ""); err != nil {
+		if err := s.e.StartMining(0); err != nil {
 			return work, err
 		}
 	}
@@ -141,7 +142,7 @@ func (s *PrivateMinerAPI) Start(threads *rpc.HexNumber) (bool, error) {
 		threads = rpc.NewHexNumber(runtime.NumCPU())
 	}
 
-	err := s.e.StartMining(threads.Int(), "")
+	err := s.e.StartMining(threads.Int())
 	if err == nil {
 		return true, nil
 	}
@@ -303,13 +304,13 @@ func (api *PublicDebugAPI) DumpBlock(number uint64) (state.Dump, error) {
 // PrivateDebugAPI is the collection of Etheruem full node APIs exposed over
 // the private debugging endpoint.
 type PrivateDebugAPI struct {
-	config *core.ChainConfig
+	config *params.ChainConfig
 	eth    *Ethereum
 }
 
 // NewPrivateDebugAPI creates a new API definition for the full node-related
 // private debug methods of the Ethereum service.
-func NewPrivateDebugAPI(config *core.ChainConfig, eth *Ethereum) *PrivateDebugAPI {
+func NewPrivateDebugAPI(config *params.ChainConfig, eth *Ethereum) *PrivateDebugAPI {
 	return &PrivateDebugAPI{config: config, eth: eth}
 }
 
@@ -505,20 +506,14 @@ func (api *PrivateDebugAPI) TraceTransaction(ctx context.Context, txHash common.
 	if err != nil {
 		return nil, err
 	}
+
+	signer := types.MakeSigner(api.config, block.Number())
 	// Mutate the state and trace the selected transaction
 	for idx, tx := range block.Transactions() {
 		// Assemble the transaction call message
-		from, err := tx.FromFrontier()
+		msg, err := tx.AsMessage(signer)
 		if err != nil {
 			return nil, fmt.Errorf("sender retrieval failed: %v", err)
-		}
-		msg := callmsg{
-			addr:     from,
-			to:       tx.To(),
-			gas:      tx.Gas(),
-			gasPrice: tx.GasPrice(),
-			value:    tx.Value(),
-			data:     tx.Data(),
 		}
 		// Mutate the state if we haven't reached the tracing transaction yet
 		if uint64(idx) < txIndex {

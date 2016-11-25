@@ -32,6 +32,7 @@ import (
 	"github.com/ethereum/go-ethereum/logger"
 	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/ethereum/go-ethereum/p2p/discover"
+	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/p2p/nat"
 )
 
@@ -95,15 +96,22 @@ type Config struct {
 	// or not. Disabling is usually useful for protocol debugging (manual topology).
 	NoDiscovery bool
 
+	// DiscoveryV5 specifies whether the the new topic-discovery based V5 discovery
+	// protocol should be started or not.
 	DiscoveryV5 bool
 
-	// Bootstrap nodes used to establish connectivity with the rest of the network.
+	// Listener address for the V5 discovery protocol UDP traffic.
+	DiscoveryV5Addr string
+
+	// BootstrapNodes used to establish connectivity with the rest of the network.
 	BootstrapNodes []*discover.Node
+
+	// BootstrapNodesV5 used to establish connectivity with the rest of the network
+	// using the V5 discovery protocol.
+	BootstrapNodesV5 []*discv5.Node
 
 	// Network interface address on which the node should listen for inbound peers.
 	ListenAddr string
-
-	ListenAddrV5 string
 
 	// If set to a non-nil value, the given NAT port mapper is used to make the
 	// listening port available to the Internet.
@@ -268,7 +276,7 @@ func (c *Config) name() string {
 	return c.Name
 }
 
-// These resources are resolved differently for the "geth" and "geth-testnet" instances.
+// These resources are resolved differently for "geth" instances.
 var isOldGethResource = map[string]bool{
 	"chaindata":          true,
 	"nodes":              true,
@@ -297,7 +305,14 @@ func (c *Config) resolvePath(path string) string {
 			return oldpath
 		}
 	}
-	return filepath.Join(c.DataDir, c.name(), path)
+	return filepath.Join(c.instanceDir(), path)
+}
+
+func (c *Config) instanceDir() string {
+	if c.DataDir == "" {
+		return ""
+	}
+	return filepath.Join(c.DataDir, c.name())
 }
 
 // NodeKey retrieves the currently configured private key of the node, checking
@@ -350,12 +365,11 @@ func (c *Config) TrusterNodes() []*discover.Node {
 
 // parsePersistentNodes parses a list of discovery node URLs loaded from a .json
 // file from within the data directory.
-func (c *Config) parsePersistentNodes(file string) []*discover.Node {
+func (c *Config) parsePersistentNodes(path string) []*discover.Node {
 	// Short circuit if no node config is present
 	if c.DataDir == "" {
 		return nil
 	}
-	path := filepath.Join(c.DataDir, file)
 	if _, err := os.Stat(path); err != nil {
 		return nil
 	}

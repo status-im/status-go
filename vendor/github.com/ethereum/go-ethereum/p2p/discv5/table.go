@@ -1,4 +1,4 @@
-// Copyright 2015 The go-ethereum Authors
+// Copyright 2016 The go-ethereum Authors
 // This file is part of the go-ethereum library.
 //
 // The go-ethereum library is free software: you can redistribute it and/or modify
@@ -25,6 +25,7 @@ package discv5
 import (
 	"crypto/rand"
 	"encoding/binary"
+	"fmt"
 	"net"
 	"sort"
 
@@ -64,6 +65,56 @@ func newTable(ourID NodeID, ourAddr *net.UDPAddr) *Table {
 	return tab
 }
 
+const printTable = false
+
+// chooseBucketRefreshTarget selects random refresh targets to keep all Kademlia
+// buckets filled with live connections and keep the network topology healthy.
+// This requires selecting addresses closer to our own with a higher probability
+// in order to refresh closer buckets too.
+//
+// This algorithm approximates the distance distribution of existing nodes in the
+// table by selecting a random node from the table and selecting a target address
+// with a distance less than twice of that of the selected node.
+// This algorithm will be improved later to specifically target the least recently
+// used buckets.
+func (tab *Table) chooseBucketRefreshTarget() common.Hash {
+	entries := 0
+	if printTable {
+		fmt.Println()
+	}
+	for i, b := range tab.buckets {
+		entries += len(b.entries)
+		if printTable {
+			for _, e := range b.entries {
+				fmt.Println(i, e.state, e.addr().String(), e.ID.String(), e.sha.Hex())
+			}
+		}
+	}
+
+	prefix := binary.BigEndian.Uint64(tab.self.sha[0:8])
+	dist := ^uint64(0)
+	entry := int(randUint(uint32(entries + 1)))
+	for _, b := range tab.buckets {
+		if entry < len(b.entries) {
+			n := b.entries[entry]
+			dist = binary.BigEndian.Uint64(n.sha[0:8]) ^ prefix
+			break
+		}
+		entry -= len(b.entries)
+	}
+
+	ddist := ^uint64(0)
+	if dist+dist > dist {
+		ddist = dist
+	}
+	targetPrefix := prefix ^ randUint64n(ddist)
+
+	var target common.Hash
+	binary.BigEndian.PutUint64(target[0:8], targetPrefix)
+	rand.Read(target[8:])
+	return target
+}
+
 // readRandomNodes fills the given slice with random nodes from the
 // table. It will not write the same node more than once. The nodes in
 // the slice are copies and can be modified by the caller.
@@ -101,12 +152,21 @@ func (tab *Table) readRandomNodes(buf []*Node) (n int) {
 }
 
 func randUint(max uint32) uint32 {
-	if max == 0 {
+	if max < 2 {
 		return 0
 	}
 	var b [4]byte
 	rand.Read(b[:])
 	return binary.BigEndian.Uint32(b[:]) % max
+}
+
+func randUint64n(max uint64) uint64 {
+	if max < 2 {
+		return 0
+	}
+	var b [8]byte
+	rand.Read(b[:])
+	return binary.BigEndian.Uint64(b[:]) % max
 }
 
 // closest returns the n nodes in the table that are closest to the
@@ -128,6 +188,10 @@ func (tab *Table) closest(target common.Hash, nresults int) *nodesByDistance {
 // bucket has space available, adding the node succeeds immediately.
 // Otherwise, the node is added to the replacement cache for the bucket.
 func (tab *Table) add(n *Node) (contested *Node) {
+	//fmt.Println("add", n.addr().String(), n.ID.String(), n.sha.Hex())
+	if n.ID == tab.self.ID {
+		return
+	}
 	b := tab.buckets[logdist(tab.self.sha, n.sha)]
 	switch {
 	case b.bump(n):
@@ -181,6 +245,7 @@ outer:
 // delete removes an entry from the node table (used to evacuate
 // failed/non-bonded discovery peers).
 func (tab *Table) delete(node *Node) {
+	//fmt.Println("delete", node.addr().String(), node.ID.String(), node.sha.Hex())
 	bucket := tab.buckets[logdist(tab.self.sha, node.sha)]
 	for i := range bucket.entries {
 		if bucket.entries[i].ID == node.ID {

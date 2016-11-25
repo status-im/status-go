@@ -40,7 +40,6 @@ func main() {
 		nodeKeyHex  = flag.String("nodekeyhex", "", "private key as hex (for testing)")
 		natdesc     = flag.String("nat", "none", "port mapping mechanism (any|none|upnp|pmp|extip:<IP>)")
 		runv5       = flag.Bool("v5", false, "run a v5 topic discovery bootnode")
-		v5test      = flag.Bool("v5test", false, "run a v5 topic discovery test node (adds default bootnodes to form a test network)")
 
 		nodeKey *ecdsa.PrivateKey
 		err     error
@@ -82,15 +81,9 @@ func main() {
 		os.Exit(0)
 	}
 
-	if *runv5 || *v5test {
-		if ntab, err := discv5.ListenUDP(nodeKey, *listenAddr, natm, ""); err != nil {
+	if *runv5 {
+		if _, err := discv5.ListenUDP(nodeKey, *listenAddr, natm, ""); err != nil {
 			utils.Fatalf("%v", err)
-		} else {
-			if *v5test {
-				if err := ntab.SetFallbackNodes(discv5.BootNodes); err != nil {
-					utils.Fatalf("%v", err)
-				}
-			}
 		}
 	} else {
 		if _, err := discover.ListenUDP(nodeKey, *listenAddr, natm, ""); err != nil {

@@ -1,4 +1,4 @@
-// Copyright 2015 The go-ethereum Authors
+// Copyright 2016 The go-ethereum Authors
 // This file is part of the go-ethereum library.
 //
 // The go-ethereum library is free software: you can redistribute it and/or modify
@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"math/big"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
@@ -36,6 +37,8 @@ import (
 	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discover"
+	"github.com/ethereum/go-ethereum/p2p/discv5"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/pow"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
@@ -93,11 +96,15 @@ type ProtocolManager struct {
 	txpool      txPool
 	txrelay     *LesTxRelay
 	networkId   int
-	chainConfig *core.ChainConfig
+	chainConfig *params.ChainConfig
 	blockchain  BlockChain
 	chainDb     ethdb.Database
 	odr         *LesOdr
 	server      *LesServer
+
+	topicDisc *discv5.Network
+	lesTopic  discv5.Topic
+	p2pServer *p2p.Server
 
 	downloader *downloader.Downloader
 	fetcher    *lightFetcher
@@ -123,7 +130,7 @@ type ProtocolManager struct {
 
 // NewProtocolManager returns a new ethereum sub protocol manager. The Ethereum sub protocol manages peers capable
 // with the ethereum network.
-func NewProtocolManager(chainConfig *core.ChainConfig, lightSync bool, networkId int, mux *event.TypeMux, pow pow.PoW, blockchain BlockChain, txpool txPool, chainDb ethdb.Database, odr *LesOdr, txrelay *LesTxRelay) (*ProtocolManager, error) {
+func NewProtocolManager(chainConfig *params.ChainConfig, lightSync bool, networkId int, mux *event.TypeMux, pow pow.PoW, blockchain BlockChain, txpool txPool, chainDb ethdb.Database, odr *LesOdr, txrelay *LesTxRelay) (*ProtocolManager, error) {
 	// Create the protocol manager with the base fields
 	manager := &ProtocolManager{
 		lightSync:   lightSync,
@@ -229,11 +236,56 @@ func (pm *ProtocolManager) removePeer(id string) {
 	}
 }
 
-func (pm *ProtocolManager) Start() {
+func (pm *ProtocolManager) findServers() {
+	if pm.p2pServer == nil || pm.topicDisc == nil {
+		return
+	}
+	glog.V(logger.Debug).Infoln("Looking for topic", string(pm.lesTopic))
+	enodes := make(chan string, 100)
+	stop := make(chan struct{})
+	go pm.topicDisc.SearchTopic(pm.lesTopic, stop, enodes)
+	go func() {
+		added := make(map[string]bool)
+		for {
+			select {
+			case enode := <-enodes:
+				if !added[enode] {
+					glog.V(logger.Info).Infoln("Found LES server:", enode)
+					added[enode] = true
+					if node, err := discover.ParseNode(enode); err == nil {
+						pm.p2pServer.AddPeer(node)
+					}
+				}
+			case <-stop:
+				return
+			}
+		}
+	}()
+	select {
+	case <-time.After(time.Second * 20):
+	case <-pm.quitSync:
+	}
+	close(stop)
+}
+
+func (pm *ProtocolManager) Start(srvr *p2p.Server) {
+	pm.p2pServer = srvr
+	if srvr != nil {
+		pm.topicDisc = srvr.DiscV5
+	}
+	pm.lesTopic = discv5.Topic("LES@" + common.Bytes2Hex(pm.blockchain.Genesis().Hash().Bytes()[0:8]))
 	if pm.lightSync {
 		// start sync handler
+		go pm.findServers()
 		go pm.syncer()
 	} else {
+		if pm.topicDisc != nil {
+			go func() {
+				glog.V(logger.Debug).Infoln("Starting registering topic", string(pm.lesTopic))
+				pm.topicDisc.RegisterTopic(pm.lesTopic, pm.quitSync)
+				glog.V(logger.Debug).Infoln("Stopped registering topic", string(pm.lesTopic))
+			}()
+		}
 		go func() {
 			for range pm.newPeerCh {
 			}
@@ -329,9 +381,8 @@ func (pm *ProtocolManager) handle(p *peer) error {
 		// new block announce loop
 		for {
 			select {
-			case announce := <-p.newBlockHashChn:
-				p.SendNewBlockHash(announce)
-				//fmt.Println("  BROADCAST sent")
+			case announce := <-p.announceChn:
+				p.SendAnnounce(announce)
 			case <-stop:
 				return
 			}
@@ -342,11 +393,9 @@ func (pm *ProtocolManager) handle(p *peer) error {
 	for {
 		if err := pm.handleMsg(p); err != nil {
 			glog.V(logger.Debug).Infof("%v: message handling failed: %v", p, err)
-			//fmt.Println("handleMsg err:", err)
 			return err
 		}
 	}
-	return nil
 }
 
 var reqList = []uint64{GetBlockHeadersMsg, GetBlockBodiesMsg, GetCodeMsg, GetReceiptsMsg, GetProofsMsg, SendTxMsg, GetHeaderProofsMsg}
@@ -363,7 +412,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 	var costs *requestCosts
 	var reqCnt, maxReqs int
 
-	//fmt.Println("MSG", msg.Code, msg.Size)
+	glog.V(logger.Debug).Infoln("msg:", msg.Code, msg.Size)
 	if rc, ok := p.fcCosts[msg.Code]; ok { // check if msg is a supported request type
 		costs = rc
 		if p.fcClient == nil {
@@ -392,21 +441,23 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 	// Handle the message depending on its contents
 	switch msg.Code {
 	case StatusMsg:
-		glog.V(logger.Debug).Infof("LES: received StatusMsg from peer %v", p.id)
+		glog.V(logger.Debug).Infof("<=== StatusMsg from peer %v", p.id)
 		// Status messages should never arrive after the handshake
 		return errResp(ErrExtraStatusMsg, "uncontrolled status message")
 
 	// Block header query, collect the requested headers and reply
-	case NewBlockHashMsg:
-		var req newBlockHashData
+	case AnnounceMsg:
+		glog.V(logger.Debug).Infoln("<=== AnnounceMsg from peer %v:", p.id)
+
+		var req announceData
 		if err := msg.Decode(&req); err != nil {
 			return errResp(ErrDecode, "%v: %v", msg, err)
 		}
-		//fmt.Println("RECEIVED", req.Number, req.Hash, req.Td, req.ReorgDepth)
+		glog.V(logger.Detail).Infoln("AnnounceMsg:", req.Number, req.Hash, req.Td, req.ReorgDepth)
 		pm.fetcher.notify(p, &req)
 
 	case GetBlockHeadersMsg:
-		glog.V(logger.Debug).Infof("LES: received GetBlockHeadersMsg from peer %v", p.id)
+		glog.V(logger.Debug).Infof("<=== GetBlockHeadersMsg from peer %v", p.id)
 		// Decode the complex header query
 		var req struct {
 			ReqID uint64
@@ -491,7 +542,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			return errResp(ErrUnexpectedResponse, "")
 		}
 
-		glog.V(logger.Debug).Infof("LES: received BlockHeadersMsg from peer %v", p.id)
+		glog.V(logger.Debug).Infof("<=== BlockHeadersMsg from peer %v", p.id)
 		// A batch of headers arrived to one of our previous requests
 		var resp struct {
 			ReqID, BV uint64
@@ -511,7 +562,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		}
 
 	case GetBlockBodiesMsg:
-		glog.V(logger.Debug).Infof("LES: received GetBlockBodiesMsg from peer %v", p.id)
+		glog.V(logger.Debug).Infof("<===  GetBlockBodiesMsg from peer %v", p.id)
 		// Decode the retrieval message
 		var req struct {
 			ReqID  uint64
@@ -548,7 +599,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			return errResp(ErrUnexpectedResponse, "")
 		}
 
-		glog.V(logger.Debug).Infof("LES: received BlockBodiesMsg from peer %v", p.id)
+		glog.V(logger.Debug).Infof("<===  BlockBodiesMsg from peer %v", p.id)
 		// A batch of block bodies arrived to one of our previous requests
 		var resp struct {
 			ReqID, BV uint64
@@ -565,7 +616,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		}
 
 	case GetCodeMsg:
-		glog.V(logger.Debug).Infof("LES: received GetCodeMsg from peer %v", p.id)
+		glog.V(logger.Debug).Infof("<===  GetCodeMsg from peer %v", p.id)
 		// Decode the retrieval message
 		var req struct {
 			ReqID uint64
@@ -609,7 +660,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			return errResp(ErrUnexpectedResponse, "")
 		}
 
-		glog.V(logger.Debug).Infof("LES: received CodeMsg from peer %v", p.id)
+		glog.V(logger.Debug).Infof("<=== CodeMsg from peer %v", p.id)
 		// A batch of node state data arrived to one of our previous requests
 		var resp struct {
 			ReqID, BV uint64
@@ -626,7 +677,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		}
 
 	case GetReceiptsMsg:
-		glog.V(logger.Debug).Infof("LES: received GetReceiptsMsg from peer %v", p.id)
+		glog.V(logger.Debug).Infof("<===  GetReceiptsMsg from peer %v", p.id)
 		// Decode the retrieval message
 		var req struct {
 			ReqID  uint64
@@ -672,7 +723,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			return errResp(ErrUnexpectedResponse, "")
 		}
 
-		glog.V(logger.Debug).Infof("LES: received ReceiptsMsg from peer %v", p.id)
+		glog.V(logger.Debug).Infof("<=== ReceiptsMsg from peer %v", p.id)
 		// A batch of receipts arrived to one of our previous requests
 		var resp struct {
 			ReqID, BV uint64
@@ -689,7 +740,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		}
 
 	case GetProofsMsg:
-		glog.V(logger.Debug).Infof("LES: received GetProofsMsg from peer %v", p.id)
+		glog.V(logger.Debug).Infof("<=== GetProofsMsg from peer %v", p.id)
 		// Decode the retrieval message
 		var req struct {
 			ReqID uint64
@@ -739,7 +790,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			return errResp(ErrUnexpectedResponse, "")
 		}
 
-		glog.V(logger.Debug).Infof("LES: received ProofsMsg from peer %v", p.id)
+		glog.V(logger.Debug).Infof("<=== ProofsMsg from peer %v", p.id)
 		// A batch of merkle proofs arrived to one of our previous requests
 		var resp struct {
 			ReqID, BV uint64
@@ -756,7 +807,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		}
 
 	case GetHeaderProofsMsg:
-		glog.V(logger.Debug).Infof("LES: received GetHeaderProofsMsg from peer %v", p.id)
+		glog.V(logger.Debug).Infof("<=== GetHeaderProofsMsg from peer %v", p.id)
 		// Decode the retrieval message
 		var req struct {
 			ReqID uint64
@@ -800,7 +851,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			return errResp(ErrUnexpectedResponse, "")
 		}
 
-		glog.V(logger.Debug).Infof("LES: received HeaderProofsMsg from peer %v", p.id)
+		glog.V(logger.Debug).Infof("<=== HeaderProofsMsg from peer %v", p.id)
 		var resp struct {
 			ReqID, BV uint64
 			Data      []ChtResp
@@ -833,7 +884,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		pm.server.fcCostStats.update(msg.Code, uint64(reqCnt), rcost)
 
 	default:
-		glog.V(logger.Debug).Infof("LES: received unknown message with code %d from peer %v", msg.Code, p.id)
+		glog.V(logger.Debug).Infof("<=== unknown message with code %d from peer %v", msg.Code, p.id)
 		return errResp(ErrInvalidMsgCode, "%v", msg.Code)
 	}
 

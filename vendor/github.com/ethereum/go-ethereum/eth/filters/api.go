@@ -63,13 +63,13 @@ type PublicFilterAPI struct {
 }
 
 // NewPublicFilterAPI returns a new PublicFilterAPI instance.
-func NewPublicFilterAPI(backend Backend, useMipMap bool) *PublicFilterAPI {
+func NewPublicFilterAPI(backend Backend, lightMode bool) *PublicFilterAPI {
 	api := &PublicFilterAPI{
 		backend:   backend,
-		useMipMap: useMipMap,
+		useMipMap: !lightMode,
 		mux:       backend.EventMux(),
 		chainDb:   backend.ChainDb(),
-		events:    NewEventSystem(backend.EventMux()),
+		events:    NewEventSystem(backend.EventMux(), backend, lightMode),
 		filters:   make(map[rpc.ID]*filter),
 	}
 

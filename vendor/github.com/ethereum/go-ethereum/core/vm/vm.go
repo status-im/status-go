@@ -51,9 +51,9 @@ type EVM struct {
 func New(env Environment, cfg Config) *EVM {
 	return &EVM{
 		env:       env,
-		jumpTable: newJumpTable(env.RuleSet(), env.BlockNumber()),
+		jumpTable: newJumpTable(env.ChainConfig(), env.BlockNumber()),
 		cfg:       cfg,
-		gasTable:  env.RuleSet().GasTable(env.BlockNumber()),
+		gasTable:  env.ChainConfig().GasTable(env.BlockNumber()),
 	}
 }
 
@@ -78,7 +78,9 @@ func (evm *EVM) Run(contract *Contract, input []byte) (ret []byte, err error) {
 		codehash = crypto.Keccak256Hash(contract.Code)
 	}
 	var program *Program
-	if evm.cfg.EnableJit {
+	if false {
+		// JIT disabled due to JIT not being Homestead gas reprice ready.
+
 		// If the JIT is enabled check the status of the JIT program,
 		// if it doesn't exist compile a new program in a separate
 		// goroutine or wait for compilation to finish if the JIT is
@@ -170,6 +172,7 @@ func (evm *EVM) Run(contract *Contract, input []byte) (ret []byte, err error) {
 
 		// Get the memory location of pc
 		op = contract.GetOp(pc)
+		//fmt.Printf("OP %d %v\n", op, op)
 		// calculate the new memory size and gas price for the current executing opcode
 		newMemSize, cost, err = calculateGasAndSize(evm.gasTable, evm.env, contract, caller, op, statedb, mem, stack)
 		if err != nil {
@@ -186,7 +189,10 @@ func (evm *EVM) Run(contract *Contract, input []byte) (ret []byte, err error) {
 		mem.Resize(newMemSize.Uint64())
 		// Add a log message
 		if evm.cfg.Debug {
-			evm.cfg.Tracer.CaptureState(evm.env, pc, op, contract.Gas, cost, mem, stack, contract, evm.env.Depth(), nil)
+			err = evm.cfg.Tracer.CaptureState(evm.env, pc, op, contract.Gas, cost, mem, stack, contract, evm.env.Depth(), nil)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		if opPtr := evm.jumpTable[op]; opPtr.valid {
@@ -249,10 +255,20 @@ func calculateGasAndSize(gasTable params.GasTable, env Environment, contract *Co
 	// stack Check, memory resize & gas phase
 	switch op {
 	case SUICIDE:
-		// if suicide is not nil: homestead gas fork
+		// EIP150 homestead gas reprice fork:
 		if gasTable.CreateBySuicide != nil {
 			gas.Set(gasTable.Suicide)
-			if !env.Db().Exist(common.BigToAddress(stack.data[len(stack.data)-1])) {
+			var (
+				address = common.BigToAddress(stack.data[len(stack.data)-1])
+				eip158  = env.ChainConfig().IsEIP158(env.BlockNumber())
+			)
+
+			if eip158 {
+				// if empty and transfers value
+				if env.Db().Empty(address) && statedb.GetBalance(contract.Address()).BitLen() > 0 {
+					gas.Add(gas, gasTable.CreateBySuicide)
+				}
+			} else if !env.Db().Exist(address) {
 				gas.Add(gas, gasTable.CreateBySuicide)
 			}
 		}
@@ -297,7 +313,8 @@ func calculateGasAndSize(gasTable params.GasTable, env Environment, contract *Co
 
 		quadMemGas(mem, newMemSize, gas)
 	case EXP:
-		gas.Add(gas, new(big.Int).Mul(big.NewInt(int64(len(stack.data[stack.len()-2].Bytes()))), params.ExpByteGas))
+		expByteLen := int64((stack.data[stack.len()-2].BitLen() + 7) / 8)
+		gas.Add(gas, new(big.Int).Mul(big.NewInt(expByteLen), gasTable.ExpByte))
 	case SSTORE:
 		err := stack.require(2)
 		if err != nil {
@@ -373,12 +390,21 @@ func calculateGasAndSize(gasTable params.GasTable, env Environment, contract *Co
 	case CALL, CALLCODE:
 		gas.Set(gasTable.Calls)
 
+		transfersValue := stack.data[len(stack.data)-3].BitLen() > 0
 		if op == CALL {
-			if !env.Db().Exist(common.BigToAddress(stack.data[stack.len()-2])) {
+			var (
+				address = common.BigToAddress(stack.data[len(stack.data)-2])
+				eip158  = env.ChainConfig().IsEIP158(env.BlockNumber())
+			)
+			if eip158 {
+				if env.Db().Empty(address) && transfersValue {
+					gas.Add(gas, params.CallNewAccountGas)
+				}
+			} else if !env.Db().Exist(address) {
 				gas.Add(gas, params.CallNewAccountGas)
 			}
 		}
-		if len(stack.data[stack.len()-3].Bytes()) > 0 {
+		if transfersValue {
 			gas.Add(gas, params.CallValueTransferGas)
 		}
 		x := calcMemSize(stack.data[stack.len()-6], stack.data[stack.len()-7])

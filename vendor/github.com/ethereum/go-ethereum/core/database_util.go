@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 
@@ -28,6 +29,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/logger"
 	"github.com/ethereum/go-ethereum/logger/glog"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
@@ -59,6 +61,8 @@ var (
 	oldBlockNumPrefix      = []byte("block-num-")
 	oldBlockReceiptsPrefix = []byte("receipts-block-")
 	oldBlockHashPrefix     = []byte("block-hash-") // [deprecated by the header/block split, remove eventually]
+
+	ChainConfigNotFoundErr = errors.New("ChainConfig not found") // general config not found error
 )
 
 // encodeBlockNumber encodes a block number as big endian uint64
@@ -600,7 +604,7 @@ func WriteBlockChainVersion(db ethdb.Database, vsn int) {
 }
 
 // WriteChainConfig writes the chain config settings to the database.
-func WriteChainConfig(db ethdb.Database, hash common.Hash, cfg *ChainConfig) error {
+func WriteChainConfig(db ethdb.Database, hash common.Hash, cfg *params.ChainConfig) error {
 	// short circuit and ignore if nil config. GetChainConfig
 	// will return a default.
 	if cfg == nil {
@@ -616,13 +620,13 @@ func WriteChainConfig(db ethdb.Database, hash common.Hash, cfg *ChainConfig) err
 }
 
 // GetChainConfig will fetch the network settings based on the given hash.
-func GetChainConfig(db ethdb.Database, hash common.Hash) (*ChainConfig, error) {
+func GetChainConfig(db ethdb.Database, hash common.Hash) (*params.ChainConfig, error) {
 	jsonChainConfig, _ := db.Get(append(configPrefix, hash[:]...))
 	if len(jsonChainConfig) == 0 {
 		return nil, ChainConfigNotFoundErr
 	}
 
-	var config ChainConfig
+	var config params.ChainConfig
 	if err := json.Unmarshal(jsonChainConfig, &config); err != nil {
 		return nil, err
 	}
@@ -632,24 +636,24 @@ func GetChainConfig(db ethdb.Database, hash common.Hash) (*ChainConfig, error) {
 
 // FindCommonAncestor returns the last common ancestor of two block headers
 func FindCommonAncestor(db ethdb.Database, a, b *types.Header) *types.Header {
-	for a.GetNumberU64() > b.GetNumberU64() {
-		a = GetHeader(db, a.ParentHash, a.GetNumberU64()-1)
+	for bn := b.Number.Uint64(); a.Number.Uint64() > bn; {
+		a = GetHeader(db, a.ParentHash, a.Number.Uint64()-1)
 		if a == nil {
 			return nil
 		}
 	}
-	for a.GetNumberU64() < b.GetNumberU64() {
-		b = GetHeader(db, b.ParentHash, b.GetNumberU64()-1)
+	for an := a.Number.Uint64(); an < b.Number.Uint64(); {
+		b = GetHeader(db, b.ParentHash, b.Number.Uint64()-1)
 		if b == nil {
 			return nil
 		}
 	}
 	for a.Hash() != b.Hash() {
-		a = GetHeader(db, a.ParentHash, a.GetNumberU64()-1)
+		a = GetHeader(db, a.ParentHash, a.Number.Uint64()-1)
 		if a == nil {
 			return nil
 		}
-		b = GetHeader(db, b.ParentHash, b.GetNumberU64()-1)
+		b = GetHeader(db, b.ParentHash, b.Number.Uint64()-1)
 		if b == nil {
 			return nil
 		}

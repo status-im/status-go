@@ -34,14 +34,12 @@ import (
 	"github.com/ethereum/go-ethereum/console"
 	"github.com/ethereum/go-ethereum/contracts/release"
 	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/internal/debug"
 	"github.com/ethereum/go-ethereum/logger"
 	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/node"
-	"github.com/ethereum/go-ethereum/p2p/discover"
 	"gopkg.in/urfave/cli.v1"
 )
 
@@ -62,6 +60,7 @@ func init() {
 	// Initialize the CLI app and start Geth
 	app.Action = geth
 	app.HideVersion = true // we have a command to print the version
+	app.Copyright = "Copyright 2013-2016 The go-ethereum Authors"
 	app.Commands = []cli.Command{
 		importCommand,
 		exportCommand,
@@ -75,9 +74,11 @@ func init() {
 		attachCommand,
 		javascriptCommand,
 		{
-			Action: makedag,
-			Name:   "makedag",
-			Usage:  "generate ethash dag (for testing)",
+			Action:    makedag,
+			Name:      "makedag",
+			Usage:     "Generate ethash DAG (for testing)",
+			ArgsUsage: "<blockNum> <outputDir>",
+			Category:  "MISCELLANEOUS COMMANDS",
 			Description: `
 The makedag command generates an ethash DAG in /tmp/dag.
 
@@ -86,43 +87,33 @@ Regular users do not need to execute it.
 `,
 		},
 		{
-			Action: gpuinfo,
-			Name:   "gpuinfo",
-			Usage:  "gpuinfo",
-			Description: `
-Prints OpenCL device info for all found GPUs.
-`,
-		},
-		{
-			Action: gpubench,
-			Name:   "gpubench",
-			Usage:  "benchmark GPU",
-			Description: `
-Runs quick benchmark on first GPU found.
-`,
-		},
-		{
-			Action: version,
-			Name:   "version",
-			Usage:  "print ethereum version numbers",
+			Action:    version,
+			Name:      "version",
+			Usage:     "Print version numbers",
+			ArgsUsage: " ",
+			Category:  "MISCELLANEOUS COMMANDS",
 			Description: `
 The output of this command is supposed to be machine-readable.
 `,
 		},
 		{
-			Action: initGenesis,
-			Name:   "init",
-			Usage:  "bootstraps and initialises a new genesis block (JSON)",
+			Action:    initGenesis,
+			Name:      "init",
+			Usage:     "Bootstrap and initialize a new genesis block",
+			ArgsUsage: "<genesisPath>",
+			Category:  "BLOCKCHAIN COMMANDS",
 			Description: `
-The init command initialises a new genesis block and definition for the network.
+The init command initializes a new genesis block and definition for the network.
 This is a destructive action and changes the network in which you will be
 participating.
 `,
 		},
 		{
-			Action: license,
-			Name:   "license",
-			Usage:  "displays geth's license information",
+			Action:    license,
+			Name:      "license",
+			Usage:     "Display license information",
+			ArgsUsage: " ",
+			Category:  "MISCELLANEOUS COMMANDS",
 		},
 	}
 
@@ -136,14 +127,13 @@ participating.
 		utils.OlympicFlag,
 		utils.FastSyncFlag,
 		utils.LightModeFlag,
-		utils.NoDefSrvFlag,
 		utils.LightServFlag,
 		utils.LightPeersFlag,
-		utils.CacheFlag,
 		utils.LightKDFFlag,
+		utils.CacheFlag,
+		utils.TrieCacheGenFlag,
 		utils.JSpathFlag,
 		utils.ListenPortFlag,
-		utils.ListenPortV5Flag,
 		utils.MaxPeersFlag,
 		utils.MaxPendingPeersFlag,
 		utils.EtherbaseFlag,
@@ -152,7 +142,6 @@ participating.
 		utils.OpposeDAOFork,
 		utils.MinerThreadsFlag,
 		utils.MiningEnabledFlag,
-		utils.MiningGPUFlag,
 		utils.AutoDAGFlag,
 		utils.TargetGasLimitFlag,
 		utils.NATFlag,
@@ -248,10 +237,6 @@ func initGenesis(ctx *cli.Context) error {
 		utils.Fatalf("must supply path to genesis JSON file")
 	}
 
-	if ctx.GlobalBool(utils.TestNetFlag.Name) {
-		state.StartingNonce = 1048576 // (2**20)
-	}
-
 	stack := makeFullNode(ctx)
 	chaindb := utils.MakeChainDatabase(ctx, stack)
 
@@ -304,29 +289,6 @@ func startNode(ctx *cli.Context, stack *node.Node) {
 	// Start up the node itself
 	utils.StartNode(stack)
 
-	if ctx.GlobalBool(utils.LightModeFlag.Name) && !ctx.GlobalBool(utils.NoDefSrvFlag.Name) {
-		// add default light server; test phase only
-		addPeer := func(url string) {
-			node, err := discover.ParseNode(url)
-			if err == nil {
-				stack.Server().AddPeer(node)
-			}
-		}
-
-		if ctx.GlobalBool(utils.TestNetFlag.Name) {
-			// TestNet (John Gerryts @phonikg)
-			addPeer("enode://6807cacb2b43b39d19162254c189b8828c008bb6539d39d832e98d3c65aeb70e10ce2698772b07e704b21ce7a6a4407ad0e15951ebb63b452f878cd366a1c3f5@50.112.52.169:30301")
-		} else {
-			if ctx.GlobalBool(utils.OpposeDAOFork.Name) {
-			} else {
-				// MainNet (Azure)
-				addPeer("enode://97d280903aff3db6049b5d5f8a5fb2c7ea9228b4352eeaa0ee919772b20009a22d1801ec4365f25c60d2f2dc9c35c6017a1d5a654e027f066ee765be4ecc5019@40.118.3.223:30303")
-				// MainNet (John Gerryts @phonikg)
-				addPeer("enode://08cc6631556d7ef632de642c0bcbbb0f9dc457155ecf1b5b92ba28baff076cd6cbfdd9e0524584fde021c691a508f133c3d019d5caad502b39944fc6ba5ce02f@50.112.52.169:30300")
-			}
-		}
-	}
-
 	// Unlock any account specifically requested
 	accman := stack.AccountManager()
 	passwords := utils.MakePasswordList(ctx)
@@ -342,7 +304,7 @@ func startNode(ctx *cli.Context, stack *node.Node) {
 		if err := stack.Service(&ethereum); err != nil {
 			utils.Fatalf("ethereum service not running: %v", err)
 		}
-		if err := ethereum.StartMining(ctx.GlobalInt(utils.MinerThreadsFlag.Name), ctx.GlobalString(utils.MiningGPUFlag.Name)); err != nil {
+		if err := ethereum.StartMining(ctx.GlobalInt(utils.MinerThreadsFlag.Name)); err != nil {
 			utils.Fatalf("Failed to start mining: %v", err)
 		}
 	}
@@ -378,48 +340,22 @@ func makedag(ctx *cli.Context) error {
 	return nil
 }
 
-func gpuinfo(ctx *cli.Context) error {
-	eth.PrintOpenCLDevices()
-	return nil
-}
-
-func gpubench(ctx *cli.Context) error {
-	args := ctx.Args()
-	wrongArgs := func() {
-		utils.Fatalf(`Usage: geth gpubench <gpu number>`)
-	}
-	switch {
-	case len(args) == 1:
-		n, err := strconv.ParseUint(args[0], 0, 64)
-		if err != nil {
-			wrongArgs()
-		}
-		eth.GPUBench(n)
-	case len(args) == 0:
-		eth.GPUBench(0)
-	default:
-		wrongArgs()
-	}
-	return nil
-}
-
-func version(c *cli.Context) error {
+func version(ctx *cli.Context) error {
 	fmt.Println(strings.Title(clientIdentifier))
 	fmt.Println("Version:", utils.Version)
 	if gitCommit != "" {
 		fmt.Println("Git Commit:", gitCommit)
 	}
 	fmt.Println("Protocol Versions:", eth.ProtocolVersions)
-	fmt.Println("Network Id:", c.GlobalInt(utils.NetworkIdFlag.Name))
+	fmt.Println("Network Id:", ctx.GlobalInt(utils.NetworkIdFlag.Name))
 	fmt.Println("Go Version:", runtime.Version())
 	fmt.Println("OS:", runtime.GOOS)
 	fmt.Printf("GOPATH=%s\n", os.Getenv("GOPATH"))
 	fmt.Printf("GOROOT=%s\n", runtime.GOROOT())
-
 	return nil
 }
 
-func license(c *cli.Context) error {
+func license(_ *cli.Context) error {
 	fmt.Println(`Geth is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
@@ -433,6 +369,5 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with geth. If not, see <http://www.gnu.org/licenses/>.
 `)
-
 	return nil
 }

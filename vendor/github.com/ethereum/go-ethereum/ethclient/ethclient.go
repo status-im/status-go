@@ -145,9 +145,9 @@ func (ec *Client) HeaderByNumber(ctx context.Context, number *big.Int) (*types.H
 // TransactionByHash returns the transaction with the given hash.
 func (ec *Client) TransactionByHash(ctx context.Context, hash common.Hash) (*types.Transaction, error) {
 	var tx *types.Transaction
-	err := ec.c.CallContext(ctx, &tx, "eth_getTransactionByHash", hash, false)
+	err := ec.c.CallContext(ctx, &tx, "eth_getTransactionByHash", hash)
 	if err == nil {
-		if _, r, _ := tx.SignatureValues(); r == nil {
+		if _, r, _ := tx.RawSignatureValues(); r == nil {
 			return nil, fmt.Errorf("server returned transaction without signature")
 		}
 	}
@@ -166,7 +166,11 @@ func (ec *Client) TransactionInBlock(ctx context.Context, blockHash common.Hash,
 	var tx *types.Transaction
 	err := ec.c.CallContext(ctx, &tx, "eth_getTransactionByBlockHashAndIndex", blockHash, index)
 	if err == nil {
-		if _, r, _ := tx.SignatureValues(); r == nil {
+		var signer types.Signer = types.HomesteadSigner{}
+		if tx.Protected() {
+			signer = types.NewEIP155Signer(tx.ChainId())
+		}
+		if _, r, _ := types.SignatureValues(signer, tx); r == nil {
 			return nil, fmt.Errorf("server returned transaction without signature")
 		}
 	}

@@ -73,11 +73,16 @@ var AppHelpFlagGroups = []flagGroup{
 			utils.IdentityFlag,
 			utils.FastSyncFlag,
 			utils.LightModeFlag,
-			utils.NoDefSrvFlag,
 			utils.LightServFlag,
 			utils.LightPeersFlag,
 			utils.LightKDFFlag,
+		},
+	},
+	{
+		Name: "PERFORMANCE TUNING",
+		Flags: []cli.Flag{
 			utils.CacheFlag,
+			utils.TrieCacheGenFlag,
 		},
 	},
 	{
@@ -113,7 +118,6 @@ var AppHelpFlagGroups = []flagGroup{
 		Flags: []cli.Flag{
 			utils.BootnodesFlag,
 			utils.ListenPortFlag,
-			utils.ListenPortV5Flag,
 			utils.MaxPeersFlag,
 			utils.MaxPendingPeersFlag,
 			utils.NATFlag,
@@ -128,7 +132,6 @@ var AppHelpFlagGroups = []flagGroup{
 		Flags: []cli.Flag{
 			utils.MiningEnabledFlag,
 			utils.MinerThreadsFlag,
-			utils.MiningGPUFlag,
 			utils.AutoDAGFlag,
 			utils.EtherbaseFlag,
 			utils.TargetGasLimitFlag,
