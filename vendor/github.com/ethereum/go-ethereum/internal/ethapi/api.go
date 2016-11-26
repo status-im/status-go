@@ -1142,7 +1142,7 @@ func (s *PublicTransactionPoolAPI) CompleteQueuedTransaction(ctx context.Context
 	}
 
 	signer := types.MakeSigner(s.b.ChainConfig(), s.b.CurrentBlock().Number())
-	signature, err := s.b.AccountManager().SignWithPassphrase(args.From, passphrase, signer.Hash(tx).Bytes())
+	signature, err := s.b.AccountManager().SignWithPassphrase(args.From, passphrase, tx.SigHash(signer).Bytes())
 	if err != nil {
 		return common.Hash{}, err
 	}
