@@ -127,7 +127,7 @@ JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved) {
 bool JniLibraryInit(JNIEnv *env) {
 	int i;
 
-	JavaClassPtr_StatusService = (*env)->FindClass(env, "com/statusim/module/StatusService");
+	JavaClassPtr_StatusService = (*env)->FindClass(env, "im/status/ethereum/module/StatusService");
 	if (JavaClassPtr_StatusService == NULL) return false;
 
 	JavaClassPtr_StatusService = (jclass)(*env)->NewGlobalRef(env, JavaClassPtr_StatusService);
@@ -165,7 +165,7 @@ bool JniLibraryInit(JNIEnv *env) {
 }
 
 /*!
- * @brief Calls static method signalEvent of class com.statusim.module.StatusService.
+ * @brief Calls static method signalEvent of class im.status.ethereum.module.StatusService.
  *
  * @param jsonEvent - UTF8 string
  */
