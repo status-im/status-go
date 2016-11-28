@@ -41,6 +41,10 @@ type SendTransactionEvent struct {
 	MessageId string            `json:"message_id"`
 }
 
+type LocalStorageEvent struct {
+	Data string            `json:"data"`
+}
+
 type ReturnSendTransactionEvent struct {
 	Id           string            `json:"id"`
 	Args         status.SendTxArgs `json:"args"`

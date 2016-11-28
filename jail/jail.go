@@ -69,6 +69,22 @@ func NewJailedRuntime(id string) *JailedRuntime {
 	}
 }
 
+func localStorageSetData(call otto.FunctionCall) otto.Value {
+	data := call.Argument(0).String()
+
+	event := geth.GethEvent{
+		Type: geth.EventLocalStorageSet,
+		Event: geth.LocalStorageEvent{
+			Data: data,
+		},
+	}
+
+	body, _ := json.Marshal(&event)
+	geth.SendSignal(body)
+
+	return otto.Value{}
+}
+
 func (jail *Jail) Parse(chatId string, js string) string {
 	if jail == nil {
 		return printError(ErrInvalidJail.Error())
@@ -94,6 +110,10 @@ func (jail *Jail) Parse(chatId string, js string) string {
 	jethObj.Object().Set("isConnected", func(call otto.FunctionCall) (response otto.Value) {
 		return jail.IsConnected(call)
 	})
+
+	vm.Set("localStorage", struct{}{})
+	localStorage, _ := vm.Get("localStorage")
+	localStorage.Object().Set("set", localStorageSetData)
 
 	jjs := Web3_JS + `
 	var Web3 = require('web3');
@@ -187,7 +207,7 @@ func (jail *Jail) Send(chatId string, call otto.FunctionCall) (response otto.Val
 	var (
 		rawReq = []byte(reqVal.String())
 		reqs   []geth.RPCCall
-		batch  bool
+		batch bool
 	)
 	if rawReq[0] == '[' {
 		batch = true
