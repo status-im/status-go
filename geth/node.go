@@ -27,7 +27,7 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/ethereum/go-ethereum/whisper"
+	whisper "github.com/ethereum/go-ethereum/whisper/whisperv2"
 	"gopkg.in/urfave/cli.v1"
 )
 
@@ -38,7 +38,8 @@ const (
 	versionPatch     = 0          // Patch version component of the current release
 	versionMeta      = "unstable" // Version metadata to append to the version string
 
-	RPCPort = 8545 // RPC port (replaced in unit tests)
+	RPCPort     = 8545 // RPC port (replaced in unit tests)
+	NetworkPort = 30303
 
 	EventNodeStarted = "node.started"
 )
@@ -126,6 +127,7 @@ func (m *NodeManager) MakeNode(datadir string, rpcport int) *node.Node {
 	set.String("rpcapi", "db,eth,net,web3,shh,personal,admin", "rpc api(s)")
 	set.String("datadir", datadir, "data directory for geth")
 	set.String("logdir", datadir, "log dir for glog")
+	set.Int("port", NetworkPort, "network listening port")
 	m.ctx = cli.NewContext(nil, set, nil)
 
 	utils.DebugSetup(m.ctx)

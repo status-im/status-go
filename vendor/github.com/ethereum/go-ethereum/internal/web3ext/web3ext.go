@@ -338,6 +338,10 @@ web3._extend({
 			outputFormatter: console.log
 		}),
 		new web3._extend.Method({
+			name: 'chaindbCompact',
+			call: 'debug_chaindbCompact',
+		}),
+		new web3._extend.Method({
 			name: 'metrics',
 			call: 'debug_metrics',
 			params: 1
@@ -583,9 +587,20 @@ web3._extend({
 			call: 'personal_sendTransaction',
 			params: 2,
 			inputFormatter: [web3._extend.formatters.inputTransactionFormatter, null]
+		}),
+		new web3._extend.Method({
+			name: 'sign',
+			call: 'personal_sign',
+			params: 3,
+			inputFormatter: [null, web3._extend.formatters.inputAddressFormatter, null]
+		}),
+		new web3._extend.Method({
+			name: 'ecRecover',
+			call: 'personal_ecRecover',
+			params: 2
 		})
 	]
-});
+})
 `
 
 const RPC_JS = `

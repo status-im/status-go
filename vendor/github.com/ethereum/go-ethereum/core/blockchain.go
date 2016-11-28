@@ -38,6 +38,7 @@ import (
 	"github.com/ethereum/go-ethereum/logger"
 	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/ethereum/go-ethereum/metrics"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/pow"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
@@ -78,7 +79,7 @@ const (
 // included in the canonical one where as GetBlockByNumber always represents the
 // canonical chain.
 type BlockChain struct {
-	config *ChainConfig // chain & network configuration
+	config *params.ChainConfig // chain & network configuration
 
 	hc           *HeaderChain
 	chainDb      ethdb.Database
@@ -113,7 +114,7 @@ type BlockChain struct {
 // NewBlockChain returns a fully initialised block chain using information
 // available in the database. It initialiser the default Ethereum Validator and
 // Processor.
-func NewBlockChain(chainDb ethdb.Database, config *ChainConfig, pow pow.PoW, mux *event.TypeMux) (*BlockChain, error) {
+func NewBlockChain(chainDb ethdb.Database, config *params.ChainConfig, pow pow.PoW, mux *event.TypeMux) (*BlockChain, error) {
 	bodyCache, _ := lru.New(bodyCacheLimit)
 	bodyRLPCache, _ := lru.New(bodyCacheLimit)
 	blockCache, _ := lru.New(blockCacheLimit)
@@ -633,17 +634,19 @@ func (self *BlockChain) Rollback(chain []common.Hash) {
 }
 
 // SetReceiptsData computes all the non-consensus fields of the receipts
-func SetReceiptsData(block *types.Block, receipts types.Receipts) {
+func SetReceiptsData(config *params.ChainConfig, block *types.Block, receipts types.Receipts) {
+	signer := types.MakeSigner(config, block.Number())
+
 	transactions, logIndex := block.Transactions(), uint(0)
 
 	for j := 0; j < len(receipts); j++ {
 		// The transaction hash can be retrieved from the transaction itself
 		receipts[j].TxHash = transactions[j].Hash()
 
+		tx, _ := transactions[j].AsMessage(signer)
 		// The contract address can be derived from the transaction itself
-		if MessageCreatesContract(transactions[j]) {
-			from, _ := transactions[j].From()
-			receipts[j].ContractAddress = crypto.CreateAddress(from, transactions[j].Nonce())
+		if MessageCreatesContract(tx) {
+			receipts[j].ContractAddress = crypto.CreateAddress(tx.From(), tx.Nonce())
 		}
 		// The used gas can be calculated based on previous receipts
 		if j == 0 {
@@ -665,6 +668,7 @@ func SetReceiptsData(block *types.Block, receipts types.Receipts) {
 
 // InsertReceiptChain attempts to complete an already existing header chain with
 // transaction and receipt data.
+// XXX should this be moved to the test?
 func (self *BlockChain) InsertReceiptChain(blockChain types.Blocks, receiptChain []types.Receipts) (int, error) {
 	self.wg.Add(1)
 	defer self.wg.Done()
@@ -704,7 +708,7 @@ func (self *BlockChain) InsertReceiptChain(blockChain types.Blocks, receiptChain
 				continue
 			}
 			// Compute all the non-consensus fields of the receipts
-			SetReceiptsData(block, receipts)
+			SetReceiptsData(self.config, block, receipts)
 			// Write all the data out into the database
 			if err := WriteBody(self.chainDb, block.Hash(), block.NumberU64(), block.Body()); err != nil {
 				errs[index] = fmt.Errorf("failed to write block body: %v", err)
@@ -780,7 +784,7 @@ func (self *BlockChain) InsertReceiptChain(blockChain types.Blocks, receiptChain
 	if stats.ignored > 0 {
 		ignored = fmt.Sprintf(" (%d ignored)", stats.ignored)
 	}
-	glog.V(logger.Info).Infof("imported %d receipts%s in %9v. #%d [%x… / %x…]", stats.processed, ignored, common.PrettyDuration(time.Since(start)), last.Number(), first.Hash().Bytes()[:4], last.Hash().Bytes()[:4])
+	glog.V(logger.Info).Infof("imported %d receipts in %9v. #%d [%x… / %x…]%s", stats.processed, common.PrettyDuration(time.Since(start)), last.Number(), first.Hash().Bytes()[:4], last.Hash().Bytes()[:4], ignored)
 
 	return 0, nil
 }
@@ -874,7 +878,7 @@ func (self *BlockChain) InsertChain(chain types.Blocks) (int, error) {
 
 		if BadHashes[block.Hash()] {
 			err := BadHashError(block.Hash())
-			reportBlock(block, err)
+			self.reportBlock(block, nil, err)
 			return i, err
 		}
 		// Stage 1 validation of the block using the chain's validator
@@ -906,7 +910,7 @@ func (self *BlockChain) InsertChain(chain types.Blocks) (int, error) {
 				continue
 			}
 
-			reportBlock(block, err)
+			self.reportBlock(block, nil, err)
 
 			return i, err
 		}
@@ -920,23 +924,23 @@ func (self *BlockChain) InsertChain(chain types.Blocks) (int, error) {
 			err = self.stateCache.Reset(chain[i-1].Root())
 		}
 		if err != nil {
-			reportBlock(block, err)
+			self.reportBlock(block, nil, err)
 			return i, err
 		}
 		// Process block using the parent state as reference point.
-		receipts, logs, usedGas, err := self.processor.Process(block, self.stateCache, self.config.VmConfig)
+		receipts, logs, usedGas, err := self.processor.Process(block, self.stateCache, vm.Config{})
 		if err != nil {
-			reportBlock(block, err)
+			self.reportBlock(block, receipts, err)
 			return i, err
 		}
 		// Validate the state using the default validator
 		err = self.Validator().ValidateState(block, self.GetBlock(block.ParentHash(), block.NumberU64()-1), self.stateCache, receipts, usedGas)
 		if err != nil {
-			reportBlock(block, err)
+			self.reportBlock(block, receipts, err)
 			return i, err
 		}
 		// Write state changes to database
-		_, err = self.stateCache.Commit()
+		_, err = self.stateCache.Commit(self.config.IsEIP158(block.Number()))
 		if err != nil {
 			return i, err
 		}
@@ -987,6 +991,7 @@ func (self *BlockChain) InsertChain(chain types.Blocks) (int, error) {
 
 		stats.processed++
 		if glog.V(logger.Info) {
+			stats.usedGas += usedGas.Uint64()
 			stats.report(chain, i)
 		}
 	}
@@ -999,6 +1004,7 @@ func (self *BlockChain) InsertChain(chain types.Blocks) (int, error) {
 // insertStats tracks and reports on block insertion.
 type insertStats struct {
 	queued, processed, ignored int
+	usedGas                    uint64
 	lastIndex                  int
 	startTime                  time.Time
 }
@@ -1010,10 +1016,15 @@ const statsReportLimit = 8 * time.Second
 // report prints statistics if some number of blocks have been processed
 // or more than a few seconds have passed since the last message.
 func (st *insertStats) report(chain []*types.Block, index int) {
+	// Fetch the timings for the batch
 	var (
 		now     = time.Now()
 		elapsed = now.Sub(st.startTime)
 	)
+	if elapsed == 0 { // Yes Windows, I'm looking at you
+		elapsed = 1
+	}
+	// If we're at the last block of the batch or report period reached, log
 	if index == len(chain)-1 || elapsed >= statsReportLimit {
 		start, end := chain[st.lastIndex], chain[index]
 		txcount := countTransactions(chain[st.lastIndex : index+1])
@@ -1022,7 +1033,13 @@ func (st *insertStats) report(chain []*types.Block, index int) {
 		if st.queued > 0 || st.ignored > 0 {
 			extra = fmt.Sprintf(" (%d queued %d ignored)", st.queued, st.ignored)
 		}
-		glog.Infof("imported %d blocks%s, %5d txs in %9v. #%v [%x… / %x…]\n", st.processed, extra, txcount, common.PrettyDuration(elapsed), end.Number(), start.Hash().Bytes()[:4], end.Hash().Bytes()[:4])
+		hashes := ""
+		if st.processed > 1 {
+			hashes = fmt.Sprintf("%x… / %x…", start.Hash().Bytes()[:4], end.Hash().Bytes()[:4])
+		} else {
+			hashes = fmt.Sprintf("%x…", end.Hash().Bytes()[:4])
+		}
+		glog.Infof("imported %d blocks, %5d txs (%7.3f Mg) in %9v (%6.3f Mg/s). #%v [%s]%s", st.processed, txcount, float64(st.usedGas)/1000000, common.PrettyDuration(elapsed), float64(st.usedGas)*1000/float64(elapsed), end.Number(), hashes, extra)
 
 		*st = insertStats{startTime: now, lastIndex: index}
 	}
@@ -1190,10 +1207,23 @@ func (self *BlockChain) update() {
 }
 
 // reportBlock logs a bad block error.
-func reportBlock(block *types.Block, err error) {
+func (bc *BlockChain) reportBlock(block *types.Block, receipts types.Receipts, err error) {
 	if glog.V(logger.Error) {
-		glog.Errorf("Bad block #%v (%s)\n", block.Number(), block.Hash().Hex())
-		glog.Errorf("    %v", err)
+		var receiptString string
+		for _, receipt := range receipts {
+			receiptString += fmt.Sprintf("\t%v\n", receipt)
+		}
+		glog.Errorf(`
+########## BAD BLOCK #########
+Chain config: %v
+
+Number: %v
+Hash: 0x%x
+%v
+
+Error: %v
+##############################
+`, bc.config, block.Number(), block.Hash(), receiptString, err)
 	}
 }
 
@@ -1296,4 +1326,4 @@ func (self *BlockChain) GetHeaderByNumber(number uint64) *types.Header {
 }
 
 // Config retrieves the blockchain's chain configuration.
-func (self *BlockChain) Config() *ChainConfig { return self.config }
+func (self *BlockChain) Config() *params.ChainConfig { return self.config }

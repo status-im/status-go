@@ -1,4 +1,4 @@
-// Copyright 2015 The go-ethereum Authors
+// Copyright 2016 The go-ethereum Authors
 // This file is part of the go-ethereum library.
 //
 // The go-ethereum library is free software: you can redistribute it and/or modify
@@ -51,11 +51,11 @@ type peer struct {
 
 	id string
 
-	firstHeadInfo, headInfo *newBlockHashData
+	firstHeadInfo, headInfo *announceData
 	headInfoLen             int
 	lock                    sync.RWMutex
 
-	newBlockHashChn chan newBlockHashData
+	announceChn chan announceData
 
 	fcClient       *flowcontrol.ClientNode // nil if the peer is server only
 	fcServer       *flowcontrol.ServerNode // nil if the peer is client only
@@ -67,12 +67,12 @@ func newPeer(version, network int, p *p2p.Peer, rw p2p.MsgReadWriter) *peer {
 	id := p.ID()
 
 	return &peer{
-		Peer:            p,
-		rw:              rw,
-		version:         version,
-		network:         network,
-		id:              fmt.Sprintf("%x", id[:8]),
-		newBlockHashChn: make(chan newBlockHashData, 20),
+		Peer:        p,
+		rw:          rw,
+		version:     version,
+		network:     network,
+		id:          fmt.Sprintf("%x", id[:8]),
+		announceChn: make(chan announceData, 20),
 	}
 }
 
@@ -109,7 +109,7 @@ func (p *peer) headBlockInfo() blockInfo {
 	return blockInfo{Hash: p.headInfo.Hash, Number: p.headInfo.Number, Td: p.headInfo.Td}
 }
 
-func (p *peer) addNotify(announce *newBlockHashData) bool {
+func (p *peer) addNotify(announce *announceData) bool {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -121,11 +121,13 @@ func (p *peer) addNotify(announce *newBlockHashData) bool {
 		p.firstHeadInfo = p.firstHeadInfo.next
 		p.headInfoLen--
 	}
-	hh := p.headInfo.Number - announce.ReorgDepth
-	if p.headInfo.haveHeaders < hh {
-		hh = p.headInfo.haveHeaders
+	if announce.haveHeaders == 0 {
+		hh := p.headInfo.Number - announce.ReorgDepth
+		if p.headInfo.haveHeaders < hh {
+			hh = p.headInfo.haveHeaders
+		}
+		announce.haveHeaders = hh
 	}
-	announce.haveHeaders = hh
 	p.headInfo.next = announce
 	p.headInfo = announce
 	p.headInfoLen++
@@ -200,10 +202,10 @@ func (p *peer) GetRequestCost(msgcode uint64, amount int) uint64 {
 	return cost
 }
 
-// SendNewBlockHash announces the availability of a number of blocks through
+// SendAnnounce announces the availability of a number of blocks through
 // a hash notification.
-func (p *peer) SendNewBlockHash(request newBlockHashData) error {
-	return p2p.Send(p.rw, NewBlockHashMsg, request)
+func (p *peer) SendAnnounce(request announceData) error {
+	return p2p.Send(p.rw, AnnounceMsg, request)
 }
 
 // SendBlockHeaders sends a batch of block headers to the remote peer.
@@ -451,7 +453,7 @@ func (p *peer) Handshake(td *big.Int, head common.Hash, headNum uint64, genesis 
 		p.fcCosts = MRC.decode()
 	}
 
-	p.firstHeadInfo = &newBlockHashData{Td: rTd, Hash: rHash, Number: rNum}
+	p.firstHeadInfo = &announceData{Td: rTd, Hash: rHash, Number: rNum}
 	p.headInfo = p.firstHeadInfo
 	p.headInfoLen = 1
 	return nil

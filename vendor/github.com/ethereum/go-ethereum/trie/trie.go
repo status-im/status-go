@@ -25,6 +25,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto/sha3"
 	"github.com/ethereum/go-ethereum/logger"
 	"github.com/ethereum/go-ethereum/logger/glog"
+	"github.com/rcrowley/go-metrics"
 )
 
 var (
@@ -33,6 +34,25 @@ var (
 	// This is the known hash of an empty state trie entry.
 	emptyState common.Hash
 )
+
+var (
+	cacheMissCounter   = metrics.NewRegisteredCounter("trie/cachemiss", nil)
+	cacheUnloadCounter = metrics.NewRegisteredCounter("trie/cacheunload", nil)
+)
+
+// CacheMisses retrieves a global counter measuring the number of cache misses
+// the trie did since process startup. This isn't useful for anything apart from
+// trie debugging purposes.
+func CacheMisses() int64 {
+	return cacheMissCounter.Count()
+}
+
+// CacheUnloads retrieves a global counter measuring the number of cache unloads
+// the trie did since process startup. This isn't useful for anything apart from
+// trie debugging purposes.
+func CacheUnloads() int64 {
+	return cacheUnloadCounter.Count()
+}
 
 func init() {
 	sha3.NewKeccak256().Sum(emptyState[:0])
@@ -93,13 +113,11 @@ func New(root common.Hash, db Database) (*Trie, error) {
 		if db == nil {
 			panic("trie.New: cannot use existing root without a database")
 		}
-		if v, _ := trie.db.Get(root[:]); len(v) == 0 {
-			return nil, &MissingNodeError{
-				RootHash: root,
-				NodeHash: root,
-			}
+		rootnode, err := trie.resolveHash(root[:], nil, nil)
+		if err != nil {
+			return nil, err
 		}
-		trie.root = hashNode(root.Bytes())
+		trie.root = rootnode
 	}
 	return trie, nil
 }
@@ -146,14 +164,15 @@ func (t *Trie) tryGet(origNode node, key []byte, pos int) (value []byte, newnode
 		if err == nil && didResolve {
 			n = n.copy()
 			n.Val = newnode
+			n.flags.gen = t.cachegen
 		}
 		return value, n, didResolve, err
 	case *fullNode:
 		value, newnode, didResolve, err = t.tryGet(n.Children[key[pos]], key, pos+1)
 		if err == nil && didResolve {
 			n = n.copy()
+			n.flags.gen = t.cachegen
 			n.Children[key[pos]] = newnode
-
 		}
 		return value, n, didResolve, err
 	case hashNode:
@@ -249,7 +268,8 @@ func (t *Trie) insert(n node, prefix, key []byte, value node) (bool, node, error
 			return false, n, err
 		}
 		n = n.copy()
-		n.Children[key[0]], n.flags.hash, n.flags.dirty = nn, nil, true
+		n.flags = t.newFlag()
+		n.Children[key[0]] = nn
 		return true, n, nil
 
 	case nil:
@@ -333,7 +353,8 @@ func (t *Trie) delete(n node, prefix, key []byte) (bool, node, error) {
 			return false, n, err
 		}
 		n = n.copy()
-		n.Children[key[0]], n.flags.hash, n.flags.dirty = nn, nil, true
+		n.flags = t.newFlag()
+		n.Children[key[0]] = nn
 
 		// Check how many non-nil entries are left after deleting and
 		// reduce the full node to a short node if only one entry is
@@ -419,6 +440,8 @@ func (t *Trie) resolve(n node, prefix, suffix []byte) (node, error) {
 }
 
 func (t *Trie) resolveHash(n hashNode, prefix, suffix []byte) (node, error) {
+	cacheMissCounter.Inc(1)
+
 	enc, err := t.db.Get(n)
 	if err != nil || enc == nil {
 		return nil, &MissingNodeError{
@@ -429,7 +452,7 @@ func (t *Trie) resolveHash(n hashNode, prefix, suffix []byte) (node, error) {
 			SuffixLen: len(suffix),
 		}
 	}
-	dec := mustDecodeNode(n, enc)
+	dec := mustDecodeNode(n, enc, t.cachegen)
 	return dec, nil
 }
 

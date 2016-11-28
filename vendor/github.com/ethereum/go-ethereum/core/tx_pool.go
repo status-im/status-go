@@ -30,6 +30,8 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/logger"
 	"github.com/ethereum/go-ethereum/logger/glog"
+	"github.com/ethereum/go-ethereum/metrics"
+	"github.com/ethereum/go-ethereum/params"
 	"gopkg.in/karalabe/cookiejar.v2/collections/prque"
 )
 
@@ -55,6 +57,23 @@ var (
 	evictionInterval     = time.Minute   // Time interval to check for evictable transactions
 )
 
+var (
+	// Metrics for the pending pool
+	pendingDiscardCounter = metrics.NewCounter("txpool/pending/discard")
+	pendingReplaceCounter = metrics.NewCounter("txpool/pending/replace")
+	pendingRLCounter      = metrics.NewCounter("txpool/pending/ratelimit") // Dropped due to rate limiting
+	pendingNofundsCounter = metrics.NewCounter("txpool/pending/nofunds")   // Dropped due to out-of-funds
+
+	// Metrics for the queued pool
+	queuedDiscardCounter = metrics.NewCounter("txpool/queued/discard")
+	queuedReplaceCounter = metrics.NewCounter("txpool/queued/replace")
+	queuedRLCounter      = metrics.NewCounter("txpool/queued/ratelimit") // Dropped due to rate limiting
+	queuedNofundsCounter = metrics.NewCounter("txpool/queued/nofunds")   // Dropped due to out-of-funds
+
+	// General tx metrics
+	invalidTxCounter = metrics.NewCounter("txpool/invalid")
+)
+
 type stateFn func() (*state.StateDB, error)
 
 // TxPool contains all currently known transactions. Transactions
@@ -65,7 +84,7 @@ type stateFn func() (*state.StateDB, error)
 // current state) and future transactions. Transactions move between those
 // two states over time as they are received and processed.
 type TxPool struct {
-	config       *ChainConfig
+	config       *params.ChainConfig
 	currentState stateFn // The state function which will allow us to do some pre checks
 	pendingState *state.ManagedState
 	gasLimit     func() *big.Int // The current gas limit function callback
@@ -73,6 +92,7 @@ type TxPool struct {
 	eventMux     *event.TypeMux
 	events       event.Subscription
 	localTx      *txSet
+	signer       types.Signer
 	mu           sync.RWMutex
 
 	pending map[common.Address]*txList         // All currently processable transactions
@@ -86,9 +106,10 @@ type TxPool struct {
 	homestead bool
 }
 
-func NewTxPool(config *ChainConfig, eventMux *event.TypeMux, currentStateFn stateFn, gasLimitFn func() *big.Int) *TxPool {
+func NewTxPool(config *params.ChainConfig, eventMux *event.TypeMux, currentStateFn stateFn, gasLimitFn func() *big.Int) *TxPool {
 	pool := &TxPool{
 		config:       config,
+		signer:       types.NewEIP155Signer(config.ChainId),
 		pending:      make(map[common.Address]*txList),
 		queue:        make(map[common.Address]*txList),
 		all:          make(map[common.Hash]*types.Transaction),
@@ -120,8 +141,10 @@ func (pool *TxPool) eventLoop() {
 		switch ev := ev.Data.(type) {
 		case ChainHeadEvent:
 			pool.mu.Lock()
-			if ev.Block != nil && pool.config.IsHomestead(ev.Block.Number()) {
-				pool.homestead = true
+			if ev.Block != nil {
+				if pool.config.IsHomestead(ev.Block.Number()) {
+					pool.homestead = true
+				}
 			}
 
 			pool.resetState()
@@ -253,7 +276,7 @@ func (pool *TxPool) validateTx(tx *types.Transaction) error {
 		return err
 	}
 
-	from, err := tx.From()
+	from, err := types.Sender(pool.signer, tx)
 	if err != nil {
 		return ErrInvalidSender
 	}
@@ -288,7 +311,7 @@ func (pool *TxPool) validateTx(tx *types.Transaction) error {
 		return ErrInsufficientFunds
 	}
 
-	intrGas := IntrinsicGas(tx.Data(), MessageCreatesContract(tx), pool.homestead)
+	intrGas := IntrinsicGas(tx.Data(), tx.To() == nil, pool.homestead)
 	if tx.Gas().Cmp(intrGas) < 0 {
 		return ErrIntrinsicGas
 	}
@@ -306,6 +329,7 @@ func (pool *TxPool) add(tx *types.Transaction) error {
 	}
 	// Otherwise ensure basic validation passes and queue it up
 	if err := pool.validateTx(tx); err != nil {
+		invalidTxCounter.Inc(1)
 		return err
 	}
 	pool.enqueueTx(hash, tx)
@@ -316,7 +340,7 @@ func (pool *TxPool) add(tx *types.Transaction) error {
 		if to := tx.To(); to != nil {
 			rcpt = common.Bytes2Hex(to[:4])
 		}
-		from, _ := tx.From() // from already verified during tx validation
+		from, _ := types.Sender(pool.signer, tx) // from already verified during tx validation
 		glog.Infof("(t) 0x%x => %s (%v) %x\n", from[:4], rcpt, tx.Value, hash)
 	}
 	return nil
@@ -327,17 +351,19 @@ func (pool *TxPool) add(tx *types.Transaction) error {
 // Note, this method assumes the pool lock is held!
 func (pool *TxPool) enqueueTx(hash common.Hash, tx *types.Transaction) {
 	// Try to insert the transaction into the future queue
-	from, _ := tx.From() // already validated
+	from, _ := types.Sender(pool.signer, tx) // already validated
 	if pool.queue[from] == nil {
 		pool.queue[from] = newTxList(false)
 	}
 	inserted, old := pool.queue[from].Add(tx)
 	if !inserted {
+		queuedDiscardCounter.Inc(1)
 		return // An older transaction was better, discard this
 	}
 	// Discard any previous transaction and mark this
 	if old != nil {
 		delete(pool.all, old.Hash())
+		queuedReplaceCounter.Inc(1)
 	}
 	pool.all[hash] = tx
 }
@@ -360,11 +386,13 @@ func (pool *TxPool) promoteTx(addr common.Address, hash common.Hash, tx *types.T
 	if !inserted {
 		// An older transaction was better, discard this
 		delete(pool.all, hash)
+		pendingDiscardCounter.Inc(1)
 		return
 	}
 	// Otherwise discard any previous transaction and mark this
 	if old != nil {
 		delete(pool.all, old.Hash())
+		pendingReplaceCounter.Inc(1)
 	}
 	pool.all[hash] = tx // Failsafe to work around direct pending inserts (tests)
 
@@ -435,7 +463,7 @@ func (pool *TxPool) removeTx(hash common.Hash) {
 	if !ok {
 		return
 	}
-	addr, _ := tx.From() // already validated during insertion
+	addr, _ := types.Sender(pool.signer, tx) // already validated during insertion
 
 	// Remove it from the list of known transactions
 	delete(pool.all, hash)
@@ -499,6 +527,7 @@ func (pool *TxPool) promoteExecutables() {
 				glog.Infof("Removed unpayable queued transaction: %v", tx)
 			}
 			delete(pool.all, tx.Hash())
+			queuedNofundsCounter.Inc(1)
 		}
 		// Gather all executable transactions and promote them
 		for _, tx := range list.Ready(pool.pendingState.GetNonce(addr)) {
@@ -513,6 +542,7 @@ func (pool *TxPool) promoteExecutables() {
 				glog.Infof("Removed cap-exceeding queued transaction: %v", tx)
 			}
 			delete(pool.all, tx.Hash())
+			queuedRLCounter.Inc(1)
 		}
 		queued += uint64(list.Len())
 
@@ -527,6 +557,7 @@ func (pool *TxPool) promoteExecutables() {
 		pending += uint64(list.Len())
 	}
 	if pending > maxPendingTotal {
+		pendingBeforeCap := pending
 		// Assemble a spam order to penalize large transactors first
 		spammers := prque.New()
 		for addr, list := range pool.pending {
@@ -573,6 +604,7 @@ func (pool *TxPool) promoteExecutables() {
 				}
 			}
 		}
+		pendingRLCounter.Inc(int64(pendingBeforeCap - pending))
 	}
 	// If we've queued more transactions than the hard limit, drop oldest ones
 	if queued > maxQueuedInTotal {
@@ -596,6 +628,7 @@ func (pool *TxPool) promoteExecutables() {
 					pool.removeTx(tx.Hash())
 				}
 				drop -= size
+				queuedRLCounter.Inc(int64(size))
 				continue
 			}
 			// Otherwise drop only last few transactions
@@ -603,6 +636,7 @@ func (pool *TxPool) promoteExecutables() {
 			for i := len(txs) - 1; i >= 0 && drop > 0; i-- {
 				pool.removeTx(txs[i].Hash())
 				drop--
+				queuedRLCounter.Inc(1)
 			}
 		}
 	}
@@ -636,6 +670,7 @@ func (pool *TxPool) demoteUnexecutables() {
 				glog.Infof("Removed unpayable pending transaction: %v", tx)
 			}
 			delete(pool.all, tx.Hash())
+			pendingNofundsCounter.Inc(1)
 		}
 		for _, tx := range invalids {
 			if glog.V(logger.Core) {

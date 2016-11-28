@@ -1,4 +1,4 @@
-// Copyright 2015 The go-ethereum Authors
+// Copyright 2016 The go-ethereum Authors
 // This file is part of the go-ethereum library.
 //
 // The go-ethereum library is free software: you can redistribute it and/or modify
@@ -47,7 +47,7 @@ const (
 const (
 	// Protocol messages belonging to LPV1
 	StatusMsg          = 0x00
-	NewBlockHashMsg  = 0x01
+	AnnounceMsg        = 0x01
 	GetBlockHeadersMsg = 0x02
 	BlockHeadersMsg    = 0x03
 	GetBlockBodiesMsg  = 0x04
@@ -111,30 +111,20 @@ type chainManager interface {
 	Status() (td *big.Int, currentBlock common.Hash, genesisBlock common.Hash)
 }
 
-// statusData is the network packet for the status message.
-type statusData struct {
-	ProtocolVersion uint32
-	NetworkId       uint32
-	TD              *big.Int
-	CurrentBlock    common.Hash
-	GenesisBlock    common.Hash
-	History         uint64
-	BL, MRR         uint64
-	MRC             RequestCostList
-}
-
-// newBlockHashData is the network packet for the block announcements.
-type newBlockHashData struct{
-	Hash   common.Hash // Hash of one particular block being announced
-	Number uint64      // Number of one particular block being announced
-	Td     *big.Int    // Total difficulty of one particular block being announced
+// announceData is the network packet for the block announcements.
+type announceData struct {
+	Hash       common.Hash // Hash of one particular block being announced
+	Number     uint64      // Number of one particular block being announced
+	Td         *big.Int    // Total difficulty of one particular block being announced
 	ReorgDepth uint64
+	Update     keyValueList
 
 	haveHeaders uint64 // we have the headers of the remote peer's chain up to this number
-	headKnown bool
-	requested bool
-	next *newBlockHashData
+	headKnown   bool
+	requested   bool
+	next        *announceData
 }
+
 type blockInfo struct {
 	Hash   common.Hash // Hash of one particular block being announced
 	Number uint64      // Number of one particular block being announced

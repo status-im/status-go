@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	TEST_ADDRESS          = "0x89b50b2b26947ccad43accaef76c21d175ad85f4"
-	TEST_ADDRESS_PASSWORD = "asdf"
+	TEST_ADDRESS          = "0xadaf150b905cf5e6a778e553e15a139b6618bbb7"
+	TEST_ADDRESS_PASSWORD = "asdfasdf"
 	CHAT_ID_INIT          = "CHAT_ID_INIT_TEST"
 	CHAT_ID_CALL          = "CHAT_ID_CALL_TEST"
 	CHAT_ID_SEND          = "CHAT_ID_CALL_SEND"

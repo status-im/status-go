@@ -1,4 +1,4 @@
-// Copyright 2014 The go-ethereum Authors
+// Copyright 2016 The go-ethereum Authors
 // This file is part of go-ethereum.
 //
 // go-ethereum is free software: you can redistribute it and/or modify
@@ -30,7 +30,7 @@ import (
 const (
 	VersionMajor = 1          // Major version component of the current release
 	VersionMinor = 5          // Minor version component of the current release
-	VersionPatch = 0          // Patch version component of the current release
+	VersionPatch = 4          // Patch version component of the current release
 	VersionMeta  = "unstable" // Version metadata to append to the version string
 )
 

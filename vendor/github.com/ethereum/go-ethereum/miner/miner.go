@@ -50,8 +50,6 @@ type Miner struct {
 
 	worker *worker
 
-	MinAcceptedGasPrice *big.Int
-
 	threads  int
 	coinbase common.Address
 	mining   int32
@@ -62,7 +60,7 @@ type Miner struct {
 	shouldStart int32 // should start indicates whether we should start after sync
 }
 
-func New(eth Backend, config *core.ChainConfig, mux *event.TypeMux, pow pow.PoW) *Miner {
+func New(eth Backend, config *params.ChainConfig, mux *event.TypeMux, pow pow.PoW) *Miner {
 	miner := &Miner{
 		eth:      eth,
 		mux:      mux,
@@ -107,12 +105,15 @@ out:
 	}
 }
 
+func (m *Miner) GasPrice() *big.Int {
+	return new(big.Int).Set(m.worker.gasPrice)
+}
+
 func (m *Miner) SetGasPrice(price *big.Int) {
 	// FIXME block tests set a nil gas price. Quick dirty fix
 	if price == nil {
 		return
 	}
-
 	m.worker.setGasPrice(price)
 }
 
