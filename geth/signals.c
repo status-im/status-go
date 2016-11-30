@@ -5,10 +5,43 @@
 
 #include <stddef.h>
 #include <stdbool.h>
+#include <stdlib.h>
+#include <objc/objc.h>
+#include <objc/runtime.h>
+#include <objc/message.h>
 
+static id statusServiceClassRef = nil;
+static SEL statusServiceSelector = nil;
+
+static bool initLibrary() {
+    if (statusServiceClassRef == nil) {
+        statusServiceClassRef = objc_getClass("Status");
+        if (statusServiceClassRef == nil) return false;
+    }
+
+    if (statusServiceSelector == nil) {
+        statusServiceSelector = sel_getUid("signalEvent:");
+        if (statusServiceSelector == nil) return false;
+    }
+
+    return true;
+}
+
+
+/*!
+ * @brief Calls static method signalEvent of class GethService.
+ *
+ * @param jsonEvent - UTF8 string
+ *
+ * @note Definition of signalEvent method.
+ *  + (void)signalEvent:(const char *)json
+ */
 bool StatusServiceSignalEvent(const char *jsonEvent) {
-    // code for sending JSON notification up to iOS app
-	return true;
+    if (!initLibrary()) return false;
+
+    objc_msgSend(statusServiceClassRef, statusServiceSelector, jsonEvent);
+
+    return true;
 }
 
 #elif defined(ANDROID_DEPLOYMENT)
@@ -94,7 +127,7 @@ JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved) {
 bool JniLibraryInit(JNIEnv *env) {
 	int i;
 
-	JavaClassPtr_StatusService = (*env)->FindClass(env, "com/statusim/module/StatusService");
+	JavaClassPtr_StatusService = (*env)->FindClass(env, "im/status/ethereum/module/StatusService");
 	if (JavaClassPtr_StatusService == NULL) return false;
 
 	JavaClassPtr_StatusService = (jclass)(*env)->NewGlobalRef(env, JavaClassPtr_StatusService);
@@ -132,7 +165,7 @@ bool JniLibraryInit(JNIEnv *env) {
 }
 
 /*!
- * @brief Calls static method signalEvent of class com.statusim.module.StatusService.
+ * @brief Calls static method signalEvent of class im.status.ethereum.module.StatusService.
  *
  * @param jsonEvent - UTF8 string
  */

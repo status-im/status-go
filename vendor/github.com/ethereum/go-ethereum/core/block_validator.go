@@ -41,13 +41,13 @@ var (
 //
 // BlockValidator implements Validator.
 type BlockValidator struct {
-	config *ChainConfig // Chain configuration options
-	bc     *BlockChain  // Canonical block chain
-	Pow    pow.PoW      // Proof of work used for validating
+	config *params.ChainConfig // Chain configuration options
+	bc     *BlockChain         // Canonical block chain
+	Pow    pow.PoW             // Proof of work used for validating
 }
 
 // NewBlockValidator returns a new block validator which is safe for re-use
-func NewBlockValidator(config *ChainConfig, blockchain *BlockChain, pow pow.PoW) *BlockValidator {
+func NewBlockValidator(config *params.ChainConfig, blockchain *BlockChain, pow pow.PoW) *BlockValidator {
 	validator := &BlockValidator{
 		config: config,
 		Pow:    pow,
@@ -93,14 +93,14 @@ func (v *BlockValidator) ValidateBlock(block *types.Block) error {
 	// Verify UncleHash before running other uncle validations
 	unclesSha := types.CalcUncleHash(block.Uncles())
 	if unclesSha != header.UncleHash {
-		return fmt.Errorf("invalid uncles root hash. received=%x calculated=%x", header.UncleHash, unclesSha)
+		return fmt.Errorf("invalid uncles root hash (remote: %x local: %x)", header.UncleHash, unclesSha)
 	}
 
 	// The transactions Trie's root (R = (Tr [[i, RLP(T1)], [i, RLP(T2)], ... [n, RLP(Tn)]]))
 	// can be used by light clients to make sure they've received the correct Txs
 	txSha := types.DeriveSha(block.Transactions())
 	if txSha != header.TxHash {
-		return fmt.Errorf("invalid transaction root hash. received=%x calculated=%x", header.TxHash, txSha)
+		return fmt.Errorf("invalid transaction root hash (remote: %x local: %x)", header.TxHash, txSha)
 	}
 
 	return nil
@@ -113,23 +113,23 @@ func (v *BlockValidator) ValidateBlock(block *types.Block) error {
 func (v *BlockValidator) ValidateState(block, parent *types.Block, statedb *state.StateDB, receipts types.Receipts, usedGas *big.Int) (err error) {
 	header := block.Header()
 	if block.GasUsed().Cmp(usedGas) != 0 {
-		return ValidationError(fmt.Sprintf("gas used error (%v / %v)", block.GasUsed(), usedGas))
+		return ValidationError(fmt.Sprintf("invalid gas used (remote: %v local: %v)", block.GasUsed(), usedGas))
 	}
 	// Validate the received block's bloom with the one derived from the generated receipts.
 	// For valid blocks this should always validate to true.
 	rbloom := types.CreateBloom(receipts)
 	if rbloom != header.Bloom {
-		return fmt.Errorf("unable to replicate block's bloom=%x vs calculated bloom=%x", header.Bloom, rbloom)
+		return fmt.Errorf("invalid bloom (remote: %x  local: %x)", header.Bloom, rbloom)
 	}
 	// Tre receipt Trie's root (R = (Tr [[H1, R1], ... [Hn, R1]]))
 	receiptSha := types.DeriveSha(receipts)
 	if receiptSha != header.ReceiptHash {
-		return fmt.Errorf("invalid receipt root hash. received=%x calculated=%x", header.ReceiptHash, receiptSha)
+		return fmt.Errorf("invalid receipt root hash (remote: %x local: %x)", header.ReceiptHash, receiptSha)
 	}
 	// Validate the state root against the received state root and throw
 	// an error if they don't match.
-	if root := statedb.IntermediateRoot(); header.Root != root {
-		return fmt.Errorf("invalid merkle root: header=%x computed=%x", header.Root, root)
+	if root := statedb.IntermediateRoot(v.config.IsEIP158(header.Number)); header.Root != root {
+		return fmt.Errorf("invalid merkle root (remote: %x local: %x)", header.Root, root)
 	}
 	return nil
 }
@@ -203,7 +203,7 @@ func (v *BlockValidator) ValidateHeader(header, parent *types.Header, checkPow b
 // Validates a header. Returns an error if the header is invalid.
 //
 // See YP section 4.3.4. "Block Header Validity"
-func ValidateHeader(config *ChainConfig, pow pow.PoW, header *types.Header, parent *types.Header, checkPow, uncle bool) error {
+func ValidateHeader(config *params.ChainConfig, pow pow.PoW, header *types.Header, parent *types.Header, checkPow, uncle bool) error {
 	if big.NewInt(int64(len(header.Extra))).Cmp(params.MaximumExtraDataSize) == 1 {
 		return fmt.Errorf("Header extra data too long (%d)", len(header.Extra))
 	}
@@ -223,7 +223,7 @@ func ValidateHeader(config *ChainConfig, pow pow.PoW, header *types.Header, pare
 
 	expd := CalcDifficulty(config, header.Time.Uint64(), parent.Time.Uint64(), parent.Number, parent.Difficulty)
 	if expd.Cmp(header.Difficulty) != 0 {
-		return fmt.Errorf("Difficulty check failed for header %v, %v", header.Difficulty, expd)
+		return fmt.Errorf("Difficulty check failed for header (remote: %v local: %v)", header.Difficulty, expd)
 	}
 
 	a := new(big.Int).Set(parent.GasLimit)
@@ -232,7 +232,7 @@ func ValidateHeader(config *ChainConfig, pow pow.PoW, header *types.Header, pare
 	b := new(big.Int).Set(parent.GasLimit)
 	b = b.Div(b, params.GasLimitBoundDivisor)
 	if !(a.Cmp(b) < 0) || (header.GasLimit.Cmp(params.MinGasLimit) == -1) {
-		return fmt.Errorf("GasLimit check failed for header %v (%v > %v)", header.GasLimit, a, b)
+		return fmt.Errorf("GasLimit check failed for header (remote: %v local_max: %v)", header.GasLimit, b)
 	}
 
 	num := new(big.Int).Set(parent.Number)
@@ -248,13 +248,21 @@ func ValidateHeader(config *ChainConfig, pow pow.PoW, header *types.Header, pare
 		}
 	}
 	// If all checks passed, validate the extra-data field for hard forks
-	return ValidateDAOHeaderExtraData(config, header)
+	if err := ValidateDAOHeaderExtraData(config, header); err != nil {
+		return err
+	}
+	if !uncle && config.EIP150Block != nil && config.EIP150Block.Cmp(header.Number) == 0 {
+		if config.EIP150Hash != (common.Hash{}) && config.EIP150Hash != header.Hash() {
+			return ValidationError("Homestead gas reprice fork hash mismatch: have 0x%x, want 0x%x", header.Hash(), config.EIP150Hash)
+		}
+	}
+	return nil
 }
 
 // CalcDifficulty is the difficulty adjustment algorithm. It returns
 // the difficulty that a new block should have when created at time
 // given the parent block's time and difficulty.
-func CalcDifficulty(config *ChainConfig, time, parentTime uint64, parentNumber, parentDiff *big.Int) *big.Int {
+func CalcDifficulty(config *params.ChainConfig, time, parentTime uint64, parentNumber, parentDiff *big.Int) *big.Int {
 	if config.IsHomestead(new(big.Int).Add(parentNumber, common.Big1)) {
 		return calcDifficultyHomestead(time, parentTime, parentNumber, parentDiff)
 	} else {

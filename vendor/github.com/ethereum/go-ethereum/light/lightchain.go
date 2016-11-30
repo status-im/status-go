@@ -1,4 +1,4 @@
-// Copyright 2015 The go-ethereum Authors
+// Copyright 2016 The go-ethereum Authors
 // This file is part of the go-ethereum library.
 //
 // The go-ethereum library is free software: you can redistribute it and/or modify
@@ -13,6 +13,7 @@
 //
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
+
 package light
 
 import (
@@ -28,6 +29,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/logger"
 	"github.com/ethereum/go-ethereum/logger/glog"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/pow"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/hashicorp/golang-lru"
@@ -70,7 +72,7 @@ type LightChain struct {
 // NewLightChain returns a fully initialised light chain using information
 // available in the database. It initialises the default Ethereum header
 // validator.
-func NewLightChain(odr OdrBackend, config *core.ChainConfig, pow pow.PoW, mux *event.TypeMux) (*LightChain, error) {
+func NewLightChain(odr OdrBackend, config *params.ChainConfig, pow pow.PoW, mux *event.TypeMux) (*LightChain, error) {
 	bodyCache, _ := lru.New(bodyCacheLimit)
 	bodyRLPCache, _ := lru.New(bodyCacheLimit)
 	blockCache, _ := lru.New(blockCacheLimit)
@@ -106,8 +108,8 @@ func NewLightChain(odr OdrBackend, config *core.ChainConfig, pow pow.PoW, mux *e
 		// add trusted CHT
 		if config.DAOForkSupport {
 			WriteTrustedCht(bc.chainDb, TrustedCht{
-				Number: 523,
-				Root:   common.HexToHash("c9c3203ca7e58bf0ceaae50ed00c7ae234e7b3cc054aee086a1d0873f843df4e"),
+				Number: 637,
+				Root:   common.HexToHash("01e408d9b1942f05dba1a879f3eaafe34d219edaeb8223fecf1244cc023d3e23"),
 			})
 		} else {
 			WriteTrustedCht(bc.chainDb, TrustedCht{
@@ -120,8 +122,8 @@ func NewLightChain(odr OdrBackend, config *core.ChainConfig, pow pow.PoW, mux *e
 		if bc.genesisBlock.Hash() == (common.Hash{12, 215, 134, 162, 66, 93, 22, 241, 82, 198, 88, 49, 108, 66, 62, 108, 225, 24, 30, 21, 195, 41, 88, 38, 215, 201, 144, 76, 186, 156, 227, 3}) {
 			// add trusted CHT for testnet
 			WriteTrustedCht(bc.chainDb, TrustedCht{
-				Number: 319,
-				Root:   common.HexToHash("43b679ff9b4918b0b19e6256f20e35877365ec3e20b38e3b2a02cef5606176dc"),
+				Number: 452,
+				Root:   common.HexToHash("511da2c88e32b14cf4a4e62f7fcbb297139faebc260a4ab5eb43cce6edcba324"),
 			})
 			glog.V(logger.Info).Infoln("Added trusted CHT for testnet")
 		} else {

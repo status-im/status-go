@@ -1,4 +1,4 @@
-// Copyright 2015 The go-ethereum Authors
+// Copyright 2016 The go-ethereum Authors
 // This file is part of the go-ethereum library.
 //
 // The go-ethereum library is free software: you can redistribute it and/or modify
@@ -19,7 +19,6 @@ package les
 
 import (
 	"encoding/binary"
-	"fmt"
 	"math"
 	"sync"
 	"time"
@@ -31,6 +30,8 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/les/flowcontrol"
 	"github.com/ethereum/go-ethereum/light"
+	"github.com/ethereum/go-ethereum/logger"
+	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
@@ -66,8 +67,9 @@ func (s *LesServer) Protocols() []p2p.Protocol {
 	return s.protocolManager.SubProtocols
 }
 
-func (s *LesServer) Start() {
-	s.protocolManager.Start()
+func (s *LesServer) Start(srvr *p2p.Server) {
+	s.protocolManager.Start(srvr)
+
 }
 
 func (s *LesServer) Stop() {
@@ -278,20 +280,22 @@ func (pm *ProtocolManager) blockLoop() {
 				if len(peers) > 0 {
 					header := ev.Data.(core.ChainHeadEvent).Block.Header()
 					hash := header.Hash()
-					number := header.GetNumberU64()
+					number := header.Number.Uint64()
 					td := core.GetTd(pm.chainDb, hash, number)
 					if td != nil && td.Cmp(lastBroadcastTd) > 0 {
 						var reorg uint64
 						if lastHead != nil {
-							reorg = lastHead.GetNumberU64() - core.FindCommonAncestor(pm.chainDb, header, lastHead).GetNumberU64()
+							reorg = lastHead.Number.Uint64() - core.FindCommonAncestor(pm.chainDb, header, lastHead).Number.Uint64()
 						}
 						lastHead = header
 						lastBroadcastTd = td
-						//fmt.Println("BROADCAST", number, hash, td, reorg)
-						announce := newBlockHashData{Hash: hash, Number: number, Td: td, ReorgDepth: reorg}
+
+						glog.V(logger.Debug).Infoln("===> ", number, hash, td, reorg)
+
+						announce := announceData{Hash: hash, Number: number, Td: td, ReorgDepth: reorg}
 						for _, p := range peers {
 							select {
-							case p.newBlockHashChn <- announce:
+							case p.announceChn <- announce:
 							default:
 								pm.removePeer(p.id)
 							}
@@ -390,7 +394,9 @@ func makeCht(db ethdb.Database) bool {
 		lastChtNum = 0
 	} else {
 		lastChtNum++
-		fmt.Printf("CHT %d %064x\n", lastChtNum, root)
+
+		glog.V(logger.Detail).Infof("cht: %d %064x", lastChtNum, root)
+
 		storeChtRoot(db, lastChtNum, root)
 		var data [8]byte
 		binary.BigEndian.PutUint64(data[:], lastChtNum)

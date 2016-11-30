@@ -22,20 +22,23 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/state"
-	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/params"
 )
 
 // The default, always homestead, rule set for the vm env
 type ruleSet struct{}
 
 func (ruleSet) IsHomestead(*big.Int) bool { return true }
+func (ruleSet) GasTable(*big.Int) params.GasTable {
+	return params.GasTableHomesteadGasRepriceFork
+}
 
 // Config is a basic type specifying certain configuration flags for running
 // the EVM.
 type Config struct {
-	RuleSet     vm.RuleSet
+	ChainConfig *params.ChainConfig
 	Difficulty  *big.Int
 	Origin      common.Address
 	Coinbase    common.Address
@@ -53,8 +56,16 @@ type Config struct {
 
 // sets defaults on the config
 func setDefaults(cfg *Config) {
-	if cfg.RuleSet == nil {
-		cfg.RuleSet = ruleSet{}
+	if cfg.ChainConfig == nil {
+		cfg.ChainConfig = &params.ChainConfig{
+			ChainId:        big.NewInt(1),
+			HomesteadBlock: new(big.Int),
+			DAOForkBlock:   new(big.Int),
+			DAOForkSupport: false,
+			EIP150Block:    new(big.Int),
+			EIP155Block:    new(big.Int),
+			EIP158Block:    new(big.Int),
+		}
 	}
 
 	if cfg.Difficulty == nil {
@@ -104,7 +115,7 @@ func Execute(code, input []byte, cfg *Config) ([]byte, *state.StateDB, error) {
 		receiver = cfg.State.CreateAccount(common.StringToAddress("contract"))
 	)
 	// set the receiver's (the executing contract) code for execution.
-	receiver.SetCode(code)
+	receiver.SetCode(crypto.Keccak256Hash(code), code)
 
 	// Call the code with the given configuration.
 	ret, err := vmenv.Call(

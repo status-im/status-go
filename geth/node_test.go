@@ -2,17 +2,18 @@ package geth_test
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
-	"path/filepath"
 
 	"github.com/status-im/status-go/geth"
 )
 
 const (
-	testAddress         = "0x89b50b2b26947ccad43accaef76c21d175ad85f4"
-	testAddressPassword = "asdf"
+	testAddress         = "0xadaf150b905cf5e6a778e553e15a139b6618bbb7"
+	testAddressPassword = "asdfasdf"
 	newAccountPassword  = "badpassword"
+	testAddress1        = "0xadd4d1d02e71c7360c53296968e59d57fd15e2ba"
 
 	whisperMessage1 = "test message 1 (K1 -> K1)"
 	whisperMessage2 = "test message 2 (K1 -> '')"
@@ -28,7 +29,7 @@ func TestMain(m *testing.M) {
 	}
 	// make sure you panic if node start signal is not received
 	signalRecieved := make(chan struct{}, 1)
-	abortPanic := make(chan bool, 1)
+	abortPanic := make(chan struct{}, 1)
 	if syncRequired {
 		geth.PanicAfter(geth.TestNodeSyncSeconds*time.Second, abortPanic, "TestNodeSetup")
 	} else {
@@ -44,11 +45,10 @@ func TestMain(m *testing.M) {
 	err := geth.PrepareTestNode()
 	if err != nil {
 		panic(err)
-		return
 	}
 
 	<-signalRecieved // block and wait for either panic or successful signal
-	abortPanic <- true
+	abortPanic <- struct{}{}
 
 	os.Exit(m.Run())
 }

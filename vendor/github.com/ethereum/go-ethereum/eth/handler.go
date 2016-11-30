@@ -17,6 +17,7 @@
 package eth
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -36,6 +37,7 @@ import (
 	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discover"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/pow"
 	"github.com/ethereum/go-ethereum/rlp"
 )
@@ -66,7 +68,8 @@ type ProtocolManager struct {
 	txpool      txPool
 	blockchain  *core.BlockChain
 	chaindb     ethdb.Database
-	chainconfig *core.ChainConfig
+	chainconfig *params.ChainConfig
+	maxPeers    int
 
 	downloader *downloader.Downloader
 	fetcher    *fetcher.Fetcher
@@ -93,7 +96,7 @@ type ProtocolManager struct {
 
 // NewProtocolManager returns a new ethereum sub protocol manager. The Ethereum sub protocol manages peers capable
 // with the ethereum network.
-func NewProtocolManager(config *core.ChainConfig, fastSync bool, networkId int, mux *event.TypeMux, txpool txPool, pow pow.PoW, blockchain *core.BlockChain, chaindb ethdb.Database) (*ProtocolManager, error) {
+func NewProtocolManager(config *params.ChainConfig, fastSync bool, networkId int, maxPeers int, mux *event.TypeMux, txpool txPool, pow pow.PoW, blockchain *core.BlockChain, chaindb ethdb.Database) (*ProtocolManager, error) {
 	// Create the protocol manager with the base fields
 	manager := &ProtocolManager{
 		networkId:   networkId,
@@ -102,6 +105,7 @@ func NewProtocolManager(config *core.ChainConfig, fastSync bool, networkId int, 
 		blockchain:  blockchain,
 		chaindb:     chaindb,
 		chainconfig: config,
+		maxPeers:    maxPeers,
 		peers:       newPeerSet(),
 		newPeerCh:   make(chan *peer),
 		noMorePeers: make(chan struct{}),
@@ -252,10 +256,10 @@ func (pm *ProtocolManager) newPeer(pv int, p *p2p.Peer, rw p2p.MsgReadWriter) *p
 // handle is the callback invoked to manage the life cycle of an eth peer. When
 // this function terminates, the peer is disconnected.
 func (pm *ProtocolManager) handle(p *peer) error {
-	if pm.peers.Len() >= 20 {
+	if pm.peers.Len() >= pm.maxPeers {
 		return p2p.DiscTooManyPeers
-	}	
-	
+	}
+
 	glog.V(logger.Debug).Infof("%v: peer connected [%s]", p, p.Name())
 
 	// Execute the Ethereum handshake
@@ -291,7 +295,7 @@ func (pm *ProtocolManager) handle(p *peer) error {
 		}
 		// Start a timer to disconnect if the peer doesn't reply in time
 		p.forkDrop = time.AfterFunc(daoChallengeTimeout, func() {
-			glog.V(logger.Warn).Infof("%v: timed out DAO fork-check, dropping", p)
+			glog.V(logger.Debug).Infof("%v: timed out DAO fork-check, dropping", p)
 			pm.removePeer(p.id)
 		})
 		// Make sure it's cleaned up if the peer dies off
@@ -375,14 +379,24 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 				}
 			case query.Origin.Hash != (common.Hash{}) && !query.Reverse:
 				// Hash based traversal towards the leaf block
-				if header := pm.blockchain.GetHeaderByNumber(origin.Number.Uint64() + query.Skip + 1); header != nil {
-					if pm.blockchain.GetBlockHashesFromHash(header.Hash(), query.Skip+1)[query.Skip] == query.Origin.Hash {
-						query.Origin.Hash = header.Hash()
+				var (
+					current = origin.Number.Uint64()
+					next    = current + query.Skip + 1
+				)
+				if next <= current {
+					infos, _ := json.MarshalIndent(p.Peer.Info(), "", "  ")
+					glog.V(logger.Warn).Infof("%v: GetBlockHeaders skip overflow attack (current %v, skip %v, next %v)\nMalicious peer infos: %s", p, current, query.Skip, next, infos)
+					unknown = true
+				} else {
+					if header := pm.blockchain.GetHeaderByNumber(next); header != nil {
+						if pm.blockchain.GetBlockHashesFromHash(header.Hash(), query.Skip+1)[query.Skip] == query.Origin.Hash {
+							query.Origin.Hash = header.Hash()
+						} else {
+							unknown = true
+						}
 					} else {
 						unknown = true
 					}
-				} else {
-					unknown = true
 				}
 			case query.Reverse:
 				// Number based traversal towards the genesis block
@@ -638,9 +652,6 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		if err := msg.Decode(&request); err != nil {
 			return errResp(ErrDecode, "%v: %v", msg, err)
 		}
-		if err := request.Block.ValidateFields(); err != nil {
-			return errResp(ErrDecode, "block validation %v: %v", msg, err)
-		}
 		request.Block.ReceivedAt = msg.ReceivedAt
 		request.Block.ReceivedFrom = p
 
@@ -684,7 +695,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			}
 			p.MarkTransaction(tx.Hash())
 		}
-		pm.txpool.AddTransactions(txs)
+		pm.txpool.AddBatch(txs)
 
 	default:
 		return errResp(ErrInvalidMsgCode, "%v", msg.Code)

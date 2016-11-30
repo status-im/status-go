@@ -31,7 +31,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/internal/ethapi"
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
@@ -53,7 +52,8 @@ type filter struct {
 // PublicFilterAPI offers support to create and manage filters. This will allow external clients to retrieve various
 // information related to the Ethereum protocol such als blocks, transactions and logs.
 type PublicFilterAPI struct {
-	apiBackend ethapi.Backend
+	backend   Backend
+	useMipMap bool
 	mux       *event.TypeMux
 	quit      chan struct{}
 	chainDb   ethdb.Database
@@ -63,13 +63,14 @@ type PublicFilterAPI struct {
 }
 
 // NewPublicFilterAPI returns a new PublicFilterAPI instance.
-func NewPublicFilterAPI(apiBackend ethapi.Backend) *PublicFilterAPI {
+func NewPublicFilterAPI(backend Backend, lightMode bool) *PublicFilterAPI {
 	api := &PublicFilterAPI{
-		apiBackend:       apiBackend,
-		mux:              apiBackend.EventMux(),
-		chainDb:          apiBackend.ChainDb(),
-		events:  	NewEventSystem(apiBackend.EventMux()),
-		filters: 	make(map[rpc.ID]*filter),
+		backend:   backend,
+		useMipMap: !lightMode,
+		mux:       backend.EventMux(),
+		chainDb:   backend.ChainDb(),
+		events:    NewEventSystem(backend.EventMux(), backend, lightMode),
+		filters:   make(map[rpc.ID]*filter),
 	}
 
 	go api.timeoutLoop()
@@ -325,7 +326,7 @@ func (api *PublicFilterAPI) GetLogs(ctx context.Context, crit FilterCriteria) ([
 		crit.ToBlock = big.NewInt(rpc.LatestBlockNumber.Int64())
 	}
 
-	filter := New(api.apiBackend)
+	filter := New(api.backend, api.useMipMap)
 	filter.SetBeginBlock(crit.FromBlock.Int64())
 	filter.SetEndBlock(crit.ToBlock.Int64())
 	filter.SetAddresses(crit.Addresses)
@@ -365,7 +366,7 @@ func (api *PublicFilterAPI) GetFilterLogs(ctx context.Context, id rpc.ID) ([]Log
 		return []Log{}, nil
 	}
 
-	filter := New(api.apiBackend)
+	filter := New(api.backend, api.useMipMap)
 	filter.SetBeginBlock(f.crit.FromBlock.Int64())
 	filter.SetEndBlock(f.crit.ToBlock.Int64())
 	filter.SetAddresses(f.crit.Addresses)
@@ -541,4 +542,3 @@ func (args *FilterCriteria) UnmarshalJSON(data []byte) error {
 
 	return nil
 }
-

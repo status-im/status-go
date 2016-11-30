@@ -17,6 +17,8 @@
 package rpc
 
 import (
+	"bytes"
+	"encoding/hex"
 	"fmt"
 	"math"
 	"math/big"
@@ -273,30 +275,30 @@ func (bn BlockNumber) Int64() int64 {
 	return (int64)(bn)
 }
 
-type ClientRestartWrapper struct {
-	client      *Client
-	newClientFn func() *Client
-	mu          sync.RWMutex
+// HexBytes JSON-encodes as hex with 0x prefix.
+type HexBytes []byte
+
+func (b HexBytes) MarshalJSON() ([]byte, error) {
+	result := make([]byte, len(b)*2+4)
+	copy(result, `"0x`)
+	hex.Encode(result[3:], b)
+	result[len(result)-1] = '"'
+	return result, nil
 }
 
-func NewClientRestartWrapper(newClientFn func() *Client) *ClientRestartWrapper {
-	return &ClientRestartWrapper{
-		client:      newClientFn(),
-		newClientFn: newClientFn,
+func (b *HexBytes) UnmarshalJSON(input []byte) error {
+	if len(input) >= 2 && input[0] == '"' && input[len(input)-1] == '"' {
+		input = input[1 : len(input)-1]
 	}
-}
-
-func (rw *ClientRestartWrapper) Client() *Client {
-	rw.mu.RLock()
-	defer rw.mu.RUnlock()
-
-	return rw.client
-}
-
-func (rw *ClientRestartWrapper) Restart() {
-	rw.mu.Lock()
-	defer rw.mu.Unlock()
-
-	rw.client.Close()
-	rw.client = rw.newClientFn()
+	if !bytes.HasPrefix(input, []byte("0x")) {
+		return fmt.Errorf("missing 0x prefix for hex byte array")
+	}
+	input = input[2:]
+	if len(input) == 0 {
+		*b = nil
+		return nil
+	}
+	*b = make([]byte, len(input)/2)
+	_, err := hex.Decode(*b, input)
+	return err
 }

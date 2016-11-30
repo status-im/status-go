@@ -22,13 +22,11 @@ import (
 	"io/ioutil"
 	"math"
 	"math/big"
-	"math/rand"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/ethereum/ethash"
 	"github.com/ethereum/go-ethereum/accounts"
@@ -41,18 +39,17 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/internal/debug"
 	"github.com/ethereum/go-ethereum/les"
-	"github.com/ethereum/go-ethereum/light"
 	"github.com/ethereum/go-ethereum/logger"
 	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/discover"
+	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/p2p/nat"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/pow"
-	"github.com/ethereum/go-ethereum/release"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/ethereum/go-ethereum/whisper"
+	whisper "github.com/ethereum/go-ethereum/whisper/whisperv2"
 	"gopkg.in/urfave/cli.v1"
 )
 
@@ -83,13 +80,16 @@ OPTIONS:
 }
 
 // NewApp creates an app with sane defaults.
-func NewApp(version, usage string) *cli.App {
+func NewApp(gitCommit, usage string) *cli.App {
 	app := cli.NewApp()
 	app.Name = filepath.Base(os.Args[0])
 	app.Author = ""
 	//app.Authors = nil
 	app.Email = ""
-	app.Version = version
+	app.Version = Version
+	if gitCommit != "" {
+		app.Version += "-" + gitCommit[:8]
+	}
 	app.Usage = usage
 	return app
 }
@@ -106,7 +106,7 @@ var (
 	DataDirFlag = DirectoryFlag{
 		Name:  "datadir",
 		Usage: "Data directory for the databases and keystore",
-		Value: DirectoryString{common.DefaultDataDir()},
+		Value: DirectoryString{node.DefaultDataDir()},
 	}
 	KeyStoreDirFlag = DirectoryFlag{
 		Name:  "keystore",
@@ -140,17 +140,7 @@ var (
 	DocRootFlag = DirectoryFlag{
 		Name:  "docroot",
 		Usage: "Document Root for HTTPClient file scheme",
-		Value: DirectoryString{common.HomeDir()},
-	}
-	CacheFlag = cli.IntFlag{
-		Name:  "cache",
-		Usage: "Megabytes of memory allocated to internal caching (min 16MB / database forced)",
-		Value: 128,
-	}
-	BlockchainVersionFlag = cli.IntFlag{
-		Name:  "blockchainversion",
-		Usage: "Blockchain version (integer)",
-		Value: core.BlockChainVersion,
+		Value: DirectoryString{homeDir()},
 	}
 	FastSyncFlag = cli.BoolFlag{
 		Name:  "fast",
@@ -160,23 +150,30 @@ var (
 		Name:  "light",
 		Usage: "Enable light client mode",
 	}
-	NoDefSrvFlag = cli.BoolFlag{
-		Name:  "nodefsrv",
-		Usage: "Don't add default LES server (only for test version)",
-	}
 	LightServFlag = cli.IntFlag{
 		Name:  "lightserv",
 		Usage: "Maximum percentage of time allowed for serving LES requests (0-90)",
-		Value: 20,
+		Value: 0,
 	}
 	LightPeersFlag = cli.IntFlag{
 		Name:  "lightpeers",
 		Usage: "Maximum number of LES client peers",
-		Value: 10,
+		Value: 20,
 	}
 	LightKDFFlag = cli.BoolFlag{
 		Name:  "lightkdf",
 		Usage: "Reduce key-derivation RAM & CPU usage at some expense of KDF strength",
+	}
+	// Performance tuning settings
+	CacheFlag = cli.IntFlag{
+		Name:  "cache",
+		Usage: "Megabytes of memory allocated to internal caching (min 16MB / database forced)",
+		Value: 128,
+	}
+	TrieCacheGenFlag = cli.IntFlag{
+		Name:  "trie-cache-gens",
+		Usage: "Number of trie node generations to keep in memory",
+		Value: int(state.MaxTrieCacheGen),
 	}
 	// Fork settings
 	SupportDAOFork = cli.BoolFlag{
@@ -188,7 +185,6 @@ var (
 		Usage: "Updates the chain rules to oppose the DAO hard-fork",
 	}
 	// Miner settings
-	// TODO: refactor CPU vs GPU mining flags
 	MiningEnabledFlag = cli.BoolFlag{
 		Name:  "mine",
 		Usage: "Enable mining",
@@ -197,10 +193,6 @@ var (
 		Name:  "minerthreads",
 		Usage: "Number of CPU threads to use for mining",
 		Value: runtime.NumCPU(),
-	}
-	MiningGPUFlag = cli.StringFlag{
-		Name:  "minergpus",
-		Usage: "List of GPUs to use for mining (e.g. '0,1' will use the first two GPUs found)",
 	}
 	TargetGasLimitFlag = cli.StringFlag{
 		Name:  "targetgaslimit",
@@ -269,12 +261,12 @@ var (
 	RPCListenAddrFlag = cli.StringFlag{
 		Name:  "rpcaddr",
 		Usage: "HTTP-RPC server listening interface",
-		Value: common.DefaultHTTPHost,
+		Value: node.DefaultHTTPHost,
 	}
 	RPCPortFlag = cli.IntFlag{
 		Name:  "rpcport",
 		Usage: "HTTP-RPC server listening port",
-		Value: common.DefaultHTTPPort,
+		Value: node.DefaultHTTPPort,
 	}
 	RPCCORSDomainFlag = cli.StringFlag{
 		Name:  "rpccorsdomain",
@@ -292,13 +284,13 @@ var (
 	}
 	IPCApiFlag = cli.StringFlag{
 		Name:  "ipcapi",
-		Usage: "API's offered over the IPC-RPC interface",
+		Usage: "APIs offered over the IPC-RPC interface",
 		Value: rpc.DefaultIPCApis,
 	}
 	IPCPathFlag = DirectoryFlag{
 		Name:  "ipcpath",
 		Usage: "Filename for IPC socket/pipe within the datadir (explicit paths escape it)",
-		Value: DirectoryString{common.DefaultIPCSocket},
+		Value: DirectoryString{"geth.ipc"},
 	}
 	WSEnabledFlag = cli.BoolFlag{
 		Name:  "ws",
@@ -307,12 +299,12 @@ var (
 	WSListenAddrFlag = cli.StringFlag{
 		Name:  "wsaddr",
 		Usage: "WS-RPC server listening interface",
-		Value: common.DefaultWSHost,
+		Value: node.DefaultWSHost,
 	}
 	WSPortFlag = cli.IntFlag{
 		Name:  "wsport",
 		Usage: "WS-RPC server listening port",
-		Value: common.DefaultWSPort,
+		Value: node.DefaultWSPort,
 	}
 	WSApiFlag = cli.StringFlag{
 		Name:  "wsapi",
@@ -370,6 +362,10 @@ var (
 	NoDiscoverFlag = cli.BoolFlag{
 		Name:  "nodiscover",
 		Usage: "Disables the peer discovery mechanism (manual peer addition)",
+	}
+	DiscoveryV5Flag = cli.BoolFlag{
+		Name:  "v5disc",
+		Usage: "Enables the experimental RLPx V5 (Topic Discovery) mechanism",
 	}
 	NoEthFlag = cli.BoolFlag{
 		Name:  "noeth",
@@ -431,13 +427,14 @@ func DebugSetup(ctx *cli.Context) error {
 	return err
 }
 
-// MustMakeDataDir retrieves the currently requested data directory, terminating
+// MakeDataDir retrieves the currently requested data directory, terminating
 // if none (or the empty string) is specified. If the node is starting a testnet,
 // the a subdirectory of the specified datadir will be used.
-func MustMakeDataDir(ctx *cli.Context) string {
+func MakeDataDir(ctx *cli.Context) string {
 	if path := ctx.GlobalString(DataDirFlag.Name); path != "" {
+		// TODO: choose a different location outside of the regular datadir.
 		if ctx.GlobalBool(TestNetFlag.Name) {
-			return filepath.Join(path, "/testnet")
+			return filepath.Join(path, "testnet")
 		}
 		return path
 	}
@@ -482,16 +479,16 @@ func MakeNodeKey(ctx *cli.Context) *ecdsa.PrivateKey {
 	return key
 }
 
-// MakeNodeName creates a node name from a base set and the command line flags.
-func MakeNodeName(client, version string, ctx *cli.Context) string {
-	name := common.MakeName(client, version)
+// makeNodeUserIdent creates the user identifier from CLI flags.
+func makeNodeUserIdent(ctx *cli.Context) string {
+	var comps []string
 	if identity := ctx.GlobalString(IdentityFlag.Name); len(identity) > 0 {
-		name += "/" + identity
+		comps = append(comps, identity)
 	}
 	if ctx.GlobalBool(VMEnableJitFlag.Name) {
-		name += "/JIT"
+		comps = append(comps, "JIT")
 	}
-	return name
+	return strings.Join(comps, "/")
 }
 
 // MakeBootstrapNodes creates a list of bootstrap nodes from the command line
@@ -500,9 +497,9 @@ func MakeBootstrapNodes(ctx *cli.Context) []*discover.Node {
 	// Return pre-configured nodes if none were manually requested
 	if !ctx.GlobalIsSet(BootnodesFlag.Name) {
 		if ctx.GlobalBool(TestNetFlag.Name) {
-			return TestNetBootNodes
+			return params.TestnetBootnodes
 		}
-		return FrontierBootNodes
+		return params.MainnetBootnodes
 	}
 	// Otherwise parse and use the CLI bootstrap nodes
 	bootnodes := []*discover.Node{}
@@ -518,10 +515,37 @@ func MakeBootstrapNodes(ctx *cli.Context) []*discover.Node {
 	return bootnodes
 }
 
+// MakeBootstrapNodesV5 creates a list of bootstrap nodes from the command line
+// flags, reverting to pre-configured ones if none have been specified.
+func MakeBootstrapNodesV5(ctx *cli.Context) []*discv5.Node {
+	// Return pre-configured nodes if none were manually requested
+	if !ctx.GlobalIsSet(BootnodesFlag.Name) {
+		return params.DiscoveryV5Bootnodes
+	}
+	// Otherwise parse and use the CLI bootstrap nodes
+	bootnodes := []*discv5.Node{}
+
+	for _, url := range strings.Split(ctx.GlobalString(BootnodesFlag.Name), ",") {
+		node, err := discv5.ParseNode(url)
+		if err != nil {
+			glog.V(logger.Error).Infof("Bootstrap URL %s: %v\n", url, err)
+			continue
+		}
+		bootnodes = append(bootnodes, node)
+	}
+	return bootnodes
+}
+
 // MakeListenAddress creates a TCP listening address string from set command
 // line flags.
 func MakeListenAddress(ctx *cli.Context) string {
 	return fmt.Sprintf(":%d", ctx.GlobalInt(ListenPortFlag.Name))
+}
+
+// MakeDiscoveryV5Address creates a UDP listening address string from set command
+// line flags for the V5 discovery protocol.
+func MakeDiscoveryV5Address(ctx *cli.Context) string {
+	return fmt.Sprintf(":%d", ctx.GlobalInt(ListenPortFlag.Name)+1)
 }
 
 // MakeNAT creates a port mapper from set command line flags.
@@ -640,15 +664,25 @@ func MakePasswordList(ctx *cli.Context) []string {
 }
 
 // MakeNode configures a node with no services from command line flags.
-func MakeNode(ctx *cli.Context, name, version string) *node.Node {
+func MakeNode(ctx *cli.Context, name, gitCommit string) *node.Node {
+	vsn := Version
+	if gitCommit != "" {
+		vsn += "-" + gitCommit[:8]
+	}
+
 	config := &node.Config{
-		DataDir:           MustMakeDataDir(ctx),
+		DataDir:           MakeDataDir(ctx),
 		KeyStoreDir:       ctx.GlobalString(KeyStoreDirFlag.Name),
 		UseLightweightKDF: ctx.GlobalBool(LightKDFFlag.Name),
 		PrivateKey:        MakeNodeKey(ctx),
-		Name:              MakeNodeName(name, version, ctx),
-		NoDiscovery:       ctx.GlobalBool(NoDiscoverFlag.Name),
+		Name:              name,
+		Version:           vsn,
+		UserIdent:         makeNodeUserIdent(ctx),
+		NoDiscovery:       ctx.GlobalBool(NoDiscoverFlag.Name) || ctx.GlobalBool(LightModeFlag.Name),
+		DiscoveryV5:       ctx.GlobalBool(DiscoveryV5Flag.Name) || ctx.GlobalBool(LightModeFlag.Name) || ctx.GlobalInt(LightServFlag.Name) > 0,
+		DiscoveryV5Addr:   MakeDiscoveryV5Address(ctx),
 		BootstrapNodes:    MakeBootstrapNodes(ctx),
+		BootstrapNodesV5:  MakeBootstrapNodesV5(ctx),
 		ListenAddr:        MakeListenAddress(ctx),
 		NAT:               MakeNAT(ctx),
 		MaxPeers:          ctx.GlobalInt(MaxPeersFlag.Name),
@@ -680,7 +714,7 @@ func MakeNode(ctx *cli.Context, name, version string) *node.Node {
 
 // RegisterEthService configures eth.Ethereum from command line flags and adds it to the
 // given node.
-func RegisterEthService(ctx *cli.Context, stack *node.Node, relconf release.Config, extra []byte) {
+func RegisterEthService(ctx *cli.Context, stack *node.Node, extra []byte) {
 	ethDisabled := ctx.GlobalBool(NoEthFlag.Name)
 	if ethDisabled {
 		glog.V(logger.Info).Infof("Ethereum service registration by-passed (--%s flag used)\n", NoEthFlag.Name)
@@ -698,25 +732,14 @@ func RegisterEthService(ctx *cli.Context, stack *node.Node, relconf release.Conf
 		Fatalf("The %v flags are mutually exclusive", netFlags)
 	}
 
-	// initialise new random number generator
-	rand := rand.New(rand.NewSource(time.Now().UnixNano()))
-	// get enabled jit flag
-	jitEnabled := ctx.GlobalBool(VMEnableJitFlag.Name)
-	// if the jit is not enabled enable it for 10 pct of the people
-	if !jitEnabled && rand.Float64() < 0.1 {
-		jitEnabled = true
-		glog.V(logger.Info).Infoln("You're one of the lucky few that will try out the JIT VM (random). If you get a consensus failure please be so kind to report this incident with the block hash that failed. You can switch to the regular VM by setting --jitvm=false")
-	}
-
 	ethConf := &eth.Config{
 		Etherbase:               MakeEtherbase(stack.AccountManager(), ctx),
-		ChainConfig:             MustMakeChainConfig(ctx),
+		ChainConfig:             MakeChainConfig(ctx, stack),
 		FastSync:                ctx.GlobalBool(FastSyncFlag.Name),
 		LightMode:               ctx.GlobalBool(LightModeFlag.Name),
-		NoDefSrv:                ctx.GlobalBool(NoDefSrvFlag.Name),
 		LightServ:               ctx.GlobalInt(LightServFlag.Name),
 		LightPeers:              ctx.GlobalInt(LightPeersFlag.Name),
-		BlockChainVersion:       ctx.GlobalInt(BlockchainVersionFlag.Name),
+		MaxPeers:                ctx.GlobalInt(MaxPeersFlag.Name),
 		DatabaseCache:           ctx.GlobalInt(CacheFlag.Name),
 		DatabaseHandles:         MakeDatabaseHandles(),
 		NetworkId:               ctx.GlobalInt(NetworkIdFlag.Name),
@@ -724,8 +747,6 @@ func RegisterEthService(ctx *cli.Context, stack *node.Node, relconf release.Conf
 		ExtraData:               MakeMinerExtra(extra, ctx),
 		NatSpec:                 ctx.GlobalBool(NatspecEnabledFlag.Name),
 		DocRoot:                 ctx.GlobalString(DocRootFlag.Name),
-		EnableJit:               jitEnabled,
-		ForceJit:                ctx.GlobalBool(VMForceJitFlag.Name),
 		GasPrice:                common.String2Big(ctx.GlobalString(GasPriceFlag.Name)),
 		GpoMinGasPrice:          common.String2Big(ctx.GlobalString(GpoMinGasPriceFlag.Name)),
 		GpoMaxGasPrice:          common.String2Big(ctx.GlobalString(GpoMaxGasPriceFlag.Name)),
@@ -747,11 +768,9 @@ func RegisterEthService(ctx *cli.Context, stack *node.Node, relconf release.Conf
 
 	case ctx.GlobalBool(TestNetFlag.Name):
 		if !ctx.GlobalIsSet(NetworkIdFlag.Name) {
-			ethConf.NetworkId = 2
+			ethConf.NetworkId = 3
 		}
-		ethConf.Genesis = core.TestNetGenesisBlock()
-		state.StartingNonce = 1048576 // (2**20)
-		light.StartingNonce = 1048576 // (2**20)
+		ethConf.Genesis = core.DefaultTestnetGenesisBlock()
 
 	case ctx.GlobalBool(DevModeFlag.Name):
 		ethConf.Genesis = core.OlympicGenesisBlock()
@@ -759,6 +778,10 @@ func RegisterEthService(ctx *cli.Context, stack *node.Node, relconf release.Conf
 			ethConf.GasPrice = new(big.Int)
 		}
 		ethConf.PowTest = true
+	}
+	// Override any global options pertaining to the Ethereum protocol
+	if gen := ctx.GlobalInt(TrieCacheGenFlag.Name); gen > 0 {
+		state.MaxTrieCacheGen = uint16(gen)
 	}
 
 	if ethConf.LightMode {
@@ -770,7 +793,7 @@ func RegisterEthService(ctx *cli.Context, stack *node.Node, relconf release.Conf
 	} else {
 		if err := stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
 			fullNode, err := eth.New(ctx, ethConf)
-			if fullNode != nil {
+			if fullNode != nil && ethConf.LightServ > 0 {
 				ls, _ := les.NewLesServer(fullNode, ethConf)
 				fullNode.AddLesServer(ls)
 			}
@@ -778,11 +801,6 @@ func RegisterEthService(ctx *cli.Context, stack *node.Node, relconf release.Conf
 		}); err != nil {
 			Fatalf("Failed to register the Ethereum full node service: %v", err)
 		}
-	}
-	if err := stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-		return release.NewReleaseService(ctx, relconf)
-	}); err != nil {
-		Fatalf("Failed to register the Geth release oracle service: %v", err)
 	}
 }
 
@@ -808,18 +826,18 @@ func SetupNetwork(ctx *cli.Context) {
 	params.TargetGasLimit = common.String2Big(ctx.GlobalString(TargetGasLimitFlag.Name))
 }
 
-// MustMakeChainConfig reads the chain configuration from the database in ctx.Datadir.
-func MustMakeChainConfig(ctx *cli.Context) *core.ChainConfig {
-	db := MakeChainDatabase(ctx)
+// MakeChainConfig reads the chain configuration from the database in ctx.Datadir.
+func MakeChainConfig(ctx *cli.Context, stack *node.Node) *params.ChainConfig {
+	db := MakeChainDatabase(ctx, stack)
 	defer db.Close()
 
-	return MustMakeChainConfigFromDb(ctx, db)
+	return MakeChainConfigFromDb(ctx, db)
 }
 
-// MustMakeChainConfigFromDb reads the chain configuration from the given database.
-func MustMakeChainConfigFromDb(ctx *cli.Context, db ethdb.Database) *core.ChainConfig {
+// MakeChainConfigFromDb reads the chain configuration from the given database.
+func MakeChainConfigFromDb(ctx *cli.Context, db ethdb.Database) *params.ChainConfig {
 	// If the chain is already initialized, use any existing chain configs
-	config := new(core.ChainConfig)
+	config := new(params.ChainConfig)
 
 	genesis := core.GetBlock(db, core.GetCanonicalHash(db, 0), 0)
 	if genesis != nil {
@@ -833,21 +851,36 @@ func MustMakeChainConfigFromDb(ctx *cli.Context, db ethdb.Database) *core.ChainC
 			Fatalf("Could not make chain configuration: %v", err)
 		}
 	}
-	// Set any missing fields due to them being unset or system upgrade
-	if config.HomesteadBlock == nil {
-		if ctx.GlobalBool(TestNetFlag.Name) {
-			config.HomesteadBlock = params.TestNetHomesteadBlock
-		} else {
-			config.HomesteadBlock = params.MainNetHomesteadBlock
-		}
+	// set chain id in case it's zero.
+	if config.ChainId == nil {
+		config.ChainId = new(big.Int)
 	}
-	if config.DAOForkBlock == nil {
+	// Check whether we are allowed to set default config params or not:
+	//  - If no genesis is set, we're running either mainnet or testnet (private nets use `geth init`)
+	//  - If a genesis is already set, ensure we have a configuration for it (mainnet or testnet)
+	defaults := genesis == nil ||
+		(genesis.Hash() == params.MainNetGenesisHash && !ctx.GlobalBool(TestNetFlag.Name)) ||
+		(genesis.Hash() == params.TestNetGenesisHash && ctx.GlobalBool(TestNetFlag.Name))
+
+	if defaults {
 		if ctx.GlobalBool(TestNetFlag.Name) {
-			config.DAOForkBlock = params.TestNetDAOForkBlock
+			config = params.TestnetChainConfig
 		} else {
+			// Homestead fork
+			config.HomesteadBlock = params.MainNetHomesteadBlock
+			// DAO fork
 			config.DAOForkBlock = params.MainNetDAOForkBlock
+			config.DAOForkSupport = true
+
+			// DoS reprice fork
+			config.EIP150Block = params.MainNetHomesteadGasRepriceBlock
+			config.EIP150Hash = params.MainNetHomesteadGasRepriceHash
+
+			// DoS state cleanup fork
+			config.EIP155Block = params.MainNetSpuriousDragon
+			config.EIP158Block = params.MainNetSpuriousDragon
+			config.ChainId = params.MainNetChainID
 		}
-		config.DAOForkSupport = true
 	}
 	// Force override any existing configs if explicitly requested
 	switch {
@@ -855,23 +888,6 @@ func MustMakeChainConfigFromDb(ctx *cli.Context, db ethdb.Database) *core.ChainC
 		config.DAOForkSupport = true
 	case ctx.GlobalBool(OpposeDAOFork.Name):
 		config.DAOForkSupport = false
-	}
-	// Temporarilly display a proper message so the user knows which fork its on
-	if !ctx.GlobalBool(TestNetFlag.Name) && (genesis == nil || genesis.Hash() == common.HexToHash("0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3")) {
-		choice := "SUPPORT"
-		if !config.DAOForkSupport {
-			choice = "OPPOSE"
-		}
-		current := fmt.Sprintf("Geth is currently configured to %s the DAO hard-fork!", choice)
-		howtoswap := fmt.Sprintf("You can change your choice prior to block #%v with --support-dao-fork or --oppose-dao-fork.", config.DAOForkBlock)
-		howtosync := fmt.Sprintf("After the hard-fork block #%v passed, changing chains requires a resync from scratch!", config.DAOForkBlock)
-		separator := strings.Repeat("-", len(howtoswap))
-
-		glog.V(logger.Warn).Info(separator)
-		glog.V(logger.Warn).Info(current)
-		glog.V(logger.Warn).Info(howtoswap)
-		glog.V(logger.Warn).Info(howtosync)
-		glog.V(logger.Warn).Info(separator)
 	}
 	return config
 }
@@ -885,15 +901,14 @@ func ChainDbName(ctx *cli.Context) string {
 }
 
 // MakeChainDatabase open an LevelDB using the flags passed to the client and will hard crash if it fails.
-func MakeChainDatabase(ctx *cli.Context) ethdb.Database {
+func MakeChainDatabase(ctx *cli.Context, stack *node.Node) ethdb.Database {
 	var (
-		datadir = MustMakeDataDir(ctx)
 		cache   = ctx.GlobalInt(CacheFlag.Name)
 		handles = MakeDatabaseHandles()
 		name    = ChainDbName(ctx)
 	)
 
-	chainDb, err := ethdb.NewLDBDatabase(filepath.Join(datadir, name), cache, handles)
+	chainDb, err := stack.OpenDatabase(name, cache, handles)
 	if err != nil {
 		Fatalf("Could not open database: %v", err)
 	}
@@ -901,9 +916,9 @@ func MakeChainDatabase(ctx *cli.Context) ethdb.Database {
 }
 
 // MakeChain creates a chain manager from set command line flags.
-func MakeChain(ctx *cli.Context) (chain *core.BlockChain, chainDb ethdb.Database) {
+func MakeChain(ctx *cli.Context, stack *node.Node) (chain *core.BlockChain, chainDb ethdb.Database) {
 	var err error
-	chainDb = MakeChainDatabase(ctx)
+	chainDb = MakeChainDatabase(ctx, stack)
 
 	if ctx.GlobalBool(OlympicFlag.Name) {
 		_, err := core.WriteTestNetGenesisBlock(chainDb)
@@ -911,7 +926,7 @@ func MakeChain(ctx *cli.Context) (chain *core.BlockChain, chainDb ethdb.Database
 			glog.Fatalln(err)
 		}
 	}
-	chainConfig := MustMakeChainConfigFromDb(ctx, chainDb)
+	chainConfig := MakeChainConfigFromDb(ctx, chainDb)
 
 	pow := pow.PoW(core.FakePow{})
 	if !ctx.GlobalBool(FakePoWFlag.Name) {

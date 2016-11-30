@@ -23,8 +23,6 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -32,7 +30,7 @@ import (
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/tests"
-	"github.com/ethereum/go-ethereum/whisper"
+	whisper "github.com/ethereum/go-ethereum/whisper/whisperv2"
 )
 
 const defaultTestKey = "b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291"
@@ -88,12 +86,12 @@ func MakeSystemNode(privkey string, test *tests.BlockTest) (*node.Node, error) {
 	// Create a networkless protocol stack
 	stack, err := node.New(&node.Config{
 		UseLightweightKDF: true,
-		IPCPath:           node.DefaultIPCEndpoint(),
-		HTTPHost:          common.DefaultHTTPHost,
-		HTTPPort:          common.DefaultHTTPPort,
+		IPCPath:           node.DefaultIPCEndpoint(""),
+		HTTPHost:          node.DefaultHTTPHost,
+		HTTPPort:          node.DefaultHTTPPort,
 		HTTPModules:       []string{"admin", "db", "eth", "debug", "miner", "net", "shh", "txpool", "personal", "web3"},
-		WSHost:            common.DefaultWSHost,
-		WSPort:            common.DefaultWSPort,
+		WSHost:            node.DefaultWSHost,
+		WSPort:            node.DefaultWSPort,
 		WSModules:         []string{"admin", "db", "eth", "debug", "miner", "net", "shh", "txpool", "personal", "web3"},
 		NoDiscovery:       true,
 	})
@@ -123,7 +121,7 @@ func MakeSystemNode(privkey string, test *tests.BlockTest) (*node.Node, error) {
 	ethConf := &eth.Config{
 		TestGenesisState: db,
 		TestGenesisBlock: test.Genesis,
-		ChainConfig:      &core.ChainConfig{HomesteadBlock: params.MainNetHomesteadBlock},
+		ChainConfig:      &params.ChainConfig{HomesteadBlock: params.MainNetHomesteadBlock},
 	}
 	if err := stack.Register(func(ctx *node.ServiceContext) (node.Service, error) { return eth.New(ctx, ethConf) }); err != nil {
 		return nil, err

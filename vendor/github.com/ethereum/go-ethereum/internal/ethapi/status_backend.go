@@ -3,6 +3,7 @@ package ethapi
 import (
 	"sync"
 
+	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/les/status"
 	"github.com/ethereum/go-ethereum/logger"
@@ -46,6 +47,18 @@ func GetStatusBackend() *StatusBackend {
 	return statusBackend
 }
 
+func (b *StatusBackend) NotifyOnQueuedTxReturn(queuedTx *status.QueuedTx, err error) {
+	if b == nil {
+		return
+	}
+
+	b.txQueue.NotifyOnQueuedTxReturn(queuedTx, err)
+}
+
+func (b *StatusBackend) SetTransactionReturnHandler(fn status.EnqueuedTxReturnHandler) {
+	b.txQueue.SetTxReturnHandler(fn)
+}
+
 func (b *StatusBackend) SetTransactionQueueHandler(fn status.EnqueuedTxHandler) {
 	b.txQueue.SetEnqueueHandler(fn)
 }
@@ -79,11 +92,36 @@ func (b *StatusBackend) CompleteQueuedTransaction(id status.QueuedTxId, passphra
 	}
 
 	hash, err := b.txapi.CompleteQueuedTransaction(context.Background(), SendTxArgs(queuedTx.Args), passphrase)
+
+	// on password error, notify the app, and keep tx in queue (so that CompleteQueuedTransaction() can be resent)
+	if err == accounts.ErrDecrypt {
+		b.NotifyOnQueuedTxReturn(queuedTx, err)
+		return hash, err // SendTransaction is still blocked
+	}
+
+	// allow SendTransaction to return
 	queuedTx.Hash = hash
 	queuedTx.Err = err
 	queuedTx.Done <- struct{}{} // sendTransaction() waits on this, notify so that it can return
 
 	return hash, err
+}
+
+// DiscardQueuedTransaction discards queued transaction forcing SendTransaction to return
+func (b *StatusBackend) DiscardQueuedTransaction(id status.QueuedTxId) error {
+	queuedTx, err := b.txQueue.Get(id)
+	if err != nil {
+		return err
+	}
+
+	// remove from queue, before notifying SendTransaction
+	b.TransactionQueue().Remove(queuedTx.Id)
+
+	// allow SendTransaction to return
+	queuedTx.Err = status.ErrQueuedTxDiscarded
+	queuedTx.Discard <- struct{}{} // sendTransaction() waits on this, notify so that it can return
+
+	return nil
 }
 
 func (b *StatusBackend) transactionQueueForwardingLoop() {

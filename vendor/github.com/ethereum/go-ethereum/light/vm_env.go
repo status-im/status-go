@@ -1,4 +1,4 @@
-// Copyright 2015 The go-ethereum Authors
+// Copyright 2016 The go-ethereum Authors
 // This file is part of the go-ethereum library.
 //
 // The go-ethereum library is free software: you can redistribute it and/or modify
@@ -23,6 +23,8 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/params"
 	"golang.org/x/net/context"
 )
 
@@ -33,56 +35,44 @@ import (
 type VMEnv struct {
 	vm.Environment
 	ctx         context.Context
-	chainConfig *core.ChainConfig
+	chainConfig *params.ChainConfig
 	evm         *vm.EVM
 	state       *VMState
 	header      *types.Header
 	msg         core.Message
 	depth       int
 	chain       *LightChain
-	typ         vm.Type
-	// structured logging
-	logs []vm.StructLog
-	err  error
+	err         error
 }
 
 // NewEnv creates a new execution environment based on an ODR capable light state
-func NewEnv(ctx context.Context, state *LightState, chainConfig *core.ChainConfig, chain *LightChain, msg core.Message, header *types.Header, cfg vm.Config) *VMEnv {
+func NewEnv(ctx context.Context, state *LightState, chainConfig *params.ChainConfig, chain *LightChain, msg core.Message, header *types.Header, cfg vm.Config) *VMEnv {
 	env := &VMEnv{
 		chainConfig: chainConfig,
 		chain:       chain,
 		header:      header,
 		msg:         msg,
-		typ:         vm.StdVmTy,
 	}
 	env.state = &VMState{ctx: ctx, state: state, env: env}
-
-	// if no log collector is present set self as the collector
-	if cfg.Logger.Collector == nil {
-		cfg.Logger.Collector = env
-	}
 
 	env.evm = vm.New(env, cfg)
 	return env
 }
 
-func (self *VMEnv) RuleSet() vm.RuleSet      { return self.chainConfig }
-func (self *VMEnv) Vm() vm.Vm                { return self.evm }
-func (self *VMEnv) Origin() common.Address   { f, _ := self.msg.From(); return f }
-func (self *VMEnv) BlockNumber() *big.Int    { return self.header.Number }
-func (self *VMEnv) Coinbase() common.Address { return self.header.Coinbase }
-func (self *VMEnv) Time() *big.Int           { return self.header.Time }
-func (self *VMEnv) Difficulty() *big.Int     { return self.header.Difficulty }
-func (self *VMEnv) GasLimit() *big.Int       { return self.header.GasLimit }
-func (self *VMEnv) Value() *big.Int          { return self.msg.Value() }
-func (self *VMEnv) Db() vm.Database          { return self.state }
-func (self *VMEnv) Depth() int               { return self.depth }
-func (self *VMEnv) SetDepth(i int)           { self.depth = i }
-func (self *VMEnv) VmType() vm.Type          { return self.typ }
-func (self *VMEnv) SetVmType(t vm.Type)      { self.typ = t }
+func (self *VMEnv) ChainConfig() *params.ChainConfig { return self.chainConfig }
+func (self *VMEnv) Vm() vm.Vm                        { return self.evm }
+func (self *VMEnv) Origin() common.Address           { return self.msg.From() }
+func (self *VMEnv) BlockNumber() *big.Int            { return self.header.Number }
+func (self *VMEnv) Coinbase() common.Address         { return self.header.Coinbase }
+func (self *VMEnv) Time() *big.Int                   { return self.header.Time }
+func (self *VMEnv) Difficulty() *big.Int             { return self.header.Difficulty }
+func (self *VMEnv) GasLimit() *big.Int               { return self.header.GasLimit }
+func (self *VMEnv) Db() vm.Database                  { return self.state }
+func (self *VMEnv) Depth() int                       { return self.depth }
+func (self *VMEnv) SetDepth(i int)                   { self.depth = i }
 func (self *VMEnv) GetHash(n uint64) common.Hash {
 	for header := self.chain.GetHeader(self.header.ParentHash, self.header.Number.Uint64()-1); header != nil; header = self.chain.GetHeader(header.ParentHash, header.Number.Uint64()-1) {
-		if header.GetNumberU64() == n {
+		if header.Number.Uint64() == n {
 			return header.Hash()
 		}
 	}
@@ -97,12 +87,12 @@ func (self *VMEnv) CanTransfer(from common.Address, balance *big.Int) bool {
 	return self.state.GetBalance(from).Cmp(balance) >= 0
 }
 
-func (self *VMEnv) MakeSnapshot() vm.Database {
-	return &VMState{ctx: self.ctx, state: self.state.state.Copy(), env: self}
+func (self *VMEnv) SnapshotDatabase() int {
+	return self.state.SnapshotDatabase()
 }
 
-func (self *VMEnv) SetSnapshot(copy vm.Database) {
-	self.state.state.Set(copy.(*VMState).state)
+func (self *VMEnv) RevertToSnapshot(idx int) {
+	self.state.RevertToSnapshot(idx)
 }
 
 func (self *VMEnv) Transfer(from, to vm.Account, amount *big.Int) {
@@ -116,16 +106,12 @@ func (self *VMEnv) CallCode(me vm.ContractRef, addr common.Address, data []byte,
 	return core.CallCode(self, me, addr, data, gas, price, value)
 }
 
+func (self *VMEnv) DelegateCall(me vm.ContractRef, addr common.Address, data []byte, gas, price *big.Int) ([]byte, error) {
+	return core.DelegateCall(self, me, addr, data, gas, price)
+}
+
 func (self *VMEnv) Create(me vm.ContractRef, data []byte, gas, price, value *big.Int) ([]byte, common.Address, error) {
 	return core.Create(self, me, data, gas, price, value)
-}
-
-func (self *VMEnv) StructLogs() []vm.StructLog {
-	return self.logs
-}
-
-func (self *VMEnv) AddStructLog(log vm.StructLog) {
-	self.logs = append(self.logs, log)
 }
 
 // Error returns the error (if any) that happened during execution.
@@ -137,9 +123,10 @@ func (self *VMEnv) Error() error {
 // passes it to any state operation that requires it.
 type VMState struct {
 	vm.Database
-	ctx   context.Context
-	state *LightState
-	env   *VMEnv
+	ctx       context.Context
+	state     *LightState
+	snapshots []*LightState
+	env       *VMEnv
 }
 
 // errHandler handles and stores any state error that happens during execution.
@@ -147,6 +134,16 @@ func (s *VMState) errHandler(err error) {
 	if err != nil && s.env.err == nil {
 		s.env.err = err
 	}
+}
+
+func (self *VMState) SnapshotDatabase() int {
+	self.snapshots = append(self.snapshots, self.state.Copy())
+	return len(self.snapshots) - 1
+}
+
+func (self *VMState) RevertToSnapshot(idx int) {
+	self.state.Set(self.snapshots[idx])
+	self.snapshots = self.snapshots[:idx]
 }
 
 // GetAccount returns the account object of the given account or nil if the
@@ -208,6 +205,20 @@ func (s *VMState) GetCode(addr common.Address) []byte {
 	return res
 }
 
+// GetCodeHash returns the contract code hash at the given address
+func (s *VMState) GetCodeHash(addr common.Address) common.Hash {
+	res, err := s.state.GetCode(s.ctx, addr)
+	s.errHandler(err)
+	return crypto.Keccak256Hash(res)
+}
+
+// GetCodeSize returns the contract code size at the given address
+func (s *VMState) GetCodeSize(addr common.Address) int {
+	res, err := s.state.GetCode(s.ctx, addr)
+	s.errHandler(err)
+	return len(res)
+}
+
 // SetCode sets the contract code at the specified account
 func (s *VMState) SetCode(addr common.Address, code []byte) {
 	err := s.state.SetCode(s.ctx, addr, code)
@@ -238,9 +249,9 @@ func (s *VMState) SetState(addr common.Address, key common.Hash, value common.Ha
 	s.errHandler(err)
 }
 
-// Delete marks an account to be removed and clears its balance
-func (s *VMState) Delete(addr common.Address) bool {
-	res, err := s.state.Delete(s.ctx, addr)
+// Suicide marks an account to be removed and clears its balance
+func (s *VMState) Suicide(addr common.Address) bool {
+	res, err := s.state.Suicide(s.ctx, addr)
 	s.errHandler(err)
 	return res
 }
@@ -252,10 +263,10 @@ func (s *VMState) Exist(addr common.Address) bool {
 	return res
 }
 
-// IsDeleted returns true if the given account has been marked for deletion
+// HasSuicided returns true if the given account has been marked for deletion
 // or false if the account does not exist
-func (s *VMState) IsDeleted(addr common.Address) bool {
-	res, err := s.state.IsDeleted(s.ctx, addr)
+func (s *VMState) HasSuicided(addr common.Address) bool {
+	res, err := s.state.HasSuicided(s.ctx, addr)
 	s.errHandler(err)
 	return res
 }

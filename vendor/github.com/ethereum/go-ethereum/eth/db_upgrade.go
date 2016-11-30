@@ -1,4 +1,4 @@
-// Copyright 2014 The go-ethereum Authors
+// Copyright 2016 The go-ethereum Authors
 // This file is part of the go-ethereum library.
 //
 // The go-ethereum library is free software: you can redistribute it and/or modify
@@ -49,6 +49,8 @@ func upgradeSequentialKeys(db ethdb.Database) (stopFn func()) {
 		db.Put(useSequentialKeys, []byte{42})
 		return nil // empty database, nothing to do
 	}
+
+	glog.V(logger.Info).Infof("Upgrading chain database to use sequential keys")
 
 	stopChn := make(chan struct{})
 	stoppedChn := make(chan struct{})

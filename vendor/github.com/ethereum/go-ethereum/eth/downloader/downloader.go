@@ -28,6 +28,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	ethereum "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -63,12 +64,12 @@ var (
 	maxHeadersProcess = 2048      // Number of header download results to import at once into the chain
 	maxResultsProcess = 2048      // Number of content download results to import at once into the chain
 
-	fsHeaderCheckFrequency = 100  // Verification frequency of the downloaded headers during fast sync
-	fsHeaderSafetyNet      = 2048 // Number of headers to discard in case a chain violation is detected
-	fsHeaderForceVerify    = 24   // Number of headers to verify before and after the pivot to accept it
-	fsPivotInterval        = 512  // Number of headers out of which to randomize the pivot point
-	fsMinFullBlocks        = 1024 // Number of blocks to retrieve fully even in fast sync
-	fsCriticalTrials       = 10   // Number of times to retry in the cricical section before bailing
+	fsHeaderCheckFrequency = 100        // Verification frequency of the downloaded headers during fast sync
+	fsHeaderSafetyNet      = 2048       // Number of headers to discard in case a chain violation is detected
+	fsHeaderForceVerify    = 24         // Number of headers to verify before and after the pivot to accept it
+	fsPivotInterval        = 256        // Number of headers out of which to randomize the pivot point
+	fsMinFullBlocks        = 64         // Number of blocks to retrieve fully even in fast sync
+	fsCriticalTrials       = uint32(32) // Number of times to retry in the cricical section before bailing
 )
 
 var (
@@ -104,7 +105,7 @@ type Downloader struct {
 	peers *peerSet // Set of active peers from which download can proceed
 
 	fsPivotLock  *types.Header // Pivot header on critical section entry (cannot change between retries)
-	fsPivotFails int           // Number of fast sync failures in the critical section
+	fsPivotFails uint32        // Number of subsequent fast sync failures in the critical section
 
 	rttEstimate   uint64 // Round trip time to target for download requests
 	rttConfidence uint64 // Confidence in the estimated RTT (unit: millionths to allow atomic ops)
@@ -211,7 +212,7 @@ func New(mode SyncMode, stateDb ethdb.Database, mux *event.TypeMux, hasHeader he
 // In addition, during the state download phase of fast synchronisation the number
 // of processed and the total number of known states are also returned. Otherwise
 // these are zero.
-func (d *Downloader) Progress() (uint64, uint64, uint64, uint64, uint64) {
+func (d *Downloader) Progress() ethereum.SyncProgress {
 	// Fetch the pending state count outside of the lock to prevent unforeseen deadlocks
 	pendingStates := uint64(d.queue.PendingNodeData())
 
@@ -228,7 +229,13 @@ func (d *Downloader) Progress() (uint64, uint64, uint64, uint64, uint64) {
 	case LightSync:
 		current = d.headHeader().Number.Uint64()
 	}
-	return d.syncStatsChainOrigin, current, d.syncStatsChainHeight, d.syncStatsStateDone, d.syncStatsStateDone + pendingStates
+	return ethereum.SyncProgress{
+		StartingBlock: d.syncStatsChainOrigin,
+		CurrentBlock:  current,
+		HighestBlock:  d.syncStatsChainHeight,
+		PulledStates:  d.syncStatsStateDone,
+		KnownStates:   d.syncStatsStateDone + pendingStates,
+	}
 }
 
 // Synchronising returns whether the downloader is currently retrieving blocks.
@@ -354,7 +361,7 @@ func (d *Downloader) synchronise(id string, hash common.Hash, td *big.Int, mode 
 
 	// Set the requested sync mode, unless it's forbidden
 	d.mode = mode
-	if d.mode == FastSync && d.fsPivotFails >= fsCriticalTrials {
+	if d.mode == FastSync && atomic.LoadUint32(&d.fsPivotFails) >= fsCriticalTrials {
 		d.mode = FullSync
 	}
 	// Retrieve the origin peer and initiate the downloading process
@@ -473,6 +480,11 @@ func (d *Downloader) spawnSync(origin uint64, fetchers ...func() error) error {
 	d.queue.Close()
 	d.cancel()
 	wg.Wait()
+
+	// If sync failed in the critical section, bump the fail counter
+	if err != nil && d.mode == FastSync && d.fsPivotLock != nil {
+		atomic.AddUint32(&d.fsPivotFails, 1)
+	}
 	return err
 }
 
@@ -919,10 +931,10 @@ func (d *Downloader) fetchNodeData() error {
 	var (
 		deliver = func(packet dataPack) (int, error) {
 			start := time.Now()
-			return d.queue.DeliverNodeData(packet.PeerId(), packet.(*statePack).states, func(err error, delivered int) {
+			return d.queue.DeliverNodeData(packet.PeerId(), packet.(*statePack).states, func(delivered int, progressed bool, err error) {
 				// If the peer returned old-requested data, forgive
 				if err == trie.ErrNotRequested {
-					glog.V(logger.Info).Infof("peer %s: replied to stale state request, forgiving", packet.PeerId())
+					glog.V(logger.Debug).Infof("peer %s: replied to stale state request, forgiving", packet.PeerId())
 					return
 				}
 				if err != nil {
@@ -941,11 +953,17 @@ func (d *Downloader) fetchNodeData() error {
 				}
 				d.syncStatsLock.Lock()
 				d.syncStatsStateDone += uint64(delivered)
+				syncStatsStateDone := d.syncStatsStateDone // Thread safe copy for the log below
 				d.syncStatsLock.Unlock()
 
+				// If real database progress was made, reset any fast-sync pivot failure
+				if progressed && atomic.LoadUint32(&d.fsPivotFails) > 1 {
+					glog.V(logger.Debug).Infof("fast-sync progressed, resetting fail counter from %d", atomic.LoadUint32(&d.fsPivotFails))
+					atomic.StoreUint32(&d.fsPivotFails, 1) // Don't ever reset to 0, as that will unlock the pivot block
+				}
 				// Log a message to the user and return
 				if delivered > 0 {
-					glog.V(logger.Info).Infof("imported %d state entries in %v: processed %d, pending at least %d", delivered, time.Since(start), d.syncStatsStateDone, pending)
+					glog.V(logger.Info).Infof("imported %3d state entries in %9v: processed %d, pending at least %d", delivered, common.PrettyDuration(time.Since(start)), syncStatsStateDone, pending)
 				}
 			})
 		}
@@ -1182,7 +1200,7 @@ func (d *Downloader) processHeaders(origin uint64, td *big.Int) error {
 			// If we're already past the pivot point, this could be an attack, thread carefully
 			if rollback[len(rollback)-1].Number.Uint64() > pivot {
 				// If we didn't ever fail, lock in te pivot header (must! not! change!)
-				if d.fsPivotFails == 0 {
+				if atomic.LoadUint32(&d.fsPivotFails) == 0 {
 					for _, header := range rollback {
 						if header.Number.Uint64() == pivot {
 							glog.V(logger.Warn).Infof("Fast-sync critical section failure, locked pivot to header #%d [%x…]", pivot, header.Hash().Bytes()[:4])
@@ -1190,7 +1208,6 @@ func (d *Downloader) processHeaders(origin uint64, td *big.Int) error {
 						}
 					}
 				}
-				d.fsPivotFails++
 			}
 		}
 	}()

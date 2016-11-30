@@ -23,13 +23,14 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/vm"
+	"github.com/ethereum/go-ethereum/params"
 )
 
 // Env is a basic runtime environment required for running the EVM.
 type Env struct {
-	ruleSet vm.RuleSet
-	depth   int
-	state   *state.StateDB
+	chainConfig *params.ChainConfig
+	depth       int
+	state       *state.StateDB
 
 	origin   common.Address
 	coinbase common.Address
@@ -39,8 +40,6 @@ type Env struct {
 	difficulty *big.Int
 	gasLimit   *big.Int
 
-	logs []vm.StructLog
-
 	getHashFn func(uint64) common.Hash
 
 	evm *vm.EVM
@@ -49,46 +48,34 @@ type Env struct {
 // NewEnv returns a new vm.Environment
 func NewEnv(cfg *Config, state *state.StateDB) vm.Environment {
 	env := &Env{
-		ruleSet:    cfg.RuleSet,
-		state:      state,
-		origin:     cfg.Origin,
-		coinbase:   cfg.Coinbase,
-		number:     cfg.BlockNumber,
-		time:       cfg.Time,
-		difficulty: cfg.Difficulty,
-		gasLimit:   cfg.GasLimit,
+		chainConfig: cfg.ChainConfig,
+		state:       state,
+		origin:      cfg.Origin,
+		coinbase:    cfg.Coinbase,
+		number:      cfg.BlockNumber,
+		time:        cfg.Time,
+		difficulty:  cfg.Difficulty,
+		gasLimit:    cfg.GasLimit,
 	}
 	env.evm = vm.New(env, vm.Config{
 		Debug:     cfg.Debug,
 		EnableJit: !cfg.DisableJit,
 		ForceJit:  !cfg.DisableJit,
-
-		Logger: vm.LogConfig{
-			Collector: env,
-		},
 	})
 
 	return env
 }
 
-func (self *Env) StructLogs() []vm.StructLog {
-	return self.logs
-}
-
-func (self *Env) AddStructLog(log vm.StructLog) {
-	self.logs = append(self.logs, log)
-}
-
-func (self *Env) RuleSet() vm.RuleSet      { return self.ruleSet }
-func (self *Env) Vm() vm.Vm                { return self.evm }
-func (self *Env) Origin() common.Address   { return self.origin }
-func (self *Env) BlockNumber() *big.Int    { return self.number }
-func (self *Env) Coinbase() common.Address { return self.coinbase }
-func (self *Env) Time() *big.Int           { return self.time }
-func (self *Env) Difficulty() *big.Int     { return self.difficulty }
-func (self *Env) Db() vm.Database          { return self.state }
-func (self *Env) GasLimit() *big.Int       { return self.gasLimit }
-func (self *Env) VmType() vm.Type          { return vm.StdVmTy }
+func (self *Env) ChainConfig() *params.ChainConfig { return self.chainConfig }
+func (self *Env) Vm() vm.Vm                        { return self.evm }
+func (self *Env) Origin() common.Address           { return self.origin }
+func (self *Env) BlockNumber() *big.Int            { return self.number }
+func (self *Env) Coinbase() common.Address         { return self.coinbase }
+func (self *Env) Time() *big.Int                   { return self.time }
+func (self *Env) Difficulty() *big.Int             { return self.difficulty }
+func (self *Env) Db() vm.Database                  { return self.state }
+func (self *Env) GasLimit() *big.Int               { return self.gasLimit }
+func (self *Env) VmType() vm.Type                  { return vm.StdVmTy }
 func (self *Env) GetHash(n uint64) common.Hash {
 	return self.getHashFn(n)
 }
@@ -100,11 +87,11 @@ func (self *Env) SetDepth(i int) { self.depth = i }
 func (self *Env) CanTransfer(from common.Address, balance *big.Int) bool {
 	return self.state.GetBalance(from).Cmp(balance) >= 0
 }
-func (self *Env) MakeSnapshot() vm.Database {
-	return self.state.Copy()
+func (self *Env) SnapshotDatabase() int {
+	return self.state.Snapshot()
 }
-func (self *Env) SetSnapshot(copy vm.Database) {
-	self.state.Set(copy.(*state.StateDB))
+func (self *Env) RevertToSnapshot(snapshot int) {
+	self.state.RevertToSnapshot(snapshot)
 }
 
 func (self *Env) Transfer(from, to vm.Account, amount *big.Int) {

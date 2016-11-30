@@ -30,6 +30,8 @@ import (
 var AppHelpTemplate = `NAME:
    {{.App.Name}} - {{.App.Usage}}
 
+   Copyright 2013-2016 The go-ethereum Authors
+
 USAGE:
    {{.App.HelpName}} [options]{{if .App.Commands}} command [command options]{{end}} {{if .App.ArgsUsage}}{{.App.ArgsUsage}}{{else}}[arguments...]{{end}}
    {{if .App.Version}}
@@ -71,12 +73,16 @@ var AppHelpFlagGroups = []flagGroup{
 			utils.IdentityFlag,
 			utils.FastSyncFlag,
 			utils.LightModeFlag,
-			utils.NoDefSrvFlag,
 			utils.LightServFlag,
 			utils.LightPeersFlag,
 			utils.LightKDFFlag,
+		},
+	},
+	{
+		Name: "PERFORMANCE TUNING",
+		Flags: []cli.Flag{
 			utils.CacheFlag,
-			utils.BlockchainVersionFlag,
+			utils.TrieCacheGenFlag,
 		},
 	},
 	{
@@ -116,6 +122,7 @@ var AppHelpFlagGroups = []flagGroup{
 			utils.MaxPendingPeersFlag,
 			utils.NATFlag,
 			utils.NoDiscoverFlag,
+			utils.DiscoveryV5Flag,
 			utils.NodeKeyFileFlag,
 			utils.NodeKeyHexFlag,
 		},
@@ -125,7 +132,6 @@ var AppHelpFlagGroups = []flagGroup{
 		Flags: []cli.Flag{
 			utils.MiningEnabledFlag,
 			utils.MinerThreadsFlag,
-			utils.MiningGPUFlag,
 			utils.AutoDAGFlag,
 			utils.EtherbaseFlag,
 			utils.TargetGasLimitFlag,

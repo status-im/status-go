@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/ethereum/go-ethereum/whisper"
+	whisper "github.com/ethereum/go-ethereum/whisper/whisperv2"
 	"github.com/status-im/status-go/geth"
 	"github.com/status-im/status-go/jail"
 )
@@ -117,28 +117,6 @@ func Logout() *C.char {
 	return C.CString(string(outBytes))
 }
 
-//export UnlockAccount
-func UnlockAccount(address, password *C.char, seconds int) *C.char {
-
-	// This is equivalent to unlocking an account from the command line,
-	// just modified to unlock the account for the currently running geth node
-	// based on the provided arguments
-	err := geth.UnlockAccount(C.GoString(address), C.GoString(password), seconds)
-
-	errString := ""
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		errString = err.Error()
-	}
-
-	out := geth.JSONError{
-		Error: errString,
-	}
-	outBytes, _ := json.Marshal(&out)
-
-	return C.CString(string(outBytes))
-}
-
 //export CompleteTransaction
 func CompleteTransaction(id, password *C.char) *C.char {
 	txHash, err := geth.CompleteTransaction(C.GoString(id), C.GoString(password))
@@ -150,8 +128,69 @@ func CompleteTransaction(id, password *C.char) *C.char {
 	}
 
 	out := geth.CompleteTransactionResult{
+		Id:    C.GoString(id),
 		Hash:  txHash.Hex(),
 		Error: errString,
+	}
+	outBytes, _ := json.Marshal(&out)
+
+	return C.CString(string(outBytes))
+}
+
+//export CompleteTransactions
+func CompleteTransactions(ids, password *C.char) *C.char {
+	out := geth.CompleteTransactionsResult{}
+	out.Results = make(map[string]geth.CompleteTransactionResult)
+
+	results := geth.CompleteTransactions(C.GoString(ids), C.GoString(password))
+	for txId, result := range results {
+		txResult := geth.CompleteTransactionResult{
+			Id:   txId,
+			Hash: result.Hash.Hex(),
+		}
+		if result.Error != nil {
+			txResult.Error = result.Error.Error()
+		}
+		out.Results[txId] = txResult
+	}
+	outBytes, _ := json.Marshal(&out)
+
+	return C.CString(string(outBytes))
+}
+
+//export DiscardTransaction
+func DiscardTransaction(id *C.char) *C.char {
+	err := geth.DiscardTransaction(C.GoString(id))
+
+	errString := ""
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		errString = err.Error()
+	}
+
+	out := geth.DiscardTransactionResult{
+		Id:    C.GoString(id),
+		Error: errString,
+	}
+	outBytes, _ := json.Marshal(&out)
+
+	return C.CString(string(outBytes))
+}
+
+//export DiscardTransactions
+func DiscardTransactions(ids *C.char) *C.char {
+	out := geth.DiscardTransactionsResult{}
+	out.Results = make(map[string]geth.DiscardTransactionResult)
+
+	results := geth.DiscardTransactions(C.GoString(ids))
+	for txId, result := range results {
+		txResult := geth.DiscardTransactionResult{
+			Id: txId,
+		}
+		if result.Error != nil {
+			txResult.Error = result.Error.Error()
+		}
+		out.Results[txId] = txResult
 	}
 	outBytes, _ := json.Marshal(&out)
 

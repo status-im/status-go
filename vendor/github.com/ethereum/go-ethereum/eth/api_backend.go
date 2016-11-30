@@ -1,18 +1,18 @@
 // Copyright 2015 The go-ethereum Authors
-// This file is part of go-ethereum.
+// This file is part of the go-ethereum library.
 //
-// go-ethereum is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
+// The go-ethereum library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// go-ethereum is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
+// GNU Lesser General Public License for more details.
 //
-// You should have received a copy of the GNU General Public License
-// along with go-ethereum. If not, see <http://www.gnu.org/licenses/>.
+// You should have received a copy of the GNU Lesser General Public License
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package eth
 
@@ -30,6 +30,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/internal/ethapi"
+	"github.com/ethereum/go-ethereum/params"
 	rpc "github.com/ethereum/go-ethereum/rpc"
 	"golang.org/x/net/context"
 )
@@ -38,6 +39,14 @@ import (
 type EthApiBackend struct {
 	eth *Ethereum
 	gpo *gasprice.GasPriceOracle
+}
+
+func (b *EthApiBackend) ChainConfig() *params.ChainConfig {
+	return b.eth.chainConfig
+}
+
+func (b *EthApiBackend) CurrentBlock() *types.Block {
+	return b.eth.blockchain.CurrentBlock()
 }
 
 func (b *EthApiBackend) SetHead(number uint64) {
@@ -81,7 +90,7 @@ func (b *EthApiBackend) StateAndHeaderByNumber(ctx context.Context, blockNr rpc.
 	if header == nil || err != nil {
 		return nil, nil, err
 	}
-	stateDb, err := state.New(header.Root, b.eth.chainDb)
+	stateDb, err := b.eth.BlockChain().StateAt(header.Root)
 	return EthApiState{stateDb}, header, err
 }
 
@@ -98,12 +107,11 @@ func (b *EthApiBackend) GetTd(blockHash common.Hash) *big.Int {
 }
 
 func (b *EthApiBackend) GetVMEnv(ctx context.Context, msg core.Message, state ethapi.State, header *types.Header) (vm.Environment, func() error, error) {
-	stateDb := state.(EthApiState).state.Copy()
-	addr, _ := msg.From()
-	from := stateDb.GetOrNewStateObject(addr)
+	statedb := state.(EthApiState).state
+	from := statedb.GetOrNewStateObject(msg.From())
 	from.SetBalance(common.MaxBig)
 	vmError := func() error { return nil }
-	return core.NewEnv(stateDb, b.eth.chainConfig, b.eth.blockchain, msg, header, b.eth.chainConfig.VmConfig), vmError, nil
+	return core.NewEnv(statedb, b.eth.chainConfig, b.eth.blockchain, msg, header, vm.Config{}), vmError, nil
 }
 
 func (b *EthApiBackend) SendTx(ctx context.Context, signedTx *types.Transaction) error {
@@ -118,21 +126,25 @@ func (b *EthApiBackend) RemoveTx(txHash common.Hash) {
 	b.eth.txMu.Lock()
 	defer b.eth.txMu.Unlock()
 
-	b.eth.txPool.RemoveTx(txHash)
+	b.eth.txPool.Remove(txHash)
 }
 
 func (b *EthApiBackend) GetPoolTransactions() types.Transactions {
 	b.eth.txMu.Lock()
 	defer b.eth.txMu.Unlock()
 
-	return b.eth.txPool.GetTransactions()
+	var txs types.Transactions
+	for _, batch := range b.eth.txPool.Pending() {
+		txs = append(txs, batch...)
+	}
+	return txs
 }
 
-func (b *EthApiBackend) GetPoolTransaction(txHash common.Hash) *types.Transaction {
+func (b *EthApiBackend) GetPoolTransaction(hash common.Hash) *types.Transaction {
 	b.eth.txMu.Lock()
 	defer b.eth.txMu.Unlock()
 
-	return b.eth.txPool.GetTransaction(txHash)
+	return b.eth.txPool.Get(hash)
 }
 
 func (b *EthApiBackend) GetPoolNonce(ctx context.Context, addr common.Address) (uint64, error) {
@@ -149,7 +161,7 @@ func (b *EthApiBackend) Stats() (pending int, queued int) {
 	return b.eth.txPool.Stats()
 }
 
-func (b *EthApiBackend) TxPoolContent() (map[common.Address]map[uint64][]*types.Transaction, map[common.Address]map[uint64][]*types.Transaction) {
+func (b *EthApiBackend) TxPoolContent() (map[common.Address]types.Transactions, map[common.Address]types.Transactions) {
 	b.eth.txMu.Lock()
 	defer b.eth.txMu.Unlock()
 

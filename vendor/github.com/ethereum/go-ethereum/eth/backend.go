@@ -35,7 +35,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/registrar/ethreg"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/eth/filters"
 	"github.com/ethereum/go-ethereum/eth/gasprice"
@@ -47,6 +46,7 @@ import (
 	"github.com/ethereum/go-ethereum/miner"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
@@ -64,17 +64,16 @@ var (
 )
 
 type Config struct {
-	ChainConfig *core.ChainConfig // chain configuration
+	ChainConfig *params.ChainConfig // chain configuration
 
 	NetworkId  int    // Network ID to use for selecting peers to connect to
 	Genesis    string // Genesis JSON to seed the chain database with
 	FastSync   bool   // Enables the state download based fast synchronisation algorithm
 	LightMode  bool   // Running in light client mode
-	NoDefSrv   bool   // No default LES server
 	LightServ  int    // Maximum percentage of time allowed for serving LES requests
 	LightPeers int    // Maximum number of LES client peers
+	MaxPeers   int    // Maximum number of global peers
 
-	BlockChainVersion  int
 	SkipBcVersionCheck bool // e.g. blockchain export
 	DatabaseCache      int
 	DatabaseHandles    int
@@ -106,14 +105,14 @@ type Config struct {
 }
 
 type LesServer interface {
-	Start()
+	Start(srvr *p2p.Server)
 	Stop()
 	Protocols() []p2p.Protocol
 }
 
 // Ethereum implements the Ethereum full node service.
 type Ethereum struct {
-	chainConfig *core.ChainConfig
+	chainConfig *params.ChainConfig
 	// Channel for shutting down the service
 	shutdownChan  chan bool // Channel for shutting down the ethereum
 	stopDbUpgrade func()    // stop chain db sequential key upgrade
@@ -122,7 +121,7 @@ type Ethereum struct {
 	txMu            sync.Mutex
 	blockchain      *core.BlockChain
 	protocolManager *ProtocolManager
-	ls              LesServer
+	lesServer       LesServer
 	// DB interfaces
 	chainDb ethdb.Database // Block chain database
 
@@ -148,7 +147,7 @@ type Ethereum struct {
 }
 
 func (s *Ethereum) AddLesServer(ls LesServer) {
-	s.ls = ls
+	s.lesServer = ls
 }
 
 // New creates a new Ethereum object (including the
@@ -195,10 +194,10 @@ func New(ctx *node.ServiceContext, config *Config) (*Ethereum, error) {
 
 	if !config.SkipBcVersionCheck {
 		bcVersion := core.GetBlockChainVersion(chainDb)
-		if bcVersion != config.BlockChainVersion && bcVersion != 0 {
-			return nil, fmt.Errorf("Blockchain DB version mismatch (%d / %d). Run geth upgradedb.\n", bcVersion, config.BlockChainVersion)
+		if bcVersion != core.BlockChainVersion && bcVersion != 0 {
+			return nil, fmt.Errorf("Blockchain DB version mismatch (%d / %d). Run geth upgradedb.\n", bcVersion, core.BlockChainVersion)
 		}
-		core.WriteBlockChainVersion(chainDb, config.BlockChainVersion)
+		core.WriteBlockChainVersion(chainDb, core.BlockChainVersion)
 	}
 
 	// load the genesis block or write a new one if no genesis
@@ -218,10 +217,8 @@ func New(ctx *node.ServiceContext, config *Config) (*Ethereum, error) {
 	core.WriteChainConfig(chainDb, genesis.Hash(), config.ChainConfig)
 
 	eth.chainConfig = config.ChainConfig
-	eth.chainConfig.VmConfig = vm.Config{
-		EnableJit: config.EnableJit,
-		ForceJit:  config.ForceJit,
-	}
+
+	glog.V(logger.Info).Infoln("Chain config:", eth.chainConfig)
 
 	eth.blockchain, err = core.NewBlockChain(chainDb, eth.chainConfig, eth.pow, eth.EventMux())
 	if err != nil {
@@ -233,7 +230,18 @@ func New(ctx *node.ServiceContext, config *Config) (*Ethereum, error) {
 	newPool := core.NewTxPool(eth.chainConfig, eth.EventMux(), eth.blockchain.State, eth.blockchain.GasLimit)
 	eth.txPool = newPool
 
-	if eth.protocolManager, err = NewProtocolManager(eth.chainConfig, config.FastSync, config.NetworkId, eth.eventMux, eth.txPool, eth.pow, eth.blockchain, chainDb); err != nil {
+	maxPeers := config.MaxPeers
+	if config.LightServ > 0 {
+		// if we are running a light server, limit the number of ETH peers so that we reserve some space for incoming LES connections
+		// temporary solution until the new peer connectivity API is finished
+		halfPeers := maxPeers / 2
+		maxPeers -= config.LightPeers
+		if maxPeers < halfPeers {
+			maxPeers = halfPeers
+		}
+	}
+
+	if eth.protocolManager, err = NewProtocolManager(eth.chainConfig, config.FastSync, config.NetworkId, maxPeers, eth.eventMux, eth.txPool, eth.pow, eth.blockchain, chainDb); err != nil {
 		return nil, err
 	}
 	eth.miner = miner.New(eth, eth.chainConfig, eth.EventMux(), eth.pow)
@@ -328,7 +336,7 @@ func (s *Ethereum) APIs() []rpc.API {
 		}, {
 			Namespace: "eth",
 			Version:   "1.0",
-			Service:   filters.NewPublicFilterAPI(s.ApiBackend),
+			Service:   filters.NewPublicFilterAPI(s.ApiBackend, false),
 			Public:    true,
 		}, {
 			Namespace: "admin",
@@ -378,6 +386,17 @@ func (self *Ethereum) SetEtherbase(etherbase common.Address) {
 	self.miner.SetEtherbase(etherbase)
 }
 
+func (s *Ethereum) StartMining(threads int) error {
+	eb, err := s.Etherbase()
+	if err != nil {
+		err = fmt.Errorf("Cannot start mining without etherbase address: %v", err)
+		glog.V(logger.Error).Infoln(err)
+		return err
+	}
+	go s.miner.Start(eb, threads)
+	return nil
+}
+
 func (s *Ethereum) StopMining()         { s.miner.Stop() }
 func (s *Ethereum) IsMining() bool      { return s.miner.Mining() }
 func (s *Ethereum) Miner() *miner.Miner { return s.miner }
@@ -396,10 +415,10 @@ func (s *Ethereum) Downloader() *downloader.Downloader { return s.protocolManage
 // Protocols implements node.Service, returning all the currently configured
 // network protocols to start.
 func (s *Ethereum) Protocols() []p2p.Protocol {
-	if s.ls == nil {
+	if s.lesServer == nil {
 		return s.protocolManager.SubProtocols
 	} else {
-		return append(s.protocolManager.SubProtocols, s.ls.Protocols()...)
+		return append(s.protocolManager.SubProtocols, s.lesServer.Protocols()...)
 	}
 }
 
@@ -411,8 +430,8 @@ func (s *Ethereum) Start(srvr *p2p.Server) error {
 		s.StartAutoDAG()
 	}
 	s.protocolManager.Start()
-	if s.ls != nil {
-		s.ls.Start()
+	if s.lesServer != nil {
+		s.lesServer.Start(srvr)
 	}
 	return nil
 }
@@ -425,8 +444,8 @@ func (s *Ethereum) Stop() error {
 	}
 	s.blockchain.Stop()
 	s.protocolManager.Stop()
-	if s.ls != nil {
-		s.ls.Stop()
+	if s.lesServer != nil {
+		s.lesServer.Stop()
 	}
 	s.txPool.Stop()
 	s.miner.Stop()

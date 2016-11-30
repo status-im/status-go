@@ -63,18 +63,18 @@ type uint64RingBuffer struct {
 // Work is the workers current environment and holds
 // all of the current state information
 type Work struct {
-	config             *core.ChainConfig
-	state              *state.StateDB // apply state changes here
-	ancestors          *set.Set       // ancestor set (used for checking uncle parent validity)
-	family             *set.Set       // family set (used for checking uncle invalidity)
-	uncles             *set.Set       // uncle set
-	remove             *set.Set       // tx which will be removed
-	tcount             int            // tx count in cycle
-	ignoredTransactors *set.Set
-	lowGasTransactors  *set.Set
-	ownedAccounts      *set.Set
-	lowGasTxs          types.Transactions
-	localMinedBlocks   *uint64RingBuffer // the most recent block numbers that were mined locally (used to check block inclusion)
+	config *params.ChainConfig
+	signer types.Signer
+
+	state            *state.StateDB // apply state changes here
+	ancestors        *set.Set       // ancestor set (used for checking uncle parent validity)
+	family           *set.Set       // family set (used for checking uncle invalidity)
+	uncles           *set.Set       // uncle set
+	tcount           int            // tx count in cycle
+	ownedAccounts    *set.Set
+	lowGasTxs        types.Transactions
+	failedTxs        types.Transactions
+	localMinedBlocks *uint64RingBuffer // the most recent block numbers that were mined locally (used to check block inclusion)
 
 	Block *types.Block // the new block
 
@@ -92,7 +92,7 @@ type Result struct {
 
 // worker is the main object which takes care of applying messages to the new state
 type worker struct {
-	config *core.ChainConfig
+	config *params.ChainConfig
 
 	mu sync.Mutex
 
@@ -130,7 +130,7 @@ type worker struct {
 	fullValidation bool
 }
 
-func newWorker(config *core.ChainConfig, coinbase common.Address, eth Backend, mux *event.TypeMux) *worker {
+func newWorker(config *params.ChainConfig, coinbase common.Address, eth Backend, mux *event.TypeMux) *worker {
 	worker := &worker{
 		config:         config,
 		eth:            eth,
@@ -171,9 +171,9 @@ func (self *worker) pending() (*types.Block, *state.StateDB) {
 			self.current.txs,
 			nil,
 			self.current.receipts,
-		), self.current.state
+		), self.current.state.Copy()
 	}
-	return self.current.Block, self.current.state
+	return self.current.Block, self.current.state.Copy()
 }
 
 func (self *worker) start() {
@@ -236,7 +236,12 @@ func (self *worker) update() {
 			// Apply transaction to the pending state if we're not mining
 			if atomic.LoadInt32(&self.mining) == 0 {
 				self.currentMu.Lock()
-				self.current.commitTransactions(self.mux, types.Transactions{ev.Tx}, self.gasPrice, self.chain)
+
+				acc, _ := types.Sender(self.current.signer, ev.Tx)
+				txs := map[common.Address]types.Transactions{acc: types.Transactions{ev.Tx}}
+				txset := types.NewTransactionsByPriceAndNonce(txs)
+
+				self.current.commitTransactions(self.mux, txset, self.gasPrice, self.chain)
 				self.currentMu.Unlock()
 			}
 		}
@@ -273,7 +278,7 @@ func (self *worker) wait() {
 				}
 				go self.mux.Post(core.NewMinedBlockEvent{Block: block})
 			} else {
-				work.state.Commit()
+				work.state.Commit(self.config.IsEIP158(block.Number()))
 				parent := self.chain.GetBlock(block.ParentHash(), block.NumberU64()-1)
 				if parent == nil {
 					glog.V(logger.Error).Infoln("Invalid block found during mining")
@@ -358,12 +363,13 @@ func (self *worker) push(work *Work) {
 
 // makeCurrent creates a new environment for the current cycle.
 func (self *worker) makeCurrent(parent *types.Block, header *types.Header) error {
-	state, err := state.New(parent.Root(), self.eth.ChainDb())
+	state, err := self.chain.StateAt(parent.Root())
 	if err != nil {
 		return err
 	}
 	work := &Work{
 		config:    self.config,
+		signer:    types.NewEIP155Signer(self.config.ChainId),
 		state:     state,
 		ancestors: set.New(),
 		family:    set.New(),
@@ -383,10 +389,7 @@ func (self *worker) makeCurrent(parent *types.Block, header *types.Header) error
 	accounts := self.eth.AccountManager().Accounts()
 
 	// Keep track of transactions which return errors so they can be removed
-	work.remove = set.New()
 	work.tcount = 0
-	work.ignoredTransactors = set.New()
-	work.lowGasTransactors = set.New()
 	work.ownedAccounts = accountAddressesSet(accounts)
 	if self.current != nil {
 		work.localMinedBlocks = self.current.localMinedBlocks
@@ -495,45 +498,11 @@ func (self *worker) commitNewWork() {
 	if self.config.DAOForkSupport && self.config.DAOForkBlock != nil && self.config.DAOForkBlock.Cmp(header.Number) == 0 {
 		core.ApplyDAOHardFork(work.state)
 	}
+	txs := types.NewTransactionsByPriceAndNonce(self.eth.TxPool().Pending())
+	work.commitTransactions(self.mux, txs, self.gasPrice, self.chain)
 
-	/* //approach 1
-	transactions := self.eth.TxPool().GetTransactions()
-	sort.Sort(types.TxByNonce(transactions))
-	*/
-
-	//approach 2
-	transactions := self.eth.TxPool().GetTransactions()
-	types.SortByPriceAndNonce(transactions)
-
-	/* // approach 3
-	// commit transactions for this run.
-	txPerOwner := make(map[common.Address]types.Transactions)
-	// Sort transactions by owner
-	for _, tx := range self.eth.TxPool().GetTransactions() {
-		from, _ := tx.From() // we can ignore the sender error
-		txPerOwner[from] = append(txPerOwner[from], tx)
-	}
-	var (
-		singleTxOwner types.Transactions
-		multiTxOwner  types.Transactions
-	)
-	// Categorise transactions by
-	// 1. 1 owner tx per block
-	// 2. multi txs owner per block
-	for _, txs := range txPerOwner {
-		if len(txs) == 1 {
-			singleTxOwner = append(singleTxOwner, txs[0])
-		} else {
-			multiTxOwner = append(multiTxOwner, txs...)
-		}
-	}
-	sort.Sort(types.TxByPrice(singleTxOwner))
-	sort.Sort(types.TxByNonce(multiTxOwner))
-	transactions := append(singleTxOwner, multiTxOwner...)
-	*/
-
-	work.commitTransactions(self.mux, transactions, self.gasPrice, self.chain)
-	self.eth.TxPool().RemoveTransactions(work.lowGasTxs)
+	self.eth.TxPool().RemoveBatch(work.lowGasTxs)
+	self.eth.TxPool().RemoveBatch(work.failedTxs)
 
 	// compute uncles for the new block.
 	var (
@@ -562,7 +531,7 @@ func (self *worker) commitNewWork() {
 	if atomic.LoadInt32(&self.mining) == 1 {
 		// commit state root after all state transitions.
 		core.AccumulateRewards(work.state, header, uncles)
-		header.Root = work.state.IntermediateRoot()
+		header.Root = work.state.IntermediateRoot(self.config.IsEIP158(header.Number))
 	}
 
 	// create the new block whose nonce will be mined.
@@ -591,65 +560,62 @@ func (self *worker) commitUncle(work *Work, uncle *types.Header) error {
 	return nil
 }
 
-func (env *Work) commitTransactions(mux *event.TypeMux, transactions types.Transactions, gasPrice *big.Int, bc *core.BlockChain) {
+func (env *Work) commitTransactions(mux *event.TypeMux, txs *types.TransactionsByPriceAndNonce, gasPrice *big.Int, bc *core.BlockChain) {
 	gp := new(core.GasPool).AddGas(env.header.GasLimit)
 
 	var coalescedLogs vm.Logs
-	for _, tx := range transactions {
+
+	for {
+		// Retrieve the next transaction and abort if all done
+		tx := txs.Peek()
+		if tx == nil {
+			break
+		}
 		// Error may be ignored here. The error has already been checked
 		// during transaction acceptance is the transaction pool.
-		from, _ := tx.From()
+		//
+		// We use the eip155 signer regardless of the current hf.
+		from, _ := types.Sender(env.signer, tx)
+		// Check whether the tx is replay protected. If we're not in the EIP155 hf
+		// phase, start ignoring the sender until we do.
+		if tx.Protected() && !env.config.IsEIP155(env.header.Number) {
+			glog.V(logger.Detail).Infof("Transaction (%x) is replay protected, but we haven't yet hardforked. Transaction will be ignored until we hardfork.\n", tx.Hash())
 
-		// Check if it falls within margin. Txs from owned accounts are always processed.
+			txs.Pop()
+			continue
+		}
+
+		// Ignore any transactions (and accounts subsequently) with low gas limits
 		if tx.GasPrice().Cmp(gasPrice) < 0 && !env.ownedAccounts.Has(from) {
-			// ignore the transaction and transactor. We ignore the transactor
-			// because nonce will fail after ignoring this transaction so there's
-			// no point
-			env.lowGasTransactors.Add(from)
+			// Pop the current low-priced transaction without shifting in the next from the account
+			glog.V(logger.Info).Infof("Transaction (%x) below gas price (tx=%v ask=%v). All sequential txs from this address(%x) will be ignored\n", tx.Hash().Bytes()[:4], common.CurrencyToString(tx.GasPrice()), common.CurrencyToString(gasPrice), from[:4])
 
-			glog.V(logger.Info).Infof("transaction(%x) below gas price (tx=%v ask=%v). All sequential txs from this address(%x) will be ignored\n", tx.Hash().Bytes()[:4], common.CurrencyToString(tx.GasPrice()), common.CurrencyToString(gasPrice), from[:4])
-		}
+			env.lowGasTxs = append(env.lowGasTxs, tx)
+			txs.Pop()
 
-		// Continue with the next transaction if the transaction sender is included in
-		// the low gas tx set. This will also remove the tx and all sequential transaction
-		// from this transactor
-		if env.lowGasTransactors.Has(from) {
-			// add tx to the low gas set. This will be removed at the end of the run
-			// owned accounts are ignored
-			if !env.ownedAccounts.Has(from) {
-				env.lowGasTxs = append(env.lowGasTxs, tx)
-			}
 			continue
 		}
-
-		// Move on to the next transaction when the transactor is in ignored transactions set
-		// This may occur when a transaction hits the gas limit. When a gas limit is hit and
-		// the transaction is processed (that could potentially be included in the block) it
-		// will throw a nonce error because the previous transaction hasn't been processed.
-		// Therefor we need to ignore any transaction after the ignored one.
-		if env.ignoredTransactors.Has(from) {
-			continue
-		}
-
-		env.state.StartRecord(tx.Hash(), common.Hash{}, 0)
+		// Start executing the transaction
+		env.state.StartRecord(tx.Hash(), common.Hash{}, env.tcount)
 
 		err, logs := env.commitTransaction(tx, bc, gp)
 		switch {
 		case core.IsGasLimitErr(err):
-			// ignore the transactor so no nonce errors will be thrown for this account
-			// next time the worker is run, they'll be picked up again.
-			env.ignoredTransactors.Add(from)
-
+			// Pop the current out-of-gas transaction without shifting in the next from the account
 			glog.V(logger.Detail).Infof("Gas limit reached for (%x) in this block. Continue to try smaller txs\n", from[:4])
-		case err != nil:
-			env.remove.Add(tx.Hash())
+			txs.Pop()
 
-			if glog.V(logger.Detail) {
-				glog.Infof("TX (%x) failed, will be removed: %v\n", tx.Hash().Bytes()[:4], err)
-			}
+		case err != nil:
+			// Pop the current failed transaction without shifting in the next from the account
+			glog.V(logger.Detail).Infof("Transaction (%x) failed, will be removed: %v\n", tx.Hash().Bytes()[:4], err)
+			env.failedTxs = append(env.failedTxs, tx)
+			txs.Pop()
+
 		default:
-			env.tcount++
+			// Everything ok, collect the logs and shift in the next transaction from the same account
 			coalescedLogs = append(coalescedLogs, logs...)
+			env.tcount++
+			txs.Shift()
 		}
 	}
 	if len(coalescedLogs) > 0 || env.tcount > 0 {
@@ -665,18 +631,11 @@ func (env *Work) commitTransactions(mux *event.TypeMux, transactions types.Trans
 }
 
 func (env *Work) commitTransaction(tx *types.Transaction, bc *core.BlockChain, gp *core.GasPool) (error, vm.Logs) {
-	snap := env.state.Copy()
+	snap := env.state.Snapshot()
 
-	// this is a bit of a hack to force jit for the miners
-	config := env.config.VmConfig
-	if !(config.EnableJit && config.ForceJit) {
-		config.EnableJit = false
-	}
-	config.ForceJit = false // disable forcing jit
-
-	receipt, logs, _, err := core.ApplyTransaction(env.config, bc, gp, env.state, env.header, tx, env.header.GasUsed, config)
+	receipt, logs, _, err := core.ApplyTransaction(env.config, bc, gp, env.state, env.header, tx, env.header.GasUsed, vm.Config{})
 	if err != nil {
-		env.state.Set(snap)
+		env.state.RevertToSnapshot(snap)
 		return err, nil
 	}
 	env.txs = append(env.txs, tx)

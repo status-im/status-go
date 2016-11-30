@@ -1,4 +1,4 @@
-// Copyright 2015 The go-ethereum Authors
+// Copyright 2016 The go-ethereum Authors
 // This file is part of the go-ethereum library.
 //
 // The go-ethereum library is free software: you can redistribute it and/or modify
@@ -26,29 +26,23 @@ import (
 	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/robertkrimen/otto"
-	"golang.org/x/net/context"
 )
 
 // bridge is a collection of JavaScript utility methods to bride the .js runtime
 // environment and the Go RPC connection backing the remote method calls.
 type bridge struct {
-	client   *rpc.ClientRestartWrapper   // RPC client to execute Ethereum requests through
+	client   *rpc.Client  // RPC client to execute Ethereum requests through
 	prompter UserPrompter // Input prompter to allow interactive user feedback
 	printer  io.Writer    // Output writer to serialize any display strings to
-	ctx context.Context
 }
 
 // newBridge creates a new JavaScript wrapper around an RPC client.
-func newBridge(client *rpc.ClientRestartWrapper, prompter UserPrompter, printer io.Writer) *bridge {
+func newBridge(client *rpc.Client, prompter UserPrompter, printer io.Writer) *bridge {
 	return &bridge{
 		client:   client,
 		prompter: prompter,
 		printer:  printer,
 	}
-}
-
-func (b *bridge) setContext(ctx context.Context) {
-	b.ctx = ctx
 }
 
 // NewAccount is a wrapper around the personal.newAccount RPC method that uses a
@@ -126,6 +120,44 @@ func (b *bridge) UnlockAccount(call otto.FunctionCall) (response otto.Value) {
 	}
 	// Send the request to the backend and return
 	val, err := call.Otto.Call("jeth.unlockAccount", nil, account, passwd, duration)
+	if err != nil {
+		throwJSException(err.Error())
+	}
+	return val
+}
+
+// Sign is a wrapper around the personal.sign RPC method that uses a non-echoing password
+// prompt to aquire the passphrase and executes the original RPC method (saved in
+// jeth.sign) with it to actually execute the RPC call.
+func (b *bridge) Sign(call otto.FunctionCall) (response otto.Value) {
+	var (
+		message = call.Argument(0)
+		account = call.Argument(1)
+		passwd  = call.Argument(2)
+	)
+
+	if !message.IsString() {
+		throwJSException("first argument must be the message to sign")
+	}
+	if !account.IsString() {
+		throwJSException("second argument must be the account to sign with")
+	}
+
+	// if the password is not given or null ask the user and ensure password is a string
+	if passwd.IsUndefined() || passwd.IsNull() {
+		fmt.Fprintf(b.printer, "Give password for account %s\n", account)
+		if input, err := b.prompter.PromptPassword("Passphrase: "); err != nil {
+			throwJSException(err.Error())
+		} else {
+			passwd, _ = otto.ToValue(input)
+		}
+	}
+	if !passwd.IsString() {
+		throwJSException("third argument must be the password to unlock the account")
+	}
+
+	// Send the request to the backend and return
+	val, err := call.Otto.Call("jeth.sign", nil, message, account, passwd)
 	if err != nil {
 		throwJSException(err.Error())
 	}
@@ -228,26 +260,7 @@ func (b *bridge) Send(call otto.FunctionCall) (response otto.Value) {
 		resp, _ := call.Otto.Object(`({"jsonrpc":"2.0"})`)
 		resp.Set("id", req.Id)
 		var result json.RawMessage
-
-		client := b.client.Client()
-		errc := make(chan error, 1)
-		errc2 := make(chan error)
-		go func(){
-			if b.ctx != nil {
-				select {
-				case <-b.ctx.Done():
-					b.client.Restart()
-					errc2 <- b.ctx.Err()
-				case err := <-errc:
-					errc2 <- err
-				}
-			} else {
-				errc2 <- <-errc
-			}
-		}()
-		errc <- client.Call(&result, req.Method, req.Params...)
-		err = <-errc2
-
+		err = b.client.Call(&result, req.Method, req.Params...)
 		switch err := err.(type) {
 		case nil:
 			if result == nil {

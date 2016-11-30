@@ -20,11 +20,11 @@ package mclock
 import (
 	"time"
 
-	"github.com/aristanetworks/goarista/atime"
+	"github.com/aristanetworks/goarista/monotime"
 )
 
-type AbsTime time.Duration  // absolute monotonic time
+type AbsTime time.Duration // absolute monotonic time
 
 func Now() AbsTime {
-	return AbsTime(atime.NanoTime())
+	return AbsTime(monotime.Now())
 }

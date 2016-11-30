@@ -2,15 +2,12 @@ package geth_test
 
 import (
 	"errors"
-	"fmt"
 	"reflect"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/logger"
-	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/status-im/status-go/geth"
 )
 
@@ -145,7 +142,7 @@ func TestCreateChildAccount(t *testing.T) {
 		t.Errorf("could not create account: %v", err)
 		return
 	}
-	glog.V(logger.Info).Infof("Account created: {address: %s, key: %s, mnemonic:%s}", address, pubKey, mnemonic)
+	t.Logf("Account created: {address: %s, key: %s, mnemonic:%s}", address, pubKey, mnemonic)
 
 	account, err := utils.MakeAddress(accountManager, address)
 	if err != nil {
@@ -228,7 +225,7 @@ func TestRecoverAccount(t *testing.T) {
 		t.Errorf("could not create account: %v", err)
 		return
 	}
-	glog.V(logger.Info).Infof("Account created: {address: %s, key: %s, mnemonic:%s}", address, pubKey, mnemonic)
+	t.Logf("Account created: {address: %s, key: %s, mnemonic:%s}", address, pubKey, mnemonic)
 
 	// try recovering using password + mnemonic
 	addressCheck, pubKeyCheck, err := geth.RecoverAccount(newAccountPassword, mnemonic)
@@ -326,15 +323,14 @@ func TestAccountSelect(t *testing.T) {
 		t.Errorf("could not create account: %v", err)
 		return
 	}
-	glog.V(logger.Info).Infof("Account created: {address: %s, key: %s}", address1, pubKey1)
+	t.Logf("Account created: {address: %s, key: %s}", address1, pubKey1)
 
 	address2, pubKey2, _, err := geth.CreateAccount(newAccountPassword)
 	if err != nil {
-		fmt.Println(err.Error())
 		t.Error("Test failed: could not create account")
 		return
 	}
-	glog.V(logger.Info).Infof("Account created: {address: %s, key: %s}", address2, pubKey2)
+	t.Logf("Account created: {address: %s, key: %s}", address2, pubKey2)
 
 	// make sure that identity is not (yet injected)
 	if whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey1))) {

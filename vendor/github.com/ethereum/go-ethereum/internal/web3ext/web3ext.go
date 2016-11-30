@@ -18,16 +18,158 @@
 package web3ext
 
 var Modules = map[string]string{
-	"admin":    Admin_JS,
-	"debug":    Debug_JS,
-	"eth":      Eth_JS,
-	"miner":    Miner_JS,
-	"net":      Net_JS,
-	"personal": Personal_JS,
-	"rpc":      RPC_JS,
-	"shh":      Shh_JS,
-	"txpool":   TxPool_JS,
+	"admin":      Admin_JS,
+	"bzz":        Bzz_JS,
+	"chequebook": Chequebook_JS,
+	"debug":      Debug_JS,
+	"ens":        ENS_JS,
+	"eth":        Eth_JS,
+	"miner":      Miner_JS,
+	"net":        Net_JS,
+	"personal":   Personal_JS,
+	"rpc":        RPC_JS,
+	"shh":        Shh_JS,
+	"txpool":     TxPool_JS,
 }
+
+const Bzz_JS = `
+web3._extend({
+	property: 'bzz',
+	methods:
+	[
+		new web3._extend.Method({
+			name: 'blockNetworkRead',
+			call: 'bzz_blockNetworkRead',
+			params: 1,
+			inputFormatter: [null]
+		}),
+		new web3._extend.Method({
+			name: 'syncEnabled',
+			call: 'bzz_syncEnabled',
+			params: 1,
+			inputFormatter: [null]
+		}),
+		new web3._extend.Method({
+			name: 'swapEnabled',
+			call: 'bzz_swapEnabled',
+			params: 1,
+			inputFormatter: [null]
+		}),
+		new web3._extend.Method({
+			name: 'download',
+			call: 'bzz_download',
+			params: 2,
+			inputFormatter: [null, null]
+		}),
+		new web3._extend.Method({
+			name: 'upload',
+			call: 'bzz_upload',
+			params: 2,
+			inputFormatter: [null, null]
+		}),
+		new web3._extend.Method({
+			name: 'retrieve',
+			call: 'bzz_retrieve',
+			params: 1,
+			inputFormatter: [null]
+		}),
+		new web3._extend.Method({
+			name: 'store',
+			call: 'bzz_store',
+			params: 2,
+			inputFormatter: [null]
+		}),
+		new web3._extend.Method({
+			name: 'get',
+			call: 'bzz_get',
+			params: 1,
+			inputFormatter: [null]
+		}),
+		new web3._extend.Method({
+			name: 'put',
+			call: 'bzz_put',
+			params: 2,
+			inputFormatter: [null, null]
+		}),
+		new web3._extend.Method({
+			name: 'modify',
+			call: 'bzz_modify',
+			params: 4,
+			inputFormatter: [null, null, null, null]
+		})
+	],
+	properties:
+	[
+		new web3._extend.Property({
+			name: 'hive',
+			getter: 'bzz_hive'
+		}),
+		new web3._extend.Property({
+			name: 'info',
+			getter: 'bzz_info',
+		}),
+	]
+});
+`
+
+const ENS_JS = `
+web3._extend({
+  property: 'ens',
+  methods:
+  [
+    new web3._extend.Method({
+			name: 'register',
+			call: 'ens_register',
+			params: 1,
+			inputFormatter: [null]
+		}),
+	new web3._extend.Method({
+			name: 'setContentHash',
+			call: 'ens_setContentHash',
+			params: 2,
+			inputFormatter: [null, null]
+		}),
+	new web3._extend.Method({
+			name: 'resolve',
+			call: 'ens_resolve',
+			params: 1,
+			inputFormatter: [null]
+		}),
+	]
+})
+`
+
+const Chequebook_JS = `
+web3._extend({
+  property: 'chequebook',
+  methods:
+  [
+    new web3._extend.Method({
+      name: 'deposit',
+      call: 'chequebook_deposit',
+      params: 1,
+      inputFormatter: [null]
+    }),
+    new web3._extend.Property({
+			name: 'balance',
+			getter: 'chequebook_balance',
+				outputFormatter: web3._extend.utils.toDecimal
+		}),
+    new web3._extend.Method({
+      name: 'cash',
+      call: 'chequebook_cash',
+      params: 1,
+      inputFormatter: [null]
+    }),
+    new web3._extend.Method({
+      name: 'issue',
+      call: 'chequebook_issue',
+      params: 2,
+      inputFormatter: [null, null]
+    }),
+  ]
+});
+`
 
 const Admin_JS = `
 web3._extend({
@@ -196,6 +338,10 @@ web3._extend({
 			outputFormatter: console.log
 		}),
 		new web3._extend.Method({
+			name: 'chaindbCompact',
+			call: 'debug_chaindbCompact',
+		}),
+		new web3._extend.Method({
 			name: 'metrics',
 			call: 'debug_metrics',
 			params: 1
@@ -284,7 +430,8 @@ web3._extend({
 		new web3._extend.Method({
 			name: 'traceTransaction',
 			call: 'debug_traceTransaction',
-			params: 1
+			params: 2,
+			inputFormatter: [null, null]
 		})
 	],
 	properties: []
@@ -325,6 +472,19 @@ web3._extend({
 			call: 'eth_submitTransaction',
 			params: 1,
 			inputFormatter: [web3._extend.formatters.inputTransactionFormatter]
+		}),
+		new web3._extend.Method({
+			name: 'getRawTransaction',
+			call: 'eth_getRawTransactionByHash',
+			params: 1
+		}),
+		new web3._extend.Method({
+			name: 'getRawTransactionFromBlock',
+			call: function(args) {
+				return (web3._extend.utils.isString(args[0]) && args[0].indexOf('0x') === 0) ? 'eth_getRawTransactionByBlockHashAndIndex' : 'eth_getRawTransactionByBlockNumberAndIndex';
+			},
+			params: 2,
+			inputFormatter: [web3._extend.formatters.inputBlockNumberFormatter, web3._extend.utils.toHex]
 		})
 	],
 	properties:
@@ -427,9 +587,20 @@ web3._extend({
 			call: 'personal_sendTransaction',
 			params: 2,
 			inputFormatter: [web3._extend.formatters.inputTransactionFormatter, null]
+		}),
+		new web3._extend.Method({
+			name: 'sign',
+			call: 'personal_sign',
+			params: 3,
+			inputFormatter: [null, web3._extend.formatters.inputAddressFormatter, null]
+		}),
+		new web3._extend.Method({
+			name: 'ecRecover',
+			call: 'personal_ecRecover',
+			params: 2
 		})
 	]
-});
+})
 `
 
 const RPC_JS = `

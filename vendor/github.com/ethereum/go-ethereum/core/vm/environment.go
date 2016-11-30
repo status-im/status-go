@@ -20,25 +20,20 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/params"
 )
-
-// RuleSet is an interface that defines the current rule set during the
-// execution of the EVM instructions (e.g. whether it's homestead)
-type RuleSet interface {
-	IsHomestead(*big.Int) bool
-}
 
 // Environment is an EVM requirement and helper which allows access to outside
 // information such as states.
 type Environment interface {
 	// The current ruleset
-	RuleSet() RuleSet
+	ChainConfig() *params.ChainConfig
 	// The state database
 	Db() Database
 	// Creates a restorable snapshot
-	MakeSnapshot() Database
+	SnapshotDatabase() int
 	// Set database to previous snapshot
-	SetSnapshot(Database)
+	RevertToSnapshot(int)
 	// Address of the original invoker (first occurrence of the VM invoker)
 	Origin() common.Address
 	// The block number this VM is invoked on
@@ -73,8 +68,6 @@ type Environment interface {
 	DelegateCall(me ContractRef, addr common.Address, data []byte, gas, price *big.Int) ([]byte, error)
 	// Create a new contract
 	Create(me ContractRef, data []byte, gas, price, value *big.Int) ([]byte, common.Address, error)
-
-	StructLogs() []StructLog
 }
 
 // Vm is the basic interface for an implementation of the EVM.
@@ -96,6 +89,8 @@ type Database interface {
 	GetNonce(common.Address) uint64
 	SetNonce(common.Address, uint64)
 
+	GetCodeHash(common.Address) common.Hash
+	GetCodeSize(common.Address) int
 	GetCode(common.Address) []byte
 	SetCode(common.Address, []byte)
 
@@ -105,9 +100,15 @@ type Database interface {
 	GetState(common.Address, common.Hash) common.Hash
 	SetState(common.Address, common.Hash, common.Hash)
 
-	Delete(common.Address) bool
+	Suicide(common.Address) bool
+	HasSuicided(common.Address) bool
+
+	// Exist reports whether the given account exists in state.
+	// Notably this should also return true for suicided accounts.
 	Exist(common.Address) bool
-	IsDeleted(common.Address) bool
+	// Empty returns whether the given account is empty. Empty
+	// is defined according to EIP161 (balance = nonce = code = 0).
+	Empty(common.Address) bool
 }
 
 // Account represents a contract or basic ethereum account.
@@ -119,7 +120,7 @@ type Account interface {
 	Balance() *big.Int
 	Address() common.Address
 	ReturnGas(*big.Int, *big.Int)
-	SetCode([]byte)
+	SetCode(common.Hash, []byte)
 	ForEachStorage(cb func(key, value common.Hash) bool)
 	Value() *big.Int
 }

@@ -1,4 +1,4 @@
-// Copyright 2015 The go-ethereum Authors
+// Copyright 2016 The go-ethereum Authors
 // This file is part of the go-ethereum library.
 //
 // The go-ethereum library is free software: you can redistribute it and/or modify
@@ -28,6 +28,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/logger"
 	"github.com/ethereum/go-ethereum/logger/glog"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"golang.org/x/net/context"
 )
@@ -42,7 +43,8 @@ var txPermanent = uint64(500)
 // always receive all locally signed transactions in the same order as they are
 // created.
 type TxPool struct {
-	config   *core.ChainConfig
+	config   *params.ChainConfig
+	signer   types.Signer
 	quit     chan bool
 	eventMux *event.TypeMux
 	events   event.Subscription
@@ -76,9 +78,10 @@ type TxRelayBackend interface {
 }
 
 // NewTxPool creates a new light transaction pool
-func NewTxPool(config *core.ChainConfig, eventMux *event.TypeMux, chain *LightChain, relay TxRelayBackend) *TxPool {
+func NewTxPool(config *params.ChainConfig, eventMux *event.TypeMux, chain *LightChain, relay TxRelayBackend) *TxPool {
 	pool := &TxPool{
 		config:   config,
+		signer:   types.NewEIP155Signer(config.ChainId),
 		nonce:    make(map[common.Address]uint64),
 		pending:  make(map[common.Hash]*types.Transaction),
 		mined:    make(map[common.Hash][]*types.Transaction),
@@ -90,7 +93,7 @@ func NewTxPool(config *core.ChainConfig, eventMux *event.TypeMux, chain *LightCh
 		odr:      chain.Odr(),
 		chainDb:  chain.Odr().Database(),
 		head:     chain.CurrentHeader().Hash(),
-		clearIdx: chain.CurrentHeader().GetNumberU64(),
+		clearIdx: chain.CurrentHeader().Number.Uint64(),
 	}
 	go pool.eventLoop()
 
@@ -197,7 +200,7 @@ func (pool *TxPool) checkMinedTxs(ctx context.Context, hash common.Hash, idx uin
 				if len(receipts) != len(block.Transactions()) {
 					panic(nil) // should never happen if hashes did match
 				}
-				core.SetReceiptsData(block, receipts)
+				core.SetReceiptsData(pool.config, block, receipts)
 			}
 			//fmt.Println("WriteReceipt", receipts[i].TxHash)
 			core.WriteReceipt(pool.chainDb, receipts[i])
@@ -241,11 +244,11 @@ func (pool *TxPool) setNewHead(ctx context.Context, newHeader *types.Header) (tx
 	// find common ancestor, create list of rolled back and new block hashes
 	var oldHashes, newHashes []common.Hash
 	for oldh.Hash() != newh.Hash() {
-		if oldh.GetNumberU64() >= newh.GetNumberU64() {
+		if oldh.Number.Uint64() >= newh.Number.Uint64() {
 			oldHashes = append(oldHashes, oldh.Hash())
 			oldh = pool.chain.GetHeader(oldh.ParentHash, oldh.Number.Uint64()-1)
 		}
-		if oldh.GetNumberU64() < newh.GetNumberU64() {
+		if oldh.Number.Uint64() < newh.Number.Uint64() {
 			newHashes = append(newHashes, newh.Hash())
 			newh = pool.chain.GetHeader(newh.ParentHash, newh.Number.Uint64()-1)
 			if newh == nil {
@@ -254,8 +257,8 @@ func (pool *TxPool) setNewHead(ctx context.Context, newHeader *types.Header) (tx
 			}
 		}
 	}
-	if oldh.GetNumberU64() < pool.clearIdx {
-		pool.clearIdx = oldh.GetNumberU64()
+	if oldh.Number.Uint64() < pool.clearIdx {
+		pool.clearIdx = oldh.Number.Uint64()
 	}
 	// roll back old blocks
 	for _, hash := range oldHashes {
@@ -265,14 +268,14 @@ func (pool *TxPool) setNewHead(ctx context.Context, newHeader *types.Header) (tx
 	// check mined txs of new blocks (array is in reversed order)
 	for i := len(newHashes) - 1; i >= 0; i-- {
 		hash := newHashes[i]
-		if err := pool.checkMinedTxs(ctx, hash, newHeader.GetNumberU64()-uint64(i), txc); err != nil {
+		if err := pool.checkMinedTxs(ctx, hash, newHeader.Number.Uint64()-uint64(i), txc); err != nil {
 			return txc, err
 		}
 		pool.head = hash
 	}
 
 	// clear old mined tx entries of old blocks
-	if idx := newHeader.GetNumberU64(); idx > pool.clearIdx+txPermanent {
+	if idx := newHeader.Number.Uint64(); idx > pool.clearIdx+txPermanent {
 		idx2 := idx - txPermanent
 		for i := pool.clearIdx; i < idx2; i++ {
 			hash := core.GetCanonicalHash(pool.chainDb, i)
@@ -308,6 +311,7 @@ func (pool *TxPool) eventLoop() {
 			m, r := txc.getLists()
 			pool.relay.NewHead(pool.head, m, r)
 			pool.homestead = pool.config.IsHomestead(head.Number)
+			pool.signer = types.MakeSigner(pool.config, head.Number)
 			pool.mu.Unlock()
 		}
 	}
@@ -339,7 +343,7 @@ func (pool *TxPool) validateTx(ctx context.Context, tx *types.Transaction) error
 
 	// Validate the transaction sender and it's sig. Throw
 	// if the from fields is invalid.
-	if from, err = tx.From(); err != nil {
+	if from, err = types.Sender(pool.signer, tx); err != nil {
 		return core.ErrInvalidSender
 	}
 
@@ -388,7 +392,7 @@ func (pool *TxPool) validateTx(ctx context.Context, tx *types.Transaction) error
 	}
 
 	// Should supply enough intrinsic gas
-	if tx.Gas().Cmp(core.IntrinsicGas(tx.Data(), core.MessageCreatesContract(tx), pool.homestead)) < 0 {
+	if tx.Gas().Cmp(core.IntrinsicGas(tx.Data(), tx.To() == nil, pool.homestead)) < 0 {
 		return core.ErrIntrinsicGas
 	}
 
@@ -412,7 +416,8 @@ func (self *TxPool) add(ctx context.Context, tx *types.Transaction) error {
 		self.pending[hash] = tx
 
 		nonce := tx.Nonce() + 1
-		addr, _ := tx.From()
+
+		addr, _ := types.Sender(self.signer, tx)
 		if nonce > self.nonce[addr] {
 			self.nonce[addr] = nonce
 		}
@@ -420,7 +425,7 @@ func (self *TxPool) add(ctx context.Context, tx *types.Transaction) error {
 		// Notify the subscribers. This event is posted in a goroutine
 		// because it's possible that somewhere during the post "Remove transaction"
 		// gets called which will then wait for the global tx pool lock and deadlock.
-		go self.eventMux.Post(core.TxPreEvent{tx})
+		go self.eventMux.Post(core.TxPreEvent{Tx: tx})
 	}
 
 	if glog.V(logger.Debug) {
@@ -432,7 +437,7 @@ func (self *TxPool) add(ctx context.Context, tx *types.Transaction) error {
 		}
 		// we can ignore the error here because From is
 		// verified in ValidateTransaction.
-		f, _ := tx.From()
+		f, _ := types.Sender(self.signer, tx)
 		from := common.Bytes2Hex(f[:4])
 		glog.Infof("(t) %x => %s (%v) %x\n", from, toname, tx.Value, hash)
 	}
@@ -463,7 +468,7 @@ func (self *TxPool) Add(ctx context.Context, tx *types.Transaction) error {
 
 // AddTransactions adds all valid transactions to the pool and passes them to
 // the tx relay backend
-func (self *TxPool) AddTransactions(ctx context.Context, txs []*types.Transaction) {
+func (self *TxPool) AddBatch(ctx context.Context, txs []*types.Transaction) {
 	self.mu.Lock()
 	defer self.mu.Unlock()
 	var sendTx types.Transactions
@@ -510,24 +515,18 @@ func (self *TxPool) GetTransactions() (txs types.Transactions) {
 
 // Content retrieves the data content of the transaction pool, returning all the
 // pending as well as queued transactions, grouped by account and nonce.
-func (self *TxPool) Content() (map[common.Address]map[uint64][]*types.Transaction, map[common.Address]map[uint64][]*types.Transaction) {
+func (self *TxPool) Content() (map[common.Address]types.Transactions, map[common.Address]types.Transactions) {
 	self.mu.RLock()
 	defer self.mu.RUnlock()
 
 	// Retrieve all the pending transactions and sort by account and by nonce
-	pending := make(map[common.Address]map[uint64][]*types.Transaction)
+	pending := make(map[common.Address]types.Transactions)
 	for _, tx := range self.pending {
-		account, _ := tx.From()
-
-		owned, ok := pending[account]
-		if !ok {
-			owned = make(map[uint64][]*types.Transaction)
-			pending[account] = owned
-		}
-		owned[tx.Nonce()] = append(owned[tx.Nonce()], tx)
+		account, _ := types.Sender(self.signer, tx)
+		pending[account] = append(pending[account], tx)
 	}
 	// There are no queued transactions in a light pool, just return an empty map
-	queued := make(map[common.Address]map[uint64][]*types.Transaction)
+	queued := make(map[common.Address]types.Transactions)
 	return pending, queued
 }
 

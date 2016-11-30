@@ -1,6 +1,7 @@
 package geth
 
 import (
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/les/status"
 )
 
@@ -35,16 +36,54 @@ type WhisperMessageEvent struct {
 }
 
 type SendTransactionEvent struct {
-	Id   string            `json:"id"`
-	Args status.SendTxArgs `json:"args"`
+	Id        string            `json:"id"`
+	Args      status.SendTxArgs `json:"args"`
+	MessageId string            `json:"message_id"`
+}
+
+type ReturnSendTransactionEvent struct {
+	Id           string            `json:"id"`
+	Args         status.SendTxArgs `json:"args"`
+	MessageId    string            `json:"message_id"`
+	ErrorMessage string            `json:"error_message"`
+	ErrorCode    string            `json:"error_code"`
 }
 
 type CompleteTransactionResult struct {
+	Id    string `json:"id"`
 	Hash  string `json:"hash"`
 	Error string `json:"error"`
+}
+
+type RawCompleteTransactionResult struct {
+	Hash  common.Hash
+	Error error
+}
+
+type CompleteTransactionsResult struct {
+	Results map[string]CompleteTransactionResult `json:"results"`
+}
+
+type RawDiscardTransactionResult struct {
+	Error error
+}
+
+type DiscardTransactionResult struct {
+	Id    string `json:"id"`
+	Error string `json:"error"`
+}
+
+type DiscardTransactionsResult struct {
+	Results map[string]DiscardTransactionResult `json:"results"`
 }
 
 type GethEvent struct {
 	Type  string      `json:"type"`
 	Event interface{} `json:"event"`
+}
+
+type RPCCall struct {
+	Id     int64
+	Method string
+	Params []interface{}
 }

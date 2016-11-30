@@ -1,4 +1,4 @@
-// Copyright 2015 The go-ethereum Authors
+// Copyright 2016 The go-ethereum Authors
 // This file is part of the go-ethereum library.
 //
 // The go-ethereum library is free software: you can redistribute it and/or modify
@@ -24,11 +24,11 @@ import (
 
 	"github.com/ethereum/ethash"
 	"github.com/ethereum/go-ethereum/accounts"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/compiler"
 	"github.com/ethereum/go-ethereum/common/httpclient"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/eth/filters"
@@ -37,15 +37,18 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/internal/ethapi"
 	"github.com/ethereum/go-ethereum/light"
+	"github.com/ethereum/go-ethereum/logger"
+	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
+	"github.com/ethereum/go-ethereum/params"
 	rpc "github.com/ethereum/go-ethereum/rpc"
 )
 
 type LightEthereum struct {
 	odr         *LesOdr
 	relay       *LesTxRelay
-	chainConfig *core.ChainConfig
+	chainConfig *params.ChainConfig
 	// Channel for shutting down the service
 	shutdownChan chan bool
 	// Handlers
@@ -106,10 +109,6 @@ func New(ctx *node.ServiceContext, config *eth.Config) (*LightEthereum, error) {
 		return nil, errors.New("missing chain config")
 	}
 	eth.chainConfig = config.ChainConfig
-	eth.chainConfig.VmConfig = vm.Config{
-		EnableJit: config.EnableJit,
-		ForceJit:  config.ForceJit,
-	}
 	eth.blockchain, err = light.NewLightChain(odr, eth.chainConfig, eth.pow, eth.eventMux)
 	if err != nil {
 		if err == core.ErrNoGenesis {
@@ -132,6 +131,28 @@ func New(ctx *node.ServiceContext, config *eth.Config) (*LightEthereum, error) {
 	return eth, nil
 }
 
+type LightDummyAPI struct{}
+
+// Etherbase is the address that mining rewards will be send to
+func (s *LightDummyAPI) Etherbase() (common.Address, error) {
+	return common.Address{}, fmt.Errorf("not supported")
+}
+
+// Coinbase is the address that mining rewards will be send to (alias for Etherbase)
+func (s *LightDummyAPI) Coinbase() (common.Address, error) {
+	return common.Address{}, fmt.Errorf("not supported")
+}
+
+// Hashrate returns the POW hashrate
+func (s *LightDummyAPI) Hashrate() *rpc.HexNumber {
+	return rpc.NewHexNumber(0)
+}
+
+// Mining returns an indication if this node is currently mining.
+func (s *LightDummyAPI) Mining() bool {
+	return false
+}
+
 // APIs returns the collection of RPC services the ethereum package offers.
 // NOTE, some of these services probably need to be moved to somewhere else.
 func (s *LightEthereum) APIs() []rpc.API {
@@ -139,12 +160,17 @@ func (s *LightEthereum) APIs() []rpc.API {
 		{
 			Namespace: "eth",
 			Version:   "1.0",
+			Service:   &LightDummyAPI{},
+			Public:    true,
+		}, {
+			Namespace: "eth",
+			Version:   "1.0",
 			Service:   downloader.NewPublicDownloaderAPI(s.protocolManager.downloader, s.eventMux),
 			Public:    true,
 		}, {
 			Namespace: "eth",
 			Version:   "1.0",
-			Service:   filters.NewPublicFilterAPI(s.ApiBackend),
+			Service:   filters.NewPublicFilterAPI(s.ApiBackend, true),
 			Public:    true,
 		}, {
 			Namespace: "net",
@@ -173,8 +199,9 @@ func (s *LightEthereum) Protocols() []p2p.Protocol {
 // Start implements node.Service, starting all internal goroutines needed by the
 // Ethereum protocol implementation.
 func (s *LightEthereum) Start(srvr *p2p.Server) error {
+	glog.V(logger.Info).Infof("WARNING: light client mode is an experimental feature")
 	s.netRPCService = ethapi.NewPublicNetAPI(srvr, s.netVersionId)
-	s.protocolManager.Start()
+	s.protocolManager.Start(srvr)
 	return nil
 }
 

@@ -18,6 +18,7 @@ package core
 
 import (
 	crand "crypto/rand"
+	"fmt"
 	"math"
 	"math/big"
 	mrand "math/rand"
@@ -31,6 +32,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/logger"
 	"github.com/ethereum/go-ethereum/logger/glog"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/pow"
 	"github.com/hashicorp/golang-lru"
 )
@@ -47,7 +49,7 @@ const (
 // It is not thread safe either, the encapsulating chain structures should do
 // the necessary mutex locking/unlocking.
 type HeaderChain struct {
-	config *ChainConfig
+	config *params.ChainConfig
 
 	chainDb       ethdb.Database
 	genesisHeader *types.Header
@@ -72,7 +74,7 @@ type getHeaderValidatorFn func() HeaderValidator
 //  getValidator should return the parent's validator
 //  procInterrupt points to the parent's interrupt semaphore
 //  wg points to the parent's shutdown wait group
-func NewHeaderChain(chainDb ethdb.Database, config *ChainConfig, getValidator getHeaderValidatorFn, procInterrupt func() bool) (*HeaderChain, error) {
+func NewHeaderChain(chainDb ethdb.Database, config *params.ChainConfig, getValidator getHeaderValidatorFn, procInterrupt func() bool) (*HeaderChain, error) {
 	headerCache, _ := lru.New(headerCacheLimit)
 	tdCache, _ := lru.New(tdCacheLimit)
 	numberCache, _ := lru.New(numberCacheLimit)
@@ -321,8 +323,12 @@ func (hc *HeaderChain) InsertHeaderChain(chain []*types.Header, checkFreq int, w
 	}
 	// Report some public statistics so the user has a clue what's going on
 	first, last := chain[0], chain[len(chain)-1]
-	glog.V(logger.Info).Infof("imported %d header(s) (%d ignored) in %v. #%v [%x… / %x…]", stats.processed, stats.ignored,
-		time.Since(start), last.Number, first.Hash().Bytes()[:4], last.Hash().Bytes()[:4])
+
+	ignored := ""
+	if stats.ignored > 0 {
+		ignored = fmt.Sprintf(" (%d ignored)", stats.ignored)
+	}
+	glog.V(logger.Info).Infof("imported %d headers%s in %9v. #%v [%x… / %x…]", stats.processed, ignored, common.PrettyDuration(time.Since(start)), last.Number, first.Hash().Bytes()[:4], last.Hash().Bytes()[:4])
 
 	return 0, nil
 }
@@ -485,13 +491,13 @@ func (hc *HeaderChain) SetGenesis(head *types.Header) {
 //
 // headerValidator implements HeaderValidator.
 type headerValidator struct {
-	config *ChainConfig
+	config *params.ChainConfig
 	hc     *HeaderChain // Canonical header chain
 	Pow    pow.PoW      // Proof of work used for validating
 }
 
 // NewBlockValidator returns a new block validator which is safe for re-use
-func NewHeaderValidator(config *ChainConfig, chain *HeaderChain, pow pow.PoW) HeaderValidator {
+func NewHeaderValidator(config *params.ChainConfig, chain *HeaderChain, pow pow.PoW) HeaderValidator {
 	return &headerValidator{
 		config: config,
 		Pow:    pow,

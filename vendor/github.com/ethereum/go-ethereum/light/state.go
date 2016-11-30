@@ -20,13 +20,11 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/logger"
 	"github.com/ethereum/go-ethereum/logger/glog"
 	"golang.org/x/net/context"
 )
-
-// StartingNonce determines the default nonce when new accounts are being created.
-var StartingNonce uint64
 
 // LightState is a memory representation of a state.
 // This version is ODR capable, caching only the already accessed part of the
@@ -120,9 +118,9 @@ func (self *LightState) GetState(ctx context.Context, a common.Address, b common
 	return common.Hash{}, err
 }
 
-// IsDeleted returns true if the given account has been marked for deletion
+// HasSuicided returns true if the given account has been marked for deletion
 // or false if the account does not exist
-func (self *LightState) IsDeleted(ctx context.Context, addr common.Address) (bool, error) {
+func (self *LightState) HasSuicided(ctx context.Context, addr common.Address) (bool, error) {
 	stateObject, err := self.GetStateObject(ctx, addr)
 	if err == nil && stateObject != nil {
 		return stateObject.remove, nil
@@ -156,7 +154,7 @@ func (self *LightState) SetNonce(ctx context.Context, addr common.Address, nonce
 func (self *LightState) SetCode(ctx context.Context, addr common.Address, code []byte) error {
 	stateObject, err := self.GetOrNewStateObject(ctx, addr)
 	if err == nil && stateObject != nil {
-		stateObject.SetCode(code)
+		stateObject.SetCode(crypto.Keccak256Hash(code), code)
 	}
 	return err
 }
@@ -171,7 +169,7 @@ func (self *LightState) SetState(ctx context.Context, addr common.Address, key c
 }
 
 // Delete marks an account to be removed and clears its balance
-func (self *LightState) Delete(ctx context.Context, addr common.Address) (bool, error) {
+func (self *LightState) Suicide(ctx context.Context, addr common.Address) (bool, error) {
 	stateObject, err := self.GetOrNewStateObject(ctx, addr)
 	if err == nil && stateObject != nil {
 		stateObject.MarkForDeletion()
@@ -237,7 +235,6 @@ func (self *LightState) newStateObject(addr common.Address) *StateObject {
 	}
 
 	stateObject := NewStateObject(addr, self.odr)
-	stateObject.SetNonce(StartingNonce)
 	self.stateObjects[addr.Str()] = stateObject
 
 	return stateObject
@@ -273,7 +270,9 @@ func (self *LightState) Copy() *LightState {
 	state.trie = self.trie
 	state.id = self.id
 	for k, stateObject := range self.stateObjects {
-		state.stateObjects[k] = stateObject.Copy()
+		if stateObject.dirty {
+			state.stateObjects[k] = stateObject.Copy()
+		}
 	}
 
 	state.refund.Set(self.refund)

@@ -15,6 +15,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/cmd/utils"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/logger"
 	"github.com/ethereum/go-ethereum/logger/glog"
 )
@@ -23,7 +25,7 @@ var muPrepareTestNode sync.Mutex
 
 const (
 	TestDataDir         = "../.ethereumtest"
-	TestNodeSyncSeconds = 480
+	TestNodeSyncSeconds = 120
 )
 
 type NodeNotificationHandler func(jsonEvent string)
@@ -119,7 +121,7 @@ func PrepareTestNode() (err error) {
 	if !manager.HasNode() {
 		panic(ErrInvalidGethNode)
 	}
-	if !manager.HasClientRestartWrapper() {
+	if !manager.HasRPCClient() {
 		panic(ErrInvalidGethNode)
 	}
 	if !manager.HasWhisperService() {
@@ -128,8 +130,6 @@ func PrepareTestNode() (err error) {
 	if !manager.HasLightEthereumService() {
 		panic(ErrInvalidGethNode)
 	}
-
-	manager.AddPeer("enode://409772c7dea96fa59a912186ad5bcdb5e51b80556b3fe447d940f99d9eaadb51d4f0ffedb68efad232b52475dd7bd59b51cee99968b3cc79e2d5684b33c4090c@139.162.166.59:30303")
 
 	if syncRequired {
 		glog.V(logger.Warn).Infof("Sync is required, it will take %d seconds", TestNodeSyncSeconds)
@@ -169,21 +169,41 @@ func PreprocessDataDir(dataDir string) (string, error) {
 }
 
 // PanicAfter throws panic() after waitSeconds, unless abort channel receives notification
-func PanicAfter(waitSeconds time.Duration, abort chan bool, desc string) {
-	// panic if function takes too long
-	timeout := make(chan bool, 1)
-
-	go func() {
-		time.Sleep(waitSeconds)
-		timeout <- true
-	}()
-
+func PanicAfter(waitSeconds time.Duration, abort chan struct{}, desc string) {
 	go func() {
 		select {
 		case <-abort:
 			return
-		case <-timeout:
+		case <-time.After(waitSeconds):
 			panic("whatever you were doing takes toooo long: " + desc)
 		}
 	}()
+}
+
+func FromAddress(accountAddress string) common.Address {
+	accountManager, err := GetNodeManager().AccountManager()
+	if err != nil {
+		return common.Address{}
+	}
+
+	from, err := utils.MakeAddress(accountManager, accountAddress)
+	if err != nil {
+		return common.Address{}
+	}
+
+	return from.Address
+}
+
+func ToAddress(accountAddress string) *common.Address {
+	accountManager, err := GetNodeManager().AccountManager()
+	if err != nil {
+		return nil
+	}
+
+	to, err := utils.MakeAddress(accountManager, accountAddress)
+	if err != nil {
+		return nil
+	}
+
+	return &to.Address
 }
