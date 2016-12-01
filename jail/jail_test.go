@@ -419,3 +419,48 @@ func TestJailGetVM(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 }
+
+func TestIsConnected(t *testing.T) {
+	err := geth.PrepareTestNode()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	jailInstance := jail.Init("")
+	jailInstance.Parse(CHAT_ID_CALL, "")
+
+	// obtain VM for a given chat (to send custom JS to jailed version of Send())
+	vm, err := jailInstance.GetVM(CHAT_ID_CALL)
+	if err != nil {
+		t.Errorf("cannot get VM: %v", err)
+		return
+	}
+
+	_, err = vm.Run(`
+	    var responseValue = web3.isConnected();
+	    responseValue = JSON.stringify(responseValue);
+	`)
+	if err != nil {
+		t.Errorf("cannot run custom code on VM: %v", err)
+		return
+	}
+
+	responseValue, err := vm.Get("responseValue")
+	if err != nil {
+		t.Errorf("cannot obtain result of isConnected(): %v", err)
+		return
+	}
+
+	response, err := responseValue.ToString()
+	if err != nil {
+		t.Errorf("cannot parse result: %v", err)
+		return
+	}
+
+	expectedResponse := `{"jsonrpc":"2.0","result":"true"}`
+	if !reflect.DeepEqual(response, expectedResponse) {
+		t.Errorf("expected response is not returned: expected %s, got %s", expectedResponse, response)
+		return
+	}
+}
