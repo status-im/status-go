@@ -115,9 +115,9 @@ func (m *NodeManager) MakeNode(datadir string, rpcport int) *node.Node {
 	set := flag.NewFlagSet("test", 0)
 	set.Bool("lightkdf", true, "Reduce key-derivation RAM & CPU usage at some expense of KDF strength")
 	set.Bool("shh", true, "whisper")
-	set.Bool("light", true, "disable eth")
+	set.Bool("light", true, "enable light client mode")
 	if UseTestnet == "true" {
-		set.Bool("testnet", true, "light test network")
+		set.Bool("testnet", true, "test network")
 	}
 	set.Bool("rpc", true, "enable rpc")
 	set.String("rpcaddr", "localhost", "host for RPC")
