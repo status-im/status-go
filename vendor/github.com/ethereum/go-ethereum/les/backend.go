@@ -26,7 +26,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/compiler"
-	"github.com/ethereum/go-ethereum/common/httpclient"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/eth"
@@ -62,7 +61,6 @@ type LightEthereum struct {
 
 	eventMux       *event.TypeMux
 	pow            *ethash.Ethash
-	httpclient     *httpclient.HTTPClient
 	accountManager *accounts.Manager
 	solcPath       string
 	solc           *compiler.Solidity
@@ -98,7 +96,6 @@ func New(ctx *node.ServiceContext, config *eth.Config) (*LightEthereum, error) {
 		accountManager: ctx.AccountManager,
 		pow:            pow,
 		shutdownChan:   make(chan bool),
-		httpclient:     httpclient.New(config.DocRoot),
 		netVersionId:   config.NetworkId,
 		NatSpec:        config.NatSpec,
 		PowTest:        config.PowTest,
@@ -189,6 +186,7 @@ func (s *LightEthereum) BlockChain() *light.LightChain      { return s.blockchai
 func (s *LightEthereum) TxPool() *light.TxPool              { return s.txPool }
 func (s *LightEthereum) LesVersion() int                    { return int(s.protocolManager.SubProtocols[0].Version) }
 func (s *LightEthereum) Downloader() *downloader.Downloader { return s.protocolManager.downloader }
+func (s *LightEthereum) EventMux() *event.TypeMux           { return s.eventMux }
 
 // Protocols implements node.Service, returning all the currently configured
 // network protocols to start.

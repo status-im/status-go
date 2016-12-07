@@ -179,7 +179,7 @@ func (c *StateObject) SetBalance(amount *big.Int) {
 }
 
 // ReturnGas returns the gas back to the origin. Used by the Virtual machine or Closures
-func (c *StateObject) ReturnGas(gas, price *big.Int) {}
+func (c *StateObject) ReturnGas(gas *big.Int) {}
 
 // Copy creates a copy of the state object
 func (self *StateObject) Copy() *StateObject {
@@ -201,14 +201,19 @@ func (self *StateObject) Copy() *StateObject {
 // Attribute accessors
 //
 
+// empty returns whether the account is considered empty.
+func (self *StateObject) empty() bool {
+	return self.nonce == 0 && self.balance.BitLen() == 0 && bytes.Equal(self.codeHash, emptyCodeHash)
+}
+
 // Balance returns the account balance
 func (self *StateObject) Balance() *big.Int {
 	return self.balance
 }
 
 // Address returns the address of the contract/account
-func (c *StateObject) Address() common.Address {
-	return c.address
+func (self *StateObject) Address() common.Address {
+	return self.address
 }
 
 // Code returns the contract code

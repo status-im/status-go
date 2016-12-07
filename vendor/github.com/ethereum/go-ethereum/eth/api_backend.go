@@ -56,7 +56,7 @@ func (b *EthApiBackend) SetHead(number uint64) {
 func (b *EthApiBackend) HeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Header, error) {
 	// Pending block is only known by the miner
 	if blockNr == rpc.PendingBlockNumber {
-		block, _ := b.eth.miner.Pending()
+		block := b.eth.miner.PendingBlock()
 		return block.Header(), nil
 	}
 	// Otherwise resolve and return the block
@@ -69,7 +69,7 @@ func (b *EthApiBackend) HeaderByNumber(ctx context.Context, blockNr rpc.BlockNum
 func (b *EthApiBackend) BlockByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Block, error) {
 	// Pending block is only known by the miner
 	if blockNr == rpc.PendingBlockNumber {
-		block, _ := b.eth.miner.Pending()
+		block := b.eth.miner.PendingBlock()
 		return block, nil
 	}
 	// Otherwise resolve and return the block
@@ -106,12 +106,14 @@ func (b *EthApiBackend) GetTd(blockHash common.Hash) *big.Int {
 	return b.eth.blockchain.GetTdByHash(blockHash)
 }
 
-func (b *EthApiBackend) GetVMEnv(ctx context.Context, msg core.Message, state ethapi.State, header *types.Header) (vm.Environment, func() error, error) {
+func (b *EthApiBackend) GetVMEnv(ctx context.Context, msg core.Message, state ethapi.State, header *types.Header) (*vm.Environment, func() error, error) {
 	statedb := state.(EthApiState).state
 	from := statedb.GetOrNewStateObject(msg.From())
 	from.SetBalance(common.MaxBig)
 	vmError := func() error { return nil }
-	return core.NewEnv(statedb, b.eth.chainConfig, b.eth.blockchain, msg, header, vm.Config{}), vmError, nil
+
+	context := core.NewEVMContext(msg, header, b.eth.BlockChain())
+	return vm.NewEnvironment(context, statedb, b.eth.chainConfig, vm.Config{}), vmError, nil
 }
 
 func (b *EthApiBackend) SendTx(ctx context.Context, signedTx *types.Transaction) error {

@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with go-ethereum. If not, see <http://www.gnu.org/licenses/>.
 
+// Package utils contains internal helper functions for go-ethereum commands.
 package utils
 
 import (
@@ -36,6 +37,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/ethstats"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/internal/debug"
 	"github.com/ethereum/go-ethereum/les"
@@ -46,6 +48,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/p2p/nat"
+	"github.com/ethereum/go-ethereum/p2p/netutil"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/pow"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -86,7 +89,7 @@ func NewApp(gitCommit, usage string) *cli.App {
 	app.Author = ""
 	//app.Authors = nil
 	app.Email = ""
-	app.Version = Version
+	app.Version = params.Version
 	if gitCommit != "" {
 		app.Version += "-" + gitCommit[:8]
 	}
@@ -114,7 +117,7 @@ var (
 	}
 	NetworkIdFlag = cli.IntFlag{
 		Name:  "networkid",
-		Usage: "Network identifier (integer, 0=Olympic, 1=Frontier, 2=Morden)",
+		Usage: "Network identifier (integer, 0=Olympic (disused), 1=Frontier, 2=Morden (disused), 3=Ropsten)",
 		Value: eth.NetworkId,
 	}
 	OlympicFlag = cli.BoolFlag{
@@ -123,7 +126,7 @@ var (
 	}
 	TestNetFlag = cli.BoolFlag{
 		Name:  "testnet",
-		Usage: "Morden network: pre-configured test network with modified starting nonces (replay protection)",
+		Usage: "Ropsten network: pre-configured test network",
 	}
 	DevModeFlag = cli.BoolFlag{
 		Name:  "dev",
@@ -174,15 +177,6 @@ var (
 		Name:  "trie-cache-gens",
 		Usage: "Number of trie node generations to keep in memory",
 		Value: int(state.MaxTrieCacheGen),
-	}
-	// Fork settings
-	SupportDAOFork = cli.BoolFlag{
-		Name:  "support-dao-fork",
-		Usage: "Updates the chain rules to support the DAO hard-fork",
-	}
-	OpposeDAOFork = cli.BoolFlag{
-		Name:  "oppose-dao-fork",
-		Usage: "Updates the chain rules to oppose the DAO hard-fork",
 	}
 	// Miner settings
 	MiningEnabledFlag = cli.BoolFlag{
@@ -242,8 +236,11 @@ var (
 		Name:  "jitvm",
 		Usage: "Enable the JIT VM",
 	}
-
-	// logging and debug settings
+	// Logging and debug settings
+	EthStatsURLFlag = cli.StringFlag{
+		Name:  "ethstats",
+		Usage: "Reporting URL of a ethstats service (nodename:secret@host:port)",
+	}
 	MetricsEnabledFlag = cli.BoolFlag{
 		Name:  metrics.MetricsEnabledFlag,
 		Usage: "Enable metrics collection and reporting",
@@ -367,18 +364,20 @@ var (
 		Name:  "v5disc",
 		Usage: "Enables the experimental RLPx V5 (Topic Discovery) mechanism",
 	}
-	NoEthFlag = cli.BoolFlag{
-		Name:  "noeth",
-		Usage: "Disable Ethereum Protocol",
+	NetrestrictFlag = cli.StringFlag{
+		Name:  "netrestrict",
+		Usage: "Restricts network communication to the given IP networks (CIDR masks)",
 	}
+
 	WhisperEnabledFlag = cli.BoolFlag{
 		Name:  "shh",
 		Usage: "Enable Whisper",
 	}
+
 	// ATM the url is left to the user and deployment to
 	JSpathFlag = cli.StringFlag{
 		Name:  "jspath",
-		Usage: "JavaScript root path for `loadScript` and document root for `admin.httpGet`",
+		Usage: "JavaScript root path for `loadScript`",
 		Value: ".",
 	}
 	SolcPathFlag = cli.StringFlag{
@@ -665,7 +664,7 @@ func MakePasswordList(ctx *cli.Context) []string {
 
 // MakeNode configures a node with no services from command line flags.
 func MakeNode(ctx *cli.Context, name, gitCommit string) *node.Node {
-	vsn := Version
+	vsn := params.Version
 	if gitCommit != "" {
 		vsn += "-" + gitCommit[:8]
 	}
@@ -705,6 +704,14 @@ func MakeNode(ctx *cli.Context, name, gitCommit string) *node.Node {
 		config.MaxPeers = 0
 		config.ListenAddr = ":0"
 	}
+	if netrestrict := ctx.GlobalString(NetrestrictFlag.Name); netrestrict != "" {
+		list, err := netutil.ParseNetlist(netrestrict)
+		if err != nil {
+			Fatalf("Option %q: %v", NetrestrictFlag.Name, err)
+		}
+		config.NetRestrict = list
+	}
+
 	stack, err := node.New(config)
 	if err != nil {
 		Fatalf("Failed to create the protocol stack: %v", err)
@@ -715,12 +722,6 @@ func MakeNode(ctx *cli.Context, name, gitCommit string) *node.Node {
 // RegisterEthService configures eth.Ethereum from command line flags and adds it to the
 // given node.
 func RegisterEthService(ctx *cli.Context, stack *node.Node, extra []byte) {
-	ethDisabled := ctx.GlobalBool(NoEthFlag.Name)
-	if ethDisabled {
-		glog.V(logger.Info).Infof("Ethereum service registration by-passed (--%s flag used)\n", NoEthFlag.Name)
-		return
-	}
-
 	// Avoid conflicting network flags
 	networks, netFlags := 0, []cli.BoolFlag{DevModeFlag, TestNetFlag, OlympicFlag}
 	for _, flag := range netFlags {
@@ -804,10 +805,27 @@ func RegisterEthService(ctx *cli.Context, stack *node.Node, extra []byte) {
 	}
 }
 
-// RegisterShhService configures whisper and adds it to the given node.
+// RegisterShhService configures Whisper and adds it to the given node.
 func RegisterShhService(stack *node.Node) {
 	if err := stack.Register(func(*node.ServiceContext) (node.Service, error) { return whisper.New(), nil }); err != nil {
 		Fatalf("Failed to register the Whisper service: %v", err)
+	}
+}
+
+// RegisterEthStatsService configures the Ethereum Stats daemon and adds it to
+// th egiven node.
+func RegisterEthStatsService(stack *node.Node, url string) {
+	if err := stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
+		// Retrieve both eth and les services
+		var ethServ *eth.Ethereum
+		ctx.Service(&ethServ)
+
+		var lesServ *les.LightEthereum
+		ctx.Service(&lesServ)
+
+		return ethstats.New(url, ethServ, lesServ)
+	}); err != nil {
+		Fatalf("Failed to register the Ethereum Stats service: %v", err)
 	}
 }
 
@@ -881,13 +899,6 @@ func MakeChainConfigFromDb(ctx *cli.Context, db ethdb.Database) *params.ChainCon
 			config.EIP158Block = params.MainNetSpuriousDragon
 			config.ChainId = params.MainNetChainID
 		}
-	}
-	// Force override any existing configs if explicitly requested
-	switch {
-	case ctx.GlobalBool(SupportDAOFork.Name):
-		config.DAOForkSupport = true
-	case ctx.GlobalBool(OpposeDAOFork.Name):
-		config.DAOForkSupport = false
 	}
 	return config
 }

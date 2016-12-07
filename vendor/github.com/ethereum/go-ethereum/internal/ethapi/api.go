@@ -1126,13 +1126,11 @@ func (s *PublicTransactionPoolAPI) CompleteQueuedTransaction(ctx context.Context
 		return common.Hash{}, err
 	}
 
-	if args.Nonce == nil {
-		nonce, err := s.b.GetPoolNonce(ctx, args.From)
-		if err != nil {
-			return common.Hash{}, err
-		}
-		args.Nonce = rpc.NewHexNumber(nonce)
+	nonce, err := s.b.GetPoolNonce(ctx, args.From)
+	if err != nil {
+		return common.Hash{}, err
 	}
+	args.Nonce = rpc.NewHexNumber(nonce)
 
 	var tx *types.Transaction
 	if args.To == nil {
