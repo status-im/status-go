@@ -161,6 +161,7 @@ var AppHelpFlagGroups = []flagGroup{
 	{
 		Name: "LOGGING AND DEBUGGING",
 		Flags: append([]cli.Flag{
+			utils.EthStatsURLFlag,
 			utils.MetricsEnabledFlag,
 			utils.FakePoWFlag,
 		}, debug.Flags...),
@@ -170,7 +171,6 @@ var AppHelpFlagGroups = []flagGroup{
 		Flags: []cli.Flag{
 			utils.WhisperEnabledFlag,
 			utils.NatspecEnabledFlag,
-			utils.NoEthFlag,
 		},
 	},
 	{

@@ -235,7 +235,7 @@ func Call(chatId *C.char, path *C.char, params *C.char) *C.char {
 
 //export AddPeer
 func AddPeer(url *C.char) *C.char {
-	success, err := geth.GetNodeManager().AddPeer(C.GoString(url))
+	success, err := geth.NodeManagerInstance().AddPeer(C.GoString(url))
 	errString := ""
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)

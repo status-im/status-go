@@ -21,7 +21,7 @@ func TestQueuedTransactions(t *testing.T) {
 	}
 
 	// obtain reference to status backend
-	lightEthereum, err := geth.GetNodeManager().LightEthereumService()
+	lightEthereum, err := geth.NodeManagerInstance().LightEthereumService()
 	if err != nil {
 		t.Errorf("Test failed: LES service is not running: %v", err)
 		return
@@ -91,7 +91,7 @@ func TestDoubleCompleteQueuedTransactions(t *testing.T) {
 	}
 
 	// obtain reference to status backend
-	lightEthereum, err := geth.GetNodeManager().LightEthereumService()
+	lightEthereum, err := geth.NodeManagerInstance().LightEthereumService()
 	if err != nil {
 		t.Errorf("Test failed: LES service is not running: %v", err)
 		return
@@ -212,7 +212,7 @@ func TestDiscardQueuedTransactions(t *testing.T) {
 	}
 
 	// obtain reference to status backend
-	lightEthereum, err := geth.GetNodeManager().LightEthereumService()
+	lightEthereum, err := geth.NodeManagerInstance().LightEthereumService()
 	if err != nil {
 		t.Errorf("Test failed: LES service is not running: %v", err)
 		return
@@ -327,7 +327,7 @@ func TestCompleteMultipleQueuedTransactions(t *testing.T) {
 	}
 
 	// obtain reference to status backend
-	lightEthereum, err := geth.GetNodeManager().LightEthereumService()
+	lightEthereum, err := geth.NodeManagerInstance().LightEthereumService()
 	if err != nil {
 		t.Errorf("Test failed: LES service is not running: %v", err)
 		return
@@ -452,7 +452,7 @@ func TestDiscardMultipleQueuedTransactions(t *testing.T) {
 	}
 
 	// obtain reference to status backend
-	lightEthereum, err := geth.GetNodeManager().LightEthereumService()
+	lightEthereum, err := geth.NodeManagerInstance().LightEthereumService()
 	if err != nil {
 		t.Errorf("Test failed: LES service is not running: %v", err)
 		return
@@ -653,7 +653,7 @@ func TestEvictionOfQueuedTransactions(t *testing.T) {
 	}
 
 	// obtain reference to status backend
-	lightEthereum, err := geth.GetNodeManager().LightEthereumService()
+	lightEthereum, err := geth.NodeManagerInstance().LightEthereumService()
 	if err != nil {
 		t.Errorf("Test failed: LES service is not running: %v", err)
 		return

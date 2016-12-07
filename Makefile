@@ -81,6 +81,11 @@ test-extkeys:
 	@build/env.sh go tool cover -html=coverage.out -o coverage.html
 	@build/env.sh go tool cover -func=coverage.out
 
+test-cmd:
+	build/env.sh go test -v -coverprofile=coverage.out ./cmd/status
+	@build/env.sh go tool cover -html=coverage.out -o coverage.html
+	@build/env.sh go tool cover -func=coverage.out
+
 clean:
 	rm -fr build/bin/*
 	rm coverage.out coverage-all.out coverage.html

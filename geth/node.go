@@ -1,304 +1,249 @@
 package geth
 
-/*
-#include <stddef.h>
-#include <stdbool.h>
-extern bool StatusServiceSignalEvent( const char *jsonEvent );
-*/
-import "C"
 import (
-	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
+	"math/big"
+	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
-	"sync"
+	"strings"
+	"syscall"
 
-	"github.com/ethereum/go-ethereum/accounts"
-	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/les"
 	"github.com/ethereum/go-ethereum/logger"
 	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/ethereum/go-ethereum/node"
-	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/ethereum/go-ethereum/rpc"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv2"
-	"gopkg.in/urfave/cli.v1"
 )
 
 const (
-	clientIdentifier = "Geth"     // Client identifier to advertise over the network
-	versionMajor     = 1          // Major version component of the current release
-	versionMinor     = 5          // Minor version component of the current release
-	versionPatch     = 0          // Patch version component of the current release
-	versionMeta      = "unstable" // Version metadata to append to the version string
+	ClientIdentifier = "StatusIM" // Client identifier to advertise over the network
+	VersionMajor     = 1          // Major version component of the current release
+	VersionMinor     = 1          // Minor version component of the current release
+	VersionPatch     = 0          // Patch version component of the current release
+	VersionMeta      = "stable" // Version metadata to append to the version string
 
-	RPCPort     = 8545 // RPC port (replaced in unit tests)
-	NetworkPort = 30303
+	RPCPort         = 8545 // RPC port (replaced in unit tests)
+	NetworkPort     = 30303
+	MaxPeers        = 25
+	MaxLightPeers   = 20
+	MaxPendingPeers = 0
+
+	ProcessFileDescriptorLimit = uint64(2048)
+	DatabaseCacheSize          = 128 // Megabytes of memory allocated to internal caching (min 16MB / database forced)
 
 	EventNodeStarted = "node.started"
 )
 
+// Gas price settings
 var (
-	ErrDataDirPreprocessingFailed  = errors.New("failed to pre-process data directory")
-	ErrInvalidGethNode             = errors.New("no running geth node detected")
-	ErrInvalidAccountManager       = errors.New("could not retrieve account manager")
-	ErrInvalidWhisperService       = errors.New("whisper service is unavailable")
-	ErrInvalidLightEthereumService = errors.New("can not retrieve LES service")
-	ErrInvalidClient               = errors.New("RPC client is not properly initialized")
-	ErrInvalidJailedRequestQueue   = errors.New("Jailed request queue is not properly initialized")
-	ErrNodeStartFailure            = errors.New("could not create the in-memory node object")
+	GasPrice                = new(big.Int).Mul(big.NewInt(20), common.Shannon)  // Minimal gas price to accept for mining a transactions
+	GpoMinGasPrice          = new(big.Int).Mul(big.NewInt(20), common.Shannon)  // Minimum suggested gas price
+	GpoMaxGasPrice          = new(big.Int).Mul(big.NewInt(500), common.Shannon) // Maximum suggested gas price
+	GpoFullBlockRatio       = 80                                                // Full block threshold for gas price calculation (%)
+	GpobaseStepDown         = 10                                                // Suggested gas price base step down ratio (1/1000)
+	GpobaseStepUp           = 100                                               // Suggested gas price base step up ratio (1/1000)
+	GpobaseCorrectionFactor = 110                                               // Suggested gas price base correction factor (%)
 )
 
-type SelectedExtKey struct {
-	Address     common.Address
-	AccountKey  *accounts.Key
-	SubAccounts []accounts.Account
-}
-
-type NodeManager struct {
-	currentNode        *node.Node          // currently running geth node
-	ctx                *cli.Context        // the CLI context used to start the geth node
-	lightEthereum      *les.LightEthereum  // LES service
-	accountManager     *accounts.Manager   // the account manager attached to the currentNode
-	jailedRequestQueue *JailedRequestQueue // bridge via which jail notifies node of incoming requests
-	SelectedAccount    *SelectedExtKey     // account that was processed during the last call to SelectAccount()
-	whisperService     *whisper.Whisper    // Whisper service
-	client             *rpc.Client         // RPC client
-	nodeStarted        chan struct{}       // channel to wait for node to start
-}
-
+// default node configuration options
 var (
-	UseTestnet          = "true" // can be overridden via -ldflags '-X geth.UseTestnet'
-	nodeManagerInstance *NodeManager
-	createOnce          sync.Once
+	UseTestnetFlag = "true" // to be overridden via -ldflags '-X geth.UseTestnetFlag'
+	UseTestnet     = false
 )
 
-func NewNodeManager(datadir string, rpcport int) *NodeManager {
-	createOnce.Do(func() {
-		nodeManagerInstance = &NodeManager{
-			jailedRequestQueue: NewJailedRequestsQueue(),
-		}
-		nodeManagerInstance.MakeNode(datadir, rpcport)
-	})
-
-	return nodeManagerInstance
-}
-
-func GetNodeManager() *NodeManager {
-	return nodeManagerInstance
-}
-
-// createAndStartNode creates a node entity and starts the
-// node running locally exposing given RPC port
-func CreateAndRunNode(datadir string, rpcport int) error {
-	nodeManager := NewNodeManager(datadir, rpcport)
-
-	if nodeManager.HasNode() {
-		nodeManager.RunNode()
-
-		<-nodeManager.nodeStarted // block until node is ready
-		return nil
+func init() {
+	if UseTestnetFlag == "true" { // set at compile time, here we make sure to set corresponding boolean flag
+		UseTestnet = true
 	}
+}
 
-	return ErrNodeStartFailure
+// node-related errors
+var (
+	ErrRLimitRaiseFailure            = errors.New("failed to register the whisper service")
+	ErrDatabaseAccessFailure         = errors.New("could not open database")
+	ErrChainConfigurationFailure     = errors.New("could not make chain configuration")
+	ErrEthServiceRegistrationFailure = errors.New("failed to register the Ethereum service")
+	ErrSshServiceRegistrationFailure = errors.New("failed to register the Whisper service")
+	ErrLightEthRegistrationFailure   = errors.New("failed to register the LES service")
+)
+
+type Node struct {
+	geth    *node.Node    // reference to the running Geth node
+	started chan struct{} // channel to wait for node to start
+}
+
+// Inited checks whether status node has been properly initialized
+func (n *Node) Inited() bool {
+	return n != nil && n.geth != nil
 }
 
 // MakeNode create a geth node entity
-func (m *NodeManager) MakeNode(datadir string, rpcport int) *node.Node {
-	// TODO remove admin rpcapi flag
-	set := flag.NewFlagSet("test", 0)
-	set.Bool("lightkdf", true, "Reduce key-derivation RAM & CPU usage at some expense of KDF strength")
-	set.Bool("shh", true, "whisper")
-	set.Bool("light", true, "disable eth")
-	if UseTestnet == "true" {
-		set.Bool("testnet", true, "light test network")
-	}
-	set.Bool("rpc", true, "enable rpc")
-	set.String("rpcaddr", "localhost", "host for RPC")
-	set.Int("rpcport", rpcport, "rpc port")
-	set.String("rpccorsdomain", "*", "allow all domains")
-	set.String("verbosity", "3", "verbosity level")
-	set.String("rpcapi", "db,eth,net,web3,shh,personal,admin", "rpc api(s)")
-	set.String("datadir", datadir, "data directory for geth")
-	set.String("logdir", datadir, "log dir for glog")
-	set.Int("port", NetworkPort, "network listening port")
-	m.ctx = cli.NewContext(nil, set, nil)
+func MakeNode(dataDir string, rpcPort int) *Node {
+	glog.CopyStandardLogTo("INFO")
+	glog.SetToStderr(true)
 
-	utils.DebugSetup(m.ctx)
-
-	// create node and start requested protocols
-	m.currentNode = utils.MakeNode(m.ctx, clientIdentifier, "")
-	utils.RegisterEthService(m.ctx, m.currentNode, makeDefaultExtra())
-
-	// Whisper must be explicitly enabled, but is auto-enabled in --dev mode.
-	shhEnabled := m.ctx.GlobalBool(utils.WhisperEnabledFlag.Name)
-	shhAutoEnabled := !m.ctx.GlobalIsSet(utils.WhisperEnabledFlag.Name) && m.ctx.GlobalIsSet(utils.DevModeFlag.Name)
-	if shhEnabled || shhAutoEnabled {
-		utils.RegisterShhService(m.currentNode)
+	bootstrapNodes := params.MainnetBootnodes
+	if UseTestnet {
+		dataDir = filepath.Join(dataDir, "testnet")
+		bootstrapNodes = params.TestnetBootnodes
 	}
 
-	m.accountManager = m.currentNode.AccountManager()
-	m.nodeStarted = make(chan struct{})
-
-	return m.currentNode
-}
-
-// StartNode starts a geth node entity
-func (m *NodeManager) RunNode() {
-	go func() {
-		utils.StartNode(m.currentNode)
-
-		if m.currentNode.AccountManager() == nil {
-			glog.V(logger.Warn).Infoln("cannot get account manager")
-		}
-		if err := m.currentNode.Service(&m.whisperService); err != nil {
-			glog.V(logger.Warn).Infoln("cannot get whisper service:", err)
-		}
-		if err := m.currentNode.Service(&m.lightEthereum); err != nil {
-			glog.V(logger.Warn).Infoln("cannot get light ethereum service:", err)
-		}
-
-		// setup handlers
-		m.lightEthereum.StatusBackend.SetTransactionQueueHandler(onSendTransactionRequest)
-		m.lightEthereum.StatusBackend.SetAccountsFilterHandler(onAccountsListRequest)
-		m.lightEthereum.StatusBackend.SetTransactionReturnHandler(onSendTransactionReturn)
-
-		var err error
-		m.client, err = m.currentNode.Attach()
-		if err != nil {
-			glog.V(logger.Warn).Infoln("cannot get RPC client service:", ErrInvalidClient)
-		}
-
-		// @TODO Remove after LES supports discover out of box
-		m.populateStaticPeers()
-
-		m.onNodeStarted() // node started, notify listeners
-		m.currentNode.Wait()
-	}()
-}
-
-func (m *NodeManager) onNodeStarted() {
-	// notify local listener
-	m.nodeStarted <- struct{}{}
-	close(m.nodeStarted)
-
-	// send signal up to native app
-	event := GethEvent{
-		Type:  EventNodeStarted,
-		Event: struct{}{},
+	// configure required node (should you need to update node's config, e.g. add bootstrap nodes, see node.Config)
+	config := &node.Config{
+		DataDir:           dataDir,
+		UseLightweightKDF: true,
+		Name:              ClientIdentifier,
+		Version:           fmt.Sprintf("%d.%d.%d-%s", VersionMajor, VersionMinor, VersionPatch, VersionMeta),
+		NoDiscovery:       true,
+		DiscoveryV5:       true,
+		DiscoveryV5Addr:   fmt.Sprintf(":%d", NetworkPort+1),
+		BootstrapNodes:    bootstrapNodes,
+		BootstrapNodesV5:  params.DiscoveryV5Bootnodes,
+		ListenAddr:        fmt.Sprintf(":%d", NetworkPort),
+		MaxPeers:          MaxPeers,
+		MaxPendingPeers:   MaxPendingPeers,
+		HTTPHost:          node.DefaultHTTPHost,
+		HTTPPort:          rpcPort,
+		HTTPCors:          "*",
+		HTTPModules:       strings.Split("db,eth,net,web3,shh,personal,admin", ","), // TODO remove "admin" on main net
 	}
 
-	body, _ := json.Marshal(&event)
-	C.StatusServiceSignalEvent(C.CString(string(body)))
-}
-
-func (m *NodeManager) AddPeer(url string) (bool, error) {
-	if m == nil || !m.HasNode() {
-		return false, ErrInvalidGethNode
-	}
-
-	server := m.currentNode.Server()
-	if server == nil {
-		return false, errors.New("node not started")
-	}
-	// Try to add the url as a static peer and return
-	parsedNode, err := discover.ParseNode(url)
+	stack, err := node.New(config)
 	if err != nil {
-		return false, fmt.Errorf("invalid enode: %v", err)
-	}
-	server.AddPeer(parsedNode)
-
-	return true, nil
-}
-
-func (m *NodeManager) HasNode() bool {
-	return m != nil && m.currentNode != nil
-}
-
-func (m *NodeManager) HasAccountManager() bool {
-	return m.accountManager != nil
-}
-
-func (m *NodeManager) AccountManager() (*accounts.Manager, error) {
-	if m == nil || !m.HasNode() {
-		return nil, ErrInvalidGethNode
+		Fatalf(ErrNodeMakeFailure)
 	}
 
-	if !m.HasAccountManager() {
-		return nil, ErrInvalidAccountManager
+	// start Ethereum service
+	if err := activateEthService(stack, makeDefaultExtra()); err != nil {
+		Fatalf(fmt.Errorf("%v: %v", ErrEthServiceRegistrationFailure, err))
 	}
 
-	return m.accountManager, nil
+	// start Whisper service
+	if err := activateShhService(stack); err != nil {
+		Fatalf(fmt.Errorf("%v: %v", ErrSshServiceRegistrationFailure, err))
+	}
+
+	return &Node{
+		geth:    stack,
+		started: make(chan struct{}),
+	}
 }
 
-func (m *NodeManager) HasWhisperService() bool {
-	return m.whisperService != nil
+// activateEthService configures and registers the eth.Ethereum service with a given node.
+func activateEthService(stack *node.Node, extra []byte) error {
+	ethConf := &eth.Config{
+		Etherbase:               common.Address{},
+		ChainConfig:             makeChainConfig(stack),
+		FastSync:                false,
+		LightMode:               true,
+		LightServ:               60,
+		LightPeers:              MaxLightPeers,
+		MaxPeers:                MaxPeers,
+		DatabaseCache:           DatabaseCacheSize,
+		DatabaseHandles:         makeDatabaseHandles(),
+		NetworkId:               1, // Olympic
+		MinerThreads:            runtime.NumCPU(),
+		GasPrice:                GasPrice,
+		GpoMinGasPrice:          GpoMinGasPrice,
+		GpoMaxGasPrice:          GpoMaxGasPrice,
+		GpoFullBlockRatio:       GpoFullBlockRatio,
+		GpobaseStepDown:         GpobaseStepDown,
+		GpobaseStepUp:           GpobaseStepUp,
+		GpobaseCorrectionFactor: GpobaseCorrectionFactor,
+		SolcPath:                "solc",
+		AutoDAG:                 false,
+	}
+
+	if UseTestnet {
+		ethConf.NetworkId = 3
+		ethConf.Genesis = core.DefaultTestnetGenesisBlock()
+	}
+
+	if err := stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
+		return les.New(ctx, ethConf)
+	}); err != nil {
+		return fmt.Errorf("%v: %v", ErrLightEthRegistrationFailure, err)
+	}
+
+	return nil
 }
 
-func (m *NodeManager) WhisperService() (*whisper.Whisper, error) {
-	if m == nil || !m.HasNode() {
-		return nil, ErrInvalidGethNode
+// activateShhService configures Whisper and adds it to the given node.
+func activateShhService(stack *node.Node) error {
+	serviceConstructor := func(*node.ServiceContext) (node.Service, error) {
+		return whisper.New(), nil
+	}
+	if err := stack.Register(serviceConstructor); err != nil {
+		return err
 	}
 
-	if !m.HasWhisperService() {
-		return nil, ErrInvalidWhisperService
-	}
-
-	return m.whisperService, nil
+	return nil
 }
 
-func (m *NodeManager) HasLightEthereumService() bool {
-	return m.lightEthereum != nil
+// makeChainConfig reads the chain configuration from the database in the datadir.
+func makeChainConfig(stack *node.Node) *params.ChainConfig {
+	config := new(params.ChainConfig)
+
+	if UseTestnet {
+		config = params.TestnetChainConfig
+	} else {
+		// Homestead fork
+		config.HomesteadBlock = params.MainNetHomesteadBlock
+		// DAO fork
+		config.DAOForkBlock = params.MainNetDAOForkBlock
+		config.DAOForkSupport = true
+
+		// DoS reprice fork
+		config.EIP150Block = params.MainNetHomesteadGasRepriceBlock
+		config.EIP150Hash = params.MainNetHomesteadGasRepriceHash
+
+		// DoS state cleanup fork
+		config.EIP155Block = params.MainNetSpuriousDragon
+		config.EIP158Block = params.MainNetSpuriousDragon
+		config.ChainId = params.MainNetChainID
+	}
+
+	return config
 }
 
-func (m *NodeManager) LightEthereumService() (*les.LightEthereum, error) {
-	if m == nil || !m.HasNode() {
-		return nil, ErrInvalidGethNode
+// makeDatabaseHandles makes sure that enough file descriptors are available to the process
+// (and returns half of them for node's database to use)
+func makeDatabaseHandles() int {
+	// current limit
+	var limit syscall.Rlimit
+	if err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &limit); err != nil {
+		Fatalf(err)
 	}
 
-	if !m.HasLightEthereumService() {
-		return nil, ErrInvalidLightEthereumService
+	// increase limit
+	limit.Cur = limit.Max
+	if limit.Cur > ProcessFileDescriptorLimit {
+		limit.Cur = ProcessFileDescriptorLimit
+	}
+	if err := syscall.Setrlimit(syscall.RLIMIT_NOFILE, &limit); err != nil {
+		Fatalf(err)
 	}
 
-	return m.lightEthereum, nil
-}
-
-func (m *NodeManager) HasRPCClient() bool {
-	return m.client != nil
-}
-
-func (m *NodeManager) RPCClient() (*rpc.Client, error) {
-	if m == nil || !m.HasNode() {
-		return nil, ErrInvalidGethNode
+	// re-query limit
+	if err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &limit); err != nil {
+		Fatalf(err)
 	}
 
-	if !m.HasRPCClient() {
-		return nil, ErrInvalidClient
+	// cap limit
+	if limit.Cur > ProcessFileDescriptorLimit {
+		limit.Cur = ProcessFileDescriptorLimit
 	}
 
-	return m.client, nil
-}
-
-func (m *NodeManager) HasJailedRequestQueue() bool {
-	return m.jailedRequestQueue != nil
-}
-
-func (m *NodeManager) JailedRequestQueue() (*JailedRequestQueue, error) {
-	if m == nil || !m.HasNode() {
-		return nil, ErrInvalidGethNode
-	}
-
-	if !m.HasJailedRequestQueue() {
-		return nil, ErrInvalidJailedRequestQueue
-	}
-
-	return m.jailedRequestQueue, nil
+	return int(limit.Cur) / 2
 }
 
 func makeDefaultExtra() []byte {
@@ -307,7 +252,7 @@ func makeDefaultExtra() []byte {
 		Name      string
 		GoVersion string
 		Os        string
-	}{uint(versionMajor<<16 | versionMinor<<8 | versionPatch), clientIdentifier, runtime.Version(), runtime.GOOS}
+	}{uint(VersionMajor<<16 | VersionMinor<<8 | VersionPatch), ClientIdentifier, runtime.Version(), runtime.GOOS}
 	extra, err := rlp.EncodeToBytes(clientInfo)
 	if err != nil {
 		glog.V(logger.Warn).Infoln("error setting canonical miner information:", err)
@@ -322,18 +267,22 @@ func makeDefaultExtra() []byte {
 	return extra
 }
 
-func (m *NodeManager) populateStaticPeers() {
-	// manually add static nodes (LES auto-discovery is not stable yet)
-	configFile, err := ioutil.ReadFile(filepath.Join("../data", "static-nodes.json"))
-	if err != nil {
-		return
-	}
-	var enodes []string
-	if err = json.Unmarshal(configFile, &enodes); err != nil {
-		return
+func Fatalf(reason interface{}, args ...interface{}) {
+	// decide on output stream
+	w := io.MultiWriter(os.Stdout, os.Stderr)
+	outf, _ := os.Stdout.Stat()
+	errf, _ := os.Stderr.Stat()
+	if outf != nil && errf != nil && os.SameFile(outf, errf) {
+		w = os.Stderr
 	}
 
-	for _, enode := range enodes {
-		m.AddPeer(enode)
+	// find out whether error or string has been passed as a reason
+	r := reflect.ValueOf(reason)
+	if r.Kind() == reflect.String {
+		fmt.Fprintf(w, "Fatal Failure: "+reason.(string)+"\n", args)
+	} else {
+		fmt.Fprintf(w, "Fatal Failure: %v\n", reason.(error))
 	}
+
+	os.Exit(1)
 }

@@ -9,5 +9,5 @@ fi
 
 # set gitCommit when running from a Git checkout.
 if [ -f ".git/HEAD" ]; then
-    echo "-ldflags '-X github.com/status-im/status-go/geth.UseTestnet=false -X main.buildStamp=`date -u '+%Y-%m-%d.%H:%M:%S'` -X main.gitCommit=$(git rev-parse HEAD)'";
+    echo "-ldflags '-X github.com/status-im/status-go/geth.UseTestnetFlag=false -X main.buildStamp=`date -u '+%Y-%m-%d.%H:%M:%S'` -X main.gitCommit=$(git rev-parse HEAD)'";
 fi

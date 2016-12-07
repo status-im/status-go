@@ -36,7 +36,7 @@ func onWhisperMessage(message *whisper.Message) {
 }
 
 func AddWhisperFilter(args whisper.NewFilterArgs) int {
-	whisperService, err := GetNodeManager().WhisperService()
+	whisperService, err := NodeManagerInstance().WhisperService()
 	if err != nil {
 		return -1
 	}
@@ -54,7 +54,7 @@ func AddWhisperFilter(args whisper.NewFilterArgs) int {
 }
 
 func RemoveWhisperFilter(idFilter int) {
-	whisperService, err := GetNodeManager().WhisperService()
+	whisperService, err := NodeManagerInstance().WhisperService()
 	if err != nil {
 		return
 	}
