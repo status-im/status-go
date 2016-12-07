@@ -260,8 +260,8 @@ func (jail *Jail) RPCClient() (*rpc.Client, error) {
 		return jail.client, nil
 	}
 
-	nodeManager := geth.GetNodeManager()
-	if !nodeManager.HasNode() {
+	nodeManager := geth.NodeManagerInstance()
+	if !nodeManager.NodeInited() {
 		return nil, geth.ErrInvalidGethNode
 	}
 
@@ -284,8 +284,8 @@ func (jail *Jail) RequestQueue() (*geth.JailedRequestQueue, error) {
 		return jail.requestQueue, nil
 	}
 
-	nodeManager := geth.GetNodeManager()
-	if !nodeManager.HasNode() {
+	nodeManager := geth.NodeManagerInstance()
+	if !nodeManager.NodeInited() {
 		return nil, geth.ErrInvalidGethNode
 	}
 

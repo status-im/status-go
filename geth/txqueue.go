@@ -92,7 +92,7 @@ func sendTransactionErrorCode(err error) string {
 }
 
 func CompleteTransaction(id, password string) (common.Hash, error) {
-	lightEthereum, err := GetNodeManager().LightEthereumService()
+	lightEthereum, err := NodeManagerInstance().LightEthereumService()
 	if err != nil {
 		return common.Hash{}, err
 	}
@@ -125,7 +125,7 @@ func CompleteTransactions(ids, password string) map[string]RawCompleteTransactio
 }
 
 func DiscardTransaction(id string) error {
-	lightEthereum, err := GetNodeManager().LightEthereumService()
+	lightEthereum, err := NodeManagerInstance().LightEthereumService()
 	if err != nil {
 		return err
 	}
@@ -195,7 +195,7 @@ func (q *JailedRequestQueue) PostProcessRequest(vm *otto.Otto, req RPCCall, mess
 
 func (q *JailedRequestQueue) ProcessSendTransactionRequest(vm *otto.Otto, req RPCCall) (common.Hash, error) {
 	// obtain status backend from LES service
-	lightEthereum, err := GetNodeManager().LightEthereumService()
+	lightEthereum, err := NodeManagerInstance().LightEthereumService()
 	if err != nil {
 		return common.Hash{}, err
 	}

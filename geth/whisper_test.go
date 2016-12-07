@@ -18,7 +18,7 @@ func TestWhisperMessaging(t *testing.T) {
 		return
 	}
 
-	whisperService, err := geth.GetNodeManager().WhisperService()
+	whisperService, err := geth.NodeManagerInstance().WhisperService()
 	if err != nil {
 		t.Errorf("whisper service not running: %v", err)
 	}

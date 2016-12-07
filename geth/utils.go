@@ -12,10 +12,11 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/cmd/utils"
+	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/logger"
 	"github.com/ethereum/go-ethereum/logger/glog"
@@ -86,8 +87,8 @@ func PrepareTestNode() (err error) {
 	muPrepareTestNode.Lock()
 	defer muPrepareTestNode.Unlock()
 
-	manager := GetNodeManager()
-	if manager.HasNode() {
+	manager := NodeManagerInstance()
+	if manager.NodeInited() {
 		return nil
 	}
 
@@ -117,17 +118,17 @@ func PrepareTestNode() (err error) {
 	// internally once.Do() is used, so call below is thread-safe
 	CreateAndRunNode(dataDir, 8546) // to avoid conflicts with running react-native app, run on different port
 
-	manager = GetNodeManager()
-	if !manager.HasNode() {
+	manager = NodeManagerInstance()
+	if !manager.NodeInited() {
 		panic(ErrInvalidGethNode)
 	}
-	if !manager.HasRPCClient() {
+	if service, err := manager.RPCClient(); err != nil || service == nil {
 		panic(ErrInvalidGethNode)
 	}
-	if !manager.HasWhisperService() {
+	if service, err := manager.WhisperService(); err != nil || service == nil {
 		panic(ErrInvalidGethNode)
 	}
-	if !manager.HasLightEthereumService() {
+	if service, err := manager.LightEthereumService(); err != nil || service == nil {
 		panic(ErrInvalidGethNode)
 	}
 
@@ -181,12 +182,12 @@ func PanicAfter(waitSeconds time.Duration, abort chan struct{}, desc string) {
 }
 
 func FromAddress(accountAddress string) common.Address {
-	accountManager, err := GetNodeManager().AccountManager()
+	accountManager, err := NodeManagerInstance().AccountManager()
 	if err != nil {
 		return common.Address{}
 	}
 
-	from, err := utils.MakeAddress(accountManager, accountAddress)
+	from, err := ParseAccountString(accountManager, accountAddress)
 	if err != nil {
 		return common.Address{}
 	}
@@ -195,15 +196,31 @@ func FromAddress(accountAddress string) common.Address {
 }
 
 func ToAddress(accountAddress string) *common.Address {
-	accountManager, err := GetNodeManager().AccountManager()
+	accountManager, err := NodeManagerInstance().AccountManager()
 	if err != nil {
 		return nil
 	}
 
-	to, err := utils.MakeAddress(accountManager, accountAddress)
+	to, err := ParseAccountString(accountManager, accountAddress)
 	if err != nil {
 		return nil
 	}
 
 	return &to.Address
+}
+
+// parseAccount parses hex encoded string or key index in the accounts key store
+// and converts it to an internal account representation.
+func ParseAccountString(accman *accounts.Manager, account string) (accounts.Account, error) {
+	// valid address, convert to account
+	if common.IsHexAddress(account) {
+		return accounts.Account{Address: common.HexToAddress(account)}, nil
+	}
+	// valid key index, return account referenced by that key
+	index, err := strconv.Atoi(account)
+	if err != nil {
+		return accounts.Account{}, ErrInvalidAccountAddressOrKey
+	}
+
+	return accman.AccountByIndex(index)
 }
