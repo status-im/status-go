@@ -5,7 +5,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/status-im/status-go/geth"
@@ -18,7 +17,7 @@ func TestAccountsList(t *testing.T) {
 		return
 	}
 
-	les, err := geth.GetNodeManager().LightEthereumService()
+	les, err := geth.NodeManagerInstance().LightEthereumService()
 	if err != nil {
 		t.Errorf("expected LES service: %v", err)
 	}
@@ -130,7 +129,7 @@ func TestCreateChildAccount(t *testing.T) {
 
 	geth.Logout() // to make sure that we start with empty account (which might get populated during previous tests)
 
-	accountManager, err := geth.GetNodeManager().AccountManager()
+	accountManager, err := geth.NodeManagerInstance().AccountManager()
 	if err != nil {
 		t.Error(err)
 		return
@@ -144,7 +143,7 @@ func TestCreateChildAccount(t *testing.T) {
 	}
 	t.Logf("Account created: {address: %s, key: %s, mnemonic:%s}", address, pubKey, mnemonic)
 
-	account, err := utils.MakeAddress(accountManager, address)
+	account, err := geth.ParseAccountString(accountManager, address)
 	if err != nil {
 		t.Errorf("can not get account from address: %v", err)
 		return
@@ -217,7 +216,7 @@ func TestRecoverAccount(t *testing.T) {
 		return
 	}
 
-	accountManager, _ := geth.GetNodeManager().AccountManager()
+	accountManager, _ := geth.NodeManagerInstance().AccountManager()
 
 	// create an account
 	address, pubKey, mnemonic, err := geth.CreateAccount(newAccountPassword)
@@ -238,7 +237,7 @@ func TestRecoverAccount(t *testing.T) {
 	}
 
 	// now test recovering, but make sure that account/key file is removed i.e. simulate recovering on a new device
-	account, err := utils.MakeAddress(accountManager, address)
+	account, err := geth.ParseAccountString(accountManager, address)
 	if err != nil {
 		t.Errorf("can not get account from address: %v", err)
 	}
@@ -284,7 +283,7 @@ func TestRecoverAccount(t *testing.T) {
 	}
 
 	// time to login with recovered data
-	whisperService, err := geth.GetNodeManager().WhisperService()
+	whisperService, err := geth.NodeManagerInstance().WhisperService()
 	if err != nil {
 		t.Errorf("whisper service not running: %v", err)
 	}
@@ -312,7 +311,7 @@ func TestAccountSelect(t *testing.T) {
 	}
 
 	// test to see if the account was injected in whisper
-	whisperService, err := geth.GetNodeManager().WhisperService()
+	whisperService, err := geth.NodeManagerInstance().WhisperService()
 	if err != nil {
 		t.Errorf("whisper service not running: %v", err)
 	}
@@ -377,7 +376,7 @@ func TestAccountLogout(t *testing.T) {
 		return
 	}
 
-	whisperService, err := geth.GetNodeManager().WhisperService()
+	whisperService, err := geth.NodeManagerInstance().WhisperService()
 	if err != nil {
 		t.Errorf("whisper service not running: %v", err)
 	}

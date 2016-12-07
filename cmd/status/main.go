@@ -8,23 +8,18 @@ import (
 var (
 	gitCommit  = "rely on linker: -ldflags -X main.GitCommit"
 	buildStamp = "rely on linker: -ldflags -X main.buildStamp"
-
-	versionMajor = 1          // Major version component of the current release
-	versionMinor = 1          // Minor version component of the current release
-	versionPatch = 0          // Patch version component of the current release
-	versionMeta  = "unstable" // Version metadata to append to the version string
 )
 
 func main() {
-	verString := fmt.Sprintf("%d.%d.%d", versionMajor, versionMinor, versionPatch)
-	if versionMeta != "" {
-		verString += "-" + versionMeta
+	verString := fmt.Sprintf("%d.%d.%d", geth.VersionMajor, geth.VersionMinor, geth.VersionPatch)
+	if geth.VersionMeta != "" {
+		verString += "-" + geth.VersionMeta
 	}
 	if gitCommit != "" {
 		verString += "-" + gitCommit[:8]
 	}
 	netVersion := "mainnet"
-	if geth.UseTestnet == "true" {
+	if geth.UseTestnet {
 		netVersion = "testnet"
 	}
 	fmt.Printf("Status\nGit Commit: %s\nBuild Time: %s\nVersion: %s\nNetwork: %s\n",

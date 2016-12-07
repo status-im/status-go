@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/accounts"
-	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/status-im/status-go/extkeys"
@@ -20,6 +19,7 @@ var (
 	ErrWhisperNoIdentityFound          = errors.New("failed to locate identity previously injected into Whisper")
 	ErrNoAccountSelected               = errors.New("no account has been selected, please login")
 	ErrInvalidMasterKeyCreated         = errors.New("can not create master extended key")
+	ErrInvalidAccountAddressOrKey      = errors.New("cannot parse address or key to valid account address")
 )
 
 // CreateAccount creates an internal geth account
@@ -53,7 +53,7 @@ func CreateAccount(password string) (address, pubKey, mnemonic string, err error
 // CKD#2 is used as root for master accounts (when parentAddress is "").
 // Otherwise (when parentAddress != ""), child is derived directly from parent.
 func CreateChildAccount(parentAddress, password string) (address, pubKey string, err error) {
-	nodeManager := GetNodeManager()
+	nodeManager := NodeManagerInstance()
 	accountManager, err := nodeManager.AccountManager()
 	if err != nil {
 		return "", "", err
@@ -67,7 +67,7 @@ func CreateChildAccount(parentAddress, password string) (address, pubKey string,
 		return "", "", ErrNoAccountSelected
 	}
 
-	account, err := utils.MakeAddress(accountManager, parentAddress)
+	account, err := ParseAccountString(accountManager, parentAddress)
 	if err != nil {
 		return "", "", ErrAddressToAccountMappingFailure
 	}
@@ -128,13 +128,13 @@ func RecoverAccount(password, mnemonic string) (address, pubKey string, err erro
 // using provided password. Once verification is done, decrypted key is injected into Whisper (as a single identity,
 // all previous identities are removed).
 func SelectAccount(address, password string) error {
-	nodeManager := GetNodeManager()
+	nodeManager := NodeManagerInstance()
 	accountManager, err := nodeManager.AccountManager()
 	if err != nil {
 		return err
 	}
 
-	account, err := utils.MakeAddress(accountManager, address)
+	account, err := ParseAccountString(accountManager, address)
 	if err != nil {
 		return ErrAddressToAccountMappingFailure
 	}
@@ -169,7 +169,7 @@ func SelectAccount(address, password string) error {
 
 // Logout clears whisper identities
 func Logout() error {
-	nodeManager := GetNodeManager()
+	nodeManager := NodeManagerInstance()
 	whisperService, err := nodeManager.WhisperService()
 	if err != nil {
 		return err
@@ -195,7 +195,7 @@ func UnlockAccount(address, password string, seconds int) error {
 // importExtendedKey processes incoming extended key, extracts required info and creates corresponding account key.
 // Once account key is formed, that key is put (if not already) into keystore i.e. key is *encoded* into key file.
 func importExtendedKey(extKey *extkeys.ExtendedKey, password string) (address, pubKey string, err error) {
-	accountManager, err := GetNodeManager().AccountManager()
+	accountManager, err := NodeManagerInstance().AccountManager()
 	if err != nil {
 		return "", "", err
 	}
@@ -218,7 +218,7 @@ func importExtendedKey(extKey *extkeys.ExtendedKey, password string) (address, p
 }
 
 func onAccountsListRequest(entities []accounts.Account) []accounts.Account {
-	nodeManager := GetNodeManager()
+	nodeManager := NodeManagerInstance()
 
 	if nodeManager.SelectedAccount == nil {
 		return []accounts.Account{}
@@ -246,7 +246,7 @@ func onAccountsListRequest(entities []accounts.Account) []accounts.Account {
 
 // refreshSelectedAccount re-populates list of sub-accounts of the currently selected account (if any)
 func refreshSelectedAccount() {
-	nodeManager := GetNodeManager()
+	nodeManager := NodeManagerInstance()
 
 	if nodeManager.SelectedAccount == nil {
 		return
@@ -273,7 +273,7 @@ func refreshSelectedAccount() {
 // that belong to the currently selected account.
 // The extKey is CKD#2 := root of sub-accounts of the main account
 func findSubAccounts(extKey *extkeys.ExtendedKey, subAccountIndex uint32) ([]accounts.Account, error) {
-	nodeManager := GetNodeManager()
+	nodeManager := NodeManagerInstance()
 	accountManager, err := nodeManager.AccountManager()
 	if err != nil {
 		return []accounts.Account{}, err

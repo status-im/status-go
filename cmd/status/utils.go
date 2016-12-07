@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/les/status"
@@ -90,7 +89,7 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 func testCreateChildAccount(t *testing.T) bool {
 	geth.Logout() // to make sure that we start with empty account (which might get populated during previous tests)
 
-	accountManager, err := geth.GetNodeManager().AccountManager()
+	accountManager, err := geth.NodeManagerInstance().AccountManager()
 	if err != nil {
 		t.Error(err)
 		return false
@@ -112,7 +111,7 @@ func testCreateChildAccount(t *testing.T) bool {
 	address, pubKey, mnemonic := createAccountResponse.Address, createAccountResponse.PubKey, createAccountResponse.Mnemonic
 	t.Logf("Account created: {address: %s, key: %s, mnemonic:%s}", address, pubKey, mnemonic)
 
-	account, err := utils.MakeAddress(accountManager, address)
+	account, err := geth.ParseAccountString(accountManager, address)
 	if err != nil {
 		t.Errorf("can not get account from address: %v", err)
 		return false
@@ -221,7 +220,7 @@ func testCreateChildAccount(t *testing.T) bool {
 }
 
 func testRecoverAccount(t *testing.T) bool {
-	accountManager, _ := geth.GetNodeManager().AccountManager()
+	accountManager, _ := geth.NodeManagerInstance().AccountManager()
 
 	// create an account
 	address, pubKey, mnemonic, err := geth.CreateAccount(newAccountPassword)
@@ -250,7 +249,7 @@ func testRecoverAccount(t *testing.T) bool {
 	}
 
 	// now test recovering, but make sure that account/key file is removed i.e. simulate recovering on a new device
-	account, err := utils.MakeAddress(accountManager, address)
+	account, err := geth.ParseAccountString(accountManager, address)
 	if err != nil {
 		t.Errorf("can not get account from address: %v", err)
 	}
@@ -312,7 +311,7 @@ func testRecoverAccount(t *testing.T) bool {
 	}
 
 	// time to login with recovered data
-	whisperService, err := geth.GetNodeManager().WhisperService()
+	whisperService, err := geth.NodeManagerInstance().WhisperService()
 	if err != nil {
 		t.Errorf("whisper service not running: %v", err)
 	}
@@ -335,7 +334,7 @@ func testRecoverAccount(t *testing.T) bool {
 
 func testAccountSelect(t *testing.T) bool {
 	// test to see if the account was injected in whisper
-	whisperService, err := geth.GetNodeManager().WhisperService()
+	whisperService, err := geth.NodeManagerInstance().WhisperService()
 	if err != nil {
 		t.Errorf("whisper service not running: %v", err)
 	}
@@ -418,7 +417,7 @@ func testAccountSelect(t *testing.T) bool {
 }
 
 func testAccountLogout(t *testing.T) bool {
-	whisperService, err := geth.GetNodeManager().WhisperService()
+	whisperService, err := geth.NodeManagerInstance().WhisperService()
 	if err != nil {
 		t.Errorf("whisper service not running: %v", err)
 		return false
@@ -472,7 +471,7 @@ func testAccountLogout(t *testing.T) bool {
 
 func testCompleteTransaction(t *testing.T) bool {
 	// obtain reference to status backend
-	lightEthereum, err := geth.GetNodeManager().LightEthereumService()
+	lightEthereum, err := geth.NodeManagerInstance().LightEthereumService()
 	if err != nil {
 		t.Errorf("Test failed: LES service is not running: %v", err)
 		return false
@@ -551,7 +550,7 @@ func testCompleteTransaction(t *testing.T) bool {
 
 func testCompleteMultipleQueuedTransactions(t *testing.T) bool {
 	// obtain reference to status backend
-	lightEthereum, err := geth.GetNodeManager().LightEthereumService()
+	lightEthereum, err := geth.NodeManagerInstance().LightEthereumService()
 	if err != nil {
 		t.Errorf("Test failed: LES service is not running: %v", err)
 		return false
@@ -680,7 +679,7 @@ func testCompleteMultipleQueuedTransactions(t *testing.T) bool {
 
 func testDiscardTransaction(t *testing.T) bool {
 	// obtain reference to status backend
-	lightEthereum, err := geth.GetNodeManager().LightEthereumService()
+	lightEthereum, err := geth.NodeManagerInstance().LightEthereumService()
 	if err != nil {
 		t.Errorf("Test failed: LES service is not running: %v", err)
 		return false
@@ -794,7 +793,7 @@ func testDiscardTransaction(t *testing.T) bool {
 
 func testDiscardMultipleQueuedTransactions(t *testing.T) bool {
 	// obtain reference to status backend
-	lightEthereum, err := geth.GetNodeManager().LightEthereumService()
+	lightEthereum, err := geth.NodeManagerInstance().LightEthereumService()
 	if err != nil {
 		t.Errorf("Test failed: LES service is not running: %v", err)
 		return false
