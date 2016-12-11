@@ -36,6 +36,10 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 		fn   func(t *testing.T) bool
 	}{
 		{
+			"restart node RPC",
+			testRestartNodeRPC,
+		},
+		{
 			"create main and child accounts",
 			testCreateChildAccount,
 		},
@@ -84,6 +88,50 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 	}
 
 	done <- struct{}{}
+}
+
+func testRestartNodeRPC(t *testing.T) bool {
+	// stop RPC
+	stopNodeRPCServerResponse := geth.JSONError{}
+	rawResponse := StopNodeRPCServer()
+
+	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &stopNodeRPCServerResponse); err != nil {
+		t.Errorf("cannot decode StopNodeRPCServer reponse (%s): %v", C.GoString(rawResponse), err)
+		return false
+	}
+	if stopNodeRPCServerResponse.Error != "" {
+		t.Errorf("unexpected error: %s", stopNodeRPCServerResponse.Error)
+		return false
+	}
+
+	// start again RPC
+	startNodeRPCServerResponse := geth.JSONError{}
+	rawResponse = StartNodeRPCServer()
+
+	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &startNodeRPCServerResponse); err != nil {
+		t.Errorf("cannot decode StartNodeRPCServer reponse (%s): %v", C.GoString(rawResponse), err)
+		return false
+	}
+	if startNodeRPCServerResponse.Error != "" {
+		t.Errorf("unexpected error: %s", startNodeRPCServerResponse.Error)
+		return false
+	}
+
+	// start when we have RPC already running
+	startNodeRPCServerResponse = geth.JSONError{}
+	rawResponse = StartNodeRPCServer()
+
+	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &startNodeRPCServerResponse); err != nil {
+		t.Errorf("cannot decode StartNodeRPCServer reponse (%s): %v", C.GoString(rawResponse), err)
+		return false
+	}
+	expectedError := "HTTP RPC already running on localhost:8545"
+	if startNodeRPCServerResponse.Error != expectedError {
+		t.Errorf("expected error not thrown: %s", expectedError)
+		return false
+	}
+
+	return true
 }
 
 func testCreateChildAccount(t *testing.T) bool {

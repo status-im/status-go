@@ -216,6 +216,20 @@ func StartNode(datadir *C.char) *C.char {
 	return C.CString(string(outBytes))
 }
 
+//export StopNodeRPCServer
+func StopNodeRPCServer() *C.char {
+	_, err := geth.NodeManagerInstance().StopNodeRPCServer()
+
+	return makeJSONErrorResponse(err)
+}
+
+//export StartNodeRPCServer
+func StartNodeRPCServer() *C.char {
+	_, err := geth.NodeManagerInstance().StartNodeRPCServer()
+
+	return makeJSONErrorResponse(err)
+}
+
 //export InitJail
 func InitJail(js *C.char) {
 	jail.Init(C.GoString(js))
@@ -286,4 +300,19 @@ func RemoveWhisperFilter(idFilter int) {
 //export ClearWhisperFilters
 func ClearWhisperFilters() {
 	geth.ClearWhisperFilters()
+}
+
+func makeJSONErrorResponse(err error) *C.char {
+	errString := ""
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		errString = err.Error()
+	}
+
+	out := geth.JSONError{
+		Error: errString,
+	}
+	outBytes, _ := json.Marshal(&out)
+
+	return C.CString(string(outBytes))
 }
