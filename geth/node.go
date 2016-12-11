@@ -79,6 +79,7 @@ var (
 type Node struct {
 	geth    *node.Node    // reference to the running Geth node
 	started chan struct{} // channel to wait for node to start
+	config  *node.Config
 }
 
 // Inited checks whether status node has been properly initialized
@@ -135,6 +136,7 @@ func MakeNode(dataDir string, rpcPort int) *Node {
 	return &Node{
 		geth:    stack,
 		started: make(chan struct{}),
+		config:  config,
 	}
 }
 

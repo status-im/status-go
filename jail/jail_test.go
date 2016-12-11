@@ -193,7 +193,7 @@ func TestJailRPCSend(t *testing.T) {
 		return
 	}
 
-	if balance < 90 || balance > 100 {
+	if balance < 100 {
 		t.Error("wrong balance (there should be lots of test Ether on that account)")
 		return
 	}
