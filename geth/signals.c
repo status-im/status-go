@@ -39,7 +39,8 @@ static bool initLibrary() {
 bool StatusServiceSignalEvent(const char *jsonEvent) {
     if (!initLibrary()) return false;
 
-    objc_msgSend(statusServiceClassRef, statusServiceSelector, jsonEvent);
+    void (*action)(id, SEL, const char *) = (void (*)(id, SEL, const char *)) objc_msgSend;
+    action(statusServiceClassRef, statusServiceSelector, jsonEvent);
 
     return true;
 }
