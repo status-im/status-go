@@ -572,6 +572,9 @@ for TARGET in $TARGETS; do
         done
         (cd $framework && ln -nsf Versions/A/Headers Headers)
 
+        echo "Patching Statusgo.h to work correctly on any arch (32bit, 64bit)"
+        (cd $framework && perl -i -p0e 's/(\/\*\n\s*static assertion[\s\n\r\S+]+)(typedef char _check_for[^;]+;)/\1#ifdef __LP64__\ntypedef char _check_for_64_bit_pointer_matching_GoInt[sizeof(void*)==64\/8 ? 1:-1];\n#else\ntypedef char _check_for_32_bit_pointer_matching_GoInt[sizeof(void*)==32\/8 ? 1:-1];\n#endif/igm' Headers/Statusgo.h)
+
         mkdir -p $framework/Versions/A/Resources
         echo -e "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\">\n<dict>\n</dict>\n</plist>" > $framework/Versions/A/Resources/Info.plist
         (cd $framework && ln -nsf Versions/A/Resources Resources)
