@@ -85,16 +85,22 @@ func (b *StatusBackend) SendTransaction(ctx context.Context, args status.SendTxA
 }
 
 // CompleteQueuedTransaction wraps call to PublicTransactionPoolAPI.CompleteQueuedTransaction
-func (b *StatusBackend) CompleteQueuedTransaction(id status.QueuedTxId, passphrase string) (common.Hash, error) {
+func (b *StatusBackend) CompleteQueuedTransaction(ctx context.Context, id status.QueuedTxId, passphrase string) (common.Hash, error) {
 	queuedTx, err := b.txQueue.Get(id)
 	if err != nil {
 		return common.Hash{}, err
 	}
 
-	hash, err := b.txapi.CompleteQueuedTransaction(context.Background(), SendTxArgs(queuedTx.Args), passphrase)
+	hash, err := b.txapi.CompleteQueuedTransaction(ctx, SendTxArgs(queuedTx.Args), passphrase)
 
 	// on password error, notify the app, and keep tx in queue (so that CompleteQueuedTransaction() can be resent)
 	if err == accounts.ErrDecrypt {
+		b.NotifyOnQueuedTxReturn(queuedTx, err)
+		return hash, err // SendTransaction is still blocked
+	}
+
+	// when incorrect sender tries to complete the account, notify and keep tx in queue (so that correct sender can complete)
+	if err == status.ErrInvalidCompleteTxSender {
 		b.NotifyOnQueuedTxReturn(queuedTx, err)
 		return hash, err // SendTransaction is still blocked
 	}
