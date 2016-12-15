@@ -208,6 +208,12 @@ func TestJailSendQueuedTransaction(t *testing.T) {
 		return
 	}
 
+	// log into account from which transactions will be sent
+	if err := geth.SelectAccount(TEST_ADDRESS, TEST_ADDRESS_PASSWORD); err != nil {
+		t.Errorf("cannot select account: %v", TEST_ADDRESS)
+		return
+	}
+
 	txParams := `{
   		"from": "` + TEST_ADDRESS + `",
   		"to": "0xf82da7547534045b4e00442bc89e16186cf8c272",

@@ -329,3 +329,11 @@ func (m *NodeManager) populateStaticPeers() {
 		m.AddPeer(enode)
 	}
 }
+
+func (k *SelectedExtKey) Hex() string {
+	if k == nil {
+		return "0x0"
+	}
+
+	return k.Address.Hex()
+}

@@ -99,7 +99,10 @@ func CompleteTransaction(id, password string) (common.Hash, error) {
 
 	backend := lightEthereum.StatusBackend
 
-	return backend.CompleteQueuedTransaction(status.QueuedTxId(id), password)
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, status.SelectedAccountKey, NodeManagerInstance().SelectedAccount.Hex())
+
+	return backend.CompleteQueuedTransaction(ctx, status.QueuedTxId(id), password)
 }
 
 func CompleteTransactions(ids, password string) map[string]RawCompleteTransactionResult {
