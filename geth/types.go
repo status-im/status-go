@@ -5,6 +5,11 @@ import (
 	"github.com/ethereum/go-ethereum/les/status"
 )
 
+type SignalEnvelope struct {
+	Type  string      `json:"type"`
+	Event interface{} `json:"event"`
+}
+
 type AccountInfo struct {
 	Address  string `json:"address"`
 	PubKey   string `json:"pubkey"`
@@ -39,10 +44,6 @@ type SendTransactionEvent struct {
 	Id        string            `json:"id"`
 	Args      status.SendTxArgs `json:"args"`
 	MessageId string            `json:"message_id"`
-}
-
-type LocalStorageEvent struct {
-	Data string            `json:"data"`
 }
 
 type ReturnSendTransactionEvent struct {
@@ -81,9 +82,9 @@ type DiscardTransactionsResult struct {
 	Results map[string]DiscardTransactionResult `json:"results"`
 }
 
-type GethEvent struct {
-	Type  string      `json:"type"`
-	Event interface{} `json:"event"`
+type LocalStorageSetEvent struct {
+	ChatId string `json:"chat_id"`
+	Data   string `json:"data"`
 }
 
 type RPCCall struct {

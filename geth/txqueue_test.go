@@ -35,7 +35,7 @@ func TestQueuedTransactions(t *testing.T) {
 	// replace transaction notification handler
 	var txHash = common.Hash{}
 	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var envelope geth.GethEvent
+		var envelope geth.SignalEnvelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
@@ -107,7 +107,7 @@ func TestDoubleCompleteQueuedTransactions(t *testing.T) {
 	txFailedEventCalled := false
 	txHash := common.Hash{}
 	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var envelope geth.GethEvent
+		var envelope geth.SignalEnvelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
@@ -230,7 +230,7 @@ func TestDiscardQueuedTransactions(t *testing.T) {
 	var txId string
 	txFailedEventCalled := false
 	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var envelope geth.GethEvent
+		var envelope geth.SignalEnvelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
@@ -345,7 +345,7 @@ func TestCompleteMultipleQueuedTransactions(t *testing.T) {
 	// replace transaction notification handler
 	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var txId string
-		var envelope geth.GethEvent
+		var envelope geth.SignalEnvelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
@@ -471,7 +471,7 @@ func TestDiscardMultipleQueuedTransactions(t *testing.T) {
 	txFailedEventCallCount := 0
 	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var txId string
-		var envelope geth.GethEvent
+		var envelope geth.SignalEnvelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
@@ -613,7 +613,7 @@ func TestNonExistentQueuedTransactions(t *testing.T) {
 	// replace transaction notification handler
 	var txHash = common.Hash{}
 	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var envelope geth.GethEvent
+		var envelope geth.SignalEnvelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
@@ -667,7 +667,7 @@ func TestEvictionOfQueuedTransactions(t *testing.T) {
 	// replace transaction notification handler
 	var txHash = common.Hash{}
 	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var envelope geth.GethEvent
+		var envelope geth.SignalEnvelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return

@@ -537,7 +537,7 @@ func testCompleteTransaction(t *testing.T) bool {
 	// replace transaction notification handler
 	var txHash = ""
 	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var envelope geth.GethEvent
+		var envelope geth.SignalEnvelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
@@ -616,7 +616,7 @@ func testCompleteMultipleQueuedTransactions(t *testing.T) bool {
 	// replace transaction notification handler
 	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var txId string
-		var envelope geth.GethEvent
+		var envelope geth.SignalEnvelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
@@ -745,7 +745,7 @@ func testDiscardTransaction(t *testing.T) bool {
 	var txId string
 	txFailedEventCalled := false
 	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var envelope geth.GethEvent
+		var envelope geth.SignalEnvelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
@@ -860,7 +860,7 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool {
 	txFailedEventCallCount := 0
 	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var txId string
-		var envelope geth.GethEvent
+		var envelope geth.SignalEnvelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
@@ -1072,7 +1072,7 @@ func startTestNode(t *testing.T) <-chan struct{} {
 	waitForNodeStart := make(chan struct{}, 1)
 	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		t.Log(jsonEvent)
-		var envelope geth.GethEvent
+		var envelope geth.SignalEnvelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return

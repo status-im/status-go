@@ -8,6 +8,7 @@ extern bool StatusServiceSignalEvent(const char *jsonEvent);
 import "C"
 import (
 	"bytes"
+	"encoding/json"
 	"io"
 	"os"
 	"path"
@@ -39,12 +40,18 @@ func SetDefaultNodeNotificationHandler(fn NodeNotificationHandler) {
 	notificationHandler = fn
 }
 
+// SendSignal sends application signal (JSON, normally) upwards
+func SendSignal(signal SignalEnvelope) {
+	data, _ := json.Marshal(&signal)
+	C.StatusServiceSignalEvent(C.CString(string(data)))
+}
+
 //export NotifyNode
 func NotifyNode(jsonEvent *C.char) {
 	notificationHandler(C.GoString(jsonEvent))
 }
 
-// export TriggerTestSignal
+//export TriggerTestSignal
 func TriggerTestSignal() {
 	C.StatusServiceSignalEvent(C.CString(`{"answer": 42}`))
 }

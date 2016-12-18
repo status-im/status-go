@@ -1,13 +1,6 @@
 package geth
 
-/*
-#include <stddef.h>
-#include <stdbool.h>
-extern bool StatusServiceSignalEvent( const char *jsonEvent );
-*/
-import "C"
 import (
-	"encoding/json"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -20,7 +13,7 @@ var (
 )
 
 func onWhisperMessage(message *whisper.Message) {
-	event := GethEvent{
+	SendSignal(SignalEnvelope{
 		Type: "whisper",
 		Event: WhisperMessageEvent{
 			Payload: string(message.Payload),
@@ -30,9 +23,7 @@ func onWhisperMessage(message *whisper.Message) {
 			TTL:     int64(message.TTL / time.Second),
 			Hash:    common.ToHex(message.Hash.Bytes()),
 		},
-	}
-	body, _ := json.Marshal(&event)
-	C.StatusServiceSignalEvent(C.CString(string(body)))
+	})
 }
 
 func AddWhisperFilter(args whisper.NewFilterArgs) int {
