@@ -12,4 +12,3 @@
 - [How To Build](https://github.com/status-im/status-go/wiki/Build-Process-Explained)
 - [Notes on Bindings](https://github.com/status-im/status-go/wiki/Notes-on-Bindings)
 - [Developers' Guide](https://github.com/status-im/status-react/wiki/Developers'-Guide)
-151.101.128.133
