@@ -1,11 +1,5 @@
 package geth
 
-/*
-#include <stddef.h>
-#include <stdbool.h>
-extern bool StatusServiceSignalEvent( const char *jsonEvent );
-*/
-import "C"
 import (
 	"encoding/json"
 	"errors"
@@ -304,13 +298,10 @@ func (m *NodeManager) onNodeStarted() {
 	close(m.node.started)
 
 	// send signal up to native app
-	event := GethEvent{
+	SendSignal(SignalEnvelope{
 		Type:  EventNodeStarted,
 		Event: struct{}{},
-	}
-
-	body, _ := json.Marshal(&event)
-	C.StatusServiceSignalEvent(C.CString(string(body)))
+	})
 }
 
 // populateStaticPeers connects current node with our publicly available LES cluster

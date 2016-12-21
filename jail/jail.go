@@ -82,18 +82,18 @@ func (jail *Jail) Parse(chatId string, js string) string {
 
 	initJjs := jail.statusJS + ";"
 	_, err := vm.Run(initJjs)
+
+	// jeth and its handlers
 	vm.Set("jeth", struct{}{})
-
-	sendHandler := func(call otto.FunctionCall) (response otto.Value) {
-		return jail.Send(chatId, call)
-	}
-
 	jethObj, _ := vm.Get("jeth")
-	jethObj.Object().Set("send", sendHandler)
-	jethObj.Object().Set("sendAsync", sendHandler)
-	jethObj.Object().Set("isConnected", func(call otto.FunctionCall) (response otto.Value) {
-		return jail.IsConnected(call)
-	})
+	jethObj.Object().Set("send", makeSendHandler(jail, chatId))
+	jethObj.Object().Set("sendAsync", makeSendHandler(jail, chatId))
+	jethObj.Object().Set("isConnected", makeJethIsConnectedHandler(jail))
+
+	// localStorage and its handlers
+	vm.Set("localStorage", struct{}{})
+	localStorage, _ := vm.Get("localStorage")
+	localStorage.Object().Set("set", makeLocalStorageSetHandler(chatId))
 
 	jjs := Web3_JS + `
 	var Web3 = require('web3');
@@ -144,26 +144,6 @@ func (jail *Jail) GetVM(chatId string) (*otto.Otto, error) {
 	}
 
 	return cell.vm, nil
-}
-
-func (jail *Jail) IsConnected(call otto.FunctionCall) otto.Value {
-	resp, _ := call.Otto.Object(`({"jsonrpc":"2.0", "result": "true"})`)
-
-	client, err := jail.RPCClient()
-	if err != nil {
-		return newErrorResponse(call, -32603, err.Error(), nil)
-	}
-
-	var netListeningResult bool
-	if err := client.Call(&netListeningResult, "net_listening"); err != nil {
-		return newErrorResponse(call, -32603, err.Error(), nil)
-	}
-
-	if netListeningResult != true {
-		return newErrorResponse(call, -32603, geth.ErrInvalidGethNode.Error(), nil)
-	}
-
-	return resp.Value()
 }
 
 // Send will serialize the first argument, send it to the node and returns the response.
@@ -327,6 +307,13 @@ func newErrorResponse(call otto.FunctionCall, code int, msg string, id interface
 	res, _ := json.Marshal(m)
 	val, _ := call.Otto.Run("(" + string(res) + ")")
 	return val
+}
+
+func newResultResponse(call otto.FunctionCall, result interface{}) otto.Value {
+	resp, _ := call.Otto.Object(`({"jsonrpc":"2.0"})`)
+	resp.Set("result", result)
+
+	return resp.Value()
 }
 
 // throwJSException panics on an otto.Value. The Otto VM will recover from the
