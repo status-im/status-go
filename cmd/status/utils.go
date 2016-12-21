@@ -529,6 +529,12 @@ func testCompleteTransaction(t *testing.T) bool {
 	// reset queue
 	backend.TransactionQueue().Reset()
 
+	// log into account from which transactions will be sent
+	if err := geth.SelectAccount(testAddress, testAddressPassword); err != nil {
+		t.Errorf("cannot select account: %v", testAddress)
+		return false
+	}
+
 	// make sure you panic if transaction complete doesn't return
 	queuedTxCompleted := make(chan struct{}, 1)
 	abortPanic := make(chan struct{}, 1)
@@ -607,6 +613,12 @@ func testCompleteMultipleQueuedTransactions(t *testing.T) bool {
 
 	// reset queue
 	backend.TransactionQueue().Reset()
+
+	// log into account from which transactions will be sent
+	if err := geth.SelectAccount(testAddress, testAddressPassword); err != nil {
+		t.Errorf("cannot select account: %v", testAddress)
+		return false
+	}
 
 	// make sure you panic if transaction complete doesn't return
 	testTxCount := 3
@@ -737,6 +749,12 @@ func testDiscardTransaction(t *testing.T) bool {
 	// reset queue
 	backend.TransactionQueue().Reset()
 
+	// log into account from which transactions will be sent
+	if err := geth.SelectAccount(testAddress, testAddressPassword); err != nil {
+		t.Errorf("cannot select account: %v", testAddress)
+		return false
+	}
+
 	// make sure you panic if transaction complete doesn't return
 	completeQueuedTransaction := make(chan struct{}, 1)
 	geth.PanicAfter(20*time.Second, completeQueuedTransaction, "TestDiscardQueuedTransactions")
@@ -850,6 +868,12 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool {
 
 	// reset queue
 	backend.TransactionQueue().Reset()
+
+	// log into account from which transactions will be sent
+	if err := geth.SelectAccount(testAddress, testAddressPassword); err != nil {
+		t.Errorf("cannot select account: %v", testAddress)
+		return false
+	}
 
 	// make sure you panic if transaction complete doesn't return
 	testTxCount := 3

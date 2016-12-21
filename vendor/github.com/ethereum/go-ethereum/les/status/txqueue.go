@@ -14,12 +14,14 @@ const (
 	DefaultTxQueueCap              = int(35) // how many items can be queued
 	DefaultTxSendQueueCap          = int(70) // how many items can be passed to sendTransaction() w/o blocking
 	DefaultTxSendCompletionTimeout = 300     // how many seconds to wait before returning result in sentTransaction()
+	SelectedAccountKey             = "selected_account"
 )
 
 var (
-	ErrQueuedTxIdNotFound = errors.New("transaction hash not found")
-	ErrQueuedTxTimedOut   = errors.New("transaction sending timed out")
-	ErrQueuedTxDiscarded  = errors.New("transaction has been discarded")
+	ErrQueuedTxIdNotFound      = errors.New("transaction hash not found")
+	ErrQueuedTxTimedOut        = errors.New("transaction sending timed out")
+	ErrQueuedTxDiscarded       = errors.New("transaction has been discarded")
+	ErrInvalidCompleteTxSender = errors.New("transaction can only be completed by the same account which created it")
 )
 
 // TxQueue is capped container that holds pending transactions
@@ -177,8 +179,12 @@ func (q *TxQueue) NotifyOnQueuedTxReturn(queuedTx *QueuedTx, err error) {
 		return
 	}
 
-	// remove from queue on any error (except for password related one) and propagate
-	if err != accounts.ErrDecrypt {
+	// remove from queue on any error (except for transient ones) and propagate
+	transientErrs := map[error]bool{
+		accounts.ErrDecrypt:        true, // wrong password
+		ErrInvalidCompleteTxSender: true, // completing tx create from another account
+	}
+	if !transientErrs[err] { // remove only on unrecoverable errors
 		q.Remove(queuedTx.Id)
 	}
 
