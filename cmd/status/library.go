@@ -200,20 +200,17 @@ func DiscardTransactions(ids *C.char) *C.char {
 //export StartNode
 func StartNode(datadir *C.char) *C.char {
 	// This starts a geth node with the given datadir
-	err := geth.CreateAndRunNode(C.GoString(datadir), geth.RPCPort)
+	err := geth.CreateAndRunNode(C.GoString(datadir), geth.RPCPort, false)
 
-	errString := ""
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		errString = err.Error()
-	}
+	return makeJSONErrorResponse(err)
+}
 
-	out := geth.JSONError{
-		Error: errString,
-	}
-	outBytes, _ := json.Marshal(&out)
+//export StartTLSNode
+func StartTLSNode(datadir *C.char) *C.char {
+	// This starts a geth node with the given datadir
+	err := geth.CreateAndRunNode(C.GoString(datadir), geth.RPCPort, true)
 
-	return C.CString(string(outBytes))
+	return makeJSONErrorResponse(err)
 }
 
 //export StopNodeRPCServer

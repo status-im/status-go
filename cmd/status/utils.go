@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"math/big"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -28,8 +29,22 @@ const (
 	testStatusJsFile    = "../../jail/testdata/status.js"
 )
 
+func init() {
+	rand.Seed(time.Now().UTC().UnixNano())
+}
+
 func testExportedAPI(t *testing.T, done chan struct{}) {
-	<-startTestNode(t)
+	if rand.Intn(100)%2 == 1 {
+		<-startTestNode(t, false) // standard node
+	} else {
+		<-startTestNode(t, true) // TLS-enabled node
+	}
+	runTests(t)
+
+	done <- struct{}{}
+}
+
+func runTests(t *testing.T) {
 
 	tests := []struct {
 		name string
@@ -86,8 +101,6 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 			break
 		}
 	}
-
-	done <- struct{}{}
 }
 
 func testRestartNodeRPC(t *testing.T) bool {
@@ -538,7 +551,7 @@ func testCompleteTransaction(t *testing.T) bool {
 	// make sure you panic if transaction complete doesn't return
 	queuedTxCompleted := make(chan struct{}, 1)
 	abortPanic := make(chan struct{}, 1)
-	geth.PanicAfter(10*time.Second, abortPanic, "testCompleteTransaction")
+	geth.PanicAfter(30*time.Second, abortPanic, "testCompleteTransaction")
 
 	// replace transaction notification handler
 	var txHash = ""
@@ -567,7 +580,6 @@ func testCompleteTransaction(t *testing.T) bool {
 			txHash = completeTxResponse.Hash
 
 			t.Logf("transaction complete: https://testnet.etherscan.io/tx/%s", txHash)
-			abortPanic <- struct{}{} // so that timeout is aborted
 			queuedTxCompleted <- struct{}{}
 		}
 	})
@@ -582,7 +594,8 @@ func testCompleteTransaction(t *testing.T) bool {
 		t.Errorf("Test failed: cannot send transaction: %v", err)
 	}
 
-	<-queuedTxCompleted // make sure that complete transaction handler completes its magic, before we proceed
+	<-queuedTxCompleted      // make sure that complete transaction handler completes its magic, before we proceed
+	abortPanic <- struct{}{} // so that timeout is aborted
 
 	if txHash != txHashCheck.Hex() {
 		t.Errorf("Transaction hash returned from SendTransaction is invalid: expected %s, got %s", txHashCheck.Hex(), txHash)
@@ -1087,10 +1100,19 @@ func testJailFunctionCall(t *testing.T) bool {
 	return true
 }
 
-func startTestNode(t *testing.T) <-chan struct{} {
+func startTestNode(t *testing.T, tlsEnabled bool) <-chan struct{} {
 	syncRequired := false
 	if _, err := os.Stat(filepath.Join(testDataDir, "testnet")); os.IsNotExist(err) {
 		syncRequired = true
+	}
+
+	// import test account (with test ether on it)
+	dst := filepath.Join(testDataDir, "testnet", "keystore", "test-account.pk")
+	if _, err := os.Stat(dst); os.IsNotExist(err) {
+		err = geth.CopyFile(dst, filepath.Join("../../data", "test-account.pk"))
+		if err != nil {
+			t.Errorf("cannot copy test account PK: %v", err)
+		}
 	}
 
 	waitForNodeStart := make(chan struct{}, 1)
@@ -1132,7 +1154,12 @@ func startTestNode(t *testing.T) <-chan struct{} {
 	})
 
 	go func() {
-		response := StartNode(C.CString(testDataDir))
+		var response *C.char
+		if tlsEnabled {
+			response = StartTLSNode(C.CString(testDataDir))
+		} else {
+			response = StartNode(C.CString(testDataDir))
+		}
 		err := geth.JSONError{}
 
 		json.Unmarshal([]byte(C.GoString(response)), &err)
