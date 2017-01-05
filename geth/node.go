@@ -1,6 +1,7 @@
 package geth
 
 import (
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
@@ -91,7 +92,7 @@ func (n *Node) Inited() bool {
 }
 
 // MakeNode create a geth node entity
-func MakeNode(dataDir string, rpcPort int) *Node {
+func MakeNode(dataDir string, rpcPort int, tlsEnabled bool) *Node {
 	glog.CopyStandardLogTo("INFO")
 	glog.SetToStderr(true)
 
@@ -108,12 +109,7 @@ func MakeNode(dataDir string, rpcPort int) *Node {
 	}
 
 	// configure TLS support
-	certPath := path.Join(dataDir, rpc.DefaultTLSCertFile)
-	keyPath := path.Join(dataDir, rpc.DefaultTLSKeyFile)
-	tlsConfig, err := rpc.MakeServerTLSConfig(node.DefaultHTTPHost, certPath, keyPath)
-	if err != nil {
-		Fatalf(fmt.Errorf("%v: %v", ErrNodeMakeFailure, err))
-	}
+	tlsConfig := makeTLSConfig(dataDir, tlsEnabled)
 
 	// configure required node (should you need to update node's config, e.g. add bootstrap nodes, see node.Config)
 	config := &node.Config{
@@ -133,7 +129,7 @@ func MakeNode(dataDir string, rpcPort int) *Node {
 		HTTPPort:          rpcPort,
 		HTTPCors:          "*",
 		HTTPModules:       strings.Split("db,eth,net,web3,shh,personal,admin", ","), // TODO remove "admin" on main net
-		TLSEnabled:        true,
+		TLSEnabled:        tlsEnabled,
 		TLSConfig:         tlsConfig,
 	}
 
@@ -208,6 +204,23 @@ func activateShhService(stack *node.Node) error {
 	}
 
 	return nil
+}
+
+// makeTLSConfig creates TLS configuration. Defaults to empty config (for non-TSL node)
+func makeTLSConfig(dataDir string, tlsEnabled bool) *tls.Config {
+	var tlsConfig *tls.Config
+	var err error
+
+	if tlsEnabled {
+		certPath := path.Join(dataDir, rpc.DefaultTLSCertFile)
+		keyPath := path.Join(dataDir, rpc.DefaultTLSKeyFile)
+		tlsConfig, err = rpc.MakeServerTLSConfig(node.DefaultHTTPHost, certPath, keyPath)
+		if err != nil {
+			Fatalf(fmt.Errorf("%v: %v", ErrNodeMakeFailure, err))
+		}
+	}
+
+	return tlsConfig
 }
 
 // makeChainConfig reads the chain configuration from the database in the datadir.

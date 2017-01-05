@@ -123,7 +123,7 @@ func PrepareTestNode() (err error) {
 
 	// start geth node and wait for it to initialize
 	// internally once.Do() is used, so call below is thread-safe
-	CreateAndRunNode(dataDir, 8546) // to avoid conflicts with running react-native app, run on different port
+	CreateAndRunNode(dataDir, 8546, false) // to avoid conflicts with running react-native app, run on different port
 
 	manager = NodeManagerInstance()
 	if !manager.NodeInited() {
