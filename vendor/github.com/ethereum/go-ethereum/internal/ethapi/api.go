@@ -280,7 +280,7 @@ func (s *PrivateAccountAPI) SendTransaction(ctx context.Context, args SendTxArgs
 	}
 	tx := args.toTransaction()
 	signer := types.MakeSigner(s.b.ChainConfig(), s.b.CurrentBlock().Number())
-	signature, err := s.am.SignWithPassphrase(args.From, passwd, signer.Hash(tx).Bytes())
+	signature, err := s.am.SignWithPassphrase(accounts.Account{Address: args.From}, passwd, signer.Hash(tx).Bytes())
 	if err != nil {
 		return common.Hash{}, err
 	}
@@ -303,11 +303,19 @@ func signHash(data []byte) []byte {
 // Sign calculates an Ethereum ECDSA signature for:
 // keccack256("\x19Ethereum Signed Message:\n" + len(message) + message))
 //
+// Note, the produced signature conforms to the secp256k1 curve R, S and V values,
+// where the V value will be 27 or 28 for legacy reasons.
+//
 // The key used to calculate the signature is decrypted with the given password.
 //
 // https://github.com/ethereum/go-ethereum/wiki/Management-APIs#personal_sign
 func (s *PrivateAccountAPI) Sign(ctx context.Context, data hexutil.Bytes, addr common.Address, passwd string) (hexutil.Bytes, error) {
-	return s.b.AccountManager().SignWithPassphrase(addr, passwd, signHash(data))
+	signature, err := s.b.AccountManager().SignWithPassphrase(accounts.Account{Address: addr}, passwd, signHash(data))
+	if err != nil {
+		return nil, err
+	}
+	signature[64] += 27 // Transform V from 0/1 to 27/28 according to the yellow paper
+	return signature, nil
 }
 
 // EcRecover returns the address for the account that was used to create the signature.
@@ -316,15 +324,19 @@ func (s *PrivateAccountAPI) Sign(ctx context.Context, data hexutil.Bytes, addr c
 // hash = keccak256("\x19Ethereum Signed Message:\n"${message length}${message})
 // addr = ecrecover(hash, signature)
 //
+// Note, the signature must conform to the secp256k1 curve R, S and V values, where
+// the V value must be be 27 or 28 for legacy reasons.
+//
 // https://github.com/ethereum/go-ethereum/wiki/Management-APIs#personal_ecRecover
 func (s *PrivateAccountAPI) EcRecover(ctx context.Context, data, sig hexutil.Bytes) (common.Address, error) {
 	if len(sig) != 65 {
 		return common.Address{}, fmt.Errorf("signature must be 65 bytes long")
 	}
-	// see crypto.Ecrecover description
-	if sig[64] == 27 || sig[64] == 28 {
-		sig[64] -= 27
+	if sig[64] != 27 && sig[64] != 28 {
+		return common.Address{}, fmt.Errorf("invalid Ethereum signature (V is not 27 or 28)")
 	}
+	sig[64] -= 27 // Transform yellow paper V from 27/28 to 0/1
+
 	rpk, err := crypto.Ecrecover(signHash(data), sig)
 	if err != nil {
 		return common.Address{}, err
@@ -474,7 +486,7 @@ func (s *PublicBlockChainAPI) GetStorageAt(ctx context.Context, address common.A
 	return res.Hex(), nil
 }
 
-// callmsg is the message type used for call transations.
+// callmsg is the message type used for call transitions.
 type callmsg struct {
 	addr          common.Address
 	to            *common.Address
@@ -545,14 +557,14 @@ func (s *PublicBlockChainAPI) doCall(ctx context.Context, args CallArgs, blockNr
 	if err := vmError(); err != nil {
 		return "0x", common.Big0, err
 	}
-	if len(res) == 0 { // backwards compatability
+	if len(res) == 0 { // backwards compatibility
 		return "0x", gas, err
 	}
 	return common.ToHex(res), gas, err
 }
 
 // Call executes the given transaction on the state for the given block number.
-// It doesn't make and changes in the state/blockchain and is usefull to execute and retrieve values.
+// It doesn't make and changes in the state/blockchain and is useful to execute and retrieve values.
 func (s *PublicBlockChainAPI) Call(ctx context.Context, args CallArgs, blockNr rpc.BlockNumber) (string, error) {
 	result, _, err := s.doCall(ctx, args, blockNr)
 	return result, err
@@ -981,7 +993,7 @@ func (s *PublicTransactionPoolAPI) GetTransactionReceipt(txHash common.Hash) (ma
 		"logsBloom":         receipt.Bloom,
 	}
 	if receipt.Logs == nil {
-		fields["logs"] = []vm.Logs{}
+		fields["logs"] = [][]*types.Log{}
 	}
 	// If the ContractAddress is 20 0x0 bytes, assume it is not a contract creation
 	if receipt.ContractAddress != (common.Address{}) {
@@ -994,7 +1006,7 @@ func (s *PublicTransactionPoolAPI) GetTransactionReceipt(txHash common.Hash) (ma
 func (s *PublicTransactionPoolAPI) sign(addr common.Address, tx *types.Transaction) (*types.Transaction, error) {
 	signer := types.MakeSigner(s.b.ChainConfig(), s.b.CurrentBlock().Number())
 
-	signature, err := s.b.AccountManager().SignEthereum(addr, signer.Hash(tx).Bytes())
+	signature, err := s.b.AccountManager().Sign(addr, signer.Hash(tx).Bytes())
 	if err != nil {
 		return nil, err
 	}
@@ -1142,7 +1154,6 @@ func (s *PublicTransactionPoolAPI) CompleteQueuedTransaction(ctx context.Context
 	if err != nil {
 		return common.Hash{}, err
 	}
-
 	return submitTransaction(ctx, s.b, tx, signature)
 }
 
@@ -1176,11 +1187,18 @@ func (s *PublicTransactionPoolAPI) SendRawTransaction(ctx context.Context, encod
 // Sign calculates an ECDSA signature for:
 // keccack256("\x19Ethereum Signed Message:\n" + len(message) + message).
 //
+// Note, the produced signature conforms to the secp256k1 curve R, S and V values,
+// where the V value will be 27 or 28 for legacy reasons.
+//
 // The account associated with addr must be unlocked.
 //
 // https://github.com/ethereum/wiki/wiki/JSON-RPC#eth_sign
 func (s *PublicTransactionPoolAPI) Sign(addr common.Address, data hexutil.Bytes) (hexutil.Bytes, error) {
-	return s.b.AccountManager().SignEthereum(addr, signHash(data))
+	signature, err := s.b.AccountManager().Sign(addr, signHash(data))
+	if err == nil {
+		signature[64] += 27 // Transform V from 0/1 to 27/28 according to the yellow paper
+	}
+	return signature, err
 }
 
 // SignTransactionResult represents a RLP encoded signed transaction.

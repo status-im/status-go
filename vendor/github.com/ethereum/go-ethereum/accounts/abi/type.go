@@ -34,6 +34,7 @@ const (
 	BytesTy
 	HashTy
 	FixedpointTy
+	FunctionTy
 )
 
 // Type is the reflection of the supported argument type
@@ -64,7 +65,7 @@ var (
 	//      string     int       uint       fixed
 	//      string32   int8      uint8      uint[]
 	//      address    int256    uint256    fixed128x128[2]
-	fullTypeRegex = regexp.MustCompile("([a-zA-Z0-9]+)(\\[([0-9]*)\\])?")
+	fullTypeRegex = regexp.MustCompile(`([a-zA-Z0-9]+)(\[([0-9]*)\])?`)
 	// typeRegex parses the abi sub types
 	typeRegex = regexp.MustCompile("([a-zA-Z]+)(([0-9]+)(x([0-9]+))?)?")
 )
@@ -148,6 +149,12 @@ func NewType(t string) (typ Type, err error) {
 			typ.T = FixedBytesTy
 			typ.SliceSize = varSize
 		}
+	case "function":
+		sliceType, _ := NewType("uint8")
+		typ.Elem = &sliceType
+		typ.IsArray = true
+		typ.T = FunctionTy
+		typ.SliceSize = 24
 	default:
 		return Type{}, fmt.Errorf("unsupported arg type: %s", t)
 	}
@@ -168,7 +175,7 @@ func (t Type) pack(v reflect.Value) ([]byte, error) {
 		return nil, err
 	}
 
-	if (t.IsSlice || t.IsArray) && t.T != BytesTy && t.T != FixedBytesTy {
+	if (t.IsSlice || t.IsArray) && t.T != BytesTy && t.T != FixedBytesTy && t.T != FunctionTy {
 		var packed []byte
 
 		for i := 0; i < v.Len(); i++ {
