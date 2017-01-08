@@ -9,8 +9,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/les/status"
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/geth"
 )
 
@@ -88,7 +88,7 @@ func TestQueuedTransactions(t *testing.T) {
 	txHashCheck, err := backend.SendTransaction(nil, status.SendTxArgs{
 		From:  geth.FromAddress(testAddress),
 		To:    geth.ToAddress(testAddress1),
-		Value: rpc.NewHexNumber(big.NewInt(1000000000000)),
+		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 	})
 	if err != nil {
 		t.Errorf("Test failed: cannot send transaction: %v", err)
@@ -208,7 +208,7 @@ func TestDoubleCompleteQueuedTransactions(t *testing.T) {
 	txHashCheck, err := backend.SendTransaction(nil, status.SendTxArgs{
 		From:  geth.FromAddress(testAddress),
 		To:    geth.ToAddress(testAddress1),
-		Value: rpc.NewHexNumber(big.NewInt(1000000000000)),
+		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 	})
 	if err != nil {
 		t.Errorf("cannot send transaction: %v", err)
@@ -334,7 +334,7 @@ func TestDiscardQueuedTransactions(t *testing.T) {
 	txHashCheck, err := backend.SendTransaction(nil, status.SendTxArgs{
 		From:  geth.FromAddress(testAddress),
 		To:    geth.ToAddress(testAddress1),
-		Value: rpc.NewHexNumber(big.NewInt(1000000000000)),
+		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 	})
 	if err != status.ErrQueuedTxDiscarded {
 		t.Errorf("expected error not thrown: %v", err)
@@ -411,7 +411,7 @@ func TestCompleteMultipleQueuedTransactions(t *testing.T) {
 		txHashCheck, err := backend.SendTransaction(nil, status.SendTxArgs{
 			From:  geth.FromAddress(testAddress),
 			To:    geth.ToAddress(testAddress1),
-			Value: rpc.NewHexNumber(big.NewInt(1000000000000)),
+			Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 		})
 		if err != nil {
 			t.Errorf("unexpected error thrown: %v", err)
@@ -571,7 +571,7 @@ func TestDiscardMultipleQueuedTransactions(t *testing.T) {
 		txHashCheck, err := backend.SendTransaction(nil, status.SendTxArgs{
 			From:  geth.FromAddress(testAddress),
 			To:    geth.ToAddress(testAddress1),
-			Value: rpc.NewHexNumber(big.NewInt(1000000000000)),
+			Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 		})
 		if err != status.ErrQueuedTxDiscarded {
 			t.Errorf("expected error not thrown: %v", err)

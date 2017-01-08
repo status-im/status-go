@@ -6,7 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"golang.org/x/net/context"
 )
 
@@ -61,11 +61,11 @@ type EnqueuedTxReturnHandler func(queuedTx *QueuedTx, err error)
 type SendTxArgs struct {
 	From     common.Address  `json:"from"`
 	To       *common.Address `json:"to"`
-	Gas      *rpc.HexNumber  `json:"gas"`
-	GasPrice *rpc.HexNumber  `json:"gasPrice"`
-	Value    *rpc.HexNumber  `json:"value"`
-	Data     string          `json:"data"`
-	Nonce    *rpc.HexNumber  `json:"nonce"`
+	Gas      *hexutil.Big    `json:"gas"`
+	GasPrice *hexutil.Big    `json:"gasPrice"`
+	Value    *hexutil.Big    `json:"value"`
+	Data     hexutil.Bytes   `json:"data"`
+	Nonce    *hexutil.Uint64 `json:"nonce"`
 }
 
 func NewTransactionQueue() *TxQueue {
