@@ -184,7 +184,7 @@ func (m *NodeManager) StartNodeRPCServer() (bool, error) {
 	config := m.node.config
 	modules := strings.Join(config.HTTPModules, ",")
 
-	return m.api.StartRPC(&config.HTTPHost, rpc.NewHexNumber(config.HTTPPort), &config.HTTPCors, &modules)
+	return m.api.StartRPC(&config.HTTPHost, &config.HTTPPort, &config.HTTPCors, &modules)
 }
 
 // StopNodeRPCServer stops HTTP RPC service attached to node
