@@ -21,6 +21,8 @@ import (
 	"github.com/ethereum/go-ethereum/logger"
 	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/ethereum/go-ethereum/node"
+	"github.com/ethereum/go-ethereum/p2p/discover"
+	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -96,11 +98,10 @@ func MakeNode(dataDir string, rpcPort int, tlsEnabled bool) *Node {
 	glog.CopyStandardLogTo("INFO")
 	glog.SetToStderr(true)
 
-	bootstrapNodes := params.MainnetBootnodes
 	if UseTestnet {
 		dataDir = filepath.Join(dataDir, "testnet")
-		bootstrapNodes = params.TestnetBootnodes
 	}
+
 	// make sure that data dir exists
 	if _, err := os.Stat(dataDir); os.IsNotExist(err) {
 		if err := os.MkdirAll(dataDir, 0755); err != nil {
@@ -120,8 +121,8 @@ func MakeNode(dataDir string, rpcPort int, tlsEnabled bool) *Node {
 		NoDiscovery:       true,
 		DiscoveryV5:       true,
 		DiscoveryV5Addr:   fmt.Sprintf(":%d", NetworkPort+1),
-		BootstrapNodes:    bootstrapNodes,
-		BootstrapNodesV5:  params.DiscoveryV5Bootnodes,
+		BootstrapNodes:    makeBootstrapNodes(),
+		BootstrapNodesV5:  makeBootstrapNodesV5(),
 		ListenAddr:        fmt.Sprintf(":%d", NetworkPort),
 		MaxPeers:          MaxPeers,
 		MaxPendingPeers:   MaxPendingPeers,
@@ -299,6 +300,33 @@ func makeDefaultExtra() []byte {
 	}
 
 	return extra
+}
+
+// makeBootstrapNodes returns default (hence bootstrap) list of peers
+func makeBootstrapNodes() []*discover.Node {
+	enodes := params.MainnetBootnodes
+	if UseTestnet {
+		enodes = params.TestnetBootnodes
+	}
+
+	var bootstapNodes []*discover.Node
+	for _, enode := range enodes {
+		bootstapNodes = append(bootstapNodes, discover.MustParseNode(enode))
+	}
+
+	return bootstapNodes
+}
+
+// makeBootstrapNodesV5 returns default (hence bootstrap) list of peers
+func makeBootstrapNodesV5() []*discv5.Node {
+	enodes := params.DiscoveryV5Bootnodes
+
+	var bootstapNodes []*discv5.Node
+	for _, enode := range enodes {
+		bootstapNodes = append(bootstapNodes, discv5.MustParseNode(enode))
+	}
+
+	return bootstapNodes
 }
 
 func Fatalf(reason interface{}, args ...interface{}) {
