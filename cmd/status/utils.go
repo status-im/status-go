@@ -1101,6 +1101,11 @@ func startTestNode(t *testing.T) <-chan struct{} {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
 		}
+		if envelope.Type == geth.EventNodeCrashed {
+			geth.TriggerDefaultNodeNotificationHandler(jsonEvent)
+			return
+		}
+
 		if envelope.Type == geth.EventTransactionQueued {
 		}
 		if envelope.Type == geth.EventNodeStarted {
