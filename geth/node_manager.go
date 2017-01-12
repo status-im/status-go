@@ -65,6 +65,8 @@ var (
 
 // CreateAndRunNode creates and starts running Geth node locally (exposing given RPC port along the way)
 func CreateAndRunNode(dataDir string, rpcPort int, tlsEnabled bool) error {
+	defer HaltOnPanic()
+
 	nodeManager := NewNodeManager(dataDir, rpcPort, tlsEnabled)
 
 	if nodeManager.NodeInited() {
@@ -99,6 +101,8 @@ func NodeManagerInstance() *NodeManager {
 // RunNode starts Geth node
 func (m *NodeManager) RunNode() {
 	go func() {
+		defer HaltOnPanic()
+
 		m.StartNode()
 
 		if _, err := m.AccountManager(); err != nil {

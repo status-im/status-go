@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"runtime/debug"
 	"strings"
 	"syscall"
 
@@ -46,6 +47,7 @@ const (
 	DatabaseCacheSize          = 128 // Megabytes of memory allocated to internal caching (min 16MB / database forced)
 
 	EventNodeStarted = "node.started"
+	EventNodeCrashed = "node.crashed"
 )
 
 // Gas price settings
@@ -346,5 +348,24 @@ func Fatalf(reason interface{}, args ...interface{}) {
 		fmt.Fprintf(w, "Fatal Failure: %v\n", reason.(error))
 	}
 
+	debug.PrintStack()
+
 	os.Exit(1)
+}
+
+// HaltOnPanic recovers from panic, logs issue, sends upward notification, and exits
+func HaltOnPanic() {
+	if r := recover(); r != nil {
+		err := fmt.Errorf("%v: %v", ErrNodeStartFailure, r)
+
+		// send signal up to native app
+		SendSignal(SignalEnvelope{
+			Type: EventNodeCrashed,
+			Event: NodeCrashEvent{
+				Error: err.Error(),
+			},
+		})
+
+		Fatalf(err) // os.exit(1) is called internally
+	}
 }
