@@ -562,3 +562,74 @@ func TestLocalStorageSet(t *testing.T) {
 		return
 	}
 }
+
+func TestLongRunningCallHalting(t *testing.T) {
+	err := geth.PrepareTestNode()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	jailInstance := jail.Init("")
+	jailInstance.Config.LongRunningJobTimeout = 3 * time.Second
+
+	statusJS := geth.LoadFromFile(TESTDATA_STATUS_JS) + `;
+	_status_catalog.commands["neverEndingCommand"] = function () {
+		while (true) {
+			// loops forever
+		}
+	};`
+	jailInstance.Parse(CHAT_ID_CALL, statusJS)
+
+	correctlyHalted := make(chan struct{}, 1)
+	go func() {
+		response := jailInstance.Call(CHAT_ID_CALL, `["commands", "neverEndingCommand"]`, `""`)
+		expectedResponse := `{"error":"long running job timed out"}`
+		if response != expectedResponse {
+			t.Errorf("expected response is not returned: expected %s, got %s", expectedResponse, response)
+		}
+
+		correctlyHalted <- struct{}{}
+	}()
+
+	select {
+	case <-correctlyHalted:
+	// pass
+	case <-time.After((jail.JailedRuntimeRequestTimeout + 5) * time.Second):
+		t.Error("long running jail.Call() request hasn't been halted")
+	}
+}
+
+func TestLongRunningParseHalting(t *testing.T) {
+	err := geth.PrepareTestNode()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	jailInstance := jail.Init("")
+	jailInstance.Config.LongRunningJobTimeout = 3 * time.Second
+
+	statusJS := geth.LoadFromFile(TESTDATA_STATUS_JS) + `;
+	while (true) {
+		// loops forever
+	}`
+
+	correctlyHalted := make(chan struct{}, 1)
+	go func() {
+		response := jailInstance.Parse(CHAT_ID_CALL, statusJS)
+		expectedResponse := `{"error":"long running job timed out"}`
+		if response != expectedResponse {
+			t.Errorf("expected response is not returned: expected %s, got %s", expectedResponse, response)
+		}
+
+		correctlyHalted <- struct{}{}
+	}()
+
+	select {
+	case <-correctlyHalted:
+		// pass
+	case <-time.After((jail.JailedRuntimeRequestTimeout + 5) * time.Second):
+		t.Error("long running jail.Parse() request hasn't been halted")
+	}
+}
