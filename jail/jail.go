@@ -16,15 +16,21 @@ import (
 )
 
 const (
-	JailedRuntimeRequestTimeout = time.Second * 60
+	JailedRuntimeRequestTimeout = 60
 )
 
 var (
-	ErrInvalidJail = errors.New("jail environment is not properly initialized")
+	ErrInvalidJail    = errors.New("jail environment is not properly initialized")
+	ErrRequestTimeout = errors.New("long running job timed out")
 )
+
+type JailConfig struct {
+	LongRunningJobTimeout time.Duration
+}
 
 type Jail struct {
 	sync.RWMutex
+	Config       *JailConfig
 	client       *rpc.Client               // lazy inited on the first call
 	cells        map[string]*JailedRuntime // jail supports running many isolated instances of jailed runtime
 	statusJS     string
@@ -43,6 +49,9 @@ var once sync.Once
 func New() *Jail {
 	once.Do(func() {
 		jailInstance = &Jail{
+			Config: &JailConfig{
+				LongRunningJobTimeout: JailedRuntimeRequestTimeout * time.Second,
+			},
 			cells: make(map[string]*JailedRuntime),
 		}
 	})
@@ -65,11 +74,13 @@ func NewJailedRuntime(id string) *JailedRuntime {
 	return &JailedRuntime{
 		id:  id,
 		vm:  otto.New(),
-		sem: semaphore.New(1, JailedRuntimeRequestTimeout),
+		sem: semaphore.New(1, JailedRuntimeRequestTimeout*time.Second),
 	}
 }
 
 func (jail *Jail) Parse(chatId string, js string) string {
+	defer geth.HaltOnPanic()
+
 	if jail == nil {
 		return printError(ErrInvalidJail.Error())
 	}
@@ -79,9 +90,12 @@ func (jail *Jail) Parse(chatId string, js string) string {
 
 	jail.cells[chatId] = NewJailedRuntime(chatId)
 	vm := jail.cells[chatId].vm
+	vm.Interrupt = make(chan func(), 1) // make sure that interrupt channel exists
 
 	initJjs := jail.statusJS + ";"
-	_, err := vm.Run(initJjs)
+	_, err := jail.RunUnsafe(vm, func() (otto.Value, error) {
+		return vm.Run(initJjs)
+	})
 
 	// jeth and its handlers
 	vm.Set("jeth", struct{}{})
@@ -103,14 +117,19 @@ func (jail *Jail) Parse(chatId string, js string) string {
             return new Bignumber(val);
         }
 	` + js + "; var catalog = JSON.stringify(_status_catalog);"
-	vm.Run(jjs)
+	response, err := jail.RunUnsafe(vm, func() (otto.Value, error) {
+		return vm.Run(jjs)
+	})
+	if err == nil {
+		response, _ = vm.Get("catalog")
+	}
 
-	res, _ := vm.Get("catalog")
-
-	return printResult(res.String(), err)
+	return printResult(response.String(), err)
 }
 
 func (jail *Jail) Call(chatId string, path string, args string) string {
+	defer geth.HaltOnPanic()
+
 	_, err := jail.RPCClient()
 	if err != nil {
 		return printError(err.Error())
@@ -124,10 +143,48 @@ func (jail *Jail) Call(chatId string, path string, args string) string {
 	}
 	jail.RUnlock()
 
-	vm := cell.vm.Copy() // isolate VM to allow concurrent access
-	res, err := vm.Call("call", nil, path, args)
+	vm := cell.vm.Copy()                // isolate VM to allow concurrent access
+	vm.Interrupt = make(chan func(), 1) // make sure that interrupt channel exists
 
-	return printResult(res.String(), err)
+	response, err := jail.RunUnsafe(vm, func() (response otto.Value, err error) {
+		return vm.Call("call", nil, path, args)
+	})
+
+	return printResult(response.String(), err)
+}
+
+// RunUnsafe executes unsafe, 3rd party code with timeout (which halts execution, if job takes too long)
+func (jail *Jail) RunUnsafe(vm *otto.Otto, fn func() (response otto.Value, err error)) (response otto.Value, err error) {
+	// service timeout panics (allows to return from long running jobs)
+	defer func() {
+		if r := recover(); r != nil {
+			if r == ErrRequestTimeout {
+				response, err = otto.Value{}, ErrRequestTimeout
+				return
+			}
+
+			panic(r) // re-panic
+		}
+
+	}()
+
+	// allow long running job interruption
+	cancelInterrupt := make(chan struct{}, 1)
+	go func() {
+		select {
+		case <-cancelInterrupt:
+			return
+		case <-time.After(jail.Config.LongRunningJobTimeout):
+			vm.Interrupt <- func() {
+				panic(ErrRequestTimeout)
+			}
+		}
+	}()
+
+	response, err = fn()
+	cancelInterrupt <- struct{}{} // not a long running job, it is ok to cancel timeout
+
+	return
 }
 
 func (jail *Jail) GetVM(chatId string) (*otto.Otto, error) {
