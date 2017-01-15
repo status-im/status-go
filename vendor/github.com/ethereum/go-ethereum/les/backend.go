@@ -118,11 +118,12 @@ func New(ctx *node.ServiceContext, config *eth.Config) (*LightEthereum, error) {
 		return nil, err
 	}
 
-	eth.ApiBackend = &LesApiBackend{eth, nil}
+	eth.ApiBackend = &LesApiBackend{eth, nil, nil}
 	eth.ApiBackend.gpo = gasprice.NewLightPriceOracle(eth.ApiBackend)
 
 	// inject status-im backend
-	eth.StatusBackend = ethapi.NewStatusBackend(eth.ApiBackend)
+	eth.ApiBackend.statusBackend = ethapi.NewStatusBackend(eth.ApiBackend)
+	eth.StatusBackend = eth.ApiBackend.statusBackend // alias
 
 	return eth, nil
 }
@@ -199,6 +200,7 @@ func (s *LightEthereum) Start(srvr *p2p.Server) error {
 	glog.V(logger.Info).Infof("WARNING: light client mode is an experimental feature")
 	s.netRPCService = ethapi.NewPublicNetAPI(srvr, s.netVersionId)
 	s.protocolManager.Start(srvr)
+	s.StatusBackend.Start()
 	return nil
 }
 
@@ -215,6 +217,8 @@ func (s *LightEthereum) Stop() error {
 	time.Sleep(time.Millisecond * 200)
 	s.chainDb.Close()
 	close(s.shutdownChan)
+
+	s.StatusBackend.Stop()
 
 	return nil
 }

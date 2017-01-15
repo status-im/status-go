@@ -37,8 +37,13 @@ import (
 
 // EthApiBackend implements ethapi.Backend for full nodes
 type EthApiBackend struct {
-	eth *Ethereum
-	gpo *gasprice.GasPriceOracle
+	eth           *Ethereum
+	gpo           *gasprice.GasPriceOracle
+	statusBackend *ethapi.StatusBackend
+}
+
+func (b *EthApiBackend) GetStatusBackend() *ethapi.StatusBackend {
+	return b.statusBackend
 }
 
 func (b *EthApiBackend) ChainConfig() *params.ChainConfig {
