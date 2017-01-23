@@ -63,3 +63,22 @@ func TestMain(m *testing.M) {
 
 	os.Exit(m.Run())
 }
+
+func TestResetChainData(t *testing.T) {
+	err := geth.PrepareTestNode()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	if err := geth.NodeManagerInstance().ResetChainData(); err != nil {
+		t.Error(err)
+		return
+	}
+
+	// allow some time to re-sync
+	time.Sleep(15 * time.Second)
+
+	// now make sure that everything is intact
+	TestQueuedTransactions(t)
+}

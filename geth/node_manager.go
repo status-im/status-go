@@ -30,8 +30,16 @@ type SelectedExtKey struct {
 	SubAccounts []accounts.Account
 }
 
+// NodeManagerConfig stores configuration options passed to constructor
+type NodeManagerConfig struct {
+	DataDir    string
+	RPCPort    int
+	TLSEnabled bool
+}
+
 // NodeManager manages Status node (which abstracts contained geth node)
 type NodeManager struct {
+	config          *NodeManagerConfig    // reference to passed configuration variables
 	node            *Node                 // reference to Status node
 	services        *NodeServiceStack     // default stack of services running on geth node
 	api             *node.PrivateAdminAPI // exposes collection of administrative API methods
@@ -73,8 +81,7 @@ func CreateAndRunNode(dataDir string, rpcPort int) error {
 
 	if nodeManager.NodeInited() {
 		nodeManager.RunNode()
-
-		<-nodeManager.node.started // block until node is ready
+		nodeManager.WaitNodeStarted()
 		return nil
 	}
 
@@ -85,6 +92,11 @@ func CreateAndRunNode(dataDir string, rpcPort int) error {
 func NewNodeManager(dataDir string, rpcPort int) *NodeManager {
 	createOnce.Do(func() {
 		nodeManagerInstance = &NodeManager{
+			config: &NodeManagerConfig{
+				DataDir:    dataDir,
+				RPCPort:    rpcPort,
+				TLSEnabled: false,
+			},
 			services: &NodeServiceStack{
 				jailedRequestQueue: NewJailedRequestsQueue(),
 			},
@@ -139,6 +151,8 @@ func (m *NodeManager) RunNode() {
 
 		m.onNodeStarted() // node started, notify listeners
 		m.node.geth.Wait()
+
+		glog.V(logger.Info).Infoln("node stopped")
 	}()
 }
 
@@ -170,12 +184,53 @@ func (m *NodeManager) StartNode() {
 	}()
 }
 
+// StopNode stops running P2P node
+func (m *NodeManager) StopNode() error {
+	if m == nil || !m.NodeInited() {
+		return ErrInvalidGethNode
+	}
+
+	m.node.geth.Stop()
+	m.node.started = make(chan struct{})
+	return nil
+}
+
+// RestartNode restarts P2P node
 func (m *NodeManager) RestartNode() error {
 	if m == nil || !m.NodeInited() {
 		return ErrInvalidGethNode
 	}
 
-	return m.node.geth.Restart()
+	m.StopNode()
+	m.RunNode()
+	m.WaitNodeStarted()
+
+	return nil
+}
+
+// ResetChainData purges chain data (by removing data directory). Safe to apply on running P2P node.
+func (m *NodeManager) ResetChainData() error {
+	if m == nil || !m.NodeInited() {
+		return ErrInvalidGethNode
+	}
+
+	if err := m.StopNode(); err != nil {
+		return err
+	}
+
+	chainDataDir := filepath.Join(m.node.config.DataDir, m.node.config.Name, "lightchaindata")
+	if _, err := os.Stat(chainDataDir); os.IsNotExist(err) {
+		return err
+	}
+
+	if err := os.RemoveAll(chainDataDir); err != nil {
+		return err
+	}
+
+	m.RunNode()
+	m.WaitNodeStarted()
+
+	return nil
 }
 
 func (m *NodeManager) StartNodeRPCServer() (bool, error) {
@@ -319,6 +374,11 @@ func (m *NodeManager) AddPeer(url string) (bool, error) {
 	server.AddPeer(parsedNode)
 
 	return true, nil
+}
+
+// WaitNodeStarted blocks until node is started (start channel gets notified)
+func (m *NodeManager) WaitNodeStarted() {
+	<-m.node.started // block until node is started
 }
 
 // onNodeStarted sends upward notification letting the app know that Geth node is ready to be used
