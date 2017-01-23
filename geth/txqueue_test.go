@@ -36,9 +36,11 @@ func TestQueuedTransactions(t *testing.T) {
 		return
 	}
 
+	geth.Logout()
+
 	// make sure you panic if transaction complete doesn't return
 	completeQueuedTransaction := make(chan struct{}, 1)
-	geth.PanicAfter(20*time.Second, completeQueuedTransaction, "TestQueuedTransactions")
+	geth.PanicAfter(60*time.Second, completeQueuedTransaction, "TestQueuedTransactions")
 
 	// replace transaction notification handler
 	var txHash = common.Hash{}

@@ -122,7 +122,7 @@ func (q *TxQueue) enqueueLoop() {
 	for {
 		select {
 		case queuedTx := <-q.incomingPool:
-			glog.V(logger.Info).Infof("StatusIM: transaction enqueued")
+			glog.V(logger.Info).Infof("StatusIM: transaction enqueued %v", queuedTx.Id)
 			q.Enqueue(queuedTx)
 		case <-q.stopped:
 			glog.V(logger.Info).Infof("StatusIM: transaction queue's enqueue loop stopped")

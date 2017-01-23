@@ -205,6 +205,12 @@ func StartNode(datadir *C.char) *C.char {
 	return makeJSONErrorResponse(err)
 }
 
+//export ResetChainData
+func ResetChainData() *C.char {
+	err := geth.NodeManagerInstance().ResetChainData()
+	return makeJSONErrorResponse(err)
+}
+
 //export StartTLSNode
 func StartTLSNode(datadir *C.char) *C.char {
 	// This starts a geth node with the given datadir
