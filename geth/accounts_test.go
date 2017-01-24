@@ -413,3 +413,185 @@ func TestAccountLogout(t *testing.T) {
 		t.Error("identity not cleared from whisper")
 	}
 }
+
+func TestSelectedAccountOnNodeRestart(t *testing.T) {
+	err := geth.PrepareTestNode()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	// we need to make sure that selected account is injected as identity into Whisper
+	whisperService, err := geth.NodeManagerInstance().WhisperService()
+	if err != nil {
+		t.Errorf("whisper service not running: %v", err)
+	}
+
+	// create test accounts
+	address1, pubKey1, _, err := geth.CreateAccount(newAccountPassword)
+	if err != nil {
+		t.Errorf("could not create account: %v", err)
+		return
+	}
+	t.Logf("account1 created: {address: %s, key: %s}", address1, pubKey1)
+	address2, pubKey2, _, err := geth.CreateAccount(newAccountPassword)
+	if err != nil {
+		t.Errorf("could not create account: %v", err)
+		return
+	}
+	t.Logf("account2 created: {address: %s, key: %s}", address2, pubKey2)
+
+	// make sure that identity is not (yet injected)
+	if whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey1))) {
+		t.Error("identity already present in whisper")
+	}
+
+	// make sure that no account is selected by default
+	if geth.NodeManagerInstance().SelectedAccount != nil {
+		t.Error("account selected, but should not be")
+		return
+	}
+
+	// select account
+	err = geth.SelectAccount(address1, "wrongPassword")
+	if err == nil {
+		t.Error("select account is expected to throw error: wrong password used")
+		return
+	}
+	err = geth.SelectAccount(address1, newAccountPassword)
+	if err != nil {
+		t.Errorf("could not select account: %v", err)
+		return
+	}
+	if !whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey1))) {
+		t.Errorf("identity not injected into whisper: %v", err)
+	}
+
+	// select another account, make sure that previous account is wiped out from Whisper cache
+	if whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey2))) {
+		t.Error("identity already present in whisper")
+	}
+	err = geth.SelectAccount(address2, newAccountPassword)
+	if err != nil {
+		t.Errorf("Test failed: could not select account: %v", err)
+		return
+	}
+	if !whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey2))) {
+		t.Errorf("identity not injected into whisper: %v", err)
+	}
+	if whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey1))) {
+		t.Error("identity should be removed, but it is still present in whisper")
+	}
+
+	// stop node (and all of its sub-protocols)
+	if err := geth.NodeManagerInstance().StopNode(); err != nil {
+		t.Error(err)
+		return
+	}
+
+	// make sure that account is still selected
+	if geth.NodeManagerInstance().SelectedAccount == nil {
+		t.Error("no selected account")
+		return
+	}
+	if geth.NodeManagerInstance().SelectedAccount.Address.Hex() != "0x"+address2 {
+		t.Error("incorrect address selected")
+		return
+	}
+
+	// resume node
+	if err := geth.NodeManagerInstance().ResumeNode(); err != nil {
+		t.Error(err)
+		return
+	}
+
+	// re-check selected account (account2 MUST be selected)
+	if geth.NodeManagerInstance().SelectedAccount == nil {
+		t.Error("no selected account")
+		return
+	}
+	if geth.NodeManagerInstance().SelectedAccount.Address.Hex() != "0x"+address2 {
+		t.Error("incorrect address selected")
+		return
+	}
+
+	// make sure that Whisper gets identity re-injected
+	whisperService, err = geth.NodeManagerInstance().WhisperService()
+	if err != nil {
+		t.Errorf("whisper service not running: %v", err)
+	}
+	if !whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey2))) {
+		t.Errorf("identity not injected into whisper: %v", err)
+	}
+	if whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey1))) {
+		t.Error("identity should not be present, but it is still present in whisper")
+	}
+}
+
+func TestNodeRestartWithNoSelectedAccount(t *testing.T) {
+	err := geth.PrepareTestNode()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	geth.Logout()
+
+	// we need to make sure that selected account is injected as identity into Whisper
+	whisperService, err := geth.NodeManagerInstance().WhisperService()
+	if err != nil {
+		t.Errorf("whisper service not running: %v", err)
+	}
+
+	// create test accounts
+	address1, pubKey1, _, err := geth.CreateAccount(newAccountPassword)
+	if err != nil {
+		t.Errorf("could not create account: %v", err)
+		return
+	}
+	t.Logf("account1 created: {address: %s, key: %s}", address1, pubKey1)
+
+	// make sure that identity is not present
+	if whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey1))) {
+		t.Error("identity already present in whisper")
+	}
+
+	// make sure that no account is selected
+	if geth.NodeManagerInstance().SelectedAccount != nil {
+		t.Error("account selected, but should not be")
+		return
+	}
+
+	// stop node (and all of its sub-protocols)
+	if err := geth.NodeManagerInstance().StopNode(); err != nil {
+		t.Error(err)
+		return
+	}
+
+	// make sure that no account is selected
+	if geth.NodeManagerInstance().SelectedAccount != nil {
+		t.Error("account selected, but should not be")
+		return
+	}
+
+	// resume node
+	if err := geth.NodeManagerInstance().ResumeNode(); err != nil {
+		t.Error(err)
+		return
+	}
+
+	// make sure that no account is selected
+	if geth.NodeManagerInstance().SelectedAccount != nil {
+		t.Error("account selected, but should not be")
+		return
+	}
+
+	// make sure that Whisper gets identity re-injected
+	whisperService, err = geth.NodeManagerInstance().WhisperService()
+	if err != nil {
+		t.Errorf("whisper service not running: %v", err)
+	}
+	if whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey1))) {
+		t.Error("identity should not be present, but it is present in whisper")
+	}
+}

@@ -205,6 +205,18 @@ func StartNode(datadir *C.char) *C.char {
 	return makeJSONErrorResponse(err)
 }
 
+//export StopNode
+func StopNode() *C.char {
+	err := geth.NodeManagerInstance().StopNode()
+	return makeJSONErrorResponse(err)
+}
+
+//export ResumeNode
+func ResumeNode() *C.char {
+	err := geth.NodeManagerInstance().ResumeNode()
+	return makeJSONErrorResponse(err)
+}
+
 //export ResetChainData
 func ResetChainData() *C.char {
 	err := geth.NodeManagerInstance().ResetChainData()
