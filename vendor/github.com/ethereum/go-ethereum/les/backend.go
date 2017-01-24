@@ -66,7 +66,6 @@ type LightEthereum struct {
 	solcPath       string
 	solc           *compiler.Solidity
 
-	NatSpec       bool
 	netVersionId  int
 	netRPCService *ethapi.PublicNetAPI
 
@@ -97,7 +96,6 @@ func New(ctx *node.ServiceContext, config *eth.Config) (*LightEthereum, error) {
 		pow:            pow,
 		shutdownChan:   make(chan bool),
 		netVersionId:   config.NetworkId,
-		NatSpec:        config.NatSpec,
 		solcPath:       config.SolcPath,
 	}
 

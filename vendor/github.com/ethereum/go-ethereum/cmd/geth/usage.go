@@ -67,7 +67,6 @@ var AppHelpFlagGroups = []flagGroup{
 			utils.DataDirFlag,
 			utils.KeyStoreDirFlag,
 			utils.NetworkIdFlag,
-			utils.OlympicFlag,
 			utils.TestNetFlag,
 			utils.DevModeFlag,
 			utils.IdentityFlag,
@@ -161,6 +160,7 @@ var AppHelpFlagGroups = []flagGroup{
 			utils.VMEnableJitFlag,
 			utils.VMForceJitFlag,
 			utils.VMJitCacheFlag,
+			utils.VMEnableDebugFlag,
 		},
 	},
 	{
@@ -175,7 +175,6 @@ var AppHelpFlagGroups = []flagGroup{
 		Name: "EXPERIMENTAL",
 		Flags: []cli.Flag{
 			utils.WhisperEnabledFlag,
-			utils.NatspecEnabledFlag,
 		},
 	},
 	{

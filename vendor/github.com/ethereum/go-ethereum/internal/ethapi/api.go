@@ -19,7 +19,9 @@ package ethapi
 import (
 	"bytes"
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"math"
 	"math/big"
 	"strings"
 	"time"
@@ -254,17 +256,18 @@ func (s *PrivateAccountAPI) ImportRawKey(privkey string, password string) (commo
 // UnlockAccount will unlock the account associated with the given address with
 // the given password for duration seconds. If duration is nil it will use a
 // default of 300 seconds. It returns an indication if the account was unlocked.
-func (s *PrivateAccountAPI) UnlockAccount(addr common.Address, password string, duration *hexutil.Uint) (bool, error) {
+func (s *PrivateAccountAPI) UnlockAccount(addr common.Address, password string, duration *uint64) (bool, error) {
+	const max = uint64(time.Duration(math.MaxInt64) / time.Second)
 	var d time.Duration
 	if duration == nil {
 		d = 300 * time.Second
+	} else if *duration > max {
+		return false, errors.New("unlock duration too large")
 	} else {
 		d = time.Duration(*duration) * time.Second
 	}
-	if err := s.am.TimedUnlock(accounts.Account{Address: addr}, password, d); err != nil {
-		return false, err
-	}
-	return true, nil
+	err := s.am.TimedUnlock(accounts.Account{Address: addr}, password, d)
+	return err == nil, err
 }
 
 // LockAccount will lock the account associated with the given address when it's unlocked.
@@ -573,8 +576,34 @@ func (s *PublicBlockChainAPI) Call(ctx context.Context, args CallArgs, blockNr r
 
 // EstimateGas returns an estimate of the amount of gas needed to execute the given transaction.
 func (s *PublicBlockChainAPI) EstimateGas(ctx context.Context, args CallArgs) (*hexutil.Big, error) {
-	_, gas, err := s.doCall(ctx, args, rpc.PendingBlockNumber)
-	return (*hexutil.Big)(gas), err
+	// Binary search the gas requirement, as it may be higher than the amount used
+	var lo, hi uint64
+	if (*big.Int)(&args.Gas).BitLen() > 0 {
+		hi = (*big.Int)(&args.Gas).Uint64()
+	} else {
+		// Retrieve the current pending block to act as the gas ceiling
+		block, err := s.b.BlockByNumber(ctx, rpc.PendingBlockNumber)
+		if err != nil {
+			return nil, err
+		}
+		hi = block.GasLimit().Uint64()
+	}
+	for lo+1 < hi {
+		// Take a guess at the gas, and check transaction validity
+		mid := (hi + lo) / 2
+		(*big.Int)(&args.Gas).SetUint64(mid)
+
+		_, gas, err := s.doCall(ctx, args, rpc.PendingBlockNumber)
+
+		// If the transaction became invalid or used all the gas (failed), raise the gas limit
+		if err != nil || gas.Cmp((*big.Int)(&args.Gas)) == 0 {
+			lo = mid
+			continue
+		}
+		// Otherwise assume the transaction succeeded, lower the gas limit
+		hi = mid
+	}
+	return (*hexutil.Big)(new(big.Int).SetUint64(hi)), nil
 }
 
 // ExecutionResult groups all structured logs emitted by the EVM

@@ -96,8 +96,8 @@ func (s *PublicMinerAPI) Mining() bool {
 
 // SubmitWork can be used by external miner to submit their POW solution. It returns an indication if the work was
 // accepted. Note, this is not an indication if the provided work was valid!
-func (s *PublicMinerAPI) SubmitWork(nonce hexutil.Uint64, solution, digest common.Hash) bool {
-	return s.agent.SubmitWork(uint64(nonce), digest, solution)
+func (s *PublicMinerAPI) SubmitWork(nonce types.BlockNonce, solution, digest common.Hash) bool {
+	return s.agent.SubmitWork(nonce, digest, solution)
 }
 
 // GetWork returns a work package for external miner. The work package consists of 3 strings
@@ -559,4 +559,10 @@ func (api *PrivateDebugAPI) TraceTransaction(ctx context.Context, txHash common.
 		}
 	}
 	return nil, errors.New("database inconsistency")
+}
+
+// Preimage is a debug API function that returns the preimage for a sha3 hash, if known.
+func (api *PrivateDebugAPI) Preimage(ctx context.Context, hash common.Hash) (hexutil.Bytes, error) {
+	db := core.PreimageTable(api.eth.ChainDb())
+	return db.Get(hash.Bytes())
 }
