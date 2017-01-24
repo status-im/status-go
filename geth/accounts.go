@@ -167,6 +167,27 @@ func SelectAccount(address, password string) error {
 	return nil
 }
 
+// ReSelectAccount selects previously selected account, often, after node restart.
+func ReSelectAccount() error {
+	nodeManager := NodeManagerInstance()
+
+	selectedAccount := nodeManager.SelectedAccount
+	if selectedAccount == nil {
+		return nil
+	}
+
+	whisperService, err := nodeManager.WhisperService()
+	if err != nil {
+		return err
+	}
+
+	if err := whisperService.InjectIdentity(selectedAccount.AccountKey.PrivateKey); err != nil {
+		return ErrWhisperIdentityInjectionFailure
+	}
+
+	return nil
+}
+
 // Logout clears whisper identities
 func Logout() error {
 	nodeManager := NodeManagerInstance()

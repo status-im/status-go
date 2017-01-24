@@ -206,6 +206,23 @@ func (m *NodeManager) RestartNode() error {
 	return nil
 }
 
+// ResumeNode resumes previously stopped P2P node
+func (m *NodeManager) ResumeNode() error {
+	if m == nil || !m.NodeInited() {
+		return ErrInvalidGethNode
+	}
+
+	m.RunNode()
+	m.WaitNodeStarted()
+
+	// re-select the previously selected account
+	if err := ReSelectAccount(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // ResetChainData purges chain data (by removing data directory). Safe to apply on running P2P node.
 func (m *NodeManager) ResetChainData() error {
 	if m == nil || !m.NodeInited() {
@@ -225,8 +242,9 @@ func (m *NodeManager) ResetChainData() error {
 		return err
 	}
 
-	m.RunNode()
-	m.WaitNodeStarted()
+	if err := m.ResumeNode(); err != nil {
+		return err
+	}
 
 	return nil
 }
