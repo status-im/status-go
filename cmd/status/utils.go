@@ -79,6 +79,14 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 			"test jailed calls",
 			testJailFunctionCall,
 		},
+		{
+			"reset blockchain data",
+			testResetChainData,
+		},
+		{
+			"pause node",
+			testStopResumeNode,
+		},
 	}
 
 	for _, test := range tests {
@@ -88,6 +96,119 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 	}
 
 	done <- struct{}{}
+}
+
+func testResetChainData(t *testing.T) bool {
+	resetChainDataResponse := geth.JSONError{}
+	rawResponse := ResetChainData()
+
+	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &resetChainDataResponse); err != nil {
+		t.Errorf("cannot decode ResetChainData reponse (%s): %v", C.GoString(rawResponse), err)
+		return false
+	}
+	if resetChainDataResponse.Error != "" {
+		t.Errorf("unexpected error: %s", resetChainDataResponse.Error)
+		return false
+	}
+
+	time.Sleep(15 * time.Second) // allow to re-sync blockchain
+
+	testCompleteTransaction(t)
+
+	return true
+}
+
+func testStopResumeNode(t *testing.T) bool {
+	geth.Logout() // to make sure that we start with empty account (which might get populated during previous tests)
+
+	whisperService, err := geth.NodeManagerInstance().WhisperService()
+	if err != nil {
+		t.Errorf("whisper service not running: %v", err)
+	}
+
+	// create an account
+	address1, pubKey1, _, err := geth.CreateAccount(newAccountPassword)
+	if err != nil {
+		t.Errorf("could not create account: %v", err)
+		return false
+	}
+	t.Logf("account created: {address: %s, key: %s}", address1, pubKey1)
+
+	// make sure that identity is not (yet injected)
+	if whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey1))) {
+		t.Error("identity already present in whisper")
+	}
+
+	// select account
+	loginResponse := geth.JSONError{}
+	rawResponse := Login(C.CString(address1), C.CString(newAccountPassword))
+
+	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &loginResponse); err != nil {
+		t.Errorf("cannot decode RecoverAccount reponse (%s): %v", C.GoString(rawResponse), err)
+		return false
+	}
+
+	if loginResponse.Error != "" {
+		t.Errorf("could not select account: %v", err)
+		return false
+	}
+	if !whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey1))) {
+		t.Errorf("identity not injected into whisper: %v", err)
+	}
+
+	// stop and resume node, then make sure that selected account is still selected
+	stopNodeFn := func() bool {
+		response := geth.JSONError{}
+		rawResponse = StopNode()
+
+		if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &response); err != nil {
+			t.Errorf("cannot decode StopNode reponse (%s): %v", C.GoString(rawResponse), err)
+			return false
+		}
+		if response.Error != "" {
+			t.Errorf("unexpected error: %s", response.Error)
+			return false
+		}
+
+		return true
+	}
+
+	resumeNodeFn := func() bool {
+		response := geth.JSONError{}
+		rawResponse = ResumeNode()
+
+		if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &response); err != nil {
+			t.Errorf("cannot decode ResumeNode reponse (%s): %v", C.GoString(rawResponse), err)
+			return false
+		}
+		if response.Error != "" {
+			t.Errorf("unexpected error: %s", response.Error)
+			return false
+		}
+
+		return true
+	}
+
+	if !stopNodeFn() {
+		return false
+	}
+	if !resumeNodeFn() {
+		return false
+	}
+
+	// now, verify that we still have account logged in
+	whisperService, err = geth.NodeManagerInstance().WhisperService()
+	if err != nil {
+		t.Errorf("whisper service not running: %v", err)
+	}
+	if !whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey1))) {
+		t.Errorf("identity evicted from whisper on node restart: %v", err)
+	}
+
+	// additionally, let's complete transaction (just to make sure that node lives through pause/resume w/o issues)
+	testCompleteTransaction(t)
+
+	return true
 }
 
 func testRestartNodeRPC(t *testing.T) bool {
