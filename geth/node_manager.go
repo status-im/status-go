@@ -29,16 +29,8 @@ type SelectedExtKey struct {
 	SubAccounts []accounts.Account
 }
 
-// NodeManagerConfig stores configuration options passed to constructor
-type NodeManagerConfig struct {
-	DataDir    string
-	RPCPort    int
-	TLSEnabled bool
-}
-
 // NodeManager manages Status node (which abstracts contained geth node)
 type NodeManager struct {
-	config          *NodeManagerConfig    // reference to passed configuration variables
 	node            *Node                 // reference to Status node
 	services        *NodeServiceStack     // default stack of services running on geth node
 	api             *node.PrivateAdminAPI // exposes collection of administrative API methods
@@ -72,10 +64,10 @@ var (
 )
 
 // CreateAndRunNode creates and starts running Geth node locally (exposing given RPC port along the way)
-func CreateAndRunNode(dataDir string, rpcPort int) error {
+func CreateAndRunNode(config *NodeConfig) error {
 	defer HaltOnPanic()
 
-	nodeManager := NewNodeManager(dataDir, rpcPort)
+	nodeManager := NewNodeManager(config)
 
 	if nodeManager.NodeInited() {
 		nodeManager.RunNode()
@@ -87,19 +79,14 @@ func CreateAndRunNode(dataDir string, rpcPort int) error {
 }
 
 // NewNodeManager makes new instance of node manager
-func NewNodeManager(dataDir string, rpcPort int) *NodeManager {
+func NewNodeManager(config *NodeConfig) *NodeManager {
 	createOnce.Do(func() {
 		nodeManagerInstance = &NodeManager{
-			config: &NodeManagerConfig{
-				DataDir:    dataDir,
-				RPCPort:    rpcPort,
-				TLSEnabled: false,
-			},
 			services: &NodeServiceStack{
 				jailedRequestQueue: NewJailedRequestsQueue(),
 			},
 		}
-		nodeManagerInstance.node = MakeNode(dataDir, rpcPort)
+		nodeManagerInstance.node = MakeNode(config)
 	})
 
 	return nodeManagerInstance
@@ -233,7 +220,7 @@ func (m *NodeManager) ResetChainData() error {
 		return err
 	}
 
-	chainDataDir := filepath.Join(m.node.config.DataDir, m.node.config.Name, "lightchaindata")
+	chainDataDir := filepath.Join(m.node.gethConfig.DataDir, m.node.gethConfig.Name, "lightchaindata")
 	if _, err := os.Stat(chainDataDir); os.IsNotExist(err) {
 		return err
 	}
@@ -258,7 +245,7 @@ func (m *NodeManager) StartNodeRPCServer() (bool, error) {
 		return false, ErrInvalidNodeAPI
 	}
 
-	config := m.node.config
+	config := m.node.gethConfig
 	modules := strings.Join(config.HTTPModules, ",")
 
 	return m.api.StartRPC(&config.HTTPHost, rpc.NewHexNumber(config.HTTPPort), &config.HTTPCors, &modules)
