@@ -132,6 +132,7 @@ func PrepareTestNode() (err error) {
 	// start geth node and wait for it to initialize
 	err = CreateAndRunNode(&NodeConfig{
 		DataDir:    dataDir,
+		IPCEnabled: true,
 		HTTPPort:   TestNodeHTTPPort, // to avoid conflicts with running app, using different port in tests
 		WSEnabled:  true,
 		WSPort:     TestNodeWSPort, // ditto

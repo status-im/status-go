@@ -33,13 +33,13 @@ const (
 	VersionMinor     = 2          // Minor version component of the current release
 	VersionPatch     = 0          // Patch version component of the current release
 	VersionMeta      = "unstable" // Version metadata to append to the version string
-
-	HTTPPort        = 8545 // HTTP-RPC port (replaced in unit tests)
-	WSPort          = 8546 // WS-RPC port (replaced in unit tests)
-	NetworkPort     = 30303
-	MaxPeers        = 25
-	MaxLightPeers   = 20
-	MaxPendingPeers = 0
+	IPCFile          = "geth.ipc" // Filename of exposed IPC-RPC Server
+	HTTPPort         = 8545       // HTTP-RPC port (replaced in unit tests)
+	WSPort           = 8546       // WS-RPC port (replaced in unit tests)
+	NetworkPort      = 30303
+	MaxPeers         = 25
+	MaxLightPeers    = 20
+	MaxPendingPeers  = 0
 
 	ProcessFileDescriptorLimit = uint64(2048)
 	DatabaseCacheSize          = 128 // Megabytes of memory allocated to internal caching (min 16MB / database forced)
@@ -81,6 +81,7 @@ var (
 // NodeConfig stores configuration options for a node
 type NodeConfig struct {
 	DataDir    string // base data directory
+	IPCEnabled bool   // whether IPC-RPC Server is enabled or not
 	HTTPPort   int    // HTTP-RPC Server port
 	WSPort     int    // WS-RPC Server port
 	WSEnabled  bool   // whether WS-RPC Server is enabled or not
@@ -127,6 +128,7 @@ func MakeNode(config *NodeConfig) *Node {
 		ListenAddr:        fmt.Sprintf(":%d", NetworkPort),
 		MaxPeers:          MaxPeers,
 		MaxPendingPeers:   MaxPendingPeers,
+		IPCPath:           makeIPCPath(dataDir, config.IPCEnabled),
 		HTTPHost:          node.DefaultHTTPHost,
 		HTTPPort:          config.HTTPPort,
 		HTTPCors:          "*",
@@ -209,6 +211,15 @@ func activateShhService(stack *node.Node) error {
 	}
 
 	return nil
+}
+
+// makeIPCPath returns IPC-RPC filename
+func makeIPCPath(dataDir string, ipcEnabled bool) string {
+	if !ipcEnabled {
+		return ""
+	}
+
+	return path.Join(dataDir, IPCFile)
 }
 
 // makeWSHost returns WS-RPC Server host, given enabled/disabled flag
