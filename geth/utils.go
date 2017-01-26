@@ -27,6 +27,8 @@ var muPrepareTestNode sync.Mutex
 const (
 	TestDataDir         = "../.ethereumtest"
 	TestNodeSyncSeconds = 30
+	TestNodeHTTPPort    = 8645
+	TestNodeWSPort      = 8646
 )
 
 type NodeNotificationHandler func(jsonEvent string)
@@ -127,8 +129,13 @@ func PrepareTestNode() (err error) {
 	}
 
 	// start geth node and wait for it to initialize
-	// internally once.Do() is used, so call below is thread-safe
-	err = CreateAndRunNode(dataDir, 8546) // to avoid conflicts with running react-native app, run on different port
+	err = CreateAndRunNode(&NodeConfig{
+		DataDir:    dataDir,
+		HTTPPort:   TestNodeHTTPPort, // to avoid conflicts with running app, using different port in tests
+		WSEnabled:  true,
+		WSPort:     TestNodeWSPort, // ditto
+		TLSEnabled: false,
+	})
 	if err != nil {
 		panic(err)
 	}
