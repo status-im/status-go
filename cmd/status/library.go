@@ -202,9 +202,9 @@ func StartNode(datadir *C.char) *C.char {
 	// This starts a geth node with the given datadir
 	err := geth.CreateAndRunNode(&geth.NodeConfig{
 		DataDir:    C.GoString(datadir),
-		IPCEnabled: true,
+		IPCEnabled: false,
 		HTTPPort:   geth.HTTPPort,
-		WSEnabled:  true,
+		WSEnabled:  false,
 		WSPort:     geth.WSPort,
 		TLSEnabled: false,
 	})

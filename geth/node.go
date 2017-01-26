@@ -6,6 +6,7 @@ import (
 	"io"
 	"math/big"
 	"os"
+	"path"
 	"path/filepath"
 	"reflect"
 	"runtime"
