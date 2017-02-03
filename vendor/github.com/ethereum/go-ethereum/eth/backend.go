@@ -33,6 +33,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/eth/filters"
 	"github.com/ethereum/go-ethereum/eth/gasprice"
@@ -45,6 +46,7 @@ import (
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/pow"
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
@@ -76,9 +78,9 @@ type Config struct {
 	DatabaseCache      int
 	DatabaseHandles    int
 
-	NatSpec   bool
 	DocRoot   string
 	AutoDAG   bool
+	PowFake   bool
 	PowTest   bool
 	PowShared bool
 	ExtraData []byte
@@ -95,8 +97,7 @@ type Config struct {
 	GpobaseStepUp           int
 	GpobaseCorrectionFactor int
 
-	EnableJit bool
-	ForceJit  bool
+	EnablePreimageRecording bool
 
 	TestGenesisBlock *types.Block   // Genesis block to seed the chain database with (testing only!)
 	TestGenesisState ethdb.Database // Genesis state to seed the database with (testing only!)
@@ -124,7 +125,7 @@ type Ethereum struct {
 	chainDb ethdb.Database // Block chain database
 
 	eventMux       *event.TypeMux
-	pow            *ethash.Ethash
+	pow            pow.PoW
 	accountManager *accounts.Manager
 
 	ApiBackend *EthApiBackend
@@ -137,14 +138,13 @@ type Ethereum struct {
 	etherbase    common.Address
 	solcPath     string
 
-	NatSpec       bool
-	PowTest       bool
 	netVersionId  int
 	netRPCService *ethapi.PublicNetAPI
 }
 
 func (s *Ethereum) AddLesServer(ls LesServer) {
 	s.lesServer = ls
+	s.protocolManager.lesServer = ls
 }
 
 // New creates a new Ethereum object (including the
@@ -171,8 +171,6 @@ func New(ctx *node.ServiceContext, config *Config) (*Ethereum, error) {
 		shutdownChan:   make(chan bool),
 		stopDbUpgrade:  stopDbUpgrade,
 		netVersionId:   config.NetworkId,
-		NatSpec:        config.NatSpec,
-		PowTest:        config.PowTest,
 		etherbase:      config.Etherbase,
 		MinerThreads:   config.MinerThreads,
 		AutoDAG:        config.AutoDAG,
@@ -216,7 +214,7 @@ func New(ctx *node.ServiceContext, config *Config) (*Ethereum, error) {
 
 	glog.V(logger.Info).Infoln("Chain config:", eth.chainConfig)
 
-	eth.blockchain, err = core.NewBlockChain(chainDb, eth.chainConfig, eth.pow, eth.EventMux())
+	eth.blockchain, err = core.NewBlockChain(chainDb, eth.chainConfig, eth.pow, eth.EventMux(), vm.Config{EnablePreimageRecording: config.EnablePreimageRecording})
 	if err != nil {
 		if err == core.ErrNoGenesis {
 			return nil, fmt.Errorf(`No chain found. Please initialise a new chain using the "init" subcommand.`)
@@ -253,7 +251,7 @@ func New(ctx *node.ServiceContext, config *Config) (*Ethereum, error) {
 		GpobaseCorrectionFactor: config.GpobaseCorrectionFactor,
 	}
 	gpo := gasprice.NewGasPriceOracle(eth.blockchain, chainDb, eth.eventMux, gpoParams)
-	eth.ApiBackend = &EthApiBackend{eth, gpo}
+	eth.ApiBackend = &EthApiBackend{eth, gpo, nil}
 
 	return eth, nil
 }
@@ -291,15 +289,17 @@ func SetupGenesisBlock(chainDb *ethdb.Database, config *Config) error {
 }
 
 // CreatePoW creates the required type of PoW instance for an Ethereum service
-func CreatePoW(config *Config) (*ethash.Ethash, error) {
+func CreatePoW(config *Config) (pow.PoW, error) {
 	switch {
+	case config.PowFake:
+		glog.V(logger.Info).Infof("ethash used in fake mode")
+		return pow.PoW(core.FakePow{}), nil
 	case config.PowTest:
 		glog.V(logger.Info).Infof("ethash used in test mode")
 		return ethash.NewForTesting()
 	case config.PowShared:
 		glog.V(logger.Info).Infof("ethash used in shared mode")
 		return ethash.NewShared(), nil
-
 	default:
 		return ethash.New(), nil
 	}
@@ -397,7 +397,7 @@ func (s *Ethereum) AccountManager() *accounts.Manager  { return s.accountManager
 func (s *Ethereum) BlockChain() *core.BlockChain       { return s.blockchain }
 func (s *Ethereum) TxPool() *core.TxPool               { return s.txPool }
 func (s *Ethereum) EventMux() *event.TypeMux           { return s.eventMux }
-func (s *Ethereum) Pow() *ethash.Ethash                { return s.pow }
+func (s *Ethereum) Pow() pow.PoW                       { return s.pow }
 func (s *Ethereum) ChainDb() ethdb.Database            { return s.chainDb }
 func (s *Ethereum) IsListening() bool                  { return true } // Always listening
 func (s *Ethereum) EthVersion() int                    { return int(s.protocolManager.SubProtocols[0].Version) }

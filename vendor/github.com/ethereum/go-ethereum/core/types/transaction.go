@@ -18,7 +18,6 @@ package types
 
 import (
 	"container/heap"
-	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -135,7 +134,7 @@ func (tx *Transaction) ChainId() *big.Int {
 	return deriveChainId(tx.data.V)
 }
 
-// Protected returns whether the transaction is pretected from replay protection
+// Protected returns whether the transaction is protected from replay protection.
 func (tx *Transaction) Protected() bool {
 	return isProtectedV(tx.data.V)
 }
@@ -199,9 +198,10 @@ func (tx *Transaction) UnmarshalJSON(input []byte) error {
 
 	var V byte
 	if isProtectedV((*big.Int)(dec.V)) {
-		V = normaliseV(NewEIP155Signer(deriveChainId((*big.Int)(dec.V))), (*big.Int)(dec.V))
+		chainId := deriveChainId((*big.Int)(dec.V)).Uint64()
+		V = byte(dec.V.ToInt().Uint64() - 35 - 2*chainId)
 	} else {
-		V = byte(((*big.Int)(dec.V)).Uint64())
+		V = byte(((*big.Int)(dec.V)).Uint64() - 27)
 	}
 	if !crypto.ValidateSignatureValues(V, (*big.Int)(dec.R), (*big.Int)(dec.S), false) {
 		return ErrInvalidSig
@@ -272,51 +272,6 @@ func (tx *Transaction) Size() common.StorageSize {
 	return common.StorageSize(c)
 }
 
-/*
-// From returns the address derived from the signature (V, R, S) using secp256k1
-// elliptic curve and an error if it failed deriving or upon an incorrect
-// signature.
-//
-// From Uses the homestead consensus rules to determine whether the signature is
-// valid.
-//
-// From caches the address, allowing it to be used regardless of
-// Frontier / Homestead. however, the first time called it runs
-// signature validations, so we need two versions. This makes it
-// easier to ensure backwards compatibility of things like package rpc
-// where eth_getblockbynumber uses tx.From() and needs to work for
-// both txs before and after the first homestead block. Signatures
-// valid in homestead are a subset of valid ones in Frontier)
-func (tx *Transaction) From() (common.Address, error) {
-	if tx.signer == nil {
-		return common.Address{}, errNoSigner
-	}
-
-	if from := tx.from.Load(); from != nil {
-		return from.(common.Address), nil
-	}
-
-	pubkey, err := tx.signer.PublicKey(tx)
-	if err != nil {
-		return common.Address{}, err
-	}
-	var addr common.Address
-	copy(addr[:], crypto.Keccak256(pubkey[1:])[12:])
-	tx.from.Store(addr)
-	return addr, nil
-}
-
-// SignatureValues returns the ECDSA signature values contained in the transaction.
-func (tx *Transaction) SignatureValues() (v byte, r *big.Int, s *big.Int, err error) {
-	if tx.signer == nil {
-		return 0, nil, nil,errNoSigner
-	}
-
-	return normaliseV(tx.signer, tx.data.V), new(big.Int).Set(tx.data.R),new(big.Int).Set(tx.data.S), nil
-}
-
-*/
-
 // AsMessage returns the transaction as a core.Message.
 //
 // AsMessage requires a signer to derive the sender.
@@ -338,14 +293,6 @@ func (tx *Transaction) AsMessage(s Signer) (Message, error) {
 	return msg, err
 }
 
-// SignECDSA signs the transaction using the given signer and private key
-//
-// XXX This only makes for a nice API: NewTx(...).SignECDSA(signer, prv). Should
-// we keep this?
-func (tx *Transaction) SignECDSA(signer Signer, prv *ecdsa.PrivateKey) (*Transaction, error) {
-	return signer.SignECDSA(tx, prv)
-}
-
 // WithSignature returns a new transaction with the given signature.
 // This signature needs to be formatted as described in the yellow paper (v+27).
 func (tx *Transaction) WithSignature(signer Signer, sig []byte) (*Transaction, error) {
@@ -364,16 +311,20 @@ func (tx *Transaction) RawSignatureValues() (*big.Int, *big.Int, *big.Int) {
 }
 
 func (tx *Transaction) String() string {
-	// make a best guess about the signer and use that to derive
-	// the sender.
-	signer := deriveSigner(tx.data.V)
-
 	var from, to string
-	if f, err := Sender(signer, tx); err != nil { // derive but don't cache
-		from = "[invalid sender: invalid sig]"
+	if tx.data.V != nil {
+		// make a best guess about the signer and use that to derive
+		// the sender.
+		signer := deriveSigner(tx.data.V)
+		if f, err := Sender(signer, tx); err != nil { // derive but don't cache
+			from = "[invalid sender: invalid sig]"
+		} else {
+			from = fmt.Sprintf("%x", f[:])
+		}
 	} else {
-		from = fmt.Sprintf("%x", f[:])
+		from = "[invalid sender: nil V field]"
 	}
+
 	if tx.data.Recipient == nil {
 		to = "[contract creation]"
 	} else {
@@ -386,13 +337,13 @@ func (tx *Transaction) String() string {
 	From:     %s
 	To:       %s
 	Nonce:    %v
-	GasPrice: %v
-	GasLimit  %v
-	Value:    %v
+	GasPrice: %#x
+	GasLimit  %#x
+	Value:    %#x
 	Data:     0x%x
-	V:        0x%x
-	R:        0x%x
-	S:        0x%x
+	V:        %#x
+	R:        %#x
+	S:        %#x
 	Hex:      %x
 `,
 		tx.Hash(),

@@ -119,11 +119,11 @@ func NewLightChain(odr OdrBackend, config *params.ChainConfig, pow pow.PoW, mux 
 		}
 		glog.V(logger.Info).Infoln("Added trusted CHT for mainnet")
 	} else {
-		if bc.genesisBlock.Hash() == (common.Hash{12, 215, 134, 162, 66, 93, 22, 241, 82, 198, 88, 49, 108, 66, 62, 108, 225, 24, 30, 21, 195, 41, 88, 38, 215, 201, 144, 76, 186, 156, 227, 3}) {
+		if bc.genesisBlock.Hash() == (common.Hash{65, 148, 16, 35, 104, 9, 35, 224, 254, 77, 116, 163, 75, 218, 200, 20, 31, 37, 64, 227, 174, 144, 98, 55, 24, 228, 125, 102, 209, 202, 74, 45}) {
 			// add trusted CHT for testnet
 			WriteTrustedCht(bc.chainDb, TrustedCht{
-				Number: 452,
-				Root:   common.HexToHash("511da2c88e32b14cf4a4e62f7fcbb297139faebc260a4ab5eb43cce6edcba324"),
+				Number: 110,
+				Root:   common.HexToHash("b987c60c4ae1bad5c97521b7e32f91a039098be54e31cbf22b012373d983db16"),
 			})
 			glog.V(logger.Info).Infoln("Added trusted CHT for testnet")
 		} else {
@@ -135,7 +135,7 @@ func NewLightChain(odr OdrBackend, config *params.ChainConfig, pow pow.PoW, mux 
 		return nil, err
 	}
 	// Check the current state of the block hashes and make sure that we do not have any of the bad blocks in our chain
-	for hash, _ := range core.BadHashes {
+	for hash := range core.BadHashes {
 		if header := bc.GetHeaderByHash(hash); header != nil {
 			glog.V(logger.Error).Infof("Found bad hash, rewinding chain to block #%d [%x…]", header.Number, header.ParentHash[:4])
 			bc.SetHead(header.Number.Uint64() - 1)
@@ -504,4 +504,15 @@ func (self *LightChain) SyncCht(ctx context.Context) bool {
 		}
 	}
 	return false
+}
+
+// LockChain locks the chain mutex for reading so that multiple canonical hashes can be
+// retrieved while it is guaranteed that they belong to the same version of the chain
+func (self *LightChain) LockChain() {
+	self.chainmu.RLock()
+}
+
+// UnlockChain unlocks the chain mutex
+func (self *LightChain) UnlockChain() {
+	self.chainmu.RUnlock()
 }

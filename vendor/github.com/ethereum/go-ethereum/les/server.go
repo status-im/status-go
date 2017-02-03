@@ -42,6 +42,7 @@ type LesServer struct {
 	fcManager       *flowcontrol.ClientManager // nil if our node is client only
 	fcCostStats     *requestCostStats
 	defParams       *flowcontrol.ServerParams
+	stopped         bool
 }
 
 func NewLesServer(eth *eth.Ethereum, config *eth.Config) (*LesServer, error) {
@@ -67,11 +68,12 @@ func (s *LesServer) Protocols() []p2p.Protocol {
 	return s.protocolManager.SubProtocols
 }
 
+// Start starts the LES server
 func (s *LesServer) Start(srvr *p2p.Server) {
 	s.protocolManager.Start(srvr)
-
 }
 
+// Stop stops the LES service
 func (s *LesServer) Stop() {
 	s.fcCostStats.store()
 	s.fcManager.Stop()
@@ -323,9 +325,8 @@ func (pm *ProtocolManager) blockLoop() {
 }
 
 var (
-	lastChtKey       = []byte("LastChtNumber") // chtNum (uint64 big endian)
-	chtPrefix        = []byte("cht")           // chtPrefix + chtNum (uint64 big endian) -> trie root hash
-	chtConfirmations = light.ChtFrequency / 2
+	lastChtKey = []byte("LastChtNumber") // chtNum (uint64 big endian)
+	chtPrefix  = []byte("cht")           // chtPrefix + chtNum (uint64 big endian) -> trie root hash
 )
 
 func getChtRoot(db ethdb.Database, num uint64) common.Hash {
@@ -346,8 +347,8 @@ func makeCht(db ethdb.Database) bool {
 	headNum := core.GetBlockNumber(db, headHash)
 
 	var newChtNum uint64
-	if headNum > chtConfirmations {
-		newChtNum = (headNum - chtConfirmations) / light.ChtFrequency
+	if headNum > light.ChtConfirmations {
+		newChtNum = (headNum - light.ChtConfirmations) / light.ChtFrequency
 	}
 
 	var lastChtNum uint64

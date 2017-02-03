@@ -62,6 +62,11 @@ func readManifest(manifestReader storage.LazySectionReader, hash storage.Key, dp
 
 	// TODO check size for oversized manifests
 	size, err := manifestReader.Size(quitC)
+	if err != nil { // size == 0
+		// can't determine size means we don't have the root chunk
+		err = fmt.Errorf("Manifest not Found")
+		return
+	}
 	manifestData := make([]byte, size)
 	read, err := manifestReader.Read(manifestData)
 	if int64(read) < size {
@@ -297,7 +302,8 @@ func (self *manifestTrie) findPrefixOf(path string, quitC chan bool) (entry *man
 	if (len(path) >= epl) && (path[:epl] == entry.Path) {
 		glog.V(logger.Detail).Infof("entry.ContentType = %v", entry.ContentType)
 		if entry.ContentType == manifestType {
-			if self.loadSubTrie(entry, quitC) != nil {
+			err := self.loadSubTrie(entry, quitC)
+			if err != nil {
 				return nil, 0
 			}
 			entry, pos = entry.subtrie.findPrefixOf(path[epl:], quitC)
@@ -307,8 +313,6 @@ func (self *manifestTrie) findPrefixOf(path string, quitC chan bool) (entry *man
 		} else {
 			pos = epl
 		}
-	} else {
-		entry = nil
 	}
 	return
 }
