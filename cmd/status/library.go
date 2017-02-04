@@ -202,18 +202,13 @@ func StartNode(datadir *C.char) *C.char {
 	// This starts a geth node with the given datadir
 	err := geth.CreateAndRunNode(C.GoString(datadir), geth.RPCPort)
 
-	errString := ""
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		errString = err.Error()
-	}
+	return makeJSONErrorResponse(err)
+}
 
-	out := geth.JSONError{
-		Error: errString,
-	}
-	outBytes, _ := json.Marshal(&out)
-
-	return C.CString(string(outBytes))
+//export ResetChainData
+func ResetChainData() *C.char {
+	err := geth.NodeManagerInstance().ResetChainData()
+	return makeJSONErrorResponse(err)
 }
 
 //export StopNodeRPCServer
