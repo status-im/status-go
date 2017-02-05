@@ -3,6 +3,7 @@ package jail_test
 import (
 	"encoding/json"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -557,6 +558,97 @@ func TestLocalStorageSet(t *testing.T) {
 	}
 
 	expectedResponse := `{"jsonrpc":"2.0","result":true}`
+	if !reflect.DeepEqual(response, expectedResponse) {
+		t.Errorf("expected response is not returned: expected %s, got %s", expectedResponse, response)
+		return
+	}
+}
+
+func TestContractDeployment(t *testing.T) {
+	err := geth.PrepareTestNode()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	jailInstance := jail.Init("")
+	jailInstance.Parse(CHAT_ID_CALL, "")
+
+	// obtain VM for a given chat (to send custom JS to jailed version of Send())
+	vm, err := jailInstance.GetVM(CHAT_ID_CALL)
+	if err != nil {
+		t.Errorf("cannot get VM: %v", err)
+		return
+	}
+
+	// make sure you panic if transaction complete doesn't return
+	completeQueuedTransaction := make(chan struct{}, 1)
+	geth.PanicAfter(30*time.Second, completeQueuedTransaction, "TestContractDeployment")
+
+	// replace transaction notification handler
+	var txHash common.Hash
+	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+		var envelope geth.SignalEnvelope
+		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
+			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
+			return
+		}
+		if envelope.Type == geth.EventTransactionQueued {
+			event := envelope.Event.(map[string]interface{})
+
+			t.Logf("Transaction queued (will be completed in 5 secs): {id: %s}\n", event["id"].(string))
+			time.Sleep(5 * time.Second)
+
+			if err := geth.SelectAccount(TEST_ADDRESS, TEST_ADDRESS_PASSWORD); err != nil {
+				t.Errorf("cannot select account: %v", TEST_ADDRESS)
+				return
+			}
+
+			if txHash, err = geth.CompleteTransaction(event["id"].(string), TEST_ADDRESS_PASSWORD); err != nil {
+				t.Errorf("cannot complete queued transation[%v]: %v", event["id"], err)
+				return
+			} else {
+				t.Logf("Contract created: https://testnet.etherscan.io/tx/%s", txHash.Hex())
+			}
+
+			close(completeQueuedTransaction) // so that timeout is aborted
+		}
+	})
+
+	_, err = vm.Run(`
+		var responseValue = null;
+		var testContract = web3.eth.contract([{"constant":true,"inputs":[{"name":"a","type":"int256"}],"name":"double","outputs":[{"name":"","type":"int256"}],"payable":false,"type":"function"}]);
+		var test = testContract.new(
+		{
+			from: '` + TEST_ADDRESS + `',
+			data: '0x6060604052341561000c57fe5b5b60a58061001b6000396000f30060606040526000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff1680636ffa1caa14603a575bfe5b3415604157fe5b60556004808035906020019091905050606b565b6040518082815260200191505060405180910390f35b60008160020290505b9190505600a165627a7a72305820ccdadd737e4ac7039963b54cee5e5afb25fa859a275252bdcf06f653155228210029',
+			gas: '` + strconv.Itoa(geth.DefaultGas) + `'
+		}, function (e, contract){
+			if (!e) {
+				responseValue = contract.transactionHash
+			}
+		})
+	`)
+	if err != nil {
+		t.Errorf("cannot run custom code on VM: %v", err)
+		return
+	}
+
+	<-completeQueuedTransaction
+
+	responseValue, err := vm.Get("responseValue")
+	if err != nil {
+		t.Errorf("cannot obtain result of isConnected(): %v", err)
+		return
+	}
+
+	response, err := responseValue.ToString()
+	if err != nil {
+		t.Errorf("cannot parse result: %v", err)
+		return
+	}
+
+	expectedResponse := txHash.Hex()
 	if !reflect.DeepEqual(response, expectedResponse) {
 		t.Errorf("expected response is not returned: expected %s, got %s", expectedResponse, response)
 		return
