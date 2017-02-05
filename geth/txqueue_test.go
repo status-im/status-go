@@ -14,6 +14,113 @@ import (
 	"github.com/status-im/status-go/geth"
 )
 
+func TestQueuedContracts(t *testing.T) {
+	err := geth.PrepareTestNode()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	// obtain reference to status backend
+	lightEthereum, err := geth.NodeManagerInstance().LightEthereumService()
+	if err != nil {
+		t.Errorf("Test failed: LES service is not running: %v", err)
+		return
+	}
+	backend := lightEthereum.StatusBackend
+
+	// create an account
+	sampleAddress, _, _, err := geth.CreateAccount(newAccountPassword)
+	if err != nil {
+		t.Errorf("could not create account: %v", err)
+		return
+	}
+
+	geth.Logout()
+
+	// make sure you panic if transaction complete doesn't return
+	completeQueuedTransaction := make(chan struct{}, 1)
+	geth.PanicAfter(60*time.Second, completeQueuedTransaction, "TestQueuedContracts")
+
+	// replace transaction notification handler
+	var txHash = common.Hash{}
+	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+		var envelope geth.SignalEnvelope
+		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
+			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
+			return
+		}
+		if envelope.Type == geth.EventTransactionQueued {
+			event := envelope.Event.(map[string]interface{})
+			t.Logf("transaction queued (will be completed in 5 secs): {id: %s}\n", event["id"].(string))
+			time.Sleep(5 * time.Second)
+
+			// the first call will fail (we are not logged in, but trying to complete tx)
+			if txHash, err = geth.CompleteTransaction(event["id"].(string), testAddressPassword); err != status.ErrInvalidCompleteTxSender {
+				t.Errorf("expected error on queued transation[%v] not thrown: expected %v, got %v", event["id"], status.ErrInvalidCompleteTxSender, err)
+				return
+			}
+
+			// the second call will also fail (we are logged in as different user)
+			if err := geth.SelectAccount(sampleAddress, newAccountPassword); err != nil {
+				t.Errorf("cannot select account: %v", sampleAddress)
+				return
+			}
+			if txHash, err = geth.CompleteTransaction(event["id"].(string), testAddressPassword); err != status.ErrInvalidCompleteTxSender {
+				t.Errorf("expected error on queued transation[%v] not thrown: expected %v, got %v", event["id"], status.ErrInvalidCompleteTxSender, err)
+				return
+			}
+
+			// the third call will work as expected (as we are logged in with correct credentials)
+			if err := geth.SelectAccount(testAddress, testAddressPassword); err != nil {
+				t.Errorf("cannot select account: %v", testAddress)
+				return
+			}
+			if txHash, err = geth.CompleteTransaction(event["id"].(string), testAddressPassword); err != nil {
+				t.Errorf("cannot complete queued transation[%v]: %v", event["id"], err)
+				return
+			}
+
+			t.Logf("contract transaction complete: https://testnet.etherscan.io/tx/%s", txHash.Hex())
+			completeQueuedTransaction <- struct{}{} // so that timeout is aborted
+		}
+	})
+
+	//  this call blocks, up until Complete Transaction is called
+	byteCode, err := hexutil.Decode(`0x6060604052341561000c57fe5b5b60a58061001b6000396000f30060606040526000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff1680636ffa1caa14603a575bfe5b3415604157fe5b60556004808035906020019091905050606b565b6040518082815260200191505060405180910390f35b60008160020290505b9190505600a165627a7a72305820ccdadd737e4ac7039963b54cee5e5afb25fa859a275252bdcf06f653155228210029`)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	txHashCheck, err := backend.SendTransaction(nil, status.SendTxArgs{
+		From: geth.FromAddress(testAddress),
+		To:   nil, // marker, contract creation is expected
+		//Value: (*hexutil.Big)(new(big.Int).Mul(big.NewInt(1), common.Ether)),
+		Gas:  (*hexutil.Big)(big.NewInt(geth.DefaultGas)),
+		Data: byteCode,
+	})
+	if err != nil {
+		t.Errorf("Test failed: cannot send transaction: %v", err)
+	}
+
+	if !reflect.DeepEqual(txHash, txHashCheck) {
+		t.Errorf("Transaction hash returned from SendTransaction is invalid: expected %s, got %s", txHashCheck, txHash)
+		return
+	}
+
+	time.Sleep(10 * time.Second)
+
+	if reflect.DeepEqual(txHashCheck, common.Hash{}) {
+		t.Error("Test failed: transaction was never queued or completed")
+		return
+	}
+
+	if backend.TransactionQueue().Count() != 0 {
+		t.Error("tx queue must be empty at this point")
+		return
+	}
+}
+
 func TestQueuedTransactions(t *testing.T) {
 	err := geth.PrepareTestNode()
 	if err != nil {

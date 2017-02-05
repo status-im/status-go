@@ -3,8 +3,6 @@ package geth
 import (
 	"context"
 	"encoding/json"
-	"math/big"
-	"strconv"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
@@ -231,42 +229,120 @@ func sendTxArgsFromRPCCall(req RPCCall) status.SendTxArgs {
 		return status.SendTxArgs{}
 	}
 
-	params, ok := req.Params[0].(map[string]interface{})
+	return status.SendTxArgs{
+		From:     req.parseFromAddress(),
+		To:       req.parseToAddress(),
+		Value:    req.parseValue(),
+		Data:     req.parseData(),
+		Gas:      req.parseGas(),
+		GasPrice: req.parseGasPrice(),
+	}
+}
+
+func (r RPCCall) parseFromAddress() common.Address {
+	params, ok := r.Params[0].(map[string]interface{})
 	if !ok {
-		return status.SendTxArgs{}
+		return common.HexToAddress("0x")
 	}
 
 	from, ok := params["from"].(string)
 	if !ok {
-		from = ""
+		from = "0x"
+	}
+
+	return common.HexToAddress(from)
+}
+
+func (r RPCCall) parseToAddress() *common.Address {
+	params, ok := r.Params[0].(map[string]interface{})
+	if !ok {
+		return nil
 	}
 
 	to, ok := params["to"].(string)
 	if !ok {
-		to = ""
+		return nil
 	}
 
-	param, ok := params["value"].(string)
+	address := common.HexToAddress(to)
+	return &address
+}
+
+func (r RPCCall) parseData() hexutil.Bytes {
+	params, ok := r.Params[0].(map[string]interface{})
 	if !ok {
-		param = "0x0"
-	}
-	value, err := strconv.ParseInt(param, 0, 64)
-	if err != nil {
-		return status.SendTxArgs{}
+		return hexutil.Bytes("0x")
 	}
 
 	data, ok := params["data"].(string)
 	if !ok {
-		data = ""
+		data = "0x"
 	}
 
-	toAddress := common.HexToAddress(to)
-	return status.SendTxArgs{
-		From:  common.HexToAddress(from),
-		To:    &toAddress,
-		Value: (*hexutil.Big)(big.NewInt(value)),
-		Data:  hexutil.Bytes(data),
+	byteCode, err := hexutil.Decode(data)
+	if err != nil {
+		byteCode = hexutil.Bytes(data)
 	}
+
+	return byteCode
+}
+
+func (r RPCCall) parseValue() *hexutil.Big {
+	params, ok := r.Params[0].(map[string]interface{})
+	if !ok {
+		return nil
+		//return (*hexutil.Big)(big.NewInt("0x0"))
+	}
+
+	inputValue, ok := params["value"].(string)
+	if !ok {
+		return nil
+	}
+
+	parsedValue, err := hexutil.DecodeBig(inputValue)
+	if err != nil {
+		return nil
+	}
+
+	return (*hexutil.Big)(parsedValue)
+}
+
+func (r RPCCall) parseGas() *hexutil.Big {
+	params, ok := r.Params[0].(map[string]interface{})
+	if !ok {
+		return nil
+	}
+
+	inputValue, ok := params["gas"].(string)
+	if !ok {
+		return nil
+	}
+
+	parsedValue, err := hexutil.DecodeBig(inputValue)
+	if err != nil {
+		return nil
+	}
+
+	return (*hexutil.Big)(parsedValue)
+}
+
+func (r RPCCall) parseGasPrice() *hexutil.Big {
+	params, ok := r.Params[0].(map[string]interface{})
+	if !ok {
+		return nil
+	}
+
+	inputValue, ok := params["gasPrice"].(string)
+	if !ok {
+		return nil
+	}
+
+	parsedValue, err := hexutil.DecodeBig(inputValue)
+	if err != nil {
+		return nil
+	}
+
+	return (*hexutil.Big)(parsedValue)
 }
 
 func parseJSONArray(items string) ([]string, error) {
