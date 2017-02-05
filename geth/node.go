@@ -41,6 +41,7 @@ const (
 	MaxPeers         = 25
 	MaxLightPeers    = 20
 	MaxPendingPeers  = 0
+	DefaultGas       = 180000
 
 	ProcessFileDescriptorLimit = uint64(2048)
 	DatabaseCacheSize          = 128 // Megabytes of memory allocated to internal caching (min 16MB / database forced)
