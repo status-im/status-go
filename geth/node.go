@@ -6,6 +6,7 @@ import (
 	"io"
 	"math/big"
 	"os"
+	"path"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -33,12 +34,13 @@ const (
 	VersionMinor     = 2          // Minor version component of the current release
 	VersionPatch     = 0          // Patch version component of the current release
 	VersionMeta      = "unstable" // Version metadata to append to the version string
-
-	RPCPort         = 8545 // RPC port (replaced in unit tests)
-	NetworkPort     = 30303
-	MaxPeers        = 25
-	MaxLightPeers   = 20
-	MaxPendingPeers = 0
+	IPCFile          = "geth.ipc" // Filename of exposed IPC-RPC Server
+	HTTPPort         = 8545       // HTTP-RPC port (replaced in unit tests)
+	WSPort           = 8546       // WS-RPC port (replaced in unit tests)
+	NetworkPort      = 30303
+	MaxPeers         = 25
+	MaxLightPeers    = 20
+	MaxPendingPeers  = 0
 
 	ProcessFileDescriptorLimit = uint64(2048)
 	DatabaseCacheSize          = 128 // Megabytes of memory allocated to internal caching (min 16MB / database forced)
@@ -72,18 +74,27 @@ func init() {
 
 // node-related errors
 var (
-	ErrRLimitRaiseFailure            = errors.New("failed to register the whisper service")
-	ErrDatabaseAccessFailure         = errors.New("could not open database")
-	ErrChainConfigurationFailure     = errors.New("could not make chain configuration")
 	ErrEthServiceRegistrationFailure = errors.New("failed to register the Ethereum service")
 	ErrSshServiceRegistrationFailure = errors.New("failed to register the Whisper service")
 	ErrLightEthRegistrationFailure   = errors.New("failed to register the LES service")
 )
 
+// NodeConfig stores configuration options for a node
+type NodeConfig struct {
+	DataDir    string // base data directory
+	IPCEnabled bool   // whether IPC-RPC Server is enabled or not
+	HTTPPort   int    // HTTP-RPC Server port
+	WSPort     int    // WS-RPC Server port
+	WSEnabled  bool   // whether WS-RPC Server is enabled or not
+	TLSEnabled bool   // whether TLS support should be enabled on node or not
+}
+
+// Node represents running node (serves as a wrapper around P2P node)
 type Node struct {
-	geth    *node.Node    // reference to the running Geth node
-	started chan struct{} // channel to wait for node to start
-	config  *node.Config
+	config     *NodeConfig   // configuration used to create Status node
+	geth       *node.Node    // reference to the running Geth node
+	gethConfig *node.Config  // configuration used to create P2P node
+	started    chan struct{} // channel to wait for node to start
 }
 
 // Inited checks whether status node has been properly initialized
@@ -92,16 +103,20 @@ func (n *Node) Inited() bool {
 }
 
 // MakeNode create a geth node entity
-func MakeNode(dataDir string, rpcPort int) *Node {
+func MakeNode(config *NodeConfig) *Node {
 	glog.CopyStandardLogTo("INFO")
 	glog.SetToStderr(true)
 
+	dataDir := config.DataDir
 	if UseTestnet {
-		dataDir = filepath.Join(dataDir, "testnet")
+		dataDir = filepath.Join(config.DataDir, "testnet")
 	}
 
+	// exposed RPC APIs
+	exposedAPIs := "db,eth,net,web3,shh,personal,admin" // TODO remove "admin" on main net
+
 	// configure required node (should you need to update node's config, e.g. add bootstrap nodes, see node.Config)
-	config := &node.Config{
+	stackConfig := &node.Config{
 		DataDir:           dataDir,
 		UseLightweightKDF: true,
 		Name:              ClientIdentifier,
@@ -114,13 +129,18 @@ func MakeNode(dataDir string, rpcPort int) *Node {
 		ListenAddr:        fmt.Sprintf(":%d", NetworkPort),
 		MaxPeers:          MaxPeers,
 		MaxPendingPeers:   MaxPendingPeers,
+		IPCPath:           makeIPCPath(dataDir, config.IPCEnabled),
 		HTTPHost:          node.DefaultHTTPHost,
-		HTTPPort:          rpcPort,
+		HTTPPort:          config.HTTPPort,
 		HTTPCors:          "*",
-		HTTPModules:       strings.Split("db,eth,net,web3,shh,personal,admin", ","), // TODO remove "admin" on main net
+		HTTPModules:       strings.Split(exposedAPIs, ","),
+		WSHost:            makeWSHost(config.WSEnabled),
+		WSPort:            config.WSPort,
+		WSOrigins:         "*",
+		WSModules:         strings.Split(exposedAPIs, ","),
 	}
 
-	stack, err := node.New(config)
+	stack, err := node.New(stackConfig)
 	if err != nil {
 		Fatalf(ErrNodeMakeFailure)
 	}
@@ -136,9 +156,10 @@ func MakeNode(dataDir string, rpcPort int) *Node {
 	}
 
 	return &Node{
-		geth:    stack,
-		started: make(chan struct{}),
-		config:  config,
+		geth:       stack,
+		gethConfig: stackConfig,
+		started:    make(chan struct{}),
+		config:     config,
 	}
 }
 
@@ -191,6 +212,24 @@ func activateShhService(stack *node.Node) error {
 	}
 
 	return nil
+}
+
+// makeIPCPath returns IPC-RPC filename
+func makeIPCPath(dataDir string, ipcEnabled bool) string {
+	if !ipcEnabled {
+		return ""
+	}
+
+	return path.Join(dataDir, IPCFile)
+}
+
+// makeWSHost returns WS-RPC Server host, given enabled/disabled flag
+func makeWSHost(wsEnabled bool) string {
+	if !wsEnabled {
+		return ""
+	}
+
+	return node.DefaultWSHost
 }
 
 // makeChainConfig reads the chain configuration from the database in the datadir.
