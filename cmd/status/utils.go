@@ -36,6 +36,10 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 		fn   func(t *testing.T) bool
 	}{
 		{
+			"restart node RPC",
+			testRestartNodeRPC,
+		},
+		{
 			"create main and child accounts",
 			testCreateChildAccount,
 		},
@@ -84,6 +88,50 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 	}
 
 	done <- struct{}{}
+}
+
+func testRestartNodeRPC(t *testing.T) bool {
+	// stop RPC
+	stopNodeRPCServerResponse := geth.JSONError{}
+	rawResponse := StopNodeRPCServer()
+
+	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &stopNodeRPCServerResponse); err != nil {
+		t.Errorf("cannot decode StopNodeRPCServer reponse (%s): %v", C.GoString(rawResponse), err)
+		return false
+	}
+	if stopNodeRPCServerResponse.Error != "" {
+		t.Errorf("unexpected error: %s", stopNodeRPCServerResponse.Error)
+		return false
+	}
+
+	// start again RPC
+	startNodeRPCServerResponse := geth.JSONError{}
+	rawResponse = StartNodeRPCServer()
+
+	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &startNodeRPCServerResponse); err != nil {
+		t.Errorf("cannot decode StartNodeRPCServer reponse (%s): %v", C.GoString(rawResponse), err)
+		return false
+	}
+	if startNodeRPCServerResponse.Error != "" {
+		t.Errorf("unexpected error: %s", startNodeRPCServerResponse.Error)
+		return false
+	}
+
+	// start when we have RPC already running
+	startNodeRPCServerResponse = geth.JSONError{}
+	rawResponse = StartNodeRPCServer()
+
+	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &startNodeRPCServerResponse); err != nil {
+		t.Errorf("cannot decode StartNodeRPCServer reponse (%s): %v", C.GoString(rawResponse), err)
+		return false
+	}
+	expectedError := "HTTP RPC already running on localhost:8545"
+	if startNodeRPCServerResponse.Error != expectedError {
+		t.Errorf("expected error not thrown: %s", expectedError)
+		return false
+	}
+
+	return true
 }
 
 func testCreateChildAccount(t *testing.T) bool {
@@ -481,6 +529,12 @@ func testCompleteTransaction(t *testing.T) bool {
 	// reset queue
 	backend.TransactionQueue().Reset()
 
+	// log into account from which transactions will be sent
+	if err := geth.SelectAccount(testAddress, testAddressPassword); err != nil {
+		t.Errorf("cannot select account: %v", testAddress)
+		return false
+	}
+
 	// make sure you panic if transaction complete doesn't return
 	queuedTxCompleted := make(chan struct{}, 1)
 	abortPanic := make(chan struct{}, 1)
@@ -489,7 +543,7 @@ func testCompleteTransaction(t *testing.T) bool {
 	// replace transaction notification handler
 	var txHash = ""
 	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var envelope geth.GethEvent
+		var envelope geth.SignalEnvelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
@@ -560,6 +614,12 @@ func testCompleteMultipleQueuedTransactions(t *testing.T) bool {
 	// reset queue
 	backend.TransactionQueue().Reset()
 
+	// log into account from which transactions will be sent
+	if err := geth.SelectAccount(testAddress, testAddressPassword); err != nil {
+		t.Errorf("cannot select account: %v", testAddress)
+		return false
+	}
+
 	// make sure you panic if transaction complete doesn't return
 	testTxCount := 3
 	txIds := make(chan string, testTxCount)
@@ -568,7 +628,7 @@ func testCompleteMultipleQueuedTransactions(t *testing.T) bool {
 	// replace transaction notification handler
 	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var txId string
-		var envelope geth.GethEvent
+		var envelope geth.SignalEnvelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
@@ -689,6 +749,12 @@ func testDiscardTransaction(t *testing.T) bool {
 	// reset queue
 	backend.TransactionQueue().Reset()
 
+	// log into account from which transactions will be sent
+	if err := geth.SelectAccount(testAddress, testAddressPassword); err != nil {
+		t.Errorf("cannot select account: %v", testAddress)
+		return false
+	}
+
 	// make sure you panic if transaction complete doesn't return
 	completeQueuedTransaction := make(chan struct{}, 1)
 	geth.PanicAfter(20*time.Second, completeQueuedTransaction, "TestDiscardQueuedTransactions")
@@ -697,7 +763,7 @@ func testDiscardTransaction(t *testing.T) bool {
 	var txId string
 	txFailedEventCalled := false
 	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var envelope geth.GethEvent
+		var envelope geth.SignalEnvelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
@@ -803,6 +869,12 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool {
 	// reset queue
 	backend.TransactionQueue().Reset()
 
+	// log into account from which transactions will be sent
+	if err := geth.SelectAccount(testAddress, testAddressPassword); err != nil {
+		t.Errorf("cannot select account: %v", testAddress)
+		return false
+	}
+
 	// make sure you panic if transaction complete doesn't return
 	testTxCount := 3
 	txIds := make(chan string, testTxCount)
@@ -812,7 +884,7 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool {
 	txFailedEventCallCount := 0
 	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var txId string
-		var envelope geth.GethEvent
+		var envelope geth.SignalEnvelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
@@ -1024,7 +1096,7 @@ func startTestNode(t *testing.T) <-chan struct{} {
 	waitForNodeStart := make(chan struct{}, 1)
 	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		t.Log(jsonEvent)
-		var envelope geth.GethEvent
+		var envelope geth.SignalEnvelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return

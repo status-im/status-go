@@ -193,7 +193,7 @@ func TestJailRPCSend(t *testing.T) {
 		return
 	}
 
-	if balance < 90 || balance > 100 {
+	if balance < 100 {
 		t.Error("wrong balance (there should be lots of test Ether on that account)")
 		return
 	}
@@ -205,6 +205,12 @@ func TestJailSendQueuedTransaction(t *testing.T) {
 	err := geth.PrepareTestNode()
 	if err != nil {
 		t.Error(err)
+		return
+	}
+
+	// log into account from which transactions will be sent
+	if err := geth.SelectAccount(TEST_ADDRESS, TEST_ADDRESS_PASSWORD); err != nil {
+		t.Errorf("cannot select account: %v", TEST_ADDRESS)
 		return
 	}
 
@@ -221,7 +227,7 @@ func TestJailSendQueuedTransaction(t *testing.T) {
 	// replace transaction notification handler
 	requireMessageId := false
 	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var envelope geth.GethEvent
+		var envelope geth.SignalEnvelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
@@ -458,7 +464,99 @@ func TestIsConnected(t *testing.T) {
 		return
 	}
 
-	expectedResponse := `{"jsonrpc":"2.0","result":"true"}`
+	expectedResponse := `{"jsonrpc":"2.0","result":true}`
+	if !reflect.DeepEqual(response, expectedResponse) {
+		t.Errorf("expected response is not returned: expected %s, got %s", expectedResponse, response)
+		return
+	}
+}
+
+func TestLocalStorageSet(t *testing.T) {
+	err := geth.PrepareTestNode()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	jailInstance := jail.Init("")
+	jailInstance.Parse(CHAT_ID_CALL, "")
+
+	// obtain VM for a given chat (to send custom JS to jailed version of Send())
+	vm, err := jailInstance.GetVM(CHAT_ID_CALL)
+	if err != nil {
+		t.Errorf("cannot get VM: %v", err)
+		return
+	}
+
+	testData := "foobar"
+
+	opCompletedSuccessfully := make(chan struct{}, 1)
+
+	// replace transaction notification handler
+	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+		var envelope geth.SignalEnvelope
+		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
+			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
+			return
+		}
+		if envelope.Type == jail.EventLocalStorageSet {
+			event := envelope.Event.(map[string]interface{})
+			chatId, ok := event["chat_id"].(string)
+			if !ok {
+				t.Error("Chat id is required, but not found")
+				return
+			}
+			if chatId != CHAT_ID_CALL {
+				t.Errorf("incorrect chat id: expected %q, got: %q", CHAT_ID_CALL, chatId)
+				return
+			}
+
+			actualData, ok := event["data"].(string)
+			if !ok {
+				t.Error("Data field is required, but not found")
+				return
+			}
+
+			if actualData != testData {
+				t.Errorf("incorrect data: expected %q, got: %q", testData, actualData)
+				return
+			}
+
+			t.Logf("event processed: %s", jsonEvent)
+			opCompletedSuccessfully <- struct{}{} // so that timeout is aborted
+		}
+	})
+
+	_, err = vm.Run(`
+	    var responseValue = localStorage.set("` + testData + `");
+	    responseValue = JSON.stringify(responseValue);
+	`)
+	if err != nil {
+		t.Errorf("cannot run custom code on VM: %v", err)
+		return
+	}
+
+	// make sure that signal is sent (and its parameters are correct)
+	select {
+	case <-opCompletedSuccessfully:
+		// pass
+	case <-time.After(3 * time.Second):
+		t.Error("operation timed out")
+	}
+
+	responseValue, err := vm.Get("responseValue")
+	if err != nil {
+		t.Errorf("cannot obtain result of localStorage.set(): %v", err)
+		return
+	}
+
+	response, err := responseValue.ToString()
+	if err != nil {
+		t.Errorf("cannot parse result: %v", err)
+		return
+	}
+
+	expectedResponse := `{"jsonrpc":"2.0","result":true}`
 	if !reflect.DeepEqual(response, expectedResponse) {
 		t.Errorf("expected response is not returned: expected %s, got %s", expectedResponse, response)
 		return

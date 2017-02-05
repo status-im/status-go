@@ -22,6 +22,7 @@ statusgo-ios: xgo
 	@echo "iOS framework cross compilation done."
 
 statusgo-ios-simulator: xgo
+	@build/env.sh docker pull farazdagi/xgo-ios-simulator
 	build/env.sh $(GOBIN)/xgo --image farazdagi/xgo-ios-simulator --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v $(shell build/testnet-flags.sh) ./cmd/status
 	@echo "iOS framework cross compilation done."
 

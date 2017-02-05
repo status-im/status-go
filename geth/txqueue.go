@@ -1,12 +1,5 @@
 package geth
 
-/*
-#include <stddef.h>
-#include <stdbool.h>
-extern bool StatusServiceSignalEvent( const char *jsonEvent );
-*/
-import "C"
-
 import (
 	"context"
 	"encoding/json"
@@ -35,17 +28,14 @@ const (
 )
 
 func onSendTransactionRequest(queuedTx status.QueuedTx) {
-	event := GethEvent{
+	SendSignal(SignalEnvelope{
 		Type: EventTransactionQueued,
 		Event: SendTransactionEvent{
 			Id:        string(queuedTx.Id),
 			Args:      queuedTx.Args,
 			MessageId: messageIdFromContext(queuedTx.Context),
 		},
-	}
-
-	body, _ := json.Marshal(&event)
-	C.StatusServiceSignalEvent(C.CString(string(body)))
+	})
 }
 
 func onSendTransactionReturn(queuedTx *status.QueuedTx, err error) {
@@ -59,7 +49,7 @@ func onSendTransactionReturn(queuedTx *status.QueuedTx, err error) {
 	}
 
 	// error occurred, signal up to application
-	event := GethEvent{
+	SendSignal(SignalEnvelope{
 		Type: EventTransactionFailed,
 		Event: ReturnSendTransactionEvent{
 			Id:           string(queuedTx.Id),
@@ -68,10 +58,7 @@ func onSendTransactionReturn(queuedTx *status.QueuedTx, err error) {
 			ErrorMessage: err.Error(),
 			ErrorCode:    sendTransactionErrorCode(err),
 		},
-	}
-
-	body, _ := json.Marshal(&event)
-	C.StatusServiceSignalEvent(C.CString(string(body)))
+	})
 }
 
 func sendTransactionErrorCode(err error) string {
@@ -99,7 +86,10 @@ func CompleteTransaction(id, password string) (common.Hash, error) {
 
 	backend := lightEthereum.StatusBackend
 
-	return backend.CompleteQueuedTransaction(status.QueuedTxId(id), password)
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, status.SelectedAccountKey, NodeManagerInstance().SelectedAccount.Hex())
+
+	return backend.CompleteQueuedTransaction(ctx, status.QueuedTxId(id), password)
 }
 
 func CompleteTransactions(ids, password string) map[string]RawCompleteTransactionResult {

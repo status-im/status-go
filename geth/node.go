@@ -26,10 +26,10 @@ import (
 
 const (
 	ClientIdentifier = "StatusIM" // Client identifier to advertise over the network
-	VersionMajor     = 1          // Major version component of the current release
-	VersionMinor     = 1          // Minor version component of the current release
-	VersionPatch     = 0          // Patch version component of the current release
-	VersionMeta      = "stable" // Version metadata to append to the version string
+	VersionMajor     = 0          // Major version component of the current release
+	VersionMinor     = 9          // Minor version component of the current release
+	VersionPatch     = 3          // Patch version component of the current release
+	VersionMeta      = "stable"   // Version metadata to append to the version string
 
 	RPCPort         = 8545 // RPC port (replaced in unit tests)
 	NetworkPort     = 30303
@@ -79,6 +79,7 @@ var (
 type Node struct {
 	geth    *node.Node    // reference to the running Geth node
 	started chan struct{} // channel to wait for node to start
+	config  *node.Config
 }
 
 // Inited checks whether status node has been properly initialized
@@ -135,6 +136,7 @@ func MakeNode(dataDir string, rpcPort int) *Node {
 	return &Node{
 		geth:    stack,
 		started: make(chan struct{}),
+		config:  config,
 	}
 }
 

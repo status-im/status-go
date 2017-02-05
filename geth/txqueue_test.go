@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/les/status"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -28,6 +29,13 @@ func TestQueuedTransactions(t *testing.T) {
 	}
 	backend := lightEthereum.StatusBackend
 
+	// create an account
+	sampleAddress, _, _, err := geth.CreateAccount(newAccountPassword)
+	if err != nil {
+		t.Errorf("could not create account: %v", err)
+		return
+	}
+
 	// make sure you panic if transaction complete doesn't return
 	completeQueuedTransaction := make(chan struct{}, 1)
 	geth.PanicAfter(20*time.Second, completeQueuedTransaction, "TestQueuedTransactions")
@@ -35,7 +43,7 @@ func TestQueuedTransactions(t *testing.T) {
 	// replace transaction notification handler
 	var txHash = common.Hash{}
 	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var envelope geth.GethEvent
+		var envelope geth.SignalEnvelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
@@ -45,6 +53,27 @@ func TestQueuedTransactions(t *testing.T) {
 			t.Logf("transaction queued (will be completed in 5 secs): {id: %s}\n", event["id"].(string))
 			time.Sleep(5 * time.Second)
 
+			// the first call will fail (we are not logged in, but trying to complete tx)
+			if txHash, err = geth.CompleteTransaction(event["id"].(string), testAddressPassword); err != status.ErrInvalidCompleteTxSender {
+				t.Errorf("expected error on queued transation[%v] not thrown: expected %v, got %v", event["id"], status.ErrInvalidCompleteTxSender, err)
+				return
+			}
+
+			// the second call will also fail (we are logged in as different user)
+			if err := geth.SelectAccount(sampleAddress, newAccountPassword); err != nil {
+				t.Errorf("cannot select account: %v", sampleAddress)
+				return
+			}
+			if txHash, err = geth.CompleteTransaction(event["id"].(string), testAddressPassword); err != status.ErrInvalidCompleteTxSender {
+				t.Errorf("expected error on queued transation[%v] not thrown: expected %v, got %v", event["id"], status.ErrInvalidCompleteTxSender, err)
+				return
+			}
+
+			// the third call will work as expected (as we are logged in with correct credentials)
+			if err := geth.SelectAccount(testAddress, testAddressPassword); err != nil {
+				t.Errorf("cannot select account: %v", testAddress)
+				return
+			}
 			if txHash, err = geth.CompleteTransaction(event["id"].(string), testAddressPassword); err != nil {
 				t.Errorf("cannot complete queued transation[%v]: %v", event["id"], err)
 				return
@@ -98,6 +127,12 @@ func TestDoubleCompleteQueuedTransactions(t *testing.T) {
 	}
 	backend := lightEthereum.StatusBackend
 
+	// log into account from which transactions will be sent
+	if err := geth.SelectAccount(testAddress, testAddressPassword); err != nil {
+		t.Errorf("cannot select account: %v", testAddress)
+		return
+	}
+
 	// make sure you panic if transaction complete doesn't return
 	completeQueuedTransaction := make(chan struct{}, 1)
 	geth.PanicAfter(20*time.Second, completeQueuedTransaction, "TestQueuedTransactions")
@@ -107,7 +142,7 @@ func TestDoubleCompleteQueuedTransactions(t *testing.T) {
 	txFailedEventCalled := false
 	txHash := common.Hash{}
 	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var envelope geth.GethEvent
+		var envelope geth.SignalEnvelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
@@ -119,8 +154,8 @@ func TestDoubleCompleteQueuedTransactions(t *testing.T) {
 
 			// try with wrong password
 			// make sure that tx is NOT removed from the queue (by re-trying with the correct password)
-			if _, err = geth.CompleteTransaction(txId, testAddressPassword+"wrong"); err == nil {
-				t.Error("expects wrong password error, but call succeeded")
+			if _, err = geth.CompleteTransaction(txId, testAddressPassword+"wrong"); err != accounts.ErrDecrypt {
+				t.Errorf("expects wrong password error, but call succeeded (or got another error: %v)", err)
 				return
 			}
 
@@ -222,6 +257,12 @@ func TestDiscardQueuedTransactions(t *testing.T) {
 	// reset queue
 	backend.TransactionQueue().Reset()
 
+	// log into account from which transactions will be sent
+	if err := geth.SelectAccount(testAddress, testAddressPassword); err != nil {
+		t.Errorf("cannot select account: %v", testAddress)
+		return
+	}
+
 	// make sure you panic if transaction complete doesn't return
 	completeQueuedTransaction := make(chan struct{}, 1)
 	geth.PanicAfter(20*time.Second, completeQueuedTransaction, "TestDiscardQueuedTransactions")
@@ -230,7 +271,7 @@ func TestDiscardQueuedTransactions(t *testing.T) {
 	var txId string
 	txFailedEventCalled := false
 	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var envelope geth.GethEvent
+		var envelope geth.SignalEnvelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
@@ -337,6 +378,12 @@ func TestCompleteMultipleQueuedTransactions(t *testing.T) {
 	// reset queue
 	backend.TransactionQueue().Reset()
 
+	// log into account from which transactions will be sent
+	if err := geth.SelectAccount(testAddress, testAddressPassword); err != nil {
+		t.Errorf("cannot select account: %v", testAddress)
+		return
+	}
+
 	// make sure you panic if transaction complete doesn't return
 	testTxCount := 3
 	txIds := make(chan string, testTxCount)
@@ -345,7 +392,7 @@ func TestCompleteMultipleQueuedTransactions(t *testing.T) {
 	// replace transaction notification handler
 	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var txId string
-		var envelope geth.GethEvent
+		var envelope geth.SignalEnvelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
@@ -462,6 +509,12 @@ func TestDiscardMultipleQueuedTransactions(t *testing.T) {
 	// reset queue
 	backend.TransactionQueue().Reset()
 
+	// log into account from which transactions will be sent
+	if err := geth.SelectAccount(testAddress, testAddressPassword); err != nil {
+		t.Errorf("cannot select account: %v", testAddress)
+		return
+	}
+
 	// make sure you panic if transaction complete doesn't return
 	testTxCount := 3
 	txIds := make(chan string, testTxCount)
@@ -471,7 +524,7 @@ func TestDiscardMultipleQueuedTransactions(t *testing.T) {
 	txFailedEventCallCount := 0
 	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var txId string
-		var envelope geth.GethEvent
+		var envelope geth.SignalEnvelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
@@ -606,6 +659,12 @@ func TestNonExistentQueuedTransactions(t *testing.T) {
 		return
 	}
 
+	// log into account from which transactions will be sent
+	if err := geth.SelectAccount(testAddress, testAddressPassword); err != nil {
+		t.Errorf("cannot select account: %v", testAddress)
+		return
+	}
+
 	// make sure you panic if transaction complete doesn't return
 	completeQueuedTransaction := make(chan struct{}, 1)
 	geth.PanicAfter(20*time.Second, completeQueuedTransaction, "TestQueuedTransactions")
@@ -613,7 +672,7 @@ func TestNonExistentQueuedTransactions(t *testing.T) {
 	// replace transaction notification handler
 	var txHash = common.Hash{}
 	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var envelope geth.GethEvent
+		var envelope geth.SignalEnvelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
@@ -660,6 +719,12 @@ func TestEvictionOfQueuedTransactions(t *testing.T) {
 	}
 	backend := lightEthereum.StatusBackend
 
+	// log into account from which transactions will be sent
+	if err := geth.SelectAccount(testAddress, testAddressPassword); err != nil {
+		t.Errorf("cannot select account: %v", testAddress)
+		return
+	}
+
 	// make sure you panic if transaction complete doesn't return
 	completeQueuedTransaction := make(chan struct{}, 1)
 	geth.PanicAfter(20*time.Second, completeQueuedTransaction, "TestQueuedTransactions")
@@ -667,7 +732,7 @@ func TestEvictionOfQueuedTransactions(t *testing.T) {
 	// replace transaction notification handler
 	var txHash = common.Hash{}
 	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var envelope geth.GethEvent
+		var envelope geth.SignalEnvelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return

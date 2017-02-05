@@ -1,11 +1,5 @@
 package geth
 
-/*
-#include <stddef.h>
-#include <stdbool.h>
-extern bool StatusServiceSignalEvent( const char *jsonEvent );
-*/
-import "C"
 import (
 	"encoding/json"
 	"errors"
@@ -14,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/accounts"
@@ -21,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/les"
 	"github.com/ethereum/go-ethereum/logger"
 	"github.com/ethereum/go-ethereum/logger/glog"
+	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/rpc"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv2"
@@ -35,9 +31,10 @@ type SelectedExtKey struct {
 
 // NodeManager manages Status node (which abstracts contained geth node)
 type NodeManager struct {
-	node            *Node             // reference to Status node
-	services        *NodeServiceStack // default stack of services running on geth node
-	SelectedAccount *SelectedExtKey   // account that was processed during the last call to SelectAccount()
+	node            *Node                 // reference to Status node
+	services        *NodeServiceStack     // default stack of services running on geth node
+	api             *node.PrivateAdminAPI // exposes collection of administrative API methods
+	SelectedAccount *SelectedExtKey       // account that was processed during the last call to SelectAccount()
 }
 
 // NodeServiceStack contains "standard" node services (which are always available)
@@ -58,6 +55,7 @@ var (
 	ErrInvalidJailedRequestQueue   = errors.New("jailed request queue is not properly initialized")
 	ErrNodeMakeFailure             = errors.New("error creating p2p node")
 	ErrNodeStartFailure            = errors.New("error starting p2p node")
+	ErrInvalidNodeAPI              = errors.New("no node API connected")
 )
 
 var (
@@ -128,7 +126,9 @@ func (m *NodeManager) RunNode() {
 			glog.V(logger.Warn).Infoln("cannot get RPC client service:", ErrInvalidClient)
 		}
 
-		// @TODO Remove after LES supports discover out of box
+		// expose API
+		m.api = node.NewPrivateAdminAPI(m.node.geth)
+
 		m.populateStaticPeers()
 
 		m.onNodeStarted() // node started, notify listeners
@@ -162,6 +162,42 @@ func (m *NodeManager) StartNode() {
 		}
 		panic("interrupted!")
 	}()
+}
+
+func (m *NodeManager) RestartNode() error {
+	if m == nil || !m.NodeInited() {
+		return ErrInvalidGethNode
+	}
+
+	return m.node.geth.Restart()
+}
+
+func (m *NodeManager) StartNodeRPCServer() (bool, error) {
+	if m == nil || !m.NodeInited() {
+		return false, ErrInvalidGethNode
+	}
+
+	if m.api == nil {
+		return false, ErrInvalidNodeAPI
+	}
+
+	config := m.node.config
+	modules := strings.Join(config.HTTPModules, ",")
+
+	return m.api.StartRPC(&config.HTTPHost, rpc.NewHexNumber(config.HTTPPort), &config.HTTPCors, &modules)
+}
+
+// StopNodeRPCServer stops HTTP RPC service attached to node
+func (m *NodeManager) StopNodeRPCServer() (bool, error) {
+	if m == nil || !m.NodeInited() {
+		return false, ErrInvalidGethNode
+	}
+
+	if m.api == nil {
+		return false, ErrInvalidNodeAPI
+	}
+
+	return m.api.StopRPC()
 }
 
 // HasNode checks whether manager has initialized node attached
@@ -262,13 +298,10 @@ func (m *NodeManager) onNodeStarted() {
 	close(m.node.started)
 
 	// send signal up to native app
-	event := GethEvent{
+	SendSignal(SignalEnvelope{
 		Type:  EventNodeStarted,
 		Event: struct{}{},
-	}
-
-	body, _ := json.Marshal(&event)
-	C.StatusServiceSignalEvent(C.CString(string(body)))
+	})
 }
 
 // populateStaticPeers connects current node with our publicly available LES cluster
@@ -286,4 +319,12 @@ func (m *NodeManager) populateStaticPeers() {
 	for _, enode := range enodes {
 		m.AddPeer(enode)
 	}
+}
+
+func (k *SelectedExtKey) Hex() string {
+	if k == nil {
+		return "0x0"
+	}
+
+	return k.Address.Hex()
 }

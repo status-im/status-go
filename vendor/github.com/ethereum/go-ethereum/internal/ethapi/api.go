@@ -1126,6 +1126,16 @@ func (s *PublicTransactionPoolAPI) CompleteQueuedTransaction(ctx context.Context
 		return common.Hash{}, err
 	}
 
+	// make sure that only account which created the tx can complete it
+	selectedAccountAddress := "0x0"
+	if address, ok := ctx.Value(status.SelectedAccountKey).(string); ok {
+		selectedAccountAddress = address
+	}
+	if args.From.Hex() != selectedAccountAddress {
+		glog.V(logger.Info).Infof("Failed to complete tx by %s (when logged in as %s)", args.From.Hex(), selectedAccountAddress)
+		return common.Hash{}, status.ErrInvalidCompleteTxSender
+	}
+
 	nonce, err := s.b.GetPoolNonce(ctx, args.From)
 	if err != nil {
 		return common.Hash{}, err
