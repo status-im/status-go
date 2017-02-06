@@ -75,9 +75,10 @@ func init() {
 
 // node-related errors
 var (
-	ErrEthServiceRegistrationFailure = errors.New("failed to register the Ethereum service")
-	ErrSshServiceRegistrationFailure = errors.New("failed to register the Whisper service")
-	ErrLightEthRegistrationFailure   = errors.New("failed to register the LES service")
+	ErrEthServiceRegistrationFailure   = errors.New("failed to register the Ethereum service")
+	ErrSshServiceRegistrationFailure   = errors.New("failed to register the Whisper service")
+	ErrSwarmServiceRegistrationFailure = errors.New("failed to register the Swarm service")
+	ErrLightEthRegistrationFailure     = errors.New("failed to register the LES service")
 )
 
 // NodeConfig stores configuration options for a node
@@ -92,10 +93,11 @@ type NodeConfig struct {
 
 // Node represents running node (serves as a wrapper around P2P node)
 type Node struct {
-	config     *NodeConfig   // configuration used to create Status node
-	geth       *node.Node    // reference to the running Geth node
-	gethConfig *node.Config  // configuration used to create P2P node
-	started    chan struct{} // channel to wait for node to start
+	config       *NodeConfig   // configuration used to create Status node
+	geth         *node.Node    // reference to the running Geth node
+	gethConfig   *node.Config  // configuration used to create P2P node
+	started      chan struct{} // channel to wait for node to start
+	swarmService *SwarmService
 }
 
 // Inited checks whether status node has been properly initialized
@@ -156,11 +158,18 @@ func MakeNode(config *NodeConfig) *Node {
 		Fatalf(fmt.Errorf("%v: %v", ErrSshServiceRegistrationFailure, err))
 	}
 
+	// start Swarm service
+	swarmService, err := activateSwarmService(stack)
+	if err != nil {
+		Fatalf(fmt.Errorf("%v: %v", ErrSwarmServiceRegistrationFailure, err))
+	}
+
 	return &Node{
-		geth:       stack,
-		gethConfig: stackConfig,
-		started:    make(chan struct{}),
-		config:     config,
+		geth:         stack,
+		gethConfig:   stackConfig,
+		started:      make(chan struct{}),
+		config:       config,
+		swarmService: swarmService,
 	}
 }
 
@@ -213,6 +222,23 @@ func activateShhService(stack *node.Node) error {
 	}
 
 	return nil
+}
+
+// activateSwarmService configures Swarm and adds it to the given node.
+func activateSwarmService(stack *node.Node) (*SwarmService, error) {
+	swarmService, err := newSwarmService(stack)
+	if err != nil {
+		return nil, err
+	}
+
+	serviceConstructor := func(ctx *node.ServiceContext) (node.Service, error) {
+		return swarmService.swarm, nil
+	}
+	if err := stack.Register(serviceConstructor); err != nil {
+		return nil, err
+	}
+
+	return swarmService, nil
 }
 
 // makeIPCPath returns IPC-RPC filename

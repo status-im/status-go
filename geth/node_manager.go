@@ -19,6 +19,7 @@ import (
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/ethereum/go-ethereum/swarm"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv2"
 )
 
@@ -43,6 +44,7 @@ type NodeServiceStack struct {
 	whisperService     *whisper.Whisper    // Whisper service
 	rpcClient          *rpc.Client         // RPC client
 	jailedRequestQueue *JailedRequestQueue // bridge via which jail notifies node of incoming requests
+	swarm              *swarm.Swarm        // swarm service
 }
 
 var (
@@ -113,6 +115,9 @@ func (m *NodeManager) RunNode() {
 		if err := m.node.geth.Service(&m.services.lightEthereum); err != nil {
 			glog.V(logger.Warn).Infoln("cannot get light ethereum service:", err)
 		}
+		if err := m.node.geth.Service(&m.services.swarm); err != nil {
+			glog.V(logger.Warn).Infoln("cannot get swarm service:", err)
+		}
 
 		// setup handlers
 		lightEthereum, err := m.LightEthereumService()
@@ -177,6 +182,7 @@ func (m *NodeManager) StopNode() error {
 
 	m.node.geth.Stop()
 	m.node.started = make(chan struct{})
+
 	return nil
 }
 
@@ -396,4 +402,17 @@ func (k *SelectedExtKey) Hex() string {
 	}
 
 	return k.Address.Hex()
+}
+
+// SwarmService exposes Swarm service
+func (m *NodeManager) SwarmService() (*SwarmService, error) {
+	if m == nil || !m.NodeInited() {
+		return nil, ErrInvalidGethNode
+	}
+
+	if m.node == nil || m.node.swarmService == nil {
+		return nil, ErrInvalidSwarmService
+	}
+
+	return m.node.swarmService, nil
 }

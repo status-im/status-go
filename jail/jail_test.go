@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"fmt"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/geth"
 	"github.com/status-im/status-go/jail"
@@ -174,7 +175,7 @@ func TestJailRPCSend(t *testing.T) {
 	// internally (since we replaced `web3.send` with `jail.Send`)
 	// all requests to web3 are forwarded to `jail.Send`
 	_, err = vm.Run(`
-	    var balance = web3.eth.getBalance("` + TEST_ADDRESS + `");
+		var balance = web3.eth.getBalance("` + TEST_ADDRESS + `");
 		var sendResult = web3.fromWei(balance, "ether")
 	`)
 	if err != nil {
@@ -216,9 +217,9 @@ func TestJailSendQueuedTransaction(t *testing.T) {
 	}
 
 	txParams := `{
-  		"from": "` + TEST_ADDRESS + `",
-  		"to": "0xf82da7547534045b4e00442bc89e16186cf8c272",
-  		"value": "0.000001"
+		"from": "` + TEST_ADDRESS + `",
+		"to": "0xf82da7547534045b4e00442bc89e16186cf8c272",
+		"value": "0.000001"
 	}`
 
 	txCompletedSuccessfully := make(chan struct{})
@@ -445,8 +446,8 @@ func TestIsConnected(t *testing.T) {
 	}
 
 	_, err = vm.Run(`
-	    var responseValue = web3.isConnected();
-	    responseValue = JSON.stringify(responseValue);
+		var responseValue = web3.isConnected();
+		responseValue = JSON.stringify(responseValue);
 	`)
 	if err != nil {
 		t.Errorf("cannot run custom code on VM: %v", err)
@@ -529,8 +530,8 @@ func TestLocalStorageSet(t *testing.T) {
 	})
 
 	_, err = vm.Run(`
-	    var responseValue = localStorage.set("` + testData + `");
-	    responseValue = JSON.stringify(responseValue);
+		var responseValue = localStorage.set("` + testData + `");
+		responseValue = JSON.stringify(responseValue);
 	`)
 	if err != nil {
 		t.Errorf("cannot run custom code on VM: %v", err)
@@ -651,6 +652,69 @@ func TestContractDeployment(t *testing.T) {
 	expectedResponse := txHash.Hex()
 	if !reflect.DeepEqual(response, expectedResponse) {
 		t.Errorf("expected response is not returned: expected %s, got %s", expectedResponse, response)
+		return
+	}
+}
+
+func TestSwarm(t *testing.T) {
+	err := geth.PrepareTestNode()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	// log into account from which transactions will be sent
+	if err := geth.SelectAccount(TEST_ADDRESS, TEST_ADDRESS_PASSWORD); err != nil {
+		t.Errorf("cannot select account: %v", TEST_ADDRESS)
+		return
+	}
+
+	jailInstance := jail.Init("")
+	jailInstance.Parse(CHAT_ID_CALL, "")
+
+	// obtain VM for a given chat (to send custom JS to jailed version of Send())
+	vm, err := jailInstance.GetVM(CHAT_ID_CALL)
+	if err != nil {
+		t.Errorf("cannot get VM: %v", err)
+		return
+	}
+
+	expectedResult := "test string"
+	_, err = vm.Run(fmt.Sprintf(`
+		web3.bzz.put("%s", "application/text", function (err, filehash) {
+			if (err) {
+				return
+			}
+
+			web3.bzz.get(filehash, function (err, result) {
+				if (err) {
+					return
+				}
+
+				responseValue = result.Content
+			})
+
+		});
+	`, expectedResult))
+	if err != nil {
+		t.Errorf("cannot run custom code on VM: %v", err)
+		return
+	}
+
+	responseValue, err := vm.Get("responseValue")
+	if err != nil {
+		t.Errorf("cannot obtain result of isConnected(): %v", err)
+		return
+	}
+
+	response, err := responseValue.ToString()
+	if err != nil {
+		t.Errorf("cannot parse result: %v", err)
+		return
+	}
+
+	if !reflect.DeepEqual(response, expectedResult) {
+		t.Errorf("expected response is not returned: expected %s, got %s", expectedResult, response)
 		return
 	}
 }
