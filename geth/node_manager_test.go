@@ -77,7 +77,7 @@ func TestResetChainData(t *testing.T) {
 	}
 
 	// allow some time to re-sync
-	time.Sleep(15 * time.Second)
+	time.Sleep(geth.TestNodeSyncSeconds * time.Second)
 
 	// now make sure that everything is intact
 	TestQueuedTransactions(t)

@@ -302,7 +302,7 @@ func makeDefaultExtra() []byte {
 		glog.V(logger.Warn).Infoln("error setting canonical miner information:", err)
 	}
 
-	if uint64(len(extra)) > params.MaximumExtraDataSize.Uint64() {
+	if uint64(len(extra)) > params.MaximumExtraDataSize {
 		glog.V(logger.Warn).Infoln("error setting canonical miner information: extra exceeds", params.MaximumExtraDataSize)
 		glog.V(logger.Debug).Infof("extra: %x\n", extra)
 		return nil

@@ -27,7 +27,7 @@ var muPrepareTestNode sync.Mutex
 
 const (
 	TestDataDir         = "../.ethereumtest"
-	TestNodeSyncSeconds = 30
+	TestNodeSyncSeconds = 60
 	TestNodeHTTPPort    = 8645
 	TestNodeWSPort      = 8646
 )

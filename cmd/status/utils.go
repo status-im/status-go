@@ -36,6 +36,14 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 		fn   func(t *testing.T) bool
 	}{
 		{
+			"reset blockchain data",
+			testResetChainData,
+		},
+		{
+			"pause node",
+			testStopResumeNode,
+		},
+		{
 			"restart node RPC",
 			testRestartNodeRPC,
 		},
@@ -79,14 +87,6 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 			"test jailed calls",
 			testJailFunctionCall,
 		},
-		{
-			"reset blockchain data",
-			testResetChainData,
-		},
-		{
-			"pause node",
-			testStopResumeNode,
-		},
 	}
 
 	for _, test := range tests {
@@ -111,7 +111,7 @@ func testResetChainData(t *testing.T) bool {
 		return false
 	}
 
-	time.Sleep(15 * time.Second) // allow to re-sync blockchain
+	time.Sleep(testNodeSyncSeconds * time.Second) // allow to re-sync blockchain
 
 	testCompleteTransaction(t)
 
