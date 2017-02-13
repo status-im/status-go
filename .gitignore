@@ -13,6 +13,7 @@
 .ethtest
 */**/*tx_database*
 */**/*dapps*
+vendor/github.com/ethereum/go-ethereum/vendor
 
 #*
 .#*
@@ -35,6 +36,8 @@ profile.cov
 
 # tests
 .ethereumtest/
+/vendor/**/*_test.go
+
 #
 # golang
 coverage.out
