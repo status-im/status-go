@@ -40,7 +40,6 @@ var (
 type peerDropFn func(id string)
 
 type odrPeerSelector interface {
-	selectPeerWait(uint64, func(*peer) (bool, time.Duration), <-chan struct{}) *peer
 	adjustResponseTime(*poolEntry, time.Duration, bool)
 }
 
@@ -52,6 +51,7 @@ type LesOdr struct {
 	mlock, clock sync.Mutex
 	sentReqs     map[uint64]*sentReq
 	serverPool   odrPeerSelector
+	reqDist      *requestDistributor
 }
 
 func NewLesOdr(db ethdb.Database) *LesOdr {
@@ -166,18 +166,44 @@ func (self *LesOdr) requestPeer(req *sentReq, peer *peer, delivered, timeout cha
 func (self *LesOdr) networkRequest(ctx context.Context, lreq LesOdrRequest) error {
 	answered := make(chan struct{})
 	req := &sentReq{
-		valFunc:  lreq.Valid,
+		valFunc:  lreq.Validate,
 		sentTo:   make(map[*peer]chan struct{}),
 		answered: answered, // reply delivered by any peer
 	}
-	reqID := getNextReqID()
-	self.mlock.Lock()
-	self.sentReqs[reqID] = req
-	self.mlock.Unlock()
+
+	exclude := make(map[*peer]struct{})
 
 	reqWg := new(sync.WaitGroup)
 	reqWg.Add(1)
 	defer reqWg.Done()
+
+	var timeout chan struct{}
+	reqID := getNextReqID()
+	rq := newDistReq(func(dp distPeer) uint64 {
+		return lreq.GetCost(dp.(*peer))
+	}, func(dp distPeer) bool {
+		p := dp.(*peer)
+		_, ok := exclude[p]
+		return !ok && lreq.CanSend(p)
+	}, func(dp distPeer) func() {
+		p := dp.(*peer)
+		exclude[p] = struct{}{}
+		delivered := make(chan struct{})
+		timeout = make(chan struct{})
+		req.lock.Lock()
+		req.sentTo[p] = delivered
+		req.lock.Unlock()
+		reqWg.Add(1)
+		cost := lreq.GetCost(p)
+		p.fcServer.SendRequest(reqID, cost)
+		go self.requestPeer(req, p, delivered, timeout, reqWg)
+		return func() { lreq.Request(reqID, p) }
+	})
+
+	self.mlock.Lock()
+	self.sentReqs[reqID] = req
+	self.mlock.Unlock()
+
 	go func() {
 		reqWg.Wait()
 		self.mlock.Lock()
@@ -185,45 +211,27 @@ func (self *LesOdr) networkRequest(ctx context.Context, lreq LesOdrRequest) erro
 		self.mlock.Unlock()
 	}()
 
-	exclude := make(map[*peer]struct{})
 	for {
-		var p *peer
-		if self.serverPool != nil {
-			p = self.serverPool.selectPeerWait(reqID, func(p *peer) (bool, time.Duration) {
-				if _, ok := exclude[p]; ok || !lreq.CanSend(p) {
-					return false, 0
-				}
-				return true, p.fcServer.CanSend(lreq.GetCost(p))
-			}, ctx.Done())
+		peerChn := self.reqDist.queue(rq)
+		select {
+		case <-ctx.Done():
+			self.reqDist.cancel(rq)
+			return ctx.Err()
+		case <-answered:
+			self.reqDist.cancel(rq)
+			return nil
+		case _, ok := <-peerChn:
+			if !ok {
+				return ErrNoPeers
+			}
 		}
-		if p == nil {
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-req.answered:
-				return nil
-			case <-time.After(retryPeers):
-			}
-		} else {
-			exclude[p] = struct{}{}
-			delivered := make(chan struct{})
-			timeout := make(chan struct{})
-			req.lock.Lock()
-			req.sentTo[p] = delivered
-			req.lock.Unlock()
-			reqWg.Add(1)
-			cost := lreq.GetCost(p)
-			p.fcServer.SendRequest(reqID, cost)
-			go self.requestPeer(req, p, delivered, timeout, reqWg)
-			lreq.Request(reqID, p)
 
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-answered:
-				return nil
-			case <-timeout:
-			}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-answered:
+			return nil
+		case <-timeout:
 		}
 	}
 }

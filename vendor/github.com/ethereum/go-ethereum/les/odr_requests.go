@@ -38,7 +38,7 @@ type LesOdrRequest interface {
 	GetCost(*peer) uint64
 	CanSend(*peer) bool
 	Request(uint64, *peer) error
-	Valid(ethdb.Database, *Msg) bool // if true, keeps the retrieved object
+	Validate(ethdb.Database, *Msg) bool
 }
 
 func LesRequest(req light.OdrRequest) LesOdrRequest {
@@ -81,7 +81,7 @@ func (self *BlockRequest) Request(reqID uint64, peer *peer) error {
 // Valid processes an ODR request reply message from the LES network
 // returns true and stores results in memory if the message was a valid reply
 // to the request (implementation of LesOdrRequest)
-func (self *BlockRequest) Valid(db ethdb.Database, msg *Msg) bool {
+func (self *BlockRequest) Validate(db ethdb.Database, msg *Msg) bool {
 	glog.V(logger.Debug).Infof("ODR: validating body of block %08x", self.Hash[:4])
 	if msg.MsgType != MsgBlockBodies {
 		glog.V(logger.Debug).Infof("ODR: invalid message type")
@@ -141,7 +141,7 @@ func (self *ReceiptsRequest) Request(reqID uint64, peer *peer) error {
 // Valid processes an ODR request reply message from the LES network
 // returns true and stores results in memory if the message was a valid reply
 // to the request (implementation of LesOdrRequest)
-func (self *ReceiptsRequest) Valid(db ethdb.Database, msg *Msg) bool {
+func (self *ReceiptsRequest) Validate(db ethdb.Database, msg *Msg) bool {
 	glog.V(logger.Debug).Infof("ODR: validating receipts for block %08x", self.Hash[:4])
 	if msg.MsgType != MsgReceipts {
 		glog.V(logger.Debug).Infof("ODR: invalid message type")
@@ -201,7 +201,7 @@ func (self *TrieRequest) Request(reqID uint64, peer *peer) error {
 // Valid processes an ODR request reply message from the LES network
 // returns true and stores results in memory if the message was a valid reply
 // to the request (implementation of LesOdrRequest)
-func (self *TrieRequest) Valid(db ethdb.Database, msg *Msg) bool {
+func (self *TrieRequest) Validate(db ethdb.Database, msg *Msg) bool {
 	glog.V(logger.Debug).Infof("ODR: validating trie root %08x key %08x", self.Id.Root[:4], self.Key[:4])
 
 	if msg.MsgType != MsgProofs {
@@ -255,7 +255,7 @@ func (self *CodeRequest) Request(reqID uint64, peer *peer) error {
 // Valid processes an ODR request reply message from the LES network
 // returns true and stores results in memory if the message was a valid reply
 // to the request (implementation of LesOdrRequest)
-func (self *CodeRequest) Valid(db ethdb.Database, msg *Msg) bool {
+func (self *CodeRequest) Validate(db ethdb.Database, msg *Msg) bool {
 	glog.V(logger.Debug).Infof("ODR: validating node data for hash %08x", self.Hash[:4])
 	if msg.MsgType != MsgCode {
 		glog.V(logger.Debug).Infof("ODR: invalid message type")
@@ -315,7 +315,7 @@ func (self *ChtRequest) Request(reqID uint64, peer *peer) error {
 // Valid processes an ODR request reply message from the LES network
 // returns true and stores results in memory if the message was a valid reply
 // to the request (implementation of LesOdrRequest)
-func (self *ChtRequest) Valid(db ethdb.Database, msg *Msg) bool {
+func (self *ChtRequest) Validate(db ethdb.Database, msg *Msg) bool {
 	glog.V(logger.Debug).Infof("ODR: validating CHT #%d block #%d", self.ChtNum, self.BlockNum)
 
 	if msg.MsgType != MsgHeaderProofs {
