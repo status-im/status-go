@@ -30,18 +30,19 @@ import (
 
 const (
 	ClientIdentifier = "StatusIM" // Client identifier to advertise over the network
-	VersionMajor     = 1          // Major version component of the current release
-	VersionMinor     = 2          // Minor version component of the current release
-	VersionPatch     = 0          // Patch version component of the current release
-	VersionMeta      = "unstable" // Version metadata to append to the version string
-	IPCFile          = "geth.ipc" // Filename of exposed IPC-RPC Server
-	HTTPPort         = 8545       // HTTP-RPC port (replaced in unit tests)
-	WSPort           = 8546       // WS-RPC port (replaced in unit tests)
-	NetworkPort      = 30303
-	MaxPeers         = 25
-	MaxLightPeers    = 20
-	MaxPendingPeers  = 0
-	DefaultGas       = 180000
+	VersionMajor     = 0          // Major version component of the current release
+	VersionMinor     = 9          // Minor version component of the current release
+	VersionPatch     = 3          // Patch version component of the current release
+	VersionMeta      = "stable"   // Version metadata to append to the version string
+
+	IPCFile         = "geth.ipc" // Filename of exposed IPC-RPC Server
+	HTTPPort        = 8545       // HTTP-RPC port (replaced in unit tests)
+	WSPort          = 8546       // WS-RPC port (replaced in unit tests)
+	NetworkPort     = 30303
+	MaxPeers        = 25
+	MaxLightPeers   = 20
+	MaxPendingPeers = 0
+	DefaultGas      = 180000
 
 	ProcessFileDescriptorLimit = uint64(2048)
 	DatabaseCacheSize          = 128 // Megabytes of memory allocated to internal caching (min 16MB / database forced)
