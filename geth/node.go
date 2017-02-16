@@ -30,10 +30,10 @@ import (
 
 const (
 	ClientIdentifier = "StatusIM" // Client identifier to advertise over the network
-	VersionMajor     = 1          // Major version component of the current release
-	VersionMinor     = 2          // Minor version component of the current release
-	VersionPatch     = 0          // Patch version component of the current release
-	VersionMeta      = "unstable" // Version metadata to append to the version string
+	VersionMajor     = 0          // Major version component of the current release
+	VersionMinor     = 9          // Minor version component of the current release
+	VersionPatch     = 3          // Patch version component of the current release
+	VersionMeta      = "stable"   // Version metadata to append to the version string
 	IPCFile          = "geth.ipc" // Filename of exposed IPC-RPC Server
 	HTTPPort         = 8545       // HTTP-RPC port (replaced in unit tests)
 	WSPort           = 8546       // WS-RPC port (replaced in unit tests)
