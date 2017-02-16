@@ -316,8 +316,8 @@ func (pool *TxPool) eventLoop() {
 			pool.homestead = pool.config.IsHomestead(head.Number)
 			pool.signer = types.MakeSigner(pool.config, head.Number)
 			pool.mu.Unlock()
-			runtime.Gosched()
-			time.Sleep(10 * time.Millisecond)
+			//runtime.Gosched()
+			time.Sleep(2 * time.Second)
 		}
 	}
 }
