@@ -317,6 +317,7 @@ func (pool *TxPool) eventLoop() {
 			pool.signer = types.MakeSigner(pool.config, head.Number)
 			pool.mu.Unlock()
 			runtime.Gosched()
+			time.Sleep(10 * time.Millisecond)
 		}
 	}
 }
