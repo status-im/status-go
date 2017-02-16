@@ -51,7 +51,7 @@ var (
 	ErrInvalidAccountManager       = errors.New("could not retrieve account manager")
 	ErrInvalidWhisperService       = errors.New("whisper service is unavailable")
 	ErrInvalidLightEthereumService = errors.New("can not retrieve LES service")
-	ErrInvalidClient               = errors.New("RPC client is not properly initialized")
+	ErrInvalidRPCClient            = errors.New("RPC client is not properly initialized")
 	ErrInvalidJailedRequestQueue   = errors.New("jailed request queue is not properly initialized")
 	ErrNodeMakeFailure             = errors.New("error creating p2p node")
 	ErrNodeStartFailure            = errors.New("error starting p2p node")
@@ -126,7 +126,7 @@ func (m *NodeManager) RunNode() {
 
 		m.services.rpcClient, err = m.node.geth.Attach()
 		if err != nil {
-			glog.V(logger.Warn).Infoln("cannot get RPC client service:", ErrInvalidClient)
+			glog.V(logger.Warn).Infoln("cannot get RPC client service:", ErrInvalidRPCClient)
 		}
 
 		// expose API
@@ -186,9 +186,13 @@ func (m *NodeManager) RestartNode() error {
 		return ErrInvalidGethNode
 	}
 
-	m.StopNode()
-	m.RunNode()
-	m.WaitNodeStarted()
+	if err := m.StopNode(); err != nil {
+		return err
+	}
+
+	if err := m.ResumeNode(); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -198,6 +202,9 @@ func (m *NodeManager) ResumeNode() error {
 	if m == nil || !m.NodeInited() {
 		return ErrInvalidGethNode
 	}
+
+	// recreate node (which is cheap, as in geth.Start() is rebuilding the node anyway)
+	m.node = MakeNode(m.node.config)
 
 	m.RunNode()
 	m.WaitNodeStarted()
@@ -315,7 +322,7 @@ func (m *NodeManager) RPCClient() (*rpc.Client, error) {
 	}
 
 	if m.services.rpcClient == nil {
-		return nil, ErrInvalidClient
+		return nil, ErrInvalidRPCClient
 	}
 
 	return m.services.rpcClient, nil

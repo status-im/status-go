@@ -25,10 +25,8 @@ var (
 
 type Jail struct {
 	sync.RWMutex
-	client       *rpc.Client               // lazy inited on the first call
-	cells        map[string]*JailedRuntime // jail supports running many isolated instances of jailed runtime
-	statusJS     string
-	requestQueue *geth.JailedRequestQueue
+	cells    map[string]*JailedRuntime // jail supports running many isolated instances of jailed runtime
+	statusJS string
 }
 
 type JailedRuntime struct {
@@ -150,12 +148,12 @@ func (jail *Jail) GetVM(chatId string) (*otto.Otto, error) {
 func (jail *Jail) Send(chatId string, call otto.FunctionCall) (response otto.Value) {
 	client, err := jail.RPCClient()
 	if err != nil {
-		return newErrorResponse(call, -32603, err.Error(), nil)
+		return throwJSException(err.Error())
 	}
 
 	requestQueue, err := jail.RequestQueue()
 	if err != nil {
-		return newErrorResponse(call, -32603, err.Error(), nil)
+		return throwJSException(err.Error())
 	}
 
 	// Remarshal the request into a Go value.
@@ -259,10 +257,6 @@ func (jail *Jail) RPCClient() (*rpc.Client, error) {
 		return nil, ErrInvalidJail
 	}
 
-	if jail.client != nil {
-		return jail.client, nil
-	}
-
 	nodeManager := geth.NodeManagerInstance()
 	if !nodeManager.NodeInited() {
 		return nil, geth.ErrInvalidGethNode
@@ -273,18 +267,13 @@ func (jail *Jail) RPCClient() (*rpc.Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	jail.client = client
 
-	return jail.client, nil
+	return client, nil
 }
 
 func (jail *Jail) RequestQueue() (*geth.JailedRequestQueue, error) {
 	if jail == nil {
 		return nil, ErrInvalidJail
-	}
-
-	if jail.requestQueue != nil {
-		return jail.requestQueue, nil
 	}
 
 	nodeManager := geth.NodeManagerInstance()
@@ -296,14 +285,14 @@ func (jail *Jail) RequestQueue() (*geth.JailedRequestQueue, error) {
 	if err != nil {
 		return nil, err
 	}
-	jail.requestQueue = requestQueue
 
-	return jail.requestQueue, nil
+	return requestQueue, nil
+
 }
 
 func newErrorResponse(call otto.FunctionCall, code int, msg string, id interface{}) otto.Value {
 	// Bundle the error into a JSON RPC call response
-	m := map[string]interface{}{"jsonrpc": "2.0", "id": id, "error": map[string]interface{}{"code": code, msg: msg}}
+	m := map[string]interface{}{"jsonrpc": "2.0", "id": id, "error": map[string]interface{}{"code": code, "message": msg}}
 	res, _ := json.Marshal(m)
 	val, _ := call.Otto.Run("(" + string(res) + ")")
 	return val

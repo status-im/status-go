@@ -22,16 +22,16 @@ func makeJethIsConnectedHandler(jail *Jail) func(call otto.FunctionCall) (respon
 	return func(call otto.FunctionCall) otto.Value {
 		client, err := jail.RPCClient()
 		if err != nil {
-			return newErrorResponse(call, -32603, err.Error(), nil)
+			return throwJSException(err.Error())
 		}
 
 		var netListeningResult bool
 		if err := client.Call(&netListeningResult, "net_listening"); err != nil {
-			return newErrorResponse(call, -32603, err.Error(), nil)
+			return throwJSException(err.Error())
 		}
 
 		if netListeningResult != true {
-			return newErrorResponse(call, -32603, geth.ErrInvalidGethNode.Error(), nil)
+			return throwJSException(err.Error())
 		}
 
 		return newResultResponse(call, true)

@@ -9,6 +9,9 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/logger"
+	"github.com/ethereum/go-ethereum/logger/glog"
+	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth"
 	"github.com/status-im/status-go/jail"
 )
@@ -16,6 +19,7 @@ import (
 const (
 	TEST_ADDRESS          = "0xadaf150b905cf5e6a778e553e15a139b6618bbb7"
 	TEST_ADDRESS_PASSWORD = "asdfasdf"
+	TEST_ADDRESS1         = "0xadd4d1d02e71c7360c53296968e59d57fd15e2ba"
 	CHAT_ID_INIT          = "CHAT_ID_INIT_TEST"
 	CHAT_ID_CALL          = "CHAT_ID_CALL_TEST"
 	CHAT_ID_SEND          = "CHAT_ID_CALL_SEND"
@@ -606,7 +610,6 @@ func TestContractDeployment(t *testing.T) {
 
 			if txHash, err = geth.CompleteTransaction(event["id"].(string), TEST_ADDRESS_PASSWORD); err != nil {
 				t.Errorf("cannot complete queued transation[%v]: %v", event["id"], err)
-				return
 			} else {
 				t.Logf("Contract created: https://testnet.etherscan.io/tx/%s", txHash.Hex())
 			}
@@ -638,7 +641,7 @@ func TestContractDeployment(t *testing.T) {
 
 	responseValue, err := vm.Get("responseValue")
 	if err != nil {
-		t.Errorf("cannot obtain result of isConnected(): %v", err)
+		t.Errorf("cannot obtain result of custom code: %v", err)
 		return
 	}
 
@@ -653,4 +656,238 @@ func TestContractDeployment(t *testing.T) {
 		t.Errorf("expected response is not returned: expected %s, got %s", expectedResponse, response)
 		return
 	}
+}
+
+func TestJailBlockingDuringSync(t *testing.T) {
+	err := geth.PrepareTestNode()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	// reset chain data, forcing re-sync
+	if err := geth.NodeManagerInstance().ResetChainData(); err != nil {
+		panic(err)
+	}
+	time.Sleep(5 * time.Second) // so that sync has enough time to start
+
+	jailInstance := jail.Init("")
+	jailInstance.Parse(CHAT_ID_CALL, "")
+
+	// obtain VM for a given chat (to send custom JS to jailed version of Send())
+	vm, err := jailInstance.GetVM(CHAT_ID_CALL)
+	if err != nil {
+		t.Errorf("cannot get VM: %v", err)
+		return
+	}
+
+	// define helper types
+	type ntfyHandler struct {
+		waiter   chan interface{}
+		activate func(waiter chan interface{})
+	}
+
+	type TestCase struct {
+		name    string
+		code    string
+		handler ntfyHandler
+		check   func(responseValue otto.Value, returnedByWaiter interface{}) bool
+	}
+
+	// make sure you panic if transaction complete doesn't return
+	abortPanic := make(chan struct{})
+	geth.PanicAfter(60*time.Second, abortPanic, "TestJailBlockingDuringSync")
+
+	makeTxCompleteHandler := func() ntfyHandler {
+		return ntfyHandler{
+			waiter: make(chan interface{}, 1),
+			activate: func(waiter chan interface{}) {
+				geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+					var txHash common.Hash
+					var envelope geth.SignalEnvelope
+					if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
+						t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
+						return
+					}
+					if envelope.Type == geth.EventTransactionQueued {
+						event := envelope.Event.(map[string]interface{})
+
+						glog.V(logger.Info).Infof("transaction queued (will be completed immediately): {id: %s}\n", event["id"].(string))
+
+						if err := geth.SelectAccount(TEST_ADDRESS, TEST_ADDRESS_PASSWORD); err != nil {
+							t.Errorf("cannot select account: %v", TEST_ADDRESS)
+							return
+						}
+
+						if txHash, err = geth.CompleteTransaction(event["id"].(string), TEST_ADDRESS_PASSWORD); err != nil {
+							glog.V(logger.Info).Infof("cannot complete queued transation[%v]: %v", event["id"], err)
+							waiter <- common.Hash{}
+						} else {
+							glog.V(logger.Info).Infof("tx created: https://testnet.etherscan.io/tx/%s", txHash.Hex())
+							waiter <- txHash
+						}
+
+						close(waiter)
+					}
+				})
+			},
+		}
+	}
+	makeDoNothingHandler := func() ntfyHandler {
+		return ntfyHandler{
+			waiter: make(chan interface{}, 1),
+			activate: func(waiter chan interface{}) {
+				close(waiter)
+			},
+		}
+	}
+
+	testCases := []TestCase{
+		{
+			"getBalance",
+			`
+				var getBalanceResponse = web3.fromWei(web3.eth.getBalance('` + TEST_ADDRESS + `'), 'ether');
+			`,
+			makeDoNothingHandler(),
+			func(responseValue otto.Value, returnedByWaiter interface{}) bool {
+				response, err := responseValue.ToInteger()
+				if err != nil {
+					t.Errorf("cannot parse result: %v", err)
+					return false
+				}
+
+				if response > 9000 {
+					return true
+				}
+
+				return false
+			},
+		},
+		{
+			"getTransactionCount",
+			`
+				var getTransactionCountResponse = web3.eth.getTransactionCount('` + TEST_ADDRESS + `');
+			`,
+			makeDoNothingHandler(),
+			func(responseValue otto.Value, returnedByWaiter interface{}) bool {
+				response, err := responseValue.ToInteger()
+				if err != nil {
+					t.Errorf("cannot parse result: %v", err)
+					return false
+				}
+
+				if response > 1000 {
+					return true
+				}
+
+				return false
+			},
+		},
+		{
+			"sendEther",
+			`
+				var sendEtherResponse = "0x0000000000000000000000000000000000000000000000000000000000000000"
+				web3.eth.sendTransaction(
+				{
+					from: '` + TEST_ADDRESS + `', to: '` + TEST_ADDRESS1 + `', value: web3.toWei(0.000002, "ether")
+				}, function (e, hash) {
+					if (!e) {
+						sendEtherResponse = hash
+					} else {
+						sendEtherResponse = e
+					}
+				})
+			`,
+			makeTxCompleteHandler(),
+			func(responseValue otto.Value, returnedByWaiter interface{}) bool {
+				response, err := responseValue.ToString()
+				if err != nil {
+					t.Errorf("cannot parse result: %v", err)
+					return false
+				}
+
+				expectedResponse1 := "0x0000000000000000000000000000000000000000000000000000000000000000"
+				if txHash, ok := returnedByWaiter.(common.Hash); ok {
+					expectedResponse1 = txHash.Hex()
+				}
+
+				expectedResponse2 := `Error: Nonce too low`
+				if !reflect.DeepEqual(response, expectedResponse1) && !reflect.DeepEqual(response, expectedResponse2) {
+					t.Errorf("expected response is not returned: expected %s or %s, got %s", expectedResponse1, expectedResponse2, response)
+					return false
+				}
+
+				return true
+			},
+		},
+		{
+			"createContract",
+			`
+				var createContractResponse = "0x0000000000000000000000000000000000000000000000000000000000000000";
+				var testContract = web3.eth.contract([{"constant":true,"inputs":[{"name":"a","type":"int256"}],"name":"double","outputs":[{"name":"","type":"int256"}],"payable":false,"type":"function"}]);
+				var test = testContract.new(
+				{
+					from: '` + TEST_ADDRESS + `',
+					data: '0x6060604052341561000c57fe5b5b60a58061001b6000396000f30060606040526000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff1680636ffa1caa14603a575bfe5b3415604157fe5b60556004808035906020019091905050606b565b6040518082815260200191505060405180910390f35b60008160020290505b9190505600a165627a7a72305820ccdadd737e4ac7039963b54cee5e5afb25fa859a275252bdcf06f653155228210029',
+					gas: '` + strconv.Itoa(geth.DefaultGas) + `'
+				}, function (e, contract){
+					if (!e) {
+						createContractResponse = contract.transactionHash
+					} else {
+						createContractResponse = e
+					}
+				})
+			`,
+			makeTxCompleteHandler(),
+			func(responseValue otto.Value, returnedByWaiter interface{}) bool {
+				response, err := responseValue.ToString()
+				if err != nil {
+					t.Errorf("cannot parse result: %v", err)
+					return false
+				}
+
+				expectedResponse1 := ""
+				if txHash, ok := returnedByWaiter.(common.Hash); ok {
+					expectedResponse1 = txHash.Hex()
+				}
+
+				expectedResponse2 := `Error: Nonce too low`
+				if !reflect.DeepEqual(response, expectedResponse1) && !reflect.DeepEqual(response, expectedResponse2) {
+					t.Errorf("expected response is not returned: expected %s or %s, got %s", expectedResponse1, expectedResponse2, response)
+					return false
+				}
+
+				return true
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		// prepare notification handler
+		testCase.handler.activate(testCase.handler.waiter)
+
+		// execute test code
+		vm.Run(testCase.code)
+
+		// wait for handler (if necessary)
+		returnedByWaiter := <-testCase.handler.waiter
+
+		// process response
+		responseValue, err := vm.Get(testCase.name + "Response")
+		if err != nil {
+			t.Errorf("cannot obtain result of custom code: %v", err)
+			return
+		}
+
+		if !testCase.check(responseValue, returnedByWaiter) {
+			t.Fatalf("case failed: %v", testCase.name)
+			return
+		}
+	}
+
+	abortPanic <- struct{}{}
+
+	// allow to sync (for other tests)
+	time.Sleep(120 * time.Second)
+
 }
