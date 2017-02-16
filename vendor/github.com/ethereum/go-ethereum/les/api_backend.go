@@ -31,13 +31,18 @@ import (
 	"github.com/ethereum/go-ethereum/internal/ethapi"
 	"github.com/ethereum/go-ethereum/light"
 	"github.com/ethereum/go-ethereum/params"
-	rpc "github.com/ethereum/go-ethereum/rpc"
+	"github.com/ethereum/go-ethereum/rpc"
 	"golang.org/x/net/context"
 )
 
 type LesApiBackend struct {
-	eth *LightEthereum
-	gpo *gasprice.LightPriceOracle
+	eth           *LightEthereum
+	gpo           *gasprice.LightPriceOracle
+	statusBackend *ethapi.StatusBackend
+}
+
+func (b *LesApiBackend) GetStatusBackend() *ethapi.StatusBackend {
+	return b.statusBackend
 }
 
 func (b *LesApiBackend) ChainConfig() *params.ChainConfig {
@@ -88,7 +93,7 @@ func (b *LesApiBackend) GetTd(blockHash common.Hash) *big.Int {
 	return b.eth.blockchain.GetTdByHash(blockHash)
 }
 
-func (b *LesApiBackend) GetVMEnv(ctx context.Context, msg core.Message, state ethapi.State, header *types.Header) (*vm.Environment, func() error, error) {
+func (b *LesApiBackend) GetEVM(ctx context.Context, msg core.Message, state ethapi.State, header *types.Header, vmCfg vm.Config) (*vm.EVM, func() error, error) {
 	stateDb := state.(*light.LightState).Copy()
 	addr := msg.From()
 	from, err := stateDb.GetOrNewStateObject(ctx, addr)
@@ -99,7 +104,7 @@ func (b *LesApiBackend) GetVMEnv(ctx context.Context, msg core.Message, state et
 
 	vmstate := light.NewVMState(ctx, stateDb)
 	context := core.NewEVMContext(msg, header, b.eth.blockchain)
-	return vm.NewEnvironment(context, vmstate, b.eth.chainConfig, vm.Config{}), vmstate.Error, nil
+	return vm.NewEVM(context, vmstate, b.eth.chainConfig, vmCfg), vmstate.Error, nil
 }
 
 func (b *LesApiBackend) SendTx(ctx context.Context, signedTx *types.Transaction) error {
@@ -110,7 +115,7 @@ func (b *LesApiBackend) RemoveTx(txHash common.Hash) {
 	b.eth.txPool.RemoveTx(txHash)
 }
 
-func (b *LesApiBackend) GetPoolTransactions() types.Transactions {
+func (b *LesApiBackend) GetPoolTransactions() (types.Transactions, error) {
 	return b.eth.txPool.GetTransactions()
 }
 

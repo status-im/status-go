@@ -27,20 +27,26 @@ var muPrepareTestNode sync.Mutex
 
 const (
 	TestDataDir         = "../.ethereumtest"
-	TestNodeSyncSeconds = 120
+	TestNodeSyncSeconds = 60
+	TestNodeHTTPPort    = 8645
+	TestNodeWSPort      = 8646
 )
 
 type NodeNotificationHandler func(jsonEvent string)
 
-var notificationHandler NodeNotificationHandler = func(jsonEvent string) { // internal signal handler (used in tests)
-	glog.V(logger.Info).Infof("notification received (default notification handler): %s\n", jsonEvent)
-}
+var notificationHandler NodeNotificationHandler = TriggerDefaultNodeNotificationHandler
 
+// SetDefaultNodeNotificationHandler sets notification handler to invoke on SendSignal
 func SetDefaultNodeNotificationHandler(fn NodeNotificationHandler) {
 	notificationHandler = fn
 }
 
-// SendSignal sends application signal (JSON, normally) upwards
+// TriggerDefaultNodeNotificationHandler triggers default notification handler (helpful in tests)
+func TriggerDefaultNodeNotificationHandler(jsonEvent string) {
+	glog.V(logger.Info).Infof("notification received (default notification handler): %s\n", jsonEvent)
+}
+
+// SendSignal sends application signal (JSON, normally) upwards to application (via default notification handler)
 func SendSignal(signal SignalEnvelope) {
 	data, _ := json.Marshal(&signal)
 	C.StatusServiceSignalEvent(C.CString(string(data)))
@@ -99,6 +105,8 @@ func PrepareTestNode() (err error) {
 		return nil
 	}
 
+	defer HaltOnPanic()
+
 	syncRequired := false
 	if _, err := os.Stat(filepath.Join(TestDataDir, "testnet")); os.IsNotExist(err) {
 		syncRequired = true
@@ -122,8 +130,17 @@ func PrepareTestNode() (err error) {
 	}
 
 	// start geth node and wait for it to initialize
-	// internally once.Do() is used, so call below is thread-safe
-	CreateAndRunNode(dataDir, 8546) // to avoid conflicts with running react-native app, run on different port
+	err = CreateAndRunNode(&NodeConfig{
+		DataDir:    dataDir,
+		IPCEnabled: false,
+		HTTPPort:   TestNodeHTTPPort, // to avoid conflicts with running app, using different port in tests
+		WSEnabled:  false,
+		WSPort:     TestNodeWSPort, // ditto
+		TLSEnabled: false,
+	})
+	if err != nil {
+		panic(err)
+	}
 
 	manager = NodeManagerInstance()
 	if !manager.NodeInited() {

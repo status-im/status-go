@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/les/status"
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/geth"
 )
 
@@ -35,6 +35,14 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 		name string
 		fn   func(t *testing.T) bool
 	}{
+		{
+			"reset blockchain data",
+			testResetChainData,
+		},
+		{
+			"pause node",
+			testStopResumeNode,
+		},
 		{
 			"restart node RPC",
 			testRestartNodeRPC,
@@ -88,6 +96,119 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 	}
 
 	done <- struct{}{}
+}
+
+func testResetChainData(t *testing.T) bool {
+	resetChainDataResponse := geth.JSONError{}
+	rawResponse := ResetChainData()
+
+	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &resetChainDataResponse); err != nil {
+		t.Errorf("cannot decode ResetChainData reponse (%s): %v", C.GoString(rawResponse), err)
+		return false
+	}
+	if resetChainDataResponse.Error != "" {
+		t.Errorf("unexpected error: %s", resetChainDataResponse.Error)
+		return false
+	}
+
+	time.Sleep(testNodeSyncSeconds * time.Second) // allow to re-sync blockchain
+
+	testCompleteTransaction(t)
+
+	return true
+}
+
+func testStopResumeNode(t *testing.T) bool {
+	geth.Logout() // to make sure that we start with empty account (which might get populated during previous tests)
+
+	whisperService, err := geth.NodeManagerInstance().WhisperService()
+	if err != nil {
+		t.Errorf("whisper service not running: %v", err)
+	}
+
+	// create an account
+	address1, pubKey1, _, err := geth.CreateAccount(newAccountPassword)
+	if err != nil {
+		t.Errorf("could not create account: %v", err)
+		return false
+	}
+	t.Logf("account created: {address: %s, key: %s}", address1, pubKey1)
+
+	// make sure that identity is not (yet injected)
+	if whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey1))) {
+		t.Error("identity already present in whisper")
+	}
+
+	// select account
+	loginResponse := geth.JSONError{}
+	rawResponse := Login(C.CString(address1), C.CString(newAccountPassword))
+
+	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &loginResponse); err != nil {
+		t.Errorf("cannot decode RecoverAccount reponse (%s): %v", C.GoString(rawResponse), err)
+		return false
+	}
+
+	if loginResponse.Error != "" {
+		t.Errorf("could not select account: %v", err)
+		return false
+	}
+	if !whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey1))) {
+		t.Errorf("identity not injected into whisper: %v", err)
+	}
+
+	// stop and resume node, then make sure that selected account is still selected
+	stopNodeFn := func() bool {
+		response := geth.JSONError{}
+		rawResponse = StopNode()
+
+		if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &response); err != nil {
+			t.Errorf("cannot decode StopNode reponse (%s): %v", C.GoString(rawResponse), err)
+			return false
+		}
+		if response.Error != "" {
+			t.Errorf("unexpected error: %s", response.Error)
+			return false
+		}
+
+		return true
+	}
+
+	resumeNodeFn := func() bool {
+		response := geth.JSONError{}
+		rawResponse = ResumeNode()
+
+		if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &response); err != nil {
+			t.Errorf("cannot decode ResumeNode reponse (%s): %v", C.GoString(rawResponse), err)
+			return false
+		}
+		if response.Error != "" {
+			t.Errorf("unexpected error: %s", response.Error)
+			return false
+		}
+
+		return true
+	}
+
+	if !stopNodeFn() {
+		return false
+	}
+	if !resumeNodeFn() {
+		return false
+	}
+
+	// now, verify that we still have account logged in
+	whisperService, err = geth.NodeManagerInstance().WhisperService()
+	if err != nil {
+		t.Errorf("whisper service not running: %v", err)
+	}
+	if !whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey1))) {
+		t.Errorf("identity evicted from whisper on node restart: %v", err)
+	}
+
+	// additionally, let's complete transaction (just to make sure that node lives through pause/resume w/o issues)
+	testCompleteTransaction(t)
+
+	return true
 }
 
 func testRestartNodeRPC(t *testing.T) bool {
@@ -309,7 +430,7 @@ func testRecoverAccount(t *testing.T) bool {
 	}
 	extChild2String := key.ExtendedKey.String()
 
-	if err := accountManager.DeleteAccount(account, newAccountPassword); err != nil {
+	if err := accountManager.Delete(account, newAccountPassword); err != nil {
 		t.Errorf("cannot remove account: %v", err)
 	}
 
@@ -576,7 +697,7 @@ func testCompleteTransaction(t *testing.T) bool {
 	txHashCheck, err := backend.SendTransaction(nil, status.SendTxArgs{
 		From:  geth.FromAddress(testAddress),
 		To:    geth.ToAddress(testAddress1),
-		Value: rpc.NewHexNumber(big.NewInt(1000000000000)),
+		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 	})
 	if err != nil {
 		t.Errorf("Test failed: cannot send transaction: %v", err)
@@ -647,7 +768,7 @@ func testCompleteMultipleQueuedTransactions(t *testing.T) bool {
 		txHashCheck, err := backend.SendTransaction(nil, status.SendTxArgs{
 			From:  geth.FromAddress(testAddress),
 			To:    geth.ToAddress(testAddress1),
-			Value: rpc.NewHexNumber(big.NewInt(1000000000000)),
+			Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 		})
 		if err != nil {
 			t.Errorf("unexpected error thrown: %v", err)
@@ -832,7 +953,7 @@ func testDiscardTransaction(t *testing.T) bool {
 	txHashCheck, err := backend.SendTransaction(nil, status.SendTxArgs{
 		From:  geth.FromAddress(testAddress),
 		To:    geth.ToAddress(testAddress1),
-		Value: rpc.NewHexNumber(big.NewInt(1000000000000)),
+		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 	})
 	if err != status.ErrQueuedTxDiscarded {
 		t.Errorf("expected error not thrown: %v", err)
@@ -931,7 +1052,7 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool {
 		txHashCheck, err := backend.SendTransaction(nil, status.SendTxArgs{
 			From:  geth.FromAddress(testAddress),
 			To:    geth.ToAddress(testAddress1),
-			Value: rpc.NewHexNumber(big.NewInt(1000000000000)),
+			Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 		})
 		if err != status.ErrQueuedTxDiscarded {
 			t.Errorf("expected error not thrown: %v", err)
@@ -1101,6 +1222,11 @@ func startTestNode(t *testing.T) <-chan struct{} {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
 		}
+		if envelope.Type == geth.EventNodeCrashed {
+			geth.TriggerDefaultNodeNotificationHandler(jsonEvent)
+			return
+		}
+
 		if envelope.Type == geth.EventTransactionQueued {
 		}
 		if envelope.Type == geth.EventNodeStarted {

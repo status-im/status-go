@@ -1,6 +1,8 @@
 package geth_test
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -37,6 +39,15 @@ func TestMain(m *testing.M) {
 	}
 
 	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+		var envelope geth.SignalEnvelope
+		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
+			panic(fmt.Errorf("cannot unmarshal event's JSON: %s", jsonEvent))
+		}
+		if envelope.Type == geth.EventNodeCrashed {
+			geth.TriggerDefaultNodeNotificationHandler(jsonEvent)
+			return
+		}
+
 		if jsonEvent == `{"type":"node.started","event":{}}` {
 			signalRecieved <- struct{}{}
 		}
@@ -51,4 +62,23 @@ func TestMain(m *testing.M) {
 	abortPanic <- struct{}{}
 
 	os.Exit(m.Run())
+}
+
+func TestResetChainData(t *testing.T) {
+	err := geth.PrepareTestNode()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	if err := geth.NodeManagerInstance().ResetChainData(); err != nil {
+		t.Error(err)
+		return
+	}
+
+	// allow some time to re-sync
+	time.Sleep(geth.TestNodeSyncSeconds * time.Second)
+
+	// now make sure that everything is intact
+	TestQueuedTransactions(t)
 }

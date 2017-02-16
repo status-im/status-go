@@ -44,14 +44,6 @@ var (
 		Name:  "debug",
 		Usage: "output full trace logs",
 	}
-	ForceJitFlag = cli.BoolFlag{
-		Name:  "forcejit",
-		Usage: "forces jit compilation",
-	}
-	DisableJitFlag = cli.BoolFlag{
-		Name:  "nojit",
-		Usage: "disabled jit compilation",
-	}
 	CodeFlag = cli.StringFlag{
 		Name:  "code",
 		Usage: "EVM code",
@@ -95,6 +87,10 @@ var (
 		Name:  "create",
 		Usage: "indicates the action should be create rather than call",
 	}
+	DisableGasMeteringFlag = cli.BoolFlag{
+		Name:  "nogasmetering",
+		Usage: "disable gas metering",
+	}
 )
 
 func init() {
@@ -102,8 +98,6 @@ func init() {
 		CreateFlag,
 		DebugFlag,
 		VerbosityFlag,
-		ForceJitFlag,
-		DisableJitFlag,
 		SysStatFlag,
 		CodeFlag,
 		CodeFileFlag,
@@ -112,6 +106,7 @@ func init() {
 		ValueFlag,
 		DumpFlag,
 		InputFlag,
+		DisableGasMeteringFlag,
 	}
 	app.Action = run
 }
@@ -161,11 +156,13 @@ func run(ctx *cli.Context) error {
 		ret, _, err = runtime.Create(input, &runtime.Config{
 			Origin:   sender.Address(),
 			State:    statedb,
-			GasLimit: common.Big(ctx.GlobalString(GasFlag.Name)),
+			GasLimit: common.Big(ctx.GlobalString(GasFlag.Name)).Uint64(),
 			GasPrice: common.Big(ctx.GlobalString(PriceFlag.Name)),
 			Value:    common.Big(ctx.GlobalString(ValueFlag.Name)),
 			EVMConfig: vm.Config{
-				Tracer: logger,
+				Tracer:             logger,
+				Debug:              ctx.GlobalBool(DebugFlag.Name),
+				DisableGasMetering: ctx.GlobalBool(DisableGasMeteringFlag.Name),
 			},
 		})
 	} else {
@@ -175,11 +172,13 @@ func run(ctx *cli.Context) error {
 		ret, err = runtime.Call(receiver.Address(), common.Hex2Bytes(ctx.GlobalString(InputFlag.Name)), &runtime.Config{
 			Origin:   sender.Address(),
 			State:    statedb,
-			GasLimit: common.Big(ctx.GlobalString(GasFlag.Name)),
+			GasLimit: common.Big(ctx.GlobalString(GasFlag.Name)).Uint64(),
 			GasPrice: common.Big(ctx.GlobalString(PriceFlag.Name)),
 			Value:    common.Big(ctx.GlobalString(ValueFlag.Name)),
 			EVMConfig: vm.Config{
-				Tracer: logger,
+				Tracer:             logger,
+				Debug:              ctx.GlobalBool(DebugFlag.Name),
+				DisableGasMetering: ctx.GlobalBool(DisableGasMeteringFlag.Name),
 			},
 		})
 	}

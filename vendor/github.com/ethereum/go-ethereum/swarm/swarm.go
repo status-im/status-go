@@ -52,7 +52,9 @@ type Swarm struct {
 	hive        *network.Hive          // the logistic manager
 	backend     chequebook.Backend     // simple blockchain Backend
 	privateKey  *ecdsa.PrivateKey
+	corsString  string
 	swapEnabled bool
+	lstore      *storage.LocalStore // local store, needs to store for releasing resources after node stopped
 }
 
 type SwarmAPI struct {
@@ -71,7 +73,7 @@ func (self *Swarm) API() *SwarmAPI {
 
 // creates a new swarm service instance
 // implements node.Service
-func NewSwarm(ctx *node.ServiceContext, backend chequebook.Backend, config *api.Config, swapEnabled, syncEnabled bool) (self *Swarm, err error) {
+func NewSwarm(ctx *node.ServiceContext, backend chequebook.Backend, config *api.Config, swapEnabled, syncEnabled bool, cors string) (self *Swarm, err error) {
 	if bytes.Equal(common.FromHex(config.PublicKey), storage.ZeroKey) {
 		return nil, fmt.Errorf("empty public key")
 	}
@@ -84,11 +86,12 @@ func NewSwarm(ctx *node.ServiceContext, backend chequebook.Backend, config *api.
 		swapEnabled: swapEnabled,
 		backend:     backend,
 		privateKey:  config.Swap.PrivateKey(),
+		corsString:  cors,
 	}
 	glog.V(logger.Debug).Infof("Setting up Swarm service components")
 
 	hash := storage.MakeHashFunc(config.ChunkerParams.Hash)
-	lstore, err := storage.NewLocalStore(hash, config.StoreParams)
+	self.lstore, err = storage.NewLocalStore(hash, config.StoreParams)
 	if err != nil {
 		return
 	}
@@ -96,7 +99,7 @@ func NewSwarm(ctx *node.ServiceContext, backend chequebook.Backend, config *api.
 	// setup local store
 	glog.V(logger.Debug).Infof("Set up local storage")
 
-	self.dbAccess = network.NewDbAccess(lstore)
+	self.dbAccess = network.NewDbAccess(self.lstore)
 	glog.V(logger.Debug).Infof("Set up local db access (iterator/counter)")
 
 	// set up the kademlia hive
@@ -113,15 +116,15 @@ func NewSwarm(ctx *node.ServiceContext, backend chequebook.Backend, config *api.
 	glog.V(logger.Debug).Infof("-> set swarm forwarder as cloud storage backend")
 	// setup cloud storage internal access layer
 
-	self.storage = storage.NewNetStore(hash, lstore, cloud, config.StoreParams)
+	self.storage = storage.NewNetStore(hash, self.lstore, cloud, config.StoreParams)
 	glog.V(logger.Debug).Infof("-> swarm net store shared access layer to Swarm Chunk Store")
 
 	// set up Depo (storage handler = cloud storage access layer for incoming remote requests)
-	self.depo = network.NewDepo(hash, lstore, self.storage)
+	self.depo = network.NewDepo(hash, self.lstore, self.storage)
 	glog.V(logger.Debug).Infof("-> REmote Access to CHunks")
 
 	// set up DPA, the cloud storage local access layer
-	dpaChunkStore := storage.NewDpaChunkStore(lstore, self.storage)
+	dpaChunkStore := storage.NewDpaChunkStore(self.lstore, self.storage)
 	glog.V(logger.Debug).Infof("-> Local Access to Swarm")
 	// Swarm Hash Merklised Chunking for Arbitrary-length Document/File storage
 	self.dpa = storage.NewDPA(dpaChunkStore, self.config.ChunkerParams)
@@ -188,9 +191,15 @@ func (self *Swarm) Start(net *p2p.Server) error {
 
 	// start swarm http proxy server
 	if self.config.Port != "" {
-		go httpapi.StartHttpServer(self.api, self.config.Port)
+		addr := ":" + self.config.Port
+		go httpapi.StartHttpServer(self.api, &httpapi.Server{Addr: addr, CorsString: self.corsString})
 	}
+
 	glog.V(logger.Debug).Infof("Swarm http proxy started on port: %v", self.config.Port)
+
+	if self.corsString != "" {
+		glog.V(logger.Debug).Infof("Swarm http proxy started with corsdomain:", self.corsString)
+	}
 
 	return nil
 }
@@ -204,6 +213,11 @@ func (self *Swarm) Stop() error {
 		ch.Stop()
 		ch.Save()
 	}
+
+	if self.lstore != nil {
+		self.lstore.DbStore.Close()
+	}
+
 	return self.config.Save()
 }
 

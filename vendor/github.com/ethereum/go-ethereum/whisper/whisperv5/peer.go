@@ -148,7 +148,7 @@ func (peer *Peer) expire() {
 		return true
 	})
 	// Dump all known but unavailable
-	for hash, _ := range unmark {
+	for hash := range unmark {
 		peer.known.Remove(hash)
 	}
 }
@@ -174,4 +174,9 @@ func (p *Peer) broadcast() error {
 	}
 	glog.V(logger.Detail).Infoln(p.peer, "broadcasted", len(transmit), "message(s)")
 	return nil
+}
+
+func (p *Peer) ID() []byte {
+	id := p.peer.ID()
+	return id[:]
 }

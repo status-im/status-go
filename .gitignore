@@ -35,6 +35,8 @@ profile.cov
 
 # tests
 .ethereumtest/
+/vendor/**/*_test.go
+
 #
 # golang
 coverage.out

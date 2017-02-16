@@ -64,13 +64,14 @@ var (
 )
 
 // CreateAndRunNode creates and starts running Geth node locally (exposing given RPC port along the way)
-func CreateAndRunNode(dataDir string, rpcPort int) error {
-	nodeManager := NewNodeManager(dataDir, rpcPort)
+func CreateAndRunNode(config *NodeConfig) error {
+	defer HaltOnPanic()
+
+	nodeManager := NewNodeManager(config)
 
 	if nodeManager.NodeInited() {
 		nodeManager.RunNode()
-
-		<-nodeManager.node.started // block until node is ready
+		nodeManager.WaitNodeStarted()
 		return nil
 	}
 
@@ -78,14 +79,14 @@ func CreateAndRunNode(dataDir string, rpcPort int) error {
 }
 
 // NewNodeManager makes new instance of node manager
-func NewNodeManager(dataDir string, rpcPort int) *NodeManager {
+func NewNodeManager(config *NodeConfig) *NodeManager {
 	createOnce.Do(func() {
 		nodeManagerInstance = &NodeManager{
 			services: &NodeServiceStack{
 				jailedRequestQueue: NewJailedRequestsQueue(),
 			},
 		}
-		nodeManagerInstance.node = MakeNode(dataDir, rpcPort)
+		nodeManagerInstance.node = MakeNode(config)
 	})
 
 	return nodeManagerInstance
@@ -99,6 +100,8 @@ func NodeManagerInstance() *NodeManager {
 // RunNode starts Geth node
 func (m *NodeManager) RunNode() {
 	go func() {
+		defer HaltOnPanic()
+
 		m.StartNode()
 
 		if _, err := m.AccountManager(); err != nil {
@@ -133,6 +136,8 @@ func (m *NodeManager) RunNode() {
 
 		m.onNodeStarted() // node started, notify listeners
 		m.node.geth.Wait()
+
+		glog.V(logger.Info).Infoln("node stopped")
 	}()
 }
 
@@ -164,12 +169,71 @@ func (m *NodeManager) StartNode() {
 	}()
 }
 
+// StopNode stops running P2P node
+func (m *NodeManager) StopNode() error {
+	if m == nil || !m.NodeInited() {
+		return ErrInvalidGethNode
+	}
+
+	m.node.geth.Stop()
+	m.node.started = make(chan struct{})
+	return nil
+}
+
+// RestartNode restarts P2P node
 func (m *NodeManager) RestartNode() error {
 	if m == nil || !m.NodeInited() {
 		return ErrInvalidGethNode
 	}
 
-	return m.node.geth.Restart()
+	m.StopNode()
+	m.RunNode()
+	m.WaitNodeStarted()
+
+	return nil
+}
+
+// ResumeNode resumes previously stopped P2P node
+func (m *NodeManager) ResumeNode() error {
+	if m == nil || !m.NodeInited() {
+		return ErrInvalidGethNode
+	}
+
+	m.RunNode()
+	m.WaitNodeStarted()
+
+	// re-select the previously selected account
+	if err := ReSelectAccount(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// ResetChainData purges chain data (by removing data directory). Safe to apply on running P2P node.
+func (m *NodeManager) ResetChainData() error {
+	if m == nil || !m.NodeInited() {
+		return ErrInvalidGethNode
+	}
+
+	if err := m.StopNode(); err != nil {
+		return err
+	}
+
+	chainDataDir := filepath.Join(m.node.gethConfig.DataDir, m.node.gethConfig.Name, "lightchaindata")
+	if _, err := os.Stat(chainDataDir); os.IsNotExist(err) {
+		return err
+	}
+
+	if err := os.RemoveAll(chainDataDir); err != nil {
+		return err
+	}
+
+	if err := m.ResumeNode(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (m *NodeManager) StartNodeRPCServer() (bool, error) {
@@ -181,10 +245,10 @@ func (m *NodeManager) StartNodeRPCServer() (bool, error) {
 		return false, ErrInvalidNodeAPI
 	}
 
-	config := m.node.config
+	config := m.node.gethConfig
 	modules := strings.Join(config.HTTPModules, ",")
 
-	return m.api.StartRPC(&config.HTTPHost, rpc.NewHexNumber(config.HTTPPort), &config.HTTPCors, &modules)
+	return m.api.StartRPC(&config.HTTPHost, &config.HTTPPort, &config.HTTPCors, &modules)
 }
 
 // StopNodeRPCServer stops HTTP RPC service attached to node
@@ -289,6 +353,11 @@ func (m *NodeManager) AddPeer(url string) (bool, error) {
 	server.AddPeer(parsedNode)
 
 	return true, nil
+}
+
+// WaitNodeStarted blocks until node is started (start channel gets notified)
+func (m *NodeManager) WaitNodeStarted() {
+	<-m.node.started // block until node is started
 }
 
 // onNodeStarted sends upward notification letting the app know that Geth node is ready to be used

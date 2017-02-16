@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/mclock"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
@@ -46,9 +47,6 @@ import (
 )
 
 var (
-	chainlogger = logger.NewLogger("CHAIN")
-	jsonlogger  = logger.NewJsonLogger()
-
 	blockInsertTimer = metrics.NewTimer("chain/inserts")
 
 	ErrNoGenesis = errors.New("Genesis not found in chain")
@@ -109,12 +107,13 @@ type BlockChain struct {
 	pow       pow.PoW
 	processor Processor // block processor interface
 	validator Validator // block and state validator interface
+	vmConfig  vm.Config
 }
 
 // NewBlockChain returns a fully initialised block chain using information
 // available in the database. It initialiser the default Ethereum Validator and
 // Processor.
-func NewBlockChain(chainDb ethdb.Database, config *params.ChainConfig, pow pow.PoW, mux *event.TypeMux) (*BlockChain, error) {
+func NewBlockChain(chainDb ethdb.Database, config *params.ChainConfig, pow pow.PoW, mux *event.TypeMux, vmConfig vm.Config) (*BlockChain, error) {
 	bodyCache, _ := lru.New(bodyCacheLimit)
 	bodyRLPCache, _ := lru.New(bodyCacheLimit)
 	blockCache, _ := lru.New(blockCacheLimit)
@@ -130,6 +129,7 @@ func NewBlockChain(chainDb ethdb.Database, config *params.ChainConfig, pow pow.P
 		blockCache:   blockCache,
 		futureBlocks: futureBlocks,
 		pow:          pow,
+		vmConfig:     vmConfig,
 	}
 	bc.SetValidator(NewBlockValidator(config, bc, pow))
 	bc.SetProcessor(NewStateProcessor(config, bc))
@@ -150,7 +150,7 @@ func NewBlockChain(chainDb ethdb.Database, config *params.ChainConfig, pow pow.P
 		return nil, err
 	}
 	// Check the current state of the block hashes and make sure that we do not have any of the bad blocks in our chain
-	for hash, _ := range BadHashes {
+	for hash := range BadHashes {
 		if header := bc.GetHeaderByHash(hash); header != nil {
 			// get the canonical block corresponding to the offending header's number
 			headerByNumber := bc.GetHeaderByNumber(header.Number.Uint64())
@@ -402,10 +402,7 @@ func (bc *BlockChain) ResetWithGenesisBlock(genesis *types.Block) {
 
 // Export writes the active chain to the given writer.
 func (self *BlockChain) Export(w io.Writer) error {
-	if err := self.ExportN(w, uint64(0), self.currentBlock.NumberU64()); err != nil {
-		return err
-	}
-	return nil
+	return self.ExportN(w, uint64(0), self.currentBlock.NumberU64())
 }
 
 // ExportN writes a subset of the active chain to the given writer.
@@ -601,7 +598,11 @@ func (self *BlockChain) procFutureBlocks() {
 	}
 	if len(blocks) > 0 {
 		types.BlockBy(types.Number).Sort(blocks)
-		self.InsertChain(blocks)
+
+		// Insert one by one as chain insertion needs contiguous ancestry between blocks
+		for i := range blocks {
+			self.InsertChain(blocks[i : i+1])
+		}
 	}
 }
 
@@ -675,6 +676,18 @@ func SetReceiptsData(config *params.ChainConfig, block *types.Block, receipts ty
 // transaction and receipt data.
 // XXX should this be moved to the test?
 func (self *BlockChain) InsertReceiptChain(blockChain types.Blocks, receiptChain []types.Receipts) (int, error) {
+	// Do a sanity check that the provided chain is actually ordered and linked
+	for i := 1; i < len(blockChain); i++ {
+		if blockChain[i].NumberU64() != blockChain[i-1].NumberU64()+1 || blockChain[i].ParentHash() != blockChain[i-1].Hash() {
+			// Chain broke ancestry, log a messge (programming error) and skip insertion
+			failure := fmt.Errorf("non contiguous insert: item %d is #%d [%x…], item %d is #%d [%x…] (parent [%x…])", i-1, blockChain[i-1].NumberU64(),
+				blockChain[i-1].Hash().Bytes()[:4], i, blockChain[i].NumberU64(), blockChain[i].Hash().Bytes()[:4], blockChain[i].ParentHash().Bytes()[:4])
+
+			glog.V(logger.Error).Info(failure.Error())
+			return 0, failure
+		}
+	}
+	// Pre-checks passed, start the block body and receipt imports
 	self.wg.Add(1)
 	defer self.wg.Done()
 
@@ -789,7 +802,7 @@ func (self *BlockChain) InsertReceiptChain(blockChain types.Blocks, receiptChain
 	if stats.ignored > 0 {
 		ignored = fmt.Sprintf(" (%d ignored)", stats.ignored)
 	}
-	glog.V(logger.Info).Infof("imported %d receipts in %9v. #%d [%x… / %x…]%s", stats.processed, common.PrettyDuration(time.Since(start)), last.Number(), first.Hash().Bytes()[:4], last.Hash().Bytes()[:4], ignored)
+	glog.V(logger.Info).Infof("imported %4d receipts in %9v. #%d [%x… / %x…]%s", stats.processed, common.PrettyDuration(time.Since(start)), last.Number(), first.Hash().Bytes()[:4], last.Hash().Bytes()[:4], ignored)
 
 	return 0, nil
 }
@@ -840,9 +853,21 @@ func (self *BlockChain) WriteBlock(block *types.Block) (status WriteStatus, err 
 	return
 }
 
-// InsertChain will attempt to insert the given chain in to the canonical chain or, otherwise, create a fork. It an error is returned
+// InsertChain will attempt to insert the given chain in to the canonical chain or, otherwise, create a fork. If an error is returned
 // it will return the index number of the failing block as well an error describing what went wrong (for possible errors see core/errors.go).
 func (self *BlockChain) InsertChain(chain types.Blocks) (int, error) {
+	// Do a sanity check that the provided chain is actually ordered and linked
+	for i := 1; i < len(chain); i++ {
+		if chain[i].NumberU64() != chain[i-1].NumberU64()+1 || chain[i].ParentHash() != chain[i-1].Hash() {
+			// Chain broke ancestry, log a messge (programming error) and skip insertion
+			failure := fmt.Errorf("non contiguous insert: item %d is #%d [%x…], item %d is #%d [%x…] (parent [%x…])",
+				i-1, chain[i-1].NumberU64(), chain[i-1].Hash().Bytes()[:4], i, chain[i].NumberU64(), chain[i].Hash().Bytes()[:4], chain[i].ParentHash().Bytes()[:4])
+
+			glog.V(logger.Error).Info(failure.Error())
+			return 0, failure
+		}
+	}
+	// Pre-checks passed, start the full block imports
 	self.wg.Add(1)
 	defer self.wg.Done()
 
@@ -853,9 +878,9 @@ func (self *BlockChain) InsertChain(chain types.Blocks) (int, error) {
 	// faster than direct delivery and requires much less mutex
 	// acquiring.
 	var (
-		stats         = insertStats{startTime: time.Now()}
+		stats         = insertStats{startTime: mclock.Now()}
 		events        = make([]interface{}, 0, len(chain))
-		coalescedLogs vm.Logs
+		coalescedLogs []*types.Log
 		nonceChecked  = make([]bool, len(chain))
 	)
 
@@ -916,10 +941,8 @@ func (self *BlockChain) InsertChain(chain types.Blocks) (int, error) {
 			}
 
 			self.reportBlock(block, nil, err)
-
 			return i, err
 		}
-
 		// Create a new statedb using the parent block and report an
 		// error if it fails.
 		switch {
@@ -933,7 +956,7 @@ func (self *BlockChain) InsertChain(chain types.Blocks) (int, error) {
 			return i, err
 		}
 		// Process block using the parent state as reference point.
-		receipts, logs, usedGas, err := self.processor.Process(block, self.stateCache, vm.Config{})
+		receipts, logs, usedGas, err := self.processor.Process(block, self.stateCache, self.vmConfig)
 		if err != nil {
 			self.reportBlock(block, receipts, err)
 			return i, err
@@ -983,6 +1006,10 @@ func (self *BlockChain) InsertChain(chain types.Blocks) (int, error) {
 			if err := WriteMipmapBloom(self.chainDb, block.NumberU64(), receipts); err != nil {
 				return i, err
 			}
+			// Write hash preimages
+			if err := WritePreimages(self.chainDb, block.NumberU64(), self.stateCache.Preimages()); err != nil {
+				return i, err
+			}
 		case SideStatTy:
 			if glog.V(logger.Detail) {
 				glog.Infof("inserted forked block #%d [%x…] (TD=%v) in %9v: %3d txs %d uncles.", block.Number(), block.Hash().Bytes()[0:4], block.Difficulty(), common.PrettyDuration(time.Since(bstart)), len(block.Transactions()), len(block.Uncles()))
@@ -1011,7 +1038,7 @@ type insertStats struct {
 	queued, processed, ignored int
 	usedGas                    uint64
 	lastIndex                  int
-	startTime                  time.Time
+	startTime                  mclock.AbsTime
 }
 
 // statsReportLimit is the time limit during import after which we always print
@@ -1023,28 +1050,24 @@ const statsReportLimit = 8 * time.Second
 func (st *insertStats) report(chain []*types.Block, index int) {
 	// Fetch the timings for the batch
 	var (
-		now     = time.Now()
-		elapsed = now.Sub(st.startTime)
+		now     = mclock.Now()
+		elapsed = time.Duration(now) - time.Duration(st.startTime)
 	)
-	if elapsed == 0 { // Yes Windows, I'm looking at you
-		elapsed = 1
-	}
 	// If we're at the last block of the batch or report period reached, log
 	if index == len(chain)-1 || elapsed >= statsReportLimit {
 		start, end := chain[st.lastIndex], chain[index]
 		txcount := countTransactions(chain[st.lastIndex : index+1])
 
-		extra := ""
+		var hashes, extra string
 		if st.queued > 0 || st.ignored > 0 {
 			extra = fmt.Sprintf(" (%d queued %d ignored)", st.queued, st.ignored)
 		}
-		hashes := ""
 		if st.processed > 1 {
 			hashes = fmt.Sprintf("%x… / %x…", start.Hash().Bytes()[:4], end.Hash().Bytes()[:4])
 		} else {
 			hashes = fmt.Sprintf("%x…", end.Hash().Bytes()[:4])
 		}
-		glog.Infof("imported %d blocks, %5d txs (%7.3f Mg) in %9v (%6.3f Mg/s). #%v [%s]%s", st.processed, txcount, float64(st.usedGas)/1000000, common.PrettyDuration(elapsed), float64(st.usedGas)*1000/float64(elapsed), end.Number(), hashes, extra)
+		glog.Infof("imported %4d blocks, %5d txs (%7.3f Mg) in %9v (%6.3f Mg/s). #%v [%s]%s", st.processed, txcount, float64(st.usedGas)/1000000, common.PrettyDuration(elapsed), float64(st.usedGas)*1000/float64(elapsed), end.Number(), hashes, extra)
 
 		*st = insertStats{startTime: now, lastIndex: index}
 	}
@@ -1065,10 +1088,8 @@ func (self *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 		newChain    types.Blocks
 		oldChain    types.Blocks
 		commonBlock *types.Block
-		oldStart    = oldBlock
-		newStart    = newBlock
 		deletedTxs  types.Transactions
-		deletedLogs vm.Logs
+		deletedLogs []*types.Log
 		// collectLogs collects the logs that were generated during the
 		// processing of the block that corresponds with the given hash.
 		// These logs are later announced as deleted.
@@ -1107,7 +1128,6 @@ func (self *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 		return fmt.Errorf("Invalid new chain")
 	}
 
-	numSplit := newBlock.Number()
 	for {
 		if oldBlock.Hash() == newBlock.Hash() {
 			commonBlock = oldBlock
@@ -1128,9 +1148,19 @@ func (self *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 		}
 	}
 
-	if glog.V(logger.Debug) {
-		commonHash := commonBlock.Hash()
-		glog.Infof("Chain split detected @ %x. Reorganising chain from #%v %x to %x", commonHash[:4], numSplit, oldStart.Hash().Bytes()[:4], newStart.Hash().Bytes()[:4])
+	if oldLen := len(oldChain); oldLen > 63 || glog.V(logger.Debug) {
+		newLen := len(newChain)
+		newLast := newChain[0]
+		newFirst := newChain[newLen-1]
+		oldLast := oldChain[0]
+		oldFirst := oldChain[oldLen-1]
+		glog.Infof("Chain split detected after #%v [%x…]. Reorganising chain (-%v +%v blocks), rejecting #%v-#%v [%x…/%x…] in favour of #%v-#%v [%x…/%x…]",
+			commonBlock.Number(), commonBlock.Hash().Bytes()[:4],
+			oldLen, newLen,
+			oldFirst.Number(), oldLast.Number(),
+			oldFirst.Hash().Bytes()[:4], oldLast.Hash().Bytes()[:4],
+			newFirst.Number(), newLast.Number(),
+			newFirst.Hash().Bytes()[:4], newLast.Hash().Bytes()[:4])
 	}
 
 	var addedTxs types.Transactions
@@ -1184,7 +1214,7 @@ func (self *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 
 // postChainEvents iterates over the events generated by a chain insertion and
 // posts them into the event mux.
-func (self *BlockChain) postChainEvents(events []interface{}, logs vm.Logs) {
+func (self *BlockChain) postChainEvents(events []interface{}, logs []*types.Log) {
 	// post event logs for further processing
 	self.eventMux.Post(logs)
 	for _, event := range events {

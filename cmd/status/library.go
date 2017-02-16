@@ -200,20 +200,47 @@ func DiscardTransactions(ids *C.char) *C.char {
 //export StartNode
 func StartNode(datadir *C.char) *C.char {
 	// This starts a geth node with the given datadir
-	err := geth.CreateAndRunNode(C.GoString(datadir), geth.RPCPort)
+	err := geth.CreateAndRunNode(&geth.NodeConfig{
+		DataDir:    C.GoString(datadir),
+		IPCEnabled: false,
+		HTTPPort:   geth.HTTPPort,
+		WSEnabled:  false,
+		WSPort:     geth.WSPort,
+		TLSEnabled: false,
+	})
 
-	errString := ""
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		errString = err.Error()
-	}
+	return makeJSONErrorResponse(err)
+}
 
-	out := geth.JSONError{
-		Error: errString,
-	}
-	outBytes, _ := json.Marshal(&out)
+//export StopNode
+func StopNode() *C.char {
+	err := geth.NodeManagerInstance().StopNode()
+	return makeJSONErrorResponse(err)
+}
 
-	return C.CString(string(outBytes))
+//export ResumeNode
+func ResumeNode() *C.char {
+	err := geth.NodeManagerInstance().ResumeNode()
+	return makeJSONErrorResponse(err)
+}
+
+//export ResetChainData
+func ResetChainData() *C.char {
+	err := geth.NodeManagerInstance().ResetChainData()
+	return makeJSONErrorResponse(err)
+}
+
+//export StartTLSNode
+func StartTLSNode(datadir *C.char) *C.char {
+	// This starts a geth node with the given datadir
+	err := geth.CreateAndRunNode(&geth.NodeConfig{
+		DataDir:    C.GoString(datadir),
+		HTTPPort:   geth.HTTPPort,
+		WSPort:     geth.WSPort,
+		TLSEnabled: true,
+	})
+
+	return makeJSONErrorResponse(err)
 }
 
 //export StopNodeRPCServer
