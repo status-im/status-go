@@ -20,7 +20,7 @@ import (
 
 const (
 	testDataDir         = "../../.ethereumtest"
-	testNodeSyncSeconds = 120
+	testNodeSyncSeconds = 30
 	testAddress         = "0xadaf150b905cf5e6a778e553e15a139b6618bbb7"
 	testAddressPassword = "asdfasdf"
 	newAccountPassword  = "badpassword"
