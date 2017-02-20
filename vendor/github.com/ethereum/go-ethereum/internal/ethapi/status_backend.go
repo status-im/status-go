@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/les/status"
 	"github.com/ethereum/go-ethereum/logger"
 	"github.com/ethereum/go-ethereum/logger/glog"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/pborman/uuid"
 	"golang.org/x/net/context"
 )
@@ -81,6 +82,12 @@ func (b *StatusBackend) AccountManager() *status.AccountManager {
 func (b *StatusBackend) SendTransaction(ctx context.Context, args status.SendTxArgs) (common.Hash, error) {
 	if ctx == nil {
 		ctx = context.Background()
+	}
+
+	if estimatedGas, err := b.EstimateGas(ctx, args); err == nil {
+		if estimatedGas.BigInt().Cmp(rpc.NewHexNumber(defaultGas).BigInt()) == 1 { // gas > defaultGas
+			args.Gas = estimatedGas
+		}
 	}
 
 	queuedTx := &status.QueuedTx{
@@ -158,4 +165,31 @@ func (b *StatusBackend) DiscardQueuedTransaction(id status.QueuedTxId) error {
 	queuedTx.Discard <- struct{}{} // sendTransaction() waits on this, notify so that it can return
 
 	return nil
+}
+
+// EstimateGas uses underlying blockchain API to obtain gas for a given tx arguments
+func (b *StatusBackend) EstimateGas(ctx context.Context, args status.SendTxArgs) (*rpc.HexNumber, error) {
+	if args.Gas != nil {
+		return args.Gas, nil
+	}
+
+	var gasPrice rpc.HexNumber
+	if args.GasPrice != nil {
+		gasPrice = *args.GasPrice
+	}
+
+	var value rpc.HexNumber
+	if args.Value != nil {
+		value = *args.Value
+	}
+
+	callArgs := CallArgs{
+		From:     args.From,
+		To:       args.To,
+		GasPrice: gasPrice,
+		Value:    value,
+		Data:     args.Data,
+	}
+
+	return b.bcapi.EstimateGas(ctx, callArgs)
 }
