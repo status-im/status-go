@@ -7,6 +7,8 @@ import (
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/ethereum/go-ethereum/logger"
+	"github.com/ethereum/go-ethereum/logger/glog"
 	"golang.org/x/net/context"
 )
 
@@ -27,9 +29,14 @@ var (
 // TxQueue is capped container that holds pending transactions
 type TxQueue struct {
 	transactions  map[QueuedTxId]*QueuedTx
-	mu            sync.RWMutex // to guard trasactions map
+	mu            sync.RWMutex // to guard transactions map
 	evictableIds  chan QueuedTxId
 	enqueueTicker chan struct{}
+	incomingPool  chan *QueuedTx
+
+	// when this channel is closed, all queue channels processing must cease (incoming queue, processing queued items etc)
+	stopped      chan struct{}
+	stoppedGroup sync.WaitGroup // to make sure that all routines are stopped
 
 	// when items are enqueued notify subscriber
 	txEnqueueHandler EnqueuedTxHandler
@@ -57,7 +64,7 @@ type EnqueuedTxHandler func(QueuedTx)
 // EnqueuedTxReturnHandler is a function that receives response when tx is complete (both on success and error)
 type EnqueuedTxReturnHandler func(queuedTx *QueuedTx, err error)
 
-// SendTxArgs represents the arguments to submbit a new transaction into the transaction pool.
+// SendTxArgs represents the arguments to submit a new transaction into the transaction pool.
 type SendTxArgs struct {
 	From     common.Address  `json:"from"`
 	To       *common.Address `json:"to"`
@@ -69,22 +76,58 @@ type SendTxArgs struct {
 }
 
 func NewTransactionQueue() *TxQueue {
-	txQueue := &TxQueue{
+	glog.V(logger.Info).Infof("StatusIM: initializing transaction queue")
+	return &TxQueue{
 		transactions:  make(map[QueuedTxId]*QueuedTx),
 		evictableIds:  make(chan QueuedTxId, DefaultTxQueueCap), // will be used to evict in FIFO
 		enqueueTicker: make(chan struct{}),
+		incomingPool:  make(chan *QueuedTx, DefaultTxSendQueueCap),
 	}
+}
 
-	go txQueue.evictionLoop()
+func (q *TxQueue) Start() {
+	glog.V(logger.Info).Infof("StatusIM: starting transaction queue")
 
-	return txQueue
+	q.stopped = make(chan struct{})
+	q.stoppedGroup.Add(2)
+
+	go q.evictionLoop()
+	go q.enqueueLoop()
+}
+
+func (q *TxQueue) Stop() {
+	glog.V(logger.Info).Infof("StatusIM: stopping transaction queue")
+	close(q.stopped) // stops all processing loops (enqueue, eviction etc)
+	q.stoppedGroup.Wait()
 }
 
 func (q *TxQueue) evictionLoop() {
-	for range q.enqueueTicker {
-		if len(q.transactions) >= (DefaultTxQueueCap - 1) { // eviction is required to accommodate another/last item
-			q.Remove(<-q.evictableIds)
-			q.enqueueTicker <- struct{}{} // in case we pulled already removed item
+	for {
+		select {
+		case <-q.enqueueTicker:
+			if len(q.transactions) >= (DefaultTxQueueCap - 1) { // eviction is required to accommodate another/last item
+				q.Remove(<-q.evictableIds)
+				q.enqueueTicker <- struct{}{} // in case we pulled already removed item
+			}
+		case <-q.stopped:
+			glog.V(logger.Info).Infof("StatusIM: transaction queue's eviction loop stopped")
+			q.stoppedGroup.Done()
+			return
+		}
+	}
+}
+
+func (q *TxQueue) enqueueLoop() {
+	// enqueue incoming transactions
+	for {
+		select {
+		case queuedTx := <-q.incomingPool:
+			glog.V(logger.Info).Infof("StatusIM: transaction enqueued %v", queuedTx.Id)
+			q.Enqueue(queuedTx)
+		case <-q.stopped:
+			glog.V(logger.Info).Infof("StatusIM: transaction queue's enqueue loop stopped")
+			q.stoppedGroup.Done()
+			return
 		}
 	}
 }
@@ -96,6 +139,12 @@ func (q *TxQueue) Reset() {
 
 	q.transactions = make(map[QueuedTxId]*QueuedTx)
 	q.evictableIds = make(chan QueuedTxId, DefaultTxQueueCap)
+}
+
+func (q *TxQueue) EnqueueAsync(tx *QueuedTx) error {
+	q.incomingPool <- tx
+
+	return nil
 }
 
 func (q *TxQueue) Enqueue(tx *QueuedTx) error {

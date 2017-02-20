@@ -114,6 +114,7 @@ func (am *Manager) Accounts() []Account {
 	return am.cache.accounts()
 }
 
+// AccountDecryptedKey returns decrypted key for account (provided that password is correct).
 func (am *Manager) AccountDecryptedKey(a Account, auth string) (Account, *Key, error) {
 	return am.getDecryptedKey(a, auth)
 }

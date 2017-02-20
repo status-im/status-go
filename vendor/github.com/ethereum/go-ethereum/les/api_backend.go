@@ -36,8 +36,13 @@ import (
 )
 
 type LesApiBackend struct {
-	eth *LightEthereum
-	gpo *gasprice.LightPriceOracle
+	eth           *LightEthereum
+	gpo           *gasprice.LightPriceOracle
+	statusBackend *ethapi.StatusBackend
+}
+
+func (b *LesApiBackend) GetStatusBackend() *ethapi.StatusBackend {
+	return b.statusBackend
 }
 
 func (b *LesApiBackend) ChainConfig() *params.ChainConfig {
@@ -110,7 +115,7 @@ func (b *LesApiBackend) RemoveTx(txHash common.Hash) {
 	b.eth.txPool.RemoveTx(txHash)
 }
 
-func (b *LesApiBackend) GetPoolTransactions() types.Transactions {
+func (b *LesApiBackend) GetPoolTransactions() (types.Transactions, error) {
 	return b.eth.txPool.GetTransactions()
 }
 

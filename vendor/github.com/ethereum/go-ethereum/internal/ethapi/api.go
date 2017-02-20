@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/ethereum/ethash"
@@ -40,13 +39,14 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/pborman/uuid"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/util"
 	"golang.org/x/net/context"
 )
 
 const defaultGas = uint64(90000)
+
+var emptyHex = "0x"
 
 // PublicEthereumAPI provides an API to access Ethereum related information.
 // It offers only methods that operate on public data that is freely available to anyone.
@@ -178,18 +178,22 @@ func (s *PublicTxPoolAPI) Inspect() map[string]map[string]map[string]string {
 // It offers only methods that can retrieve accounts.
 type PublicAccountAPI struct {
 	am *accounts.Manager
+	b  Backend
 }
 
 // NewPublicAccountAPI creates a new PublicAccountAPI.
-func NewPublicAccountAPI(am *accounts.Manager) *PublicAccountAPI {
-	return &PublicAccountAPI{am: am}
+func NewPublicAccountAPI(b Backend) *PublicAccountAPI {
+	return &PublicAccountAPI{
+		am: b.AccountManager(),
+		b:  b,
+	}
 }
 
 // Accounts returns the collection of accounts this node manages
 func (s *PublicAccountAPI) Accounts() []accounts.Account {
-	backend := GetStatusBackend()
+	backend := s.b.GetStatusBackend()
 	if backend != nil {
-		return statusBackend.am.Accounts()
+		return backend.am.Accounts()
 	}
 
 	return s.am.Accounts()
@@ -214,9 +218,9 @@ func NewPrivateAccountAPI(b Backend) *PrivateAccountAPI {
 // ListAccounts will return a list of addresses for accounts this node manages.
 func (s *PrivateAccountAPI) ListAccounts() []common.Address {
 	var accounts []accounts.Account
-	backend := GetStatusBackend()
+	backend := s.b.GetStatusBackend()
 	if backend != nil {
-		accounts = statusBackend.am.Accounts()
+		accounts = backend.am.Accounts()
 	} else {
 		accounts = s.am.Accounts()
 	}
@@ -797,25 +801,13 @@ func newRPCTransaction(b *types.Block, txHash common.Hash) (*RPCTransaction, err
 
 // PublicTransactionPoolAPI exposes methods for the RPC interface
 type PublicTransactionPoolAPI struct {
-	b       Backend
-	txQueue chan *status.QueuedTx
+	b Backend
 }
-
-var txSingletonQueue chan *status.QueuedTx
 
 // NewPublicTransactionPoolAPI creates a new RPC service with methods specific for the transaction pool.
 func NewPublicTransactionPoolAPI(b Backend) *PublicTransactionPoolAPI {
-	var once sync.Once
-	once.Do(func() {
-		if txSingletonQueue == nil {
-			glog.V(logger.Info).Infof("Transaction queue inited (Public Transaction Pool API)")
-			txSingletonQueue = make(chan *status.QueuedTx, status.DefaultTxSendQueueCap)
-		}
-	})
-
 	return &PublicTransactionPoolAPI{
-		b:       b,
-		txQueue: txSingletonQueue,
+		b: b,
 	}
 }
 
@@ -1079,42 +1071,14 @@ func submitTransaction(ctx context.Context, b Backend, tx *types.Transaction, si
 	return signedTx.Hash(), nil
 }
 
-func (s *PublicTransactionPoolAPI) GetTransactionQueue() (chan *status.QueuedTx, error) {
-	return s.txQueue, nil
-}
-
 // SendTransaction queues transactions, to be fulfilled by CompleteQueuedTransaction()
 func (s *PublicTransactionPoolAPI) SendTransaction(ctx context.Context, args SendTxArgs) (common.Hash, error) {
-	queuedTx := &status.QueuedTx{
-		Id:      status.QueuedTxId(uuid.New()),
-		Hash:    common.Hash{},
-		Context: ctx,
-		Args:    status.SendTxArgs(args),
-		Done:    make(chan struct{}, 1),
-		Discard: make(chan struct{}, 1),
+	backend := s.b.GetStatusBackend()
+	if backend != nil {
+		return backend.SendTransaction(ctx, status.SendTxArgs(args))
 	}
 
-	// send transaction to pending pool
-	s.txQueue <- queuedTx
-
-	// now wait up until transaction is:
-	// - completed (via CompleteQueuedTransaction),
-	// - discarded (via DiscardQueuedTransaction)
-	// - or times out
-	backend := GetStatusBackend()
-	select {
-	case <-queuedTx.Done:
-		backend.NotifyOnQueuedTxReturn(queuedTx, queuedTx.Err)
-		return queuedTx.Hash, queuedTx.Err
-	case <-queuedTx.Discard:
-		backend.NotifyOnQueuedTxReturn(queuedTx, status.ErrQueuedTxDiscarded)
-		return queuedTx.Hash, queuedTx.Err
-	case <-time.After(status.DefaultTxSendCompletionTimeout * time.Second):
-		backend.NotifyOnQueuedTxReturn(queuedTx, status.ErrQueuedTxTimedOut)
-		return common.Hash{}, status.ErrQueuedTxTimedOut
-	}
-
-	return queuedTx.Hash, nil
+	return common.Hash{}, ErrStatusBackendNotInited
 }
 
 // CompleteQueuedTransaction creates a transaction by unpacking queued transaction, signs it and submits to the
@@ -1348,8 +1312,12 @@ func (s *PublicTransactionPoolAPI) SignTransaction(ctx context.Context, args Sig
 
 // PendingTransactions returns the transactions that are in the transaction pool and have a from address that is one of
 // the accounts this node manages.
-func (s *PublicTransactionPoolAPI) PendingTransactions() []*RPCTransaction {
-	pending := s.b.GetPoolTransactions()
+func (s *PublicTransactionPoolAPI) PendingTransactions() ([]*RPCTransaction, error) {
+	pending, err := s.b.GetPoolTransactions()
+	if err != nil {
+		return nil, err
+	}
+
 	transactions := make([]*RPCTransaction, 0, len(pending))
 	for _, tx := range pending {
 		var signer types.Signer = types.HomesteadSigner{}
@@ -1361,13 +1329,17 @@ func (s *PublicTransactionPoolAPI) PendingTransactions() []*RPCTransaction {
 			transactions = append(transactions, newRPCPendingTransaction(tx))
 		}
 	}
-	return transactions
+	return transactions, nil
 }
 
 // Resend accepts an existing transaction and a new gas price and limit. It will remove the given transaction from the
 // pool and reinsert it with the new gas price and limit.
 func (s *PublicTransactionPoolAPI) Resend(ctx context.Context, tx Tx, gasPrice, gasLimit *rpc.HexNumber) (common.Hash, error) {
-	pending := s.b.GetPoolTransactions()
+	pending, err := s.b.GetPoolTransactions()
+	if err != nil {
+		return common.Hash{}, err
+	}
+
 	for _, p := range pending {
 		var signer types.Signer = types.HomesteadSigner{}
 		if p.Protected() {

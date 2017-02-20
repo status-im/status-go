@@ -37,8 +37,13 @@ import (
 
 // EthApiBackend implements ethapi.Backend for full nodes
 type EthApiBackend struct {
-	eth *Ethereum
-	gpo *gasprice.GasPriceOracle
+	eth           *Ethereum
+	gpo           *gasprice.GasPriceOracle
+	statusBackend *ethapi.StatusBackend
+}
+
+func (b *EthApiBackend) GetStatusBackend() *ethapi.StatusBackend {
+	return b.statusBackend
 }
 
 func (b *EthApiBackend) ChainConfig() *params.ChainConfig {
@@ -131,15 +136,20 @@ func (b *EthApiBackend) RemoveTx(txHash common.Hash) {
 	b.eth.txPool.Remove(txHash)
 }
 
-func (b *EthApiBackend) GetPoolTransactions() types.Transactions {
+func (b *EthApiBackend) GetPoolTransactions() (types.Transactions, error) {
 	b.eth.txMu.Lock()
 	defer b.eth.txMu.Unlock()
 
+	pending, err := b.eth.txPool.Pending()
+	if err != nil {
+		return nil, err
+	}
+
 	var txs types.Transactions
-	for _, batch := range b.eth.txPool.Pending() {
+	for _, batch := range pending {
 		txs = append(txs, batch...)
 	}
-	return txs
+	return txs, nil
 }
 
 func (b *EthApiBackend) GetPoolTransaction(hash common.Hash) *types.Transaction {
