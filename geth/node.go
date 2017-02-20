@@ -19,6 +19,8 @@ import (
 	"github.com/ethereum/go-ethereum/logger"
 	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/ethereum/go-ethereum/node"
+	"github.com/ethereum/go-ethereum/p2p/discover"
+	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv2"
@@ -92,10 +94,8 @@ func MakeNode(dataDir string, rpcPort int) *Node {
 	glog.CopyStandardLogTo("INFO")
 	glog.SetToStderr(true)
 
-	bootstrapNodes := params.MainnetBootnodes
 	if UseTestnet {
 		dataDir = filepath.Join(dataDir, "testnet")
-		bootstrapNodes = params.TestnetBootnodes
 	}
 
 	// configure required node (should you need to update node's config, e.g. add bootstrap nodes, see node.Config)
@@ -107,8 +107,8 @@ func MakeNode(dataDir string, rpcPort int) *Node {
 		NoDiscovery:       true,
 		DiscoveryV5:       true,
 		DiscoveryV5Addr:   fmt.Sprintf(":%d", NetworkPort+1),
-		BootstrapNodes:    bootstrapNodes,
-		BootstrapNodesV5:  params.DiscoveryV5Bootnodes,
+		BootstrapNodes:    makeBootstrapNodes(),
+		BootstrapNodesV5:  makeBootstrapNodesV5(),
 		ListenAddr:        fmt.Sprintf(":%d", NetworkPort),
 		MaxPeers:          MaxPeers,
 		MaxPendingPeers:   MaxPendingPeers,
@@ -267,6 +267,33 @@ func makeDefaultExtra() []byte {
 	}
 
 	return extra
+}
+
+// makeBootstrapNodes returns default (hence bootstrap) list of peers
+func makeBootstrapNodes() []*discover.Node {
+	enodes := params.MainnetBootnodes
+	if UseTestnet {
+		enodes = params.TestnetBootnodes
+	}
+
+	var bootstapNodes []*discover.Node
+	for _, enode := range enodes {
+		bootstapNodes = append(bootstapNodes, discover.MustParseNode(enode.String()))
+	}
+
+	return bootstapNodes
+}
+
+// makeBootstrapNodesV5 returns default (hence bootstrap) list of peers
+func makeBootstrapNodesV5() []*discv5.Node {
+	enodes := params.DiscoveryV5Bootnodes
+
+	var bootstapNodes []*discv5.Node
+	for _, enode := range enodes {
+		bootstapNodes = append(bootstapNodes, discv5.MustParseNode(enode.String()))
+	}
+
+	return bootstapNodes
 }
 
 func Fatalf(reason interface{}, args ...interface{}) {
