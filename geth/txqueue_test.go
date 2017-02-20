@@ -87,16 +87,12 @@ func TestQueuedContracts(t *testing.T) {
 	})
 
 	//  this call blocks, up until Complete Transaction is called
-	byteCode, err := hexutil.Decode(`0x6060604052341561000c57fe5b5b60a58061001b6000396000f30060606040526000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff1680636ffa1caa14603a575bfe5b3415604157fe5b60556004808035906020019091905050606b565b6040518082815260200191505060405180910390f35b60008160020290505b9190505600a165627a7a72305820ccdadd737e4ac7039963b54cee5e5afb25fa859a275252bdcf06f653155228210029`)
-	if err != nil {
-		t.Error(err)
-		return
-	}
+	byteCode := `0x6060604052341561000c57fe5b5b60a58061001b6000396000f30060606040526000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff1680636ffa1caa14603a575bfe5b3415604157fe5b60556004808035906020019091905050606b565b6040518082815260200191505060405180910390f35b60008160020290505b9190505600a165627a7a72305820ccdadd737e4ac7039963b54cee5e5afb25fa859a275252bdcf06f653155228210029`
 	txHashCheck, err := backend.SendTransaction(nil, status.SendTxArgs{
 		From: geth.FromAddress(testAddress),
 		To:   nil, // marker, contract creation is expected
 		//Value: (*hexutil.Big)(new(big.Int).Mul(big.NewInt(1), common.Ether)),
-		Gas:  (*hexutil.Big)(big.NewInt(geth.DefaultGas)),
+		Gas:  (*rpc.HexNumber)(big.NewInt(geth.DefaultGas)),
 		Data: byteCode,
 	})
 	if err != nil {
@@ -119,6 +115,8 @@ func TestQueuedContracts(t *testing.T) {
 		t.Error("tx queue must be empty at this point")
 		return
 	}
+
+	time.Sleep(10 * time.Second)
 }
 
 func TestQueuedTransactions(t *testing.T) {

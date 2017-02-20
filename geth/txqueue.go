@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/les/status"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/robertkrimen/otto"
 )
 
@@ -268,26 +269,21 @@ func (r RPCCall) parseToAddress() *common.Address {
 	return &address
 }
 
-func (r RPCCall) parseData() hexutil.Bytes {
+func (r RPCCall) parseData() string {
 	params, ok := r.Params[0].(map[string]interface{})
 	if !ok {
-		return hexutil.Bytes("0x")
+		return "0x"
 	}
 
 	data, ok := params["data"].(string)
 	if !ok {
-		data = "0x"
+		return "0x"
 	}
 
-	byteCode, err := hexutil.Decode(data)
-	if err != nil {
-		byteCode = hexutil.Bytes(data)
-	}
-
-	return byteCode
+	return data
 }
 
-func (r RPCCall) parseValue() *hexutil.Big {
+func (r RPCCall) parseValue() *rpc.HexNumber {
 	params, ok := r.Params[0].(map[string]interface{})
 	if !ok {
 		return nil
@@ -304,10 +300,10 @@ func (r RPCCall) parseValue() *hexutil.Big {
 		return nil
 	}
 
-	return (*hexutil.Big)(parsedValue)
+	return (*rpc.HexNumber)(parsedValue)
 }
 
-func (r RPCCall) parseGas() *hexutil.Big {
+func (r RPCCall) parseGas() *rpc.HexNumber {
 	params, ok := r.Params[0].(map[string]interface{})
 	if !ok {
 		return nil
@@ -323,10 +319,10 @@ func (r RPCCall) parseGas() *hexutil.Big {
 		return nil
 	}
 
-	return (*hexutil.Big)(parsedValue)
+	return (*rpc.HexNumber)(parsedValue)
 }
 
-func (r RPCCall) parseGasPrice() *hexutil.Big {
+func (r RPCCall) parseGasPrice() *rpc.HexNumber {
 	params, ok := r.Params[0].(map[string]interface{})
 	if !ok {
 		return nil
@@ -342,7 +338,7 @@ func (r RPCCall) parseGasPrice() *hexutil.Big {
 		return nil
 	}
 
-	return (*hexutil.Big)(parsedValue)
+	return (*rpc.HexNumber)(parsedValue)
 }
 
 func parseJSONArray(items string) ([]string, error) {
