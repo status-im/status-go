@@ -8,8 +8,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/les/status"
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/robertkrimen/otto"
 )
 
@@ -264,8 +264,8 @@ func sendTxArgsFromRPCCall(req RPCCall) status.SendTxArgs {
 	return status.SendTxArgs{
 		From:  common.HexToAddress(from),
 		To:    &toAddress,
-		Value: rpc.NewHexNumber(big.NewInt(value)),
-		Data:  data,
+		Value: (*hexutil.Big)(big.NewInt(value)),
+		Data:  hexutil.Bytes(data),
 	}
 }
 
