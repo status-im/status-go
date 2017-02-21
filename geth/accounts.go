@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/accounts"
+	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/status-im/status-go/extkeys"
@@ -21,6 +22,11 @@ var (
 	ErrInvalidMasterKeyCreated         = errors.New("can not create master extended key")
 	ErrInvalidAccountAddressOrKey      = errors.New("cannot parse address or key to valid account address")
 )
+
+// fetchKeystore retrives the encrypted keystore from the account manager.
+func fetchKeystore(am *accounts.Manager) *keystore.KeyStore {
+	return am.Backends(keystore.KeyStoreType)[0].(*keystore.KeyStore)
+}
 
 // CreateAccount creates an internal geth account
 // BIP44-compatible keys are generated: CKD#1 is stored as account key, CKD#2 stored as sub-account root
@@ -73,7 +79,7 @@ func CreateChildAccount(parentAddress, password string) (address, pubKey string,
 	}
 
 	// make sure that given password can decrypt key associated with a given parent address
-	account, accountKey, err := accountManager.AccountDecryptedKey(account, password)
+	account, accountKey, err := fetchKeystore(accountManager).AccountDecryptedKey(account, password)
 	if err != nil {
 		return "", "", fmt.Errorf("%s: %v", ErrAccountToKeyMappingFailure.Error(), err)
 	}
@@ -88,7 +94,8 @@ func CreateChildAccount(parentAddress, password string) (address, pubKey string,
 	if err != nil {
 		return "", "", err
 	}
-	accountManager.IncSubAccountIndex(account, password)
+
+	fetchKeystore(accountManager).IncSubAccountIndex(account, password)
 	accountKey.SubAccountIndex++
 
 	// import derived key into account keystore
@@ -139,7 +146,7 @@ func SelectAccount(address, password string) error {
 		return ErrAddressToAccountMappingFailure
 	}
 
-	account, accountKey, err := accountManager.AccountDecryptedKey(account, password)
+	account, accountKey, err := fetchKeystore(accountManager).AccountDecryptedKey(account, password)
 	if err != nil {
 		return fmt.Errorf("%s: %v", ErrAccountToKeyMappingFailure.Error(), err)
 	}
@@ -222,14 +229,14 @@ func importExtendedKey(extKey *extkeys.ExtendedKey, password string) (address, p
 	}
 
 	// imports extended key, create key file (if necessary)
-	account, err := accountManager.ImportExtendedKey(extKey, password)
+	account, err := fetchKeystore(accountManager).ImportExtendedKey(extKey, password)
 	if err != nil {
 		return "", "", err
 	}
 	address = fmt.Sprintf("%x", account.Address)
 
 	// obtain public key to return
-	account, key, err := accountManager.AccountDecryptedKey(account, password)
+	account, key, err := fetchKeystore(accountManager).AccountDecryptedKey(account, password)
 	if err != nil {
 		return address, "", err
 	}
@@ -313,7 +320,7 @@ func findSubAccounts(extKey *extkeys.ExtendedKey, subAccountIndex uint32) ([]acc
 		}
 
 		// see if any of the gathered addresses actually exist in cached accounts list
-		for _, cachedAccount := range accountManager.Accounts() {
+		for _, cachedAccount := range fetchKeystore(accountManager).Accounts() {
 			for _, possibleAddress := range subAccountAddresses {
 				if possibleAddress.Hex() == cachedAccount.Address.Hex() {
 					subAccounts = append(subAccounts, cachedAccount)

@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"fmt"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/logger"
@@ -246,5 +247,9 @@ func ParseAccountString(accman *accounts.Manager, account string) (accounts.Acco
 		return accounts.Account{}, ErrInvalidAccountAddressOrKey
 	}
 
-	return accman.AccountByIndex(index)
+	accs := fetchKeystore(accman).Accounts()
+	if len(accs) <= index {
+		return accounts.Account{}, fmt.Errorf("index %d higher than number of accounts %d", index, len(accs))
+	}
+	return accs[index], nil
 }

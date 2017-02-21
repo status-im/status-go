@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	"github.com/ethereum/go-ethereum/accounts"
+	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/les"
 	"github.com/ethereum/go-ethereum/logger"
@@ -25,7 +26,7 @@ import (
 // SelectedExtKey is a container for currently selected (logged in) account
 type SelectedExtKey struct {
 	Address     common.Address
-	AccountKey  *accounts.Key
+	AccountKey  *keystore.Key
 	SubAccounts []accounts.Account
 }
 

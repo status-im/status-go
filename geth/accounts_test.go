@@ -5,10 +5,16 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/accounts"
+	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/status-im/status-go/geth"
 )
+
+func fetchKeystore(am *accounts.Manager) *keystore.KeyStore {
+	return am.Backends(keystore.KeyStoreType)[0].(*keystore.KeyStore)
+}
 
 func TestAccountsList(t *testing.T) {
 	err := geth.PrepareTestNode()
@@ -150,7 +156,7 @@ func TestCreateChildAccount(t *testing.T) {
 	}
 
 	// obtain decrypted key, and make sure that extended key (which will be used as root for sub-accounts) is present
-	account, key, err := accountManager.AccountDecryptedKey(account, newAccountPassword)
+	account, key, err := fetchKeystore(accountManager).AccountDecryptedKey(account, newAccountPassword)
 	if err != nil {
 		t.Errorf("can not obtain decrypted account key: %v", err)
 		return
@@ -242,14 +248,14 @@ func TestRecoverAccount(t *testing.T) {
 		t.Errorf("can not get account from address: %v", err)
 	}
 
-	account, key, err := accountManager.AccountDecryptedKey(account, newAccountPassword)
+	account, key, err := fetchKeystore(accountManager).AccountDecryptedKey(account, newAccountPassword)
 	if err != nil {
 		t.Errorf("can not obtain decrypted account key: %v", err)
 		return
 	}
 	extChild2String := key.ExtendedKey.String()
 
-	if err := accountManager.Delete(account, newAccountPassword); err != nil {
+	if err := fetchKeystore(accountManager).Delete(account, newAccountPassword); err != nil {
 		t.Errorf("cannot remove account: %v", err)
 	}
 
@@ -263,7 +269,7 @@ func TestRecoverAccount(t *testing.T) {
 	}
 
 	// make sure that extended key exists and is imported ok too
-	account, key, err = accountManager.AccountDecryptedKey(account, newAccountPassword)
+	account, key, err = fetchKeystore(accountManager).AccountDecryptedKey(account, newAccountPassword)
 	if err != nil {
 		t.Errorf("can not obtain decrypted account key: %v", err)
 		return
