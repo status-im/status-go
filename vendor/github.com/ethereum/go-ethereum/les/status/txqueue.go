@@ -4,7 +4,7 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/ethereum/go-ethereum/accounts"
+	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/logger"
@@ -230,7 +230,7 @@ func (q *TxQueue) NotifyOnQueuedTxReturn(queuedTx *QueuedTx, err error) {
 
 	// remove from queue on any error (except for transient ones) and propagate
 	transientErrs := map[error]bool{
-		accounts.ErrDecrypt:        true, // wrong password
+		keystore.ErrDecrypt:        true, // wrong password
 		ErrInvalidCompleteTxSender: true, // completing tx create from another account
 	}
 	if !transientErrs[err] { // remove only on unrecoverable errors

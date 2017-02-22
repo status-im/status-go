@@ -4,7 +4,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts"
+	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/les/status"
 	"github.com/ethereum/go-ethereum/logger"
@@ -124,7 +124,7 @@ func (b *StatusBackend) CompleteQueuedTransaction(ctx context.Context, id status
 	hash, err := b.txapi.CompleteQueuedTransaction(ctx, SendTxArgs(queuedTx.Args), passphrase)
 
 	// on password error, notify the app, and keep tx in queue (so that CompleteQueuedTransaction() can be resent)
-	if err == accounts.ErrDecrypt {
+	if err == keystore.ErrDecrypt {
 		b.NotifyOnQueuedTxReturn(queuedTx, err)
 		return hash, err // SendTransaction is still blocked
 	}
