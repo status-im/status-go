@@ -249,7 +249,7 @@ func TestRecoverAccount(t *testing.T) {
 	}
 	extChild2String := key.ExtendedKey.String()
 
-	if err := accountManager.DeleteAccount(account, newAccountPassword); err != nil {
+	if err := accountManager.Delete(account, newAccountPassword); err != nil {
 		t.Errorf("cannot remove account: %v", err)
 	}
 
