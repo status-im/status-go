@@ -18,7 +18,7 @@ package whisperv2
 
 import (
 	"crypto/ecdsa"
-	"fmt"
+	"errors"
 	"sync"
 	"time"
 
@@ -30,7 +30,6 @@ import (
 	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
-
 	"gopkg.in/fatih/set.v0"
 )
 
@@ -166,7 +165,7 @@ func (self *Whisper) InjectIdentity(key *ecdsa.PrivateKey) error {
 	self.keys[string(crypto.FromECDSAPub(&key.PublicKey))] = key
 	self.keysMu.Unlock()
 	if _, ok := self.keys[string(crypto.FromECDSAPub(&key.PublicKey))]; !ok {
-		return fmt.Errorf("key insert into keys map failed")
+		return errors.New("key insert into keys map failed")
 	}
 
 	glog.V(logger.Info).Infof("Injected identity into whisper: %s\n", common.ToHex(crypto.FromECDSAPub(&key.PublicKey)))
@@ -180,7 +179,7 @@ func (self *Whisper) ClearIdentities() error {
 
 	self.keys = make(map[string]*ecdsa.PrivateKey)
 	if len(self.keys) != 0 {
-		return fmt.Errorf("could not clear keys map")
+		return errors.New("could not clear keys map")
 	}
 
 	return nil

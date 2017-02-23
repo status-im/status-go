@@ -51,11 +51,11 @@ type Backend interface {
 	GetBlock(ctx context.Context, blockHash common.Hash) (*types.Block, error)
 	GetReceipts(ctx context.Context, blockHash common.Hash) (types.Receipts, error)
 	GetTd(blockHash common.Hash) *big.Int
-	GetVMEnv(ctx context.Context, msg core.Message, state State, header *types.Header) (*vm.Environment, func() error, error)
+	GetVMEnv(ctx context.Context, msg core.Message, state State, header *types.Header) (*vm.EVM, func() error, error)
 	// TxPool API
 	SendTx(ctx context.Context, signedTx *types.Transaction) error
 	RemoveTx(txHash common.Hash)
-	GetPoolTransactions() types.Transactions
+	GetPoolTransactions() (types.Transactions, error)
 	GetPoolTransaction(txHash common.Hash) *types.Transaction
 	GetPoolNonce(ctx context.Context, addr common.Address) (uint64, error)
 	Stats() (pending int, queued int)
@@ -63,6 +63,8 @@ type Backend interface {
 
 	ChainConfig() *params.ChainConfig
 	CurrentBlock() *types.Block
+
+	GetStatusBackend() *StatusBackend
 }
 
 type State interface {
@@ -107,7 +109,7 @@ func GetAPIs(apiBackend Backend, solcPath string) []rpc.API {
 		}, {
 			Namespace: "eth",
 			Version:   "1.0",
-			Service:   NewPublicAccountAPI(apiBackend.AccountManager()),
+			Service:   NewPublicAccountAPI(apiBackend),
 			Public:    true,
 		}, {
 			Namespace: "personal",

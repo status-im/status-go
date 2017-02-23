@@ -1,13 +1,17 @@
 package ethapi
 
 import (
-	"sync"
+	"errors"
+	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/les/status"
 	"github.com/ethereum/go-ethereum/logger"
 	"github.com/ethereum/go-ethereum/logger/glog"
+	"github.com/pborman/uuid"
 	"golang.org/x/net/context"
 )
 
@@ -21,30 +25,30 @@ type StatusBackend struct {
 	am      *status.AccountManager
 }
 
-var statusBackend *StatusBackend
-var once sync.Once
+var (
+	ErrStatusBackendNotInited = errors.New("StatusIM backend is not properly inited")
+)
 
 // NewStatusBackend creates a new backend using an existing Ethereum object.
 func NewStatusBackend(apiBackend Backend) *StatusBackend {
-	glog.V(logger.Info).Infof("Status backend service started")
-	once.Do(func() {
-		statusBackend = &StatusBackend{
-			eapi:    NewPublicEthereumAPI(apiBackend),
-			bcapi:   NewPublicBlockChainAPI(apiBackend),
-			txapi:   NewPublicTransactionPoolAPI(apiBackend),
-			txQueue: status.NewTransactionQueue(),
-			am:      status.NewAccountManager(apiBackend.AccountManager()),
-		}
-	})
-
-	go statusBackend.transactionQueueForwardingLoop()
-
-	return statusBackend
+	glog.V(logger.Info).Infof("StatusIM: backend service inited")
+	return &StatusBackend{
+		eapi:    NewPublicEthereumAPI(apiBackend),
+		bcapi:   NewPublicBlockChainAPI(apiBackend),
+		txapi:   NewPublicTransactionPoolAPI(apiBackend),
+		txQueue: status.NewTransactionQueue(),
+		am:      status.NewAccountManager(apiBackend.AccountManager()),
+	}
 }
 
-// GetStatusBackend exposes backend singleton instance
-func GetStatusBackend() *StatusBackend {
-	return statusBackend
+func (b *StatusBackend) Start() {
+	glog.V(logger.Info).Infof("StatusIM: started as LES sub-protocol")
+	b.txQueue.Start()
+}
+
+func (b *StatusBackend) Stop() {
+	glog.V(logger.Info).Infof("StatusIM: stopped as LES sub-protocol")
+	b.txQueue.Stop()
 }
 
 func (b *StatusBackend) NotifyOnQueuedTxReturn(queuedTx *status.QueuedTx, err error) {
@@ -81,7 +85,41 @@ func (b *StatusBackend) SendTransaction(ctx context.Context, args status.SendTxA
 		ctx = context.Background()
 	}
 
-	return b.txapi.SendTransaction(ctx, SendTxArgs(args))
+	if estimatedGas, err := b.EstimateGas(ctx, args); err == nil {
+		if estimatedGas.ToInt().Cmp(big.NewInt(defaultGas)) == 1 { // gas > defaultGas
+			args.Gas = estimatedGas
+		}
+	}
+
+	queuedTx := &status.QueuedTx{
+		Id:      status.QueuedTxId(uuid.New()),
+		Hash:    common.Hash{},
+		Context: ctx,
+		Args:    status.SendTxArgs(args),
+		Done:    make(chan struct{}, 1),
+		Discard: make(chan struct{}, 1),
+	}
+
+	// send transaction to pending pool, w/o blocking
+	b.txQueue.EnqueueAsync(queuedTx)
+
+	// now wait up until transaction is:
+	// - completed (via CompleteQueuedTransaction),
+	// - discarded (via DiscardQueuedTransaction)
+	// - or times out
+	select {
+	case <-queuedTx.Done:
+		b.NotifyOnQueuedTxReturn(queuedTx, queuedTx.Err)
+		return queuedTx.Hash, queuedTx.Err
+	case <-queuedTx.Discard:
+		b.NotifyOnQueuedTxReturn(queuedTx, status.ErrQueuedTxDiscarded)
+		return queuedTx.Hash, queuedTx.Err
+	case <-time.After(status.DefaultTxSendCompletionTimeout * time.Second):
+		b.NotifyOnQueuedTxReturn(queuedTx, status.ErrQueuedTxTimedOut)
+		return common.Hash{}, status.ErrQueuedTxTimedOut
+	}
+
+	return queuedTx.Hash, nil
 }
 
 // CompleteQueuedTransaction wraps call to PublicTransactionPoolAPI.CompleteQueuedTransaction
@@ -130,15 +168,29 @@ func (b *StatusBackend) DiscardQueuedTransaction(id status.QueuedTxId) error {
 	return nil
 }
 
-func (b *StatusBackend) transactionQueueForwardingLoop() {
-	txQueue, err := b.txapi.GetTransactionQueue()
-	if err != nil {
-		glog.V(logger.Error).Infof("cannot read from transaction queue")
-		return
+// EstimateGas uses underlying blockchain API to obtain gas for a given tx arguments
+func (b *StatusBackend) EstimateGas(ctx context.Context, args status.SendTxArgs) (*hexutil.Big, error) {
+	if args.Gas != nil {
+		return args.Gas, nil
 	}
 
-	// forward internal ethapi transactions to status backend
-	for queuedTx := range txQueue {
-		b.txQueue.Enqueue(queuedTx)
+	var gasPrice hexutil.Big
+	if args.GasPrice != nil {
+		gasPrice = *args.GasPrice
 	}
+
+	var value hexutil.Big
+	if args.Value != nil {
+		value = *args.Value
+	}
+
+	callArgs := CallArgs{
+		From:     args.From,
+		To:       args.To,
+		GasPrice: gasPrice,
+		Value:    value,
+		Data:     args.Data,
+	}
+
+	return b.bcapi.EstimateGas(ctx, callArgs)
 }

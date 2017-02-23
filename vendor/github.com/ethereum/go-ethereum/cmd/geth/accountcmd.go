@@ -214,7 +214,7 @@ func unlockAccount(ctx *cli.Context, accman *accounts.Manager, address string, i
 	return accounts.Account{}, ""
 }
 
-// getPassPhrase retrieves the password associated with an account, either fetched
+// getPassPhrase retrieves the passwor associated with an account, either fetched
 // from a list of preloaded passphrases, or requested interactively from the user.
 func getPassPhrase(prompt string, confirmation bool, i int, passwords []string) string {
 	// If a list of passwords was supplied, retrieve from them

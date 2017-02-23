@@ -517,7 +517,7 @@ func (ps *peerSet) AllPeerIDs() []string {
 
 	res := make([]string, len(ps.peers))
 	idx := 0
-	for id, _ := range ps.peers {
+	for id := range ps.peers {
 		res[idx] = id
 		idx++
 	}

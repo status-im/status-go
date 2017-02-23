@@ -22,10 +22,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ethereum/ethash"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/compiler"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/eth"
@@ -41,6 +41,7 @@ import (
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/pow"
 	rpc "github.com/ethereum/go-ethereum/rpc"
 )
 
@@ -60,13 +61,12 @@ type LightEthereum struct {
 	ApiBackend *LesApiBackend
 
 	eventMux       *event.TypeMux
-	pow            *ethash.Ethash
+	pow            pow.PoW
 	accountManager *accounts.Manager
 	solcPath       string
 	solc           *compiler.Solidity
 
 	NatSpec       bool
-	PowTest       bool
 	netVersionId  int
 	netRPCService *ethapi.PublicNetAPI
 
@@ -98,7 +98,6 @@ func New(ctx *node.ServiceContext, config *eth.Config) (*LightEthereum, error) {
 		shutdownChan:   make(chan bool),
 		netVersionId:   config.NetworkId,
 		NatSpec:        config.NatSpec,
-		PowTest:        config.PowTest,
 		solcPath:       config.SolcPath,
 	}
 
@@ -119,11 +118,12 @@ func New(ctx *node.ServiceContext, config *eth.Config) (*LightEthereum, error) {
 		return nil, err
 	}
 
-	eth.ApiBackend = &LesApiBackend{eth, nil}
+	eth.ApiBackend = &LesApiBackend{eth, nil, nil}
 	eth.ApiBackend.gpo = gasprice.NewLightPriceOracle(eth.ApiBackend)
 
 	// inject status-im backend
-	eth.StatusBackend = ethapi.NewStatusBackend(eth.ApiBackend)
+	eth.ApiBackend.statusBackend = ethapi.NewStatusBackend(eth.ApiBackend)
+	eth.StatusBackend = eth.ApiBackend.statusBackend // alias
 
 	return eth, nil
 }
@@ -141,8 +141,8 @@ func (s *LightDummyAPI) Coinbase() (common.Address, error) {
 }
 
 // Hashrate returns the POW hashrate
-func (s *LightDummyAPI) Hashrate() *rpc.HexNumber {
-	return rpc.NewHexNumber(0)
+func (s *LightDummyAPI) Hashrate() hexutil.Uint {
+	return 0
 }
 
 // Mining returns an indication if this node is currently mining.
@@ -200,6 +200,7 @@ func (s *LightEthereum) Start(srvr *p2p.Server) error {
 	glog.V(logger.Info).Infof("WARNING: light client mode is an experimental feature")
 	s.netRPCService = ethapi.NewPublicNetAPI(srvr, s.netVersionId)
 	s.protocolManager.Start(srvr)
+	s.StatusBackend.Start()
 	return nil
 }
 
@@ -216,6 +217,8 @@ func (s *LightEthereum) Stop() error {
 	time.Sleep(time.Millisecond * 200)
 	s.chainDb.Close()
 	close(s.shutdownChan)
+
+	s.StatusBackend.Stop()
 
 	return nil
 }
