@@ -6,7 +6,7 @@ import (
 	"math/big"
 	"strconv"
 
-	"github.com/ethereum/go-ethereum/accounts"
+	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/les/status"
@@ -67,7 +67,7 @@ func sendTransactionErrorCode(err error) string {
 	}
 
 	switch err {
-	case accounts.ErrDecrypt:
+	case keystore.ErrDecrypt:
 		return SendTransactionPasswordErrorCode
 	case status.ErrQueuedTxTimedOut:
 		return SendTransactionTimeoutErrorCode

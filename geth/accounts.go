@@ -54,7 +54,7 @@ func CreateAccount(password string) (address, pubKey, mnemonic string, err error
 // Otherwise (when parentAddress != ""), child is derived directly from parent.
 func CreateChildAccount(parentAddress, password string) (address, pubKey string, err error) {
 	nodeManager := NodeManagerInstance()
-	accountManager, err := nodeManager.AccountManager()
+	keyStore, err := nodeManager.AccountKeyStore()
 	if err != nil {
 		return "", "", err
 	}
@@ -67,13 +67,13 @@ func CreateChildAccount(parentAddress, password string) (address, pubKey string,
 		return "", "", ErrNoAccountSelected
 	}
 
-	account, err := ParseAccountString(accountManager, parentAddress)
+	account, err := ParseAccountString(parentAddress)
 	if err != nil {
 		return "", "", ErrAddressToAccountMappingFailure
 	}
 
 	// make sure that given password can decrypt key associated with a given parent address
-	account, accountKey, err := accountManager.AccountDecryptedKey(account, password)
+	account, accountKey, err := keyStore.AccountDecryptedKey(account, password)
 	if err != nil {
 		return "", "", fmt.Errorf("%s: %v", ErrAccountToKeyMappingFailure.Error(), err)
 	}
@@ -88,7 +88,7 @@ func CreateChildAccount(parentAddress, password string) (address, pubKey string,
 	if err != nil {
 		return "", "", err
 	}
-	accountManager.IncSubAccountIndex(account, password)
+	keyStore.IncSubAccountIndex(account, password)
 	accountKey.SubAccountIndex++
 
 	// import derived key into account keystore
@@ -129,17 +129,17 @@ func RecoverAccount(password, mnemonic string) (address, pubKey string, err erro
 // all previous identities are removed).
 func SelectAccount(address, password string) error {
 	nodeManager := NodeManagerInstance()
-	accountManager, err := nodeManager.AccountManager()
+	keyStore, err := nodeManager.AccountKeyStore()
 	if err != nil {
 		return err
 	}
 
-	account, err := ParseAccountString(accountManager, address)
+	account, err := ParseAccountString(address)
 	if err != nil {
 		return ErrAddressToAccountMappingFailure
 	}
 
-	account, accountKey, err := accountManager.AccountDecryptedKey(account, password)
+	account, accountKey, err := keyStore.AccountDecryptedKey(account, password)
 	if err != nil {
 		return fmt.Errorf("%s: %v", ErrAccountToKeyMappingFailure.Error(), err)
 	}
@@ -195,20 +195,20 @@ func UnlockAccount(address, password string, seconds int) error {
 // importExtendedKey processes incoming extended key, extracts required info and creates corresponding account key.
 // Once account key is formed, that key is put (if not already) into keystore i.e. key is *encoded* into key file.
 func importExtendedKey(extKey *extkeys.ExtendedKey, password string) (address, pubKey string, err error) {
-	accountManager, err := NodeManagerInstance().AccountManager()
+	keyStore, err := NodeManagerInstance().AccountKeyStore()
 	if err != nil {
 		return "", "", err
 	}
 
 	// imports extended key, create key file (if necessary)
-	account, err := accountManager.ImportExtendedKey(extKey, password)
+	account, err := keyStore.ImportExtendedKey(extKey, password)
 	if err != nil {
 		return "", "", err
 	}
 	address = fmt.Sprintf("%x", account.Address)
 
 	// obtain public key to return
-	account, key, err := accountManager.AccountDecryptedKey(account, password)
+	account, key, err := keyStore.AccountDecryptedKey(account, password)
 	if err != nil {
 		return address, "", err
 	}
@@ -217,24 +217,24 @@ func importExtendedKey(extKey *extkeys.ExtendedKey, password string) (address, p
 	return
 }
 
-func onAccountsListRequest(entities []accounts.Account) []accounts.Account {
+func onAccountsListRequest(entities []common.Address) []common.Address {
 	nodeManager := NodeManagerInstance()
 
 	if nodeManager.SelectedAccount == nil {
-		return []accounts.Account{}
+		return []common.Address{}
 	}
 
 	refreshSelectedAccount()
 
-	filtered := make([]accounts.Account, 0)
+	filtered := make([]common.Address, 0)
 	for _, account := range entities {
 		// main account
-		if nodeManager.SelectedAccount.Address.Hex() == account.Address.Hex() {
+		if nodeManager.SelectedAccount.Address.Hex() == account.Hex() {
 			filtered = append(filtered, account)
 		} else {
 			// sub accounts
 			for _, subAccount := range nodeManager.SelectedAccount.SubAccounts {
-				if subAccount.Address.Hex() == account.Address.Hex() {
+				if subAccount.Address.Hex() == account.Hex() {
 					filtered = append(filtered, account)
 				}
 			}
@@ -274,7 +274,7 @@ func refreshSelectedAccount() {
 // The extKey is CKD#2 := root of sub-accounts of the main account
 func findSubAccounts(extKey *extkeys.ExtendedKey, subAccountIndex uint32) ([]accounts.Account, error) {
 	nodeManager := NodeManagerInstance()
-	accountManager, err := nodeManager.AccountManager()
+	keyStore, err := nodeManager.AccountKeyStore()
 	if err != nil {
 		return []accounts.Account{}, err
 	}
@@ -292,7 +292,7 @@ func findSubAccounts(extKey *extkeys.ExtendedKey, subAccountIndex uint32) ([]acc
 		}
 
 		// see if any of the gathered addresses actually exist in cached accounts list
-		for _, cachedAccount := range accountManager.Accounts() {
+		for _, cachedAccount := range keyStore.Accounts() {
 			for _, possibleAddress := range subAccountAddresses {
 				if possibleAddress.Hex() == cachedAccount.Address.Hex() {
 					subAccounts = append(subAccounts, cachedAccount)

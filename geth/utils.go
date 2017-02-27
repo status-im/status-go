@@ -13,7 +13,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"strconv"
 	"sync"
 	"time"
 
@@ -189,12 +188,7 @@ func PanicAfter(waitSeconds time.Duration, abort chan struct{}, desc string) {
 }
 
 func FromAddress(accountAddress string) common.Address {
-	accountManager, err := NodeManagerInstance().AccountManager()
-	if err != nil {
-		return common.Address{}
-	}
-
-	from, err := ParseAccountString(accountManager, accountAddress)
+	from, err := ParseAccountString(accountAddress)
 	if err != nil {
 		return common.Address{}
 	}
@@ -203,12 +197,7 @@ func FromAddress(accountAddress string) common.Address {
 }
 
 func ToAddress(accountAddress string) *common.Address {
-	accountManager, err := NodeManagerInstance().AccountManager()
-	if err != nil {
-		return nil
-	}
-
-	to, err := ParseAccountString(accountManager, accountAddress)
+	to, err := ParseAccountString(accountAddress)
 	if err != nil {
 		return nil
 	}
@@ -216,18 +205,12 @@ func ToAddress(accountAddress string) *common.Address {
 	return &to.Address
 }
 
-// parseAccount parses hex encoded string or key index in the accounts key store
-// and converts it to an internal account representation.
-func ParseAccountString(accman *accounts.Manager, account string) (accounts.Account, error) {
+// ParseAccountString parses hex encoded string and returns is as accounts.Account.
+func ParseAccountString(account string) (accounts.Account, error) {
 	// valid address, convert to account
 	if common.IsHexAddress(account) {
 		return accounts.Account{Address: common.HexToAddress(account)}, nil
 	}
-	// valid key index, return account referenced by that key
-	index, err := strconv.Atoi(account)
-	if err != nil {
-		return accounts.Account{}, ErrInvalidAccountAddressOrKey
-	}
 
-	return accman.AccountByIndex(index)
+	return accounts.Account{}, ErrInvalidAccountAddressOrKey
 }

@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	"github.com/ethereum/go-ethereum/accounts"
+	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/les"
 	"github.com/ethereum/go-ethereum/logger"
@@ -25,7 +26,7 @@ import (
 // SelectedExtKey is a container for currently selected (logged in) account
 type SelectedExtKey struct {
 	Address     common.Address
-	AccountKey  *accounts.Key
+	AccountKey  *keystore.Key
 	SubAccounts []accounts.Account
 }
 
@@ -56,6 +57,7 @@ var (
 	ErrNodeMakeFailure             = errors.New("error creating p2p node")
 	ErrNodeStartFailure            = errors.New("error starting p2p node")
 	ErrInvalidNodeAPI              = errors.New("no node API connected")
+	ErrAccountKeyStoreMissing      = errors.New("account key store is not set")
 )
 
 var (
@@ -216,6 +218,30 @@ func (m *NodeManager) AccountManager() (*accounts.Manager, error) {
 	}
 
 	return m.node.geth.AccountManager(), nil
+}
+
+// AccountKeyStore exposes reference to accounts key store
+func (m *NodeManager) AccountKeyStore() (*keystore.KeyStore, error) {
+	if m == nil || !m.NodeInited() {
+		return nil, ErrInvalidGethNode
+	}
+
+	accountManager, err := m.AccountManager()
+	if err != nil {
+		return nil, err
+	}
+
+	backends := accountManager.Backends(keystore.KeyStoreType)
+	if len(backends) == 0 {
+		return nil, ErrAccountKeyStoreMissing
+	}
+
+	keyStore, ok := backends[0].(*keystore.KeyStore)
+	if !ok {
+		return nil, ErrAccountKeyStoreMissing
+	}
+
+	return keyStore, nil
 }
 
 // LightEthereumService exposes LES

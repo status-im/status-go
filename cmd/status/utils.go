@@ -137,7 +137,7 @@ func testRestartNodeRPC(t *testing.T) bool {
 func testCreateChildAccount(t *testing.T) bool {
 	geth.Logout() // to make sure that we start with empty account (which might get populated during previous tests)
 
-	accountManager, err := geth.NodeManagerInstance().AccountManager()
+	keyStore, err := geth.NodeManagerInstance().AccountKeyStore()
 	if err != nil {
 		t.Error(err)
 		return false
@@ -159,14 +159,14 @@ func testCreateChildAccount(t *testing.T) bool {
 	address, pubKey, mnemonic := createAccountResponse.Address, createAccountResponse.PubKey, createAccountResponse.Mnemonic
 	t.Logf("Account created: {address: %s, key: %s, mnemonic:%s}", address, pubKey, mnemonic)
 
-	account, err := geth.ParseAccountString(accountManager, address)
+	account, err := geth.ParseAccountString(address)
 	if err != nil {
 		t.Errorf("can not get account from address: %v", err)
 		return false
 	}
 
 	// obtain decrypted key, and make sure that extended key (which will be used as root for sub-accounts) is present
-	account, key, err := accountManager.AccountDecryptedKey(account, newAccountPassword)
+	account, key, err := keyStore.AccountDecryptedKey(account, newAccountPassword)
 	if err != nil {
 		t.Errorf("can not obtain decrypted account key: %v", err)
 		return false
@@ -268,7 +268,7 @@ func testCreateChildAccount(t *testing.T) bool {
 }
 
 func testRecoverAccount(t *testing.T) bool {
-	accountManager, _ := geth.NodeManagerInstance().AccountManager()
+	keyStore, _ := geth.NodeManagerInstance().AccountKeyStore()
 
 	// create an account
 	address, pubKey, mnemonic, err := geth.CreateAccount(newAccountPassword)
@@ -297,19 +297,19 @@ func testRecoverAccount(t *testing.T) bool {
 	}
 
 	// now test recovering, but make sure that account/key file is removed i.e. simulate recovering on a new device
-	account, err := geth.ParseAccountString(accountManager, address)
+	account, err := geth.ParseAccountString(address)
 	if err != nil {
 		t.Errorf("can not get account from address: %v", err)
 	}
 
-	account, key, err := accountManager.AccountDecryptedKey(account, newAccountPassword)
+	account, key, err := keyStore.AccountDecryptedKey(account, newAccountPassword)
 	if err != nil {
 		t.Errorf("can not obtain decrypted account key: %v", err)
 		return false
 	}
 	extChild2String := key.ExtendedKey.String()
 
-	if err := accountManager.Delete(account, newAccountPassword); err != nil {
+	if err := keyStore.Delete(account, newAccountPassword); err != nil {
 		t.Errorf("cannot remove account: %v", err)
 	}
 
@@ -331,7 +331,7 @@ func testRecoverAccount(t *testing.T) bool {
 	}
 
 	// make sure that extended key exists and is imported ok too
-	account, key, err = accountManager.AccountDecryptedKey(account, newAccountPassword)
+	account, key, err = keyStore.AccountDecryptedKey(account, newAccountPassword)
 	if err != nil {
 		t.Errorf("can not obtain decrypted account key: %v", err)
 		return false

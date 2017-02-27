@@ -56,9 +56,9 @@ func TestAccountsList(t *testing.T) {
 		t.Error("exactly single account is expected (main account)")
 		return
 	}
-	if string(accounts[0].Address.Hex()) != "0x"+address {
+	if string(accounts[0].Hex()) != "0x"+address {
 		t.Errorf("main account is not retured as the first key: got %s, expected %s",
-			accounts[0].Address.Hex(), "0x"+address)
+			accounts[0].Hex(), "0x"+address)
 		return
 	}
 
@@ -75,13 +75,13 @@ func TestAccountsList(t *testing.T) {
 		t.Error("exactly 2 accounts are expected (main + sub-account 1)")
 		return
 	}
-	if string(accounts[0].Address.Hex()) != "0x"+address {
+	if string(accounts[0].Hex()) != "0x"+address {
 		t.Errorf("main account is not retured as the first key: got %s, expected %s",
-			accounts[0].Address.Hex(), "0x"+address)
+			accounts[0].Hex(), "0x"+address)
 		return
 	}
-	if string(accounts[1].Address.Hex()) != "0x"+subAccount1 {
-		t.Errorf("subAcount1 not returned: got %s, expected %s", accounts[1].Address.Hex(), "0x"+subAccount1)
+	if string(accounts[1].Hex()) != "0x"+subAccount1 {
+		t.Errorf("subAcount1 not returned: got %s, expected %s", accounts[1].Hex(), "0x"+subAccount1)
 		return
 	}
 
@@ -101,21 +101,21 @@ func TestAccountsList(t *testing.T) {
 		t.Errorf("unexpected number of accounts: expected %d, got %d", 3, len(accounts))
 		return
 	}
-	if string(accounts[0].Address.Hex()) != "0x"+address {
+	if string(accounts[0].Hex()) != "0x"+address {
 		t.Errorf("main account is not retured as the first key: got %s, expected %s",
-			accounts[0].Address.Hex(), "0x"+address)
+			accounts[0].Hex(), "0x"+address)
 		return
 	}
-	subAccount1MatchesKey1 := string(accounts[1].Address.Hex()) != "0x"+subAccount1
-	subAccount1MatchesKey2 := string(accounts[2].Address.Hex()) != "0x"+subAccount1
+	subAccount1MatchesKey1 := string(accounts[1].Hex()) != "0x"+subAccount1
+	subAccount1MatchesKey2 := string(accounts[2].Hex()) != "0x"+subAccount1
 	if !subAccount1MatchesKey1 && !subAccount1MatchesKey2 {
-		t.Errorf("subAcount1 not returned: got %s, expected %s", accounts[1].Address.Hex(), "0x"+subAccount1)
+		t.Errorf("subAcount1 not returned: got %s, expected %s", accounts[1].Hex(), "0x"+subAccount1)
 		return
 	}
-	subAccount2MatchesKey1 := string(accounts[1].Address.Hex()) != "0x"+subAccount2
-	subAccount2MatchesKey2 := string(accounts[2].Address.Hex()) != "0x"+subAccount2
+	subAccount2MatchesKey1 := string(accounts[1].Hex()) != "0x"+subAccount2
+	subAccount2MatchesKey2 := string(accounts[2].Hex()) != "0x"+subAccount2
 	if !subAccount2MatchesKey1 && !subAccount2MatchesKey2 {
-		t.Errorf("subAcount2 not returned: got %s, expected %s", accounts[2].Address.Hex(), "0x"+subAccount1)
+		t.Errorf("subAcount2 not returned: got %s, expected %s", accounts[2].Hex(), "0x"+subAccount1)
 		return
 	}
 }
@@ -129,7 +129,7 @@ func TestCreateChildAccount(t *testing.T) {
 
 	geth.Logout() // to make sure that we start with empty account (which might get populated during previous tests)
 
-	accountManager, err := geth.NodeManagerInstance().AccountManager()
+	keyStore, err := geth.NodeManagerInstance().AccountKeyStore()
 	if err != nil {
 		t.Error(err)
 		return
@@ -143,14 +143,14 @@ func TestCreateChildAccount(t *testing.T) {
 	}
 	t.Logf("Account created: {address: %s, key: %s, mnemonic:%s}", address, pubKey, mnemonic)
 
-	account, err := geth.ParseAccountString(accountManager, address)
+	account, err := geth.ParseAccountString(address)
 	if err != nil {
 		t.Errorf("can not get account from address: %v", err)
 		return
 	}
 
 	// obtain decrypted key, and make sure that extended key (which will be used as root for sub-accounts) is present
-	account, key, err := accountManager.AccountDecryptedKey(account, newAccountPassword)
+	account, key, err := keyStore.AccountDecryptedKey(account, newAccountPassword)
 	if err != nil {
 		t.Errorf("can not obtain decrypted account key: %v", err)
 		return
@@ -216,7 +216,7 @@ func TestRecoverAccount(t *testing.T) {
 		return
 	}
 
-	accountManager, _ := geth.NodeManagerInstance().AccountManager()
+	keyStore, _ := geth.NodeManagerInstance().AccountKeyStore()
 
 	// create an account
 	address, pubKey, mnemonic, err := geth.CreateAccount(newAccountPassword)
@@ -237,19 +237,19 @@ func TestRecoverAccount(t *testing.T) {
 	}
 
 	// now test recovering, but make sure that account/key file is removed i.e. simulate recovering on a new device
-	account, err := geth.ParseAccountString(accountManager, address)
+	account, err := geth.ParseAccountString(address)
 	if err != nil {
 		t.Errorf("can not get account from address: %v", err)
 	}
 
-	account, key, err := accountManager.AccountDecryptedKey(account, newAccountPassword)
+	account, key, err := keyStore.AccountDecryptedKey(account, newAccountPassword)
 	if err != nil {
 		t.Errorf("can not obtain decrypted account key: %v", err)
 		return
 	}
 	extChild2String := key.ExtendedKey.String()
 
-	if err := accountManager.Delete(account, newAccountPassword); err != nil {
+	if err := keyStore.Delete(account, newAccountPassword); err != nil {
 		t.Errorf("cannot remove account: %v", err)
 	}
 
@@ -263,7 +263,7 @@ func TestRecoverAccount(t *testing.T) {
 	}
 
 	// make sure that extended key exists and is imported ok too
-	account, key, err = accountManager.AccountDecryptedKey(account, newAccountPassword)
+	account, key, err = keyStore.AccountDecryptedKey(account, newAccountPassword)
 	if err != nil {
 		t.Errorf("can not obtain decrypted account key: %v", err)
 		return

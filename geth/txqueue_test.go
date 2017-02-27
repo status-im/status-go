@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts"
+	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/les/status"
@@ -154,7 +154,7 @@ func TestDoubleCompleteQueuedTransactions(t *testing.T) {
 
 			// try with wrong password
 			// make sure that tx is NOT removed from the queue (by re-trying with the correct password)
-			if _, err = geth.CompleteTransaction(txId, testAddressPassword+"wrong"); err != accounts.ErrDecrypt {
+			if _, err = geth.CompleteTransaction(txId, testAddressPassword+"wrong"); err != keystore.ErrDecrypt {
 				t.Errorf("expects wrong password error, but call succeeded (or got another error: %v)", err)
 				return
 			}
