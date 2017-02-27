@@ -126,7 +126,7 @@ func (evm *Interpreter) Run(contract *Contract, input []byte) (ret []byte, err e
 	}
 
 	// The Interpreter main run loop (contextual). This loop runs until either an
-	// explicit STOP, RETURN or SUICIDE is executed, an error accured during
+	// explicit STOP, RETURN or SELFDESTRUCT is executed, an error occurred during
 	// the execution of one of the operations or until the evm.done is set by
 	// the parent context.Context.
 	for atomic.LoadInt32(&evm.env.abort) == 0 {

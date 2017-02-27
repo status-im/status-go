@@ -1,4 +1,4 @@
-// Copyright 2016 The go-ethereum Authors
+// Copyright 2017 The go-ethereum Authors
 // This file is part of the go-ethereum library.
 //
 // The go-ethereum library is free software: you can redistribute it and/or modify
@@ -14,15 +14,25 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-// +build ios linux,arm64 windows !darwin,!freebsd,!linux,!netbsd,!solaris
+// This file contains the implementation for interacting with the Ledger hardware
+// wallets. The wire protocol spec can be found in the Ledger Blue GitHub repo:
+// https://raw.githubusercontent.com/LedgerHQ/blue-app-eth/master/doc/ethapp.asc
 
-// This is the fallback implementation of directory watching.
-// It is used on unsupported platforms.
+// +build ios
 
-package accounts
+package usbwallet
 
-type watcher struct{ running bool }
+import (
+	"errors"
 
-func newWatcher(*addrCache) *watcher { return new(watcher) }
-func (*watcher) start()              {}
-func (*watcher) close()              {}
+	"github.com/ethereum/go-ethereum/accounts"
+)
+
+// Here be dragons! There is no USB support on iOS.
+
+// ErrIOSNotSupported is returned for all USB hardware backends on iOS.
+var ErrIOSNotSupported = errors.New("no USB support on iOS")
+
+func NewLedgerHub() (accounts.Backend, error) {
+	return nil, ErrIOSNotSupported
+}

@@ -33,7 +33,8 @@ var errBadChannel = errors.New("event: Subscribe argument does not have sendable
 //
 // The zero value is ready to use.
 type Feed struct {
-	sendLock  chan struct{}    // one-element buffer, empty when held
+	once      sync.Once        // ensures that init only runs once
+	sendLock  chan struct{}    // sendLock has a one-element buffer and is empty when held.It protects sendCases.
 	removeSub chan interface{} // interrupts Send
 	sendCases caseList         // the active set of select cases used by Send
 
@@ -43,6 +44,10 @@ type Feed struct {
 	etype  reflect.Type
 	closed bool
 }
+
+// This is the index of the first actual subscription channel in sendCases.
+// sendCases[0] is a SelectRecv case for the removeSub channel.
+const firstSubSendCase = 1
 
 type feedTypeError struct {
 	got, want reflect.Type
@@ -54,9 +59,6 @@ func (e feedTypeError) Error() string {
 }
 
 func (f *Feed) init() {
-	if f.sendLock != nil {
-		return
-	}
 	f.removeSub = make(chan interface{})
 	f.sendLock = make(chan struct{}, 1)
 	f.sendLock <- struct{}{}
@@ -67,7 +69,10 @@ func (f *Feed) init() {
 // until the subscription is canceled. All channels added must have the same element type.
 //
 // The channel should have ample buffer space to avoid blocking other subscribers.
+// Slow subscribers are not dropped.
 func (f *Feed) Subscribe(channel interface{}) Subscription {
+	f.once.Do(f.init)
+
 	chanval := reflect.ValueOf(channel)
 	chantyp := chanval.Type()
 	if chantyp.Kind() != reflect.Chan || chantyp.ChanDir()&reflect.SendDir == 0 {
@@ -77,7 +82,6 @@ func (f *Feed) Subscribe(channel interface{}) Subscription {
 
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.init()
 	if !f.typecheck(chantyp.Elem()) {
 		panic(feedTypeError{op: "Subscribe", got: chantyp, want: reflect.ChanOf(reflect.SendDir, f.etype)})
 	}
@@ -123,15 +127,13 @@ func (f *Feed) remove(sub *feedSub) {
 // Send delivers to all subscribed channels simultaneously.
 // It returns the number of subscribers that the value was sent to.
 func (f *Feed) Send(value interface{}) (nsent int) {
-	f.mu.Lock()
-	f.init()
+	f.once.Do(f.init)
 	<-f.sendLock
-	// Add new subscriptions from the inbox, then clear it.
+
+	// Add new cases from the inbox after taking the send lock.
+	f.mu.Lock()
 	f.sendCases = append(f.sendCases, f.inbox...)
-	for i := range f.inbox {
-		f.inbox[i] = reflect.SelectCase{}
-	}
-	f.inbox = f.inbox[:0]
+	f.inbox = nil
 	f.mu.Unlock()
 
 	// Set the sent value on all channels.
@@ -140,7 +142,7 @@ func (f *Feed) Send(value interface{}) (nsent int) {
 		f.sendLock <- struct{}{}
 		panic(feedTypeError{op: "Send", got: rvalue.Type(), want: f.etype})
 	}
-	for i := 1; i < len(f.sendCases); i++ {
+	for i := firstSubSendCase; i < len(f.sendCases); i++ {
 		f.sendCases[i].Send = rvalue
 	}
 
@@ -150,13 +152,14 @@ func (f *Feed) Send(value interface{}) (nsent int) {
 		// Fast path: try sending without blocking before adding to the select set.
 		// This should usually succeed if subscribers are fast enough and have free
 		// buffer space.
-		for i := 1; i < len(cases); i++ {
+		for i := firstSubSendCase; i < len(cases); i++ {
 			if cases[i].Chan.TrySend(rvalue) {
-				cases = cases.deactivate(i)
 				nsent++
+				cases = cases.deactivate(i)
+				i--
 			}
 		}
-		if len(cases) == 1 {
+		if len(cases) == firstSubSendCase {
 			break
 		}
 		// Select on all the receivers, waiting for them to unblock.
@@ -174,7 +177,7 @@ func (f *Feed) Send(value interface{}) (nsent int) {
 	}
 
 	// Forget about the sent value and hand off the send lock.
-	for i := 1; i < len(f.sendCases); i++ {
+	for i := firstSubSendCase; i < len(f.sendCases); i++ {
 		f.sendCases[i].Send = reflect.Value{}
 	}
 	f.sendLock <- struct{}{}

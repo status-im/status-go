@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-package accounts
+package keystore
 
 import (
 	"bytes"
@@ -29,6 +29,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
@@ -47,8 +48,7 @@ type Key struct {
 	// we only store privkey as pubkey/address can be derived from it
 	// privkey in this struct is always in plaintext
 	PrivateKey *ecdsa.PrivateKey
-	// if whisper is enabled here, the address will be used as a whisper
-	// identity upon creation of the account or unlocking of the account
+	// when enabled, the key will be used as a Whisper identity
 	WhisperEnabled bool
 	// extended key is the root node for new hardened children i.e. sub-accounts
 	ExtendedKey *extkeys.ExtendedKey
@@ -221,14 +221,14 @@ func newKey(rand io.Reader) (*Key, error) {
 	return newKeyFromECDSA(privateKeyECDSA), nil
 }
 
-func storeNewKey(ks keyStore, rand io.Reader, auth string, w bool) (*Key, Account, error) {
+func storeNewKey(ks keyStore, rand io.Reader, auth string, whisperEnabled bool) (*Key, accounts.Account, error) {
 	key, err := newKey(rand)
 	if err != nil {
-		return nil, Account{}, err
+		return nil, accounts.Account{}, err
 	}
-	key.WhisperEnabled = w
-	a := Account{Address: key.Address, File: ks.JoinPath(keyFileName(key.Address))}
-	if err := ks.StoreKey(a.File, key, auth); err != nil {
+	key.WhisperEnabled = whisperEnabled
+	a := accounts.Account{Address: key.Address, URL: accounts.URL{Scheme: KeyStoreScheme, Path: ks.JoinPath(keyFileName(key.Address))}}
+	if err := ks.StoreKey(a.URL.Path, key, auth); err != nil {
 		zeroKey(key.PrivateKey)
 		return nil, a, err
 	}

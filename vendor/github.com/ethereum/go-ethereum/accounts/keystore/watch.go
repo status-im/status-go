@@ -16,7 +16,7 @@
 
 // +build darwin,!ios freebsd linux,!arm64 netbsd solaris
 
-package accounts
+package keystore
 
 import (
 	"time"
@@ -27,14 +27,14 @@ import (
 )
 
 type watcher struct {
-	ac       *addrCache
+	ac       *accountCache
 	starting bool
 	running  bool
 	ev       chan notify.EventInfo
 	quit     chan struct{}
 }
 
-func newWatcher(ac *addrCache) *watcher {
+func newWatcher(ac *accountCache) *watcher {
 	return &watcher{
 		ac:   ac,
 		ev:   make(chan notify.EventInfo, 10),

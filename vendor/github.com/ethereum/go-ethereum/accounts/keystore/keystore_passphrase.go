@@ -23,7 +23,7 @@ The crypto is documented at https://github.com/ethereum/wiki/wiki/Web3-Secret-St
 
 */
 
-package accounts
+package keystore
 
 import (
 	"bytes"
@@ -212,6 +212,7 @@ func DecryptKey(keyjson []byte, auth string) (*Key, error) {
 	// Depending on the version try to parse one way or another
 	var (
 		keyBytes, keyId []byte
+		whisperEnabled  bool
 		err             error
 		extKeyBytes     []byte
 		extKey          *extkeys.ExtendedKey
@@ -249,6 +250,11 @@ func DecryptKey(keyjson []byte, auth string) (*Key, error) {
 		}
 		extKey, err = extkeys.NewKeyFromString(string(extKeyBytes))
 	}
+
+	whisperEnabled, ok = m["whisperenabled"].(bool)
+	if !ok {
+		whisperEnabled = false
+	}
 	// Handle any decryption errors and return the key
 	if err != nil {
 		return nil, err
@@ -258,7 +264,7 @@ func DecryptKey(keyjson []byte, auth string) (*Key, error) {
 		Id:              uuid.UUID(keyId),
 		Address:         crypto.PubkeyToAddress(key.PublicKey),
 		PrivateKey:      key,
-		WhisperEnabled:  m["whisperenabled"].(bool),
+		WhisperEnabled:  whisperEnabled,
 		ExtendedKey:     extKey,
 		SubAccountIndex: uint32(subAccountIndex),
 	}, nil
