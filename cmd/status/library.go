@@ -274,6 +274,11 @@ func Call(chatId *C.char, path *C.char, params *C.char) *C.char {
 	return C.CString(res)
 }
 
+//export PopulateStaticPeers
+func PopulateStaticPeers() {
+	geth.NodeManagerInstance().PopulateStaticPeers()
+}
+
 //export AddPeer
 func AddPeer(url *C.char) *C.char {
 	success, err := geth.NodeManagerInstance().AddPeer(C.GoString(url))

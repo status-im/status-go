@@ -3,7 +3,6 @@ package main
 import "C"
 import (
 	"encoding/json"
-	"io/ioutil"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -1231,18 +1230,7 @@ func startTestNode(t *testing.T) <-chan struct{} {
 		}
 		if envelope.Type == geth.EventNodeStarted {
 			// manually add static nodes (LES auto-discovery is not stable yet)
-			configFile, err := ioutil.ReadFile(filepath.Join("../../data", "static-nodes.json"))
-			if err != nil {
-				return
-			}
-			var enodes []string
-			if err = json.Unmarshal(configFile, &enodes); err != nil {
-				return
-			}
-
-			for _, enode := range enodes {
-				AddPeer(C.CString(enode))
-			}
+			PopulateStaticPeers()
 
 			// sync
 			if syncRequired {

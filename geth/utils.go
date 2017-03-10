@@ -180,15 +180,6 @@ func PreprocessDataDir(dataDir string) (string, error) {
 		}
 	}
 
-	// copy over static peer nodes list (LES auto-discovery is not stable yet)
-	dst := filepath.Join(dataDir, "testnet", "static-nodes.json")
-	if _, err := os.Stat(dst); os.IsNotExist(err) {
-		src := filepath.Join("../data", "static-nodes.json")
-		if err := CopyFile(dst, src); err != nil {
-			return dataDir, err
-		}
-	}
-
 	return dataDir, nil
 }
 

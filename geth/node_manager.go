@@ -19,6 +19,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/rpc"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv2"
+	"github.com/status-im/status-go/params"
 )
 
 // SelectedExtKey is a container for currently selected (logged in) account
@@ -132,7 +133,7 @@ func (m *NodeManager) RunNode() {
 		// expose API
 		m.api = node.NewPrivateAdminAPI(m.node.geth)
 
-		m.populateStaticPeers()
+		m.PopulateStaticPeers()
 
 		m.onNodeStarted() // node started, notify listeners
 		m.node.geth.Wait()
@@ -397,17 +398,9 @@ func (m *NodeManager) onNodeStarted() {
 	})
 }
 
-// populateStaticPeers connects current node with our publicly available LES cluster
-func (m *NodeManager) populateStaticPeers() {
-	// manually add static nodes (LES auto-discovery is not stable yet)
-	enodes := []string{
-		"enode://ebdf43b6fbca48141d08eef70e5735241445e7f2d2937dfd1cb808b598a94fb1e9834372b9f59b1f72e01a38d4102767cc40144f7f4ff17a9a6808b2202559e4@162.243.63.248:30303",
-		"enode://e19d89e6faf2772e2f250e9625478ee7f313fcc0bb5e9310d5d407371496d9d7d73ccecd9f226cc2a8be34484525f72ba9db9d26f0222f4efc3c6d9d995ee224@198.199.105.122:30303",
-		"enode://5f23bf4913dd005ce945648cb12d3ef970069818d8563a3fe054e5e1dc3898b9cb83e0af1f51b2dce75eaffc76e93f996caf538e21c5b64db5fa324958d59630@95.85.40.211:30303",
-		"enode://b9de2532421f15ac55da9d9a7cddc0dc08b0d646d631fd7ab2a170bd2163fb86b095dd8bde66b857592812f7cd9539f2919b6c64bc1a784a1d1c6ec8137681ed@188.166.229.119:30303",
-		"enode://1ad53266faaa9258ae71eef4d162022ba0d39498e1a3488e6c65fd86e0fb528e2aa68ad0e199da69fd39f4a3a38e9e8e95ac53ba5cc7676dfeaacf5fd6c0ad27@139.59.212.114:30303",
-	}
-	for _, enode := range enodes {
+// PopulateStaticPeers connects current node with our publicly available LES/SHH/Swarm cluster
+func (m *NodeManager) PopulateStaticPeers() {
+	for _, enode := range params.TestnetBootnodes {
 		m.AddPeer(enode)
 	}
 }

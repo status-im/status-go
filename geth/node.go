@@ -23,6 +23,7 @@ import (
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
+	"github.com/ethereum/go-ethereum/p2p/nat"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv2"
@@ -30,14 +31,13 @@ import (
 
 const (
 	ClientIdentifier = "StatusIM" // Client identifier to advertise over the network
-	VersionMajor     = 1          // Major version component of the current release
-	VersionMinor     = 2          // Minor version component of the current release
-	VersionPatch     = 0          // Patch version component of the current release
+	VersionMajor     = 0          // Major version component of the current release
+	VersionMinor     = 9          // Minor version component of the current release
+	VersionPatch     = 3          // Patch version component of the current release
 	VersionMeta      = "unstable" // Version metadata to append to the version string
 	IPCFile          = "geth.ipc" // Filename of exposed IPC-RPC Server
 	HTTPPort         = 8545       // HTTP-RPC port (replaced in unit tests)
 	WSPort           = 8546       // WS-RPC port (replaced in unit tests)
-	NetworkPort      = 30303
 	MaxPeers         = 25
 	MaxLightPeers    = 20
 	MaxPendingPeers  = 0
@@ -103,6 +103,11 @@ func (n *Node) Inited() bool {
 	return n != nil && n.geth != nil
 }
 
+// GethStack returns reference to Geth stack
+func (n *Node) GethStack() *node.Node {
+	return n.geth
+}
+
 // MakeNode create a geth node entity
 func MakeNode(config *NodeConfig) *Node {
 	glog.CopyStandardLogTo("INFO")
@@ -123,11 +128,12 @@ func MakeNode(config *NodeConfig) *Node {
 		Name:              ClientIdentifier,
 		Version:           fmt.Sprintf("%d.%d.%d-%s", VersionMajor, VersionMinor, VersionPatch, VersionMeta),
 		NoDiscovery:       true,
-		DiscoveryV5:       true,
-		DiscoveryV5Addr:   fmt.Sprintf(":%d", NetworkPort+1),
+		DiscoveryV5:       false,
+		DiscoveryV5Addr:   ":0",
 		BootstrapNodes:    makeBootstrapNodes(),
 		BootstrapNodesV5:  makeBootstrapNodesV5(),
-		ListenAddr:        fmt.Sprintf(":%d", NetworkPort),
+		ListenAddr:        ":0",
+		NAT:               nat.Any(),
 		MaxPeers:          MaxPeers,
 		MaxPendingPeers:   MaxPendingPeers,
 		IPCPath:           makeIPCPath(dataDir, config.IPCEnabled),
@@ -313,10 +319,9 @@ func makeDefaultExtra() []byte {
 
 // makeBootstrapNodes returns default (hence bootstrap) list of peers
 func makeBootstrapNodes() []*discover.Node {
-	enodes := params.MainnetBootnodes
-	if UseTestnet {
-		enodes = params.TestnetBootnodes
-	}
+	// on desktops params.TestnetBootnodes and params.MainBootnodes,
+	// on mobile client we deliberately keep this list empty
+	enodes := []string{}
 
 	var bootstapNodes []*discover.Node
 	for _, enode := range enodes {
@@ -328,7 +333,9 @@ func makeBootstrapNodes() []*discover.Node {
 
 // makeBootstrapNodesV5 returns default (hence bootstrap) list of peers
 func makeBootstrapNodesV5() []*discv5.Node {
-	enodes := params.DiscoveryV5Bootnodes
+	// on desktops params.DiscoveryV5Bootnodes,
+	// on mobile client we deliberately keep this list empty
+	enodes := []string{}
 
 	var bootstapNodes []*discv5.Node
 	for _, enode := range enodes {
