@@ -55,6 +55,8 @@ type Swarm struct {
 	corsString  string
 	swapEnabled bool
 	lstore      *storage.LocalStore // local store, needs to store for releasing resources after node stopped
+
+	httpHandler *httpapi.Server // HTTP request handler processing API requests
 }
 
 type SwarmAPI struct {
@@ -191,8 +193,13 @@ func (self *Swarm) Start(net *p2p.Server) error {
 
 	// start swarm http proxy server
 	if self.config.Port != "" {
-		addr := ":" + self.config.Port
-		go httpapi.StartHttpServer(self.api, &httpapi.Server{Addr: addr, CorsString: self.corsString})
+		self.httpHandler = &httpapi.Server{
+			Addr:       ":" + self.config.Port,
+			CorsString: self.corsString,
+		}
+		if err := httpapi.StartHttpServer(self.api, self.httpHandler); err != nil {
+			return err
+		}
 	}
 
 	glog.V(logger.Debug).Infof("Swarm http proxy started on port: %v", self.config.Port)
@@ -216,6 +223,12 @@ func (self *Swarm) Stop() error {
 
 	if self.lstore != nil {
 		self.lstore.DbStore.Close()
+	}
+
+	// stop swarm http proxy server
+	if self.httpHandler != nil {
+		self.httpHandler.StopHttpServer()
+		self.httpHandler = nil
 	}
 
 	return self.config.Save()
