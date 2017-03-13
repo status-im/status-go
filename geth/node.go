@@ -121,7 +121,7 @@ func MakeNode(config *NodeConfig) *Node {
 	}
 
 	// exposed RPC APIs
-	exposedAPIs := "db,eth,net,web3,shh,personal,admin" // TODO remove "admin" on main net
+	exposedAPIs := "db,eth,net,web3,shh,personal,admin,bzz" // TODO remove "admin" on main net
 
 	// configure required node (should you need to update node's config, e.g. add bootstrap nodes, see node.Config)
 	stackConfig := &node.Config{

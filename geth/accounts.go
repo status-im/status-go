@@ -219,14 +219,7 @@ func Logout() error {
 		return fmt.Errorf("%s: %v", ErrWhisperClearIdentitiesFailure, err)
 	}
 
-	swarmService, err := nodeManager.SwarmService()
-	if err != nil {
-		return err
-	}
-
-	if err := swarmService.StopSwarmNode(); err != nil {
-		return err
-	}
+	// TODO add swarm.StopSwarmNode() (once Swarm allows to switch accounts better)
 
 	nodeManager.SelectedAccount = nil
 

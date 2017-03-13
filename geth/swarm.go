@@ -4,13 +4,15 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
+	"path/filepath"
+	"strings"
+
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/crypto/secp256k1"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/swarm"
 	bzzapi "github.com/ethereum/go-ethereum/swarm/api"
-	"path/filepath"
 )
 
 var (
@@ -28,7 +30,7 @@ type SwarmService struct {
 
 func newSwarmService(stack *node.Node) (*SwarmService, error) {
 	service := &SwarmService{
-		instanceDir:  filepath.Join(stack.InstanceDir(), "swarm"),
+		instanceDir:  filepath.Join(stack.InstanceDir(), "swarmdata"),
 		httpEndpoint: fmt.Sprintf("http://%s", stack.HTTPEndpoint()),
 	}
 
@@ -40,8 +42,14 @@ func newSwarmService(stack *node.Node) (*SwarmService, error) {
 
 // activateSwarmService configures and registers the SwarmService with a given node.
 func (s *SwarmService) newSwarmNode(prvkey *ecdsa.PrivateKey) (*swarm.Swarm, error) {
+	var err error
 	if prvkey == nil {
-		prvkey, _ = crypto.GenerateKey()
+		// TODO rely on truly random key (via crypto.GenerateKey())
+		// atm, Swarm has issues with dynamically switching underlying account
+		prvkey, err = ecdsa.GenerateKey(secp256k1.S256(), strings.NewReader("fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	chbookaddr := common.Address{}
@@ -66,13 +74,15 @@ func (s *SwarmService) newSwarmNode(prvkey *ecdsa.PrivateKey) (*swarm.Swarm, err
 }
 
 // Run swarm node on with specified private key
+// TODO implement dynamic account selection (when Swarm is stable enough for this)
 func (s *SwarmService) RunSwarmNode(prvkey *ecdsa.PrivateKey) error {
+	return nil
+
 	nodeManager := NodeManagerInstance()
 	p2p := nodeManager.node.geth.Server()
 
 	// stop old swarm instance
-	err := s.StopSwarmNode()
-	if err != nil {
+	if err := s.StopSwarmNode(); err != nil {
 		return err
 	}
 
@@ -85,11 +95,21 @@ func (s *SwarmService) RunSwarmNode(prvkey *ecdsa.PrivateKey) error {
 	return s.swarm.Start(p2p)
 }
 
-// Stop current running swarm node
-func (s *SwarmService) StopSwarmNode() error {
-	err := s.swarm.Stop()
-	if err != nil {
+func (s *SwarmService) RestartSwarmNode() error {
+	nodeManager := NodeManagerInstance()
+
+	if err := s.StopSwarmNode(); err != nil {
 		return err
 	}
+
+	return s.swarm.Start(nodeManager.node.geth.Server())
+}
+
+// Stop current running swarm node
+func (s *SwarmService) StopSwarmNode() error {
+	if err := s.swarm.Stop(); err != nil {
+		return err
+	}
+
 	return nil
 }
