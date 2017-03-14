@@ -8,7 +8,7 @@ import (
 
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv2"
 	"github.com/status-im/status-go/geth"
-	"github.com/status-im/status-go/jail"
+	"github.com/status-im/status-go/geth/jail"
 )
 
 //export CreateAccount

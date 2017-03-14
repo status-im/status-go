@@ -2,6 +2,7 @@ package jail_test
 
 import (
 	"encoding/json"
+	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -10,20 +11,35 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/geth"
-	"github.com/status-im/status-go/jail"
+	"github.com/status-im/status-go/geth/jail"
 )
 
 const (
-	TEST_ADDRESS          = "0xadaf150b905cf5e6a778e553e15a139b6618bbb7"
-	TEST_ADDRESS_PASSWORD = "asdfasdf"
-	CHAT_ID_INIT          = "CHAT_ID_INIT_TEST"
-	CHAT_ID_CALL          = "CHAT_ID_CALL_TEST"
-	CHAT_ID_SEND          = "CHAT_ID_CALL_SEND"
-	CHAT_ID_NON_EXISTENT  = "CHAT_IDNON_EXISTENT"
+	CHAT_ID_INIT         = "CHAT_ID_INIT_TEST"
+	CHAT_ID_CALL         = "CHAT_ID_CALL_TEST"
+	CHAT_ID_SEND         = "CHAT_ID_CALL_SEND"
+	CHAT_ID_NON_EXISTENT = "CHAT_IDNON_EXISTENT"
 
 	TESTDATA_STATUS_JS  = "testdata/status.js"
 	TESTDATA_TX_SEND_JS = "testdata/tx-send/"
 )
+
+var testConfig *geth.TestConfig
+
+func TestMain(m *testing.M) {
+	// load shared test configuration
+	var err error
+	testConfig, err = geth.LoadTestConfig()
+	if err != nil {
+		panic(err)
+	}
+
+	// run tests
+	retCode := m.Run()
+
+	//time.Sleep(25 * time.Second) // to give some time to propagate txs to the rest of the network
+	os.Exit(retCode)
+}
 
 func TestJailUnInited(t *testing.T) {
 	errorWrapper := func(err error) string {
@@ -174,7 +190,7 @@ func TestJailRPCSend(t *testing.T) {
 	// internally (since we replaced `web3.send` with `jail.Send`)
 	// all requests to web3 are forwarded to `jail.Send`
 	_, err = vm.Run(`
-	    var balance = web3.eth.getBalance("` + TEST_ADDRESS + `");
+	    var balance = web3.eth.getBalance("` + testConfig.Account.Address + `");
 		var sendResult = web3.fromWei(balance, "ether")
 	`)
 	if err != nil {
@@ -199,7 +215,7 @@ func TestJailRPCSend(t *testing.T) {
 		return
 	}
 
-	t.Logf("Balance of %.2f ETH found on '%s' account", balance, TEST_ADDRESS)
+	t.Logf("Balance of %.2f ETH found on '%s' account", balance, testConfig.Account.Address)
 }
 
 func TestJailSendQueuedTransaction(t *testing.T) {
@@ -210,13 +226,13 @@ func TestJailSendQueuedTransaction(t *testing.T) {
 	}
 
 	// log into account from which transactions will be sent
-	if err := geth.SelectAccount(TEST_ADDRESS, TEST_ADDRESS_PASSWORD); err != nil {
-		t.Errorf("cannot select account: %v", TEST_ADDRESS)
+	if err := geth.SelectAccount(testConfig.Account.Address, testConfig.Account.Password); err != nil {
+		t.Errorf("cannot select account: %v", testConfig.Account.Address)
 		return
 	}
 
 	txParams := `{
-  		"from": "` + TEST_ADDRESS + `",
+  		"from": "` + testConfig.Account.Address + `",
   		"to": "0xf82da7547534045b4e00442bc89e16186cf8c272",
   		"value": "0.000001"
 	}`
@@ -251,11 +267,10 @@ func TestJailSendQueuedTransaction(t *testing.T) {
 					return
 				}
 			}
-			t.Logf("Transaction queued (will be completed in 5 secs): {id: %s}\n", event["id"].(string))
-			time.Sleep(5 * time.Second)
+			t.Logf("Transaction queued (will be completed shortly): {id: %s}\n", event["id"].(string))
 
 			var txHash common.Hash
-			if txHash, err = geth.CompleteTransaction(event["id"].(string), TEST_ADDRESS_PASSWORD); err != nil {
+			if txHash, err = geth.CompleteTransaction(event["id"].(string), testConfig.Account.Password); err != nil {
 				t.Errorf("cannot complete queued transation[%v]: %v", event["id"], err)
 			} else {
 				t.Logf("Transaction complete: https://testnet.etherscan.io/tx/%s", txHash.Hex())
@@ -293,7 +308,7 @@ func TestJailSendQueuedTransaction(t *testing.T) {
 				},
 				{
 					`["commands", "getBalance"]`,
-					`{"address": "` + TEST_ADDRESS + `"}`,
+					`{"address": "` + testConfig.Account.Address + `"}`,
 					`{"result": {"balance":42}}`,
 				},
 			},
@@ -311,7 +326,7 @@ func TestJailSendQueuedTransaction(t *testing.T) {
 				},
 				{
 					`["commands", "getBalance"]`,
-					`{"address": "` + TEST_ADDRESS + `"}`,
+					`{"address": "` + testConfig.Account.Address + `"}`,
 					`{"result": {"context":{},"result":{"balance":42}}}`, // note emtpy (but present) context!
 				},
 			},
@@ -329,7 +344,7 @@ func TestJailSendQueuedTransaction(t *testing.T) {
 				},
 				{
 					`["commands", "getBalance"]`,
-					`{"address": "` + TEST_ADDRESS + `"}`,
+					`{"address": "` + testConfig.Account.Address + `"}`,
 					`{"result": {"balance":42}}`, // note emtpy context!
 				},
 			},
@@ -347,7 +362,7 @@ func TestJailSendQueuedTransaction(t *testing.T) {
 				},
 				{
 					`["commands", "getBalance"]`,
-					`{"address": "` + TEST_ADDRESS + `"}`,
+					`{"address": "` + testConfig.Account.Address + `"}`,
 					`{"result": {"context":{"message_id":"42"},"result":{"balance":42}}}`, // message id in context, but default one is used!
 				},
 			},
@@ -596,15 +611,14 @@ func TestContractDeployment(t *testing.T) {
 		if envelope.Type == geth.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
 
-			t.Logf("Transaction queued (will be completed in 5 secs): {id: %s}\n", event["id"].(string))
-			time.Sleep(5 * time.Second)
+			t.Logf("Transaction queued (will be completed shortly): {id: %s}\n", event["id"].(string))
 
-			if err := geth.SelectAccount(TEST_ADDRESS, TEST_ADDRESS_PASSWORD); err != nil {
-				t.Errorf("cannot select account: %v", TEST_ADDRESS)
+			if err := geth.SelectAccount(testConfig.Account.Address, testConfig.Account.Password); err != nil {
+				t.Errorf("cannot select account: %v", testConfig.Account.Address)
 				return
 			}
 
-			if txHash, err = geth.CompleteTransaction(event["id"].(string), TEST_ADDRESS_PASSWORD); err != nil {
+			if txHash, err = geth.CompleteTransaction(event["id"].(string), testConfig.Account.Password); err != nil {
 				t.Errorf("cannot complete queued transation[%v]: %v", event["id"], err)
 				return
 			} else {
@@ -620,7 +634,7 @@ func TestContractDeployment(t *testing.T) {
 		var testContract = web3.eth.contract([{"constant":true,"inputs":[{"name":"a","type":"int256"}],"name":"double","outputs":[{"name":"","type":"int256"}],"payable":false,"type":"function"}]);
 		var test = testContract.new(
 		{
-			from: '` + TEST_ADDRESS + `',
+			from: '` + testConfig.Account.Address + `',
 			data: '0x6060604052341561000c57fe5b5b60a58061001b6000396000f30060606040526000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff1680636ffa1caa14603a575bfe5b3415604157fe5b60556004808035906020019091905050606b565b6040518082815260200191505060405180910390f35b60008160020290505b9190505600a165627a7a72305820ccdadd737e4ac7039963b54cee5e5afb25fa859a275252bdcf06f653155228210029',
 			gas: '` + strconv.Itoa(geth.DefaultGas) + `'
 		}, function (e, contract){
@@ -689,12 +703,12 @@ func TestGasEstimation(t *testing.T) {
 
 			t.Logf("Transaction queued (will be completed immediately): {id: %s}\n", event["id"].(string))
 
-			if err := geth.SelectAccount(TEST_ADDRESS, TEST_ADDRESS_PASSWORD); err != nil {
-				t.Errorf("cannot select account: %v", TEST_ADDRESS)
+			if err := geth.SelectAccount(testConfig.Account.Address, testConfig.Account.Password); err != nil {
+				t.Errorf("cannot select account: %v", testConfig.Account.Address)
 				return
 			}
 
-			if txHash, err = geth.CompleteTransaction(event["id"].(string), TEST_ADDRESS_PASSWORD); err != nil {
+			if txHash, err = geth.CompleteTransaction(event["id"].(string), testConfig.Account.Password); err != nil {
 				t.Errorf("cannot complete queued transation[%v]: %v", event["id"], err)
 				return
 			} else {
@@ -710,7 +724,7 @@ func TestGasEstimation(t *testing.T) {
 		var testContract = web3.eth.contract([{"constant":true,"inputs":[{"name":"a","type":"int256"}],"name":"double","outputs":[{"name":"","type":"int256"}],"payable":false,"type":"function"}]);
 		var test = testContract.new(
 		{
-			from: '` + TEST_ADDRESS + `',
+			from: '` + testConfig.Account.Address + `',
 			data: '0x6060604052341561000c57fe5b5b60a58061001b6000396000f30060606040526000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff1680636ffa1caa14603a575bfe5b3415604157fe5b60556004808035906020019091905050606b565b6040518082815260200191505060405180910390f35b60008160020290505b9190505600a165627a7a72305820ccdadd737e4ac7039963b54cee5e5afb25fa859a275252bdcf06f653155228210029',
 		}, function (e, contract){
 			if (!e) {
@@ -741,5 +755,5 @@ func TestGasEstimation(t *testing.T) {
 	if !reflect.DeepEqual(response, expectedResponse) {
 		t.Errorf("expected response is not returned: expected %s, got %s", expectedResponse, response)
 		return
-}
+	}
 }

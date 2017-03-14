@@ -11,8 +11,8 @@ import (
 	"encoding/json"
 	"io"
 	"os"
-	"path"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"time"
 
@@ -22,13 +22,18 @@ import (
 	"github.com/ethereum/go-ethereum/logger/glog"
 )
 
-var muPrepareTestNode sync.Mutex
-
 const (
-	TestDataDir         = "../.ethereumtest"
 	TestNodeSyncSeconds = 60
 	TestNodeHTTPPort    = 8645
 	TestNodeWSPort      = 8646
+)
+
+var (
+	muPrepareTestNode sync.Mutex
+	_, basePath, _, _ = runtime.Caller(0)
+	RootDir           = filepath.Join(filepath.Dir(basePath), "..")
+	DataDir           = filepath.Join(RootDir, "data")
+	TestDataDir       = filepath.Join(RootDir, ".ethereumtest")
 )
 
 type NodeNotificationHandler func(jsonEvent string)
@@ -59,6 +64,31 @@ func NotifyNode(jsonEvent *C.char) {
 //export TriggerTestSignal
 func TriggerTestSignal() {
 	C.StatusServiceSignalEvent(C.CString(`{"answer": 42}`))
+}
+
+// TestConfig contains shared (among different test packages) parameters
+type TestConfig struct {
+	Node struct {
+		SyncSeconds int
+		HTTPPort    int
+		WSPort      int
+	}
+	Account struct {
+		Address  string
+		Password string
+	}
+}
+
+// LoadTestConfig loads test configuration values from disk
+func LoadTestConfig() (*TestConfig, error) {
+	var testConfig TestConfig
+
+	configData := LoadFromFile(filepath.Join(DataDir, "test-data.json"))
+	if err := json.Unmarshal([]byte(configData), &testConfig); err != nil {
+		return nil, err
+	}
+
+	return &testConfig, nil
 }
 
 func CopyFile(dst, src string) error {
@@ -112,8 +142,7 @@ func PrepareTestNode() (err error) {
 	}
 
 	// prepare node directory
-	dataDir, err := PreprocessDataDir(TestDataDir)
-	if err != nil {
+	if err := os.MkdirAll(filepath.Join(TestDataDir, "testnet", "keystore"), os.ModePerm); err != nil {
 		glog.V(logger.Warn).Infoln("make node failed:", err)
 		return err
 	}
@@ -121,7 +150,7 @@ func PrepareTestNode() (err error) {
 	// import test account (with test ether on it)
 	dst := filepath.Join(TestDataDir, "testnet", "keystore", "test-account.pk")
 	if _, err := os.Stat(dst); os.IsNotExist(err) {
-		err = CopyFile(dst, filepath.Join("../data", "test-account.pk"))
+		err = CopyFile(dst, filepath.Join(RootDir, "data", "test-account.pk"))
 		if err != nil {
 			glog.V(logger.Warn).Infof("cannot copy test account PK: %v", err)
 			return err
@@ -130,7 +159,7 @@ func PrepareTestNode() (err error) {
 
 	// start geth node and wait for it to initialize
 	err = CreateAndRunNode(&NodeConfig{
-		DataDir:    dataDir,
+		DataDir:    TestDataDir,
 		IPCEnabled: false,
 		HTTPPort:   TestNodeHTTPPort, // to avoid conflicts with running app, using different port in tests
 		WSEnabled:  false,
@@ -170,17 +199,6 @@ func RemoveTestNode() {
 	if err != nil {
 		glog.V(logger.Warn).Infof("could not clean up temporary datadir")
 	}
-}
-
-func PreprocessDataDir(dataDir string) (string, error) {
-	testDataDir := path.Join(dataDir, "testnet", "keystore")
-	if _, err := os.Stat(testDataDir); os.IsNotExist(err) {
-		if err := os.MkdirAll(testDataDir, 0755); err != nil {
-			return dataDir, ErrDataDirPreprocessingFailed
-		}
-	}
-
-	return dataDir, nil
 }
 
 // PanicAfter throws panic() after waitSeconds, unless abort channel receives notification
