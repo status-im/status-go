@@ -11,6 +11,14 @@ import (
 	"github.com/status-im/status-go/geth"
 )
 
+const (
+	whisperMessage1 = "test message 1 (K1 -> K1)"
+	whisperMessage2 = "test message 2 (K1 -> '')"
+	whisperMessage3 = "test message 3 ('' -> '')"
+	whisperMessage4 = "test message 4 ('' -> K1)"
+	whisperMessage5 = "test message 5 (K2 -> K1)"
+)
+
 func TestWhisperMessaging(t *testing.T) {
 	err := geth.PrepareTestNode()
 	if err != nil {
@@ -35,7 +43,7 @@ func TestWhisperMessaging(t *testing.T) {
 	}
 
 	// create an accounts
-	address1, pubKey1, _, err := geth.CreateAccount(newAccountPassword)
+	address1, pubKey1, _, err := geth.CreateAccount(testConfig.Account1.Password)
 	if err != nil {
 		fmt.Println(err.Error())
 		t.Error("Test failed: could not create account")
@@ -43,7 +51,7 @@ func TestWhisperMessaging(t *testing.T) {
 	}
 	t.Logf("Account created: {address: %s, key: %s}", address1, pubKey1)
 
-	address2, pubKey2, _, err := geth.CreateAccount(newAccountPassword)
+	address2, pubKey2, _, err := geth.CreateAccount(testConfig.Account1.Password)
 	if err != nil {
 		fmt.Println(err.Error())
 		t.Error("Test failed: could not create account")
@@ -72,7 +80,7 @@ func TestWhisperMessaging(t *testing.T) {
 	if whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey1))) {
 		t.Error("identity already present in whisper")
 	}
-	err = geth.SelectAccount(address1, newAccountPassword)
+	err = geth.SelectAccount(address1, testConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("Test failed: could not select account: %v", err)
 		return
@@ -86,7 +94,7 @@ func TestWhisperMessaging(t *testing.T) {
 	}
 
 	// double selecting (shouldn't be a problem)
-	err = geth.SelectAccount(address1, newAccountPassword)
+	err = geth.SelectAccount(address1, testConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("Test failed: could not select account: %v", err)
 		return

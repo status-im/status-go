@@ -12,7 +12,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -22,19 +22,29 @@ import (
 	"github.com/ethereum/go-ethereum/logger/glog"
 )
 
-const (
-	TestNodeSyncSeconds = 60
-	TestNodeHTTPPort    = 8645
-	TestNodeWSPort      = 8646
-)
-
 var (
 	muPrepareTestNode sync.Mutex
-	_, basePath, _, _ = runtime.Caller(0)
-	RootDir           = filepath.Join(filepath.Dir(basePath), "..")
-	DataDir           = filepath.Join(RootDir, "data")
-	TestDataDir       = filepath.Join(RootDir, ".ethereumtest")
+	RootDir           string
+	DataDir           string
+	TestDataDir       string
 )
+
+func init() {
+	pwd, err := os.Getwd()
+	if err != nil {
+		panic(err)
+	}
+
+	// setup root directory
+	RootDir = filepath.Dir(pwd)
+	if strings.HasSuffix(RootDir, "geth") || strings.HasSuffix(RootDir, "cmd") { // we need to hop one more level
+		RootDir = filepath.Join(RootDir, "..")
+	}
+
+	// setup auxiliary directories
+	DataDir = filepath.Join(RootDir, "data")
+	TestDataDir = filepath.Join(RootDir, ".ethereumtest")
+}
 
 type NodeNotificationHandler func(jsonEvent string)
 
@@ -69,11 +79,15 @@ func TriggerTestSignal() {
 // TestConfig contains shared (among different test packages) parameters
 type TestConfig struct {
 	Node struct {
-		SyncSeconds int
+		SyncSeconds time.Duration
 		HTTPPort    int
 		WSPort      int
 	}
-	Account struct {
+	Account1 struct {
+		Address  string
+		Password string
+	}
+	Account2 struct {
 		Address  string
 		Password string
 	}
@@ -136,6 +150,11 @@ func PrepareTestNode() (err error) {
 
 	defer HaltOnPanic()
 
+	testConfig, err := LoadTestConfig()
+	if err != nil {
+		return err
+	}
+
 	syncRequired := false
 	if _, err := os.Stat(filepath.Join(TestDataDir, "testnet")); os.IsNotExist(err) {
 		syncRequired = true
@@ -161,9 +180,9 @@ func PrepareTestNode() (err error) {
 	err = CreateAndRunNode(&NodeConfig{
 		DataDir:    TestDataDir,
 		IPCEnabled: false,
-		HTTPPort:   TestNodeHTTPPort, // to avoid conflicts with running app, using different port in tests
+		HTTPPort:   testConfig.Node.HTTPPort, // to avoid conflicts with running app, using different port in tests
 		WSEnabled:  false,
-		WSPort:     TestNodeWSPort, // ditto
+		WSPort:     testConfig.Node.WSPort, // ditto
 		TLSEnabled: false,
 	})
 	if err != nil {
@@ -185,8 +204,8 @@ func PrepareTestNode() (err error) {
 	}
 
 	if syncRequired {
-		glog.V(logger.Warn).Infof("Sync is required, it will take %d seconds", TestNodeSyncSeconds)
-		time.Sleep(TestNodeSyncSeconds * time.Second) // LES syncs headers, so that we are up do date when it is done
+		glog.V(logger.Warn).Infof("Sync is required, it will take %d seconds", testConfig.Node.SyncSeconds)
+		time.Sleep(testConfig.Node.SyncSeconds * time.Second) // LES syncs headers, so that we are up do date when it is done
 	} else {
 		time.Sleep(5 * time.Second)
 	}

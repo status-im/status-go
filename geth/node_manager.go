@@ -46,7 +46,6 @@ type NodeServiceStack struct {
 }
 
 var (
-	ErrDataDirPreprocessingFailed  = errors.New("failed to pre-process data directory")
 	ErrInvalidGethNode             = errors.New("no running geth node detected")
 	ErrInvalidAccountManager       = errors.New("could not retrieve account manager")
 	ErrInvalidWhisperService       = errors.New("whisper service is unavailable")
