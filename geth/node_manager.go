@@ -64,7 +64,7 @@ var (
 )
 
 // CreateAndRunNode creates and starts running Geth node locally (exposing given RPC port along the way)
-func CreateAndRunNode(config *NodeConfig) error {
+func CreateAndRunNode(config *params.NodeConfig) error {
 	defer HaltOnPanic()
 
 	nodeManager := NewNodeManager(config)
@@ -79,7 +79,7 @@ func CreateAndRunNode(config *NodeConfig) error {
 }
 
 // NewNodeManager makes new instance of node manager
-func NewNodeManager(config *NodeConfig) *NodeManager {
+func NewNodeManager(config *params.NodeConfig) *NodeManager {
 	createOnce.Do(func() {
 		nodeManagerInstance = &NodeManager{
 			services: &NodeServiceStack{

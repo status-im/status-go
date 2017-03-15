@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/les/status"
 	"github.com/status-im/status-go/geth"
+	"github.com/status-im/status-go/geth/params"
 )
 
 func TestQueuedContracts(t *testing.T) {
@@ -95,7 +96,7 @@ func TestQueuedContracts(t *testing.T) {
 		From: geth.FromAddress(testConfig.Account1.Address),
 		To:   nil, // marker, contract creation is expected
 		//Value: (*hexutil.Big)(new(big.Int).Mul(big.NewInt(1), common.Ether)),
-		Gas:  (*hexutil.Big)(big.NewInt(geth.DefaultGas)),
+		Gas:  (*hexutil.Big)(big.NewInt(params.DefaultGas)),
 		Data: byteCode,
 	})
 	if err != nil {

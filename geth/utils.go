@@ -20,6 +20,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/logger"
 	"github.com/ethereum/go-ethereum/logger/glog"
+	"github.com/status-im/status-go/geth/params"
 )
 
 var (
@@ -177,14 +178,14 @@ func PrepareTestNode() (err error) {
 	}
 
 	// start geth node and wait for it to initialize
-	err = CreateAndRunNode(&NodeConfig{
-		DataDir:    TestDataDir,
-		IPCEnabled: false,
-		HTTPPort:   testConfig.Node.HTTPPort, // to avoid conflicts with running app, using different port in tests
-		WSEnabled:  false,
-		WSPort:     testConfig.Node.WSPort, // ditto
-		TLSEnabled: false,
-	})
+	config, err := params.NewNodeConfig(TestDataDir, params.TestNetworkId)
+	if err != nil {
+		return err
+	}
+	config.HTTPPort = testConfig.Node.HTTPPort // to avoid conflicts with running app, using different port in tests
+	config.WSPort = testConfig.Node.WSPort     // ditto
+
+	err = CreateAndRunNode(config)
 	if err != nil {
 		panic(err)
 	}

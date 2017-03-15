@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"testing"
 	"time"
 
@@ -14,18 +15,17 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/les/status"
+	gethparams "github.com/ethereum/go-ethereum/params"
 	"github.com/status-im/status-go/geth"
+	"github.com/status-im/status-go/geth/params"
 )
 
 var testConfig *geth.TestConfig
 
 func init() {
-	// load shared test configuration
-	var err error
-	testConfig, err = geth.LoadTestConfig()
-	if err != nil {
-		panic(err)
-	}
+	// error is ignored, as it will occur on non-test compilation only, and there testConfig is not used at all
+	// (we have to use "main" package due to restrictions on including C imports into *_test packages)
+	testConfig, _ = geth.LoadTestConfig()
 }
 
 func testExportedAPI(t *testing.T, done chan struct{}) {
@@ -35,6 +35,10 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 		name string
 		fn   func(t *testing.T) bool
 	}{
+		{
+			"check default configuration",
+			testGetDefaultConfig,
+		},
 		{
 			"reset blockchain data",
 			testResetChainData,
@@ -96,6 +100,97 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 	}
 
 	done <- struct{}{}
+}
+
+func testGetDefaultConfig(t *testing.T) bool {
+	// test Mainnet config
+	nodeConfig := params.NodeConfig{}
+
+	rawResponse := GenerateConfig(C.CString("/tmp/data-folder"), 1)
+	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &nodeConfig); err != nil {
+		t.Errorf("cannot decode reponse (%s): %v", C.GoString(rawResponse), err)
+		return false
+	}
+
+	chainConfig := nodeConfig.ChainConfig
+	if chainConfig.HomesteadBlock.Cmp(gethparams.MainNetHomesteadBlock) != 0 {
+		t.Error("invalid chainConfig.HomesteadBlock")
+		return false
+	}
+	if chainConfig.DAOForkBlock.Cmp(gethparams.MainNetDAOForkBlock) != 0 {
+		t.Error("invalid chainConfig.DAOForkBlock")
+		return false
+	}
+	if chainConfig.DAOForkSupport != true {
+		t.Error("invalid chainConfig.DAOForkSupport")
+		return false
+	}
+	if chainConfig.EIP150Block.Cmp(gethparams.MainNetHomesteadGasRepriceBlock) != 0 {
+		t.Error("invalid chainConfig.EIP150Block")
+		return false
+	}
+	if chainConfig.EIP150Hash != gethparams.MainNetHomesteadGasRepriceHash {
+		t.Error("invalid chainConfig.EIP150Hash")
+		return false
+	}
+	if chainConfig.EIP155Block.Cmp(gethparams.MainNetSpuriousDragon) != 0 {
+		t.Error("invalid chainConfig.EIP155Block")
+		return false
+	}
+	if chainConfig.EIP158Block.Cmp(gethparams.MainNetSpuriousDragon) != 0 {
+		t.Error("invalid chainConfig.EIP158Block")
+		return false
+	}
+	if chainConfig.ChainId.Cmp(gethparams.MainNetChainID) != 0 {
+		t.Error("invalid chainConfig.ChainId")
+		return false
+	}
+
+	// test Testnet
+	nodeConfig = params.NodeConfig{}
+	rawResponse = GenerateConfig(C.CString("/tmp/data-folder"), 3)
+	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &nodeConfig); err != nil {
+		t.Errorf("cannot decode reponse (%s): %v", C.GoString(rawResponse), err)
+		return false
+	}
+
+	chainConfig = nodeConfig.ChainConfig
+	refChainConfig := gethparams.TestnetChainConfig
+
+	if chainConfig.HomesteadBlock.Cmp(refChainConfig.HomesteadBlock) != 0 {
+		t.Error("invalid chainConfig.HomesteadBlock")
+		return false
+	}
+	if chainConfig.DAOForkBlock != nil { // already forked
+		t.Error("invalid chainConfig.DAOForkBlock")
+		return false
+	}
+	if chainConfig.DAOForkSupport != refChainConfig.DAOForkSupport {
+		t.Error("invalid chainConfig.DAOForkSupport")
+		return false
+	}
+	if chainConfig.EIP150Block.Cmp(refChainConfig.EIP150Block) != 0 {
+		t.Error("invalid chainConfig.EIP150Block")
+		return false
+	}
+	if chainConfig.EIP150Hash != refChainConfig.EIP150Hash {
+		t.Error("invalid chainConfig.EIP150Hash")
+		return false
+	}
+	if chainConfig.EIP155Block.Cmp(refChainConfig.EIP155Block) != 0 {
+		t.Error("invalid chainConfig.EIP155Block")
+		return false
+	}
+	if chainConfig.EIP158Block.Cmp(refChainConfig.EIP158Block) != 0 {
+		t.Error("invalid chainConfig.EIP158Block")
+		return false
+	}
+	if chainConfig.ChainId.Cmp(refChainConfig.ChainId) != 0 {
+		t.Error("invalid chainConfig.ChainId")
+		return false
+	}
+
+	return true
 }
 
 func testResetChainData(t *testing.T) bool {
@@ -246,7 +341,7 @@ func testRestartNodeRPC(t *testing.T) bool {
 		t.Errorf("cannot decode StartNodeRPCServer reponse (%s): %v", C.GoString(rawResponse), err)
 		return false
 	}
-	expectedError := "HTTP RPC already running on localhost:8545"
+	expectedError := "HTTP RPC already running on localhost:8645"
 	if startNodeRPCServerResponse.Error != expectedError {
 		t.Errorf("expected error not thrown: %s", expectedError)
 		return false
@@ -1213,6 +1308,20 @@ func startTestNode(t *testing.T) <-chan struct{} {
 		syncRequired = true
 	}
 
+	// prepare node directory
+	if err := os.MkdirAll(filepath.Join(geth.TestDataDir, "testnet", "keystore"), os.ModePerm); err != nil {
+		panic(err)
+	}
+
+	// import test account (with test ether on it)
+	dst := filepath.Join(geth.TestDataDir, "testnet", "keystore", "test-account.pk")
+	if _, err := os.Stat(dst); os.IsNotExist(err) {
+		err = geth.CopyFile(dst, filepath.Join(geth.RootDir, "data", "test-account.pk"))
+		if err != nil {
+			panic(err)
+		}
+	}
+
 	waitForNodeStart := make(chan struct{}, 1)
 	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		t.Log(jsonEvent)
@@ -1246,12 +1355,18 @@ func startTestNode(t *testing.T) <-chan struct{} {
 	})
 
 	go func() {
-		response := StartNode(C.CString(geth.TestDataDir))
+		configJSON := `{
+			"NetworkId": ` + strconv.Itoa(params.TestNetworkId) + `,
+			"DataDir": "` + geth.TestDataDir + `",
+			"HTTPPort": ` + strconv.Itoa(testConfig.Node.HTTPPort) + `,
+			"WSPort": ` + strconv.Itoa(testConfig.Node.WSPort) + `
+		}`
+		response := StartNode(C.CString(configJSON))
 		err := geth.JSONError{}
 
 		json.Unmarshal([]byte(C.GoString(response)), &err)
 		if err.Error != "" {
-			t.Error("cannot start node")
+			panic("cannot start node: " + err.Error)
 		}
 	}()
 

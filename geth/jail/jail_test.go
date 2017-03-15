@@ -11,6 +11,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/geth"
+	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/jail"
 )
 
@@ -636,7 +637,7 @@ func TestContractDeployment(t *testing.T) {
 		{
 			from: '` + testConfig.Account1.Address + `',
 			data: '0x6060604052341561000c57fe5b5b60a58061001b6000396000f30060606040526000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff1680636ffa1caa14603a575bfe5b3415604157fe5b60556004808035906020019091905050606b565b6040518082815260200191505060405180910390f35b60008160020290505b9190505600a165627a7a72305820ccdadd737e4ac7039963b54cee5e5afb25fa859a275252bdcf06f653155228210029',
-			gas: '` + strconv.Itoa(geth.DefaultGas) + `'
+			gas: '` + strconv.Itoa(params.DefaultGas) + `'
 		}, function (e, contract){
 			if (!e) {
 				responseValue = contract.transactionHash
