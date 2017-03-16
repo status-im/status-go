@@ -153,6 +153,15 @@ func SelectAccount(address, password string) error {
 		return ErrWhisperIdentityInjectionFailure
 	}
 
+	swarmService, err := nodeManager.SwarmService()
+	if err != nil {
+		return err
+	}
+
+	if err := swarmService.RunSwarmNode(accountKey.PrivateKey); err != nil {
+		return ErrSwarmIdentityInjectionFailure
+	}
+
 	// persist account key for easier recovery of currently selected key
 	subAccounts, err := findSubAccounts(accountKey.ExtendedKey, accountKey.SubAccountIndex)
 	if err != nil {
@@ -185,6 +194,15 @@ func ReSelectAccount() error {
 		return ErrWhisperIdentityInjectionFailure
 	}
 
+	swarmService, err := nodeManager.SwarmService()
+	if err != nil {
+		return err
+	}
+
+	if err := swarmService.RunSwarmNode(selectedAccount.AccountKey.PrivateKey); err != nil {
+		return ErrSwarmIdentityInjectionFailure
+	}
+
 	return nil
 }
 
@@ -200,6 +218,8 @@ func Logout() error {
 	if err != nil {
 		return fmt.Errorf("%s: %v", ErrWhisperClearIdentitiesFailure, err)
 	}
+
+	// TODO add swarm.StopSwarmNode() (once Swarm allows to switch accounts better)
 
 	nodeManager.SelectedAccount = nil
 

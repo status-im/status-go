@@ -22,6 +22,7 @@ package http
 import (
 	"bytes"
 	"io"
+	"net"
 	"net/http"
 	"regexp"
 	"strings"
@@ -59,8 +60,9 @@ type sequentialReader struct {
 // Server is the basic configuration needs for the HTTP server and also
 // includes CORS settings.
 type Server struct {
-	Addr       string
-	CorsString string
+	Addr         string
+	CorsString   string
+	httpListener net.Listener // HTTP listener socket
 }
 
 // browser API for registering bzz url scheme handlers:
@@ -69,7 +71,7 @@ type Server struct {
 // https://github.com/atom/electron/blob/master/docs/api/protocol.md
 
 // starts up http server
-func StartHttpServer(api *api.Api, server *Server) {
+func StartHttpServer(api *api.Api, server *Server) error {
 	serveMux := http.NewServeMux()
 	serveMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		handler(w, r, api)
@@ -85,8 +87,29 @@ func StartHttpServer(api *api.Api, server *Server) {
 	})
 	hdlr := c.Handler(serveMux)
 
-	go http.ListenAndServe(server.Addr, hdlr)
-	glog.V(logger.Info).Infof("Swarm HTTP proxy started on localhost:%s", server.Addr)
+	var (
+		listener net.Listener
+		err      error
+	)
+	if listener, err = net.Listen("tcp", server.Addr); err != nil {
+		return err
+	}
+
+	httpServer := http.Server{Handler: hdlr}
+	go httpServer.Serve(listener)
+	server.httpListener = listener
+	glog.V(logger.Info).Infof("Swarm HTTP proxy started on http://localhost:%s", server.Addr)
+
+	return nil
+}
+
+// StopHttpServer stops http server
+func (s *Server) StopHttpServer() {
+	if s.httpListener != nil {
+		s.httpListener.Close()
+		s.httpListener = nil
+		glog.V(logger.Info).Infof("Swarm HTTP proxy stopped on http://localhost:%s", s.Addr)
+	}
 }
 
 func handler(w http.ResponseWriter, r *http.Request, a *api.Api) {

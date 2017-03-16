@@ -2,6 +2,7 @@ package jail_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
@@ -741,5 +742,68 @@ func TestGasEstimation(t *testing.T) {
 	if !reflect.DeepEqual(response, expectedResponse) {
 		t.Errorf("expected response is not returned: expected %s, got %s", expectedResponse, response)
 		return
+	}
 }
+
+func TestSwarm(t *testing.T) {
+	err := geth.PrepareTestNode()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	// log into account from which transactions will be sent
+	if err := geth.SelectAccount(TEST_ADDRESS, TEST_ADDRESS_PASSWORD); err != nil {
+		t.Errorf("cannot select account: %v", TEST_ADDRESS)
+		return
+	}
+
+	jailInstance := jail.Init("")
+	jailInstance.Parse(CHAT_ID_CALL, "")
+
+	// obtain VM for a given chat (to send custom JS to jailed version of Send())
+	vm, err := jailInstance.GetVM(CHAT_ID_CALL)
+	if err != nil {
+		t.Errorf("cannot get VM: %v", err)
+		return
+	}
+
+	expectedResult := "test string"
+	_, err = vm.Run(fmt.Sprintf(`
+ 		web3.bzz.put("%s", "application/text", function (err, filehash) {
+ 			if (err) {
+ 				return
+ 			}
+
+ 			web3.bzz.get(filehash, function (err, result) {
+ 				if (err) {
+ 					return
+ 				}
+
+ 				responseValue = result.Content
+			})
+
+ 		});
+ 	`, expectedResult))
+	if err != nil {
+		t.Errorf("cannot run custom code on VM: %v", err)
+		return
+	}
+
+	responseValue, err := vm.Get("responseValue")
+	if err != nil {
+		t.Errorf("cannot obtain result of isConnected(): %v", err)
+		return
+	}
+
+	response, err := responseValue.ToString()
+	if err != nil {
+		t.Errorf("cannot parse result: %v", err)
+		return
+	}
+
+	if !reflect.DeepEqual(response, expectedResult) {
+		t.Errorf("expected response is not returned: expected %s, got %s", expectedResult, response)
+		return
+	}
 }
