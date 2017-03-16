@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/status-im/status-go/geth"
+	"github.com/status-im/status-go/geth/params"
 )
 
 var (
@@ -11,17 +12,10 @@ var (
 )
 
 func main() {
-	verString := fmt.Sprintf("%d.%d.%d", geth.VersionMajor, geth.VersionMinor, geth.VersionPatch)
-	if geth.VersionMeta != "" {
-		verString += "-" + geth.VersionMeta
-	}
-	if gitCommit != "" {
-		verString += "-" + gitCommit[:8]
-	}
 	netVersion := "mainnet"
 	if geth.UseTestnet {
 		netVersion = "testnet"
 	}
-	fmt.Printf("Status\nGit Commit: %s\nBuild Time: %s\nVersion: %s\nNetwork: %s\n",
-		gitCommit, buildStamp, verString, netVersion)
+	fmt.Printf("%s\nVersion: %s\nGit Commit: %s\nBuild Date: %s\nNetwork: %s\n",
+		geth.ClientIdentifier, params.Version, gitCommit, buildStamp, netVersion)
 }

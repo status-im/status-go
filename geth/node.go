@@ -31,10 +31,6 @@ import (
 
 const (
 	ClientIdentifier = "StatusIM" // Client identifier to advertise over the network
-	VersionMajor     = 0          // Major version component of the current release
-	VersionMinor     = 9          // Minor version component of the current release
-	VersionPatch     = 4          // Patch version component of the current release
-	VersionMeta      = "stable"   // Version metadata to append to the version string
 	IPCFile          = "geth.ipc" // Filename of exposed IPC-RPC Server
 	HTTPPort         = 8545       // HTTP-RPC port (replaced in unit tests)
 	WSPort           = 8546       // WS-RPC port (replaced in unit tests)
@@ -126,7 +122,7 @@ func MakeNode(config *NodeConfig) *Node {
 		DataDir:           dataDir,
 		UseLightweightKDF: true,
 		Name:              ClientIdentifier,
-		Version:           fmt.Sprintf("%d.%d.%d-%s", VersionMajor, VersionMinor, VersionPatch, VersionMeta),
+		Version:           params.Version,
 		NoDiscovery:       true,
 		DiscoveryV5:       false,
 		DiscoveryV5Addr:   ":0",
@@ -302,7 +298,7 @@ func makeDefaultExtra() []byte {
 		Name      string
 		GoVersion string
 		Os        string
-	}{uint(VersionMajor<<16 | VersionMinor<<8 | VersionPatch), ClientIdentifier, runtime.Version(), runtime.GOOS}
+	}{uint(params.VersionMajor<<16 | params.VersionMinor<<8 | params.VersionPatch), ClientIdentifier, runtime.Version(), runtime.GOOS}
 	extra, err := rlp.EncodeToBytes(clientInfo)
 	if err != nil {
 		glog.V(logger.Warn).Infoln("error setting canonical miner information:", err)
