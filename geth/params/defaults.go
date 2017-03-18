@@ -8,7 +8,7 @@ import (
 
 const (
 	// DefaultClientIdentifier is client identifier to advertise over the network
-	DefaultClientIdentifier = "status"
+	DefaultClientIdentifier = "StatusIM"
 
 	// DefaultIPCFile is filename of exposed IPC RPC Server
 	DefaultIPCFile = "geth.ipc"
