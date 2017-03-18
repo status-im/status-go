@@ -2,7 +2,7 @@
     "TestNet": true,
     "NetworkId": 3,
     "DataDir": "$TMPDIR",
-    "Name": "status",
+    "Name": "StatusIM",
     "Version": "$VERSION",
     "APIModules": "db,eth,net,web3,shh,personal,admin",
     "HTTPHost": "localhost",
