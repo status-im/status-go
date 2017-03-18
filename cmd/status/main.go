@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/status-im/status-go/geth"
 	"github.com/status-im/status-go/geth/params"
 )
 
@@ -12,10 +11,16 @@ var (
 )
 
 func main() {
+	nodeConfig, err := params.NewNodeConfig(".ethereumcmd", params.TestNetworkId)
+	if err != nil {
+		panic(err)
+	}
+
 	netVersion := "mainnet"
-	if geth.UseTestnet {
+	if nodeConfig.TestNet {
 		netVersion = "testnet"
 	}
+
 	fmt.Printf("%s\nVersion: %s\nGit Commit: %s\nBuild Date: %s\nNetwork: %s\n",
-		geth.ClientIdentifier, params.Version, gitCommit, buildStamp, netVersion)
+		nodeConfig.Name, params.Version, gitCommit, buildStamp, netVersion)
 }

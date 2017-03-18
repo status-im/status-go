@@ -49,14 +49,17 @@ statusgo-ios-simulator-mainnet: xgo
 
 ci:
 	build/env.sh go test -v -cover ./geth
-	build/env.sh go test -v -cover ./jail
+	build/env.sh go test -v -cover ./geth/params
+	build/env.sh go test -v -cover ./geth/jail
 	build/env.sh go test -v -cover ./extkeys
 
-test-all:
+test:
 	@build/env.sh echo "mode: set" > coverage-all.out
 	build/env.sh go test -coverprofile=coverage.out -covermode=set ./geth
 	@build/env.sh tail -n +2 coverage.out >> coverage-all.out
-	build/env.sh go test -coverprofile=coverage.out -covermode=set ./jail
+	build/env.sh go test -coverprofile=coverage.out -covermode=set ./geth/params
+	@build/env.sh tail -n +2 coverage.out >> coverage-all.out
+	build/env.sh go test -coverprofile=coverage.out -covermode=set ./geth/jail
 	@build/env.sh tail -n +2 coverage.out >> coverage-all.out
 	build/env.sh go test -coverprofile=coverage.out -covermode=set ./extkeys
 	@build/env.sh tail -n +2 coverage.out >> coverage-all.out
@@ -65,15 +68,18 @@ test-all:
 	@build/env.sh go tool cover -html=coverage-all.out -o coverage.html
 	@build/env.sh go tool cover -func=coverage-all.out
 
-test: test-all
-
 test-geth:
 	build/env.sh go test -v -coverprofile=coverage.out ./geth
 	@build/env.sh go tool cover -html=coverage.out -o coverage.html
 	@build/env.sh go tool cover -func=coverage.out
 
+test-config:
+	build/env.sh go test -v -coverprofile=coverage.out ./geth/params
+	@build/env.sh go tool cover -html=coverage.out -o coverage.html
+	@build/env.sh go tool cover -func=coverage.out
+
 test-jail:
-	build/env.sh go test -v -coverprofile=coverage.out ./jail
+	build/env.sh go test -v -coverprofile=coverage.out ./geth/jail
 	@build/env.sh go tool cover -html=coverage.out -o coverage.html
 	@build/env.sh go tool cover -func=coverage.out
 

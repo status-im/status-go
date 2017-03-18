@@ -1,0 +1,15 @@
+{
+  "Node": {
+    "SyncSeconds": 90,
+    "HTTPPort": 8645,
+    "WSPort": 8646
+  },
+  "Account1": {
+    "Address": "0xadaf150b905cf5e6a778e553e15a139b6618bbb7",
+    "Password": "asdfasdf"
+  },
+  "Account2": {
+    "Address": "0xadd4d1d02e71c7360c53296968e59d57fd15e2ba",
+    "Password": "asdfasdf"
+  }
+}

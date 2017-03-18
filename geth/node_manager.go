@@ -19,7 +19,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/rpc"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv2"
-	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/geth/params"
 )
 
 // SelectedExtKey is a container for currently selected (logged in) account
@@ -46,7 +46,6 @@ type NodeServiceStack struct {
 }
 
 var (
-	ErrDataDirPreprocessingFailed  = errors.New("failed to pre-process data directory")
 	ErrInvalidGethNode             = errors.New("no running geth node detected")
 	ErrInvalidAccountManager       = errors.New("could not retrieve account manager")
 	ErrInvalidWhisperService       = errors.New("whisper service is unavailable")
@@ -65,7 +64,7 @@ var (
 )
 
 // CreateAndRunNode creates and starts running Geth node locally (exposing given RPC port along the way)
-func CreateAndRunNode(config *NodeConfig) error {
+func CreateAndRunNode(config *params.NodeConfig) error {
 	defer HaltOnPanic()
 
 	nodeManager := NewNodeManager(config)
@@ -80,7 +79,7 @@ func CreateAndRunNode(config *NodeConfig) error {
 }
 
 // NewNodeManager makes new instance of node manager
-func NewNodeManager(config *NodeConfig) *NodeManager {
+func NewNodeManager(config *params.NodeConfig) *NodeManager {
 	createOnce.Do(func() {
 		nodeManagerInstance = &NodeManager{
 			services: &NodeServiceStack{

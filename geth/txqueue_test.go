@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/les/status"
 	"github.com/status-im/status-go/geth"
+	"github.com/status-im/status-go/geth/params"
 )
 
 func TestQueuedContracts(t *testing.T) {
@@ -30,7 +31,7 @@ func TestQueuedContracts(t *testing.T) {
 	backend := lightEthereum.StatusBackend
 
 	// create an account
-	sampleAddress, _, _, err := geth.CreateAccount(newAccountPassword)
+	sampleAddress, _, _, err := geth.CreateAccount(testConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("could not create account: %v", err)
 		return
@@ -40,7 +41,7 @@ func TestQueuedContracts(t *testing.T) {
 
 	// make sure you panic if transaction complete doesn't return
 	completeQueuedTransaction := make(chan struct{}, 1)
-	geth.PanicAfter(60*time.Second, completeQueuedTransaction, "TestQueuedContracts")
+	geth.PanicAfter(5*time.Second, completeQueuedTransaction, "TestQueuedContracts")
 
 	// replace transaction notification handler
 	var txHash = common.Hash{}
@@ -52,37 +53,36 @@ func TestQueuedContracts(t *testing.T) {
 		}
 		if envelope.Type == geth.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
-			t.Logf("transaction queued (will be completed in 5 secs): {id: %s}\n", event["id"].(string))
-			time.Sleep(5 * time.Second)
+			t.Logf("transaction queued (will be completed shortly): {id: %s}\n", event["id"].(string))
 
 			// the first call will fail (we are not logged in, but trying to complete tx)
-			if txHash, err = geth.CompleteTransaction(event["id"].(string), testAddressPassword); err != status.ErrInvalidCompleteTxSender {
+			if txHash, err = geth.CompleteTransaction(event["id"].(string), testConfig.Account1.Password); err != status.ErrInvalidCompleteTxSender {
 				t.Errorf("expected error on queued transation[%v] not thrown: expected %v, got %v", event["id"], status.ErrInvalidCompleteTxSender, err)
 				return
 			}
 
 			// the second call will also fail (we are logged in as different user)
-			if err := geth.SelectAccount(sampleAddress, newAccountPassword); err != nil {
+			if err := geth.SelectAccount(sampleAddress, testConfig.Account1.Password); err != nil {
 				t.Errorf("cannot select account: %v", sampleAddress)
 				return
 			}
-			if txHash, err = geth.CompleteTransaction(event["id"].(string), testAddressPassword); err != status.ErrInvalidCompleteTxSender {
+			if txHash, err = geth.CompleteTransaction(event["id"].(string), testConfig.Account1.Password); err != status.ErrInvalidCompleteTxSender {
 				t.Errorf("expected error on queued transation[%v] not thrown: expected %v, got %v", event["id"], status.ErrInvalidCompleteTxSender, err)
 				return
 			}
 
 			// the third call will work as expected (as we are logged in with correct credentials)
-			if err := geth.SelectAccount(testAddress, testAddressPassword); err != nil {
-				t.Errorf("cannot select account: %v", testAddress)
+			if err := geth.SelectAccount(testConfig.Account1.Address, testConfig.Account1.Password); err != nil {
+				t.Errorf("cannot select account: %v", testConfig.Account1.Address)
 				return
 			}
-			if txHash, err = geth.CompleteTransaction(event["id"].(string), testAddressPassword); err != nil {
+			if txHash, err = geth.CompleteTransaction(event["id"].(string), testConfig.Account1.Password); err != nil {
 				t.Errorf("cannot complete queued transation[%v]: %v", event["id"], err)
 				return
 			}
 
 			t.Logf("contract transaction complete: https://testnet.etherscan.io/tx/%s", txHash.Hex())
-			completeQueuedTransaction <- struct{}{} // so that timeout is aborted
+			close(completeQueuedTransaction)
 		}
 	})
 
@@ -93,10 +93,10 @@ func TestQueuedContracts(t *testing.T) {
 		return
 	}
 	txHashCheck, err := backend.SendTransaction(nil, status.SendTxArgs{
-		From: geth.FromAddress(testAddress),
+		From: geth.FromAddress(testConfig.Account1.Address),
 		To:   nil, // marker, contract creation is expected
 		//Value: (*hexutil.Big)(new(big.Int).Mul(big.NewInt(1), common.Ether)),
-		Gas:  (*hexutil.Big)(big.NewInt(geth.DefaultGas)),
+		Gas:  (*hexutil.Big)(big.NewInt(params.DefaultGas)),
 		Data: byteCode,
 	})
 	if err != nil {
@@ -108,7 +108,7 @@ func TestQueuedContracts(t *testing.T) {
 		return
 	}
 
-	time.Sleep(10 * time.Second)
+	<-completeQueuedTransaction
 
 	if reflect.DeepEqual(txHashCheck, common.Hash{}) {
 		t.Error("Test failed: transaction was never queued or completed")
@@ -137,7 +137,7 @@ func TestQueuedTransactions(t *testing.T) {
 	backend := lightEthereum.StatusBackend
 
 	// create an account
-	sampleAddress, _, _, err := geth.CreateAccount(newAccountPassword)
+	sampleAddress, _, _, err := geth.CreateAccount(testConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("could not create account: %v", err)
 		return
@@ -147,7 +147,7 @@ func TestQueuedTransactions(t *testing.T) {
 
 	// make sure you panic if transaction complete doesn't return
 	completeQueuedTransaction := make(chan struct{}, 1)
-	geth.PanicAfter(60*time.Second, completeQueuedTransaction, "TestQueuedTransactions")
+	geth.PanicAfter(5*time.Second, completeQueuedTransaction, "TestQueuedTransactions")
 
 	// replace transaction notification handler
 	var txHash = common.Hash{}
@@ -159,44 +159,43 @@ func TestQueuedTransactions(t *testing.T) {
 		}
 		if envelope.Type == geth.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
-			t.Logf("transaction queued (will be completed in 5 secs): {id: %s}\n", event["id"].(string))
-			time.Sleep(5 * time.Second)
+			t.Logf("transaction queued (will be completed shortly): {id: %s}\n", event["id"].(string))
 
 			// the first call will fail (we are not logged in, but trying to complete tx)
-			if txHash, err = geth.CompleteTransaction(event["id"].(string), testAddressPassword); err != status.ErrInvalidCompleteTxSender {
+			if txHash, err = geth.CompleteTransaction(event["id"].(string), testConfig.Account1.Password); err != status.ErrInvalidCompleteTxSender {
 				t.Errorf("expected error on queued transation[%v] not thrown: expected %v, got %v", event["id"], status.ErrInvalidCompleteTxSender, err)
 				return
 			}
 
 			// the second call will also fail (we are logged in as different user)
-			if err := geth.SelectAccount(sampleAddress, newAccountPassword); err != nil {
+			if err := geth.SelectAccount(sampleAddress, testConfig.Account1.Password); err != nil {
 				t.Errorf("cannot select account: %v", sampleAddress)
 				return
 			}
-			if txHash, err = geth.CompleteTransaction(event["id"].(string), testAddressPassword); err != status.ErrInvalidCompleteTxSender {
+			if txHash, err = geth.CompleteTransaction(event["id"].(string), testConfig.Account1.Password); err != status.ErrInvalidCompleteTxSender {
 				t.Errorf("expected error on queued transation[%v] not thrown: expected %v, got %v", event["id"], status.ErrInvalidCompleteTxSender, err)
 				return
 			}
 
 			// the third call will work as expected (as we are logged in with correct credentials)
-			if err := geth.SelectAccount(testAddress, testAddressPassword); err != nil {
-				t.Errorf("cannot select account: %v", testAddress)
+			if err := geth.SelectAccount(testConfig.Account1.Address, testConfig.Account1.Password); err != nil {
+				t.Errorf("cannot select account: %v", testConfig.Account1.Address)
 				return
 			}
-			if txHash, err = geth.CompleteTransaction(event["id"].(string), testAddressPassword); err != nil {
+			if txHash, err = geth.CompleteTransaction(event["id"].(string), testConfig.Account1.Password); err != nil {
 				t.Errorf("cannot complete queued transation[%v]: %v", event["id"], err)
 				return
 			}
 
 			t.Logf("transaction complete: https://testnet.etherscan.io/tx/%s", txHash.Hex())
-			completeQueuedTransaction <- struct{}{} // so that timeout is aborted
+			close(completeQueuedTransaction)
 		}
 	})
 
 	//  this call blocks, up until Complete Transaction is called
 	txHashCheck, err := backend.SendTransaction(nil, status.SendTxArgs{
-		From:  geth.FromAddress(testAddress),
-		To:    geth.ToAddress(testAddress1),
+		From:  geth.FromAddress(testConfig.Account1.Address),
+		To:    geth.ToAddress(testConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 	})
 	if err != nil {
@@ -208,7 +207,7 @@ func TestQueuedTransactions(t *testing.T) {
 		return
 	}
 
-	time.Sleep(10 * time.Second)
+	<-completeQueuedTransaction
 
 	if reflect.DeepEqual(txHashCheck, common.Hash{}) {
 		t.Error("Test failed: transaction was never queued or completed")
@@ -237,8 +236,8 @@ func TestDoubleCompleteQueuedTransactions(t *testing.T) {
 	backend := lightEthereum.StatusBackend
 
 	// log into account from which transactions will be sent
-	if err := geth.SelectAccount(testAddress, testAddressPassword); err != nil {
-		t.Errorf("cannot select account: %v", testAddress)
+	if err := geth.SelectAccount(testConfig.Account1.Address, testConfig.Account1.Password); err != nil {
+		t.Errorf("cannot select account: %v", testConfig.Account1.Address)
 		return
 	}
 
@@ -263,21 +262,18 @@ func TestDoubleCompleteQueuedTransactions(t *testing.T) {
 
 			// try with wrong password
 			// make sure that tx is NOT removed from the queue (by re-trying with the correct password)
-			if _, err = geth.CompleteTransaction(txId, testAddressPassword+"wrong"); err != keystore.ErrDecrypt {
+			if _, err = geth.CompleteTransaction(txId, testConfig.Account1.Password+"wrong"); err != keystore.ErrDecrypt {
 				t.Errorf("expects wrong password error, but call succeeded (or got another error: %v)", err)
 				return
 			}
 
-			time.Sleep(1 * time.Second) // make sure that tx complete signal propagates
 			if txCount := backend.TransactionQueue().Count(); txCount != 1 {
 				t.Errorf("txqueue cannot be empty, as tx has failed: expected = 1, got = %d", txCount)
 				return
 			}
 
 			// now try to complete transaction, but with the correct password
-			t.Log("allow 5 seconds before sedning the second CompleteTransaction")
-			time.Sleep(5 * time.Second)
-			if txHash, err = geth.CompleteTransaction(event["id"].(string), testAddressPassword); err != nil {
+			if txHash, err = geth.CompleteTransaction(event["id"].(string), testConfig.Account1.Password); err != nil {
 				t.Errorf("cannot complete queued transation[%v]: %v", event["id"], err)
 				return
 			}
@@ -315,8 +311,8 @@ func TestDoubleCompleteQueuedTransactions(t *testing.T) {
 
 	//  this call blocks, and should return on *second* attempt to CompleteTransaction (w/ the correct password)
 	txHashCheck, err := backend.SendTransaction(nil, status.SendTxArgs{
-		From:  geth.FromAddress(testAddress),
-		To:    geth.ToAddress(testAddress1),
+		From:  geth.FromAddress(testConfig.Account1.Address),
+		To:    geth.ToAddress(testConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 	})
 	if err != nil {
@@ -343,9 +339,6 @@ func TestDoubleCompleteQueuedTransactions(t *testing.T) {
 		t.Error("expected tx failure signal is not received")
 		return
 	}
-
-	t.Log("sleep extra time, to allow sync")
-	time.Sleep(5 * time.Second)
 }
 
 func TestDiscardQueuedTransactions(t *testing.T) {
@@ -367,8 +360,8 @@ func TestDiscardQueuedTransactions(t *testing.T) {
 	backend.TransactionQueue().Reset()
 
 	// log into account from which transactions will be sent
-	if err := geth.SelectAccount(testAddress, testAddressPassword); err != nil {
-		t.Errorf("cannot select account: %v", testAddress)
+	if err := geth.SelectAccount(testConfig.Account1.Address, testConfig.Account1.Password); err != nil {
+		t.Errorf("cannot select account: %v", testConfig.Account1.Address)
 		return
 	}
 
@@ -403,7 +396,7 @@ func TestDiscardQueuedTransactions(t *testing.T) {
 			}
 
 			// try completing discarded transaction
-			_, err = geth.CompleteTransaction(txId, testAddressPassword)
+			_, err = geth.CompleteTransaction(txId, testConfig.Account1.Password)
 			if err.Error() != "transaction hash not found" {
 				t.Error("expects tx not found, but call to CompleteTransaction succeeded")
 				return
@@ -441,8 +434,8 @@ func TestDiscardQueuedTransactions(t *testing.T) {
 
 	//  this call blocks, and should return when DiscardQueuedTransaction() is called
 	txHashCheck, err := backend.SendTransaction(nil, status.SendTxArgs{
-		From:  geth.FromAddress(testAddress),
-		To:    geth.ToAddress(testAddress1),
+		From:  geth.FromAddress(testConfig.Account1.Address),
+		To:    geth.ToAddress(testConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 	})
 	if err != status.ErrQueuedTxDiscarded {
@@ -464,9 +457,6 @@ func TestDiscardQueuedTransactions(t *testing.T) {
 		t.Error("expected tx failure signal is not received")
 		return
 	}
-
-	t.Log("sleep extra time, to allow sync")
-	time.Sleep(5 * time.Second)
 }
 
 func TestCompleteMultipleQueuedTransactions(t *testing.T) {
@@ -488,8 +478,8 @@ func TestCompleteMultipleQueuedTransactions(t *testing.T) {
 	backend.TransactionQueue().Reset()
 
 	// log into account from which transactions will be sent
-	if err := geth.SelectAccount(testAddress, testAddressPassword); err != nil {
-		t.Errorf("cannot select account: %v", testAddress)
+	if err := geth.SelectAccount(testConfig.Account1.Address, testConfig.Account1.Password); err != nil {
+		t.Errorf("cannot select account: %v", testConfig.Account1.Address)
 		return
 	}
 
@@ -518,8 +508,8 @@ func TestCompleteMultipleQueuedTransactions(t *testing.T) {
 	//  this call blocks, and should return when DiscardQueuedTransaction() for a given tx id is called
 	sendTx := func() {
 		txHashCheck, err := backend.SendTransaction(nil, status.SendTxArgs{
-			From:  geth.FromAddress(testAddress),
-			To:    geth.ToAddress(testAddress1),
+			From:  geth.FromAddress(testConfig.Account1.Address),
+			To:    geth.ToAddress(testConfig.Account2.Address),
 			Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 		})
 		if err != nil {
@@ -542,7 +532,7 @@ func TestCompleteMultipleQueuedTransactions(t *testing.T) {
 		updatedTxIdStrings, _ := json.Marshal(parsedIds)
 
 		// complete
-		results := geth.CompleteTransactions(string(updatedTxIdStrings), testAddressPassword)
+		results := geth.CompleteTransactions(string(updatedTxIdStrings), testConfig.Account1.Password)
 		if len(results) != (testTxCount+1) || results["invalid-tx-id"].Error.Error() != "transaction hash not found" {
 			t.Errorf("cannot complete txs: %v", results)
 			return
@@ -619,8 +609,8 @@ func TestDiscardMultipleQueuedTransactions(t *testing.T) {
 	backend.TransactionQueue().Reset()
 
 	// log into account from which transactions will be sent
-	if err := geth.SelectAccount(testAddress, testAddressPassword); err != nil {
-		t.Errorf("cannot select account: %v", testAddress)
+	if err := geth.SelectAccount(testConfig.Account1.Address, testConfig.Account1.Password); err != nil {
+		t.Errorf("cannot select account: %v", testConfig.Account1.Address)
 		return
 	}
 
@@ -678,8 +668,8 @@ func TestDiscardMultipleQueuedTransactions(t *testing.T) {
 	//  this call blocks, and should return when DiscardQueuedTransaction() for a given tx id is called
 	sendTx := func() {
 		txHashCheck, err := backend.SendTransaction(nil, status.SendTxArgs{
-			From:  geth.FromAddress(testAddress),
-			To:    geth.ToAddress(testAddress1),
+			From:  geth.FromAddress(testConfig.Account1.Address),
+			To:    geth.ToAddress(testConfig.Account2.Address),
 			Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 		})
 		if err != status.ErrQueuedTxDiscarded {
@@ -709,7 +699,7 @@ func TestDiscardMultipleQueuedTransactions(t *testing.T) {
 		}
 
 		// try completing discarded transaction
-		completeResults := geth.CompleteTransactions(string(updatedTxIdStrings), testAddressPassword)
+		completeResults := geth.CompleteTransactions(string(updatedTxIdStrings), testConfig.Account1.Password)
 		if len(completeResults) != (testTxCount + 1) {
 			t.Error("unexpected number of errors (call to CompleteTransaction should not succeed)")
 		}
@@ -769,8 +759,8 @@ func TestNonExistentQueuedTransactions(t *testing.T) {
 	}
 
 	// log into account from which transactions will be sent
-	if err := geth.SelectAccount(testAddress, testAddressPassword); err != nil {
-		t.Errorf("cannot select account: %v", testAddress)
+	if err := geth.SelectAccount(testConfig.Account1.Address, testConfig.Account1.Password); err != nil {
+		t.Errorf("cannot select account: %v", testConfig.Account1.Address)
 		return
 	}
 
@@ -788,11 +778,10 @@ func TestNonExistentQueuedTransactions(t *testing.T) {
 		}
 		if envelope.Type == geth.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
-			t.Logf("Transaction queued (will be completed in 5 secs): {id: %s}\n", event["id"].(string))
-			time.Sleep(5 * time.Second)
+			t.Logf("Transaction queued (will be completed shortly): {id: %s}\n", event["id"].(string))
 
 			// next call is the very same one, but with the correct password
-			if txHash, err = geth.CompleteTransaction(event["id"].(string), testAddressPassword); err != nil {
+			if txHash, err = geth.CompleteTransaction(event["id"].(string), testConfig.Account1.Password); err != nil {
 				t.Errorf("cannot complete queued transation[%v]: %v", event["id"], err)
 				return
 			}
@@ -803,7 +792,7 @@ func TestNonExistentQueuedTransactions(t *testing.T) {
 	})
 
 	// try completing non-existing transaction
-	if _, err = geth.CompleteTransaction("some-bad-transaction-id", testAddressPassword); err == nil {
+	if _, err = geth.CompleteTransaction("some-bad-transaction-id", testConfig.Account1.Password); err == nil {
 		t.Error("error expected and not recieved")
 		return
 	}
@@ -829,8 +818,8 @@ func TestEvictionOfQueuedTransactions(t *testing.T) {
 	backend := lightEthereum.StatusBackend
 
 	// log into account from which transactions will be sent
-	if err := geth.SelectAccount(testAddress, testAddressPassword); err != nil {
-		t.Errorf("cannot select account: %v", testAddress)
+	if err := geth.SelectAccount(testConfig.Account1.Address, testConfig.Account1.Password); err != nil {
+		t.Errorf("cannot select account: %v", testConfig.Account1.Address)
 		return
 	}
 
@@ -848,11 +837,10 @@ func TestEvictionOfQueuedTransactions(t *testing.T) {
 		}
 		if envelope.Type == geth.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
-			t.Logf("Transaction queued (will be completed in 5 secs): {id: %s}\n", event["id"].(string))
-			time.Sleep(5 * time.Second)
+			t.Logf("Transaction queued (will be completed shortly): {id: %s}\n", event["id"].(string))
 
 			// next call is the very same one, but with the correct password
-			if txHash, err = geth.CompleteTransaction(event["id"].(string), testAddressPassword); err != nil {
+			if txHash, err = geth.CompleteTransaction(event["id"].(string), testConfig.Account1.Password); err != nil {
 				t.Errorf("cannot complete queued transation[%v]: %v", event["id"], err)
 				return
 			}
