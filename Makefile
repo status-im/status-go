@@ -73,7 +73,7 @@ test-geth:
 	@build/env.sh go tool cover -html=coverage.out -o coverage.html
 	@build/env.sh go tool cover -func=coverage.out
 
-test-config:
+test-params:
 	build/env.sh go test -v -coverprofile=coverage.out ./geth/params
 	@build/env.sh go tool cover -html=coverage.out -o coverage.html
 	@build/env.sh go tool cover -func=coverage.out

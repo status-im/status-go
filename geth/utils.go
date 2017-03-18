@@ -184,6 +184,7 @@ func PrepareTestNode() (err error) {
 	}
 	config.HTTPPort = testConfig.Node.HTTPPort // to avoid conflicts with running app, using different port in tests
 	config.WSPort = testConfig.Node.WSPort     // ditto
+	config.LogEnabled = true
 
 	err = CreateAndRunNode(config)
 	if err != nil {

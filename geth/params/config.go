@@ -130,6 +130,15 @@ type NodeConfig struct {
 	// handshake phase, counted separately for inbound and outbound connections.
 	MaxPendingPeers int
 
+	// LogToFile specified whether logs should be saved into file
+	LogEnabled bool
+
+	// LogFile is filename where exposed logs get written to
+	LogFile string
+
+	// LogLevel defines minimum log level. Valid names are "ERROR", "WARNING", "INFO", "DEBUG", and "DETAIL".
+	LogLevel string
+
 	// ChainConfig extra configuration for blockchain
 	*ChainConfig `json:"ChainConfig,"`
 
@@ -158,6 +167,8 @@ func NewNodeConfig(dataDir string, networkId int) (*NodeConfig, error) {
 		MaxPeers:        DefaultMaxPeers,
 		MaxPendingPeers: DefaultMaxPendingPeers,
 		IPCFile:         DefaultIPCFile,
+		LogFile:         DefaultLogFile,
+		LogLevel:        DefaultLogLevel,
 		ChainConfig:     &ChainConfig{},
 		LightEthConfig: &LightEthConfig{
 			DatabaseCache: DefaultDatabaseCache,

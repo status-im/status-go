@@ -57,8 +57,12 @@ func (n *Node) GethStack() *node.Node {
 
 // MakeNode create a geth node entity
 func MakeNode(config *params.NodeConfig) *Node {
+	// setup logging
 	glog.CopyStandardLogTo("INFO")
 	glog.SetToStderr(true)
+	if _, err := params.SetupLogger(config); err != nil {
+		Fatalf(err)
+	}
 
 	// configure required node (should you need to update node's config, e.g. add bootstrap nodes, see node.Config)
 	stackConfig := &node.Config{
