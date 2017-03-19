@@ -2,12 +2,12 @@ package params
 
 import (
 	"encoding/json"
+	"errors"
 	"io/ioutil"
+	"math/big"
 	"os"
 	"path/filepath"
 	"strings"
-	"math/big"
-	"errors"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
@@ -195,9 +195,6 @@ func (c *NodeConfig) populateChainConfig() {
 		c.ChainConfig.EIP158Block = params.TestnetChainConfig.EIP158Block
 		c.ChainConfig.ChainId = params.TestnetChainConfig.ChainId
 
-		if len(c.DataDir) > 0 {
-			c.DataDir = filepath.Join(c.DataDir, "testnet")
-		}
 		c.Genesis = core.DefaultTestnetGenesisBlock()
 	} else {
 		// Homestead fork

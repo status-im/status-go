@@ -11,8 +11,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/geth"
-	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/jail"
+	"github.com/status-im/status-go/geth/params"
 )
 
 const (

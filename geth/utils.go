@@ -157,18 +157,18 @@ func PrepareTestNode() (err error) {
 	}
 
 	syncRequired := false
-	if _, err := os.Stat(filepath.Join(TestDataDir, "testnet")); os.IsNotExist(err) {
+	if _, err := os.Stat(TestDataDir); os.IsNotExist(err) {
 		syncRequired = true
 	}
 
 	// prepare node directory
-	if err := os.MkdirAll(filepath.Join(TestDataDir, "testnet", "keystore"), os.ModePerm); err != nil {
+	if err := os.MkdirAll(filepath.Join(TestDataDir, "keystore"), os.ModePerm); err != nil {
 		glog.V(logger.Warn).Infoln("make node failed:", err)
 		return err
 	}
 
 	// import test account (with test ether on it)
-	dst := filepath.Join(TestDataDir, "testnet", "keystore", "test-account.pk")
+	dst := filepath.Join(TestDataDir, "keystore", "test-account.pk")
 	if _, err := os.Stat(dst); os.IsNotExist(err) {
 		err = CopyFile(dst, filepath.Join(RootDir, "data", "test-account.pk"))
 		if err != nil {

@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
+	gethparams "github.com/ethereum/go-ethereum/params"
 	"github.com/status-im/status-go/geth"
 	"github.com/status-im/status-go/geth/params"
-	gethparams "github.com/ethereum/go-ethereum/params"
 )
 
 var loadConfigTestCases = []struct {
@@ -60,40 +60,18 @@ var loadConfigTestCases = []struct {
 		},
 	},
 	{
-		`testnet subdirectory not used (while we are on Network = 3)`,
+		`check static DataDir passing`,
 		`{
 			"NetworkId": 3,
-			"DataDir": "$TMPDIR"
+			"DataDir": "/storage/emulated/0/ethereum/"
 		}`,
 		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			if nodeConfig.DataDir != filepath.Join(dataDir, "testnet") {
-				t.Fatal("'testnet' subdirectory not used")
-			}
-
-			if !strings.Contains(nodeConfig.LightEthConfig.Genesis, "\"chainId\": 3") {
-				t.Fatal("wrong genesis")
-			}
-		},
-	},
-	{
-		`testnet subdirectory used (while we are on Network != 3)`,
-		`{
-			"NetworkId": 1,
-			"DataDir": "$TMPDIR"
-		}`,
-		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if nodeConfig.DataDir != dataDir {
-				t.Fatal("'testnet' subdirectory used")
-			}
-
-			if strings.Contains(nodeConfig.LightEthConfig.Genesis, "\"chainId\": 3") {
-				t.Fatal("wrong genesis")
+			expectedDataDir := "/storage/emulated/0/ethereum/"
+			if nodeConfig.DataDir != expectedDataDir {
+				t.Fatalf("incorrect DataDir used, expected: %v, got: %v", expectedDataDir, nodeConfig.DataDir)
 			}
 		},
 	},
@@ -139,7 +117,7 @@ var loadConfigTestCases = []struct {
 				t.Fatal("wrong WSEnabled")
 			}
 
-			if nodeConfig.IPCEnabled != true{
+			if nodeConfig.IPCEnabled != true {
 				t.Fatal("wrong IPCEnabled")
 			}
 			if nodeConfig.LightEthConfig.DatabaseCache != 64 {
