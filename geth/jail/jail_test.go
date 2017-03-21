@@ -10,19 +10,23 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
+	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth"
 	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/params"
 )
 
 const (
-	CHAT_ID_INIT         = "CHAT_ID_INIT_TEST"
-	CHAT_ID_CALL         = "CHAT_ID_CALL_TEST"
-	CHAT_ID_SEND         = "CHAT_ID_CALL_SEND"
-	CHAT_ID_NON_EXISTENT = "CHAT_IDNON_EXISTENT"
-
-	TESTDATA_STATUS_JS  = "testdata/status.js"
-	TESTDATA_TX_SEND_JS = "testdata/tx-send/"
+	whisperMessage1  = `test message 1 (K1 -> K2, signed+encrypted, from us)`
+	whisperMessage2  = `test message 2 (K1 -> K1, signed+encrypted to ourselves)`
+	whisperMessage3  = `test message 3 (K1 -> "", signed broadcast)`
+	whisperMessage4  = `test message 4 ("" -> "", anon broadcast)`
+	whisperMessage5  = `test message 5 ("" -> K1, encrypted anon broadcast)`
+	whisperMessage6  = `test message 6 (K2 -> K1, signed+encrypted, to us)`
+	chatID           = "testChat"
+	statusJSFilePath = "testdata/status.js"
+	txSendFolder     = "testdata/tx-send/"
 )
 
 var testConfig *geth.TestConfig
@@ -50,17 +54,17 @@ func TestJailUnInited(t *testing.T) {
 	expectedError := errorWrapper(jail.ErrInvalidJail)
 
 	var jailInstance *jail.Jail
-	response := jailInstance.Parse(CHAT_ID_CALL, ``)
+	response := jailInstance.Parse(chatID, ``)
 	if response != expectedError {
 		t.Errorf("error expected, but got: %v", response)
 	}
 
-	response = jailInstance.Call(CHAT_ID_CALL, `["commands", "testCommand"]`, `{"val": 12}`)
+	response = jailInstance.Call(chatID, `["commands", "testCommand"]`, `{"val": 12}`)
 	if response != expectedError {
 		t.Errorf("error expected, but got: %v", response)
 	}
 
-	_, err := jailInstance.GetVM(CHAT_ID_CALL)
+	_, err := jailInstance.GetVM(chatID)
 	if err != jail.ErrInvalidJail {
 		t.Errorf("error expected, but got: %v", err)
 	}
@@ -76,18 +80,18 @@ func TestJailUnInited(t *testing.T) {
 		t.Error("jail instance shouldn't be nil at this point")
 		return
 	}
-	statusJS := geth.LoadFromFile(TESTDATA_STATUS_JS) + `;
+	statusJS := geth.LoadFromFile(statusJSFilePath) + `;
 	_status_catalog.commands["testCommand"] = function (params) {
 		return params.val * params.val;
 	};`
-	response = jailInstance.Parse(CHAT_ID_CALL, statusJS)
+	response = jailInstance.Parse(chatID, statusJS)
 	expectedResponse := `{"result": {"commands":{},"responses":{}}}`
 	if response != expectedResponse {
 		t.Errorf("unexpected response received: %v", response)
 	}
 
 	// however, we still expect issue voiced if somebody tries to execute code with Call
-	response = jailInstance.Call(CHAT_ID_CALL, `["commands", "testCommand"]`, `{"val": 12}`)
+	response = jailInstance.Call(chatID, `["commands", "testCommand"]`, `{"val": 12}`)
 	if response != errorWrapper(geth.ErrInvalidGethNode) {
 		t.Errorf("error expected, but got: %v", response)
 	}
@@ -98,7 +102,7 @@ func TestJailUnInited(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	response = jailInstance.Call(CHAT_ID_CALL, `["commands", "testCommand"]`, `{"val": 12}`)
+	response = jailInstance.Call(chatID, `["commands", "testCommand"]`, `{"val": 12}`)
 	expectedResponse = `{"result": 144}`
 	if response != expectedResponse {
 		t.Errorf("expected response is not returned: expected %s, got %s", expectedResponse, response)
@@ -125,7 +129,7 @@ func TestJailInit(t *testing.T) {
 	  return x * x;
 	};
 	`
-	response := jailInstance.Parse(CHAT_ID_INIT, extraCode)
+	response := jailInstance.Parse("newChat", extraCode)
 
 	expectedResponse := `{"result": {"foo":"bar"}}`
 
@@ -145,22 +149,22 @@ func TestJailFunctionCall(t *testing.T) {
 	jailInstance := jail.Init("")
 
 	// load Status JS and add test command to it
-	statusJS := geth.LoadFromFile(TESTDATA_STATUS_JS) + `;
+	statusJS := geth.LoadFromFile(statusJSFilePath) + `;
 	_status_catalog.commands["testCommand"] = function (params) {
 		return params.val * params.val;
 	};`
-	jailInstance.Parse(CHAT_ID_CALL, statusJS)
+	jailInstance.Parse(chatID, statusJS)
 
 	// call with wrong chat id
-	response := jailInstance.Call(CHAT_ID_NON_EXISTENT, "", "")
-	expectedError := `{"error":"Cell[CHAT_IDNON_EXISTENT] doesn't exist."}`
+	response := jailInstance.Call("chatIdNonExistent", "", "")
+	expectedError := `{"error":"Cell[chatIdNonExistent] doesn't exist."}`
 	if response != expectedError {
 		t.Errorf("expected error is not returned: expected %s, got %s", expectedError, response)
 		return
 	}
 
 	// call extraFunc()
-	response = jailInstance.Call(CHAT_ID_CALL, `["commands", "testCommand"]`, `{"val": 12}`)
+	response = jailInstance.Call(chatID, `["commands", "testCommand"]`, `{"val": 12}`)
 	expectedResponse := `{"result": 144}`
 	if response != expectedResponse {
 		t.Errorf("expected response is not returned: expected %s, got %s", expectedResponse, response)
@@ -178,11 +182,11 @@ func TestJailRPCSend(t *testing.T) {
 	jailInstance := jail.Init("")
 
 	// load Status JS and add test command to it
-	statusJS := geth.LoadFromFile(TESTDATA_STATUS_JS)
-	jailInstance.Parse(CHAT_ID_CALL, statusJS)
+	statusJS := geth.LoadFromFile(statusJSFilePath)
+	jailInstance.Parse(chatID, statusJS)
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
-	vm, err := jailInstance.GetVM(CHAT_ID_CALL)
+	vm, err := jailInstance.GetVM(chatID)
 	if err != nil {
 		t.Errorf("cannot get VM: %v", err)
 		return
@@ -371,16 +375,16 @@ func TestJailSendQueuedTransaction(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		jailInstance := jail.Init(geth.LoadFromFile(TESTDATA_TX_SEND_JS + test.file))
+		jailInstance := jail.Init(geth.LoadFromFile(txSendFolder + test.file))
 		geth.PanicAfter(60*time.Second, txCompletedSuccessfully, test.name)
-		jailInstance.Parse(CHAT_ID_SEND, ``)
+		jailInstance.Parse(chatID, ``)
 
 		requireMessageId = test.requireMessageId
 
 		for _, command := range test.commands {
 			go func(jail *jail.Jail, test testCase, command testCommand) {
 				t.Logf("->%s: %s", test.name, command.command)
-				response := jail.Call(CHAT_ID_SEND, command.command, command.params)
+				response := jail.Call(chatID, command.command, command.params)
 				var txHash common.Hash
 				if command.command == `["commands", "send"]` {
 					txHash = <-txHashes
@@ -428,16 +432,16 @@ func TestJailGetVM(t *testing.T) {
 
 	jailInstance := jail.Init("")
 
-	expectedError := `Cell[` + CHAT_ID_NON_EXISTENT + `] doesn't exist.`
-	_, err = jailInstance.GetVM(CHAT_ID_NON_EXISTENT)
+	expectedError := `Cell[nonExistentChat] doesn't exist.`
+	_, err = jailInstance.GetVM("nonExistentChat")
 	if err == nil || err.Error() != expectedError {
 		t.Error("expected error, but call succeeded")
 	}
 
 	// now let's create VM..
-	jailInstance.Parse(CHAT_ID_CALL, ``)
+	jailInstance.Parse(chatID, ``)
 	// ..and see if VM becomes available
-	_, err = jailInstance.GetVM(CHAT_ID_CALL)
+	_, err = jailInstance.GetVM(chatID)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -451,10 +455,10 @@ func TestIsConnected(t *testing.T) {
 	}
 
 	jailInstance := jail.Init("")
-	jailInstance.Parse(CHAT_ID_CALL, "")
+	jailInstance.Parse(chatID, "")
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
-	vm, err := jailInstance.GetVM(CHAT_ID_CALL)
+	vm, err := jailInstance.GetVM(chatID)
 	if err != nil {
 		t.Errorf("cannot get VM: %v", err)
 		return
@@ -496,10 +500,10 @@ func TestLocalStorageSet(t *testing.T) {
 	}
 
 	jailInstance := jail.Init("")
-	jailInstance.Parse(CHAT_ID_CALL, "")
+	jailInstance.Parse(chatID, "")
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
-	vm, err := jailInstance.GetVM(CHAT_ID_CALL)
+	vm, err := jailInstance.GetVM(chatID)
 	if err != nil {
 		t.Errorf("cannot get VM: %v", err)
 		return
@@ -523,8 +527,8 @@ func TestLocalStorageSet(t *testing.T) {
 				t.Error("Chat id is required, but not found")
 				return
 			}
-			if chatId != CHAT_ID_CALL {
-				t.Errorf("incorrect chat id: expected %q, got: %q", CHAT_ID_CALL, chatId)
+			if chatId != chatID {
+				t.Errorf("incorrect chat id: expected %q, got: %q", chatID, chatId)
 				return
 			}
 
@@ -588,10 +592,10 @@ func TestContractDeployment(t *testing.T) {
 	}
 
 	jailInstance := jail.Init("")
-	jailInstance.Parse(CHAT_ID_CALL, "")
+	jailInstance.Parse(chatID, "")
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
-	vm, err := jailInstance.GetVM(CHAT_ID_CALL)
+	vm, err := jailInstance.GetVM(chatID)
 	if err != nil {
 		t.Errorf("cannot get VM: %v", err)
 		return
@@ -678,10 +682,10 @@ func TestGasEstimation(t *testing.T) {
 	}
 
 	jailInstance := jail.Init("")
-	jailInstance.Parse(CHAT_ID_CALL, "")
+	jailInstance.Parse(chatID, "")
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
-	vm, err := jailInstance.GetVM(CHAT_ID_CALL)
+	vm, err := jailInstance.GetVM(chatID)
 	if err != nil {
 		t.Errorf("cannot get VM: %v", err)
 		return
@@ -756,5 +760,383 @@ func TestGasEstimation(t *testing.T) {
 	if !reflect.DeepEqual(response, expectedResponse) {
 		t.Errorf("expected response is not returned: expected %s, got %s", expectedResponse, response)
 		return
+	}
+}
+
+func TestJailWhisper(t *testing.T) {
+	err := geth.PrepareTestNode()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	whisperService, err := geth.NodeManagerInstance().WhisperService()
+	if err != nil {
+		t.Errorf("whisper service not running: %v", err)
+	}
+	whisperAPI := whisper.NewPublicWhisperAPI(whisperService)
+
+	// account1
+	_, accountKey1, err := geth.AddressToDecryptedAccount(testConfig.Account1.Address, testConfig.Account1.Password)
+	if err != nil {
+		t.Fatal(err)
+	}
+	accountKey1Hex := common.ToHex(crypto.FromECDSAPub(&accountKey1.PrivateKey.PublicKey))
+
+	whisperService.AddIdentity(accountKey1.PrivateKey)
+	if ok, err := whisperAPI.HasIdentity(accountKey1Hex); err != nil || !ok {
+		t.Fatalf("identity not injected: %v", accountKey1Hex)
+	}
+
+	// account2
+	_, accountKey2, err := geth.AddressToDecryptedAccount(testConfig.Account2.Address, testConfig.Account2.Password)
+	if err != nil {
+		t.Fatal(err)
+	}
+	accountKey2Hex := common.ToHex(crypto.FromECDSAPub(&accountKey2.PrivateKey.PublicKey))
+
+	whisperService.AddIdentity(accountKey2.PrivateKey)
+	if ok, err := whisperAPI.HasIdentity(accountKey2Hex); err != nil || !ok {
+		t.Fatalf("identity not injected: %v", accountKey2Hex)
+	}
+
+	passedTests := map[string]bool{
+		whisperMessage1: false,
+		whisperMessage2: false,
+		whisperMessage3: false,
+		whisperMessage4: false,
+		whisperMessage5: false,
+		whisperMessage6: false,
+	}
+	installedFilters := map[string]string{
+		whisperMessage1: "",
+		whisperMessage2: "",
+		whisperMessage3: "",
+		whisperMessage4: "",
+		whisperMessage5: "",
+		whisperMessage6: "",
+	}
+
+	jailInstance := jail.Init("")
+
+	testCases := []struct {
+		name      string
+		testCode  string
+		useFilter bool
+	}{
+		{
+			"test 0: ensure correct version of Whisper is used",
+			`
+				var expectedVersion = '0x5';
+				if (web3.version.whisper != expectedVersion) {
+					throw 'unexpected shh version, expected: ' + expectedVersion + ', got: ' + web3.version.whisper;
+				}
+			`,
+			false,
+		},
+		{
+			"test 1: encrypted signed message from us (From != nil && To != nil)",
+			`
+				var identity1 = '` + accountKey1Hex + `';
+				if (!web3.shh.hasIdentity(identity1)) {
+					throw 'idenitity "` + accountKey1Hex + `" not found in whisper';
+				}
+
+				var identity2 = '` + accountKey2Hex + `';
+				if (!web3.shh.hasIdentity(identity2)) {
+					throw 'idenitity "` + accountKey2Hex + `" not found in whisper';
+				}
+
+				var topic = 'example1';
+				var payload = '` + whisperMessage1 + `';
+
+				// start watching for messages
+				var filter = shh.filter({
+					from: identity1,
+					to: identity2,
+					topics: [web3.fromAscii(topic)]
+				});
+
+				// post message
+				var message = {
+				  from: identity1,
+				  to: identity2,
+				  topics: [web3.fromAscii(topic)],
+				  payload: payload,
+				  ttl: 20,
+				};
+				var err = shh.post(message)
+				if (err !== null) {
+					throw 'message not sent: ' + message;
+				}
+
+				var filterName = '` + whisperMessage1 + `';
+				var filterId = filter.filterId;
+				if (!filterId) {
+					throw 'filter not installed properly';
+				}
+			`,
+			true,
+		},
+		{
+			"test 2: encrypted signed message to yourself (From != nil && To != nil)",
+			`
+				var identity = '` + accountKey1Hex + `';
+				if (!web3.shh.hasIdentity(identity)) {
+					throw 'idenitity "` + accountKey1Hex + `" not found in whisper';
+				}
+
+				var topic = 'example2';
+				var payload = '` + whisperMessage2 + `';
+
+				// start watching for messages
+				var filter = shh.filter({
+					from: identity,
+					to: identity,
+					topics: [web3.fromAscii(topic)],
+				});
+
+				// post message
+				var message = {
+				  from: identity,
+				  to: identity,
+				  topics: [web3.fromAscii(topic)],
+				  payload: payload,
+				  ttl: 20,
+				};
+				var err = shh.post(message)
+				if (err !== null) {
+					throw 'message not sent: ' + message;
+				}
+
+				var filterName = '` + whisperMessage2 + `';
+				var filterId = filter.filterId;
+				if (!filterId) {
+					throw 'filter not installed properly';
+				}
+			`,
+			true,
+		},
+		{
+			"test 3: signed (known sender) broadcast (From != nil && To == nil)",
+			`
+				var identity = '` + accountKey1Hex + `';
+				if (!web3.shh.hasIdentity(identity)) {
+					throw 'idenitity "` + accountKey1Hex + `" not found in whisper';
+				}
+
+				var topic = 'example3';
+				var payload = '` + whisperMessage3 + `';
+
+				// generate symmetric key (if doesn't already exist)
+				if (!shh.hasSymKey(topic)) {
+					shh.addSymKey(topic, "0xdeadbeef"); // alternatively: shh.generateSymKey("example3");
+														// to delete key, rely on: shh.deleteSymKey(topic);
+				}
+
+				// start watching for messages
+				var filter = shh.filter({
+					from: identity,
+					topics: [web3.fromAscii(topic)],
+					keyname: topic // you can use some other name for key too
+				});
+
+				// post message
+				var message = {
+					from: identity,
+					topics: [web3.fromAscii(topic)],
+					payload: payload,
+					ttl: 20,
+					keyname: topic
+				};
+				var err = shh.post(message)
+				if (err !== null) {
+					throw 'message not sent: ' + message;
+				}
+
+				var filterName = '` + whisperMessage3 + `';
+				var filterId = filter.filterId;
+				if (!filterId) {
+					throw 'filter not installed properly';
+				}
+			`,
+			true,
+		},
+		{
+			"test 4: anonymous broadcast (From == nil && To == nil)",
+			`
+				var topic = 'example4';
+				var payload = '` + whisperMessage4 + `';
+
+				// generate symmetric key (if doesn't already exist)
+				if (!shh.hasSymKey(topic)) {
+					shh.addSymKey(topic, "0xdeadbeef"); // alternatively: shh.generateSymKey("example3");
+														// to delete key, rely on: shh.deleteSymKey(topic);
+				}
+
+				// start watching for messages
+				var filter = shh.filter({
+					topics: [web3.fromAscii(topic)],
+					keyname: topic // you can use some other name for key too
+				});
+
+				// post message
+				var message = {
+					topics: [web3.fromAscii(topic)],
+					payload: payload,
+					ttl: 20,
+					keyname: topic
+				};
+				var err = shh.post(message)
+				if (err !== null) {
+					throw 'message not sent: ' + err;
+				}
+
+				var filterName = '` + whisperMessage4 + `';
+				var filterId = filter.filterId;
+				if (!filterId) {
+					throw 'filter not installed properly';
+				}
+			`,
+			true,
+		},
+		{
+			"test 5: encrypted anonymous message (From == nil && To != nil)",
+			`
+				var identity = '` + accountKey2Hex + `';
+				if (!web3.shh.hasIdentity(identity)) {
+					throw 'idenitity "` + accountKey2Hex + `" not found in whisper';
+				}
+
+				var topic = 'example5';
+				var payload = '` + whisperMessage5 + `';
+
+				// start watching for messages
+				var filter = shh.filter({
+					to: identity,
+					topics: [web3.fromAscii(topic)],
+				});
+
+				// post message
+				var message = {
+					to: identity,
+					topics: [web3.fromAscii(topic)],
+					payload: payload,
+					ttl: 20
+				};
+				var err = shh.post(message)
+				if (err !== null) {
+					throw 'message not sent: ' + message;
+				}
+
+				var filterName = '` + whisperMessage5 + `';
+				var filterId = filter.filterId;
+				if (!filterId) {
+					throw 'filter not installed properly';
+				}
+			`,
+			true,
+		},
+		{
+			"test 6: encrypted signed response to us (From != nil && To != nil)",
+			`
+				var identity1 = '` + accountKey1Hex + `';
+				if (!web3.shh.hasIdentity(identity1)) {
+					throw 'idenitity "` + accountKey1Hex + `" not found in whisper';
+				}
+
+				var identity2 = '` + accountKey2Hex + `';
+				if (!web3.shh.hasIdentity(identity2)) {
+					throw 'idenitity "` + accountKey2Hex + `" not found in whisper';
+				}
+
+				var topic = 'example6';
+				var payload = '` + whisperMessage6 + `';
+
+				// start watching for messages
+				var filter = shh.filter({
+					from: identity2,
+					to: identity1,
+					topics: [web3.fromAscii(topic)]
+				});
+
+				// post message
+				var message = {
+				  from: identity2,
+				  to: identity1,
+				  topics: [web3.fromAscii(topic)],
+				  payload: payload,
+				  ttl: 20
+				};
+				var err = shh.post(message)
+				if (err !== null) {
+					throw 'message not sent: ' + message;
+				}
+
+				var filterName = '` + whisperMessage6 + `';
+				var filterId = filter.filterId;
+				if (!filterId) {
+					throw 'filter not installed properly';
+				}
+			`,
+			true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Log(testCase.name)
+		testCaseKey := crypto.Keccak256Hash([]byte(testCase.name)).Hex()
+		jailInstance.Parse(testCaseKey, `var shh = web3.shh;`)
+		vm, err := jailInstance.GetVM(testCaseKey)
+		if err != nil {
+			t.Errorf("cannot get VM: %v", err)
+			return
+		}
+
+		// post messages
+		if _, err := vm.Run(testCase.testCode); err != nil {
+			t.Error(err)
+			return
+		}
+
+		if !testCase.useFilter {
+			continue
+		}
+
+		// update installed filters
+		filterId, err := vm.Get("filterId")
+		if err != nil {
+			t.Errorf("cannot get filterId: %v", err)
+			return
+		}
+		filterName, err := vm.Get("filterName")
+		if err != nil {
+			t.Errorf("cannot get filterName: %v", err)
+			return
+		}
+
+		if _, ok := installedFilters[filterName.String()]; !ok {
+			t.Fatal("unrecognized filter")
+		}
+
+		installedFilters[filterName.String()] = filterId.String()
+	}
+
+	time.Sleep(2 * time.Second) // allow whisper to poll
+
+	for testKey, filter := range installedFilters {
+		if filter != "" {
+			t.Logf("filter found: %v", filter)
+			for _, message := range whisperAPI.GetFilterChanges(filter) {
+				t.Logf("message found: %s", common.FromHex(message.Payload))
+				passedTests[testKey] = true
+			}
+		}
+	}
+
+	for testName, passedTest := range passedTests {
+		if !passedTest {
+			t.Fatalf("test not passed: %v", testName)
+		}
 	}
 }

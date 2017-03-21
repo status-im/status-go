@@ -1,0 +1,87 @@
+
+<html lang="en">
+<head>
+    <title>web3.js sample</title>
+    <link rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
+    <script
+            src="https://code.jquery.com/jquery-3.1.1.js"
+            integrity="sha256-16cdPddA6VdVInumRGo6IbivbERE8p7CQR3HzTBuELA="
+            crossorigin="anonymous"></script>
+    <script type="text/javascript" src="http://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
+    <script type="text/javascript" src="./bignumber.js"></script>
+    <script type="text/javascript" src="./web3.js"></script>
+
+    <script type="text/javascript">
+        var web3 = new Web3();
+        var shh = web3.shh;
+        web3.setProvider(new web3.providers.HttpProvider('http://localhost:8645'));
+
+        var identity = '0x04eedbaafd6adf4a9233a13e7b1c3c14461fffeba2e9054b8d456ce5f6ebeafadcbf3dce3716253fbc391277fa5a086b60b283daf61fb5b1f26895f456c2f31ae3';
+        if (!web3.shh.hasIdentity(identity)) {
+            throw 'idenitity "0x04eedbaafd6adf4a9233a13e7b1c3c14461fffeba2e9054b8d456ce5f6ebeafadcbf3dce3716253fbc391277fa5a086b60b283daf61fb5b1f26895f456c2f31ae3" not found in whisper';
+        }
+
+        var topic = 'example3';
+        var payload = 'test message 3 (K1 -> "", signed broadcast)';
+
+        // generate symmetric key (if doesn't already exist)
+        if (!shh.hasSymKey(topic)) {
+            shh.addSymKey(topic, "0xdeadbeef"); // alternatively: shh.generateSymKey("example3");
+                                                // to delete key, rely on: shh.deleteSymKey(topic);
+        }
+
+        // start watching for messages
+        var filter = shh.filter({
+            from: identity,
+            topics: [web3.fromAscii(topic)],
+            keyname: topic // you can use some other name for key too
+        });
+        filter.watch(function(error, result){
+            if (!error) {
+                console.log("Message received1: ", result);
+            }
+        });
+
+
+        setTimeout(function () {
+            var message = {
+                from: identity,
+                topics: [web3.fromAscii(topic)],
+                payload: payload,
+                ttl: 20,
+                keyname: topic
+            };
+            var err = shh.post(message)
+            if (err !== null) {
+                console.log("message NOT sent")
+            } else {
+                console.log("message sent OK")
+            }
+        }, 3000)
+
+
+        $(document).ready(function () {
+        });
+
+    </script>
+
+</head>
+
+<body>
+<!-- Static navbar -->
+<nav class="navbar navbar-default navbar-static-top">
+    <div class="container">
+    </div>
+</nav>
+
+<div class="container">
+    <div class="jumbotron">
+
+    </div>
+</div>
+
+
+</body>
+
+</html>
