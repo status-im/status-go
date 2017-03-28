@@ -63,6 +63,9 @@ type ChainConfig struct {
 // LightEthConfig holds LES-related configuration
 // Status nodes are always lightweight clients (due to mobile platform constraints)
 type LightEthConfig struct {
+	// Enabled flag specifies whether  protocol is enabled
+	Enabled bool
+
 	// Genesis is JSON to seed the chain database with
 	Genesis string
 
@@ -71,10 +74,16 @@ type LightEthConfig struct {
 }
 
 // WhisperConfig holds SHH-related configuration
-type WhisperConfig struct{}
+type WhisperConfig struct {
+	// Enabled flag specifies whether  protocol is enabled
+	Enabled bool
+}
 
 // SwarmConfig holds Swarm-related configuration
-type SwarmConfig struct{}
+type SwarmConfig struct {
+	// Enabled flag specifies whether  protocol is enabled
+	Enabled bool
+}
 
 // NodeConfig stores configuration options for a node
 type NodeConfig struct {
@@ -143,13 +152,13 @@ type NodeConfig struct {
 	*ChainConfig `json:"ChainConfig,"`
 
 	// LightEthConfig extra configuration for LES
-	*LightEthConfig `json:"LightEthConfig,"`
+	LightEthConfig *LightEthConfig `json:"LightEthConfig,"`
 
 	// WhisperConfig extra configuration for SHH
-	*WhisperConfig `json:"WhisperConfig,"`
+	WhisperConfig *WhisperConfig `json:"WhisperConfig,"`
 
 	// SwarmConfig extra configuration for Swarm and ENS
-	*SwarmConfig `json:"SwarmConfig,"`
+	SwarmConfig *SwarmConfig `json:"SwarmConfig,"`
 }
 
 // NewNodeConfig creates new node configuration object
@@ -171,10 +180,13 @@ func NewNodeConfig(dataDir string, networkId int) (*NodeConfig, error) {
 		LogLevel:        DefaultLogLevel,
 		ChainConfig:     &ChainConfig{},
 		LightEthConfig: &LightEthConfig{
+			Enabled:       true,
 			DatabaseCache: DefaultDatabaseCache,
 		},
-		WhisperConfig: &WhisperConfig{},
-		SwarmConfig:   &SwarmConfig{},
+		WhisperConfig: &WhisperConfig{
+			Enabled: true,
+		},
+		SwarmConfig: &SwarmConfig{},
 	}
 
 	nodeConfig.populateChainConfig()
@@ -206,7 +218,7 @@ func (c *NodeConfig) populateChainConfig() {
 		c.ChainConfig.EIP158Block = params.TestnetChainConfig.EIP158Block
 		c.ChainConfig.ChainId = params.TestnetChainConfig.ChainId
 
-		c.Genesis = core.DefaultTestnetGenesisBlock()
+		c.LightEthConfig.Genesis = core.DefaultTestnetGenesisBlock()
 	} else {
 		// Homestead fork
 		c.ChainConfig.HomesteadBlock = params.MainNetHomesteadBlock
@@ -223,7 +235,7 @@ func (c *NodeConfig) populateChainConfig() {
 		c.ChainConfig.EIP158Block = params.MainNetSpuriousDragon
 		c.ChainConfig.ChainId = params.MainNetChainID
 
-		c.Genesis = core.DefaultGenesisBlock()
+		c.LightEthConfig.Genesis = core.DefaultGenesisBlock()
 	}
 }
 
