@@ -1359,7 +1359,9 @@ func startTestNode(t *testing.T) <-chan struct{} {
 			"NetworkId": ` + strconv.Itoa(params.TestNetworkId) + `,
 			"DataDir": "` + geth.TestDataDir + `",
 			"HTTPPort": ` + strconv.Itoa(testConfig.Node.HTTPPort) + `,
-			"WSPort": ` + strconv.Itoa(testConfig.Node.WSPort) + `
+			"WSPort": ` + strconv.Itoa(testConfig.Node.WSPort) + `,
+			"LogEnabled": true,
+			"LogLevel": "INFO"
 		}`
 		response := StartNode(C.CString(configJSON))
 		err := geth.JSONError{}

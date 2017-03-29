@@ -15,6 +15,9 @@
     "TLSEnabled": false,
     "MaxPeers": 25,
     "MaxPendingPeers": 0,
+    "LogEnabled": false,
+    "LogFile": "geth.log",
+    "LogLevel": "INFO",
     "ChainConfig": {
         "ChainId": 3,
         "HomesteadBlock": 0,

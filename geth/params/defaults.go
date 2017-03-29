@@ -45,6 +45,12 @@ const (
 	// DefaultDatabaseCache is memory (in MBs) allocated to internal caching (min 16MB / database forced)
 	DefaultDatabaseCache = 128
 
+	// DefaultLogFile defines where to write logs to
+	DefaultLogFile = "geth.log"
+
+	// DefaultLogLevel defines the minimum log level to report
+	DefaultLogLevel = "INFO"
+
 	// TestNetworkId is id of a test network
 	TestNetworkId = 3
 )
