@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"path/filepath"
 	"reflect"
 	"runtime"
 	"runtime/debug"
@@ -15,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/les"
+	"github.com/ethereum/go-ethereum/logger"
 	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/discover"
@@ -57,6 +59,11 @@ func (n *Node) GethStack() *node.Node {
 
 // MakeNode create a geth node entity
 func MakeNode(config *params.NodeConfig) *Node {
+	// make sure data directory exists
+	if err := os.MkdirAll(filepath.Join(config.DataDir), os.ModePerm); err != nil {
+		Fatalf(err)
+	}
+
 	// setup logging
 	glog.CopyStandardLogTo("INFO")
 	glog.SetToStderr(true)
@@ -115,6 +122,11 @@ func MakeNode(config *params.NodeConfig) *Node {
 
 // activateEthService configures and registers the eth.Ethereum service with a given node.
 func activateEthService(stack *node.Node, config *params.NodeConfig) error {
+	if !config.LightEthConfig.Enabled {
+		glog.V(logger.Info).Infoln("LES protocol is disabled")
+		return nil
+	}
+
 	ethConf := &eth.Config{
 		Etherbase:               common.Address{},
 		ChainConfig:             makeChainConfig(config),
@@ -148,6 +160,10 @@ func activateEthService(stack *node.Node, config *params.NodeConfig) error {
 
 // activateShhService configures Whisper and adds it to the given node.
 func activateShhService(stack *node.Node, config *params.NodeConfig) error {
+	if !config.WhisperConfig.Enabled {
+		glog.V(logger.Info).Infoln("SHH protocol is disabled")
+		return nil
+	}
 	serviceConstructor := func(*node.ServiceContext) (node.Service, error) {
 		return whisper.New(), nil
 	}

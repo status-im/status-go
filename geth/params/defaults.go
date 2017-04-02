@@ -10,6 +10,9 @@ const (
 	// DefaultClientIdentifier is client identifier to advertise over the network
 	DefaultClientIdentifier = "StatusIM"
 
+	// DefaultDataDir is default data directory used by statusd executable
+	DefaultDataDir = "statusd-data"
+
 	// DefaultIPCFile is filename of exposed IPC RPC Server
 	DefaultIPCFile = "geth.ipc"
 

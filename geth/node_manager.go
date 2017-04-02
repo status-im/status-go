@@ -115,15 +115,13 @@ func (m *NodeManager) RunNode() {
 		}
 
 		// setup handlers
-		lightEthereum, err := m.LightEthereumService()
-		if err != nil {
-			panic("service stack misses LES")
+		if lightEthereum, err := m.LightEthereumService(); err == nil {
+			lightEthereum.StatusBackend.SetTransactionQueueHandler(onSendTransactionRequest)
+			lightEthereum.StatusBackend.SetAccountsFilterHandler(onAccountsListRequest)
+			lightEthereum.StatusBackend.SetTransactionReturnHandler(onSendTransactionReturn)
 		}
 
-		lightEthereum.StatusBackend.SetTransactionQueueHandler(onSendTransactionRequest)
-		lightEthereum.StatusBackend.SetAccountsFilterHandler(onAccountsListRequest)
-		lightEthereum.StatusBackend.SetTransactionReturnHandler(onSendTransactionReturn)
-
+		var err error
 		m.services.rpcClient, err = m.node.geth.Attach()
 		if err != nil {
 			glog.V(logger.Warn).Infoln("cannot get RPC client service:", ErrInvalidClient)
@@ -264,13 +262,22 @@ func (m *NodeManager) StopNodeRPCServer() (bool, error) {
 	return m.api.StopRPC()
 }
 
-// HasNode checks whether manager has initialized node attached
+// NodeInited checks whether manager has initialized node attached
 func (m *NodeManager) NodeInited() bool {
 	if m == nil || !m.node.Inited() {
 		return false
 	}
 
 	return true
+}
+
+// Node returns attached node if it has been initialized
+func (m *NodeManager) Node() *Node {
+	if !m.NodeInited() {
+		return nil
+	}
+
+	return m.node
 }
 
 // AccountManager exposes reference to accounts manager
