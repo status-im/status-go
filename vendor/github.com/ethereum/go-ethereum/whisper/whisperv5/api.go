@@ -406,6 +406,10 @@ func (args *PostArgs) UnmarshalJSON(data []byte) (err error) {
 		args.Topic = BytesToTopic(x)
 	}
 
+	if objJSON, err := json.Marshal(&obj); err == nil {
+		glog.V(logger.Info).Infoln("shh message posted: ", string(objJSON))
+	}
+
 	return nil
 }
 
