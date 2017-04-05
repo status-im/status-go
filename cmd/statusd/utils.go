@@ -13,7 +13,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/les/status"
 	gethparams "github.com/ethereum/go-ethereum/params"
 	"github.com/status-im/status-go/geth"
@@ -230,7 +229,7 @@ func testStopResumeNode(t *testing.T) bool {
 	t.Logf("account created: {address: %s, key: %s}", address1, pubKey1)
 
 	// make sure that identity is not (yet injected)
-	if whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey1))) {
+	if whisperService.HasIdentity(pubKey1) {
 		t.Error("identity already present in whisper")
 	}
 
@@ -247,7 +246,7 @@ func testStopResumeNode(t *testing.T) bool {
 		t.Errorf("could not select account: %v", err)
 		return false
 	}
-	if !whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey1))) {
+	if !whisperService.HasIdentity(pubKey1) {
 		t.Errorf("identity not injected into whisper: %v", err)
 	}
 
@@ -296,7 +295,7 @@ func testStopResumeNode(t *testing.T) bool {
 	if err != nil {
 		t.Errorf("whisper service not running: %v", err)
 	}
-	if !whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey1))) {
+	if !whisperService.HasIdentity(pubKey1) {
 		t.Errorf("identity evicted from whisper on node restart: %v", err)
 	}
 
@@ -581,7 +580,7 @@ func testRecoverAccount(t *testing.T) bool {
 	}
 
 	// make sure that identity is not (yet injected)
-	if whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKeyCheck))) {
+	if whisperService.HasIdentity(pubKeyCheck) {
 		t.Error("identity already present in whisper")
 	}
 	err = geth.SelectAccount(addressCheck, testConfig.Account1.Password)
@@ -589,7 +588,7 @@ func testRecoverAccount(t *testing.T) bool {
 		t.Errorf("Test failed: could not select account: %v", err)
 		return false
 	}
-	if !whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKeyCheck))) {
+	if !whisperService.HasIdentity(pubKeyCheck) {
 		t.Errorf("identity not injected into whisper: %v", err)
 	}
 
@@ -619,7 +618,7 @@ func testAccountSelect(t *testing.T) bool {
 	t.Logf("Account created: {address: %s, key: %s}", address2, pubKey2)
 
 	// make sure that identity is not (yet injected)
-	if whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey1))) {
+	if whisperService.HasIdentity(pubKey1) {
 		t.Error("identity already present in whisper")
 	}
 
@@ -649,12 +648,12 @@ func testAccountSelect(t *testing.T) bool {
 		t.Errorf("Test failed: could not select account: %v", err)
 		return false
 	}
-	if !whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey1))) {
+	if !whisperService.HasIdentity(pubKey1) {
 		t.Errorf("identity not injected into whisper: %v", err)
 	}
 
 	// select another account, make sure that previous account is wiped out from Whisper cache
-	if whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey2))) {
+	if whisperService.HasIdentity(pubKey2) {
 		t.Error("identity already present in whisper")
 	}
 
@@ -670,10 +669,10 @@ func testAccountSelect(t *testing.T) bool {
 		t.Errorf("Test failed: could not select account: %v", loginResponse.Error)
 		return false
 	}
-	if !whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey2))) {
+	if !whisperService.HasIdentity(pubKey2) {
 		t.Errorf("identity not injected into whisper: %v", err)
 	}
-	if whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey1))) {
+	if whisperService.HasIdentity(pubKey1) {
 		t.Error("identity should be removed, but it is still present in whisper")
 	}
 
@@ -695,7 +694,7 @@ func testAccountLogout(t *testing.T) bool {
 	}
 
 	// make sure that identity doesn't exist (yet) in Whisper
-	if whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey))) {
+	if whisperService.HasIdentity(pubKey) {
 		t.Error("identity already present in whisper")
 		return false
 	}
@@ -706,7 +705,7 @@ func testAccountLogout(t *testing.T) bool {
 		t.Errorf("Test failed: could not select account: %v", err)
 		return false
 	}
-	if !whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey))) {
+	if !whisperService.HasIdentity(pubKey) {
 		t.Error("identity not injected into whisper")
 		return false
 	}
@@ -725,7 +724,7 @@ func testAccountLogout(t *testing.T) bool {
 	}
 
 	// now, logout and check if identity is removed indeed
-	if whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey))) {
+	if whisperService.HasIdentity(pubKey) {
 		t.Error("identity not cleared from whisper")
 		return false
 	}
@@ -1314,12 +1313,22 @@ func startTestNode(t *testing.T) <-chan struct{} {
 	}
 
 	// import test account (with test ether on it)
-	dst := filepath.Join(geth.TestDataDir, "testnet", "keystore", "test-account.pk")
-	if _, err := os.Stat(dst); os.IsNotExist(err) {
-		err = geth.CopyFile(dst, filepath.Join(geth.RootDir, "data", "test-account.pk"))
-		if err != nil {
-			panic(err)
+	importTestAccount := func(accountFile string) error {
+		dst := filepath.Join(geth.TestDataDir, "keystore", accountFile)
+		if _, err := os.Stat(dst); os.IsNotExist(err) {
+			err = geth.CopyFile(dst, filepath.Join(geth.RootDir, "data", accountFile))
+			if err != nil {
+				panic(err)
+			}
 		}
+
+		return nil
+	}
+	if err := importTestAccount("test-account1.pk"); err != nil {
+		panic(err)
+	}
+	if err := importTestAccount("test-account2.pk"); err != nil {
+		panic(err)
 	}
 
 	waitForNodeStart := make(chan struct{}, 1)

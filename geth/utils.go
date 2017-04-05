@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts"
+	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/logger"
 	"github.com/ethereum/go-ethereum/logger/glog"
@@ -168,13 +169,23 @@ func PrepareTestNode() (err error) {
 	}
 
 	// import test account (with test ether on it)
-	dst := filepath.Join(TestDataDir, "keystore", "test-account.pk")
-	if _, err := os.Stat(dst); os.IsNotExist(err) {
-		err = CopyFile(dst, filepath.Join(RootDir, "data", "test-account.pk"))
-		if err != nil {
-			glog.V(logger.Warn).Infof("cannot copy test account PK: %v", err)
-			return err
+	importTestAccount := func(accountFile string) error {
+		dst := filepath.Join(TestDataDir, "keystore", accountFile)
+		if _, err := os.Stat(dst); os.IsNotExist(err) {
+			err = CopyFile(dst, filepath.Join(RootDir, "data", accountFile))
+			if err != nil {
+				glog.V(logger.Warn).Infof("cannot copy test account PK: %v", err)
+				return err
+			}
 		}
+
+		return nil
+	}
+	if err := importTestAccount("test-account1.pk"); err != nil {
+		panic(err)
+	}
+	if err := importTestAccount("test-account2.pk"); err != nil {
+		panic(err)
 	}
 
 	// start geth node and wait for it to initialize
@@ -208,8 +219,6 @@ func PrepareTestNode() (err error) {
 	if syncRequired {
 		glog.V(logger.Warn).Infof("Sync is required, it will take %d seconds", testConfig.Node.SyncSeconds)
 		time.Sleep(testConfig.Node.SyncSeconds * time.Second) // LES syncs headers, so that we are up do date when it is done
-	} else {
-		time.Sleep(5 * time.Second)
 	}
 
 	return nil
@@ -260,4 +269,20 @@ func ParseAccountString(account string) (accounts.Account, error) {
 	}
 
 	return accounts.Account{}, ErrInvalidAccountAddressOrKey
+}
+
+// AddressToDecryptedAccount tries to load and decrypt account with a given password
+func AddressToDecryptedAccount(address, password string) (accounts.Account, *keystore.Key, error) {
+	nodeManager := NodeManagerInstance()
+	keyStore, err := nodeManager.AccountKeyStore()
+	if err != nil {
+		return accounts.Account{}, nil, err
+	}
+
+	account, err := ParseAccountString(address)
+	if err != nil {
+		return accounts.Account{}, nil, ErrAddressToAccountMappingFailure
+	}
+
+	return keyStore.AccountDecryptedKey(account, password)
 }

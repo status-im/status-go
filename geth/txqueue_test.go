@@ -103,7 +103,7 @@ func TestQueuedContracts(t *testing.T) {
 		t.Errorf("Test failed: cannot send transaction: %v", err)
 	}
 
-	if !reflect.DeepEqual(txHash, txHashCheck) {
+	if txHashCheck.Hex() != txHash.Hex() {
 		t.Errorf("Transaction hash returned from SendTransaction is invalid: expected %s, got %s", txHashCheck.Hex(), txHash.Hex())
 		return
 	}
@@ -202,7 +202,7 @@ func TestQueuedTransactions(t *testing.T) {
 		t.Errorf("Test failed: cannot send transaction: %v", err)
 	}
 
-	if !reflect.DeepEqual(txHash, txHashCheck) {
+	if txHashCheck.Hex() != txHash.Hex() {
 		t.Errorf("Transaction hash returned from SendTransaction is invalid: expected %s, got %s", txHashCheck.Hex(), txHash.Hex())
 		return
 	}
@@ -320,7 +320,7 @@ func TestDoubleCompleteQueuedTransactions(t *testing.T) {
 		return
 	}
 
-	if !reflect.DeepEqual(txHash, txHashCheck) {
+	if txHashCheck.Hex() != txHash.Hex() {
 		t.Errorf("tx hash returned from SendTransaction is invalid: expected %s, got %s", txHashCheck.Hex(), txHash.Hex())
 		return
 	}

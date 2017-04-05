@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv2"
 	"github.com/status-im/status-go/geth"
 	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/params"
@@ -294,43 +293,6 @@ func AddPeer(url *C.char) *C.char {
 	outBytes, _ := json.Marshal(&out)
 
 	return C.CString(string(outBytes))
-}
-
-//export AddWhisperFilter
-func AddWhisperFilter(filterJson *C.char) *C.char {
-
-	var id int
-	var filter whisper.NewFilterArgs
-
-	err := json.Unmarshal([]byte(C.GoString(filterJson)), &filter)
-	if err == nil {
-		id = geth.AddWhisperFilter(filter)
-	}
-
-	errString := ""
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		errString = err.Error()
-	}
-
-	out := geth.AddWhisperFilterResult{
-		Id:    id,
-		Error: errString,
-	}
-	outBytes, _ := json.Marshal(&out)
-
-	return C.CString(string(outBytes))
-
-}
-
-//export RemoveWhisperFilter
-func RemoveWhisperFilter(idFilter int) {
-	geth.RemoveWhisperFilter(idFilter)
-}
-
-//export ClearWhisperFilters
-func ClearWhisperFilters() {
-	geth.ClearWhisperFilters()
 }
 
 func makeJSONErrorResponse(err error) *C.char {
