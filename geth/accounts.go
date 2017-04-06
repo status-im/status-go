@@ -4,10 +4,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/accounts"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/status-im/status-go/extkeys"
+	"github.com/teslapatrick/go-ethereum/accounts"
+	"github.com/teslapatrick/go-ethereum/common"
+	"github.com/teslapatrick/go-ethereum/crypto"
+	"github.com/teslapatrick-im/status-go/extkeys"
 )
 
 var (

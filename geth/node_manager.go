@@ -9,17 +9,17 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/ethereum/go-ethereum/accounts"
-	"github.com/ethereum/go-ethereum/accounts/keystore"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/les"
-	"github.com/ethereum/go-ethereum/logger"
-	"github.com/ethereum/go-ethereum/logger/glog"
-	"github.com/ethereum/go-ethereum/node"
-	"github.com/ethereum/go-ethereum/p2p/discover"
-	"github.com/ethereum/go-ethereum/rpc"
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv2"
-	"github.com/status-im/status-go/params"
+	"github.com/teslapatrick/go-ethereum/accounts"
+	"github.com/teslapatrick/go-ethereum/accounts/keystore"
+	"github.com/teslapatrick/go-ethereum/common"
+	"github.com/teslapatrick/go-ethereum/les"
+	"github.com/teslapatrick/go-ethereum/logger"
+	"github.com/teslapatrick/go-ethereum/logger/glog"
+	"github.com/teslapatrick/go-ethereum/node"
+	"github.com/teslapatrick/go-ethereum/p2p/discover"
+	"github.com/teslapatrick/go-ethereum/rpc"
+	whisper "github.com/teslapatrick/go-ethereum/whisper/whisperv2"
+	"github.com/teslapatrick/status-go/params"
 )
 
 // SelectedExtKey is a container for currently selected (logged in) account

@@ -14,23 +14,23 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/eth"
-	"github.com/ethereum/go-ethereum/les"
-	"github.com/ethereum/go-ethereum/logger"
-	"github.com/ethereum/go-ethereum/logger/glog"
-	"github.com/ethereum/go-ethereum/node"
-	"github.com/ethereum/go-ethereum/p2p/discover"
-	"github.com/ethereum/go-ethereum/p2p/discv5"
-	"github.com/ethereum/go-ethereum/p2p/nat"
-	"github.com/ethereum/go-ethereum/params"
-	"github.com/ethereum/go-ethereum/rlp"
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv2"
+	"github.com/teslapatrick/go-ethereum/common"
+	"github.com/teslapatrick/go-ethereum/core"
+	"github.com/teslapatrick/go-ethereum/eth"
+	"github.com/teslapatrick/go-ethereum/les"
+	"github.com/teslapatrick/go-ethereum/logger"
+	"github.com/teslapatrick/go-ethereum/logger/glog"
+	"github.com/teslapatrick/go-ethereum/node"
+	"github.com/teslapatrick/go-ethereum/p2p/discover"
+	"github.com/teslapatrick/go-ethereum/p2p/discv5"
+	"github.com/teslapatrick/go-ethereum/p2p/nat"
+	"github.com/teslapatrick/go-ethereum/params"
+	"github.com/teslapatrick/go-ethereum/rlp"
+	whisper "github.com/teslapatrick/go-ethereum/whisper/whisperv2"
 )
 
 const (
-	ClientIdentifier = "StatusIM" // Client identifier to advertise over the network
+	ClientIdentifier = "20170308" // Client identifier to advertise over the network
 	VersionMajor     = 0          // Major version component of the current release
 	VersionMinor     = 9          // Minor version component of the current release
 	VersionPatch     = 4          // Patch version component of the current release
@@ -132,7 +132,7 @@ func MakeNode(config *NodeConfig) *Node {
 		DiscoveryV5Addr:   ":0",
 		BootstrapNodes:    makeBootstrapNodes(),
 		BootstrapNodesV5:  makeBootstrapNodesV5(),
-		ListenAddr:        ":0",
+		ListenAddr:        ":30303",
 		NAT:               nat.Any(),
 		MaxPeers:          MaxPeers,
 		MaxPendingPeers:   MaxPendingPeers,
@@ -182,7 +182,7 @@ func activateEthService(stack *node.Node, extra []byte) error {
 		MaxPeers:                MaxPeers,
 		DatabaseCache:           DatabaseCacheSize,
 		DatabaseHandles:         makeDatabaseHandles(),
-		NetworkId:               1, // Olympic
+		NetworkId:               20170308, // Olympic
 		MinerThreads:            runtime.NumCPU(),
 		GasPrice:                GasPrice,
 		GpoMinGasPrice:          GpoMinGasPrice,
@@ -196,7 +196,7 @@ func activateEthService(stack *node.Node, extra []byte) error {
 	}
 
 	if UseTestnet {
-		ethConf.NetworkId = 3
+		ethConf.NetworkId = 20170308
 		ethConf.Genesis = core.DefaultTestnetGenesisBlock()
 	}
 
