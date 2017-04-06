@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"os"
 
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv2"
-	"github.com/status-im/status-go/geth"
-	"github.com/status-im/status-go/jail"
+	whisper "github.com/teslapatrick/go-ethereum/whisper/whisperv2"
+	"github.com/teslapatrick/status-go/geth"
+	"github.com/teslapatrick/status-go/jail"
 )
 
 //export CreateAccount

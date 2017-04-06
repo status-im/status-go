@@ -1,8 +1,8 @@
 package geth
 
 import (
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/les/status"
+	"github.com/teslapatrick/go-ethereum/common"
+	"github.com/teslapatrick/go-ethereum/les/status"
 )
 
 type SignalEnvelope struct {

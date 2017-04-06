@@ -10,11 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/les/status"
-	"github.com/status-im/status-go/geth"
+	"github.com/teslapatrick/go-ethereum/common"
+	"github.com/teslapatrick/go-ethereum/common/hexutil"
+	"github.com/teslapatrick/go-ethereum/crypto"
+	"github.com/teslapatrick/go-ethereum/les/status"
+	"github.com/teslapatrick/status-go/geth"
 )
 
 const (

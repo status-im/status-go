@@ -3,9 +3,9 @@ package geth
 import (
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv2"
+	"github.com/teslapatrick/go-ethereum/common"
+	"github.com/teslapatrick/go-ethereum/crypto"
+	whisper "github.com/teslapatrick/go-ethereum/whisper/whisperv2"
 )
 
 var (

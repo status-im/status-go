@@ -8,11 +8,11 @@ import (
 	"time"
 
 	"github.com/eapache/go-resiliency/semaphore"
-	"github.com/ethereum/go-ethereum/logger"
-	"github.com/ethereum/go-ethereum/logger/glog"
-	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/teslapatrick/go-ethereum/logger"
+	"github.com/teslapatrick/go-ethereum/logger/glog"
+	"github.com/teslapatrick/go-ethereum/rpc"
 	"github.com/robertkrimen/otto"
-	"github.com/status-im/status-go/geth"
+	"github.com/teslapatrick/status-go/geth"
 )
 
 const (

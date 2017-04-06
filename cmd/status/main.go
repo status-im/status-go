@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/status-im/status-go/geth"
+	"github.com/teslapatrick/status-go/geth"
 )
 
 var (

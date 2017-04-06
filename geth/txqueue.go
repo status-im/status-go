@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/ethereum/go-ethereum/accounts/keystore"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/les/status"
+	"github.com/teslapatrick/go-ethereum/accounts/keystore"
+	"github.com/teslapatrick/go-ethereum/common"
+	"github.com/teslapatrick/go-ethereum/common/hexutil"
+	"github.com/teslapatrick/go-ethereum/les/status"
 	"github.com/robertkrimen/otto"
 )
 
