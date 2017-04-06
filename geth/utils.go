@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,12 +23,12 @@ import (
 	"github.com/ethereum/go-ethereum/logger"
 	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/static"
 )
 
 var (
 	muPrepareTestNode sync.Mutex
 	RootDir           string
-	DataDir           string
 	TestDataDir       string
 )
 
@@ -44,7 +45,6 @@ func init() {
 	}
 
 	// setup auxiliary directories
-	DataDir = filepath.Join(RootDir, "data")
 	TestDataDir = filepath.Join(RootDir, ".ethereumtest")
 }
 
@@ -99,7 +99,7 @@ type TestConfig struct {
 func LoadTestConfig() (*TestConfig, error) {
 	var testConfig TestConfig
 
-	configData := LoadFromFile(filepath.Join(DataDir, "test-data.json"))
+	configData := string(static.MustAsset("config/test-data.json"))
 	if err := json.Unmarshal([]byte(configData), &testConfig); err != nil {
 		return nil, err
 	}
@@ -172,7 +172,7 @@ func PrepareTestNode() (err error) {
 	importTestAccount := func(accountFile string) error {
 		dst := filepath.Join(TestDataDir, "keystore", accountFile)
 		if _, err := os.Stat(dst); os.IsNotExist(err) {
-			err = CopyFile(dst, filepath.Join(RootDir, "data", accountFile))
+			err = ioutil.WriteFile(dst, static.MustAsset("keys/"+accountFile), 0644)
 			if err != nil {
 				glog.V(logger.Warn).Infof("cannot copy test account PK: %v", err)
 				return err
