@@ -1,0 +1,11 @@
+<component name="libraryTable">
+  <library name="Go SDK">
+    <CLASSES>
+      <root url="file://E:/Software/Install/go/src" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="file://E:/Software/Install/go/src" />
+    </SOURCES>
+  </library>
+</component>

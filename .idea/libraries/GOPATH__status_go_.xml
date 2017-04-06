@@ -1,0 +1,18 @@
+<component name="libraryTable">
+  <library name="GOPATH &lt;status-go&gt;">
+    <CLASSES>
+      <root url="file://D:/Testing/Go/src/github.com" />
+      <root url="file://D:/Testing/Go/src/golang.org" />
+      <root url="file://D:/Testing/Go/src/sourcegraph.com" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="file://D:/Testing/Go/src/github.com" />
+      <root url="file://D:/Testing/Go/src/golang.org" />
+      <root url="file://D:/Testing/Go/src/sourcegraph.com" />
+    </SOURCES>
+    <excluded>
+      <root url="file://$PROJECT_DIR$" />
+    </excluded>
+  </library>
+</component>
