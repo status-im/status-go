@@ -24,7 +24,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/core/vm"
+	"github.com/teslapatrick/go-ethereum/core/vm"
 )
 
 func main() {

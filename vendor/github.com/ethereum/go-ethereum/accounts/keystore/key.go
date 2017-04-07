@@ -29,12 +29,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/crypto/secp256k1"
+	"github.com/teslapatrick/go-ethereum/accounts"
+	"github.com/teslapatrick/go-ethereum/common"
+	"github.com/teslapatrick/go-ethereum/crypto"
+	"github.com/teslapatrick/go-ethereum/crypto/secp256k1"
 	"github.com/pborman/uuid"
-	"github.com/status-im/status-go/extkeys"
+	"github.com/teslapatrick/status-go/extkeys"
 )
 
 const (

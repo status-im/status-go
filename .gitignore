@@ -13,7 +13,7 @@
 .ethtest
 */**/*tx_database*
 */**/*dapps*
-vendor/github.com/ethereum/go-ethereum/vendor
+vendor/github.com/teslapatrick/go-ethereum/vendor
 
 #*
 .#*

@@ -4,11 +4,11 @@
 # Ethash
 
 For details on this project, please see the Ethereum wiki:
-https://github.com/ethereum/wiki/wiki/Ethash
+https://github.com/teslapatrick/wiki/wiki/Ethash
 
 ### Coding Style for C++ code:
 
-Follow the same exact style as in [cpp-ethereum](https://github.com/ethereum/cpp-ethereum/blob/develop/CodingStandards.txt)
+Follow the same exact style as in [cpp-ethereum](https://github.com/teslapatrick/cpp-ethereum/blob/develop/CodingStandards.txt)
 
 ### Coding Style for C code:
 

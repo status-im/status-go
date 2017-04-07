@@ -23,14 +23,14 @@ import (
 	"math/big"
 	"sync"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/eth"
-	"github.com/ethereum/go-ethereum/les/flowcontrol"
-	"github.com/ethereum/go-ethereum/logger"
-	"github.com/ethereum/go-ethereum/logger/glog"
-	"github.com/ethereum/go-ethereum/p2p"
-	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/teslapatrick/go-ethereum/common"
+	"github.com/teslapatrick/go-ethereum/core/types"
+	"github.com/teslapatrick/go-ethereum/eth"
+	"github.com/teslapatrick/go-ethereum/les/flowcontrol"
+	"github.com/teslapatrick/go-ethereum/logger"
+	"github.com/teslapatrick/go-ethereum/logger/glog"
+	"github.com/teslapatrick/go-ethereum/p2p"
+	"github.com/teslapatrick/go-ethereum/rlp"
 )
 
 var (

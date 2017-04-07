@@ -23,13 +23,13 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/ethereum/go-ethereum/cmd/utils"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/logger/glog"
-	"github.com/ethereum/go-ethereum/p2p/discover"
-	"github.com/ethereum/go-ethereum/p2p/discv5"
-	"github.com/ethereum/go-ethereum/p2p/nat"
-	"github.com/ethereum/go-ethereum/p2p/netutil"
+	"github.com/teslapatrick/go-ethereum/cmd/utils"
+	"github.com/teslapatrick/go-ethereum/crypto"
+	"github.com/teslapatrick/go-ethereum/logger/glog"
+	"github.com/teslapatrick/go-ethereum/p2p/discover"
+	"github.com/teslapatrick/go-ethereum/p2p/discv5"
+	"github.com/teslapatrick/go-ethereum/p2p/nat"
+	"github.com/teslapatrick/go-ethereum/p2p/netutil"
 )
 
 func main() {

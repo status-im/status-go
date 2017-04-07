@@ -25,11 +25,11 @@ import (
 	"math/big"
 	"sync/atomic"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/params"
-	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/teslapatrick/go-ethereum/common"
+	"github.com/teslapatrick/go-ethereum/common/hexutil"
+	"github.com/teslapatrick/go-ethereum/crypto"
+	"github.com/teslapatrick/go-ethereum/params"
+	"github.com/teslapatrick/go-ethereum/rlp"
 )
 
 var ErrInvalidSig = errors.New("invalid transaction v, r, s values")

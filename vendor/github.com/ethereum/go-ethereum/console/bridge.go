@@ -22,9 +22,9 @@ import (
 	"io"
 	"time"
 
-	"github.com/ethereum/go-ethereum/logger"
-	"github.com/ethereum/go-ethereum/logger/glog"
-	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/teslapatrick/go-ethereum/logger"
+	"github.com/teslapatrick/go-ethereum/logger/glog"
+	"github.com/teslapatrick/go-ethereum/rpc"
 	"github.com/robertkrimen/otto"
 )
 

@@ -22,9 +22,9 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/teslapatrick/go-ethereum/common"
+	"github.com/teslapatrick/go-ethereum/common/hexutil"
+	"github.com/teslapatrick/go-ethereum/rlp"
 )
 
 var errMissingLogFields = errors.New("missing required JSON log fields")

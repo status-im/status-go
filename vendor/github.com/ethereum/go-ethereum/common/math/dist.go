@@ -20,7 +20,7 @@ import (
 	"math/big"
 	"sort"
 
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/teslapatrick/go-ethereum/common"
 )
 
 type Summer interface {

@@ -7,11 +7,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts/keystore"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/les/status"
-	"github.com/status-im/status-go/geth"
+	"github.com/teslapatrick/go-ethereum/accounts/keystore"
+	"github.com/teslapatrick/go-ethereum/common"
+	"github.com/teslapatrick/go-ethereum/common/hexutil"
+	"github.com/teslapatrick/go-ethereum/les/status"
+	"github.com/teslapatrick/status-go/geth"
 )
 
 func TestQueuedContracts(t *testing.T) {

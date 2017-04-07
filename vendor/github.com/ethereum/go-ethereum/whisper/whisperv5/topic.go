@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/teslapatrick/go-ethereum/common"
 )
 
 // Topic represents a cryptographically secure, probabilistic partial

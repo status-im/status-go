@@ -39,8 +39,8 @@ import (
 	"unsafe"
 
 	"github.com/Gustav-Simonsson/go-opencl/cl"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/pow"
+	"github.com/teslapatrick/go-ethereum/common"
+	"github.com/teslapatrick/go-ethereum/pow"
 )
 
 /*
@@ -59,8 +59,8 @@ import (
 
   References mentioned in code comments:
 
-  1. https://github.com/ethereum/wiki/wiki/Ethash
-  2. https://github.com/ethereum/cpp-ethereum/blob/develop/libethash-cl/ethash_cl_miner.cpp
+  1. https://github.com/teslapatrick/wiki/wiki/Ethash
+  2. https://github.com/teslapatrick/cpp-ethereum/blob/develop/libethash-cl/ethash_cl_miner.cpp
   3. https://www.khronos.org/registry/cl/sdk/1.2/docs/man/xhtml/
   4. http://amd-dev.wpengine.netdna-cdn.com/wordpress/media/2013/12/AMD_OpenCL_Programming_User_Guide.pdf
 

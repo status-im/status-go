@@ -24,14 +24,14 @@ import (
 	goruntime "runtime"
 	"time"
 
-	"github.com/ethereum/go-ethereum/cmd/utils"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/state"
-	"github.com/ethereum/go-ethereum/core/vm"
-	"github.com/ethereum/go-ethereum/core/vm/runtime"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/logger/glog"
+	"github.com/teslapatrick/go-ethereum/cmd/utils"
+	"github.com/teslapatrick/go-ethereum/common"
+	"github.com/teslapatrick/go-ethereum/core/state"
+	"github.com/teslapatrick/go-ethereum/core/vm"
+	"github.com/teslapatrick/go-ethereum/core/vm/runtime"
+	"github.com/teslapatrick/go-ethereum/crypto"
+	"github.com/teslapatrick/go-ethereum/ethdb"
+	"github.com/teslapatrick/go-ethereum/logger/glog"
 	"gopkg.in/urfave/cli.v1"
 )
 

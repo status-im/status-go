@@ -21,9 +21,9 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/internal/ethapi"
-	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/teslapatrick/go-ethereum/common"
+	"github.com/teslapatrick/go-ethereum/internal/ethapi"
+	"github.com/teslapatrick/go-ethereum/rpc"
 	"golang.org/x/net/context"
 )
 

@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/status-im/status-go/geth"
-	"github.com/status-im/status-go/jail"
+	"github.com/teslapatrick/go-ethereum/common"
+	"github.com/teslapatrick/status-go/geth"
+	"github.com/teslapatrick/status-go/jail"
 )
 
 const (

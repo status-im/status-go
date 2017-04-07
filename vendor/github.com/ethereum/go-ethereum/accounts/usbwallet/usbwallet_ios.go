@@ -25,7 +25,7 @@ package usbwallet
 import (
 	"errors"
 
-	"github.com/ethereum/go-ethereum/accounts"
+	"github.com/teslapatrick/go-ethereum/accounts"
 )
 
 // Here be dragons! There is no USB support on iOS.

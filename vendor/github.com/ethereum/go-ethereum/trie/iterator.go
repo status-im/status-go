@@ -16,7 +16,7 @@
 
 package trie
 
-import "github.com/ethereum/go-ethereum/common"
+import "github.com/teslapatrick/go-ethereum/common"
 
 // Iterator is a key-value trie iterator that traverses a Trie.
 type Iterator struct {

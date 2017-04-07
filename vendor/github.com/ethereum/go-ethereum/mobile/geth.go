@@ -24,15 +24,15 @@ import (
 	"math/big"
 	"path/filepath"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/eth"
-	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/ethereum/go-ethereum/ethstats"
-	"github.com/ethereum/go-ethereum/les"
-	"github.com/ethereum/go-ethereum/node"
-	"github.com/ethereum/go-ethereum/p2p/nat"
-	"github.com/ethereum/go-ethereum/params"
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv2"
+	"github.com/teslapatrick/go-ethereum/common"
+	"github.com/teslapatrick/go-ethereum/eth"
+	"github.com/teslapatrick/go-ethereum/ethclient"
+	"github.com/teslapatrick/go-ethereum/ethstats"
+	"github.com/teslapatrick/go-ethereum/les"
+	"github.com/teslapatrick/go-ethereum/node"
+	"github.com/teslapatrick/go-ethereum/p2p/nat"
+	"github.com/teslapatrick/go-ethereum/params"
+	whisper "github.com/teslapatrick/go-ethereum/whisper/whisperv2"
 )
 
 // NodeConfig represents the collection of configuration values to fine tune the Geth

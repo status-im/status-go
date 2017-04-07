@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv2"
-	"github.com/status-im/status-go/geth"
+	"github.com/teslapatrick/go-ethereum/common"
+	"github.com/teslapatrick/go-ethereum/crypto"
+	whisper "github.com/teslapatrick/go-ethereum/whisper/whisperv2"
+	"github.com/teslapatrick/status-go/geth"
 )
 
 func TestWhisperMessaging(t *testing.T) {

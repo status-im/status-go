@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/status-im/status-go/geth"
+	"github.com/teslapatrick/status-go/geth"
 )
 
 const (

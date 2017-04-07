@@ -19,7 +19,7 @@ package main
 import (
 	"log"
 
-	"github.com/ethereum/go-ethereum/swarm/storage"
+	"github.com/teslapatrick/go-ethereum/swarm/storage"
 	"gopkg.in/urfave/cli.v1"
 )
 

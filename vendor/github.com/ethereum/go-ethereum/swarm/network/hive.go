@@ -23,13 +23,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/logger"
-	"github.com/ethereum/go-ethereum/logger/glog"
-	"github.com/ethereum/go-ethereum/p2p/discover"
-	"github.com/ethereum/go-ethereum/p2p/netutil"
-	"github.com/ethereum/go-ethereum/swarm/network/kademlia"
-	"github.com/ethereum/go-ethereum/swarm/storage"
+	"github.com/teslapatrick/go-ethereum/common"
+	"github.com/teslapatrick/go-ethereum/logger"
+	"github.com/teslapatrick/go-ethereum/logger/glog"
+	"github.com/teslapatrick/go-ethereum/p2p/discover"
+	"github.com/teslapatrick/go-ethereum/p2p/netutil"
+	"github.com/teslapatrick/go-ethereum/swarm/network/kademlia"
+	"github.com/teslapatrick/go-ethereum/swarm/storage"
 )
 
 // Hive is the logistic manager of the swarm

@@ -1,8 +1,8 @@
 package status
 
 import (
-	"github.com/ethereum/go-ethereum/accounts"
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/teslapatrick/go-ethereum/accounts"
+	"github.com/teslapatrick/go-ethereum/common"
 )
 
 type AccountManager struct {

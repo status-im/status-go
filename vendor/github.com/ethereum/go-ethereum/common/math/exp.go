@@ -19,7 +19,7 @@ package math
 import (
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/teslapatrick/go-ethereum/common"
 )
 
 // wordSize is the size number of bits in a big.Int Word.

@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common/mclock"
+	"github.com/teslapatrick/go-ethereum/common/mclock"
 )
 
 const fcTimeConst = 1000000

@@ -21,7 +21,7 @@ if [ ! -d "$WS1/src" ]; then
 fi
 
 # expose project itself
-PROJECTDIR="$WS2/src/github.com/status-im"
+PROJECTDIR="$WS2/src/github.com/teslapatrick"
 if [ ! -L "$PROJECTDIR/status-go" ]; then
     mkdir -p "$PROJECTDIR"
     cd "$PROJECTDIR"

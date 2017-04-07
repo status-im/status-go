@@ -19,7 +19,7 @@ package errs
 import (
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/logger/glog"
+	"github.com/teslapatrick/go-ethereum/logger/glog"
 )
 
 /*
