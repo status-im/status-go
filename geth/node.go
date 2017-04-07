@@ -44,7 +44,7 @@ const (
 	DefaultGas       = 180000
 
 	ProcessFileDescriptorLimit = uint64(2048)
-	DatabaseCacheSize          = 128 // Megabytes of memory allocated to internal caching (min 16MB / database forced)
+	DatabaseCacheSize          = 32 // Megabytes of memory allocated to internal caching (min 16MB / database forced)
 
 	EventNodeStarted = "node.started"
 	EventNodeCrashed = "node.crashed"
@@ -132,7 +132,7 @@ func MakeNode(config *NodeConfig) *Node {
 		DiscoveryV5Addr:   ":0",
 		BootstrapNodes:    makeBootstrapNodes(),
 		BootstrapNodesV5:  makeBootstrapNodesV5(),
-		ListenAddr:        ":30303",
+		ListenAddr:        ":0",
 		NAT:               nat.Any(),
 		MaxPeers:          MaxPeers,
 		MaxPendingPeers:   MaxPendingPeers,
