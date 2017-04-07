@@ -132,7 +132,7 @@ func MakeNode(config *NodeConfig) *Node {
 		DiscoveryV5Addr:   ":0",
 		BootstrapNodes:    makeBootstrapNodes(),
 		BootstrapNodesV5:  makeBootstrapNodesV5(),
-		ListenAddr:        ":0",
+		ListenAddr:        ":30303",
 		NAT:               nat.Any(),
 		MaxPeers:          MaxPeers,
 		MaxPendingPeers:   MaxPendingPeers,
@@ -182,7 +182,7 @@ func activateEthService(stack *node.Node, extra []byte) error {
 		MaxPeers:                MaxPeers,
 		DatabaseCache:           DatabaseCacheSize,
 		DatabaseHandles:         makeDatabaseHandles(),
-		NetworkId:               20170308, // Olympic
+		NetworkId:               20170308, //
 		MinerThreads:            runtime.NumCPU(),
 		GasPrice:                GasPrice,
 		GpoMinGasPrice:          GpoMinGasPrice,
