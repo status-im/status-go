@@ -7,7 +7,7 @@ import (
 	"github.com/teslapatrick/go-ethereum/accounts"
 	"github.com/teslapatrick/go-ethereum/common"
 	"github.com/teslapatrick/go-ethereum/crypto"
-	"github.com/teslapatrick-im/status-go/extkeys"
+	"github.com/teslapatrick/status-go/extkeys"
 )
 
 var (
