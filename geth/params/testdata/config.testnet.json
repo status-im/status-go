@@ -2,6 +2,7 @@
     "TestNet": true,
     "NetworkId": 3,
     "DataDir": "$TMPDIR",
+    "NodeKeyFile": "",
     "Name": "StatusIM",
     "Version": "$VERSION",
     "APIModules": "db,eth,net,web3,shh,personal,admin",
@@ -34,7 +35,18 @@
         "DatabaseCache": 128
     },
     "WhisperConfig": {
-        "Enabled": true
+        "Enabled": true,
+        "EchoMode": false,
+        "BootstrapNode": false,
+        "ForwarderNode": false,
+        "MailServerNode": false,
+        "MailServerPassword": "",
+        "NotificationServerNode": false,
+        "NotificationServerPassword": "",
+        "DataDir": "$TMPDIR/wnode",
+        "Port": 30379,
+        "MinimumPoW": 0.001,
+        "TTL": 120
     },
     "SwarmConfig": {
         "Enabled": false

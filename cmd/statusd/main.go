@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 
 	"github.com/status-im/status-go/geth"
 	"github.com/status-im/status-go/geth/params"
@@ -19,10 +18,14 @@ var (
 )
 
 var (
+	NodeKeyFileFlag = cli.StringFlag{
+		Name:  "nodekey",
+		Usage: "P2P node key file (private key)",
+	}
 	DataDirFlag = cli.StringFlag{
 		Name:  "datadir",
 		Usage: "Data directory for the databases and keystore",
-		Value: params.DefaultDataDir,
+		Value: params.DataDir,
 	}
 	NetworkIdFlag = cli.IntFlag{
 		Name:  "networkid",
@@ -48,7 +51,7 @@ var (
 	HTTPPortFlag = cli.IntFlag{
 		Name:  "httpport",
 		Usage: "HTTP RPC server's listening port",
-		Value: params.DefaultHTTPPort,
+		Value: params.HTTPPort,
 	}
 	IPCEnabledFlag = cli.BoolFlag{
 		Name:  "ipc",
@@ -59,14 +62,6 @@ var (
 		Usage: `Log level, one of: ""ERROR", "WARNING", "INFO", "DEBUG", and "DETAIL"`,
 		Value: "INFO",
 	}
-	TestAccountKey = cli.StringFlag{
-		Name:  "accountkey",
-		Usage: "Test account PK (will be loaded into accounts cache, and injected to Whisper)",
-	}
-	TestAccountPasswd = cli.StringFlag{
-		Name:  "accountpasswd",
-		Usage: "Test account password",
-	}
 )
 
 func init() {
@@ -74,14 +69,12 @@ func init() {
 	app.Action = statusd
 	app.HideVersion = true // separate command prints version
 	app.Commands = []cli.Command{
-		{
-			Action: version,
-			Name:   "version",
-			Usage:  "Print app version",
-		},
+		versionCommand,
+		wnodeCommand,
 	}
 
 	app.Flags = []cli.Flag{
+		NodeKeyFileFlag,
 		DataDirFlag,
 		NetworkIdFlag,
 		LightEthEnabledFlag,
@@ -133,6 +126,7 @@ func makeNodeConfig(ctx *cli.Context) (*params.NodeConfig, error) {
 		return nil, err
 	}
 
+	nodeConfig.NodeKeyFile = ctx.GlobalString(NodeKeyFileFlag.Name)
 	if !ctx.GlobalBool(HTTPEnabledFlag.Name) {
 		nodeConfig.HTTPHost = "" // HTTP RPC is disabled
 	}
@@ -148,23 +142,6 @@ func makeNodeConfig(ctx *cli.Context) (*params.NodeConfig, error) {
 	}
 
 	return nodeConfig, nil
-}
-
-// version displays app version
-func version(ctx *cli.Context) error {
-	fmt.Println(strings.Title(params.DefaultClientIdentifier))
-	fmt.Println("Version:", params.Version)
-	if gitCommit != "" {
-		fmt.Println("Git Commit:", gitCommit)
-	}
-
-	fmt.Println("Network Id:", ctx.GlobalInt(NetworkIdFlag.Name))
-	fmt.Println("Go Version:", runtime.Version())
-	fmt.Println("OS:", runtime.GOOS)
-	fmt.Printf("GOPATH=%s\n", os.Getenv("GOPATH"))
-	fmt.Printf("GOROOT=%s\n", runtime.GOROOT())
-
-	return nil
 }
 
 // makeApp creates an app with sane defaults.

@@ -168,23 +168,11 @@ func PrepareTestNode() (err error) {
 		return err
 	}
 
-	// import test account (with test ether on it)
-	importTestAccount := func(accountFile string) error {
-		dst := filepath.Join(TestDataDir, "keystore", accountFile)
-		if _, err := os.Stat(dst); os.IsNotExist(err) {
-			err = ioutil.WriteFile(dst, static.MustAsset("keys/"+accountFile), 0644)
-			if err != nil {
-				glog.V(logger.Warn).Infof("cannot copy test account PK: %v", err)
-				return err
-			}
-		}
-
-		return nil
-	}
-	if err := importTestAccount("test-account1.pk"); err != nil {
+	// import test accounts (with test ether on it)
+	if err := ImportTestAccount(filepath.Join(TestDataDir, "keystore"), "test-account1.pk"); err != nil {
 		panic(err)
 	}
-	if err := importTestAccount("test-account2.pk"); err != nil {
+	if err := ImportTestAccount(filepath.Join(TestDataDir, "keystore"), "test-account2.pk"); err != nil {
 		panic(err)
 	}
 
@@ -285,4 +273,24 @@ func AddressToDecryptedAccount(address, password string) (accounts.Account, *key
 	}
 
 	return keyStore.AccountDecryptedKey(account, password)
+}
+
+// ImportTestAccount checks if test account exists in keystore, and if not
+// tries to import it (from static resources, see "static/keys" folder)
+func ImportTestAccount(keystoreDir, accountFile string) error {
+	// make sure that keystore folder exists
+	if _, err := os.Stat(keystoreDir); os.IsNotExist(err) {
+		os.MkdirAll(keystoreDir, os.ModePerm)
+	}
+
+	dst := filepath.Join(keystoreDir, accountFile)
+	if _, err := os.Stat(dst); os.IsNotExist(err) {
+		err = ioutil.WriteFile(dst, static.MustAsset("keys/"+accountFile), 0644)
+		if err != nil {
+			glog.V(logger.Warn).Infof("cannot copy test account PK: %v", err)
+			return err
+		}
+	}
+
+	return nil
 }

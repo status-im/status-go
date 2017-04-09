@@ -7,37 +7,37 @@ import (
 )
 
 const (
-	// DefaultClientIdentifier is client identifier to advertise over the network
-	DefaultClientIdentifier = "StatusIM"
+	// ClientIdentifier is client identifier to advertise over the network
+	ClientIdentifier = "StatusIM"
 
-	// DefaultDataDir is default data directory used by statusd executable
-	DefaultDataDir = "statusd-data"
+	// DataDir is default data directory used by statusd executable
+	DataDir = "statusd-data"
 
-	// DefaultIPCFile is filename of exposed IPC RPC Server
-	DefaultIPCFile = "geth.ipc"
+	// IPCFile is filename of exposed IPC RPC Server
+	IPCFile = "geth.ipc"
 
-	// DefaultHTTPHost is host interface for the HTTP RPC server
-	DefaultHTTPHost = "localhost"
+	// HTTPHost is host interface for the HTTP RPC server
+	HTTPHost = "localhost"
 
-	// DefaultHTTPPort is HTTP-RPC port (replaced in unit tests)
-	DefaultHTTPPort = 8545
+	// HTTPPort is HTTP-RPC port (replaced in unit tests)
+	HTTPPort = 8545
 
-	// DefaultAPIModules is a list of modules to expose vie HTTP RPC
+	// APIModules is a list of modules to expose vie HTTP RPC
 	// TODO remove "admin" on main net
-	DefaultAPIModules = "db,eth,net,web3,shh,personal,admin"
+	APIModules = "db,eth,net,web3,shh,personal,admin"
 
-	// DefaultWSHost is a host interface for the websocket RPC server
-	DefaultWSHost = "localhost"
+	// WSHost is a host interface for the websocket RPC server
+	WSHost = "localhost"
 
-	// DefaultWSPort is a WS-RPC port (replaced in unit tests)
-	DefaultWSPort = 8546
+	// WSPort is a WS-RPC port (replaced in unit tests)
+	WSPort = 8546
 
-	// DefaultMaxPeers is the maximum number of global peers
-	DefaultMaxPeers = 25
+	// MaxPeers is the maximum number of global peers
+	MaxPeers = 25
 
-	// DefaultMaxPendingPeers is the maximum number of peers that can be pending in the
+	// MaxPendingPeers is the maximum number of peers that can be pending in the
 	// handshake phase, counted separately for inbound and outbound connections.
-	DefaultMaxPendingPeers = 0
+	MaxPendingPeers = 0
 
 	// DefaultGas default amount of gas used for transactions
 	DefaultGas = 180000
@@ -45,14 +45,23 @@ const (
 	// DefaultFileDescriptorLimit is fd limit that database can use
 	DefaultFileDescriptorLimit = uint64(2048)
 
-	// DefaultDatabaseCache is memory (in MBs) allocated to internal caching (min 16MB / database forced)
-	DefaultDatabaseCache = 128
+	// DatabaseCache is memory (in MBs) allocated to internal caching (min 16MB / database forced)
+	DatabaseCache = 128
 
-	// DefaultLogFile defines where to write logs to
-	DefaultLogFile = "geth.log"
+	// LogFile defines where to write logs to
+	LogFile = "geth.log"
 
-	// DefaultLogLevel defines the minimum log level to report
-	DefaultLogLevel = "INFO"
+	// LogLevel defines the minimum log level to report
+	LogLevel = "INFO"
+
+	// WhisperPort is Whisper node listening port
+	WhisperPort = 30379
+
+	// WhisperMinimumPoW amount of work for Whisper message to be added to sending queue
+	WhisperMinimumPoW = 0.001
+
+	// WhisperTTL is time to live for messages, in seconds
+	WhisperTTL = 120
 
 	// TestNetworkId is id of a test network
 	TestNetworkId = 3

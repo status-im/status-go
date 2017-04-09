@@ -101,11 +101,11 @@ var loadConfigTestCases = []struct {
 				t.Fatal("wrong Name")
 			}
 
-			if nodeConfig.HTTPPort != params.DefaultHTTPPort {
+			if nodeConfig.HTTPPort != params.HTTPPort {
 				t.Fatal("wrong HTTPPort")
 			}
 
-			if nodeConfig.HTTPHost != params.DefaultHTTPHost {
+			if nodeConfig.HTTPHost != params.HTTPHost {
 				t.Fatal("wrong HTTPHost")
 			}
 
