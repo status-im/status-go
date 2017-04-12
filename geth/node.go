@@ -14,6 +14,7 @@ import (
 	"syscall"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/les"
 	"github.com/ethereum/go-ethereum/logger"
@@ -23,6 +24,8 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/p2p/nat"
 	gethparams "github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/whisper/mailserver"
+	"github.com/ethereum/go-ethereum/whisper/notifications"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/params"
 )
@@ -102,6 +105,17 @@ func MakeNode(config *params.NodeConfig) *Node {
 		WSModules:         strings.Split(config.APIModules, ","),
 	}
 
+	if len(config.NodeKeyFile) > 0 {
+		glog.V(logger.Info).Infof("Loading private key file: [%s]", config.NodeKeyFile)
+		pk, err := crypto.LoadECDSA(config.NodeKeyFile)
+		if err != nil {
+			glog.V(logger.Warn).Infof("Failed loading private key file '%s': %v", config.NodeKeyFile, err)
+		}
+
+		// override node's private key
+		stackConfig.PrivateKey = pk
+	}
+
 	stack, err := node.New(stackConfig)
 	if err != nil {
 		Fatalf(ErrNodeMakeFailure)
@@ -170,7 +184,30 @@ func activateShhService(stack *node.Node, config *params.NodeConfig) error {
 		return nil
 	}
 	serviceConstructor := func(*node.ServiceContext) (node.Service, error) {
-		return whisper.New(), nil
+		whisperConfig := config.WhisperConfig
+		whisperService := whisper.New()
+
+		// enable mail service
+		if whisperConfig.MailServerNode {
+			password, err := whisperConfig.ReadPasswordFile()
+			if err != nil {
+				return nil, err
+			}
+
+			var mailServer mailserver.WMailServer
+			whisperService.RegisterServer(&mailServer)
+			mailServer.Init(whisperService, whisperConfig.DataDir, string(password), whisperConfig.MinimumPoW)
+		}
+
+		// enable notification service
+		if whisperConfig.NotificationServerNode {
+			var notificationServer notifications.NotificationServer
+			whisperService.RegisterNotificationServer(&notificationServer)
+
+			notificationServer.Init(whisperService, whisperConfig)
+		}
+
+		return whisperService, nil
 	}
 	if err := stack.Register(serviceConstructor); err != nil {
 		return err
@@ -304,7 +341,7 @@ func Fatalf(reason interface{}, args ...interface{}) {
 // HaltOnPanic recovers from panic, logs issue, sends upward notification, and exits
 func HaltOnPanic() {
 	if r := recover(); r != nil {
-		err := fmt.Errorf("%v: %v", ErrNodeStartFailure, r)
+		err := fmt.Errorf("%v: %v", ErrNodeRunFailure, r)
 
 		// send signal up to native app
 		SendSignal(SignalEnvelope{
