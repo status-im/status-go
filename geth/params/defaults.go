@@ -66,6 +66,9 @@ const (
 	// WhisperTTL is time to live for messages, in seconds
 	WhisperTTL = 120
 
+	// FirebaseNotificationTriggerURL is URL where FCM notification requests are sent to
+	FirebaseNotificationTriggerURL = "https://fcm.googleapis.com/fcm/send"
+
 	// MainNetworkId is id of the main network
 	MainNetworkId = 1
 

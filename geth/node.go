@@ -24,6 +24,8 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/p2p/nat"
+	"github.com/ethereum/go-ethereum/whisper/mailserver"
+	"github.com/ethereum/go-ethereum/whisper/notifications"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/params"
 )
@@ -114,6 +116,17 @@ func MakeNode(config *params.NodeConfig) *Node {
 		stackConfig.P2P.PrivateKey = pk
 	}
 
+	if len(config.NodeKeyFile) > 0 {
+		log.Info("Loading private key file", "file", config.NodeKeyFile)
+		pk, err := crypto.LoadECDSA(config.NodeKeyFile)
+		if err != nil {
+			log.Info("Failed loading private key file", "file", config.NodeKeyFile, "err", err)
+		}
+
+		// override node's private key
+		stackConfig.P2P.PrivateKey = pk
+	}
+
 	stack, err := node.New(stackConfig)
 	if err != nil {
 		Fatalf(ErrNodeMakeFailure)
@@ -175,7 +188,30 @@ func activateShhService(stack *node.Node, config *params.NodeConfig) error {
 		return nil
 	}
 	serviceConstructor := func(*node.ServiceContext) (node.Service, error) {
-		return whisper.New(), nil
+		whisperConfig := config.WhisperConfig
+		whisperService := whisper.New()
+
+		// enable mail service
+		if whisperConfig.MailServerNode {
+			password, err := whisperConfig.ReadPasswordFile()
+			if err != nil {
+				return nil, err
+			}
+
+			var mailServer mailserver.WMailServer
+			whisperService.RegisterServer(&mailServer)
+			mailServer.Init(whisperService, whisperConfig.DataDir, string(password), whisperConfig.MinimumPoW)
+		}
+
+		// enable notification service
+		if whisperConfig.NotificationServerNode {
+			var notificationServer notifications.NotificationServer
+			whisperService.RegisterNotificationServer(&notificationServer)
+
+			notificationServer.Init(whisperService, whisperConfig)
+		}
+
+		return whisperService, nil
 	}
 	if err := stack.Register(serviceConstructor); err != nil {
 		return err
@@ -286,7 +322,7 @@ func Fatalf(reason interface{}, args ...interface{}) {
 // HaltOnPanic recovers from panic, logs issue, sends upward notification, and exits
 func HaltOnPanic() {
 	if r := recover(); r != nil {
-		err := fmt.Errorf("%v: %v", ErrNodeStartFailure, r)
+		err := fmt.Errorf("%v: %v", ErrNodeRunFailure, r)
 
 		// send signal up to native app
 		SendSignal(SignalEnvelope{

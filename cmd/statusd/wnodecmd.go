@@ -31,9 +31,13 @@ var (
 		Name:  "mailserver",
 		Usage: "Delivers expired messages on demand",
 	}
-	WhisperPassword = cli.StringFlag{
+	WhisperIdentityFile = cli.StringFlag{
+		Name:  "identity",
+		Usage: "Protocol identity file (private key used for asymetric encryption)",
+	}
+	WhisperPasswordFile = cli.StringFlag{
 		Name:  "password",
-		Usage: "Password, will be used for topic keys, as Mail & Notification Server password",
+		Usage: "Password file (password is used for symmetric encryption)",
 	}
 	WhisperPortFlag = cli.IntFlag{
 		Name:  "port",
@@ -54,6 +58,10 @@ var (
 		Name:  "injectaccounts",
 		Usage: "Whether test account should be injected or not (default: true)",
 	}
+	FirebaseAuthorizationKey = cli.StringFlag{
+		Name:  "firebaseauth",
+		Usage: "FCM Authorization Key used for sending Push Notifications",
+	}
 )
 
 var (
@@ -67,11 +75,13 @@ var (
 			WhisperNotificationServerNodeFlag,
 			WhisperForwarderNodeFlag,
 			WhisperMailserverNodeFlag,
-			WhisperPassword,
+			WhisperIdentityFile,
+			WhisperPasswordFile,
 			WhisperPoWFlag,
 			WhisperPortFlag,
 			WhisperTTLFlag,
 			WhisperInjectTestAccounts,
+			FirebaseAuthorizationKey,
 		},
 	}
 )
@@ -129,24 +139,52 @@ func makeWhisperNodeConfig(ctx *cli.Context) (*params.NodeConfig, error) {
 	whisperConfig := nodeConfig.WhisperConfig
 
 	whisperConfig.Enabled = true
+	whisperConfig.IdentityFile = ctx.String(WhisperIdentityFile.Name)
+	whisperConfig.PasswordFile = ctx.String(WhisperPasswordFile.Name)
 	whisperConfig.EchoMode = ctx.BoolT(WhisperEchoModeFlag.Name)
 	whisperConfig.BootstrapNode = ctx.BoolT(WhisperBootstrapNodeFlag.Name)
 	whisperConfig.ForwarderNode = ctx.Bool(WhisperForwarderNodeFlag.Name)
 	whisperConfig.NotificationServerNode = ctx.Bool(WhisperNotificationServerNodeFlag.Name)
 	whisperConfig.MailServerNode = ctx.Bool(WhisperMailserverNodeFlag.Name)
-	whisperConfig.MailServerPassword = ctx.String(WhisperPassword.Name)
-	whisperConfig.NotificationServerPassword = ctx.String(WhisperPassword.Name) // the same for both mail and notification servers
-
 	whisperConfig.Port = ctx.Int(WhisperPortFlag.Name)
 	whisperConfig.TTL = ctx.Int(WhisperTTLFlag.Name)
 	whisperConfig.MinimumPoW = ctx.Float64(WhisperPoWFlag.Name)
 
-	if whisperConfig.MailServerNode && len(whisperConfig.MailServerPassword) == 0 {
+	if whisperConfig.MailServerNode && len(whisperConfig.PasswordFile) == 0 {
 		return nil, errors.New("mail server requires --password to be specified")
 	}
 
-	if whisperConfig.NotificationServerNode && len(whisperConfig.NotificationServerPassword) == 0 {
-		return nil, errors.New("notification server requires --password to be specified")
+	if whisperConfig.NotificationServerNode && len(whisperConfig.IdentityFile) == 0 {
+		return nil, errors.New("notification server requires either --identity file to be specified")
+	}
+
+	if len(whisperConfig.PasswordFile) > 0 { // make sure that we can load password file
+		if whisperConfig.PasswordFile, err = filepath.Abs(whisperConfig.PasswordFile); err != nil {
+			return nil, err
+		}
+		if _, err := whisperConfig.ReadPasswordFile(); err != nil {
+			return nil, err
+		}
+	}
+
+	if len(whisperConfig.IdentityFile) > 0 { // make sure that we can load identity file
+		if whisperConfig.IdentityFile, err = filepath.Abs(whisperConfig.IdentityFile); err != nil {
+			return nil, err
+		}
+		if _, err := whisperConfig.ReadIdentityFile(); err != nil {
+			return nil, err
+		}
+	}
+
+	firebaseConfig := whisperConfig.FirebaseConfig
+	firebaseConfig.AuthorizationKeyFile = ctx.String(FirebaseAuthorizationKey.Name)
+	if len(firebaseConfig.AuthorizationKeyFile) > 0 { // make sure authorization key can be loaded
+		if firebaseConfig.AuthorizationKeyFile, err = filepath.Abs(firebaseConfig.AuthorizationKeyFile); err != nil {
+			return nil, err
+		}
+		if _, err := firebaseConfig.ReadAuthorizationKeyFile(); err != nil {
+			return nil, err
+		}
 	}
 
 	return nodeConfig, nil

@@ -1,6 +1,8 @@
 package params
 
 import (
+	"bytes"
+	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 )
 
@@ -26,8 +29,11 @@ func init() {
 }
 
 var (
-	ErrMissingDataDir   = errors.New("missing required 'DataDir' parameter")
-	ErrMissingNetworkId = errors.New("missing required 'NetworkId' parameter")
+	ErrMissingDataDir            = errors.New("missing required 'DataDir' parameter")
+	ErrMissingNetworkId          = errors.New("missing required 'NetworkId' parameter")
+	ErrEmptyPasswordFile         = errors.New("password file cannot be empty")
+	ErrEmptyIdentityFile         = errors.New("identity file cannot be empty")
+	ErrEmptyAuthorizationKeyFile = errors.New("authorization key file cannot be empty")
 )
 
 // LightEthConfig holds LES-related configuration
@@ -43,10 +49,25 @@ type LightEthConfig struct {
 	DatabaseCache int
 }
 
+type FirebaseConfig struct {
+	// AuthorizationKeyFile file path that contains FCM authorization key
+	AuthorizationKeyFile string
+
+	// NotificationTriggerURL URL used to send push notification requests to
+	NotificationTriggerURL string
+}
+
 // WhisperConfig holds SHH-related configuration
 type WhisperConfig struct {
 	// Enabled flag specifies whether  protocol is enabled
 	Enabled bool
+
+	// IdentityFile path to private key, that will be loaded as identity into Whisper
+	IdentityFile string
+
+	// PasswordFile path to password file, for non-interactive password entry
+	// (if no account file selected, then this password is used for symmetric encryption)
+	PasswordFile string
 
 	// EchoMode if mode is on, prints some arguments for diagnostics
 	EchoMode bool
@@ -60,14 +81,8 @@ type WhisperConfig struct {
 	// MailServerNode is mode when node is capable of delivering expired messages on demand
 	MailServerNode bool
 
-	// MailServerPassword is password for MailServer's symmetric key
-	MailServerPassword string
-
 	// NotificationServerNode is mode when node is capable of sending Push (and probably other kinds) Notifications
 	NotificationServerNode bool
-
-	// NotificationServerPassword is password for NotificationServer's symmetric key (used in discovery)
-	NotificationServerPassword string
 
 	// DataDir is the file system folder Whisper should use for any data storage needs.
 	DataDir string
@@ -80,6 +95,9 @@ type WhisperConfig struct {
 
 	// TTL time to live for messages, in seconds
 	TTL int
+
+	// FirebaseConfig extra configuration for Firebase Cloud Messaging
+	FirebaseConfig *FirebaseConfig `json:"FirebaseConfig,"`
 }
 
 // SwarmConfig holds Swarm-related configuration
@@ -200,6 +218,9 @@ func NewNodeConfig(dataDir string, networkId uint64) (*NodeConfig, error) {
 			Port:       WhisperPort,
 			MinimumPoW: WhisperMinimumPoW,
 			TTL:        WhisperTTL,
+			FirebaseConfig: &FirebaseConfig{
+				NotificationTriggerURL: FirebaseNotificationTriggerURL,
+			},
 		},
 		SwarmConfig: &SwarmConfig{},
 	}
@@ -329,4 +350,60 @@ func (c *WhisperConfig) String() string {
 func (c *SwarmConfig) String() string {
 	data, _ := json.MarshalIndent(c, "", "    ")
 	return string(data)
+}
+
+// ReadPasswordFile reads and returns content of the password file
+func (c *WhisperConfig) ReadPasswordFile() ([]byte, error) {
+	if len(c.PasswordFile) <= 0 {
+		return nil, ErrEmptyPasswordFile
+	}
+
+	password, err := ioutil.ReadFile(c.PasswordFile)
+	if err != nil {
+		return nil, err
+	}
+	password = bytes.TrimRight(password, "\n")
+
+	if len(password) == 0 {
+		return nil, ErrEmptyPasswordFile
+	}
+
+	return password, nil
+}
+
+// ReadIdentityFile reads and loads identity private key
+func (c *WhisperConfig) ReadIdentityFile() (*ecdsa.PrivateKey, error) {
+	if len(c.IdentityFile) <= 0 {
+		return nil, ErrEmptyIdentityFile
+	}
+
+	identity, err := crypto.LoadECDSA(c.IdentityFile)
+	if err != nil {
+		return nil, err
+	}
+
+	if identity == nil {
+		return nil, ErrEmptyIdentityFile
+	}
+
+	return identity, nil
+}
+
+// ReadAuthorizationKeyFile reads and loads FCM authorization key
+func (c *FirebaseConfig) ReadAuthorizationKeyFile() ([]byte, error) {
+	if len(c.AuthorizationKeyFile) <= 0 {
+		return nil, ErrEmptyAuthorizationKeyFile
+	}
+
+	key, err := ioutil.ReadFile(c.AuthorizationKeyFile)
+	if err != nil {
+		return nil, err
+	}
+	key = bytes.TrimRight(key, "\n")
+
+	if key == nil {
+		return nil, ErrEmptyAuthorizationKeyFile
+	}
+
+	return key, nil
 }

@@ -274,6 +274,11 @@ func (api *PublicWhisperAPI) Subscribe(args WhisperFilterArgs) (string, error) {
 	return api.whisper.Subscribe(&filter)
 }
 
+// UninstallFilter is alias for Unsubscribe
+func (api *PublicWhisperAPI) UninstallFilter(id string) {
+	api.Unsubscribe(id)
+}
+
 // Unsubscribe disables and removes an existing filter.
 func (api *PublicWhisperAPI) Unsubscribe(id string) {
 	api.whisper.Unsubscribe(id)

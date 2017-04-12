@@ -53,6 +53,7 @@ var (
 	ErrInvalidJailedRequestQueue   = errors.New("jailed request queue is not properly initialized")
 	ErrNodeMakeFailure             = errors.New("error creating p2p node")
 	ErrNodeStartFailure            = errors.New("error starting p2p node")
+	ErrNodeRunFailure              = errors.New("error running p2p node")
 	ErrInvalidNodeAPI              = errors.New("no node API connected")
 	ErrAccountKeyStoreMissing      = errors.New("account key store is not set")
 )
