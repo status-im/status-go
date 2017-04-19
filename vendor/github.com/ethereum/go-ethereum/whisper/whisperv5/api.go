@@ -377,6 +377,42 @@ type PostArgs struct {
 	PeerID   hexutil.Bytes `json:"peerID"`
 }
 
+func (args *PostArgs) UnmarshalJSON(data []byte) (err error) {
+	var obj struct {
+		From     string         `json:"from"`
+		To       string         `json:"to"`
+		Topics   []string       `json:"topics"`
+		Payload  string         `json:"payload"`
+		Priority hexutil.Uint64 `json:"priority"`
+		TTL      hexutil.Uint64 `json:"ttl"`
+		KeyName  string         `json:"keyname"`
+	}
+
+	if err := json.Unmarshal(data, &obj); err != nil {
+		return err
+	}
+	args.From = obj.From
+	args.To = obj.To
+	args.Payload = []byte(obj.Payload)
+	args.WorkTime = 2
+	args.PoW = MinimumPoW
+	args.TTL = uint32(obj.TTL)
+	args.KeyName = obj.KeyName
+	for j, topic := range obj.Topics {
+		x := common.FromHex(topic)
+		if x == nil {
+			return fmt.Errorf("topic[%d] is invalid", j)
+		}
+		args.Topic = BytesToTopic(x)
+	}
+
+	if objJSON, err := json.Marshal(&obj); err == nil {
+		glog.V(logger.Info).Infoln("shh message posted: ", string(objJSON))
+	}
+
+	return nil
+}
+
 type WhisperFilterArgs struct {
 	To        string      `json:"to"`
 	From      string      `json:"from"`
@@ -424,7 +460,7 @@ func (args *WhisperFilterArgs) UnmarshalJSON(b []byte) (err error) {
 		topicsDecoded := make([]TopicType, len(topics))
 		for j, s := range topics {
 			x := common.FromHex(s)
-			if x == nil || len(x) != TopicLength {
+			if x == nil {
 				return fmt.Errorf("topic[%d] is invalid", j)
 			}
 			topicsDecoded[j] = BytesToTopic(x)

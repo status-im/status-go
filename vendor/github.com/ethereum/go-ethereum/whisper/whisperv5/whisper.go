@@ -202,6 +202,38 @@ func (w *Whisper) GetIdentity(pubKey string) *ecdsa.PrivateKey {
 	return w.privateKeys[pubKey]
 }
 
+// AddIdentity adds identity into the known identities list (for message decryption).
+func (w *Whisper) AddIdentity(key *ecdsa.PrivateKey) {
+	w.keyMu.Lock()
+	defer w.keyMu.Unlock()
+	w.privateKeys[common.ToHex(crypto.FromECDSAPub(&key.PublicKey))] = key
+}
+
+// InjectIdentity injects a manually added identity/key pair into the whisper keys
+func (w *Whisper) InjectIdentity(key *ecdsa.PrivateKey) error {
+	if w.HasIdentity(common.ToHex(crypto.FromECDSAPub(&key.PublicKey))) { // no need to re-inject
+		return nil
+	}
+	w.keyMu.Lock()
+	defer w.keyMu.Unlock()
+
+	w.privateKeys = make(map[string]*ecdsa.PrivateKey) // reset key store
+	w.privateKeys[common.ToHex(crypto.FromECDSAPub(&key.PublicKey))] = key
+
+	glog.V(logger.Info).Infof("Injected identity into whisper: %s\n", common.ToHex(crypto.FromECDSAPub(&key.PublicKey)))
+	return nil
+}
+
+// ClearIdentities clears the current whisper identities in memory
+func (w *Whisper) ClearIdentities() error {
+	w.keyMu.Lock()
+	defer w.keyMu.Unlock()
+
+	w.privateKeys = make(map[string]*ecdsa.PrivateKey)
+
+	return nil
+}
+
 func (w *Whisper) GenerateSymKey(name string) error {
 	const size = aesKeyLength * 2
 	buf := make([]byte, size)

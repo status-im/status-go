@@ -3453,6 +3453,7 @@ var getOptions = function (options) {
         topics: options.topics,
         from: options.from,
         to: options.to,
+        keyname: options.keyname,
         address: options.address,
         fromBlock: formatters.inputBlockNumberFormatter(options.fromBlock),
         toBlock: formatters.inputBlockNumberFormatter(options.toBlock)
@@ -5646,12 +5647,40 @@ var methods = function () {
         params: 0
     });
 
+    var generateSymKey = new Method({
+        name: 'generateSymKey',
+        call: 'shh_generateSymKey',
+        params: 1
+    });
+
+    var hasSymKey = new Method({
+        name: 'hasSymKey',
+        call: 'shh_hasSymKey',
+        params: 1
+    });
+
+    var deleteSymKey = new Method({
+        name: 'deleteSymKey',
+        call: 'shh_deleteSymKey',
+        params: 1
+    });
+
+    var addSymKey = new Method({
+        name: 'addSymKey',
+        call: 'shh_addSymKey',
+        params: 2
+    });
+
     return [
         post,
         newIdentity,
         hasIdentity,
         newGroup,
-        addToGroup
+        addToGroup,
+        generateSymKey,
+        hasSymKey,
+        deleteSymKey,
+        addSymKey
     ];
 };
 

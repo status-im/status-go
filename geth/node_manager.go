@@ -18,8 +18,8 @@ import (
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/rpc"
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv2"
-	"github.com/status-im/status-go/params"
+	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
+	"github.com/status-im/status-go/geth/params"
 )
 
 // SelectedExtKey is a container for currently selected (logged in) account
@@ -46,7 +46,6 @@ type NodeServiceStack struct {
 }
 
 var (
-	ErrDataDirPreprocessingFailed  = errors.New("failed to pre-process data directory")
 	ErrInvalidGethNode             = errors.New("no running geth node detected")
 	ErrInvalidAccountManager       = errors.New("could not retrieve account manager")
 	ErrInvalidWhisperService       = errors.New("whisper service is unavailable")
@@ -65,7 +64,7 @@ var (
 )
 
 // CreateAndRunNode creates and starts running Geth node locally (exposing given RPC port along the way)
-func CreateAndRunNode(config *NodeConfig) error {
+func CreateAndRunNode(config *params.NodeConfig) error {
 	defer HaltOnPanic()
 
 	nodeManager := NewNodeManager(config)
@@ -80,7 +79,7 @@ func CreateAndRunNode(config *NodeConfig) error {
 }
 
 // NewNodeManager makes new instance of node manager
-func NewNodeManager(config *NodeConfig) *NodeManager {
+func NewNodeManager(config *params.NodeConfig) *NodeManager {
 	createOnce.Do(func() {
 		nodeManagerInstance = &NodeManager{
 			services: &NodeServiceStack{
@@ -116,15 +115,13 @@ func (m *NodeManager) RunNode() {
 		}
 
 		// setup handlers
-		lightEthereum, err := m.LightEthereumService()
-		if err != nil {
-			panic("service stack misses LES")
+		if lightEthereum, err := m.LightEthereumService(); err == nil {
+			lightEthereum.StatusBackend.SetTransactionQueueHandler(onSendTransactionRequest)
+			lightEthereum.StatusBackend.SetAccountsFilterHandler(onAccountsListRequest)
+			lightEthereum.StatusBackend.SetTransactionReturnHandler(onSendTransactionReturn)
 		}
 
-		lightEthereum.StatusBackend.SetTransactionQueueHandler(onSendTransactionRequest)
-		lightEthereum.StatusBackend.SetAccountsFilterHandler(onAccountsListRequest)
-		lightEthereum.StatusBackend.SetTransactionReturnHandler(onSendTransactionReturn)
-
+		var err error
 		m.services.rpcClient, err = m.node.geth.Attach()
 		if err != nil {
 			glog.V(logger.Warn).Infoln("cannot get RPC client service:", ErrInvalidClient)
@@ -265,13 +262,22 @@ func (m *NodeManager) StopNodeRPCServer() (bool, error) {
 	return m.api.StopRPC()
 }
 
-// HasNode checks whether manager has initialized node attached
+// NodeInited checks whether manager has initialized node attached
 func (m *NodeManager) NodeInited() bool {
 	if m == nil || !m.node.Inited() {
 		return false
 	}
 
 	return true
+}
+
+// Node returns attached node if it has been initialized
+func (m *NodeManager) Node() *Node {
+	if !m.NodeInited() {
+		return nil
+	}
+
+	return m.node
 }
 
 // AccountManager exposes reference to accounts manager

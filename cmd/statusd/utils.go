@@ -7,25 +7,25 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/les/status"
+	gethparams "github.com/ethereum/go-ethereum/params"
 	"github.com/status-im/status-go/geth"
+	"github.com/status-im/status-go/geth/params"
 )
 
-const (
-	testDataDir         = "../../.ethereumtest"
-	testNodeSyncSeconds = 30
-	testAddress         = "0xadaf150b905cf5e6a778e553e15a139b6618bbb7"
-	testAddressPassword = "asdfasdf"
-	newAccountPassword  = "badpassword"
-	testAddress1        = "0xadd4d1d02e71c7360c53296968e59d57fd15e2ba"
-	testStatusJsFile    = "../../jail/testdata/status.js"
-)
+var testConfig *geth.TestConfig
+
+func init() {
+	// error is ignored, as it will occur on non-test compilation only, and there testConfig is not used at all
+	// (we have to use "main" package due to restrictions on including C imports into *_test packages)
+	testConfig, _ = geth.LoadTestConfig()
+}
 
 func testExportedAPI(t *testing.T, done chan struct{}) {
 	<-startTestNode(t)
@@ -34,6 +34,10 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 		name string
 		fn   func(t *testing.T) bool
 	}{
+		{
+			"check default configuration",
+			testGetDefaultConfig,
+		},
 		{
 			"reset blockchain data",
 			testResetChainData,
@@ -97,6 +101,97 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 	done <- struct{}{}
 }
 
+func testGetDefaultConfig(t *testing.T) bool {
+	// test Mainnet config
+	nodeConfig := params.NodeConfig{}
+
+	rawResponse := GenerateConfig(C.CString("/tmp/data-folder"), 1)
+	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &nodeConfig); err != nil {
+		t.Errorf("cannot decode reponse (%s): %v", C.GoString(rawResponse), err)
+		return false
+	}
+
+	chainConfig := nodeConfig.ChainConfig
+	if chainConfig.HomesteadBlock.Cmp(gethparams.MainNetHomesteadBlock) != 0 {
+		t.Error("invalid chainConfig.HomesteadBlock")
+		return false
+	}
+	if chainConfig.DAOForkBlock.Cmp(gethparams.MainNetDAOForkBlock) != 0 {
+		t.Error("invalid chainConfig.DAOForkBlock")
+		return false
+	}
+	if chainConfig.DAOForkSupport != true {
+		t.Error("invalid chainConfig.DAOForkSupport")
+		return false
+	}
+	if chainConfig.EIP150Block.Cmp(gethparams.MainNetHomesteadGasRepriceBlock) != 0 {
+		t.Error("invalid chainConfig.EIP150Block")
+		return false
+	}
+	if chainConfig.EIP150Hash != gethparams.MainNetHomesteadGasRepriceHash {
+		t.Error("invalid chainConfig.EIP150Hash")
+		return false
+	}
+	if chainConfig.EIP155Block.Cmp(gethparams.MainNetSpuriousDragon) != 0 {
+		t.Error("invalid chainConfig.EIP155Block")
+		return false
+	}
+	if chainConfig.EIP158Block.Cmp(gethparams.MainNetSpuriousDragon) != 0 {
+		t.Error("invalid chainConfig.EIP158Block")
+		return false
+	}
+	if chainConfig.ChainId.Cmp(gethparams.MainNetChainID) != 0 {
+		t.Error("invalid chainConfig.ChainId")
+		return false
+	}
+
+	// test Testnet
+	nodeConfig = params.NodeConfig{}
+	rawResponse = GenerateConfig(C.CString("/tmp/data-folder"), 3)
+	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &nodeConfig); err != nil {
+		t.Errorf("cannot decode reponse (%s): %v", C.GoString(rawResponse), err)
+		return false
+	}
+
+	chainConfig = nodeConfig.ChainConfig
+	refChainConfig := gethparams.TestnetChainConfig
+
+	if chainConfig.HomesteadBlock.Cmp(refChainConfig.HomesteadBlock) != 0 {
+		t.Error("invalid chainConfig.HomesteadBlock")
+		return false
+	}
+	if chainConfig.DAOForkBlock != nil { // already forked
+		t.Error("invalid chainConfig.DAOForkBlock")
+		return false
+	}
+	if chainConfig.DAOForkSupport != refChainConfig.DAOForkSupport {
+		t.Error("invalid chainConfig.DAOForkSupport")
+		return false
+	}
+	if chainConfig.EIP150Block.Cmp(refChainConfig.EIP150Block) != 0 {
+		t.Error("invalid chainConfig.EIP150Block")
+		return false
+	}
+	if chainConfig.EIP150Hash != refChainConfig.EIP150Hash {
+		t.Error("invalid chainConfig.EIP150Hash")
+		return false
+	}
+	if chainConfig.EIP155Block.Cmp(refChainConfig.EIP155Block) != 0 {
+		t.Error("invalid chainConfig.EIP155Block")
+		return false
+	}
+	if chainConfig.EIP158Block.Cmp(refChainConfig.EIP158Block) != 0 {
+		t.Error("invalid chainConfig.EIP158Block")
+		return false
+	}
+	if chainConfig.ChainId.Cmp(refChainConfig.ChainId) != 0 {
+		t.Error("invalid chainConfig.ChainId")
+		return false
+	}
+
+	return true
+}
+
 func testResetChainData(t *testing.T) bool {
 	resetChainDataResponse := geth.JSONError{}
 	rawResponse := ResetChainData()
@@ -110,7 +205,7 @@ func testResetChainData(t *testing.T) bool {
 		return false
 	}
 
-	time.Sleep(testNodeSyncSeconds * time.Second) // allow to re-sync blockchain
+	time.Sleep(testConfig.Node.SyncSeconds * time.Second) // allow to re-sync blockchain
 
 	testCompleteTransaction(t)
 
@@ -126,7 +221,7 @@ func testStopResumeNode(t *testing.T) bool {
 	}
 
 	// create an account
-	address1, pubKey1, _, err := geth.CreateAccount(newAccountPassword)
+	address1, pubKey1, _, err := geth.CreateAccount(testConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("could not create account: %v", err)
 		return false
@@ -134,13 +229,13 @@ func testStopResumeNode(t *testing.T) bool {
 	t.Logf("account created: {address: %s, key: %s}", address1, pubKey1)
 
 	// make sure that identity is not (yet injected)
-	if whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey1))) {
+	if whisperService.HasIdentity(pubKey1) {
 		t.Error("identity already present in whisper")
 	}
 
 	// select account
 	loginResponse := geth.JSONError{}
-	rawResponse := Login(C.CString(address1), C.CString(newAccountPassword))
+	rawResponse := Login(C.CString(address1), C.CString(testConfig.Account1.Password))
 
 	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &loginResponse); err != nil {
 		t.Errorf("cannot decode RecoverAccount reponse (%s): %v", C.GoString(rawResponse), err)
@@ -151,7 +246,7 @@ func testStopResumeNode(t *testing.T) bool {
 		t.Errorf("could not select account: %v", err)
 		return false
 	}
-	if !whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey1))) {
+	if !whisperService.HasIdentity(pubKey1) {
 		t.Errorf("identity not injected into whisper: %v", err)
 	}
 
@@ -200,7 +295,7 @@ func testStopResumeNode(t *testing.T) bool {
 	if err != nil {
 		t.Errorf("whisper service not running: %v", err)
 	}
-	if !whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey1))) {
+	if !whisperService.HasIdentity(pubKey1) {
 		t.Errorf("identity evicted from whisper on node restart: %v", err)
 	}
 
@@ -245,7 +340,7 @@ func testRestartNodeRPC(t *testing.T) bool {
 		t.Errorf("cannot decode StartNodeRPCServer reponse (%s): %v", C.GoString(rawResponse), err)
 		return false
 	}
-	expectedError := "HTTP RPC already running on localhost:8545"
+	expectedError := "HTTP RPC already running on localhost:8645"
 	if startNodeRPCServerResponse.Error != expectedError {
 		t.Errorf("expected error not thrown: %s", expectedError)
 		return false
@@ -265,7 +360,7 @@ func testCreateChildAccount(t *testing.T) bool {
 
 	// create an account
 	createAccountResponse := geth.AccountInfo{}
-	rawResponse := CreateAccount(C.CString(newAccountPassword))
+	rawResponse := CreateAccount(C.CString(testConfig.Account1.Password))
 
 	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &createAccountResponse); err != nil {
 		t.Errorf("cannot decode CreateAccount reponse (%s): %v", C.GoString(rawResponse), err)
@@ -286,7 +381,7 @@ func testCreateChildAccount(t *testing.T) bool {
 	}
 
 	// obtain decrypted key, and make sure that extended key (which will be used as root for sub-accounts) is present
-	account, key, err := keyStore.AccountDecryptedKey(account, newAccountPassword)
+	account, key, err := keyStore.AccountDecryptedKey(account, testConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("can not obtain decrypted account key: %v", err)
 		return false
@@ -299,7 +394,7 @@ func testCreateChildAccount(t *testing.T) bool {
 
 	// try creating sub-account, w/o selecting main account i.e. w/o login to main account
 	createSubAccountResponse := geth.AccountInfo{}
-	rawResponse = CreateChildAccount(C.CString(""), C.CString(newAccountPassword))
+	rawResponse = CreateChildAccount(C.CString(""), C.CString(testConfig.Account1.Password))
 
 	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &createSubAccountResponse); err != nil {
 		t.Errorf("cannot decode CreateChildAccount reponse (%s): %v", C.GoString(rawResponse), err)
@@ -311,7 +406,7 @@ func testCreateChildAccount(t *testing.T) bool {
 		return false
 	}
 
-	err = geth.SelectAccount(address, newAccountPassword)
+	err = geth.SelectAccount(address, testConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("Test failed: could not select account: %v", err)
 		return false
@@ -333,7 +428,7 @@ func testCreateChildAccount(t *testing.T) bool {
 
 	// create sub-account (from implicit parent)
 	createSubAccountResponse1 := geth.AccountInfo{}
-	rawResponse = CreateChildAccount(C.CString(""), C.CString(newAccountPassword))
+	rawResponse = CreateChildAccount(C.CString(""), C.CString(testConfig.Account1.Password))
 
 	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &createSubAccountResponse1); err != nil {
 		t.Errorf("cannot decode CreateChildAccount reponse (%s): %v", C.GoString(rawResponse), err)
@@ -347,7 +442,7 @@ func testCreateChildAccount(t *testing.T) bool {
 
 	// make sure that sub-account index automatically progresses
 	createSubAccountResponse2 := geth.AccountInfo{}
-	rawResponse = CreateChildAccount(C.CString(""), C.CString(newAccountPassword))
+	rawResponse = CreateChildAccount(C.CString(""), C.CString(testConfig.Account1.Password))
 
 	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &createSubAccountResponse2); err != nil {
 		t.Errorf("cannot decode CreateChildAccount reponse (%s): %v", C.GoString(rawResponse), err)
@@ -365,7 +460,7 @@ func testCreateChildAccount(t *testing.T) bool {
 
 	// create sub-account (from explicit parent)
 	createSubAccountResponse3 := geth.AccountInfo{}
-	rawResponse = CreateChildAccount(C.CString(createSubAccountResponse2.Address), C.CString(newAccountPassword))
+	rawResponse = CreateChildAccount(C.CString(createSubAccountResponse2.Address), C.CString(testConfig.Account1.Password))
 
 	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &createSubAccountResponse3); err != nil {
 		t.Errorf("cannot decode CreateChildAccount reponse (%s): %v", C.GoString(rawResponse), err)
@@ -391,7 +486,7 @@ func testRecoverAccount(t *testing.T) bool {
 	keyStore, _ := geth.NodeManagerInstance().AccountKeyStore()
 
 	// create an account
-	address, pubKey, mnemonic, err := geth.CreateAccount(newAccountPassword)
+	address, pubKey, mnemonic, err := geth.CreateAccount(testConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("could not create account: %v", err)
 		return false
@@ -400,7 +495,7 @@ func testRecoverAccount(t *testing.T) bool {
 
 	// try recovering using password + mnemonic
 	recoverAccountResponse := geth.AccountInfo{}
-	rawResponse := RecoverAccount(C.CString(newAccountPassword), C.CString(mnemonic))
+	rawResponse := RecoverAccount(C.CString(testConfig.Account1.Password), C.CString(mnemonic))
 
 	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &recoverAccountResponse); err != nil {
 		t.Errorf("cannot decode RecoverAccount reponse (%s): %v", C.GoString(rawResponse), err)
@@ -422,19 +517,19 @@ func testRecoverAccount(t *testing.T) bool {
 		t.Errorf("can not get account from address: %v", err)
 	}
 
-	account, key, err := keyStore.AccountDecryptedKey(account, newAccountPassword)
+	account, key, err := keyStore.AccountDecryptedKey(account, testConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("can not obtain decrypted account key: %v", err)
 		return false
 	}
 	extChild2String := key.ExtendedKey.String()
 
-	if err := keyStore.Delete(account, newAccountPassword); err != nil {
+	if err := keyStore.Delete(account, testConfig.Account1.Password); err != nil {
 		t.Errorf("cannot remove account: %v", err)
 	}
 
 	recoverAccountResponse = geth.AccountInfo{}
-	rawResponse = RecoverAccount(C.CString(newAccountPassword), C.CString(mnemonic))
+	rawResponse = RecoverAccount(C.CString(testConfig.Account1.Password), C.CString(mnemonic))
 
 	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &recoverAccountResponse); err != nil {
 		t.Errorf("cannot decode RecoverAccount reponse (%s): %v", C.GoString(rawResponse), err)
@@ -451,7 +546,7 @@ func testRecoverAccount(t *testing.T) bool {
 	}
 
 	// make sure that extended key exists and is imported ok too
-	account, key, err = keyStore.AccountDecryptedKey(account, newAccountPassword)
+	account, key, err = keyStore.AccountDecryptedKey(account, testConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("can not obtain decrypted account key: %v", err)
 		return false
@@ -462,7 +557,7 @@ func testRecoverAccount(t *testing.T) bool {
 
 	// make sure that calling import several times, just returns from cache (no error is expected)
 	recoverAccountResponse = geth.AccountInfo{}
-	rawResponse = RecoverAccount(C.CString(newAccountPassword), C.CString(mnemonic))
+	rawResponse = RecoverAccount(C.CString(testConfig.Account1.Password), C.CString(mnemonic))
 
 	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &recoverAccountResponse); err != nil {
 		t.Errorf("cannot decode RecoverAccount reponse (%s): %v", C.GoString(rawResponse), err)
@@ -485,15 +580,15 @@ func testRecoverAccount(t *testing.T) bool {
 	}
 
 	// make sure that identity is not (yet injected)
-	if whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKeyCheck))) {
+	if whisperService.HasIdentity(pubKeyCheck) {
 		t.Error("identity already present in whisper")
 	}
-	err = geth.SelectAccount(addressCheck, newAccountPassword)
+	err = geth.SelectAccount(addressCheck, testConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("Test failed: could not select account: %v", err)
 		return false
 	}
-	if !whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKeyCheck))) {
+	if !whisperService.HasIdentity(pubKeyCheck) {
 		t.Errorf("identity not injected into whisper: %v", err)
 	}
 
@@ -508,14 +603,14 @@ func testAccountSelect(t *testing.T) bool {
 	}
 
 	// create an account
-	address1, pubKey1, _, err := geth.CreateAccount(newAccountPassword)
+	address1, pubKey1, _, err := geth.CreateAccount(testConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("could not create account: %v", err)
 		return false
 	}
 	t.Logf("Account created: {address: %s, key: %s}", address1, pubKey1)
 
-	address2, pubKey2, _, err := geth.CreateAccount(newAccountPassword)
+	address2, pubKey2, _, err := geth.CreateAccount(testConfig.Account1.Password)
 	if err != nil {
 		t.Error("Test failed: could not create account")
 		return false
@@ -523,7 +618,7 @@ func testAccountSelect(t *testing.T) bool {
 	t.Logf("Account created: {address: %s, key: %s}", address2, pubKey2)
 
 	// make sure that identity is not (yet injected)
-	if whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey1))) {
+	if whisperService.HasIdentity(pubKey1) {
 		t.Error("identity already present in whisper")
 	}
 
@@ -542,7 +637,7 @@ func testAccountSelect(t *testing.T) bool {
 	}
 
 	loginResponse = geth.JSONError{}
-	rawResponse = Login(C.CString(address1), C.CString(newAccountPassword))
+	rawResponse = Login(C.CString(address1), C.CString(testConfig.Account1.Password))
 
 	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &loginResponse); err != nil {
 		t.Errorf("cannot decode RecoverAccount reponse (%s): %v", C.GoString(rawResponse), err)
@@ -553,17 +648,17 @@ func testAccountSelect(t *testing.T) bool {
 		t.Errorf("Test failed: could not select account: %v", err)
 		return false
 	}
-	if !whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey1))) {
+	if !whisperService.HasIdentity(pubKey1) {
 		t.Errorf("identity not injected into whisper: %v", err)
 	}
 
 	// select another account, make sure that previous account is wiped out from Whisper cache
-	if whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey2))) {
+	if whisperService.HasIdentity(pubKey2) {
 		t.Error("identity already present in whisper")
 	}
 
 	loginResponse = geth.JSONError{}
-	rawResponse = Login(C.CString(address2), C.CString(newAccountPassword))
+	rawResponse = Login(C.CString(address2), C.CString(testConfig.Account1.Password))
 
 	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &loginResponse); err != nil {
 		t.Errorf("cannot decode RecoverAccount reponse (%s): %v", C.GoString(rawResponse), err)
@@ -574,10 +669,10 @@ func testAccountSelect(t *testing.T) bool {
 		t.Errorf("Test failed: could not select account: %v", loginResponse.Error)
 		return false
 	}
-	if !whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey2))) {
+	if !whisperService.HasIdentity(pubKey2) {
 		t.Errorf("identity not injected into whisper: %v", err)
 	}
-	if whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey1))) {
+	if whisperService.HasIdentity(pubKey1) {
 		t.Error("identity should be removed, but it is still present in whisper")
 	}
 
@@ -592,25 +687,25 @@ func testAccountLogout(t *testing.T) bool {
 	}
 
 	// create an account
-	address, pubKey, _, err := geth.CreateAccount(newAccountPassword)
+	address, pubKey, _, err := geth.CreateAccount(testConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("could not create account: %v", err)
 		return false
 	}
 
 	// make sure that identity doesn't exist (yet) in Whisper
-	if whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey))) {
+	if whisperService.HasIdentity(pubKey) {
 		t.Error("identity already present in whisper")
 		return false
 	}
 
 	// select/login
-	err = geth.SelectAccount(address, newAccountPassword)
+	err = geth.SelectAccount(address, testConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("Test failed: could not select account: %v", err)
 		return false
 	}
-	if !whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey))) {
+	if !whisperService.HasIdentity(pubKey) {
 		t.Error("identity not injected into whisper")
 		return false
 	}
@@ -629,7 +724,7 @@ func testAccountLogout(t *testing.T) bool {
 	}
 
 	// now, logout and check if identity is removed indeed
-	if whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey))) {
+	if whisperService.HasIdentity(pubKey) {
 		t.Error("identity not cleared from whisper")
 		return false
 	}
@@ -650,8 +745,8 @@ func testCompleteTransaction(t *testing.T) bool {
 	backend.TransactionQueue().Reset()
 
 	// log into account from which transactions will be sent
-	if err := geth.SelectAccount(testAddress, testAddressPassword); err != nil {
-		t.Errorf("cannot select account: %v", testAddress)
+	if err := geth.SelectAccount(testConfig.Account1.Address, testConfig.Account1.Password); err != nil {
+		t.Errorf("cannot select account: %v", testConfig.Account1.Address)
 		return false
 	}
 
@@ -670,11 +765,10 @@ func testCompleteTransaction(t *testing.T) bool {
 		}
 		if envelope.Type == geth.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
-			t.Logf("transaction queued (will be completed in 5 secs): {id: %s}\n", event["id"].(string))
-			time.Sleep(5 * time.Second)
+			t.Logf("transaction queued (will be completed shortly): {id: %s}\n", event["id"].(string))
 
 			completeTxResponse := geth.CompleteTransactionResult{}
-			rawResponse := CompleteTransaction(C.CString(event["id"].(string)), C.CString(testAddressPassword))
+			rawResponse := CompleteTransaction(C.CString(event["id"].(string)), C.CString(testConfig.Account1.Password))
 
 			if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &completeTxResponse); err != nil {
 				t.Errorf("cannot decode RecoverAccount reponse (%s): %v", C.GoString(rawResponse), err)
@@ -694,8 +788,8 @@ func testCompleteTransaction(t *testing.T) bool {
 
 	//  this call blocks, up until Complete Transaction is called
 	txHashCheck, err := backend.SendTransaction(nil, status.SendTxArgs{
-		From:  geth.FromAddress(testAddress),
-		To:    geth.ToAddress(testAddress1),
+		From:  geth.FromAddress(testConfig.Account1.Address),
+		To:    geth.ToAddress(testConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 	})
 	if err != nil {
@@ -735,8 +829,8 @@ func testCompleteMultipleQueuedTransactions(t *testing.T) bool {
 	backend.TransactionQueue().Reset()
 
 	// log into account from which transactions will be sent
-	if err := geth.SelectAccount(testAddress, testAddressPassword); err != nil {
-		t.Errorf("cannot select account: %v", testAddress)
+	if err := geth.SelectAccount(testConfig.Account1.Address, testConfig.Account1.Password); err != nil {
+		t.Errorf("cannot select account: %v", testConfig.Account1.Address)
 		return false
 	}
 
@@ -765,8 +859,8 @@ func testCompleteMultipleQueuedTransactions(t *testing.T) bool {
 	//  this call blocks, and should return when DiscardQueuedTransaction() for a given tx id is called
 	sendTx := func() {
 		txHashCheck, err := backend.SendTransaction(nil, status.SendTxArgs{
-			From:  geth.FromAddress(testAddress),
-			To:    geth.ToAddress(testAddress1),
+			From:  geth.FromAddress(testConfig.Account1.Address),
+			To:    geth.ToAddress(testConfig.Account2.Address),
 			Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 		})
 		if err != nil {
@@ -789,7 +883,7 @@ func testCompleteMultipleQueuedTransactions(t *testing.T) bool {
 		updatedTxIdStrings, _ := json.Marshal(parsedIds)
 
 		// complete
-		resultsString := CompleteTransactions(C.CString(string(updatedTxIdStrings)), C.CString(testAddressPassword))
+		resultsString := CompleteTransactions(C.CString(string(updatedTxIdStrings)), C.CString(testConfig.Account1.Password))
 		resultsStruct := geth.CompleteTransactionsResult{}
 		json.Unmarshal([]byte(C.GoString(resultsString)), &resultsStruct)
 		results := resultsStruct.Results
@@ -870,8 +964,8 @@ func testDiscardTransaction(t *testing.T) bool {
 	backend.TransactionQueue().Reset()
 
 	// log into account from which transactions will be sent
-	if err := geth.SelectAccount(testAddress, testAddressPassword); err != nil {
-		t.Errorf("cannot select account: %v", testAddress)
+	if err := geth.SelectAccount(testConfig.Account1.Address, testConfig.Account1.Password); err != nil {
+		t.Errorf("cannot select account: %v", testConfig.Account1.Address)
 		return false
 	}
 
@@ -912,7 +1006,7 @@ func testDiscardTransaction(t *testing.T) bool {
 			}
 
 			// try completing discarded transaction
-			_, err = geth.CompleteTransaction(txId, testAddressPassword)
+			_, err = geth.CompleteTransaction(txId, testConfig.Account1.Password)
 			if err.Error() != "transaction hash not found" {
 				t.Error("expects tx not found, but call to CompleteTransaction succeeded")
 				return
@@ -950,8 +1044,8 @@ func testDiscardTransaction(t *testing.T) bool {
 
 	//  this call blocks, and should return when DiscardQueuedTransaction() is called
 	txHashCheck, err := backend.SendTransaction(nil, status.SendTxArgs{
-		From:  geth.FromAddress(testAddress),
-		To:    geth.ToAddress(testAddress1),
+		From:  geth.FromAddress(testConfig.Account1.Address),
+		To:    geth.ToAddress(testConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 	})
 	if err != status.ErrQueuedTxDiscarded {
@@ -990,8 +1084,8 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool {
 	backend.TransactionQueue().Reset()
 
 	// log into account from which transactions will be sent
-	if err := geth.SelectAccount(testAddress, testAddressPassword); err != nil {
-		t.Errorf("cannot select account: %v", testAddress)
+	if err := geth.SelectAccount(testConfig.Account1.Address, testConfig.Account1.Password); err != nil {
+		t.Errorf("cannot select account: %v", testConfig.Account1.Address)
 		return false
 	}
 
@@ -1049,8 +1143,8 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool {
 	//  this call blocks, and should return when DiscardQueuedTransaction() for a given tx id is called
 	sendTx := func() {
 		txHashCheck, err := backend.SendTransaction(nil, status.SendTxArgs{
-			From:  geth.FromAddress(testAddress),
-			To:    geth.ToAddress(testAddress1),
+			From:  geth.FromAddress(testConfig.Account1.Address),
+			To:    geth.ToAddress(testConfig.Account2.Address),
 			Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 		})
 		if err != status.ErrQueuedTxDiscarded {
@@ -1084,7 +1178,7 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool {
 		}
 
 		// try completing discarded transaction
-		completeResultsString := CompleteTransactions(C.CString(string(updatedTxIdStrings)), C.CString(testAddressPassword))
+		completeResultsString := CompleteTransactions(C.CString(string(updatedTxIdStrings)), C.CString(testConfig.Account1.Password))
 		completeResultsStruct := geth.CompleteTransactionsResult{}
 		json.Unmarshal([]byte(C.GoString(completeResultsString)), &completeResultsStruct)
 		completeResults := completeResultsStruct.Results
@@ -1178,7 +1272,7 @@ func testJailFunctionCall(t *testing.T) bool {
 	InitJail(C.CString(""))
 
 	// load Status JS and add test command to it
-	statusJS := geth.LoadFromFile(testStatusJsFile) + `;
+	statusJS := geth.LoadFromFile(filepath.Join(geth.RootDir, "geth/jail/testdata/status.js")) + `;
 	_status_catalog.commands["testCommand"] = function (params) {
 		return params.val * params.val;
 	};`
@@ -1209,8 +1303,32 @@ func testJailFunctionCall(t *testing.T) bool {
 
 func startTestNode(t *testing.T) <-chan struct{} {
 	syncRequired := false
-	if _, err := os.Stat(filepath.Join(testDataDir, "testnet")); os.IsNotExist(err) {
+	if _, err := os.Stat(geth.TestDataDir); os.IsNotExist(err) {
 		syncRequired = true
+	}
+
+	// prepare node directory
+	if err := os.MkdirAll(filepath.Join(geth.TestDataDir, "testnet", "keystore"), os.ModePerm); err != nil {
+		panic(err)
+	}
+
+	// import test account (with test ether on it)
+	importTestAccount := func(accountFile string) error {
+		dst := filepath.Join(geth.TestDataDir, "keystore", accountFile)
+		if _, err := os.Stat(dst); os.IsNotExist(err) {
+			err = geth.CopyFile(dst, filepath.Join(geth.RootDir, "data", accountFile))
+			if err != nil {
+				panic(err)
+			}
+		}
+
+		return nil
+	}
+	if err := importTestAccount("test-account1.pk"); err != nil {
+		panic(err)
+	}
+	if err := importTestAccount("test-account2.pk"); err != nil {
+		panic(err)
 	}
 
 	waitForNodeStart := make(chan struct{}, 1)
@@ -1234,8 +1352,8 @@ func startTestNode(t *testing.T) <-chan struct{} {
 
 			// sync
 			if syncRequired {
-				t.Logf("Sync is required, it will take %d seconds", testNodeSyncSeconds)
-				time.Sleep(testNodeSyncSeconds * time.Second) // LES syncs headers, so that we are up do date when it is done
+				t.Logf("Sync is required, it will take %d seconds", testConfig.Node.SyncSeconds)
+				time.Sleep(testConfig.Node.SyncSeconds * time.Second) // LES syncs headers, so that we are up do date when it is done
 			} else {
 				time.Sleep(5 * time.Second)
 			}
@@ -1246,12 +1364,20 @@ func startTestNode(t *testing.T) <-chan struct{} {
 	})
 
 	go func() {
-		response := StartNode(C.CString(testDataDir))
+		configJSON := `{
+			"NetworkId": ` + strconv.Itoa(params.TestNetworkId) + `,
+			"DataDir": "` + geth.TestDataDir + `",
+			"HTTPPort": ` + strconv.Itoa(testConfig.Node.HTTPPort) + `,
+			"WSPort": ` + strconv.Itoa(testConfig.Node.WSPort) + `,
+			"LogEnabled": true,
+			"LogLevel": "INFO"
+		}`
+		response := StartNode(C.CString(configJSON))
 		err := geth.JSONError{}
 
 		json.Unmarshal([]byte(C.GoString(response)), &err)
 		if err.Error != "" {
-			t.Error("cannot start node")
+			panic("cannot start node: " + err.Error)
 		}
 	}()
 

@@ -21,7 +21,6 @@ package whisperv5
 import (
 	"crypto/ecdsa"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"math"
 	"time"
@@ -116,7 +115,7 @@ func (e *Envelope) Seal(options *MessageParams) error {
 	}
 
 	if target > 0 && bestBit < target {
-		return errors.New("Failed to reach the PoW target, insufficient work time")
+		return fmt.Errorf("Failed to reach the PoW target, insufficient work time. Expected: %v, got: %v", target, bestBit)
 	}
 
 	return nil

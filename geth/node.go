@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math/big"
 	"os"
 	"path"
 	"path/filepath"
@@ -15,7 +14,6 @@ import (
 	"syscall"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/les"
 	"github.com/ethereum/go-ethereum/logger"
@@ -24,54 +22,15 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/p2p/nat"
-	"github.com/ethereum/go-ethereum/params"
-	"github.com/ethereum/go-ethereum/rlp"
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv2"
+	gethparams "github.com/ethereum/go-ethereum/params"
+	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
+	"github.com/status-im/status-go/geth/params"
 )
 
 const (
-	ClientIdentifier = "StatusIM" // Client identifier to advertise over the network
-	VersionMajor     = 0          // Major version component of the current release
-	VersionMinor     = 9          // Minor version component of the current release
-	VersionPatch     = 4          // Patch version component of the current release
-	VersionMeta      = "stable"   // Version metadata to append to the version string
-	IPCFile          = "geth.ipc" // Filename of exposed IPC-RPC Server
-	HTTPPort         = 8545       // HTTP-RPC port (replaced in unit tests)
-	WSPort           = 8546       // WS-RPC port (replaced in unit tests)
-	MaxPeers         = 25
-	MaxLightPeers    = 20
-	MaxPendingPeers  = 0
-	DefaultGas       = 180000
-
-	ProcessFileDescriptorLimit = uint64(2048)
-	DatabaseCacheSize          = 128 // Megabytes of memory allocated to internal caching (min 16MB / database forced)
-
 	EventNodeStarted = "node.started"
 	EventNodeCrashed = "node.crashed"
 )
-
-// Gas price settings
-var (
-	GasPrice                = new(big.Int).Mul(big.NewInt(20), common.Shannon)  // Minimal gas price to accept for mining a transactions
-	GpoMinGasPrice          = new(big.Int).Mul(big.NewInt(20), common.Shannon)  // Minimum suggested gas price
-	GpoMaxGasPrice          = new(big.Int).Mul(big.NewInt(500), common.Shannon) // Maximum suggested gas price
-	GpoFullBlockRatio       = 80                                                // Full block threshold for gas price calculation (%)
-	GpobaseStepDown         = 10                                                // Suggested gas price base step down ratio (1/1000)
-	GpobaseStepUp           = 100                                               // Suggested gas price base step up ratio (1/1000)
-	GpobaseCorrectionFactor = 110                                               // Suggested gas price base correction factor (%)
-)
-
-// default node configuration options
-var (
-	UseTestnetFlag = "true" // to be overridden via -ldflags '-X geth.UseTestnetFlag'
-	UseTestnet     = false
-)
-
-func init() {
-	if UseTestnetFlag == "true" { // set at compile time, here we make sure to set corresponding boolean flag
-		UseTestnet = true
-	}
-}
 
 // node-related errors
 var (
@@ -80,22 +39,12 @@ var (
 	ErrLightEthRegistrationFailure   = errors.New("failed to register the LES service")
 )
 
-// NodeConfig stores configuration options for a node
-type NodeConfig struct {
-	DataDir    string // base data directory
-	IPCEnabled bool   // whether IPC-RPC Server is enabled or not
-	HTTPPort   int    // HTTP-RPC Server port
-	WSPort     int    // WS-RPC Server port
-	WSEnabled  bool   // whether WS-RPC Server is enabled or not
-	TLSEnabled bool   // whether TLS support should be enabled on node or not
-}
-
 // Node represents running node (serves as a wrapper around P2P node)
 type Node struct {
-	config     *NodeConfig   // configuration used to create Status node
-	geth       *node.Node    // reference to the running Geth node
-	gethConfig *node.Config  // configuration used to create P2P node
-	started    chan struct{} // channel to wait for node to start
+	config     *params.NodeConfig // configuration used to create Status node
+	geth       *node.Node         // reference to the running Geth node
+	gethConfig *node.Config       // configuration used to create P2P node
+	started    chan struct{}      // channel to wait for node to start
 }
 
 // Inited checks whether status node has been properly initialized
@@ -109,24 +58,25 @@ func (n *Node) GethStack() *node.Node {
 }
 
 // MakeNode create a geth node entity
-func MakeNode(config *NodeConfig) *Node {
-	glog.CopyStandardLogTo("INFO")
-	glog.SetToStderr(true)
-
-	dataDir := config.DataDir
-	if UseTestnet {
-		dataDir = filepath.Join(config.DataDir, "testnet")
+func MakeNode(config *params.NodeConfig) *Node {
+	// make sure data directory exists
+	if err := os.MkdirAll(filepath.Join(config.DataDir), os.ModePerm); err != nil {
+		Fatalf(err)
 	}
 
-	// exposed RPC APIs
-	exposedAPIs := "db,eth,net,web3,shh,personal,admin" // TODO remove "admin" on main net
+	// setup logging
+	glog.CopyStandardLogTo("INFO")
+	glog.SetToStderr(true)
+	if _, err := params.SetupLogger(config); err != nil {
+		Fatalf(err)
+	}
 
 	// configure required node (should you need to update node's config, e.g. add bootstrap nodes, see node.Config)
 	stackConfig := &node.Config{
-		DataDir:           dataDir,
+		DataDir:           config.DataDir,
 		UseLightweightKDF: true,
-		Name:              ClientIdentifier,
-		Version:           fmt.Sprintf("%d.%d.%d-%s", VersionMajor, VersionMinor, VersionPatch, VersionMeta),
+		Name:              config.Name,
+		Version:           config.Version,
 		NoDiscovery:       true,
 		DiscoveryV5:       false,
 		DiscoveryV5Addr:   ":0",
@@ -134,17 +84,17 @@ func MakeNode(config *NodeConfig) *Node {
 		BootstrapNodesV5:  makeBootstrapNodesV5(),
 		ListenAddr:        ":0",
 		NAT:               nat.Any(),
-		MaxPeers:          MaxPeers,
-		MaxPendingPeers:   MaxPendingPeers,
-		IPCPath:           makeIPCPath(dataDir, config.IPCEnabled),
-		HTTPHost:          node.DefaultHTTPHost,
+		MaxPeers:          config.MaxPeers,
+		MaxPendingPeers:   config.MaxPendingPeers,
+		IPCPath:           makeIPCPath(config),
+		HTTPHost:          config.HTTPHost,
 		HTTPPort:          config.HTTPPort,
 		HTTPCors:          "*",
-		HTTPModules:       strings.Split(exposedAPIs, ","),
-		WSHost:            makeWSHost(config.WSEnabled),
+		HTTPModules:       strings.Split(config.APIModules, ","),
+		WSHost:            makeWSHost(config),
 		WSPort:            config.WSPort,
 		WSOrigins:         "*",
-		WSModules:         strings.Split(exposedAPIs, ","),
+		WSModules:         strings.Split(config.APIModules, ","),
 	}
 
 	stack, err := node.New(stackConfig)
@@ -153,12 +103,12 @@ func MakeNode(config *NodeConfig) *Node {
 	}
 
 	// start Ethereum service
-	if err := activateEthService(stack, makeDefaultExtra()); err != nil {
+	if err := activateEthService(stack, config); err != nil {
 		Fatalf(fmt.Errorf("%v: %v", ErrEthServiceRegistrationFailure, err))
 	}
 
 	// start Whisper service
-	if err := activateShhService(stack); err != nil {
+	if err := activateShhService(stack, config); err != nil {
 		Fatalf(fmt.Errorf("%v: %v", ErrSshServiceRegistrationFailure, err))
 	}
 
@@ -171,33 +121,32 @@ func MakeNode(config *NodeConfig) *Node {
 }
 
 // activateEthService configures and registers the eth.Ethereum service with a given node.
-func activateEthService(stack *node.Node, extra []byte) error {
-	ethConf := &eth.Config{
-		Etherbase:               common.Address{},
-		ChainConfig:             makeChainConfig(stack),
-		FastSync:                false,
-		LightMode:               true,
-		LightServ:               60,
-		LightPeers:              MaxLightPeers,
-		MaxPeers:                MaxPeers,
-		DatabaseCache:           DatabaseCacheSize,
-		DatabaseHandles:         makeDatabaseHandles(),
-		NetworkId:               1, // Olympic
-		MinerThreads:            runtime.NumCPU(),
-		GasPrice:                GasPrice,
-		GpoMinGasPrice:          GpoMinGasPrice,
-		GpoMaxGasPrice:          GpoMaxGasPrice,
-		GpoFullBlockRatio:       GpoFullBlockRatio,
-		GpobaseStepDown:         GpobaseStepDown,
-		GpobaseStepUp:           GpobaseStepUp,
-		GpobaseCorrectionFactor: GpobaseCorrectionFactor,
-		SolcPath:                "solc",
-		AutoDAG:                 false,
+func activateEthService(stack *node.Node, config *params.NodeConfig) error {
+	if !config.LightEthConfig.Enabled {
+		glog.V(logger.Info).Infoln("LES protocol is disabled")
+		return nil
 	}
 
-	if UseTestnet {
-		ethConf.NetworkId = 3
-		ethConf.Genesis = core.DefaultTestnetGenesisBlock()
+	ethConf := &eth.Config{
+		Etherbase:               common.Address{},
+		ChainConfig:             makeChainConfig(config),
+		FastSync:                false,
+		LightMode:               true,
+		MaxPeers:                config.MaxPeers,
+		DatabaseCache:           config.LightEthConfig.DatabaseCache,
+		DatabaseHandles:         makeDatabaseHandles(),
+		NetworkId:               config.NetworkId,
+		Genesis:                 config.LightEthConfig.Genesis,
+		MinerThreads:            runtime.NumCPU(),
+		GasPrice:                params.GasPrice,
+		GpoMinGasPrice:          params.GpoMinGasPrice,
+		GpoMaxGasPrice:          params.GpoMaxGasPrice,
+		GpoFullBlockRatio:       params.GpoFullBlockRatio,
+		GpobaseStepDown:         params.GpobaseStepDown,
+		GpobaseStepUp:           params.GpobaseStepUp,
+		GpobaseCorrectionFactor: params.GpobaseCorrectionFactor,
+		SolcPath:                "solc",
+		AutoDAG:                 false,
 	}
 
 	if err := stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
@@ -210,7 +159,11 @@ func activateEthService(stack *node.Node, extra []byte) error {
 }
 
 // activateShhService configures Whisper and adds it to the given node.
-func activateShhService(stack *node.Node) error {
+func activateShhService(stack *node.Node, config *params.NodeConfig) error {
+	if !config.WhisperConfig.Enabled {
+		glog.V(logger.Info).Infoln("SHH protocol is disabled")
+		return nil
+	}
 	serviceConstructor := func(*node.ServiceContext) (node.Service, error) {
 		return whisper.New(), nil
 	}
@@ -222,47 +175,44 @@ func activateShhService(stack *node.Node) error {
 }
 
 // makeIPCPath returns IPC-RPC filename
-func makeIPCPath(dataDir string, ipcEnabled bool) string {
-	if !ipcEnabled {
+func makeIPCPath(config *params.NodeConfig) string {
+	if !config.IPCEnabled {
 		return ""
 	}
 
-	return path.Join(dataDir, IPCFile)
+	return path.Join(config.DataDir, config.IPCFile)
 }
 
 // makeWSHost returns WS-RPC Server host, given enabled/disabled flag
-func makeWSHost(wsEnabled bool) string {
-	if !wsEnabled {
+func makeWSHost(config *params.NodeConfig) string {
+	if !config.WSEnabled {
 		return ""
 	}
 
-	return node.DefaultWSHost
+	return config.WSHost
 }
 
 // makeChainConfig reads the chain configuration from the database in the datadir.
-func makeChainConfig(stack *node.Node) *params.ChainConfig {
-	config := new(params.ChainConfig)
+func makeChainConfig(config *params.NodeConfig) *gethparams.ChainConfig {
+	chainConfig := new(gethparams.ChainConfig)
 
-	if UseTestnet {
-		config = params.TestnetChainConfig
-	} else {
-		// Homestead fork
-		config.HomesteadBlock = params.MainNetHomesteadBlock
-		// DAO fork
-		config.DAOForkBlock = params.MainNetDAOForkBlock
-		config.DAOForkSupport = true
+	// Homestead fork
+	chainConfig.HomesteadBlock = config.HomesteadBlock
 
-		// DoS reprice fork
-		config.EIP150Block = params.MainNetHomesteadGasRepriceBlock
-		config.EIP150Hash = params.MainNetHomesteadGasRepriceHash
+	// DAO fork
+	chainConfig.DAOForkBlock = config.DAOForkBlock
+	chainConfig.DAOForkSupport = config.DAOForkSupport
 
-		// DoS state cleanup fork
-		config.EIP155Block = params.MainNetSpuriousDragon
-		config.EIP158Block = params.MainNetSpuriousDragon
-		config.ChainId = params.MainNetChainID
-	}
+	// DoS reprice fork
+	chainConfig.EIP150Block = config.EIP150Block
+	chainConfig.EIP150Hash = config.EIP150Hash
 
-	return config
+	// DoS state cleanup fork
+	chainConfig.EIP155Block = config.EIP155Block
+	chainConfig.EIP158Block = config.EIP158Block
+	chainConfig.ChainId = config.ChainId
+
+	return chainConfig
 }
 
 // makeDatabaseHandles makes sure that enough file descriptors are available to the process
@@ -276,8 +226,8 @@ func makeDatabaseHandles() int {
 
 	// increase limit
 	limit.Cur = limit.Max
-	if limit.Cur > ProcessFileDescriptorLimit {
-		limit.Cur = ProcessFileDescriptorLimit
+	if limit.Cur > params.DefaultFileDescriptorLimit {
+		limit.Cur = params.DefaultFileDescriptorLimit
 	}
 	if err := syscall.Setrlimit(syscall.RLIMIT_NOFILE, &limit); err != nil {
 		Fatalf(err)
@@ -289,32 +239,11 @@ func makeDatabaseHandles() int {
 	}
 
 	// cap limit
-	if limit.Cur > ProcessFileDescriptorLimit {
-		limit.Cur = ProcessFileDescriptorLimit
+	if limit.Cur > params.DefaultFileDescriptorLimit {
+		limit.Cur = params.DefaultFileDescriptorLimit
 	}
 
 	return int(limit.Cur) / 2
-}
-
-func makeDefaultExtra() []byte {
-	var clientInfo = struct {
-		Version   uint
-		Name      string
-		GoVersion string
-		Os        string
-	}{uint(VersionMajor<<16 | VersionMinor<<8 | VersionPatch), ClientIdentifier, runtime.Version(), runtime.GOOS}
-	extra, err := rlp.EncodeToBytes(clientInfo)
-	if err != nil {
-		glog.V(logger.Warn).Infoln("error setting canonical miner information:", err)
-	}
-
-	if uint64(len(extra)) > params.MaximumExtraDataSize.Uint64() {
-		glog.V(logger.Warn).Infoln("error setting canonical miner information: extra exceeds", params.MaximumExtraDataSize)
-		glog.V(logger.Debug).Infof("extra: %x\n", extra)
-		return nil
-	}
-
-	return extra
 }
 
 // makeBootstrapNodes returns default (hence bootstrap) list of peers

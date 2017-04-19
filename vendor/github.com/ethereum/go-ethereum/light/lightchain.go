@@ -122,8 +122,8 @@ func NewLightChain(odr OdrBackend, config *params.ChainConfig, pow pow.PoW, mux 
 		if bc.genesisBlock.Hash() == (common.Hash{65, 148, 16, 35, 104, 9, 35, 224, 254, 77, 116, 163, 75, 218, 200, 20, 31, 37, 64, 227, 174, 144, 98, 55, 24, 228, 125, 102, 209, 202, 74, 45}) {
 			// add trusted CHT for testnet
 			WriteTrustedCht(bc.chainDb, TrustedCht{
-				Number: 161,
-				Root:   common.HexToHash("0xd45125a3a51137fc26f41aa1c7face4d1218b6d56cfb0b0b9ab7e2150e0d7c75"),
+				Number: 186,
+				Root:   common.HexToHash("0x06a7857c0f38f7a4c8eb282fa0f202c6ee5b6007fccb95ee72444c586b8d80df"),
 			})
 			glog.V(logger.Info).Infoln("Added trusted CHT for testnet")
 		} else {

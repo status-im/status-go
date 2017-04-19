@@ -5,8 +5,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/status-im/status-go/geth"
 )
 
@@ -31,7 +29,7 @@ func TestAccountsList(t *testing.T) {
 	}
 
 	// create an account
-	address, _, _, err := geth.CreateAccount(newAccountPassword)
+	address, _, _, err := geth.CreateAccount(testConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("could not create account: %v", err)
 		return
@@ -45,7 +43,7 @@ func TestAccountsList(t *testing.T) {
 	}
 
 	// select account (sub-accounts will be created for this key)
-	err = geth.SelectAccount(address, newAccountPassword)
+	err = geth.SelectAccount(address, testConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("Test failed: could not select account: %v", err)
 		return
@@ -63,7 +61,7 @@ func TestAccountsList(t *testing.T) {
 	}
 
 	// create sub-account 1
-	subAccount1, subPubKey1, err := geth.CreateChildAccount("", newAccountPassword)
+	subAccount1, subPubKey1, err := geth.CreateChildAccount("", testConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("cannot create sub-account: %v", err)
 		return
@@ -86,7 +84,7 @@ func TestAccountsList(t *testing.T) {
 	}
 
 	// create sub-account 2, index automatically progresses
-	subAccount2, subPubKey2, err := geth.CreateChildAccount("", newAccountPassword)
+	subAccount2, subPubKey2, err := geth.CreateChildAccount("", testConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("cannot create sub-account: %v", err)
 	}
@@ -120,7 +118,7 @@ func TestAccountsList(t *testing.T) {
 	}
 }
 
-func TestCreateChildAccount(t *testing.T) {
+func TestAccountsCreateChildAccount(t *testing.T) {
 	err := geth.PrepareTestNode()
 	if err != nil {
 		t.Error(err)
@@ -136,7 +134,7 @@ func TestCreateChildAccount(t *testing.T) {
 	}
 
 	// create an account
-	address, pubKey, mnemonic, err := geth.CreateAccount(newAccountPassword)
+	address, pubKey, mnemonic, err := geth.CreateAccount(testConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("could not create account: %v", err)
 		return
@@ -150,7 +148,7 @@ func TestCreateChildAccount(t *testing.T) {
 	}
 
 	// obtain decrypted key, and make sure that extended key (which will be used as root for sub-accounts) is present
-	account, key, err := keyStore.AccountDecryptedKey(account, newAccountPassword)
+	account, key, err := keyStore.AccountDecryptedKey(account, testConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("can not obtain decrypted account key: %v", err)
 		return
@@ -162,13 +160,13 @@ func TestCreateChildAccount(t *testing.T) {
 	}
 
 	// try creating sub-account, w/o selecting main account i.e. w/o login to main account
-	_, _, err = geth.CreateChildAccount("", newAccountPassword)
+	_, _, err = geth.CreateChildAccount("", testConfig.Account1.Password)
 	if !reflect.DeepEqual(err, geth.ErrNoAccountSelected) {
 		t.Errorf("expected error is not returned (tried to create sub-account w/o login): %v", err)
 		return
 	}
 
-	err = geth.SelectAccount(address, newAccountPassword)
+	err = geth.SelectAccount(address, testConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("Test failed: could not select account: %v", err)
 		return
@@ -182,14 +180,14 @@ func TestCreateChildAccount(t *testing.T) {
 	}
 
 	// create sub-account (from implicit parent)
-	subAccount1, subPubKey1, err := geth.CreateChildAccount("", newAccountPassword)
+	subAccount1, subPubKey1, err := geth.CreateChildAccount("", testConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("cannot create sub-account: %v", err)
 		return
 	}
 
 	// make sure that sub-account index automatically progresses
-	subAccount2, subPubKey2, err := geth.CreateChildAccount("", newAccountPassword)
+	subAccount2, subPubKey2, err := geth.CreateChildAccount("", testConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("cannot create sub-account: %v", err)
 	}
@@ -199,7 +197,7 @@ func TestCreateChildAccount(t *testing.T) {
 	}
 
 	// create sub-account (from explicit parent)
-	subAccount3, subPubKey3, err := geth.CreateChildAccount(subAccount2, newAccountPassword)
+	subAccount3, subPubKey3, err := geth.CreateChildAccount(subAccount2, testConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("cannot create sub-account: %v", err)
 	}
@@ -209,7 +207,7 @@ func TestCreateChildAccount(t *testing.T) {
 	}
 }
 
-func TestRecoverAccount(t *testing.T) {
+func TestAccountsRecoverAccount(t *testing.T) {
 	err := geth.PrepareTestNode()
 	if err != nil {
 		t.Error(err)
@@ -219,7 +217,7 @@ func TestRecoverAccount(t *testing.T) {
 	keyStore, _ := geth.NodeManagerInstance().AccountKeyStore()
 
 	// create an account
-	address, pubKey, mnemonic, err := geth.CreateAccount(newAccountPassword)
+	address, pubKey, mnemonic, err := geth.CreateAccount(testConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("could not create account: %v", err)
 		return
@@ -227,7 +225,7 @@ func TestRecoverAccount(t *testing.T) {
 	t.Logf("Account created: {address: %s, key: %s, mnemonic:%s}", address, pubKey, mnemonic)
 
 	// try recovering using password + mnemonic
-	addressCheck, pubKeyCheck, err := geth.RecoverAccount(newAccountPassword, mnemonic)
+	addressCheck, pubKeyCheck, err := geth.RecoverAccount(testConfig.Account1.Password, mnemonic)
 	if err != nil {
 		t.Errorf("recover account failed: %v", err)
 		return
@@ -242,18 +240,18 @@ func TestRecoverAccount(t *testing.T) {
 		t.Errorf("can not get account from address: %v", err)
 	}
 
-	account, key, err := keyStore.AccountDecryptedKey(account, newAccountPassword)
+	account, key, err := keyStore.AccountDecryptedKey(account, testConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("can not obtain decrypted account key: %v", err)
 		return
 	}
 	extChild2String := key.ExtendedKey.String()
 
-	if err := keyStore.Delete(account, newAccountPassword); err != nil {
+	if err := keyStore.Delete(account, testConfig.Account1.Password); err != nil {
 		t.Errorf("cannot remove account: %v", err)
 	}
 
-	addressCheck, pubKeyCheck, err = geth.RecoverAccount(newAccountPassword, mnemonic)
+	addressCheck, pubKeyCheck, err = geth.RecoverAccount(testConfig.Account1.Password, mnemonic)
 	if err != nil {
 		t.Errorf("recover account failed (for non-cached account): %v", err)
 		return
@@ -263,7 +261,7 @@ func TestRecoverAccount(t *testing.T) {
 	}
 
 	// make sure that extended key exists and is imported ok too
-	account, key, err = keyStore.AccountDecryptedKey(account, newAccountPassword)
+	account, key, err = keyStore.AccountDecryptedKey(account, testConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("can not obtain decrypted account key: %v", err)
 		return
@@ -273,7 +271,7 @@ func TestRecoverAccount(t *testing.T) {
 	}
 
 	// make sure that calling import several times, just returns from cache (no error is expected)
-	addressCheck, pubKeyCheck, err = geth.RecoverAccount(newAccountPassword, mnemonic)
+	addressCheck, pubKeyCheck, err = geth.RecoverAccount(testConfig.Account1.Password, mnemonic)
 	if err != nil {
 		t.Errorf("recover account failed (for non-cached account): %v", err)
 		return
@@ -289,15 +287,15 @@ func TestRecoverAccount(t *testing.T) {
 	}
 
 	// make sure that identity is not (yet injected)
-	if whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKeyCheck))) {
+	if whisperService.HasIdentity(pubKeyCheck) {
 		t.Error("identity already present in whisper")
 	}
-	err = geth.SelectAccount(addressCheck, newAccountPassword)
+	err = geth.SelectAccount(addressCheck, testConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("Test failed: could not select account: %v", err)
 		return
 	}
-	if !whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKeyCheck))) {
+	if !whisperService.HasIdentity(pubKeyCheck) {
 		t.Errorf("identity not injected into whisper: %v", err)
 	}
 }
@@ -317,14 +315,14 @@ func TestAccountSelect(t *testing.T) {
 	}
 
 	// create an account
-	address1, pubKey1, _, err := geth.CreateAccount(newAccountPassword)
+	address1, pubKey1, _, err := geth.CreateAccount(testConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("could not create account: %v", err)
 		return
 	}
 	t.Logf("Account created: {address: %s, key: %s}", address1, pubKey1)
 
-	address2, pubKey2, _, err := geth.CreateAccount(newAccountPassword)
+	address2, pubKey2, _, err := geth.CreateAccount(testConfig.Account1.Password)
 	if err != nil {
 		t.Error("Test failed: could not create account")
 		return
@@ -332,7 +330,7 @@ func TestAccountSelect(t *testing.T) {
 	t.Logf("Account created: {address: %s, key: %s}", address2, pubKey2)
 
 	// make sure that identity is not (yet injected)
-	if whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey1))) {
+	if whisperService.HasIdentity(pubKey1) {
 		t.Error("identity already present in whisper")
 	}
 
@@ -342,33 +340,33 @@ func TestAccountSelect(t *testing.T) {
 		t.Error("select account is expected to throw error: wrong password used")
 		return
 	}
-	err = geth.SelectAccount(address1, newAccountPassword)
+	err = geth.SelectAccount(address1, testConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("Test failed: could not select account: %v", err)
 		return
 	}
-	if !whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey1))) {
+	if !whisperService.HasIdentity(pubKey1) {
 		t.Errorf("identity not injected into whisper: %v", err)
 	}
 
 	// select another account, make sure that previous account is wiped out from Whisper cache
-	if whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey2))) {
+	if whisperService.HasIdentity(pubKey2) {
 		t.Error("identity already present in whisper")
 	}
-	err = geth.SelectAccount(address2, newAccountPassword)
+	err = geth.SelectAccount(address2, testConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("Test failed: could not select account: %v", err)
 		return
 	}
-	if !whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey2))) {
+	if !whisperService.HasIdentity(pubKey2) {
 		t.Errorf("identity not injected into whisper: %v", err)
 	}
-	if whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey1))) {
+	if whisperService.HasIdentity(pubKey1) {
 		t.Error("identity should be removed, but it is still present in whisper")
 	}
 }
 
-func TestAccountLogout(t *testing.T) {
+func TestAccountsLogout(t *testing.T) {
 
 	err := geth.PrepareTestNode()
 	if err != nil {
@@ -382,24 +380,24 @@ func TestAccountLogout(t *testing.T) {
 	}
 
 	// create an account
-	address, pubKey, _, err := geth.CreateAccount(newAccountPassword)
+	address, pubKey, _, err := geth.CreateAccount(testConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("could not create account: %v", err)
 		return
 	}
 
 	// make sure that identity doesn't exist (yet) in Whisper
-	if whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey))) {
+	if whisperService.HasIdentity(pubKey) {
 		t.Error("identity already present in whisper")
 	}
 
 	// select/login
-	err = geth.SelectAccount(address, newAccountPassword)
+	err = geth.SelectAccount(address, testConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("Test failed: could not select account: %v", err)
 		return
 	}
-	if !whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey))) {
+	if !whisperService.HasIdentity(pubKey) {
 		t.Error("identity not injected into whisper")
 	}
 
@@ -409,12 +407,12 @@ func TestAccountLogout(t *testing.T) {
 	}
 
 	// now, logout and check if identity is removed indeed
-	if whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey))) {
+	if whisperService.HasIdentity(pubKey) {
 		t.Error("identity not cleared from whisper")
 	}
 }
 
-func TestSelectedAccountOnNodeRestart(t *testing.T) {
+func TestAccountsSelectedAccountOnNodeRestart(t *testing.T) {
 	err := geth.PrepareTestNode()
 	if err != nil {
 		t.Error(err)
@@ -428,13 +426,13 @@ func TestSelectedAccountOnNodeRestart(t *testing.T) {
 	}
 
 	// create test accounts
-	address1, pubKey1, _, err := geth.CreateAccount(newAccountPassword)
+	address1, pubKey1, _, err := geth.CreateAccount(testConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("could not create account: %v", err)
 		return
 	}
 	t.Logf("account1 created: {address: %s, key: %s}", address1, pubKey1)
-	address2, pubKey2, _, err := geth.CreateAccount(newAccountPassword)
+	address2, pubKey2, _, err := geth.CreateAccount(testConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("could not create account: %v", err)
 		return
@@ -442,7 +440,7 @@ func TestSelectedAccountOnNodeRestart(t *testing.T) {
 	t.Logf("account2 created: {address: %s, key: %s}", address2, pubKey2)
 
 	// make sure that identity is not (yet injected)
-	if whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey1))) {
+	if whisperService.HasIdentity(pubKey1) {
 		t.Error("identity already present in whisper")
 	}
 
@@ -458,28 +456,28 @@ func TestSelectedAccountOnNodeRestart(t *testing.T) {
 		t.Error("select account is expected to throw error: wrong password used")
 		return
 	}
-	err = geth.SelectAccount(address1, newAccountPassword)
+	err = geth.SelectAccount(address1, testConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("could not select account: %v", err)
 		return
 	}
-	if !whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey1))) {
+	if !whisperService.HasIdentity(pubKey1) {
 		t.Errorf("identity not injected into whisper: %v", err)
 	}
 
 	// select another account, make sure that previous account is wiped out from Whisper cache
-	if whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey2))) {
+	if whisperService.HasIdentity(pubKey2) {
 		t.Error("identity already present in whisper")
 	}
-	err = geth.SelectAccount(address2, newAccountPassword)
+	err = geth.SelectAccount(address2, testConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("Test failed: could not select account: %v", err)
 		return
 	}
-	if !whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey2))) {
+	if !whisperService.HasIdentity(pubKey2) {
 		t.Errorf("identity not injected into whisper: %v", err)
 	}
-	if whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey1))) {
+	if whisperService.HasIdentity(pubKey1) {
 		t.Error("identity should be removed, but it is still present in whisper")
 	}
 
@@ -520,15 +518,15 @@ func TestSelectedAccountOnNodeRestart(t *testing.T) {
 	if err != nil {
 		t.Errorf("whisper service not running: %v", err)
 	}
-	if !whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey2))) {
+	if !whisperService.HasIdentity(pubKey2) {
 		t.Errorf("identity not injected into whisper: %v", err)
 	}
-	if whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey1))) {
+	if whisperService.HasIdentity(pubKey1) {
 		t.Error("identity should not be present, but it is still present in whisper")
 	}
 }
 
-func TestNodeRestartWithNoSelectedAccount(t *testing.T) {
+func TestAccountsNodeRestartWithNoSelectedAccount(t *testing.T) {
 	err := geth.PrepareTestNode()
 	if err != nil {
 		t.Error(err)
@@ -544,7 +542,7 @@ func TestNodeRestartWithNoSelectedAccount(t *testing.T) {
 	}
 
 	// create test accounts
-	address1, pubKey1, _, err := geth.CreateAccount(newAccountPassword)
+	address1, pubKey1, _, err := geth.CreateAccount(testConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("could not create account: %v", err)
 		return
@@ -552,7 +550,7 @@ func TestNodeRestartWithNoSelectedAccount(t *testing.T) {
 	t.Logf("account1 created: {address: %s, key: %s}", address1, pubKey1)
 
 	// make sure that identity is not present
-	if whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey1))) {
+	if whisperService.HasIdentity(pubKey1) {
 		t.Error("identity already present in whisper")
 	}
 
@@ -591,7 +589,7 @@ func TestNodeRestartWithNoSelectedAccount(t *testing.T) {
 	if err != nil {
 		t.Errorf("whisper service not running: %v", err)
 	}
-	if whisperService.HasIdentity(crypto.ToECDSAPub(common.FromHex(pubKey1))) {
+	if whisperService.HasIdentity(pubKey1) {
 		t.Error("identity should not be present, but it is present in whisper")
 	}
 }

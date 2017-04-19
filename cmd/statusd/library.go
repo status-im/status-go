@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"os"
 
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv2"
 	"github.com/status-im/status-go/geth"
-	"github.com/status-im/status-go/jail"
+	"github.com/status-im/status-go/geth/jail"
+	"github.com/status-im/status-go/geth/params"
 )
 
 //export CreateAccount
@@ -197,18 +197,29 @@ func DiscardTransactions(ids *C.char) *C.char {
 	return C.CString(string(outBytes))
 }
 
-//export StartNode
-func StartNode(datadir *C.char) *C.char {
-	// This starts a geth node with the given datadir
-	err := geth.CreateAndRunNode(&geth.NodeConfig{
-		DataDir:    C.GoString(datadir),
-		IPCEnabled: false,
-		HTTPPort:   geth.HTTPPort,
-		WSEnabled:  false,
-		WSPort:     geth.WSPort,
-		TLSEnabled: false,
-	})
+//export GenerateConfig
+func GenerateConfig(datadir *C.char, networkId C.int) *C.char {
+	config, err := params.NewNodeConfig(C.GoString(datadir), int(networkId))
+	if err != nil {
+		return makeJSONErrorResponse(err)
+	}
 
+	outBytes, err := json.Marshal(&config)
+	if err != nil {
+		return makeJSONErrorResponse(err)
+	}
+
+	return C.CString(string(outBytes))
+}
+
+//export StartNode
+func StartNode(configJSON *C.char) *C.char {
+	config, err := params.LoadNodeConfig(C.GoString(configJSON))
+	if err != nil {
+		return makeJSONErrorResponse(err)
+	}
+
+	err = geth.CreateAndRunNode(config)
 	return makeJSONErrorResponse(err)
 }
 
@@ -227,19 +238,6 @@ func ResumeNode() *C.char {
 //export ResetChainData
 func ResetChainData() *C.char {
 	err := geth.NodeManagerInstance().ResetChainData()
-	return makeJSONErrorResponse(err)
-}
-
-//export StartTLSNode
-func StartTLSNode(datadir *C.char) *C.char {
-	// This starts a geth node with the given datadir
-	err := geth.CreateAndRunNode(&geth.NodeConfig{
-		DataDir:    C.GoString(datadir),
-		HTTPPort:   geth.HTTPPort,
-		WSPort:     geth.WSPort,
-		TLSEnabled: true,
-	})
-
 	return makeJSONErrorResponse(err)
 }
 
@@ -295,43 +293,6 @@ func AddPeer(url *C.char) *C.char {
 	outBytes, _ := json.Marshal(&out)
 
 	return C.CString(string(outBytes))
-}
-
-//export AddWhisperFilter
-func AddWhisperFilter(filterJson *C.char) *C.char {
-
-	var id int
-	var filter whisper.NewFilterArgs
-
-	err := json.Unmarshal([]byte(C.GoString(filterJson)), &filter)
-	if err == nil {
-		id = geth.AddWhisperFilter(filter)
-	}
-
-	errString := ""
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		errString = err.Error()
-	}
-
-	out := geth.AddWhisperFilterResult{
-		Id:    id,
-		Error: errString,
-	}
-	outBytes, _ := json.Marshal(&out)
-
-	return C.CString(string(outBytes))
-
-}
-
-//export RemoveWhisperFilter
-func RemoveWhisperFilter(idFilter int) {
-	geth.RemoveWhisperFilter(idFilter)
-}
-
-//export ClearWhisperFilters
-func ClearWhisperFilters() {
-	geth.ClearWhisperFilters()
 }
 
 func makeJSONErrorResponse(err error) *C.char {
