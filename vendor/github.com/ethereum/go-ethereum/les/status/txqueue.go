@@ -7,8 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/logger"
-	"github.com/ethereum/go-ethereum/logger/glog"
+	"github.com/ethereum/go-ethereum/log"
 	"golang.org/x/net/context"
 )
 
@@ -56,6 +55,7 @@ type QueuedTx struct {
 	Err     error
 }
 
+// QueuedTxId queued transaction identifier
 type QueuedTxId string
 
 // EnqueuedTxHandler is a function that receives queued/pending transactions, when they get queued
@@ -75,8 +75,9 @@ type SendTxArgs struct {
 	Nonce    *hexutil.Uint64 `json:"nonce"`
 }
 
+// NewTransactionQueue make new transaction queue
 func NewTransactionQueue() *TxQueue {
-	glog.V(logger.Info).Infof("StatusIM: initializing transaction queue")
+	log.Info("StatusIM: initializing transaction queue")
 	return &TxQueue{
 		transactions:  make(map[QueuedTxId]*QueuedTx),
 		evictableIds:  make(chan QueuedTxId, DefaultTxQueueCap), // will be used to evict in FIFO
@@ -85,8 +86,9 @@ func NewTransactionQueue() *TxQueue {
 	}
 }
 
+// Start starts enqueue and eviction loops
 func (q *TxQueue) Start() {
-	glog.V(logger.Info).Infof("StatusIM: starting transaction queue")
+	log.Info("StatusIM: starting transaction queue")
 
 	q.stopped = make(chan struct{})
 	q.stoppedGroup.Add(2)
@@ -95,12 +97,14 @@ func (q *TxQueue) Start() {
 	go q.enqueueLoop()
 }
 
+// Stop stops transaction enqueue and eviction loops
 func (q *TxQueue) Stop() {
-	glog.V(logger.Info).Infof("StatusIM: stopping transaction queue")
+	log.Info("StatusIM: stopping transaction queue")
 	close(q.stopped) // stops all processing loops (enqueue, eviction etc)
 	q.stoppedGroup.Wait()
 }
 
+// evictionLoop frees up queue to accommodate another transaction item
 func (q *TxQueue) evictionLoop() {
 	for {
 		select {
@@ -110,22 +114,23 @@ func (q *TxQueue) evictionLoop() {
 				q.enqueueTicker <- struct{}{} // in case we pulled already removed item
 			}
 		case <-q.stopped:
-			glog.V(logger.Info).Infof("StatusIM: transaction queue's eviction loop stopped")
+			log.Info("StatusIM: transaction queue's eviction loop stopped")
 			q.stoppedGroup.Done()
 			return
 		}
 	}
 }
 
+// enqueueLoop process incoming enqueue requests
 func (q *TxQueue) enqueueLoop() {
 	// enqueue incoming transactions
 	for {
 		select {
 		case queuedTx := <-q.incomingPool:
-			glog.V(logger.Info).Infof("StatusIM: transaction enqueued %v", queuedTx.Id)
+			log.Info("StatusIM: transaction enqueued", "tx", queuedTx.Id)
 			q.Enqueue(queuedTx)
 		case <-q.stopped:
-			glog.V(logger.Info).Infof("StatusIM: transaction queue's enqueue loop stopped")
+			log.Info("StatusIM: transaction queue's enqueue loop stopped")
 			q.stoppedGroup.Done()
 			return
 		}
@@ -141,12 +146,14 @@ func (q *TxQueue) Reset() {
 	q.evictableIds = make(chan QueuedTxId, DefaultTxQueueCap)
 }
 
+// EnqueueAsync enqueues incoming transaction in async manner, returns as soon as possible
 func (q *TxQueue) EnqueueAsync(tx *QueuedTx) error {
 	q.incomingPool <- tx
 
 	return nil
 }
 
+// Enqueue enqueues incoming transaction
 func (q *TxQueue) Enqueue(tx *QueuedTx) error {
 	if q.txEnqueueHandler == nil { //discard, until handler is provided
 		return nil
@@ -165,6 +172,7 @@ func (q *TxQueue) Enqueue(tx *QueuedTx) error {
 	return nil
 }
 
+// Get returns transaction by transaction identifier
 func (q *TxQueue) Get(id QueuedTxId) (*QueuedTx, error) {
 	q.mu.RLock()
 	defer q.mu.RUnlock()
@@ -176,6 +184,7 @@ func (q *TxQueue) Get(id QueuedTxId) (*QueuedTx, error) {
 	return nil, ErrQueuedTxIdNotFound
 }
 
+// Remove removes transaction by transaction identifier
 func (q *TxQueue) Remove(id QueuedTxId) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -183,6 +192,7 @@ func (q *TxQueue) Remove(id QueuedTxId) {
 	delete(q.transactions, id)
 }
 
+// Count returns number of currently queued transactions
 func (q *TxQueue) Count() int {
 	q.mu.RLock()
 	defer q.mu.RUnlock()
@@ -190,6 +200,7 @@ func (q *TxQueue) Count() int {
 	return len(q.transactions)
 }
 
+// Has checks whether transaction with a given identifier exists in queue
 func (q *TxQueue) Has(id QueuedTxId) bool {
 	q.mu.RLock()
 	defer q.mu.RUnlock()
@@ -199,14 +210,18 @@ func (q *TxQueue) Has(id QueuedTxId) bool {
 	return ok
 }
 
+// SetEnqueueHandler sets callback handler, that is triggered on enqueue operation
 func (q *TxQueue) SetEnqueueHandler(fn EnqueuedTxHandler) {
 	q.txEnqueueHandler = fn
 }
 
+// SetTxReturnHandler sets callback handler, that is triggered when transaction is finished executing
 func (q *TxQueue) SetTxReturnHandler(fn EnqueuedTxReturnHandler) {
 	q.txReturnHandler = fn
 }
 
+// NotifyOnQueuedTxReturn is invoked when transaction is ready to return
+// Transaction can be in error state, or executed successfully at this point.
 func (q *TxQueue) NotifyOnQueuedTxReturn(queuedTx *QueuedTx, err error) {
 	if q == nil {
 		return

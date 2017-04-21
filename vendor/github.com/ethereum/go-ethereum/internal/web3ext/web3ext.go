@@ -20,6 +20,7 @@ package web3ext
 var Modules = map[string]string{
 	"admin":      Admin_JS,
 	"chequebook": Chequebook_JS,
+	"clique":     Clique_JS,
 	"debug":      Debug_JS,
 	"eth":        Eth_JS,
 	"miner":      Miner_JS,
@@ -27,6 +28,7 @@ var Modules = map[string]string{
 	"personal":   Personal_JS,
 	"rpc":        RPC_JS,
 	"shh":        Shh_JS,
+	"swarmfs":    SWARMFS_JS,
 	"txpool":     TxPool_JS,
 }
 
@@ -62,6 +64,54 @@ web3._extend({
 });
 `
 
+const Clique_JS = `
+web3._extend({
+  property: 'clique',
+  methods:
+  [
+		new web3._extend.Method({
+			name: 'getSnapshot',
+			call: 'clique_getSnapshot',
+			params: 1,
+      inputFormatter: [null]
+		}),
+		new web3._extend.Method({
+			name: 'getSnapshotAtHash',
+			call: 'clique_getSnapshotAtHash',
+			params: 1
+		}),
+    new web3._extend.Method({
+      name: 'getSigners',
+      call: 'clique_getSigners',
+      params: 1,
+      inputFormatter: [null]
+    }),
+		new web3._extend.Method({
+			name: 'getSignersAtHash',
+			call: 'clique_getSignersAtHash',
+			params: 1
+		}),
+		new web3._extend.Method({
+			name: 'propose',
+			call: 'clique_propose',
+			params: 2
+		}),
+		new web3._extend.Method({
+			name: 'discard',
+			call: 'clique_discard',
+			params: 1
+		})
+  ],
+	properties:
+	[
+		new web3._extend.Property({
+			name: 'proposals',
+			getter: 'clique_proposals'
+		}),
+	]
+});
+`
+
 const Admin_JS = `
 web3._extend({
 	property: 'admin',
@@ -92,11 +142,6 @@ web3._extend({
 			name: 'sleepBlocks',
 			call: 'admin_sleepBlocks',
 			params: 2
-		}),
-		new web3._extend.Method({
-			name: 'setSolc',
-			call: 'admin_setSolc',
-			params: 1
 		}),
 		new web3._extend.Method({
 			name: 'startRPC',
@@ -294,7 +339,12 @@ web3._extend({
 			call: 'debug_preimage',
 			params: 1,
 			inputFormatter: [null]
-		})
+		}),
+		new web3._extend.Method({
+			name: 'getBadBlocks',
+			call: 'debug_getBadBlocks',
+			params: 0,
+		}),
 	],
 	properties: []
 });
@@ -394,20 +444,8 @@ web3._extend({
 			inputFormatter: [web3._extend.utils.fromDecimal]
 		}),
 		new web3._extend.Method({
-			name: 'startAutoDAG',
-			call: 'miner_startAutoDAG',
-			params: 0
-		}),
-		new web3._extend.Method({
-			name: 'stopAutoDAG',
-			call: 'miner_stopAutoDAG',
-			params: 0
-		}),
-		new web3._extend.Method({
-			name: 'makeDAG',
-			call: 'miner_makeDAG',
-			params: 1,
-			inputFormatter: [web3._extend.formatters.inputDefaultBlockNumberFormatter]
+			name: 'getHashrate',
+			call: 'miner_getHashrate'
 		})
 	],
 	properties: []
@@ -489,6 +527,29 @@ web3._extend({
 			name: 'version',
 			getter: 'shh_version',
 			outputFormatter: web3._extend.utils.toDecimal
+		})
+	]
+});
+`
+const SWARMFS_JS = `
+web3._extend({
+	property: 'swarmfs',
+	methods:
+	[
+		new web3._extend.Method({
+			name: 'mount',
+			call: 'swarmfs_mount',
+			params: 2
+		}),
+		new web3._extend.Method({
+			name: 'unmount',
+			call: 'swarmfs_unmount',
+			params: 1
+		}),
+		new web3._extend.Method({
+			name: 'listmounts',
+			call: 'swarmfs_listmounts',
+			params: 0
 		})
 	]
 });
