@@ -1,11 +1,5 @@
 package params
 
-import (
-	"math/big"
-
-	"github.com/ethereum/go-ethereum/common"
-)
-
 const (
 	// ClientIdentifier is client identifier to advertise over the network
 	ClientIdentifier = "StatusIM"
@@ -57,6 +51,9 @@ const (
 	// LogLevel defines the minimum log level to report
 	LogLevel = "INFO"
 
+	// LogToStderr defines whether logged info should also be output to os.Stderr
+	LogToStderr = true
+
 	// WhisperDataDir is directory where Whisper data is stored, relative to DataDir
 	WhisperDataDir = "wnode"
 
@@ -72,17 +69,9 @@ const (
 	// FirebaseNotificationTriggerURL is URL where FCM notification requests are sent to
 	FirebaseNotificationTriggerURL = "https://fcm.googleapis.com/fcm/send"
 
+	// MainNetworkId is id of the main network
+	MainNetworkId = 1
+
 	// TestNetworkId is id of a test network
 	TestNetworkId = 3
-)
-
-// Gas price settings
-var (
-	GasPrice                = new(big.Int).Mul(big.NewInt(20), common.Shannon)  // Minimal gas price to accept for mining a transactions
-	GpoMinGasPrice          = new(big.Int).Mul(big.NewInt(20), common.Shannon)  // Minimum suggested gas price
-	GpoMaxGasPrice          = new(big.Int).Mul(big.NewInt(500), common.Shannon) // Maximum suggested gas price
-	GpoFullBlockRatio       = 80                                                // Full block threshold for gas price calculation (%)
-	GpobaseStepDown         = 10                                                // Suggested gas price base step down ratio (1/1000)
-	GpobaseStepUp           = 100                                               // Suggested gas price base step up ratio (1/1000)
-	GpobaseCorrectionFactor = 110                                               // Suggested gas price base correction factor (%)
 )

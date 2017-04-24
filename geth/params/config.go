@@ -5,18 +5,15 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
-	"math/big"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/logger"
-	"github.com/ethereum/go-ethereum/logger/glog"
-	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/log"
 )
 
 // default node configuration options
@@ -38,33 +35,6 @@ var (
 	ErrEmptyIdentityFile         = errors.New("identity file cannot be empty")
 	ErrEmptyAuthorizationKeyFile = errors.New("authorization key file cannot be empty")
 )
-
-// ChainConfig holds core blockchain settings. It is stored in the database on a per block basis.
-type ChainConfig struct {
-	// ChainId identifies the current chain and is used for replay protection
-	ChainId *big.Int
-
-	// HomesteadBlock is Homestead switch block (nil = no fork, 0 = already homestead)
-	HomesteadBlock *big.Int
-
-	// DAOForkBlock TheDAO hard-fork switch block (nil = no fork)
-	DAOForkBlock *big.Int
-
-	// DAOForkSupport Whether the nodes supports or opposes the DAO hard-fork
-	DAOForkSupport bool
-
-	// EIP150Block is EIP150 HF block (nil = no fork)
-	EIP150Block *big.Int
-
-	// EIP150Hash is EIP150 HF hash (fast sync aid)
-	EIP150Hash common.Hash
-
-	// EIP155Block is EIP155 HF block
-	EIP155Block *big.Int
-
-	// EIP158Block is EIP158 HF block
-	EIP158Block *big.Int
-}
 
 // LightEthConfig holds LES-related configuration
 // Status nodes are always lightweight clients (due to mobile platform constraints)
@@ -205,11 +175,11 @@ type NodeConfig struct {
 	// LogFile is filename where exposed logs get written to
 	LogFile string
 
-	// LogLevel defines minimum log level. Valid names are "ERROR", "WARNING", "INFO", "DEBUG", and "DETAIL".
+	// LogLevel defines minimum log level. Valid names are "ERROR", "WARNING", "INFO", "DEBUG", and "TRACE".
 	LogLevel string
 
-	// ChainConfig extra configuration for blockchain
-	*ChainConfig `json:"ChainConfig,"`
+	// LogToStderr defines whether logged info should also be output to os.Stderr
+	LogToStderr bool
 
 	// LightEthConfig extra configuration for LES
 	LightEthConfig *LightEthConfig `json:"LightEthConfig,"`
@@ -238,7 +208,7 @@ func NewNodeConfig(dataDir string, networkId int) (*NodeConfig, error) {
 		IPCFile:         IPCFile,
 		LogFile:         LogFile,
 		LogLevel:        LogLevel,
-		ChainConfig:     &ChainConfig{},
+		LogToStderr:     LogToStderr,
 		LightEthConfig: &LightEthConfig{
 			Enabled:       true,
 			DatabaseCache: DatabaseCache,
@@ -256,14 +226,18 @@ func NewNodeConfig(dataDir string, networkId int) (*NodeConfig, error) {
 	}
 
 	// auto-populate some dependent values
-	nodeConfig.populateChainConfig()
-	nodeConfig.populateDirs()
+	if err := nodeConfig.populateGenesis(); err != nil {
+		return nil, err
+	}
+	if err := nodeConfig.populateDirs(); err != nil {
+		return nil, err
+	}
 
 	return nodeConfig, nil
 }
 
 // populateDirs updates directories that should be wrt to DataDir
-func (c *NodeConfig) populateDirs() {
+func (c *NodeConfig) populateDirs() error {
 	makeSubDirPath := func(baseDir, subDir string) string {
 		if len(baseDir) == 0 {
 			return ""
@@ -278,51 +252,32 @@ func (c *NodeConfig) populateDirs() {
 	if len(c.WhisperConfig.DataDir) == 0 {
 		c.WhisperConfig.DataDir = makeSubDirPath(c.DataDir, WhisperDataDir)
 	}
+
+	return nil
 }
 
-// populateChainConfig does necessary adjustments to config object (depending on network node will be running on)
-func (c *NodeConfig) populateChainConfig() {
+// populateChainConfig does necessary adjustments to config object (depending on network node will be runnin on)
+func (c *NodeConfig) populateGenesis() error {
 	c.TestNet = false
 	if c.NetworkId == TestNetworkId {
 		c.TestNet = true
 	}
 
+	var genesis *core.Genesis
 	if c.TestNet {
-		// Homestead fork
-		c.ChainConfig.HomesteadBlock = params.TestnetChainConfig.HomesteadBlock
-
-		// DAO fork
-		c.ChainConfig.DAOForkBlock = params.TestnetChainConfig.DAOForkBlock
-		c.ChainConfig.DAOForkSupport = params.TestnetChainConfig.DAOForkSupport
-
-		// DoS reprice fork
-		c.ChainConfig.EIP150Block = params.TestnetChainConfig.EIP150Block
-		c.ChainConfig.EIP150Hash = params.TestnetChainConfig.EIP150Hash
-
-		// DoS state cleanup fork
-		c.ChainConfig.EIP155Block = params.TestnetChainConfig.EIP155Block
-		c.ChainConfig.EIP158Block = params.TestnetChainConfig.EIP158Block
-		c.ChainConfig.ChainId = params.TestnetChainConfig.ChainId
-
-		c.LightEthConfig.Genesis = core.DefaultTestnetGenesisBlock()
+		genesis = core.DefaultTestnetGenesisBlock()
 	} else {
-		// Homestead fork
-		c.ChainConfig.HomesteadBlock = params.MainNetHomesteadBlock
-		// DAO fork
-		c.ChainConfig.DAOForkBlock = params.MainNetDAOForkBlock
-		c.ChainConfig.DAOForkSupport = true
-
-		// DoS reprice fork
-		c.ChainConfig.EIP150Block = params.MainNetHomesteadGasRepriceBlock
-		c.ChainConfig.EIP150Hash = params.MainNetHomesteadGasRepriceHash
-
-		// DoS state cleanup fork
-		c.ChainConfig.EIP155Block = params.MainNetSpuriousDragon
-		c.ChainConfig.EIP158Block = params.MainNetSpuriousDragon
-		c.ChainConfig.ChainId = params.MainNetChainID
-
-		c.LightEthConfig.Genesis = core.DefaultGenesisBlock()
+		genesis = core.DefaultGenesisBlock()
 	}
+
+	// encode the genesis into JSON
+	enc, err := json.Marshal(genesis)
+	if err != nil {
+		return err
+	}
+	c.LightEthConfig.Genesis = string(enc)
+
+	return nil
 }
 
 // LoadNodeConfig parses incoming JSON and returned it as Config
@@ -341,8 +296,12 @@ func LoadNodeConfig(configJSON string) (*NodeConfig, error) {
 	}
 
 	// repopulate
-	nodeConfig.populateChainConfig()
-	nodeConfig.populateDirs()
+	if err := nodeConfig.populateGenesis(); err != nil {
+		return nil, err
+	}
+	if err := nodeConfig.populateDirs(); err != nil {
+		return nil, err
+	}
 
 	if len(nodeConfig.DataDir) == 0 {
 		return nil, ErrMissingDataDir
@@ -371,7 +330,7 @@ func (c *NodeConfig) Save() error {
 		return err
 	}
 
-	glog.V(logger.Info).Infof("config file saved: %v", configFilePath)
+	log.Info(fmt.Sprintf("config file saved: %v", configFilePath))
 	return nil
 }
 
