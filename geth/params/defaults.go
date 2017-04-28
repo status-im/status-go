@@ -13,6 +13,9 @@ const (
 	// DataDir is default data directory used by statusd executable
 	DataDir = "statusd-data"
 
+	// KeyStoreDir is default directory where private keys are stored, relative to DataDir
+	KeyStoreDir = "keystore"
+
 	// IPCFile is filename of exposed IPC RPC Server
 	IPCFile = "geth.ipc"
 
@@ -53,6 +56,9 @@ const (
 
 	// LogLevel defines the minimum log level to report
 	LogLevel = "INFO"
+
+	// WhisperDataDir is directory where Whisper data is stored, relative to DataDir
+	WhisperDataDir = "wnode"
 
 	// WhisperPort is Whisper node listening port
 	WhisperPort = 30379

@@ -63,6 +63,10 @@ func MakeNode(config *params.NodeConfig) *Node {
 	if err := os.MkdirAll(filepath.Join(config.DataDir), os.ModePerm); err != nil {
 		Fatalf(err)
 	}
+	// make sure keys directory exists
+	if err := os.MkdirAll(filepath.Join(config.KeyStoreDir), os.ModePerm); err != nil {
+		Fatalf(err)
+	}
 
 	// setup logging
 	glog.CopyStandardLogTo("INFO")
@@ -74,6 +78,7 @@ func MakeNode(config *params.NodeConfig) *Node {
 	// configure required node (should you need to update node's config, e.g. add bootstrap nodes, see node.Config)
 	stackConfig := &node.Config{
 		DataDir:           config.DataDir,
+		KeyStoreDir:       config.KeyStoreDir,
 		UseLightweightKDF: true,
 		Name:              config.Name,
 		Version:           config.Version,

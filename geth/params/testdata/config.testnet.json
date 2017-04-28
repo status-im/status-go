@@ -2,6 +2,7 @@
     "TestNet": true,
     "NetworkId": 3,
     "DataDir": "$TMPDIR",
+    "KeyStoreDir": "$TMPDIR/keystore",
     "NodeKeyFile": "",
     "Name": "StatusIM",
     "Version": "$VERSION",

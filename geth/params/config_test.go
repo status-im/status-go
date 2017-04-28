@@ -76,6 +76,53 @@ var loadConfigTestCases = []struct {
 		},
 	},
 	{
+		`use default KeyStoreDir`,
+		`{
+			"NetworkId": 3,
+			"DataDir": "$TMPDIR"
+		}`,
+		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if _, err := os.Stat(dataDir); os.IsNotExist(err) {
+				t.Fatalf("data directory doesn't exist: %s", dataDir)
+			}
+
+			expectedDataDir := dataDir
+			if nodeConfig.DataDir != expectedDataDir {
+				t.Fatalf("incorrect DataDir used, expected: %v, got: %v", expectedDataDir, nodeConfig.DataDir)
+			}
+
+			expectedKeyStoreDir := filepath.Join(dataDir, params.KeyStoreDir)
+			if nodeConfig.KeyStoreDir != expectedKeyStoreDir {
+				t.Fatalf("incorrect KeyStoreDir used, expected: %v, got: %v", expectedKeyStoreDir, nodeConfig.KeyStoreDir)
+			}
+		},
+	},
+	{
+		`use non-default KeyStoreDir`,
+		`{
+			"NetworkId": 3,
+			"DataDir": "$TMPDIR",
+			"KeyStoreDir": "/foo/bar"
+		}`,
+		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			expectedDataDir := dataDir
+			if nodeConfig.DataDir != expectedDataDir {
+				t.Fatalf("incorrect DataDir used, expected: %v, got: %v", expectedDataDir, nodeConfig.DataDir)
+			}
+
+			expectedKeyStoreDir := "/foo/bar"
+			if nodeConfig.KeyStoreDir != expectedKeyStoreDir {
+				t.Fatalf("incorrect KeyStoreDir used, expected: %v, got: %v", expectedKeyStoreDir, nodeConfig.KeyStoreDir)
+			}
+		},
+	},
+	{
 		`test parameter overriding`,
 		`{
 			"NetworkId": 3,

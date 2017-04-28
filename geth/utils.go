@@ -177,10 +177,11 @@ func PrepareTestNode() (err error) {
 	}
 
 	// start geth node and wait for it to initialize
-	config, err := params.NewNodeConfig(TestDataDir, params.TestNetworkId)
+	config, err := params.NewNodeConfig(filepath.Join(TestDataDir, "data"), params.TestNetworkId)
 	if err != nil {
 		return err
 	}
+	config.KeyStoreDir = filepath.Join(TestDataDir, "keystore")
 	config.HTTPPort = testConfig.Node.HTTPPort // to avoid conflicts with running app, using different port in tests
 	config.WSPort = testConfig.Node.WSPort     // ditto
 	config.LogEnabled = true
