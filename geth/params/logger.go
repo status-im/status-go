@@ -31,7 +31,7 @@ func SetupLogger(config *NodeConfig) (*Logger, error) {
 			config:      config,
 			origHandler: log.Root().GetHandler(),
 		}
-		nodeLoggerInstance.handler = nodeLoggerInstance.makeLogHandler(log.LvlInfo)
+		nodeLoggerInstance.handler = nodeLoggerInstance.makeLogHandler(parseLogLevel(config.LogLevel))
 	})
 
 	if err := nodeLoggerInstance.Start(); err != nil {
@@ -62,12 +62,14 @@ func (l *Logger) Stop() error {
 func (l *Logger) makeLogHandler(lvl log.Lvl) log.Handler {
 	var handler log.Handler
 	logFilePath := filepath.Join(l.config.DataDir, l.config.LogFile)
+	fileHandler := log.Must.FileHandler(logFilePath, log.LogfmtFormat())
+	stderrHandler := log.StreamHandler(os.Stderr, log.TerminalFormat(true))
 	if l.config.LogToStderr {
 		handler = log.MultiHandler(
-			log.LvlFilterHandler(lvl, log.StreamHandler(os.Stderr, log.TerminalFormat(true))),
-			log.LvlFilterHandler(lvl, log.Must.FileHandler(logFilePath, log.LogfmtFormat())))
+			log.LvlFilterHandler(lvl, log.CallerFileHandler(log.CallerFuncHandler(stderrHandler))),
+			log.LvlFilterHandler(lvl, fileHandler))
 	} else {
-		handler = log.LvlFilterHandler(lvl, log.Must.FileHandler(logFilePath, log.LogfmtFormat()))
+		handler = log.LvlFilterHandler(lvl, fileHandler)
 	}
 
 	return handler

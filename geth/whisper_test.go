@@ -30,8 +30,8 @@ func TestWhisperFilterRace(t *testing.T) {
 	}
 	accountKey1Hex := common.ToHex(crypto.FromECDSAPub(&accountKey1.PrivateKey.PublicKey))
 
-	whisperService.AddIdentity(accountKey1.PrivateKey)
-	if ok, err := whisperAPI.HasIdentity(accountKey1Hex); err != nil || !ok {
+	whisperService.AddKeyPair(accountKey1.PrivateKey)
+	if ok, err := whisperAPI.HasKeyPair(accountKey1Hex); err != nil || !ok {
 		t.Fatalf("identity not injected: %v", accountKey1Hex)
 	}
 
@@ -42,8 +42,8 @@ func TestWhisperFilterRace(t *testing.T) {
 	}
 	accountKey2Hex := common.ToHex(crypto.FromECDSAPub(&accountKey2.PrivateKey.PublicKey))
 
-	whisperService.AddIdentity(accountKey2.PrivateKey)
-	if ok, err := whisperAPI.HasIdentity(accountKey2Hex); err != nil || !ok {
+	whisperService.AddKeyPair(accountKey2.PrivateKey)
+	if ok, err := whisperAPI.HasKeyPair(accountKey2Hex); err != nil || !ok {
 		t.Fatalf("identity not injected: %v", accountKey2Hex)
 	}
 
@@ -65,10 +65,10 @@ func TestWhisperFilterRace(t *testing.T) {
 
 	for i := 0; i < 10; i++ {
 		go func() {
-			whisperAPI.NewFilter(whisper.WhisperFilterArgs{
-				From: accountKey1Hex,
-				To:   accountKey2Hex,
-				Topics: []whisper.TopicType{
+			whisperAPI.Subscribe(whisper.WhisperFilterArgs{
+				Sig: accountKey1Hex,
+				Key: accountKey2Hex,
+				Topics: [][]byte{
 					{0x4e, 0x03, 0x65, 0x7a}, {0x34, 0x60, 0x7c, 0x9b}, {0x21, 0x41, 0x7d, 0xf9},
 				},
 			})

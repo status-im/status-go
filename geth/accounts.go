@@ -149,7 +149,7 @@ func SelectAccount(address, password string) error {
 		return err
 	}
 
-	if err := whisperService.InjectIdentity(accountKey.PrivateKey); err != nil {
+	if err := whisperService.SelectKeyPair(accountKey.PrivateKey); err != nil {
 		return ErrWhisperIdentityInjectionFailure
 	}
 
@@ -181,7 +181,7 @@ func ReSelectAccount() error {
 		return err
 	}
 
-	if err := whisperService.InjectIdentity(selectedAccount.AccountKey.PrivateKey); err != nil {
+	if err := whisperService.SelectKeyPair(selectedAccount.AccountKey.PrivateKey); err != nil {
 		return ErrWhisperIdentityInjectionFailure
 	}
 
@@ -196,7 +196,7 @@ func Logout() error {
 		return err
 	}
 
-	err = whisperService.ClearIdentities()
+	err = whisperService.DeleteKeyPairs()
 	if err != nil {
 		return fmt.Errorf("%s: %v", ErrWhisperClearIdentitiesFailure, err)
 	}
