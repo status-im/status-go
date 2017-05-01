@@ -17,25 +17,29 @@
 package les
 
 import (
+	"context"
+	"crypto/rand"
+	"encoding/binary"
 	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common/mclock"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/light"
-	"github.com/ethereum/go-ethereum/logger"
-	"github.com/ethereum/go-ethereum/logger/glog"
-	"golang.org/x/net/context"
+	"github.com/ethereum/go-ethereum/log"
 )
 
 var (
 	softRequestTimeout = time.Millisecond * 500
 	hardRequestTimeout = time.Second * 10
-	retryPeers         = time.Second * 1
 )
 
 // peerDropFn is a callback type for dropping a peer detected as malicious.
 type peerDropFn func(id string)
+
+type odrPeerSelector interface {
+	adjustResponseTime(*poolEntry, time.Duration, bool)
+}
 
 type LesOdr struct {
 	light.OdrBackend
@@ -44,15 +48,14 @@ type LesOdr struct {
 	removePeer   peerDropFn
 	mlock, clock sync.Mutex
 	sentReqs     map[uint64]*sentReq
-	peers        *odrPeerSet
-	lastReqID    uint64
+	serverPool   odrPeerSelector
+	reqDist      *requestDistributor
 }
 
 func NewLesOdr(db ethdb.Database) *LesOdr {
 	return &LesOdr{
 		db:       db,
 		stop:     make(chan struct{}),
-		peers:    newOdrPeerSet(),
 		sentReqs: make(map[uint64]*sentReq),
 	}
 }
@@ -65,9 +68,8 @@ func (odr *LesOdr) Database() ethdb.Database {
 	return odr.db
 }
 
-// validatorFunc is a function that processes a message and returns true if
-// it was a meaningful answer to a given request
-type validatorFunc func(ethdb.Database, *Msg) bool
+// validatorFunc is a function that processes a message.
+type validatorFunc func(ethdb.Database, *Msg) error
 
 // sentReq is a request waiting for an answer that satisfies its valFunc
 type sentReq struct {
@@ -75,16 +77,6 @@ type sentReq struct {
 	sentTo   map[*peer]chan struct{}
 	lock     sync.RWMutex  // protects acces to sentTo
 	answered chan struct{} // closed and set to nil when any peer answers it
-}
-
-// RegisterPeer registers a new LES peer to the ODR capable peer set
-func (self *LesOdr) RegisterPeer(p *peer) error {
-	return self.peers.register(p)
-}
-
-// UnregisterPeer removes a peer from the ODR capable peer set
-func (self *LesOdr) UnregisterPeer(p *peer) {
-	self.peers.unregister(p)
 }
 
 const (
@@ -118,17 +110,19 @@ func (self *LesOdr) Deliver(peer *peer, msg *Msg) error {
 		return errResp(ErrUnexpectedResponse, "reqID = %v", msg.ReqID)
 	}
 
-	if req.valFunc(self.db, msg) {
-		close(delivered)
-		req.lock.Lock()
-		if req.answered != nil {
-			close(req.answered)
-			req.answered = nil
-		}
-		req.lock.Unlock()
-		return nil
+	if err := req.valFunc(self.db, msg); err != nil {
+		peer.Log().Warn("Invalid odr response", "err", err)
+		return errResp(ErrInvalidResponse, "reqID = %v", msg.ReqID)
 	}
-	return errResp(ErrInvalidResponse, "reqID = %v", msg.ReqID)
+	close(delivered)
+	req.lock.Lock()
+	delete(req.sentTo, peer)
+	if req.answered != nil {
+		close(req.answered)
+		req.answered = nil
+	}
+	req.lock.Unlock()
+	return nil
 }
 
 func (self *LesOdr) requestPeer(req *sentReq, peer *peer, delivered, timeout chan struct{}, reqWg *sync.WaitGroup) {
@@ -142,28 +136,26 @@ func (self *LesOdr) requestPeer(req *sentReq, peer *peer, delivered, timeout cha
 
 	select {
 	case <-delivered:
-		servTime := uint64(mclock.Now() - stime)
-		self.peers.updateTimeout(peer, false)
-		self.peers.updateServTime(peer, servTime)
+		if self.serverPool != nil {
+			self.serverPool.adjustResponseTime(peer.poolEntry, time.Duration(mclock.Now()-stime), false)
+		}
 		return
 	case <-time.After(softRequestTimeout):
 		close(timeout)
-		if self.peers.updateTimeout(peer, true) {
-			self.removePeer(peer.id)
-		}
 	case <-self.stop:
 		return
 	}
 
 	select {
 	case <-delivered:
-		servTime := uint64(mclock.Now() - stime)
-		self.peers.updateServTime(peer, servTime)
-		return
 	case <-time.After(hardRequestTimeout):
-		self.removePeer(peer.id)
+		peer.Log().Debug("Request timed out hard")
+		go self.removePeer(peer.id)
 	case <-self.stop:
 		return
+	}
+	if self.serverPool != nil {
+		self.serverPool.adjustResponseTime(peer.poolEntry, time.Duration(mclock.Now()-stime), true)
 	}
 }
 
@@ -172,18 +164,48 @@ func (self *LesOdr) requestPeer(req *sentReq, peer *peer, delivered, timeout cha
 func (self *LesOdr) networkRequest(ctx context.Context, lreq LesOdrRequest) error {
 	answered := make(chan struct{})
 	req := &sentReq{
-		valFunc:  lreq.Valid,
+		valFunc:  lreq.Validate,
 		sentTo:   make(map[*peer]chan struct{}),
 		answered: answered, // reply delivered by any peer
 	}
-	reqID := self.getNextReqID()
-	self.mlock.Lock()
-	self.sentReqs[reqID] = req
-	self.mlock.Unlock()
+
+	exclude := make(map[*peer]struct{})
 
 	reqWg := new(sync.WaitGroup)
 	reqWg.Add(1)
 	defer reqWg.Done()
+
+	var timeout chan struct{}
+	reqID := getNextReqID()
+	rq := &distReq{
+		getCost: func(dp distPeer) uint64 {
+			return lreq.GetCost(dp.(*peer))
+		},
+		canSend: func(dp distPeer) bool {
+			p := dp.(*peer)
+			_, ok := exclude[p]
+			return !ok && lreq.CanSend(p)
+		},
+		request: func(dp distPeer) func() {
+			p := dp.(*peer)
+			exclude[p] = struct{}{}
+			delivered := make(chan struct{})
+			timeout = make(chan struct{})
+			req.lock.Lock()
+			req.sentTo[p] = delivered
+			req.lock.Unlock()
+			reqWg.Add(1)
+			cost := lreq.GetCost(p)
+			p.fcServer.QueueRequest(reqID, cost)
+			go self.requestPeer(req, p, delivered, timeout, reqWg)
+			return func() { lreq.Request(reqID, p) }
+		},
+	}
+
+	self.mlock.Lock()
+	self.sentReqs[reqID] = req
+	self.mlock.Unlock()
+
 	go func() {
 		reqWg.Wait()
 		self.mlock.Lock()
@@ -191,41 +213,32 @@ func (self *LesOdr) networkRequest(ctx context.Context, lreq LesOdrRequest) erro
 		self.mlock.Unlock()
 	}()
 
-	exclude := make(map[*peer]struct{})
 	for {
-		if peer := self.peers.bestPeer(lreq, exclude); peer == nil {
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-req.answered:
-				return nil
-			case <-time.After(retryPeers):
+		peerChn := self.reqDist.queue(rq)
+		select {
+		case <-ctx.Done():
+			self.reqDist.cancel(rq)
+			return ctx.Err()
+		case <-answered:
+			self.reqDist.cancel(rq)
+			return nil
+		case _, ok := <-peerChn:
+			if !ok {
+				return ErrNoPeers
 			}
-		} else {
-			exclude[peer] = struct{}{}
-			delivered := make(chan struct{})
-			timeout := make(chan struct{})
-			req.lock.Lock()
-			req.sentTo[peer] = delivered
-			req.lock.Unlock()
-			reqWg.Add(1)
-			cost := lreq.GetCost(peer)
-			peer.fcServer.SendRequest(reqID, cost)
-			go self.requestPeer(req, peer, delivered, timeout, reqWg)
-			lreq.Request(reqID, peer)
+		}
 
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-answered:
-				return nil
-			case <-timeout:
-			}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-answered:
+			return nil
+		case <-timeout:
 		}
 	}
 }
 
-// Retrieve tries to fetch an object from the local db, then from the LES network.
+// Retrieve tries to fetch an object from the LES network.
 // If the network retrieval was successful, it stores the object in local db.
 func (self *LesOdr) Retrieve(ctx context.Context, req light.OdrRequest) (err error) {
 	lreq := LesRequest(req)
@@ -234,15 +247,13 @@ func (self *LesOdr) Retrieve(ctx context.Context, req light.OdrRequest) (err err
 		// retrieved from network, store in db
 		req.StoreResult(self.db)
 	} else {
-		glog.V(logger.Debug).Infof("networkRequest  err = %v", err)
+		log.Debug("Failed to retrieve data from network", "err", err)
 	}
 	return
 }
 
-func (self *LesOdr) getNextReqID() uint64 {
-	self.clock.Lock()
-	defer self.clock.Unlock()
-
-	self.lastReqID++
-	return self.lastReqID
+func getNextReqID() uint64 {
+	var rnd [8]byte
+	rand.Read(rnd[:])
+	return binary.BigEndian.Uint64(rnd[:])
 }

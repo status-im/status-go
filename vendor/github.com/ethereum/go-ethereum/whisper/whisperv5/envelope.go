@@ -22,10 +22,12 @@ import (
 	"crypto/ecdsa"
 	"encoding/binary"
 	"fmt"
-	"math"
+	gmath "math"
+	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -80,7 +82,7 @@ func (e *Envelope) isAsymmetric() bool {
 }
 
 func (e *Envelope) Ver() uint64 {
-	return bytesToIntLittleEndian(e.Version)
+	return bytesToUintLittleEndian(e.Version)
 }
 
 // Seal closes the envelope by spending the requested amount of time as a proof
@@ -92,6 +94,9 @@ func (e *Envelope) Seal(options *MessageParams) error {
 		e.Expiry += options.WorkTime
 	} else {
 		target = e.powToFirstBit(options.PoW)
+		if target < 1 {
+			target = 1
+		}
 	}
 
 	buf := make([]byte, 64)
@@ -102,8 +107,8 @@ func (e *Envelope) Seal(options *MessageParams) error {
 	for nonce := uint64(0); time.Now().UnixNano() < finish; {
 		for i := 0; i < 1024; i++ {
 			binary.BigEndian.PutUint64(buf[56:], nonce)
-			h = crypto.Keccak256(buf)
-			firstBit := common.FirstBitSet(common.BigD(h))
+			d := new(big.Int).SetBytes(crypto.Keccak256(buf))
+			firstBit := math.FirstBitSet(d)
 			if firstBit > bestBit {
 				e.EnvNonce, bestBit = nonce, firstBit
 				if target > 0 && bestBit >= target {
@@ -115,7 +120,7 @@ func (e *Envelope) Seal(options *MessageParams) error {
 	}
 
 	if target > 0 && bestBit < target {
-		return fmt.Errorf("Failed to reach the PoW target, insufficient work time. Expected: %v, got: %v", target, bestBit)
+		return fmt.Errorf("failed to reach the PoW target, specified pow time (%d seconds) was insufficient", options.WorkTime)
 	}
 
 	return nil
@@ -137,9 +142,9 @@ func (e *Envelope) calculatePoW(diff uint32) {
 	h := crypto.Keccak256(e.rlpWithoutNonce())
 	copy(buf[:32], h)
 	binary.BigEndian.PutUint64(buf[56:], e.EnvNonce)
-	h = crypto.Keccak256(buf)
-	firstBit := common.FirstBitSet(common.BigD(h))
-	x := math.Pow(2, float64(firstBit))
+	d := new(big.Int).SetBytes(crypto.Keccak256(buf))
+	firstBit := math.FirstBitSet(d)
+	x := gmath.Pow(2, float64(firstBit))
 	x /= float64(e.size())
 	x /= float64(e.TTL + diff)
 	e.pow = x
@@ -149,8 +154,8 @@ func (e *Envelope) powToFirstBit(pow float64) int {
 	x := pow
 	x *= float64(e.size())
 	x *= float64(e.TTL)
-	bits := math.Log2(x)
-	bits = math.Ceil(bits)
+	bits := gmath.Log2(x)
+	bits = gmath.Ceil(bits)
 	return int(bits)
 }
 
