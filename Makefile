@@ -53,7 +53,9 @@ ci:
 	build/env.sh go test -v -cover ./extkeys
 
 generate:
+	cp ./node_modules/web3/dist/web3.js ./static/scripts/web3.js
 	build/env.sh go generate ./static
+	rm ./static/scripts/web3.js
 
 test:
 	@build/env.sh echo "mode: set" > coverage-all.out
