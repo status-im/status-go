@@ -52,6 +52,9 @@ ci:
 	build/env.sh go test -v -cover ./geth/jail
 	build/env.sh go test -v -cover ./extkeys
 
+generate:
+	build/env.sh go generate ./static
+
 test:
 	@build/env.sh echo "mode: set" > coverage-all.out
 	build/env.sh go test -coverprofile=coverage.out -covermode=set ./geth

@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth"
+	"github.com/status-im/status-go/static"
 )
 
 const (
@@ -37,6 +38,7 @@ type JailedRuntime struct {
 	sem *semaphore.Semaphore
 }
 
+var Web3_JS = static.MustAsset("scripts/web3.js")
 var jailInstance *Jail
 var once sync.Once
 
@@ -95,7 +97,7 @@ func (jail *Jail) Parse(chatId string, js string) string {
 	localStorage, _ := vm.Get("localStorage")
 	localStorage.Object().Set("set", makeLocalStorageSetHandler(chatId))
 
-	jjs := Web3_JS + `
+	jjs := string(Web3_JS) + `
 	var Web3 = require('web3');
 	var web3 = new Web3(jeth);
 	var Bignumber = require("bignumber.js");
