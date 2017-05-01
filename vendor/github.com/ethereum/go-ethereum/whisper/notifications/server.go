@@ -11,8 +11,7 @@ import (
 	"encoding/json"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/logger"
-	"github.com/ethereum/go-ethereum/logger/glog"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/params"
@@ -24,6 +23,9 @@ const (
 	topicAckNewChatSession     = "ACK_NEW_CHAT_SESSION"
 	topicNewDeviceRegistration = "NEW_DEVICE_REGISTRATION"
 	topicAckDeviceRegistration = "ACK_DEVICE_REGISTRATION"
+	topicCheckClientSession    = "CHECK_CLIENT_SESSION"
+	topicConfirmClientSession  = "CONFIRM_CLIENT_SESSION"
+	topicDropClientSession     = "DROP_CLIENT_SESSION"
 )
 
 var (
@@ -59,6 +61,7 @@ type ClientSession struct {
 	ClientKey      string      // public key uniquely identifying a client
 	SessionKey     []byte      // actual symkey used for client - server communication
 	SessionKeyHash common.Hash // The Keccak256Hash of the symmetric key, which is shared between server/client
+	SessionKeyInput []byte      // raw symkey used as input for actual SessionKey
 }
 
 // ChatSession abstracts chat session, which some previously registered client can create.
@@ -112,14 +115,28 @@ func (s *NotificationServer) Start(stack *p2p.Server) error {
 	if err != nil {
 		return err
 	}
-	s.whisper.AddIdentity(identity)
+	s.whisper.AddKeyPair(identity)
 	s.protocolKey = identity
-	glog.V(logger.Info).Infoln("protocol pubkey: ", common.ToHex(crypto.FromECDSAPub(&s.protocolKey.PublicKey)))
+	log.Info("protocol pubkey", "key", common.ToHex(crypto.FromECDSAPub(&s.protocolKey.PublicKey)))
 
 	// start discovery protocol
 	s.discovery.Start()
 
-	glog.V(logger.Info).Infoln("Whisper Notification Server started")
+	// client session status requests
+	clientSessionStatusFilterID, err := s.installKeyFilter(topicCheckClientSession, s.protocolKey)
+	if err != nil {
+		return fmt.Errorf("failed installing filter: %v", err)
+	}
+	go s.requestProcessorLoop(clientSessionStatusFilterID, topicDiscoverServer, s.processClientSessionStatusRequest)
+
+	// client session remove requests
+	dropClientSessionFilterID, err := s.installKeyFilter(topicDropClientSession, s.protocolKey)
+	if err != nil {
+		return fmt.Errorf("failed installing filter: %v", err)
+	}
+	go s.requestProcessorLoop(dropClientSessionFilterID, topicDropClientSession, s.processDropClientSessionRequest)
+
+	log.Info("Whisper Notification Server started")
 	return nil
 }
 
@@ -135,7 +152,7 @@ func (s *NotificationServer) Stop() error {
 		s.discovery.Stop()
 	}
 
-	glog.V(logger.Info).Infoln("Whisper Notification Server stopped")
+	log.Info("Whisper Notification Server stopped")
 	return nil
 }
 
@@ -154,6 +171,7 @@ func (s *NotificationServer) RegisterClientSession(session *ClientSession) (sess
 	}
 
 	// populate session key hash (will be used to match decrypted message to a given client id)
+	session.SessionKeyInput = sessionKey
 	session.SessionKeyHash = crypto.Keccak256Hash(sessionKeyDerived)
 	session.SessionKey = sessionKeyDerived
 
@@ -222,16 +240,45 @@ func (s *NotificationServer) RegisterDeviceSubscription(subscription *DeviceSubs
 		crypto.Keccak256Hash([]byte(subscription.ChatSessionKeyHash.Hex()+subscription.DeviceID)).Hex())
 	s.deviceSubscriptions[id] = subscription
 
-	glog.V(logger.Info).Infof("device registered: %s", subscription.DeviceID)
+	log.Info("device registered", "device", subscription.DeviceID)
 	return nil
 }
 
-// RemoveSubscriber uninstalls subscriber
-func (s *NotificationServer) RemoveSubscriber(id string) {
-	s.clientSessionsMu.Lock()
-	defer s.clientSessionsMu.Unlock()
+// DropClientSession uninstalls session
+func (s *NotificationServer) DropClientSession(id string) {
+	dropChatSessions := func(parentKey string) {
+		s.chatSessionsMu.Lock()
+		defer s.chatSessionsMu.Unlock()
 
-	delete(s.clientSessions, id)
+		for key, chatSession := range s.chatSessions {
+			if chatSession.ParentKey == parentKey {
+				delete(s.chatSessions, key)
+				log.Info("drop chat session", "key", key)
+			}
+		}
+	}
+
+	dropDeviceSubscriptions := func(parentKey string) {
+		s.deviceSubscriptionsMu.Lock()
+		defer s.deviceSubscriptionsMu.Unlock()
+
+		for key, subscription := range s.deviceSubscriptions {
+			if hex.EncodeToString(crypto.FromECDSAPub(subscription.PubKey)) == parentKey {
+				delete(s.deviceSubscriptions, key)
+				log.Info("drop device subscription", "key", key)
+			}
+		}
+	}
+
+	s.clientSessionsMu.Lock()
+	if session, ok := s.clientSessions[id]; ok {
+		delete(s.clientSessions, id)
+		log.Info("server drops client session", "id", id)
+		s.clientSessionsMu.Unlock()
+
+		dropDeviceSubscriptions(session.ClientKey)
+		dropChatSessions(session.ClientKey)
+	}
 }
 
 // processNewChatSessionRequest processes incoming client requests of type:
@@ -287,7 +334,8 @@ func (s *NotificationServer) processNewChatSessionRequest(msg *whisper.ReceivedM
 		return fmt.Errorf("failed to send server response message: %v", err)
 	}
 
-	glog.V(logger.Debug).Infof("server confirms chat creation (dst: %v, topic: %x)", msgParams.Dst, msgParams.Topic)
+	log.Info("server confirms chat creation", "dst",
+		common.ToHex(crypto.FromECDSAPub(msgParams.Dst)), "topic", msgParams.Topic.String())
 	return nil
 }
 
@@ -348,7 +396,8 @@ func (s *NotificationServer) processNewDeviceRegistrationRequest(msg *whisper.Re
 		return fmt.Errorf("failed to send server response message: %v", err)
 	}
 
-	glog.V(logger.Debug).Infof("server confirms device registration (dst: %v, topic: %x)", msgParams.Dst, msgParams.Topic)
+	log.Info("server confirms device registration", "dst",
+		common.ToHex(crypto.FromECDSAPub(msgParams.Dst)), "topic", msgParams.Topic.String())
 	return nil
 }
 
@@ -367,7 +416,7 @@ func (s *NotificationServer) processSendNotificationRequest(msg *whisper.Receive
 			if s.firebaseProvider != nil {
 				err := s.firebaseProvider.Send(subscriber.DeviceID, string(msg.Payload))
 				if err != nil {
-					glog.V(logger.Info).Infof("cannot send notification: %v", err)
+					log.Info("cannot send notification", "error", err)
 				}
 			}
 		}
@@ -376,48 +425,116 @@ func (s *NotificationServer) processSendNotificationRequest(msg *whisper.Receive
 	return nil
 }
 
+// processClientSessionStatusRequest processes incoming client requests when:
+// client wants to learn whether it is already registered on some of the servers
+func (s *NotificationServer) processClientSessionStatusRequest(msg *whisper.ReceivedMessage) error {
+	s.clientSessionsMu.RLock()
+	defer s.clientSessionsMu.RUnlock()
+
+	if msg.Src == nil {
+		return errors.New("message 'from' field is required")
+	}
+
+	var sessionKey []byte
+	pubKey := hex.EncodeToString(crypto.FromECDSAPub(msg.Src))
+	for _, clientSession := range s.clientSessions {
+		if clientSession.ClientKey == pubKey {
+			sessionKey = clientSession.SessionKeyInput
+			break
+		}
+	}
+
+	// session is not found
+	if sessionKey == nil {
+		return nil
+	}
+
+	// let client know that we have session for a given public key
+	msgParams := whisper.MessageParams{
+		Src:      s.protocolKey,
+		Dst:      msg.Src,
+		Topic:    MakeTopic([]byte(topicConfirmClientSession)),
+		Payload:  []byte(`{"server": "0x` + s.nodeID + `", "key": "0x` + hex.EncodeToString(sessionKey) + `"}`),
+		TTL:      uint32(s.config.TTL),
+		PoW:      s.config.MinimumPoW,
+		WorkTime: 5,
+	}
+	response := whisper.NewSentMessage(&msgParams)
+	env, err := response.Wrap(&msgParams)
+	if err != nil {
+		return fmt.Errorf("failed to wrap server response message: %v", err)
+	}
+
+	if err := s.whisper.Send(env); err != nil {
+		return fmt.Errorf("failed to send server response message: %v", err)
+	}
+
+	log.Info("server confirms client session", "dst",
+		common.ToHex(crypto.FromECDSAPub(msgParams.Dst)), "topic", msgParams.Topic.String())
+	return nil
+}
+
+// processDropClientSessionRequest processes incoming client requests when:
+// client wants to drop its sessions with notification servers (if they exist)
+func (s *NotificationServer) processDropClientSessionRequest(msg *whisper.ReceivedMessage) error {
+	if msg.Src == nil {
+		return errors.New("message 'from' field is required")
+	}
+
+	s.clientSessionsMu.RLock()
+	pubKey := hex.EncodeToString(crypto.FromECDSAPub(msg.Src))
+	for _, clientSession := range s.clientSessions {
+		if clientSession.ClientKey == pubKey {
+			s.clientSessionsMu.RUnlock()
+			s.DropClientSession(clientSession.SessionKeyHash.Hex())
+			break
+		}
+	}
+	return nil
+}
+
 // installTopicFilter installs Whisper filter using symmetric key
 func (s *NotificationServer) installTopicFilter(topicName string, topicKey []byte) (filterID string, err error) {
-	topic := MakeTopic([]byte(topicName))
+	topic := MakeTopicAsBytes([]byte(topicName))
 	filter := whisper.Filter{
-		KeySym:    topicKey,
-		Topics:    []whisper.TopicType{topic},
-		AcceptP2P: true,
+		KeySym:   topicKey,
+		Topics:   [][]byte{topic},
+		AllowP2P: true,
 	}
-	filterID, err = s.whisper.Watch(&filter)
+	filterID, err = s.whisper.Subscribe(&filter)
 	if err != nil {
 		return "", fmt.Errorf("failed installing filter: %v", err)
 	}
 
-	glog.V(logger.Debug).Infof("installed topic filter %v for topic %x (%s)", filterID, topic, topicName)
+	log.Debug(fmt.Sprintf("installed topic filter %v for topic %x (%s)", filterID, topic, topicName))
 	return
 }
 
 // installKeyFilter installs Whisper filter using asymmetric key
 func (s *NotificationServer) installKeyFilter(topicName string, key *ecdsa.PrivateKey) (filterID string, err error) {
-	topic := MakeTopic([]byte(topicName))
+	topic := MakeTopicAsBytes([]byte(topicName))
 	filter := whisper.Filter{
-		KeyAsym:   key,
-		Topics:    []whisper.TopicType{topic},
-		AcceptP2P: true,
+		KeyAsym:  key,
+		Topics:   [][]byte{topic},
+		AllowP2P: true,
 	}
-	filterID, err = s.whisper.Watch(&filter)
+	filterID, err = s.whisper.Subscribe(&filter)
 	if err != nil {
 		return "", fmt.Errorf("failed installing filter: %v", err)
 	}
 
-	glog.V(logger.Info).Infof("installed key filter %v for topic %x (%s)", filterID, topic, topicName)
+	log.Info(fmt.Sprintf("installed key filter %v for topic %x (%s)", filterID, topic, topicName))
 	return
 }
 
 // requestProcessorLoop processes incoming client requests, by listening to a given filter,
 // and executing process function on each incoming message
 func (s *NotificationServer) requestProcessorLoop(filterID string, topicWatched string, fn messageProcessingFn) {
-	glog.V(logger.Detail).Infof("request processor started: %s", topicWatched)
+	log.Debug(fmt.Sprintf("request processor started: %s", topicWatched))
 
 	filter := s.whisper.GetFilter(filterID)
 	if filter == nil {
-		glog.V(logger.Warn).Infof("filter is not installed: %s (for topic '%s')", filterID, topicWatched)
+		log.Warn(fmt.Sprintf("filter is not installed: %s (for topic '%s')", filterID, topicWatched))
 		return
 	}
 
@@ -429,11 +546,11 @@ func (s *NotificationServer) requestProcessorLoop(filterID string, topicWatched 
 			messages := filter.Retrieve()
 			for _, msg := range messages {
 				if err := fn(msg); err != nil {
-					glog.V(logger.Warn).Infof("failed processing incoming request: %v", err)
+					log.Warn("failed processing incoming request", "error", err)
 				}
 			}
 		case <-s.quit:
-			glog.V(logger.Detail).Infof("request processor stopped: %s", topicWatched)
+			log.Debug("request processor stopped", "topic", topicWatched)
 			return
 		}
 	}
@@ -449,8 +566,16 @@ func (s *NotificationServer) makeSessionKey(keyName string) (sessionKey, session
 	if err != nil {
 		return nil, nil, err
 	}
-	s.whisper.AddSymKey(keyName, sessionKey)
-	sessionKeyDerived = s.whisper.GetSymKey(keyName)
+
+	keyName, err = s.whisper.AddSymKey(keyName, sessionKey)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	sessionKeyDerived, err = s.whisper.GetSymKey(keyName)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	return
 }

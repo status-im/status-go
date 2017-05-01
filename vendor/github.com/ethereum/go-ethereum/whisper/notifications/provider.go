@@ -7,8 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/logger"
-	"github.com/ethereum/go-ethereum/logger/glog"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/geth/params"
 )
 
@@ -52,10 +51,9 @@ func (p *FirebaseProvider) Send(id string, payload string) (err error) {
 	}
 	defer resp.Body.Close()
 
-	glog.V(logger.Detail).Infoln("FCM response status: ", resp.Status)
-	glog.V(logger.Detail).Infoln("FCM response header: ", resp.Header)
+	log.Debug("FCM response", "status", resp.Status, "header", resp.Header)
 	body, _ := ioutil.ReadAll(resp.Body)
-	glog.V(logger.Info).Infoln("FCM response body: ", string(body))
+	log.Debug("FCM response body", "body", string(body))
 
 	return nil
 }

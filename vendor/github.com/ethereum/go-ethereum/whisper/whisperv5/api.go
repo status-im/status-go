@@ -206,6 +206,11 @@ func (api *PublicWhisperAPI) DeleteSymmetricKey(name string) (bool, error) {
 	return res, nil
 }
 
+// NewFilter is alias to Subscribe
+func (api *PublicWhisperAPI) NewFilter(args WhisperFilterArgs) (string, error) {
+	return api.Subscribe(args)
+}
+
 // Subscribe creates and registers a new filter to watch for inbound whisper messages.
 // Returns the ID of the newly created filter.
 func (api *PublicWhisperAPI) Subscribe(args WhisperFilterArgs) (string, error) {
@@ -214,7 +219,7 @@ func (api *PublicWhisperAPI) Subscribe(args WhisperFilterArgs) (string, error) {
 	}
 
 	filter := Filter{
-		Src:      crypto.ToECDSAPub(common.FromHex(args.SignedWith)),
+		Src:      crypto.ToECDSAPub(common.FromHex(args.Sig)),
 		PoW:      args.MinPoW,
 		Messages: make(map[common.Hash]*ReceivedMessage),
 		AllowP2P: args.AllowP2P,
@@ -228,13 +233,18 @@ func (api *PublicWhisperAPI) Subscribe(args WhisperFilterArgs) (string, error) {
 		filter.Topics = append(filter.Topics, bt)
 	}
 
+	args.Key, err = toDeterministicID(args.Key, keyIdSize)
+	if err != nil {
+		return "", err
+	}
+
 	if err = ValidateKeyID(args.Key); err != nil {
 		return "", errors.New("subscribe: " + err.Error())
 	}
 
-	if len(args.SignedWith) > 0 {
+	if len(args.Sig) > 0 {
 		if !ValidatePublicKey(filter.Src) {
-			return "", errors.New("subscribe: invalid 'SignedWith' field")
+			return "", errors.New("subscribe: sig invalid is invalid")
 		}
 	}
 
@@ -267,6 +277,11 @@ func (api *PublicWhisperAPI) Subscribe(args WhisperFilterArgs) (string, error) {
 // Unsubscribe disables and removes an existing filter.
 func (api *PublicWhisperAPI) Unsubscribe(id string) {
 	api.whisper.Unsubscribe(id)
+}
+
+// GetFilterChanges is alias for GetSubscriptionMessages
+func (api *PublicWhisperAPI) GetFilterChanges(filterId string) []*WhisperMessage {
+	return api.GetSubscriptionMessages(filterId)
 }
 
 // GetSubscriptionMessages retrieves all the new messages matched by a filter since the last retrieval.
@@ -314,8 +329,8 @@ func (api *PublicWhisperAPI) Post(args PostArgs) error {
 		return errors.New("post: key is missing")
 	}
 
-	if len(args.SignWith) > 0 {
-		params.Src, err = api.whisper.GetPrivateKey(args.SignWith)
+	if len(args.Sig) > 0 {
+		params.Src, err = api.whisper.GetPrivateKey(args.Sig)
 		if err != nil {
 			return err
 		}
@@ -382,7 +397,7 @@ func (api *PublicWhisperAPI) Post(args PostArgs) error {
 type PostArgs struct {
 	Type       string        `json:"type"`       // "sym"/"asym" (symmetric or asymmetric)
 	TTL        uint32        `json:"ttl"`        // time-to-live in seconds
-	SignWith   string        `json:"signWith"`   // id of the signing key
+	Sig        string        `json:"sig"`        // id of the signing key
 	Key        string        `json:"key"`        // id of encryption key
 	Topic      hexutil.Bytes `json:"topic"`      // topic (4 bytes)
 	Padding    hexutil.Bytes `json:"padding"`    // optional padding bytes
@@ -394,43 +409,58 @@ type PostArgs struct {
 
 func (args *PostArgs) UnmarshalJSON(data []byte) (err error) {
 	var obj struct {
-		From     string         `json:"from"`
-		To       string         `json:"to"`
-		Topics   []string       `json:"topics"`
-		Payload  string         `json:"payload"`
-		Priority hexutil.Uint64 `json:"priority"`
-		TTL      hexutil.Uint64 `json:"ttl"`
-		KeyName  string         `json:"keyname"`
+		Type       string         `json:"type"`
+		TTL        hexutil.Uint64 `json:"ttl"`
+		Sig        string         `json:"sig"`
+		Key        string         `json:"key"`
+		Topic      string         `json:"topic"`
+		Payload    string         `json:"payload"`
+		PowTime    hexutil.Uint64 `json:"powTime"`
+		PowTarget  float64        `json:"powTarget,string"`
+		TargetPeer string         `json:"targetPeer"`
 	}
 
 	if err := json.Unmarshal(data, &obj); err != nil {
 		return err
 	}
-	args.From = obj.From
-	args.To = obj.To
-	args.Payload = []byte(obj.Payload)
-	args.WorkTime = 2
-	args.PoW = MinimumPoW
-	args.TTL = uint32(obj.TTL)
-	args.KeyName = obj.KeyName
-	for j, topic := range obj.Topics {
-		x := common.FromHex(topic)
-		if x == nil {
-			return fmt.Errorf("topic[%d] is invalid", j)
-		}
-		args.Topic = BytesToTopic(x)
+
+	if obj.Type != "sym" && obj.Type != "asym" {
+		return errors.New("wrong type (sym/asym)")
 	}
+
+	args.Type = obj.Type
+	args.Key = obj.Key
+	args.TTL = uint32(obj.TTL)
+	args.Sig = obj.Sig
+	args.Payload = []byte(obj.Payload)
+	args.PowTime = uint32(obj.PowTime)
+	if args.PowTime < DefaultMinimumPoWTime { // ensure minimum PoW
+		args.PowTime = DefaultMinimumPoWTime
+	}
+	args.PowTarget = obj.PowTarget
+	if args.PowTarget < DefaultMinimumPoW { // ensure minimum PoW
+		args.PowTarget = DefaultMinimumPoW
+	}
+	args.TargetPeer = obj.TargetPeer
+
+	// process topic
+	x := common.FromHex(obj.Topic)
+	if x == nil {
+		return fmt.Errorf("topic is invalid: %v", obj.Topic)
+	}
+	topicBytes := BytesToTopic(x)
+	args.Topic = []byte(topicBytes[:])
 
 	return nil
 }
 
 type WhisperFilterArgs struct {
-	Symmetric  bool     // encryption type
-	Key        string   // id of the key to be used for decryption
-	SignedWith string   // public key of the sender to be verified
-	MinPoW     float64  // minimal PoW requirement
-	Topics     [][]byte // list of topics (up to 4 bytes each) to match
-	AllowP2P   bool     // indicates wheather direct p2p messages are allowed for this filter
+	Symmetric bool     // encryption type
+	Key       string   // id of the key to be used for decryption
+	Sig       string   // public key of the sender to be verified
+	MinPoW    float64  // minimal PoW requirement
+	Topics    [][]byte // list of topics (up to 4 bytes each) to match
+	AllowP2P  bool     // indicates wheather direct p2p messages are allowed for this filter
 }
 
 // UnmarshalJSON implements the json.Unmarshaler interface, invoked to convert a
@@ -438,12 +468,12 @@ type WhisperFilterArgs struct {
 func (args *WhisperFilterArgs) UnmarshalJSON(b []byte) (err error) {
 	// Unmarshal the JSON message and sanity check
 	var obj struct {
-		Type       string        `json:"type"`
-		Key        string        `json:"key"`
-		SignedWith string        `json:"signedWith"`
-		MinPoW     float64       `json:"minPoW"`
-		Topics     []interface{} `json:"topics"`
-		AllowP2P   bool          `json:"allowP2P"`
+		Type     string        `json:"type"`
+		Key      string        `json:"key"`
+		Sig      string        `json:"sig"`
+		MinPoW   float64       `json:"minPoW"`
+		Topics   []interface{} `json:"topics"`
+		AllowP2P bool          `json:"allowP2P"`
 	}
 	if err := json.Unmarshal(b, &obj); err != nil {
 		return err
@@ -459,8 +489,11 @@ func (args *WhisperFilterArgs) UnmarshalJSON(b []byte) (err error) {
 	}
 
 	args.Key = obj.Key
-	args.SignedWith = obj.SignedWith
+	args.Sig = obj.Sig
 	args.MinPoW = obj.MinPoW
+	if args.MinPoW < DefaultMinimumPoW { // ensure minimum PoW
+		args.MinPoW = DefaultMinimumPoW
+	}
 	args.AllowP2P = obj.AllowP2P
 
 	// Construct the topic array
@@ -495,7 +528,7 @@ type WhisperMessage struct {
 	Topic     string  `json:"topic"`
 	Payload   string  `json:"payload"`
 	Padding   string  `json:"padding"`
-	Src       string  `json:"signedWith"`
+	Src       string  `json:"sig"`
 	Dst       string  `json:"recipientPublicKey"`
 	Timestamp uint32  `json:"timestamp"`
 	TTL       uint32  `json:"ttl"`

@@ -59,6 +59,7 @@ const (
 	keyIdSize         = 32
 
 	DefaultMaxMessageLength = 1024 * 1024
+	DefaultMinimumPoWTime   = 2     // todo: review after testing.
 	DefaultMinimumPoW       = 0.001 // todo: review after testing.
 
 	padSizeLimitLower = 128 // it can not be less - we don't want to reveal the absence of signature

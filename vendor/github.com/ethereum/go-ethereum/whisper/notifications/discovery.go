@@ -8,8 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/logger"
-	"github.com/ethereum/go-ethereum/logger/glog"
+	"github.com/ethereum/go-ethereum/log"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 )
 
@@ -56,16 +55,16 @@ func (s *discoveryService) Start() error {
 	}
 	go s.server.requestProcessorLoop(s.serverAcceptedFilterID, topicServerAccepted, s.processServerAcceptedRequest)
 
-	glog.V(logger.Info).Infoln("notification server discovery service started")
+	log.Info("notification server discovery service started")
 	return nil
 }
 
 // Stop stops all discovery processing loops
 func (s *discoveryService) Stop() error {
-	s.server.whisper.Unwatch(s.discoverFilterID)
-	s.server.whisper.Unwatch(s.serverAcceptedFilterID)
+	s.server.whisper.Unsubscribe(s.discoverFilterID)
+	s.server.whisper.Unsubscribe(s.serverAcceptedFilterID)
 
-	glog.V(logger.Info).Infoln("notification server discovery service stopped")
+	log.Info("notification server discovery service stopped")
 	return nil
 }
 
@@ -92,8 +91,8 @@ func (s *discoveryService) processDiscoveryRequest(msg *whisper.ReceivedMessage)
 		return fmt.Errorf("failed to send server proposal message: %v", err)
 	}
 
-	glog.V(logger.Info).Infof("server proposal sent (server: %v, dst: %v, topic: %x)",
-		s.server.nodeID, common.ToHex(crypto.FromECDSAPub(msgParams.Dst)), msgParams.Topic)
+	log.Info(fmt.Sprintf("server proposal sent (server: %v, dst: %v, topic: %x)",
+		s.server.nodeID, common.ToHex(crypto.FromECDSAPub(msgParams.Dst)), msgParams.Topic))
 	return nil
 }
 
@@ -144,6 +143,6 @@ func (s *discoveryService) processServerAcceptedRequest(msg *whisper.ReceivedMes
 		return fmt.Errorf("failed to send server proposal message: %v", err)
 	}
 
-	glog.V(logger.Debug).Infof("server confirms client subscription (dst: %v, topic: %x)", msgParams.Dst, msgParams.Topic)
+	log.Info(fmt.Sprintf("server confirms client subscription (dst: %v, topic: %x)", msgParams.Dst, msgParams.Topic))
 	return nil
 }

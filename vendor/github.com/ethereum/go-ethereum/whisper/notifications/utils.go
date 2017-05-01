@@ -50,6 +50,17 @@ func containsOnlyZeros(data []byte) bool {
 	return true
 }
 
+// MakeTopic returns Whisper topic *as bytes array* by generating cryptographic key from the provided password
+func MakeTopicAsBytes(password []byte) ([]byte) {
+	topic := make([]byte, int(whisper.TopicLength))
+	x := pbkdf2.Key(password, password, 8196, 128, sha512.New)
+	for i := 0; i < len(x); i++ {
+		topic[i%whisper.TopicLength] ^= x[i]
+	}
+
+	return topic
+}
+
 // MakeTopic returns Whisper topic by generating cryptographic key from the provided password
 func MakeTopic(password []byte) (topic whisper.TopicType) {
 	x := pbkdf2.Key(password, password, 8196, 128, sha512.New)
