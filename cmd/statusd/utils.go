@@ -1307,29 +1307,9 @@ func startTestNode(t *testing.T) <-chan struct{} {
 		syncRequired = true
 	}
 
-	// prepare node directory
-	if err := os.MkdirAll(filepath.Join(geth.TestDataDir, "testnet", "keystore"), os.ModePerm); err != nil {
-		panic(err)
-	}
-
-	// import test account (with test ether on it)
-	importTestAccount := func(accountFile string) error {
-		dst := filepath.Join(geth.TestDataDir, "keystore", accountFile)
-		if _, err := os.Stat(dst); os.IsNotExist(err) {
-			err = geth.CopyFile(dst, filepath.Join(geth.RootDir, "data", accountFile))
-			if err != nil {
-				panic(err)
-			}
-		}
-
-		return nil
-	}
-	if err := importTestAccount("test-account1.pk"); err != nil {
-		panic(err)
-	}
-	if err := importTestAccount("test-account2.pk"); err != nil {
-		panic(err)
-	}
+	// inject test accounts
+	geth.ImportTestAccount(filepath.Join(geth.TestDataDir, "keystore"), "test-account1.pk")
+	geth.ImportTestAccount(filepath.Join(geth.TestDataDir, "keystore"), "test-account2.pk")
 
 	waitForNodeStart := make(chan struct{}, 1)
 	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {

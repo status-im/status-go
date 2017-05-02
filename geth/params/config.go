@@ -77,6 +77,39 @@ type LightEthConfig struct {
 type WhisperConfig struct {
 	// Enabled flag specifies whether  protocol is enabled
 	Enabled bool
+
+	// EchoMode if mode is on, prints some arguments for diagnostics
+	EchoMode bool
+
+	// BootstrapNode whether node doesn't actively connect to peers, and waits for incoming connections
+	BootstrapNode bool
+
+	// ForwarderNode is mode when node only forwards messages, neither sends nor decrypts messages
+	ForwarderNode bool
+
+	// MailServerNode is mode when node is capable of delivering expired messages on demand
+	MailServerNode bool
+
+	// MailServerPassword is password for MailServer's symmetric key
+	MailServerPassword string
+
+	// NotificationServerNode is mode when node is capable of sending Push (and probably other kinds) Notifications
+	NotificationServerNode bool
+
+	// NotificationServerPassword is password for NotificationServer's symmetric key (used in discovery)
+	NotificationServerPassword string
+
+	// DataDir is the file system folder Whisper should use for any data storage needs.
+	DataDir string
+
+	// Port Whisper node's listening port
+	Port int
+
+	// MinimumPoW minimum PoW for Whisper messages
+	MinimumPoW float64
+
+	// TTL time to live for messages, in seconds
+	TTL int
 }
 
 // SwarmConfig holds Swarm-related configuration
@@ -95,6 +128,15 @@ type NodeConfig struct {
 
 	// DataDir is the file system folder the node should use for any data storage needs.
 	DataDir string
+
+	// KeyStoreDir is the file system folder that contains private keys.
+	// If KeyStoreDir is empty, the default location is the "keystore" subdirectory of DataDir.
+	KeyStoreDir string
+
+	// PrivateKeyFile is a filename with node ID (private key)
+	// This file should contain a valid secp256k1 private key that will be used for both
+	// remote peer identification as well as network traffic encryption.
+	NodeKeyFile string
 
 	// Name sets the instance name of the node. It must not contain the / character.
 	Name string
@@ -166,35 +208,58 @@ func NewNodeConfig(dataDir string, networkId int) (*NodeConfig, error) {
 	nodeConfig := &NodeConfig{
 		NetworkId:       networkId,
 		DataDir:         dataDir,
-		Name:            DefaultClientIdentifier,
+		Name:            ClientIdentifier,
 		Version:         Version,
-		HTTPHost:        DefaultHTTPHost,
-		HTTPPort:        DefaultHTTPPort,
-		APIModules:      DefaultAPIModules,
-		WSHost:          DefaultWSHost,
-		WSPort:          DefaultWSPort,
-		MaxPeers:        DefaultMaxPeers,
-		MaxPendingPeers: DefaultMaxPendingPeers,
-		IPCFile:         DefaultIPCFile,
-		LogFile:         DefaultLogFile,
-		LogLevel:        DefaultLogLevel,
+		HTTPHost:        HTTPHost,
+		HTTPPort:        HTTPPort,
+		APIModules:      APIModules,
+		WSHost:          WSHost,
+		WSPort:          WSPort,
+		MaxPeers:        MaxPeers,
+		MaxPendingPeers: MaxPendingPeers,
+		IPCFile:         IPCFile,
+		LogFile:         LogFile,
+		LogLevel:        LogLevel,
 		ChainConfig:     &ChainConfig{},
 		LightEthConfig: &LightEthConfig{
 			Enabled:       true,
-			DatabaseCache: DefaultDatabaseCache,
+			DatabaseCache: DatabaseCache,
 		},
 		WhisperConfig: &WhisperConfig{
-			Enabled: true,
+			Enabled:    true,
+			Port:       WhisperPort,
+			MinimumPoW: WhisperMinimumPoW,
+			TTL:        WhisperTTL,
 		},
 		SwarmConfig: &SwarmConfig{},
 	}
 
+	// auto-populate some dependent values
 	nodeConfig.populateChainConfig()
+	nodeConfig.populateDirs()
 
 	return nodeConfig, nil
 }
 
-// populateChainConfig does necessary adjustments to config object (depending on network node will be runnin on)
+// populateDirs updates directories that should be wrt to DataDir
+func (c *NodeConfig) populateDirs() {
+	makeSubDirPath := func(baseDir, subDir string) string {
+		if len(baseDir) == 0 {
+			return ""
+		}
+
+		return filepath.Join(baseDir, subDir)
+	}
+	if len(c.KeyStoreDir) == 0 {
+		c.KeyStoreDir = makeSubDirPath(c.DataDir, KeyStoreDir)
+	}
+
+	if len(c.WhisperConfig.DataDir) == 0 {
+		c.WhisperConfig.DataDir = makeSubDirPath(c.DataDir, WhisperDataDir)
+	}
+}
+
+// populateChainConfig does necessary adjustments to config object (depending on network node will be running on)
 func (c *NodeConfig) populateChainConfig() {
 	c.TestNet = false
 	if c.NetworkId == TestNetworkId {
@@ -256,6 +321,7 @@ func LoadNodeConfig(configJSON string) (*NodeConfig, error) {
 
 	// repopulate
 	nodeConfig.populateChainConfig()
+	nodeConfig.populateDirs()
 
 	if len(nodeConfig.DataDir) == 0 {
 		return nil, ErrMissingDataDir
@@ -290,6 +356,18 @@ func (c *NodeConfig) Save() error {
 
 // String dumps config object as nicely indented JSON
 func (c *NodeConfig) String() string {
+	data, _ := json.MarshalIndent(c, "", "    ")
+	return string(data)
+}
+
+// String dumps config object as nicely indented JSON
+func (c *WhisperConfig) String() string {
+	data, _ := json.MarshalIndent(c, "", "    ")
+	return string(data)
+}
+
+// String dumps config object as nicely indented JSON
+func (c *SwarmConfig) String() string {
 	data, _ := json.MarshalIndent(c, "", "    ")
 	return string(data)
 }

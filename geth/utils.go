@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,12 +23,12 @@ import (
 	"github.com/ethereum/go-ethereum/logger"
 	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/static"
 )
 
 var (
 	muPrepareTestNode sync.Mutex
 	RootDir           string
-	DataDir           string
 	TestDataDir       string
 )
 
@@ -44,7 +45,6 @@ func init() {
 	}
 
 	// setup auxiliary directories
-	DataDir = filepath.Join(RootDir, "data")
 	TestDataDir = filepath.Join(RootDir, ".ethereumtest")
 }
 
@@ -99,7 +99,7 @@ type TestConfig struct {
 func LoadTestConfig() (*TestConfig, error) {
 	var testConfig TestConfig
 
-	configData := LoadFromFile(filepath.Join(DataDir, "test-data.json"))
+	configData := string(static.MustAsset("config/test-data.json"))
 	if err := json.Unmarshal([]byte(configData), &testConfig); err != nil {
 		return nil, err
 	}
@@ -168,31 +168,20 @@ func PrepareTestNode() (err error) {
 		return err
 	}
 
-	// import test account (with test ether on it)
-	importTestAccount := func(accountFile string) error {
-		dst := filepath.Join(TestDataDir, "keystore", accountFile)
-		if _, err := os.Stat(dst); os.IsNotExist(err) {
-			err = CopyFile(dst, filepath.Join(RootDir, "data", accountFile))
-			if err != nil {
-				glog.V(logger.Warn).Infof("cannot copy test account PK: %v", err)
-				return err
-			}
-		}
-
-		return nil
-	}
-	if err := importTestAccount("test-account1.pk"); err != nil {
+	// import test accounts (with test ether on it)
+	if err := ImportTestAccount(filepath.Join(TestDataDir, "keystore"), "test-account1.pk"); err != nil {
 		panic(err)
 	}
-	if err := importTestAccount("test-account2.pk"); err != nil {
+	if err := ImportTestAccount(filepath.Join(TestDataDir, "keystore"), "test-account2.pk"); err != nil {
 		panic(err)
 	}
 
 	// start geth node and wait for it to initialize
-	config, err := params.NewNodeConfig(TestDataDir, params.TestNetworkId)
+	config, err := params.NewNodeConfig(filepath.Join(TestDataDir, "data"), params.TestNetworkId)
 	if err != nil {
 		return err
 	}
+	config.KeyStoreDir = filepath.Join(TestDataDir, "keystore")
 	config.HTTPPort = testConfig.Node.HTTPPort // to avoid conflicts with running app, using different port in tests
 	config.WSPort = testConfig.Node.WSPort     // ditto
 	config.LogEnabled = true
@@ -285,4 +274,24 @@ func AddressToDecryptedAccount(address, password string) (accounts.Account, *key
 	}
 
 	return keyStore.AccountDecryptedKey(account, password)
+}
+
+// ImportTestAccount checks if test account exists in keystore, and if not
+// tries to import it (from static resources, see "static/keys" folder)
+func ImportTestAccount(keystoreDir, accountFile string) error {
+	// make sure that keystore folder exists
+	if _, err := os.Stat(keystoreDir); os.IsNotExist(err) {
+		os.MkdirAll(keystoreDir, os.ModePerm)
+	}
+
+	dst := filepath.Join(keystoreDir, accountFile)
+	if _, err := os.Stat(dst); os.IsNotExist(err) {
+		err = ioutil.WriteFile(dst, static.MustAsset("keys/"+accountFile), 0644)
+		if err != nil {
+			glog.V(logger.Warn).Infof("cannot copy test account PK: %v", err)
+			return err
+		}
+	}
+
+	return nil
 }
