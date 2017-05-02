@@ -9,8 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/les/status"
-	"github.com/ethereum/go-ethereum/logger"
-	"github.com/ethereum/go-ethereum/logger/glog"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/pborman/uuid"
 	"golang.org/x/net/context"
 )
@@ -31,7 +30,7 @@ var (
 
 // NewStatusBackend creates a new backend using an existing Ethereum object.
 func NewStatusBackend(apiBackend Backend) *StatusBackend {
-	glog.V(logger.Info).Infof("StatusIM: backend service inited")
+	log.Info("StatusIM: backend service inited")
 	return &StatusBackend{
 		eapi:    NewPublicEthereumAPI(apiBackend),
 		bcapi:   NewPublicBlockChainAPI(apiBackend),
@@ -41,16 +40,19 @@ func NewStatusBackend(apiBackend Backend) *StatusBackend {
 	}
 }
 
+// Start starts status backend
 func (b *StatusBackend) Start() {
-	glog.V(logger.Info).Infof("StatusIM: started as LES sub-protocol")
+	log.Info("StatusIM: started as LES sub-protocol")
 	b.txQueue.Start()
 }
 
+// Stop stops status backend
 func (b *StatusBackend) Stop() {
-	glog.V(logger.Info).Infof("StatusIM: stopped as LES sub-protocol")
+	log.Info("StatusIM: stopped as LES sub-protocol")
 	b.txQueue.Stop()
 }
 
+// NotifyOnQueuedTxReturn notifies any registered handlers that transaction is ready to return
 func (b *StatusBackend) NotifyOnQueuedTxReturn(queuedTx *status.QueuedTx, err error) {
 	if b == nil {
 		return
@@ -59,22 +61,27 @@ func (b *StatusBackend) NotifyOnQueuedTxReturn(queuedTx *status.QueuedTx, err er
 	b.txQueue.NotifyOnQueuedTxReturn(queuedTx, err)
 }
 
+// SetTransactionReturnHandler sets a callback that is triggered when transaction is ready to return
 func (b *StatusBackend) SetTransactionReturnHandler(fn status.EnqueuedTxReturnHandler) {
 	b.txQueue.SetTxReturnHandler(fn)
 }
 
+// SetTransactionQueueHandler sets a callback that is triggered when transaction is enqueued
 func (b *StatusBackend) SetTransactionQueueHandler(fn status.EnqueuedTxHandler) {
 	b.txQueue.SetEnqueueHandler(fn)
 }
 
+// TransactionQueue returns reference to transaction queue
 func (b *StatusBackend) TransactionQueue() *status.TxQueue {
 	return b.txQueue
 }
 
+// SetAccountsFilterHandler sets a callback that is triggered when account list is requested
 func (b *StatusBackend) SetAccountsFilterHandler(fn status.AccountsFilterHandler) {
 	b.am.SetAccountsFilterHandler(fn)
 }
 
+// AccountManager returns reference to account manager
 func (b *StatusBackend) AccountManager() *status.AccountManager {
 	return b.am
 }

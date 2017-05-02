@@ -287,7 +287,7 @@ func TestAccountsRecoverAccount(t *testing.T) {
 	}
 
 	// make sure that identity is not (yet injected)
-	if whisperService.HasIdentity(pubKeyCheck) {
+	if whisperService.HasKeyPair(pubKeyCheck) {
 		t.Error("identity already present in whisper")
 	}
 	err = geth.SelectAccount(addressCheck, testConfig.Account1.Password)
@@ -295,7 +295,7 @@ func TestAccountsRecoverAccount(t *testing.T) {
 		t.Errorf("Test failed: could not select account: %v", err)
 		return
 	}
-	if !whisperService.HasIdentity(pubKeyCheck) {
+	if !whisperService.HasKeyPair(pubKeyCheck) {
 		t.Errorf("identity not injected into whisper: %v", err)
 	}
 }
@@ -330,7 +330,7 @@ func TestAccountSelect(t *testing.T) {
 	t.Logf("Account created: {address: %s, key: %s}", address2, pubKey2)
 
 	// make sure that identity is not (yet injected)
-	if whisperService.HasIdentity(pubKey1) {
+	if whisperService.HasKeyPair(pubKey1) {
 		t.Error("identity already present in whisper")
 	}
 
@@ -345,12 +345,12 @@ func TestAccountSelect(t *testing.T) {
 		t.Errorf("Test failed: could not select account: %v", err)
 		return
 	}
-	if !whisperService.HasIdentity(pubKey1) {
+	if !whisperService.HasKeyPair(pubKey1) {
 		t.Errorf("identity not injected into whisper: %v", err)
 	}
 
 	// select another account, make sure that previous account is wiped out from Whisper cache
-	if whisperService.HasIdentity(pubKey2) {
+	if whisperService.HasKeyPair(pubKey2) {
 		t.Error("identity already present in whisper")
 	}
 	err = geth.SelectAccount(address2, testConfig.Account1.Password)
@@ -358,10 +358,10 @@ func TestAccountSelect(t *testing.T) {
 		t.Errorf("Test failed: could not select account: %v", err)
 		return
 	}
-	if !whisperService.HasIdentity(pubKey2) {
+	if !whisperService.HasKeyPair(pubKey2) {
 		t.Errorf("identity not injected into whisper: %v", err)
 	}
-	if whisperService.HasIdentity(pubKey1) {
+	if whisperService.HasKeyPair(pubKey1) {
 		t.Error("identity should be removed, but it is still present in whisper")
 	}
 }
@@ -387,7 +387,7 @@ func TestAccountsLogout(t *testing.T) {
 	}
 
 	// make sure that identity doesn't exist (yet) in Whisper
-	if whisperService.HasIdentity(pubKey) {
+	if whisperService.HasKeyPair(pubKey) {
 		t.Error("identity already present in whisper")
 	}
 
@@ -397,7 +397,7 @@ func TestAccountsLogout(t *testing.T) {
 		t.Errorf("Test failed: could not select account: %v", err)
 		return
 	}
-	if !whisperService.HasIdentity(pubKey) {
+	if !whisperService.HasKeyPair(pubKey) {
 		t.Error("identity not injected into whisper")
 	}
 
@@ -407,7 +407,7 @@ func TestAccountsLogout(t *testing.T) {
 	}
 
 	// now, logout and check if identity is removed indeed
-	if whisperService.HasIdentity(pubKey) {
+	if whisperService.HasKeyPair(pubKey) {
 		t.Error("identity not cleared from whisper")
 	}
 }
@@ -440,7 +440,7 @@ func TestAccountsSelectedAccountOnNodeRestart(t *testing.T) {
 	t.Logf("account2 created: {address: %s, key: %s}", address2, pubKey2)
 
 	// make sure that identity is not (yet injected)
-	if whisperService.HasIdentity(pubKey1) {
+	if whisperService.HasKeyPair(pubKey1) {
 		t.Error("identity already present in whisper")
 	}
 
@@ -461,12 +461,12 @@ func TestAccountsSelectedAccountOnNodeRestart(t *testing.T) {
 		t.Errorf("could not select account: %v", err)
 		return
 	}
-	if !whisperService.HasIdentity(pubKey1) {
+	if !whisperService.HasKeyPair(pubKey1) {
 		t.Errorf("identity not injected into whisper: %v", err)
 	}
 
 	// select another account, make sure that previous account is wiped out from Whisper cache
-	if whisperService.HasIdentity(pubKey2) {
+	if whisperService.HasKeyPair(pubKey2) {
 		t.Error("identity already present in whisper")
 	}
 	err = geth.SelectAccount(address2, testConfig.Account1.Password)
@@ -474,10 +474,10 @@ func TestAccountsSelectedAccountOnNodeRestart(t *testing.T) {
 		t.Errorf("Test failed: could not select account: %v", err)
 		return
 	}
-	if !whisperService.HasIdentity(pubKey2) {
+	if !whisperService.HasKeyPair(pubKey2) {
 		t.Errorf("identity not injected into whisper: %v", err)
 	}
-	if whisperService.HasIdentity(pubKey1) {
+	if whisperService.HasKeyPair(pubKey1) {
 		t.Error("identity should be removed, but it is still present in whisper")
 	}
 
@@ -518,10 +518,10 @@ func TestAccountsSelectedAccountOnNodeRestart(t *testing.T) {
 	if err != nil {
 		t.Errorf("whisper service not running: %v", err)
 	}
-	if !whisperService.HasIdentity(pubKey2) {
+	if !whisperService.HasKeyPair(pubKey2) {
 		t.Errorf("identity not injected into whisper: %v", err)
 	}
-	if whisperService.HasIdentity(pubKey1) {
+	if whisperService.HasKeyPair(pubKey1) {
 		t.Error("identity should not be present, but it is still present in whisper")
 	}
 }
@@ -550,7 +550,7 @@ func TestAccountsNodeRestartWithNoSelectedAccount(t *testing.T) {
 	t.Logf("account1 created: {address: %s, key: %s}", address1, pubKey1)
 
 	// make sure that identity is not present
-	if whisperService.HasIdentity(pubKey1) {
+	if whisperService.HasKeyPair(pubKey1) {
 		t.Error("identity already present in whisper")
 	}
 
@@ -589,7 +589,7 @@ func TestAccountsNodeRestartWithNoSelectedAccount(t *testing.T) {
 	if err != nil {
 		t.Errorf("whisper service not running: %v", err)
 	}
-	if whisperService.HasIdentity(pubKey1) {
+	if whisperService.HasKeyPair(pubKey1) {
 		t.Error("identity should not be present, but it is present in whisper")
 	}
 }

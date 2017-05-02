@@ -28,8 +28,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/mclock"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/sha3"
-	"github.com/ethereum/go-ethereum/logger"
-	"github.com/ethereum/go-ethereum/logger/glog"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/nat"
 	"github.com/ethereum/go-ethereum/p2p/netutil"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -126,8 +125,15 @@ type topicRegisterReq struct {
 }
 
 type topicSearchReq struct {
-	topic Topic
-	found chan<- string
+	topic  Topic
+	found  chan<- *Node
+	lookup chan<- bool
+	delay  time.Duration
+}
+
+type topicSearchResult struct {
+	target lookupInfo
+	nodes  []*Node
 }
 
 type timeoutEvent struct {
@@ -263,16 +269,23 @@ func (net *Network) lookup(target common.Hash, stopOnMatch bool) []*Node {
 			break
 		}
 		// Wait for the next reply.
-		for _, n := range <-reply {
-			if n != nil && !seen[n.ID] {
-				seen[n.ID] = true
-				result.push(n, bucketSize)
-				if stopOnMatch && n.sha == target {
-					return result.entries
+		select {
+		case nodes := <-reply:
+			for _, n := range nodes {
+				if n != nil && !seen[n.ID] {
+					seen[n.ID] = true
+					result.push(n, bucketSize)
+					if stopOnMatch && n.sha == target {
+						return result.entries
+					}
 				}
 			}
+			pendingQueries--
+		case <-time.After(respTimeout):
+			// forget all pending requests, start new ones
+			pendingQueries = 0
+			reply = make(chan []*Node, alpha)
 		}
-		pendingQueries--
 	}
 	return result.entries
 }
@@ -293,18 +306,20 @@ func (net *Network) RegisterTopic(topic Topic, stop <-chan struct{}) {
 	}
 }
 
-func (net *Network) SearchTopic(topic Topic, stop <-chan struct{}, found chan<- string) {
-	select {
-	case net.topicSearchReq <- topicSearchReq{topic, found}:
-	case <-net.closed:
-		return
-	}
-	select {
-	case <-net.closed:
-	case <-stop:
+func (net *Network) SearchTopic(topic Topic, setPeriod <-chan time.Duration, found chan<- *Node, lookup chan<- bool) {
+	for {
 		select {
-		case net.topicSearchReq <- topicSearchReq{topic, nil}:
 		case <-net.closed:
+			return
+		case delay, ok := <-setPeriod:
+			select {
+			case net.topicSearchReq <- topicSearchReq{topic: topic, found: found, lookup: lookup, delay: delay}:
+			case <-net.closed:
+				return
+			}
+			if !ok {
+				return
+			}
 		}
 	}
 }
@@ -347,6 +362,13 @@ func (net *Network) reqTableOp(f func()) (called bool) {
 
 // TODO: external address handling.
 
+type topicSearchInfo struct {
+	lookupChn chan<- bool
+	period    time.Duration
+}
+
+const maxSearchCount = 5
+
 func (net *Network) loop() {
 	var (
 		refreshTimer       = time.NewTicker(autoRefreshInterval)
@@ -385,10 +407,12 @@ func (net *Network) loop() {
 		topicRegisterLookupTarget lookupInfo
 		topicRegisterLookupDone   chan []*Node
 		topicRegisterLookupTick   = time.NewTimer(0)
-		topicSearchLookupTarget   lookupInfo
 		searchReqWhenRefreshDone  []topicSearchReq
+		searchInfo                = make(map[Topic]topicSearchInfo)
+		activeSearchCount         int
 	)
-	topicSearchLookupDone := make(chan []*Node, 1)
+	topicSearchLookupDone := make(chan topicSearchResult, 100)
+	topicSearch := make(chan Topic, 100)
 	<-topicRegisterLookupTick.C
 
 	statsDump := time.NewTicker(10 * time.Second)
@@ -412,10 +436,10 @@ loop:
 			if err := net.handle(n, pkt.ev, &pkt); err != nil {
 				status = err.Error()
 			}
-			if glog.V(logger.Detail) {
-				glog.Infof("<<< (%d) %v from %x@%v: %v -> %v (%v)",
+			log.Trace("", "msg", log.Lazy{Fn: func() string {
+				return fmt.Sprintf("<<< (%d) %v from %x@%v: %v -> %v (%v)",
 					net.tab.count, pkt.ev, pkt.remoteID[:8], pkt.remoteAddr, prestate, n.state, status)
-			}
+			}})
 			// TODO: persist state if n.state goes >= known, delete if it goes <= known
 
 		// State transition timeouts.
@@ -431,10 +455,10 @@ loop:
 			if err := net.handle(timeout.node, timeout.ev, nil); err != nil {
 				status = err.Error()
 			}
-			if glog.V(logger.Detail) {
-				glog.Infof("--- (%d) %v for %x@%v: %v -> %v (%v)",
+			log.Trace("", "msg", log.Lazy{Fn: func() string {
+				return fmt.Sprintf("--- (%d) %v for %x@%v: %v -> %v (%v)",
 					net.tab.count, timeout.ev, timeout.node.ID[:8], timeout.node.addr(), prestate, timeout.node.state, status)
-			}
+			}})
 
 		// Querying.
 		case q := <-net.queryReq:
@@ -504,21 +528,52 @@ loop:
 		case req := <-net.topicSearchReq:
 			if refreshDone == nil {
 				debugLog("<-net.topicSearchReq")
-				if req.found == nil {
-					net.ticketStore.removeSearchTopic(req.topic)
+				info, ok := searchInfo[req.topic]
+				if ok {
+					if req.delay == time.Duration(0) {
+						delete(searchInfo, req.topic)
+						net.ticketStore.removeSearchTopic(req.topic)
+					} else {
+						info.period = req.delay
+						searchInfo[req.topic] = info
+					}
 					continue
 				}
-				net.ticketStore.addSearchTopic(req.topic, req.found)
-				if (topicSearchLookupTarget.target == common.Hash{}) {
-					topicSearchLookupDone <- nil
+				if req.delay != time.Duration(0) {
+					var info topicSearchInfo
+					info.period = req.delay
+					info.lookupChn = req.lookup
+					searchInfo[req.topic] = info
+					net.ticketStore.addSearchTopic(req.topic, req.found)
+					topicSearch <- req.topic
 				}
 			} else {
 				searchReqWhenRefreshDone = append(searchReqWhenRefreshDone, req)
 			}
 
-		case nodes := <-topicSearchLookupDone:
-			debugLog("<-topicSearchLookupDone")
-			net.ticketStore.searchLookupDone(topicSearchLookupTarget, nodes, func(n *Node) []byte {
+		case topic := <-topicSearch:
+			if activeSearchCount < maxSearchCount {
+				activeSearchCount++
+				target := net.ticketStore.nextSearchLookup(topic)
+				go func() {
+					nodes := net.lookup(target.target, false)
+					topicSearchLookupDone <- topicSearchResult{target: target, nodes: nodes}
+				}()
+			}
+			period := searchInfo[topic].period
+			if period != time.Duration(0) {
+				go func() {
+					time.Sleep(period)
+					topicSearch <- topic
+				}()
+			}
+
+		case res := <-topicSearchLookupDone:
+			activeSearchCount--
+			if lookupChn := searchInfo[res.target.topic].lookupChn; lookupChn != nil {
+				lookupChn <- net.ticketStore.radius[res.target.topic].converged
+			}
+			net.ticketStore.searchLookupDone(res.target, res.nodes, func(n *Node) []byte {
 				net.ping(n, n.addr())
 				return n.pingEcho
 			}, func(n *Node, topic Topic) []byte {
@@ -531,11 +586,6 @@ loop:
 					return nil
 				}
 			})
-			topicSearchLookupTarget = net.ticketStore.nextSearchLookup()
-			target := topicSearchLookupTarget.target
-			if (target != common.Hash{}) {
-				go func() { topicSearchLookupDone <- net.lookup(target, false) }()
-			}
 
 		case <-statsDump.C:
 			debugLog("<-statsDump.C")
@@ -604,7 +654,7 @@ loop:
 	}
 	debugLog("loop stopped")
 
-	glog.V(logger.Debug).Infof("shutting down")
+	log.Debug(fmt.Sprintf("shutting down"))
 	if net.conn != nil {
 		net.conn.Close()
 	}
@@ -634,20 +684,20 @@ func (net *Network) refresh(done chan<- struct{}) {
 		seeds = net.nursery
 	}
 	if len(seeds) == 0 {
-		glog.V(logger.Detail).Info("no seed nodes found")
+		log.Trace(fmt.Sprint("no seed nodes found"))
 		close(done)
 		return
 	}
 	for _, n := range seeds {
-		if glog.V(logger.Debug) {
+		log.Debug("", "msg", log.Lazy{Fn: func() string {
 			var age string
 			if net.db != nil {
 				age = time.Since(net.db.lastPong(n.ID)).String()
 			} else {
 				age = "unknown"
 			}
-			glog.Infof("seed node (age %s): %v", age, n)
-		}
+			return fmt.Sprintf("seed node (age %s): %v", age, n)
+		}})
 		n = net.internNodeFromDB(n)
 		if n.state == unknown {
 			net.transition(n, verifyinit)
@@ -1203,7 +1253,7 @@ func (net *Network) handleNeighboursPacket(n *Node, pkt *ingressPacket) error {
 	for i, rn := range req.Nodes {
 		nn, err := net.internNodeFromNeighbours(pkt.remoteAddr, rn)
 		if err != nil {
-			glog.V(logger.Debug).Infof("invalid neighbour (%v) from %x@%v: %v", rn.IP, n.ID[:8], pkt.remoteAddr, err)
+			log.Debug(fmt.Sprintf("invalid neighbour (%v) from %x@%v: %v", rn.IP, n.ID[:8], pkt.remoteAddr, err))
 			continue
 		}
 		nodes[i] = nn

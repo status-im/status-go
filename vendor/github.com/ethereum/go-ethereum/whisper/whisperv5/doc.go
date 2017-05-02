@@ -32,6 +32,8 @@ package whisperv5
 import (
 	"fmt"
 	"time"
+
+	"github.com/ethereum/go-ethereum/p2p"
 )
 
 const (
@@ -54,9 +56,11 @@ const (
 	aesKeyLength      = 32
 	saltLength        = 12
 	AESNonceMaxLength = 12
+	keyIdSize         = 32
 
-	MaxMessageLength = 0x0FFFFF // todo: remove this restriction after testing. this should be regulated by PoW.
-	MinimumPoW       = 0.001     // todo: review after testing.
+	DefaultMaxMessageLength = 1024 * 1024
+	DefaultMinimumPoWTime   = 2     // todo: review after testing.
+	DefaultMinimumPoW       = 0.001 // todo: review after testing.
 
 	padSizeLimitLower = 128 // it can not be less - we don't want to reveal the absence of signature
 	padSizeLimitUpper = 256 // just an arbitrary number, could be changed without losing compatibility
@@ -84,4 +88,16 @@ func (e unknownVersionError) Error() string {
 type MailServer interface {
 	Archive(env *Envelope)
 	DeliverMail(whisperPeer *Peer, request *Envelope)
+}
+
+// NotificationServer represents a notification server,
+// capable of screening incoming envelopes for special
+// topics, and once located, subscribe client nodes as
+// recipients to notifications (push notifications atm)
+type NotificationServer interface {
+	// Start initializes notification sending loop
+	Start(server *p2p.Server) error
+
+	// Stop stops notification sending loop, releasing related resources
+	Stop() error
 }

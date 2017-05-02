@@ -1,12 +1,14 @@
 package params_test
 
 import (
+	"encoding/json"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/core"
 	gethparams "github.com/ethereum/go-ethereum/params"
 	"github.com/status-im/status-go/geth"
 	"github.com/status-im/status-go/geth/params"
@@ -190,7 +192,11 @@ var loadConfigTestCases = []struct {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			chainConfig := nodeConfig.ChainConfig
+			genesis := new(core.Genesis)
+			if err := json.Unmarshal([]byte(nodeConfig.LightEthConfig.Genesis), genesis); err != nil {
+				t.Fatal(err)
+			}
+			chainConfig := genesis.Config
 			refChainConfig := gethparams.TestnetChainConfig
 
 			if chainConfig.HomesteadBlock.Cmp(refChainConfig.HomesteadBlock) != 0 {
@@ -237,7 +243,11 @@ var loadConfigTestCases = []struct {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			chainConfig := nodeConfig.ChainConfig
+			genesis := new(core.Genesis)
+			if err := json.Unmarshal([]byte(nodeConfig.LightEthConfig.Genesis), genesis); err != nil {
+				t.Fatal(err)
+			}
+			chainConfig := genesis.Config
 			if chainConfig.HomesteadBlock.Cmp(gethparams.MainNetHomesteadBlock) != 0 {
 				t.Fatal("invalid chainConfig.HomesteadBlock")
 			}
@@ -272,10 +282,7 @@ var loadConfigTestCases = []struct {
 			"Name": "TestStatusNode",
 			"WSPort": 8546,
 			"IPCEnabled": true,
-			"WSEnabled": false,
-			"ChainConfig": {
-				"ChainId": 311
-			}
+			"WSEnabled": false
 		}`,
 		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
 			//nodeConfig.LightEthConfig.Genesis = nodeConfig.LightEthConfig.Genesis[:125]
@@ -289,11 +296,6 @@ var loadConfigTestCases = []struct {
 			if nodeConfig.NetworkId != networkId {
 				t.Fatalf("unexpected NetworkId, expected: %v, got: %v", networkId, nodeConfig.NetworkId)
 			}
-
-			if nodeConfig.ChainId.Int64() != int64(networkId) {
-				t.Fatalf("unexpected ChainConfig.ChainId, expected: %v, got: %v", networkId, nodeConfig.ChainId)
-			}
-
 		},
 	},
 }
@@ -314,31 +316,36 @@ func TestLoadNodeConfig(t *testing.T) {
 }
 
 func TestConfigWriteRead(t *testing.T) {
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "geth-config-tests")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
+	configReadWrite := func(networkId int, refFile string) {
+		tmpDir, err := ioutil.TempDir(os.TempDir(), "geth-config-tests")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer os.RemoveAll(tmpDir)
 
-	nodeConfig, err := params.NewNodeConfig(tmpDir, params.TestNetworkId)
-	if err != nil {
-		t.Fatalf("cannot create new config object: %v", err)
+		nodeConfig, err := params.NewNodeConfig(tmpDir, networkId)
+		if err != nil {
+			t.Fatalf("cannot create new config object: %v", err)
+		}
+
+		if err := nodeConfig.Save(); err != nil {
+			t.Fatalf("cannot persist configuration: %v", err)
+		}
+
+		loadedConfigData, err := ioutil.ReadFile(filepath.Join(nodeConfig.DataDir, "config.json"))
+		if err != nil {
+			t.Fatalf("cannot read configuration from disk: %v", err)
+		}
+
+		refConfigData := geth.LoadFromFile(refFile)
+
+		refConfigData = strings.Replace(refConfigData, "$TMPDIR", nodeConfig.DataDir, -1)
+		refConfigData = strings.Replace(refConfigData, "$VERSION", params.Version, -1)
+		if string(loadedConfigData) != refConfigData {
+			t.Fatalf("configuration mismatch,\nexpected: %v\ngot: %v", refConfigData, string(loadedConfigData))
+		}
 	}
 
-	if err := nodeConfig.Save(); err != nil {
-		t.Fatalf("cannot persist configuration: %v", err)
-	}
-
-	loadedConfigData, err := ioutil.ReadFile(filepath.Join(nodeConfig.DataDir, "config.json"))
-	if err != nil {
-		t.Fatalf("cannot read configuration from disk: %v", err)
-	}
-
-	refConfigData := geth.LoadFromFile("testdata/config.testnet.json")
-
-	refConfigData = strings.Replace(refConfigData, "$TMPDIR", nodeConfig.DataDir, -1)
-	refConfigData = strings.Replace(refConfigData, "$VERSION", params.Version, -1)
-	if string(loadedConfigData) != refConfigData {
-		t.Fatalf("configuration mismatch,\nexpected: %v\ngot: %v", refConfigData, string(loadedConfigData))
-	}
+	configReadWrite(params.TestNetworkId, "testdata/config.testnet.json")
+	configReadWrite(params.MainNetworkId, "testdata/config.mainnet.json")
 }

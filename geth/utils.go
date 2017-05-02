@@ -9,6 +9,7 @@ import "C"
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -20,8 +21,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/logger"
-	"github.com/ethereum/go-ethereum/logger/glog"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/static"
 )
@@ -59,7 +59,7 @@ func SetDefaultNodeNotificationHandler(fn NodeNotificationHandler) {
 
 // TriggerDefaultNodeNotificationHandler triggers default notification handler (helpful in tests)
 func TriggerDefaultNodeNotificationHandler(jsonEvent string) {
-	glog.V(logger.Info).Infof("notification received (default notification handler): %s\n", jsonEvent)
+	log.Info("notification received (default notification handler)", "event", jsonEvent)
 }
 
 // SendSignal sends application signal (JSON, normally) upwards to application (via default notification handler)
@@ -164,7 +164,7 @@ func PrepareTestNode() (err error) {
 
 	// prepare node directory
 	if err := os.MkdirAll(filepath.Join(TestDataDir, "keystore"), os.ModePerm); err != nil {
-		glog.V(logger.Warn).Infoln("make node failed:", err)
+		log.Warn("make node failed", "error", err)
 		return err
 	}
 
@@ -206,7 +206,7 @@ func PrepareTestNode() (err error) {
 	}
 
 	if syncRequired {
-		glog.V(logger.Warn).Infof("Sync is required, it will take %d seconds", testConfig.Node.SyncSeconds)
+		log.Warn(fmt.Sprintf("Sync is required, it will take %d seconds", testConfig.Node.SyncSeconds))
 		time.Sleep(testConfig.Node.SyncSeconds * time.Second) // LES syncs headers, so that we are up do date when it is done
 	}
 
@@ -216,7 +216,7 @@ func PrepareTestNode() (err error) {
 func RemoveTestNode() {
 	err := os.RemoveAll(TestDataDir)
 	if err != nil {
-		glog.V(logger.Warn).Infof("could not clean up temporary datadir")
+		log.Warn("could not clean up temporary datadir")
 	}
 }
 
@@ -288,7 +288,7 @@ func ImportTestAccount(keystoreDir, accountFile string) error {
 	if _, err := os.Stat(dst); os.IsNotExist(err) {
 		err = ioutil.WriteFile(dst, static.MustAsset("keys/"+accountFile), 0644)
 		if err != nil {
-			glog.V(logger.Warn).Infof("cannot copy test account PK: %v", err)
+			log.Warn("cannot copy test account PK", "error", err)
 			return err
 		}
 	}

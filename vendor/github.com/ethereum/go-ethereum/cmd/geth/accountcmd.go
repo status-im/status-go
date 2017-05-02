@@ -25,8 +25,7 @@ import (
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/console"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/logger"
-	"github.com/ethereum/go-ethereum/logger/glog"
+	"github.com/ethereum/go-ethereum/log"
 	"gopkg.in/urfave/cli.v1"
 )
 
@@ -180,8 +179,7 @@ nodes.
 )
 
 func accountList(ctx *cli.Context) error {
-	stack := utils.MakeNode(ctx, clientIdentifier, gitCommit)
-
+	stack, _ := makeConfigNode(ctx)
 	var index int
 	for _, wallet := range stack.AccountManager().Wallets() {
 		for _, account := range wallet.Accounts() {
@@ -203,11 +201,11 @@ func unlockAccount(ctx *cli.Context, ks *keystore.KeyStore, address string, i in
 		password := getPassPhrase(prompt, false, i, passwords)
 		err = ks.Unlock(account, password)
 		if err == nil {
-			glog.V(logger.Info).Infof("Unlocked account %x", account.Address)
+			log.Info("Unlocked account", "address", account.Address.Hex())
 			return account, password
 		}
 		if err, ok := err.(*keystore.AmbiguousAddrError); ok {
-			glog.V(logger.Info).Infof("Unlocked account %x", account.Address)
+			log.Info("Unlocked account", "address", account.Address.Hex())
 			return ambiguousAddrRecovery(ks, err, password), password
 		}
 		if err != keystore.ErrDecrypt {
@@ -217,6 +215,7 @@ func unlockAccount(ctx *cli.Context, ks *keystore.KeyStore, address string, i in
 	}
 	// All trials expended to unlock account, bail out
 	utils.Fatalf("Failed to unlock account %s (%v)", address, err)
+
 	return accounts.Account{}, ""
 }
 
@@ -295,7 +294,7 @@ func ambiguousAddrRecovery(ks *keystore.KeyStore, err *keystore.AmbiguousAddrErr
 
 // accountCreate creates a new account into the keystore defined by the CLI flags.
 func accountCreate(ctx *cli.Context) error {
-	stack := utils.MakeNode(ctx, clientIdentifier, gitCommit)
+	stack, _ := makeConfigNode(ctx)
 	password := getPassPhrase("Your new account is locked with a password. Please give a password. Do not forget this password.", true, 0, utils.MakePasswordList(ctx))
 	whisperEnabled := getWhisperYesNo("You can also choose to enable your new account as a Whisper identity.")
 
@@ -314,7 +313,7 @@ func accountUpdate(ctx *cli.Context) error {
 	if len(ctx.Args()) == 0 {
 		utils.Fatalf("No accounts specified to update")
 	}
-	stack := utils.MakeNode(ctx, clientIdentifier, gitCommit)
+	stack, _ := makeConfigNode(ctx)
 	ks := stack.AccountManager().Backends(keystore.KeyStoreType)[0].(*keystore.KeyStore)
 
 	account, oldPassword := unlockAccount(ctx, ks, ctx.Args().First(), 0, nil)
@@ -335,7 +334,7 @@ func importWallet(ctx *cli.Context) error {
 		utils.Fatalf("Could not read wallet file: %v", err)
 	}
 
-	stack := utils.MakeNode(ctx, clientIdentifier, gitCommit)
+	stack, _ := makeConfigNode(ctx)
 	passphrase := getPassPhrase("", false, 0, utils.MakePasswordList(ctx))
 
 	ks := stack.AccountManager().Backends(keystore.KeyStoreType)[0].(*keystore.KeyStore)
@@ -356,7 +355,7 @@ func accountImport(ctx *cli.Context) error {
 	if err != nil {
 		utils.Fatalf("Failed to load the private key: %v", err)
 	}
-	stack := utils.MakeNode(ctx, clientIdentifier, gitCommit)
+	stack, _ := makeConfigNode(ctx)
 	passphrase := getPassPhrase("Your new account is locked with a password. Please give a password. Do not forget this password.", true, 0, utils.MakePasswordList(ctx))
 
 	ks := stack.AccountManager().Backends(keystore.KeyStoreType)[0].(*keystore.KeyStore)

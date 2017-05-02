@@ -1,145 +1,94 @@
 package params
 
 import (
-	"bufio"
-	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"sync"
 
-	"github.com/ethereum/go-ethereum/logger"
-	"github.com/ethereum/go-ethereum/logger/glog"
+	"github.com/ethereum/go-ethereum/log"
 )
 
 // Logger is wrapper for custom logging
 type Logger struct {
-	sync.Mutex
-	logFile  *os.File
-	observer chan string
-	started  chan struct{}
-	stopped  chan struct{}
-	stopFlag bool
+	origHandler log.Handler
+	handler     log.Handler
+	config      *NodeConfig
 }
 
-var onceStartLogger sync.Once
+var (
+	onceInitNodeLogger sync.Once
+	nodeLoggerInstance *Logger
+)
 
 // SetupLogger configs logger using parameters in config
-func SetupLogger(config *NodeConfig) (nodeLogger *Logger, err error) {
+func SetupLogger(config *NodeConfig) (*Logger, error) {
 	if !config.LogEnabled {
 		return nil, nil
 	}
 
-	nodeLogger = &Logger{
-		started: make(chan struct{}, 1),
-		stopped: make(chan struct{}, 1),
-	}
-
-	onceStartLogger.Do(func() {
-		err = nodeLogger.createAndStartLogger(config)
+	onceInitNodeLogger.Do(func() {
+		nodeLoggerInstance = &Logger{
+			config:      config,
+			origHandler: log.Root().GetHandler(),
+		}
+		nodeLoggerInstance.handler = nodeLoggerInstance.makeLogHandler(parseLogLevel(config.LogLevel))
 	})
 
-	return
+	if err := nodeLoggerInstance.Start(); err != nil {
+		return nil, err
+	}
+
+	return nodeLoggerInstance, nil
 }
 
 // SetV allows to dynamically change log level of messages being written
 func (l *Logger) SetV(logLevel string) {
-	glog.SetV(parseLogLevel(logLevel))
+	log.Root().SetHandler(l.makeLogHandler(parseLogLevel(logLevel)))
 }
 
-// Stop marks logger as stopped, forcing to relinquish hold
-// on os.Stderr and restore it back to the original
-func (l *Logger) Stop() (stopped chan struct{}) {
-	l.Lock()
-	defer l.Unlock()
-
-	l.stopFlag = true
-	stopped = l.stopped
-	return
-}
-
-// Observe registers extra writer where logs should be written to.
-// This method is used in unit tests, and should NOT be relied upon otherwise.
-func (l *Logger) Observe(observer chan string) (started chan struct{}) {
-	l.observer = observer
-	started = l.started
-	return
-}
-
-// createAndStartLogger initializes and starts logger by replacing os.Stderr with custom writer.
-// Custom writer intercepts all requests to os.Stderr, then forwards to multiple readers, which
-// include log file and the original os.Stderr (so that logs output on screen as well)
-func (l *Logger) createAndStartLogger(config *NodeConfig) error {
-	// customize glog
-	glog.CopyStandardLogTo("INFO")
-	glog.SetToStderr(true)
-	glog.SetV(parseLogLevel(config.LogLevel))
-
-	// create log file
-	logFile, err := os.OpenFile(filepath.Join(config.DataDir, config.LogFile), os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
-	if err != nil {
-		return err
-	}
-
-	// inject reader to pipe all writes to Stderr
-	r, w, err := os.Pipe()
-	if err != nil {
-		return err
-	}
-
-	// replace Stderr
-	origStderr := os.Stderr
-	os.Stderr = w
-	scanner := bufio.NewScanner(r)
-
-	// configure writer, send to the original os.Stderr and log file
-	logWriter := io.MultiWriter(origStderr, logFile)
-
-	go func() {
-		defer func() { // restore original Stderr
-			os.Stderr = origStderr
-			logFile.Close()
-			close(l.stopped)
-		}()
-
-		// notify observer that it can start polling (unit test, normally)
-		close(l.started)
-
-		for scanner.Scan() {
-			fmt.Fprintln(logWriter, scanner.Text())
-
-			if l.observer != nil {
-				l.observer <- scanner.Text()
-			}
-
-			// allow to restore original os.Stderr if logger is stopped
-			if l.stopFlag {
-				return
-			}
-		}
-
-		if err := scanner.Err(); err != nil {
-			fmt.Fprintf(origStderr, "error reading logs: %v\n", err)
-		}
-	}()
-
+// Start installs logger handler
+func (l *Logger) Start() error {
+	log.Root().SetHandler(l.handler)
 	return nil
 }
 
-// parseLogLevel parses string and returns logger.* constant
-func parseLogLevel(logLevel string) int {
-	switch logLevel {
-	case "ERROR":
-		return logger.Error
-	case "WARNING":
-		return logger.Warn
-	case "INFO":
-		return logger.Info
-	case "DEBUG":
-		return logger.Debug
-	case "DETAIL":
-		return logger.Detail
+// Stop replaces our handler back to the original log handler
+func (l *Logger) Stop() error {
+	log.Root().SetHandler(l.origHandler)
+	return nil
+}
+
+// makeLogHandler creates a log handler for a given level and node configuration
+func (l *Logger) makeLogHandler(lvl log.Lvl) log.Handler {
+	var handler log.Handler
+	logFilePath := filepath.Join(l.config.DataDir, l.config.LogFile)
+	fileHandler := log.Must.FileHandler(logFilePath, log.LogfmtFormat())
+	stderrHandler := log.StreamHandler(os.Stderr, log.TerminalFormat(true))
+	if l.config.LogToStderr {
+		handler = log.MultiHandler(
+			log.LvlFilterHandler(lvl, log.CallerFileHandler(log.CallerFuncHandler(stderrHandler))),
+			log.LvlFilterHandler(lvl, fileHandler))
+	} else {
+		handler = log.LvlFilterHandler(lvl, fileHandler)
 	}
 
-	return logger.Info
+	return handler
+}
+
+// parseLogLevel parses string and returns logger.* constant
+func parseLogLevel(logLevel string) log.Lvl {
+	switch logLevel {
+	case "ERROR":
+		return log.LvlError
+	case "WARNING":
+		return log.LvlWarn
+	case "INFO":
+		return log.LvlInfo
+	case "DEBUG":
+		return log.LvlDebug
+	case "TRACE":
+		return log.LvlTrace
+	}
+
+	return log.LvlInfo
 }
