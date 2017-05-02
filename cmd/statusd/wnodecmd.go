@@ -50,6 +50,10 @@ var (
 		Usage: "Time to live for messages, in seconds",
 		Value: params.WhisperTTL,
 	}
+	WhisperInjectTestAccounts = cli.BoolTFlag{
+		Name:  "injectaccounts",
+		Usage: "Whether test account should be injected or not (default: true)",
+	}
 )
 
 var (
@@ -67,6 +71,7 @@ var (
 			WhisperPoWFlag,
 			WhisperPortFlag,
 			WhisperTTLFlag,
+			WhisperInjectTestAccounts,
 		},
 	}
 )
@@ -80,12 +85,21 @@ func wnode(ctx *cli.Context) error {
 
 	wnodePrintHeader(config)
 
-	// inject test accounts
-	geth.ImportTestAccount(filepath.Join(config.DataDir, "keystore"), "test-account1.pk")
-	geth.ImportTestAccount(filepath.Join(config.DataDir, "keystore"), "test-account2.pk")
+	// import test accounts
+	if ctx.BoolT(WhisperInjectTestAccounts.Name) {
+		geth.ImportTestAccount(filepath.Join(config.DataDir, "keystore"), "test-account1.pk")
+		geth.ImportTestAccount(filepath.Join(config.DataDir, "keystore"), "test-account2.pk")
+	}
 
 	if err := geth.CreateAndRunNode(config); err != nil {
 		return err
+	}
+
+	// inject test accounts into Whisper
+	if ctx.BoolT(WhisperInjectTestAccounts.Name) {
+		testConfig, _ := geth.LoadTestConfig()
+		injectAccountIntoWhisper(testConfig.Account1.Address, testConfig.Account1.Password)
+		injectAccountIntoWhisper(testConfig.Account2.Address, testConfig.Account2.Password)
 	}
 
 	// wait till node has been stopped
@@ -94,6 +108,7 @@ func wnode(ctx *cli.Context) error {
 	return nil
 }
 
+// wnodePrintHeader prints command header
 func wnodePrintHeader(nodeConfig *params.NodeConfig) {
 	fmt.Println("Starting Whisper/5 node..")
 
@@ -135,4 +150,32 @@ func makeWhisperNodeConfig(ctx *cli.Context) (*params.NodeConfig, error) {
 	}
 
 	return nodeConfig, nil
+}
+
+// injectAccountIntoWhisper adds key pair into Whisper. Similar to Select/Login,
+// but allows multiple accounts to be injected.
+func injectAccountIntoWhisper(address, password string) error {
+	nodeManager := geth.NodeManagerInstance()
+	keyStore, err := nodeManager.AccountKeyStore()
+	if err != nil {
+		return err
+	}
+
+	account, err := geth.ParseAccountString(address)
+	if err != nil {
+		return geth.ErrAddressToAccountMappingFailure
+	}
+
+	account, accountKey, err := keyStore.AccountDecryptedKey(account, password)
+	if err != nil {
+		return fmt.Errorf("%s: %v", geth.ErrAccountToKeyMappingFailure.Error(), err)
+	}
+
+	whisperService, err := nodeManager.WhisperService()
+	if err != nil {
+		return err
+	}
+	whisperService.AddKeyPair(accountKey.PrivateKey)
+
+	return nil
 }

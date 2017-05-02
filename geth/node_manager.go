@@ -13,8 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/les"
-	"github.com/ethereum/go-ethereum/logger"
-	"github.com/ethereum/go-ethereum/logger/glog"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -105,13 +104,13 @@ func (m *NodeManager) RunNode() {
 		m.StartNode()
 
 		if _, err := m.AccountManager(); err != nil {
-			glog.V(logger.Warn).Infoln(ErrInvalidAccountManager)
+			log.Warn(ErrInvalidAccountManager.Error())
 		}
 		if err := m.node.geth.Service(&m.services.whisperService); err != nil {
-			glog.V(logger.Warn).Infoln("cannot get whisper service:", err)
+			log.Warn("cannot get whisper service", "error", err)
 		}
 		if err := m.node.geth.Service(&m.services.lightEthereum); err != nil {
-			glog.V(logger.Warn).Infoln("cannot get light ethereum service:", err)
+			log.Warn("cannot get light ethereum service", "error", err)
 		}
 
 		// setup handlers
@@ -124,7 +123,7 @@ func (m *NodeManager) RunNode() {
 		var err error
 		m.services.rpcClient, err = m.node.geth.Attach()
 		if err != nil {
-			glog.V(logger.Warn).Infoln("cannot get RPC client service:", ErrInvalidClient)
+			log.Warn("cannot get RPC client service", "error", ErrInvalidClient)
 		}
 
 		// expose API
@@ -135,7 +134,7 @@ func (m *NodeManager) RunNode() {
 		m.onNodeStarted() // node started, notify listeners
 		m.node.geth.Wait()
 
-		glog.V(logger.Info).Infoln("node stopped")
+		log.Info("node stopped")
 	}()
 }
 
@@ -149,18 +148,24 @@ func (m *NodeManager) StartNode() {
 		panic(fmt.Sprintf("%v: %v", ErrNodeStartFailure, err))
 	}
 
+	if server := m.node.geth.Server(); server != nil {
+		if nodeInfo := server.NodeInfo(); nodeInfo != nil {
+			log.Info(nodeInfo.Enode)
+		}
+	}
+
 	// allow interrupting running nodes
 	go func() {
 		sigc := make(chan os.Signal, 1)
 		signal.Notify(sigc, os.Interrupt)
 		defer signal.Stop(sigc)
 		<-sigc
-		glog.V(logger.Info).Infoln("Got interrupt, shutting down...")
+		log.Info("Got interrupt, shutting down...")
 		go m.node.geth.Stop()
 		for i := 3; i > 0; i-- {
 			<-sigc
 			if i > 1 {
-				glog.V(logger.Info).Infof("Already shutting down, interrupt %d more times for panic.", i-1)
+				log.Info(fmt.Sprintf("Already shutting down, interrupt %d more times for panic.", i-1))
 			}
 		}
 		panic("interrupted!")
@@ -173,7 +178,9 @@ func (m *NodeManager) StopNode() error {
 		return ErrInvalidGethNode
 	}
 
-	m.node.geth.Stop()
+	if err := m.node.geth.Stop(); err != nil {
+		return err
+	}
 	m.node.started = make(chan struct{})
 	return nil
 }
@@ -222,10 +229,10 @@ func (m *NodeManager) ResetChainData() error {
 	if _, err := os.Stat(chainDataDir); os.IsNotExist(err) {
 		return err
 	}
-
 	if err := os.RemoveAll(chainDataDir); err != nil {
 		return err
 	}
+	log.Info("chaindata removed", "dir", chainDataDir)
 
 	if err := m.ResumeNode(); err != nil {
 		return err
@@ -245,8 +252,9 @@ func (m *NodeManager) StartNodeRPCServer() (bool, error) {
 
 	config := m.node.gethConfig
 	modules := strings.Join(config.HTTPModules, ",")
+	cors := strings.Join(config.HTTPCors, ",")
 
-	return m.api.StartRPC(&config.HTTPHost, &config.HTTPPort, &config.HTTPCors, &modules)
+	return m.api.StartRPC(&config.HTTPHost, &config.HTTPPort, &cors, &modules)
 }
 
 // StopNodeRPCServer stops HTTP RPC service attached to node

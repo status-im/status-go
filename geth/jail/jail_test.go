@@ -783,8 +783,8 @@ func TestJailWhisper(t *testing.T) {
 	}
 	accountKey1Hex := common.ToHex(crypto.FromECDSAPub(&accountKey1.PrivateKey.PublicKey))
 
-	whisperService.AddIdentity(accountKey1.PrivateKey)
-	if ok, err := whisperAPI.HasIdentity(accountKey1Hex); err != nil || !ok {
+	whisperService.AddKeyPair(accountKey1.PrivateKey)
+	if ok, err := whisperAPI.HasKeyPair(accountKey1Hex); err != nil || !ok {
 		t.Fatalf("identity not injected: %v", accountKey1Hex)
 	}
 
@@ -795,8 +795,8 @@ func TestJailWhisper(t *testing.T) {
 	}
 	accountKey2Hex := common.ToHex(crypto.FromECDSAPub(&accountKey2.PrivateKey.PublicKey))
 
-	whisperService.AddIdentity(accountKey2.PrivateKey)
-	if ok, err := whisperAPI.HasIdentity(accountKey2Hex); err != nil || !ok {
+	whisperService.AddKeyPair(accountKey2.PrivateKey)
+	if ok, err := whisperAPI.HasKeyPair(accountKey2Hex); err != nil || !ok {
 		t.Fatalf("identity not injected: %v", accountKey2Hex)
 	}
 
@@ -838,32 +838,35 @@ func TestJailWhisper(t *testing.T) {
 			"test 1: encrypted signed message from us (From != nil && To != nil)",
 			`
 				var identity1 = '` + accountKey1Hex + `';
-				if (!web3.shh.hasIdentity(identity1)) {
+				if (!web3.shh.hasKeyPair(identity1)) {
 					throw 'idenitity "` + accountKey1Hex + `" not found in whisper';
 				}
 
 				var identity2 = '` + accountKey2Hex + `';
-				if (!web3.shh.hasIdentity(identity2)) {
+				if (!web3.shh.hasKeyPair(identity2)) {
 					throw 'idenitity "` + accountKey2Hex + `" not found in whisper';
 				}
 
-				var topic = 'example1';
+				var topic = makeTopic();
 				var payload = '` + whisperMessage1 + `';
 
 				// start watching for messages
 				var filter = shh.filter({
-					from: identity1,
-					to: identity2,
-					topics: [web3.fromAscii(topic)]
+					type: "asym",
+					sig: identity1,
+					key: identity2,
+					topics: [topic]
 				});
+				console.log(JSON.stringify(filter));
 
 				// post message
 				var message = {
-				  from: identity1,
-				  to: identity2,
-				  topics: [web3.fromAscii(topic)],
-				  payload: payload,
-				  ttl: 20,
+					type: "asym",
+					sig: identity1,
+					key: identity2,
+					topic: topic,
+					payload: payload,
+					ttl: 20,
 				};
 				var err = shh.post(message)
 				if (err !== null) {
@@ -882,27 +885,29 @@ func TestJailWhisper(t *testing.T) {
 			"test 2: encrypted signed message to yourself (From != nil && To != nil)",
 			`
 				var identity = '` + accountKey1Hex + `';
-				if (!web3.shh.hasIdentity(identity)) {
+				if (!web3.shh.hasKeyPair(identity)) {
 					throw 'idenitity "` + accountKey1Hex + `" not found in whisper';
 				}
 
-				var topic = 'example2';
+				var topic = makeTopic();
 				var payload = '` + whisperMessage2 + `';
 
 				// start watching for messages
 				var filter = shh.filter({
-					from: identity,
-					to: identity,
-					topics: [web3.fromAscii(topic)],
+					type: "asym",
+					sig: identity,
+					key: identity,
+					topics: [topic],
 				});
 
 				// post message
 				var message = {
-				  from: identity,
-				  to: identity,
-				  topics: [web3.fromAscii(topic)],
-				  payload: payload,
-				  ttl: 20,
+					type: "asym",
+				  	sig: identity,
+				  	key: identity,
+				  	topic: topic,
+				  	payload: payload,
+				  	ttl: 20,
 				};
 				var err = shh.post(message)
 				if (err !== null) {
@@ -921,33 +926,35 @@ func TestJailWhisper(t *testing.T) {
 			"test 3: signed (known sender) broadcast (From != nil && To == nil)",
 			`
 				var identity = '` + accountKey1Hex + `';
-				if (!web3.shh.hasIdentity(identity)) {
+				if (!web3.shh.hasKeyPair(identity)) {
 					throw 'idenitity "` + accountKey1Hex + `" not found in whisper';
 				}
 
-				var topic = 'example3';
+				var topic = makeTopic();
 				var payload = '` + whisperMessage3 + `';
 
-				// generate symmetric key (if doesn't already exist)
-				if (!shh.hasSymKey(topic)) {
-					shh.addSymKey(topic, "0xdeadbeef"); // alternatively: shh.generateSymKey("example3");
-														// to delete key, rely on: shh.deleteSymKey(topic);
+				// generate symmetric key
+				var keyid = shh.generateSymmetricKey();
+				if (!shh.hasSymmetricKey(keyid)) {
+					throw new Error('key not found');
 				}
 
 				// start watching for messages
 				var filter = shh.filter({
-					from: identity,
-					topics: [web3.fromAscii(topic)],
-					keyname: topic // you can use some other name for key too
+					type: "sym",
+					sig: identity,
+					topics: [topic],
+					key: keyid
 				});
 
 				// post message
 				var message = {
-					from: identity,
-					topics: [web3.fromAscii(topic)],
+					type: "sym",
+					sig: identity,
+					topic: topic,
 					payload: payload,
 					ttl: 20,
-					keyname: topic
+					key: keyid
 				};
 				var err = shh.post(message)
 				if (err !== null) {
@@ -965,27 +972,29 @@ func TestJailWhisper(t *testing.T) {
 		{
 			"test 4: anonymous broadcast (From == nil && To == nil)",
 			`
-				var topic = 'example4';
+				var topic = makeTopic();
 				var payload = '` + whisperMessage4 + `';
 
-				// generate symmetric key (if doesn't already exist)
-				if (!shh.hasSymKey(topic)) {
-					shh.addSymKey(topic, "0xdeadbeef"); // alternatively: shh.generateSymKey("example3");
-														// to delete key, rely on: shh.deleteSymKey(topic);
+				// generate symmetric key
+				var keyid = shh.generateSymmetricKey();
+				if (!shh.hasSymmetricKey(keyid)) {
+					throw new Error('key not found');
 				}
 
 				// start watching for messages
 				var filter = shh.filter({
-					topics: [web3.fromAscii(topic)],
-					keyname: topic // you can use some other name for key too
+					type: "sym",
+					topics: [topic],
+					key: keyid
 				});
 
 				// post message
 				var message = {
-					topics: [web3.fromAscii(topic)],
+					type: "sym",
+					topic: topic,
 					payload: payload,
 					ttl: 20,
-					keyname: topic
+					key: keyid
 				};
 				var err = shh.post(message)
 				if (err !== null) {
@@ -1004,23 +1013,25 @@ func TestJailWhisper(t *testing.T) {
 			"test 5: encrypted anonymous message (From == nil && To != nil)",
 			`
 				var identity = '` + accountKey2Hex + `';
-				if (!web3.shh.hasIdentity(identity)) {
+				if (!web3.shh.hasKeyPair(identity)) {
 					throw 'idenitity "` + accountKey2Hex + `" not found in whisper';
 				}
 
-				var topic = 'example5';
+				var topic = makeTopic();
 				var payload = '` + whisperMessage5 + `';
 
 				// start watching for messages
 				var filter = shh.filter({
-					to: identity,
-					topics: [web3.fromAscii(topic)],
+					type: "asym",
+					key: identity,
+					topics: [topic],
 				});
 
 				// post message
 				var message = {
-					to: identity,
-					topics: [web3.fromAscii(topic)],
+					type: "asym",
+					key: identity,
+					topic: topic,
 					payload: payload,
 					ttl: 20
 				};
@@ -1041,32 +1052,34 @@ func TestJailWhisper(t *testing.T) {
 			"test 6: encrypted signed response to us (From != nil && To != nil)",
 			`
 				var identity1 = '` + accountKey1Hex + `';
-				if (!web3.shh.hasIdentity(identity1)) {
+				if (!web3.shh.hasKeyPair(identity1)) {
 					throw 'idenitity "` + accountKey1Hex + `" not found in whisper';
 				}
 
 				var identity2 = '` + accountKey2Hex + `';
-				if (!web3.shh.hasIdentity(identity2)) {
+				if (!web3.shh.hasKeyPair(identity2)) {
 					throw 'idenitity "` + accountKey2Hex + `" not found in whisper';
 				}
 
-				var topic = 'example6';
+				var topic = makeTopic();
 				var payload = '` + whisperMessage6 + `';
 
 				// start watching for messages
 				var filter = shh.filter({
-					from: identity2,
-					to: identity1,
-					topics: [web3.fromAscii(topic)]
+					type: "asym",
+					sig: identity2,
+					key: identity1,
+					topics: [topic]
 				});
 
 				// post message
 				var message = {
-				  from: identity2,
-				  to: identity1,
-				  topics: [web3.fromAscii(topic)],
-				  payload: payload,
-				  ttl: 20
+					type: "asym",
+				  	sig: identity2,
+				  	key: identity1,
+				  	topic: topic,
+				  	payload: payload,
+				  	ttl: 20
 				};
 				var err = shh.post(message)
 				if (err !== null) {
@@ -1086,7 +1099,15 @@ func TestJailWhisper(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Log(testCase.name)
 		testCaseKey := crypto.Keccak256Hash([]byte(testCase.name)).Hex()
-		jailInstance.Parse(testCaseKey, `var shh = web3.shh;`)
+		jailInstance.Parse(testCaseKey, `
+			var shh = web3.shh;
+			var makeTopic = function () {
+				var min = 1;
+				var max = Math.pow(16, 8);
+				var randInt = Math.floor(Math.random() * (max - min + 1)) + min;
+				return web3.toHex(randInt);
+			};
+		`)
 		vm, err := jailInstance.GetVM(testCaseKey)
 		if err != nil {
 			t.Errorf("cannot get VM: %v", err)
@@ -1127,7 +1148,7 @@ func TestJailWhisper(t *testing.T) {
 	for testKey, filter := range installedFilters {
 		if filter != "" {
 			t.Logf("filter found: %v", filter)
-			for _, message := range whisperAPI.GetFilterChanges(filter) {
+			for _, message := range whisperAPI.GetSubscriptionMessages(filter) {
 				t.Logf("message found: %s", common.FromHex(message.Payload))
 				passedTests[testKey] = true
 			}
