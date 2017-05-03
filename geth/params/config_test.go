@@ -56,8 +56,8 @@ var loadConfigTestCases = []struct {
 			"DataDir": "$TMPDIR"
 		}`,
 		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
-			if err != params.ErrMissingNetworkId {
-				t.Fatalf("expected error not thrown, expected: %v, thrown: %v", params.ErrMissingNetworkId, err)
+			if err != params.ErrMissingNetworkID {
+				t.Fatalf("expected error not thrown, expected: %v, thrown: %v", params.ErrMissingNetworkID, err)
 			}
 		},
 	},
@@ -142,7 +142,7 @@ var loadConfigTestCases = []struct {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			if nodeConfig.NetworkId != 3 {
+			if nodeConfig.NetworkID != 3 {
 				t.Fatal("wrong NetworkId")
 			}
 
@@ -162,11 +162,11 @@ var loadConfigTestCases = []struct {
 				t.Fatal("wrong WSPort")
 			}
 
-			if nodeConfig.WSEnabled != false {
+			if nodeConfig.WSEnabled {
 				t.Fatal("wrong WSEnabled")
 			}
 
-			if nodeConfig.IPCEnabled != true {
+			if !nodeConfig.IPCEnabled {
 				t.Fatal("wrong IPCEnabled")
 			}
 			if nodeConfig.LightEthConfig.DatabaseCache != 64 {
@@ -254,7 +254,7 @@ var loadConfigTestCases = []struct {
 			if chainConfig.DAOForkBlock.Cmp(gethparams.MainNetDAOForkBlock) != 0 {
 				t.Fatal("invalid chainConfig.DAOForkBlock")
 			}
-			if chainConfig.DAOForkSupport != true {
+			if !chainConfig.DAOForkSupport {
 				t.Fatal("invalid chainConfig.DAOForkSupport")
 			}
 			if chainConfig.EIP150Block.Cmp(gethparams.MainNetHomesteadGasRepriceBlock) != 0 {
@@ -292,8 +292,8 @@ var loadConfigTestCases = []struct {
 			}
 
 			networkId := uint64(311)
-			if nodeConfig.NetworkId != networkId {
-				t.Fatalf("unexpected NetworkId, expected: %v, got: %v", networkId, nodeConfig.NetworkId)
+			if nodeConfig.NetworkID != networkId {
+				t.Fatalf("unexpected NetworkID, expected: %v, got: %v", networkId, nodeConfig.NetworkID)
 			}
 		},
 	},
@@ -304,7 +304,7 @@ func TestLoadNodeConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer os.RemoveAll(tmpDir) // nolint: errcheck
 
 	for _, testCase := range loadConfigTestCases {
 		t.Log("test: " + testCase.name)
@@ -320,7 +320,7 @@ func TestConfigWriteRead(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer os.RemoveAll(tmpDir)
+		defer os.RemoveAll(tmpDir) // nolint: errcheck
 
 		nodeConfig, err := params.NewNodeConfig(tmpDir, networkId)
 		if err != nil {
@@ -345,6 +345,6 @@ func TestConfigWriteRead(t *testing.T) {
 		}
 	}
 
-	configReadWrite(params.TestNetworkId, "testdata/config.testnet.json")
-	configReadWrite(params.MainNetworkId, "testdata/config.mainnet.json")
+	configReadWrite(params.TestNetworkID, "testdata/config.testnet.json")
+	configReadWrite(params.MainNetworkID, "testdata/config.mainnet.json")
 }

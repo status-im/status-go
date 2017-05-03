@@ -18,7 +18,7 @@ func TestLogger(t *testing.T) {
 	}
 	//defer os.RemoveAll(tmpDir)
 
-	nodeConfig, err := params.NewNodeConfig(tmpDir, params.TestNetworkId)
+	nodeConfig, err := params.NewNodeConfig(tmpDir, params.TestNetworkID)
 	if err != nil {
 		t.Fatal("cannot create config object")
 	}
@@ -74,7 +74,9 @@ func TestLogger(t *testing.T) {
 	validateLogText(`msg="logged INFO log level message"`) // debug level message is NOT logged
 
 	// stop logger and see if os.Stderr and gethlog continue functioning
-	nodeLogger.Stop()
+	if err = nodeLogger.Stop(); err != nil {
+		t.Fatal(err)
+	}
 
 	log.Info("logging message: this message happens after custom logger has been stopped")
 }

@@ -31,15 +31,18 @@ import (
 )
 
 const (
+	// EventNodeStarted is triggered when underlying node is fully started
 	EventNodeStarted = "node.started"
+
+	// EventNodeCrashed is triggered when node crashes
 	EventNodeCrashed = "node.crashed"
 )
 
 // node-related errors
 var (
-	ErrEthServiceRegistrationFailure = errors.New("failed to register the Ethereum service")
-	ErrSshServiceRegistrationFailure = errors.New("failed to register the Whisper service")
-	ErrLightEthRegistrationFailure   = errors.New("failed to register the LES service")
+	ErrEthServiceRegistrationFailure     = errors.New("failed to register the Ethereum service")
+	ErrWhisperServiceRegistrationFailure = errors.New("failed to register the Whisper service")
+	ErrLightEthRegistrationFailure       = errors.New("failed to register the LES service")
 )
 
 // Node represents running node (serves as a wrapper around P2P node)
@@ -139,7 +142,7 @@ func MakeNode(config *params.NodeConfig) *Node {
 
 	// start Whisper service
 	if err := activateShhService(stack, config); err != nil {
-		Fatalf(fmt.Errorf("%v: %v", ErrSshServiceRegistrationFailure, err))
+		Fatalf(fmt.Errorf("%v: %v", ErrWhisperServiceRegistrationFailure, err))
 	}
 
 	return &Node{
@@ -168,7 +171,7 @@ func activateEthService(stack *node.Node, config *params.NodeConfig) error {
 	ethConf := eth.DefaultConfig
 	ethConf.Genesis = genesis
 	ethConf.SyncMode = downloader.LightSync
-	ethConf.NetworkId = config.NetworkId
+	ethConf.NetworkId = config.NetworkID
 	ethConf.DatabaseCache = config.LightEthConfig.DatabaseCache
 	ethConf.MaxPeers = config.MaxPeers
 	ethConf.DatabaseHandles = makeDatabaseHandles()
@@ -213,11 +216,8 @@ func activateShhService(stack *node.Node, config *params.NodeConfig) error {
 
 		return whisperService, nil
 	}
-	if err := stack.Register(serviceConstructor); err != nil {
-		return err
-	}
 
-	return nil
+	return stack.Register(serviceConstructor)
 }
 
 // makeIPCPath returns IPC-RPC filename
@@ -297,6 +297,9 @@ func makeBootstrapNodesV5() []*discv5.Node {
 	return bootstapNodes
 }
 
+// Fatalf is used to halt the execution.
+// When called the function prints stack end exits.
+// Failure is logged into both StdErr and StdOut.
 func Fatalf(reason interface{}, args ...interface{}) {
 	// decide on output stream
 	w := io.MultiWriter(os.Stdout, os.Stderr)

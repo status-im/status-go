@@ -10,13 +10,12 @@ import (
 	"github.com/status-im/status-go/extkeys"
 )
 
+// errors
 var (
-	ErrAddressToAccountMappingFailure  = errors.New("cannot retreive a valid account for a given address")
-	ErrAccountToKeyMappingFailure      = errors.New("cannot retreive a valid key for a given account")
-	ErrUnlockCalled                    = errors.New("no need to unlock accounts, login instead")
+	ErrAddressToAccountMappingFailure  = errors.New("cannot retrieve a valid account for a given address")
+	ErrAccountToKeyMappingFailure      = errors.New("cannot retrieve a valid key for a given account")
 	ErrWhisperIdentityInjectionFailure = errors.New("failed to inject identity into Whisper")
 	ErrWhisperClearIdentitiesFailure   = errors.New("failed to clear whisper identities")
-	ErrWhisperNoIdentityFound          = errors.New("failed to locate identity previously injected into Whisper")
 	ErrNoAccountSelected               = errors.New("no account has been selected, please login")
 	ErrInvalidMasterKeyCreated         = errors.New("can not create master extended key")
 	ErrInvalidAccountAddressOrKey      = errors.New("cannot parse address or key to valid account address")
@@ -60,7 +59,7 @@ func CreateChildAccount(parentAddress, password string) (address, pubKey string,
 	}
 
 	if parentAddress == "" && nodeManager.SelectedAccount != nil { // derive from selected account by default
-		parentAddress = string(nodeManager.SelectedAccount.Address.Hex())
+		parentAddress = nodeManager.SelectedAccount.Address.Hex()
 	}
 
 	if parentAddress == "" {
@@ -88,7 +87,9 @@ func CreateChildAccount(parentAddress, password string) (address, pubKey string,
 	if err != nil {
 		return "", "", err
 	}
-	keyStore.IncSubAccountIndex(account, password)
+	if err = keyStore.IncSubAccountIndex(account, password); err != nil {
+		return "", "", err
+	}
 	accountKey.SubAccountIndex++
 
 	// import derived key into account keystore
@@ -204,13 +205,6 @@ func Logout() error {
 	nodeManager.SelectedAccount = nil
 
 	return nil
-}
-
-// UnlockAccount unlocks an existing account for a certain duration and
-// inject the account as a whisper identity if the account was created as
-// a whisper enabled account
-func UnlockAccount(address, password string, seconds int) error {
-	return ErrUnlockCalled
 }
 
 // importExtendedKey processes incoming extended key, extracts required info and creates corresponding account key.

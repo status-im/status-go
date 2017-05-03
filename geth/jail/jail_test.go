@@ -24,7 +24,7 @@ const (
 	whisperMessage4  = `test message 4 ("" -> "", anon broadcast)`
 	whisperMessage5  = `test message 5 ("" -> K1, encrypted anon broadcast)`
 	whisperMessage6  = `test message 6 (K2 -> K1, signed+encrypted, to us)`
-	chatID           = "testChat"
+	testChatID       = "testChat"
 	statusJSFilePath = "testdata/status.js"
 	txSendFolder     = "testdata/tx-send/"
 )
@@ -54,17 +54,17 @@ func TestJailUnInited(t *testing.T) {
 	expectedError := errorWrapper(jail.ErrInvalidJail)
 
 	var jailInstance *jail.Jail
-	response := jailInstance.Parse(chatID, ``)
+	response := jailInstance.Parse(testChatID, ``)
 	if response != expectedError {
 		t.Errorf("error expected, but got: %v", response)
 	}
 
-	response = jailInstance.Call(chatID, `["commands", "testCommand"]`, `{"val": 12}`)
+	response = jailInstance.Call(testChatID, `["commands", "testCommand"]`, `{"val": 12}`)
 	if response != expectedError {
 		t.Errorf("error expected, but got: %v", response)
 	}
 
-	_, err := jailInstance.GetVM(chatID)
+	_, err := jailInstance.GetVM(testChatID)
 	if err != jail.ErrInvalidJail {
 		t.Errorf("error expected, but got: %v", err)
 	}
@@ -84,14 +84,14 @@ func TestJailUnInited(t *testing.T) {
 	_status_catalog.commands["testCommand"] = function (params) {
 		return params.val * params.val;
 	};`
-	response = jailInstance.Parse(chatID, statusJS)
+	response = jailInstance.Parse(testChatID, statusJS)
 	expectedResponse := `{"result": {"commands":{},"responses":{}}}`
 	if response != expectedResponse {
 		t.Errorf("unexpected response received: %v", response)
 	}
 
 	// however, we still expect issue voiced if somebody tries to execute code with Call
-	response = jailInstance.Call(chatID, `["commands", "testCommand"]`, `{"val": 12}`)
+	response = jailInstance.Call(testChatID, `["commands", "testCommand"]`, `{"val": 12}`)
 	if response != errorWrapper(geth.ErrInvalidGethNode) {
 		t.Errorf("error expected, but got: %v", response)
 	}
@@ -102,7 +102,7 @@ func TestJailUnInited(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	response = jailInstance.Call(chatID, `["commands", "testCommand"]`, `{"val": 12}`)
+	response = jailInstance.Call(testChatID, `["commands", "testCommand"]`, `{"val": 12}`)
 	expectedResponse = `{"result": 144}`
 	if response != expectedResponse {
 		t.Errorf("expected response is not returned: expected %s, got %s", expectedResponse, response)
@@ -153,18 +153,18 @@ func TestJailFunctionCall(t *testing.T) {
 	_status_catalog.commands["testCommand"] = function (params) {
 		return params.val * params.val;
 	};`
-	jailInstance.Parse(chatID, statusJS)
+	jailInstance.Parse(testChatID, statusJS)
 
 	// call with wrong chat id
-	response := jailInstance.Call("chatIdNonExistent", "", "")
-	expectedError := `{"error":"Cell[chatIdNonExistent] doesn't exist."}`
+	response := jailInstance.Call("chatIDNonExistent", "", "")
+	expectedError := `{"error":"Cell[chatIDNonExistent] doesn't exist."}`
 	if response != expectedError {
 		t.Errorf("expected error is not returned: expected %s, got %s", expectedError, response)
 		return
 	}
 
 	// call extraFunc()
-	response = jailInstance.Call(chatID, `["commands", "testCommand"]`, `{"val": 12}`)
+	response = jailInstance.Call(testChatID, `["commands", "testCommand"]`, `{"val": 12}`)
 	expectedResponse := `{"result": 144}`
 	if response != expectedResponse {
 		t.Errorf("expected response is not returned: expected %s, got %s", expectedResponse, response)
@@ -183,10 +183,10 @@ func TestJailRPCSend(t *testing.T) {
 
 	// load Status JS and add test command to it
 	statusJS := geth.LoadFromFile(statusJSFilePath)
-	jailInstance.Parse(chatID, statusJS)
+	jailInstance.Parse(testChatID, statusJS)
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
-	vm, err := jailInstance.GetVM(chatID)
+	vm, err := jailInstance.GetVM(testChatID)
 	if err != nil {
 		t.Errorf("cannot get VM: %v", err)
 		return
@@ -276,7 +276,7 @@ func TestJailSendQueuedTransaction(t *testing.T) {
 
 			var txHash common.Hash
 			if txHash, err = geth.CompleteTransaction(event["id"].(string), testConfig.Account1.Password); err != nil {
-				t.Errorf("cannot complete queued transation[%v]: %v", event["id"], err)
+				t.Errorf("cannot complete queued transaction[%v]: %v", event["id"], err)
 			} else {
 				t.Logf("Transaction complete: https://testnet.etherscan.io/tx/%s", txHash.Hex())
 			}
@@ -332,7 +332,7 @@ func TestJailSendQueuedTransaction(t *testing.T) {
 				{
 					`["commands", "getBalance"]`,
 					`{"address": "` + testConfig.Account1.Address + `"}`,
-					`{"result": {"context":{},"result":{"balance":42}}}`, // note emtpy (but present) context!
+					`{"result": {"context":{},"result":{"balance":42}}}`, // note empty (but present) context!
 				},
 			},
 		},
@@ -350,7 +350,7 @@ func TestJailSendQueuedTransaction(t *testing.T) {
 				{
 					`["commands", "getBalance"]`,
 					`{"address": "` + testConfig.Account1.Address + `"}`,
-					`{"result": {"balance":42}}`, // note emtpy context!
+					`{"result": {"balance":42}}`, // note empty context!
 				},
 			},
 		},
@@ -377,14 +377,14 @@ func TestJailSendQueuedTransaction(t *testing.T) {
 	for _, test := range tests {
 		jailInstance := jail.Init(geth.LoadFromFile(txSendFolder + test.file))
 		geth.PanicAfter(60*time.Second, txCompletedSuccessfully, test.name)
-		jailInstance.Parse(chatID, ``)
+		jailInstance.Parse(testChatID, ``)
 
 		requireMessageId = test.requireMessageId
 
 		for _, command := range test.commands {
 			go func(jail *jail.Jail, test testCase, command testCommand) {
 				t.Logf("->%s: %s", test.name, command.command)
-				response := jail.Call(chatID, command.command, command.params)
+				response := jail.Call(testChatID, command.command, command.params)
 				var txHash common.Hash
 				if command.command == `["commands", "send"]` {
 					txHash = <-txHashes
@@ -432,16 +432,16 @@ func TestJailGetVM(t *testing.T) {
 
 	jailInstance := jail.Init("")
 
-	expectedError := `Cell[nonExistentChat] doesn't exist.`
+	expectedError := `cell[nonExistentChat] doesn't exist`
 	_, err = jailInstance.GetVM("nonExistentChat")
 	if err == nil || err.Error() != expectedError {
 		t.Error("expected error, but call succeeded")
 	}
 
 	// now let's create VM..
-	jailInstance.Parse(chatID, ``)
+	jailInstance.Parse(testChatID, ``)
 	// ..and see if VM becomes available
-	_, err = jailInstance.GetVM(chatID)
+	_, err = jailInstance.GetVM(testChatID)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -455,10 +455,10 @@ func TestIsConnected(t *testing.T) {
 	}
 
 	jailInstance := jail.Init("")
-	jailInstance.Parse(chatID, "")
+	jailInstance.Parse(testChatID, "")
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
-	vm, err := jailInstance.GetVM(chatID)
+	vm, err := jailInstance.GetVM(testChatID)
 	if err != nil {
 		t.Errorf("cannot get VM: %v", err)
 		return
@@ -500,10 +500,10 @@ func TestLocalStorageSet(t *testing.T) {
 	}
 
 	jailInstance := jail.Init("")
-	jailInstance.Parse(chatID, "")
+	jailInstance.Parse(testChatID, "")
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
-	vm, err := jailInstance.GetVM(chatID)
+	vm, err := jailInstance.GetVM(testChatID)
 	if err != nil {
 		t.Errorf("cannot get VM: %v", err)
 		return
@@ -522,13 +522,13 @@ func TestLocalStorageSet(t *testing.T) {
 		}
 		if envelope.Type == jail.EventLocalStorageSet {
 			event := envelope.Event.(map[string]interface{})
-			chatId, ok := event["chat_id"].(string)
+			chatID, ok := event["chat_id"].(string)
 			if !ok {
 				t.Error("Chat id is required, but not found")
 				return
 			}
-			if chatId != chatID {
-				t.Errorf("incorrect chat id: expected %q, got: %q", chatID, chatId)
+			if chatID != testChatID {
+				t.Errorf("incorrect chat id: expected %q, got: %q", testChatID, chatID)
 				return
 			}
 
@@ -592,10 +592,10 @@ func TestContractDeployment(t *testing.T) {
 	}
 
 	jailInstance := jail.Init("")
-	jailInstance.Parse(chatID, "")
+	jailInstance.Parse(testChatID, "")
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
-	vm, err := jailInstance.GetVM(chatID)
+	vm, err := jailInstance.GetVM(testChatID)
 	if err != nil {
 		t.Errorf("cannot get VM: %v", err)
 		return
@@ -607,32 +607,11 @@ func TestContractDeployment(t *testing.T) {
 
 	// replace transaction notification handler
 	var txHash common.Hash
-	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var envelope geth.SignalEnvelope
-		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
-			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
-			return
-		}
-		if envelope.Type == geth.EventTransactionQueued {
-			event := envelope.Event.(map[string]interface{})
-
-			t.Logf("Transaction queued (will be completed shortly): {id: %s}\n", event["id"].(string))
-
-			if err := geth.SelectAccount(testConfig.Account1.Address, testConfig.Account1.Password); err != nil {
-				t.Errorf("cannot select account: %v", testConfig.Account1.Address)
-				return
-			}
-
-			if txHash, err = geth.CompleteTransaction(event["id"].(string), testConfig.Account1.Password); err != nil {
-				t.Errorf("cannot complete queued transation[%v]: %v", event["id"], err)
-				return
-			} else {
-				t.Logf("Contract created: https://testnet.etherscan.io/tx/%s", txHash.Hex())
-			}
-
-			close(completeQueuedTransaction) // so that timeout is aborted
-		}
-	})
+	handler, err := geth.MakeTestCompleteTxHandler(t, &txHash, completeQueuedTransaction)
+	if err != nil {
+		t.Fatal(err)
+	}
+	geth.SetDefaultNodeNotificationHandler(handler)
 
 	_, err = vm.Run(`
 		var responseValue = null;
@@ -682,10 +661,10 @@ func TestGasEstimation(t *testing.T) {
 	}
 
 	jailInstance := jail.Init("")
-	jailInstance.Parse(chatID, "")
+	jailInstance.Parse(testChatID, "")
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
-	vm, err := jailInstance.GetVM(chatID)
+	vm, err := jailInstance.GetVM(testChatID)
 	if err != nil {
 		t.Errorf("cannot get VM: %v", err)
 		return
@@ -697,32 +676,11 @@ func TestGasEstimation(t *testing.T) {
 
 	// replace transaction notification handler
 	var txHash common.Hash
-	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var envelope geth.SignalEnvelope
-		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
-			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
-			return
-		}
-		if envelope.Type == geth.EventTransactionQueued {
-			event := envelope.Event.(map[string]interface{})
-
-			t.Logf("Transaction queued (will be completed immediately): {id: %s}\n", event["id"].(string))
-
-			if err := geth.SelectAccount(testConfig.Account1.Address, testConfig.Account1.Password); err != nil {
-				t.Errorf("cannot select account: %v", testConfig.Account1.Address)
-				return
-			}
-
-			if txHash, err = geth.CompleteTransaction(event["id"].(string), testConfig.Account1.Password); err != nil {
-				t.Errorf("cannot complete queued transation[%v]: %v", event["id"], err)
-				return
-			} else {
-				t.Logf("Contract created: https://testnet.etherscan.io/tx/%s", txHash.Hex())
-			}
-
-			close(completeQueuedTransaction) // so that timeout is aborted
-		}
-	})
+	handler, err := geth.MakeTestCompleteTxHandler(t, &txHash, completeQueuedTransaction)
+	if err != nil {
+		t.Fatal(err)
+	}
+	geth.SetDefaultNodeNotificationHandler(handler)
 
 	_, err = vm.Run(`
 		var responseValue = null;
@@ -783,7 +741,9 @@ func TestJailWhisper(t *testing.T) {
 	}
 	accountKey1Hex := common.ToHex(crypto.FromECDSAPub(&accountKey1.PrivateKey.PublicKey))
 
-	whisperService.AddKeyPair(accountKey1.PrivateKey)
+	if _, err := whisperService.AddKeyPair(accountKey1.PrivateKey); err != nil {
+		t.Fatalf("identity not injected: %v", accountKey1Hex)
+	}
 	if ok, err := whisperAPI.HasKeyPair(accountKey1Hex); err != nil || !ok {
 		t.Fatalf("identity not injected: %v", accountKey1Hex)
 	}
@@ -795,7 +755,9 @@ func TestJailWhisper(t *testing.T) {
 	}
 	accountKey2Hex := common.ToHex(crypto.FromECDSAPub(&accountKey2.PrivateKey.PublicKey))
 
-	whisperService.AddKeyPair(accountKey2.PrivateKey)
+	if _, err := whisperService.AddKeyPair(accountKey2.PrivateKey); err != nil {
+		t.Fatalf("identity not injected: %v", accountKey2Hex)
+	}
 	if ok, err := whisperAPI.HasKeyPair(accountKey2Hex); err != nil || !ok {
 		t.Fatalf("identity not injected: %v", accountKey2Hex)
 	}

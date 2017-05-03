@@ -7,10 +7,11 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"golang.org/x/crypto/pbkdf2"
-	"golang.org/x/text/unicode/norm"
 	"math/big"
 	"strings"
+
+	"golang.org/x/crypto/pbkdf2"
+	"golang.org/x/text/unicode/norm"
 )
 
 // Implementation of BIP39 https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki
@@ -24,6 +25,7 @@ import (
 // https://github.com/trezor/python-mnemonic/blob/master/mnemonic/mnemonic.py
 // https://github.com/bitpay/bitcore-mnemonic/blob/master/lib/mnemonic.js (used in eth-lightwallet.js)
 
+// Salt is input salt to mnemonic key
 const Salt = "status-im"
 
 // available dictionaries
@@ -39,6 +41,7 @@ const (
 	totalAvailableLanguages
 )
 
+// Languages is a list of supported languages for which mnemonic keys can be generated
 var Languages = [...]string{
 	"English",
 	"Chinese (Simplified)",
@@ -51,19 +54,26 @@ var Languages = [...]string{
 }
 
 var (
-	Last11BitsMask          = big.NewInt(2047)
-	RightShift11BitsDivider = big.NewInt(2048)
-	BigOne                  = big.NewInt(1)
-	BigTwo                  = big.NewInt(2)
+	last11BitsMask          = big.NewInt(2047)
+	rightShift11BitsDivider = big.NewInt(2048)
+	bigOne                  = big.NewInt(1)
+	bigTwo                  = big.NewInt(2)
 )
 
+// Language is language identifier
 type Language int
+
+// WordList is a list of input strings out of which mnemonic phrase is generated
 type WordList [2048]string
+
+// Mnemonic represents mnemonic generator inited with a given salt
 type Mnemonic struct {
 	salt      string
 	wordLists [totalAvailableLanguages]*WordList
 }
 
+// NewMnemonic returns new mnemonic generator
+// nolint: dupl, misspell
 func NewMnemonic(salt string) *Mnemonic {
 	if len(salt) == 0 {
 		salt = Salt
@@ -85,6 +95,7 @@ func NewMnemonic(salt string) *Mnemonic {
 	return mnemonic
 }
 
+// AvailableLanguages returns list of languages available for mnemonic generation
 func (m *Mnemonic) AvailableLanguages() []Language {
 	languages := make([]Language, totalAvailableLanguages)
 	for language := range m.wordLists {
@@ -97,7 +108,8 @@ func (m *Mnemonic) AvailableLanguages() []Language {
 //
 //}
 
-// To create a binary seed from the mnemonic, we use the PBKDF2 function with a mnemonic sentence (in UTF-8 NFKD)
+// MnemonicSeed creates and returns a binary seed from the mnemonic.
+// We use the PBKDF2 function with a mnemonic sentence (in UTF-8 NFKD)
 // used as the password and the string SALT + passphrase (again in UTF-8 NFKD) used as the salt.
 // The iteration count is set to 2048 and HMAC-SHA512 is used as the pseudo-random function.
 // The length of the derived key is 512 bits (= 64 bytes).
@@ -105,7 +117,7 @@ func (m *Mnemonic) MnemonicSeed(mnemonic string, password string) []byte {
 	return pbkdf2.Key(norm.NFKD.Bytes([]byte(mnemonic)), norm.NFKD.Bytes([]byte(m.salt+password)), 2048, 64, sha512.New)
 }
 
-// Returns a human readable seed for BIP32 Hierarchical Deterministic Wallets
+// MnemonicPhrase returns a human readable seed for BIP32 Hierarchical Deterministic Wallets
 func (m *Mnemonic) MnemonicPhrase(strength, language Language) (string, error) {
 	wordList, err := m.WordList(language)
 	if err != nil {
@@ -149,15 +161,14 @@ func (m *Mnemonic) MnemonicPhrase(strength, language Language) (string, error) {
 	// TODO simplify?
 	for i := uint(0); i < checksumBitLength; i++ {
 		// Bitshift 1 left
-		entropyBigInt.Mul(entropyBigInt, BigTwo)
+		entropyBigInt.Mul(entropyBigInt, bigTwo)
 
 		// Set rightmost bit if leftmost checksum bit is set
-		if uint8(hash[0]&(1<<(7-i))) > 0 {
-			entropyBigInt.Or(entropyBigInt, BigOne)
+		if uint8(hash[0]&(1<<(7-i))) > 0 { // nolint: unconvert
+			entropyBigInt.Or(entropyBigInt, bigOne)
 		}
 	}
 
-	entropy = entropyBigInt.Bytes()
 	word := big.NewInt(0)
 
 	for i := sentenceLength - 1; i >= 0; i-- {
@@ -165,8 +176,8 @@ func (m *Mnemonic) MnemonicPhrase(strength, language Language) (string, error) {
 		// each encoding a number from 0-2047, serving as an index into a wordlist.
 
 		// Get 11 right most bits and bitshift 11 to the right for next time
-		word.And(entropyBigInt, Last11BitsMask)
-		entropyBigInt.Div(entropyBigInt, RightShift11BitsDivider)
+		word.And(entropyBigInt, last11BitsMask)
+		entropyBigInt.Div(entropyBigInt, rightShift11BitsDivider)
 
 		// Get the bytes representing the 11 bits as a 2 byte slice
 		wordBytes := padByteSlice(word.Bytes(), 2)
@@ -179,6 +190,7 @@ func (m *Mnemonic) MnemonicPhrase(strength, language Language) (string, error) {
 	return strings.Join(words, wordSeperator), nil
 }
 
+// ValidMnemonic validates mnemonic string
 func (m *Mnemonic) ValidMnemonic(mnemonic string, language Language) bool {
 	wordList, err := m.WordList(language)
 	if err != nil {
@@ -206,6 +218,7 @@ func (m *Mnemonic) ValidMnemonic(mnemonic string, language Language) bool {
 	return true
 }
 
+// WordList returns list of words for a given language
 func (m *Mnemonic) WordList(language Language) (*WordList, error) {
 	if m.wordLists[language] == nil {
 		return nil, fmt.Errorf("language word list is missing (language id: %d)", language)
