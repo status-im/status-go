@@ -44,6 +44,7 @@ type NodeServiceStack struct {
 	jailedRequestQueue *JailedRequestQueue // bridge via which jail notifies node of incoming requests
 }
 
+// errors
 var (
 	ErrInvalidGethNode             = errors.New("no running geth node detected")
 	ErrInvalidAccountManager       = errors.New("could not retrieve account manager")
@@ -162,7 +163,7 @@ func (m *NodeManager) StartNode() {
 		defer signal.Stop(sigc)
 		<-sigc
 		log.Info("Got interrupt, shutting down...")
-		go m.node.geth.Stop()
+		go m.node.geth.Stop() // nolint: errcheck
 		for i := 3; i > 0; i-- {
 			<-sigc
 			if i > 1 {
@@ -192,7 +193,9 @@ func (m *NodeManager) RestartNode() error {
 		return ErrInvalidGethNode
 	}
 
-	m.StopNode()
+	if err := m.StopNode(); err != nil {
+		return err
+	}
 	m.RunNode()
 	m.WaitNodeStarted()
 
@@ -208,12 +211,7 @@ func (m *NodeManager) ResumeNode() error {
 	m.RunNode()
 	m.WaitNodeStarted()
 
-	// re-select the previously selected account
-	if err := ReSelectAccount(); err != nil {
-		return err
-	}
-
-	return nil
+	return ReSelectAccount()
 }
 
 // ResetChainData purges chain data (by removing data directory). Safe to apply on running P2P node.
@@ -235,13 +233,10 @@ func (m *NodeManager) ResetChainData() error {
 	}
 	log.Info("chaindata removed", "dir", chainDataDir)
 
-	if err := m.ResumeNode(); err != nil {
-		return err
-	}
-
-	return nil
+	return m.ResumeNode()
 }
 
+// StartNodeRPCServer starts HTTP RPC server
 func (m *NodeManager) StartNodeRPCServer() (bool, error) {
 	if m == nil || !m.NodeInited() {
 		return false, ErrInvalidGethNode
@@ -258,7 +253,7 @@ func (m *NodeManager) StartNodeRPCServer() (bool, error) {
 	return m.api.StartRPC(&config.HTTPHost, &config.HTTPPort, &cors, &modules)
 }
 
-// StopNodeRPCServer stops HTTP RPC service attached to node
+// StopNodeRPCServer stops HTTP RPC server attached to node
 func (m *NodeManager) StopNodeRPCServer() (bool, error) {
 	if m == nil || !m.NodeInited() {
 		return false, ErrInvalidGethNode
@@ -323,6 +318,7 @@ func (m *NodeManager) AccountKeyStore() (*keystore.KeyStore, error) {
 }
 
 // LightEthereumService exposes LES
+// nolint: dupl
 func (m *NodeManager) LightEthereumService() (*les.LightEthereum, error) {
 	if m == nil || !m.NodeInited() {
 		return nil, ErrInvalidGethNode
@@ -336,6 +332,7 @@ func (m *NodeManager) LightEthereumService() (*les.LightEthereum, error) {
 }
 
 // WhisperService exposes Whisper service
+// nolint: dupl
 func (m *NodeManager) WhisperService() (*whisper.Whisper, error) {
 	if m == nil || !m.NodeInited() {
 		return nil, ErrInvalidGethNode
@@ -349,6 +346,7 @@ func (m *NodeManager) WhisperService() (*whisper.Whisper, error) {
 }
 
 // RPCClient exposes Geth's RPC client
+// nolint: dupl
 func (m *NodeManager) RPCClient() (*rpc.Client, error) {
 	if m == nil || !m.NodeInited() {
 		return nil, ErrInvalidGethNode
@@ -416,10 +414,11 @@ func (m *NodeManager) onNodeStarted() {
 // PopulateStaticPeers connects current node with our publicly available LES/SHH/Swarm cluster
 func (m *NodeManager) PopulateStaticPeers() {
 	for _, enode := range params.TestnetBootnodes {
-		m.AddPeer(enode)
+		m.AddPeer(enode) // nolint: errcheck
 	}
 }
 
+// Hex dumps address of a given extended key as hex string
 func (k *SelectedExtKey) Hex() string {
 	if k == nil {
 		return "0x0"

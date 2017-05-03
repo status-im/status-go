@@ -99,7 +99,7 @@ func (b *StatusBackend) SendTransaction(ctx context.Context, args status.SendTxA
 	}
 
 	queuedTx := &status.QueuedTx{
-		Id:      status.QueuedTxId(uuid.New()),
+		ID:      status.QueuedTxID(uuid.New()),
 		Hash:    common.Hash{},
 		Context: ctx,
 		Args:    status.SendTxArgs(args),
@@ -130,7 +130,7 @@ func (b *StatusBackend) SendTransaction(ctx context.Context, args status.SendTxA
 }
 
 // CompleteQueuedTransaction wraps call to PublicTransactionPoolAPI.CompleteQueuedTransaction
-func (b *StatusBackend) CompleteQueuedTransaction(ctx context.Context, id status.QueuedTxId, passphrase string) (common.Hash, error) {
+func (b *StatusBackend) CompleteQueuedTransaction(ctx context.Context, id status.QueuedTxID, passphrase string) (common.Hash, error) {
 	queuedTx, err := b.txQueue.Get(id)
 	if err != nil {
 		return common.Hash{}, err
@@ -159,14 +159,14 @@ func (b *StatusBackend) CompleteQueuedTransaction(ctx context.Context, id status
 }
 
 // DiscardQueuedTransaction discards queued transaction forcing SendTransaction to return
-func (b *StatusBackend) DiscardQueuedTransaction(id status.QueuedTxId) error {
+func (b *StatusBackend) DiscardQueuedTransaction(id status.QueuedTxID) error {
 	queuedTx, err := b.txQueue.Get(id)
 	if err != nil {
 		return err
 	}
 
 	// remove from queue, before notifying SendTransaction
-	b.TransactionQueue().Remove(queuedTx.Id)
+	b.TransactionQueue().Remove(queuedTx.ID)
 
 	// allow SendTransaction to return
 	queuedTx.Err = status.ErrQueuedTxDiscarded

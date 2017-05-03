@@ -18,45 +18,64 @@ var (
 )
 
 var (
+	// NodeKeyFileFlag is a node key file to be used as node's private key
 	NodeKeyFileFlag = cli.StringFlag{
 		Name:  "nodekey",
 		Usage: "P2P node key file (private key)",
 	}
+
+	// DataDirFlag defines data directory for the node
 	DataDirFlag = cli.StringFlag{
 		Name:  "datadir",
 		Usage: "Data directory for the databases and keystore",
 		Value: params.DataDir,
 	}
-	NetworkIdFlag = cli.IntFlag{
+
+	// NetworkIDFlag defines network ID
+	NetworkIDFlag = cli.IntFlag{
 		Name:  "networkid",
 		Usage: "Network identifier (integer, 1=Frontier, 2=Morden (disused), 3=Ropsten)",
-		Value: params.TestNetworkId,
+		Value: params.TestNetworkID,
 	}
+
+	// LightEthEnabledFlag flags whether LES is enabled or not
 	LightEthEnabledFlag = cli.BoolFlag{
 		Name:  "les",
 		Usage: "LES protocol enabled",
 	}
+
+	// WhisperEnabledFlag flags whether Whisper is enabled or not
 	WhisperEnabledFlag = cli.BoolFlag{
 		Name:  "shh",
 		Usage: "SHH protocol enabled",
 	}
+
+	// SwarmEnabledFlag flags whether Swarm is enabled or not
 	SwarmEnabledFlag = cli.BoolFlag{
 		Name:  "swarm",
 		Usage: "Swarm protocol enabled",
 	}
+
+	// HTTPEnabledFlag defines whether HTTP RPC endpoint should be opened or not
 	HTTPEnabledFlag = cli.BoolFlag{
 		Name:  "http",
 		Usage: "HTTP RPC enpoint enabled",
 	}
+
+	// HTTPPortFlag defines HTTP RPC port to use (if HTTP RPC is enabled)
 	HTTPPortFlag = cli.IntFlag{
 		Name:  "httpport",
 		Usage: "HTTP RPC server's listening port",
 		Value: params.HTTPPort,
 	}
+
+	// IPCEnabledFlag flags whether IPC is enabled or not
 	IPCEnabledFlag = cli.BoolFlag{
 		Name:  "ipc",
 		Usage: "IPC RPC enpoint enabled",
 	}
+
+	// LogLevelFlag defines a log reporting level
 	LogLevelFlag = cli.StringFlag{
 		Name:  "log",
 		Usage: `Log level, one of: ""ERROR", "WARNING", "INFO", "DEBUG", and "TRACE"`,
@@ -76,7 +95,7 @@ func init() {
 	app.Flags = []cli.Flag{
 		NodeKeyFileFlag,
 		DataDirFlag,
-		NetworkIdFlag,
+		NetworkIDFlag,
 		LightEthEnabledFlag,
 		WhisperEnabledFlag,
 		SwarmEnabledFlag,
@@ -121,7 +140,7 @@ func statusd(ctx *cli.Context) error {
 
 // makeNodeConfig parses incoming CLI options and returns node configuration object
 func makeNodeConfig(ctx *cli.Context) (*params.NodeConfig, error) {
-	nodeConfig, err := params.NewNodeConfig(ctx.GlobalString(DataDirFlag.Name), ctx.GlobalUint64(NetworkIdFlag.Name))
+	nodeConfig, err := params.NewNodeConfig(ctx.GlobalString(DataDirFlag.Name), ctx.GlobalUint64(NetworkIDFlag.Name))
 	if err != nil {
 		return nil, err
 	}

@@ -28,9 +28,10 @@ func init() {
 	}
 }
 
+// errors
 var (
 	ErrMissingDataDir            = errors.New("missing required 'DataDir' parameter")
-	ErrMissingNetworkId          = errors.New("missing required 'NetworkId' parameter")
+	ErrMissingNetworkID          = errors.New("missing required 'NetworkID' parameter")
 	ErrEmptyPasswordFile         = errors.New("password file cannot be empty")
 	ErrEmptyIdentityFile         = errors.New("identity file cannot be empty")
 	ErrEmptyAuthorizationKeyFile = errors.New("authorization key file cannot be empty")
@@ -49,6 +50,7 @@ type LightEthConfig struct {
 	DatabaseCache int
 }
 
+// FirebaseConfig holds FCM-related configuration
 type FirebaseConfig struct {
 	// AuthorizationKeyFile file path that contains FCM authorization key
 	AuthorizationKeyFile string
@@ -111,8 +113,8 @@ type NodeConfig struct {
 	// TestNet flag whether given configuration describes a test or mainnet
 	TestNet bool
 
-	// NetworkId sets network to use for selecting peers to connect to
-	NetworkId uint64
+	// NetworkID sets network to use for selecting peers to connect to
+	NetworkID uint64 `json:"NetworkId,"`
 
 	// DataDir is the file system folder the node should use for any data storage needs.
 	DataDir string
@@ -192,9 +194,9 @@ type NodeConfig struct {
 }
 
 // NewNodeConfig creates new node configuration object
-func NewNodeConfig(dataDir string, networkId uint64) (*NodeConfig, error) {
+func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 	nodeConfig := &NodeConfig{
-		NetworkId:       networkId,
+		NetworkID:       networkID,
 		DataDir:         dataDir,
 		Name:            ClientIdentifier,
 		Version:         Version,
@@ -259,7 +261,7 @@ func (c *NodeConfig) populateDirs() error {
 // populateChainConfig does necessary adjustments to config object (depending on network node will be runnin on)
 func (c *NodeConfig) populateGenesis() error {
 	c.TestNet = false
-	if c.NetworkId == TestNetworkId {
+	if c.NetworkID == TestNetworkID {
 		c.TestNet = true
 	}
 
@@ -307,8 +309,8 @@ func LoadNodeConfig(configJSON string) (*NodeConfig, error) {
 		return nil, ErrMissingDataDir
 	}
 
-	if nodeConfig.NetworkId <= 0 {
-		return nil, ErrMissingNetworkId
+	if nodeConfig.NetworkID <= 0 {
+		return nil, ErrMissingNetworkID
 	}
 
 	return nodeConfig, nil

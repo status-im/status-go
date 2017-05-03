@@ -11,7 +11,7 @@ import (
 func TestAccountsList(t *testing.T) {
 	err := geth.PrepareTestNode()
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 		return
 	}
 
@@ -20,7 +20,9 @@ func TestAccountsList(t *testing.T) {
 		t.Errorf("expected LES service: %v", err)
 	}
 	accounts := les.StatusBackend.AccountManager().Accounts()
-	geth.Logout()
+	if err = geth.Logout(); err != nil {
+		t.Fatal(err)
+	}
 
 	// make sure that we start with empty accounts list (nobody has logged in yet)
 	if len(accounts) != 0 {
@@ -121,16 +123,17 @@ func TestAccountsList(t *testing.T) {
 func TestAccountsCreateChildAccount(t *testing.T) {
 	err := geth.PrepareTestNode()
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
-	geth.Logout() // to make sure that we start with empty account (which might get populated during previous tests)
+	// to make sure that we start with empty account (which might get populated during previous tests)
+	if err = geth.Logout(); err != nil {
+		t.Fatal(err)
+	}
 
 	keyStore, err := geth.NodeManagerInstance().AccountKeyStore()
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	// create an account
@@ -148,7 +151,7 @@ func TestAccountsCreateChildAccount(t *testing.T) {
 	}
 
 	// obtain decrypted key, and make sure that extended key (which will be used as root for sub-accounts) is present
-	account, key, err := keyStore.AccountDecryptedKey(account, testConfig.Account1.Password)
+	_, key, err := keyStore.AccountDecryptedKey(account, testConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("can not obtain decrypted account key: %v", err)
 		return
@@ -174,7 +177,7 @@ func TestAccountsCreateChildAccount(t *testing.T) {
 
 	// try to create sub-account with wrong password
 	_, _, err = geth.CreateChildAccount("", "wrong password")
-	if !reflect.DeepEqual(err, errors.New("cannot retreive a valid key for a given account: could not decrypt key with given passphrase")) {
+	if !reflect.DeepEqual(err, errors.New("cannot retrieve a valid key for a given account: could not decrypt key with given passphrase")) {
 		t.Errorf("expected error is not returned (tried to create sub-account with wrong password): %v", err)
 		return
 	}
@@ -210,8 +213,7 @@ func TestAccountsCreateChildAccount(t *testing.T) {
 func TestAccountsRecoverAccount(t *testing.T) {
 	err := geth.PrepareTestNode()
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	keyStore, _ := geth.NodeManagerInstance().AccountKeyStore()
@@ -261,7 +263,7 @@ func TestAccountsRecoverAccount(t *testing.T) {
 	}
 
 	// make sure that extended key exists and is imported ok too
-	account, key, err = keyStore.AccountDecryptedKey(account, testConfig.Account1.Password)
+	_, key, err = keyStore.AccountDecryptedKey(account, testConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("can not obtain decrypted account key: %v", err)
 		return
@@ -304,8 +306,7 @@ func TestAccountSelect(t *testing.T) {
 
 	err := geth.PrepareTestNode()
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	// test to see if the account was injected in whisper
@@ -370,8 +371,7 @@ func TestAccountsLogout(t *testing.T) {
 
 	err := geth.PrepareTestNode()
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	whisperService, err := geth.NodeManagerInstance().WhisperService()
@@ -401,8 +401,7 @@ func TestAccountsLogout(t *testing.T) {
 		t.Error("identity not injected into whisper")
 	}
 
-	err = geth.Logout()
-	if err != nil {
+	if err = geth.Logout(); err != nil {
 		t.Errorf("cannot logout: %v", err)
 	}
 
@@ -415,8 +414,7 @@ func TestAccountsLogout(t *testing.T) {
 func TestAccountsSelectedAccountOnNodeRestart(t *testing.T) {
 	err := geth.PrepareTestNode()
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	// we need to make sure that selected account is injected as identity into Whisper
@@ -483,8 +481,7 @@ func TestAccountsSelectedAccountOnNodeRestart(t *testing.T) {
 
 	// stop node (and all of its sub-protocols)
 	if err := geth.NodeManagerInstance().StopNode(); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	// make sure that account is still selected
@@ -499,8 +496,7 @@ func TestAccountsSelectedAccountOnNodeRestart(t *testing.T) {
 
 	// resume node
 	if err := geth.NodeManagerInstance().ResumeNode(); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	// re-check selected account (account2 MUST be selected)
@@ -529,11 +525,12 @@ func TestAccountsSelectedAccountOnNodeRestart(t *testing.T) {
 func TestAccountsNodeRestartWithNoSelectedAccount(t *testing.T) {
 	err := geth.PrepareTestNode()
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
-	geth.Logout()
+	if err = geth.Logout(); err != nil {
+		t.Fatal(err)
+	}
 
 	// we need to make sure that selected account is injected as identity into Whisper
 	whisperService, err := geth.NodeManagerInstance().WhisperService()
@@ -562,8 +559,7 @@ func TestAccountsNodeRestartWithNoSelectedAccount(t *testing.T) {
 
 	// stop node (and all of its sub-protocols)
 	if err := geth.NodeManagerInstance().StopNode(); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	// make sure that no account is selected
@@ -574,8 +570,7 @@ func TestAccountsNodeRestartWithNoSelectedAccount(t *testing.T) {
 
 	// resume node
 	if err := geth.NodeManagerInstance().ResumeNode(); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	// make sure that no account is selected

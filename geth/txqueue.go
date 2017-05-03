@@ -12,12 +12,24 @@ import (
 )
 
 const (
+	// EventTransactionQueued is triggered whan send transaction request is queued
 	EventTransactionQueued = "transaction.queued"
-	EventTransactionFailed = "transaction.failed"
-	SendTransactionRequest = "eth_sendTransaction"
-	MessageIdKey           = "message_id"
 
-	// tx error codes
+	// EventTransactionFailed is triggered when send transaction request fails
+	EventTransactionFailed = "transaction.failed"
+
+	// SendTransactionRequest is triggered on send transaction request
+	SendTransactionRequest = "eth_sendTransaction"
+
+	// MessageIDKey is a key for message ID
+	// This ID is required to track from which chat a given send transaction request is coming.
+	MessageIDKey = contextKey("message_id")
+)
+
+type contextKey string // in order to make sure that our context key does not collide with keys from other packages
+
+// Send transaction response codes
+const (
 	SendTransactionNoErrorCode        = "0"
 	SendTransactionDefaultErrorCode   = "1"
 	SendTransactionPasswordErrorCode  = "2"
@@ -29,9 +41,9 @@ func onSendTransactionRequest(queuedTx status.QueuedTx) {
 	SendSignal(SignalEnvelope{
 		Type: EventTransactionQueued,
 		Event: SendTransactionEvent{
-			Id:        string(queuedTx.Id),
+			ID:        string(queuedTx.ID),
 			Args:      queuedTx.Args,
-			MessageId: messageIdFromContext(queuedTx.Context),
+			MessageID: messageIDFromContext(queuedTx.Context),
 		},
 	})
 }
@@ -50,9 +62,9 @@ func onSendTransactionReturn(queuedTx *status.QueuedTx, err error) {
 	SendSignal(SignalEnvelope{
 		Type: EventTransactionFailed,
 		Event: ReturnSendTransactionEvent{
-			Id:           string(queuedTx.Id),
+			ID:           string(queuedTx.ID),
 			Args:         queuedTx.Args,
-			MessageId:    messageIdFromContext(queuedTx.Context),
+			MessageID:    messageIDFromContext(queuedTx.Context),
 			ErrorMessage: err.Error(),
 			ErrorCode:    sendTransactionErrorCode(err),
 		},
@@ -76,6 +88,7 @@ func sendTransactionErrorCode(err error) string {
 	}
 }
 
+// CompleteTransaction instructs backend to complete sending of a given transaction
 func CompleteTransaction(id, password string) (common.Hash, error) {
 	lightEthereum, err := NodeManagerInstance().LightEthereumService()
 	if err != nil {
@@ -87,13 +100,14 @@ func CompleteTransaction(id, password string) (common.Hash, error) {
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, status.SelectedAccountKey, NodeManagerInstance().SelectedAccount.Hex())
 
-	return backend.CompleteQueuedTransaction(ctx, status.QueuedTxId(id), password)
+	return backend.CompleteQueuedTransaction(ctx, status.QueuedTxID(id), password)
 }
 
+// CompleteTransactions instructs backend to complete sending of multiple transactions
 func CompleteTransactions(ids, password string) map[string]RawCompleteTransactionResult {
 	results := make(map[string]RawCompleteTransactionResult)
 
-	parsedIds, err := parseJSONArray(ids)
+	parsedIDs, err := parseJSONArray(ids)
 	if err != nil {
 		results["none"] = RawCompleteTransactionResult{
 			Error: err,
@@ -101,9 +115,9 @@ func CompleteTransactions(ids, password string) map[string]RawCompleteTransactio
 		return results
 	}
 
-	for _, txId := range parsedIds {
-		txHash, txErr := CompleteTransaction(txId, password)
-		results[txId] = RawCompleteTransactionResult{
+	for _, txID := range parsedIDs {
+		txHash, txErr := CompleteTransaction(txID, password)
+		results[txID] = RawCompleteTransactionResult{
 			Hash:  txHash,
 			Error: txErr,
 		}
@@ -112,6 +126,7 @@ func CompleteTransactions(ids, password string) map[string]RawCompleteTransactio
 	return results
 }
 
+// DiscardTransaction discards a given transaction from transaction queue
 func DiscardTransaction(id string) error {
 	lightEthereum, err := NodeManagerInstance().LightEthereumService()
 	if err != nil {
@@ -120,14 +135,15 @@ func DiscardTransaction(id string) error {
 
 	backend := lightEthereum.StatusBackend
 
-	return backend.DiscardQueuedTransaction(status.QueuedTxId(id))
+	return backend.DiscardQueuedTransaction(status.QueuedTxID(id))
 }
 
+// DiscardTransactions discards given multiple transactions from transaction queue
 func DiscardTransactions(ids string) map[string]RawDiscardTransactionResult {
-	var parsedIds []string
+	var parsedIDs []string
 	results := make(map[string]RawDiscardTransactionResult)
 
-	parsedIds, err := parseJSONArray(ids)
+	parsedIDs, err := parseJSONArray(ids)
 	if err != nil {
 		results["none"] = RawDiscardTransactionResult{
 			Error: err,
@@ -135,10 +151,10 @@ func DiscardTransactions(ids string) map[string]RawDiscardTransactionResult {
 		return results
 	}
 
-	for _, txId := range parsedIds {
-		err := DiscardTransaction(txId)
+	for _, txID := range parsedIDs {
+		err := DiscardTransaction(txID)
 		if err != nil {
-			results[txId] = RawDiscardTransactionResult{
+			results[txID] = RawDiscardTransactionResult{
 				Error: err,
 			}
 		}
@@ -147,40 +163,50 @@ func DiscardTransactions(ids string) map[string]RawDiscardTransactionResult {
 	return results
 }
 
-func messageIdFromContext(ctx context.Context) string {
+func messageIDFromContext(ctx context.Context) string {
 	if ctx == nil {
 		return ""
 	}
-	if messageId, ok := ctx.Value(MessageIdKey).(string); ok {
-		return messageId
+	if messageID, ok := ctx.Value(MessageIDKey).(string); ok {
+		return messageID
 	}
 
 	return ""
 }
 
+// JailedRequestQueue is used for allowing request pre and post processing.
+// Such processing may include validation, injection of params (like message ID) etc
 type JailedRequestQueue struct{}
 
+// NewJailedRequestsQueue returns new instance of request queue
 func NewJailedRequestsQueue() *JailedRequestQueue {
 	return &JailedRequestQueue{}
 }
 
+// PreProcessRequest pre-processes a given RPC call to a given Otto VM
 func (q *JailedRequestQueue) PreProcessRequest(vm *otto.Otto, req RPCCall) (string, error) {
-	messageId := currentMessageId(vm.Context())
+	messageID := currentMessageID(vm.Context())
 
-	return messageId, nil
+	return messageID, nil
 }
 
-func (q *JailedRequestQueue) PostProcessRequest(vm *otto.Otto, req RPCCall, messageId string) {
-	if len(messageId) > 0 {
-		vm.Call("addContext", nil, messageId, MessageIdKey, messageId)
+// PostProcessRequest post-processes a given RPC call to a given Otto VM
+func (q *JailedRequestQueue) PostProcessRequest(vm *otto.Otto, req RPCCall, messageID string) {
+	if len(messageID) > 0 {
+		vm.Call("addContext", nil, messageID, MessageIDKey, messageID) // nolint: errcheck
 	}
 
 	// set extra markers for queued transaction requests
 	if req.Method == SendTransactionRequest {
-		vm.Call("addContext", nil, messageId, SendTransactionRequest, true)
+		vm.Call("addContext", nil, messageID, SendTransactionRequest, true) // nolint: errcheck
 	}
 }
 
+// ProcessSendTransactionRequest processes send transaction request.
+// Both pre and post processing happens within this function. Pre-processing
+// happens before transaction is send to backend, and post processing occurs
+// when backend notifies that transaction sending is complete (either successfully
+// or with error)
 func (q *JailedRequestQueue) ProcessSendTransactionRequest(vm *otto.Otto, req RPCCall) (common.Hash, error) {
 	// obtain status backend from LES service
 	lightEthereum, err := NodeManagerInstance().LightEthereumService()
@@ -189,13 +215,13 @@ func (q *JailedRequestQueue) ProcessSendTransactionRequest(vm *otto.Otto, req RP
 	}
 	backend := lightEthereum.StatusBackend
 
-	messageId, err := q.PreProcessRequest(vm, req)
+	messageID, err := q.PreProcessRequest(vm, req)
 	if err != nil {
 		return common.Hash{}, err
 	}
 	// onSendTransactionRequest() will use context to obtain and release ticket
 	ctx := context.Background()
-	ctx = context.WithValue(ctx, MessageIdKey, messageId)
+	ctx = context.WithValue(ctx, MessageIDKey, messageID)
 
 	//  this call blocks, up until Complete Transaction is called
 	txHash, err := backend.SendTransaction(ctx, sendTxArgsFromRPCCall(req))
@@ -204,20 +230,20 @@ func (q *JailedRequestQueue) ProcessSendTransactionRequest(vm *otto.Otto, req RP
 	}
 
 	// invoke post processing
-	q.PostProcessRequest(vm, req, messageId)
+	q.PostProcessRequest(vm, req, messageID)
 
 	return txHash, nil
 }
 
-// currentMessageId looks for `status.message_id` variable in current JS context
-func currentMessageId(ctx otto.Context) string {
+// currentMessageID looks for `status.message_id` variable in current JS context
+func currentMessageID(ctx otto.Context) string {
 	if statusObj, ok := ctx.Symbols["status"]; ok {
-		messageId, err := statusObj.Object().Get("message_id")
+		messageID, err := statusObj.Object().Get("message_id")
 		if err != nil {
 			return ""
 		}
-		if messageId, err := messageId.ToString(); err == nil {
-			return messageId
+		if messageID, err := messageID.ToString(); err == nil {
+			return messageID
 		}
 	}
 
@@ -287,6 +313,7 @@ func (r RPCCall) parseData() hexutil.Bytes {
 	return byteCode
 }
 
+// nolint: dupl
 func (r RPCCall) parseValue() *hexutil.Big {
 	params, ok := r.Params[0].(map[string]interface{})
 	if !ok {
@@ -307,6 +334,7 @@ func (r RPCCall) parseValue() *hexutil.Big {
 	return (*hexutil.Big)(parsedValue)
 }
 
+// nolint: dupl
 func (r RPCCall) parseGas() *hexutil.Big {
 	params, ok := r.Params[0].(map[string]interface{})
 	if !ok {
@@ -326,6 +354,7 @@ func (r RPCCall) parseGas() *hexutil.Big {
 	return (*hexutil.Big)(parsedValue)
 }
 
+// nolint: dupl
 func (r RPCCall) parseGasPrice() *hexutil.Big {
 	params, ok := r.Params[0].(map[string]interface{})
 	if !ok {

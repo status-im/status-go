@@ -128,7 +128,7 @@ func CompleteTransaction(id, password *C.char) *C.char {
 	}
 
 	out := geth.CompleteTransactionResult{
-		Id:    C.GoString(id),
+		ID:    C.GoString(id),
 		Hash:  txHash.Hex(),
 		Error: errString,
 	}
@@ -143,15 +143,15 @@ func CompleteTransactions(ids, password *C.char) *C.char {
 	out.Results = make(map[string]geth.CompleteTransactionResult)
 
 	results := geth.CompleteTransactions(C.GoString(ids), C.GoString(password))
-	for txId, result := range results {
+	for txID, result := range results {
 		txResult := geth.CompleteTransactionResult{
-			Id:   txId,
+			ID:   txID,
 			Hash: result.Hash.Hex(),
 		}
 		if result.Error != nil {
 			txResult.Error = result.Error.Error()
 		}
-		out.Results[txId] = txResult
+		out.Results[txID] = txResult
 	}
 	outBytes, _ := json.Marshal(&out)
 
@@ -169,7 +169,7 @@ func DiscardTransaction(id *C.char) *C.char {
 	}
 
 	out := geth.DiscardTransactionResult{
-		Id:    C.GoString(id),
+		ID:    C.GoString(id),
 		Error: errString,
 	}
 	outBytes, _ := json.Marshal(&out)
@@ -183,14 +183,14 @@ func DiscardTransactions(ids *C.char) *C.char {
 	out.Results = make(map[string]geth.DiscardTransactionResult)
 
 	results := geth.DiscardTransactions(C.GoString(ids))
-	for txId, result := range results {
+	for txID, result := range results {
 		txResult := geth.DiscardTransactionResult{
-			Id: txId,
+			ID: txID,
 		}
 		if result.Error != nil {
 			txResult.Error = result.Error.Error()
 		}
-		out.Results[txId] = txResult
+		out.Results[txID] = txResult
 	}
 	outBytes, _ := json.Marshal(&out)
 
@@ -198,8 +198,8 @@ func DiscardTransactions(ids *C.char) *C.char {
 }
 
 //export GenerateConfig
-func GenerateConfig(datadir *C.char, networkId C.int) *C.char {
-	config, err := params.NewNodeConfig(C.GoString(datadir), uint64(networkId))
+func GenerateConfig(datadir *C.char, networkID C.int) *C.char {
+	config, err := params.NewNodeConfig(C.GoString(datadir), uint64(networkID))
 	if err != nil {
 		return makeJSONErrorResponse(err)
 	}
@@ -261,14 +261,14 @@ func InitJail(js *C.char) {
 }
 
 //export Parse
-func Parse(chatId *C.char, js *C.char) *C.char {
-	res := jail.GetInstance().Parse(C.GoString(chatId), C.GoString(js))
+func Parse(chatID *C.char, js *C.char) *C.char {
+	res := jail.GetInstance().Parse(C.GoString(chatID), C.GoString(js))
 	return C.CString(res)
 }
 
 //export Call
-func Call(chatId *C.char, path *C.char, params *C.char) *C.char {
-	res := jail.GetInstance().Call(C.GoString(chatId), C.GoString(path), C.GoString(params))
+func Call(chatID *C.char, path *C.char, params *C.char) *C.char {
+	res := jail.GetInstance().Call(C.GoString(chatID), C.GoString(path), C.GoString(params))
 	return C.CString(res)
 }
 

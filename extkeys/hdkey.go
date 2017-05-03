@@ -42,6 +42,7 @@ import (
 // TODO make sure we're doing this ^^^^ !!!!!!
 
 const (
+	// HardenedKeyStart defines a starting point for hardened key.
 	// Each extended key has 2^31 normal child keys and 2^31 hardened child keys.
 	// Thus the range for normal child keys is [0, 2^31 - 1] and the range for hardened child keys is [2^31, 2^32 - 1].
 	HardenedKeyStart = 0x80000000 // 2^31
@@ -58,31 +59,40 @@ const (
 	// public/private key data.
 	serializedKeyLen = 4 + 1 + 4 + 4 + 32 + 33 // 78 bytes
 
-	CoinTypeBTC     = 0  // 0x80000000
-	CoinTypeTestNet = 1  // 0x80000001
-	CoinTypeETH     = 60 // 0x8000003c
-	CoinTypeETC     = 60 // 0x80000000
+	// CoinTypeBTC is BTC coin type
+	CoinTypeBTC = 0 // 0x80000000
 
+	// CoinTypeTestNet is test net coin type
+	CoinTypeTestNet = 1 // 0x80000001
+
+	// CoinTypeETH is ETH coin type
+	CoinTypeETH = 60 // 0x8000003c
+
+	// EmptyExtendedKeyString marker string for zero extended key
 	EmptyExtendedKeyString = "Zeroed extended key"
 )
 
+// errors
 var (
 	ErrInvalidKey                 = errors.New("key is invalid")
 	ErrInvalidSeed                = errors.New("seed is invalid")
 	ErrInvalidSeedLen             = fmt.Errorf("the recommended size of seed is %d-%d bits", MinSeedBytes, MaxSeedBytes)
-	ErrDerivingPrivateFromPublic  = errors.New("cannot derive private key from public key")
 	ErrDerivingHardenedFromPublic = errors.New("cannot derive a hardened key from public key")
 	ErrBadChecksum                = errors.New("bad extended key checksum")
 	ErrInvalidKeyLen              = errors.New("serialized extended key length is invalid")
 	ErrDerivingChild              = errors.New("error deriving child key")
 	ErrInvalidMasterKey           = errors.New("invalid master key supplied")
-
-	PrivateKeyVersion, _ = hex.DecodeString("0488ADE4")
-	PublicKeyVersion, _  = hex.DecodeString("0488B21E")
 )
 
-type CoinType int
+var (
+	// PrivateKeyVersion is version for private key
+	PrivateKeyVersion, _ = hex.DecodeString("0488ADE4")
 
+	// PublicKeyVersion is version for public key
+	PublicKeyVersion, _ = hex.DecodeString("0488B21E")
+)
+
+// ExtendedKey represents BIP44-compliant HD key
 type ExtendedKey struct {
 	Version          []byte // 4 bytes, mainnet: 0x0488B21E public, 0x0488ADE4 private; testnet: 0x043587CF public, 0x04358394 private
 	Depth            uint16 // 1 byte,  depth: 0x00 for master nodes, 0x01 for level-1 derived keys, ....
@@ -133,10 +143,10 @@ func NewMaster(seed, salt []byte) (*ExtendedKey, error) {
 // 2) Private extended key -> Non-hardened child private extended key
 // 3) Public extended key -> Non-hardened child public extended key
 // 4) Public extended key -> Hardened child public extended key (INVALID!)
-func (parent *ExtendedKey) Child(i uint32) (*ExtendedKey, error) {
+func (k *ExtendedKey) Child(i uint32) (*ExtendedKey, error) {
 	// A hardened child may not be created from a public extended key (Case #4).
 	isChildHardened := i >= HardenedKeyStart
-	if !parent.IsPrivate && isChildHardened {
+	if !k.IsPrivate && isChildHardened {
 		return nil, ErrDerivingHardenedFromPublic
 	}
 
@@ -144,30 +154,30 @@ func (parent *ExtendedKey) Child(i uint32) (*ExtendedKey, error) {
 	seed := make([]byte, keyLen+4)
 	if isChildHardened {
 		// Case #1: 0x00 || ser256(parentKey) || ser32(i)
-		copy(seed[1:], parent.KeyData) // 0x00 || ser256(parentKey)
+		copy(seed[1:], k.KeyData) // 0x00 || ser256(parentKey)
 	} else {
 		// Case #2 and #3: serP(parentPubKey) || ser32(i)
-		copy(seed, parent.pubKeyBytes())
+		copy(seed, k.pubKeyBytes())
 	}
 	binary.BigEndian.PutUint32(seed[keyLen:], i)
 
-	secretKey, chainCode, err := splitHMAC(seed, parent.ChainCode)
+	secretKey, chainCode, err := splitHMAC(seed, k.ChainCode)
 	if err != nil {
 		return nil, err
 	}
 
 	child := &ExtendedKey{
 		ChainCode:   chainCode,
-		Depth:       parent.Depth + 1,
+		Depth:       k.Depth + 1,
 		ChildNumber: i,
-		IsPrivate:   parent.IsPrivate,
+		IsPrivate:   k.IsPrivate,
 		// The fingerprint for the derived child is the first 4 bytes of parent's
-		FingerPrint: btcutil.Hash160(parent.pubKeyBytes())[:4],
+		FingerPrint: btcutil.Hash160(k.pubKeyBytes())[:4],
 	}
 
-	if parent.IsPrivate {
+	if k.IsPrivate {
 		// Case #1 or #2: childKey = parse256(IL) + parentKey
-		parentKeyBigInt := new(big.Int).SetBytes(parent.KeyData)
+		parentKeyBigInt := new(big.Int).SetBytes(k.KeyData)
 		keyBigInt := new(big.Int).SetBytes(secretKey)
 		keyBigInt.Add(keyBigInt, parentKeyBigInt)
 		keyBigInt.Mod(keyBigInt, btcec.S256().N)
@@ -185,7 +195,7 @@ func (parent *ExtendedKey) Child(i uint32) (*ExtendedKey, error) {
 
 		// Convert the serialized compressed parent public key into X and Y coordinates
 		// so it can be added to the intermediate public key.
-		pubKey, err := btcec.ParsePubKey(parent.KeyData, btcec.S256())
+		pubKey, err := btcec.ParsePubKey(k.KeyData, btcec.S256())
 		if err != nil {
 			return nil, err
 		}
@@ -201,17 +211,17 @@ func (parent *ExtendedKey) Child(i uint32) (*ExtendedKey, error) {
 
 // BIP44Child returns Status CKD#i (where i is child index).
 // BIP44 format is used: m / purpose' / coin_type' / account' / change / address_index
-func (master *ExtendedKey) BIP44Child(coinType, i uint32) (*ExtendedKey, error) {
-	if !master.IsPrivate {
+func (k *ExtendedKey) BIP44Child(coinType, i uint32) (*ExtendedKey, error) {
+	if !k.IsPrivate {
 		return nil, ErrInvalidMasterKey
 	}
 
-	if master.Depth != 0 {
+	if k.Depth != 0 {
 		return nil, ErrInvalidMasterKey
 	}
 
 	// m/44'/60'/0'/0/index
-	extKey, err := master.Derive([]uint32{
+	extKey, err := k.Derive([]uint32{
 		HardenedKeyStart + 44,       // purpose
 		HardenedKeyStart + coinType, // cointype
 		HardenedKeyStart + 0,        // account
@@ -225,9 +235,10 @@ func (master *ExtendedKey) BIP44Child(coinType, i uint32) (*ExtendedKey, error) 
 	return extKey, nil
 }
 
-func (parent *ExtendedKey) Derive(path []uint32) (*ExtendedKey, error) {
+// Derive returns a derived child key at a given path
+func (k *ExtendedKey) Derive(path []uint32) (*ExtendedKey, error) {
 	var err error
-	extKey := parent
+	extKey := k
 	for _, i := range path {
 		extKey, err = extKey.Child(i)
 		if err != nil {
@@ -238,6 +249,8 @@ func (parent *ExtendedKey) Derive(path []uint32) (*ExtendedKey, error) {
 	return extKey, nil
 }
 
+// Neuter returns a new extended public key from a give extended private key.
+// If the input extended key is already public, it will be returned unaltered.
 func (k *ExtendedKey) Neuter() (*ExtendedKey, error) {
 	// Already an extended public key.
 	if !k.IsPrivate {

@@ -19,7 +19,7 @@ const (
 )
 
 var (
-	ErrQueuedTxIdNotFound      = errors.New("transaction hash not found")
+	ErrQueuedTxIDNotFound      = errors.New("transaction hash not found")
 	ErrQueuedTxTimedOut        = errors.New("transaction sending timed out")
 	ErrQueuedTxDiscarded       = errors.New("transaction has been discarded")
 	ErrInvalidCompleteTxSender = errors.New("transaction can only be completed by the same account which created it")
@@ -27,9 +27,9 @@ var (
 
 // TxQueue is capped container that holds pending transactions
 type TxQueue struct {
-	transactions  map[QueuedTxId]*QueuedTx
+	transactions  map[QueuedTxID]*QueuedTx
 	mu            sync.RWMutex // to guard transactions map
-	evictableIds  chan QueuedTxId
+	evictableIDs  chan QueuedTxID
 	enqueueTicker chan struct{}
 	incomingPool  chan *QueuedTx
 
@@ -46,7 +46,7 @@ type TxQueue struct {
 
 // QueuedTx holds enough information to complete the queued transaction.
 type QueuedTx struct {
-	Id      QueuedTxId
+	ID      QueuedTxID
 	Hash    common.Hash
 	Context context.Context
 	Args    SendTxArgs
@@ -55,8 +55,8 @@ type QueuedTx struct {
 	Err     error
 }
 
-// QueuedTxId queued transaction identifier
-type QueuedTxId string
+// QueuedTxID queued transaction identifier
+type QueuedTxID string
 
 // EnqueuedTxHandler is a function that receives queued/pending transactions, when they get queued
 type EnqueuedTxHandler func(QueuedTx)
@@ -79,8 +79,8 @@ type SendTxArgs struct {
 func NewTransactionQueue() *TxQueue {
 	log.Info("StatusIM: initializing transaction queue")
 	return &TxQueue{
-		transactions:  make(map[QueuedTxId]*QueuedTx),
-		evictableIds:  make(chan QueuedTxId, DefaultTxQueueCap), // will be used to evict in FIFO
+		transactions:  make(map[QueuedTxID]*QueuedTx),
+		evictableIDs:  make(chan QueuedTxID, DefaultTxQueueCap), // will be used to evict in FIFO
 		enqueueTicker: make(chan struct{}),
 		incomingPool:  make(chan *QueuedTx, DefaultTxSendQueueCap),
 	}
@@ -110,7 +110,7 @@ func (q *TxQueue) evictionLoop() {
 		select {
 		case <-q.enqueueTicker:
 			if len(q.transactions) >= (DefaultTxQueueCap - 1) { // eviction is required to accommodate another/last item
-				q.Remove(<-q.evictableIds)
+				q.Remove(<-q.evictableIDs)
 				q.enqueueTicker <- struct{}{} // in case we pulled already removed item
 			}
 		case <-q.stopped:
@@ -127,7 +127,7 @@ func (q *TxQueue) enqueueLoop() {
 	for {
 		select {
 		case queuedTx := <-q.incomingPool:
-			log.Info("StatusIM: transaction enqueued", "tx", queuedTx.Id)
+			log.Info("StatusIM: transaction enqueued", "tx", queuedTx.ID)
 			q.Enqueue(queuedTx)
 		case <-q.stopped:
 			log.Info("StatusIM: transaction queue's enqueue loop stopped")
@@ -142,8 +142,8 @@ func (q *TxQueue) Reset() {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
-	q.transactions = make(map[QueuedTxId]*QueuedTx)
-	q.evictableIds = make(chan QueuedTxId, DefaultTxQueueCap)
+	q.transactions = make(map[QueuedTxID]*QueuedTx)
+	q.evictableIDs = make(chan QueuedTxID, DefaultTxQueueCap)
 }
 
 // EnqueueAsync enqueues incoming transaction in async manner, returns as soon as possible
@@ -160,10 +160,10 @@ func (q *TxQueue) Enqueue(tx *QueuedTx) error {
 	}
 
 	q.enqueueTicker <- struct{}{} // notify eviction loop that we are trying to insert new item
-	q.evictableIds <- tx.Id       // this will block when we hit DefaultTxQueueCap
+	q.evictableIDs <- tx.ID       // this will block when we hit DefaultTxQueueCap
 
 	q.mu.Lock()
-	q.transactions[tx.Id] = tx
+	q.transactions[tx.ID] = tx
 	q.mu.Unlock()
 
 	// notify handler
@@ -173,7 +173,7 @@ func (q *TxQueue) Enqueue(tx *QueuedTx) error {
 }
 
 // Get returns transaction by transaction identifier
-func (q *TxQueue) Get(id QueuedTxId) (*QueuedTx, error) {
+func (q *TxQueue) Get(id QueuedTxID) (*QueuedTx, error) {
 	q.mu.RLock()
 	defer q.mu.RUnlock()
 
@@ -181,11 +181,11 @@ func (q *TxQueue) Get(id QueuedTxId) (*QueuedTx, error) {
 		return tx, nil
 	}
 
-	return nil, ErrQueuedTxIdNotFound
+	return nil, ErrQueuedTxIDNotFound
 }
 
 // Remove removes transaction by transaction identifier
-func (q *TxQueue) Remove(id QueuedTxId) {
+func (q *TxQueue) Remove(id QueuedTxID) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -201,7 +201,7 @@ func (q *TxQueue) Count() int {
 }
 
 // Has checks whether transaction with a given identifier exists in queue
-func (q *TxQueue) Has(id QueuedTxId) bool {
+func (q *TxQueue) Has(id QueuedTxID) bool {
 	q.mu.RLock()
 	defer q.mu.RUnlock()
 
@@ -234,7 +234,7 @@ func (q *TxQueue) NotifyOnQueuedTxReturn(queuedTx *QueuedTx, err error) {
 
 	// on success, remove item from the queue and stop propagating
 	if err == nil {
-		q.Remove(queuedTx.Id)
+		q.Remove(queuedTx.ID)
 		return
 	}
 
@@ -249,7 +249,7 @@ func (q *TxQueue) NotifyOnQueuedTxReturn(queuedTx *QueuedTx, err error) {
 		ErrInvalidCompleteTxSender: true, // completing tx create from another account
 	}
 	if !transientErrs[err] { // remove only on unrecoverable errors
-		q.Remove(queuedTx.Id)
+		q.Remove(queuedTx.ID)
 	}
 
 	// notify handler

@@ -37,7 +37,9 @@ func TestQueuedContracts(t *testing.T) {
 		return
 	}
 
-	geth.Logout()
+	if err = geth.Logout(); err != nil {
+		t.Fatal(err)
+	}
 
 	// make sure you panic if transaction complete doesn't return
 	completeQueuedTransaction := make(chan struct{}, 1)
@@ -45,7 +47,7 @@ func TestQueuedContracts(t *testing.T) {
 
 	// replace transaction notification handler
 	var txHash = common.Hash{}
-	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) { // nolint :dupl
 		var envelope geth.SignalEnvelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
@@ -57,7 +59,7 @@ func TestQueuedContracts(t *testing.T) {
 
 			// the first call will fail (we are not logged in, but trying to complete tx)
 			if txHash, err = geth.CompleteTransaction(event["id"].(string), testConfig.Account1.Password); err != status.ErrInvalidCompleteTxSender {
-				t.Errorf("expected error on queued transation[%v] not thrown: expected %v, got %v", event["id"], status.ErrInvalidCompleteTxSender, err)
+				t.Errorf("expected error on queued transaction[%v] not thrown: expected %v, got %v", event["id"], status.ErrInvalidCompleteTxSender, err)
 				return
 			}
 
@@ -67,7 +69,7 @@ func TestQueuedContracts(t *testing.T) {
 				return
 			}
 			if txHash, err = geth.CompleteTransaction(event["id"].(string), testConfig.Account1.Password); err != status.ErrInvalidCompleteTxSender {
-				t.Errorf("expected error on queued transation[%v] not thrown: expected %v, got %v", event["id"], status.ErrInvalidCompleteTxSender, err)
+				t.Errorf("expected error on queued transaction[%v] not thrown: expected %v, got %v", event["id"], status.ErrInvalidCompleteTxSender, err)
 				return
 			}
 
@@ -77,7 +79,7 @@ func TestQueuedContracts(t *testing.T) {
 				return
 			}
 			if txHash, err = geth.CompleteTransaction(event["id"].(string), testConfig.Account1.Password); err != nil {
-				t.Errorf("cannot complete queued transation[%v]: %v", event["id"], err)
+				t.Errorf("cannot complete queued transaction[%v]: %v", event["id"], err)
 				return
 			}
 
@@ -143,7 +145,9 @@ func TestQueuedTransactions(t *testing.T) {
 		return
 	}
 
-	geth.Logout()
+	if err = geth.Logout(); err != nil {
+		t.Fatal(err)
+	}
 
 	// make sure you panic if transaction complete doesn't return
 	completeQueuedTransaction := make(chan struct{}, 1)
@@ -151,7 +155,7 @@ func TestQueuedTransactions(t *testing.T) {
 
 	// replace transaction notification handler
 	var txHash = common.Hash{}
-	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) { // nolint: dupl
 		var envelope geth.SignalEnvelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
@@ -163,7 +167,7 @@ func TestQueuedTransactions(t *testing.T) {
 
 			// the first call will fail (we are not logged in, but trying to complete tx)
 			if txHash, err = geth.CompleteTransaction(event["id"].(string), testConfig.Account1.Password); err != status.ErrInvalidCompleteTxSender {
-				t.Errorf("expected error on queued transation[%v] not thrown: expected %v, got %v", event["id"], status.ErrInvalidCompleteTxSender, err)
+				t.Errorf("expected error on queued transaction[%v] not thrown: expected %v, got %v", event["id"], status.ErrInvalidCompleteTxSender, err)
 				return
 			}
 
@@ -173,7 +177,7 @@ func TestQueuedTransactions(t *testing.T) {
 				return
 			}
 			if txHash, err = geth.CompleteTransaction(event["id"].(string), testConfig.Account1.Password); err != status.ErrInvalidCompleteTxSender {
-				t.Errorf("expected error on queued transation[%v] not thrown: expected %v, got %v", event["id"], status.ErrInvalidCompleteTxSender, err)
+				t.Errorf("expected error on queued transaction[%v] not thrown: expected %v, got %v", event["id"], status.ErrInvalidCompleteTxSender, err)
 				return
 			}
 
@@ -183,7 +187,7 @@ func TestQueuedTransactions(t *testing.T) {
 				return
 			}
 			if txHash, err = geth.CompleteTransaction(event["id"].(string), testConfig.Account1.Password); err != nil {
-				t.Errorf("cannot complete queued transation[%v]: %v", event["id"], err)
+				t.Errorf("cannot complete queued transaction[%v]: %v", event["id"], err)
 				return
 			}
 
@@ -246,7 +250,7 @@ func TestDoubleCompleteQueuedTransactions(t *testing.T) {
 	geth.PanicAfter(20*time.Second, completeQueuedTransaction, "TestQueuedTransactions")
 
 	// replace transaction notification handler
-	var txId string
+	var txID string
 	txFailedEventCalled := false
 	txHash := common.Hash{}
 	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
@@ -257,12 +261,12 @@ func TestDoubleCompleteQueuedTransactions(t *testing.T) {
 		}
 		if envelope.Type == geth.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
-			txId = event["id"].(string)
-			t.Logf("transaction queued (will be failed and completed on the second call): {id: %s}\n", txId)
+			txID = event["id"].(string)
+			t.Logf("transaction queued (will be failed and completed on the second call): {id: %s}\n", txID)
 
 			// try with wrong password
 			// make sure that tx is NOT removed from the queue (by re-trying with the correct password)
-			if _, err = geth.CompleteTransaction(txId, testConfig.Account1.Password+"wrong"); err != keystore.ErrDecrypt {
+			if _, err = geth.CompleteTransaction(txID, testConfig.Account1.Password+"wrong"); err != keystore.ErrDecrypt {
 				t.Errorf("expects wrong password error, but call succeeded (or got another error: %v)", err)
 				return
 			}
@@ -274,7 +278,7 @@ func TestDoubleCompleteQueuedTransactions(t *testing.T) {
 
 			// now try to complete transaction, but with the correct password
 			if txHash, err = geth.CompleteTransaction(event["id"].(string), testConfig.Account1.Password); err != nil {
-				t.Errorf("cannot complete queued transation[%v]: %v", event["id"], err)
+				t.Errorf("cannot complete queued transaction[%v]: %v", event["id"], err)
 				return
 			}
 
@@ -370,7 +374,7 @@ func TestDiscardQueuedTransactions(t *testing.T) {
 	geth.PanicAfter(20*time.Second, completeQueuedTransaction, "TestDiscardQueuedTransactions")
 
 	// replace transaction notification handler
-	var txId string
+	var txID string
 	txFailedEventCalled := false
 	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var envelope geth.SignalEnvelope
@@ -380,31 +384,31 @@ func TestDiscardQueuedTransactions(t *testing.T) {
 		}
 		if envelope.Type == geth.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
-			txId = event["id"].(string)
-			t.Logf("transaction queued (will be discarded soon): {id: %s}\n", txId)
+			txID = event["id"].(string)
+			t.Logf("transaction queued (will be discarded soon): {id: %s}\n", txID)
 
-			if !backend.TransactionQueue().Has(status.QueuedTxId(txId)) {
-				t.Errorf("txqueue should still have test tx: %s", txId)
+			if !backend.TransactionQueue().Has(status.QueuedTxID(txID)) {
+				t.Errorf("txqueue should still have test tx: %s", txID)
 				return
 			}
 
 			// discard
-			err := geth.DiscardTransaction(txId)
+			err := geth.DiscardTransaction(txID)
 			if err != nil {
 				t.Errorf("cannot discard tx: %v", err)
 				return
 			}
 
 			// try completing discarded transaction
-			_, err = geth.CompleteTransaction(txId, testConfig.Account1.Password)
+			_, err = geth.CompleteTransaction(txID, testConfig.Account1.Password)
 			if err.Error() != "transaction hash not found" {
 				t.Error("expects tx not found, but call to CompleteTransaction succeeded")
 				return
 			}
 
 			time.Sleep(1 * time.Second) // make sure that tx complete signal propagates
-			if backend.TransactionQueue().Has(status.QueuedTxId(txId)) {
-				t.Errorf("txqueue should not have test tx at this point (it should be discarded): %s", txId)
+			if backend.TransactionQueue().Has(status.QueuedTxID(txID)) {
+				t.Errorf("txqueue should not have test tx at this point (it should be discarded): %s", txID)
 				return
 			}
 
@@ -485,12 +489,12 @@ func TestCompleteMultipleQueuedTransactions(t *testing.T) {
 
 	// make sure you panic if transaction complete doesn't return
 	testTxCount := 3
-	txIds := make(chan string, testTxCount)
+	txIDs := make(chan string, testTxCount)
 	allTestTxCompleted := make(chan struct{}, 1)
 
 	// replace transaction notification handler
 	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var txId string
+		var txID string
 		var envelope geth.SignalEnvelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
@@ -498,10 +502,10 @@ func TestCompleteMultipleQueuedTransactions(t *testing.T) {
 		}
 		if envelope.Type == geth.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
-			txId = event["id"].(string)
-			t.Logf("transaction queued (will be completed in a single call, once aggregated): {id: %s}\n", txId)
+			txID = event["id"].(string)
+			t.Logf("transaction queued (will be completed in a single call, once aggregated): {id: %s}\n", txID)
 
-			txIds <- txId
+			txIDs <- txID
 		}
 	})
 
@@ -524,26 +528,29 @@ func TestCompleteMultipleQueuedTransactions(t *testing.T) {
 	}
 
 	// wait for transactions, and complete them in a single call
-	completeTxs := func(txIdStrings string) {
-		var parsedIds []string
-		json.Unmarshal([]byte(txIdStrings), &parsedIds)
+	completeTxs := func(txIDStrings string) {
+		var parsedIDs []string
+		if err := json.Unmarshal([]byte(txIDStrings), &parsedIDs); err != nil {
+			t.Error(err)
+			return
+		}
 
-		parsedIds = append(parsedIds, "invalid-tx-id")
-		updatedTxIdStrings, _ := json.Marshal(parsedIds)
+		parsedIDs = append(parsedIDs, "invalid-tx-id")
+		updatedTxIDStrings, _ := json.Marshal(parsedIDs)
 
 		// complete
-		results := geth.CompleteTransactions(string(updatedTxIdStrings), testConfig.Account1.Password)
+		results := geth.CompleteTransactions(string(updatedTxIDStrings), testConfig.Account1.Password)
 		if len(results) != (testTxCount+1) || results["invalid-tx-id"].Error.Error() != "transaction hash not found" {
 			t.Errorf("cannot complete txs: %v", results)
 			return
 		}
-		for txId, txResult := range results {
-			if txResult.Error != nil && txId != "invalid-tx-id" {
-				t.Errorf("invalid error for %s", txId)
+		for txID, txResult := range results {
+			if txResult.Error != nil && txID != "invalid-tx-id" {
+				t.Errorf("invalid error for %s", txID)
 				return
 			}
-			if txResult.Hash.Hex() == "0x0000000000000000000000000000000000000000000000000000000000000000" && txId != "invalid-tx-id" {
-				t.Errorf("invalid hash (expected non empty hash): %s", txId)
+			if txResult.Hash.Hex() == "0x0000000000000000000000000000000000000000000000000000000000000000" && txID != "invalid-tx-id" {
+				t.Errorf("invalid hash (expected non empty hash): %s", txID)
 				return
 			}
 
@@ -553,21 +560,21 @@ func TestCompleteMultipleQueuedTransactions(t *testing.T) {
 		}
 
 		time.Sleep(1 * time.Second) // make sure that tx complete signal propagates
-		for _, txId := range parsedIds {
-			if backend.TransactionQueue().Has(status.QueuedTxId(txId)) {
-				t.Errorf("txqueue should not have test tx at this point (it should be completed): %s", txId)
+		for _, txID := range parsedIDs {
+			if backend.TransactionQueue().Has(status.QueuedTxID(txID)) {
+				t.Errorf("txqueue should not have test tx at this point (it should be completed): %s", txID)
 				return
 			}
 		}
 	}
 	go func() {
-		var txIdStrings []string
+		var txIDStrings []string
 		for i := 0; i < testTxCount; i++ {
-			txIdStrings = append(txIdStrings, <-txIds)
+			txIDStrings = append(txIDStrings, <-txIDs)
 		}
 
-		txIdJSON, _ := json.Marshal(txIdStrings)
-		completeTxs(string(txIdJSON))
+		txIDJSON, _ := json.Marshal(txIDStrings)
+		completeTxs(string(txIDJSON))
 		allTestTxCompleted <- struct{}{}
 	}()
 
@@ -616,13 +623,13 @@ func TestDiscardMultipleQueuedTransactions(t *testing.T) {
 
 	// make sure you panic if transaction complete doesn't return
 	testTxCount := 3
-	txIds := make(chan string, testTxCount)
+	txIDs := make(chan string, testTxCount)
 	allTestTxDiscarded := make(chan struct{}, 1)
 
 	// replace transaction notification handler
 	txFailedEventCallCount := 0
 	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var txId string
+		var txID string
 		var envelope geth.SignalEnvelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
@@ -630,15 +637,15 @@ func TestDiscardMultipleQueuedTransactions(t *testing.T) {
 		}
 		if envelope.Type == geth.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
-			txId = event["id"].(string)
-			t.Logf("transaction queued (will be discarded soon): {id: %s}\n", txId)
+			txID = event["id"].(string)
+			t.Logf("transaction queued (will be discarded soon): {id: %s}\n", txID)
 
-			if !backend.TransactionQueue().Has(status.QueuedTxId(txId)) {
-				t.Errorf("txqueue should still have test tx: %s", txId)
+			if !backend.TransactionQueue().Has(status.QueuedTxID(txID)) {
+				t.Errorf("txqueue should still have test tx: %s", txID)
 				return
 			}
 
-			txIds <- txId
+			txIDs <- txID
 		}
 
 		if envelope.Type == geth.EventTransactionFailed {
@@ -684,22 +691,25 @@ func TestDiscardMultipleQueuedTransactions(t *testing.T) {
 	}
 
 	// wait for transactions, and discard immediately
-	discardTxs := func(txIdStrings string) {
-		var parsedIds []string
-		json.Unmarshal([]byte(txIdStrings), &parsedIds)
+	discardTxs := func(txIDStrings string) {
+		var parsedIDs []string
+		if err := json.Unmarshal([]byte(txIDStrings), &parsedIDs); err != nil {
+			t.Error(err)
+			return
+		}
 
-		parsedIds = append(parsedIds, "invalid-tx-id")
-		updatedTxIdStrings, _ := json.Marshal(parsedIds)
+		parsedIDs = append(parsedIDs, "invalid-tx-id")
+		updatedTxIDStrings, _ := json.Marshal(parsedIDs)
 
 		// discard
-		discardResults := geth.DiscardTransactions(string(updatedTxIdStrings))
+		discardResults := geth.DiscardTransactions(string(updatedTxIDStrings))
 		if len(discardResults) != 1 || discardResults["invalid-tx-id"].Error.Error() != "transaction hash not found" {
 			t.Errorf("cannot discard txs: %v", discardResults)
 			return
 		}
 
 		// try completing discarded transaction
-		completeResults := geth.CompleteTransactions(string(updatedTxIdStrings), testConfig.Account1.Password)
+		completeResults := geth.CompleteTransactions(string(updatedTxIDStrings), testConfig.Account1.Password)
 		if len(completeResults) != (testTxCount + 1) {
 			t.Error("unexpected number of errors (call to CompleteTransaction should not succeed)")
 		}
@@ -715,21 +725,21 @@ func TestDiscardMultipleQueuedTransactions(t *testing.T) {
 		}
 
 		time.Sleep(1 * time.Second) // make sure that tx complete signal propagates
-		for _, txId := range parsedIds {
-			if backend.TransactionQueue().Has(status.QueuedTxId(txId)) {
-				t.Errorf("txqueue should not have test tx at this point (it should be discarded): %s", txId)
+		for _, txID := range parsedIDs {
+			if backend.TransactionQueue().Has(status.QueuedTxID(txID)) {
+				t.Errorf("txqueue should not have test tx at this point (it should be discarded): %s", txID)
 				return
 			}
 		}
 	}
 	go func() {
-		var txIdStrings []string
+		var txIDStrings []string
 		for i := 0; i < testTxCount; i++ {
-			txIdStrings = append(txIdStrings, <-txIds)
+			txIDStrings = append(txIDStrings, <-txIDs)
 		}
 
-		txIdJSON, _ := json.Marshal(txIdStrings)
-		discardTxs(string(txIdJSON))
+		txIDJSON, _ := json.Marshal(txIDStrings)
+		discardTxs(string(txIDJSON))
 	}()
 
 	// send multiple transactions
@@ -769,35 +779,15 @@ func TestNonExistentQueuedTransactions(t *testing.T) {
 	geth.PanicAfter(20*time.Second, completeQueuedTransaction, "TestQueuedTransactions")
 
 	// replace transaction notification handler
-	var txHash = common.Hash{}
-	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var envelope geth.SignalEnvelope
-		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
-			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
-			return
-		}
-		if envelope.Type == geth.EventTransactionQueued {
-			event := envelope.Event.(map[string]interface{})
-			t.Logf("Transaction queued (will be completed shortly): {id: %s}\n", event["id"].(string))
-
-			// next call is the very same one, but with the correct password
-			if txHash, err = geth.CompleteTransaction(event["id"].(string), testConfig.Account1.Password); err != nil {
-				t.Errorf("cannot complete queued transation[%v]: %v", event["id"], err)
-				return
-			}
-
-			t.Logf("Transaction complete: https://testnet.etherscan.io/tx/%s", txHash.Hex())
-			completeQueuedTransaction <- struct{}{} // so that timeout is aborted
-		}
-	})
+	geth.SetDefaultNodeNotificationHandler(func(string) {})
 
 	// try completing non-existing transaction
 	if _, err = geth.CompleteTransaction("some-bad-transaction-id", testConfig.Account1.Password); err == nil {
-		t.Error("error expected and not recieved")
+		t.Error("error expected and not received")
 		return
 	}
-	if err != status.ErrQueuedTxIdNotFound {
-		t.Errorf("unexpected error recieved: expected '%s', got: '%s'", status.ErrQueuedTxIdNotFound.Error(), err.Error())
+	if err != status.ErrQueuedTxIDNotFound {
+		t.Errorf("unexpected error received: expected '%s', got: '%s'", status.ErrQueuedTxIDNotFound.Error(), err.Error())
 		return
 	}
 }
@@ -841,7 +831,7 @@ func TestEvictionOfQueuedTransactions(t *testing.T) {
 
 			// next call is the very same one, but with the correct password
 			if txHash, err = geth.CompleteTransaction(event["id"].(string), testConfig.Account1.Password); err != nil {
-				t.Errorf("cannot complete queued transation[%v]: %v", event["id"], err)
+				t.Errorf("cannot complete queued transaction[%v]: %v", event["id"], err)
 				return
 			}
 
@@ -852,10 +842,10 @@ func TestEvictionOfQueuedTransactions(t *testing.T) {
 
 	txQueue := backend.TransactionQueue()
 	var i = 0
-	txIds := [status.DefaultTxQueueCap + 5 + 10]status.QueuedTxId{}
+	txIDs := [status.DefaultTxQueueCap + 5 + 10]status.QueuedTxID{}
 	backend.SetTransactionQueueHandler(func(queuedTx status.QueuedTx) {
-		t.Logf("%d. Transaction queued (queue size: %d): {id: %v}\n", i, txQueue.Count(), queuedTx.Id)
-		txIds[i] = queuedTx.Id
+		t.Logf("%d. Transaction queued (queue size: %d): {id: %v}\n", i, txQueue.Count(), queuedTx.ID)
+		txIDs[i] = queuedTx.ID
 		i++
 	})
 
@@ -865,7 +855,7 @@ func TestEvictionOfQueuedTransactions(t *testing.T) {
 	}
 
 	for i := 0; i < 10; i++ {
-		go backend.SendTransaction(nil, status.SendTxArgs{})
+		go backend.SendTransaction(nil, status.SendTxArgs{}) // nolint: errcheck
 	}
 	time.Sleep(3 * time.Second)
 
@@ -877,7 +867,7 @@ func TestEvictionOfQueuedTransactions(t *testing.T) {
 	}
 
 	for i := 0; i < status.DefaultTxQueueCap+5; i++ { // stress test by hitting with lots of goroutines
-		go backend.SendTransaction(nil, status.SendTxArgs{})
+		go backend.SendTransaction(nil, status.SendTxArgs{}) // nolint: errcheck
 	}
 	time.Sleep(5 * time.Second)
 
@@ -886,8 +876,8 @@ func TestEvictionOfQueuedTransactions(t *testing.T) {
 		return
 	}
 
-	for _, txId := range txIds {
-		txQueue.Remove(txId)
+	for _, txID := range txIDs {
+		txQueue.Remove(txID)
 	}
 
 	if txQueue.Count() != 0 {

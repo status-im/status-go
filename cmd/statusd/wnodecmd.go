@@ -11,53 +11,79 @@ import (
 )
 
 var (
+	// WhisperEchoModeFlag enables/disables Echo mode (arguments are printed for diagnostics)
 	WhisperEchoModeFlag = cli.BoolTFlag{
 		Name:  "echo",
 		Usage: "Echo mode, prints some arguments for diagnostics (default: true)",
 	}
+
+	// WhisperBootstrapNodeFlag marks node as not actively listening for incoming connections
 	WhisperBootstrapNodeFlag = cli.BoolTFlag{
 		Name:  "bootstrap",
 		Usage: "Don't actively connect to peers, wait for incoming connections (default: true)",
 	}
+
+	// WhisperNotificationServerNodeFlag enables/disables Push Notifications services
 	WhisperNotificationServerNodeFlag = cli.BoolFlag{
 		Name:  "notify",
 		Usage: "Node is capable of sending Push Notifications",
 	}
+
+	// WhisperForwarderNodeFlag enables/disables message forwarding
+	// (when neither sends nor decrypts envelopes, just forwards them)
 	WhisperForwarderNodeFlag = cli.BoolFlag{
 		Name:  "forward",
 		Usage: "Only forward messages, neither send nor decrypt messages",
 	}
+
+	// WhisperMailserverNodeFlag enables/disables Inboxing services
 	WhisperMailserverNodeFlag = cli.BoolFlag{
 		Name:  "mailserver",
 		Usage: "Delivers expired messages on demand",
 	}
+
+	// WhisperIdentityFile is path to file containing private key of the node (for asymmetric encryption)
 	WhisperIdentityFile = cli.StringFlag{
 		Name:  "identity",
-		Usage: "Protocol identity file (private key used for asymetric encryption)",
+		Usage: "Protocol identity file (private key used for asymmetric encryption)",
 	}
+
+	// WhisperPasswordFile is password used to do a symmetric encryption
 	WhisperPasswordFile = cli.StringFlag{
 		Name:  "password",
 		Usage: "Password file (password is used for symmetric encryption)",
 	}
+
+	// WhisperPortFlag defines port on which Whisper protocol is listening
 	WhisperPortFlag = cli.IntFlag{
 		Name:  "port",
 		Usage: "Whisper node's listening port",
 		Value: params.WhisperPort,
 	}
+
+	// WhisperPoWFlag is the minimum PoW required by the node
 	WhisperPoWFlag = cli.Float64Flag{
 		Name:  "pow",
 		Usage: "PoW for messages to be added to queue, in float format",
 		Value: params.WhisperMinimumPoW,
 	}
+
+	// WhisperTTLFlag defines node's default TTL for envelopes
 	WhisperTTLFlag = cli.IntFlag{
 		Name:  "ttl",
 		Usage: "Time to live for messages, in seconds",
 		Value: params.WhisperTTL,
 	}
+
+	// WhisperInjectTestAccounts if set, then test accounts will be imported
+	// into node's key store, and then will be injected as key pairs (identities)
+	// into the Whisper as well.
 	WhisperInjectTestAccounts = cli.BoolTFlag{
 		Name:  "injectaccounts",
 		Usage: "Whether test account should be injected or not (default: true)",
 	}
+
+	// FirebaseAuthorizationKey path to file containing FCM password
 	FirebaseAuthorizationKey = cli.StringFlag{
 		Name:  "firebaseauth",
 		Usage: "FCM Authorization Key used for sending Push Notifications",
@@ -97,19 +123,27 @@ func wnode(ctx *cli.Context) error {
 
 	// import test accounts
 	if ctx.BoolT(WhisperInjectTestAccounts.Name) {
-		geth.ImportTestAccount(filepath.Join(config.DataDir, "keystore"), "test-account1.pk")
-		geth.ImportTestAccount(filepath.Join(config.DataDir, "keystore"), "test-account2.pk")
+		if err = geth.ImportTestAccount(filepath.Join(config.DataDir, "keystore"), "test-account1.pk"); err != nil {
+			return err
+		}
+		if err = geth.ImportTestAccount(filepath.Join(config.DataDir, "keystore"), "test-account2.pk"); err != nil {
+			return err
+		}
 	}
 
-	if err := geth.CreateAndRunNode(config); err != nil {
+	if err = geth.CreateAndRunNode(config); err != nil {
 		return err
 	}
 
 	// inject test accounts into Whisper
 	if ctx.BoolT(WhisperInjectTestAccounts.Name) {
 		testConfig, _ := geth.LoadTestConfig()
-		injectAccountIntoWhisper(testConfig.Account1.Address, testConfig.Account1.Password)
-		injectAccountIntoWhisper(testConfig.Account2.Address, testConfig.Account2.Password)
+		if err = injectAccountIntoWhisper(testConfig.Account1.Address, testConfig.Account1.Password); err != nil {
+			return err
+		}
+		if err = injectAccountIntoWhisper(testConfig.Account2.Address, testConfig.Account2.Password); err != nil {
+			return err
+		}
 	}
 
 	// wait till node has been stopped
@@ -204,7 +238,7 @@ func injectAccountIntoWhisper(address, password string) error {
 		return geth.ErrAddressToAccountMappingFailure
 	}
 
-	account, accountKey, err := keyStore.AccountDecryptedKey(account, password)
+	_, accountKey, err := keyStore.AccountDecryptedKey(account, password)
 	if err != nil {
 		return fmt.Errorf("%s: %v", geth.ErrAccountToKeyMappingFailure.Error(), err)
 	}
@@ -213,7 +247,9 @@ func injectAccountIntoWhisper(address, password string) error {
 	if err != nil {
 		return err
 	}
-	whisperService.AddKeyPair(accountKey.PrivateKey)
+	if _, err = whisperService.AddKeyPair(accountKey.PrivateKey); err != nil {
+		return err
+	}
 
 	return nil
 }

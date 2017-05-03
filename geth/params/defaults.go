@@ -69,9 +69,9 @@ const (
 	// FirebaseNotificationTriggerURL is URL where FCM notification requests are sent to
 	FirebaseNotificationTriggerURL = "https://fcm.googleapis.com/fcm/send"
 
-	// MainNetworkId is id of the main network
-	MainNetworkId = 1
+	// MainNetworkID is id of the main network
+	MainNetworkID = 1
 
-	// TestNetworkId is id of a test network
-	TestNetworkId = 3
+	// TestNetworkID is id of a test network
+	TestNetworkID = 3
 )

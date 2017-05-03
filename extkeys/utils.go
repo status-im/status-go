@@ -9,13 +9,16 @@ import (
 	"github.com/btcsuite/btcd/btcec"
 )
 
+// errors
 var (
 	ErrInvalidSecretKey = errors.New("generated secret key cannot be used")
 )
 
 func splitHMAC(seed, salt []byte) (secretKey, chainCode []byte, err error) {
 	data := hmac.New(sha512.New, salt)
-	data.Write(seed)
+	if _, err = data.Write(seed); err != nil {
+		return
+	}
 	I := data.Sum(nil)
 
 	// Split I into two 32-byte sequences, IL and IR.

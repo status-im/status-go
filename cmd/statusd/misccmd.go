@@ -25,8 +25,11 @@ func version(ctx *cli.Context) error {
 	if gitCommit != "" {
 		fmt.Println("Git Commit:", gitCommit)
 	}
+	if buildStamp != "" {
+		fmt.Println("Build Stamp:", buildStamp)
+	}
 
-	fmt.Println("Network Id:", ctx.GlobalInt(NetworkIdFlag.Name))
+	fmt.Println("Network Id:", ctx.GlobalInt(NetworkIDFlag.Name))
 	fmt.Println("Go Version:", runtime.Version())
 	fmt.Println("OS:", runtime.GOOS)
 	fmt.Printf("GOPATH=%s\n", os.Getenv("GOPATH"))

@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts"
@@ -27,8 +28,12 @@ import (
 
 var (
 	muPrepareTestNode sync.Mutex
-	RootDir           string
-	TestDataDir       string
+
+	// RootDir is the main application directory
+	RootDir string
+
+	// TestDataDir is data directory used for tests
+	TestDataDir string
 )
 
 func init() {
@@ -47,6 +52,8 @@ func init() {
 	TestDataDir = filepath.Join(RootDir, ".ethereumtest")
 }
 
+// NodeNotificationHandler defines a handler able to process incoming node events.
+// Events are encoded as JSON strings.
 type NodeNotificationHandler func(jsonEvent string)
 
 var notificationHandler NodeNotificationHandler = TriggerDefaultNodeNotificationHandler
@@ -68,12 +75,12 @@ func SendSignal(signal SignalEnvelope) {
 }
 
 //export NotifyNode
-func NotifyNode(jsonEvent *C.char) {
+func NotifyNode(jsonEvent *C.char) { // nolint: golint
 	notificationHandler(C.GoString(jsonEvent))
 }
 
 //export TriggerTestSignal
-func TriggerTestSignal() {
+func TriggerTestSignal() { // nolint: golint
 	C.StatusServiceSignalEvent(C.CString(`{"answer": 42}`))
 }
 
@@ -106,27 +113,8 @@ func LoadTestConfig() (*TestConfig, error) {
 	return &testConfig, nil
 }
 
-func CopyFile(dst, src string) error {
-	s, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer s.Close()
-
-	d, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer d.Close()
-
-	if _, err := io.Copy(d, s); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// LoadFromFile is usefull for loading test data, from testdata/filename into a variable
+// LoadFromFile is useful for loading test data, from testdata/filename into a variable
+// nolint: errcheck
 func LoadFromFile(filename string) string {
 	f, err := os.Open(filename)
 	if err != nil {
@@ -140,6 +128,7 @@ func LoadFromFile(filename string) string {
 	return string(buf.Bytes())
 }
 
+// PrepareTestNode initializes node manager and start a test node (only once!)
 func PrepareTestNode() (err error) {
 	muPrepareTestNode.Lock()
 	defer muPrepareTestNode.Unlock()
@@ -157,26 +146,26 @@ func PrepareTestNode() (err error) {
 	}
 
 	syncRequired := false
-	if _, err := os.Stat(TestDataDir); os.IsNotExist(err) {
+	if _, err = os.Stat(TestDataDir); os.IsNotExist(err) {
 		syncRequired = true
 	}
 
 	// prepare node directory
-	if err := os.MkdirAll(filepath.Join(TestDataDir, "keystore"), os.ModePerm); err != nil {
+	if err = os.MkdirAll(filepath.Join(TestDataDir, "keystore"), os.ModePerm); err != nil {
 		log.Warn("make node failed", "error", err)
 		return err
 	}
 
 	// import test accounts (with test ether on it)
-	if err := ImportTestAccount(filepath.Join(TestDataDir, "keystore"), "test-account1.pk"); err != nil {
+	if err = ImportTestAccount(filepath.Join(TestDataDir, "keystore"), "test-account1.pk"); err != nil {
 		panic(err)
 	}
-	if err := ImportTestAccount(filepath.Join(TestDataDir, "keystore"), "test-account2.pk"); err != nil {
+	if err = ImportTestAccount(filepath.Join(TestDataDir, "keystore"), "test-account2.pk"); err != nil {
 		panic(err)
 	}
 
 	// start geth node and wait for it to initialize
-	config, err := params.NewNodeConfig(filepath.Join(TestDataDir, "data"), params.TestNetworkId)
+	config, err := params.NewNodeConfig(filepath.Join(TestDataDir, "data"), params.TestNetworkID)
 	if err != nil {
 		return err
 	}
@@ -212,11 +201,42 @@ func PrepareTestNode() (err error) {
 	return nil
 }
 
-func RemoveTestNode() {
-	err := os.RemoveAll(TestDataDir)
+// MakeTestCompleteTxHandler returns node notification handler to be used in test
+// basically notification handler completes a transaction (that is enqueued after
+// the handler has been installed)
+func MakeTestCompleteTxHandler(t *testing.T, txHash *common.Hash, completed chan struct{}) (handler func(jsonEvent string), err error) {
+	testConfig, err := LoadTestConfig()
 	if err != nil {
-		log.Warn("could not clean up temporary datadir")
+		return
 	}
+
+	handler = func(jsonEvent string) {
+		var envelope SignalEnvelope
+		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
+			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
+			return
+		}
+		if envelope.Type == EventTransactionQueued {
+			event := envelope.Event.(map[string]interface{})
+
+			t.Logf("Transaction queued (will be completed shortly): {id: %s}\n", event["id"].(string))
+
+			if err := SelectAccount(testConfig.Account1.Address, testConfig.Account1.Password); err != nil {
+				t.Errorf("cannot select account: %v", testConfig.Account1.Address)
+				return
+			}
+
+			var err error
+			if *txHash, err = CompleteTransaction(event["id"].(string), testConfig.Account1.Password); err != nil {
+				t.Errorf("cannot complete queued transaction[%v]: %v", event["id"], err)
+				return
+			}
+
+			t.Logf("Contract created: https://testnet.etherscan.io/tx/%s", txHash.Hex())
+			close(completed) // so that timeout is aborted
+		}
+	}
+	return
 }
 
 // PanicAfter throws panic() after waitSeconds, unless abort channel receives notification
@@ -231,6 +251,8 @@ func PanicAfter(waitSeconds time.Duration, abort chan struct{}, desc string) {
 	}()
 }
 
+// FromAddress converts account address from string to common.Address.
+// The function is useful to format "From" field of send transaction struct.
 func FromAddress(accountAddress string) common.Address {
 	from, err := ParseAccountString(accountAddress)
 	if err != nil {
@@ -240,6 +262,8 @@ func FromAddress(accountAddress string) common.Address {
 	return from.Address
 }
 
+// ToAddress converts account address from string to *common.Address.
+// The function is useful to format "To" field of send transaction struct.
 func ToAddress(accountAddress string) *common.Address {
 	to, err := ParseAccountString(accountAddress)
 	if err != nil {
@@ -280,7 +304,7 @@ func AddressToDecryptedAccount(address, password string) (accounts.Account, *key
 func ImportTestAccount(keystoreDir, accountFile string) error {
 	// make sure that keystore folder exists
 	if _, err := os.Stat(keystoreDir); os.IsNotExist(err) {
-		os.MkdirAll(keystoreDir, os.ModePerm)
+		os.MkdirAll(keystoreDir, os.ModePerm) // nolint: errcheck
 	}
 
 	dst := filepath.Join(keystoreDir, accountFile)
