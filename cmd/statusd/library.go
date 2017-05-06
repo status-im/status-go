@@ -77,44 +77,25 @@ func RecoverAccount(password, mnemonic *C.char) *C.char {
 	return C.CString(string(outBytes))
 }
 
+//export VerifyAccountPassword
+func VerifyAccountPassword(keyPath, address, password *C.char) *C.char {
+	_, err := geth.VerifyAccountPassword(C.GoString(keyPath), C.GoString(address), C.GoString(password))
+	return makeJSONErrorResponse(err)
+}
+
 //export Login
 func Login(address, password *C.char) *C.char {
 	// loads a key file (for a given address), tries to decrypt it using the password, to verify ownership
 	// if verified, purges all the previous identities from Whisper, and injects verified key as shh identity
 	err := geth.SelectAccount(C.GoString(address), C.GoString(password))
-
-	errString := ""
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		errString = err.Error()
-	}
-
-	out := geth.JSONError{
-		Error: errString,
-	}
-	outBytes, _ := json.Marshal(&out)
-
-	return C.CString(string(outBytes))
+	return makeJSONErrorResponse(err)
 }
 
 //export Logout
 func Logout() *C.char {
-
 	// This is equivalent to clearing whisper identities
 	err := geth.Logout()
-
-	errString := ""
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		errString = err.Error()
-	}
-
-	out := geth.JSONError{
-		Error: errString,
-	}
-	outBytes, _ := json.Marshal(&out)
-
-	return C.CString(string(outBytes))
+	return makeJSONErrorResponse(err)
 }
 
 //export CompleteTransaction

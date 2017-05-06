@@ -2,11 +2,85 @@ package geth_test
 
 import (
 	"errors"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/geth"
 )
+
+func TestVerifyAccountPassword(t *testing.T) {
+	tmpDir, err := ioutil.TempDir(os.TempDir(), "accounts")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir) // nolint: errcheck
+
+	if err = geth.ImportTestAccount(tmpDir, "test-account1.pk"); err != nil {
+		t.Fatal(err)
+	}
+
+	accountFilePath := filepath.Join(tmpDir, "test-account1.pk")
+	account1Address := common.BytesToAddress(common.FromHex(testConfig.Account1.Address))
+	account2Address := common.BytesToAddress(common.FromHex(testConfig.Account2.Address))
+
+	testCases := []struct {
+		name          string
+		keyPath       string
+		address       string
+		password      string
+		expectedError error
+	}{
+		{
+			"correct address, correct password (decrypt should succeed)",
+			accountFilePath,
+			testConfig.Account1.Address,
+			testConfig.Account1.Password,
+			nil,
+		},
+		{
+			"correct address, correct password, invalid key file",
+			filepath.Join(tmpDir, "non-existent-file.pk"),
+			testConfig.Account1.Address,
+			testConfig.Account1.Password,
+			fmt.Errorf("invalid account key file: open %s/non-existent-file.pk: no such file or directory", tmpDir),
+		},
+		{
+			"wrong address, correct password",
+			accountFilePath,
+			testConfig.Account2.Address, // wrong address (swap attack)
+			testConfig.Account1.Password,
+			fmt.Errorf("account mismatch: have %x, want %x", account1Address, account2Address),
+		},
+		{
+			"correct address, wrong password",
+			accountFilePath,
+			testConfig.Account1.Address,
+			"wrong password", // wrong password
+			errors.New("could not decrypt key with given passphrase"),
+		},
+	}
+	for _, testCase := range testCases {
+		t.Log(testCase.name)
+		accountKey, err := geth.VerifyAccountPassword(testCase.keyPath, testCase.address, testCase.password)
+		if !reflect.DeepEqual(err, testCase.expectedError) {
+			t.Errorf("unexpected error: expected \n'%v', got \n'%v'", testCase.expectedError, err)
+		}
+		if err == nil {
+			if accountKey == nil {
+				t.Error("no error reported, but account key is missing")
+			}
+			accountAddress := common.BytesToAddress(common.FromHex(testCase.address))
+			if accountKey.Address != accountAddress {
+				t.Errorf("account mismatch: have %x, want %x", accountKey.Address, accountAddress)
+			}
+		}
+	}
+}
 
 func TestAccountsList(t *testing.T) {
 	err := geth.PrepareTestNode()

@@ -3,6 +3,7 @@ package main
 import "C"
 import (
 	"encoding/json"
+	"io/ioutil"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -59,6 +60,10 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 			testCreateChildAccount,
 		},
 		{
+			"verify account password",
+			testVerifyAccountPassword,
+		},
+		{
 			"recover account",
 			testRecoverAccount,
 		},
@@ -103,6 +108,36 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 	}
 
 	done <- struct{}{}
+}
+
+func testVerifyAccountPassword(t *testing.T) bool {
+	tmpDir, err := ioutil.TempDir(os.TempDir(), "accounts")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir) // nolint: errcheck
+
+	if err = geth.ImportTestAccount(tmpDir, "test-account1.pk"); err != nil {
+		t.Fatal(err)
+	}
+
+	accountFilePath := filepath.Join(tmpDir, "test-account1.pk")
+	response := geth.JSONError{}
+	rawResponse := VerifyAccountPassword(
+		C.CString(accountFilePath),
+		C.CString(testConfig.Account1.Address),
+		C.CString(testConfig.Account1.Password))
+
+	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &response); err != nil {
+		t.Errorf("cannot decode response (%s): %v", C.GoString(rawResponse), err)
+		return false
+	}
+	if response.Error != "" {
+		t.Errorf("unexpected error: %s", response.Error)
+		return false
+	}
+
+	return true
 }
 
 func testGetDefaultConfig(t *testing.T) bool {

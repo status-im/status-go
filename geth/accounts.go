@@ -3,8 +3,10 @@ package geth
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
 
 	"github.com/ethereum/go-ethereum/accounts"
+	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/status-im/status-go/extkeys"
@@ -123,6 +125,28 @@ func RecoverAccount(password, mnemonic string) (address, pubKey string, err erro
 	}
 
 	return address, pubKey, nil
+}
+
+// VerifyAccountPassword tries to decrypt a given account key file, with a provided password.
+// If no error is returned, then account is considered verified.
+func VerifyAccountPassword(keyPath, address, password string) (*keystore.Key, error) {
+	keyJSON, err := ioutil.ReadFile(keyPath)
+	if err != nil {
+		return nil, fmt.Errorf("invalid account key file: %v", err)
+	}
+
+	key, err := keystore.DecryptKey(keyJSON, password)
+	if err != nil {
+		return nil, err
+	}
+
+	// avoid swap attack
+	addr := common.BytesToAddress(common.FromHex(address))
+	if key.Address != addr {
+		return nil, fmt.Errorf("account mismatch: have %x, want %x", key.Address, addr)
+	}
+
+	return key, nil
 }
 
 // SelectAccount selects current account, by verifying that address has corresponding account which can be decrypted
