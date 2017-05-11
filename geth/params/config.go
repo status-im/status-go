@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/static"
 )
 
 // default node configuration options
@@ -40,7 +41,7 @@ var (
 // LightEthConfig holds LES-related configuration
 // Status nodes are always lightweight clients (due to mobile platform constraints)
 type LightEthConfig struct {
-	// Enabled flag specifies whether  protocol is enabled
+	// Enabled flag specifies whether protocol is enabled
 	Enabled bool
 
 	// Genesis is JSON to seed the chain database with
@@ -61,7 +62,7 @@ type FirebaseConfig struct {
 
 // WhisperConfig holds SHH-related configuration
 type WhisperConfig struct {
-	// Enabled flag specifies whether  protocol is enabled
+	// Enabled flag specifies whether protocol is enabled
 	Enabled bool
 
 	// IdentityFile path to private key, that will be loaded as identity into Whisper
@@ -104,8 +105,23 @@ type WhisperConfig struct {
 
 // SwarmConfig holds Swarm-related configuration
 type SwarmConfig struct {
-	// Enabled flag specifies whether  protocol is enabled
+	// Enabled flag specifies whether protocol is enabled
 	Enabled bool
+}
+
+// BootCluster holds configuration for supporting boot cluster, which is a temporary
+// means for mobile devices to get connected to Ethereum network (UDP-based discovery
+// may not be available, so we need means to discover the network manually).
+type BootClusterConfig struct {
+	// Enabled flag specifies whether feature is enabled
+	Enabled bool
+
+	// ConfigFile is a path to JSON file containing array of boot nodes
+	// See `static/bootcluster/*.json` for cluster configurations provided
+	// out of box. You can pass absolute path, and if file at that path can be
+	// loaded, it will be used. Otherwise, file is supposed to be relative to
+	// `static/bootcluster` folder.
+	ConfigFile string
 }
 
 // NodeConfig stores configuration options for a node
@@ -183,6 +199,9 @@ type NodeConfig struct {
 	// LogToStderr defines whether logged info should also be output to os.Stderr
 	LogToStderr bool
 
+	// BootClusterConfig extra configuration for supporting cluster
+	BootClusterConfig *BootClusterConfig `json:"BootClusterConfig,"`
+
 	// LightEthConfig extra configuration for LES
 	LightEthConfig *LightEthConfig `json:"LightEthConfig,"`
 
@@ -214,6 +233,9 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 		LightEthConfig: &LightEthConfig{
 			Enabled:       true,
 			DatabaseCache: DatabaseCache,
+		},
+		BootClusterConfig: &BootClusterConfig{
+			ConfigFile: BootClusterConfigFile,
 		},
 		WhisperConfig: &WhisperConfig{
 			Enabled:    true,
@@ -336,6 +358,29 @@ func (c *NodeConfig) Save() error {
 	return nil
 }
 
+// LoadBootClusterNodes loads boot nodes from a config file provided in BootClusterConfig
+func (c *NodeConfig) LoadBootClusterNodes() ([]string, error) {
+	var bootnodes []string
+	var configData []byte
+	var err error
+
+	filename := c.BootClusterConfig.ConfigFile
+	if _, err = os.Stat(filename); os.IsNotExist(err) { // load from static resources
+		configData, err = static.Asset("bootcluster/" + filename)
+	} else {
+		configData, err = ioutil.ReadFile(filename)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	// parse JSON
+	if err := json.Unmarshal([]byte(configData), &bootnodes); err != nil {
+		return nil, err
+	}
+	return bootnodes, nil
+}
+
 // String dumps config object as nicely indented JSON
 func (c *NodeConfig) String() string {
 	data, _ := json.MarshalIndent(c, "", "    ")
@@ -350,6 +395,12 @@ func (c *WhisperConfig) String() string {
 
 // String dumps config object as nicely indented JSON
 func (c *SwarmConfig) String() string {
+	data, _ := json.MarshalIndent(c, "", "    ")
+	return string(data)
+}
+
+// String dumps config object as nicely indented JSON
+func (c *BootClusterConfig) String() string {
 	data, _ := json.MarshalIndent(c, "", "    ")
 	return string(data)
 }

@@ -413,8 +413,13 @@ func (m *NodeManager) onNodeStarted() {
 
 // PopulateStaticPeers connects current node with our publicly available LES/SHH/Swarm cluster
 func (m *NodeManager) PopulateStaticPeers() {
-	for _, enode := range params.TestnetBootnodes {
+	enodes, err := m.node.config.LoadBootClusterNodes()
+	if err != nil {
+		Fatalf("can not load boot nodes: %v", err)
+	}
+	for _, enode := range enodes {
 		m.AddPeer(enode) // nolint: errcheck
+		log.Info("bootnode added", "enode", enode)
 	}
 }
 
