@@ -22,7 +22,7 @@
     "LogLevel": "INFO",
     "LogToStderr": true,
     "BootClusterConfig": {
-        "Enabled": false,
+        "Enabled": true,
         "ConfigFile": "ropsten.dev.json"
     },
     "LightEthConfig": {

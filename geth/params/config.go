@@ -235,6 +235,7 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 			DatabaseCache: DatabaseCache,
 		},
 		BootClusterConfig: &BootClusterConfig{
+			Enabled:    true,
 			ConfigFile: BootClusterConfigFile,
 		},
 		WhisperConfig: &WhisperConfig{
@@ -365,6 +366,7 @@ func (c *NodeConfig) LoadBootClusterNodes() ([]string, error) {
 	var err error
 
 	filename := c.BootClusterConfig.ConfigFile
+	log.Info("loading boot nodes", "source", filename)
 	if _, err = os.Stat(filename); os.IsNotExist(err) { // load from static resources
 		configData, err = static.Asset("bootcluster/" + filename)
 	} else {
