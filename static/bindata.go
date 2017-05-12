@@ -97,7 +97,7 @@ func scriptsReadmeMd() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "scripts/README.md", size: 133, mode: os.FileMode(420), modTime: time.Unix(1494793924, 0)}
+	info := bindataFileInfo{name: "scripts/README.md", size: 133, mode: os.FileMode(420), modTime: time.Unix(1494795629, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -117,7 +117,7 @@ func scriptsWeb3Js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "scripts/web3.js", size: 496165, mode: os.FileMode(420), modTime: time.Unix(1494794103, 0)}
+	info := bindataFileInfo{name: "scripts/web3.js", size: 496165, mode: os.FileMode(420), modTime: time.Unix(1494795674, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -257,7 +257,7 @@ func configLinter_exclude_listTxt() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/linter_exclude_list.txt", size: 2258, mode: os.FileMode(420), modTime: time.Unix(1494793924, 0)}
+	info := bindataFileInfo{name: "config/linter_exclude_list.txt", size: 2258, mode: os.FileMode(420), modTime: time.Unix(1494795629, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -297,7 +297,7 @@ func keysFirebaseauthkey() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/firebaseauthkey", size: 153, mode: os.FileMode(420), modTime: time.Unix(1494793924, 0)}
+	info := bindataFileInfo{name: "keys/firebaseauthkey", size: 153, mode: os.FileMode(420), modTime: time.Unix(1494795629, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -357,7 +357,7 @@ func keysWnodekey() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/wnodekey", size: 65, mode: os.FileMode(420), modTime: time.Unix(1494793924, 0)}
+	info := bindataFileInfo{name: "keys/wnodekey", size: 65, mode: os.FileMode(420), modTime: time.Unix(1494795629, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -377,7 +377,7 @@ func keysWnodepassword() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/wnodepassword", size: 9, mode: os.FileMode(420), modTime: time.Unix(1494793924, 0)}
+	info := bindataFileInfo{name: "keys/wnodepassword", size: 9, mode: os.FileMode(420), modTime: time.Unix(1494795629, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }

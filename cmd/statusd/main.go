@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/status-im/status-go/geth"
 	"github.com/status-im/status-go/geth/params"
 	"gopkg.in/urfave/cli.v1"
 )
@@ -34,26 +33,15 @@ var (
 	// NetworkIDFlag defines network ID
 	NetworkIDFlag = cli.IntFlag{
 		Name:  "networkid",
-		Usage: "Network identifier (integer, 1=Frontier, 2=Morden (disused), 3=Ropsten)",
+		Usage: "Network identifier (integer, 1=Homestead, 3=Ropsten, 4=Rinkeby)",
 		Value: params.TestNetworkID,
 	}
 
-	// LightEthEnabledFlag flags whether LES is enabled or not
-	LightEthEnabledFlag = cli.BoolFlag{
-		Name:  "les",
-		Usage: "LES protocol enabled",
-	}
-
-	// WhisperEnabledFlag flags whether Whisper is enabled or not
-	WhisperEnabledFlag = cli.BoolFlag{
-		Name:  "shh",
-		Usage: "SHH protocol enabled",
-	}
-
-	// SwarmEnabledFlag flags whether Swarm is enabled or not
-	SwarmEnabledFlag = cli.BoolFlag{
-		Name:  "swarm",
-		Usage: "Swarm protocol enabled",
+	// BootClusterConfigFileFlag allows to switch boot cluster nodes
+	BootClusterConfigFileFlag = cli.StringFlag{
+		Name:  "bootcluster",
+		Usage: "Boot cluster config file",
+		Value: params.BootClusterConfigFile,
 	}
 
 	// HTTPEnabledFlag defines whether HTTP RPC endpoint should be opened or not
@@ -85,24 +73,19 @@ var (
 
 func init() {
 	// setup the app
-	app.Action = statusd
+	app.Action = cli.ShowAppHelp
 	app.HideVersion = true // separate command prints version
 	app.Commands = []cli.Command{
 		versionCommand,
+		faucetCommand,
 		wnodeCommand,
 	}
-
 	app.Flags = []cli.Flag{
 		NodeKeyFileFlag,
 		DataDirFlag,
 		NetworkIDFlag,
-		LightEthEnabledFlag,
-		WhisperEnabledFlag,
-		SwarmEnabledFlag,
-		HTTPEnabledFlag,
-		HTTPPortFlag,
-		IPCEnabledFlag,
 		LogLevelFlag,
+		BootClusterConfigFileFlag,
 	}
 	app.Before = func(ctx *cli.Context) error {
 		runtime.GOMAXPROCS(runtime.NumCPU())
@@ -120,49 +103,6 @@ func main() {
 	}
 }
 
-// statusd runs Status node
-func statusd(ctx *cli.Context) error {
-	config, err := makeNodeConfig(ctx)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "can not parse config: %v", err)
-		return err
-	}
-
-	if err := geth.CreateAndRunNode(config); err != nil {
-		return err
-	}
-
-	// wait till node has been stopped
-	geth.NodeManagerInstance().Node().GethStack().Wait()
-
-	return nil
-}
-
-// makeNodeConfig parses incoming CLI options and returns node configuration object
-func makeNodeConfig(ctx *cli.Context) (*params.NodeConfig, error) {
-	nodeConfig, err := params.NewNodeConfig(ctx.GlobalString(DataDirFlag.Name), ctx.GlobalUint64(NetworkIDFlag.Name))
-	if err != nil {
-		return nil, err
-	}
-
-	nodeConfig.NodeKeyFile = ctx.GlobalString(NodeKeyFileFlag.Name)
-	if !ctx.GlobalBool(HTTPEnabledFlag.Name) {
-		nodeConfig.HTTPHost = "" // HTTP RPC is disabled
-	}
-	nodeConfig.IPCEnabled = ctx.GlobalBool(IPCEnabledFlag.Name)
-	nodeConfig.LightEthConfig.Enabled = ctx.GlobalBool(LightEthEnabledFlag.Name)
-	nodeConfig.WhisperConfig.Enabled = ctx.GlobalBool(WhisperEnabledFlag.Name)
-	nodeConfig.SwarmConfig.Enabled = ctx.GlobalBool(SwarmEnabledFlag.Name)
-	nodeConfig.HTTPPort = ctx.GlobalInt(HTTPPortFlag.Name)
-
-	if logLevel := ctx.GlobalString(LogLevelFlag.Name); len(logLevel) > 0 {
-		nodeConfig.LogEnabled = true
-		nodeConfig.LogLevel = logLevel
-	}
-
-	return nodeConfig, nil
-}
-
 // makeApp creates an app with sane defaults.
 func makeApp(gitCommit string) *cli.App {
 	app := cli.NewApp()
@@ -174,6 +114,34 @@ func makeApp(gitCommit string) *cli.App {
 	if gitCommit != "" {
 		app.Version += "-" + gitCommit[:8]
 	}
-	app.Usage = "Status CLI"
+	app.Usage = "CLI for Status nodes management"
 	return app
+}
+
+// makeNodeConfig parses incoming CLI options and returns node configuration object
+func makeNodeConfig(ctx *cli.Context) (*params.NodeConfig, error) {
+	nodeConfig, err := params.NewNodeConfig(ctx.GlobalString(DataDirFlag.Name), ctx.GlobalUint64(NetworkIDFlag.Name))
+	if err != nil {
+		return nil, err
+	}
+
+	nodeConfig.NodeKeyFile = ctx.GlobalString(NodeKeyFileFlag.Name)
+
+	if logLevel := ctx.GlobalString(LogLevelFlag.Name); len(logLevel) > 0 {
+		nodeConfig.LogEnabled = true
+		nodeConfig.LogLevel = logLevel
+	}
+
+	return nodeConfig, nil
+}
+
+// printNodeConfig prints node config
+func printNodeConfig(ctx *cli.Context) {
+	nodeConfig, err := makeNodeConfig(ctx)
+	if err != nil {
+		fmt.Printf("Loaded Config: failed (err: %v)", err)
+		return
+	}
+	nodeConfig.LightEthConfig.Genesis = "SKIP"
+	fmt.Println("Loaded Config: ", nodeConfig)
 }
