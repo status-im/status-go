@@ -1,16 +1,13 @@
 package params_test
 
 import (
-	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
-	"time"
 
-	"github.com/ethereum/go-ethereum/logger"
-	"github.com/ethereum/go-ethereum/logger/glog"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/geth/params"
 )
 
@@ -19,7 +16,7 @@ func TestLogger(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
+	//defer os.RemoveAll(tmpDir)
 
 	nodeConfig, err := params.NewNodeConfig(tmpDir, params.TestNetworkId)
 	if err != nil {
@@ -34,6 +31,7 @@ func TestLogger(t *testing.T) {
 	}
 
 	nodeConfig.LogEnabled = true
+	nodeConfig.LogToStderr = false // just capture logs to file
 	nodeLogger, err = params.SetupLogger(nodeConfig)
 	if err != nil {
 		t.Fatal("cannot create logger object")
@@ -42,104 +40,41 @@ func TestLogger(t *testing.T) {
 		t.Fatal("logger is empty (while logs are enabled)")
 	}
 
-	logReader := make(chan string, 100)
-	loggerStarted := nodeLogger.Observe(logReader)
-	<-loggerStarted // allow logger to setup itself
-
-	expectedLogTextInLogFile := "" // aggregate log contents accross all tests
-	validateLoggerObserverText := func(observer chan string, expectedLogText string) {
-		logText := ""
-
-		select {
-		case logText = <-observer:
-			expectedLogTextInLogFile += logText + "\n"
-			logText = logText[len(logText)-len(expectedLogText):] // as logs can be prepended with glog info
-		case <-time.After(3 * time.Second):
+	validateLogText := func(expectedLogText string) {
+		logFilePath := filepath.Join(nodeConfig.DataDir, nodeConfig.LogFile)
+		logBytes, err := ioutil.ReadFile(logFilePath)
+		if err != nil {
+			panic(err)
 		}
+		logText := string(logBytes)
+		logText = strings.Trim(logText, "\n")
+		logText = logText[len(logText)-len(expectedLogText):] // as logs can be prepended with log info
 
-		if logText != expectedLogText {
-			t.Fatalf("invalid log, expected: %#v, got: %#v", expectedLogText, logText)
+		if expectedLogText != logText {
+			t.Fatalf("invalid log, expected: [%s], got: [%s]", expectedLogText, string(logText))
+		} else {
+			t.Logf("log match found, expected: [%s], got: [%s]", expectedLogText, string(logText))
 		}
 	}
 
-	loggerTestCases := []struct {
-		name     string
-		log      func()
-		validate func()
-	}{
-		{
-			"log using standard log package",
-			func() {
-				log.Println("use standard log package")
-			},
-			func() {
-				validateLoggerObserverText(logReader, "use standard log package")
-			},
-		},
-		{
-			"log using standard glog package",
-			func() {
-				glog.V(logger.Info).Infoln("use glog package")
-			},
-			func() {
-				validateLoggerObserverText(logReader, "use glog package")
-			},
-		},
-		{
-			"log using os.Stderr (write directly to it)",
-			func() {
-				fmt.Fprintln(os.Stderr, "use os.Stderr package")
-			},
-			func() {
-				validateLoggerObserverText(logReader, "use os.Stderr package")
-			},
-		},
-		{
-			"log using DEBUG log level (with appropriate level set)",
-			func() {
-				nodeLogger.SetV("DEBUG")
-				glog.V(logger.Debug).Info("logged DEBUG log level message")
-			},
-			func() {
-				validateLoggerObserverText(logReader, "logged DEBUG log level message")
-			},
-		},
-		{
-			"log using DEBUG log level (with appropriate level NOT set)",
-			func() {
-				nodeLogger.SetV("INFO")
-				glog.V(logger.Info).Info("logged INFO log level message")
-				glog.V(logger.Debug).Info("logged DEBUG log level message")
-			},
-			func() {
-				validateLoggerObserverText(logReader, "logged INFO log level message")
-			},
-		},
-	}
+	// sample log message
+	log.Info("use log package")
+	validateLogText(`msg="use log package"`)
 
-	for _, testCase := range loggerTestCases {
-		t.Log("test: " + testCase.name)
-		testCase.log()
-		testCase.validate()
-	}
+	// log using DEBUG log level (with appropriate level set)
+	nodeLogger.SetV("DEBUG")
+	log.Info("logged DEBUG log level message")
+	validateLogText(`msg="logged DEBUG log level message"`)
 
-	logFileContents, err := ioutil.ReadFile(filepath.Join(tmpDir, nodeConfig.LogFile))
-	if err != nil {
-		t.Fatalf("cannot read logs file: %v", err)
-	}
-	if string(logFileContents) != expectedLogTextInLogFile {
-		t.Fatalf("wrong content of log file, expected:\n%v\ngot:\n%v", expectedLogTextInLogFile, string(logFileContents))
-	}
+	// log using DEBUG log level (with appropriate level set)
+	nodeLogger.SetV("INFO")
+	log.Info("logged INFO log level message")
+	validateLogText(`msg="logged INFO log level message"`)
+	log.Debug("logged DEBUG log level message")
+	validateLogText(`msg="logged INFO log level message"`) // debug level message is NOT logged
 
-	go func() {
-		for i := 0; i < 10; i++ {
-			glog.Infoln("logging message: ", i)
-			time.Sleep(1 * time.Millisecond)
-		}
-	}()
+	// stop logger and see if os.Stderr and gethlog continue functioning
+	nodeLogger.Stop()
 
-	// stop logger and see if os.Stderr and glog continue functioning
-	<-nodeLogger.Stop()
-
-	glog.Infoln("logging message: this message happens after custom logger has been stopped")
+	log.Info("logging message: this message happens after custom logger has been stopped")
 }

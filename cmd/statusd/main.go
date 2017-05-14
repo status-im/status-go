@@ -59,7 +59,7 @@ var (
 	}
 	LogLevelFlag = cli.StringFlag{
 		Name:  "log",
-		Usage: `Log level, one of: ""ERROR", "WARNING", "INFO", "DEBUG", and "DETAIL"`,
+		Usage: `Log level, one of: ""ERROR", "WARNING", "INFO", "DEBUG", and "TRACE"`,
 		Value: "INFO",
 	}
 )
@@ -121,7 +121,7 @@ func statusd(ctx *cli.Context) error {
 
 // makeNodeConfig parses incoming CLI options and returns node configuration object
 func makeNodeConfig(ctx *cli.Context) (*params.NodeConfig, error) {
-	nodeConfig, err := params.NewNodeConfig(ctx.GlobalString(DataDirFlag.Name), ctx.GlobalInt(NetworkIdFlag.Name))
+	nodeConfig, err := params.NewNodeConfig(ctx.GlobalString(DataDirFlag.Name), ctx.GlobalUint64(NetworkIdFlag.Name))
 	if err != nil {
 		return nil, err
 	}

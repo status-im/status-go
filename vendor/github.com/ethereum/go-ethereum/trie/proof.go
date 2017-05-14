@@ -23,8 +23,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto/sha3"
-	"github.com/ethereum/go-ethereum/logger"
-	"github.com/ethereum/go-ethereum/logger/glog"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
@@ -39,7 +38,7 @@ import (
 // absence of the key.
 func (t *Trie) Prove(key []byte) []rlp.RawValue {
 	// Collect all nodes on the path to key.
-	key = compactHexDecode(key)
+	key = keybytesToHex(key)
 	nodes := []node{}
 	tn := t.root
 	for len(key) > 0 && tn != nil {
@@ -61,9 +60,7 @@ func (t *Trie) Prove(key []byte) []rlp.RawValue {
 			var err error
 			tn, err = t.resolveHash(n, nil, nil)
 			if err != nil {
-				if glog.V(logger.Error) {
-					glog.Errorf("Unhandled trie error: %v", err)
-				}
+				log.Error(fmt.Sprintf("Unhandled trie error: %v", err))
 				return nil
 			}
 		default:
@@ -92,7 +89,7 @@ func (t *Trie) Prove(key []byte) []rlp.RawValue {
 // returns an error if the proof contains invalid trie nodes or the
 // wrong value.
 func VerifyProof(rootHash common.Hash, key []byte, proof []rlp.RawValue) (value []byte, err error) {
-	key = compactHexDecode(key)
+	key = keybytesToHex(key)
 	sha := sha3.NewKeccak256()
 	wantHash := rootHash.Bytes()
 	for i, buf := range proof {

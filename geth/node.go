@@ -1,6 +1,7 @@
 package geth
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -8,21 +9,23 @@ import (
 	"path"
 	"path/filepath"
 	"reflect"
-	"runtime"
 	"runtime/debug"
 	"strings"
 	"syscall"
 
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/eth"
+	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/les"
-	"github.com/ethereum/go-ethereum/logger"
-	"github.com/ethereum/go-ethereum/logger/glog"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
+	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/p2p/nat"
-	gethparams "github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/whisper/mailserver"
+	"github.com/ethereum/go-ethereum/whisper/notifications"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/params"
 )
@@ -69,8 +72,6 @@ func MakeNode(config *params.NodeConfig) *Node {
 	}
 
 	// setup logging
-	glog.CopyStandardLogTo("INFO")
-	glog.SetToStderr(true)
 	if _, err := params.SetupLogger(config); err != nil {
 		Fatalf(err)
 	}
@@ -82,24 +83,48 @@ func MakeNode(config *params.NodeConfig) *Node {
 		UseLightweightKDF: true,
 		Name:              config.Name,
 		Version:           config.Version,
-		NoDiscovery:       true,
-		DiscoveryV5:       false,
-		DiscoveryV5Addr:   ":0",
-		BootstrapNodes:    makeBootstrapNodes(),
-		BootstrapNodesV5:  makeBootstrapNodesV5(),
-		ListenAddr:        ":0",
-		NAT:               nat.Any(),
-		MaxPeers:          config.MaxPeers,
-		MaxPendingPeers:   config.MaxPendingPeers,
-		IPCPath:           makeIPCPath(config),
-		HTTPHost:          config.HTTPHost,
-		HTTPPort:          config.HTTPPort,
-		HTTPCors:          "*",
-		HTTPModules:       strings.Split(config.APIModules, ","),
-		WSHost:            makeWSHost(config),
-		WSPort:            config.WSPort,
-		WSOrigins:         "*",
-		WSModules:         strings.Split(config.APIModules, ","),
+		P2P: p2p.Config{
+			NoDiscovery:      true,
+			DiscoveryV5:      false,
+			DiscoveryV5Addr:  ":0",
+			BootstrapNodes:   makeBootstrapNodes(),
+			BootstrapNodesV5: makeBootstrapNodesV5(),
+			ListenAddr:       ":0",
+			NAT:              nat.Any(),
+			MaxPeers:         config.MaxPeers,
+			MaxPendingPeers:  config.MaxPendingPeers,
+		},
+		IPCPath:     makeIPCPath(config),
+		HTTPHost:    config.HTTPHost,
+		HTTPPort:    config.HTTPPort,
+		HTTPCors:    []string{"*"},
+		HTTPModules: strings.Split(config.APIModules, ","),
+		WSHost:      makeWSHost(config),
+		WSPort:      config.WSPort,
+		WSOrigins:   []string{"*"},
+		WSModules:   strings.Split(config.APIModules, ","),
+	}
+
+	if len(config.NodeKeyFile) > 0 {
+		log.Info("Loading private key file", "file", config.NodeKeyFile)
+		pk, err := crypto.LoadECDSA(config.NodeKeyFile)
+		if err != nil {
+			log.Warn(fmt.Sprintf("Failed loading private key file '%s': %v", config.NodeKeyFile, err))
+		}
+
+		// override node's private key
+		stackConfig.P2P.PrivateKey = pk
+	}
+
+	if len(config.NodeKeyFile) > 0 {
+		log.Info("Loading private key file", "file", config.NodeKeyFile)
+		pk, err := crypto.LoadECDSA(config.NodeKeyFile)
+		if err != nil {
+			log.Info("Failed loading private key file", "file", config.NodeKeyFile, "err", err)
+		}
+
+		// override node's private key
+		stackConfig.P2P.PrivateKey = pk
 	}
 
 	stack, err := node.New(stackConfig)
@@ -128,34 +153,27 @@ func MakeNode(config *params.NodeConfig) *Node {
 // activateEthService configures and registers the eth.Ethereum service with a given node.
 func activateEthService(stack *node.Node, config *params.NodeConfig) error {
 	if !config.LightEthConfig.Enabled {
-		glog.V(logger.Info).Infoln("LES protocol is disabled")
+		log.Info("LES protocol is disabled")
 		return nil
 	}
 
-	ethConf := &eth.Config{
-		Etherbase:               common.Address{},
-		ChainConfig:             makeChainConfig(config),
-		FastSync:                false,
-		LightMode:               true,
-		MaxPeers:                config.MaxPeers,
-		DatabaseCache:           config.LightEthConfig.DatabaseCache,
-		DatabaseHandles:         makeDatabaseHandles(),
-		NetworkId:               config.NetworkId,
-		Genesis:                 config.LightEthConfig.Genesis,
-		MinerThreads:            runtime.NumCPU(),
-		GasPrice:                params.GasPrice,
-		GpoMinGasPrice:          params.GpoMinGasPrice,
-		GpoMaxGasPrice:          params.GpoMaxGasPrice,
-		GpoFullBlockRatio:       params.GpoFullBlockRatio,
-		GpobaseStepDown:         params.GpobaseStepDown,
-		GpobaseStepUp:           params.GpobaseStepUp,
-		GpobaseCorrectionFactor: params.GpobaseCorrectionFactor,
-		SolcPath:                "solc",
-		AutoDAG:                 false,
+	var genesis *core.Genesis
+	if config.LightEthConfig.Genesis != "" {
+		genesis = new(core.Genesis)
+		if err := json.Unmarshal([]byte(config.LightEthConfig.Genesis), genesis); err != nil {
+			return fmt.Errorf("invalid genesis spec: %v", err)
+		}
 	}
 
+	ethConf := eth.DefaultConfig
+	ethConf.Genesis = genesis
+	ethConf.SyncMode = downloader.LightSync
+	ethConf.NetworkId = config.NetworkId
+	ethConf.DatabaseCache = config.LightEthConfig.DatabaseCache
+	ethConf.MaxPeers = config.MaxPeers
+	ethConf.DatabaseHandles = makeDatabaseHandles()
 	if err := stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-		return les.New(ctx, ethConf)
+		return les.New(ctx, &ethConf)
 	}); err != nil {
 		return fmt.Errorf("%v: %v", ErrLightEthRegistrationFailure, err)
 	}
@@ -166,11 +184,34 @@ func activateEthService(stack *node.Node, config *params.NodeConfig) error {
 // activateShhService configures Whisper and adds it to the given node.
 func activateShhService(stack *node.Node, config *params.NodeConfig) error {
 	if !config.WhisperConfig.Enabled {
-		glog.V(logger.Info).Infoln("SHH protocol is disabled")
+		log.Info("SHH protocol is disabled")
 		return nil
 	}
 	serviceConstructor := func(*node.ServiceContext) (node.Service, error) {
-		return whisper.New(), nil
+		whisperConfig := config.WhisperConfig
+		whisperService := whisper.New()
+
+		// enable mail service
+		if whisperConfig.MailServerNode {
+			password, err := whisperConfig.ReadPasswordFile()
+			if err != nil {
+				return nil, err
+			}
+
+			var mailServer mailserver.WMailServer
+			whisperService.RegisterServer(&mailServer)
+			mailServer.Init(whisperService, whisperConfig.DataDir, string(password), whisperConfig.MinimumPoW)
+		}
+
+		// enable notification service
+		if whisperConfig.NotificationServerNode {
+			var notificationServer notifications.NotificationServer
+			whisperService.RegisterNotificationServer(&notificationServer)
+
+			notificationServer.Init(whisperService, whisperConfig)
+		}
+
+		return whisperService, nil
 	}
 	if err := stack.Register(serviceConstructor); err != nil {
 		return err
@@ -195,29 +236,6 @@ func makeWSHost(config *params.NodeConfig) string {
 	}
 
 	return config.WSHost
-}
-
-// makeChainConfig reads the chain configuration from the database in the datadir.
-func makeChainConfig(config *params.NodeConfig) *gethparams.ChainConfig {
-	chainConfig := new(gethparams.ChainConfig)
-
-	// Homestead fork
-	chainConfig.HomesteadBlock = config.HomesteadBlock
-
-	// DAO fork
-	chainConfig.DAOForkBlock = config.DAOForkBlock
-	chainConfig.DAOForkSupport = config.DAOForkSupport
-
-	// DoS reprice fork
-	chainConfig.EIP150Block = config.EIP150Block
-	chainConfig.EIP150Hash = config.EIP150Hash
-
-	// DoS state cleanup fork
-	chainConfig.EIP155Block = config.EIP155Block
-	chainConfig.EIP158Block = config.EIP158Block
-	chainConfig.ChainId = config.ChainId
-
-	return chainConfig
 }
 
 // makeDatabaseHandles makes sure that enough file descriptors are available to the process
@@ -304,7 +322,7 @@ func Fatalf(reason interface{}, args ...interface{}) {
 // HaltOnPanic recovers from panic, logs issue, sends upward notification, and exits
 func HaltOnPanic() {
 	if r := recover(); r != nil {
-		err := fmt.Errorf("%v: %v", ErrNodeStartFailure, r)
+		err := fmt.Errorf("%v: %v", ErrNodeRunFailure, r)
 
 		// send signal up to native app
 		SendSignal(SignalEnvelope{

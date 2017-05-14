@@ -18,18 +18,18 @@
 // wallets. The wire protocol spec can be found in the Ledger Blue GitHub repo:
 // https://raw.githubusercontent.com/LedgerHQ/blue-app-eth/master/doc/ethapp.asc
 
-// +build !ios
-
 package usbwallet
 
 import (
-	"fmt"
+	"errors"
+	"runtime"
 	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/karalabe/gousb/usb"
+	"github.com/ethereum/go-ethereum/log"
+	"github.com/karalabe/hid"
 )
 
 // LedgerScheme is the protocol scheme prefixing account and wallet URLs.
@@ -49,8 +49,6 @@ const ledgerRefreshThrottling = 500 * time.Millisecond
 
 // LedgerHub is a accounts.Backend that can find and handle Ledger hardware wallets.
 type LedgerHub struct {
-	ctx *usb.Context // Context interfacing with a libusb instance
-
 	refreshed   time.Time               // Time instance when the list of wallets was last refreshed
 	wallets     []accounts.Wallet       // List of Ledger devices currently tracking
 	updateFeed  event.Feed              // Event feed to notify wallet additions/removals
@@ -58,23 +56,23 @@ type LedgerHub struct {
 	updating    bool                    // Whether the event notification loop is running
 
 	quit chan chan error
-	lock sync.RWMutex
+
+	stateLock sync.RWMutex // Protects the internals of the hub from racey access
+
+	// TODO(karalabe): remove if hotplug lands on Windows
+	commsPend int        // Number of operations blocking enumeration
+	commsLock sync.Mutex // Lock protecting the pending counter and enumeration
 }
 
 // NewLedgerHub creates a new hardware wallet manager for Ledger devices.
 func NewLedgerHub() (*LedgerHub, error) {
-	// Initialize the USB library to access Ledgers through
-	ctx, err := usb.NewContext()
-	if err != nil {
-		return nil, err
+	if !hid.Supported() {
+		return nil, errors.New("unsupported platform")
 	}
-	// Create the USB hub, start and return it
 	hub := &LedgerHub{
-		ctx:  ctx,
 		quit: make(chan chan error),
 	}
 	hub.refreshWallets()
-
 	return hub, nil
 }
 
@@ -84,8 +82,8 @@ func (hub *LedgerHub) Wallets() []accounts.Wallet {
 	// Make sure the list of wallets is up to date
 	hub.refreshWallets()
 
-	hub.lock.RLock()
-	defer hub.lock.RUnlock()
+	hub.stateLock.RLock()
+	defer hub.stateLock.RUnlock()
 
 	cpy := make([]accounts.Wallet, len(hub.wallets))
 	copy(cpy, hub.wallets)
@@ -96,39 +94,49 @@ func (hub *LedgerHub) Wallets() []accounts.Wallet {
 // list of wallets based on the found devices.
 func (hub *LedgerHub) refreshWallets() {
 	// Don't scan the USB like crazy it the user fetches wallets in a loop
-	hub.lock.RLock()
+	hub.stateLock.RLock()
 	elapsed := time.Since(hub.refreshed)
-	hub.lock.RUnlock()
+	hub.stateLock.RUnlock()
 
 	if elapsed < ledgerRefreshThrottling {
 		return
 	}
 	// Retrieve the current list of Ledger devices
-	var devIDs []deviceID
-	var busIDs []uint16
+	var ledgers []hid.DeviceInfo
 
-	hub.ctx.ListDevices(func(desc *usb.Descriptor) bool {
-		// Gather Ledger devices, don't connect any just yet
+	if runtime.GOOS == "linux" {
+		// hidapi on Linux opens the device during enumeration to retrieve some infos,
+		// breaking the Ledger protocol if that is waiting for user confirmation. This
+		// is a bug acknowledged at Ledger, but it won't be fixed on old devices so we
+		// need to prevent concurrent comms ourselves. The more elegant solution would
+		// be to ditch enumeration in favor of hutplug events, but that don't work yet
+		// on Windows so if we need to hack it anyway, this is more elegant for now.
+		hub.commsLock.Lock()
+		if hub.commsPend > 0 { // A confirmation is pending, don't refresh
+			hub.commsLock.Unlock()
+			return
+		}
+	}
+	for _, info := range hid.Enumerate(0, 0) { // Can't enumerate directly, one valid ID is the 0 wildcard
 		for _, id := range ledgerDeviceIDs {
-			if desc.Vendor == id.Vendor && desc.Product == id.Product {
-				devIDs = append(devIDs, deviceID{Vendor: desc.Vendor, Product: desc.Product})
-				busIDs = append(busIDs, uint16(desc.Bus)<<8+uint16(desc.Address))
-				return false
+			if info.VendorID == id.Vendor && info.ProductID == id.Product {
+				ledgers = append(ledgers, info)
+				break
 			}
 		}
-		// Not ledger, ignore and don't connect either
-		return false
-	})
+	}
+	if runtime.GOOS == "linux" {
+		// See rationale before the enumeration why this is needed and only on Linux.
+		hub.commsLock.Unlock()
+	}
 	// Transform the current list of wallets into the new one
-	hub.lock.Lock()
+	hub.stateLock.Lock()
 
-	wallets := make([]accounts.Wallet, 0, len(devIDs))
+	wallets := make([]accounts.Wallet, 0, len(ledgers))
 	events := []accounts.WalletEvent{}
 
-	for i := 0; i < len(devIDs); i++ {
-		devID, busID := devIDs[i], busIDs[i]
-
-		url := accounts.URL{Scheme: LedgerScheme, Path: fmt.Sprintf("%03d:%03d", busID>>8, busID&0xff)}
+	for _, ledger := range ledgers {
+		url := accounts.URL{Scheme: LedgerScheme, Path: ledger.Path}
 
 		// Drop wallets in front of the next device or those that failed for some reason
 		for len(hub.wallets) > 0 && (hub.wallets[0].URL().Cmp(url) < 0 || hub.wallets[0].(*ledgerWallet).failed()) {
@@ -137,7 +145,7 @@ func (hub *LedgerHub) refreshWallets() {
 		}
 		// If there are no more wallets or the device is before the next, wrap new wallet
 		if len(hub.wallets) == 0 || hub.wallets[0].URL().Cmp(url) > 0 {
-			wallet := &ledgerWallet{context: hub.ctx, hardwareID: devID, locationID: busID, url: &url}
+			wallet := &ledgerWallet{hub: hub, url: &url, info: ledger, log: log.New("url", url)}
 
 			events = append(events, accounts.WalletEvent{Wallet: wallet, Arrive: true})
 			wallets = append(wallets, wallet)
@@ -156,7 +164,7 @@ func (hub *LedgerHub) refreshWallets() {
 	}
 	hub.refreshed = time.Now()
 	hub.wallets = wallets
-	hub.lock.Unlock()
+	hub.stateLock.Unlock()
 
 	// Fire all wallet events and return
 	for _, event := range events {
@@ -168,8 +176,8 @@ func (hub *LedgerHub) refreshWallets() {
 // receive notifications on the addition or removal of Ledger wallets.
 func (hub *LedgerHub) Subscribe(sink chan<- accounts.WalletEvent) event.Subscription {
 	// We need the mutex to reliably start/stop the update loop
-	hub.lock.Lock()
-	defer hub.lock.Unlock()
+	hub.stateLock.Lock()
+	defer hub.stateLock.Unlock()
 
 	// Subscribe the caller and track the subscriber count
 	sub := hub.updateScope.Track(hub.updateFeed.Subscribe(sink))
@@ -198,12 +206,12 @@ func (hub *LedgerHub) updater() {
 		hub.refreshWallets()
 
 		// If all our subscribers left, stop the updater
-		hub.lock.Lock()
+		hub.stateLock.Lock()
 		if hub.updateScope.Count() == 0 {
 			hub.updating = false
-			hub.lock.Unlock()
+			hub.stateLock.Unlock()
 			return
 		}
-		hub.lock.Unlock()
+		hub.stateLock.Unlock()
 	}
 }
