@@ -649,14 +649,11 @@ func (wh *Whisper) add(envelope *Envelope) (bool, error) {
 		return false, fmt.Errorf("oversized version [%x]", envelope.Hash())
 	}
 
-	if len(envelope.AESNonce) > AESNonceMaxLength {
-		// the standard AES GSM nonce size is 12,
-		// but const gcmStandardNonceSize cannot be accessed directly
-		return false, fmt.Errorf("oversized AESNonce [%x]", envelope.Hash())
-	}
-
-	if len(envelope.Salt) > saltLength {
-		return false, fmt.Errorf("oversized salt [%x]", envelope.Hash())
+	aesNonceSize := len(envelope.AESNonce)
+	if aesNonceSize != 0 && aesNonceSize != AESNonceLength {
+		// the standard AES GCM nonce size is 12 bytes,
+		// but constant gcmStandardNonceSize cannot be accessed (not exported)
+		return false, fmt.Errorf("wrong size of AESNonce: %d bytes [env: %x]", aesNonceSize, envelope.Hash())
 	}
 
 	if envelope.PoW() < wh.minPoW {
