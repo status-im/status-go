@@ -403,60 +403,13 @@ type PostArgs struct {
 	Type       string        `json:"type"`       // "sym"/"asym" (symmetric or asymmetric)
 	TTL        uint32        `json:"ttl"`        // time-to-live in seconds
 	Sig        string        `json:"sig"`        // id of the signing key
-	Key        string        `json:"key"`        // id of encryption key
+	Key        string        `json:"key"`        // key id (in case of sym) or public key (in case of asym)
 	Topic      hexutil.Bytes `json:"topic"`      // topic (4 bytes)
 	Padding    hexutil.Bytes `json:"padding"`    // optional padding bytes
 	Payload    hexutil.Bytes `json:"payload"`    // payload to be encrypted
 	PowTime    uint32        `json:"powTime"`    // maximal time in seconds to be spent on PoW
 	PowTarget  float64       `json:"powTarget"`  // minimal PoW required for this message
 	TargetPeer string        `json:"targetPeer"` // peer id (for p2p message only)
-}
-
-func (args *PostArgs) UnmarshalJSON(data []byte) (err error) {
-	var obj struct {
-		Type       string         `json:"type"`
-		TTL        hexutil.Uint64 `json:"ttl"`
-		Sig        string         `json:"sig"`
-		Key        string         `json:"key"`
-		Topic      string         `json:"topic"`
-		Payload    string         `json:"payload"`
-		PowTime    hexutil.Uint64 `json:"powTime"`
-		PowTarget  float64        `json:"powTarget,string"`
-		TargetPeer string         `json:"targetPeer"`
-	}
-
-	if err := json.Unmarshal(data, &obj); err != nil {
-		return err
-	}
-
-	if obj.Type != "sym" && obj.Type != "asym" {
-		return errors.New("wrong type (sym/asym)")
-	}
-
-	args.Type = obj.Type
-	args.Key = obj.Key
-	args.TTL = uint32(obj.TTL)
-	args.Sig = obj.Sig
-	args.Payload = []byte(obj.Payload)
-	args.PowTime = uint32(obj.PowTime)
-	if args.PowTime < DefaultMinimumPoWTime { // ensure minimum PoW
-		args.PowTime = DefaultMinimumPoWTime
-	}
-	args.PowTarget = obj.PowTarget
-	if args.PowTarget < DefaultMinimumPoW { // ensure minimum PoW
-		args.PowTarget = DefaultMinimumPoW
-	}
-	args.TargetPeer = obj.TargetPeer
-
-	// process topic
-	x := common.FromHex(obj.Topic)
-	if x == nil {
-		return fmt.Errorf("topic is invalid: %v", obj.Topic)
-	}
-	topicBytes := BytesToTopic(x)
-	args.Topic = []byte(topicBytes[:])
-
-	return nil
 }
 
 type WhisperFilterArgs struct {
@@ -517,7 +470,7 @@ func (args *WhisperFilterArgs) UnmarshalJSON(b []byte) (err error) {
 		topicsDecoded := make([][]byte, len(topics))
 		for j, s := range topics {
 			x := common.FromHex(s)
-			if x == nil {
+			if x == nil || len(x) > TopicLength {
 				return fmt.Errorf("topic[%d] is invalid", j)
 			}
 			topicsDecoded[j] = x
@@ -544,7 +497,6 @@ type WhisperMessage struct {
 // NewWhisperMessage converts an internal message into an API version.
 func NewWhisperMessage(message *ReceivedMessage) *WhisperMessage {
 	msg := WhisperMessage{
-		Topic:     common.ToHex(message.Topic[:]),
 		Payload:   common.ToHex(message.Payload),
 		Padding:   common.ToHex(message.Padding),
 		Timestamp: message.Sent,
@@ -553,11 +505,20 @@ func NewWhisperMessage(message *ReceivedMessage) *WhisperMessage {
 		Hash:      common.ToHex(message.EnvelopeHash.Bytes()),
 	}
 
+	if len(message.Topic) == TopicLength {
+		msg.Topic = common.ToHex(message.Topic[:])
+	}
 	if message.Dst != nil {
-		msg.Dst = common.ToHex(crypto.FromECDSAPub(message.Dst))
+		b := crypto.FromECDSAPub(message.Dst)
+		if b != nil {
+			msg.Dst = common.ToHex(b)
+		}
 	}
 	if isMessageSigned(message.Raw[0]) {
-		msg.Src = common.ToHex(crypto.FromECDSAPub(message.SigToPubKey()))
+		b := crypto.FromECDSAPub(message.SigToPubKey())
+		if b != nil {
+			msg.Src = common.ToHex(b)
+		}
 	}
 	return &msg
 }
