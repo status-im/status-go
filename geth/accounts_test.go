@@ -14,19 +14,27 @@ import (
 )
 
 func TestVerifyAccountPassword(t *testing.T) {
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "accounts")
+	keyStoreDir, err := ioutil.TempDir(os.TempDir(), "accounts")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir) // nolint: errcheck
+	defer os.RemoveAll(keyStoreDir) // nolint: errcheck
 
-	if err = geth.ImportTestAccount(tmpDir, "test-account1.pk"); err != nil {
+	emptyKeyStoreDir, err := ioutil.TempDir(os.TempDir(), "empty")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(emptyKeyStoreDir) // nolint: errcheck
+
+	// import account keys
+	if err = geth.ImportTestAccount(keyStoreDir, "test-account1.pk"); err != nil {
+		t.Fatal(err)
+	}
+	if err = geth.ImportTestAccount(keyStoreDir, "test-account2.pk"); err != nil {
 		t.Fatal(err)
 	}
 
-	accountFilePath := filepath.Join(tmpDir, "test-account1.pk")
 	account1Address := common.BytesToAddress(common.FromHex(testConfig.Account1.Address))
-	account2Address := common.BytesToAddress(common.FromHex(testConfig.Account2.Address))
 
 	testCases := []struct {
 		name          string
@@ -37,28 +45,35 @@ func TestVerifyAccountPassword(t *testing.T) {
 	}{
 		{
 			"correct address, correct password (decrypt should succeed)",
-			accountFilePath,
+			keyStoreDir,
 			testConfig.Account1.Address,
 			testConfig.Account1.Password,
 			nil,
 		},
 		{
-			"correct address, correct password, invalid key file",
-			filepath.Join(tmpDir, "non-existent-file.pk"),
+			"correct address, correct password, non-existent key store",
+			filepath.Join(keyStoreDir, "non-existent-folder"),
 			testConfig.Account1.Address,
 			testConfig.Account1.Password,
-			fmt.Errorf("invalid account key file: open %s/non-existent-file.pk: no such file or directory", tmpDir),
+			fmt.Errorf("cannot traverse key store folder: lstat %s/non-existent-folder: no such file or directory", keyStoreDir),
+		},
+		{
+			"correct address, correct password, empty key store (pk is not there)",
+			emptyKeyStoreDir,
+			testConfig.Account1.Address,
+			testConfig.Account1.Password,
+			fmt.Errorf("cannot locate account for address: %x", account1Address),
 		},
 		{
 			"wrong address, correct password",
-			accountFilePath,
-			testConfig.Account2.Address, // wrong address (swap attack)
+			keyStoreDir,
+			"0x79791d3e8f2daa1f7fec29649d152c0ada3cc535",
 			testConfig.Account1.Password,
-			fmt.Errorf("account mismatch: have %x, want %x", account1Address, account2Address),
+			fmt.Errorf("cannot locate account for address: %s", "79791d3e8f2daa1f7fec29649d152c0ada3cc535"),
 		},
 		{
 			"correct address, wrong password",
-			accountFilePath,
+			keyStoreDir,
 			testConfig.Account1.Address,
 			"wrong password", // wrong password
 			errors.New("could not decrypt key with given passphrase"),
@@ -68,7 +83,7 @@ func TestVerifyAccountPassword(t *testing.T) {
 		t.Log(testCase.name)
 		accountKey, err := geth.VerifyAccountPassword(testCase.keyPath, testCase.address, testCase.password)
 		if !reflect.DeepEqual(err, testCase.expectedError) {
-			t.Errorf("unexpected error: expected \n'%v', got \n'%v'", testCase.expectedError, err)
+			t.Fatalf("unexpected error: expected \n'%v', got \n'%v'", testCase.expectedError, err)
 		}
 		if err == nil {
 			if accountKey == nil {
@@ -76,7 +91,7 @@ func TestVerifyAccountPassword(t *testing.T) {
 			}
 			accountAddress := common.BytesToAddress(common.FromHex(testCase.address))
 			if accountKey.Address != accountAddress {
-				t.Errorf("account mismatch: have %x, want %x", accountKey.Address, accountAddress)
+				t.Fatalf("account mismatch: have %x, want %x", accountKey.Address, accountAddress)
 			}
 		}
 	}

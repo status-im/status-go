@@ -120,11 +120,20 @@ func testVerifyAccountPassword(t *testing.T) bool {
 	if err = geth.ImportTestAccount(tmpDir, "test-account1.pk"); err != nil {
 		t.Fatal(err)
 	}
+	if err = geth.ImportTestAccount(tmpDir, "test-account2.pk"); err != nil {
+		t.Fatal(err)
+	}
 
-	accountFilePath := filepath.Join(tmpDir, "test-account1.pk")
+	// rename account file (to see that file's internals reviewed, when locating account key)
+	accountFilePathOriginal := filepath.Join(tmpDir, "test-account1.pk")
+	accountFilePath := filepath.Join(tmpDir, "foo"+testConfig.Account1.Address+"bar.pk")
+	if err := os.Rename(accountFilePathOriginal, accountFilePath); err != nil {
+		t.Fatal(err)
+	}
+
 	response := geth.JSONError{}
 	rawResponse := VerifyAccountPassword(
-		C.CString(accountFilePath),
+		C.CString(tmpDir),
 		C.CString(testConfig.Account1.Address),
 		C.CString(testConfig.Account1.Password))
 

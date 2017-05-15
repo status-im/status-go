@@ -78,8 +78,8 @@ func RecoverAccount(password, mnemonic *C.char) *C.char {
 }
 
 //export VerifyAccountPassword
-func VerifyAccountPassword(keyPath, address, password *C.char) *C.char {
-	_, err := geth.VerifyAccountPassword(C.GoString(keyPath), C.GoString(address), C.GoString(password))
+func VerifyAccountPassword(keyStoreDir, address, password *C.char) *C.char {
+	_, err := geth.VerifyAccountPassword(C.GoString(keyStoreDir), C.GoString(address), C.GoString(password))
 	return makeJSONErrorResponse(err)
 }
 
