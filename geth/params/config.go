@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/static"
 )
 
 // default node configuration options
@@ -40,7 +41,7 @@ var (
 // LightEthConfig holds LES-related configuration
 // Status nodes are always lightweight clients (due to mobile platform constraints)
 type LightEthConfig struct {
-	// Enabled flag specifies whether  protocol is enabled
+	// Enabled flag specifies whether protocol is enabled
 	Enabled bool
 
 	// Genesis is JSON to seed the chain database with
@@ -61,7 +62,7 @@ type FirebaseConfig struct {
 
 // WhisperConfig holds SHH-related configuration
 type WhisperConfig struct {
-	// Enabled flag specifies whether  protocol is enabled
+	// Enabled flag specifies whether protocol is enabled
 	Enabled bool
 
 	// IdentityFile path to private key, that will be loaded as identity into Whisper
@@ -104,14 +105,31 @@ type WhisperConfig struct {
 
 // SwarmConfig holds Swarm-related configuration
 type SwarmConfig struct {
-	// Enabled flag specifies whether  protocol is enabled
+	// Enabled flag specifies whether protocol is enabled
 	Enabled bool
+}
+
+// BootCluster holds configuration for supporting boot cluster, which is a temporary
+// means for mobile devices to get connected to Ethereum network (UDP-based discovery
+// may not be available, so we need means to discover the network manually).
+type BootClusterConfig struct {
+	// Enabled flag specifies whether feature is enabled
+	Enabled bool
+
+	// ConfigFile is a path to JSON file containing array of boot nodes
+	// See `static/bootcluster/*.json` for cluster configurations provided
+	// out of box. You can pass absolute path, and if file at that path can be
+	// loaded, it will be used. Otherwise, file is supposed to be relative to
+	// `static/bootcluster` folder.
+	ConfigFile string
 }
 
 // NodeConfig stores configuration options for a node
 type NodeConfig struct {
-	// TestNet flag whether given configuration describes a test or mainnet
-	TestNet bool
+	// DevMode is true when given configuration is to be used during development.
+	// For production, this flag should be turned off, so that more strict requirements
+	// are applied to node's configuration
+	DevMode bool
 
 	// NetworkID sets network to use for selecting peers to connect to
 	NetworkID uint64 `json:"NetworkId,"`
@@ -183,6 +201,9 @@ type NodeConfig struct {
 	// LogToStderr defines whether logged info should also be output to os.Stderr
 	LogToStderr bool
 
+	// BootClusterConfig extra configuration for supporting cluster
+	BootClusterConfig *BootClusterConfig `json:"BootClusterConfig,"`
+
 	// LightEthConfig extra configuration for LES
 	LightEthConfig *LightEthConfig `json:"LightEthConfig,"`
 
@@ -194,15 +215,15 @@ type NodeConfig struct {
 }
 
 // NewNodeConfig creates new node configuration object
-func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
+func NewNodeConfig(dataDir string, networkID uint64, devMode bool) (*NodeConfig, error) {
 	nodeConfig := &NodeConfig{
+		DevMode:         devMode,
 		NetworkID:       networkID,
 		DataDir:         dataDir,
 		Name:            ClientIdentifier,
 		Version:         Version,
 		HTTPHost:        HTTPHost,
 		HTTPPort:        HTTPPort,
-		APIModules:      APIModules,
 		WSHost:          WSHost,
 		WSPort:          WSPort,
 		MaxPeers:        MaxPeers,
@@ -214,6 +235,10 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 		LightEthConfig: &LightEthConfig{
 			Enabled:       true,
 			DatabaseCache: DatabaseCache,
+		},
+		BootClusterConfig: &BootClusterConfig{
+			Enabled:    true,
+			ConfigFile: BootClusterConfigFile,
 		},
 		WhisperConfig: &WhisperConfig{
 			Enabled:    true,
@@ -227,64 +252,17 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 		SwarmConfig: &SwarmConfig{},
 	}
 
-	// auto-populate some dependent values
-	if err := nodeConfig.populateGenesis(); err != nil {
-		return nil, err
-	}
-	if err := nodeConfig.populateDirs(); err != nil {
+	// adjust dependent values
+	if err := nodeConfig.updateConfig(); err != nil {
 		return nil, err
 	}
 
 	return nodeConfig, nil
 }
 
-// populateDirs updates directories that should be wrt to DataDir
-func (c *NodeConfig) populateDirs() error {
-	makeSubDirPath := func(baseDir, subDir string) string {
-		if len(baseDir) == 0 {
-			return ""
-		}
-
-		return filepath.Join(baseDir, subDir)
-	}
-	if len(c.KeyStoreDir) == 0 {
-		c.KeyStoreDir = makeSubDirPath(c.DataDir, KeyStoreDir)
-	}
-
-	if len(c.WhisperConfig.DataDir) == 0 {
-		c.WhisperConfig.DataDir = makeSubDirPath(c.DataDir, WhisperDataDir)
-	}
-
-	return nil
-}
-
-// populateChainConfig does necessary adjustments to config object (depending on network node will be runnin on)
-func (c *NodeConfig) populateGenesis() error {
-	c.TestNet = false
-	if c.NetworkID == TestNetworkID {
-		c.TestNet = true
-	}
-
-	var genesis *core.Genesis
-	if c.TestNet {
-		genesis = core.DefaultTestnetGenesisBlock()
-	} else {
-		genesis = core.DefaultGenesisBlock()
-	}
-
-	// encode the genesis into JSON
-	enc, err := json.Marshal(genesis)
-	if err != nil {
-		return err
-	}
-	c.LightEthConfig.Genesis = string(enc)
-
-	return nil
-}
-
 // LoadNodeConfig parses incoming JSON and returned it as Config
 func LoadNodeConfig(configJSON string) (*NodeConfig, error) {
-	nodeConfig, err := NewNodeConfig("", 0)
+	nodeConfig, err := NewNodeConfig("", 0, true)
 	if err != nil {
 		return nil, err
 	}
@@ -298,10 +276,7 @@ func LoadNodeConfig(configJSON string) (*NodeConfig, error) {
 	}
 
 	// repopulate
-	if err := nodeConfig.populateGenesis(); err != nil {
-		return nil, err
-	}
-	if err := nodeConfig.populateDirs(); err != nil {
+	if err := nodeConfig.updateConfig(); err != nil {
 		return nil, err
 	}
 
@@ -336,6 +311,125 @@ func (c *NodeConfig) Save() error {
 	return nil
 }
 
+// LoadBootClusterNodes loads boot nodes from a config file provided in BootClusterConfig
+func (c *NodeConfig) LoadBootClusterNodes() ([]string, error) {
+	var bootnodes []string
+	var configData []byte
+	var err error
+
+	filename := c.BootClusterConfig.ConfigFile
+	log.Info("Loading boot nodes config file", "source", filename)
+	if _, err = os.Stat(filename); os.IsNotExist(err) { // load from static resources
+		configData, err = static.Asset("bootcluster/" + filename)
+	} else {
+		configData, err = ioutil.ReadFile(filename)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	// parse JSON
+	if err := json.Unmarshal([]byte(configData), &bootnodes); err != nil {
+		return nil, err
+	}
+	return bootnodes, nil
+}
+
+// updateConfig traverses configuration and adjusts dependent fields
+// (we have a development/production and mobile/full node dependent configurations)
+func (c *NodeConfig) updateConfig() error {
+	if err := c.updateGenesisConfig(); err != nil {
+		return err
+	}
+	if err := c.updateRPCConfig(); err != nil {
+		return err
+	}
+	if err := c.updateBootClusterConfig(); err != nil {
+		return err
+	}
+	if err := c.updateRelativeDirsConfig(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// updateGenesisConfig does necessary adjustments to config object (depending on network node will be running on)
+func (c *NodeConfig) updateGenesisConfig() error {
+	var genesis *core.Genesis
+
+	switch c.NetworkID {
+	case MainNetworkID:
+		genesis = core.DefaultGenesisBlock()
+	case RopstenNetworkID:
+		genesis = core.DefaultTestnetGenesisBlock()
+	case RinkebyNetworkID:
+		genesis = core.DefaultRinkebyGenesisBlock()
+	default:
+		return nil
+	}
+
+	// encode the genesis into JSON
+	enc, err := json.Marshal(genesis)
+	if err != nil {
+		return err
+	}
+	c.LightEthConfig.Genesis = string(enc)
+
+	return nil
+}
+
+// updateBootClusterConfig populates cluster config file, depending on dev/prod and mobile/full settings
+func (c *NodeConfig) updateBootClusterConfig() error {
+	var configFile string
+	switch c.NetworkID {
+	case MainNetworkID:
+		configFile = "homestead.prod.json"
+	case RopstenNetworkID:
+		configFile = "ropsten.prod.json"
+	case RinkebyNetworkID:
+		configFile = "rinkeby.prod.json"
+	}
+	if c.DevMode {
+		configFile = strings.Replace(configFile, "prod", "dev", 1)
+	}
+	if len(configFile) > 0 {
+		c.BootClusterConfig.ConfigFile = configFile
+	}
+
+	return nil
+}
+
+// updateRPCConfig transforms RPC settings to meet requirements of a given configuration
+func (c *NodeConfig) updateRPCConfig() error {
+	c.APIModules = ProdAPIModules
+	if c.DevMode {
+		c.APIModules = DevAPIModules
+	}
+
+	return nil
+}
+
+// updateRelativeDirsConfig updates directories that should be wrt to DataDir
+func (c *NodeConfig) updateRelativeDirsConfig() error {
+	makeSubDirPath := func(baseDir, subDir string) string {
+		if len(baseDir) == 0 {
+			return ""
+		}
+
+		return filepath.Join(baseDir, subDir)
+	}
+	if len(c.KeyStoreDir) == 0 {
+		c.KeyStoreDir = makeSubDirPath(c.DataDir, KeyStoreDir)
+	}
+
+	if len(c.WhisperConfig.DataDir) == 0 {
+		c.WhisperConfig.DataDir = makeSubDirPath(c.DataDir, WhisperDataDir)
+	}
+
+	return nil
+}
+
 // String dumps config object as nicely indented JSON
 func (c *NodeConfig) String() string {
 	data, _ := json.MarshalIndent(c, "", "    ")
@@ -350,6 +444,12 @@ func (c *WhisperConfig) String() string {
 
 // String dumps config object as nicely indented JSON
 func (c *SwarmConfig) String() string {
+	data, _ := json.MarshalIndent(c, "", "    ")
+	return string(data)
+}
+
+// String dumps config object as nicely indented JSON
+func (c *BootClusterConfig) String() string {
 	data, _ := json.MarshalIndent(c, "", "    ")
 	return string(data)
 }

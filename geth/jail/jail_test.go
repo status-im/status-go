@@ -1110,7 +1110,7 @@ func TestJailWhisper(t *testing.T) {
 	for testKey, filter := range installedFilters {
 		if filter != "" {
 			t.Logf("filter found: %v", filter)
-			for _, message := range whisperAPI.GetSubscriptionMessages(filter) {
+			for _, message := range whisperAPI.GetNewSubscriptionMessages(filter) {
 				t.Logf("message found: %s", common.FromHex(message.Payload))
 				passedTests[testKey] = true
 			}

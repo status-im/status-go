@@ -108,6 +108,8 @@ var (
 			WhisperTTLFlag,
 			WhisperInjectTestAccounts,
 			FirebaseAuthorizationKey,
+			HTTPEnabledFlag,
+			HTTPPortFlag,
 		},
 	}
 )
@@ -170,6 +172,8 @@ func makeWhisperNodeConfig(ctx *cli.Context) (*params.NodeConfig, error) {
 		return nil, err
 	}
 
+	nodeConfig.LightEthConfig.Enabled = false
+
 	whisperConfig := nodeConfig.WhisperConfig
 
 	whisperConfig.Enabled = true
@@ -220,6 +224,12 @@ func makeWhisperNodeConfig(ctx *cli.Context) (*params.NodeConfig, error) {
 			return nil, err
 		}
 	}
+
+	// RPC configuration
+	if !ctx.Bool(HTTPEnabledFlag.Name) {
+		nodeConfig.HTTPHost = "" // HTTP RPC is disabled
+	}
+	nodeConfig.HTTPPort = ctx.Int(HTTPPortFlag.Name)
 
 	return nodeConfig, nil
 }

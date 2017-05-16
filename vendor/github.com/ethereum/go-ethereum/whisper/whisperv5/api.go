@@ -219,7 +219,6 @@ func (api *PublicWhisperAPI) Subscribe(args WhisperFilterArgs) (string, error) {
 	}
 
 	filter := Filter{
-		Src:      crypto.ToECDSAPub(common.FromHex(args.Sig)),
 		PoW:      args.MinPoW,
 		Messages: make(map[common.Hash]*ReceivedMessage),
 		AllowP2P: args.AllowP2P,
@@ -243,8 +242,13 @@ func (api *PublicWhisperAPI) Subscribe(args WhisperFilterArgs) (string, error) {
 	}
 
 	if len(args.Sig) > 0 {
+		sb := common.FromHex(args.Sig)
+		if sb == nil {
+			return "", errors.New("subscribe: sig parameter is invalid")
+		}
+		filter.Src = crypto.ToECDSAPub(sb)
 		if !ValidatePublicKey(filter.Src) {
-			return "", errors.New("subscribe: sig invalid is invalid")
+			return "", errors.New("subscribe: invalid 'sig' field")
 		}
 	}
 
@@ -284,14 +288,15 @@ func (api *PublicWhisperAPI) Unsubscribe(id string) {
 	api.whisper.Unsubscribe(id)
 }
 
-// GetFilterChanges is alias for GetSubscriptionMessages
+// GetFilterChanges is alias for GetNewSubscriptionMessages
 func (api *PublicWhisperAPI) GetFilterChanges(filterId string) []*WhisperMessage {
-	return api.GetSubscriptionMessages(filterId)
+	return api.GetNewSubscriptionMessages(filterId)
 }
 
-// GetSubscriptionMessages retrieves all the new messages matched by a filter since the last retrieval.
-func (api *PublicWhisperAPI) GetSubscriptionMessages(filterId string) []*WhisperMessage {
-	f := api.whisper.GetFilter(filterId)
+// GetNewSubscriptionMessages retrieves all the new messages matched by the corresponding
+// subscription filter since the last retrieval.
+func (api *PublicWhisperAPI) GetNewSubscriptionMessages(id string) []*WhisperMessage {
+	f := api.whisper.GetFilter(id)
 	if f != nil {
 		newMail := f.Retrieve()
 		return toWhisperMessages(newMail)
@@ -299,10 +304,10 @@ func (api *PublicWhisperAPI) GetSubscriptionMessages(filterId string) []*Whisper
 	return toWhisperMessages(nil)
 }
 
-// GetMessages retrieves all the floating messages that match a specific filter.
+// GetMessages retrieves all the floating messages that match a specific subscription filter.
 // It is likely to be called once per session, right after Subscribe call.
-func (api *PublicWhisperAPI) GetMessages(filterId string) []*WhisperMessage {
-	all := api.whisper.Messages(filterId)
+func (api *PublicWhisperAPI) GetFloatingMessages(id string) []*WhisperMessage {
+	all := api.whisper.Messages(id)
 	return toWhisperMessages(all)
 }
 
@@ -365,7 +370,11 @@ func (api *PublicWhisperAPI) Post(args PostArgs) error {
 			return errors.New("post: topic is missing for symmetric encryption")
 		}
 	} else if args.Type == "asym" {
-		params.Dst = crypto.ToECDSAPub(common.FromHex(args.Key))
+		kb := common.FromHex(args.Key)
+		if kb == nil {
+			return errors.New("post: public key for asymmetric encryption is invalid")
+		}
+		params.Dst = crypto.ToECDSAPub(kb)
 		if !ValidatePublicKey(params.Dst) {
 			return errors.New("post: public key for asymmetric encryption is invalid")
 		}
@@ -374,9 +383,9 @@ func (api *PublicWhisperAPI) Post(args PostArgs) error {
 	}
 
 	// encrypt and send
-	message := NewSentMessage(&params)
-	if message == nil {
-		return errors.New("post: failed create new message, probably due to failed rand function (OS level)")
+	message, err := NewSentMessage(&params)
+	if err != nil {
+		return err
 	}
 	envelope, err := message.Wrap(&params)
 	if err != nil {
@@ -403,7 +412,7 @@ type PostArgs struct {
 	Type       string        `json:"type"`       // "sym"/"asym" (symmetric or asymmetric)
 	TTL        uint32        `json:"ttl"`        // time-to-live in seconds
 	Sig        string        `json:"sig"`        // id of the signing key
-	Key        string        `json:"key"`        // id of encryption key
+	Key        string        `json:"key"`        // key id (in case of sym) or public key (in case of asym)
 	Topic      hexutil.Bytes `json:"topic"`      // topic (4 bytes)
 	Padding    hexutil.Bytes `json:"padding"`    // optional padding bytes
 	Payload    hexutil.Bytes `json:"payload"`    // payload to be encrypted
@@ -544,7 +553,6 @@ type WhisperMessage struct {
 // NewWhisperMessage converts an internal message into an API version.
 func NewWhisperMessage(message *ReceivedMessage) *WhisperMessage {
 	msg := WhisperMessage{
-		Topic:     common.ToHex(message.Topic[:]),
 		Payload:   common.ToHex(message.Payload),
 		Padding:   common.ToHex(message.Padding),
 		Timestamp: message.Sent,
@@ -553,11 +561,20 @@ func NewWhisperMessage(message *ReceivedMessage) *WhisperMessage {
 		Hash:      common.ToHex(message.EnvelopeHash.Bytes()),
 	}
 
+	if len(message.Topic) == TopicLength {
+		msg.Topic = common.ToHex(message.Topic[:])
+	}
 	if message.Dst != nil {
-		msg.Dst = common.ToHex(crypto.FromECDSAPub(message.Dst))
+		b := crypto.FromECDSAPub(message.Dst)
+		if b != nil {
+			msg.Dst = common.ToHex(b)
+		}
 	}
 	if isMessageSigned(message.Raw[0]) {
-		msg.Src = common.ToHex(crypto.FromECDSAPub(message.SigToPubKey()))
+		b := crypto.FromECDSAPub(message.SigToPubKey())
+		if b != nil {
+			msg.Src = common.ToHex(b)
+		}
 	}
 	return &msg
 }

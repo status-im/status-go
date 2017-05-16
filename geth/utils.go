@@ -165,7 +165,7 @@ func PrepareTestNode() (err error) {
 	}
 
 	// start geth node and wait for it to initialize
-	config, err := params.NewNodeConfig(filepath.Join(TestDataDir, "data"), params.TestNetworkID)
+	config, err := params.NewNodeConfig(filepath.Join(TestDataDir, "data"), params.RopstenNetworkID, true)
 	if err != nil {
 		return err
 	}
