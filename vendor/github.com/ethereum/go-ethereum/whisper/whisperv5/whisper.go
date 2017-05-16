@@ -568,21 +568,18 @@ func (wh *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 			log.Warn("unxepected status message received", "peer", p.peer.ID())
 		case messagesCode:
 			// decode the contained envelopes
-			var envelopes []*Envelope
-			if err := packet.Decode(&envelopes); err != nil {
+			var envelope Envelope
+			if err := packet.Decode(&envelope); err != nil {
 				log.Warn("failed to decode envelope, peer will be disconnected", "peer", p.peer.ID(), "err", err)
 				return errors.New("invalid envelope")
 			}
-			// inject all envelopes into the internal pool
-			for _, envelope := range envelopes {
-				cached, err := wh.add(envelope)
-				if err != nil {
-					log.Warn("bad envelope received, peer will be disconnected", "peer", p.peer.ID(), "err", err)
-					return errors.New("invalid envelope")
-				}
-				if cached {
-					p.mark(envelope)
-				}
+			cached, err := wh.add(&envelope)
+			if err != nil {
+				log.Warn("bad envelope received, peer will be disconnected", "peer", p.peer.ID(), "err", err)
+				return errors.New("invalid envelope")
+			}
+			if cached {
+				p.mark(&envelope)
 			}
 		case p2pCode:
 			// peer-to-peer message, sent directly to peer bypassing PoW checks, etc.
@@ -649,14 +646,11 @@ func (wh *Whisper) add(envelope *Envelope) (bool, error) {
 		return false, fmt.Errorf("oversized version [%x]", envelope.Hash())
 	}
 
-	if len(envelope.AESNonce) > AESNonceMaxLength {
-		// the standard AES GSM nonce size is 12,
-		// but const gcmStandardNonceSize cannot be accessed directly
-		return false, fmt.Errorf("oversized AESNonce [%x]", envelope.Hash())
-	}
-
-	if len(envelope.Salt) > saltLength {
-		return false, fmt.Errorf("oversized salt [%x]", envelope.Hash())
+	aesNonceSize := len(envelope.AESNonce)
+	if aesNonceSize != 0 && aesNonceSize != AESNonceLength {
+		// the standard AES GCM nonce size is 12 bytes,
+		// but constant gcmStandardNonceSize cannot be accessed (not exported)
+		return false, fmt.Errorf("wrong size of AESNonce: %d bytes [env: %x]", aesNonceSize, envelope.Hash())
 	}
 
 	if envelope.PoW() < wh.minPoW {
