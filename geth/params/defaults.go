@@ -74,4 +74,7 @@ const (
 
 	// TestNetworkID is id of a test network
 	TestNetworkID = 3
+
+	// BootClusterConfigFile is default config file containing boot node list (as JSON array)
+	BootClusterConfigFile = "ropsten.dev.json"
 )

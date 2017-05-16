@@ -12,14 +12,14 @@ import (
 
 var (
 	versionCommand = cli.Command{
-		Action: version,
+		Action: versionCommandHandler,
 		Name:   "version",
 		Usage:  "Print app version",
 	}
 )
 
-// version displays app version
-func version(ctx *cli.Context) error {
+// versionCommandHandler displays app version
+func versionCommandHandler(ctx *cli.Context) error {
 	fmt.Println(strings.Title(params.ClientIdentifier))
 	fmt.Println("Version:", params.Version)
 	if gitCommit != "" {
@@ -34,6 +34,8 @@ func version(ctx *cli.Context) error {
 	fmt.Println("OS:", runtime.GOOS)
 	fmt.Printf("GOPATH=%s\n", os.Getenv("GOPATH"))
 	fmt.Printf("GOROOT=%s\n", runtime.GOROOT())
+
+	printNodeConfig(ctx)
 
 	return nil
 }
