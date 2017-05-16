@@ -80,33 +80,7 @@ func MakeNode(config *params.NodeConfig) *Node {
 	}
 
 	// configure required node (should you need to update node's config, e.g. add bootstrap nodes, see node.Config)
-	stackConfig := &node.Config{
-		DataDir:           config.DataDir,
-		KeyStoreDir:       config.KeyStoreDir,
-		UseLightweightKDF: true,
-		Name:              config.Name,
-		Version:           config.Version,
-		P2P: p2p.Config{
-			NoDiscovery:      true,
-			DiscoveryV5:      false,
-			DiscoveryV5Addr:  ":0",
-			BootstrapNodes:   makeBootstrapNodes(),
-			BootstrapNodesV5: makeBootstrapNodesV5(),
-			ListenAddr:       ":0",
-			NAT:              nat.Any(),
-			MaxPeers:         config.MaxPeers,
-			MaxPendingPeers:  config.MaxPendingPeers,
-		},
-		IPCPath:     makeIPCPath(config),
-		HTTPHost:    config.HTTPHost,
-		HTTPPort:    config.HTTPPort,
-		HTTPCors:    []string{"*"},
-		HTTPModules: strings.Split(config.APIModules, ","),
-		WSHost:      makeWSHost(config),
-		WSPort:      config.WSPort,
-		WSOrigins:   []string{"*"},
-		WSModules:   strings.Split(config.APIModules, ","),
-	}
+	stackConfig := defaultEmbeddedNodeConfig(config)
 
 	if len(config.NodeKeyFile) > 0 {
 		log.Info("Loading private key file", "file", config.NodeKeyFile)
@@ -150,6 +124,37 @@ func MakeNode(config *params.NodeConfig) *Node {
 		gethConfig: stackConfig,
 		started:    make(chan struct{}),
 		config:     config,
+	}
+}
+
+// defaultEmbeddedNodeConfig returns default stack configuration for mobile client node
+func defaultEmbeddedNodeConfig(config *params.NodeConfig) *node.Config {
+	return &node.Config{
+		DataDir:           config.DataDir,
+		KeyStoreDir:       config.KeyStoreDir,
+		UseLightweightKDF: true,
+		Name:              config.Name,
+		Version:           config.Version,
+		P2P: p2p.Config{
+			NoDiscovery:      true,
+			DiscoveryV5:      false,
+			DiscoveryV5Addr:  ":0",
+			BootstrapNodes:   makeBootstrapNodes(),
+			BootstrapNodesV5: makeBootstrapNodesV5(),
+			ListenAddr:       ":0",
+			NAT:              nat.Any(),
+			MaxPeers:         config.MaxPeers,
+			MaxPendingPeers:  config.MaxPendingPeers,
+		},
+		IPCPath:     makeIPCPath(config),
+		HTTPHost:    config.HTTPHost,
+		HTTPPort:    config.HTTPPort,
+		HTTPCors:    []string{"*"},
+		HTTPModules: strings.Split(config.APIModules, ","),
+		WSHost:      makeWSHost(config),
+		WSPort:      config.WSPort,
+		WSOrigins:   []string{"*"},
+		WSModules:   strings.Split(config.APIModules, ","),
 	}
 }
 

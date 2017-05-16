@@ -19,9 +19,11 @@ const (
 	// HTTPPort is HTTP-RPC port (replaced in unit tests)
 	HTTPPort = 8545
 
-	// APIModules is a list of modules to expose vie HTTP RPC
-	// TODO remove "admin" on main net
-	APIModules = "db,eth,net,web3,shh,personal,admin"
+	// DevAPIModules is a list of modules to expose via any type of RPC (HTTP, IPC) during development
+	DevAPIModules = "db,eth,net,web3,shh,personal,admin"
+
+	// ProdAPIModules is a list of modules to expose via any type of RPC (HTTP, IPC) in production
+	ProdAPIModules = "eth,net,web3,shh,personal"
 
 	// WSHost is a host interface for the websocket RPC server
 	WSHost = "localhost"
@@ -72,8 +74,11 @@ const (
 	// MainNetworkID is id of the main network
 	MainNetworkID = 1
 
-	// TestNetworkID is id of a test network
-	TestNetworkID = 3
+	// RopstenNetworkID is id of a test network (on PoW)
+	RopstenNetworkID = 3
+
+	// RinkebyNetworkID is id of a test network (on PoA)
+	RinkebyNetworkID = 4
 
 	// BootClusterConfigFile is default config file containing boot node list (as JSON array)
 	BootClusterConfigFile = "ropsten.dev.json"

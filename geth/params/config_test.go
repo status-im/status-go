@@ -299,7 +299,7 @@ var loadConfigTestCases = []struct {
 	{
 		`default boot cluster (Ropsten Dev)`,
 		`{
-			"NetworkId": 311,
+			"NetworkId": 3,
 			"DataDir": "$TMPDIR"
 		}`,
 		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
@@ -310,6 +310,10 @@ var loadConfigTestCases = []struct {
 			if nodeConfig.BootClusterConfig.ConfigFile != params.BootClusterConfigFile {
 				t.Fatalf("unexpected BootClusterConfigFile, expected: %v, got: %v",
 					params.BootClusterConfigFile, nodeConfig.BootClusterConfig.ConfigFile)
+			}
+
+			if nodeConfig.BootClusterConfig.Enabled != true {
+				t.Fatal("boot cluster is expected to be enabled by default")
 			}
 
 			enodes, err := nodeConfig.LoadBootClusterNodes()
@@ -333,6 +337,25 @@ var loadConfigTestCases = []struct {
 			}
 			if !reflect.DeepEqual(enodes, expectedEnodes) {
 				t.Fatalf("wrong list of enodes, expected: \n%v,\n\ngot:\n%v", expectedEnodes, enodes)
+			}
+		},
+	},
+	{
+		`disabled boot cluster`,
+		`{
+			"NetworkId": 311,
+			"DataDir": "$TMPDIR",
+			"BootClusterConfig": {
+				"Enabled": false
+			}
+		}`,
+		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if nodeConfig.BootClusterConfig.Enabled != false {
+				t.Fatal("boot cluster is expected to be disabled")
 			}
 		},
 	},
@@ -404,7 +427,11 @@ var loadConfigTestCases = []struct {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			expectedEnodes := []string{}
+			expectedEnodes := []string{
+				"enode://7512c8f6e7ffdcc723cf77e602a1de9d8cc2e8ad35db309464819122cd773857131aee390fec33894db13da730c8432bb248eed64039e3810e156e979b2847cb@51.15.78.243:30303",
+				"enode://1cc27a5a41130a5c8b90db5b2273dc28f7b56f3edfc0dcc57b665d451274b26541e8de49ea7a074281906a82209b9600239c981163b6ff85c3038a8e2bc5d8b8@51.15.68.93:30303",
+				"enode://798d17064141b8f88df718028a8272b943d1cb8e696b3dab56519c70b77b1d3469b56b6f4ce3788457646808f5c7299e9116626f2281f30b959527b969a71e4f@51.15.75.244:30303",
+			}
 			if len(enodes) != len(expectedEnodes) {
 				t.Fatalf("wrong number of enodes, expected: %d, got: %d", len(expectedEnodes), len(enodes))
 			}
@@ -437,7 +464,11 @@ var loadConfigTestCases = []struct {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			expectedEnodes := []string{}
+			expectedEnodes := []string{
+				"enode://fda3f6273a0f2da4ac5858d1f52e5afaf9def281121be3d37558c67d4d9ca26c6ad7a0520b2cd7454120fb770e86d5760487c9924b2166e65485f606e56d60fc@51.15.69.144:30303",
+				"enode://ba41aa829287a0a9076d9bffed97c8ce2e491b99873288c9e886f16fd575306ac6c656db4fbf814f5a9021aec004ffa9c0ae8650f92fd10c12eeb7c364593eb3@51.15.69.147:30303",
+				"enode://28ecf5272b560ca951f4cd7f1eb8bd62da5853b026b46db432c4b01797f5b0114819a090a72acd7f32685365ecd8e00450074fa0673039aefe10f3fb666e0f3f@51.15.76.249:30303",
+			}
 			if len(enodes) != len(expectedEnodes) {
 				t.Fatalf("wrong number of enodes, expected: %d, got: %d", len(expectedEnodes), len(enodes))
 			}
@@ -470,7 +501,11 @@ var loadConfigTestCases = []struct {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			expectedEnodes := []string{}
+			expectedEnodes := []string{
+				"enode://93833be81c3d1bdb2ae5cde258c8f82ad1011a1bea8eb49fe50b0af394d4f7f7e45974356870552f36744efd732692a64865d1e8b64114eaf89a1bad0a1903a2@51.15.64.29:30303",
+				"enode://d76854bc54144b2269c5316d5f00f0a194efee2fb8d31e7b1939effd7e17f25773f8dc7fda8c4eb469450799da7f39b4e364e2a278d91b53539dcbb10b139635@51.15.73.37:30303",
+				"enode://57874205931df976079e4ff8ebb5756461030fb00f73486bd5ec4ae6ed6ba98e27d09f58e59bd85281d24084a6062bc8ab514dbcdaa9678fc3001d47772e626e@51.15.75.213:30303",
+			}
 			if len(enodes) != len(expectedEnodes) {
 				t.Fatalf("wrong number of enodes, expected: %d, got: %d", len(expectedEnodes), len(enodes))
 			}
@@ -503,7 +538,11 @@ var loadConfigTestCases = []struct {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			expectedEnodes := []string{}
+			expectedEnodes := []string{
+				"enode://f3b0e5dca730962bae814f3402b8f8a296644c33e8d7a95bd1ab313143a752c77076a03bcb76263570f2f34d4eb530f1daf5054c0990921a872a34eb505dcedf@51.15.73.129:30303",
+				"enode://fce0d1c2292829b0eccce444f8943f88087ce00a5e910b157972ee1658a948d23c7a046f26567f73b2b18d126811509d7ef1de5be9b1decfcbb14738a590c477@51.15.75.187:30303",
+				"enode://3b4b9fa02ae8d54c2db51a674bc93d85649b4775f22400f74ae25e9f1c665baa3bcdd33cadd2c1a93cd08a6af984cb605fbb61ec0d750a11d48d4080298af008@51.15.77.193:30303",
+			}
 			if len(enodes) != len(expectedEnodes) {
 				t.Fatalf("wrong number of enodes, expected: %d, got: %d", len(expectedEnodes), len(enodes))
 			}
@@ -548,6 +587,218 @@ var loadConfigTestCases = []struct {
 			}
 		},
 	},
+	{
+		`default DevMode (true)`,
+		`{
+			"NetworkId": 311,
+			"DataDir": "$TMPDIR"
+		}`,
+		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if nodeConfig.DevMode != true {
+				t.Fatalf("unexpected dev mode: expected: %v, got: %v", true, nodeConfig.DevMode)
+			}
+
+			if nodeConfig.BootClusterConfig.Enabled != true {
+				t.Fatal("expected boot cluster to be enabled")
+			}
+
+			if nodeConfig.BootClusterConfig.ConfigFile != params.BootClusterConfigFile {
+				t.Fatalf("unexpected bootcluster config file, expected: %v, got: %v",
+					params.BootClusterConfigFile, nodeConfig.BootClusterConfig.ConfigFile)
+			}
+		},
+	},
+	{
+		`explicit DevMode = false`,
+		`{
+			"NetworkId": 3,
+			"DataDir": "$TMPDIR",
+			"DevMode": false
+		}`,
+		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if nodeConfig.DevMode != false {
+				t.Fatalf("unexpected dev mode: expected: %v, got: %v", false, nodeConfig.DevMode)
+			}
+
+			if nodeConfig.BootClusterConfig.Enabled != true {
+				t.Fatal("expected boot cluster to be enabled")
+			}
+
+			expectedBootClusterConfigFile := "ropsten.prod.json"
+			if nodeConfig.BootClusterConfig.ConfigFile != expectedBootClusterConfigFile {
+				t.Fatalf("unexpected bootcluster config file, expected: %v, got: %v",
+					expectedBootClusterConfigFile, nodeConfig.BootClusterConfig.ConfigFile)
+			}
+		},
+	},
+	{
+		`populate bootstrap config (Homestead/Dev)`,
+		`{
+			"NetworkId": 1,
+			"DataDir": "$TMPDIR",
+			"DevMode": true
+		}`,
+		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if nodeConfig.DevMode != true {
+				t.Fatalf("unexpected dev mode: expected: %v, got: %v", true, nodeConfig.DevMode)
+			}
+
+			if nodeConfig.BootClusterConfig.Enabled != true {
+				t.Fatal("expected boot cluster to be enabled")
+			}
+
+			expectedBootClusterConfigFile := "homestead.dev.json"
+			if nodeConfig.BootClusterConfig.ConfigFile != expectedBootClusterConfigFile {
+				t.Fatalf("unexpected bootcluster config file, expected: %v, got: %v",
+					expectedBootClusterConfigFile, nodeConfig.BootClusterConfig.ConfigFile)
+			}
+		},
+	},
+	{
+		`populate bootstrap config (Homestead/Prod)`,
+		`{
+			"NetworkId": 1,
+			"DataDir": "$TMPDIR",
+			"DevMode": false
+		}`,
+		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if nodeConfig.DevMode != false {
+				t.Fatalf("unexpected dev mode: expected: %v, got: %v", false, nodeConfig.DevMode)
+			}
+
+			if nodeConfig.BootClusterConfig.Enabled != true {
+				t.Fatal("expected boot cluster to be enabled")
+			}
+
+			expectedBootClusterConfigFile := "homestead.prod.json"
+			if nodeConfig.BootClusterConfig.ConfigFile != expectedBootClusterConfigFile {
+				t.Fatalf("unexpected bootcluster config file, expected: %v, got: %v",
+					expectedBootClusterConfigFile, nodeConfig.BootClusterConfig.ConfigFile)
+			}
+		},
+	},
+	{
+		`populate bootstrap config (Ropsten/Dev)`,
+		`{
+			"NetworkId": 3,
+			"DataDir": "$TMPDIR"
+		}`,
+		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if nodeConfig.DevMode != true {
+				t.Fatalf("unexpected dev mode: expected: %v, got: %v", true, nodeConfig.DevMode)
+			}
+
+			if nodeConfig.BootClusterConfig.Enabled != true {
+				t.Fatal("expected boot cluster to be enabled")
+			}
+
+			expectedBootClusterConfigFile := "ropsten.dev.json"
+			if nodeConfig.BootClusterConfig.ConfigFile != expectedBootClusterConfigFile {
+				t.Fatalf("unexpected bootcluster config file, expected: %v, got: %v",
+					expectedBootClusterConfigFile, nodeConfig.BootClusterConfig.ConfigFile)
+			}
+		},
+	},
+	{
+		`populate bootstrap config (Ropsten/Prod)`,
+		`{
+			"NetworkId": 3,
+			"DataDir": "$TMPDIR",
+			"DevMode": false
+		}`,
+		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if nodeConfig.DevMode != false {
+				t.Fatalf("unexpected dev mode: expected: %v, got: %v", false, nodeConfig.DevMode)
+			}
+
+			if nodeConfig.BootClusterConfig.Enabled != true {
+				t.Fatal("expected boot cluster to be enabled")
+			}
+
+			expectedBootClusterConfigFile := "ropsten.prod.json"
+			if nodeConfig.BootClusterConfig.ConfigFile != expectedBootClusterConfigFile {
+				t.Fatalf("unexpected bootcluster config file, expected: %v, got: %v",
+					expectedBootClusterConfigFile, nodeConfig.BootClusterConfig.ConfigFile)
+			}
+		},
+	},
+	{
+		`populate bootstrap config (Rinkeby/Dev)`,
+		`{
+			"NetworkId": 4,
+			"DataDir": "$TMPDIR"
+		}`,
+		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if nodeConfig.DevMode != true {
+				t.Fatalf("unexpected dev mode: expected: %v, got: %v", true, nodeConfig.DevMode)
+			}
+
+			if nodeConfig.BootClusterConfig.Enabled != true {
+				t.Fatal("expected boot cluster to be enabled")
+			}
+
+			expectedBootClusterConfigFile := "rinkeby.dev.json"
+			if nodeConfig.BootClusterConfig.ConfigFile != expectedBootClusterConfigFile {
+				t.Fatalf("unexpected bootcluster config file, expected: %v, got: %v",
+					expectedBootClusterConfigFile, nodeConfig.BootClusterConfig.ConfigFile)
+			}
+		},
+	},
+	{
+		`populate bootstrap config (Rinkeby/Prod)`,
+		`{
+			"NetworkId": 4,
+			"DataDir": "$TMPDIR",
+			"DevMode": false
+		}`,
+		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if nodeConfig.DevMode != false {
+				t.Fatalf("unexpected dev mode: expected: %v, got: %v", false, nodeConfig.DevMode)
+			}
+
+			if nodeConfig.BootClusterConfig.Enabled != true {
+				t.Fatal("expected boot cluster to be enabled")
+			}
+
+			expectedBootClusterConfigFile := "rinkeby.prod.json"
+			if nodeConfig.BootClusterConfig.ConfigFile != expectedBootClusterConfigFile {
+				t.Fatalf("unexpected bootcluster config file, expected: %v, got: %v",
+					expectedBootClusterConfigFile, nodeConfig.BootClusterConfig.ConfigFile)
+			}
+		},
+	},
 }
 
 func TestLoadNodeConfig(t *testing.T) {
@@ -580,7 +831,7 @@ func TestConfigWriteRead(t *testing.T) {
 		}
 		defer os.RemoveAll(tmpDir) // nolint: errcheck
 
-		nodeConfig, err := params.NewNodeConfig(tmpDir, networkId)
+		nodeConfig, err := params.NewNodeConfig(tmpDir, networkId, true)
 		if err != nil {
 			t.Fatalf("cannot create new config object: %v", err)
 		}
@@ -603,6 +854,7 @@ func TestConfigWriteRead(t *testing.T) {
 		}
 	}
 
-	configReadWrite(params.TestNetworkID, "testdata/config.testnet.json")
+	configReadWrite(params.RinkebyNetworkID, "testdata/config.rinkeby.json")
+	configReadWrite(params.RopstenNetworkID, "testdata/config.ropsten.json")
 	configReadWrite(params.MainNetworkID, "testdata/config.mainnet.json")
 }

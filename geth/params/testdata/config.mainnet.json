@@ -1,5 +1,5 @@
 {
-    "TestNet": false,
+    "DevMode": true,
     "NetworkId": 1,
     "DataDir": "$TMPDIR",
     "KeyStoreDir": "$TMPDIR/keystore",
@@ -23,7 +23,7 @@
     "LogToStderr": true,
     "BootClusterConfig": {
         "Enabled": true,
-        "ConfigFile": "ropsten.dev.json"
+        "ConfigFile": "homestead.dev.json"
     },
     "LightEthConfig": {
         "Enabled": true,

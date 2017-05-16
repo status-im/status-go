@@ -56,7 +56,6 @@ func parseFaucetCommandConfig(ctx *cli.Context) (*params.NodeConfig, error) {
 
 	// extra options
 	nodeConfig.BootClusterConfig.Enabled = true
-	nodeConfig.BootClusterConfig.ConfigFile = ctx.GlobalString(BootClusterConfigFileFlag.Name)
 
 	return nodeConfig, nil
 }

@@ -17,6 +17,12 @@ var (
 )
 
 var (
+	// ProdModeFlag is whether we need dev or production settings
+	ProdModeFlag = cli.BoolFlag{
+		Name:  "production",
+		Usage: "Whether production settings should be loaded",
+	}
+
 	// NodeKeyFileFlag is a node key file to be used as node's private key
 	NodeKeyFileFlag = cli.StringFlag{
 		Name:  "nodekey",
@@ -34,14 +40,25 @@ var (
 	NetworkIDFlag = cli.IntFlag{
 		Name:  "networkid",
 		Usage: "Network identifier (integer, 1=Homestead, 3=Ropsten, 4=Rinkeby)",
-		Value: params.TestNetworkID,
+		Value: params.RopstenNetworkID,
 	}
 
-	// BootClusterConfigFileFlag allows to switch boot cluster nodes
-	BootClusterConfigFileFlag = cli.StringFlag{
-		Name:  "bootcluster",
-		Usage: "Boot cluster config file",
-		Value: params.BootClusterConfigFile,
+	// LightEthEnabledFlag flags whether LES is enabled or not
+	LightEthEnabledFlag = cli.BoolFlag{
+		Name:  "les",
+		Usage: "LES protocol enabled",
+	}
+
+	// WhisperEnabledFlag flags whether Whisper is enabled or not
+	WhisperEnabledFlag = cli.BoolFlag{
+		Name:  "shh",
+		Usage: "SHH protocol enabled",
+	}
+
+	// SwarmEnabledFlag flags whether Swarm is enabled or not
+	SwarmEnabledFlag = cli.BoolFlag{
+		Name:  "swarm",
+		Usage: "Swarm protocol enabled",
 	}
 
 	// HTTPEnabledFlag defines whether HTTP RPC endpoint should be opened or not
@@ -78,14 +95,15 @@ func init() {
 	app.Commands = []cli.Command{
 		versionCommand,
 		faucetCommand,
+		lesCommand,
 		wnodeCommand,
 	}
 	app.Flags = []cli.Flag{
+		ProdModeFlag,
 		NodeKeyFileFlag,
 		DataDirFlag,
 		NetworkIDFlag,
 		LogLevelFlag,
-		BootClusterConfigFileFlag,
 	}
 	app.Before = func(ctx *cli.Context) error {
 		runtime.GOMAXPROCS(runtime.NumCPU())
@@ -120,7 +138,10 @@ func makeApp(gitCommit string) *cli.App {
 
 // makeNodeConfig parses incoming CLI options and returns node configuration object
 func makeNodeConfig(ctx *cli.Context) (*params.NodeConfig, error) {
-	nodeConfig, err := params.NewNodeConfig(ctx.GlobalString(DataDirFlag.Name), ctx.GlobalUint64(NetworkIDFlag.Name))
+	nodeConfig, err := params.NewNodeConfig(
+		ctx.GlobalString(DataDirFlag.Name),
+		ctx.GlobalUint64(NetworkIDFlag.Name),
+		!ctx.GlobalBool(ProdModeFlag.Name))
 	if err != nil {
 		return nil, err
 	}

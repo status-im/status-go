@@ -1,5 +1,5 @@
 {
-    "TestNet": true,
+    "DevMode": true,
     "NetworkId": 3,
     "DataDir": "$TMPDIR",
     "KeyStoreDir": "$TMPDIR/keystore",
