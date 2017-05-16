@@ -30,6 +30,7 @@ type SelectedExtKey struct {
 
 // NodeManager manages Status node (which abstracts contained geth node)
 type NodeManager struct {
+	sync.RWMutex
 	node            *Node                 // reference to Status node
 	services        *NodeServiceStack     // default stack of services running on geth node
 	api             *node.PrivateAdminAPI // exposes collection of administrative API methods
@@ -87,8 +88,10 @@ func NewNodeManager(config *params.NodeConfig) *NodeManager {
 				jailedRequestQueue: NewJailedRequestsQueue(),
 			},
 		}
-		nodeManagerInstance.node = MakeNode(config)
 	})
+	nodeManagerInstance.Lock()
+	defer nodeManagerInstance.Unlock()
+	nodeManagerInstance.node = MakeNode(config)
 
 	return nodeManagerInstance
 }
@@ -100,6 +103,9 @@ func NodeManagerInstance() *NodeManager {
 
 // RunNode starts Geth node
 func (m *NodeManager) RunNode() {
+	m.RLock()
+	defer m.RUnlock()
+
 	go func() {
 		defer HaltOnPanic()
 
@@ -136,6 +142,11 @@ func (m *NodeManager) RunNode() {
 		m.onNodeStarted() // node started, notify listeners
 		m.node.geth.Wait()
 
+		// send signal up to native app
+		SendSignal(SignalEnvelope{
+			Type:  EventNodeStopped,
+			Event: struct{}{},
+		})
 		log.Info("node stopped")
 	}()
 }
@@ -231,6 +242,11 @@ func (m *NodeManager) ResetChainData() error {
 	if err := os.RemoveAll(chainDataDir); err != nil {
 		return err
 	}
+	// send signal up to native app
+	SendSignal(SignalEnvelope{
+		Type:  EventChainDataRemoved,
+		Event: struct{}{},
+	})
 	log.Info("chaindata removed", "dir", chainDataDir)
 
 	return m.ResumeNode()

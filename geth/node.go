@@ -34,6 +34,12 @@ const (
 	// EventNodeStarted is triggered when underlying node is fully started
 	EventNodeStarted = "node.started"
 
+	// EventNodeStopped is triggered when underlying node is fully stopped
+	EventNodeStopped = "node.stopped"
+
+	// EventChainDataRemoved is triggered when node's chain data is removed
+	EventChainDataRemoved = "chaindata.removed"
+
 	// EventNodeCrashed is triggered when node crashes
 	EventNodeCrashed = "node.crashed"
 )
