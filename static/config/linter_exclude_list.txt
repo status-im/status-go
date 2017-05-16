@@ -21,3 +21,4 @@ comment on exported function PopulateStaticPeers should be of the form "Populate
 comment on exported function AddPeer should be of the form "AddPeer ..." (golint)
 comment on exported function NotifyNode should be of the form "NotifyNode ..." (golint)
 comment on exported function TriggerTestSignal should be of the form "TriggerTestSignal ..." (golint)
+comment on exported function VerifyAccountPassword should be of the form "VerifyAccountPassword ..." (golint)

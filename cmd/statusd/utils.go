@@ -3,6 +3,7 @@ package main
 import "C"
 import (
 	"encoding/json"
+	"io/ioutil"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -59,6 +60,10 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 			testCreateChildAccount,
 		},
 		{
+			"verify account password",
+			testVerifyAccountPassword,
+		},
+		{
 			"recover account",
 			testRecoverAccount,
 		},
@@ -103,6 +108,45 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 	}
 
 	done <- struct{}{}
+}
+
+func testVerifyAccountPassword(t *testing.T) bool {
+	tmpDir, err := ioutil.TempDir(os.TempDir(), "accounts")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir) // nolint: errcheck
+
+	if err = geth.ImportTestAccount(tmpDir, "test-account1.pk"); err != nil {
+		t.Fatal(err)
+	}
+	if err = geth.ImportTestAccount(tmpDir, "test-account2.pk"); err != nil {
+		t.Fatal(err)
+	}
+
+	// rename account file (to see that file's internals reviewed, when locating account key)
+	accountFilePathOriginal := filepath.Join(tmpDir, "test-account1.pk")
+	accountFilePath := filepath.Join(tmpDir, "foo"+testConfig.Account1.Address+"bar.pk")
+	if err := os.Rename(accountFilePathOriginal, accountFilePath); err != nil {
+		t.Fatal(err)
+	}
+
+	response := geth.JSONError{}
+	rawResponse := VerifyAccountPassword(
+		C.CString(tmpDir),
+		C.CString(testConfig.Account1.Address),
+		C.CString(testConfig.Account1.Password))
+
+	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &response); err != nil {
+		t.Errorf("cannot decode response (%s): %v", C.GoString(rawResponse), err)
+		return false
+	}
+	if response.Error != "" {
+		t.Errorf("unexpected error: %s", response.Error)
+		return false
+	}
+
+	return true
 }
 
 func testGetDefaultConfig(t *testing.T) bool {

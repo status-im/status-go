@@ -1,10 +1,15 @@
 package geth
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 
 	"github.com/ethereum/go-ethereum/accounts"
+	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/status-im/status-go/extkeys"
@@ -123,6 +128,56 @@ func RecoverAccount(password, mnemonic string) (address, pubKey string, err erro
 	}
 
 	return address, pubKey, nil
+}
+
+// VerifyAccountPassword tries to decrypt a given account key file, with a provided password.
+// If no error is returned, then account is considered verified.
+func VerifyAccountPassword(keyStoreDir, address, password string) (*keystore.Key, error) {
+	var err error
+	var keyJSON []byte
+
+	addressObj := common.BytesToAddress(common.FromHex(address))
+	checkAccountKey := func(path string, fileInfo os.FileInfo) error {
+		if len(keyJSON) > 0 || fileInfo.IsDir() {
+			return nil
+		}
+
+		keyJSON, err = ioutil.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("invalid account key file: %v", err)
+		}
+		if !bytes.Contains(keyJSON, []byte(fmt.Sprintf(`"address":"%s"`, addressObj.Hex()[2:]))) {
+			keyJSON = []byte{}
+		}
+
+		return nil
+	}
+	// locate key within key store directory (address should be within the file)
+	err = filepath.Walk(keyStoreDir, func(path string, fileInfo os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		return checkAccountKey(path, fileInfo)
+	})
+	if err != nil {
+		return nil, fmt.Errorf("cannot traverse key store folder: %v", err)
+	}
+
+	if len(keyJSON) == 0 {
+		return nil, fmt.Errorf("cannot locate account for address: %x", addressObj)
+	}
+
+	key, err := keystore.DecryptKey(keyJSON, password)
+	if err != nil {
+		return nil, err
+	}
+
+	// avoid swap attack
+	if key.Address != addressObj {
+		return nil, fmt.Errorf("account mismatch: have %x, want %x", key.Address, addressObj)
+	}
+
+	return key, nil
 }
 
 // SelectAccount selects current account, by verifying that address has corresponding account which can be decrypted

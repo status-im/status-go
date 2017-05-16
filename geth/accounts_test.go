@@ -2,11 +2,100 @@ package geth_test
 
 import (
 	"errors"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/geth"
 )
+
+func TestVerifyAccountPassword(t *testing.T) {
+	keyStoreDir, err := ioutil.TempDir(os.TempDir(), "accounts")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(keyStoreDir) // nolint: errcheck
+
+	emptyKeyStoreDir, err := ioutil.TempDir(os.TempDir(), "empty")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(emptyKeyStoreDir) // nolint: errcheck
+
+	// import account keys
+	if err = geth.ImportTestAccount(keyStoreDir, "test-account1.pk"); err != nil {
+		t.Fatal(err)
+	}
+	if err = geth.ImportTestAccount(keyStoreDir, "test-account2.pk"); err != nil {
+		t.Fatal(err)
+	}
+
+	account1Address := common.BytesToAddress(common.FromHex(testConfig.Account1.Address))
+
+	testCases := []struct {
+		name          string
+		keyPath       string
+		address       string
+		password      string
+		expectedError error
+	}{
+		{
+			"correct address, correct password (decrypt should succeed)",
+			keyStoreDir,
+			testConfig.Account1.Address,
+			testConfig.Account1.Password,
+			nil,
+		},
+		{
+			"correct address, correct password, non-existent key store",
+			filepath.Join(keyStoreDir, "non-existent-folder"),
+			testConfig.Account1.Address,
+			testConfig.Account1.Password,
+			fmt.Errorf("cannot traverse key store folder: lstat %s/non-existent-folder: no such file or directory", keyStoreDir),
+		},
+		{
+			"correct address, correct password, empty key store (pk is not there)",
+			emptyKeyStoreDir,
+			testConfig.Account1.Address,
+			testConfig.Account1.Password,
+			fmt.Errorf("cannot locate account for address: %x", account1Address),
+		},
+		{
+			"wrong address, correct password",
+			keyStoreDir,
+			"0x79791d3e8f2daa1f7fec29649d152c0ada3cc535",
+			testConfig.Account1.Password,
+			fmt.Errorf("cannot locate account for address: %s", "79791d3e8f2daa1f7fec29649d152c0ada3cc535"),
+		},
+		{
+			"correct address, wrong password",
+			keyStoreDir,
+			testConfig.Account1.Address,
+			"wrong password", // wrong password
+			errors.New("could not decrypt key with given passphrase"),
+		},
+	}
+	for _, testCase := range testCases {
+		t.Log(testCase.name)
+		accountKey, err := geth.VerifyAccountPassword(testCase.keyPath, testCase.address, testCase.password)
+		if !reflect.DeepEqual(err, testCase.expectedError) {
+			t.Fatalf("unexpected error: expected \n'%v', got \n'%v'", testCase.expectedError, err)
+		}
+		if err == nil {
+			if accountKey == nil {
+				t.Error("no error reported, but account key is missing")
+			}
+			accountAddress := common.BytesToAddress(common.FromHex(testCase.address))
+			if accountKey.Address != accountAddress {
+				t.Fatalf("account mismatch: have %x, want %x", accountKey.Address, accountAddress)
+			}
+		}
+	}
+}
 
 func TestAccountsList(t *testing.T) {
 	err := geth.PrepareTestNode()
