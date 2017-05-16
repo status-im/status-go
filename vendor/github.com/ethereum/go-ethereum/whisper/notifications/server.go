@@ -324,7 +324,10 @@ func (s *NotificationServer) processNewChatSessionRequest(msg *whisper.ReceivedM
 		PoW:      s.config.MinimumPoW,
 		WorkTime: 5,
 	}
-	response := whisper.NewSentMessage(&msgParams)
+	response, err := whisper.NewSentMessage(&msgParams)
+	if err != nil {
+		return fmt.Errorf("failed to create server response message: %v", err)
+	}
 	env, err := response.Wrap(&msgParams)
 	if err != nil {
 		return fmt.Errorf("failed to wrap server response message: %v", err)
@@ -386,7 +389,10 @@ func (s *NotificationServer) processNewDeviceRegistrationRequest(msg *whisper.Re
 		PoW:      s.config.MinimumPoW,
 		WorkTime: 5,
 	}
-	response := whisper.NewSentMessage(&msgParams)
+	response, err := whisper.NewSentMessage(&msgParams)
+	if err != nil {
+		return fmt.Errorf("failed to create server response message: %v", err)
+	}
 	env, err := response.Wrap(&msgParams)
 	if err != nil {
 		return fmt.Errorf("failed to wrap server response message: %v", err)
@@ -459,7 +465,10 @@ func (s *NotificationServer) processClientSessionStatusRequest(msg *whisper.Rece
 		PoW:      s.config.MinimumPoW,
 		WorkTime: 5,
 	}
-	response := whisper.NewSentMessage(&msgParams)
+	response, err := whisper.NewSentMessage(&msgParams)
+	if err != nil {
+		return fmt.Errorf("failed to create server response message: %v", err)
+	}
 	env, err := response.Wrap(&msgParams)
 	if err != nil {
 		return fmt.Errorf("failed to wrap server response message: %v", err)

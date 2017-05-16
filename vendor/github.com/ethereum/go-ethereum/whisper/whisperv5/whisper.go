@@ -331,22 +331,12 @@ func (w *Whisper) GetPrivateKey(id string) (*ecdsa.PrivateKey, error) {
 // GenerateSymKey generates a random symmetric key and stores it under id,
 // which is then returned. Will be used in the future for session key exchange.
 func (w *Whisper) GenerateSymKey() (string, error) {
-	const size = aesKeyLength * 2
-	buf := make([]byte, size)
-	_, err := crand.Read(buf)
+	key := make([]byte, aesKeyLength)
+	_, err := crand.Read(key)
 	if err != nil {
 		return "", err
-	} else if !validateSymmetricKey(buf) {
+	} else if !validateSymmetricKey(key) {
 		return "", fmt.Errorf("error in GenerateSymKey: crypto/rand failed to generate random data")
-	}
-
-	key := buf[:aesKeyLength]
-	salt := buf[aesKeyLength:]
-	derived, err := DeriveOneTimeKey(key, salt, EnvelopeVersion)
-	if err != nil {
-		return "", err
-	} else if !validateSymmetricKey(derived) {
-		return "", fmt.Errorf("failed to derive valid key")
 	}
 
 	id, err := GenerateRandomID()
@@ -360,7 +350,7 @@ func (w *Whisper) GenerateSymKey() (string, error) {
 	if w.symKeys[id] != nil {
 		return "", fmt.Errorf("failed to generate unique ID")
 	}
-	w.symKeys[id] = derived
+	w.symKeys[id] = key
 	return id, nil
 }
 
@@ -481,6 +471,9 @@ func (w *Whisper) Unsubscribe(id string) error {
 // network in the coming cycles.
 func (w *Whisper) Send(envelope *Envelope) error {
 	ok, err := w.add(envelope)
+	if err != nil {
+		return err
+	}
 	if !ok {
 		return fmt.Errorf("failed to add envelope")
 	}
@@ -646,14 +639,11 @@ func (wh *Whisper) add(envelope *Envelope) (bool, error) {
 		return false, fmt.Errorf("oversized version [%x]", envelope.Hash())
 	}
 
-	if len(envelope.AESNonce) > AESNonceMaxLength {
-		// the standard AES GSM nonce size is 12,
-		// but const gcmStandardNonceSize cannot be accessed directly
-		return false, fmt.Errorf("oversized AESNonce [%x]", envelope.Hash())
-	}
-
-	if len(envelope.Salt) > saltLength {
-		return false, fmt.Errorf("oversized salt [%x]", envelope.Hash())
+	aesNonceSize := len(envelope.AESNonce)
+	if aesNonceSize != 0 && aesNonceSize != AESNonceLength {
+		// the standard AES GCM nonce size is 12 bytes,
+		// but constant gcmStandardNonceSize cannot be accessed (not exported)
+		return false, fmt.Errorf("wrong size of AESNonce: %d bytes [env: %x]", aesNonceSize, envelope.Hash())
 	}
 
 	if envelope.PoW() < wh.minPoW {

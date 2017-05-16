@@ -10,8 +10,8 @@ describe('Whisper Tests', function () {
     node1.setProvider(new web3.providers.HttpProvider('http://localhost:8645'));
     node2.setProvider(new web3.providers.HttpProvider('http://localhost:8745'));
 
-    console.log('Node is expected: statusd --datadir app1 --http --httpport 8645 wnode');
-    console.log('Node is expected: statusd --datadir app2 --http --httpport 8745 wnode');
+    console.log('Node is expected: statusd --datadir app1 wnode --http --httpport 8645');
+    console.log('Node is expected: statusd --datadir app2 wnode --http --httpport 8745');
     console.log('Node is expected: statusd --datadir wnode1 wnode --notify --injectaccounts=false --identity ./static/keys/wnodekey --firebaseauth ./static/keys/firebaseauthkey');
 
     // some common vars
@@ -216,9 +216,9 @@ describe('Whisper Tests', function () {
                 assert.lengthOf(filterid1, 64);
             });
 
-            it('shh.getMessages(filterID) - symmetric filter', function () {
+            it('shh.getFloatingMessages(filterID) - symmetric filter', function () {
                 // let's try to capture message that was there *before* filter is created
-                var messages = node1.shh.getMessages(filterid1);
+                var messages = node1.shh.getFloatingMessages(filterid1);
                 assert.typeOf(messages, 'array');
                 assert.lengthOf(messages, 1);
                 assert.equal(web3.toAscii(messages[0].payload), payloadBeforeSymFilter);
@@ -233,9 +233,9 @@ describe('Whisper Tests', function () {
                 expect(node1.shh.post(message)).to.equal(null);
             });
 
-            it('shh.getMessages(filterID) - asymmetric filter', function () {
+            it('shh.getFloatingMessages(filterID) - asymmetric filter', function () {
                 // let's try to capture message that was there *before* filter is created
-                var messages = node1.shh.getMessages(filterid2);
+                var messages = node1.shh.getFloatingMessages(filterid2);
                 assert.typeOf(messages, 'array');
                 assert.lengthOf(messages, 1);
                 assert.equal(web3.toAscii(messages[0].payload), payloadBeforeAsymFilter);
@@ -250,17 +250,17 @@ describe('Whisper Tests', function () {
                 expect(node1.shh.post(message)).to.equal(null);
             });
 
-            it('shh.getSubscriptionMessages(filterID) - symmetric filter', function (done) {
+            it('shh.getNewSubscriptionMessages(filterID) - symmetric filter', function (done) {
                 // allow some time for message to propagate
                 setTimeout(function () {
                     // now let's try to capture new messages from our last capture
-                    var messages = node1.shh.getSubscriptionMessages(filterid1);
+                    var messages = node1.shh.getNewSubscriptionMessages(filterid1);
                     assert.typeOf(messages, 'array');
                     assert.lengthOf(messages, 1);
                     assert.equal(web3.toAscii(messages[0].payload), payloadAfterSymFilter);
 
                     // no more messages should be returned
-                    messages = node1.shh.getSubscriptionMessages(filterid1);
+                    messages = node1.shh.getNewSubscriptionMessages(filterid1);
                     assert.typeOf(messages, 'array');
                     assert.lengthOf(messages, 0);
 
@@ -268,17 +268,17 @@ describe('Whisper Tests', function () {
                 }, 200);
             });
 
-            it('shh.getSubscriptionMessages(filterID) - asymmetric filter', function () {
+            it('shh.getNewSubscriptionMessages(filterID) - asymmetric filter', function () {
                 // allow some time for message to propagate
                 setTimeout(function () {
                     // now let's try to capture new messages from our last capture
-                    var messages = node1.shh.getSubscriptionMessages(filterid2);
+                    var messages = node1.shh.getNewSubscriptionMessages(filterid2);
                     assert.typeOf(messages, 'array');
                     assert.lengthOf(messages, 1);
                     assert.equal(web3.toAscii(messages[0].payload), payloadAfterAsymFilter);
 
                     // no more messages should be returned
-                    messages = node1.shh.getSubscriptionMessages(filterid2);
+                    messages = node1.shh.getNewSubscriptionMessages(filterid2);
                     assert.typeOf(messages, 'array');
                     assert.lengthOf(messages, 0);
 

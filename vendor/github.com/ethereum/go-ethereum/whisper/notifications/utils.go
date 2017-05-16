@@ -3,6 +3,7 @@ package notifications
 import (
 	"crypto/sha512"
 	"errors"
+	"crypto/sha256"
 
 	crand "crypto/rand"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
@@ -14,8 +15,7 @@ import (
 func makeSessionKey() ([]byte, error) {
 	// generate random key
 	const keyLen = 32
-	const size = keyLen * 2
-	buf := make([]byte, size)
+	buf := make([]byte, keyLen)
 	_, err := crand.Read(buf)
 	if err != nil {
 		return nil, err
@@ -24,8 +24,7 @@ func makeSessionKey() ([]byte, error) {
 	}
 
 	key := buf[:keyLen]
-	salt := buf[keyLen:]
-	derived, err := whisper.DeriveOneTimeKey(key, salt, whisper.EnvelopeVersion)
+	derived, err := deriveKeyMaterial(key, whisper.EnvelopeVersion)
 	if err != nil {
 		return nil, err
 	} else if !validateSymmetricKey(derived) {
@@ -48,6 +47,19 @@ func containsOnlyZeros(data []byte) bool {
 		}
 	}
 	return true
+}
+
+// deriveKeyMaterial derives symmetric key material from the key or password./~~~
+// pbkdf2 is used for security, in case people use password instead of randomly generated keys.
+func deriveKeyMaterial(key []byte, version uint64) (derivedKey []byte, err error) {
+	if version == 0 {
+		// kdf should run no less than 0.1 seconds on average compute,
+		// because it's a once in a session experience
+		derivedKey := pbkdf2.Key(key, nil, 65356, 32, sha256.New)
+		return derivedKey, nil
+	} else {
+		return nil, errors.New("unknown version")
+	}
 }
 
 // MakeTopic returns Whisper topic *as bytes array* by generating cryptographic key from the provided password
