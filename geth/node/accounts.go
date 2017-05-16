@@ -1,4 +1,4 @@
-package geth
+package node
 
 import (
 	"bytes"
@@ -10,9 +10,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
-	"github.com/ethereum/go-ethereum/common"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/status-im/status-go/extkeys"
+	"github.com/status-im/status-go/geth/common"
 )
 
 // errors
@@ -23,29 +24,41 @@ var (
 	ErrWhisperClearIdentitiesFailure   = errors.New("failed to clear whisper identities")
 	ErrNoAccountSelected               = errors.New("no account has been selected, please login")
 	ErrInvalidMasterKeyCreated         = errors.New("can not create master extended key")
-	ErrInvalidAccountAddressOrKey      = errors.New("cannot parse address or key to valid account address")
 )
+
+// AccountManager represents account manager interface
+type AccountManager struct {
+	nodeManager     common.NodeManager
+	selectedAccount *common.SelectedExtKey // account that was processed during the last call to SelectAccount()
+}
+
+// NewAccountManager returns new node account manager
+func NewAccountManager(nodeManager common.NodeManager) *AccountManager {
+	return &AccountManager{
+		nodeManager: nodeManager,
+	}
+}
 
 // CreateAccount creates an internal geth account
 // BIP44-compatible keys are generated: CKD#1 is stored as account key, CKD#2 stored as sub-account root
 // Public key of CKD#1 is returned, with CKD#2 securely encoded into account key file (to be used for
 // sub-account derivations)
-func CreateAccount(password string) (address, pubKey, mnemonic string, err error) {
+func (m *AccountManager) CreateAccount(password string) (address, pubKey, mnemonic string, err error) {
 	// generate mnemonic phrase
-	m := extkeys.NewMnemonic(extkeys.Salt)
-	mnemonic, err = m.MnemonicPhrase(128, extkeys.EnglishLanguage)
+	mn := extkeys.NewMnemonic(extkeys.Salt)
+	mnemonic, err = mn.MnemonicPhrase(128, extkeys.EnglishLanguage)
 	if err != nil {
 		return "", "", "", fmt.Errorf("can not create mnemonic seed: %v", err)
 	}
 
 	// generate extended master key (see BIP32)
-	extKey, err := extkeys.NewMaster(m.MnemonicSeed(mnemonic, password), []byte(extkeys.Salt))
+	extKey, err := extkeys.NewMaster(mn.MnemonicSeed(mnemonic, password), []byte(extkeys.Salt))
 	if err != nil {
 		return "", "", "", fmt.Errorf("can not create master extended key: %v", err)
 	}
 
 	// import created key into account keystore
-	address, pubKey, err = importExtendedKey(extKey, password)
+	address, pubKey, err = m.importExtendedKey(extKey, password)
 	if err != nil {
 		return "", "", "", err
 	}
@@ -56,22 +69,21 @@ func CreateAccount(password string) (address, pubKey, mnemonic string, err error
 // CreateChildAccount creates sub-account for an account identified by parent address.
 // CKD#2 is used as root for master accounts (when parentAddress is "").
 // Otherwise (when parentAddress != ""), child is derived directly from parent.
-func CreateChildAccount(parentAddress, password string) (address, pubKey string, err error) {
-	nodeManager := NodeManagerInstance()
-	keyStore, err := nodeManager.AccountKeyStore()
+func (m *AccountManager) CreateChildAccount(parentAddress, password string) (address, pubKey string, err error) {
+	keyStore, err := m.nodeManager.AccountKeyStore()
 	if err != nil {
 		return "", "", err
 	}
 
-	if parentAddress == "" && nodeManager.SelectedAccount != nil { // derive from selected account by default
-		parentAddress = nodeManager.SelectedAccount.Address.Hex()
+	if parentAddress == "" && m.selectedAccount != nil { // derive from selected account by default
+		parentAddress = m.selectedAccount.Address.Hex()
 	}
 
 	if parentAddress == "" {
 		return "", "", ErrNoAccountSelected
 	}
 
-	account, err := ParseAccountString(parentAddress)
+	account, err := common.ParseAccountString(parentAddress)
 	if err != nil {
 		return "", "", ErrAddressToAccountMappingFailure
 	}
@@ -98,14 +110,14 @@ func CreateChildAccount(parentAddress, password string) (address, pubKey string,
 	accountKey.SubAccountIndex++
 
 	// import derived key into account keystore
-	address, pubKey, err = importExtendedKey(childKey, password)
+	address, pubKey, err = m.importExtendedKey(childKey, password)
 	if err != nil {
 		return
 	}
 
 	// update in-memory selected account
-	if nodeManager.SelectedAccount != nil {
-		nodeManager.SelectedAccount.AccountKey = accountKey
+	if m.selectedAccount != nil {
+		m.selectedAccount.AccountKey = accountKey
 	}
 
 	return address, pubKey, nil
@@ -113,16 +125,16 @@ func CreateChildAccount(parentAddress, password string) (address, pubKey string,
 
 // RecoverAccount re-creates master key using given details.
 // Once master key is re-generated, it is inserted into keystore (if not already there).
-func RecoverAccount(password, mnemonic string) (address, pubKey string, err error) {
+func (m *AccountManager) RecoverAccount(password, mnemonic string) (address, pubKey string, err error) {
 	// re-create extended key (see BIP32)
-	m := extkeys.NewMnemonic(extkeys.Salt)
-	extKey, err := extkeys.NewMaster(m.MnemonicSeed(mnemonic, password), []byte(extkeys.Salt))
+	mn := extkeys.NewMnemonic(extkeys.Salt)
+	extKey, err := extkeys.NewMaster(mn.MnemonicSeed(mnemonic, password), []byte(extkeys.Salt))
 	if err != nil {
 		return "", "", ErrInvalidMasterKeyCreated
 	}
 
 	// import re-created key into account keystore
-	address, pubKey, err = importExtendedKey(extKey, password)
+	address, pubKey, err = m.importExtendedKey(extKey, password)
 	if err != nil {
 		return
 	}
@@ -132,11 +144,11 @@ func RecoverAccount(password, mnemonic string) (address, pubKey string, err erro
 
 // VerifyAccountPassword tries to decrypt a given account key file, with a provided password.
 // If no error is returned, then account is considered verified.
-func VerifyAccountPassword(keyStoreDir, address, password string) (*keystore.Key, error) {
+func (m *AccountManager) VerifyAccountPassword(keyStoreDir, address, password string) (*keystore.Key, error) {
 	var err error
 	var keyJSON []byte
 
-	addressObj := common.BytesToAddress(common.FromHex(address))
+	addressObj := gethcommon.BytesToAddress(gethcommon.FromHex(address))
 	checkAccountKey := func(path string, fileInfo os.FileInfo) error {
 		if len(keyJSON) > 0 || fileInfo.IsDir() {
 			return nil
@@ -183,14 +195,13 @@ func VerifyAccountPassword(keyStoreDir, address, password string) (*keystore.Key
 // SelectAccount selects current account, by verifying that address has corresponding account which can be decrypted
 // using provided password. Once verification is done, decrypted key is injected into Whisper (as a single identity,
 // all previous identities are removed).
-func SelectAccount(address, password string) error {
-	nodeManager := NodeManagerInstance()
-	keyStore, err := nodeManager.AccountKeyStore()
+func (m *AccountManager) SelectAccount(address, password string) error {
+	keyStore, err := m.nodeManager.AccountKeyStore()
 	if err != nil {
 		return err
 	}
 
-	account, err := ParseAccountString(address)
+	account, err := common.ParseAccountString(address)
 	if err != nil {
 		return ErrAddressToAccountMappingFailure
 	}
@@ -200,7 +211,7 @@ func SelectAccount(address, password string) error {
 		return fmt.Errorf("%s: %v", ErrAccountToKeyMappingFailure.Error(), err)
 	}
 
-	whisperService, err := nodeManager.WhisperService()
+	whisperService, err := m.nodeManager.WhisperService()
 	if err != nil {
 		return err
 	}
@@ -210,11 +221,11 @@ func SelectAccount(address, password string) error {
 	}
 
 	// persist account key for easier recovery of currently selected key
-	subAccounts, err := findSubAccounts(accountKey.ExtendedKey, accountKey.SubAccountIndex)
+	subAccounts, err := m.findSubAccounts(accountKey.ExtendedKey, accountKey.SubAccountIndex)
 	if err != nil {
 		return err
 	}
-	nodeManager.SelectedAccount = &SelectedExtKey{
+	m.selectedAccount = &common.SelectedExtKey{
 		Address:     account.Address,
 		AccountKey:  accountKey,
 		SubAccounts: subAccounts,
@@ -223,16 +234,22 @@ func SelectAccount(address, password string) error {
 	return nil
 }
 
-// ReSelectAccount selects previously selected account, often, after node restart.
-func ReSelectAccount() error {
-	nodeManager := NodeManagerInstance()
+// SelectedAccount returns currently selected account
+func (m *AccountManager) SelectedAccount() (*common.SelectedExtKey, error) {
+	if m.selectedAccount == nil {
+		return nil, ErrNoAccountSelected
+	}
+	return m.selectedAccount, nil
+}
 
-	selectedAccount := nodeManager.SelectedAccount
+// ReSelectAccount selects previously selected account, often, after node restart.
+func (m *AccountManager) ReSelectAccount() error {
+	selectedAccount := m.selectedAccount
 	if selectedAccount == nil {
 		return nil
 	}
 
-	whisperService, err := nodeManager.WhisperService()
+	whisperService, err := m.nodeManager.WhisperService()
 	if err != nil {
 		return err
 	}
@@ -245,9 +262,8 @@ func ReSelectAccount() error {
 }
 
 // Logout clears whisper identities
-func Logout() error {
-	nodeManager := NodeManagerInstance()
-	whisperService, err := nodeManager.WhisperService()
+func (m *AccountManager) Logout() error {
+	whisperService, err := m.nodeManager.WhisperService()
 	if err != nil {
 		return err
 	}
@@ -257,15 +273,15 @@ func Logout() error {
 		return fmt.Errorf("%s: %v", ErrWhisperClearIdentitiesFailure, err)
 	}
 
-	nodeManager.SelectedAccount = nil
+	m.selectedAccount = nil
 
 	return nil
 }
 
 // importExtendedKey processes incoming extended key, extracts required info and creates corresponding account key.
 // Once account key is formed, that key is put (if not already) into keystore i.e. key is *encoded* into key file.
-func importExtendedKey(extKey *extkeys.ExtendedKey, password string) (address, pubKey string, err error) {
-	keyStore, err := NodeManagerInstance().AccountKeyStore()
+func (m *AccountManager) importExtendedKey(extKey *extkeys.ExtendedKey, password string) (address, pubKey string, err error) {
+	keyStore, err := m.nodeManager.AccountKeyStore()
 	if err != nil {
 		return "", "", err
 	}
@@ -282,59 +298,58 @@ func importExtendedKey(extKey *extkeys.ExtendedKey, password string) (address, p
 	if err != nil {
 		return address, "", err
 	}
-	pubKey = common.ToHex(crypto.FromECDSAPub(&key.PrivateKey.PublicKey))
+	pubKey = gethcommon.ToHex(crypto.FromECDSAPub(&key.PrivateKey.PublicKey))
 
 	return
 }
 
-func onAccountsListRequest(entities []common.Address) []common.Address {
-	nodeManager := NodeManagerInstance()
+// AccountsListRequestHandler returns handler to process account list request
+func (m *AccountManager) AccountsListRequestHandler() func(entities []gethcommon.Address) []gethcommon.Address {
+	return func(entities []gethcommon.Address) []gethcommon.Address {
+		if m.selectedAccount == nil {
+			return []gethcommon.Address{}
+		}
 
-	if nodeManager.SelectedAccount == nil {
-		return []common.Address{}
-	}
+		m.refreshSelectedAccount()
 
-	refreshSelectedAccount()
-
-	filtered := make([]common.Address, 0)
-	for _, account := range entities {
-		// main account
-		if nodeManager.SelectedAccount.Address.Hex() == account.Hex() {
-			filtered = append(filtered, account)
-		} else {
-			// sub accounts
-			for _, subAccount := range nodeManager.SelectedAccount.SubAccounts {
-				if subAccount.Address.Hex() == account.Hex() {
-					filtered = append(filtered, account)
+		filtered := make([]gethcommon.Address, 0)
+		for _, account := range entities {
+			// main account
+			if m.selectedAccount.Address.Hex() == account.Hex() {
+				filtered = append(filtered, account)
+			} else {
+				// sub accounts
+				for _, subAccount := range m.selectedAccount.SubAccounts {
+					if subAccount.Address.Hex() == account.Hex() {
+						filtered = append(filtered, account)
+					}
 				}
 			}
 		}
-	}
 
-	return filtered
+		return filtered
+	}
 }
 
 // refreshSelectedAccount re-populates list of sub-accounts of the currently selected account (if any)
-func refreshSelectedAccount() {
-	nodeManager := NodeManagerInstance()
-
-	if nodeManager.SelectedAccount == nil {
+func (m *AccountManager) refreshSelectedAccount() {
+	if m.selectedAccount == nil {
 		return
 	}
 
-	accountKey := nodeManager.SelectedAccount.AccountKey
+	accountKey := m.selectedAccount.AccountKey
 	if accountKey == nil {
 		return
 	}
 
 	// re-populate list of sub-accounts
-	subAccounts, err := findSubAccounts(accountKey.ExtendedKey, accountKey.SubAccountIndex)
+	subAccounts, err := m.findSubAccounts(accountKey.ExtendedKey, accountKey.SubAccountIndex)
 	if err != nil {
 		return
 	}
-	nodeManager.SelectedAccount = &SelectedExtKey{
-		Address:     nodeManager.SelectedAccount.Address,
-		AccountKey:  nodeManager.SelectedAccount.AccountKey,
+	m.selectedAccount = &common.SelectedExtKey{
+		Address:     m.selectedAccount.Address,
+		AccountKey:  m.selectedAccount.AccountKey,
 		SubAccounts: subAccounts,
 	}
 }
@@ -342,9 +357,8 @@ func refreshSelectedAccount() {
 // findSubAccounts traverses cached accounts and adds as a sub-accounts any
 // that belong to the currently selected account.
 // The extKey is CKD#2 := root of sub-accounts of the main account
-func findSubAccounts(extKey *extkeys.ExtendedKey, subAccountIndex uint32) ([]accounts.Account, error) {
-	nodeManager := NodeManagerInstance()
-	keyStore, err := nodeManager.AccountKeyStore()
+func (m *AccountManager) findSubAccounts(extKey *extkeys.ExtendedKey, subAccountIndex uint32) ([]accounts.Account, error) {
+	keyStore, err := m.nodeManager.AccountKeyStore()
 	if err != nil {
 		return []accounts.Account{}, err
 	}
@@ -352,7 +366,7 @@ func findSubAccounts(extKey *extkeys.ExtendedKey, subAccountIndex uint32) ([]acc
 	subAccounts := make([]accounts.Account, 0)
 	if extKey.Depth == 5 { // CKD#2 level
 		// gather possible sub-account addresses
-		subAccountAddresses := make([]common.Address, 0)
+		subAccountAddresses := make([]gethcommon.Address, 0)
 		for i := uint32(0); i < subAccountIndex; i++ {
 			childKey, err := extKey.Child(i)
 			if err != nil {
@@ -372,4 +386,21 @@ func findSubAccounts(extKey *extkeys.ExtendedKey, subAccountIndex uint32) ([]acc
 	}
 
 	return subAccounts, nil
+}
+
+// AddressToDecryptedAccount tries to load decrypted key for a given account.
+// The running node, has a keystore directory which is loaded on start. Key file
+// for a given address is expected to be in that directory prior to node start.
+func (m *AccountManager) AddressToDecryptedAccount(address, password string) (accounts.Account, *keystore.Key, error) {
+	keyStore, err := m.nodeManager.AccountKeyStore()
+	if err != nil {
+		return accounts.Account{}, nil, err
+	}
+
+	account, err := common.ParseAccountString(address)
+	if err != nil {
+		return accounts.Account{}, nil, ErrAddressToAccountMappingFailure
+	}
+
+	return keyStore.AccountDecryptedKey(account, password)
 }

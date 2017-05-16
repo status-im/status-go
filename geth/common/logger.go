@@ -1,4 +1,4 @@
-package params
+package common
 
 import (
 	"os"
@@ -6,13 +6,14 @@ import (
 	"sync"
 
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/geth/params"
 )
 
 // Logger is wrapper for custom logging
 type Logger struct {
 	origHandler log.Handler
 	handler     log.Handler
-	config      *NodeConfig
+	config      *params.NodeConfig
 }
 
 var (
@@ -21,7 +22,7 @@ var (
 )
 
 // SetupLogger configs logger using parameters in config
-func SetupLogger(config *NodeConfig) (*Logger, error) {
+func SetupLogger(config *params.NodeConfig) (*Logger, error) {
 	if !config.LogEnabled {
 		return nil, nil
 	}

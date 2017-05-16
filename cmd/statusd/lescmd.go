@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 
-	"github.com/status-im/status-go/geth"
 	"github.com/status-im/status-go/geth/params"
 	"gopkg.in/urfave/cli.v1"
 )
@@ -31,12 +30,16 @@ func lesCommandHandler(ctx *cli.Context) error {
 	}
 
 	fmt.Println("Starting Light Status node..")
-	if err = geth.CreateAndRunNode(config); err != nil {
+	if err := statusAPI.StartNode(config); err != nil {
 		return err
 	}
 
 	// wait till node has been stopped
-	geth.NodeManagerInstance().Node().GethStack().Wait()
+	node, err := statusAPI.NodeManager().Node()
+	if err != nil {
+		return nil
+	}
+	node.Wait()
 
 	return nil
 }

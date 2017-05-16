@@ -1,4 +1,4 @@
-package params_test
+package common_test
 
 import (
 	"io/ioutil"
@@ -9,6 +9,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/geth/common"
 )
 
 func TestLogger(t *testing.T) {
@@ -22,7 +23,7 @@ func TestLogger(t *testing.T) {
 	if err != nil {
 		t.Fatal("cannot create config object")
 	}
-	nodeLogger, err := params.SetupLogger(nodeConfig)
+	nodeLogger, err := common.SetupLogger(nodeConfig)
 	if err != nil {
 		t.Fatal("cannot create logger object")
 	}
@@ -32,7 +33,7 @@ func TestLogger(t *testing.T) {
 
 	nodeConfig.LogEnabled = true
 	nodeConfig.LogToStderr = false // just capture logs to file
-	nodeLogger, err = params.SetupLogger(nodeConfig)
+	nodeLogger, err = common.SetupLogger(nodeConfig)
 	if err != nil {
 		t.Fatal("cannot create logger object")
 	}
