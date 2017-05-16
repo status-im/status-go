@@ -109,7 +109,7 @@ type SwarmConfig struct {
 	Enabled bool
 }
 
-// BootCluster holds configuration for supporting boot cluster, which is a temporary
+// BootClusterConfig holds configuration for supporting boot cluster, which is a temporary
 // means for mobile devices to get connected to Ethereum network (UDP-based discovery
 // may not be available, so we need means to discover the network manually).
 type BootClusterConfig struct {
@@ -329,7 +329,7 @@ func (c *NodeConfig) LoadBootClusterNodes() ([]string, error) {
 	}
 
 	// parse JSON
-	if err := json.Unmarshal([]byte(configData), &bootnodes); err != nil {
+	if err := json.Unmarshal(configData, &bootnodes); err != nil {
 		return nil, err
 	}
 	return bootnodes, nil

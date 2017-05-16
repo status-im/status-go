@@ -312,7 +312,7 @@ var loadConfigTestCases = []struct {
 					params.BootClusterConfigFile, nodeConfig.BootClusterConfig.ConfigFile)
 			}
 
-			if nodeConfig.BootClusterConfig.Enabled != true {
+			if !nodeConfig.BootClusterConfig.Enabled {
 				t.Fatal("boot cluster is expected to be enabled by default")
 			}
 
@@ -354,7 +354,7 @@ var loadConfigTestCases = []struct {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			if nodeConfig.BootClusterConfig.Enabled != false {
+			if nodeConfig.BootClusterConfig.Enabled {
 				t.Fatal("boot cluster is expected to be disabled")
 			}
 		},
@@ -598,11 +598,11 @@ var loadConfigTestCases = []struct {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			if nodeConfig.DevMode != true {
+			if !nodeConfig.DevMode {
 				t.Fatalf("unexpected dev mode: expected: %v, got: %v", true, nodeConfig.DevMode)
 			}
 
-			if nodeConfig.BootClusterConfig.Enabled != true {
+			if !nodeConfig.BootClusterConfig.Enabled {
 				t.Fatal("expected boot cluster to be enabled")
 			}
 
@@ -624,11 +624,11 @@ var loadConfigTestCases = []struct {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			if nodeConfig.DevMode != false {
+			if nodeConfig.DevMode {
 				t.Fatalf("unexpected dev mode: expected: %v, got: %v", false, nodeConfig.DevMode)
 			}
 
-			if nodeConfig.BootClusterConfig.Enabled != true {
+			if !nodeConfig.BootClusterConfig.Enabled {
 				t.Fatal("expected boot cluster to be enabled")
 			}
 
@@ -651,11 +651,11 @@ var loadConfigTestCases = []struct {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			if nodeConfig.DevMode != true {
+			if !nodeConfig.DevMode {
 				t.Fatalf("unexpected dev mode: expected: %v, got: %v", true, nodeConfig.DevMode)
 			}
 
-			if nodeConfig.BootClusterConfig.Enabled != true {
+			if !nodeConfig.BootClusterConfig.Enabled {
 				t.Fatal("expected boot cluster to be enabled")
 			}
 
@@ -678,11 +678,11 @@ var loadConfigTestCases = []struct {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			if nodeConfig.DevMode != false {
+			if nodeConfig.DevMode {
 				t.Fatalf("unexpected dev mode: expected: %v, got: %v", false, nodeConfig.DevMode)
 			}
 
-			if nodeConfig.BootClusterConfig.Enabled != true {
+			if !nodeConfig.BootClusterConfig.Enabled {
 				t.Fatal("expected boot cluster to be enabled")
 			}
 
@@ -704,11 +704,11 @@ var loadConfigTestCases = []struct {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			if nodeConfig.DevMode != true {
+			if !nodeConfig.DevMode {
 				t.Fatalf("unexpected dev mode: expected: %v, got: %v", true, nodeConfig.DevMode)
 			}
 
-			if nodeConfig.BootClusterConfig.Enabled != true {
+			if !nodeConfig.BootClusterConfig.Enabled {
 				t.Fatal("expected boot cluster to be enabled")
 			}
 
@@ -731,11 +731,11 @@ var loadConfigTestCases = []struct {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			if nodeConfig.DevMode != false {
+			if nodeConfig.DevMode {
 				t.Fatalf("unexpected dev mode: expected: %v, got: %v", false, nodeConfig.DevMode)
 			}
 
-			if nodeConfig.BootClusterConfig.Enabled != true {
+			if !nodeConfig.BootClusterConfig.Enabled {
 				t.Fatal("expected boot cluster to be enabled")
 			}
 
@@ -757,11 +757,11 @@ var loadConfigTestCases = []struct {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			if nodeConfig.DevMode != true {
+			if !nodeConfig.DevMode {
 				t.Fatalf("unexpected dev mode: expected: %v, got: %v", true, nodeConfig.DevMode)
 			}
 
-			if nodeConfig.BootClusterConfig.Enabled != true {
+			if !nodeConfig.BootClusterConfig.Enabled {
 				t.Fatal("expected boot cluster to be enabled")
 			}
 
@@ -784,11 +784,11 @@ var loadConfigTestCases = []struct {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			if nodeConfig.DevMode != false {
+			if nodeConfig.DevMode {
 				t.Fatalf("unexpected dev mode: expected: %v, got: %v", false, nodeConfig.DevMode)
 			}
 
-			if nodeConfig.BootClusterConfig.Enabled != true {
+			if !nodeConfig.BootClusterConfig.Enabled {
 				t.Fatal("expected boot cluster to be enabled")
 			}
 
