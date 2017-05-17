@@ -13,11 +13,13 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/les"
+	"github.com/ethereum/go-ethereum/light"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
@@ -158,6 +160,30 @@ func defaultEmbeddedNodeConfig(config *params.NodeConfig) *node.Config {
 	}
 }
 
+// updateCHT changes trusted canonical hash trie root
+func updateCHT(eth *les.LightEthereum, config *params.NodeConfig) {
+	// 0xabaa042dec1ee30e0e8323d010a9c7d9a09b848631acdf66f66e966903b67755
+	bc := eth.BlockChain()
+	if bc.Genesis().Hash() == params.MainNetGenesisHash {
+		eth.WriteTrustedCht(light.TrustedCht{
+			Number: 805,
+			Root:   common.HexToHash("85e4286fe0a730390245c49de8476977afdae0eb5530b277f62a52b12313d50f"),
+		})
+		log.Info("Added trusted CHT for mainnet")
+	}
+	if bc.Genesis().Hash() == params.RopstenNetGenesisHash {
+		root := "28bcafd5504326a34995efc36d3a9ba0b6a22f5832e8e58bacb646b54cb8911a"
+		if config.DevMode {
+			root = "abaa042dec1ee30e0e8323d010a9c7d9a09b848631acdf66f66e966903b67755"
+		}
+		eth.WriteTrustedCht(light.TrustedCht{
+			Number: 226,
+			Root:   common.HexToHash(root),
+		})
+		log.Info("Added trusted CHT for Ropsten", "CHT", root)
+	}
+}
+
 // activateEthService configures and registers the eth.Ethereum service with a given node.
 func activateEthService(stack *node.Node, config *params.NodeConfig) error {
 	if !config.LightEthConfig.Enabled {
@@ -181,7 +207,11 @@ func activateEthService(stack *node.Node, config *params.NodeConfig) error {
 	ethConf.MaxPeers = config.MaxPeers
 	ethConf.DatabaseHandles = makeDatabaseHandles()
 	if err := stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-		return les.New(ctx, &ethConf)
+		lightEth, err := les.New(ctx, &ethConf)
+		if err == nil {
+			updateCHT(lightEth, config)
+		}
+		return lightEth, err
 	}); err != nil {
 		return fmt.Errorf("%v: %v", ErrLightEthRegistrationFailure, err)
 	}
