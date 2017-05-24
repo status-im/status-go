@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/status-im/status-go/geth"
+	"github.com/status-im/status-go/geth/common"
+	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
 	"gopkg.in/urfave/cli.v1"
 )
@@ -125,21 +126,20 @@ func wnode(ctx *cli.Context) error {
 
 	// import test accounts
 	if ctx.BoolT(WhisperInjectTestAccounts.Name) {
-		if err = geth.ImportTestAccount(filepath.Join(config.DataDir, "keystore"), "test-account1.pk"); err != nil {
+		if err = common.ImportTestAccount(filepath.Join(config.DataDir, "keystore"), "test-account1.pk"); err != nil {
 			return err
 		}
-		if err = geth.ImportTestAccount(filepath.Join(config.DataDir, "keystore"), "test-account2.pk"); err != nil {
+		if err = common.ImportTestAccount(filepath.Join(config.DataDir, "keystore"), "test-account2.pk"); err != nil {
 			return err
 		}
 	}
-
-	if err = geth.CreateAndRunNode(config); err != nil {
+	if err := statusAPI.StartNode(config); err != nil {
 		return err
 	}
 
 	// inject test accounts into Whisper
 	if ctx.BoolT(WhisperInjectTestAccounts.Name) {
-		testConfig, _ := geth.LoadTestConfig()
+		testConfig, _ := common.LoadTestConfig()
 		if err = injectAccountIntoWhisper(testConfig.Account1.Address, testConfig.Account1.Password); err != nil {
 			return err
 		}
@@ -149,7 +149,11 @@ func wnode(ctx *cli.Context) error {
 	}
 
 	// wait till node has been stopped
-	geth.NodeManagerInstance().Node().GethStack().Wait()
+	node, err := statusAPI.NodeManager().Node()
+	if err != nil {
+		return nil
+	}
+	node.Wait()
 
 	return nil
 }
@@ -237,20 +241,20 @@ func makeWhisperNodeConfig(ctx *cli.Context) (*params.NodeConfig, error) {
 // injectAccountIntoWhisper adds key pair into Whisper. Similar to Select/Login,
 // but allows multiple accounts to be injected.
 func injectAccountIntoWhisper(address, password string) error {
-	nodeManager := geth.NodeManagerInstance()
+	nodeManager := statusAPI.NodeManager()
 	keyStore, err := nodeManager.AccountKeyStore()
 	if err != nil {
 		return err
 	}
 
-	account, err := geth.ParseAccountString(address)
+	account, err := common.ParseAccountString(address)
 	if err != nil {
-		return geth.ErrAddressToAccountMappingFailure
+		return node.ErrAddressToAccountMappingFailure
 	}
 
 	_, accountKey, err := keyStore.AccountDecryptedKey(account, password)
 	if err != nil {
-		return fmt.Errorf("%s: %v", geth.ErrAccountToKeyMappingFailure.Error(), err)
+		return fmt.Errorf("%s: %v", node.ErrAccountToKeyMappingFailure.Error(), err)
 	}
 
 	whisperService, err := nodeManager.WhisperService()

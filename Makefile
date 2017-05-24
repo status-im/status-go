@@ -47,10 +47,12 @@ statusgo-ios-simulator-mainnet: xgo
 	@echo "iOS framework cross compilation done (mainnet)."
 
 ci:
-	build/env.sh go test -v -cover ./geth
-	build/env.sh go test -v -cover ./geth/params
-	build/env.sh go test -v -cover ./geth/jail
-	build/env.sh go test -v -cover ./extkeys
+	build/env.sh go test -v ./geth/api
+	build/env.sh go test -v ./geth/common
+	build/env.sh go test -v ./geth/jail
+	build/env.sh go test -v ./geth/node
+	build/env.sh go test -v ./geth/params
+	build/env.sh go test -v ./extkeys
 
 generate:
 	cp ./node_modules/web3/dist/web3.js ./static/scripts/web3.js
@@ -110,11 +112,15 @@ lint:
 
 test:
 	@build/env.sh echo "mode: set" > coverage-all.out
-	build/env.sh go test -coverprofile=coverage.out -covermode=set ./geth
+	build/env.sh go test -coverprofile=coverage.out -covermode=set ./geth/api
 	@build/env.sh tail -n +2 coverage.out >> coverage-all.out
-	build/env.sh go test -coverprofile=coverage.out -covermode=set ./geth/params
+	build/env.sh go test -coverprofile=coverage.out -covermode=set ./geth/common
 	@build/env.sh tail -n +2 coverage.out >> coverage-all.out
 	build/env.sh go test -coverprofile=coverage.out -covermode=set ./geth/jail
+	@build/env.sh tail -n +2 coverage.out >> coverage-all.out
+	build/env.sh go test -coverprofile=coverage.out -covermode=set ./geth/node
+	@build/env.sh tail -n +2 coverage.out >> coverage-all.out
+	build/env.sh go test -coverprofile=coverage.out -covermode=set ./geth/params
 	@build/env.sh tail -n +2 coverage.out >> coverage-all.out
 	build/env.sh go test -coverprofile=coverage.out -covermode=set ./extkeys
 	@build/env.sh tail -n +2 coverage.out >> coverage-all.out
@@ -123,18 +129,28 @@ test:
 	@build/env.sh go tool cover -html=coverage-all.out -o coverage.html
 	@build/env.sh go tool cover -func=coverage-all.out
 
-test-geth:
-	build/env.sh go test -v -coverprofile=coverage.out ./geth
+test-api:
+	build/env.sh go test -v -coverprofile=coverage.out  -coverpkg=./geth/node ./geth/api
 	@build/env.sh go tool cover -html=coverage.out -o coverage.html
 	@build/env.sh go tool cover -func=coverage.out
 
-test-params:
-	build/env.sh go test -v -coverprofile=coverage.out ./geth/params
+test-common:
+	build/env.sh go test -v -coverprofile=coverage.out ./geth/common
 	@build/env.sh go tool cover -html=coverage.out -o coverage.html
 	@build/env.sh go tool cover -func=coverage.out
 
 test-jail:
 	build/env.sh go test -v -coverprofile=coverage.out ./geth/jail
+	@build/env.sh go tool cover -html=coverage.out -o coverage.html
+	@build/env.sh go tool cover -func=coverage.out
+
+test-node:
+	build/env.sh go test -v -coverprofile=coverage.out ./geth/node
+	@build/env.sh go tool cover -html=coverage.out -o coverage.html
+	@build/env.sh go tool cover -func=coverage.out
+
+test-params:
+	build/env.sh go test -v -coverprofile=coverage.out ./geth/params
 	@build/env.sh go tool cover -html=coverage.out -o coverage.html
 	@build/env.sh go tool cover -func=coverage.out
 

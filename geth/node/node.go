@@ -1,19 +1,18 @@
-package geth
+package node
 
 import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
+	"net/http"
 	"os"
 	"path"
 	"path/filepath"
-	"reflect"
-	"runtime/debug"
+	"strconv"
 	"strings"
-	"syscall"
+	"time"
 
-	"github.com/ethereum/go-ethereum/common"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/eth"
@@ -29,15 +28,8 @@ import (
 	"github.com/ethereum/go-ethereum/whisper/mailserver"
 	"github.com/ethereum/go-ethereum/whisper/notifications"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
+	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
-)
-
-const (
-	// EventNodeStarted is triggered when underlying node is fully started
-	EventNodeStarted = "node.started"
-
-	// EventNodeCrashed is triggered when node crashes
-	EventNodeCrashed = "node.crashed"
 )
 
 // node-related errors
@@ -45,40 +37,26 @@ var (
 	ErrEthServiceRegistrationFailure     = errors.New("failed to register the Ethereum service")
 	ErrWhisperServiceRegistrationFailure = errors.New("failed to register the Whisper service")
 	ErrLightEthRegistrationFailure       = errors.New("failed to register the LES service")
+	ErrNodeMakeFailure                   = errors.New("error creating p2p node")
+	ErrNodeRunFailure                    = errors.New("error running p2p node")
+	ErrNodeStartFailure                  = errors.New("error starting p2p node")
 )
 
-// Node represents running node (serves as a wrapper around P2P node)
-type Node struct {
-	config     *params.NodeConfig // configuration used to create Status node
-	geth       *node.Node         // reference to the running Geth node
-	gethConfig *node.Config       // configuration used to create P2P node
-	started    chan struct{}      // channel to wait for node to start
-}
-
-// Inited checks whether status node has been properly initialized
-func (n *Node) Inited() bool {
-	return n != nil && n.geth != nil
-}
-
-// GethStack returns reference to Geth stack
-func (n *Node) GethStack() *node.Node {
-	return n.geth
-}
-
 // MakeNode create a geth node entity
-func MakeNode(config *params.NodeConfig) *Node {
+func MakeNode(config *params.NodeConfig) (*node.Node, error) {
 	// make sure data directory exists
 	if err := os.MkdirAll(filepath.Join(config.DataDir), os.ModePerm); err != nil {
-		Fatalf(err)
+		return nil, err
 	}
+
 	// make sure keys directory exists
 	if err := os.MkdirAll(filepath.Join(config.KeyStoreDir), os.ModePerm); err != nil {
-		Fatalf(err)
+		return nil, err
 	}
 
 	// setup logging
-	if _, err := params.SetupLogger(config); err != nil {
-		Fatalf(err)
+	if _, err := common.SetupLogger(config); err != nil {
+		return nil, err
 	}
 
 	// configure required node (should you need to update node's config, e.g. add bootstrap nodes, see node.Config)
@@ -108,25 +86,20 @@ func MakeNode(config *params.NodeConfig) *Node {
 
 	stack, err := node.New(stackConfig)
 	if err != nil {
-		Fatalf(ErrNodeMakeFailure)
+		return nil, ErrNodeMakeFailure
 	}
 
 	// start Ethereum service
 	if err := activateEthService(stack, config); err != nil {
-		Fatalf(fmt.Errorf("%v: %v", ErrEthServiceRegistrationFailure, err))
+		return nil, fmt.Errorf("%v: %v", ErrEthServiceRegistrationFailure, err)
 	}
 
 	// start Whisper service
 	if err := activateShhService(stack, config); err != nil {
-		Fatalf(fmt.Errorf("%v: %v", ErrWhisperServiceRegistrationFailure, err))
+		return nil, fmt.Errorf("%v: %v", ErrWhisperServiceRegistrationFailure, err)
 	}
 
-	return &Node{
-		geth:       stack,
-		gethConfig: stackConfig,
-		started:    make(chan struct{}),
-		config:     config,
-	}
+	return stack, nil
 }
 
 // defaultEmbeddedNodeConfig returns default stack configuration for mobile client node
@@ -135,6 +108,7 @@ func defaultEmbeddedNodeConfig(config *params.NodeConfig) *node.Config {
 		DataDir:           config.DataDir,
 		KeyStoreDir:       config.KeyStoreDir,
 		UseLightweightKDF: true,
+		NoUSB:             true,
 		Name:              config.Name,
 		Version:           config.Version,
 		P2P: p2p.Config{
@@ -162,26 +136,90 @@ func defaultEmbeddedNodeConfig(config *params.NodeConfig) *node.Config {
 
 // updateCHT changes trusted canonical hash trie root
 func updateCHT(eth *les.LightEthereum, config *params.NodeConfig) {
-	// 0xabaa042dec1ee30e0e8323d010a9c7d9a09b848631acdf66f66e966903b67755
 	bc := eth.BlockChain()
+
+	// TODO: Remove this thing as this is an ugly hack.
+	// Once CHT sync sub-protocol is working in LES, we will rely on it, as it provides
+	// decentralized solution. For now, in order to avoid forcing users to long sync times
+	// we use central static resource
+	type MsgCHTRoot struct {
+		GenesisHash string `json:"net"`
+		Number      uint64 `json:"number"`
+		Prod        string `json:"prod"`
+		Dev         string `json:"dev"`
+	}
+	loadCHTLists := func() ([]MsgCHTRoot, error) {
+		url := "https://gist.githubusercontent.com/farazdagi/a8d36e2818b3b2b6074d691da63a0c36/raw/?u=" + strconv.Itoa(int(time.Now().Unix()))
+		client := &http.Client{Timeout: 5 * time.Second}
+		r, err := client.Get(url)
+		if err != nil {
+			return nil, err
+		}
+		defer r.Body.Close()
+
+		var roots []MsgCHTRoot
+		err = json.NewDecoder(r.Body).Decode(&roots)
+		if err != nil {
+			return nil, err
+		}
+
+		return roots, nil
+	}
+	if roots, err := loadCHTLists(); err == nil {
+		for _, root := range roots {
+			if bc.Genesis().Hash().Hex() == root.GenesisHash {
+				log.Info("Loaded root", "root", root)
+				if root.Number == 0 {
+					continue
+				}
+
+				chtRoot := root.Prod
+				if config.DevMode {
+					chtRoot = root.Dev
+				}
+				eth.WriteTrustedCht(light.TrustedCht{
+					Number: root.Number,
+					Root:   gethcommon.HexToHash(chtRoot),
+				})
+				log.Info("Loaded CHT from net", "CHT", chtRoot, "number", root.Number)
+				return
+			}
+		}
+	}
+
+	// resort to manually updated
+	log.Info("Loading CHT from net failed, setting manually")
 	if bc.Genesis().Hash() == params.MainNetGenesisHash {
 		eth.WriteTrustedCht(light.TrustedCht{
 			Number: 805,
-			Root:   common.HexToHash("85e4286fe0a730390245c49de8476977afdae0eb5530b277f62a52b12313d50f"),
+			Root:   gethcommon.HexToHash("85e4286fe0a730390245c49de8476977afdae0eb5530b277f62a52b12313d50f"),
 		})
 		log.Info("Added trusted CHT for mainnet")
 	}
+
 	if bc.Genesis().Hash() == params.RopstenNetGenesisHash {
-		root := "28bcafd5504326a34995efc36d3a9ba0b6a22f5832e8e58bacb646b54cb8911a"
+		root := "fa851b5252cc48ab55f375833b0344cc5c7cacea69be7e2a57976c38d3bb3aef"
 		if config.DevMode {
-			root = "abaa042dec1ee30e0e8323d010a9c7d9a09b848631acdf66f66e966903b67755"
+			root = "f2f862314509b22a773eedaaa7fa6452474eb71a3b72525a97dbf5060cbea88f"
 		}
 		eth.WriteTrustedCht(light.TrustedCht{
-			Number: 226,
-			Root:   common.HexToHash(root),
+			Number: 239,
+			Root:   gethcommon.HexToHash(root),
 		})
 		log.Info("Added trusted CHT for Ropsten", "CHT", root)
 	}
+
+	//if bc.Genesis().Hash() == params.RinkebyNetGenesisHash {
+	//	root := "0xb100882d00a09292f15e712707649b24d019a47a509e83a00530ac542425c3bd"
+	//	if config.DevMode {
+	//		root = "0xb100882d00a09292f15e712707649b24d019a47a509e83a00530ac542425c3bd"
+	//	}
+	//	eth.WriteTrustedCht(light.TrustedCht{
+	//		Number: 55,
+	//		Root:   gethcommon.HexToHash(root),
+	//	})
+	//	log.Info("Added trusted CHT for Rinkeby", "CHT", root)
+	//}
 }
 
 // activateEthService configures and registers the eth.Ethereum service with a given node.
@@ -205,7 +243,6 @@ func activateEthService(stack *node.Node, config *params.NodeConfig) error {
 	ethConf.NetworkId = config.NetworkID
 	ethConf.DatabaseCache = config.LightEthConfig.DatabaseCache
 	ethConf.MaxPeers = config.MaxPeers
-	ethConf.DatabaseHandles = makeDatabaseHandles()
 	if err := stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
 		lightEth, err := les.New(ctx, &ethConf)
 		if err == nil {
@@ -273,37 +310,6 @@ func makeWSHost(config *params.NodeConfig) string {
 	return config.WSHost
 }
 
-// makeDatabaseHandles makes sure that enough file descriptors are available to the process
-// (and returns half of them for node's database to use)
-func makeDatabaseHandles() int {
-	// current limit
-	var limit syscall.Rlimit
-	if err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &limit); err != nil {
-		Fatalf(err)
-	}
-
-	// increase limit
-	limit.Cur = limit.Max
-	if limit.Cur > params.DefaultFileDescriptorLimit {
-		limit.Cur = params.DefaultFileDescriptorLimit
-	}
-	if err := syscall.Setrlimit(syscall.RLIMIT_NOFILE, &limit); err != nil {
-		Fatalf(err)
-	}
-
-	// re-query limit
-	if err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &limit); err != nil {
-		Fatalf(err)
-	}
-
-	// cap limit
-	if limit.Cur > params.DefaultFileDescriptorLimit {
-		limit.Cur = params.DefaultFileDescriptorLimit
-	}
-
-	return int(limit.Cur) / 2
-}
-
 // makeBootstrapNodes returns default (hence bootstrap) list of peers
 func makeBootstrapNodes() []*discover.Node {
 	// on desktops params.TestnetBootnodes and params.MainBootnodes,
@@ -330,46 +336,4 @@ func makeBootstrapNodesV5() []*discv5.Node {
 	}
 
 	return bootstapNodes
-}
-
-// Fatalf is used to halt the execution.
-// When called the function prints stack end exits.
-// Failure is logged into both StdErr and StdOut.
-func Fatalf(reason interface{}, args ...interface{}) {
-	// decide on output stream
-	w := io.MultiWriter(os.Stdout, os.Stderr)
-	outf, _ := os.Stdout.Stat()
-	errf, _ := os.Stderr.Stat()
-	if outf != nil && errf != nil && os.SameFile(outf, errf) {
-		w = os.Stderr
-	}
-
-	// find out whether error or string has been passed as a reason
-	r := reflect.ValueOf(reason)
-	if r.Kind() == reflect.String {
-		fmt.Fprintf(w, "Fatal Failure: "+reason.(string)+"\n", args)
-	} else {
-		fmt.Fprintf(w, "Fatal Failure: %v\n", reason.(error))
-	}
-
-	debug.PrintStack()
-
-	os.Exit(1)
-}
-
-// HaltOnPanic recovers from panic, logs issue, sends upward notification, and exits
-func HaltOnPanic() {
-	if r := recover(); r != nil {
-		err := fmt.Errorf("%v: %v", ErrNodeRunFailure, r)
-
-		// send signal up to native app
-		SendSignal(SignalEnvelope{
-			Type: EventNodeCrashed,
-			Event: NodeCrashEvent{
-				Error: err.Error(),
-			},
-		})
-
-		Fatalf(err) // os.exit(1) is called internally
-	}
 }

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"runtime"
 
+	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/params"
 	"gopkg.in/urfave/cli.v1"
 )
@@ -14,6 +15,7 @@ var (
 	gitCommit  = "rely on linker: -ldflags -X main.GitCommit"
 	buildStamp = "rely on linker: -ldflags -X main.buildStamp"
 	app        = makeApp(gitCommit)
+	statusAPI  = api.NewStatusAPI()
 )
 
 var (

@@ -1,6 +1,6 @@
 // +build darwin,cgo
 
-package geth
+package node
 
 /*
 #cgo CFLAGS: -x objective-c

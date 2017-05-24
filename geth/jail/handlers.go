@@ -2,7 +2,7 @@ package jail
 
 import (
 	"github.com/robertkrimen/otto"
-	"github.com/status-im/status-go/geth"
+	"github.com/status-im/status-go/geth/node"
 )
 
 const (
@@ -64,7 +64,7 @@ func makeSendHandler(jail *Jail, chatID string) func(call otto.FunctionCall) (re
 // makeJethIsConnectedHandler returns jeth.isConnected() handler
 func makeJethIsConnectedHandler(jail *Jail) func(call otto.FunctionCall) (response otto.Value) {
 	return func(call otto.FunctionCall) otto.Value {
-		client, err := jail.RPCClient()
+		client, err := jail.requestManager.RPCClient()
 		if err != nil {
 			return newErrorResponse(call, -32603, err.Error(), nil)
 		}
@@ -75,11 +75,17 @@ func makeJethIsConnectedHandler(jail *Jail) func(call otto.FunctionCall) (respon
 		}
 
 		if !netListeningResult {
-			return newErrorResponse(call, -32603, geth.ErrInvalidGethNode.Error(), nil)
+			return newErrorResponse(call, -32603, node.ErrNoRunningNode.Error(), nil)
 		}
 
 		return newResultResponse(call, true)
 	}
+}
+
+// LocalStorageSetEvent is a signal sent whenever local storage Set method is called
+type LocalStorageSetEvent struct {
+	ChatID string `json:"chat_id"`
+	Data   string `json:"data"`
 }
 
 // makeLocalStorageSetHandler returns localStorage.set() handler
@@ -90,9 +96,9 @@ func makeLocalStorageSetHandler(chatID string) func(call otto.FunctionCall) (res
 			data = data[:LocalStorageMaxDataLen]
 		}
 
-		geth.SendSignal(geth.SignalEnvelope{
+		node.SendSignal(node.SignalEnvelope{
 			Type: EventLocalStorageSet,
-			Event: geth.LocalStorageSetEvent{
+			Event: LocalStorageSetEvent{
 				ChatID: chatID,
 				Data:   data,
 			},
