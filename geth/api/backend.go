@@ -72,8 +72,6 @@ func (m *StatusBackend) onNodeStart(backendReady chan struct{}, nodeStarted <-ch
 	if err := m.registerHandlers(); err != nil {
 		log.Error("Handler registration failed", "err", err)
 	}
-
-	m.accountManager.ReSelectAccount()
 }
 
 // RestartNode restart running Status node, fails if node is not running

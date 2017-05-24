@@ -83,13 +83,14 @@ func (s *BackendTestSuite) LightEthereumService() *les.LightEthereum {
 func (s *BackendTestSuite) RestartTestNode() {
 	require := s.Require()
 	require.NotNil(s.backend)
+	require.True(s.backend.IsNodeRunning())
 
 	require.True(s.backend.IsNodeRunning())
 	nodeRestarted, err := s.backend.RestartNode()
 	require.NoError(err)
 	require.NotNil(nodeRestarted)
-	require.True(s.backend.IsNodeRunning())
 	<-nodeRestarted
+	require.True(s.backend.IsNodeRunning())
 }
 
 func (s *BackendTestSuite) TestNewBackend() {

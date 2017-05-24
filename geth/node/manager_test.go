@@ -304,7 +304,9 @@ func (s *ManagerTestSuite) TestResetChainData() {
 	time.Sleep(2 * time.Second) // allow to sync for some time
 
 	s.True(s.NodeManager.IsNodeRunning())
-	require.NoError(s.NodeManager.ResetChainData())
+	nodeReady, err := s.NodeManager.ResetChainData()
+	require.NoError(err)
+	<-nodeReady
 	s.True(s.NodeManager.IsNodeRunning()) // new node, with previous config should be running
 
 	// make sure we can read the first byte, and it is valid (for Rinkeby)

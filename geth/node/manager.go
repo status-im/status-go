@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
@@ -17,6 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/rpc"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
+	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
 )
 
@@ -24,6 +26,8 @@ import (
 var (
 	ErrNodeAlreadyExists           = errors.New("there is a running node already, stop it before starting another one")
 	ErrNoRunningNode               = errors.New("there is no running node")
+	ErrNodeOpTimedOut              = errors.New("operation takes too long, timed out")
+	ErrInvalidRunningNode          = errors.New("running node is not correctly initialized")
 	ErrInvalidNodeManager          = errors.New("node manager is not properly initialized")
 	ErrInvalidWhisperService       = errors.New("whisper service is unavailable")
 	ErrInvalidLightEthereumService = errors.New("LES service is unavailable")
@@ -37,6 +41,7 @@ type NodeManager struct {
 	sync.RWMutex
 	config         *params.NodeConfig // Status node configuration
 	node           *node.Node         // reference to Geth P2P stack/node
+	nodeStopped    chan struct{}      // channel to wait for termination notifications
 	whisperService *whisper.Whisper   // reference to Whisper service
 	lesService     *les.LightEthereum // reference to LES service
 	rpcClient      *rpc.Client        // reference to RPC client
@@ -78,16 +83,12 @@ func (m *NodeManager) StartNode(config *params.NodeConfig) (<-chan struct{}, err
 	m.Lock()
 	defer m.Unlock()
 
-	if m.node != nil {
-		return nil, ErrNodeAlreadyExists
-	}
-
 	return m.startNode(config)
 }
 
 // startNode start Status node, fails if node is already started
 func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, error) {
-	if m.node != nil {
+	if m.node != nil || m.nodeStopped != nil {
 		return nil, ErrNodeAlreadyExists
 	}
 
@@ -99,6 +100,7 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 	m.config = config // preserve config of successfully created node
 
 	nodeStarted := make(chan struct{})
+	m.nodeStopped = make(chan struct{})
 	go func() {
 		defer HaltOnPanic()
 
@@ -108,6 +110,7 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 			m.lesService = nil
 			m.whisperService = nil
 			m.rpcClient = nil
+			m.nodeStopped = nil
 			m.node = nil
 			m.Unlock()
 			SendSignal(SignalEnvelope{
@@ -155,6 +158,7 @@ func (m *NodeManager) onNodeStarted(nodeStarted chan struct{}) {
 		Type:  EventNodeStopped,
 		Event: struct{}{},
 	})
+	close(m.nodeStopped)
 	log.Info("Node is stopped", "enode", nodeInfo.Enode)
 }
 
@@ -167,7 +171,7 @@ func (m *NodeManager) IsNodeRunning() bool {
 	m.RLock()
 	defer m.RUnlock()
 
-	return m.node != nil
+	return m.node != nil && m.nodeStopped != nil
 }
 
 // StopNode stop Status node. Stopped node cannot be resumed.
@@ -188,16 +192,28 @@ func (m *NodeManager) stopNode() error {
 		return ErrNoRunningNode
 	}
 
+	if m.nodeStopped == nil { // node may be running, but required channel not set
+		return ErrInvalidRunningNode
+	}
+
 	if err := m.node.Stop(); err != nil {
 		return err
+	}
+
+	// wait till the previous node is fully stopped
+	select {
+	case <-m.nodeStopped:
+		// pass
+	case <-time.After(30 * time.Second):
+		return fmt.Errorf("%v: %s", ErrNodeOpTimedOut, common.NameOf(m.StopNode))
 	}
 
 	m.config = nil
 	m.lesService = nil
 	m.whisperService = nil
 	m.rpcClient = nil
+	m.nodeStopped = nil
 	m.node = nil
-
 	return nil
 }
 

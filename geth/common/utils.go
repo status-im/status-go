@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"runtime/debug"
 	"time"
 
@@ -94,6 +95,17 @@ func PanicAfter(waitSeconds time.Duration, abort chan struct{}, desc string) {
 			panic("whatever you were doing takes toooo long: " + desc)
 		}
 	}()
+}
+
+// NameOf returns name of caller, at runtime
+func NameOf(f interface{}) string {
+	v := reflect.ValueOf(f)
+	if v.Kind() == reflect.Func {
+		if rf := runtime.FuncForPC(v.Pointer()); rf != nil {
+			return rf.Name()
+		}
+	}
+	return v.String()
 }
 
 // MessageIDFromContext returns message id from context (if exists)
