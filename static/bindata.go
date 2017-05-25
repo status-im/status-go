@@ -124,7 +124,7 @@ func scriptsWeb3Js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "scripts/web3.js", size: 496217, mode: os.FileMode(420), modTime: time.Unix(1495573395, 0)}
+	info := bindataFileInfo{name: "scripts/web3.js", size: 496217, mode: os.FileMode(420), modTime: time.Unix(1495715456, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -269,7 +269,7 @@ func configLinter_exclude_listTxt() (*asset, error) {
 	return a, nil
 }
 
-var _configTestDataJson = []byte("\x1f\x8b\x08\x00\x00\x09\x6e\x88\x00\xff\x84\x8d\x31\x6b\xc3\x40\x0c\x46\x77\xff\x0a\xa1\xb9\xc3\xc9\xae\xe4\xb3\xb7\x6c\x9d\x8a\xc1\x81\xce\x3a\x9d\x3c\xfa\xc0\x97\xd2\x96\x92\xff\x5e\x8e\x06\x02\x85\x92\x41\x20\x1e\x7c\xef\x7d\x77\x00\xf8\x5a\xb2\xe3\x0c\xed\x07\xc0\xf5\x6b\xb7\xd5\xad\xec\xb9\xe2\x0c\x14\x9e\x7e\xf1\xcb\xf9\xbc\x2c\xe5\xb8\xe0\x0c\x51\x9e\xf9\x46\xdf\xd6\x3b\x93\x0e\xe0\xda\x38\x9e\xcc\xca\xfb\x7e\xa1\xbb\xf4\x94\xf3\xe1\xb5\x09\x31\x7c\x6a\xd6\x8d\x38\xa4\x29\xb0\x6d\xec\xa2\xe3\x18\x9d\x79\x70\x62\xa5\x61\x4a\x22\x14\x53\x4a\x23\xde\x22\x8b\xd6\xfa\x51\x8e\xdc\xd6\x5a\xf3\xd6\x0e\xff\xc6\xfa\x7f\x62\xc2\x16\x88\xa3\xa8\x06\x73\xe2\x3e\x0e\x6c\x63\x8c\x6a\x2e\xc2\x3e\x91\xa6\x81\xfb\x31\xc5\x87\xb1\xee\xfa\x13\x00\x00\xff\xff\x93\xde\xa0\x86\x2d\x01\x00\x00")
+var _configTestDataJson = []byte("\x1f\x8b\x08\x00\x00\x09\x6e\x88\x00\xff\x84\x8d\x31\x6b\xc4\x30\x0c\x46\xf7\xfc\x0a\xa1\xb9\x83\x1d\x57\xb2\x93\xed\xb6\x4e\x25\x90\x83\xce\xb2\xac\x8c\x31\xc4\x57\xda\x52\xee\xbf\x17\xd3\x83\x83\x42\xb9\x41\x20\x1e\x7c\xef\x7d\x0f\x00\xf8\x5a\x8b\xe1\x0c\xfd\x07\xc0\xf5\x6b\xd7\xd5\xb4\xee\xa5\xe1\x0c\xa3\x7b\xfa\xc5\x2f\xe7\xf3\xb2\xd4\xe3\x82\x33\x24\x7e\xa6\x1b\x7d\x5b\xef\x8c\x07\x80\x6b\xe7\x78\x52\xad\xef\xfb\xc5\xdf\xa5\xa7\x52\x0e\x6b\x5d\x88\xee\x53\x8a\x6c\x9e\x5c\x9e\x1c\xe9\x46\xc6\x12\x63\x32\xa2\x60\x9e\xc4\x87\x29\x33\xfb\x94\x73\x8e\x78\x8b\x2c\xd2\xda\x47\x3d\x4a\x5f\x4b\x2b\x5b\x3f\xfc\x1b\x1b\xff\x89\x31\xa9\xf3\x94\x58\xc4\xa9\x79\x1a\x53\x20\x8d\x29\x89\x1a\x33\xd9\xe4\x25\x07\x1a\x63\x4e\x0f\x63\xc3\xf5\x27\x00\x00\xff\xff\x86\xe9\x3c\x6a\x2d\x01\x00\x00")
 
 func configTestDataJsonBytes() ([]byte, error) {
 	return bindataRead(
@@ -284,7 +284,7 @@ func configTestDataJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/test-data.json", size: 301, mode: os.FileMode(420), modTime: time.Unix(1495573389, 0)}
+	info := bindataFileInfo{name: "config/test-data.json", size: 301, mode: os.FileMode(420), modTime: time.Unix(1495715449, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -404,7 +404,7 @@ func testdataJailCommandsJs() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "testdata/jail/commands.js", size: 7677, mode: os.FileMode(420), modTime: time.Unix(1492580435, 0)}
+	info := bindataFileInfo{name: "testdata/jail/commands.js", size: 7677, mode: os.FileMode(420), modTime: time.Unix(1495640010, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -424,7 +424,7 @@ func testdataJailStatusJs() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "testdata/jail/status.js", size: 3402, mode: os.FileMode(420), modTime: time.Unix(1492580435, 0)}
+	info := bindataFileInfo{name: "testdata/jail/status.js", size: 3402, mode: os.FileMode(420), modTime: time.Unix(1495640010, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -444,7 +444,7 @@ func testdataJailTxSendContextNoMessageIdJs() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "testdata/jail/tx-send/context-no-message-id.js", size: 1793, mode: os.FileMode(420), modTime: time.Unix(1492580435, 0)}
+	info := bindataFileInfo{name: "testdata/jail/tx-send/context-no-message-id.js", size: 1793, mode: os.FileMode(420), modTime: time.Unix(1495640010, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -464,7 +464,7 @@ func testdataJailTxSendMessageIdNoContextJs() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "testdata/jail/tx-send/message-id-no-context.js", size: 1875, mode: os.FileMode(420), modTime: time.Unix(1492580435, 0)}
+	info := bindataFileInfo{name: "testdata/jail/tx-send/message-id-no-context.js", size: 1875, mode: os.FileMode(420), modTime: time.Unix(1495640010, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -484,7 +484,7 @@ func testdataJailTxSendNoMessageIdOrContextJs() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "testdata/jail/tx-send/no-message-id-or-context.js", size: 1354, mode: os.FileMode(420), modTime: time.Unix(1492580435, 0)}
+	info := bindataFileInfo{name: "testdata/jail/tx-send/no-message-id-or-context.js", size: 1354, mode: os.FileMode(420), modTime: time.Unix(1495640010, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -504,7 +504,7 @@ func testdataJailTxSendTxSendJs() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "testdata/jail/tx-send/tx-send.js", size: 2987, mode: os.FileMode(420), modTime: time.Unix(1492580435, 0)}
+	info := bindataFileInfo{name: "testdata/jail/tx-send/tx-send.js", size: 2987, mode: os.FileMode(420), modTime: time.Unix(1495640010, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -524,7 +524,7 @@ func testdataNodeTestSol() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "testdata/node/test.sol", size: 119, mode: os.FileMode(420), modTime: time.Unix(1488290438, 0)}
+	info := bindataFileInfo{name: "testdata/node/test.sol", size: 119, mode: os.FileMode(420), modTime: time.Unix(1495640010, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
