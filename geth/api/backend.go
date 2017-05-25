@@ -1,7 +1,8 @@
 package api
 
 import (
-	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"sync"
+
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/les"
 	"github.com/ethereum/go-ethereum/log"
@@ -13,6 +14,8 @@ import (
 
 // StatusBackend implements Status.im service
 type StatusBackend struct {
+	sync.Mutex
+	nodeReady      chan struct{} // channel to wait for when node is fully ready
 	nodeManager    common.NodeManager
 	accountManager common.AccountManager
 	txQueueManager common.TxQueueManager
@@ -55,102 +58,110 @@ func (m *StatusBackend) IsNodeRunning() bool {
 
 // StartNode start Status node, fails if node is already started
 func (m *StatusBackend) StartNode(config *params.NodeConfig) (<-chan struct{}, error) {
-	backendReady := make(chan struct{})
+	m.Lock()
+	defer m.Unlock()
+
+	if m.nodeReady != nil {
+		return nil, node.ErrNodeExists
+	}
+
 	nodeStarted, err := m.nodeManager.StartNode(config)
 	if err != nil {
 		return nil, err
 	}
 
-	go m.onNodeStart(backendReady, nodeStarted)
-	return backendReady, err
+	m.nodeReady = make(chan struct{}, 1)
+	go m.onNodeStart(nodeStarted, m.nodeReady) // waits on nodeStarted, writes to backendReady
+
+	return m.nodeReady, err
 }
 
-func (m *StatusBackend) onNodeStart(backendReady chan struct{}, nodeStarted <-chan struct{}) {
-	defer close(backendReady)
+// onNodeStart does everything required to prepare backend
+func (m *StatusBackend) onNodeStart(nodeStarted <-chan struct{}, backendReady chan struct{}) {
 	<-nodeStarted
 
 	if err := m.registerHandlers(); err != nil {
 		log.Error("Handler registration failed", "err", err)
 	}
+
+	m.accountManager.ReSelectAccount()
+	log.Info("Account reselected")
+
+	close(backendReady)
+	node.SendSignal(node.SignalEnvelope{
+		Type:  node.EventNodeReady,
+		Event: struct{}{},
+	})
+}
+
+// StopNode stop Status node. Stopped node cannot be resumed.
+func (m *StatusBackend) StopNode() (<-chan struct{}, error) {
+	m.Lock()
+	defer m.Unlock()
+
+	if m.nodeReady == nil {
+		return nil, node.ErrNoRunningNode
+	}
+	<-m.nodeReady
+
+	nodeStopped, err := m.nodeManager.StopNode()
+	if err != nil {
+		return nil, err
+	}
+
+	backendStopped := make(chan struct{}, 1)
+	go func() {
+		<-nodeStopped
+		m.Lock()
+		m.nodeReady = nil
+		m.Unlock()
+		close(backendStopped)
+	}()
+
+	return backendStopped, nil
 }
 
 // RestartNode restart running Status node, fails if node is not running
 func (m *StatusBackend) RestartNode() (<-chan struct{}, error) {
-	backendReady := make(chan struct{})
+	m.Lock()
+	defer m.Unlock()
+
+	if m.nodeReady == nil {
+		return nil, node.ErrNoRunningNode
+	}
+	<-m.nodeReady
+
 	nodeRestarted, err := m.nodeManager.RestartNode()
 	if err != nil {
 		return nil, err
 	}
 
-	go m.onNodeStart(backendReady, nodeRestarted)
-	return backendReady, err
-}
+	m.nodeReady = make(chan struct{}, 1)
+	go m.onNodeStart(nodeRestarted, m.nodeReady) // waits on nodeRestarted, writes to backendReady
 
-// StopNode stop Status node. Stopped node cannot be resumed.
-func (m *StatusBackend) StopNode() error {
-	return m.nodeManager.StopNode()
+	return m.nodeReady, err
 }
 
 // ResetChainData remove chain data from data directory.
 // Node is stopped, and new node is started, with clean data directory.
 func (m *StatusBackend) ResetChainData() (<-chan struct{}, error) {
-	backendReady := make(chan struct{})
-	nodeRestarted, err := m.nodeManager.ResetChainData()
+	m.Lock()
+	defer m.Unlock()
+
+	if m.nodeReady == nil {
+		return nil, node.ErrNoRunningNode
+	}
+	<-m.nodeReady
+
+	nodeReset, err := m.nodeManager.ResetChainData()
 	if err != nil {
 		return nil, err
 	}
 
-	go m.onNodeStart(backendReady, nodeRestarted)
-	return backendReady, err
-}
+	m.nodeReady = make(chan struct{}, 1)
+	go m.onNodeStart(nodeReset, m.nodeReady) // waits on nodeReset, writes to backendReady
 
-// CreateAccount creates an internal geth account
-// BIP44-compatible keys are generated: CKD#1 is stored as account key, CKD#2 stored as sub-account root
-// Public key of CKD#1 is returned, with CKD#2 securely encoded into account key file (to be used for
-// sub-account derivations)
-func (m *StatusBackend) CreateAccount(password string) (address, pubKey, mnemonic string, err error) {
-	return m.accountManager.CreateAccount(password)
-}
-
-// CreateChildAccount creates sub-account for an account identified by parent address.
-// CKD#2 is used as root for master accounts (when parentAddress is "").
-// Otherwise (when parentAddress != ""), child is derived directly from parent.
-func (m *StatusBackend) CreateChildAccount(parentAddress, password string) (address, pubKey string, err error) {
-	return m.accountManager.CreateChildAccount(parentAddress, password)
-}
-
-// RecoverAccount re-creates master key using given details.
-// Once master key is re-generated, it is inserted into keystore (if not already there).
-func (m *StatusBackend) RecoverAccount(password, mnemonic string) (address, pubKey string, err error) {
-	return m.accountManager.RecoverAccount(password, mnemonic)
-}
-
-// VerifyAccountPassword tries to decrypt a given account key file, with a provided password.
-// If no error is returned, then account is considered verified.
-func (m *StatusBackend) VerifyAccountPassword(keyStoreDir, address, password string) (*keystore.Key, error) {
-	return m.accountManager.VerifyAccountPassword(keyStoreDir, address, password)
-}
-
-// SelectAccount selects current account, by verifying that address has corresponding account which can be decrypted
-// using provided password. Once verification is done, decrypted key is injected into Whisper (as a single identity,
-// all previous identities are removed).
-func (m *StatusBackend) SelectAccount(address, password string) error {
-	return m.accountManager.SelectAccount(address, password)
-}
-
-// ReSelectAccount selects previously selected account, often, after node restart.
-func (m *StatusBackend) ReSelectAccount() error {
-	return m.accountManager.ReSelectAccount()
-}
-
-// Logout clears whisper identities
-func (m *StatusBackend) Logout() error {
-	return m.accountManager.Logout()
-}
-
-// SelectedAccount returns currently selected account
-func (m *StatusBackend) SelectedAccount() (*common.SelectedExtKey, error) {
-	return m.accountManager.SelectedAccount()
+	return m.nodeReady, err
 }
 
 // CompleteTransaction instructs backend to complete sending of a given transaction
@@ -193,14 +204,6 @@ func (m *StatusBackend) registerHandlers() error {
 
 	lightEthereum.StatusBackend.SetTransactionReturnHandler(m.txQueueManager.TransactionReturnHandler())
 	log.Info("Registered handler", "fn", "TransactionReturnHandler")
-
-	m.ReSelectAccount()
-	log.Info("Account reselected")
-
-	node.SendSignal(node.SignalEnvelope{
-		Type:  node.EventNodeReady,
-		Event: struct{}{},
-	})
 
 	return nil
 }

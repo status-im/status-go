@@ -51,6 +51,11 @@ func SetDefaultNodeNotificationHandler(fn NodeNotificationHandler) {
 	notificationHandler = fn
 }
 
+// ReetDefaultNodeNotificationHandler sets notification handler to default one
+func ResetDefaultNodeNotificationHandler() {
+	notificationHandler = TriggerDefaultNodeNotificationHandler
+}
+
 // TriggerDefaultNodeNotificationHandler triggers default notification handler (helpful in tests)
 func TriggerDefaultNodeNotificationHandler(jsonEvent string) {
 	log.Info("Notification received", "event", jsonEvent)

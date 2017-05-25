@@ -35,7 +35,7 @@ func (s *BackendTestSuite) TestAccountsList() {
 	require.Zero(len(accounts), "accounts returned, while there should be none (we haven't logged in yet)")
 
 	// create an account
-	address, _, _, err := s.backend.CreateAccount(TestConfig.Account1.Password)
+	address, _, _, err := s.backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
 	require.NoError(err)
 
 	// ensure that there is still no accounts returned
@@ -43,7 +43,7 @@ func (s *BackendTestSuite) TestAccountsList() {
 	require.Zero(len(accounts), "accounts returned, while there should be none (we haven't logged in yet)")
 
 	// select account (sub-accounts will be created for this key)
-	err = s.backend.SelectAccount(address, TestConfig.Account1.Password)
+	err = s.backend.AccountManager().SelectAccount(address, TestConfig.Account1.Password)
 	require.NoError(err, "account selection failed")
 
 	// at this point main account should show up
@@ -53,7 +53,7 @@ func (s *BackendTestSuite) TestAccountsList() {
 		fmt.Sprintf("main account is not retured as the first key: got %s, expected %s", accounts[0].Hex(), "0x"+address))
 
 	// create sub-account 1
-	subAccount1, subPubKey1, err := s.backend.CreateChildAccount("", TestConfig.Account1.Password)
+	subAccount1, subPubKey1, err := s.backend.AccountManager().CreateChildAccount("", TestConfig.Account1.Password)
 	require.NoError(err, "cannot create sub-account")
 
 	// now we expect to see both main account and sub-account 1
@@ -63,7 +63,7 @@ func (s *BackendTestSuite) TestAccountsList() {
 	require.Equal(string(accounts[1].Hex()), "0x"+subAccount1, "subAcount1 not returned")
 
 	// create sub-account 2, index automatically progresses
-	subAccount2, subPubKey2, err := s.backend.CreateChildAccount("", TestConfig.Account1.Password)
+	subAccount2, subPubKey2, err := s.backend.AccountManager().CreateChildAccount("", TestConfig.Account1.Password)
 	require.NoError(err, "cannot create sub-account")
 	require.False(subAccount1 == subAccount2 || subPubKey1 == subPubKey2, "sub-account index auto-increament failed")
 
@@ -93,7 +93,7 @@ func (s *BackendTestSuite) TestCreateChildAccount() {
 	require.NotNil(keyStore)
 
 	// create an account
-	address, pubKey, mnemonic, err := s.backend.CreateAccount(TestConfig.Account1.Password)
+	address, pubKey, mnemonic, err := s.backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
 	require.NoError(err)
 	s.T().Logf("Account created: {address: %s, key: %s, mnemonic:%s}", address, pubKey, mnemonic)
 
@@ -106,28 +106,28 @@ func (s *BackendTestSuite) TestCreateChildAccount() {
 	require.NotNil(key.ExtendedKey, "CKD#2 has not been generated for new account")
 
 	// try creating sub-account, w/o selecting main account i.e. w/o login to main account
-	_, _, err = s.backend.CreateChildAccount("", TestConfig.Account1.Password)
+	_, _, err = s.backend.AccountManager().CreateChildAccount("", TestConfig.Account1.Password)
 	require.EqualError(node.ErrNoAccountSelected, err.Error(), "expected error is not returned (tried to create sub-account w/o login)")
 
-	err = s.backend.SelectAccount(address, TestConfig.Account1.Password)
+	err = s.backend.AccountManager().SelectAccount(address, TestConfig.Account1.Password)
 	require.NoError(err, "cannot select account")
 
 	// try to create sub-account with wrong password
-	_, _, err = s.backend.CreateChildAccount("", "wrong password")
+	_, _, err = s.backend.AccountManager().CreateChildAccount("", "wrong password")
 	expectedErr := errors.New("cannot retrieve a valid key for a given account: could not decrypt key with given passphrase")
 	require.EqualError(expectedErr, err.Error(), "create sub-account with wrong password")
 
 	// create sub-account (from implicit parent)
-	subAccount1, subPubKey1, err := s.backend.CreateChildAccount("", TestConfig.Account1.Password)
+	subAccount1, subPubKey1, err := s.backend.AccountManager().CreateChildAccount("", TestConfig.Account1.Password)
 	require.NoError(err, "cannot create sub-account")
 
 	// make sure that sub-account index automatically progresses
-	subAccount2, subPubKey2, err := s.backend.CreateChildAccount("", TestConfig.Account1.Password)
+	subAccount2, subPubKey2, err := s.backend.AccountManager().CreateChildAccount("", TestConfig.Account1.Password)
 	require.NoError(err)
 	require.False(subAccount1 == subAccount2 || subPubKey1 == subPubKey2, "sub-account index auto-increament failed")
 
 	// create sub-account (from explicit parent)
-	subAccount3, subPubKey3, err := s.backend.CreateChildAccount(subAccount2, TestConfig.Account1.Password)
+	subAccount3, subPubKey3, err := s.backend.AccountManager().CreateChildAccount(subAccount2, TestConfig.Account1.Password)
 	require.NoError(err)
 	require.False(subAccount1 == subAccount3 || subPubKey1 == subPubKey3 || subAccount2 == subAccount3 || subPubKey2 == subPubKey3)
 }
@@ -144,12 +144,12 @@ func (s *BackendTestSuite) TestRecoverAccount() {
 	require.NotNil(keyStore)
 
 	// create an account
-	address, pubKey, mnemonic, err := s.backend.CreateAccount(TestConfig.Account1.Password)
+	address, pubKey, mnemonic, err := s.backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
 	require.NoError(err)
 	s.T().Logf("Account created: {address: %s, key: %s, mnemonic:%s}", address, pubKey, mnemonic)
 
 	// try recovering using password + mnemonic
-	addressCheck, pubKeyCheck, err := s.backend.RecoverAccount(TestConfig.Account1.Password, mnemonic)
+	addressCheck, pubKeyCheck, err := s.backend.AccountManager().RecoverAccount(TestConfig.Account1.Password, mnemonic)
 	require.NoError(err, "recover account failed")
 	require.False(address != addressCheck || pubKey != pubKeyCheck, "incorrect accound details recovered")
 
@@ -163,7 +163,7 @@ func (s *BackendTestSuite) TestRecoverAccount() {
 
 	require.NoError(keyStore.Delete(account, TestConfig.Account1.Password), "cannot remove account")
 
-	addressCheck, pubKeyCheck, err = s.backend.RecoverAccount(TestConfig.Account1.Password, mnemonic)
+	addressCheck, pubKeyCheck, err = s.backend.AccountManager().RecoverAccount(TestConfig.Account1.Password, mnemonic)
 	require.NoError(err, "recover account failed (for non-cached account)")
 	require.False(address != addressCheck || pubKey != pubKeyCheck,
 		"incorrect account details recovered (for non-cached account)")
@@ -174,7 +174,7 @@ func (s *BackendTestSuite) TestRecoverAccount() {
 	require.Equal(extChild2String, key.ExtendedKey.String(), "CKD#2 key mismatch")
 
 	// make sure that calling import several times, just returns from cache (no error is expected)
-	addressCheck, pubKeyCheck, err = s.backend.RecoverAccount(TestConfig.Account1.Password, mnemonic)
+	addressCheck, pubKeyCheck, err = s.backend.AccountManager().RecoverAccount(TestConfig.Account1.Password, mnemonic)
 	require.NoError(err, "recover account failed (for non-cached account)")
 	require.False(address != addressCheck || pubKey != pubKeyCheck,
 		"incorrect account details recovered (for non-cached account)")
@@ -184,7 +184,7 @@ func (s *BackendTestSuite) TestRecoverAccount() {
 
 	// make sure that identity is not (yet injected)
 	require.False(whisperService.HasKeyPair(pubKeyCheck), "identity already present in whisper")
-	require.NoError(s.backend.SelectAccount(addressCheck, TestConfig.Account1.Password))
+	require.NoError(s.backend.AccountManager().SelectAccount(addressCheck, TestConfig.Account1.Password))
 	require.True(whisperService.HasKeyPair(pubKeyCheck), "identity not injected into whisper")
 }
 
@@ -199,11 +199,11 @@ func (s *BackendTestSuite) TestSelectAccount() {
 	whisperService := s.WhisperService()
 
 	// create an account
-	address1, pubKey1, _, err := s.backend.CreateAccount(TestConfig.Account1.Password)
+	address1, pubKey1, _, err := s.backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
 	require.NoError(err)
 	s.T().Logf("Account created: {address: %s, key: %s}", address1, pubKey1)
 
-	address2, pubKey2, _, err := s.backend.CreateAccount(TestConfig.Account1.Password)
+	address2, pubKey2, _, err := s.backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
 	require.NoError(err)
 	s.T().Logf("Account created: {address: %s, key: %s}", address2, pubKey2)
 
@@ -211,17 +211,17 @@ func (s *BackendTestSuite) TestSelectAccount() {
 	require.False(whisperService.HasKeyPair(pubKey1), "identity already present in whisper")
 
 	// try selecting with wrong password
-	err = s.backend.SelectAccount(address1, "wrongPassword")
+	err = s.backend.AccountManager().SelectAccount(address1, "wrongPassword")
 	expectedErr := errors.New("cannot retrieve a valid key for a given account: could not decrypt key with given passphrase")
 	require.EqualError(expectedErr, err.Error(), "select account is expected to throw error: wrong password used")
 
-	err = s.backend.SelectAccount(address1, TestConfig.Account1.Password)
+	err = s.backend.AccountManager().SelectAccount(address1, TestConfig.Account1.Password)
 	require.NoError(err)
 	require.True(whisperService.HasKeyPair(pubKey1), "identity not injected into whisper")
 
 	// select another account, make sure that previous account is wiped out from Whisper cache
 	require.False(whisperService.HasKeyPair(pubKey2), "identity already present in whisper")
-	require.NoError(s.backend.SelectAccount(address2, TestConfig.Account1.Password))
+	require.NoError(s.backend.AccountManager().SelectAccount(address2, TestConfig.Account1.Password))
 	require.True(whisperService.HasKeyPair(pubKey2), "identity not injected into whisper")
 	require.False(whisperService.HasKeyPair(pubKey1), "identity should be removed, but it is still present in whisper")
 }
@@ -236,15 +236,15 @@ func (s *BackendTestSuite) TestLogout() {
 	whisperService := s.WhisperService()
 
 	// create an account
-	address, pubKey, _, err := s.backend.CreateAccount(TestConfig.Account1.Password)
+	address, pubKey, _, err := s.backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
 	require.NoError(err)
 
 	// make sure that identity doesn't exist (yet) in Whisper
 	require.False(whisperService.HasKeyPair(pubKey), "identity already present in whisper")
-	require.NoError(s.backend.SelectAccount(address, TestConfig.Account1.Password))
+	require.NoError(s.backend.AccountManager().SelectAccount(address, TestConfig.Account1.Password))
 	require.True(whisperService.HasKeyPair(pubKey), "identity not injected into whisper")
 
-	require.NoError(s.backend.Logout())
+	require.NoError(s.backend.AccountManager().Logout())
 	require.False(whisperService.HasKeyPair(pubKey), "identity not cleared from whisper")
 }
 
@@ -258,42 +258,44 @@ func (s *BackendTestSuite) TestSelectedAccountOnRestart() {
 	whisperService := s.WhisperService()
 
 	// create test accounts
-	address1, pubKey1, _, err := s.backend.CreateAccount(TestConfig.Account1.Password)
+	address1, pubKey1, _, err := s.backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
 	require.NoError(err)
-	address2, pubKey2, _, err := s.backend.CreateAccount(TestConfig.Account1.Password)
+	address2, pubKey2, _, err := s.backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
 	require.NoError(err)
 
 	// make sure that identity is not (yet injected)
 	require.False(whisperService.HasKeyPair(pubKey1), "identity already present in whisper")
 
 	// make sure that no account is selected by default
-	selectedAccount, err := s.backend.SelectedAccount()
+	selectedAccount, err := s.backend.AccountManager().SelectedAccount()
 	require.EqualError(node.ErrNoAccountSelected, err.Error(), "account selected, but should not be")
 	require.Nil(selectedAccount)
 
 	// select account
-	err = s.backend.SelectAccount(address1, "wrongPassword")
+	err = s.backend.AccountManager().SelectAccount(address1, "wrongPassword")
 	expectedErr := errors.New("cannot retrieve a valid key for a given account: could not decrypt key with given passphrase")
 	require.EqualError(expectedErr, err.Error())
 
-	require.NoError(s.backend.SelectAccount(address1, TestConfig.Account1.Password))
+	require.NoError(s.backend.AccountManager().SelectAccount(address1, TestConfig.Account1.Password))
 	require.True(whisperService.HasKeyPair(pubKey1), "identity not injected into whisper")
 
 	// select another account, make sure that previous account is wiped out from Whisper cache
 	require.False(whisperService.HasKeyPair(pubKey2), "identity already present in whisper")
-	require.NoError(s.backend.SelectAccount(address2, TestConfig.Account1.Password))
+	require.NoError(s.backend.AccountManager().SelectAccount(address2, TestConfig.Account1.Password))
 	require.True(whisperService.HasKeyPair(pubKey2), "identity not injected into whisper")
 	require.False(whisperService.HasKeyPair(pubKey1), "identity should be removed, but it is still present in whisper")
 
 	// stop node (and all of its sub-protocols)
-	nodeConfig, err := s.NodeManager.NodeConfig()
+	nodeConfig, err := s.backend.NodeManager().NodeConfig()
 	require.NoError(err)
 	require.NotNil(nodeConfig)
 	preservedNodeConfig := *nodeConfig
-	require.NoError(s.NodeManager.StopNode())
+	nodeStoped, err := s.backend.StopNode()
+	require.NoError(err)
+	<-nodeStoped
 
 	// make sure that account is still selected
-	selectedAccount, err = s.backend.SelectedAccount()
+	selectedAccount, err = s.backend.AccountManager().SelectedAccount()
 	require.NoError(err)
 	require.NotNil(selectedAccount)
 	require.Equal(selectedAccount.Address.Hex(), "0x"+address2, "incorrect address selected")
@@ -304,7 +306,7 @@ func (s *BackendTestSuite) TestSelectedAccountOnRestart() {
 	<-nodeStarted
 
 	// re-check selected account (account2 MUST be selected)
-	selectedAccount, err = s.backend.SelectedAccount()
+	selectedAccount, err = s.backend.AccountManager().SelectedAccount()
 	require.NoError(err)
 	require.NotNil(selectedAccount)
 	require.Equal(selectedAccount.Address.Hex(), "0x"+address2, "incorrect address selected")
@@ -323,13 +325,13 @@ func (s *BackendTestSuite) TestSelectedAccountOnRestart() {
 	require.False(whisperService.HasKeyPair(pubKey1), "identity should not be present, but it is still present in whisper")
 
 	// now logout, and make sure that on restart no account is selected (i.e. logout works properly)
-	require.NoError(s.backend.Logout())
+	require.NoError(s.backend.AccountManager().Logout())
 	s.RestartTestNode()
 	whisperService = s.WhisperService()
 	require.False(whisperService.HasKeyPair(pubKey2), "identity not injected into whisper")
 	require.False(whisperService.HasKeyPair(pubKey1), "identity should not be present, but it is still present in whisper")
 
-	selectedAccount, err = s.backend.SelectedAccount()
+	selectedAccount, err = s.backend.AccountManager().SelectedAccount()
 	require.EqualError(node.ErrNoAccountSelected, err.Error())
 	require.Nil(selectedAccount)
 }

@@ -32,24 +32,26 @@ func StartNode(configJSON *C.char) *C.char {
 		return makeJSONResponse(err)
 	}
 
-	err = statusAPI.StartNodeNonBlocking(config)
+	_, err = statusAPI.StartNodeAsync(config)
 	return makeJSONResponse(err)
 }
 
 //export StopNode
 func StopNode() *C.char {
-	return makeJSONResponse(statusAPI.StopNode())
+	_, err := statusAPI.StopNodeAsync()
+	return makeJSONResponse(err)
+}
+
+//export ResetChainData
+func ResetChainData() *C.char {
+	_, err := statusAPI.ResetChainDataAsync()
+	return makeJSONResponse(err)
 }
 
 //export ResumeNode
 func ResumeNode() *C.char {
 	err := fmt.Errorf("%v: %v", common.ErrDeprecatedMethod.Error(), "ResumeNode")
 	return makeJSONResponse(err)
-}
-
-//export ResetChainData
-func ResetChainData() *C.char {
-	return makeJSONResponse(statusAPI.ResetChainData())
 }
 
 //export StopNodeRPCServer

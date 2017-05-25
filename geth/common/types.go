@@ -45,7 +45,7 @@ type NodeManager interface {
 
 	// StopNode stop the running Status node.
 	// Stopped node cannot be resumed, one starts a new node instead.
-	StopNode() error
+	StopNode() (<-chan struct{}, error)
 
 	// RestartNode restart running Status node, fails if node is not running
 	RestartNode() (<-chan struct{}, error)

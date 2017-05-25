@@ -31,7 +31,7 @@ func (s *BackendTestSuite) TestSendContractTx() {
 	require.NotNil(backend)
 
 	// create an account
-	sampleAddress, _, _, err := s.backend.CreateAccount(TestConfig.Account1.Password)
+	sampleAddress, _, _, err := s.backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
 	require.NoError(err)
 
 	// make sure you panic if transaction complete doesn't return
@@ -58,7 +58,7 @@ func (s *BackendTestSuite) TestSendContractTx() {
 
 			// the second call will also fail (we are logged in as different user)
 			log.Info("trying to complete with invalid user")
-			err = s.backend.SelectAccount(sampleAddress, TestConfig.Account1.Password)
+			err = s.backend.AccountManager().SelectAccount(sampleAddress, TestConfig.Account1.Password)
 			s.NoError(err)
 			txHash, err = s.backend.CompleteTransaction(event["id"].(string), TestConfig.Account1.Password)
 			s.EqualError(err, status.ErrInvalidCompleteTxSender.Error(),
@@ -66,7 +66,7 @@ func (s *BackendTestSuite) TestSendContractTx() {
 
 			// the third call will work as expected (as we are logged in with correct credentials)
 			log.Info("trying to complete with correct user, this should suceed")
-			s.NoError(s.backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
+			s.NoError(s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 			txHash, err = s.backend.CompleteTransaction(event["id"].(string), TestConfig.Account1.Password)
 			s.NoError(err, fmt.Sprintf("cannot complete queued transaction[%v]", event["id"]))
 
@@ -109,7 +109,7 @@ func (s *BackendTestSuite) TestSendEtherTx() {
 	require.NotNil(backend)
 
 	// create an account
-	sampleAddress, _, _, err := s.backend.CreateAccount(TestConfig.Account1.Password)
+	sampleAddress, _, _, err := s.backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
 	require.NoError(err)
 
 	// make sure you panic if transaction complete doesn't return
@@ -136,7 +136,7 @@ func (s *BackendTestSuite) TestSendEtherTx() {
 
 			// the second call will also fail (we are logged in as different user)
 			log.Info("trying to complete with invalid user")
-			err = s.backend.SelectAccount(sampleAddress, TestConfig.Account1.Password)
+			err = s.backend.AccountManager().SelectAccount(sampleAddress, TestConfig.Account1.Password)
 			s.NoError(err)
 			txHash, err = s.backend.CompleteTransaction(event["id"].(string), TestConfig.Account1.Password)
 			s.EqualError(err, status.ErrInvalidCompleteTxSender.Error(),
@@ -144,7 +144,7 @@ func (s *BackendTestSuite) TestSendEtherTx() {
 
 			// the third call will work as expected (as we are logged in with correct credentials)
 			log.Info("trying to complete with correct user, this should suceed")
-			s.NoError(s.backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
+			s.NoError(s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 			txHash, err = s.backend.CompleteTransaction(event["id"].(string), TestConfig.Account1.Password)
 			s.NoError(err, fmt.Sprintf("cannot complete queued transaction[%v]", event["id"]))
 
@@ -181,7 +181,7 @@ func (s *BackendTestSuite) TestDoubleCompleteQueuedTransactions() {
 	require.NotNil(backend)
 
 	// log into account from which transactions will be sent
-	require.NoError(s.backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
+	require.NoError(s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 
 	// make sure you panic if transaction complete doesn't return
 	completeQueuedTransaction := make(chan struct{}, 1)
@@ -265,7 +265,7 @@ func (s *BackendTestSuite) TestDiscardQueuedTransaction() {
 	backend.TransactionQueue().Reset()
 
 	// log into account from which transactions will be sent
-	require.NoError(s.backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
+	require.NoError(s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 
 	// make sure you panic if transaction complete doesn't return
 	completeQueuedTransaction := make(chan struct{}, 1)
@@ -346,7 +346,7 @@ func (s *BackendTestSuite) TestCompleteMultipleQueuedTransactions() {
 	backend.TransactionQueue().Reset()
 
 	// log into account from which transactions will be sent
-	require.NoError(s.backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
+	require.NoError(s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 
 	// make sure you panic if transaction complete doesn't return
 	testTxCount := 3
@@ -461,7 +461,7 @@ func (s *BackendTestSuite) TestDiscardMultipleQueuedTransactions() {
 	backend.TransactionQueue().Reset()
 
 	// log into account from which transactions will be sent
-	require.NoError(s.backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
+	require.NoError(s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 
 	// make sure you panic if transaction complete doesn't return
 	testTxCount := 3
@@ -594,7 +594,7 @@ func (s *BackendTestSuite) TestNonExistentQueuedTransactions() {
 	require.NotNil(backend)
 
 	// log into account from which transactions will be sent
-	require.NoError(s.backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
+	require.NoError(s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 
 	// replace transaction notification handler
 	node.SetDefaultNodeNotificationHandler(func(string) {})
@@ -619,13 +619,13 @@ func (s *BackendTestSuite) TestEvictionOfQueuedTransactions() {
 	backend.TransactionQueue().Reset()
 
 	// log into account from which transactions will be sent
-	require.NoError(s.backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
+	require.NoError(s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 
 	txQueue := backend.TransactionQueue()
 	var i = 0
 	txIDs := [status.DefaultTxQueueCap + 5 + 10]status.QueuedTxID{}
 	backend.SetTransactionQueueHandler(func(queuedTx status.QueuedTx) {
-		log.Info("tx enqueued", "i", i + 1, "queue size", txQueue.Count(), "id", queuedTx.ID)
+		log.Info("tx enqueued", "i", i+1, "queue size", txQueue.Count(), "id", queuedTx.ID)
 		txIDs[i] = queuedTx.ID
 		i++
 	})

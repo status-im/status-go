@@ -335,7 +335,6 @@ func testStopResumeNode(t *testing.T) bool {
 		response := common.APIResponse{}
 		rawResponse = StartNode(C.CString(nodeConfigJSON))
 
-
 		if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &response); err != nil {
 			t.Errorf("cannot decode StartNode response (%s): %v", C.GoString(rawResponse), err)
 			return false

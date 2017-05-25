@@ -12,6 +12,7 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
+	assertions "github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -81,20 +82,21 @@ func (s *BaseTestSuite) StopTestNode() {
 	require := s.Require()
 	require.NotNil(s.NodeManager)
 	require.True(s.NodeManager.IsNodeRunning())
-	require.NoError(s.NodeManager.StopNode())
+	nodeStopped, err := s.NodeManager.StopNode()
+	require.NoError(err)
+	<-nodeStopped
 	require.False(s.NodeManager.IsNodeRunning())
 }
 
-func (s *BaseTestSuite) FirstBlockHash(expectedHash string) {
-	require := s.Require()
-	require.NotNil(s.NodeManager)
+func FirstBlockHash(require *assertions.Assertions, nodeManager common.NodeManager, expectedHash string) {
+	require.NotNil(nodeManager)
 
 	var firstBlock struct {
 		Hash gethcommon.Hash `json:"hash"`
 	}
 
 	// obtain RPC client for running node
-	runningNode, err := s.NodeManager.Node()
+	runningNode, err := nodeManager.Node()
 	require.NoError(err)
 	require.NotNil(runningNode)
 
@@ -105,7 +107,7 @@ func (s *BaseTestSuite) FirstBlockHash(expectedHash string) {
 	err = rpcClient.CallContext(context.Background(), &firstBlock, "eth_getBlockByNumber", "0x0", true)
 	require.NoError(err)
 
-	s.Equal(expectedHash, firstBlock.Hash.Hex())
+	require.Equal(expectedHash, firstBlock.Hash.Hex())
 }
 
 func MakeTestNodeConfig(networkID int) (*params.NodeConfig, error) {
