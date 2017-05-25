@@ -17,7 +17,6 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/rpc"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
-	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
 )
 
@@ -205,7 +204,7 @@ func (m *NodeManager) stopNode() error {
 	case <-m.nodeStopped:
 		// pass
 	case <-time.After(30 * time.Second):
-		return fmt.Errorf("%v: %s", ErrNodeOpTimedOut, common.NameOf(m.StopNode))
+		return ErrNodeOpTimedOut
 	}
 
 	m.config = nil
