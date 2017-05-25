@@ -14,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/les"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
-	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/rpc"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
@@ -138,10 +137,11 @@ func (m *NodeManager) onNodeStarted(nodeStarted chan struct{}) {
 	}
 
 	// obtain node info
-	var nodeInfo *p2p.NodeInfo
+	enode := "none"
 	if server := m.node.Server(); server != nil {
-		if nodeInfo = server.NodeInfo(); nodeInfo != nil {
-			log.Info("Node is ready", "enode", nodeInfo.Enode)
+		if nodeInfo := server.NodeInfo(); nodeInfo != nil {
+			enode = nodeInfo.Enode
+			log.Info("Node is ready", "enode", enode)
 		}
 	}
 
@@ -159,7 +159,7 @@ func (m *NodeManager) onNodeStarted(nodeStarted chan struct{}) {
 		Event: struct{}{},
 	})
 	close(m.nodeStopped)
-	log.Info("Node is stopped", "enode", nodeInfo.Enode)
+	log.Info("Node is stopped", "enode", enode)
 }
 
 // IsNodeRunning confirm that node is running
