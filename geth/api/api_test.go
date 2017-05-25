@@ -1,7 +1,9 @@
 package api_test
 
 import (
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/params"
@@ -35,15 +37,21 @@ func (s *APITestSuite) TestStartStopRaces() {
 	progress := make(chan struct{}, 100)
 
 	start := func() {
+		fmt.Println("start node")
 		s.api.StartNode(nodeConfig)
 		progress <- struct{}{}
 	}
 	stop := func() {
+		fmt.Println("stop node")
 		s.api.StopNode()
 		progress <- struct{}{}
 	}
 
-	for i := 0; i < 50; i++ {
+	// start one node and sync it a bit
+	start()
+	time.Sleep(5 * time.Second)
+
+	for i := 0; i < 20; i++ {
 		go start()
 		go stop()
 	}
@@ -51,7 +59,7 @@ func (s *APITestSuite) TestStartStopRaces() {
 	cnt := 0
 	for range progress {
 		cnt += 1
-		if cnt >= 100 {
+		if cnt >= 40 {
 			break
 		}
 	}
