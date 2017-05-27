@@ -51,6 +51,10 @@ const (
 	// DatabaseCache is memory (in MBs) allocated to internal caching (min 16MB / database forced)
 	DatabaseCache = 16
 
+	// CHTRootConfigURL defines URL to file containing hard-coded CHT roots
+	// TODO remove this hack, once CHT sync is implemented on LES side
+	CHTRootConfigURL = "https://gist.githubusercontent.com/farazdagi/a8d36e2818b3b2b6074d691da63a0c36/raw/"
+
 	// LogFile defines where to write logs to
 	LogFile = "geth.log"
 

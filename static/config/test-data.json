@@ -1,6 +1,6 @@
 {
   "Node": {
-    "SyncSeconds": 20,
+    "SyncSeconds": 7,
     "HTTPPort": 8645,
     "WSPort": 8646
   },

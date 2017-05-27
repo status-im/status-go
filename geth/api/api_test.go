@@ -1,7 +1,10 @@
 package api_test
 
 import (
+	"io/ioutil"
 	"math/rand"
+	"os"
+	"strconv"
 	"testing"
 	"time"
 
@@ -28,6 +31,35 @@ func (s *APITestSuite) SetupTest() {
 	require.IsType(&api.StatusAPI{}, statusAPI)
 	s.api = statusAPI
 }
+
+func (s *APITestSuite) TestCHTUpdate() {
+	require := s.Require()
+	require.NotNil(s.api)
+
+	tmpDir, err := ioutil.TempDir(os.TempDir(), "cht-updates")
+	require.NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	url := "https://gist.githubusercontent.com/farazdagi/3d05d1d3bfa36db7b650c955e23fd7ae/raw/?u=" + strconv.Itoa(int(time.Now().Unix()))
+	configJSON := `{
+		"NetworkId": ` + strconv.Itoa(params.RopstenNetworkID) + `,
+		"DataDir": "` + tmpDir + `",
+		"LogEnabled": true,
+		"LogLevel": "INFO",
+		"LightEthConfig": {
+			"CHTRootConfigURL": "` + url + `"
+		}
+	}`
+	nodeConfig, err := params.LoadNodeConfig(configJSON)
+	require.NoError(err)
+
+	// start node
+	nodeConfig.DevMode = true
+	s.api.StartNode(nodeConfig)
+	time.Sleep(TestConfig.Node.SyncSeconds * time.Second)
+	s.api.StopNode()
+}
+
 func (s *APITestSuite) TestRaceConditions() {
 	require := s.Require()
 	require.NotNil(s.api)
