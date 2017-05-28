@@ -148,6 +148,94 @@ func (s *BackendTestSuite) TestNodeStartStop() {
 	require.True(s.backend.IsNodeRunning())
 }
 
+func (s *BackendTestSuite) TestCallRPC() {
+	require := s.Require()
+	require.NotNil(s.backend)
+
+	nodeConfig, err := MakeTestNodeConfig(params.RinkebyNetworkID)
+	require.NoError(err)
+
+	nodeStarted, err := s.backend.StartNode(nodeConfig)
+	require.NoError(err)
+	require.NotNil(nodeStarted)
+	defer s.backend.StopNode()
+	<-nodeStarted
+
+	progress := make(chan struct{}, 25)
+	type rpcCall struct {
+		inputJSON string
+		validator func(resultJSON string)
+	}
+	var rpcCalls = []rpcCall{
+		{
+			`{"jsonrpc":"2.0","method":"eth_sendTransaction","params":[{
+				"from": "0xb60e8dd61c5d32be8058bb8eb970870f07233155",
+				"to": "0xd46e8dd67c5d32be8058bb8eb970870f07244567",
+				"gas": "0x76c0",
+				"gasPrice": "0x9184e72a000",
+				"value": "0x9184e72a",
+				"data": "0xd46e8dd67c5d32be8d46e8dd67c5d32be8058bb8eb970870f072445675058bb8eb970870f072445675"}],"id":1}`,
+			func(resultJSON string) {
+				log.Info("eth_sendTransaction")
+				s.T().Log("GOT: ", resultJSON)
+				progress <- struct{}{}
+			},
+		},
+		{
+			`{"jsonrpc":"2.0","method":"shh_version","params":[],"id":67}`,
+			func(resultJSON string) {
+				expected := `{"jsonrpc":"2.0","id":67,"result":"0x5"}` + "\n"
+				s.Equal(expected, resultJSON)
+				s.T().Log("shh_version: ", resultJSON)
+				progress <- struct{}{}
+			},
+		},
+		{
+			`{"jsonrpc":"2.0","method":"web3_sha3","params":["0x68656c6c6f20776f726c64"],"id":64}`,
+			func(resultJSON string) {
+				expected := `{"jsonrpc":"2.0","id":64,"result":"0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad"}` + "\n"
+				s.Equal(expected, resultJSON)
+				s.T().Log("web3_sha3: ", resultJSON)
+				progress <- struct{}{}
+			},
+		},
+		{
+			`{"jsonrpc":"2.0","method":"net_version","params":[]}`, // w/o id
+			func(resultJSON string) {
+				expected := `{"jsonrpc":"2.0","id":1,"result":"4"}` + "\n"
+				s.Equal(expected, resultJSON)
+				s.T().Log("net_version: ", resultJSON)
+				progress <- struct{}{}
+			},
+		},
+		{
+			`{"jsonrpc":"2.0","method":"net_version","params":[],"id":67}`,
+			func(resultJSON string) {
+				expected := `{"jsonrpc":"2.0","id":67,"result":"4"}` + "\n"
+				s.Equal(expected, resultJSON)
+				s.T().Log("net_version: ", resultJSON)
+				progress <- struct{}{}
+			},
+		},
+	}
+
+	cnt := len(rpcCalls) - 1 // send transaction blocks up until complete/discarded/times out
+	for _, r := range rpcCalls {
+		go func(r rpcCall) {
+			s.T().Logf("Run test: %v", r.inputJSON)
+			resultJSON := s.backend.CallRPC(r.inputJSON)
+			r.validator(resultJSON)
+		}(r)
+	}
+
+	for range progress {
+		cnt -= 1
+		if cnt <= 0 {
+			break
+		}
+	}
+}
+
 func (s *BackendTestSuite) TestRaceConditions() {
 	require := s.Require()
 	require.NotNil(s.backend)

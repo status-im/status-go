@@ -97,6 +97,11 @@ func (api *StatusAPI) ResetChainDataAsync() (<-chan struct{}, error) {
 	return api.b.ResetChainData()
 }
 
+// CallRPC executes RPC request on node's in-proc RPC server
+func (api *StatusAPI) CallRPC(inputJSON string) string {
+	return api.b.CallRPC(inputJSON)
+}
+
 // CreateAccount creates an internal geth account
 // BIP44-compatible keys are generated: CKD#1 is stored as account key, CKD#2 stored as sub-account root
 // Public key of CKD#1 is returned, with CKD#2 securely encoded into account key file (to be used for
@@ -156,19 +161,19 @@ func (api *StatusAPI) DiscardTransactions(ids string) map[string]common.RawDisca
 	return api.b.DiscardTransactions(ids)
 }
 
-// Parse creates a new jail cell context, with the given chatID as identifier.
+// JailParse creates a new jail cell context, with the given chatID as identifier.
 // New context executes provided JavaScript code, right after the initialization.
 func (api *StatusAPI) JailParse(chatID string, js string) string {
 	return api.b.jailManager.Parse(chatID, js)
 }
 
-// Call executes given JavaScript function w/i a jail cell context identified by the chatID.
+// JailCall executes given JavaScript function w/i a jail cell context identified by the chatID.
 // Jail cell is clonned before call is executed i.e. all calls execute w/i their own contexts.
 func (api *StatusAPI) JailCall(chatID string, path string, args string) string {
 	return api.b.jailManager.Call(chatID, path, args)
 }
 
-// BaseJS allows to setup initial JavaScript to be loaded on each jail.Parse()
+// JailBaseJS allows to setup initial JavaScript to be loaded on each jail.Parse()
 func (api *StatusAPI) JailBaseJS(js string) {
 	api.b.jailManager.BaseJS(js)
 }

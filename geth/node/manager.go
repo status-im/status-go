@@ -27,7 +27,8 @@ var (
 	ErrInvalidLightEthereumService = errors.New("LES service is unavailable")
 	ErrInvalidAccountManager       = errors.New("could not retrieve account manager")
 	ErrAccountKeyStoreMissing      = errors.New("account key store is not set")
-	ErrInvalidRPCClient            = errors.New("RPC service is unavailable")
+	ErrInvalidRPCClient            = errors.New("RPC client is unavailable")
+	ErrInvalidRPCServer            = errors.New("RPC server is unavailable")
 )
 
 // NodeManager manages Status node (which abstracts contained geth node)
@@ -40,6 +41,7 @@ type NodeManager struct {
 	whisperService *whisper.Whisper   // reference to Whisper service
 	lesService     *les.LightEthereum // reference to LES service
 	rpcClient      *rpc.Client        // reference to RPC client
+	rpcServer      *rpc.Server        // reference to RPC server
 }
 
 // NewNodeManager makes new instance of node manager
@@ -157,6 +159,7 @@ func (m *NodeManager) stopNode() (<-chan struct{}, error) {
 		m.lesService = nil
 		m.whisperService = nil
 		m.rpcClient = nil
+		m.rpcServer = nil
 		m.nodeStarted = nil
 		m.node = nil
 		m.Unlock()
@@ -530,4 +533,35 @@ func (m *NodeManager) RPCClient() (*rpc.Client, error) {
 	}
 
 	return m.rpcClient, nil
+}
+
+// RPCServer exposes reference to running node's in-proc RPC server/handler
+func (m *NodeManager) RPCServer() (*rpc.Server, error) {
+	if m == nil {
+		return nil, ErrInvalidNodeManager
+	}
+
+	m.RLock()
+	defer m.RUnlock()
+
+	// make sure that node is fully started
+	if m.node == nil || m.nodeStarted == nil {
+		return nil, ErrNoRunningNode
+	}
+	<-m.nodeStarted
+
+	if m.rpcServer == nil {
+		var err error
+		m.rpcServer, err = m.node.InProcRPC()
+		if err != nil {
+			log.Error("Cannot expose on-proc RPC server", "error", err)
+			return nil, ErrInvalidRPCServer
+		}
+	}
+
+	if m.rpcServer == nil {
+		return nil, ErrInvalidRPCServer
+	}
+
+	return m.rpcServer, nil
 }

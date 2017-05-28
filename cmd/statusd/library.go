@@ -48,6 +48,12 @@ func ResetChainData() *C.char {
 	return makeJSONResponse(err)
 }
 
+//export CallRPC
+func CallRPC(inputJSON *C.char) *C.char {
+	outputJSON := statusAPI.CallRPC(C.GoString(inputJSON))
+	return C.CString(outputJSON)
+}
+
 //export ResumeNode
 func ResumeNode() *C.char {
 	err := fmt.Errorf("%v: %v", common.ErrDeprecatedMethod.Error(), "ResumeNode")

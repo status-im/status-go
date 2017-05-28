@@ -20,6 +20,7 @@ type StatusBackend struct {
 	accountManager common.AccountManager
 	txQueueManager common.TxQueueManager
 	jailManager    common.JailManager
+	rpcManager     common.RPCManager
 }
 
 // NewStatusBackend create a new NewStatusBackend instance
@@ -33,6 +34,7 @@ func NewStatusBackend() *StatusBackend {
 		accountManager: accountManager,
 		txQueueManager: node.NewTxQueueManager(nodeManager, accountManager),
 		jailManager:    jail.New(nodeManager),
+		rpcManager:     node.NewRPCManager(nodeManager),
 	}
 }
 
@@ -162,6 +164,11 @@ func (m *StatusBackend) ResetChainData() (<-chan struct{}, error) {
 	go m.onNodeStart(nodeReset, m.nodeReady) // waits on nodeReset, writes to backendReady
 
 	return m.nodeReady, err
+}
+
+// CallRPC executes RPC request on node's in-proc RPC server
+func (m *StatusBackend) CallRPC(inputJSON string) string {
+	return m.rpcManager.Call(inputJSON)
 }
 
 // CompleteTransaction instructs backend to complete sending of a given transaction
