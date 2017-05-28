@@ -83,15 +83,6 @@ func (s *RPCTestSuite) TestCallRPC() {
 			},
 		},
 		{
-			`{"jsonrpc":"2.0","method":"net_version","params":[]}`, // w/o id
-			func(resultJSON string) {
-				expected := `{"jsonrpc":"2.0","id":1,"result":"4"}` + "\n"
-				s.Equal(expected, resultJSON)
-				s.T().Log("net_version: ", resultJSON)
-				progress <- struct{}{}
-			},
-		},
-		{
 			`{"jsonrpc":"2.0","method":"net_version","params":[],"id":67}`,
 			func(resultJSON string) {
 				expected := `{"jsonrpc":"2.0","id":67,"result":"4"}` + "\n"

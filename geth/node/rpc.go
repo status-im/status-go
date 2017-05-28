@@ -16,7 +16,6 @@ import (
 
 const (
 	jsonrpcVersion         = "2.0"
-	serviceMethodSeparator = "_"
 )
 
 type jsonRequest struct {
@@ -69,12 +68,6 @@ func (c *RPCManager) Call(inputJSON string) string {
 	// allow HTTP requests to block w/o
 	outputJSON := make(chan string, 1)
 	go func() {
-		inputJSON, err = c.prepare(inputJSON)
-		if err != nil {
-			outputJSON <- c.makeJSONErrorResponse(err)
-			return
-		}
-
 		httpReq := httptest.NewRequest("POST", "/", strings.NewReader(inputJSON))
 		rr := httptest.NewRecorder()
 		server.ServeHTTP(rr, httpReq)
@@ -99,34 +92,6 @@ func (c *RPCManager) Call(inputJSON string) string {
 	}
 
 	return c.makeJSONErrorResponse(ErrRPCServerTimeout)
-}
-
-// prepare applies necessary transformations to incoming JSON
-func (c *RPCManager) prepare(inputJSON string) (string, error) {
-	var in jsonRequest
-	if err := json.Unmarshal(json.RawMessage(inputJSON), &in); err != nil {
-		return inputJSON, err
-	}
-
-	elems := strings.Split(in.Method, serviceMethodSeparator)
-	if len(elems) != 2 {
-		return inputJSON, ErrInvalidMethod
-	}
-
-	// inject next ID
-	if in.ID == 0 {
-		c.Lock()
-		c.requestID++
-		c.Unlock()
-		in.ID = c.requestID
-	}
-
-	outputJSON, err := json.Marshal(&in)
-	if err != nil {
-		return inputJSON, err
-	}
-
-	return string(outputJSON), nil
 }
 
 // makeJSONErrorResponse returns error as JSON response
