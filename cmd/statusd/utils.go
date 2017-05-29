@@ -56,6 +56,10 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 			testStopResumeNode,
 		},
 		{
+			"call RPC on in-proc handler",
+			testCallRPC,
+		},
+		{
 			"create main and child accounts",
 			testCreateChildAccount,
 		},
@@ -335,7 +339,6 @@ func testStopResumeNode(t *testing.T) bool {
 		response := common.APIResponse{}
 		rawResponse = StartNode(C.CString(nodeConfigJSON))
 
-
 		if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &response); err != nil {
 			t.Errorf("cannot decode StartNode response (%s): %v", C.GoString(rawResponse), err)
 			return false
@@ -368,6 +371,18 @@ func testStopResumeNode(t *testing.T) bool {
 
 	// additionally, let's complete transaction (just to make sure that node lives through pause/resume w/o issues)
 	testCompleteTransaction(t)
+
+	return true
+}
+
+func testCallRPC(t *testing.T) bool {
+	expected := `{"jsonrpc":"2.0","id":64,"result":"0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad"}` + "\n"
+	rawResponse := CallRPC(C.CString(`{"jsonrpc":"2.0","method":"web3_sha3","params":["0x68656c6c6f20776f726c64"],"id":64}`))
+	received := C.GoString(rawResponse)
+	if expected != received {
+		t.Errorf("unexpected reponse: expected: %v, got: %v", expected, received)
+		return false
+	}
 
 	return true
 }

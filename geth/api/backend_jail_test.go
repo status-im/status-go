@@ -65,7 +65,7 @@ func (s *BackendTestSuite) TestJailContractDeployment() {
 
 			//t.Logf("Transaction queued (will be completed shortly): {id: %s}\n", event["id"].(string))
 
-			s.NoError(s.backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
+			s.NoError(s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 
 			var err error
 			txHash, err = s.backend.CompleteTransaction(event["id"].(string), TestConfig.Account1.Password)
@@ -117,7 +117,7 @@ func (s *BackendTestSuite) TestJailSendQueuedTransaction() {
 	require.NotNil(jailInstance)
 
 	// log into account from which transactions will be sent
-	require.NoError(s.backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
+	require.NoError(s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 
 	txParams := `{
   		"from": "` + TestConfig.Account1.Address + `",
@@ -310,7 +310,7 @@ func (s *BackendTestSuite) TestGasEstimation() {
 
 			//t.Logf("Transaction queued (will be completed shortly): {id: %s}\n", event["id"].(string))
 
-			s.NoError(s.backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
+			s.NoError(s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 
 			var err error
 			txHash, err = s.backend.CompleteTransaction(event["id"].(string), TestConfig.Account1.Password)

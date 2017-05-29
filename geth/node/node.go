@@ -149,7 +149,7 @@ func updateCHT(eth *les.LightEthereum, config *params.NodeConfig) {
 		Dev         string `json:"dev"`
 	}
 	loadCHTLists := func() ([]MsgCHTRoot, error) {
-		url := "https://gist.githubusercontent.com/farazdagi/a8d36e2818b3b2b6074d691da63a0c36/raw/?u=" + strconv.Itoa(int(time.Now().Unix()))
+		url := config.LightEthConfig.CHTRootConfigURL + "?u=" + strconv.Itoa(int(time.Now().Unix()))
 		client := &http.Client{Timeout: 5 * time.Second}
 		r, err := client.Get(url)
 		if err != nil {
@@ -181,7 +181,7 @@ func updateCHT(eth *les.LightEthereum, config *params.NodeConfig) {
 					Number: root.Number,
 					Root:   gethcommon.HexToHash(chtRoot),
 				})
-				log.Info("Loaded CHT from net", "CHT", chtRoot, "number", root.Number)
+				log.Info("Loaded CHT from net", "CHT", chtRoot, "number", root.Number, "dev", config.DevMode)
 				return
 			}
 		}

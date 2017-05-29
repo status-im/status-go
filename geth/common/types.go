@@ -18,6 +18,7 @@ import (
 	"github.com/status-im/status-go/static"
 )
 
+// errors
 var (
 	ErrDeprecatedMethod = errors.New("Method is depricated and will be removed in future release")
 )
@@ -45,7 +46,7 @@ type NodeManager interface {
 
 	// StopNode stop the running Status node.
 	// Stopped node cannot be resumed, one starts a new node instead.
-	StopNode() error
+	StopNode() (<-chan struct{}, error)
 
 	// RestartNode restart running Status node, fails if node is not running
 	RestartNode() (<-chan struct{}, error)
@@ -83,6 +84,9 @@ type NodeManager interface {
 
 	// RPCClient exposes reference to RPC client connected to the running node
 	RPCClient() (*rpc.Client, error)
+
+	// RPCServer exposes reference to running node's in-proc RPC server/handler
+	RPCServer() (*rpc.Server, error)
 }
 
 // AccountManager defines expected methods for managing Status accounts
@@ -127,6 +131,12 @@ type AccountManager interface {
 	// The running node, has a keystore directory which is loaded on start. Key file
 	// for a given address is expected to be in that directory prior to node start.
 	AddressToDecryptedAccount(address, password string) (accounts.Account, *keystore.Key, error)
+}
+
+// RPCManager defines expected methods for managing RPC client/server
+type RPCManager interface {
+	// Call executes RPC request on node's in-proc RPC server
+	Call(inputJSON string) string
 }
 
 // RawCompleteTransactionResult is a JSON returned from transaction complete function (used internally)
