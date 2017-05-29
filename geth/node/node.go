@@ -25,6 +25,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/p2p/nat"
+	gethparams "github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/whisper/mailserver"
 	"github.com/ethereum/go-ethereum/whisper/notifications"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
@@ -113,7 +114,7 @@ func defaultEmbeddedNodeConfig(config *params.NodeConfig) *node.Config {
 		Version:           config.Version,
 		P2P: p2p.Config{
 			NoDiscovery:      true,
-			DiscoveryV5:      false,
+			DiscoveryV5:      true,
 			DiscoveryV5Addr:  ":0",
 			BootstrapNodes:   makeBootstrapNodes(),
 			BootstrapNodesV5: makeBootstrapNodesV5(),
@@ -326,9 +327,7 @@ func makeBootstrapNodes() []*discover.Node {
 
 // makeBootstrapNodesV5 returns default (hence bootstrap) list of peers
 func makeBootstrapNodesV5() []*discv5.Node {
-	// on desktops params.DiscoveryV5Bootnodes,
-	// on mobile client we deliberately keep this list empty
-	enodes := []string{}
+	enodes := gethparams.DiscoveryV5Bootnodes
 
 	var bootstapNodes []*discv5.Node
 	for _, enode := range enodes {
