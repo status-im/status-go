@@ -5,6 +5,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
+// AccountManager abstracts both internal account manager and extra filter status backend requires
 type AccountManager struct {
 	am                    *accounts.Manager
 	accountsFilterHandler AccountsFilterHandler
@@ -17,6 +18,7 @@ func NewAccountManager(am *accounts.Manager) *AccountManager {
 	}
 }
 
+// AccountsFilterHandler function to filter out accounts list
 type AccountsFilterHandler func([]common.Address) []common.Address
 
 // Accounts returns accounts' addresses of currently logged in user.
@@ -37,6 +39,7 @@ func (d *AccountManager) Accounts() []common.Address {
 	return addresses
 }
 
+// SetAccountsFilterHandler sets filtering function for accounts list
 func (d *AccountManager) SetAccountsFilterHandler(fn AccountsFilterHandler) {
 	d.accountsFilterHandler = fn
 }

@@ -32,6 +32,8 @@ package whisperv5
 import (
 	"fmt"
 	"time"
+
+	"github.com/ethereum/go-ethereum/p2p"
 )
 
 const (
@@ -49,17 +51,17 @@ const (
 	paddingMask   = byte(3)
 	signatureFlag = byte(4)
 
-	TopicLength       = 4
-	signatureLength   = 65
-	aesKeyLength      = 32
-	saltLength        = 12
-	AESNonceMaxLength = 12
+	TopicLength     = 4
+	signatureLength = 65
+	aesKeyLength    = 32
+	AESNonceLength  = 12
+	keyIdSize       = 32
 
-	MaxMessageLength = 0x0FFFFF // todo: remove this restriction after testing. this should be regulated by PoW.
-	MinimumPoW       = 0.001     // todo: review after testing.
+	DefaultMaxMessageLength = 1024 * 1024
+	DefaultMinimumPoWTime   = 2     // todo: review after testing.
+	DefaultMinimumPoW       = 0.001 // todo: review after testing.
 
-	padSizeLimitLower = 128 // it can not be less - we don't want to reveal the absence of signature
-	padSizeLimitUpper = 256 // just an arbitrary number, could be changed without losing compatibility
+	padSizeLimit      = 256 // just an arbitrary number, could be changed without breaking the protocol (must not exceed 2^24)
 	messageQueueLimit = 1024
 
 	expirationCycle   = time.Second
@@ -84,4 +86,16 @@ func (e unknownVersionError) Error() string {
 type MailServer interface {
 	Archive(env *Envelope)
 	DeliverMail(whisperPeer *Peer, request *Envelope)
+}
+
+// NotificationServer represents a notification server,
+// capable of screening incoming envelopes for special
+// topics, and once located, subscribe client nodes as
+// recipients to notifications (push notifications atm)
+type NotificationServer interface {
+	// Start initializes notification sending loop
+	Start(server *p2p.Server) error
+
+	// Stop stops notification sending loop, releasing related resources
+	Stop() error
 }

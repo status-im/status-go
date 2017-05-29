@@ -3,6 +3,7 @@ package main
 import "C"
 import (
 	"encoding/json"
+	"io/ioutil"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -11,22 +12,30 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/les/status"
 	gethparams "github.com/ethereum/go-ethereum/params"
-	"github.com/status-im/status-go/geth"
+	"github.com/status-im/status-go/geth/common"
+	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
+	. "github.com/status-im/status-go/geth/testing"
+	"github.com/status-im/status-go/static"
 )
 
-var testConfig *geth.TestConfig
+const zeroHash = "0x0000000000000000000000000000000000000000000000000000000000000000"
 
-func init() {
-	// error is ignored, as it will occur on non-test compilation only, and there testConfig is not used at all
-	// (we have to use "main" package due to restrictions on including C imports into *_test packages)
-	testConfig, _ = geth.LoadTestConfig()
-}
+var nodeConfigJSON = `{
+	"NetworkId": ` + strconv.Itoa(params.RopstenNetworkID) + `,
+	"DataDir": "` + TestDataDir + `",
+	"HTTPPort": ` + strconv.Itoa(TestConfig.Node.HTTPPort) + `,
+	"WSPort": ` + strconv.Itoa(TestConfig.Node.WSPort) + `,
+	"LogEnabled": true,
+	"LogLevel": "INFO"
+}`
 
+// nolint: deadcode
 func testExportedAPI(t *testing.T, done chan struct{}) {
 	<-startTestNode(t)
 
@@ -43,16 +52,20 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 			testResetChainData,
 		},
 		{
-			"pause node",
+			"stop/resume node",
 			testStopResumeNode,
 		},
 		{
-			"restart node RPC",
-			testRestartNodeRPC,
+			"call RPC on in-proc handler",
+			testCallRPC,
 		},
 		{
 			"create main and child accounts",
 			testCreateChildAccount,
+		},
+		{
+			"verify account password",
+			testVerifyAccountPassword,
 		},
 		{
 			"recover account",
@@ -93,6 +106,7 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 	}
 
 	for _, test := range tests {
+		t.Logf("=== RUN   %s", test.name)
 		if ok := test.fn(t); !ok {
 			break
 		}
@@ -101,17 +115,61 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 	done <- struct{}{}
 }
 
+func testVerifyAccountPassword(t *testing.T) bool {
+	tmpDir, err := ioutil.TempDir(os.TempDir(), "accounts")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir) // nolint: errcheck
+
+	if err = common.ImportTestAccount(tmpDir, "test-account1.pk"); err != nil {
+		t.Fatal(err)
+	}
+	if err = common.ImportTestAccount(tmpDir, "test-account2.pk"); err != nil {
+		t.Fatal(err)
+	}
+
+	// rename account file (to see that file's internals reviewed, when locating account key)
+	accountFilePathOriginal := filepath.Join(tmpDir, "test-account1.pk")
+	accountFilePath := filepath.Join(tmpDir, "foo"+TestConfig.Account1.Address+"bar.pk")
+	if err := os.Rename(accountFilePathOriginal, accountFilePath); err != nil {
+		t.Fatal(err)
+	}
+
+	response := common.APIResponse{}
+	rawResponse := VerifyAccountPassword(
+		C.CString(tmpDir),
+		C.CString(TestConfig.Account1.Address),
+		C.CString(TestConfig.Account1.Password))
+
+	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &response); err != nil {
+		t.Errorf("cannot decode response (%s): %v", C.GoString(rawResponse), err)
+		return false
+	}
+	if response.Error != "" {
+		t.Errorf("unexpected error: %s", response.Error)
+		return false
+	}
+
+	return true
+}
+
 func testGetDefaultConfig(t *testing.T) bool {
 	// test Mainnet config
 	nodeConfig := params.NodeConfig{}
 
-	rawResponse := GenerateConfig(C.CString("/tmp/data-folder"), 1)
+	rawResponse := GenerateConfig(C.CString("/tmp/data-folder"), 1, 1)
 	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &nodeConfig); err != nil {
-		t.Errorf("cannot decode reponse (%s): %v", C.GoString(rawResponse), err)
+		t.Errorf("cannot decode response (%s): %v", C.GoString(rawResponse), err)
 		return false
 	}
 
-	chainConfig := nodeConfig.ChainConfig
+	genesis := new(core.Genesis)
+	if err := json.Unmarshal([]byte(nodeConfig.LightEthConfig.Genesis), genesis); err != nil {
+		t.Error(err)
+		return false
+	}
+	chainConfig := genesis.Config
 	if chainConfig.HomesteadBlock.Cmp(gethparams.MainNetHomesteadBlock) != 0 {
 		t.Error("invalid chainConfig.HomesteadBlock")
 		return false
@@ -147,13 +205,18 @@ func testGetDefaultConfig(t *testing.T) bool {
 
 	// test Testnet
 	nodeConfig = params.NodeConfig{}
-	rawResponse = GenerateConfig(C.CString("/tmp/data-folder"), 3)
+	rawResponse = GenerateConfig(C.CString("/tmp/data-folder"), 3, 1)
 	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &nodeConfig); err != nil {
-		t.Errorf("cannot decode reponse (%s): %v", C.GoString(rawResponse), err)
+		t.Errorf("cannot decode response (%s): %v", C.GoString(rawResponse), err)
 		return false
 	}
 
-	chainConfig = nodeConfig.ChainConfig
+	genesis = new(core.Genesis)
+	if err := json.Unmarshal([]byte(nodeConfig.LightEthConfig.Genesis), genesis); err != nil {
+		t.Error(err)
+		return false
+	}
+	chainConfig = genesis.Config
 	refChainConfig := gethparams.TestnetChainConfig
 
 	if chainConfig.HomesteadBlock.Cmp(refChainConfig.HomesteadBlock) != 0 {
@@ -193,11 +256,11 @@ func testGetDefaultConfig(t *testing.T) bool {
 }
 
 func testResetChainData(t *testing.T) bool {
-	resetChainDataResponse := geth.JSONError{}
+	resetChainDataResponse := common.APIResponse{}
 	rawResponse := ResetChainData()
 
 	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &resetChainDataResponse); err != nil {
-		t.Errorf("cannot decode ResetChainData reponse (%s): %v", C.GoString(rawResponse), err)
+		t.Errorf("cannot decode ResetChainData response (%s): %v", C.GoString(rawResponse), err)
 		return false
 	}
 	if resetChainDataResponse.Error != "" {
@@ -205,7 +268,7 @@ func testResetChainData(t *testing.T) bool {
 		return false
 	}
 
-	time.Sleep(testConfig.Node.SyncSeconds * time.Second) // allow to re-sync blockchain
+	time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to re-sync blockchain
 
 	testCompleteTransaction(t)
 
@@ -213,15 +276,18 @@ func testResetChainData(t *testing.T) bool {
 }
 
 func testStopResumeNode(t *testing.T) bool {
-	geth.Logout() // to make sure that we start with empty account (which might get populated during previous tests)
+	// to make sure that we start with empty account (which might get populated during previous tests)
+	if err := statusAPI.Logout(); err != nil {
+		t.Fatal(err)
+	}
 
-	whisperService, err := geth.NodeManagerInstance().WhisperService()
+	whisperService, err := statusAPI.NodeManager().WhisperService()
 	if err != nil {
 		t.Errorf("whisper service not running: %v", err)
 	}
 
 	// create an account
-	address1, pubKey1, _, err := geth.CreateAccount(testConfig.Account1.Password)
+	address1, pubKey1, _, err := statusAPI.CreateAccount(TestConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("could not create account: %v", err)
 		return false
@@ -229,16 +295,16 @@ func testStopResumeNode(t *testing.T) bool {
 	t.Logf("account created: {address: %s, key: %s}", address1, pubKey1)
 
 	// make sure that identity is not (yet injected)
-	if whisperService.HasIdentity(pubKey1) {
+	if whisperService.HasKeyPair(pubKey1) {
 		t.Error("identity already present in whisper")
 	}
 
 	// select account
-	loginResponse := geth.JSONError{}
-	rawResponse := Login(C.CString(address1), C.CString(testConfig.Account1.Password))
+	loginResponse := common.APIResponse{}
+	rawResponse := Login(C.CString(address1), C.CString(TestConfig.Account1.Password))
 
-	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &loginResponse); err != nil {
-		t.Errorf("cannot decode RecoverAccount reponse (%s): %v", C.GoString(rawResponse), err)
+	if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &loginResponse); err != nil {
+		t.Errorf("cannot decode RecoverAccount response (%s): %v", C.GoString(rawResponse), err)
 		return false
 	}
 
@@ -246,17 +312,18 @@ func testStopResumeNode(t *testing.T) bool {
 		t.Errorf("could not select account: %v", err)
 		return false
 	}
-	if !whisperService.HasIdentity(pubKey1) {
+	if !whisperService.HasKeyPair(pubKey1) {
 		t.Errorf("identity not injected into whisper: %v", err)
 	}
 
 	// stop and resume node, then make sure that selected account is still selected
+	// nolint: dupl
 	stopNodeFn := func() bool {
-		response := geth.JSONError{}
+		response := common.APIResponse{}
 		rawResponse = StopNode()
 
-		if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &response); err != nil {
-			t.Errorf("cannot decode StopNode reponse (%s): %v", C.GoString(rawResponse), err)
+		if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &response); err != nil {
+			t.Errorf("cannot decode StopNode response (%s): %v", C.GoString(rawResponse), err)
 			return false
 		}
 		if response.Error != "" {
@@ -267,12 +334,13 @@ func testStopResumeNode(t *testing.T) bool {
 		return true
 	}
 
+	// nolint: dupl
 	resumeNodeFn := func() bool {
-		response := geth.JSONError{}
-		rawResponse = ResumeNode()
+		response := common.APIResponse{}
+		rawResponse = StartNode(C.CString(nodeConfigJSON))
 
-		if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &response); err != nil {
-			t.Errorf("cannot decode ResumeNode reponse (%s): %v", C.GoString(rawResponse), err)
+		if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &response); err != nil {
+			t.Errorf("cannot decode StartNode response (%s): %v", C.GoString(rawResponse), err)
 			return false
 		}
 		if response.Error != "" {
@@ -290,12 +358,14 @@ func testStopResumeNode(t *testing.T) bool {
 		return false
 	}
 
+	time.Sleep(5 * time.Second) // allow to start (instead of using blocking version of start, of filter event)
+
 	// now, verify that we still have account logged in
-	whisperService, err = geth.NodeManagerInstance().WhisperService()
+	whisperService, err = statusAPI.NodeManager().WhisperService()
 	if err != nil {
 		t.Errorf("whisper service not running: %v", err)
 	}
-	if !whisperService.HasIdentity(pubKey1) {
+	if !whisperService.HasKeyPair(pubKey1) {
 		t.Errorf("identity evicted from whisper on node restart: %v", err)
 	}
 
@@ -305,44 +375,12 @@ func testStopResumeNode(t *testing.T) bool {
 	return true
 }
 
-func testRestartNodeRPC(t *testing.T) bool {
-	// stop RPC
-	stopNodeRPCServerResponse := geth.JSONError{}
-	rawResponse := StopNodeRPCServer()
-
-	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &stopNodeRPCServerResponse); err != nil {
-		t.Errorf("cannot decode StopNodeRPCServer reponse (%s): %v", C.GoString(rawResponse), err)
-		return false
-	}
-	if stopNodeRPCServerResponse.Error != "" {
-		t.Errorf("unexpected error: %s", stopNodeRPCServerResponse.Error)
-		return false
-	}
-
-	// start again RPC
-	startNodeRPCServerResponse := geth.JSONError{}
-	rawResponse = StartNodeRPCServer()
-
-	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &startNodeRPCServerResponse); err != nil {
-		t.Errorf("cannot decode StartNodeRPCServer reponse (%s): %v", C.GoString(rawResponse), err)
-		return false
-	}
-	if startNodeRPCServerResponse.Error != "" {
-		t.Errorf("unexpected error: %s", startNodeRPCServerResponse.Error)
-		return false
-	}
-
-	// start when we have RPC already running
-	startNodeRPCServerResponse = geth.JSONError{}
-	rawResponse = StartNodeRPCServer()
-
-	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &startNodeRPCServerResponse); err != nil {
-		t.Errorf("cannot decode StartNodeRPCServer reponse (%s): %v", C.GoString(rawResponse), err)
-		return false
-	}
-	expectedError := "HTTP RPC already running on localhost:8645"
-	if startNodeRPCServerResponse.Error != expectedError {
-		t.Errorf("expected error not thrown: %s", expectedError)
+func testCallRPC(t *testing.T) bool {
+	expected := `{"jsonrpc":"2.0","id":64,"result":"0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad"}` + "\n"
+	rawResponse := CallRPC(C.CString(`{"jsonrpc":"2.0","method":"web3_sha3","params":["0x68656c6c6f20776f726c64"],"id":64}`))
+	received := C.GoString(rawResponse)
+	if expected != received {
+		t.Errorf("unexpected reponse: expected: %v, got: %v", expected, received)
 		return false
 	}
 
@@ -350,20 +388,23 @@ func testRestartNodeRPC(t *testing.T) bool {
 }
 
 func testCreateChildAccount(t *testing.T) bool {
-	geth.Logout() // to make sure that we start with empty account (which might get populated during previous tests)
+	// to make sure that we start with empty account (which might get populated during previous tests)
+	if err := statusAPI.Logout(); err != nil {
+		t.Fatal(err)
+	}
 
-	keyStore, err := geth.NodeManagerInstance().AccountKeyStore()
+	keyStore, err := statusAPI.NodeManager().AccountKeyStore()
 	if err != nil {
 		t.Error(err)
 		return false
 	}
 
 	// create an account
-	createAccountResponse := geth.AccountInfo{}
-	rawResponse := CreateAccount(C.CString(testConfig.Account1.Password))
+	createAccountResponse := common.AccountInfo{}
+	rawResponse := CreateAccount(C.CString(TestConfig.Account1.Password))
 
-	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &createAccountResponse); err != nil {
-		t.Errorf("cannot decode CreateAccount reponse (%s): %v", C.GoString(rawResponse), err)
+	if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &createAccountResponse); err != nil {
+		t.Errorf("cannot decode CreateAccount response (%s): %v", C.GoString(rawResponse), err)
 		return false
 	}
 
@@ -374,14 +415,14 @@ func testCreateChildAccount(t *testing.T) bool {
 	address, pubKey, mnemonic := createAccountResponse.Address, createAccountResponse.PubKey, createAccountResponse.Mnemonic
 	t.Logf("Account created: {address: %s, key: %s, mnemonic:%s}", address, pubKey, mnemonic)
 
-	account, err := geth.ParseAccountString(address)
+	account, err := common.ParseAccountString(address)
 	if err != nil {
 		t.Errorf("can not get account from address: %v", err)
 		return false
 	}
 
 	// obtain decrypted key, and make sure that extended key (which will be used as root for sub-accounts) is present
-	account, key, err := keyStore.AccountDecryptedKey(account, testConfig.Account1.Password)
+	_, key, err := keyStore.AccountDecryptedKey(account, TestConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("can not obtain decrypted account key: %v", err)
 		return false
@@ -393,45 +434,45 @@ func testCreateChildAccount(t *testing.T) bool {
 	}
 
 	// try creating sub-account, w/o selecting main account i.e. w/o login to main account
-	createSubAccountResponse := geth.AccountInfo{}
-	rawResponse = CreateChildAccount(C.CString(""), C.CString(testConfig.Account1.Password))
+	createSubAccountResponse := common.AccountInfo{}
+	rawResponse = CreateChildAccount(C.CString(""), C.CString(TestConfig.Account1.Password))
 
-	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &createSubAccountResponse); err != nil {
-		t.Errorf("cannot decode CreateChildAccount reponse (%s): %v", C.GoString(rawResponse), err)
+	if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &createSubAccountResponse); err != nil {
+		t.Errorf("cannot decode CreateChildAccount response (%s): %v", C.GoString(rawResponse), err)
 		return false
 	}
 
-	if createSubAccountResponse.Error != geth.ErrNoAccountSelected.Error() {
+	if createSubAccountResponse.Error != node.ErrNoAccountSelected.Error() {
 		t.Errorf("expected error is not returned (tried to create sub-account w/o login): %v", createSubAccountResponse.Error)
 		return false
 	}
 
-	err = geth.SelectAccount(address, testConfig.Account1.Password)
+	err = statusAPI.SelectAccount(address, TestConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("Test failed: could not select account: %v", err)
 		return false
 	}
 
 	// try to create sub-account with wrong password
-	createSubAccountResponse = geth.AccountInfo{}
+	createSubAccountResponse = common.AccountInfo{}
 	rawResponse = CreateChildAccount(C.CString(""), C.CString("wrong password"))
 
 	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &createSubAccountResponse); err != nil {
-		t.Errorf("cannot decode CreateChildAccount reponse (%s): %v", C.GoString(rawResponse), err)
+		t.Errorf("cannot decode CreateChildAccount response (%s): %v", C.GoString(rawResponse), err)
 		return false
 	}
 
-	if createSubAccountResponse.Error != "cannot retreive a valid key for a given account: could not decrypt key with given passphrase" {
+	if createSubAccountResponse.Error != "cannot retrieve a valid key for a given account: could not decrypt key with given passphrase" {
 		t.Errorf("expected error is not returned (tried to create sub-account with wrong password): %v", createSubAccountResponse.Error)
 		return false
 	}
 
 	// create sub-account (from implicit parent)
-	createSubAccountResponse1 := geth.AccountInfo{}
-	rawResponse = CreateChildAccount(C.CString(""), C.CString(testConfig.Account1.Password))
+	createSubAccountResponse1 := common.AccountInfo{}
+	rawResponse = CreateChildAccount(C.CString(""), C.CString(TestConfig.Account1.Password))
 
 	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &createSubAccountResponse1); err != nil {
-		t.Errorf("cannot decode CreateChildAccount reponse (%s): %v", C.GoString(rawResponse), err)
+		t.Errorf("cannot decode CreateChildAccount response (%s): %v", C.GoString(rawResponse), err)
 		return false
 	}
 
@@ -441,11 +482,11 @@ func testCreateChildAccount(t *testing.T) bool {
 	}
 
 	// make sure that sub-account index automatically progresses
-	createSubAccountResponse2 := geth.AccountInfo{}
-	rawResponse = CreateChildAccount(C.CString(""), C.CString(testConfig.Account1.Password))
+	createSubAccountResponse2 := common.AccountInfo{}
+	rawResponse = CreateChildAccount(C.CString(""), C.CString(TestConfig.Account1.Password))
 
 	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &createSubAccountResponse2); err != nil {
-		t.Errorf("cannot decode CreateChildAccount reponse (%s): %v", C.GoString(rawResponse), err)
+		t.Errorf("cannot decode CreateChildAccount response (%s): %v", C.GoString(rawResponse), err)
 		return false
 	}
 
@@ -459,11 +500,11 @@ func testCreateChildAccount(t *testing.T) bool {
 	}
 
 	// create sub-account (from explicit parent)
-	createSubAccountResponse3 := geth.AccountInfo{}
-	rawResponse = CreateChildAccount(C.CString(createSubAccountResponse2.Address), C.CString(testConfig.Account1.Password))
+	createSubAccountResponse3 := common.AccountInfo{}
+	rawResponse = CreateChildAccount(C.CString(createSubAccountResponse2.Address), C.CString(TestConfig.Account1.Password))
 
 	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &createSubAccountResponse3); err != nil {
-		t.Errorf("cannot decode CreateChildAccount reponse (%s): %v", C.GoString(rawResponse), err)
+		t.Errorf("cannot decode CreateChildAccount response (%s): %v", C.GoString(rawResponse), err)
 		return false
 	}
 
@@ -483,10 +524,10 @@ func testCreateChildAccount(t *testing.T) bool {
 }
 
 func testRecoverAccount(t *testing.T) bool {
-	keyStore, _ := geth.NodeManagerInstance().AccountKeyStore()
+	keyStore, _ := statusAPI.NodeManager().AccountKeyStore()
 
 	// create an account
-	address, pubKey, mnemonic, err := geth.CreateAccount(testConfig.Account1.Password)
+	address, pubKey, mnemonic, err := statusAPI.CreateAccount(TestConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("could not create account: %v", err)
 		return false
@@ -494,11 +535,11 @@ func testRecoverAccount(t *testing.T) bool {
 	t.Logf("Account created: {address: %s, key: %s, mnemonic:%s}", address, pubKey, mnemonic)
 
 	// try recovering using password + mnemonic
-	recoverAccountResponse := geth.AccountInfo{}
-	rawResponse := RecoverAccount(C.CString(testConfig.Account1.Password), C.CString(mnemonic))
+	recoverAccountResponse := common.AccountInfo{}
+	rawResponse := RecoverAccount(C.CString(TestConfig.Account1.Password), C.CString(mnemonic))
 
-	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &recoverAccountResponse); err != nil {
-		t.Errorf("cannot decode RecoverAccount reponse (%s): %v", C.GoString(rawResponse), err)
+	if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &recoverAccountResponse); err != nil {
+		t.Errorf("cannot decode RecoverAccount response (%s): %v", C.GoString(rawResponse), err)
 		return false
 	}
 
@@ -512,27 +553,27 @@ func testRecoverAccount(t *testing.T) bool {
 	}
 
 	// now test recovering, but make sure that account/key file is removed i.e. simulate recovering on a new device
-	account, err := geth.ParseAccountString(address)
+	account, err := common.ParseAccountString(address)
 	if err != nil {
 		t.Errorf("can not get account from address: %v", err)
 	}
 
-	account, key, err := keyStore.AccountDecryptedKey(account, testConfig.Account1.Password)
+	account, key, err := keyStore.AccountDecryptedKey(account, TestConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("can not obtain decrypted account key: %v", err)
 		return false
 	}
 	extChild2String := key.ExtendedKey.String()
 
-	if err := keyStore.Delete(account, testConfig.Account1.Password); err != nil {
+	if err = keyStore.Delete(account, TestConfig.Account1.Password); err != nil {
 		t.Errorf("cannot remove account: %v", err)
 	}
 
-	recoverAccountResponse = geth.AccountInfo{}
-	rawResponse = RecoverAccount(C.CString(testConfig.Account1.Password), C.CString(mnemonic))
+	recoverAccountResponse = common.AccountInfo{}
+	rawResponse = RecoverAccount(C.CString(TestConfig.Account1.Password), C.CString(mnemonic))
 
-	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &recoverAccountResponse); err != nil {
-		t.Errorf("cannot decode RecoverAccount reponse (%s): %v", C.GoString(rawResponse), err)
+	if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &recoverAccountResponse); err != nil {
+		t.Errorf("cannot decode RecoverAccount response (%s): %v", C.GoString(rawResponse), err)
 		return false
 	}
 
@@ -546,7 +587,7 @@ func testRecoverAccount(t *testing.T) bool {
 	}
 
 	// make sure that extended key exists and is imported ok too
-	account, key, err = keyStore.AccountDecryptedKey(account, testConfig.Account1.Password)
+	_, key, err = keyStore.AccountDecryptedKey(account, TestConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("can not obtain decrypted account key: %v", err)
 		return false
@@ -556,11 +597,11 @@ func testRecoverAccount(t *testing.T) bool {
 	}
 
 	// make sure that calling import several times, just returns from cache (no error is expected)
-	recoverAccountResponse = geth.AccountInfo{}
-	rawResponse = RecoverAccount(C.CString(testConfig.Account1.Password), C.CString(mnemonic))
+	recoverAccountResponse = common.AccountInfo{}
+	rawResponse = RecoverAccount(C.CString(TestConfig.Account1.Password), C.CString(mnemonic))
 
-	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &recoverAccountResponse); err != nil {
-		t.Errorf("cannot decode RecoverAccount reponse (%s): %v", C.GoString(rawResponse), err)
+	if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &recoverAccountResponse); err != nil {
+		t.Errorf("cannot decode RecoverAccount response (%s): %v", C.GoString(rawResponse), err)
 		return false
 	}
 
@@ -574,21 +615,21 @@ func testRecoverAccount(t *testing.T) bool {
 	}
 
 	// time to login with recovered data
-	whisperService, err := geth.NodeManagerInstance().WhisperService()
+	whisperService, err := statusAPI.NodeManager().WhisperService()
 	if err != nil {
 		t.Errorf("whisper service not running: %v", err)
 	}
 
 	// make sure that identity is not (yet injected)
-	if whisperService.HasIdentity(pubKeyCheck) {
+	if whisperService.HasKeyPair(pubKeyCheck) {
 		t.Error("identity already present in whisper")
 	}
-	err = geth.SelectAccount(addressCheck, testConfig.Account1.Password)
+	err = statusAPI.SelectAccount(addressCheck, TestConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("Test failed: could not select account: %v", err)
 		return false
 	}
-	if !whisperService.HasIdentity(pubKeyCheck) {
+	if !whisperService.HasKeyPair(pubKeyCheck) {
 		t.Errorf("identity not injected into whisper: %v", err)
 	}
 
@@ -597,20 +638,20 @@ func testRecoverAccount(t *testing.T) bool {
 
 func testAccountSelect(t *testing.T) bool {
 	// test to see if the account was injected in whisper
-	whisperService, err := geth.NodeManagerInstance().WhisperService()
+	whisperService, err := statusAPI.NodeManager().WhisperService()
 	if err != nil {
 		t.Errorf("whisper service not running: %v", err)
 	}
 
 	// create an account
-	address1, pubKey1, _, err := geth.CreateAccount(testConfig.Account1.Password)
+	address1, pubKey1, _, err := statusAPI.CreateAccount(TestConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("could not create account: %v", err)
 		return false
 	}
 	t.Logf("Account created: {address: %s, key: %s}", address1, pubKey1)
 
-	address2, pubKey2, _, err := geth.CreateAccount(testConfig.Account1.Password)
+	address2, pubKey2, _, err := statusAPI.CreateAccount(TestConfig.Account1.Password)
 	if err != nil {
 		t.Error("Test failed: could not create account")
 		return false
@@ -618,16 +659,16 @@ func testAccountSelect(t *testing.T) bool {
 	t.Logf("Account created: {address: %s, key: %s}", address2, pubKey2)
 
 	// make sure that identity is not (yet injected)
-	if whisperService.HasIdentity(pubKey1) {
+	if whisperService.HasKeyPair(pubKey1) {
 		t.Error("identity already present in whisper")
 	}
 
 	// try selecting with wrong password
-	loginResponse := geth.JSONError{}
+	loginResponse := common.APIResponse{}
 	rawResponse := Login(C.CString(address1), C.CString("wrongPassword"))
 
-	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &loginResponse); err != nil {
-		t.Errorf("cannot decode RecoverAccount reponse (%s): %v", C.GoString(rawResponse), err)
+	if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &loginResponse); err != nil {
+		t.Errorf("cannot decode RecoverAccount response (%s): %v", C.GoString(rawResponse), err)
 		return false
 	}
 
@@ -636,11 +677,11 @@ func testAccountSelect(t *testing.T) bool {
 		return false
 	}
 
-	loginResponse = geth.JSONError{}
-	rawResponse = Login(C.CString(address1), C.CString(testConfig.Account1.Password))
+	loginResponse = common.APIResponse{}
+	rawResponse = Login(C.CString(address1), C.CString(TestConfig.Account1.Password))
 
-	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &loginResponse); err != nil {
-		t.Errorf("cannot decode RecoverAccount reponse (%s): %v", C.GoString(rawResponse), err)
+	if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &loginResponse); err != nil {
+		t.Errorf("cannot decode RecoverAccount response (%s): %v", C.GoString(rawResponse), err)
 		return false
 	}
 
@@ -648,20 +689,20 @@ func testAccountSelect(t *testing.T) bool {
 		t.Errorf("Test failed: could not select account: %v", err)
 		return false
 	}
-	if !whisperService.HasIdentity(pubKey1) {
+	if !whisperService.HasKeyPair(pubKey1) {
 		t.Errorf("identity not injected into whisper: %v", err)
 	}
 
 	// select another account, make sure that previous account is wiped out from Whisper cache
-	if whisperService.HasIdentity(pubKey2) {
+	if whisperService.HasKeyPair(pubKey2) {
 		t.Error("identity already present in whisper")
 	}
 
-	loginResponse = geth.JSONError{}
-	rawResponse = Login(C.CString(address2), C.CString(testConfig.Account1.Password))
+	loginResponse = common.APIResponse{}
+	rawResponse = Login(C.CString(address2), C.CString(TestConfig.Account1.Password))
 
-	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &loginResponse); err != nil {
-		t.Errorf("cannot decode RecoverAccount reponse (%s): %v", C.GoString(rawResponse), err)
+	if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &loginResponse); err != nil {
+		t.Errorf("cannot decode RecoverAccount response (%s): %v", C.GoString(rawResponse), err)
 		return false
 	}
 
@@ -669,10 +710,10 @@ func testAccountSelect(t *testing.T) bool {
 		t.Errorf("Test failed: could not select account: %v", loginResponse.Error)
 		return false
 	}
-	if !whisperService.HasIdentity(pubKey2) {
+	if !whisperService.HasKeyPair(pubKey2) {
 		t.Errorf("identity not injected into whisper: %v", err)
 	}
-	if whisperService.HasIdentity(pubKey1) {
+	if whisperService.HasKeyPair(pubKey1) {
 		t.Error("identity should be removed, but it is still present in whisper")
 	}
 
@@ -680,41 +721,41 @@ func testAccountSelect(t *testing.T) bool {
 }
 
 func testAccountLogout(t *testing.T) bool {
-	whisperService, err := geth.NodeManagerInstance().WhisperService()
+	whisperService, err := statusAPI.NodeManager().WhisperService()
 	if err != nil {
 		t.Errorf("whisper service not running: %v", err)
 		return false
 	}
 
 	// create an account
-	address, pubKey, _, err := geth.CreateAccount(testConfig.Account1.Password)
+	address, pubKey, _, err := statusAPI.CreateAccount(TestConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("could not create account: %v", err)
 		return false
 	}
 
 	// make sure that identity doesn't exist (yet) in Whisper
-	if whisperService.HasIdentity(pubKey) {
+	if whisperService.HasKeyPair(pubKey) {
 		t.Error("identity already present in whisper")
 		return false
 	}
 
 	// select/login
-	err = geth.SelectAccount(address, testConfig.Account1.Password)
+	err = statusAPI.SelectAccount(address, TestConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("Test failed: could not select account: %v", err)
 		return false
 	}
-	if !whisperService.HasIdentity(pubKey) {
+	if !whisperService.HasKeyPair(pubKey) {
 		t.Error("identity not injected into whisper")
 		return false
 	}
 
-	logoutResponse := geth.JSONError{}
+	logoutResponse := common.APIResponse{}
 	rawResponse := Logout()
 
 	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &logoutResponse); err != nil {
-		t.Errorf("cannot decode RecoverAccount reponse (%s): %v", C.GoString(rawResponse), err)
+		t.Errorf("cannot decode RecoverAccount response (%s): %v", C.GoString(rawResponse), err)
 		return false
 	}
 
@@ -724,7 +765,7 @@ func testAccountLogout(t *testing.T) bool {
 	}
 
 	// now, logout and check if identity is removed indeed
-	if whisperService.HasIdentity(pubKey) {
+	if whisperService.HasKeyPair(pubKey) {
 		t.Error("identity not cleared from whisper")
 		return false
 	}
@@ -734,7 +775,7 @@ func testAccountLogout(t *testing.T) bool {
 
 func testCompleteTransaction(t *testing.T) bool {
 	// obtain reference to status backend
-	lightEthereum, err := geth.NodeManagerInstance().LightEthereumService()
+	lightEthereum, err := statusAPI.NodeManager().LightEthereumService()
 	if err != nil {
 		t.Errorf("Test failed: LES service is not running: %v", err)
 		return false
@@ -744,38 +785,40 @@ func testCompleteTransaction(t *testing.T) bool {
 	// reset queue
 	backend.TransactionQueue().Reset()
 
+	time.Sleep(5 * time.Second) // allow to sync
+
 	// log into account from which transactions will be sent
-	if err := geth.SelectAccount(testConfig.Account1.Address, testConfig.Account1.Password); err != nil {
-		t.Errorf("cannot select account: %v", testConfig.Account1.Address)
+	if err = statusAPI.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password); err != nil {
+		t.Errorf("cannot select account: %v", TestConfig.Account1.Address)
 		return false
 	}
 
 	// make sure you panic if transaction complete doesn't return
 	queuedTxCompleted := make(chan struct{}, 1)
 	abortPanic := make(chan struct{}, 1)
-	geth.PanicAfter(10*time.Second, abortPanic, "testCompleteTransaction")
+	common.PanicAfter(10*time.Second, abortPanic, "testCompleteTransaction")
 
 	// replace transaction notification handler
 	var txHash = ""
-	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var envelope geth.SignalEnvelope
-		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
+	node.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+		var envelope node.SignalEnvelope
+		if err = json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
 		}
-		if envelope.Type == geth.EventTransactionQueued {
+		if envelope.Type == node.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
 			t.Logf("transaction queued (will be completed shortly): {id: %s}\n", event["id"].(string))
 
-			completeTxResponse := geth.CompleteTransactionResult{}
-			rawResponse := CompleteTransaction(C.CString(event["id"].(string)), C.CString(testConfig.Account1.Password))
+			completeTxResponse := common.CompleteTransactionResult{}
+			rawResponse := CompleteTransaction(C.CString(event["id"].(string)), C.CString(TestConfig.Account1.Password))
 
-			if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &completeTxResponse); err != nil {
-				t.Errorf("cannot decode RecoverAccount reponse (%s): %v", C.GoString(rawResponse), err)
+			if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &completeTxResponse); err != nil {
+				t.Errorf("cannot decode RecoverAccount response (%s): %v", C.GoString(rawResponse), err)
 			}
 
 			if completeTxResponse.Error != "" {
-				t.Errorf("cannot complete queued transation[%v]: %v", event["id"], completeTxResponse.Error)
+				t.Errorf("cannot complete queued transaction[%v]: %v", event["id"], completeTxResponse.Error)
 			}
 
 			txHash = completeTxResponse.Hash
@@ -788,8 +831,8 @@ func testCompleteTransaction(t *testing.T) bool {
 
 	//  this call blocks, up until Complete Transaction is called
 	txHashCheck, err := backend.SendTransaction(nil, status.SendTxArgs{
-		From:  geth.FromAddress(testConfig.Account1.Address),
-		To:    geth.ToAddress(testConfig.Account2.Address),
+		From:  common.FromAddress(TestConfig.Account1.Address),
+		To:    common.ToAddress(TestConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 	})
 	if err != nil {
@@ -803,7 +846,7 @@ func testCompleteTransaction(t *testing.T) bool {
 		return false
 	}
 
-	if reflect.DeepEqual(txHashCheck, common.Hash{}) {
+	if reflect.DeepEqual(txHashCheck, gethcommon.Hash{}) {
 		t.Error("Test failed: transaction was never queued or completed")
 		return false
 	}
@@ -818,7 +861,7 @@ func testCompleteTransaction(t *testing.T) bool {
 
 func testCompleteMultipleQueuedTransactions(t *testing.T) bool {
 	// obtain reference to status backend
-	lightEthereum, err := geth.NodeManagerInstance().LightEthereumService()
+	lightEthereum, err := statusAPI.NodeManager().LightEthereumService()
 	if err != nil {
 		t.Errorf("Test failed: LES service is not running: %v", err)
 		return false
@@ -829,38 +872,38 @@ func testCompleteMultipleQueuedTransactions(t *testing.T) bool {
 	backend.TransactionQueue().Reset()
 
 	// log into account from which transactions will be sent
-	if err := geth.SelectAccount(testConfig.Account1.Address, testConfig.Account1.Password); err != nil {
-		t.Errorf("cannot select account: %v", testConfig.Account1.Address)
+	if err := statusAPI.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password); err != nil {
+		t.Errorf("cannot select account: %v", TestConfig.Account1.Address)
 		return false
 	}
 
 	// make sure you panic if transaction complete doesn't return
 	testTxCount := 3
-	txIds := make(chan string, testTxCount)
+	txIDs := make(chan string, testTxCount)
 	allTestTxCompleted := make(chan struct{}, 1)
 
 	// replace transaction notification handler
-	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var txId string
-		var envelope geth.SignalEnvelope
+	node.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+		var txID string
+		var envelope node.SignalEnvelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
 		}
-		if envelope.Type == geth.EventTransactionQueued {
+		if envelope.Type == node.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
-			txId = event["id"].(string)
-			t.Logf("transaction queued (will be completed in a single call, once aggregated): {id: %s}\n", txId)
+			txID = event["id"].(string)
+			t.Logf("transaction queued (will be completed in a single call, once aggregated): {id: %s}\n", txID)
 
-			txIds <- txId
+			txIDs <- txID
 		}
 	})
 
 	//  this call blocks, and should return when DiscardQueuedTransaction() for a given tx id is called
 	sendTx := func() {
 		txHashCheck, err := backend.SendTransaction(nil, status.SendTxArgs{
-			From:  geth.FromAddress(testConfig.Account1.Address),
-			To:    geth.ToAddress(testConfig.Account2.Address),
+			From:  common.FromAddress(TestConfig.Account1.Address),
+			To:    common.ToAddress(TestConfig.Account2.Address),
 			Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 		})
 		if err != nil {
@@ -868,65 +911,71 @@ func testCompleteMultipleQueuedTransactions(t *testing.T) bool {
 			return
 		}
 
-		if reflect.DeepEqual(txHashCheck, common.Hash{}) {
+		if reflect.DeepEqual(txHashCheck, gethcommon.Hash{}) {
 			t.Error("transaction returned empty hash")
 			return
 		}
 	}
 
 	// wait for transactions, and complete them in a single call
-	completeTxs := func(txIdStrings string) {
-		var parsedIds []string
-		json.Unmarshal([]byte(txIdStrings), &parsedIds)
+	completeTxs := func(txIDStrings string) {
+		var parsedIDs []string
+		if err := json.Unmarshal([]byte(txIDStrings), &parsedIDs); err != nil {
+			t.Error(err)
+			return
+		}
 
-		parsedIds = append(parsedIds, "invalid-tx-id")
-		updatedTxIdStrings, _ := json.Marshal(parsedIds)
+		parsedIDs = append(parsedIDs, "invalid-tx-id")
+		updatedTxIDStrings, _ := json.Marshal(parsedIDs)
 
 		// complete
-		resultsString := CompleteTransactions(C.CString(string(updatedTxIdStrings)), C.CString(testConfig.Account1.Password))
-		resultsStruct := geth.CompleteTransactionsResult{}
-		json.Unmarshal([]byte(C.GoString(resultsString)), &resultsStruct)
+		resultsString := CompleteTransactions(C.CString(string(updatedTxIDStrings)), C.CString(TestConfig.Account1.Password))
+		resultsStruct := common.CompleteTransactionsResult{}
+		if err := json.Unmarshal([]byte(C.GoString(resultsString)), &resultsStruct); err != nil {
+			t.Error(err)
+			return
+		}
 		results := resultsStruct.Results
 
-		if len(results) != (testTxCount+1) || results["invalid-tx-id"].Error != "transaction hash not found" {
+		if len(results) != (testTxCount+1) || results["invalid-tx-id"].Error != status.ErrQueuedTxIDNotFound.Error() {
 			t.Errorf("cannot complete txs: %v", results)
 			return
 		}
-		for txId, txResult := range results {
-			if txId != txResult.Id {
-				t.Errorf("tx id not set in result: expected id is %s", txId)
+		for txID, txResult := range results {
+			if txID != txResult.ID {
+				t.Errorf("tx id not set in result: expected id is %s", txID)
 				return
 			}
-			if txResult.Error != "" && txId != "invalid-tx-id" {
-				t.Errorf("invalid error for %s", txId)
+			if txResult.Error != "" && txID != "invalid-tx-id" {
+				t.Errorf("invalid error for %s", txID)
 				return
 			}
-			if txResult.Hash == "0x0000000000000000000000000000000000000000000000000000000000000000" && txId != "invalid-tx-id" {
-				t.Errorf("invalid hash (expected non empty hash): %s", txId)
+			if txResult.Hash == zeroHash && txID != "invalid-tx-id" {
+				t.Errorf("invalid hash (expected non empty hash): %s", txID)
 				return
 			}
 
-			if txResult.Hash != "0x0000000000000000000000000000000000000000000000000000000000000000" {
+			if txResult.Hash != zeroHash {
 				t.Logf("transaction complete: https://testnet.etherscan.io/tx/%s", txResult.Hash)
 			}
 		}
 
 		time.Sleep(1 * time.Second) // make sure that tx complete signal propagates
-		for _, txId := range parsedIds {
-			if backend.TransactionQueue().Has(status.QueuedTxId(txId)) {
-				t.Errorf("txqueue should not have test tx at this point (it should be completed): %s", txId)
+		for _, txID := range parsedIDs {
+			if backend.TransactionQueue().Has(status.QueuedTxID(txID)) {
+				t.Errorf("txqueue should not have test tx at this point (it should be completed): %s", txID)
 				return
 			}
 		}
 	}
 	go func() {
-		var txIdStrings []string
+		var txIDStrings []string
 		for i := 0; i < testTxCount; i++ {
-			txIdStrings = append(txIdStrings, <-txIds)
+			txIDStrings = append(txIDStrings, <-txIDs)
 		}
 
-		txIdJSON, _ := json.Marshal(txIdStrings)
-		completeTxs(string(txIdJSON))
+		txIDJSON, _ := json.Marshal(txIDStrings)
+		completeTxs(string(txIDJSON))
 		allTestTxCompleted <- struct{}{}
 	}()
 
@@ -953,7 +1002,7 @@ func testCompleteMultipleQueuedTransactions(t *testing.T) bool {
 
 func testDiscardTransaction(t *testing.T) bool {
 	// obtain reference to status backend
-	lightEthereum, err := geth.NodeManagerInstance().LightEthereumService()
+	lightEthereum, err := statusAPI.NodeManager().LightEthereumService()
 	if err != nil {
 		t.Errorf("Test failed: LES service is not running: %v", err)
 		return false
@@ -964,40 +1013,40 @@ func testDiscardTransaction(t *testing.T) bool {
 	backend.TransactionQueue().Reset()
 
 	// log into account from which transactions will be sent
-	if err := geth.SelectAccount(testConfig.Account1.Address, testConfig.Account1.Password); err != nil {
-		t.Errorf("cannot select account: %v", testConfig.Account1.Address)
+	if err = statusAPI.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password); err != nil {
+		t.Errorf("cannot select account: %v", TestConfig.Account1.Address)
 		return false
 	}
 
 	// make sure you panic if transaction complete doesn't return
 	completeQueuedTransaction := make(chan struct{}, 1)
-	geth.PanicAfter(20*time.Second, completeQueuedTransaction, "TestDiscardQueuedTransactions")
+	common.PanicAfter(20*time.Second, completeQueuedTransaction, "testDiscardTransaction")
 
 	// replace transaction notification handler
-	var txId string
+	var txID string
 	txFailedEventCalled := false
-	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var envelope geth.SignalEnvelope
-		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
+	node.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+		var envelope node.SignalEnvelope
+		if err = json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
 		}
-		if envelope.Type == geth.EventTransactionQueued {
+		if envelope.Type == node.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
-			txId = event["id"].(string)
-			t.Logf("transaction queued (will be discarded soon): {id: %s}\n", txId)
+			txID = event["id"].(string)
+			t.Logf("transaction queued (will be discarded soon): {id: %s}\n", txID)
 
-			if !backend.TransactionQueue().Has(status.QueuedTxId(txId)) {
-				t.Errorf("txqueue should still have test tx: %s", txId)
+			if !backend.TransactionQueue().Has(status.QueuedTxID(txID)) {
+				t.Errorf("txqueue should still have test tx: %s", txID)
 				return
 			}
 
 			// discard
-			discardResponse := geth.DiscardTransactionResult{}
-			rawResponse := DiscardTransaction(C.CString(txId))
+			discardResponse := common.DiscardTransactionResult{}
+			rawResponse := DiscardTransaction(C.CString(txID))
 
-			if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &discardResponse); err != nil {
-				t.Errorf("cannot decode RecoverAccount reponse (%s): %v", C.GoString(rawResponse), err)
+			if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &discardResponse); err != nil {
+				t.Errorf("cannot decode RecoverAccount response (%s): %v", C.GoString(rawResponse), err)
 			}
 
 			if discardResponse.Error != "" {
@@ -1006,22 +1055,22 @@ func testDiscardTransaction(t *testing.T) bool {
 			}
 
 			// try completing discarded transaction
-			_, err = geth.CompleteTransaction(txId, testConfig.Account1.Password)
-			if err.Error() != "transaction hash not found" {
+			_, err = statusAPI.CompleteTransaction(txID, TestConfig.Account1.Password)
+			if err != status.ErrQueuedTxIDNotFound {
 				t.Error("expects tx not found, but call to CompleteTransaction succeeded")
 				return
 			}
 
 			time.Sleep(1 * time.Second) // make sure that tx complete signal propagates
-			if backend.TransactionQueue().Has(status.QueuedTxId(txId)) {
-				t.Errorf("txqueue should not have test tx at this point (it should be discarded): %s", txId)
+			if backend.TransactionQueue().Has(status.QueuedTxID(txID)) {
+				t.Errorf("txqueue should not have test tx at this point (it should be discarded): %s", txID)
 				return
 			}
 
 			completeQueuedTransaction <- struct{}{} // so that timeout is aborted
 		}
 
-		if envelope.Type == geth.EventTransactionFailed {
+		if envelope.Type == node.EventTransactionFailed {
 			event := envelope.Event.(map[string]interface{})
 			t.Logf("transaction return event received: {id: %s}\n", event["id"].(string))
 
@@ -1033,7 +1082,7 @@ func testDiscardTransaction(t *testing.T) bool {
 			}
 
 			receivedErrCode := event["error_code"].(string)
-			if receivedErrCode != geth.SendTransactionDiscardedErrorCode {
+			if receivedErrCode != node.SendTransactionDiscardedErrorCode {
 				t.Errorf("unexpected error code received: got %v", receivedErrCode)
 				return
 			}
@@ -1044,8 +1093,8 @@ func testDiscardTransaction(t *testing.T) bool {
 
 	//  this call blocks, and should return when DiscardQueuedTransaction() is called
 	txHashCheck, err := backend.SendTransaction(nil, status.SendTxArgs{
-		From:  geth.FromAddress(testConfig.Account1.Address),
-		To:    geth.ToAddress(testConfig.Account2.Address),
+		From:  common.FromAddress(TestConfig.Account1.Address),
+		To:    common.ToAddress(TestConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 	})
 	if err != status.ErrQueuedTxDiscarded {
@@ -1053,7 +1102,7 @@ func testDiscardTransaction(t *testing.T) bool {
 		return false
 	}
 
-	if !reflect.DeepEqual(txHashCheck, common.Hash{}) {
+	if !reflect.DeepEqual(txHashCheck, gethcommon.Hash{}) {
 		t.Error("transaction returned hash, while it shouldn't")
 		return false
 	}
@@ -1073,7 +1122,7 @@ func testDiscardTransaction(t *testing.T) bool {
 
 func testDiscardMultipleQueuedTransactions(t *testing.T) bool {
 	// obtain reference to status backend
-	lightEthereum, err := geth.NodeManagerInstance().LightEthereumService()
+	lightEthereum, err := statusAPI.NodeManager().LightEthereumService()
 	if err != nil {
 		t.Errorf("Test failed: LES service is not running: %v", err)
 		return false
@@ -1084,39 +1133,39 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool {
 	backend.TransactionQueue().Reset()
 
 	// log into account from which transactions will be sent
-	if err := geth.SelectAccount(testConfig.Account1.Address, testConfig.Account1.Password); err != nil {
-		t.Errorf("cannot select account: %v", testConfig.Account1.Address)
+	if err := statusAPI.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password); err != nil {
+		t.Errorf("cannot select account: %v", TestConfig.Account1.Address)
 		return false
 	}
 
 	// make sure you panic if transaction complete doesn't return
 	testTxCount := 3
-	txIds := make(chan string, testTxCount)
+	txIDs := make(chan string, testTxCount)
 	allTestTxDiscarded := make(chan struct{}, 1)
 
 	// replace transaction notification handler
 	txFailedEventCallCount := 0
-	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var txId string
-		var envelope geth.SignalEnvelope
+	node.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+		var txID string
+		var envelope node.SignalEnvelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
 		}
-		if envelope.Type == geth.EventTransactionQueued {
+		if envelope.Type == node.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
-			txId = event["id"].(string)
-			t.Logf("transaction queued (will be discarded soon): {id: %s}\n", txId)
+			txID = event["id"].(string)
+			t.Logf("transaction queued (will be discarded soon): {id: %s}\n", txID)
 
-			if !backend.TransactionQueue().Has(status.QueuedTxId(txId)) {
-				t.Errorf("txqueue should still have test tx: %s", txId)
+			if !backend.TransactionQueue().Has(status.QueuedTxID(txID)) {
+				t.Errorf("txqueue should still have test tx: %s", txID)
 				return
 			}
 
-			txIds <- txId
+			txIDs <- txID
 		}
 
-		if envelope.Type == geth.EventTransactionFailed {
+		if envelope.Type == node.EventTransactionFailed {
 			event := envelope.Event.(map[string]interface{})
 			t.Logf("transaction return event received: {id: %s}\n", event["id"].(string))
 
@@ -1128,7 +1177,7 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool {
 			}
 
 			receivedErrCode := event["error_code"].(string)
-			if receivedErrCode != geth.SendTransactionDiscardedErrorCode {
+			if receivedErrCode != node.SendTransactionDiscardedErrorCode {
 				t.Errorf("unexpected error code received: got %v", receivedErrCode)
 				return
 			}
@@ -1143,8 +1192,8 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool {
 	//  this call blocks, and should return when DiscardQueuedTransaction() for a given tx id is called
 	sendTx := func() {
 		txHashCheck, err := backend.SendTransaction(nil, status.SendTxArgs{
-			From:  geth.FromAddress(testConfig.Account1.Address),
-			To:    geth.ToAddress(testConfig.Account2.Address),
+			From:  common.FromAddress(TestConfig.Account1.Address),
+			To:    common.ToAddress(TestConfig.Account2.Address),
 			Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 		})
 		if err != status.ErrQueuedTxDiscarded {
@@ -1152,71 +1201,80 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool {
 			return
 		}
 
-		if !reflect.DeepEqual(txHashCheck, common.Hash{}) {
+		if !reflect.DeepEqual(txHashCheck, gethcommon.Hash{}) {
 			t.Error("transaction returned hash, while it shouldn't")
 			return
 		}
 	}
 
 	// wait for transactions, and discard immediately
-	discardTxs := func(txIdStrings string) {
-		var parsedIds []string
-		json.Unmarshal([]byte(txIdStrings), &parsedIds)
+	discardTxs := func(txIDStrings string) {
+		var parsedIDs []string
+		if err := json.Unmarshal([]byte(txIDStrings), &parsedIDs); err != nil {
+			t.Error(err)
+			return
+		}
 
-		parsedIds = append(parsedIds, "invalid-tx-id")
-		updatedTxIdStrings, _ := json.Marshal(parsedIds)
+		parsedIDs = append(parsedIDs, "invalid-tx-id")
+		updatedTxIDStrings, _ := json.Marshal(parsedIDs)
 
 		// discard
-		discardResultsString := DiscardTransactions(C.CString(string(updatedTxIdStrings)))
-		discardResultsStruct := geth.DiscardTransactionsResult{}
-		json.Unmarshal([]byte(C.GoString(discardResultsString)), &discardResultsStruct)
+		discardResultsString := DiscardTransactions(C.CString(string(updatedTxIDStrings)))
+		discardResultsStruct := common.DiscardTransactionsResult{}
+		if err := json.Unmarshal([]byte(C.GoString(discardResultsString)), &discardResultsStruct); err != nil {
+			t.Error(err)
+			return
+		}
 		discardResults := discardResultsStruct.Results
 
-		if len(discardResults) != 1 || discardResults["invalid-tx-id"].Error != "transaction hash not found" {
+		if len(discardResults) != 1 || discardResults["invalid-tx-id"].Error != status.ErrQueuedTxIDNotFound.Error() {
 			t.Errorf("cannot discard txs: %v", discardResults)
 			return
 		}
 
 		// try completing discarded transaction
-		completeResultsString := CompleteTransactions(C.CString(string(updatedTxIdStrings)), C.CString(testConfig.Account1.Password))
-		completeResultsStruct := geth.CompleteTransactionsResult{}
-		json.Unmarshal([]byte(C.GoString(completeResultsString)), &completeResultsStruct)
+		completeResultsString := CompleteTransactions(C.CString(string(updatedTxIDStrings)), C.CString(TestConfig.Account1.Password))
+		completeResultsStruct := common.CompleteTransactionsResult{}
+		if err := json.Unmarshal([]byte(C.GoString(completeResultsString)), &completeResultsStruct); err != nil {
+			t.Error(err)
+			return
+		}
 		completeResults := completeResultsStruct.Results
 
 		if len(completeResults) != (testTxCount + 1) {
 			t.Error("unexpected number of errors (call to CompleteTransaction should not succeed)")
 		}
-		for txId, txResult := range completeResults {
-			if txId != txResult.Id {
-				t.Errorf("tx id not set in result: expected id is %s", txId)
+		for txID, txResult := range completeResults {
+			if txID != txResult.ID {
+				t.Errorf("tx id not set in result: expected id is %s", txID)
 				return
 			}
-			if txResult.Error != "transaction hash not found" {
+			if txResult.Error != status.ErrQueuedTxIDNotFound.Error() {
 				t.Errorf("invalid error for %s", txResult.Hash)
 				return
 			}
-			if txResult.Hash != "0x0000000000000000000000000000000000000000000000000000000000000000" {
+			if txResult.Hash != zeroHash {
 				t.Errorf("invalid hash (expected zero): %s", txResult.Hash)
 				return
 			}
 		}
 
 		time.Sleep(1 * time.Second) // make sure that tx complete signal propagates
-		for _, txId := range parsedIds {
-			if backend.TransactionQueue().Has(status.QueuedTxId(txId)) {
-				t.Errorf("txqueue should not have test tx at this point (it should be discarded): %s", txId)
+		for _, txID := range parsedIDs {
+			if backend.TransactionQueue().Has(status.QueuedTxID(txID)) {
+				t.Errorf("txqueue should not have test tx at this point (it should be discarded): %s", txID)
 				return
 			}
 		}
 	}
 	go func() {
-		var txIdStrings []string
+		var txIDStrings []string
 		for i := 0; i < testTxCount; i++ {
-			txIdStrings = append(txIdStrings, <-txIds)
+			txIDStrings = append(txIDStrings, <-txIDs)
 		}
 
-		txIdJSON, _ := json.Marshal(txIdStrings)
-		discardTxs(string(txIdJSON))
+		txIDJSON, _ := json.Marshal(txIDStrings)
+		discardTxs(string(txIDJSON))
 	}()
 
 	// send multiple transactions
@@ -1272,7 +1330,7 @@ func testJailFunctionCall(t *testing.T) bool {
 	InitJail(C.CString(""))
 
 	// load Status JS and add test command to it
-	statusJS := geth.LoadFromFile(filepath.Join(geth.RootDir, "geth/jail/testdata/status.js")) + `;
+	statusJS := string(static.MustAsset("testdata/jail/status.js")) + `;
 	_status_catalog.commands["testCommand"] = function (params) {
 		return params.val * params.val;
 	};`
@@ -1303,37 +1361,44 @@ func testJailFunctionCall(t *testing.T) bool {
 
 func startTestNode(t *testing.T) <-chan struct{} {
 	syncRequired := false
-	if _, err := os.Stat(geth.TestDataDir); os.IsNotExist(err) {
+	if _, err := os.Stat(TestDataDir); os.IsNotExist(err) {
 		syncRequired = true
 	}
 
 	// inject test accounts
-	geth.ImportTestAccount(filepath.Join(geth.TestDataDir, "keystore"), "test-account1.pk")
-	geth.ImportTestAccount(filepath.Join(geth.TestDataDir, "keystore"), "test-account2.pk")
+	if err := common.ImportTestAccount(filepath.Join(TestDataDir, "keystore"), "test-account1.pk"); err != nil {
+		panic(err)
+	}
+	if err := common.ImportTestAccount(filepath.Join(TestDataDir, "keystore"), "test-account2.pk"); err != nil {
+		panic(err)
+	}
 
 	waitForNodeStart := make(chan struct{}, 1)
-	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+	node.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		t.Log(jsonEvent)
-		var envelope geth.SignalEnvelope
+		var envelope node.SignalEnvelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
 		}
-		if envelope.Type == geth.EventNodeCrashed {
-			geth.TriggerDefaultNodeNotificationHandler(jsonEvent)
+		if envelope.Type == node.EventNodeCrashed {
+			node.TriggerDefaultNodeNotificationHandler(jsonEvent)
 			return
 		}
 
-		if envelope.Type == geth.EventTransactionQueued {
+		if envelope.Type == node.EventTransactionQueued {
 		}
-		if envelope.Type == geth.EventNodeStarted {
+		if envelope.Type == node.EventNodeStarted {
+			t.Log("Node started, but we wait till it be ready")
+		}
+		if envelope.Type == node.EventNodeReady {
 			// manually add static nodes (LES auto-discovery is not stable yet)
 			PopulateStaticPeers()
 
 			// sync
 			if syncRequired {
-				t.Logf("Sync is required, it will take %d seconds", testConfig.Node.SyncSeconds)
-				time.Sleep(testConfig.Node.SyncSeconds * time.Second) // LES syncs headers, so that we are up do date when it is done
+				t.Logf("Sync is required, it will take %d seconds", TestConfig.Node.SyncSeconds)
+				time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // LES syncs headers, so that we are up do date when it is done
 			} else {
 				time.Sleep(5 * time.Second)
 			}
@@ -1344,20 +1409,14 @@ func startTestNode(t *testing.T) <-chan struct{} {
 	})
 
 	go func() {
-		configJSON := `{
-			"NetworkId": ` + strconv.Itoa(params.TestNetworkId) + `,
-			"DataDir": "` + geth.TestDataDir + `",
-			"HTTPPort": ` + strconv.Itoa(testConfig.Node.HTTPPort) + `,
-			"WSPort": ` + strconv.Itoa(testConfig.Node.WSPort) + `,
-			"LogEnabled": true,
-			"LogLevel": "INFO"
-		}`
-		response := StartNode(C.CString(configJSON))
-		err := geth.JSONError{}
+		response := StartNode(C.CString(nodeConfigJSON))
+		responseErr := common.APIResponse{}
 
-		json.Unmarshal([]byte(C.GoString(response)), &err)
-		if err.Error != "" {
-			panic("cannot start node: " + err.Error)
+		if err := json.Unmarshal([]byte(C.GoString(response)), &responseErr); err != nil {
+			panic(err)
+		}
+		if responseErr.Error != "" {
+			panic("cannot start node: " + responseErr.Error)
 		}
 	}()
 

@@ -47,21 +47,80 @@ statusgo-ios-simulator-mainnet: xgo
 	@echo "iOS framework cross compilation done (mainnet)."
 
 ci:
-	build/env.sh go test -v -cover ./geth
-	build/env.sh go test -v -cover ./geth/params
-	build/env.sh go test -v -cover ./geth/jail
-	build/env.sh go test -v -cover ./extkeys
+	build/env.sh go test -v ./geth/api
+	build/env.sh go test -v ./geth/common
+	build/env.sh go test -v ./geth/jail
+	build/env.sh go test -v ./geth/node
+	build/env.sh go test -v ./geth/params
+	build/env.sh go test -v ./extkeys
 
 generate:
+	cp ./node_modules/web3/dist/web3.js ./static/scripts/web3.js
 	build/env.sh go generate ./static
+	rm ./static/scripts/web3.js
+
+lint-deps:
+	go get -u github.com/alecthomas/gometalinter
+	gometalinter --install
+
+lint-cur:
+	gometalinter --disable-all --enable=deadcode extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
+
+lint:
+	@echo "Linter: go vet\n--------------------"
+	@gometalinter --disable-all --enable=vet extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
+	@echo "Linter: go vet --shadow\n--------------------"
+	@gometalinter --disable-all --enable=vetshadow extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
+	@echo "Linter: gofmt\n--------------------"
+	@gometalinter --disable-all --enable=gofmt extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
+	@echo "Linter: goimports\n--------------------"
+	@gometalinter --disable-all --enable=goimports extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
+	@echo "Linter: golint\n--------------------"
+	@gometalinter --disable-all --enable=golint extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
+	@echo "Linter: deadcode\n--------------------"
+	@gometalinter --disable-all --enable=deadcode extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
+	@echo "Linter: misspell\n--------------------"
+	@gometalinter --disable-all --enable=misspell extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
+	@echo "Linter: unparam\n--------------------"
+	@gometalinter --disable-all --deadline 45s --enable=unparam extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
+	@echo "Linter: unused\n--------------------"
+	@gometalinter --disable-all --deadline 45s --enable=unused extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
+	@echo "Linter: gocyclo\n--------------------"
+	@gometalinter --disable-all --enable=gocyclo extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
+	@echo "Linter: errcheck\n--------------------"
+	@gometalinter --disable-all --enable=errcheck extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
+	@echo "Linter: dupl\n--------------------"
+	@gometalinter --disable-all --enable=dupl extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
+	@echo "Linter: ineffassign\n--------------------"
+	@gometalinter --disable-all --enable=ineffassign extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
+	@echo "Linter: interfacer\n--------------------"
+	@gometalinter --disable-all --enable=interfacer extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
+	@echo "Linter: unconvert\n--------------------"
+	@gometalinter --disable-all --enable=unconvert extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
+	@echo "Linter: goconst\n--------------------"
+	@gometalinter --disable-all --enable=goconst extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
+	@echo "Linter: staticcheck\n--------------------"
+	@gometalinter --disable-all --deadline 45s --enable=staticcheck extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
+	@echo "Linter: gas\n--------------------"
+	@gometalinter --disable-all --enable=gas extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
+	@echo "Linter: varcheck\n--------------------"
+	@gometalinter --disable-all --deadline 60s --enable=varcheck extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
+	@echo "Linter: structcheck\n--------------------"
+	@gometalinter --disable-all --enable=structcheck extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
+	@echo "Linter: gosimple\n--------------------"
+	@gometalinter --disable-all --deadline 45s --enable=gosimple extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
 
 test:
 	@build/env.sh echo "mode: set" > coverage-all.out
-	build/env.sh go test -coverprofile=coverage.out -covermode=set ./geth
+	build/env.sh go test -coverprofile=coverage.out -covermode=set ./geth/api
 	@build/env.sh tail -n +2 coverage.out >> coverage-all.out
-	build/env.sh go test -coverprofile=coverage.out -covermode=set ./geth/params
+	build/env.sh go test -coverprofile=coverage.out -covermode=set ./geth/common
 	@build/env.sh tail -n +2 coverage.out >> coverage-all.out
 	build/env.sh go test -coverprofile=coverage.out -covermode=set ./geth/jail
+	@build/env.sh tail -n +2 coverage.out >> coverage-all.out
+	build/env.sh go test -coverprofile=coverage.out -covermode=set ./geth/node
+	@build/env.sh tail -n +2 coverage.out >> coverage-all.out
+	build/env.sh go test -coverprofile=coverage.out -covermode=set ./geth/params
 	@build/env.sh tail -n +2 coverage.out >> coverage-all.out
 	build/env.sh go test -coverprofile=coverage.out -covermode=set ./extkeys
 	@build/env.sh tail -n +2 coverage.out >> coverage-all.out
@@ -70,18 +129,28 @@ test:
 	@build/env.sh go tool cover -html=coverage-all.out -o coverage.html
 	@build/env.sh go tool cover -func=coverage-all.out
 
-test-geth:
-	build/env.sh go test -v -coverprofile=coverage.out ./geth
+test-api:
+	build/env.sh go test -v -coverprofile=coverage.out  -coverpkg=./geth/node ./geth/api
 	@build/env.sh go tool cover -html=coverage.out -o coverage.html
 	@build/env.sh go tool cover -func=coverage.out
 
-test-params:
-	build/env.sh go test -v -coverprofile=coverage.out ./geth/params
+test-common:
+	build/env.sh go test -v -coverprofile=coverage.out ./geth/common
 	@build/env.sh go tool cover -html=coverage.out -o coverage.html
 	@build/env.sh go tool cover -func=coverage.out
 
 test-jail:
 	build/env.sh go test -v -coverprofile=coverage.out ./geth/jail
+	@build/env.sh go tool cover -html=coverage.out -o coverage.html
+	@build/env.sh go tool cover -func=coverage.out
+
+test-node:
+	build/env.sh go test -v -coverprofile=coverage.out ./geth/node
+	@build/env.sh go tool cover -html=coverage.out -o coverage.html
+	@build/env.sh go tool cover -func=coverage.out
+
+test-params:
+	build/env.sh go test -v -coverprofile=coverage.out ./geth/params
 	@build/env.sh go tool cover -html=coverage.out -o coverage.html
 	@build/env.sh go tool cover -func=coverage.out
 

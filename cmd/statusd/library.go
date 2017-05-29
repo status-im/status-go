@@ -6,16 +6,89 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/status-im/status-go/geth"
-	"github.com/status-im/status-go/geth/jail"
+	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
 )
+
+//export GenerateConfig
+func GenerateConfig(datadir *C.char, networkID C.int, devMode C.int) *C.char {
+	config, err := params.NewNodeConfig(C.GoString(datadir), uint64(networkID), devMode == 1)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	outBytes, err := json.Marshal(&config)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return C.CString(string(outBytes))
+}
+
+//export StartNode
+func StartNode(configJSON *C.char) *C.char {
+	config, err := params.LoadNodeConfig(C.GoString(configJSON))
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	_, err = statusAPI.StartNodeAsync(config)
+	return makeJSONResponse(err)
+}
+
+//export StopNode
+func StopNode() *C.char {
+	_, err := statusAPI.StopNodeAsync()
+	return makeJSONResponse(err)
+}
+
+//export ResetChainData
+func ResetChainData() *C.char {
+	_, err := statusAPI.ResetChainDataAsync()
+	return makeJSONResponse(err)
+}
+
+//export CallRPC
+func CallRPC(inputJSON *C.char) *C.char {
+	outputJSON := statusAPI.CallRPC(C.GoString(inputJSON))
+	return C.CString(outputJSON)
+}
+
+//export ResumeNode
+func ResumeNode() *C.char {
+	err := fmt.Errorf("%v: %v", common.ErrDeprecatedMethod.Error(), "ResumeNode")
+	return makeJSONResponse(err)
+}
+
+//export StopNodeRPCServer
+func StopNodeRPCServer() *C.char {
+	err := fmt.Errorf("%v: %v", common.ErrDeprecatedMethod.Error(), "StopNodeRPCServer")
+	return makeJSONResponse(err)
+}
+
+//export StartNodeRPCServer
+func StartNodeRPCServer() *C.char {
+	err := fmt.Errorf("%v: %v", common.ErrDeprecatedMethod.Error(), "StartNodeRPCServer")
+	return makeJSONResponse(err)
+}
+
+//export PopulateStaticPeers
+func PopulateStaticPeers() *C.char {
+	err := fmt.Errorf("%v: %v", common.ErrDeprecatedMethod.Error(), "PopulateStaticPeers")
+	return makeJSONResponse(err)
+}
+
+//export AddPeer
+func AddPeer(url *C.char) *C.char {
+	err := fmt.Errorf("%v: %v", common.ErrDeprecatedMethod.Error(), "AddPeer")
+	return makeJSONResponse(err)
+}
 
 //export CreateAccount
 func CreateAccount(password *C.char) *C.char {
 	// This is equivalent to creating an account from the command line,
 	// just modified to handle the function arg passing
-	address, pubKey, mnemonic, err := geth.CreateAccount(C.GoString(password))
+	address, pubKey, mnemonic, err := statusAPI.CreateAccount(C.GoString(password))
 
 	errString := ""
 	if err != nil {
@@ -23,21 +96,19 @@ func CreateAccount(password *C.char) *C.char {
 		errString = err.Error()
 	}
 
-	out := geth.AccountInfo{
+	out := common.AccountInfo{
 		Address:  address,
 		PubKey:   pubKey,
 		Mnemonic: mnemonic,
 		Error:    errString,
 	}
 	outBytes, _ := json.Marshal(&out)
-
 	return C.CString(string(outBytes))
 }
 
 //export CreateChildAccount
 func CreateChildAccount(parentAddress, password *C.char) *C.char {
-
-	address, pubKey, err := geth.CreateChildAccount(C.GoString(parentAddress), C.GoString(password))
+	address, pubKey, err := statusAPI.CreateChildAccount(C.GoString(parentAddress), C.GoString(password))
 
 	errString := ""
 	if err != nil {
@@ -45,20 +116,18 @@ func CreateChildAccount(parentAddress, password *C.char) *C.char {
 		errString = err.Error()
 	}
 
-	out := geth.AccountInfo{
+	out := common.AccountInfo{
 		Address: address,
 		PubKey:  pubKey,
 		Error:   errString,
 	}
 	outBytes, _ := json.Marshal(&out)
-
 	return C.CString(string(outBytes))
 }
 
 //export RecoverAccount
 func RecoverAccount(password, mnemonic *C.char) *C.char {
-
-	address, pubKey, err := geth.RecoverAccount(C.GoString(password), C.GoString(mnemonic))
+	address, pubKey, err := statusAPI.RecoverAccount(C.GoString(password), C.GoString(mnemonic))
 
 	errString := ""
 	if err != nil {
@@ -66,60 +135,40 @@ func RecoverAccount(password, mnemonic *C.char) *C.char {
 		errString = err.Error()
 	}
 
-	out := geth.AccountInfo{
+	out := common.AccountInfo{
 		Address:  address,
 		PubKey:   pubKey,
 		Mnemonic: C.GoString(mnemonic),
 		Error:    errString,
 	}
 	outBytes, _ := json.Marshal(&out)
-
 	return C.CString(string(outBytes))
+}
+
+//export VerifyAccountPassword
+func VerifyAccountPassword(keyStoreDir, address, password *C.char) *C.char {
+	_, err := statusAPI.VerifyAccountPassword(C.GoString(keyStoreDir), C.GoString(address), C.GoString(password))
+	return makeJSONResponse(err)
 }
 
 //export Login
 func Login(address, password *C.char) *C.char {
 	// loads a key file (for a given address), tries to decrypt it using the password, to verify ownership
 	// if verified, purges all the previous identities from Whisper, and injects verified key as shh identity
-	err := geth.SelectAccount(C.GoString(address), C.GoString(password))
-
-	errString := ""
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		errString = err.Error()
-	}
-
-	out := geth.JSONError{
-		Error: errString,
-	}
-	outBytes, _ := json.Marshal(&out)
-
-	return C.CString(string(outBytes))
+	err := statusAPI.SelectAccount(C.GoString(address), C.GoString(password))
+	return makeJSONResponse(err)
 }
 
 //export Logout
 func Logout() *C.char {
-
 	// This is equivalent to clearing whisper identities
-	err := geth.Logout()
-
-	errString := ""
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		errString = err.Error()
-	}
-
-	out := geth.JSONError{
-		Error: errString,
-	}
-	outBytes, _ := json.Marshal(&out)
-
-	return C.CString(string(outBytes))
+	err := statusAPI.Logout()
+	return makeJSONResponse(err)
 }
 
 //export CompleteTransaction
 func CompleteTransaction(id, password *C.char) *C.char {
-	txHash, err := geth.CompleteTransaction(C.GoString(id), C.GoString(password))
+	txHash, err := statusAPI.CompleteTransaction(C.GoString(id), C.GoString(password))
 
 	errString := ""
 	if err != nil {
@@ -127,8 +176,8 @@ func CompleteTransaction(id, password *C.char) *C.char {
 		errString = err.Error()
 	}
 
-	out := geth.CompleteTransactionResult{
-		Id:    C.GoString(id),
+	out := common.CompleteTransactionResult{
+		ID:    C.GoString(id),
 		Hash:  txHash.Hex(),
 		Error: errString,
 	}
@@ -139,19 +188,19 @@ func CompleteTransaction(id, password *C.char) *C.char {
 
 //export CompleteTransactions
 func CompleteTransactions(ids, password *C.char) *C.char {
-	out := geth.CompleteTransactionsResult{}
-	out.Results = make(map[string]geth.CompleteTransactionResult)
+	out := common.CompleteTransactionsResult{}
+	out.Results = make(map[string]common.CompleteTransactionResult)
 
-	results := geth.CompleteTransactions(C.GoString(ids), C.GoString(password))
-	for txId, result := range results {
-		txResult := geth.CompleteTransactionResult{
-			Id:   txId,
+	results := statusAPI.CompleteTransactions(C.GoString(ids), C.GoString(password))
+	for txID, result := range results {
+		txResult := common.CompleteTransactionResult{
+			ID:   txID,
 			Hash: result.Hash.Hex(),
 		}
 		if result.Error != nil {
 			txResult.Error = result.Error.Error()
 		}
-		out.Results[txId] = txResult
+		out.Results[txID] = txResult
 	}
 	outBytes, _ := json.Marshal(&out)
 
@@ -160,7 +209,7 @@ func CompleteTransactions(ids, password *C.char) *C.char {
 
 //export DiscardTransaction
 func DiscardTransaction(id *C.char) *C.char {
-	err := geth.DiscardTransaction(C.GoString(id))
+	err := statusAPI.DiscardTransaction(C.GoString(id))
 
 	errString := ""
 	if err != nil {
@@ -168,8 +217,8 @@ func DiscardTransaction(id *C.char) *C.char {
 		errString = err.Error()
 	}
 
-	out := geth.DiscardTransactionResult{
-		Id:    C.GoString(id),
+	out := common.DiscardTransactionResult{
+		ID:    C.GoString(id),
 		Error: errString,
 	}
 	outBytes, _ := json.Marshal(&out)
@@ -179,130 +228,49 @@ func DiscardTransaction(id *C.char) *C.char {
 
 //export DiscardTransactions
 func DiscardTransactions(ids *C.char) *C.char {
-	out := geth.DiscardTransactionsResult{}
-	out.Results = make(map[string]geth.DiscardTransactionResult)
+	out := common.DiscardTransactionsResult{}
+	out.Results = make(map[string]common.DiscardTransactionResult)
 
-	results := geth.DiscardTransactions(C.GoString(ids))
-	for txId, result := range results {
-		txResult := geth.DiscardTransactionResult{
-			Id: txId,
+	results := statusAPI.DiscardTransactions(C.GoString(ids))
+	for txID, result := range results {
+		txResult := common.DiscardTransactionResult{
+			ID: txID,
 		}
 		if result.Error != nil {
 			txResult.Error = result.Error.Error()
 		}
-		out.Results[txId] = txResult
+		out.Results[txID] = txResult
 	}
 	outBytes, _ := json.Marshal(&out)
 
 	return C.CString(string(outBytes))
-}
-
-//export GenerateConfig
-func GenerateConfig(datadir *C.char, networkId C.int) *C.char {
-	config, err := params.NewNodeConfig(C.GoString(datadir), int(networkId))
-	if err != nil {
-		return makeJSONErrorResponse(err)
-	}
-
-	outBytes, err := json.Marshal(&config)
-	if err != nil {
-		return makeJSONErrorResponse(err)
-	}
-
-	return C.CString(string(outBytes))
-}
-
-//export StartNode
-func StartNode(configJSON *C.char) *C.char {
-	config, err := params.LoadNodeConfig(C.GoString(configJSON))
-	if err != nil {
-		return makeJSONErrorResponse(err)
-	}
-
-	err = geth.CreateAndRunNode(config)
-	return makeJSONErrorResponse(err)
-}
-
-//export StopNode
-func StopNode() *C.char {
-	err := geth.NodeManagerInstance().StopNode()
-	return makeJSONErrorResponse(err)
-}
-
-//export ResumeNode
-func ResumeNode() *C.char {
-	err := geth.NodeManagerInstance().ResumeNode()
-	return makeJSONErrorResponse(err)
-}
-
-//export ResetChainData
-func ResetChainData() *C.char {
-	err := geth.NodeManagerInstance().ResetChainData()
-	return makeJSONErrorResponse(err)
-}
-
-//export StopNodeRPCServer
-func StopNodeRPCServer() *C.char {
-	_, err := geth.NodeManagerInstance().StopNodeRPCServer()
-
-	return makeJSONErrorResponse(err)
-}
-
-//export StartNodeRPCServer
-func StartNodeRPCServer() *C.char {
-	_, err := geth.NodeManagerInstance().StartNodeRPCServer()
-
-	return makeJSONErrorResponse(err)
 }
 
 //export InitJail
 func InitJail(js *C.char) {
-	jail.Init(C.GoString(js))
+	statusAPI.JailBaseJS(C.GoString(js))
 }
 
 //export Parse
-func Parse(chatId *C.char, js *C.char) *C.char {
-	res := jail.GetInstance().Parse(C.GoString(chatId), C.GoString(js))
+func Parse(chatID *C.char, js *C.char) *C.char {
+	res := statusAPI.JailParse(C.GoString(chatID), C.GoString(js))
 	return C.CString(res)
 }
 
 //export Call
-func Call(chatId *C.char, path *C.char, params *C.char) *C.char {
-	res := jail.GetInstance().Call(C.GoString(chatId), C.GoString(path), C.GoString(params))
+func Call(chatID *C.char, path *C.char, params *C.char) *C.char {
+	res := statusAPI.JailCall(C.GoString(chatID), C.GoString(path), C.GoString(params))
 	return C.CString(res)
 }
 
-//export PopulateStaticPeers
-func PopulateStaticPeers() {
-	geth.NodeManagerInstance().PopulateStaticPeers()
-}
-
-//export AddPeer
-func AddPeer(url *C.char) *C.char {
-	success, err := geth.NodeManagerInstance().AddPeer(C.GoString(url))
+func makeJSONResponse(err error) *C.char {
 	errString := ""
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		errString = err.Error()
 	}
 
-	out := geth.AddPeerResult{
-		Success: success,
-		Error:   errString,
-	}
-	outBytes, _ := json.Marshal(&out)
-
-	return C.CString(string(outBytes))
-}
-
-func makeJSONErrorResponse(err error) *C.char {
-	errString := ""
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		errString = err.Error()
-	}
-
-	out := geth.JSONError{
+	out := common.APIResponse{
 		Error: errString,
 	}
 	outBytes, _ := json.Marshal(&out)
