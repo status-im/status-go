@@ -15,7 +15,7 @@ const (
 	VersionPatch = 7
 
 	// VersionMeta is metadata to append to the version string
-	VersionMeta = "unstable"
+	VersionMeta = "stable"
 )
 
 // Version exposes string representation of program version.
