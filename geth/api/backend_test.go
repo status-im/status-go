@@ -16,14 +16,13 @@ import (
 	. "github.com/status-im/status-go/geth/testing"
 	"github.com/stretchr/testify/suite"
 )
-
-func TestBackendTestSuite(t *testing.T) {
-	suite.Run(t, new(BackendTestSuite))
-}
-
 type BackendTestSuite struct {
 	suite.Suite
 	backend *api.StatusBackend
+}
+
+func TestAPIBackend(t *testing.T) {
+	suite.Run(t, new(BackendTestSuite))
 }
 
 func (s *BackendTestSuite) SetupTest() {

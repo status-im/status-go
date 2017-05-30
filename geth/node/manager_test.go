@@ -20,12 +20,12 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-func TestManagerTestSuite(t *testing.T) {
-	suite.Run(t, new(ManagerTestSuite))
-}
-
 type ManagerTestSuite struct {
 	BaseTestSuite
+}
+
+func TestNodeManager(t *testing.T) {
+	suite.Run(t, new(ManagerTestSuite))
 }
 
 func (s *ManagerTestSuite) SetupTest() {

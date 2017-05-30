@@ -20,13 +20,13 @@ const (
 
 var baseStatusJSCode = string(static.MustAsset("testdata/jail/status.js"))
 
-func TestJailTestSuite(t *testing.T) {
-	suite.Run(t, new(JailTestSuite))
-}
-
 type JailTestSuite struct {
 	BaseTestSuite
 	jail *jail.Jail
+}
+
+func TestJail(t *testing.T) {
+	suite.Run(t, new(JailTestSuite))
 }
 
 func (s *JailTestSuite) SetupTest() {

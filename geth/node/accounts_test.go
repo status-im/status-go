@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-func TestAccountsTestSuite(t *testing.T) {
+func TestNodeAccounts(t *testing.T) {
 	suite.Run(t, new(AccountsTestSuite))
 }
 
