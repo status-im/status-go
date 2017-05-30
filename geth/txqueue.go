@@ -3,6 +3,7 @@ package geth
 import (
 	"context"
 	"encoding/json"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
@@ -207,7 +208,7 @@ func (q *JailedRequestQueue) PostProcessRequest(vm *otto.Otto, req RPCCall, mess
 // happens before transaction is send to backend, and post processing occurs
 // when backend notifies that transaction sending is complete (either successfully
 // or with error)
-func (q *JailedRequestQueue) ProcessSendTransactionRequest(vm *otto.Otto, req RPCCall) (common.Hash, error) {
+func (q *JailedRequestQueue) ProcessSendTransactionRequest(lock sync.Locker, vm *otto.Otto, req RPCCall) (common.Hash, error) {
 	// obtain status backend from LES service
 	lightEthereum, err := NodeManagerInstance().LightEthereumService()
 	if err != nil {
@@ -224,10 +225,13 @@ func (q *JailedRequestQueue) ProcessSendTransactionRequest(vm *otto.Otto, req RP
 	ctx = context.WithValue(ctx, MessageIDKey, messageID)
 
 	//  this call blocks, up until Complete Transaction is called
+	lock.Unlock() // allow some other routine to access jailed runtime (cell)
 	txHash, err := backend.SendTransaction(ctx, sendTxArgsFromRPCCall(req))
 	if err != nil {
+		lock.Lock()
 		return common.Hash{}, err
 	}
+	lock.Lock() // re-lock
 
 	// invoke post processing
 	q.PostProcessRequest(vm, req, messageID)

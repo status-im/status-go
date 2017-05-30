@@ -66,19 +66,19 @@ func makeJethIsConnectedHandler(jail *Jail) func(call otto.FunctionCall) (respon
 	return func(call otto.FunctionCall) otto.Value {
 		client, err := jail.RPCClient()
 		if err != nil {
-			return newErrorResponse(call, -32603, err.Error(), nil)
+			return newErrorResponse(call.Otto, -32603, err.Error(), nil)
 		}
 
 		var netListeningResult bool
 		if err := client.Call(&netListeningResult, "net_listening"); err != nil {
-			return newErrorResponse(call, -32603, err.Error(), nil)
+			return newErrorResponse(call.Otto, -32603, err.Error(), nil)
 		}
 
 		if !netListeningResult {
-			return newErrorResponse(call, -32603, geth.ErrInvalidGethNode.Error(), nil)
+			return newErrorResponse(call.Otto, -32603, geth.ErrInvalidGethNode.Error(), nil)
 		}
 
-		return newResultResponse(call, true)
+		return newResultResponse(call.Otto, true)
 	}
 }
 
@@ -98,6 +98,6 @@ func makeLocalStorageSetHandler(chatID string) func(call otto.FunctionCall) (res
 			},
 		})
 
-		return newResultResponse(call, true)
+		return newResultResponse(call.Otto, true)
 	}
 }
