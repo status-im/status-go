@@ -47,6 +47,7 @@ statusgo-ios-simulator-mainnet: xgo
 	@echo "iOS framework cross compilation done (mainnet)."
 
 ci:
+	build/env.sh go test -v -tags test ./cmd/statusd
 	build/env.sh go test -v ./geth/api
 	build/env.sh go test -v ./geth/common
 	build/env.sh go test -v ./geth/jail
@@ -110,7 +111,7 @@ lint:
 	@echo "Linter: gosimple\n--------------------"
 	@gometalinter --disable-all --deadline 45s --enable=gosimple extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
 
-test:
+test: lint
 	@build/env.sh echo "mode: set" > coverage-all.out
 	build/env.sh go test -coverprofile=coverage.out -covermode=set ./geth/api
 	@build/env.sh tail -n +2 coverage.out >> coverage-all.out
@@ -124,7 +125,7 @@ test:
 	@build/env.sh tail -n +2 coverage.out >> coverage-all.out
 	build/env.sh go test -coverprofile=coverage.out -covermode=set ./extkeys
 	@build/env.sh tail -n +2 coverage.out >> coverage-all.out
-	build/env.sh go test -coverprofile=coverage.out -covermode=set ./cmd/statusd
+	build/env.sh go test -tags test -coverprofile=coverage.out -covermode=set ./cmd/statusd
 	@build/env.sh tail -n +2 coverage.out >> coverage-all.out
 	@build/env.sh go tool cover -html=coverage-all.out -o coverage.html
 	@build/env.sh go tool cover -func=coverage-all.out
@@ -160,7 +161,7 @@ test-extkeys:
 	@build/env.sh go tool cover -func=coverage.out
 
 test-cmd:
-	build/env.sh go test -v -coverprofile=coverage.out ./cmd/statusd
+	build/env.sh go test -v -tags test -coverprofile=coverage.out ./cmd/statusd
 	@build/env.sh go tool cover -html=coverage.out -o coverage.html
 	@build/env.sh go tool cover -func=coverage.out
 
