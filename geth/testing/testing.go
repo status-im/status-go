@@ -116,8 +116,13 @@ func MakeTestNodeConfig(networkID int) (*params.NodeConfig, error) {
 		"DataDir": "` + filepath.Join(TestDataDir, TestNetworkNames[networkID]) + `",
 		"HTTPPort": ` + strconv.Itoa(TestConfig.Node.HTTPPort) + `,
 		"WSPort": ` + strconv.Itoa(TestConfig.Node.WSPort) + `,
-		"LogEnabled": true,
-		"LogLevel": "ERROR"
+		"LoggerConfig": {
+			"Enabled": true,
+			"LogLevel": "ERROR",
+			"LogToFile": false,
+			"LogToRemote": true,
+			"RemoteAPIKey": "` + params.LoggerRemoteAPIKey + `"
+		}
 	}`
 	nodeConfig, err := params.LoadNodeConfig(configJSON)
 	if err != nil {

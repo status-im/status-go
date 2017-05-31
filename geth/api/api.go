@@ -13,10 +13,29 @@ type StatusAPI struct {
 }
 
 // NewStatusAPI create a new StatusAPI instance
-func NewStatusAPI() *StatusAPI {
+func NewStatusAPI(hostName, logLevel string) (*StatusAPI, error) {
+	// setup logger
+	loggerConfig := &params.LoggerConfig{
+		Enabled:             true,
+		RemoteHostName:      hostName,
+		Level:               logLevel,
+		RemoteAPIKey:        params.LoggerRemoteAPIKey,
+		RemoteFlushInterval: 1,
+		RemoteBufferSize:    25,
+		LogToRemote:         true,
+		LogToStderr:         true,
+		LogToFile:           false,
+	}
+
+	nodeLogger, err := common.NewLogger(loggerConfig)
+	if err != nil {
+		return nil, err
+	}
+	nodeLogger.Attach()
+
 	return &StatusAPI{
 		b: NewStatusBackend(),
-	}
+	}, nil
 }
 
 // NodeManager returns reference to node manager

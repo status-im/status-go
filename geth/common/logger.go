@@ -1,11 +1,12 @@
 package common
 
 import (
+	"errors"
 	"os"
-	"path/filepath"
-	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/geth/common/logdna"
 	"github.com/status-im/status-go/geth/params"
 )
 
@@ -13,67 +14,80 @@ import (
 type Logger struct {
 	origHandler log.Handler
 	handler     log.Handler
-	config      *params.NodeConfig
+	config      *params.LoggerConfig
 }
 
+// errors
 var (
-	onceInitNodeLogger sync.Once
-	nodeLoggerInstance *Logger
+	ErrLoggerDisabled = errors.New("logger is disabled")
 )
 
-// SetupLogger configs logger using parameters in config
-func SetupLogger(config *params.NodeConfig) (*Logger, error) {
-	if !config.LogEnabled {
-		return nil, nil
+// NewLogger configs and returns a logger using parameters in config
+func NewLogger(config *params.LoggerConfig) (*Logger, error) {
+	if !config.Enabled {
+		return nil, ErrLoggerDisabled
 	}
 
-	onceInitNodeLogger.Do(func() {
-		nodeLoggerInstance = &Logger{
-			config:      config,
-			origHandler: log.Root().GetHandler(),
-		}
-		nodeLoggerInstance.handler = nodeLoggerInstance.makeLogHandler(parseLogLevel(config.LogLevel))
-	})
-
-	if err := nodeLoggerInstance.Start(); err != nil {
-		return nil, err
-	}
-
-	return nodeLoggerInstance, nil
+	return &Logger{
+		config:      config,
+		origHandler: log.Root().GetHandler(),
+		handler:     makeLogHandler(config),
+	}, nil
 }
 
-// SetV allows to dynamically change log level of messages being written
-func (l *Logger) SetV(logLevel string) {
-	log.Root().SetHandler(l.makeLogHandler(parseLogLevel(logLevel)))
+// SetV dynamically changes log level
+func (l *Logger) SetV(lvl log.Lvl) {
+	l.config.Level = logLevelString(lvl)
+	log.Root().SetHandler(makeLogHandler(l.config))
 }
 
-// Start installs logger handler
-func (l *Logger) Start() error {
-	log.Root().SetHandler(l.handler)
+// Attach starts log handlers
+func (l *Logger) Attach() error {
+	log.Root().SetHandler(makeLogHandler(l.config))
 	return nil
 }
 
-// Stop replaces our handler back to the original log handler
-func (l *Logger) Stop() error {
+// Detach restores original handler
+func (l *Logger) Detach() error {
 	log.Root().SetHandler(l.origHandler)
 	return nil
 }
 
-// makeLogHandler creates a log handler for a given level and node configuration
-func (l *Logger) makeLogHandler(lvl log.Lvl) log.Handler {
-	var handler log.Handler
-	logFilePath := filepath.Join(l.config.DataDir, l.config.LogFile)
-	fileHandler := log.Must.FileHandler(logFilePath, log.LogfmtFormat())
-	stderrHandler := log.StreamHandler(os.Stderr, log.TerminalFormat(true))
-	if l.config.LogToStderr {
-		handler = log.MultiHandler(
-			log.LvlFilterHandler(lvl, log.CallerFileHandler(log.CallerFuncHandler(stderrHandler))),
-			log.LvlFilterHandler(lvl, fileHandler))
-	} else {
-		handler = log.LvlFilterHandler(lvl, fileHandler)
+// makeLogHandler creates a log handler for a given node configuration
+func makeLogHandler(config *params.LoggerConfig) log.Handler {
+	var handlers []log.Handler
+	lvl := parseLogLevel(config.Level)
+
+	if config.LogToFile {
+		handler := log.Must.FileHandler(config.LogFile, log.LogfmtFormat())
+		handlers = append(handlers, log.LvlFilterHandler(lvl, handler))
 	}
 
-	return handler
+	if config.LogToStderr {
+		handler := log.StreamHandler(os.Stderr, log.TerminalFormat(true))
+		handlers = append(handlers, log.LvlFilterHandler(lvl, log.CallerFileHandler(log.CallerFuncHandler(handler))))
+	}
+
+	if config.LogToRemote {
+		remoteLogger, err := logdna.NewClient(&logdna.Config{
+			APIKey:        config.RemoteAPIKey,
+			HostName:      config.RemoteHostName,
+			AppName:       params.Version,
+			FlushInterval: time.Duration(config.RemoteFlushInterval) * time.Second,
+			BufferSize:    config.RemoteBufferSize,
+		})
+		if err == nil {
+			remoteLogger.Start()
+			formatter := log.TerminalFormat(true)
+			handler := log.FuncHandler(func(r *log.Record) error {
+				msg := formatter.Format(r)
+				return remoteLogger.Log(r.Time, logLevelString(r.Lvl), string(msg[31:]))
+			})
+			handlers = append(handlers, log.LvlFilterHandler(lvl, handler))
+		}
+	}
+
+	return log.MultiHandler(handlers...)
 }
 
 // parseLogLevel parses string and returns logger.* constant
@@ -81,7 +95,7 @@ func parseLogLevel(logLevel string) log.Lvl {
 	switch logLevel {
 	case "ERROR":
 		return log.LvlError
-	case "WARNING":
+	case "WARN":
 		return log.LvlWarn
 	case "INFO":
 		return log.LvlInfo
@@ -92,4 +106,24 @@ func parseLogLevel(logLevel string) log.Lvl {
 	}
 
 	return log.LvlInfo
+}
+
+// logLevelToString returns string name of the level
+func logLevelString(l log.Lvl) string {
+	switch l {
+	case log.LvlTrace:
+		return "TRACE"
+	case log.LvlDebug:
+		return "DEBUG"
+	case log.LvlInfo:
+		return "INFO"
+	case log.LvlWarn:
+		return "WARN"
+	case log.LvlError:
+		return "ERROR"
+	case log.LvlCrit:
+		return "CRIT"
+	}
+
+	return "BAD LEVEL"
 }

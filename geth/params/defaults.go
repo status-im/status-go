@@ -55,18 +55,22 @@ const (
 	// TODO remove this hack, once CHT sync is implemented on LES side
 	CHTRootConfigURL = "https://gist.githubusercontent.com/farazdagi/a8d36e2818b3b2b6074d691da63a0c36/raw/"
 
-	// LogFile defines where to write logs to
-	LogFile = "geth.log"
+	// LoggerLogFile defines where to write logs to (wrt DataDir)
+	LoggerLogFile = "geth.log"
 
-	// LogLevel defines the minimum log level to report
-	LogLevel = "INFO"
+	// LoggerLogLevel defines the minimum log level to report
+	LoggerLogLevel = "INFO"
 
-	// LogLevelSuccinct defines the log level when only errors are reported.
-	// Useful when the default INFO level becomes too verbose.
-	LogLevelSuccinct = "ERROR"
+	// LoggerRemoteAPIKey remote API key to use, when sending logs to remote server
+	LoggerRemoteAPIKey = "d7dd521223bbd5d7d63a30b4d431bfbc"
 
-	// LogToStderr defines whether logged info should also be output to os.Stderr
-	LogToStderr = true
+	// LoggerRemoteFlushInterval specifies how many seconds to aggregate logs for,
+	// before they are flushed to the remote server
+	LoggerRemoteFlushInterval = 5
+
+	// LoggerRemoteBufferSize specifies how many log rows to aggregate, before they
+	// are flushed to the remote server
+	LoggerRemoteBufferSize = 25
 
 	// WhisperDataDir is directory where Whisper data is stored, relative to DataDir
 	WhisperDataDir = "wnode"
