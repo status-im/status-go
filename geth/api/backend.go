@@ -80,6 +80,7 @@ func (m *StatusBackend) StartNode(config *params.NodeConfig) (<-chan struct{}, e
 
 // onNodeStart does everything required to prepare backend
 func (m *StatusBackend) onNodeStart(nodeStarted <-chan struct{}, backendReady chan struct{}) {
+	defer common.HaltOnPanic()
 	<-nodeStarted
 
 	if err := m.registerHandlers(); err != nil {
@@ -113,6 +114,7 @@ func (m *StatusBackend) StopNode() (<-chan struct{}, error) {
 
 	backendStopped := make(chan struct{}, 1)
 	go func() {
+		defer common.HaltOnPanic()
 		<-nodeStopped
 		m.Lock()
 		m.nodeReady = nil

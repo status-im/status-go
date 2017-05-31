@@ -1362,6 +1362,8 @@ func testJailFunctionCall(t *testing.T) bool {
 }
 
 func startTestNode(t *testing.T) <-chan struct{} {
+	StartAPI(C.CString("library_test.go"), C.CString("INFO"))
+
 	syncRequired := false
 	if _, err := os.Stat(TestDataDir); os.IsNotExist(err) {
 		syncRequired = true

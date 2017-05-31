@@ -1,8 +1,10 @@
 package main
 
+import "C"
 import (
 	"fmt"
 
+	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
 	"gopkg.in/urfave/cli.v1"
 )
@@ -20,6 +22,9 @@ var (
 
 // faucetCommandHandler handles `statusd faucet` command
 func faucetCommandHandler(ctx *cli.Context) error {
+	defer common.HaltOnPanic()
+	StartAPI(C.CString(params.ClientIdentifier), C.CString("INFO"))
+
 	config, err := parseFaucetCommandConfig(ctx)
 	if err != nil {
 		return fmt.Errorf("can not parse config: %v", err)

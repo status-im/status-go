@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/rpc"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
+	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
 )
 
@@ -76,7 +77,7 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 	}
 	m.nodeStarted = make(chan struct{}, 1)
 	go func() {
-		defer HaltOnPanic()
+		defer common.HaltOnPanic()
 
 		// start underlying node
 		if err := ethNode.Start(); err != nil {
@@ -101,6 +102,7 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 
 		// underlying node is started, every method can use it, we use it immediately
 		go func() {
+			defer common.HaltOnPanic()
 			if err := m.PopulateStaticPeers(); err != nil {
 				log.Error("Static peers population", "error", err)
 			}
@@ -150,6 +152,7 @@ func (m *NodeManager) stopNode() (<-chan struct{}, error) {
 
 	nodeStopped := make(chan struct{}, 1)
 	go func() {
+		defer common.HaltOnPanic()
 		<-m.nodeStopped // Status node is stopped (code after Wait() is executed)
 		log.Info("Ready to reset node")
 

@@ -131,6 +131,15 @@ func ParseJSONArray(items string) ([]string, error) {
 	return parsedItems, nil
 }
 
+// HaltOnPanic recovers from panic, logs issue, and exits
+func HaltOnPanic() {
+	if r := recover(); r != nil {
+		log.Error("Runtime PANIC!!!", "error", r, "stack", string(debug.Stack()))
+		time.Sleep(5 * time.Second) // allow logger to flush logs
+		Fatalf(r)                   // os.exit(1) is called internally
+	}
+}
+
 // Fatalf is used to halt the execution.
 // When called the function prints stack end exits.
 // Failure is logged into both StdErr and StdOut.

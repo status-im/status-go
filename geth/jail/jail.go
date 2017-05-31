@@ -207,6 +207,7 @@ func (jail *Jail) Send(chatID string, call otto.FunctionCall) (response otto.Val
 		errc := make(chan error, 1)
 		errc2 := make(chan error)
 		go func() {
+			defer common.HaltOnPanic()
 			errc2 <- <-errc
 		}()
 		errc <- client.Call(&result, req.Method, req.Params...)
