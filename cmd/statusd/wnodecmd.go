@@ -1,5 +1,6 @@
 package main
 
+import "C"
 import (
 	"errors"
 	"fmt"
@@ -117,6 +118,9 @@ var (
 
 // version displays app version
 func wnode(ctx *cli.Context) error {
+	defer common.HaltOnPanic()
+	StartAPI(C.CString(params.ClientIdentifier), C.CString("INFO"))
+
 	config, err := makeWhisperNodeConfig(ctx)
 	if err != nil {
 		return fmt.Errorf("can not parse config: %v", err)

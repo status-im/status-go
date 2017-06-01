@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	jsonrpcVersion         = "2.0"
+	jsonrpcVersion = "2.0"
 )
 
 type jsonRequest struct {
@@ -68,6 +68,7 @@ func (c *RPCManager) Call(inputJSON string) string {
 	// allow HTTP requests to block w/o
 	outputJSON := make(chan string, 1)
 	go func() {
+		defer common.HaltOnPanic()
 		httpReq := httptest.NewRequest("POST", "/", strings.NewReader(inputJSON))
 		rr := httptest.NewRecorder()
 		server.ServeHTTP(rr, httpReq)

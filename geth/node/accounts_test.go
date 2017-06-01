@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-func TestAccountsTestSuite(t *testing.T) {
+func TestNodeAccounts(t *testing.T) {
 	suite.Run(t, new(AccountsTestSuite))
 }
 
@@ -25,6 +25,7 @@ type AccountsTestSuite struct {
 }
 
 func (s *AccountsTestSuite) SetupTest() {
+	AttachLogger("UnitTest:Accounts", "INFO")
 	require := s.Require()
 	s.NodeManager = node.NewNodeManager()
 	require.NotNil(s.NodeManager)

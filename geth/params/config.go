@@ -128,6 +128,41 @@ type BootClusterConfig struct {
 	ConfigFile string
 }
 
+// LoggerConfig logging options
+type LoggerConfig struct {
+	// Enabled flag specifies whether logging service is enabled at all
+	Enabled bool
+
+	// Level defines minimum log level. Valid names are "ERROR", "WARN", "INFO", "DEBUG", and "TRACE".
+	Level string
+
+	// LogFile is *absolute* path where logs get written to
+	LogFile string
+
+	// RemoteAPIKey access token/key to send logs to remote server
+	RemoteAPIKey string
+
+	// RemoteHostName uniquely identifies host that sends logs (useful for searching through aggregated logs)
+	RemoteHostName string
+
+	// RemoteFlushInterval specifies how many seconds to aggregate logs for,
+	// before they are flushed to the remote server
+	RemoteFlushInterval int
+
+	// RemoteBufferSize specifies how many log rows to aggregate, before they
+	// are flushed to the remote server
+	RemoteBufferSize int
+
+	// LogToFile defines whether logs should be sent to file specified by LogFile
+	LogToFile bool
+
+	// LogToRemote defines whether logs are allowed to be sent to remote server
+	LogToRemote bool
+
+	// LogToStderr defines whether logged info should also be output to os.Stderr
+	LogToStderr bool
+}
+
 // NodeConfig stores configuration options for a node
 type NodeConfig struct {
 	// DevMode is true when given configuration is to be used during development.
@@ -193,17 +228,8 @@ type NodeConfig struct {
 	// handshake phase, counted separately for inbound and outbound connections.
 	MaxPendingPeers int
 
-	// LogToFile specified whether logs should be saved into file
-	LogEnabled bool
-
-	// LogFile is filename where exposed logs get written to
-	LogFile string
-
-	// LogLevel defines minimum log level. Valid names are "ERROR", "WARNING", "INFO", "DEBUG", and "TRACE".
-	LogLevel string
-
-	// LogToStderr defines whether logged info should also be output to os.Stderr
-	LogToStderr bool
+	// LoggerConfig logging configuration
+	LoggerConfig *LoggerConfig `json:"LoggerConfig,"`
 
 	// BootClusterConfig extra configuration for supporting cluster
 	BootClusterConfig *BootClusterConfig `json:"BootClusterConfig,"`
@@ -233,9 +259,15 @@ func NewNodeConfig(dataDir string, networkID uint64, devMode bool) (*NodeConfig,
 		MaxPeers:        MaxPeers,
 		MaxPendingPeers: MaxPendingPeers,
 		IPCFile:         IPCFile,
-		LogFile:         LogFile,
-		LogLevel:        LogLevel,
-		LogToStderr:     LogToStderr,
+		LoggerConfig: &LoggerConfig{
+			RemoteHostName:      ClientIdentifier,
+			Level:               LoggerLogLevel,
+			LogFile:             filepath.Join(dataDir, LoggerLogFile),
+			LogToStderr:         true,
+			RemoteAPIKey:        LoggerRemoteAPIKey,
+			RemoteFlushInterval: LoggerRemoteFlushInterval,
+			RemoteBufferSize:    LoggerRemoteBufferSize,
+		},
 		LightEthConfig: &LightEthConfig{
 			Enabled:          true,
 			DatabaseCache:    DatabaseCache,

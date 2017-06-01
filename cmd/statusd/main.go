@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/params"
 	"gopkg.in/urfave/cli.v1"
 )
@@ -15,7 +14,6 @@ var (
 	gitCommit  = "rely on linker: -ldflags -X main.GitCommit"
 	buildStamp = "rely on linker: -ldflags -X main.buildStamp"
 	app        = makeApp(gitCommit)
-	statusAPI  = api.NewStatusAPI()
 )
 
 var (
@@ -151,8 +149,8 @@ func makeNodeConfig(ctx *cli.Context) (*params.NodeConfig, error) {
 	nodeConfig.NodeKeyFile = ctx.GlobalString(NodeKeyFileFlag.Name)
 
 	if logLevel := ctx.GlobalString(LogLevelFlag.Name); len(logLevel) > 0 {
-		nodeConfig.LogEnabled = true
-		nodeConfig.LogLevel = logLevel
+		nodeConfig.LoggerConfig.Enabled = true
+		nodeConfig.LoggerConfig.Level = logLevel
 	}
 
 	return nodeConfig, nil

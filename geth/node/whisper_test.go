@@ -12,12 +12,12 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-func TestWhisperTestSuite(t *testing.T) {
-	suite.Run(t, new(WhisperTestSuite))
-}
-
 type WhisperTestSuite struct {
 	BaseTestSuite
+}
+
+func TestWhisper(t *testing.T) {
+	suite.Run(t, new(WhisperTestSuite))
 }
 
 func (s *WhisperTestSuite) SetupTest() {

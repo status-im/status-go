@@ -116,14 +116,42 @@ func MakeTestNodeConfig(networkID int) (*params.NodeConfig, error) {
 		"DataDir": "` + filepath.Join(TestDataDir, TestNetworkNames[networkID]) + `",
 		"HTTPPort": ` + strconv.Itoa(TestConfig.Node.HTTPPort) + `,
 		"WSPort": ` + strconv.Itoa(TestConfig.Node.WSPort) + `,
-		"LogEnabled": true,
-		"LogLevel": "ERROR"
+		"LoggerConfig": {
+			"Enabled": true,
+			"LogLevel": "ERROR",
+			"LogToFile": false,
+			"LogToRemote": true,
+			"RemoteAPIKey": "` + params.LoggerRemoteAPIKey + `"
+		}
 	}`
 	nodeConfig, err := params.LoadNodeConfig(configJSON)
 	if err != nil {
 		return nil, err
 	}
 	return nodeConfig, nil
+}
+
+// AttachLogger creates and attaches test logger
+func AttachLogger(hostName, logLevel string) error {
+	loggerConfig := &params.LoggerConfig{
+		Enabled:             true,
+		RemoteHostName:      hostName,
+		Level:               logLevel,
+		RemoteAPIKey:        params.LoggerRemoteAPIKey,
+		RemoteFlushInterval: 1,
+		RemoteBufferSize:    25,
+		LogToRemote:         false,
+		LogToStderr:         true,
+		LogToFile:           false,
+	}
+
+	nodeLogger, err := common.NewLogger(loggerConfig)
+	if err != nil {
+		return err
+	}
+	nodeLogger.Attach()
+
+	return nil
 }
 
 // LoadFromFile is useful for loading test data, from testdata/filename into a variable
