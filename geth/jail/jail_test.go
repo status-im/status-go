@@ -2,6 +2,7 @@ package jail_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"reflect"
 	"strconv"
@@ -1160,4 +1161,179 @@ func TestJailWhisper(t *testing.T) {
 			t.Fatalf("test not passed: %v", testName)
 		}
 	}
+}
+
+func makeTestJail() *jail.Jail {
+	return jail.Init(`
+		var _status_catalog = {}
+		function call(pathStr, paramsStr) {
+			var params = JSON.parse(paramsStr),
+				path = JSON.parse(pathStr),
+				fn, res;
+
+			fn = path.reduce(function (catalog, name) {
+					if (catalog && catalog[name]) {
+						return catalog[name];
+					}
+				},
+				_status_catalog
+			);
+
+			if (!fn) {
+				return null;
+			}
+
+			res = fn(params);
+
+			return JSON.stringify(res);
+		}
+	`)
+}
+
+func TestJailVMPersistence(t *testing.T) {
+	err := geth.PrepareTestNode()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	// log into account from which transactions will be sent
+	if err := geth.SelectAccount(testConfig.Account1.Address, testConfig.Account1.Password); err != nil {
+		t.Errorf("cannot select account: %v", testConfig.Account1.Address)
+		return
+	}
+
+	type testCase struct {
+		command   string
+		params    string
+		validator func(response string) error
+	}
+	var testCases = []testCase{
+		{
+			`["sendTestTx"]`,
+			`{"amount": "0.000001", "from": "` + testConfig.Account1.Address + `"}`,
+			func(response string) error {
+				return nil
+			},
+		},
+		{
+			`["sendTestTx"]`,
+			`{"amount": "0.000002", "from": "` + testConfig.Account1.Address + `"}`,
+			func(response string) error {
+				return nil
+			},
+		},
+		{
+			`["ping"]`,
+			`{"pong": "Ping1", "amount": 0.42}`,
+			func(response string) error {
+				expectedResponse := `{"result": "Ping1"}`
+				if response != expectedResponse {
+					return fmt.Errorf("unexpected response, expected: %v, got: %v", expectedResponse, response)
+				}
+				return nil
+			},
+		},
+		{
+			`["ping"]`,
+			`{"pong": "Ping2", "amount": 0.42}`,
+			func(response string) error {
+				expectedResponse := `{"result": "Ping2"}`
+				if response != expectedResponse {
+					return fmt.Errorf("unexpected response, expected: %v, got: %v", expectedResponse, response)
+				}
+				return nil
+			},
+		},
+	}
+
+	jailInstance := makeTestJail()
+	vmID := "persistentVM" // we will send concurrent request to the very same VM
+	jailInstance.Parse(vmID, `
+		var total = 0;
+		_status_catalog['ping'] = function(params) {
+			total += params.amount;
+			return params.pong;
+		}
+
+		_status_catalog['sendTestTx'] = function(params) {
+		  var amount = params.amount;
+		  var transaction = {
+			"from": params.from,
+			"to": "0xf82da7547534045b4e00442bc89e16186cf8c272",
+			"value": web3.toWei(amount, "ether")
+		  };
+		  web3.eth.sendTransaction(transaction, function (error, result) {
+		  	 console.log("eth.sendTransaction callback: 'total' variable (is it updated by concurrent routine): " + total);
+			 if(!error)
+				total += amount;
+		  });
+		}
+	`)
+
+	progress := make(chan string, len(testCases)+1)
+	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+		var envelope geth.SignalEnvelope
+		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
+			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
+			return
+		}
+		if envelope.Type == geth.EventTransactionQueued {
+			event := envelope.Event.(map[string]interface{})
+			t.Logf("Transaction queued (will be completed shortly): {id: %s}\n", event["id"].(string))
+
+			time.Sleep(1 * time.Second)
+
+			//if err := geth.DiscardTransaction(event["id"].(string)); err != nil {
+			//	t.Errorf("cannot discard: %v", err)
+			//	progress <- "tx discarded"
+			//	return
+			//}
+
+			var txHash common.Hash
+			if txHash, err = geth.CompleteTransaction(event["id"].(string), testConfig.Account1.Password); err != nil {
+				t.Errorf("cannot complete queued transaction[%v]: %v", event["id"], err)
+			} else {
+				t.Logf("Transaction complete: https://testnet.etherscan.io/tx/%s", txHash.Hex())
+			}
+
+			progress <- "event queue notification processed"
+		}
+	})
+
+	// run commands concurrently
+	for _, tc := range testCases {
+		go func(tc testCase) {
+			t.Logf("CALL START: %v %v", tc.command, tc.params)
+			response := jailInstance.Call(vmID, tc.command, tc.params)
+			if err := tc.validator(response); err != nil {
+				t.Errorf("failed test validation: %v, err: %v", tc.command, err)
+			}
+			t.Logf("CALL END: %v %v", tc.command, tc.params)
+			progress <- tc.command
+		}(tc)
+	}
+
+	// wait for all tests to finish
+	cnt := len(testCases) + 1
+	time.AfterFunc(5*time.Second, func() {
+		// to long, allow main thread to return
+		cnt = 0
+	})
+
+Loop:
+	for {
+		select {
+		case <-progress:
+			cnt--
+			if cnt <= 0 {
+				break Loop
+			}
+		case <-time.After(10 * time.Second): // timeout
+			t.Error("test timed out")
+			break Loop
+		}
+	}
+
+	time.Sleep(2 * time.Second) // allow to propagate
 }
