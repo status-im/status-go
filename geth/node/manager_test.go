@@ -25,6 +25,7 @@ type ManagerTestSuite struct {
 }
 
 func TestNodeManager(t *testing.T) {
+	AttachLogger("UnitTest:Library", "INFO")
 	suite.Run(t, new(ManagerTestSuite))
 }
 

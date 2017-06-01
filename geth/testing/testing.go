@@ -131,6 +131,29 @@ func MakeTestNodeConfig(networkID int) (*params.NodeConfig, error) {
 	return nodeConfig, nil
 }
 
+// AttachLogger creates and attaches test logger
+func AttachLogger(hostName, logLevel string) error {
+	loggerConfig := &params.LoggerConfig{
+		Enabled:             true,
+		RemoteHostName:      hostName,
+		Level:               logLevel,
+		RemoteAPIKey:        params.LoggerRemoteAPIKey,
+		RemoteFlushInterval: 1,
+		RemoteBufferSize:    25,
+		LogToRemote:         false,
+		LogToStderr:         true,
+		LogToFile:           false,
+	}
+
+	nodeLogger, err := common.NewLogger(loggerConfig)
+	if err != nil {
+		return err
+	}
+	nodeLogger.Attach()
+
+	return nil
+}
+
 // LoadFromFile is useful for loading test data, from testdata/filename into a variable
 // nolint: errcheck
 func LoadFromFile(filename string) string {

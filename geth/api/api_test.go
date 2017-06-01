@@ -26,7 +26,8 @@ type APITestSuite struct {
 
 func (s *APITestSuite) SetupTest() {
 	require := s.Require()
-	statusAPI := api.NewStatusAPI()
+	statusAPI, err := api.NewStatusAPI("UnitTest:API", "INFO")
+	require.NoError(err)
 	require.NotNil(statusAPI)
 	require.IsType(&api.StatusAPI{}, statusAPI)
 	s.api = statusAPI

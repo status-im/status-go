@@ -17,10 +17,18 @@
     "TLSEnabled": false,
     "MaxPeers": 25,
     "MaxPendingPeers": 0,
-    "LogEnabled": false,
-    "LogFile": "geth.log",
-    "LogLevel": "INFO",
-    "LogToStderr": true,
+    "LoggerConfig": {
+        "Enabled": false,
+        "Level": "INFO",
+        "LogFile": "$TMPDIR/geth.log",
+        "RemoteAPIKey": "d7dd521223bbd5d7d63a30b4d431bfbc",
+        "RemoteHostName": "StatusIM",
+        "RemoteFlushInterval": 5,
+        "RemoteBufferSize": 25,
+        "LogToFile": false,
+        "LogToRemote": false,
+        "LogToStderr": true
+    },
     "BootClusterConfig": {
         "Enabled": true,
         "ConfigFile": "ropsten.dev.json"

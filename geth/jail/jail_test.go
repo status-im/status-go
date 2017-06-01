@@ -26,6 +26,7 @@ type JailTestSuite struct {
 }
 
 func TestJail(t *testing.T) {
+	AttachLogger("UnitTest:Jail", "INFO")
 	suite.Run(t, new(JailTestSuite))
 }
 

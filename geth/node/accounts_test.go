@@ -25,6 +25,7 @@ type AccountsTestSuite struct {
 }
 
 func (s *AccountsTestSuite) SetupTest() {
+	AttachLogger("UnitTest:Accounts", "INFO")
 	require := s.Require()
 	s.NodeManager = node.NewNodeManager()
 	require.NotNil(s.NodeManager)
