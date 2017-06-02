@@ -99,11 +99,6 @@ func NewLightChain(odr OdrBackend, config *params.ChainConfig, engine consensus.
 		WriteTrustedCht(bc.chainDb, TrustedCht{Number: 805, Root: common.HexToHash("85e4286fe0a730390245c49de8476977afdae0eb5530b277f62a52b12313d50f")})
 		log.Info("Added trusted CHT for mainnet")
 	}
-	if bc.genesisBlock.Hash() == params.TestNetGenesisHash {
-		// add trusted CHT
-		WriteTrustedCht(bc.chainDb, TrustedCht{Number: 259, Root: common.HexToHash("91825fffecb5678167273955deaddbf03c26ae04287cfda61403c0bad5ceab8d")})
-		log.Info("Added trusted CHT for testnet")
-	}
 
 	if err := bc.loadLastState(); err != nil {
 		return nil, err

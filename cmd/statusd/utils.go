@@ -1009,7 +1009,7 @@ func testCompleteMultipleQueuedTransactions(t *testing.T) bool {
 
 	select {
 	case <-allTestTxCompleted:
-	// pass
+		// pass
 	case <-time.After(20 * time.Second):
 		t.Error("test timed out")
 		return false
@@ -1307,7 +1307,7 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool {
 
 	select {
 	case <-allTestTxDiscarded:
-	// pass
+		// pass
 	case <-time.After(20 * time.Second):
 		t.Error("test timed out")
 		return false

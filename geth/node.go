@@ -13,11 +13,13 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/les"
+	"github.com/ethereum/go-ethereum/light"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
@@ -156,6 +158,29 @@ func defaultEmbeddedNodeConfig(config *params.NodeConfig) *node.Config {
 		WSOrigins:   []string{"*"},
 		WSModules:   strings.Split(config.APIModules, ","),
 	}
+
+}
+
+// updateCHT changes trusted canonical hash trie root
+func updateCHT(eth *les.LightEthereum, config *params.NodeConfig) {
+	if !config.BootClusterConfig.Enabled {
+		return
+	}
+
+	if config.BootClusterConfig.RootNumber == 0 {
+		return
+	}
+
+	if config.BootClusterConfig.RootHash == "" {
+		return
+	}
+
+	eth.WriteTrustedCht(light.TrustedCht{
+		Number: uint64(config.BootClusterConfig.RootNumber),
+		Root:   common.HexToHash(config.BootClusterConfig.RootHash),
+	})
+	log.Info("Added trusted CHT",
+		"develop", config.DevMode, "number", config.BootClusterConfig.RootNumber, "hash", config.BootClusterConfig.RootHash)
 }
 
 // activateEthService configures and registers the eth.Ethereum service with a given node.
@@ -181,7 +206,11 @@ func activateEthService(stack *node.Node, config *params.NodeConfig) error {
 	ethConf.MaxPeers = config.MaxPeers
 	ethConf.DatabaseHandles = makeDatabaseHandles()
 	if err := stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-		return les.New(ctx, &ethConf)
+		lightEth, err := les.New(ctx, &ethConf)
+		if err == nil {
+			updateCHT(lightEth, config)
+		}
+		return lightEth, err
 	}); err != nil {
 		return fmt.Errorf("%v: %v", ErrLightEthRegistrationFailure, err)
 	}
