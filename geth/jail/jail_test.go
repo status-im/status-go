@@ -592,15 +592,27 @@ func TestContractDeployment(t *testing.T) {
 		return
 	}
 
-	jailInstance := jail.Init("")
-	jailInstance.Parse(chatID, "")
-
-	// obtain VM for a given chat (to send custom JS to jailed version of Send())
-	vm, err := jailInstance.GetVM(chatID)
-	if err != nil {
-		t.Errorf("cannot get VM: %v", err)
-		return
-	}
+	jailInstance := makeTestJail()
+	jailInstance.Parse(chatID, `
+		var txHash = "not_set";
+		_status_catalog['createContract'] = function () {
+			var responseValue = null;
+			var testContract = web3.eth.contract([{"constant":true,"inputs":[{"name":"a","type":"int256"}],"name":"double","outputs":[{"name":"","type":"int256"}],"payable":false,"type":"function"}]);
+			var test = testContract.new(
+			{
+				from: '`+testConfig.Account1.Address+`',
+				data: '0x6060604052341561000c57fe5b5b60a58061001b6000396000f30060606040526000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff1680636ffa1caa14603a575bfe5b3415604157fe5b60556004808035906020019091905050606b565b6040518082815260200191505060405180910390f35b60008160020290505b9190505600a165627a7a72305820ccdadd737e4ac7039963b54cee5e5afb25fa859a275252bdcf06f653155228210029',
+				gas: '`+strconv.Itoa(params.DefaultGas)+`'
+			}, function (e, contract){
+				if (!e) {
+					txHash = contract.transactionHash
+				}
+			})
+		}
+		_status_catalog['getTxHash'] = function () {
+			return txHash;
+		}
+	`)
 
 	// make sure you panic if transaction complete doesn't return
 	completeQueuedTransaction := make(chan struct{}, 1)
@@ -635,42 +647,19 @@ func TestContractDeployment(t *testing.T) {
 		}
 	})
 
-	_, err = vm.Run(`
-		var responseValue = null;
-		var testContract = web3.eth.contract([{"constant":true,"inputs":[{"name":"a","type":"int256"}],"name":"double","outputs":[{"name":"","type":"int256"}],"payable":false,"type":"function"}]);
-		var test = testContract.new(
-		{
-			from: '` + testConfig.Account1.Address + `',
-			data: '0x6060604052341561000c57fe5b5b60a58061001b6000396000f30060606040526000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff1680636ffa1caa14603a575bfe5b3415604157fe5b60556004808035906020019091905050606b565b6040518082815260200191505060405180910390f35b60008160020290505b9190505600a165627a7a72305820ccdadd737e4ac7039963b54cee5e5afb25fa859a275252bdcf06f653155228210029',
-			gas: '` + strconv.Itoa(params.DefaultGas) + `'
-		}, function (e, contract){
-			if (!e) {
-				responseValue = contract.transactionHash
-			}
-		})
-	`)
-	if err != nil {
-		t.Errorf("cannot run custom code on VM: %v", err)
+	response := jailInstance.Call(chatID, `["createContract"]`, `{}`)
+	expectedResponse := `{"result": null}`
+	if response != expectedResponse {
+		t.Errorf("unexpected response, expected: %v, got: %v", expectedResponse, response)
 		return
 	}
 
 	<-completeQueuedTransaction
 
-	responseValue, err := vm.Get("responseValue")
-	if err != nil {
-		t.Errorf("vm.Get() failed: %v", err)
-		return
-	}
-
-	response, err := responseValue.ToString()
-	if err != nil {
-		t.Errorf("cannot parse result: %v", err)
-		return
-	}
-
-	expectedResponse := txHash.Hex()
-	if !reflect.DeepEqual(response, expectedResponse) {
-		t.Errorf("expected response is not returned: expected %s, got %s", expectedResponse, response)
+	response = jailInstance.Call(chatID, `["getTxHash"]`, `{}`)
+	expectedResponse = `{"result": "` + txHash.Hex() + `"}`
+	if response != expectedResponse {
+		t.Errorf("unexpected response, expected: %v, got: %v", expectedResponse, response)
 		return
 	}
 }
@@ -682,15 +671,27 @@ func TestGasEstimation(t *testing.T) {
 		return
 	}
 
-	jailInstance := jail.Init("")
-	jailInstance.Parse(chatID, "")
+	jailInstance := makeTestJail()
+	jailInstance.Parse(chatID, `
+		var txHash = "not_set";
+		_status_catalog['createContractWithGasEstimated'] = function () {
+			var responseValue = null;
+			var testContract = web3.eth.contract([{"constant":true,"inputs":[{"name":"a","type":"int256"}],"name":"double","outputs":[{"name":"","type":"int256"}],"payable":false,"type":"function"}]);
+			var test = testContract.new(
+			{
+				from: '`+testConfig.Account1.Address+`',
+				data: '0x6060604052341561000c57fe5b5b60a58061001b6000396000f30060606040526000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff1680636ffa1caa14603a575bfe5b3415604157fe5b60556004808035906020019091905050606b565b6040518082815260200191505060405180910390f35b60008160020290505b9190505600a165627a7a72305820ccdadd737e4ac7039963b54cee5e5afb25fa859a275252bdcf06f653155228210029',
+			}, function (e, contract){
+				if (!e) {
+					txHash = contract.transactionHash
+				}
+			})
+		};
 
-	// obtain VM for a given chat (to send custom JS to jailed version of Send())
-	vm, err := jailInstance.GetVM(chatID)
-	if err != nil {
-		t.Errorf("cannot get VM: %v", err)
-		return
-	}
+		_status_catalog['getTxHash'] = function () {
+			return txHash;
+		}
+	`)
 
 	// make sure you panic if transaction complete doesn't return
 	completeQueuedTransaction := make(chan struct{}, 1)
@@ -725,41 +726,19 @@ func TestGasEstimation(t *testing.T) {
 		}
 	})
 
-	_, err = vm.Run(`
-		var responseValue = null;
-		var testContract = web3.eth.contract([{"constant":true,"inputs":[{"name":"a","type":"int256"}],"name":"double","outputs":[{"name":"","type":"int256"}],"payable":false,"type":"function"}]);
-		var test = testContract.new(
-		{
-			from: '` + testConfig.Account1.Address + `',
-			data: '0x6060604052341561000c57fe5b5b60a58061001b6000396000f30060606040526000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff1680636ffa1caa14603a575bfe5b3415604157fe5b60556004808035906020019091905050606b565b6040518082815260200191505060405180910390f35b60008160020290505b9190505600a165627a7a72305820ccdadd737e4ac7039963b54cee5e5afb25fa859a275252bdcf06f653155228210029',
-		}, function (e, contract){
-			if (!e) {
-				responseValue = contract.transactionHash
-			}
-		})
-	`)
-	if err != nil {
-		t.Errorf("cannot run custom code on VM: %v", err)
+	response := jailInstance.Call(chatID, `["createContractWithGasEstimated"]`, `{}`)
+	expectedResponse := `{"result": null}`
+	if response != expectedResponse {
+		t.Errorf("unexpected response, expected: %v, got: %v", expectedResponse, response)
 		return
 	}
 
 	<-completeQueuedTransaction
 
-	responseValue, err := vm.Get("responseValue")
-	if err != nil {
-		t.Errorf("vm.Get() failed: %v", err)
-		return
-	}
-
-	response, err := responseValue.ToString()
-	if err != nil {
-		t.Errorf("cannot parse result: %v", err)
-		return
-	}
-
-	expectedResponse := txHash.Hex()
-	if !reflect.DeepEqual(response, expectedResponse) {
-		t.Errorf("expected response is not returned: expected %s, got %s", expectedResponse, response)
+	response = jailInstance.Call(chatID, `["getTxHash"]`, `{}`)
+	expectedResponse = `{"result": "` + txHash.Hex() + `"}`
+	if response != expectedResponse {
+		t.Errorf("unexpected response, expected: %v, got: %v", expectedResponse, response)
 		return
 	}
 }
