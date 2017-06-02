@@ -111,10 +111,22 @@ func TestJailUnInited(t *testing.T) {
 	}
 }
 
-func TestJailInit(t *testing.T) {
+func TestJailInitAndParse(t *testing.T) {
 	err := geth.PrepareTestNode()
 	if err != nil {
 		t.Error(err)
+		return
+	}
+
+	initInvalidCode := `
+	var _status_catalog = {
+		foo: 'bar'
+	`
+	jailInstance := jail.Init(initInvalidCode)
+	response := jailInstance.Parse("newChat", ``)
+	expectedResponse := `{"error":"(anonymous): Line 4:3 Unexpected end of input (and 3 more errors)"}`
+	if expectedResponse != response {
+		t.Errorf("unexpected response, expected: %v, got: %v", expectedResponse, response)
 		return
 	}
 
@@ -123,19 +135,28 @@ func TestJailInit(t *testing.T) {
 		foo: 'bar'
 	};
 	`
-	jailInstance := jail.Init(initCode)
+	jailInstance = jail.Init(initCode)
+
+	extraInvalidCode := `
+	var extraFunc = function (x) {
+	  return x * x;
+	`
+	response = jailInstance.Parse("newChat", extraInvalidCode)
+	expectedResponse = `{"error":"(anonymous): Line 16331:50 Unexpected end of input (and 1 more errors)"}`
+	if expectedResponse != response {
+		t.Errorf("unexpected response, expected: %v, got: %v", expectedResponse, response)
+		return
+	}
 
 	extraCode := `
 	var extraFunc = function (x) {
 	  return x * x;
 	};
 	`
-	response := jailInstance.Parse("newChat", extraCode)
-
-	expectedResponse := `{"result": {"foo":"bar"}}`
-
-	if !reflect.DeepEqual(expectedResponse, response) {
-		t.Error("Expected output not returned from jail.Parse()")
+	response = jailInstance.Parse("newChat", extraCode)
+	expectedResponse = `{"result": {"foo":"bar"}}`
+	if expectedResponse != response {
+		t.Errorf("unexpected response, expected: %v, got: %v", expectedResponse, response)
 		return
 	}
 }
