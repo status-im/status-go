@@ -97,6 +97,12 @@ func (jail *Jail) Parse(chatId string, js string) string {
 	localStorage, _ := vm.Get("localStorage")
 	localStorage.Object().Set("set", makeLocalStorageSetHandler(chatId))
 
+	// sendMessage/showSuggestions handlers
+	vm.Set("statusSignals", struct{}{})
+	statusSignals, _ := vm.Get("statusSignals")
+	statusSignals.Object().Set("sendMessage", makeSendMessageHandler(chatId))
+	statusSignals.Object().Set("showSuggestions", makeShowSuggestionsHandler(chatId))
+
 	jjs := string(Web3_JS) + `
 	var Web3 = require('web3');
 	var web3 = new Web3(jeth);

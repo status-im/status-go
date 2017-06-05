@@ -6,7 +6,9 @@ import (
 )
 
 const (
-	EventLocalStorageSet   = "local_storage.set"
+	EventLocalStorageSet = "local_storage.set"
+	EventSendMessage = "jail.send_message"
+	EventShowSuggestions = "jail.show_suggestions"
 	LocalStorageMaxDataLen = 256
 )
 
@@ -51,6 +53,38 @@ func makeLocalStorageSetHandler(chatId string) func(call otto.FunctionCall) (res
 			Event: geth.LocalStorageSetEvent{
 				ChatId: chatId,
 				Data:   data,
+			},
+		})
+
+		return newResultResponse(call.Otto, true)
+	}
+}
+
+func makeSendMessageHandler(chatId string) func(call otto.FunctionCall) (response otto.Value) {
+	return func(call otto.FunctionCall) otto.Value {
+		message := call.Argument(0).String()
+
+		geth.SendSignal(geth.SignalEnvelope{
+			Type: EventSendMessage,
+			Event: geth.SendMessageEvent{
+				ChatId: chatId,
+				Message:   message,
+			},
+		})
+
+		return newResultResponse(call.Otto, true)
+	}
+}
+
+func makeShowSuggestionsHandler(chatId string) func(call otto.FunctionCall) (response otto.Value) {
+	return func(call otto.FunctionCall) otto.Value {
+		suggestionsMarkup := call.Argument(0).String()
+
+		geth.SendSignal(geth.SignalEnvelope{
+			Type: EventShowSuggestions,
+			Event: geth.ShowSuggestionsEvent{
+				ChatId: chatId,
+				Markup: suggestionsMarkup,
 			},
 		})
 

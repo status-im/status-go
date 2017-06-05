@@ -91,6 +91,16 @@ type LocalStorageSetEvent struct {
 	Data   string `json:"data"`
 }
 
+type SendMessageEvent struct {
+	ChatId  string `json:"chat_id"`
+	Message string `json:"message"`
+}
+
+type ShowSuggestionsEvent struct {
+	ChatId string `json:"chat_id"`
+	Markup string `json:"markup"`
+}
+
 type RPCCall struct {
 	Id     int64
 	Method string
