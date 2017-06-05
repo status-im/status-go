@@ -82,9 +82,6 @@ func (jail *Jail) Parse(chatId string, js string) string {
 	jail.cells[chatId] = NewJailedRuntime(chatId)
 	vm := jail.cells[chatId].vm
 
-	initJjs := jail.statusJS + ";"
-	_, err := vm.Run(initJjs)
-
 	// jeth and its handlers
 	vm.Set("jeth", struct{}{})
 	jethObj, _ := vm.Get("jeth")
@@ -96,6 +93,15 @@ func (jail *Jail) Parse(chatId string, js string) string {
 	vm.Set("localStorage", struct{}{})
 	localStorage, _ := vm.Get("localStorage")
 	localStorage.Object().Set("set", makeLocalStorageSetHandler(chatId))
+
+	// sendMessage/showSuggestions handlers
+	vm.Set("statusSignals", struct{}{})
+	statusSignals, _ := vm.Get("statusSignals")
+	statusSignals.Object().Set("sendMessage", makeSendMessageHandler(chatId))
+	statusSignals.Object().Set("showSuggestions", makeShowSuggestionsHandler(chatId))
+
+	initJjs := jail.statusJS + ";"
+	_, err := vm.Run(initJjs)
 
 	jjs := string(Web3_JS) + `
 	var Web3 = require('web3');
