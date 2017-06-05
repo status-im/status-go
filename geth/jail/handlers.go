@@ -9,7 +9,6 @@ const (
 	EventLocalStorageSet = "local_storage.set"
 	EventSendMessage = "jail.send_message"
 	EventShowSuggestions = "jail.show_suggestions"
-	LocalStorageMaxDataLen = 256
 )
 
 // makeSendHandler returns jeth.send() and jeth.sendAsync() handler
@@ -44,9 +43,6 @@ func makeJethIsConnectedHandler(jail *Jail) func(call otto.FunctionCall) (respon
 func makeLocalStorageSetHandler(chatId string) func(call otto.FunctionCall) (response otto.Value) {
 	return func(call otto.FunctionCall) otto.Value {
 		data := call.Argument(0).String()
-		if len(data) > LocalStorageMaxDataLen { // cap input string
-			data = data[:LocalStorageMaxDataLen]
-		}
 
 		geth.SendSignal(geth.SignalEnvelope{
 			Type: EventLocalStorageSet,
