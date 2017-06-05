@@ -6,10 +6,9 @@ import (
 )
 
 const (
-	// EventLocalStorageSet is triggered when set request is sent to local storage
-	EventLocalStorageSet = "local_storage.set"
-
-	// LocalStorageMaxDataLen is maximum length of data that you can store in local storage
+	EventLocalStorageSet   = "local_storage.set"
+	EventSendMessage       = "jail.send_message"
+	EventShowSuggestions   = "jail.show_suggestions"
 	LocalStorageMaxDataLen = 256
 )
 
@@ -95,6 +94,38 @@ func makeLocalStorageSetHandler(chatID string) func(call otto.FunctionCall) (res
 			Event: geth.LocalStorageSetEvent{
 				ChatID: chatID,
 				Data:   data,
+			},
+		})
+
+		return newResultResponse(call.Otto, true)
+	}
+}
+
+func makeSendMessageHandler(chatID string) func(call otto.FunctionCall) (response otto.Value) {
+	return func(call otto.FunctionCall) otto.Value {
+		message := call.Argument(0).String()
+
+		geth.SendSignal(geth.SignalEnvelope{
+			Type: EventSendMessage,
+			Event: geth.SendMessageEvent{
+				ChatID:  chatID,
+				Message: message,
+			},
+		})
+
+		return newResultResponse(call.Otto, true)
+	}
+}
+
+func makeShowSuggestionsHandler(chatID string) func(call otto.FunctionCall) (response otto.Value) {
+	return func(call otto.FunctionCall) otto.Value {
+		suggestionsMarkup := call.Argument(0).String()
+
+		geth.SendSignal(geth.SignalEnvelope{
+			Type: EventShowSuggestions,
+			Event: geth.ShowSuggestionsEvent{
+				ChatID: chatID,
+				Markup: suggestionsMarkup,
 			},
 		})
 

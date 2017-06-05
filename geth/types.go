@@ -107,3 +107,15 @@ type RPCCall struct {
 	Method string
 	Params []interface{}
 }
+
+// SendMessageEvent wraps Jail send signals
+type SendMessageEvent struct {
+	ChatID  string `json:"chat_id"`
+	Message string `json:"message"`
+}
+
+// ShowSuggestionsEvent wraps Jail show suggestion signals
+type ShowSuggestionsEvent struct {
+	ChatID string `json:"chat_id"`
+	Markup string `json:"markup"`
+}
