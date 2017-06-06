@@ -37,7 +37,7 @@ var (
 		Ethash:         new(EthashConfig),
 	}
 
-	// TestnetChainConfig contains the chain parameters to run a node on the ropsten test network.
+	// TestnetChainConfig contains the chain parameters to run a node on the Ropsten test network.
 	TestnetChainConfig = &ChainConfig{
 		ChainId:        big.NewInt(3),
 		HomesteadBlock: big.NewInt(0),
