@@ -5,11 +5,11 @@ import (
 	"github.com/status-im/status-go/geth"
 )
 
+// signals
 const (
-	EventLocalStorageSet   = "local_storage.set"
-	EventSendMessage       = "jail.send_message"
-	EventShowSuggestions   = "jail.show_suggestions"
-	LocalStorageMaxDataLen = 256
+	EventLocalStorageSet = "local_storage.set"
+	EventSendMessage     = "jail.send_message"
+	EventShowSuggestions = "jail.show_suggestions"
 )
 
 // registerHandlers augments and transforms a given jail cell's underlying VM,
@@ -50,6 +50,22 @@ func registerHandlers(jail *Jail, vm *otto.Otto, chatID string) (err error) {
 		return
 	}
 
+	// register sendMessage/showSuggestions handlers
+	if err = vm.Set("statusSignals", struct{}{}); err != nil {
+		return err
+	}
+	statusSignals, err := vm.Get("statusSignals")
+	if err != nil {
+		return err
+	}
+	registerHandler = statusSignals.Object().Set
+	if err = registerHandler("sendMessage", makeSendMessageHandler(chatID)); err != nil {
+		return err
+	}
+	if err = registerHandler("showSuggestions", makeShowSuggestionsHandler(chatID)); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -85,9 +101,6 @@ func makeJethIsConnectedHandler(jail *Jail) func(call otto.FunctionCall) (respon
 func makeLocalStorageSetHandler(chatID string) func(call otto.FunctionCall) (response otto.Value) {
 	return func(call otto.FunctionCall) otto.Value {
 		data := call.Argument(0).String()
-		if len(data) > LocalStorageMaxDataLen { // cap input string
-			data = data[:LocalStorageMaxDataLen]
-		}
 
 		geth.SendSignal(geth.SignalEnvelope{
 			Type: EventLocalStorageSet,
