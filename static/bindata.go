@@ -97,7 +97,7 @@ func scriptsReadmeMd() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "scripts/README.md", size: 133, mode: os.FileMode(420), modTime: time.Unix(1494856773, 0)}
+	info := bindataFileInfo{name: "scripts/README.md", size: 133, mode: os.FileMode(420), modTime: time.Unix(1496184740, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -117,7 +117,7 @@ func scriptsWeb3Js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "scripts/web3.js", size: 496217, mode: os.FileMode(420), modTime: time.Unix(1494921623, 0)}
+	info := bindataFileInfo{name: "scripts/web3.js", size: 496217, mode: os.FileMode(420), modTime: time.Unix(1496711192, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -137,7 +137,7 @@ func bootclusterHomesteadDevJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "bootcluster/homestead.dev.json", size: 484, mode: os.FileMode(420), modTime: time.Unix(1494921071, 0)}
+	info := bindataFileInfo{name: "bootcluster/homestead.dev.json", size: 484, mode: os.FileMode(420), modTime: time.Unix(1496685730, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -157,7 +157,7 @@ func bootclusterHomesteadProdJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "bootcluster/homestead.prod.json", size: 486, mode: os.FileMode(420), modTime: time.Unix(1494921071, 0)}
+	info := bindataFileInfo{name: "bootcluster/homestead.prod.json", size: 486, mode: os.FileMode(420), modTime: time.Unix(1496685730, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -177,7 +177,7 @@ func bootclusterRinkebyDevJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "bootcluster/rinkeby.dev.json", size: 484, mode: os.FileMode(420), modTime: time.Unix(1494921071, 0)}
+	info := bindataFileInfo{name: "bootcluster/rinkeby.dev.json", size: 484, mode: os.FileMode(420), modTime: time.Unix(1496685730, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -197,12 +197,12 @@ func bootclusterRinkebyProdJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "bootcluster/rinkeby.prod.json", size: 486, mode: os.FileMode(420), modTime: time.Unix(1494921071, 0)}
+	info := bindataFileInfo{name: "bootcluster/rinkeby.prod.json", size: 486, mode: os.FileMode(420), modTime: time.Unix(1496685730, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _bootclusterRopstenDevJson = []byte("\x1f\x8b\x08\x00\x00\x09\x6e\x88\x00\xff\x6c\x93\x39\xaa\x26\x46\xb2\x46\x7d\xad\x42\x94\x2d\xae\x62\x1e\x64\xbd\x7d\x3c\xda\x88\x8c\xc1\xec\xde\xbf\xd7\xfc\xd0\x05\x42\xb7\x16\x90\x70\xf2\xc4\x77\xfe\xff\xb7\xdf\x7f\xff\xb1\xff\xfe\xcf\xec\x5f\x7f\xfe\xf9\x5a\x0a\x19\x08\xb3\x36\xa5\xa9\xcc\x96\xb7\x99\xdd\x9b\x4a\x0c\x16\xc0\x46\xed\x85\xfb\xe8\xc6\xce\x83\x81\x0b\x30\xe9\x13\x80\x43\xf4\x52\x2e\xe5\xc8\x53\xa5\xce\xc5\x42\xa2\x97\x05\xbe\x5b\x25\xb8\xbe\x13\xa1\x64\xb1\x1b\xa4\xcf\xca\x23\x30\xe2\x9e\xd2\xfe\x9f\xe2\x17\xea\x97\xea\x17\x61\xfe\xc5\xc0\x9e\x3f\xfe\xf8\x3b\xe0\xbd\x99\x3b\xf1\x58\x0c\x4a\x9a\x66\x7a\x09\x87\x9c\xef\xdc\xb9\x20\xa6\x22\xef\x96\x92\x20\x56\x66\x01\x12\xcf\x5a\x23\xd7\xe0\xba\xaf\x0e\x6d\xe4\xa4\xdc\xde\x4a\x9e\xba\x07\x35\x18\x6e\xc7\x56\x3a\x78\x18\x60\xdb\xb1\xf9\x6d\xbd\x29\x17\x38\xed\x0d\x12\xfb\x06\x08\xfc\xe3\x8f\xdf\xfe\x4e\x38\x47\xc0\x4a\x03\x9e\x24\x77\x9b\xbc\xe6\xbb\xbe\x81\x08\x3a\xfe\x48\xe1\x3c\x99\xee\x64\x81\x15\xa7\xa8\xaf\xd0\x29\x68\x95\xcf\x4d\x23\xb5\x99\x7a\x8a\xed\x39\xcc\xbd\x8c\xd9\x83\x27\x4e\x8f\x72\x3e\x8f\xd1\xd9\x81\xd5\x04\xdf\xf1\xeb\xd3\xd4\xe9\x46\x10\xfc\x1f\x21\xeb\x17\x22\xfc\x4a\xa1\xac\xee\x82\x84\x97\x4c\xb0\x64\xbd\xac\x4c\xd2\x07\xb0\x3b\x70\xe9\x36\x19\xe9\xd4\x5a\x44\x27\x7c\xa3\x30\x28\x24\x91\xee\xea\xc0\xd4\x6c\x47\xce\x4f\x58\x4a\x86\x17\x90\x8b\x54\x64\xbb\x5c\x2a\x07\x0b\x04\xf3\xf2\xc0\xcf\xdf\x13\xc6\xa0\x72\x9e\x63\x4b\xf8\x06\xf8\x4d\x21\xf5\xeb\xf6\xc7\x03\xe6\x1a\x08\x4e\x60\x86\xc2\x0b\x57\xb3\x30\x00\xbe\x01\xdb\x1d\x17\xb6\x4f\x5c\x09\xa0\x79\x8a\xcb\x26\x70\x46\x16\xd7\x41\xf1\x9a\xe7\x6a\x97\xd9\x0f\x11\x7a\xb7\x0d\x35\xa5\x12\xf0\x41\x2e\xdb\x3e\x36\x37\xca\xcf\xaa\x6c\x71\x6e\x52\xf5\x27\xa1\x7c\xf1\xaf\x04\x62\xec\x4d\xd6\x3d\x03\xf9\x40\xc1\xed\x18\x50\x37\xcc\x29\x59\x0f\x4e\xa8\xf0\xd0\x19\xb0\xcf\x25\x07\xec\x4b\xe7\x61\x78\x7a\x03\x52\x9d\x47\x84\xa0\x7c\x41\xc0\xf2\xf9\xa4\xe2\xbb\xb1\x55\x61\xb5\xca\xac\x23\x52\x3d\x2c\x73\x19\xc7\x41\x17\x81\xb2\x4e\x7d\xff\xc0\xfb\xa6\xaf\xe7\xa5\x1e\x4f\x98\x89\x53\xb9\x60\x2a\x0b\xa5\x7f\xba\x28\xd9\xf1\xcb\x67\xd1\x83\x1b\x6d\x97\x45\xfa\x18\xd3\x9b\x08\x0f\xf0\x35\xb8\x75\xbf\x72\x03\x16\x9c\x78\x96\xef\xd9\xbb\xd7\xf9\x4e\x6e\x3e\x4d\x40\x57\x65\xee\xc2\x3b\x59\xcf\x44\xbf\xc2\x13\x12\xe2\xfe\xd9\x88\x7d\xa1\xca\xaf\x04\xea\xcb\x6c\xe8\xc7\x4e\x94\x79\xc3\x47\x93\x62\x48\x65\x41\x99\xe0\x44\xfb\xbc\x3f\x9b\xa2\xa9\xde\xeb\x20\x87\x7d\x7e\xe8\x74\x6d\x99\x8d\x33\x57\x13\x64\xf7\xae\xd3\x93\x1c\x94\x63\x63\x22\xdf\x58\x62\x3a\xf0\xbe\xdc\xcf\x41\xb6\x1a\x4a\x74\xf3\x9e\xa8\x22\xf1\x37\xc0\x6f\x0a\x3f\xb5\x6f\xda\xa4\x46\x9a\xa3\x9b\x97\x3f\x6c\x7b\x59\x2c\x9f\xdc\x98\x34\x9c\xc3\xf7\x81\xd1\xac\x23\x55\x9e\xa3\x95\xd9\x81\x9e\x20\x21\x19\x12\xf6\xca\xa4\x33\xc3\x6b\x9d\xf6\x92\xe4\xb8\xc3\xed\x26\x62\xb0\x07\x2f\x5e\x7a\xf9\xb9\x7c\x6e\xa1\xa7\xd9\x46\x3f\x1b\x31\xf8\xa2\x5f\x4e\x10\x16\x47\x06\xae\x6f\x23\xe2\x5d\x94\x78\x3c\xb8\x89\x74\x83\x12\x77\xe6\xd2\x06\xe9\x11\x9f\x65\x65\x4a\x2d\xdb\x17\x33\x1b\xa7\x12\x84\x8f\x11\xd3\x94\x7c\xa0\xb5\x9d\xcb\x81\x64\x3a\xef\x58\x90\xdc\x92\x86\xd8\x43\xe0\x1a\xb2\x19\xe9\x71\x61\xf6\x50\xdc\xfe\x93\x0f\xf8\xc7\x6f\xff\xfa\x6f\x00\x00\x00\xff\xff\xf6\xfd\x99\x14\x4a\x06\x00\x00")
+var _bootclusterRopstenDevJson = []byte("\x1f\x8b\x08\x00\x00\x09\x6e\x88\x00\xff\x04\xc0\xb9\x71\xc4\x30\x0c\x00\xc0\x5c\x55\x68\x54\x80\x04\xe2\x23\xa0\xc8\x7d\x78\x1c\x10\x0f\x43\x5f\xff\xd9\xed\xef\x71\x9e\x57\xff\x7f\xaa\xdf\xe7\x99\x2b\xd0\x2d\xbb\x92\x87\xc9\x32\xe7\xc2\x51\xb6\x58\x87\xa0\x62\xa7\x46\x65\xab\xa6\x87\x4e\x23\x9b\x86\x62\x0d\x25\x41\x03\x06\x15\x41\x3a\x90\x39\x21\x13\xee\x09\x2d\x81\xa1\x4b\xb2\x08\x29\xb6\x21\x88\xf0\xce\x40\xdc\x91\x33\x58\x48\xa7\x99\x0b\x62\x7b\x32\xfb\x8f\x8c\x7b\xc8\xad\x74\x3b\xbd\x04\x04\x74\x1d\x7f\xdf\x00\x00\x00\xff\xff\xa8\x78\x97\x70\xa2\x00\x00\x00")
 
 func bootclusterRopstenDevJsonBytes() ([]byte, error) {
 	return bindataRead(
@@ -217,7 +217,7 @@ func bootclusterRopstenDevJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "bootcluster/ropsten.dev.json", size: 1610, mode: os.FileMode(420), modTime: time.Unix(1494921071, 0)}
+	info := bindataFileInfo{name: "bootcluster/ropsten.dev.json", size: 162, mode: os.FileMode(420), modTime: time.Unix(1496710782, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -237,7 +237,7 @@ func bootclusterRopstenProdJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "bootcluster/ropsten.prod.json", size: 1608, mode: os.FileMode(420), modTime: time.Unix(1494921071, 0)}
+	info := bindataFileInfo{name: "bootcluster/ropsten.prod.json", size: 1608, mode: os.FileMode(420), modTime: time.Unix(1496685730, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -257,7 +257,7 @@ func configLinter_exclude_listTxt() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/linter_exclude_list.txt", size: 2258, mode: os.FileMode(420), modTime: time.Unix(1494920851, 0)}
+	info := bindataFileInfo{name: "config/linter_exclude_list.txt", size: 2258, mode: os.FileMode(420), modTime: time.Unix(1496685730, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -277,7 +277,7 @@ func configTestDataJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/test-data.json", size: 301, mode: os.FileMode(420), modTime: time.Unix(1493762696, 0)}
+	info := bindataFileInfo{name: "config/test-data.json", size: 301, mode: os.FileMode(420), modTime: time.Unix(1496674793, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -297,7 +297,7 @@ func keysFirebaseauthkey() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/firebaseauthkey", size: 153, mode: os.FileMode(420), modTime: time.Unix(1494845997, 0)}
+	info := bindataFileInfo{name: "keys/firebaseauthkey", size: 153, mode: os.FileMode(420), modTime: time.Unix(1496184740, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -317,7 +317,7 @@ func keysTestAccount1Pk() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/test-account1.pk", size: 637, mode: os.FileMode(420), modTime: time.Unix(1493762696, 0)}
+	info := bindataFileInfo{name: "keys/test-account1.pk", size: 637, mode: os.FileMode(420), modTime: time.Unix(1496184740, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -337,7 +337,7 @@ func keysTestAccount2Pk() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/test-account2.pk", size: 1073, mode: os.FileMode(420), modTime: time.Unix(1493762696, 0)}
+	info := bindataFileInfo{name: "keys/test-account2.pk", size: 1073, mode: os.FileMode(420), modTime: time.Unix(1496184740, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -357,7 +357,7 @@ func keysWnodekey() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/wnodekey", size: 65, mode: os.FileMode(420), modTime: time.Unix(1494845997, 0)}
+	info := bindataFileInfo{name: "keys/wnodekey", size: 65, mode: os.FileMode(420), modTime: time.Unix(1496184740, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -377,7 +377,7 @@ func keysWnodepassword() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/wnodepassword", size: 9, mode: os.FileMode(420), modTime: time.Unix(1494845997, 0)}
+	info := bindataFileInfo{name: "keys/wnodepassword", size: 9, mode: os.FileMode(420), modTime: time.Unix(1496184740, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
