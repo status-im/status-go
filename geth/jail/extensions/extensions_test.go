@@ -24,66 +24,6 @@ type ExtensionsTestSuite struct {
 	vm *otto.Otto
 }
 
-// TestConsoleError will validate the operations of the console.error extension
-// for the otto vm.
-func (s *ExtensionsTestSuite) TestConsoleError() {
-	require := s.Require()
-	written := "Bob Marley"
-
-	var customWriter bytes.Buffer
-
-	console.Stdout = &customWriter
-
-	_, err := s.vm.Run(fmt.Sprintf(`
-		console.error(%q);
-	`, written))
-
-	require.NoError(err)
-
-	require.NotEmpty(&customWriter)
-	require.Equal(written, strings.TrimPrefix(customWriter.String(), "console.error: "))
-}
-
-// TestConsoleDebug will validate the operations of the console.debug extension
-// for the otto vm.
-func (s *ExtensionsTestSuite) TestConsoleDebug() {
-	require := s.Require()
-	written := "Bob Marley"
-
-	var customWriter bytes.Buffer
-
-	console.Stdout = &customWriter
-
-	_, err := s.vm.Run(fmt.Sprintf(`
-		console.debug(%q);
-	`, written))
-
-	require.NoError(err)
-
-	require.NotEmpty(&customWriter)
-	require.Equal(written, strings.TrimPrefix(customWriter.String(), "console.debug: "))
-}
-
-// TestConsoleWarn will validate the operations of the console.warn extension
-// for the otto vm.
-func (s *ExtensionsTestSuite) TestConsoleWarn() {
-	require := s.Require()
-	written := "Bob Marley"
-
-	var customWriter bytes.Buffer
-
-	console.Stdout = &customWriter
-
-	_, err := s.vm.Run(fmt.Sprintf(`
-		console.warn(%q);
-	`, written))
-
-	require.NoError(err)
-
-	require.NotEmpty(&customWriter)
-	require.Equal(written, strings.TrimPrefix(customWriter.String(), "console.warn: "))
-}
-
 // TestConsoleLog will validate the operations of the console.log extension
 // for the otto vm.
 func (s *ExtensionsTestSuite) TestConsoleLog() {

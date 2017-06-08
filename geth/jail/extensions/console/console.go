@@ -30,10 +30,7 @@ var (
 
 	_ = extensions.Register(func(vm *otto.Otto) error {
 		return vm.Set("console", map[string]interface{}{
-			"log":   consoleLog,
-			"error": consoleError,
-			"debug": consoleDebug,
-			"warn":  consoleWarn,
+			"log": consoleLog,
 		})
 	})
 )
