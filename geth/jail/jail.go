@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/common"
+	"github.com/status-im/status-go/geth/jail/extensions"
 	"github.com/status-im/status-go/static"
 )
 
@@ -43,6 +44,7 @@ type Jail struct {
 	baseJSCode     string                     // JavaScript used to initialize all new cells with
 }
 
+// CellVM returns the otto.Otto VM associated with a given jail cell.
 func (cell *JailCell) CellVM() *otto.Otto {
 	return cell.vm
 }
@@ -80,7 +82,14 @@ func (jail *Jail) Parse(chatID string, js string) string {
 	jail.Lock()
 	defer jail.Unlock()
 
-	jail.cells[chatID] = jail.NewJailCell(chatID)
+	cell := jail.NewJailCell(chatID)
+
+	// Registers all extensions to the vm.
+	if err := extensions.ActivateExtensions(cell.CellVM()); err != nil {
+		return makeError(err.Error())
+	}
+
+	jail.cells[chatID] = cell
 	vm := jail.cells[chatID].CellVM()
 
 	initJjs := jail.baseJSCode + ";"
