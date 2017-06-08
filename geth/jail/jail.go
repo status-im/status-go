@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth"
+	"github.com/status-im/status-go/geth/jail/extensions"
 	"github.com/status-im/status-go/static"
 )
 
@@ -91,8 +92,15 @@ func (jail *Jail) Parse(chatID string, js string) string {
 	jail.Lock()
 	defer jail.Unlock()
 
-	jail.cells[chatID] = NewJailedRuntime(chatID)
-	vm := jail.cells[chatID].vm
+	cell := NewJailedRuntime(chatID)
+	vm := cell.vm
+
+	// Registers all extensions to the vm.
+	if err := extensions.ActivateExtensions(vm); err != nil {
+		return printError(err.Error())
+	}
+
+	jail.cells[chatID] = cell
 
 	// init jeth and its handlers
 	if err = vm.Set("jeth", struct{}{}); err != nil {
