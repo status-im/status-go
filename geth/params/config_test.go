@@ -21,6 +21,25 @@ var loadConfigTestCases = []struct {
 	validator  func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error)
 }{
 	{
+		`valid input configuration`,
+		`{
+			"NetworkId": 3,
+			"DataDir": "$TMPDIR",
+			"Name": "TestStatusNode",
+			"WSPort": 8546,
+			"IPCEnabled": true,
+			"WSEnabled": false,
+			"LightEthConfig": {
+				"DatabaseCache": 64
+			}
+		}`,
+		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
+			if err != nil {
+				t.Fatalf("error is not expected, check config: %+q", err)
+			}
+		},
+	},
+	{
 		`invalid input configuration`,
 		`{
 			"NetworkId": 3
