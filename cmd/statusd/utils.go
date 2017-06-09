@@ -159,14 +159,17 @@ func testVerifyAccountPassword(t *testing.T) bool {
 }
 
 func testValidConfig(t *testing.T) bool {
-	config, err := params.LoadNodeConfig(nodeConfigJSON)
-	if err != nil {
-		t.Errorf("invalid configuration:  does not match config standards: %+q", err)
+	response := ValidateConfig(C.CString(nodeConfigJSON))
+
+	var res common.APIResponse
+
+	if err := json.Unmarshal([]byte(C.GoString(response)), &res); err != nil {
+		t.Errorf("Invalid response: Expected common.APIResponse type: %+q", err)
 		return false
 	}
 
-	if config.DataDir != TestDataDir {
-		t.Errorf("Loaded config.DataDir does not expected: %q", TestDataDir)
+	if len(res.Error) != 0 {
+		t.Errorf("Invalid configuration: Expected no error for config: %+q", res.Error)
 		return false
 	}
 

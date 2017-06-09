@@ -25,6 +25,12 @@ func GenerateConfig(datadir *C.char, networkID C.int, devMode C.int) *C.char {
 	return C.CString(string(outBytes))
 }
 
+//export ValidateConfig
+func ValidateConfig(configJSON *C.char) *C.char {
+	_, err := params.LoadNodeConfig(C.GoString(configJSON))
+	return makeJSONResponse(err)
+}
+
 //export StartNode
 func StartNode(configJSON *C.char) *C.char {
 	config, err := params.LoadNodeConfig(C.GoString(configJSON))
