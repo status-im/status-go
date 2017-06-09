@@ -44,6 +44,10 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 		fn   func(t *testing.T) bool
 	}{
 		{
+			"validate default configuration",
+			testValidConfig,
+		},
+		{
 			"check default configuration",
 			testGetDefaultConfig,
 		},
@@ -148,6 +152,21 @@ func testVerifyAccountPassword(t *testing.T) bool {
 	}
 	if response.Error != "" {
 		t.Errorf("unexpected error: %s", response.Error)
+		return false
+	}
+
+	return true
+}
+
+func testValidConfig(t *testing.T) bool {
+	config, err := params.LoadNodeConfig(nodeConfigJSON)
+	if err != nil {
+		t.Errorf("invalid configuration:  does not match config standards: %+q", err)
+		return false
+	}
+
+	if config.DataDir != TestDataDir {
+		t.Errorf("Loaded config.DataDir does not expected: %q", TestDataDir)
 		return false
 	}
 
