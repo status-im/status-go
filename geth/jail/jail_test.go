@@ -394,6 +394,24 @@ func TestJailSendQueuedTransaction(t *testing.T) {
 				},
 			},
 		},
+		{
+			// both message id and context are present in inited JS (this UC is what we normally expect to see)
+			name:             "Case 5: both message id and context are present and delivered with sendAsync",
+			file:             "tx-send.js",
+			requireMessageId: true,
+			commands: []testCommand{
+				{
+					`["commands", "sendAsync"]`,
+					txParams,
+					`{"result": {"context":{"eth_sendTransaction":true,"message_id":"foobar"},"result":{"transaction-hash":"TX_HASH"}}}`,
+				},
+				{
+					`["commands", "getBalance"]`,
+					`{"address": "` + testConfig.Account1.Address + `"}`,
+					`{"result": {"context":{"message_id":"42"},"result":{"balance":42}}}`, // message id in context, but default one is used!
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -408,9 +426,11 @@ func TestJailSendQueuedTransaction(t *testing.T) {
 				t.Logf("->%s: %s", test.name, command.command)
 				response := jail.Call(testChatID, command.command, command.params)
 				var txHash common.Hash
-				if command.command == `["commands", "send"]` {
+
+				if command.command == `["commands", "send"]` || command.command == `["commands", "sendAsync"]` {
 					txHash = <-txHashes
 				}
+
 				expectedResponse := strings.Replace(command.expectedResponse, "TX_HASH", txHash.Hex(), 1)
 				if response != expectedResponse {
 					t.Errorf("expected response is not returned: expected %s, got %s", expectedResponse, response)

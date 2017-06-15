@@ -1,6 +1,8 @@
 package jail
 
 import (
+	"fmt"
+
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth"
 )
@@ -73,11 +75,14 @@ func registerHandlers(jail *Jail, vm *otto.Otto, chatID string) (err error) {
 func makeAsyncSendHandler(jail *Jail, chatID string) func(call otto.FunctionCall) (response otto.Value) {
 	return func(call otto.FunctionCall) (response otto.Value) {
 		go func() {
+			fmt.Printf("Delivering response: %+q\n", chatID)
 			res := jail.Send(chatID, call)
 
 			// Deliver response if callback is provided.
+			fmt.Printf("Deliver response: %+q\n", res)
 			if call.Otto != nil {
-				newResultResponse(call, res)
+				newResultResponse(call.Otto, res)
+				fmt.Printf("Delivered response: %+q\n", res)
 			}
 		}()
 
