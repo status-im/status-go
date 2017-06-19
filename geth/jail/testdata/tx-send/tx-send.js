@@ -10,6 +10,7 @@ var _status_catalog = {
 };
 
 var context = {};
+
 function addContext(ns, key, value) { // this function is expected to be present, as status-go uses it to set context
     if (!(ns in context)) {
         context[ns] = {}
@@ -54,6 +55,26 @@ function call(pathStr, paramsStr) {
     return JSON.stringify(res);
 }
 
+function sendAsyncTransaction(params, callback) {
+    var data = {
+        from: params.from,
+        to: params.to,
+        value: web3.toWei(params.value, "ether")
+    };
+
+    // message_id allows you to distinguish between !send invocations
+    // (when you receive transaction queued event, message_id will be
+    // attached along the queued transaction id)
+    status.message_id = 'foobar';
+
+    // Blocking call, it will return when transaction is complete.
+    // While call is executing, status-go will call up the application,
+    // allowing it to validate and complete transaction
+    var hash = web3.eth.sendTransaction(data, callback);
+
+    return { "transaction-hash": hash };
+}
+
 function sendTransaction(params) {
     var data = {
         from: params.from,
@@ -71,11 +92,13 @@ function sendTransaction(params) {
     // allowing it to validate and complete transaction
     var hash = web3.eth.sendTransaction(data);
 
-    return {"transaction-hash": hash};
+    return { "transaction-hash": hash };
 }
 
 _status_catalog.commands['send'] = sendTransaction;
-_status_catalog.commands['getBalance'] = function (params) {
+_status_catalog.commands['sendAsync'] = sendAsyncTransaction;
+
+_status_catalog.commands['getBalance'] = function(params) {
     var balance = web3.eth.getBalance(params.address);
     balance = web3.fromWei(balance, "ether");
     if (balance < 90) {
@@ -83,5 +106,5 @@ _status_catalog.commands['getBalance'] = function (params) {
     }
     // used in tx tests, to check that non-context, non-message-is requests work too
     // so actual balance is not important
-    return {"balance": 42}
+    return { "balance": 42 }
 };

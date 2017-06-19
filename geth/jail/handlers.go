@@ -74,8 +74,9 @@ func registerHandlers(jail *Jail, vm *otto.Otto, chatID string) (err error) {
 // makeAsyncSendHandler returns jeth.sendAsync() handler.
 func makeAsyncSendHandler(jail *Jail, chatID string) func(call otto.FunctionCall) (response otto.Value) {
 	return func(call otto.FunctionCall) (response otto.Value) {
+		fmt.Printf("Delivering response to goroutine: %+q\n", chatID)
+
 		go func() {
-			fmt.Printf("Delivering response: %+q\n", chatID)
 			res := jail.Send(chatID, call)
 
 			// Deliver response if callback is provided.
@@ -93,6 +94,7 @@ func makeAsyncSendHandler(jail *Jail, chatID string) func(call otto.FunctionCall
 // makeSendHandler returns jeth.send() and jeth.sendAsync() handler
 func makeSendHandler(jail *Jail, chatID string) func(call otto.FunctionCall) (response otto.Value) {
 	return func(call otto.FunctionCall) (response otto.Value) {
+		fmt.Printf("Delivering response to flat: %+q\n", chatID)
 		return jail.Send(chatID, call)
 	}
 }

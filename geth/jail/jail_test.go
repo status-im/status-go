@@ -2,6 +2,7 @@ package jail_test
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"reflect"
@@ -245,6 +246,118 @@ func TestJailRPCSend(t *testing.T) {
 	t.Logf("Balance of %.2f ETH found on '%s' account", balance, testConfig.Account1.Address)
 }
 
+func TestJailAsyncSend(t *testing.T) {
+	err := geth.PrepareTestNode()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	// log into account from which transactions will be sent
+	if err := geth.SelectAccount(testConfig.Account1.Address, testConfig.Account1.Password); err != nil {
+		t.Errorf("cannot select account: %v", testConfig.Account1.Address)
+		return
+	}
+
+	txParams := `{
+  		"from": "` + testConfig.Account1.Address + `",
+  		"to": "0xf82da7547534045b4e00442bc89e16186cf8c272",
+  		"value": "0.000001"
+	}`
+
+	txCompletedSuccessfully := make(chan struct{})
+	txCompletedBadly := make(chan struct{})
+
+	// replace transaction notification handler
+	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+		var envelope geth.SignalEnvelope
+		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
+			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
+			return
+		}
+
+		if envelope.Type == geth.EventTransactionQueued {
+			txCompletedSuccessfully <- struct{}{} // so that timeout is aborted
+			return
+		}
+
+		txCompletedBadly <- struct{}{}
+	})
+
+	jailInstance := jail.Init(geth.LoadFromFile(txSendFolder + "tx-send.js"))
+	jailInstance.Parse(testChatID, ``)
+
+	go func() {
+		response := jailInstance.Call(testChatID, `["commands", "sendAsync"]`, txParams)
+		fmt.Printf("Response: %+q\n", response)
+	}()
+
+	select {
+	case <-txCompletedBadly:
+		t.Error(errors.New("Failed to successfully finish Jail command"))
+	case <-txCompletedSuccessfully:
+		t.Log("Successfully passed and finish Jail command")
+	case <-time.After(60 * time.Second):
+		t.Error(errors.New("Failed to successfully receive Jail success/failuree"))
+	}
+}
+
+func TestJailSyncSend(t *testing.T) {
+	err := geth.PrepareTestNode()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	// log into account from which transactions will be sent
+	if err := geth.SelectAccount(testConfig.Account1.Address, testConfig.Account1.Password); err != nil {
+		t.Errorf("cannot select account: %v", testConfig.Account1.Address)
+		return
+	}
+
+	txParams := `{
+  		"from": "` + testConfig.Account1.Address + `",
+  		"to": "0xf82da7547534045b4e00442bc89e16186cf8c272",
+  		"value": "0.000001"
+	}`
+
+	txCompletedSuccessfully := make(chan struct{})
+	txCompletedBadly := make(chan struct{})
+
+	// replace transaction notification handler
+	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+		var envelope geth.SignalEnvelope
+		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
+			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
+			return
+		}
+
+		if envelope.Type == geth.EventTransactionQueued {
+			txCompletedSuccessfully <- struct{}{} // so that timeout is aborted
+			return
+		}
+
+		txCompletedBadly <- struct{}{}
+	})
+
+	jailInstance := jail.Init(geth.LoadFromFile(txSendFolder + "tx-send.js"))
+	jailInstance.Parse(testChatID, ``)
+
+	go func() {
+		response := jailInstance.Call(testChatID, `["commands", "send"]`, txParams)
+		fmt.Printf("Response: %+q\n", response)
+	}()
+
+	select {
+	case <-txCompletedBadly:
+		t.Error(errors.New("Failed to successfully finish Jail command"))
+	case <-txCompletedSuccessfully:
+		t.Log("Successfully passed and finish Jail command")
+	case <-time.After(60 * time.Second):
+		t.Error(errors.New("Failed to successfully receive Jail success/failuree"))
+	}
+}
+
 func TestJailSendQueuedTransaction(t *testing.T) {
 	err := geth.PrepareTestNode()
 	if err != nil {
@@ -384,24 +497,6 @@ func TestJailSendQueuedTransaction(t *testing.T) {
 			commands: []testCommand{
 				{
 					`["commands", "send"]`,
-					txParams,
-					`{"result": {"context":{"eth_sendTransaction":true,"message_id":"foobar"},"result":{"transaction-hash":"TX_HASH"}}}`,
-				},
-				{
-					`["commands", "getBalance"]`,
-					`{"address": "` + testConfig.Account1.Address + `"}`,
-					`{"result": {"context":{"message_id":"42"},"result":{"balance":42}}}`, // message id in context, but default one is used!
-				},
-			},
-		},
-		{
-			// both message id and context are present in inited JS (this UC is what we normally expect to see)
-			name:             "Case 5: both message id and context are present and delivered with sendAsync",
-			file:             "tx-send.js",
-			requireMessageId: true,
-			commands: []testCommand{
-				{
-					`["commands", "sendAsync"]`,
 					txParams,
 					`{"result": {"context":{"eth_sendTransaction":true,"message_id":"foobar"},"result":{"transaction-hash":"TX_HASH"}}}`,
 				},
