@@ -80,10 +80,8 @@ func makeAsyncSendHandler(jail *Jail, chatID string) func(call otto.FunctionCall
 			res := jail.Send(chatID, call)
 
 			// Deliver response if callback is provided.
-			fmt.Printf("Deliver response: %+q\n", res)
 			if call.Otto != nil {
 				newResultResponse(call.Otto, res)
-				fmt.Printf("Delivered response: %+q\n", res)
 			}
 		}()
 

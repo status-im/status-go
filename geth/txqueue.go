@@ -209,28 +209,38 @@ func (q *JailedRequestQueue) PostProcessRequest(vm *otto.Otto, req RPCCall, mess
 // when backend notifies that transaction sending is complete (either successfully
 // or with error)
 func (q *JailedRequestQueue) ProcessSendTransactionRequest(lock sync.Locker, vm *otto.Otto, req RPCCall) (common.Hash, error) {
+
 	// obtain status backend from LES service
 	lightEthereum, err := NodeManagerInstance().LightEthereumService()
 	if err != nil {
 		return common.Hash{}, err
 	}
+
 	backend := lightEthereum.StatusBackend
+
+	// TODO(alex): Ask why this was not locked around here?
+	lock.Lock()
 
 	messageID, err := q.PreProcessRequest(vm, req)
 	if err != nil {
 		return common.Hash{}, err
 	}
+
 	// onSendTransactionRequest() will use context to obtain and release ticket
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, MessageIDKey, messageID)
 
 	//  this call blocks, up until Complete Transaction is called
 	lock.Unlock() // allow some other routine to access jailed runtime (cell)
+
 	txHash, err := backend.SendTransaction(ctx, sendTxArgsFromRPCCall(req))
 	if err != nil {
+
+		//TODO(alex): Why do we relock this here?
 		lock.Lock()
 		return common.Hash{}, err
 	}
+
 	lock.Lock() // re-lock
 
 	// invoke post processing

@@ -273,6 +273,7 @@ func TestJailAsyncSend(t *testing.T) {
 		var envelope geth.SignalEnvelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
+			txCompletedBadly <- struct{}{}
 			return
 		}
 
@@ -284,20 +285,20 @@ func TestJailAsyncSend(t *testing.T) {
 		txCompletedBadly <- struct{}{}
 	})
 
-	jailInstance := jail.Init(geth.LoadFromFile(txSendFolder + "tx-send.js"))
+	jailInstance := jail.Init(geth.LoadFromFile(txSendFolder + "rx-send.js"))
 	jailInstance.Parse(testChatID, ``)
 
-	go func() {
-		response := jailInstance.Call(testChatID, `["commands", "sendAsync"]`, txParams)
-		fmt.Printf("Response: %+q\n", response)
-	}()
+	jailInstance.Call(testChatID, `["commands", "sendAsync"]`, txParams)
 
 	select {
 	case <-txCompletedBadly:
+		// fmt.Println("Badly done")
 		t.Error(errors.New("Failed to successfully finish Jail command"))
 	case <-txCompletedSuccessfully:
+		// fmt.Println("Goodly done")
 		t.Log("Successfully passed and finish Jail command")
 	case <-time.After(60 * time.Second):
+		// fmt.Println("Not done")
 		t.Error(errors.New("Failed to successfully receive Jail success/failuree"))
 	}
 }

@@ -55,56 +55,46 @@ function call(pathStr, paramsStr) {
     return JSON.stringify(res);
 }
 
-function sendAsyncTransaction(params, callback) {
+var status = {
+    message_id: '42',
+};
+
+function send(params) {
+    console.log("Recieving send: ", params);
     var data = {
         from: params.from,
         to: params.to,
         value: web3.toWei(params.value, "ether")
     };
 
-    // message_id allows you to distinguish between !send invocations
-    // (when you receive transaction queued event, message_id will be
-    // attached along the queued transaction id)
-    status.message_id = 'foobar';
-
-    // Blocking call, it will return when transaction is complete.
-    // While call is executing, status-go will call up the application,
-    // allowing it to validate and complete transaction
-    var hash = web3.eth.sendTransaction(data, callback);
-
-    return { "transaction-hash": hash };
-}
-
-function sendTransaction(params) {
-    var data = {
-        from: params.from,
-        to: params.to,
-        value: web3.toWei(params.value, "ether")
-    };
-
-    // message_id allows you to distinguish between !send invocations
-    // (when you receive transaction queued event, message_id will be
-    // attached along the queued transaction id)
-    status.message_id = 'foobar';
-
-    // Blocking call, it will return when transaction is complete.
-    // While call is executing, status-go will call up the application,
-    // allowing it to validate and complete transaction
     var hash = web3.eth.sendTransaction(data);
 
     return { "transaction-hash": hash };
-}
+};
 
-_status_catalog.commands['send'] = sendTransaction;
-// _status_catalog.commands['sendAsync'] = sendAsyncTransaction;
+function sendAsync(params) {
+    console.log("Recieving sendAsync: ", params);
 
-_status_catalog.commands['getBalance'] = function(params) {
-    var balance = web3.eth.getBalance(params.address);
-    balance = web3.fromWei(balance, "ether");
-    if (balance < 90) {
-        console.log("Unexpected balance (<90): ", balance)
-    }
-    // used in tx tests, to check that non-context, non-message-is requests work too
-    // so actual balance is not important
-    return { "balance": 42 }
+    var data = {
+        from: params.from,
+        to: params.to,
+        value: web3.toWei(params.value, "ether")
+    };
+
+    var hash
+
+    web3.eth.sendTransaction(data, function(hash) {
+        hash = hash
+    });
+
+    return { "transaction-hash": hash };
+};
+
+var _status_catalog = {
+    commands: {
+        silo: 'rocker',
+        send: send,
+        sendAsync: sendAsync,
+    },
+    responses: {},
 };
