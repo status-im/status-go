@@ -1,8 +1,6 @@
 package jail
 
 import (
-	"fmt"
-
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth"
 )
@@ -74,8 +72,6 @@ func registerHandlers(jail *Jail, vm *otto.Otto, chatID string) (err error) {
 // makeAsyncSendHandler returns jeth.sendAsync() handler.
 func makeAsyncSendHandler(jail *Jail, chatID string) func(call otto.FunctionCall) (response otto.Value) {
 	return func(call otto.FunctionCall) (response otto.Value) {
-		fmt.Printf("Delivering response to goroutine: %+q\n", chatID)
-
 		go func() {
 			res := jail.Send(chatID, call)
 
@@ -92,7 +88,6 @@ func makeAsyncSendHandler(jail *Jail, chatID string) func(call otto.FunctionCall
 // makeSendHandler returns jeth.send() and jeth.sendAsync() handler
 func makeSendHandler(jail *Jail, chatID string) func(call otto.FunctionCall) (response otto.Value) {
 	return func(call otto.FunctionCall) (response otto.Value) {
-		fmt.Printf("Delivering response to flat: %+q\n", chatID)
 		return jail.Send(chatID, call)
 	}
 }
