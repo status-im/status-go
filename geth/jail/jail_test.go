@@ -2,6 +2,7 @@ package jail_test
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"reflect"
@@ -245,6 +246,119 @@ func TestJailRPCSend(t *testing.T) {
 	t.Logf("Balance of %.2f ETH found on '%s' account", balance, testConfig.Account1.Address)
 }
 
+func TestJailAsyncSend(t *testing.T) {
+	err := geth.PrepareTestNode()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	// log into account from which transactions will be sent
+	if err := geth.SelectAccount(testConfig.Account1.Address, testConfig.Account1.Password); err != nil {
+		t.Errorf("cannot select account: %v", testConfig.Account1.Address)
+		return
+	}
+
+	txParams := `{
+  		"from": "` + testConfig.Account1.Address + `",
+  		"to": "0xf82da7547534045b4e00442bc89e16186cf8c272",
+  		"value": "0.000001"
+	}`
+
+	txCompletedSuccessfully := make(chan struct{})
+	txCompletedBadly := make(chan struct{})
+
+	// replace transaction notification handler
+	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+		var envelope geth.SignalEnvelope
+		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
+			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
+			txCompletedBadly <- struct{}{}
+			return
+		}
+
+		if envelope.Type == geth.EventTransactionQueued {
+			txCompletedSuccessfully <- struct{}{} // so that timeout is aborted
+			return
+		}
+
+		txCompletedBadly <- struct{}{}
+	})
+
+	jailInstance := jail.Init(geth.LoadFromFile(txSendFolder + "rx-send.js"))
+	jailInstance.Parse(testChatID, ``)
+
+	jailInstance.Call(testChatID, `["commands", "sendAsync"]`, txParams)
+
+	select {
+	case <-txCompletedBadly:
+		// fmt.Println("Badly done")
+		t.Error(errors.New("Failed to successfully finish Jail command"))
+	case <-txCompletedSuccessfully:
+		// fmt.Println("Goodly done")
+		t.Log("Successfully passed and finish Jail command")
+	case <-time.After(60 * time.Second):
+		// fmt.Println("Not done")
+		t.Error(errors.New("Failed to successfully receive Jail success/failuree"))
+	}
+}
+
+func TestJailSyncSend(t *testing.T) {
+	err := geth.PrepareTestNode()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	// log into account from which transactions will be sent
+	if err := geth.SelectAccount(testConfig.Account1.Address, testConfig.Account1.Password); err != nil {
+		t.Errorf("cannot select account: %v", testConfig.Account1.Address)
+		return
+	}
+
+	txParams := `{
+  		"from": "` + testConfig.Account1.Address + `",
+  		"to": "0xf82da7547534045b4e00442bc89e16186cf8c272",
+  		"value": "0.000001"
+	}`
+
+	txCompletedSuccessfully := make(chan struct{})
+	txCompletedBadly := make(chan struct{})
+
+	// replace transaction notification handler
+	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+		var envelope geth.SignalEnvelope
+		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
+			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
+			return
+		}
+
+		if envelope.Type == geth.EventTransactionQueued {
+			txCompletedSuccessfully <- struct{}{} // so that timeout is aborted
+			return
+		}
+
+		txCompletedBadly <- struct{}{}
+	})
+
+	jailInstance := jail.Init(geth.LoadFromFile(txSendFolder + "tx-send.js"))
+	jailInstance.Parse(testChatID, ``)
+
+	go func() {
+		response := jailInstance.Call(testChatID, `["commands", "send"]`, txParams)
+		fmt.Printf("Response: %+q\n", response)
+	}()
+
+	select {
+	case <-txCompletedBadly:
+		t.Error(errors.New("Failed to successfully finish Jail command"))
+	case <-txCompletedSuccessfully:
+		t.Log("Successfully passed and finish Jail command")
+	case <-time.After(60 * time.Second):
+		t.Error(errors.New("Failed to successfully receive Jail success/failuree"))
+	}
+}
+
 func TestJailSendQueuedTransaction(t *testing.T) {
 	err := geth.PrepareTestNode()
 	if err != nil {
@@ -408,9 +522,11 @@ func TestJailSendQueuedTransaction(t *testing.T) {
 				t.Logf("->%s: %s", test.name, command.command)
 				response := jail.Call(testChatID, command.command, command.params)
 				var txHash common.Hash
-				if command.command == `["commands", "send"]` {
+
+				if command.command == `["commands", "send"]` || command.command == `["commands", "sendAsync"]` {
 					txHash = <-txHashes
 				}
+
 				expectedResponse := strings.Replace(command.expectedResponse, "TX_HASH", txHash.Hex(), 1)
 				if response != expectedResponse {
 					t.Errorf("expected response is not returned: expected %s, got %s", expectedResponse, response)

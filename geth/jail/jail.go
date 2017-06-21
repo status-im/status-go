@@ -318,7 +318,10 @@ func (jail *Jail) RPCClient() (*rpc.Client, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	jail.Lock()
 	jail.client = client
+	jail.Unlock()
 
 	return jail.client, nil
 }
