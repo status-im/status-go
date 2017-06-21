@@ -218,7 +218,7 @@ func (q *JailedRequestQueue) ProcessSendTransactionRequest(lock sync.Locker, vm 
 
 	backend := lightEthereum.StatusBackend
 
-	// TODO(alex): Ask why this was not locked around here?
+	//TODO(farazdagi): Ask why this was not locked around here?
 	lock.Lock()
 
 	messageID, err := q.PreProcessRequest(vm, req)
@@ -236,11 +236,13 @@ func (q *JailedRequestQueue) ProcessSendTransactionRequest(lock sync.Locker, vm 
 	txHash, err := backend.SendTransaction(ctx, sendTxArgsFromRPCCall(req))
 	if err != nil {
 
-		//TODO(alex): Why do we relock this here?
+		//TODO(farazdagi): Why do we relock this here?
 		lock.Lock()
 		return common.Hash{}, err
 	}
 
+	//TODO(farazdagi): Why do we relock this here? Should we ensure only functions
+	// that need the lock, lock and unlock as needed.
 	lock.Lock() // re-lock
 
 	// invoke post processing
