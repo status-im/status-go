@@ -13,6 +13,9 @@ import (
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/static"
+
+	"fknsrs.biz/p/ottoext/loop"
+	"fknsrs.biz/p/ottoext/timers"
 )
 
 const (
@@ -31,6 +34,7 @@ var (
 type JailCell struct {
 	id  string
 	vm  *otto.Otto
+	lo  *loop.Loop
 	sem *semaphore.Semaphore
 }
 
@@ -43,6 +47,53 @@ type Jail struct {
 	baseJSCode     string                     // JavaScript used to initialize all new cells with
 }
 
+// Copy returns a new JailCell instance with a new eventloop runtime associated with
+// the given cell.
+func (cell *JailCell) Copy() (*JailCell, error) {
+	vmCopy := cell.vm.Copy()
+	loCopy := loop.New(vmCopy)
+
+	if err := timers.Define(vmCopy, loCopy); err != nil {
+		return nil, err
+	}
+
+	return &JailCell{
+		id:  cell.id,
+		vm:  vmCopy,
+		lo:  loCopy,
+		sem: semaphore.New(1, JailCellRequestTimeout*time.Second),
+	}, nil
+}
+
+// Exec evaluates the giving js string on the associated vm loop returning
+// an error.
+func (cell *JailCell) Exec(val string) (otto.Value, error) {
+	res, err := cell.vm.Run(val)
+	if err != nil {
+		return res, err
+	}
+
+	return res, cell.lo.Run()
+}
+
+// EvalExec evaluates the giving js string on the associated vm loop returning
+// an error.
+func (cell *JailCell) EvalExec(val string) error {
+	return cell.lo.EvalAndRun(val)
+}
+
+// Run evaluates the giving js string on the associated vm llop.
+func (cell *JailCell) Run(val string) (otto.Value, error) {
+	return cell.vm.Run(val)
+}
+
+// CellLoop returns the ottoext.Loop instance which provides underline timeout/setInternval
+// event runtime for the Jail vm.
+func (cell *JailCell) CellLoop() *loop.Loop {
+	return cell.lo
+}
+
+// CellVM returns the associated otto.Vm connect to the giving cell.
 func (cell *JailCell) CellVM() *otto.Otto {
 	return cell.vm
 }
@@ -62,9 +113,17 @@ func (jail *Jail) BaseJS(js string) {
 
 // NewJailCell initializes and returns jail cell
 func (jail *Jail) NewJailCell(id string) common.JailCell {
+	vmCopy := otto.New()
+	loCopy := loop.New(vmCopy)
+
+	if err := timers.Define(vmCopy, loCopy); err != nil {
+		panic(err)
+	}
+
 	return &JailCell{
 		id:  id,
-		vm:  otto.New(),
+		lo:  loCopy,
+		vm:  vmCopy,
 		sem: semaphore.New(1, JailCellRequestTimeout*time.Second),
 	}
 }
@@ -127,8 +186,15 @@ func (jail *Jail) Call(chatID string, path string, args string) string {
 	}
 	jail.RUnlock()
 
-	vm := cell.CellVM().Copy() // isolate VM to allow concurrent access
-	res, err := vm.Call("call", nil, path, args)
+	// Due to the new timer assigned we need to clone existing cell to allow
+	// unique cell runtime and eventloop context.
+	cellCopy, err := cell.Copy()
+	if err != nil {
+		return makeError(err.Error())
+	}
+
+	// isolate VM to allow concurrent access
+	res, err := cellCopy.vm.Call("call", nil, path, args)
 
 	return makeResult(res.String(), err)
 }

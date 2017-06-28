@@ -3,6 +3,7 @@ package jail_test
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -113,6 +114,24 @@ func (s *JailTestSuite) TestFunctionCall() {
 	response = s.jail.Call(testChatID, `["commands", "testCommand"]`, `{"val": 12}`)
 	expectedResponse := `{"result": 144}`
 	require.Equal(expectedResponse, response)
+}
+
+func (s *JailTestSuite) TestJailTimeout() {
+	require := s.Require()
+	require.NotNil(s.jail)
+
+	newCell := s.jail.NewJailCell(testChatID)
+	require.NotNil(newCell)
+
+	// Attempt to run a timeout string against a JailCell.
+	res, err := newCell.Exec(`
+		setTimeout(function(n){
+			console.log('We are ready: ', n)
+		}, 50, Date.now());
+	`)
+
+	<-time.After(100 * time.Millisecond)
+	fmt.Printf("Response: %+v : %+q : %+q", res, res, err)
 }
 
 func (s *JailTestSuite) TestJailRPCSend() {

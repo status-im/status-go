@@ -16,6 +16,8 @@ import (
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/static"
+
+	"fknsrs.biz/p/ottoext/loop"
 )
 
 // errors
@@ -174,6 +176,7 @@ type TxQueueManager interface {
 // JailCell represents single jail cell, which is basically a JavaScript VM.
 type JailCell interface {
 	CellVM() *otto.Otto
+	CellLoop() *loop.Loop
 }
 
 // JailManager defines methods for managing jailed environments
