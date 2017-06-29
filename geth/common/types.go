@@ -177,8 +177,9 @@ type TxQueueManager interface {
 // against a Jail vm.
 type JailExecutor interface {
 	EvalExec(string) error
-	Exec(string) (otto.Value, error)
 	Run(string) (otto.Value, error)
+	Exec(string) (otto.Value, error)
+	Fetch(string, func(otto.Value)) (otto.Value, error)
 }
 
 // JailCell represents single jail cell, which is basically a JavaScript VM.

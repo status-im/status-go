@@ -14,6 +14,7 @@ import (
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/static"
 
+	"fknsrs.biz/p/ottoext/fetch"
 	"fknsrs.biz/p/ottoext/loop"
 	"fknsrs.biz/p/ottoext/timers"
 )
@@ -53,6 +54,12 @@ func (cell *JailCell) Copy() (common.JailCell, error) {
 	vmCopy := cell.vm.Copy()
 	loCopy := loop.New(vmCopy)
 
+	// Register fetch provider from ottoext.
+	if err := fetch.Define(vmCopy, loCopy); err != nil {
+		return nil, err
+	}
+
+	// Register event loop for timers.
 	if err := timers.Define(vmCopy, loCopy); err != nil {
 		return nil, err
 	}
@@ -63,6 +70,27 @@ func (cell *JailCell) Copy() (common.JailCell, error) {
 		lo:  loCopy,
 		sem: semaphore.New(1, JailCellRequestTimeout*time.Second),
 	}, nil
+}
+
+// Fetch attempts to call the underline Fetch API added through the
+// ottoext package.
+func (cell *JailCell) Fetch(url string, callback func(otto.Value)) (otto.Value, error) {
+	if err := cell.vm.Set("__captureFetch", func(res otto.Value) {
+		callback(res)
+	}); err != nil {
+		return otto.UndefinedValue(), err
+	}
+
+	return cell.Exec(`fetch("` + url + `").then(function(response){
+			__captureFetch({
+				"url": response.url,
+				"type": response.type,
+				"body": response.text(),
+				"status": response.status,
+				"headers": response.headers,
+			});
+		});
+	`)
 }
 
 // Exec evaluates the giving js string on the associated vm loop returning
@@ -122,6 +150,11 @@ func (jail *Jail) NewJailCell(id string) common.JailCell {
 	loCopy := loop.New(vmCopy)
 
 	if err := timers.Define(vmCopy, loCopy); err != nil {
+		panic(err)
+	}
+
+	// Register fetch provider from ottoext.
+	if err := fetch.Define(vmCopy, loCopy); err != nil {
 		panic(err)
 	}
 
