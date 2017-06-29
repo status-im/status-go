@@ -49,7 +49,7 @@ type Jail struct {
 
 // Copy returns a new JailCell instance with a new eventloop runtime associated with
 // the given cell.
-func (cell *JailCell) Copy() (*JailCell, error) {
+func (cell *JailCell) Copy() (common.JailCell, error) {
 	vmCopy := cell.vm.Copy()
 	loCopy := loop.New(vmCopy)
 
@@ -91,6 +91,11 @@ func (cell *JailCell) Run(val string) (otto.Value, error) {
 // event runtime for the Jail vm.
 func (cell *JailCell) CellLoop() *loop.Loop {
 	return cell.lo
+}
+
+// Executor returns a structure which implements the common.JailExecutor.
+func (cell *JailCell) Executor() common.JailExecutor {
+	return cell
 }
 
 // CellVM returns the associated otto.Vm connect to the giving cell.
@@ -194,7 +199,8 @@ func (jail *Jail) Call(chatID string, path string, args string) string {
 	}
 
 	// isolate VM to allow concurrent access
-	res, err := cellCopy.vm.Call("call", nil, path, args)
+	vm := cellCopy.CellVM()
+	res, err := vm.Call("call", nil, path, args)
 
 	return makeResult(res.String(), err)
 }

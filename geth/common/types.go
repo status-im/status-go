@@ -173,10 +173,20 @@ type TxQueueManager interface {
 	DiscardTransactions(ids string) map[string]RawDiscardTransactionResult
 }
 
+// JailExecutor defines an interface which exposes method to be executed
+// against a Jail vm.
+type JailExecutor interface {
+	EvalExec(string) error
+	Exec(string) (otto.Value, error)
+	Run(string) (otto.Value, error)
+}
+
 // JailCell represents single jail cell, which is basically a JavaScript VM.
 type JailCell interface {
 	CellVM() *otto.Otto
 	CellLoop() *loop.Loop
+	Executor() JailExecutor
+	Copy() (JailCell, error)
 }
 
 // JailManager defines methods for managing jailed environments

@@ -3,7 +3,6 @@ package jail_test
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"testing"
 	"time"
 
@@ -116,6 +115,29 @@ func (s *JailTestSuite) TestFunctionCall() {
 	require.Equal(expectedResponse, response)
 }
 
+func (s *JailTestSuite) TestJailTimeoutFailure() {
+	require := s.Require()
+	require.NotNil(s.jail)
+
+	newCell := s.jail.NewJailCell(testChatID)
+	require.NotNil(newCell)
+
+	execr := newCell.Executor()
+
+	// Attempt to run a timeout string against a JailCell.
+	_, err := execr.Exec(`
+		setTimeout(function(n){
+			if(Date.now() - n < 50){
+				throw new Error("Timedout early");
+			}
+
+			return n;
+		}, 30, Date.now());
+	`)
+
+	require.NotNil(err)
+}
+
 func (s *JailTestSuite) TestJailTimeout() {
 	require := s.Require()
 	require.NotNil(s.jail)
@@ -123,15 +145,21 @@ func (s *JailTestSuite) TestJailTimeout() {
 	newCell := s.jail.NewJailCell(testChatID)
 	require.NotNil(newCell)
 
+	execr := newCell.Executor()
+
 	// Attempt to run a timeout string against a JailCell.
-	res, err := newCell.Exec(`
+	res, err := execr.Exec(`
 		setTimeout(function(n){
-			console.log('We are ready: ', n)
+			if(Date.now() - n < 50){
+				throw new Error("Timedout early");
+			}
+
+			return n;
 		}, 50, Date.now());
 	`)
 
-	<-time.After(100 * time.Millisecond)
-	fmt.Printf("Response: %+v : %+q : %+q", res, res, err)
+	require.NoError(err)
+	require.NotNil(res)
 }
 
 func (s *JailTestSuite) TestJailRPCSend() {
