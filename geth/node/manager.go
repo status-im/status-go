@@ -74,7 +74,9 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 	if err != nil {
 		return nil, err
 	}
+
 	m.nodeStarted = make(chan struct{}, 1)
+
 	go func() {
 		defer HaltOnPanic()
 
