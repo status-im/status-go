@@ -31,11 +31,12 @@ func init() {
 
 // errors
 var (
-	ErrMissingDataDir            = errors.New("missing required 'DataDir' parameter")
-	ErrMissingNetworkID          = errors.New("missing required 'NetworkID' parameter")
-	ErrEmptyPasswordFile         = errors.New("password file cannot be empty")
-	ErrEmptyIdentityFile         = errors.New("identity file cannot be empty")
-	ErrEmptyAuthorizationKeyFile = errors.New("authorization key file cannot be empty")
+	ErrMissingDataDir             = errors.New("missing required 'DataDir' parameter")
+	ErrMissingNetworkID           = errors.New("missing required 'NetworkID' parameter")
+	ErrEmptyPasswordFile          = errors.New("password file cannot be empty")
+	ErrEmptyIdentityFile          = errors.New("identity file cannot be empty")
+	ErrEmptyAuthorizationKeyFile  = errors.New("authorization key file cannot be empty")
+	ErrAuthorizationKeyFileNotSet = errors.New("authorization key file is not set")
 )
 
 // LightEthConfig holds LES-related configuration
@@ -69,16 +70,17 @@ type FirebaseConfig struct {
 // ReadAuthorizationKeyFile reads and loads FCM authorization key
 func (c *FirebaseConfig) ReadAuthorizationKeyFile() ([]byte, error) {
 	if len(c.AuthorizationKeyFile) <= 0 {
-		return nil, ErrEmptyAuthorizationKeyFile
+		return nil, ErrAuthorizationKeyFileNotSet
 	}
 
 	key, err := ioutil.ReadFile(c.AuthorizationKeyFile)
 	if err != nil {
 		return nil, err
 	}
+
 	key = bytes.TrimRight(key, "\n")
 
-	if key == nil {
+	if len(key) == 0 {
 		return nil, ErrEmptyAuthorizationKeyFile
 	}
 
@@ -247,8 +249,8 @@ type NodeConfig struct {
 	// Pass empty string if no HTTP RPC interface needs to be started.
 	HTTPHost string
 
-	// HTTPEnabled specifies whether the http RPC server is to be enabled by default.
-	HTTPEnabledMode bool
+	// RPCEnabled specifies whether the http RPC server is to be enabled by default.
+	RPCEnabled bool
 
 	// HTTPPort is the TCP port number on which to start the Geth's HTTP RPC server.
 	HTTPPort int

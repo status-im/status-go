@@ -123,10 +123,7 @@ func defaultEmbeddedNodeConfig(config *params.NodeConfig) *node.Config {
 			MaxPeers:         config.MaxPeers,
 			MaxPendingPeers:  config.MaxPendingPeers,
 		},
-		IPCPath: makeIPCPath(config),
-		// Disable this by default allow and set if given config allows http server.
-		// HTTPHost:    config.HTTPHost,
-		// HTTPPort:    config.HTTPPort,
+		IPCPath:     makeIPCPath(config),
 		HTTPCors:    []string{"*"},
 		HTTPModules: strings.Split(config.APIModules, ","),
 		WSHost:      makeWSHost(config),
@@ -135,7 +132,7 @@ func defaultEmbeddedNodeConfig(config *params.NodeConfig) *node.Config {
 		WSModules:   strings.Split(config.APIModules, ","),
 	}
 
-	if config.HTTPEnabledMode {
+	if config.RPCEnabled {
 		nc.HTTPHost = config.HTTPHost
 		nc.HTTPPort = config.HTTPPort
 	}
