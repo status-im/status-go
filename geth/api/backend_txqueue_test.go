@@ -535,6 +535,7 @@ func (s *BackendTestSuite) TestDiscardMultipleQueuedTransactions() {
 		if len(completeResults) != (testTxCount + 1) {
 			s.Fail(fmt.Sprint("unexpected number of errors (call to CompleteTransaction should not succeed)"))
 		}
+
 		for _, txResult := range completeResults {
 			if txResult.Error.Error() != "transaction hash not found" {
 				s.Fail(fmt.Sprintf("invalid error for %s", txResult.Hash.Hex()))

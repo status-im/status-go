@@ -34,6 +34,8 @@ var (
 	ErrMissingDataDir             = errors.New("missing required 'DataDir' parameter")
 	ErrMissingNetworkID           = errors.New("missing required 'NetworkID' parameter")
 	ErrEmptyPasswordFile          = errors.New("password file cannot be empty")
+	ErrNoPasswordFileValueSet     = errors.New("password file path not set")
+	ErrNoIdentityFileValueSet     = errors.New("identity file path not set")
 	ErrEmptyIdentityFile          = errors.New("identity file cannot be empty")
 	ErrEmptyAuthorizationKeyFile  = errors.New("authorization key file cannot be empty")
 	ErrAuthorizationKeyFileNotSet = errors.New("authorization key file is not set")
@@ -69,7 +71,7 @@ type FirebaseConfig struct {
 
 // ReadAuthorizationKeyFile reads and loads FCM authorization key
 func (c *FirebaseConfig) ReadAuthorizationKeyFile() ([]byte, error) {
-	if len(c.AuthorizationKeyFile) <= 0 {
+	if len(c.AuthorizationKeyFile) == 0 {
 		return nil, ErrAuthorizationKeyFileNotSet
 	}
 
@@ -134,8 +136,8 @@ type WhisperConfig struct {
 
 // ReadPasswordFile reads and returns content of the password file
 func (c *WhisperConfig) ReadPasswordFile() ([]byte, error) {
-	if len(c.PasswordFile) <= 0 {
-		return nil, ErrEmptyPasswordFile
+	if len(c.PasswordFile) == 0 {
+		return nil, ErrNoPasswordFileValueSet
 	}
 
 	password, err := ioutil.ReadFile(c.PasswordFile)
@@ -153,8 +155,8 @@ func (c *WhisperConfig) ReadPasswordFile() ([]byte, error) {
 
 // ReadIdentityFile reads and loads identity private key
 func (c *WhisperConfig) ReadIdentityFile() (*ecdsa.PrivateKey, error) {
-	if len(c.IdentityFile) <= 0 {
-		return nil, ErrEmptyIdentityFile
+	if len(c.IdentityFile) == 0 {
+		return nil, ErrNoIdentityFileValueSet
 	}
 
 	identity, err := crypto.LoadECDSA(c.IdentityFile)
