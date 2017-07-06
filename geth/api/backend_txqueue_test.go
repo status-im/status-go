@@ -269,7 +269,7 @@ func (s *BackendTestSuite) TestDiscardQueuedTransaction() {
 
 	// make sure you panic if transaction complete doesn't return
 	completeQueuedTransaction := make(chan struct{}, 1)
-	common.PanicAfter(20*time.Second, completeQueuedTransaction, s.T().Name())
+	common.PanicAfter(30*time.Second, completeQueuedTransaction, s.T().Name())
 
 	// replace transaction notification handler
 	var txID string
@@ -434,7 +434,7 @@ func (s *BackendTestSuite) TestCompleteMultipleQueuedTransactions() {
 	select {
 	case <-allTestTxCompleted:
 	// pass
-	case <-time.After(20 * time.Second):
+	case <-time.After(30 * time.Second):
 		s.Fail("test timed out")
 		return
 	}
@@ -573,7 +573,7 @@ func (s *BackendTestSuite) TestDiscardMultipleQueuedTransactions() {
 	select {
 	case <-allTestTxDiscarded:
 		// pass
-	case <-time.After(20 * time.Second):
+	case <-time.After(30 * time.Second):
 		s.Fail("test timed out")
 		return
 	}

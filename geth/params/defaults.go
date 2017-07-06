@@ -17,9 +17,9 @@ const (
 	// IPCFile is filename of exposed IPC RPC Server
 	IPCFile = "geth.ipc"
 
-	// HTTPDefaultEnabledMode is the default state of whether the http rpc server is supposed
+	// RPCEnabledDefault is the default state of whether the http rpc server is supposed
 	// to be started along with a node.
-	HTTPDefaultEnabledMode = false
+	RPCEnabledDefault = false
 
 	// HTTPHost is host interface for the HTTP RPC server
 	HTTPHost = "localhost"
