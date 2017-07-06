@@ -47,12 +47,12 @@ statusgo-ios-simulator-mainnet: xgo
 	@echo "iOS framework cross compilation done (mainnet)."
 
 ci:
-	build/env.sh go test -v ./geth/api
-	build/env.sh go test -v ./geth/common
-	build/env.sh go test -v ./geth/jail
-	build/env.sh go test -v ./geth/node
-	build/env.sh go test -v ./geth/params
-	build/env.sh go test -v ./extkeys
+	build/env.sh go test -timeout 40m -v ./geth/api
+	build/env.sh go test -timeout 40m -v ./geth/common
+	build/env.sh go test -timeout 40m -v ./geth/jail
+	build/env.sh go test -timeout 40m -v ./geth/node
+	build/env.sh go test -timeout 40m -v ./geth/params
+	build/env.sh go test -timeout 40m -v ./extkeys
 
 generate:
 	cp ./node_modules/web3/dist/web3.js ./static/scripts/web3.js
