@@ -41,7 +41,7 @@ type JailCell struct {
 
 // newJailCell encapsulates what we need to create a new jailCell from the
 // provided vm and eventloop instance.
-func newJailCell(vm *otto.Otto, lo *loop.Loop) *JailCell {
+func newJailCell(id string, vm *otto.Otto, lo *loop.Loop) (*JailCell, error) {
 
 	// Register fetch provider from ottoext.
 	if err := fetch.Define(vm, lo); err != nil {
@@ -54,11 +54,11 @@ func newJailCell(vm *otto.Otto, lo *loop.Loop) *JailCell {
 	}
 
 	return &JailCell{
-		id:  cell.id,
+		id:  id,
 		vm:  vm,
 		lo:  lo,
 		sem: semaphore.New(1, JailCellRequestTimeout*time.Second),
-	}
+	}, nil
 }
 
 // Jail represents jailed environment inside of which we hold multiple cells.
@@ -74,7 +74,7 @@ type Jail struct {
 // the given cell.
 func (cell *JailCell) Copy() (common.JailCell, error) {
 	vmCopy := cell.vm.Copy()
-	return newJailCell(vmCopy, loop.New(vmCopy)), nil
+	newJailCell(cell.id, vmCopy, loop.New(vmCopy))
 }
 
 // Fetch attempts to call the underline Fetch API added through the
@@ -144,7 +144,15 @@ func (jail *Jail) BaseJS(js string) {
 // NewJailCell initializes and returns jail cell
 func (jail *Jail) NewJailCell(id string) common.JailCell {
 	vm := otto.New()
-	return newJailCell(vm, loop.New(vm))
+
+	newJail, err := newJailCell(id, vm, loop.New(vm))
+	if err != nil {
+		//TODO(alex): Should we really panic here, his there
+		// a better way. Think on it.
+		panic(err)
+	}
+
+	return newJail
 }
 
 // Parse creates a new jail cell context, with the given chatID as identifier.
