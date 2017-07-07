@@ -39,6 +39,28 @@ type JailCell struct {
 	sem *semaphore.Semaphore
 }
 
+// newJailCell encapsulates what we need to create a new jailCell from the 
+// provided vm and eventloop instance.
+func newJailCell(vm *otto.Otto, lo *loop.Loop) *JailCell {
+
+	// Register fetch provider from ottoext.
+	if err := fetch.Define(vm, lo); err != nil {
+		return nil, err
+	}
+
+	// Register event loop for timers.
+	if err := timers.Define(vm, lo); err != nil {
+		return nil, err
+	}
+
+	return &JailCell{
+		id:  cell.id,
+		vm:  vm,
+		lo:  lo,
+		sem: semaphore.New(1, JailCellRequestTimeout*time.Second),
+	}
+}
+
 // Jail represents jailed environment inside of which we hold multiple cells.
 // Each cell is a separate JavaScript VM.
 type Jail struct {
@@ -54,30 +76,13 @@ func (cell *JailCell) Copy() (common.JailCell, error) {
 	vmCopy := cell.vm.Copy()
 	loCopy := loop.New(vmCopy)
 
-	// Register fetch provider from ottoext.
-	if err := fetch.Define(vmCopy, loCopy); err != nil {
-		return nil, err
-	}
-
-	// Register event loop for timers.
-	if err := timers.Define(vmCopy, loCopy); err != nil {
-		return nil, err
-	}
-
-	return &JailCell{
-		id:  cell.id,
-		vm:  vmCopy,
-		lo:  loCopy,
-		sem: semaphore.New(1, JailCellRequestTimeout*time.Second),
-	}, nil
+	, nil
 }
 
 // Fetch attempts to call the underline Fetch API added through the
 // ottoext package.
 func (cell *JailCell) Fetch(url string, callback func(otto.Value)) (otto.Value, error) {
-	if err := cell.vm.Set("__captureFetch", func(res otto.Value) {
-		callback(res)
-	}); err != nil {
+	if err := cell.vm.Set("__captureFetch", callback); err != nil {
 		return otto.UndefinedValue(), err
 	}
 
@@ -102,12 +107,6 @@ func (cell *JailCell) Exec(val string) (otto.Value, error) {
 	}
 
 	return res, cell.lo.Run()
-}
-
-// EvalExec evaluates the giving js string on the associated vm loop returning
-// an error.
-func (cell *JailCell) EvalExec(val string) error {
-	return cell.lo.EvalAndRun(val)
 }
 
 // Run evaluates the giving js string on the associated vm llop.
@@ -146,24 +145,8 @@ func (jail *Jail) BaseJS(js string) {
 
 // NewJailCell initializes and returns jail cell
 func (jail *Jail) NewJailCell(id string) common.JailCell {
-	vmCopy := otto.New()
-	loCopy := loop.New(vmCopy)
-
-	if err := timers.Define(vmCopy, loCopy); err != nil {
-		panic(err)
-	}
-
-	// Register fetch provider from ottoext.
-	if err := fetch.Define(vmCopy, loCopy); err != nil {
-		panic(err)
-	}
-
-	return &JailCell{
-		id:  id,
-		lo:  loCopy,
-		vm:  vmCopy,
-		sem: semaphore.New(1, JailCellRequestTimeout*time.Second),
-	}
+	vm := otto.New()
+	return newJailCell(vm, loop.New(vm))
 }
 
 // Parse creates a new jail cell context, with the given chatID as identifier.
