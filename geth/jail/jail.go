@@ -39,7 +39,7 @@ type JailCell struct {
 	sem *semaphore.Semaphore
 }
 
-// newJailCell encapsulates what we need to create a new jailCell from the 
+// newJailCell encapsulates what we need to create a new jailCell from the
 // provided vm and eventloop instance.
 func newJailCell(vm *otto.Otto, lo *loop.Loop) *JailCell {
 
@@ -74,9 +74,7 @@ type Jail struct {
 // the given cell.
 func (cell *JailCell) Copy() (common.JailCell, error) {
 	vmCopy := cell.vm.Copy()
-	loCopy := loop.New(vmCopy)
-
-	, nil
+	return newJailCell(vmCopy, loop.New(vmCopy)), nil
 }
 
 // Fetch attempts to call the underline Fetch API added through the
