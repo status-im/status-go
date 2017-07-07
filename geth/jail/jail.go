@@ -74,7 +74,7 @@ type Jail struct {
 // the given cell.
 func (cell *JailCell) Copy() (common.JailCell, error) {
 	vmCopy := cell.vm.Copy()
-	newJailCell(cell.id, vmCopy, loop.New(vmCopy))
+	return newJailCell(cell.id, vmCopy, loop.New(vmCopy))
 }
 
 // Fetch attempts to call the underline Fetch API added through the
