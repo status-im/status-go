@@ -190,7 +190,6 @@ var loadConfigTestCases = []struct {
 			"WSPort": 8546,
 			"IPCEnabled": true,
 			"WSEnabled": false,
-			"HTTPEnabledMode": false,
 			"LightEthConfig": {
 				"DatabaseCache": 64
 			}
@@ -242,7 +241,6 @@ var loadConfigTestCases = []struct {
 			"WSPort": 8546,
 			"IPCEnabled": true,
 			"WSEnabled": false,
-			"HTTPEnabledMode": false,
 			"LightEthConfig": {
 				"DatabaseCache": 64
 			}
