@@ -27,14 +27,15 @@ type StatusBackend struct {
 func NewStatusBackend() *StatusBackend {
 	defer log.Info("Status backend initialized")
 
-	nodeManager := node.NewNodeManager()
+	nodeManager := proxy.NewPRCRouter(node.NewNodeManager())
 	accountManager := node.NewAccountManager(nodeManager)
+
 	return &StatusBackend{
 		nodeManager:    nodeManager,
 		accountManager: accountManager,
-		txQueueManager: node.NewTxQueueManager(nodeManager, accountManager),
 		jailManager:    jail.New(nodeManager),
 		rpcManager:     node.NewRPCManager(nodeManager),
+		txQueueManager: node.NewTxQueueManager(nodeManager, accountManager),
 	}
 }
 

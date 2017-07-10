@@ -64,7 +64,7 @@ func makeSendHandler(jail *Jail, chatID string) func(call otto.FunctionCall) (re
 // makeJethIsConnectedHandler returns jeth.isConnected() handler
 func makeJethIsConnectedHandler(jail *Jail) func(call otto.FunctionCall) (response otto.Value) {
 	return func(call otto.FunctionCall) otto.Value {
-		client, err := jail.requestManager.RPCClient()
+		client, err := jail.manager.RPCClient()
 		if err != nil {
 			return newErrorResponse(call, -32603, err.Error(), nil)
 		}

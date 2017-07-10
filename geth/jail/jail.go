@@ -9,7 +9,6 @@ import (
 
 	"github.com/eapache/go-resiliency/semaphore"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/static"
@@ -38,9 +37,9 @@ type JailCell struct {
 // Each cell is a separate JavaScript VM.
 type Jail struct {
 	sync.RWMutex
-	requestManager *RequestManager
-	cells          map[string]common.JailCell // jail supports running many isolated instances of jailed runtime
-	baseJSCode     string                     // JavaScript used to initialize all new cells with
+	manager    common.RPCNodeManager
+	cells      map[string]common.JailCell // jail supports running many isolated instances of jailed runtime
+	baseJSCode string                     // JavaScript used to initialize all new cells with
 }
 
 func (cell *JailCell) CellVM() *otto.Otto {
@@ -48,10 +47,10 @@ func (cell *JailCell) CellVM() *otto.Otto {
 }
 
 // New returns new Jail environment
-func New(nodeManager common.NodeManager) *Jail {
+func New(manager common.RPCNodeManager) *Jail {
 	return &Jail{
-		requestManager: NewRequestManager(nodeManager),
-		cells:          make(map[string]common.JailCell),
+		manager: manager,
+		cells:   make(map[string]common.JailCell),
 	}
 }
 
@@ -153,10 +152,6 @@ func (jail *Jail) JailCellVM(chatID string) (*otto.Otto, error) {
 // Send will serialize the first argument, send it to the node and returns the response.
 // nolint: errcheck, unparam
 func (jail *Jail) Send(chatID string, call otto.FunctionCall) (response otto.Value) {
-	client, err := jail.requestManager.RPCClient()
-	if err != nil {
-		return newErrorResponse(call, -32603, err.Error(), nil)
-	}
 
 	// Remarshal the request into a Go value.
 	JSON, _ := call.Otto.Object("JSON")
@@ -164,80 +159,38 @@ func (jail *Jail) Send(chatID string, call otto.FunctionCall) (response otto.Val
 	if err != nil {
 		throwJSException(err.Error())
 	}
+
 	var (
 		rawReq = []byte(reqVal.String())
-		reqs   []RPCCall
+		reqs   []common.RPCCall
 		batch  bool
 	)
+
 	if rawReq[0] == '[' {
 		batch = true
 		json.Unmarshal(rawReq, &reqs)
 	} else {
 		batch = false
-		reqs = make([]RPCCall, 1)
+		reqs = make([]common.RPCCall, 1)
 		json.Unmarshal(rawReq, &reqs[0])
 	}
 
-	// Execute the requests.
+	JSON, _ := call.Otto.Object("JSON")
 	resps, _ := call.Otto.Object("new Array()")
+
+	// Execute the requests.
 	for _, req := range reqs {
-		resp, _ := call.Otto.Object(`({"jsonrpc":"2.0"})`)
-		resp.Set("id", req.ID)
-		var result json.RawMessage
-
-		// execute directly w/o RPC call to node
-		if req.Method == SendTransactionRequest {
-			txHash, err := jail.requestManager.ProcessSendTransactionRequest(call.Otto, req)
-			resp.Set("result", txHash.Hex())
-			if err != nil {
-				resp = newErrorResponse(call, -32603, err.Error(), &req.ID).Object()
-			}
-			resps.Call("push", resp)
-			continue
-		}
-
-		// do extra request pre processing (persist message id)
-		// within function semaphore will be acquired and released,
-		// so that no more than one client (per cell) can enter
-		messageID, err := jail.requestManager.PreProcessRequest(call.Otto, req)
+		res, err := jail.manager.Exec(req, call)
 		if err != nil {
-			return newErrorResponse(call, -32603, err.Error(), nil)
-		}
-
-		errc := make(chan error, 1)
-		errc2 := make(chan error)
-		go func() {
-			errc2 <- <-errc
-		}()
-		errc <- client.Call(&result, req.Method, req.Params...)
-		err = <-errc2
-
-		switch err := err.(type) {
-		case nil:
-			if result == nil {
-				// Special case null because it is decoded as an empty
-				// raw message for some reason.
-				resp.Set("result", otto.NullValue())
-			} else {
-				resultVal, callErr := JSON.Call("parse", string(result))
-				if callErr != nil {
-					resp = newErrorResponse(call, -32603, callErr.Error(), &req.ID).Object()
-				} else {
-					resp.Set("result", resultVal)
-				}
+			switch err.(type) {
+			case common.StopRPCCallError:
+				return newErrorResponse(call, -32603, err.Error(), nil)
+			default:
+				res = newErrorResponse(call, -32603, err.Error(), &req.ID).Object()
 			}
-		case rpc.Error:
-			resp.Set("error", map[string]interface{}{
-				"code":    err.ErrorCode(),
-				"message": err.Error(),
-			})
-		default:
-			resp = newErrorResponse(call, -32603, err.Error(), &req.ID).Object()
 		}
-		resps.Call("push", resp)
 
-		// do extra request post processing (setting back tx context)
-		jail.requestManager.PostProcessRequest(call.Otto, req, messageID)
+		resps.Call("push", res)
 	}
 
 	// Return the responses either to the callback (if supplied)
@@ -247,10 +200,12 @@ func (jail *Jail) Send(chatID string, call otto.FunctionCall) (response otto.Val
 	} else {
 		response, _ = resps.Get("0")
 	}
+
 	if fn := call.Argument(1); fn.Class() == "Function" {
 		fn.Call(otto.NullValue(), otto.NullValue(), response)
 		return otto.UndefinedValue()
 	}
+
 	return response
 }
 

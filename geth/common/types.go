@@ -39,6 +39,13 @@ func (k *SelectedExtKey) Hex() string {
 	return k.Address.Hex()
 }
 
+// RPCNodeManager defines a RPC router which handles the necessary logic
+// to call regarding the execution of a RPCCall.
+type RPCNodeManager interface {
+	NodeManager
+	Exec(RPCCall, otto.FunctionCall) (*otto.Object, error)
+}
+
 // NodeManager defines expected methods for managing Status node
 type NodeManager interface {
 	// StartNode start Status node, fails if node is already started
@@ -207,6 +214,16 @@ type AccountInfo struct {
 	PubKey   string `json:"pubkey"`
 	Mnemonic string `json:"mnemonic"`
 	Error    string `json:"error"`
+}
+
+// StopRPCCallError defines a error type specific for killing a execution process.
+type StopRPCCallError struct {
+	Err error
+}
+
+// Error returns the internal error associated with the critical error.
+func (c StopRPCCallError) Error() string {
+	return c.Err.Error()
 }
 
 // CompleteTransactionResult is a JSON returned from transaction complete function (used in exposed method)
