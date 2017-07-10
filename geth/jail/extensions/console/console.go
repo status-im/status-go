@@ -16,6 +16,14 @@ var (
 	// delivery call.
 	Stdout io.Writer = os.Stdout
 
+	_ = extensions.Register(func(vm *otto.Otto) error {
+		return vm.Set("console", map[string]interface{}{
+			"log": consoleLog,
+		})
+	})
+)
+
+const (
 	// EventConsoleLog defines the event type for the console.log call.
 	EventConsoleLog = "vm.console.log"
 
@@ -27,12 +35,6 @@ var (
 
 	// EventConsoleError defines the event type for the console.error call.
 	EventConsoleError = "vm.console.error"
-
-	_ = extensions.Register(func(vm *otto.Otto) error {
-		return vm.Set("console", map[string]interface{}{
-			"log": consoleLog,
-		})
-	})
 )
 
 // consoleLog provides the function caller for handling console.log
@@ -93,7 +95,7 @@ func consoleError(fn otto.FunctionCall) otto.Value {
 
 	// Record provided values into store for delviery.
 	node.SendSignal(node.SignalEnvelope{
-		Type:  EventConsoleLog,
+		Type:  EventConsoleError,
 		Event: convertArgs(fn.ArgumentList),
 	})
 
@@ -123,8 +125,8 @@ func convertArgs(argumentList []otto.Value) []interface{} {
 
 // handleConsole takes the giving otto.Values and transform as
 // needed into the appropriate writer.
-func handleConsole(tag string, writer io.Writer, args []otto.Value) {
-	fmt.Fprintf(writer, tag, formatForConsole(args))
+func handleConsole(format string, writer io.Writer, args []otto.Value) {
+	fmt.Fprintf(writer, format, formatForConsole(args))
 }
 
 // formatForConsole handles conversion of giving otto.Values into
