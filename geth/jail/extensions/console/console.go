@@ -49,7 +49,7 @@ func consoleLog(fn otto.FunctionCall) otto.Value {
 	})
 
 	// Next print out the giving values.
-	handleConsole("console.log: %s", Stdout, fn.ArgumentList)
+	handleConsole(Stdout, "console.log: %s", fn.ArgumentList)
 
 	return otto.UndefinedValue()
 }
@@ -66,7 +66,7 @@ func consoleWarn(fn otto.FunctionCall) otto.Value {
 	})
 
 	// Next print out the giving values.
-	handleConsole("console.warn: %s", Stdout, fn.ArgumentList)
+	handleConsole(Stdout, "console.warn: %s", fn.ArgumentList)
 
 	return otto.UndefinedValue()
 }
@@ -83,7 +83,7 @@ func consoleDebug(fn otto.FunctionCall) otto.Value {
 	})
 
 	// Next print out the giving values.
-	handleConsole("console.debug: %s", Stdout, fn.ArgumentList)
+	handleConsole(Stdout, "console.debug: %s", fn.ArgumentList)
 
 	return otto.UndefinedValue()
 }
@@ -100,7 +100,7 @@ func consoleError(fn otto.FunctionCall) otto.Value {
 	})
 
 	// Next print out the giving values.
-	handleConsole("console.error: %s", Stdout, fn.ArgumentList)
+	handleConsole(Stdout, "console.error: %s", fn.ArgumentList)
 
 	return otto.UndefinedValue()
 }
@@ -125,7 +125,7 @@ func convertArgs(argumentList []otto.Value) []interface{} {
 
 // handleConsole takes the giving otto.Values and transform as
 // needed into the appropriate writer.
-func handleConsole(format string, writer io.Writer, args []otto.Value) {
+func handleConsole(writer io.Writer, format string, args []otto.Value) {
 	fmt.Fprintf(writer, format, formatForConsole(args))
 }
 
