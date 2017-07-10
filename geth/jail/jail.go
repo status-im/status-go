@@ -175,7 +175,6 @@ func (jail *Jail) Send(chatID string, call otto.FunctionCall) (response otto.Val
 		json.Unmarshal(rawReq, &reqs[0])
 	}
 
-	JSON, _ := call.Otto.Object("JSON")
 	resps, _ := call.Otto.Object("new Array()")
 
 	// Execute the requests.

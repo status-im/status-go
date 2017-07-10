@@ -9,6 +9,7 @@ import (
 	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/geth/proxy"
 	. "github.com/status-im/status-go/geth/testing"
 	"github.com/status-im/status-go/static"
 	"github.com/stretchr/testify/suite"
@@ -33,7 +34,9 @@ func (s *JailTestSuite) SetupTest() {
 	s.NodeManager = node.NewNodeManager()
 	s.Require().NotNil(s.NodeManager)
 	s.Require().IsType(&node.NodeManager{}, s.NodeManager)
-	s.jail = jail.New(s.NodeManager)
+
+	s.jail = jail.New(proxy.NewRPCRouter(s.NodeManager))
+
 	s.Require().NotNil(s.jail)
 	s.Require().IsType(&jail.Jail{}, s.jail)
 }
