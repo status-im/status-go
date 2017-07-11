@@ -21,6 +21,10 @@
     "LogFile": "geth.log",
     "LogLevel": "INFO",
     "LogToStderr": true,
+    "UpstreamConfig": {
+        "Enabled": false,
+        "URL": "https://mainnet.infura.io/nKmXgiFgc2KqtoQ8BCGJ"
+    },
     "BootClusterConfig": {
         "Enabled": true,
         "ConfigFile": "rinkeby.dev.json"

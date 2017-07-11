@@ -1,7 +1,7 @@
 package proxy
 
 import (
-	"fmt"
+	"errors"
 
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/robertkrimen/otto"
@@ -29,6 +29,7 @@ type RPCRouter struct {
 	defaultExecutor  RPCExecutor
 	nonsignExecutors map[string]RPCExecutor
 	signExecutors    map[string]RPCExecutor
+	rpclient         *rpc.Client
 }
 
 // NewRPCRouter returns a new instance of a RPCRouter.
@@ -67,20 +68,55 @@ func (rp *RPCRouter) Exec(req common.RPCCall, caller otto.FunctionCall) (*otto.O
 		return executor(rp, req, caller)
 	}
 
-	if rp.defaultExecutor != nil {
-		return rp.defaultExecutor(rp.NodeManager, req, caller)
-	}
+	// if rp.defaultExecutor != nil {
+	// return rp.defaultExecutor(rp.NodeManager, req, caller)
+	// }
 
-	return nil, fmt.Errorf("RPC Method %q not supported", req.Method)
+	// return nil, fmt.Errorf("RPC Method %q not supported", req.Method)
+
+	return rp.defaultExecutor(rp.NodeManager, req, caller)
 }
 
 // RPCClient returns a client associated with the specific RPC server
 // which will either be the associated NodeManager or a upstream system.
 func (rp *RPCRouter) RPCClient() (*rpc.Client, error) {
-	//TODO(alex): Figure out how we can return a rpc client that connects to an upstream
-	// instead of the normal node based rpc client.
+	if rp.NodeManager == nil {
+		return nil, errors.New("Node Manager is not initialized")
+	}
 
-	return rp.NodeManager.RPCClient()
+	//TODO(alex): Should we check if NodeManager is started here as well?
+	// if rp.NodeManager.IsNodeRunning(){
+	// 	return nil, errors.New("NodeManager.Node is not started yet")
+	// }
+
+	if rp.rpclient != nil {
+		return rp.rpclient, nil
+	}
+
+	config, err := rp.NodeManager.NodeConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	// If we have no UpstreamRPCConfig set then just return normal RPClient from
+	// embedded NodeManager.
+	if config.UpstreamConfig == nil {
+		return rp.NodeManager.RPCClient()
+	}
+
+	// If we have UpstreamRPCConfig but it's not enabled then return embedded NodeManager's
+	// rpc.Client.
+	if !config.UpstreamConfig.Enabled {
+		return rp.NodeManager.RPCClient()
+	}
+
+	// Connect to upstream RPC server with new client and cache instance.
+	rp.rpclient, err = rpc.Dial(config.UpstreamConfig.URL)
+	if err != nil {
+		return nil, err
+	}
+
+	return rp.rpclient, nil
 }
 
 //======================================================================================================
