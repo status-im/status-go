@@ -70,12 +70,6 @@ func (rp *RPCRouter) RPCClient() (*rpc.Client, error) {
 		return nil, err
 	}
 
-	// If we have no UpstreamRPCConfig set then just return normal RPClient from
-	// embedded NodeManager.
-	if config.UpstreamConfig == nil {
-		return rp.NodeManager.RPCClient()
-	}
-
 	// If we have UpstreamRPCConfig but it's not enabled then return embedded NodeManager's
 	// rpc.Client.
 	if !config.UpstreamConfig.Enabled {

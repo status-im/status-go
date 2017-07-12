@@ -216,7 +216,7 @@ type NodeConfig struct {
 	LogToStderr bool
 
 	// UpstreamConfig extra config for providing upstream infura server.
-	UpstreamConfig *UpstreamRPCConfig `json:"UpstreamConfig"`
+	UpstreamConfig UpstreamRPCConfig `json:"UpstreamConfig"`
 
 	// BootClusterConfig extra configuration for supporting cluster
 	BootClusterConfig *BootClusterConfig `json:"BootClusterConfig,"`
@@ -249,7 +249,7 @@ func NewNodeConfig(dataDir string, networkID uint64, devMode bool) (*NodeConfig,
 		LogFile:         LogFile,
 		LogLevel:        LogLevel,
 		LogToStderr:     LogToStderr,
-		UpstreamConfig: &UpstreamRPCConfig{
+		UpstreamConfig: UpstreamRPCConfig{
 			Enabled: false,
 		},
 		LightEthConfig: &LightEthConfig{
