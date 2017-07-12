@@ -422,8 +422,7 @@ func (c *NodeConfig) updateUpstreamConfig() error {
 	case RopstenNetworkID:
 		c.UpstreamConfig.URL = UpstreamRopstenEthereumNetworkURL
 	case RinkebyNetworkID:
-		//TODO(influx6): Should we set up a different url or set none at all here.
-		c.UpstreamConfig.URL = UpstreamMainNetEthereumNetworkURL
+		c.UpstreamConfig.URL = UpstreamRopstenEthereumNetworkURL
 	}
 
 	return nil

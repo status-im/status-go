@@ -23,7 +23,7 @@
     "LogToStderr": true,
     "UpstreamConfig": {
         "Enabled": false,
-        "URL": "https://mainnet.infura.io/nKmXgiFgc2KqtoQ8BCGJ"
+        "URL": "https://ropsten.infura.io/nKmXgiFgc2KqtoQ8BCGJ"
     },
     "BootClusterConfig": {
         "Enabled": true,
