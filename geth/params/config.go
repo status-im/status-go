@@ -249,9 +249,6 @@ func NewNodeConfig(dataDir string, networkID uint64, devMode bool) (*NodeConfig,
 		LogFile:         LogFile,
 		LogLevel:        LogLevel,
 		LogToStderr:     LogToStderr,
-		UpstreamConfig: UpstreamRPCConfig{
-			Enabled: false,
-		},
 		LightEthConfig: &LightEthConfig{
 			Enabled:          true,
 			DatabaseCache:    DatabaseCache,
