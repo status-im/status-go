@@ -148,10 +148,6 @@ var loadConfigTestCases = []struct {
 				t.Fatal("wrong NetworkId")
 			}
 
-			if nodeConfig.UpstreamConfig == nil {
-				t.Fatal("UpstreamConfig cant be nil")
-			}
-
 			if !nodeConfig.UpstreamConfig.Enabled {
 				t.Fatal("wrong UpstreamConfig.Enabled state")
 			}

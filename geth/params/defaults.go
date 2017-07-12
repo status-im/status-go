@@ -91,6 +91,10 @@ const (
 	// allow us avoid syncing node.
 	UpstreamRopstenEthereumNetworkURL = "https://ropsten.infura.io/nKmXgiFgc2KqtoQ8BCGJ"
 
+	// UpstreamRinkebyEthereumNetworkURL is URL where the upstream ethereum network is loaded to
+	// allow us avoid syncing node.
+	UpstreamRinkebyEthereumNetworkURL = "https://rinkeby.infura.io/nKmXgiFgc2KqtoQ8BCGJ"
+
 	// MainNetworkID is id of the main network
 	MainNetworkID = 1
 

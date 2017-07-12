@@ -92,9 +92,13 @@ func MakeNode(config *params.NodeConfig) (*node.Node, error) {
 
 	// start Ethereum service if we are not expected to use an upstream server.
 	if !config.UpstreamConfig.Enabled {
+
 		if err := activateEthService(stack, config); err != nil {
 			return nil, fmt.Errorf("%v: %v", ErrEthServiceRegistrationFailure, err)
 		}
+
+	} else {
+		log.Info("Blockchain synchronization is switched off, RPC requests will be proxied to %s", config.UpstreamConfig.URL)
 	}
 
 	// start Whisper service

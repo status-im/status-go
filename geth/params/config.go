@@ -422,7 +422,7 @@ func (c *NodeConfig) updateUpstreamConfig() error {
 	case RopstenNetworkID:
 		c.UpstreamConfig.URL = UpstreamRopstenEthereumNetworkURL
 	case RinkebyNetworkID:
-		c.UpstreamConfig.URL = UpstreamRopstenEthereumNetworkURL
+		c.UpstreamConfig.URL = UpstreamRinkebyEthereumNetworkURL
 	}
 
 	return nil
