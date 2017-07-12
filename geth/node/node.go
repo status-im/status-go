@@ -90,9 +90,11 @@ func MakeNode(config *params.NodeConfig) (*node.Node, error) {
 		return nil, ErrNodeMakeFailure
 	}
 
-	// start Ethereum service
-	if err := activateEthService(stack, config); err != nil {
-		return nil, fmt.Errorf("%v: %v", ErrEthServiceRegistrationFailure, err)
+	// start Ethereum service if we are not expected to use an upstream server.
+	if config.UpstreamConfig == nil || !config.UpstreamConfig.Enabled {
+		if err := activateEthService(stack, config); err != nil {
+			return nil, fmt.Errorf("%v: %v", ErrEthServiceRegistrationFailure, err)
+		}
 	}
 
 	// start Whisper service
@@ -149,6 +151,7 @@ func updateCHT(eth *les.LightEthereum, config *params.NodeConfig) {
 		Prod        string `json:"prod"`
 		Dev         string `json:"dev"`
 	}
+
 	loadCHTLists := func() ([]MsgCHTRoot, error) {
 		url := config.LightEthConfig.CHTRootConfigURL + "?u=" + strconv.Itoa(int(time.Now().Unix()))
 		client := &http.Client{Timeout: 5 * time.Second}
@@ -244,6 +247,7 @@ func activateEthService(stack *node.Node, config *params.NodeConfig) error {
 	ethConf.NetworkId = config.NetworkID
 	ethConf.DatabaseCache = config.LightEthConfig.DatabaseCache
 	ethConf.MaxPeers = config.MaxPeers
+
 	if err := stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
 		lightEth, err := les.New(ctx, &ethConf)
 		if err == nil {
