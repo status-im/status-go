@@ -13,7 +13,10 @@ import (
 	"github.com/status-im/status-go/geth/common"
 )
 
-var sendTransactionName = "eth_sendTransaction"
+// contains sets of possible defines the name for a giving transaction.
+const (
+	SendTransactionName = "eth_sendTransaction"
+)
 
 // ExecuteSendTransaction defines a function which handles the procedure called for the dealing with
 // RPCCalls with "eth_sendTransaction" Methods.
@@ -150,13 +153,13 @@ func postProcessRequest(vm *otto.Otto, req common.RPCCall, messageID string) {
 	}
 
 	// set extra markers for queued transaction requests
-	if req.Method == sendTransactionName {
-		vm.Call("addContext", nil, messageID, sendTransactionName, true) // nolint: errcheck
+	if req.Method == SendTransactionName {
+		vm.Call("addContext", nil, messageID, SendTransactionName, true) // nolint: errcheck
 	}
 }
 
 func sendTxArgsFromRPCCall(req common.RPCCall) status.SendTxArgs {
-	if req.Method != sendTransactionName { // no need to persist extra state for other requests
+	if req.Method != SendTransactionName { // no need to persist extra state for other requests
 		return status.SendTxArgs{}
 	}
 

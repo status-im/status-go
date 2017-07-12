@@ -26,55 +26,27 @@ type RPCExecutor func(common.NodeManager, common.RPCCall, otto.FunctionCall) (*o
 // to a external service or a running etherem service.
 type RPCRouter struct {
 	common.NodeManager
-	defaultExecutor  RPCExecutor
-	nonsignExecutors map[string]RPCExecutor
-	signExecutors    map[string]RPCExecutor
-	rpclient         *rpc.Client
+	rpclient *rpc.Client
 }
 
 // NewRPCRouter returns a new instance of a RPCRouter.
 func NewRPCRouter(manager common.NodeManager) *RPCRouter {
 	router := &RPCRouter{
-		NodeManager:      manager,
-		defaultExecutor:  transactions.ExecuteOtherTransaction,
-		nonsignExecutors: make(map[string]RPCExecutor),
-		signExecutors:    make(map[string]RPCExecutor),
+		NodeManager: manager,
 	}
-
-	router.RegisterExecutor(EthSendTransaction, transactions.ExecuteSendTransaction, true)
 
 	return router
-}
-
-// RegisterExecutor adds the executor into the router map associated with the
-// giving method name.
-func (rp *RPCRouter) RegisterExecutor(methodName string, executor RPCExecutor, requiresSigning bool) {
-	if requiresSigning {
-		rp.signExecutors[methodName] = executor
-		return
-	}
-
-	rp.nonsignExecutors[methodName] = executor
 }
 
 // Exec takes the giving RPCCall and caller to be executed against the appropriate caller.
 // To accommodate the
 func (rp *RPCRouter) Exec(req common.RPCCall, caller otto.FunctionCall) (*otto.Object, error) {
-	if executor, ok := rp.signExecutors[req.Method]; ok {
-		return executor(rp.NodeManager, req, caller)
+	switch req.Method {
+	case transactions.SendTransactionName:
+		return transactions.ExecuteSendTransaction(rp.NodeManager, req, caller)
+	default:
+		return transactions.ExecuteOtherTransaction(rp, req, caller)
 	}
-
-	if executor, ok := rp.nonsignExecutors[req.Method]; ok {
-		return executor(rp, req, caller)
-	}
-
-	// if rp.defaultExecutor != nil {
-	// return rp.defaultExecutor(rp.NodeManager, req, caller)
-	// }
-
-	// return nil, fmt.Errorf("RPC Method %q not supported", req.Method)
-
-	return rp.defaultExecutor(rp.NodeManager, req, caller)
 }
 
 // RPCClient returns a client associated with the specific RPC server
