@@ -94,6 +94,8 @@ func (s *RPCRouterTestSuite) TestRPCClientConnection() {
 		break
 	}
 
+	defer s.NodeManager.StopNode()
+
 	// create a new client and issue a request.
 	client, err := s.NodeManager.RPCClient()
 	require.NoError(err)

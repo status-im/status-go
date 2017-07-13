@@ -1,21 +1,25 @@
 package node
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"sync"
 	"time"
+
+	"net/url"
 
 	"github.com/ethereum/go-ethereum/les/status"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/geth/common"
+	"github.com/status-im/status-go/geth/params"
 )
 
 const (
-	jsonrpcVersion         = "2.0"
+	jsonrpcVersion = "2.0"
 )
 
 type jsonRequest struct {
@@ -60,7 +64,7 @@ func NewRPCManager(nodeManager common.NodeManager) *RPCManager {
 
 // Call executes RPC request on node's in-proc RPC server
 func (c *RPCManager) Call(inputJSON string) string {
-	server, err := c.nodeManager.RPCServer()
+	config, err := c.nodeManager.NodeConfig()
 	if err != nil {
 		return c.makeJSONErrorResponse(err)
 	}
@@ -68,19 +72,31 @@ func (c *RPCManager) Call(inputJSON string) string {
 	// allow HTTP requests to block w/o
 	outputJSON := make(chan string, 1)
 	go func() {
-		httpReq := httptest.NewRequest("POST", "/", strings.NewReader(inputJSON))
-		rr := httptest.NewRecorder()
-		server.ServeHTTP(rr, httpReq)
+		body := bytes.NewBufferString(inputJSON)
 
-		// Check the status code is what we expect.
-		if respStatus := rr.Code; respStatus != http.StatusOK {
-			log.Error("handler returned wrong status code", "got", respStatus, "want", http.StatusOK)
-			outputJSON <- c.makeJSONErrorResponse(ErrRPCServerCallFailed)
+		if !config.UpstreamConfig.Enabled {
+			log.Info("Making RPC JSON Request to internal RPCServer")
+
+			resbody, err := c.callNodeStream(body)
+			if err != nil {
+				outputJSON <- c.makeJSONErrorResponse(err)
+				return
+			}
+
+			outputJSON <- string(resbody)
 			return
 		}
 
-		// everything is ok, return
-		outputJSON <- rr.Body.String()
+		log.Info("Making RPC JSON Request to upstream RPCServer")
+
+		resbody, err := c.callUpstreamStream(config, body)
+		if err != nil {
+			outputJSON <- c.makeJSONErrorResponse(err)
+			return
+		}
+
+		outputJSON <- string(resbody)
+		return
 	}()
 
 	// wait till call is complete
@@ -92,6 +108,66 @@ func (c *RPCManager) Call(inputJSON string) string {
 	}
 
 	return c.makeJSONErrorResponse(ErrRPCServerTimeout)
+}
+
+// callNodeStream delivers giving request and body content to the external ethereum
+// (infura) RPCServer to process the request and returns response.
+func (c *RPCManager) callUpstreamStream(config *params.NodeConfig, body io.Reader) ([]byte, error) {
+	upstreamURL, err := url.Parse(config.UpstreamConfig.URL)
+	if err != nil {
+		return nil, err
+	}
+
+	httpReq := httptest.NewRequest("POST", "/", body)
+	httpReq.RequestURI = ""
+	httpReq.URL = upstreamURL
+
+	httpClient := http.Client{
+		Timeout: 20 * time.Second,
+	}
+
+	res, err := httpClient.Do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+
+	if respStatusCode := res.StatusCode; respStatusCode != http.StatusOK {
+		log.Error("handler returned wrong status code", "got", respStatusCode, "want", http.StatusOK)
+		return nil, ErrRPCServerCallFailed
+	}
+
+	defer res.Body.Close()
+
+	var resbody bytes.Buffer
+
+	if _, err := io.Copy(&resbody, res.Body); err != nil && err != io.EOF {
+		return nil, err
+	}
+
+	return resbody.Bytes(), nil
+}
+
+// callNodeStream delivers giving request and body content to the internal ethereum
+// RPCServer to process the request.
+func (c *RPCManager) callNodeStream(body io.Reader) ([]byte, error) {
+	server, err := c.nodeManager.RPCServer()
+	if err != nil {
+		// return c.makeJSONErrorResponse(err)
+		return nil, err
+	}
+
+	httpReq := httptest.NewRequest("POST", "/", body)
+	rr := httptest.NewRecorder()
+	server.ServeHTTP(rr, httpReq)
+
+	// Check the status code is what we expect.
+	if respStatus := rr.Code; respStatus != http.StatusOK {
+		log.Error("handler returned wrong status code", "got", respStatus, "want", http.StatusOK)
+		// outputJSON <- c.makeJSONErrorResponse(ErrRPCServerCallFailed)
+		return nil, ErrRPCServerCallFailed
+	}
+
+	return rr.Body.Bytes(), nil
 }
 
 // makeJSONErrorResponse returns error as JSON response
