@@ -3,9 +3,12 @@ package jail_test
 import (
 	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
+	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
@@ -113,6 +116,83 @@ func (s *JailTestSuite) TestFunctionCall() {
 	response = s.jail.Call(testChatID, `["commands", "testCommand"]`, `{"val": 12}`)
 	expectedResponse := `{"result": 144}`
 	require.Equal(expectedResponse, response)
+}
+
+func (s *JailTestSuite) TestJailTimeoutFailure() {
+	require := s.Require()
+	require.NotNil(s.jail)
+
+	newCell := s.jail.NewJailCell(testChatID)
+	require.NotNil(newCell)
+
+	execr := newCell.Executor()
+
+	// Attempt to run a timeout string against a JailCell.
+	_, err := execr.Exec(`
+		setTimeout(function(n){
+			if(Date.now() - n < 50){
+				throw new Error("Timedout early");
+			}
+
+			return n;
+		}, 30, Date.now());
+	`)
+
+	require.NotNil(err)
+}
+
+func (s *JailTestSuite) TestJailTimeout() {
+	require := s.Require()
+	require.NotNil(s.jail)
+
+	newCell := s.jail.NewJailCell(testChatID)
+	require.NotNil(newCell)
+
+	execr := newCell.Executor()
+
+	// Attempt to run a timeout string against a JailCell.
+	res, err := execr.Exec(`
+		setTimeout(function(n){
+			if(Date.now() - n < 50){
+				throw new Error("Timedout early");
+			}
+
+			return n;
+		}, 50, Date.now());
+	`)
+
+	require.NoError(err)
+	require.NotNil(res)
+}
+
+func (s *JailTestSuite) TestJailFetch() {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("Hello World"))
+	})
+
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	require := s.Require()
+	require.NotNil(s.jail)
+
+	newCell := s.jail.NewJailCell(testChatID)
+	require.NotNil(newCell)
+
+	execr := newCell.Executor()
+
+	wait := make(chan struct{})
+
+	// Attempt to run a fetch resource.
+	_, err := execr.Fetch(server.URL, func(res otto.Value) {
+		go func() { wait <- struct{}{} }()
+	})
+
+	require.NoError(err)
+
+	<-wait
 }
 
 func (s *JailTestSuite) TestJailRPCSend() {
