@@ -18,7 +18,9 @@ import (
 )
 
 const (
-	testChatID = "testChat"
+	testChatID       = "testChat"
+	statusJSFilePath = "testdata/status.js"
+	txSendFolder     = "testdata/tx-send/"
 )
 
 var baseStatusJSCode = string(static.MustAsset("testdata/jail/status.js"))
@@ -193,6 +195,34 @@ func (s *JailTestSuite) TestJailFetch() {
 	require.NoError(err)
 
 	<-wait
+}
+
+func (s *JailTestSuite) TestJailRPCAsyncSend() {
+	require := s.Require()
+	require.NotNil(s.jail)
+
+	s.StartTestNode(params.RopstenNetworkID)
+	defer s.StopTestNode()
+
+	// load Status JS and add test command to it
+	s.jail.BaseJS(baseStatusJSCode)
+	s.jail.Parse(testChatID, rxSendJS)
+
+	vm, err := s.jail.JailCellVM(testChatID)
+	require.NoError(err)
+	require.NotNil(vm)
+
+	// internally (since we replaced `web3.send` with `jail.Send`)
+	// all requests to web3 are forwarded to `jail.Send`
+	_, err = vm.Run(`
+		_status_catalog.commands.sendAsync({
+			"from": "` + TestConfig.Account1.Address + `",
+			"to": "0xf82da7547534045b4e00442bc89e16186cf8c272",
+			"value": "0.000001"
+		})
+	`)
+
+	require.NoError(err)
 }
 
 func (s *JailTestSuite) TestJailRPCSend() {
