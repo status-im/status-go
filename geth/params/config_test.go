@@ -29,6 +29,7 @@ var loadConfigTestCases = []struct {
 			"WSPort": 8546,
 			"IPCEnabled": true,
 			"WSEnabled": false,
+			"RPCEnabled": false,
 			"LightEthConfig": {
 				"DatabaseCache": 64
 			}
@@ -134,6 +135,7 @@ var loadConfigTestCases = []struct {
 			"WSPort": 4242,
 			"IPCEnabled": true,
 			"WSEnabled": false,
+			"RPCEnabled": true,
 			"LightEthConfig": {
 				"DatabaseCache": 64
 			}
@@ -157,6 +159,10 @@ var loadConfigTestCases = []struct {
 
 			if nodeConfig.HTTPHost != params.HTTPHost {
 				t.Fatal("wrong HTTPHost")
+			}
+
+			if !nodeConfig.RPCEnabled {
+				t.Fatal("Wrong RPCEnabled flag")
 			}
 
 			if nodeConfig.WSPort != 4242 {

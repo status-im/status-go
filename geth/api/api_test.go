@@ -46,6 +46,7 @@ func (s *APITestSuite) TestCHTUpdate() {
 		"DataDir": "` + tmpDir + `",
 		"LogEnabled": true,
 		"LogLevel": "INFO",
+		"RPCEnabled": true,
 		"LightEthConfig": {
 			"CHTRootConfigURL": "` + url + `"
 		}

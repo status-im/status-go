@@ -31,11 +31,14 @@ func init() {
 
 // errors
 var (
-	ErrMissingDataDir            = errors.New("missing required 'DataDir' parameter")
-	ErrMissingNetworkID          = errors.New("missing required 'NetworkID' parameter")
-	ErrEmptyPasswordFile         = errors.New("password file cannot be empty")
-	ErrEmptyIdentityFile         = errors.New("identity file cannot be empty")
-	ErrEmptyAuthorizationKeyFile = errors.New("authorization key file cannot be empty")
+	ErrMissingDataDir             = errors.New("missing required 'DataDir' parameter")
+	ErrMissingNetworkID           = errors.New("missing required 'NetworkID' parameter")
+	ErrEmptyPasswordFile          = errors.New("password file cannot be empty")
+	ErrNoPasswordFileValueSet     = errors.New("password file path not set")
+	ErrNoIdentityFileValueSet     = errors.New("identity file path not set")
+	ErrEmptyIdentityFile          = errors.New("identity file cannot be empty")
+	ErrEmptyAuthorizationKeyFile  = errors.New("authorization key file cannot be empty")
+	ErrAuthorizationKeyFileNotSet = errors.New("authorization key file is not set")
 )
 
 // LightEthConfig holds LES-related configuration
@@ -55,6 +58,8 @@ type LightEthConfig struct {
 	CHTRootConfigURL string
 }
 
+//=====================================================================================
+
 // FirebaseConfig holds FCM-related configuration
 type FirebaseConfig struct {
 	// AuthorizationKeyFile file path that contains FCM authorization key
@@ -63,6 +68,28 @@ type FirebaseConfig struct {
 	// NotificationTriggerURL URL used to send push notification requests to
 	NotificationTriggerURL string
 }
+
+// ReadAuthorizationKeyFile reads and loads FCM authorization key
+func (c *FirebaseConfig) ReadAuthorizationKeyFile() ([]byte, error) {
+	if len(c.AuthorizationKeyFile) == 0 {
+		return nil, ErrAuthorizationKeyFileNotSet
+	}
+
+	key, err := ioutil.ReadFile(c.AuthorizationKeyFile)
+	if err != nil {
+		return nil, err
+	}
+
+	key = bytes.TrimRight(key, "\n")
+
+	if len(key) == 0 {
+		return nil, ErrEmptyAuthorizationKeyFile
+	}
+
+	return key, nil
+}
+
+//=====================================================================================
 
 // WhisperConfig holds SHH-related configuration
 type WhisperConfig struct {
@@ -107,11 +134,64 @@ type WhisperConfig struct {
 	FirebaseConfig *FirebaseConfig `json:"FirebaseConfig,"`
 }
 
+// ReadPasswordFile reads and returns content of the password file
+func (c *WhisperConfig) ReadPasswordFile() ([]byte, error) {
+	if len(c.PasswordFile) == 0 {
+		return nil, ErrNoPasswordFileValueSet
+	}
+
+	password, err := ioutil.ReadFile(c.PasswordFile)
+	if err != nil {
+		return nil, err
+	}
+	password = bytes.TrimRight(password, "\n")
+
+	if len(password) == 0 {
+		return nil, ErrEmptyPasswordFile
+	}
+
+	return password, nil
+}
+
+// ReadIdentityFile reads and loads identity private key
+func (c *WhisperConfig) ReadIdentityFile() (*ecdsa.PrivateKey, error) {
+	if len(c.IdentityFile) == 0 {
+		return nil, ErrNoIdentityFileValueSet
+	}
+
+	identity, err := crypto.LoadECDSA(c.IdentityFile)
+	if err != nil {
+		return nil, err
+	}
+
+	if identity == nil {
+		return nil, ErrEmptyIdentityFile
+	}
+
+	return identity, nil
+}
+
+// String dumps config object as nicely indented JSON
+func (c *WhisperConfig) String() string {
+	data, _ := json.MarshalIndent(c, "", "    ")
+	return string(data)
+}
+
+//=====================================================================================
+
 // SwarmConfig holds Swarm-related configuration
 type SwarmConfig struct {
 	// Enabled flag specifies whether protocol is enabled
 	Enabled bool
 }
+
+// String dumps config object as nicely indented JSON
+func (c *SwarmConfig) String() string {
+	data, _ := json.MarshalIndent(c, "", "    ")
+	return string(data)
+}
+
+//=====================================================================================
 
 // BootClusterConfig holds configuration for supporting boot cluster, which is a temporary
 // means for mobile devices to get connected to Ethereum network (UDP-based discovery
@@ -127,6 +207,14 @@ type BootClusterConfig struct {
 	// `static/bootcluster` folder.
 	ConfigFile string
 }
+
+// String dumps config object as nicely indented JSON
+func (c *BootClusterConfig) String() string {
+	data, _ := json.MarshalIndent(c, "", "    ")
+	return string(data)
+}
+
+//=====================================================================================
 
 // NodeConfig stores configuration options for a node
 type NodeConfig struct {
@@ -162,6 +250,9 @@ type NodeConfig struct {
 	// HTTPHost is the host interface on which to start the HTTP RPC server.
 	// Pass empty string if no HTTP RPC interface needs to be started.
 	HTTPHost string
+
+	// RPCEnabled specifies whether the http RPC server is to be enabled by default.
+	RPCEnabled bool
 
 	// HTTPPort is the TCP port number on which to start the Geth's HTTP RPC server.
 	HTTPPort int
@@ -226,6 +317,7 @@ func NewNodeConfig(dataDir string, networkID uint64, devMode bool) (*NodeConfig,
 		DataDir:         dataDir,
 		Name:            ClientIdentifier,
 		Version:         Version,
+		RPCEnabled:      RPCEnabledDefault,
 		HTTPHost:        HTTPHost,
 		HTTPPort:        HTTPPort,
 		WSHost:          WSHost,
@@ -323,12 +415,14 @@ func (c *NodeConfig) LoadBootClusterNodes() ([]string, error) {
 	var err error
 
 	filename := c.BootClusterConfig.ConfigFile
+
 	log.Info("Loading boot nodes config file", "source", filename)
 	if _, err = os.Stat(filename); os.IsNotExist(err) { // load from static resources
 		configData, err = static.Asset("bootcluster/" + filename)
 	} else {
 		configData, err = ioutil.ReadFile(filename)
 	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -387,6 +481,7 @@ func (c *NodeConfig) updateGenesisConfig() error {
 // updateBootClusterConfig populates cluster config file, depending on dev/prod and mobile/full settings
 func (c *NodeConfig) updateBootClusterConfig() error {
 	var configFile string
+
 	switch c.NetworkID {
 	case MainNetworkID:
 		configFile = "homestead.prod.json"
@@ -395,9 +490,11 @@ func (c *NodeConfig) updateBootClusterConfig() error {
 	case RinkebyNetworkID:
 		configFile = "rinkeby.prod.json"
 	}
+
 	if c.DevMode {
 		configFile = strings.Replace(configFile, "prod", "dev", 1)
 	}
+
 	if len(configFile) > 0 {
 		c.BootClusterConfig.ConfigFile = configFile
 	}
@@ -408,6 +505,7 @@ func (c *NodeConfig) updateBootClusterConfig() error {
 // updateRPCConfig transforms RPC settings to meet requirements of a given configuration
 func (c *NodeConfig) updateRPCConfig() error {
 	c.APIModules = ProdAPIModules
+
 	if c.DevMode {
 		c.APIModules = DevAPIModules
 	}
@@ -439,78 +537,4 @@ func (c *NodeConfig) updateRelativeDirsConfig() error {
 func (c *NodeConfig) String() string {
 	data, _ := json.MarshalIndent(c, "", "    ")
 	return string(data)
-}
-
-// String dumps config object as nicely indented JSON
-func (c *WhisperConfig) String() string {
-	data, _ := json.MarshalIndent(c, "", "    ")
-	return string(data)
-}
-
-// String dumps config object as nicely indented JSON
-func (c *SwarmConfig) String() string {
-	data, _ := json.MarshalIndent(c, "", "    ")
-	return string(data)
-}
-
-// String dumps config object as nicely indented JSON
-func (c *BootClusterConfig) String() string {
-	data, _ := json.MarshalIndent(c, "", "    ")
-	return string(data)
-}
-
-// ReadPasswordFile reads and returns content of the password file
-func (c *WhisperConfig) ReadPasswordFile() ([]byte, error) {
-	if len(c.PasswordFile) <= 0 {
-		return nil, ErrEmptyPasswordFile
-	}
-
-	password, err := ioutil.ReadFile(c.PasswordFile)
-	if err != nil {
-		return nil, err
-	}
-	password = bytes.TrimRight(password, "\n")
-
-	if len(password) == 0 {
-		return nil, ErrEmptyPasswordFile
-	}
-
-	return password, nil
-}
-
-// ReadIdentityFile reads and loads identity private key
-func (c *WhisperConfig) ReadIdentityFile() (*ecdsa.PrivateKey, error) {
-	if len(c.IdentityFile) <= 0 {
-		return nil, ErrEmptyIdentityFile
-	}
-
-	identity, err := crypto.LoadECDSA(c.IdentityFile)
-	if err != nil {
-		return nil, err
-	}
-
-	if identity == nil {
-		return nil, ErrEmptyIdentityFile
-	}
-
-	return identity, nil
-}
-
-// ReadAuthorizationKeyFile reads and loads FCM authorization key
-func (c *FirebaseConfig) ReadAuthorizationKeyFile() ([]byte, error) {
-	if len(c.AuthorizationKeyFile) <= 0 {
-		return nil, ErrEmptyAuthorizationKeyFile
-	}
-
-	key, err := ioutil.ReadFile(c.AuthorizationKeyFile)
-	if err != nil {
-		return nil, err
-	}
-	key = bytes.TrimRight(key, "\n")
-
-	if key == nil {
-		return nil, ErrEmptyAuthorizationKeyFile
-	}
-
-	return key, nil
 }
