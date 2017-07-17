@@ -35,20 +35,23 @@ type RPCRouterTestSuite struct {
 }
 
 func (s *RPCRouterTestSuite) SetupTest() {
+	require := s.Require()
+
 	s.NodeManager = proxy.NewRPCRouter(node.NewNodeManager())
 
 	s.Require().NotNil(s.NodeManager)
 	s.Require().IsType(&proxy.RPCRouter{}, s.NodeManager)
+
+	// create a new client and issue a request.
+	client, err := s.NodeManager.RPCClient()
+	require.NoError(err)
+	require.NotNil(client)
+
 }
 
 func (s *RPCRouterTestSuite) TestRPCClientConnection() {
 	require := s.Require()
 	require.NotNil(s.NodeManager)
-
-	//TODO(alex): How do we validate whether the client we
-	// receive is actually from a upstrem or is from the internally
-	// started server.
-	// For now validate config state.
 
 	nodeConfig, err := MakeTestNodeConfig(params.RopstenNetworkID)
 	require.NoError(err)

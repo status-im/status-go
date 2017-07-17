@@ -248,7 +248,7 @@ func (s *ManagerTestSuite) TestReferences() {
 	}
 
 	// test with node fully started
-	s.StartTestNode(params.RinkebyNetworkID)
+	s.StartTestNode(params.RinkebyNetworkID, false)
 	defer s.StopTestNode()
 	var nodeReadyTestCases = []struct {
 		name         string
@@ -403,7 +403,7 @@ func (s *ManagerTestSuite) TestResetChainData() {
 	require := s.Require()
 	require.NotNil(s.NodeManager)
 
-	s.StartTestNode(params.RinkebyNetworkID)
+	s.StartTestNode(params.RinkebyNetworkID, false)
 	defer s.StopTestNode()
 
 	time.Sleep(2 * time.Second) // allow to sync for some time
@@ -422,7 +422,7 @@ func (s *ManagerTestSuite) TestRestartNode() {
 	require := s.Require()
 	require.NotNil(s.NodeManager)
 
-	s.StartTestNode(params.RinkebyNetworkID)
+	s.StartTestNode(params.RinkebyNetworkID, false)
 	defer s.StopTestNode()
 
 	s.True(s.NodeManager.IsNodeRunning())
