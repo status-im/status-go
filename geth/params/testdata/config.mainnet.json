@@ -8,6 +8,7 @@
     "Version": "$VERSION",
     "APIModules": "db,eth,net,web3,shh,personal,admin",
     "HTTPHost": "localhost",
+    "RPCEnabled": false,
     "HTTPPort": 8545,
     "WSHost": "localhost",
     "WSPort": 8546,

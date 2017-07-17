@@ -111,7 +111,7 @@ func MakeNode(config *params.NodeConfig) (*node.Node, error) {
 
 // defaultEmbeddedNodeConfig returns default stack configuration for mobile client node
 func defaultEmbeddedNodeConfig(config *params.NodeConfig) *node.Config {
-	return &node.Config{
+	nc := &node.Config{
 		DataDir:           config.DataDir,
 		KeyStoreDir:       config.KeyStoreDir,
 		UseLightweightKDF: true,
@@ -130,8 +130,6 @@ func defaultEmbeddedNodeConfig(config *params.NodeConfig) *node.Config {
 			MaxPendingPeers:  config.MaxPendingPeers,
 		},
 		IPCPath:     makeIPCPath(config),
-		HTTPHost:    config.HTTPHost,
-		HTTPPort:    config.HTTPPort,
 		HTTPCors:    []string{"*"},
 		HTTPModules: strings.Split(config.APIModules, ","),
 		WSHost:      makeWSHost(config),
@@ -139,6 +137,13 @@ func defaultEmbeddedNodeConfig(config *params.NodeConfig) *node.Config {
 		WSOrigins:   []string{"*"},
 		WSModules:   strings.Split(config.APIModules, ","),
 	}
+
+	if config.RPCEnabled {
+		nc.HTTPHost = config.HTTPHost
+		nc.HTTPPort = config.HTTPPort
+	}
+
+	return nc
 }
 
 // updateCHT changes trusted canonical hash trie root
@@ -271,6 +276,7 @@ func activateShhService(stack *node.Node, config *params.NodeConfig) error {
 		log.Info("SHH protocol is disabled")
 		return nil
 	}
+
 	serviceConstructor := func(*node.ServiceContext) (node.Service, error) {
 		whisperConfig := config.WhisperConfig
 		whisperService := whisper.New()
