@@ -172,7 +172,7 @@ func (s *JailTestSuite) TestSendTransactionWithJail() {
 	sendResponse, err := vm.Get("sendResponse")
 	require.NoError(err, "cannot obtain response for sendtransaction")
 
-	s.T().Logf("Received Transaction Nounce: %+q", sendResponse)
+	s.T().Logf("Received Transaction response: %+q", sendResponse)
 }
 
 func (s *JailTestSuite) TestJailRPCSend() {
