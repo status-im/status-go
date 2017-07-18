@@ -45,6 +45,8 @@ func (k *SelectedExtKey) Hex() string {
 // to call regarding the execution of a RPCCall.
 type RPCNodeManager interface {
 	NodeManager
+
+	Account() AccountManager
 	Exec(RPCCall, otto.FunctionCall) (*otto.Object, error)
 }
 

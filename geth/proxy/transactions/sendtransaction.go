@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/big"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/les/status"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -17,6 +19,49 @@ import (
 const (
 	SendTransactionName = "eth_sendTransaction"
 )
+
+// ExecuteRemoteSendTransaction defines a funct
+func ExecuteRemoteSendTransaction(manager common.RPCNodeManager, req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
+	resp, _ := call.Otto.Object(`({"jsonrpc":"2.0"})`)
+	resp.Set("id", req.ID)
+
+	selectedAcct, err := manager.Account().SelectedAccount()
+	if err != nil {
+		return nil, err
+	}
+
+	toAddr := req.ParseFromAddress()
+	gas := (*big.Int)(req.ParseGas())
+	dataVal := []byte(req.ParseData())
+	priceVal := (*big.Int)(req.ParseValue())
+	gasPrice := (*big.Int)(req.ParseGasPrice())
+
+	tx := types.NewTransaction(uint64(req.ID), toAddr, priceVal, gas, gasPrice, dataVal)
+	txs, err := types.SignTx(tx, types.HomesteadSigner{}, selectedAcct.AccountKey.PrivateKey)
+	if err != nil {
+		return nil, err
+	}
+
+	rawTx, err := txs.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+
+	client, err := manager.RPCClient()
+	if err != nil {
+		return nil, err
+	}
+
+	var result json.RawMessage
+
+	if err := client.Call(&result, "eth_sendRawTransaction", rawTx); err != nil {
+		return nil, err
+	}
+
+	resp.Set("result", result)
+
+	return resp, nil
+}
 
 // ExecuteSendTransaction defines a function which handles the procedure called for the dealing with
 // RPCCalls with "eth_sendTransaction" Methods.

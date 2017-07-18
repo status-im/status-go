@@ -12,7 +12,7 @@ type RPCCall struct {
 	Params []interface{}
 }
 
-// parseFromAddress returns the address associated with the RPCCall.
+// ParseFromAddress returns the address associated with the RPCCall.
 func (r RPCCall) ParseFromAddress() gethcommon.Address {
 	params, ok := r.Params[0].(map[string]interface{})
 	if !ok {

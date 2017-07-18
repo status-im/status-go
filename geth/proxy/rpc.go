@@ -26,23 +26,40 @@ type RPCExecutor func(common.NodeManager, common.RPCCall, otto.FunctionCall) (*o
 // to a external service or a running etherem service.
 type RPCRouter struct {
 	common.NodeManager
-	rpclient *rpc.Client
+	accountManager common.AccountManager
+	rpclient       *rpc.Client
 }
 
 // NewRPCRouter returns a new instance of a RPCRouter.
-func NewRPCRouter(manager common.NodeManager) *RPCRouter {
+func NewRPCRouter(manager common.NodeManager, acct common.AccountManager) *RPCRouter {
 	router := &RPCRouter{
-		NodeManager: manager,
+		NodeManager:    manager,
+		accountManager: acct,
 	}
 
 	return router
 }
 
+// Account returns the associated common.AccountManager suited for the
+// giving rpc router.
+func (rp *RPCRouter) Account() common.AccountManager {
+	return rp.accountManager
+}
+
 // Exec takes the giving RPCCall and caller to be executed against the appropriate caller.
 // To accommodate the
 func (rp *RPCRouter) Exec(req common.RPCCall, caller otto.FunctionCall) (*otto.Object, error) {
+	config, err := rp.NodeManager.NodeConfig()
+	if err != nil {
+		return nil, err
+	}
+
 	switch req.Method {
 	case transactions.SendTransactionName:
+		if config.UpstreamConfig.Enabled {
+			return transactions.ExecuteRemoteSendTransaction(rp, req, caller)
+		}
+
 		return transactions.ExecuteSendTransaction(rp.NodeManager, req, caller)
 	default:
 		return transactions.ExecuteOtherTransaction(rp, req, caller)
