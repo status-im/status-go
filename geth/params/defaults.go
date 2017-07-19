@@ -17,6 +17,10 @@ const (
 	// IPCFile is filename of exposed IPC RPC Server
 	IPCFile = "geth.ipc"
 
+	// RPCEnabledDefault is the default state of whether the http rpc server is supposed
+	// to be started along with a node.
+	RPCEnabledDefault = false
+
 	// HTTPHost is host interface for the HTTP RPC server
 	HTTPHost = "localhost"
 
@@ -46,7 +50,11 @@ const (
 	DefaultFileDescriptorLimit = uint64(2048)
 
 	// DatabaseCache is memory (in MBs) allocated to internal caching (min 16MB / database forced)
-	DatabaseCache = 128
+	DatabaseCache = 16
+
+	// CHTRootConfigURL defines URL to file containing hard-coded CHT roots
+	// TODO remove this hack, once CHT sync is implemented on LES side
+	CHTRootConfigURL = "https://gist.githubusercontent.com/farazdagi/a8d36e2818b3b2b6074d691da63a0c36/raw/"
 
 	// BootClusterConfigURL defines URL to file containing hard-coded CHT roots and boot nodes
 	// TODO remove this hack, once CHT sync is implemented on LES side
@@ -57,6 +65,10 @@ const (
 
 	// LogLevel defines the minimum log level to report
 	LogLevel = "INFO"
+
+	// LogLevelSuccinct defines the log level when only errors are reported.
+	// Useful when the default INFO level becomes too verbose.
+	LogLevelSuccinct = "ERROR"
 
 	// LogToStderr defines whether logged info should also be output to os.Stderr
 	LogToStderr = true
@@ -87,6 +99,7 @@ const (
 )
 
 var (
-	RopstenNetGenesisHash = common.HexToHash("0x41941023680923e0fe4d74a34bdac8141f2540e3ae90623718e47d66d1ca4a2d") // Testnet genesis hash to enforce below configs on
-	MainNetGenesisHash    = common.HexToHash("0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3") // Mainnet genesis hash to enforce below configs on
+	RopstenNetGenesisHash = common.HexToHash("0x41941023680923e0fe4d74a34bdac8141f2540e3ae90623718e47d66d1ca4a2d")
+	RinkebyNetGenesisHash = common.HexToHash("0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177")
+	MainNetGenesisHash    = common.HexToHash("0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3")
 )

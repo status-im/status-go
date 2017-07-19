@@ -3,6 +3,7 @@ package status
 import (
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
@@ -106,13 +107,18 @@ func (q *TxQueue) Stop() {
 
 // evictionLoop frees up queue to accommodate another transaction item
 func (q *TxQueue) evictionLoop() {
+	evict := func() {
+		if len(q.transactions) >= DefaultTxQueueCap { // eviction is required to accommodate another/last item
+			q.Remove(<-q.evictableIDs)
+		}
+	}
+
 	for {
 		select {
-		case <-q.enqueueTicker:
-			if len(q.transactions) >= (DefaultTxQueueCap - 1) { // eviction is required to accommodate another/last item
-				q.Remove(<-q.evictableIDs)
-				q.enqueueTicker <- struct{}{} // in case we pulled already removed item
-			}
+		case <-time.After(250 * time.Millisecond): // do not wait for manual ticks, check queue regularly
+			evict()
+		case <-q.enqueueTicker: // when manually requested
+			evict()
 		case <-q.stopped:
 			log.Info("StatusIM: transaction queue's eviction loop stopped")
 			q.stoppedGroup.Done()
@@ -127,8 +133,9 @@ func (q *TxQueue) enqueueLoop() {
 	for {
 		select {
 		case queuedTx := <-q.incomingPool:
-			log.Info("StatusIM: transaction enqueued", "tx", queuedTx.ID)
+			log.Info("StatusIM: transaction enqueued requested", "tx", queuedTx.ID)
 			q.Enqueue(queuedTx)
+			log.Info("StatusIM: transaction enqueued", "tx", queuedTx.ID)
 		case <-q.stopped:
 			log.Info("StatusIM: transaction queue's enqueue loop stopped")
 			q.stoppedGroup.Done()

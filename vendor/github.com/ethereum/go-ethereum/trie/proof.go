@@ -96,6 +96,7 @@ func VerifyProof(rootHash common.Hash, key []byte, proof []rlp.RawValue) (value 
 		sha.Reset()
 		sha.Write(buf)
 		if !bytes.Equal(sha.Sum(nil), wantHash) {
+			log.Error("Invalid CHT Proof", "hash", common.ToHex(sha.Sum(nil)), "node", i)
 			return nil, fmt.Errorf("bad proof node %d: hash mismatch", i)
 		}
 		n, err := decodeNode(wantHash, buf, 0)

@@ -2,7 +2,7 @@ package jail
 
 import (
 	"github.com/robertkrimen/otto"
-	"github.com/status-im/status-go/geth"
+	"github.com/status-im/status-go/geth/node"
 )
 
 // signals
@@ -14,7 +14,7 @@ const (
 
 // registerHandlers augments and transforms a given jail cell's underlying VM,
 // by adding and replacing method handlers.
-func registerHandlers(jail *Jail, vm *otto.Otto, chatID string) (err error) {
+func registerHandlers(jail *Jail, vm *otto.Otto, chatID string) error {
 	jeth, err := vm.Get("jeth")
 	if err != nil {
 		return err
@@ -38,16 +38,16 @@ func registerHandlers(jail *Jail, vm *otto.Otto, chatID string) (err error) {
 
 	// define localStorage
 	if err = vm.Set("localStorage", struct{}{}); err != nil {
-		return
+		return err
 	}
 
 	// register localStorage.set handler
 	localStorage, err := vm.Get("localStorage")
 	if err != nil {
-		return
+		return err
 	}
 	if err = localStorage.Object().Set("set", makeLocalStorageSetHandler(chatID)); err != nil {
-		return
+		return err
 	}
 
 	// register sendMessage/showSuggestions handlers
@@ -79,7 +79,7 @@ func makeSendHandler(jail *Jail, chatID string) func(call otto.FunctionCall) (re
 // makeJethIsConnectedHandler returns jeth.isConnected() handler
 func makeJethIsConnectedHandler(jail *Jail) func(call otto.FunctionCall) (response otto.Value) {
 	return func(call otto.FunctionCall) otto.Value {
-		client, err := jail.RPCClient()
+		client, err := jail.requestManager.RPCClient()
 		if err != nil {
 			return newErrorResponse(call.Otto, -32603, err.Error(), nil)
 		}
@@ -90,11 +90,17 @@ func makeJethIsConnectedHandler(jail *Jail) func(call otto.FunctionCall) (respon
 		}
 
 		if !netListeningResult {
-			return newErrorResponse(call.Otto, -32603, geth.ErrInvalidGethNode.Error(), nil)
+			return newErrorResponse(call.Otto, -32603, node.ErrNoRunningNode.Error(), nil)
 		}
 
 		return newResultResponse(call.Otto, true)
 	}
+}
+
+// LocalStorageSetEvent is a signal sent whenever local storage Set method is called
+type LocalStorageSetEvent struct {
+	ChatID string `json:"chat_id"`
+	Data   string `json:"data"`
 }
 
 // makeLocalStorageSetHandler returns localStorage.set() handler
@@ -102,9 +108,9 @@ func makeLocalStorageSetHandler(chatID string) func(call otto.FunctionCall) (res
 	return func(call otto.FunctionCall) otto.Value {
 		data := call.Argument(0).String()
 
-		geth.SendSignal(geth.SignalEnvelope{
+		node.SendSignal(node.SignalEnvelope{
 			Type: EventLocalStorageSet,
-			Event: geth.LocalStorageSetEvent{
+			Event: LocalStorageSetEvent{
 				ChatID: chatID,
 				Data:   data,
 			},
@@ -114,13 +120,19 @@ func makeLocalStorageSetHandler(chatID string) func(call otto.FunctionCall) (res
 	}
 }
 
+// SendMessageEvent wraps Jail send signals
+type SendMessageEvent struct {
+	ChatID  string `json:"chat_id"`
+	Message string `json:"message"`
+}
+
 func makeSendMessageHandler(chatID string) func(call otto.FunctionCall) (response otto.Value) {
 	return func(call otto.FunctionCall) otto.Value {
 		message := call.Argument(0).String()
 
-		geth.SendSignal(geth.SignalEnvelope{
+		node.SendSignal(node.SignalEnvelope{
 			Type: EventSendMessage,
-			Event: geth.SendMessageEvent{
+			Event: SendMessageEvent{
 				ChatID:  chatID,
 				Message: message,
 			},
@@ -130,13 +142,19 @@ func makeSendMessageHandler(chatID string) func(call otto.FunctionCall) (respons
 	}
 }
 
+// ShowSuggestionsEvent wraps Jail show suggestion signals
+type ShowSuggestionsEvent struct {
+	ChatID string `json:"chat_id"`
+	Markup string `json:"markup"`
+}
+
 func makeShowSuggestionsHandler(chatID string) func(call otto.FunctionCall) (response otto.Value) {
 	return func(call otto.FunctionCall) otto.Value {
 		suggestionsMarkup := call.Argument(0).String()
 
-		geth.SendSignal(geth.SignalEnvelope{
+		node.SendSignal(node.SignalEnvelope{
 			Type: EventShowSuggestions,
-			Event: geth.ShowSuggestionsEvent{
+			Event: ShowSuggestionsEvent{
 				ChatID: chatID,
 				Markup: suggestionsMarkup,
 			},

@@ -7,566 +7,307 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"errors"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
-	"github.com/status-im/status-go/geth"
+	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/jail"
+	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
+	. "github.com/status-im/status-go/geth/testing"
+	"github.com/status-im/status-go/static"
+	"github.com/stretchr/testify/suite"
 )
 
 const (
-	whisperMessage1  = `test message 1 (K1 -> K2, signed+encrypted, from us)`
-	whisperMessage2  = `test message 2 (K1 -> K1, signed+encrypted to ourselves)`
-	whisperMessage3  = `test message 3 (K1 -> "", signed broadcast)`
-	whisperMessage4  = `test message 4 ("" -> "", anon broadcast)`
-	whisperMessage5  = `test message 5 ("" -> K1, encrypted anon broadcast)`
-	whisperMessage6  = `test message 6 (K2 -> K1, signed+encrypted, to us)`
-	testChatID       = "testChat"
-	statusJSFilePath = "testdata/status.js"
-	txSendFolder     = "testdata/tx-send/"
+	testChatID = "testChat"
 )
 
-var testConfig *geth.TestConfig
+var baseStatusJSCode = string(static.MustAsset("testdata/jail/status.js"))
 
-func TestMain(m *testing.M) {
-	// load shared test configuration
-	var err error
-	testConfig, err = geth.LoadTestConfig()
-	if err != nil {
-		panic(err)
-	}
-
-	// run tests
-	retCode := m.Run()
-
-	//time.Sleep(25 * time.Second) // to give some time to propagate txs to the rest of the network
-	os.Exit(retCode)
+func TestJailTestSuite(t *testing.T) {
+	suite.Run(t, new(JailTestSuite))
 }
 
-func TestJailUnInited(t *testing.T) {
+type JailTestSuite struct {
+	BaseTestSuite
+	jail *jail.Jail
+}
+
+func (s *JailTestSuite) SetupTest() {
+	s.NodeManager = node.NewNodeManager()
+	s.Require().NotNil(s.NodeManager)
+	s.Require().IsType(&node.NodeManager{}, s.NodeManager)
+	s.jail = jail.New(s.NodeManager)
+	s.Require().NotNil(s.jail)
+	s.Require().IsType(&jail.Jail{}, s.jail)
+}
+
+func (s *JailTestSuite) TestInit() {
+	require := s.Require()
+	require.NotNil(s.jail)
+
 	errorWrapper := func(err error) string {
 		return `{"error":"` + err.Error() + `"}`
 	}
 
-	expectedError := errorWrapper(jail.ErrInvalidJail)
+	// get cell VM w/o defining cell first
+	vm, err := s.jail.JailCellVM(testChatID)
+	require.EqualError(err, "cell[testChat] doesn't exist")
+	require.Nil(vm)
 
-	var jailInstance *jail.Jail
-	response := jailInstance.Parse(testChatID, ``)
-	if response != expectedError {
-		t.Errorf("error expected, but got: %v", response)
-	}
+	// create VM (w/o properly initializing base JS script)
+	err = errors.New("ReferenceError: '_status_catalog' is not defined")
+	require.Equal(errorWrapper(err), s.jail.Parse(testChatID, ``))
+	err = errors.New("ReferenceError: 'call' is not defined")
+	require.Equal(errorWrapper(err), s.jail.Call(testChatID, `["commands", "testCommand"]`, `{"val": 12}`))
 
-	response = jailInstance.Call(testChatID, `["commands", "testCommand"]`, `{"val": 12}`)
-	if response != expectedError {
-		t.Errorf("error expected, but got: %v", response)
-	}
+	// get existing cell (even though we got errors, cell was still created)
+	vm, err = s.jail.JailCellVM(testChatID)
+	require.NoError(err)
+	require.NotNil(vm)
 
-	_, err := jailInstance.GetVM(testChatID)
-	if err != jail.ErrInvalidJail {
-		t.Errorf("error expected, but got: %v", err)
-	}
-
-	_, err = jailInstance.RPCClient()
-	if err != jail.ErrInvalidJail {
-		t.Errorf("error expected, but got: %v", err)
-	}
-
-	// now make sure that if Init is called, then Parse doesn't produce any error
-	jailInstance = jail.Init(``)
-	if jailInstance == nil {
-		t.Error("jail instance shouldn't be nil at this point")
-		return
-	}
-	statusJS := geth.LoadFromFile(statusJSFilePath) + `;
+	statusJS := baseStatusJSCode + `;
 	_status_catalog.commands["testCommand"] = function (params) {
 		return params.val * params.val;
 	};`
-	response = jailInstance.Parse(testChatID, statusJS)
+	s.jail.BaseJS(statusJS)
+
+	// now no error should occur
+	response := s.jail.Parse(testChatID, ``)
 	expectedResponse := `{"result": {"commands":{},"responses":{}}}`
-	if response != expectedResponse {
-		t.Errorf("unexpected response received: %v", response)
-	}
+	require.Equal(expectedResponse, response)
 
-	// however, we still expect issue voiced if somebody tries to execute code with Call
-	response = jailInstance.Call(testChatID, `["commands", "testCommand"]`, `{"val": 12}`)
-	if response != errorWrapper(geth.ErrInvalidGethNode) {
-		t.Errorf("error expected, but got: %v", response)
-	}
-
-	// make sure that Call() succeeds when node is started
-	err = geth.PrepareTestNode()
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	response = jailInstance.Call(testChatID, `["commands", "testCommand"]`, `{"val": 12}`)
+	// make sure that Call succeeds even w/o running node
+	response = s.jail.Call(testChatID, `["commands", "testCommand"]`, `{"val": 12}`)
 	expectedResponse = `{"result": 144}`
-	if response != expectedResponse {
-		t.Errorf("expected response is not returned: expected %s, got %s", expectedResponse, response)
-		return
-	}
+	require.Equal(expectedResponse, response)
 }
 
-func TestJailInitAndParse(t *testing.T) {
-	err := geth.PrepareTestNode()
-	if err != nil {
-		t.Error(err)
-		return
-	}
-
-	initInvalidCode := `
-	var _status_catalog = {
-		foo: 'bar'
-	`
-	jailInstance := jail.Init(initInvalidCode)
-	response := jailInstance.Parse("newChat", ``)
-	expectedResponse := `{"error":"(anonymous): Line 4:3 Unexpected end of input (and 3 more errors)"}`
-	if expectedResponse != response {
-		t.Errorf("unexpected response, expected: %v, got: %v", expectedResponse, response)
-		return
-	}
-
-	initCode := `
-	var _status_catalog = {
-		foo: 'bar'
-	};
-	`
-	jailInstance = jail.Init(initCode)
-
-	extraInvalidCode := `
-	var extraFunc = function (x) {
-	  return x * x;
-	`
-	response = jailInstance.Parse("newChat", extraInvalidCode)
-	expectedResponse = `{"error":"(anonymous): Line 16331:50 Unexpected end of input (and 1 more errors)"}`
-	if expectedResponse != response {
-		t.Errorf("unexpected response, expected: %v, got: %v", expectedResponse, response)
-		return
-	}
+func (s *JailTestSuite) TestParse() {
+	require := s.Require()
+	require.NotNil(s.jail)
 
 	extraCode := `
-	var extraFunc = function (x) {
-	  return x * x;
+	var _status_catalog = {
+		foo: 'bar'
 	};
 	`
-	response = jailInstance.Parse("newChat", extraCode)
-	expectedResponse = `{"result": {"foo":"bar"}}`
-	if expectedResponse != response {
-		t.Errorf("unexpected response, expected: %v, got: %v", expectedResponse, response)
-		return
-	}
+	response := s.jail.Parse("newChat", extraCode)
+	expectedResponse := `{"result": {"foo":"bar"}}`
+	require.Equal(expectedResponse, response)
 }
 
-func TestJailFunctionCall(t *testing.T) {
-	err := geth.PrepareTestNode()
-	if err != nil {
-		t.Error(err)
-		return
-	}
-
-	jailInstance := jail.Init("")
+func (s *JailTestSuite) TestFunctionCall() {
+	require := s.Require()
+	require.NotNil(s.jail)
 
 	// load Status JS and add test command to it
-	statusJS := geth.LoadFromFile(statusJSFilePath) + `;
+	statusJS := baseStatusJSCode + `;
 	_status_catalog.commands["testCommand"] = function (params) {
 		return params.val * params.val;
 	};`
-	jailInstance.Parse(testChatID, statusJS)
+	s.jail.Parse(testChatID, statusJS)
 
 	// call with wrong chat id
-	response := jailInstance.Call("chatIDNonExistent", "", "")
+	response := s.jail.Call("chatIDNonExistent", "", "")
 	expectedError := `{"error":"Cell[chatIDNonExistent] doesn't exist."}`
-	if response != expectedError {
-		t.Errorf("expected error is not returned: expected %s, got %s", expectedError, response)
-		return
-	}
+	require.Equal(expectedError, response)
 
 	// call extraFunc()
-	response = jailInstance.Call(testChatID, `["commands", "testCommand"]`, `{"val": 12}`)
+	response = s.jail.Call(testChatID, `["commands", "testCommand"]`, `{"val": 12}`)
 	expectedResponse := `{"result": 144}`
-	if response != expectedResponse {
-		t.Errorf("expected response is not returned: expected %s, got %s", expectedResponse, response)
-		return
-	}
+	require.Equal(expectedResponse, response)
 }
 
-func TestJailRPCSend(t *testing.T) {
-	err := geth.PrepareTestNode()
-	if err != nil {
-		t.Error(err)
-		return
-	}
+func (s *JailTestSuite) TestJailTimeoutFailure() {
+	require := s.Require()
+	require.NotNil(s.jail)
 
-	jailInstance := jail.Init("")
+	newCell := s.jail.NewJailCell(testChatID)
+	require.NotNil(newCell)
+
+	execr := newCell.Executor()
+
+	// Attempt to run a timeout string against a JailCell.
+	_, err := execr.Exec(`
+		setTimeout(function(n){
+			if(Date.now() - n < 50){
+				throw new Error("Timedout early");
+			}
+
+			return n;
+		}, 30, Date.now());
+	`)
+
+	require.NotNil(err)
+}
+
+func (s *JailTestSuite) TestJailTimeout() {
+	require := s.Require()
+	require.NotNil(s.jail)
+
+	newCell := s.jail.NewJailCell(testChatID)
+	require.NotNil(newCell)
+
+	execr := newCell.Executor()
+
+	// Attempt to run a timeout string against a JailCell.
+	res, err := execr.Exec(`
+		setTimeout(function(n){
+			if(Date.now() - n < 50){
+				throw new Error("Timedout early");
+			}
+
+			return n;
+		}, 50, Date.now());
+	`)
+
+	require.NoError(err)
+	require.NotNil(res)
+}
+
+func (s *JailTestSuite) TestJailFetch() {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("Hello World"))
+	})
+
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	require := s.Require()
+	require.NotNil(s.jail)
+
+	newCell := s.jail.NewJailCell(testChatID)
+	require.NotNil(newCell)
+
+	execr := newCell.Executor()
+
+	wait := make(chan struct{})
+
+	// Attempt to run a fetch resource.
+	_, err := execr.Fetch(server.URL, func(res otto.Value) {
+		go func() { wait <- struct{}{} }()
+	})
+
+	require.NoError(err)
+
+	<-wait
+}
+
+func (s *JailTestSuite) TestJailRPCSend() {
+	require := s.Require()
+	require.NotNil(s.jail)
+
+	s.StartTestNode(params.RopstenNetworkID)
+	defer s.StopTestNode()
 
 	// load Status JS and add test command to it
-	statusJS := geth.LoadFromFile(statusJSFilePath)
-	jailInstance.Parse(testChatID, statusJS)
+	s.jail.BaseJS(baseStatusJSCode)
+	s.jail.Parse(testChatID, ``)
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
-	vm, err := jailInstance.GetVM(testChatID)
-	if err != nil {
-		t.Errorf("cannot get VM: %v", err)
-		return
-	}
+	vm, err := s.jail.JailCellVM(testChatID)
+	require.NoError(err)
+	require.NotNil(vm)
 
 	// internally (since we replaced `web3.send` with `jail.Send`)
 	// all requests to web3 are forwarded to `jail.Send`
 	_, err = vm.Run(`
-	    var balance = web3.eth.getBalance("` + testConfig.Account1.Address + `");
+	    var balance = web3.eth.getBalance("` + TestConfig.Account1.Address + `");
 		var sendResult = web3.fromWei(balance, "ether")
 	`)
-	if err != nil {
-		t.Errorf("cannot run custom code on VM: %v", err)
-		return
-	}
+	require.NoError(err)
 
 	value, err := vm.Get("sendResult")
-	if err != nil {
-		t.Errorf("cannot obtain result of balance check operation: %v", err)
-		return
-	}
+	require.NoError(err, "cannot obtain result of balance check operation")
 
 	balance, err := value.ToFloat()
-	if err != nil {
-		t.Errorf("cannot obtain result of balance check operation: %v", err)
-		return
-	}
+	require.NoError(err)
 
-	if balance < 100 {
-		t.Error("wrong balance (there should be lots of test Ether on that account)")
-		return
-	}
-
-	t.Logf("Balance of %.2f ETH found on '%s' account", balance, testConfig.Account1.Address)
+	s.T().Logf("Balance of %.2f ETH found on '%s' account", balance, TestConfig.Account1.Address)
+	require.False(balance < 100, "wrong balance (there should be lots of test Ether on that account)")
 }
 
-func TestJailSendQueuedTransaction(t *testing.T) {
-	err := geth.PrepareTestNode()
-	if err != nil {
-		t.Error(err)
-		return
-	}
-
-	// log into account from which transactions will be sent
-	if err := geth.SelectAccount(testConfig.Account1.Address, testConfig.Account1.Password); err != nil {
-		t.Errorf("cannot select account: %v", testConfig.Account1.Address)
-		return
-	}
-
-	txParams := `{
-  		"from": "` + testConfig.Account1.Address + `",
-  		"to": "0xf82da7547534045b4e00442bc89e16186cf8c272",
-  		"value": "0.000001"
-	}`
-
-	txCompletedSuccessfully := make(chan struct{})
-	txCompletedCounter := make(chan struct{})
-	txHashes := make(chan common.Hash)
-
-	// replace transaction notification handler
-	requireMessageId := false
-	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var envelope geth.SignalEnvelope
-		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
-			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
-			return
-		}
-		if envelope.Type == geth.EventTransactionQueued {
-			event := envelope.Event.(map[string]interface{})
-			messageId, ok := event["message_id"].(string)
-			if !ok {
-				t.Error("Message id is required, but not found")
-				return
-			}
-			if requireMessageId {
-				if len(messageId) == 0 {
-					t.Error("Message id is required, but not provided")
-					return
-				}
-			} else {
-				if len(messageId) != 0 {
-					t.Error("Message id is not required, but provided")
-					return
-				}
-			}
-			t.Logf("Transaction queued (will be completed shortly): {id: %s}\n", event["id"].(string))
-
-			var txHash common.Hash
-			if txHash, err = geth.CompleteTransaction(event["id"].(string), testConfig.Account1.Password); err != nil {
-				t.Errorf("cannot complete queued transaction[%v]: %v", event["id"], err)
-			} else {
-				t.Logf("Transaction complete: https://testnet.etherscan.io/tx/%s", txHash.Hex())
-			}
-
-			txCompletedSuccessfully <- struct{}{} // so that timeout is aborted
-			txHashes <- txHash
-			txCompletedCounter <- struct{}{}
-		}
-	})
-
-	type testCommand struct {
-		command          string
-		params           string
-		expectedResponse string
-	}
-	type testCase struct {
-		name             string
-		file             string
-		requireMessageId bool
-		commands         []testCommand
-	}
-
-	tests := []testCase{
-		{
-			// no context or message id
-			name:             "Case 1: no message id or context in inited JS",
-			file:             "no-message-id-or-context.js",
-			requireMessageId: false,
-			commands: []testCommand{
-				{
-					`["commands", "send"]`,
-					txParams,
-					`{"result": {"transaction-hash":"TX_HASH"}}`,
-				},
-				{
-					`["commands", "getBalance"]`,
-					`{"address": "` + testConfig.Account1.Address + `"}`,
-					`{"result": {"balance":42}}`,
-				},
-			},
-		},
-		{
-			// context is present in inited JS (but no message id is there)
-			name:             "Case 2: context is present in inited JS (but no message id is there)",
-			file:             "context-no-message-id.js",
-			requireMessageId: false,
-			commands: []testCommand{
-				{
-					`["commands", "send"]`,
-					txParams,
-					`{"result": {"context":{"` + geth.SendTransactionRequest + `":true},"result":{"transaction-hash":"TX_HASH"}}}`,
-				},
-				{
-					`["commands", "getBalance"]`,
-					`{"address": "` + testConfig.Account1.Address + `"}`,
-					`{"result": {"context":{},"result":{"balance":42}}}`, // note empty (but present) context!
-				},
-			},
-		},
-		{
-			// message id is present in inited JS, but no context is there
-			name:             "Case 3: message id is present, context is not present",
-			file:             "message-id-no-context.js",
-			requireMessageId: true,
-			commands: []testCommand{
-				{
-					`["commands", "send"]`,
-					txParams,
-					`{"result": {"transaction-hash":"TX_HASH"}}`,
-				},
-				{
-					`["commands", "getBalance"]`,
-					`{"address": "` + testConfig.Account1.Address + `"}`,
-					`{"result": {"balance":42}}`, // note empty context!
-				},
-			},
-		},
-		{
-			// both message id and context are present in inited JS (this UC is what we normally expect to see)
-			name:             "Case 4: both message id and context are present",
-			file:             "tx-send.js",
-			requireMessageId: true,
-			commands: []testCommand{
-				{
-					`["commands", "send"]`,
-					txParams,
-					`{"result": {"context":{"eth_sendTransaction":true,"message_id":"foobar"},"result":{"transaction-hash":"TX_HASH"}}}`,
-				},
-				{
-					`["commands", "getBalance"]`,
-					`{"address": "` + testConfig.Account1.Address + `"}`,
-					`{"result": {"context":{"message_id":"42"},"result":{"balance":42}}}`, // message id in context, but default one is used!
-				},
-			},
-		},
-	}
-
-	for _, test := range tests {
-		jailInstance := jail.Init(geth.LoadFromFile(txSendFolder + test.file))
-		geth.PanicAfter(60*time.Second, txCompletedSuccessfully, test.name)
-		jailInstance.Parse(testChatID, ``)
-
-		requireMessageId = test.requireMessageId
-
-		for _, command := range test.commands {
-			go func(jail *jail.Jail, test testCase, command testCommand) {
-				t.Logf("->%s: %s", test.name, command.command)
-				response := jail.Call(testChatID, command.command, command.params)
-				var txHash common.Hash
-				if command.command == `["commands", "send"]` {
-					txHash = <-txHashes
-				}
-				expectedResponse := strings.Replace(command.expectedResponse, "TX_HASH", txHash.Hex(), 1)
-				if response != expectedResponse {
-					t.Errorf("expected response is not returned: expected %s, got %s", expectedResponse, response)
-					return
-				}
-			}(jailInstance, test, command)
-		}
-		<-txCompletedCounter
-	}
-}
-
-func TestJailMultipleInitSingletonJail(t *testing.T) {
-	err := geth.PrepareTestNode()
-	if err != nil {
-		t.Error(err)
-		return
-	}
-
-	jailInstance1 := jail.Init("")
-	jailInstance2 := jail.Init("")
-	jailInstance3 := jail.New()
-	jailInstance4 := jail.GetInstance()
-
-	if !reflect.DeepEqual(jailInstance1, jailInstance2) {
-		t.Error("singleton property of jail instance is violated")
-	}
-	if !reflect.DeepEqual(jailInstance2, jailInstance3) {
-		t.Error("singleton property of jail instance is violated")
-	}
-	if !reflect.DeepEqual(jailInstance3, jailInstance4) {
-		t.Error("singleton property of jail instance is violated")
-	}
-}
-
-func TestJailGetVM(t *testing.T) {
-	err := geth.PrepareTestNode()
-	if err != nil {
-		t.Error(err)
-		return
-	}
-
-	jailInstance := jail.Init("")
-
+func (s *JailTestSuite) TestGetJailCellVM() {
 	expectedError := `cell[nonExistentChat] doesn't exist`
-	_, err = jailInstance.GetVM("nonExistentChat")
-	if err == nil || err.Error() != expectedError {
-		t.Error("expected error, but call succeeded")
-	}
+	_, err := s.jail.JailCellVM("nonExistentChat")
+	s.EqualError(err, expectedError)
 
 	// now let's create VM..
-	jailInstance.Parse(testChatID, ``)
+	s.jail.Parse(testChatID, ``)
+
 	// ..and see if VM becomes available
-	_, err = jailInstance.GetVM(testChatID)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	_, err = s.jail.JailCellVM(testChatID)
+	s.NoError(err)
 }
 
-func TestIsConnected(t *testing.T) {
-	err := geth.PrepareTestNode()
-	if err != nil {
-		t.Error(err)
-		return
-	}
+func (s *JailTestSuite) TestIsConnected() {
+	require := s.Require()
+	require.NotNil(s.jail)
 
-	jailInstance := jail.Init("")
-	jailInstance.Parse(testChatID, "")
+	s.StartTestNode(params.RopstenNetworkID)
+	defer s.StopTestNode()
+
+	s.jail.Parse(testChatID, "")
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
-	vm, err := jailInstance.GetVM(testChatID)
-	if err != nil {
-		t.Errorf("cannot get VM: %v", err)
-		return
-	}
+	vm, err := s.jail.JailCellVM(testChatID)
+	require.NoError(err)
 
 	_, err = vm.Run(`
 	    var responseValue = web3.isConnected();
 	    responseValue = JSON.stringify(responseValue);
 	`)
-	if err != nil {
-		t.Errorf("cannot run custom code on VM: %v", err)
-		return
-	}
+	require.NoError(err)
 
 	responseValue, err := vm.Get("responseValue")
-	if err != nil {
-		t.Errorf("cannot obtain result of isConnected(): %v", err)
-		return
-	}
+	require.NoError(err, "cannot obtain result of isConnected()")
 
 	response, err := responseValue.ToString()
-	if err != nil {
-		t.Errorf("cannot parse result: %v", err)
-		return
-	}
+	require.NoError(err, "cannot parse result")
 
 	expectedResponse := `{"jsonrpc":"2.0","result":true}`
-	if !reflect.DeepEqual(response, expectedResponse) {
-		t.Errorf("expected response is not returned: expected %s, got %s", expectedResponse, response)
-		return
-	}
+	require.Equal(expectedResponse, response)
 }
 
-func TestLocalStorageSet(t *testing.T) {
-	err := geth.PrepareTestNode()
-	if err != nil {
-		t.Error(err)
-		return
-	}
+func (s *JailTestSuite) TestLocalStorageSet() {
+	require := s.Require()
+	require.NotNil(s.jail)
 
-	jailInstance := jail.Init("")
-	jailInstance.Parse(testChatID, "")
+	s.jail.Parse(testChatID, "")
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
-	vm, err := jailInstance.GetVM(testChatID)
-	if err != nil {
-		t.Errorf("cannot get VM: %v", err)
-		return
-	}
+	vm, err := s.jail.JailCellVM(testChatID)
+	require.NoError(err)
 
 	testData := "foobar"
 
 	opCompletedSuccessfully := make(chan struct{}, 1)
 
 	// replace transaction notification handler
-	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var envelope geth.SignalEnvelope
-		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
-			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
-			return
-		}
+	node.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+		var envelope node.SignalEnvelope
+		err := json.Unmarshal([]byte(jsonEvent), &envelope)
+		require.NoError(err)
+
 		if envelope.Type == jail.EventLocalStorageSet {
 			event := envelope.Event.(map[string]interface{})
 			chatID, ok := event["chat_id"].(string)
-			if !ok {
-				t.Error("Chat id is required, but not found")
-				return
-			}
-			if chatID != testChatID {
-				t.Errorf("incorrect chat id: expected %q, got: %q", testChatID, chatID)
-				return
-			}
+			require.True(ok, "chat id is required, but not found")
+			require.Equal(testChatID, chatID, "incorrect chat ID")
 
 			actualData, ok := event["data"].(string)
-			if !ok {
-				t.Error("Data field is required, but not found")
-				return
-			}
+			require.True(ok, "data field is required, but not found")
+			require.Equal(testData, actualData, "incorrect data")
 
-			if actualData != testData {
-				t.Errorf("incorrect data: expected %q, got: %q", testData, actualData)
-				return
-			}
-
-			t.Logf("event processed: %s", jsonEvent)
-			opCompletedSuccessfully <- struct{}{} // so that timeout is aborted
+			s.T().Logf("event processed: %s", jsonEvent)
+			close(opCompletedSuccessfully)
 		}
 	})
 
@@ -574,556 +315,27 @@ func TestLocalStorageSet(t *testing.T) {
 	    var responseValue = localStorage.set("` + testData + `");
 	    responseValue = JSON.stringify(responseValue);
 	`)
-	if err != nil {
-		t.Errorf("cannot run custom code on VM: %v", err)
-		return
-	}
+	s.NoError(err)
 
 	// make sure that signal is sent (and its parameters are correct)
 	select {
 	case <-opCompletedSuccessfully:
 		// pass
 	case <-time.After(3 * time.Second):
-		t.Error("operation timed out")
+		s.Fail("operation timed out")
 	}
 
 	responseValue, err := vm.Get("responseValue")
-	if err != nil {
-		t.Errorf("cannot obtain result of localStorage.set(): %v", err)
-		return
-	}
+	s.NoError(err, "cannot obtain result of localStorage.set()")
 
 	response, err := responseValue.ToString()
-	if err != nil {
-		t.Errorf("cannot parse result: %v", err)
-		return
-	}
+	s.NoError(err, "cannot parse result")
 
 	expectedResponse := `{"jsonrpc":"2.0","result":true}`
-	if !reflect.DeepEqual(response, expectedResponse) {
-		t.Errorf("expected response is not returned: expected %s, got %s", expectedResponse, response)
-		return
-	}
+	s.Equal(expectedResponse, response)
 }
 
-func TestContractDeployment(t *testing.T) {
-	err := geth.PrepareTestNode()
-	if err != nil {
-		t.Error(err)
-		return
-	}
 
-	jailInstance := makeTestJail()
-	jailInstance.Parse(testChatID, `
-		var txHash = "not_set";
-		_status_catalog['createContract'] = function () {
-			var responseValue = null;
-			var testContract = web3.eth.contract([{"constant":true,"inputs":[{"name":"a","type":"int256"}],"name":"double","outputs":[{"name":"","type":"int256"}],"payable":false,"type":"function"}]);
-			var test = testContract.new(
-			{
-				from: '`+testConfig.Account1.Address+`',
-				data: '0x6060604052341561000c57fe5b5b60a58061001b6000396000f30060606040526000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff1680636ffa1caa14603a575bfe5b3415604157fe5b60556004808035906020019091905050606b565b6040518082815260200191505060405180910390f35b60008160020290505b9190505600a165627a7a72305820ccdadd737e4ac7039963b54cee5e5afb25fa859a275252bdcf06f653155228210029',
-				gas: '`+strconv.Itoa(params.DefaultGas)+`'
-			}, function (e, contract){
-				if (!e) {
-					txHash = contract.transactionHash
-				}
-			})
-		}
-		_status_catalog['getTxHash'] = function () {
-			return txHash;
-		}
-	`)
-
-	// make sure you panic if transaction complete doesn't return
-	completeQueuedTransaction := make(chan struct{}, 1)
-	geth.PanicAfter(30*time.Second, completeQueuedTransaction, "TestContractDeployment")
-
-	// replace transaction notification handler
-	var txHash common.Hash
-	handler, err := geth.MakeTestCompleteTxHandler(t, &txHash, completeQueuedTransaction)
-	if err != nil {
-		t.Fatal(err)
-	}
-	geth.SetDefaultNodeNotificationHandler(handler)
-
-	response := jailInstance.Call(testChatID, `["createContract"]`, `{}`)
-	expectedResponse := `{"result": null}`
-	if response != expectedResponse {
-		t.Errorf("unexpected response, expected: %v, got: %v", expectedResponse, response)
-		return
-	}
-
-	<-completeQueuedTransaction
-
-	response = jailInstance.Call(testChatID, `["getTxHash"]`, `{}`)
-	expectedResponse = `{"result": "` + txHash.Hex() + `"}`
-	if response != expectedResponse {
-		t.Errorf("unexpected response, expected: %v, got: %v", expectedResponse, response)
-		return
-	}
-}
-
-func TestGasEstimation(t *testing.T) {
-	err := geth.PrepareTestNode()
-	if err != nil {
-		t.Error(err)
-		return
-	}
-
-	jailInstance := makeTestJail()
-	jailInstance.Parse(testChatID, `
-		var txHash = "not_set";
-		_status_catalog['createContractWithGasEstimated'] = function () {
-			var responseValue = null;
-			var testContract = web3.eth.contract([{"constant":true,"inputs":[{"name":"a","type":"int256"}],"name":"double","outputs":[{"name":"","type":"int256"}],"payable":false,"type":"function"}]);
-			var test = testContract.new(
-			{
-				from: '`+testConfig.Account1.Address+`',
-				data: '0x6060604052341561000c57fe5b5b60a58061001b6000396000f30060606040526000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff1680636ffa1caa14603a575bfe5b3415604157fe5b60556004808035906020019091905050606b565b6040518082815260200191505060405180910390f35b60008160020290505b9190505600a165627a7a72305820ccdadd737e4ac7039963b54cee5e5afb25fa859a275252bdcf06f653155228210029',
-			}, function (e, contract){
-				if (!e) {
-					txHash = contract.transactionHash
-				}
-			})
-		};
-
-		_status_catalog['getTxHash'] = function () {
-			return txHash;
-		}
-	`)
-
-	// make sure you panic if transaction complete doesn't return
-	completeQueuedTransaction := make(chan struct{}, 1)
-	geth.PanicAfter(30*time.Second, completeQueuedTransaction, "TestContractDeployment")
-
-	// replace transaction notification handler
-	var txHash common.Hash
-	handler, err := geth.MakeTestCompleteTxHandler(t, &txHash, completeQueuedTransaction)
-	if err != nil {
-		t.Fatal(err)
-	}
-	geth.SetDefaultNodeNotificationHandler(handler)
-
-	response := jailInstance.Call(testChatID, `["createContractWithGasEstimated"]`, `{}`)
-	expectedResponse := `{"result": null}`
-	if response != expectedResponse {
-		t.Errorf("unexpected response, expected: %v, got: %v", expectedResponse, response)
-		return
-	}
-
-	<-completeQueuedTransaction
-
-	response = jailInstance.Call(testChatID, `["getTxHash"]`, `{}`)
-	expectedResponse = `{"result": "` + txHash.Hex() + `"}`
-	if response != expectedResponse {
-		t.Errorf("unexpected response, expected: %v, got: %v", expectedResponse, response)
-		return
-	}
-}
-
-func TestJailWhisper(t *testing.T) {
-	err := geth.PrepareTestNode()
-	if err != nil {
-		t.Error(err)
-		return
-	}
-
-	whisperService, err := geth.NodeManagerInstance().WhisperService()
-	if err != nil {
-		t.Errorf("whisper service not running: %v", err)
-	}
-	whisperAPI := whisper.NewPublicWhisperAPI(whisperService)
-
-	// account1
-	_, accountKey1, err := geth.AddressToDecryptedAccount(testConfig.Account1.Address, testConfig.Account1.Password)
-	if err != nil {
-		t.Fatal(err)
-	}
-	accountKey1Hex := common.ToHex(crypto.FromECDSAPub(&accountKey1.PrivateKey.PublicKey))
-
-	if _, err := whisperService.AddKeyPair(accountKey1.PrivateKey); err != nil {
-		t.Fatalf("identity not injected: %v", accountKey1Hex)
-	}
-	if ok, err := whisperAPI.HasKeyPair(accountKey1Hex); err != nil || !ok {
-		t.Fatalf("identity not injected: %v", accountKey1Hex)
-	}
-
-	// account2
-	_, accountKey2, err := geth.AddressToDecryptedAccount(testConfig.Account2.Address, testConfig.Account2.Password)
-	if err != nil {
-		t.Fatal(err)
-	}
-	accountKey2Hex := common.ToHex(crypto.FromECDSAPub(&accountKey2.PrivateKey.PublicKey))
-
-	if _, err := whisperService.AddKeyPair(accountKey2.PrivateKey); err != nil {
-		t.Fatalf("identity not injected: %v", accountKey2Hex)
-	}
-	if ok, err := whisperAPI.HasKeyPair(accountKey2Hex); err != nil || !ok {
-		t.Fatalf("identity not injected: %v", accountKey2Hex)
-	}
-
-	passedTests := map[string]bool{
-		whisperMessage1: false,
-		whisperMessage2: false,
-		whisperMessage3: false,
-		whisperMessage4: false,
-		whisperMessage5: false,
-		whisperMessage6: false,
-	}
-	installedFilters := map[string]string{
-		whisperMessage1: "",
-		whisperMessage2: "",
-		whisperMessage3: "",
-		whisperMessage4: "",
-		whisperMessage5: "",
-		whisperMessage6: "",
-	}
-
-	jailInstance := jail.Init("")
-
-	testCases := []struct {
-		name      string
-		testCode  string
-		useFilter bool
-	}{
-		{
-			"test 0: ensure correct version of Whisper is used",
-			`
-				var expectedVersion = '0x5';
-				if (web3.version.whisper != expectedVersion) {
-					throw 'unexpected shh version, expected: ' + expectedVersion + ', got: ' + web3.version.whisper;
-				}
-			`,
-			false,
-		},
-		{
-			"test 1: encrypted signed message from us (From != nil && To != nil)",
-			`
-				var identity1 = '` + accountKey1Hex + `';
-				if (!web3.shh.hasKeyPair(identity1)) {
-					throw 'idenitity "` + accountKey1Hex + `" not found in whisper';
-				}
-
-				var identity2 = '` + accountKey2Hex + `';
-				if (!web3.shh.hasKeyPair(identity2)) {
-					throw 'idenitity "` + accountKey2Hex + `" not found in whisper';
-				}
-
-				var topic = makeTopic();
-				var payload = '` + whisperMessage1 + `';
-
-				// start watching for messages
-				var filter = shh.filter({
-					type: "asym",
-					sig: identity1,
-					key: identity2,
-					topics: [topic]
-				});
-				console.log(JSON.stringify(filter));
-
-				// post message
-				var message = {
-					type: "asym",
-					sig: identity1,
-					key: identity2,
-					topic: topic,
-					payload: payload,
-					ttl: 20,
-				};
-				var err = shh.post(message)
-				if (err !== null) {
-					throw 'message not sent: ' + message;
-				}
-
-				var filterName = '` + whisperMessage1 + `';
-				var filterId = filter.filterId;
-				if (!filterId) {
-					throw 'filter not installed properly';
-				}
-			`,
-			true,
-		},
-		{
-			"test 2: encrypted signed message to yourself (From != nil && To != nil)",
-			`
-				var identity = '` + accountKey1Hex + `';
-				if (!web3.shh.hasKeyPair(identity)) {
-					throw 'idenitity "` + accountKey1Hex + `" not found in whisper';
-				}
-
-				var topic = makeTopic();
-				var payload = '` + whisperMessage2 + `';
-
-				// start watching for messages
-				var filter = shh.filter({
-					type: "asym",
-					sig: identity,
-					key: identity,
-					topics: [topic],
-				});
-
-				// post message
-				var message = {
-					type: "asym",
-				  	sig: identity,
-				  	key: identity,
-				  	topic: topic,
-				  	payload: payload,
-				  	ttl: 20,
-				};
-				var err = shh.post(message)
-				if (err !== null) {
-					throw 'message not sent: ' + message;
-				}
-
-				var filterName = '` + whisperMessage2 + `';
-				var filterId = filter.filterId;
-				if (!filterId) {
-					throw 'filter not installed properly';
-				}
-			`,
-			true,
-		},
-		{
-			"test 3: signed (known sender) broadcast (From != nil && To == nil)",
-			`
-				var identity = '` + accountKey1Hex + `';
-				if (!web3.shh.hasKeyPair(identity)) {
-					throw 'idenitity "` + accountKey1Hex + `" not found in whisper';
-				}
-
-				var topic = makeTopic();
-				var payload = '` + whisperMessage3 + `';
-
-				// generate symmetric key
-				var keyid = shh.generateSymmetricKey();
-				if (!shh.hasSymmetricKey(keyid)) {
-					throw new Error('key not found');
-				}
-
-				// start watching for messages
-				var filter = shh.filter({
-					type: "sym",
-					sig: identity,
-					topics: [topic],
-					key: keyid
-				});
-
-				// post message
-				var message = {
-					type: "sym",
-					sig: identity,
-					topic: topic,
-					payload: payload,
-					ttl: 20,
-					key: keyid
-				};
-				var err = shh.post(message)
-				if (err !== null) {
-					throw 'message not sent: ' + message;
-				}
-
-				var filterName = '` + whisperMessage3 + `';
-				var filterId = filter.filterId;
-				if (!filterId) {
-					throw 'filter not installed properly';
-				}
-			`,
-			true,
-		},
-		{
-			"test 4: anonymous broadcast (From == nil && To == nil)",
-			`
-				var topic = makeTopic();
-				var payload = '` + whisperMessage4 + `';
-
-				// generate symmetric key
-				var keyid = shh.generateSymmetricKey();
-				if (!shh.hasSymmetricKey(keyid)) {
-					throw new Error('key not found');
-				}
-
-				// start watching for messages
-				var filter = shh.filter({
-					type: "sym",
-					topics: [topic],
-					key: keyid
-				});
-
-				// post message
-				var message = {
-					type: "sym",
-					topic: topic,
-					payload: payload,
-					ttl: 20,
-					key: keyid
-				};
-				var err = shh.post(message)
-				if (err !== null) {
-					throw 'message not sent: ' + err;
-				}
-
-				var filterName = '` + whisperMessage4 + `';
-				var filterId = filter.filterId;
-				if (!filterId) {
-					throw 'filter not installed properly';
-				}
-			`,
-			true,
-		},
-		{
-			"test 5: encrypted anonymous message (From == nil && To != nil)",
-			`
-				var identity = '` + accountKey2Hex + `';
-				if (!web3.shh.hasKeyPair(identity)) {
-					throw 'idenitity "` + accountKey2Hex + `" not found in whisper';
-				}
-
-				var topic = makeTopic();
-				var payload = '` + whisperMessage5 + `';
-
-				// start watching for messages
-				var filter = shh.filter({
-					type: "asym",
-					key: identity,
-					topics: [topic],
-				});
-
-				// post message
-				var message = {
-					type: "asym",
-					key: identity,
-					topic: topic,
-					payload: payload,
-					ttl: 20
-				};
-				var err = shh.post(message)
-				if (err !== null) {
-					throw 'message not sent: ' + message;
-				}
-
-				var filterName = '` + whisperMessage5 + `';
-				var filterId = filter.filterId;
-				if (!filterId) {
-					throw 'filter not installed properly';
-				}
-			`,
-			true,
-		},
-		{
-			"test 6: encrypted signed response to us (From != nil && To != nil)",
-			`
-				var identity1 = '` + accountKey1Hex + `';
-				if (!web3.shh.hasKeyPair(identity1)) {
-					throw 'idenitity "` + accountKey1Hex + `" not found in whisper';
-				}
-
-				var identity2 = '` + accountKey2Hex + `';
-				if (!web3.shh.hasKeyPair(identity2)) {
-					throw 'idenitity "` + accountKey2Hex + `" not found in whisper';
-				}
-
-				var topic = makeTopic();
-				var payload = '` + whisperMessage6 + `';
-
-				// start watching for messages
-				var filter = shh.filter({
-					type: "asym",
-					sig: identity2,
-					key: identity1,
-					topics: [topic]
-				});
-
-				// post message
-				var message = {
-					type: "asym",
-				  	sig: identity2,
-				  	key: identity1,
-				  	topic: topic,
-				  	payload: payload,
-				  	ttl: 20
-				};
-				var err = shh.post(message)
-				if (err !== null) {
-					throw 'message not sent: ' + message;
-				}
-
-				var filterName = '` + whisperMessage6 + `';
-				var filterId = filter.filterId;
-				if (!filterId) {
-					throw 'filter not installed properly';
-				}
-			`,
-			true,
-		},
-	}
-
-	for _, testCase := range testCases {
-		t.Log(testCase.name)
-		testCaseKey := crypto.Keccak256Hash([]byte(testCase.name)).Hex()
-		jailInstance.Parse(testCaseKey, `
-			var shh = web3.shh;
-			var makeTopic = function () {
-				var min = 1;
-				var max = Math.pow(16, 8);
-				var randInt = Math.floor(Math.random() * (max - min + 1)) + min;
-				return web3.toHex(randInt);
-			};
-		`)
-		vm, err := jailInstance.GetVM(testCaseKey)
-		if err != nil {
-			t.Errorf("cannot get VM: %v", err)
-			return
-		}
-
-		// post messages
-		if _, err := vm.Run(testCase.testCode); err != nil {
-			t.Error(err)
-			return
-		}
-
-		if !testCase.useFilter {
-			continue
-		}
-
-		// update installed filters
-		filterId, err := vm.Get("filterId")
-		if err != nil {
-			t.Errorf("cannot get filterId: %v", err)
-			return
-		}
-		filterName, err := vm.Get("filterName")
-		if err != nil {
-			t.Errorf("cannot get filterName: %v", err)
-			return
-		}
-
-		if _, ok := installedFilters[filterName.String()]; !ok {
-			t.Fatal("unrecognized filter")
-		}
-
-		installedFilters[filterName.String()] = filterId.String()
-	}
-
-	time.Sleep(2 * time.Second) // allow whisper to poll
-
-	for testKey, filter := range installedFilters {
-		if filter != "" {
-			t.Logf("filter found: %v", filter)
-			for _, message := range whisperAPI.GetNewSubscriptionMessages(filter) {
-				t.Logf("message found: %s", common.FromHex(message.Payload))
-				passedTests[testKey] = true
-			}
-		}
-	}
-
-	for testName, passedTest := range passedTests {
-		if !passedTest {
-			t.Fatalf("test not passed: %v", testName)
-		}
-	}
-}
 
 func makeTestJail() *jail.Jail {
 	return jail.Init(`

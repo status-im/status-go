@@ -11,8 +11,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/core"
 	gethparams "github.com/ethereum/go-ethereum/params"
-	"github.com/status-im/status-go/geth"
 	"github.com/status-im/status-go/geth/params"
+	. "github.com/status-im/status-go/geth/testing"
 )
 
 var loadConfigTestCases = []struct {
@@ -29,6 +29,7 @@ var loadConfigTestCases = []struct {
 			"WSPort": 8546,
 			"IPCEnabled": true,
 			"WSEnabled": false,
+			"RPCEnabled": false,
 			"LightEthConfig": {
 				"DatabaseCache": 64
 			}
@@ -134,6 +135,7 @@ var loadConfigTestCases = []struct {
 			"WSPort": 4242,
 			"IPCEnabled": true,
 			"WSEnabled": false,
+			"RPCEnabled": true,
 			"LightEthConfig": {
 				"DatabaseCache": 64
 			}
@@ -157,6 +159,10 @@ var loadConfigTestCases = []struct {
 
 			if nodeConfig.HTTPHost != params.HTTPHost {
 				t.Fatal("wrong HTTPHost")
+			}
+
+			if !nodeConfig.RPCEnabled {
+				t.Fatal("Wrong RPCEnabled flag")
 			}
 
 			if nodeConfig.WSPort != 4242 {
@@ -303,11 +309,13 @@ var loadConfigTestCases = []struct {
 			"DataDir": "$TMPDIR"
 		}`,
 		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
+			// Bootnodes for dev and prod modes are the same so no need for a separate Ropsten Prod test.
+
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			if nodeConfig.BootClusterConfig.Enabled != true {
+			if !nodeConfig.BootClusterConfig.Enabled {
 				t.Fatal("boot cluster is expected to be enabled by default")
 			}
 
@@ -363,7 +371,7 @@ var loadConfigTestCases = []struct {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			if nodeConfig.BootClusterConfig.Enabled != false {
+			if nodeConfig.BootClusterConfig.Enabled {
 				t.Fatal("boot cluster is expected to be disabled")
 			}
 
@@ -605,11 +613,11 @@ var loadConfigTestCases = []struct {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			if nodeConfig.DevMode != true {
+			if !nodeConfig.DevMode {
 				t.Fatalf("unexpected dev mode: expected: %v, got: %v", true, nodeConfig.DevMode)
 			}
 
-			if nodeConfig.BootClusterConfig.Enabled != true {
+			if !nodeConfig.BootClusterConfig.Enabled {
 				t.Fatal("expected boot cluster to be enabled")
 			}
 		},
@@ -626,11 +634,11 @@ var loadConfigTestCases = []struct {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			if nodeConfig.DevMode != false {
+			if nodeConfig.DevMode {
 				t.Fatalf("unexpected dev mode: expected: %v, got: %v", false, nodeConfig.DevMode)
 			}
 
-			if nodeConfig.BootClusterConfig.Enabled != true {
+			if !nodeConfig.BootClusterConfig.Enabled {
 				t.Fatal("expected boot cluster to be enabled")
 			}
 		},
@@ -681,7 +689,7 @@ func TestConfigWriteRead(t *testing.T) {
 			t.Fatalf("cannot read configuration from disk: %v", err)
 		}
 
-		refConfigData := geth.LoadFromFile(refFile)
+		refConfigData := LoadFromFile(refFile)
 
 		refConfigData = strings.Replace(refConfigData, "$TMPDIR", nodeConfig.DataDir, -1)
 		refConfigData = strings.Replace(refConfigData, "$VERSION", params.Version, -1)
