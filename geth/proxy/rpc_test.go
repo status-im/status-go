@@ -2,7 +2,6 @@ package proxy_test
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -133,25 +132,7 @@ func (s *RPCRouterTestSuite) TestSendTransaction() {
 	require.NotEmpty(nodeConfig.UpstreamConfig.URL)
 	require.Equal(nodeConfig.UpstreamConfig.URL, params.UpstreamRopstenEthereumNetworkURL)
 
-	rpcService := service{Handler: func(w http.ResponseWriter, r *http.Request) {
-		defer r.Body.Close()
-
-		var req map[string]interface{}
-
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			require.NoError(err)
-			return
-		}
-
-		method, ok := req["method"]
-		require.NotEqual(ok, false)
-		require.IsType((string)(""), method)
-		require.Equal(method, "eth_swapspace")
-
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"jsonrpc": "2.0", "status":200, "result": "3434=done"}`))
-	}}
-
+	rpcService := new(service)
 	httpRPCServer := httptest.NewServer(rpcService)
 
 	nodeConfig.UpstreamConfig.URL = httpRPCServer.URL
@@ -169,6 +150,49 @@ func (s *RPCRouterTestSuite) TestSendTransaction() {
 		break
 	}
 
+	rpcNodeManager, ok := s.NodeManager.(common.RPCNodeManager)
+	require.Equal(ok, true)
+
+	accountManager := rpcNodeManager.Account()
+	require.NotNil(accountManager)
+
+	accountPassword := "fieldMarshal"
+	address, _, _, err := accountManager.CreateAccount(accountPassword)
+	require.NoError(err)
+
+	selectErr := accountManager.SelectAccount(address, accountPassword)
+	require.NoError(selectErr)
+
+	rpcService.Handler = func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+
+		var req map[string]interface{}
+
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			require.NoError(err)
+			return
+		}
+
+		method, ok := req["method"]
+		require.NotEqual(ok, false)
+		require.IsType((string)(""), method)
+		require.Equal(method, "eth_sendRawTransaction")
+
+		params, ok := req["params"].([]interface{})
+		require.NotEqual(ok, false)
+		require.NotNil(params)
+		require.Len(params, 1)
+
+		txBu, ok := params[0].(string)
+		require.NotEqual(ok, false)
+		require.NotNil(txBu)
+
+		//TODO(influx6): Figure a better way to validate it is signed.
+
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"jsonrpc": "2.0", "status":200, "result": "3434=done"}`))
+	}
+
 	defer s.NodeManager.StopNode()
 
 	odFunc := otto.FunctionCall{
@@ -184,14 +208,34 @@ func (s *RPCRouterTestSuite) TestSendTransaction() {
 	request := common.RPCCall{
 		ID:     65454545334343,
 		Method: "eth_sendTransaction",
-		Params: []interface{}{},
+		Params: []interface{}{
+			map[string]interface{}{
+				"from":     address,
+				"to":       "0xe410006cad020e3690c8ba21ed8b0f065dde2453",
+				"value":    "0x2",
+				"nonce":    "0x1",
+				"data":     "Will-power",
+				"gasPrice": "0x4a817c800",
+				"gasLimit": "0x5208",
+				"chainId":  3391,
+			},
+		},
 	}
-
-	rpcNodeManager, ok := s.NodeManager.(common.RPCNodeManager)
-	require.Equal(ok, true)
 
 	res, err := rpcNodeManager.Exec(request, odFunc)
 	require.NoError(err)
 
-	fmt.Printf("Res: %+q\n", res)
+	result, err := res.Get("result")
+	require.NoError(err)
+	require.NotNil(result)
+
+	exported, err := result.Export()
+	require.NoError(err)
+
+	rawJSON, ok := exported.(json.RawMessage)
+	require.Equal(ok, true)
+	require.IsType((json.RawMessage)(nil), rawJSON)
+
+	require.Equal(string(rawJSON), "\"3434=done\"")
+
 }

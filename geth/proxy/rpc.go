@@ -73,11 +73,6 @@ func (rp *RPCRouter) RPCClient() (*rpc.Client, error) {
 		return nil, errors.New("Node Manager is not initialized")
 	}
 
-	//TODO(alex): Should we check if NodeManager is started here as well?
-	// if rp.NodeManager.IsNodeRunning(){
-	// 	return nil, errors.New("NodeManager.Node is not started yet")
-	// }
-
 	if rp.rpclient != nil {
 		return rp.rpclient, nil
 	}

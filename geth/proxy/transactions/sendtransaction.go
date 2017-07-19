@@ -1,6 +1,7 @@
 package transactions
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -42,8 +43,14 @@ func ExecuteRemoteSendTransaction(manager common.RPCNodeManager, req common.RPCC
 		return nil, err
 	}
 
-	rawTx, err := txs.MarshalJSON()
-	if err != nil {
+	// rawTx, err := txs.MarshalJSON()
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	// Attempt to get the hex version of the transaction.
+	var bu bytes.Buffer
+	if err := txs.EncodeRLP(&bu); err != nil {
 		return nil, err
 	}
 
@@ -54,11 +61,13 @@ func ExecuteRemoteSendTransaction(manager common.RPCNodeManager, req common.RPCC
 
 	var result json.RawMessage
 
-	if err := client.Call(&result, "eth_sendRawTransaction", rawTx); err != nil {
+	if err := client.Call(&result, "eth_sendRawTransaction", bu.Bytes()); err != nil {
 		return nil, err
 	}
 
 	resp.Set("result", result)
+	// resp.Set("hash", tx.Hash())
+	// resp.Set("rawTx", bu.String())
 
 	return resp, nil
 }
