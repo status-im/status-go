@@ -54,11 +54,11 @@ const (
 
 	// CHTRootConfigURL defines URL to file containing hard-coded CHT roots
 	// TODO remove this hack, once CHT sync is implemented on LES side
-	CHTRootConfigURL = "https://gist.githubusercontent.com/farazdagi/a8d36e2818b3b2b6074d691da63a0c36/raw/"
+	CHTRootConfigURL = "https://gist.githubusercontent.com/tiabc/83ed515fbb0c0e9d39700a6279072b6a/raw/a8c7b08488fab3c1d9139b18af33da3df823e3ff/cht.json"
 
 	// BootClusterConfigURL defines URL to file containing hard-coded CHT roots and boot nodes
 	// TODO remove this hack, once CHT sync is implemented on LES side
-	BootClusterConfigURL = "https://gist.githubusercontent.com/farazdagi/a8d36e2818b3b2b6074d691da63a0c36/raw/"
+	BootClusterConfigURL = "https://gist.githubusercontent.com/tiabc/83ed515fbb0c0e9d39700a6279072b6a/raw/a8c7b08488fab3c1d9139b18af33da3df823e3ff/cht.json"
 
 	// LogFile defines where to write logs to
 	LogFile = "geth.log"
@@ -96,10 +96,4 @@ const (
 
 	// RinkebyNetworkID is id of a test network (on PoA)
 	RinkebyNetworkID = 4
-)
-
-var (
-	RopstenNetGenesisHash = common.HexToHash("0x41941023680923e0fe4d74a34bdac8141f2540e3ae90623718e47d66d1ca4a2d")
-	RinkebyNetGenesisHash = common.HexToHash("0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177")
-	MainNetGenesisHash    = common.HexToHash("0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3")
 )
