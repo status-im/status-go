@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/robertkrimen/otto"
@@ -184,10 +183,19 @@ func (s *RPCRouterTestSuite) TestSendTransaction() {
 			return
 		}
 
-		fmt.Printf("Px: %#q\n", txReq)
+		payload := ([]byte)(txReq.Payload)
+
+		var bu []interface{}
+		jserr := json.Unmarshal(payload, &bu)
+		require.NoError(jserr)
+
+		buElem, ok := bu[0].(string)
+		require.Equal(ok, true)
+
+		fmt.Printf("Px: %#q\n", buElem)
 
 		var tx types.Transaction
-		decodeErr := rlp.DecodeBytes(gethcommon.CopyBytes(([]byte)(txReq.Payload)), &tx)
+		decodeErr := rlp.DecodeBytes([]byte(buElem), &tx)
 		require.NoError(decodeErr)
 		require.NotNil(tx)
 
