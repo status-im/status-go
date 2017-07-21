@@ -2,7 +2,6 @@ package proxy_test
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -10,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/robertkrimen/otto"
@@ -188,18 +188,22 @@ func (s *RPCRouterTestSuite) TestSendTransaction() {
 		var bu []interface{}
 		jserr := json.Unmarshal(payload, &bu)
 		require.NoError(jserr)
+		require.NotNil(bu)
+		require.Len(bu, 1)
 
 		buElem, ok := bu[0].(string)
 		require.Equal(ok, true)
 
-		fmt.Printf("Px: %#q\n", buElem)
+		decoded, err := hexutil.Decode(buElem)
+		require.NoError(err)
+		require.NotNil(decoded)
 
 		var tx types.Transaction
-		decodeErr := rlp.DecodeBytes([]byte(buElem), &tx)
+		decodeErr := rlp.DecodeBytes(decoded, &tx)
 		require.NoError(decodeErr)
 		require.NotNil(tx)
 
-		fmt.Printf("Px: %#v\n", tx)
+		require.Equal(tx.ChainId().Int64(), int64(nodeConfig.NetworkID))
 
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"jsonrpc": "2.0", "status":200, "result": "3434=done"}`))
