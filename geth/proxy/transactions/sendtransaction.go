@@ -1,7 +1,6 @@
 package transactions
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -11,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/les/status"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/common"
@@ -26,31 +26,33 @@ func ExecuteRemoteSendTransaction(manager common.RPCNodeManager, req common.RPCC
 	resp, _ := call.Otto.Object(`({"jsonrpc":"2.0"})`)
 	resp.Set("id", req.ID)
 
+	config, err := manager.NodeConfig()
+	if err != nil {
+		return nil, err
+	}
+
 	selectedAcct, err := manager.Account().SelectedAccount()
 	if err != nil {
 		return nil, err
 	}
 
+	nonce := uint64(req.ID)
 	toAddr := req.ParseFromAddress()
 	gas := (*big.Int)(req.ParseGas())
 	dataVal := []byte(req.ParseData())
 	priceVal := (*big.Int)(req.ParseValue())
 	gasPrice := (*big.Int)(req.ParseGasPrice())
+	chainID := big.NewInt(int64(config.NetworkID))
 
-	tx := types.NewTransaction(uint64(req.ID), toAddr, priceVal, gas, gasPrice, dataVal)
-	txs, err := types.SignTx(tx, types.HomesteadSigner{}, selectedAcct.AccountKey.PrivateKey)
+	tx := types.NewTransaction(nonce, toAddr, priceVal, gas, gasPrice, dataVal)
+	txs, err := types.SignTx(tx, types.NewEIP155Signer(chainID), selectedAcct.AccountKey.PrivateKey)
 	if err != nil {
 		return nil, err
 	}
 
-	// rawTx, err := txs.MarshalJSON()
-	// if err != nil {
-	// 	return nil, err
-	// }
-
 	// Attempt to get the hex version of the transaction.
-	var bu bytes.Buffer
-	if err := txs.EncodeRLP(&bu); err != nil {
+	txBytes, err := rlp.EncodeToBytes(txs)
+	if err != nil {
 		return nil, err
 	}
 
@@ -60,14 +62,12 @@ func ExecuteRemoteSendTransaction(manager common.RPCNodeManager, req common.RPCC
 	}
 
 	var result json.RawMessage
-
-	if err := client.Call(&result, "eth_sendRawTransaction", bu.Bytes()); err != nil {
+	if err := client.Call(&result, "eth_sendRawTransaction", gethcommon.ToHex(txBytes)); err != nil {
 		return nil, err
 	}
 
 	resp.Set("result", result)
-	// resp.Set("hash", tx.Hash())
-	// resp.Set("rawTx", bu.String())
+	resp.Set("hash", txs.Hash().String())
 
 	return resp, nil
 }

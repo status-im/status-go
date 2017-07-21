@@ -2,6 +2,7 @@ package proxy_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -9,6 +10,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/node"
@@ -17,6 +21,13 @@ import (
 	. "github.com/status-im/status-go/geth/testing"
 	"github.com/stretchr/testify/suite"
 )
+
+type txRequest struct {
+	Method  string          `json:"method"`
+	Version string          `json:"jsonrpc"`
+	ID      int             `json:"id,omitempty"`
+	Payload json.RawMessage `json:"params,omitempty"`
+}
 
 type service struct {
 	Handler http.HandlerFunc
@@ -166,28 +177,21 @@ func (s *RPCRouterTestSuite) TestSendTransaction() {
 	rpcService.Handler = func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
 
-		var req map[string]interface{}
+		var txReq txRequest
 
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if err := json.NewDecoder(r.Body).Decode(&txReq); err != nil {
 			require.NoError(err)
 			return
 		}
 
-		method, ok := req["method"]
-		require.NotEqual(ok, false)
-		require.IsType((string)(""), method)
-		require.Equal(method, "eth_sendRawTransaction")
+		fmt.Printf("Px: %#q\n", txReq)
 
-		params, ok := req["params"].([]interface{})
-		require.NotEqual(ok, false)
-		require.NotNil(params)
-		require.Len(params, 1)
+		var tx types.Transaction
+		decodeErr := rlp.DecodeBytes(gethcommon.CopyBytes(([]byte)(txReq.Payload)), &tx)
+		require.NoError(decodeErr)
+		require.NotNil(tx)
 
-		txBu, ok := params[0].(string)
-		require.NotEqual(ok, false)
-		require.NotNil(txBu)
-
-		//TODO(influx6): Figure a better way to validate it is signed.
+		fmt.Printf("Px: %#v\n", tx)
 
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"jsonrpc": "2.0", "status":200, "result": "3434=done"}`))
