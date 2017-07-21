@@ -1,9 +1,5 @@
 package params
 
-import (
-	"github.com/ethereum/go-ethereum/common"
-)
-
 const (
 	// ClientIdentifier is client identifier to advertise over the network
 	ClientIdentifier = "StatusIM"

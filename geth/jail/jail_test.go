@@ -2,12 +2,8 @@ package jail_test
 
 import (
 	"encoding/json"
-	"fmt"
-	"os"
-	"reflect"
-	"strconv"
-	"strings"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -251,6 +247,7 @@ func (s *JailTestSuite) TestIsConnected() {
 	require := s.Require()
 	require.NotNil(s.jail)
 
+	// TODO(tiabc): Is this required?
 	s.StartTestNode(params.RopstenNetworkID)
 	defer s.StopTestNode()
 
@@ -335,47 +332,18 @@ func (s *JailTestSuite) TestLocalStorageSet() {
 	s.Equal(expectedResponse, response)
 }
 
+func (s *JailTestSuite) TestJailVMPersistence(t *testing.T) {
+	require := s.Require()
 
+	s.StartTestNode(params.RopstenNetworkID)
+	defer s.StopTestNode()
 
-func makeTestJail() *jail.Jail {
-	return jail.Init(`
-		var _status_catalog = {}
-		function call(pathStr, paramsStr) {
-			var params = JSON.parse(paramsStr),
-				path = JSON.parse(pathStr),
-				fn, res;
-
-			fn = path.reduce(function (catalog, name) {
-					if (catalog && catalog[name]) {
-						return catalog[name];
-					}
-				},
-				_status_catalog
-			);
-
-			if (!fn) {
-				return null;
-			}
-
-			res = fn(params);
-
-			return JSON.stringify(res);
-		}
-	`)
-}
-
-func TestJailVMPersistence(t *testing.T) {
-	err := geth.PrepareTestNode()
-	if err != nil {
-		t.Error(err)
-		return
-	}
+	accountManager := node.NewAccountManager(s.NodeManager)
+	txQueueManager := node.NewTxQueueManager(s.NodeManager, accountManager)
 
 	// log into account from which transactions will be sent
-	if err := geth.SelectAccount(testConfig.Account1.Address, testConfig.Account1.Password); err != nil {
-		t.Errorf("cannot select account: %v", testConfig.Account1.Address)
-		return
-	}
+	err := accountManager.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
+	require.NoError(err, "cannot select account: %v", TestConfig.Account1.Address)
 
 	type testCase struct {
 		command   string
@@ -385,14 +353,14 @@ func TestJailVMPersistence(t *testing.T) {
 	var testCases = []testCase{
 		{
 			`["sendTestTx"]`,
-			`{"amount": "0.000001", "from": "` + testConfig.Account1.Address + `"}`,
+			`{"amount": "0.000001", "from": "` + TestConfig.Account1.Address + `"}`,
 			func(response string) error {
 				return nil
 			},
 		},
 		{
 			`["sendTestTx"]`,
-			`{"amount": "0.000002", "from": "` + testConfig.Account1.Address + `"}`,
+			`{"amount": "0.000002", "from": "` + TestConfig.Account1.Address + `"}`,
 			func(response string) error {
 				return nil
 			},
@@ -421,7 +389,7 @@ func TestJailVMPersistence(t *testing.T) {
 		},
 	}
 
-	jailInstance := makeTestJail()
+	jailInstance := jail.New(s.NodeManager)
 	vmID := "persistentVM" // we will send concurrent request to the very same VM
 	jailInstance.Parse(vmID, `
 		var total = 0;
@@ -446,13 +414,13 @@ func TestJailVMPersistence(t *testing.T) {
 	`)
 
 	progress := make(chan string, len(testCases)+1)
-	geth.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var envelope geth.SignalEnvelope
+	node.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+		var envelope node.SignalEnvelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
 		}
-		if envelope.Type == geth.EventTransactionQueued {
+		if envelope.Type == node.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
 			t.Logf("Transaction queued (will be completed shortly): {id: %s}\n", event["id"].(string))
 
@@ -464,12 +432,11 @@ func TestJailVMPersistence(t *testing.T) {
 			//	return
 			//}
 
-			var txHash common.Hash
-			if txHash, err = geth.CompleteTransaction(event["id"].(string), testConfig.Account1.Password); err != nil {
-				t.Errorf("cannot complete queued transaction[%v]: %v", event["id"], err)
-			} else {
-				t.Logf("Transaction complete: https://testnet.etherscan.io/tx/%s", txHash.Hex())
-			}
+			//var txHash common.Hash
+			txHash, err := txQueueManager.CompleteTransaction(event["id"].(string), TestConfig.Account1.Password)
+			require.NoError(err, "cannot complete queued transaction[%v]: %v", event["id"], err)
+
+			t.Logf("Transaction complete: https://testnet.etherscan.io/tx/%s", txHash.Hex())
 
 			progress <- "event queue notification processed"
 		}
