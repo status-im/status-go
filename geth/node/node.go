@@ -71,17 +71,6 @@ func MakeNode(config *params.NodeConfig) (*node.Node, error) {
 		stackConfig.P2P.PrivateKey = pk
 	}
 
-	if len(config.NodeKeyFile) > 0 {
-		log.Info("Loading private key file", "file", config.NodeKeyFile)
-		pk, err := crypto.LoadECDSA(config.NodeKeyFile)
-		if err != nil {
-			log.Info("Failed loading private key file", "file", config.NodeKeyFile, "err", err)
-		}
-
-		// override node's private key
-		stackConfig.P2P.PrivateKey = pk
-	}
-
 	stack, err := node.New(stackConfig)
 	if err != nil {
 		return nil, ErrNodeMakeFailure

@@ -54,10 +54,6 @@ type LightEthConfig struct {
 
 	// DatabaseCache is memory (in MBs) allocated to internal caching (min 16MB / database forced)
 	DatabaseCache int
-
-	// CHTRootConfigURL defines URL to file containing hard-coded CHT roots
-	// TODO remove this hack, once CHT sync is implemented on LES side
-	CHTRootConfigURL string
 }
 
 // FirebaseConfig holds FCM-related configuration
@@ -329,9 +325,8 @@ func NewNodeConfig(dataDir string, networkID uint64, devMode bool) (*NodeConfig,
 			BootNodes: []string{},
 		},
 		LightEthConfig: &LightEthConfig{
-			Enabled:          true,
-			DatabaseCache:    DatabaseCache,
-			CHTRootConfigURL: CHTRootConfigURL,
+			Enabled:       true,
+			DatabaseCache: DatabaseCache,
 		},
 		WhisperConfig: &WhisperConfig{
 			Enabled:    true,
