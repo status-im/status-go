@@ -277,47 +277,42 @@ func (s *BackendTestSuite) TestJailSendQueuedTransaction() {
 	}
 }
 
-//
-func (s *BackendTestSuite) TestGasEstimation() {
+func (s *BackendTestSuite) TestContractCreation() {
 	require := s.Require()
-	require.NotNil(s.backend)
 
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	jailInstance := s.backend.JailManager()
-	require.NotNil(jailInstance)
-	jailInstance.Parse(testChatID, "")
-
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
+	jailInstance := s.backend.JailManager()
+	jailInstance.Parse(testChatID, "")
 	vm, err := jailInstance.JailCellVM(testChatID)
 	require.NoError(err)
 
 	// make sure you panic if transaction complete doesn't return
 	completeQueuedTransaction := make(chan struct{}, 1)
-	common.PanicAfter(30*time.Second, completeQueuedTransaction, s.T().Name())
+	common.PanicAfter(1*time.Minute, completeQueuedTransaction, s.T().Name())
 
 	// replace transaction notification handler
 	var txHash gethcommon.Hash
 	node.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var envelope node.SignalEnvelope
 		err := json.Unmarshal([]byte(jsonEvent), &envelope)
-		s.NoError(err, fmt.Sprintf("cannot unmarshal JSON: %s", jsonEvent))
+		require.NoError(err, fmt.Sprintf("cannot unmarshal JSON: %s", jsonEvent))
 
 		if envelope.Type == node.EventTransactionQueued {
+			defer close(completeQueuedTransaction) // Any require.* function may leave this unclosed.
+
 			event := envelope.Event.(map[string]interface{})
-			log.Info("transaction queued (will be completed shortly)", "id", event["id"].(string))
+			s.T().Logf("transaction queued and will be completed shortly, id: %v", event["id"])
 
-			//t.Logf("Transaction queued (will be completed shortly): {id: %s}\n", event["id"].(string))
-
-			s.NoError(s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
+			require.NoError(s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 
 			var err error
 			txHash, err = s.backend.CompleteTransaction(event["id"].(string), TestConfig.Account1.Password)
-			s.NoError(err, fmt.Sprintf("cannot complete queued transaction[%v]", event["id"]))
+			require.NoError(err, event["id"])
 
-			log.Info("contract transaction complete", "URL", "https://rinkeby.etherscan.io/tx/"+txHash.Hex())
-			close(completeQueuedTransaction)
+			s.T().Logf("contract transaction complete, URL: %s", "https://ropsten.etherscan.io/tx/"+txHash.Hex())
 		}
 	})
 
@@ -334,18 +329,18 @@ func (s *BackendTestSuite) TestGasEstimation() {
 			}
 		})
 	`)
-	s.NoError(err)
+	require.NoError(err)
 
 	<-completeQueuedTransaction
 
 	responseValue, err := vm.Get("responseValue")
-	s.NoError(err, "vm.Get() failed")
+	require.NoError(err)
 
 	response, err := responseValue.ToString()
-	s.NoError(err, "cannot parse result")
+	require.NoError(err)
 
 	expectedResponse := txHash.Hex()
-	s.Equal(expectedResponse, response, "expected response is not returned")
+	require.Equal(expectedResponse, response)
 	s.T().Logf("estimation complete: %s", response)
 }
 
