@@ -38,6 +38,7 @@ func (m *RequestManager) PreProcessRequest(vm *otto.Otto, req RPCCall) (string, 
 
 // PostProcessRequest post-processes a given RPC call to a given Otto VM
 func (m *RequestManager) PostProcessRequest(vm *otto.Otto, req RPCCall, messageID string) {
+	// Errors are ignored because addContext may not exist and it's alright.
 	if len(messageID) > 0 {
 		vm.Call("addContext", nil, messageID, common.MessageIDKey, messageID) // nolint: errcheck
 	}

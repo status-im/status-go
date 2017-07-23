@@ -22,12 +22,12 @@ func registerHandlers(jail *Jail, vm *otto.Otto, chatID string) error {
 	registerHandler := jeth.Object().Set
 
 	// register send handler
-	if err = registerHandler("send", makeSendHandler(jail, chatID)); err != nil {
+	if err = registerHandler("send", makeSendHandler(jail)); err != nil {
 		return err
 	}
 
 	// register sendAsync handler
-	if err = registerHandler("sendAsync", makeSendHandler(jail, chatID)); err != nil {
+	if err = registerHandler("sendAsync", makeSendHandler(jail)); err != nil {
 		return err
 	}
 
@@ -70,10 +70,8 @@ func registerHandlers(jail *Jail, vm *otto.Otto, chatID string) error {
 }
 
 // makeSendHandler returns jeth.send() and jeth.sendAsync() handler
-func makeSendHandler(jail *Jail, chatID string) func(call otto.FunctionCall) (response otto.Value) {
-	return func(call otto.FunctionCall) (response otto.Value) {
-		return jail.Send(chatID, call)
-	}
+func makeSendHandler(jail *Jail) func(call otto.FunctionCall) (response otto.Value) {
+	return jail.Send
 }
 
 // makeJethIsConnectedHandler returns jeth.isConnected() handler

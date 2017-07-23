@@ -106,15 +106,11 @@ func (s *BackendTestSuite) TestJailContractDeployment() {
 
 func (s *BackendTestSuite) TestJailSendQueuedTransaction() {
 	require := s.Require()
-	require.NotNil(s.backend)
 
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
 	time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to sync
-
-	jailInstance := s.backend.JailManager()
-	require.NotNil(jailInstance)
 
 	// log into account from which transactions will be sent
 	require.NoError(s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
@@ -126,7 +122,6 @@ func (s *BackendTestSuite) TestJailSendQueuedTransaction() {
 	}`
 
 	txCompletedSuccessfully := make(chan struct{})
-	txCompletedCounter := make(chan struct{})
 	txHashes := make(chan gethcommon.Hash)
 
 	// replace transaction notification handler
@@ -162,7 +157,6 @@ func (s *BackendTestSuite) TestJailSendQueuedTransaction() {
 
 			txCompletedSuccessfully <- struct{}{} // so that timeout is aborted
 			txHashes <- txHash
-			txCompletedCounter <- struct{}{}
 		}
 	})
 
@@ -253,27 +247,24 @@ func (s *BackendTestSuite) TestJailSendQueuedTransaction() {
 		},
 	}
 
+	jailInstance := s.backend.JailManager()
 	for _, test := range tests {
-
 		jailInstance.BaseJS(string(static.MustAsset(txSendFolder + test.file)))
-		common.PanicAfter(60*time.Second, txCompletedSuccessfully, test.name)
+		common.PanicAfter(1*time.Minute, txCompletedSuccessfully, test.name)
 		jailInstance.Parse(testChatID, ``)
 
 		requireMessageId = test.requireMessageId
 
 		for _, command := range test.commands {
-			go func(jail common.JailManager, test testCase, command testCommand) {
-				log.Info(fmt.Sprintf("->%s: %s", test.name, command.command))
-				response := jail.Call(testChatID, command.command, command.params)
-				var txHash gethcommon.Hash
-				if command.command == `["commands", "send"]` {
-					txHash = <-txHashes
-				}
-				expectedResponse := strings.Replace(command.expectedResponse, "TX_HASH", txHash.Hex(), 1)
-				s.Equal(expectedResponse, response)
-			}(jailInstance, test, command)
+			s.T().Logf("%s: %s", test.name, command.command)
+			response := jailInstance.Call(testChatID, command.command, command.params)
+			var txHash gethcommon.Hash
+			if command.command == `["commands", "send"]` {
+				txHash = <-txHashes
+			}
+			expectedResponse := strings.Replace(command.expectedResponse, "TX_HASH", txHash.Hex(), 1)
+			s.Require().Equal(expectedResponse, response)
 		}
-		<-txCompletedCounter
 	}
 }
 

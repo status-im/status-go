@@ -106,7 +106,7 @@ func (jail *Jail) Parse(chatID string, js string) string {
 	return makeResult(res.String(), err)
 }
 
-// Call executes given JavaScript function w/i a jail cell context identified by the chatID.
+// Call executes the `call` function w/i a jail cell context identified by the chatID.
 // Jail cell is clonned before call is executed i.e. all calls execute w/i their own contexts.
 func (jail *Jail) Call(chatID string, path string, args string) string {
 	jail.RLock()
@@ -167,18 +167,14 @@ func (jail *Jail) GetCell(chatID string) (common.JailCell, error) {
 
 // Send will serialize the first argument, send it to the node and returns the response.
 // nolint: errcheck, unparam
-func (jail *Jail) Send(chatID string, call otto.FunctionCall) (response otto.Value) {
-	chatCell, err := jail.GetCell(chatID)
-	if err != nil {
-		return newErrorResponse(chatCell.CellVM(), -32603, err.Error(), nil)
-	}
+func (jail *Jail) Send(call otto.FunctionCall) (response otto.Value) {
 	client, err := jail.requestManager.RPCClient()
 	if err != nil {
-		return newErrorResponse(chatCell.CellVM(), -32603, err.Error(), nil)
+		return newErrorResponse(call.Otto, -32603, err.Error(), nil)
 	}
 
 	// Remarshal the request into a Go value.
-	JSON, _ := chatCell.CellVM().Object("JSON")
+	JSON, _ := call.Otto.Object("JSON")
 	reqVal, err := JSON.Call("stringify", call.Argument(0))
 	if err != nil {
 		throwJSException(err.Error())
@@ -198,18 +194,18 @@ func (jail *Jail) Send(chatID string, call otto.FunctionCall) (response otto.Val
 	}
 
 	// Execute the requests.
-	resps, _ := chatCell.CellVM().Object("new Array()")
+	resps, _ := call.Otto.Object("new Array()")
 	for _, req := range reqs {
-		resp, _ := chatCell.CellVM().Object(`({"jsonrpc":"2.0"})`)
+		resp, _ := call.Otto.Object(`({"jsonrpc":"2.0"})`)
 		resp.Set("id", req.ID)
 		var result json.RawMessage
 
 		// execute directly w/o RPC call to node
 		if req.Method == SendTransactionRequest {
-			txHash, err := jail.requestManager.ProcessSendTransactionRequest(chatCell.CellVM(), req)
+			txHash, err := jail.requestManager.ProcessSendTransactionRequest(call.Otto, req)
 			resp.Set("result", txHash.Hex())
 			if err != nil {
-				resp = newErrorResponse(chatCell.CellVM(), -32603, err.Error(), &req.ID).Object()
+				resp = newErrorResponse(call.Otto, -32603, err.Error(), &req.ID).Object()
 			}
 			resps.Call("push", resp)
 			continue
@@ -218,9 +214,9 @@ func (jail *Jail) Send(chatID string, call otto.FunctionCall) (response otto.Val
 		// do extra request pre processing (persist message id)
 		// within function semaphore will be acquired and released,
 		// so that no more than one client (per cell) can enter
-		messageID, err := jail.requestManager.PreProcessRequest(chatCell.CellVM(), req)
+		messageID, err := jail.requestManager.PreProcessRequest(call.Otto, req)
 		if err != nil {
-			return newErrorResponse(chatCell.CellVM(), -32603, err.Error(), nil)
+			return newErrorResponse(call.Otto, -32603, err.Error(), nil)
 		}
 
 		errc := make(chan error, 1)
@@ -240,7 +236,7 @@ func (jail *Jail) Send(chatID string, call otto.FunctionCall) (response otto.Val
 			} else {
 				resultVal, callErr := JSON.Call("parse", string(result))
 				if callErr != nil {
-					resp = newErrorResponse(chatCell.CellVM(), -32603, callErr.Error(), &req.ID).Object()
+					resp = newErrorResponse(call.Otto, -32603, callErr.Error(), &req.ID).Object()
 				} else {
 					resp.Set("result", resultVal)
 				}
@@ -251,12 +247,12 @@ func (jail *Jail) Send(chatID string, call otto.FunctionCall) (response otto.Val
 				"message": err.Error(),
 			})
 		default:
-			resp = newErrorResponse(chatCell.CellVM(), -32603, err.Error(), &req.ID).Object()
+			resp = newErrorResponse(call.Otto, -32603, err.Error(), &req.ID).Object()
 		}
 		resps.Call("push", resp)
 
 		// do extra request post processing (setting back tx context)
-		jail.requestManager.PostProcessRequest(chatCell.CellVM(), req, messageID)
+		jail.requestManager.PostProcessRequest(call.Otto, req, messageID)
 	}
 
 	// Return the responses either to the callback (if supplied)
