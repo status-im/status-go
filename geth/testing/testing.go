@@ -117,7 +117,7 @@ func MakeTestNodeConfig(networkID int) (*params.NodeConfig, error) {
 		"HTTPPort": ` + strconv.Itoa(TestConfig.Node.HTTPPort) + `,
 		"WSPort": ` + strconv.Itoa(TestConfig.Node.WSPort) + `,
 		"LogEnabled": true,
-		"LogLevel": "ERROR"
+		"LogLevel": "TRACE"
 	}`
 	nodeConfig, err := params.LoadNodeConfig(configJSON)
 	if err != nil {

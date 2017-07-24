@@ -573,7 +573,7 @@ func (s *BackendTestSuite) TestDiscardMultipleQueuedTransactions() {
 	select {
 	case <-allTestTxDiscarded:
 		// pass
-	case <-time.After(30 * time.Second):
+	case <-time.After(1 * time.Minute):
 		s.Fail("test timed out")
 		return
 	}
