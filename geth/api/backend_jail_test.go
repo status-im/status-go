@@ -30,80 +30,6 @@ const (
 	testChatID      = "testChat"
 )
 
-func (s *BackendTestSuite) TestJailContractDeployment() {
-	require := s.Require()
-	require.NotNil(s.backend)
-
-	s.StartTestBackend(params.RopstenNetworkID)
-	defer s.StopTestBackend()
-
-	time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to sync
-
-	jailInstance := s.backend.JailManager()
-	require.NotNil(jailInstance)
-
-	jailInstance.Parse(testChatID, "")
-
-	// obtain VM for a given chat (to send custom JS to jailed version of Send())
-	vm, err := jailInstance.JailCellVM(testChatID)
-	require.NoError(err)
-
-	// make sure you panic if transaction complete doesn't return
-	completeQueuedTransaction := make(chan struct{}, 1)
-	common.PanicAfter(30*time.Second, completeQueuedTransaction, s.T().Name())
-
-	// replace transaction notification handler
-	var txHash gethcommon.Hash
-	node.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var envelope node.SignalEnvelope
-		err := json.Unmarshal([]byte(jsonEvent), &envelope)
-		s.NoError(err, fmt.Sprintf("cannot unmarshal JSON: %s", jsonEvent))
-
-		if envelope.Type == node.EventTransactionQueued {
-			event := envelope.Event.(map[string]interface{})
-			log.Info("transaction queued (will be completed shortly)", "id", event["id"].(string))
-
-			//t.Logf("Transaction queued (will be completed shortly): {id: %s}\n", event["id"].(string))
-
-			s.NoError(s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
-
-			var err error
-			txHash, err = s.backend.CompleteTransaction(event["id"].(string), TestConfig.Account1.Password)
-			s.NoError(err, fmt.Sprintf("cannot complete queued transaction[%v]", event["id"]))
-
-			log.Info("contract transaction complete", "URL", "https://rinkeby.etherscan.io/tx/"+txHash.Hex())
-			close(completeQueuedTransaction)
-		}
-	})
-
-	_, err = vm.Run(`
-		var responseValue = null;
-		var testContract = web3.eth.contract([{"constant":true,"inputs":[{"name":"a","type":"int256"}],"name":"double","outputs":[{"name":"","type":"int256"}],"payable":false,"type":"function"}]);
-		var test = testContract.new(
-		{
-			from: '` + TestConfig.Account1.Address + `',
-			data: '0x6060604052341561000c57fe5b5b60a58061001b6000396000f30060606040526000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff1680636ffa1caa14603a575bfe5b3415604157fe5b60556004808035906020019091905050606b565b6040518082815260200191505060405180910390f35b60008160020290505b9190505600a165627a7a72305820ccdadd737e4ac7039963b54cee5e5afb25fa859a275252bdcf06f653155228210029',
-			gas: '` + strconv.Itoa(params.DefaultGas) + `'
-		}, function (e, contract){
-			if (!e) {
-				responseValue = contract.transactionHash
-			}
-		})
-	`)
-	require.NoError(err)
-
-	<-completeQueuedTransaction
-
-	responseValue, err := vm.Get("responseValue")
-	require.NoError(err, "vm.Get() failed")
-
-	response, err := responseValue.ToString()
-	require.NoError(err, "cannot parse result")
-
-	expectedResponse := txHash.Hex()
-	require.Equal(expectedResponse, response, "expected response is not returned")
-}
-
 func (s *BackendTestSuite) TestJailSendQueuedTransaction() {
 	require := s.Require()
 
@@ -268,11 +194,14 @@ func (s *BackendTestSuite) TestJailSendQueuedTransaction() {
 	}
 }
 
-func (s *BackendTestSuite) TestContractCreation() {
+func (s *BackendTestSuite) TestContractDeployment() {
 	require := s.Require()
 
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
+
+	// Allow to sync, otherwise you'll get "Nonce too low."
+	time.Sleep(TestConfig.Node.SyncSeconds * time.Second)
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
 	jailInstance := s.backend.JailManager()
@@ -292,18 +221,20 @@ func (s *BackendTestSuite) TestContractCreation() {
 		require.NoError(err, fmt.Sprintf("cannot unmarshal JSON: %s", jsonEvent))
 
 		if envelope.Type == node.EventTransactionQueued {
-			defer close(completeQueuedTransaction) // Any require.* function may leave this unclosed.
+			// Use s.* for assertions - require leaves the channel unclosed.
 
 			event := envelope.Event.(map[string]interface{})
 			s.T().Logf("transaction queued and will be completed shortly, id: %v", event["id"])
 
-			require.NoError(s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
+			s.NoError(s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 
 			var err error
 			txHash, err = s.backend.CompleteTransaction(event["id"].(string), TestConfig.Account1.Password)
-			require.NoError(err, event["id"])
+			if s.NoError(err, event["id"]) {
+				s.T().Logf("contract transaction complete, URL: %s", "https://ropsten.etherscan.io/tx/"+txHash.Hex())
+			}
 
-			s.T().Logf("contract transaction complete, URL: %s", "https://ropsten.etherscan.io/tx/"+txHash.Hex())
+			close(completeQueuedTransaction)
 		}
 	})
 
@@ -314,6 +245,7 @@ func (s *BackendTestSuite) TestContractCreation() {
 		{
 			from: '` + TestConfig.Account1.Address + `',
 			data: '0x6060604052341561000c57fe5b5b60a58061001b6000396000f30060606040526000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff1680636ffa1caa14603a575bfe5b3415604157fe5b60556004808035906020019091905050606b565b6040518082815260200191505060405180910390f35b60008160020290505b9190505600a165627a7a72305820ccdadd737e4ac7039963b54cee5e5afb25fa859a275252bdcf06f653155228210029',
+			gas: '` + strconv.Itoa(params.DefaultGas) + `'
 		}, function (e, contract){
 			if (!e) {
 				responseValue = contract.transactionHash
