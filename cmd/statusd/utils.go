@@ -44,6 +44,10 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 		fn   func(t *testing.T) bool
 	}{
 		{
+			"validate default configuration",
+			testValidConfig,
+		},
+		{
 			"check default configuration",
 			testGetDefaultConfig,
 		},
@@ -148,6 +152,24 @@ func testVerifyAccountPassword(t *testing.T) bool {
 	}
 	if response.Error != "" {
 		t.Errorf("unexpected error: %s", response.Error)
+		return false
+	}
+
+	return true
+}
+
+func testValidConfig(t *testing.T) bool {
+	response := ValidateConfig(C.CString(nodeConfigJSON))
+
+	var res common.APIResponse
+
+	if err := json.Unmarshal([]byte(C.GoString(response)), &res); err != nil {
+		t.Errorf("Invalid response: Expected common.APIResponse type: %+q", err)
+		return false
+	}
+
+	if len(res.Error) != 0 {
+		t.Errorf("Invalid configuration: Expected no error for config: %+q", res.Error)
 		return false
 	}
 
