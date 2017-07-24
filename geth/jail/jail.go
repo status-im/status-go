@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/common"
+	"github.com/status-im/status-go/geth/jail/extensions"
 	"github.com/status-im/status-go/static"
 
 	"fknsrs.biz/p/ottoext/fetch"
@@ -166,7 +167,14 @@ func (jail *Jail) Parse(chatID string, js string) string {
 	jail.Lock()
 	defer jail.Unlock()
 
-	jail.cells[chatID] = jail.NewJailCell(chatID)
+	cell := jail.NewJailCell(chatID)
+
+	// Registers all extensions to the vm.
+	if err := extensions.ActivateExtensions(cell.CellVM()); err != nil {
+		return makeError(err.Error())
+	}
+
+	jail.cells[chatID] = cell
 	vm := jail.cells[chatID].CellVM()
 
 	initJjs := jail.baseJSCode + ";"
