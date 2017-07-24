@@ -36,7 +36,7 @@ func (s *BackendTestSuite) TestSendContractTx() {
 
 	// make sure you panic if transaction complete doesn't return
 	completeQueuedTransaction := make(chan struct{}, 10)
-	common.PanicAfter(20*time.Second, completeQueuedTransaction, s.T().Name())
+	common.PanicAfter(1*time.Minute, completeQueuedTransaction, s.T().Name())
 
 	// replace transaction notification handler
 	var txHash = gethcommon.Hash{}
@@ -114,7 +114,7 @@ func (s *BackendTestSuite) TestSendEtherTx() {
 
 	// make sure you panic if transaction complete doesn't return
 	completeQueuedTransaction := make(chan struct{}, 1)
-	common.PanicAfter(20*time.Second, completeQueuedTransaction, s.T().Name())
+	common.PanicAfter(1*time.Minute, completeQueuedTransaction, s.T().Name())
 
 	// replace transaction notification handler
 	var txHash = gethcommon.Hash{}
@@ -185,7 +185,7 @@ func (s *BackendTestSuite) TestDoubleCompleteQueuedTransactions() {
 
 	// make sure you panic if transaction complete doesn't return
 	completeQueuedTransaction := make(chan struct{}, 1)
-	common.PanicAfter(20*time.Second, completeQueuedTransaction, s.T().Name())
+	common.PanicAfter(1*time.Minute, completeQueuedTransaction, s.T().Name())
 
 	// replace transaction notification handler
 	var txID string
@@ -269,7 +269,7 @@ func (s *BackendTestSuite) TestDiscardQueuedTransaction() {
 
 	// make sure you panic if transaction complete doesn't return
 	completeQueuedTransaction := make(chan struct{}, 1)
-	common.PanicAfter(30*time.Second, completeQueuedTransaction, s.T().Name())
+	common.PanicAfter(1*time.Minute, completeQueuedTransaction, s.T().Name())
 
 	// replace transaction notification handler
 	var txID string
