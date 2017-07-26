@@ -332,7 +332,7 @@ func (s *JailTestSuite) TestLocalStorageSet() {
 	s.Equal(expectedResponse, response)
 }
 
-func (s *JailTestSuite) TestJailVMPersistence(t *testing.T) {
+func (s *JailTestSuite) TestJailVMPersistence() {
 	require := s.Require()
 
 	s.StartTestNode(params.RopstenNetworkID)
@@ -417,12 +417,12 @@ func (s *JailTestSuite) TestJailVMPersistence(t *testing.T) {
 	node.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var envelope node.SignalEnvelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
-			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
+			s.T().Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
 		}
 		if envelope.Type == node.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
-			t.Logf("Transaction queued (will be completed shortly): {id: %s}\n", event["id"].(string))
+			s.T().Logf("Transaction queued (will be completed shortly): {id: %s}\n", event["id"].(string))
 
 			time.Sleep(1 * time.Second)
 
@@ -436,7 +436,7 @@ func (s *JailTestSuite) TestJailVMPersistence(t *testing.T) {
 			txHash, err := txQueueManager.CompleteTransaction(event["id"].(string), TestConfig.Account1.Password)
 			require.NoError(err, "cannot complete queued transaction[%v]: %v", event["id"], err)
 
-			t.Logf("Transaction complete: https://testnet.etherscan.io/tx/%s", txHash.Hex())
+			s.T().Logf("Transaction complete: https://testnet.etherscan.io/tx/%s", txHash.Hex())
 
 			progress <- "event queue notification processed"
 		}
@@ -445,12 +445,12 @@ func (s *JailTestSuite) TestJailVMPersistence(t *testing.T) {
 	// run commands concurrently
 	for _, tc := range testCases {
 		go func(tc testCase) {
-			t.Logf("CALL START: %v %v", tc.command, tc.params)
+			s.T().Logf("CALL START: %v %v", tc.command, tc.params)
 			response := jailInstance.Call(vmID, tc.command, tc.params)
 			if err := tc.validator(response); err != nil {
-				t.Errorf("failed test validation: %v, err: %v", tc.command, err)
+				s.T().Errorf("failed test validation: %v, err: %v", tc.command, err)
 			}
-			t.Logf("CALL END: %v %v", tc.command, tc.params)
+			s.T().Logf("CALL END: %v %v", tc.command, tc.params)
 			progress <- tc.command
 		}(tc)
 	}
@@ -471,7 +471,7 @@ Loop:
 				break Loop
 			}
 		case <-time.After(10 * time.Second): // timeout
-			t.Error("test timed out")
+			s.T().Error("test timed out")
 			break Loop
 		}
 	}
