@@ -243,22 +243,22 @@ func makeBootstrapNodes() []*discover.Node {
 	// on mobile client we deliberately keep this list empty
 	enodes := []string{}
 
-	var bootstapNodes []*discover.Node
+	var bootstrapNodes []*discover.Node
 	for _, enode := range enodes {
-		bootstapNodes = append(bootstapNodes, discover.MustParseNode(enode))
+		bootstrapNodes = append(bootstrapNodes, discover.MustParseNode(enode))
 	}
 
-	return bootstapNodes
+	return bootstrapNodes
 }
 
 // makeBootstrapNodesV5 returns default (hence bootstrap) list of peers
 func makeBootstrapNodesV5() []*discv5.Node {
 	enodes := gethparams.DiscoveryV5Bootnodes
 
-	var bootstapNodes []*discv5.Node
+	var bootstrapNodes []*discv5.Node
 	for _, enode := range enodes {
-		bootstapNodes = append(bootstapNodes, discv5.MustParseNode(enode))
+		bootstrapNodes = append(bootstrapNodes, discv5.MustParseNode(enode))
 	}
 
-	return bootstapNodes
+	return bootstrapNodes
 }
