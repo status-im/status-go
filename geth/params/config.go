@@ -379,6 +379,12 @@ func LoadNodeConfig(configJSON string) (*NodeConfig, error) {
 	return nodeConfig, nil
 }
 
+// Validate checks if NodeConfig fields have valid values.
+func (c *NodeConfig) Validate() error {
+	// TODO(adam): add validation here...
+	return nil
+}
+
 // Save dumps configuration to the disk
 func (c *NodeConfig) Save() error {
 	data, err := json.MarshalIndent(c, "", "    ")

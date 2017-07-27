@@ -42,6 +42,16 @@ func StopNode() *C.char {
 	return makeJSONResponse(err)
 }
 
+//export ValidateNodeConfig
+func ValidateNodeConfig(configJSON *C.char) *C.char {
+	nodeConfig, err := params.LoadNodeConfig(C.GoString(configJSON))
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return makeJSONResponse(nodeConfig.Validate())
+}
+
 //export ResetChainData
 func ResetChainData() *C.char {
 	_, err := statusAPI.ResetChainDataAsync()
