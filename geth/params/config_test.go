@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	validator "gopkg.in/go-playground/validator.v9"
+
 	"github.com/ethereum/go-ethereum/core"
 	gethparams "github.com/ethereum/go-ethereum/params"
 	"github.com/status-im/status-go/geth/params"
@@ -21,40 +23,13 @@ var loadConfigTestCases = []struct {
 	validator  func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error)
 }{
 	{
-		`invalid input configuration`,
+		`invalid input JSON (missing comma at the end of key:value pair)`,
 		`{
 			"NetworkId": 3
-			"DataDir": "$TMPDIR",
-			"Name": "TestStatusNode",
-			"WSPort": 8546,
-			"IPCEnabled": true,
-			"WSEnabled": false,
-			"RPCEnabled": false,
-			"LightEthConfig": {
-				"DatabaseCache": 64
-			}
-		}`,
-		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
-			require.Error(t, err, "error is expected, not thrown")
-		},
-	},
-	{
-		`missing required field (DataDir)`,
-		`{
-			"NetworkId": 3,
-			"Name": "TestStatusNode"
-		}`,
-		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
-			require.Equal(t, params.ErrMissingDataDir, err)
-		},
-	},
-	{
-		`missing required field (NetworkId)`,
-		`{
 			"DataDir": "$TMPDIR"
 		}`,
 		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
-			require.Equal(t, params.ErrMissingNetworkID, err)
+			require.Error(t, err, "error is expected, not thrown")
 		},
 	},
 	{
@@ -452,4 +427,65 @@ func TestConfigWriteRead(t *testing.T) {
 	configReadWrite(params.RinkebyNetworkID, "testdata/config.rinkeby.json")
 	configReadWrite(params.RopstenNetworkID, "testdata/config.ropsten.json")
 	configReadWrite(params.MainNetworkID, "testdata/config.mainnet.json")
+}
+
+func TestNodeConfigValidate(t *testing.T) {
+	testCases := []struct {
+		Name   string
+		Config string
+		Result map[string]string // map[Field]Tag
+	}{
+		{
+			Name:   "Validate all required fields",
+			Config: `{}`,
+			Result: map[string]string{
+				"NetworkID":   "required",
+				"NodeKeyFile": "required",
+				"DataDir":     "required",
+			},
+		},
+		{
+			Name: "Check invalid NetworkID validation",
+			Config: `{
+				"NetworkId": 999,
+				"NodeKeyFile": "some-key",
+				"DataDir": "/some/dir"
+			}`,
+			Result: map[string]string{
+				"NetworkID": "network",
+			},
+		},
+		{
+			Name: "Validate Name does not contain slash",
+			Config: `{
+				"NetworkId": 1,
+				"NodeKeyFile": "some-key",
+				"DataDir": "/some/dir",
+				"Name": "invalid/name"
+			}`,
+			Result: map[string]string{
+				"Name": "excludeas",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Logf("Test Case %s", tc.Name)
+
+		var err error
+
+		_, err = params.LoadNodeConfig(tc.Config)
+		if tc.Result == nil {
+			require.Nil(t, err)
+		} else {
+			require.NotNil(t, err)
+		}
+
+		validationErrors := err.(validator.ValidationErrors)
+		t.Logf("error: %s", err)
+		for _, ve := range validationErrors {
+			require.Contains(t, tc.Result, ve.Field())
+			require.Equal(t, tc.Result[ve.Field()], ve.Tag())
+		}
+	}
 }

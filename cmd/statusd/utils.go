@@ -57,6 +57,10 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 			testStopResumeNode,
 		},
 		{
+			"validate node config",
+			testValidateNodeConfig,
+		},
+		{
 			"call RPC on in-proc handler",
 			testCallRPC,
 		},
@@ -380,6 +384,23 @@ func testStopResumeNode(t *testing.T) bool {
 
 	// additionally, let's complete transaction (just to make sure that node lives through pause/resume w/o issues)
 	testCompleteTransaction(t)
+
+	return true
+}
+
+func testValidateNodeConfig(t *testing.T) bool {
+	result := ValidateNodeConfig(C.CString(nodeConfigJSON))
+
+	var response common.APIResponse
+	if err := json.Unmarshal([]byte(C.GoString(result)), &response); err != nil {
+		t.Errorf("could not unmarshal response as common.APIResponse: %s", err)
+		return false
+	}
+
+	if response.Error != "" {
+		t.Errorf("expected valid configuration but error occured: %s", response.Error)
+		return false
+	}
 
 	return true
 }
