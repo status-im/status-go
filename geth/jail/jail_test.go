@@ -121,64 +121,6 @@ func (s *JailTestSuite) TestFunctionCall() {
 	require.Equal(expectedResponse, response)
 }
 
-
-// TestSendTransactionWithJail attemps to validate usage of upstream for transaction
-// processing.
-// TODO(influx6): Ensure upstream gets Account nodes so this tests passes.
-func (s *JailTestSuite) TestSendTransactionWithJail() {
-	require := s.Require()
-	require.NotNil(s.jail)
-
-	s.StartTestNode(params.RopstenNetworkID, true)
-	defer s.StopTestNode()
-
-	// load Status JS and add test command to it
-	s.jail.BaseJS(baseStatusJSCode)
-	s.jail.Parse(testChatID, ``)
-
-	// obtain VM for a given chat (to send custom JS to jailed version of Send())
-	vm, err := s.jail.JailCellVM(testChatID)
-	require.NoError(err)
-	require.NotNil(vm)
-
-	_, err = vm.Run(`
-	    var accountId = "` + TestConfig.Account1.Address + `";
-	    var transactionCount = web3.eth.getTransactionCount(accountId, "latest");
-	`)
-
-	require.NoError(err)
-
-	transactionCount, err := vm.Get("transanctionCount")
-	require.NoError(err, "cannot obtain new transaction nounce")
-
-	s.T().Logf("Received Transaction Nounce: %+q", transactionCount)
-
-	_, err = vm.Run(`
-	    var fromAccount = "` + TestConfig.Account1.Address + `";
-	    var toAccount = "` + TestConfig.Account2.Address + `";
-	    var nonce = "` + transactionCount.String() + `";
-
-			var signedData = web3.eth.sign(fromAccount, "{message:'levitate in the void'}")
-
-	    var sendResponse = web3.eth.sendTransaction({
-				to: toAccount,
-				from: fromAccount,
-				gas: "0x76c0",
-				nonce: nounce,
-				data: signedData,
-				gasPrice: "0x9184e72a000",
-				value: web3.toWei(0.05, "ether"),
-			});
-	`)
-
-	require.NoError(err)
-
-	sendResponse, err := vm.Get("sendResponse")
-	require.NoError(err, "cannot obtain response for sendtransaction")
-
-	s.T().Logf("Received Transaction response: %+q", sendResponse)
-}
-
 func (s *JailTestSuite) TestJailTimeoutFailure() {
 	require := s.Require()
 	require.NotNil(s.jail)
