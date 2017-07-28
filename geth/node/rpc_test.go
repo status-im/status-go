@@ -1,11 +1,8 @@
 package node_test
 
 import (
-	"encoding/json"
 	"net/http"
-	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/geth/node"
@@ -37,66 +34,6 @@ func (s *RPCTestSuite) SetupTest() {
 	s.NodeManager = proxy.NewRPCRouter(node.NewNodeManager())
 	require.NotNil(s.NodeManager)
 	require.IsType(&proxy.RPCRouter{}, s.NodeManager)
-}
-
-func (s *RPCTestSuite) TestUpstreamCallRPC() {
-	require := s.Require()
-	require.NotNil(s.NodeManager)
-
-	expectedResponse := `{"jsonrpc": "2.0", "status":200, "result": "3434=done"}`
-
-	nodeConfig, err := MakeTestNodeConfig(params.RinkebyNetworkID)
-	require.NoError(err)
-
-	rpcService := service{Handler: func(w http.ResponseWriter, r *http.Request) {
-		defer r.Body.Close()
-
-		var req map[string]interface{}
-
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			require.NoError(err)
-			return
-		}
-
-		method, ok := req["method"]
-		require.NotEqual(ok, false)
-		require.IsType((string)(""), method)
-		require.Equal(method, "eth_swapspace")
-
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(expectedResponse))
-	}}
-
-	httpRPCServer := httptest.NewServer(rpcService)
-
-	nodeConfig.UpstreamConfig.Enabled = true
-	nodeConfig.UpstreamConfig.URL = httpRPCServer.URL
-
-	started, err := s.NodeManager.StartNode(nodeConfig)
-	require.NoError(err)
-
-	// Attempt to find out if we started well.
-	select {
-	case <-started:
-		break
-	case <-time.After(1 * time.Second):
-		s.T().Fatal("failed to start node manager")
-		break
-	}
-
-	defer s.NodeManager.StopNode()
-
-	rpcClient := node.NewRPCManager(s.NodeManager)
-	require.NotNil(rpcClient)
-
-	responseString := rpcClient.Call(`{
-		"jsonrpc": "2.0",
-		"method": "eth_swapspace",
-		"args": [1,50,1]
-	}`)
-
-	require.Equal(expectedResponse, responseString)
 }
 
 func (s *RPCTestSuite) TestCallRPC() {
