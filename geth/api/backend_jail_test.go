@@ -12,9 +12,9 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/common"
-	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/geth/proxy/transactions"
 	. "github.com/status-im/status-go/geth/testing"
 	"github.com/status-im/status-go/static"
 )
@@ -206,7 +206,7 @@ func (s *BackendTestSuite) TestJailSendQueuedTransaction() {
 				{
 					`["commands", "send"]`,
 					txParams,
-					`{"result": {"context":{"` + jail.SendTransactionRequest + `":true},"result":{"transaction-hash":"TX_HASH"}}}`,
+					`{"result": {"context":{"` + transactions.SendTransactionName + `":true},"result":{"transaction-hash":"TX_HASH"}}}`,
 				},
 				{
 					`["commands", "getBalance"]`,
