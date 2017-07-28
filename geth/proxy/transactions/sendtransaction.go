@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"time"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/les/status"
 	"github.com/ethereum/go-ethereum/log"
@@ -36,15 +38,32 @@ func ExecuteRemoteSendTransaction(manager common.RPCNodeManager, req common.RPCC
 		return nil, err
 	}
 
-	nonce := uint64(req.ID)
-	toAddr := req.ParseFromAddress()
+	client, err := manager.RPCClient()
+	if err != nil {
+		return nil, err
+	}
+
+	fromAddr := req.ParseFromAddress()
+
+	// We need to request a new transaction nounce from upstream node.
+	ctx, canceler := context.WithDeadline(context.Background(), time.Now().Add(1*time.Minute))
+
+	defer canceler()
+
+	var num hexutil.Uint
+	if err := client.CallContext(ctx, &num, "eth_getBlockTransactionCountByHash", fromAddr.Hash()); err != nil {
+		return nil, err
+	}
+
+	nonce := uint64(num)
+	toAddr := req.ParseToAddress()
 	gas := (*big.Int)(req.ParseGas())
 	dataVal := []byte(req.ParseData())
 	priceVal := (*big.Int)(req.ParseValue())
 	gasPrice := (*big.Int)(req.ParseGasPrice())
 	chainID := big.NewInt(int64(config.NetworkID))
 
-	tx := types.NewTransaction(nonce, toAddr, priceVal, gas, gasPrice, dataVal)
+	tx := types.NewTransaction(nonce, *toAddr, priceVal, gas, gasPrice, dataVal)
 	txs, err := types.SignTx(tx, types.NewEIP155Signer(chainID), selectedAcct.AccountKey.PrivateKey)
 	if err != nil {
 		return nil, err
@@ -56,13 +75,11 @@ func ExecuteRemoteSendTransaction(manager common.RPCNodeManager, req common.RPCC
 		return nil, err
 	}
 
-	client, err := manager.RPCClient()
-	if err != nil {
-		return nil, err
-	}
+	ctx2, canceler2 := context.WithDeadline(context.Background(), time.Now().Add(1*time.Minute))
+	defer canceler2()
 
 	var result json.RawMessage
-	if err := client.Call(&result, "eth_sendRawTransaction", gethcommon.ToHex(txBytes)); err != nil {
+	if err := client.CallContext(ctx2, &result, "eth_sendRawTransaction", gethcommon.ToHex(txBytes)); err != nil {
 		return nil, err
 	}
 
