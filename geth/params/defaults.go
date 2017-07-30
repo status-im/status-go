@@ -95,7 +95,7 @@ const (
 )
 
 // NetworkIDs is a list of currently supported networks.
-var NetworkIDs = map[int]bool{
+var NetworkIDs = map[uint64]bool{
 	MainNetworkID:    true,
 	RopstenNetworkID: true,
 	RinkebyNetworkID: true,
