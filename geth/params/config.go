@@ -384,6 +384,20 @@ func loadNodeConfig(configJSON string) (*NodeConfig, error) {
 }
 
 // Validate checks if NodeConfig fields have valid values.
+//
+// It returns nil if there are no errors, otherwise one or more errors
+// can be returned. Multiple errors are joined with a new line.
+//
+// A single error for a struct:
+//
+//   type TestStruct struct {
+//       TestField string `validate:"required"`
+//   }
+//
+// has the following format:
+//
+//   Key: 'TestStruct.TestField' Error:Field validation for 'TestField' failed on the 'required' tag
+//
 func (c *NodeConfig) Validate() error {
 	validate := NewValidator()
 	return validate.Struct(c)
