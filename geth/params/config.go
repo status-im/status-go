@@ -215,10 +215,10 @@ type NodeConfig struct {
 	DevMode bool
 
 	// NetworkID sets network to use for selecting peers to connect to
-	NetworkID uint64 `json:"NetworkId,"`
+	NetworkID uint64 `json:"NetworkId," validate:"required,network"`
 
 	// DataDir is the file system folder the node should use for any data storage needs.
-	DataDir string
+	DataDir string `validate:"required"`
 
 	// KeyStoreDir is the file system folder that contains private keys.
 	// If KeyStoreDir is empty, the default location is the "keystore" subdirectory of DataDir.
@@ -227,7 +227,7 @@ type NodeConfig struct {
 	// PrivateKeyFile is a filename with node ID (private key)
 	// This file should contain a valid secp256k1 private key that will be used for both
 	// remote peer identification as well as network traffic encryption.
-	NodeKeyFile string
+	NodeKeyFile string `validate:"required"`
 
 	// Name sets the instance name of the node. It must not contain the / character.
 	Name string
@@ -350,13 +350,25 @@ func NewNodeConfig(dataDir string, networkID uint64, devMode bool) (*NodeConfig,
 
 // LoadNodeConfig parses incoming JSON and returned it as Config
 func LoadNodeConfig(configJSON string) (*NodeConfig, error) {
+	nodeConfig, err := loadNodeConfig(configJSON)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := nodeConfig.Validate(); err != nil {
+		return nil, err
+	}
+
+	return nodeConfig, nil
+}
+
+func loadNodeConfig(configJSON string) (*NodeConfig, error) {
 	nodeConfig, err := NewNodeConfig("", 0, true)
 	if err != nil {
 		return nil, err
 	}
 
 	decoder := json.NewDecoder(strings.NewReader(configJSON))
-	//decoder.UseNumber()
 
 	// override default configuration with values by JSON input
 	if err := decoder.Decode(&nodeConfig); err != nil {
@@ -368,21 +380,13 @@ func LoadNodeConfig(configJSON string) (*NodeConfig, error) {
 		return nil, err
 	}
 
-	if len(nodeConfig.DataDir) == 0 {
-		return nil, ErrMissingDataDir
-	}
-
-	if nodeConfig.NetworkID <= 0 {
-		return nil, ErrMissingNetworkID
-	}
-
 	return nodeConfig, nil
 }
 
 // Validate checks if NodeConfig fields have valid values.
 func (c *NodeConfig) Validate() error {
-	// TODO(adam): add validation here...
-	return nil
+	validate := NewValidator()
+	return validate.Struct(c)
 }
 
 // Save dumps configuration to the disk

@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	validator "gopkg.in/go-playground/validator.v9"
+
 	"github.com/ethereum/go-ethereum/core"
 	gethparams "github.com/ethereum/go-ethereum/params"
 	"github.com/status-im/status-go/geth/params"
@@ -451,4 +453,41 @@ func TestConfigWriteRead(t *testing.T) {
 	configReadWrite(params.RinkebyNetworkID, "testdata/config.rinkeby.json")
 	//configReadWrite(params.RopstenNetworkID, "testdata/config.ropsten.json")
 	//configReadWrite(params.MainNetworkID, "testdata/config.mainnet.json")
+}
+
+func TestNodeConfigValidate(t *testing.T) {
+	testCases := []struct {
+		Name   string
+		Config string
+		Result map[string]string // map[Field]Tag
+	}{
+		{
+			Name:   "Test required fields",
+			Config: `{}`,
+			Result: map[string]string{
+				"NetworkID":   "network",
+				"NodeKeyFile": "required",
+				"DataDir":     "required",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Logf("Test Case %s", tc.Name)
+
+		var err error
+
+		_, err = params.LoadNodeConfig(tc.Config)
+		if tc.Result == nil {
+			require.Nil(t, err)
+		} else {
+			require.NotNil(t, err)
+		}
+
+		validationErrors := err.(validator.ValidationErrors)
+		for _, ve := range validationErrors {
+			require.Contains(t, tc.Result, ve.Field())
+			require.Equal(t, tc.Result[ve.Field()], ve.Tag())
+		}
+	}
 }
