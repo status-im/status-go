@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	validator "gopkg.in/go-playground/validator.v9"
+	"gopkg.in/go-playground/validator.v9"
 
 	"github.com/ethereum/go-ethereum/core"
 	gethparams "github.com/ethereum/go-ethereum/params"
@@ -439,16 +439,14 @@ func TestNodeConfigValidate(t *testing.T) {
 			Name:   "Validate all required fields",
 			Config: `{}`,
 			Result: map[string]string{
-				"NetworkID":   "required",
-				"NodeKeyFile": "required",
-				"DataDir":     "required",
+				"NetworkID": "required",
+				"DataDir":   "required",
 			},
 		},
 		{
 			Name: "Check invalid NetworkID validation",
 			Config: `{
 				"NetworkId": 999,
-				"NodeKeyFile": "some-key",
 				"DataDir": "/some/dir"
 			}`,
 			Result: map[string]string{
@@ -459,7 +457,6 @@ func TestNodeConfigValidate(t *testing.T) {
 			Name: "Validate Name does not contain slash",
 			Config: `{
 				"NetworkId": 1,
-				"NodeKeyFile": "some-key",
 				"DataDir": "/some/dir",
 				"Name": "invalid/name"
 			}`,
