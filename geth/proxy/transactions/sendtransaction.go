@@ -46,12 +46,11 @@ func ExecuteRemoteSendTransaction(manager common.RPCNodeManager, req common.RPCC
 	fromAddr := req.ParseFromAddress()
 
 	// We need to request a new transaction nounce from upstream node.
-	ctx, canceler := context.WithDeadline(context.Background(), time.Now().Add(1*time.Minute))
-
-	defer canceler()
+	ctx, canceller := context.WithDeadline(context.Background(), time.Now().Add(1*time.Minute))
+	defer canceller()
 
 	var num hexutil.Uint
-	if err := client.CallContext(ctx, &num, "eth_getBlockTransactionCountByHash", fromAddr.Hash()); err != nil {
+	if err := client.CallContext(ctx, &num, "eth_getTransactionCount", fromAddr, "latest"); err != nil {
 		return nil, err
 	}
 

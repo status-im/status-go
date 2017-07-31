@@ -100,7 +100,7 @@ func (s *RPCRouterTestSuite) TestSendTransaction() {
 		}
 
 		switch txReq.Method {
-		case "eth_getBlockTransactionCountByHash":
+		case "eth_getBlockTransactionCountByHash", "eth_getTransactionCount":
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte(`{"jsonrpc": "2.0", "status":200, "result": "0x434"}`))
 			return
@@ -127,6 +127,7 @@ func (s *RPCRouterTestSuite) TestSendTransaction() {
 		decodeErr := rlp.DecodeBytes(decoded, &tx)
 		require.NoError(decodeErr)
 
+		// Validate we are receiving transaction from the proper network chain.
 		require.Equal(tx.ChainId().Int64(), int64(nodeConfig.NetworkID))
 
 		w.WriteHeader(http.StatusOK)
