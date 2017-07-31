@@ -230,7 +230,7 @@ type NodeConfig struct {
 	NodeKeyFile string `validate:"required"`
 
 	// Name sets the instance name of the node. It must not contain the / character.
-	Name string
+	Name string `validate:"excludes=/"`
 
 	// Version exposes program's version. It is used in the devp2p node identifier.
 	Version string
