@@ -227,7 +227,7 @@ type NodeConfig struct {
 	// PrivateKeyFile is a filename with node ID (private key)
 	// This file should contain a valid secp256k1 private key that will be used for both
 	// remote peer identification as well as network traffic encryption.
-	NodeKeyFile string `validate:"required"`
+	NodeKeyFile string
 
 	// Name sets the instance name of the node. It must not contain the / character.
 	Name string `validate:"excludes=/"`
