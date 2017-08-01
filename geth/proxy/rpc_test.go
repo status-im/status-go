@@ -100,7 +100,7 @@ func (s *RPCRouterTestSuite) TestSendTransaction() {
 		}
 
 		switch txReq.Method {
-		case "eth_getBlockTransactionCountByHash", "eth_getTransactionCount":
+		case "eth_getTransactionCount":
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte(`{"jsonrpc": "2.0", "status":200, "result": "0x434"}`))
 			return
