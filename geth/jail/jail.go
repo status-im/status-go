@@ -73,16 +73,16 @@ func (jail *Jail) Parse(chatID string, js string) string {
 	jail.cells[chatID] = jail.NewJailCell(chatID)
 	vm := jail.cells[chatID].CellVM()
 
-	initJjs := jail.baseJSCode + ";"
-	if _, err = vm.Run(initJjs); err != nil {
-		return makeError(err.Error())
-	}
-
 	// init jeth and its handlers
 	if err = vm.Set("jeth", struct{}{}); err != nil {
 		return makeError(err.Error())
 	}
 	if err = registerHandlers(jail, vm, chatID); err != nil {
+		return makeError(err.Error())
+	}
+
+	initJjs := jail.baseJSCode + ";"
+	if _, err = vm.Run(initJjs); err != nil {
 		return makeError(err.Error())
 	}
 
