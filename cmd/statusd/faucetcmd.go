@@ -56,6 +56,7 @@ func parseFaucetCommandConfig(ctx *cli.Context) (*params.NodeConfig, error) {
 	nodeConfig.APIModules = "eth"
 	nodeConfig.HTTPHost = "0.0.0.0" // allow to connect from anywhere
 	nodeConfig.HTTPPort = ctx.Int(HTTPPortFlag.Name)
+	nodeConfig.RPCEnabled = ctx.Bool(HTTPEnabledFlag.Name)
 
 	// extra options
 	nodeConfig.BootClusterConfig.Enabled = true
