@@ -206,7 +206,8 @@ func (s *BackendTestSuite) TestContractDeployment() {
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
 	jailInstance := s.backend.JailManager()
 	jailInstance.Parse(testChatID, "")
-	vm, err := jailInstance.JailCellVM(testChatID)
+
+	cell, err := jailInstance.GetJailCell(testChatID)
 	require.NoError(err)
 
 	// make sure you panic if transaction complete doesn't return
@@ -238,7 +239,7 @@ func (s *BackendTestSuite) TestContractDeployment() {
 		}
 	})
 
-	_, err = vm.Run(`
+	_, err = cell.Run(`
 		var responseValue = null;
 		var testContract = web3.eth.contract([{"constant":true,"inputs":[{"name":"a","type":"int256"}],"name":"double","outputs":[{"name":"","type":"int256"}],"payable":false,"type":"function"}]);
 		var test = testContract.new(
@@ -256,7 +257,7 @@ func (s *BackendTestSuite) TestContractDeployment() {
 
 	<-completeQueuedTransaction
 
-	responseValue, err := vm.Get("responseValue")
+	responseValue, err := cell.Get("responseValue")
 	require.NoError(err)
 
 	response, err := responseValue.ToString()
@@ -612,11 +613,12 @@ func (s *BackendTestSuite) TestJailWhisper() {
 				return web3.toHex(randInt);
 			};
 		`)
-		vm, err := jailInstance.JailCellVM(testCaseKey)
+
+		cell, err := jailInstance.GetJailCell(testCaseKey)
 		require.NoError(err, "cannot get VM")
 
 		// post messages
-		if _, err := vm.Run(testCase.testCode); err != nil {
+		if _, err := cell.Run(testCase.testCode); err != nil {
 			require.Fail(err.Error())
 			return
 		}
@@ -626,10 +628,10 @@ func (s *BackendTestSuite) TestJailWhisper() {
 		}
 
 		// update installed filters
-		filterId, err := vm.Get("filterId")
+		filterId, err := cell.Get("filterId")
 		require.NoError(err, "cannot get filterId")
 
-		filterName, err := vm.Get("filterName")
+		filterName, err := cell.Get("filterName")
 		require.NoError(err, "cannot get filterName")
 
 		if _, ok := installedFilters[filterName.String()]; !ok {

@@ -7,9 +7,10 @@ import (
 
 // signals
 const (
-	EventLocalStorageSet = "local_storage.set"
-	EventSendMessage     = "jail.send_message"
-	EventShowSuggestions = "jail.show_suggestions"
+	EventLocalStorageSet   = "local_storage.set"
+	EventSendMessage       = "jail.send_message"
+	EventShowSuggestions   = "jail.show_suggestions"
+	LocalStorageMaxDataLen = 256
 )
 
 // registerHandlers augments and transforms a given jail cell's underlying VM,
