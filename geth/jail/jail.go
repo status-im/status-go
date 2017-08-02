@@ -10,7 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/common"
-	"github.com/status-im/status-go/geth/jail/extensions"
 	"github.com/status-im/status-go/static"
 
 	"fknsrs.biz/p/ottoext/loop"

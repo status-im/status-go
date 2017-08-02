@@ -10,8 +10,6 @@ import (
 	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
-
-	_ "github.com/status-im/status-go/geth/jail/extensions/console" // Register console.log
 )
 
 // StatusBackend implements Status.im service
