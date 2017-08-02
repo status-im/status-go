@@ -116,11 +116,6 @@ func (jail *Jail) Parse(chatID string, js string) string {
 		return makeError(err.Error())
 	}
 
-	initJjs := jail.baseJSCode + ";"
-	if _, err = vm.Run(initJjs); err != nil {
-		return makeError(err.Error())
-	}
-
 	// sendMessage/showSuggestions handlers
 	jcell.vm.Set("statusSignals", struct{}{})
 	statusSignals, _ := jcell.vm.Get("statusSignals")
