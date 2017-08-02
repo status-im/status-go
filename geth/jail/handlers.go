@@ -3,6 +3,7 @@ package jail
 import (
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/node"
+	"github.com/status-im/status-go/geth/jail/console"
 )
 
 const (
@@ -21,6 +22,11 @@ func registerHandlers(jail *Jail, vm *otto.Otto, chatID string) (err error) {
 		return err
 	}
 	registerHandler := jeth.Object().Set
+
+	// register console handler.
+	if err = registerHandler("console", map[string]interface{}{
+		"log": console.Extension(os.Stdout, console.Log),
+	})
 
 	// register send handler
 	if err = registerHandler("send", makeSendHandler(jail, chatID)); err != nil {

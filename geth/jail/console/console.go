@@ -3,24 +3,10 @@ package console
 import (
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
 	"github.com/robertkrimen/otto"
-	"github.com/status-im/status-go/geth/jail/extensions"
 	"github.com/status-im/status-go/geth/node"
-)
-
-var (
-	// Stdout defines the default writer for the console.log
-	// delivery call.
-	Stdout io.Writer = os.Stdout
-
-	_ = extensions.Register(func(vm *otto.Otto) error {
-		return vm.Set("console", map[string]interface{}{
-			"log": consoleLog,
-		})
-	})
 )
 
 const (
@@ -37,11 +23,18 @@ const (
 	EventConsoleError = "vm.console.error"
 )
 
-// consoleLog provides the function caller for handling console.log
+// Extension takes a giving extension function and writer and returns a standard otto.Function
+// callable by a otto vm.
+func Extension(w io.Writer, ext func(otto.FunctionCall, io.Writer) otto.Value) func(otto.FunctionCall) otto.Value {
+	return func(fn otto.FunctionCall) otto.Value {
+		return ext(fn, w)
+	}
+}
+
+// Log provides the function caller for handling console.log
 // calls as replacement for the default console.log function within a
 // otto.Otto VM instance.
-func consoleLog(fn otto.FunctionCall) otto.Value {
-
+func Log(fn otto.FunctionCall, w io.Writer) otto.Value {
 	// Record provided values into store for delviery.
 	node.SendSignal(node.SignalEnvelope{
 		Type:  EventConsoleLog,
@@ -49,16 +42,15 @@ func consoleLog(fn otto.FunctionCall) otto.Value {
 	})
 
 	// Next print out the giving values.
-	handleConsole(Stdout, "console.log: %s", fn.ArgumentList)
+	handleConsole(w, "console.log: %s", fn.ArgumentList)
 
 	return otto.UndefinedValue()
 }
 
-// consoleWarn provides the function caller for handling console.warn
+// Warn provides the function caller for handling console.warn
 // calls as replacement for the default console.log function within a
 // otto.Otto VM instance.
-func consoleWarn(fn otto.FunctionCall) otto.Value {
-
+func Warn(fn otto.FunctionCall, w io.Writer) otto.Value {
 	// Record provided values into store for delviery.
 	node.SendSignal(node.SignalEnvelope{
 		Type:  EventConsoleWarn,
@@ -66,16 +58,15 @@ func consoleWarn(fn otto.FunctionCall) otto.Value {
 	})
 
 	// Next print out the giving values.
-	handleConsole(Stdout, "console.warn: %s", fn.ArgumentList)
+	handleConsole(w, "console.warn: %s", fn.ArgumentList)
 
 	return otto.UndefinedValue()
 }
 
-// consoleDebug provides the function caller for handling console.debug
+// Debug provides the function caller for handling console.debug
 // calls as replacement for the default console.Error function within a
 // otto.Otto VM instance.
-func consoleDebug(fn otto.FunctionCall) otto.Value {
-
+func Debug(fn otto.FunctionCall, w io.Writer) otto.Value {
 	// Record provided values into store for delviery.
 	node.SendSignal(node.SignalEnvelope{
 		Type:  EventConsoleDebug,
@@ -83,16 +74,15 @@ func consoleDebug(fn otto.FunctionCall) otto.Value {
 	})
 
 	// Next print out the giving values.
-	handleConsole(Stdout, "console.debug: %s", fn.ArgumentList)
+	handleConsole(w, "console.debug: %s", fn.ArgumentList)
 
 	return otto.UndefinedValue()
 }
 
-// consoleError provides the function caller for handling console.error
+// Error provides the function caller for handling console.error
 // calls as replacement for the default console.Error function within a
 // otto.Otto VM instance.
-func consoleError(fn otto.FunctionCall) otto.Value {
-
+func Error(fn otto.FunctionCall, w io.Writer) otto.Value {
 	// Record provided values into store for delviery.
 	node.SendSignal(node.SignalEnvelope{
 		Type:  EventConsoleError,
@@ -100,7 +90,7 @@ func consoleError(fn otto.FunctionCall) otto.Value {
 	})
 
 	// Next print out the giving values.
-	handleConsole(Stdout, "console.error: %s", fn.ArgumentList)
+	handleConsole(w, "console.error: %s", fn.ArgumentList)
 
 	return otto.UndefinedValue()
 }
