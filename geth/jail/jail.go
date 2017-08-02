@@ -70,7 +70,10 @@ func (jail *Jail) Parse(chatID string, js string) string {
 	jail.Lock()
 	defer jail.Unlock()
 
-	jail.cells[chatID] = jail.NewJailCell(chatID)
+	// Registers all extensions to the vm.
+	cell := jail.NewJailCell(chatID)
+
+	jail.cells[chatID] = cell
 	vm := jail.cells[chatID].CellVM()
 
 	// init jeth and its handlers
