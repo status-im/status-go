@@ -70,23 +70,8 @@ func (jail *Jail) Parse(chatID string, js string) string {
 	jail.Lock()
 	defer jail.Unlock()
 
+	// Registers all extensions to the vm.
 	cell := jail.NewJailCell(chatID)
-<<<<<<< HEAD
-=======
-
-	// Registers all extensions to the vm.
-	if err := extensions.ActivateExtensions(cell.CellVM()); err != nil {
-		return makeError(err.Error())
-	}
-
-	jail.cells[chatID] = cell
-	vm := jail.cells[chatID].CellVM()
->>>>>>> 0204094329486b4dfa0c6c451c5198296e110616
-
-	// Registers all extensions to the vm.
-	if err := extensions.ActivateExtensions(cell.CellVM()); err != nil {
-		return makeError(err.Error())
-	}
 
 	jail.cells[chatID] = cell
 	vm := jail.cells[chatID].CellVM()
