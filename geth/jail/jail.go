@@ -91,6 +91,8 @@ func (jail *Jail) Parse(chatID string, js string) string {
 		return makeError(ErrInvalidJail.Error())
 	}
 
+	//TODO(influx6): Find out if calls to Parse must always start with new Jail,
+	// is it possible to get a ChatID that was previous registered?
 	if _, err := jail.NewJailCell(chatID); err != nil {
 		return makeError(err.Error())
 	}
@@ -148,10 +150,10 @@ func (jail *Jail) Call(chatID string, path string, args string) string {
 		return makeError(err.Error())
 	}
 
+	res, err := jcell.Call("call", nil, path, args)
+
 	jcell.Lock()
 	defer jcell.Unlock()
-
-	res, err := jcell.vm.Call("call", nil, path, args)
 
 	// WARNING(influx6): We can have go-routine leakage due to continous call to this method
 	// and the call to cell.CellLoop().Run() due to improper usage, let's keep this
