@@ -121,8 +121,6 @@ func (s *JailTestSuite) TestJailLoopInCall() {
 	`)
 	require.NoError(err)
 
-	// NOTE: Fails to work because it's running intirely
-
 	_, err = cell.CallOnLoop("callRunner", nil, "softball")
 	require.NoError(err)
 
