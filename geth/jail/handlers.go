@@ -1,16 +1,21 @@
 package jail
 
 import (
+	"os"
+
 	"github.com/robertkrimen/otto"
+	"github.com/status-im/status-go/geth/jail/console"
 	"github.com/status-im/status-go/geth/node"
 )
 
 // signals
 const (
-	EventLocalStorageSet   = "local_storage.set"
-	EventSendMessage       = "jail.send_message"
-	EventShowSuggestions   = "jail.show_suggestions"
-	LocalStorageMaxDataLen = 256
+	EventLocalStorageSet = "local_storage.set"
+	EventSendMessage     = "jail.send_message"
+	EventShowSuggestions = "jail.show_suggestions"
+
+	// EventConsoleLog defines the event type for the console.log call.
+	eventConsoleLog = "vm.console.log"
 )
 
 // registerHandlers augments and transforms a given jail cell's underlying VM,
@@ -21,6 +26,14 @@ func registerHandlers(jail *Jail, vm *otto.Otto, chatID string) error {
 		return err
 	}
 	registerHandler := jeth.Object().Set
+
+	if err = registerHandler("console", map[string]interface{}{
+		"log": func(fn otto.FunctionCall) otto.Value {
+			return console.Write(fn, os.Stdout, eventConsoleLog)
+		},
+	}); err != nil {
+		return err
+	}
 
 	// register send handler
 	if err = registerHandler("send", makeSendHandler(jail)); err != nil {
