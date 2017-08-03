@@ -115,9 +115,10 @@ func (c *RPCManager) callUpstreamStream(config *params.NodeConfig, body io.Reade
 		return nil, err
 	}
 
-	httpReq := httptest.NewRequest("POST", "/", body)
-	httpReq.RequestURI = ""
-	httpReq.URL = upstreamURL
+	httpReq, err := http.NewRequest("POST", upstreamURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
 
 	httpClient := http.Client{
 		Timeout: 20 * time.Second,
@@ -143,12 +144,16 @@ func (c *RPCManager) callUpstreamStream(config *params.NodeConfig, body io.Reade
 func (c *RPCManager) callNodeStream(body io.Reader) ([]byte, error) {
 	server, err := c.nodeManager.RPCServer()
 	if err != nil {
-		// return c.makeJSONErrorResponse(err)
 		return nil, err
 	}
 
-	httpReq := httptest.NewRequest("POST", "/", body)
+	httpReq, err := http.NewRequest("POST", "/", body)
+	if err != nil {
+		return nil, err
+	}
+
 	rr := httptest.NewRecorder()
+
 	server.ServeHTTP(rr, httpReq)
 
 	// Check the status code is what we expect.
