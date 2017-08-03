@@ -139,9 +139,7 @@ func ExecuteOtherTransaction(manager common.NodeManager, req common.RPCCall, cal
 		return nil, common.StopRPCCallError{Err: err}
 	}
 
-	errc := make(chan error, 1)
-	errc <- client.Call(&result, req.Method, req.Params...)
-	err = <-errc
+	err = client.Call(&result, req.Method, req.Params...)
 
 	switch err := err.(type) {
 	case nil:
