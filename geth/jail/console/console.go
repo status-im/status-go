@@ -9,24 +9,18 @@ import (
 	"github.com/status-im/status-go/geth/node"
 )
 
-// Write provides the baselevel function to writes data to the underline writer
+// Write provides the base function to write data to the underline writer
 // for the underline otto vm.
-func Write(fn otto.FunctionCall, w io.Writer, ntype string) otto.Value {
+func Write(fn otto.FunctionCall, w io.Writer, consoleEventName string) otto.Value {
 	node.SendSignal(node.SignalEnvelope{
-		Type:  ntype,
+		Type:  consoleEventName,
 		Event: convertArgs(fn.ArgumentList),
 	})
 
 	// Next print out the giving values.
-	writeConsole(w, "%s: %s", ntype, fn.ArgumentList)
+	fmt.Fprintf(w, "%s: %s", consoleEventName, formatForConsole(fn.ArgumentList))
 
 	return otto.UndefinedValue()
-}
-
-// writeArgument takes the giving otto.Values and transform as
-// needed into the appropriate writer.
-func writeConsole(writer io.Writer, format string, ntype string, args []otto.Value) {
-	fmt.Fprintf(writer, format, ntype, formatForConsole(args))
 }
 
 // formatForConsole handles conversion of giving otto.Values into
