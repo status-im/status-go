@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -71,31 +72,27 @@ func (c *RPCManager) Call(inputJSON string) string {
 
 	// allow HTTP requests to block w/o
 	outputJSON := make(chan string, 1)
+
 	go func() {
 		body := bytes.NewBufferString(inputJSON)
 
-		if !config.UpstreamConfig.Enabled {
+		var err error
+		var res []byte
+
+		if config.UpstreamConfig.Enabled {
+			log.Info("Making RPC JSON Request to upstream RPCServer")
+			res, err = c.callUpstreamStream(config, body)
+		} else {
 			log.Info("Making RPC JSON Request to internal RPCServer")
-
-			resbody, err := c.callNodeStream(body)
-			if err != nil {
-				outputJSON <- c.makeJSONErrorResponse(err)
-				return
-			}
-
-			outputJSON <- string(resbody)
-			return
+			res, err = c.callNodeStream(body)
 		}
 
-		log.Info("Making RPC JSON Request to upstream RPCServer")
-
-		resbody, err := c.callUpstreamStream(config, body)
 		if err != nil {
 			outputJSON <- c.makeJSONErrorResponse(err)
 			return
 		}
 
-		outputJSON <- string(resbody)
+		outputJSON <- string(res)
 		return
 	}()
 
@@ -138,13 +135,7 @@ func (c *RPCManager) callUpstreamStream(config *params.NodeConfig, body io.Reade
 
 	defer res.Body.Close()
 
-	var resbody bytes.Buffer
-
-	if _, err := io.Copy(&resbody, res.Body); err != nil && err != io.EOF {
-		return nil, err
-	}
-
-	return resbody.Bytes(), nil
+	return ioutil.ReadAll(res.Body)
 }
 
 // callNodeStream delivers giving request and body content to the internal ethereum

@@ -18,12 +18,14 @@ import (
 	"github.com/status-im/status-go/geth/common"
 )
 
+// TODO(influx6): Can we refactor this all into jail package.
+
 // contains sets of possible defines the name for a giving transaction.
 const (
 	SendTransactionName = "eth_sendTransaction"
 )
 
-// ExecuteRemoteSendTransaction defines a funct
+// ExecuteRemoteSendTransaction defines a function to execute RPC method over the upstream server.
 func ExecuteRemoteSendTransaction(manager common.RPCNodeManager, req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
 	resp, _ := call.Otto.Object(`({"jsonrpc":"2.0"})`)
 	resp.Set("id", req.ID)
@@ -43,7 +45,15 @@ func ExecuteRemoteSendTransaction(manager common.RPCNodeManager, req common.RPCC
 		return nil, err
 	}
 
-	fromAddr := req.ParseFromAddress()
+	fromAddr, err := req.ParseFromAddress()
+	if err != nil {
+		return nil, err
+	}
+
+	toAddr, err := req.ParseToAddress()
+	if err != nil {
+		return nil, err
+	}
 
 	// We need to request a new transaction nounce from upstream node.
 	ctx, canceller := context.WithDeadline(context.Background(), time.Now().Add(1*time.Minute))
@@ -55,14 +65,13 @@ func ExecuteRemoteSendTransaction(manager common.RPCNodeManager, req common.RPCC
 	}
 
 	nonce := uint64(num)
-	toAddr := req.ParseToAddress()
 	gas := (*big.Int)(req.ParseGas())
 	dataVal := []byte(req.ParseData())
 	priceVal := (*big.Int)(req.ParseValue())
 	gasPrice := (*big.Int)(req.ParseGasPrice())
 	chainID := big.NewInt(int64(config.NetworkID))
 
-	tx := types.NewTransaction(nonce, *toAddr, priceVal, gas, gasPrice, dataVal)
+	tx := types.NewTransaction(nonce, toAddr, priceVal, gas, gasPrice, dataVal)
 	txs, err := types.SignTx(tx, types.NewEIP155Signer(chainID), selectedAcct.AccountKey.PrivateKey)
 	if err != nil {
 		return nil, err
@@ -88,8 +97,8 @@ func ExecuteRemoteSendTransaction(manager common.RPCNodeManager, req common.RPCC
 	return resp, nil
 }
 
-// ExecuteSendTransaction defines a function which handles the procedure called for the dealing with
-// RPCCalls with "eth_sendTransaction" Methods.
+// ExecuteSendTransaction defines a function which handles execution of RPC method over the internal rpc server
+// from the eth.LightClient. It specifically caters to process eth_sendTransaction.
 func ExecuteSendTransaction(manager common.NodeManager, req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
 	resp, _ := call.Otto.Object(`({"jsonrpc":"2.0"})`)
 	resp.Set("id", req.ID)
@@ -105,39 +114,10 @@ func ExecuteSendTransaction(manager common.NodeManager, req common.RPCCall, call
 	return resp, nil
 }
 
-func processRPCCall(manager common.NodeManager, req common.RPCCall, call otto.FunctionCall) (gethcommon.Hash, error) {
-	lightEthereum, err := manager.LightEthereumService()
-	if err != nil {
-		return gethcommon.Hash{}, err
-	}
-
-	backend := lightEthereum.StatusBackend
-
-	messageID, err := preProcessRequest(call.Otto, req)
-	if err != nil {
-		return gethcommon.Hash{}, err
-	}
-
-	// onSendTransactionRequest() will use context to obtain and release ticket
-	ctx := context.Background()
-	ctx = context.WithValue(ctx, common.MessageIDKey, messageID)
-
-	//  this call blocks, up until Complete Transaction is called
-	txHash, err := backend.SendTransaction(ctx, sendTxArgsFromRPCCall(req))
-	if err != nil {
-		return gethcommon.Hash{}, err
-	}
-
-	// invoke post processing
-	postProcessRequest(call.Otto, req, messageID)
-
-	return txHash, nil
-}
-
-//==========================================================================================================
-
 // ExecuteOtherTransaction defines a function which handles the processing of non `eth_sendTransaction`
-// requests. It is expected that this method does not require signing the transaction.
+// rpc request to the internal node server.
+// TODO(influx6): Consider refactoring this later, am not sure yet but feel we can do better when the
+// project settles.
 func ExecuteOtherTransaction(manager common.NodeManager, req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
 	client, err := manager.RPCClient()
 	if err != nil {
@@ -209,6 +189,35 @@ func ExecuteOtherTransaction(manager common.NodeManager, req common.RPCCall, cal
 
 //==========================================================================================================
 
+func processRPCCall(manager common.NodeManager, req common.RPCCall, call otto.FunctionCall) (gethcommon.Hash, error) {
+	lightEthereum, err := manager.LightEthereumService()
+	if err != nil {
+		return gethcommon.Hash{}, err
+	}
+
+	backend := lightEthereum.StatusBackend
+
+	messageID, err := preProcessRequest(call.Otto, req)
+	if err != nil {
+		return gethcommon.Hash{}, err
+	}
+
+	// onSendTransactionRequest() will use context to obtain and release ticket
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, common.MessageIDKey, messageID)
+
+	//  this call blocks, up until Complete Transaction is called
+	txHash, err := backend.SendTransaction(ctx, sendTxArgsFromRPCCall(req))
+	if err != nil {
+		return gethcommon.Hash{}, err
+	}
+
+	// invoke post processing
+	postProcessRequest(call.Otto, req, messageID)
+
+	return txHash, nil
+}
+
 // preProcessRequest pre-processes a given RPC call to a given Otto VM
 func preProcessRequest(vm *otto.Otto, req common.RPCCall) (string, error) {
 	messageID := currentMessageID(vm.Context())
@@ -233,9 +242,22 @@ func sendTxArgsFromRPCCall(req common.RPCCall) status.SendTxArgs {
 		return status.SendTxArgs{}
 	}
 
+	var err error
+	var fromAddr, toAddr gethcommon.Address
+
+	fromAddr, err = req.ParseFromAddress()
+	if err != nil {
+		fromAddr = gethcommon.HexToAddress("0x0")
+	}
+
+	toAddr, err = req.ParseFromAddress()
+	if err != nil {
+		toAddr = gethcommon.HexToAddress("0x0")
+	}
+
 	return status.SendTxArgs{
-		From:     req.ParseFromAddress(),
-		To:       req.ParseToAddress(),
+		To:       &toAddr,
+		From:     fromAddr,
 		Value:    req.ParseValue(),
 		Data:     req.ParseData(),
 		Gas:      req.ParseGas(),

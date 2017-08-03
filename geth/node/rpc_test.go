@@ -31,9 +31,14 @@ type RPCTestSuite struct {
 func (s *RPCTestSuite) SetupTest() {
 	require := s.Require()
 
-	s.NodeManager = proxy.NewRPCRouter(node.NewNodeManager())
+	nodeManager := node.NewNodeManager()
+	require.NotNil(nodeManager)
+
+	acctManager := node.NewAccountManager(nodeManager)
+	require.NotNil(acctManager)
+
+	s.NodeManager = proxy.NewRPCRouter(nodeManager, acctManager)
 	require.NotNil(s.NodeManager)
-	require.IsType(&proxy.RPCRouter{}, s.NodeManager)
 }
 
 func (s *RPCTestSuite) TestCallRPC() {

@@ -104,7 +104,6 @@ func (s *RPCRouterTestSuite) TestSendTransaction() {
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte(`{"jsonrpc": "2.0", "status":200, "result": "0x434"}`))
 			return
-		default:
 		}
 
 		payload := ([]byte)(txReq.Payload)

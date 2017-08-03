@@ -1,6 +1,8 @@
 package common
 
 import (
+	"errors"
+
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 )
@@ -12,35 +14,40 @@ type RPCCall struct {
 	Params []interface{}
 }
 
+// contains series of errors for parsing operations.
+var (
+	ErrInvalidFromAddress = errors.New("Failed to parse From Address")
+	ErrInvalidToAddress   = errors.New("Failed to parse To Address")
+)
+
 // ParseFromAddress returns the address associated with the RPCCall.
-func (r RPCCall) ParseFromAddress() gethcommon.Address {
+func (r RPCCall) ParseFromAddress() (gethcommon.Address, error) {
 	params, ok := r.Params[0].(map[string]interface{})
 	if !ok {
-		return gethcommon.HexToAddress("0x")
+		return gethcommon.HexToAddress("0x"), ErrInvalidFromAddress
 	}
 
 	from, ok := params["from"].(string)
 	if !ok {
-		from = "0x"
+		return gethcommon.HexToAddress("0x"), ErrInvalidFromAddress
 	}
 
-	return gethcommon.HexToAddress(from)
+	return gethcommon.HexToAddress(from), nil
 }
 
 // ParseToAddress returns the gethcommon.Address associated with the call.
-func (r RPCCall) ParseToAddress() *gethcommon.Address {
+func (r RPCCall) ParseToAddress() (gethcommon.Address, error) {
 	params, ok := r.Params[0].(map[string]interface{})
 	if !ok {
-		return nil
+		return gethcommon.HexToAddress("0x"), ErrInvalidToAddress
 	}
 
 	to, ok := params["to"].(string)
 	if !ok {
-		return nil
+		return gethcommon.HexToAddress("0x"), ErrInvalidToAddress
 	}
 
-	address := gethcommon.HexToAddress(to)
-	return &address
+	return gethcommon.HexToAddress(to), nil
 }
 
 // ParseData returns the bytes associated with the call.
