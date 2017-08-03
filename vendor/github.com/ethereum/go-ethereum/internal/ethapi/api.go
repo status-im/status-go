@@ -19,7 +19,6 @@ package ethapi
 import (
 	"bytes"
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -119,16 +118,16 @@ func (s *PublicTxPoolAPI) Content() map[string]map[string]map[string]*RPCTransac
 	// Flatten the pending transactions
 	for account, txs := range pending {
 		dump := make(map[string]*RPCTransaction)
-		for nonce, tx := range txs {
-			dump[fmt.Sprintf("%d", nonce)] = newRPCPendingTransaction(tx)
+		for _, tx := range txs {
+			dump[fmt.Sprintf("%d", tx.Nonce())] = newRPCPendingTransaction(tx)
 		}
 		content["pending"][account.Hex()] = dump
 	}
 	// Flatten the queued transactions
 	for account, txs := range queue {
 		dump := make(map[string]*RPCTransaction)
-		for nonce, tx := range txs {
-			dump[fmt.Sprintf("%d", nonce)] = newRPCPendingTransaction(tx)
+		for _, tx := range txs {
+			dump[fmt.Sprintf("%d", tx.Nonce())] = newRPCPendingTransaction(tx)
 		}
 		content["queued"][account.Hex()] = dump
 	}
@@ -163,16 +162,16 @@ func (s *PublicTxPoolAPI) Inspect() map[string]map[string]map[string]string {
 	// Flatten the pending transactions
 	for account, txs := range pending {
 		dump := make(map[string]string)
-		for nonce, tx := range txs {
-			dump[fmt.Sprintf("%d", nonce)] = format(tx)
+		for _, tx := range txs {
+			dump[fmt.Sprintf("%d", tx.Nonce())] = format(tx)
 		}
 		content["pending"][account.Hex()] = dump
 	}
 	// Flatten the queued transactions
 	for account, txs := range queue {
 		dump := make(map[string]string)
-		for nonce, tx := range txs {
-			dump[fmt.Sprintf("%d", nonce)] = format(tx)
+		for _, tx := range txs {
+			dump[fmt.Sprintf("%d", tx.Nonce())] = format(tx)
 		}
 		content["queued"][account.Hex()] = dump
 	}
@@ -214,15 +213,17 @@ func (s *PublicAccountAPI) Accounts() []common.Address {
 // It offers methods to create, (un)lock en list accounts. Some methods accept
 // passwords and are therefore considered private by default.
 type PrivateAccountAPI struct {
-	am *accounts.Manager
-	b  Backend
+	am        *accounts.Manager
+	nonceLock *AddrLocker
+	b         Backend
 }
 
 // NewPrivateAccountAPI create a new PrivateAccountAPI.
-func NewPrivateAccountAPI(b Backend) *PrivateAccountAPI {
+func NewPrivateAccountAPI(b Backend, nonceLock *AddrLocker) *PrivateAccountAPI {
 	return &PrivateAccountAPI{
-		am: b.AccountManager(),
-		b:  b,
+		am:        b.AccountManager(),
+		nonceLock: nonceLock,
+		b:         b,
 	}
 }
 
@@ -296,12 +297,11 @@ func fetchKeystore(am *accounts.Manager) *keystore.KeyStore {
 // ImportRawKey stores the given hex encoded ECDSA key into the key directory,
 // encrypting it with the passphrase.
 func (s *PrivateAccountAPI) ImportRawKey(privkey string, password string) (common.Address, error) {
-	hexkey, err := hex.DecodeString(privkey)
+	key, err := crypto.HexToECDSA(privkey)
 	if err != nil {
 		return common.Address{}, err
 	}
-
-	acc, err := fetchKeystore(s.am).ImportECDSA(crypto.ToECDSA(hexkey), password)
+	acc, err := fetchKeystore(s.am).ImportECDSA(key, password)
 	return acc.Address, err
 }
 
@@ -331,15 +331,23 @@ func (s *PrivateAccountAPI) LockAccount(addr common.Address) bool {
 // tries to sign it with the key associated with args.To. If the given passwd isn't
 // able to decrypt the key it fails.
 func (s *PrivateAccountAPI) SendTransaction(ctx context.Context, args SendTxArgs, passwd string) (common.Hash, error) {
-	// Set some sanity defaults and terminate on failure
-	if err := args.setDefaults(ctx, s.b); err != nil {
-		return common.Hash{}, err
-	}
 	// Look up the wallet containing the requested signer
 	account := accounts.Account{Address: args.From}
 
 	wallet, err := s.am.Find(account)
 	if err != nil {
+		return common.Hash{}, err
+	}
+
+	if args.Nonce == nil {
+		// Hold the addresse's mutex around signing to prevent concurrent assignment of
+		// the same nonce to multiple accounts.
+		s.nonceLock.LockAddr(args.From)
+		defer s.nonceLock.UnlockAddr(args.From)
+	}
+
+	// Set some sanity defaults and terminate on failure
+	if err := args.setDefaults(ctx, s.b); err != nil {
 		return common.Hash{}, err
 	}
 	// Assemble the transaction and sign with the wallet
@@ -453,8 +461,8 @@ func (s *PublicBlockChainAPI) GetBalance(ctx context.Context, address common.Add
 	if state == nil || err != nil {
 		return nil, err
 	}
-
-	return state.GetBalance(ctx, address)
+	b := state.GetBalance(address)
+	return b, state.Error()
 }
 
 // GetBlockByNumber returns the requested block. When blockNr is -1 the chain head is returned. When fullTx is true all
@@ -535,31 +543,25 @@ func (s *PublicBlockChainAPI) GetUncleCountByBlockHash(ctx context.Context, bloc
 }
 
 // GetCode returns the code stored at the given address in the state for the given block number.
-func (s *PublicBlockChainAPI) GetCode(ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (string, error) {
+func (s *PublicBlockChainAPI) GetCode(ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (hexutil.Bytes, error) {
 	state, _, err := s.b.StateAndHeaderByNumber(ctx, blockNr)
 	if state == nil || err != nil {
-		return "", err
+		return nil, err
 	}
-	res, err := state.GetCode(ctx, address)
-	if len(res) == 0 || err != nil { // backwards compatibility
-		return "0x", err
-	}
-	return common.ToHex(res), nil
+	code := state.GetCode(address)
+	return code, state.Error()
 }
 
 // GetStorageAt returns the storage from the state at the given address, key and
 // block number. The rpc.LatestBlockNumber and rpc.PendingBlockNumber meta block
 // numbers are also allowed.
-func (s *PublicBlockChainAPI) GetStorageAt(ctx context.Context, address common.Address, key string, blockNr rpc.BlockNumber) (string, error) {
+func (s *PublicBlockChainAPI) GetStorageAt(ctx context.Context, address common.Address, key string, blockNr rpc.BlockNumber) (hexutil.Bytes, error) {
 	state, _, err := s.b.StateAndHeaderByNumber(ctx, blockNr)
 	if state == nil || err != nil {
-		return "0x", err
+		return nil, err
 	}
-	res, err := state.GetState(ctx, address, common.HexToHash(key))
-	if err != nil {
-		return "0x", err
-	}
-	return res.Hex(), nil
+	res := state.GetState(address, common.HexToHash(key))
+	return res[:], state.Error()
 }
 
 // callmsg is the message type used for call transitions.
@@ -901,12 +903,13 @@ func newRPCTransaction(b *types.Block, txHash common.Hash) (*RPCTransaction, err
 
 // PublicTransactionPoolAPI exposes methods for the RPC interface
 type PublicTransactionPoolAPI struct {
-	b Backend
+	b         Backend
+	nonceLock *AddrLocker
 }
 
 // NewPublicTransactionPoolAPI creates a new RPC service with methods specific for the transaction pool.
-func NewPublicTransactionPoolAPI(b Backend) *PublicTransactionPoolAPI {
-	return &PublicTransactionPoolAPI{b}
+func NewPublicTransactionPoolAPI(b Backend, nonceLock *AddrLocker) *PublicTransactionPoolAPI {
+	return &PublicTransactionPoolAPI{b, nonceLock}
 }
 
 func getTransaction(chainDb ethdb.Database, b Backend, txHash common.Hash) (*types.Transaction, bool, error) {
@@ -983,11 +986,8 @@ func (s *PublicTransactionPoolAPI) GetTransactionCount(ctx context.Context, addr
 	if state == nil || err != nil {
 		return nil, err
 	}
-	nonce, err := state.GetNonce(ctx, address)
-	if err != nil {
-		return nil, err
-	}
-	return (*hexutil.Uint64)(&nonce), nil
+	nonce := state.GetNonce(address)
+	return (*hexutil.Uint64)(&nonce), state.Error()
 }
 
 // getTransactionBlockData fetches the meta data for the given transaction from the chain database. This is useful to
@@ -1216,6 +1216,18 @@ func (s *PublicTransactionPoolAPI) CompleteQueuedTransaction(ctx context.Context
 	if err != nil {
 		return common.Hash{}, err
 	}
+
+	if args.Nonce == nil {
+		// Hold the addresse's mutex around signing to prevent concurrent assignment of
+		// the same nonce to multiple accounts.
+		s.nonceLock.LockAddr(args.From)
+		defer s.nonceLock.UnlockAddr(args.From)
+	}
+
+	// Set some sanity defaults and terminate on failure
+	if err := args.setDefaults(ctx, s.b); err != nil {
+		return common.Hash{}, err
+	}
 	// Assemble the transaction and sign with the wallet
 	tx := args.toTransaction()
 
@@ -1292,6 +1304,12 @@ type SignTransactionResult struct {
 // The node needs to have the private key of the account corresponding with
 // the given from address and it needs to be unlocked.
 func (s *PublicTransactionPoolAPI) SignTransaction(ctx context.Context, args SendTxArgs) (*SignTransactionResult, error) {
+	if args.Nonce == nil {
+		// Hold the addresse's mutex around signing to prevent concurrent assignment of
+		// the same nonce to multiple accounts.
+		s.nonceLock.LockAddr(args.From)
+		defer s.nonceLock.UnlockAddr(args.From)
+	}
 	if err := args.setDefaults(ctx, s.b); err != nil {
 		return nil, err
 	}

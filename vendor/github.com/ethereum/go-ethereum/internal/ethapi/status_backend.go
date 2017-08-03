@@ -34,7 +34,7 @@ func NewStatusBackend(apiBackend Backend) *StatusBackend {
 	return &StatusBackend{
 		eapi:    NewPublicEthereumAPI(apiBackend),
 		bcapi:   NewPublicBlockChainAPI(apiBackend),
-		txapi:   NewPublicTransactionPoolAPI(apiBackend),
+		txapi:   NewPublicTransactionPoolAPI(apiBackend, new(AddrLocker)),
 		txQueue: status.NewTransactionQueue(),
 		am:      status.NewAccountManager(apiBackend.AccountManager()),
 	}
