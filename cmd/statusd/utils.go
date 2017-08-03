@@ -179,11 +179,11 @@ func testGetDefaultConfig(t *testing.T) bool {
 		return false
 	}
 	chainConfig := genesis.Config
-	if chainConfig.HomesteadBlock.Cmp(gethparams.MainNetHomesteadBlock) != 0 {
+	if chainConfig.HomesteadBlock.Cmp(gethparams.MainnetChainConfig.HomesteadBlock) != 0 {
 		t.Error("invalid chainConfig.HomesteadBlock")
 		return false
 	}
-	if chainConfig.DAOForkBlock.Cmp(gethparams.MainNetDAOForkBlock) != 0 {
+	if chainConfig.DAOForkBlock.Cmp(gethparams.MainnetChainConfig.DAOForkBlock) != 0 {
 		t.Error("invalid chainConfig.DAOForkBlock")
 		return false
 	}
@@ -191,23 +191,23 @@ func testGetDefaultConfig(t *testing.T) bool {
 		t.Error("invalid chainConfig.DAOForkSupport")
 		return false
 	}
-	if chainConfig.EIP150Block.Cmp(gethparams.MainNetHomesteadGasRepriceBlock) != 0 {
+	if chainConfig.EIP150Block.Cmp(gethparams.MainnetChainConfig.EIP150Block) != 0 {
 		t.Error("invalid chainConfig.EIP150Block")
 		return false
 	}
-	if chainConfig.EIP150Hash != gethparams.MainNetHomesteadGasRepriceHash {
+	if chainConfig.EIP150Hash != gethparams.MainnetChainConfig.EIP150Hash {
 		t.Error("invalid chainConfig.EIP150Hash")
 		return false
 	}
-	if chainConfig.EIP155Block.Cmp(gethparams.MainNetSpuriousDragon) != 0 {
+	if chainConfig.EIP155Block.Cmp(gethparams.MainnetChainConfig.EIP155Block) != 0 {
 		t.Error("invalid chainConfig.EIP155Block")
 		return false
 	}
-	if chainConfig.EIP158Block.Cmp(gethparams.MainNetSpuriousDragon) != 0 {
+	if chainConfig.EIP158Block.Cmp(gethparams.MainnetChainConfig.EIP158Block) != 0 {
 		t.Error("invalid chainConfig.EIP158Block")
 		return false
 	}
-	if chainConfig.ChainId.Cmp(gethparams.MainNetChainID) != 0 {
+	if chainConfig.ChainId.Cmp(gethparams.MainnetChainConfig.ChainId) != 0 {
 		t.Error("invalid chainConfig.ChainId")
 		return false
 	}

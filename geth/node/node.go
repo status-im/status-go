@@ -191,7 +191,7 @@ func activateShhService(stack *node.Node, config *params.NodeConfig) error {
 
 	serviceConstructor := func(*node.ServiceContext) (node.Service, error) {
 		whisperConfig := config.WhisperConfig
-		whisperService := whisper.New()
+		whisperService := whisper.New(nil)
 
 		// enable mail service
 		if whisperConfig.MailServerNode {
