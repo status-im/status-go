@@ -24,12 +24,10 @@ type ConsoleTestSuite struct {
 }
 
 func (s *ConsoleTestSuite) SetupTest() {
-	vm := otto.New()
 	require := s.Require()
 
+	vm := otto.New()
 	require.NotNil(vm)
-	require.IsType(&otto.Otto{}, vm)
-
 	s.vm = vm
 }
 
@@ -41,23 +39,24 @@ func (s *ConsoleTestSuite) TestConsoleLog() {
 
 	var customWriter bytes.Buffer
 
-	// register console handler.
 	err := s.vm.Set("console", map[string]interface{}{
-		"log": console.Extension(&customWriter, console.Log),
+		"log": func(fn otto.FunctionCall) otto.Value {
+			return console.Write(fn, &customWriter, "vm.console")
+		},
 	})
 	require.NoError(err)
 
 	_, err = s.vm.Run(fmt.Sprintf(`console.log(%q);`, written))
 	require.NoError(err)
-
-	require.NotEmpty(&customWriter)
-	require.Equal(written, strings.TrimPrefix(customWriter.String(), "console.log: "))
+	require.Equal(written, strings.TrimPrefix(customWriter.String(), "vm.console: "))
 }
 
 // TestObjectLogging will validate the operations of the console.log extension
 // when capturing objects declared from javascript.
 func (s *ConsoleTestSuite) TestObjectLogging() {
 	require := s.Require()
+
+	var customWriter bytes.Buffer
 
 	node.SetDefaultNodeNotificationHandler(func(event string) {
 
@@ -72,7 +71,7 @@ func (s *ConsoleTestSuite) TestObjectLogging() {
 		err := json.Unmarshal([]byte(event), &eventReceived)
 		require.NoError(err)
 
-		require.Equal(eventReceived.Type, "vm.console.log")
+		require.Equal(eventReceived.Type, "vm.console")
 		require.NotEmpty(eventReceived.Event)
 
 		objectReceived := eventReceived.Event[0]
@@ -80,11 +79,10 @@ func (s *ConsoleTestSuite) TestObjectLogging() {
 		require.Equal(objectReceived.Name, "bob")
 	})
 
-	var customWriter bytes.Buffer
-
-	// register console handler.
 	err := s.vm.Set("console", map[string]interface{}{
-		"log": console.Extension(&customWriter, console.Log),
+		"log": func(fn otto.FunctionCall) otto.Value {
+			return console.Write(fn, &customWriter, "vm.console")
+		},
 	})
 	require.NoError(err)
 
