@@ -657,3 +657,146 @@ func (s *BackendTestSuite) TestJailWhisper() {
 		}
 	}
 }
+
+func (s *BackendTestSuite) TestJailVMPersistence() {
+	require := s.Require()
+
+	s.StartTestBackend(params.RopstenNetworkID)
+	defer s.StopTestBackend()
+
+	// log into account from which transactions will be sent
+	err := s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
+	require.NoError(err, "cannot select account: %v", TestConfig.Account1.Address)
+
+	type testCase struct {
+		command   string
+		params    string
+		validator func(response string) error
+	}
+	var testCases = []testCase{
+		{
+			`["sendTestTx"]`,
+			`{"amount": "0.000001", "from": "` + TestConfig.Account1.Address + `"}`,
+			func(response string) error {
+				return nil
+			},
+		},
+		{
+			`["sendTestTx"]`,
+			`{"amount": "0.000002", "from": "` + TestConfig.Account1.Address + `"}`,
+			func(response string) error {
+				return nil
+			},
+		},
+		{
+			`["ping"]`,
+			`{"pong": "Ping1", "amount": 0.42}`,
+			func(response string) error {
+				expectedResponse := `{"result": "Ping1"}`
+				if response != expectedResponse {
+					return fmt.Errorf("unexpected response, expected: %v, got: %v", expectedResponse, response)
+				}
+				return nil
+			},
+		},
+		{
+			`["ping"]`,
+			`{"pong": "Ping2", "amount": 0.42}`,
+			func(response string) error {
+				expectedResponse := `{"result": "Ping2"}`
+				if response != expectedResponse {
+					return fmt.Errorf("unexpected response, expected: %v, got: %v", expectedResponse, response)
+				}
+				return nil
+			},
+		},
+	}
+
+	jailInstance := jail.New(s.backend.NodeManager())
+	jailInstance.Parse(testChatID, `
+		var total = 0;
+		_status_catalog['ping'] = function(params) {
+			total += params.amount;
+			return params.pong;
+		}
+
+		_status_catalog['sendTestTx'] = function(params) {
+		  var amount = params.amount;
+		  var transaction = {
+			"from": params.from,
+			"to": "0xf82da7547534045b4e00442bc89e16186cf8c272",
+			"value": web3.toWei(amount, "ether")
+		  };
+		  web3.eth.sendTransaction(transaction, function (error, result) {
+		  	 console.log("eth.sendTransaction callback: 'total' variable (is it updated by concurrent routine): " + total);
+			 if(!error)
+				total += amount;
+		  });
+		}
+	`)
+
+	progress := make(chan string, len(testCases)+1)
+	node.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+		var envelope node.SignalEnvelope
+		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
+			s.T().Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
+			return
+		}
+		if envelope.Type == node.EventTransactionQueued {
+			event := envelope.Event.(map[string]interface{})
+			s.T().Logf("Transaction queued (will be completed shortly): {id: %s}\n", event["id"].(string))
+
+			time.Sleep(1 * time.Second)
+
+			//if err := geth.DiscardTransaction(event["id"].(string)); err != nil {
+			//	t.Errorf("cannot discard: %v", err)
+			//	progress <- "tx discarded"
+			//	return
+			//}
+
+			//var txHash common.Hash
+			txHash, err := s.backend.CompleteTransaction(event["id"].(string), TestConfig.Account1.Password)
+			require.NoError(err, "cannot complete queued transaction[%v]: %v", event["id"], err)
+
+			s.T().Logf("Transaction complete: https://testnet.etherscan.io/tx/%s", txHash.Hex())
+
+			progress <- "event queue notification processed"
+		}
+	})
+
+	// run commands concurrently
+	for _, tc := range testCases {
+		go func(tc testCase) {
+			s.T().Logf("CALL START: %v %v", tc.command, tc.params)
+			response := jailInstance.Call(testChatID, tc.command, tc.params)
+			if err := tc.validator(response); err != nil {
+				s.T().Errorf("failed test validation: %v, err: %v", tc.command, err)
+			}
+			s.T().Logf("CALL END: %v %v", tc.command, tc.params)
+			progress <- tc.command
+		}(tc)
+	}
+
+	// wait for all tests to finish
+	cnt := len(testCases) + 1
+	time.AfterFunc(5*time.Second, func() {
+		// to long, allow main thread to return
+		cnt = 0
+	})
+
+Loop:
+	for {
+		select {
+		case <-progress:
+			cnt--
+			if cnt <= 0 {
+				break Loop
+			}
+		case <-time.After(20 * time.Second): // timeout
+			s.T().Error("test timed out")
+			break Loop
+		}
+	}
+
+	time.Sleep(2 * time.Second) // allow to propagate
+}
