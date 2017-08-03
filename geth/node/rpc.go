@@ -129,12 +129,12 @@ func (c *RPCManager) callUpstreamStream(config *params.NodeConfig, body io.Reade
 		return nil, err
 	}
 
+	defer res.Body.Close()
+
 	if respStatusCode := res.StatusCode; respStatusCode != http.StatusOK {
 		log.Error("handler returned wrong status code", "got", respStatusCode, "want", http.StatusOK)
 		return nil, ErrRPCServerCallFailed
 	}
-
-	defer res.Body.Close()
 
 	return ioutil.ReadAll(res.Body)
 }
