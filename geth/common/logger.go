@@ -1,3 +1,4 @@
+// TODO (@marineo) This log in common package is not needed anymore - remove ?
 package common
 
 import (
