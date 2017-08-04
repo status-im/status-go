@@ -10,12 +10,12 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/les/status"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/geth/common"
+	"github.com/status-im/status-go/geth/log"
 )
 
 const (
-	jsonrpcVersion         = "2.0"
+	jsonrpcVersion = "2.0"
 )
 
 type jsonRequest struct {

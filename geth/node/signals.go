@@ -8,7 +8,8 @@ extern bool StatusServiceSignalEvent(const char *jsonEvent);
 import "C"
 import (
 	"encoding/json"
-	"github.com/ethereum/go-ethereum/log"
+
+	"github.com/status-im/status-go/geth/log"
 )
 
 const (
