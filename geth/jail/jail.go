@@ -28,24 +28,24 @@ var (
 type Jail struct {
 	sync.RWMutex
 	requestManager *RequestManager
-	cells          map[string]*JCell // jail supports running many isolated instances of jailed runtime
-	baseJSCode     string            // JavaScript used to initialize all new cells with
+	cells          map[string]*JailCell // jail supports running many isolated instances of jailed runtime
+	baseJSCode     string               // JavaScript used to initialize all new cells with
 }
 
-// New returns new Jail environment
+// New returns new Jail environment.
 func New(nodeManager common.NodeManager) *Jail {
 	return &Jail{
-		cells:          make(map[string]*JCell),
+		cells:          make(map[string]*JailCell),
 		requestManager: NewRequestManager(nodeManager),
 	}
 }
 
-// BaseJS allows to setup initial JavaScript to be loaded on each jail.Parse()
+// BaseJS allows to setup initial JavaScript to be loaded on each jail.Parse().
 func (jail *Jail) BaseJS(js string) {
 	jail.baseJSCode = js
 }
 
-// NewJailCell initializes and returns jail cell
+// NewJailCell initializes and returns jail cell.
 func (jail *Jail) NewJailCell(id string) (common.JailCell, error) {
 	if jail == nil {
 		return nil, ErrInvalidJail
@@ -53,7 +53,7 @@ func (jail *Jail) NewJailCell(id string) (common.JailCell, error) {
 
 	vm := otto.New()
 
-	newJail, err := newJCell(id, vm, loop.New(vm))
+	newJail, err := newJailCell(id, vm, loop.New(vm))
 	if err != nil {
 		return nil, err
 	}
@@ -65,13 +65,13 @@ func (jail *Jail) NewJailCell(id string) (common.JailCell, error) {
 	return newJail, nil
 }
 
-// GetJailCell returns the associated *JCell for the provided chatID.
+// GetJailCell returns the associated *JailCell for the provided chatID.
 func (jail *Jail) GetJailCell(chatID string) (common.JailCell, error) {
 	return jail.GetCell(chatID)
 }
 
-// GetCell returns the associated *JCell for the provided chatID.
-func (jail *Jail) GetCell(chatID string) (*JCell, error) {
+// GetCell returns the associated *JailCell for the provided chatID.
+func (jail *Jail) GetCell(chatID string) (*JailCell, error) {
 	jail.RLock()
 	defer jail.RUnlock()
 
@@ -91,7 +91,7 @@ func (jail *Jail) Parse(chatID string, js string) string {
 	}
 
 	var err error
-	var jcell *JCell
+	var jcell *JailCell
 
 	if jcell, err = jail.GetCell(chatID); err != nil {
 		if _, mkerr := jail.NewJailCell(chatID); mkerr != nil {

@@ -18,6 +18,7 @@ import (
 	. "github.com/status-im/status-go/geth/testing"
 )
 
+// FIXME(tiabc): Sometimes it fails due to "no suitable peers found".
 func (s *BackendTestSuite) TestSendContractTx() {
 	require := s.Require()
 	require.NotNil(s.backend)

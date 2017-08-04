@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -43,7 +44,7 @@ func (s *BackendTestSuite) TestJailSendQueuedTransaction() {
 
 	txParams := `{
   		"from": "` + TestConfig.Account1.Address + `",
-  		"to": "0xf82da7547534045b4e00442bc89e16186cf8c272",
+  		"to": "` + TestConfig.Account2.Address + `",
   		"value": "0.000001"
 	}`
 
@@ -658,4 +659,135 @@ func (s *BackendTestSuite) TestJailWhisper() {
 			s.Fail(fmt.Sprintf("test not passed: %v", testName))
 		}
 	}
+}
+
+func (s *BackendTestSuite) TestJailVMPersistence() {
+	require := s.Require()
+
+	s.StartTestBackend(params.RopstenNetworkID)
+	defer s.StopTestBackend()
+
+	// log into account from which transactions will be sent
+	err := s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
+	require.NoError(err, "cannot select account: %v", TestConfig.Account1.Address)
+
+	type testCase struct {
+		command   string
+		params    string
+		validator func(response string) error
+	}
+	var testCases = []testCase{
+		{
+			`["sendTestTx"]`,
+			`{"amount": "0.000001", "from": "` + TestConfig.Account1.Address + `"}`,
+			func(response string) error {
+				if strings.Contains(response, "error") {
+					return fmt.Errorf("unexpected response: %v", response)
+				}
+				return nil
+			},
+		},
+		{
+			`["sendTestTx"]`,
+			`{"amount": "0.000002", "from": "` + TestConfig.Account1.Address + `"}`,
+			func(response string) error {
+				if strings.Contains(response, "error") {
+					return fmt.Errorf("unexpected response: %v", response)
+				}
+				return nil
+			},
+		},
+		{
+			`["ping"]`,
+			`{"pong": "Ping1", "amount": 0.42}`,
+			func(response string) error {
+				expectedResponse := `{"result": "Ping1"}`
+				if response != expectedResponse {
+					return fmt.Errorf("unexpected response, expected: %v, got: %v", expectedResponse, response)
+				}
+				return nil
+			},
+		},
+		{
+			`["ping"]`,
+			`{"pong": "Ping2", "amount": 0.42}`,
+			func(response string) error {
+				expectedResponse := `{"result": "Ping2"}`
+				if response != expectedResponse {
+					return fmt.Errorf("unexpected response, expected: %v, got: %v", expectedResponse, response)
+				}
+				return nil
+			},
+		},
+	}
+
+	jailInstance := s.backend.JailManager()
+	jailInstance.BaseJS(string(static.MustAsset("testdata/jail/status.js")))
+	parseResult := jailInstance.Parse(testChatID, `
+		var total = 0;
+		_status_catalog['ping'] = function(params) {
+			total += params.amount;
+			return params.pong;
+		}
+
+		_status_catalog['sendTestTx'] = function(params) {
+		  var amount = params.amount;
+		  var transaction = {
+			"from": params.from,
+			"to": "`+TestConfig.Account2.Address+`",
+			"value": web3.toWei(amount, "ether")
+		  };
+		  web3.eth.sendTransaction(transaction, function (error, result) {
+		  	 console.log("eth.sendTransaction callback: 'total' variable (is it updated by concurrent goroutine?): " + total);
+			 if(!error)
+				total += amount;
+		  });
+		}
+	`)
+	require.NotContains(parseResult, "error", "further will fail if initial parsing failed")
+
+	var wg sync.WaitGroup
+	node.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+		var envelope node.SignalEnvelope
+		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
+			s.T().Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
+			return
+		}
+		if envelope.Type == node.EventTransactionQueued {
+			event := envelope.Event.(map[string]interface{})
+			s.T().Logf("Transaction queued (will be completed shortly): {id: %s}\n", event["id"].(string))
+
+			time.Sleep(1 * time.Second)
+
+			//if err := geth.DiscardTransaction(event["id"].(string)); err != nil {
+			//	t.Errorf("cannot discard: %v", err)
+			//	progress <- "tx discarded"
+			//	return
+			//}
+
+			//var txHash common.Hash
+			txHash, err := s.backend.CompleteTransaction(event["id"].(string), TestConfig.Account1.Password)
+			require.NoError(err, "cannot complete queued transaction[%v]: %v", event["id"], err)
+
+			s.T().Logf("Transaction complete: https://ropsten.etherscan.io/tx/%s", txHash.Hex())
+		}
+	})
+
+	// run commands concurrently
+	for _, tc := range testCases {
+		wg.Add(1)
+		go func(tc testCase) {
+			s.T().Logf("CALL START: %v %v", tc.command, tc.params)
+			response := jailInstance.Call(testChatID, tc.command, tc.params)
+			if err := tc.validator(response); err != nil {
+				s.T().Errorf("failed test validation: %v, err: %v", tc.command, err)
+			}
+			s.T().Logf("CALL END: %v %v", tc.command, tc.params)
+
+			wg.Done()
+		}(tc)
+	}
+
+	common.PanicAfter(10*time.Second, nil, "test timed out")
+	wg.Wait()
 }
