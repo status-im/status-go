@@ -20,6 +20,7 @@ package eth
 import (
 	"errors"
 	"fmt"
+	"math/big"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -61,7 +62,6 @@ type Ethereum struct {
 	stopDbUpgrade func()    // stop chain db sequential key upgrade
 	// Handlers
 	txPool          *core.TxPool
-	txMu            sync.Mutex
 	blockchain      *core.BlockChain
 	protocolManager *ProtocolManager
 	lesServer       LesServer
@@ -74,18 +74,18 @@ type Ethereum struct {
 
 	ApiBackend *EthApiBackend
 
-	miner        *miner.Miner
-	Mining       bool
-	MinerThreads int
-	etherbase    common.Address
+	miner     *miner.Miner
+	gasPrice  *big.Int
+	etherbase common.Address
 
 	networkId     uint64
 	netRPCService *ethapi.PublicNetAPI
+
+	lock sync.RWMutex // Protects the variadic fields (e.g. gas price and etherbase)
 }
 
 func (s *Ethereum) AddLesServer(ls LesServer) {
 	s.lesServer = ls
-	s.protocolManager.lesServer = ls
 }
 
 // New creates a new Ethereum object (including the
@@ -118,8 +118,8 @@ func New(ctx *node.ServiceContext, config *Config) (*Ethereum, error) {
 		shutdownChan:   make(chan bool),
 		stopDbUpgrade:  stopDbUpgrade,
 		networkId:      config.NetworkId,
+		gasPrice:       config.GasPrice,
 		etherbase:      config.Etherbase,
-		MinerThreads:   config.MinerThreads,
 	}
 
 	if err := addMipmapBloomBins(chainDb); err != nil {
@@ -147,7 +147,7 @@ func New(ctx *node.ServiceContext, config *Config) (*Ethereum, error) {
 		core.WriteChainConfig(chainDb, genesisHash, chainConfig)
 	}
 
-	newPool := core.NewTxPool(eth.chainConfig, eth.EventMux(), eth.blockchain.State, eth.blockchain.GasLimit)
+	newPool := core.NewTxPool(config.TxPool, eth.chainConfig, eth.EventMux(), eth.blockchain.State, eth.blockchain.GasLimit)
 	eth.txPool = newPool
 
 	maxPeers := config.MaxPeers
@@ -166,7 +166,6 @@ func New(ctx *node.ServiceContext, config *Config) (*Ethereum, error) {
 	}
 
 	eth.miner = miner.New(eth, eth.chainConfig, eth.EventMux(), eth.engine)
-	eth.miner.SetGasPrice(config.GasPrice)
 	eth.miner.SetExtra(makeExtraData(config.ExtraData))
 
 	eth.ApiBackend = &EthApiBackend{eth, nil, nil}
@@ -198,10 +197,13 @@ func makeExtraData(extra []byte) []byte {
 // CreateDB creates the chain database.
 func CreateDB(ctx *node.ServiceContext, config *Config, name string) (ethdb.Database, error) {
 	db, err := ctx.OpenDatabase(name, config.DatabaseCache, config.DatabaseHandles)
+	if err != nil {
+		return nil, err
+	}
 	if db, ok := db.(*ethdb.LDBDatabase); ok {
 		db.Meter("eth/db/chaindata/")
 	}
-	return db, err
+	return db, nil
 }
 
 // CreateConsensusEngine creates the required type of consensus engine instance for an Ethereum service
@@ -291,8 +293,12 @@ func (s *Ethereum) ResetWithGenesisBlock(gb *types.Block) {
 }
 
 func (s *Ethereum) Etherbase() (eb common.Address, err error) {
-	if s.etherbase != (common.Address{}) {
-		return s.etherbase, nil
+	s.lock.RLock()
+	etherbase := s.etherbase
+	s.lock.RUnlock()
+
+	if etherbase != (common.Address{}) {
+		return etherbase, nil
 	}
 	if wallets := s.AccountManager().Wallets(); len(wallets) > 0 {
 		if accounts := wallets[0].Accounts(); len(accounts) > 0 {
@@ -304,7 +310,10 @@ func (s *Ethereum) Etherbase() (eb common.Address, err error) {
 
 // set in js console via admin interface or wrapper from cli flags
 func (self *Ethereum) SetEtherbase(etherbase common.Address) {
+	self.lock.Lock()
 	self.etherbase = etherbase
+	self.lock.Unlock()
+
 	self.miner.SetEtherbase(etherbase)
 }
 

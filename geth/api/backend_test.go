@@ -186,7 +186,7 @@ func (s *BackendTestSuite) TestCallRPC() {
 		{
 			`{"jsonrpc":"2.0","method":"shh_version","params":[],"id":67}`,
 			func(resultJSON string) {
-				expected := `{"jsonrpc":"2.0","id":67,"result":"0x5"}` + "\n"
+				expected := `{"jsonrpc":"2.0","id":67,"result":"5.0"}` + "\n"
 				s.Equal(expected, resultJSON)
 				s.T().Log("shh_version: ", resultJSON)
 				progress <- struct{}{}

@@ -56,7 +56,7 @@ type ServerConfig struct {
 // https://github.com/atom/electron/blob/master/docs/api/protocol.md
 
 // starts up http server
-func StartHttpServer(api *api.Api, config *ServerConfig) error {
+func StartHttpServer(api *api.Api, config *ServerConfig) (*Server, error) {
 	var allowedOrigins []string
 	for _, domain := range strings.Split(config.CorsString, ",") {
 		allowedOrigins = append(allowedOrigins, strings.TrimSpace(domain))
@@ -72,15 +72,16 @@ func StartHttpServer(api *api.Api, config *ServerConfig) error {
 		err      error
 	)
 	if listener, err = net.Listen("tcp", config.Addr); err != nil {
-		return err
+		return nil, err
 	}
-	hdlr := c.Handler(NewServer(api, config, listener))
 
+	server := NewServer(api, config, listener)
+	handler := c.Handler(server)
 	httpServer := http.Server{Handler: hdlr}
 	go httpServer.Serve(listener)
 	log.Info(fmt.Sprintf("Swarm HTTP proxy started on localhost:%s", config.Addr))
 
-	return nil
+	return server, nil
 }
 
 // StopHttpServer stops http server
