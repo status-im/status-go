@@ -17,35 +17,46 @@ import (
 
 // ExecutionPolicy provides a central container for the executions of RPCCall requests for both
 // remote/upstream processing and internal node processing.
-type ExecutionPolicy struct{}
+type ExecutionPolicy struct {
+	nodeManager    common.NodeManager
+	accountManager common.AccountManager
+}
+
+// NewExecutionPolicy returns a new instance of ExecutionPolicy.
+func NewExecutionPolicy(nodeManager common.NodeManager, accountManager common.AccountManager) *ExecutionPolicy {
+	return &ExecutionPolicy{
+		nodeManager:    nodeManager,
+		accountManager: accountManager,
+	}
+}
 
 // ExecuteSendTransaction defines a function to execute RPC requests for eth_sendTransaction method only.
-func (ep ExecutionPolicy) ExecuteSendTransaction(manager common.NodeManager, account common.AccountManager, req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
-	config, err := manager.NodeConfig()
+func (ep *ExecutionPolicy) ExecuteSendTransaction(req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
+	config, err := ep.nodeManager.NodeConfig()
 	if err != nil {
 		return nil, err
 	}
 
 	if config.UpstreamConfig.Enabled {
-		return ep.ExecuteRemoteSendTransaction(manager, account, req, call)
+		return ep.executeRemoteSendTransaction(req, call)
 	}
 
-	return ep.ExecuteLocalSendTransaction(manager, req, call)
+	return ep.executeLocalSendTransaction(req, call)
 }
 
-// ExecuteRemoteSendTransaction defines a function to execute RPC method eth_sendTransaction over the upstream server.
-func (ExecutionPolicy) ExecuteRemoteSendTransaction(manager common.NodeManager, account common.AccountManager, req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
-	config, err := manager.NodeConfig()
+// executeRemoteSendTransaction defines a function to execute RPC method eth_sendTransaction over the upstream server.
+func (ep *ExecutionPolicy) executeRemoteSendTransaction(req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
+	config, err := ep.nodeManager.NodeConfig()
 	if err != nil {
 		return nil, err
 	}
 
-	selectedAcct, err := account.SelectedAccount()
+	selectedAcct, err := ep.accountManager.SelectedAccount()
 	if err != nil {
 		return nil, err
 	}
 
-	client, err := manager.RPCClient()
+	client, err := ep.nodeManager.RPCClient()
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +72,7 @@ func (ExecutionPolicy) ExecuteRemoteSendTransaction(manager common.NodeManager, 
 	}
 
 	// We need to request a new transaction nounce from upstream node.
-	ctx, canceller := context.WithDeadline(context.Background(), time.Now().Add(1*time.Minute))
+	ctx, canceller := context.WithTimeout(context.Background(), time.Minute)
 	defer canceller()
 
 	var num hexutil.Uint
@@ -88,7 +99,9 @@ func (ExecutionPolicy) ExecuteRemoteSendTransaction(manager common.NodeManager, 
 		return nil, err
 	}
 
-	ctx2, canceler2 := context.WithDeadline(context.Background(), time.Now().Add(1*time.Minute))
+	//TODO(influx6): Should we use a single context with a higher timeout, say 3-5 minutes
+	// for calls to rpcClient?
+	ctx2, canceler2 := context.WithTimeout(context.Background(), time.Minute)
 	defer canceler2()
 
 	var result json.RawMessage
@@ -108,9 +121,9 @@ func (ExecutionPolicy) ExecuteRemoteSendTransaction(manager common.NodeManager, 
 	return resp, nil
 }
 
-// ExecuteLocalSendTransaction defines a function which handles execution of RPC method over the internal rpc server
+// executeLocalSendTransaction defines a function which handles execution of RPC method over the internal rpc server
 // from the eth.LightClient. It specifically caters to process eth_sendTransaction.
-func (ExecutionPolicy) ExecuteLocalSendTransaction(manager common.NodeManager, req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
+func (ep *ExecutionPolicy) executeLocalSendTransaction(req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
 	resp, err := call.Otto.Object(`({"jsonrpc":"2.0"})`)
 	if err != nil {
 		return nil, err
@@ -118,7 +131,7 @@ func (ExecutionPolicy) ExecuteLocalSendTransaction(manager common.NodeManager, r
 
 	resp.Set("id", req.ID)
 
-	txHash, err := processRPCCall(manager, req, call)
+	txHash, err := processRPCCall(ep.nodeManager, req, call)
 	resp.Set("result", txHash.Hex())
 
 	if err != nil {
@@ -131,8 +144,8 @@ func (ExecutionPolicy) ExecuteLocalSendTransaction(manager common.NodeManager, r
 
 // ExecuteOtherTransaction defines a function which handles the processing of non `eth_sendTransaction`
 // rpc request to the internal node server.
-func (ExecutionPolicy) ExecuteOtherTransaction(manager common.NodeManager, req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
-	client, err := manager.RPCClient()
+func (ep *ExecutionPolicy) ExecuteOtherTransaction(req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
+	client, err := ep.nodeManager.RPCClient()
 	if err != nil {
 		return nil, common.StopRPCCallError{Err: err}
 	}

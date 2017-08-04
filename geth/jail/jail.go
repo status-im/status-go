@@ -67,10 +67,11 @@ func newJailCell(id string, vm *otto.Otto, lo *loop.Loop) (*JailCell, error) {
 // Each cell is a separate JavaScript VM.
 type Jail struct {
 	sync.RWMutex
-	manager    common.NodeManager
-	account    common.AccountManager
-	cells      map[string]common.JailCell // jail supports running many isolated instances of jailed runtime
-	baseJSCode string                     // JavaScript used to initialize all new cells with
+	nodeManager    common.NodeManager
+	accountManager common.AccountManager
+	policy         *ExecutionPolicy
+	cells          map[string]common.JailCell // jail supports running many isolated instances of jailed runtime
+	baseJSCode     string                     // JavaScript used to initialize all new cells with
 }
 
 // Copy returns a new JailCell instance with a new eventloop runtime associated with
@@ -133,11 +134,12 @@ func (cell *JailCell) CellVM() *otto.Otto {
 
 // New returns new Jail environment with the associated NodeManager and
 // AccountManager.
-func New(manager common.NodeManager, account common.AccountManager) *Jail {
+func New(nodeManager common.NodeManager, accountManager common.AccountManager) *Jail {
 	return &Jail{
-		manager: manager,
-		account: account,
-		cells:   make(map[string]common.JailCell),
+		nodeManager:    nodeManager,
+		accountManager: accountManager,
+		cells:          make(map[string]common.JailCell),
+		policy:         NewExecutionPolicy(nodeManager, accountManager),
 	}
 }
 
@@ -276,8 +278,6 @@ func (jail *Jail) Send(chatID string, call otto.FunctionCall) (response otto.Val
 
 	resps, _ := call.Otto.Object("new Array()")
 
-	var policy ExecutionPolicy
-
 	// Execute the requests.
 	for _, req := range reqs {
 
@@ -286,10 +286,9 @@ func (jail *Jail) Send(chatID string, call otto.FunctionCall) (response otto.Val
 
 		switch req.Method {
 		case sendTransactionName:
-			res, resErr = policy.ExecuteSendTransaction(jail.manager, jail.account, req, call)
-			break
+			res, resErr = jail.policy.ExecuteSendTransaction(req, call)
 		default:
-			res, resErr = policy.ExecuteOtherTransaction(jail.manager, req, call)
+			res, resErr = jail.policy.ExecuteOtherTransaction(req, call)
 		}
 
 		if resErr != nil {

@@ -199,7 +199,11 @@ func (s *JailTestSuite) TestJailFetch() {
 
 	require.NoError(err)
 
-	<-wait
+	select {
+	case <-wait:
+	case <-time.After(1 * time.Minute):
+		require.Fail("Failed to receive fetch response")
+	}
 }
 
 func (s *JailTestSuite) TestJailRPCSend() {

@@ -44,13 +44,11 @@ func TestJailRPCTestSuite(t *testing.T) {
 type JailRPCTestSuite struct {
 	BaseTestSuite
 	Account common.AccountManager
-	Policy  jail.ExecutionPolicy
+	Policy  *jail.ExecutionPolicy
 }
 
 func (s *JailRPCTestSuite) SetupTest() {
 	require := s.Require()
-
-	var policy jail.ExecutionPolicy
 
 	nodeman := node.NewNodeManager()
 	require.NotNil(nodeman)
@@ -58,9 +56,12 @@ func (s *JailRPCTestSuite) SetupTest() {
 	acctman := node.NewAccountManager(nodeman)
 	require.NotNil(acctman)
 
+	policy := jail.NewExecutionPolicy(nodeman, acctman)
+	require.NotNil(policy)
+
 	s.Policy = policy
-	s.NodeManager = nodeman
 	s.Account = acctman
+	s.NodeManager = nodeman
 }
 
 func (s *JailRPCTestSuite) TestSendTransaction() {
@@ -163,7 +164,7 @@ func (s *JailRPCTestSuite) TestSendTransaction() {
 	selectErr := s.Account.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	require.NoError(selectErr)
 
-	res, err := s.Policy.ExecuteRemoteSendTransaction(s.NodeManager, s.Account, request, odFunc)
+	res, err := s.Policy.ExecuteSendTransaction(request, odFunc)
 	require.NoError(err)
 
 	result, err := res.Get("result")
@@ -230,7 +231,7 @@ func (s *JailRPCTestSuite) TestSendTransaction() {
 // 	selectErr := s.Account.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 // 	require.NoError(selectErr)
 
-// 	res, err := s.Policy.ExecuteRemoteSendTransaction(s.NodeManager, s.Account, request, odFunc)
+// 	res, err := s.Policy.ExecuteSendTransaction(request, odFunc)
 // 	require.NoError(err)
 
 // 	_, err = res.Get("hash")
@@ -289,7 +290,7 @@ func (s *JailRPCTestSuite) TestSendTransaction() {
 // 	selectErr := s.Account.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 // 	require.NoError(selectErr)
 
-// 	res, err := s.Policy.ExecuteRemoteSendTransaction(s.NodeManager, s.Account, request, odFunc)
+// 	res, err := s.Policy.ExecuteSendTransaction(request, odFunc)
 // 	require.NoError(err)
 
 // 	_, err = res.Get("hash")
@@ -348,7 +349,7 @@ func (s *JailRPCTestSuite) TestSendTransaction() {
 // 	selectErr := s.Account.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 // 	require.NoError(selectErr)
 
-// 	res, err := s.Policy.ExecuteRemoteSendTransaction(s.NodeManager, s.Account, request, odFunc)
+// 	res, err := s.Policy.ExecuteSendTransaction(request, odFunc)
 // 	require.NoError(err)
 
 // 	_, err = res.Get("hash")
