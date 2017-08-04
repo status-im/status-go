@@ -47,14 +47,25 @@ func newJailCell(id string, vm *otto.Otto, lo *loop.Loop) (*JailCell, error) {
 // Fetch attempts to call the underline Fetch API added through the
 // ottoext package.
 func (cell *JailCell) Fetch(url string, callback func(otto.Value)) (otto.Value, error) {
+	val, err := cell.prepareFetchCall(url, callback)
+	if err != nil {
+		return val, err
+	}
+
+	return val, cell.lo.Run()
+}
+
+// prepareFetchCall prepares the needed calls to hook into the vm to receive the expected response
+// for a call to the FetchAPI. We need this to ensure confidence in mutex locking and unlocking.
+func (cell *JailCell) prepareFetchCall(url string, callback func(otto.Value)) (otto.Value, error) {
 	cell.Lock()
+	defer cell.Unlock()
 
 	if err := cell.vm.Set("__captureFetch", callback); err != nil {
-		cell.Unlock()
 		return otto.UndefinedValue(), err
 	}
 
-	val, err := cell.vm.Run(`fetch("` + url + `").then(function(response){
+	return cell.vm.Run(`fetch("` + url + `").then(function(response){
 			__captureFetch({
 				"url": response.url,
 				"type": response.type,
@@ -64,15 +75,6 @@ func (cell *JailCell) Fetch(url string, callback func(otto.Value)) (otto.Value, 
 			});
 		});
 	`)
-
-	if err != nil {
-		cell.Unlock()
-		return val, err
-	}
-
-	cell.Unlock()
-
-	return val, cell.lo.Run()
 }
 
 // Set sets the value to be keyed by the provided keyname.
