@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"sync"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -678,6 +679,9 @@ func (s *BackendTestSuite) TestJailVMPersistence() {
 			`["sendTestTx"]`,
 			`{"amount": "0.000001", "from": "` + TestConfig.Account1.Address + `"}`,
 			func(response string) error {
+				if strings.Contains(response, "error") {
+					return fmt.Errorf("unexpected response: %v", response)
+				}
 				return nil
 			},
 		},
@@ -685,6 +689,9 @@ func (s *BackendTestSuite) TestJailVMPersistence() {
 			`["sendTestTx"]`,
 			`{"amount": "0.000002", "from": "` + TestConfig.Account1.Address + `"}`,
 			func(response string) error {
+				if strings.Contains(response, "error") {
+					return fmt.Errorf("unexpected response: %v", response)
+				}
 				return nil
 			},
 		},
@@ -712,8 +719,9 @@ func (s *BackendTestSuite) TestJailVMPersistence() {
 		},
 	}
 
-	jailInstance := jail.New(s.backend.NodeManager())
-	jailInstance.Parse(testChatID, `
+	jailInstance := s.backend.JailManager()
+	jailInstance.BaseJS(string(static.MustAsset("testdata/jail/status.js")))
+	parseResult := jailInstance.Parse(testChatID, `
 		var total = 0;
 		_status_catalog['ping'] = function(params) {
 			total += params.amount;
@@ -724,18 +732,19 @@ func (s *BackendTestSuite) TestJailVMPersistence() {
 		  var amount = params.amount;
 		  var transaction = {
 			"from": params.from,
-			"to": "0xf82da7547534045b4e00442bc89e16186cf8c272",
+			"to": "`+TestConfig.Account2.Address+`",
 			"value": web3.toWei(amount, "ether")
 		  };
 		  web3.eth.sendTransaction(transaction, function (error, result) {
-		  	 console.log("eth.sendTransaction callback: 'total' variable (is it updated by concurrent routine): " + total);
+		  	 console.log("eth.sendTransaction callback: 'total' variable (is it updated by concurrent goroutine?): " + total);
 			 if(!error)
 				total += amount;
 		  });
 		}
 	`)
+	require.NotContains(parseResult, "error", "further will fail if initial parsing failed")
 
-	progress := make(chan string, len(testCases)+1)
+	var wg sync.WaitGroup
 	node.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var envelope node.SignalEnvelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
@@ -758,14 +767,13 @@ func (s *BackendTestSuite) TestJailVMPersistence() {
 			txHash, err := s.backend.CompleteTransaction(event["id"].(string), TestConfig.Account1.Password)
 			require.NoError(err, "cannot complete queued transaction[%v]: %v", event["id"], err)
 
-			s.T().Logf("Transaction complete: https://testnet.etherscan.io/tx/%s", txHash.Hex())
-
-			progress <- "event queue notification processed"
+			s.T().Logf("Transaction complete: https://ropsten.etherscan.io/tx/%s", txHash.Hex())
 		}
 	})
 
 	// run commands concurrently
 	for _, tc := range testCases {
+		wg.Add(1)
 		go func(tc testCase) {
 			s.T().Logf("CALL START: %v %v", tc.command, tc.params)
 			response := jailInstance.Call(testChatID, tc.command, tc.params)
@@ -773,30 +781,11 @@ func (s *BackendTestSuite) TestJailVMPersistence() {
 				s.T().Errorf("failed test validation: %v, err: %v", tc.command, err)
 			}
 			s.T().Logf("CALL END: %v %v", tc.command, tc.params)
-			progress <- tc.command
+
+			wg.Done()
 		}(tc)
 	}
 
-	// wait for all tests to finish
-	cnt := len(testCases) + 1
-	time.AfterFunc(5*time.Second, func() {
-		// to long, allow main thread to return
-		cnt = 0
-	})
-
-Loop:
-	for {
-		select {
-		case <-progress:
-			cnt--
-			if cnt <= 0 {
-				break Loop
-			}
-		case <-time.After(20 * time.Second): // timeout
-			s.T().Error("test timed out")
-			break Loop
-		}
-	}
-
-	time.Sleep(2 * time.Second) // allow to propagate
+	common.PanicAfter(10*time.Second, nil, "test timed out")
+	wg.Wait()
 }
