@@ -25,7 +25,6 @@ import (
 	"github.com/ethereum/go-ethereum/whisper/mailserver"
 	"github.com/ethereum/go-ethereum/whisper/notifications"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
-	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
 )
@@ -53,7 +52,7 @@ func MakeNode(config *params.NodeConfig) (*node.Node, error) {
 	}
 
 	// setup logging
-	if _, err := common.SetupLogger(config); err != nil {
+	if _, err := log.SetupLogger(config); err != nil {
 		return nil, err
 	}
 
