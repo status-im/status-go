@@ -23,6 +23,7 @@ type RequestManager struct {
 	nodeManager common.NodeManager
 }
 
+// NewRequestManager returns a new instance of the RequestManager pointer.
 func NewRequestManager(nodeManager common.NodeManager) *RequestManager {
 	return &RequestManager{
 		nodeManager: nodeManager,
