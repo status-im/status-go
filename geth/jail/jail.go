@@ -86,39 +86,38 @@ func (jail *Jail) GetCell(chatID string) (*JCell, error) {
 // Parse creates a new jail cell context, with the given chatID as identifier.
 // New context executes provided JavaScript code, right after the initialization.
 func (jail *Jail) Parse(chatID string, js string) string {
-	var err error
 	if jail == nil {
 		return makeError(ErrInvalidJail.Error())
 	}
 
-	//TODO(influx6): Find out if calls to Parse must always start with new Jail,
-	// is it possible to get a ChatID that was previous registered?
-	if _, err := jail.NewJailCell(chatID); err != nil {
-		return makeError(err.Error())
+	var err error
+	var jcell *JCell
+
+	if jcell, err = jail.GetCell(chatID); err != nil {
+		if _, mkerr := jail.NewJailCell(chatID); mkerr != nil {
+			return makeError(mkerr.Error())
+		}
+
+		jcell, _ = jail.GetCell(chatID)
 	}
-
-	jcell, _ := jail.GetCell(chatID)
-
-	jcell.Lock()
-	defer jcell.Unlock()
 
 	// init jeth and its handlers
-	if err = jcell.vm.Set("jeth", struct{}{}); err != nil {
+	if err = jcell.Set("jeth", struct{}{}); err != nil {
 		return makeError(err.Error())
 	}
 
-	if err = registerHandlers(jail, jcell.vm, chatID); err != nil {
+	if err = registerHandlers(jail, jcell, chatID); err != nil {
 		return makeError(err.Error())
 	}
 
 	initJs := jail.baseJSCode + ";"
-	if _, err = jcell.vm.Run(initJs); err != nil {
+	if _, err = jcell.Run(initJs); err != nil {
 		return makeError(err.Error())
 	}
 
 	// sendMessage/showSuggestions handlers
-	jcell.vm.Set("statusSignals", struct{}{})
-	statusSignals, _ := jcell.vm.Get("statusSignals")
+	jcell.Set("statusSignals", struct{}{})
+	statusSignals, _ := jcell.Get("statusSignals")
 	statusSignals.Object().Set("sendMessage", makeSendMessageHandler(chatID))
 	statusSignals.Object().Set("showSuggestions", makeShowSuggestionsHandler(chatID))
 
@@ -130,11 +129,11 @@ func (jail *Jail) Parse(chatID string, js string) string {
             return new Bignumber(val);
         }
 	` + js + "; var catalog = JSON.stringify(_status_catalog);"
-	if _, err = jcell.vm.Run(jjs); err != nil {
+	if _, err = jcell.Run(jjs); err != nil {
 		return makeError(err.Error())
 	}
 
-	res, err := jcell.vm.Get("catalog")
+	res, err := jcell.Get("catalog")
 	if err != nil {
 		return makeError(err.Error())
 	}

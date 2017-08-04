@@ -20,11 +20,12 @@ const (
 
 // registerHandlers augments and transforms a given jail cell's underlying VM,
 // by adding and replacing method handlers.
-func registerHandlers(jail *Jail, vm *otto.Otto, chatID string) error {
-	jeth, err := vm.Get("jeth")
+func registerHandlers(jail *Jail, cell *JCell, chatID string) error {
+	jeth, err := cell.Get("jeth")
 	if err != nil {
 		return err
 	}
+
 	registerHandler := jeth.Object().Set
 
 	if err = registerHandler("console", map[string]interface{}{
@@ -51,31 +52,36 @@ func registerHandlers(jail *Jail, vm *otto.Otto, chatID string) error {
 	}
 
 	// define localStorage
-	if err = vm.Set("localStorage", struct{}{}); err != nil {
+	if err = cell.Set("localStorage", struct{}{}); err != nil {
 		return err
 	}
 
 	// register localStorage.set handler
-	localStorage, err := vm.Get("localStorage")
+	localStorage, err := cell.Get("localStorage")
 	if err != nil {
 		return err
 	}
+
 	if err = localStorage.Object().Set("set", makeLocalStorageSetHandler(chatID)); err != nil {
 		return err
 	}
 
 	// register sendMessage/showSuggestions handlers
-	if err = vm.Set("statusSignals", struct{}{}); err != nil {
+	if err = cell.Set("statusSignals", struct{}{}); err != nil {
 		return err
 	}
-	statusSignals, err := vm.Get("statusSignals")
+
+	statusSignals, err := cell.Get("statusSignals")
 	if err != nil {
 		return err
 	}
+
 	registerHandler = statusSignals.Object().Set
+
 	if err = registerHandler("sendMessage", makeSendMessageHandler(chatID)); err != nil {
 		return err
 	}
+
 	if err = registerHandler("showSuggestions", makeShowSuggestionsHandler(chatID)); err != nil {
 		return err
 	}

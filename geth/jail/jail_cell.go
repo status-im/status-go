@@ -47,15 +47,13 @@ func newJCell(id string, vm *otto.Otto, lo *loop.Loop) (*JCell, error) {
 // ottoext package.
 func (cell *JCell) Fetch(url string, callback func(otto.Value)) (otto.Value, error) {
 	cell.Lock()
-	if err := cell.vm.Set("__captureFetch", callback); err != nil {
-		cell.Unlock()
+	defer cell.Unlock()
 
+	if err := cell.vm.Set("__captureFetch", callback); err != nil {
 		return otto.UndefinedValue(), err
 	}
 
-	cell.Unlock()
-
-	return cell.Run(`fetch("` + url + `").then(function(response){
+	val, err := cell.vm.Run(`fetch("` + url + `").then(function(response){
 			__captureFetch({
 				"url": response.url,
 				"type": response.type,
@@ -65,6 +63,12 @@ func (cell *JCell) Fetch(url string, callback func(otto.Value)) (otto.Value, err
 			});
 		});
 	`)
+
+	if err != nil {
+		return val, err
+	}
+
+	return val, cell.lo.Run()
 }
 
 // Set sets the value to be keyed by the provided keyname.
