@@ -242,7 +242,7 @@ func sendTxArgsFromRPCCall(req common.RPCCall) status.SendTxArgs {
 		fromAddr = gethcommon.HexToAddress("0x0")
 	}
 
-	toAddr, err = req.ParseFromAddress()
+	toAddr, err = req.ParseToAddress()
 	if err != nil {
 		toAddr = gethcommon.HexToAddress("0x0")
 	}
