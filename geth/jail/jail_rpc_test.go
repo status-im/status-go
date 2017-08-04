@@ -1,4 +1,4 @@
-package proxy_test
+package jail_test
 
 import (
 	"testing"
@@ -13,9 +13,9 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/common"
+	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
-	"github.com/status-im/status-go/geth/proxy"
 	. "github.com/status-im/status-go/geth/testing"
 	"github.com/stretchr/testify/suite"
 )
@@ -37,27 +37,33 @@ func (s service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 //==================================================================================================
 
-func TestRPCRouterTestSuite(t *testing.T) {
-	suite.Run(t, new(RPCRouterTestSuite))
+func TestJailRPCTestSuite(t *testing.T) {
+	suite.Run(t, new(JailRPCTestSuite))
 }
 
-type RPCRouterTestSuite struct {
+type JailRPCTestSuite struct {
 	BaseTestSuite
+	Account common.AccountManager
+	Policy  jail.ExecutionPolicy
 }
 
-func (s *RPCRouterTestSuite) SetupTest() {
+func (s *JailRPCTestSuite) SetupTest() {
 	require := s.Require()
 
+	var policy jail.ExecutionPolicy
+
 	nodeman := node.NewNodeManager()
+	require.NotNil(nodeman)
+
 	acctman := node.NewAccountManager(nodeman)
+	require.NotNil(acctman)
 
-	s.NodeManager = proxy.NewRPCRouter(nodeman, acctman)
-
-	require.NotNil(s.NodeManager)
-	require.IsType(&proxy.RPCRouter{}, s.NodeManager)
+	s.Policy = policy
+	s.NodeManager = nodeman
+	s.Account = acctman
 }
 
-func (s *RPCRouterTestSuite) TestSendTransaction() {
+func (s *JailRPCTestSuite) TestSendTransaction() {
 	require := s.Require()
 	require.NotNil(s.NodeManager)
 
@@ -154,13 +160,10 @@ func (s *RPCRouterTestSuite) TestSendTransaction() {
 	require.NoError(err)
 	require.NotNil(client)
 
-	rpcNodeManager := s.NodeManager.(common.RPCNodeManager)
-	accountManager := rpcNodeManager.Account()
-
-	selectErr := accountManager.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
+	selectErr := s.Account.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	require.NoError(selectErr)
 
-	res, err := rpcNodeManager.Exec(request, odFunc)
+	res, err := s.Policy.ExecuteRemoteSendTransaction(s.NodeManager, s.Account, request, odFunc)
 	require.NoError(err)
 
 	result, err := res.Get("result")
@@ -175,7 +178,7 @@ func (s *RPCRouterTestSuite) TestSendTransaction() {
 	require.Equal(string(rawJSON), "\"3434=done\"")
 }
 
-// func (s *RPCRouterTestSuite) TestMainnetAcceptance() {
+// func (s *JailRPCTestSuite) TestMainnetAcceptance() {
 // 	require := s.Require()
 // 	require.NotNil(s.NodeManager)
 
@@ -201,7 +204,7 @@ func (s *RPCRouterTestSuite) TestSendTransaction() {
 // 		},
 // 	}
 
-// 	nodeConfig, err := MakeTestNodeConfig(params.UpstreamMainNetEthereumNetworkURL)
+// 	nodeConfig, err := MakeTestNodeConfig(params.MainNetworkID)
 // 	require.NoError(err)
 
 // 	nodeConfig.UpstreamConfig.Enabled = true
@@ -224,20 +227,17 @@ func (s *RPCRouterTestSuite) TestSendTransaction() {
 // 	require.NoError(err)
 // 	require.NotNil(client)
 
-// 	rpcNodeManager := s.NodeManager.(common.RPCNodeManager)
-// 	accountManager := rpcNodeManager.Account()
-
-// 	selectErr := accountManager.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
+// 	selectErr := s.Account.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 // 	require.NoError(selectErr)
 
-// 	res, err := rpcNodeManager.Exec(request, odFunc)
+// 	res, err := s.Policy.ExecuteRemoteSendTransaction(s.NodeManager, s.Account, request, odFunc)
 // 	require.NoError(err)
 
 // 	_, err = res.Get("hash")
 // 	require.NoError(err)
 // }
 
-// func (s *RPCRouterTestSuite) TestRinkebyAcceptance() {
+// func (s *JailRPCTestSuite) TestRobstenAcceptance() {
 // 	require := s.Require()
 // 	require.NotNil(s.NodeManager)
 
@@ -263,7 +263,7 @@ func (s *RPCRouterTestSuite) TestSendTransaction() {
 // 		},
 // 	}
 
-// 	nodeConfig, err := MakeTestNodeConfig(params.UpstreamRinkebyEthereumNetworkURL)
+// 	nodeConfig, err := MakeTestNodeConfig(params.RopstenNetworkID)
 // 	require.NoError(err)
 
 // 	nodeConfig.UpstreamConfig.Enabled = true
@@ -286,19 +286,18 @@ func (s *RPCRouterTestSuite) TestSendTransaction() {
 // 	require.NoError(err)
 // 	require.NotNil(client)
 
-// 	rpcNodeManager := s.NodeManager.(common.RPCNodeManager)
-// 	accountManager := rpcNodeManager.Account()
-
-// 	selectErr := accountManager.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
+// 	selectErr := s.Account.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 // 	require.NoError(selectErr)
 
-// 	res, err := rpcNodeManager.Exec(request, odFunc)
+// 	res, err := s.Policy.ExecuteRemoteSendTransaction(s.NodeManager, s.Account, request, odFunc)
 // 	require.NoError(err)
 
 // 	_, err = res.Get("hash")
 // 	require.NoError(err)
 // }
 
+// func (s *JailRPCTestSuite) TestRinkebyAcceptance() {
+// 	require := s.Require()
 // 	require.NotNil(s.NodeManager)
 
 // 	odFunc := otto.FunctionCall{
@@ -323,7 +322,7 @@ func (s *RPCRouterTestSuite) TestSendTransaction() {
 // 		},
 // 	}
 
-// 	nodeConfig, err := MakeTestNodeConfig(params.UpstreamRopstenEthereumNetworkURL)
+// 	nodeConfig, err := MakeTestNodeConfig(params.RinkebyNetworkID)
 // 	require.NoError(err)
 
 // 	nodeConfig.UpstreamConfig.Enabled = true
@@ -346,14 +345,12 @@ func (s *RPCRouterTestSuite) TestSendTransaction() {
 // 	require.NoError(err)
 // 	require.NotNil(client)
 
-// 	rpcNodeManager := s.NodeManager.(common.RPCNodeManager)
-// 	accountManager := rpcNodeManager.Account()
-
-// 	selectErr := accountManager.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
+// 	selectErr := s.Account.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 // 	require.NoError(selectErr)
 
-// 	res, err := rpcNodeManager.Exec(request, odFunc)
+// 	res, err := s.Policy.ExecuteRemoteSendTransaction(s.NodeManager, s.Account, request, odFunc)
 // 	require.NoError(err)
 
 // 	_, err = res.Get("hash")
 // 	require.NoError(err)
+// }

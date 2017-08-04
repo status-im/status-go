@@ -506,10 +506,15 @@ func (m *NodeManager) AccountKeyStore() (*keystore.KeyStore, error) {
 	return keyStore, nil
 }
 
-// RPCClient exposes reference to RPC client connected to the running node
+// RPCClient exposes reference to RPC client connected to the running node.
 func (m *NodeManager) RPCClient() (*rpc.Client, error) {
 	if m == nil {
 		return nil, ErrInvalidNodeManager
+	}
+
+	config, err := m.NodeConfig()
+	if err != nil {
+		return nil, err
 	}
 
 	m.RLock()
@@ -519,7 +524,19 @@ func (m *NodeManager) RPCClient() (*rpc.Client, error) {
 	if m.node == nil || m.nodeStarted == nil {
 		return nil, ErrNoRunningNode
 	}
+
 	<-m.nodeStarted
+
+	// Connect to upstream RPC server with new client and cache instance.
+	if config.UpstreamConfig.Enabled {
+		m.rpcClient, err = rpc.Dial(config.UpstreamConfig.URL)
+		if err != nil {
+			log.Error("Failed to conect to upstream RPC server", "error", err)
+			return nil, err
+		}
+
+		return m.rpcClient, nil
+	}
 
 	if m.rpcClient == nil {
 		var err error

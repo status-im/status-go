@@ -10,7 +10,6 @@ import (
 	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
-	"github.com/status-im/status-go/geth/proxy"
 )
 
 // StatusBackend implements Status.im service
@@ -28,15 +27,13 @@ type StatusBackend struct {
 func NewStatusBackend() *StatusBackend {
 	defer log.Info("Status backend initialized")
 
-	baseNodeManager := node.NewNodeManager()
-	accountManager := node.NewAccountManager(baseNodeManager)
-
-	nodeManager := proxy.NewRPCRouter(baseNodeManager, accountManager)
+	nodeManager := node.NewNodeManager()
+	accountManager := node.NewAccountManager(nodeManager)
 
 	return &StatusBackend{
 		nodeManager:    nodeManager,
 		accountManager: accountManager,
-		jailManager:    jail.New(nodeManager),
+		jailManager:    jail.New(nodeManager, accountManager),
 		rpcManager:     node.NewRPCManager(nodeManager),
 		txQueueManager: node.NewTxQueueManager(nodeManager, accountManager),
 	}

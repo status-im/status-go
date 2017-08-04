@@ -12,7 +12,6 @@ import (
 	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
-	"github.com/status-im/status-go/geth/proxy"
 	. "github.com/status-im/status-go/geth/testing"
 	"github.com/status-im/status-go/static"
 	"github.com/stretchr/testify/suite"
@@ -34,14 +33,19 @@ type JailTestSuite struct {
 }
 
 func (s *JailTestSuite) SetupTest() {
-	s.NodeManager = node.NewNodeManager()
-	s.Require().NotNil(s.NodeManager)
-	s.Require().IsType(&node.NodeManager{}, s.NodeManager)
+	require := s.Require()
 
-	s.jail = jail.New(proxy.NewRPCRouter(s.NodeManager))
+	nodeManager := node.NewNodeManager()
+	require.NotNil(nodeManager)
 
-	s.Require().NotNil(s.jail)
-	s.Require().IsType(&jail.Jail{}, s.jail)
+	accountManager := node.NewAccountManager(nodeManager)
+	require.NotNil(accountManager)
+
+	jail := jail.New(nodeManager, accountManager)
+	require.NotNil(jail)
+
+	s.jail = jail
+	s.NodeManager = nodeManager
 }
 
 func (s *JailTestSuite) TestInit() {
