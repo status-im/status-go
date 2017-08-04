@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 	"sync"
+	"time"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -44,7 +44,7 @@ func (s *BackendTestSuite) TestJailSendQueuedTransaction() {
 
 	txParams := `{
   		"from": "` + TestConfig.Account1.Address + `",
-  		"to": "0xf82da7547534045b4e00442bc89e16186cf8c272",
+  		"to": "` + TestConfig.Account2.Address + `",
   		"value": "0.000001"
 	}`
 

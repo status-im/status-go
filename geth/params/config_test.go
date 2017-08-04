@@ -445,10 +445,11 @@ func TestConfigWriteRead(t *testing.T) {
 
 		refConfigData = strings.Replace(refConfigData, "$TMPDIR", nodeConfig.DataDir, -1)
 		refConfigData = strings.Replace(refConfigData, "$VERSION", params.Version, -1)
-		require.Equal(t, refConfigData, string(loadedConfigData)) // FIXME: EqualValues?
+
+		require.EqualValues(t, refConfigData, loadedConfigData)
 	}
 
 	configReadWrite(params.RinkebyNetworkID, "testdata/config.rinkeby.json")
-	//configReadWrite(params.RopstenNetworkID, "testdata/config.ropsten.json")
-	//configReadWrite(params.MainNetworkID, "testdata/config.mainnet.json")
+	configReadWrite(params.RopstenNetworkID, "testdata/config.ropsten.json")
+	configReadWrite(params.MainNetworkID, "testdata/config.mainnet.json")
 }
