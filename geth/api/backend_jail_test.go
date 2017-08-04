@@ -1,6 +1,7 @@
 package api_test
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -290,7 +291,7 @@ func (s *BackendTestSuite) TestJailWhisper() {
 	_, err = whisperService.AddKeyPair(accountKey1.PrivateKey)
 	require.NoError(err, fmt.Sprintf("identity not injected: %v", accountKey1Hex))
 
-	if ok, err := whisperAPI.HasKeyPair(accountKey1Hex); err != nil || !ok {
+	if ok := whisperAPI.HasKeyPair(context.Background(), accountKey1Hex); !ok {
 		require.FailNow(fmt.Sprintf("identity not injected: %v", accountKey1Hex))
 	}
 
@@ -302,7 +303,7 @@ func (s *BackendTestSuite) TestJailWhisper() {
 	_, err = whisperService.AddKeyPair(accountKey2.PrivateKey)
 	require.NoError(err, fmt.Sprintf("identity not injected: %v", accountKey2Hex))
 
-	if ok, err := whisperAPI.HasKeyPair(accountKey2Hex); err != nil || !ok {
+	if ok := whisperAPI.HasKeyPair(context.Background(), accountKey2Hex); !ok {
 		require.FailNow(fmt.Sprintf("identity not injected: %v", accountKey2Hex))
 	}
 
@@ -644,8 +645,10 @@ func (s *BackendTestSuite) TestJailWhisper() {
 	for testKey, filter := range installedFilters {
 		if filter != "" {
 			s.T().Logf("filter found: %v", filter)
-			for _, message := range whisperAPI.GetNewSubscriptionMessages(filter) {
-				s.T().Logf("message found: %s", gethcommon.FromHex(message.Payload))
+			messages, err := whisperAPI.GetFilterMessages(filter)
+			require.NoError(err)
+			for _, message := range messages {
+				s.T().Logf("message found: %s", string(message.Payload))
 				passedTests[testKey] = true
 			}
 		}
