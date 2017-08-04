@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/common"
+	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/static"
 
 	"fknsrs.biz/p/ottoext/loop"
