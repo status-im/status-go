@@ -76,7 +76,7 @@ func (self *Swarm) API() *SwarmAPI {
 
 // creates a new swarm service instance
 // implements node.Service
-func NewSwarm(ctx *node.ServiceContext, backend chequebook.Backend, config *api.Config, swapEnabled, syncEnabled bool, cors string) (self *Swarm, err error) {
+func NewSwarm(ctx *node.ServiceContext, backend chequebook.Backend, ensClient *ethclient.Client, config *api.Config, swapEnabled, syncEnabled bool, cors string) (self *Swarm, err error) {
 	if bytes.Equal(common.FromHex(config.PublicKey), storage.ZeroKey) {
 		return nil, fmt.Errorf("empty public key")
 	}
@@ -136,10 +136,10 @@ func NewSwarm(ctx *node.ServiceContext, backend chequebook.Backend, config *api.
 	// set up high level api
 	transactOpts := bind.NewKeyedTransactor(self.privateKey)
 
-	if backend == (*ethclient.Client)(nil) {
-		log.Warn("No ENS, please specify non-empty --ethapi to use domain name resolution")
+	if ensClient == nil {
+		log.Warn("No ENS, please specify non-empty --ens-api to use domain name resolution")
 	} else {
-		self.dns, err = ens.NewENS(transactOpts, config.EnsRoot, self.backend)
+		self.dns, err = ens.NewENS(transactOpts, config.EnsRoot, ensClient)
 		if err != nil {
 			return nil, err
 		}
@@ -167,13 +167,13 @@ Start is called when the stack is started
 * TODO: start subservices like sword, swear, swarmdns
 */
 // implements the node.Service interface
-func (self *Swarm) Start(net *p2p.Server) error {
+func (self *Swarm) Start(srv *p2p.Server) error {
 	connectPeer := func(url string) error {
 		node, err := discover.ParseNode(url)
 		if err != nil {
 			return fmt.Errorf("invalid node URL: %v", err)
 		}
-		net.AddPeer(node)
+		srv.AddPeer(node)
 		return nil
 	}
 	// set chequebook
@@ -190,8 +190,8 @@ func (self *Swarm) Start(net *p2p.Server) error {
 
 	log.Warn(fmt.Sprintf("Starting Swarm service"))
 	self.hive.Start(
-		discover.PubkeyID(&net.PrivateKey.PublicKey),
-		func() string { return net.ListenAddr },
+		discover.PubkeyID(&srv.PrivateKey.PublicKey),
+		func() string { return srv.ListenAddr },
 		connectPeer,
 	)
 	log.Info(fmt.Sprintf("Swarm network started on bzz address: %v", self.hive.Addr()))
@@ -201,19 +201,15 @@ func (self *Swarm) Start(net *p2p.Server) error {
 
 	// start swarm http proxy server
 	if self.config.Port != "" {
-		self.httpHandler = &httpapi.ServerConfig{
+		serverConfig := &httpapi.ServerConfig{
 			Addr:       ":" + self.config.Port,
 			CorsString: self.corsString,
 		}
-		if err := httpapi.StartHttpServer(self.api, self.httpHandler); err != nil {
+		server, err := httpapi.StartHttpServer(self.api, serverConfig)
+		if err != nil {
 			return err
 		}
-	}
-
-	log.Debug(fmt.Sprintf("Swarm http proxy started on port: %v", self.config.Port))
-
-	if self.corsString != "" {
-		log.Debug(fmt.Sprintf("Swarm http proxy started with corsdomain: %v", self.corsString))
+		self.httpHandler = server
 	}
 
 	return nil

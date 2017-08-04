@@ -16,8 +16,6 @@ import (
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/static"
-
-	"fknsrs.biz/p/ottoext/loop"
 )
 
 // errors
@@ -173,28 +171,12 @@ type TxQueueManager interface {
 	DiscardTransactions(ids string) map[string]RawDiscardTransactionResult
 }
 
-// JailExecutor defines an interface which exposes method to be executed
-// against a Jail vm.
-type JailExecutor interface {
-	// Run exist so we are able to execute js code on pure otto.VM without runing
-	// it on the event loop.
-	Run(string) (otto.Value, error)
-
-	// Exec exists for the purpose to execute has normal on the event loop provided by
-	// ottoext.
-	Exec(string) (otto.Value, error)
-
-	// Fetch calls the underlying FetchAPI which makes http request
-	// to desired path. (See https://developer.mozilla.org/en/docs/Web/API/Fetch_API).
-	Fetch(string, func(otto.Value)) (otto.Value, error)
-}
-
 // JailCell represents single jail cell, which is basically a JavaScript VM.
 type JailCell interface {
-	CellVM() *otto.Otto
-	CellLoop() *loop.Loop
-	Executor() JailExecutor
-	Copy() (JailCell, error)
+	Set(string, interface{}) error
+	Get(string) (otto.Value, error)
+	Run(string) (otto.Value, error)
+	RunOnLoop(string) (otto.Value, error)
 }
 
 // JailManager defines methods for managing jailed environments
@@ -208,10 +190,10 @@ type JailManager interface {
 	Call(chatID string, path string, args string) string
 
 	// NewJailCell initializes and returns jail cell
-	NewJailCell(id string) JailCell
+	NewJailCell(id string) (JailCell, error)
 
-	// JailCellVM returns instance of Otto VM (which is persisted w/i jail cell) by chatID
-	JailCellVM(chatID string) (*otto.Otto, error)
+	// GetJailCell returns instance of JailCell (which is persisted w/i jail cell) by chatID
+	GetJailCell(chatID string) (JailCell, error)
 
 	// BaseJS allows to setup initial JavaScript to be loaded on each jail.Parse()
 	BaseJS(js string)
