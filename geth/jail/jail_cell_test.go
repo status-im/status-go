@@ -1,9 +1,12 @@
 package jail_test
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"time"
 
 	"github.com/robertkrimen/otto"
+	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/params"
 )
 
@@ -52,41 +55,38 @@ func (s *JailTestSuite) TestJailTimeout() {
 	require.NotNil(res)
 }
 
-// TODO(influx6): JCell.Fetch is not yet being used or needed by
-// other API, keep test out for the main time, if method is later required
-// add to common.JailCell interface then uncomment test.
-// func (s *JailTestSuite) TestJailFetch() {
-// 	mux := http.NewServeMux()
-// 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-// 		w.WriteHeader(http.StatusOK)
-// 		w.Write([]byte("Hello World"))
-// 	})
+func (s *JailTestSuite) TestJailFetch() {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("Hello World"))
+	})
 
-// 	server := httptest.NewServer(mux)
-// 	defer server.Close()
+	server := httptest.NewServer(mux)
+	defer server.Close()
 
-// 	require := s.Require()
-// 	require.NotNil(s.jail)
+	require := s.Require()
+	require.NotNil(s.jail)
 
-// 	newCell, err := s.jail.NewJailCell(testChatID)
-// 	require.NoError(err)
-// 	require.NotNil(newCell)
+	newCell, err := s.jail.NewJailCell(testChatID)
+	require.NoError(err)
+	require.NotNil(newCell)
 
-// 	jcell, ok := newCell.(*jail.JailCell)
-// 	require.Equal(ok, true)
-// 	require.NotNil(jcell)
+	jcell, ok := newCell.(*jail.JailCell)
+	require.Equal(ok, true)
+	require.NotNil(jcell)
 
-// 	wait := make(chan struct{})
+	wait := make(chan struct{})
 
-// 	// Attempt to run a fetch resource.
-// 	_, err = jcell.Fetch(server.URL, func(res otto.Value) {
-// 		go func() { wait <- struct{}{} }()
-// 	})
+	// Attempt to run a fetch resource.
+	_, err = jcell.Fetch(server.URL, func(res otto.Value) {
+		go func() { wait <- struct{}{} }()
+	})
 
-// 	require.NoError(err)
+	require.NoError(err)
 
-// 	<-wait
-// }
+	<-wait
+}
 
 func (s *JailTestSuite) TestJailLoopInCall() {
 	require := s.Require()

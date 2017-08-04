@@ -151,9 +151,6 @@ func (jail *Jail) Call(chatID string, path string, args string) string {
 
 	res, err := jcell.Call("call", nil, path, args)
 
-	jcell.Lock()
-	defer jcell.Unlock()
-
 	// WARNING(influx6): We can have go-routine leakage due to continous call to this method
 	// and the call to cell.CellLoop().Run() due to improper usage, let's keep this
 	// in sight if things ever go wrong here.
