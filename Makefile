@@ -126,6 +126,8 @@ test:
 	@build/env.sh tail -n +2 coverage.out >> coverage-all.out
 	build/env.sh go test -coverprofile=coverage.out -covermode=set ./cmd/statusd
 	@build/env.sh tail -n +2 coverage.out >> coverage-all.out
+	build/env.sh go test -coverprofile=coverage.out -covermode=set ./helper
+	@build/env.sh tail -n +2 coverage.out >> coverage-all.out
 	@build/env.sh go tool cover -html=coverage-all.out -o coverage.html
 	@build/env.sh go tool cover -func=coverage-all.out
 
