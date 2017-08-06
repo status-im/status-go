@@ -18,6 +18,7 @@ import (
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
 	. "github.com/status-im/status-go/geth/testing"
+	"github.com/status-im/status-go/helper/math"
 	"github.com/status-im/status-go/static"
 )
 
@@ -80,7 +81,7 @@ func (s *BackendTestSuite) TestJailSendQueuedTransaction() {
 			if txHash, err = s.backend.CompleteTransaction(event["id"].(string), TestConfig.Account1.Password); err != nil {
 				s.Fail(fmt.Sprintf("cannot complete queued transaction[%v]: %v", event["id"], err))
 			} else {
-				log.Info("Transaction complete", "URL", "https://rinkeby.etherscan.io/tx/%s"+txHash.Hex())
+				log.Info("Transaction complete", "URL", "https://ropsten.etherscan.io/tx/%s"+txHash.Hex())
 			}
 
 			txCompletedSuccessfully <- struct{}{} // so that timeout is aborted
@@ -162,14 +163,14 @@ func (s *BackendTestSuite) TestJailSendQueuedTransaction() {
 			requireMessageId: true,
 			commands: []testCommand{
 				{
-					`["commands", "send"]`,
-					txParams,
-					`{"result": {"context":{"eth_sendTransaction":true,"message_id":"foobar"},"result":{"transaction-hash":"TX_HASH"}}}`,
-				},
-				{
 					`["commands", "getBalance"]`,
 					`{"address": "` + TestConfig.Account1.Address + `"}`,
 					`{"result": {"context":{"message_id":"42"},"result":{"balance":42}}}`, // message id in context, but default one is used!
+				},
+				{
+					`["commands", "send"]`,
+					txParams,
+					`{"result": {"context":{"eth_sendTransaction":true,"message_id":"foobar"},"result":{"transaction-hash":"TX_HASH"}}}`,
 				},
 			},
 		},
@@ -670,6 +671,8 @@ func (s *BackendTestSuite) TestJailVMPersistence() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
+	time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to sync
+
 	// log into account from which transactions will be sent
 	err := s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	require.NoError(err, "cannot select account: %v", TestConfig.Account1.Address)
@@ -729,7 +732,10 @@ func (s *BackendTestSuite) TestJailVMPersistence() {
 	parseResult := jailInstance.Parse(testChatID, `
 		var total = 0;
 		_status_catalog['ping'] = function(params) {
-			total += params.amount;
+			console.log("before: ", total);
+			console.log("add: ", params.amount);
+			total += Number(params.amount);
+			console.log("after: ", total)
 			return params.pong;
 		}
 
@@ -741,9 +747,12 @@ func (s *BackendTestSuite) TestJailVMPersistence() {
 			"value": web3.toWei(amount, "ether")
 		  };
 		  web3.eth.sendTransaction(transaction, function (error, result) {
-		  	 console.log("eth.sendTransaction callback: 'total' variable (is it updated by concurrent goroutine?): " + total);
-			 if(!error)
-				total += amount;
+			 if(!error) {
+				console.log("before: ", total);
+				console.log("add: ", amount);
+				total += Number(amount);
+				console.log("after: ", total);
+			 }
 		  });
 		}
 	`)
@@ -751,6 +760,7 @@ func (s *BackendTestSuite) TestJailVMPersistence() {
 
 	var wg sync.WaitGroup
 	node.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+		s.T().Logf("Got something: %v", jsonEvent)
 		var envelope node.SignalEnvelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			s.T().Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
@@ -780,17 +790,31 @@ func (s *BackendTestSuite) TestJailVMPersistence() {
 	for _, tc := range testCases {
 		wg.Add(1)
 		go func(tc testCase) {
+			//func(tc testCase) {
+			defer wg.Done() // ensure we don't forget it
+
 			s.T().Logf("CALL START: %v %v", tc.command, tc.params)
 			response := jailInstance.Call(testChatID, tc.command, tc.params)
 			if err := tc.validator(response); err != nil {
 				s.T().Errorf("failed test validation: %v, err: %v", tc.command, err)
 			}
 			s.T().Logf("CALL END: %v %v", tc.command, tc.params)
-
-			wg.Done()
 		}(tc)
 	}
 
-	common.PanicAfter(10*time.Second, nil, "test timed out")
+	common.PanicAfter(60*time.Second, nil, "test timed out")
 	wg.Wait()
+
+	// Validate total.
+	cell, err := jailInstance.GetJailCell(testChatID)
+	require.NoError(err)
+
+	totalOtto, err := cell.Get("total")
+	require.NoError(err)
+
+	total, err := totalOtto.ToFloat()
+	require.NoError(err)
+
+	s.T().Log(total)
+	require.Equal(0.840003, math.Round(total, 6))
 }
