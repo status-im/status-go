@@ -732,10 +732,7 @@ func (s *BackendTestSuite) TestJailVMPersistence() {
 	parseResult := jailInstance.Parse(testChatID, `
 		var total = 0;
 		_status_catalog['ping'] = function(params) {
-			console.log("before: ", total);
-			console.log("add: ", params.amount);
 			total += Number(params.amount);
-			console.log("after: ", total)
 			return params.pong;
 		}
 
@@ -748,10 +745,7 @@ func (s *BackendTestSuite) TestJailVMPersistence() {
 		  };
 		  web3.eth.sendTransaction(transaction, function (error, result) {
 			 if(!error) {
-				console.log("before: ", total);
-				console.log("add: ", amount);
 				total += Number(amount);
-				console.log("after: ", total);
 			 }
 		  });
 		}
@@ -790,7 +784,6 @@ func (s *BackendTestSuite) TestJailVMPersistence() {
 	for _, tc := range testCases {
 		wg.Add(1)
 		go func(tc testCase) {
-			//func(tc testCase) {
 			defer wg.Done() // ensure we don't forget it
 
 			s.T().Logf("CALL START: %v %v", tc.command, tc.params)
