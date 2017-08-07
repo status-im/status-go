@@ -135,7 +135,7 @@ func (ep *ExecutionPolicy) executeLocalSendTransaction(req common.RPCCall, call 
 	resp.Set("result", txHash.Hex())
 
 	if err != nil {
-		resp = newErrorResponse(call, -32603, err.Error(), &req.ID).Object()
+		resp = newErrorResponse(call.Otto, -32603, err.Error(), &req.ID).Object()
 		return resp, nil
 	}
 
@@ -183,7 +183,7 @@ func (ep *ExecutionPolicy) ExecuteOtherTransaction(req common.RPCCall, call otto
 			resultVal, callErr := JSON.Call("parse", string(result))
 
 			if callErr != nil {
-				resp = newErrorResponse(call, -32603, callErr.Error(), &req.ID).Object()
+				resp = newErrorResponse(call.Otto, -32603, callErr.Error(), &req.ID).Object()
 			} else {
 				resp.Set("result", resultVal)
 			}
@@ -199,7 +199,7 @@ func (ep *ExecutionPolicy) ExecuteOtherTransaction(req common.RPCCall, call otto
 
 	default:
 
-		resp = newErrorResponse(call, -32603, err.Error(), &req.ID).Object()
+		resp = newErrorResponse(call.Otto, -32603, err.Error(), &req.ID).Object()
 	}
 
 	// do extra request post processing (setting back tx context)

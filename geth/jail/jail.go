@@ -13,6 +13,7 @@ import (
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/static"
+	"github.com/status-im/status-go/geth/params"
 
 	"fknsrs.biz/p/ottoext/loop"
 )
@@ -33,7 +34,7 @@ type Jail struct {
 	nodeManager    common.NodeManager
 	accountManager common.AccountManager
 	policy         *ExecutionPolicy
-	cells          map[string]common.JailCell // jail supports running many isolated instances of jailed runtime
+	cells          map[string]*JailCell // jail supports running many isolated instances of jailed runtime
 	baseJSCode     string                     // JavaScript used to initialize all new cells with
 }
 
@@ -43,7 +44,7 @@ func New(nodeManager common.NodeManager, accountManager common.AccountManager) *
 	return &Jail{
 		nodeManager:    nodeManager,
 		accountManager: accountManager,
-		cells:          make(map[string]common.JailCell),
+		cells:          make(map[string]*JailCell),
 		policy:         NewExecutionPolicy(nodeManager, accountManager),
 	}
 }
@@ -213,9 +214,9 @@ func (jail *Jail) Send(call otto.FunctionCall) (response otto.Value) {
 		if resErr != nil {
 			switch resErr.(type) {
 			case common.StopRPCCallError:
-				return newErrorResponse(call, -32603, err.Error(), nil)
+				return newErrorResponse(call.Otto, -32603, err.Error(), nil)
 			default:
-				res = newErrorResponse(call, -32603, err.Error(), &req.ID).Object()
+				res = newErrorResponse(call.Otto, -32603, err.Error(), &req.ID).Object()
 			}
 		}
 

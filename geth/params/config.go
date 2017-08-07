@@ -427,10 +427,6 @@ func (c *NodeConfig) updateConfig() error {
 		return err
 	}
 
-	if err := c.updateRPCConfig(); err != nil {
-		return err
-	}
-
 	if err := c.updateBootClusterConfig(); err != nil {
 		return err
 	}
