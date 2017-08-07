@@ -753,7 +753,6 @@ func (s *BackendTestSuite) TestJailVMPersistence() {
 
 	var wg sync.WaitGroup
 	node.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		s.T().Logf("Got something: %v", jsonEvent)
 		var envelope node.SignalEnvelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			s.T().Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
