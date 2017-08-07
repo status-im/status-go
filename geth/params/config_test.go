@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"fmt"
 
 	"github.com/ethereum/go-ethereum/core"
 	gethparams "github.com/ethereum/go-ethereum/params"
