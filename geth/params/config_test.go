@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"fmt"
 
 	"github.com/ethereum/go-ethereum/core"
 	gethparams "github.com/ethereum/go-ethereum/params"
@@ -182,14 +183,14 @@ var loadConfigTestCases = []struct {
 
 			chainConfig := genesis.Config
 
-			require.Empty(t, chainConfig.HomesteadBlock.Cmp(gethparams.MainNetHomesteadBlock))
-			require.Empty(t, chainConfig.DAOForkBlock.Cmp(gethparams.MainNetDAOForkBlock))
+			require.Empty(t, chainConfig.HomesteadBlock.Cmp(gethparams.MainnetChainConfig.HomesteadBlock))
+			require.Empty(t, chainConfig.DAOForkBlock.Cmp(gethparams.MainnetChainConfig.DAOForkBlock))
 			require.True(t, chainConfig.DAOForkSupport)
-			require.Empty(t, chainConfig.EIP150Block.Cmp(gethparams.MainNetHomesteadGasRepriceBlock))
-			require.Equal(t, gethparams.MainNetHomesteadGasRepriceHash, chainConfig.EIP150Hash)
-			require.Empty(t, chainConfig.EIP155Block.Cmp(gethparams.MainNetSpuriousDragon))
-			require.Empty(t, chainConfig.EIP158Block.Cmp(gethparams.MainNetSpuriousDragon))
-			require.Empty(t, chainConfig.ChainId.Cmp(gethparams.MainNetChainID))
+			require.Empty(t, chainConfig.EIP150Block.Cmp(gethparams.MainnetChainConfig.EIP150Block))
+			require.Equal(t, gethparams.MainnetChainConfig.EIP150Hash, chainConfig.EIP150Hash)
+			require.Empty(t, chainConfig.EIP155Block.Cmp(gethparams.MainnetChainConfig.EIP155Block))
+			require.Empty(t, chainConfig.EIP158Block.Cmp(gethparams.MainnetChainConfig.EIP158Block))
+			require.Empty(t, chainConfig.ChainId.Cmp(gethparams.MainnetChainConfig.ChainId))
 		},
 	},
 	{
@@ -442,6 +443,8 @@ func TestConfigWriteRead(t *testing.T) {
 		require.Nil(t, err, "cannot read configuration from disk")
 
 		refConfigData := LoadFromFile(refFile)
+
+		// ioutil.WriteFile(fmt.Sprintf("/tmp/chainId.%d.json", networkId), []byte(loadedConfigData), 0777) // ease updating new config
 
 		refConfigData = strings.Replace(refConfigData, "$TMPDIR", nodeConfig.DataDir, -1)
 		refConfigData = strings.Replace(refConfigData, "$VERSION", params.Version, -1)

@@ -26,6 +26,7 @@ var (
 // Jail represents jailed environment inside of which we hold multiple cells.
 // Each cell is a separate JavaScript VM.
 type Jail struct {
+	// FIXME(tiabc): This mutex handles cells field access and must be renamed appropriately: cellsMutex
 	sync.RWMutex
 	requestManager *RequestManager
 	cells          map[string]*JailCell // jail supports running many isolated instances of jailed runtime
