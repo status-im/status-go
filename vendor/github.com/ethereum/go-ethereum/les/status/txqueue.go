@@ -2,6 +2,8 @@ package status
 
 import (
 	"errors"
+	"os"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -105,8 +107,18 @@ func (q *TxQueue) Stop() {
 	q.stoppedGroup.Wait()
 }
 
+// HaltOnPanic recovers from panic, logs issue, and exits
+func HaltOnPanic() {
+	if r := recover(); r != nil {
+		log.Error("Runtime PANIC!!!", "error", r, "stack", string(debug.Stack()))
+		time.Sleep(5 * time.Second) // allow logger to flush logs
+		os.Exit(1)
+	}
+}
+
 // evictionLoop frees up queue to accommodate another transaction item
 func (q *TxQueue) evictionLoop() {
+	defer HaltOnPanic()
 	evict := func() {
 		if len(q.transactions) >= DefaultTxQueueCap { // eviction is required to accommodate another/last item
 			q.Remove(<-q.evictableIDs)
@@ -129,6 +141,8 @@ func (q *TxQueue) evictionLoop() {
 
 // enqueueLoop process incoming enqueue requests
 func (q *TxQueue) enqueueLoop() {
+	defer HaltOnPanic()
+
 	// enqueue incoming transactions
 	for {
 		select {

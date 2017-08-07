@@ -148,6 +148,8 @@ func (s *BackendTestSuite) TestNodeStartStop() {
 	require.True(s.backend.IsNodeRunning())
 }
 
+// FIXME(tiabc): There's also a test with the same name in geth/node/rpc_test.go
+// so this test should only check StatusBackend logic with a mocked version of the underlying NodeManager.
 func (s *BackendTestSuite) TestCallRPC() {
 	require := s.Require()
 	require.NotNil(s.backend)
@@ -184,7 +186,7 @@ func (s *BackendTestSuite) TestCallRPC() {
 		{
 			`{"jsonrpc":"2.0","method":"shh_version","params":[],"id":67}`,
 			func(resultJSON string) {
-				expected := `{"jsonrpc":"2.0","id":67,"result":"0x5"}` + "\n"
+				expected := `{"jsonrpc":"2.0","id":67,"result":"5.0"}` + "\n"
 				s.Equal(expected, resultJSON)
 				s.T().Log("shh_version: ", resultJSON)
 				progress <- struct{}{}
@@ -227,6 +229,8 @@ func (s *BackendTestSuite) TestCallRPC() {
 	}
 }
 
+// FIXME(tiabc): There's also a test with the same name in geth/node/manager_test.go
+// so this test should only check StatusBackend logic with a mocked version of the underlying NodeManager.
 func (s *BackendTestSuite) TestRaceConditions() {
 	require := s.Require()
 	require.NotNil(s.backend)
@@ -382,6 +386,8 @@ func (s *BackendTestSuite) TestRaceConditions() {
 	}
 }
 
+// FIXME(tiabc): There's also a test with the same name in geth/node/manager_test.go
+// so this test should only check StatusBackend logic with a mocked version of the underlying NodeManager.
 func (s *BackendTestSuite) TestNetworkSwitching() {
 	require := s.Require()
 	require.NotNil(s.backend)
@@ -423,6 +429,8 @@ func (s *BackendTestSuite) TestNetworkSwitching() {
 	<-nodeStopped
 }
 
+// FIXME(tiabc): There's also a test with the same name in geth/node/manager_test.go
+// so this test should only check StatusBackend logic with a mocked version of the underlying NodeManager.
 func (s *BackendTestSuite) TestResetChainData() {
 	require := s.Require()
 	require.NotNil(s.backend)
@@ -442,6 +450,8 @@ func (s *BackendTestSuite) TestResetChainData() {
 	FirstBlockHash(require, s.backend.NodeManager(), "0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177")
 }
 
+// FIXME(tiabc): There's also a test with the same name in geth/node/manager_test.go
+// so this test should only check StatusBackend logic with a mocked version of the underlying NodeManager.
 func (s *BackendTestSuite) TestRestartNode() {
 	require := s.Require()
 	require.NotNil(s.backend)

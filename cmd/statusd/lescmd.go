@@ -53,6 +53,7 @@ func parseLESCommandConfig(ctx *cli.Context) (*params.NodeConfig, error) {
 
 	// Enabled sub-protocols
 	nodeConfig.LightEthConfig.Enabled = true
+	nodeConfig.RPCEnabled = ctx.Bool(HTTPEnabledFlag.Name)
 	nodeConfig.WhisperConfig.Enabled = ctx.Bool(WhisperEnabledFlag.Name)
 	nodeConfig.SwarmConfig.Enabled = ctx.Bool(SwarmEnabledFlag.Name)
 

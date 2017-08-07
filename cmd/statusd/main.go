@@ -66,7 +66,7 @@ var (
 	// HTTPEnabledFlag defines whether HTTP RPC endpoint should be opened or not
 	HTTPEnabledFlag = cli.BoolFlag{
 		Name:  "http",
-		Usage: "HTTP RPC enpoint enabled",
+		Usage: "HTTP RPC enpoint enabled (default: false)",
 	}
 
 	// HTTPPortFlag defines HTTP RPC port to use (if HTTP RPC is enabled)

@@ -286,7 +286,7 @@ describe('Whisper Tests', function () {
                 }, 200);
             });
 
-            it('shh.unsubscribe(filterID)', function () {
+            it.skip('shh.unsubscribe(filterID)', function () {
                 node1.shh.unsubscribe(filterid1);
                 node1.shh.unsubscribe(filterid2);
             });

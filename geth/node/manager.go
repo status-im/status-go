@@ -241,11 +241,7 @@ func (m *NodeManager) populateStaticPeers() error {
 		return nil
 	}
 
-	enodes, err := m.config.LoadBootClusterNodes()
-	if err != nil {
-		log.Warn("Can not load boot nodes", "error", err)
-	}
-	for _, enode := range enodes {
+	for _, enode := range m.config.BootClusterConfig.BootNodes {
 		err := m.addPeer(enode)
 		if err != nil {
 			log.Warn("Boot node addition failed", "error", err)

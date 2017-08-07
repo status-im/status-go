@@ -7,14 +7,16 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/status-im/status-go/static"
 )
 
 // default node configuration options
@@ -52,13 +54,7 @@ type LightEthConfig struct {
 
 	// DatabaseCache is memory (in MBs) allocated to internal caching (min 16MB / database forced)
 	DatabaseCache int
-
-	// CHTRootConfigURL defines URL to file containing hard-coded CHT roots
-	// TODO remove this hack, once CHT sync is implemented on LES side
-	CHTRootConfigURL string
 }
-
-//=====================================================================================
 
 // FirebaseConfig holds FCM-related configuration
 type FirebaseConfig struct {
@@ -88,8 +84,6 @@ func (c *FirebaseConfig) ReadAuthorizationKeyFile() ([]byte, error) {
 
 	return key, nil
 }
-
-//=====================================================================================
 
 // WhisperConfig holds SHH-related configuration
 type WhisperConfig struct {
@@ -177,8 +171,6 @@ func (c *WhisperConfig) String() string {
 	return string(data)
 }
 
-//=====================================================================================
-
 // SwarmConfig holds Swarm-related configuration
 type SwarmConfig struct {
 	// Enabled flag specifies whether protocol is enabled
@@ -191,8 +183,6 @@ func (c *SwarmConfig) String() string {
 	return string(data)
 }
 
-//=====================================================================================
-
 // BootClusterConfig holds configuration for supporting boot cluster, which is a temporary
 // means for mobile devices to get connected to Ethereum network (UDP-based discovery
 // may not be available, so we need means to discover the network manually).
@@ -200,12 +190,15 @@ type BootClusterConfig struct {
 	// Enabled flag specifies whether feature is enabled
 	Enabled bool
 
-	// ConfigFile is a path to JSON file containing array of boot nodes
-	// See `static/bootcluster/*.json` for cluster configurations provided
-	// out of box. You can pass absolute path, and if file at that path can be
-	// loaded, it will be used. Otherwise, file is supposed to be relative to
-	// `static/bootcluster` folder.
-	ConfigFile string
+	// RootNumber CHT root number
+	RootNumber int
+
+	// RootHash is hash of CHT root for a given root number
+	RootHash string
+
+	// BootNodes list of bootstrap nodes for a given network (Ropsten, Rinkeby, Homestead),
+	// for a given mode (production vs development)
+	BootNodes []string
 }
 
 // String dumps config object as nicely indented JSON
@@ -335,6 +328,7 @@ func NewNodeConfig(dataDir string, networkID uint64, devMode bool) (*NodeConfig,
 		RPCEnabled:      RPCEnabledDefault,
 		HTTPHost:        HTTPHost,
 		HTTPPort:        HTTPPort,
+		APIModules:      APIModules,
 		WSHost:          WSHost,
 		WSPort:          WSPort,
 		MaxPeers:        MaxPeers,
@@ -343,14 +337,13 @@ func NewNodeConfig(dataDir string, networkID uint64, devMode bool) (*NodeConfig,
 		LogFile:         LogFile,
 		LogLevel:        LogLevel,
 		LogToStderr:     LogToStderr,
-		LightEthConfig: &LightEthConfig{
-			Enabled:          true,
-			DatabaseCache:    DatabaseCache,
-			CHTRootConfigURL: CHTRootConfigURL,
-		},
 		BootClusterConfig: &BootClusterConfig{
-			Enabled:    true,
-			ConfigFile: BootClusterConfigFile,
+			Enabled:   true,
+			BootNodes: []string{},
+		},
+		LightEthConfig: &LightEthConfig{
+			Enabled:       true,
+			DatabaseCache: DatabaseCache,
 		},
 		WhisperConfig: &WhisperConfig{
 			Enabled:    true,
@@ -421,32 +414,6 @@ func (c *NodeConfig) Save() error {
 
 	log.Info(fmt.Sprintf("config file saved: %v", configFilePath))
 	return nil
-}
-
-// LoadBootClusterNodes loads boot nodes from a config file provided in BootClusterConfig
-func (c *NodeConfig) LoadBootClusterNodes() ([]string, error) {
-	var bootnodes []string
-	var configData []byte
-	var err error
-
-	filename := c.BootClusterConfig.ConfigFile
-
-	log.Info("Loading boot nodes config file", "source", filename)
-	if _, err = os.Stat(filename); os.IsNotExist(err) { // load from static resources
-		configData, err = static.Asset("bootcluster/" + filename)
-	} else {
-		configData, err = ioutil.ReadFile(filename)
-	}
-
-	if err != nil {
-		return nil, err
-	}
-
-	// parse JSON
-	if err := json.Unmarshal(configData, &bootnodes); err != nil {
-		return nil, err
-	}
-	return bootnodes, nil
 }
 
 // updateConfig traverses configuration and adjusts dependent fields
@@ -521,36 +488,55 @@ func (c *NodeConfig) updateUpstreamConfig() error {
 	return nil
 }
 
-// updateBootClusterConfig populates cluster config file, depending on dev/prod and mobile/full settings
+// updateBootClusterConfig loads boot nodes and CHT for a given network and mode.
+// This is necessary until we have LES protocol support CHT sync, and better node
+// discovery on mobile devices)
 func (c *NodeConfig) updateBootClusterConfig() error {
-	var configFile string
-
-	switch c.NetworkID {
-	case MainNetworkID:
-		configFile = "homestead.prod.json"
-	case RopstenNetworkID:
-		configFile = "ropsten.prod.json"
-	case RinkebyNetworkID:
-		configFile = "rinkeby.prod.json"
+	if !c.BootClusterConfig.Enabled {
+		return nil
 	}
 
-	if c.DevMode {
-		configFile = strings.Replace(configFile, "prod", "dev", 1)
+	// TODO: Remove this thing as this is an ugly hack.
+	// Once CHT sync sub-protocol is working in LES, we will rely on it, as it provides
+	// decentralized solution. For now, in order to avoid forcing users to long sync times
+	// we use central static resource
+	type subClusterConfig struct {
+		Number    int      `json:"number"`
+		Hash      string   `json:"hash"`
+		BootNodes []string `json:"bootnodes"`
+	}
+	type clusterConfig struct {
+		NetworkID   int              `json:"networkID"`
+		GenesisHash string           `json:"genesisHash"`
+		Prod        subClusterConfig `json:"prod"`
+		Dev         subClusterConfig `json:"dev"`
 	}
 
-	if len(configFile) > 0 {
-		c.BootClusterConfig.ConfigFile = configFile
+	client := &http.Client{Timeout: 5 * time.Second}
+	r, err := client.Get(BootClusterConfigURL + "?u=" + strconv.Itoa(int(time.Now().Unix())))
+	if err != nil {
+		return err
+	}
+	defer r.Body.Close()
+
+	var clusters []clusterConfig
+	err = json.NewDecoder(r.Body).Decode(&clusters)
+	if err != nil {
+		return err
 	}
 
-	return nil
-}
-
-// updateRPCConfig transforms RPC settings to meet requirements of a given configuration
-func (c *NodeConfig) updateRPCConfig() error {
-	c.APIModules = ProdAPIModules
-
-	if c.DevMode {
-		c.APIModules = DevAPIModules
+	for _, cluster := range clusters {
+		if cluster.NetworkID == int(c.NetworkID) {
+			c.BootClusterConfig.RootNumber = cluster.Prod.Number
+			c.BootClusterConfig.RootHash = cluster.Prod.Hash
+			c.BootClusterConfig.BootNodes = cluster.Prod.BootNodes
+			if c.DevMode {
+				c.BootClusterConfig.RootNumber = cluster.Dev.Number
+				c.BootClusterConfig.RootHash = cluster.Dev.Hash
+				c.BootClusterConfig.BootNodes = cluster.Dev.BootNodes
+			}
+			break
+		}
 	}
 
 	return nil

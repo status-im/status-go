@@ -4,13 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"os"
 	"path"
 	"path/filepath"
-	"strconv"
 	"strings"
-	"time"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
@@ -68,17 +65,6 @@ func MakeNode(config *params.NodeConfig) (*node.Node, error) {
 		pk, err := crypto.LoadECDSA(config.NodeKeyFile)
 		if err != nil {
 			log.Warn(fmt.Sprintf("Failed loading private key file '%s': %v", config.NodeKeyFile, err))
-		}
-
-		// override node's private key
-		stackConfig.P2P.PrivateKey = pk
-	}
-
-	if len(config.NodeKeyFile) > 0 {
-		log.Info("Loading private key file", "file", config.NodeKeyFile)
-		pk, err := crypto.LoadECDSA(config.NodeKeyFile)
-		if err != nil {
-			log.Info("Failed loading private key file", "file", config.NodeKeyFile, "err", err)
 		}
 
 		// override node's private key
@@ -148,6 +134,7 @@ func defaultEmbeddedNodeConfig(config *params.NodeConfig) *node.Config {
 
 // updateCHT changes trusted canonical hash trie root
 func updateCHT(eth *les.LightEthereum, config *params.NodeConfig) {
+<<<<<<< HEAD
 	bc := eth.BlockChain()
 
 	// TODO: Remove this thing as this is an ugly hack.
@@ -198,41 +185,26 @@ func updateCHT(eth *les.LightEthereum, config *params.NodeConfig) {
 				return
 			}
 		}
+=======
+	if !config.BootClusterConfig.Enabled {
+		return
+>>>>>>> 02705906469a1a44e6ea89e51eb71628045b0b5f
 	}
 
-	// resort to manually updated
-	log.Info("Loading CHT from net failed, setting manually")
-	if bc.Genesis().Hash() == params.MainNetGenesisHash {
-		eth.WriteTrustedCht(light.TrustedCht{
-			Number: 805,
-			Root:   gethcommon.HexToHash("85e4286fe0a730390245c49de8476977afdae0eb5530b277f62a52b12313d50f"),
-		})
-		log.Info("Added trusted CHT for mainnet")
+	if config.BootClusterConfig.RootNumber == 0 {
+		return
 	}
 
-	if bc.Genesis().Hash() == params.RopstenNetGenesisHash {
-		root := "fa851b5252cc48ab55f375833b0344cc5c7cacea69be7e2a57976c38d3bb3aef"
-		if config.DevMode {
-			root = "f2f862314509b22a773eedaaa7fa6452474eb71a3b72525a97dbf5060cbea88f"
-		}
-		eth.WriteTrustedCht(light.TrustedCht{
-			Number: 239,
-			Root:   gethcommon.HexToHash(root),
-		})
-		log.Info("Added trusted CHT for Ropsten", "CHT", root)
+	if config.BootClusterConfig.RootHash == "" {
+		return
 	}
 
-	//if bc.Genesis().Hash() == params.RinkebyNetGenesisHash {
-	//	root := "0xb100882d00a09292f15e712707649b24d019a47a509e83a00530ac542425c3bd"
-	//	if config.DevMode {
-	//		root = "0xb100882d00a09292f15e712707649b24d019a47a509e83a00530ac542425c3bd"
-	//	}
-	//	eth.WriteTrustedCht(light.TrustedCht{
-	//		Number: 55,
-	//		Root:   gethcommon.HexToHash(root),
-	//	})
-	//	log.Info("Added trusted CHT for Rinkeby", "CHT", root)
-	//}
+	eth.WriteTrustedCht(light.TrustedCht{
+		Number: uint64(config.BootClusterConfig.RootNumber),
+		Root:   gethcommon.HexToHash(config.BootClusterConfig.RootHash),
+	})
+	log.Info("Added trusted CHT",
+		"develop", config.DevMode, "number", config.BootClusterConfig.RootNumber, "hash", config.BootClusterConfig.RootHash)
 }
 
 // activateEthService configures and registers the eth.Ethereum service with a given node.
@@ -279,7 +251,7 @@ func activateShhService(stack *node.Node, config *params.NodeConfig) error {
 
 	serviceConstructor := func(*node.ServiceContext) (node.Service, error) {
 		whisperConfig := config.WhisperConfig
-		whisperService := whisper.New()
+		whisperService := whisper.New(nil)
 
 		// enable mail service
 		if whisperConfig.MailServerNode {
@@ -331,22 +303,22 @@ func makeBootstrapNodes() []*discover.Node {
 	// on mobile client we deliberately keep this list empty
 	enodes := []string{}
 
-	var bootstapNodes []*discover.Node
+	var bootstrapNodes []*discover.Node
 	for _, enode := range enodes {
-		bootstapNodes = append(bootstapNodes, discover.MustParseNode(enode))
+		bootstrapNodes = append(bootstrapNodes, discover.MustParseNode(enode))
 	}
 
-	return bootstapNodes
+	return bootstrapNodes
 }
 
 // makeBootstrapNodesV5 returns default (hence bootstrap) list of peers
 func makeBootstrapNodesV5() []*discv5.Node {
 	enodes := gethparams.DiscoveryV5Bootnodes
 
-	var bootstapNodes []*discv5.Node
+	var bootstrapNodes []*discv5.Node
 	for _, enode := range enodes {
-		bootstapNodes = append(bootstapNodes, discv5.MustParseNode(enode))
+		bootstrapNodes = append(bootstrapNodes, discv5.MustParseNode(enode))
 	}
 
-	return bootstapNodes
+	return bootstrapNodes
 }

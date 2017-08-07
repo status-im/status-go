@@ -34,7 +34,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/nat"
 	"github.com/ethereum/go-ethereum/params"
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv2"
+	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 )
 
 // NodeConfig represents the collection of configuration values to fine tune the Geth
@@ -169,7 +169,9 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 	}
 	// Register the Whisper protocol if requested
 	if config.WhisperEnabled {
-		if err := rawStack.Register(func(*node.ServiceContext) (node.Service, error) { return whisper.New(), nil }); err != nil {
+		if err := rawStack.Register(func(*node.ServiceContext) (node.Service, error) {
+			return whisper.New(&whisper.DefaultConfig), nil
+		}); err != nil {
 			return nil, fmt.Errorf("whisper init: %v", err)
 		}
 	}

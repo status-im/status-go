@@ -103,8 +103,8 @@ func (c *Client) sendBatchHTTP(ctx context.Context, op *requestOp, msgs []*jsonr
 	if err := json.NewDecoder(respBody).Decode(&respmsgs); err != nil {
 		return err
 	}
-	for _, respmsg := range respmsgs {
-		op.resp <- &respmsg
+	for i := 0; i < len(respmsgs); i++ {
+		op.resp <- &respmsgs[i]
 	}
 	return nil
 }
@@ -162,6 +162,11 @@ func (srv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func newCorsHandler(srv *Server, allowedOrigins []string) http.Handler {
+	// disable CORS support if user has not specified a custom CORS configuration
+	if len(allowedOrigins) == 0 {
+		return srv
+	}
+
 	c := cors.New(cors.Options{
 		AllowedOrigins: allowedOrigins,
 		AllowedMethods: []string{"POST", "GET"},

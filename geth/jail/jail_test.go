@@ -3,12 +3,9 @@ package jail_test
 import (
 	"encoding/json"
 	"errors"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 
-	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
@@ -57,9 +54,9 @@ func (s *JailTestSuite) TestInit() {
 	}
 
 	// get cell VM w/o defining cell first
-	vm, err := s.jail.JailCellVM(testChatID)
+	cell, err := s.jail.GetCell(testChatID)
 	require.EqualError(err, "cell[testChat] doesn't exist")
-	require.Nil(vm)
+	require.Nil(cell)
 
 	// create VM (w/o properly initializing base JS script)
 	err = errors.New("ReferenceError: '_status_catalog' is not defined")
@@ -68,9 +65,9 @@ func (s *JailTestSuite) TestInit() {
 	require.Equal(errorWrapper(err), s.jail.Call(testChatID, `["commands", "testCommand"]`, `{"val": 12}`))
 
 	// get existing cell (even though we got errors, cell was still created)
-	vm, err = s.jail.JailCellVM(testChatID)
+	cell, err = s.jail.GetCell(testChatID)
 	require.NoError(err)
-	require.NotNil(vm)
+	require.NotNil(cell)
 
 	statusJS := baseStatusJSCode + `;
 	_status_catalog.commands["testCommand"] = function (params) {
@@ -116,7 +113,7 @@ func (s *JailTestSuite) TestFunctionCall() {
 
 	// call with wrong chat id
 	response := s.jail.Call("chatIDNonExistent", "", "")
-	expectedError := `{"error":"Cell[chatIDNonExistent] doesn't exist."}`
+	expectedError := `{"error":"cell[chatIDNonExistent] doesn't exist"}`
 	require.Equal(expectedError, response)
 
 	// call extraFunc()
@@ -218,19 +215,19 @@ func (s *JailTestSuite) TestJailRPCSend() {
 	s.jail.Parse(testChatID, ``)
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
-	vm, err := s.jail.JailCellVM(testChatID)
+	cell, err := s.jail.GetCell(testChatID)
 	require.NoError(err)
-	require.NotNil(vm)
+	require.NotNil(cell)
 
 	// internally (since we replaced `web3.send` with `jail.Send`)
 	// all requests to web3 are forwarded to `jail.Send`
-	_, err = vm.Run(`
+	_, err = cell.Run(`
 	    var balance = web3.eth.getBalance("` + TestConfig.Account1.Address + `");
 		var sendResult = web3.fromWei(balance, "ether")
 	`)
 	require.NoError(err)
 
-	value, err := vm.Get("sendResult")
+	value, err := cell.Get("sendResult")
 	require.NoError(err, "cannot obtain result of balance check operation")
 
 	balance, err := value.ToFloat()
@@ -240,39 +237,28 @@ func (s *JailTestSuite) TestJailRPCSend() {
 	require.False(balance < 100, "wrong balance (there should be lots of test Ether on that account)")
 }
 
-func (s *JailTestSuite) TestGetJailCellVM() {
-	expectedError := `cell[nonExistentChat] doesn't exist`
-	_, err := s.jail.JailCellVM("nonExistentChat")
-	s.EqualError(err, expectedError)
-
-	// now let's create VM..
-	s.jail.Parse(testChatID, ``)
-
-	// ..and see if VM becomes available
-	_, err = s.jail.JailCellVM(testChatID)
-	s.NoError(err)
-}
-
 func (s *JailTestSuite) TestIsConnected() {
 	require := s.Require()
 	require.NotNil(s.jail)
 
-	s.StartTestNode(params.RopstenNetworkID, false)
+	// TODO(tiabc): Is this required?
+	s.StartTestNode(params.RopstenNetworkID)
+
 	defer s.StopTestNode()
 
 	s.jail.Parse(testChatID, "")
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
-	vm, err := s.jail.JailCellVM(testChatID)
+	cell, err := s.jail.GetCell(testChatID)
 	require.NoError(err)
 
-	_, err = vm.Run(`
+	_, err = cell.Run(`
 	    var responseValue = web3.isConnected();
 	    responseValue = JSON.stringify(responseValue);
 	`)
 	require.NoError(err)
 
-	responseValue, err := vm.Get("responseValue")
+	responseValue, err := cell.Get("responseValue")
 	require.NoError(err, "cannot obtain result of isConnected()")
 
 	response, err := responseValue.ToString()
@@ -289,7 +275,7 @@ func (s *JailTestSuite) TestLocalStorageSet() {
 	s.jail.Parse(testChatID, "")
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
-	vm, err := s.jail.JailCellVM(testChatID)
+	cell, err := s.jail.GetCell(testChatID)
 	require.NoError(err)
 
 	testData := "foobar"
@@ -317,7 +303,7 @@ func (s *JailTestSuite) TestLocalStorageSet() {
 		}
 	})
 
-	_, err = vm.Run(`
+	_, err = cell.Run(`
 	    var responseValue = localStorage.set("` + testData + `");
 	    responseValue = JSON.stringify(responseValue);
 	`)
@@ -331,7 +317,7 @@ func (s *JailTestSuite) TestLocalStorageSet() {
 		s.Fail("operation timed out")
 	}
 
-	responseValue, err := vm.Get("responseValue")
+	responseValue, err := cell.Get("responseValue")
 	s.NoError(err, "cannot obtain result of localStorage.set()")
 
 	response, err := responseValue.ToString()
