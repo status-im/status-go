@@ -122,87 +122,6 @@ func (s *JailTestSuite) TestFunctionCall() {
 	require.Equal(expectedResponse, response)
 }
 
-func (s *JailTestSuite) TestJailTimeoutFailure() {
-	require := s.Require()
-	require.NotNil(s.jail)
-
-	newCell := s.jail.NewJailCell(testChatID)
-	require.NotNil(newCell)
-
-	execr := newCell.Executor()
-
-	// Attempt to run a timeout string against a JailCell.
-	_, err := execr.Exec(`
-		setTimeout(function(n){
-			if(Date.now() - n < 50){
-				throw new Error("Timedout early");
-			}
-
-			return n;
-		}, 30, Date.now());
-	`)
-
-	require.NotNil(err)
-}
-
-func (s *JailTestSuite) TestJailTimeout() {
-	require := s.Require()
-	require.NotNil(s.jail)
-
-	newCell := s.jail.NewJailCell(testChatID)
-	require.NotNil(newCell)
-
-	execr := newCell.Executor()
-
-	// Attempt to run a timeout string against a JailCell.
-	res, err := execr.Exec(`
-		setTimeout(function(n){
-			if(Date.now() - n < 50){
-				throw new Error("Timedout early");
-			}
-
-			return n;
-		}, 50, Date.now());
-	`)
-
-	require.NoError(err)
-	require.NotNil(res)
-}
-
-func (s *JailTestSuite) TestJailFetch() {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Hello World"))
-	})
-
-	server := httptest.NewServer(mux)
-	defer server.Close()
-
-	require := s.Require()
-	require.NotNil(s.jail)
-
-	newCell := s.jail.NewJailCell(testChatID)
-	require.NotNil(newCell)
-
-	execr := newCell.Executor()
-
-	wait := make(chan struct{})
-
-	// Attempt to run a fetch resource.
-	_, err := execr.Fetch(server.URL, func(res otto.Value) {
-		go func() { wait <- struct{}{} }()
-	})
-
-	require.NoError(err)
-
-	select {
-	case <-wait:
-	case <-time.After(1 * time.Minute):
-		require.Fail("Failed to receive fetch response")
-	}
-}
-
 func (s *JailTestSuite) TestJailRPCSend() {
 	require := s.Require()
 	require.NotNil(s.jail)
@@ -242,7 +161,7 @@ func (s *JailTestSuite) TestIsConnected() {
 	require.NotNil(s.jail)
 
 	// TODO(tiabc): Is this required?
-	s.StartTestNode(params.RopstenNetworkID)
+	s.StartTestNode(params.RopstenNetworkID, false)
 
 	defer s.StopTestNode()
 

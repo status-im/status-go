@@ -92,7 +92,7 @@ func (s *JailTestSuite) TestJailLoopInCall() {
 	require := s.Require()
 	require.NotNil(s.jail)
 
-	s.StartTestNode(params.RopstenNetworkID)
+	s.StartTestNode(params.RopstenNetworkID, true)
 	defer s.StopTestNode()
 
 	// load Status JS and add test command to it
