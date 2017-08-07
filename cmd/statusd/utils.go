@@ -18,11 +18,13 @@ import (
 	"github.com/ethereum/go-ethereum/les/status"
 	gethparams "github.com/ethereum/go-ethereum/params"
 
+	"fmt"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
 	. "github.com/status-im/status-go/geth/testing"
 	"github.com/status-im/status-go/static"
+	"github.com/stretchr/testify/require"
 )
 
 const zeroHash = "0x0000000000000000000000000000000000000000000000000000000000000000"
@@ -40,6 +42,9 @@ var nodeConfigJSON = `{
 func testExportedAPI(t *testing.T, done chan struct{}) {
 	<-startTestNode(t)
 
+	// FIXME(tiabc): All of that is done because usage of cgo is not supported in tests.
+	// Probably, there should be a cleaner way, for example, test cgo bindings in e2e tests
+	// separately from other internal tests.
 	tests := []struct {
 		name string
 		fn   func(t *testing.T) bool
@@ -164,103 +169,34 @@ func testVerifyAccountPassword(t *testing.T) bool {
 }
 
 func testGetDefaultConfig(t *testing.T) bool {
-	// test Mainnet config
-	nodeConfig := params.NodeConfig{}
+	networks := []struct {
+		chainID        int
+		refChainConfig *gethparams.ChainConfig
+	}{
+		{params.MainNetworkID, gethparams.MainnetChainConfig},
+		{params.RopstenNetworkID, gethparams.TestnetChainConfig},
+		{params.RinkebyNetworkID, gethparams.RinkebyChainConfig},
+	}
+	for i := range networks {
+		network := networks[i]
 
-	rawResponse := GenerateConfig(C.CString("/tmp/data-folder"), 1, 1)
-	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &nodeConfig); err != nil {
-		t.Errorf("cannot decode response (%s): %v", C.GoString(rawResponse), err)
-		return false
-	}
+		t.Run(fmt.Sprintf("networkID=%d", network.chainID), func(t *testing.T) {
+			var (
+				nodeConfig  = params.NodeConfig{}
+				rawResponse = GenerateConfig(C.CString("/tmp/data-folder"), C.int(network.chainID), 1)
+			)
+			if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &nodeConfig); err != nil {
+				t.Errorf("cannot decode response (%s): %v", C.GoString(rawResponse), err)
+			}
 
-	genesis := new(core.Genesis)
-	if err := json.Unmarshal([]byte(nodeConfig.LightEthConfig.Genesis), genesis); err != nil {
-		t.Error(err)
-		return false
-	}
-	chainConfig := genesis.Config
-	if chainConfig.HomesteadBlock.Cmp(gethparams.MainnetChainConfig.HomesteadBlock) != 0 {
-		t.Error("invalid chainConfig.HomesteadBlock")
-		return false
-	}
-	if chainConfig.DAOForkBlock.Cmp(gethparams.MainnetChainConfig.DAOForkBlock) != 0 {
-		t.Error("invalid chainConfig.DAOForkBlock")
-		return false
-	}
-	if chainConfig.DAOForkSupport != true {
-		t.Error("invalid chainConfig.DAOForkSupport")
-		return false
-	}
-	if chainConfig.EIP150Block.Cmp(gethparams.MainnetChainConfig.EIP150Block) != 0 {
-		t.Error("invalid chainConfig.EIP150Block")
-		return false
-	}
-	if chainConfig.EIP150Hash != gethparams.MainnetChainConfig.EIP150Hash {
-		t.Error("invalid chainConfig.EIP150Hash")
-		return false
-	}
-	if chainConfig.EIP155Block.Cmp(gethparams.MainnetChainConfig.EIP155Block) != 0 {
-		t.Error("invalid chainConfig.EIP155Block")
-		return false
-	}
-	if chainConfig.EIP158Block.Cmp(gethparams.MainnetChainConfig.EIP158Block) != 0 {
-		t.Error("invalid chainConfig.EIP158Block")
-		return false
-	}
-	if chainConfig.ChainId.Cmp(gethparams.MainnetChainConfig.ChainId) != 0 {
-		t.Error("invalid chainConfig.ChainId")
-		return false
-	}
+			genesis := new(core.Genesis)
+			if err := json.Unmarshal([]byte(nodeConfig.LightEthConfig.Genesis), genesis); err != nil {
+				t.Error(err)
+			}
 
-	// test Testnet
-	nodeConfig = params.NodeConfig{}
-	rawResponse = GenerateConfig(C.CString("/tmp/data-folder"), 3, 1)
-	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &nodeConfig); err != nil {
-		t.Errorf("cannot decode response (%s): %v", C.GoString(rawResponse), err)
-		return false
+			require.Equal(t, network.refChainConfig, genesis.Config)
+		})
 	}
-
-	genesis = new(core.Genesis)
-	if err := json.Unmarshal([]byte(nodeConfig.LightEthConfig.Genesis), genesis); err != nil {
-		t.Error(err)
-		return false
-	}
-	chainConfig = genesis.Config
-	refChainConfig := gethparams.TestnetChainConfig
-
-	if chainConfig.HomesteadBlock.Cmp(refChainConfig.HomesteadBlock) != 0 {
-		t.Error("invalid chainConfig.HomesteadBlock")
-		return false
-	}
-	if chainConfig.DAOForkBlock != nil { // already forked
-		t.Error("invalid chainConfig.DAOForkBlock")
-		return false
-	}
-	if chainConfig.DAOForkSupport != refChainConfig.DAOForkSupport {
-		t.Error("invalid chainConfig.DAOForkSupport")
-		return false
-	}
-	if chainConfig.EIP150Block.Cmp(refChainConfig.EIP150Block) != 0 {
-		t.Error("invalid chainConfig.EIP150Block")
-		return false
-	}
-	if chainConfig.EIP150Hash != refChainConfig.EIP150Hash {
-		t.Error("invalid chainConfig.EIP150Hash")
-		return false
-	}
-	if chainConfig.EIP155Block.Cmp(refChainConfig.EIP155Block) != 0 {
-		t.Error("invalid chainConfig.EIP155Block")
-		return false
-	}
-	if chainConfig.EIP158Block.Cmp(refChainConfig.EIP158Block) != 0 {
-		t.Error("invalid chainConfig.EIP158Block")
-		return false
-	}
-	if chainConfig.ChainId.Cmp(refChainConfig.ChainId) != 0 {
-		t.Error("invalid chainConfig.ChainId")
-		return false
-	}
-
 	return true
 }
 
