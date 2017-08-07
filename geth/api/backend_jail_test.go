@@ -18,7 +18,6 @@ import (
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
 	. "github.com/status-im/status-go/geth/testing"
-	"github.com/status-im/status-go/helper/math"
 	"github.com/status-im/status-go/static"
 )
 
@@ -809,5 +808,5 @@ func (s *BackendTestSuite) TestJailVMPersistence() {
 	require.NoError(err)
 
 	s.T().Log(total)
-	require.Equal(0.840003, math.Round(total, 6))
+	require.InDelta(0.840003, total, 0.0000001)
 }
