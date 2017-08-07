@@ -334,7 +334,7 @@ func (s *BackendTestSuite) TestJailWhisper() {
 		{
 			"test 0: ensure correct version of Whisper is used",
 			`
-				var expectedVersion = '0x5';
+				var expectedVersion = '5.0';
 				if (web3.version.whisper != expectedVersion) {
 					throw 'unexpected shh version, expected: ' + expectedVersion + ', got: ' + web3.version.whisper;
 				}
