@@ -39,15 +39,6 @@ func (k *SelectedExtKey) Hex() string {
 	return k.Address.Hex()
 }
 
-// RPCNodeManager defines a RPC router which handles the necessary logic
-// to call regarding the execution of a RPCCall.
-type RPCNodeManager interface {
-	NodeManager
-
-	Account() AccountManager
-	Exec(RPCCall, otto.FunctionCall) (*otto.Object, error)
-}
-
 // NodeManager defines expected methods for managing Status node
 type NodeManager interface {
 	// StartNode start Status node, fails if node is already started
