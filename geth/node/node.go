@@ -134,61 +134,8 @@ func defaultEmbeddedNodeConfig(config *params.NodeConfig) *node.Config {
 
 // updateCHT changes trusted canonical hash trie root
 func updateCHT(eth *les.LightEthereum, config *params.NodeConfig) {
-<<<<<<< HEAD
-	bc := eth.BlockChain()
-
-	// TODO: Remove this thing as this is an ugly hack.
-	// Once CHT sync sub-protocol is working in LES, we will rely on it, as it provides
-	// decentralized solution. For now, in order to avoid forcing users to long sync times
-	// we use central static resource
-	type MsgCHTRoot struct {
-		GenesisHash string `json:"net"`
-		Number      uint64 `json:"number"`
-		Prod        string `json:"prod"`
-		Dev         string `json:"dev"`
-	}
-
-	loadCHTLists := func() ([]MsgCHTRoot, error) {
-		url := config.LightEthConfig.CHTRootConfigURL + "?u=" + strconv.Itoa(int(time.Now().Unix()))
-		client := &http.Client{Timeout: 5 * time.Second}
-		r, err := client.Get(url)
-		if err != nil {
-			return nil, err
-		}
-		defer r.Body.Close()
-
-		var roots []MsgCHTRoot
-		err = json.NewDecoder(r.Body).Decode(&roots)
-		if err != nil {
-			return nil, err
-		}
-
-		return roots, nil
-	}
-	if roots, err := loadCHTLists(); err == nil {
-		for _, root := range roots {
-			if bc.Genesis().Hash().Hex() == root.GenesisHash {
-				log.Info("Loaded root", "root", root)
-				if root.Number == 0 {
-					continue
-				}
-
-				chtRoot := root.Prod
-				if config.DevMode {
-					chtRoot = root.Dev
-				}
-				eth.WriteTrustedCht(light.TrustedCht{
-					Number: root.Number,
-					Root:   gethcommon.HexToHash(chtRoot),
-				})
-				log.Info("Loaded CHT from net", "CHT", chtRoot, "number", root.Number, "dev", config.DevMode)
-				return
-			}
-		}
-=======
 	if !config.BootClusterConfig.Enabled {
 		return
->>>>>>> 02705906469a1a44e6ea89e51eb71628045b0b5f
 	}
 
 	if config.BootClusterConfig.RootNumber == 0 {
