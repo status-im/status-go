@@ -204,7 +204,7 @@ func (jail *Jail) Send(call otto.FunctionCall) (response otto.Value) {
 		var res *otto.Object
 
 		switch req.Method {
-		case sendTransactionName:
+		case params.SendTransactionMethodName:
 			res, resErr = jail.policy.ExecuteSendTransaction(req, call)
 		default:
 			res, resErr = jail.policy.ExecuteOtherTransaction(req, call)
@@ -240,10 +240,6 @@ func (jail *Jail) Send(call otto.FunctionCall) (response otto.Value) {
 
 //==================================================================================================================================
 
-// contains sets of possible defines the name for a giving transaction.
-const (
-	sendTransactionName = "eth_sendTransaction"
-)
 
 func processRPCCall(manager common.NodeManager, req common.RPCCall, call otto.FunctionCall) (gethcommon.Hash, error) {
 	lightEthereum, err := manager.LightEthereumService()
@@ -288,13 +284,13 @@ func postProcessRequest(vm *otto.Otto, req common.RPCCall, messageID string) {
 	}
 
 	// set extra markers for queued transaction requests
-	if req.Method == sendTransactionName {
-		vm.Call("addContext", nil, messageID, sendTransactionName, true) // nolint: errcheck
+	if req.Method == params.SendTransactionMethodName {
+		vm.Call("addContext", nil, messageID, params.SendTransactionMethodName, true) // nolint: errcheck
 	}
 }
 
 func sendTxArgsFromRPCCall(req common.RPCCall) status.SendTxArgs {
-	if req.Method != sendTransactionName { // no need to persist extra state for other requests
+	if req.Method != params.SendTransactionMethodName { // no need to persist extra state for other requests
 		return status.SendTxArgs{}
 	}
 

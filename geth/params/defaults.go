@@ -29,6 +29,9 @@ const (
 	// WSHost is a host interface for the websocket RPC server
 	WSHost = "localhost"
 
+	// SendTransactionMethodName defines the name for a giving transaction.
+	SendTransactionMethodName = "eth_sendTransaction"
+
 	// WSPort is a WS-RPC port (replaced in unit tests)
 	WSPort = 8546
 

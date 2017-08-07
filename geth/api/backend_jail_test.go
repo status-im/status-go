@@ -16,7 +16,6 @@ import (
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
-	"github.com/status-im/status-go/geth/proxy/transactions"
 	. "github.com/status-im/status-go/geth/testing"
 	"github.com/status-im/status-go/static"
 )
@@ -128,7 +127,7 @@ func (s *BackendTestSuite) TestJailSendQueuedTransaction() {
 				{
 					`["commands", "send"]`,
 					txParams,
-					`{"result": {"context":{"` + transactions.SendTransactionName + `":true},"result":{"transaction-hash":"TX_HASH"}}}`,
+					`{"result": {"context":{"` + params.SendTransactionMethodName + `":true},"result":{"transaction-hash":"TX_HASH"}}}`,
 				},
 				{
 					`["commands", "getBalance"]`,
