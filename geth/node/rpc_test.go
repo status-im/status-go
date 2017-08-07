@@ -34,11 +34,7 @@ func (s *RPCTestSuite) SetupTest() {
 	nodeManager := node.NewNodeManager()
 	require.NotNil(nodeManager)
 
-	acctManager := node.NewAccountManager(nodeManager)
-	require.NotNil(acctManager)
-
-	s.NodeManager = proxy.NewRPCRouter(nodeManager, acctManager)
-	require.NotNil(s.NodeManager)
+	s.NodeManager = nodeManager
 }
 
 func (s *RPCTestSuite) TestCallRPC() {
@@ -54,10 +50,13 @@ func (s *RPCTestSuite) TestCallRPC() {
 	nodeConfig.IPCEnabled = false
 	nodeConfig.WSEnabled = false
 	nodeConfig.HTTPHost = "" // to make sure that no HTTP interface is started
+
 	nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
 	require.NoError(err)
 	require.NotNil(nodeConfig)
+
 	defer s.NodeManager.StopNode()
+
 	<-nodeStarted
 
 	progress := make(chan struct{}, 25)
