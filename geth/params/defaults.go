@@ -93,10 +93,3 @@ const (
 	// RinkebyNetworkID is id of a test network (on PoA)
 	RinkebyNetworkID = 4
 )
-
-// NetworkIDs is a list of currently supported networks.
-var NetworkIDs = map[uint64]bool{
-	MainNetworkID:    true,
-	RopstenNetworkID: true,
-	RinkebyNetworkID: true,
-}

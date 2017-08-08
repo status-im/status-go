@@ -23,6 +23,7 @@ import (
 	"github.com/status-im/status-go/geth/params"
 	. "github.com/status-im/status-go/geth/testing"
 	"github.com/status-im/status-go/static"
+	"github.com/stretchr/testify/require"
 )
 
 const zeroHash = "0x0000000000000000000000000000000000000000000000000000000000000000"
@@ -55,10 +56,6 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 		{
 			"stop/resume node",
 			testStopResumeNode,
-		},
-		{
-			"validate node config",
-			testValidateNodeConfig,
 		},
 		{
 			"call RPC on in-proc handler",
@@ -384,23 +381,6 @@ func testStopResumeNode(t *testing.T) bool {
 
 	// additionally, let's complete transaction (just to make sure that node lives through pause/resume w/o issues)
 	testCompleteTransaction(t)
-
-	return true
-}
-
-func testValidateNodeConfig(t *testing.T) bool {
-	result := ValidateNodeConfig(C.CString(nodeConfigJSON))
-
-	var response common.APIResponse
-	if err := json.Unmarshal([]byte(C.GoString(result)), &response); err != nil {
-		t.Errorf("could not unmarshal response as common.APIResponse: %s", err)
-		return false
-	}
-
-	if response.Error != "" {
-		t.Errorf("expected valid configuration but error occured: %s", response.Error)
-		return false
-	}
 
 	return true
 }
@@ -1496,4 +1476,15 @@ func startTestNode(t *testing.T) <-chan struct{} {
 	}()
 
 	return waitForNodeStart
+}
+
+func testValidateNodeConfig(t *testing.T, config string, fn func(common.APIDetailedResponse)) {
+	result := ValidateNodeConfig(C.CString(config))
+
+	var resp common.APIDetailedResponse
+
+	err := json.Unmarshal([]byte(C.GoString(result)), &resp)
+	require.NoError(t, err)
+
+	fn(resp)
 }

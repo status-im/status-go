@@ -215,7 +215,7 @@ type NodeConfig struct {
 	DevMode bool
 
 	// NetworkID sets network to use for selecting peers to connect to
-	NetworkID uint64 `json:"NetworkId," validate:"required,network"`
+	NetworkID uint64 `json:"NetworkId" validate:"required"`
 
 	// DataDir is the file system folder the node should use for any data storage needs.
 	DataDir string `validate:"required"`
@@ -282,22 +282,22 @@ type NodeConfig struct {
 	LogFile string
 
 	// LogLevel defines minimum log level. Valid names are "ERROR", "WARNING", "INFO", "DEBUG", and "TRACE".
-	LogLevel string
+	LogLevel string `validate:"eq=ERROR|eq=WARNING|eq=INFO|eq=DEBUG|eq=TRACE"`
 
 	// LogToStderr defines whether logged info should also be output to os.Stderr
 	LogToStderr bool
 
 	// BootClusterConfig extra configuration for supporting cluster
-	BootClusterConfig *BootClusterConfig `json:"BootClusterConfig,"`
+	BootClusterConfig *BootClusterConfig `json:"BootClusterConfig," validate:"structonly"`
 
 	// LightEthConfig extra configuration for LES
-	LightEthConfig *LightEthConfig `json:"LightEthConfig,"`
+	LightEthConfig *LightEthConfig `json:"LightEthConfig," validate:"structonly"`
 
 	// WhisperConfig extra configuration for SHH
-	WhisperConfig *WhisperConfig `json:"WhisperConfig,"`
+	WhisperConfig *WhisperConfig `json:"WhisperConfig," validate:"structonly"`
 
 	// SwarmConfig extra configuration for Swarm and ENS
-	SwarmConfig *SwarmConfig `json:"SwarmConfig,"`
+	SwarmConfig *SwarmConfig `json:"SwarmConfig," validate:"structonly"`
 }
 
 // NewNodeConfig creates new node configuration object
@@ -400,7 +400,36 @@ func loadNodeConfig(configJSON string) (*NodeConfig, error) {
 //
 func (c *NodeConfig) Validate() error {
 	validate := NewValidator()
-	return validate.Struct(c)
+
+	if err := validate.Struct(c); err != nil {
+		return err
+	}
+
+	if c.BootClusterConfig.Enabled {
+		if err := validate.Struct(c.BootClusterConfig); err != nil {
+			return err
+		}
+	}
+
+	if c.LightEthConfig.Enabled {
+		if err := validate.Struct(c.LightEthConfig); err != nil {
+			return err
+		}
+	}
+
+	if c.WhisperConfig.Enabled {
+		if err := validate.Struct(c.WhisperConfig); err != nil {
+			return err
+		}
+	}
+
+	if c.SwarmConfig.Enabled {
+		if err := validate.Struct(c.SwarmConfig); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // Save dumps configuration to the disk

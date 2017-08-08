@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"fmt"
 
 	"gopkg.in/go-playground/validator.v9"
 
@@ -381,6 +380,7 @@ var loadConfigTestCases = []struct {
 	},
 }
 
+// TestLoadNodeConfig tests loading JSON configuration and setting default values.
 func TestLoadNodeConfig(t *testing.T) {
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "geth-config-tests")
 	if err != nil {
@@ -432,28 +432,42 @@ func TestConfigWriteRead(t *testing.T) {
 	configReadWrite(params.MainNetworkID, "testdata/config.mainnet.json")
 }
 
+// TestNodeConfigValidate checks validation of individual fields.
 func TestNodeConfigValidate(t *testing.T) {
 	testCases := []struct {
-		Name   string
-		Config string
-		Result map[string]string // map[Field]Tag
+		Name        string
+		Config      string
+		Error       string
+		FieldErrors map[string]string // map[Field]Tag
 	}{
+		{
+			Name: "Valid JSON config",
+			Config: `{
+				"NetworkId": 1,
+				"DataDir": "/tmp/data"
+			}`,
+			Error:       "",
+			FieldErrors: nil,
+		},
+		{
+			Name:        "Invalid JSON config",
+			Config:      `{"NetworkId": }`,
+			Error:       "invalid character '}'",
+			FieldErrors: nil,
+		},
+		{
+			Name:        "Invalid field type",
+			Config:      `{"NetworkId": "abc"}`,
+			Error:       "json: cannot unmarshal string into Go struct field",
+			FieldErrors: nil,
+		},
 		{
 			Name:   "Validate all required fields",
 			Config: `{}`,
-			Result: map[string]string{
+			Error:  "",
+			FieldErrors: map[string]string{
 				"NetworkID": "required",
 				"DataDir":   "required",
-			},
-		},
-		{
-			Name: "Check invalid NetworkID validation",
-			Config: `{
-				"NetworkId": 999,
-				"DataDir": "/some/dir"
-			}`,
-			Result: map[string]string{
-				"NetworkID": "network",
 			},
 		},
 		{
@@ -463,8 +477,9 @@ func TestNodeConfigValidate(t *testing.T) {
 				"DataDir": "/some/dir",
 				"Name": "invalid/name"
 			}`,
-			Result: map[string]string{
-				"Name": "excludeas",
+			Error: "",
+			FieldErrors: map[string]string{
+				"Name": "excludes",
 			},
 		},
 	}
@@ -472,20 +487,19 @@ func TestNodeConfigValidate(t *testing.T) {
 	for _, tc := range testCases {
 		t.Logf("Test Case %s", tc.Name)
 
-		var err error
+		_, err := params.LoadNodeConfig(tc.Config)
 
-		_, err = params.LoadNodeConfig(tc.Config)
-		if tc.Result == nil {
-			require.Nil(t, err)
-		} else {
-			require.NotNil(t, err)
-		}
-
-		validationErrors := err.(validator.ValidationErrors)
-		t.Logf("error: %s", err)
-		for _, ve := range validationErrors {
-			require.Contains(t, tc.Result, ve.Field())
-			require.Equal(t, tc.Result[ve.Field()], ve.Tag())
+		switch err := err.(type) {
+		case validator.ValidationErrors:
+			for _, ve := range err {
+				require.Contains(t, tc.FieldErrors, ve.Field())
+				require.Equal(t, tc.FieldErrors[ve.Field()], ve.Tag())
+			}
+		case error:
+			require.Contains(t, err.Error(), tc.Error)
+		case nil:
+			require.Empty(t, tc.Error)
+			require.Nil(t, tc.FieldErrors)
 		}
 	}
 }

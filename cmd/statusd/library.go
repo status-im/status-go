@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 
+	"gopkg.in/go-playground/validator.v9"
+
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
 )
@@ -44,8 +46,44 @@ func StopNode() *C.char {
 
 //export ValidateNodeConfig
 func ValidateNodeConfig(configJSON *C.char) *C.char {
+	var resp common.APIDetailedResponse
+
 	_, err := params.LoadNodeConfig(C.GoString(configJSON))
-	return makeJSONResponse(err)
+
+	// Convert errors to common.APIDetailedResponse
+	switch err := err.(type) {
+	case validator.ValidationErrors:
+		resp = common.APIDetailedResponse{
+			Message:     "validation: validation failed",
+			FieldErrors: make([]common.APIFieldError, len(err)),
+		}
+
+		for i, ve := range err {
+			resp.FieldErrors[i] = common.APIFieldError{
+				Parameter: ve.Namespace(),
+				Errors: []common.APIError{
+					{
+						Message: fmt.Sprintf("field validation failed on the '%s' tag", ve.Tag()),
+					},
+				},
+			}
+		}
+	case error:
+		resp = common.APIDetailedResponse{
+			Message: fmt.Sprintf("validation: %s", err.Error()),
+		}
+	case nil:
+		resp = common.APIDetailedResponse{
+			Status: true,
+		}
+	}
+
+	respJSON, err := json.Marshal(resp)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return C.CString(string(respJSON))
 }
 
 //export ResetChainData
