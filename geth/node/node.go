@@ -51,11 +51,6 @@ func MakeNode(config *params.NodeConfig) (*node.Node, error) {
 		return nil, err
 	}
 
-	// setup logging
-	if _, err := log.SetupLogger(config); err != nil {
-		return nil, err
-	}
-
 	// configure required node (should you need to update node's config, e.g. add bootstrap nodes, see node.Config)
 	stackConfig := defaultEmbeddedNodeConfig(config)
 
