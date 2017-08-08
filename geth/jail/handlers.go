@@ -8,8 +8,10 @@ import (
 // signals
 const (
 	EventLocalStorageSet = "local_storage.set"
-	EventSendMessage     = "jail.send_message"
-	EventShowSuggestions = "jail.show_suggestions"
+
+	EventSendMessage       = "jail.send_message"
+	EventShowSuggestions   = "jail.show_suggestions"
+	LocalStorageMaxDataLen = 256
 )
 
 // registerHandlers augments and transforms a given jail cell's underlying VM,
@@ -159,5 +161,49 @@ func makeShowSuggestionsHandler(chatID string) func(call otto.FunctionCall) (res
 		})
 
 		return newResultResponse(call.Otto, true)
+	}
+}
+
+// SendMessageEvent wraps Jail send signals
+type SendMessageEvent struct {
+	ChatID  string `json:"chat_id"`
+	Message string `json:"message"`
+}
+
+func makeSendMessageHandler(chatID string) func(call otto.FunctionCall) (response otto.Value) {
+	return func(call otto.FunctionCall) otto.Value {
+		message := call.Argument(0).String()
+
+		node.SendSignal(node.SignalEnvelope{
+			Type: EventSendMessage,
+			Event: SendMessageEvent{
+				ChatID:  chatID,
+				Message: message,
+			},
+		})
+
+		return newResultResponse(call, true)
+	}
+}
+
+// ShowSuggestionsEvent wraps Jail show suggestion signals
+type ShowSuggestionsEvent struct {
+	ChatID string `json:"chat_id"`
+	Markup string `json:"markup"`
+}
+
+func makeShowSuggestionsHandler(chatID string) func(call otto.FunctionCall) (response otto.Value) {
+	return func(call otto.FunctionCall) otto.Value {
+		suggestionsMarkup := call.Argument(0).String()
+
+		node.SendSignal(node.SignalEnvelope{
+			Type: EventShowSuggestions,
+			Event: ShowSuggestionsEvent{
+				ChatID: chatID,
+				Markup: suggestionsMarkup,
+			},
+		})
+
+		return newResultResponse(call, true)
 	}
 }
