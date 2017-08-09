@@ -16,7 +16,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/geth/log"
 )
 
 // default node configuration options
