@@ -10,7 +10,7 @@ type Logger struct {
 }
 
 // Instance to a logger struct
-var instance *Logger
+var logger *Logger
 
 // Trace is a convenient alias for Root().Trace
 func Trace(msg string, ctx ...interface{}) {
@@ -44,32 +44,32 @@ func Crit(msg string, ctx ...interface{}) {
 
 // outputs the log to a given log config level
 func printLog(lvl log.Lvl, msg string, ctx ...interface{}) {
-	if instance == nil {
-		instance = &Logger{
+	if logger == nil {
+		logger = &Logger{
 			output: log.New("geth", "StatusIM"),
 		}
-		instance.output.SetHandler(log.StdoutHandler)
+		logger.output.SetHandler(log.StdoutHandler)
 	}
 
 	switch lvl {
 
 	case log.LvlError:
-		instance.output.Error(msg, ctx...)
+		logger.output.Error(msg, ctx...)
 		break
 	case log.LvlWarn:
-		instance.output.Warn(msg, ctx...)
+		logger.output.Warn(msg, ctx...)
 		break
 	case log.LvlInfo:
-		instance.output.Info(msg, ctx...)
+		logger.output.Info(msg, ctx...)
 		break
 	case log.LvlDebug:
-		instance.output.Debug(msg, ctx...)
+		logger.output.Debug(msg, ctx...)
 		break
 	case log.LvlTrace:
-		instance.output.Trace(msg, ctx...)
+		logger.output.Trace(msg, ctx...)
 		break
 	default:
-		instance.output.Info(msg, ctx...)
+		logger.output.Info(msg, ctx...)
 
 	}
 }
