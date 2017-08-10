@@ -23,6 +23,7 @@ import (
 	"github.com/status-im/status-go/geth/params"
 	. "github.com/status-im/status-go/geth/testing"
 	"github.com/status-im/status-go/static"
+	"github.com/stretchr/testify/require"
 )
 
 const zeroHash = "0x0000000000000000000000000000000000000000000000000000000000000000"
@@ -1475,4 +1476,15 @@ func startTestNode(t *testing.T) <-chan struct{} {
 	}()
 
 	return waitForNodeStart
+}
+
+func testValidateNodeConfig(t *testing.T, config string, fn func(common.APIDetailedResponse)) {
+	result := ValidateNodeConfig(C.CString(config))
+
+	var resp common.APIDetailedResponse
+
+	err := json.Unmarshal([]byte(C.GoString(result)), &resp)
+	require.NoError(t, err)
+
+	fn(resp)
 }
