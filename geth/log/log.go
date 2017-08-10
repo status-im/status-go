@@ -55,19 +55,19 @@ func printLog(lvl log.Lvl, msg string, ctx ...interface{}) {
 
 	case log.LvlError:
 		logger.output.Error(msg, ctx...)
-		break
+
 	case log.LvlWarn:
 		logger.output.Warn(msg, ctx...)
-		break
+
 	case log.LvlInfo:
 		logger.output.Info(msg, ctx...)
-		break
+
 	case log.LvlDebug:
 		logger.output.Debug(msg, ctx...)
-		break
+
 	case log.LvlTrace:
 		logger.output.Trace(msg, ctx...)
-		break
+
 	default:
 		logger.output.Info(msg, ctx...)
 
