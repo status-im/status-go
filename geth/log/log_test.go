@@ -12,7 +12,7 @@ func TestLogger(t *testing.T) {
 	Trace("Trace Message")
 	Debug("Debug Message")
 	Info("Info Message")
-	Warn("Watn Message")
+	Warn("Warn Message")
 	Error("Error Message")
 	Crit("Crit Message")
 }
