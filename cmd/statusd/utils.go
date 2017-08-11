@@ -17,11 +17,13 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/les/status"
 	gethparams "github.com/ethereum/go-ethereum/params"
+
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
 	. "github.com/status-im/status-go/geth/testing"
 	"github.com/status-im/status-go/static"
+	"github.com/stretchr/testify/require"
 )
 
 const zeroHash = "0x0000000000000000000000000000000000000000000000000000000000000000"
@@ -94,6 +96,14 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 		{
 			"test discard multiple queued transactions",
 			testDiscardMultipleQueuedTransactions,
+		},
+		{
+			"test jail invalid initialization",
+			testJailInitInvalid,
+		},
+		{
+			"test jail invalid parse",
+			testJailParseInvalid,
 		},
 		{
 			"test jail initialization",
@@ -170,11 +180,11 @@ func testGetDefaultConfig(t *testing.T) bool {
 		return false
 	}
 	chainConfig := genesis.Config
-	if chainConfig.HomesteadBlock.Cmp(gethparams.MainNetHomesteadBlock) != 0 {
+	if chainConfig.HomesteadBlock.Cmp(gethparams.MainnetChainConfig.HomesteadBlock) != 0 {
 		t.Error("invalid chainConfig.HomesteadBlock")
 		return false
 	}
-	if chainConfig.DAOForkBlock.Cmp(gethparams.MainNetDAOForkBlock) != 0 {
+	if chainConfig.DAOForkBlock.Cmp(gethparams.MainnetChainConfig.DAOForkBlock) != 0 {
 		t.Error("invalid chainConfig.DAOForkBlock")
 		return false
 	}
@@ -182,23 +192,23 @@ func testGetDefaultConfig(t *testing.T) bool {
 		t.Error("invalid chainConfig.DAOForkSupport")
 		return false
 	}
-	if chainConfig.EIP150Block.Cmp(gethparams.MainNetHomesteadGasRepriceBlock) != 0 {
+	if chainConfig.EIP150Block.Cmp(gethparams.MainnetChainConfig.EIP150Block) != 0 {
 		t.Error("invalid chainConfig.EIP150Block")
 		return false
 	}
-	if chainConfig.EIP150Hash != gethparams.MainNetHomesteadGasRepriceHash {
+	if chainConfig.EIP150Hash != gethparams.MainnetChainConfig.EIP150Hash {
 		t.Error("invalid chainConfig.EIP150Hash")
 		return false
 	}
-	if chainConfig.EIP155Block.Cmp(gethparams.MainNetSpuriousDragon) != 0 {
+	if chainConfig.EIP155Block.Cmp(gethparams.MainnetChainConfig.EIP155Block) != 0 {
 		t.Error("invalid chainConfig.EIP155Block")
 		return false
 	}
-	if chainConfig.EIP158Block.Cmp(gethparams.MainNetSpuriousDragon) != 0 {
+	if chainConfig.EIP158Block.Cmp(gethparams.MainnetChainConfig.EIP158Block) != 0 {
 		t.Error("invalid chainConfig.EIP158Block")
 		return false
 	}
-	if chainConfig.ChainId.Cmp(gethparams.MainNetChainID) != 0 {
+	if chainConfig.ChainId.Cmp(gethparams.MainnetChainConfig.ChainId) != 0 {
 		t.Error("invalid chainConfig.ChainId")
 		return false
 	}
@@ -986,7 +996,7 @@ func testCompleteMultipleQueuedTransactions(t *testing.T) bool {
 
 	select {
 	case <-allTestTxCompleted:
-	// pass
+		// pass
 	case <-time.After(20 * time.Second):
 		t.Error("test timed out")
 		return false
@@ -1284,7 +1294,7 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool {
 
 	select {
 	case <-allTestTxDiscarded:
-	// pass
+		// pass
 	case <-time.After(20 * time.Second):
 		t.Error("test timed out")
 		return false
@@ -1295,6 +1305,51 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool {
 		return false
 	}
 
+	return true
+}
+
+func testJailInitInvalid(t *testing.T) bool {
+	// Arrange.
+	initInvalidCode := `
+	var _status_catalog = {
+		foo: 'bar'
+	`
+
+	// Act.
+	InitJail(C.CString(initInvalidCode))
+	response := C.GoString(Parse(C.CString("CHAT_ID_INIT_TEST"), C.CString(``)))
+
+	// Assert.
+	expectedResponse := `{"error":"(anonymous): Line 4:3 Unexpected end of input (and 3 more errors)"}`
+	if expectedResponse != response {
+		t.Errorf("unexpected response, expected: %v, got: %v", expectedResponse, response)
+		return false
+	}
+	return true
+}
+
+func testJailParseInvalid(t *testing.T) bool {
+	// Arrange.
+	initCode := `
+	var _status_catalog = {
+		foo: 'bar'
+	};
+	`
+
+	// Act.
+	InitJail(C.CString(initCode))
+	extraInvalidCode := `
+	var extraFunc = function (x) {
+	  return x * x;
+	`
+	response := C.GoString(Parse(C.CString("CHAT_ID_INIT_TEST"), C.CString(extraInvalidCode)))
+
+	// Assert.
+	expectedResponse := `{"error":"(anonymous): Line 16331:50 Unexpected end of input (and 1 more errors)"}`
+	if expectedResponse != response {
+		t.Errorf("unexpected response, expected: %v, got: %v", expectedResponse, response)
+		return false
+	}
 	return true
 }
 
@@ -1421,4 +1476,15 @@ func startTestNode(t *testing.T) <-chan struct{} {
 	}()
 
 	return waitForNodeStart
+}
+
+func testValidateNodeConfig(t *testing.T, config string, fn func(common.APIDetailedResponse)) {
+	result := ValidateNodeConfig(C.CString(config))
+
+	var resp common.APIDetailedResponse
+
+	err := json.Unmarshal([]byte(C.GoString(result)), &resp)
+	require.NoError(t, err)
+
+	fn(resp)
 }

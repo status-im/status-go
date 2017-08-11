@@ -2,8 +2,8 @@ package node_test
 
 import (
 	"testing"
+	"context"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/node"
@@ -46,22 +46,19 @@ func (s *WhisperTestSuite) TestWhisperFilterRace() {
 	// account1
 	_, accountKey1, err := accountManager.AddressToDecryptedAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	require.NoError(err)
-	accountKey1Hex := common.ToHex(crypto.FromECDSAPub(&accountKey1.PrivateKey.PublicKey))
+	accountKey1Byte := crypto.FromECDSAPub(&accountKey1.PrivateKey.PublicKey)
 
-	_, err = whisperService.AddKeyPair(accountKey1.PrivateKey)
+	key1ID, err := whisperService.AddKeyPair(accountKey1.PrivateKey)
 	require.NoError(err)
-	ok, err := whisperAPI.HasKeyPair(accountKey1Hex)
-	require.NoError(err)
+	ok := whisperAPI.HasKeyPair(context.Background(), key1ID)
 	require.True(ok, "identity not injected")
 
 	// account2
 	_, accountKey2, err := accountManager.AddressToDecryptedAccount(TestConfig.Account2.Address, TestConfig.Account2.Password)
 	require.NoError(err)
-	accountKey2Hex := common.ToHex(crypto.FromECDSAPub(&accountKey2.PrivateKey.PublicKey))
-	_, err = whisperService.AddKeyPair(accountKey2.PrivateKey)
+	key2ID, err := whisperService.AddKeyPair(accountKey2.PrivateKey)
 	require.NoError(err)
-	ok, err = whisperAPI.HasKeyPair(accountKey2Hex)
-	require.NoError(err)
+	ok = whisperAPI.HasKeyPair(context.Background(), key2ID)
 	require.True(ok, "identity not injected")
 
 	// race filter addition
@@ -83,11 +80,13 @@ func (s *WhisperTestSuite) TestWhisperFilterRace() {
 	for i := 0; i < 10; i++ {
 		go func() {
 			// nolint: errcheck
-			whisperAPI.Subscribe(whisper.WhisperFilterArgs{
-				Sig: accountKey1Hex,
-				Key: accountKey2Hex,
-				Topics: [][]byte{
-					{0x4e, 0x03, 0x65, 0x7a}, {0x34, 0x60, 0x7c, 0x9b}, {0x21, 0x41, 0x7d, 0xf9},
+			whisperAPI.NewMessageFilter(whisper.Criteria{
+				Sig:          accountKey1Byte,
+				PrivateKeyID: key2ID,
+				Topics: []whisper.TopicType{
+					{0x4e, 0x03, 0x65, 0x7a},
+					{0x34, 0x60, 0x7c, 0x9b},
+					{0x21, 0x41, 0x7d, 0xf9},
 				},
 			})
 			filterAdded <- struct{}{}

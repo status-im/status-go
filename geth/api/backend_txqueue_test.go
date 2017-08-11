@@ -11,13 +11,14 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/les/status"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/geth/common"
+	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
 	. "github.com/status-im/status-go/geth/testing"
 )
 
+// FIXME(tiabc): Sometimes it fails due to "no suitable peers found".
 func (s *BackendTestSuite) TestSendContractTx() {
 	require := s.Require()
 	require.NotNil(s.backend)
@@ -36,7 +37,7 @@ func (s *BackendTestSuite) TestSendContractTx() {
 
 	// make sure you panic if transaction complete doesn't return
 	completeQueuedTransaction := make(chan struct{}, 10)
-	common.PanicAfter(20*time.Second, completeQueuedTransaction, s.T().Name())
+	common.PanicAfter(1*time.Minute, completeQueuedTransaction, s.T().Name())
 
 	// replace transaction notification handler
 	var txHash = gethcommon.Hash{}
@@ -114,7 +115,7 @@ func (s *BackendTestSuite) TestSendEtherTx() {
 
 	// make sure you panic if transaction complete doesn't return
 	completeQueuedTransaction := make(chan struct{}, 1)
-	common.PanicAfter(20*time.Second, completeQueuedTransaction, s.T().Name())
+	common.PanicAfter(1*time.Minute, completeQueuedTransaction, s.T().Name())
 
 	// replace transaction notification handler
 	var txHash = gethcommon.Hash{}
@@ -185,7 +186,7 @@ func (s *BackendTestSuite) TestDoubleCompleteQueuedTransactions() {
 
 	// make sure you panic if transaction complete doesn't return
 	completeQueuedTransaction := make(chan struct{}, 1)
-	common.PanicAfter(20*time.Second, completeQueuedTransaction, s.T().Name())
+	common.PanicAfter(1*time.Minute, completeQueuedTransaction, s.T().Name())
 
 	// replace transaction notification handler
 	var txID string
@@ -269,7 +270,7 @@ func (s *BackendTestSuite) TestDiscardQueuedTransaction() {
 
 	// make sure you panic if transaction complete doesn't return
 	completeQueuedTransaction := make(chan struct{}, 1)
-	common.PanicAfter(30*time.Second, completeQueuedTransaction, s.T().Name())
+	common.PanicAfter(1*time.Minute, completeQueuedTransaction, s.T().Name())
 
 	// replace transaction notification handler
 	var txID string
@@ -573,7 +574,7 @@ func (s *BackendTestSuite) TestDiscardMultipleQueuedTransactions() {
 	select {
 	case <-allTestTxDiscarded:
 		// pass
-	case <-time.After(30 * time.Second):
+	case <-time.After(1 * time.Minute):
 		s.Fail("test timed out")
 		return
 	}

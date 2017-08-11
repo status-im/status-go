@@ -10,11 +10,11 @@ import (
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/les"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/rpc"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
+	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
 )
 
@@ -241,11 +241,7 @@ func (m *NodeManager) populateStaticPeers() error {
 		return nil
 	}
 
-	enodes, err := m.config.LoadBootClusterNodes()
-	if err != nil {
-		log.Warn("Can not load boot nodes", "error", err)
-	}
-	for _, enode := range enodes {
+	for _, enode := range m.config.BootClusterConfig.BootNodes {
 		err := m.addPeer(enode)
 		if err != nil {
 			log.Warn("Boot node addition failed", "error", err)

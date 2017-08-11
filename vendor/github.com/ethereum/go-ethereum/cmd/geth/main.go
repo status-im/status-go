@@ -49,6 +49,88 @@ var (
 	relOracle = common.HexToAddress("0xfa7b9770ca4cb04296cac84f37736d4041251cdf")
 	// The app that holds all commands and flags.
 	app = utils.NewApp(gitCommit, "the go-ethereum command line interface")
+	// flags that configure the node
+	nodeFlags = []cli.Flag{
+		utils.IdentityFlag,
+		utils.UnlockedAccountFlag,
+		utils.PasswordFileFlag,
+		utils.BootnodesFlag,
+		utils.BootnodesV4Flag,
+		utils.BootnodesV5Flag,
+		utils.DataDirFlag,
+		utils.KeyStoreDirFlag,
+		utils.NoUSBFlag,
+		utils.EthashCacheDirFlag,
+		utils.EthashCachesInMemoryFlag,
+		utils.EthashCachesOnDiskFlag,
+		utils.EthashDatasetDirFlag,
+		utils.EthashDatasetsInMemoryFlag,
+		utils.EthashDatasetsOnDiskFlag,
+		utils.TxPoolNoLocalsFlag,
+		utils.TxPoolPriceLimitFlag,
+		utils.TxPoolPriceBumpFlag,
+		utils.TxPoolAccountSlotsFlag,
+		utils.TxPoolGlobalSlotsFlag,
+		utils.TxPoolAccountQueueFlag,
+		utils.TxPoolGlobalQueueFlag,
+		utils.TxPoolLifetimeFlag,
+		utils.FastSyncFlag,
+		utils.LightModeFlag,
+		utils.SyncModeFlag,
+		utils.LightServFlag,
+		utils.LightPeersFlag,
+		utils.LightKDFFlag,
+		utils.CacheFlag,
+		utils.TrieCacheGenFlag,
+		utils.ListenPortFlag,
+		utils.MaxPeersFlag,
+		utils.MaxPendingPeersFlag,
+		utils.EtherbaseFlag,
+		utils.GasPriceFlag,
+		utils.MinerThreadsFlag,
+		utils.MiningEnabledFlag,
+		utils.TargetGasLimitFlag,
+		utils.NATFlag,
+		utils.NoDiscoverFlag,
+		utils.DiscoveryV5Flag,
+		utils.NetrestrictFlag,
+		utils.NodeKeyFileFlag,
+		utils.NodeKeyHexFlag,
+		utils.DevModeFlag,
+		utils.TestnetFlag,
+		utils.RinkebyFlag,
+		utils.VMEnableDebugFlag,
+		utils.NetworkIdFlag,
+		utils.RPCCORSDomainFlag,
+		utils.EthStatsURLFlag,
+		utils.MetricsEnabledFlag,
+		utils.FakePoWFlag,
+		utils.NoCompactionFlag,
+		utils.GpoBlocksFlag,
+		utils.GpoPercentileFlag,
+		utils.ExtraDataFlag,
+		configFileFlag,
+	}
+
+	rpcFlags = []cli.Flag{
+		utils.RPCEnabledFlag,
+		utils.RPCListenAddrFlag,
+		utils.RPCPortFlag,
+		utils.RPCApiFlag,
+		utils.WSEnabledFlag,
+		utils.WSListenAddrFlag,
+		utils.WSPortFlag,
+		utils.WSApiFlag,
+		utils.WSAllowedOriginsFlag,
+		utils.IPCDisabledFlag,
+		utils.IPCPathFlag,
+	}
+
+	whisperFlags = []cli.Flag{
+		utils.WhisperEnabledFlag,
+		utils.WhisperMaxMessageSizeFlag,
+		utils.WhisperMinPOWFlag,
+	}
 )
 
 func init() {
@@ -81,72 +163,11 @@ func init() {
 		dumpConfigCommand,
 	}
 
-	app.Flags = []cli.Flag{
-		utils.IdentityFlag,
-		utils.UnlockedAccountFlag,
-		utils.PasswordFileFlag,
-		utils.BootnodesFlag,
-		utils.DataDirFlag,
-		utils.KeyStoreDirFlag,
-		utils.NoUSBFlag,
-		utils.EthashCacheDirFlag,
-		utils.EthashCachesInMemoryFlag,
-		utils.EthashCachesOnDiskFlag,
-		utils.EthashDatasetDirFlag,
-		utils.EthashDatasetsInMemoryFlag,
-		utils.EthashDatasetsOnDiskFlag,
-		utils.FastSyncFlag,
-		utils.LightModeFlag,
-		utils.SyncModeFlag,
-		utils.LightServFlag,
-		utils.LightPeersFlag,
-		utils.LightKDFFlag,
-		utils.CacheFlag,
-		utils.TrieCacheGenFlag,
-		utils.JSpathFlag,
-		utils.ListenPortFlag,
-		utils.MaxPeersFlag,
-		utils.MaxPendingPeersFlag,
-		utils.EtherbaseFlag,
-		utils.GasPriceFlag,
-		utils.MinerThreadsFlag,
-		utils.MiningEnabledFlag,
-		utils.TargetGasLimitFlag,
-		utils.NATFlag,
-		utils.NoDiscoverFlag,
-		utils.DiscoveryV5Flag,
-		utils.NetrestrictFlag,
-		utils.NodeKeyFileFlag,
-		utils.NodeKeyHexFlag,
-		utils.RPCEnabledFlag,
-		utils.RPCListenAddrFlag,
-		utils.RPCPortFlag,
-		utils.RPCApiFlag,
-		utils.WSEnabledFlag,
-		utils.WSListenAddrFlag,
-		utils.WSPortFlag,
-		utils.WSApiFlag,
-		utils.WSAllowedOriginsFlag,
-		utils.IPCDisabledFlag,
-		utils.IPCPathFlag,
-		utils.ExecFlag,
-		utils.PreloadJSFlag,
-		utils.WhisperEnabledFlag,
-		utils.DevModeFlag,
-		utils.TestNetFlag,
-		utils.VMEnableDebugFlag,
-		utils.NetworkIdFlag,
-		utils.RPCCORSDomainFlag,
-		utils.EthStatsURLFlag,
-		utils.MetricsEnabledFlag,
-		utils.FakePoWFlag,
-		utils.NoCompactionFlag,
-		utils.GpoBlocksFlag,
-		utils.GpoPercentileFlag,
-		utils.ExtraDataFlag,
-		configFileFlag,
-	}
+	app.Flags = append(app.Flags, nodeFlags...)
+	app.Flags = append(app.Flags, rpcFlags...)
+	app.Flags = append(app.Flags, consoleFlags...)
 	app.Flags = append(app.Flags, debug.Flags...)
+	app.Flags = append(app.Flags, whisperFlags...)
 
 	app.Before = func(ctx *cli.Context) error {
 		runtime.GOMAXPROCS(runtime.NumCPU())
@@ -238,10 +259,12 @@ func startNode(ctx *cli.Context, stack *node.Node) {
 	}()
 	// Start auxiliary services if enabled
 	if ctx.GlobalBool(utils.MiningEnabledFlag.Name) {
+		// Mining only makes sense if a full Ethereum node is running
 		var ethereum *eth.Ethereum
 		if err := stack.Service(&ethereum); err != nil {
 			utils.Fatalf("ethereum service not running: %v", err)
 		}
+		// Use a reduced number of threads if requested
 		if threads := ctx.GlobalInt(utils.MinerThreadsFlag.Name); threads > 0 {
 			type threaded interface {
 				SetThreads(threads int)
@@ -250,6 +273,8 @@ func startNode(ctx *cli.Context, stack *node.Node) {
 				th.SetThreads(threads)
 			}
 		}
+		// Set the gas price to the limits from the CLI and start mining
+		ethereum.TxPool().SetGasPrice(utils.GlobalBig(ctx, utils.GasPriceFlag.Name))
 		if err := ethereum.StartMining(true); err != nil {
 			utils.Fatalf("Failed to start mining: %v", err)
 		}
