@@ -16,7 +16,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/geth/log"
 )
 
 // default node configuration options
@@ -229,10 +229,10 @@ type NodeConfig struct {
 	DevMode bool
 
 	// NetworkID sets network to use for selecting peers to connect to
-	NetworkID uint64 `json:"NetworkId,"`
+	NetworkID uint64 `json:"NetworkId" validate:"required"`
 
 	// DataDir is the file system folder the node should use for any data storage needs.
-	DataDir string
+	DataDir string `validate:"required"`
 
 	// KeyStoreDir is the file system folder that contains private keys.
 	// If KeyStoreDir is empty, the default location is the "keystore" subdirectory of DataDir.
@@ -244,7 +244,7 @@ type NodeConfig struct {
 	NodeKeyFile string
 
 	// Name sets the instance name of the node. It must not contain the / character.
-	Name string
+	Name string `validate:"excludes=/"`
 
 	// Version exposes program's version. It is used in the devp2p node identifier.
 	Version string
@@ -296,7 +296,7 @@ type NodeConfig struct {
 	LogFile string
 
 	// LogLevel defines minimum log level. Valid names are "ERROR", "WARNING", "INFO", "DEBUG", and "TRACE".
-	LogLevel string
+	LogLevel string `validate:"eq=ERROR|eq=WARNING|eq=INFO|eq=DEBUG|eq=TRACE"`
 
 	// LogToStderr defines whether logged info should also be output to os.Stderr
 	LogToStderr bool
@@ -305,16 +305,16 @@ type NodeConfig struct {
 	UpstreamConfig UpstreamRPCConfig `json:"UpstreamConfig"`
 
 	// BootClusterConfig extra configuration for supporting cluster
-	BootClusterConfig *BootClusterConfig `json:"BootClusterConfig,"`
+	BootClusterConfig *BootClusterConfig `json:"BootClusterConfig," validate:"structonly"`
 
 	// LightEthConfig extra configuration for LES
-	LightEthConfig *LightEthConfig `json:"LightEthConfig,"`
+	LightEthConfig *LightEthConfig `json:"LightEthConfig," validate:"structonly"`
 
 	// WhisperConfig extra configuration for SHH
-	WhisperConfig *WhisperConfig `json:"WhisperConfig,"`
+	WhisperConfig *WhisperConfig `json:"WhisperConfig," validate:"structonly"`
 
 	// SwarmConfig extra configuration for Swarm and ENS
-	SwarmConfig *SwarmConfig `json:"SwarmConfig,"`
+	SwarmConfig *SwarmConfig `json:"SwarmConfig," validate:"structonly"`
 }
 
 // NewNodeConfig creates new node configuration object
@@ -367,13 +367,25 @@ func NewNodeConfig(dataDir string, networkID uint64, devMode bool) (*NodeConfig,
 
 // LoadNodeConfig parses incoming JSON and returned it as Config
 func LoadNodeConfig(configJSON string) (*NodeConfig, error) {
+	nodeConfig, err := loadNodeConfig(configJSON)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := nodeConfig.Validate(); err != nil {
+		return nil, err
+	}
+
+	return nodeConfig, nil
+}
+
+func loadNodeConfig(configJSON string) (*NodeConfig, error) {
 	nodeConfig, err := NewNodeConfig("", 0, true)
 	if err != nil {
 		return nil, err
 	}
 
 	decoder := json.NewDecoder(strings.NewReader(configJSON))
-	//decoder.UseNumber()
 
 	// override default configuration with values by JSON input
 	if err := decoder.Decode(&nodeConfig); err != nil {
@@ -385,15 +397,56 @@ func LoadNodeConfig(configJSON string) (*NodeConfig, error) {
 		return nil, err
 	}
 
-	if len(nodeConfig.DataDir) == 0 {
-		return nil, ErrMissingDataDir
-	}
-
-	if nodeConfig.NetworkID <= 0 {
-		return nil, ErrMissingNetworkID
-	}
-
 	return nodeConfig, nil
+}
+
+// Validate checks if NodeConfig fields have valid values.
+//
+// It returns nil if there are no errors, otherwise one or more errors
+// can be returned. Multiple errors are joined with a new line.
+//
+// A single error for a struct:
+//
+//   type TestStruct struct {
+//       TestField string `validate:"required"`
+//   }
+//
+// has the following format:
+//
+//   Key: 'TestStruct.TestField' Error:Field validation for 'TestField' failed on the 'required' tag
+//
+func (c *NodeConfig) Validate() error {
+	validate := NewValidator()
+
+	if err := validate.Struct(c); err != nil {
+		return err
+	}
+
+	if c.BootClusterConfig.Enabled {
+		if err := validate.Struct(c.BootClusterConfig); err != nil {
+			return err
+		}
+	}
+
+	if c.LightEthConfig.Enabled {
+		if err := validate.Struct(c.LightEthConfig); err != nil {
+			return err
+		}
+	}
+
+	if c.WhisperConfig.Enabled {
+		if err := validate.Struct(c.WhisperConfig); err != nil {
+			return err
+		}
+	}
+
+	if c.SwarmConfig.Enabled {
+		if err := validate.Struct(c.SwarmConfig); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // Save dumps configuration to the disk

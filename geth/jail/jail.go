@@ -12,8 +12,9 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/common"
-	"github.com/status-im/status-go/static"
+	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/static"
 
 	"fknsrs.biz/p/ottoext/loop"
 )
@@ -35,7 +36,7 @@ type Jail struct {
 	accountManager common.AccountManager
 	policy         *ExecutionPolicy
 	cells          map[string]*JailCell // jail supports running many isolated instances of jailed runtime
-	baseJSCode     string                     // JavaScript used to initialize all new cells with
+	baseJSCode     string               // JavaScript used to initialize all new cells with
 }
 
 // New returns new Jail environment with the associated NodeManager and
@@ -240,7 +241,6 @@ func (jail *Jail) Send(call otto.FunctionCall) (response otto.Value) {
 }
 
 //==================================================================================================================================
-
 
 func processRPCCall(manager common.NodeManager, req common.RPCCall, call otto.FunctionCall) (gethcommon.Hash, error) {
 	lightEthereum, err := manager.LightEthereumService()
