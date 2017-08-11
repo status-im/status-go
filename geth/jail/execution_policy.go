@@ -76,7 +76,7 @@ func (ep *ExecutionPolicy) executeRemoteSendTransaction(req common.RPCCall, call
 	defer canceller()
 
 	var num hexutil.Uint
-	if err := client.CallContext(ctx, &num, "eth_getTransactionCount", fromAddr, "latest"); err != nil {
+	if err := client.CallContext(ctx, &num, "eth_getTransactionCount", fromAddr, "pending"); err != nil {
 		return nil, err
 	}
 
