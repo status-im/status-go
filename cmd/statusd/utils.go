@@ -115,6 +115,10 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 			"test jailed calls",
 			testJailFunctionCall,
 		},
+		{
+			"test node offline",
+			testNodeOffline,
+		},
 	}
 
 	for _, test := range tests {
@@ -1317,6 +1321,29 @@ func testJailFunctionCall(t *testing.T) bool {
 	t.Logf("jailed method called: %s", parsedResponse)
 
 	return true
+}
+
+func testNodeOffline(t *testing.T) bool {
+
+	StopNode()
+	//time to sync
+	time.Sleep(5 * time.Second)
+
+	loginResponse := common.APIResponse{}
+	rawResponse := Login(C.CString("aaa"), C.CString(TestConfig.Account1.Password))
+
+	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &loginResponse); err != nil {
+		t.Errorf("cannot decode RecoverAccount response (%s): %v", C.GoString(rawResponse), err)
+		return false
+	}
+
+	if loginResponse.Error != node.ErrNodeOffline.Error() {
+		t.Errorf("node should be offline, got: %s", loginResponse.Error)
+		return false
+	}
+
+	return true
+
 }
 
 func startTestNode(t *testing.T) <-chan struct{} {
