@@ -135,7 +135,6 @@ func (m *NodeManager) StopNode() (<-chan struct{}, error) {
 
 // stopNode stop Status node. Stopped node cannot be resumed.
 func (m *NodeManager) stopNode() (<-chan struct{}, error) {
-
 	if m.node == nil {
 		return nil, ErrNodeOffline
 	}
@@ -223,7 +222,6 @@ func (m *NodeManager) PopulateStaticPeers() error {
 
 // populateStaticPeers connects current node with our publicly available LES/SHH/Swarm cluster
 func (m *NodeManager) populateStaticPeers() error {
-
 	// check if we have a node running
 	if m.node == nil {
 		return ErrNodeOffline
@@ -262,7 +260,6 @@ func (m *NodeManager) AddPeer(url string) error {
 
 // addPeer adds new static peer node
 func (m *NodeManager) addPeer(url string) error {
-
 	// check if we have a node running
 	if m.node == nil {
 		return ErrNodeOffline
@@ -301,7 +298,6 @@ func (m *NodeManager) ResetChainData() (<-chan struct{}, error) {
 // resetChainData remove chain data from data directory.
 // Node is stopped, and new node is started, with clean data directory.
 func (m *NodeManager) resetChainData() (<-chan struct{}, error) {
-
 	// check if we have a node running
 	if m.node == nil {
 		return nil, ErrNodeOffline
@@ -350,7 +346,6 @@ func (m *NodeManager) RestartNode() (<-chan struct{}, error) {
 
 // restartNode restart running Status node, fails if node is not running
 func (m *NodeManager) restartNode() (<-chan struct{}, error) {
-
 	// check if we have a node running
 	if m.node == nil {
 		return nil, ErrNodeOffline
