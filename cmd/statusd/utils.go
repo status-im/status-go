@@ -1327,10 +1327,10 @@ func testNodeOffline(t *testing.T) bool {
 
 	StopNode()
 	//time to sync
-	time.Sleep(5 * time.Second)
+	time.Sleep(10 * time.Second)
 
 	loginResponse := common.APIResponse{}
-	rawResponse := Login(C.CString("aaa"), C.CString(TestConfig.Account1.Password))
+	rawResponse := Login(C.CString(TestConfig.Account1.Address), C.CString(TestConfig.Account1.Password))
 
 	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &loginResponse); err != nil {
 		t.Errorf("cannot decode RecoverAccount response (%s): %v", C.GoString(rawResponse), err)
