@@ -9,7 +9,6 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/les/status"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/log"
