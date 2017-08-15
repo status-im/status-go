@@ -29,6 +29,9 @@ const (
 	// WSHost is a host interface for the websocket RPC server
 	WSHost = "localhost"
 
+	// SendTransactionMethodName defines the name for a giving transaction.
+	SendTransactionMethodName = "eth_sendTransaction"
+
 	// WSPort is a WS-RPC port (replaced in unit tests)
 	WSPort = 8546
 
@@ -83,6 +86,18 @@ const (
 
 	// FirebaseNotificationTriggerURL is URL where FCM notification requests are sent to
 	FirebaseNotificationTriggerURL = "https://fcm.googleapis.com/fcm/send"
+
+	// UpstreamMainNetEthereumNetworkURL is URL where the upstream ethereum network is loaded to
+	// allow us avoid syncing node.
+	UpstreamMainNetEthereumNetworkURL = "https://mainnet.infura.io/nKmXgiFgc2KqtoQ8BCGJ"
+
+	// UpstreamRopstenEthereumNetworkURL is URL where the upstream ethereum network is loaded to
+	// allow us avoid syncing node.
+	UpstreamRopstenEthereumNetworkURL = "https://ropsten.infura.io/nKmXgiFgc2KqtoQ8BCGJ"
+
+	// UpstreamRinkebyEthereumNetworkURL is URL where the upstream ethereum network is loaded to
+	// allow us avoid syncing node.
+	UpstreamRinkebyEthereumNetworkURL = "https://rinkeby.infura.io/nKmXgiFgc2KqtoQ8BCGJ"
 
 	// MainNetworkID is id of the main network
 	MainNetworkID = 1

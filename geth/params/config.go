@@ -207,6 +207,20 @@ func (c *BootClusterConfig) String() string {
 	return string(data)
 }
 
+//=====================================================================================
+
+// UpstreamRPCConfig stores configuration for upstream rpc connection.
+type UpstreamRPCConfig struct {
+	// Enabled flag specifies whether feature is enabled
+	Enabled bool
+
+	// URL sets the rpc upstream host address for communication with
+	// a non-local infura endpoint.
+	URL string
+}
+
+//=====================================================================================
+
 // NodeConfig stores configuration options for a node
 type NodeConfig struct {
 	// DevMode is true when given configuration is to be used during development.
@@ -286,6 +300,9 @@ type NodeConfig struct {
 
 	// LogToStderr defines whether logged info should also be output to os.Stderr
 	LogToStderr bool
+
+	// UpstreamConfig extra config for providing upstream infura server.
+	UpstreamConfig UpstreamRPCConfig `json:"UpstreamConfig"`
 
 	// BootClusterConfig extra configuration for supporting cluster
 	BootClusterConfig *BootClusterConfig `json:"BootClusterConfig," validate:"structonly"`
@@ -458,9 +475,15 @@ func (c *NodeConfig) updateConfig() error {
 	if err := c.updateGenesisConfig(); err != nil {
 		return err
 	}
+
+	if err := c.updateUpstreamConfig(); err != nil {
+		return err
+	}
+
 	if err := c.updateBootClusterConfig(); err != nil {
 		return err
 	}
+
 	if err := c.updateRelativeDirsConfig(); err != nil {
 		return err
 	}
@@ -489,6 +512,27 @@ func (c *NodeConfig) updateGenesisConfig() error {
 		return err
 	}
 	c.LightEthConfig.Genesis = string(enc)
+
+	return nil
+}
+
+// updateUpstreamConfig sets the proper UpstreamConfig.URL for the network id being used.
+func (c *NodeConfig) updateUpstreamConfig() error {
+
+	// If we have a URL already set then keep URL incase
+	// of custom server.
+	if c.UpstreamConfig.URL != "" {
+		return nil
+	}
+
+	switch c.NetworkID {
+	case MainNetworkID:
+		c.UpstreamConfig.URL = UpstreamMainNetEthereumNetworkURL
+	case RopstenNetworkID:
+		c.UpstreamConfig.URL = UpstreamRopstenEthereumNetworkURL
+	case RinkebyNetworkID:
+		c.UpstreamConfig.URL = UpstreamRinkebyEthereumNetworkURL
+	}
 
 	return nil
 }

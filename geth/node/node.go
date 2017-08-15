@@ -70,9 +70,15 @@ func MakeNode(config *params.NodeConfig) (*node.Node, error) {
 		return nil, ErrNodeMakeFailure
 	}
 
-	// start Ethereum service
-	if err := activateEthService(stack, config); err != nil {
-		return nil, fmt.Errorf("%v: %v", ErrEthServiceRegistrationFailure, err)
+	// start Ethereum service if we are not expected to use an upstream server.
+	if !config.UpstreamConfig.Enabled {
+
+		if err := activateEthService(stack, config); err != nil {
+			return nil, fmt.Errorf("%v: %v", ErrEthServiceRegistrationFailure, err)
+		}
+
+	} else {
+		log.Info("Blockchain synchronization is switched off, RPC requests will be proxied to %s", config.UpstreamConfig.URL)
 	}
 
 	// start Whisper service
@@ -163,6 +169,7 @@ func activateEthService(stack *node.Node, config *params.NodeConfig) error {
 	ethConf.NetworkId = config.NetworkID
 	ethConf.DatabaseCache = config.LightEthConfig.DatabaseCache
 	ethConf.MaxPeers = config.MaxPeers
+
 	if err := stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
 		lightEth, err := les.New(ctx, &ethConf)
 		if err == nil {

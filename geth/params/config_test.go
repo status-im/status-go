@@ -73,6 +73,38 @@ var loadConfigTestCases = []struct {
 		},
 	},
 	{
+		`test Upstream config setting`,
+		`{
+			"NetworkId": 3,
+			"DataDir": "$TMPDIR",
+			"Name": "TestStatusNode",
+			"WSPort": 4242,
+			"IPCEnabled": true,
+			"WSEnabled": false,
+			"UpstreamConfig": {
+				"Enabled": true,
+				"URL": "http://upstream.loco.net/nodes"
+			}
+		}`,
+		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if nodeConfig.NetworkID != 3 {
+				t.Fatal("wrong NetworkId")
+			}
+
+			if !nodeConfig.UpstreamConfig.Enabled {
+				t.Fatal("wrong UpstreamConfig.Enabled state")
+			}
+
+			if nodeConfig.UpstreamConfig.URL != "http://upstream.loco.net/nodes" {
+				t.Fatal("wrong UpstreamConfig.URL value")
+			}
+		},
+	},
+	{
 		`test parameter overriding`,
 		`{
 			"NetworkId": 3,

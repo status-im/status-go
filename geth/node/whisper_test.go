@@ -30,7 +30,7 @@ func (s *WhisperTestSuite) TestWhisperFilterRace() {
 	require := s.Require()
 	require.NotNil(s.NodeManager)
 
-	s.StartTestNode(params.RinkebyNetworkID)
+	s.StartTestNode(params.RinkebyNetworkID, false)
 	defer s.StopTestNode()
 
 	whisperService, err := s.NodeManager.WhisperService()

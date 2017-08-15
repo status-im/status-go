@@ -30,12 +30,19 @@ type JailTestSuite struct {
 }
 
 func (s *JailTestSuite) SetupTest() {
-	s.NodeManager = node.NewNodeManager()
-	s.Require().NotNil(s.NodeManager)
-	s.Require().IsType(&node.NodeManager{}, s.NodeManager)
-	s.jail = jail.New(s.NodeManager)
-	s.Require().NotNil(s.jail)
-	s.Require().IsType(&jail.Jail{}, s.jail)
+	require := s.Require()
+
+	nodeManager := node.NewNodeManager()
+	require.NotNil(nodeManager)
+
+	accountManager := node.NewAccountManager(nodeManager)
+	require.NotNil(accountManager)
+
+	jail := jail.New(nodeManager, accountManager)
+	require.NotNil(jail)
+
+	s.jail = jail
+	s.NodeManager = nodeManager
 }
 
 func (s *JailTestSuite) TestInit() {
@@ -119,7 +126,7 @@ func (s *JailTestSuite) TestJailRPCSend() {
 	require := s.Require()
 	require.NotNil(s.jail)
 
-	s.StartTestNode(params.RopstenNetworkID)
+	s.StartTestNode(params.RopstenNetworkID, false)
 	defer s.StopTestNode()
 
 	// load Status JS and add test command to it
@@ -154,7 +161,8 @@ func (s *JailTestSuite) TestIsConnected() {
 	require.NotNil(s.jail)
 
 	// TODO(tiabc): Is this required?
-	s.StartTestNode(params.RopstenNetworkID)
+	s.StartTestNode(params.RopstenNetworkID, false)
+
 	defer s.StopTestNode()
 
 	s.jail.Parse(testChatID, "")

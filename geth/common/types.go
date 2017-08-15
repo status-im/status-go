@@ -265,6 +265,16 @@ type AccountInfo struct {
 	Error    string `json:"error"`
 }
 
+// StopRPCCallError defines a error type specific for killing a execution process.
+type StopRPCCallError struct {
+	Err error
+}
+
+// Error returns the internal error associated with the critical error.
+func (c StopRPCCallError) Error() string {
+	return c.Err.Error()
+}
+
 // CompleteTransactionResult is a JSON returned from transaction complete function (used in exposed method)
 type CompleteTransactionResult struct {
 	ID    string `json:"id"`
