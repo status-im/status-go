@@ -1,15 +1,18 @@
 package jail
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"sync"
 
-	"github.com/ethereum/go-ethereum/rpc"
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/les/status"
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/log"
+	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/static"
 
 	"fknsrs.biz/p/ottoext/loop"
@@ -28,16 +31,21 @@ var (
 type Jail struct {
 	// FIXME(tiabc): This mutex handles cells field access and must be renamed appropriately: cellsMutex
 	sync.RWMutex
-	requestManager *RequestManager
+	nodeManager    common.NodeManager
+	accountManager common.AccountManager
+	policy         *ExecutionPolicy
 	cells          map[string]*JailCell // jail supports running many isolated instances of jailed runtime
 	baseJSCode     string               // JavaScript used to initialize all new cells with
 }
 
-// New returns new Jail environment.
-func New(nodeManager common.NodeManager) *Jail {
+// New returns new Jail environment with the associated NodeManager and
+// AccountManager.
+func New(nodeManager common.NodeManager, accountManager common.AccountManager) *Jail {
 	return &Jail{
+		nodeManager:    nodeManager,
+		accountManager: accountManager,
 		cells:          make(map[string]*JailCell),
-		requestManager: NewRequestManager(nodeManager),
+		policy:         NewExecutionPolicy(nodeManager, accountManager),
 	}
 }
 
@@ -167,91 +175,52 @@ func (jail *Jail) Call(chatID string, path string, args string) string {
 // Send will serialize the first argument, send it to the node and returns the response.
 // nolint: errcheck, unparam
 func (jail *Jail) Send(call otto.FunctionCall) (response otto.Value) {
-	client, err := jail.requestManager.RPCClient()
-	if err != nil {
-		return newErrorResponse(call.Otto, -32603, err.Error(), nil)
-	}
-
 	// Remarshal the request into a Go value.
 	JSON, _ := call.Otto.Object("JSON")
 	reqVal, err := JSON.Call("stringify", call.Argument(0))
 	if err != nil {
 		throwJSException(err.Error())
 	}
+
 	var (
 		rawReq = []byte(reqVal.String())
-		reqs   []RPCCall
+		reqs   []common.RPCCall
 		batch  bool
 	)
+
 	if rawReq[0] == '[' {
 		batch = true
 		json.Unmarshal(rawReq, &reqs)
 	} else {
 		batch = false
-		reqs = make([]RPCCall, 1)
+		reqs = make([]common.RPCCall, 1)
 		json.Unmarshal(rawReq, &reqs[0])
 	}
 
-	// Execute the requests.
 	resps, _ := call.Otto.Object("new Array()")
+
+	// Execute the requests.
 	for _, req := range reqs {
-		resp, _ := call.Otto.Object(`({"jsonrpc":"2.0"})`)
-		resp.Set("id", req.ID)
-		var result json.RawMessage
+		var resErr error
+		var res *otto.Object
 
-		// execute directly w/o RPC call to node
-		if req.Method == SendTransactionRequest {
-			txHash, err := jail.requestManager.ProcessSendTransactionRequest(call.Otto, req)
-			resp.Set("result", txHash.Hex())
-			if err != nil {
-				resp = newErrorResponse(call.Otto, -32603, err.Error(), &req.ID).Object()
-			}
-			resps.Call("push", resp)
-			continue
-		}
-
-		// do extra request pre processing (persist message id)
-		// within function semaphore will be acquired and released,
-		// so that no more than one client (per cell) can enter
-		messageID, err := jail.requestManager.PreProcessRequest(call.Otto, req)
-		if err != nil {
-			return newErrorResponse(call.Otto, -32603, err.Error(), nil)
-		}
-
-		errc := make(chan error, 1)
-		errc2 := make(chan error)
-		go func() {
-			errc2 <- <-errc
-		}()
-		errc <- client.Call(&result, req.Method, req.Params...)
-		err = <-errc2
-
-		switch err := err.(type) {
-		case nil:
-			if result == nil {
-				// Special case null because it is decoded as an empty
-				// raw message for some reason.
-				resp.Set("result", otto.NullValue())
-			} else {
-				resultVal, callErr := JSON.Call("parse", string(result))
-				if callErr != nil {
-					resp = newErrorResponse(call.Otto, -32603, callErr.Error(), &req.ID).Object()
-				} else {
-					resp.Set("result", resultVal)
-				}
-			}
-		case rpc.Error:
-			resp.Set("error", map[string]interface{}{
-				"code":    err.ErrorCode(),
-				"message": err.Error(),
-			})
+		switch req.Method {
+		case params.SendTransactionMethodName:
+			res, resErr = jail.policy.ExecuteSendTransaction(req, call)
 		default:
-			resp = newErrorResponse(call.Otto, -32603, err.Error(), &req.ID).Object()
+			res, resErr = jail.policy.ExecuteOtherTransaction(req, call)
 		}
-		resps.Call("push", resp)
 
-		// do extra request post processing (setting back tx context)
-		jail.requestManager.PostProcessRequest(call.Otto, req, messageID)
+		if resErr != nil {
+			switch resErr.(type) {
+			case common.StopRPCCallError:
+				return newErrorResponse(call.Otto, -32603, err.Error(), nil)
+			default:
+				res = newErrorResponse(call.Otto, -32603, err.Error(), &req.ID).Object()
+			}
+		}
+
+		resps.Call("push", res)
 	}
 
 	// Return the responses either to the callback (if supplied)
@@ -261,18 +230,115 @@ func (jail *Jail) Send(call otto.FunctionCall) (response otto.Value) {
 	} else {
 		response, _ = resps.Get("0")
 	}
+
 	if fn := call.Argument(1); fn.Class() == "Function" {
 		fn.Call(otto.NullValue(), otto.NullValue(), response)
 		return otto.UndefinedValue()
 	}
+
 	return response
 }
 
-func newErrorResponse(otto *otto.Otto, code int, msg string, id interface{}) otto.Value {
+//==================================================================================================================================
+
+func processRPCCall(manager common.NodeManager, req common.RPCCall, call otto.FunctionCall) (gethcommon.Hash, error) {
+	lightEthereum, err := manager.LightEthereumService()
+	if err != nil {
+		return gethcommon.Hash{}, err
+	}
+
+	backend := lightEthereum.StatusBackend
+
+	messageID, err := preProcessRequest(call.Otto, req)
+	if err != nil {
+		return gethcommon.Hash{}, err
+	}
+
+	// onSendTransactionRequest() will use context to obtain and release ticket
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, common.MessageIDKey, messageID)
+
+	//  this call blocks, up until Complete Transaction is called
+	txHash, err := backend.SendTransaction(ctx, sendTxArgsFromRPCCall(req))
+	if err != nil {
+		return gethcommon.Hash{}, err
+	}
+
+	// invoke post processing
+	postProcessRequest(call.Otto, req, messageID)
+
+	return txHash, nil
+}
+
+// preProcessRequest pre-processes a given RPC call to a given Otto VM
+func preProcessRequest(vm *otto.Otto, req common.RPCCall) (string, error) {
+	messageID := currentMessageID(vm.Context())
+
+	return messageID, nil
+}
+
+// postProcessRequest post-processes a given RPC call to a given Otto VM
+func postProcessRequest(vm *otto.Otto, req common.RPCCall, messageID string) {
+	if len(messageID) > 0 {
+		vm.Call("addContext", nil, messageID, common.MessageIDKey, messageID) // nolint: errcheck
+	}
+
+	// set extra markers for queued transaction requests
+	if req.Method == params.SendTransactionMethodName {
+		vm.Call("addContext", nil, messageID, params.SendTransactionMethodName, true) // nolint: errcheck
+	}
+}
+
+func sendTxArgsFromRPCCall(req common.RPCCall) status.SendTxArgs {
+	if req.Method != params.SendTransactionMethodName { // no need to persist extra state for other requests
+		return status.SendTxArgs{}
+	}
+
+	var err error
+	var fromAddr, toAddr gethcommon.Address
+
+	fromAddr, err = req.ParseFromAddress()
+	if err != nil {
+		fromAddr = gethcommon.HexToAddress("0x0")
+	}
+
+	toAddr, err = req.ParseToAddress()
+	if err != nil {
+		toAddr = gethcommon.HexToAddress("0x0")
+	}
+
+	return status.SendTxArgs{
+		To:       &toAddr,
+		From:     fromAddr,
+		Value:    req.ParseValue(),
+		Data:     req.ParseData(),
+		Gas:      req.ParseGas(),
+		GasPrice: req.ParseGasPrice(),
+	}
+}
+
+// currentMessageID looks for `status.message_id` variable in current JS context
+func currentMessageID(ctx otto.Context) string {
+	if statusObj, ok := ctx.Symbols["status"]; ok {
+		messageID, err := statusObj.Object().Get("message_id")
+		if err != nil {
+			return ""
+		}
+		if messageID, err := messageID.ToString(); err == nil {
+			return messageID
+		}
+	}
+
+	return ""
+}
+
+//==========================================================================================================
+
+func newErrorResponse(vm *otto.Otto, code int, msg string, id interface{}) otto.Value {
 	// Bundle the error into a JSON RPC call response
 	m := map[string]interface{}{"jsonrpc": "2.0", "id": id, "error": map[string]interface{}{"code": code, msg: msg}}
 	res, _ := json.Marshal(m)
-	val, _ := otto.Run("(" + string(res) + ")")
+	val, _ := vm.Run("(" + string(res) + ")")
 	return val
 }
 

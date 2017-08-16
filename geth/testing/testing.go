@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	// TestConfig defines the default configuration for testing.
+	// TestConfig defines the default config usable at package-level.
 	TestConfig *common.TestConfig
 
 	// RootDir is the main application directory
@@ -57,17 +57,24 @@ func init() {
 	}
 }
 
+// BaseTestSuite defines a base tests suit which others suites can embedded to
+// access initialization methods useful for testing.
 type BaseTestSuite struct {
 	suite.Suite
 	NodeManager common.NodeManager
 }
 
-func (s *BaseTestSuite) StartTestNode(networkID int) {
+// StartTestNode initiazes a NodeManager instances with configuration retrieved
+// from the test config.
+func (s *BaseTestSuite) StartTestNode(networkID int, upstream bool) {
 	require := s.Require()
 	require.NotNil(s.NodeManager)
 
 	nodeConfig, err := MakeTestNodeConfig(networkID)
 	require.NoError(err)
+
+	nodeConfig.UpstreamConfig.Enabled = upstream
+	require.Equal(nodeConfig.UpstreamConfig.Enabled, upstream)
 
 	keyStoreDir := filepath.Join(TestDataDir, TestNetworkNames[networkID], "keystore")
 	require.NoError(common.ImportTestAccount(keyStoreDir, "test-account1.pk"))
@@ -81,6 +88,7 @@ func (s *BaseTestSuite) StartTestNode(networkID int) {
 	require.True(s.NodeManager.IsNodeRunning())
 }
 
+// StopTestNode attempts to stop initialized NodeManager.
 func (s *BaseTestSuite) StopTestNode() {
 	require := s.Require()
 	require.NotNil(s.NodeManager)
@@ -91,6 +99,7 @@ func (s *BaseTestSuite) StopTestNode() {
 	require.False(s.NodeManager.IsNodeRunning())
 }
 
+// FirstBlockHash validates Attach operation for the NodeManager.
 func FirstBlockHash(require *assertions.Assertions, nodeManager common.NodeManager, expectedHash string) {
 	require.NotNil(nodeManager)
 
@@ -113,7 +122,12 @@ func FirstBlockHash(require *assertions.Assertions, nodeManager common.NodeManag
 	require.Equal(expectedHash, firstBlock.Hash.Hex())
 }
 
+<<<<<<< HEAD
 // MakeTestNodeConfig returns the default params.NodeConfig for testing.
+=======
+// MakeTestNodeConfig defines a function to return a giving params.NodeConfig
+// where specific network addresses are assigned based on provieded network id.
+>>>>>>> e6e05aff01101e2ea8f4bc6765faf92706fa6faa
 func MakeTestNodeConfig(networkID int) (*params.NodeConfig, error) {
 	testDir := filepath.Join(TestDataDir, TestNetworkNames[networkID])
 

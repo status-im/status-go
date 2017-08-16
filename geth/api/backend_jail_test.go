@@ -128,7 +128,7 @@ func (s *BackendTestSuite) TestJailSendQueuedTransaction() {
 				{
 					`["commands", "send"]`,
 					txParams,
-					`{"result": {"context":{"` + jail.SendTransactionRequest + `":true},"result":{"transaction-hash":"TX_HASH"}}}`,
+					`{"result": {"context":{"` + params.SendTransactionMethodName + `":true},"result":{"transaction-hash":"TX_HASH"}}}`,
 				},
 				{
 					`["commands", "getBalance"]`,

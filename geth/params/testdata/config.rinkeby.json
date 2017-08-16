@@ -22,6 +22,10 @@
     "LogFile": "geth.log",
     "LogLevel": "INFO",
     "LogToStderr": true,
+    "UpstreamConfig": {
+        "Enabled": false,
+        "URL": "https://rinkeby.infura.io/nKmXgiFgc2KqtoQ8BCGJ"
+    },
     "BootClusterConfig": {
         "Enabled": true,
         "RootNumber": 66,

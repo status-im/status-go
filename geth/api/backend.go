@@ -29,12 +29,13 @@ func NewStatusBackend() *StatusBackend {
 
 	nodeManager := node.NewNodeManager()
 	accountManager := node.NewAccountManager(nodeManager)
+
 	return &StatusBackend{
 		nodeManager:    nodeManager,
 		accountManager: accountManager,
-		txQueueManager: node.NewTxQueueManager(nodeManager, accountManager),
-		jailManager:    jail.New(nodeManager),
+		jailManager:    jail.New(nodeManager, accountManager),
 		rpcManager:     node.NewRPCManager(nodeManager),
+		txQueueManager: node.NewTxQueueManager(nodeManager, accountManager),
 	}
 }
 

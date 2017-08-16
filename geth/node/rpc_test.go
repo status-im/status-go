@@ -1,6 +1,7 @@
 package node_test
 
 import (
+	"net/http"
 	"testing"
 
 	"github.com/status-im/status-go/geth/log"
@@ -9,6 +10,14 @@ import (
 	. "github.com/status-im/status-go/geth/testing"
 	"github.com/stretchr/testify/suite"
 )
+
+type service struct {
+	Handler http.HandlerFunc
+}
+
+func (s service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	s.Handler(w, r)
+}
 
 func TestRPCTestSuite(t *testing.T) {
 	suite.Run(t, new(RPCTestSuite))
@@ -20,9 +29,11 @@ type RPCTestSuite struct {
 
 func (s *RPCTestSuite) SetupTest() {
 	require := s.Require()
-	s.NodeManager = node.NewNodeManager()
-	require.NotNil(s.NodeManager)
-	require.IsType(&node.NodeManager{}, s.NodeManager)
+
+	nodeManager := node.NewNodeManager()
+	require.NotNil(nodeManager)
+
+	s.NodeManager = nodeManager
 }
 
 func (s *RPCTestSuite) TestCallRPC() {
@@ -38,10 +49,13 @@ func (s *RPCTestSuite) TestCallRPC() {
 	nodeConfig.IPCEnabled = false
 	nodeConfig.WSEnabled = false
 	nodeConfig.HTTPHost = "" // to make sure that no HTTP interface is started
+
 	nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
 	require.NoError(err)
 	require.NotNil(nodeConfig)
+
 	defer s.NodeManager.StopNode()
+
 	<-nodeStarted
 
 	progress := make(chan struct{}, 25)
