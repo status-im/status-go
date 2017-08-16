@@ -122,12 +122,8 @@ func FirstBlockHash(require *assertions.Assertions, nodeManager common.NodeManag
 	require.Equal(expectedHash, firstBlock.Hash.Hex())
 }
 
-<<<<<<< HEAD
-// MakeTestNodeConfig returns the default params.NodeConfig for testing.
-=======
 // MakeTestNodeConfig defines a function to return a giving params.NodeConfig
 // where specific network addresses are assigned based on provieded network id.
->>>>>>> e6e05aff01101e2ea8f4bc6765faf92706fa6faa
 func MakeTestNodeConfig(networkID int) (*params.NodeConfig, error) {
 	testDir := filepath.Join(TestDataDir, TestNetworkNames[networkID])
 
