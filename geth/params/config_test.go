@@ -7,7 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"fmt"
+
+	"gopkg.in/go-playground/validator.v9"
 
 	"github.com/ethereum/go-ethereum/core"
 	gethparams "github.com/ethereum/go-ethereum/params"
@@ -22,40 +23,13 @@ var loadConfigTestCases = []struct {
 	validator  func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error)
 }{
 	{
-		`invalid input configuration`,
+		`invalid input JSON (missing comma at the end of key:value pair)`,
 		`{
 			"NetworkId": 3
-			"DataDir": "$TMPDIR",
-			"Name": "TestStatusNode",
-			"WSPort": 8546,
-			"IPCEnabled": true,
-			"WSEnabled": false,
-			"RPCEnabled": false,
-			"LightEthConfig": {
-				"DatabaseCache": 64
-			}
-		}`,
-		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
-			require.Error(t, err, "error is expected, not thrown")
-		},
-	},
-	{
-		`missing required field (DataDir)`,
-		`{
-			"NetworkId": 3,
-			"Name": "TestStatusNode"
-		}`,
-		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
-			require.Equal(t, params.ErrMissingDataDir, err)
-		},
-	},
-	{
-		`missing required field (NetworkId)`,
-		`{
 			"DataDir": "$TMPDIR"
 		}`,
 		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
-			require.Equal(t, params.ErrMissingNetworkID, err)
+			require.Error(t, err, "error is expected, not thrown")
 		},
 	},
 	{
@@ -406,6 +380,7 @@ var loadConfigTestCases = []struct {
 	},
 }
 
+// TestLoadNodeConfig tests loading JSON configuration and setting default values.
 func TestLoadNodeConfig(t *testing.T) {
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "geth-config-tests")
 	if err != nil {
@@ -455,4 +430,76 @@ func TestConfigWriteRead(t *testing.T) {
 	configReadWrite(params.RinkebyNetworkID, "testdata/config.rinkeby.json")
 	configReadWrite(params.RopstenNetworkID, "testdata/config.ropsten.json")
 	configReadWrite(params.MainNetworkID, "testdata/config.mainnet.json")
+}
+
+// TestNodeConfigValidate checks validation of individual fields.
+func TestNodeConfigValidate(t *testing.T) {
+	testCases := []struct {
+		Name        string
+		Config      string
+		Error       string
+		FieldErrors map[string]string // map[Field]Tag
+	}{
+		{
+			Name: "Valid JSON config",
+			Config: `{
+				"NetworkId": 1,
+				"DataDir": "/tmp/data"
+			}`,
+			Error:       "",
+			FieldErrors: nil,
+		},
+		{
+			Name:        "Invalid JSON config",
+			Config:      `{"NetworkId": }`,
+			Error:       "invalid character '}'",
+			FieldErrors: nil,
+		},
+		{
+			Name:        "Invalid field type",
+			Config:      `{"NetworkId": "abc"}`,
+			Error:       "json: cannot unmarshal string into Go struct field",
+			FieldErrors: nil,
+		},
+		{
+			Name:   "Validate all required fields",
+			Config: `{}`,
+			Error:  "",
+			FieldErrors: map[string]string{
+				"NetworkID": "required",
+				"DataDir":   "required",
+			},
+		},
+		{
+			Name: "Validate Name does not contain slash",
+			Config: `{
+				"NetworkId": 1,
+				"DataDir": "/some/dir",
+				"Name": "invalid/name"
+			}`,
+			Error: "",
+			FieldErrors: map[string]string{
+				"Name": "excludes",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Logf("Test Case %s", tc.Name)
+
+		_, err := params.LoadNodeConfig(tc.Config)
+
+		switch err := err.(type) {
+		case validator.ValidationErrors:
+			for _, ve := range err {
+				require.Contains(t, tc.FieldErrors, ve.Field())
+				require.Equal(t, tc.FieldErrors[ve.Field()], ve.Tag())
+			}
+		case error:
+			require.Contains(t, err.Error(), tc.Error)
+		case nil:
+			require.Empty(t, tc.Error)
+			require.Nil(t, tc.FieldErrors)
+		}
+	}
 }

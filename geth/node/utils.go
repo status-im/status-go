@@ -5,8 +5,8 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/geth/common"
+	"github.com/status-im/status-go/geth/log"
 )
 
 // HaltOnPanic recovers from panic, logs issue, sends upward notification, and exits

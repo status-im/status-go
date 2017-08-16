@@ -1,3 +1,4 @@
+// Package testing implements the base level testing types needed.
 package testing
 
 import (
@@ -6,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -17,6 +19,7 @@ import (
 )
 
 var (
+	// TestConfig defines the default configuration for testing.
 	TestConfig *common.TestConfig
 
 	// RootDir is the main application directory
@@ -110,15 +113,23 @@ func FirstBlockHash(require *assertions.Assertions, nodeManager common.NodeManag
 	require.Equal(expectedHash, firstBlock.Hash.Hex())
 }
 
+// MakeTestNodeConfig returns the default params.NodeConfig for testing.
 func MakeTestNodeConfig(networkID int) (*params.NodeConfig, error) {
+	testDir := filepath.Join(TestDataDir, TestNetworkNames[networkID])
+
+	if runtime.GOOS == "windows" {
+		testDir = filepath.ToSlash(testDir)
+	}
+
 	configJSON := `{
 		"NetworkId": ` + strconv.Itoa(networkID) + `,
-		"DataDir": "` + filepath.Join(TestDataDir, TestNetworkNames[networkID]) + `",
+		"DataDir": "` + testDir + `",
 		"HTTPPort": ` + strconv.Itoa(TestConfig.Node.HTTPPort) + `,
 		"WSPort": ` + strconv.Itoa(TestConfig.Node.WSPort) + `,
 		"LogEnabled": true,
 		"LogLevel": "ERROR"
 	}`
+
 	nodeConfig, err := params.LoadNodeConfig(configJSON)
 	if err != nil {
 		return nil, err

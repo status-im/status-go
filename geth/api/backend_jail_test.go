@@ -11,10 +11,10 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/log"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/jail"
+	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
 	. "github.com/status-im/status-go/geth/testing"
@@ -270,6 +270,8 @@ func (s *BackendTestSuite) TestContractDeployment() {
 	s.T().Logf("estimation complete: %s", response)
 }
 
+var baseStatusJSCode = string(static.MustAsset("testdata/jail/status.js"))
+
 func (s *BackendTestSuite) TestJailWhisper() {
 	require := s.Require()
 	require.NotNil(s.backend)
@@ -279,6 +281,8 @@ func (s *BackendTestSuite) TestJailWhisper() {
 
 	jailInstance := s.backend.JailManager()
 	require.NotNil(jailInstance)
+
+	jailInstance.BaseJS(baseStatusJSCode)
 
 	whisperService := s.WhisperService()
 	whisperAPI := whisper.NewPublicWhisperAPI(whisperService)
@@ -358,27 +362,28 @@ func (s *BackendTestSuite) TestJailWhisper() {
 				var payload = '` + whisperMessage1 + `';
 
 				// start watching for messages
-				var filter = shh.filter({
-					type: "asym",
+				var filter = shh.newMessageFilter({
 					sig: identity1,
-					key: identity2,
+					privateKeyID: identity2,
 					topics: [topic]
 				});
-				console.log(JSON.stringify(filter));
 
 				// post message
 				var message = {
-					type: "asym",
-					sig: identity1,
-					key: identity2,
-					topic: topic,
-					payload: payload,
 					ttl: 20,
+					powTarget: 0.01,
+					powTime: 20,
+					topic: topic,
+					sig: identity1,
+					pubKey: identity2,
+			  		payload: web3.toHex(payload),
 				};
-				var err = shh.post(message)
-				if (err !== null) {
-					throw 'message not sent: ' + message;
+
+				var sent = shh.post(message)
+				if (!sent) {
+					throw 'message not sent: ' + JSON.stringify(message);
 				}
+
 
 				var filterName = '` + whisperMessage1 + `';
 				var filterId = filter.filterId;
@@ -400,25 +405,27 @@ func (s *BackendTestSuite) TestJailWhisper() {
 				var payload = '` + whisperMessage2 + `';
 
 				// start watching for messages
-				var filter = shh.filter({
+				var filter = shh.newMessageFilter({
 					type: "asym",
 					sig: identity,
-					key: identity,
+					privateKeyID: identity,
 					topics: [topic],
 				});
 
 				// post message
 				var message = {
-					type: "asym",
-				  	sig: identity,
-				  	key: identity,
-				  	topic: topic,
-				  	payload: payload,
-				  	ttl: 20,
+					ttl: 20,
+					powTarget: 0.01,
+					powTime: 20,
+					topic: topic,
+					sig: identity,
+					pubKey: identity,
+			  		payload: web3.toHex(payload),
 				};
-				var err = shh.post(message)
-				if (err !== null) {
-					throw 'message not sent: ' + message;
+
+				var sent = shh.post(message)
+				if (!sent) {
+					throw 'message not sent: ' + JSON.stringify(message);
 				}
 
 				var filterName = '` + whisperMessage2 + `';
@@ -441,31 +448,33 @@ func (s *BackendTestSuite) TestJailWhisper() {
 				var payload = '` + whisperMessage3 + `';
 
 				// generate symmetric key
-				var keyid = shh.generateSymmetricKey();
-				if (!shh.hasSymmetricKey(keyid)) {
+				var keyid = shh.newSymKey();
+				if (!shh.hasSymKey(keyid)) {
 					throw new Error('key not found');
 				}
 
 				// start watching for messages
-				var filter = shh.filter({
+				var filter = shh.newMessageFilter({
 					type: "sym",
 					sig: identity,
 					topics: [topic],
-					key: keyid
+					symKeyID: keyid
 				});
 
 				// post message
 				var message = {
-					type: "sym",
-					sig: identity,
-					topic: topic,
-					payload: payload,
 					ttl: 20,
-					key: keyid
+					powTarget: 0.01,
+					powTime: 20,
+					topic: topic,
+					sig: identity,
+					symKeyID: keyid,
+			  		payload: web3.toHex(payload),
 				};
-				var err = shh.post(message)
-				if (err !== null) {
-					throw 'message not sent: ' + message;
+
+				var sent = shh.post(message)
+				if (!sent) {
+					throw 'message not sent: ' + JSON.stringify(message);
 				}
 
 				var filterName = '` + whisperMessage3 + `';
@@ -483,29 +492,31 @@ func (s *BackendTestSuite) TestJailWhisper() {
 				var payload = '` + whisperMessage4 + `';
 
 				// generate symmetric key
-				var keyid = shh.generateSymmetricKey();
-				if (!shh.hasSymmetricKey(keyid)) {
+				var keyid = shh.newSymKey();
+				if (!shh.hasSymKey(keyid)) {
 					throw new Error('key not found');
 				}
 
 				// start watching for messages
-				var filter = shh.filter({
+				var filter = shh.newMessageFilter({
 					type: "sym",
 					topics: [topic],
-					key: keyid
+					symKeyID: keyid
 				});
 
 				// post message
 				var message = {
-					type: "sym",
-					topic: topic,
-					payload: payload,
 					ttl: 20,
-					key: keyid
+					powTarget: 0.01,
+					powTime: 20,
+					topic: topic,
+					symKeyID: keyid,
+			  		payload: web3.toHex(payload),
 				};
-				var err = shh.post(message)
-				if (err !== null) {
-					throw 'message not sent: ' + err;
+
+				var sent = shh.post(message)
+				if (!sent) {
+					throw 'message not sent: ' + JSON.stringify(message);
 				}
 
 				var filterName = '` + whisperMessage4 + `';
@@ -528,23 +539,25 @@ func (s *BackendTestSuite) TestJailWhisper() {
 				var payload = '` + whisperMessage5 + `';
 
 				// start watching for messages
-				var filter = shh.filter({
+				var filter = shh.newMessageFilter({
 					type: "asym",
-					key: identity,
+					privateKeyID: identity,
 					topics: [topic],
 				});
 
 				// post message
 				var message = {
-					type: "asym",
-					key: identity,
+					ttl: 20,
+					powTarget: 0.01,
+					powTime: 20,
 					topic: topic,
-					payload: payload,
-					ttl: 20
+					pubKey: identity,
+			  	payload: web3.toHex(payload),
 				};
-				var err = shh.post(message)
-				if (err !== null) {
-					throw 'message not sent: ' + message;
+
+				var sent = shh.post(message)
+				if (!sent) {
+					throw 'message not sent: ' + JSON.stringify(message);
 				}
 
 				var filterName = '` + whisperMessage5 + `';
@@ -572,25 +585,27 @@ func (s *BackendTestSuite) TestJailWhisper() {
 				var payload = '` + whisperMessage6 + `';
 
 				// start watching for messages
-				var filter = shh.filter({
+				var filter = shh.newMessageFilter({
 					type: "asym",
 					sig: identity2,
-					key: identity1,
+					privateKeyID: identity1,
 					topics: [topic]
 				});
 
 				// post message
 				var message = {
-					type: "asym",
-				  	sig: identity2,
-				  	key: identity1,
-				  	topic: topic,
-				  	payload: payload,
-				  	ttl: 20
+					ttl: 20,
+					powTarget: 0.01,
+					powTime: 20,
+					topic: topic,
+					sig: identity2,
+					pubKey: identity1,
+			  		payload: web3.toHex(payload),
 				};
-				var err = shh.post(message)
-				if (err !== null) {
-					throw 'message not sent: ' + message;
+
+				var sent = shh.post(message)
+				if (!sent) {
+					throw 'message not sent: ' + JSON.stringify(message);
 				}
 
 				var filterName = '` + whisperMessage6 + `';
@@ -606,6 +621,7 @@ func (s *BackendTestSuite) TestJailWhisper() {
 	for _, testCase := range testCases {
 		s.T().Log(testCase.name)
 		testCaseKey := crypto.Keccak256Hash([]byte(testCase.name)).Hex()
+
 		jailInstance.Parse(testCaseKey, `
 			var shh = web3.shh;
 			var makeTopic = function () {
@@ -621,6 +637,7 @@ func (s *BackendTestSuite) TestJailWhisper() {
 
 		// post messages
 		if _, err := cell.Run(testCase.testCode); err != nil {
+			// fmt.Printf("Current Test: %+s\n", testCase.testCode)
 			require.Fail(err.Error())
 			return
 		}
