@@ -34,6 +34,11 @@ func (api *StatusAPI) JailManager() common.JailManager {
 	return api.b.JailManager()
 }
 
+// TxQueueManager returns reference to account manager
+func (api *StatusAPI) TxQueueManager() common.TxQueueManager {
+	return api.b.TxQueueManager()
+}
+
 // StartNode start Status node, fails if node is already started
 func (api *StatusAPI) StartNode(config *params.NodeConfig) error {
 	nodeStarted, err := api.b.StartNode(config)
@@ -143,22 +148,22 @@ func (api *StatusAPI) Logout() error {
 
 // CompleteTransaction instructs backend to complete sending of a given transaction
 func (api *StatusAPI) CompleteTransaction(id, password string) (gethcommon.Hash, error) {
-	return api.b.CompleteTransaction(id, password)
+	return api.b.txQueueManager.CompleteTransaction(id, password)
 }
 
 // CompleteTransactions instructs backend to complete sending of multiple transactions
 func (api *StatusAPI) CompleteTransactions(ids, password string) map[string]common.RawCompleteTransactionResult {
-	return api.b.CompleteTransactions(ids, password)
+	return api.b.txQueueManager.CompleteTransactions(ids, password)
 }
 
 // DiscardTransaction discards a given transaction from transaction queue
 func (api *StatusAPI) DiscardTransaction(id string) error {
-	return api.b.DiscardTransaction(id)
+	return api.b.txQueueManager.DiscardTransaction(id)
 }
 
 // DiscardTransactions discards given multiple transactions from transaction queue
 func (api *StatusAPI) DiscardTransactions(ids string) map[string]common.RawDiscardTransactionResult {
-	return api.b.DiscardTransactions(ids)
+	return api.b.txQueueManager.DiscardTransactions(ids)
 }
 
 // JailParse creates a new jail cell context, with the given chatID as identifier.

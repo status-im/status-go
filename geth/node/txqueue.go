@@ -1,194 +1,234 @@
 package node
 
 import (
-	"context"
+	"errors"
+	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
-	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/les/status"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/geth/common"
 )
 
 const (
-	// EventTransactionQueued is triggered when send transaction request is queued
-	EventTransactionQueued = "transaction.queued"
-
-	// EventTransactionFailed is triggered when send transaction request fails
-	EventTransactionFailed = "transaction.failed"
-
-	// SendTxDefaultErrorCode is sent by default, when error is not nil, but type is unknown/unexpected.
-	SendTxDefaultErrorCode = SendTransactionDefaultErrorCode
+	DefaultTxQueueCap              = int(35) // how many items can be queued
+	DefaultTxSendQueueCap          = int(70) // how many items can be passed to sendTransaction() w/o blocking
+	DefaultTxSendCompletionTimeout = 300     // how many seconds to wait before returning result in sentTransaction()
+	SelectedAccountKey             = "selected_account"
 )
 
-// Send transaction response codes
-const (
-	SendTransactionNoErrorCode        = "0"
-	SendTransactionDefaultErrorCode   = "1"
-	SendTransactionPasswordErrorCode  = "2"
-	SendTransactionTimeoutErrorCode   = "3"
-	SendTransactionDiscardedErrorCode = "4"
+var (
+	ErrQueuedTxIDNotFound      = errors.New("transaction hash not found")
+	ErrQueuedTxTimedOut        = errors.New("transaction sending timed out")
+	ErrQueuedTxDiscarded       = errors.New("transaction has been discarded")
+	ErrInvalidCompleteTxSender = errors.New("transaction can only be completed by the same account which created it")
 )
 
-var txReturnCodes = map[error]string{ // deliberately strings, in case more meaningful codes are to be returned
-	nil:                         SendTransactionNoErrorCode,
-	keystore.ErrDecrypt:         SendTransactionPasswordErrorCode,
-	status.ErrQueuedTxTimedOut:  SendTransactionTimeoutErrorCode,
-	status.ErrQueuedTxDiscarded: SendTransactionDiscardedErrorCode,
+// TxQueue is capped container that holds pending transactions
+type TxQueue struct {
+	transactions  map[common.QueuedTxID]*common.QueuedTx
+	mu            sync.RWMutex // to guard transactions map
+	evictableIDs  chan common.QueuedTxID
+	enqueueTicker chan struct{}
+	incomingPool  chan *common.QueuedTx
+
+	// when this channel is closed, all queue channels processing must cease (incoming queue, processing queued items etc)
+	stopped      chan struct{}
+	stoppedGroup sync.WaitGroup // to make sure that all routines are stopped
+
+	// when items are enqueued notify subscriber
+	txEnqueueHandler common.EnqueuedTxHandler
+
+	// when tx is returned (either successfully or with error) notify subscriber
+	txReturnHandler common.EnqueuedTxReturnHandler
 }
 
-// TxQueueManager provides means to manage internal Status Backend (injected into LES)
-type TxQueueManager struct {
-	nodeManager    common.NodeManager
-	accountManager common.AccountManager
-}
-
-func NewTxQueueManager(nodeManager common.NodeManager, accountManager common.AccountManager) *TxQueueManager {
-	return &TxQueueManager{
-		nodeManager:    nodeManager,
-		accountManager: accountManager,
+// NewTransactionQueue make new transaction queue
+func NewTransactionQueue() *TxQueue {
+	log.Info("StatusIM: initializing transaction queue")
+	return &TxQueue{
+		transactions:  make(map[common.QueuedTxID]*common.QueuedTx),
+		evictableIDs:  make(chan common.QueuedTxID, DefaultTxQueueCap), // will be used to evict in FIFO
+		enqueueTicker: make(chan struct{}),
+		incomingPool:  make(chan *common.QueuedTx, DefaultTxSendQueueCap),
 	}
 }
 
-// CompleteTransaction instructs backend to complete sending of a given transaction
-func (m *TxQueueManager) CompleteTransaction(id, password string) (gethcommon.Hash, error) {
-	lightEthereum, err := m.nodeManager.LightEthereumService()
-	if err != nil {
-		return gethcommon.Hash{}, err
-	}
+// Start starts enqueue and eviction loops
+func (q *TxQueue) Start() {
+	log.Info("StatusIM: starting transaction queue")
 
-	backend := lightEthereum.StatusBackend
+	q.stopped = make(chan struct{})
+	q.stoppedGroup.Add(2)
 
-	selectedAccount, err := m.accountManager.SelectedAccount()
-	if err != nil {
-		return gethcommon.Hash{}, err
-	}
-
-	ctx := context.Background()
-	ctx = context.WithValue(ctx, status.SelectedAccountKey, selectedAccount.Hex())
-
-	return backend.CompleteQueuedTransaction(ctx, status.QueuedTxID(id), password)
+	go q.evictionLoop()
+	go q.enqueueLoop()
 }
 
-// CompleteTransactions instructs backend to complete sending of multiple transactions
-func (m *TxQueueManager) CompleteTransactions(ids, password string) map[string]common.RawCompleteTransactionResult {
-	results := make(map[string]common.RawCompleteTransactionResult)
+// Stop stops transaction enqueue and eviction loops
+func (q *TxQueue) Stop() {
+	log.Info("StatusIM: stopping transaction queue")
+	close(q.stopped) // stops all processing loops (enqueue, eviction etc)
+	q.stoppedGroup.Wait()
+}
 
-	parsedIDs, err := common.ParseJSONArray(ids)
-	if err != nil {
-		results["none"] = common.RawCompleteTransactionResult{
-			Error: err,
-		}
-		return results
-	}
-
-	for _, txID := range parsedIDs {
-		txHash, txErr := m.CompleteTransaction(txID, password)
-		results[txID] = common.RawCompleteTransactionResult{
-			Hash:  txHash,
-			Error: txErr,
+// evictionLoop frees up queue to accommodate another transaction item
+func (q *TxQueue) evictionLoop() {
+	defer HaltOnPanic()
+	evict := func() {
+		if len(q.transactions) >= DefaultTxQueueCap { // eviction is required to accommodate another/last item
+			q.Remove(<-q.evictableIDs)
 		}
 	}
 
-	return results
-}
-
-// DiscardTransaction discards a given transaction from transaction queue
-func (m *TxQueueManager) DiscardTransaction(id string) error {
-	lightEthereum, err := m.nodeManager.LightEthereumService()
-	if err != nil {
-		return err
-	}
-
-	backend := lightEthereum.StatusBackend
-
-	return backend.DiscardQueuedTransaction(status.QueuedTxID(id))
-}
-
-// DiscardTransactions discards given multiple transactions from transaction queue
-func (m *TxQueueManager) DiscardTransactions(ids string) map[string]common.RawDiscardTransactionResult {
-	var parsedIDs []string
-	results := make(map[string]common.RawDiscardTransactionResult)
-
-	parsedIDs, err := common.ParseJSONArray(ids)
-	if err != nil {
-		results["none"] = common.RawDiscardTransactionResult{
-			Error: err,
-		}
-		return results
-	}
-
-	for _, txID := range parsedIDs {
-		err := m.DiscardTransaction(txID)
-		if err != nil {
-			results[txID] = common.RawDiscardTransactionResult{
-				Error: err,
-			}
-		}
-	}
-
-	return results
-}
-
-// SendTransactionEvent is a signal sent on a send transaction request
-type SendTransactionEvent struct {
-	ID        string            `json:"id"`
-	Args      status.SendTxArgs `json:"args"`
-	MessageID string            `json:"message_id"`
-}
-
-// TransactionQueueHandler returns handler that processes incoming tx queue requests
-func (m *TxQueueManager) TransactionQueueHandler() func(queuedTx status.QueuedTx) {
-	return func(queuedTx status.QueuedTx) {
-		SendSignal(SignalEnvelope{
-			Type: EventTransactionQueued,
-			Event: SendTransactionEvent{
-				ID:        string(queuedTx.ID),
-				Args:      queuedTx.Args,
-				MessageID: common.MessageIDFromContext(queuedTx.Context),
-			},
-		})
-	}
-}
-
-// ReturnSendTransactionEvent is a JSON returned whenever transaction send is returned
-type ReturnSendTransactionEvent struct {
-	ID           string            `json:"id"`
-	Args         status.SendTxArgs `json:"args"`
-	MessageID    string            `json:"message_id"`
-	ErrorMessage string            `json:"error_message"`
-	ErrorCode    string            `json:"error_code"`
-}
-
-// TransactionReturnHandler returns handler that processes responses from internal tx manager
-func (m *TxQueueManager) TransactionReturnHandler() func(queuedTx *status.QueuedTx, err error) {
-	return func(queuedTx *status.QueuedTx, err error) {
-		if err == nil {
+	for {
+		select {
+		case <-time.After(250 * time.Millisecond): // do not wait for manual ticks, check queue regularly
+			evict()
+		case <-q.enqueueTicker: // when manually requested
+			evict()
+		case <-q.stopped:
+			log.Info("StatusIM: transaction queue's eviction loop stopped")
+			q.stoppedGroup.Done()
 			return
 		}
-
-		// discard notifications with empty tx
-		if queuedTx == nil {
-			return
-		}
-
-		// error occurred, signal up to application
-		SendSignal(SignalEnvelope{
-			Type: EventTransactionFailed,
-			Event: ReturnSendTransactionEvent{
-				ID:           string(queuedTx.ID),
-				Args:         queuedTx.Args,
-				MessageID:    common.MessageIDFromContext(queuedTx.Context),
-				ErrorMessage: err.Error(),
-				ErrorCode:    m.sendTransactionErrorCode(err),
-			},
-		})
 	}
 }
 
-func (m *TxQueueManager) sendTransactionErrorCode(err error) string {
-	if code, ok := txReturnCodes[err]; ok {
-		return code
+// enqueueLoop process incoming enqueue requests
+func (q *TxQueue) enqueueLoop() {
+	defer HaltOnPanic()
+
+	// enqueue incoming transactions
+	for {
+		select {
+		case queuedTx := <-q.incomingPool:
+			log.Info("StatusIM: transaction enqueued requested", "tx", queuedTx.ID)
+			q.Enqueue(queuedTx)
+			log.Info("StatusIM: transaction enqueued", "tx", queuedTx.ID)
+		case <-q.stopped:
+			log.Info("StatusIM: transaction queue's enqueue loop stopped")
+			q.stoppedGroup.Done()
+			return
+		}
+	}
+}
+
+// Reset is to be used in tests only, as it simply creates new transaction map, w/o any cleanup of the previous one
+func (q *TxQueue) Reset() {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	q.transactions = make(map[common.QueuedTxID]*common.QueuedTx)
+	q.evictableIDs = make(chan common.QueuedTxID, DefaultTxQueueCap)
+}
+
+// EnqueueAsync enqueues incoming transaction in async manner, returns as soon as possible
+func (q *TxQueue) EnqueueAsync(tx *common.QueuedTx) error {
+	q.incomingPool <- tx
+
+	return nil
+}
+
+// Enqueue enqueues incoming transaction
+func (q *TxQueue) Enqueue(tx *common.QueuedTx) error {
+	if q.txEnqueueHandler == nil { //discard, until handler is provided
+		return nil
 	}
 
-	return SendTxDefaultErrorCode
+	q.enqueueTicker <- struct{}{} // notify eviction loop that we are trying to insert new item
+	q.evictableIDs <- tx.ID       // this will block when we hit DefaultTxQueueCap
+
+	q.mu.Lock()
+	q.transactions[tx.ID] = tx
+	q.mu.Unlock()
+
+	// notify handler
+	q.txEnqueueHandler(*tx)
+
+	return nil
+}
+
+// Get returns transaction by transaction identifier
+func (q *TxQueue) Get(id common.QueuedTxID) (*common.QueuedTx, error) {
+	q.mu.RLock()
+	defer q.mu.RUnlock()
+
+	if tx, ok := q.transactions[id]; ok {
+		return tx, nil
+	}
+
+	return nil, ErrQueuedTxIDNotFound
+}
+
+// Remove removes transaction by transaction identifier
+func (q *TxQueue) Remove(id common.QueuedTxID) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	delete(q.transactions, id)
+}
+
+// Count returns number of currently queued transactions
+func (q *TxQueue) Count() int {
+	q.mu.RLock()
+	defer q.mu.RUnlock()
+
+	return len(q.transactions)
+}
+
+// Has checks whether transaction with a given identifier exists in queue
+func (q *TxQueue) Has(id common.QueuedTxID) bool {
+	q.mu.RLock()
+	defer q.mu.RUnlock()
+
+	_, ok := q.transactions[id]
+
+	return ok
+}
+
+// SetEnqueueHandler sets callback handler, that is triggered on enqueue operation
+func (q *TxQueue) SetEnqueueHandler(fn common.EnqueuedTxHandler) {
+	q.txEnqueueHandler = fn
+}
+
+// SetTxReturnHandler sets callback handler, that is triggered when transaction is finished executing
+func (q *TxQueue) SetTxReturnHandler(fn common.EnqueuedTxReturnHandler) {
+	q.txReturnHandler = fn
+}
+
+// NotifyOnQueuedTxReturn is invoked when transaction is ready to return
+// Transaction can be in error state, or executed successfully at this point.
+func (q *TxQueue) NotifyOnQueuedTxReturn(queuedTx *common.QueuedTx, err error) {
+	if q == nil {
+		return
+	}
+
+	// discard, if transaction is not found
+	if queuedTx == nil {
+		return
+	}
+
+	// on success, remove item from the queue and stop propagating
+	if err == nil {
+		q.Remove(queuedTx.ID)
+		return
+	}
+
+	// error occurred, send upward notification
+	if q.txReturnHandler == nil { // discard, until handler is provided
+		return
+	}
+
+	// remove from queue on any error (except for transient ones) and propagate
+	transientErrs := map[error]bool{
+		keystore.ErrDecrypt:        true, // wrong password
+		ErrInvalidCompleteTxSender: true, // completing tx create from another account
+	}
+	if !transientErrs[err] { // remove only on unrecoverable errors
+		q.Remove(queuedTx.ID)
+	}
+
+	// notify handler
+	q.txReturnHandler(queuedTx, err)
 }

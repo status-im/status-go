@@ -29,13 +29,14 @@ func NewStatusBackend() *StatusBackend {
 
 	nodeManager := node.NewNodeManager()
 	accountManager := node.NewAccountManager(nodeManager)
+	txQueueManager := node.NewTxQueueManager(nodeManager, accountManager)
 
 	return &StatusBackend{
 		nodeManager:    nodeManager,
 		accountManager: accountManager,
-		jailManager:    jail.New(nodeManager, accountManager),
+		jailManager:    jail.New(nodeManager, accountManager, txQueueManager),
 		rpcManager:     node.NewRPCManager(nodeManager),
-		txQueueManager: node.NewTxQueueManager(nodeManager, accountManager),
+		txQueueManager: txQueueManager,
 	}
 }
 
@@ -54,6 +55,11 @@ func (m *StatusBackend) JailManager() common.JailManager {
 	return m.jailManager
 }
 
+// TxQueueManager returns reference to jail
+func (m *StatusBackend) TxQueueManager() common.TxQueueManager {
+	return m.txQueueManager
+}
+
 // IsNodeRunning confirm that node is running
 func (m *StatusBackend) IsNodeRunning() bool {
 	return m.nodeManager.IsNodeRunning()
@@ -63,6 +69,8 @@ func (m *StatusBackend) IsNodeRunning() bool {
 func (m *StatusBackend) StartNode(config *params.NodeConfig) (<-chan struct{}, error) {
 	m.Lock()
 	defer m.Unlock()
+
+	m.txQueueManager.Start()
 
 	if m.nodeReady != nil {
 		return nil, node.ErrNodeExists
@@ -101,6 +109,8 @@ func (m *StatusBackend) onNodeStart(nodeStarted <-chan struct{}, backendReady ch
 func (m *StatusBackend) StopNode() (<-chan struct{}, error) {
 	m.Lock()
 	defer m.Unlock()
+
+	m.txQueueManager.Stop()
 
 	if m.nodeReady == nil {
 		return nil, node.ErrNoRunningNode
@@ -208,10 +218,12 @@ func (m *StatusBackend) registerHandlers() error {
 	lightEthereum.StatusBackend.SetAccountsFilterHandler(m.accountManager.AccountsListRequestHandler())
 	log.Info("Registered handler", "fn", "AccountsFilterHandler")
 
-	lightEthereum.StatusBackend.SetTransactionQueueHandler(m.txQueueManager.TransactionQueueHandler())
+	// TODO(adam): it should be a default
+	m.txQueueManager.SetTransactionQueueHandler(m.txQueueManager.TransactionQueueHandler())
 	log.Info("Registered handler", "fn", "TransactionQueueHandler")
 
-	lightEthereum.StatusBackend.SetTransactionReturnHandler(m.txQueueManager.TransactionReturnHandler())
+	// TODO(adam): it should be a default
+	m.txQueueManager.SetTransactionReturnHandler(m.txQueueManager.TransactionReturnHandler())
 	log.Info("Registered handler", "fn", "TransactionReturnHandler")
 
 	return nil

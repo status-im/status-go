@@ -3,6 +3,7 @@ package jail
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -124,20 +125,46 @@ func (ep *ExecutionPolicy) executeRemoteSendTransaction(req common.RPCCall, call
 // executeLocalSendTransaction defines a function which handles execution of RPC method over the internal rpc server
 // from the eth.LightClient. It specifically caters to process eth_sendTransaction.
 func (ep *ExecutionPolicy) executeLocalSendTransaction(req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
-	resp, err := call.Otto.Object(`({"jsonrpc":"2.0"})`)
+	les, err := ep.nodeManager.LightEthereumService()
 	if err != nil {
 		return nil, err
 	}
 
+	resp, err := call.Otto.Object(`({"jsonrpc":"2.0"})`)
+	if err != nil {
+		return nil, err
+	}
 	resp.Set("id", req.ID)
 
-	txHash, err := processRPCCall(ep.nodeManager, req, call)
-	resp.Set("result", txHash.Hex())
-
+	messageID, err := preProcessRequest(call.Otto, req)
 	if err != nil {
 		resp = newErrorResponse(call.Otto, -32603, err.Error(), &req.ID).Object()
 		return resp, nil
 	}
+
+	// onSendTransactionRequest() will use context to obtain and release ticket
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, common.MessageIDKey, messageID)
+
+	// Marshal args to JSON string.
+	rawArgs, err := json.Marshal(sendTxArgsFromRPCCall(req))
+	if err != nil {
+		err = fmt.Errorf("failed to marshal args: %s", err)
+		resp = newErrorResponse(call.Otto, -32603, err.Error(), &req.ID).Object()
+		return resp, nil
+	}
+
+	//  this call blocks, up until Complete Transaction is called
+	txHash, err := les.StatusBackend.SendTransaction(ctx, rawArgs, "")
+	if err != nil {
+		resp = newErrorResponse(call.Otto, -32603, err.Error(), &req.ID).Object()
+		return resp, nil
+	}
+
+	resp.Set("result", txHash.Hex())
+
+	// invoke post processing
+	postProcessRequest(call.Otto, req, messageID)
 
 	return resp, nil
 }

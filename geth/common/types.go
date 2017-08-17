@@ -2,6 +2,7 @@ package common
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,8 +12,8 @@ import (
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/les"
-	"github.com/ethereum/go-ethereum/les/status"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/rpc"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
@@ -153,13 +154,62 @@ type RawDiscardTransactionResult struct {
 	Error error
 }
 
+// QueuedTxID queued transaction identifier
+type QueuedTxID string
+
+// QueuedTx holds enough information to complete the queued transaction.
+type QueuedTx struct {
+	ID      QueuedTxID
+	Hash    common.Hash
+	Context context.Context
+	Args    SendTxArgs
+	Done    chan struct{}
+	Discard chan struct{}
+	Err     error
+}
+
+// SendTxArgs represents the arguments to submit a new transaction into the transaction pool.
+type SendTxArgs struct {
+	From     common.Address  `json:"from"`
+	To       *common.Address `json:"to"`
+	Gas      *hexutil.Big    `json:"gas"`
+	GasPrice *hexutil.Big    `json:"gasPrice"`
+	Value    *hexutil.Big    `json:"value"`
+	Data     hexutil.Bytes   `json:"data"`
+	Nonce    *hexutil.Uint64 `json:"nonce"`
+}
+
+// EnqueuedTxHandler is a function that receives queued/pending transactions, when they get queued
+type EnqueuedTxHandler func(QueuedTx)
+
+// EnqueuedTxReturnHandler is a function that receives response when tx is complete (both on success and error)
+type EnqueuedTxReturnHandler func(queuedTx *QueuedTx, err error)
+
 // TxQueueManager defines expected methods for managing transaction queue
 type TxQueueManager interface {
+	// Start starts accepting new transaction in the queue.
+	Start()
+
+	// Stop stops accepting new transactions in the queue.
+	Stop()
+
+	// QueueTransaction adds a new request transaction to the queue.
+	QueueTransactionAndWait(ctx context.Context, req RPCCall) (*QueuedTx, error)
+
+	NotifyOnQueuedTxReturn(queuedTxI *QueuedTx, err error)
+
 	// TransactionQueueHandler returns handler that processes incoming tx queue requests
-	TransactionQueueHandler() func(queuedTx status.QueuedTx)
+	// TODO(adam): it should be a pointer as this struct contains channels
+	TransactionQueueHandler() func(queuedTx QueuedTx)
+
+	// TODO(adam): might be not needed
+	SetTransactionQueueHandler(fn EnqueuedTxHandler)
+
+	// TODO(adam): might be not needed
+	SetTransactionReturnHandler(fn EnqueuedTxReturnHandler)
 
 	// TransactionReturnHandler returns handler that processes responses from internal tx manager
-	TransactionReturnHandler() func(queuedTx *status.QueuedTx, err error)
+	TransactionReturnHandler() func(queuedTx *QueuedTx, err error)
 
 	// CompleteTransaction instructs backend to complete sending of a given transaction
 	CompleteTransaction(id, password string) (common.Hash, error)

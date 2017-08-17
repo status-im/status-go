@@ -36,7 +36,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/les/status"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/params"
@@ -1181,32 +1180,12 @@ func submitTransaction(ctx context.Context, b Backend, tx *types.Transaction) (c
 	return tx.Hash(), nil
 }
 
-// SendTransaction queues transactions, to be fulfilled by CompleteQueuedTransaction()
-func (s *PublicTransactionPoolAPI) SendTransaction(ctx context.Context, args SendTxArgs) (common.Hash, error) {
-	backend := s.b.GetStatusBackend()
-	if backend != nil {
-		return backend.SendTransaction(ctx, status.SendTxArgs(args))
-	}
-
-	return common.Hash{}, ErrStatusBackendNotInited
-}
-
 // CompleteQueuedTransaction creates a transaction by unpacking queued transaction, signs it and submits to the
 // transaction pool.
-func (s *PublicTransactionPoolAPI) CompleteQueuedTransaction(ctx context.Context, args SendTxArgs, passphrase string) (common.Hash, error) {
+func (s *PublicTransactionPoolAPI) SendTransaction(ctx context.Context, args SendTxArgs, passphrase string) (common.Hash, error) {
 	// Set some sanity defaults and terminate on failure
 	if err := args.setDefaults(ctx, s.b); err != nil {
 		return common.Hash{}, err
-	}
-
-	// make sure that only account which created the tx can complete it
-	selectedAccountAddress := "0x0"
-	if address, ok := ctx.Value(status.SelectedAccountKey).(string); ok {
-		selectedAccountAddress = address
-	}
-	if args.From.Hex() != selectedAccountAddress {
-		log.Info("Failed to complete tx", "from", args.From.Hex(), "selected account", selectedAccountAddress)
-		return common.Hash{}, status.ErrInvalidCompleteTxSender
 	}
 
 	// Look up the wallet containing the requested signer

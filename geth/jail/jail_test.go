@@ -38,7 +38,7 @@ func (s *JailTestSuite) SetupTest() {
 	accountManager := node.NewAccountManager(nodeManager)
 	require.NotNil(accountManager)
 
-	jail := jail.New(nodeManager, accountManager)
+	jail := jail.New(nodeManager, accountManager, nil)
 	require.NotNil(jail)
 
 	s.jail = jail

@@ -8,7 +8,6 @@ import (
 	"sync"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/les/status"
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/log"
@@ -31,6 +30,7 @@ type Jail struct {
 	sync.RWMutex
 	nodeManager    common.NodeManager
 	accountManager common.AccountManager
+	txQueueManager common.TxQueueManager
 	policy         *ExecutionPolicy
 	cells          map[string]*Cell // jail supports running many isolated instances of jailed runtime
 	baseJSCode     string           // JavaScript used to initialize all new cells with
@@ -38,10 +38,13 @@ type Jail struct {
 
 // New returns new Jail environment with the associated NodeManager and
 // AccountManager.
-func New(nodeManager common.NodeManager, accountManager common.AccountManager) *Jail {
+func New(
+	nodeManager common.NodeManager, accountManager common.AccountManager, txQueueManager common.TxQueueManager,
+) *Jail {
 	return &Jail{
 		nodeManager:    nodeManager,
 		accountManager: accountManager,
+		txQueueManager: txQueueManager,
 		cells:          make(map[string]*Cell),
 		policy:         NewExecutionPolicy(nodeManager, accountManager),
 	}
@@ -179,9 +182,38 @@ func (jail *Jail) Send(call otto.FunctionCall) (response otto.Value) {
 		var resErr error
 		var res *otto.Object
 
+		// TODO(adam): these calls should be called async and results collected
+		// before returning
 		switch req.Method {
 		case params.SendTransactionMethodName:
-			res, resErr = jail.policy.ExecuteSendTransaction(req, call)
+			res, resErr = call.Otto.Object(`({"jsonrpc":"2.0"})`)
+			if resErr != nil {
+				break
+			}
+
+			res.Set("id", req.ID)
+
+			messageID, err := preProcessRequest(call.Otto, req)
+			if err != nil {
+				log.Error("request preprocess error: %s", err)
+				resErr = err
+				break
+			}
+
+			// onSendTransactionRequest() will use context to obtain and release ticket
+			ctx := context.Background()
+			ctx = context.WithValue(ctx, common.MessageIDKey, messageID)
+
+			queuedTx, err := jail.txQueueManager.QueueTransactionAndWait(ctx, req)
+			if err != nil {
+				log.Error("queue transaction error: %s", err)
+				resErr = err
+				break
+			}
+
+			// invoke post processing
+			postProcessRequest(call.Otto, req, messageID)
+			res.Set("result", queuedTx.Hash.Hex())
 		default:
 			res, resErr = jail.policy.ExecuteOtherTransaction(req, call)
 		}
@@ -189,9 +221,9 @@ func (jail *Jail) Send(call otto.FunctionCall) (response otto.Value) {
 		if resErr != nil {
 			switch resErr.(type) {
 			case common.StopRPCCallError:
-				return newErrorResponse(call.Otto, -32603, err.Error(), nil)
+				return newErrorResponse(call.Otto, -32603, resErr.Error(), nil)
 			default:
-				res = newErrorResponse(call.Otto, -32603, err.Error(), &req.ID).Object()
+				res = newErrorResponse(call.Otto, -32603, resErr.Error(), &req.ID).Object()
 			}
 		}
 
@@ -214,37 +246,6 @@ func (jail *Jail) Send(call otto.FunctionCall) (response otto.Value) {
 	return response
 }
 
-//==================================================================================================================================
-
-func processRPCCall(manager common.NodeManager, req common.RPCCall, call otto.FunctionCall) (gethcommon.Hash, error) {
-	lightEthereum, err := manager.LightEthereumService()
-	if err != nil {
-		return gethcommon.Hash{}, err
-	}
-
-	backend := lightEthereum.StatusBackend
-
-	messageID, err := preProcessRequest(call.Otto, req)
-	if err != nil {
-		return gethcommon.Hash{}, err
-	}
-
-	// onSendTransactionRequest() will use context to obtain and release ticket
-	ctx := context.Background()
-	ctx = context.WithValue(ctx, common.MessageIDKey, messageID)
-
-	//  this call blocks, up until Complete Transaction is called
-	txHash, err := backend.SendTransaction(ctx, sendTxArgsFromRPCCall(req))
-	if err != nil {
-		return gethcommon.Hash{}, err
-	}
-
-	// invoke post processing
-	postProcessRequest(call.Otto, req, messageID)
-
-	return txHash, nil
-}
-
 // preProcessRequest pre-processes a given RPC call to a given Otto VM
 func preProcessRequest(vm *otto.Otto, req common.RPCCall) (string, error) {
 	messageID := currentMessageID(vm.Context())
@@ -264,9 +265,9 @@ func postProcessRequest(vm *otto.Otto, req common.RPCCall, messageID string) {
 	}
 }
 
-func sendTxArgsFromRPCCall(req common.RPCCall) status.SendTxArgs {
+func sendTxArgsFromRPCCall(req common.RPCCall) common.SendTxArgs {
 	if req.Method != params.SendTransactionMethodName { // no need to persist extra state for other requests
-		return status.SendTxArgs{}
+		return common.SendTxArgs{}
 	}
 
 	var err error
@@ -282,7 +283,7 @@ func sendTxArgsFromRPCCall(req common.RPCCall) status.SendTxArgs {
 		toAddr = gethcommon.HexToAddress("0x0")
 	}
 
-	return status.SendTxArgs{
+	return common.SendTxArgs{
 		To:       &toAddr,
 		From:     fromAddr,
 		Value:    req.ParseValue(),
