@@ -4,35 +4,23 @@ var assert = chai.assert;
 var Web3 = require('web3');
 
 describe('Whisper Tests', function () {
-    var node1 = new Web3();
-    var node2 = new Web3();
-    var web3 = node1;
-    node1.setProvider(new web3.providers.HttpProvider('http://localhost:8645'));
-    node2.setProvider(new web3.providers.HttpProvider('http://localhost:8745'));
-
+    var web3 = new Web3();
+    var node1 = new Web3(new Web3.providers.HttpProvider('http://localhost:8645'));
+    var node2 = new Web3(new Web3.providers.HttpProvider('http://localhost:8745'));
+    
     console.log('Node is expected: statusd --datadir app1 wnode --http --httpport 8645');
     console.log('Node is expected: statusd --datadir app2 wnode --http --httpport 8745');
     console.log('Node is expected: statusd --datadir wnode1 wnode --notify --injectaccounts=false --identity ./static/keys/wnodekey --firebaseauth ./static/keys/firebaseauthkey');
 
     // some common vars
-    var topic1 = '0xdeadbeef'; // each topic 4 bytes, as hex
-    var topic2 = '0xbeefdead'; // each topic 4 bytes, as hex
-    var topic3 = '0xbebebebe'; // each topic 4 bytes, as hex
-    var topic4 = '0xdadadada'; // each topic 4 bytes, as hex
+    var powTime = 3;            // maximal time in seconds to be spent on proof of work
+    var powTarget = 0.1;        // minimal PoW target required for this message
+    var ttl = 20;               // envelope time-to-live in seconds
+    var topic1 = '0xdeadbeef';  // each topic 4 bytes, as hex
+    var topic2 = '0xbeefdead';  // each topic 4 bytes, as hex
     var identity1 = '0x04eedbaafd6adf4a9233a13e7b1c3c14461fffeba2e9054b8d456ce5f6ebeafadcbf3dce3716253fbc391277fa5a086b60b283daf61fb5b1f26895f456c2f31ae3';
     var identity2 = '0x0490161b00f2c47542d28c2e8908e77159b1720dccceb6393d7c001850122efc3b1709bcea490fd8f5634ba1a145aa0722d86b9330b0e39a8d493cb981fd459da2';
-
-    // watchFilter makes sure that we halt the filter on first message received
-    var watchFilter = function (filter, done) {
-        var messageReceived = false;
-        filter.watch(function (error, message) {
-            if (messageReceived)  return; // avoid double calling
-            messageReceived = true; // no need to watch for the filter any more
-            filter.stopWatching();
-            done(error, message);
-        });
-    };
-
+    
     // makeTopic generates random topic (4 bytes, in hex)
     var makeTopic = function () {
         var min = 1;
@@ -41,84 +29,97 @@ describe('Whisper Tests', function () {
         return web3.toHex(randInt);
     };
 
+    // watch makes sure that we halt the filter on first message received
+    var watchFilter = function (filter, callback) {
+        var messageReceived = false;
+        filter.watch(function (error, message) {
+            if (messageReceived)  return; // avoid double calling
+            messageReceived = true; // no need to watch for the filter any more
+            filter.stopWatching();
+            callback(error, message);
+        });
+    };
+
     context('shh/5 API verification', function () {
-        it('statusd node is running', function () {
-            var web3 = new Web3();
-            var provider = new web3.providers.HttpProvider('http://localhost:8645');
-            var result = provider.send({});
-            assert.equal(typeof result, 'object');
-        });
+       
+        context('status', function () {
+            it('statusd node is running', function () {
+                var connected = node1.isConnected();
+                assert.isTrue(connected);
+            });
 
-        it('shh.version()', function () {
-            var version = node1.shh.version();
-            assert.equal(version, '0x5', 'Whisper version does not match');
-        });
+            it('shh.version()', function () {
+                var version = node1.shh.version();
+                assert.equal(version, '5.0', 'Whisper version does not match');
+            });
 
-        it('shh.info()', function () {
-            var info = node1.shh.info();
-            if (info == "") {
-                throw new Error('no Whisper info provided')
-            }
+            it('shh.info()', function () {
+                var info = node1.shh.info();
+                expect(info).to.have.property('memory');
+                expect(info).to.have.property('messages');
+                expect(info).to.have.property('minPow');
+                expect(info).to.have.property('maxMessageSize');
+            });
         });
 
         context('symmetric key management', function () {
-            var keyId = ''; // symmetric key ID (to be populated)
+            var keyID = '';  // symmetric key ID (to be populated)
             var keyVal = ''; // symmetric key value (to be populated)
 
-            it('shh.generateSymmetricKey()', function () {
-                keyId = node1.shh.generateSymmetricKey();
-                assert.lengthOf(keyId, 64, 'invalid keyId length');
+            it('shh.newSymKey()', function () {
+                keyID = node1.shh.newSymKey();
+                assert.lengthOf(keyID, 64, 'invalid keyId length');
             });
 
-            it('shh.getSymmetricKey(keyId)', function () {
-                keyVal = node1.shh.getSymmetricKey(keyId);
+            it('shh.getSymKey(keyID)', function () {
+                keyVal = node1.shh.getSymKey(keyID);
                 assert.lengthOf(keyVal, 66, 'invalid key value length'); // 2 bytes for "0x"
             });
 
-            it('shh.hasSymmetricKey(keyId)', function () {
-                expect(node1.shh.hasSymmetricKey(keyId)).to.equal(true);
+            it('shh.hasSymKey(keyID)', function () {
+                expect(node1.shh.hasSymKey(keyID)).to.equal(true);
             });
 
-            it('shh.deleteSymmetricKey(keyId)', function () {
-                expect(node1.shh.hasSymmetricKey(keyId)).to.equal(true);
-                node1.shh.deleteSymmetricKey(keyId);
-                expect(node1.shh.hasSymmetricKey(keyId)).to.equal(false);
+            it('shh.deleteSymKey(keyId)', function () {
+                expect(node1.shh.hasSymKey(keyID)).to.equal(true);
+                node1.shh.deleteSymKey(keyID);
+                expect(node1.shh.hasSymKey(keyID)).to.equal(false);
             });
 
-            it('shh.addSymmetricKeyDirect(keyVal)', function () {
-                keyIdOriginal = keyId;
-                keyId = node1.shh.addSymmetricKeyDirect(keyVal);
-                assert.notEqual(keyId, keyIdOriginal);
-                assert.lengthOf(keyId, 64, 'invalid keyId length');
-                expect(node1.shh.hasSymmetricKey(keyId)).to.equal(true);
+            it('shh.addSymKey(keyVal)', function () {
+                var keyIDOriginal = keyID;
+                keyID = node1.shh.addSymKey(keyVal);
+                assert.notEqual(keyID, keyIDOriginal);
+                assert.lengthOf(keyID, 64, 'invalid keyId length');
+                expect(node1.shh.hasSymKey(keyID)).to.equal(true);
             });
 
-            it('shh.addSymmetricKeyFromPassword(password)', function () {
+            it('shh.generateSymKeyFromPassword(password)', function () {
                 var password = 'foobar';
-                var keyId = node1.shh.addSymmetricKeyFromPassword(password);
-                var keyVal = node1.shh.getSymmetricKey(keyId);
-
-                assert.lengthOf(keyId, 64, 'invalid keyId length');
-                expect(node1.shh.hasSymmetricKey(keyId)).to.equal(true);
+                var keyID = node1.shh.generateSymKeyFromPassword(password);
+                var keyVal = node1.shh.getSymKey(keyID);
+                assert.lengthOf(keyID, 64, 'invalid keyId length');
+                expect(node1.shh.hasSymKey(keyID)).to.equal(true);
                 assert.equal(keyVal, '0xa582720d74d463589df14c11538189a1c07778c47e86f70bab7b5ba27e2de3cc');
             });
         });
 
-        context('assymmetric key management', function () {
-            var keyId = ''; // to be populated
+        context('asymmetric key management', function () {
+            var keyID = '';  // to be populated
             var pubKey = ''; // to be populated
+            var prvKey = '0x8bda3abeb454847b515fa9b404cede50b1cc63cfdeddd4999d074284b4c21e15';
 
             it('shh.newKeyPair()', function () {
-                keyId = node1.shh.newKeyPair();
-                assert.lengthOf(keyId, 64);
+                keyID = node1.shh.newKeyPair();
+                assert.lengthOf(keyID, 64);
             });
 
             it('shh.hasKeyPair(id)', function () {
-                expect(node1.shh.hasKeyPair(keyId)).to.equal(true);
+                expect(node1.shh.hasKeyPair(keyID)).to.equal(true);
             });
 
             it('shh.getPublicKey(id)', function () {
-                pubKey = node1.shh.getPublicKey(keyId);
+                pubKey = node1.shh.getPublicKey(keyID);
                 assert.lengthOf(pubKey, 132);
             });
 
@@ -127,261 +128,56 @@ describe('Whisper Tests', function () {
             });
 
             it('shh.getPrivateKey(id)', function () {
-                var prvkey = node1.shh.getPrivateKey(keyId);
+                var prvkey = node1.shh.getPrivateKey(keyID);
                 assert.lengthOf(prvkey, 66);
             });
 
             it('shh.deleteKeyPair(id)', function () {
                 expect(node1.shh.hasKeyPair(pubKey)).to.equal(true);
-                expect(node1.shh.hasKeyPair(keyId)).to.equal(true);
-                node1.shh.deleteKeyPair(keyId);
+                expect(node1.shh.hasKeyPair(keyID)).to.equal(true);
+                node1.shh.deleteKeyPair(keyID);
                 expect(node1.shh.hasKeyPair(pubKey)).to.equal(false);
-                expect(node1.shh.hasKeyPair(keyId)).to.equal(false);
-
+                expect(node1.shh.hasKeyPair(keyID)).to.equal(false);
                 // re-create
-                keyId = node1.shh.newKeyPair();
-                assert.lengthOf(keyId, 64);
-                pubKey = node1.shh.getPublicKey(keyId);
+                keyID = node1.shh.newKeyPair();
+                assert.lengthOf(keyID, 64);
+                pubKey = node1.shh.getPublicKey(keyID);
                 assert.lengthOf(pubKey, 132);
             });
 
             it('shh.deleteKeyPair(pubKey)', function () {
                 expect(node1.shh.hasKeyPair(pubKey)).to.equal(true);
-                expect(node1.shh.hasKeyPair(keyId)).to.equal(true);
+                expect(node1.shh.hasKeyPair(keyID)).to.equal(true);
                 node1.shh.deleteKeyPair(pubKey);
                 expect(node1.shh.hasKeyPair(pubKey)).to.equal(false);
-                expect(node1.shh.hasKeyPair(keyId)).to.equal(false);
-
+                expect(node1.shh.hasKeyPair(keyID)).to.equal(false);
                 // re-create
                 keyId = node1.shh.newKeyPair();
                 assert.lengthOf(keyId, 64);
                 pubKey = node1.shh.getPublicKey(keyId);
                 assert.lengthOf(pubKey, 132);
             });
-        });
 
-        context('subscribe and manually get messages', function () {
-            // NOTE: you can still use shh.filter to poll for messages automatically, see other examples
-
-            var filterid1 = ''; // sym filter, to be populated
-            var filterid2 = ''; // asym filter, to be populated
-            var keyId = ''; // symkey, to be populated
-            var uniqueTopic = makeTopic();
-
-            var payloadBeforeSymFilter = 'sent before filter was active (symmetric)';
-            var payloadAfterSymFilter = 'sent after filter was active (symmetric)';
-            var payloadBeforeAsymFilter = 'sent before filter was active (asymmetric)';
-            var payloadAfterAsymFilter = 'sent after filter was active (asymmetric)';
-
-            it('shh.subscribe(filterParams) - symmetric filter', function () {
-                keyId = node1.shh.generateSymmetricKey();
-                assert.lengthOf(keyId, 64);
-
-                // send message, which will be floating around *before* filter is even created
-                var message = {
-                    type: "sym",
-                    key: keyId,
-                    topic: uniqueTopic,
-                    payload: payloadBeforeSymFilter
-                };
-                expect(node1.shh.post(message)).to.equal(null);
-
-                // symmetric filter
-                filterid1 = node1.shh.subscribe({
-                    type: "sym",
-                    key: keyId,
-                    sig: identity1,
-                    topics: [topic1, topic2, uniqueTopic]
-                });
-                assert.lengthOf(filterid1, 64);
-            });
-
-            it('shh.subscribe(filterParams) - asymmetric filter', function () {
-                // send message, which will be floating around *before* filter is even created
-                var message = {
-                    type: "asym",
-                    key: identity2,
-                    topic: uniqueTopic,
-                    payload: payloadBeforeAsymFilter
-                };
-                expect(node1.shh.post(message)).to.equal(null);
-
-                // asymmetric filter
-                filterid2 = node1.shh.subscribe({
-                    type: "asym",
-                    key: identity2,
-                    sig: identity1,
-                    topics: [topic1, topic2, uniqueTopic]
-                });
-                assert.lengthOf(filterid1, 64);
-            });
-
-            it('shh.getFloatingMessages(filterID) - symmetric filter', function () {
-                // let's try to capture message that was there *before* filter is created
-                var messages = node1.shh.getFloatingMessages(filterid1);
-                assert.typeOf(messages, 'array');
-                assert.lengthOf(messages, 1);
-                assert.equal(web3.toAscii(messages[0].payload), payloadBeforeSymFilter);
-
-                // send message, after the filter has been already installed
-                var message = {
-                    type: "sym",
-                    key: keyId,
-                    topic: uniqueTopic,
-                    payload: payloadAfterSymFilter
-                };
-                expect(node1.shh.post(message)).to.equal(null);
-            });
-
-            it('shh.getFloatingMessages(filterID) - asymmetric filter', function () {
-                // let's try to capture message that was there *before* filter is created
-                var messages = node1.shh.getFloatingMessages(filterid2);
-                assert.typeOf(messages, 'array');
-                assert.lengthOf(messages, 1);
-                assert.equal(web3.toAscii(messages[0].payload), payloadBeforeAsymFilter);
-
-                // send message, after the filter has been already installed
-                var message = {
-                    type: "asym",
-                    key: identity2,
-                    topic: uniqueTopic,
-                    payload: payloadAfterAsymFilter
-                };
-                expect(node1.shh.post(message)).to.equal(null);
-            });
-
-            it('shh.getNewSubscriptionMessages(filterID) - symmetric filter', function (done) {
-                // allow some time for message to propagate
-                setTimeout(function () {
-                    // now let's try to capture new messages from our last capture
-                    var messages = node1.shh.getNewSubscriptionMessages(filterid1);
-                    assert.typeOf(messages, 'array');
-                    assert.lengthOf(messages, 1);
-                    assert.equal(web3.toAscii(messages[0].payload), payloadAfterSymFilter);
-
-                    // no more messages should be returned
-                    messages = node1.shh.getNewSubscriptionMessages(filterid1);
-                    assert.typeOf(messages, 'array');
-                    assert.lengthOf(messages, 0);
-
-                    done();
-                }, 200);
-            });
-
-            it('shh.getNewSubscriptionMessages(filterID) - asymmetric filter', function () {
-                // allow some time for message to propagate
-                setTimeout(function () {
-                    // now let's try to capture new messages from our last capture
-                    var messages = node1.shh.getNewSubscriptionMessages(filterid2);
-                    assert.typeOf(messages, 'array');
-                    assert.lengthOf(messages, 1);
-                    assert.equal(web3.toAscii(messages[0].payload), payloadAfterAsymFilter);
-
-                    // no more messages should be returned
-                    messages = node1.shh.getNewSubscriptionMessages(filterid2);
-                    assert.typeOf(messages, 'array');
-                    assert.lengthOf(messages, 0);
-
-                    done();
-                }, 200);
-            });
-
-            it.skip('shh.unsubscribe(filterID)', function () {
-                node1.shh.unsubscribe(filterid1);
-                node1.shh.unsubscribe(filterid2);
+            it('shh.addPrivateKey(prvKey)', function () {
+                keyID = node1.shh.addPrivateKey(prvKey);
+                assert.lengthOf(keyID,64);
             });
         });
-    });
 
-    context('symmetrically encrypted messages send/recieve', function () {
-        this.timeout(0);
-
-        var keyId = ''; // symmetric key ID (to be populated)
-        var keyVal = ''; // symmetric key value (to be populated)
-        var payload = 'here come the dragons';
-
-        it('default test identity is present', function () {
-            if (!node1.shh.hasKeyPair(identity1)) {
-                throw new Error('identity not found in whisper: ' + identity1);
-            }
-        });
-
-        it('ensure symkey exists', function () {
-            keyId = node1.shh.generateSymmetricKey();
-            assert.lengthOf(keyId, 64);
-            expect(node1.shh.hasSymmetricKey(keyId)).to.equal(true);
-        });
-
-        it('read the generated symkey', function () {
-            keyVal = node1.shh.getSymmetricKey(keyId);
-            assert.lengthOf(keyVal, 66); // 2 bytes for "0x"
-        });
-
-        it('send/receive symmetrically encrypted message', function (done) {
-            // start watching for messages
-            watchFilter(node1.shh.filter({
-                type: "sym",
-                key: keyId,
-                sig: identity1,
-                topics: [topic1, topic2]
-            }), function (err, message) {
-                done(err);
-            });
-
-            // send message
-            var message = {
-                type: "sym",
-                key: keyId,
-                sig: identity1,
-                topic: topic1,
-                payload: web3.fromAscii(payload),
-                ttl: 20,
-                powTime: 2,
-                powTarget: 0.001
-            };
-            expect(node1.shh.post(message)).to.equal(null);
-        });
-
-        it('send the minimal symmetric message possible', function (done) {
-            var uniqueTopic = makeTopic();
-
-            // start watching for messages
-            watchFilter(node1.shh.filter({
-                type: "sym",
-                key: keyId,
-                topics: [uniqueTopic]
-            }), function (err, message) {
-                done(err);
-            });
-
-            // send message
-            var message = {
-                type: "sym",
-                key: keyId,
-                topic: uniqueTopic
-            };
-            expect(node1.shh.post(message)).to.equal(null);
-        });
     });
 
     context('message travelling from one node to another', function () {
-        this.timeout(0);
-
-        var keyId1 = ''; // symmetric key ID on node 1 (to be populated)
-        var keyId2 = ''; // symmetric key ID on node 2 (to be populated)
+        var keyID1 = ''; // symmetric key ID on node 1 (to be populated)
+        var keyID2 = ''; // symmetric key ID on node 2 (to be populated)
 
         it('statusd node1 is running', function () {
-            var web3 = new Web3();
-            var provider = new web3.providers.HttpProvider('http://localhost:8645');
-            var result = provider.send({});
-            assert.equal(typeof result, 'object');
+            var connected = node1.isConnected();
+            assert.isTrue(connected);
         });
 
         it('statusd node2 is running', function () {
-            var web3 = new Web3();
-            var provider = new web3.providers.HttpProvider('http://localhost:8745');
-            var result = provider.send({});
-            assert.equal(typeof result, 'object');
+            var connected = node2.isConnected();
+            assert.isTrue(connected);
         });
 
         it('test identities injected', function () {
@@ -400,71 +196,91 @@ describe('Whisper Tests', function () {
         });
 
         it('ensure symkey exists', function () {
-            keyId1 = node1.shh.generateSymmetricKey();
-            assert.lengthOf(keyId1, 64);
-            expect(node1.shh.hasSymmetricKey(keyId1)).to.equal(true);
+            keyID1 = node1.shh.newSymKey();
+            assert.lengthOf(keyID1, 64);
+            expect(node1.shh.hasSymKey(keyID1)).to.equal(true);
 
             // obtain key value
-            var keyVal = node1.shh.getSymmetricKey(keyId1);
+            var keyVal = node1.shh.getSymKey(keyID1);
             assert.lengthOf(keyVal, 66); // 2 bytes of "0x"
 
             // share the value with the node2
-            keyId2 = node2.shh.addSymmetricKeyDirect(keyVal);
-            assert.lengthOf(keyId2, 64);
-            expect(node2.shh.hasSymmetricKey(keyId2)).to.equal(true);
+            keyID2 = node2.shh.addSymKey(keyVal);
+            assert.lengthOf(keyID2, 64);
+            expect(node2.shh.hasSymKey(keyID2)).to.equal(true);
         });
 
+        
         it('send symmetrically encrypted, signed message (node1 -> node2)', function (done) {
-            var payload = 'send symmetrically encrypted, signed message (node1 -> node2)';
+            this.timeout(0);
+
+            var payload = web3.fromAscii('send symmetrically encrypted, signed message (node1 -> node2)');
             var topic = makeTopic();
+            var onCreationError = function (error) {
+                done(error);
+            }
+            var onMessage = function (error, message) {
+                done(error);
+            }
+
             // start watching for messages
-            watchFilter(node2.shh.filter({
-                type: "sym",
+            var params = {
+                symKeyID: keyID2,
                 sig: identity1,
-                key: keyId2,
                 topics: [topic]
-            }), function (err, message) {
-                done(err);
-            });
-
+            }
+            filter = node2.shh.newMessageFilter(params, null, onCreationError);
+            watchFilter(filter, onMessage);
+            
             // send message
             var message = {
-                type: "sym",
+                symKeyID: keyID1,
+                ttl: ttl,
                 sig: identity1,
-                key: keyId1,
                 topic: topic,
                 payload: payload,
-                ttl: 20
+                powTime: powTime,
+                powTarget: powTarget        
             };
-            expect(node1.shh.post(message)).to.equal(null);
+            expect(node1.shh.post(message)).to.equal(true);
         });
-
+        
         it('send asymmetrically encrypted, signed message (node1.id1 -> node2.id2)', function (done) {
-            var payload = 'send asymmetrically encrypted, signed message (node1.id1 -> node2.id2)';
+            this.timeout(0);
+
+            var payload = web3.fromAscii('send asymmetrically encrypted, signed message (node1.id1 -> node2.id2)');
             var topic = makeTopic();
+            var onCreationError = function (error) {
+                done(error);
+            }
+            var onMessage = function (error, message) {
+                done(error);
+            }
+
             // start watching for messages
-            watchFilter(node2.shh.filter({
-                type: "asym",
+            var params = {
+                privateKeyID: identity2,
                 sig: identity1,
-                key: identity2
-            }), function (err, message) {
-                done(err);
-            });
+                topic: topic
+            }
+            filter = node2.shh.newMessageFilter(params, null, onCreationError);
+            watchFilter(filter, onMessage);
 
             // send message
             var message = {
-                type: "asym",
+                pubKey: identity2,
+                ttl: ttl,
                 sig: identity1,
-                key: identity2,
                 topic: topic,
                 payload: payload,
-                ttl: 20
-            };
-            expect(node1.shh.post(message)).to.equal(null);
+                powTime: powTime,
+                powTarget: powTarget        
+            }; 
+            expect(node1.shh.post(message)).to.equal(true);
         });
     });
 
-    context('push notifications', function () {
+    context('chat messages & push notifications', function () {
         this.timeout(5000);
         var discoveryPubKey = '0x040edb0d71a3dbe928e154fcb696ffbda359b153a90efc2b46f0043ce9f5dbe55b77b9328fd841a1db5273758624afadd5b39638d4c35b36b3a96e1a586c1b4c2a';
         var discoverServerTopic = '0x268302f3'; // DISCOVER_NOTIFICATION_SERVER
@@ -480,7 +296,7 @@ describe('Whisper Tests', function () {
         var confirmClientSessionTopic = '0xd3202c5f'; // CONFIRM_CLIENT_SESSION
         var dropClientSessionTopic = '0x3a6656bb'; // DROP_CLIENT_SESSION
 
-        // ensures that message had payload (which is HEX-encoded JSON)
+        // ensures that message has payload (which is HEX-encoded JSON)
         var extractPayload = function (message) {
             expect(message).to.have.property('payload');
             return JSON.parse(web3.toAscii(message.payload));
@@ -489,26 +305,24 @@ describe('Whisper Tests', function () {
         var identity1 = ''; // pub key of device 1
         var identity2 = ''; // pub key of device 2
         var chatKeySharingTopic = makeTopic(); // topic used by device1 to send chat key to device 2
-
+        var chatKeyID1 = ''; // symkey provided by server, and shared among clients so that they can trigger notifications
+        var chatKeyID2 = ''; // symkey provided by server, and shared among clients so that they can trigger notifications
+        
         context('prepare devices', function () {
             it('create key pair to be used as main identity on device1', function () {
-                var keyId = node1.shh.newKeyPair();
-                assert.lengthOf(keyId, 64);
-
-                identity1 = node1.shh.getPublicKey(keyId);
+                var keyID = node1.shh.newKeyPair();
+                assert.lengthOf(keyID, 64);
+                identity1 = node1.shh.getPublicKey(keyID);
                 assert.lengthOf(identity1, 132);
-
                 expect(node1.shh.hasKeyPair(identity1)).to.equal(true);
                 expect(node1.shh.hasKeyPair(identity2)).to.equal(false);
             });
 
             it('create key pair to be used as main identity on device2', function () {
-                var keyId = node2.shh.newKeyPair();
-                assert.lengthOf(keyId, 64);
-
-                identity2 = node2.shh.getPublicKey(keyId);
+                var keyID = node2.shh.newKeyPair();
+                assert.lengthOf(keyID, 64);
+                identity2 = node2.shh.getPublicKey(keyID);
                 assert.lengthOf(identity1, 132);
-
                 expect(node2.shh.hasKeyPair(identity1)).to.equal(false);
                 expect(node2.shh.hasKeyPair(identity2)).to.equal(true);
             });
@@ -517,184 +331,219 @@ describe('Whisper Tests', function () {
         context('run device1', function () {
             var serverId = ''; // accepted/selected server id
             var subscriptionKeyId = ''; // symkey provided by server, and used to configure client-server subscription
-            var chatKeyId = ''; // symkey provided by server, and shared among clients so that they can trigger notifications
             var appChatId = ''; // chat id that identifies device1-device2 interaction session on RN app level
 
-
-            it('start discovery by sending discovery request', function () {
-                var message = {
-                    type: "asym",
-                    sig: identity1,
-                    key: discoveryPubKey,
-                    topic: discoverServerTopic,
-                    ttl: 20
-                };
-                expect(node1.shh.post(message)).to.equal(null);
-            });
-
-            it('watch for server proposals', function (done) {
-                watchFilter(node1.shh.filter({
-                    type: "asym",
-                    sig: discoveryPubKey,
-                    key: identity1,
-                    topics: [proposeServerTopic]
-                }), function (err, message) {
-                    if (err) return done(err);
-
-                    // process payload
+            it('send discovery request & watch for server proposal ', function (done) {
+                this.timeout(0);
+                
+                // watch for server proposal
+                var onCreationError = function (error) {
+                    done(error);
+                }
+                var onMessage = function (error, message) {
+                    if (error) done(error);
                     var payload = extractPayload(message);
                     expect(payload).to.have.property('server');
                     serverId = payload.server;
-
                     done();
-                });
-            });
-
-            it('client accepts server', function () {
+                }
+                var params = {
+                    privateKeyID: identity1,
+                    topics: [proposeServerTopic]
+                }
+                filter = node1.shh.newMessageFilter(params, null, onCreationError);
+                watchFilter(filter, onMessage);
+                 
+                // send discovery request
                 var message = {
-                    type: "asym",
+                    pubKey: discoveryPubKey,
+                    ttl: ttl,
                     sig: identity1,
-                    key: discoveryPubKey,
-                    topic: acceptServerTopic,
-                    payload: '{"server": "' + serverId + '"}',
-                    ttl: 20
+                    topic: discoverServerTopic,
+                    powTime: powTime,
+                    powTarget: powTarget
                 };
-                expect(node1.shh.post(message)).to.equal(null);
+                expect(node1.shh.post(message)).to.equal(true);
             });
-
-            it('watch for server ACK response and save provided subscription key', function (done) {
-                watchFilter(node1.shh.filter({
-                    type: "asym",
-                    key: identity1,
-                    topics: [ackClientSubscriptionTopic]
-                }), function (err, message) {
-                    if (err) return done(err);
-
-                    // process payload
+        
+            it('accept server & receive server ack', function (done) {
+                this.timeout(0);
+                
+                // watch for server ack
+                var onCreationError = function (error) {
+                    done(error);
+                }
+                var onMessage = function (error, message) {
+                    if (error) return done(error);
                     var payload = extractPayload(message);
                     expect(payload).to.have.property('server');
                     expect(payload).to.have.property('key');
-
                     // save subscription key
-                    subscriptionKeyId = node1.shh.addSymmetricKeyDirect(payload.key);
-                    assert.lengthOf(subscriptionKeyId, 64);
-                    expect(node1.shh.hasSymmetricKey(subscriptionKeyId)).to.equal(true);
-
+                    subscriptionKeyID = node1.shh.addSymKey(payload.key);
+                    assert.lengthOf(subscriptionKeyID, 64);
+                    expect(node1.shh.hasSymKey(subscriptionKeyID)).to.equal(true);
                     done();
-                });
+                }
+                var params = {
+                    privateKeyID: identity1,
+                    sig: discoveryPubKey,
+                    topics: [ackClientSubscriptionTopic]
+                }
+                filter = node1.shh.newMessageFilter(params, null, onCreationError);
+                watchFilter(filter, onMessage);
+                
+                // accept server
+                var message = {
+                    pubKey: discoveryPubKey,
+                    ttl: ttl,
+                    sig: identity1,
+                    topic: acceptServerTopic,
+                    payload: web3.fromAscii('{"server": "' + serverId + '"}'),
+                    powTime: powTime,
+                    powTarget: powTarget
+                };
+                expect(node1.shh.post(message)).to.equal(true);
             });
+            
+            it('create chat session & receive chat key', function (done) {
+                this.timeout(0);
+                
+                // watch for chat key message
+                var onCreationError = function (error) {
+                    done(error);
+                }
+                var onMessage = function (error, message) {
+                    if (error) return done(error);
+                    var payload = extractPayload(message);
+                    expect(payload).to.have.property('server');
+                    expect(payload).to.have.property('key');
+                    chatKeyID1 = node1.shh.addSymKey(payload.key);
+                    assert.lengthOf(chatKeyID1, 64);
+                    expect(node1.shh.hasSymKey(chatKeyID1)).to.equal(true);
+                    done();
+                }
+                var params = {
+                    privateKeyID: identity1,
+                    topics: [ackNewChatSessionTopic]
+                }
+                filter = node1.shh.newMessageFilter(params, null, onCreationError);
+                watchFilter(filter, onMessage);
 
-            it('create chat session', function () {
+                // create chat session request
                 appChatId = makeTopic(); // globally unique chat id
                 var message = {
-                    type: "sym",
+                    symKeyID: subscriptionKeyID,
+                    ttl: ttl,
                     sig: identity1,
-                    key: subscriptionKeyId,
                     topic: newChatSessionTopic,
-                    payload: '{"chat": "' + appChatId + '"}',
-                    ttl: 20
+                    payload: web3.fromAscii('{"chat": "' + appChatId + '"}'),
+                    powTime: powTime,
+                    powTarget: powTarget
                 };
-                expect(node1.shh.post(message)).to.equal(null);
+                expect(node1.shh.post(message)).to.equal(true);
             });
 
-            it('watch for server to respond with chat key', function (done) {
-                watchFilter(node1.shh.filter({
-                    type: "asym",
-                    key: identity1,
-                    topics: [ackNewChatSessionTopic]
-                }), function (err, message) {
-                    if (err) return done(err);
+            it('register device with a given chat & receive acknowledgment', function (done) {
+                this.timeout(0);
 
-                    // process payload
+                // watch for device registration acknowledgement message
+                var onCreationError = function (error) {
+                    done(error);
+                }
+                var onMessage = function (error, message) {
+                    if (error) return done(error);
                     var payload = extractPayload(message);
                     expect(payload).to.have.property('server');
-                    expect(payload).to.have.property('key');
-
-                    // save subscription key
-                    chatKeyId = node1.shh.addSymmetricKeyDirect(payload.key);
-                    assert.lengthOf(chatKeyId, 64);
-                    expect(node1.shh.hasSymmetricKey(chatKeyId)).to.equal(true);
-
                     done();
-                });
-            });
-
-            it('register device with a given chat', function (done) {
-                // this obtained from https://status-sandbox-c1b34.firebaseapp.com/
-                var deviceId = 'ca5pRJc6L8s:APA91bHpYFtpxvXx6uOayGmnNVnktA4PEEZdquCCt3fWR5ldLzSy1A37Tsbzk5Gavlmk1d_fvHRVnK7xPAhFFl-erF7O87DnIEstW6DEyhyiKZYA4dXFh6uy323f9A3uw5hEtT_kQVhT';
-                var message = {
-                    type: "sym",
-                    sig: identity1,
-                    key: chatKeyId,
-                    topic: newDeviceRegistrationTopic,
-                    payload: '{"device": "' + deviceId + '"}',
-                    ttl: 20
-                };
-                expect(node1.shh.post(message)).to.equal(null);
-
-                // watch for server server ACK
-                watchFilter(node1.shh.filter({
-                    type: "asym",
-                    key: identity1,
+                }
+                var params = {
+                    privateKeyID: identity1,
                     topics: [ackDeviceRegistrationTopic]
-                }), function (err, message) {
-                    if (err) return done(err);
-
-                    // process payload
-                    var payload = extractPayload(message);
-                    expect(payload).to.have.property('server');
-
-                    done();
-                });
+                }
+                filter = node1.shh.newMessageFilter(params, null, onCreationError);
+                watchFilter(filter, onMessage);
+                
+                // send device registration request
+                // this obtained from https://status-sandbox-c1b34.firebaseapp.com/
+                var deviceId = 'cqMiF8cwhSM:APA91bHrv2HUajq77_gKjeUxfzKjTxU7zGsq9sgr5QdfLW3w1KVFwT7GDOGcvwmHznkA3F3dZ-eohw9PVvGjAeo5gOqlDODMZqPVWzqeuslFbu5tGgTvdjQXSpWouya-63_dT67H0a29';
+                var message = {
+                    symKeyID: chatKeyID1,
+                    ttl: ttl,
+                    sig: identity1,
+                    topic: newDeviceRegistrationTopic,
+                    payload: web3.fromAscii('{"device": "' + deviceId + '"}'),
+                    powTime: powTime,
+                    powTarget: powTarget
+                };
+                expect(node1.shh.post(message)).to.equal(true);
             });
 
-            it('share chat key, so that another device can send us notifications', function () {
-                var chatKey = node1.shh.getSymmetricKey(chatKeyId);
+            it('share chat key with device2 & device 2 receives message', function (done) {
+                this.timeout(0);
+                
+                // watch for chat key message sent by device 1
+                var onCreationError = function (error) {
+                    done(error);
+                }
+                var onMessage = function (error, message) {
+                    if (error) return done(error);
+                    var payload = extractPayload(message);
+                    expect(payload).to.have.property('chat');
+                    expect(payload).to.have.property('key');
+                    chatKeyID2 = node2.shh.addSymKey(payload.key);
+                    assert.lengthOf(chatKeyID2, 64);
+                    expect(node2.shh.hasSymKey(chatKeyID2)).to.equal(true);
+                    done();
+                }
+                var params = {
+                    privateKeyID: identity2,
+                    topics: [chatKeySharingTopic]
+                }
+                filter = node2.shh.newMessageFilter(params, null, onCreationError);
+                watchFilter(filter, onMessage);
+                
+                // share chat key with device 2
+                var chatKey = node1.shh.getSymKey(chatKeyID1);
                 assert.lengthOf(chatKey, 66);
                 var message = {
-                    type: "asym",
+                    pubKey: identity2,
+                    ttl: ttl,
                     sig: identity1,
-                    key: identity2,
                     topic: chatKeySharingTopic,
-                    payload: '{"chat": "' + appChatId + '", "key": "' + chatKey + '"}',
-                    ttl: 20
+                    payload: web3.fromAscii('{"chat": "' + appChatId + '", "key": "' + chatKey + '"}'),
+                    powTime: powTime,
+                    powTarget: powTarget
                 };
-                expect(node1.shh.post(message)).to.equal(null);
+                expect(node1.shh.post(message)).to.equal(true);
             });
         });
 
         context('run device2', function () {
-            var chatKeyId = '';
-
-            it('watch for device1 to send us chat key', function (done) {
-                watchFilter(node2.shh.filter({
-                    type: "asym",
-                    key: identity2,
-                    topics: [chatKeySharingTopic]
-                }), function (err, message) {
-                    if (err) return done(err);
-
-                    // process payload
-                    var payload = extractPayload(message);
-                    expect(payload).to.have.property('chat');
-                    expect(payload).to.have.property('key');
-
-                    // persist chat key
-                    chatKeyId = node2.shh.addSymmetricKeyDirect(payload.key);
-                    assert.lengthOf(chatKeyId, 64);
-                    expect(node2.shh.hasSymmetricKey(chatKeyId)).to.equal(true);
-
-                    done();
-                });
-            });
-
-            it('trigger notification (from device2, on device1)', function () {
+        
+            it('send chat message, trigger notification (from device2, on device1) & device 1 receives message', function (done) {
+                this.timeout(0);
+                
+                // watch for chat messages sent by device 2
+                var onCreationError = function (error) {
+                    done(error);
+                }
+                var onMessage = function (error, message) {
+                    done(error);
+                }
+                var params = {
+                    symKeyID: chatKeyID1,
+                    topics: [sendNotificationTopic]
+                }
+                filter = node1.shh.newMessageFilter(params, null, onCreationError);
+                watchFilter(filter, onMessage, done);      
+                
+                // send message + notification request (from device2, on device1)
                 var message = {
-                    type: "sym",
+                    symKeyID: chatKeyID2,
+                    ttl: ttl,
                     sig: identity2,
-                    key: chatKeyId,
                     topic: sendNotificationTopic,
-                    payload: '{' // see https://firebase.google.com/docs/cloud-messaging/http-server-ref
+                    payload: web3.fromAscii('{' // see https://firebase.google.com/docs/cloud-messaging/http-server-ref
                     + '"notification": {'
                     + '"title": "status.im notification",'
                     + '"body": "Hello this is test notification!",'
@@ -702,52 +551,59 @@ describe('Whisper Tests', function () {
                     + '"click_action": "https://status.im"'
                     + '},'
                     + '"to": "{{ ID }}"' // this get replaced by device id your've registered
-                    + '}',
-                    ttl: 20
+                    + '}'),
+                    powTime: powTime,
+                    powTarget: powTarget
                 };
-                expect(node2.shh.post(message)).to.equal(null);
+                expect(node2.shh.post(message)).to.equal(true);
             });
         });
 
         context('misc methods and cleanup', function () {
-
             it('check client session', function (done) {
-                // request status
-                var message = {
-                    type: "asym",
-                    sig: identity1,
-                    key: discoveryPubKey,
-                    topic: checkClientSessionTopic,
-                    ttl: 20
-                };
-                expect(node1.shh.post(message)).to.equal(null);
-
-                // process server's response
-                watchFilter(node1.shh.filter({
-                    type: "asym",
-                    key: identity1,
-                    topics: [confirmClientSessionTopic]
-                }), function (err, message) {
-                    if (err) return done(err);
-
-                    // process payload
+                
+                // watch for replies with the client session
+                var onCreationError = function (error) {
+                    done(error);
+                }
+                var onMessage = function (error, message) {
+                    if (error) return done(error);
                     var payload = extractPayload(message);
                     expect(payload).to.have.property('server');
                     expect(payload).to.have.property('key');
-
                     done();
-                });
+                }
+                var params = {
+                    privateKeyID: identity1,
+                    topics: [confirmClientSessionTopic]
+                }
+                filter = node1.shh.newMessageFilter(params, null, onCreationError);
+                watchFilter(filter, onMessage);            
+                
+                // request status
+                var message = {
+                    pubKey: discoveryPubKey,
+                    ttl: ttl,
+                    sig: identity1,
+                    topic: checkClientSessionTopic,
+                    powTime: powTime,
+                    powTarget: powTarget
+                };
+                expect(node1.shh.post(message)).to.equal(true);
             });
 
             it('remove client session', function () {
+                
+                // remove client session
                 var message = {
-                    type: "asym",
+                    pubKey: discoveryPubKey,
+                    ttl: ttl,
                     sig: identity1,
-                    key: discoveryPubKey,
                     topic: dropClientSessionTopic,
-                    ttl: 20
+                    powTime: powTime,
+                    powTarget: powTarget
                 };
-                expect(node1.shh.post(message)).to.equal(null);
+                expect(node1.shh.post(message)).to.equal(true);
             });
         });
     });
