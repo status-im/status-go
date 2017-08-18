@@ -1,9 +1,7 @@
 package ethapi
 
 import (
-	"encoding/json"
 	"errors"
-	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -48,14 +46,9 @@ func (b *StatusBackend) AccountManager() *status.AccountManager {
 }
 
 // SendTransaction wraps call to PublicTransactionPoolAPI.SendTransaction
-func (b *StatusBackend) SendTransaction(ctx context.Context, rawArgs []byte, passphrase string) (common.Hash, error) {
+func (b *StatusBackend) SendTransaction(ctx context.Context, args status.SendTxArgs, passphrase string) (common.Hash, error) {
 	if ctx == nil {
 		ctx = context.Background()
-	}
-
-	var args SendTxArgs
-	if err := json.Unmarshal(rawArgs, &args); err != nil {
-		return common.Hash{}, fmt.Errorf("failed to unmarshal rawArgs: %s", err)
 	}
 
 	if estimatedGas, err := b.EstimateGas(ctx, args); err == nil {
@@ -64,11 +57,11 @@ func (b *StatusBackend) SendTransaction(ctx context.Context, rawArgs []byte, pas
 		}
 	}
 
-	return b.txapi.SendTransaction(ctx, args, passphrase)
+	return b.txapi.SendTransaction(ctx, SendTxArgs(args), passphrase)
 }
 
 // EstimateGas uses underlying blockchain API to obtain gas for a given tx arguments
-func (b *StatusBackend) EstimateGas(ctx context.Context, args SendTxArgs) (*hexutil.Big, error) {
+func (b *StatusBackend) EstimateGas(ctx context.Context, args status.SendTxArgs) (*hexutil.Big, error) {
 	if args.Gas != nil {
 		return args.Gas, nil
 	}

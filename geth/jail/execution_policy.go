@@ -3,17 +3,12 @@ package jail
 import (
 	"context"
 	"encoding/json"
-	"fmt"
-	"math/big"
-	"time"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/common"
+	"github.com/status-im/status-go/geth/params"
 )
 
 // ExecutionPolicy provides a central container for the executions of RPCCall requests for both
@@ -21,157 +16,66 @@ import (
 type ExecutionPolicy struct {
 	nodeManager    common.NodeManager
 	accountManager common.AccountManager
+	txQueueManager common.TxQueueManager
 }
 
 // NewExecutionPolicy returns a new instance of ExecutionPolicy.
-func NewExecutionPolicy(nodeManager common.NodeManager, accountManager common.AccountManager) *ExecutionPolicy {
+func NewExecutionPolicy(
+	nodeManager common.NodeManager, accountManager common.AccountManager, txQueueManager common.TxQueueManager,
+) *ExecutionPolicy {
 	return &ExecutionPolicy{
 		nodeManager:    nodeManager,
 		accountManager: accountManager,
+		txQueueManager: txQueueManager,
+	}
+}
+
+func (ep *ExecutionPolicy) Execute(req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
+	switch req.Method {
+	case params.SendTransactionMethodName:
+		return ep.executeSendTransaction(req, call)
+	default:
+		return ep.executeOtherTransaction(req, call)
 	}
 }
 
 // ExecuteSendTransaction defines a function to execute RPC requests for eth_sendTransaction method only.
-func (ep *ExecutionPolicy) ExecuteSendTransaction(req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
-	config, err := ep.nodeManager.NodeConfig()
+func (ep *ExecutionPolicy) executeSendTransaction(req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
+	res, err := call.Otto.Object(`({"jsonrpc":"2.0"})`)
 	if err != nil {
 		return nil, err
 	}
 
-	if config.UpstreamConfig.Enabled {
-		return ep.executeRemoteSendTransaction(req, call)
-	}
-
-	return ep.executeLocalSendTransaction(req, call)
-}
-
-// executeRemoteSendTransaction defines a function to execute RPC method eth_sendTransaction over the upstream server.
-func (ep *ExecutionPolicy) executeRemoteSendTransaction(req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
-	config, err := ep.nodeManager.NodeConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	selectedAcct, err := ep.accountManager.SelectedAccount()
-	if err != nil {
-		return nil, err
-	}
-
-	client, err := ep.nodeManager.RPCClient()
-	if err != nil {
-		return nil, err
-	}
-
-	fromAddr, err := req.ParseFromAddress()
-	if err != nil {
-		return nil, err
-	}
-
-	toAddr, err := req.ParseToAddress()
-	if err != nil {
-		return nil, err
-	}
-
-	// We need to request a new transaction nounce from upstream node.
-	ctx, canceller := context.WithTimeout(context.Background(), time.Minute)
-	defer canceller()
-
-	var num hexutil.Uint
-	if err := client.CallContext(ctx, &num, "eth_getTransactionCount", fromAddr, "pending"); err != nil {
-		return nil, err
-	}
-
-	nonce := uint64(num)
-	gas := (*big.Int)(req.ParseGas())
-	dataVal := []byte(req.ParseData())
-	priceVal := (*big.Int)(req.ParseValue())
-	gasPrice := (*big.Int)(req.ParseGasPrice())
-	chainID := big.NewInt(int64(config.NetworkID))
-
-	tx := types.NewTransaction(nonce, toAddr, priceVal, gas, gasPrice, dataVal)
-	txs, err := types.SignTx(tx, types.NewEIP155Signer(chainID), selectedAcct.AccountKey.PrivateKey)
-	if err != nil {
-		return nil, err
-	}
-
-	// Attempt to get the hex version of the transaction.
-	txBytes, err := rlp.EncodeToBytes(txs)
-	if err != nil {
-		return nil, err
-	}
-
-	//TODO(influx6): Should we use a single context with a higher timeout, say 3-5 minutes
-	// for calls to rpcClient?
-	ctx2, canceler2 := context.WithTimeout(context.Background(), time.Minute)
-	defer canceler2()
-
-	var result json.RawMessage
-	if err := client.CallContext(ctx2, &result, "eth_sendRawTransaction", gethcommon.ToHex(txBytes)); err != nil {
-		return nil, err
-	}
-
-	resp, err := call.Otto.Object(`({"jsonrpc":"2.0"})`)
-	if err != nil {
-		return nil, err
-	}
-
-	resp.Set("id", req.ID)
-	resp.Set("result", result)
-	resp.Set("hash", txs.Hash().String())
-
-	return resp, nil
-}
-
-// executeLocalSendTransaction defines a function which handles execution of RPC method over the internal rpc server
-// from the eth.LightClient. It specifically caters to process eth_sendTransaction.
-func (ep *ExecutionPolicy) executeLocalSendTransaction(req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
-	les, err := ep.nodeManager.LightEthereumService()
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := call.Otto.Object(`({"jsonrpc":"2.0"})`)
-	if err != nil {
-		return nil, err
-	}
-	resp.Set("id", req.ID)
+	res.Set("id", req.ID)
 
 	messageID, err := preProcessRequest(call.Otto, req)
 	if err != nil {
-		resp = newErrorResponse(call.Otto, -32603, err.Error(), &req.ID).Object()
-		return resp, nil
+		return nil, err
 	}
 
 	// onSendTransactionRequest() will use context to obtain and release ticket
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, common.MessageIDKey, messageID)
 
-	// Marshal args to JSON string.
-	rawArgs, err := json.Marshal(sendTxArgsFromRPCCall(req))
+	args := sendTxArgsFromRPCCall(req)
+	queuedTx, err := ep.txQueueManager.QueueTransactionAndWait(ctx, args)
 	if err != nil {
-		err = fmt.Errorf("failed to marshal args: %s", err)
-		resp = newErrorResponse(call.Otto, -32603, err.Error(), &req.ID).Object()
-		return resp, nil
+		return nil, err
 	}
-
-	//  this call blocks, up until Complete Transaction is called
-	txHash, err := les.StatusBackend.SendTransaction(ctx, rawArgs, "")
-	if err != nil {
-		resp = newErrorResponse(call.Otto, -32603, err.Error(), &req.ID).Object()
-		return resp, nil
-	}
-
-	resp.Set("result", txHash.Hex())
 
 	// invoke post processing
 	postProcessRequest(call.Otto, req, messageID)
 
-	return resp, nil
+	// @TODO(adam): which one is actually used?
+	res.Set("result", queuedTx.Hash.Hex())
+	res.Set("hash", queuedTx.Hash.Hex())
+
+	return res, nil
 }
 
 // ExecuteOtherTransaction defines a function which handles the processing of non `eth_sendTransaction`
 // rpc request to the internal node server.
-func (ep *ExecutionPolicy) ExecuteOtherTransaction(req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
+func (ep *ExecutionPolicy) executeOtherTransaction(req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
 	client, err := ep.nodeManager.RPCClient()
 	if err != nil {
 		return nil, common.StopRPCCallError{Err: err}
@@ -233,4 +137,67 @@ func (ep *ExecutionPolicy) ExecuteOtherTransaction(req common.RPCCall, call otto
 	postProcessRequest(call.Otto, req, messageID)
 
 	return resp, nil
+}
+
+// preProcessRequest pre-processes a given RPC call to a given Otto VM
+func preProcessRequest(vm *otto.Otto, req common.RPCCall) (string, error) {
+	messageID := currentMessageID(vm.Context())
+
+	return messageID, nil
+}
+
+// postProcessRequest post-processes a given RPC call to a given Otto VM
+func postProcessRequest(vm *otto.Otto, req common.RPCCall, messageID string) {
+	if len(messageID) > 0 {
+		vm.Call("addContext", nil, messageID, common.MessageIDKey, messageID) // nolint: errcheck
+	}
+
+	// set extra markers for queued transaction requests
+	if req.Method == params.SendTransactionMethodName {
+		vm.Call("addContext", nil, messageID, params.SendTransactionMethodName, true) // nolint: errcheck
+	}
+}
+
+// currentMessageID looks for `status.message_id` variable in current JS context
+func currentMessageID(ctx otto.Context) string {
+	if statusObj, ok := ctx.Symbols["status"]; ok {
+		messageID, err := statusObj.Object().Get("message_id")
+		if err != nil {
+			return ""
+		}
+		if messageID, err := messageID.ToString(); err == nil {
+			return messageID
+		}
+	}
+
+	return ""
+}
+
+func sendTxArgsFromRPCCall(req common.RPCCall) common.SendTxArgs {
+	// no need to persist extra state for other requests
+	if req.Method != params.SendTransactionMethodName {
+		return common.SendTxArgs{}
+	}
+
+	var err error
+	var fromAddr, toAddr gethcommon.Address
+
+	fromAddr, err = req.ParseFromAddress()
+	if err != nil {
+		fromAddr = gethcommon.HexToAddress("0x0")
+	}
+
+	toAddr, err = req.ParseToAddress()
+	if err != nil {
+		toAddr = gethcommon.HexToAddress("0x0")
+	}
+
+	return common.SendTxArgs{
+		To:       &toAddr,
+		From:     fromAddr,
+		Value:    req.ParseValue(),
+		Data:     req.ParseData(),
+		Gas:      req.ParseGas(),
+		GasPrice: req.ParseGasPrice(),
+	}
 }

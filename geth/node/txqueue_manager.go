@@ -4,13 +4,18 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/les/status"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/pborman/uuid"
 	"github.com/status-im/status-go/geth/common"
+	"github.com/status-im/status-go/geth/log"
 )
 
 const (
@@ -56,19 +61,27 @@ func NewTxQueueManager(nodeManager common.NodeManager, accountManager common.Acc
 }
 
 func (m *TxQueueManager) Start() {
+	log.Info("start TxQueueManager")
 	m.txQueue.Start()
 }
 
 func (m *TxQueueManager) Stop() {
+	log.Info("stop TxQueueManager")
 	m.txQueue.Stop()
 }
 
-func (m *TxQueueManager) QueueTransactionAndWait(ctx context.Context, req common.RPCCall) (*common.QueuedTx, error) {
+func (m *TxQueueManager) TransactionQueue() common.TxQueue {
+	return m.txQueue
+}
+
+func (m *TxQueueManager) QueueTransactionAndWait(ctx context.Context, args common.SendTxArgs) (*common.QueuedTx, error) {
+	log.Info(fmt.Sprintf("queue a new transaction from %s to %s and wait", args.From.Hex(), args.To.Hex()))
+
 	tx := common.QueuedTx{
 		ID:      common.QueuedTxID(uuid.New()),
 		Hash:    gethcommon.Hash{},
 		Context: ctx,
-		Args:    sendTxArgsFromRPCCall(req),
+		Args:    args,
 		Done:    make(chan struct{}, 1),
 		Discard: make(chan struct{}, 1),
 	}
@@ -77,6 +90,8 @@ func (m *TxQueueManager) QueueTransactionAndWait(ctx context.Context, req common
 	if err != nil {
 		return &tx, err
 	}
+
+	log.Info(fmt.Sprintf("queued transaction with ID %s successfully", tx.ID))
 
 	// now wait up until transaction is:
 	// - completed (via CompleteQueuedTransaction),
@@ -95,36 +110,14 @@ func (m *TxQueueManager) QueueTransactionAndWait(ctx context.Context, req common
 	}
 }
 
-func sendTxArgsFromRPCCall(req common.RPCCall) common.SendTxArgs {
-	var err error
-	var fromAddr, toAddr gethcommon.Address
-
-	fromAddr, err = req.ParseFromAddress()
-	if err != nil {
-		fromAddr = gethcommon.HexToAddress("0x0")
-	}
-
-	toAddr, err = req.ParseToAddress()
-	if err != nil {
-		toAddr = gethcommon.HexToAddress("0x0")
-	}
-
-	return common.SendTxArgs{
-		To:       &toAddr,
-		From:     fromAddr,
-		Value:    req.ParseValue(),
-		Data:     req.ParseData(),
-		Gas:      req.ParseGas(),
-		GasPrice: req.ParseGasPrice(),
-	}
-}
-
 func (m *TxQueueManager) NotifyOnQueuedTxReturn(queuedTx *common.QueuedTx, err error) {
 	m.txQueue.NotifyOnQueuedTxReturn(queuedTx, err)
 }
 
 // CompleteTransaction instructs backend to complete sending of a given transaction
 func (m *TxQueueManager) CompleteTransaction(id, password string) (gethcommon.Hash, error) {
+	log.Info(fmt.Sprintf("complete transaction with id %s", id))
+
 	queuedTx, err := m.txQueue.Get(common.QueuedTxID(id))
 	if err != nil {
 		return gethcommon.Hash{}, err
@@ -135,41 +128,109 @@ func (m *TxQueueManager) CompleteTransaction(id, password string) (gethcommon.Ha
 		return gethcommon.Hash{}, err
 	}
 
+	config, err := m.nodeManager.NodeConfig()
+	if err != nil {
+		return gethcommon.Hash{}, err
+	}
+
 	// make sure that only account which created the tx can complete it
 	if queuedTx.Args.From.Hex() != selectedAccount.Address.Hex() {
 		return gethcommon.Hash{}, ErrInvalidCompleteTxSender
 	}
 
-	// TODO(adam): it is not needed anymore I guess
-	ctx := context.Background()
-	ctx = context.WithValue(ctx, status.SelectedAccountKey, selectedAccount.Hex())
+	// Send the transaction finally.
+	var hash gethcommon.Hash
+	var txErr error
 
-	// TODO(adam): should decide how to send the transaction,
-	// using upstream node or LES
+	log.Info(fmt.Sprintf("sending transaction"))
+
+	if config.UpstreamConfig.Enabled {
+		hash, txErr = m.completeRemoteTransaction(queuedTx, password)
+	} else {
+		hash, txErr = m.completeLocalTransaction(queuedTx, password)
+	}
+
+	// when incorrect sender tries to complete the account,
+	// notify and keep tx in queue (so that correct sender can complete)
+	if txErr == keystore.ErrDecrypt {
+		m.NotifyOnQueuedTxReturn(queuedTx, txErr)
+		return hash, txErr
+	}
+
+	queuedTx.Hash = hash
+	queuedTx.Err = txErr
+	queuedTx.Done <- struct{}{} // sendTransaction() waits on this, notify so that it can return
+
+	return hash, txErr
+}
+
+func (m *TxQueueManager) completeLocalTransaction(queuedTx *common.QueuedTx, password string) (gethcommon.Hash, error) {
+	log.Info(fmt.Sprintf("completeLocalTransaction with id %s", queuedTx.ID))
+
 	les, err := m.nodeManager.LightEthereumService()
 	if err != nil {
 		return gethcommon.Hash{}, err
 	}
 
-	// Marshal args to JSON string.
-	rawArgs, err := json.Marshal(queuedTx.Args)
+	return les.StatusBackend.SendTransaction(context.Background(), status.SendTxArgs(queuedTx.Args), password)
+}
+
+func (m *TxQueueManager) completeRemoteTransaction(queuedTx *common.QueuedTx, password string) (gethcommon.Hash, error) {
+	log.Info(fmt.Sprintf("completeRemoteTransaction withd id %s", queuedTx.ID))
+
+	var emptyHash gethcommon.Hash
+
+	config, err := m.nodeManager.NodeConfig()
 	if err != nil {
-		return gethcommon.Hash{}, fmt.Errorf("failed to marshal args: %s", err)
+		return emptyHash, err
 	}
 
-	// when incorrect sender tries to complete the account,
-	// notify and keep tx in queue (so that correct sender can complete)
-	hash, err := les.StatusBackend.SendTransaction(ctx, rawArgs, password)
-	if err == keystore.ErrDecrypt {
-		m.NotifyOnQueuedTxReturn(queuedTx, err)
-		return hash, err
+	selectedAcct, err := m.accountManager.SelectedAccount()
+	if err != nil {
+		return emptyHash, err
 	}
 
-	queuedTx.Hash = hash
-	queuedTx.Err = err
-	queuedTx.Done <- struct{}{} // sendTransaction() waits on this, notify so that it can return
+	client, err := m.nodeManager.RPCClient()
+	if err != nil {
+		return emptyHash, err
+	}
 
-	return hash, err
+	// We need to request a new transaction nounce from upstream node.
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	var txCount hexutil.Uint
+	if err := client.CallContext(ctx, &txCount, "eth_getTransactionCount", queuedTx.Args.From, "pending"); err != nil {
+		return emptyHash, err
+	}
+
+	chainID := big.NewInt(int64(config.NetworkID))
+	nonce := uint64(txCount)
+	gas := (*big.Int)(queuedTx.Args.Gas)
+	gasPrice := (*big.Int)(queuedTx.Args.GasPrice)
+	dataVal := []byte(queuedTx.Args.Data)
+	priceVal := (*big.Int)(queuedTx.Args.Value)
+
+	tx := types.NewTransaction(nonce, *queuedTx.Args.To, priceVal, gas, gasPrice, dataVal)
+	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), selectedAcct.AccountKey.PrivateKey)
+	if err != nil {
+		return emptyHash, err
+	}
+
+	txBytes, err := rlp.EncodeToBytes(signedTx)
+	if err != nil {
+		return emptyHash, err
+	}
+
+	ctx2, cancel2 := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel2()
+
+	var result json.RawMessage
+	if err := client.CallContext(ctx2, &result, "eth_sendRawTransaction", gethcommon.ToHex(txBytes)); err != nil {
+		return emptyHash, err
+	}
+
+	return signedTx.Hash(), nil
 }
 
 // CompleteTransactions instructs backend to complete sending of multiple transactions
@@ -247,6 +308,7 @@ type SendTransactionEvent struct {
 // TransactionQueueHandler returns handler that processes incoming tx queue requests
 func (m *TxQueueManager) TransactionQueueHandler() func(queuedTx common.QueuedTx) {
 	return func(queuedTx common.QueuedTx) {
+		log.Info("calling TransactionQueueHandler")
 		SendSignal(SignalEnvelope{
 			Type: EventTransactionQueued,
 			Event: SendTransactionEvent{

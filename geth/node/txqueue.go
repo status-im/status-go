@@ -2,12 +2,13 @@ package node
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/geth/common"
+	"github.com/status-im/status-go/geth/log"
 )
 
 const (
@@ -132,18 +133,25 @@ func (q *TxQueue) EnqueueAsync(tx *common.QueuedTx) error {
 
 // Enqueue enqueues incoming transaction
 func (q *TxQueue) Enqueue(tx *common.QueuedTx) error {
+	log.Info(fmt.Sprintf("enqueue transaction: %s", tx.ID))
+
 	if q.txEnqueueHandler == nil { //discard, until handler is provided
+		log.Info("there is no txEnqueueHandler")
 		return nil
 	}
 
+	log.Info("before enqueueTicker")
 	q.enqueueTicker <- struct{}{} // notify eviction loop that we are trying to insert new item
-	q.evictableIDs <- tx.ID       // this will block when we hit DefaultTxQueueCap
+	log.Info("before evictableIDs")
+	q.evictableIDs <- tx.ID // this will block when we hit DefaultTxQueueCap
+	log.Info("after evictableIDs")
 
 	q.mu.Lock()
 	q.transactions[tx.ID] = tx
 	q.mu.Unlock()
 
 	// notify handler
+	log.Info("calling txEnqueueHandler")
 	q.txEnqueueHandler(*tx)
 
 	return nil

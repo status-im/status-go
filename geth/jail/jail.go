@@ -1,17 +1,14 @@
 package jail
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"sync"
 
-	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/log"
-	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/static"
 )
 
@@ -46,7 +43,7 @@ func New(
 		accountManager: accountManager,
 		txQueueManager: txQueueManager,
 		cells:          make(map[string]*Cell),
-		policy:         NewExecutionPolicy(nodeManager, accountManager),
+		policy:         NewExecutionPolicy(nodeManager, accountManager, txQueueManager),
 	}
 }
 
@@ -179,51 +176,16 @@ func (jail *Jail) Send(call otto.FunctionCall) (response otto.Value) {
 
 	// Execute the requests.
 	for _, req := range reqs {
-		var resErr error
-		var res *otto.Object
-
 		// TODO(adam): these calls should be called async and results collected
 		// before returning
-		switch req.Method {
-		case params.SendTransactionMethodName:
-			res, resErr = call.Otto.Object(`({"jsonrpc":"2.0"})`)
-			if resErr != nil {
-				break
-			}
+		res, err := jail.policy.Execute(req, call)
 
-			res.Set("id", req.ID)
-
-			messageID, err := preProcessRequest(call.Otto, req)
-			if err != nil {
-				log.Error("request preprocess error: %s", err)
-				resErr = err
-				break
-			}
-
-			// onSendTransactionRequest() will use context to obtain and release ticket
-			ctx := context.Background()
-			ctx = context.WithValue(ctx, common.MessageIDKey, messageID)
-
-			queuedTx, err := jail.txQueueManager.QueueTransactionAndWait(ctx, req)
-			if err != nil {
-				log.Error("queue transaction error: %s", err)
-				resErr = err
-				break
-			}
-
-			// invoke post processing
-			postProcessRequest(call.Otto, req, messageID)
-			res.Set("result", queuedTx.Hash.Hex())
-		default:
-			res, resErr = jail.policy.ExecuteOtherTransaction(req, call)
-		}
-
-		if resErr != nil {
-			switch resErr.(type) {
+		if err != nil {
+			switch err.(type) {
 			case common.StopRPCCallError:
-				return newErrorResponse(call.Otto, -32603, resErr.Error(), nil)
+				return newErrorResponse(call.Otto, -32603, err.Error(), nil)
 			default:
-				res = newErrorResponse(call.Otto, -32603, resErr.Error(), &req.ID).Object()
+				res = newErrorResponse(call.Otto, -32603, err.Error(), &req.ID).Object()
 			}
 		}
 
@@ -244,68 +206,6 @@ func (jail *Jail) Send(call otto.FunctionCall) (response otto.Value) {
 	}
 
 	return response
-}
-
-// preProcessRequest pre-processes a given RPC call to a given Otto VM
-func preProcessRequest(vm *otto.Otto, req common.RPCCall) (string, error) {
-	messageID := currentMessageID(vm.Context())
-
-	return messageID, nil
-}
-
-// postProcessRequest post-processes a given RPC call to a given Otto VM
-func postProcessRequest(vm *otto.Otto, req common.RPCCall, messageID string) {
-	if len(messageID) > 0 {
-		vm.Call("addContext", nil, messageID, common.MessageIDKey, messageID) // nolint: errcheck
-	}
-
-	// set extra markers for queued transaction requests
-	if req.Method == params.SendTransactionMethodName {
-		vm.Call("addContext", nil, messageID, params.SendTransactionMethodName, true) // nolint: errcheck
-	}
-}
-
-func sendTxArgsFromRPCCall(req common.RPCCall) common.SendTxArgs {
-	if req.Method != params.SendTransactionMethodName { // no need to persist extra state for other requests
-		return common.SendTxArgs{}
-	}
-
-	var err error
-	var fromAddr, toAddr gethcommon.Address
-
-	fromAddr, err = req.ParseFromAddress()
-	if err != nil {
-		fromAddr = gethcommon.HexToAddress("0x0")
-	}
-
-	toAddr, err = req.ParseToAddress()
-	if err != nil {
-		toAddr = gethcommon.HexToAddress("0x0")
-	}
-
-	return common.SendTxArgs{
-		To:       &toAddr,
-		From:     fromAddr,
-		Value:    req.ParseValue(),
-		Data:     req.ParseData(),
-		Gas:      req.ParseGas(),
-		GasPrice: req.ParseGasPrice(),
-	}
-}
-
-// currentMessageID looks for `status.message_id` variable in current JS context
-func currentMessageID(ctx otto.Context) string {
-	if statusObj, ok := ctx.Symbols["status"]; ok {
-		messageID, err := statusObj.Object().Get("message_id")
-		if err != nil {
-			return ""
-		}
-		if messageID, err := messageID.ToString(); err == nil {
-			return messageID
-		}
-	}
-
-	return ""
 }
 
 //==========================================================================================================

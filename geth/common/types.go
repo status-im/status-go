@@ -185,6 +185,12 @@ type EnqueuedTxHandler func(QueuedTx)
 // EnqueuedTxReturnHandler is a function that receives response when tx is complete (both on success and error)
 type EnqueuedTxReturnHandler func(queuedTx *QueuedTx, err error)
 
+type TxQueue interface {
+	Reset()
+	Count() int
+	Has(id QueuedTxID) bool
+}
+
 // TxQueueManager defines expected methods for managing transaction queue
 type TxQueueManager interface {
 	// Start starts accepting new transaction in the queue.
@@ -193,8 +199,10 @@ type TxQueueManager interface {
 	// Stop stops accepting new transactions in the queue.
 	Stop()
 
+	TransactionQueue() TxQueue
+
 	// QueueTransaction adds a new request transaction to the queue.
-	QueueTransactionAndWait(ctx context.Context, req RPCCall) (*QueuedTx, error)
+	QueueTransactionAndWait(ctx context.Context, args SendTxArgs) (*QueuedTx, error)
 
 	NotifyOnQueuedTxReturn(queuedTxI *QueuedTx, err error)
 
