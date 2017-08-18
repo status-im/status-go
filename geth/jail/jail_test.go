@@ -21,6 +21,16 @@ const (
 	txSendFolder     = "testdata/tx-send/"
 )
 
+var (
+	txSendAsync = `
+		_status_catalog.commands.sendAsync({
+			"from": "` + TestConfig.Account1.Address + `",
+			"to": "0xf82da7547534045b4e00442bc89e16186cf8c272",
+			"value": "0.000001"
+		})
+	`
+)
+
 var baseStatusJSCode = string(static.MustAsset("testdata/jail/status.js"))
 
 func TestJailTestSuite(t *testing.T) {
@@ -149,13 +159,7 @@ func (s *JailTestSuite) TestJailRPCAsyncSend() {
 			wg.Add(1)
 			defer wg.Done()
 
-			_, err = cell.Run(`
-				_status_catalog.commands.sendAsync({
-					"from": "` + TestConfig.Account1.Address + `",
-					"to": "0xf82da7547534045b4e00442bc89e16186cf8c272",
-					"value": "0.000001"
-				})
-			`)
+			_, err = cell.Run(txSendAsync)
 
 			require.NoError(err, "Request failed to process")
 		}()

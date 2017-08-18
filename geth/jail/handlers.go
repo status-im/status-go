@@ -95,7 +95,7 @@ func makeAsyncSendHandler(jail *Jail, chatID string) func(call otto.FunctionCall
 		go func() {
 			res := jail.Send(call)
 
-			// Deliver response if callback is provided.
+			// Deliver response to provided callback.
 			newResultResponse(call.Otto, res)
 		}()
 
