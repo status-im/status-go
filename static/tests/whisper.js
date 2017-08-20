@@ -63,63 +63,63 @@ describe('Whisper Tests', function () {
         });
 
         context('symmetric key management', function () {
-            var keyID = '';  // symmetric key ID (to be populated)
+            var keyId = '';  // symmetric key Id (to be populated)
             var keyVal = ''; // symmetric key value (to be populated)
 
             it('shh.newSymKey()', function () {
-                keyID = node1.shh.newSymKey();
-                assert.lengthOf(keyID, 64, 'invalid keyId length');
+                keyId = node1.shh.newSymKey();
+                assert.lengthOf(keyId, 64, 'invalid keyId length');
             });
 
-            it('shh.getSymKey(keyID)', function () {
-                keyVal = node1.shh.getSymKey(keyID);
+            it('shh.getSymKey(keyId)', function () {
+                keyVal = node1.shh.getSymKey(keyId);
                 assert.lengthOf(keyVal, 66, 'invalid key value length'); // 2 bytes for "0x"
             });
 
-            it('shh.hasSymKey(keyID)', function () {
-                expect(node1.shh.hasSymKey(keyID)).to.equal(true);
+            it('shh.hasSymKey(keyId)', function () {
+                expect(node1.shh.hasSymKey(keyId)).to.equal(true);
             });
 
             it('shh.deleteSymKey(keyId)', function () {
-                expect(node1.shh.hasSymKey(keyID)).to.equal(true);
-                node1.shh.deleteSymKey(keyID);
-                expect(node1.shh.hasSymKey(keyID)).to.equal(false);
+                expect(node1.shh.hasSymKey(keyId)).to.equal(true);
+                node1.shh.deleteSymKey(keyId);
+                expect(node1.shh.hasSymKey(keyId)).to.equal(false);
             });
 
             it('shh.addSymKey(keyVal)', function () {
-                var keyIDOriginal = keyID;
-                keyID = node1.shh.addSymKey(keyVal);
-                assert.notEqual(keyID, keyIDOriginal);
-                assert.lengthOf(keyID, 64, 'invalid keyId length');
-                expect(node1.shh.hasSymKey(keyID)).to.equal(true);
+                var keyIdOriginal = keyId;
+                keyId = node1.shh.addSymKey(keyVal);
+                assert.notEqual(keyId, keyIdOriginal);
+                assert.lengthOf(keyId, 64, 'invalid keyId length');
+                expect(node1.shh.hasSymKey(keyId)).to.equal(true);
             });
 
             it('shh.generateSymKeyFromPassword(password)', function () {
                 var password = 'foobar';
-                var keyID = node1.shh.generateSymKeyFromPassword(password);
-                var keyVal = node1.shh.getSymKey(keyID);
-                assert.lengthOf(keyID, 64, 'invalid keyId length');
-                expect(node1.shh.hasSymKey(keyID)).to.equal(true);
+                var keyId = node1.shh.generateSymKeyFromPassword(password);
+                var keyVal = node1.shh.getSymKey(keyId);
+                assert.lengthOf(keyId, 64, 'invalid keyId length');
+                expect(node1.shh.hasSymKey(keyId)).to.equal(true);
                 assert.equal(keyVal, '0xa582720d74d463589df14c11538189a1c07778c47e86f70bab7b5ba27e2de3cc');
             });
         });
 
         context('asymmetric key management', function () {
-            var keyID = '';  // to be populated
+            var keyId = '';  // to be populated
             var pubKey = ''; // to be populated
             var prvKey = '0x8bda3abeb454847b515fa9b404cede50b1cc63cfdeddd4999d074284b4c21e15';
 
             it('shh.newKeyPair()', function () {
-                keyID = node1.shh.newKeyPair();
-                assert.lengthOf(keyID, 64);
+                keyId = node1.shh.newKeyPair();
+                assert.lengthOf(keyId, 64);
             });
 
             it('shh.hasKeyPair(id)', function () {
-                expect(node1.shh.hasKeyPair(keyID)).to.equal(true);
+                expect(node1.shh.hasKeyPair(keyId)).to.equal(true);
             });
 
             it('shh.getPublicKey(id)', function () {
-                pubKey = node1.shh.getPublicKey(keyID);
+                pubKey = node1.shh.getPublicKey(keyId);
                 assert.lengthOf(pubKey, 132);
             });
 
@@ -128,29 +128,29 @@ describe('Whisper Tests', function () {
             });
 
             it('shh.getPrivateKey(id)', function () {
-                var prvkey = node1.shh.getPrivateKey(keyID);
+                var prvkey = node1.shh.getPrivateKey(keyId);
                 assert.lengthOf(prvkey, 66);
             });
 
             it('shh.deleteKeyPair(id)', function () {
                 expect(node1.shh.hasKeyPair(pubKey)).to.equal(true);
-                expect(node1.shh.hasKeyPair(keyID)).to.equal(true);
-                node1.shh.deleteKeyPair(keyID);
+                expect(node1.shh.hasKeyPair(keyId)).to.equal(true);
+                node1.shh.deleteKeyPair(keyId);
                 expect(node1.shh.hasKeyPair(pubKey)).to.equal(false);
-                expect(node1.shh.hasKeyPair(keyID)).to.equal(false);
+                expect(node1.shh.hasKeyPair(keyId)).to.equal(false);
                 // re-create
-                keyID = node1.shh.newKeyPair();
-                assert.lengthOf(keyID, 64);
-                pubKey = node1.shh.getPublicKey(keyID);
+                keyId = node1.shh.newKeyPair();
+                assert.lengthOf(keyId, 64);
+                pubKey = node1.shh.getPublicKey(keyId);
                 assert.lengthOf(pubKey, 132);
             });
 
             it('shh.deleteKeyPair(pubKey)', function () {
                 expect(node1.shh.hasKeyPair(pubKey)).to.equal(true);
-                expect(node1.shh.hasKeyPair(keyID)).to.equal(true);
+                expect(node1.shh.hasKeyPair(keyId)).to.equal(true);
                 node1.shh.deleteKeyPair(pubKey);
                 expect(node1.shh.hasKeyPair(pubKey)).to.equal(false);
-                expect(node1.shh.hasKeyPair(keyID)).to.equal(false);
+                expect(node1.shh.hasKeyPair(keyId)).to.equal(false);
                 // re-create
                 keyId = node1.shh.newKeyPair();
                 assert.lengthOf(keyId, 64);
@@ -159,16 +159,16 @@ describe('Whisper Tests', function () {
             });
 
             it('shh.addPrivateKey(prvKey)', function () {
-                keyID = node1.shh.addPrivateKey(prvKey);
-                assert.lengthOf(keyID,64);
+                keyId = node1.shh.addPrivateKey(prvKey);
+                assert.lengthOf(keyId,64);
             });
         });
 
     });
 
     context('message travelling from one node to another', function () {
-        var keyID1 = ''; // symmetric key ID on node 1 (to be populated)
-        var keyID2 = ''; // symmetric key ID on node 2 (to be populated)
+        var keyId1 = ''; // symmetric key Id on node 1 (to be populated)
+        var keyId2 = ''; // symmetric key Id on node 2 (to be populated)
 
         it('statusd node1 is running', function () {
             var connected = node1.isConnected();
@@ -196,18 +196,18 @@ describe('Whisper Tests', function () {
         });
 
         it('ensure symkey exists', function () {
-            keyID1 = node1.shh.newSymKey();
-            assert.lengthOf(keyID1, 64);
-            expect(node1.shh.hasSymKey(keyID1)).to.equal(true);
+            keyId1 = node1.shh.newSymKey();
+            assert.lengthOf(keyId1, 64);
+            expect(node1.shh.hasSymKey(keyId1)).to.equal(true);
 
             // obtain key value
-            var keyVal = node1.shh.getSymKey(keyID1);
+            var keyVal = node1.shh.getSymKey(keyId1);
             assert.lengthOf(keyVal, 66); // 2 bytes of "0x"
 
             // share the value with the node2
-            keyID2 = node2.shh.addSymKey(keyVal);
-            assert.lengthOf(keyID2, 64);
-            expect(node2.shh.hasSymKey(keyID2)).to.equal(true);
+            keyId2 = node2.shh.addSymKey(keyVal);
+            assert.lengthOf(keyId2, 64);
+            expect(node2.shh.hasSymKey(keyId2)).to.equal(true);
         });
 
         
@@ -225,7 +225,7 @@ describe('Whisper Tests', function () {
 
             // start watching for messages
             var params = {
-                symKeyID: keyID2,
+                symKeyId: keyId2,
                 sig: identity1,
                 topics: [topic]
             }
@@ -234,7 +234,7 @@ describe('Whisper Tests', function () {
             
             // send message
             var message = {
-                symKeyID: keyID1,
+                symKeyId: keyId1,
                 ttl: ttl,
                 sig: identity1,
                 topic: topic,
@@ -259,7 +259,7 @@ describe('Whisper Tests', function () {
 
             // start watching for messages
             var params = {
-                privateKeyID: identity2,
+                privateKeyId: identity2,
                 sig: identity1,
                 topic: topic
             }
@@ -305,23 +305,23 @@ describe('Whisper Tests', function () {
         var identity1 = ''; // pub key of device 1
         var identity2 = ''; // pub key of device 2
         var chatKeySharingTopic = makeTopic(); // topic used by device1 to send chat key to device 2
-        var chatKeyID1 = ''; // symkey provided by server, and shared among clients so that they can trigger notifications
-        var chatKeyID2 = ''; // symkey provided by server, and shared among clients so that they can trigger notifications
+        var chatKeyId1 = ''; // symkey provided by server, and shared among clients so that they can trigger notifications
+        var chatKeyId2 = ''; // symkey provided by server, and shared among clients so that they can trigger notifications
         
         context('prepare devices', function () {
             it('create key pair to be used as main identity on device1', function () {
-                var keyID = node1.shh.newKeyPair();
-                assert.lengthOf(keyID, 64);
-                identity1 = node1.shh.getPublicKey(keyID);
+                var keyId = node1.shh.newKeyPair();
+                assert.lengthOf(keyId, 64);
+                identity1 = node1.shh.getPublicKey(keyId);
                 assert.lengthOf(identity1, 132);
                 expect(node1.shh.hasKeyPair(identity1)).to.equal(true);
                 expect(node1.shh.hasKeyPair(identity2)).to.equal(false);
             });
 
             it('create key pair to be used as main identity on device2', function () {
-                var keyID = node2.shh.newKeyPair();
-                assert.lengthOf(keyID, 64);
-                identity2 = node2.shh.getPublicKey(keyID);
+                var keyId = node2.shh.newKeyPair();
+                assert.lengthOf(keyId, 64);
+                identity2 = node2.shh.getPublicKey(keyId);
                 assert.lengthOf(identity1, 132);
                 expect(node2.shh.hasKeyPair(identity1)).to.equal(false);
                 expect(node2.shh.hasKeyPair(identity2)).to.equal(true);
@@ -348,7 +348,7 @@ describe('Whisper Tests', function () {
                     done();
                 }
                 var params = {
-                    privateKeyID: identity1,
+                    privateKeyId: identity1,
                     topics: [proposeServerTopic]
                 }
                 filter = node1.shh.newMessageFilter(params, null, onCreationError);
@@ -379,13 +379,13 @@ describe('Whisper Tests', function () {
                     expect(payload).to.have.property('server');
                     expect(payload).to.have.property('key');
                     // save subscription key
-                    subscriptionKeyID = node1.shh.addSymKey(payload.key);
-                    assert.lengthOf(subscriptionKeyID, 64);
-                    expect(node1.shh.hasSymKey(subscriptionKeyID)).to.equal(true);
+                    subscriptionKeyId = node1.shh.addSymKey(payload.key);
+                    assert.lengthOf(subscriptionKeyId, 64);
+                    expect(node1.shh.hasSymKey(subscriptionKeyId)).to.equal(true);
                     done();
                 }
                 var params = {
-                    privateKeyID: identity1,
+                    privateKeyId: identity1,
                     sig: discoveryPubKey,
                     topics: [ackClientSubscriptionTopic]
                 }
@@ -417,13 +417,13 @@ describe('Whisper Tests', function () {
                     var payload = extractPayload(message);
                     expect(payload).to.have.property('server');
                     expect(payload).to.have.property('key');
-                    chatKeyID1 = node1.shh.addSymKey(payload.key);
-                    assert.lengthOf(chatKeyID1, 64);
-                    expect(node1.shh.hasSymKey(chatKeyID1)).to.equal(true);
+                    chatKeyId1 = node1.shh.addSymKey(payload.key);
+                    assert.lengthOf(chatKeyId1, 64);
+                    expect(node1.shh.hasSymKey(chatKeyId1)).to.equal(true);
                     done();
                 }
                 var params = {
-                    privateKeyID: identity1,
+                    privateKeyId: identity1,
                     topics: [ackNewChatSessionTopic]
                 }
                 filter = node1.shh.newMessageFilter(params, null, onCreationError);
@@ -432,7 +432,7 @@ describe('Whisper Tests', function () {
                 // create chat session request
                 appChatId = makeTopic(); // globally unique chat id
                 var message = {
-                    symKeyID: subscriptionKeyID,
+                    symKeyId: subscriptionKeyId,
                     ttl: ttl,
                     sig: identity1,
                     topic: newChatSessionTopic,
@@ -457,7 +457,7 @@ describe('Whisper Tests', function () {
                     done();
                 }
                 var params = {
-                    privateKeyID: identity1,
+                    privateKeyId: identity1,
                     topics: [ackDeviceRegistrationTopic]
                 }
                 filter = node1.shh.newMessageFilter(params, null, onCreationError);
@@ -467,7 +467,7 @@ describe('Whisper Tests', function () {
                 // this obtained from https://status-sandbox-c1b34.firebaseapp.com/
                 var deviceId = 'cqMiF8cwhSM:APA91bHrv2HUajq77_gKjeUxfzKjTxU7zGsq9sgr5QdfLW3w1KVFwT7GDOGcvwmHznkA3F3dZ-eohw9PVvGjAeo5gOqlDODMZqPVWzqeuslFbu5tGgTvdjQXSpWouya-63_dT67H0a29';
                 var message = {
-                    symKeyID: chatKeyID1,
+                    symKeyId: chatKeyId1,
                     ttl: ttl,
                     sig: identity1,
                     topic: newDeviceRegistrationTopic,
@@ -490,20 +490,20 @@ describe('Whisper Tests', function () {
                     var payload = extractPayload(message);
                     expect(payload).to.have.property('chat');
                     expect(payload).to.have.property('key');
-                    chatKeyID2 = node2.shh.addSymKey(payload.key);
-                    assert.lengthOf(chatKeyID2, 64);
-                    expect(node2.shh.hasSymKey(chatKeyID2)).to.equal(true);
+                    chatKeyId2 = node2.shh.addSymKey(payload.key);
+                    assert.lengthOf(chatKeyId2, 64);
+                    expect(node2.shh.hasSymKey(chatKeyId2)).to.equal(true);
                     done();
                 }
                 var params = {
-                    privateKeyID: identity2,
+                    privateKeyId: identity2,
                     topics: [chatKeySharingTopic]
                 }
                 filter = node2.shh.newMessageFilter(params, null, onCreationError);
                 watchFilter(filter, onMessage);
                 
                 // share chat key with device 2
-                var chatKey = node1.shh.getSymKey(chatKeyID1);
+                var chatKey = node1.shh.getSymKey(chatKeyId1);
                 assert.lengthOf(chatKey, 66);
                 var message = {
                     pubKey: identity2,
@@ -531,7 +531,7 @@ describe('Whisper Tests', function () {
                     done(error);
                 }
                 var params = {
-                    symKeyID: chatKeyID1,
+                    symKeyId: chatKeyId1,
                     topics: [sendNotificationTopic]
                 }
                 filter = node1.shh.newMessageFilter(params, null, onCreationError);
@@ -539,7 +539,7 @@ describe('Whisper Tests', function () {
                 
                 // send message + notification request (from device2, on device1)
                 var message = {
-                    symKeyID: chatKeyID2,
+                    symKeyId: chatKeyId2,
                     ttl: ttl,
                     sig: identity2,
                     topic: sendNotificationTopic,
@@ -550,7 +550,7 @@ describe('Whisper Tests', function () {
                     + '"icon": "https://status.im/img/logo.png",'
                     + '"click_action": "https://status.im"'
                     + '},'
-                    + '"to": "{{ ID }}"' // this get replaced by device id your've registered
+                    + '"to": "{{ Id }}"' // this get replaced by device id your've registered
                     + '}'),
                     powTime: powTime,
                     powTarget: powTarget
@@ -574,7 +574,7 @@ describe('Whisper Tests', function () {
                     done();
                 }
                 var params = {
-                    privateKeyID: identity1,
+                    privateKeyId: identity1,
                     topics: [confirmClientSessionTopic]
                 }
                 filter = node1.shh.newMessageFilter(params, null, onCreationError);
