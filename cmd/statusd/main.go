@@ -7,6 +7,7 @@ import (
 	"runtime"
 
 	"github.com/status-im/status-go/geth/api"
+	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
 	"gopkg.in/urfave/cli.v1"
 )
@@ -16,6 +17,7 @@ var (
 	buildStamp = "rely on linker: -ldflags -X main.buildStamp"
 	app        = makeApp(gitCommit)
 	statusAPI  = api.NewStatusAPI()
+	profiling  = common.NewProfiling()
 )
 
 var (
@@ -112,6 +114,7 @@ func init() {
 		return nil
 	}
 	app.After = func(ctx *cli.Context) error {
+		profiling.Stop()
 		return nil
 	}
 }
