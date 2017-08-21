@@ -152,7 +152,7 @@ func (q *TxQueue) Enqueue(tx *common.QueuedTx) error {
 
 	// notify handler
 	log.Info("calling txEnqueueHandler")
-	q.txEnqueueHandler(*tx)
+	q.txEnqueueHandler(tx)
 
 	return nil
 }

@@ -237,20 +237,11 @@ func (m *TxQueueManager) completeRemoteTransaction(queuedTx *common.QueuedTx, pa
 }
 
 // CompleteTransactions instructs backend to complete sending of multiple transactions
-func (m *TxQueueManager) CompleteTransactions(ids string, password string) map[string]common.RawCompleteTransactionResult {
-	results := make(map[string]common.RawCompleteTransactionResult)
+func (m *TxQueueManager) CompleteTransactions(ids []common.QueuedTxID, password string) map[common.QueuedTxID]common.RawCompleteTransactionResult {
+	results := make(map[common.QueuedTxID]common.RawCompleteTransactionResult)
 
-	// TODO(adam): move it out from here to more appropriate place
-	parsedIDs, err := common.ParseJSONArray(ids)
-	if err != nil {
-		results["none"] = common.RawCompleteTransactionResult{
-			Error: err,
-		}
-		return results
-	}
-
-	for _, txID := range parsedIDs {
-		txHash, txErr := m.CompleteTransaction(common.QueuedTxID(txID), password)
+	for _, txID := range ids {
+		txHash, txErr := m.CompleteTransaction(txID, password)
 		results[txID] = common.RawCompleteTransactionResult{
 			Hash:  txHash,
 			Error: txErr,
@@ -278,21 +269,11 @@ func (m *TxQueueManager) DiscardTransaction(id common.QueuedTxID) error {
 }
 
 // DiscardTransactions discards given multiple transactions from transaction queue
-func (m *TxQueueManager) DiscardTransactions(ids string) map[string]common.RawDiscardTransactionResult {
-	var parsedIDs []string
-	results := make(map[string]common.RawDiscardTransactionResult)
+func (m *TxQueueManager) DiscardTransactions(ids []common.QueuedTxID) map[common.QueuedTxID]common.RawDiscardTransactionResult {
+	results := make(map[common.QueuedTxID]common.RawDiscardTransactionResult)
 
-	// TODO(adam): move it out from here to more appropriate place
-	parsedIDs, err := common.ParseJSONArray(ids)
-	if err != nil {
-		results["none"] = common.RawDiscardTransactionResult{
-			Error: err,
-		}
-		return results
-	}
-
-	for _, txID := range parsedIDs {
-		err := m.DiscardTransaction(common.QueuedTxID(txID))
+	for _, txID := range ids {
+		err := m.DiscardTransaction(txID)
 		if err != nil {
 			results[txID] = common.RawDiscardTransactionResult{
 				Error: err,
@@ -311,8 +292,8 @@ type SendTransactionEvent struct {
 }
 
 // TransactionQueueHandler returns handler that processes incoming tx queue requests
-func (m *TxQueueManager) TransactionQueueHandler() func(queuedTx common.QueuedTx) {
-	return func(queuedTx common.QueuedTx) {
+func (m *TxQueueManager) TransactionQueueHandler() func(queuedTx *common.QueuedTx) {
+	return func(queuedTx *common.QueuedTx) {
 		log.Info("calling TransactionQueueHandler")
 		SendSignal(SignalEnvelope{
 			Type: EventTransactionQueued,

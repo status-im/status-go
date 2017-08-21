@@ -188,7 +188,7 @@ func (m *StatusBackend) CompleteTransaction(id common.QueuedTxID, password strin
 }
 
 // CompleteTransactions instructs backend to complete sending of multiple transactions
-func (m *StatusBackend) CompleteTransactions(ids, password string) map[string]common.RawCompleteTransactionResult {
+func (m *StatusBackend) CompleteTransactions(ids []common.QueuedTxID, password string) map[common.QueuedTxID]common.RawCompleteTransactionResult {
 	return m.txQueueManager.CompleteTransactions(ids, password)
 }
 
@@ -198,7 +198,7 @@ func (m *StatusBackend) DiscardTransaction(id common.QueuedTxID) error {
 }
 
 // DiscardTransactions discards given multiple transactions from transaction queue
-func (m *StatusBackend) DiscardTransactions(ids string) map[string]common.RawDiscardTransactionResult {
+func (m *StatusBackend) DiscardTransactions(ids []common.QueuedTxID) map[common.QueuedTxID]common.RawDiscardTransactionResult {
 	return m.txQueueManager.DiscardTransactions(ids)
 }
 
@@ -218,11 +218,9 @@ func (m *StatusBackend) registerHandlers() error {
 	lightEthereum.StatusBackend.SetAccountsFilterHandler(m.accountManager.AccountsListRequestHandler())
 	log.Info("Registered handler", "fn", "AccountsFilterHandler")
 
-	// TODO(adam): it should be a default
 	m.txQueueManager.SetTransactionQueueHandler(m.txQueueManager.TransactionQueueHandler())
 	log.Info("Registered handler", "fn", "TransactionQueueHandler")
 
-	// TODO(adam): it should be a default
 	m.txQueueManager.SetTransactionReturnHandler(m.txQueueManager.TransactionReturnHandler())
 	log.Info("Registered handler", "fn", "TransactionReturnHandler")
 

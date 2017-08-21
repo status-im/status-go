@@ -152,7 +152,7 @@ func (api *StatusAPI) CompleteTransaction(id common.QueuedTxID, password string)
 }
 
 // CompleteTransactions instructs backend to complete sending of multiple transactions
-func (api *StatusAPI) CompleteTransactions(ids, password string) map[string]common.RawCompleteTransactionResult {
+func (api *StatusAPI) CompleteTransactions(ids []common.QueuedTxID, password string) map[common.QueuedTxID]common.RawCompleteTransactionResult {
 	return api.b.txQueueManager.CompleteTransactions(ids, password)
 }
 
@@ -162,7 +162,7 @@ func (api *StatusAPI) DiscardTransaction(id common.QueuedTxID) error {
 }
 
 // DiscardTransactions discards given multiple transactions from transaction queue
-func (api *StatusAPI) DiscardTransactions(ids string) map[string]common.RawDiscardTransactionResult {
+func (api *StatusAPI) DiscardTransactions(ids []common.QueuedTxID) map[common.QueuedTxID]common.RawDiscardTransactionResult {
 	return api.b.txQueueManager.DiscardTransactions(ids)
 }
 

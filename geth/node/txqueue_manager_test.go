@@ -63,7 +63,7 @@ func (suite *TxQueueTestSuite) TestCompleteTransaction() {
 	})
 
 	// TransactionQueueHandler is required to enqueue a transaction.
-	m.SetTransactionQueueHandler(func(queuedTx common.QueuedTx) {
+	m.SetTransactionQueueHandler(func(queuedTx *common.QueuedTx) {
 		suite.Equal(tx.ID, queuedTx.ID)
 	})
 
@@ -110,7 +110,7 @@ func (suite *TxQueueTestSuite) TestAccountMissmatch() {
 	})
 
 	// TransactionQueueHandler is required to enqueue a transaction.
-	m.SetTransactionQueueHandler(func(queuedTx common.QueuedTx) {
+	m.SetTransactionQueueHandler(func(queuedTx *common.QueuedTx) {
 		suite.Equal(tx.ID, queuedTx.ID)
 	})
 
@@ -156,7 +156,7 @@ func (suite *TxQueueTestSuite) TestInvalidPassword() {
 	})
 
 	// TransactionQueueHandler is required to enqueue a transaction.
-	m.SetTransactionQueueHandler(func(queuedTx common.QueuedTx) {
+	m.SetTransactionQueueHandler(func(queuedTx *common.QueuedTx) {
 		suite.Equal(tx.ID, queuedTx.ID)
 	})
 
@@ -192,7 +192,7 @@ func (suite *TxQueueTestSuite) TestDiscardTransaction() {
 	})
 
 	// TransactionQueueHandler is required to enqueue a transaction.
-	m.SetTransactionQueueHandler(func(queuedTx common.QueuedTx) {
+	m.SetTransactionQueueHandler(func(queuedTx *common.QueuedTx) {
 		suite.Equal(tx.ID, queuedTx.ID)
 	})
 

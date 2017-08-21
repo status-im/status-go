@@ -236,17 +236,30 @@ func CompleteTransactions(ids, password *C.char) *C.char {
 	out := common.CompleteTransactionsResult{}
 	out.Results = make(map[string]common.CompleteTransactionResult)
 
-	results := statusAPI.CompleteTransactions(C.GoString(ids), C.GoString(password))
-	for txID, result := range results {
-		txResult := common.CompleteTransactionResult{
-			ID:   txID,
-			Hash: result.Hash.Hex(),
+	parsedIDs, err := common.ParseJSONArray(C.GoString(ids))
+	if err != nil {
+		out.Results["none"] = common.CompleteTransactionResult{
+			Error: err.Error(),
 		}
-		if result.Error != nil {
-			txResult.Error = result.Error.Error()
+	} else {
+		txIDs := make([]common.QueuedTxID, len(parsedIDs))
+		for i, id := range parsedIDs {
+			txIDs[i] = common.QueuedTxID(id)
 		}
-		out.Results[txID] = txResult
+
+		results := statusAPI.CompleteTransactions(txIDs, C.GoString(password))
+		for txID, result := range results {
+			txResult := common.CompleteTransactionResult{
+				ID:   string(txID),
+				Hash: result.Hash.Hex(),
+			}
+			if result.Error != nil {
+				txResult.Error = result.Error.Error()
+			}
+			out.Results[string(txID)] = txResult
+		}
 	}
+
 	outBytes, _ := json.Marshal(&out)
 
 	return C.CString(string(outBytes))
@@ -276,16 +289,29 @@ func DiscardTransactions(ids *C.char) *C.char {
 	out := common.DiscardTransactionsResult{}
 	out.Results = make(map[string]common.DiscardTransactionResult)
 
-	results := statusAPI.DiscardTransactions(C.GoString(ids))
-	for txID, result := range results {
-		txResult := common.DiscardTransactionResult{
-			ID: txID,
+	parsedIDs, err := common.ParseJSONArray(C.GoString(ids))
+	if err != nil {
+		out.Results["none"] = common.DiscardTransactionResult{
+			Error: err.Error(),
 		}
-		if result.Error != nil {
-			txResult.Error = result.Error.Error()
+	} else {
+		txIDs := make([]common.QueuedTxID, len(parsedIDs))
+		for i, id := range parsedIDs {
+			txIDs[i] = common.QueuedTxID(id)
 		}
-		out.Results[txID] = txResult
+
+		results := statusAPI.DiscardTransactions(txIDs)
+		for txID, result := range results {
+			txResult := common.DiscardTransactionResult{
+				ID: string(txID),
+			}
+			if result.Error != nil {
+				txResult.Error = result.Error.Error()
+			}
+			out.Results[string(txID)] = txResult
+		}
 	}
+
 	outBytes, _ := json.Marshal(&out)
 
 	return C.CString(string(outBytes))

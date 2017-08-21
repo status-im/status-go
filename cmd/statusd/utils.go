@@ -915,7 +915,7 @@ func testCompleteMultipleQueuedTransactions(t *testing.T) bool {
 			From:  common.FromAddress(TestConfig.Account1.Address),
 			To:    common.ToAddress(TestConfig.Account2.Address),
 			Value: (*hexutil.Big)(big.NewInt(1000000000000)),
-		}, "")
+		}, TestConfig.Account1.Password)
 		if err != nil {
 			t.Errorf("unexpected error thrown: %v", err)
 			return
@@ -1107,7 +1107,7 @@ func testDiscardTransaction(t *testing.T) bool {
 		From:  common.FromAddress(TestConfig.Account1.Address),
 		To:    common.ToAddress(TestConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
-	}, "")
+	}, TestConfig.Account1.Password)
 	if err != node.ErrQueuedTxDiscarded {
 		t.Errorf("expected error not thrown: %v", err)
 		return false
@@ -1206,7 +1206,7 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool {
 			From:  common.FromAddress(TestConfig.Account1.Address),
 			To:    common.ToAddress(TestConfig.Account2.Address),
 			Value: (*hexutil.Big)(big.NewInt(1000000000000)),
-		}, "")
+		}, TestConfig.Account1.Password)
 		if err != node.ErrQueuedTxDiscarded {
 			t.Errorf("expected error not thrown: %v", err)
 			return

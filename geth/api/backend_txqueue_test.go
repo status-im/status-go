@@ -603,7 +603,7 @@ func (s *BackendTestSuite) TestEvictionOfQueuedTransactions() {
 	txQueue := backend.TransactionQueue()
 	var i = 0
 	txIDs := [status.DefaultTxQueueCap + 5 + 10]status.QueuedTxID{}
-	backend.SetTransactionQueueHandler(func(queuedTx status.QueuedTx) {
+	backend.SetTransactionQueueHandler(func(queuedTx *status.QueuedTx) {
 		log.Info("tx enqueued", "i", i+1, "queue size", txQueue.Count(), "id", queuedTx.ID)
 		txIDs[i] = queuedTx.ID
 		i++
