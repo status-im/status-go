@@ -151,7 +151,6 @@ func (s *JailTestSuite) TestJailRPCAsyncSend() {
 			require.NoError(err, "Request failed to process")
 		}()
 	}
-
 	wg.Wait()
 }
 
