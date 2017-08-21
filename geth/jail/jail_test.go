@@ -16,19 +16,7 @@ import (
 )
 
 const (
-	testChatID       = "testChat"
-	statusJSFilePath = "testdata/status.js"
-	txSendFolder     = "testdata/tx-send/"
-)
-
-var (
-	txSendAsync = `
-		_status_catalog.commands.sendAsync({
-			"from": "` + TestConfig.Account1.Address + `",
-			"to": "0xf82da7547534045b4e00442bc89e16186cf8c272",
-			"value": "0.000001"
-		})
-	`
+	testChatID = "testChat"
 )
 
 var baseStatusJSCode = string(static.MustAsset("testdata/jail/status.js"))
@@ -130,14 +118,16 @@ func (s *JailTestSuite) TestFunctionCall() {
 
 func (s *JailTestSuite) TestJailRPCAsyncSend() {
 	require := s.Require()
-
-	defer func() {
-		if err := recover(); err != nil {
-			require.NotNil(err, "Panic occured")
-		}
-	}()
-
-	require.NotNil(s.jail)
+	var wg sync.WaitGroup
+	txSendAsync := `
+		_status_catalog.commands.send({
+			"from": "` + TestConfig.Account1.Address + `",
+			"to": "` + TestConfig.Account2.Address + `",
+			"value": "0.000001"
+		})
+	`
+	rxSendJS := LoadFromFile("../../static/testdata/jail/tx-send/rx-send.js")
+	require.NotEmpty(rxSendJS, "Base script is empty")
 
 	s.StartTestNode(params.RopstenNetworkID)
 	defer s.StopTestNode()
@@ -150,17 +140,14 @@ func (s *JailTestSuite) TestJailRPCAsyncSend() {
 	require.NoError(err)
 	require.NotNil(cell)
 
-	var wg sync.WaitGroup
-
 	// internally (since we replaced `web3.send` with `jail.Send`)
 	// all requests to web3 are forwarded to `jail.Send`
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
 		go func() {
-			wg.Add(1)
 			defer wg.Done()
 
 			_, err = cell.Run(txSendAsync)
-
 			require.NoError(err, "Request failed to process")
 		}()
 	}

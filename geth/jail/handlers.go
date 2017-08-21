@@ -42,7 +42,7 @@ func registerHandlers(jail *Jail, cell *JailCell, chatID string) error {
 	}
 
 	// register sendAsync handler
-	if err = registerHandler("sendAsync", makeAsyncSendHandler(jail, chatID)); err != nil {
+	if err = registerHandler("sendAsync", makeAsyncSendHandler(jail)); err != nil {
 		return err
 	}
 
@@ -90,7 +90,7 @@ func registerHandlers(jail *Jail, cell *JailCell, chatID string) error {
 }
 
 // makeAsyncSendHandler returns jeth.sendAsync() handler.
-func makeAsyncSendHandler(jail *Jail, chatID string) func(call otto.FunctionCall) (response otto.Value) {
+func makeAsyncSendHandler(jail *Jail) func(call otto.FunctionCall) (response otto.Value) {
 	return func(call otto.FunctionCall) (response otto.Value) {
 		go func() {
 			res := jail.Send(call)
