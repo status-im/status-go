@@ -5,13 +5,13 @@ var Web3 = require('web3');
 
 describe('Whisper Tests', function () {
     var web3 = new Web3();
+    // status peer
     var node1 = new Web3(new Web3.providers.HttpProvider('http://localhost:8645'));
+    // status peer
     var node2 = new Web3(new Web3.providers.HttpProvider('http://localhost:8745'));
+    // notification service node
+    var node3 = new Web3(new Web3.providers.HttpProvider('http://localhost:8845'));
     
-    console.log('Node is expected: statusd --datadir app1 wnode --http --httpport 8645');
-    console.log('Node is expected: statusd --datadir app2 wnode --http --httpport 8745');
-    console.log('Node is expected: statusd --datadir wnode1 wnode --notify --injectaccounts=false --identity ./static/keys/wnodekey --firebaseauth ./static/keys/firebaseauthkey');
-
     // some common vars
     var powTime = 3;            // maximal time in seconds to be spent on proof of work
     var powTarget = 0.1;        // minimal PoW target required for this message
@@ -40,14 +40,17 @@ describe('Whisper Tests', function () {
         });
     };
 
+    console.log('Node is expected: statusd --datadir app1 wnode --http --httpport 8645');
+    console.log('Node is expected: statusd --datadir app1 wnode --http --httpport 8745');
+    console.log('Node is expected: statusd --datadir wnode1 wnode --notify --injectaccounts=false --identity ./static/keys/wnodekey --firebaseauth ./static/keys/firebaseauthkey --http --httpport 8845');
+
+    if (!node1.isConnected()) throw 'node1 is not available!';
+    if (!node2.isConnected()) throw 'node2 is not available!';
+    if (!node3.isConnected()) throw 'notification service node is not available!';
+
     context('shh/5 API verification', function () {
        
         context('status', function () {
-            it('statusd node is running', function () {
-                var connected = node1.isConnected();
-                assert.isTrue(connected);
-            });
-
             it('shh.version()', function () {
                 var version = node1.shh.version();
                 assert.equal(version, '5.0', 'Whisper version does not match');
@@ -169,16 +172,6 @@ describe('Whisper Tests', function () {
     context('message travelling from one node to another', function () {
         var keyId1 = ''; // symmetric key Id on node 1 (to be populated)
         var keyId2 = ''; // symmetric key Id on node 2 (to be populated)
-
-        it('statusd node1 is running', function () {
-            var connected = node1.isConnected();
-            assert.isTrue(connected);
-        });
-
-        it('statusd node2 is running', function () {
-            var connected = node2.isConnected();
-            assert.isTrue(connected);
-        });
 
         it('test identities injected', function () {
             if (!node1.shh.hasKeyPair(identity1)) {
