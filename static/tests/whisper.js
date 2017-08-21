@@ -197,8 +197,6 @@ describe('Whisper Tests', function () {
 
         it('ensure symkey exists', function () {
             keyId1 = node1.shh.newSymKey();
-            assert.lengthOf(keyId1, 64);
-            expect(node1.shh.hasSymKey(keyId1)).to.equal(true);
 
             // obtain key value
             var keyVal = node1.shh.getSymKey(keyId1);
@@ -206,8 +204,6 @@ describe('Whisper Tests', function () {
 
             // share the value with the node2
             keyId2 = node2.shh.addSymKey(keyVal);
-            assert.lengthOf(keyId2, 64);
-            expect(node2.shh.hasSymKey(keyId2)).to.equal(true);
         });
 
         
@@ -306,20 +302,12 @@ describe('Whisper Tests', function () {
         context('prepare devices', function () {
             it('create key pair to be used as main identity on device1', function () {
                 var keyId = node1.shh.newKeyPair();
-                assert.lengthOf(keyId, 64);
                 identity1 = node1.shh.getPublicKey(keyId);
-                assert.lengthOf(identity1, 132);
-                expect(node1.shh.hasKeyPair(identity1)).to.equal(true);
-                expect(node1.shh.hasKeyPair(identity2)).to.equal(false);
             });
 
             it('create key pair to be used as main identity on device2', function () {
                 var keyId = node2.shh.newKeyPair();
-                assert.lengthOf(keyId, 64);
                 identity2 = node2.shh.getPublicKey(keyId);
-                assert.lengthOf(identity1, 132);
-                expect(node2.shh.hasKeyPair(identity1)).to.equal(false);
-                expect(node2.shh.hasKeyPair(identity2)).to.equal(true);
             });
         });
 
