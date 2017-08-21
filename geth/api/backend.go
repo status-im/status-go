@@ -183,7 +183,7 @@ func (m *StatusBackend) CallRPC(inputJSON string) string {
 }
 
 // CompleteTransaction instructs backend to complete sending of a given transaction
-func (m *StatusBackend) CompleteTransaction(id, password string) (gethcommon.Hash, error) {
+func (m *StatusBackend) CompleteTransaction(id common.QueuedTxID, password string) (gethcommon.Hash, error) {
 	return m.txQueueManager.CompleteTransaction(id, password)
 }
 
@@ -193,7 +193,7 @@ func (m *StatusBackend) CompleteTransactions(ids, password string) map[string]co
 }
 
 // DiscardTransaction discards a given transaction from transaction queue
-func (m *StatusBackend) DiscardTransaction(id string) error {
+func (m *StatusBackend) DiscardTransaction(id common.QueuedTxID) error {
 	return m.txQueueManager.DiscardTransaction(id)
 }
 

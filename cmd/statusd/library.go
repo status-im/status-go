@@ -213,7 +213,7 @@ func Logout() *C.char {
 
 //export CompleteTransaction
 func CompleteTransaction(id, password *C.char) *C.char {
-	txHash, err := statusAPI.CompleteTransaction(C.GoString(id), C.GoString(password))
+	txHash, err := statusAPI.CompleteTransaction(common.QueuedTxID(C.GoString(id)), C.GoString(password))
 
 	errString := ""
 	if err != nil {
@@ -254,7 +254,7 @@ func CompleteTransactions(ids, password *C.char) *C.char {
 
 //export DiscardTransaction
 func DiscardTransaction(id *C.char) *C.char {
-	err := statusAPI.DiscardTransaction(C.GoString(id))
+	err := statusAPI.DiscardTransaction(common.QueuedTxID(C.GoString(id)))
 
 	errString := ""
 	if err != nil {

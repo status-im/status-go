@@ -3,7 +3,6 @@ package node
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"math/big"
 	"time"
 
@@ -74,10 +73,8 @@ func (m *TxQueueManager) TransactionQueue() common.TxQueue {
 	return m.txQueue
 }
 
-func (m *TxQueueManager) QueueTransactionAndWait(ctx context.Context, args common.SendTxArgs) (*common.QueuedTx, error) {
-	log.Info(fmt.Sprintf("queue a new transaction from %s to %s and wait", args.From.Hex(), args.To.Hex()))
-
-	tx := common.QueuedTx{
+func (m *TxQueueManager) CreateTransaction(ctx context.Context, args common.SendTxArgs) *common.QueuedTx {
+	return &common.QueuedTx{
 		ID:      common.QueuedTxID(uuid.New()),
 		Hash:    gethcommon.Hash{},
 		Context: ctx,
@@ -85,13 +82,17 @@ func (m *TxQueueManager) QueueTransactionAndWait(ctx context.Context, args commo
 		Done:    make(chan struct{}, 1),
 		Discard: make(chan struct{}, 1),
 	}
+}
 
-	err := m.txQueue.Enqueue(&tx)
-	if err != nil {
-		return &tx, err
-	}
+func (m *TxQueueManager) QueueTransaction(tx *common.QueuedTx) error {
+	log.Info("queue a new transaction", "id", tx.ID, "from", tx.Args.From.Hex(), "to", tx.Args.To.Hex())
+	return m.txQueue.Enqueue(tx)
+}
 
-	log.Info(fmt.Sprintf("queued transaction with ID %s successfully", tx.ID))
+// QueueTransactionAndWait adds a transaction to the queue and blocks
+// until it's completed, discarded or times out.
+func (m *TxQueueManager) WaitForTransaction(tx *common.QueuedTx) error {
+	log.Info("wait for transaction", "id", tx.ID)
 
 	// now wait up until transaction is:
 	// - completed (via CompleteQueuedTransaction),
@@ -99,26 +100,27 @@ func (m *TxQueueManager) QueueTransactionAndWait(ctx context.Context, args commo
 	// - or times out
 	select {
 	case <-tx.Done:
-		m.NotifyOnQueuedTxReturn(&tx, tx.Err)
-		return &tx, tx.Err
+		m.NotifyOnQueuedTxReturn(tx, tx.Err)
+		return tx.Err
 	case <-tx.Discard:
-		m.NotifyOnQueuedTxReturn(&tx, ErrQueuedTxDiscarded)
-		return &tx, ErrQueuedTxDiscarded
+		m.NotifyOnQueuedTxReturn(tx, ErrQueuedTxDiscarded)
+		return ErrQueuedTxDiscarded
 	case <-time.After(DefaultTxSendCompletionTimeout * time.Second):
-		m.NotifyOnQueuedTxReturn(&tx, ErrQueuedTxTimedOut)
-		return &tx, ErrQueuedTxTimedOut
+		m.NotifyOnQueuedTxReturn(tx, ErrQueuedTxTimedOut)
+		return ErrQueuedTxTimedOut
 	}
 }
 
+// NotifyOnQueuedTxReturn calls a handler when a transaction resolves.
 func (m *TxQueueManager) NotifyOnQueuedTxReturn(queuedTx *common.QueuedTx, err error) {
 	m.txQueue.NotifyOnQueuedTxReturn(queuedTx, err)
 }
 
 // CompleteTransaction instructs backend to complete sending of a given transaction
-func (m *TxQueueManager) CompleteTransaction(id, password string) (gethcommon.Hash, error) {
-	log.Info(fmt.Sprintf("complete transaction with id %s", id))
+func (m *TxQueueManager) CompleteTransaction(id common.QueuedTxID, password string) (gethcommon.Hash, error) {
+	log.Info("complete transaction", "id", id)
 
-	queuedTx, err := m.txQueue.Get(common.QueuedTxID(id))
+	queuedTx, err := m.txQueue.Get(id)
 	if err != nil {
 		return gethcommon.Hash{}, err
 	}
@@ -128,21 +130,20 @@ func (m *TxQueueManager) CompleteTransaction(id, password string) (gethcommon.Ha
 		return gethcommon.Hash{}, err
 	}
 
+	// make sure that only account which created the tx can complete it
+	if queuedTx.Args.From.Hex() != selectedAccount.Address.Hex() {
+		m.NotifyOnQueuedTxReturn(queuedTx, ErrInvalidCompleteTxSender)
+		return gethcommon.Hash{}, ErrInvalidCompleteTxSender
+	}
+
 	config, err := m.nodeManager.NodeConfig()
 	if err != nil {
 		return gethcommon.Hash{}, err
 	}
 
-	// make sure that only account which created the tx can complete it
-	if queuedTx.Args.From.Hex() != selectedAccount.Address.Hex() {
-		return gethcommon.Hash{}, ErrInvalidCompleteTxSender
-	}
-
 	// Send the transaction finally.
 	var hash gethcommon.Hash
 	var txErr error
-
-	log.Info(fmt.Sprintf("sending transaction"))
 
 	if config.UpstreamConfig.Enabled {
 		hash, txErr = m.completeRemoteTransaction(queuedTx, password)
@@ -157,6 +158,8 @@ func (m *TxQueueManager) CompleteTransaction(id, password string) (gethcommon.Ha
 		return hash, txErr
 	}
 
+	log.Info("finally complete transaction", "id", queuedTx.ID)
+
 	queuedTx.Hash = hash
 	queuedTx.Err = txErr
 	queuedTx.Done <- struct{}{} // sendTransaction() waits on this, notify so that it can return
@@ -165,7 +168,7 @@ func (m *TxQueueManager) CompleteTransaction(id, password string) (gethcommon.Ha
 }
 
 func (m *TxQueueManager) completeLocalTransaction(queuedTx *common.QueuedTx, password string) (gethcommon.Hash, error) {
-	log.Info(fmt.Sprintf("completeLocalTransaction with id %s", queuedTx.ID))
+	log.Info("complete transaction using local node", "id", queuedTx.ID)
 
 	les, err := m.nodeManager.LightEthereumService()
 	if err != nil {
@@ -176,7 +179,7 @@ func (m *TxQueueManager) completeLocalTransaction(queuedTx *common.QueuedTx, pas
 }
 
 func (m *TxQueueManager) completeRemoteTransaction(queuedTx *common.QueuedTx, password string) (gethcommon.Hash, error) {
-	log.Info(fmt.Sprintf("completeRemoteTransaction withd id %s", queuedTx.ID))
+	log.Info("complete transaction using upstream node", "id", queuedTx.ID)
 
 	var emptyHash gethcommon.Hash
 
@@ -234,9 +237,10 @@ func (m *TxQueueManager) completeRemoteTransaction(queuedTx *common.QueuedTx, pa
 }
 
 // CompleteTransactions instructs backend to complete sending of multiple transactions
-func (m *TxQueueManager) CompleteTransactions(ids, password string) map[string]common.RawCompleteTransactionResult {
+func (m *TxQueueManager) CompleteTransactions(ids string, password string) map[string]common.RawCompleteTransactionResult {
 	results := make(map[string]common.RawCompleteTransactionResult)
 
+	// TODO(adam): move it out from here to more appropriate place
 	parsedIDs, err := common.ParseJSONArray(ids)
 	if err != nil {
 		results["none"] = common.RawCompleteTransactionResult{
@@ -246,7 +250,7 @@ func (m *TxQueueManager) CompleteTransactions(ids, password string) map[string]c
 	}
 
 	for _, txID := range parsedIDs {
-		txHash, txErr := m.CompleteTransaction(txID, password)
+		txHash, txErr := m.CompleteTransaction(common.QueuedTxID(txID), password)
 		results[txID] = common.RawCompleteTransactionResult{
 			Hash:  txHash,
 			Error: txErr,
@@ -257,8 +261,8 @@ func (m *TxQueueManager) CompleteTransactions(ids, password string) map[string]c
 }
 
 // DiscardTransaction discards a given transaction from transaction queue
-func (m *TxQueueManager) DiscardTransaction(id string) error {
-	queuedTx, err := m.txQueue.Get(common.QueuedTxID(id))
+func (m *TxQueueManager) DiscardTransaction(id common.QueuedTxID) error {
+	queuedTx, err := m.txQueue.Get(id)
 	if err != nil {
 		return err
 	}
@@ -278,6 +282,7 @@ func (m *TxQueueManager) DiscardTransactions(ids string) map[string]common.RawDi
 	var parsedIDs []string
 	results := make(map[string]common.RawDiscardTransactionResult)
 
+	// TODO(adam): move it out from here to more appropriate place
 	parsedIDs, err := common.ParseJSONArray(ids)
 	if err != nil {
 		results["none"] = common.RawDiscardTransactionResult{
@@ -287,7 +292,7 @@ func (m *TxQueueManager) DiscardTransactions(ids string) map[string]common.RawDi
 	}
 
 	for _, txID := range parsedIDs {
-		err := m.DiscardTransaction(txID)
+		err := m.DiscardTransaction(common.QueuedTxID(txID))
 		if err != nil {
 			results[txID] = common.RawDiscardTransactionResult{
 				Error: err,

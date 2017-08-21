@@ -2,6 +2,7 @@ package main
 
 import "C"
 import (
+	"context"
 	"encoding/json"
 	"io/ioutil"
 	"math/big"
@@ -833,13 +834,18 @@ func testCompleteTransaction(t *testing.T) bool {
 	})
 
 	// this call blocks, up until Complete Transaction is called
-	queuedTx, err := txQueueManager.QueueTransactionAndWait(nil, common.SendTxArgs{
+	queuedTx := txQueueManager.CreateTransaction(context.Background(), common.SendTxArgs{
 		From:  common.FromAddress(TestConfig.Account1.Address),
 		To:    common.ToAddress(TestConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 	})
-	if err != nil {
-		t.Errorf("Test failed: cannot send transaction: %v", err)
+	if err := txQueueManager.QueueTransaction(queuedTx); err != nil {
+		t.Errorf("Test failed: cannot queue transaction: %v", err)
+		return false
+	}
+	if err := txQueueManager.WaitForTransaction(queuedTx); err != nil {
+		t.Errorf("Test failed: could not complete transaction: %v", err)
+		return false
 	}
 
 	<-queuedTxCompleted // make sure that complete transaction handler completes its magic, before we proceed
@@ -1059,7 +1065,7 @@ func testDiscardTransaction(t *testing.T) bool {
 			}
 
 			// try completing discarded transaction
-			_, err = statusAPI.CompleteTransaction(txID, TestConfig.Account1.Password)
+			_, err = statusAPI.CompleteTransaction(common.QueuedTxID(txID), TestConfig.Account1.Password)
 			if err != node.ErrQueuedTxIDNotFound {
 				t.Error("expects tx not found, but call to CompleteTransaction succeeded")
 				return

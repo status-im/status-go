@@ -53,13 +53,16 @@ func (ep *ExecutionPolicy) executeSendTransaction(req common.RPCCall, call otto.
 		return nil, err
 	}
 
-	// onSendTransactionRequest() will use context to obtain and release ticket
-	ctx := context.Background()
-	ctx = context.WithValue(ctx, common.MessageIDKey, messageID)
-
+	// TODO(adam): check if context is used
+	ctx := context.WithValue(context.Background(), common.MessageIDKey, messageID)
 	args := sendTxArgsFromRPCCall(req)
-	queuedTx, err := ep.txQueueManager.QueueTransactionAndWait(ctx, args)
-	if err != nil {
+	tx := ep.txQueueManager.CreateTransaction(ctx, args)
+
+	if err := ep.txQueueManager.QueueTransaction(tx); err != nil {
+		return nil, err
+	}
+
+	if err := ep.txQueueManager.WaitForTransaction(tx); err != nil {
 		return nil, err
 	}
 
@@ -67,8 +70,8 @@ func (ep *ExecutionPolicy) executeSendTransaction(req common.RPCCall, call otto.
 	postProcessRequest(call.Otto, req, messageID)
 
 	// @TODO(adam): which one is actually used?
-	res.Set("result", queuedTx.Hash.Hex())
-	res.Set("hash", queuedTx.Hash.Hex())
+	res.Set("result", tx.Hash.Hex())
+	res.Set("hash", tx.Hash.Hex())
 
 	return res, nil
 }

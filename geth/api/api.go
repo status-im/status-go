@@ -147,7 +147,7 @@ func (api *StatusAPI) Logout() error {
 }
 
 // CompleteTransaction instructs backend to complete sending of a given transaction
-func (api *StatusAPI) CompleteTransaction(id, password string) (gethcommon.Hash, error) {
+func (api *StatusAPI) CompleteTransaction(id common.QueuedTxID, password string) (gethcommon.Hash, error) {
 	return api.b.txQueueManager.CompleteTransaction(id, password)
 }
 
@@ -157,7 +157,7 @@ func (api *StatusAPI) CompleteTransactions(ids, password string) map[string]comm
 }
 
 // DiscardTransaction discards a given transaction from transaction queue
-func (api *StatusAPI) DiscardTransaction(id string) error {
+func (api *StatusAPI) DiscardTransaction(id common.QueuedTxID) error {
 	return api.b.txQueueManager.DiscardTransaction(id)
 }
 

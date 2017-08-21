@@ -201,10 +201,15 @@ type TxQueueManager interface {
 
 	TransactionQueue() TxQueue
 
-	// QueueTransaction adds a new request transaction to the queue.
-	QueueTransactionAndWait(ctx context.Context, args SendTxArgs) (*QueuedTx, error)
+	// CreateTransactoin creates a new transaction.
+	CreateTransaction(ctx context.Context, args SendTxArgs) *QueuedTx
 
-	NotifyOnQueuedTxReturn(queuedTxI *QueuedTx, err error)
+	// QueueTransaction adds a new transaction to the queue.
+	QueueTransaction(tx *QueuedTx) error
+
+	WaitForTransaction(tx *QueuedTx) error
+
+	NotifyOnQueuedTxReturn(queuedTx *QueuedTx, err error)
 
 	// TransactionQueueHandler returns handler that processes incoming tx queue requests
 	// TODO(adam): it should be a pointer as this struct contains channels
@@ -220,13 +225,13 @@ type TxQueueManager interface {
 	TransactionReturnHandler() func(queuedTx *QueuedTx, err error)
 
 	// CompleteTransaction instructs backend to complete sending of a given transaction
-	CompleteTransaction(id, password string) (common.Hash, error)
+	CompleteTransaction(id QueuedTxID, password string) (common.Hash, error)
 
 	// CompleteTransactions instructs backend to complete sending of multiple transactions
-	CompleteTransactions(ids, password string) map[string]RawCompleteTransactionResult
+	CompleteTransactions(ids string, password string) map[string]RawCompleteTransactionResult
 
 	// DiscardTransaction discards a given transaction from transaction queue
-	DiscardTransaction(id string) error
+	DiscardTransaction(id QueuedTxID) error
 
 	// DiscardTransactions discards given multiple transactions from transaction queue
 	DiscardTransactions(ids string) map[string]RawDiscardTransactionResult
