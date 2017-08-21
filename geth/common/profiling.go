@@ -7,11 +7,13 @@ import (
 )
 
 const (
-	PROFILING_FILENAME = "status.prof"
+	CpuProfilingFilename = "status_cpu.prof"
+	MemProfilingFilename = "status_mem.prof"
 )
 
 type Profiling struct {
-	file *os.File
+	cpuFile *os.File
+	memFile *os.File
 }
 
 // Returns new profiling struct
@@ -21,21 +23,27 @@ func NewProfiling() *Profiling {
 
 // Enables CPU profiling for the current process.
 // While profiling, the profile will be buffered and written to file in folder dataDir
-func (p *Profiling) Start(dataDir string) *Profiling {
-	if p.file == nil {
-		p.file, _ = os.Create(filepath.Join(dataDir, PROFILING_FILENAME))
-
+func (p *Profiling) Start(dataDir string) error {
+	if err := p.setup(dataDir); err != nil {
+		return err
 	}
-	pprof.StartCPUProfile(p.file)
-	return p
+	return pprof.StartCPUProfile(p.cpuFile)
 }
 
 // Stops the current CPU profile, if any and closes the file
-func (p *Profiling) Stop() *Profiling {
-	if p.file == nil {
-		return p
-	}
+func (p *Profiling) Stop() error {
 	pprof.StopCPUProfile()
-	p.file.Close()
-	return p
+	return pprof.WriteHeapProfile(p.memFile)
+}
+
+// Setup cpu and mem profiling
+func (p *Profiling) setup(dataDir string) error {
+	var err error
+	p.cpuFile, err = os.Create(filepath.Join(dataDir, CpuProfilingFilename))
+	if err != nil {
+		return err
+	}
+
+	p.memFile, err = os.Create(filepath.Join(dataDir, MemProfilingFilename))
+	return err
 }
