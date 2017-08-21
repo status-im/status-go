@@ -212,8 +212,6 @@ describe('Whisper Tests', function () {
 
         
         it('send symmetrically encrypted, signed message (node1 -> node2)', function (done) {
-            this.timeout(0);
-
             var payload = web3.fromAscii('send symmetrically encrypted, signed message (node1 -> node2)');
             var topic = makeTopic();
             var onCreationError = function (error) {
@@ -246,8 +244,6 @@ describe('Whisper Tests', function () {
         });
         
         it('send asymmetrically encrypted, signed message (node1.id1 -> node2.id2)', function (done) {
-            this.timeout(0);
-
             var payload = web3.fromAscii('send asymmetrically encrypted, signed message (node1.id1 -> node2.id2)');
             var topic = makeTopic();
             var onCreationError = function (error) {
@@ -281,7 +277,6 @@ describe('Whisper Tests', function () {
     });
 
     context('chat messages & push notifications', function () {
-        this.timeout(5000);
         var discoveryPubKey = '0x040edb0d71a3dbe928e154fcb696ffbda359b153a90efc2b46f0043ce9f5dbe55b77b9328fd841a1db5273758624afadd5b39638d4c35b36b3a96e1a586c1b4c2a';
         var discoverServerTopic = '0x268302f3'; // DISCOVER_NOTIFICATION_SERVER
         var proposeServerTopic = '0x08e3d8c0'; // PROPOSE_NOTIFICATION_SERVER
@@ -334,8 +329,6 @@ describe('Whisper Tests', function () {
             var appChatId = ''; // chat id that identifies device1-device2 interaction session on RN app level
 
             it('send discovery request & watch for server proposal ', function (done) {
-                this.timeout(0);
-                
                 // watch for server proposal
                 var onCreationError = function (error) {
                     done(error);
@@ -367,8 +360,6 @@ describe('Whisper Tests', function () {
             });
         
             it('accept server & receive server ack', function (done) {
-                this.timeout(0);
-                
                 // watch for server ack
                 var onCreationError = function (error) {
                     done(error);
@@ -406,8 +397,6 @@ describe('Whisper Tests', function () {
             });
             
             it('create chat session & receive chat key', function (done) {
-                this.timeout(0);
-                
                 // watch for chat key message
                 var onCreationError = function (error) {
                     done(error);
@@ -444,8 +433,6 @@ describe('Whisper Tests', function () {
             });
 
             it('register device with a given chat & receive acknowledgment', function (done) {
-                this.timeout(0);
-
                 // watch for device registration acknowledgement message
                 var onCreationError = function (error) {
                     done(error);
@@ -479,8 +466,6 @@ describe('Whisper Tests', function () {
             });
 
             it('share chat key with device2 & device 2 receives message', function (done) {
-                this.timeout(0);
-                
                 // watch for chat key message sent by device 1
                 var onCreationError = function (error) {
                     done(error);
@@ -521,8 +506,6 @@ describe('Whisper Tests', function () {
         context('run device2', function () {
         
             it('send chat message, trigger notification (from device2, on device1) & device 1 receives message', function (done) {
-                this.timeout(0);
-                
                 // watch for chat messages sent by device 2
                 var onCreationError = function (error) {
                     done(error);
