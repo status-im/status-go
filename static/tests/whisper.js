@@ -4,6 +4,7 @@ var assert = chai.assert;
 var Web3 = require('web3');
 
 describe('Whisper Tests', function () {
+    this.timeout(0);
     var web3 = new Web3();
     // status peer
     var node1 = new Web3(new Web3.providers.HttpProvider('http://localhost:8645'));
@@ -41,7 +42,7 @@ describe('Whisper Tests', function () {
     };
 
     console.log('Node is expected: statusd --datadir app1 wnode --http --httpport 8645');
-    console.log('Node is expected: statusd --datadir app1 wnode --http --httpport 8745');
+    console.log('Node is expected: statusd --datadir app2 wnode --http --httpport 8745');
     console.log('Node is expected: statusd --datadir wnode1 wnode --notify --injectaccounts=false --identity ./static/keys/wnodekey --firebaseauth ./static/keys/firebaseauthkey --http --httpport 8845');
 
     if (!node1.isConnected()) throw 'node1 is not available!';
@@ -265,7 +266,7 @@ describe('Whisper Tests', function () {
         });
     });
 
-    context('chat messages & push notifications', function () {
+    context('push notifications', function () {
         var discoveryPubKey = '0x040edb0d71a3dbe928e154fcb696ffbda359b153a90efc2b46f0043ce9f5dbe55b77b9328fd841a1db5273758624afadd5b39638d4c35b36b3a96e1a586c1b4c2a';
         var discoverServerTopic = '0x268302f3'; // DISCOVER_NOTIFICATION_SERVER
         var proposeServerTopic = '0x08e3d8c0'; // PROPOSE_NOTIFICATION_SERVER
@@ -486,22 +487,8 @@ describe('Whisper Tests', function () {
 
         context('run device2', function () {
         
-            it('send chat message, trigger notification (from device2, on device1) & device 1 receives message', function (done) {
-                // watch for chat messages sent by device 2
-                var onCreationError = function (error) {
-                    done(error);
-                }
-                var onMessage = function (error, message) {
-                    done(error);
-                }
-                var params = {
-                    symKeyId: chatKeyId1,
-                    topics: [sendNotificationTopic]
-                }
-                filter = node1.shh.newMessageFilter(params, null, onCreationError);
-                watchFilter(filter, onMessage, done);      
-                
-                // send message + notification request (from device2, on device1)
+            it('trigger notification (from device2, on device1)', function () {
+                // notification request (from device2, on device1)
                 var message = {
                     symKeyId: chatKeyId2,
                     ttl: ttl,
