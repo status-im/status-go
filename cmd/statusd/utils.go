@@ -1494,7 +1494,10 @@ func testValidateNodeConfig(t *testing.T, config string, fn func(common.APIDetai
 }
 
 func testProfiling(t *testing.T) bool {
-	StartProfiling(C.CString(""))
+	if err := profiling.Start(""); err != nil {
+		t.Error("Cannot start profiling:", err)
+		return false
+	}
 
 	address, _, _, err := statusAPI.CreateAccount(TestConfig.Account1.Password)
 	if err != nil {
@@ -1504,7 +1507,10 @@ func testProfiling(t *testing.T) bool {
 
 	t.Log("Account created: ", address)
 
-	profiling.Stop()
+	if err := profiling.Stop(); err != nil {
+		t.Error("Cannot stop profiling:", err)
+		return false
+	}
 
 	return true
 }
