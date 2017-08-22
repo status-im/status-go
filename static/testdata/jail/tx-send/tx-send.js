@@ -54,6 +54,30 @@ function call(pathStr, paramsStr) {
     return JSON.stringify(res);
 }
 
+function sendAsyncTransaction(params) {
+    var data = {
+        from: params.from,
+        to: params.to,
+        value: web3.toWei(params.value, "ether")
+    };
+
+    // message_id allows you to distinguish between !send invocations
+    // (when you receive transaction queued event, message_id will be
+    // attached along the queued transaction id)
+    status.message_id = 'foobar';
+
+    // Blocking call, it will return when transaction is complete.
+    // While call is executing, status-go will call up the application,
+    // allowing it to validate and complete transaction
+    var hash
+
+    web3.eth.sendTransaction(data, function(h){
+      hash = h
+    });
+
+    return {"transaction-hash": hash};
+}
+
 function sendTransaction(params) {
     var data = {
         from: params.from,
@@ -75,6 +99,7 @@ function sendTransaction(params) {
 }
 
 _status_catalog.commands['send'] = sendTransaction;
+_status_catalog.commands['sendAsync'] = sendAsyncTransaction;
 _status_catalog.commands['getBalance'] = function (params) {
     var balance = web3.eth.getBalance(params.address);
     balance = web3.fromWei(balance, "ether");

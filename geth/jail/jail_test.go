@@ -19,7 +19,10 @@ const (
 	testChatID = "testChat"
 )
 
-var baseStatusJSCode = string(static.MustAsset("testdata/jail/status.js"))
+var (
+	baseStatusJSCode = string(static.MustAsset("testdata/jail/status.js"))
+	txJSCode         = string(static.MustAsset("testdata/jail/tx-send/tx-send.js"))
+)
 
 func TestJailTestSuite(t *testing.T) {
 	suite.Run(t, new(JailTestSuite))
@@ -118,23 +121,10 @@ func (s *JailTestSuite) TestFunctionCall() {
 
 func (s *JailTestSuite) TestJailRPCAsyncSend() {
 	require := s.Require()
-	var wg sync.WaitGroup
-	txSendAsync := `
-		_status_catalog.commands.send({
-			"from": "` + TestConfig.Account1.Address + `",
-			"to": "` + TestConfig.Account2.Address + `",
-			"value": "0.000001"
-		})
-	`
-	rxSendJS := LoadFromFile("../../static/testdata/jail/tx-send/rx-send.js")
-	require.NotEmpty(rxSendJS, "Base script is empty")
-
-	s.StartTestNode(params.RopstenNetworkID)
-	defer s.StopTestNode()
 
 	// load Status JS and add test command to it
 	s.jail.BaseJS(baseStatusJSCode)
-	s.jail.Parse(testChatID, rxSendJS)
+	s.jail.Parse(testChatID, txJSCode)
 
 	cell, err := s.jail.GetCell(testChatID)
 	require.NoError(err)
@@ -142,12 +132,19 @@ func (s *JailTestSuite) TestJailRPCAsyncSend() {
 
 	// internally (since we replaced `web3.send` with `jail.Send`)
 	// all requests to web3 are forwarded to `jail.Send`
+	var wg sync.WaitGroup
 	for i := 0; i < 20; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 
-			_, err = cell.Run(txSendAsync)
+			_, err = cell.Run(`
+			_status_catalog.commands.sendAsync({
+				"from": "` + TestConfig.Account1.Address + `",
+				"to": "` + TestConfig.Account2.Address + `",
+				"value": "0.000001"
+			})
+		`)
 			require.NoError(err, "Request failed to process")
 		}()
 	}
