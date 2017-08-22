@@ -308,8 +308,9 @@ func Call(chatID *C.char, path *C.char, params *C.char) *C.char {
 }
 
 //export StartProfiling
-func StartProfiling(path *C.char) {
-	profiling.Start(C.GoString(path))
+func StartProfiling(path *C.char) *C.char {
+	err := profiling.Start(C.GoString(path))
+	return makeJSONResponse(err)
 }
 
 func makeJSONResponse(err error) *C.char {
