@@ -78,13 +78,13 @@ func (suite *TxQueueTestSuite) TestCompleteTransaction() {
 	go func() {
 		_, err := m.CompleteTransaction(tx.ID, TestConfig.Account1.Password)
 		if err != errTxAssumedSent {
-			suite.Fail("failed to complete transaction: %s", err)
+			suite.Fail(err.Error())
 		}
 	}()
 
 	err = m.WaitForTransaction(tx)
 	if err != errTxAssumedSent {
-		suite.Fail("unexpected transaction error: %s", err)
+		suite.Fail(err.Error())
 	}
 
 	// Check that error is assigned to the transaction.
@@ -211,7 +211,7 @@ func (suite *TxQueueTestSuite) TestDiscardTransaction() {
 
 	err = m.WaitForTransaction(tx)
 	if err != ErrQueuedTxDiscarded {
-		suite.Fail("unexpected transaction error: %s", err)
+		suite.Fail(err.Error())
 	}
 
 	// Check that error is assigned to the transaction.

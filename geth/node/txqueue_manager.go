@@ -116,7 +116,9 @@ func (m *TxQueueManager) NotifyOnQueuedTxReturn(queuedTx *common.QueuedTx, err e
 	m.txQueue.NotifyOnQueuedTxReturn(queuedTx, err)
 }
 
-// CompleteTransaction instructs backend to complete sending of a given transaction
+// CompleteTransaction instructs backend to complete sending of a given transaction.
+// TODO(adam): investiagte a possible bug that calling this method multiple times with the same Transaction ID
+// results in sending multiple transactions.
 func (m *TxQueueManager) CompleteTransaction(id common.QueuedTxID, password string) (gethcommon.Hash, error) {
 	log.Info("complete transaction", "id", id)
 
