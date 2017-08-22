@@ -2,7 +2,6 @@ package main
 
 import "C"
 import (
-	"context"
 	"encoding/json"
 	"io/ioutil"
 	"math/big"
@@ -16,7 +15,6 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/les/status"
 	gethparams "github.com/ethereum/go-ethereum/params"
 
 	"github.com/status-im/status-go/geth/common"
@@ -834,29 +832,25 @@ func testCompleteTransaction(t *testing.T) bool {
 	})
 
 	// this call blocks, up until Complete Transaction is called
-	queuedTx := txQueueManager.CreateTransaction(context.Background(), common.SendTxArgs{
+	txChechHash, err := statusAPI.SendTransaction(nil, common.SendTxArgs{
 		From:  common.FromAddress(TestConfig.Account1.Address),
 		To:    common.ToAddress(TestConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 	})
-	if err := txQueueManager.QueueTransaction(queuedTx); err != nil {
-		t.Errorf("Test failed: cannot queue transaction: %v", err)
-		return false
-	}
-	if err := txQueueManager.WaitForTransaction(queuedTx); err != nil {
-		t.Errorf("Test failed: could not complete transaction: %v", err)
+	if err != nil {
+		t.Errorf("Failed to SendTransaction: %s", err)
 		return false
 	}
 
 	<-queuedTxCompleted // make sure that complete transaction handler completes its magic, before we proceed
 
-	if txHash != queuedTx.Hash.Hex() {
+	if txHash != txChechHash.Hex() {
 		t.Errorf("Transaction hash returned from SendTransaction is invalid: expected %s, got %s",
-			queuedTx.Hash.Hex(), txHash)
+			txChechHash.Hex(), txHash)
 		return false
 	}
 
-	if reflect.DeepEqual(queuedTx.Hash, gethcommon.Hash{}) {
+	if reflect.DeepEqual(txChechHash, gethcommon.Hash{}) {
 		t.Error("Test failed: transaction was never queued or completed")
 		return false
 	}
@@ -870,15 +864,7 @@ func testCompleteTransaction(t *testing.T) bool {
 }
 
 func testCompleteMultipleQueuedTransactions(t *testing.T) bool {
-	les, err := statusAPI.NodeManager().LightEthereumService()
-	if err != nil {
-		t.Errorf("cannot get LES instance: %s", err)
-		return false
-	}
-
-	backend := les.StatusBackend
 	txQueue := statusAPI.TxQueueManager().TransactionQueue()
-
 	txQueue.Reset()
 
 	// log into account from which transactions will be sent
@@ -911,11 +897,11 @@ func testCompleteMultipleQueuedTransactions(t *testing.T) bool {
 
 	//  this call blocks, and should return when DiscardQueuedTransaction() for a given tx id is called
 	sendTx := func() {
-		txHashCheck, err := backend.SendTransaction(nil, status.SendTxArgs{
+		txHashCheck, err := statusAPI.SendTransaction(nil, common.SendTxArgs{
 			From:  common.FromAddress(TestConfig.Account1.Address),
 			To:    common.ToAddress(TestConfig.Account2.Address),
 			Value: (*hexutil.Big)(big.NewInt(1000000000000)),
-		}, TestConfig.Account1.Password)
+		})
 		if err != nil {
 			t.Errorf("unexpected error thrown: %v", err)
 			return
@@ -1011,19 +997,11 @@ func testCompleteMultipleQueuedTransactions(t *testing.T) bool {
 }
 
 func testDiscardTransaction(t *testing.T) bool {
-	les, err := statusAPI.NodeManager().LightEthereumService()
-	if err != nil {
-		t.Errorf("cannot get LES instance: %s", err)
-		return false
-	}
-
-	backend := les.StatusBackend
 	txQueue := statusAPI.TxQueueManager().TransactionQueue()
-
 	txQueue.Reset()
 
 	// log into account from which transactions will be sent
-	if err = statusAPI.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password); err != nil {
+	if err := statusAPI.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password); err != nil {
 		t.Errorf("cannot select account: %v", TestConfig.Account1.Address)
 		return false
 	}
@@ -1037,7 +1015,7 @@ func testDiscardTransaction(t *testing.T) bool {
 	txFailedEventCalled := false
 	node.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var envelope node.SignalEnvelope
-		if err = json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
+		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
 		}
@@ -1055,7 +1033,7 @@ func testDiscardTransaction(t *testing.T) bool {
 			discardResponse := common.DiscardTransactionResult{}
 			rawResponse := DiscardTransaction(C.CString(txID))
 
-			if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &discardResponse); err != nil {
+			if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &discardResponse); err != nil {
 				t.Errorf("cannot decode RecoverAccount response (%s): %v", C.GoString(rawResponse), err)
 			}
 
@@ -1065,7 +1043,7 @@ func testDiscardTransaction(t *testing.T) bool {
 			}
 
 			// try completing discarded transaction
-			_, err = statusAPI.CompleteTransaction(common.QueuedTxID(txID), TestConfig.Account1.Password)
+			_, err := statusAPI.CompleteTransaction(common.QueuedTxID(txID), TestConfig.Account1.Password)
 			if err != node.ErrQueuedTxIDNotFound {
 				t.Error("expects tx not found, but call to CompleteTransaction succeeded")
 				return
@@ -1101,13 +1079,12 @@ func testDiscardTransaction(t *testing.T) bool {
 		}
 	})
 
-	//  this call blocks, and should return when DiscardQueuedTransaction() is called
-
-	txHashCheck, err := backend.SendTransaction(nil, status.SendTxArgs{
+	// this call blocks, and should return when DiscardQueuedTransaction() is called
+	txHashCheck, err := statusAPI.SendTransaction(nil, common.SendTxArgs{
 		From:  common.FromAddress(TestConfig.Account1.Address),
 		To:    common.ToAddress(TestConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
-	}, TestConfig.Account1.Password)
+	})
 	if err != node.ErrQueuedTxDiscarded {
 		t.Errorf("expected error not thrown: %v", err)
 		return false
@@ -1132,15 +1109,7 @@ func testDiscardTransaction(t *testing.T) bool {
 }
 
 func testDiscardMultipleQueuedTransactions(t *testing.T) bool {
-	les, err := statusAPI.NodeManager().LightEthereumService()
-	if err != nil {
-		t.Errorf("cannot get LES instance: %s", err)
-		return false
-	}
-
-	backend := les.StatusBackend
 	txQueue := statusAPI.TxQueueManager().TransactionQueue()
-
 	txQueue.Reset()
 
 	// log into account from which transactions will be sent
@@ -1200,13 +1169,13 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool {
 		}
 	})
 
-	//  this call blocks, and should return when DiscardQueuedTransaction() for a given tx id is called
+	// this call blocks, and should return when DiscardQueuedTransaction() for a given tx id is called
 	sendTx := func() {
-		txHashCheck, err := backend.SendTransaction(nil, status.SendTxArgs{
+		txHashCheck, err := statusAPI.SendTransaction(nil, common.SendTxArgs{
 			From:  common.FromAddress(TestConfig.Account1.Address),
 			To:    common.ToAddress(TestConfig.Account2.Address),
 			Value: (*hexutil.Big)(big.NewInt(1000000000000)),
-		}, TestConfig.Account1.Password)
+		})
 		if err != node.ErrQueuedTxDiscarded {
 			t.Errorf("expected error not thrown: %v", err)
 			return

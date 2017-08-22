@@ -1,6 +1,8 @@
 package api
 
 import (
+	"context"
+
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/geth/common"
@@ -144,6 +146,11 @@ func (api *StatusAPI) SelectAccount(address, password string) error {
 // Logout clears whisper identities
 func (api *StatusAPI) Logout() error {
 	return api.b.AccountManager().Logout()
+}
+
+// SendTransaction creates a new transaction and waits until it's complete.
+func (api *StatusAPI) SendTransaction(ctx context.Context, args common.SendTxArgs) (gethcommon.Hash, error) {
+	return api.b.SendTransaction(ctx, args)
 }
 
 // CompleteTransaction instructs backend to complete sending of a given transaction

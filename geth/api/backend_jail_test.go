@@ -67,10 +67,11 @@ func (s *BackendTestSuite) TestJailSendQueuedTransaction() {
 			} else {
 				require.Empty(messageId, "Message id is not required, but provided")
 			}
-			log.Info("Transaction queued (will be completed shortly)", "id", event["id"].(string))
 
-			txHash, err := s.backend.CompleteTransaction(event["id"].(common.QueuedTxID), TestConfig.Account1.Password)
+			txID := event["id"].(string)
+			txHash, err := s.backend.CompleteTransaction(common.QueuedTxID(txID), TestConfig.Account1.Password)
 			require.NoError(err, "cannot complete queued transaction[%v]", event["id"])
+
 			log.Info("Transaction complete", "URL", "https://ropsten.etherscan.io/tx/%s"+txHash.Hex())
 
 			txCompletedSuccessfully <- struct{}{} // so that timeout is aborted
@@ -221,7 +222,8 @@ func (s *BackendTestSuite) TestContractDeployment() {
 
 			s.NoError(s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 
-			txHash, err := s.backend.CompleteTransaction(event["id"].(common.QueuedTxID), TestConfig.Account1.Password)
+			txID := event["id"].(string)
+			txHash, err := s.backend.CompleteTransaction(common.QueuedTxID(txID), TestConfig.Account1.Password)
 			if s.NoError(err, event["id"]) {
 				s.T().Logf("contract transaction complete, URL: %s", "https://ropsten.etherscan.io/tx/"+txHash.Hex())
 			}
@@ -755,7 +757,8 @@ func (s *BackendTestSuite) TestJailVMPersistence() {
 			//}
 
 			//var txHash common.Hash
-			txHash, err := s.backend.CompleteTransaction(event["id"].(common.QueuedTxID), TestConfig.Account1.Password)
+			txID := event["id"].(string)
+			txHash, err := s.backend.CompleteTransaction(common.QueuedTxID(txID), TestConfig.Account1.Password)
 			require.NoError(err, "cannot complete queued transaction[%v]: %v", event["id"], err)
 
 			s.T().Logf("Transaction complete: https://ropsten.etherscan.io/tx/%s", txHash.Hex())
