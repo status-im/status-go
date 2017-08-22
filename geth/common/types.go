@@ -187,6 +187,9 @@ type EnqueuedTxReturnHandler func(*QueuedTx, error)
 
 // TxQueue is a queue of transactions.
 type TxQueue interface {
+	// Remove removes a transaction from the queue.
+	Remove(id QueuedTxID)
+
 	// Reset resets the state of the queue.
 	Reset()
 

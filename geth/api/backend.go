@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"sync"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -180,6 +181,25 @@ func (m *StatusBackend) ResetChainData() (<-chan struct{}, error) {
 // CallRPC executes RPC request on node's in-proc RPC server
 func (m *StatusBackend) CallRPC(inputJSON string) string {
 	return m.rpcManager.Call(inputJSON)
+}
+
+// SendTransaction creates a new transaction and waits until it's complete.
+func (m *StatusBackend) SendTransaction(ctx context.Context, args common.SendTxArgs) (gethcommon.Hash, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	tx := m.txQueueManager.CreateTransaction(ctx, args)
+
+	if err := m.txQueueManager.QueueTransaction(tx); err != nil {
+		return gethcommon.Hash{}, err
+	}
+
+	if err := m.txQueueManager.WaitForTransaction(tx); err != nil {
+		return gethcommon.Hash{}, err
+	}
+
+	return tx.Hash, nil
 }
 
 // CompleteTransaction instructs backend to complete sending of a given transaction

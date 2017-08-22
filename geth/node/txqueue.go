@@ -59,6 +59,10 @@ func NewTransactionQueue() *TxQueue {
 func (q *TxQueue) Start() {
 	log.Info("StatusIM: starting transaction queue")
 
+	if q.stopped != nil {
+		return
+	}
+
 	q.stopped = make(chan struct{})
 	q.stoppedGroup.Add(2)
 
@@ -69,8 +73,16 @@ func (q *TxQueue) Start() {
 // Stop stops transaction enqueue and eviction loops
 func (q *TxQueue) Stop() {
 	log.Info("StatusIM: stopping transaction queue")
+
+	if q.stopped == nil {
+		return
+	}
+
 	close(q.stopped) // stops all processing loops (enqueue, eviction etc)
 	q.stoppedGroup.Wait()
+	q.stopped = nil
+
+	log.Info("StatusIM: finally stopped transaction queue")
 }
 
 // evictionLoop frees up queue to accommodate another transaction item

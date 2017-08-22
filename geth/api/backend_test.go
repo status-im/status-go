@@ -102,6 +102,10 @@ func (s *BackendTestSuite) LightEthereumService() *les.LightEthereum {
 	return lightEthereum
 }
 
+func (s *BackendTestSuite) TxQueueManager() common.TxQueueManager {
+	return s.backend.TxQueueManager()
+}
+
 func (s *BackendTestSuite) RestartTestNode() {
 	require := s.Require()
 	require.NotNil(s.backend)
@@ -365,12 +369,14 @@ func (s *BackendTestSuite) TestRaceConditions() {
 		},
 		func(config *params.NodeConfig) {
 			log.Info("CompleteTransactions()")
-			s.T().Logf("CompleteTransactions(), result: %v", s.backend.CompleteTransactions(`["id1","id2"]`, "password"))
+			ids := []common.QueuedTxID{"id1", "id2"}
+			s.T().Logf("CompleteTransactions(), result: %v", s.backend.CompleteTransactions(ids, "password"))
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
 			log.Info("DiscardTransactions()")
-			s.T().Logf("DiscardTransactions(), result: %v", s.backend.DiscardTransactions(`["id1","id2"]`))
+			ids := []common.QueuedTxID{"id1", "id2"}
+			s.T().Logf("DiscardTransactions(), result: %v", s.backend.DiscardTransactions(ids))
 			progress <- struct{}{}
 		},
 	}
