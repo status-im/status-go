@@ -138,13 +138,11 @@ func (s *JailTestSuite) TestJailRPCAsyncSend() {
 		go func() {
 			defer wg.Done()
 
-			_, err = cell.Run(`
-			_status_catalog.commands.sendAsync({
+			_, err = cell.Run(`_status_catalog.commands.sendAsync({
 				"from": "` + TestConfig.Account1.Address + `",
 				"to": "` + TestConfig.Account2.Address + `",
 				"value": "0.000001"
-			})
-		`)
+			})`)
 			require.NoError(err, "Request failed to process")
 		}()
 	}
