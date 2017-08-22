@@ -31,6 +31,10 @@ const (
 	testChatID      = "testChat"
 )
 
+var (
+	baseStatusJSCode = string(static.MustAsset("testdata/jail/status.js"))
+)
+
 func (s *BackendTestSuite) TestJailSendQueuedTransaction() {
 	require := s.Require()
 
@@ -268,8 +272,6 @@ func (s *BackendTestSuite) TestContractDeployment() {
 	require.Equal(expectedResponse, response)
 	s.T().Logf("estimation complete: %s", response)
 }
-
-var baseStatusJSCode = string(static.MustAsset("testdata/jail/status.js"))
 
 func (s *BackendTestSuite) TestJailWhisper() {
 	require := s.Require()
@@ -541,11 +543,8 @@ func (s *BackendTestSuite) TestJailWhisper() {
 		require.NoError(err, "cannot get VM")
 
 		// post messages
-		if _, err := cell.Run(testCase.testCode); err != nil {
-			// fmt.Printf("Current Test: %+s\n", testCase.testCode)
-			require.Fail(err.Error())
-			return
-		}
+		_, err = cell.Run(testCase.testCode)
+		require.NoError(err)
 
 		if !testCase.useFilter {
 			continue
@@ -649,7 +648,8 @@ func (s *BackendTestSuite) TestJailVMPersistence() {
 	}
 
 	jailInstance := s.backend.JailManager()
-	jailInstance.BaseJS(string(static.MustAsset("testdata/jail/status.js")))
+	jailInstance.BaseJS(baseStatusJSCode)
+
 	parseResult := jailInstance.Parse(testChatID, `
 		var total = 0;
 		_status_catalog['ping'] = function(params) {
