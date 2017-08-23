@@ -321,8 +321,33 @@ func (s *ManagerTestSuite) TestReferences() {
 	}
 }
 
-// TestNodeSynchronization validates the working of new node synchronization API.
-func (s *ManagerTestSuite) TestNodeSynchronization() {
+// TestNodeSynchronizationFailure validates the failure of node synchronization if LightEthereum is disabled.
+func (s *ManagerTestSuite) TestNodeSynchronizationFailure() {
+	require := s.Require()
+
+	nodeConfig, err := MakeTestNodeConfig(params.RopstenNetworkID)
+	require.NoError(err)
+
+	nodeConfig.LightEthConfig.Enabled = false
+
+	nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
+	require.NoError(err)
+	require.NotNil(nodeStarted)
+
+	defer s.NodeManager.StopNode()
+	<-nodeStarted
+
+	// Validate that synchronization has indeed started.
+	syncStartedError := s.NodeManager.HasNodeSyncStarted()
+	require.NotNil(syncStartedError)
+
+	// Validate that synchronization was indeed completed.
+	syncCompletedError := s.NodeManager.HasNodeSyncCompleted()
+	require.NotNil(syncCompletedError)
+}
+
+// TestNodeSynchronizationSuccess validates the working of new node synchronization API.
+func (s *ManagerTestSuite) TestNodeSynchronizationSuccess() {
 	require := s.Require()
 
 	nodeConfig, err := MakeTestNodeConfig(params.RopstenNetworkID)

@@ -98,6 +98,7 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 					close(m.nodeSyncError)
 					return
 				case <-syncStateWait.C:
+					// fmt.Printf("Started?: %t -> %#q\n", downlder.Synchronising(), progress)
 					if downlder.Synchronising() {
 						close(m.nodeSyncStarted)
 						break nloop
@@ -118,7 +119,9 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 					close(m.nodeSyncError)
 					return
 				case <-syncStateWait.C:
-					if downlder.Synchronising() {
+					progress := downlder.Progress()
+					// fmt.Printf("Completed?: %t -> %#q\n", downlder.Synchronising(), progress)
+					if progress.CurrentBlock >= progress.HighestBlock {
 						close(m.nodeSyncCompleted)
 						break cloop
 					}
