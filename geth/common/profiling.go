@@ -40,6 +40,7 @@ func StopCPUProfile() error {
 	return cpuFile.Close()
 }
 
+// Write heap memory to a file
 func WriteHeapFile(dataDir string) error {
 	if memFile == nil {
 		var err error
