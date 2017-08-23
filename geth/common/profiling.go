@@ -3,6 +3,7 @@ package common
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"runtime/pprof"
 )
 
@@ -49,5 +50,6 @@ func WriteHeapFile(dataDir string) error {
 			return err
 		}
 	}
+	runtime.GC()
 	return pprof.WriteHeapProfile(memFile)
 }
