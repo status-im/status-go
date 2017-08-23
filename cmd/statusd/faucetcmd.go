@@ -14,6 +14,7 @@ var (
 		Usage:  "Starts faucet node (light node used by faucet service to request Ether)",
 		Flags: []cli.Flag{
 			HTTPPortFlag,
+			HTTPEnabledFlag,
 		},
 	}
 )
