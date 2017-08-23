@@ -22,7 +22,7 @@ func init() {
 func SetLevel(level string) {
 	lvl, err := log.LvlFromString(strings.ToLower(level))
 	if err != nil {
-		fmt.Printf("Incorrect log level: %s, using defaults", level)
+		fmt.Printf("Incorrect log level: %s, using defaults\n", level)
 		lvl = log.LvlInfo
 	}
 
