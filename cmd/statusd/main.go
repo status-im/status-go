@@ -154,7 +154,7 @@ func makeNodeConfig(ctx *cli.Context) (*params.NodeConfig, error) {
 	if logLevel := ctx.GlobalString(LogLevelFlag.Name); len(logLevel) > 0 {
 		nodeConfig.LogEnabled = true
 		nodeConfig.LogLevel = logLevel
-		log.Init(logLevel)
+		log.SetLevel(logLevel)
 	}
 
 	return nodeConfig, nil

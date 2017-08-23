@@ -10,12 +10,16 @@ import (
 // logger is package scope instance of log.Logger
 var logger = log.New("geth", "StatusIM")
 
+func init() {
+	SetLevel("INFO")
+}
+
 // Init inits status and ethereum-go logging packages,
 // enabling logging and setting up proper log level.
 //
 // Our log levels are in form "DEBUG|ERROR|WARN|etc", while
 // ethereum-go expects names in lower case: "debug|error|warn|etc".
-func Init(level string) {
+func SetLevel(level string) {
 	lvl, err := log.LvlFromString(strings.ToLower(level))
 	if err != nil {
 		fmt.Printf("Incorrect log level: %s, using defaults", level)
