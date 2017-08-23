@@ -84,9 +84,6 @@ const (
 	// WhisperTTL is time to live for messages, in seconds
 	WhisperTTL = 120
 
-	// FirebaseNotificationTriggerURL is URL where FCM notification requests are sent to
-	FirebaseNotificationTriggerURL = "https://fcm.googleapis.com/fcm/send"
-
 	// UpstreamMainNetEthereumNetworkURL is URL where the upstream ethereum network is loaded to
 	// allow us avoid syncing node.
 	UpstreamMainNetEthereumNetworkURL = "https://mainnet.infura.io/nKmXgiFgc2KqtoQ8BCGJ"
