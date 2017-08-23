@@ -307,9 +307,15 @@ func Call(chatID *C.char, path *C.char, params *C.char) *C.char {
 	return C.CString(res)
 }
 
-//export StartProfiling
-func StartProfiling(path *C.char) *C.char {
-	err := profiling.Start(C.GoString(path))
+//export StartCPUProfile
+func StartCPUProfile(path *C.char) *C.char {
+	err := common.StartCPUProfile(C.GoString(path))
+	return makeJSONResponse(err)
+}
+
+//export WriteHeapProfile
+func WriteHeapProfile(path *C.char) *C.char {
+	err := common.WriteHeapFile(C.GoString(path))
 	return makeJSONResponse(err)
 }
 

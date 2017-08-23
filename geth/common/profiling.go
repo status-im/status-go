@@ -11,39 +11,42 @@ const (
 	MemProfilingFilename = "status_mem.prof"
 )
 
-type Profiling struct {
+var (
 	cpuFile *os.File
 	memFile *os.File
-}
-
-// Returns new profiling struct
-func NewProfiling() *Profiling {
-	return &Profiling{}
-}
+)
 
 // Enables CPU profiling for the current process.
 // While profiling, the profile will be buffered and written to file in folder dataDir
-func (p *Profiling) Start(dataDir string) error {
-	if err := p.setup(dataDir); err != nil {
-		return err
+func StartCPUProfile(dataDir string) error {
+	if cpuFile == nil {
+		var err error
+		cpuFile, err = os.Create(filepath.Join(dataDir, CpuProfilingFilename))
+		if err != nil {
+			return err
+		}
 	}
-	return pprof.StartCPUProfile(p.cpuFile)
+
+	return pprof.StartCPUProfile(cpuFile)
+
 }
 
 // Stops the current CPU profile, if any and closes the file
-func (p *Profiling) Stop() error {
+func StopCPUProfile() error {
+	if cpuFile == nil {
+		return nil
+	}
 	pprof.StopCPUProfile()
-	return pprof.WriteHeapProfile(p.memFile)
+	return cpuFile.Close()
 }
 
-// Setup cpu and mem profiling
-func (p *Profiling) setup(dataDir string) error {
-	var err error
-	p.cpuFile, err = os.Create(filepath.Join(dataDir, CpuProfilingFilename))
-	if err != nil {
-		return err
+func WriteHeapFile(dataDir string) error {
+	if memFile == nil {
+		var err error
+		memFile, err = os.Create(filepath.Join(dataDir, MemProfilingFilename))
+		if err != nil {
+			return err
+		}
 	}
-
-	p.memFile, err = os.Create(filepath.Join(dataDir, MemProfilingFilename))
-	return err
+	return pprof.WriteHeapProfile(memFile)
 }

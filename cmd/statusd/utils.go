@@ -1494,7 +1494,7 @@ func testValidateNodeConfig(t *testing.T, config string, fn func(common.APIDetai
 }
 
 func testProfiling(t *testing.T) bool {
-	if err := profiling.Start(""); err != nil {
+	if err := common.StartCPUProfile(""); err != nil {
 		t.Error("Cannot start profiling:", err)
 		return false
 	}
@@ -1507,7 +1507,7 @@ func testProfiling(t *testing.T) bool {
 
 	t.Log("Account created: ", address)
 
-	if err := profiling.Stop(); err != nil {
+	if err := common.StopCPUProfile(); err != nil {
 		t.Error("Cannot stop profiling:", err)
 		return false
 	}
