@@ -321,6 +321,31 @@ func (s *ManagerTestSuite) TestReferences() {
 	}
 }
 
+// TestNodeSynchronization validates the working of new node synchronization API.
+func (s *ManagerTestSuite) TestNodeSynchronization() {
+	require := s.Require()
+
+	nodeConfig, err := MakeTestNodeConfig(params.RopstenNetworkID)
+	require.NoError(err)
+
+	nodeConfig.LightEthConfig.Enabled = true
+
+	nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
+	require.NoError(err)
+	require.NotNil(nodeStarted)
+
+	defer s.NodeManager.StopNode()
+	<-nodeStarted
+
+	// Validate that synchronization has indeed started.
+	syncStartedError := s.NodeManager.HasNodeSyncStarted()
+	require.NoError(syncStartedError)
+
+	// Validate that synchronization was indeed completed.
+	syncCompletedError := s.NodeManager.HasNodeSyncCompleted()
+	require.NoError(syncCompletedError)
+}
+
 func (s *ManagerTestSuite) TestNodeStartStop() {
 	require := s.Require()
 	require.NotNil(s.NodeManager)

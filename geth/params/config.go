@@ -54,6 +54,8 @@ type LightEthConfig struct {
 
 	// DatabaseCache is memory (in MBs) allocated to internal caching (min 16MB / database forced)
 	DatabaseCache int
+
+	// TODO(influx6) should we allow setting delay for synchronization checks here as well.
 }
 
 // FirebaseConfig holds FCM-related configuration

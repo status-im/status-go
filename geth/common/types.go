@@ -67,6 +67,12 @@ type NodeManager interface {
 	// Node returns underlying Status node
 	Node() (*node.Node, error)
 
+	// HasNodeSyncCompleted returns an error if node sync failed to complete.
+	HasNodeSyncCompleted() error
+
+	// HasNodeSyncStarted returns an error if node failed to start synchronization.
+	HasNodeSyncStarted() error
+
 	// PopulateStaticPeers populates node's list of static bootstrap peers
 	PopulateStaticPeers() error
 
