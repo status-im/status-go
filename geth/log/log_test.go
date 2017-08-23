@@ -36,7 +36,7 @@ func TestLogLevels(t *testing.T) {
 	for _, test := range tests {
 		buf.Reset()
 
-		initWithHandler(test.lvl, handler)
+		setHandler(test.lvl, handler)
 
 		Trace(trace)
 		Debug(debug)

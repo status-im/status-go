@@ -26,12 +26,12 @@ func SetLevel(level string) {
 		lvl = log.LvlInfo
 	}
 
-	initWithHandler(lvl, log.StdoutHandler)
+	setHandler(lvl, log.StdoutHandler)
 }
 
-// initWithHandler is a init helper that allows (re)initialization
+// setHandler is a init helper that allows (re)initialization
 // with different handler. Useful for testing.
-func initWithHandler(lvl log.Lvl, handler log.Handler) {
+func setHandler(lvl log.Lvl, handler log.Handler) {
 	h := log.LvlFilterHandler(lvl, handler)
 	logger.SetHandler(h)
 	log.Root().SetHandler(h) // ethereum-go logger
