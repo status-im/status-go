@@ -14,7 +14,7 @@ func init() {
 	SetLevel("INFO")
 }
 
-// Init inits status and ethereum-go logging packages,
+// SetLevel inits status and ethereum-go logging packages,
 // enabling logging and setting up proper log level.
 //
 // Our log levels are in form "DEBUG|ERROR|WARN|etc", while
