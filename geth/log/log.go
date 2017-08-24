@@ -1,75 +1,68 @@
 package log
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/ethereum/go-ethereum/log"
 )
 
-// Logger is wrapper for go-ethereum log
-type Logger struct {
-	output log.Logger
+// logger is package scope instance of log.Logger
+var logger = log.New("geth", "StatusIM")
+
+func init() {
+	SetLevel("INFO")
 }
 
-// Instance to a logger struct
-var logger *Logger
+// SetLevel inits status and ethereum-go logging packages,
+// enabling logging and setting up proper log level.
+//
+// Our log levels are in form "DEBUG|ERROR|WARN|etc", while
+// ethereum-go expects names in lower case: "debug|error|warn|etc".
+func SetLevel(level string) {
+	lvl, err := log.LvlFromString(strings.ToLower(level))
+	if err != nil {
+		fmt.Printf("Incorrect log level: %s, using defaults\n", level)
+		lvl = log.LvlInfo
+	}
 
-// Trace is a convenient alias for Root().Trace
+	setHandler(lvl, log.StdoutHandler)
+}
+
+// setHandler is a init helper that allows (re)initialization
+// with different handler. Useful for testing.
+func setHandler(lvl log.Lvl, handler log.Handler) {
+	h := log.LvlFilterHandler(lvl, handler)
+	logger.SetHandler(h)
+	log.Root().SetHandler(h) // ethereum-go logger
+}
+
+// Trace is a package scope alias for logger.Trace
 func Trace(msg string, ctx ...interface{}) {
-	printLog(log.LvlTrace, msg, ctx...)
+	logger.Trace(msg, ctx...)
 }
 
-// Debug is a convenient alias for Root().Debug
+// Debug is a package scope for logger.Debug
 func Debug(msg string, ctx ...interface{}) {
-	printLog(log.LvlDebug, msg, ctx...)
+	logger.Debug(msg, ctx...)
 }
 
-// Info is a convenient alias for Root().Info
+// Info is a package scope for logger.Info
 func Info(msg string, ctx ...interface{}) {
-	printLog(log.LvlInfo, msg, ctx...)
+	logger.Info(msg, ctx...)
 }
 
-// Warn is a convenient alias for Root().Warn
+// Warn is a package scope for logger.Warn
 func Warn(msg string, ctx ...interface{}) {
-	printLog(log.LvlWarn, msg, ctx...)
+	logger.Warn(msg, ctx...)
 }
 
-// Error is a convenient alias for Root().Error
+// Error is a package scope for logger.Error
 func Error(msg string, ctx ...interface{}) {
-	printLog(log.LvlError, msg, ctx...)
+	logger.Error(msg, ctx...)
 }
 
-// Crit is a convenient alias for Root().Crit
+// Crit is a package scope for logger.Crit
 func Crit(msg string, ctx ...interface{}) {
-	printLog(log.LvlCrit, msg, ctx...)
-}
-
-// outputs the log to a given log config level
-func printLog(lvl log.Lvl, msg string, ctx ...interface{}) {
-	if logger == nil {
-		logger = &Logger{
-			output: log.New("geth", "StatusIM"),
-		}
-		logger.output.SetHandler(log.StdoutHandler)
-	}
-
-	switch lvl {
-
-	case log.LvlError:
-		logger.output.Error(msg, ctx...)
-
-	case log.LvlWarn:
-		logger.output.Warn(msg, ctx...)
-
-	case log.LvlInfo:
-		logger.output.Info(msg, ctx...)
-
-	case log.LvlDebug:
-		logger.output.Debug(msg, ctx...)
-
-	case log.LvlTrace:
-		logger.output.Trace(msg, ctx...)
-
-	default:
-		logger.output.Info(msg, ctx...)
-
-	}
+	logger.Crit(msg, ctx...)
 }
