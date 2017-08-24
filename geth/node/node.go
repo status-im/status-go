@@ -129,11 +129,6 @@ func defaultEmbeddedNodeConfig(config *params.NodeConfig) *node.Config {
 	return nc
 }
 
-// startSyncProgressWatch listens into the provided LightEthereum client for sync progress.
-func startSyncProgressWatch(eth *les.LightEthereum, config *params.NodeConfig) {
-
-}
-
 // updateCHT changes trusted canonical hash trie root
 func updateCHT(eth *les.LightEthereum, config *params.NodeConfig) {
 	if !config.BootClusterConfig.Enabled {
