@@ -2,6 +2,8 @@ package log
 
 import (
 	"bytes"
+	"io/ioutil"
+	"strings"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/log"
@@ -47,5 +49,34 @@ func TestLogLevels(t *testing.T) {
 		if buf.String() != test.out {
 			t.Errorf("Expecting log output to be '%s', got '%s'", test.out, buf.String())
 		}
+	}
+}
+
+func TestLogFile(t *testing.T) {
+	file, err := ioutil.TempFile("", "statusim_log_test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+
+	// setup log
+	SetLevel("INFO")
+	SetLogFile(file.Name())
+
+	// test log output to file
+	Info(info)
+	Debug(debug)
+
+	data, err := ioutil.ReadAll(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := string(data)
+	if !strings.Contains(got, info) {
+		t.Fatalf("Expecting log output should contain '%s', but got '%s'\n", info, got)
+	}
+	if strings.Contains(got, debug) {
+		t.Fatalf("Expecting log output should NOT contain '%s', but got '%s'\n", debug, got)
 	}
 }
