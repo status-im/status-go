@@ -71,8 +71,6 @@ func (m *StatusBackend) StartNode(config *params.NodeConfig) (<-chan struct{}, e
 	m.Lock()
 	defer m.Unlock()
 
-	m.txQueueManager.Start()
-
 	if m.nodeReady != nil {
 		return nil, node.ErrNodeExists
 	}
@@ -81,6 +79,8 @@ func (m *StatusBackend) StartNode(config *params.NodeConfig) (<-chan struct{}, e
 	if err != nil {
 		return nil, err
 	}
+
+	m.txQueueManager.Start()
 
 	m.nodeReady = make(chan struct{}, 1)
 	go m.onNodeStart(nodeStarted, m.nodeReady) // waits on nodeStarted, writes to backendReady
@@ -111,8 +111,6 @@ func (m *StatusBackend) StopNode() (<-chan struct{}, error) {
 	m.Lock()
 	defer m.Unlock()
 
-	m.txQueueManager.Stop()
-
 	if m.nodeReady == nil {
 		return nil, node.ErrNoRunningNode
 	}
@@ -122,6 +120,8 @@ func (m *StatusBackend) StopNode() (<-chan struct{}, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	m.txQueueManager.Stop()
 
 	backendStopped := make(chan struct{}, 1)
 	go func() {
