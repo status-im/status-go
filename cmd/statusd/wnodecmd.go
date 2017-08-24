@@ -177,6 +177,7 @@ func makeWhisperNodeConfig(ctx *cli.Context) (*params.NodeConfig, error) {
 	}
 
 	nodeConfig.LightEthConfig.Enabled = false
+	nodeConfig.RPCEnabled = ctx.Bool(HTTPEnabledFlag.Name)
 
 	whisperConfig := nodeConfig.WhisperConfig
 

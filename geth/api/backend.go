@@ -202,6 +202,7 @@ func (m *StatusBackend) registerHandlers() error {
 	var lightEthereum *les.LightEthereum
 	if err := runningNode.Service(&lightEthereum); err != nil {
 		log.Error("Cannot get light ethereum service", "error", err)
+		return err
 	}
 
 	lightEthereum.StatusBackend.SetAccountsFilterHandler(m.accountManager.AccountsListRequestHandler())
