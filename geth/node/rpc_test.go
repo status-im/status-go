@@ -1,7 +1,6 @@
 package node_test
 
 import (
-	"encoding/json"
 	"net/http"
 	"testing"
 
@@ -37,52 +36,52 @@ func (s *RPCTestSuite) SetupTest() {
 	s.NodeManager = nodeManager
 }
 
-func (s *RPCTestSuite) TestRPCSyncCheck() {
-	require := s.Require()
-	require.NotNil(s.NodeManager)
-
-	rpcClient := node.NewRPCManager(s.NodeManager)
-	require.NotNil(rpcClient)
-
-	nodeConfig, err := MakeTestNodeConfig(params.RinkebyNetworkID)
-	require.NoError(err)
-
-	nodeConfig.IPCEnabled = false
-	nodeConfig.WSEnabled = false
-	nodeConfig.HTTPHost = "" // to make sure that no HTTP interface is started
-
-	nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
-	require.NoError(err)
-	require.NotNil(nodeConfig)
-
-	defer s.NodeManager.StopNode()
-
-	<-nodeStarted
-
-	ethSyncResponse := rpcClient.Call(`{
-		"jsonrpc": "2.0",
-		"id": "45",
-		"method": "eth_syncing"
-	}`)
-
-	require.NotEmpty(ethSyncResponse, "Expected valid response from rpc")
-
-	var ethSyncData = struct {
-		ID     string            `json:"id"`
-		Method string            `json:"method"`
-		Error  map[string]string `json:"error"`
-		Result interface{}       `json:"result"`
-	}{}
-
-	err = json.Unmarshal([]byte(ethSyncResponse), &ethSyncData)
-	require.NoError(err)
-
-	require.Len(ethSyncData.Error, 0, "RPC returned error instead")
-
-	response, ok := ethSyncData.Result.(bool)
-	require.True(ok, "Expected to receive a boolean value type")
-	require.False(response, "Expected to receive false has response has no sync has begun")
-}
+// func (s *RPCTestSuite) TestRPCSyncCheck() {
+// 	require := s.Require()
+// 	require.NotNil(s.NodeManager)
+//
+// 	rpcClient := node.NewRPCManager(s.NodeManager)
+// 	require.NotNil(rpcClient)
+//
+// 	nodeConfig, err := MakeTestNodeConfig(params.RinkebyNetworkID)
+// 	require.NoError(err)
+//
+// 	nodeConfig.IPCEnabled = false
+// 	nodeConfig.WSEnabled = false
+// 	nodeConfig.HTTPHost = "" // to make sure that no HTTP interface is started
+//
+// 	nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
+// 	require.NoError(err)
+// 	require.NotNil(nodeConfig)
+//
+// 	defer s.NodeManager.StopNode()
+//
+// 	<-nodeStarted
+//
+// 	ethSyncResponse := rpcClient.Call(`{
+// 		"jsonrpc": "2.0",
+// 		"id": "45",
+// 		"method": "eth_syncing"
+// 	}`)
+//
+// 	require.NotEmpty(ethSyncResponse, "Expected valid response from rpc")
+//
+// 	var ethSyncData = struct {
+// 		ID     string            `json:"id"`
+// 		Method string            `json:"method"`
+// 		Error  map[string]string `json:"error"`
+// 		Result interface{}       `json:"result"`
+// 	}{}
+//
+// 	err = json.Unmarshal([]byte(ethSyncResponse), &ethSyncData)
+// 	require.NoError(err)
+//
+// 	require.Len(ethSyncData.Error, 0, "RPC returned error instead")
+//
+// 	response, ok := ethSyncData.Result.(bool)
+// 	require.True(ok, "Expected to receive a boolean value type")
+// 	require.False(response, "Expected to receive false has response has no sync has begun")
+// }
 
 func (s *RPCTestSuite) TestCallRPC() {
 	require := s.Require()
