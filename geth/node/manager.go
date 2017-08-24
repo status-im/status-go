@@ -94,6 +94,12 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 		nloop:
 			for {
 				select {
+				case <-m.nodeSyncError:
+					// Listen for error to ensure we are not in a case of concurrent runs of this,
+					// as I noticed an issue of double closure of channels but not way of knowing why.
+					// This provides us a benefit that the go-routine will instantly be shutdown if the channel
+					// was already closed.
+					return
 				case <-syncStateWaitMax.C:
 					close(m.nodeSyncError)
 					return
@@ -115,6 +121,12 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 		cloop:
 			for {
 				select {
+				case <-m.nodeSyncError:
+					// Listen for error to ensure we are not in a case of concurrent runs of this,
+					// as I noticed an issue of double closure of channels but not way of knowing why.
+					// This provides us a benefit that the go-routine will instantly be shutdown if the channel
+					// was already closed.
+					return
 				case <-syncStateWaitMax.C:
 					close(m.nodeSyncError)
 					return
@@ -140,7 +152,7 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 
 	// If we are expected to use external RPC upstream connection, then
 	// immediately close synchronization notification channel.
-	if config.RPCEnabled {
+	if config.UpstreamConfig.Enabled {
 		close(m.nodeSyncStarted)
 		close(m.nodeSyncCompleted)
 	}
@@ -198,6 +210,20 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 	}()
 
 	return m.nodeStarted, nil
+}
+
+// HasNodeSynchronized returns a non-nil error if NodeManager internal node fails to start or
+// complete synchronization.
+func (m *NodeManager) HasNodeSynchronized() error {
+	if err := m.HasNodeSyncStarted(); err != nil {
+		return err
+	}
+
+	if err := m.HasNodeSyncCompleted(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // HasNodeSyncCompleted returns an error if the node was node found, or has

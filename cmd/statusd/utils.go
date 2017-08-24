@@ -278,7 +278,11 @@ func testResetChainData(t *testing.T) bool {
 		return false
 	}
 
-	time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to re-sync blockchain
+	// time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to re-sync blockchain
+	if err := statusAPI.NodeManager().HasNodeSynchronized(); err != nil {
+		t.Errorf("failed to re-sync blockchain after ResetChainData: %+q", err)
+		return false
+	}
 
 	testCompleteTransaction(t)
 

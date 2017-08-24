@@ -37,7 +37,9 @@ func (s *BackendTestSuite) TestJailSendQueuedTransaction() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to sync
+	// time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to sync
+	syncErr := s.backend.NodeManager().HasNodeSynchronized()
+	require.NoError(syncErr)
 
 	// log into account from which transactions will be sent
 	require.NoError(s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
@@ -202,7 +204,9 @@ func (s *BackendTestSuite) TestContractDeployment() {
 	defer s.StopTestBackend()
 
 	// Allow to sync, otherwise you'll get "Nonce too low."
-	time.Sleep(TestConfig.Node.SyncSeconds * time.Second)
+	// time.Sleep(TestConfig.Node.SyncSeconds * time.Second)
+	syncErr := s.backend.NodeManager().HasNodeSynchronized()
+	require.NoError(syncErr)
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
 	jailInstance := s.backend.JailManager()
@@ -669,7 +673,9 @@ func (s *BackendTestSuite) TestJailVMPersistence() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to sync
+	// time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to sync
+	syncErr := s.backend.NodeManager().HasNodeSynchronized()
+	require.NoError(syncErr)
 
 	// log into account from which transactions will be sent
 	err := s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)

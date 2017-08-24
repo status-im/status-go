@@ -26,7 +26,9 @@ func (s *BackendTestSuite) TestSendContractTx() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to sync
+	// time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to sync
+	syncErr := s.backend.NodeManager().HasNodeSynchronized()
+	require.NoError(syncErr)
 
 	backend := s.LightEthereumService().StatusBackend
 	require.NotNil(backend)
@@ -104,7 +106,9 @@ func (s *BackendTestSuite) TestSendEtherTx() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to sync
+	// time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to sync
+	syncErr := s.backend.NodeManager().HasNodeSynchronized()
+	require.NoError(syncErr)
 
 	backend := s.LightEthereumService().StatusBackend
 	require.NotNil(backend)
@@ -176,7 +180,9 @@ func (s *BackendTestSuite) TestDoubleCompleteQueuedTransactions() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to sync
+	// time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to sync
+	syncErr := s.backend.NodeManager().HasNodeSynchronized()
+	require.NoError(syncErr)
 
 	backend := s.LightEthereumService().StatusBackend
 	require.NotNil(backend)
@@ -257,7 +263,9 @@ func (s *BackendTestSuite) TestDiscardQueuedTransaction() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to sync
+	// time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to sync
+	syncErr := s.backend.NodeManager().HasNodeSynchronized()
+	require.NoError(syncErr)
 
 	backend := s.LightEthereumService().StatusBackend
 	require.NotNil(backend)
@@ -338,7 +346,9 @@ func (s *BackendTestSuite) TestCompleteMultipleQueuedTransactions() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to sync
+	// time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to sync
+	syncErr := s.backend.NodeManager().HasNodeSynchronized()
+	require.NoError(syncErr)
 
 	backend := s.LightEthereumService().StatusBackend
 	require.NotNil(backend)
@@ -453,7 +463,9 @@ func (s *BackendTestSuite) TestDiscardMultipleQueuedTransactions() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to sync
+	// time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to sync
+	syncErr := s.backend.NodeManager().HasNodeSynchronized()
+	require.NoError(syncErr)
 
 	backend := s.LightEthereumService().StatusBackend
 	require.NotNil(backend)

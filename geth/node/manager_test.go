@@ -456,7 +456,9 @@ func (s *ManagerTestSuite) TestResetChainData() {
 	s.StartTestNode(params.RinkebyNetworkID, false)
 	defer s.StopTestNode()
 
-	time.Sleep(2 * time.Second) // allow to sync for some time
+	// time.Sleep(2 * time.Second) // allow to sync for some time
+	syncErr := s.NodeManager.HasNodeSynchronized()
+	require.NoError(syncErr)
 
 	s.True(s.NodeManager.IsNodeRunning())
 	nodeReady, err := s.NodeManager.ResetChainData()

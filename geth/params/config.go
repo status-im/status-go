@@ -563,7 +563,7 @@ func (c *NodeConfig) updateBootClusterConfig() error {
 		Dev         subClusterConfig `json:"dev"`
 	}
 
-	client := &http.Client{Timeout: 5 * time.Second}
+	client := &http.Client{Timeout: 25 * time.Second}
 	r, err := client.Get(BootClusterConfigURL + "?u=" + strconv.Itoa(int(time.Now().Unix())))
 	if err != nil {
 		return err
