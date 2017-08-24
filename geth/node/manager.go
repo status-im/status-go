@@ -96,7 +96,7 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 				select {
 				case <-m.nodeSyncError:
 					// Listen for error to ensure we are not in a case of concurrent runs of this,
-					// as I noticed an issue of double closure of channels but not way of knowing why.
+					// as I noticed an issue of double closure of channels, but no way of knowing why.
 					// This provides us a benefit that the go-routine will instantly be shutdown if the channel
 					// was already closed.
 					return
@@ -123,7 +123,7 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 				select {
 				case <-m.nodeSyncError:
 					// Listen for error to ensure we are not in a case of concurrent runs of this,
-					// as I noticed an issue of double closure of channels but not way of knowing why.
+					// as I noticed an issue of double closure of channels, but no way of knowing why.
 					// This provides us a benefit that the go-routine will instantly be shutdown if the channel
 					// was already closed.
 					return
@@ -157,11 +157,11 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 		close(m.nodeSyncCompleted)
 	}
 
-	// If we are not expected to have this running, then sync cant be done, close error.
-	// TODO(influx6): Find out if this is good or if we should instead just make sync a success.
-	if config.LightEthConfig == nil || !config.LightEthConfig.Enabled {
-		close(m.nodeSyncError)
-	}
+	// // If we are not expected to have this running, then sync cant be done, close error.
+	// // TODO(influx6): Find out if this is good or if we should instead just make sync a success.
+	// if config.LightEthConfig == nil || !config.LightEthConfig.Enabled {
+	// 	close(m.nodeSyncError)
+	// }
 
 	go func() {
 		defer HaltOnPanic()
