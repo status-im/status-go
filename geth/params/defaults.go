@@ -56,14 +56,6 @@ const (
 	// DatabaseCache is memory (in MBs) allocated to internal caching (min 16MB / database forced)
 	DatabaseCache = 16
 
-	// CHTRootConfigURL defines URL to file containing hard-coded CHT roots
-	// TODO remove this hack, once CHT sync is implemented on LES side
-	CHTRootConfigURL = "https://gist.githubusercontent.com/tiabc/83ed515fbb0c0e9d39700a6279072b6a/raw/a8c7b08488fab3c1d9139b18af33da3df823e3ff/cht.json"
-
-	// BootClusterConfigURL defines URL to file containing hard-coded CHT roots and boot nodes
-	// TODO remove this hack, once CHT sync is implemented on LES side
-	BootClusterConfigURL = "https://gist.githubusercontent.com/tiabc/83ed515fbb0c0e9d39700a6279072b6a/raw/a8c7b08488fab3c1d9139b18af33da3df823e3ff/cht.json"
-
 	// LogFile defines where to write logs to
 	LogFile = "geth.log"
 
