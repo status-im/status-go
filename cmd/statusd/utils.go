@@ -268,6 +268,8 @@ func testGetDefaultConfig(t *testing.T) bool {
 
 func testResetChainData(t *testing.T) bool {
 	resetChainDataResponse := common.APIResponse{}
+
+	//TODO(influx6): Should we apply the copy of chain directory and restore after test here?
 	rawResponse := ResetChainData()
 
 	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &resetChainDataResponse); err != nil {
