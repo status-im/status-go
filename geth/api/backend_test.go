@@ -1,6 +1,7 @@
 package api_test
 
 import (
+	"context"
 	"math/rand"
 	"testing"
 	"time"
@@ -60,6 +61,30 @@ func (s *BackendTestSuite) StopTestBackend() {
 	require.NoError(err)
 	<-backendStopped
 	require.False(s.backend.IsNodeRunning())
+}
+
+// EnsureNodeSync ensures that synchronization of the node is done once and that it
+// is done properly else, the call will fail.
+func (s *BackendTestSuite) EnsureNodeSync() {
+	if s.nodeSyncCompleted {
+		return
+	}
+
+	require := s.Require()
+
+	ethClient, err := s.NodeManager.LightEthereumService()
+	require.NoError(err)
+	require.NotNil(ethClient)
+
+	sync := node.NewSyncPoll(ethClient)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Hour)
+	defer cancel()
+
+	// Validate that synchronization failed because of time.
+	syncError := sync.Poll(ctx)
+	require.NoError(syncError)
+
+	s.nodeSyncCompleted = true
 }
 
 func (s *BackendTestSuite) WhisperService() *whisper.Whisper {

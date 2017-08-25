@@ -37,18 +37,7 @@ func (s *BackendTestSuite) TestJailSendQueuedTransaction() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	// time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to sync
-	ethClient, err := s.backend.NodeManager().LightEthereumService()
-	require.NoError(err)
-	require.NotNil(ethClient)
-
-	sync := node.NewSyncPoll(ethClient)
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Hour)
-	defer cancel()
-
-	// Validate that synchronization failed because of time.
-	syncError := sync.Poll(ctx)
-	require.NoError(syncError)
+	s.EnsureNodeSync()
 
 	// log into account from which transactions will be sent
 	require.NoError(s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
@@ -212,19 +201,7 @@ func (s *BackendTestSuite) TestContractDeployment() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	// Allow to sync, otherwise you'll get "Nonce too low."
-	// time.Sleep(TestConfig.Node.SyncSeconds * time.Second)
-	ethClient, err := s.backend.NodeManager().LightEthereumService()
-	require.NoError(err)
-	require.NotNil(ethClient)
-
-	sync := node.NewSyncPoll(ethClient)
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Hour)
-	defer cancel()
-
-	// Validate that synchronization failed because of time.
-	syncError := sync.Poll(ctx)
-	require.NoError(syncError)
+	s.EnsureNodeSync()
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
 	jailInstance := s.backend.JailManager()
@@ -691,20 +668,10 @@ func (s *BackendTestSuite) TestJailVMPersistence() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	ethClient, err := s.backend.NodeManager().LightEthereumService()
-	require.NoError(err)
-	require.NotNil(ethClient)
-
-	syncer := node.NewSyncPoll(ethClient)
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Hour)
-	defer cancel()
-
-	// Validate that synchronization failed because of time.
-	syncError := syncer.Poll(ctx)
-	require.NoError(syncError)
+	s.EnsureNodeSync()
 
 	// log into account from which transactions will be sent
-	err = s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
+	err := s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	require.NoError(err, "cannot select account: %v", TestConfig.Account1.Address)
 
 	type testCase struct {

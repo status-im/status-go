@@ -24,71 +24,54 @@ var (
 // SyncPoll provides a structure that allows us to check the status of
 // ethereum node synchronization.
 type SyncPoll struct {
-	eth *les.LightEthereum
+	eth        *les.LightEthereum
+	downloader *downloader.Downloader
 }
 
 // NewSyncPoll returns a new instance of SyncPoll.
 func NewSyncPoll(leth *les.LightEthereum) *SyncPoll {
 	return &SyncPoll{
-		eth: leth,
+		eth:        leth,
+		downloader: leth.Downloader(),
 	}
 }
 
 // Poll returns a channel which allows the user to listen for a done signal
 // as to when the node has finished syncing or stop due to an error.
 func (n *SyncPoll) Poll(ctx context.Context) error {
-	errChan := make(chan error)
-	downloader := n.eth.Downloader()
-
-	syncStart := make(chan struct{})
-	go n.pollSyncStart(ctx, syncStart, errChan, downloader)
-
-	// Block to be notified whether error occured or if sync has started
-	select {
-	case err := <-errChan:
+	if err := n.pollSyncStart(ctx); err != nil {
 		return err
-	case <-syncStart:
 	}
 
-	syncCompleted := make(chan struct{})
-	go n.pollSyncCompleted(ctx, syncCompleted, errChan, downloader)
-
-	// Block to be notified if node failed to complete sync or if context has expired.
-	select {
-	case err := <-errChan:
+	if err := n.pollSyncCompleted(ctx); err != nil {
 		return err
-	case <-syncCompleted:
 	}
 
 	return nil
 }
 
-func (n *SyncPoll) pollSyncStart(ctx context.Context, syncStart chan struct{}, errorChan chan error, downloader *downloader.Downloader) {
+func (n *SyncPoll) pollSyncStart(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			errorChan <- ErrNodeSyncFailedToStart
-			return
+			return ErrNodeSyncFailedToStart
 		case <-time.After(delayCycleForSyncStart):
-			if downloader.Synchronising() {
-				close(syncStart)
-				return
+			if n.downloader.Synchronising() {
+				return nil
 			}
 		}
 	}
 }
 
-func (n *SyncPoll) pollSyncCompleted(ctx context.Context, doneChan chan struct{}, errorChan chan error, downloader *downloader.Downloader) {
+func (n *SyncPoll) pollSyncCompleted(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			errorChan <- ErrNodeSyncTakesTooLong
-			return
+			return ErrNodeSyncTakesTooLong
 		case <-time.After(delayCycleForSyncStart):
-			progress := downloader.Progress()
+			progress := n.downloader.Progress()
 			if progress.CurrentBlock >= progress.HighestBlock {
-				close(doneChan)
-				return
+				return nil
 			}
 		}
 	}

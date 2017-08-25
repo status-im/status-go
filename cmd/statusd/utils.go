@@ -286,13 +286,13 @@ func testResetChainData(t *testing.T) bool {
 		return false
 	}
 
-	sync := node.NewSyncPoll(ethClient)
+	syncer := node.NewSyncPoll(ethClient)
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Hour)
 	defer cancel()
 
 	// Validate that synchronization failed because of time.
-	if syncError := sync.Poll(ctx); err != nil {
-		t.Errorf("failed to re-sync blockchain after ResetChainData: %+q", syncError)
+	if err := syncer.Poll(ctx); err != nil {
+		t.Errorf("failed to re-sync blockchain after ResetChainData: %+q", err)
 		return false
 	}
 

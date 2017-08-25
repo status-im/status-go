@@ -39,11 +39,8 @@ var (
 	ErrNodeStartFailure                  = errors.New("error starting p2p node")
 )
 
-// LightEthereumOptions defines a function type that accepts the instance of les.LightEthereum for its operations.
-type LightEthereumOptions func(*les.LightEthereum, *node.Node, *params.NodeConfig)
-
 // MakeNode create a geth node entity
-func MakeNode(config *params.NodeConfig, ops ...LightEthereumOptions) (*node.Node, error) {
+func MakeNode(config *params.NodeConfig) (*node.Node, error) {
 	// make sure data directory exists
 	if err := os.MkdirAll(filepath.Join(config.DataDir), os.ModePerm); err != nil {
 		return nil, err
@@ -76,7 +73,7 @@ func MakeNode(config *params.NodeConfig, ops ...LightEthereumOptions) (*node.Nod
 	// start Ethereum service if we are not expected to use an upstream server.
 	if !config.UpstreamConfig.Enabled {
 
-		if err := activateEthService(stack, config, ops...); err != nil {
+		if err := activateEthService(stack, config); err != nil {
 			return nil, fmt.Errorf("%v: %v", ErrEthServiceRegistrationFailure, err)
 		}
 
@@ -152,7 +149,7 @@ func updateCHT(eth *les.LightEthereum, config *params.NodeConfig) {
 }
 
 // activateEthService configures and registers the eth.Ethereum service with a given node.
-func activateEthService(stack *node.Node, config *params.NodeConfig, ops ...LightEthereumOptions) error {
+func activateEthService(stack *node.Node, config *params.NodeConfig) error {
 	if !config.LightEthConfig.Enabled {
 		log.Info("LES protocol is disabled")
 		return nil
@@ -177,11 +174,6 @@ func activateEthService(stack *node.Node, config *params.NodeConfig, ops ...Ligh
 		lightEth, err := les.New(ctx, &ethConf)
 		if err == nil {
 			updateCHT(lightEth, config)
-
-			// Let the operations run their ops on the les.LightEthereum.
-			for _, op := range ops {
-				op(lightEth, stack, config)
-			}
 		}
 
 		return lightEth, err

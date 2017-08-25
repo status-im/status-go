@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
+	"os"
 	"testing"
 	"time"
 
@@ -349,6 +350,7 @@ func (s *ManagerTestSuite) TestNodeSynchronizationFailure() {
 	// Validate that synchronization failed because of time.
 	syncError := sync.Poll(ctx)
 	require.NotNil(syncError)
+	require.Equal(syncError, node.ErrNodeSyncFailedToStart)
 }
 
 // TestNodeSynchronizationSuccess validates the working of new node synchronization API.
@@ -375,7 +377,6 @@ func (s *ManagerTestSuite) TestNodeSynchronizationSuccess() {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Hour)
 	defer cancel()
 
-	// Validate that synchronization failed because of time.
 	syncError := sync.Poll(ctx)
 	require.NoError(syncError)
 }
@@ -462,21 +463,18 @@ func (s *ManagerTestSuite) TestResetChainData() {
 	require := s.Require()
 	require.NotNil(s.NodeManager)
 
+	config, err := s.NodeManager.NodeConfig()
+	require.NoError(err)
+	require.NotNil(config)
+
+	defer os.RemoveAll("./resetableChainDir")
+	config.DataDir = "./resetableChainDir"
+
 	s.StartTestNode(params.RinkebyNetworkID, false)
 	defer s.StopTestNode()
 
 	// time.Sleep(2 * time.Second) // allow to sync for some time
-	ethClient, err := s.NodeManager.LightEthereumService()
-	require.NoError(err)
-	require.NotNil(ethClient)
-
-	sync := node.NewSyncPoll(ethClient)
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Hour)
-	defer cancel()
-
-	// Validate that synchronization failed because of time.
-	syncError := sync.Poll(ctx)
-	require.NoError(syncError)
+	s.EnsureNodeSync()
 
 	s.True(s.NodeManager.IsNodeRunning())
 	nodeReady, err := s.NodeManager.ResetChainData()

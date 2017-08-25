@@ -1,7 +1,5 @@
 package params
 
-import "time"
-
 const (
 	// ClientIdentifier is client identifier to advertise over the network
 	ClientIdentifier = "StatusIM"
@@ -18,9 +16,6 @@ const (
 	// RPCEnabledDefault is the default state of whether the http rpc server is supposed
 	// to be started along with a node.
 	RPCEnabledDefault = false
-
-	// DelayCycleForSyncStartMaxWait sets the timeout synchronization must be completed to take before we give up.
-	DelayCycleForSyncCompletedMaxWait = 1 * time.Hour
 
 	// HTTPHost is host interface for the HTTP RPC server
 	HTTPHost = "localhost"

@@ -1,7 +1,6 @@
 package api_test
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -27,17 +26,7 @@ func (s *BackendTestSuite) TestSendContractTx() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	ethClient, err := s.backend.NodeManager().LightEthereumService()
-	require.NoError(err)
-	require.NotNil(ethClient)
-
-	sync := node.NewSyncPoll(ethClient)
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Hour)
-	defer cancel()
-
-	// Validate that synchronization failed because of time.
-	syncError := sync.Poll(ctx)
-	require.NoError(syncError)
+	s.EnsureNodeSync()
 
 	backend := s.LightEthereumService().StatusBackend
 	require.NotNil(backend)
@@ -115,17 +104,7 @@ func (s *BackendTestSuite) TestSendEtherTx() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	ethClient, err := s.backend.NodeManager().LightEthereumService()
-	require.NoError(err)
-	require.NotNil(ethClient)
-
-	sync := node.NewSyncPoll(ethClient)
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Hour)
-	defer cancel()
-
-	// Validate that synchronization failed because of time.
-	syncError := sync.Poll(ctx)
-	require.NoError(syncError)
+	s.EnsureNodeSync()
 
 	backend := s.LightEthereumService().StatusBackend
 	require.NotNil(backend)
@@ -197,17 +176,7 @@ func (s *BackendTestSuite) TestDoubleCompleteQueuedTransactions() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	ethClient, err := s.backend.NodeManager().LightEthereumService()
-	require.NoError(err)
-	require.NotNil(ethClient)
-
-	sync := node.NewSyncPoll(ethClient)
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Hour)
-	defer cancel()
-
-	// Validate that synchronization failed because of time.
-	syncError := sync.Poll(ctx)
-	require.NoError(syncError)
+	s.EnsureNodeSync()
 
 	backend := s.LightEthereumService().StatusBackend
 	require.NotNil(backend)
@@ -288,17 +257,7 @@ func (s *BackendTestSuite) TestDiscardQueuedTransaction() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	ethClient, err := s.backend.NodeManager().LightEthereumService()
-	require.NoError(err)
-	require.NotNil(ethClient)
-
-	sync := node.NewSyncPoll(ethClient)
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Hour)
-	defer cancel()
-
-	// Validate that synchronization failed because of time.
-	syncError := sync.Poll(ctx)
-	require.NoError(syncError)
+	s.EnsureNodeSync()
 
 	backend := s.LightEthereumService().StatusBackend
 	require.NotNil(backend)
@@ -379,17 +338,7 @@ func (s *BackendTestSuite) TestCompleteMultipleQueuedTransactions() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	ethClient, err := s.backend.NodeManager().LightEthereumService()
-	require.NoError(err)
-	require.NotNil(ethClient)
-
-	sync := node.NewSyncPoll(ethClient)
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Hour)
-	defer cancel()
-
-	// Validate that synchronization failed because of time.
-	syncError := sync.Poll(ctx)
-	require.NoError(syncError)
+	s.EnsureNodeSync()
 
 	backend := s.LightEthereumService().StatusBackend
 	require.NotNil(backend)
@@ -504,17 +453,7 @@ func (s *BackendTestSuite) TestDiscardMultipleQueuedTransactions() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	ethClient, err := s.backend.NodeManager().LightEthereumService()
-	require.NoError(err)
-	require.NotNil(ethClient)
-
-	sync := node.NewSyncPoll(ethClient)
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Hour)
-	defer cancel()
-
-	// Validate that synchronization failed because of time.
-	syncError := sync.Poll(ctx)
-	require.NoError(syncError)
+	s.EnsureNodeSync()
 
 	backend := s.LightEthereumService().StatusBackend
 	require.NotNil(backend)
