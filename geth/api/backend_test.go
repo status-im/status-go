@@ -18,7 +18,7 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-func TestNodeStartWithUpstream(t *testing.T) {
+func TestStartNodeWithUpstreamEnabled(t *testing.T) {
 	backend := api.NewStatusBackend()
 	require.NotNil(t, backend)
 
