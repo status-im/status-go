@@ -9,6 +9,7 @@ import (
 	"gopkg.in/go-playground/validator.v9"
 
 	"github.com/status-im/status-go/geth/common"
+	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/helpers/profiling"
 )
@@ -226,7 +227,11 @@ func CompleteTransaction(id, password *C.char) *C.char {
 		Hash:  txHash.Hex(),
 		Error: errString,
 	}
-	outBytes, _ := json.Marshal(&out)
+	outBytes, err := json.Marshal(&out)
+	if err != nil {
+		log.Error("failed to marshal CompleteTransaction output", "error", err.Error())
+		return makeJSONResponse(err)
+	}
 
 	return C.CString(string(outBytes))
 }
@@ -260,7 +265,11 @@ func CompleteTransactions(ids, password *C.char) *C.char {
 		}
 	}
 
-	outBytes, _ := json.Marshal(&out)
+	outBytes, err := json.Marshal(&out)
+	if err != nil {
+		log.Error("failed to marshal CompleteTransactions output", "error", err.Error())
+		return makeJSONResponse(err)
+	}
 
 	return C.CString(string(outBytes))
 }
@@ -279,7 +288,11 @@ func DiscardTransaction(id *C.char) *C.char {
 		ID:    C.GoString(id),
 		Error: errString,
 	}
-	outBytes, _ := json.Marshal(&out)
+	outBytes, err := json.Marshal(&out)
+	if err != nil {
+		log.Error("failed to marshal DiscardTransaction output", "error", err.Error())
+		return makeJSONResponse(err)
+	}
 
 	return C.CString(string(outBytes))
 }
@@ -312,7 +325,11 @@ func DiscardTransactions(ids *C.char) *C.char {
 		}
 	}
 
-	outBytes, _ := json.Marshal(&out)
+	outBytes, err := json.Marshal(&out)
+	if err != nil {
+		log.Error("failed to marshal DiscardTransactions output", "error", err.Error())
+		return makeJSONResponse(err)
+	}
 
 	return C.CString(string(outBytes))
 }
