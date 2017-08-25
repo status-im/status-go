@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"math/big"
+	"strings"
 	"time"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -13,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/common"
+	"github.com/status-im/status-go/geth/params"
 )
 
 // ExecutionPolicy provides a central container for the executions of RPCCall requests for both
@@ -30,18 +32,58 @@ func NewExecutionPolicy(nodeManager common.NodeManager, accountManager common.Ac
 	}
 }
 
-// ExecuteSendTransaction defines a function to execute RPC requests for eth_sendTransaction method only.
-func (ep *ExecutionPolicy) ExecuteSendTransaction(req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
+// Execute handles the execution of a RPC request
+func (ep *ExecutionPolicy) Execute(req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
 	config, err := ep.nodeManager.NodeConfig()
 	if err != nil {
 		return nil, err
 	}
 
-	if config.UpstreamConfig.Enabled {
-		return ep.executeRemoteSendTransaction(req, call)
+	var res *otto.Object
+	var resErr error
+
+	switch {
+	case strings.HasPrefix(req.Method, "shh_"):
+		res, resErr = ep.ExecuteLocally(req, call)
+	case params.SendTransactionMethodName == req.Method:
+		switch config.UpstreamConfig.Enabled {
+		case true:
+			res, resErr = ep.executeRemoteSendTransaction(req, call)
+		case false:
+			res, resErr = ep.executeLocalSendTransaction(req, call)
+		}
+	default:
+		switch config.UpstreamConfig.Enabled {
+		case true:
+			res, resErr = ep.ExecuteOnRemote(req, call)
+		case false:
+			res, resErr = ep.ExecuteLocally(req, call)
+		}
 	}
 
-	return ep.executeLocalSendTransaction(req, call)
+	return res, resErr
+}
+
+// ExecuteLocally defines a function which handles the processing of `shh_*` transaction methods
+// rpc request to the internal node server.
+func (ep *ExecutionPolicy) ExecuteLocally(req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
+	client, err := ep.nodeManager.RPCLocalClient()
+	if err != nil {
+		return nil, common.StopRPCCallError{Err: err}
+	}
+
+	return ep.executedWithClient(client, req, call)
+}
+
+// ExecuteOnRemote defines a function which handles the processing of non `eth_sendTransaction`
+// rpc request to the upstream node server.
+func (ep *ExecutionPolicy) ExecuteOnRemote(req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
+	client, err := ep.nodeManager.RPCUpstreamClient()
+	if err != nil {
+		return nil, common.StopRPCCallError{Err: err}
+	}
+
+	return ep.executedWithClient(client, req, call)
 }
 
 // executeRemoteSendTransaction defines a function to execute RPC method eth_sendTransaction over the upstream server.
@@ -142,80 +184,7 @@ func (ep *ExecutionPolicy) executeLocalSendTransaction(req common.RPCCall, call 
 	return resp, nil
 }
 
-// ExecuteSHH defines a function which handles the processing of `shh_*` transaction methods
-// rpc request to the internal node server.
-func (ep *ExecutionPolicy) ExecuteSHH(req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
-	client, err := ep.nodeManager.RPCLocalClient()
-	if err != nil {
-		return nil, common.StopRPCCallError{Err: err}
-	}
-
-	JSON, err := call.Otto.Object("JSON")
-	if err != nil {
-		return nil, err
-	}
-
-	var result json.RawMessage
-
-	resp, _ := call.Otto.Object(`({"jsonrpc":"2.0"})`)
-	resp.Set("id", req.ID)
-
-	// do extra request pre processing (persist message id)
-	// within function semaphore will be acquired and released,
-	// so that no more than one client (per cell) can enter
-	messageID, err := preProcessRequest(call.Otto, req)
-	if err != nil {
-		return nil, common.StopRPCCallError{Err: err}
-	}
-
-	err = client.Call(&result, req.Method, req.Params...)
-
-	switch err := err.(type) {
-	case nil:
-		if result == nil {
-
-			// Special case null because it is decoded as an empty
-			// raw message for some reason.
-			resp.Set("result", otto.NullValue())
-
-		} else {
-
-			resultVal, callErr := JSON.Call("parse", string(result))
-
-			if callErr != nil {
-				resp = newErrorResponse(call.Otto, -32603, callErr.Error(), &req.ID).Object()
-			} else {
-				resp.Set("result", resultVal)
-			}
-
-		}
-
-	case rpc.Error:
-
-		resp.Set("error", map[string]interface{}{
-			"code":    err.ErrorCode(),
-			"message": err.Error(),
-		})
-
-	default:
-
-		resp = newErrorResponse(call.Otto, -32603, err.Error(), &req.ID).Object()
-	}
-
-	// do extra request post processing (setting back tx context)
-	postProcessRequest(call.Otto, req, messageID)
-
-	return resp, nil
-}
-
-// ExecuteOtherTransaction defines a function which handles the processing of non `eth_sendTransaction`
-// rpc request to the internal node server.
-func (ep *ExecutionPolicy) ExecuteOtherTransaction(req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
-	client, err := ep.nodeManager.RPCClient()
-	if err != nil {
-		return nil, common.StopRPCCallError{Err: err}
-	}
-
+func (ep *ExecutionPolicy) executedWithClient(client *rpc.Client, req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
 	JSON, err := call.Otto.Object("JSON")
 	if err != nil {
 		return nil, err
