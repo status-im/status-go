@@ -176,8 +176,6 @@ func (jail *Jail) Send(call otto.FunctionCall) (response otto.Value) {
 
 	// Execute the requests.
 	for _, req := range reqs {
-		// TODO(adam): these calls should be called async and results collected
-		// before returning
 		res, err := jail.policy.Execute(req, call)
 
 		if err != nil {
