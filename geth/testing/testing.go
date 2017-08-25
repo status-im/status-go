@@ -8,10 +8,12 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/log"
+	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
 	assertions "github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -62,7 +64,8 @@ func init() {
 // access initialization methods useful for testing.
 type BaseTestSuite struct {
 	suite.Suite
-	NodeManager common.NodeManager
+	NodeManager       common.NodeManager
+	nodeSyncCompleted bool
 }
 
 // StartTestNode initiazes a NodeManager instances with configuration retrieved
@@ -87,6 +90,30 @@ func (s *BaseTestSuite) StartTestNode(networkID int, upstream bool) {
 	require.NotNil(nodeStarted)
 	<-nodeStarted
 	require.True(s.NodeManager.IsNodeRunning())
+}
+
+// EnsureNodeSync ensures that synchronization of the node is done once and that it
+// is done properly else, the call will fail.
+func (s *BaseTestSuite) EnsureNodeSync() {
+	if s.nodeSyncCompleted {
+		return
+	}
+
+	require := s.Require()
+
+	ethClient, err := s.NodeManager.LightEthereumService()
+	require.NoError(err)
+	require.NotNil(ethClient)
+
+	sync := node.NewSyncPoll(ethClient)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Hour)
+	defer cancel()
+
+	// Validate that synchronization failed because of time.
+	syncError := sync.Poll(ctx)
+	require.NoError(syncError)
+
+	s.nodeSyncCompleted = true
 }
 
 // StopTestNode attempts to stop initialized NodeManager.
