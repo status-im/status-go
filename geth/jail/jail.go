@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -204,8 +205,10 @@ func (jail *Jail) Send(call otto.FunctionCall) (response otto.Value) {
 		var resErr error
 		var res *otto.Object
 
-		switch req.Method {
-		case params.SendTransactionMethodName:
+		switch {
+		case strings.HasPrefix(req.Method, "shh_"):
+			res, resErr = jail.policy.ExecuteSHH(req, call)
+		case params.SendTransactionMethodName == req.Method:
 			res, resErr = jail.policy.ExecuteSendTransaction(req, call)
 		default:
 			res, resErr = jail.policy.ExecuteOtherTransaction(req, call)

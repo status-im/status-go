@@ -56,7 +56,7 @@ func (ep *ExecutionPolicy) executeRemoteSendTransaction(req common.RPCCall, call
 		return nil, err
 	}
 
-	client, err := ep.nodeManager.RPCClient()
+	client, err := ep.nodeManager.RPCUpstreamClient()
 	if err != nil {
 		return nil, err
 	}
@@ -138,6 +138,72 @@ func (ep *ExecutionPolicy) executeLocalSendTransaction(req common.RPCCall, call 
 		resp = newErrorResponse(call.Otto, -32603, err.Error(), &req.ID).Object()
 		return resp, nil
 	}
+
+	return resp, nil
+}
+
+// ExecuteSHH defines a function which handles the processing of `shh_*` transaction methods
+// rpc request to the internal node server.
+func (ep *ExecutionPolicy) ExecuteSHH(req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
+	client, err := ep.nodeManager.RPCLocalClient()
+	if err != nil {
+		return nil, common.StopRPCCallError{Err: err}
+	}
+
+	JSON, err := call.Otto.Object("JSON")
+	if err != nil {
+		return nil, err
+	}
+
+	var result json.RawMessage
+
+	resp, _ := call.Otto.Object(`({"jsonrpc":"2.0"})`)
+	resp.Set("id", req.ID)
+
+	// do extra request pre processing (persist message id)
+	// within function semaphore will be acquired and released,
+	// so that no more than one client (per cell) can enter
+	messageID, err := preProcessRequest(call.Otto, req)
+	if err != nil {
+		return nil, common.StopRPCCallError{Err: err}
+	}
+
+	err = client.Call(&result, req.Method, req.Params...)
+
+	switch err := err.(type) {
+	case nil:
+		if result == nil {
+
+			// Special case null because it is decoded as an empty
+			// raw message for some reason.
+			resp.Set("result", otto.NullValue())
+
+		} else {
+
+			resultVal, callErr := JSON.Call("parse", string(result))
+
+			if callErr != nil {
+				resp = newErrorResponse(call.Otto, -32603, callErr.Error(), &req.ID).Object()
+			} else {
+				resp.Set("result", resultVal)
+			}
+
+		}
+
+	case rpc.Error:
+
+		resp.Set("error", map[string]interface{}{
+			"code":    err.ErrorCode(),
+			"message": err.Error(),
+		})
+
+	default:
+
+		resp = newErrorResponse(call.Otto, -32603, err.Error(), &req.ID).Object()
+	}
+
+	// do extra request post processing (setting back tx context)
+	postProcessRequest(call.Otto, req, messageID)
 
 	return resp, nil
 }

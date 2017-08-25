@@ -88,6 +88,12 @@ type NodeManager interface {
 	// RPCClient exposes reference to RPC client connected to the running node
 	RPCClient() (*rpc.Client, error)
 
+	// RPCLocalClient exposes reference to RPC client connected to the running local node rpcserver
+	RPCLocalClient() (*rpc.Client, error)
+
+	// RPCUpstreamClient exposes reference to RPC client connected to the upstream node server
+	RPCUpstreamClient() (*rpc.Client, error)
+
 	// RPCServer exposes reference to running node's in-proc RPC server/handler
 	RPCServer() (*rpc.Server, error)
 }

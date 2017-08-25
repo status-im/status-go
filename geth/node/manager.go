@@ -502,8 +502,8 @@ func (m *NodeManager) AccountKeyStore() (*keystore.KeyStore, error) {
 	return keyStore, nil
 }
 
-// RPCClient exposes reference to RPC client connected to the running node.
-func (m *NodeManager) RPCClient() (*rpc.Client, error) {
+// RPCLocalClient exposes reference to RPC client connected to the running node.
+func (m *NodeManager) RPCLocalClient() (*rpc.Client, error) {
 	if m == nil {
 		return nil, ErrInvalidNodeManager
 	}
@@ -523,17 +523,6 @@ func (m *NodeManager) RPCClient() (*rpc.Client, error) {
 
 	<-m.nodeStarted
 
-	// Connect to upstream RPC server with new client and cache instance.
-	if config.UpstreamConfig.Enabled {
-		m.rpcClient, err = rpc.Dial(config.UpstreamConfig.URL)
-		if err != nil {
-			log.Error("Failed to conect to upstream RPC server", "error", err)
-			return nil, err
-		}
-
-		return m.rpcClient, nil
-	}
-
 	if m.rpcClient == nil {
 		var err error
 		m.rpcClient, err = m.node.Attach()
@@ -548,6 +537,61 @@ func (m *NodeManager) RPCClient() (*rpc.Client, error) {
 	}
 
 	return m.rpcClient, nil
+}
+
+// RPCUpstreamClient exposes reference to RPC client connected to the running node.
+func (m *NodeManager) RPCUpstreamClient() (*rpc.Client, error) {
+	if m == nil {
+		return nil, ErrInvalidNodeManager
+	}
+
+	config, err := m.NodeConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	m.RLock()
+	defer m.RUnlock()
+
+	// make sure that node is fully started
+	if m.node == nil || m.nodeStarted == nil {
+		return nil, ErrNoRunningNode
+	}
+
+	<-m.nodeStarted
+
+	if m.rpcClient == nil {
+		m.rpcClient, err = rpc.Dial(config.UpstreamConfig.URL)
+		if err != nil {
+			log.Error("Failed to conect to upstream RPC server", "error", err)
+			return nil, err
+		}
+	}
+
+	if m.rpcClient == nil {
+		return nil, ErrInvalidRPCClient
+	}
+
+	return m.rpcClient, nil
+}
+
+// RPCClient exposes reference to RPC client connected to the running node.
+func (m *NodeManager) RPCClient() (*rpc.Client, error) {
+	if m == nil {
+		return nil, ErrInvalidNodeManager
+	}
+
+	config, err := m.NodeConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	// Connect to upstream RPC server with new client and cache instance.
+	if config.UpstreamConfig.Enabled {
+		return m.RPCUpstreamClient()
+	}
+
+	return m.RPCUpstreamClient()
 }
 
 // RPCServer exposes reference to running node's in-proc RPC server/handler
