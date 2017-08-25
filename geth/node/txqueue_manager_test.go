@@ -17,6 +17,10 @@ import (
 
 var errTxAssumedSent = errors.New("assume tx is done")
 
+func TestTxQueueTestSuite(t *testing.T) {
+	suite.Run(t, new(TxQueueTestSuite))
+}
+
 type TxQueueTestSuite struct {
 	suite.Suite
 	nodeManagerMockCtrl    *gomock.Controller
@@ -25,201 +29,189 @@ type TxQueueTestSuite struct {
 	accountManagerMock     *common.MockAccountManager
 }
 
-func (suite *TxQueueTestSuite) SetupTest() {
-	suite.nodeManagerMockCtrl = gomock.NewController(suite.T())
-	suite.accountManagerMockCtrl = gomock.NewController(suite.T())
+func (s *TxQueueTestSuite) SetupTest() {
+	s.nodeManagerMockCtrl = gomock.NewController(s.T())
+	s.accountManagerMockCtrl = gomock.NewController(s.T())
 
-	suite.nodeManagerMock = common.NewMockNodeManager(suite.nodeManagerMockCtrl)
-	suite.accountManagerMock = common.NewMockAccountManager(suite.accountManagerMockCtrl)
+	s.nodeManagerMock = common.NewMockNodeManager(s.nodeManagerMockCtrl)
+	s.accountManagerMock = common.NewMockAccountManager(s.accountManagerMockCtrl)
 }
 
-func (suite *TxQueueTestSuite) TearDownTest() {
-	suite.nodeManagerMockCtrl.Finish()
-	suite.accountManagerMockCtrl.Finish()
+func (s *TxQueueTestSuite) TearDownTest() {
+	s.nodeManagerMockCtrl.Finish()
+	s.accountManagerMockCtrl.Finish()
 }
 
-func (suite *TxQueueTestSuite) TestCompleteTransaction() {
-	suite.accountManagerMock.EXPECT().SelectedAccount().Return(&common.SelectedExtKey{
+func (s *TxQueueTestSuite) TestCompleteTransaction() {
+	s.accountManagerMock.EXPECT().SelectedAccount().Return(&common.SelectedExtKey{
 		Address: common.FromAddress(TestConfig.Account1.Address),
 	}, nil)
 
-	suite.nodeManagerMock.EXPECT().NodeConfig().Return(
+	s.nodeManagerMock.EXPECT().NodeConfig().Return(
 		params.NewNodeConfig("/tmp", params.RopstenNetworkID, true))
 
 	// TODO(adam): StatusBackend as an interface would allow a better solution.
 	// As we want to avoid network connection, we mock LES with a known error
 	// and treat as success.
-	suite.nodeManagerMock.EXPECT().LightEthereumService().Return(nil, errTxAssumedSent)
+	s.nodeManagerMock.EXPECT().LightEthereumService().Return(nil, errTxAssumedSent)
 
-	m := NewTxQueueManager(suite.nodeManagerMock, suite.accountManagerMock)
+	txQueueManager := NewTxQueueManager(s.nodeManagerMock, s.accountManagerMock)
 
-	m.Start()
-	defer m.Stop()
+	txQueueManager.Start()
+	defer txQueueManager.Stop()
 
-	toAddr := common.FromAddress(TestConfig.Account2.Address)
-	tx := m.CreateTransaction(context.Background(), common.SendTxArgs{
+	tx := txQueueManager.CreateTransaction(context.Background(), common.SendTxArgs{
 		From: common.FromAddress(TestConfig.Account1.Address),
-		To:   &toAddr,
+		To:   common.ToAddress(TestConfig.Account2.Address),
 	})
 
 	// TransactionQueueHandler is required to enqueue a transaction.
-	m.SetTransactionQueueHandler(func(queuedTx *common.QueuedTx) {
-		suite.Equal(tx.ID, queuedTx.ID)
+	txQueueManager.SetTransactionQueueHandler(func(queuedTx *common.QueuedTx) {
+		s.Equal(tx.ID, queuedTx.ID)
 	})
 
-	m.SetTransactionReturnHandler(func(queuedTx *common.QueuedTx, err error) {
-		suite.Equal(tx.ID, queuedTx.ID)
-		suite.Equal(errTxAssumedSent, err)
+	txQueueManager.SetTransactionReturnHandler(func(queuedTx *common.QueuedTx, err error) {
+		s.Equal(tx.ID, queuedTx.ID)
+		s.Equal(errTxAssumedSent, err)
 	})
 
-	err := m.QueueTransaction(tx)
-	suite.NoError(err)
+	err := txQueueManager.QueueTransaction(tx)
+	s.NoError(err)
 
 	go func() {
-		_, err := m.CompleteTransaction(tx.ID, TestConfig.Account1.Password)
+		_, err := txQueueManager.CompleteTransaction(tx.ID, TestConfig.Account1.Password)
 		if err != errTxAssumedSent {
-			suite.Fail(err.Error())
+			s.Fail(err.Error())
 		}
 	}()
 
-	err = m.WaitForTransaction(tx)
-	if err != errTxAssumedSent {
-		suite.Fail(err.Error())
-	}
-
+	err = txQueueManager.WaitForTransaction(tx)
 	// Check that error is assigned to the transaction.
-	suite.Equal(errTxAssumedSent, tx.Err)
+	s.Equal(errTxAssumedSent, tx.Err)
 	// Transaction should be already removed from the queue.
-	suite.False(m.TransactionQueue().Has(tx.ID))
+	s.False(txQueueManager.TransactionQueue().Has(tx.ID))
 }
 
-func (suite *TxQueueTestSuite) TestAccountMissmatch() {
-	suite.accountManagerMock.EXPECT().SelectedAccount().Return(&common.SelectedExtKey{
+func (s *TxQueueTestSuite) TestAccountMismatch() {
+	s.accountManagerMock.EXPECT().SelectedAccount().Return(&common.SelectedExtKey{
 		Address: common.FromAddress(TestConfig.Account2.Address),
 	}, nil)
 
-	m := NewTxQueueManager(suite.nodeManagerMock, suite.accountManagerMock)
+	txQueueManager := NewTxQueueManager(s.nodeManagerMock, s.accountManagerMock)
 
-	m.Start()
-	defer m.Stop()
+	txQueueManager.Start()
+	defer txQueueManager.Stop()
 
-	toAddr := common.FromAddress(TestConfig.Account2.Address)
-	tx := m.CreateTransaction(context.Background(), common.SendTxArgs{
+	tx := txQueueManager.CreateTransaction(context.Background(), common.SendTxArgs{
 		From: common.FromAddress(TestConfig.Account1.Address),
-		To:   &toAddr,
+		To:   common.ToAddress(TestConfig.Account2.Address),
 	})
 
 	// TransactionQueueHandler is required to enqueue a transaction.
-	m.SetTransactionQueueHandler(func(queuedTx *common.QueuedTx) {
-		suite.Equal(tx.ID, queuedTx.ID)
+	txQueueManager.SetTransactionQueueHandler(func(queuedTx *common.QueuedTx) {
+		s.Equal(tx.ID, queuedTx.ID)
 	})
 
 	// Missmatched address is a recoverable error, that's why
 	// the return handler is called.
-	m.SetTransactionReturnHandler(func(queuedTx *common.QueuedTx, err error) {
-		suite.Equal(tx.ID, queuedTx.ID)
-		suite.Equal(ErrInvalidCompleteTxSender, err)
-		suite.Nil(tx.Err)
+	txQueueManager.SetTransactionReturnHandler(func(queuedTx *common.QueuedTx, err error) {
+		s.Equal(tx.ID, queuedTx.ID)
+		s.Equal(ErrInvalidCompleteTxSender, err)
+		s.Nil(tx.Err)
 	})
 
-	err := m.QueueTransaction(tx)
-	suite.NoError(err)
+	err := txQueueManager.QueueTransaction(tx)
+	s.NoError(err)
 
-	_, err = m.CompleteTransaction(tx.ID, TestConfig.Account1.Password)
-	suite.Equal(err, ErrInvalidCompleteTxSender)
+	_, err = txQueueManager.CompleteTransaction(tx.ID, TestConfig.Account1.Password)
+	s.Equal(err, ErrInvalidCompleteTxSender)
 
 	// Transaction should stay in the queue as mismatched accounts
 	// is a recoverable error.
-	suite.True(m.TransactionQueue().Has(tx.ID))
+	s.True(txQueueManager.TransactionQueue().Has(tx.ID))
 }
 
-func (suite *TxQueueTestSuite) TestInvalidPassword() {
-	suite.accountManagerMock.EXPECT().SelectedAccount().Return(&common.SelectedExtKey{
+func (s *TxQueueTestSuite) TestInvalidPassword() {
+	s.accountManagerMock.EXPECT().SelectedAccount().Return(&common.SelectedExtKey{
 		Address: common.FromAddress(TestConfig.Account1.Address),
 	}, nil)
 
-	suite.nodeManagerMock.EXPECT().NodeConfig().Return(
+	s.nodeManagerMock.EXPECT().NodeConfig().Return(
 		params.NewNodeConfig("/tmp", params.RopstenNetworkID, true))
 
 	// Set ErrDecrypt error response as expected with a wrong password.
-	suite.nodeManagerMock.EXPECT().LightEthereumService().Return(nil, keystore.ErrDecrypt)
+	s.nodeManagerMock.EXPECT().LightEthereumService().Return(nil, keystore.ErrDecrypt)
 
-	m := NewTxQueueManager(suite.nodeManagerMock, suite.accountManagerMock)
+	txQueueManager := NewTxQueueManager(s.nodeManagerMock, s.accountManagerMock)
 
-	m.Start()
-	defer m.Stop()
+	txQueueManager.Start()
+	defer txQueueManager.Stop()
 
-	toAddr := common.FromAddress(TestConfig.Account2.Address)
-	tx := m.CreateTransaction(context.Background(), common.SendTxArgs{
+	tx := txQueueManager.CreateTransaction(context.Background(), common.SendTxArgs{
 		From: common.FromAddress(TestConfig.Account1.Address),
-		To:   &toAddr,
+		To:   common.ToAddress(TestConfig.Account2.Address),
 	})
 
 	// TransactionQueueHandler is required to enqueue a transaction.
-	m.SetTransactionQueueHandler(func(queuedTx *common.QueuedTx) {
-		suite.Equal(tx.ID, queuedTx.ID)
+	txQueueManager.SetTransactionQueueHandler(func(queuedTx *common.QueuedTx) {
+		s.Equal(tx.ID, queuedTx.ID)
 	})
 
 	// Missmatched address is a revocable error, that's why
 	// the return handler is called.
-	m.SetTransactionReturnHandler(func(queuedTx *common.QueuedTx, err error) {
-		suite.Equal(tx.ID, queuedTx.ID)
-		suite.Equal(keystore.ErrDecrypt, err)
-		suite.Nil(tx.Err)
+	txQueueManager.SetTransactionReturnHandler(func(queuedTx *common.QueuedTx, err error) {
+		s.Equal(tx.ID, queuedTx.ID)
+		s.Equal(keystore.ErrDecrypt, err)
+		s.Nil(tx.Err)
 	})
 
-	err := m.QueueTransaction(tx)
-	suite.NoError(err)
+	err := txQueueManager.QueueTransaction(tx)
+	s.NoError(err)
 
-	_, err = m.CompleteTransaction(tx.ID, "invalid-password")
-	suite.Equal(err, keystore.ErrDecrypt)
+	_, err = txQueueManager.CompleteTransaction(tx.ID, "invalid-password")
+	s.Equal(err, keystore.ErrDecrypt)
 
 	// Transaction should stay in the queue as mismatched accounts
 	// is a recoverable error.
-	suite.True(m.TransactionQueue().Has(tx.ID))
+	s.True(txQueueManager.TransactionQueue().Has(tx.ID))
 }
 
-func (suite *TxQueueTestSuite) TestDiscardTransaction() {
-	m := NewTxQueueManager(suite.nodeManagerMock, suite.accountManagerMock)
+func (s *TxQueueTestSuite) TestDiscardTransaction() {
+	txQueueManager := NewTxQueueManager(s.nodeManagerMock, s.accountManagerMock)
 
-	m.Start()
-	defer m.Stop()
+	txQueueManager.Start()
+	defer txQueueManager.Stop()
 
-	toAddr := common.FromAddress(TestConfig.Account2.Address)
-	tx := m.CreateTransaction(context.Background(), common.SendTxArgs{
+	tx := txQueueManager.CreateTransaction(context.Background(), common.SendTxArgs{
 		From: common.FromAddress(TestConfig.Account1.Address),
-		To:   &toAddr,
+		To:   common.ToAddress(TestConfig.Account2.Address),
 	})
 
 	// TransactionQueueHandler is required to enqueue a transaction.
-	m.SetTransactionQueueHandler(func(queuedTx *common.QueuedTx) {
-		suite.Equal(tx.ID, queuedTx.ID)
+	txQueueManager.SetTransactionQueueHandler(func(queuedTx *common.QueuedTx) {
+		s.Equal(tx.ID, queuedTx.ID)
 	})
 
-	m.SetTransactionReturnHandler(func(queuedTx *common.QueuedTx, err error) {
-		suite.Equal(tx.ID, queuedTx.ID)
-		suite.Equal(ErrQueuedTxDiscarded, err)
+	txQueueManager.SetTransactionReturnHandler(func(queuedTx *common.QueuedTx, err error) {
+		s.Equal(tx.ID, queuedTx.ID)
+		s.Equal(ErrQueuedTxDiscarded, err)
 	})
 
-	err := m.QueueTransaction(tx)
-	suite.NoError(err)
+	err := txQueueManager.QueueTransaction(tx)
+	s.NoError(err)
 
 	go func() {
-		err := m.DiscardTransaction(tx.ID)
-		suite.NoError(err)
+		err := txQueueManager.DiscardTransaction(tx.ID)
+		s.NoError(err)
 	}()
 
-	err = m.WaitForTransaction(tx)
+	err = txQueueManager.WaitForTransaction(tx)
 	if err != ErrQueuedTxDiscarded {
-		suite.Fail(err.Error())
+		s.Fail(err.Error())
 	}
 
 	// Check that error is assigned to the transaction.
-	suite.Equal(ErrQueuedTxDiscarded, tx.Err)
+	s.Equal(ErrQueuedTxDiscarded, tx.Err)
 	// Transaction should be already removed from the queue.
-	suite.False(m.TransactionQueue().Has(tx.ID))
-}
-
-func TestTxQueueTestSuite(t *testing.T) {
-	suite.Run(t, new(TxQueueTestSuite))
+	s.False(txQueueManager.TransactionQueue().Has(tx.ID))
 }

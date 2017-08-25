@@ -52,24 +52,36 @@ func (s *BackendTestSuite) TestSendContractTx() {
 			// the first call will fail (we are not logged in, but trying to complete tx)
 			log.Info("trying to complete with no user logged in")
 			txHash, err = s.backend.CompleteTransaction(
-				common.QueuedTxID(event["id"].(string)), TestConfig.Account1.Password)
-			s.EqualError(err, node.ErrNoAccountSelected.Error(),
-				fmt.Sprintf("expected error on queued transaction[%v] not thrown", event["id"]))
+				common.QueuedTxID(event["id"].(string)),
+				TestConfig.Account1.Password,
+			)
+			s.EqualError(
+				err,
+				node.ErrNoAccountSelected.Error(),
+				fmt.Sprintf("expected error on queued transaction[%v] not thrown", event["id"]),
+			)
 
 			// the second call will also fail (we are logged in as different user)
 			log.Info("trying to complete with invalid user")
 			err = s.backend.AccountManager().SelectAccount(sampleAddress, TestConfig.Account1.Password)
 			s.NoError(err)
 			txHash, err = s.backend.CompleteTransaction(
-				common.QueuedTxID(event["id"].(string)), TestConfig.Account1.Password)
-			s.EqualError(err, node.ErrInvalidCompleteTxSender.Error(),
-				fmt.Sprintf("expected error on queued transaction[%v] not thrown", event["id"]))
+				common.QueuedTxID(event["id"].(string)),
+				TestConfig.Account1.Password,
+			)
+			s.EqualError(
+				err,
+				node.ErrInvalidCompleteTxSender.Error(),
+				fmt.Sprintf("expected error on queued transaction[%v] not thrown", event["id"]),
+			)
 
 			// the third call will work as expected (as we are logged in with correct credentials)
 			log.Info("trying to complete with correct user, this should suceed")
 			s.NoError(s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 			txHash, err = s.backend.CompleteTransaction(
-				common.QueuedTxID(event["id"].(string)), TestConfig.Account1.Password)
+				common.QueuedTxID(event["id"].(string)),
+				TestConfig.Account1.Password,
+			)
 			s.NoError(err, fmt.Sprintf("cannot complete queued transaction[%v]", event["id"]))
 
 			log.Info("contract transaction complete", "URL", "https://rinkeby.etherscan.io/tx/"+txHash.Hex())
@@ -131,9 +143,14 @@ func (s *BackendTestSuite) TestSendEtherTx() {
 			// the first call will fail (we are not logged in, but trying to complete tx)
 			log.Info("trying to complete with no user logged in")
 			txHash, err = s.backend.CompleteTransaction(
-				common.QueuedTxID(event["id"].(string)), TestConfig.Account1.Password)
-			s.EqualError(err, node.ErrNoAccountSelected.Error(),
-				fmt.Sprintf("expected error on queued transaction[%v] not thrown", event["id"]))
+				common.QueuedTxID(event["id"].(string)),
+				TestConfig.Account1.Password,
+			)
+			s.EqualError(
+				err,
+				node.ErrNoAccountSelected.Error(),
+				fmt.Sprintf("expected error on queued transaction[%v] not thrown", event["id"]),
+			)
 
 			// the second call will also fail (we are logged in as different user)
 			log.Info("trying to complete with invalid user")
@@ -141,14 +158,19 @@ func (s *BackendTestSuite) TestSendEtherTx() {
 			s.NoError(err)
 			txHash, err = s.backend.CompleteTransaction(
 				common.QueuedTxID(event["id"].(string)), TestConfig.Account1.Password)
-			s.EqualError(err, node.ErrInvalidCompleteTxSender.Error(),
-				fmt.Sprintf("expected error on queued transaction[%v] not thrown", event["id"]))
+			s.EqualError(
+				err,
+				node.ErrInvalidCompleteTxSender.Error(),
+				fmt.Sprintf("expected error on queued transaction[%v] not thrown", event["id"]),
+			)
 
 			// the third call will work as expected (as we are logged in with correct credentials)
 			log.Info("trying to complete with correct user, this should suceed")
 			s.NoError(s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 			txHash, err = s.backend.CompleteTransaction(
-				common.QueuedTxID(event["id"].(string)), TestConfig.Account1.Password)
+				common.QueuedTxID(event["id"].(string)),
+				TestConfig.Account1.Password,
+			)
 			s.NoError(err, fmt.Sprintf("cannot complete queued transaction[%v]", event["id"]))
 
 			log.Info("contract transaction complete", "URL", "https://rinkeby.etherscan.io/tx/"+txHash.Hex())

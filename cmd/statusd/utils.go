@@ -832,7 +832,7 @@ func testCompleteTransaction(t *testing.T) bool {
 	})
 
 	// this call blocks, up until Complete Transaction is called
-	txChechHash, err := statusAPI.SendTransaction(nil, common.SendTxArgs{
+	txCheckHash, err := statusAPI.SendTransaction(nil, common.SendTxArgs{
 		From:  common.FromAddress(TestConfig.Account1.Address),
 		To:    common.ToAddress(TestConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
@@ -844,13 +844,13 @@ func testCompleteTransaction(t *testing.T) bool {
 
 	<-queuedTxCompleted // make sure that complete transaction handler completes its magic, before we proceed
 
-	if txHash != txChechHash.Hex() {
+	if txHash != txCheckHash.Hex() {
 		t.Errorf("Transaction hash returned from SendTransaction is invalid: expected %s, got %s",
-			txChechHash.Hex(), txHash)
+			txCheckHash.Hex(), txHash)
 		return false
 	}
 
-	if reflect.DeepEqual(txChechHash, gethcommon.Hash{}) {
+	if reflect.DeepEqual(txCheckHash, gethcommon.Hash{}) {
 		t.Error("Test failed: transaction was never queued or completed")
 		return false
 	}

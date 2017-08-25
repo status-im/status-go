@@ -46,7 +46,7 @@ type TxQueue struct {
 
 // NewTransactionQueue make new transaction queue
 func NewTransactionQueue() *TxQueue {
-	log.Info("StatusIM: initializing transaction queue")
+	log.Info("initializing transaction queue")
 	return &TxQueue{
 		transactions:  make(map[common.QueuedTxID]*common.QueuedTx),
 		evictableIDs:  make(chan common.QueuedTxID, DefaultTxQueueCap), // will be used to evict in FIFO
@@ -57,7 +57,7 @@ func NewTransactionQueue() *TxQueue {
 
 // Start starts enqueue and eviction loops
 func (q *TxQueue) Start() {
-	log.Info("StatusIM: starting transaction queue")
+	log.Info("starting transaction queue")
 
 	if q.stopped != nil {
 		return
@@ -72,7 +72,7 @@ func (q *TxQueue) Start() {
 
 // Stop stops transaction enqueue and eviction loops
 func (q *TxQueue) Stop() {
-	log.Info("StatusIM: stopping transaction queue")
+	log.Info("stopping transaction queue")
 
 	if q.stopped == nil {
 		return
@@ -82,7 +82,7 @@ func (q *TxQueue) Stop() {
 	q.stoppedGroup.Wait()
 	q.stopped = nil
 
-	log.Info("StatusIM: finally stopped transaction queue")
+	log.Info("finally stopped transaction queue")
 }
 
 // evictionLoop frees up queue to accommodate another transaction item
@@ -101,7 +101,7 @@ func (q *TxQueue) evictionLoop() {
 		case <-q.enqueueTicker: // when manually requested
 			evict()
 		case <-q.stopped:
-			log.Info("StatusIM: transaction queue's eviction loop stopped")
+			log.Info("transaction queue's eviction loop stopped")
 			q.stoppedGroup.Done()
 			return
 		}
@@ -116,11 +116,11 @@ func (q *TxQueue) enqueueLoop() {
 	for {
 		select {
 		case queuedTx := <-q.incomingPool:
-			log.Info("StatusIM: transaction enqueued requested", "tx", queuedTx.ID)
+			log.Info("transaction enqueued requested", "tx", queuedTx.ID)
 			q.Enqueue(queuedTx)
-			log.Info("StatusIM: transaction enqueued", "tx", queuedTx.ID)
+			log.Info("transaction enqueued", "tx", queuedTx.ID)
 		case <-q.stopped:
-			log.Info("StatusIM: transaction queue's enqueue loop stopped")
+			log.Info("transaction queue's enqueue loop stopped")
 			q.stoppedGroup.Done()
 			return
 		}
