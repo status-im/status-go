@@ -2,7 +2,6 @@ package node
 
 import (
 	"context"
-	"encoding/json"
 	"math/big"
 	"time"
 
@@ -230,8 +229,7 @@ func (m *TxQueueManager) completeRemoteTransaction(queuedTx *common.QueuedTx, pa
 	ctx2, cancel2 := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel2()
 
-	var result json.RawMessage
-	if err := client.CallContext(ctx2, &result, "eth_sendRawTransaction", gethcommon.ToHex(txBytes)); err != nil {
+	if err := client.CallContext(ctx2, nil, "eth_sendRawTransaction", gethcommon.ToHex(txBytes)); err != nil {
 		return emptyHash, err
 	}
 
