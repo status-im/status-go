@@ -2,6 +2,7 @@ package main
 
 import "C"
 import (
+	"context"
 	"encoding/json"
 	"io/ioutil"
 	"math/big"
@@ -279,8 +280,19 @@ func testResetChainData(t *testing.T) bool {
 	}
 
 	// time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to re-sync blockchain
-	if err := statusAPI.NodeManager().HasNodeSynchronized(); err != nil {
-		t.Errorf("failed to re-sync blockchain after ResetChainData: %+q", err)
+	ethClient, err := statusAPI.NodeManager().LightEthereumService()
+	if err != nil {
+		t.Errorf("failed to retrieve LightEthereumService from StatusAP: %+q", err)
+		return false
+	}
+
+	sync := node.NewSyncPoll(ethClient)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Hour)
+	defer cancel()
+
+	// Validate that synchronization failed because of time.
+	if syncError := sync.Poll(ctx); err != nil {
+		t.Errorf("failed to re-sync blockchain after ResetChainData: %+q", syncError)
 		return false
 	}
 

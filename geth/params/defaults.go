@@ -19,15 +19,6 @@ const (
 	// to be started along with a node.
 	RPCEnabledDefault = false
 
-	// DelayCycleForSyncStart sets the timeout for checking state of synchronization starting.
-	DelayCycleForSyncStart = 100 * time.Millisecond
-
-	// DelayCycleForSyncStartMaxWait sets the timeout synchronization must be allowed to take before we give up.
-	DelayCycleForSyncStartMaxWait = 30 * time.Second
-
-	// DelayCycleForSyncStart sets the timeout for checking state of synchronization completion.
-	DelayCycleForSyncCompleted = 1 * time.Second
-
 	// DelayCycleForSyncStartMaxWait sets the timeout synchronization must be completed to take before we give up.
 	DelayCycleForSyncCompletedMaxWait = 1 * time.Hour
 

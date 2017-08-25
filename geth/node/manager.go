@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-	"time"
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
@@ -22,8 +21,6 @@ import (
 // errors
 var (
 	ErrNodeExists                  = errors.New("node is already running")
-	ErrNodeInvalidSynchState       = errors.New("node synchronization has ended unknown state")
-	ErrNodeSyncTakesTooLong        = errors.New("node synchronization is taking too long")
 	ErrNoRunningNode               = errors.New("there is no running node")
 	ErrInvalidNodeManager          = errors.New("node manager is not properly initialized")
 	ErrInvalidWhisperService       = errors.New("whisper service is unavailable")
@@ -37,17 +34,14 @@ var (
 // NodeManager manages Status node (which abstracts contained geth node)
 type NodeManager struct {
 	sync.RWMutex
-	config            *params.NodeConfig // Status node configuration
-	node              *node.Node         // reference to Geth P2P stack/node
-	nodeStarted       chan struct{}      // channel to wait for start up notifications
-	nodeStopped       chan struct{}      // channel to wait for termination notifications
-	nodeSyncStarted   chan struct{}      // channel to wait for synchronization start up notifications
-	nodeSyncError     chan struct{}      // channel to wait for synchronization startup error notifications
-	nodeSyncCompleted chan struct{}      // channel to wait for synchronization completed notifications
-	whisperService    *whisper.Whisper   // reference to Whisper service
-	lesService        *les.LightEthereum // reference to LES service
-	rpcClient         *rpc.Client        // reference to RPC client
-	rpcServer         *rpc.Server        // reference to RPC server
+	config         *params.NodeConfig // Status node configuration
+	node           *node.Node         // reference to Geth P2P stack/node
+	nodeStarted    chan struct{}      // channel to wait for start up notifications
+	nodeStopped    chan struct{}      // channel to wait for termination notifications
+	whisperService *whisper.Whisper   // reference to Whisper service
+	lesService     *les.LightEthereum // reference to LES service
+	rpcClient      *rpc.Client        // reference to RPC client
+	rpcServer      *rpc.Server        // reference to RPC server
 }
 
 // NewNodeManager makes new instance of node manager
@@ -76,90 +70,12 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 		return nil, ErrNodeExists
 	}
 
-	m.nodeSyncStarted = make(chan struct{}, 0)
-	m.nodeSyncError = make(chan struct{}, 0)
-	m.nodeSyncCompleted = make(chan struct{}, 0)
-
-	ethNode, err := MakeNode(config, func(leth *les.LightEthereum, stack *node.Node, config *params.NodeConfig) {
-		downlder := leth.Downloader()
-
-		go func() {
-			syncStateWait := time.NewTimer(params.DelayCycleForSyncStart)
-			syncStateWaitMax := time.NewTimer(params.DelayCycleForSyncStartMaxWait)
-
-			defer syncStateWait.Stop()
-			defer syncStateWaitMax.Stop()
-
-			// Initially we want to listen for when node have started synchronizing it's data.
-		nloop:
-			for {
-				select {
-				case <-m.nodeSyncError:
-					// Listen for error to ensure we are not in a case of concurrent runs of this,
-					// as I noticed an issue of double closure of channels, but no way of knowing why.
-					// This provides us a benefit that the go-routine will instantly be shutdown if the channel
-					// was already closed.
-					return
-				case <-syncStateWaitMax.C:
-					close(m.nodeSyncError)
-					return
-				case <-syncStateWait.C:
-					if downlder.Synchronising() {
-						close(m.nodeSyncStarted)
-						break nloop
-					}
-					syncStateWait.Reset(params.DelayCycleForSyncStart)
-				}
-			}
-
-			syncStateWait.Reset(params.DelayCycleForSyncCompleted)
-			syncStateWaitMax.Reset(params.DelayCycleForSyncCompletedMaxWait)
-
-			// Once we have validating, that things have properly started then, we then track
-			// progress for when a finished signal is called.
-		cloop:
-			for {
-				select {
-				case <-m.nodeSyncError:
-					// Listen for error to ensure we are not in a case of concurrent runs of this,
-					// as I noticed an issue of double closure of channels, but no way of knowing why.
-					// This provides us a benefit that the go-routine will instantly be shutdown if the channel
-					// was already closed.
-					return
-				case <-syncStateWaitMax.C:
-					close(m.nodeSyncError)
-					return
-				case <-syncStateWait.C:
-					progress := downlder.Progress()
-					if progress.CurrentBlock >= progress.HighestBlock {
-						close(m.nodeSyncCompleted)
-						break cloop
-					}
-					syncStateWait.Reset(params.DelayCycleForSyncCompleted)
-				}
-			}
-		}()
-	})
-
+	ethNode, err := MakeNode(config)
 	if err != nil {
-		close(m.nodeSyncError)
 		return nil, err
 	}
 
 	m.nodeStarted = make(chan struct{}, 1)
-
-	// If we are expected to use external RPC upstream connection, then
-	// immediately close synchronization notification channel.
-	if config.UpstreamConfig.Enabled {
-		close(m.nodeSyncStarted)
-		close(m.nodeSyncCompleted)
-	}
-
-	// // If we are not expected to have this running, then sync cant be done, close error.
-	// // TODO(influx6): Find out if this is good or if we should instead just make sync a success.
-	// if config.LightEthConfig == nil || !config.LightEthConfig.Enabled {
-	// 	close(m.nodeSyncError)
-	// }
 
 	go func() {
 		defer HaltOnPanic()
@@ -208,74 +124,6 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 	}()
 
 	return m.nodeStarted, nil
-}
-
-// HasNodeSynchronized returns a non-nil error if NodeManager internal node fails to start or
-// complete synchronization.
-func (m *NodeManager) HasNodeSynchronized() error {
-	if err := m.HasNodeSyncStarted(); err != nil {
-		return err
-	}
-
-	if err := m.HasNodeSyncCompleted(); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// HasNodeSyncCompleted returns an error if the node was node found, or has
-// failed to complete synchronization within allowed duration.
-func (m *NodeManager) HasNodeSyncCompleted() error {
-	if m == nil {
-		return ErrInvalidNodeManager
-	}
-
-	m.Lock()
-	defer m.Unlock()
-
-	if m.node == nil || m.nodeSyncCompleted == nil {
-		return ErrNoRunningNode
-	}
-
-	return m.hasNodeSyncCompleted()
-}
-
-// hasNodeSyncCompleted returns error/no-error depending on node synch channels.
-func (m *NodeManager) hasNodeSyncCompleted() error {
-	select {
-	case <-m.nodeSyncError:
-		return ErrNodeSyncTakesTooLong
-	case <-m.nodeSyncCompleted:
-		return nil
-	}
-}
-
-// HasNodeSyncStarted returns an error if the node was node found, or has
-// failed to start synchronization.
-func (m *NodeManager) HasNodeSyncStarted() error {
-	if m == nil {
-		return ErrInvalidNodeManager
-	}
-
-	m.Lock()
-	defer m.Unlock()
-
-	if m.node == nil || m.nodeSyncStarted == nil {
-		return ErrNoRunningNode
-	}
-
-	return m.hasNodeSyncStarted()
-}
-
-// hasNodeSyncStarted returns error/no-error depending on node synch channels.
-func (m *NodeManager) hasNodeSyncStarted() error {
-	select {
-	case <-m.nodeSyncError:
-		return ErrNodeInvalidSynchState
-	case <-m.nodeSyncStarted:
-		return nil
-	}
 }
 
 // StopNode stop Status node. Stopped node cannot be resumed.

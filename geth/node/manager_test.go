@@ -1,6 +1,7 @@
 package node_test
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math/rand"
@@ -328,7 +329,7 @@ func (s *ManagerTestSuite) TestNodeSynchronizationFailure() {
 	nodeConfig, err := MakeTestNodeConfig(params.RopstenNetworkID)
 	require.NoError(err)
 
-	nodeConfig.LightEthConfig.Enabled = false
+	nodeConfig.LightEthConfig.Enabled = true
 
 	nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
 	require.NoError(err)
@@ -337,13 +338,17 @@ func (s *ManagerTestSuite) TestNodeSynchronizationFailure() {
 	defer s.NodeManager.StopNode()
 	<-nodeStarted
 
-	// Validate that synchronization has indeed started.
-	syncStartedError := s.NodeManager.HasNodeSyncStarted()
-	require.NotNil(syncStartedError)
+	ethClient, err := s.NodeManager.LightEthereumService()
+	require.NoError(err)
+	require.NotNil(ethClient)
 
-	// Validate that synchronization was indeed completed.
-	syncCompletedError := s.NodeManager.HasNodeSyncCompleted()
-	require.NotNil(syncCompletedError)
+	sync := node.NewSyncPoll(ethClient)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer cancel()
+
+	// Validate that synchronization failed because of time.
+	syncError := sync.Poll(ctx)
+	require.NotNil(syncError)
 }
 
 // TestNodeSynchronizationSuccess validates the working of new node synchronization API.
@@ -362,13 +367,17 @@ func (s *ManagerTestSuite) TestNodeSynchronizationSuccess() {
 	defer s.NodeManager.StopNode()
 	<-nodeStarted
 
-	// Validate that synchronization has indeed started.
-	syncStartedError := s.NodeManager.HasNodeSyncStarted()
-	require.NoError(syncStartedError)
+	ethClient, err := s.NodeManager.LightEthereumService()
+	require.NoError(err)
+	require.NotNil(ethClient)
 
-	// Validate that synchronization was indeed completed.
-	syncCompletedError := s.NodeManager.HasNodeSyncCompleted()
-	require.NoError(syncCompletedError)
+	sync := node.NewSyncPoll(ethClient)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Hour)
+	defer cancel()
+
+	// Validate that synchronization failed because of time.
+	syncError := sync.Poll(ctx)
+	require.NoError(syncError)
 }
 
 func (s *ManagerTestSuite) TestNodeStartStop() {
@@ -457,8 +466,17 @@ func (s *ManagerTestSuite) TestResetChainData() {
 	defer s.StopTestNode()
 
 	// time.Sleep(2 * time.Second) // allow to sync for some time
-	syncErr := s.NodeManager.HasNodeSynchronized()
-	require.NoError(syncErr)
+	ethClient, err := s.NodeManager.LightEthereumService()
+	require.NoError(err)
+	require.NotNil(ethClient)
+
+	sync := node.NewSyncPoll(ethClient)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Hour)
+	defer cancel()
+
+	// Validate that synchronization failed because of time.
+	syncError := sync.Poll(ctx)
+	require.NoError(syncError)
 
 	s.True(s.NodeManager.IsNodeRunning())
 	nodeReady, err := s.NodeManager.ResetChainData()
