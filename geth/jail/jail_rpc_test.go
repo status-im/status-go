@@ -164,7 +164,7 @@ func (s *JailRPCTestSuite) TestSendTransaction() {
 	selectErr := s.Account.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	require.NoError(selectErr)
 
-	res, err := s.Policy.ExecuteSendTransaction(request, odFunc)
+	res, err := s.Policy.Execute(request, odFunc)
 	require.NoError(err)
 
 	result, err := res.Get("result")
@@ -231,7 +231,7 @@ func (s *JailRPCTestSuite) TestSendTransaction() {
 // 	selectErr := s.Account.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 // 	require.NoError(selectErr)
 
-// 	res, err := s.Policy.ExecuteSendTransaction(request, odFunc)
+// 	res, err := s.Policy.Execute(request, odFunc)
 // 	require.NoError(err)
 
 // 	_, err = res.Get("hash")
@@ -290,7 +290,7 @@ func (s *JailRPCTestSuite) TestSendTransaction() {
 // 	selectErr := s.Account.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 // 	require.NoError(selectErr)
 
-// 	res, err := s.Policy.ExecuteSendTransaction(request, odFunc)
+// 	res, err := s.Policy.Execute(request, odFunc)
 // 	require.NoError(err)
 
 // 	_, err = res.Get("hash")
@@ -349,7 +349,7 @@ func (s *JailRPCTestSuite) TestSendTransaction() {
 // 	selectErr := s.Account.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 // 	require.NoError(selectErr)
 
-// 	res, err := s.Policy.ExecuteSendTransaction(request, odFunc)
+// 	res, err := s.Policy.Execute(request, odFunc)
 // 	require.NoError(err)
 
 // 	_, err = res.Get("hash")
