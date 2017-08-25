@@ -14,8 +14,26 @@ import (
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
 	. "github.com/status-im/status-go/geth/testing"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
+
+func TestNodeStartWithUpstream(t *testing.T) {
+	backend := api.NewStatusBackend()
+	require.NotNil(t, backend)
+
+	nodeConfig, err := MakeTestNodeConfig(params.RopstenNetworkID)
+	require.NoError(t, err)
+
+	nodeConfig.UpstreamConfig.Enabled = true
+
+	nodeStarted, err := backend.StartNode(nodeConfig)
+	require.NoError(t, err)
+	defer backend.StopNode()
+
+	<-nodeStarted
+	require.True(t, backend.IsNodeRunning())
+}
 
 func TestBackendTestSuite(t *testing.T) {
 	suite.Run(t, new(BackendTestSuite))
