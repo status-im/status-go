@@ -7,16 +7,14 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
-	"time"
 
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/status-im/status-go/geth/log"
+	"github.com/status-im/status-go/static"
 )
 
 // default node configuration options
@@ -561,17 +559,15 @@ func (c *NodeConfig) updateBootClusterConfig() error {
 		Dev         subClusterConfig `json:"dev"`
 	}
 
-	client := &http.Client{Timeout: 20 * time.Second}
-	r, err := client.Get(BootClusterConfigURL + "?u=" + strconv.Itoa(int(time.Now().Unix())))
+	chtFile, err := static.Asset("config/cht.json")
 	if err != nil {
-		return err
+		return fmt.Errorf("cht.json could not be loaded: %s", err)
 	}
-	defer r.Body.Close()
 
 	var clusters []clusterConfig
-	err = json.NewDecoder(r.Body).Decode(&clusters)
+	err = json.Unmarshal(chtFile, &clusters)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to unmarshal cht.json: %s", err)
 	}
 
 	for _, cluster := range clusters {
