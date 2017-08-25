@@ -508,11 +508,6 @@ func (m *NodeManager) RPCLocalClient() (*rpc.Client, error) {
 		return nil, ErrInvalidNodeManager
 	}
 
-	config, err := m.NodeConfig()
-	if err != nil {
-		return nil, err
-	}
-
 	m.RLock()
 	defer m.RUnlock()
 
