@@ -280,11 +280,6 @@ func (m *NodeManager) ResetChainData() (<-chan struct{}, error) {
 // resetChainData remove chain data from data directory.
 // Node is stopped, and new node is started, with clean data directory.
 func (m *NodeManager) resetChainData() (<-chan struct{}, error) {
-	// check if we have a node running
-	if m.node == nil {
-		return nil, ErrNodeOffline
-	}
-
 	if err := m.isNodeAvailable(); err != nil {
 		return nil, err
 	}
@@ -328,15 +323,10 @@ func (m *NodeManager) RestartNode() (<-chan struct{}, error) {
 
 // restartNode restart running Status node, fails if node is not running
 func (m *NodeManager) restartNode() (<-chan struct{}, error) {
-	// check if we have a node running
-	if m.node == nil {
-		return nil, ErrNodeOffline
+	if err := m.isNodeAvailable(); err != nil {
+		return nil, err
 	}
 
-	// make sure that node is fully started
-	if m.nodeStarted == nil {
-		return nil, ErrNoRunningNode
-	}
 	<-m.nodeStarted
 
 	prevConfig := *m.config
@@ -563,7 +553,7 @@ func (m *NodeManager) initLog(config *params.NodeConfig) {
 	}
 }
 
-// Check if we have a node running and make sure is fully started
+// isNodeAvailable check if we have a node running and make sure is fully started
 func (m *NodeManager) isNodeAvailable() error {
 	if m.node == nil {
 		return ErrNodeOffline
