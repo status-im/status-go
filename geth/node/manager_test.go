@@ -462,38 +462,6 @@ func (s *ManagerTestSuite) TestNetworkSwitching() {
 	s.StopTestNode()
 }
 
-func (s *ManagerTestSuite) TestResetChainData() {
-	require := s.Require()
-	require.NotNil(s.NodeManager)
-
-	s.StartTestNode(params.RinkebyNetworkID, false)
-	defer s.StopTestNode()
-
-	config, err := s.NodeManager.NodeConfig()
-	require.NoError(err)
-	require.NotNil(config)
-
-	tmpDir := "./resetableChainDir"
-
-	err = s.copyToDir(config.DataDir, tmpDir)
-	require.NoError(err)
-
-	defer os.RemoveAll(tmpDir)
-	config.DataDir = tmpDir
-
-	// time.Sleep(2 * time.Second) // allow to sync for some time
-	s.EnsureNodeSync()
-
-	s.True(s.NodeManager.IsNodeRunning())
-	nodeReady, err := s.NodeManager.ResetChainData()
-	require.NoError(err)
-	<-nodeReady
-	s.True(s.NodeManager.IsNodeRunning()) // new node, with previous config should be running
-
-	// make sure we can read the first byte, and it is valid (for Rinkeby)
-	FirstBlockHash(require, s.NodeManager, "0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177")
-}
-
 func (s *ManagerTestSuite) TestRestartNode() {
 	require := s.Require()
 	require.NotNil(s.NodeManager)
