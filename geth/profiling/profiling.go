@@ -1,4 +1,4 @@
-package common
+package profiling
 
 import (
 	"os"
@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	CpuProfilingFilename = "status_cpu.prof"
+	CPUProfilingFilename = "status_cpu.prof"
 	MemProfilingFilename = "status_mem.prof"
 )
 
@@ -22,7 +22,7 @@ var (
 func StartCPUProfile(dataDir string) error {
 	if cpuFile == nil {
 		var err error
-		cpuFile, err = os.Create(filepath.Join(dataDir, CpuProfilingFilename))
+		cpuFile, err = os.Create(filepath.Join(dataDir, CPUProfilingFilename))
 		if err != nil {
 			return err
 		}

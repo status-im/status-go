@@ -10,6 +10,7 @@ import (
 
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/geth/profiling"
 )
 
 //export GenerateConfig
@@ -309,13 +310,19 @@ func Call(chatID *C.char, path *C.char, params *C.char) *C.char {
 
 //export StartCPUProfile
 func StartCPUProfile(path *C.char) *C.char {
-	err := common.StartCPUProfile(C.GoString(path))
+	err := profiling.StartCPUProfile(C.GoString(path))
+	return makeJSONResponse(err)
+}
+
+//export StopCPUProfiling
+func StopCPUProfiling() *C.char {
+	err := profiling.StopCPUProfile()
 	return makeJSONResponse(err)
 }
 
 //export WriteHeapProfile
 func WriteHeapProfile(path *C.char) *C.char {
-	err := common.WriteHeapFile(C.GoString(path))
+	err := profiling.WriteHeapFile(C.GoString(path))
 	return makeJSONResponse(err)
 }
 

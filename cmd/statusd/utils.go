@@ -113,10 +113,6 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 			"test jailed calls",
 			testJailFunctionCall,
 		},
-		{
-			"test profiling",
-			testProfiling,
-		},
 	}
 
 	for _, test := range tests {
@@ -1491,26 +1487,4 @@ func testValidateNodeConfig(t *testing.T, config string, fn func(common.APIDetai
 	require.NoError(t, err)
 
 	fn(resp)
-}
-
-func testProfiling(t *testing.T) bool {
-	if err := common.StartCPUProfile(""); err != nil {
-		t.Error("Cannot start profiling:", err)
-		return false
-	}
-
-	address, _, _, err := statusAPI.CreateAccount(TestConfig.Account1.Password)
-	if err != nil {
-		t.Errorf("could not create account: %v", err)
-		return false
-	}
-
-	t.Log("Account created: ", address)
-
-	if err := common.StopCPUProfile(); err != nil {
-		t.Error("Cannot stop profiling:", err)
-		return false
-	}
-
-	return true
 }
