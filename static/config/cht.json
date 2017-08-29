@@ -49,8 +49,8 @@
     "networkID": 4,
     "genesisHash": "0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177",
     "prod": {
-      "number": 66,
-      "hash": "rinkeby-prod",
+      "number": 194,
+      "hash": "9a102f2c65a5a467d6a57d659f87b962709addec66e80c4c77d2f1208a7de3fe",
       "bootnodes": [
         "enode://fda3f6273a0f2da4ac5858d1f52e5afaf9def281121be3d37558c67d4d9ca26c6ad7a0520b2cd7454120fb770e86d5760487c9924b2166e65485f606e56d60fc@51.15.69.144:30303",
         "enode://ba41aa829287a0a9076d9bffed97c8ce2e491b99873288c9e886f16fd575306ac6c656db4fbf814f5a9021aec004ffa9c0ae8650f92fd10c12eeb7c364593eb3@51.15.69.147:30303",
@@ -58,8 +58,8 @@
       ]
     },
     "dev": {
-      "number": 66,
-      "hash": "rinkeby-dev",
+      "number": 194,
+      "hash": "9a102f2c65a5a467d6a57d659f87b962709addec66e80c4c77d2f1208a7de3fe",
       "bootnodes": [
         "enode://7512c8f6e7ffdcc723cf77e602a1de9d8cc2e8ad35db309464819122cd773857131aee390fec33894db13da730c8432bb248eed64039e3810e156e979b2847cb@51.15.78.243:30303",
         "enode://1cc27a5a41130a5c8b90db5b2273dc28f7b56f3edfc0dcc57b665d451274b26541e8de49ea7a074281906a82209b9600239c981163b6ff85c3038a8e2bc5d8b8@51.15.68.93:30303",
