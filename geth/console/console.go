@@ -193,7 +193,7 @@ func (c *Console) Interactive(commandHandler <-chan string) <-chan string {
 }
 
 // Stop cleans up the console and terminates the runtime envorinment.
-func (c *Console) Stop(graceful bool) error {
+func (c *Console) Stop() error {
 	if err := ioutil.WriteFile(c.histPath, []byte(strings.Join(c.history, "\n")), 0600); err != nil {
 		return err
 	}
