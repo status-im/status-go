@@ -124,5 +124,9 @@ LOOP:
 		commandHandler <- ""
 	}
 
+	if err := c.Stop(); err != nil {
+		fmt.Printf("Failed to gracefully stop the console: %s\n", err)
+	}
+
 	return nil
 }
