@@ -100,6 +100,7 @@ func init() {
 		faucetCommand,
 		lesCommand,
 		wnodeCommand,
+		consoleCommand,
 	}
 	app.Flags = []cli.Flag{
 		ProdModeFlag,
