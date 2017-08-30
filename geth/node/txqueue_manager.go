@@ -50,6 +50,7 @@ type TxQueueManager struct {
 	txQueue        *TxQueue
 }
 
+// NewTxQueueManager returns a new TxQueueManager.
 func NewTxQueueManager(nodeManager common.NodeManager, accountManager common.AccountManager) *TxQueueManager {
 	return &TxQueueManager{
 		nodeManager:    nodeManager,
@@ -58,20 +59,24 @@ func NewTxQueueManager(nodeManager common.NodeManager, accountManager common.Acc
 	}
 }
 
+// Start starts accepting new transactions into the queue.
 func (m *TxQueueManager) Start() {
 	log.Info("start TxQueueManager")
 	m.txQueue.Start()
 }
 
+// Stop stops accepting new transactions into the queue.
 func (m *TxQueueManager) Stop() {
 	log.Info("stop TxQueueManager")
 	m.txQueue.Stop()
 }
 
+// TransactionQueue returns a reference to the queue.
 func (m *TxQueueManager) TransactionQueue() common.TxQueue {
 	return m.txQueue
 }
 
+// CreateTransaction returns a transaction object.
 func (m *TxQueueManager) CreateTransaction(ctx context.Context, args common.SendTxArgs) *common.QueuedTx {
 	return &common.QueuedTx{
 		ID:      common.QueuedTxID(uuid.New()),
@@ -83,12 +88,13 @@ func (m *TxQueueManager) CreateTransaction(ctx context.Context, args common.Send
 	}
 }
 
+// QueueTransaction puts a transaction into the queue.
 func (m *TxQueueManager) QueueTransaction(tx *common.QueuedTx) error {
 	log.Info("queue a new transaction", "id", tx.ID, "from", tx.Args.From.Hex(), "to", tx.Args.To.Hex())
 	return m.txQueue.Enqueue(tx)
 }
 
-// QueueTransactionAndWait adds a transaction to the queue and blocks
+// WaitForTransaction adds a transaction to the queue and blocks
 // until it's completed, discarded or times out.
 func (m *TxQueueManager) WaitForTransaction(tx *common.QueuedTx) error {
 	log.Info("wait for transaction", "id", tx.ID)
@@ -116,7 +122,7 @@ func (m *TxQueueManager) NotifyOnQueuedTxReturn(queuedTx *common.QueuedTx, err e
 }
 
 // CompleteTransaction instructs backend to complete sending of a given transaction.
-// TODO(adam): investiagte a possible bug that calling this method multiple times with the same Transaction ID
+// TODO(adam): investigate a possible bug that calling this method multiple times with the same Transaction ID
 // results in sending multiple transactions.
 func (m *TxQueueManager) CompleteTransaction(id common.QueuedTxID, password string) (gethcommon.Hash, error) {
 	log.Info("complete transaction", "id", id)
@@ -204,8 +210,8 @@ func (m *TxQueueManager) completeRemoteTransaction(queuedTx *common.QueuedTx, pa
 	defer cancel()
 
 	var txCount hexutil.Uint
-	if err := client.CallContext(ctx, &txCount, "eth_getTransactionCount", queuedTx.Args.From, "pending"); err != nil {
-		return emptyHash, err
+	if callErr := client.CallContext(ctx, &txCount, "eth_getTransactionCount", queuedTx.Args.From, "pending"); callErr != nil {
+		return emptyHash, callErr
 	}
 
 	chainID := big.NewInt(int64(config.NetworkID))
@@ -306,6 +312,8 @@ func (m *TxQueueManager) TransactionQueueHandler() func(queuedTx *common.QueuedT
 	}
 }
 
+// SetTransactionQueueHandler sets a handler that will be called
+// when a new transaction is enqueued.
 func (m *TxQueueManager) SetTransactionQueueHandler(fn common.EnqueuedTxHandler) {
 	m.txQueue.SetEnqueueHandler(fn)
 }
@@ -353,6 +361,9 @@ func (m *TxQueueManager) sendTransactionErrorCode(err error) string {
 	return SendTxDefaultErrorCode
 }
 
+// SetTransactionReturnHandler sets a handler that will be called
+// when a transaction is about to return or when a recoverable error occured.
+// Recoverable error is, for instance, wrong password.
 func (m *TxQueueManager) SetTransactionReturnHandler(fn common.EnqueuedTxReturnHandler) {
 	m.txQueue.SetTxReturnHandler(fn)
 }

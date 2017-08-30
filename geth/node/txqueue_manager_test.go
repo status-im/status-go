@@ -86,6 +86,7 @@ func (s *TxQueueTestSuite) TestCompleteTransaction() {
 	}()
 
 	err = txQueueManager.WaitForTransaction(tx)
+	s.Equal(errTxAssumedSent, err)
 	// Check that error is assigned to the transaction.
 	s.Equal(errTxAssumedSent, tx.Err)
 	// Transaction should be already removed from the queue.

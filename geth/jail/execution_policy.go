@@ -30,6 +30,7 @@ func NewExecutionPolicy(
 	}
 }
 
+// Execute handles a received RPC call.
 func (ep *ExecutionPolicy) Execute(req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
 	switch req.Method {
 	case params.SendTransactionMethodName:

@@ -76,7 +76,7 @@ func (s *BackendTestSuite) TestSendContractTx() {
 			)
 
 			// the third call will work as expected (as we are logged in with correct credentials)
-			log.Info("trying to complete with correct user, this should suceed")
+			log.Info("trying to complete with correct user, this should succeed")
 			s.NoError(s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 			txHash, err = s.backend.CompleteTransaction(
 				common.QueuedTxID(event["id"].(string)),
@@ -165,7 +165,7 @@ func (s *BackendTestSuite) TestSendEtherTx() {
 			)
 
 			// the third call will work as expected (as we are logged in with correct credentials)
-			log.Info("trying to complete with correct user, this should suceed")
+			log.Info("trying to complete with correct user, this should succeed")
 			s.NoError(s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 			txHash, err = s.backend.CompleteTransaction(
 				common.QueuedTxID(event["id"].(string)),

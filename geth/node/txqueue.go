@@ -12,10 +12,12 @@ import (
 )
 
 const (
-	DefaultTxQueueCap              = int(35) // how many items can be queued
-	DefaultTxSendQueueCap          = int(70) // how many items can be passed to sendTransaction() w/o blocking
-	DefaultTxSendCompletionTimeout = 300     // how many seconds to wait before returning result in sentTransaction()
-	SelectedAccountKey             = "selected_account"
+	// DefaultTxQueueCap defines how many items can be queued.
+	DefaultTxQueueCap = int(35)
+	// DefaultTxSendQueueCap defines how many items can be passed to sendTransaction() w/o blocking.
+	DefaultTxSendQueueCap = int(70)
+	// DefaultTxSendCompletionTimeout defines how many seconds to wait before returning result in sentTransaction().
+	DefaultTxSendCompletionTimeout = 300
 )
 
 var (
