@@ -209,17 +209,17 @@ func (m *NodeManager) PopulateStaticPeers() error {
 	m.RLock()
 	defer m.RUnlock()
 
-	return m.populateStaticPeers()
-}
-
-// populateStaticPeers connects current node with our publicly available LES/SHH/Swarm cluster
-func (m *NodeManager) populateStaticPeers() error {
 	if err := m.isNodeAvailable(); err != nil {
 		return err
 	}
 
 	<-m.nodeStarted
 
+	return m.populateStaticPeers()
+}
+
+// populateStaticPeers connects current node with our publicly available LES/SHH/Swarm cluster
+func (m *NodeManager) populateStaticPeers() error {
 	if !m.config.BootClusterConfig.Enabled {
 		log.Info("Boot cluster is disabled")
 		return nil
@@ -242,17 +242,17 @@ func (m *NodeManager) AddPeer(url string) error {
 	m.RLock()
 	defer m.RUnlock()
 
-	return m.addPeer(url)
-}
-
-// addPeer adds new static peer node
-func (m *NodeManager) addPeer(url string) error {
 	if err := m.isNodeAvailable(); err != nil {
 		return err
 	}
 
 	<-m.nodeStarted
 
+	return m.addPeer(url)
+}
+
+// addPeer adds new static peer node
+func (m *NodeManager) addPeer(url string) error {
 	server := m.node.Server()
 	if server == nil {
 		return ErrNoRunningNode
@@ -274,18 +274,18 @@ func (m *NodeManager) ResetChainData() (<-chan struct{}, error) {
 	m.Lock()
 	defer m.Unlock()
 
-	return m.resetChainData()
-}
-
-// resetChainData remove chain data from data directory.
-// Node is stopped, and new node is started, with clean data directory.
-func (m *NodeManager) resetChainData() (<-chan struct{}, error) {
 	if err := m.isNodeAvailable(); err != nil {
 		return nil, err
 	}
 
 	<-m.nodeStarted
 
+	return m.resetChainData()
+}
+
+// resetChainData remove chain data from data directory.
+// Node is stopped, and new node is started, with clean data directory.
+func (m *NodeManager) resetChainData() (<-chan struct{}, error) {
 	prevConfig := *m.config
 	nodeStopped, err := m.stopNode()
 	if err != nil {
@@ -318,17 +318,17 @@ func (m *NodeManager) RestartNode() (<-chan struct{}, error) {
 	m.Lock()
 	defer m.Unlock()
 
-	return m.restartNode()
-}
-
-// restartNode restart running Status node, fails if node is not running
-func (m *NodeManager) restartNode() (<-chan struct{}, error) {
 	if err := m.isNodeAvailable(); err != nil {
 		return nil, err
 	}
 
 	<-m.nodeStarted
 
+	return m.restartNode()
+}
+
+// restartNode restart running Status node, fails if node is not running
+func (m *NodeManager) restartNode() (<-chan struct{}, error) {
 	prevConfig := *m.config
 	nodeStopped, err := m.stopNode()
 	if err != nil {
@@ -555,12 +555,12 @@ func (m *NodeManager) initLog(config *params.NodeConfig) {
 
 // isNodeAvailable check if we have a node running and make sure is fully started
 func (m *NodeManager) isNodeAvailable() error {
-	if m.node == nil {
-		return ErrNodeOffline
-	}
-
 	if m.nodeStarted == nil {
 		return ErrNoRunningNode
+	}
+
+	if m.node == nil {
+		return ErrNodeOffline
 	}
 
 	return nil
