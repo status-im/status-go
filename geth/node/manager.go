@@ -578,7 +578,7 @@ func (m *NodeManager) RPCClient() (*rpc.Client, error) {
 		return m.RPCUpstreamClient()
 	}
 
-	return m.RPCUpstreamClient()
+	return m.RPCLocalClient()
 }
 
 // RPCServer exposes reference to running node's in-proc RPC server/handler
