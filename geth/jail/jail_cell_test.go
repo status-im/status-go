@@ -7,51 +7,6 @@ import (
 	"github.com/status-im/status-go/geth/params"
 )
 
-func (s *JailTestSuite) TestJailTimeoutFailure() {
-	require := s.Require()
-	require.NotNil(s.jail)
-
-	newCell, err := s.jail.NewJailCell(testChatID)
-	require.NoError(err)
-	require.NotNil(newCell)
-
-	// Attempt to run a timeout string against a JailCell.
-	_, err = newCell.Run(`
-		setTimeout(function(n){
-			if(Date.now() - n < 50){
-				throw new Error("Timedout early");
-			}
-
-			return n;
-		}, 30, Date.now());
-	`)
-
-	require.NotNil(err)
-}
-
-func (s *JailTestSuite) TestJailTimeout() {
-	require := s.Require()
-	require.NotNil(s.jail)
-
-	newCell, err := s.jail.NewJailCell(testChatID)
-	require.NoError(err)
-	require.NotNil(newCell)
-
-	// Attempt to run a timeout string against a JailCell.
-	res, err := newCell.Run(`
-		setTimeout(function(n){
-			if(Date.now() - n < 50){
-				throw new Error("Timedout early");
-			}
-
-			return n;
-		}, 50, Date.now());
-	`)
-
-	require.NoError(err)
-	require.NotNil(res)
-}
-
 func (s *JailTestSuite) TestJailLoopInCall() {
 	require := s.Require()
 	require.NotNil(s.jail)
