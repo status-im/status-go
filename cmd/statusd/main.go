@@ -7,7 +7,6 @@ import (
 	"runtime"
 
 	"github.com/status-im/status-go/geth/api"
-	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
 	"gopkg.in/urfave/cli.v1"
 )
@@ -118,18 +117,6 @@ func init() {
 	}
 	app.Before = func(ctx *cli.Context) error {
 		runtime.GOMAXPROCS(runtime.NumCPU())
-
-		if logLevel := ctx.GlobalString(LogLevelFlag.Name); len(logLevel) > 0 {
-			log.SetLevel(logLevel)
-		}
-
-		if logFile := ctx.GlobalString(LogFileFlag.Name); len(logFile) > 0 {
-			err := log.SetLogFile(logFile)
-			if err != nil {
-				fmt.Println("Failed to open log file, using stdout")
-			}
-		}
-
 		return nil
 	}
 	app.After = func(ctx *cli.Context) error {
@@ -171,11 +158,12 @@ func makeNodeConfig(ctx *cli.Context) (*params.NodeConfig, error) {
 
 	nodeConfig.NodeKeyFile = ctx.GlobalString(NodeKeyFileFlag.Name)
 
-	// TODO: check if log configuration in NodeConfig is used at all, and remove
-	// it from node config if not.
-	if logLevel := ctx.GlobalString(LogLevelFlag.Name); len(logLevel) > 0 {
+	if logLevel := ctx.GlobalString(LogLevelFlag.Name); logLevel != "" {
 		nodeConfig.LogEnabled = true
 		nodeConfig.LogLevel = logLevel
+	}
+	if logFile := ctx.GlobalString(LogFileFlag.Name); logFile != "" {
+		nodeConfig.LogFile = logFile
 	}
 
 	return nodeConfig, nil
