@@ -130,17 +130,20 @@ func (m *NodeManager) StopNode() (<-chan struct{}, error) {
 	m.Lock()
 	defer m.Unlock()
 
+	if err := m.isNodeAvailable(); err != nil {
+		return nil, err
+	}
+	if m.nodeStopped == nil {
+		return nil, ErrNoRunningNode
+	}
+
+	<-m.nodeStarted // make sure you operate on fully started node
+
 	return m.stopNode()
 }
 
 // stopNode stop Status node. Stopped node cannot be resumed.
 func (m *NodeManager) stopNode() (<-chan struct{}, error) {
-	if err := m.isNodeAvailable(); err != nil {
-		return nil, err
-	}
-
-	<-m.nodeStarted // make sure you operate on fully started node
-
 	// now attempt to stop
 	if err := m.node.Stop(); err != nil {
 		return nil, err
