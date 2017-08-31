@@ -53,6 +53,7 @@ ci:
 	build/env.sh go test -timeout 40m -v ./geth/node
 	build/env.sh go test -timeout 40m -v ./geth/params
 	build/env.sh go test -timeout 40m -v ./extkeys
+	build/env.sh go test -timeout 1m -v ./helpers/...
 
 generate:
 	cp ./node_modules/web3/dist/web3.js ./static/scripts/web3.js
