@@ -144,46 +144,22 @@ func (l *Loop) processTask(t Task) error {
 	return nil
 }
 
-// Run handles the task scheduling and finalisation. It will block until
-// there's no work left to do, or an error occurs.
+// Run handles the task scheduling and finalisation.
+// It runs infinitely waiting for new tasks.
 func (l *Loop) Run() error {
-	for {
-		l.lock.Lock()
-		if len(l.tasks) == 0 {
-			// prevent any more tasks entering the ready channel
-			l.closed = true
-
-			l.lock.Unlock()
-
-			break
+	for t := range <-l.ready {
+		if t == nil {
+			continue
 		}
-		l.lock.Unlock()
 
-		t := <-l.ready
-
-		if t != nil {
-			if err := l.processTask(t); err != nil {
-				return err
-			}
+		err := l.processTask(t)
+		if err != nil {
+			// TODO(divan): do we need to report
+			// errors up to the caller?
+			// Ignoring for now, as loop
+			// should keep running.
+			continue
 		}
 	}
-
-	// drain ready channel of any existing tasks
-outer:
-	for {
-		select {
-		case t := <-l.ready:
-			if t != nil {
-				if err := l.processTask(t); err != nil {
-					return err
-				}
-			}
-		default:
-			break outer
-		}
-	}
-
-	close(l.ready)
-
 	return nil
 }
