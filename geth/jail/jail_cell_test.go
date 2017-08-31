@@ -1,12 +1,9 @@
 package jail_test
 
 import (
-	"net/http"
-	"net/http/httptest"
 	"time"
 
 	"github.com/robertkrimen/otto"
-	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/params"
 )
 
@@ -19,7 +16,7 @@ func (s *JailTestSuite) TestJailTimeoutFailure() {
 	require.NotNil(newCell)
 
 	// Attempt to run a timeout string against a JailCell.
-	_, err = newCell.RunOnLoop(`
+	_, err = newCell.Run(`
 		setTimeout(function(n){
 			if(Date.now() - n < 50){
 				throw new Error("Timedout early");
@@ -41,7 +38,7 @@ func (s *JailTestSuite) TestJailTimeout() {
 	require.NotNil(newCell)
 
 	// Attempt to run a timeout string against a JailCell.
-	res, err := newCell.RunOnLoop(`
+	res, err := newCell.Run(`
 		setTimeout(function(n){
 			if(Date.now() - n < 50){
 				throw new Error("Timedout early");
@@ -88,7 +85,7 @@ func (s *JailTestSuite) TestJailLoopInCall() {
 	`)
 	require.NoError(err)
 
-	_, err = cell.CallOnLoop("callRunner", nil, "softball")
+	_, err = cell.Call("callRunner", nil, "softball")
 	require.NoError(err)
 
 	select {

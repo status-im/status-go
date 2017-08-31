@@ -179,7 +179,6 @@ type JailCell interface {
 	Set(string, interface{}) error
 	Get(string) (otto.Value, error)
 	Run(string) (otto.Value, error)
-	RunOnLoop(string) (otto.Value, error)
 }
 
 // JailManager defines methods for managing jailed environments

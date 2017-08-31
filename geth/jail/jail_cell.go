@@ -54,34 +54,6 @@ func (cell *JailCell) Get(key string) (otto.Value, error) {
 	return cell.vm.Get(key)
 }
 
-// RunOnLoop evaluates the giving js string on the associated vm loop returning
-// an error.
-func (cell *JailCell) RunOnLoop(val string) (otto.Value, error) {
-	cell.Lock()
-	defer cell.Unlock()
-
-	res, err := cell.vm.Run(val)
-	if err != nil {
-		return res, err
-	}
-
-	return res, cell.lo.Run()
-}
-
-// CallOnLoop attempts to call the internal call function for the giving response associated with the
-// proper values.
-func (cell *JailCell) CallOnLoop(item string, this interface{}, args ...interface{}) (otto.Value, error) {
-	cell.Lock()
-	defer cell.Unlock()
-
-	res, err := cell.vm.Call(item, this, args...)
-	if err != nil {
-		return res, err
-	}
-
-	return res, cell.lo.Run()
-}
-
 // Call attempts to call the internal call function for the giving response associated with the
 // proper values.
 func (cell *JailCell) Call(item string, this interface{}, args ...interface{}) (otto.Value, error) {
