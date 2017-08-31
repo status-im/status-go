@@ -55,39 +55,6 @@ func (s *JailTestSuite) TestJailTimeout() {
 	require.NotNil(res)
 }
 
-func (s *JailTestSuite) TestJailFetch() {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Hello World"))
-	})
-
-	server := httptest.NewServer(mux)
-	defer server.Close()
-
-	require := s.Require()
-	require.NotNil(s.jail)
-
-	newCell, err := s.jail.NewJailCell(testChatID)
-	require.NoError(err)
-	require.NotNil(newCell)
-
-	jcell, ok := newCell.(*jail.JailCell)
-	require.Equal(ok, true)
-	require.NotNil(jcell)
-
-	wait := make(chan struct{})
-
-	// Attempt to run a fetch resource.
-	_, err = jcell.Fetch(server.URL, func(res otto.Value) {
-		go func() { wait <- struct{}{} }()
-	})
-
-	require.NoError(err)
-
-	<-wait
-}
-
 func (s *JailTestSuite) TestJailLoopInCall() {
 	require := s.Require()
 	require.NotNil(s.jail)
