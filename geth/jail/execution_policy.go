@@ -132,7 +132,12 @@ func (ep *ExecutionPolicy) Execute(req common.RPCCall, call otto.FunctionCall) (
 	var resErr error
 	switch rpcCommandsRoute[req.Method] {
 	case upstreamCommand:
-		res, resErr = ep.ExecuteOnRemote(req, call)
+		// If it's expected to be upstream and we are using local only then revert to local execution.
+		if config.UpstreamConfig.Enabled {
+			res, resErr = ep.ExecuteOnRemote(req, call)
+		} else {
+			res, resErr = ep.ExecuteLocally(req, call)
+		}
 	case localCommand:
 		res, resErr = ep.ExecuteLocally(req, call)
 	}
