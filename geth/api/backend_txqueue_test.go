@@ -27,16 +27,13 @@ func (s *BackendTestSuite) TestSendContractTx() {
 
 	time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to sync
 
-	backend := s.LightEthereumService().StatusBackend
-	require.NotNil(backend)
-
 	// create an account
 	sampleAddress, _, _, err := s.backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
 	require.NoError(err)
 
 	// make sure you panic if transaction complete doesn't return
 	completeQueuedTransaction := make(chan struct{}, 10)
-	common.PanicAfter(1*time.Minute, completeQueuedTransaction, s.T().Name())
+	common.PanicAfter(2*time.Minute, completeQueuedTransaction, s.T().Name())
 
 	// replace transaction notification handler
 	var txHash gethcommon.Hash

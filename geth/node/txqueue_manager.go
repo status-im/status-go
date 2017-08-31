@@ -90,7 +90,12 @@ func (m *TxQueueManager) CreateTransaction(ctx context.Context, args common.Send
 
 // QueueTransaction puts a transaction into the queue.
 func (m *TxQueueManager) QueueTransaction(tx *common.QueuedTx) error {
-	log.Info("queue a new transaction", "id", tx.ID, "from", tx.Args.From.Hex(), "to", tx.Args.To.Hex())
+	to := "<nil>"
+	if tx.Args.To != nil {
+		to = tx.Args.To.Hex()
+	}
+	log.Info("queue a new transaction", "id", tx.ID, "from", tx.Args.From.Hex(), "to", to)
+
 	return m.txQueue.Enqueue(tx)
 }
 
@@ -129,22 +134,26 @@ func (m *TxQueueManager) CompleteTransaction(id common.QueuedTxID, password stri
 
 	queuedTx, err := m.txQueue.Get(id)
 	if err != nil {
+		log.Warn("failed to complete transaction", "err", err)
 		return gethcommon.Hash{}, err
 	}
 
 	selectedAccount, err := m.accountManager.SelectedAccount()
 	if err != nil {
+		log.Warn("failed to complete transaction", "err", err)
 		return gethcommon.Hash{}, err
 	}
 
 	// make sure that only account which created the tx can complete it
 	if queuedTx.Args.From.Hex() != selectedAccount.Address.Hex() {
+		log.Warn("failed to complete transaction", "err", ErrInvalidCompleteTxSender)
 		m.NotifyOnQueuedTxReturn(queuedTx, ErrInvalidCompleteTxSender)
 		return gethcommon.Hash{}, ErrInvalidCompleteTxSender
 	}
 
 	config, err := m.nodeManager.NodeConfig()
 	if err != nil {
+		log.Warn("failed to complete transaction", "err", err)
 		return gethcommon.Hash{}, err
 	}
 
@@ -161,11 +170,12 @@ func (m *TxQueueManager) CompleteTransaction(id common.QueuedTxID, password stri
 	// when incorrect sender tries to complete the account,
 	// notify and keep tx in queue (so that correct sender can complete)
 	if txErr == keystore.ErrDecrypt {
+		log.Warn("failed to complete transaction", "err", err)
 		m.NotifyOnQueuedTxReturn(queuedTx, txErr)
 		return hash, txErr
 	}
 
-	log.Info("finally complete transaction", "id", queuedTx.ID)
+	log.Info("finally completed transaction", "id", queuedTx.ID, "hash", hash, "err", txErr)
 
 	queuedTx.Hash = hash
 	queuedTx.Err = txErr
