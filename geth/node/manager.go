@@ -527,10 +527,6 @@ func (m *NodeManager) RPCLocalClient() (*rpc.Client, error) {
 		}
 	}
 
-	if m.rpcClient == nil {
-		return nil, ErrInvalidRPCClient
-	}
-
 	return m.rpcClient, nil
 }
 
@@ -559,12 +555,8 @@ func (m *NodeManager) RPCUpstreamClient() (*rpc.Client, error) {
 		m.rpcClient, err = rpc.Dial(config.UpstreamConfig.URL)
 		if err != nil {
 			log.Error("Failed to conect to upstream RPC server", "error", err)
-			return nil, err
+			return nil, ErrInvalidRPCClient
 		}
-	}
-
-	if m.rpcClient == nil {
-		return nil, ErrInvalidRPCClient
 	}
 
 	return m.rpcClient, nil

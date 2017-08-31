@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"math/big"
-	"strings"
 	"time"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -15,6 +14,88 @@ import (
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
+)
+
+// rpcRouteID defines a int type used for specifying command routing.
+type rpcRouteID int
+
+// local and upstream RouteID
+const (
+	localCommand rpcRouteID = iota + 1
+	upstreamCommand
+)
+
+// map of command routes
+var (
+	rpcCommandsRoute = map[string]rpcRouteID{
+		//Whisper commands
+		"shh_post":             localCommand,
+		"shh_version":          localCommand,
+		"shh_newIdentity":      localCommand,
+		"shh_hasIdentity":      localCommand,
+		"shh_newGroup":         localCommand,
+		"shh_addToGroup":       localCommand,
+		"shh_newFilter":        localCommand,
+		"shh_uninstallFilter":  localCommand,
+		"shh_getFilterChanges": localCommand,
+		"shh_getMessages":      localCommand,
+
+		// DB commands
+		"db_putString": localCommand,
+		"db_getString": localCommand,
+		"db_putHex":    localCommand,
+		"db_getHex":    localCommand,
+
+		// Other commands
+		"net_version":   localCommand,
+		"net_peerCount": localCommand,
+		"net_listening": localCommand,
+
+		// blockchain commands
+		"eth_sign":                                localCommand,
+		"eth_accounts":                            localCommand,
+		"eth_getCompilers":                        localCommand,
+		"eth_compileLLL":                          localCommand,
+		"eth_compileSolidity":                     localCommand,
+		"eth_compileSerpent":                      localCommand,
+		"eth_protocolVersion":                     upstreamCommand,
+		"eth_syncing":                             upstreamCommand,
+		"eth_coinbase":                            upstreamCommand,
+		"eth_mining":                              upstreamCommand,
+		"eth_hashrate":                            upstreamCommand,
+		"eth_gasPrice":                            upstreamCommand,
+		"eth_blockNumber":                         upstreamCommand,
+		"eth_getBalance":                          upstreamCommand,
+		"eth_getStorageAt":                        upstreamCommand,
+		"eth_getTransactionCount":                 upstreamCommand,
+		"eth_getBlockTransactionCountByHash":      upstreamCommand,
+		"eth_getBlockTransactionCountByNumber":    upstreamCommand,
+		"eth_getUncleCountByBlockHash":            upstreamCommand,
+		"eth_getUncleCountByBlockNumber":          upstreamCommand,
+		"eth_getCode":                             upstreamCommand,
+		"eth_sendTransaction":                     upstreamCommand,
+		"eth_sendRawTransaction":                  upstreamCommand,
+		"eth_call":                                upstreamCommand,
+		"eth_estimateGas":                         upstreamCommand,
+		"eth_getBlockByHash":                      upstreamCommand,
+		"eth_getBlockByNumber":                    upstreamCommand,
+		"eth_getTransactionByHash":                upstreamCommand,
+		"eth_getTransactionByBlockHashAndIndex":   upstreamCommand,
+		"eth_getTransactionByBlockNumberAndIndex": upstreamCommand,
+		"eth_getTransactionReceipt":               upstreamCommand,
+		"eth_getUncleByBlockHashAndIndex":         upstreamCommand,
+		"eth_getUncleByBlockNumberAndIndex":       upstreamCommand,
+		"eth_newFilter":                           upstreamCommand,
+		"eth_newBlockFilter":                      upstreamCommand,
+		"eth_newPendingTransactionFilter":         upstreamCommand,
+		"eth_uninstallFilter":                     upstreamCommand,
+		"eth_getFilterChanges":                    upstreamCommand,
+		"eth_getFilterLogs":                       upstreamCommand,
+		"eth_getLogs":                             upstreamCommand,
+		"eth_getWork":                             upstreamCommand,
+		"eth_submitWork":                          upstreamCommand,
+		"eth_submitHashrate":                      upstreamCommand,
+	}
 )
 
 // ExecutionPolicy provides a central container for the executions of RPCCall requests for both
@@ -39,26 +120,21 @@ func (ep *ExecutionPolicy) Execute(req common.RPCCall, call otto.FunctionCall) (
 		return nil, err
 	}
 
+	if params.SendTransactionMethodName == req.Method {
+		if config.UpstreamConfig.Enabled {
+			return ep.ExecuteRemoteSendTransaction(req, call)
+		}
+
+		return ep.ExecuteLocalSendTransaction(req, call)
+	}
+
 	var res *otto.Object
 	var resErr error
-
-	switch {
-	case strings.HasPrefix(req.Method, "shh_"):
+	switch rpcCommandsRoute[req.Method] {
+	case upstreamCommand:
+		res, resErr = ep.ExecuteOnRemote(req, call)
+	case localCommand:
 		res, resErr = ep.ExecuteLocally(req, call)
-	case params.SendTransactionMethodName == req.Method:
-		switch config.UpstreamConfig.Enabled {
-		case true:
-			res, resErr = ep.executeRemoteSendTransaction(req, call)
-		case false:
-			res, resErr = ep.executeLocalSendTransaction(req, call)
-		}
-	default:
-		switch config.UpstreamConfig.Enabled {
-		case true:
-			res, resErr = ep.ExecuteOnRemote(req, call)
-		case false:
-			res, resErr = ep.ExecuteLocally(req, call)
-		}
 	}
 
 	return res, resErr
@@ -72,7 +148,7 @@ func (ep *ExecutionPolicy) ExecuteLocally(req common.RPCCall, call otto.Function
 		return nil, common.StopRPCCallError{Err: err}
 	}
 
-	return ep.executedWithClient(client, req, call)
+	return ep.executeWithClient(client, req, call)
 }
 
 // ExecuteOnRemote defines a function which handles the processing of non `eth_sendTransaction`
@@ -83,11 +159,11 @@ func (ep *ExecutionPolicy) ExecuteOnRemote(req common.RPCCall, call otto.Functio
 		return nil, common.StopRPCCallError{Err: err}
 	}
 
-	return ep.executedWithClient(client, req, call)
+	return ep.executeWithClient(client, req, call)
 }
 
-// executeRemoteSendTransaction defines a function to execute RPC method eth_sendTransaction over the upstream server.
-func (ep *ExecutionPolicy) executeRemoteSendTransaction(req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
+// ExecuteRemoteSendTransaction defines a function to execute RPC method eth_sendTransaction over the upstream server.
+func (ep *ExecutionPolicy) ExecuteRemoteSendTransaction(req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
 	config, err := ep.nodeManager.NodeConfig()
 	if err != nil {
 		return nil, err
@@ -163,9 +239,9 @@ func (ep *ExecutionPolicy) executeRemoteSendTransaction(req common.RPCCall, call
 	return resp, nil
 }
 
-// executeLocalSendTransaction defines a function which handles execution of RPC method over the internal rpc server
+// ExecuteLocalSendTransaction defines a function which handles execution of RPC method over the internal rpc server
 // from the eth.LightClient. It specifically caters to process eth_sendTransaction.
-func (ep *ExecutionPolicy) executeLocalSendTransaction(req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
+func (ep *ExecutionPolicy) ExecuteLocalSendTransaction(req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
 	resp, err := call.Otto.Object(`({"jsonrpc":"2.0"})`)
 	if err != nil {
 		return nil, err
@@ -184,7 +260,7 @@ func (ep *ExecutionPolicy) executeLocalSendTransaction(req common.RPCCall, call 
 	return resp, nil
 }
 
-func (ep *ExecutionPolicy) executedWithClient(client *rpc.Client, req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
+func (ep *ExecutionPolicy) executeWithClient(client *rpc.Client, req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
 	JSON, err := call.Otto.Object("JSON")
 	if err != nil {
 		return nil, err
