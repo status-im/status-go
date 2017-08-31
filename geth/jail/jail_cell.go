@@ -20,21 +20,29 @@ type JailCell struct {
 
 	id string
 	vm *otto.Otto
-	lo *loop.Loop
 }
 
 // newJailCell encapsulates what we need to create a new jailCell from the
 // provided vm and eventloop instance.
-func newJailCell(id string, vm *otto.Otto, lo *loop.Loop) (*JailCell, error) {
-	// Register event loop for timers.
+func newJailCell(id string, vm *otto.Otto) (*JailCell, error) {
+	// create new event loop for the new cell.
+	// this loop is handling 'setTimeout/setInterval'
+	// calls and is running endlessly in a separate goroutine
+	lo := loop.New(vm)
+
+	// register handlers for setTimeout/setInterval
+	// functions
 	if err := timers.Define(vm, lo); err != nil {
 		return nil, err
 	}
 
+	// finally, start loop in a goroutine
+	// JailCell is currently immortal, so the loop
+	go lo.Run()
+
 	return &JailCell{
 		id: id,
 		vm: vm,
-		lo: lo,
 	}, nil
 }
 
