@@ -147,7 +147,7 @@ func (l *Loop) processTask(t Task) error {
 // Run handles the task scheduling and finalisation.
 // It runs infinitely waiting for new tasks.
 func (l *Loop) Run() error {
-	for t := range <-l.ready {
+	for t := range l.ready {
 		if t == nil {
 			continue
 		}
