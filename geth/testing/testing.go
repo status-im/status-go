@@ -11,7 +11,6 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/geth/common"
-	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
 	assertions "github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -54,8 +53,6 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-
-	log.SetLevel("ERROR")
 }
 
 // BaseTestSuite defines a base tests suit which others suites can embedded to

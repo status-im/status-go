@@ -52,7 +52,7 @@ const (
 	DatabaseCache = 16
 
 	// LogFile defines where to write logs to
-	LogFile = "geth.log"
+	LogFile = ""
 
 	// LogLevel defines the minimum log level to report
 	LogLevel = "INFO"
