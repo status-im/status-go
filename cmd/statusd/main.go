@@ -86,7 +86,7 @@ var (
 	LogLevelFlag = cli.StringFlag{
 		Name:  "log",
 		Usage: `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`,
-		Value: "INFO",
+		Value: "",
 	}
 
 	// LogFileFlag defines a log filename
@@ -159,7 +159,6 @@ func makeNodeConfig(ctx *cli.Context) (*params.NodeConfig, error) {
 	nodeConfig.NodeKeyFile = ctx.GlobalString(NodeKeyFileFlag.Name)
 
 	if logLevel := ctx.GlobalString(LogLevelFlag.Name); logLevel != "" {
-		nodeConfig.LogEnabled = true
 		nodeConfig.LogLevel = logLevel
 	}
 	if logFile := ctx.GlobalString(LogFileFlag.Name); logFile != "" {

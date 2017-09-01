@@ -18,7 +18,7 @@ type Logger struct {
 // logger is package scope instance of Logger
 var logger = Logger{
 	Logger:  log.New("geth", "StatusIM"),
-	Level:   log.LvlInfo,
+	Level:   log.LvlError,
 	Handler: log.StreamHandler(os.Stdout, log.TerminalFormat(true)),
 }
 
