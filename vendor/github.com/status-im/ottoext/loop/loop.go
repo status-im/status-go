@@ -1,4 +1,4 @@
-package loop // import "fknsrs.biz/p/ottoext/loop"
+package loop
 
 import (
 	"fmt"

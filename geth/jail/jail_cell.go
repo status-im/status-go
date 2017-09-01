@@ -3,9 +3,9 @@ package jail
 import (
 	"sync"
 
-	"fknsrs.biz/p/ottoext/loop"
-	"fknsrs.biz/p/ottoext/timers"
 	"github.com/robertkrimen/otto"
+	"github.com/status-im/ottoext/loop"
+	"github.com/status-im/ottoext/timers"
 )
 
 const (
