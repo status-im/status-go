@@ -3,10 +3,10 @@ package log
 import (
 	"bytes"
 	"io/ioutil"
-	"strings"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -46,17 +46,14 @@ func TestLogLevels(t *testing.T) {
 		Warn(warn)
 		Error(err)
 
-		if buf.String() != test.out {
-			t.Errorf("Expecting log output to be '%s', got '%s'", test.out, buf.String())
-		}
+		require.Equal(t, test.out, buf.String())
 	}
 }
 
 func TestLogFile(t *testing.T) {
 	file, err := ioutil.TempFile("", "statusim_log_test")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+
 	defer file.Close()
 
 	// setup log
@@ -68,15 +65,9 @@ func TestLogFile(t *testing.T) {
 	Debug(debug)
 
 	data, err := ioutil.ReadAll(file)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	got := string(data)
-	if !strings.Contains(got, info) {
-		t.Fatalf("Expecting log output should contain '%s', but got '%s'\n", info, got)
-	}
-	if strings.Contains(got, debug) {
-		t.Fatalf("Expecting log output should NOT contain '%s', but got '%s'\n", debug, got)
-	}
+	require.Contains(t, got, info)
+	require.NotContains(t, got, debug)
 }
