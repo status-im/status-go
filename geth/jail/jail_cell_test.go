@@ -7,6 +7,68 @@ import (
 	"github.com/status-im/status-go/geth/params"
 )
 
+func (s *JailTestSuite) TestJailTimeoutFailure() {
+	require := s.Require()
+	require.NotNil(s.jail)
+
+	cell, err := s.jail.NewJailCell(testChatID)
+	require.NoError(err)
+	require.NotNil(cell)
+
+	// Attempt to run a timeout string against a JailCell.
+	_, err = cell.Run(`
+		var timerCounts = 0;
+ 		setTimeout(function(n){		
+ 			if (Date.now() - n < 50) {
+ 				throw new Error("Timed out");
+ 			}
+
+			timerCounts++;
+ 		}, 30, Date.now());
+ 	`)
+	require.NoError(err)
+
+	// wait at least 10x longer to decrease probability
+	// of false negatives as we using real clock here
+	time.Sleep(300 * time.Millisecond)
+
+	value, err := cell.Get("timerCounts")
+	require.NoError(err)
+	require.True(value.IsNumber())
+	require.Equal("0", value.String())
+}
+
+func (s *JailTestSuite) TestJailTimeout() {
+	require := s.Require()
+	require.NotNil(s.jail)
+
+	cell, err := s.jail.NewJailCell(testChatID)
+	require.NoError(err)
+	require.NotNil(cell)
+
+	// Attempt to run a timeout string against a JailCell.
+	_, err = cell.Run(`
+		var timerCounts = 0;
+ 		setTimeout(function(n){		
+ 			if (Date.now() - n < 50) {
+ 				throw new Error("Timed out");
+ 			}
+
+			timerCounts++;
+ 		}, 50, Date.now());
+ 	`)
+	require.NoError(err)
+
+	// wait at least 10x longer to decrease probability
+	// of false negatives as we using real clock here
+	time.Sleep(300 * time.Millisecond)
+
+	value, err := cell.Get("timerCounts")
+	require.NoError(err)
+	require.True(value.IsNumber())
+	require.Equal("1", value.String())
+}
+
 func (s *JailTestSuite) TestJailLoopInCall() {
 	require := s.Require()
 	require.NotNil(s.jail)
