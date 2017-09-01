@@ -19,7 +19,7 @@ type Logger struct {
 var logger = Logger{
 	Logger:  log.New("geth", "StatusIM"),
 	Level:   log.LvlInfo,
-	Handler: log.StdoutHandler,
+	Handler: log.StreamHandler(os.Stdout, log.TerminalFormat(true)),
 }
 
 func init() {
