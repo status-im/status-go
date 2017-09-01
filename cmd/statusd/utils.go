@@ -33,7 +33,6 @@ var nodeConfigJSON = `{
 	"DataDir": "` + TestDataDir + `",
 	"HTTPPort": ` + strconv.Itoa(TestConfig.Node.HTTPPort) + `,
 	"WSPort": ` + strconv.Itoa(TestConfig.Node.WSPort) + `,
-	"LogEnabled": true,
 	"LogLevel": "INFO"
 }`
 

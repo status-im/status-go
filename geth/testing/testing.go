@@ -11,7 +11,6 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/geth/common"
-	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
 	assertions "github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -54,8 +53,6 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-
-	log.SetLevel("ERROR")
 }
 
 // BaseTestSuite defines a base tests suit which others suites can embedded to
@@ -131,8 +128,7 @@ func MakeTestNodeConfig(networkID int) (*params.NodeConfig, error) {
 		"DataDir": "` + filepath.Join(TestDataDir, TestNetworkNames[networkID]) + `",
 		"HTTPPort": ` + strconv.Itoa(TestConfig.Node.HTTPPort) + `,
 		"WSPort": ` + strconv.Itoa(TestConfig.Node.WSPort) + `,
-		"LogEnabled": true,
-		"LogLevel": "ERROR"
+		"LogLevel": "INFO"
 	}`
 	nodeConfig, err := params.LoadNodeConfig(configJSON)
 	if err != nil {

@@ -70,6 +70,8 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 		return nil, ErrNodeExists
 	}
 
+	m.initLog(config)
+
 	ethNode, err := MakeNode(config)
 	if err != nil {
 		return nil, err
@@ -579,4 +581,17 @@ func (m *NodeManager) RPCServer() (*rpc.Server, error) {
 	}
 
 	return m.rpcServer, nil
+}
+
+// initLog initializes global logger parameters based on
+// provided node configurations.
+func (m *NodeManager) initLog(config *params.NodeConfig) {
+	log.SetLevel(config.LogLevel)
+
+	if config.LogFile != "" {
+		err := log.SetLogFile(config.LogFile)
+		if err != nil {
+			fmt.Println("Failed to open log file, using stdout")
+		}
+	}
 }
