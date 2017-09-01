@@ -10,6 +10,7 @@ import (
 
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/helpers/profiling"
 )
 
 //export GenerateConfig
@@ -305,6 +306,24 @@ func Parse(chatID *C.char, js *C.char) *C.char {
 func Call(chatID *C.char, path *C.char, params *C.char) *C.char {
 	res := statusAPI.JailCall(C.GoString(chatID), C.GoString(path), C.GoString(params))
 	return C.CString(res)
+}
+
+//export StartCPUProfile
+func StartCPUProfile(dataDir *C.char) *C.char {
+	err := profiling.StartCPUProfile(C.GoString(dataDir))
+	return makeJSONResponse(err)
+}
+
+//export StopCPUProfiling
+func StopCPUProfiling() *C.char {
+	err := profiling.StopCPUProfile()
+	return makeJSONResponse(err)
+}
+
+//export WriteHeapProfile
+func WriteHeapProfile(dataDir *C.char) *C.char {
+	err := profiling.WriteHeapFile(C.GoString(dataDir))
+	return makeJSONResponse(err)
 }
 
 func makeJSONResponse(err error) *C.char {
