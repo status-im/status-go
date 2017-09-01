@@ -3,7 +3,7 @@ package looptask
 import (
 	"errors"
 
-	"fknsrs.biz/p/ottoext/loop"
+	"github.com/status-im/ottoext/loop"
 	"github.com/robertkrimen/otto"
 )
 

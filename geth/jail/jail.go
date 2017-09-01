@@ -14,8 +14,6 @@ import (
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/static"
-
-	"fknsrs.biz/p/ottoext/loop"
 )
 
 // FIXME(tiabc): Get rid of this global variable. Move it to a constructor or initialization.
@@ -62,7 +60,7 @@ func (jail *Jail) NewJailCell(id string) (common.JailCell, error) {
 
 	vm := otto.New()
 
-	newJail, err := newJailCell(id, vm, loop.New(vm))
+	newJail, err := newJailCell(id, vm)
 	if err != nil {
 		return nil, err
 	}
@@ -159,15 +157,6 @@ func (jail *Jail) Call(chatID string, path string, args string) string {
 	}
 
 	res, err := jcell.Call("call", nil, path, args)
-
-	// WARNING(influx6): We can have go-routine leakage due to continous call to this method
-	// and the call to cell.CellLoop().Run() due to improper usage, let's keep this
-	// in sight if things ever go wrong here.
-	// Due to the new event loop provided by ottoext.
-	// We need to ensure that all possible calls to internal setIntervals/SetTimeouts/SetImmediate
-	// work by lunching the loop.Run() method.
-	// Needs to be done in a go-routine.
-	go jcell.lo.Run()
 
 	return makeResult(res.String(), err)
 }

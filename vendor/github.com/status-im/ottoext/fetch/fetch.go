@@ -1,4 +1,4 @@
-package fetch // import "fknsrs.biz/p/ottoext/fetch"
+package fetch
 
 import (
 	"io"
@@ -10,8 +10,8 @@ import (
 	"github.com/GeertJohan/go.rice"
 	"github.com/robertkrimen/otto"
 
-	"fknsrs.biz/p/ottoext/loop"
-	"fknsrs.biz/p/ottoext/promise"
+	"github.com/status-im/ottoext/loop"
+	"github.com/status-im/ottoext/promise"
 )
 
 func mustValue(v otto.Value, err error) otto.Value {

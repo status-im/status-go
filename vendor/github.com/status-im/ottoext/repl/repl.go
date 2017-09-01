@@ -1,16 +1,16 @@
 // Package repl implements an event loop aware REPL (read-eval-print loop)
 // for otto.
-package repl // import "fknsrs.biz/p/ottoext/repl"
+package repl
 
 import (
 	"fmt"
 	"io"
 	"strings"
 
-	"fknsrs.biz/p/ottoext/loop"
-	"fknsrs.biz/p/ottoext/loop/looptask"
 	"github.com/robertkrimen/otto"
 	"github.com/robertkrimen/otto/parser"
+	"github.com/status-im/ottoext/loop"
+	"github.com/status-im/ottoext/loop/looptask"
 	"gopkg.in/readline.v1"
 )
 
