@@ -18,6 +18,8 @@ import (
 
 // map of command routes
 var (
+	//TODO(influx6): Replace this with a registry of commands to functions that
+	// call appropriate op for command with ExecutionPolicy.
 	rpcLocalCommandRoute = map[string]bool{
 		//Whisper commands
 		"shh_post":             true,
