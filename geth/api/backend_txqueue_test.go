@@ -359,16 +359,14 @@ func (s *BackendTestSuite) TestCompleteMultipleQueuedTransactions() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to sync
+	// allow to sync
+	time.Sleep(TestConfig.Node.SyncSeconds * time.Second)
 
-	backend := s.LightEthereumService().StatusBackend
-	require.NotNil(backend)
-
-	// reset queue
 	s.TxQueueManager().TransactionQueue().Reset()
 
 	// log into account from which transactions will be sent
-	require.NoError(s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
+	err := s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
+	require.NoError(err)
 
 	// make sure you panic if transaction complete doesn't return
 	testTxCount := 3
@@ -414,9 +412,10 @@ func (s *BackendTestSuite) TestCompleteMultipleQueuedTransactions() {
 				"invalid error for %s", txID,
 			)
 			require.False(
-				txResult.Hash.Hex() == "0x0000000000000000000000000000000000000000000000000000000000000000" && txID != "invalid-tx-id",
+				txResult.Hash == (gethcommon.Hash{}) && txID != "invalid-tx-id",
 				"invalid hash (expected non empty hash): %s", txID,
 			)
+			log.Info("transaction complete", "URL", "https://rinkeby.etherscan.io/tx/"+txResult.Hash.Hex())
 		}
 
 		time.Sleep(1 * time.Second) // make sure that tx complete signal propagates
@@ -450,7 +449,7 @@ func (s *BackendTestSuite) TestCompleteMultipleQueuedTransactions() {
 		require.Fail("test timed out")
 	}
 
-	require.Zero(backend.TransactionQueue().Count(), "queue should be empty")
+	require.Zero(s.TxQueueManager().TransactionQueue().Count(), "queue should be empty")
 }
 
 func (s *BackendTestSuite) TestDiscardMultipleQueuedTransactions() {

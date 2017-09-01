@@ -211,7 +211,8 @@ func (s *BackendTestSuite) TestContractDeployment() {
 	var txHash gethcommon.Hash
 	node.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var envelope node.SignalEnvelope
-		err := json.Unmarshal([]byte(jsonEvent), &envelope)
+		var err error
+		err = json.Unmarshal([]byte(jsonEvent), &envelope)
 		require.NoError(err, fmt.Sprintf("cannot unmarshal JSON: %s", jsonEvent))
 
 		if envelope.Type == node.EventTransactionQueued {
@@ -223,7 +224,7 @@ func (s *BackendTestSuite) TestContractDeployment() {
 			s.NoError(s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 
 			txID := event["id"].(string)
-			txHash, err := s.backend.CompleteTransaction(common.QueuedTxID(txID), TestConfig.Account1.Password)
+			txHash, err = s.backend.CompleteTransaction(common.QueuedTxID(txID), TestConfig.Account1.Password)
 			if s.NoError(err, event["id"]) {
 				s.T().Logf("contract transaction complete, URL: %s", "https://ropsten.etherscan.io/tx/"+txHash.Hex())
 			}
@@ -240,9 +241,13 @@ func (s *BackendTestSuite) TestContractDeployment() {
 			from: '` + TestConfig.Account1.Address + `',
 			data: '0x6060604052341561000c57fe5b5b60a58061001b6000396000f30060606040526000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff1680636ffa1caa14603a575bfe5b3415604157fe5b60556004808035906020019091905050606b565b6040518082815260200191505060405180910390f35b60008160020290505b9190505600a165627a7a72305820ccdadd737e4ac7039963b54cee5e5afb25fa859a275252bdcf06f653155228210029',
 			gas: '` + strconv.Itoa(params.DefaultGas) + `'
-		}, function (e, contract){
+		}, function (e, contract) {
+			// NOTE: The callback will fire twice!
+			// Once the contract has the transactionHash property set and once its deployed on an address.
 			if (!e) {
-				responseValue = contract.transactionHash
+				if (!contract.address) {
+					responseValue = contract.transactionHash;
+				}
 			}
 		})
 	`)
