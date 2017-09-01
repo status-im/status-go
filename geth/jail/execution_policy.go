@@ -16,85 +16,39 @@ import (
 	"github.com/status-im/status-go/geth/params"
 )
 
-// rpcRouteID defines a int type used for specifying command routing.
-type rpcRouteID int
-
-// local and upstream RouteID
-const (
-	localCommand rpcRouteID = iota + 1
-	upstreamCommand
-)
-
 // map of command routes
 var (
-	rpcCommandsRoute = map[string]rpcRouteID{
+	rpcLocalCommandRoute = map[string]bool{
 		//Whisper commands
-		"shh_post":             localCommand,
-		"shh_version":          localCommand,
-		"shh_newIdentity":      localCommand,
-		"shh_hasIdentity":      localCommand,
-		"shh_newGroup":         localCommand,
-		"shh_addToGroup":       localCommand,
-		"shh_newFilter":        localCommand,
-		"shh_uninstallFilter":  localCommand,
-		"shh_getFilterChanges": localCommand,
-		"shh_getMessages":      localCommand,
+		"shh_post":             true,
+		"shh_version":          true,
+		"shh_newIdentity":      true,
+		"shh_hasIdentity":      true,
+		"shh_newGroup":         true,
+		"shh_addToGroup":       true,
+		"shh_newFilter":        true,
+		"shh_uninstallFilter":  true,
+		"shh_getFilterChanges": true,
+		"shh_getMessages":      true,
 
 		// DB commands
-		"db_putString": localCommand,
-		"db_getString": localCommand,
-		"db_putHex":    localCommand,
-		"db_getHex":    localCommand,
+		"db_putString": true,
+		"db_getString": true,
+		"db_putHex":    true,
+		"db_getHex":    true,
 
 		// Other commands
-		"net_version":   localCommand,
-		"net_peerCount": localCommand,
-		"net_listening": localCommand,
+		"net_version":   true,
+		"net_peerCount": true,
+		"net_listening": true,
 
 		// blockchain commands
-		"eth_sign":                                localCommand,
-		"eth_accounts":                            localCommand,
-		"eth_getCompilers":                        localCommand,
-		"eth_compileLLL":                          localCommand,
-		"eth_compileSolidity":                     localCommand,
-		"eth_compileSerpent":                      localCommand,
-		"eth_protocolVersion":                     upstreamCommand,
-		"eth_syncing":                             upstreamCommand,
-		"eth_coinbase":                            upstreamCommand,
-		"eth_mining":                              upstreamCommand,
-		"eth_hashrate":                            upstreamCommand,
-		"eth_gasPrice":                            upstreamCommand,
-		"eth_blockNumber":                         upstreamCommand,
-		"eth_getBalance":                          upstreamCommand,
-		"eth_getStorageAt":                        upstreamCommand,
-		"eth_getTransactionCount":                 upstreamCommand,
-		"eth_getBlockTransactionCountByHash":      upstreamCommand,
-		"eth_getBlockTransactionCountByNumber":    upstreamCommand,
-		"eth_getUncleCountByBlockHash":            upstreamCommand,
-		"eth_getUncleCountByBlockNumber":          upstreamCommand,
-		"eth_getCode":                             upstreamCommand,
-		"eth_sendTransaction":                     upstreamCommand,
-		"eth_sendRawTransaction":                  upstreamCommand,
-		"eth_call":                                upstreamCommand,
-		"eth_estimateGas":                         upstreamCommand,
-		"eth_getBlockByHash":                      upstreamCommand,
-		"eth_getBlockByNumber":                    upstreamCommand,
-		"eth_getTransactionByHash":                upstreamCommand,
-		"eth_getTransactionByBlockHashAndIndex":   upstreamCommand,
-		"eth_getTransactionByBlockNumberAndIndex": upstreamCommand,
-		"eth_getTransactionReceipt":               upstreamCommand,
-		"eth_getUncleByBlockHashAndIndex":         upstreamCommand,
-		"eth_getUncleByBlockNumberAndIndex":       upstreamCommand,
-		"eth_newFilter":                           upstreamCommand,
-		"eth_newBlockFilter":                      upstreamCommand,
-		"eth_newPendingTransactionFilter":         upstreamCommand,
-		"eth_uninstallFilter":                     upstreamCommand,
-		"eth_getFilterChanges":                    upstreamCommand,
-		"eth_getFilterLogs":                       upstreamCommand,
-		"eth_getLogs":                             upstreamCommand,
-		"eth_getWork":                             upstreamCommand,
-		"eth_submitWork":                          upstreamCommand,
-		"eth_submitHashrate":                      upstreamCommand,
+		"eth_sign":            true,
+		"eth_accounts":        true,
+		"eth_getCompilers":    true,
+		"eth_compileLLL":      true,
+		"eth_compileSolidity": true,
+		"eth_compileSerpent":  true,
 	}
 )
 
@@ -120,29 +74,23 @@ func (ep *ExecutionPolicy) Execute(req common.RPCCall, call otto.FunctionCall) (
 		return nil, err
 	}
 
-	if params.SendTransactionMethodName == req.Method {
-		if config.UpstreamConfig.Enabled {
+	if config.UpstreamConfig.Enabled {
+		if params.SendTransactionMethodName == req.Method {
 			return ep.ExecuteRemoteSendTransaction(req, call)
 		}
 
+		if !rpcLocalCommandRoute[req.Method] {
+			return ep.ExecuteOnRemote(req, call)
+		}
+
+		return ep.ExecuteLocally(req, call)
+	}
+
+	if params.SendTransactionMethodName == req.Method {
 		return ep.ExecuteLocalSendTransaction(req, call)
 	}
 
-	var res *otto.Object
-	var resErr error
-	switch rpcCommandsRoute[req.Method] {
-	case upstreamCommand:
-		// If it's expected to be upstream and we are using local only then revert to local execution.
-		if config.UpstreamConfig.Enabled {
-			res, resErr = ep.ExecuteOnRemote(req, call)
-		} else {
-			res, resErr = ep.ExecuteLocally(req, call)
-		}
-	case localCommand:
-		res, resErr = ep.ExecuteLocally(req, call)
-	}
-
-	return res, resErr
+	return ep.ExecuteLocally(req, call)
 }
 
 // ExecuteLocally defines a function which handles the processing of `shh_*` transaction methods
