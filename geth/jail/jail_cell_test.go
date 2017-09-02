@@ -173,7 +173,7 @@ func (s *JailTestSuite) TestJailFetchCatch() {
 	err = cell.Set("__captureError", func(res otto.Value) { errCh <- res })
 	require.NoError(err)
 
-	// run JS code for fetching valid URL
+	// run JS code for fetching invalid URL
 	_, err = cell.Run(`fetch('http://👽/nonexistent').then(function(r) {
 		return r.text()
 	}).then(function(data) {
@@ -196,5 +196,67 @@ func (s *JailTestSuite) TestJailFetchCatch() {
 		require.NoError(err)
 	case <-timer.C:
 		require.Fail("test timed out")
+	}
+}
+
+func (s *JailTestSuite) TestJailFetchRace() {
+	body := `{"key": "value"}`
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Content-Type", "application/json")
+		w.Write([]byte(body))
+	}))
+	defer server.Close()
+	require := s.Require()
+	require.NotNil(s.jail)
+
+	cell, err := s.jail.NewJailCell(testChatID)
+	require.NoError(err)
+	require.NotNil(cell)
+
+	dataCh := make(chan otto.Value, 1)
+	errCh := make(chan otto.Value, 1)
+
+	err = cell.Set("__captureSuccess", func(res otto.Value) { dataCh <- res })
+	require.NoError(err)
+	err = cell.Set("__captureError", func(res otto.Value) { errCh <- res })
+	require.NoError(err)
+
+	// run JS code for fetching valid URL
+	_, err = cell.Run(`fetch('` + server.URL + `').then(function(r) {
+		return r.text()
+	}).then(function(data) {
+		__captureSuccess(data)
+	}).catch(function (e) {
+		__captureError(e)
+	})`)
+	require.NoError(err)
+
+	// run JS code for fetching invalid URL
+	_, err = cell.Run(`fetch('http://👽/nonexistent').then(function(r) {
+		return r.text()
+	}).then(function(data) {
+		__captureSuccess(data)
+	}).catch(function (e) {
+		__captureError(e)
+	})`)
+	//require.NoError(err)
+
+	timer := time.NewTimer(500 * time.Millisecond)
+	for i := 0; i < 2; i++ {
+		select {
+		case data := <-dataCh:
+			require.True(data.IsString())
+			require.Equal(body, data.String())
+		case e := <-errCh:
+			require.True(e.IsObject())
+			name, err := e.Object().Get("name")
+			require.NoError(err)
+			require.Equal("Error", name.String())
+			_, err = e.Object().Get("message")
+			require.NoError(err)
+		case <-timer.C:
+			require.Fail("test timed out")
+			return
+		}
 	}
 }
