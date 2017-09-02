@@ -47,7 +47,6 @@ func (s *JailTestSuite) SetupTest() {
 
 func (s *JailTestSuite) TestInit() {
 	require := s.Require()
-	require.NotNil(s.jail)
 
 	errorWrapper := func(err error) string {
 		return `{"error":"` + err.Error() + `"}`
@@ -88,7 +87,6 @@ func (s *JailTestSuite) TestInit() {
 
 func (s *JailTestSuite) TestParse() {
 	require := s.Require()
-	require.NotNil(s.jail)
 
 	extraCode := `
 	var _status_catalog = {
@@ -102,7 +100,6 @@ func (s *JailTestSuite) TestParse() {
 
 func (s *JailTestSuite) TestFunctionCall() {
 	require := s.Require()
-	require.NotNil(s.jail)
 
 	// load Status JS and add test command to it
 	statusJS := baseStatusJSCode + `;
@@ -124,7 +121,6 @@ func (s *JailTestSuite) TestFunctionCall() {
 
 func (s *JailTestSuite) TestJailRPCSend() {
 	require := s.Require()
-	require.NotNil(s.jail)
 
 	s.StartTestNode(params.RopstenNetworkID, false)
 	defer s.StopTestNode()
@@ -158,11 +154,8 @@ func (s *JailTestSuite) TestJailRPCSend() {
 
 func (s *JailTestSuite) TestIsConnected() {
 	require := s.Require()
-	require.NotNil(s.jail)
 
-	// TODO(tiabc): Is this required?
 	s.StartTestNode(params.RopstenNetworkID, false)
-
 	defer s.StopTestNode()
 
 	s.jail.Parse(testChatID, "")
@@ -189,7 +182,6 @@ func (s *JailTestSuite) TestIsConnected() {
 
 func (s *JailTestSuite) TestLocalStorageSet() {
 	require := s.Require()
-	require.NotNil(s.jail)
 
 	s.jail.Parse(testChatID, "")
 

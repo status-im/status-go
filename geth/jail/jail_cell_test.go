@@ -9,7 +9,6 @@ import (
 
 func (s *JailTestSuite) TestJailTimeoutFailure() {
 	require := s.Require()
-	require.NotNil(s.jail)
 
 	cell, err := s.jail.NewCell(testChatID)
 	require.NoError(err)
@@ -40,7 +39,6 @@ func (s *JailTestSuite) TestJailTimeoutFailure() {
 
 func (s *JailTestSuite) TestJailTimeout() {
 	require := s.Require()
-	require.NotNil(s.jail)
 
 	cell, err := s.jail.NewCell(testChatID)
 	require.NoError(err)
@@ -71,7 +69,6 @@ func (s *JailTestSuite) TestJailTimeout() {
 
 func (s *JailTestSuite) TestJailLoopInCall() {
 	require := s.Require()
-	require.NotNil(s.jail)
 
 	s.StartTestNode(params.RopstenNetworkID, true)
 	defer s.StopTestNode()
