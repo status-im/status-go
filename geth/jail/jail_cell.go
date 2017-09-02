@@ -10,15 +10,13 @@ import (
 
 // Cell represents a single jail cell, which is basically a JavaScript VM.
 type Cell struct {
-	sync.Mutex
-
 	id string
 	*vm.VM
 }
 
 // newCell encapsulates what we need to create a new jailCell from the
 // provided vm and eventloop instance.
-func newCell(id string, vm *otto.Otto) (*Cell, error) {
+func newCell(id string, ottoVM *otto.Otto) (*Cell, error) {
 	cellVM := vm.New(ottoVM)
 
 	lo := loop.New(cellVM)

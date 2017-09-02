@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/robertkrimen/otto"
-	"github.com/status-im/status-go/geth/jail"
 )
 
 func (s *JailTestSuite) TestJailTimeoutFailure() {
@@ -113,11 +112,9 @@ func (s *JailTestSuite) TestJailLoopRace() {
 	require := s.Require()
 	require.NotNil(s.jail)
 
-	cell, err := s.jail.NewJailCell(testChatID)
+	cell, err := s.jail.NewCell(testChatID)
 	require.NoError(err)
 	require.NotNil(cell)
-
-	jcell := cell.(*jail.JailCell)
 
 	items := make(chan string)
 
@@ -137,7 +134,7 @@ func (s *JailTestSuite) TestJailLoopRace() {
 	require.NoError(err)
 
 	for i := 0; i < 100; i++ {
-		_, err = jcell.Call("callRunner", nil, "softball")
+		_, err = cell.Call("callRunner", nil, "softball")
 		require.NoError(err)
 	}
 
@@ -163,7 +160,7 @@ func (s *JailTestSuite) TestJailFetchPromise() {
 	require := s.Require()
 	require.NotNil(s.jail)
 
-	cell, err := s.jail.NewJailCell(testChatID)
+	cell, err := s.jail.NewCell(testChatID)
 	require.NoError(err)
 	require.NotNil(cell)
 
@@ -200,7 +197,7 @@ func (s *JailTestSuite) TestJailFetchCatch() {
 	require := s.Require()
 	require.NotNil(s.jail)
 
-	cell, err := s.jail.NewJailCell(testChatID)
+	cell, err := s.jail.NewCell(testChatID)
 	require.NoError(err)
 	require.NotNil(cell)
 
@@ -247,7 +244,7 @@ func (s *JailTestSuite) TestJailFetchRace() {
 	require := s.Require()
 	require.NotNil(s.jail)
 
-	cell, err := s.jail.NewJailCell(testChatID)
+	cell, err := s.jail.NewCell(testChatID)
 	require.NoError(err)
 	require.NotNil(cell)
 
