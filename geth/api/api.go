@@ -168,9 +168,8 @@ func (api *StatusAPI) JailParse(chatID string, js string) string {
 }
 
 // JailCall executes given JavaScript function w/i a jail cell context identified by the chatID.
-// Jail cell is clonned before call is executed i.e. all calls execute w/i their own contexts.
-func (api *StatusAPI) JailCall(chatID string, path string, args string) string {
-	return api.b.jailManager.Call(chatID, path, args)
+func (api *StatusAPI) JailCall(chatID, this, args string) string {
+	return api.b.jailManager.Call(chatID, this, args)
 }
 
 // JailBaseJS allows to setup initial JavaScript to be loaded on each jail.Parse()

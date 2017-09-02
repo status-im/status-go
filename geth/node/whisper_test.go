@@ -1,8 +1,8 @@
 package node_test
 
 import (
-	"testing"
 	"context"
+	"testing"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
@@ -30,7 +30,7 @@ func (s *WhisperTestSuite) TestWhisperFilterRace() {
 	require := s.Require()
 	require.NotNil(s.NodeManager)
 
-	s.StartTestNode(params.RinkebyNetworkID, false)
+	s.StartTestNode(params.RinkebyNetworkID)
 	defer s.StopTestNode()
 
 	whisperService, err := s.NodeManager.WhisperService()
