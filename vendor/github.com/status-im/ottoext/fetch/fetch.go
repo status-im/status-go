@@ -12,6 +12,7 @@ import (
 
 	"github.com/status-im/ottoext/loop"
 	"github.com/status-im/ottoext/promise"
+	"github.com/status-im/status-go/geth/jail/vm"
 )
 
 func mustValue(v otto.Value, err error) otto.Value {
@@ -36,7 +37,7 @@ type fetchTask struct {
 func (t *fetchTask) SetID(id int64) { t.id = id }
 func (t *fetchTask) GetID() int64   { return t.id }
 
-func (t *fetchTask) Execute(vm *otto.Otto, l *loop.Loop) error {
+func (t *fetchTask) Execute(vm *vm.VM, l *loop.Loop) error {
 	var arguments []interface{}
 
 	if t.err != nil {
@@ -70,11 +71,11 @@ func (t *fetchTask) Execute(vm *otto.Otto, l *loop.Loop) error {
 func (t *fetchTask) Cancel() {
 }
 
-func Define(vm *otto.Otto, l *loop.Loop) error {
+func Define(vm *vm.VM, l *loop.Loop) error {
 	return DefineWithHandler(vm, l, nil)
 }
 
-func DefineWithHandler(vm *otto.Otto, l *loop.Loop, h http.Handler) error {
+func DefineWithHandler(vm *vm.VM, l *loop.Loop, h http.Handler) error {
 	if err := promise.Define(vm, l); err != nil {
 		return err
 	}
