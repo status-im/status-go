@@ -12,6 +12,8 @@ import (
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/helpers/profiling"
+
+	_ "github.com/status-im/status-go/helpers/expvars"
 )
 
 //export GenerateConfig
