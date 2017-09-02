@@ -1,13 +1,12 @@
 package promise
 
 import (
-	"github.com/robertkrimen/otto"
-
 	"github.com/status-im/ottoext/loop"
 	"github.com/status-im/ottoext/timers"
+	"github.com/status-im/status-go/geth/jail/vm"
 )
 
-func Define(vm *otto.Otto, l *loop.Loop) error {
+func Define(vm *vm.VM, l *loop.Loop) error {
 	if v, err := vm.Get("Promise"); err != nil {
 		return err
 	} else if !v.IsUndefined() {

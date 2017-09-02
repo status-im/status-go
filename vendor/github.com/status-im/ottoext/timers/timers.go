@@ -6,6 +6,7 @@ import (
 	"github.com/robertkrimen/otto"
 
 	"github.com/status-im/ottoext/loop"
+	"github.com/status-im/status-go/geth/jail/vm"
 )
 
 var minDelay = map[bool]int64{
@@ -13,7 +14,7 @@ var minDelay = map[bool]int64{
 	false: 4,
 }
 
-func Define(vm *otto.Otto, l *loop.Loop) error {
+func Define(vm *vm.VM, l *loop.Loop) error {
 	if v, err := vm.Get("setTimeout"); err != nil {
 		return err
 	} else if !v.IsUndefined() {
@@ -97,7 +98,7 @@ type timerTask struct {
 func (t *timerTask) SetID(id int64) { t.id = id }
 func (t *timerTask) GetID() int64   { return t.id }
 
-func (t *timerTask) Execute(vm *otto.Otto, l *loop.Loop) error {
+func (t *timerTask) Execute(vm *vm.VM, l *loop.Loop) error {
 	var arguments []interface{}
 
 	if len(t.call.ArgumentList) > 2 {
