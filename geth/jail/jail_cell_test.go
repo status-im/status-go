@@ -11,11 +11,11 @@ func (s *JailTestSuite) TestJailTimeoutFailure() {
 	require := s.Require()
 	require.NotNil(s.jail)
 
-	cell, err := s.jail.NewJailCell(testChatID)
+	cell, err := s.jail.NewCell(testChatID)
 	require.NoError(err)
 	require.NotNil(cell)
 
-	// Attempt to run a timeout string against a JailCell.
+	// Attempt to run a timeout string against a Cell.
 	_, err = cell.Run(`
 		var timerCounts = 0;
  		setTimeout(function(n){		
@@ -42,11 +42,11 @@ func (s *JailTestSuite) TestJailTimeout() {
 	require := s.Require()
 	require.NotNil(s.jail)
 
-	cell, err := s.jail.NewJailCell(testChatID)
+	cell, err := s.jail.NewCell(testChatID)
 	require.NoError(err)
 	require.NotNil(cell)
 
-	// Attempt to run a timeout string against a JailCell.
+	// Attempt to run a timeout string against a Cell.
 	_, err = cell.Run(`
 		var timerCounts = 0;
  		setTimeout(function(n){		
@@ -80,7 +80,7 @@ func (s *JailTestSuite) TestJailLoopInCall() {
 	s.jail.BaseJS(baseStatusJSCode)
 	s.jail.Parse(testChatID, ``)
 
-	cell, err := s.jail.GetCell(testChatID)
+	cell, err := s.jail.GetConcreteCell(testChatID)
 	require.NoError(err)
 	require.NotNil(cell)
 

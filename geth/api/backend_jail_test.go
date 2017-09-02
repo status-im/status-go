@@ -208,7 +208,7 @@ func (s *BackendTestSuite) TestContractDeployment() {
 	jailInstance := s.backend.JailManager()
 	jailInstance.Parse(testChatID, "")
 
-	cell, err := jailInstance.GetJailCell(testChatID)
+	cell, err := jailInstance.Cell(testChatID)
 	require.NoError(err)
 
 	// make sure you panic if transaction complete doesn't return
@@ -615,7 +615,7 @@ func (s *BackendTestSuite) TestJailWhisper() {
 			};
 		`)
 
-		cell, err := jailInstance.GetJailCell(testCaseKey)
+		cell, err := jailInstance.Cell(testCaseKey)
 		require.NoError(err, "cannot get VM")
 
 		// post messages
@@ -796,7 +796,7 @@ func (s *BackendTestSuite) TestJailVMPersistence() {
 	wg.Wait()
 
 	// Validate total.
-	cell, err := jailInstance.GetJailCell(testChatID)
+	cell, err := jailInstance.Cell(testChatID)
 	require.NoError(err)
 
 	totalOtto, err := cell.Get("total")

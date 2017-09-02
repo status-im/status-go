@@ -185,17 +185,16 @@ type JailCell interface {
 type JailManager interface {
 	// Parse creates a new jail cell context, with the given chatID as identifier.
 	// New context executes provided JavaScript code, right after the initialization.
-	Parse(chatID string, js string) string
+	Parse(chatID, js string) string
 
 	// Call executes given JavaScript function w/i a jail cell context identified by the chatID.
-	// Jail cell is clonned before call is executed i.e. all calls execute w/i their own contexts.
-	Call(chatID string, path string, args string) string
+	Call(chatID, path, args string) string
 
-	// NewJailCell initializes and returns jail cell
-	NewJailCell(id string) (JailCell, error)
+	// NewCell initializes and returns a new jail cell.
+	NewCell(chatID string) (JailCell, error)
 
-	// GetJailCell returns instance of JailCell (which is persisted w/i jail cell) by chatID
-	GetJailCell(chatID string) (JailCell, error)
+	// Cell returns an existing instance of JailCell.
+	Cell(chatID string) (JailCell, error)
 
 	// BaseJS allows to setup initial JavaScript to be loaded on each jail.Parse()
 	BaseJS(js string)
