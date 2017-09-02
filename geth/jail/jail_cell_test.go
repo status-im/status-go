@@ -1,6 +1,8 @@
 package jail_test
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"time"
 
 	"github.com/robertkrimen/otto"
@@ -107,5 +109,92 @@ func (s *JailTestSuite) TestJailLoopInCall() {
 		require.Equal(received, "softball")
 	case <-time.After(5 * time.Second):
 		require.Fail("Failed to received event response")
+	}
+}
+
+func (s *JailTestSuite) TestJailFetchPromise() {
+	body := `{"key": "value"}`
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Content-Type", "application/json")
+		w.Write([]byte(body))
+	}))
+	defer server.Close()
+
+	require := s.Require()
+	require.NotNil(s.jail)
+
+	cell, err := s.jail.NewJailCell(testChatID)
+	require.NoError(err)
+	require.NotNil(cell)
+
+	dataCh := make(chan otto.Value, 1)
+	errCh := make(chan otto.Value, 1)
+
+	err = cell.Set("__captureSuccess", func(res otto.Value) { dataCh <- res })
+	require.NoError(err)
+	err = cell.Set("__captureError", func(res otto.Value) { errCh <- res })
+	require.NoError(err)
+
+	// run JS code for fetching valid URL
+	_, err = cell.Run(`fetch('` + server.URL + `').then(function(r) {
+		return r.text()
+	}).then(function(data) {
+		__captureSuccess(data)
+	}).catch(function (e) {
+		__captureError(e)
+	})`)
+	require.NoError(err)
+
+	timer := time.NewTimer(500 * time.Millisecond)
+	select {
+	case data := <-dataCh:
+		require.True(data.IsString())
+		require.Equal(body, data.String())
+	case err := <-errCh:
+		require.Fail("request failed", err)
+	case <-timer.C:
+		require.Fail("test timed out")
+	}
+}
+
+func (s *JailTestSuite) TestJailFetchCatch() {
+	require := s.Require()
+	require.NotNil(s.jail)
+
+	cell, err := s.jail.NewJailCell(testChatID)
+	require.NoError(err)
+	require.NotNil(cell)
+
+	dataCh := make(chan otto.Value, 1)
+	errCh := make(chan otto.Value, 1)
+
+	err = cell.Set("__captureSuccess", func(res otto.Value) { dataCh <- res })
+	require.NoError(err)
+	err = cell.Set("__captureError", func(res otto.Value) { errCh <- res })
+	require.NoError(err)
+
+	// run JS code for fetching valid URL
+	_, err = cell.Run(`fetch('http://👽/nonexistent').then(function(r) {
+		return r.text()
+	}).then(function(data) {
+		__captureSuccess(data)
+	}).catch(function (e) {
+		__captureError(e)
+	})`)
+	require.NoError(err)
+
+	timer := time.NewTimer(500 * time.Millisecond)
+	select {
+	case data := <-dataCh:
+		require.Fail("request should have failed, but returned", data)
+	case e := <-errCh:
+		require.True(e.IsObject())
+		name, err := e.Object().Get("name")
+		require.NoError(err)
+		require.Equal("Error", name.String())
+		_, err = e.Object().Get("message")
+		require.NoError(err)
+	case <-timer.C:
+		require.Fail("test timed out")
 	}
 }

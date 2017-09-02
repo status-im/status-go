@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/robertkrimen/otto"
+	"github.com/status-im/ottoext/fetch"
 	"github.com/status-im/ottoext/loop"
 	"github.com/status-im/ottoext/timers"
 )
@@ -27,6 +28,11 @@ func newCell(id string, vm *otto.Otto) (*Cell, error) {
 	// register handlers for setTimeout/setInterval
 	// functions
 	if err := timers.Define(vm, lo); err != nil {
+		return nil, err
+	}
+
+	// register handlers for FetchAPI functions
+	if err := fetch.Define(vm, lo); err != nil {
 		return nil, err
 	}
 
