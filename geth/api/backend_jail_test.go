@@ -611,9 +611,8 @@ func (s *BackendTestSuite) TestJailWhisper() {
 		require.NoError(err, "cannot get VM")
 
 		// post messages
-		if _, err := cell.Run(testCase.testCode); err != nil {
-			require.Fail(err.Error())
-		}
+		_, err = cell.Run(testCase.testCode)
+		require.NoError(err)
 
 		if !testCase.useFilter {
 			continue
@@ -626,9 +625,8 @@ func (s *BackendTestSuite) TestJailWhisper() {
 		filterName, err := cell.Get("filterName")
 		require.NoError(err, "cannot get filterName")
 
-		if _, ok := installedFilters[filterName.String()]; !ok {
-			require.FailNow("unrecognized filter")
-		}
+		_, ok := installedFilters[filterName.String()]
+		require.True(ok, "unrecognized filter")
 
 		installedFilters[filterName.String()] = filterId.String()
 	}

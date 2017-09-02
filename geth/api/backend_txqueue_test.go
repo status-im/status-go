@@ -395,23 +395,23 @@ func (s *BackendTestSuite) TestCompleteMultipleQueuedTransactions() {
 		require.EqualError(results["invalid-tx-id"].Error, "transaction hash not found")
 
 		for txID, txResult := range results {
-			if txResult.Error != nil && txID != "invalid-tx-id" {
-				require.Fail(fmt.Sprintf("invalid error for %s", txID))
-			}
+			require.False(
+				txResult.Error != nil && txID != "invalid-tx-id",
+				"invalid error for %s", txID,
+			)
 
-			if txResult.Hash.Hex() == "0x0000000000000000000000000000000000000000000000000000000000000000" && txID != "invalid-tx-id" {
-				require.Fail(fmt.Sprintf("invalid hash (expected non empty hash): %s", txID))
-			}
-
-			if txResult.Hash.Hex() != "0x0000000000000000000000000000000000000000000000000000000000000000" {
-				log.Info("transaction complete", "URL", "https://ropsten.etherscan.io/tx/"+txResult.Hash.Hex())
-			}
+			require.False(
+				txResult.Hash.Hex() == "0x0000000000000000000000000000000000000000000000000000000000000000" && txID != "invalid-tx-id",
+				"invalid hash (expected non empty hash): %s", txID,
+			)
 		}
 
 		time.Sleep(1 * time.Second) // make sure that tx complete signal propagates
 		for _, txID := range parsedIDs {
-			require.False(backend.TransactionQueue().Has(status.QueuedTxID(txID)),
-				"txqueue should not have test tx at this point (it should be completed)")
+			require.False(
+				backend.TransactionQueue().Has(status.QueuedTxID(txID)),
+				"txqueue should not have test tx at this point (it should be completed)",
+			)
 		}
 	}
 	go func() {

@@ -92,26 +92,26 @@ func (jail *Jail) Parse(chatID, js string) string {
 		return makeError(ErrInvalidJail.Error())
 	}
 
-	jailCell, err := jail.Cell(chatID)
+	cell, err := jail.Cell(chatID)
 	if err != nil {
 		if _, mkerr := jail.NewCell(chatID); mkerr != nil {
 			return makeError(mkerr.Error())
 		}
 
-		jailCell, _ = jail.Cell(chatID)
+		cell, _ = jail.Cell(chatID)
 	}
 
 	// init jeth and its handlers
-	if err = jailCell.Set("jeth", struct{}{}); err != nil {
+	if err = cell.Set("jeth", struct{}{}); err != nil {
 		return makeError(err.Error())
 	}
 
-	if err = registerHandlers(jail, jailCell, chatID); err != nil {
+	if err = registerHandlers(jail, cell, chatID); err != nil {
 		return makeError(err.Error())
 	}
 
 	initJs := jail.baseJSCode + ";"
-	if _, err = jailCell.Run(initJs); err != nil {
+	if _, err = cell.Run(initJs); err != nil {
 		return makeError(err.Error())
 	}
 
@@ -123,11 +123,11 @@ func (jail *Jail) Parse(chatID, js string) string {
             return new Bignumber(val);
         }
 	` + js + "; var catalog = JSON.stringify(_status_catalog);"
-	if _, err = jailCell.Run(jjs); err != nil {
+	if _, err = cell.Run(jjs); err != nil {
 		return makeError(err.Error())
 	}
 
-	res, err := jailCell.Get("catalog")
+	res, err := cell.Get("catalog")
 	if err != nil {
 		return makeError(err.Error())
 	}
