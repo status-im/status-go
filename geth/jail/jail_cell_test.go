@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/robertkrimen/otto"
-	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/geth/jail"
 )
 
 func (s *JailTestSuite) TestJailTimeoutFailure() {
@@ -72,9 +72,6 @@ func (s *JailTestSuite) TestJailTimeout() {
 func (s *JailTestSuite) TestJailLoopInCall() {
 	require := s.Require()
 
-	s.StartTestNode(params.RopstenNetworkID)
-	defer s.StopTestNode()
-
 	// load Status JS and add test command to it
 	s.jail.BaseJS(baseStatusJSCode)
 	s.jail.Parse(testChatID, ``)
@@ -112,6 +109,49 @@ func (s *JailTestSuite) TestJailLoopInCall() {
 	}
 }
 
+func (s *JailTestSuite) TestJailLoopRace() {
+	require := s.Require()
+	require.NotNil(s.jail)
+
+	cell, err := s.jail.NewJailCell(testChatID)
+	require.NoError(err)
+	require.NotNil(cell)
+
+	jcell := cell.(*jail.JailCell)
+
+	items := make(chan string)
+
+	err = cell.Set("__captureResponse", func(val string) otto.Value {
+		go func() { items <- val }()
+		return otto.UndefinedValue()
+	})
+	require.NoError(err)
+
+	_, err = cell.Run(`
+		function callRunner(namespace){
+			return setTimeout(function(){
+				__captureResponse(namespace);
+			}, 1000);
+		}
+	`)
+	require.NoError(err)
+
+	for i := 0; i < 100; i++ {
+		_, err = jcell.Call("callRunner", nil, "softball")
+		require.NoError(err)
+	}
+
+	for i := 0; i < 100; i++ {
+		select {
+		case received := <-items:
+			require.Equal(received, "softball")
+			break
+		case <-time.After(5 * time.Second):
+			require.Fail("test timed out")
+		}
+	}
+}
+
 func (s *JailTestSuite) TestJailFetchPromise() {
 	body := `{"key": "value"}`
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -145,14 +185,13 @@ func (s *JailTestSuite) TestJailFetchPromise() {
 	})`)
 	require.NoError(err)
 
-	timer := time.NewTimer(500 * time.Millisecond)
 	select {
 	case data := <-dataCh:
 		require.True(data.IsString())
 		require.Equal(body, data.String())
 	case err := <-errCh:
 		require.Fail("request failed", err)
-	case <-timer.C:
+	case <-time.After(1 * time.Second):
 		require.Fail("test timed out")
 	}
 }
@@ -183,7 +222,6 @@ func (s *JailTestSuite) TestJailFetchCatch() {
 	})`)
 	require.NoError(err)
 
-	timer := time.NewTimer(500 * time.Millisecond)
 	select {
 	case data := <-dataCh:
 		require.Fail("request should have failed, but returned", data)
@@ -194,7 +232,7 @@ func (s *JailTestSuite) TestJailFetchCatch() {
 		require.Equal("Error", name.String())
 		_, err = e.Object().Get("message")
 		require.NoError(err)
-	case <-timer.C:
+	case <-time.After(1 * time.Second):
 		require.Fail("test timed out")
 	}
 }
@@ -239,9 +277,8 @@ func (s *JailTestSuite) TestJailFetchRace() {
 	}).catch(function (e) {
 		__captureError(e)
 	})`)
-	//require.NoError(err)
+	require.NoError(err)
 
-	timer := time.NewTimer(500 * time.Millisecond)
 	for i := 0; i < 2; i++ {
 		select {
 		case data := <-dataCh:
@@ -254,7 +291,7 @@ func (s *JailTestSuite) TestJailFetchRace() {
 			require.Equal("Error", name.String())
 			_, err = e.Object().Get("message")
 			require.NoError(err)
-		case <-timer.C:
+		case <-time.After(1 * time.Second):
 			require.Fail("test timed out")
 			return
 		}
