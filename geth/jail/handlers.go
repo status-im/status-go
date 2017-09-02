@@ -70,18 +70,14 @@ func registerHandlers(jail *Jail, cell *Cell, chatID string) error {
 	if err = cell.Set("statusSignals", struct{}{}); err != nil {
 		return err
 	}
-
 	statusSignals, err := cell.Get("statusSignals")
 	if err != nil {
 		return err
 	}
-
 	registerHandler = statusSignals.Object().Set
-
 	if err = registerHandler("sendMessage", makeSendMessageHandler(chatID)); err != nil {
 		return err
 	}
-
 	if err = registerHandler("showSuggestions", makeShowSuggestionsHandler(chatID)); err != nil {
 		return err
 	}
