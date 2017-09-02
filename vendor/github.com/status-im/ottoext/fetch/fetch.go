@@ -49,6 +49,9 @@ func (t *fetchTask) Execute(vm *vm.VM, l *loop.Loop) error {
 		arguments = append(arguments, e)
 	}
 
+	vm.Lock()
+	defer vm.Unlock()
+
 	t.jsRes.Set("status", t.status)
 	t.jsRes.Set("statusText", t.statusText)
 	h := mustValue(t.jsRes.Get("headers")).Object()
