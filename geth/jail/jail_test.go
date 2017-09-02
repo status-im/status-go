@@ -53,7 +53,7 @@ func (s *JailTestSuite) TestInit() {
 	}
 
 	// get cell VM w/o defining cell first
-	cell, err := s.jail.GetConcreteCell(testChatID)
+	cell, err := s.jail.Cell(testChatID)
 	require.EqualError(err, "cell[testChat] doesn't exist")
 	require.Nil(cell)
 
@@ -64,7 +64,7 @@ func (s *JailTestSuite) TestInit() {
 	require.Equal(errorWrapper(err), s.jail.Call(testChatID, `["commands", "testCommand"]`, `{"val": 12}`))
 
 	// get existing cell (even though we got errors, cell was still created)
-	cell, err = s.jail.GetConcreteCell(testChatID)
+	cell, err = s.jail.Cell(testChatID)
 	require.NoError(err)
 	require.NotNil(cell)
 
@@ -130,7 +130,7 @@ func (s *JailTestSuite) TestJailRPCSend() {
 	s.jail.Parse(testChatID, ``)
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
-	cell, err := s.jail.GetConcreteCell(testChatID)
+	cell, err := s.jail.Cell(testChatID)
 	require.NoError(err)
 	require.NotNil(cell)
 
@@ -161,7 +161,7 @@ func (s *JailTestSuite) TestIsConnected() {
 	s.jail.Parse(testChatID, "")
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
-	cell, err := s.jail.GetConcreteCell(testChatID)
+	cell, err := s.jail.Cell(testChatID)
 	require.NoError(err)
 
 	_, err = cell.Run(`
@@ -186,7 +186,7 @@ func (s *JailTestSuite) TestLocalStorageSet() {
 	s.jail.Parse(testChatID, "")
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
-	cell, err := s.jail.GetConcreteCell(testChatID)
+	cell, err := s.jail.Cell(testChatID)
 	require.NoError(err)
 
 	testData := "foobar"

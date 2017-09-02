@@ -8,11 +8,6 @@ import (
 	"github.com/status-im/ottoext/timers"
 )
 
-const (
-	// JailCellRequestTimeout seconds before jailed request times out.
-	JailCellRequestTimeout = 60
-)
-
 // Cell represents a single jail cell, which is basically a JavaScript VM.
 type Cell struct {
 	sync.Mutex

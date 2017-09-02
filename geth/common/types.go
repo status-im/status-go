@@ -179,6 +179,7 @@ type JailCell interface {
 	Set(string, interface{}) error
 	Get(string) (otto.Value, error)
 	Run(string) (otto.Value, error)
+	Call(item string, this interface{}, args ...interface{}) (otto.Value, error)
 }
 
 // JailManager defines methods for managing jailed environments
@@ -188,7 +189,7 @@ type JailManager interface {
 	Parse(chatID, js string) string
 
 	// Call executes given JavaScript function w/i a jail cell context identified by the chatID.
-	Call(chatID, path, args string) string
+	Call(chatID, this, args string) string
 
 	// NewCell initializes and returns a new jail cell.
 	NewCell(chatID string) (JailCell, error)

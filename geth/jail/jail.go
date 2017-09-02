@@ -74,12 +74,6 @@ func (jail *Jail) NewCell(chatID string) (common.JailCell, error) {
 
 // Cell returns the existing instance of Cell.
 func (jail *Jail) Cell(chatID string) (common.JailCell, error) {
-	return jail.GetConcreteCell(chatID)
-}
-
-// Cell returns the associated *Cell for the provided chatID.
-// TODO(tiabc): Deal with this duplicated method.
-func (jail *Jail) GetConcreteCell(chatID string) (*Cell, error) {
 	jail.RLock()
 	defer jail.RUnlock()
 
@@ -98,28 +92,26 @@ func (jail *Jail) Parse(chatID, js string) string {
 		return makeError(ErrInvalidJail.Error())
 	}
 
-	var err error
-	var jcell *Cell
-
-	if jcell, err = jail.GetConcreteCell(chatID); err != nil {
+	jailCell, err := jail.Cell(chatID)
+	if err != nil {
 		if _, mkerr := jail.NewCell(chatID); mkerr != nil {
 			return makeError(mkerr.Error())
 		}
 
-		jcell, _ = jail.GetConcreteCell(chatID)
+		jailCell, _ = jail.Cell(chatID)
 	}
 
 	// init jeth and its handlers
-	if err = jcell.Set("jeth", struct{}{}); err != nil {
+	if err = jailCell.Set("jeth", struct{}{}); err != nil {
 		return makeError(err.Error())
 	}
 
-	if err = registerHandlers(jail, jcell, chatID); err != nil {
+	if err = registerHandlers(jail, jailCell, chatID); err != nil {
 		return makeError(err.Error())
 	}
 
 	initJs := jail.baseJSCode + ";"
-	if _, err = jcell.Run(initJs); err != nil {
+	if _, err = jailCell.Run(initJs); err != nil {
 		return makeError(err.Error())
 	}
 
@@ -131,11 +123,11 @@ func (jail *Jail) Parse(chatID, js string) string {
             return new Bignumber(val);
         }
 	` + js + "; var catalog = JSON.stringify(_status_catalog);"
-	if _, err = jcell.Run(jjs); err != nil {
+	if _, err = jailCell.Run(jjs); err != nil {
 		return makeError(err.Error())
 	}
 
-	res, err := jcell.Get("catalog")
+	res, err := jailCell.Get("catalog")
 	if err != nil {
 		return makeError(err.Error())
 	}
@@ -144,13 +136,13 @@ func (jail *Jail) Parse(chatID, js string) string {
 }
 
 // Call executes the `call` function w/i a jail cell context identified by the chatID.
-func (jail *Jail) Call(chatID, path, args string) string {
-	jcell, err := jail.GetConcreteCell(chatID)
+func (jail *Jail) Call(chatID, this, args string) string {
+	cell, err := jail.Cell(chatID)
 	if err != nil {
 		return makeError(err.Error())
 	}
 
-	res, err := jcell.Call("call", nil, path, args)
+	res, err := cell.Call("call", nil, this, args)
 
 	return makeResult(res.String(), err)
 }

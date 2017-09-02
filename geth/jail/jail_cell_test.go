@@ -77,7 +77,7 @@ func (s *JailTestSuite) TestJailLoopInCall() {
 	s.jail.BaseJS(baseStatusJSCode)
 	s.jail.Parse(testChatID, ``)
 
-	cell, err := s.jail.GetConcreteCell(testChatID)
+	cell, err := s.jail.Cell(testChatID)
 	require.NoError(err)
 	require.NotNil(cell)
 

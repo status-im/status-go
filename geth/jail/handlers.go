@@ -4,6 +4,7 @@ import (
 	"os"
 
 	"github.com/robertkrimen/otto"
+	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/jail/console"
 	"github.com/status-im/status-go/geth/node"
 )
@@ -20,7 +21,7 @@ const (
 
 // registerHandlers augments and transforms a given jail cell's underlying VM,
 // by adding and replacing method handlers.
-func registerHandlers(jail *Jail, cell *Cell, chatID string) error {
+func registerHandlers(jail *Jail, cell common.JailCell, chatID string) error {
 	jeth, err := cell.Get("jeth")
 	if err != nil {
 		return err
