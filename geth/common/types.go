@@ -178,7 +178,7 @@ type TxQueueManager interface {
 type JailCell interface {
 	Set(string, interface{}) error
 	Get(string) (otto.Value, error)
-	Run(string) (otto.Value, error)
+	Run(interface{}) (otto.Value, error)
 	Call(item string, this interface{}, args ...interface{}) (otto.Value, error)
 }
 
