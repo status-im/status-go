@@ -32,8 +32,8 @@ type Jail struct {
 	nodeManager    common.NodeManager
 	accountManager common.AccountManager
 	policy         *ExecutionPolicy
-	cells          map[string]*JailCell // jail supports running many isolated instances of jailed runtime
-	baseJSCode     string               // JavaScript used to initialize all new cells with
+	cells          map[string]*Cell // jail supports running many isolated instances of jailed runtime
+	baseJSCode     string           // JavaScript used to initialize all new cells with
 }
 
 // New returns new Jail environment with the associated NodeManager and
@@ -42,7 +42,7 @@ func New(nodeManager common.NodeManager, accountManager common.AccountManager) *
 	return &Jail{
 		nodeManager:    nodeManager,
 		accountManager: accountManager,
-		cells:          make(map[string]*JailCell),
+		cells:          make(map[string]*Cell),
 		policy:         NewExecutionPolicy(nodeManager, accountManager),
 	}
 }
@@ -52,33 +52,28 @@ func (jail *Jail) BaseJS(js string) {
 	jail.baseJSCode = js
 }
 
-// NewJailCell initializes and returns jail cell.
-func (jail *Jail) NewJailCell(id string) (common.JailCell, error) {
+// NewCell initializes and returns a new jail cell.
+func (jail *Jail) NewCell(chatID string) (common.JailCell, error) {
 	if jail == nil {
 		return nil, ErrInvalidJail
 	}
 
 	vm := otto.New()
 
-	newJail, err := newJailCell(id, vm)
+	cell, err := newCell(chatID, vm)
 	if err != nil {
 		return nil, err
 	}
 
 	jail.Lock()
-	jail.cells[id] = newJail
+	jail.cells[chatID] = cell
 	jail.Unlock()
 
-	return newJail, nil
+	return cell, nil
 }
 
-// GetJailCell returns the associated *JailCell for the provided chatID.
-func (jail *Jail) GetJailCell(chatID string) (common.JailCell, error) {
-	return jail.GetCell(chatID)
-}
-
-// GetCell returns the associated *JailCell for the provided chatID.
-func (jail *Jail) GetCell(chatID string) (*JailCell, error) {
+// Cell returns the existing instance of Cell.
+func (jail *Jail) Cell(chatID string) (common.JailCell, error) {
 	jail.RLock()
 	defer jail.RUnlock()
 
@@ -92,41 +87,33 @@ func (jail *Jail) GetCell(chatID string) (*JailCell, error) {
 
 // Parse creates a new jail cell context, with the given chatID as identifier.
 // New context executes provided JavaScript code, right after the initialization.
-func (jail *Jail) Parse(chatID string, js string) string {
+func (jail *Jail) Parse(chatID, js string) string {
 	if jail == nil {
 		return makeError(ErrInvalidJail.Error())
 	}
 
-	var err error
-	var jcell *JailCell
-
-	if jcell, err = jail.GetCell(chatID); err != nil {
-		if _, mkerr := jail.NewJailCell(chatID); mkerr != nil {
+	cell, err := jail.Cell(chatID)
+	if err != nil {
+		if _, mkerr := jail.NewCell(chatID); mkerr != nil {
 			return makeError(mkerr.Error())
 		}
 
-		jcell, _ = jail.GetCell(chatID)
+		cell, _ = jail.Cell(chatID)
 	}
 
 	// init jeth and its handlers
-	if err = jcell.Set("jeth", struct{}{}); err != nil {
+	if err = cell.Set("jeth", struct{}{}); err != nil {
 		return makeError(err.Error())
 	}
 
-	if err = registerHandlers(jail, jcell, chatID); err != nil {
+	if err = registerHandlers(jail, cell, chatID); err != nil {
 		return makeError(err.Error())
 	}
 
 	initJs := jail.baseJSCode + ";"
-	if _, err = jcell.Run(initJs); err != nil {
+	if _, err = cell.Run(initJs); err != nil {
 		return makeError(err.Error())
 	}
-
-	// sendMessage/showSuggestions handlers
-	jcell.Set("statusSignals", struct{}{})
-	statusSignals, _ := jcell.Get("statusSignals")
-	statusSignals.Object().Set("sendMessage", makeSendMessageHandler(chatID))
-	statusSignals.Object().Set("showSuggestions", makeShowSuggestionsHandler(chatID))
 
 	jjs := string(web3JSCode) + `
 	var Web3 = require('web3');
@@ -136,11 +123,11 @@ func (jail *Jail) Parse(chatID string, js string) string {
             return new Bignumber(val);
         }
 	` + js + "; var catalog = JSON.stringify(_status_catalog);"
-	if _, err = jcell.Run(jjs); err != nil {
+	if _, err = cell.Run(jjs); err != nil {
 		return makeError(err.Error())
 	}
 
-	res, err := jcell.Get("catalog")
+	res, err := cell.Get("catalog")
 	if err != nil {
 		return makeError(err.Error())
 	}
@@ -149,14 +136,13 @@ func (jail *Jail) Parse(chatID string, js string) string {
 }
 
 // Call executes the `call` function w/i a jail cell context identified by the chatID.
-// Jail cell is clonned before call is executed i.e. all calls execute w/i their own contexts.
-func (jail *Jail) Call(chatID string, path string, args string) string {
-	jcell, err := jail.GetCell(chatID)
+func (jail *Jail) Call(chatID, this, args string) string {
+	cell, err := jail.Cell(chatID)
 	if err != nil {
 		return makeError(err.Error())
 	}
 
-	res, err := jcell.Call("call", nil, path, args)
+	res, err := cell.Call("call", nil, this, args)
 
 	return makeResult(res.String(), err)
 }

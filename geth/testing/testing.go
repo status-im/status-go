@@ -64,15 +64,17 @@ type BaseTestSuite struct {
 
 // StartTestNode initiazes a NodeManager instances with configuration retrieved
 // from the test config.
-func (s *BaseTestSuite) StartTestNode(networkID int, upstream bool) {
+func (s *BaseTestSuite) StartTestNode(networkID int, opts ...TestNodeOption) {
 	require := s.Require()
 	require.NotNil(s.NodeManager)
 
 	nodeConfig, err := MakeTestNodeConfig(networkID)
 	require.NoError(err)
 
-	nodeConfig.UpstreamConfig.Enabled = upstream
-	require.Equal(nodeConfig.UpstreamConfig.Enabled, upstream)
+	// Apply any options altering node config.
+	for i := range opts {
+		opts[i](nodeConfig)
+	}
 
 	keyStoreDir := filepath.Join(TestDataDir, TestNetworkNames[networkID], "keystore")
 	require.NoError(common.ImportTestAccount(keyStoreDir, "test-account1.pk"))
@@ -84,6 +86,17 @@ func (s *BaseTestSuite) StartTestNode(networkID int, upstream bool) {
 	require.NotNil(nodeStarted)
 	<-nodeStarted
 	require.True(s.NodeManager.IsNodeRunning())
+}
+
+// TestNodeOption is a callback passed to StartTestNode which alters its config.
+type TestNodeOption func(config *params.NodeConfig)
+
+// WithUpstream returns TestNodeOption which enabled UpstreamConfig.
+func WithUpstream(url string) TestNodeOption {
+	return func(config *params.NodeConfig) {
+		config.UpstreamConfig.Enabled = true
+		config.UpstreamConfig.URL = url
+	}
 }
 
 // StopTestNode attempts to stop initialized NodeManager.

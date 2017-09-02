@@ -8,23 +8,17 @@ import (
 	"github.com/status-im/ottoext/timers"
 )
 
-const (
-	// JailCellRequestTimeout seconds before jailed request times out.
-	JailCellRequestTimeout = 60
-)
-
-// JailCell represents single jail cell, which is basically a JavaScript VM.
-// TODO(influx6): Rename JailCell to Cell in next refactoring phase.
-type JailCell struct {
+// Cell represents a single jail cell, which is basically a JavaScript VM.
+type Cell struct {
 	sync.Mutex
 
 	id string
 	vm *otto.Otto
 }
 
-// newJailCell encapsulates what we need to create a new jailCell from the
+// newCell encapsulates what we need to create a new jailCell from the
 // provided vm and eventloop instance.
-func newJailCell(id string, vm *otto.Otto) (*JailCell, error) {
+func newCell(id string, vm *otto.Otto) (*Cell, error) {
 	// create new event loop for the new cell.
 	// this loop is handling 'setTimeout/setInterval'
 	// calls and is running endlessly in a separate goroutine
@@ -37,17 +31,17 @@ func newJailCell(id string, vm *otto.Otto) (*JailCell, error) {
 	}
 
 	// finally, start loop in a goroutine
-	// JailCell is currently immortal, so the loop
+	// Cell is currently immortal, so the loop
 	go lo.Run()
 
-	return &JailCell{
+	return &Cell{
 		id: id,
 		vm: vm,
 	}, nil
 }
 
 // Set sets the value to be keyed by the provided keyname.
-func (cell *JailCell) Set(key string, val interface{}) error {
+func (cell *Cell) Set(key string, val interface{}) error {
 	cell.Lock()
 	defer cell.Unlock()
 
@@ -55,7 +49,7 @@ func (cell *JailCell) Set(key string, val interface{}) error {
 }
 
 // Get returns the giving key's otto.Value from the underline otto vm.
-func (cell *JailCell) Get(key string) (otto.Value, error) {
+func (cell *Cell) Get(key string) (otto.Value, error) {
 	cell.Lock()
 	defer cell.Unlock()
 
@@ -64,7 +58,7 @@ func (cell *JailCell) Get(key string) (otto.Value, error) {
 
 // Call attempts to call the internal call function for the giving response associated with the
 // proper values.
-func (cell *JailCell) Call(item string, this interface{}, args ...interface{}) (otto.Value, error) {
+func (cell *Cell) Call(item string, this interface{}, args ...interface{}) (otto.Value, error) {
 	cell.Lock()
 	defer cell.Unlock()
 
@@ -72,7 +66,7 @@ func (cell *JailCell) Call(item string, this interface{}, args ...interface{}) (
 }
 
 // Run evaluates the giving js string on the associated vm llop.
-func (cell *JailCell) Run(val string) (otto.Value, error) {
+func (cell *Cell) Run(val string) (otto.Value, error) {
 	cell.Lock()
 	defer cell.Unlock()
 

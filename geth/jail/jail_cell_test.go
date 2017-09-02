@@ -9,13 +9,12 @@ import (
 
 func (s *JailTestSuite) TestJailTimeoutFailure() {
 	require := s.Require()
-	require.NotNil(s.jail)
 
-	cell, err := s.jail.NewJailCell(testChatID)
+	cell, err := s.jail.NewCell(testChatID)
 	require.NoError(err)
 	require.NotNil(cell)
 
-	// Attempt to run a timeout string against a JailCell.
+	// Attempt to run a timeout string against a Cell.
 	_, err = cell.Run(`
 		var timerCounts = 0;
  		setTimeout(function(n){		
@@ -40,13 +39,12 @@ func (s *JailTestSuite) TestJailTimeoutFailure() {
 
 func (s *JailTestSuite) TestJailTimeout() {
 	require := s.Require()
-	require.NotNil(s.jail)
 
-	cell, err := s.jail.NewJailCell(testChatID)
+	cell, err := s.jail.NewCell(testChatID)
 	require.NoError(err)
 	require.NotNil(cell)
 
-	// Attempt to run a timeout string against a JailCell.
+	// Attempt to run a timeout string against a Cell.
 	_, err = cell.Run(`
 		var timerCounts = 0;
  		setTimeout(function(n){		
@@ -71,16 +69,15 @@ func (s *JailTestSuite) TestJailTimeout() {
 
 func (s *JailTestSuite) TestJailLoopInCall() {
 	require := s.Require()
-	require.NotNil(s.jail)
 
-	s.StartTestNode(params.RopstenNetworkID, true)
+	s.StartTestNode(params.RopstenNetworkID)
 	defer s.StopTestNode()
 
 	// load Status JS and add test command to it
 	s.jail.BaseJS(baseStatusJSCode)
 	s.jail.Parse(testChatID, ``)
 
-	cell, err := s.jail.GetCell(testChatID)
+	cell, err := s.jail.Cell(testChatID)
 	require.NoError(err)
 	require.NotNil(cell)
 
@@ -108,8 +105,6 @@ func (s *JailTestSuite) TestJailLoopInCall() {
 	select {
 	case received := <-items:
 		require.Equal(received, "softball")
-		break
-
 	case <-time.After(5 * time.Second):
 		require.Fail("Failed to received event response")
 	}

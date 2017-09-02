@@ -63,24 +63,16 @@ func (s *BackendTestSuite) TestJailSendQueuedTransaction() {
 			messageId, ok := event["message_id"].(string)
 			s.True(ok, "Message id is required, but not found")
 			if requireMessageId {
-				if len(messageId) == 0 {
-					s.Fail("Message id is required, but not provided")
-					return
-				}
+				require.NotEmpty(messageId, "Message id is required, but not provided")
 			} else {
-				if len(messageId) != 0 {
-					s.Fail("Message id is not required, but provided")
-					return
-				}
+				require.Empty(messageId, "Message id is not required, but provided")
 			}
 			log.Info("Transaction queued (will be completed shortly)", "id", event["id"].(string))
 
-			var txHash gethcommon.Hash
-			if txHash, err = s.backend.CompleteTransaction(event["id"].(string), TestConfig.Account1.Password); err != nil {
-				s.Fail(fmt.Sprintf("cannot complete queued transaction[%v]: %v", event["id"], err))
-			} else {
-				log.Info("Transaction complete", "URL", "https://ropsten.etherscan.io/tx/%s"+txHash.Hex())
-			}
+			txHash, err := s.backend.CompleteTransaction(event["id"].(string), TestConfig.Account1.Password)
+			require.NoError(err, "cannot complete queued transaction[%v]", event["id"])
+
+			log.Info("Transaction complete", "URL", "https://ropsten.etherscan.io/tx/%s"+txHash.Hex())
 
 			txCompletedSuccessfully <- struct{}{} // so that timeout is aborted
 			txHashes <- txHash
@@ -190,7 +182,7 @@ func (s *BackendTestSuite) TestJailSendQueuedTransaction() {
 				txHash = <-txHashes
 			}
 			expectedResponse := strings.Replace(command.expectedResponse, "TX_HASH", txHash.Hex(), 1)
-			s.Require().Equal(expectedResponse, response)
+			require.Equal(expectedResponse, response)
 		}
 	}
 }
@@ -208,7 +200,7 @@ func (s *BackendTestSuite) TestContractDeployment() {
 	jailInstance := s.backend.JailManager()
 	jailInstance.Parse(testChatID, "")
 
-	cell, err := jailInstance.GetJailCell(testChatID)
+	cell, err := jailInstance.Cell(testChatID)
 	require.NoError(err)
 
 	// make sure you panic if transaction complete doesn't return
@@ -615,14 +607,12 @@ func (s *BackendTestSuite) TestJailWhisper() {
 			};
 		`)
 
-		cell, err := jailInstance.GetJailCell(testCaseKey)
+		cell, err := jailInstance.Cell(testCaseKey)
 		require.NoError(err, "cannot get VM")
 
 		// post messages
-		if _, err := cell.Run(testCase.testCode); err != nil {
-			require.Fail(err.Error())
-			return
-		}
+		_, err = cell.Run(testCase.testCode)
+		require.NoError(err)
 
 		if !testCase.useFilter {
 			continue
@@ -635,9 +625,8 @@ func (s *BackendTestSuite) TestJailWhisper() {
 		filterName, err := cell.Get("filterName")
 		require.NoError(err, "cannot get filterName")
 
-		if _, ok := installedFilters[filterName.String()]; !ok {
-			require.FailNow("unrecognized filter")
-		}
+		_, ok := installedFilters[filterName.String()]
+		require.True(ok, "unrecognized filter")
 
 		installedFilters[filterName.String()] = filterId.String()
 	}
@@ -657,9 +646,7 @@ func (s *BackendTestSuite) TestJailWhisper() {
 	}
 
 	for testName, passedTest := range passedTests {
-		if !passedTest {
-			s.Fail(fmt.Sprintf("test not passed: %v", testName))
-		}
+		s.True(passedTest, "test not passed: %v", testName)
 	}
 }
 
@@ -796,7 +783,7 @@ func (s *BackendTestSuite) TestJailVMPersistence() {
 	wg.Wait()
 
 	// Validate total.
-	cell, err := jailInstance.GetJailCell(testChatID)
+	cell, err := jailInstance.Cell(testChatID)
 	require.NoError(err)
 
 	totalOtto, err := cell.Get("total")

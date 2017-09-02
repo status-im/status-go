@@ -2,7 +2,6 @@ package jail_test
 
 import (
 	"testing"
-	"time"
 
 	"encoding/json"
 	"net/http"
@@ -66,7 +65,6 @@ func (s *JailRPCTestSuite) SetupTest() {
 
 func (s *JailRPCTestSuite) TestSendTransaction() {
 	require := s.Require()
-	require.NotNil(s.NodeManager)
 
 	odFunc := otto.FunctionCall{
 		Otto: otto.New(),
@@ -90,21 +88,14 @@ func (s *JailRPCTestSuite) TestSendTransaction() {
 		},
 	}
 
-	nodeConfig, err := MakeTestNodeConfig(params.RopstenNetworkID)
-	require.NoError(err)
-
-	nodeConfig.UpstreamConfig.Enabled = true
-
 	rpcService := new(service)
 	rpcService.Handler = func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
 
 		var txReq txRequest
 
-		if err := json.NewDecoder(r.Body).Decode(&txReq); err != nil {
-			require.NoError(err)
-			return
-		}
+		err := json.NewDecoder(r.Body).Decode(&txReq)
+		require.NoError(err)
 
 		switch txReq.Method {
 		case "eth_getTransactionCount":
@@ -134,28 +125,18 @@ func (s *JailRPCTestSuite) TestSendTransaction() {
 		require.NoError(decodeErr)
 
 		// Validate we are receiving transaction from the proper network chain.
-		require.Equal(tx.ChainId().Int64(), int64(nodeConfig.NetworkID))
+		c, err := s.NodeManager.NodeConfig()
+		require.NoError(err)
+		require.Equal(tx.ChainId().Uint64(), c.NetworkID)
 
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"jsonrpc": "2.0", "status":200, "result": "3434=done"}`))
 	}
 
+	// httpRPCServer will serve as an upstream server accepting transactions.
 	httpRPCServer := httptest.NewServer(rpcService)
-	nodeConfig.UpstreamConfig.URL = httpRPCServer.URL
-
-	// Start NodeManagers Node
-	started, err := s.NodeManager.StartNode(nodeConfig)
-	require.NoError(err)
-
-	select {
-	case <-started:
-		break
-	case <-time.After(1 * time.Second):
-		require.Fail("Failed to start NodeManager")
-		break
-	}
-
-	defer s.NodeManager.StopNode()
+	s.StartTestNode(params.RopstenNetworkID, WithUpstream(httpRPCServer.URL))
+	defer s.StopTestNode()
 
 	client, err := s.NodeManager.RPCClient()
 	require.NoError(err)
