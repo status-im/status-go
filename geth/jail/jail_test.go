@@ -122,7 +122,7 @@ func (s *JailTestSuite) TestFunctionCall() {
 func (s *JailTestSuite) TestJailRPCSend() {
 	require := s.Require()
 
-	s.StartTestNode(params.RopstenNetworkID, false)
+	s.StartTestNode(params.RopstenNetworkID)
 	defer s.StopTestNode()
 
 	// load Status JS and add test command to it
@@ -155,7 +155,7 @@ func (s *JailTestSuite) TestJailRPCSend() {
 func (s *JailTestSuite) TestIsConnected() {
 	require := s.Require()
 
-	s.StartTestNode(params.RopstenNetworkID, false)
+	s.StartTestNode(params.RopstenNetworkID)
 	defer s.StopTestNode()
 
 	s.jail.Parse(testChatID, "")
@@ -225,15 +225,15 @@ func (s *JailTestSuite) TestLocalStorageSet() {
 	case <-opCompletedSuccessfully:
 		// pass
 	case <-time.After(3 * time.Second):
-		s.Fail("operation timed out")
+		require.Fail("operation timed out")
 	}
 
 	responseValue, err := cell.Get("responseValue")
-	s.NoError(err, "cannot obtain result of localStorage.set()")
+	require.NoError(err, "cannot obtain result of localStorage.set()")
 
 	response, err := responseValue.ToString()
-	s.NoError(err, "cannot parse result")
+	require.NoError(err, "cannot parse result")
 
 	expectedResponse := `{"jsonrpc":"2.0","result":true}`
-	s.Equal(expectedResponse, response)
+	require.Equal(expectedResponse, response)
 }

@@ -391,28 +391,26 @@ func (s *BackendTestSuite) TestCompleteMultipleQueuedTransactions() {
 
 		// complete
 		results := s.backend.CompleteTransactions(string(updatedTxIDStrings), TestConfig.Account1.Password)
-		if len(results) != (testTxCount+1) || results["invalid-tx-id"].Error.Error() != "transaction hash not found" {
-			s.Fail(fmt.Sprintf("cannot complete txs: %v", results))
-			return
-		}
+		require.Len(results, testTxCount+1)
+		require.EqualError(results["invalid-tx-id"].Error, "transaction hash not found")
+
 		for txID, txResult := range results {
 			if txResult.Error != nil && txID != "invalid-tx-id" {
-				s.Fail(fmt.Sprintf("invalid error for %s", txID))
-				return
+				require.Fail(fmt.Sprintf("invalid error for %s", txID))
 			}
+
 			if txResult.Hash.Hex() == "0x0000000000000000000000000000000000000000000000000000000000000000" && txID != "invalid-tx-id" {
-				s.Fail(fmt.Sprintf("invalid hash (expected non empty hash): %s", txID))
-				return
+				require.Fail(fmt.Sprintf("invalid hash (expected non empty hash): %s", txID))
 			}
 
 			if txResult.Hash.Hex() != "0x0000000000000000000000000000000000000000000000000000000000000000" {
-				log.Info("transaction complete", "URL", "https://rinkeby.etherscan.io/tx/%s"+txResult.Hash.Hex())
+				log.Info("transaction complete", "URL", "https://ropsten.etherscan.io/tx/"+txResult.Hash.Hex())
 			}
 		}
 
 		time.Sleep(1 * time.Second) // make sure that tx complete signal propagates
 		for _, txID := range parsedIDs {
-			s.False(backend.TransactionQueue().Has(status.QueuedTxID(txID)),
+			require.False(backend.TransactionQueue().Has(status.QueuedTxID(txID)),
 				"txqueue should not have test tx at this point (it should be completed)")
 		}
 	}
@@ -436,14 +434,10 @@ func (s *BackendTestSuite) TestCompleteMultipleQueuedTransactions() {
 	case <-allTestTxCompleted:
 	// pass
 	case <-time.After(30 * time.Second):
-		s.Fail("test timed out")
-		return
+		require.Fail("test timed out")
 	}
 
-	if backend.TransactionQueue().Count() != 0 {
-		s.Fail("tx queue must be empty at this point")
-		return
-	}
+	require.Empty(backend.TransactionQueue().Count())
 }
 
 func (s *BackendTestSuite) TestDiscardMultipleQueuedTransactions() {
@@ -526,34 +520,21 @@ func (s *BackendTestSuite) TestDiscardMultipleQueuedTransactions() {
 
 		// discard
 		discardResults := s.backend.DiscardTransactions(string(updatedTxIDStrings))
-		if len(discardResults) != 1 || discardResults["invalid-tx-id"].Error.Error() != "transaction hash not found" {
-			s.Fail(fmt.Sprintf("cannot discard txs: %v", discardResults))
-			return
-		}
+		require.Len(discardResults, 1, "cannot discard txs: %v", discardResults)
+		require.Error(discardResults["invalid-tx-id"].Error, "transaction hash not found", "cannot discard txs: %v", discardResults)
 
 		// try completing discarded transaction
 		completeResults := s.backend.CompleteTransactions(string(updatedTxIDStrings), TestConfig.Account1.Password)
-		if len(completeResults) != (testTxCount + 1) {
-			s.Fail(fmt.Sprint("unexpected number of errors (call to CompleteTransaction should not succeed)"))
-		}
+		require.Len(completeResults, testTxCount+1, "unexpected number of errors (call to CompleteTransaction should not succeed)")
 
 		for _, txResult := range completeResults {
-			if txResult.Error.Error() != "transaction hash not found" {
-				s.Fail(fmt.Sprintf("invalid error for %s", txResult.Hash.Hex()))
-				return
-			}
-			if txResult.Hash.Hex() != "0x0000000000000000000000000000000000000000000000000000000000000000" {
-				s.Fail(fmt.Sprintf("invalid hash (expected zero): %s", txResult.Hash.Hex()))
-				return
-			}
+			require.Error(txResult.Error, "transaction hash not found", "invalid error for %s", txResult.Hash.Hex())
+			require.Equal("0x0000000000000000000000000000000000000000000000000000000000000000", txResult.Hash.Hex(), "invalid hash (expected zero): %s", txResult.Hash.Hex())
 		}
 
 		time.Sleep(1 * time.Second) // make sure that tx complete signal propagates
 		for _, txID := range parsedIDs {
-			if backend.TransactionQueue().Has(status.QueuedTxID(txID)) {
-				s.Fail(fmt.Sprintf("txqueue should not have test tx at this point (it should be discarded): %s", txID))
-				return
-			}
+			require.False(backend.TransactionQueue().Has(status.QueuedTxID(txID)), "txqueue should not have test txs at this point (it should be discarded): %s", txID)
 		}
 	}
 	go func() {
@@ -575,14 +556,10 @@ func (s *BackendTestSuite) TestDiscardMultipleQueuedTransactions() {
 	case <-allTestTxDiscarded:
 		// pass
 	case <-time.After(1 * time.Minute):
-		s.Fail("test timed out")
-		return
+		require.Fail("test timed out")
 	}
 
-	if backend.TransactionQueue().Count() != 0 {
-		s.Fail("tx queue must be empty at this point")
-		return
-	}
+	require.Empty(backend.TransactionQueue().Count(), "tx queue must be empty at this point")
 }
 
 func (s *BackendTestSuite) TestNonExistentQueuedTransactions() {
@@ -649,17 +626,11 @@ func (s *BackendTestSuite) TestEvictionOfQueuedTransactions() {
 	}
 	time.Sleep(3 * time.Second)
 
-	if txQueue.Count() > status.DefaultTxQueueCap {
-		s.Fail(fmt.Sprintf("transaction count should be %d (or %d): got %d", status.DefaultTxQueueCap, status.DefaultTxQueueCap-1, txQueue.Count()))
-		return
-	}
+	require.True(txQueue.Count() <= status.DefaultTxQueueCap, "transaction count should be %d (or %d): got %d", status.DefaultTxQueueCap, status.DefaultTxQueueCap-1, txQueue.Count())
 
 	for _, txID := range txIDs {
 		txQueue.Remove(txID)
 	}
 
-	if txQueue.Count() != 0 {
-		s.Fail(fmt.Sprintf("transaction count should be zero: %d", txQueue.Count()))
-		return
-	}
+	require.Empty(txQueue.Count(), "transaction count should be zero: %d", txQueue.Count())
 }

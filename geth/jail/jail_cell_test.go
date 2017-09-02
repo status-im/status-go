@@ -70,7 +70,7 @@ func (s *JailTestSuite) TestJailTimeout() {
 func (s *JailTestSuite) TestJailLoopInCall() {
 	require := s.Require()
 
-	s.StartTestNode(params.RopstenNetworkID, true)
+	s.StartTestNode(params.RopstenNetworkID)
 	defer s.StopTestNode()
 
 	// load Status JS and add test command to it
@@ -105,8 +105,6 @@ func (s *JailTestSuite) TestJailLoopInCall() {
 	select {
 	case received := <-items:
 		require.Equal(received, "softball")
-		break
-
 	case <-time.After(5 * time.Second):
 		require.Fail("Failed to received event response")
 	}
