@@ -123,7 +123,7 @@ func (s *JailTestSuite) TestJailFetchPromise() {
 	require := s.Require()
 	require.NotNil(s.jail)
 
-	cell, err := s.jail.NewJailCell(testChatID)
+	cell, err := s.jail.NewCell(testChatID)
 	require.NoError(err)
 	require.NotNil(cell)
 
@@ -161,7 +161,7 @@ func (s *JailTestSuite) TestJailFetchCatch() {
 	require := s.Require()
 	require.NotNil(s.jail)
 
-	cell, err := s.jail.NewJailCell(testChatID)
+	cell, err := s.jail.NewCell(testChatID)
 	require.NoError(err)
 	require.NotNil(cell)
 
@@ -209,7 +209,7 @@ func (s *JailTestSuite) TestJailFetchRace() {
 	require := s.Require()
 	require.NotNil(s.jail)
 
-	cell, err := s.jail.NewJailCell(testChatID)
+	cell, err := s.jail.NewCell(testChatID)
 	require.NoError(err)
 	require.NotNil(cell)
 
