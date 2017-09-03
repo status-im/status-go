@@ -1,15 +1,15 @@
-# Package jail
+# Jail
 --
 
     import "github.com/status-im/status-go/geth/jail"
-    
-[![GoDoc](https://godoc.org/github.com/status-im/status-go/geth/jail?status.svg)](https://godoc.org/github.com/status-im/status-go/geth/jail)
+
+go:generate godocdown -heading Title -o README.md
 
 Package jail implements "jailed" enviroment for executing arbitrary JavaScript
 code using Otto JS interpreter (https://github.com/robertkrimen/otto).
 
-Jail create multiple JailCells, one cell per status client chat. Each cell runs
-own Otto virtual machine and lives forever, but that may change in the future.
+Jail create multiple Cells, one cell per status client chat. Each cell runs own
+Otto virtual machine and lives forever, but that may change in the future.
 
     +----------------------------------------------+
     |                     Jail                     |
@@ -24,28 +24,34 @@ own Otto virtual machine and lives forever, but that may change in the future.
     ++-------++ ++-------++ ++-------++  ++-------++
 
 
-# Get and Set
+### Cells
 
-(*JailCell).Get/Set functions provide transparent and concurrently safe wrappers
-for Otto VM Get and Set functions respectively. See Otto documentation for usage
+Each Cell object embeds *VM from 'jail/vm' for concurrency safe wrapper around
+*otto.VM functions. This important when dealing with setTimeout and Fetch API
+functions (see below).
+
+
+### Get and Set
+
+(*VM).Get/Set functions provide transparent and concurrently safe wrappers for
+Otto VM Get and Set functions respectively. See Otto documentation for usage
 examples: https://godoc.org/github.com/robertkrimen/otto
 
 
-# Call and Run
+### Call and Run
 
-(*JailCell).Call/Run functions allows executing arbitrary JS in the cell.
-They're also wrappers arount Otto VM functions of the same name. Run accepts raw
-JS strings for execution, Call takes a JS function name (defined in VM) and
-parameters.
+(*VM).Call/Run functions allows executing arbitrary JS in the cell. They're also
+wrappers arount Otto VM functions of the same name. Run accepts raw JS strings
+for execution, Call takes a JS function name (defined in VM) and parameters.
 
 
-# Timeouts and intervals support
+### Timeouts and intervals support
 
 Default Otto VM interpreter doesn't support setTimeout()/setInterval() JS
 functions, because they're not part of ECMA-262 spec, but properties of the
 window object in browser. We add support for them using
-http://github.com/deoxxa/ottoext/timers and
-http://github.com/deoxxa/ottoext/loop packages.
+http://github.com/status-im/ottoext/timers and
+http://github.com/status-im/ottoext/loop packages.
 
 Each cell starts a new loop in a separate goroutine, registers functions for
 setTimeout/setInterval calls and associate them with this loop. All JS code
@@ -67,6 +73,25 @@ In order to capture response one may use following approach:
     cell.Run(`setTimeout(function(){ __captureResponse("OK") }, 2000);`)
 
 
-# Fetch support
+### Fetch support
 
-### TBD
+Fetch API is implemented using http://github.com/status-im/ottoext/fetch
+package. When Cell is created, corresponding handlers are registered within VM
+and associated event loop.
+
+Due to asynchronous nature of Fetch API, the following code will return
+immediately:
+
+    cell.Run(`fetch('http://example.com/').then(function(data) { ... })`)
+
+### and callback function in a promise will be executed in a event loop in the
+backgrounds. Thus, it's user responsibility to register a corresponding callback
+function before:
+
+    cell.Set("__captureSuccess", func(res otto.Value) { ... })
+
+    cell.Run(`fetch('http://example.com').then(function(r) {
+    	return r.text()
+    }).then(function(data) {
+    	__captureSuccess(data)
+    }))
