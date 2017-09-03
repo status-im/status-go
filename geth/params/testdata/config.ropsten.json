@@ -67,7 +67,6 @@
         "TTL": 120,
         "FirebaseConfig": {
             "AuthorizationKeyFile": "",
-            "NotificationTriggerURL": "https://fcm.googleapis.com/fcm/send"
         }
     },
     "SwarmConfig": {

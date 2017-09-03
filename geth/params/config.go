@@ -58,9 +58,6 @@ type LightEthConfig struct {
 type FirebaseConfig struct {
 	// AuthorizationKeyFile file path that contains FCM authorization key
 	AuthorizationKeyFile string
-
-	// NotificationTriggerURL URL used to send push notification requests to
-	NotificationTriggerURL string
 }
 
 // ReadAuthorizationKeyFile reads and loads FCM authorization key
@@ -345,9 +342,7 @@ func NewNodeConfig(dataDir string, networkID uint64, devMode bool) (*NodeConfig,
 			Port:       WhisperPort,
 			MinimumPoW: WhisperMinimumPoW,
 			TTL:        WhisperTTL,
-			FirebaseConfig: &FirebaseConfig{
-				NotificationTriggerURL: FirebaseNotificationTriggerURL,
-			},
+			FirebaseConfig: &FirebaseConfig{},
 		},
 		SwarmConfig: &SwarmConfig{},
 	}
