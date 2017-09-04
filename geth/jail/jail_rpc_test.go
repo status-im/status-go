@@ -1,6 +1,7 @@
 package jail_test
 
 import (
+	"fmt"
 	"testing"
 
 	"encoding/json"
@@ -42,27 +43,28 @@ func TestJailRPCTestSuite(t *testing.T) {
 
 type JailRPCTestSuite struct {
 	BaseTestSuite
-	Account common.AccountManager
-	Policy  *jail.ExecutionPolicy
+	Account        common.AccountManager
+	Policy         *jail.ExecutionPolicy
+	TxQueueManager common.TxQueueManager
 }
 
 func (s *JailRPCTestSuite) SetupTest() {
 	require := s.Require()
 
-	nodeman := node.NewNodeManager()
-	require.NotNil(nodeman)
+	nodeManager := node.NewNodeManager()
 
-	acctman := node.NewAccountManager(nodeman)
+	acctman := node.NewAccountManager(nodeManager)
 	require.NotNil(acctman)
 
-	txQueueManager := node.NewTxQueueManager(nodeman, acctman)
+	txQueueManager := node.NewTxQueueManager(nodeManager, acctman)
 
-	policy := jail.NewExecutionPolicy(nodeman, acctman, txQueueManager)
+	policy := jail.NewExecutionPolicy(nodeManager, acctman, txQueueManager)
 	require.NotNil(policy)
 
 	s.Policy = policy
 	s.Account = acctman
-	s.NodeManager = nodeman
+	s.NodeManager = nodeManager
+	s.TxQueueManager = txQueueManager
 }
 
 func (s *JailRPCTestSuite) TestSendTransaction() {
@@ -98,6 +100,8 @@ func (s *JailRPCTestSuite) TestSendTransaction() {
 
 		err := json.NewDecoder(r.Body).Decode(&txReq)
 		require.NoError(err)
+
+		fmt.Printf("Incoming request: %+q\n", txReq)
 
 		switch txReq.Method {
 		case "eth_getTransactionCount":
@@ -149,6 +153,13 @@ func (s *JailRPCTestSuite) TestSendTransaction() {
 
 	res, err := s.Policy.Execute(request, odFunc)
 	require.NoError(err)
+
+	// TODO(influx6): How do we move this into ExecutionPolicy.executeSendTransaction since
+	// we also need the account's password.
+	// TransactionQueueHandler is required to enqueue a transaction.
+	s.TxQueueManager.SetTransactionQueueHandler(func(queuedTx *common.QueuedTx) {
+		s.TxQueueManager.CompleteTransaction(queuedTx.ID, TestConfig.Account1.Password)
+	})
 
 	result, err := res.Get("result")
 	require.NoError(err)

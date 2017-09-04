@@ -133,6 +133,7 @@ func (ep *ExecutionPolicy) executeSendTransaction(req common.RPCCall, call otto.
 	// TODO(adam): check if context is used
 	ctx := context.WithValue(context.Background(), common.MessageIDKey, messageID)
 	args := sendTxArgsFromRPCCall(req)
+
 	tx := ep.txQueueManager.CreateTransaction(ctx, args)
 
 	if err := ep.txQueueManager.QueueTransaction(tx); err != nil {
