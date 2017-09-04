@@ -48,7 +48,8 @@ func (s *TxQueueTestSuite) TestCompleteTransaction() {
 	}, nil)
 
 	s.nodeManagerMock.EXPECT().NodeConfig().Return(
-		params.NewNodeConfig("/tmp", params.RopstenNetworkID, true))
+		params.NewNodeConfig("/tmp", params.RopstenNetworkID, true),
+	)
 
 	// TODO(adam): StatusBackend as an interface would allow a better solution.
 	// As we want to avoid network connection, we mock LES with a known error
@@ -80,9 +81,7 @@ func (s *TxQueueTestSuite) TestCompleteTransaction() {
 
 	go func() {
 		_, err := txQueueManager.CompleteTransaction(tx.ID, TestConfig.Account1.Password)
-		if err != errTxAssumedSent {
-			s.Fail(err.Error())
-		}
+		s.Equal(errTxAssumedSent, err)
 	}()
 
 	err = txQueueManager.WaitForTransaction(tx)
@@ -138,7 +137,8 @@ func (s *TxQueueTestSuite) TestInvalidPassword() {
 	}, nil)
 
 	s.nodeManagerMock.EXPECT().NodeConfig().Return(
-		params.NewNodeConfig("/tmp", params.RopstenNetworkID, true))
+		params.NewNodeConfig("/tmp", params.RopstenNetworkID, true),
+	)
 
 	// Set ErrDecrypt error response as expected with a wrong password.
 	s.nodeManagerMock.EXPECT().LightEthereumService().Return(nil, keystore.ErrDecrypt)
@@ -207,10 +207,7 @@ func (s *TxQueueTestSuite) TestDiscardTransaction() {
 	}()
 
 	err = txQueueManager.WaitForTransaction(tx)
-	if err != ErrQueuedTxDiscarded {
-		s.Fail(err.Error())
-	}
-
+	s.Equal(ErrQueuedTxDiscarded, err)
 	// Check that error is assigned to the transaction.
 	s.Equal(ErrQueuedTxDiscarded, tx.Err)
 	// Transaction should be already removed from the queue.

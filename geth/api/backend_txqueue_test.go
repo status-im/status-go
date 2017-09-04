@@ -227,16 +227,11 @@ func (s *BackendTestSuite) TestDoubleCompleteQueuedTransactions() {
 			_, err = s.backend.CompleteTransaction(txID, TestConfig.Account1.Password+"wrong")
 			s.EqualError(err, keystore.ErrDecrypt.Error())
 
-			s.Equal(1, s.TxQueueManager().TransactionQueue().Count(),
-				"txqueue cannot be empty, as tx has failed")
+			s.Equal(1, s.TxQueueManager().TransactionQueue().Count(), "txqueue cannot be empty, as tx has failed")
 
 			// now try to complete transaction, but with the correct password
 			txHash, err = s.backend.CompleteTransaction(txID, TestConfig.Account1.Password)
 			s.NoError(err)
-
-			time.Sleep(1 * time.Second) // make sure that tx complete signal propagates
-			s.Equal(0, s.backend.TxQueueManager().TransactionQueue().Count(),
-				"txqueue must be empty, as tx has completed")
 
 			log.Info("transaction complete", "URL", "https://rinkeby.etherscan.io/tx/"+txHash.Hex())
 			close(completeQueuedTransaction)

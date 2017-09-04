@@ -134,26 +134,26 @@ func (m *TxQueueManager) CompleteTransaction(id common.QueuedTxID, password stri
 
 	queuedTx, err := m.txQueue.Get(id)
 	if err != nil {
-		log.Warn("failed to complete transaction", "err", err)
+		log.Warn("could not get a queued transaction", "err", err)
 		return gethcommon.Hash{}, err
 	}
 
 	selectedAccount, err := m.accountManager.SelectedAccount()
 	if err != nil {
-		log.Warn("failed to complete transaction", "err", err)
+		log.Warn("failed to get a selected account", "err", err)
 		return gethcommon.Hash{}, err
 	}
 
 	// make sure that only account which created the tx can complete it
 	if queuedTx.Args.From.Hex() != selectedAccount.Address.Hex() {
-		log.Warn("failed to complete transaction", "err", ErrInvalidCompleteTxSender)
+		log.Warn("queued transaction does not belong to the selected account", "err", ErrInvalidCompleteTxSender)
 		m.NotifyOnQueuedTxReturn(queuedTx, ErrInvalidCompleteTxSender)
 		return gethcommon.Hash{}, ErrInvalidCompleteTxSender
 	}
 
 	config, err := m.nodeManager.NodeConfig()
 	if err != nil {
-		log.Warn("failed to complete transaction", "err", err)
+		log.Warn("could not get a node config", "err", err)
 		return gethcommon.Hash{}, err
 	}
 
@@ -170,7 +170,7 @@ func (m *TxQueueManager) CompleteTransaction(id common.QueuedTxID, password stri
 	// when incorrect sender tries to complete the account,
 	// notify and keep tx in queue (so that correct sender can complete)
 	if txErr == keystore.ErrDecrypt {
-		log.Warn("failed to complete transaction", "err", err)
+		log.Warn("failed to complete transaction", "err", txErr)
 		m.NotifyOnQueuedTxReturn(queuedTx, txErr)
 		return hash, txErr
 	}
