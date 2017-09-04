@@ -1,4 +1,4 @@
-package notifications
+package notificationserver
 
 import (
 	"crypto/sha512"

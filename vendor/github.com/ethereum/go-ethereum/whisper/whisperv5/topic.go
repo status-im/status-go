@@ -21,6 +21,7 @@ package whisperv5
 import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // Topic represents a cryptographically secure, probabilistic partial
@@ -28,6 +29,20 @@ import (
 // SHA3 hash of some arbitrary data given by the original author of the message.
 type TopicType [TopicLength]byte
 
+// TopicFromString converts a string to a byte array
+func TopicFromString(data string) []byte {
+	return NewTopic([]byte(data))
+}
+
+// NewTopic creates a TopicType out of an array of bytes
+func NewTopic(data []byte) []byte {
+	prefix := [4]byte{}
+	copy(prefix[:], crypto.Keccak256(data)[:TopicLength])
+	return prefix[:]
+}
+
+// BytesToTopic is an helper function that retuns a
+// TopicType based on an array of bytes
 func BytesToTopic(b []byte) (t TopicType) {
 	sz := TopicLength
 	if x := len(b); x < TopicLength {
