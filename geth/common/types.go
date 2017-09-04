@@ -2,6 +2,7 @@ package common
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,8 +12,8 @@ import (
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/les"
-	"github.com/ethereum/go-ethereum/les/status"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/rpc"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
@@ -153,25 +154,98 @@ type RawDiscardTransactionResult struct {
 	Error error
 }
 
+// QueuedTxID queued transaction identifier
+type QueuedTxID string
+
+// QueuedTx holds enough information to complete the queued transaction.
+type QueuedTx struct {
+	ID      QueuedTxID
+	Hash    common.Hash
+	Context context.Context
+	Args    SendTxArgs
+	Done    chan struct{}
+	Discard chan struct{}
+	Err     error
+}
+
+// SendTxArgs represents the arguments to submit a new transaction into the transaction pool.
+type SendTxArgs struct {
+	From     common.Address  `json:"from"`
+	To       *common.Address `json:"to"`
+	Gas      *hexutil.Big    `json:"gas"`
+	GasPrice *hexutil.Big    `json:"gasPrice"`
+	Value    *hexutil.Big    `json:"value"`
+	Data     hexutil.Bytes   `json:"data"`
+	Nonce    *hexutil.Uint64 `json:"nonce"`
+}
+
+// EnqueuedTxHandler is a function that receives queued/pending transactions, when they get queued
+type EnqueuedTxHandler func(*QueuedTx)
+
+// EnqueuedTxReturnHandler is a function that receives response when tx is complete (both on success and error)
+type EnqueuedTxReturnHandler func(*QueuedTx, error)
+
+// TxQueue is a queue of transactions.
+type TxQueue interface {
+	// Remove removes a transaction from the queue.
+	Remove(id QueuedTxID)
+
+	// Reset resets the state of the queue.
+	Reset()
+
+	// Count returns a number of transactions in the queue.
+	Count() int
+
+	// Has returns true if a transaction is in the queue.
+	Has(id QueuedTxID) bool
+}
+
 // TxQueueManager defines expected methods for managing transaction queue
 type TxQueueManager interface {
+	// Start starts accepting new transaction in the queue.
+	Start()
+
+	// Stop stops accepting new transactions in the queue.
+	Stop()
+
+	// TransactionQueue returns a transaction queue.
+	TransactionQueue() TxQueue
+
+	// CreateTransactoin creates a new transaction.
+	CreateTransaction(ctx context.Context, args SendTxArgs) *QueuedTx
+
+	// QueueTransaction adds a new transaction to the queue.
+	QueueTransaction(tx *QueuedTx) error
+
+	// WaitForTransactions blocks until transaction is completed, discarded or timed out.
+	WaitForTransaction(tx *QueuedTx) error
+
+	// NotifyOnQueuedTxReturn notifies a handler when a transaction returns.
+	NotifyOnQueuedTxReturn(queuedTx *QueuedTx, err error)
+
 	// TransactionQueueHandler returns handler that processes incoming tx queue requests
-	TransactionQueueHandler() func(queuedTx status.QueuedTx)
+	TransactionQueueHandler() func(queuedTx *QueuedTx)
+
+	// TODO(adam): might be not needed
+	SetTransactionQueueHandler(fn EnqueuedTxHandler)
+
+	// TODO(adam): might be not needed
+	SetTransactionReturnHandler(fn EnqueuedTxReturnHandler)
 
 	// TransactionReturnHandler returns handler that processes responses from internal tx manager
-	TransactionReturnHandler() func(queuedTx *status.QueuedTx, err error)
+	TransactionReturnHandler() func(queuedTx *QueuedTx, err error)
 
 	// CompleteTransaction instructs backend to complete sending of a given transaction
-	CompleteTransaction(id, password string) (common.Hash, error)
+	CompleteTransaction(id QueuedTxID, password string) (common.Hash, error)
 
 	// CompleteTransactions instructs backend to complete sending of multiple transactions
-	CompleteTransactions(ids, password string) map[string]RawCompleteTransactionResult
+	CompleteTransactions(ids []QueuedTxID, password string) map[QueuedTxID]RawCompleteTransactionResult
 
 	// DiscardTransaction discards a given transaction from transaction queue
-	DiscardTransaction(id string) error
+	DiscardTransaction(id QueuedTxID) error
 
 	// DiscardTransactions discards given multiple transactions from transaction queue
-	DiscardTransactions(ids string) map[string]RawDiscardTransactionResult
+	DiscardTransactions(ids []QueuedTxID) map[QueuedTxID]RawDiscardTransactionResult
 }
 
 // JailCell represents single jail cell, which is basically a JavaScript VM.

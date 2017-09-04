@@ -15,7 +15,6 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/les/status"
 	gethparams "github.com/ethereum/go-ethereum/params"
 
 	"github.com/status-im/status-go/geth/common"
@@ -783,21 +782,15 @@ func testAccountLogout(t *testing.T) bool {
 }
 
 func testCompleteTransaction(t *testing.T) bool {
-	// obtain reference to status backend
-	lightEthereum, err := statusAPI.NodeManager().LightEthereumService()
-	if err != nil {
-		t.Errorf("Test failed: LES service is not running: %v", err)
-		return false
-	}
-	backend := lightEthereum.StatusBackend
+	txQueueManager := statusAPI.TxQueueManager()
+	txQueue := txQueueManager.TransactionQueue()
 
-	// reset queue
-	backend.TransactionQueue().Reset()
+	txQueue.Reset()
 
 	time.Sleep(5 * time.Second) // allow to sync
 
 	// log into account from which transactions will be sent
-	if err = statusAPI.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password); err != nil {
+	if err := statusAPI.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password); err != nil {
 		t.Errorf("cannot select account: %v", TestConfig.Account1.Address)
 		return false
 	}
@@ -811,7 +804,7 @@ func testCompleteTransaction(t *testing.T) bool {
 	var txHash = ""
 	node.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var envelope node.SignalEnvelope
-		if err = json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
+		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
 		}
@@ -822,7 +815,7 @@ func testCompleteTransaction(t *testing.T) bool {
 			completeTxResponse := common.CompleteTransactionResult{}
 			rawResponse := CompleteTransaction(C.CString(event["id"].(string)), C.CString(TestConfig.Account1.Password))
 
-			if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &completeTxResponse); err != nil {
+			if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &completeTxResponse); err != nil {
 				t.Errorf("cannot decode RecoverAccount response (%s): %v", C.GoString(rawResponse), err)
 			}
 
@@ -838,29 +831,31 @@ func testCompleteTransaction(t *testing.T) bool {
 		}
 	})
 
-	//  this call blocks, up until Complete Transaction is called
-	txHashCheck, err := backend.SendTransaction(nil, status.SendTxArgs{
+	// this call blocks, up until Complete Transaction is called
+	txCheckHash, err := statusAPI.SendTransaction(nil, common.SendTxArgs{
 		From:  common.FromAddress(TestConfig.Account1.Address),
 		To:    common.ToAddress(TestConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 	})
 	if err != nil {
-		t.Errorf("Test failed: cannot send transaction: %v", err)
+		t.Errorf("Failed to SendTransaction: %s", err)
+		return false
 	}
 
 	<-queuedTxCompleted // make sure that complete transaction handler completes its magic, before we proceed
 
-	if txHash != txHashCheck.Hex() {
-		t.Errorf("Transaction hash returned from SendTransaction is invalid: expected %s, got %s", txHashCheck.Hex(), txHash)
+	if txHash != txCheckHash.Hex() {
+		t.Errorf("Transaction hash returned from SendTransaction is invalid: expected %s, got %s",
+			txCheckHash.Hex(), txHash)
 		return false
 	}
 
-	if reflect.DeepEqual(txHashCheck, gethcommon.Hash{}) {
+	if reflect.DeepEqual(txCheckHash, gethcommon.Hash{}) {
 		t.Error("Test failed: transaction was never queued or completed")
 		return false
 	}
 
-	if backend.TransactionQueue().Count() != 0 {
+	if txQueue.Count() != 0 {
 		t.Error("tx queue must be empty at this point")
 		return false
 	}
@@ -869,16 +864,8 @@ func testCompleteTransaction(t *testing.T) bool {
 }
 
 func testCompleteMultipleQueuedTransactions(t *testing.T) bool {
-	// obtain reference to status backend
-	lightEthereum, err := statusAPI.NodeManager().LightEthereumService()
-	if err != nil {
-		t.Errorf("Test failed: LES service is not running: %v", err)
-		return false
-	}
-	backend := lightEthereum.StatusBackend
-
-	// reset queue
-	backend.TransactionQueue().Reset()
+	txQueue := statusAPI.TxQueueManager().TransactionQueue()
+	txQueue.Reset()
 
 	// log into account from which transactions will be sent
 	if err := statusAPI.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password); err != nil {
@@ -910,7 +897,7 @@ func testCompleteMultipleQueuedTransactions(t *testing.T) bool {
 
 	//  this call blocks, and should return when DiscardQueuedTransaction() for a given tx id is called
 	sendTx := func() {
-		txHashCheck, err := backend.SendTransaction(nil, status.SendTxArgs{
+		txHashCheck, err := statusAPI.SendTransaction(nil, common.SendTxArgs{
 			From:  common.FromAddress(TestConfig.Account1.Address),
 			To:    common.ToAddress(TestConfig.Account2.Address),
 			Value: (*hexutil.Big)(big.NewInt(1000000000000)),
@@ -946,7 +933,7 @@ func testCompleteMultipleQueuedTransactions(t *testing.T) bool {
 		}
 		results := resultsStruct.Results
 
-		if len(results) != (testTxCount+1) || results["invalid-tx-id"].Error != status.ErrQueuedTxIDNotFound.Error() {
+		if len(results) != (testTxCount+1) || results["invalid-tx-id"].Error != node.ErrQueuedTxIDNotFound.Error() {
 			t.Errorf("cannot complete txs: %v", results)
 			return
 		}
@@ -971,7 +958,7 @@ func testCompleteMultipleQueuedTransactions(t *testing.T) bool {
 
 		time.Sleep(1 * time.Second) // make sure that tx complete signal propagates
 		for _, txID := range parsedIDs {
-			if backend.TransactionQueue().Has(status.QueuedTxID(txID)) {
+			if txQueue.Has(common.QueuedTxID(txID)) {
 				t.Errorf("txqueue should not have test tx at this point (it should be completed): %s", txID)
 				return
 			}
@@ -1001,7 +988,7 @@ func testCompleteMultipleQueuedTransactions(t *testing.T) bool {
 		return false
 	}
 
-	if backend.TransactionQueue().Count() != 0 {
+	if txQueue.Count() != 0 {
 		t.Error("tx queue must be empty at this point")
 		return false
 	}
@@ -1010,19 +997,11 @@ func testCompleteMultipleQueuedTransactions(t *testing.T) bool {
 }
 
 func testDiscardTransaction(t *testing.T) bool {
-	// obtain reference to status backend
-	lightEthereum, err := statusAPI.NodeManager().LightEthereumService()
-	if err != nil {
-		t.Errorf("Test failed: LES service is not running: %v", err)
-		return false
-	}
-	backend := lightEthereum.StatusBackend
-
-	// reset queue
-	backend.TransactionQueue().Reset()
+	txQueue := statusAPI.TxQueueManager().TransactionQueue()
+	txQueue.Reset()
 
 	// log into account from which transactions will be sent
-	if err = statusAPI.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password); err != nil {
+	if err := statusAPI.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password); err != nil {
 		t.Errorf("cannot select account: %v", TestConfig.Account1.Address)
 		return false
 	}
@@ -1036,7 +1015,7 @@ func testDiscardTransaction(t *testing.T) bool {
 	txFailedEventCalled := false
 	node.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var envelope node.SignalEnvelope
-		if err = json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
+		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
 		}
@@ -1045,7 +1024,7 @@ func testDiscardTransaction(t *testing.T) bool {
 			txID = event["id"].(string)
 			t.Logf("transaction queued (will be discarded soon): {id: %s}\n", txID)
 
-			if !backend.TransactionQueue().Has(status.QueuedTxID(txID)) {
+			if !txQueue.Has(common.QueuedTxID(txID)) {
 				t.Errorf("txqueue should still have test tx: %s", txID)
 				return
 			}
@@ -1054,7 +1033,7 @@ func testDiscardTransaction(t *testing.T) bool {
 			discardResponse := common.DiscardTransactionResult{}
 			rawResponse := DiscardTransaction(C.CString(txID))
 
-			if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &discardResponse); err != nil {
+			if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &discardResponse); err != nil {
 				t.Errorf("cannot decode RecoverAccount response (%s): %v", C.GoString(rawResponse), err)
 			}
 
@@ -1064,14 +1043,14 @@ func testDiscardTransaction(t *testing.T) bool {
 			}
 
 			// try completing discarded transaction
-			_, err = statusAPI.CompleteTransaction(txID, TestConfig.Account1.Password)
-			if err != status.ErrQueuedTxIDNotFound {
+			_, err := statusAPI.CompleteTransaction(common.QueuedTxID(txID), TestConfig.Account1.Password)
+			if err != node.ErrQueuedTxIDNotFound {
 				t.Error("expects tx not found, but call to CompleteTransaction succeeded")
 				return
 			}
 
 			time.Sleep(1 * time.Second) // make sure that tx complete signal propagates
-			if backend.TransactionQueue().Has(status.QueuedTxID(txID)) {
+			if txQueue.Has(common.QueuedTxID(txID)) {
 				t.Errorf("txqueue should not have test tx at this point (it should be discarded): %s", txID)
 				return
 			}
@@ -1084,7 +1063,7 @@ func testDiscardTransaction(t *testing.T) bool {
 			t.Logf("transaction return event received: {id: %s}\n", event["id"].(string))
 
 			receivedErrMessage := event["error_message"].(string)
-			expectedErrMessage := status.ErrQueuedTxDiscarded.Error()
+			expectedErrMessage := node.ErrQueuedTxDiscarded.Error()
 			if receivedErrMessage != expectedErrMessage {
 				t.Errorf("unexpected error message received: got %v", receivedErrMessage)
 				return
@@ -1100,13 +1079,13 @@ func testDiscardTransaction(t *testing.T) bool {
 		}
 	})
 
-	//  this call blocks, and should return when DiscardQueuedTransaction() is called
-	txHashCheck, err := backend.SendTransaction(nil, status.SendTxArgs{
+	// this call blocks, and should return when DiscardQueuedTransaction() is called
+	txHashCheck, err := statusAPI.SendTransaction(nil, common.SendTxArgs{
 		From:  common.FromAddress(TestConfig.Account1.Address),
 		To:    common.ToAddress(TestConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 	})
-	if err != status.ErrQueuedTxDiscarded {
+	if err != node.ErrQueuedTxDiscarded {
 		t.Errorf("expected error not thrown: %v", err)
 		return false
 	}
@@ -1116,7 +1095,7 @@ func testDiscardTransaction(t *testing.T) bool {
 		return false
 	}
 
-	if backend.TransactionQueue().Count() != 0 {
+	if txQueue.Count() != 0 {
 		t.Error("tx queue must be empty at this point")
 		return false
 	}
@@ -1130,16 +1109,8 @@ func testDiscardTransaction(t *testing.T) bool {
 }
 
 func testDiscardMultipleQueuedTransactions(t *testing.T) bool {
-	// obtain reference to status backend
-	lightEthereum, err := statusAPI.NodeManager().LightEthereumService()
-	if err != nil {
-		t.Errorf("Test failed: LES service is not running: %v", err)
-		return false
-	}
-	backend := lightEthereum.StatusBackend
-
-	// reset queue
-	backend.TransactionQueue().Reset()
+	txQueue := statusAPI.TxQueueManager().TransactionQueue()
+	txQueue.Reset()
 
 	// log into account from which transactions will be sent
 	if err := statusAPI.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password); err != nil {
@@ -1166,7 +1137,7 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool {
 			txID = event["id"].(string)
 			t.Logf("transaction queued (will be discarded soon): {id: %s}\n", txID)
 
-			if !backend.TransactionQueue().Has(status.QueuedTxID(txID)) {
+			if !txQueue.Has(common.QueuedTxID(txID)) {
 				t.Errorf("txqueue should still have test tx: %s", txID)
 				return
 			}
@@ -1179,7 +1150,7 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool {
 			t.Logf("transaction return event received: {id: %s}\n", event["id"].(string))
 
 			receivedErrMessage := event["error_message"].(string)
-			expectedErrMessage := status.ErrQueuedTxDiscarded.Error()
+			expectedErrMessage := node.ErrQueuedTxDiscarded.Error()
 			if receivedErrMessage != expectedErrMessage {
 				t.Errorf("unexpected error message received: got %v", receivedErrMessage)
 				return
@@ -1198,14 +1169,14 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool {
 		}
 	})
 
-	//  this call blocks, and should return when DiscardQueuedTransaction() for a given tx id is called
+	// this call blocks, and should return when DiscardQueuedTransaction() for a given tx id is called
 	sendTx := func() {
-		txHashCheck, err := backend.SendTransaction(nil, status.SendTxArgs{
+		txHashCheck, err := statusAPI.SendTransaction(nil, common.SendTxArgs{
 			From:  common.FromAddress(TestConfig.Account1.Address),
 			To:    common.ToAddress(TestConfig.Account2.Address),
 			Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 		})
-		if err != status.ErrQueuedTxDiscarded {
+		if err != node.ErrQueuedTxDiscarded {
 			t.Errorf("expected error not thrown: %v", err)
 			return
 		}
@@ -1236,7 +1207,7 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool {
 		}
 		discardResults := discardResultsStruct.Results
 
-		if len(discardResults) != 1 || discardResults["invalid-tx-id"].Error != status.ErrQueuedTxIDNotFound.Error() {
+		if len(discardResults) != 1 || discardResults["invalid-tx-id"].Error != node.ErrQueuedTxIDNotFound.Error() {
 			t.Errorf("cannot discard txs: %v", discardResults)
 			return
 		}
@@ -1258,7 +1229,7 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool {
 				t.Errorf("tx id not set in result: expected id is %s", txID)
 				return
 			}
-			if txResult.Error != status.ErrQueuedTxIDNotFound.Error() {
+			if txResult.Error != node.ErrQueuedTxIDNotFound.Error() {
 				t.Errorf("invalid error for %s", txResult.Hash)
 				return
 			}
@@ -1270,7 +1241,7 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool {
 
 		time.Sleep(1 * time.Second) // make sure that tx complete signal propagates
 		for _, txID := range parsedIDs {
-			if backend.TransactionQueue().Has(status.QueuedTxID(txID)) {
+			if txQueue.Has(common.QueuedTxID(txID)) {
 				t.Errorf("txqueue should not have test tx at this point (it should be discarded): %s", txID)
 				return
 			}
@@ -1299,7 +1270,7 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool {
 		return false
 	}
 
-	if backend.TransactionQueue().Count() != 0 {
+	if txQueue.Count() != 0 {
 		t.Error("tx queue must be empty at this point")
 		return false
 	}

@@ -1,18 +1,14 @@
 package jail
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"sync"
 
-	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/les/status"
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/log"
-	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/static"
 )
 
@@ -31,6 +27,7 @@ type Jail struct {
 	sync.RWMutex
 	nodeManager    common.NodeManager
 	accountManager common.AccountManager
+	txQueueManager common.TxQueueManager
 	policy         *ExecutionPolicy
 	cells          map[string]*Cell // jail supports running many isolated instances of jailed runtime
 	baseJSCode     string           // JavaScript used to initialize all new cells with
@@ -38,12 +35,15 @@ type Jail struct {
 
 // New returns new Jail environment with the associated NodeManager and
 // AccountManager.
-func New(nodeManager common.NodeManager, accountManager common.AccountManager) *Jail {
+func New(
+	nodeManager common.NodeManager, accountManager common.AccountManager, txQueueManager common.TxQueueManager,
+) *Jail {
 	return &Jail{
 		nodeManager:    nodeManager,
 		accountManager: accountManager,
+		txQueueManager: txQueueManager,
 		cells:          make(map[string]*Cell),
-		policy:         NewExecutionPolicy(nodeManager, accountManager),
+		policy:         NewExecutionPolicy(nodeManager, accountManager, txQueueManager),
 	}
 }
 
@@ -176,18 +176,12 @@ func (jail *Jail) Send(call otto.FunctionCall) (response otto.Value) {
 
 	// Execute the requests.
 	for _, req := range reqs {
-		var resErr error
-		var res *otto.Object
+		log.Info("executing a request via jail.policy", "method", req.Method, "params", req.Params)
+		res, err := jail.policy.Execute(req, call)
+		log.Info("response from the request", "err", err)
 
-		switch req.Method {
-		case params.SendTransactionMethodName:
-			res, resErr = jail.policy.ExecuteSendTransaction(req, call)
-		default:
-			res, resErr = jail.policy.ExecuteOtherTransaction(req, call)
-		}
-
-		if resErr != nil {
-			switch resErr.(type) {
+		if err != nil {
+			switch err.(type) {
 			case common.StopRPCCallError:
 				return newErrorResponse(call.Otto, -32603, err.Error(), nil)
 			default:
@@ -212,99 +206,6 @@ func (jail *Jail) Send(call otto.FunctionCall) (response otto.Value) {
 	}
 
 	return response
-}
-
-//==================================================================================================================================
-
-func processRPCCall(manager common.NodeManager, req common.RPCCall, call otto.FunctionCall) (gethcommon.Hash, error) {
-	lightEthereum, err := manager.LightEthereumService()
-	if err != nil {
-		return gethcommon.Hash{}, err
-	}
-
-	backend := lightEthereum.StatusBackend
-
-	messageID, err := preProcessRequest(call.Otto, req)
-	if err != nil {
-		return gethcommon.Hash{}, err
-	}
-
-	// onSendTransactionRequest() will use context to obtain and release ticket
-	ctx := context.Background()
-	ctx = context.WithValue(ctx, common.MessageIDKey, messageID)
-
-	//  this call blocks, up until Complete Transaction is called
-	txHash, err := backend.SendTransaction(ctx, sendTxArgsFromRPCCall(req))
-	if err != nil {
-		return gethcommon.Hash{}, err
-	}
-
-	// invoke post processing
-	postProcessRequest(call.Otto, req, messageID)
-
-	return txHash, nil
-}
-
-// preProcessRequest pre-processes a given RPC call to a given Otto VM
-func preProcessRequest(vm *otto.Otto, req common.RPCCall) (string, error) {
-	messageID := currentMessageID(vm.Context())
-
-	return messageID, nil
-}
-
-// postProcessRequest post-processes a given RPC call to a given Otto VM
-func postProcessRequest(vm *otto.Otto, req common.RPCCall, messageID string) {
-	if len(messageID) > 0 {
-		vm.Call("addContext", nil, messageID, common.MessageIDKey, messageID) // nolint: errcheck
-	}
-
-	// set extra markers for queued transaction requests
-	if req.Method == params.SendTransactionMethodName {
-		vm.Call("addContext", nil, messageID, params.SendTransactionMethodName, true) // nolint: errcheck
-	}
-}
-
-func sendTxArgsFromRPCCall(req common.RPCCall) status.SendTxArgs {
-	if req.Method != params.SendTransactionMethodName { // no need to persist extra state for other requests
-		return status.SendTxArgs{}
-	}
-
-	var err error
-	var fromAddr, toAddr gethcommon.Address
-
-	fromAddr, err = req.ParseFromAddress()
-	if err != nil {
-		fromAddr = gethcommon.HexToAddress("0x0")
-	}
-
-	toAddr, err = req.ParseToAddress()
-	if err != nil {
-		toAddr = gethcommon.HexToAddress("0x0")
-	}
-
-	return status.SendTxArgs{
-		To:       &toAddr,
-		From:     fromAddr,
-		Value:    req.ParseValue(),
-		Data:     req.ParseData(),
-		Gas:      req.ParseGas(),
-		GasPrice: req.ParseGasPrice(),
-	}
-}
-
-// currentMessageID looks for `status.message_id` variable in current JS context
-func currentMessageID(ctx otto.Context) string {
-	if statusObj, ok := ctx.Symbols["status"]; ok {
-		messageID, err := statusObj.Object().Get("message_id")
-		if err != nil {
-			return ""
-		}
-		if messageID, err := messageID.ToString(); err == nil {
-			return messageID
-		}
-	}
-
-	return ""
 }
 
 //==========================================================================================================
