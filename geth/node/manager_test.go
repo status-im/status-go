@@ -4,11 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
-	"os"
-	"path/filepath"
-	"runtime"
 	"testing"
 	"time"
 
@@ -253,7 +249,7 @@ func (s *ManagerTestSuite) TestReferences() {
 	}
 
 	// test with node fully started
-	s.StartTestNode(params.RinkebyNetworkID, false)
+	s.StartTestNode(params.RinkebyNetworkID)
 	defer s.StopTestNode()
 	var nodeReadyTestCases = []struct {
 		name         string
@@ -466,7 +462,7 @@ func (s *ManagerTestSuite) TestRestartNode() {
 	require := s.Require()
 	require.NotNil(s.NodeManager)
 
-	s.StartTestNode(params.RinkebyNetworkID, false)
+	s.StartTestNode(params.RinkebyNetworkID)
 	defer s.StopTestNode()
 
 	s.True(s.NodeManager.IsNodeRunning())
@@ -477,66 +473,6 @@ func (s *ManagerTestSuite) TestRestartNode() {
 
 	// make sure we can read the first byte, and it is valid (for Rinkeby)
 	FirstBlockHash(require, s.NodeManager, "0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177")
-}
-
-func (s *ManagerTestSuite) copyToDir(fromDir string, toDir string) error {
-	isWin := runtime.GOOS == "window"
-
-	return filepath.Walk(fromDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		// If its a symlink, don't deal with it.
-		if !info.Mode().IsRegular() {
-			return nil
-		}
-
-		// If on windows, correct path slash.
-		if isWin {
-			path = filepath.ToSlash(path)
-		}
-
-		// Retrive relative path for giving path.
-		relPath, err := filepath.Rel(fromDir, path)
-		if err != nil {
-			return err
-		}
-
-		newToPath := filepath.Join(toDir, relPath)
-
-		switch info.Mode().IsDir() {
-		case true:
-			if err := os.MkdirAll(newToPath, 0777); err != nil && err != os.ErrExist {
-				return err
-			}
-
-			return nil
-		case false:
-			if err := os.MkdirAll(filepath.Dir(newToPath), 0777); err != nil && err != os.ErrExist {
-				return err
-			}
-		}
-
-		fromFileData, err := ioutil.ReadFile(path)
-		if err != nil {
-			return err
-		}
-
-		toFile, err := os.Create(newToPath)
-		if err != nil {
-			return err
-		}
-
-		defer toFile.Close()
-
-		if _, err := toFile.Write(fromFileData); err != nil {
-			return err
-		}
-
-		return nil
-	})
-
 }
 
 func (s *ManagerTestSuite) TestRaceConditions() {

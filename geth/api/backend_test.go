@@ -15,8 +15,26 @@ import (
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
 	. "github.com/status-im/status-go/geth/testing"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
+
+func TestStartNodeWithUpstreamEnabled(t *testing.T) {
+	backend := api.NewStatusBackend()
+	require.NotNil(t, backend)
+
+	nodeConfig, err := MakeTestNodeConfig(params.RopstenNetworkID)
+	require.NoError(t, err)
+
+	nodeConfig.UpstreamConfig.Enabled = true
+
+	nodeStarted, err := backend.StartNode(nodeConfig)
+	require.NoError(t, err)
+	defer backend.StopNode()
+
+	<-nodeStarted
+	require.True(t, backend.IsNodeRunning())
+}
 
 func TestBackendTestSuite(t *testing.T) {
 	suite.Run(t, new(BackendTestSuite))
@@ -107,6 +125,10 @@ func (s *BackendTestSuite) LightEthereumService() *les.LightEthereum {
 	require.NotNil(lightEthereum)
 
 	return lightEthereum
+}
+
+func (s *BackendTestSuite) TxQueueManager() common.TxQueueManager {
+	return s.backend.TxQueueManager()
 }
 
 func (s *BackendTestSuite) RestartTestNode() {
@@ -372,12 +394,14 @@ func (s *BackendTestSuite) TestRaceConditions() {
 		},
 		func(config *params.NodeConfig) {
 			log.Info("CompleteTransactions()")
-			s.T().Logf("CompleteTransactions(), result: %v", s.backend.CompleteTransactions(`["id1","id2"]`, "password"))
+			ids := []common.QueuedTxID{"id1", "id2"}
+			s.T().Logf("CompleteTransactions(), result: %v", s.backend.CompleteTransactions(ids, "password"))
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
 			log.Info("DiscardTransactions()")
-			s.T().Logf("DiscardTransactions(), result: %v", s.backend.DiscardTransactions(`["id1","id2"]`))
+			ids := []common.QueuedTxID{"id1", "id2"}
+			s.T().Logf("DiscardTransactions(), result: %v", s.backend.DiscardTransactions(ids))
 			progress <- struct{}{}
 		},
 	}

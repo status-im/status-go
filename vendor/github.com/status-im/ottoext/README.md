@@ -1,7 +1,7 @@
 ottoext
 =======
 
-[![GoDoc](https://godoc.org/fknsrs.biz/p/ottoext?status.svg)](https://godoc.org/fknsrs.biz/p/ottoext)
+[![GoDoc](https://godoc.org/github.com/status-im/ottoext?status.svg)](https://godoc.org/github.com/status-im/ottoext)
 
 Overview
 --------
