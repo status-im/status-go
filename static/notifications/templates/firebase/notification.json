@@ -1,0 +1,23 @@
+{
+  "collapse_key": "",
+  "priority": "high",
+  "notification": {
+    "title": "status.im notification",
+    "body": "You have a new message!",
+    "icon": "https://status.im/img/logo.png",
+    "sound": "",
+    "badge": "",
+    "tag": "",
+    "color": "",
+    "click_action": "https://status.im",
+    "body_loc_key": "",
+    "body_loc_args": "",
+    "title_loc_key": "",
+    "title_loc_args": ""
+  },
+  "content_available": false,
+  "time_to_live": 2419200,
+  "restricted_package_name": "",
+  "dry_run": false,
+  "condition": ""
+}
