@@ -176,7 +176,9 @@ func (jail *Jail) Send(call otto.FunctionCall) (response otto.Value) {
 
 	// Execute the requests.
 	for _, req := range reqs {
+		log.Info("executing a request via jail.policy", "method", req.Method, "params", req.Params)
 		res, err := jail.policy.Execute(req, call)
+		log.Info("response from the request", "res", res, "err", err)
 
 		if err != nil {
 			switch err.(type) {

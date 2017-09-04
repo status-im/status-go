@@ -49,7 +49,7 @@ func (s *BackendTestSuite) TestJailSendQueuedTransaction() {
 	}`
 
 	txCompletedSuccessfully := make(chan struct{})
-	txHashes := make(chan gethcommon.Hash)
+	txHashes := make(chan gethcommon.Hash, 1)
 
 	// replace transaction notification handler
 	requireMessageId := false
