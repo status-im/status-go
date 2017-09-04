@@ -8,7 +8,13 @@ import (
 	"time"
 )
 
-var startTime = time.Now().UTC()
+var (
+	// Example exported vars
+	Cells = expvar.NewInt("Cells")
+	Peers = expvar.NewInt("Peers")
+
+	startTime = time.Now().UTC()
+)
 
 // goroutines is an expvar.Func compliant
 // wrapper for active goroutines counter
