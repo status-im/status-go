@@ -69,7 +69,7 @@ func NewExecutionPolicy(nodeManager common.NodeManager, accountManager common.Ac
 	}
 }
 
-// Execute handles the execution of a RPC request
+// Execute handles the execution of a RPC request and routes appropriately to either a local or remote ethereum node.
 func (ep *ExecutionPolicy) Execute(req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
 	config, err := ep.nodeManager.NodeConfig()
 	if err != nil {
@@ -77,27 +77,23 @@ func (ep *ExecutionPolicy) Execute(req common.RPCCall, call otto.FunctionCall) (
 	}
 
 	if config.UpstreamConfig.Enabled {
-		if params.SendTransactionMethodName == req.Method {
-			return ep.ExecuteRemoteSendTransaction(req, call)
+		if rpcLocalCommandRoute[req.Method] {
+			return ep.ExecuteLocally(req, call)
 		}
 
-		if !rpcLocalCommandRoute[req.Method] {
-			return ep.ExecuteOnRemote(req, call)
-		}
-
-		return ep.ExecuteLocally(req, call)
-	}
-
-	if params.SendTransactionMethodName == req.Method {
-		return ep.ExecuteLocalSendTransaction(req, call)
+		return ep.ExecuteOnRemote(req, call)
 	}
 
 	return ep.ExecuteLocally(req, call)
 }
 
-// ExecuteLocally defines a function which handles the processing of `shh_*` transaction methods
-// rpc request to the internal node server.
+// ExecuteLocally defines a function which handles the processing of all RPC requests from the jail object
+// to be processed with the internal ethereum node server(light.LightEthereum).
 func (ep *ExecutionPolicy) ExecuteLocally(req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
+	if params.SendTransactionMethodName == req.Method {
+		return ep.executeLocalSendTransaction(req, call)
+	}
+
 	client, err := ep.nodeManager.RPCLocalClient()
 	if err != nil {
 		return nil, common.StopRPCCallError{Err: err}
@@ -106,9 +102,13 @@ func (ep *ExecutionPolicy) ExecuteLocally(req common.RPCCall, call otto.Function
 	return ep.executeWithClient(client, req, call)
 }
 
-// ExecuteOnRemote defines a function which handles the processing of non `eth_sendTransaction`
-// rpc request to the upstream node server.
+// ExecuteOnRemote defines a function which handles the processing of all RPC requests from the jail object
+// to be processed by a remote ethereum node server with responses returned as needed.
 func (ep *ExecutionPolicy) ExecuteOnRemote(req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
+	if params.SendTransactionMethodName == req.Method {
+		return ep.executeRemoteSendTransaction(req, call)
+	}
+
 	client, err := ep.nodeManager.RPCUpstreamClient()
 	if err != nil {
 		return nil, common.StopRPCCallError{Err: err}
@@ -117,8 +117,8 @@ func (ep *ExecutionPolicy) ExecuteOnRemote(req common.RPCCall, call otto.Functio
 	return ep.executeWithClient(client, req, call)
 }
 
-// ExecuteRemoteSendTransaction defines a function to execute RPC method eth_sendTransaction over the upstream server.
-func (ep *ExecutionPolicy) ExecuteRemoteSendTransaction(req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
+// executeRemoteSendTransaction defines a function to execute RPC method eth_sendTransaction over the upstream server.
+func (ep *ExecutionPolicy) executeRemoteSendTransaction(req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
 	config, err := ep.nodeManager.NodeConfig()
 	if err != nil {
 		return nil, err
@@ -194,9 +194,9 @@ func (ep *ExecutionPolicy) ExecuteRemoteSendTransaction(req common.RPCCall, call
 	return resp, nil
 }
 
-// ExecuteLocalSendTransaction defines a function which handles execution of RPC method over the internal rpc server
+// executeLocalSendTransaction defines a function which handles execution of RPC method over the internal rpc server
 // from the eth.LightClient. It specifically caters to process eth_sendTransaction.
-func (ep *ExecutionPolicy) ExecuteLocalSendTransaction(req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
+func (ep *ExecutionPolicy) executeLocalSendTransaction(req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
 	resp, err := call.Otto.Object(`({"jsonrpc":"2.0"})`)
 	if err != nil {
 		return nil, err

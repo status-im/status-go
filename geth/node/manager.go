@@ -508,11 +508,11 @@ func (m *NodeManager) RPCLocalClient() (*rpc.Client, error) {
 		return nil, ErrInvalidNodeManager
 	}
 
-	m.RLock()
-	defer m.RUnlock()
+	m.Lock()
+	defer m.Unlock()
 
 	// make sure that node is fully started
-	if m.node == nil || m.nodeStarted == nil {
+	if m.node == nil {
 		return nil, ErrNoRunningNode
 	}
 
@@ -541,15 +541,8 @@ func (m *NodeManager) RPCUpstreamClient() (*rpc.Client, error) {
 		return nil, err
 	}
 
-	m.RLock()
-	defer m.RUnlock()
-
-	// make sure that node is fully started
-	if m.node == nil || m.nodeStarted == nil {
-		return nil, ErrNoRunningNode
-	}
-
-	<-m.nodeStarted
+	m.Lock()
+	defer m.Unlock()
 
 	if m.rpcClient == nil {
 		m.rpcClient, err = rpc.Dial(config.UpstreamConfig.URL)
