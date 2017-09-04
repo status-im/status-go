@@ -23,7 +23,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/nat"
 	gethparams "github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/whisper/mailserver"
-	"github.com/ethereum/go-ethereum/whisper/notifications"
+	"github.com/ethereum/go-ethereum/whisper/notificationserver"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
@@ -207,8 +207,8 @@ func activateShhService(stack *node.Node, config *params.NodeConfig) error {
 		}
 
 		// enable notification service
-		if whisperConfig.NotificationServerNode {
-			var notificationServer notifications.NotificationServer
+		if whisperConfig.NotificationServerNode.Enabled {
+			var notificationServer notificationserver.NotificationServer
 			whisperService.RegisterNotificationServer(&notificationServer)
 
 			notificationServer.Init(whisperService, whisperConfig)

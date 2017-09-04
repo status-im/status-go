@@ -27,7 +27,7 @@ var (
 	// WhisperNotificationServerNodeFlag enables/disables Push Notifications services
 	WhisperNotificationServerNodeFlag = cli.BoolFlag{
 		Name:  "notify",
-		Usage: "Node is capable of sending Push Notifications",
+		Usage: "Node is capable of sending notifications",
 	}
 
 	// WhisperForwarderNodeFlag enables/disables message forwarding
@@ -177,26 +177,29 @@ func makeWhisperNodeConfig(ctx *cli.Context) (*params.NodeConfig, error) {
 	}
 
 	nodeConfig.LightEthConfig.Enabled = false
+	nodeConfig.RPCEnabled = ctx.Bool(HTTPEnabledFlag.Name)
 
 	whisperConfig := nodeConfig.WhisperConfig
-
 	whisperConfig.Enabled = true
 	whisperConfig.IdentityFile = ctx.String(WhisperIdentityFile.Name)
 	whisperConfig.PasswordFile = ctx.String(WhisperPasswordFile.Name)
 	whisperConfig.EchoMode = ctx.BoolT(WhisperEchoModeFlag.Name)
 	whisperConfig.BootstrapNode = ctx.BoolT(WhisperBootstrapNodeFlag.Name)
 	whisperConfig.ForwarderNode = ctx.Bool(WhisperForwarderNodeFlag.Name)
-	whisperConfig.NotificationServerNode = ctx.Bool(WhisperNotificationServerNodeFlag.Name)
 	whisperConfig.MailServerNode = ctx.Bool(WhisperMailserverNodeFlag.Name)
 	whisperConfig.Port = ctx.Int(WhisperPortFlag.Name)
 	whisperConfig.TTL = ctx.Int(WhisperTTLFlag.Name)
 	whisperConfig.MinimumPoW = ctx.Float64(WhisperPoWFlag.Name)
 
+	// notification server configuration
+	notificationsConfig := whisperConfig.NotificationServerNode
+	notificationsConfig.Enabled = ctx.Bool(WhisperNotificationServerNodeFlag.Name)
+
 	if whisperConfig.MailServerNode && len(whisperConfig.PasswordFile) == 0 {
 		return nil, errors.New("mail server requires --password to be specified")
 	}
 
-	if whisperConfig.NotificationServerNode && len(whisperConfig.IdentityFile) == 0 {
+	if notificationsConfig.Enabled && len(whisperConfig.IdentityFile) == 0 {
 		return nil, errors.New("notification server requires either --identity file to be specified")
 	}
 
@@ -218,7 +221,7 @@ func makeWhisperNodeConfig(ctx *cli.Context) (*params.NodeConfig, error) {
 		}
 	}
 
-	firebaseConfig := whisperConfig.FirebaseConfig
+	firebaseConfig := notificationsConfig.FirebaseConfig
 	firebaseConfig.AuthorizationKeyFile = ctx.String(FirebaseAuthorizationKey.Name)
 	if len(firebaseConfig.AuthorizationKeyFile) > 0 { // make sure authorization key can be loaded
 		if firebaseConfig.AuthorizationKeyFile, err = filepath.Abs(firebaseConfig.AuthorizationKeyFile); err != nil {

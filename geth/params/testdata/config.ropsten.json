@@ -61,14 +61,16 @@
         "BootstrapNode": false,
         "ForwarderNode": false,
         "MailServerNode": false,
-        "NotificationServerNode": false,
+        "NotificationServerNode": {
+            "Enabled": false,
+            "FirebaseConfig": {
+                "AuthorizationKeyFile": ""
+            }
+        },
         "DataDir": "$TMPDIR/wnode",
         "Port": 30379,
         "MinimumPoW": 0.001,
-        "TTL": 120,
-        "FirebaseConfig": {
-            "AuthorizationKeyFile": "",
-        }
+        "TTL": 120
     },
     "SwarmConfig": {
         "Enabled": false

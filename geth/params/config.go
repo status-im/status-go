@@ -56,6 +56,15 @@ type LightEthConfig struct {
 	DatabaseCache int
 }
 
+// NotificationServerConfig holds Notifications-related configuration
+type NotificationServerConfig struct {
+	// Enabled flag specifies whether notification server is enabled
+	Enabled bool
+
+	// FirebaseConfig extra configuration for Firebase Cloud Messaging
+	FirebaseConfig *FirebaseConfig `json:"FirebaseConfig,"`
+}
+
 // FirebaseConfig holds FCM-related configuration
 type FirebaseConfig struct {
 	// AuthorizationKeyFile file path that contains FCM authorization key
@@ -63,23 +72,21 @@ type FirebaseConfig struct {
 }
 
 // ReadAuthorizationKeyFile reads and loads FCM authorization key
-func (c *FirebaseConfig) ReadAuthorizationKeyFile() ([]byte, error) {
+func (c *FirebaseConfig) ReadAuthorizationKeyFile() (string, error) {
 	if len(c.AuthorizationKeyFile) == 0 {
-		return nil, ErrAuthorizationKeyFileNotSet
+		return "", ErrAuthorizationKeyFileNotSet
 	}
 
 	key, err := ioutil.ReadFile(c.AuthorizationKeyFile)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-
 	key = bytes.TrimRight(key, "\n")
 
 	if len(key) == 0 {
-		return nil, ErrEmptyAuthorizationKeyFile
+		return "", ErrEmptyAuthorizationKeyFile
 	}
-
-	return key, nil
+	return string(key[:]), nil
 }
 
 // WhisperConfig holds SHH-related configuration
@@ -106,8 +113,8 @@ type WhisperConfig struct {
 	// MailServerNode is mode when node is capable of delivering expired messages on demand
 	MailServerNode bool
 
-	// NotificationServerNode is mode when node is capable of sending Push (and probably other kinds) Notifications
-	NotificationServerNode bool
+	// NotificationNode holds notifications-related configuration
+	NotificationServerNode *NotificationServerConfig `json:"NotificationServerNode,"`
 
 	// DataDir is the file system folder Whisper should use for any data storage needs.
 	DataDir string
@@ -120,9 +127,6 @@ type WhisperConfig struct {
 
 	// TTL time to live for messages, in seconds
 	TTL int
-
-	// FirebaseConfig extra configuration for Firebase Cloud Messaging
-	FirebaseConfig *FirebaseConfig `json:"FirebaseConfig,"`
 }
 
 // ReadPasswordFile reads and returns content of the password file
@@ -347,7 +351,9 @@ func NewNodeConfig(dataDir string, networkID uint64, devMode bool) (*NodeConfig,
 			Port:       WhisperPort,
 			MinimumPoW: WhisperMinimumPoW,
 			TTL:        WhisperTTL,
-			FirebaseConfig: &FirebaseConfig{},
+			NotificationServerNode: &NotificationServerConfig{
+				FirebaseConfig: &FirebaseConfig{},
+			},
 		},
 		SwarmConfig: &SwarmConfig{},
 	}
