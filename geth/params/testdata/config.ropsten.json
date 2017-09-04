@@ -18,9 +18,8 @@
     "TLSEnabled": false,
     "MaxPeers": 25,
     "MaxPendingPeers": 0,
-    "LogEnabled": false,
-    "LogFile": "geth.log",
-    "LogLevel": "INFO",
+    "LogFile": "",
+    "LogLevel": "ERROR",
     "LogToStderr": true,
     "UpstreamConfig": {
         "Enabled": false,

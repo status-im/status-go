@@ -5,6 +5,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
+const SelectedAccountKey = "selected_account"
+
 // AccountManager abstracts both internal account manager and extra filter status backend requires
 type AccountManager struct {
 	am                    *accounts.Manager
