@@ -162,10 +162,8 @@ func (m *TxQueueManager) CompleteTransaction(id common.QueuedTxID, password stri
 	var txErr error
 
 	if config.UpstreamConfig.Enabled {
-		log.Info("completing completed upstream", "id", queuedTx.ID)
 		hash, txErr = m.completeRemoteTransaction(queuedTx, password)
 	} else {
-		log.Info("completing completed locally", "id", queuedTx.ID)
 		hash, txErr = m.completeLocalTransaction(queuedTx, password)
 	}
 
