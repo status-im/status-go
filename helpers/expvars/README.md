@@ -56,3 +56,9 @@ Command to use:
 ```bash
 expvarmon -ports 10000 -vars Goroutines,duration:Uptime,Cells,Peers,mem:memstats.Alloc,mem:memstats.Sys,mem:memstats.HeapAlloc,mem:memstats.HeapInuse,duration:memstats.PauseNs,duration:memstats.PauseTotalNs -i 500ms
 ```
+
+# Further read
+If you want to learn better `expvar` package, a few links:
+
+ - [http://blog.ralch.com/tutorial/golang-metrics-with-expvar/](http://blog.ralch.com/tutorial/golang-metrics-with-expvar/)
+ - [https://golang.org/pkg/expvar/](https://golang.org/pkg/expvar/)
