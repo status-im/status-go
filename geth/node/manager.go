@@ -54,10 +54,6 @@ func NewNodeManager() *NodeManager {
 
 // StartNode start Status node, fails if node is already started
 func (m *NodeManager) StartNode(config *params.NodeConfig) (<-chan struct{}, error) {
-	if m == nil {
-		return nil, ErrInvalidNodeManager
-	}
-
 	m.Lock()
 	defer m.Unlock()
 
@@ -130,10 +126,6 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 
 // StopNode stop Status node. Stopped node cannot be resumed.
 func (m *NodeManager) StopNode() (<-chan struct{}, error) {
-	if m == nil {
-		return nil, ErrInvalidNodeManager
-	}
-
 	m.Lock()
 	defer m.Unlock()
 
@@ -184,10 +176,6 @@ func (m *NodeManager) stopNode() (<-chan struct{}, error) {
 
 // IsNodeRunning confirm that node is running
 func (m *NodeManager) IsNodeRunning() bool {
-	if m == nil {
-		return false
-	}
-
 	m.RLock()
 	defer m.RUnlock()
 
@@ -202,10 +190,6 @@ func (m *NodeManager) IsNodeRunning() bool {
 
 // Node returns underlying Status node
 func (m *NodeManager) Node() (*node.Node, error) {
-	if m == nil {
-		return nil, ErrInvalidNodeManager
-	}
-
 	m.RLock()
 	defer m.RUnlock()
 
@@ -220,10 +204,6 @@ func (m *NodeManager) Node() (*node.Node, error) {
 
 // PopulateStaticPeers connects current node with our publicly available LES/SHH/Swarm cluster
 func (m *NodeManager) PopulateStaticPeers() error {
-	if m == nil {
-		return ErrInvalidNodeManager
-	}
-
 	m.RLock()
 	defer m.RUnlock()
 
@@ -257,10 +237,6 @@ func (m *NodeManager) populateStaticPeers() error {
 
 // AddPeer adds new static peer node
 func (m *NodeManager) AddPeer(url string) error {
-	if m == nil {
-		return ErrInvalidNodeManager
-	}
-
 	m.RLock()
 	defer m.RUnlock()
 
@@ -293,10 +269,6 @@ func (m *NodeManager) addPeer(url string) error {
 // ResetChainData remove chain data from data directory.
 // Node is stopped, and new node is started, with clean data directory.
 func (m *NodeManager) ResetChainData() (<-chan struct{}, error) {
-	if m == nil {
-		return nil, ErrInvalidNodeManager
-	}
-
 	m.Lock()
 	defer m.Unlock()
 
@@ -341,10 +313,6 @@ func (m *NodeManager) resetChainData() (<-chan struct{}, error) {
 
 // RestartNode restart running Status node, fails if node is not running
 func (m *NodeManager) RestartNode() (<-chan struct{}, error) {
-	if m == nil {
-		return nil, ErrInvalidNodeManager
-	}
-
 	m.Lock()
 	defer m.Unlock()
 
@@ -374,10 +342,6 @@ func (m *NodeManager) restartNode() (<-chan struct{}, error) {
 
 // NodeConfig exposes reference to running node's configuration
 func (m *NodeManager) NodeConfig() (*params.NodeConfig, error) {
-	if m == nil {
-		return nil, ErrInvalidNodeManager
-	}
-
 	m.RLock()
 	defer m.RUnlock()
 
@@ -392,10 +356,6 @@ func (m *NodeManager) NodeConfig() (*params.NodeConfig, error) {
 
 // LightEthereumService exposes reference to LES service running on top of the node
 func (m *NodeManager) LightEthereumService() (*les.LightEthereum, error) {
-	if m == nil {
-		return nil, ErrInvalidNodeManager
-	}
-
 	m.RLock()
 	defer m.RUnlock()
 
@@ -421,10 +381,6 @@ func (m *NodeManager) LightEthereumService() (*les.LightEthereum, error) {
 
 // WhisperService exposes reference to Whisper service running on top of the node
 func (m *NodeManager) WhisperService() (*whisper.Whisper, error) {
-	if m == nil {
-		return nil, ErrInvalidNodeManager
-	}
-
 	m.RLock()
 	defer m.RUnlock()
 
@@ -450,10 +406,6 @@ func (m *NodeManager) WhisperService() (*whisper.Whisper, error) {
 
 // AccountManager exposes reference to node's accounts manager
 func (m *NodeManager) AccountManager() (*accounts.Manager, error) {
-	if m == nil {
-		return nil, ErrInvalidNodeManager
-	}
-
 	m.RLock()
 	defer m.RUnlock()
 
@@ -473,10 +425,6 @@ func (m *NodeManager) AccountManager() (*accounts.Manager, error) {
 
 // AccountKeyStore exposes reference to accounts key store
 func (m *NodeManager) AccountKeyStore() (*keystore.KeyStore, error) {
-	if m == nil {
-		return nil, ErrInvalidNodeManager
-	}
-
 	m.RLock()
 	defer m.RUnlock()
 
@@ -506,15 +454,11 @@ func (m *NodeManager) AccountKeyStore() (*keystore.KeyStore, error) {
 
 // RPCLocalClient exposes reference to RPC client connected to the running node.
 func (m *NodeManager) RPCLocalClient() (*rpc.Client, error) {
-	if m == nil {
-		return nil, ErrInvalidNodeManager
-	}
-
 	m.Lock()
 	defer m.Unlock()
 
 	// make sure that node is fully started
-	if m.node == nil {
+	if m.node == nil || m.nodeStarted == nil {
 		return nil, ErrNoRunningNode
 	}
 
@@ -534,10 +478,6 @@ func (m *NodeManager) RPCLocalClient() (*rpc.Client, error) {
 
 // RPCUpstreamClient exposes reference to RPC client connected to the running node.
 func (m *NodeManager) RPCUpstreamClient() (*rpc.Client, error) {
-	if m == nil {
-		return nil, ErrInvalidNodeManager
-	}
-
 	config, err := m.NodeConfig()
 	if err != nil {
 		return nil, err
@@ -559,10 +499,6 @@ func (m *NodeManager) RPCUpstreamClient() (*rpc.Client, error) {
 
 // RPCClient exposes reference to RPC client connected to the running node.
 func (m *NodeManager) RPCClient() (*rpc.Client, error) {
-	if m == nil {
-		return nil, ErrInvalidNodeManager
-	}
-
 	config, err := m.NodeConfig()
 	if err != nil {
 		return nil, err
@@ -578,10 +514,6 @@ func (m *NodeManager) RPCClient() (*rpc.Client, error) {
 
 // RPCServer exposes reference to running node's in-proc RPC server/handler
 func (m *NodeManager) RPCServer() (*rpc.Server, error) {
-	if m == nil {
-		return nil, ErrInvalidNodeManager
-	}
-
 	m.RLock()
 	defer m.RUnlock()
 

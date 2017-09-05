@@ -1,20 +1,18 @@
 package jail_test
 
 import (
-	"fmt"
-	"testing"
-
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"testing"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/robertkrimen/otto"
-	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/jail"
+	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
 	. "github.com/status-im/status-go/geth/testing"
 	"github.com/stretchr/testify/suite"
@@ -43,7 +41,6 @@ func TestJailRPCTestSuite(t *testing.T) {
 
 type JailRPCTestSuite struct {
 	BaseTestSuite
-	Backend        *api.StatusBackend
 	TxQueueManager common.TxQueueManager
 	Account        common.AccountManager
 	Policy         *jail.ExecutionPolicy
@@ -52,16 +49,13 @@ type JailRPCTestSuite struct {
 func (s *JailRPCTestSuite) SetupTest() {
 	require := s.Require()
 
-	backend := api.NewStatusBackend()
-	require.NotNil(backend)
-
-	nodeManager := backend.NodeManager()
+	nodeManager := node.NewNodeManager()
 	require.NotNil(nodeManager)
 
-	acctman := backend.AccountManager()
+	acctman := node.NewAccountManager(nodeManager)
 	require.NotNil(acctman)
 
-	txQueueManager := backend.TxQueueManager()
+	txQueueManager := node.NewTxQueueManager(nodeManager, acctman)
 	require.NotNil(txQueueManager)
 
 	policy := jail.NewExecutionPolicy(nodeManager, acctman, txQueueManager)
@@ -69,9 +63,18 @@ func (s *JailRPCTestSuite) SetupTest() {
 
 	s.Policy = policy
 	s.Account = acctman
-	s.Backend = backend
 	s.NodeManager = nodeManager
 	s.TxQueueManager = txQueueManager
+}
+
+func (s *JailRPCTestSuite) StartNodeTxQueue(networkID int, ops ...TestNodeOption) {
+	s.StartTestNode(networkID, ops...)
+	s.TxQueueManager.Start()
+}
+
+func (s *JailRPCTestSuite) StopNodeTxQueue() {
+	defer s.StopTestNode()
+	s.TxQueueManager.Stop()
 }
 
 func (s *JailRPCTestSuite) TestSendTransaction() {
@@ -146,8 +149,8 @@ func (s *JailRPCTestSuite) TestSendTransaction() {
 
 	// httpRPCServer will serve as an upstream server accepting transactions.
 	httpRPCServer := httptest.NewServer(rpcService)
-	s.StartTestBackend(params.RopstenNetworkID, WithUpstream(httpRPCServer.URL))
-	defer s.StopTestBackend()
+	s.StartNodeTxQueue(params.RopstenNetworkID, WithUpstream(httpRPCServer.URL))
+	defer s.StopNodeTxQueue()
 
 	client, err := s.NodeManager.RPCClient()
 	require.NoError(err)
@@ -160,7 +163,8 @@ func (s *JailRPCTestSuite) TestSendTransaction() {
 	// we also need the account's password.
 	// TransactionQueueHandler is required to enqueue a transaction.
 	s.TxQueueManager.SetTransactionQueueHandler(func(queuedTx *common.QueuedTx) {
-		s.TxQueueManager.CompleteTransaction(queuedTx.ID, TestConfig.Account1.Password)
+		_, err := s.TxQueueManager.CompleteTransaction(queuedTx.ID, TestConfig.Account1.Password)
+		require.NoError(err)
 	})
 
 	res, err := s.Policy.Execute(request, odFunc)
@@ -169,48 +173,8 @@ func (s *JailRPCTestSuite) TestSendTransaction() {
 	result, err := res.Get("result")
 	require.NoError(err)
 	require.NotNil(result)
-
-	exported, err := result.Export()
-	require.NoError(err)
-
-	fmt.Printf("Incoming response: %+q -> %+q\n", result, exported)
-
-	rawJSON, ok := exported.(string)
-	require.True(ok, "Expected Transaction Hash")
-	require.NotEmpty(rawJSON)
-}
-
-func (s *JailRPCTestSuite) StartTestBackend(networkID int, ops ...TestNodeOption) {
-	require := s.Require()
-	require.NotNil(s.Backend)
-
-	nodeConfig, err := MakeTestNodeConfig(networkID)
-	require.NoError(err)
-
-	for _, op := range ops {
-		op(nodeConfig)
-	}
-
-	// import account keys
-	require.NoError(common.ImportTestAccount(nodeConfig.KeyStoreDir, "test-account1.pk"))
-	require.NoError(common.ImportTestAccount(nodeConfig.KeyStoreDir, "test-account2.pk"))
-
-	require.False(s.Backend.IsNodeRunning())
-	nodeStarted, err := s.Backend.StartNode(nodeConfig)
-	require.NoError(err)
-	<-nodeStarted
-	require.True(s.Backend.IsNodeRunning())
-}
-
-func (s *JailRPCTestSuite) StopTestBackend() {
-	require := s.Require()
-	require.NotNil(s.Backend)
-	require.True(s.Backend.IsNodeRunning())
-
-	backendStopped, err := s.Backend.StopNode()
-	require.NoError(err)
-	<-backendStopped
-	require.False(s.Backend.IsNodeRunning())
+	require.True(result.IsString())
+	require.NotEmpty(result.String())
 }
 
 // func (s *JailRPCTestSuite) TestMainnetSendTransaction() {
