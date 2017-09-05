@@ -28,14 +28,6 @@ type txRequest struct {
 	Payload json.RawMessage `json:"params,omitempty"`
 }
 
-type service struct {
-	Handler http.HandlerFunc
-}
-
-func (s service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	s.Handler(w, r)
-}
-
 //==================================================================================================
 
 type service struct {
@@ -45,6 +37,8 @@ type service struct {
 func (s service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.Handler(w, r)
 }
+
+//==================================================================================================
 
 func TestRPCTestSuite(t *testing.T) {
 	suite.Run(t, new(RPCTestSuite))
