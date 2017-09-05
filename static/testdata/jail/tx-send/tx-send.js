@@ -70,13 +70,13 @@ function sendAsyncTransaction(params) {
     // While call is executing, status-go will call up the application,
     // allowing it to validate and complete transaction
     var hash
-
+    
     web3.eth.sendTransaction(data, function(h){
-      hash = h
+        hash = h;
     });
 
     return {"transaction-hash": hash};
-}
+};
 
 function sendTransaction(params) {
     var data = {
@@ -96,7 +96,7 @@ function sendTransaction(params) {
     var hash = web3.eth.sendTransaction(data);
 
     return {"transaction-hash": hash};
-}
+};
 
 _status_catalog.commands['send'] = sendTransaction;
 _status_catalog.commands['sendAsync'] = sendAsyncTransaction;
