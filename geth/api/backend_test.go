@@ -42,7 +42,8 @@ func TestBackendTestSuite(t *testing.T) {
 
 type BackendTestSuite struct {
 	suite.Suite
-	backend *api.StatusBackend
+	backend           *api.StatusBackend
+	nodeSyncCompleted bool
 }
 
 func (s *BackendTestSuite) SetupTest() {
@@ -90,7 +91,8 @@ func (s *BackendTestSuite) EnsureNodeSync() {
 
 	require := s.Require()
 
-	ethClient, err := s.NodeManager.LightEthereumService()
+	nodeManager := s.backend.NodeManager()
+	ethClient, err := nodeManager.LightEthereumService()
 	require.NoError(err)
 	require.NotNil(ethClient)
 
@@ -487,13 +489,15 @@ func (s *BackendTestSuite) TestResetChainData() {
 	s.StartTestBackend(params.RinkebyNetworkID)
 	defer s.StopTestBackend()
 
-	time.Sleep(2 * time.Second) // allow to sync for some time
+	s.EnsureNodeSync()
 
 	s.True(s.backend.IsNodeRunning())
 	nodeReady, err := s.backend.ResetChainData()
 	require.NoError(err)
 	<-nodeReady
 	s.True(s.backend.IsNodeRunning()) // new node, with previous config should be running
+
+	s.EnsureNodeSync()
 
 	// make sure we can read the first byte, and it is valid (for Rinkeby)
 	FirstBlockHash(require, s.backend.NodeManager(), "0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177")
