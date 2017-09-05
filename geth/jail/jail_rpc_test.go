@@ -159,10 +159,8 @@ func (s *JailRPCTestSuite) TestSendTransaction() {
 	selectErr := s.Account.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	require.NoError(selectErr)
 
-	// TODO(influx6): How do we move this into ExecutionPolicy.executeSendTransaction since
-	// we also need the account's password.
-	// TransactionQueueHandler is required to enqueue a transaction.
 	s.TxQueueManager.SetTransactionQueueHandler(func(queuedTx *common.QueuedTx) {
+		s.T().Logf("queued a new transaction: %s", queuedTx.ID)
 		_, err := s.TxQueueManager.CompleteTransaction(queuedTx.ID, TestConfig.Account1.Password)
 		require.NoError(err)
 	})
@@ -259,11 +257,10 @@ func (s *JailRPCTestSuite) TestSendTransaction() {
 // 	selectErr := s.Account.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 // 	require.NoError(selectErr)
 
-// 	// TODO(influx6): How do we move this into ExecutionPolicy.executeSendTransaction since
-// 	// we also need the account's password.
-// 	// TransactionQueueHandler is required to enqueue a transaction.
 // 	s.TxQueueManager.SetTransactionQueueHandler(func(queuedTx *common.QueuedTx) {
-// 		s.TxQueueManager.CompleteTransaction(queuedTx.ID, TestConfig.Account1.Password)
+//		s.T().Logf("queued a new transaction: %s", queuedTx.ID)
+//		_, err := s.TxQueueManager.CompleteTransaction(queuedTx.ID, TestConfig.Account1.Password)
+//		require.NoError(err)
 // 	})
 
 // 	res, err := s.Policy.Execute(request, odFunc)
@@ -365,11 +362,10 @@ func (s *JailRPCTestSuite) TestSendTransaction() {
 // 	selectErr := s.Account.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 // 	require.NoError(selectErr)
 
-// 	// TODO(influx6): How do we move this into ExecutionPolicy.executeSendTransaction since
-// 	// we also need the account's password.
-// 	// TransactionQueueHandler is required to enqueue a transaction.
 // 	s.TxQueueManager.SetTransactionQueueHandler(func(queuedTx *common.QueuedTx) {
-// 		s.TxQueueManager.CompleteTransaction(queuedTx.ID, TestConfig.Account1.Password)
+//		s.T().Logf("queued a new transaction: %s", queuedTx.ID)
+//		_, err := s.TxQueueManager.CompleteTransaction(queuedTx.ID, TestConfig.Account1.Password)
+//		require.NoError(err)
 // 	})
 
 // 	res, err := s.Policy.Execute(request, odFunc)
