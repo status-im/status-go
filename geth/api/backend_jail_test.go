@@ -13,7 +13,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/common"
-	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
@@ -50,7 +49,7 @@ func (s *BackendTestSuite) TestJailSendQueuedTransaction() {
 	}`
 
 	txCompletedSuccessfully := make(chan struct{})
-	txHashes := make(chan gethcommon.Hash)
+	txHashes := make(chan gethcommon.Hash, 1)
 
 	// replace transaction notification handler
 	requireMessageId := false
@@ -64,24 +63,16 @@ func (s *BackendTestSuite) TestJailSendQueuedTransaction() {
 			messageId, ok := event["message_id"].(string)
 			s.True(ok, "Message id is required, but not found")
 			if requireMessageId {
-				if len(messageId) == 0 {
-					s.Fail("Message id is required, but not provided")
-					return
-				}
+				require.NotEmpty(messageId, "Message id is required, but not provided")
 			} else {
-				if len(messageId) != 0 {
-					s.Fail("Message id is not required, but provided")
-					return
-				}
+				require.Empty(messageId, "Message id is not required, but provided")
 			}
-			log.Info("Transaction queued (will be completed shortly)", "id", event["id"].(string))
 
-			var txHash gethcommon.Hash
-			if txHash, err = s.backend.CompleteTransaction(event["id"].(string), TestConfig.Account1.Password); err != nil {
-				s.Fail(fmt.Sprintf("cannot complete queued transaction[%v]: %v", event["id"], err))
-			} else {
-				log.Info("Transaction complete", "URL", "https://ropsten.etherscan.io/tx/%s"+txHash.Hex())
-			}
+			txID := event["id"].(string)
+			txHash, err := s.backend.CompleteTransaction(common.QueuedTxID(txID), TestConfig.Account1.Password)
+			require.NoError(err, "cannot complete queued transaction[%v]", event["id"])
+
+			log.Info("Transaction complete", "URL", "https://ropsten.etherscan.io/tx/%s"+txHash.Hex())
 
 			txCompletedSuccessfully <- struct{}{} // so that timeout is aborted
 			txHashes <- txHash
@@ -128,7 +119,7 @@ func (s *BackendTestSuite) TestJailSendQueuedTransaction() {
 				{
 					`["commands", "send"]`,
 					txParams,
-					`{"result": {"context":{"` + jail.SendTransactionRequest + `":true},"result":{"transaction-hash":"TX_HASH"}}}`,
+					`{"result": {"context":{"` + params.SendTransactionMethodName + `":true},"result":{"transaction-hash":"TX_HASH"}}}`,
 				},
 				{
 					`["commands", "getBalance"]`,
@@ -191,7 +182,7 @@ func (s *BackendTestSuite) TestJailSendQueuedTransaction() {
 				txHash = <-txHashes
 			}
 			expectedResponse := strings.Replace(command.expectedResponse, "TX_HASH", txHash.Hex(), 1)
-			s.Require().Equal(expectedResponse, response)
+			require.Equal(expectedResponse, response)
 		}
 	}
 }
@@ -209,7 +200,7 @@ func (s *BackendTestSuite) TestContractDeployment() {
 	jailInstance := s.backend.JailManager()
 	jailInstance.Parse(testChatID, "")
 
-	cell, err := jailInstance.GetJailCell(testChatID)
+	cell, err := jailInstance.Cell(testChatID)
 	require.NoError(err)
 
 	// make sure you panic if transaction complete doesn't return
@@ -220,7 +211,8 @@ func (s *BackendTestSuite) TestContractDeployment() {
 	var txHash gethcommon.Hash
 	node.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var envelope node.SignalEnvelope
-		err := json.Unmarshal([]byte(jsonEvent), &envelope)
+		var err error
+		err = json.Unmarshal([]byte(jsonEvent), &envelope)
 		require.NoError(err, fmt.Sprintf("cannot unmarshal JSON: %s", jsonEvent))
 
 		if envelope.Type == node.EventTransactionQueued {
@@ -231,8 +223,8 @@ func (s *BackendTestSuite) TestContractDeployment() {
 
 			s.NoError(s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 
-			var err error
-			txHash, err = s.backend.CompleteTransaction(event["id"].(string), TestConfig.Account1.Password)
+			txID := event["id"].(string)
+			txHash, err = s.backend.CompleteTransaction(common.QueuedTxID(txID), TestConfig.Account1.Password)
 			if s.NoError(err, event["id"]) {
 				s.T().Logf("contract transaction complete, URL: %s", "https://ropsten.etherscan.io/tx/"+txHash.Hex())
 			}
@@ -249,9 +241,13 @@ func (s *BackendTestSuite) TestContractDeployment() {
 			from: '` + TestConfig.Account1.Address + `',
 			data: '0x6060604052341561000c57fe5b5b60a58061001b6000396000f30060606040526000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff1680636ffa1caa14603a575bfe5b3415604157fe5b60556004808035906020019091905050606b565b6040518082815260200191505060405180910390f35b60008160020290505b9190505600a165627a7a72305820ccdadd737e4ac7039963b54cee5e5afb25fa859a275252bdcf06f653155228210029',
 			gas: '` + strconv.Itoa(params.DefaultGas) + `'
-		}, function (e, contract){
+		}, function (e, contract) {
+			// NOTE: The callback will fire twice!
+			// Once the contract has the transactionHash property set and once its deployed on an address.
 			if (!e) {
-				responseValue = contract.transactionHash
+				if (!contract.address) {
+					responseValue = contract.transactionHash;
+				}
 			}
 		})
 	`)
@@ -616,14 +612,12 @@ func (s *BackendTestSuite) TestJailWhisper() {
 			};
 		`)
 
-		cell, err := jailInstance.GetJailCell(testCaseKey)
+		cell, err := jailInstance.Cell(testCaseKey)
 		require.NoError(err, "cannot get VM")
 
 		// post messages
-		if _, err := cell.Run(testCase.testCode); err != nil {
-			require.Fail(err.Error())
-			return
-		}
+		_, err = cell.Run(testCase.testCode)
+		require.NoError(err)
 
 		if !testCase.useFilter {
 			continue
@@ -636,9 +630,8 @@ func (s *BackendTestSuite) TestJailWhisper() {
 		filterName, err := cell.Get("filterName")
 		require.NoError(err, "cannot get filterName")
 
-		if _, ok := installedFilters[filterName.String()]; !ok {
-			require.FailNow("unrecognized filter")
-		}
+		_, ok := installedFilters[filterName.String()]
+		require.True(ok, "unrecognized filter")
 
 		installedFilters[filterName.String()] = filterId.String()
 	}
@@ -658,9 +651,7 @@ func (s *BackendTestSuite) TestJailWhisper() {
 	}
 
 	for testName, passedTest := range passedTests {
-		if !passedTest {
-			s.Fail(fmt.Sprintf("test not passed: %v", testName))
-		}
+		s.True(passedTest, "test not passed: %v", testName)
 	}
 }
 
@@ -771,7 +762,8 @@ func (s *BackendTestSuite) TestJailVMPersistence() {
 			//}
 
 			//var txHash common.Hash
-			txHash, err := s.backend.CompleteTransaction(event["id"].(string), TestConfig.Account1.Password)
+			txID := event["id"].(string)
+			txHash, err := s.backend.CompleteTransaction(common.QueuedTxID(txID), TestConfig.Account1.Password)
 			require.NoError(err, "cannot complete queued transaction[%v]: %v", event["id"], err)
 
 			s.T().Logf("Transaction complete: https://ropsten.etherscan.io/tx/%s", txHash.Hex())
@@ -797,7 +789,7 @@ func (s *BackendTestSuite) TestJailVMPersistence() {
 	wg.Wait()
 
 	// Validate total.
-	cell, err := jailInstance.GetJailCell(testChatID)
+	cell, err := jailInstance.Cell(testChatID)
 	require.NoError(err)
 
 	totalOtto, err := cell.Get("total")

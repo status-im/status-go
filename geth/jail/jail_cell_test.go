@@ -1,96 +1,74 @@
 package jail_test
 
 import (
-	"net/http"
-	"net/http/httptest"
 	"time"
 
 	"github.com/robertkrimen/otto"
-	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/params"
 )
 
 func (s *JailTestSuite) TestJailTimeoutFailure() {
 	require := s.Require()
-	require.NotNil(s.jail)
 
-	newCell, err := s.jail.NewJailCell(testChatID)
+	cell, err := s.jail.NewCell(testChatID)
 	require.NoError(err)
-	require.NotNil(newCell)
+	require.NotNil(cell)
 
-	// Attempt to run a timeout string against a JailCell.
-	_, err = newCell.RunOnLoop(`
-		setTimeout(function(n){
-			if(Date.now() - n < 50){
-				throw new Error("Timedout early");
-			}
+	// Attempt to run a timeout string against a Cell.
+	_, err = cell.Run(`
+		var timerCounts = 0;
+ 		setTimeout(function(n){		
+ 			if (Date.now() - n < 50) {
+ 				throw new Error("Timed out");
+ 			}
 
-			return n;
-		}, 30, Date.now());
-	`)
+			timerCounts++;
+ 		}, 30, Date.now());
+ 	`)
+	require.NoError(err)
 
-	require.NotNil(err)
+	// wait at least 10x longer to decrease probability
+	// of false negatives as we using real clock here
+	time.Sleep(300 * time.Millisecond)
+
+	value, err := cell.Get("timerCounts")
+	require.NoError(err)
+	require.True(value.IsNumber())
+	require.Equal("0", value.String())
 }
 
 func (s *JailTestSuite) TestJailTimeout() {
 	require := s.Require()
-	require.NotNil(s.jail)
 
-	newCell, err := s.jail.NewJailCell(testChatID)
+	cell, err := s.jail.NewCell(testChatID)
 	require.NoError(err)
-	require.NotNil(newCell)
+	require.NotNil(cell)
 
-	// Attempt to run a timeout string against a JailCell.
-	res, err := newCell.RunOnLoop(`
-		setTimeout(function(n){
-			if(Date.now() - n < 50){
-				throw new Error("Timedout early");
-			}
+	// Attempt to run a timeout string against a Cell.
+	_, err = cell.Run(`
+		var timerCounts = 0;
+ 		setTimeout(function(n){		
+ 			if (Date.now() - n < 50) {
+ 				throw new Error("Timed out");
+ 			}
 
-			return n;
-		}, 50, Date.now());
-	`)
-
-	require.NoError(err)
-	require.NotNil(res)
-}
-
-func (s *JailTestSuite) TestJailFetch() {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Hello World"))
-	})
-
-	server := httptest.NewServer(mux)
-	defer server.Close()
-
-	require := s.Require()
-	require.NotNil(s.jail)
-
-	newCell, err := s.jail.NewJailCell(testChatID)
-	require.NoError(err)
-	require.NotNil(newCell)
-
-	jcell, ok := newCell.(*jail.JailCell)
-	require.Equal(ok, true)
-	require.NotNil(jcell)
-
-	wait := make(chan struct{})
-
-	// Attempt to run a fetch resource.
-	_, err = jcell.Fetch(server.URL, func(res otto.Value) {
-		go func() { wait <- struct{}{} }()
-	})
-
+			timerCounts++;
+ 		}, 50, Date.now());
+ 	`)
 	require.NoError(err)
 
-	<-wait
+	// wait at least 10x longer to decrease probability
+	// of false negatives as we using real clock here
+	time.Sleep(300 * time.Millisecond)
+
+	value, err := cell.Get("timerCounts")
+	require.NoError(err)
+	require.True(value.IsNumber())
+	require.Equal("1", value.String())
 }
 
 func (s *JailTestSuite) TestJailLoopInCall() {
 	require := s.Require()
-	require.NotNil(s.jail)
 
 	s.StartTestNode(params.RopstenNetworkID)
 	defer s.StopTestNode()
@@ -99,7 +77,7 @@ func (s *JailTestSuite) TestJailLoopInCall() {
 	s.jail.BaseJS(baseStatusJSCode)
 	s.jail.Parse(testChatID, ``)
 
-	cell, err := s.jail.GetCell(testChatID)
+	cell, err := s.jail.Cell(testChatID)
 	require.NoError(err)
 	require.NotNil(cell)
 
@@ -121,14 +99,12 @@ func (s *JailTestSuite) TestJailLoopInCall() {
 	`)
 	require.NoError(err)
 
-	_, err = cell.CallOnLoop("callRunner", nil, "softball")
+	_, err = cell.Call("callRunner", nil, "softball")
 	require.NoError(err)
 
 	select {
 	case received := <-items:
 		require.Equal(received, "softball")
-		break
-
 	case <-time.After(5 * time.Second):
 		require.Fail("Failed to received event response")
 	}

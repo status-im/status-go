@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"sync"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -29,12 +30,14 @@ func NewStatusBackend() *StatusBackend {
 
 	nodeManager := node.NewNodeManager()
 	accountManager := node.NewAccountManager(nodeManager)
+	txQueueManager := node.NewTxQueueManager(nodeManager, accountManager)
+
 	return &StatusBackend{
 		nodeManager:    nodeManager,
 		accountManager: accountManager,
-		txQueueManager: node.NewTxQueueManager(nodeManager, accountManager),
-		jailManager:    jail.New(nodeManager),
+		jailManager:    jail.New(nodeManager, accountManager, txQueueManager),
 		rpcManager:     node.NewRPCManager(nodeManager),
+		txQueueManager: txQueueManager,
 	}
 }
 
@@ -51,6 +54,11 @@ func (m *StatusBackend) AccountManager() common.AccountManager {
 // JailManager returns reference to jail
 func (m *StatusBackend) JailManager() common.JailManager {
 	return m.jailManager
+}
+
+// TxQueueManager returns reference to jail
+func (m *StatusBackend) TxQueueManager() common.TxQueueManager {
+	return m.txQueueManager
 }
 
 // IsNodeRunning confirm that node is running
@@ -71,6 +79,8 @@ func (m *StatusBackend) StartNode(config *params.NodeConfig) (<-chan struct{}, e
 	if err != nil {
 		return nil, err
 	}
+
+	m.txQueueManager.Start()
 
 	m.nodeReady = make(chan struct{}, 1)
 	go m.onNodeStart(nodeStarted, m.nodeReady) // waits on nodeStarted, writes to backendReady
@@ -110,6 +120,8 @@ func (m *StatusBackend) StopNode() (<-chan struct{}, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	m.txQueueManager.Stop()
 
 	backendStopped := make(chan struct{}, 1)
 	go func() {
@@ -171,23 +183,42 @@ func (m *StatusBackend) CallRPC(inputJSON string) string {
 	return m.rpcManager.Call(inputJSON)
 }
 
+// SendTransaction creates a new transaction and waits until it's complete.
+func (m *StatusBackend) SendTransaction(ctx context.Context, args common.SendTxArgs) (gethcommon.Hash, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	tx := m.txQueueManager.CreateTransaction(ctx, args)
+
+	if err := m.txQueueManager.QueueTransaction(tx); err != nil {
+		return gethcommon.Hash{}, err
+	}
+
+	if err := m.txQueueManager.WaitForTransaction(tx); err != nil {
+		return gethcommon.Hash{}, err
+	}
+
+	return tx.Hash, nil
+}
+
 // CompleteTransaction instructs backend to complete sending of a given transaction
-func (m *StatusBackend) CompleteTransaction(id, password string) (gethcommon.Hash, error) {
+func (m *StatusBackend) CompleteTransaction(id common.QueuedTxID, password string) (gethcommon.Hash, error) {
 	return m.txQueueManager.CompleteTransaction(id, password)
 }
 
 // CompleteTransactions instructs backend to complete sending of multiple transactions
-func (m *StatusBackend) CompleteTransactions(ids, password string) map[string]common.RawCompleteTransactionResult {
+func (m *StatusBackend) CompleteTransactions(ids []common.QueuedTxID, password string) map[common.QueuedTxID]common.RawCompleteTransactionResult {
 	return m.txQueueManager.CompleteTransactions(ids, password)
 }
 
 // DiscardTransaction discards a given transaction from transaction queue
-func (m *StatusBackend) DiscardTransaction(id string) error {
+func (m *StatusBackend) DiscardTransaction(id common.QueuedTxID) error {
 	return m.txQueueManager.DiscardTransaction(id)
 }
 
 // DiscardTransactions discards given multiple transactions from transaction queue
-func (m *StatusBackend) DiscardTransactions(ids string) map[string]common.RawDiscardTransactionResult {
+func (m *StatusBackend) DiscardTransactions(ids []common.QueuedTxID) map[common.QueuedTxID]common.RawDiscardTransactionResult {
 	return m.txQueueManager.DiscardTransactions(ids)
 }
 
@@ -201,15 +232,16 @@ func (m *StatusBackend) registerHandlers() error {
 	var lightEthereum *les.LightEthereum
 	if err := runningNode.Service(&lightEthereum); err != nil {
 		log.Error("Cannot get light ethereum service", "error", err)
+		return err
 	}
 
 	lightEthereum.StatusBackend.SetAccountsFilterHandler(m.accountManager.AccountsListRequestHandler())
 	log.Info("Registered handler", "fn", "AccountsFilterHandler")
 
-	lightEthereum.StatusBackend.SetTransactionQueueHandler(m.txQueueManager.TransactionQueueHandler())
+	m.txQueueManager.SetTransactionQueueHandler(m.txQueueManager.TransactionQueueHandler())
 	log.Info("Registered handler", "fn", "TransactionQueueHandler")
 
-	lightEthereum.StatusBackend.SetTransactionReturnHandler(m.txQueueManager.TransactionReturnHandler())
+	m.txQueueManager.SetTransactionReturnHandler(m.txQueueManager.TransactionReturnHandler())
 	log.Info("Registered handler", "fn", "TransactionReturnHandler")
 
 	return nil

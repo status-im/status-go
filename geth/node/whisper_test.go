@@ -1,8 +1,8 @@
 package node_test
 
 import (
-	"testing"
 	"context"
+	"testing"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"

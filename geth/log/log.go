@@ -1,75 +1,99 @@
 package log
 
 import (
+	"fmt"
+	"os"
+	"strings"
+
 	"github.com/ethereum/go-ethereum/log"
 )
 
-// Logger is wrapper for go-ethereum log
+// Logger is a wrapper around log.Logger.
 type Logger struct {
-	output log.Logger
+	log.Logger
+	Level   log.Lvl
+	Handler log.Handler
 }
 
-// Instance to a logger struct
-var logger *Logger
+// logger is package scope instance of Logger
+var logger = Logger{
+	Logger:  log.New("geth", "StatusIM"),
+	Level:   log.LvlError,
+	Handler: log.StreamHandler(os.Stdout, log.TerminalFormat(true)),
+}
 
-// Trace is a convenient alias for Root().Trace
+func init() {
+	setHandler(logger.Level, logger.Handler)
+}
+
+// SetLevel inits status and ethereum-go logging packages,
+// enabling logging and setting up proper log level.
+//
+// Our log levels are in form "DEBUG|ERROR|WARN|etc", while
+// ethereum-go expects names in lower case: "debug|error|warn|etc".
+func SetLevel(level string) {
+	lvl := levelFromString(level)
+
+	logger.Level = lvl
+	setHandler(lvl, logger.Handler)
+}
+
+// SetLogFile configures logger to write output into file.
+// This call preserves current logging level.
+func SetLogFile(filename string) error {
+	handler, err := log.FileHandler(filename, log.TerminalFormat(false))
+	if err != nil {
+		return err
+	}
+
+	logger.Handler = handler
+	setHandler(logger.Level, handler)
+	return nil
+}
+
+func levelFromString(level string) log.Lvl {
+	lvl, err := log.LvlFromString(strings.ToLower(level))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Incorrect log level: %s, using defaults\n", level)
+		lvl = log.LvlInfo
+	}
+	return lvl
+}
+
+// setHandler is a helper that allows log (re)initialization
+// with different level and handler. Useful for testing.
+func setHandler(lvl log.Lvl, handler log.Handler) {
+	h := log.LvlFilterHandler(lvl, handler)
+	logger.SetHandler(h)
+	log.Root().SetHandler(h) // ethereum-go logger
+}
+
+// Trace is a package scope alias for logger.Trace
 func Trace(msg string, ctx ...interface{}) {
-	printLog(log.LvlTrace, msg, ctx...)
+	logger.Trace(msg, ctx...)
 }
 
-// Debug is a convenient alias for Root().Debug
+// Debug is a package scope for logger.Debug
 func Debug(msg string, ctx ...interface{}) {
-	printLog(log.LvlDebug, msg, ctx...)
+	logger.Debug(msg, ctx...)
 }
 
-// Info is a convenient alias for Root().Info
+// Info is a package scope for logger.Info
 func Info(msg string, ctx ...interface{}) {
-	printLog(log.LvlInfo, msg, ctx...)
+	logger.Info(msg, ctx...)
 }
 
-// Warn is a convenient alias for Root().Warn
+// Warn is a package scope for logger.Warn
 func Warn(msg string, ctx ...interface{}) {
-	printLog(log.LvlWarn, msg, ctx...)
+	logger.Warn(msg, ctx...)
 }
 
-// Error is a convenient alias for Root().Error
+// Error is a package scope for logger.Error
 func Error(msg string, ctx ...interface{}) {
-	printLog(log.LvlError, msg, ctx...)
+	logger.Error(msg, ctx...)
 }
 
-// Crit is a convenient alias for Root().Crit
+// Crit is a package scope for logger.Crit
 func Crit(msg string, ctx ...interface{}) {
-	printLog(log.LvlCrit, msg, ctx...)
-}
-
-// outputs the log to a given log config level
-func printLog(lvl log.Lvl, msg string, ctx ...interface{}) {
-	if logger == nil {
-		logger = &Logger{
-			output: log.New("geth", "StatusIM"),
-		}
-		logger.output.SetHandler(log.StdoutHandler)
-	}
-
-	switch lvl {
-
-	case log.LvlError:
-		logger.output.Error(msg, ctx...)
-
-	case log.LvlWarn:
-		logger.output.Warn(msg, ctx...)
-
-	case log.LvlInfo:
-		logger.output.Info(msg, ctx...)
-
-	case log.LvlDebug:
-		logger.output.Debug(msg, ctx...)
-
-	case log.LvlTrace:
-		logger.output.Trace(msg, ctx...)
-
-	default:
-		logger.output.Info(msg, ctx...)
-
-	}
+	logger.Crit(msg, ctx...)
 }

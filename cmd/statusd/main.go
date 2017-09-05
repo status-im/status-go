@@ -85,8 +85,15 @@ var (
 	// LogLevelFlag defines a log reporting level
 	LogLevelFlag = cli.StringFlag{
 		Name:  "log",
-		Usage: `Log level, one of: ""ERROR", "WARNING", "INFO", "DEBUG", and "TRACE"`,
-		Value: "INFO",
+		Usage: `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`,
+		Value: "",
+	}
+
+	// LogFileFlag defines a log filename
+	LogFileFlag = cli.StringFlag{
+		Name:  "logfile",
+		Usage: `Path to the log file`,
+		Value: "",
 	}
 )
 
@@ -106,6 +113,7 @@ func init() {
 		DataDirFlag,
 		NetworkIDFlag,
 		LogLevelFlag,
+		LogFileFlag,
 	}
 	app.Before = func(ctx *cli.Context) error {
 		runtime.GOMAXPROCS(runtime.NumCPU())
@@ -150,9 +158,11 @@ func makeNodeConfig(ctx *cli.Context) (*params.NodeConfig, error) {
 
 	nodeConfig.NodeKeyFile = ctx.GlobalString(NodeKeyFileFlag.Name)
 
-	if logLevel := ctx.GlobalString(LogLevelFlag.Name); len(logLevel) > 0 {
-		nodeConfig.LogEnabled = true
+	if logLevel := ctx.GlobalString(LogLevelFlag.Name); logLevel != "" {
 		nodeConfig.LogLevel = logLevel
+	}
+	if logFile := ctx.GlobalString(LogFileFlag.Name); logFile != "" {
+		nodeConfig.LogFile = logFile
 	}
 
 	return nodeConfig, nil

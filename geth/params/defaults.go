@@ -29,6 +29,9 @@ const (
 	// WSHost is a host interface for the websocket RPC server
 	WSHost = "localhost"
 
+	// SendTransactionMethodName defines the name for a giving transaction.
+	SendTransactionMethodName = "eth_sendTransaction"
+
 	// WSPort is a WS-RPC port (replaced in unit tests)
 	WSPort = 8546
 
@@ -48,19 +51,11 @@ const (
 	// DatabaseCache is memory (in MBs) allocated to internal caching (min 16MB / database forced)
 	DatabaseCache = 16
 
-	// CHTRootConfigURL defines URL to file containing hard-coded CHT roots
-	// TODO remove this hack, once CHT sync is implemented on LES side
-	CHTRootConfigURL = "https://gist.githubusercontent.com/tiabc/83ed515fbb0c0e9d39700a6279072b6a/raw/a8c7b08488fab3c1d9139b18af33da3df823e3ff/cht.json"
-
-	// BootClusterConfigURL defines URL to file containing hard-coded CHT roots and boot nodes
-	// TODO remove this hack, once CHT sync is implemented on LES side
-	BootClusterConfigURL = "https://gist.githubusercontent.com/tiabc/83ed515fbb0c0e9d39700a6279072b6a/raw/a8c7b08488fab3c1d9139b18af33da3df823e3ff/cht.json"
-
 	// LogFile defines where to write logs to
-	LogFile = "geth.log"
+	LogFile = ""
 
 	// LogLevel defines the minimum log level to report
-	LogLevel = "INFO"
+	LogLevel = "ERROR"
 
 	// LogLevelSuccinct defines the log level when only errors are reported.
 	// Useful when the default INFO level becomes too verbose.
@@ -83,6 +78,18 @@ const (
 
 	// FirebaseNotificationTriggerURL is URL where FCM notification requests are sent to
 	FirebaseNotificationTriggerURL = "https://fcm.googleapis.com/fcm/send"
+
+	// UpstreamMainNetEthereumNetworkURL is URL where the upstream ethereum network is loaded to
+	// allow us avoid syncing node.
+	UpstreamMainNetEthereumNetworkURL = "https://mainnet.infura.io/nKmXgiFgc2KqtoQ8BCGJ"
+
+	// UpstreamRopstenEthereumNetworkURL is URL where the upstream ethereum network is loaded to
+	// allow us avoid syncing node.
+	UpstreamRopstenEthereumNetworkURL = "https://ropsten.infura.io/nKmXgiFgc2KqtoQ8BCGJ"
+
+	// UpstreamRinkebyEthereumNetworkURL is URL where the upstream ethereum network is loaded to
+	// allow us avoid syncing node.
+	UpstreamRinkebyEthereumNetworkURL = "https://rinkeby.infura.io/nKmXgiFgc2KqtoQ8BCGJ"
 
 	// MainNetworkID is id of the main network
 	MainNetworkID = 1

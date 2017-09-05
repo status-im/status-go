@@ -34,24 +34,30 @@ type JailTestSuite struct {
 }
 
 func (s *JailTestSuite) SetupTest() {
-	s.NodeManager = node.NewNodeManager()
-	s.Require().NotNil(s.NodeManager)
-	s.Require().IsType(&node.NodeManager{}, s.NodeManager)
-	s.jail = jail.New(s.NodeManager)
-	s.Require().NotNil(s.jail)
-	s.Require().IsType(&jail.Jail{}, s.jail)
+	require := s.Require()
+
+	nodeManager := node.NewNodeManager()
+	require.NotNil(nodeManager)
+
+	accountManager := node.NewAccountManager(nodeManager)
+	require.NotNil(accountManager)
+
+	jail := jail.New(nodeManager, accountManager, nil)
+	require.NotNil(jail)
+
+	s.jail = jail
+	s.NodeManager = nodeManager
 }
 
 func (s *JailTestSuite) TestInit() {
 	require := s.Require()
-	require.NotNil(s.jail)
 
 	errorWrapper := func(err error) string {
 		return `{"error":"` + err.Error() + `"}`
 	}
 
 	// get cell VM w/o defining cell first
-	cell, err := s.jail.GetCell(testChatID)
+	cell, err := s.jail.Cell(testChatID)
 	require.EqualError(err, "cell[testChat] doesn't exist")
 	require.Nil(cell)
 
@@ -62,7 +68,7 @@ func (s *JailTestSuite) TestInit() {
 	require.Equal(errorWrapper(err), s.jail.Call(testChatID, `["commands", "testCommand"]`, `{"val": 12}`))
 
 	// get existing cell (even though we got errors, cell was still created)
-	cell, err = s.jail.GetCell(testChatID)
+	cell, err = s.jail.Cell(testChatID)
 	require.NoError(err)
 	require.NotNil(cell)
 
@@ -85,7 +91,6 @@ func (s *JailTestSuite) TestInit() {
 
 func (s *JailTestSuite) TestParse() {
 	require := s.Require()
-	require.NotNil(s.jail)
 
 	extraCode := `
 	var _status_catalog = {
@@ -99,7 +104,6 @@ func (s *JailTestSuite) TestParse() {
 
 func (s *JailTestSuite) TestFunctionCall() {
 	require := s.Require()
-	require.NotNil(s.jail)
 
 	// load Status JS and add test command to it
 	statusJS := baseStatusJSCode + `;
@@ -151,7 +155,6 @@ func (s *JailTestSuite) TestJailRPCAsyncSend() {
 
 func (s *JailTestSuite) TestJailRPCSend() {
 	require := s.Require()
-	require.NotNil(s.jail)
 
 	s.StartTestNode(params.RopstenNetworkID)
 	defer s.StopTestNode()
@@ -161,7 +164,7 @@ func (s *JailTestSuite) TestJailRPCSend() {
 	s.jail.Parse(testChatID, ``)
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
-	cell, err := s.jail.GetCell(testChatID)
+	cell, err := s.jail.Cell(testChatID)
 	require.NoError(err)
 	require.NotNil(cell)
 
@@ -185,16 +188,14 @@ func (s *JailTestSuite) TestJailRPCSend() {
 
 func (s *JailTestSuite) TestIsConnected() {
 	require := s.Require()
-	require.NotNil(s.jail)
 
-	// TODO(tiabc): Is this required?
 	s.StartTestNode(params.RopstenNetworkID)
 	defer s.StopTestNode()
 
 	s.jail.Parse(testChatID, "")
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
-	cell, err := s.jail.GetCell(testChatID)
+	cell, err := s.jail.Cell(testChatID)
 	require.NoError(err)
 
 	_, err = cell.Run(`
@@ -215,12 +216,11 @@ func (s *JailTestSuite) TestIsConnected() {
 
 func (s *JailTestSuite) TestLocalStorageSet() {
 	require := s.Require()
-	require.NotNil(s.jail)
 
 	s.jail.Parse(testChatID, "")
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
-	cell, err := s.jail.GetCell(testChatID)
+	cell, err := s.jail.Cell(testChatID)
 	require.NoError(err)
 
 	testData := "foobar"
@@ -259,15 +259,15 @@ func (s *JailTestSuite) TestLocalStorageSet() {
 	case <-opCompletedSuccessfully:
 		// pass
 	case <-time.After(3 * time.Second):
-		s.Fail("operation timed out")
+		require.Fail("operation timed out")
 	}
 
 	responseValue, err := cell.Get("responseValue")
-	s.NoError(err, "cannot obtain result of localStorage.set()")
+	require.NoError(err, "cannot obtain result of localStorage.set()")
 
 	response, err := responseValue.ToString()
-	s.NoError(err, "cannot parse result")
+	require.NoError(err, "cannot parse result")
 
 	expectedResponse := `{"jsonrpc":"2.0","result":true}`
-	s.Equal(expectedResponse, response)
+	require.Equal(expectedResponse, response)
 }

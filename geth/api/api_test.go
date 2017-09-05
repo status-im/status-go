@@ -40,16 +40,11 @@ func (s *APITestSuite) TestCHTUpdate() {
 	require.NoError(err)
 	defer os.RemoveAll(tmpDir)
 
-	url := "https://gist.githubusercontent.com/tiabc/83ed515fbb0c0e9d39700a6279072b6a/raw/a8c7b08488fab3c1d9139b18af33da3df823e3ff/cht.json?u=" + strconv.Itoa(int(time.Now().Unix()))
 	configJSON := `{
 		"NetworkId": ` + strconv.Itoa(params.RopstenNetworkID) + `,
 		"DataDir": "` + tmpDir + `",
-		"LogEnabled": true,
 		"LogLevel": "INFO",
-		"RPCEnabled": true,
-		"LightEthConfig": {
-			"CHTRootConfigURL": "` + url + `"
-		}
+		"RPCEnabled": true
 	}`
 	//nodeConfig, err := params.LoadNodeConfig(configJSON)
 	_, err = params.LoadNodeConfig(configJSON)

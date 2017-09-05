@@ -6,13 +6,10 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/static"
-
-	"fknsrs.biz/p/ottoext/loop"
 )
 
 // FIXME(tiabc): Get rid of this global variable. Move it to a constructor or initialization.
@@ -28,16 +25,25 @@ var (
 type Jail struct {
 	// FIXME(tiabc): This mutex handles cells field access and must be renamed appropriately: cellsMutex
 	sync.RWMutex
-	requestManager *RequestManager
-	cells          map[string]*JailCell // jail supports running many isolated instances of jailed runtime
-	baseJSCode     string               // JavaScript used to initialize all new cells with
+	nodeManager    common.NodeManager
+	accountManager common.AccountManager
+	txQueueManager common.TxQueueManager
+	policy         *ExecutionPolicy
+	cells          map[string]*Cell // jail supports running many isolated instances of jailed runtime
+	baseJSCode     string           // JavaScript used to initialize all new cells with
 }
 
-// New returns new Jail environment.
-func New(nodeManager common.NodeManager) *Jail {
+// New returns new Jail environment with the associated NodeManager and
+// AccountManager.
+func New(
+	nodeManager common.NodeManager, accountManager common.AccountManager, txQueueManager common.TxQueueManager,
+) *Jail {
 	return &Jail{
-		cells:          make(map[string]*JailCell),
-		requestManager: NewRequestManager(nodeManager),
+		nodeManager:    nodeManager,
+		accountManager: accountManager,
+		txQueueManager: txQueueManager,
+		cells:          make(map[string]*Cell),
+		policy:         NewExecutionPolicy(nodeManager, accountManager, txQueueManager),
 	}
 }
 
@@ -46,33 +52,28 @@ func (jail *Jail) BaseJS(js string) {
 	jail.baseJSCode = js
 }
 
-// NewJailCell initializes and returns jail cell.
-func (jail *Jail) NewJailCell(id string) (common.JailCell, error) {
+// NewCell initializes and returns a new jail cell.
+func (jail *Jail) NewCell(chatID string) (common.JailCell, error) {
 	if jail == nil {
 		return nil, ErrInvalidJail
 	}
 
 	vm := otto.New()
 
-	newJail, err := newJailCell(id, vm, loop.New(vm))
+	cell, err := newCell(chatID, vm)
 	if err != nil {
 		return nil, err
 	}
 
 	jail.Lock()
-	jail.cells[id] = newJail
+	jail.cells[chatID] = cell
 	jail.Unlock()
 
-	return newJail, nil
+	return cell, nil
 }
 
-// GetJailCell returns the associated *JailCell for the provided chatID.
-func (jail *Jail) GetJailCell(chatID string) (common.JailCell, error) {
-	return jail.GetCell(chatID)
-}
-
-// GetCell returns the associated *JailCell for the provided chatID.
-func (jail *Jail) GetCell(chatID string) (*JailCell, error) {
+// Cell returns the existing instance of Cell.
+func (jail *Jail) Cell(chatID string) (common.JailCell, error) {
 	jail.RLock()
 	defer jail.RUnlock()
 
@@ -86,41 +87,33 @@ func (jail *Jail) GetCell(chatID string) (*JailCell, error) {
 
 // Parse creates a new jail cell context, with the given chatID as identifier.
 // New context executes provided JavaScript code, right after the initialization.
-func (jail *Jail) Parse(chatID string, js string) string {
+func (jail *Jail) Parse(chatID, js string) string {
 	if jail == nil {
 		return makeError(ErrInvalidJail.Error())
 	}
 
-	var err error
-	var jcell *JailCell
-
-	if jcell, err = jail.GetCell(chatID); err != nil {
-		if _, mkerr := jail.NewJailCell(chatID); mkerr != nil {
+	cell, err := jail.Cell(chatID)
+	if err != nil {
+		if _, mkerr := jail.NewCell(chatID); mkerr != nil {
 			return makeError(mkerr.Error())
 		}
 
-		jcell, _ = jail.GetCell(chatID)
+		cell, _ = jail.Cell(chatID)
 	}
 
 	// init jeth and its handlers
-	if err = jcell.Set("jeth", struct{}{}); err != nil {
+	if err = cell.Set("jeth", struct{}{}); err != nil {
 		return makeError(err.Error())
 	}
 
-	if err = registerHandlers(jail, jcell, chatID); err != nil {
+	if err = registerHandlers(jail, cell, chatID); err != nil {
 		return makeError(err.Error())
 	}
 
 	initJs := jail.baseJSCode + ";"
-	if _, err = jcell.Run(initJs); err != nil {
+	if _, err = cell.Run(initJs); err != nil {
 		return makeError(err.Error())
 	}
-
-	// sendMessage/showSuggestions handlers
-	jcell.Set("statusSignals", struct{}{})
-	statusSignals, _ := jcell.Get("statusSignals")
-	statusSignals.Object().Set("sendMessage", makeSendMessageHandler(chatID))
-	statusSignals.Object().Set("showSuggestions", makeShowSuggestionsHandler(chatID))
 
 	jjs := string(web3JSCode) + `
 	var Web3 = require('web3');
@@ -130,11 +123,11 @@ func (jail *Jail) Parse(chatID string, js string) string {
             return new Bignumber(val);
         }
 	` + js + "; var catalog = JSON.stringify(_status_catalog);"
-	if _, err = jcell.Run(jjs); err != nil {
+	if _, err = cell.Run(jjs); err != nil {
 		return makeError(err.Error())
 	}
 
-	res, err := jcell.Get("catalog")
+	res, err := cell.Get("catalog")
 	if err != nil {
 		return makeError(err.Error())
 	}
@@ -143,23 +136,13 @@ func (jail *Jail) Parse(chatID string, js string) string {
 }
 
 // Call executes the `call` function w/i a jail cell context identified by the chatID.
-// Jail cell is clonned before call is executed i.e. all calls execute w/i their own contexts.
-func (jail *Jail) Call(chatID string, path string, args string) string {
-	jcell, err := jail.GetCell(chatID)
+func (jail *Jail) Call(chatID, this, args string) string {
+	cell, err := jail.Cell(chatID)
 	if err != nil {
 		return makeError(err.Error())
 	}
 
-	res, err := jcell.Call("call", nil, path, args)
-
-	// WARNING(influx6): We can have go-routine leakage due to continous call to this method
-	// and the call to cell.CellLoop().Run() due to improper usage, let's keep this
-	// in sight if things ever go wrong here.
-	// Due to the new event loop provided by ottoext.
-	// We need to ensure that all possible calls to internal setIntervals/SetTimeouts/SetImmediate
-	// work by lunching the loop.Run() method.
-	// Needs to be done in a go-routine.
-	go jcell.lo.Run()
+	res, err := cell.Call("call", nil, this, args)
 
 	return makeResult(res.String(), err)
 }
@@ -167,91 +150,46 @@ func (jail *Jail) Call(chatID string, path string, args string) string {
 // Send will serialize the first argument, send it to the node and returns the response.
 // nolint: errcheck, unparam
 func (jail *Jail) Send(call otto.FunctionCall) (response otto.Value) {
-	client, err := jail.requestManager.RPCClient()
-	if err != nil {
-		return newErrorResponse(call.Otto, -32603, err.Error(), nil)
-	}
-
 	// Remarshal the request into a Go value.
 	JSON, _ := call.Otto.Object("JSON")
 	reqVal, err := JSON.Call("stringify", call.Argument(0))
 	if err != nil {
 		throwJSException(err.Error())
 	}
+
 	var (
 		rawReq = []byte(reqVal.String())
-		reqs   []RPCCall
+		reqs   []common.RPCCall
 		batch  bool
 	)
+
 	if rawReq[0] == '[' {
 		batch = true
 		json.Unmarshal(rawReq, &reqs)
 	} else {
 		batch = false
-		reqs = make([]RPCCall, 1)
+		reqs = make([]common.RPCCall, 1)
 		json.Unmarshal(rawReq, &reqs[0])
 	}
 
-	// Execute the requests.
 	resps, _ := call.Otto.Object("new Array()")
+
+	// Execute the requests.
 	for _, req := range reqs {
-		resp, _ := call.Otto.Object(`({"jsonrpc":"2.0"})`)
-		resp.Set("id", req.ID)
-		var result json.RawMessage
+		log.Info("executing a request via jail.policy", "method", req.Method, "params", req.Params)
+		res, err := jail.policy.Execute(req, call)
+		log.Info("response from the request", "err", err)
 
-		// execute directly w/o RPC call to node
-		if req.Method == SendTransactionRequest {
-			txHash, err := jail.requestManager.ProcessSendTransactionRequest(call.Otto, req)
-			resp.Set("result", txHash.Hex())
-			if err != nil {
-				resp = newErrorResponse(call.Otto, -32603, err.Error(), &req.ID).Object()
-			}
-			resps.Call("push", resp)
-			continue
-		}
-
-		// do extra request pre processing (persist message id)
-		// within function semaphore will be acquired and released,
-		// so that no more than one client (per cell) can enter
-		messageID, err := jail.requestManager.PreProcessRequest(call.Otto, req)
 		if err != nil {
-			return newErrorResponse(call.Otto, -32603, err.Error(), nil)
-		}
-
-		errc := make(chan error, 1)
-		errc2 := make(chan error)
-		go func() {
-			errc2 <- <-errc
-		}()
-		errc <- client.Call(&result, req.Method, req.Params...)
-		err = <-errc2
-
-		switch err := err.(type) {
-		case nil:
-			if result == nil {
-				// Special case null because it is decoded as an empty
-				// raw message for some reason.
-				resp.Set("result", otto.NullValue())
-			} else {
-				resultVal, callErr := JSON.Call("parse", string(result))
-				if callErr != nil {
-					resp = newErrorResponse(call.Otto, -32603, callErr.Error(), &req.ID).Object()
-				} else {
-					resp.Set("result", resultVal)
-				}
+			switch err.(type) {
+			case common.StopRPCCallError:
+				return newErrorResponse(call.Otto, -32603, err.Error(), nil)
+			default:
+				res = newErrorResponse(call.Otto, -32603, err.Error(), &req.ID).Object()
 			}
-		case rpc.Error:
-			resp.Set("error", map[string]interface{}{
-				"code":    err.ErrorCode(),
-				"message": err.Error(),
-			})
-		default:
-			resp = newErrorResponse(call.Otto, -32603, err.Error(), &req.ID).Object()
 		}
-		resps.Call("push", resp)
 
-		// do extra request post processing (setting back tx context)
-		jail.requestManager.PostProcessRequest(call.Otto, req, messageID)
+		resps.Call("push", res)
 	}
 
 	// Return the responses either to the callback (if supplied)
@@ -261,18 +199,22 @@ func (jail *Jail) Send(call otto.FunctionCall) (response otto.Value) {
 	} else {
 		response, _ = resps.Get("0")
 	}
+
 	if fn := call.Argument(1); fn.Class() == "Function" {
 		fn.Call(otto.NullValue(), otto.NullValue(), response)
 		return otto.UndefinedValue()
 	}
+
 	return response
 }
 
-func newErrorResponse(otto *otto.Otto, code int, msg string, id interface{}) otto.Value {
+//==========================================================================================================
+
+func newErrorResponse(vm *otto.Otto, code int, msg string, id interface{}) otto.Value {
 	// Bundle the error into a JSON RPC call response
 	m := map[string]interface{}{"jsonrpc": "2.0", "id": id, "error": map[string]interface{}{"code": code, msg: msg}}
 	res, _ := json.Marshal(m)
-	val, _ := otto.Run("(" + string(res) + ")")
+	val, _ := vm.Run("(" + string(res) + ")")
 	return val
 }
 

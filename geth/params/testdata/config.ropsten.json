@@ -18,10 +18,13 @@
     "TLSEnabled": false,
     "MaxPeers": 25,
     "MaxPendingPeers": 0,
-    "LogEnabled": false,
-    "LogFile": "geth.log",
-    "LogLevel": "INFO",
+    "LogFile": "",
+    "LogLevel": "ERROR",
     "LogToStderr": true,
+    "UpstreamConfig": {
+        "Enabled": false,
+        "URL": "https://ropsten.infura.io/nKmXgiFgc2KqtoQ8BCGJ"
+    },
     "BootClusterConfig": {
         "Enabled": true,
         "RootNumber": 259,

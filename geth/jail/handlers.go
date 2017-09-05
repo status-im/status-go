@@ -4,6 +4,7 @@ import (
 	"os"
 
 	"github.com/robertkrimen/otto"
+	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/jail/console"
 	"github.com/status-im/status-go/geth/node"
 )
@@ -20,7 +21,7 @@ const (
 
 // registerHandlers augments and transforms a given jail cell's underlying VM,
 // by adding and replacing method handlers.
-func registerHandlers(jail *Jail, cell *JailCell, chatID string) error {
+func registerHandlers(jail *Jail, cell common.JailCell, chatID string) error {
 	jeth, err := cell.Get("jeth")
 	if err != nil {
 		return err
@@ -70,18 +71,14 @@ func registerHandlers(jail *Jail, cell *JailCell, chatID string) error {
 	if err = cell.Set("statusSignals", struct{}{}); err != nil {
 		return err
 	}
-
 	statusSignals, err := cell.Get("statusSignals")
 	if err != nil {
 		return err
 	}
-
 	registerHandler = statusSignals.Object().Set
-
 	if err = registerHandler("sendMessage", makeSendMessageHandler(chatID)); err != nil {
 		return err
 	}
-
 	if err = registerHandler("showSuggestions", makeShowSuggestionsHandler(chatID)); err != nil {
 		return err
 	}
@@ -111,7 +108,7 @@ func makeSendHandler(jail *Jail) func(call otto.FunctionCall) (response otto.Val
 // makeJethIsConnectedHandler returns jeth.isConnected() handler
 func makeJethIsConnectedHandler(jail *Jail) func(call otto.FunctionCall) (response otto.Value) {
 	return func(call otto.FunctionCall) otto.Value {
-		client, err := jail.requestManager.RPCClient()
+		client, err := jail.nodeManager.RPCClient()
 		if err != nil {
 			return newErrorResponse(call.Otto, -32603, err.Error(), nil)
 		}
