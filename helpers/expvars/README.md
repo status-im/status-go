@@ -47,7 +47,7 @@ Note: you may define new vars in any package, but it would be nice to keep all e
 # Monitoring
 Setting up the monitoring/metrics stack is too expensive for debug sessions or even impossible for mobile environment.
 
-There is a tool for easy zero-cost expvar monitoring, [expvarmon](https://github.com/divan/expvarmon). Here is an example output for `statusd`:
+There is a tool for easy zero-conf expvar monitoring, [expvarmon](https://github.com/divan/expvarmon). Here is an example output for `statusd`:
 
 ![](https://i.imgur.com/oz11bmT.png)
 
