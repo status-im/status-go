@@ -108,41 +108,40 @@ func (s *JailTestSuite) TestJailLoopInCall() {
 	}
 }
 
+// TestJailLoopRace tests multiple setTimeout callbacks,
+// supposed to be run with '-race' flag.
 func (s *JailTestSuite) TestJailLoopRace() {
 	require := s.Require()
-	require.NotNil(s.jail)
 
 	cell, err := s.jail.NewCell(testChatID)
 	require.NoError(err)
 	require.NotNil(cell)
 
-	items := make(chan string)
+	items := make(chan struct{})
 
-	err = cell.Set("__captureResponse", func(val string) otto.Value {
-		go func() { items <- val }()
+	err = cell.Set("__captureResponse", func() otto.Value {
+		go func() { items <- struct{}{} }()
 		return otto.UndefinedValue()
 	})
 	require.NoError(err)
 
 	_, err = cell.Run(`
-		function callRunner(namespace){
+		function callRunner(){
 			return setTimeout(function(){
-				__captureResponse(namespace);
+				__captureResponse();
 			}, 1000);
 		}
 	`)
 	require.NoError(err)
 
 	for i := 0; i < 100; i++ {
-		_, err = cell.Call("callRunner", nil, "softball")
+		_, err = cell.Call("callRunner", nil)
 		require.NoError(err)
 	}
 
 	for i := 0; i < 100; i++ {
 		select {
-		case received := <-items:
-			require.Equal(received, "softball")
-			break
+		case <-items:
 		case <-time.After(5 * time.Second):
 			require.Fail("test timed out")
 		}
@@ -158,7 +157,6 @@ func (s *JailTestSuite) TestJailFetchPromise() {
 	defer server.Close()
 
 	require := s.Require()
-	require.NotNil(s.jail)
 
 	cell, err := s.jail.NewCell(testChatID)
 	require.NoError(err)
@@ -195,7 +193,6 @@ func (s *JailTestSuite) TestJailFetchPromise() {
 
 func (s *JailTestSuite) TestJailFetchCatch() {
 	require := s.Require()
-	require.NotNil(s.jail)
 
 	cell, err := s.jail.NewCell(testChatID)
 	require.NoError(err)
@@ -234,6 +231,8 @@ func (s *JailTestSuite) TestJailFetchCatch() {
 	}
 }
 
+// TestJailFetchRace tests multiple fetch callbacks,
+// supposed to be run with '-race' flag.
 func (s *JailTestSuite) TestJailFetchRace() {
 	body := `{"key": "value"}`
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -242,7 +241,6 @@ func (s *JailTestSuite) TestJailFetchRace() {
 	}))
 	defer server.Close()
 	require := s.Require()
-	require.NotNil(s.jail)
 
 	cell, err := s.jail.NewCell(testChatID)
 	require.NoError(err)

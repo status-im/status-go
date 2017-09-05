@@ -79,6 +79,7 @@ it's user responsibility to register a corresponding callback function before:
 	cell.Run(`fetch('http://example.com').then(function(r) {
 		return r.text()
 	}).then(function(data) {
+		// user code
 		__captureSuccess(data)
 	}))
 

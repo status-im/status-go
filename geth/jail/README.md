@@ -93,5 +93,6 @@ function before:
     cell.Run(`fetch('http://example.com').then(function(r) {
     	return r.text()
     }).then(function(data) {
+    	// user code
     	__captureSuccess(data)
     }))
