@@ -86,7 +86,7 @@ func (c *FirebaseConfig) ReadAuthorizationKeyFile() (string, error) {
 	if len(key) == 0 {
 		return "", ErrEmptyAuthorizationKeyFile
 	}
-	return string(key[:]), nil
+	return string(key), nil
 }
 
 // WhisperConfig holds SHH-related configuration
