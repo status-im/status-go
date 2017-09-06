@@ -213,7 +213,6 @@ func (s *LightEthereum) Start(srvr *p2p.Server) error {
 	s.netRPCService = ethapi.NewPublicNetAPI(srvr, s.networkId)
 	s.serverPool.start(srvr, lesTopic(s.blockchain.Genesis().Hash()))
 	s.protocolManager.Start()
-	s.StatusBackend.Start()
 	return nil
 }
 
@@ -230,8 +229,6 @@ func (s *LightEthereum) Stop() error {
 	time.Sleep(time.Millisecond * 200)
 	s.chainDb.Close()
 	close(s.shutdownChan)
-
-	s.StatusBackend.Stop()
 
 	return nil
 }

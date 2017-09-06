@@ -43,7 +43,6 @@ func (s *APITestSuite) TestCHTUpdate() {
 	configJSON := `{
 		"NetworkId": ` + strconv.Itoa(params.RopstenNetworkID) + `,
 		"DataDir": "` + tmpDir + `",
-		"LogEnabled": true,
 		"LogLevel": "INFO",
 		"RPCEnabled": true
 	}`

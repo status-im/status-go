@@ -2,9 +2,11 @@ package log
 
 import (
 	"bytes"
+	"io/ioutil"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -44,8 +46,28 @@ func TestLogLevels(t *testing.T) {
 		Warn(warn)
 		Error(err)
 
-		if buf.String() != test.out {
-			t.Errorf("Expecting log output to be '%s', got '%s'", test.out, buf.String())
-		}
+		require.Equal(t, test.out, buf.String())
 	}
+}
+
+func TestLogFile(t *testing.T) {
+	file, err := ioutil.TempFile("", "statusim_log_test")
+	require.NoError(t, err)
+
+	defer file.Close()
+
+	// setup log
+	SetLevel("INFO")
+	SetLogFile(file.Name())
+
+	// test log output to file
+	Info(info)
+	Debug(debug)
+
+	data, err := ioutil.ReadAll(file)
+	require.NoError(t, err)
+
+	got := string(data)
+	require.Contains(t, got, info)
+	require.NotContains(t, got, debug)
 }

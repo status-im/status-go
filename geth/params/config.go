@@ -287,9 +287,6 @@ type NodeConfig struct {
 	// handshake phase, counted separately for inbound and outbound connections.
 	MaxPendingPeers int
 
-	// LogToFile specified whether logs should be saved into file
-	LogEnabled bool
-
 	// LogFile is filename where exposed logs get written to
 	LogFile string
 

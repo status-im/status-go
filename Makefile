@@ -46,13 +46,14 @@ statusgo-ios-simulator-mainnet: xgo
 	build/env.sh $(GOBIN)/xgo --image farazdagi/xgo-ios-simulator --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v $(shell build/mainnet-flags.sh) ./cmd/statusd
 	@echo "iOS framework cross compilation done (mainnet)."
 
-ci:
+ci: mock
 	build/env.sh go test -timeout 40m -v ./geth/api
 	build/env.sh go test -timeout 40m -v ./geth/common
 	build/env.sh go test -timeout 40m -v ./geth/jail
 	build/env.sh go test -timeout 40m -v ./geth/node
 	build/env.sh go test -timeout 40m -v ./geth/params
 	build/env.sh go test -timeout 40m -v ./extkeys
+	build/env.sh go test -timeout 1m -v ./helpers/...
 
 generate:
 	cp ./node_modules/web3/dist/web3.js ./static/scripts/web3.js
@@ -109,6 +110,12 @@ lint:
 	@gometalinter --disable-all --enable=structcheck extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
 	@echo "Linter: gosimple\n--------------------"
 	@gometalinter --disable-all --deadline 45s --enable=gosimple extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
+
+mock-install:
+	go get -u github.com/golang/mock/mockgen
+
+mock: mock-install
+	mockgen -source=geth/common/types.go -destination=geth/common/types_mock.go -package=common
 
 test:
 	@build/env.sh echo "mode: set" > coverage-all.out
