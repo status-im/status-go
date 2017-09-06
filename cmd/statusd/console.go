@@ -40,6 +40,10 @@ var (
 		"InitJail":              InitJail,
 		"Parse":                 Parse,
 		"Call":                  Call,
+		"StartNodeWithConfig": func(datadir *C.char, networkID C.int, devMode C.int) *C.char {
+			config := GenerateConfig(datadir, networkID, devMode)
+			return StartNode(config)
+		},
 	}
 
 	typeCCharPtr = reflect.TypeOf((*C.char)(nil))
@@ -49,7 +53,7 @@ var (
 // consoleCommandHandler handles statusd console command.
 func consoleCommandHandler(ctx *cli.Context) error {
 	var autocomplete []string
-	for k, _ := range bindings {
+	for k := range bindings {
 		autocomplete = append(autocomplete, k)
 	}
 
