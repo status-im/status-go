@@ -13,16 +13,12 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-//==================================================================================================
-
 type txRequest struct {
 	Method  string          `json:"method"`
 	Version string          `json:"jsonrpc"`
 	ID      int             `json:"id,omitempty"`
 	Payload json.RawMessage `json:"params,omitempty"`
 }
-
-//==================================================================================================
 
 type service struct {
 	Handler http.HandlerFunc
@@ -31,8 +27,6 @@ type service struct {
 func (s service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.Handler(w, r)
 }
-
-//==================================================================================================
 
 func TestRPCTestSuite(t *testing.T) {
 	suite.Run(t, new(RPCTestSuite))
@@ -60,12 +54,10 @@ func (s *RPCTestSuite) TestRPCSendTransaction() {
 			defer r.Body.Close()
 
 			var txReq txRequest
-
 			err := json.NewDecoder(r.Body).Decode(&txReq)
 			require.NoError(err)
 
-			switch txReq.Method {
-			case "eth_getTransactionCount":
+			if txReq.Method == "eth_getTransactionCount" {
 				w.WriteHeader(http.StatusOK)
 				w.Write([]byte(`{"jsonrpc": "2.0", "status":200, "result": "0x434"}`))
 				return
@@ -74,10 +66,8 @@ func (s *RPCTestSuite) TestRPCSendTransaction() {
 			payload := ([]byte)(txReq.Payload)
 
 			var bu []interface{}
-
 			jserr := json.Unmarshal(payload, &bu)
 			require.NoError(jserr)
-			require.NotNil(bu)
 			require.Len(bu, 1)
 			require.IsType(bu[0], (map[string]interface{})(nil))
 
