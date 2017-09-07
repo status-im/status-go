@@ -4,7 +4,7 @@ import (
 	"errors"
 
 	"github.com/robertkrimen/otto"
-	"github.com/status-im/ottoext/loop"
+	"github.com/status-im/status-go/geth/jail/ottoext/loop"
 	"github.com/status-im/status-go/geth/jail/vm"
 )
 

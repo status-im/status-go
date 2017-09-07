@@ -9,8 +9,8 @@ import (
 
 	"github.com/robertkrimen/otto"
 	"github.com/robertkrimen/otto/parser"
-	"github.com/status-im/ottoext/loop"
-	"github.com/status-im/ottoext/loop/looptask"
+	"github.com/status-im/status-go/geth/jail/ottoext/loop"
+	"github.com/status-im/status-go/geth/jail/ottoext/loop/looptask"
 	"gopkg.in/readline.v1"
 )
 

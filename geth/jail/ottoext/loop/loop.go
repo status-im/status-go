@@ -5,7 +5,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/status-im/status-go/geth/jail/vm"
+	"github.com/status-im/status-go/geth/jail/ottoext/vm"
 )
 
 func formatTask(t Task) string {

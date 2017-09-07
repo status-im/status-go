@@ -1,9 +1,9 @@
 package promise
 
 import (
-	"github.com/status-im/ottoext/loop"
-	"github.com/status-im/ottoext/timers"
-	"github.com/status-im/status-go/geth/jail/vm"
+	"github.com/status-im/status-go/geth/jail/ottoext/loop"
+	"github.com/status-im/status-go/geth/jail/ottoext/timers"
+	"github.com/status-im/status-go/geth/jail/ottoext/vm"
 )
 
 func Define(vm *vm.VM, l *loop.Loop) error {

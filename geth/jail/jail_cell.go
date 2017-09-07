@@ -2,10 +2,10 @@ package jail
 
 import (
 	"github.com/robertkrimen/otto"
-	"github.com/status-im/ottoext/fetch"
-	"github.com/status-im/ottoext/loop"
-	"github.com/status-im/ottoext/timers"
-	"github.com/status-im/status-go/geth/jail/vm"
+	"github.com/status-im/status-go/geth/jail/ottoext/fetch"
+	"github.com/status-im/status-go/geth/jail/ottoext/loop"
+	"github.com/status-im/status-go/geth/jail/ottoext/timers"
+	"github.com/status-im/status-go/geth/jail/ottoext/vm"
 )
 
 // Cell represents a single jail cell, which is basically a JavaScript VM.
