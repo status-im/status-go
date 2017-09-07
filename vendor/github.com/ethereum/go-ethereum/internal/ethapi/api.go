@@ -1180,7 +1180,7 @@ func submitTransaction(ctx context.Context, b Backend, tx *types.Transaction) (c
 	return tx.Hash(), nil
 }
 
-// CompleteQueuedTransaction creates a transaction by unpacking queued transaction, signs it and submits to the
+// SendTransaction creates a transaction by unpacking queued transaction, signs it and submits to the
 // transaction pool.
 func (s *PublicTransactionPoolAPI) SendTransaction(ctx context.Context, args SendTxArgs, passphrase string) (common.Hash, error) {
 	// Set some sanity defaults and terminate on failure
