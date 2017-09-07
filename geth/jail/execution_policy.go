@@ -11,6 +11,44 @@ import (
 	"github.com/status-im/status-go/geth/params"
 )
 
+// map of command routes
+var (
+	//TODO(influx6): Replace this with a registry of commands to functions that
+	// call appropriate op for command with ExecutionPolicy.
+	rpcLocalCommandRoute = map[string]bool{
+		//Whisper commands
+		"shh_post":             true,
+		"shh_version":          true,
+		"shh_newIdentity":      true,
+		"shh_hasIdentity":      true,
+		"shh_newGroup":         true,
+		"shh_addToGroup":       true,
+		"shh_newFilter":        true,
+		"shh_uninstallFilter":  true,
+		"shh_getFilterChanges": true,
+		"shh_getMessages":      true,
+
+		// DB commands
+		"db_putString": true,
+		"db_getString": true,
+		"db_putHex":    true,
+		"db_getHex":    true,
+
+		// Other commands
+		"net_version":   true,
+		"net_peerCount": true,
+		"net_listening": true,
+
+		// blockchain commands
+		"eth_sign":            true,
+		"eth_accounts":        true,
+		"eth_getCompilers":    true,
+		"eth_compileLLL":      true,
+		"eth_compileSolidity": true,
+		"eth_compileSerpent":  true,
+	}
+)
+
 // ExecutionPolicy provides a central container for the executions of RPCCall requests for both
 // remote/upstream processing and internal node processing.
 type ExecutionPolicy struct {
@@ -30,17 +68,55 @@ func NewExecutionPolicy(
 	}
 }
 
-// Execute handles a received RPC call.
+// Execute handles the execution of a RPC request and routes appropriately to either a local or remote ethereum node.
 func (ep *ExecutionPolicy) Execute(req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
-	switch req.Method {
-	case params.SendTransactionMethodName:
-		return ep.executeSendTransaction(req, call)
-	default:
-		return ep.executeOtherTransaction(req, call)
+	config, err := ep.nodeManager.NodeConfig()
+	if err != nil {
+		return nil, err
 	}
+
+	if config.UpstreamConfig.Enabled {
+		if rpcLocalCommandRoute[req.Method] {
+			return ep.ExecuteLocally(req, call)
+		}
+
+		return ep.ExecuteOnRemote(req, call)
+	}
+
+	return ep.ExecuteLocally(req, call)
 }
 
-// ExecuteSendTransaction defines a function to execute RPC requests for eth_sendTransaction method only.
+// ExecuteLocally defines a function which handles the processing of all RPC requests from the jail object
+// to be processed with the internal ethereum node server(light.LightEthereum).
+func (ep *ExecutionPolicy) ExecuteLocally(req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
+	if params.SendTransactionMethodName == req.Method {
+		return ep.executeSendTransaction(req, call)
+	}
+
+	client, err := ep.nodeManager.RPCLocalClient()
+	if err != nil {
+		return nil, common.StopRPCCallError{Err: err}
+	}
+
+	return ep.executeWithClient(client, req, call)
+}
+
+// ExecuteOnRemote defines a function which handles the processing of all RPC requests from the jail object
+// to be processed by a remote ethereum node server with responses returned as needed.
+func (ep *ExecutionPolicy) ExecuteOnRemote(req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
+	if params.SendTransactionMethodName == req.Method {
+		return ep.executeSendTransaction(req, call)
+	}
+
+	client, err := ep.nodeManager.RPCUpstreamClient()
+	if err != nil {
+		return nil, common.StopRPCCallError{Err: err}
+	}
+
+	return ep.executeWithClient(client, req, call)
+}
+
+// executeRemoteSendTransaction defines a function to execute RPC method eth_sendTransaction over the upstream server.
 func (ep *ExecutionPolicy) executeSendTransaction(req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
 	res, err := call.Otto.Object(`({"jsonrpc":"2.0"})`)
 	if err != nil {
@@ -57,6 +133,7 @@ func (ep *ExecutionPolicy) executeSendTransaction(req common.RPCCall, call otto.
 	// TODO(adam): check if context is used
 	ctx := context.WithValue(context.Background(), common.MessageIDKey, messageID)
 	args := sendTxArgsFromRPCCall(req)
+
 	tx := ep.txQueueManager.CreateTransaction(ctx, args)
 
 	if err := ep.txQueueManager.QueueTransaction(tx); err != nil {
@@ -77,14 +154,7 @@ func (ep *ExecutionPolicy) executeSendTransaction(req common.RPCCall, call otto.
 	return res, nil
 }
 
-// ExecuteOtherTransaction defines a function which handles the processing of non `eth_sendTransaction`
-// rpc request to the internal node server.
-func (ep *ExecutionPolicy) executeOtherTransaction(req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
-	client, err := ep.nodeManager.RPCClient()
-	if err != nil {
-		return nil, common.StopRPCCallError{Err: err}
-	}
-
+func (ep *ExecutionPolicy) executeWithClient(client *rpc.Client, req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
 	JSON, err := call.Otto.Object("JSON")
 	if err != nil {
 		return nil, err
