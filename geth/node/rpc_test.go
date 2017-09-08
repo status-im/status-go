@@ -1,7 +1,9 @@
 package node_test
 
 import (
+	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/status-im/status-go/geth/log"
@@ -10,6 +12,13 @@ import (
 	. "github.com/status-im/status-go/geth/testing"
 	"github.com/stretchr/testify/suite"
 )
+
+type txRequest struct {
+	Method  string          `json:"method"`
+	Version string          `json:"jsonrpc"`
+	ID      int             `json:"id,omitempty"`
+	Payload json.RawMessage `json:"params,omitempty"`
+}
 
 type service struct {
 	Handler http.HandlerFunc
@@ -32,8 +41,63 @@ func (s *RPCTestSuite) SetupTest() {
 
 	nodeManager := node.NewNodeManager()
 	require.NotNil(nodeManager)
-
 	s.NodeManager = nodeManager
+}
+
+func (s *RPCTestSuite) TestRPCSendTransaction() {
+	require := s.Require()
+	expectedResponse := []byte(`{"jsonrpc": "2.0", "status":200, "result": "3434=done"}`)
+
+	// httpRPCServer will serve as an upstream server accepting transactions.
+	httpRPCServer := httptest.NewServer(service{
+		Handler: func(w http.ResponseWriter, r *http.Request) {
+			defer r.Body.Close()
+
+			var txReq txRequest
+			err := json.NewDecoder(r.Body).Decode(&txReq)
+			require.NoError(err)
+
+			if txReq.Method == "eth_getTransactionCount" {
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte(`{"jsonrpc": "2.0", "status":200, "result": "0x434"}`))
+				return
+			}
+
+			payload := ([]byte)(txReq.Payload)
+
+			var bu []interface{}
+			jserr := json.Unmarshal(payload, &bu)
+			require.NoError(jserr)
+			require.Len(bu, 1)
+			require.IsType(bu[0], (map[string]interface{})(nil))
+
+			w.WriteHeader(http.StatusOK)
+			w.Write(expectedResponse)
+		},
+	})
+
+	s.StartTestNode(params.RopstenNetworkID, WithUpstream(httpRPCServer.URL))
+	defer s.StopTestNode()
+
+	rpcClient := node.NewRPCManager(s.NodeManager)
+	require.NotNil(rpcClient)
+
+	response := rpcClient.Call(`{
+		"jsonrpc": "2.0",
+		"id":10,
+		"method": "eth_sendTransaction",
+		"params": [{
+			"from":     "` + TestConfig.Account1.Address + `",
+			"to":       "` + TestConfig.Account2.Address + `",
+			"value":    "0x200",
+			"nonce":    "0x100",
+			"data":     "Will-power",
+			"gasPrice": "0x4a817c800",
+			"gasLimit": "0x5208",
+			"chainId":  3391
+		}]
+	}`)
+	require.Equal(response, string(expectedResponse))
 }
 
 func (s *RPCTestSuite) TestCallRPC() {

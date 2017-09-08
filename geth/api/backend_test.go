@@ -84,6 +84,10 @@ func (s *BackendTestSuite) LightEthereumService() *les.LightEthereum {
 	return lightEthereum
 }
 
+func (s *BackendTestSuite) TxQueueManager() common.TxQueueManager {
+	return s.backend.TxQueueManager()
+}
+
 func (s *BackendTestSuite) RestartTestNode() {
 	require := s.Require()
 	require.NotNil(s.backend)
@@ -146,6 +150,25 @@ func (s *BackendTestSuite) TestNodeStartStop() {
 
 	<-nodeStarted
 	require.True(s.backend.IsNodeRunning())
+}
+
+func (s *BackendTestSuite) TestStartNodeWithUpstreamEnabled(t *testing.T) {
+	require := s.Require()
+
+	backend := api.NewStatusBackend()
+	require.NotNil(t, backend)
+
+	nodeConfig, err := MakeTestNodeConfig(params.RopstenNetworkID)
+	require.NoError(err)
+
+	nodeConfig.UpstreamConfig.Enabled = true
+
+	nodeStarted, err := backend.StartNode(nodeConfig)
+	require.NoError(err)
+	defer backend.StopNode()
+
+	<-nodeStarted
+	require.True(backend.IsNodeRunning())
 }
 
 // FIXME(tiabc): There's also a test with the same name in geth/node/rpc_test.go
@@ -347,12 +370,14 @@ func (s *BackendTestSuite) TestRaceConditions() {
 		},
 		func(config *params.NodeConfig) {
 			log.Info("CompleteTransactions()")
-			s.T().Logf("CompleteTransactions(), result: %v", s.backend.CompleteTransactions(`["id1","id2"]`, "password"))
+			ids := []common.QueuedTxID{"id1", "id2"}
+			s.T().Logf("CompleteTransactions(), result: %v", s.backend.CompleteTransactions(ids, "password"))
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
 			log.Info("DiscardTransactions()")
-			s.T().Logf("DiscardTransactions(), result: %v", s.backend.DiscardTransactions(`["id1","id2"]`))
+			ids := []common.QueuedTxID{"id1", "id2"}
+			s.T().Logf("DiscardTransactions(), result: %v", s.backend.DiscardTransactions(ids))
 			progress <- struct{}{}
 		},
 	}

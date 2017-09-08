@@ -13,7 +13,6 @@ import (
 
 	"net/url"
 
-	"github.com/ethereum/go-ethereum/les/status"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
@@ -100,7 +99,7 @@ func (c *RPCManager) Call(inputJSON string) string {
 	select {
 	case out := <-outputJSON:
 		return out
-	case <-time.After((status.DefaultTxSendCompletionTimeout + 10) * time.Minute): // give up eventually
+	case <-time.After((DefaultTxSendCompletionTimeout + 10) * time.Minute): // give up eventually
 		// pass
 	}
 

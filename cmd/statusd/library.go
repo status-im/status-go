@@ -9,7 +9,9 @@ import (
 	"gopkg.in/go-playground/validator.v9"
 
 	"github.com/status-im/status-go/geth/common"
+	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/helpers/profiling"
 )
 
 //export GenerateConfig
@@ -212,7 +214,7 @@ func Logout() *C.char {
 
 //export CompleteTransaction
 func CompleteTransaction(id, password *C.char) *C.char {
-	txHash, err := statusAPI.CompleteTransaction(C.GoString(id), C.GoString(password))
+	txHash, err := statusAPI.CompleteTransaction(common.QueuedTxID(C.GoString(id)), C.GoString(password))
 
 	errString := ""
 	if err != nil {
@@ -225,7 +227,11 @@ func CompleteTransaction(id, password *C.char) *C.char {
 		Hash:  txHash.Hex(),
 		Error: errString,
 	}
-	outBytes, _ := json.Marshal(&out)
+	outBytes, err := json.Marshal(&out)
+	if err != nil {
+		log.Error("failed to marshal CompleteTransaction output", "error", err.Error())
+		return makeJSONResponse(err)
+	}
 
 	return C.CString(string(outBytes))
 }
@@ -235,25 +241,42 @@ func CompleteTransactions(ids, password *C.char) *C.char {
 	out := common.CompleteTransactionsResult{}
 	out.Results = make(map[string]common.CompleteTransactionResult)
 
-	results := statusAPI.CompleteTransactions(C.GoString(ids), C.GoString(password))
-	for txID, result := range results {
-		txResult := common.CompleteTransactionResult{
-			ID:   txID,
-			Hash: result.Hash.Hex(),
+	parsedIDs, err := common.ParseJSONArray(C.GoString(ids))
+	if err != nil {
+		out.Results["none"] = common.CompleteTransactionResult{
+			Error: err.Error(),
 		}
-		if result.Error != nil {
-			txResult.Error = result.Error.Error()
+	} else {
+		txIDs := make([]common.QueuedTxID, len(parsedIDs))
+		for i, id := range parsedIDs {
+			txIDs[i] = common.QueuedTxID(id)
 		}
-		out.Results[txID] = txResult
+
+		results := statusAPI.CompleteTransactions(txIDs, C.GoString(password))
+		for txID, result := range results {
+			txResult := common.CompleteTransactionResult{
+				ID:   string(txID),
+				Hash: result.Hash.Hex(),
+			}
+			if result.Error != nil {
+				txResult.Error = result.Error.Error()
+			}
+			out.Results[string(txID)] = txResult
+		}
 	}
-	outBytes, _ := json.Marshal(&out)
+
+	outBytes, err := json.Marshal(&out)
+	if err != nil {
+		log.Error("failed to marshal CompleteTransactions output", "error", err.Error())
+		return makeJSONResponse(err)
+	}
 
 	return C.CString(string(outBytes))
 }
 
 //export DiscardTransaction
 func DiscardTransaction(id *C.char) *C.char {
-	err := statusAPI.DiscardTransaction(C.GoString(id))
+	err := statusAPI.DiscardTransaction(common.QueuedTxID(C.GoString(id)))
 
 	errString := ""
 	if err != nil {
@@ -265,7 +288,11 @@ func DiscardTransaction(id *C.char) *C.char {
 		ID:    C.GoString(id),
 		Error: errString,
 	}
-	outBytes, _ := json.Marshal(&out)
+	outBytes, err := json.Marshal(&out)
+	if err != nil {
+		log.Error("failed to marshal DiscardTransaction output", "error", err.Error())
+		return makeJSONResponse(err)
+	}
 
 	return C.CString(string(outBytes))
 }
@@ -275,17 +302,34 @@ func DiscardTransactions(ids *C.char) *C.char {
 	out := common.DiscardTransactionsResult{}
 	out.Results = make(map[string]common.DiscardTransactionResult)
 
-	results := statusAPI.DiscardTransactions(C.GoString(ids))
-	for txID, result := range results {
-		txResult := common.DiscardTransactionResult{
-			ID: txID,
+	parsedIDs, err := common.ParseJSONArray(C.GoString(ids))
+	if err != nil {
+		out.Results["none"] = common.DiscardTransactionResult{
+			Error: err.Error(),
 		}
-		if result.Error != nil {
-			txResult.Error = result.Error.Error()
+	} else {
+		txIDs := make([]common.QueuedTxID, len(parsedIDs))
+		for i, id := range parsedIDs {
+			txIDs[i] = common.QueuedTxID(id)
 		}
-		out.Results[txID] = txResult
+
+		results := statusAPI.DiscardTransactions(txIDs)
+		for txID, result := range results {
+			txResult := common.DiscardTransactionResult{
+				ID: string(txID),
+			}
+			if result.Error != nil {
+				txResult.Error = result.Error.Error()
+			}
+			out.Results[string(txID)] = txResult
+		}
 	}
-	outBytes, _ := json.Marshal(&out)
+
+	outBytes, err := json.Marshal(&out)
+	if err != nil {
+		log.Error("failed to marshal DiscardTransactions output", "error", err.Error())
+		return makeJSONResponse(err)
+	}
 
 	return C.CString(string(outBytes))
 }
@@ -305,6 +349,24 @@ func Parse(chatID *C.char, js *C.char) *C.char {
 func Call(chatID *C.char, path *C.char, params *C.char) *C.char {
 	res := statusAPI.JailCall(C.GoString(chatID), C.GoString(path), C.GoString(params))
 	return C.CString(res)
+}
+
+//export StartCPUProfile
+func StartCPUProfile(dataDir *C.char) *C.char {
+	err := profiling.StartCPUProfile(C.GoString(dataDir))
+	return makeJSONResponse(err)
+}
+
+//export StopCPUProfiling
+func StopCPUProfiling() *C.char {
+	err := profiling.StopCPUProfile()
+	return makeJSONResponse(err)
+}
+
+//export WriteHeapProfile
+func WriteHeapProfile(dataDir *C.char) *C.char {
+	err := profiling.WriteHeapFile(C.GoString(dataDir))
+	return makeJSONResponse(err)
 }
 
 func makeJSONResponse(err error) *C.char {

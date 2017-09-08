@@ -52,10 +52,10 @@ const (
 	DatabaseCache = 16
 
 	// LogFile defines where to write logs to
-	LogFile = "geth.log"
+	LogFile = ""
 
 	// LogLevel defines the minimum log level to report
-	LogLevel = "INFO"
+	LogLevel = "ERROR"
 
 	// LogLevelSuccinct defines the log level when only errors are reported.
 	// Useful when the default INFO level becomes too verbose.
