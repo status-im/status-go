@@ -14,7 +14,7 @@ import (
 
 func (s *TimersSuite) TestSetTimeout() {
 	err := s.vm.Set("__capture", func() {
-		defer func() { s.ch <- struct{}{} }()
+		s.ch <- struct{}{}
 	})
 	s.NoError(err)
 
@@ -36,7 +36,7 @@ func (s *TimersSuite) TestSetTimeout() {
 
 func (s *TimersSuite) TestClearTimeout() {
 	err := s.vm.Set("__shouldNeverRun", func() {
-		defer func() { s.ch <- struct{}{} }()
+		s.Fail("should never run")
 	})
 	s.NoError(err)
 
@@ -45,16 +45,12 @@ func (s *TimersSuite) TestClearTimeout() {
 	}, 50));`)
 	s.NoError(err)
 
-	select {
-	case <-s.ch:
-		s.Fail("should never run")
-	case <-time.After(100 * time.Millisecond):
-	}
+	<-time.After(100 * time.Millisecond)
 }
 
 func (s *TimersSuite) TestSetInterval() {
 	err := s.vm.Set("__done", func() {
-		defer func() { s.ch <- struct{}{} }()
+		s.ch <- struct{}{}
 	})
 	s.NoError(err)
 
@@ -84,7 +80,7 @@ func (s *TimersSuite) TestSetInterval() {
 
 func (s *TimersSuite) TestClearIntervalImmediately() {
 	err := s.vm.Set("__shouldNeverRun", func() {
-		defer func() { s.ch <- struct{}{} }()
+		s.Fail("should never run")
 	})
 	s.NoError(err)
 
@@ -93,11 +89,7 @@ func (s *TimersSuite) TestClearIntervalImmediately() {
 	}, 50));`)
 	s.NoError(err)
 
-	select {
-	case <-s.ch:
-		s.Fail("should never run")
-	case <-time.After(100 * time.Millisecond):
-	}
+	<-time.After(100 * time.Millisecond)
 }
 
 type TimersSuite struct {

@@ -37,7 +37,6 @@ func (s *FetchSuite) TestFetch() {
 	case <-ch:
 	case <-time.After(1 * time.Second):
 		s.Fail("test timed out")
-		return
 	}
 }
 
@@ -51,9 +50,8 @@ func (s *FetchSuite) TestFetchCallback() {
 
 	ch := make(chan struct{})
 	err = s.vm.Set("__capture", func(str string) {
-		defer func() { ch <- struct{}{} }()
-
 		s.Contains(str, "hello")
+		ch <- struct{}{}
 	})
 	s.NoError(err)
 
@@ -66,7 +64,6 @@ func (s *FetchSuite) TestFetchCallback() {
 	case <-ch:
 	case <-time.After(1 * time.Second):
 		s.Fail("test timed out")
-		return
 	}
 }
 
@@ -84,9 +81,8 @@ func (s *FetchSuite) TestFetchHeaders() {
 
 	ch := make(chan struct{})
 	err = s.vm.Set("__capture", func(str string) {
-		defer func() { ch <- struct{}{} }()
-
 		s.Equal(str, `{"header-one":["1"],"header-two":["2a","2b"]}`)
+		ch <- struct{}{}
 	})
 	s.NoError(err)
 
@@ -102,7 +98,6 @@ func (s *FetchSuite) TestFetchHeaders() {
 	case <-ch:
 	case <-time.After(1 * time.Second):
 		s.Fail("test timed out")
-		return
 	}
 }
 
@@ -118,9 +113,8 @@ func (s *FetchSuite) TestFetchJSON() {
 
 	ch := make(chan struct{})
 	err = s.vm.Set("__capture", func(str string) {
-		defer func() { ch <- struct{}{} }()
-
 		s.Equal(str, `[1,2,3]`)
+		ch <- struct{}{}
 	})
 	s.NoError(err)
 
@@ -133,7 +127,6 @@ func (s *FetchSuite) TestFetchJSON() {
 	case <-ch:
 	case <-time.After(1 * time.Second):
 		s.Fail("test timed out")
-		return
 	}
 }
 
@@ -149,9 +142,8 @@ func (s *FetchSuite) TestFetchWithHandler() {
 
 	ch := make(chan struct{})
 	err = s.vm.Set("__capture", func(str string) {
-		defer func() { ch <- struct{}{} }()
-
 		s.Equal(str, `[1,2,3]`)
+		ch <- struct{}{}
 	})
 	s.NoError(err)
 
@@ -164,7 +156,6 @@ func (s *FetchSuite) TestFetchWithHandler() {
 	case <-ch:
 	case <-time.After(1 * time.Second):
 		s.Fail("test timed out")
-		return
 	}
 }
 
