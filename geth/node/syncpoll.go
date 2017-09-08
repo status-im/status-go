@@ -24,14 +24,12 @@ var (
 // SyncPoll provides a structure that allows us to check the status of
 // ethereum node synchronization.
 type SyncPoll struct {
-	eth        *les.LightEthereum
 	downloader *downloader.Downloader
 }
 
 // NewSyncPoll returns a new instance of SyncPoll.
 func NewSyncPoll(leth *les.LightEthereum) *SyncPoll {
 	return &SyncPoll{
-		eth:        leth,
 		downloader: leth.Downloader(),
 	}
 }

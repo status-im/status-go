@@ -1,6 +1,7 @@
 package node_test
 
 import (
+	"io/ioutil"
 	"os"
 	"testing"
 
@@ -19,7 +20,7 @@ func TestNodeChainTestSuite(t *testing.T) {
 // with it's chain data directory.
 type NodeChainTestSuite struct {
 	BaseTestSuite
-	initialChainDir string
+	chainDir string
 }
 
 // Setup sets up the related entities for running this test suite.
@@ -27,31 +28,30 @@ func (nc *NodeChainTestSuite) SetupTest() {
 	require := nc.Require()
 
 	nc.NodeManager = node.NewNodeManager()
-	require.NotNil(nc.NodeManager)
-	require.IsType(&node.NodeManager{}, nc.NodeManager)
 
-	initialChainDir := ".nodechain-status"
-
-	nc.initialChainDir = initialChainDir
-	require.Equal(nc.initialChainDir, initialChainDir)
+	chainDir, err := ioutil.TempDir("", "chainDir")
+	require.NoError(err)
+	nc.chainDir = chainDir
 }
 
-func (nc *NodeChainTestSuite) TestInitialChainSyncWithResetChainData() {
+func (nc *NodeChainTestSuite) TearDownTest() {
+	require := nc.Require()
+	err := os.RemoveAll(nc.chainDir)
+	require.NoError(err)
+}
+
+func (nc *NodeChainTestSuite) TestResetChainData() {
 	require := nc.Require()
 	require.NotNil(nc.NodeManager)
-
-	defer os.RemoveAll(nc.initialChainDir)
-	os.MkdirAll(nc.initialChainDir, 0777)
 
 	nodeConfig, err := MakeTestNodeConfig(params.RopstenNetworkID)
 	require.NoError(err)
 
-	nodeConfig.DataDir = nc.initialChainDir
+	nodeConfig.DataDir = nc.chainDir
 	require.False(nc.NodeManager.IsNodeRunning())
 
 	nodeStarted, err := nc.NodeManager.StartNode(nodeConfig)
 	require.NoError(err)
-	require.NotNil(nodeStarted)
 	<-nodeStarted
 	require.True(nc.NodeManager.IsNodeRunning())
 
