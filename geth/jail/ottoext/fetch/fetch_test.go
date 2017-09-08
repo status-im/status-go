@@ -1,45 +1,48 @@
-package fetch
+package fetch_test
 
 import (
-	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
+	"time"
 
 	"github.com/robertkrimen/otto"
 
+	"github.com/status-im/status-go/geth/jail/ottoext/fetch"
 	"github.com/status-im/status-go/geth/jail/ottoext/loop"
+	"github.com/status-im/status-go/geth/jail/ottoext/vm"
+	"github.com/stretchr/testify/require"
 )
 
-func must(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
-
 func TestFetch(t *testing.T) {
+	ch := make(chan struct{})
 	m := http.NewServeMux()
 	m.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("hello"))
+		ch <- struct{}{}
 	})
 	s := httptest.NewServer(m)
 	defer s.Close()
 
-	vm := otto.New()
-	l := loop.New(vm)
+	v, l := newVM()
+	err := fetch.Define(v, l)
+	require.NoError(t, err)
 
-	if err := Define(vm, l); err != nil {
-		panic(err)
+	err = l.Eval(`fetch('` + s.URL + `').then(function(r) {
+		    return r.text();
+		  }).then(function(d) {
+		    if (d.indexOf('hellox') === -1) {
+		      throw new Error('what');
+		    }
+		  });`)
+	require.NoError(t, err)
+
+	select {
+	case <-ch:
+	case <-time.After(1 * time.Second):
+		require.Fail(t, "test timed out")
+		return
 	}
-
-	must(l.EvalAndRun(`fetch('` + s.URL + `').then(function(r) {
-    return r.text();
-  }).then(function(d) {
-    if (d.indexOf('hellox') === -1) {
-      throw new Error('what');
-    }
-  });`))
 }
 
 func TestFetchCallback(t *testing.T) {
@@ -50,30 +53,30 @@ func TestFetchCallback(t *testing.T) {
 	s := httptest.NewServer(m)
 	defer s.Close()
 
-	vm := otto.New()
-	l := loop.New(vm)
+	v, l := newVM()
+	err := fetch.Define(v, l)
+	require.NoError(t, err)
 
-	if err := Define(vm, l); err != nil {
-		panic(err)
+	ch := make(chan struct{})
+
+	err = v.Set("__capture", func(s string) {
+		defer func() { ch <- struct{}{} }()
+
+		require.Contains(t, s, "hello")
+	})
+	require.NoError(t, err)
+
+	err = l.Eval(`fetch('` + s.URL + `').then(function(r) {
+		return r.text();
+	}).then(__capture)`)
+	require.NoError(t, err)
+
+	select {
+	case <-ch:
+	case <-time.After(1 * time.Second):
+		require.Fail(t, "test timed out")
+		return
 	}
-
-	ch := make(chan bool, 1)
-
-	if err := vm.Set("__capture", func(s string) {
-		defer func() { ch <- true }()
-
-		if !strings.Contains(s, "hello") {
-			panic(fmt.Errorf("expected to find `hello' in response"))
-		}
-	}); err != nil {
-		panic(err)
-	}
-
-	must(l.EvalAndRun(`fetch('` + s.URL + `').then(function(r) {
-    return r.text();
-  }).then(__capture)`))
-
-	<-ch
 }
 
 func TestFetchHeaders(t *testing.T) {
@@ -88,33 +91,33 @@ func TestFetchHeaders(t *testing.T) {
 	s := httptest.NewServer(m)
 	defer s.Close()
 
-	vm := otto.New()
-	l := loop.New(vm)
+	v, l := newVM()
+	err := fetch.Define(v, l)
+	require.NoError(t, err)
 
-	if err := Define(vm, l); err != nil {
-		panic(err)
-	}
+	ch := make(chan struct{})
 
-	ch := make(chan bool, 1)
+	err = v.Set("__capture", func(s string) {
+		defer func() { ch <- struct{}{} }()
 
-	if err := vm.Set("__capture", func(s string) {
-		defer func() { ch <- true }()
+		require.Equal(t, s, `{"header-one":["1"],"header-two":["2a","2b"]}`)
+	})
+	require.NoError(t, err)
 
-		if s != `{"header-one":["1"],"header-two":["2a","2b"]}` {
-			panic(fmt.Errorf("expected headers to contain 1, 2a, and 2b"))
-		}
-	}); err != nil {
-		panic(err)
-	}
-
-	must(l.EvalAndRun(`fetch('` + s.URL + `').then(function(r) {
+	err = l.Eval(`fetch('` + s.URL + `').then(function(r) {
     return __capture(JSON.stringify({
       'header-one': r.headers.getAll('header-one'),
       'header-two': r.headers.getAll('header-two'),
     }));
-  })`))
+  })`)
+	require.NoError(t, err)
 
-	<-ch
+	select {
+	case <-ch:
+	case <-time.After(1 * time.Second):
+		require.Fail(t, "test timed out")
+		return
+	}
 }
 
 func TestFetchJSON(t *testing.T) {
@@ -127,30 +130,30 @@ func TestFetchJSON(t *testing.T) {
 	s := httptest.NewServer(m)
 	defer s.Close()
 
-	vm := otto.New()
-	l := loop.New(vm)
+	v, l := newVM()
+	err := fetch.Define(v, l)
+	require.NoError(t, err)
 
-	if err := Define(vm, l); err != nil {
-		panic(err)
-	}
+	ch := make(chan struct{})
 
-	ch := make(chan bool, 1)
+	err = v.Set("__capture", func(s string) {
+		defer func() { ch <- struct{}{} }()
 
-	if err := vm.Set("__capture", func(s string) {
-		defer func() { ch <- true }()
+		require.Equal(t, s, `[1,2,3]`)
+	})
+	require.NoError(t, err)
 
-		if s != `[1,2,3]` {
-			panic(fmt.Errorf("expected data to be json, and for that json to be parsed"))
-		}
-	}); err != nil {
-		panic(err)
-	}
-
-	must(l.EvalAndRun(`fetch('` + s.URL + `').then(function(r) { return r.json(); }).then(function(d) {
+	err = l.Eval(`fetch('` + s.URL + `').then(function(r) { return r.json(); }).then(function(d) {
     return setTimeout(__capture, 4, JSON.stringify(d));
-  })`))
+  })`)
+	require.NoError(t, err)
 
-	<-ch
+	select {
+	case <-ch:
+	case <-time.After(1 * time.Second):
+		require.Fail(t, "test timed out")
+		return
+	}
 }
 
 func TestFetchJSONRepeated(t *testing.T) {
@@ -171,30 +174,30 @@ func TestFetchWithHandler(t *testing.T) {
 		w.Write([]byte("[ 1 , 2 , 3 ]"))
 	})
 
-	vm := otto.New()
-	l := loop.New(vm)
+	v, l := newVM()
+	err := fetch.DefineWithHandler(v, l, m)
+	require.NoError(t, err)
 
-	if err := DefineWithHandler(vm, l, m); err != nil {
-		panic(err)
-	}
+	ch := make(chan struct{})
 
-	ch := make(chan bool, 1)
+	err = v.Set("__capture", func(s string) {
+		defer func() { ch <- struct{}{} }()
 
-	if err := vm.Set("__capture", func(s string) {
-		defer func() { ch <- true }()
+		require.Equal(t, s, `[1,2,3]`)
+	})
+	require.NoError(t, err)
 
-		if s != `[1,2,3]` {
-			panic(fmt.Errorf("expected data to be json, and for that json to be parsed"))
-		}
-	}); err != nil {
-		panic(err)
-	}
-
-	must(l.EvalAndRun(`fetch('/').then(function(r) { return r.json(); }).then(function(d) {
+	err = l.Eval(`fetch('/').then(function(r) { return r.json(); }).then(function(d) {
     return setTimeout(__capture, 4, JSON.stringify(d));
-  })`))
+  })`)
+	require.NoError(t, err)
 
-	<-ch
+	select {
+	case <-ch:
+	case <-time.After(1 * time.Second):
+		require.Fail(t, "test timed out")
+		return
+	}
 }
 
 func TestFetchWithHandlerParallel(t *testing.T) {
@@ -203,24 +206,47 @@ func TestFetchWithHandlerParallel(t *testing.T) {
 		w.Write([]byte("hello"))
 	})
 
-	vm := otto.New()
-	l := loop.New(vm)
+	v, l := newVM()
+	err := fetch.DefineWithHandler(v, l, m)
+	require.NoError(t, err)
 
-	if err := DefineWithHandler(vm, l, m); err != nil {
-		panic(err)
-	}
+	ch := make(chan struct{})
 
-	ch := make(chan bool, 1)
-
-	if err := vm.Set("__capture", func(c otto.FunctionCall) otto.Value {
-		defer func() { ch <- true }()
+	err = v.Set("__capture", func(c otto.FunctionCall) otto.Value {
+		ch <- struct{}{}
 
 		return otto.UndefinedValue()
-	}); err != nil {
-		panic(err)
+	})
+	require.NoError(t, err)
+
+	err = l.Eval(`Promise.all([1,2,3,4,5].map(function(i) { return fetch('/' + i).then(__capture); }))`)
+	require.NoError(t, err)
+
+	timerCh := time.After(1 * time.Second)
+	var count int
+loop:
+	for i := 0; i < 5; i++ {
+		select {
+		case <-ch:
+			count++
+		case <-timerCh:
+			break loop
+		}
 	}
+	require.Equal(t, 5, count)
+}
 
-	must(l.EvalAndRun(`Promise.all([1,2,3,4,5].map(function(i) { return fetch('/' + i); })).then(__capture)`))
-
-	<-ch
+// newVM creates new VM along with the loop.
+//
+// Currently all ottoext Define-functions accepts both
+// vm and loop as a tuple. It should be
+// refactored to accept only loop (which has an access to vm),
+// and this function provide easy way
+// to reflect this refactor for tests at least.
+func newVM() (*vm.VM, *loop.Loop) {
+	o := otto.New()
+	v := vm.New(o)
+	l := loop.New(v)
+	go l.Run()
+	return v, l
 }
