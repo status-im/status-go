@@ -105,15 +105,6 @@ func (l *Loop) Ready(t Task) {
 	l.ready <- t
 }
 
-// EvalAndRun is a combination of Eval and Run. Creatively named.
-func (l *Loop) EvalAndRun(s interface{}) error {
-	if err := l.Eval(s); err != nil {
-		return err
-	}
-
-	return l.Run()
-}
-
 // Eval executes some code in the VM associated with the loop and returns an
 // error if that execution fails.
 func (l *Loop) Eval(s interface{}) error {
