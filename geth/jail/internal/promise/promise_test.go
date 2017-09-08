@@ -7,9 +7,9 @@ import (
 	"github.com/robertkrimen/otto"
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/geth/jail/ottoext/loop"
-	"github.com/status-im/status-go/geth/jail/ottoext/promise"
-	"github.com/status-im/status-go/geth/jail/ottoext/vm"
+	"github.com/status-im/status-go/geth/jail/internal/loop"
+	"github.com/status-im/status-go/geth/jail/internal/promise"
+	"github.com/status-im/status-go/geth/jail/internal/vm"
 )
 
 func TestResolve(t *testing.T) {

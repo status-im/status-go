@@ -8,9 +8,9 @@ import (
 
 	"github.com/robertkrimen/otto"
 
-	"github.com/status-im/status-go/geth/jail/ottoext/fetch"
-	"github.com/status-im/status-go/geth/jail/ottoext/loop"
-	"github.com/status-im/status-go/geth/jail/ottoext/vm"
+	"github.com/status-im/status-go/geth/jail/internal/fetch"
+	"github.com/status-im/status-go/geth/jail/internal/loop"
+	"github.com/status-im/status-go/geth/jail/internal/vm"
 	"github.com/stretchr/testify/require"
 )
 

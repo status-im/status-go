@@ -10,9 +10,9 @@ import (
 	"github.com/GeertJohan/go.rice"
 	"github.com/robertkrimen/otto"
 
-	"github.com/status-im/status-go/geth/jail/ottoext/loop"
-	"github.com/status-im/status-go/geth/jail/ottoext/promise"
-	"github.com/status-im/status-go/geth/jail/ottoext/vm"
+	"github.com/status-im/status-go/geth/jail/internal/loop"
+	"github.com/status-im/status-go/geth/jail/internal/promise"
+	"github.com/status-im/status-go/geth/jail/internal/vm"
 )
 
 func mustValue(v otto.Value, err error) otto.Value {

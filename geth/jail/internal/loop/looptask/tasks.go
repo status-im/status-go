@@ -4,8 +4,8 @@ import (
 	"errors"
 
 	"github.com/robertkrimen/otto"
-	"github.com/status-im/status-go/geth/jail/ottoext/loop"
-	"github.com/status-im/status-go/geth/jail/ottoext/vm"
+	"github.com/status-im/status-go/geth/jail/internal/loop"
+	"github.com/status-im/status-go/geth/jail/internal/vm"
 )
 
 // IdleTask is designed to sit in a loop and keep it active, without doing any

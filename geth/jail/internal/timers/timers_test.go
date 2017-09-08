@@ -7,9 +7,9 @@ import (
 	"github.com/robertkrimen/otto"
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/geth/jail/ottoext/loop"
-	"github.com/status-im/status-go/geth/jail/ottoext/timers"
-	"github.com/status-im/status-go/geth/jail/ottoext/vm"
+	"github.com/status-im/status-go/geth/jail/internal/loop"
+	"github.com/status-im/status-go/geth/jail/internal/timers"
+	"github.com/status-im/status-go/geth/jail/internal/vm"
 )
 
 func TestSetTimeout(t *testing.T) {
