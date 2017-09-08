@@ -620,7 +620,7 @@ func (s *BackendTestSuite) TestEvictionOfQueuedTransactions() {
 	for i := 0; i < 10; i++ {
 		go s.backend.SendTransaction(nil, common.SendTxArgs{}) // nolint: errcheck
 	}
-	time.Sleep(1 * time.Second)
+	time.Sleep(2 * time.Second) // FIXME(tiabc): more reliable synchronization to ensure all transactions are enqueued
 
 	log.Info(fmt.Sprintf("Number of transactions queued: %d. Queue size (shouldn't be more than %d): %d",
 		i, node.DefaultTxQueueCap, txQueue.Count()))

@@ -1,3 +1,4 @@
+// Package testing implements the base level testing types needed.
 package testing
 
 import (
@@ -6,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -136,13 +138,20 @@ func FirstBlockHash(require *assertions.Assertions, nodeManager common.NodeManag
 // MakeTestNodeConfig defines a function to return a giving params.NodeConfig
 // where specific network addresses are assigned based on provieded network id.
 func MakeTestNodeConfig(networkID int) (*params.NodeConfig, error) {
+	testDir := filepath.Join(TestDataDir, TestNetworkNames[networkID])
+
+	if runtime.GOOS == "windows" {
+		testDir = filepath.ToSlash(testDir)
+	}
+
 	configJSON := `{
 		"NetworkId": ` + strconv.Itoa(networkID) + `,
-		"DataDir": "` + filepath.Join(TestDataDir, TestNetworkNames[networkID]) + `",
+		"DataDir": "` + testDir + `",
 		"HTTPPort": ` + strconv.Itoa(TestConfig.Node.HTTPPort) + `,
 		"WSPort": ` + strconv.Itoa(TestConfig.Node.WSPort) + `,
 		"LogLevel": "INFO"
 	}`
+
 	nodeConfig, err := params.LoadNodeConfig(configJSON)
 	if err != nil {
 		return nil, err
