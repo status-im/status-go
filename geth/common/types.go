@@ -255,10 +255,15 @@ type TxQueueManager interface {
 }
 
 // JailCell represents single jail cell, which is basically a JavaScript VM.
+// It's designed to be a transparent wrapper around otto.VM's methods.
 type JailCell interface {
+	// Set a value inside VM.
 	Set(string, interface{}) error
+	// Get a value from VM.
 	Get(string) (otto.Value, error)
-	Run(string) (otto.Value, error)
+	// Run an arbitrary JS code. Input maybe string or otto.Script.
+	Run(interface{}) (otto.Value, error)
+	// Call an arbitrary JS function by name and args.
 	Call(item string, this interface{}, args ...interface{}) (otto.Value, error)
 }
 

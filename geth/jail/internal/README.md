@@ -1,7 +1,9 @@
 ottoext
 =======
 
-[![GoDoc](https://godoc.org/github.com/status-im/ottoext?status.svg)](https://godoc.org/github.com/status-im/ottoext)
+Originally based on [github.com/deoxxa/ottoext](https://github.com/deoxxa/ottoext)
+
+[![GoDoc](https://godoc.org/github.com/status-im/status-go/geth/jail/ottoext?status.svg)](https://godoc.org/github.com/status-im/status-go/geth/jail/ottoext)
 
 Overview
 --------
