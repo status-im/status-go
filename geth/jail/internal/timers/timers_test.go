@@ -5,78 +5,60 @@ import (
 	"time"
 
 	"github.com/robertkrimen/otto"
-	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/geth/jail/internal/loop"
 	"github.com/status-im/status-go/geth/jail/internal/timers"
 	"github.com/status-im/status-go/geth/jail/internal/vm"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestSetTimeout(t *testing.T) {
-	v, l := newVM()
-
-	err := timers.Define(v, l)
-	require.NoError(t, err)
-
-	ch := make(chan struct{})
-	err = v.Set("__capture", func() {
-		defer func() { ch <- struct{}{} }()
+func (s *TimersSuite) TestSetTimeout() {
+	err := s.vm.Set("__capture", func() {
+		defer func() { s.ch <- struct{}{} }()
 	})
-	require.NoError(t, err)
+	s.NoError(err)
 
-	err = l.Eval(`setTimeout(function(n) {
+	err = s.loop.Eval(`setTimeout(function(n) {
 		if (Date.now() - n < 50) {
 			throw new Error('timeout was called too soon');
 		}
 		__capture();
 	}, 50, Date.now());`)
-	require.NoError(t, err)
+	s.NoError(err)
 
 	select {
-	case <-ch:
+	case <-s.ch:
 	case <-time.After(1 * time.Second):
-		require.Fail(t, "test timed out")
+		s.Fail("test timed out")
 		return
 	}
 }
 
-func TestClearTimeout(t *testing.T) {
-	v, l := newVM()
-
-	err := timers.Define(v, l)
-	require.NoError(t, err)
-
-	ch := make(chan struct{})
-	err = v.Set("__shouldNeverRun", func() {
-		defer func() { ch <- struct{}{} }()
+func (s *TimersSuite) TestClearTimeout() {
+	err := s.vm.Set("__shouldNeverRun", func() {
+		defer func() { s.ch <- struct{}{} }()
 	})
-	require.NoError(t, err)
+	s.NoError(err)
 
-	err = l.Eval(`clearTimeout(setTimeout(function() {
+	err = s.loop.Eval(`clearTimeout(setTimeout(function() {
 		__shouldNeverRun();
 	}, 50));`)
-	require.NoError(t, err)
+	s.NoError(err)
 
 	select {
-	case <-ch:
-		require.Fail(t, "should never run")
+	case <-s.ch:
+		s.Fail("should never run")
 	case <-time.After(100 * time.Millisecond):
 	}
 }
 
-func TestSetInterval(t *testing.T) {
-	v, l := newVM()
-
-	err := timers.Define(v, l)
-	require.NoError(t, err)
-
-	ch := make(chan struct{})
-	err = v.Set("__done", func() {
-		defer func() { ch <- struct{}{} }()
+func (s *TimersSuite) TestSetInterval() {
+	err := s.vm.Set("__done", func() {
+		defer func() { s.ch <- struct{}{} }()
 	})
-	require.NoError(t, err)
+	s.NoError(err)
 
-	err = l.Eval(`
+	err = s.loop.Eval(`
 		var c = 0;
 		var iv = setInterval(function() {
 			if (c === 1) {
@@ -86,55 +68,60 @@ func TestSetInterval(t *testing.T) {
 			c++;
 		}, 50);
 	`)
-	require.NoError(t, err)
+	s.NoError(err)
 
 	select {
-	case <-ch:
-		value, err := v.Get("c")
-		require.NoError(t, err)
+	case <-s.ch:
+		value, err := s.vm.Get("c")
+		s.NoError(err)
 		n, err := value.ToInteger()
-		require.NoError(t, err)
-		require.Equal(t, 2, int(n))
+		s.NoError(err)
+		s.Equal(2, int(n))
 	case <-time.After(1 * time.Second):
-		require.Fail(t, "test timed out")
+		s.Fail("test timed out")
 	}
 }
 
-func TestClearIntervalImmediately(t *testing.T) {
-	v, l := newVM()
-
-	err := timers.Define(v, l)
-	require.NoError(t, err)
-
-	ch := make(chan struct{})
-	err = v.Set("__shouldNeverRun", func() {
-		defer func() { ch <- struct{}{} }()
+func (s *TimersSuite) TestClearIntervalImmediately() {
+	err := s.vm.Set("__shouldNeverRun", func() {
+		defer func() { s.ch <- struct{}{} }()
 	})
-	require.NoError(t, err)
+	s.NoError(err)
 
-	err = l.Eval(`clearInterval(setInterval(function() {
+	err = s.loop.Eval(`clearInterval(setInterval(function() {
 		__shouldNeverRun();
 	}, 50));`)
-	require.NoError(t, err)
+	s.NoError(err)
 
 	select {
-	case <-ch:
-		require.Fail(t, "should never run")
+	case <-s.ch:
+		s.Fail("should never run")
 	case <-time.After(100 * time.Millisecond):
 	}
 }
 
-// newVM creates new VM along with the loop.
-//
-// Currently all ottoext Define-functions accepts both
-// vm and loop as a tuple. It should be
-// refactored to accept only loop (which has an access to vm),
-// and this function provide easy way
-// to reflect this refactor for tests at least.
-func newVM() (*vm.VM, *loop.Loop) {
+type TimersSuite struct {
+	suite.Suite
+
+	loop *loop.Loop
+	vm   *vm.VM
+
+	ch chan struct{}
+}
+
+func (s *TimersSuite) SetupTest() {
 	o := otto.New()
-	v := vm.New(o)
-	l := loop.New(v)
-	go l.Run()
-	return v, l
+	s.vm = vm.New(o)
+	s.loop = loop.New(s.vm)
+
+	go s.loop.Run()
+
+	err := timers.Define(s.vm, s.loop)
+	s.NoError(err)
+
+	s.ch = make(chan struct{})
+}
+
+func TestTimersSuite(t *testing.T) {
+	suite.Run(t, new(TimersSuite))
 }

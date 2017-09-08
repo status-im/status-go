@@ -5,28 +5,22 @@ import (
 	"time"
 
 	"github.com/robertkrimen/otto"
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/geth/jail/internal/loop"
 	"github.com/status-im/status-go/geth/jail/internal/promise"
 	"github.com/status-im/status-go/geth/jail/internal/vm"
 )
 
-func TestResolve(t *testing.T) {
-	v, l := newVM()
+func (s *PromiseSuite) TestResolve() {
+	err := s.vm.Set("__resolve", func(str string) {
+		defer func() { s.ch <- struct{}{} }()
 
-	err := promise.Define(v, l)
-	require.NoError(t, err)
-
-	ch := make(chan struct{})
-	err = v.Set("__resolve", func(s string) {
-		defer func() { ch <- struct{}{} }()
-
-		require.Equal(t, "good", s)
+		s.Equal("good", str)
 	})
-	require.NoError(t, err)
+	s.NoError(err)
 
-	err = l.Eval(`
+	err = s.loop.Eval(`
 		var p = new Promise(function(resolve, reject) {
 			setTimeout(function() {
 				resolve('good');
@@ -41,31 +35,25 @@ func TestResolve(t *testing.T) {
 			throw err;
 		});
 	`)
-	require.NoError(t, err)
+	s.NoError(err)
 
 	select {
-	case <-ch:
+	case <-s.ch:
 	case <-time.After(1 * time.Second):
-		require.Fail(t, "test timed out")
+		s.Fail("test timed out")
 		return
 	}
 }
 
-func TestReject(t *testing.T) {
-	v, l := newVM()
+func (s *PromiseSuite) TestReject() {
+	err := s.vm.Set("__reject", func(str string) {
+		defer func() { s.ch <- struct{}{} }()
 
-	err := promise.Define(v, l)
-	require.NoError(t, err)
-
-	ch := make(chan struct{})
-	err = v.Set("__reject", func(s string) {
-		defer func() { ch <- struct{}{} }()
-
-		require.Equal(t, "bad", s)
+		s.Equal("bad", str)
 	})
-	require.NoError(t, err)
+	s.NoError(err)
 
-	err = l.Eval(`
+	err = s.loop.Eval(`
 		var p = new Promise(function(resolve, reject) {
 			setTimeout(function() {
 				reject('bad');
@@ -76,27 +64,38 @@ func TestReject(t *testing.T) {
 			__reject(err);
 		});
 	`)
-	require.NoError(t, err)
+	s.NoError(err)
 
 	select {
-	case <-ch:
+	case <-s.ch:
 	case <-time.After(1 * time.Second):
-		require.Fail(t, "test timed out")
+		s.Fail("test timed out")
 		return
 	}
 }
 
-// newVM creates new VM along with the loop.
-//
-// Currently all ottoext Define-functions accepts both
-// vm and loop as a tuple. It should be
-// refactored to accept only loop (which has an access to vm),
-// and this function provide easy way
-// to reflect this refactor for tests at least.
-func newVM() (*vm.VM, *loop.Loop) {
+type PromiseSuite struct {
+	suite.Suite
+
+	loop *loop.Loop
+	vm   *vm.VM
+
+	ch chan struct{}
+}
+
+func (s *PromiseSuite) SetupTest() {
 	o := otto.New()
-	v := vm.New(o)
-	l := loop.New(v)
-	go l.Run()
-	return v, l
+	s.vm = vm.New(o)
+	s.loop = loop.New(s.vm)
+
+	go s.loop.Run()
+
+	err := promise.Define(s.vm, s.loop)
+	s.NoError(err)
+
+	s.ch = make(chan struct{})
+}
+
+func TestPromiseSuite(t *testing.T) {
+	suite.Run(t, new(PromiseSuite))
 }
