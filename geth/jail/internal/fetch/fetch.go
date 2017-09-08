@@ -49,6 +49,9 @@ func (t *fetchTask) Execute(vm *vm.VM, l *loop.Loop) error {
 		arguments = append(arguments, e)
 	}
 
+	// We're locking on VM here because underlying otto's VM
+	// is not concurrently safe, and this function indirectly
+	// access vm's functions in cb.Call/h.Set.
 	vm.Lock()
 	defer vm.Unlock()
 
