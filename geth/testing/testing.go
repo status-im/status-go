@@ -102,6 +102,11 @@ func (s *BaseTestSuite) StartTestNode(networkID int, opts ...TestNodeOption) {
 	require.True(s.NodeManager.IsNodeRunning())
 }
 
+// ResetSyncFlag resets the nodeSyncCompleted flag.
+func (s *BaseTestSuite) ResetSyncFlag() {
+	s.nodeSyncCompleted = false
+}
+
 // EnsureNodeSync ensures that synchronization of the node is done once and that it
 // is done properly else, the call will fail.
 func (s *BaseTestSuite) EnsureNodeSync() {

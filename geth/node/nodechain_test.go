@@ -63,5 +63,6 @@ func (nc *NodeChainTestSuite) TestResetChainData() {
 	<-ready
 	require.True(nc.NodeManager.IsNodeRunning())
 
+	nc.ResetSyncFlag()
 	nc.EnsureNodeSync()
 }
