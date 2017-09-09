@@ -765,3 +765,43 @@ func (s *BackendTestSuite) TestJailVMPersistence() {
 	s.T().Log(total)
 	require.InDelta(0.840003, total, 0.0000001)
 }
+
+func (s *BackendTestSuite) TestSendTransactionWithCallback() {
+	require := s.Require()
+
+	s.StartTestBackend(params.RopstenNetworkID)
+	defer s.StopTestBackend()
+
+	time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to sync
+
+	// log into account from which transactions will be sent
+	err := s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
+	require.NoError(err, "cannot select account: %v", TestConfig.Account1.Address)
+
+	jail := s.backend.JailManager()
+	jail.BaseJS(baseStatusJSCode)
+
+	result := jail.Parse(testChatID, `
+		_status_catalog['sendTestTx'] = function() {
+		  var transaction = {
+			"from": "`+TestConfig.Account1.Address+`",
+			"to": "`+TestConfig.Account2.Address+`",
+			"value": web3.toWei(0.01, "ether")
+		  };
+		  web3.eth.sendTransaction(transaction, function (error, result) {
+			 // Nothing, callback presence is enough.
+		  });
+		}
+	`)
+	require.NotContains(result, "error", "further will fail if initial parsing failed")
+
+	node.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+		// Never finish the transaction.
+	})
+
+	// Set reasonable amount of time and panic, which means the jail was blocked.
+	common.PanicAfter(20*time.Second, nil, "sendTransaction with callback blocked jail")
+
+	resp := jail.Call(testChatID, `["sendTestTx"]`, "{}")
+	require.NotContains(resp, "error")
+}

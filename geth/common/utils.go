@@ -90,7 +90,6 @@ func PanicAfter(waitSeconds time.Duration, abort chan struct{}, desc string) {
 	go func() {
 		select {
 		case <-abort:
-			return
 		case <-time.After(waitSeconds):
 			panic("whatever you were doing takes toooo long: " + desc)
 		}
