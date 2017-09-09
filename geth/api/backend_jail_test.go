@@ -599,7 +599,8 @@ func (s *BackendTestSuite) TestJailWhisper() {
 		installedFilters[filterName.String()] = filterId.String()
 	}
 
-	time.Sleep(2 * time.Second) // allow whisper to poll
+	// TODO(tiabc): What's the hell? Elaborate or eliminate.
+	time.Sleep(5 * time.Second) // allow whisper to poll
 
 	for testKey, filter := range installedFilters {
 		if filter != "" {

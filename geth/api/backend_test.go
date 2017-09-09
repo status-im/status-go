@@ -152,11 +152,11 @@ func (s *BackendTestSuite) TestNodeStartStop() {
 	require.True(s.backend.IsNodeRunning())
 }
 
-func (s *BackendTestSuite) TestStartNodeWithUpstreamEnabled(t *testing.T) {
+func (s *BackendTestSuite) TestStartNodeWithUpstreamEnabled() {
 	require := s.Require()
 
 	backend := api.NewStatusBackend()
-	require.NotNil(t, backend)
+	require.NotNil(backend)
 
 	nodeConfig, err := MakeTestNodeConfig(params.RopstenNetworkID)
 	require.NoError(err)
@@ -463,7 +463,7 @@ func (s *BackendTestSuite) TestResetChainData() {
 	s.StartTestBackend(params.RinkebyNetworkID)
 	defer s.StopTestBackend()
 
-	time.Sleep(2 * time.Second) // allow to sync for some time
+	time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to sync
 
 	s.True(s.backend.IsNodeRunning())
 	nodeReady, err := s.backend.ResetChainData()
