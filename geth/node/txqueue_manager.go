@@ -210,7 +210,7 @@ func (m *TxQueueManager) completeRemoteTransaction(queuedTx *common.QueuedTx, pa
 		return emptyHash, err
 	}
 
-	client, err := m.nodeManager.RPCClient()
+	client, err := m.nodeManager.RPCUpstreamClient()
 	if err != nil {
 		return emptyHash, err
 	}

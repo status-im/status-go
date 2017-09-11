@@ -22,13 +22,16 @@ import (
 
 const (
 	whisperMessage1 = `test message 1 (K1 -> K2, signed+encrypted, from us)`
-	whisperMessage2 = `test message 2 (K1 -> K1, signed+encrypted to ourselves)`
-	whisperMessage3 = `test message 3 (K1 -> "", signed broadcast)`
-	whisperMessage4 = `test message 4 ("" -> "", anon broadcast)`
-	whisperMessage5 = `test message 5 ("" -> K1, encrypted anon broadcast)`
-	whisperMessage6 = `test message 6 (K2 -> K1, signed+encrypted, to us)`
+	whisperMessage2 = `test message 3 (K1 -> "", signed broadcast)`
+	whisperMessage3 = `test message 4 ("" -> "", anon broadcast)`
+	whisperMessage4 = `test message 5 ("" -> K1, encrypted anon broadcast)`
+	whisperMessage5 = `test message 6 (K2 -> K1, signed+encrypted, to us)`
 	txSendFolder    = "testdata/jail/tx-send/"
 	testChatID      = "testChat"
+)
+
+var (
+	baseStatusJSCode = string(static.MustAsset("testdata/jail/status.js"))
 )
 
 func (s *BackendTestSuite) TestJailSendQueuedTransaction() {
@@ -276,6 +279,8 @@ func (s *BackendTestSuite) TestJailWhisper() {
 	jailInstance := s.backend.JailManager()
 	require.NotNil(jailInstance)
 
+	jailInstance.BaseJS(baseStatusJSCode)
+
 	whisperService := s.WhisperService()
 	whisperAPI := whisper.NewPublicWhisperAPI(whisperService)
 
@@ -311,7 +316,6 @@ func (s *BackendTestSuite) TestJailWhisper() {
 		whisperMessage3: false,
 		whisperMessage4: false,
 		whisperMessage5: false,
-		whisperMessage6: false,
 	}
 	installedFilters := map[string]string{
 		whisperMessage1: "",
@@ -319,7 +323,6 @@ func (s *BackendTestSuite) TestJailWhisper() {
 		whisperMessage3: "",
 		whisperMessage4: "",
 		whisperMessage5: "",
-		whisperMessage6: "",
 	}
 
 	testCases := []struct {
@@ -330,7 +333,7 @@ func (s *BackendTestSuite) TestJailWhisper() {
 		{
 			"test 0: ensure correct version of Whisper is used",
 			`
-				var expectedVersion = '0x5';
+				var expectedVersion = '5.0';
 				if (web3.version.whisper != expectedVersion) {
 					throw 'unexpected shh version, expected: ' + expectedVersion + ', got: ' + web3.version.whisper;
 				}
@@ -341,40 +344,41 @@ func (s *BackendTestSuite) TestJailWhisper() {
 			"test 1: encrypted signed message from us (From != nil && To != nil)",
 			`
 				var identity1 = '` + accountKey1Hex + `';
-				if (!web3.shh.hasKeyPair(identity1)) {
+				if (!shh.hasKeyPair(identity1)) {
 					throw 'idenitity "` + accountKey1Hex + `" not found in whisper';
 				}
 
 				var identity2 = '` + accountKey2Hex + `';
-				if (!web3.shh.hasKeyPair(identity2)) {
-					throw 'idenitity "` + accountKey2Hex + `" not found in whisper';
+				if (!shh.hasKeyPair(identity2)) {
+					throw 'identitity "` + accountKey2Hex + `" not found in whisper';
 				}
 
 				var topic = makeTopic();
 				var payload = '` + whisperMessage1 + `';
 
 				// start watching for messages
-				var filter = shh.filter({
-					type: "asym",
+				var filter = shh.newMessageFilter({
 					sig: identity1,
-					key: identity2,
+					privateKeyID: identity2,
 					topics: [topic]
 				});
-				console.log(JSON.stringify(filter));
 
 				// post message
 				var message = {
-					type: "asym",
-					sig: identity1,
-					key: identity2,
-					topic: topic,
-					payload: payload,
 					ttl: 20,
+					powTarget: 0.01,
+					powTime: 20,
+					topic: topic,
+					sig: identity1,
+					pubKey: identity2,
+			  		payload: web3.toHex(payload),
 				};
-				var err = shh.post(message)
-				if (err !== null) {
-					throw 'message not sent: ' + message;
+
+				var sent = shh.post(message)
+				if (!sent) {
+					throw 'message not sent: ' + JSON.stringify(message);
 				}
+
 
 				var filterName = '` + whisperMessage1 + `';
 				var filterId = filter.filterId;
@@ -385,36 +389,43 @@ func (s *BackendTestSuite) TestJailWhisper() {
 			true,
 		},
 		{
-			"test 2: encrypted signed message to yourself (From != nil && To != nil)",
+			"test 2: signed (known sender) broadcast (From != nil && To == nil)",
 			`
 				var identity = '` + accountKey1Hex + `';
-				if (!web3.shh.hasKeyPair(identity)) {
+				if (!shh.hasKeyPair(identity)) {
 					throw 'idenitity "` + accountKey1Hex + `" not found in whisper';
 				}
 
 				var topic = makeTopic();
 				var payload = '` + whisperMessage2 + `';
 
+				// generate symmetric key
+				var keyid = shh.newSymKey();
+				if (!shh.hasSymKey(keyid)) {
+					throw new Error('key not found');
+				}
+
 				// start watching for messages
-				var filter = shh.filter({
-					type: "asym",
+				var filter = shh.newMessageFilter({
 					sig: identity,
-					key: identity,
 					topics: [topic],
+					symKeyID: keyid
 				});
 
 				// post message
 				var message = {
-					type: "asym",
-				  	sig: identity,
-				  	key: identity,
-				  	topic: topic,
-				  	payload: payload,
-				  	ttl: 20,
+					ttl: 20,
+					powTarget: 0.01,
+					powTime: 20,
+					topic: topic,
+					sig: identity,
+					symKeyID: keyid,
+			  		payload: web3.toHex(payload),
 				};
-				var err = shh.post(message)
-				if (err !== null) {
-					throw 'message not sent: ' + message;
+
+				var sent = shh.post(message)
+				if (!sent) {
+					throw 'message not sent: ' + JSON.stringify(message);
 				}
 
 				var filterName = '` + whisperMessage2 + `';
@@ -426,42 +437,36 @@ func (s *BackendTestSuite) TestJailWhisper() {
 			true,
 		},
 		{
-			"test 3: signed (known sender) broadcast (From != nil && To == nil)",
+			"test 3: anonymous broadcast (From == nil && To == nil)",
 			`
-				var identity = '` + accountKey1Hex + `';
-				if (!web3.shh.hasKeyPair(identity)) {
-					throw 'idenitity "` + accountKey1Hex + `" not found in whisper';
-				}
-
 				var topic = makeTopic();
 				var payload = '` + whisperMessage3 + `';
 
 				// generate symmetric key
-				var keyid = shh.generateSymmetricKey();
-				if (!shh.hasSymmetricKey(keyid)) {
+				var keyid = shh.newSymKey();
+				if (!shh.hasSymKey(keyid)) {
 					throw new Error('key not found');
 				}
 
 				// start watching for messages
-				var filter = shh.filter({
-					type: "sym",
-					sig: identity,
+				var filter = shh.newMessageFilter({
 					topics: [topic],
-					key: keyid
+					symKeyID: keyid
 				});
 
 				// post message
 				var message = {
-					type: "sym",
-					sig: identity,
-					topic: topic,
-					payload: payload,
 					ttl: 20,
-					key: keyid
+					powTarget: 0.01,
+					powTime: 20,
+					topic: topic,
+					symKeyID: keyid,
+			  		payload: web3.toHex(payload),
 				};
-				var err = shh.post(message)
-				if (err !== null) {
-					throw 'message not sent: ' + message;
+
+				var sent = shh.post(message)
+				if (!sent) {
+					throw 'message not sent: ' + JSON.stringify(message);
 				}
 
 				var filterName = '` + whisperMessage3 + `';
@@ -473,35 +478,35 @@ func (s *BackendTestSuite) TestJailWhisper() {
 			true,
 		},
 		{
-			"test 4: anonymous broadcast (From == nil && To == nil)",
+			"test 4: encrypted anonymous message (From == nil && To != nil)",
 			`
+				var identity = '` + accountKey2Hex + `';
+				if (!shh.hasKeyPair(identity)) {
+					throw 'idenitity "` + accountKey2Hex + `" not found in whisper';
+				}
+
 				var topic = makeTopic();
 				var payload = '` + whisperMessage4 + `';
 
-				// generate symmetric key
-				var keyid = shh.generateSymmetricKey();
-				if (!shh.hasSymmetricKey(keyid)) {
-					throw new Error('key not found');
-				}
-
 				// start watching for messages
-				var filter = shh.filter({
-					type: "sym",
+				var filter = shh.newMessageFilter({
+					privateKeyID: identity,
 					topics: [topic],
-					key: keyid
 				});
-
+				
 				// post message
 				var message = {
-					type: "sym",
-					topic: topic,
-					payload: payload,
 					ttl: 20,
-					key: keyid
+					powTarget: 0.01,
+					powTime: 20,
+					topic: topic,
+					pubKey: identity,
+			  		payload: web3.toHex(payload),
 				};
-				var err = shh.post(message)
-				if (err !== null) {
-					throw 'message not sent: ' + err;
+
+				var sent = shh.post(message)
+				if (!sent) {
+					throw 'message not sent: ' + JSON.stringify(message);
 				}
 
 				var filterName = '` + whisperMessage4 + `';
@@ -513,83 +518,40 @@ func (s *BackendTestSuite) TestJailWhisper() {
 			true,
 		},
 		{
-			"test 5: encrypted anonymous message (From == nil && To != nil)",
-			`
-				var identity = '` + accountKey2Hex + `';
-				if (!web3.shh.hasKeyPair(identity)) {
-					throw 'idenitity "` + accountKey2Hex + `" not found in whisper';
-				}
-
-				var topic = makeTopic();
-				var payload = '` + whisperMessage5 + `';
-
-				// start watching for messages
-				var filter = shh.filter({
-					type: "asym",
-					key: identity,
-					topics: [topic],
-				});
-
-				// post message
-				var message = {
-					type: "asym",
-					key: identity,
-					topic: topic,
-					payload: payload,
-					ttl: 20
-				};
-				var err = shh.post(message)
-				if (err !== null) {
-					throw 'message not sent: ' + message;
-				}
-
-				var filterName = '` + whisperMessage5 + `';
-				var filterId = filter.filterId;
-				if (!filterId) {
-					throw 'filter not installed properly';
-				}
-			`,
-			true,
-		},
-		{
-			"test 6: encrypted signed response to us (From != nil && To != nil)",
+			"test 5: encrypted signed response to us (From != nil && To != nil)",
 			`
 				var identity1 = '` + accountKey1Hex + `';
-				if (!web3.shh.hasKeyPair(identity1)) {
+				if (!shh.hasKeyPair(identity1)) {
 					throw 'idenitity "` + accountKey1Hex + `" not found in whisper';
 				}
-
 				var identity2 = '` + accountKey2Hex + `';
-				if (!web3.shh.hasKeyPair(identity2)) {
+				if (!shh.hasKeyPair(identity2)) {
 					throw 'idenitity "` + accountKey2Hex + `" not found in whisper';
 				}
-
 				var topic = makeTopic();
-				var payload = '` + whisperMessage6 + `';
-
+				var payload = '` + whisperMessage5 + `';
 				// start watching for messages
-				var filter = shh.filter({
-					type: "asym",
+				var filter = shh.newMessageFilter({
+					privateKeyID: identity1,
 					sig: identity2,
-					key: identity1,
-					topics: [topic]
+					topics: [topic],
 				});
-
+				
 				// post message
 				var message = {
-					type: "asym",
 				  	sig: identity2,
-				  	key: identity1,
+				  	pubKey: identity1,
 				  	topic: topic,
-				  	payload: payload,
-				  	ttl: 20
+				  	payload: web3.toHex(payload),
+					ttl: 20,
+					powTime: 20,
+					powTarget: 0.01,
 				};
-				var err = shh.post(message)
-				if (err !== null) {
+				var sent = shh.post(message)
+				if (!sent) {
 					throw 'message not sent: ' + message;
 				}
-
-				var filterName = '` + whisperMessage6 + `';
+				var filterName = '` + whisperMessage5 + `';
 				var filterId = filter.filterId;
 				if (!filterId) {
 					throw 'filter not installed properly';
@@ -602,6 +564,7 @@ func (s *BackendTestSuite) TestJailWhisper() {
 	for _, testCase := range testCases {
 		s.T().Log(testCase.name)
 		testCaseKey := crypto.Keccak256Hash([]byte(testCase.name)).Hex()
+
 		jailInstance.Parse(testCaseKey, `
 			var shh = web3.shh;
 			var makeTopic = function () {
@@ -718,7 +681,8 @@ func (s *BackendTestSuite) TestJailVMPersistence() {
 	}
 
 	jailInstance := s.backend.JailManager()
-	jailInstance.BaseJS(string(static.MustAsset("testdata/jail/status.js")))
+	jailInstance.BaseJS(baseStatusJSCode)
+
 	parseResult := jailInstance.Parse(testChatID, `
 		var total = 0;
 		_status_catalog['ping'] = function(params) {

@@ -221,6 +221,32 @@ func (mr *MockNodeManagerMockRecorder) RPCClient() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RPCClient", reflect.TypeOf((*MockNodeManager)(nil).RPCClient))
 }
 
+// RPCLocalClient mocks base method
+func (m *MockNodeManager) RPCLocalClient() (*rpc.Client, error) {
+	ret := m.ctrl.Call(m, "RPCLocalClient")
+	ret0, _ := ret[0].(*rpc.Client)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RPCLocalClient indicates an expected call of RPCLocalClient
+func (mr *MockNodeManagerMockRecorder) RPCLocalClient() *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RPCLocalClient", reflect.TypeOf((*MockNodeManager)(nil).RPCLocalClient))
+}
+
+// RPCUpstreamClient mocks base method
+func (m *MockNodeManager) RPCUpstreamClient() (*rpc.Client, error) {
+	ret := m.ctrl.Call(m, "RPCUpstreamClient")
+	ret0, _ := ret[0].(*rpc.Client)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RPCUpstreamClient indicates an expected call of RPCUpstreamClient
+func (mr *MockNodeManagerMockRecorder) RPCUpstreamClient() *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RPCUpstreamClient", reflect.TypeOf((*MockNodeManager)(nil).RPCUpstreamClient))
+}
+
 // RPCServer mocks base method
 func (m *MockNodeManager) RPCServer() (*rpc.Server, error) {
 	ret := m.ctrl.Call(m, "RPCServer")
@@ -745,17 +771,22 @@ func (mr *MockJailCellMockRecorder) Run(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Run", reflect.TypeOf((*MockJailCell)(nil).Run), arg0)
 }
 
-// RunOnLoop mocks base method
-func (m *MockJailCell) RunOnLoop(arg0 string) (otto.Value, error) {
-	ret := m.ctrl.Call(m, "RunOnLoop", arg0)
+// Call mocks base method
+func (m *MockJailCell) Call(item string, this interface{}, args ...interface{}) (otto.Value, error) {
+	varargs := []interface{}{item, this}
+	for _, a := range args {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "Call", varargs...)
 	ret0, _ := ret[0].(otto.Value)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// RunOnLoop indicates an expected call of RunOnLoop
-func (mr *MockJailCellMockRecorder) RunOnLoop(arg0 interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RunOnLoop", reflect.TypeOf((*MockJailCell)(nil).RunOnLoop), arg0)
+// Call indicates an expected call of Call
+func (mr *MockJailCellMockRecorder) Call(item, this interface{}, args ...interface{}) *gomock.Call {
+	varargs := append([]interface{}{item, this}, args...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Call", reflect.TypeOf((*MockJailCell)(nil).Call), varargs...)
 }
 
 // MockJailManager is a mock of JailManager interface
@@ -794,41 +825,41 @@ func (mr *MockJailManagerMockRecorder) Parse(chatID, js interface{}) *gomock.Cal
 }
 
 // Call mocks base method
-func (m *MockJailManager) Call(chatID, path, args string) string {
-	ret := m.ctrl.Call(m, "Call", chatID, path, args)
+func (m *MockJailManager) Call(chatID, this, args string) string {
+	ret := m.ctrl.Call(m, "Call", chatID, this, args)
 	ret0, _ := ret[0].(string)
 	return ret0
 }
 
 // Call indicates an expected call of Call
-func (mr *MockJailManagerMockRecorder) Call(chatID, path, args interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Call", reflect.TypeOf((*MockJailManager)(nil).Call), chatID, path, args)
+func (mr *MockJailManagerMockRecorder) Call(chatID, this, args interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Call", reflect.TypeOf((*MockJailManager)(nil).Call), chatID, this, args)
 }
 
-// NewJailCell mocks base method
-func (m *MockJailManager) NewJailCell(id string) (JailCell, error) {
-	ret := m.ctrl.Call(m, "NewJailCell", id)
+// NewCell mocks base method
+func (m *MockJailManager) NewCell(chatID string) (JailCell, error) {
+	ret := m.ctrl.Call(m, "NewCell", chatID)
 	ret0, _ := ret[0].(JailCell)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// NewJailCell indicates an expected call of NewJailCell
-func (mr *MockJailManagerMockRecorder) NewJailCell(id interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewJailCell", reflect.TypeOf((*MockJailManager)(nil).NewJailCell), id)
+// NewCell indicates an expected call of NewCell
+func (mr *MockJailManagerMockRecorder) NewCell(chatID interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewCell", reflect.TypeOf((*MockJailManager)(nil).NewCell), chatID)
 }
 
-// GetJailCell mocks base method
-func (m *MockJailManager) GetJailCell(chatID string) (JailCell, error) {
-	ret := m.ctrl.Call(m, "GetJailCell", chatID)
+// Cell mocks base method
+func (m *MockJailManager) Cell(chatID string) (JailCell, error) {
+	ret := m.ctrl.Call(m, "Cell", chatID)
 	ret0, _ := ret[0].(JailCell)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetJailCell indicates an expected call of GetJailCell
-func (mr *MockJailManagerMockRecorder) GetJailCell(chatID interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetJailCell", reflect.TypeOf((*MockJailManager)(nil).GetJailCell), chatID)
+// Cell indicates an expected call of Cell
+func (mr *MockJailManagerMockRecorder) Cell(chatID interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Cell", reflect.TypeOf((*MockJailManager)(nil).Cell), chatID)
 }
 
 // BaseJS mocks base method

@@ -130,7 +130,7 @@ func (s *JailTestSuite) TestJailRPCAsyncSend() {
 	s.jail.BaseJS(baseStatusJSCode)
 	s.jail.Parse(testChatID, txJSCode)
 
-	cell, err := s.jail.GetCell(testChatID)
+	cell, err := s.jail.Cell(testChatID)
 	require.NoError(err)
 	require.NotNil(cell)
 

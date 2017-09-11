@@ -89,6 +89,12 @@ type NodeManager interface {
 	// RPCClient exposes reference to RPC client connected to the running node
 	RPCClient() (*rpc.Client, error)
 
+	// RPCLocalClient exposes reference to RPC client connected to the running local node rpcserver
+	RPCLocalClient() (*rpc.Client, error)
+
+	// RPCUpstreamClient exposes reference to RPC client connected to the upstream node server
+	RPCUpstreamClient() (*rpc.Client, error)
+
 	// RPCServer exposes reference to running node's in-proc RPC server/handler
 	RPCServer() (*rpc.Server, error)
 }
@@ -249,10 +255,15 @@ type TxQueueManager interface {
 }
 
 // JailCell represents single jail cell, which is basically a JavaScript VM.
+// It's designed to be a transparent wrapper around otto.VM's methods.
 type JailCell interface {
+	// Set a value inside VM.
 	Set(string, interface{}) error
+	// Get a value from VM.
 	Get(string) (otto.Value, error)
-	Run(string) (otto.Value, error)
+	// Run an arbitrary JS code. Input maybe string or otto.Script.
+	Run(interface{}) (otto.Value, error)
+	// Call an arbitrary JS function by name and args.
 	Call(item string, this interface{}, args ...interface{}) (otto.Value, error)
 }
 
