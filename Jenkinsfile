@@ -1,6 +1,6 @@
 node {
     gitSHA = sh(returnStdout: true, script: 'git rev-parse HEAD').trim()
-    gitShortSHA = gitCommit.take(7)
+    gitShortSHA = gitSHA.take(7)
     gitBranch = sh(returnStdout: true, script: 'git rev-parse --abbrev-ref HEAD').trim()
 
     stage('Debug') {
