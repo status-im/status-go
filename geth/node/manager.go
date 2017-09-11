@@ -29,7 +29,6 @@ var (
 	ErrAccountKeyStoreMissing      = errors.New("account key store is not set")
 	ErrInvalidRPCClient            = errors.New("RPC client is unavailable")
 	ErrInvalidRPCServer            = errors.New("RPC server is unavailable")
-	ErrNodeOffline                 = errors.New("node offline")
 )
 
 // NodeManager manages Status node (which abstracts contained geth node)
@@ -558,12 +557,8 @@ func (m *NodeManager) initLog(config *params.NodeConfig) {
 
 // isNodeAvailable check if we have a node running and make sure is fully started
 func (m *NodeManager) isNodeAvailable() error {
-	if m.nodeStarted == nil {
+	if m.nodeStarted == nil || m.node == nil {
 		return ErrNoRunningNode
-	}
-
-	if m.node == nil {
-		return ErrNodeOffline
 	}
 
 	return nil
