@@ -18,6 +18,7 @@ import (
 	gethparams "github.com/ethereum/go-ethereum/params"
 
 	"fmt"
+
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"

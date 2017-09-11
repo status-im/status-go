@@ -37,124 +37,12 @@ func (s *ManagerTestSuite) SetupTest() {
 func (s *ManagerTestSuite) TestReferences() {
 	s.Require().NotNil(s.NodeManager)
 
-	var nilNodeManager *node.NodeManager
-
 	// test for nil values of nodeManager
 	var noNodeTests = []struct {
 		name        string
 		initFn      func() (interface{}, error)
 		expectedErr error
 	}{
-		{
-			"null manager, StartNode()",
-			func() (interface{}, error) {
-				return nilNodeManager.StartNode(nil)
-			},
-			node.ErrInvalidNodeManager,
-		},
-		{
-			"null manager, StopNode()",
-			func() (interface{}, error) {
-				return nilNodeManager.StopNode()
-			},
-			node.ErrInvalidNodeManager,
-		},
-		{
-			"null manager, RestartNode()",
-			func() (interface{}, error) {
-				return nilNodeManager.RestartNode()
-			},
-			node.ErrInvalidNodeManager,
-		},
-		{
-			"null manager, ResetChainData()",
-			func() (interface{}, error) {
-				return nilNodeManager.ResetChainData()
-			},
-			node.ErrInvalidNodeManager,
-		},
-		{
-			"null manager, IsNodeRunning()",
-			func() (interface{}, error) {
-				result := nilNodeManager.IsNodeRunning()
-				var err error
-				if !result {
-					err = node.ErrInvalidNodeManager
-				}
-				return nil, err
-			},
-			node.ErrInvalidNodeManager,
-		},
-		{
-			"null manager, PopulateStaticPeers()",
-			func() (interface{}, error) {
-				return nil, nilNodeManager.PopulateStaticPeers()
-			},
-			node.ErrInvalidNodeManager,
-		},
-		{
-			"null manager, AddPeer()",
-			func() (interface{}, error) {
-				return nil, nilNodeManager.AddPeer("enode://da3bf389a031f33fb55c9f5f54fde8473912402d27fffaa50efd74c0d0515f3a61daf6d52151f2876b19c15828e6f670352bff432b5ec457652e74755e8c864f@51.15.62.116:30303")
-			},
-			node.ErrInvalidNodeManager,
-		},
-		{
-			"null manager, get NodeConfig",
-			func() (interface{}, error) {
-				return nilNodeManager.NodeConfig()
-			},
-			node.ErrInvalidNodeManager,
-		},
-		{
-			"null manager, get Node",
-			func() (interface{}, error) {
-				return nilNodeManager.Node()
-			},
-			node.ErrInvalidNodeManager,
-		},
-		{
-			"null manager, get LES",
-			func() (interface{}, error) {
-				return nilNodeManager.LightEthereumService()
-			},
-			node.ErrInvalidNodeManager,
-		},
-		{
-			"null manager, get Whisper",
-			func() (interface{}, error) {
-				return nilNodeManager.WhisperService()
-			},
-			node.ErrInvalidNodeManager,
-		},
-		{
-			"null manager, get AccountManager",
-			func() (interface{}, error) {
-				return nilNodeManager.AccountManager()
-			},
-			node.ErrInvalidNodeManager,
-		},
-		{
-			"null manager, get AccountKeyStore",
-			func() (interface{}, error) {
-				return nilNodeManager.AccountKeyStore()
-			},
-			node.ErrInvalidNodeManager,
-		},
-		{
-			"null manager, get RPC Client",
-			func() (interface{}, error) {
-				return nilNodeManager.RPCClient()
-			},
-			node.ErrInvalidNodeManager,
-		},
-		{
-			"null manager, get RPC Server",
-			func() (interface{}, error) {
-				return nilNodeManager.RPCServer()
-			},
-			node.ErrInvalidNodeManager,
-		},
 		{
 			"non-null manager, no running node, RestartNode()",
 			func() (interface{}, error) {
