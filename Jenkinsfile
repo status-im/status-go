@@ -36,7 +36,10 @@ node {
             ]
         }"""
 
-        def buildInfo = server.upload(uploadSpec)
-        println(buildInfo)
+        def buildInfo = Artifactory.newBuildInfo()
+        server.upload(uploadSpec, buildInfo)
+        // server upload iOS
+        // server upload iOS simulator
+        server.publishBuildInfo(buildInfo)
     }
 }
