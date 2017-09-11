@@ -1,7 +1,7 @@
 node {
     gitSHA = sh(returnStdout: true, script: 'git rev-parse HEAD').trim()
     gitShortSHA = gitSHA.take(7)
-    gitBranch = sh(returnStdout: true, script: 'git rev-parse --abbrev-ref HEAD').trim()
+    gitBranch = sh(returnStdout: true, script: 'git name-rev --name-only HEAD').trim()
 
     stage('Debug') {
         sh 'env'
