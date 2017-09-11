@@ -41,3 +41,30 @@ func TestUnmarshalMessage(t *testing.T) {
 	}
 	require.Equal(t, expected, got)
 }
+
+func TestMethodAndParamsFromBody(t *testing.T) {
+	body := `{"jsonrpc": "2.0", "method": "subtract", "params": [{"subtrahend": 23, "minuend": 42}]}`
+	paramsExpect := []interface{}{
+		map[string]interface{}{
+			"subtrahend": float64(23),
+			"minuend":    float64(42),
+		},
+	}
+
+	method, params, err := methodAndParamsFromBody(body)
+	require.NoError(t, err)
+	require.Equal(t, "subtract", method)
+	require.Equal(t, paramsExpect, params)
+
+	body = `{"jsonrpc": "2.0", "method": "test", "params": []}`
+	method, params, err = methodAndParamsFromBody(body)
+	require.NoError(t, err)
+	require.Equal(t, "test", method)
+	require.Equal(t, []interface{}{}, params)
+
+	body = `{"jsonrpc": "2.0", "method": "test"}`
+	method, params, err = methodAndParamsFromBody(body)
+	require.NoError(t, err)
+	require.Equal(t, "test", method)
+	require.Equal(t, []interface{}{}, params)
+}

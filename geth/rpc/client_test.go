@@ -46,7 +46,7 @@ func (s *RPCTestSuite) SetupTest() {
 
 func (s *RPCTestSuite) TestRPCSendTransaction() {
 	require := s.Require()
-	expectedResponse := []byte(`{"jsonrpc": "2.0", "status":200, "result": "3434=done"}`)
+	expectedResponse := []byte(`{"jsonrpc":"2.0","result":"3434=done"}`)
 
 	// httpRPCServer will serve as an upstream server accepting transactions.
 	httpRPCServer := httptest.NewServer(service{
@@ -59,7 +59,7 @@ func (s *RPCTestSuite) TestRPCSendTransaction() {
 
 			if txReq.Method == "eth_getTransactionCount" {
 				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(`{"jsonrpc": "2.0", "status":200, "result": "0x434"}`))
+				w.Write([]byte(`{"jsonrpc": "2.0", "result": "0x434"}`))
 				return
 			}
 

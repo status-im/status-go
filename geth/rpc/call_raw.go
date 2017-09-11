@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
+	"github.com/status-im/status-go/geth/log"
 )
 
 const (
@@ -49,22 +50,14 @@ type jsonError struct {
 // refactoring go-ethereum's client to allow using raw JSON directly.
 func (c *Client) callRawContext(ctx context.Context, body string) string {
 	// unmarshal JSON body into json-rpc request
-	msg, err := unmarshalMessage(body)
-	if err != nil {
-		return newErrorResponse(errInvalidMessageCode, err)
-	}
-
-	method := msg.Method
-
-	var params []interface{}
-	err = json.Unmarshal(msg.Params, &params)
+	method, params, err := methodAndParamsFromBody(body)
 	if err != nil {
 		return newErrorResponse(errInvalidMessageCode, err)
 	}
 
 	// route and execute
 	var result json.RawMessage
-	err = c.CallContext(ctx, result, method, params...)
+	err = c.CallContext(ctx, &result, method, params...)
 
 	// as we have to return original JSON, we have to
 	// analyze returned error and reconstruct original
@@ -79,6 +72,28 @@ func (c *Client) callRawContext(ctx context.Context, body string) string {
 
 	// finally, marshal answer
 	return newSuccessResponse(result)
+}
+
+// methodAndParamsFromBody extracts Method and Params of
+// JSON-RPC body into values ready to use with ethereum-go's
+// RPC client Call() function. A lot of empty interface usage is
+// due to the underlying code design :/
+func methodAndParamsFromBody(body string) (string, []interface{}, error) {
+	msg, err := unmarshalMessage(body)
+	if err != nil {
+		return "", nil, err
+	}
+
+	params := []interface{}{}
+	if msg.Params != nil {
+		err = json.Unmarshal(msg.Params, &params)
+		if err != nil {
+			log.Error("unmarshal params", "error", err)
+			return "", nil, err
+		}
+	}
+
+	return msg.Method, params, nil
 }
 
 func unmarshalMessage(body string) (*jsonrpcMessage, error) {
