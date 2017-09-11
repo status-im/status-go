@@ -6,6 +6,8 @@ def getVersion(branch, sha) {
 }
 
 node {
+    checkout scm
+
     def remoteOriginRegex = ~/^remotes\/origin\//
 
     gitSHA = sh(returnStdout: true, script: 'git rev-parse HEAD').trim()
