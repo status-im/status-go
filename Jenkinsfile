@@ -5,9 +5,7 @@ node {
 
     stage('Build') {
         def scmVars = checkout scm
-        print scmVars
-        print scmVars.BRANCH_NAME
-        print scmVars['GIT_COMMIT']
+        print scmVars.GIT_COMMIT
         // sh 'make statusgo-android'
     }
 
