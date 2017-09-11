@@ -94,10 +94,7 @@ func makeSendHandler(jail *Jail) func(call otto.FunctionCall) (response otto.Val
 // makeJethIsConnectedHandler returns jeth.isConnected() handler
 func makeJethIsConnectedHandler(jail *Jail) func(call otto.FunctionCall) (response otto.Value) {
 	return func(call otto.FunctionCall) otto.Value {
-		client, err := jail.nodeManager.RPCClient()
-		if err != nil {
-			return newErrorResponse(call.Otto, -32603, err.Error(), nil)
-		}
+		client := jail.nodeManager.RPCClient()
 
 		var netListeningResult bool
 		if err := client.Call(&netListeningResult, "net_listening"); err != nil {
