@@ -1,13 +1,17 @@
 node {
+    gitSHA = sh(returnStdout: true, script: 'git rev-parse HEAD').trim()
+    gitShortSHA = gitCommit.take(7)
+    gitBranch = sh(returnStdout: true, script: 'git rev-parse --abbrev-ref HEAD').trim()
+
     stage('Debug') {
         sh 'env'
+        print gitBranch
+        print gitSHA
     }
 
-    stage('Build') {
-        def scmVars = checkout scm
-        print scmVars.GIT_COMMIT
-        // sh 'make statusgo-android'
-    }
+    // stage('Build') {
+    //     sh 'make statusgo-android'
+    // }
 
     // stage('Deploy') {
     //     withCredentials([usernameColonPassword(credentialsId: 'artifactory-deploy-bot', variable: 'USERPASS')]) {
