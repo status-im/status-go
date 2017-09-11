@@ -8,8 +8,6 @@ node {
     }
 
     stage('Deploy') {
-        let version=$(get_version ${TRAVIS_BRANCH} ${TRAVIS_COMMIT})
-
         withCredentials([usernameColonPassword(credentialsId: 'artifactory-deploy-bot', variable: 'USERPASS')]) {
             sh '''
                 set +x
