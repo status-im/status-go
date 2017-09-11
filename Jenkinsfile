@@ -25,15 +25,18 @@ node {
     }
 
     stage('Deploy') {
-        env.version = getVersion(gitBranch, gitShortSHA)
+        def version = getVersion(gitBranch, gitShortSHA)
+        def server = Artifactory.server 'artifactory'
+        def uploadSpec = """{
+            "files": [
+                {
+                    "pattern": "build/bin/statusgo-android-16.aar",
+                    "target": "libs-release-local/status-im/status-go/${version}/status-go-${version}.aar"
+                }
+            ]
+        }"""
 
-        withCredentials([usernameColonPassword(credentialsId: 'artifactory-deploy-bot', variable: 'USERPASS')]) {
-            sh '''
-                set +x
-                curl -u "${USERPASS}" \
-                    -X PUT "http://139.162.11.12:8081/artifactory/libs-release-local/status-im/status-go/${version}/status-go-${version}.aar" \
-                    -T ./build/bin/statusgo-android-16.aar
-            '''
-        }
+        def buildInfo = server.upload(uploadSpec)
+        println(buildInfo)
     }
 }
