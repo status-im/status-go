@@ -24,45 +24,44 @@ type NodeChainTestSuite struct {
 }
 
 // Setup sets up the related entities for running this test suite.
-func (nc *NodeChainTestSuite) SetupTest() {
-	require := nc.Require()
+func (s *NodeChainTestSuite) SetupTest() {
+	require := s.Require()
 
-	nc.NodeManager = node.NewNodeManager()
+	s.NodeManager = node.NewNodeManager()
 
 	chainDir, err := ioutil.TempDir("", "chainDir")
 	require.NoError(err)
-	nc.chainDir = chainDir
+	s.chainDir = chainDir
 }
 
-func (nc *NodeChainTestSuite) TearDownTest() {
-	require := nc.Require()
-	err := os.RemoveAll(nc.chainDir)
+func (s *NodeChainTestSuite) TearDownTest() {
+	require := s.Require()
+	err := os.RemoveAll(s.chainDir)
 	require.NoError(err)
 }
 
-func (nc *NodeChainTestSuite) TestResetChainData() {
-	require := nc.Require()
-	require.NotNil(nc.NodeManager)
+func (s *NodeChainTestSuite) TestResetChainData() {
+	require := s.Require()
+	require.NotNil(s.NodeManager)
 
 	nodeConfig, err := MakeTestNodeConfig(params.RopstenNetworkID)
 	require.NoError(err)
 
-	nodeConfig.DataDir = nc.chainDir
-	require.False(nc.NodeManager.IsNodeRunning())
+	nodeConfig.DataDir = s.chainDir
+	require.False(s.NodeManager.IsNodeRunning())
 
-	nodeStarted, err := nc.NodeManager.StartNode(nodeConfig)
+	nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
 	require.NoError(err)
 	<-nodeStarted
-	require.True(nc.NodeManager.IsNodeRunning())
+	require.True(s.NodeManager.IsNodeRunning())
 
-	nc.EnsureNodeSync()
+	s.EnsureNodeSync()
 
-	ready, resetErr := nc.NodeManager.ResetChainData()
+	ready, resetErr := s.NodeManager.ResetChainData()
 	require.NoError(resetErr)
 	require.NotNil(ready)
 	<-ready
-	require.True(nc.NodeManager.IsNodeRunning())
+	require.True(s.NodeManager.IsNodeRunning())
 
-	nc.ResetSyncFlag()
-	nc.EnsureNodeSync()
+	s.EnsureNodeSync(true)
 }

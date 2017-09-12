@@ -1,7 +1,6 @@
 package node_test
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"math/rand"
@@ -320,64 +319,6 @@ func (s *ManagerTestSuite) TestReferences() {
 		s.NotNil(obj)
 		s.IsType(testCase.expectedType, obj)
 	}
-}
-
-// TestNodeSynchronizationFailure validates the failure of node synchronization if LightEthereum is disabled.
-func (s *ManagerTestSuite) TestNodeSynchronizationFailure() {
-	require := s.Require()
-
-	nodeConfig, err := MakeTestNodeConfig(params.RopstenNetworkID)
-	require.NoError(err)
-
-	nodeConfig.LightEthConfig.Enabled = true
-
-	nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
-	require.NoError(err)
-	require.NotNil(nodeStarted)
-
-	defer s.NodeManager.StopNode()
-	<-nodeStarted
-
-	ethClient, err := s.NodeManager.LightEthereumService()
-	require.NoError(err)
-	require.NotNil(ethClient)
-
-	sync := node.NewSyncPoll(ethClient)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
-	defer cancel()
-
-	// Validate that synchronization failed because of time.
-	syncError := sync.Poll(ctx)
-	require.NotNil(syncError)
-	require.Equal(syncError, node.ErrNodeSyncFailedToStart)
-}
-
-// TestNodeSynchronizationSuccess validates the working of new node synchronization API.
-func (s *ManagerTestSuite) TestNodeSynchronizationSuccess() {
-	require := s.Require()
-
-	nodeConfig, err := MakeTestNodeConfig(params.RopstenNetworkID)
-	require.NoError(err)
-
-	nodeConfig.LightEthConfig.Enabled = true
-
-	nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
-	require.NoError(err)
-	require.NotNil(nodeStarted)
-
-	defer s.NodeManager.StopNode()
-	<-nodeStarted
-
-	ethClient, err := s.NodeManager.LightEthereumService()
-	require.NoError(err)
-	require.NotNil(ethClient)
-
-	sync := node.NewSyncPoll(ethClient)
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Hour)
-	defer cancel()
-
-	syncError := sync.Poll(ctx)
-	require.NoError(syncError)
 }
 
 func (s *ManagerTestSuite) TestNodeStartStop() {

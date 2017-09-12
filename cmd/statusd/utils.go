@@ -263,42 +263,6 @@ func testGetDefaultConfig(t *testing.T) bool {
 	return true
 }
 
-// func testResetChainData(t *testing.T) bool {
-// 	resetChainDataResponse := common.APIResponse{}
-
-// 	rawResponse := ResetChainData()
-
-// 	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &resetChainDataResponse); err != nil {
-// 		t.Errorf("cannot decode ResetChainData response (%s): %v", C.GoString(rawResponse), err)
-// 		return false
-// 	}
-// 	if resetChainDataResponse.Error != "" {
-// 		t.Errorf("unexpected error: %s", resetChainDataResponse.Error)
-// 		return false
-// 	}
-
-// 	// time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to re-sync blockchain
-// 	ethClient, err := statusAPI.NodeManager().LightEthereumService()
-// 	if err != nil {
-// 		t.Errorf("failed to retrieve LightEthereumService from StatusAP: %+q", err)
-// 		return false
-// 	}
-
-// 	syncer := node.NewSyncPoll(ethClient)
-// 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Hour)
-// 	defer cancel()
-
-// 	// Validate that synchronization failed because of time.
-// 	if err := syncer.Poll(ctx); err != nil {
-// 		t.Errorf("failed to re-sync blockchain after ResetChainData: %+q", err)
-// 		return false
-// 	}
-
-// 	testCompleteTransaction(t)
-
-// 	return true
-// }
-
 func testStopResumeNode(t *testing.T) bool {
 	// to make sure that we start with empty account (which might get populated during previous tests)
 	if err := statusAPI.Logout(); err != nil {

@@ -11,8 +11,8 @@ import (
 
 // errors
 var (
-	ErrNodeSyncFailedToStart = errors.New("node synchronization failed to start")
-	ErrNodeSyncTakesTooLong  = errors.New("node synchronization is taking too long")
+	ErrSyncStartTimeout  = errors.New("node synchronization timeout before start")
+	ErrSyncFinishTimeout = errors.New("node synchronization timeout before completion")
 )
 
 // delays
@@ -52,8 +52,8 @@ func (n *SyncPoll) pollSyncStart(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			return ErrNodeSyncFailedToStart
-		case <-time.After(delayCycleForSyncStart):
+			return ErrSyncStartTimeout
+		case <-time.After(100 * time.Millisecond):
 			if n.downloader.Synchronising() {
 				return nil
 			}
@@ -65,8 +65,8 @@ func (n *SyncPoll) pollSyncCompleted(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			return ErrNodeSyncTakesTooLong
-		case <-time.After(delayCycleForSyncStart):
+			return ErrSyncFinishTimeout
+		case <-time.After(100 * time.Millisecond):
 			progress := n.downloader.Progress()
 			if progress.CurrentBlock >= progress.HighestBlock {
 				return nil
