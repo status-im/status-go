@@ -68,7 +68,7 @@
             }
         },
         "DataDir": "$TMPDIR/wnode",
-        "Port": 30379,
+        "Port": 30303,
         "MinimumPoW": 0.001,
         "TTL": 120
     },
