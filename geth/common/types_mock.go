@@ -374,41 +374,6 @@ func (mr *MockAccountManagerMockRecorder) AddressToDecryptedAccount(address, pas
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddressToDecryptedAccount", reflect.TypeOf((*MockAccountManager)(nil).AddressToDecryptedAccount), address, password)
 }
 
-// MockRPCManager is a mock of RPCManager interface
-type MockRPCManager struct {
-	ctrl     *gomock.Controller
-	recorder *MockRPCManagerMockRecorder
-}
-
-// MockRPCManagerMockRecorder is the mock recorder for MockRPCManager
-type MockRPCManagerMockRecorder struct {
-	mock *MockRPCManager
-}
-
-// NewMockRPCManager creates a new mock instance
-func NewMockRPCManager(ctrl *gomock.Controller) *MockRPCManager {
-	mock := &MockRPCManager{ctrl: ctrl}
-	mock.recorder = &MockRPCManagerMockRecorder{mock}
-	return mock
-}
-
-// EXPECT returns an object that allows the caller to indicate expected use
-func (m *MockRPCManager) EXPECT() *MockRPCManagerMockRecorder {
-	return m.recorder
-}
-
-// Call mocks base method
-func (m *MockRPCManager) Call(inputJSON string) string {
-	ret := m.ctrl.Call(m, "Call", inputJSON)
-	ret0, _ := ret[0].(string)
-	return ret0
-}
-
-// Call indicates an expected call of Call
-func (mr *MockRPCManagerMockRecorder) Call(inputJSON interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Call", reflect.TypeOf((*MockRPCManager)(nil).Call), inputJSON)
-}
-
 // MockTxQueue is a mock of TxQueue interface
 type MockTxQueue struct {
 	ctrl     *gomock.Controller

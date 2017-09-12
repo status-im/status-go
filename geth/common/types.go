@@ -134,12 +134,6 @@ type AccountManager interface {
 	AddressToDecryptedAccount(address, password string) (accounts.Account, *keystore.Key, error)
 }
 
-// RPCManager defines expected methods for managing RPC client/server
-type RPCManager interface {
-	// Call executes RPC request on node's in-proc RPC server
-	Call(inputJSON string) string
-}
-
 // RawCompleteTransactionResult is a JSON returned from transaction complete function (used internally)
 type RawCompleteTransactionResult struct {
 	Hash  common.Hash
