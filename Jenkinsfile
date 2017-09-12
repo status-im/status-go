@@ -20,6 +20,11 @@ node {
         println(gitSHA)
     }
 
+    // TODO(adam): enable when unit tests start passing
+    // stage('Test') {
+    //     sh 'make ci'
+    // }
+
     stage('Build') {
         sh 'make statusgo-android'
     }
@@ -36,10 +41,13 @@ node {
             ]
         }"""
 
+        // TODO(adam): do we need a POM file?
+
         def buildInfo = Artifactory.newBuildInfo()
+        buildInfo.name = 'status-go'
         server.upload(uploadSpec, buildInfo)
-        // server upload iOS
-        // server upload iOS simulator
+        // TODO(adam): server upload iOS
+        // TODO(adam): server upload iOS simulator
         server.publishBuildInfo(buildInfo)
     }
 }
