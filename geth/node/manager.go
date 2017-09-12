@@ -132,16 +132,20 @@ func (m *NodeManager) StopNode() (<-chan struct{}, error) {
 	m.Lock()
 	defer m.Unlock()
 
+	if err := m.isNodeAvailable(); err != nil {
+		return nil, err
+	}
+	if m.nodeStopped == nil {
+		return nil, ErrNoRunningNode
+	}
+
+	<-m.nodeStarted // make sure you operate on fully started node
+
 	return m.stopNode()
 }
 
 // stopNode stop Status node. Stopped node cannot be resumed.
 func (m *NodeManager) stopNode() (<-chan struct{}, error) {
-	if m.node == nil || m.nodeStarted == nil || m.nodeStopped == nil {
-		return nil, ErrNoRunningNode
-	}
-	<-m.nodeStarted // make sure you operate on fully started node
-
 	// now attempt to stop
 	if err := m.node.Stop(); err != nil {
 		return nil, err
@@ -181,10 +185,10 @@ func (m *NodeManager) IsNodeRunning() bool {
 	m.RLock()
 	defer m.RUnlock()
 
-	// make sure that node is fully started
-	if m.node == nil || m.nodeStarted == nil {
+	if err := m.isNodeAvailable(); err != nil {
 		return false
 	}
+
 	<-m.nodeStarted
 
 	return true
@@ -195,10 +199,10 @@ func (m *NodeManager) Node() (*node.Node, error) {
 	m.RLock()
 	defer m.RUnlock()
 
-	// make sure that node is fully started
-	if m.node == nil || m.nodeStarted == nil {
-		return nil, ErrNoRunningNode
+	if err := m.isNodeAvailable(); err != nil {
+		return nil, err
 	}
+
 	<-m.nodeStarted
 
 	return m.node, nil
@@ -209,17 +213,17 @@ func (m *NodeManager) PopulateStaticPeers() error {
 	m.RLock()
 	defer m.RUnlock()
 
+	if err := m.isNodeAvailable(); err != nil {
+		return err
+	}
+
+	<-m.nodeStarted
+
 	return m.populateStaticPeers()
 }
 
 // populateStaticPeers connects current node with our publicly available LES/SHH/Swarm cluster
 func (m *NodeManager) populateStaticPeers() error {
-	// make sure that node is fully started
-	if m.node == nil || m.nodeStarted == nil {
-		return ErrNoRunningNode
-	}
-	<-m.nodeStarted
-
 	if !m.config.BootClusterConfig.Enabled {
 		log.Info("Boot cluster is disabled")
 		return nil
@@ -242,17 +246,17 @@ func (m *NodeManager) AddPeer(url string) error {
 	m.RLock()
 	defer m.RUnlock()
 
+	if err := m.isNodeAvailable(); err != nil {
+		return err
+	}
+
+	<-m.nodeStarted
+
 	return m.addPeer(url)
 }
 
 // addPeer adds new static peer node
 func (m *NodeManager) addPeer(url string) error {
-	// make sure that node is fully started
-	if m.node == nil || m.nodeStarted == nil {
-		return ErrNoRunningNode
-	}
-	<-m.nodeStarted
-
 	server := m.node.Server()
 	if server == nil {
 		return ErrNoRunningNode
@@ -274,18 +278,18 @@ func (m *NodeManager) ResetChainData() (<-chan struct{}, error) {
 	m.Lock()
 	defer m.Unlock()
 
+	if err := m.isNodeAvailable(); err != nil {
+		return nil, err
+	}
+
+	<-m.nodeStarted
+
 	return m.resetChainData()
 }
 
 // resetChainData remove chain data from data directory.
 // Node is stopped, and new node is started, with clean data directory.
 func (m *NodeManager) resetChainData() (<-chan struct{}, error) {
-	// make sure that node is fully started
-	if m.node == nil || m.nodeStarted == nil {
-		return nil, ErrNoRunningNode
-	}
-	<-m.nodeStarted
-
 	prevConfig := *m.config
 	nodeStopped, err := m.stopNode()
 	if err != nil {
@@ -318,17 +322,17 @@ func (m *NodeManager) RestartNode() (<-chan struct{}, error) {
 	m.Lock()
 	defer m.Unlock()
 
+	if err := m.isNodeAvailable(); err != nil {
+		return nil, err
+	}
+
+	<-m.nodeStarted
+
 	return m.restartNode()
 }
 
 // restartNode restart running Status node, fails if node is not running
 func (m *NodeManager) restartNode() (<-chan struct{}, error) {
-	// make sure that node is fully started
-	if m.node == nil || m.nodeStarted == nil {
-		return nil, ErrNoRunningNode
-	}
-	<-m.nodeStarted
-
 	prevConfig := *m.config
 	nodeStopped, err := m.stopNode()
 	if err != nil {
@@ -347,10 +351,10 @@ func (m *NodeManager) NodeConfig() (*params.NodeConfig, error) {
 	m.RLock()
 	defer m.RUnlock()
 
-	// make sure that node is fully started
-	if m.node == nil || m.nodeStarted == nil {
-		return nil, ErrNoRunningNode
+	if err := m.isNodeAvailable(); err != nil {
+		return nil, err
 	}
+
 	<-m.nodeStarted
 
 	return m.config, nil
@@ -361,10 +365,10 @@ func (m *NodeManager) LightEthereumService() (*les.LightEthereum, error) {
 	m.RLock()
 	defer m.RUnlock()
 
-	// make sure that node is fully started
-	if m.node == nil || m.nodeStarted == nil {
-		return nil, ErrNoRunningNode
+	if err := m.isNodeAvailable(); err != nil {
+		return nil, err
 	}
+
 	<-m.nodeStarted
 
 	if m.lesService == nil {
@@ -386,10 +390,10 @@ func (m *NodeManager) WhisperService() (*whisper.Whisper, error) {
 	m.RLock()
 	defer m.RUnlock()
 
-	// make sure that node is fully started
-	if m.node == nil || m.nodeStarted == nil {
-		return nil, ErrNoRunningNode
+	if err := m.isNodeAvailable(); err != nil {
+		return nil, err
 	}
+
 	<-m.nodeStarted
 
 	if m.whisperService == nil {
@@ -411,10 +415,10 @@ func (m *NodeManager) AccountManager() (*accounts.Manager, error) {
 	m.RLock()
 	defer m.RUnlock()
 
-	// make sure that node is fully started
-	if m.node == nil || m.nodeStarted == nil {
-		return nil, ErrNoRunningNode
+	if err := m.isNodeAvailable(); err != nil {
+		return nil, err
 	}
+
 	<-m.nodeStarted
 
 	accountManager := m.node.AccountManager()
@@ -430,10 +434,10 @@ func (m *NodeManager) AccountKeyStore() (*keystore.KeyStore, error) {
 	m.RLock()
 	defer m.RUnlock()
 
-	// make sure that node is fully started
-	if m.node == nil || m.nodeStarted == nil {
-		return nil, ErrNoRunningNode
+	if err := m.isNodeAvailable(); err != nil {
+		return nil, err
 	}
+
 	<-m.nodeStarted
 
 	accountManager := m.node.AccountManager()
@@ -473,4 +477,13 @@ func (m *NodeManager) initLog(config *params.NodeConfig) {
 			fmt.Println("Failed to open log file, using stdout")
 		}
 	}
+}
+
+// isNodeAvailable check if we have a node running and make sure is fully started
+func (m *NodeManager) isNodeAvailable() error {
+	if m.nodeStarted == nil || m.node == nil {
+		return ErrNoRunningNode
+	}
+
+	return nil
 }
