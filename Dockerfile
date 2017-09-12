@@ -9,7 +9,7 @@ RUN \
   rm -rf /status-go && rm -rf /var/cache/apk/*
 
 EXPOSE 8545
-EXPOSE 30303
+EXPOSE 30379
 EXPOSE 3001
 
 ENTRYPOINT ["/statusd"]
