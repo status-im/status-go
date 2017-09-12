@@ -11,8 +11,8 @@ import (
 
 // errors
 var (
-	ErrSyncStartTimeout  = errors.New("node synchronization timeout before start")
-	ErrSyncFinishTimeout = errors.New("node synchronization timeout before completion")
+	ErrSyncStartTimeout = errors.New("node synchronization timeout before start")
+	ErrSyncAborted      = errors.New("node synchronization timeout before completion")
 )
 
 // delays
@@ -65,7 +65,7 @@ func (n *SyncPoll) pollSyncCompleted(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			return ErrSyncFinishTimeout
+			return ErrSyncAborted
 		case <-time.After(100 * time.Millisecond):
 			progress := n.downloader.Progress()
 			if progress.CurrentBlock >= progress.HighestBlock {
