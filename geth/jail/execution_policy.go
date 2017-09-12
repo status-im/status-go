@@ -107,7 +107,7 @@ func (ep *ExecutionPolicy) executeWithClient(client *rpc.Client, req common.RPCC
 				"message": err2.Error(),
 			})
 		} else {
-			resp = newErrorResponse(call.Otto, -32603, err2.Error(), &req.ID).Object()
+			resp = newErrorResponse(call.Otto, -32603, err.Error(), &req.ID).Object()
 		}
 	}
 
