@@ -135,7 +135,7 @@ func (s *RPCTestSuite) TestCallRPC() {
 				"gas": "0x76c0",
 				"gasPrice": "0x9184e72a000",
 				"value": "0x9184e72a",
-				"data": "0xd46e8dd67c5d32be8d46e8dd67c5d32be8058bb8eb970870f072445675058bb8eb970870f072445675"}],"id":1}`,
+				"data": "0xd46e8dd67c5d32be8d46e8dd67c5d32be8058bb8eb970870f072445675058bb8eb970870f072445675"}]}`,
 			func(resultJSON string) {
 				log.Info("eth_sendTransaction")
 				s.T().Log("GOT: ", resultJSON)
@@ -145,7 +145,7 @@ func (s *RPCTestSuite) TestCallRPC() {
 		{
 			`{"jsonrpc":"2.0","method":"shh_version","params":[],"id":67}`,
 			func(resultJSON string) {
-				expected := `{"jsonrpc":"2.0","id":67,"result":"5.0"}` + "\n"
+				expected := `{"jsonrpc":"2.0","result":"5.0"}`
 				s.Equal(expected, resultJSON)
 				s.T().Log("shh_version: ", resultJSON)
 				progress <- struct{}{}
@@ -154,7 +154,7 @@ func (s *RPCTestSuite) TestCallRPC() {
 		{
 			`{"jsonrpc":"2.0","method":"web3_sha3","params":["0x68656c6c6f20776f726c64"],"id":64}`,
 			func(resultJSON string) {
-				expected := `{"jsonrpc":"2.0","id":64,"result":"0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad"}` + "\n"
+				expected := `{"jsonrpc":"2.0","result":"0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad"}`
 				s.Equal(expected, resultJSON)
 				s.T().Log("web3_sha3: ", resultJSON)
 				progress <- struct{}{}
@@ -163,7 +163,7 @@ func (s *RPCTestSuite) TestCallRPC() {
 		{
 			`{"jsonrpc":"2.0","method":"net_version","params":[],"id":67}`,
 			func(resultJSON string) {
-				expected := `{"jsonrpc":"2.0","id":67,"result":"4"}` + "\n"
+				expected := `{"jsonrpc":"2.0","result":"4"}`
 				s.Equal(expected, resultJSON)
 				s.T().Log("net_version: ", resultJSON)
 				progress <- struct{}{}
