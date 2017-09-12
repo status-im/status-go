@@ -5,12 +5,16 @@ package rpc
 // Local node.
 type router struct {
 	methods map[string]bool
+
+	upstreamEnabled bool
 }
 
 // newRouter inits new router.
-func newRouter() *router {
+func newRouter(upstreamEnabled bool) *router {
 	r := &router{
 		methods: make(map[string]bool),
+
+		upstreamEnabled: upstreamEnabled,
 	}
 
 	for _, m := range localMethods {
@@ -20,9 +24,16 @@ func newRouter() *router {
 	return r
 }
 
-// isLocal returns true if given method should be routed to
+// routeLocally returns true if given method should be routed to
 // the local node
-func (r *router) isLocal(method string) bool {
+func (r *router) routeLocally(method string) bool {
+	// if upstream is disabled, always route to
+	// the local node
+	if !r.upstreamEnabled {
+		return true
+	}
+
+	// else check route using the methods list
 	return r.methods[method]
 }
 

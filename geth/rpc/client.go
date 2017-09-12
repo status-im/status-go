@@ -27,9 +27,7 @@ type Client struct {
 // Client is safe for concurrent use and will automatically
 // reconnect to the server if connection is lost.
 func NewClient(node *node.Node, upstreamURL string) (*Client, error) {
-	c := &Client{
-		router: newRouter(),
-	}
+	c := &Client{}
 
 	var err error
 	c.local, err = node.Attach()
@@ -46,6 +44,8 @@ func NewClient(node *node.Node, upstreamURL string) (*Client, error) {
 			return nil, fmt.Errorf("dial upstream RPC server: %s", err)
 		}
 	}
+
+	c.router = newRouter(c.upstreamEnabled)
 
 	return c, nil
 }
@@ -70,7 +70,7 @@ func (c *Client) Call(result interface{}, method string, args ...interface{}) er
 //
 // It uses custom routing scheme for calls.
 func (c *Client) CallContext(ctx context.Context, result interface{}, method string, args ...interface{}) error {
-	if !c.upstreamEnabled || c.router.isLocal(method) {
+	if c.router.routeLocally(method) {
 		return c.local.CallContext(ctx, result, method, args...)
 	}
 
