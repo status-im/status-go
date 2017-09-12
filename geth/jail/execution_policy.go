@@ -101,13 +101,13 @@ func (ep *ExecutionPolicy) executeWithClient(client *rpc.Client, req common.RPCC
 
 	err = client.Call(&result, req.Method, req.Params...)
 	if err != nil {
-		if err, ok := err.(gethrpc.Error); ok {
+		if err2, ok := err.(gethrpc.Error); ok {
 			resp.Set("error", map[string]interface{}{
-				"code":    err.ErrorCode(),
-				"message": err.Error(),
+				"code":    err2.ErrorCode(),
+				"message": err2.Error(),
 			})
 		} else {
-			resp = newErrorResponse(call.Otto, -32603, err.Error(), &req.ID).Object()
+			resp = newErrorResponse(call.Otto, -32603, err2.Error(), &req.ID).Object()
 		}
 	}
 
