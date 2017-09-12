@@ -48,10 +48,6 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 			testGetDefaultConfig,
 		},
 		{
-			"reset blockchain data",
-			testResetChainData,
-		},
-		{
 			"stop/resume node",
 			testStopResumeNode,
 		},
