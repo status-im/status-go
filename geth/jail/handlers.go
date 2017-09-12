@@ -11,9 +11,7 @@ import (
 
 // signals
 const (
-	EventLocalStorageSet = "local_storage.set"
-	EventSendMessage     = "jail.send_message"
-	EventShowSuggestions = "jail.show_suggestions"
+	EventSignal          = "jail.signal"
 
 	// EventConsoleLog defines the event type for the console.log call.
 	eventConsoleLog = "vm.console.log"
@@ -52,21 +50,6 @@ func registerHandlers(jail *Jail, cell common.JailCell, chatID string) error {
 		return err
 	}
 
-	// define localStorage
-	if err = cell.Set("localStorage", struct{}{}); err != nil {
-		return err
-	}
-
-	// register localStorage.set handler
-	localStorage, err := cell.Get("localStorage")
-	if err != nil {
-		return err
-	}
-
-	if err = localStorage.Object().Set("set", makeLocalStorageSetHandler(chatID)); err != nil {
-		return err
-	}
-
 	// register sendMessage/showSuggestions handlers
 	if err = cell.Set("statusSignals", struct{}{}); err != nil {
 		return err
@@ -76,10 +59,7 @@ func registerHandlers(jail *Jail, cell common.JailCell, chatID string) error {
 		return err
 	}
 	registerHandler = statusSignals.Object().Set
-	if err = registerHandler("sendMessage", makeSendMessageHandler(chatID)); err != nil {
-		return err
-	}
-	if err = registerHandler("showSuggestions", makeShowSuggestionsHandler(chatID)); err != nil {
+	if err = registerHandler("sendSignal", makeSignalHandler(chatID)); err != nil {
 		return err
 	}
 
@@ -112,66 +92,21 @@ func makeJethIsConnectedHandler(jail *Jail) func(call otto.FunctionCall) (respon
 	}
 }
 
-// LocalStorageSetEvent is a signal sent whenever local storage Set method is called
-type LocalStorageSetEvent struct {
+// SignalEvent wraps Jail send signals
+type SignalEvent struct {
 	ChatID string `json:"chat_id"`
 	Data   string `json:"data"`
 }
 
-// makeLocalStorageSetHandler returns localStorage.set() handler
-func makeLocalStorageSetHandler(chatID string) func(call otto.FunctionCall) (response otto.Value) {
-	return func(call otto.FunctionCall) otto.Value {
-		data := call.Argument(0).String()
-
-		node.SendSignal(node.SignalEnvelope{
-			Type: EventLocalStorageSet,
-			Event: LocalStorageSetEvent{
-				ChatID: chatID,
-				Data:   data,
-			},
-		})
-
-		return newResultResponse(call.Otto, true)
-	}
-}
-
-// SendMessageEvent wraps Jail send signals
-type SendMessageEvent struct {
-	ChatID  string `json:"chat_id"`
-	Message string `json:"message"`
-}
-
-func makeSendMessageHandler(chatID string) func(call otto.FunctionCall) (response otto.Value) {
+func makeSignalHandler(chatID string) func(call otto.FunctionCall) otto.Value {
 	return func(call otto.FunctionCall) otto.Value {
 		message := call.Argument(0).String()
 
 		node.SendSignal(node.SignalEnvelope{
-			Type: EventSendMessage,
-			Event: SendMessageEvent{
-				ChatID:  chatID,
-				Message: message,
-			},
-		})
-
-		return newResultResponse(call.Otto, true)
-	}
-}
-
-// ShowSuggestionsEvent wraps Jail show suggestion signals
-type ShowSuggestionsEvent struct {
-	ChatID string `json:"chat_id"`
-	Markup string `json:"markup"`
-}
-
-func makeShowSuggestionsHandler(chatID string) func(call otto.FunctionCall) (response otto.Value) {
-	return func(call otto.FunctionCall) otto.Value {
-		suggestionsMarkup := call.Argument(0).String()
-
-		node.SendSignal(node.SignalEnvelope{
-			Type: EventShowSuggestions,
-			Event: ShowSuggestionsEvent{
+			Type: EventSignal,
+			Event: SignalEvent{
 				ChatID: chatID,
-				Markup: suggestionsMarkup,
+				Data:   message,
 			},
 		})
 
