@@ -15,12 +15,6 @@ var (
 	ErrSyncAborted      = errors.New("node synchronization timeout before completion")
 )
 
-// delays
-var (
-	// delayCycleForSyncStart sets the timeout for checking state of synchronization starting.
-	delayCycleForSyncStart = 100 * time.Millisecond
-)
-
 // SyncPoll provides a structure that allows us to check the status of
 // ethereum node synchronization.
 type SyncPoll struct {
