@@ -107,7 +107,7 @@ var (
 			WhisperPoWFlag,
 			WhisperPortFlag,
 			WhisperTTLFlag,
-			WhisperInjectTestAccounts,
+			//WhisperInjectTestAccounts,
 			FirebaseAuthorizationKey,
 			HTTPEnabledFlag,
 			HTTPPortFlag,
@@ -124,29 +124,31 @@ func wnode(ctx *cli.Context) error {
 
 	wnodePrintHeader(config)
 
-	// import test accounts
-	if ctx.BoolT(WhisperInjectTestAccounts.Name) {
-		if err = common.ImportTestAccount(filepath.Join(config.DataDir, "keystore"), "test-account1.pk"); err != nil {
+	/*
+		// import test accounts
+		if ctx.BoolT(WhisperInjectTestAccounts.Name) {
+			if err = common.ImportTestAccount(filepath.Join(config.DataDir, "keystore"), "test-account1.pk"); err != nil {
+				return err
+			}
+			if err = common.ImportTestAccount(filepath.Join(config.DataDir, "keystore"), "test-account2.pk"); err != nil {
+				return err
+			}
+		}
+		if err := statusAPI.StartNode(config); err != nil {
 			return err
 		}
-		if err = common.ImportTestAccount(filepath.Join(config.DataDir, "keystore"), "test-account2.pk"); err != nil {
-			return err
-		}
-	}
-	if err := statusAPI.StartNode(config); err != nil {
-		return err
-	}
 
-	// inject test accounts into Whisper
-	if ctx.BoolT(WhisperInjectTestAccounts.Name) {
-		testConfig, _ := common.LoadTestConfig()
-		if err = injectAccountIntoWhisper(testConfig.Account1.Address, testConfig.Account1.Password); err != nil {
-			return err
+		// inject test accounts into Whisper
+		if ctx.BoolT(WhisperInjectTestAccounts.Name) {
+			testConfig, _ := common.LoadTestConfig()
+			if err = injectAccountIntoWhisper(testConfig.Account1.Address, testConfig.Account1.Password); err != nil {
+				return err
+			}
+			if err = injectAccountIntoWhisper(testConfig.Account2.Address, testConfig.Account2.Password); err != nil {
+				return err
+			}
 		}
-		if err = injectAccountIntoWhisper(testConfig.Account2.Address, testConfig.Account2.Password); err != nil {
-			return err
-		}
-	}
+	*/
 
 	// wait till node has been stopped
 	node, err := statusAPI.NodeManager().Node()
