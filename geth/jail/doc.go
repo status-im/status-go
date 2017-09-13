@@ -21,7 +21,7 @@ Otto virtual machine and lives forever, but that may change in the future.
 Cells
 
 Each Cell object embeds *VM from 'jail/vm' for concurrency safe wrapper around
-*otto.VM functions. This important when dealing with setTimeout and Fetch API
+*otto.VM functions. This is important when dealing with setTimeout and Fetch API
 functions (see below).
 
 Get and Set
@@ -40,8 +40,7 @@ Timeouts and intervals support
 
 Default Otto VM interpreter doesn't support setTimeout()/setInterval() JS functions,
 because they're not part of ECMA-262 spec, but properties of the window object in browser.
-We add support for them using http://github.com/status-im/ottoext/timers and http://github.com/status-im/ottoext/loop
-packages.
+We add support for them using own implementation of Event Loop, heavily based on http://github.com/status-im/ottoext package. See loop/fetch/promise packages under `jail/internal/`.
 
 Each cell starts a new loop in a separate goroutine, registers functions for setTimeout/setInterval
 calls and associate them with this loop. All JS code executed as callback to setTimeout/setInterval
@@ -64,14 +63,13 @@ In order to capture response one may use following approach:
 
 Fetch support
 
-Fetch API is implemented using http://github.com/status-im/ottoext/fetch package. When
-Cell is created, corresponding handlers are registered within VM and associated event loop.
+Fetch API is implemented in a similar way using the same loop. When Cell is created, corresponding handlers are registered within VM and associated event loop.
 
 Due to asynchronous nature of Fetch API, the following code will return immediately:
 
 	cell.Run(`fetch('http://example.com/').then(function(data) { ... })`)
 
-and callback function in a promise will be executed in a event loop in the backgrounds. Thus,
+and callback function in a promise will be executed in a event loop in the background. Thus,
 it's user responsibility to register a corresponding callback function before:
 
 	cell.Set("__captureSuccess", func(res otto.Value) { ... })
