@@ -2,7 +2,11 @@
 
 @NonCPS
 def getVersion(branch, sha) {
-    return branch.replaceAll(/\//, '-') + '-' + sha
+    if (sha?.trim()) {
+        return branch.replaceAll(/\//, '-') + '-' + sha
+    }
+
+    return branch.replaceAll(/\//, '-')
 }
 
 node {
@@ -12,7 +16,7 @@ node {
 
     gitSHA = sh(returnStdout: true, script: 'git rev-parse HEAD').trim()
     gitShortSHA = gitSHA.take(7)
-    String gitBranch = sh(returnStdout: true, script: 'git name-rev --name-only HEAD').trim() - remoteOriginRegex
+    gitBranch = sh(returnStdout: true, script: 'git name-rev --name-only HEAD').trim() - remoteOriginRegex
 
     stage('Debug') {
         sh 'env'
@@ -26,28 +30,50 @@ node {
     // }
 
     stage('Build') {
-        sh 'make statusgo-android'
+        parallel (
+            'statusgo-android': {
+                sh 'make statusgo-android'
+            },
+            'statusgo-ios-simulator': {
+                sh '''
+                    make statusgo-ios-simulator
+                    cd build/bin/statusgo-ios-9.3-framework/
+                    zip -r status-go-ios.zip Statusgo.framework
+                '''
+            }
+        )
     }
 
     stage('Deploy') {
-        def version = getVersion(gitBranch, gitShortSHA)
+        // For branch builds, replace the old artifact. For develop keep all of them.
+        def version = gitBranch == 'develop' ? getVersion(gitBranch, gitShortSHA) : getVersion(gitBranch, '')
+
+        // Clean up the previous artifacts.
+        withCredentials([usernameColonPassword(credentialsId: 'artifactory-deploy-bot', variable: 'USERPASS')]) {
+            sh """
+                curl -u "${USERPASS}" -X DELETE "http://artifacts.status.im:8081/artifactory/libs-release-local/status-im/status-go/${version}"
+                curl -u "${USERPASS}" -X DELETE "http://artifacts.status.im:8081/artifactory/libs-release-local/status-im/status-go-ios-simulator/${version}"
+            """
+        }
+
         def server = Artifactory.server 'artifactory'
         def uploadSpec = """{
             "files": [
                 {
                     "pattern": "build/bin/statusgo-android-16.aar",
                     "target": "libs-release-local/status-im/status-go/${version}/status-go-${version}.aar"
+                },
+                {
+                    "pattern": "build/bin/statusgo-ios-9.3-framework/status-go-ios.zip",
+                    "target": "libs-release-local/status-im/status-go-ios-simulator/${version}/status-go-ios-simulator-${version}.zip"
                 }
             ]
         }"""
 
-        // TODO(adam): do we need a POM file?
-
         def buildInfo = Artifactory.newBuildInfo()
+        buildInfo.env.capture = false
         buildInfo.name = 'status-go'
         server.upload(uploadSpec, buildInfo)
-        // TODO(adam): server upload iOS
-        // TODO(adam): server upload iOS simulator
         server.publishBuildInfo(buildInfo)
     }
 }
