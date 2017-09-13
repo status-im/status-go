@@ -94,6 +94,12 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 		m.node = ethNode
 		m.nodeStopped = make(chan struct{}, 1)
 		m.config = config
+
+		// init RPC client for this node
+		m.rpcClient, err = rpc.NewClient(m.node, m.config.UpstreamConfig.URL)
+		if err != nil {
+			log.Error("Init RPC client failed", "error", err)
+		}
 		m.Unlock()
 
 		// underlying node is started, every method can use it, we use it immediately
@@ -102,12 +108,6 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 				log.Error("Static peers population", "error", err)
 			}
 		}()
-
-		// init RPC client for this node
-		m.rpcClient, err = rpc.NewClient(m.node, m.config.UpstreamConfig.URL)
-		if err != nil {
-			log.Error("Init RPC client failed", "error", err)
-		}
 
 		// notify all subscribers that Status node is started
 		close(m.nodeStarted)
