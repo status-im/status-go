@@ -4,16 +4,14 @@ package rpc
 // JSON-RPC requests either to Upstream or
 // Local node.
 type router struct {
-	methods map[string]bool
-
+	methods         map[string]bool
 	upstreamEnabled bool
 }
 
 // newRouter inits new router.
 func newRouter(upstreamEnabled bool) *router {
 	r := &router{
-		methods: make(map[string]bool),
-
+		methods:         make(map[string]bool),
 		upstreamEnabled: upstreamEnabled,
 	}
 

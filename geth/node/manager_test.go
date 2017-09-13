@@ -398,7 +398,7 @@ func (s *ManagerTestSuite) TestRaceConditions() {
 		},
 		func(config *params.NodeConfig) {
 			log.Info("RPCClient()")
-			_ = s.NodeManager.RPCClient()
+			s.NodeManager.RPCClient()
 			progress <- struct{}{}
 		},
 	}
