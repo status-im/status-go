@@ -12,20 +12,20 @@ func TestNewSuccessResponse(t *testing.T) {
 	res := []byte(`"3434=done"`)
 	got := newSuccessResponse(res)
 
-	expected := `{"jsonrpc":"2.0","result":"3434=done"}`
+	expected := `{"jsonrpc":"2.0","id":0,"result":"3434=done"}`
 	require.Equal(t, expected, got)
 
 	res = []byte(`{"field": "value"}`)
 	got = newSuccessResponse(res)
 
-	expected = `{"jsonrpc":"2.0","result":{"field":"value"}}`
+	expected = `{"jsonrpc":"2.0","id":0,"result":{"field":"value"}}`
 	require.Equal(t, expected, got)
 }
 
 func TestNewErrorResponse(t *testing.T) {
 	got := newErrorResponse(-32601, errors.New("Method not found"))
 
-	expected := `{"jsonrpc":"2.0","error":{"code":-32601,"message":"Method not found"}}`
+	expected := `{"jsonrpc":"2.0","id":0,"error":{"code":-32601,"message":"Method not found"}}`
 	require.Equal(t, expected, got)
 }
 

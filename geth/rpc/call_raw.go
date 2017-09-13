@@ -13,6 +13,14 @@ const (
 	errInvalidMessageCode = -32700 // from go-ethereum/rpc/errors.go
 )
 
+// for JSON-RPC responses obtained via CallRaw(), we have no way
+// to know ID field from actual response. web3.js (primary and
+// only user of CallRaw()) will validate response by checking
+// ID field for being a number:
+// https://github.com/ethereum/web3.js/blob/develop/lib/web3/jsonrpc.js#L66
+// thus, we will use zero ID as a workaround of this limitation
+var defaultMsgID = json.RawMessage(`0`)
+
 // CallRaw performs a JSON-RPC call with already crafted JSON-RPC body. It
 // returns string in JSON format with response (successul or error).
 func (c *Client) CallRaw(body string) string {
@@ -104,6 +112,7 @@ func unmarshalMessage(body string) (*jsonrpcMessage, error) {
 
 func newSuccessResponse(result json.RawMessage) string {
 	msg := &jsonrpcMessage{
+		ID:      defaultMsgID,
 		Version: jsonrpcVersion,
 		Result:  result,
 	}
@@ -114,6 +123,7 @@ func newSuccessResponse(result json.RawMessage) string {
 func newErrorResponse(code int, err error) string {
 	errMsg := &jsonrpcMessage{
 		Version: jsonrpcVersion,
+		ID:      defaultMsgID,
 		Error: &jsonError{
 			Code:    code,
 			Message: err.Error(),
