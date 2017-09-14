@@ -10,22 +10,28 @@ import (
 
 func TestNewSuccessResponse(t *testing.T) {
 	res := []byte(`"3434=done"`)
-	got := newSuccessResponse(res)
+	got := newSuccessResponse(res, nil)
 
 	expected := `{"jsonrpc":"2.0","id":0,"result":"3434=done"}`
 	require.Equal(t, expected, got)
 
 	res = []byte(`{"field": "value"}`)
-	got = newSuccessResponse(res)
+	got = newSuccessResponse(res, nil)
 
 	expected = `{"jsonrpc":"2.0","id":0,"result":{"field":"value"}}`
+	require.Equal(t, expected, got)
+
+	res = []byte(`{"field": "value"}`)
+	got = newSuccessResponse(res, json.RawMessage(`42`))
+
+	expected = `{"jsonrpc":"2.0","id":42,"result":{"field":"value"}}`
 	require.Equal(t, expected, got)
 }
 
 func TestNewErrorResponse(t *testing.T) {
-	got := newErrorResponse(-32601, errors.New("Method not found"))
+	got := newErrorResponse(-32601, errors.New("Method not found"), json.RawMessage(`42`))
 
-	expected := `{"jsonrpc":"2.0","id":0,"error":{"code":-32601,"message":"Method not found"}}`
+	expected := `{"jsonrpc":"2.0","id":42,"error":{"code":-32601,"message":"Method not found"}}`
 	require.Equal(t, expected, got)
 }
 
@@ -43,7 +49,7 @@ func TestUnmarshalMessage(t *testing.T) {
 }
 
 func TestMethodAndParamsFromBody(t *testing.T) {
-	body := `{"jsonrpc": "2.0", "method": "subtract", "params": [{"subtrahend": 23, "minuend": 42}]}`
+	body := `{"jsonrpc": "2.0", "id": 42, "method": "subtract", "params": [{"subtrahend": 23, "minuend": 42}]}`
 	paramsExpect := []interface{}{
 		map[string]interface{}{
 			"subtrahend": float64(23),
@@ -51,20 +57,23 @@ func TestMethodAndParamsFromBody(t *testing.T) {
 		},
 	}
 
-	method, params, err := methodAndParamsFromBody(body)
+	method, params, id, err := methodAndParamsFromBody(body)
 	require.NoError(t, err)
 	require.Equal(t, "subtract", method)
 	require.Equal(t, paramsExpect, params)
+	require.Equal(t, json.RawMessage(`42`), id)
 
 	body = `{"jsonrpc": "2.0", "method": "test", "params": []}`
-	method, params, err = methodAndParamsFromBody(body)
+	method, params, id, err = methodAndParamsFromBody(body)
 	require.NoError(t, err)
 	require.Equal(t, "test", method)
 	require.Equal(t, []interface{}{}, params)
+	require.Equal(t, defaultMsgID, id)
 
 	body = `{"jsonrpc": "2.0", "method": "test"}`
-	method, params, err = methodAndParamsFromBody(body)
+	method, params, id, err = methodAndParamsFromBody(body)
 	require.NoError(t, err)
 	require.Equal(t, "test", method)
 	require.Equal(t, []interface{}{}, params)
+	require.Equal(t, defaultMsgID, id)
 }

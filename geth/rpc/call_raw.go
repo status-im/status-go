@@ -58,9 +58,9 @@ type jsonError struct {
 // refactoring go-ethereum's client to allow using raw JSON directly.
 func (c *Client) callRawContext(ctx context.Context, body string) string {
 	// unmarshal JSON body into json-rpc request
-	method, params, err := methodAndParamsFromBody(body)
+	method, params, id, err := methodAndParamsFromBody(body)
 	if err != nil {
-		return newErrorResponse(errInvalidMessageCode, err)
+		return newErrorResponse(errInvalidMessageCode, err, id)
 	}
 
 	// route and execute
@@ -72,24 +72,24 @@ func (c *Client) callRawContext(ctx context.Context, body string) string {
 	// JSON error response.
 	if err != nil && err != gethrpc.ErrNoResult {
 		if er, ok := err.(gethrpc.Error); ok {
-			return newErrorResponse(er.ErrorCode(), err)
+			return newErrorResponse(er.ErrorCode(), err, id)
 		}
 
-		return newErrorResponse(errInvalidMessageCode, err)
+		return newErrorResponse(errInvalidMessageCode, err, id)
 	}
 
 	// finally, marshal answer
-	return newSuccessResponse(result)
+	return newSuccessResponse(result, id)
 }
 
 // methodAndParamsFromBody extracts Method and Params of
 // JSON-RPC body into values ready to use with ethereum-go's
 // RPC client Call() function. A lot of empty interface usage is
 // due to the underlying code design :/
-func methodAndParamsFromBody(body string) (string, []interface{}, error) {
+func methodAndParamsFromBody(body string) (string, []interface{}, json.RawMessage, error) {
 	msg, err := unmarshalMessage(body)
 	if err != nil {
-		return "", nil, err
+		return "", nil, nil, err
 	}
 
 	params := []interface{}{}
@@ -97,11 +97,16 @@ func methodAndParamsFromBody(body string) (string, []interface{}, error) {
 		err = json.Unmarshal(msg.Params, &params)
 		if err != nil {
 			log.Error("unmarshal params", "error", err)
-			return "", nil, err
+			return "", nil, nil, err
 		}
 	}
 
-	return msg.Method, params, nil
+	id := msg.ID
+	if id == nil {
+		id = defaultMsgID
+	}
+
+	return msg.Method, params, id, nil
 }
 
 func unmarshalMessage(body string) (*jsonrpcMessage, error) {
@@ -110,9 +115,9 @@ func unmarshalMessage(body string) (*jsonrpcMessage, error) {
 	return &msg, err
 }
 
-func newSuccessResponse(result json.RawMessage) string {
+func newSuccessResponse(result json.RawMessage, id json.RawMessage) string {
 	msg := &jsonrpcMessage{
-		ID:      defaultMsgID,
+		ID:      id,
 		Version: jsonrpcVersion,
 		Result:  result,
 	}
@@ -120,10 +125,10 @@ func newSuccessResponse(result json.RawMessage) string {
 	return string(data)
 }
 
-func newErrorResponse(code int, err error) string {
+func newErrorResponse(code int, err error, id json.RawMessage) string {
 	errMsg := &jsonrpcMessage{
 		Version: jsonrpcVersion,
-		ID:      defaultMsgID,
+		ID:      id,
 		Error: &jsonError{
 			Code:    code,
 			Message: err.Error(),
