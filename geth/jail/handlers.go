@@ -41,7 +41,7 @@ func registerHandlers(jail *Jail, cell common.JailCell, chatID string) error {
 	}
 
 	// register sendAsync handler
-	if err = registerHandler("sendAsync", makeSendHandler(jail)); err != nil {
+	if err = registerHandler("sendAsync", makeAsyncSendHandler(jail)); err != nil {
 		return err
 	}
 
@@ -64,6 +64,20 @@ func registerHandlers(jail *Jail, cell common.JailCell, chatID string) error {
 	}
 
 	return nil
+}
+
+// makeAsyncSendHandler returns jeth.sendAsync() handler.
+func makeAsyncSendHandler(jail *Jail) func(call otto.FunctionCall) (response otto.Value) {
+	return func(call otto.FunctionCall) (response otto.Value) {
+		go func() {
+			res := jail.Send(call)
+
+			// Deliver response to provided callback.
+			newResultResponse(call.Otto, res)
+		}()
+
+		return otto.UndefinedValue()
+	}
 }
 
 // makeSendHandler returns jeth.send() and jeth.sendAsync() handler
