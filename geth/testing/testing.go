@@ -16,6 +16,7 @@ import (
 	"github.com/status-im/status-go/geth/params"
 	assertions "github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"testing"
 )
 
 var (
@@ -144,12 +145,19 @@ func MakeTestNodeConfig(networkID int) (*params.NodeConfig, error) {
 		testDir = filepath.ToSlash(testDir)
 	}
 
+	// run tests with "INFO" log level only
+	// when `go test` invoked with `-v` flag
+	errorLevel := "ERROR"
+	if testing.Verbose() {
+		errorLevel = "INFO"
+	}
+
 	configJSON := `{
 		"NetworkId": ` + strconv.Itoa(networkID) + `,
 		"DataDir": "` + testDir + `",
 		"HTTPPort": ` + strconv.Itoa(TestConfig.Node.HTTPPort) + `,
 		"WSPort": ` + strconv.Itoa(TestConfig.Node.WSPort) + `,
-		"LogLevel": "INFO"
+		"LogLevel": "` + errorLevel + `"
 	}`
 
 	nodeConfig, err := params.LoadNodeConfig(configJSON)
