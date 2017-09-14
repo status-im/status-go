@@ -68,12 +68,12 @@ func TestMethodAndParamsFromBody(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "test", method)
 	require.Equal(t, []interface{}{}, params)
-	require.Equal(t, defaultMsgID, id)
+	require.Equal(t, json.RawMessage(nil), id)
 
 	body = `{"jsonrpc": "2.0", "method": "test"}`
 	method, params, id, err = methodAndParamsFromBody(body)
 	require.NoError(t, err)
 	require.Equal(t, "test", method)
 	require.Equal(t, []interface{}{}, params)
-	require.Equal(t, defaultMsgID, id)
+	require.Equal(t, json.RawMessage(nil), id)
 }

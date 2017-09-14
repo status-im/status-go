@@ -101,12 +101,7 @@ func methodAndParamsFromBody(body string) (string, []interface{}, json.RawMessag
 		}
 	}
 
-	id := msg.ID
-	if id == nil {
-		id = defaultMsgID
-	}
-
-	return msg.Method, params, id, nil
+	return msg.Method, params, msg.ID, nil
 }
 
 func unmarshalMessage(body string) (*jsonrpcMessage, error) {
@@ -116,6 +111,10 @@ func unmarshalMessage(body string) (*jsonrpcMessage, error) {
 }
 
 func newSuccessResponse(result json.RawMessage, id json.RawMessage) string {
+	if id == nil {
+		id = defaultMsgID
+	}
+
 	msg := &jsonrpcMessage{
 		ID:      id,
 		Version: jsonrpcVersion,
@@ -126,6 +125,10 @@ func newSuccessResponse(result json.RawMessage, id json.RawMessage) string {
 }
 
 func newErrorResponse(code int, err error, id json.RawMessage) string {
+	if id == nil {
+		id = defaultMsgID
+	}
+
 	errMsg := &jsonrpcMessage{
 		Version: jsonrpcVersion,
 		ID:      id,
