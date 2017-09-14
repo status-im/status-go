@@ -104,6 +104,7 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 				log.Warn("Can't connect to Upstream RPC, will retry", "error", err)
 			case rpc.LocalError:
 				log.Error("Init RPC client failed:", "error", err)
+				m.Unlock()
 				SendSignal(SignalEnvelope{
 					Type: EventNodeCrashed,
 					Event: NodeCrashEvent{
