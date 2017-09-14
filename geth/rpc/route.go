@@ -38,6 +38,8 @@ func (r *router) routeLocally(method string) bool {
 // localMethods contains methods that should be routed to
 // the local node; the rest is considered to be routed to
 // the upstream node.
+// TODO: in the future, default option may be "local node",
+// so it'd be convinient to keep track of "remoteMethods" here.
 var localMethods = [...]string{
 	//Whisper commands
 	"shh_post",
