@@ -12,10 +12,10 @@ import (
 	"github.com/ethereum/go-ethereum/les"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/discover"
-	"github.com/ethereum/go-ethereum/rpc"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/geth/rpc"
 )
 
 // errors
@@ -27,8 +27,6 @@ var (
 	ErrInvalidLightEthereumService = errors.New("LES service is unavailable")
 	ErrInvalidAccountManager       = errors.New("could not retrieve account manager")
 	ErrAccountKeyStoreMissing      = errors.New("account key store is not set")
-	ErrInvalidRPCClient            = errors.New("RPC client is unavailable")
-	ErrInvalidRPCServer            = errors.New("RPC server is unavailable")
 )
 
 // NodeManager manages Status node (which abstracts contained geth node)
@@ -41,7 +39,6 @@ type NodeManager struct {
 	whisperService *whisper.Whisper   // reference to Whisper service
 	lesService     *les.LightEthereum // reference to LES service
 	rpcClient      *rpc.Client        // reference to RPC client
-	rpcServer      *rpc.Server        // reference to RPC server
 }
 
 // NewNodeManager makes new instance of node manager
@@ -97,6 +94,12 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 		m.node = ethNode
 		m.nodeStopped = make(chan struct{}, 1)
 		m.config = config
+
+		// init RPC client for this node
+		m.rpcClient, err = rpc.NewClient(m.node, m.config.UpstreamConfig.URL)
+		if err != nil {
+			log.Error("Init RPC client failed", "error", err)
+		}
 		m.Unlock()
 
 		// underlying node is started, every method can use it, we use it immediately
@@ -159,7 +162,6 @@ func (m *NodeManager) stopNode() (<-chan struct{}, error) {
 		m.lesService = nil
 		m.whisperService = nil
 		m.rpcClient = nil
-		m.rpcServer = nil
 		m.nodeStarted = nil
 		m.node = nil
 		m.Unlock()
@@ -456,90 +458,12 @@ func (m *NodeManager) AccountKeyStore() (*keystore.KeyStore, error) {
 	return keyStore, nil
 }
 
-// RPCLocalClient exposes reference to RPC client connected to the running node.
-func (m *NodeManager) RPCLocalClient() (*rpc.Client, error) {
-	m.Lock()
-	defer m.Unlock()
-
-	if err := m.isNodeAvailable(); err != nil {
-		return nil, err
-	}
-
-	<-m.nodeStarted
-
-	if m.rpcClient == nil {
-		var err error
-		m.rpcClient, err = m.node.Attach()
-		if err != nil {
-			log.Error("Cannot attach RPC client to node", "error", err)
-			return nil, ErrInvalidRPCClient
-		}
-	}
-
-	return m.rpcClient, nil
-}
-
-// RPCUpstreamClient exposes reference to RPC client connected to the running node.
-func (m *NodeManager) RPCUpstreamClient() (*rpc.Client, error) {
-	config, err := m.NodeConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	m.Lock()
-	defer m.Unlock()
-
-	if m.rpcClient == nil {
-		m.rpcClient, err = rpc.Dial(config.UpstreamConfig.URL)
-		if err != nil {
-			log.Error("Failed to connect to upstream RPC server", "error", err)
-			return nil, ErrInvalidRPCClient
-		}
-	}
-
-	return m.rpcClient, nil
-}
-
 // RPCClient exposes reference to RPC client connected to the running node.
-func (m *NodeManager) RPCClient() (*rpc.Client, error) {
-	config, err := m.NodeConfig()
-	if err != nil {
-		return nil, err
-	}
+func (m *NodeManager) RPCClient() *rpc.Client {
+	m.Lock()
+	defer m.Unlock()
 
-	// Connect to upstream RPC server with new client and cache instance.
-	if config.UpstreamConfig.Enabled {
-		return m.RPCUpstreamClient()
-	}
-
-	return m.RPCLocalClient()
-}
-
-// RPCServer exposes reference to running node's in-proc RPC server/handler
-func (m *NodeManager) RPCServer() (*rpc.Server, error) {
-	m.RLock()
-	defer m.RUnlock()
-
-	if err := m.isNodeAvailable(); err != nil {
-		return nil, err
-	}
-
-	<-m.nodeStarted
-
-	if m.rpcServer == nil {
-		var err error
-		m.rpcServer, err = m.node.InProcRPC()
-		if err != nil {
-			log.Error("Cannot expose on-proc RPC server", "error", err)
-			return nil, ErrInvalidRPCServer
-		}
-	}
-
-	if m.rpcServer == nil {
-		return nil, ErrInvalidRPCServer
-	}
-
-	return m.rpcServer, nil
+	return m.rpcClient
 }
 
 // initLog initializes global logger parameters based on
