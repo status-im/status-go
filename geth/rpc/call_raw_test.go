@@ -9,23 +9,23 @@ import (
 )
 
 func TestNewSuccessResponse(t *testing.T) {
-	res := []byte(`"3434=done"`)
-	got := newSuccessResponse(res, nil)
+	cases := []struct {
+		name     string
+		result   json.RawMessage
+		id       json.RawMessage
+		expected string
+	}{
+		{"string", json.RawMessage(`"3434=done"`), nil, `{"jsonrpc":"2.0","id":0,"result":"3434=done"}`},
+		{"struct_nil_id", json.RawMessage(`{"field": "value"}`), nil, `{"jsonrpc":"2.0","id":0,"result":{"field":"value"}}`},
+		{"struct_non_nil_id", json.RawMessage(`{"field": "value"}`), json.RawMessage(`42`), `{"jsonrpc":"2.0","id":42,"result":{"field":"value"}}`},
+	}
 
-	expected := `{"jsonrpc":"2.0","id":0,"result":"3434=done"}`
-	require.Equal(t, expected, got)
-
-	res = []byte(`{"field": "value"}`)
-	got = newSuccessResponse(res, nil)
-
-	expected = `{"jsonrpc":"2.0","id":0,"result":{"field":"value"}}`
-	require.Equal(t, expected, got)
-
-	res = []byte(`{"field": "value"}`)
-	got = newSuccessResponse(res, json.RawMessage(`42`))
-
-	expected = `{"jsonrpc":"2.0","id":42,"result":{"field":"value"}}`
-	require.Equal(t, expected, got)
+	for _, test := range cases {
+		t.Run(test.name, func(t *testing.T) {
+			got := newSuccessResponse(test.result, test.id)
+			require.Equal(t, test.expected, got)
+		})
+	}
 }
 
 func TestNewErrorResponse(t *testing.T) {
@@ -49,31 +49,48 @@ func TestUnmarshalMessage(t *testing.T) {
 }
 
 func TestMethodAndParamsFromBody(t *testing.T) {
-	body := `{"jsonrpc": "2.0", "id": 42, "method": "subtract", "params": [{"subtrahend": 23, "minuend": 42}]}`
-	paramsExpect := []interface{}{
-		map[string]interface{}{
-			"subtrahend": float64(23),
-			"minuend":    float64(42),
+	cases := []struct {
+		name   string
+		body   string
+		params []interface{}
+		method string
+		id     json.RawMessage
+	}{
+		{
+			"params_array",
+			`{"jsonrpc": "2.0", "id": 42, "method": "subtract", "params": [{"subtrahend": 23, "minuend": 42}]}`,
+			[]interface{}{
+				map[string]interface{}{
+					"subtrahend": float64(23),
+					"minuend":    float64(42),
+				},
+			},
+			"subtract",
+			json.RawMessage(`42`),
+		},
+		{
+			"params_empty_array",
+			`{"jsonrpc": "2.0", "method": "test", "params": []}`,
+			[]interface{}{},
+			"test",
+			json.RawMessage(nil),
+		},
+		{
+			"params_none",
+			`{"jsonrpc": "2.0", "method": "test"}`,
+			[]interface{}{},
+			"test",
+			json.RawMessage(nil),
 		},
 	}
 
-	method, params, id, err := methodAndParamsFromBody(body)
-	require.NoError(t, err)
-	require.Equal(t, "subtract", method)
-	require.Equal(t, paramsExpect, params)
-	require.Equal(t, json.RawMessage(`42`), id)
-
-	body = `{"jsonrpc": "2.0", "method": "test", "params": []}`
-	method, params, id, err = methodAndParamsFromBody(body)
-	require.NoError(t, err)
-	require.Equal(t, "test", method)
-	require.Equal(t, []interface{}{}, params)
-	require.Equal(t, json.RawMessage(nil), id)
-
-	body = `{"jsonrpc": "2.0", "method": "test"}`
-	method, params, id, err = methodAndParamsFromBody(body)
-	require.NoError(t, err)
-	require.Equal(t, "test", method)
-	require.Equal(t, []interface{}{}, params)
-	require.Equal(t, json.RawMessage(nil), id)
+	for _, test := range cases {
+		t.Run(test.name, func(t *testing.T) {
+			method, params, id, err := methodAndParamsFromBody(test.body)
+			require.NoError(t, err)
+			require.Equal(t, test.method, method)
+			require.Equal(t, test.params, params)
+			require.Equal(t, test.id, id)
+		})
+	}
 }
