@@ -47,15 +47,6 @@ node {
     stage('Deploy') {
         // For branch builds, replace the old artifact. For develop keep all of them.
         def version = gitBranch == 'develop' ? getVersion(gitBranch, gitShortSHA) : getVersion(gitBranch, '')
-
-        // Clean up the previous artifacts.
-        withCredentials([usernameColonPassword(credentialsId: 'artifactory-deploy-bot', variable: 'USERPASS')]) {
-            sh """
-                curl -u "${USERPASS}" -X DELETE "http://artifacts.status.im:8081/artifactory/libs-release-local/status-im/status-go/${version}"
-                curl -u "${USERPASS}" -X DELETE "http://artifacts.status.im:8081/artifactory/libs-release-local/status-im/status-go-ios-simulator/${version}"
-            """
-        }
-
         def server = Artifactory.server 'artifactory'
         def uploadSpec = """{
             "files": [
