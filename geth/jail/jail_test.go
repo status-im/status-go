@@ -180,7 +180,7 @@ func (s *JailTestSuite) TestIsConnected() {
 	require.Equal(expectedResponse, response)
 }
 
-func (s *JailTestSuite) TestLocalStorageSet() {
+func (s *JailTestSuite) TestEventSignal() {
 	require := s.Require()
 
 	s.jail.Parse(testChatID, "")
@@ -199,7 +199,7 @@ func (s *JailTestSuite) TestLocalStorageSet() {
 		err := json.Unmarshal([]byte(jsonEvent), &envelope)
 		require.NoError(err)
 
-		if envelope.Type == jail.EventLocalStorageSet {
+		if envelope.Type == jail.EventSignal {
 			event := envelope.Event.(map[string]interface{})
 			chatID, ok := event["chat_id"].(string)
 			require.True(ok, "chat id is required, but not found")
@@ -215,7 +215,7 @@ func (s *JailTestSuite) TestLocalStorageSet() {
 	})
 
 	_, err = cell.Run(`
-	    var responseValue = localStorage.set("` + testData + `");
+	    var responseValue = statusSignals.sendSignal("` + testData + `");
 	    responseValue = JSON.stringify(responseValue);
 	`)
 	s.NoError(err)
