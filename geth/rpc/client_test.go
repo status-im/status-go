@@ -174,7 +174,6 @@ func (s *RPCTestSuite) TestCallRPC() {
 	cnt := len(rpcCalls) - 1 // send transaction blocks up until complete/discarded/times out
 	for _, r := range rpcCalls {
 		go func(r rpcCall) {
-			s.T().Logf("Run test: %v", r.inputJSON)
 			resultJSON := rpcClient.CallRaw(r.inputJSON)
 			r.validator(resultJSON)
 		}(r)
