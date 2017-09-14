@@ -36,17 +36,17 @@ func registerHandlers(jail *Jail, cell common.JailCell, chatID string) error {
 	}
 
 	// register send handler
-	if err = registerHandler("send", makeSendHandler(jail)); err != nil {
+	if err = registerHandler("send", makeSendHandler(jail, cell)); err != nil {
 		return err
 	}
 
 	// register sendAsync handler
-	if err = registerHandler("sendAsync", makeSendHandler(jail)); err != nil {
+	if err = registerHandler("sendAsync", makeAsyncSendHandler(jail, cell)); err != nil {
 		return err
 	}
 
 	// register isConnected handler
-	if err = registerHandler("isConnected", makeJethIsConnectedHandler(jail)); err != nil {
+	if err = registerHandler("isConnected", makeJethIsConnectedHandler(jail, cell)); err != nil {
 		return err
 	}
 
@@ -66,23 +66,47 @@ func registerHandlers(jail *Jail, cell common.JailCell, chatID string) error {
 	return nil
 }
 
+// makeAsyncSendHandler returns jeth.sendAsync() handler.
+func makeAsyncSendHandler(jail *Jail, cellInt common.JailCell) func(call otto.FunctionCall) otto.Value {
+	// FIXME(tiabc): Get rid of this.
+	cell := cellInt.(*Cell)
+	return func(call otto.FunctionCall) otto.Value {
+		go func() {
+			response := jail.Send(call, cell.VM)
+
+			if fn := call.Argument(1); fn.Class() == "Function" {
+				cell.Lock()
+				fn.Call(otto.NullValue(), otto.NullValue(), response)
+				cell.Unlock()
+			}
+		}()
+		return otto.UndefinedValue()
+	}
+}
+
 // makeSendHandler returns jeth.send() and jeth.sendAsync() handler
-func makeSendHandler(jail *Jail) func(call otto.FunctionCall) (response otto.Value) {
-	return jail.Send
+func makeSendHandler(jail *Jail, cellInt common.JailCell) func(call otto.FunctionCall) otto.Value {
+	// FIXME(tiabc): Get rid of this.
+	cell := cellInt.(*Cell)
+	return func(call otto.FunctionCall) otto.Value {
+		return jail.Send(call, cell.VM)
+	}
 }
 
 // makeJethIsConnectedHandler returns jeth.isConnected() handler
-func makeJethIsConnectedHandler(jail *Jail) func(call otto.FunctionCall) (response otto.Value) {
+func makeJethIsConnectedHandler(jail *Jail, cellInt common.JailCell) func(call otto.FunctionCall) (response otto.Value) {
+	// FIXME(tiabc): Get rid of this.
+	cell := cellInt.(*Cell)
 	return func(call otto.FunctionCall) otto.Value {
 		client := jail.nodeManager.RPCClient()
 
 		var netListeningResult bool
 		if err := client.Call(&netListeningResult, "net_listening"); err != nil {
-			return newErrorResponse(call.Otto, -32603, err.Error(), nil)
+			return newErrorResponseOtto(cell.VM, -32603, err.Error(), nil)
 		}
 
 		if !netListeningResult {
-			return newErrorResponse(call.Otto, -32603, node.ErrNoRunningNode.Error(), nil)
+			return newErrorResponseOtto(cell.VM, -32603, node.ErrNoRunningNode.Error(), nil)
 		}
 
 		return newResultResponse(call.Otto, true)

@@ -8,6 +8,7 @@ import (
 
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/common"
+	"github.com/status-im/status-go/geth/jail/internal/vm"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/static"
 )
@@ -38,6 +39,9 @@ type Jail struct {
 func New(
 	nodeManager common.NodeManager, accountManager common.AccountManager, txQueueManager common.TxQueueManager,
 ) *Jail {
+	if nodeManager == nil || accountManager == nil || txQueueManager == nil {
+		panic("Jail is missing mandatory dependencies")
+	}
 	return &Jail{
 		nodeManager:    nodeManager,
 		accountManager: accountManager,
@@ -148,11 +152,10 @@ func (jail *Jail) Call(chatID, this, args string) string {
 }
 
 // Send will serialize the first argument, send it to the node and returns the response.
+// IMPORTANT: Don't use `call.Otto` in this function unless you want to run into race conditions.
 // nolint: errcheck, unparam
-func (jail *Jail) Send(call otto.FunctionCall) (response otto.Value) {
-	// Remarshal the request into a Go value.
-	JSON, _ := call.Otto.Object("JSON")
-	reqVal, err := JSON.Call("stringify", call.Argument(0))
+func (jail *Jail) Send(call otto.FunctionCall, vm *vm.VM) (response otto.Value) {
+	reqVal, err := vm.Call("JSON.stringify", nil, call.Argument(0))
 	if err != nil {
 		throwJSException(err.Error())
 	}
@@ -172,43 +175,39 @@ func (jail *Jail) Send(call otto.FunctionCall) (response otto.Value) {
 		json.Unmarshal(rawReq, &reqs[0])
 	}
 
-	resps, _ := call.Otto.Object("new Array()")
+	resps, _ := vm.Call("new Array()", nil)
 
 	// Execute the requests.
 	for _, req := range reqs {
-		res, err := jail.policy.Execute(req, call)
+		res, err := jail.policy.Execute(req, vm)
 
 		if err != nil {
 			switch err.(type) {
 			case common.StopRPCCallError:
-				return newErrorResponse(call.Otto, -32603, err.Error(), nil)
+				return newErrorResponseOtto(vm, -32603, err.Error(), nil)
 			default:
-				res = newErrorResponse(call.Otto, -32603, err.Error(), &req.ID).Object()
+				res = newErrorResponse(-32603, err.Error(), &req.ID)
 			}
 		}
 
-		resps.Call("push", res)
+		// FIXME(tiabc): Return an error in case of failure?
+		resps.Object().Call("push", res)
 	}
 
 	// Return the responses either to the callback (if supplied)
 	// or directly as the return value.
 	if batch {
-		response = resps.Value()
+		response = resps
 	} else {
-		response, _ = resps.Get("0")
-	}
-
-	if fn := call.Argument(1); fn.Class() == "Function" {
-		fn.Call(otto.NullValue(), otto.NullValue(), response)
-		return otto.UndefinedValue()
+		response, _ = resps.Object().Get("0")
 	}
 
 	return response
 }
 
-func newErrorResponse(vm *otto.Otto, code int, msg string, id interface{}) otto.Value {
+func newErrorResponse(code int, msg string, id interface{}) map[string]interface{} {
 	// Bundle the error into a JSON RPC call response
-	m := map[string]interface{}{
+	return map[string]interface{}{
 		"jsonrpc": "2.0",
 		"id":      id,
 		"error": map[string]interface{}{
@@ -216,9 +215,13 @@ func newErrorResponse(vm *otto.Otto, code int, msg string, id interface{}) otto.
 			"message": msg,
 		},
 	}
-	res, _ := json.Marshal(m)
-	val, _ := vm.Run("(" + string(res) + ")")
-	return val
+}
+
+func newErrorResponseOtto(vm *vm.VM, code int, msg string, id interface{}) otto.Value {
+	// TODO(tiabc): Handle errors.
+	errResp, _ := json.Marshal(newErrorResponse(code, msg, id))
+	errRespVal, _ := vm.Run("(" + string(errResp) + ")")
+	return errRespVal
 }
 
 func newResultResponse(vm *otto.Otto, result interface{}) otto.Value {
