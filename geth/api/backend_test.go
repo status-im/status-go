@@ -34,12 +34,17 @@ func (s *BackendTestSuite) SetupTest() {
 	s.backend = backend
 }
 
-func (s *BackendTestSuite) StartTestBackend(networkID int) {
+func (s *BackendTestSuite) StartTestBackend(networkID int, opts ...TestNodeOption) {
 	require := s.Require()
 	require.NotNil(s.backend)
 
 	nodeConfig, err := MakeTestNodeConfig(networkID)
 	require.NoError(err)
+
+	// Apply any options altering node config.
+	for i := range opts {
+		opts[i](nodeConfig)
+	}
 
 	// import account keys
 	require.NoError(common.ImportTestAccount(nodeConfig.KeyStoreDir, "test-account1.pk"))

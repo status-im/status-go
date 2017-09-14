@@ -335,3 +335,47 @@ func (s *BackendTestSuite) TestSelectedAccountOnRestart() {
 	require.EqualError(node.ErrNoAccountSelected, err.Error())
 	require.Nil(selectedAccount)
 }
+
+func (s *BackendTestSuite) TestRPCEthAccounts() {
+	require := s.Require()
+
+	s.StartTestBackend(params.RopstenNetworkID)
+	defer s.StopTestBackend()
+
+	// log into test account
+	err := s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
+	require.NoError(err)
+
+	rpcClient := s.backend.NodeManager().RPCClient()
+
+	expectedResponse := `{"jsonrpc":"2.0","id":1,"result":["0xadaf150b905cf5e6a778e553e15a139b6618bbb7"]}`
+	resp := rpcClient.CallRaw(`{
+              "jsonrpc": "2.0",
+              "id":1,
+              "method": "eth_accounts",
+              "params": []
+      }`)
+	require.Equal(expectedResponse, resp)
+}
+
+func (s *BackendTestSuite) TestRPCEthAccountsWithUpstream() {
+	require := s.Require()
+
+	s.StartTestBackend(params.RopstenNetworkID, WithUpstream("https://ropsten.infura.io/z6GCTmjdP3FETEJmMBI4"))
+	defer s.StopTestBackend()
+
+	// log into test account
+	err := s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
+	require.NoError(err)
+
+	rpcClient := s.backend.NodeManager().RPCClient()
+
+	expectedResponse := `{"jsonrpc":"2.0","id":1,"result":["0xadaf150b905cf5e6a778e553e15a139b6618bbb7"]}`
+	resp := rpcClient.CallRaw(`{
+              "jsonrpc": "2.0",
+              "id":1,
+              "method": "eth_accounts",
+              "params": []
+      }`)
+	require.Equal(expectedResponse, resp)
+}
