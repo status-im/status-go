@@ -16,6 +16,7 @@ import (
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/helpers/expvars"
 )
 
 // errors
@@ -266,6 +267,8 @@ func (m *NodeManager) addPeer(url string) error {
 		return err
 	}
 	server.AddPeer(parsedNode)
+
+	expvars.Peers.Add(1)
 
 	return nil
 }

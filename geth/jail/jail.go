@@ -9,6 +9,7 @@ import (
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/log"
+	"github.com/status-im/status-go/helpers/expvars"
 	"github.com/status-im/status-go/static"
 )
 
@@ -68,6 +69,8 @@ func (jail *Jail) NewCell(chatID string) (common.JailCell, error) {
 	jail.Lock()
 	jail.cells[chatID] = cell
 	jail.Unlock()
+
+	expvars.Cells.Add(1)
 
 	return cell, nil
 }
