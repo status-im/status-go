@@ -51,7 +51,6 @@ func (s *BackendTestSuite) TestJailSendQueuedTransaction() {
   		"value": "0.000001"
 	}`
 
-	txCompletedSuccessfully := make(chan struct{})
 	txHashes := make(chan gethcommon.Hash, 1)
 
 	// replace transaction notification handler
@@ -77,7 +76,6 @@ func (s *BackendTestSuite) TestJailSendQueuedTransaction() {
 
 			log.Info("Transaction complete", "URL", "https://ropsten.etherscan.io/tx/%s"+txHash.Hex())
 
-			txCompletedSuccessfully <- struct{}{} // so that timeout is aborted
 			txHashes <- txHash
 		}
 	})
@@ -172,18 +170,25 @@ func (s *BackendTestSuite) TestJailSendQueuedTransaction() {
 	jailInstance := s.backend.JailManager()
 	for _, test := range tests {
 		jailInstance.BaseJS(string(static.MustAsset(txSendFolder + test.file)))
-		common.PanicAfter(1*time.Minute, txCompletedSuccessfully, test.name)
 		jailInstance.Parse(testChatID, ``)
 
+		// used by notification handler
 		requireMessageId = test.requireMessageId
 
 		for _, command := range test.commands {
 			s.T().Logf("%s: %s", test.name, command.command)
 			response := jailInstance.Call(testChatID, command.command, command.params)
+
 			var txHash gethcommon.Hash
 			if command.command == `["commands", "send"]` {
-				txHash = <-txHashes
+				select {
+				case txHash = <-txHashes:
+				case <-time.After(time.Minute):
+					s.Fail("test timed out: %s", test.name)
+					return
+				}
 			}
+
 			expectedResponse := strings.Replace(command.expectedResponse, "TX_HASH", txHash.Hex(), 1)
 			require.Equal(expectedResponse, response)
 		}
@@ -206,9 +211,7 @@ func (s *BackendTestSuite) TestContractDeployment() {
 	cell, err := jailInstance.Cell(testChatID)
 	require.NoError(err)
 
-	// make sure you panic if transaction complete doesn't return
-	completeQueuedTransaction := make(chan struct{}, 1)
-	common.PanicAfter(1*time.Minute, completeQueuedTransaction, s.T().Name())
+	completeQueuedTransaction := make(chan struct{})
 
 	// replace transaction notification handler
 	var txHash gethcommon.Hash
@@ -256,7 +259,12 @@ func (s *BackendTestSuite) TestContractDeployment() {
 	`)
 	require.NoError(err)
 
-	<-completeQueuedTransaction
+	select {
+	case <-completeQueuedTransaction:
+	case <-time.After(time.Minute):
+		s.Fail("test timed out")
+		return
+	}
 
 	responseValue, err := cell.Get("responseValue")
 	require.NoError(err)
@@ -493,7 +501,7 @@ func (s *BackendTestSuite) TestJailWhisper() {
 					privateKeyID: identity,
 					topics: [topic],
 				});
-				
+
 				// post message
 				var message = {
 					ttl: 20,
@@ -536,7 +544,7 @@ func (s *BackendTestSuite) TestJailWhisper() {
 					sig: identity2,
 					topics: [topic],
 				});
-				
+
 				// post message
 				var message = {
 				  	sig: identity2,
@@ -749,8 +757,18 @@ func (s *BackendTestSuite) TestJailVMPersistence() {
 		}(tc)
 	}
 
-	common.PanicAfter(60*time.Second, nil, "test timed out")
-	wg.Wait()
+	finishTestCases := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(finishTestCases)
+	}()
+
+	select {
+	case <-finishTestCases:
+	case <-time.After(time.Minute):
+		s.Fail("some tests failed to finish in time")
+		return
+	}
 
 	// Validate total.
 	cell, err := jailInstance.Cell(testChatID)

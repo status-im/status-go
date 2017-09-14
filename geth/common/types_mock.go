@@ -759,7 +759,7 @@ func (mr *MockJailCellMockRecorder) Get(arg0 interface{}) *gomock.Call {
 }
 
 // Run mocks base method
-func (m *MockJailCell) Run(arg0 string) (otto.Value, error) {
+func (m *MockJailCell) Run(arg0 interface{}) (otto.Value, error) {
 	ret := m.ctrl.Call(m, "Run", arg0)
 	ret0, _ := ret[0].(otto.Value)
 	ret1, _ := ret[1].(error)
