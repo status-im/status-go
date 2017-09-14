@@ -152,11 +152,10 @@ func (s *BackendTestSuite) TestNodeStartStop() {
 	require.True(s.backend.IsNodeRunning())
 }
 
-func (s *BackendTestSuite) TestStartNodeWithUpstreamEnabled(t *testing.T) {
+func (s *BackendTestSuite) TestStartNodeWithUpstreamEnabled() {
 	require := s.Require()
 
 	backend := api.NewStatusBackend()
-	require.NotNil(t, backend)
 
 	nodeConfig, err := MakeTestNodeConfig(params.RopstenNetworkID)
 	require.NoError(err)
