@@ -100,8 +100,7 @@ func (s *BackendTestSuite) TestSendContractTx() {
 	select {
 	case <-completeQueuedTransaction:
 	case <-time.After(2 * time.Minute):
-		s.Fail("completing transaction timed out")
-		return
+		s.FailNow("completing transaction timed out")
 	}
 
 	s.Equal(txHashCheck.Hex(), txHash.Hex(), "transaction hash returned from SendTransaction is invalid")
@@ -188,8 +187,7 @@ func (s *BackendTestSuite) TestSendEtherTx() {
 	select {
 	case <-completeQueuedTransaction:
 	case <-time.After(2 * time.Minute):
-		s.Fail("completing transaction timed out")
-		return
+		s.FailNow("completing transaction timed out")
 	}
 
 	s.Equal(txHashCheck.Hex(), txHash.Hex(), "transaction hash returned from SendTransaction is invalid")
@@ -268,8 +266,7 @@ func (s *BackendTestSuite) TestDoubleCompleteQueuedTransactions() {
 	select {
 	case <-completeQueuedTransaction:
 	case <-time.After(time.Minute):
-		s.Fail("test timed out")
-		return
+		s.FailNow("test timed out")
 	}
 
 	s.Equal(txHashCheck.Hex(), txHash.Hex(), "transaction hash returned from SendTransaction is invalid")
@@ -353,8 +350,7 @@ func (s *BackendTestSuite) TestDiscardQueuedTransaction() {
 	select {
 	case <-completeQueuedTransaction:
 	case <-time.After(time.Minute):
-		s.Fail("test timed out")
-		return
+		s.FailNow("test timed out")
 	}
 
 	s.True(reflect.DeepEqual(txHashCheck, gethcommon.Hash{}), "transaction returned hash, while it shouldn't")
@@ -454,8 +450,7 @@ func (s *BackendTestSuite) TestCompleteMultipleQueuedTransactions() {
 	select {
 	case <-allTestTxCompleted:
 	case <-time.After(30 * time.Second):
-		s.Fail("test timed out")
-		return
+		s.FailNow("test timed out")
 	}
 
 	require.Zero(s.TxQueueManager().TransactionQueue().Count(), "queue should be empty")
@@ -574,8 +569,7 @@ func (s *BackendTestSuite) TestDiscardMultipleQueuedTransactions() {
 	select {
 	case <-allTestTxDiscarded:
 	case <-time.After(1 * time.Minute):
-		require.Fail("test timed out")
-		return
+		require.FailNow("test timed out")
 	}
 
 	require.Zero(s.backend.TxQueueManager().TransactionQueue().Count(), "tx queue must be empty at this point")

@@ -184,8 +184,7 @@ func (s *BackendTestSuite) TestJailSendQueuedTransaction() {
 				select {
 				case txHash = <-txHashes:
 				case <-time.After(time.Minute):
-					s.Fail("test timed out: %s", test.name)
-					return
+					s.FailNow("test timed out: %s", test.name)
 				}
 			}
 
@@ -262,8 +261,7 @@ func (s *BackendTestSuite) TestContractDeployment() {
 	select {
 	case <-completeQueuedTransaction:
 	case <-time.After(time.Minute):
-		s.Fail("test timed out")
-		return
+		s.FailNow("test timed out")
 	}
 
 	responseValue, err := cell.Get("responseValue")
@@ -766,8 +764,7 @@ func (s *BackendTestSuite) TestJailVMPersistence() {
 	select {
 	case <-finishTestCases:
 	case <-time.After(time.Minute):
-		s.Fail("some tests failed to finish in time")
-		return
+		s.FailNow("some tests failed to finish in time")
 	}
 
 	// Validate total.
