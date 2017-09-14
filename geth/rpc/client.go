@@ -23,12 +23,6 @@ type Client struct {
 	router *router
 }
 
-type (
-	// Error types for package.
-	UpstreamError struct{ error }
-	LocalError    struct{ error }
-)
-
 // NewClient initializes Client and tries to connect to both,
 // upstream and local node.
 //
@@ -40,7 +34,7 @@ func NewClient(node *node.Node, upstream params.UpstreamRPCConfig) (*Client, err
 	var err error
 	c.local, err = node.Attach()
 	if err != nil {
-		return nil, LocalError{fmt.Errorf("attach to local node: %s", err)}
+		return nil, fmt.Errorf("attach to local node: %s", err)
 	}
 
 	if upstream.Enabled {
@@ -49,7 +43,7 @@ func NewClient(node *node.Node, upstream params.UpstreamRPCConfig) (*Client, err
 
 		c.upstream, err = gethrpc.Dial(c.upstreamURL)
 		if err != nil {
-			return nil, UpstreamError{fmt.Errorf("dial server: %s", err)}
+			return nil, fmt.Errorf("dial upstream server: %s", err)
 		}
 	}
 

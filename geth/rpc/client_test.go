@@ -70,7 +70,6 @@ func (s *RPCTestSuite) TestNewClient() {
 	upstreamBad.URL = "///__httphh://///incorrect_urlxxx"
 	_, err = rpc.NewClient(node, upstreamBad)
 	require.NotNil(err)
-	require.IsType(rpc.UpstreamError{}, err)
 
 	// upstream enabled with correct URL, local node ok
 	upstreamGood := config.UpstreamConfig
@@ -87,7 +86,6 @@ func (s *RPCTestSuite) TestNewClient() {
 
 	_, err = rpc.NewClient(node, config.UpstreamConfig)
 	require.NotNil(err)
-	require.IsType(rpc.LocalError{}, err)
 }
 
 func (s *RPCTestSuite) TestRPCSendTransaction() {
