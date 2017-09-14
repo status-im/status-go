@@ -9,6 +9,7 @@ import (
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/geth/rpc"
 	. "github.com/status-im/status-go/geth/testing"
 	"github.com/stretchr/testify/suite"
 )
@@ -42,6 +43,51 @@ func (s *RPCTestSuite) SetupTest() {
 	nodeManager := node.NewNodeManager()
 	require.NotNil(nodeManager)
 	s.NodeManager = nodeManager
+}
+
+func (s *RPCTestSuite) TestNewClient() {
+	require := s.Require()
+
+	config, err := MakeTestNodeConfig(params.RinkebyNetworkID)
+	require.NoError(err)
+
+	nodeStarted, err := s.NodeManager.StartNode(config)
+	require.NoError(err)
+	require.NotNil(config)
+
+	<-nodeStarted
+
+	node, err := s.NodeManager.Node()
+	require.NoError(err)
+
+	// upstream disabled, local node ok
+	_, err = rpc.NewClient(node, config.UpstreamConfig)
+	require.NoError(err)
+
+	// upstream enabled with incorrect URL, local node ok
+	upstreamBad := config.UpstreamConfig
+	upstreamBad.Enabled = true
+	upstreamBad.URL = "///__httphh://///incorrect_urlxxx"
+	_, err = rpc.NewClient(node, upstreamBad)
+	require.NotNil(err)
+	require.IsType(rpc.UpstreamError{}, err)
+
+	// upstream enabled with correct URL, local node ok
+	upstreamGood := config.UpstreamConfig
+	upstreamGood.Enabled = true
+	upstreamGood.URL = "http://example.com/rpc"
+	_, err = rpc.NewClient(node, upstreamGood)
+	require.Nil(err)
+
+	// upstream disabled, local node failed (stopped)
+	nodeStopped, err := s.NodeManager.StopNode()
+	require.NoError(err)
+
+	<-nodeStopped
+
+	_, err = rpc.NewClient(node, config.UpstreamConfig)
+	require.NotNil(err)
+	require.IsType(rpc.LocalError{}, err)
 }
 
 func (s *RPCTestSuite) TestRPCSendTransaction() {

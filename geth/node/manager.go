@@ -27,6 +27,7 @@ var (
 	ErrInvalidLightEthereumService = errors.New("LES service is unavailable")
 	ErrInvalidAccountManager       = errors.New("could not retrieve account manager")
 	ErrAccountKeyStoreMissing      = errors.New("account key store is not set")
+	ErrRPCClient                   = errors.New("failed to init RPC client")
 )
 
 // NodeManager manages Status node (which abstracts contained geth node)
@@ -98,7 +99,19 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 		// init RPC client for this node
 		m.rpcClient, err = rpc.NewClient(m.node, m.config.UpstreamConfig)
 		if err != nil {
-			log.Error("Init RPC client failed", "error", err)
+			switch err.(type) {
+			case rpc.UpstreamError:
+				log.Warn("Can't connect to Upstream RPC, will retry", "error", err)
+			case rpc.LocalError:
+				log.Error("Init RPC client failed:", "error", err)
+				SendSignal(SignalEnvelope{
+					Type: EventNodeCrashed,
+					Event: NodeCrashEvent{
+						Error: ErrRPCClient.Error(),
+					},
+				})
+				return
+			}
 		}
 		m.Unlock()
 
