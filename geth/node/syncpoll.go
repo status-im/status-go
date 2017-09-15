@@ -28,8 +28,9 @@ func NewSyncPoll(leth *les.LightEthereum) *SyncPoll {
 	}
 }
 
-// Poll returns a channel which allows the user to listen for a done signal
-// as to when the node has finished syncing or stop due to an error.
+// Poll checks for the status of blockchain synchronization and returns an error
+// if the blockchain failed to start synchronizing or fails to complete, within
+// the time provided by the passed in context.
 func (n *SyncPoll) Poll(ctx context.Context) error {
 	if err := n.pollSyncStart(ctx); err != nil {
 		return err

@@ -41,8 +41,7 @@ func TestBackendTestSuite(t *testing.T) {
 
 type BackendTestSuite struct {
 	BaseTestSuite
-	backend           *api.StatusBackend
-	nodeSyncCompleted bool
+	backend *api.StatusBackend
 }
 
 func (s *BackendTestSuite) SetupTest() {
@@ -117,57 +116,6 @@ func (s *BackendTestSuite) RestartTestNode() {
 	require.NoError(err)
 	require.NotNil(nodeRestarted)
 	<-nodeRestarted
-	require.True(s.backend.IsNodeRunning())
-}
-
-func (s *BackendTestSuite) TestNewBackend() {
-	require := s.Require()
-	require.NotNil(s.backend)
-
-	s.StartTestBackend(params.RinkebyNetworkID)
-	defer s.StopTestBackend()
-}
-
-func (s *BackendTestSuite) TestNodeStartStop() {
-	require := s.Require()
-	require.NotNil(s.backend)
-
-	nodeConfig, err := MakeTestNodeConfig(params.RopstenNetworkID)
-	require.NoError(err)
-
-	// try stopping non-started node
-	require.False(s.backend.IsNodeRunning())
-	nodeStopped, err := s.backend.StopNode()
-	require.EqualError(err, node.ErrNoRunningNode.Error())
-	require.Nil(nodeStopped)
-
-	require.False(s.backend.IsNodeRunning())
-	nodeStarted, err := s.backend.StartNode(nodeConfig)
-	require.NoError(err)
-	require.NotNil(nodeStarted)
-
-	<-nodeStarted // wait till node is started
-	require.True(s.backend.IsNodeRunning())
-
-	// try starting another node (w/o stopping the previously started node)
-	nodeStarted, err = s.backend.StartNode(nodeConfig)
-	require.EqualError(err, node.ErrNodeExists.Error())
-	require.Nil(nodeStarted)
-
-	// now stop node, and make sure that a new node, on different network can be started
-	nodeStopped, err = s.backend.StopNode()
-	require.NoError(err)
-	require.NotNil(nodeStopped)
-	<-nodeStopped
-
-	// start new node with exactly the same config
-	require.False(s.backend.IsNodeRunning())
-	nodeStarted, err = s.backend.StartNode(nodeConfig)
-	require.NoError(err)
-	require.NotNil(nodeStarted)
-	defer s.backend.StopNode()
-
-	<-nodeStarted
 	require.True(s.backend.IsNodeRunning())
 }
 
