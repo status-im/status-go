@@ -21,6 +21,7 @@ type StatusBackend struct {
 	accountManager common.AccountManager
 	txQueueManager common.TxQueueManager
 	jailManager    common.JailManager
+	// TODO(oskarth): notifer here
 }
 
 // NewStatusBackend create a new NewStatusBackend instance
