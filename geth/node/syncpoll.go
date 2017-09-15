@@ -11,8 +11,8 @@ import (
 
 // errors
 var (
-	ErrSyncStartTimeout = errors.New("node synchronization timeout before start")
-	ErrSyncAborted      = errors.New("node synchronization timeout before completion")
+	ErrStartAborted = errors.New("node synchronization timeout before starting")
+	ErrSyncAborted  = errors.New("node synchronization timeout before completion")
 )
 
 // SyncPoll provides a structure that allows us to check the status of
@@ -47,7 +47,7 @@ func (n *SyncPoll) pollSyncStart(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			return ErrSyncStartTimeout
+			return ErrStartAborted
 		case <-time.After(100 * time.Millisecond):
 			if n.downloader.Synchronising() {
 				return nil

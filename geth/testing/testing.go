@@ -12,13 +12,14 @@ import (
 	"strings"
 	"time"
 
+	"testing"
+
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
 	assertions "github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"testing"
 )
 
 var (
@@ -123,7 +124,7 @@ func (s *BaseTestSuite) EnsureNodeSync(forceResync ...bool) {
 	require.NotNil(ethClient)
 
 	sync := node.NewSyncPoll(ethClient)
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Hour)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 	defer cancel()
 
 	// Validate that synchronization failed because of time.
