@@ -3,6 +3,7 @@ package node
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
@@ -90,6 +91,70 @@ func (s *TxQueueTestSuite) TestCompleteTransaction() {
 	s.Equal(errTxAssumedSent, tx.Err)
 	// Transaction should be already removed from the queue.
 	s.False(txQueueManager.TransactionQueue().Has(tx.ID))
+}
+
+func (s *TxQueueTestSuite) TestCompleteTransactionMultipleTimes() {
+	s.accountManagerMock.EXPECT().SelectedAccount().Return(&common.SelectedExtKey{
+		Address: common.FromAddress(TestConfig.Account1.Address),
+	}, nil)
+
+	s.nodeManagerMock.EXPECT().NodeConfig().Return(
+		params.NewNodeConfig("/tmp", params.RopstenNetworkID, true),
+	)
+
+	// TODO(adam): StatusBackend as an interface would allow a better solution.
+	// As we want to avoid network connection, we mock LES with a known error
+	// and treat as success.
+	s.nodeManagerMock.EXPECT().LightEthereumService().Return(nil, errTxAssumedSent)
+
+	txQueueManager := NewTxQueueManager(s.nodeManagerMock, s.accountManagerMock)
+
+	txQueueManager.Start()
+	defer txQueueManager.Stop()
+
+	tx := txQueueManager.CreateTransaction(context.Background(), common.SendTxArgs{
+		From: common.FromAddress(TestConfig.Account1.Address),
+		To:   common.ToAddress(TestConfig.Account2.Address),
+	})
+
+	// TransactionQueueHandler is required to enqueue a transaction.
+	txQueueManager.SetTransactionQueueHandler(func(queuedTx *common.QueuedTx) {
+		s.Equal(tx.ID, queuedTx.ID)
+	})
+
+	txQueueManager.SetTransactionReturnHandler(func(queuedTx *common.QueuedTx, err error) {
+		s.Equal(tx.ID, queuedTx.ID)
+		s.Equal(errTxAssumedSent, err)
+	})
+
+	err := txQueueManager.QueueTransaction(tx)
+	s.NoError(err)
+
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	completeTxErrors := make(map[error]int)
+	for i := 0; i < 3; i++ {
+		wg.Add(1)
+		go func() {
+			_, err := txQueueManager.CompleteTransaction(tx.ID, TestConfig.Account1.Password)
+			mu.Lock()
+			completeTxErrors[err]++
+			mu.Unlock()
+
+			wg.Done()
+		}()
+	}
+
+	err = txQueueManager.WaitForTransaction(tx)
+	s.Equal(errTxAssumedSent, err)
+	// Check that error is assigned to the transaction.
+	s.Equal(errTxAssumedSent, tx.Err)
+	// Transaction should be already removed from the queue.
+	s.False(txQueueManager.TransactionQueue().Has(tx.ID))
+
+	// Wait for all CompleteTransaction calls.
+	wg.Wait()
+	s.Equal(completeTxErrors[errTxAssumedSent], 1)
 }
 
 func (s *TxQueueTestSuite) TestAccountMismatch() {
