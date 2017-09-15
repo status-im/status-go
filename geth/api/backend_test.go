@@ -157,11 +157,11 @@ func (s *BackendTestSuite) TestNodeStartStop() {
 	require.True(s.backend.IsNodeRunning())
 }
 
-func (s *BackendTestSuite) TestStartNodeWithUpstreamEnabled(t *testing.T) {
+func (s *BackendTestSuite) TestStartNodeWithUpstreamEnabled() {
 	require := s.Require()
 
 	backend := api.NewStatusBackend()
-	require.NotNil(t, backend)
+	require.NotNil(backend)
 
 	nodeConfig, err := MakeTestNodeConfig(params.RopstenNetworkID)
 	require.NoError(err)
@@ -459,26 +459,30 @@ func (s *BackendTestSuite) TestNetworkSwitching() {
 	<-nodeStopped
 }
 
-// FIXME(tiabc): There's also a test with the same name in geth/node/manager_test.go
-// so this test should only check StatusBackend logic with a mocked version of the underlying NodeManager.
-func (s *BackendTestSuite) TestResetChainData() {
-	require := s.Require()
-	require.NotNil(s.backend)
-
-	s.StartTestBackend(params.RinkebyNetworkID)
-	defer s.StopTestBackend()
-
-	time.Sleep(2 * time.Second) // allow to sync for some time
-
-	s.True(s.backend.IsNodeRunning())
-	nodeReady, err := s.backend.ResetChainData()
-	require.NoError(err)
-	<-nodeReady
-	s.True(s.backend.IsNodeRunning()) // new node, with previous config should be running
-
-	// make sure we can read the first byte, and it is valid (for Rinkeby)
-	FirstBlockHash(require, s.backend.NodeManager(), "0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177")
-}
+//// FIXME(tiabc): There's also a test with the same name in geth/node/manager_test.go
+//// so this test should only check StatusBackend logic with a mocked version of the underlying NodeManager.
+//func (s *BackendTestSuite) TestResetChainData() {
+//	require := s.Require()
+//	require.NotNil(s.backend)
+//
+//	s.StartTestBackend(params.RinkebyNetworkID)
+//	defer s.StopTestBackend()
+//
+//	node.SetDefaultNodeNotificationHandler(func(string) {
+//		// Ensure no callback is invoked.
+//	})
+//
+//	time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to sync
+//
+//	s.True(s.backend.IsNodeRunning())
+//	nodeReady, err := s.backend.ResetChainData()
+//	require.NoError(err)
+//	<-nodeReady
+//	s.True(s.backend.IsNodeRunning()) // new node, with previous config should be running
+//
+//	// make sure we can read the first byte, and it is valid (for Rinkeby)
+//	FirstBlockHash(require, s.backend.NodeManager(), "0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177")
+//}
 
 // FIXME(tiabc): There's also a test with the same name in geth/node/manager_test.go
 // so this test should only check StatusBackend logic with a mocked version of the underlying NodeManager.
