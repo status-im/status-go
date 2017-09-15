@@ -348,10 +348,10 @@ func (s *BackendTestSuite) TestRPCEthAccounts() {
 
 	rpcClient := s.backend.NodeManager().RPCClient()
 
-	expectedResponse := `{"jsonrpc":"2.0","id":1,"result":["0xadaf150b905cf5e6a778e553e15a139b6618bbb7"]}`
+	expectedResponse := `{"jsonrpc":"2.0","id":1,"result":["` + TestConfig.Account1.Address + `"]}`
 	resp := rpcClient.CallRaw(`{
               "jsonrpc": "2.0",
-              "id":1,
+              "id": 1,
               "method": "eth_accounts",
               "params": []
       }`)
@@ -370,10 +370,10 @@ func (s *BackendTestSuite) TestRPCEthAccountsWithUpstream() {
 
 	rpcClient := s.backend.NodeManager().RPCClient()
 
-	expectedResponse := `{"jsonrpc":"2.0","id":1,"result":["0xadaf150b905cf5e6a778e553e15a139b6618bbb7"]}`
+	expectedResponse := `{"jsonrpc":"2.0","id":1,"result":["` + TestConfig.Account1.Address + `"]}`
 	resp := rpcClient.CallRaw(`{
               "jsonrpc": "2.0",
-              "id":1,
+              "id": 1,
               "method": "eth_accounts",
               "params": []
       }`)
