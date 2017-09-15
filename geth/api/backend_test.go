@@ -47,9 +47,12 @@ type BackendTestSuite struct {
 func (s *BackendTestSuite) SetupTest() {
 	require := s.Require()
 	backend := api.NewStatusBackend()
+	nodeManager := backend.NodeManager()
 	require.NotNil(backend)
+	require.NotNil(nodeManager)
 	require.IsType(&api.StatusBackend{}, backend)
 	s.backend = backend
+	s.NodeManager = nodeManager
 }
 
 func (s *BackendTestSuite) StartTestBackend(networkID int) {
