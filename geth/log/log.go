@@ -1,4 +1,41 @@
+/*Package log implements logger for status-go.
+
+This logger handles two loggers - it's own and ethereum-go logger.
+Both are used as "singletons" - using global shared variables.
+
+Usage
+
+First, import package into your code:
+
+    import "github.com/status-im/status-go/geth/log
+
+Then simply use `Info/Error/Debug/etc` functions to log at desired level:
+
+    log.Info("Info message")
+    log.Debug("Debug message")
+    log.Error("Error message")
+
+Slightly more complicated logging:
+
+	log.Warn("abnormal conn rate", "rate", curRate, "low", lowRate, "high", highRate)
+
+Note, in this case parameters should be in in pairs (key, value).
+
+This logger is based upon log15-logger, so see its documentation for advanced usage: https://github.com/inconshreveable/log15
+
+
+Initialization
+
+By default logger is set to log to stdout with Error level via `init()` function.
+You may change both level and file output by `log.SetLevel()` and `log.SetLogFile()` functions:
+
+	log.SetLevel("DEBUG")
+	log.SetLogFile("/path/to/geth.log")
+
+*/
 package log
+
+//go:generate autoreadme -f
 
 import (
 	"fmt"
