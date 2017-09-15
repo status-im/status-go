@@ -11,7 +11,7 @@ import (
 
 // signals
 const (
-	EventSignal          = "jail.signal"
+	EventSignal = "jail.signal"
 
 	// EventConsoleLog defines the event type for the console.log call.
 	eventConsoleLog = "vm.console.log"
