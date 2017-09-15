@@ -14,26 +14,8 @@ import (
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
 	. "github.com/status-im/status-go/geth/testing"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
-
-func TestStartNodeWithUpstreamEnabled(t *testing.T) {
-	backend := api.NewStatusBackend()
-	require.NotNil(t, backend)
-
-	nodeConfig, err := MakeTestNodeConfig(params.RopstenNetworkID)
-	require.NoError(t, err)
-
-	nodeConfig.UpstreamConfig.Enabled = true
-
-	nodeStarted, err := backend.StartNode(nodeConfig)
-	require.NoError(t, err)
-	defer backend.StopNode()
-
-	<-nodeStarted
-	require.True(t, backend.IsNodeRunning())
-}
 
 func TestBackendTestSuite(t *testing.T) {
 	suite.Run(t, new(BackendTestSuite))
@@ -55,12 +37,17 @@ func (s *BackendTestSuite) SetupTest() {
 	s.NodeManager = nodeManager
 }
 
-func (s *BackendTestSuite) StartTestBackend(networkID int) {
+func (s *BackendTestSuite) StartTestBackend(networkID int, opts ...TestNodeOption) {
 	require := s.Require()
 	require.NotNil(s.backend)
 
 	nodeConfig, err := MakeTestNodeConfig(networkID)
 	require.NoError(err)
+
+	// Apply any options altering node config.
+	for i := range opts {
+		opts[i](nodeConfig)
+	}
 
 	// import account keys
 	require.NoError(common.ImportTestAccount(nodeConfig.KeyStoreDir, "test-account1.pk"))
@@ -122,6 +109,24 @@ func (s *BackendTestSuite) RestartTestNode() {
 	require.True(s.backend.IsNodeRunning())
 }
 
+func (s *BackendTestSuite) TestStartNodeWithUpstreamEnabled() {
+	require := s.Require()
+
+	backend := api.NewStatusBackend()
+
+	nodeConfig, err := MakeTestNodeConfig(params.RopstenNetworkID)
+	require.NoError(err)
+
+	nodeConfig.UpstreamConfig.Enabled = true
+
+	nodeStarted, err := backend.StartNode(nodeConfig)
+	require.NoError(err)
+	defer backend.StopNode()
+
+	<-nodeStarted
+	require.True(backend.IsNodeRunning())
+}
+
 // FIXME(tiabc): There's also a test with the same name in geth/node/rpc_test.go
 // so this test should only check StatusBackend logic with a mocked version of the underlying NodeManager.
 func (s *BackendTestSuite) TestCallRPC() {
@@ -160,7 +165,7 @@ func (s *BackendTestSuite) TestCallRPC() {
 		{
 			`{"jsonrpc":"2.0","method":"shh_version","params":[],"id":67}`,
 			func(resultJSON string) {
-				expected := `{"jsonrpc":"2.0","id":67,"result":"5.0"}` + "\n"
+				expected := `{"jsonrpc":"2.0","id":67,"result":"5.0"}`
 				s.Equal(expected, resultJSON)
 				s.T().Log("shh_version: ", resultJSON)
 				progress <- struct{}{}
@@ -169,7 +174,7 @@ func (s *BackendTestSuite) TestCallRPC() {
 		{
 			`{"jsonrpc":"2.0","method":"web3_sha3","params":["0x68656c6c6f20776f726c64"],"id":64}`,
 			func(resultJSON string) {
-				expected := `{"jsonrpc":"2.0","id":64,"result":"0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad"}` + "\n"
+				expected := `{"jsonrpc":"2.0","id":64,"result":"0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad"}`
 				s.Equal(expected, resultJSON)
 				s.T().Log("web3_sha3: ", resultJSON)
 				progress <- struct{}{}
@@ -178,7 +183,7 @@ func (s *BackendTestSuite) TestCallRPC() {
 		{
 			`{"jsonrpc":"2.0","method":"net_version","params":[],"id":67}`,
 			func(resultJSON string) {
-				expected := `{"jsonrpc":"2.0","id":67,"result":"4"}` + "\n"
+				expected := `{"jsonrpc":"2.0","id":67,"result":"4"}`
 				s.Equal(expected, resultJSON)
 				s.T().Log("net_version: ", resultJSON)
 				progress <- struct{}{}

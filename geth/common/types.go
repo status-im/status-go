@@ -15,10 +15,10 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/les"
 	"github.com/ethereum/go-ethereum/node"
-	"github.com/ethereum/go-ethereum/rpc"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/geth/rpc"
 	"github.com/status-im/status-go/static"
 )
 
@@ -87,10 +87,7 @@ type NodeManager interface {
 	AccountKeyStore() (*keystore.KeyStore, error)
 
 	// RPCClient exposes reference to RPC client connected to the running node
-	RPCClient() (*rpc.Client, error)
-
-	// RPCServer exposes reference to running node's in-proc RPC server/handler
-	RPCServer() (*rpc.Server, error)
+	RPCClient() *rpc.Client
 }
 
 // AccountManager defines expected methods for managing Status accounts
@@ -135,12 +132,6 @@ type AccountManager interface {
 	// The running node, has a keystore directory which is loaded on start. Key file
 	// for a given address is expected to be in that directory prior to node start.
 	AddressToDecryptedAccount(address, password string) (accounts.Account, *keystore.Key, error)
-}
-
-// RPCManager defines expected methods for managing RPC client/server
-type RPCManager interface {
-	// Call executes RPC request on node's in-proc RPC server
-	Call(inputJSON string) string
 }
 
 // RawCompleteTransactionResult is a JSON returned from transaction complete function (used internally)
@@ -249,10 +240,15 @@ type TxQueueManager interface {
 }
 
 // JailCell represents single jail cell, which is basically a JavaScript VM.
+// It's designed to be a transparent wrapper around otto.VM's methods.
 type JailCell interface {
+	// Set a value inside VM.
 	Set(string, interface{}) error
+	// Get a value from VM.
 	Get(string) (otto.Value, error)
-	Run(string) (otto.Value, error)
+	// Run an arbitrary JS code. Input maybe string or otto.Script.
+	Run(interface{}) (otto.Value, error)
+	// Call an arbitrary JS function by name and args.
 	Call(item string, this interface{}, args ...interface{}) (otto.Value, error)
 }
 

@@ -5,10 +5,11 @@ import (
 	"encoding/json"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/rpc"
+	gethrpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/geth/rpc"
 )
 
 // ExecutionPolicy provides a central container for the executions of RPCCall requests for both
@@ -30,17 +31,18 @@ func NewExecutionPolicy(
 	}
 }
 
-// Execute handles a received RPC call.
+// Execute handles the execution of a RPC request and routes appropriately to either a local or remote ethereum node.
 func (ep *ExecutionPolicy) Execute(req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
-	switch req.Method {
-	case params.SendTransactionMethodName:
+	if params.SendTransactionMethodName == req.Method {
 		return ep.executeSendTransaction(req, call)
-	default:
-		return ep.executeOtherTransaction(req, call)
 	}
+
+	client := ep.nodeManager.RPCClient()
+
+	return ep.executeWithClient(client, req, call)
 }
 
-// ExecuteSendTransaction defines a function to execute RPC requests for eth_sendTransaction method only.
+// executeRemoteSendTransaction defines a function to execute RPC method eth_sendTransaction over the upstream server.
 func (ep *ExecutionPolicy) executeSendTransaction(req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
 	res, err := call.Otto.Object(`({"jsonrpc":"2.0"})`)
 	if err != nil {
@@ -57,6 +59,7 @@ func (ep *ExecutionPolicy) executeSendTransaction(req common.RPCCall, call otto.
 	// TODO(adam): check if context is used
 	ctx := context.WithValue(context.Background(), common.MessageIDKey, messageID)
 	args := sendTxArgsFromRPCCall(req)
+
 	tx := ep.txQueueManager.CreateTransaction(ctx, args)
 
 	if err := ep.txQueueManager.QueueTransaction(tx); err != nil {
@@ -77,14 +80,7 @@ func (ep *ExecutionPolicy) executeSendTransaction(req common.RPCCall, call otto.
 	return res, nil
 }
 
-// ExecuteOtherTransaction defines a function which handles the processing of non `eth_sendTransaction`
-// rpc request to the internal node server.
-func (ep *ExecutionPolicy) executeOtherTransaction(req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
-	client, err := ep.nodeManager.RPCClient()
-	if err != nil {
-		return nil, common.StopRPCCallError{Err: err}
-	}
-
+func (ep *ExecutionPolicy) executeWithClient(client *rpc.Client, req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
 	JSON, err := call.Otto.Object("JSON")
 	if err != nil {
 		return nil, err
@@ -103,38 +99,33 @@ func (ep *ExecutionPolicy) executeOtherTransaction(req common.RPCCall, call otto
 		return nil, common.StopRPCCallError{Err: err}
 	}
 
-	err = client.Call(&result, req.Method, req.Params...)
-
-	switch err := err.(type) {
-	case nil:
-		if result == nil {
-
-			// Special case null because it is decoded as an empty
-			// raw message for some reason.
-			resp.Set("result", otto.NullValue())
-
-		} else {
-
-			resultVal, callErr := JSON.Call("parse", string(result))
-
-			if callErr != nil {
-				resp = newErrorResponse(call.Otto, -32603, callErr.Error(), &req.ID).Object()
+	if client == nil {
+		resp = newErrorResponse(call.Otto, -32603, "RPC client is not available. Node is stopped?", &req.ID).Object()
+	} else {
+		err = client.Call(&result, req.Method, req.Params...)
+		if err != nil {
+			if err2, ok := err.(gethrpc.Error); ok {
+				resp.Set("error", map[string]interface{}{
+					"code":    err2.ErrorCode(),
+					"message": err2.Error(),
+				})
 			} else {
-				resp.Set("result", resultVal)
+				resp = newErrorResponse(call.Otto, -32603, err.Error(), &req.ID).Object()
 			}
-
 		}
+	}
 
-	case rpc.Error:
-
-		resp.Set("error", map[string]interface{}{
-			"code":    err.ErrorCode(),
-			"message": err.Error(),
-		})
-
-	default:
-
-		resp = newErrorResponse(call.Otto, -32603, err.Error(), &req.ID).Object()
+	if result == nil {
+		// Special case null because it is decoded as an empty
+		// raw message for some reason.
+		resp.Set("result", otto.NullValue())
+	} else {
+		resultVal, callErr := JSON.Call("parse", string(result))
+		if callErr != nil {
+			resp = newErrorResponse(call.Otto, -32603, callErr.Error(), &req.ID).Object()
+		} else {
+			resp.Set("result", resultVal)
+		}
 	}
 
 	// do extra request post processing (setting back tx context)

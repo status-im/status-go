@@ -1,3 +1,4 @@
+// Package testing implements the base level testing types needed.
 package testing
 
 import (
@@ -6,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -16,6 +18,7 @@ import (
 	"github.com/status-im/status-go/geth/params"
 	assertions "github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"testing"
 )
 
 var (
@@ -167,13 +170,27 @@ func FirstBlockHash(require *assertions.Assertions, nodeManager common.NodeManag
 // MakeTestNodeConfig defines a function to return a giving params.NodeConfig
 // where specific network addresses are assigned based on provieded network id.
 func MakeTestNodeConfig(networkID int) (*params.NodeConfig, error) {
+	testDir := filepath.Join(TestDataDir, TestNetworkNames[networkID])
+
+	if runtime.GOOS == "windows" {
+		testDir = filepath.ToSlash(testDir)
+	}
+
+	// run tests with "INFO" log level only
+	// when `go test` invoked with `-v` flag
+	errorLevel := "ERROR"
+	if testing.Verbose() {
+		errorLevel = "INFO"
+	}
+
 	configJSON := `{
 		"NetworkId": ` + strconv.Itoa(networkID) + `,
-		"DataDir": "` + filepath.Join(TestDataDir, TestNetworkNames[networkID]) + `",
+		"DataDir": "` + testDir + `",
 		"HTTPPort": ` + strconv.Itoa(TestConfig.Node.HTTPPort) + `,
 		"WSPort": ` + strconv.Itoa(TestConfig.Node.WSPort) + `,
-		"LogLevel": "INFO"
+		"LogLevel": "` + errorLevel + `"
 	}`
+
 	nodeConfig, err := params.LoadNodeConfig(configJSON)
 	if err != nil {
 		return nil, err

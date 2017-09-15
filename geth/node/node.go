@@ -72,13 +72,18 @@ func MakeNode(config *params.NodeConfig) (*node.Node, error) {
 
 	// start Ethereum service if we are not expected to use an upstream server.
 	if !config.UpstreamConfig.Enabled {
-
 		if err := activateEthService(stack, config); err != nil {
 			return nil, fmt.Errorf("%v: %v", ErrEthServiceRegistrationFailure, err)
 		}
-
 	} else {
-		log.Info("Blockchain synchronization is switched off, RPC requests will be proxied to %s", config.UpstreamConfig.URL)
+		// TODO(divan): FIXME: this is rude workaround for #294 issue
+		// we start activate LES service to have RPC handler for `eth_accounts` call
+		// should be removed once proper own RPC and refactoring is completed
+		config.MaxPeers = 0
+		if err := activateEthService(stack, config); err != nil {
+			return nil, fmt.Errorf("%v: %v", ErrEthServiceRegistrationFailure, err)
+		}
+		log.Info("Blockchain synchronization is switched off, RPC requests will be proxied to " + config.UpstreamConfig.URL)
 	}
 
 	// start Whisper service

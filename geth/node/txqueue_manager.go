@@ -210,18 +210,14 @@ func (m *TxQueueManager) completeRemoteTransaction(queuedTx *common.QueuedTx, pa
 		return emptyHash, err
 	}
 
-	client, err := m.nodeManager.RPCClient()
-	if err != nil {
-		return emptyHash, err
-	}
-
 	// We need to request a new transaction nounce from upstream node.
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
 	var txCount hexutil.Uint
-	if callErr := client.CallContext(ctx, &txCount, "eth_getTransactionCount", queuedTx.Args.From, "pending"); callErr != nil {
-		return emptyHash, callErr
+	client := m.nodeManager.RPCClient()
+	if err := client.CallContext(ctx, &txCount, "eth_getTransactionCount", queuedTx.Args.From, "pending"); err != nil {
+		return emptyHash, err
 	}
 
 	chainID := big.NewInt(int64(config.NetworkID))
