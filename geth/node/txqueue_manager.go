@@ -193,7 +193,6 @@ func (m *TxQueueManager) completeLocalTransaction(queuedTx *common.QueuedTx, pas
 	log.Info("complete transaction using local node", "id", queuedTx.ID)
 
 	les, err := m.nodeManager.LightEthereumService()
-	log.Info("retrival les service", "err", err)
 	if err != nil {
 		return gethcommon.Hash{}, err
 	}

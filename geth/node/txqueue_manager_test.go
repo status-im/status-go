@@ -136,12 +136,11 @@ func (s *TxQueueTestSuite) TestCompleteTransactionMultipleTimes() {
 	for i := 0; i < 3; i++ {
 		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			_, err := txQueueManager.CompleteTransaction(tx.ID, TestConfig.Account1.Password)
 			mu.Lock()
 			completeTxErrors[err]++
 			mu.Unlock()
-
-			wg.Done()
 		}()
 	}
 
