@@ -176,9 +176,10 @@ func (jail *Jail) Send(call otto.FunctionCall) (response otto.Value) {
 
 	// Execute the requests.
 	for _, req := range reqs {
+		log.Info("execute request", "method", req.Method)
 		res, err := jail.policy.Execute(req, call)
-
 		if err != nil {
+			log.Info("request errored", "error", err.Error())
 			switch err.(type) {
 			case common.StopRPCCallError:
 				return newErrorResponse(call.Otto, -32603, err.Error(), nil)

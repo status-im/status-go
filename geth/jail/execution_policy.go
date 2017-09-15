@@ -99,15 +99,19 @@ func (ep *ExecutionPolicy) executeWithClient(client *rpc.Client, req common.RPCC
 		return nil, common.StopRPCCallError{Err: err}
 	}
 
-	err = client.Call(&result, req.Method, req.Params...)
-	if err != nil {
-		if err2, ok := err.(gethrpc.Error); ok {
-			resp.Set("error", map[string]interface{}{
-				"code":    err2.ErrorCode(),
-				"message": err2.Error(),
-			})
-		} else {
-			resp = newErrorResponse(call.Otto, -32603, err.Error(), &req.ID).Object()
+	if client == nil {
+		resp = newErrorResponse(call.Otto, -32603, "RPC client is not available. Node is stopped?", &req.ID).Object()
+	} else {
+		err = client.Call(&result, req.Method, req.Params...)
+		if err != nil {
+			if err2, ok := err.(gethrpc.Error); ok {
+				resp.Set("error", map[string]interface{}{
+					"code":    err2.ErrorCode(),
+					"message": err2.Error(),
+				})
+			} else {
+				resp = newErrorResponse(call.Otto, -32603, err.Error(), &req.ID).Object()
+			}
 		}
 	}
 
