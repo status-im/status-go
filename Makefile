@@ -47,7 +47,7 @@ statusgo-ios-simulator-mainnet: xgo
 	@echo "iOS framework cross compilation done (mainnet)."
 
 ci: mock
-	build/env.sh go test -timeout 10m -v ./geth/api/...
+	build/env.sh go test -timeout 40m -v ./geth/api/...
 	build/env.sh go test -timeout 40m -v ./geth/common
 	build/env.sh go test -timeout 40m -v ./geth/jail
 	build/env.sh go test -timeout 40m -v ./geth/node
