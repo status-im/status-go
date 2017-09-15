@@ -48,19 +48,19 @@ import (
 // Logger is a wrapper around log.Logger.
 type Logger struct {
 	log.Logger
-	Level   log.Lvl
-	Handler log.Handler
+	level   log.Lvl
+	handler log.Handler
 }
 
 // logger is package scope instance of Logger
 var logger = Logger{
 	Logger:  log.New("geth", "StatusIM"),
-	Level:   log.LvlError,
-	Handler: log.StreamHandler(os.Stdout, log.TerminalFormat(true)),
+	level:   log.LvlError,
+	handler: log.StreamHandler(os.Stdout, log.TerminalFormat(true)),
 }
 
 func init() {
-	setHandler(logger.Level, logger.Handler)
+	setHandler(logger.level, logger.handler)
 }
 
 // SetLevel inits status and ethereum-go logging packages,
@@ -71,8 +71,8 @@ func init() {
 func SetLevel(level string) {
 	lvl := levelFromString(level)
 
-	logger.Level = lvl
-	setHandler(lvl, logger.Handler)
+	logger.level = lvl
+	setHandler(lvl, logger.handler)
 }
 
 // SetLogFile configures logger to write output into file.
@@ -83,8 +83,8 @@ func SetLogFile(filename string) error {
 		return err
 	}
 
-	logger.Handler = handler
-	setHandler(logger.Level, handler)
+	logger.handler = handler
+	setHandler(logger.level, handler)
 	return nil
 }
 
