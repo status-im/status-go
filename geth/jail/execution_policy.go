@@ -10,6 +10,7 @@ import (
 	"github.com/status-im/status-go/geth/jail/internal/vm"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/rpc"
+	"fmt"
 )
 
 // ExecutionPolicy provides a central container for the executions of RPCCall requests for both
@@ -95,15 +96,19 @@ func (ep *ExecutionPolicy) executeWithClient(client *rpc.Client, vm *vm.VM, req 
 		return nil, common.StopRPCCallError{Err: err}
 	}
 
-	err = client.Call(&result, req.Method, req.Params...)
-	if err != nil {
-		if err2, ok := err.(gethrpc.Error); ok {
-			resp["error"] = map[string]interface{}{
-				"code":    err2.ErrorCode(),
-				"message": err2.Error(),
+	if client == nil {
+		resp = newErrorResponse("RPC client is not available. Node is stopped?", &req.ID)
+	} else {
+		err = client.Call(&result, req.Method, req.Params...)
+		if err != nil {
+			if err2, ok := err.(gethrpc.Error); ok {
+				resp["error"] = map[string]interface{}{
+					"code":    err2.ErrorCode(),
+					"message": err2.Error(),
+				}
+			} else {
+				resp = newErrorResponse(err.Error(), &req.ID)
 			}
-		} else {
-			resp = newErrorResponse(err.Error(), &req.ID)
 		}
 	}
 
