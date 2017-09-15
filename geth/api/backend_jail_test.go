@@ -258,6 +258,9 @@ func (s *BackendTestSuite) TestContractDeployment() {
 
 	<-completeQueuedTransaction
 
+	// Wait until callback is fired and `responseValue` is set. Hacky but simple.
+	time.Sleep(2 * time.Second)
+
 	responseValue, err := cell.Get("responseValue")
 	require.NoError(err)
 
