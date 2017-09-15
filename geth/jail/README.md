@@ -1,5 +1,5 @@
-#jail [![GoDoc](https://godoc.org/github.com/status-im/status-go/geth/jail?status.png)](https://godoc.org/github.com/status-im/status-go/geth/jail)
-go:generate autoreadme -f Package jail implements "jailed" enviroment for executing arbitrary JavaScript code using Otto JS interpreter (https://github.com/robertkrimen/otto).
+# jail [![GoDoc](https://godoc.org/github.com/status-im/status-go/geth/jail?status.png)](https://godoc.org/github.com/status-im/status-go/geth/jail)
+jail - jailed enviroment for executing JS code.
 
 Download:
 ```shell
@@ -7,7 +7,7 @@ go get github.com/status-im/status-go/geth/jail
 ```
 
 * * *
-go:generate autoreadme -f
+jail - jailed enviroment for executing JS code.
 
 Package jail implements "jailed" enviroment for executing arbitrary
 JavaScript code using Otto JS interpreter (https://github.com/robertkrimen/otto).
