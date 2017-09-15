@@ -10,7 +10,6 @@ import (
 	"github.com/status-im/status-go/geth/jail/internal/vm"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/rpc"
-	"fmt"
 )
 
 // ExecutionPolicy provides a central container for the executions of RPCCall requests for both
