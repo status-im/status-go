@@ -102,11 +102,11 @@ func makeJethIsConnectedHandler(jail *Jail, cellInt common.JailCell) func(call o
 
 		var netListeningResult bool
 		if err := client.Call(&netListeningResult, "net_listening"); err != nil {
-			return newErrorResponseOtto(cell.VM, -32603, err.Error(), nil)
+			return newErrorResponseOtto(cell.VM, err.Error(), nil)
 		}
 
 		if !netListeningResult {
-			return newErrorResponseOtto(cell.VM, -32603, node.ErrNoRunningNode.Error(), nil)
+			return newErrorResponseOtto(cell.VM, node.ErrNoRunningNode.Error(), nil)
 		}
 
 		return newResultResponse(call.Otto, true)

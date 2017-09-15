@@ -103,7 +103,7 @@ func (ep *ExecutionPolicy) executeWithClient(client *rpc.Client, vm *vm.VM, req 
 				"message": err2.Error(),
 			}
 		} else {
-			resp = newErrorResponse(-32603, err.Error(), &req.ID)
+			resp = newErrorResponse(err.Error(), &req.ID)
 		}
 	}
 
@@ -146,11 +146,7 @@ func currentMessageID(vm *vm.VM) string {
 	if err != nil {
 		return ""
 	}
-	msgIDStr, err := msgID.ToString()
-	if err != nil {
-		return ""
-	}
-	return msgIDStr
+	return msgID.String()
 }
 
 func sendTxArgsFromRPCCall(req common.RPCCall) common.SendTxArgs {

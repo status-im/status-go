@@ -190,9 +190,9 @@ func (jail *Jail) Send(call otto.FunctionCall, vm *vm.VM) otto.Value {
 		if err != nil {
 			switch err.(type) {
 			case common.StopRPCCallError:
-				return newErrorResponseOtto(vm, -32603, err.Error(), nil)
+				return newErrorResponseOtto(vm, err.Error(), nil)
 			default:
-				res = newErrorResponse(-32603, err.Error(), &req.ID)
+				res = newErrorResponse(err.Error(), &req.ID)
 			}
 		}
 
@@ -214,21 +214,21 @@ func (jail *Jail) Send(call otto.FunctionCall, vm *vm.VM) otto.Value {
 	return v
 }
 
-func newErrorResponse(code int, msg string, id interface{}) map[string]interface{} {
+func newErrorResponse(msg string, id interface{}) map[string]interface{} {
 	// Bundle the error into a JSON RPC call response
 	return map[string]interface{}{
 		"jsonrpc": "2.0",
 		"id":      id,
 		"error": map[string]interface{}{
-			"code":    code,
+			"code":    -32603, // Internal JSON-RPC Error, see http://www.jsonrpc.org/specification#error_object
 			"message": msg,
 		},
 	}
 }
 
-func newErrorResponseOtto(vm *vm.VM, code int, msg string, id interface{}) otto.Value {
+func newErrorResponseOtto(vm *vm.VM, msg string, id interface{}) otto.Value {
 	// TODO(tiabc): Handle errors.
-	errResp, _ := json.Marshal(newErrorResponse(code, msg, id))
+	errResp, _ := json.Marshal(newErrorResponse(msg, id))
 	errRespVal, _ := vm.Run("(" + string(errResp) + ")")
 	return errRespVal
 }
