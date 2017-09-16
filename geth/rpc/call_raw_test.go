@@ -116,7 +116,7 @@ func TestMethodAndParamsFromBody(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			method, params, id, err := methodAndParamsFromBody(test.body)
 			if test.shouldFail {
-				require.NotNil(t, err)
+				require.Error(t, err)
 				return
 			}
 			require.NoError(t, err)
