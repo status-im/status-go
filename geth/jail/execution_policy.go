@@ -5,11 +5,48 @@ import (
 	"encoding/json"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	gethrpc "github.com/ethereum/go-ethereum/rpc"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
-	"github.com/status-im/status-go/geth/rpc"
+)
+
+// map of command routes
+var (
+	//TODO(influx6): Replace this with a registry of commands to functions that
+	// call appropriate op for command with ExecutionPolicy.
+	rpcLocalCommandRoute = map[string]bool{
+		//Whisper commands
+		"shh_post":             true,
+		"shh_version":          true,
+		"shh_newIdentity":      true,
+		"shh_hasIdentity":      true,
+		"shh_newGroup":         true,
+		"shh_addToGroup":       true,
+		"shh_newFilter":        true,
+		"shh_uninstallFilter":  true,
+		"shh_getFilterChanges": true,
+		"shh_getMessages":      true,
+
+		// DB commands
+		"db_putString": true,
+		"db_getString": true,
+		"db_putHex":    true,
+		"db_getHex":    true,
+
+		// Other commands
+		"net_version":   true,
+		"net_peerCount": true,
+		"net_listening": true,
+
+		// blockchain commands
+		"eth_sign":            true,
+		"eth_accounts":        true,
+		"eth_getCompilers":    true,
+		"eth_compileLLL":      true,
+		"eth_compileSolidity": true,
+		"eth_compileSerpent":  true,
+	}
 )
 
 // ExecutionPolicy provides a central container for the executions of RPCCall requests for both
@@ -33,11 +70,48 @@ func NewExecutionPolicy(
 
 // Execute handles the execution of a RPC request and routes appropriately to either a local or remote ethereum node.
 func (ep *ExecutionPolicy) Execute(req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
+	config, err := ep.nodeManager.NodeConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	if config.UpstreamConfig.Enabled {
+		if rpcLocalCommandRoute[req.Method] {
+			return ep.ExecuteLocally(req, call)
+		}
+
+		return ep.ExecuteOnRemote(req, call)
+	}
+
+	return ep.ExecuteLocally(req, call)
+}
+
+// ExecuteLocally defines a function which handles the processing of all RPC requests from the jail object
+// to be processed with the internal ethereum node server(light.LightEthereum).
+func (ep *ExecutionPolicy) ExecuteLocally(req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
 	if params.SendTransactionMethodName == req.Method {
 		return ep.executeSendTransaction(req, call)
 	}
 
-	client := ep.nodeManager.RPCClient()
+	client, err := ep.nodeManager.RPCLocalClient()
+	if err != nil {
+		return nil, common.StopRPCCallError{Err: err}
+	}
+
+	return ep.executeWithClient(client, req, call)
+}
+
+// ExecuteOnRemote defines a function which handles the processing of all RPC requests from the jail object
+// to be processed by a remote ethereum node server with responses returned as needed.
+func (ep *ExecutionPolicy) ExecuteOnRemote(req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
+	if params.SendTransactionMethodName == req.Method {
+		return ep.executeSendTransaction(req, call)
+	}
+
+	client, err := ep.nodeManager.RPCUpstreamClient()
+	if err != nil {
+		return nil, common.StopRPCCallError{Err: err}
+	}
 
 	return ep.executeWithClient(client, req, call)
 }
@@ -99,33 +173,38 @@ func (ep *ExecutionPolicy) executeWithClient(client *rpc.Client, req common.RPCC
 		return nil, common.StopRPCCallError{Err: err}
 	}
 
-	if client == nil {
-		resp = newErrorResponse(call.Otto, -32603, "RPC client is not available. Node is stopped?", &req.ID).Object()
-	} else {
-		err = client.Call(&result, req.Method, req.Params...)
-		if err != nil {
-			if err2, ok := err.(gethrpc.Error); ok {
-				resp.Set("error", map[string]interface{}{
-					"code":    err2.ErrorCode(),
-					"message": err2.Error(),
-				})
-			} else {
-				resp = newErrorResponse(call.Otto, -32603, err.Error(), &req.ID).Object()
-			}
-		}
-	}
+	err = client.Call(&result, req.Method, req.Params...)
 
-	if result == nil {
-		// Special case null because it is decoded as an empty
-		// raw message for some reason.
-		resp.Set("result", otto.NullValue())
-	} else {
-		resultVal, callErr := JSON.Call("parse", string(result))
-		if callErr != nil {
-			resp = newErrorResponse(call.Otto, -32603, callErr.Error(), &req.ID).Object()
+	switch err := err.(type) {
+	case nil:
+		if result == nil {
+
+			// Special case null because it is decoded as an empty
+			// raw message for some reason.
+			resp.Set("result", otto.NullValue())
+
 		} else {
-			resp.Set("result", resultVal)
+
+			resultVal, callErr := JSON.Call("parse", string(result))
+
+			if callErr != nil {
+				resp = newErrorResponse(call.Otto, -32603, callErr.Error(), &req.ID).Object()
+			} else {
+				resp.Set("result", resultVal)
+			}
+
 		}
+
+	case rpc.Error:
+
+		resp.Set("error", map[string]interface{}{
+			"code":    err.ErrorCode(),
+			"message": err.Error(),
+		})
+
+	default:
+
+		resp = newErrorResponse(call.Otto, -32603, err.Error(), &req.ID).Object()
 	}
 
 	// do extra request post processing (setting back tx context)

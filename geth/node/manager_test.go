@@ -116,7 +116,14 @@ func (s *ManagerTestSuite) TestReferences() {
 		{
 			"non-null manager, no running node, get RPC Client",
 			func() (interface{}, error) {
-				return s.NodeManager.RPCClient(), nil
+				return s.NodeManager.RPCClient()
+			},
+			node.ErrNoRunningNode,
+		},
+		{
+			"non-null manager, no running node, get RPC Server",
+			func() (interface{}, error) {
+				return s.NodeManager.RPCServer()
 			},
 			node.ErrNoRunningNode,
 		},
@@ -181,9 +188,16 @@ func (s *ManagerTestSuite) TestReferences() {
 		{
 			"node is running, get RPC Client",
 			func() (interface{}, error) {
-				return s.NodeManager.RPCClient(), nil
+				return s.NodeManager.RPCClient()
 			},
 			&rpc.Client{},
+		},
+		{
+			"node is running, get RPC Server",
+			func() (interface{}, error) {
+				return s.NodeManager.RPCServer()
+			},
+			&rpc.Server{},
 		},
 	}
 	for _, testCase := range nodeReadyTestCases {
@@ -398,7 +412,14 @@ func (s *ManagerTestSuite) TestRaceConditions() {
 		},
 		func(config *params.NodeConfig) {
 			log.Info("RPCClient()")
-			s.NodeManager.RPCClient()
+			_, err := s.NodeManager.RPCClient()
+			s.T().Logf("RPCClient(), error: %v", err)
+			progress <- struct{}{}
+		},
+		func(config *params.NodeConfig) {
+			log.Info("RPCServer()")
+			_, err := s.NodeManager.RPCServer()
+			s.T().Logf("RPCServer(), error: %v", err)
 			progress <- struct{}{}
 		},
 	}

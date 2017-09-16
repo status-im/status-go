@@ -11,11 +11,11 @@ import (
 	common "github.com/ethereum/go-ethereum/common"
 	les "github.com/ethereum/go-ethereum/les"
 	node "github.com/ethereum/go-ethereum/node"
+	rpc "github.com/ethereum/go-ethereum/rpc"
 	whisperv5 "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	gomock "github.com/golang/mock/gomock"
 	otto "github.com/robertkrimen/otto"
 	params "github.com/status-im/status-go/geth/params"
-	rpc "github.com/status-im/status-go/geth/rpc"
 	reflect "reflect"
 )
 
@@ -209,15 +209,55 @@ func (mr *MockNodeManagerMockRecorder) AccountKeyStore() *gomock.Call {
 }
 
 // RPCClient mocks base method
-func (m *MockNodeManager) RPCClient() *rpc.Client {
+func (m *MockNodeManager) RPCClient() (*rpc.Client, error) {
 	ret := m.ctrl.Call(m, "RPCClient")
 	ret0, _ := ret[0].(*rpc.Client)
-	return ret0
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // RPCClient indicates an expected call of RPCClient
 func (mr *MockNodeManagerMockRecorder) RPCClient() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RPCClient", reflect.TypeOf((*MockNodeManager)(nil).RPCClient))
+}
+
+// RPCLocalClient mocks base method
+func (m *MockNodeManager) RPCLocalClient() (*rpc.Client, error) {
+	ret := m.ctrl.Call(m, "RPCLocalClient")
+	ret0, _ := ret[0].(*rpc.Client)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RPCLocalClient indicates an expected call of RPCLocalClient
+func (mr *MockNodeManagerMockRecorder) RPCLocalClient() *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RPCLocalClient", reflect.TypeOf((*MockNodeManager)(nil).RPCLocalClient))
+}
+
+// RPCUpstreamClient mocks base method
+func (m *MockNodeManager) RPCUpstreamClient() (*rpc.Client, error) {
+	ret := m.ctrl.Call(m, "RPCUpstreamClient")
+	ret0, _ := ret[0].(*rpc.Client)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RPCUpstreamClient indicates an expected call of RPCUpstreamClient
+func (mr *MockNodeManagerMockRecorder) RPCUpstreamClient() *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RPCUpstreamClient", reflect.TypeOf((*MockNodeManager)(nil).RPCUpstreamClient))
+}
+
+// RPCServer mocks base method
+func (m *MockNodeManager) RPCServer() (*rpc.Server, error) {
+	ret := m.ctrl.Call(m, "RPCServer")
+	ret0, _ := ret[0].(*rpc.Server)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RPCServer indicates an expected call of RPCServer
+func (mr *MockNodeManagerMockRecorder) RPCServer() *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RPCServer", reflect.TypeOf((*MockNodeManager)(nil).RPCServer))
 }
 
 // MockAccountManager is a mock of AccountManager interface
@@ -372,6 +412,41 @@ func (m *MockAccountManager) AddressToDecryptedAccount(address, password string)
 // AddressToDecryptedAccount indicates an expected call of AddressToDecryptedAccount
 func (mr *MockAccountManagerMockRecorder) AddressToDecryptedAccount(address, password interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddressToDecryptedAccount", reflect.TypeOf((*MockAccountManager)(nil).AddressToDecryptedAccount), address, password)
+}
+
+// MockRPCManager is a mock of RPCManager interface
+type MockRPCManager struct {
+	ctrl     *gomock.Controller
+	recorder *MockRPCManagerMockRecorder
+}
+
+// MockRPCManagerMockRecorder is the mock recorder for MockRPCManager
+type MockRPCManagerMockRecorder struct {
+	mock *MockRPCManager
+}
+
+// NewMockRPCManager creates a new mock instance
+func NewMockRPCManager(ctrl *gomock.Controller) *MockRPCManager {
+	mock := &MockRPCManager{ctrl: ctrl}
+	mock.recorder = &MockRPCManagerMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use
+func (m *MockRPCManager) EXPECT() *MockRPCManagerMockRecorder {
+	return m.recorder
+}
+
+// Call mocks base method
+func (m *MockRPCManager) Call(inputJSON string) string {
+	ret := m.ctrl.Call(m, "Call", inputJSON)
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// Call indicates an expected call of Call
+func (mr *MockRPCManagerMockRecorder) Call(inputJSON interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Call", reflect.TypeOf((*MockRPCManager)(nil).Call), inputJSON)
 }
 
 // MockTxQueue is a mock of TxQueue interface
@@ -684,7 +759,7 @@ func (mr *MockJailCellMockRecorder) Get(arg0 interface{}) *gomock.Call {
 }
 
 // Run mocks base method
-func (m *MockJailCell) Run(arg0 interface{}) (otto.Value, error) {
+func (m *MockJailCell) Run(arg0 string) (otto.Value, error) {
 	ret := m.ctrl.Call(m, "Run", arg0)
 	ret0, _ := ret[0].(otto.Value)
 	ret1, _ := ret[1].(error)
