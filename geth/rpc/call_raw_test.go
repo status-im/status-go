@@ -50,11 +50,12 @@ func TestUnmarshalMessage(t *testing.T) {
 
 func TestMethodAndParamsFromBody(t *testing.T) {
 	cases := []struct {
-		name   string
-		body   string
-		params []interface{}
-		method string
-		id     json.RawMessage
+		name       string
+		body       string
+		params     []interface{}
+		method     string
+		id         json.RawMessage
+		shouldFail bool
 	}{
 		{
 			"params_array",
@@ -67,6 +68,7 @@ func TestMethodAndParamsFromBody(t *testing.T) {
 			},
 			"subtract",
 			json.RawMessage(`42`),
+			false,
 		},
 		{
 			"params_empty_array",
@@ -74,6 +76,7 @@ func TestMethodAndParamsFromBody(t *testing.T) {
 			[]interface{}{},
 			"test",
 			json.RawMessage(nil),
+			false,
 		},
 		{
 			"params_none",
@@ -81,12 +84,41 @@ func TestMethodAndParamsFromBody(t *testing.T) {
 			[]interface{}{},
 			"test",
 			json.RawMessage(nil),
+			false,
+		},
+		{
+			"getFilterMessage",
+			`{"jsonrpc":"2.0","id":44,"method":"shh_getFilterMessages","params":["3de6a8867aeb75be74d68478b853b4b0e063704d30f8231c45d0fcbd97af207e"]}`,
+			[]interface{}{string("3de6a8867aeb75be74d68478b853b4b0e063704d30f8231c45d0fcbd97af207e")},
+			"shh_getFilterMessages",
+			json.RawMessage(`44`),
+			false,
+		},
+		{
+			"getFilterMessage_array",
+			`[{"jsonrpc":"2.0","id":44,"method":"shh_getFilterMessages","params":["3de6a8867aeb75be74d68478b853b4b0e063704d30f8231c45d0fcbd97af207e"]}]`,
+			[]interface{}{string("3de6a8867aeb75be74d68478b853b4b0e063704d30f8231c45d0fcbd97af207e")},
+			"shh_getFilterMessages",
+			json.RawMessage(`44`),
+			false,
+		},
+		{
+			"empty_array",
+			`[]`,
+			[]interface{}{},
+			"",
+			json.RawMessage(nil),
+			true,
 		},
 	}
 
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
 			method, params, id, err := methodAndParamsFromBody(test.body)
+			if test.shouldFail {
+				require.NotNil(t, err)
+				return
+			}
 			require.NoError(t, err)
 			require.Equal(t, test.method, method)
 			require.Equal(t, test.params, params)
