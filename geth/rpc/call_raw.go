@@ -97,7 +97,6 @@ func methodAndParamsFromBody(body string) (string, []interface{}, json.RawMessag
 	if msg.Params != nil {
 		err = json.Unmarshal(msg.Params, &params)
 		if err != nil {
-			log.Error("unmarshal params", "error", err)
 			return "", nil, nil, err
 		}
 	}
@@ -137,6 +136,8 @@ func unmarshalMessageArray(body string) (*jsonrpcMessage, error) {
 	// return first element
 	if len(msgs) == 0 {
 		return nil, errors.New("empty array")
+	} else if len(msgs) > 1 {
+		log.Warn("JSON-RPC payload has more then 1 objects", "len", len(msgs), "body", body)
 	}
 	return msgs[0], nil
 }
