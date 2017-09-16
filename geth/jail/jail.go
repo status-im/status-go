@@ -176,8 +176,10 @@ func (jail *Jail) Send(call otto.FunctionCall) (response otto.Value) {
 
 	// Execute the requests.
 	for _, req := range reqs {
-		log.Info("execute request", "method", req.Method)
+		log.Info("executing a request via jail.policy", "method", req.Method, "params", req.Params)
 		res, err := jail.policy.Execute(req, call)
+		log.Info("response from the request", "err", err)
+
 		if err != nil {
 			log.Info("request errored", "error", err.Error())
 			switch err.(type) {
@@ -207,16 +209,11 @@ func (jail *Jail) Send(call otto.FunctionCall) (response otto.Value) {
 	return response
 }
 
+//==========================================================================================================
+
 func newErrorResponse(vm *otto.Otto, code int, msg string, id interface{}) otto.Value {
 	// Bundle the error into a JSON RPC call response
-	m := map[string]interface{}{
-		"jsonrpc": "2.0",
-		"id":      id,
-		"error": map[string]interface{}{
-			"code":    code,
-			"message": msg,
-		},
-	}
+	m := map[string]interface{}{"jsonrpc": "2.0", "id": id, "error": map[string]interface{}{"code": code, msg: msg}}
 	res, _ := json.Marshal(m)
 	val, _ := vm.Run("(" + string(res) + ")")
 	return val
