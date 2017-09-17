@@ -3,6 +3,7 @@ package rpc
 import (
 	"context"
 	"encoding/json"
+	"errors"
 
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/geth/log"
@@ -96,7 +97,6 @@ func methodAndParamsFromBody(body string) (string, []interface{}, json.RawMessag
 	if msg.Params != nil {
 		err = json.Unmarshal(msg.Params, &params)
 		if err != nil {
-			log.Error("unmarshal params", "error", err)
 			return "", nil, nil, err
 		}
 	}
@@ -104,10 +104,42 @@ func methodAndParamsFromBody(body string) (string, []interface{}, json.RawMessag
 	return msg.Method, params, msg.ID, nil
 }
 
+// unmarshalMessage tries to unmarshal JSON-RPC message.
+// somehow JSON-RPC input from web3.js can be in two forms:
+//
+// object:  {"jsonrpc":"2.0", …}
+// array:   [{"jsonrpc":"2.0", …}]
+//
+// unmarhsalMessage tries first option and in case of error,
+// tries to unmarshal it as an array.
+//
+// TODO(divan): fix the source of this error and cleanup.
 func unmarshalMessage(body string) (*jsonrpcMessage, error) {
 	var msg jsonrpcMessage
 	err := json.Unmarshal([]byte(body), &msg)
+	// check for array case
+	if e, ok := err.(*json.UnmarshalTypeError); ok {
+		if e.Value == "array" {
+			return unmarshalMessageArray(body)
+		}
+	}
 	return &msg, err
+}
+
+func unmarshalMessageArray(body string) (*jsonrpcMessage, error) {
+	var msgs []*jsonrpcMessage
+	err := json.Unmarshal([]byte(body), &msgs)
+	if err != nil {
+		return nil, err
+	}
+
+	// return first element
+	if len(msgs) == 0 {
+		return nil, errors.New("empty array")
+	} else if len(msgs) > 1 {
+		log.Warn("JSON-RPC payload has more then 1 objects", "len", len(msgs), "body", body)
+	}
+	return msgs[0], nil
 }
 
 func newSuccessResponse(result json.RawMessage, id json.RawMessage) string {

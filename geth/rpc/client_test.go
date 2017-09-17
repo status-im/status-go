@@ -6,7 +6,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/rpc"
@@ -183,7 +182,6 @@ func (s *RPCTestSuite) TestCallRPC() {
 				"id": 1
 			}`,
 			func(resultJSON string) {
-				log.Info("eth_sendTransaction")
 				progress <- struct{}{}
 			},
 		},
