@@ -75,7 +75,7 @@ func TestMethodAndParamsFromBody(t *testing.T) {
 			`{"jsonrpc": "2.0", "method": "test", "params": []}`,
 			[]interface{}{},
 			"test",
-			json.RawMessage(nil),
+			nil,
 			false,
 		},
 		{
@@ -83,7 +83,7 @@ func TestMethodAndParamsFromBody(t *testing.T) {
 			`{"jsonrpc": "2.0", "method": "test"}`,
 			[]interface{}{},
 			"test",
-			json.RawMessage(nil),
+			nil,
 			false,
 		},
 		{
@@ -107,7 +107,7 @@ func TestMethodAndParamsFromBody(t *testing.T) {
 			`[]`,
 			[]interface{}{},
 			"",
-			json.RawMessage(nil),
+			nil,
 			true,
 		},
 	}
@@ -117,12 +117,11 @@ func TestMethodAndParamsFromBody(t *testing.T) {
 			method, params, id, err := methodAndParamsFromBody(test.body)
 			if test.shouldFail {
 				require.Error(t, err)
-				return
 			}
 			require.NoError(t, err)
 			require.Equal(t, test.method, method)
 			require.Equal(t, test.params, params)
-			require.Equal(t, test.id, id)
+			require.EqualValues(t, test.id, id)
 		})
 	}
 }
