@@ -2,9 +2,7 @@ package jail
 
 import (
 	"context"
-	"encoding/json"
 
-	"fmt"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/geth/common"
@@ -81,7 +79,8 @@ func (ep *ExecutionPolicy) executeSendTransaction(vm *vm.VM, req common.RPCCall)
 }
 
 func (ep *ExecutionPolicy) executeWithClient(client *rpc.Client, vm *vm.VM, req common.RPCCall) (map[string]interface{}, error) {
-	var result json.RawMessage
+	// Arbitrary JSON-RPC response.
+	var result interface{}
 
 	resp := map[string]interface{}{
 		"jsonrpc": "2.0",
@@ -117,11 +116,7 @@ func (ep *ExecutionPolicy) executeWithClient(client *rpc.Client, vm *vm.VM, req 
 		// raw message for some reason.
 		resp["result"] = ""
 	} else {
-		var o interface{}
-		if err := json.Unmarshal(result, &o); err != nil {
-			return nil, fmt.Errorf("response is not valid json: %s", err)
-		}
-		resp["result"] = o
+		resp["result"] = result
 	}
 
 	// do extra request post processing (setting back tx context)
