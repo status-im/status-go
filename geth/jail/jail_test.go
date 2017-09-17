@@ -3,9 +3,9 @@ package jail_test
 import (
 	"encoding/json"
 	"errors"
+	"sync"
 	"testing"
 	"time"
-	"sync"
 
 	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/node"
@@ -125,6 +125,8 @@ func (s *JailTestSuite) TestFunctionCall() {
 	require.Equal(expectedResponse, response)
 }
 
+// TestJailRPCAsyncSend was written to catch race conditions with a weird error message
+// starting from `ReferenceError` as if otto vm were losing symbols.
 func (s *JailTestSuite) TestJailRPCAsyncSend() {
 	require := s.Require()
 

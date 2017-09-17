@@ -43,12 +43,6 @@ func (ep *ExecutionPolicy) Execute(req common.RPCCall, vm *vm.VM) (map[string]in
 
 // executeRemoteSendTransaction defines a function to execute RPC method eth_sendTransaction over the upstream server.
 func (ep *ExecutionPolicy) executeSendTransaction(vm *vm.VM, req common.RPCCall) (map[string]interface{}, error) {
-	// TODO(tiabc): Move it to the bottom where `result` and `hash` are set.
-	res := map[string]interface{}{
-		"jsonrpc": "2.0",
-		"id":      req.ID,
-	}
-
 	messageID, err := preProcessRequest(vm)
 	if err != nil {
 		return nil, err
@@ -71,9 +65,13 @@ func (ep *ExecutionPolicy) executeSendTransaction(vm *vm.VM, req common.RPCCall)
 	// invoke post processing
 	postProcessRequest(vm, req, messageID)
 
-	// @TODO(adam): which one is actually used?
-	res["result"] = tx.Hash.Hex()
-	res["hash"] = tx.Hash.Hex()
+	res := map[string]interface{}{
+		"jsonrpc": "2.0",
+		"id":      req.ID,
+		// @TODO(adam): which one is actually used?
+		"result": tx.Hash.Hex(),
+		"hash":   tx.Hash.Hex(),
+	}
 
 	return res, nil
 }
