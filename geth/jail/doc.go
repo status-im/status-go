@@ -1,5 +1,6 @@
-//go:generate godocdown -heading Title -o README.md
 /*
+jail - jailed enviroment for executing JS code.
+
 Package jail implements "jailed" enviroment for executing arbitrary
 JavaScript code using Otto JS interpreter (https://github.com/robertkrimen/otto).
 
@@ -83,3 +84,5 @@ it's user responsibility to register a corresponding callback function before:
 
 */
 package jail
+
+//go:generate autoreadme -f
