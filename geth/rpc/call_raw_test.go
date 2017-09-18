@@ -36,7 +36,7 @@ func TestNewErrorResponse(t *testing.T) {
 }
 
 func TestUnmarshalMessage(t *testing.T) {
-	body := `{"jsonrpc": "2.0", "method": "subtract", "params": {"subtrahend": 23, "minuend": 42}}`
+	body := json.RawMessage(`{"jsonrpc": "2.0", "method": "subtract", "params": {"subtrahend": 23, "minuend": 42}}`)
 	got, err := unmarshalMessage(body)
 	require.NoError(t, err)
 
@@ -50,15 +50,16 @@ func TestUnmarshalMessage(t *testing.T) {
 
 func TestMethodAndParamsFromBody(t *testing.T) {
 	cases := []struct {
-		name   string
-		body   string
-		params []interface{}
-		method string
-		id     json.RawMessage
+		name       string
+		body       json.RawMessage
+		params     []interface{}
+		method     string
+		id         json.RawMessage
+		shouldFail bool
 	}{
 		{
 			"params_array",
-			`{"jsonrpc": "2.0", "id": 42, "method": "subtract", "params": [{"subtrahend": 23, "minuend": 42}]}`,
+			json.RawMessage(`{"jsonrpc": "2.0", "id": 42, "method": "subtract", "params": [{"subtrahend": 23, "minuend": 42}]}`),
 			[]interface{}{
 				map[string]interface{}{
 					"subtrahend": float64(23),
@@ -67,30 +68,79 @@ func TestMethodAndParamsFromBody(t *testing.T) {
 			},
 			"subtract",
 			json.RawMessage(`42`),
+			false,
 		},
 		{
 			"params_empty_array",
-			`{"jsonrpc": "2.0", "method": "test", "params": []}`,
+			json.RawMessage(`{"jsonrpc": "2.0", "method": "test", "params": []}`),
 			[]interface{}{},
 			"test",
-			json.RawMessage(nil),
+			nil,
+			false,
 		},
 		{
 			"params_none",
-			`{"jsonrpc": "2.0", "method": "test"}`,
+			json.RawMessage(`{"jsonrpc": "2.0", "method": "test"}`),
 			[]interface{}{},
 			"test",
-			json.RawMessage(nil),
+			nil,
+			false,
+		},
+		{
+			"getFilterMessage",
+			json.RawMessage(`{"jsonrpc":"2.0","id":44,"method":"shh_getFilterMessages","params":["3de6a8867aeb75be74d68478b853b4b0e063704d30f8231c45d0fcbd97af207e"]}`),
+			[]interface{}{string("3de6a8867aeb75be74d68478b853b4b0e063704d30f8231c45d0fcbd97af207e")},
+			"shh_getFilterMessages",
+			json.RawMessage(`44`),
+			false,
+		},
+		{
+			"getFilterMessage_array",
+			json.RawMessage(`[{"jsonrpc":"2.0","id":44,"method":"shh_getFilterMessages","params":["3de6a8867aeb75be74d68478b853b4b0e063704d30f8231c45d0fcbd97af207e"]}]`),
+			[]interface{}{},
+			"",
+			nil,
+			true,
+		},
+		{
+			"empty_array",
+			json.RawMessage(`[]`),
+			[]interface{}{},
+			"",
+			nil,
+			true,
 		},
 	}
 
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
 			method, params, id, err := methodAndParamsFromBody(test.body)
+			if test.shouldFail {
+				require.Error(t, err)
+				return
+			}
 			require.NoError(t, err)
 			require.Equal(t, test.method, method)
 			require.Equal(t, test.params, params)
-			require.Equal(t, test.id, id)
+			require.EqualValues(t, test.id, id)
+		})
+	}
+}
+
+func TestIsBatch(t *testing.T) {
+	cases := []struct {
+		name     string
+		body     json.RawMessage
+		expected bool
+	}{
+		{"single", json.RawMessage(`{"jsonrpc":"2.0","id":44,"method":"shh_getFilterMessages","params":["3de6a8867aeb75be74d68478b853b4b0e063704d30f8231c45d0fcbd97af207e"]}`), false},
+		{"array", json.RawMessage(`[{"jsonrpc":"2.0","id":44,"method":"shh_getFilterMessages","params":["3de6a8867aeb75be74d68478b853b4b0e063704d30f8231c45d0fcbd97af207e"]}]`), true},
+	}
+
+	for _, test := range cases {
+		t.Run(test.name, func(t *testing.T) {
+			got := isBatch(test.body)
+			require.Equal(t, test.expected, got)
 		})
 	}
 }

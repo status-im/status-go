@@ -13,7 +13,7 @@ WS1="$ROOT/build/_workspace/deps"
 WS2="$ROOT/build/_workspace/project"
 
 # expose all vendored packages
-if [ ! -d "$WS1/src" ]; then
+if [ ! -L "$WS1/src" ]; then
     mkdir -p "$WS1"
     cd "$WS1"
     ln -s "$ROOT/vendor" src

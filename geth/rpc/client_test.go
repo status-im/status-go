@@ -6,7 +6,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/rpc"
@@ -183,7 +182,6 @@ func (s *RPCTestSuite) TestCallRPC() {
 				"id": 1
 			}`,
 			func(resultJSON string) {
-				log.Info("eth_sendTransaction")
 				progress <- struct{}{}
 			},
 		},
@@ -207,6 +205,22 @@ func (s *RPCTestSuite) TestCallRPC() {
 			`{"jsonrpc":"2.0","method":"net_version","params":[],"id":67}`,
 			func(resultJSON string) {
 				expected := `{"jsonrpc":"2.0","id":67,"result":"4"}`
+				s.Equal(expected, resultJSON)
+				progress <- struct{}{}
+			},
+		},
+		{
+			`[{"jsonrpc":"2.0","method":"net_version","params":[],"id":67}]`,
+			func(resultJSON string) {
+				expected := `[{"jsonrpc":"2.0","id":67,"result":"4"}]`
+				s.Equal(expected, resultJSON)
+				progress <- struct{}{}
+			},
+		},
+		{
+			`[{"jsonrpc":"2.0","method":"net_version","params":[],"id":67},{"jsonrpc":"2.0","method":"web3_sha3","params":["0x68656c6c6f20776f726c64"],"id":68}]`,
+			func(resultJSON string) {
+				expected := `[{"jsonrpc":"2.0","id":67,"result":"4"},{"jsonrpc":"2.0","id":68,"result":"0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad"}]`
 				s.Equal(expected, resultJSON)
 				progress <- struct{}{}
 			},

@@ -263,6 +263,9 @@ func (s *BackendTestSuite) TestContractDeployment() {
 		s.FailNow("test timed out")
 	}
 
+	// Wait until callback is fired and `responseValue` is set. Hacky but simple.
+	time.Sleep(2 * time.Second)
+
 	responseValue, err := cell.Get("responseValue")
 	require.NoError(err)
 
@@ -722,14 +725,6 @@ func (s *BackendTestSuite) TestJailVMPersistence() {
 			event := envelope.Event.(map[string]interface{})
 			s.T().Logf("Transaction queued (will be completed shortly): {id: %s}\n", event["id"].(string))
 
-			time.Sleep(1 * time.Second)
-
-			//if err := geth.DiscardTransaction(event["id"].(string)); err != nil {
-			//	t.Errorf("cannot discard: %v", err)
-			//	progress <- "tx discarded"
-			//	return
-			//}
-
 			//var txHash common.Hash
 			txID := event["id"].(string)
 			txHash, err := s.backend.CompleteTransaction(common.QueuedTxID(txID), TestConfig.Account1.Password)
@@ -765,6 +760,10 @@ func (s *BackendTestSuite) TestJailVMPersistence() {
 	case <-time.After(time.Minute):
 		s.FailNow("some tests failed to finish in time")
 	}
+
+	// Wait till eth_sendTransaction callbacks have been executed.
+	// FIXME(tiabc): more reliable means of testing that.
+	time.Sleep(5 * time.Second)
 
 	// Validate total.
 	cell, err := jailInstance.Cell(testChatID)

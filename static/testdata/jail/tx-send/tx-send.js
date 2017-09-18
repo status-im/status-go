@@ -54,6 +54,18 @@ function call(pathStr, paramsStr) {
     return JSON.stringify(res);
 }
 
+function sendAsyncTransaction(params) {
+    var data = {
+        from: params.from,
+        to: params.to,
+        value: web3.toWei(params.value, "ether")
+    };
+
+    web3.eth.sendTransaction(data, function(){
+        // A specified callback is enough to make this function async.
+    });
+}
+
 function sendTransaction(params) {
     var data = {
         from: params.from,
@@ -72,9 +84,10 @@ function sendTransaction(params) {
     var hash = web3.eth.sendTransaction(data);
 
     return {"transaction-hash": hash};
-}
+};
 
 _status_catalog.commands['send'] = sendTransaction;
+_status_catalog.commands['sendAsync'] = sendAsyncTransaction;
 _status_catalog.commands['getBalance'] = function (params) {
     var balance = web3.eth.getBalance(params.address);
     balance = web3.fromWei(balance, "ether");
