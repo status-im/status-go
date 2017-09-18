@@ -25,7 +25,7 @@ var (
 	ErrQueuedTxIDNotFound       = errors.New("transaction hash not found")
 	ErrQueuedTxTimedOut         = errors.New("transaction sending timed out")
 	ErrQueuedTxDiscarded        = errors.New("transaction has been discarded")
-	ErrQueuedTxInProgress       = errors.New("transaction has started being processed already")
+	ErrQueuedTxInProgress       = errors.New("transaction is in progress")
 	ErrQueuedTxAlreadyProcessed = errors.New("transaction has been already processed")
 	ErrInvalidCompleteTxSender  = errors.New("transaction can only be completed by the same account which created it")
 )
