@@ -150,13 +150,14 @@ type QueuedTxID string
 
 // QueuedTx holds enough information to complete the queued transaction.
 type QueuedTx struct {
-	ID      QueuedTxID
-	Hash    common.Hash
-	Context context.Context
-	Args    SendTxArgs
-	Done    chan struct{}
-	Discard chan struct{}
-	Err     error
+	ID         QueuedTxID
+	Hash       common.Hash
+	Context    context.Context
+	Args       SendTxArgs
+	InProgress bool // true if transaction is being sent
+	Done       chan struct{}
+	Discard    chan struct{}
+	Err        error
 }
 
 // SendTxArgs represents the arguments to submit a new transaction into the transaction pool.

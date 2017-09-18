@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/log"
 )
@@ -21,10 +22,12 @@ const (
 )
 
 var (
-	ErrQueuedTxIDNotFound      = errors.New("transaction hash not found")
-	ErrQueuedTxTimedOut        = errors.New("transaction sending timed out")
-	ErrQueuedTxDiscarded       = errors.New("transaction has been discarded")
-	ErrInvalidCompleteTxSender = errors.New("transaction can only be completed by the same account which created it")
+	ErrQueuedTxIDNotFound       = errors.New("transaction hash not found")
+	ErrQueuedTxTimedOut         = errors.New("transaction sending timed out")
+	ErrQueuedTxDiscarded        = errors.New("transaction has been discarded")
+	ErrQueuedTxInProgress       = errors.New("transaction is in progress")
+	ErrQueuedTxAlreadyProcessed = errors.New("transaction has been already processed")
+	ErrInvalidCompleteTxSender  = errors.New("transaction can only be completed by the same account which created it")
 )
 
 // TxQueue is capped container that holds pending transactions
@@ -189,6 +192,33 @@ func (q *TxQueue) Remove(id common.QueuedTxID) {
 	defer q.mu.Unlock()
 
 	delete(q.transactions, id)
+}
+
+// StartProcessing marks a transaction as in progress. It's thread-safe and
+// prevents from processing the same transaction multiple times.
+func (q *TxQueue) StartProcessing(tx *common.QueuedTx) error {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	if tx.Hash != (gethcommon.Hash{}) || tx.Err != nil {
+		return ErrQueuedTxAlreadyProcessed
+	}
+
+	if tx.InProgress {
+		return ErrQueuedTxInProgress
+	}
+
+	tx.InProgress = true
+
+	return nil
+}
+
+// StopProcessing removes the "InProgress" flag from the transaction.
+func (q *TxQueue) StopProcessing(tx *common.QueuedTx) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	tx.InProgress = false
 }
 
 // Count returns number of currently queued transactions

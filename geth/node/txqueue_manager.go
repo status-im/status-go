@@ -138,6 +138,11 @@ func (m *TxQueueManager) CompleteTransaction(id common.QueuedTxID, password stri
 		return gethcommon.Hash{}, err
 	}
 
+	if err := m.txQueue.StartProcessing(queuedTx); err != nil {
+		return gethcommon.Hash{}, err
+	}
+	defer m.txQueue.StopProcessing(queuedTx)
+
 	selectedAccount, err := m.accountManager.SelectedAccount()
 	if err != nil {
 		log.Warn("failed to get a selected account", "err", err)
@@ -179,7 +184,7 @@ func (m *TxQueueManager) CompleteTransaction(id common.QueuedTxID, password stri
 
 	queuedTx.Hash = hash
 	queuedTx.Err = txErr
-	queuedTx.Done <- struct{}{} // sendTransaction() waits on this, notify so that it can return
+	queuedTx.Done <- struct{}{}
 
 	return hash, txErr
 }
