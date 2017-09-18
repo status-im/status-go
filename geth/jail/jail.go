@@ -140,13 +140,13 @@ func (jail *Jail) Parse(chatID, js string) string {
 }
 
 // Call executes the `call` function w/i a jail cell context identified by the chatID.
-func (jail *Jail) Call(chatID, this, args string) string {
+func (jail *Jail) Call(chatID, path, args string) string {
 	cell, err := jail.Cell(chatID)
 	if err != nil {
 		return makeError(err.Error())
 	}
 
-	res, err := cell.Call("call", nil, this, args)
+	res, err := cell.Call("call", nil, path, args)
 
 	return makeResult(res.String(), err)
 }

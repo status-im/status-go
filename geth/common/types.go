@@ -260,7 +260,7 @@ type JailManager interface {
 	Parse(chatID, js string) string
 
 	// Call executes given JavaScript function w/i a jail cell context identified by the chatID.
-	Call(chatID, this, args string) string
+	Call(chatID, path, args string) string
 
 	// NewCell initializes and returns a new jail cell.
 	NewCell(chatID string) (JailCell, error)
