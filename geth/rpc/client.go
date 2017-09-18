@@ -72,9 +72,8 @@ func (c *Client) Call(result interface{}, method string, args ...interface{}) er
 //
 // It uses custom routing scheme for calls.
 func (c *Client) CallContext(ctx context.Context, result interface{}, method string, args ...interface{}) error {
-	if c.router.routeLocally(method) {
-		return c.local.CallContext(ctx, result, method, args...)
+	if c.router.routeRemote(method) {
+		return c.upstream.CallContext(ctx, result, method, args...)
 	}
-
-	return c.upstream.CallContext(ctx, result, method, args...)
+	return c.local.CallContext(ctx, result, method, args...)
 }
