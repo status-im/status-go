@@ -97,6 +97,7 @@ func (c *Client) callBatchMethods(ctx context.Context, msgs json.RawMessage) str
 	return string(data)
 }
 
+// callSingleMethod executes single JSON-RPC message and constructs proper response.
 func (c *Client) callSingleMethod(ctx context.Context, msg json.RawMessage) string {
 	// unmarshal JSON body into json-rpc request
 	method, params, id, err := methodAndParamsFromBody(msg)
