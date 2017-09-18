@@ -3,7 +3,6 @@ package rpc
 import (
 	"context"
 	"encoding/json"
-	"errors"
 
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/geth/log"
@@ -26,7 +25,7 @@ var defaultMsgID = json.RawMessage(`0`)
 // returns string in JSON format with response (successul or error).
 func (c *Client) CallRaw(body string) string {
 	ctx := context.Background()
-	return c.callRawContext(ctx, body)
+	return c.callRawContext(ctx, json.RawMessage(body))
 }
 
 // jsonrpcMessage represents JSON-RPC request, notification, successful response or
@@ -57,9 +56,49 @@ type jsonError struct {
 // This is waste of CPU and memory and should be avoided if possible,
 // either by changing exported API (provide only Call, not CallRaw) or
 // refactoring go-ethereum's client to allow using raw JSON directly.
-func (c *Client) callRawContext(ctx context.Context, body string) string {
+func (c *Client) callRawContext(ctx context.Context, body json.RawMessage) string {
+	if isBatch(body) {
+		return c.callBatchMethods(ctx, body)
+	}
+
+	return c.callSingleMethod(ctx, body)
+}
+
+// callBatchMethods handles batched JSON-RPC requests, calling each of
+// individual requests one by one and constructing proper batched response.
+//
+// See http://www.jsonrpc.org/specification#batch for details.
+//
+// We can't use gethtrpc.BatchCall here, because each call should go through
+// our routing logic and router to corresponding destination.
+func (c *Client) callBatchMethods(ctx context.Context, msgs json.RawMessage) string {
+	var requests []json.RawMessage
+
+	err := json.Unmarshal(msgs, &requests)
+	if err != nil {
+		return newErrorResponse(errInvalidMessageCode, err, defaultMsgID)
+	}
+
+	// run all methods sequentially, this seems to be main
+	// objective to use batched requests.
+	// See: https://github.com/ethereum/wiki/wiki/JavaScript-API#batch-requests
+	responses := make([]string, len(requests))
+	for i := range requests {
+		responses[i] = c.callSingleMethod(ctx, requests[i])
+	}
+
+	data, err := json.Marshal(responses)
+	if err != nil {
+		log.Error("Failed to marshal batch responses:", err)
+		return newErrorResponse(errInvalidMessageCode, err, defaultMsgID)
+	}
+
+	return string(data)
+}
+
+func (c *Client) callSingleMethod(ctx context.Context, msg json.RawMessage) string {
 	// unmarshal JSON body into json-rpc request
-	method, params, id, err := methodAndParamsFromBody(body)
+	method, params, id, err := methodAndParamsFromBody(msg)
 	if err != nil {
 		return newErrorResponse(errInvalidMessageCode, err, id)
 	}
@@ -87,7 +126,7 @@ func (c *Client) callRawContext(ctx context.Context, body string) string {
 // JSON-RPC body into values ready to use with ethereum-go's
 // RPC client Call() function. A lot of empty interface usage is
 // due to the underlying code design :/
-func methodAndParamsFromBody(body string) (string, []interface{}, json.RawMessage, error) {
+func methodAndParamsFromBody(body json.RawMessage) (string, []interface{}, json.RawMessage, error) {
 	msg, err := unmarshalMessage(body)
 	if err != nil {
 		return "", nil, nil, err
@@ -105,41 +144,10 @@ func methodAndParamsFromBody(body string) (string, []interface{}, json.RawMessag
 }
 
 // unmarshalMessage tries to unmarshal JSON-RPC message.
-// somehow JSON-RPC input from web3.js can be in two forms:
-//
-// object:  {"jsonrpc":"2.0", …}
-// array:   [{"jsonrpc":"2.0", …}]
-//
-// unmarhsalMessage tries first option and in case of error,
-// tries to unmarshal it as an array.
-//
-// TODO(divan): fix the source of this error and cleanup.
-func unmarshalMessage(body string) (*jsonrpcMessage, error) {
+func unmarshalMessage(body json.RawMessage) (*jsonrpcMessage, error) {
 	var msg jsonrpcMessage
-	err := json.Unmarshal([]byte(body), &msg)
-	// check for array case
-	if e, ok := err.(*json.UnmarshalTypeError); ok {
-		if e.Value == "array" {
-			return unmarshalMessageArray(body)
-		}
-	}
+	err := json.Unmarshal(body, &msg)
 	return &msg, err
-}
-
-func unmarshalMessageArray(body string) (*jsonrpcMessage, error) {
-	var msgs []*jsonrpcMessage
-	err := json.Unmarshal([]byte(body), &msgs)
-	if err != nil {
-		return nil, err
-	}
-
-	// return first element
-	if len(msgs) == 0 {
-		return nil, errors.New("empty array")
-	} else if len(msgs) > 1 {
-		log.Warn("JSON-RPC payload has more then 1 objects", "len", len(msgs), "body", body)
-	}
-	return msgs[0], nil
 }
 
 func newSuccessResponse(result json.RawMessage, id json.RawMessage) string {
@@ -172,4 +180,17 @@ func newErrorResponse(code int, err error, id json.RawMessage) string {
 
 	data, _ := json.Marshal(errMsg)
 	return string(data)
+}
+
+// isBatch returns true when the first non-whitespace characters is '['
+// code from go-ethereum's rpc client (rpc/client.go)
+func isBatch(msg json.RawMessage) bool {
+	for _, c := range msg {
+		// skip insignificant whitespace (http://www.ietf.org/rfc/rfc4627.txt)
+		if c == 0x20 || c == 0x09 || c == 0x0a || c == 0x0d {
+			continue
+		}
+		return c == '['
+	}
+	return false
 }
