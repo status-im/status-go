@@ -2,12 +2,11 @@ package jail
 
 import (
 	"context"
-	"encoding/json"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
-	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/common"
+	"github.com/status-im/status-go/geth/jail/internal/vm"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/rpc"
 )
@@ -32,26 +31,19 @@ func NewExecutionPolicy(
 }
 
 // Execute handles the execution of a RPC request and routes appropriately to either a local or remote ethereum node.
-func (ep *ExecutionPolicy) Execute(req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
+func (ep *ExecutionPolicy) Execute(req common.RPCCall, vm *vm.VM) (map[string]interface{}, error) {
 	if params.SendTransactionMethodName == req.Method {
-		return ep.executeSendTransaction(req, call)
+		return ep.executeSendTransaction(vm, req)
 	}
 
 	client := ep.nodeManager.RPCClient()
 
-	return ep.executeWithClient(client, req, call)
+	return ep.executeWithClient(client, vm, req)
 }
 
 // executeRemoteSendTransaction defines a function to execute RPC method eth_sendTransaction over the upstream server.
-func (ep *ExecutionPolicy) executeSendTransaction(req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
-	res, err := call.Otto.Object(`({"jsonrpc":"2.0"})`)
-	if err != nil {
-		return nil, err
-	}
-
-	res.Set("id", req.ID)
-
-	messageID, err := preProcessRequest(call.Otto, req)
+func (ep *ExecutionPolicy) executeSendTransaction(vm *vm.VM, req common.RPCCall) (map[string]interface{}, error) {
+	messageID, err := preProcessRequest(vm)
 	if err != nil {
 		return nil, err
 	}
@@ -71,46 +63,48 @@ func (ep *ExecutionPolicy) executeSendTransaction(req common.RPCCall, call otto.
 	}
 
 	// invoke post processing
-	postProcessRequest(call.Otto, req, messageID)
+	postProcessRequest(vm, req, messageID)
 
-	// @TODO(adam): which one is actually used?
-	res.Set("result", tx.Hash.Hex())
-	res.Set("hash", tx.Hash.Hex())
+	res := map[string]interface{}{
+		"jsonrpc": "2.0",
+		"id":      req.ID,
+		// @TODO(adam): which one is actually used?
+		"result": tx.Hash.Hex(),
+		"hash":   tx.Hash.Hex(),
+	}
 
 	return res, nil
 }
 
-func (ep *ExecutionPolicy) executeWithClient(client *rpc.Client, req common.RPCCall, call otto.FunctionCall) (*otto.Object, error) {
-	JSON, err := call.Otto.Object("JSON")
-	if err != nil {
-		return nil, err
+func (ep *ExecutionPolicy) executeWithClient(client *rpc.Client, vm *vm.VM, req common.RPCCall) (map[string]interface{}, error) {
+	// Arbitrary JSON-RPC response.
+	var result interface{}
+
+	resp := map[string]interface{}{
+		"jsonrpc": "2.0",
+		"id":      req.ID,
 	}
-
-	var result json.RawMessage
-
-	resp, _ := call.Otto.Object(`({"jsonrpc":"2.0"})`)
-	resp.Set("id", req.ID)
 
 	// do extra request pre processing (persist message id)
 	// within function semaphore will be acquired and released,
 	// so that no more than one client (per cell) can enter
-	messageID, err := preProcessRequest(call.Otto, req)
+	messageID, err := preProcessRequest(vm)
 	if err != nil {
 		return nil, common.StopRPCCallError{Err: err}
 	}
 
 	if client == nil {
-		resp = newErrorResponse(call.Otto, -32603, "RPC client is not available. Node is stopped?", &req.ID).Object()
+		resp = newErrorResponse("RPC client is not available. Node is stopped?", &req.ID)
 	} else {
 		err = client.Call(&result, req.Method, req.Params...)
 		if err != nil {
 			if err2, ok := err.(gethrpc.Error); ok {
-				resp.Set("error", map[string]interface{}{
+				resp["error"] = map[string]interface{}{
 					"code":    err2.ErrorCode(),
 					"message": err2.Error(),
-				})
+				}
 			} else {
-				resp = newErrorResponse(call.Otto, -32603, err.Error(), &req.ID).Object()
+				resp = newErrorResponse(err.Error(), &req.ID)
 			}
 		}
 	}
@@ -118,31 +112,26 @@ func (ep *ExecutionPolicy) executeWithClient(client *rpc.Client, req common.RPCC
 	if result == nil {
 		// Special case null because it is decoded as an empty
 		// raw message for some reason.
-		resp.Set("result", otto.NullValue())
+		resp["result"] = ""
 	} else {
-		resultVal, callErr := JSON.Call("parse", string(result))
-		if callErr != nil {
-			resp = newErrorResponse(call.Otto, -32603, callErr.Error(), &req.ID).Object()
-		} else {
-			resp.Set("result", resultVal)
-		}
+		resp["result"] = result
 	}
 
 	// do extra request post processing (setting back tx context)
-	postProcessRequest(call.Otto, req, messageID)
+	postProcessRequest(vm, req, messageID)
 
 	return resp, nil
 }
 
 // preProcessRequest pre-processes a given RPC call to a given Otto VM
-func preProcessRequest(vm *otto.Otto, req common.RPCCall) (string, error) {
-	messageID := currentMessageID(vm.Context())
+func preProcessRequest(vm *vm.VM) (string, error) {
+	messageID := currentMessageID(vm)
 
 	return messageID, nil
 }
 
 // postProcessRequest post-processes a given RPC call to a given Otto VM
-func postProcessRequest(vm *otto.Otto, req common.RPCCall, messageID string) {
+func postProcessRequest(vm *vm.VM, req common.RPCCall, messageID string) {
 	if len(messageID) > 0 {
 		vm.Call("addContext", nil, messageID, common.MessageIDKey, messageID) // nolint: errcheck
 	}
@@ -154,18 +143,12 @@ func postProcessRequest(vm *otto.Otto, req common.RPCCall, messageID string) {
 }
 
 // currentMessageID looks for `status.message_id` variable in current JS context
-func currentMessageID(ctx otto.Context) string {
-	if statusObj, ok := ctx.Symbols["status"]; ok {
-		messageID, err := statusObj.Object().Get("message_id")
-		if err != nil {
-			return ""
-		}
-		if messageID, err := messageID.ToString(); err == nil {
-			return messageID
-		}
+func currentMessageID(vm *vm.VM) string {
+	msgID, err := vm.Run("status.message_id")
+	if err != nil {
+		return ""
 	}
-
-	return ""
+	return msgID.String()
 }
 
 func sendTxArgsFromRPCCall(req common.RPCCall) common.SendTxArgs {
