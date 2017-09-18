@@ -1,5 +1,5 @@
 /*
-rpc - JSON-RPC client with custom routing.
+Package rpc - JSON-RPC client with custom routing.
 
 Package rpc implements status-go JSON-RPC client and handles
 requests to different endpoints: upstream or local node.
