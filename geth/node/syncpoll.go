@@ -7,6 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/les"
+	"github.com/status-im/status-go/geth/log"
 )
 
 // errors
@@ -50,6 +51,7 @@ func (n *SyncPoll) pollSyncStart(ctx context.Context) error {
 			return ErrStartAborted
 		case <-time.After(100 * time.Millisecond):
 			if n.downloader.Synchronising() {
+				log.Info("Block synchronization progress just started")
 				return nil
 			}
 		}
@@ -63,7 +65,15 @@ func (n *SyncPoll) pollSyncCompleted(ctx context.Context) error {
 			return ErrSyncAborted
 		case <-time.After(100 * time.Millisecond):
 			progress := n.downloader.Progress()
+
+			// If information on highest block has not being retrieved then wait.
+			if progress.HighestBlock <= 0 && progress.StartingBlock <= 0 {
+				time.Sleep(300 * time.Millisecond)
+				continue
+			}
+
 			if progress.CurrentBlock >= progress.HighestBlock {
+				log.Info("Block synchronization progress just ended")
 				return nil
 			}
 		}
