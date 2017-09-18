@@ -125,11 +125,7 @@ func (s *ManagerTestSuite) TestReferences() {
 		s.T().Log(testCase.name)
 		obj, err := testCase.initFn()
 		s.Nil(obj)
-		if testCase.expectedErr != nil {
-			s.EqualError(err, testCase.expectedErr.Error())
-		} else {
-			s.Nil(err)
-		}
+		s.Equal(testCase.expectedErr, err)
 	}
 
 	// test with node fully started
