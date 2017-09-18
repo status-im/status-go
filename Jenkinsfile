@@ -9,7 +9,7 @@ def getVersion(branch, sha) {
     return branch.replaceAll(/\//, '-')
 }
 
-node {
+node('linux') {
     checkout scm
 
     def remoteOriginRegex = ~/^remotes\/origin\//
