@@ -82,9 +82,10 @@ func (c *Client) callBatchMethods(ctx context.Context, msgs json.RawMessage) str
 	// run all methods sequentially, this seems to be main
 	// objective to use batched requests.
 	// See: https://github.com/ethereum/wiki/wiki/JavaScript-API#batch-requests
-	responses := make([]string, len(requests))
+	responses := make([]json.RawMessage, len(requests))
 	for i := range requests {
-		responses[i] = c.callSingleMethod(ctx, requests[i])
+		resp := c.callSingleMethod(ctx, requests[i])
+		responses[i] = json.RawMessage(resp)
 	}
 
 	data, err := json.Marshal(responses)
