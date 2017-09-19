@@ -44,7 +44,6 @@ type LesServer struct {
 	defParams       *flowcontrol.ServerParams
 	lesTopic        discv5.Topic
 	quitSync        chan struct{}
-	stopped         bool
 }
 
 func NewLesServer(eth *eth.Ethereum, config *eth.Config) (*LesServer, error) {
@@ -116,16 +115,6 @@ func (list RequestCostList) decode() requestCostTable {
 		}
 	}
 	return table
-}
-
-func (table requestCostTable) encode() RequestCostList {
-	list := make(RequestCostList, len(table))
-	for idx, code := range reqList {
-		list[idx].MsgCode = code
-		list[idx].BaseCost = table[code].baseCost
-		list[idx].ReqCost = table[code].reqCost
-	}
-	return list
 }
 
 type linReg struct {
@@ -282,7 +271,8 @@ func (s *requestCostStats) update(msgCode, reqCnt, cost uint64) {
 
 func (pm *ProtocolManager) blockLoop() {
 	pm.wg.Add(1)
-	sub := pm.eventMux.Subscribe(core.ChainHeadEvent{})
+	headCh := make(chan core.ChainHeadEvent, 10)
+	headSub := pm.blockchain.SubscribeChainHeadEvent(headCh)
 	newCht := make(chan struct{}, 10)
 	newCht <- struct{}{}
 	go func() {
@@ -291,10 +281,10 @@ func (pm *ProtocolManager) blockLoop() {
 		lastBroadcastTd := common.Big0
 		for {
 			select {
-			case ev := <-sub.Chan():
+			case ev := <-headCh:
 				peers := pm.peers.AllPeers()
 				if len(peers) > 0 {
-					header := ev.Data.(core.ChainHeadEvent).Block.Header()
+					header := ev.Block.Header()
 					hash := header.Hash()
 					number := header.Number.Uint64()
 					td := core.GetTd(pm.chainDb, hash, number)
@@ -330,7 +320,7 @@ func (pm *ProtocolManager) blockLoop() {
 					}
 				}()
 			case <-pm.quitSync:
-				sub.Unsubscribe()
+				headSub.Unsubscribe()
 				pm.wg.Done()
 				return
 			}

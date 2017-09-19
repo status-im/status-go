@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/big"
+	"net"
 	"os"
 	"path/filepath"
 	"sort"
@@ -106,17 +107,15 @@ func (w *wizard) readString() string {
 // readDefaultString reads a single line from stdin, trimming if from spaces. If
 // an empty line is entered, the default value is returned.
 func (w *wizard) readDefaultString(def string) string {
-	for {
-		fmt.Printf("> ")
-		text, err := w.in.ReadString('\n')
-		if err != nil {
-			log.Crit("Failed to read user input", "err", err)
-		}
-		if text = strings.TrimSpace(text); text != "" {
-			return text
-		}
-		return def
+	fmt.Printf("> ")
+	text, err := w.in.ReadString('\n')
+	if err != nil {
+		log.Crit("Failed to read user input", "err", err)
 	}
+	if text = strings.TrimSpace(text); text != "" {
+		return text
+	}
+	return def
 }
 
 // readInt reads a single line from stdin, trimming if from spaces, enforcing it
@@ -162,6 +161,7 @@ func (w *wizard) readDefaultInt(def int) int {
 	}
 }
 
+/*
 // readFloat reads a single line from stdin, trimming if from spaces, enforcing it
 // to parse into a float.
 func (w *wizard) readFloat() float64 {
@@ -182,6 +182,7 @@ func (w *wizard) readFloat() float64 {
 		return val
 	}
 }
+*/
 
 // readDefaultFloat reads a single line from stdin, trimming if from spaces, enforcing
 // it to parse into a float. If an empty line is entered, the default value is returned.
@@ -207,15 +208,13 @@ func (w *wizard) readDefaultFloat(def float64) float64 {
 // readPassword reads a single line from stdin, trimming it from the trailing new
 // line and returns it. The input will not be echoed.
 func (w *wizard) readPassword() string {
-	for {
-		fmt.Printf("> ")
-		text, err := terminal.ReadPassword(int(syscall.Stdin))
-		if err != nil {
-			log.Crit("Failed to read password", "err", err)
-		}
-		fmt.Println()
-		return string(text)
+	fmt.Printf("> ")
+	text, err := terminal.ReadPassword(int(syscall.Stdin))
+	if err != nil {
+		log.Crit("Failed to read password", "err", err)
 	}
+	fmt.Println()
+	return string(text)
 }
 
 // readAddress reads a single line from stdin, trimming if from spaces and converts
@@ -277,5 +276,28 @@ func (w *wizard) readJSON() string {
 			continue
 		}
 		return string(blob)
+	}
+}
+
+// readIPAddress reads a single line from stdin, trimming if from spaces and
+// converts it to a network IP address.
+func (w *wizard) readIPAddress() net.IP {
+	for {
+		// Read the IP address from the user
+		fmt.Printf("> ")
+		text, err := w.in.ReadString('\n')
+		if err != nil {
+			log.Crit("Failed to read user input", "err", err)
+		}
+		if text = strings.TrimSpace(text); text == "" {
+			return nil
+		}
+		// Make sure it looks ok and return it if so
+		ip := net.ParseIP(text)
+		if ip == nil {
+			log.Error("Invalid IP address, please retry")
+			continue
+		}
+		return ip
 	}
 }
