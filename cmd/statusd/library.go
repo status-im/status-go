@@ -383,3 +383,9 @@ func makeJSONResponse(err error) *C.char {
 
 	return C.CString(string(outBytes))
 }
+
+//export Notify
+func Notify(token *C.char) *C.char {
+	res := statusAPI.Notify(C.GoString(token))
+	return C.CString(res)
+}

@@ -3,6 +3,7 @@ package jail_test
 import (
 	"encoding/json"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -18,7 +19,10 @@ const (
 	testChatID = "testChat"
 )
 
-var baseStatusJSCode = string(static.MustAsset("testdata/jail/status.js"))
+var (
+	baseStatusJSCode = string(static.MustAsset("testdata/jail/status.js"))
+	txJSCode         = string(static.MustAsset("testdata/jail/tx-send/tx-send.js"))
+)
 
 func TestJailTestSuite(t *testing.T) {
 	suite.Run(t, new(JailTestSuite))
@@ -38,7 +42,9 @@ func (s *JailTestSuite) SetupTest() {
 	accountManager := node.NewAccountManager(nodeManager)
 	require.NotNil(accountManager)
 
-	jail := jail.New(nodeManager, accountManager, nil)
+	txQueueManager := node.NewTxQueueManager(nodeManager, accountManager)
+
+	jail := jail.New(nodeManager, accountManager, txQueueManager)
 	require.NotNil(jail)
 
 	s.jail = jail
@@ -119,6 +125,38 @@ func (s *JailTestSuite) TestFunctionCall() {
 	require.Equal(expectedResponse, response)
 }
 
+// TestJailRPCAsyncSend was written to catch race conditions with a weird error message
+// starting from `ReferenceError` as if otto vm were losing symbols.
+func (s *JailTestSuite) TestJailRPCAsyncSend() {
+	require := s.Require()
+
+	// load Status JS and add test command to it
+	s.jail.BaseJS(baseStatusJSCode)
+	s.jail.Parse(testChatID, txJSCode)
+
+	cell, err := s.jail.Cell(testChatID)
+	require.NoError(err)
+	require.NotNil(cell)
+
+	// internally (since we replaced `web3.send` with `jail.Send`)
+	// all requests to web3 are forwarded to `jail.Send`
+	var wg sync.WaitGroup
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			_, err = cell.Run(`_status_catalog.commands.sendAsync({
+				"from": "` + TestConfig.Account1.Address + `",
+				"to": "` + TestConfig.Account2.Address + `",
+				"value": "0.000001"
+			})`)
+			require.NoError(err, "Request failed to process")
+		}()
+	}
+	wg.Wait()
+}
+
 func (s *JailTestSuite) TestJailRPCSend() {
 	require := s.Require()
 
@@ -180,7 +218,7 @@ func (s *JailTestSuite) TestIsConnected() {
 	require.Equal(expectedResponse, response)
 }
 
-func (s *JailTestSuite) TestLocalStorageSet() {
+func (s *JailTestSuite) TestEventSignal() {
 	require := s.Require()
 
 	s.jail.Parse(testChatID, "")
@@ -199,7 +237,7 @@ func (s *JailTestSuite) TestLocalStorageSet() {
 		err := json.Unmarshal([]byte(jsonEvent), &envelope)
 		require.NoError(err)
 
-		if envelope.Type == jail.EventLocalStorageSet {
+		if envelope.Type == jail.EventSignal {
 			event := envelope.Event.(map[string]interface{})
 			chatID, ok := event["chat_id"].(string)
 			require.True(ok, "chat id is required, but not found")
@@ -215,7 +253,7 @@ func (s *JailTestSuite) TestLocalStorageSet() {
 	})
 
 	_, err = cell.Run(`
-	    var responseValue = localStorage.set("` + testData + `");
+	    var responseValue = statusSignals.sendSignal("` + testData + `");
 	    responseValue = JSON.stringify(responseValue);
 	`)
 	s.NoError(err)

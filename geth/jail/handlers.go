@@ -11,9 +11,7 @@ import (
 
 // signals
 const (
-	EventLocalStorageSet = "local_storage.set"
-	EventSendMessage     = "jail.send_message"
-	EventShowSuggestions = "jail.show_suggestions"
+	EventSignal = "jail.signal"
 
 	// EventConsoleLog defines the event type for the console.log call.
 	eventConsoleLog = "vm.console.log"
@@ -38,32 +36,17 @@ func registerHandlers(jail *Jail, cell common.JailCell, chatID string) error {
 	}
 
 	// register send handler
-	if err = registerHandler("send", makeSendHandler(jail)); err != nil {
+	if err = registerHandler("send", makeSendHandler(jail, cell)); err != nil {
 		return err
 	}
 
 	// register sendAsync handler
-	if err = registerHandler("sendAsync", makeSendHandler(jail)); err != nil {
+	if err = registerHandler("sendAsync", makeAsyncSendHandler(jail, cell)); err != nil {
 		return err
 	}
 
 	// register isConnected handler
-	if err = registerHandler("isConnected", makeJethIsConnectedHandler(jail)); err != nil {
-		return err
-	}
-
-	// define localStorage
-	if err = cell.Set("localStorage", struct{}{}); err != nil {
-		return err
-	}
-
-	// register localStorage.set handler
-	localStorage, err := cell.Get("localStorage")
-	if err != nil {
-		return err
-	}
-
-	if err = localStorage.Object().Set("set", makeLocalStorageSetHandler(chatID)); err != nil {
+	if err = registerHandler("isConnected", makeJethIsConnectedHandler(jail, cell)); err != nil {
 		return err
 	}
 
@@ -76,102 +59,82 @@ func registerHandlers(jail *Jail, cell common.JailCell, chatID string) error {
 		return err
 	}
 	registerHandler = statusSignals.Object().Set
-	if err = registerHandler("sendMessage", makeSendMessageHandler(chatID)); err != nil {
-		return err
-	}
-	if err = registerHandler("showSuggestions", makeShowSuggestionsHandler(chatID)); err != nil {
+	if err = registerHandler("sendSignal", makeSignalHandler(chatID)); err != nil {
 		return err
 	}
 
 	return nil
 }
 
+// makeAsyncSendHandler returns jeth.sendAsync() handler.
+func makeAsyncSendHandler(jail *Jail, cellInt common.JailCell) func(call otto.FunctionCall) otto.Value {
+	// FIXME(tiabc): Get rid of this.
+	cell := cellInt.(*Cell)
+	return func(call otto.FunctionCall) otto.Value {
+		go func() {
+			response := jail.Send(call, cell.VM)
+
+			if fn := call.Argument(1); fn.Class() == "Function" {
+				cell.Lock()
+				fn.Call(otto.NullValue(), otto.NullValue(), response)
+				cell.Unlock()
+			}
+		}()
+		return otto.UndefinedValue()
+	}
+}
+
 // makeSendHandler returns jeth.send() and jeth.sendAsync() handler
-func makeSendHandler(jail *Jail) func(call otto.FunctionCall) (response otto.Value) {
-	return jail.Send
+func makeSendHandler(jail *Jail, cellInt common.JailCell) func(call otto.FunctionCall) otto.Value {
+	// FIXME(tiabc): Get rid of this.
+	cell := cellInt.(*Cell)
+	return func(call otto.FunctionCall) otto.Value {
+		// Send calls are guaranteed to be only invoked from web3 after calling the appropriate
+		// method of jail.Cell and the cell is locked during that call. In order to allow jail.Send
+		// to perform any operations on cell.VM and not hang, we need to unlock the mutex and return
+		// it to the previous state afterwards so that the caller didn't panic doing cell.Unlock().
+		cell.Unlock()
+		defer cell.Lock()
+
+		return jail.Send(call, cell.VM)
+	}
 }
 
 // makeJethIsConnectedHandler returns jeth.isConnected() handler
-func makeJethIsConnectedHandler(jail *Jail) func(call otto.FunctionCall) (response otto.Value) {
+func makeJethIsConnectedHandler(jail *Jail, cellInt common.JailCell) func(call otto.FunctionCall) (response otto.Value) {
+	// FIXME(tiabc): Get rid of this.
+	cell := cellInt.(*Cell)
 	return func(call otto.FunctionCall) otto.Value {
-		client, err := jail.nodeManager.RPCClient()
-		if err != nil {
-			return newErrorResponse(call.Otto, -32603, err.Error(), nil)
-		}
+		client := jail.nodeManager.RPCClient()
 
 		var netListeningResult bool
 		if err := client.Call(&netListeningResult, "net_listening"); err != nil {
-			return newErrorResponse(call.Otto, -32603, err.Error(), nil)
+			return newErrorResponseOtto(cell.VM, err.Error(), nil)
 		}
 
 		if !netListeningResult {
-			return newErrorResponse(call.Otto, -32603, node.ErrNoRunningNode.Error(), nil)
+			return newErrorResponseOtto(cell.VM, node.ErrNoRunningNode.Error(), nil)
 		}
 
 		return newResultResponse(call.Otto, true)
 	}
 }
 
-// LocalStorageSetEvent is a signal sent whenever local storage Set method is called
-type LocalStorageSetEvent struct {
+// SignalEvent wraps Jail send signals
+type SignalEvent struct {
 	ChatID string `json:"chat_id"`
 	Data   string `json:"data"`
 }
 
-// makeLocalStorageSetHandler returns localStorage.set() handler
-func makeLocalStorageSetHandler(chatID string) func(call otto.FunctionCall) (response otto.Value) {
-	return func(call otto.FunctionCall) otto.Value {
-		data := call.Argument(0).String()
-
-		node.SendSignal(node.SignalEnvelope{
-			Type: EventLocalStorageSet,
-			Event: LocalStorageSetEvent{
-				ChatID: chatID,
-				Data:   data,
-			},
-		})
-
-		return newResultResponse(call.Otto, true)
-	}
-}
-
-// SendMessageEvent wraps Jail send signals
-type SendMessageEvent struct {
-	ChatID  string `json:"chat_id"`
-	Message string `json:"message"`
-}
-
-func makeSendMessageHandler(chatID string) func(call otto.FunctionCall) (response otto.Value) {
+func makeSignalHandler(chatID string) func(call otto.FunctionCall) otto.Value {
 	return func(call otto.FunctionCall) otto.Value {
 		message := call.Argument(0).String()
 
 		node.SendSignal(node.SignalEnvelope{
-			Type: EventSendMessage,
-			Event: SendMessageEvent{
-				ChatID:  chatID,
-				Message: message,
-			},
-		})
-
-		return newResultResponse(call.Otto, true)
-	}
-}
-
-// ShowSuggestionsEvent wraps Jail show suggestion signals
-type ShowSuggestionsEvent struct {
-	ChatID string `json:"chat_id"`
-	Markup string `json:"markup"`
-}
-
-func makeShowSuggestionsHandler(chatID string) func(call otto.FunctionCall) (response otto.Value) {
-	return func(call otto.FunctionCall) otto.Value {
-		suggestionsMarkup := call.Argument(0).String()
-
-		node.SendSignal(node.SignalEnvelope{
-			Type: EventShowSuggestions,
-			Event: ShowSuggestionsEvent{
+			Type: EventSignal,
+			Event: SignalEvent{
 				ChatID: chatID,
-				Markup: suggestionsMarkup,
+				Data:   message,
 			},
 		})
 

@@ -3,8 +3,9 @@ package looptask
 import (
 	"errors"
 
-	"github.com/status-im/ottoext/loop"
 	"github.com/robertkrimen/otto"
+	"github.com/status-im/status-go/geth/jail/internal/loop"
+	"github.com/status-im/status-go/geth/jail/internal/vm"
 )
 
 // IdleTask is designed to sit in a loop and keep it active, without doing any
@@ -29,7 +30,7 @@ func (i IdleTask) Cancel() {}
 
 // Execute always returns an error for an IdleTask, as it should never
 // actually be run.
-func (i IdleTask) Execute(vm *otto.Otto, l *loop.Loop) error {
+func (i IdleTask) Execute(vm *vm.VM, l *loop.Loop) error {
 	return errors.New("Idle task should never execute")
 }
 
@@ -65,7 +66,7 @@ func (e EvalTask) Cancel() {}
 // Execute runs the EvalTask's otto.Script in the vm provided, pushing the
 // resultant return value and error (or nil) into the associated channels.
 // If the execution results in an error, it will return that error.
-func (e EvalTask) Execute(vm *otto.Otto, l *loop.Loop) error {
+func (e EvalTask) Execute(vm *vm.VM, l *loop.Loop) error {
 	v, err := vm.Run(e.Script)
 	e.Value <- v
 	e.Error <- err

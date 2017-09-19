@@ -10,8 +10,9 @@ import (
 	"github.com/GeertJohan/go.rice"
 	"github.com/robertkrimen/otto"
 
-	"github.com/status-im/ottoext/loop"
-	"github.com/status-im/ottoext/promise"
+	"github.com/status-im/status-go/geth/jail/internal/loop"
+	"github.com/status-im/status-go/geth/jail/internal/promise"
+	"github.com/status-im/status-go/geth/jail/internal/vm"
 )
 
 func mustValue(v otto.Value, err error) otto.Value {
@@ -36,7 +37,7 @@ type fetchTask struct {
 func (t *fetchTask) SetID(id int64) { t.id = id }
 func (t *fetchTask) GetID() int64   { return t.id }
 
-func (t *fetchTask) Execute(vm *otto.Otto, l *loop.Loop) error {
+func (t *fetchTask) Execute(vm *vm.VM, l *loop.Loop) error {
 	var arguments []interface{}
 
 	if t.err != nil {
@@ -47,6 +48,12 @@ func (t *fetchTask) Execute(vm *otto.Otto, l *loop.Loop) error {
 
 		arguments = append(arguments, e)
 	}
+
+	// We're locking on VM here because underlying otto's VM
+	// is not concurrently safe, and this function indirectly
+	// access vm's functions in cb.Call/h.Set.
+	vm.Lock()
+	defer vm.Unlock()
 
 	t.jsRes.Set("status", t.status)
 	t.jsRes.Set("statusText", t.statusText)
@@ -70,11 +77,11 @@ func (t *fetchTask) Execute(vm *otto.Otto, l *loop.Loop) error {
 func (t *fetchTask) Cancel() {
 }
 
-func Define(vm *otto.Otto, l *loop.Loop) error {
+func Define(vm *vm.VM, l *loop.Loop) error {
 	return DefineWithHandler(vm, l, nil)
 }
 
-func DefineWithHandler(vm *otto.Otto, l *loop.Loop, h http.Handler) error {
+func DefineWithHandler(vm *vm.VM, l *loop.Loop, h http.Handler) error {
 	if err := promise.Define(vm, l); err != nil {
 		return err
 	}

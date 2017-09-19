@@ -138,6 +138,11 @@ func (m *TxQueueManager) CompleteTransaction(id common.QueuedTxID, password stri
 		return gethcommon.Hash{}, err
 	}
 
+	if err := m.txQueue.StartProcessing(queuedTx); err != nil {
+		return gethcommon.Hash{}, err
+	}
+	defer m.txQueue.StopProcessing(queuedTx)
+
 	selectedAccount, err := m.accountManager.SelectedAccount()
 	if err != nil {
 		log.Warn("failed to get a selected account", "err", err)
@@ -179,7 +184,7 @@ func (m *TxQueueManager) CompleteTransaction(id common.QueuedTxID, password stri
 
 	queuedTx.Hash = hash
 	queuedTx.Err = txErr
-	queuedTx.Done <- struct{}{} // sendTransaction() waits on this, notify so that it can return
+	queuedTx.Done <- struct{}{}
 
 	return hash, txErr
 }
@@ -210,28 +215,28 @@ func (m *TxQueueManager) completeRemoteTransaction(queuedTx *common.QueuedTx, pa
 		return emptyHash, err
 	}
 
-	client, err := m.nodeManager.RPCUpstreamClient()
-	if err != nil {
-		return emptyHash, err
-	}
-
 	// We need to request a new transaction nounce from upstream node.
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
 	var txCount hexutil.Uint
-	if callErr := client.CallContext(ctx, &txCount, "eth_getTransactionCount", queuedTx.Args.From, "pending"); callErr != nil {
-		return emptyHash, callErr
+	client := m.nodeManager.RPCClient()
+	if err := client.CallContext(ctx, &txCount, "eth_getTransactionCount", queuedTx.Args.From, "pending"); err != nil {
+		return emptyHash, err
 	}
 
 	chainID := big.NewInt(int64(config.NetworkID))
 	nonce := uint64(txCount)
-	gas := (*big.Int)(queuedTx.Args.Gas)
 	gasPrice := (*big.Int)(queuedTx.Args.GasPrice)
 	dataVal := []byte(queuedTx.Args.Data)
 	priceVal := (*big.Int)(queuedTx.Args.Value)
 
-	tx := types.NewTransaction(nonce, *queuedTx.Args.To, priceVal, gas, gasPrice, dataVal)
+	gas, err := m.estimateGas(queuedTx.Args)
+	if err != nil {
+		return emptyHash, err
+	}
+
+	tx := types.NewTransaction(nonce, *queuedTx.Args.To, priceVal, (*big.Int)(gas), gasPrice, dataVal)
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), selectedAcct.AccountKey.PrivateKey)
 	if err != nil {
 		return emptyHash, err
@@ -250,6 +255,54 @@ func (m *TxQueueManager) completeRemoteTransaction(queuedTx *common.QueuedTx, pa
 	}
 
 	return signedTx.Hash(), nil
+}
+
+func (m *TxQueueManager) estimateGas(args common.SendTxArgs) (*hexutil.Big, error) {
+	if args.Gas != nil {
+		return args.Gas, nil
+	}
+
+	client := m.nodeManager.RPCClient()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	var gasPrice hexutil.Big
+	if args.GasPrice != nil {
+		gasPrice = (hexutil.Big)(*args.GasPrice)
+	}
+
+	var value hexutil.Big
+	if args.Value != nil {
+		value = (hexutil.Big)(*args.Value)
+	}
+
+	params := struct {
+		From     gethcommon.Address  `json:"from"`
+		To       *gethcommon.Address `json:"to"`
+		Gas      hexutil.Big         `json:"gas"`
+		GasPrice hexutil.Big         `json:"gasPrice"`
+		Value    hexutil.Big         `json:"value"`
+		Data     hexutil.Bytes       `json:"data"`
+	}{
+		From:     args.From,
+		To:       args.To,
+		GasPrice: gasPrice,
+		Value:    value,
+		Data:     []byte(args.Data),
+	}
+
+	var estimatedGas hexutil.Big
+	if err := client.CallContext(
+		ctx,
+		&estimatedGas,
+		"eth_estimateGas",
+		params,
+	); err != nil {
+		log.Warn("failed to estimate gas", "err", err)
+		return nil, err
+	}
+
+	return &estimatedGas, nil
 }
 
 // CompleteTransactions instructs backend to complete sending of multiple transactions
