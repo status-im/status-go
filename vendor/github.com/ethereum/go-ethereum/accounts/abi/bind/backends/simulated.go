@@ -33,7 +33,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/params"
 )
 
@@ -61,7 +60,7 @@ func NewSimulatedBackend(alloc core.GenesisAlloc) *SimulatedBackend {
 	database, _ := ethdb.NewMemDatabase()
 	genesis := core.Genesis{Config: params.AllProtocolChanges, Alloc: alloc}
 	genesis.MustCommit(database)
-	blockchain, _ := core.NewBlockChain(database, genesis.Config, ethash.NewFaker(), new(event.TypeMux), vm.Config{})
+	blockchain, _ := core.NewBlockChain(database, genesis.Config, ethash.NewFaker(), vm.Config{})
 	backend := &SimulatedBackend{database: database, blockchain: blockchain, config: genesis.Config}
 	backend.rollback()
 	return backend
@@ -144,7 +143,8 @@ func (b *SimulatedBackend) StorageAt(ctx context.Context, contract common.Addres
 
 // TransactionReceipt returns the receipt of a transaction.
 func (b *SimulatedBackend) TransactionReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error) {
-	return core.GetReceipt(b.database, txHash), nil
+	receipt, _, _, _ := core.GetReceipt(b.database, txHash)
+	return receipt, nil
 }
 
 // PendingCodeAt returns the code associated with an account in the pending state.
@@ -253,7 +253,8 @@ func (b *SimulatedBackend) callContract(ctx context.Context, call ethereum.CallM
 	// about the transaction and calling mechanisms.
 	vmenv := vm.NewEVM(evmContext, statedb, b.config, vm.Config{})
 	gaspool := new(core.GasPool).AddGas(math.MaxBig256)
-	ret, gasUsed, _, err := core.NewStateTransition(vmenv, msg, gaspool).TransitionDb()
+	// TODO utilize returned failed flag to help gas estimation.
+	ret, gasUsed, _, _, err := core.NewStateTransition(vmenv, msg, gaspool).TransitionDb()
 	return ret, gasUsed, err
 }
 

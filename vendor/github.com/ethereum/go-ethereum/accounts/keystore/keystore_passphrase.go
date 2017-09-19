@@ -141,7 +141,7 @@ func EncryptKey(key *Key, auth string, scryptN, scryptP int) ([]byte, error) {
 		Cipher:       "aes-128-ctr",
 		CipherText:   hex.EncodeToString(cipherText),
 		CipherParams: cipherParamsJSON,
-		KDF:          "scrypt",
+		KDF:          keyHeaderKDF,
 		KDFParams:    scryptParamsJSON,
 		MAC:          hex.EncodeToString(mac),
 	}
@@ -154,7 +154,6 @@ func EncryptKey(key *Key, auth string, scryptN, scryptP int) ([]byte, error) {
 		cryptoStruct,
 		key.Id.String(),
 		version,
-		key.WhisperEnabled,
 		encryptedExtendedKey,
 		key.SubAccountIndex,
 	}
@@ -212,7 +211,6 @@ func DecryptKey(keyjson []byte, auth string) (*Key, error) {
 	// Depending on the version try to parse one way or another
 	var (
 		keyBytes, keyId []byte
-		whisperEnabled  bool
 		err             error
 		extKeyBytes     []byte
 		extKey          *extkeys.ExtendedKey
@@ -251,10 +249,6 @@ func DecryptKey(keyjson []byte, auth string) (*Key, error) {
 		extKey, err = extkeys.NewKeyFromString(string(extKeyBytes))
 	}
 
-	whisperEnabled, ok = m["whisperenabled"].(bool)
-	if !ok {
-		whisperEnabled = false
-	}
 	// Handle any decryption errors and return the key
 	if err != nil {
 		return nil, err
@@ -265,7 +259,6 @@ func DecryptKey(keyjson []byte, auth string) (*Key, error) {
 		Id:              uuid.UUID(keyId),
 		Address:         crypto.PubkeyToAddress(key.PublicKey),
 		PrivateKey:      key,
-		WhisperEnabled:  whisperEnabled,
 		ExtendedKey:     extKey,
 		SubAccountIndex: uint32(subAccountIndex),
 	}, nil
@@ -400,7 +393,7 @@ func getKDFKey(cryptoJSON cryptoJSON, auth string) ([]byte, error) {
 	}
 	dkLen := ensureInt(cryptoJSON.KDFParams["dklen"])
 
-	if cryptoJSON.KDF == "scrypt" {
+	if cryptoJSON.KDF == keyHeaderKDF {
 		n := ensureInt(cryptoJSON.KDFParams["n"])
 		r := ensureInt(cryptoJSON.KDFParams["r"])
 		p := ensureInt(cryptoJSON.KDFParams["p"])

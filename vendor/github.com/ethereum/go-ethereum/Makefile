@@ -8,7 +8,7 @@
 .PHONY: geth-darwin geth-darwin-386 geth-darwin-amd64
 .PHONY: geth-windows geth-windows-386 geth-windows-amd64
 
-GOBIN = build/bin
+GOBIN = $(shell pwd)/build/bin
 GO ?= latest
 
 geth:
@@ -20,11 +20,6 @@ swarm:
 	build/env.sh go run build/ci.go install ./cmd/swarm
 	@echo "Done building."
 	@echo "Run \"$(GOBIN)/swarm\" to launch swarm."
-
-evm:
-	build/env.sh go run build/ci.go install ./cmd/evm
-	@echo "Done building."
-	@echo "Run \"$(GOBIN)/evm\" to start the evm."
 
 all:
 	build/env.sh go run build/ci.go install

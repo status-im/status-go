@@ -177,9 +177,6 @@ func (s *PublicWhisperAPI) Post(args PostArgs) (bool, error) {
 
 	// construct whisper message with transmission options
 	message := NewMessage(common.FromHex(args.Payload))
-	if len(message.Payload) == 0 && len(args.Payload) > 0 {
-		message.Payload = []byte(args.Payload)
-	}
 	options := Options{
 		To:     crypto.ToECDSAPub(common.FromHex(args.To)),
 		TTL:    time.Duration(args.TTL) * time.Second,
@@ -378,15 +375,6 @@ func (w *whisperFilter) retrieve() (messages []WhisperMessage) {
 	w.update = time.Now()
 
 	return
-}
-
-// activity returns the last time instance when client requests were executed on
-// the filter.
-func (w *whisperFilter) activity() time.Time {
-	w.lock.RLock()
-	defer w.lock.RUnlock()
-
-	return w.update
 }
 
 // newWhisperFilter creates a new serialized, poll based whisper topic filter.

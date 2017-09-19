@@ -69,10 +69,8 @@ func errResp(code errCode, format string, v ...interface{}) error {
 	return fmt.Errorf("%v - %v", code, fmt.Sprintf(format, v...))
 }
 
-type hashFetcherFn func(common.Hash) error
-
 type BlockChain interface {
-	HasHeader(hash common.Hash) bool
+	HasHeader(hash common.Hash, number uint64) bool
 	GetHeader(hash common.Hash, number uint64) *types.Header
 	GetHeaderByHash(hash common.Hash) *types.Header
 	CurrentHeader() *types.Header
@@ -84,6 +82,7 @@ type BlockChain interface {
 	GetBlockHashesFromHash(hash common.Hash, max uint64) []common.Hash
 	LastBlockHash() common.Hash
 	Genesis() *types.Block
+	SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription
 }
 
 type txPool interface {
@@ -118,10 +117,6 @@ type ProtocolManager struct {
 	newPeerCh   chan *peer
 	quitSync    chan struct{}
 	noMorePeers chan struct{}
-
-	syncMu   sync.Mutex
-	syncing  bool
-	syncDone chan struct{}
 
 	// wait group is used for graceful shutdowns during downloading
 	// and processing
