@@ -195,6 +195,59 @@ func (s *BackendTestSuite) TestSendEtherTx() {
 	s.Zero(s.backend.TxQueueManager().TransactionQueue().Count(), "tx queue must be empty at this point")
 }
 
+func (s *BackendTestSuite) TestSendEtherTxUpstream() {
+	s.StartTestBackend(params.RopstenNetworkID, WithUpstream("https://ropsten.infura.io/z6GCTmjdP3FETEJmMBI4"))
+	defer s.StopTestBackend()
+
+	time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to sync
+
+	err := s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
+	s.NoError(err)
+
+	completeQueuedTransaction := make(chan struct{})
+
+	// replace transaction notification handler
+	var txHash = gethcommon.Hash{}
+	node.SetDefaultNodeNotificationHandler(func(jsonEvent string) { // nolint: dupl
+		var envelope node.SignalEnvelope
+		err := json.Unmarshal([]byte(jsonEvent), &envelope)
+		s.NoError(err, "cannot unmarshal JSON: %s", jsonEvent)
+
+		if envelope.Type == node.EventTransactionQueued {
+			event := envelope.Event.(map[string]interface{})
+			log.Info("transaction queued (will be completed shortly)", "id", event["id"].(string))
+
+			txHash, err = s.backend.CompleteTransaction(
+				common.QueuedTxID(event["id"].(string)),
+				TestConfig.Account1.Password,
+			)
+			s.NoError(err, "cannot complete queued transaction[%v]", event["id"])
+
+			log.Info("contract transaction complete", "URL", "https://ropsten.etherscan.io/tx/"+txHash.Hex())
+			close(completeQueuedTransaction)
+		}
+	})
+
+	// This call blocks, up until Complete Transaction is called.
+	// Explicitly not setting Gas to get it estimated.
+	txHashCheck, err := s.backend.SendTransaction(nil, common.SendTxArgs{
+		From:     common.FromAddress(TestConfig.Account1.Address),
+		To:       common.ToAddress(TestConfig.Account2.Address),
+		GasPrice: (*hexutil.Big)(big.NewInt(28000000000)),
+		Value:    (*hexutil.Big)(big.NewInt(1000000000000)),
+	})
+	s.NoError(err, "cannot send transaction")
+
+	select {
+	case <-completeQueuedTransaction:
+	case <-time.After(1 * time.Minute):
+		s.FailNow("completing transaction timed out")
+	}
+
+	s.Equal(txHash.Hex(), txHashCheck.Hex(), "transaction hash returned from SendTransaction is invalid")
+	s.Zero(s.backend.TxQueueManager().TransactionQueue().Count(), "tx queue must be empty at this point")
+}
+
 func (s *BackendTestSuite) TestDoubleCompleteQueuedTransactions() {
 	require := s.Require()
 	require.NotNil(s.backend)
