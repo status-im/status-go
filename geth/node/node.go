@@ -65,25 +65,25 @@ func MakeNode(config *params.NodeConfig) (*node.Node, error) {
 		stackConfig.P2P.PrivateKey = pk
 	}
 
+	// TODO(divan): FIXME: this is rude workaround for #294 issue
+	// we activating ETH/LES service to have RPC handler for `eth_accounts` call
+	// should be removed once proper own RPC and refactoring is completed
+	var activateEthNode bool = true
+	if config.UpstreamConfig.Enabled {
+		stackConfig.P2P.MaxPeers = 0
+		activateEthNode = true // just for clarity that we activate it in both cases, for upstream and local
+		log.Info("Blockchain synchronization is switched off, RPC requests will be proxied to " + config.UpstreamConfig.URL)
+	}
+
 	stack, err := node.New(stackConfig)
 	if err != nil {
 		return nil, ErrNodeMakeFailure
 	}
 
-	// start Ethereum service if we are not expected to use an upstream server.
-	if !config.UpstreamConfig.Enabled {
+	if activateEthNode {
 		if err := activateEthService(stack, config); err != nil {
 			return nil, fmt.Errorf("%v: %v", ErrEthServiceRegistrationFailure, err)
 		}
-	} else {
-		// TODO(divan): FIXME: this is rude workaround for #294 issue
-		// we start activate LES service to have RPC handler for `eth_accounts` call
-		// should be removed once proper own RPC and refactoring is completed
-		config.MaxPeers = 0
-		if err := activateEthService(stack, config); err != nil {
-			return nil, fmt.Errorf("%v: %v", ErrEthServiceRegistrationFailure, err)
-		}
-		log.Info("Blockchain synchronization is switched off, RPC requests will be proxied to " + config.UpstreamConfig.URL)
 	}
 
 	// start Whisper service
@@ -173,7 +173,6 @@ func activateEthService(stack *node.Node, config *params.NodeConfig) error {
 	ethConf.SyncMode = downloader.LightSync
 	ethConf.NetworkId = config.NetworkID
 	ethConf.DatabaseCache = config.LightEthConfig.DatabaseCache
-	ethConf.MaxPeers = config.MaxPeers
 
 	if err := stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
 		lightEth, err := les.New(ctx, &ethConf)
