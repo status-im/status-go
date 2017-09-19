@@ -79,7 +79,7 @@ func (s *AccountsTestSuite) TestVerifyAccountPassword() {
 			emptyKeyStoreDir,
 			TestConfig.Account1.Address,
 			TestConfig.Account1.Password,
-			fmt.Errorf("cannot locate account for address: %x", account1Address),
+			fmt.Errorf("cannot locate account for address: %s", account1Address.Hex()),
 		},
 		{
 			"wrong address, correct password",
@@ -108,7 +108,7 @@ func (s *AccountsTestSuite) TestVerifyAccountPassword() {
 			}
 			accountAddress := gethcommon.BytesToAddress(gethcommon.FromHex(testCase.address))
 			if accountKey.Address != accountAddress {
-				s.T().Fatalf("account mismatch: have %x, want %x", accountKey.Address, accountAddress)
+				s.T().Fatalf("account mismatch: have %s, want %s", accountKey.Address.Hex(), accountAddress.Hex())
 			}
 		}
 	}
