@@ -118,14 +118,14 @@ func (s *ManagerTestSuite) TestReferences() {
 			func() (interface{}, error) {
 				return s.NodeManager.RPCClient(), nil
 			},
-			node.ErrNoRunningNode,
+			nil,
 		},
 	}
 	for _, testCase := range noNodeTests {
 		s.T().Log(testCase.name)
 		obj, err := testCase.initFn()
 		s.Nil(obj)
-		s.EqualError(err, testCase.expectedErr.Error())
+		s.Equal(testCase.expectedErr, err)
 	}
 
 	// test with node fully started

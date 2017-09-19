@@ -225,8 +225,8 @@ var loadConfigTestCases = []struct {
 
 			require.NoError(t, err)
 			require.True(t, nodeConfig.BootClusterConfig.Enabled, "boot cluster is expected to be enabled by default")
-			require.Equal(t, "91825fffecb5678167273955deaddbf03c26ae04287cfda61403c0bad5ceab8d", nodeConfig.BootClusterConfig.RootHash)
-			require.Equal(t, 259, nodeConfig.BootClusterConfig.RootNumber)
+			require.Equal(t, "673363514b866bbbaf1b94462203650e3b1a2d4fb498df33361458b465b61ca3", nodeConfig.BootClusterConfig.RootHash)
+			require.Equal(t, 395, nodeConfig.BootClusterConfig.RootNumber)
 
 			enodes := nodeConfig.BootClusterConfig.BootNodes
 			expectedEnodes := []string{
@@ -275,8 +275,8 @@ var loadConfigTestCases = []struct {
 		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
 			require.NoError(t, err)
 			require.True(t, nodeConfig.BootClusterConfig.Enabled, "boot cluster is expected to be enabled by default")
-			require.Equal(t, "91825fffecb5678167273955deaddbf03c26ae04287cfda61403c0bad5ceab8d", nodeConfig.BootClusterConfig.RootHash)
-			require.Equal(t, 259, nodeConfig.BootClusterConfig.RootNumber)
+			require.Equal(t, "673363514b866bbbaf1b94462203650e3b1a2d4fb498df33361458b465b61ca3", nodeConfig.BootClusterConfig.RootHash)
+			require.Equal(t, 395, nodeConfig.BootClusterConfig.RootNumber)
 
 			enodes := nodeConfig.BootClusterConfig.BootNodes
 			expectedEnodes := []string{
@@ -308,8 +308,8 @@ var loadConfigTestCases = []struct {
 		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
 			require.NoError(t, err)
 			require.True(t, nodeConfig.BootClusterConfig.Enabled, "boot cluster is expected to be enabled by default")
-			require.Equal(t, "rinkeby-dev", nodeConfig.BootClusterConfig.RootHash)
-			require.True(t, nodeConfig.BootClusterConfig.RootNumber >= 66)
+			require.Equal(t, "f946d8f4d46d5b8a68006485cef0d1583db4a45feab83661323d4d52000aa2db", nodeConfig.BootClusterConfig.RootHash)
+			require.Equal(t, 205, nodeConfig.BootClusterConfig.RootNumber)
 
 			enodes := nodeConfig.BootClusterConfig.BootNodes
 			expectedEnodes := []string{
@@ -330,8 +330,8 @@ var loadConfigTestCases = []struct {
 		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
 			require.NoError(t, err)
 			require.True(t, nodeConfig.BootClusterConfig.Enabled, "boot cluster is expected to be enabled by default")
-			require.Equal(t, "rinkeby-prod", nodeConfig.BootClusterConfig.RootHash)
-			require.True(t, nodeConfig.BootClusterConfig.RootNumber >= 66)
+			require.Equal(t, "f946d8f4d46d5b8a68006485cef0d1583db4a45feab83661323d4d52000aa2db", nodeConfig.BootClusterConfig.RootHash)
+			require.Equal(t, 205, nodeConfig.BootClusterConfig.RootNumber)
 
 			enodes := nodeConfig.BootClusterConfig.BootNodes
 			expectedEnodes := []string{
@@ -451,7 +451,8 @@ func TestConfigWriteRead(t *testing.T) {
 
 		refConfigData := LoadFromFile(refFile)
 
-		// ioutil.WriteFile(fmt.Sprintf("/tmp/chainId.%d.json", networkId), []byte(loadedConfigData), 0777) // ease updating new config
+		// Ease updating new config data.
+		//ioutil.WriteFile(fmt.Sprintf("/tmp/chainId.%d.json", networkId), []byte(loadedConfigData), 0777)
 
 		refConfigData = strings.Replace(refConfigData, "$TMPDIR", nodeConfig.DataDir, -1)
 		refConfigData = strings.Replace(refConfigData, "$VERSION", params.Version, -1)
