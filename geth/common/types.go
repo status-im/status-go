@@ -126,7 +126,7 @@ type AccountManager interface {
 	Logout() error
 
 	// AccountsListRequestHandler returns handler to process account list request
-	AccountsListRequestHandler() func(entities []common.Address) []common.Address
+	EthAccountsHandler(...interface{}) (interface{}, error)
 
 	// AddressToDecryptedAccount tries to load decrypted key for a given account.
 	// The running node, has a keystore directory which is loaded on start. Key file
