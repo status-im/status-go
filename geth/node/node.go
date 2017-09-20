@@ -179,6 +179,11 @@ func activateEthService(stack *node.Node, config *params.NodeConfig) error {
 		lightEth, err := les.New(ctx, &ethConf)
 		if err == nil {
 			updateCHT(lightEth, config)
+
+			// Cancel downloaders operation if upstream enabled and ensure it stops sync.
+			if config.UpstreamConfig.Enabled {
+				lightEth.Downloader().Cancel()
+			}
 		}
 		return lightEth, err
 	}); err != nil {
