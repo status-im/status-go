@@ -94,10 +94,53 @@ func (c *Client) CallContext(ctx context.Context, result interface{}, method str
 	return c.local.CallContext(ctx, result, method, args...)
 }
 
-// rpc.RegisterClient("eth_accounts", AccountFilterWhatever)
-func (c *Client) RegisterHandler(method string, fn RPCFunc) {
+// RegisterHandler registers local handler for specific RPC method.
+//
+// If method is registered, it will be executed with given handler and
+// never routed to the upstream or local servers.
+func (c *Client) RegisterHandler(method string, handler Handler) {
 	c.mx.Lock()
 	defer c.mx.Unlock()
 
-	c.methods[method] = fn
+	c.handlers[method] = handler
+}
+
+// callMethod calls registered RPC handler with given args and pointer to result.
+// It handles proper params and result converting
+//
+// TODO(divan): use cancellation via context here?
+func (c *Client) callMethod(ctx context.Context, result interface{}, handler Handler, args ...interface{}) error {
+	res, err := handler(args...)
+	if err != nil {
+		return err
+	}
+
+	// if result is nil, just ignore result
+	if result == nil {
+		return nil
+	}
+
+	data, err := json.Marshal(res)
+	if err != nil {
+		return err
+	}
+
+	// we need to set the underlying value of empty interface
+	// TODO(divan): add additional checks for result underlying value, if needed:
+	// some example: https://golang.org/src/encoding/json/decode.go#L596
+	value := reflect.ValueOf(result).Elem()
+	if !value.CanSet() {
+		return errors.New("can't assign value to result")
+	}
+	value.Set(reflect.ValueOf(data))
+
+	return nil
+}
+
+// handler is a concurrently safe method to get registered handler by name.
+func (c *Client) handler(method string) (Handler, bool) {
+	c.mx.RLock()
+	defer c.mx.RUnlock()
+	handler, ok := c.handlers[method]
+	return handler, ok
 }
