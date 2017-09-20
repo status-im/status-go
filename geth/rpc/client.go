@@ -2,7 +2,10 @@ package rpc
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"reflect"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/node"
@@ -11,8 +14,8 @@ import (
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 )
 
-// RPCFunc defines handler for RPC methods.
-type RPCFunc func(...interface{}) error
+// Handler defines handler for RPC methods.
+type Handler func(...interface{}) (interface{}, error)
 
 // Client represents RPC client with custom routing
 // scheme. It automatically decides where RPC call
@@ -26,9 +29,8 @@ type Client struct {
 
 	router *router
 
-	mx sync.RWMutex
-	// locally registered methods
-	methods map[string]RPCFunc
+	mx       sync.RWMutex       // mx guards handlers
+	handlers map[string]Handler // locally registered handlers
 }
 
 // NewClient initializes Client and tries to connect to both,
@@ -38,7 +40,7 @@ type Client struct {
 // reconnect to the server if connection is lost.
 func NewClient(node *node.Node, upstream params.UpstreamRPCConfig) (*Client, error) {
 	c := &Client{
-		methods: make(map[string]RPCFunc),
+		handlers: make(map[string]Handler),
 	}
 
 	var err error
@@ -82,10 +84,9 @@ func (c *Client) Call(result interface{}, method string, args ...interface{}) er
 //
 // It uses custom routing scheme for calls.
 func (c *Client) CallContext(ctx context.Context, result interface{}, method string, args ...interface{}) error {
-	c.mx.RLock()
-	defer c.mx.RUnlock()
-	if handler, ok := c.methods[method]; ok {
-		return handler(args...)
+	// check locally registered handlers first
+	if handler, ok := c.handler(method); ok {
+		return c.callMethod(ctx, result, handler, args)
 	}
 
 	if c.router.routeRemote(method) {
