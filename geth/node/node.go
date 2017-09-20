@@ -182,7 +182,7 @@ func activateEthService(stack *node.Node, config *params.NodeConfig) error {
 
 			// Cancel downloaders operation if upstream enabled and ensure it stops sync.
 			if config.UpstreamConfig.Enabled {
-				lightEth.Downloader().Cancel()
+				lightEth.Downloader().Terminate()
 			}
 		}
 		return lightEth, err

@@ -178,7 +178,7 @@ func (s *BackendTestSuite) TestStartNodeWithUpstreamEnabled() {
 	lightEth, err := backend.NodeManager().LightEthereumService()
 	require.NoError(err)
 	require.NotNil(lightEth)
-	time.Sleep(3 * time.Second)
+	time.Sleep(5 * time.Second)
 	require.False(lightEth.Downloader().Synchronising(), "NodeChain synchronization is not started")
 }
 
