@@ -180,9 +180,11 @@ func activateEthService(stack *node.Node, config *params.NodeConfig) error {
 		if err == nil {
 			updateCHT(lightEth, config)
 
-			// Cancel downloaders operation if upstream enabled and ensure it stops sync.
 			if config.UpstreamConfig.Enabled {
 				lightEth.Downloader().Terminate()
+				if block := lightEth.BlockChain(); block != nil {
+					block.Stop()
+				}
 			}
 		}
 		return lightEth, err
