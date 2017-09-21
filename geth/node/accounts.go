@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/status-im/status-go/extkeys"
 	"github.com/status-im/status-go/geth/common"
+	"github.com/status-im/status-go/geth/rpc"
 )
 
 // errors
@@ -303,7 +304,9 @@ func (m *AccountManager) importExtendedKey(extKey *extkeys.ExtendedKey, password
 	return
 }
 
-func (m *AccountManager) EthAccountsHandler(...interface{}) (interface{}, error) {
+// Accounts returns list of addresses for selected account, including
+// subaccounts.
+func (m *AccountManager) Accounts() ([]gethcommon.Address, error) {
 	am, err := m.nodeManager.AccountManager()
 	if err != nil {
 		return nil, err
@@ -338,6 +341,13 @@ func (m *AccountManager) EthAccountsHandler(...interface{}) (interface{}, error)
 	}
 
 	return filtered, nil
+}
+
+// AccountsRPCHandler returns RPC Handler for the Accounts() method.
+func (m *AccountManager) AccountsRPCHandler() rpc.Handler {
+	return func(...interface{}) (interface{}, error) {
+		return m.Accounts()
+	}
 }
 
 // refreshSelectedAccount re-populates list of sub-accounts of the currently selected account (if any)
