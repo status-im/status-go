@@ -16,8 +16,6 @@ type StatusBackend struct {
 	eapi  *PublicEthereumAPI        // Wrapper around the Ethereum object to access metadata
 	bcapi *PublicBlockChainAPI      // Wrapper around the blockchain to access chain data
 	txapi *PublicTransactionPoolAPI // Wrapper around the transaction pool to access transaction data
-
-	am *status.AccountManager
 }
 
 var (
@@ -31,18 +29,7 @@ func NewStatusBackend(apiBackend Backend) *StatusBackend {
 		eapi:  NewPublicEthereumAPI(apiBackend),
 		bcapi: NewPublicBlockChainAPI(apiBackend),
 		txapi: NewPublicTransactionPoolAPI(apiBackend, new(AddrLocker)),
-		am:    status.NewAccountManager(apiBackend.AccountManager()),
 	}
-}
-
-// SetAccountsFilterHandler sets a callback that is triggered when account list is requested
-func (b *StatusBackend) SetAccountsFilterHandler(fn status.AccountsFilterHandler) {
-	b.am.SetAccountsFilterHandler(fn)
-}
-
-// AccountManager returns reference to account manager
-func (b *StatusBackend) AccountManager() *status.AccountManager {
-	return b.am
 }
 
 // SendTransaction wraps call to PublicTransactionPoolAPI.SendTransaction
