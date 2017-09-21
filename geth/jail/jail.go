@@ -156,7 +156,6 @@ func (jail *Jail) Send(call otto.FunctionCall, vm *vm.VM) otto.Value {
 	if err != nil {
 		throwJSException(err)
 	}
-	log.Debug("jai.Send", "req", string(request.String()))
 
 	client, err := jail.nodeManager.RPCClient()
 	if err != nil {
