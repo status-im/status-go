@@ -227,6 +227,8 @@ type TxQueueManager interface {
 	// TODO(adam): might be not needed
 	SetTransactionReturnHandler(fn EnqueuedTxReturnHandler)
 
+	SendTransactionRPCHandler(args ...interface{}) (interface{}, error)
+
 	// TransactionReturnHandler returns handler that processes responses from internal tx manager
 	TransactionReturnHandler() func(queuedTx *QueuedTx, err error)
 

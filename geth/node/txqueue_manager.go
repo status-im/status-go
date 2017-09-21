@@ -2,6 +2,7 @@ package node
 
 import (
 	"context"
+	"errors"
 	"math/big"
 	"time"
 
@@ -429,4 +430,38 @@ func (m *TxQueueManager) sendTransactionErrorCode(err error) string {
 // Recoverable error is, for instance, wrong password.
 func (m *TxQueueManager) SetTransactionReturnHandler(fn common.EnqueuedTxReturnHandler) {
 	m.txQueue.SetTxReturnHandler(fn)
+}
+
+// SendTransactionRPCHandler is a handler for eth_sendTransaction method.
+// It accepts one param which is a slice with a map of transaction params.
+func (m *TxQueueManager) SendTransactionRPCHandler(args ...interface{}) (interface{}, error) {
+	// Verify that just one argument was received.
+	if len(args) != 1 {
+		return nil, errors.New("invalid number of arguments")
+	}
+
+	// eth_sendTransaction parameter is a slice with a map of transaction params.
+	txParamsSlice, ok := args[0].([]interface{})
+	if !ok || len(txParamsSlice) != 1 {
+		return nil, errors.New("invalid eth_sendTransaction params")
+	}
+
+	// TODO(adam): it's a hack to parse arguments as common.RPCCall can do that.
+	// We should refactor parsing these params to a separate struct.
+	rpcCall := common.RPCCall{Params: txParamsSlice}
+
+	tx := m.CreateTransaction(context.Background(), rpcCall.ToSendTxArgs())
+	if err := m.QueueTransaction(tx); err != nil {
+		return nil, err
+	}
+
+	if err := m.QueueTransaction(tx); err != nil {
+		return nil, err
+	}
+
+	if err := m.WaitForTransaction(tx); err != nil {
+		return nil, err
+	}
+
+	return tx.Hash.Hex(), nil
 }
