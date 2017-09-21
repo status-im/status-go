@@ -245,7 +245,8 @@ func (s *RPCTestSuite) TestCallRPC() {
 	}
 }
 
-func (s *RPCTestSuite) TestCallRPCResult() {
+// TestCallRawResult checks if returned response is a valid JSON-RPC response.
+func (s *RPCTestSuite) TestCallRawResult() {
 	nodeConfig, err := MakeTestNodeConfig(params.RopstenNetworkID)
 	s.NoError(err)
 
@@ -259,6 +260,21 @@ func (s *RPCTestSuite) TestCallRPCResult() {
 
 	jsonResult := client.CallRaw(`{"jsonrpc":"2.0","method":"shh_version","params":[],"id":67}`)
 	s.Equal(`{"jsonrpc":"2.0","id":67,"result":"5.0"}`, jsonResult)
+}
+
+// TestCallContextResult checks if result passed to CallContext
+// is set accordingly to its underlying memory layout.
+func (s *RPCTestSuite) TestCallContextResult() {
+	nodeConfig, err := MakeTestNodeConfig(params.RopstenNetworkID)
+	s.NoError(err)
+
+	nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
+	s.NoError(err)
+	defer s.NodeManager.StopNode()
+
+	<-nodeStarted
+
+	client := s.NodeManager.RPCClient()
 
 	var blockNumber hexutil.Uint
 	err = client.CallContext(context.Background(), &blockNumber, "eth_blockNumber")

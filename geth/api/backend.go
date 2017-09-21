@@ -227,7 +227,6 @@ func (m *StatusBackend) registerHandlers() error {
 	rpcClient.RegisterHandler("eth_accounts", m.accountManager.AccountsRPCHandler())
 	rpcClient.RegisterHandler("eth_sendTransaction", m.txQueueManager.SendTransactionRPCHandler)
 
-	//rpcClient.RegisterHandler("eth_sendTransaction", m.txQueueManager.SomeHanlder)
 	m.txQueueManager.SetTransactionQueueHandler(m.txQueueManager.TransactionQueueHandler())
 	log.Info("Registered handler", "fn", "TransactionQueueHandler")
 
