@@ -225,6 +225,7 @@ func (m *StatusBackend) DiscardTransactions(ids []common.QueuedTxID) map[common.
 func (m *StatusBackend) registerHandlers() error {
 	rpcClient := m.NodeManager().RPCClient()
 	rpcClient.RegisterHandler("eth_accounts", m.accountManager.EthAccountsHandler)
+	rpcClient.RegisterHandler("eth_sendTransaction", m.txQueueManager.SendTransactionRPCHandler)
 
 	//rpcClient.RegisterHandler("eth_sendTransaction", m.txQueueManager.SomeHanlder)
 	m.txQueueManager.SetTransactionQueueHandler(m.txQueueManager.TransactionQueueHandler())

@@ -1,10 +1,12 @@
 package api_test
 
 import (
+	"encoding/json"
 	"math/rand"
 	"testing"
 	"time"
 
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/les"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/api"
@@ -254,6 +256,54 @@ func (s *BackendTestSuite) TestCallRPC() {
 			break
 		}
 	}
+}
+
+func (s *BackendTestSuite) TestCallRPCSendTransaction() {
+	nodeConfig, err := MakeTestNodeConfig(params.RinkebyNetworkID)
+	s.NoError(err)
+
+	nodeStarted, err := s.backend.StartNode(nodeConfig)
+	s.NoError(err)
+	defer s.backend.StopNode()
+
+	<-nodeStarted
+
+	err = s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
+	s.NoError(err)
+
+	transactionCompleted := make(chan struct{})
+
+	var txHash gethcommon.Hash
+	node.SetDefaultNodeNotificationHandler(func(rawSignal string) {
+		var signal node.SignalEnvelope
+		err := json.Unmarshal([]byte(rawSignal), &signal)
+		s.NoError(err)
+
+		if signal.Type == node.EventTransactionQueued {
+			event := signal.Event.(map[string]interface{})
+			txID := event["id"].(string)
+			txHash, err = s.backend.CompleteTransaction(common.QueuedTxID(txID), TestConfig.Account1.Password)
+			s.NoError(err, "cannot complete queued transaction %s", txID)
+
+			close(transactionCompleted)
+		}
+	})
+
+	result := s.backend.CallRPC(`{
+		"jsonrpc": "2.0",
+		"id": 1,
+		"method": "eth_sendTransaction",
+		"params": [{
+			"from": "` + TestConfig.Account1.Address + `",
+			"to": "0xd46e8dd67c5d32be8058bb8eb970870f07244567",
+			"gasPrice": "0x9184e72a000",
+			"value": "0x9184e72a"
+		}]
+	}`)
+
+	<-transactionCompleted
+
+	s.Equal(txHash.Hex(), result)
 }
 
 // FIXME(tiabc): There's also a test with the same name in geth/node/manager_test.go

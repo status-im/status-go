@@ -3,7 +3,6 @@ package jail
 import (
 	"context"
 
-	gethcommon "github.com/ethereum/go-ethereum/common"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/jail/internal/vm"
@@ -50,7 +49,7 @@ func (ep *ExecutionPolicy) executeSendTransaction(vm *vm.VM, req common.RPCCall)
 
 	// TODO(adam): check if context is used
 	ctx := context.WithValue(context.Background(), common.MessageIDKey, messageID)
-	args := sendTxArgsFromRPCCall(req)
+	args := req.ToSendTxArgs()
 
 	tx := ep.txQueueManager.CreateTransaction(ctx, args)
 
@@ -149,33 +148,4 @@ func currentMessageID(vm *vm.VM) string {
 		return ""
 	}
 	return msgID.String()
-}
-
-func sendTxArgsFromRPCCall(req common.RPCCall) common.SendTxArgs {
-	// no need to persist extra state for other requests
-	if req.Method != params.SendTransactionMethodName {
-		return common.SendTxArgs{}
-	}
-
-	var err error
-	var fromAddr, toAddr gethcommon.Address
-
-	fromAddr, err = req.ParseFromAddress()
-	if err != nil {
-		fromAddr = gethcommon.HexToAddress("0x0")
-	}
-
-	toAddr, err = req.ParseToAddress()
-	if err != nil {
-		toAddr = gethcommon.HexToAddress("0x0")
-	}
-
-	return common.SendTxArgs{
-		To:       &toAddr,
-		From:     fromAddr,
-		Value:    req.ParseValue(),
-		Data:     req.ParseData(),
-		Gas:      req.ParseGas(),
-		GasPrice: req.ParseGasPrice(),
-	}
 }
