@@ -121,32 +121,9 @@ func (c *Client) callMethod(ctx context.Context, result interface{}, handler Han
 		return nil
 	}
 
-	responseValue := reflect.ValueOf(response)
-
-	// If it is called via CallRaw, result has type json.RawMessage
-	// and we should marshal the response before setting it.
-	// Otherwise, it is called with CallContext and result is of concrete type,
-	// thus we shouldn't do any marshaling.
-	// If response type and result type are incorrect, an error should be returned.
-	// @TODO(adam): currently, if types are incorrect, it will panic.
-	switch reflect.ValueOf(result).Elem().Type() {
-	case reflect.TypeOf(json.RawMessage{}), reflect.TypeOf([]byte{}):
-		data, err := json.Marshal(response)
-		if err != nil {
-			return err
-		}
-
-		responseValue = reflect.ValueOf(data)
+	if err := setResultFromRPCResponse(result, response); err != nil {
+		return err
 	}
-
-	// we need to set the underlying value of empty interface
-	// TODO(divan): add additional checks for result underlying value, if needed:
-	// some example: https://golang.org/src/encoding/json/decode.go#L596
-	value := reflect.ValueOf(result).Elem()
-	if !value.CanSet() {
-		return errors.New("can't assign value to result")
-	}
-	value.Set(responseValue)
 
 	return nil
 }
@@ -157,4 +134,41 @@ func (c *Client) handler(method string) (Handler, bool) {
 	defer c.mx.RUnlock()
 	handler, ok := c.handlers[method]
 	return handler, ok
+}
+
+// setResultFromRPCResponse tries to set result value from response using reflection
+// as concrete types are unknown.
+func setResultFromRPCResponse(result, response interface{}) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("invalid result type: %s", r)
+		}
+	}()
+
+	responseValue := reflect.ValueOf(response)
+
+	// If it is called via CallRaw, result has type json.RawMessage and
+	// we should marshal the response before setting it.
+	// Otherwise, it is called with CallContext and result is of concrete type,
+	// thus we should try to set it as it is.
+	// If response type and result type are incorrect, an error should be returned.
+	// TODO(divan): add additional checks for result underlying value, if needed:
+	// some example: https://golang.org/src/encoding/json/decode.go#L596
+	switch reflect.ValueOf(result).Elem().Type() {
+	case reflect.TypeOf(json.RawMessage{}), reflect.TypeOf([]byte{}):
+		data, err := json.Marshal(response)
+		if err != nil {
+			return err
+		}
+
+		responseValue = reflect.ValueOf(data)
+	}
+
+	value := reflect.ValueOf(result).Elem()
+	if !value.CanSet() {
+		return errors.New("can't assign value to result")
+	}
+	value.Set(responseValue)
+
+	return nil
 }
