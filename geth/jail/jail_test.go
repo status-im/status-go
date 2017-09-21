@@ -130,6 +130,9 @@ func (s *JailTestSuite) TestFunctionCall() {
 func (s *JailTestSuite) TestJailRPCAsyncSend() {
 	require := s.Require()
 
+	s.StartTestNode(params.RopstenNetworkID)
+	defer s.StopTestNode()
+
 	// load Status JS and add test command to it
 	s.jail.BaseJS(baseStatusJSCode)
 	s.jail.Parse(testChatID, txJSCode)
