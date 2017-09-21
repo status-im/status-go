@@ -455,10 +455,6 @@ func (m *TxQueueManager) SendTransactionRPCHandler(args ...interface{}) (interfa
 		return nil, err
 	}
 
-	if err := m.QueueTransaction(tx); err != nil {
-		return nil, err
-	}
-
 	if err := m.WaitForTransaction(tx); err != nil {
 		return nil, err
 	}
