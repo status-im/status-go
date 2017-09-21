@@ -348,21 +348,29 @@ func (mr *MockAccountManagerMockRecorder) Logout() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Logout", reflect.TypeOf((*MockAccountManager)(nil).Logout))
 }
 
-// EthAccountsHandler mocks base method
-func (m *MockAccountManager) EthAccountsHandler(arg0 ...interface{}) (interface{}, error) {
-	varargs := []interface{}{}
-	for _, a := range arg0 {
-		varargs = append(varargs, a)
-	}
-	ret := m.ctrl.Call(m, "EthAccountsHandler", varargs...)
-	ret0, _ := ret[0].(interface{})
+// Accounts mocks base method
+func (m *MockAccountManager) Accounts() ([]common.Address, error) {
+	ret := m.ctrl.Call(m, "Accounts")
+	ret0, _ := ret[0].([]common.Address)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// EthAccountsHandler indicates an expected call of EthAccountsHandler
-func (mr *MockAccountManagerMockRecorder) EthAccountsHandler(arg0 ...interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EthAccountsHandler", reflect.TypeOf((*MockAccountManager)(nil).EthAccountsHandler), arg0...)
+// Accounts indicates an expected call of Accounts
+func (mr *MockAccountManagerMockRecorder) Accounts() *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Accounts", reflect.TypeOf((*MockAccountManager)(nil).Accounts))
+}
+
+// AccountsRPCHandler mocks base method
+func (m *MockAccountManager) AccountsRPCHandler() rpc.Handler {
+	ret := m.ctrl.Call(m, "AccountsRPCHandler")
+	ret0, _ := ret[0].(rpc.Handler)
+	return ret0
+}
+
+// AccountsRPCHandler indicates an expected call of AccountsRPCHandler
+func (mr *MockAccountManagerMockRecorder) AccountsRPCHandler() *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AccountsRPCHandler", reflect.TypeOf((*MockAccountManager)(nil).AccountsRPCHandler))
 }
 
 // AddressToDecryptedAccount mocks base method

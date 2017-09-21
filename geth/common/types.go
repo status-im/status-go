@@ -125,8 +125,11 @@ type AccountManager interface {
 	// Logout clears whisper identities
 	Logout() error
 
-	// AccountsListRequestHandler returns handler to process account list request
-	EthAccountsHandler(...interface{}) (interface{}, error)
+	// Accounts returns handler to process account list request
+	Accounts() ([]common.Address, error)
+
+	// AccountsRPCHandler returns RPC wrapper for Accounts()
+	AccountsRPCHandler() rpc.Handler
 
 	// AddressToDecryptedAccount tries to load decrypted key for a given account.
 	// The running node, has a keystore directory which is loaded on start. Key file
