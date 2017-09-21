@@ -303,7 +303,7 @@ func (s *BackendTestSuite) TestCallRPCSendTransaction() {
 
 	<-transactionCompleted
 
-	s.Equal(txHash.Hex(), result)
+	s.Equal(`{"jsonrpc":"2.0","id":1,"result":"`+txHash.String()+`"}`, result)
 }
 
 // FIXME(tiabc): There's also a test with the same name in geth/node/manager_test.go

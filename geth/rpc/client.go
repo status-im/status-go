@@ -111,7 +111,7 @@ func (c *Client) RegisterHandler(method string, handler Handler) {
 //
 // TODO(divan): use cancellation via context here?
 func (c *Client) callMethod(ctx context.Context, result interface{}, handler Handler, args ...interface{}) error {
-	res, err := handler(args...)
+	response, err := handler(args...)
 	if err != nil {
 		return err
 	}
@@ -121,9 +121,22 @@ func (c *Client) callMethod(ctx context.Context, result interface{}, handler Han
 		return nil
 	}
 
-	data, err := json.Marshal(res)
-	if err != nil {
-		return err
+	responseValue := reflect.ValueOf(response)
+
+	// If it is called via CallRaw, result has type json.RawMessage
+	// and we should marshal the response before setting it.
+	// Otherwise, it is called with CallContext and result is of concrete type,
+	// thus we shouldn't do any marshaling.
+	// If response type and result type are incorrect, an error should be returned.
+	// @TODO(adam): currently, if types are incorrect, it will panic.
+	switch reflect.ValueOf(result).Elem().Type() {
+	case reflect.TypeOf(json.RawMessage{}), reflect.TypeOf([]byte{}):
+		data, err := json.Marshal(response)
+		if err != nil {
+			return err
+		}
+
+		responseValue = reflect.ValueOf(data)
 	}
 
 	// we need to set the underlying value of empty interface
@@ -133,7 +146,7 @@ func (c *Client) callMethod(ctx context.Context, result interface{}, handler Han
 	if !value.CanSet() {
 		return errors.New("can't assign value to result")
 	}
-	value.Set(reflect.ValueOf(data))
+	value.Set(responseValue)
 
 	return nil
 }
