@@ -31,48 +31,8 @@ func NewExecutionPolicy(
 
 // Execute handles the execution of a RPC request and routes appropriately to either a local or remote ethereum node.
 func (ep *ExecutionPolicy) Execute(req common.RPCCall, vm *vm.VM) (map[string]interface{}, error) {
-	if params.SendTransactionMethodName == req.Method {
-		return ep.executeSendTransaction(vm, req)
-	}
-
 	client := ep.nodeManager.RPCClient()
-
 	return ep.executeWithClient(client, vm, req)
-}
-
-// executeRemoteSendTransaction defines a function to execute RPC method eth_sendTransaction over the upstream server.
-func (ep *ExecutionPolicy) executeSendTransaction(vm *vm.VM, req common.RPCCall) (map[string]interface{}, error) {
-	messageID, err := preProcessRequest(vm)
-	if err != nil {
-		return nil, err
-	}
-
-	// TODO(adam): check if context is used
-	ctx := context.WithValue(context.Background(), common.MessageIDKey, messageID)
-	args := req.ToSendTxArgs()
-
-	tx := ep.txQueueManager.CreateTransaction(ctx, args)
-
-	if err := ep.txQueueManager.QueueTransaction(tx); err != nil {
-		return nil, err
-	}
-
-	if err := ep.txQueueManager.WaitForTransaction(tx); err != nil {
-		return nil, err
-	}
-
-	// invoke post processing
-	postProcessRequest(vm, req, messageID)
-
-	res := map[string]interface{}{
-		"jsonrpc": "2.0",
-		"id":      req.ID,
-		// @TODO(adam): which one is actually used?
-		"result": tx.Hash.Hex(),
-		"hash":   tx.Hash.Hex(),
-	}
-
-	return res, nil
 }
 
 func (ep *ExecutionPolicy) executeWithClient(client *rpc.Client, vm *vm.VM, req common.RPCCall) (map[string]interface{}, error) {
@@ -95,7 +55,9 @@ func (ep *ExecutionPolicy) executeWithClient(client *rpc.Client, vm *vm.VM, req 
 	if client == nil {
 		resp = newErrorResponse("RPC client is not available. Node is stopped?", &req.ID)
 	} else {
-		err = client.Call(&result, req.Method, req.Params...)
+		// TODO(adam): check if context is used
+		ctx := context.WithValue(context.Background(), common.MessageIDKey, messageID)
+		err = client.CallContext(ctx, &result, req.Method, req.Params...)
 		if err != nil {
 			if err2, ok := err.(gethrpc.Error); ok {
 				resp["error"] = map[string]interface{}{
