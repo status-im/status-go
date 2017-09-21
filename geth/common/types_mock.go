@@ -209,10 +209,11 @@ func (mr *MockNodeManagerMockRecorder) AccountKeyStore() *gomock.Call {
 }
 
 // RPCClient mocks base method
-func (m *MockNodeManager) RPCClient() *rpc.Client {
+func (m *MockNodeManager) RPCClient() (*rpc.Client, error) {
 	ret := m.ctrl.Call(m, "RPCClient")
 	ret0, _ := ret[0].(*rpc.Client)
-	return ret0
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // RPCClient indicates an expected call of RPCClient
@@ -585,6 +586,23 @@ func (m *MockTxQueueManager) SetTransactionReturnHandler(fn EnqueuedTxReturnHand
 // SetTransactionReturnHandler indicates an expected call of SetTransactionReturnHandler
 func (mr *MockTxQueueManagerMockRecorder) SetTransactionReturnHandler(fn interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetTransactionReturnHandler", reflect.TypeOf((*MockTxQueueManager)(nil).SetTransactionReturnHandler), fn)
+}
+
+// SendTransactionRPCHandler mocks base method
+func (m *MockTxQueueManager) SendTransactionRPCHandler(args ...interface{}) (interface{}, error) {
+	varargs := []interface{}{}
+	for _, a := range args {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "SendTransactionRPCHandler", varargs...)
+	ret0, _ := ret[0].(interface{})
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SendTransactionRPCHandler indicates an expected call of SendTransactionRPCHandler
+func (mr *MockTxQueueManagerMockRecorder) SendTransactionRPCHandler(args ...interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendTransactionRPCHandler", reflect.TypeOf((*MockTxQueueManager)(nil).SendTransactionRPCHandler), args...)
 }
 
 // TransactionReturnHandler mocks base method

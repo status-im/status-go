@@ -10,6 +10,7 @@ import (
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/geth/rpc"
 )
 
 // StatusBackend implements Status.im service
@@ -178,7 +179,10 @@ func (m *StatusBackend) ResetChainData() (<-chan struct{}, error) {
 
 // CallRPC executes RPC request on node's in-proc RPC server
 func (m *StatusBackend) CallRPC(inputJSON string) string {
-	client := m.nodeManager.RPCClient()
+	client, err := m.nodeManager.RPCClient()
+	if err != nil {
+		return rpc.MakeErrorMessage(err)
+	}
 	return client.CallRaw(inputJSON)
 }
 
@@ -223,7 +227,11 @@ func (m *StatusBackend) DiscardTransactions(ids []common.QueuedTxID) map[common.
 
 // registerHandlers attaches Status callback handlers to running node
 func (m *StatusBackend) registerHandlers() error {
-	rpcClient := m.NodeManager().RPCClient()
+	rpcClient, err := m.NodeManager().RPCClient()
+	if err != nil {
+		return err
+	}
+
 	rpcClient.RegisterHandler("eth_accounts", m.accountManager.AccountsRPCHandler())
 	rpcClient.RegisterHandler("eth_sendTransaction", m.txQueueManager.SendTransactionRPCHandler)
 

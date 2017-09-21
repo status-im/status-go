@@ -221,7 +221,11 @@ func (m *TxQueueManager) completeRemoteTransaction(queuedTx *common.QueuedTx, pa
 	defer cancel()
 
 	var txCount hexutil.Uint
-	client := m.nodeManager.RPCClient()
+	client, err := m.nodeManager.RPCClient()
+	if err != nil {
+		return emptyHash, err
+	}
+
 	if err := client.CallContext(ctx, &txCount, "eth_getTransactionCount", queuedTx.Args.From, "pending"); err != nil {
 		return emptyHash, err
 	}
@@ -276,7 +280,10 @@ func (m *TxQueueManager) estimateGas(args common.SendTxArgs) (*hexutil.Big, erro
 		return args.Gas, nil
 	}
 
-	client := m.nodeManager.RPCClient()
+	client, err := m.nodeManager.RPCClient()
+	if err != nil {
+		return nil, err
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 

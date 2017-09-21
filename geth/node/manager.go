@@ -27,7 +27,8 @@ var (
 	ErrInvalidLightEthereumService = errors.New("LES service is unavailable")
 	ErrInvalidAccountManager       = errors.New("could not retrieve account manager")
 	ErrAccountKeyStoreMissing      = errors.New("account key store is not set")
-	ErrRPCClient                   = errors.New("failed to init RPC client")
+	ErrInitRPC                     = errors.New("failed to init RPC client")
+	ErrNoRPC                       = errors.New("RPC client is not initialized")
 )
 
 // NodeManager manages Status node (which abstracts contained geth node)
@@ -104,7 +105,7 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 			SendSignal(SignalEnvelope{
 				Type: EventNodeCrashed,
 				Event: NodeCrashEvent{
-					Error: ErrRPCClient.Error(),
+					Error: ErrInitRPC.Error(),
 				},
 			})
 			return
@@ -468,11 +469,19 @@ func (m *NodeManager) AccountKeyStore() (*keystore.KeyStore, error) {
 }
 
 // RPCClient exposes reference to RPC client connected to the running node.
-func (m *NodeManager) RPCClient() *rpc.Client {
+func (m *NodeManager) RPCClient() (*rpc.Client, error) {
 	m.Lock()
 	defer m.Unlock()
 
-	return m.rpcClient
+	if !m.IsNodeRunning() {
+		return nil, ErrNoRunningNode
+	}
+
+	if m.rpcClient == nil {
+		return nil, ErrNoRPC
+	}
+
+	return m.rpcClient, nil
 }
 
 // initLog initializes global logger parameters based on

@@ -87,7 +87,7 @@ type NodeManager interface {
 	AccountKeyStore() (*keystore.KeyStore, error)
 
 	// RPCClient exposes reference to RPC client connected to the running node
-	RPCClient() *rpc.Client
+	RPCClient() (*rpc.Client, error)
 }
 
 // AccountManager defines expected methods for managing Status accounts
@@ -338,16 +338,6 @@ type AccountInfo struct {
 	PubKey   string `json:"pubkey"`
 	Mnemonic string `json:"mnemonic"`
 	Error    string `json:"error"`
-}
-
-// StopRPCCallError defines a error type specific for killing a execution process.
-type StopRPCCallError struct {
-	Err error
-}
-
-// Error returns the internal error associated with the critical error.
-func (c StopRPCCallError) Error() string {
-	return c.Err.Error()
 }
 
 // CompleteTransactionResult is a JSON returned from transaction complete function (used in exposed method)

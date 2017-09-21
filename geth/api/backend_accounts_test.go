@@ -343,7 +343,8 @@ func (s *BackendTestSuite) TestRPCEthAccounts() {
 	err := s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	require.NoError(err)
 
-	rpcClient := s.backend.NodeManager().RPCClient()
+	rpcClient, err := s.backend.NodeManager().RPCClient()
+	require.NoError(err)
 
 	expectedResponse := `{"jsonrpc":"2.0","id":1,"result":["` + TestConfig.Account1.Address + `"]}`
 	resp := rpcClient.CallRaw(`{
@@ -365,7 +366,8 @@ func (s *BackendTestSuite) TestRPCEthAccountsWithUpstream() {
 	err := s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	require.NoError(err)
 
-	rpcClient := s.backend.NodeManager().RPCClient()
+	rpcClient, err := s.backend.NodeManager().RPCClient()
+	require.NoError(err)
 
 	expectedResponse := `{"jsonrpc":"2.0","id":1,"result":["` + TestConfig.Account1.Address + `"]}`
 	resp := rpcClient.CallRaw(`{

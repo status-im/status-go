@@ -116,7 +116,7 @@ func (s *ManagerTestSuite) TestReferences() {
 		{
 			"non-null manager, no running node, get RPC Client",
 			func() (interface{}, error) {
-				return s.NodeManager.RPCClient(), nil
+				return s.NodeManager.RPCClient()
 			},
 			nil,
 		},
@@ -181,7 +181,7 @@ func (s *ManagerTestSuite) TestReferences() {
 		{
 			"node is running, get RPC Client",
 			func() (interface{}, error) {
-				return s.NodeManager.RPCClient(), nil
+				return s.NodeManager.RPCClient()
 			},
 			&rpc.Client{},
 		},

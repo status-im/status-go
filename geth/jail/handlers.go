@@ -105,7 +105,10 @@ func makeJethIsConnectedHandler(jail *Jail, cellInt common.JailCell) func(call o
 	// FIXME(tiabc): Get rid of this.
 	cell := cellInt.(*Cell)
 	return func(call otto.FunctionCall) otto.Value {
-		client := jail.nodeManager.RPCClient()
+		client, err := jail.nodeManager.RPCClient()
+		if err != nil {
+			return newErrorResponseOtto(cell.VM, err.Error(), nil)
+		}
 
 		var netListeningResult bool
 		if err := client.Call(&netListeningResult, "net_listening"); err != nil {

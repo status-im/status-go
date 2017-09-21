@@ -184,6 +184,13 @@ func newErrorResponse(code int, err error, id json.RawMessage) string {
 	return string(data)
 }
 
+// MakeErrorMessage creates JSON-RPC compliant error message for
+// external callers. It's just a wrapper around any error
+// that need to be presented as JSON-RPC.
+func MakeErrorMessage(err error) string {
+	return newErrorResponse(-1, err, defaultMsgID)
+}
+
 // isBatch returns true when the first non-whitespace characters is '['
 // code from go-ethereum's rpc client (rpc/client.go)
 func isBatch(msg json.RawMessage) bool {

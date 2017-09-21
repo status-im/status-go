@@ -124,7 +124,8 @@ func (s *RPCTestSuite) TestRPCSendTransaction() {
 	s.StartTestNode(params.RopstenNetworkID, WithUpstream(httpRPCServer.URL))
 	defer s.StopTestNode()
 
-	rpcClient := s.NodeManager.RPCClient()
+	rpcClient, err := s.NodeManager.RPCClient()
+	require.NoError(err)
 	require.NotNil(rpcClient)
 
 	response := rpcClient.CallRaw(`{
@@ -164,7 +165,8 @@ func (s *RPCTestSuite) TestCallRPC() {
 
 	<-nodeStarted
 
-	rpcClient := s.NodeManager.RPCClient()
+	rpcClient, err := s.NodeManager.RPCClient()
+	require.NoError(err)
 	require.NotNil(rpcClient)
 
 	progress := make(chan struct{}, 25)
@@ -256,7 +258,8 @@ func (s *RPCTestSuite) TestCallRawResult() {
 
 	<-nodeStarted
 
-	client := s.NodeManager.RPCClient()
+	client, err := s.NodeManager.RPCClient()
+	s.NoError(err)
 
 	jsonResult := client.CallRaw(`{"jsonrpc":"2.0","method":"shh_version","params":[],"id":67}`)
 	s.Equal(`{"jsonrpc":"2.0","id":67,"result":"5.0"}`, jsonResult)
