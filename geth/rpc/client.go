@@ -29,8 +29,8 @@ type Client struct {
 
 	router *router
 
-	mx       sync.RWMutex       // mx guards handlers
-	handlers map[string]Handler // locally registered handlers
+	handlersMx sync.RWMutex       // mx guards handlers
+	handlers   map[string]Handler // locally registered handlers
 }
 
 // NewClient initializes Client and tries to connect to both,
@@ -100,8 +100,8 @@ func (c *Client) CallContext(ctx context.Context, result interface{}, method str
 // If method is registered, it will be executed with given handler and
 // never routed to the upstream or local servers.
 func (c *Client) RegisterHandler(method string, handler Handler) {
-	c.mx.Lock()
-	defer c.mx.Unlock()
+	c.handlersMx.Lock()
+	defer c.handlersMx.Unlock()
 
 	c.handlers[method] = handler
 }
@@ -116,7 +116,8 @@ func (c *Client) callMethod(ctx context.Context, result interface{}, handler Han
 		return err
 	}
 
-	// if result is nil, just ignore result
+	// if result is nil, just ignore result -
+	// the same way as gethrpc.CallContext() caller would expect
 	if result == nil {
 		return nil
 	}
@@ -130,8 +131,8 @@ func (c *Client) callMethod(ctx context.Context, result interface{}, handler Han
 
 // handler is a concurrently safe method to get registered handler by name.
 func (c *Client) handler(method string) (Handler, bool) {
-	c.mx.RLock()
-	defer c.mx.RUnlock()
+	c.handlersMx.RLock()
+	defer c.handlersMx.RUnlock()
 	handler, ok := c.handlers[method]
 	return handler, ok
 }
