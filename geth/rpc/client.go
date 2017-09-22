@@ -86,7 +86,7 @@ func (c *Client) Call(result interface{}, method string, args ...interface{}) er
 func (c *Client) CallContext(ctx context.Context, result interface{}, method string, args ...interface{}) error {
 	// check locally registered handlers first
 	if handler, ok := c.handler(method); ok {
-		return c.callMethod(ctx, result, handler, args)
+		return c.callMethod(ctx, result, handler, args...)
 	}
 
 	if c.router.routeRemote(method) {
