@@ -4,10 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/node"
-	"github.com/status-im/status-go/geth/params"
-
+	"github.com/ethereum/go-ethereum/les"
+	gethnode "github.com/ethereum/go-ethereum/node"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
+	"github.com/status-im/status-go/geth/log"
+	"github.com/status-im/status-go/geth/params"
 )
 
 // Client represents RPC client with custom routing
@@ -28,7 +29,7 @@ type Client struct {
 //
 // Client is safe for concurrent use and will automatically
 // reconnect to the server if connection is lost.
-func NewClient(node *node.Node, upstream params.UpstreamRPCConfig) (*Client, error) {
+func NewClient(node *gethnode.Node, upstream params.UpstreamRPCConfig) (*Client, error) {
 	c := &Client{}
 
 	var err error
@@ -37,13 +38,35 @@ func NewClient(node *node.Node, upstream params.UpstreamRPCConfig) (*Client, err
 		return nil, fmt.Errorf("attach to local node: %s", err)
 	}
 
-	if upstream.Enabled {
-		c.upstreamEnabled = upstream.Enabled
-		c.upstreamURL = upstream.URL
+	c.upstreamURL = upstream.URL
+	c.upstream, err = gethrpc.Dial(c.upstreamURL)
+	if err != nil {
+		return nil, fmt.Errorf("dial upstream server: %s", err)
+	}
 
-		c.upstream, err = gethrpc.Dial(c.upstreamURL)
-		if err != nil {
-			return nil, fmt.Errorf("dial upstream server: %s", err)
+	if upstream.Enabled {
+		log.Info("Enabling the upstream node")
+		c.upstreamEnabled = upstream.Enabled
+	} else {
+		// just necessary if the LES protocol is being executed
+		// verifies if the local node has enough disk space for the sync
+		// operation in case it has been selected has the go to node
+		var lesService les.LightEthereum
+		if err := node.Service(&lesService); err != gethnode.ErrServiceUnknown {
+			log.Info("Starting sync requirements analysis")
+			passed, err := SyncPreRequisites(c)
+			if err != nil {
+				return nil, fmt.Errorf("verify space requirement to sync: %s", err)
+			}
+			log.Info("Successfully analyzed sync requirements")
+			if !passed {
+				log.Info("Enabling the upstream node")
+				c.upstreamEnabled = true
+				// the eth api stays available for exceptional routes (ex: eth_sign)
+				if err := lesService.Stop(); err != nil {
+					return nil, err
+				}
+			}
 		}
 	}
 
