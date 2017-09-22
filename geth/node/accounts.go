@@ -2,6 +2,7 @@ package node
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -345,7 +346,7 @@ func (m *AccountManager) Accounts() ([]gethcommon.Address, error) {
 
 // AccountsRPCHandler returns RPC Handler for the Accounts() method.
 func (m *AccountManager) AccountsRPCHandler() rpc.Handler {
-	return func(...interface{}) (interface{}, error) {
+	return func(context.Context, ...interface{}) (interface{}, error) {
 		return m.Accounts()
 	}
 }

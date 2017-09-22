@@ -231,13 +231,26 @@ func (m *TxQueueManager) completeRemoteTransaction(queuedTx *common.QueuedTx, pa
 	gasPrice := (*big.Int)(queuedTx.Args.GasPrice)
 	dataVal := []byte(queuedTx.Args.Data)
 	priceVal := (*big.Int)(queuedTx.Args.Value)
+	toAddr := gethcommon.Address{}
+	if queuedTx.Args.To != nil {
+		toAddr = *queuedTx.Args.To
+	}
 
 	gas, err := m.estimateGas(queuedTx.Args)
 	if err != nil {
 		return emptyHash, err
 	}
 
-	tx := types.NewTransaction(nonce, *queuedTx.Args.To, priceVal, (*big.Int)(gas), gasPrice, dataVal)
+	log.Info(
+		"preparing raw transaction",
+		"from", queuedTx.Args.From.Hex(),
+		"to", toAddr.Hex(),
+		"gas", gas,
+		"gasPrice", gasPrice,
+		"value", priceVal,
+	)
+
+	tx := types.NewTransaction(nonce, toAddr, priceVal, (*big.Int)(gas), gasPrice, dataVal)
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), selectedAcct.AccountKey.PrivateKey)
 	if err != nil {
 		return emptyHash, err
@@ -434,7 +447,7 @@ func (m *TxQueueManager) SetTransactionReturnHandler(fn common.EnqueuedTxReturnH
 
 // SendTransactionRPCHandler is a handler for eth_sendTransaction method.
 // It accepts one param which is a slice with a map of transaction params.
-func (m *TxQueueManager) SendTransactionRPCHandler(args ...interface{}) (interface{}, error) {
+func (m *TxQueueManager) SendTransactionRPCHandler(ctx context.Context, args ...interface{}) (interface{}, error) {
 	// Verify that just one argument was received.
 	if len(args) != 1 {
 		return nil, errors.New("invalid number of arguments")
@@ -450,7 +463,8 @@ func (m *TxQueueManager) SendTransactionRPCHandler(args ...interface{}) (interfa
 	// We should refactor parsing these params to a separate struct.
 	rpcCall := common.RPCCall{Params: txParamsSlice}
 
-	tx := m.CreateTransaction(context.Background(), rpcCall.ToSendTxArgs())
+	tx := m.CreateTransaction(ctx, rpcCall.ToSendTxArgs())
+
 	if err := m.QueueTransaction(tx); err != nil {
 		return nil, err
 	}

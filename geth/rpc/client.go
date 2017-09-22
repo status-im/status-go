@@ -15,7 +15,7 @@ import (
 )
 
 // Handler defines handler for RPC methods.
-type Handler func(...interface{}) (interface{}, error)
+type Handler func(context.Context, ...interface{}) (interface{}, error)
 
 // Client represents RPC client with custom routing
 // scheme. It automatically decides where RPC call
@@ -111,7 +111,7 @@ func (c *Client) RegisterHandler(method string, handler Handler) {
 //
 // TODO(divan): use cancellation via context here?
 func (c *Client) callMethod(ctx context.Context, result interface{}, handler Handler, args ...interface{}) error {
-	response, err := handler(args...)
+	response, err := handler(ctx, args...)
 	if err != nil {
 		return err
 	}
