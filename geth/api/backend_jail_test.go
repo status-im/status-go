@@ -57,7 +57,7 @@ func (s *BackendTestSuite) TestJailSendQueuedTransaction() {
 	// replace transaction notification handler
 	requireMessageId := false
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var envelope signal.SignalEnvelope
+		var envelope signal.Envelope
 		err := json.Unmarshal([]byte(jsonEvent), &envelope)
 		s.NoError(err, fmt.Sprintf("cannot unmarshal JSON: %s", jsonEvent))
 
@@ -216,7 +216,7 @@ func (s *BackendTestSuite) TestContractDeployment() {
 	// replace transaction notification handler
 	var txHash gethcommon.Hash
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var envelope signal.SignalEnvelope
+		var envelope signal.Envelope
 		var err error
 		err = json.Unmarshal([]byte(jsonEvent), &envelope)
 		require.NoError(err, fmt.Sprintf("cannot unmarshal JSON: %s", jsonEvent))
@@ -718,7 +718,7 @@ func (s *BackendTestSuite) TestJailVMPersistence() {
 
 	var wg sync.WaitGroup
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var envelope signal.SignalEnvelope
+		var envelope signal.Envelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			s.T().Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return

@@ -266,7 +266,7 @@ func (s *BackendTestSuite) TestCallRPCSendTransaction() {
 
 	var txHash gethcommon.Hash
 	signal.SetDefaultNodeNotificationHandler(func(rawSignal string) {
-		var signal signal.SignalEnvelope
+		var signal signal.Envelope
 		err := json.Unmarshal([]byte(rawSignal), &signal)
 		s.NoError(err)
 
