@@ -259,7 +259,7 @@ func (s *BackendTestSuite) TestCallRPC() {
 }
 
 func (s *BackendTestSuite) TestCallRPCSendTransaction() {
-	nodeConfig, err := MakeTestNodeConfig(params.RinkebyNetworkID)
+	nodeConfig, err := MakeTestNodeConfig(params.RopstenNetworkID)
 	s.NoError(err)
 
 	nodeStarted, err := s.backend.StartNode(nodeConfig)
@@ -267,6 +267,9 @@ func (s *BackendTestSuite) TestCallRPCSendTransaction() {
 	defer s.backend.StopNode()
 
 	<-nodeStarted
+
+	// Allow to sync the blockchain.
+	time.Sleep(TestConfig.Node.SyncSeconds * time.Second)
 
 	err = s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	s.NoError(err)
@@ -296,12 +299,16 @@ func (s *BackendTestSuite) TestCallRPCSendTransaction() {
 		"params": [{
 			"from": "` + TestConfig.Account1.Address + `",
 			"to": "0xd46e8dd67c5d32be8058bb8eb970870f07244567",
-			"gasPrice": "0x9184e72a000",
 			"value": "0x9184e72a"
 		}]
 	}`)
+	s.NotContains(result, "error")
 
-	<-transactionCompleted
+	select {
+	case <-transactionCompleted:
+	case <-time.After(time.Minute):
+		s.FailNow("sending transaction timed out")
+	}
 
 	s.Equal(`{"jsonrpc":"2.0","id":1,"result":"`+txHash.String()+`"}`, result)
 }
