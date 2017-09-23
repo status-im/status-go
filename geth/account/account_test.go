@@ -1,4 +1,4 @@
-package node_test
+package account_test
 
 import (
 	"errors"
@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/node"
 	. "github.com/status-im/status-go/geth/testing"
@@ -35,7 +36,7 @@ func (s *AccountsTestSuite) TestVerifyAccountPassword() {
 	require := s.Require()
 	require.NotNil(s.NodeManager)
 
-	accountManager := node.NewAccountManager(nil)
+	accountManager := account.NewAccountManager(nil)
 	require.NotNil(accountManager)
 
 	keyStoreDir, err := ioutil.TempDir(os.TempDir(), "accounts")

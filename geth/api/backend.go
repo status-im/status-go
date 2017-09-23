@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/log"
@@ -31,7 +32,7 @@ func NewStatusBackend() *StatusBackend {
 	defer log.Info("Status backend initialized")
 
 	nodeManager := node.NewNodeManager()
-	accountManager := node.NewAccountManager(nodeManager)
+	accountManager := account.NewAccountManager(nodeManager)
 	txQueueManager := txqueue.NewTxQueueManager(nodeManager, accountManager)
 	jailManager := jail.New(nodeManager)
 

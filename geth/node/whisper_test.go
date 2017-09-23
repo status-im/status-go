@@ -6,6 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
+	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
 	. "github.com/status-im/status-go/geth/testing"
@@ -40,7 +41,7 @@ func (s *WhisperTestSuite) TestWhisperFilterRace() {
 	whisperAPI := whisper.NewPublicWhisperAPI(whisperService)
 	require.NotNil(whisperAPI)
 
-	accountManager := node.NewAccountManager(s.NodeManager)
+	accountManager := account.NewAccountManager(s.NodeManager)
 	require.NotNil(accountManager)
 
 	// account1
