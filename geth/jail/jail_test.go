@@ -44,7 +44,7 @@ func (s *JailTestSuite) SetupTest() {
 
 	txQueueManager := node.NewTxQueueManager(nodeManager, accountManager)
 
-	jail := jail.New(nodeManager, accountManager, txQueueManager)
+	jail := jail.New(nodeManager, txQueueManager)
 	require.NotNil(jail)
 
 	s.jail = jail
