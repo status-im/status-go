@@ -13,17 +13,15 @@ import (
 // ExecutionPolicy provides a central container for the executions of RPCCall requests for both
 // remote/upstream processing and internal node processing.
 type ExecutionPolicy struct {
-	nodeManager    common.NodeManager
-	txQueueManager common.TxQueueManager
+	nodeManager common.NodeManager
 }
 
 // NewExecutionPolicy returns a new instance of ExecutionPolicy.
 func NewExecutionPolicy(
-	nodeManager common.NodeManager, txQueueManager common.TxQueueManager,
+	nodeManager common.NodeManager,
 ) *ExecutionPolicy {
 	return &ExecutionPolicy{
-		nodeManager:    nodeManager,
-		txQueueManager: txQueueManager,
+		nodeManager: nodeManager,
 	}
 }
 

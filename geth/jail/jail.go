@@ -23,10 +23,9 @@ var (
 // Jail represents jailed environment inside of which we hold multiple cells.
 // Each cell is a separate JavaScript VM.
 type Jail struct {
-	nodeManager    common.NodeManager
-	txQueueManager common.TxQueueManager
-	policy         *ExecutionPolicy
-	baseJSCode     string // JavaScript used to initialize all new cells with
+	nodeManager common.NodeManager
+	policy      *ExecutionPolicy
+	baseJSCode  string // JavaScript used to initialize all new cells with
 
 	cellsMx sync.RWMutex
 	cells   map[string]*Cell // jail supports running many isolated instances of jailed runtime
@@ -34,15 +33,14 @@ type Jail struct {
 
 // New returns new Jail environment with the associated NodeManager and
 // AccountManager.
-func New(nodeManager common.NodeManager, txQueueManager common.TxQueueManager) *Jail {
-	if nodeManager == nil || txQueueManager == nil {
+func New(nodeManager common.NodeManager) *Jail {
+	if nodeManager == nil {
 		panic("Jail is missing mandatory dependencies")
 	}
 	return &Jail{
-		nodeManager:    nodeManager,
-		txQueueManager: txQueueManager,
-		cells:          make(map[string]*Cell),
-		policy:         NewExecutionPolicy(nodeManager, txQueueManager),
+		nodeManager: nodeManager,
+		cells:       make(map[string]*Cell),
+		policy:      NewExecutionPolicy(nodeManager),
 	}
 }
 
