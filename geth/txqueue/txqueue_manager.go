@@ -1,4 +1,4 @@
-package node
+package txqueue
 
 import (
 	"context"
@@ -393,14 +393,17 @@ type SendTransactionEvent struct {
 func (m *TxQueueManager) TransactionQueueHandler() func(queuedTx *common.QueuedTx) {
 	return func(queuedTx *common.QueuedTx) {
 		log.Info("calling TransactionQueueHandler")
-		SendSignal(SignalEnvelope{
-			Type: EventTransactionQueued,
-			Event: SendTransactionEvent{
-				ID:        string(queuedTx.ID),
-				Args:      queuedTx.Args,
-				MessageID: common.MessageIDFromContext(queuedTx.Context),
-			},
-		})
+		//TODO(divan): move to another package
+		/*
+			SendSignal(SignalEnvelope{
+				Type: EventTransactionQueued,
+				Event: SendTransactionEvent{
+					ID:        string(queuedTx.ID),
+					Args:      queuedTx.Args,
+					MessageID: common.MessageIDFromContext(queuedTx.Context),
+				},
+			})
+		*/
 	}
 }
 
@@ -432,16 +435,19 @@ func (m *TxQueueManager) TransactionReturnHandler() func(queuedTx *common.Queued
 		}
 
 		// error occurred, signal up to application
-		SendSignal(SignalEnvelope{
-			Type: EventTransactionFailed,
-			Event: ReturnSendTransactionEvent{
-				ID:           string(queuedTx.ID),
-				Args:         queuedTx.Args,
-				MessageID:    common.MessageIDFromContext(queuedTx.Context),
-				ErrorMessage: err.Error(),
-				ErrorCode:    m.sendTransactionErrorCode(err),
-			},
-		})
+		//TODO(divan): move to another package
+		/*
+			SendSignal(SignalEnvelope{
+				Type: EventTransactionFailed,
+				Event: ReturnSendTransactionEvent{
+					ID:           string(queuedTx.ID),
+					Args:         queuedTx.Args,
+					MessageID:    common.MessageIDFromContext(queuedTx.Context),
+					ErrorMessage: err.Error(),
+					ErrorCode:    m.sendTransactionErrorCode(err),
+				},
+			})
+		*/
 	}
 }
 

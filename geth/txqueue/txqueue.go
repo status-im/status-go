@@ -1,4 +1,4 @@
-package node
+package txqueue
 
 import (
 	"errors"
@@ -92,7 +92,9 @@ func (q *TxQueue) Stop() {
 
 // evictionLoop frees up queue to accommodate another transaction item
 func (q *TxQueue) evictionLoop() {
-	defer HaltOnPanic()
+	// TODO(divan): investigate whether it's needed in txqueue package
+	//defer HaltOnPanic()
+
 	evict := func() {
 		if len(q.transactions) >= DefaultTxQueueCap { // eviction is required to accommodate another/last item
 			q.Remove(<-q.evictableIDs)
@@ -115,7 +117,8 @@ func (q *TxQueue) evictionLoop() {
 
 // enqueueLoop process incoming enqueue requests
 func (q *TxQueue) enqueueLoop() {
-	defer HaltOnPanic()
+	// TODO(divan): investigate whether it's needed in txqueue package
+	//defer HaltOnPanic()
 
 	// enqueue incoming transactions
 	for {

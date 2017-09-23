@@ -11,6 +11,7 @@ import (
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/rpc"
+	"github.com/status-im/status-go/geth/txqueue"
 )
 
 // StatusBackend implements Status.im service
@@ -30,7 +31,7 @@ func NewStatusBackend() *StatusBackend {
 
 	nodeManager := node.NewNodeManager()
 	accountManager := node.NewAccountManager(nodeManager)
-	txQueueManager := node.NewTxQueueManager(nodeManager, accountManager)
+	txQueueManager := txqueue.NewTxQueueManager(nodeManager, accountManager)
 	jailManager := jail.New(nodeManager)
 
 	return &StatusBackend{

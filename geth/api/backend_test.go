@@ -15,6 +15,7 @@ import (
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
 	. "github.com/status-im/status-go/geth/testing"
+	"github.com/status-im/status-go/geth/txqueue"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -267,7 +268,7 @@ func (s *BackendTestSuite) TestCallRPCSendTransaction() {
 		err := json.Unmarshal([]byte(rawSignal), &signal)
 		s.NoError(err)
 
-		if signal.Type == node.EventTransactionQueued {
+		if signal.Type == txqueue.EventTransactionQueued {
 			event := signal.Event.(map[string]interface{})
 			txID := event["id"].(string)
 			txHash, err = s.backend.CompleteTransaction(common.QueuedTxID(txID), TestConfig.Account1.Password)

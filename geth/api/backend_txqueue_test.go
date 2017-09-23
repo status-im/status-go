@@ -15,6 +15,7 @@ import (
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
 	. "github.com/status-im/status-go/geth/testing"
+	"github.com/status-im/status-go/geth/txqueue"
 )
 
 // FIXME(tiabc): Sometimes it fails due to "no suitable peers found".
@@ -39,7 +40,7 @@ func (s *BackendTestSuite) TestSendContractTx() {
 		err := json.Unmarshal([]byte(jsonEvent), &envelope)
 		s.NoError(err, fmt.Sprintf("cannot unmarshal JSON: %s", jsonEvent))
 
-		if envelope.Type == node.EventTransactionQueued {
+		if envelope.Type == txqueue.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
 			log.Info("transaction queued (will be completed shortly)", "id", event["id"].(string))
 
@@ -65,7 +66,7 @@ func (s *BackendTestSuite) TestSendContractTx() {
 			)
 			s.EqualError(
 				err,
-				node.ErrInvalidCompleteTxSender.Error(),
+				txqueue.ErrInvalidCompleteTxSender.Error(),
 				fmt.Sprintf("expected error on queued transaction[%v] not thrown", event["id"]),
 			)
 
@@ -130,7 +131,7 @@ func (s *BackendTestSuite) TestSendEtherTx() {
 		err := json.Unmarshal([]byte(jsonEvent), &envelope)
 		s.NoError(err, fmt.Sprintf("cannot unmarshal JSON: %s", jsonEvent))
 
-		if envelope.Type == node.EventTransactionQueued {
+		if envelope.Type == txqueue.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
 			log.Info("transaction queued (will be completed shortly)", "id", event["id"].(string))
 
@@ -154,7 +155,7 @@ func (s *BackendTestSuite) TestSendEtherTx() {
 				common.QueuedTxID(event["id"].(string)), TestConfig.Account1.Password)
 			s.EqualError(
 				err,
-				node.ErrInvalidCompleteTxSender.Error(),
+				txqueue.ErrInvalidCompleteTxSender.Error(),
 				fmt.Sprintf("expected error on queued transaction[%v] not thrown", event["id"]),
 			)
 
@@ -210,7 +211,7 @@ func (s *BackendTestSuite) TestSendEtherTxUpstream() {
 		err := json.Unmarshal([]byte(jsonEvent), &envelope)
 		s.NoError(err, "cannot unmarshal JSON: %s", jsonEvent)
 
-		if envelope.Type == node.EventTransactionQueued {
+		if envelope.Type == txqueue.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
 			log.Info("transaction queued (will be completed shortly)", "id", event["id"].(string))
 
@@ -267,7 +268,7 @@ func (s *BackendTestSuite) TestDoubleCompleteQueuedTransactions() {
 		err := json.Unmarshal([]byte(jsonEvent), &envelope)
 		s.NoError(err, fmt.Sprintf("cannot unmarshal JSON: %s", jsonEvent))
 
-		if envelope.Type == node.EventTransactionQueued {
+		if envelope.Type == txqueue.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
 			txID := common.QueuedTxID(event["id"].(string))
 			log.Info("transaction queued (will be failed and completed on the second call)", "id", txID)
@@ -287,7 +288,7 @@ func (s *BackendTestSuite) TestDoubleCompleteQueuedTransactions() {
 			close(completeQueuedTransaction)
 		}
 
-		if envelope.Type == node.EventTransactionFailed {
+		if envelope.Type == txqueue.EventTransactionFailed {
 			event := envelope.Event.(map[string]interface{})
 			log.Info("transaction return event received", "id", event["id"].(string))
 
@@ -346,7 +347,7 @@ func (s *BackendTestSuite) TestDiscardQueuedTransaction() {
 		err := json.Unmarshal([]byte(jsonEvent), &envelope)
 		s.NoError(err, fmt.Sprintf("cannot unmarshal JSON: %s", jsonEvent))
 
-		if envelope.Type == node.EventTransactionQueued {
+		if envelope.Type == txqueue.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
 			txID := common.QueuedTxID(event["id"].(string))
 			log.Info("transaction queued (will be discarded soon)", "id", txID)
@@ -368,12 +369,12 @@ func (s *BackendTestSuite) TestDiscardQueuedTransaction() {
 			close(completeQueuedTransaction)
 		}
 
-		if envelope.Type == node.EventTransactionFailed {
+		if envelope.Type == txqueue.EventTransactionFailed {
 			event := envelope.Event.(map[string]interface{})
 			log.Info("transaction return event received", "id", event["id"].(string))
 
 			receivedErrMessage := event["error_message"].(string)
-			expectedErrMessage := node.ErrQueuedTxDiscarded.Error()
+			expectedErrMessage := txqueue.ErrQueuedTxDiscarded.Error()
 			s.Equal(receivedErrMessage, expectedErrMessage)
 
 			receivedErrCode := event["error_code"].(string)
@@ -389,7 +390,7 @@ func (s *BackendTestSuite) TestDiscardQueuedTransaction() {
 		To:    common.ToAddress(TestConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 	})
-	s.EqualError(err, node.ErrQueuedTxDiscarded.Error(), "transaction is expected to be discarded")
+	s.EqualError(err, txqueue.ErrQueuedTxDiscarded.Error(), "transaction is expected to be discarded")
 
 	select {
 	case <-completeQueuedTransaction:
@@ -428,7 +429,7 @@ func (s *BackendTestSuite) TestCompleteMultipleQueuedTransactions() {
 		err := json.Unmarshal([]byte(jsonEvent), &envelope)
 		s.NoError(err, fmt.Sprintf("cannot unmarshal JSON: %s", jsonEvent))
 
-		if envelope.Type == node.EventTransactionQueued {
+		if envelope.Type == txqueue.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
 			txID := common.QueuedTxID(event["id"].(string))
 			log.Info("transaction queued (will be completed in a single call, once aggregated)", "id", txID)
@@ -525,7 +526,7 @@ func (s *BackendTestSuite) TestDiscardMultipleQueuedTransactions() {
 		var envelope node.SignalEnvelope
 		err := json.Unmarshal([]byte(jsonEvent), &envelope)
 		s.NoError(err)
-		if envelope.Type == node.EventTransactionQueued {
+		if envelope.Type == txqueue.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
 			txID := common.QueuedTxID(event["id"].(string))
 			log.Info("transaction queued (will be discarded soon)", "id", txID)
@@ -535,12 +536,12 @@ func (s *BackendTestSuite) TestDiscardMultipleQueuedTransactions() {
 			txIDs <- txID
 		}
 
-		if envelope.Type == node.EventTransactionFailed {
+		if envelope.Type == txqueue.EventTransactionFailed {
 			event := envelope.Event.(map[string]interface{})
 			log.Info("transaction return event received", "id", event["id"].(string))
 
 			receivedErrMessage := event["error_message"].(string)
-			expectedErrMessage := node.ErrQueuedTxDiscarded.Error()
+			expectedErrMessage := txqueue.ErrQueuedTxDiscarded.Error()
 			s.Equal(receivedErrMessage, expectedErrMessage)
 
 			receivedErrCode := event["error_code"].(string)
@@ -560,7 +561,7 @@ func (s *BackendTestSuite) TestDiscardMultipleQueuedTransactions() {
 			To:    common.ToAddress(TestConfig.Account2.Address),
 			Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 		})
-		s.EqualError(err, node.ErrQueuedTxDiscarded.Error())
+		s.EqualError(err, txqueue.ErrQueuedTxDiscarded.Error())
 
 		s.True(reflect.DeepEqual(txHashCheck, gethcommon.Hash{}), "transaction returned hash, while it shouldn't")
 	}
@@ -632,7 +633,7 @@ func (s *BackendTestSuite) TestNonExistentQueuedTransactions() {
 	// try completing non-existing transaction
 	_, err := s.backend.CompleteTransaction("some-bad-transaction-id", TestConfig.Account1.Password)
 	s.Error(err, "error expected and not received")
-	s.EqualError(err, node.ErrQueuedTxIDNotFound.Error())
+	s.EqualError(err, txqueue.ErrQueuedTxIDNotFound.Error())
 }
 
 func (s *BackendTestSuite) TestEvictionOfQueuedTransactions() {
@@ -648,16 +649,16 @@ func (s *BackendTestSuite) TestEvictionOfQueuedTransactions() {
 	// log into account from which transactions will be sent
 	require.NoError(s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 
-	txQueue := s.backend.TxQueueManager().TransactionQueue()
+	queue := s.backend.TxQueueManager().TransactionQueue()
 	var i = 0
-	txIDs := [node.DefaultTxQueueCap + 5 + 10]common.QueuedTxID{}
+	txIDs := [txqueue.DefaultTxQueueCap + 5 + 10]common.QueuedTxID{}
 	s.backend.TxQueueManager().SetTransactionQueueHandler(func(queuedTx *common.QueuedTx) {
-		log.Info("tx enqueued", "i", i+1, "queue size", txQueue.Count(), "id", queuedTx.ID)
+		log.Info("tx enqueued", "i", i+1, "queue size", queue.Count(), "id", queuedTx.ID)
 		txIDs[i] = queuedTx.ID
 		i++
 	})
 
-	s.Zero(txQueue.Count(), "transaction count should be zero")
+	s.Zero(queue.Count(), "transaction count should be zero")
 
 	for i := 0; i < 10; i++ {
 		go s.backend.SendTransaction(nil, common.SendTxArgs{}) // nolint: errcheck
@@ -665,20 +666,20 @@ func (s *BackendTestSuite) TestEvictionOfQueuedTransactions() {
 	time.Sleep(2 * time.Second) // FIXME(tiabc): more reliable synchronization to ensure all transactions are enqueued
 
 	log.Info(fmt.Sprintf("Number of transactions queued: %d. Queue size (shouldn't be more than %d): %d",
-		i, node.DefaultTxQueueCap, txQueue.Count()))
+		i, txqueue.DefaultTxQueueCap, queue.Count()))
 
-	s.Equal(10, txQueue.Count(), "transaction count should be 10")
+	s.Equal(10, queue.Count(), "transaction count should be 10")
 
-	for i := 0; i < node.DefaultTxQueueCap+5; i++ { // stress test by hitting with lots of goroutines
+	for i := 0; i < txqueue.DefaultTxQueueCap+5; i++ { // stress test by hitting with lots of goroutines
 		go s.backend.SendTransaction(nil, common.SendTxArgs{}) // nolint: errcheck
 	}
 	time.Sleep(3 * time.Second)
 
-	require.True(txQueue.Count() <= node.DefaultTxQueueCap, "transaction count should be %d (or %d): got %d", node.DefaultTxQueueCap, node.DefaultTxQueueCap-1, txQueue.Count())
+	require.True(queue.Count() <= txqueue.DefaultTxQueueCap, "transaction count should be %d (or %d): got %d", txqueue.DefaultTxQueueCap, txqueue.DefaultTxQueueCap-1, queue.Count())
 
 	for _, txID := range txIDs {
-		txQueue.Remove(txID)
+		queue.Remove(txID)
 	}
 
-	require.Zero(txQueue.Count(), "transaction count should be zero: %d", txQueue.Count())
+	require.Zero(queue.Count(), "transaction count should be zero: %d", queue.Count())
 }
