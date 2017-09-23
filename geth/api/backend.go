@@ -11,6 +11,7 @@ import (
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/rpc"
+	"github.com/status-im/status-go/geth/signal"
 	"github.com/status-im/status-go/geth/txqueue"
 )
 
@@ -101,8 +102,8 @@ func (m *StatusBackend) onNodeStart(nodeStarted <-chan struct{}, backendReady ch
 	log.Info("Account reselected")
 
 	close(backendReady)
-	node.SendSignal(node.SignalEnvelope{
-		Type:  node.EventNodeReady,
+	signal.Send(signal.Envelope{
+		Type:  signal.EventNodeReady,
 		Event: struct{}{},
 	})
 }

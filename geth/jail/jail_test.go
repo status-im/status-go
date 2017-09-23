@@ -10,6 +10,7 @@ import (
 	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/geth/signal"
 	. "github.com/status-im/status-go/geth/testing"
 	"github.com/status-im/status-go/static"
 	"github.com/stretchr/testify/suite"
@@ -233,8 +234,8 @@ func (s *JailTestSuite) TestEventSignal() {
 	opCompletedSuccessfully := make(chan struct{}, 1)
 
 	// replace transaction notification handler
-	node.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var envelope node.SignalEnvelope
+	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+		var envelope signal.SignalEnvelope
 		err := json.Unmarshal([]byte(jsonEvent), &envelope)
 		require.NoError(err)
 

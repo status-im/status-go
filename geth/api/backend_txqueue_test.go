@@ -14,6 +14,7 @@ import (
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/geth/signal"
 	. "github.com/status-im/status-go/geth/testing"
 	"github.com/status-im/status-go/geth/txqueue"
 )
@@ -35,8 +36,8 @@ func (s *BackendTestSuite) TestSendContractTx() {
 
 	// replace transaction notification handler
 	var txHash gethcommon.Hash
-	node.SetDefaultNodeNotificationHandler(func(jsonEvent string) { // nolint :dupl
-		var envelope node.SignalEnvelope
+	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) { // nolint :dupl
+		var envelope signal.SignalEnvelope
 		err := json.Unmarshal([]byte(jsonEvent), &envelope)
 		s.NoError(err, fmt.Sprintf("cannot unmarshal JSON: %s", jsonEvent))
 
@@ -126,8 +127,8 @@ func (s *BackendTestSuite) TestSendEtherTx() {
 
 	// replace transaction notification handler
 	var txHash = gethcommon.Hash{}
-	node.SetDefaultNodeNotificationHandler(func(jsonEvent string) { // nolint: dupl
-		var envelope node.SignalEnvelope
+	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) { // nolint: dupl
+		var envelope signal.SignalEnvelope
 		err := json.Unmarshal([]byte(jsonEvent), &envelope)
 		s.NoError(err, fmt.Sprintf("cannot unmarshal JSON: %s", jsonEvent))
 
@@ -206,8 +207,8 @@ func (s *BackendTestSuite) TestSendEtherTxUpstream() {
 
 	// replace transaction notification handler
 	var txHash = gethcommon.Hash{}
-	node.SetDefaultNodeNotificationHandler(func(jsonEvent string) { // nolint: dupl
-		var envelope node.SignalEnvelope
+	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) { // nolint: dupl
+		var envelope signal.SignalEnvelope
 		err := json.Unmarshal([]byte(jsonEvent), &envelope)
 		s.NoError(err, "cannot unmarshal JSON: %s", jsonEvent)
 
@@ -263,8 +264,8 @@ func (s *BackendTestSuite) TestDoubleCompleteQueuedTransactions() {
 	// replace transaction notification handler
 	txFailedEventCalled := false
 	txHash := gethcommon.Hash{}
-	node.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var envelope node.SignalEnvelope
+	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+		var envelope signal.SignalEnvelope
 		err := json.Unmarshal([]byte(jsonEvent), &envelope)
 		s.NoError(err, fmt.Sprintf("cannot unmarshal JSON: %s", jsonEvent))
 
@@ -342,8 +343,8 @@ func (s *BackendTestSuite) TestDiscardQueuedTransaction() {
 
 	// replace transaction notification handler
 	txFailedEventCalled := false
-	node.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var envelope node.SignalEnvelope
+	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+		var envelope signal.SignalEnvelope
 		err := json.Unmarshal([]byte(jsonEvent), &envelope)
 		s.NoError(err, fmt.Sprintf("cannot unmarshal JSON: %s", jsonEvent))
 
@@ -424,8 +425,8 @@ func (s *BackendTestSuite) TestCompleteMultipleQueuedTransactions() {
 	allTestTxCompleted := make(chan struct{})
 
 	// replace transaction notification handler
-	node.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var envelope node.SignalEnvelope
+	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+		var envelope signal.SignalEnvelope
 		err := json.Unmarshal([]byte(jsonEvent), &envelope)
 		s.NoError(err, fmt.Sprintf("cannot unmarshal JSON: %s", jsonEvent))
 
@@ -522,8 +523,8 @@ func (s *BackendTestSuite) TestDiscardMultipleQueuedTransactions() {
 
 	// replace transaction notification handler
 	txFailedEventCallCount := 0
-	node.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var envelope node.SignalEnvelope
+	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+		var envelope signal.SignalEnvelope
 		err := json.Unmarshal([]byte(jsonEvent), &envelope)
 		s.NoError(err)
 		if envelope.Type == txqueue.EventTransactionQueued {
@@ -628,7 +629,7 @@ func (s *BackendTestSuite) TestNonExistentQueuedTransactions() {
 	require.NoError(s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 
 	// replace transaction notification handler
-	node.SetDefaultNodeNotificationHandler(func(string) {})
+	signal.SetDefaultNodeNotificationHandler(func(string) {})
 
 	// try completing non-existing transaction
 	_, err := s.backend.CompleteTransaction("some-bad-transaction-id", TestConfig.Account1.Password)
