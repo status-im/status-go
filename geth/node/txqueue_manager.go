@@ -10,7 +10,6 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/les/status"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/pborman/uuid"
 	"github.com/status-im/status-go/geth/common"
@@ -193,12 +192,21 @@ func (m *TxQueueManager) CompleteTransaction(id common.QueuedTxID, password stri
 func (m *TxQueueManager) completeLocalTransaction(queuedTx *common.QueuedTx, password string) (gethcommon.Hash, error) {
 	log.Info("complete transaction using local node", "id", queuedTx.ID)
 
-	les, err := m.nodeManager.LightEthereumService()
+	var emptyHash gethcommon.Hash
+
+	client, err := m.nodeManager.RPCClient()
 	if err != nil {
-		return gethcommon.Hash{}, err
+		return emptyHash, err
 	}
 
-	return les.StatusBackend.SendTransaction(context.Background(), status.SendTxArgs(queuedTx.Args), password)
+	var hash gethcommon.Hash
+	log.Info("eth_sendTransaction", "args", queuedTx.Args)
+	if err := client.Call(&hash, "eth_sendTransaction", queuedTx.Args); err != nil {
+		log.Info("eth_sendTransaction failed", "error", err)
+		return emptyHash, err
+	}
+	log.Info("eth_sendTransaction done")
+	return hash, nil
 }
 
 func (m *TxQueueManager) completeRemoteTransaction(queuedTx *common.QueuedTx, password string) (gethcommon.Hash, error) {
