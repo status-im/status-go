@@ -7,7 +7,6 @@ import (
 	"time"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/les"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/common"
@@ -78,17 +77,6 @@ func (s *BackendTestSuite) WhisperService() *whisper.Whisper {
 	require.NotNil(whisperService)
 
 	return whisperService
-}
-
-func (s *BackendTestSuite) LightEthereumService() *les.LightEthereum {
-	require := s.Require()
-	require.NotNil(s.backend)
-
-	lightEthereum, err := s.backend.NodeManager().LightEthereumService()
-	require.NoError(err)
-	require.NotNil(lightEthereum)
-
-	return lightEthereum
 }
 
 func (s *BackendTestSuite) TxQueueManager() common.TxQueueManager {

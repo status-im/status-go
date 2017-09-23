@@ -117,9 +117,6 @@ func (s *BackendTestSuite) TestSendEtherTx() {
 
 	time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to sync
 
-	backend := s.LightEthereumService().StatusBackend
-	require.NotNil(backend)
-
 	// create an account
 	sampleAddress, _, _, err := s.backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
 	require.NoError(err)
@@ -257,9 +254,6 @@ func (s *BackendTestSuite) TestDoubleCompleteQueuedTransactions() {
 
 	time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to sync
 
-	backend := s.LightEthereumService().StatusBackend
-	require.NotNil(backend)
-
 	// log into account from which transactions will be sent
 	require.NoError(s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 
@@ -336,9 +330,6 @@ func (s *BackendTestSuite) TestDiscardQueuedTransaction() {
 	defer s.StopTestBackend()
 
 	time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to sync
-
-	backend := s.LightEthereumService().StatusBackend
-	require.NotNil(backend)
 
 	// reset queue
 	s.backend.TxQueueManager().TransactionQueue().Reset()
@@ -518,9 +509,6 @@ func (s *BackendTestSuite) TestDiscardMultipleQueuedTransactions() {
 
 	time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to sync
 
-	backend := s.LightEthereumService().StatusBackend
-	require.NotNil(backend)
-
 	// reset queue
 	s.backend.TxQueueManager().TransactionQueue().Reset()
 
@@ -635,9 +623,6 @@ func (s *BackendTestSuite) TestNonExistentQueuedTransactions() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	backend := s.LightEthereumService().StatusBackend
-	require.NotNil(backend)
-
 	// log into account from which transactions will be sent
 	require.NoError(s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 
@@ -656,9 +641,6 @@ func (s *BackendTestSuite) TestEvictionOfQueuedTransactions() {
 
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
-
-	backend := s.LightEthereumService().StatusBackend
-	require.NotNil(backend)
 
 	// reset queue
 	s.backend.TxQueueManager().TransactionQueue().Reset()
