@@ -72,8 +72,6 @@ type LightEthereum struct {
 
 	quitSync chan struct{}
 	wg       sync.WaitGroup
-
-	StatusBackend *ethapi.StatusBackend
 }
 
 func New(ctx *node.ServiceContext, config *eth.Config) (*LightEthereum, error) {
@@ -121,16 +119,12 @@ func New(ctx *node.ServiceContext, config *eth.Config) (*LightEthereum, error) {
 		return nil, err
 	}
 
-	eth.ApiBackend = &LesApiBackend{eth, nil, nil}
+	eth.ApiBackend = &LesApiBackend{eth, nil}
 	gpoParams := config.GPO
 	if gpoParams.Default == nil {
 		gpoParams.Default = config.GasPrice
 	}
 	eth.ApiBackend.gpo = gasprice.NewOracle(eth.ApiBackend, gpoParams)
-
-	// inject status-im backend
-	eth.ApiBackend.statusBackend = ethapi.NewStatusBackend(eth.ApiBackend)
-	eth.StatusBackend = eth.ApiBackend.statusBackend // alias
 
 	return eth, nil
 }

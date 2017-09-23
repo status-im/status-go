@@ -65,8 +65,6 @@ type Backend interface {
 
 	ChainConfig() *params.ChainConfig
 	CurrentBlock() *types.Block
-
-	GetStatusBackend() *StatusBackend
 }
 
 func GetAPIs(apiBackend Backend) []rpc.API {
@@ -101,11 +99,6 @@ func GetAPIs(apiBackend Backend) []rpc.API {
 			Namespace: "debug",
 			Version:   "1.0",
 			Service:   NewPrivateDebugAPI(apiBackend),
-		}, {
-			Namespace: "eth",
-			Version:   "1.0",
-			Service:   NewPublicAccountAPI(apiBackend),
-			Public:    true,
 		}, {
 			Namespace: "personal",
 			Version:   "1.0",
