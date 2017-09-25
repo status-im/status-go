@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
@@ -40,7 +41,7 @@ func (s *JailTestSuite) SetupTest() {
 	nodeManager := node.NewNodeManager()
 	require.NotNil(nodeManager)
 
-	accountManager := node.NewAccountManager(nodeManager)
+	accountManager := account.NewManager(nodeManager)
 	require.NotNil(accountManager)
 
 	txQueueManager := node.NewTxQueueManager(nodeManager, accountManager)
