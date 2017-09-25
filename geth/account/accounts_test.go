@@ -36,7 +36,7 @@ func (s *AccountsTestSuite) TestVerifyAccountPassword() {
 	require := s.Require()
 	require.NotNil(s.NodeManager)
 
-	accountManager := account.NewAccountManager(nil)
+	accountManager := account.NewManager(nil)
 	require.NotNil(accountManager)
 
 	keyStoreDir, err := ioutil.TempDir(os.TempDir(), "accounts")
