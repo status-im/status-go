@@ -1180,9 +1180,10 @@ func submitTransaction(ctx context.Context, b Backend, tx *types.Transaction) (c
 	return tx.Hash(), nil
 }
 
-// SendTransaction creates a transaction by unpacking queued transaction, signs it and submits to the
+// SendTransactionWithPassphrase creates a transaction by unpacking queued transaction, signs it and submits to the
 // transaction pool.
-func (s *PublicTransactionPoolAPI) SendTransaction(ctx context.Context, args SendTxArgs, passphrase string) (common.Hash, error) {
+// @Status
+func (s *PublicTransactionPoolAPI) SendTransactionWithPassphrase(ctx context.Context, args SendTxArgs, passphrase string) (common.Hash, error) {
 	// Set some sanity defaults and terminate on failure
 	if err := args.setDefaults(ctx, s.b); err != nil {
 		return common.Hash{}, err
@@ -1215,6 +1216,47 @@ func (s *PublicTransactionPoolAPI) SendTransaction(ctx context.Context, args Sen
 		chainID = config.ChainId
 	}
 	signed, err := wallet.SignTxWithPassphrase(account, passphrase, tx, chainID)
+	if err != nil {
+		return common.Hash{}, err
+	}
+	return submitTransaction(ctx, s.b, signed)
+}
+
+// SendTransaction creates a transaction by unpacking queued transaction, signs it and submits to the
+// transaction pool.
+func (s *PublicTransactionPoolAPI) SendTransaction(ctx context.Context, args SendTxArgs) (common.Hash, error) {
+	// Set some sanity defaults and terminate on failure
+	if err := args.setDefaults(ctx, s.b); err != nil {
+		return common.Hash{}, err
+	}
+
+	// Look up the wallet containing the requested signer
+	account := accounts.Account{Address: args.From}
+
+	wallet, err := s.b.AccountManager().Find(account)
+	if err != nil {
+		return common.Hash{}, err
+	}
+
+	if args.Nonce == nil {
+		// Hold the addresse's mutex around signing to prevent concurrent assignment of
+		// the same nonce to multiple accounts.
+		s.nonceLock.LockAddr(args.From)
+		defer s.nonceLock.UnlockAddr(args.From)
+	}
+
+	// Set some sanity defaults and terminate on failure
+	if err := args.setDefaults(ctx, s.b); err != nil {
+		return common.Hash{}, err
+	}
+	// Assemble the transaction and sign with the wallet
+	tx := args.toTransaction()
+
+	var chainID *big.Int
+	if config := s.b.ChainConfig(); config.IsEIP155(s.b.CurrentBlock().Number()) {
+		chainID = config.ChainId
+	}
+	signed, err := wallet.SignTx(account, tx, chainID)
 	if err != nil {
 		return common.Hash{}, err
 	}

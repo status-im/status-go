@@ -208,7 +208,7 @@ func (s *BackendTestSuite) TestCallRPC() {
 				"data": "0xd46e8dd67c5d32be8d46e8dd67c5d32be8058bb8eb970870f072445675058bb8eb970870f072445675"}],"id":1}`,
 			func(resultJSON string) {
 				log.Info("eth_sendTransaction")
-				s.T().Log("GOT: ", resultJSON)
+				s.NotContains(resultJSON, "error")
 				progress <- struct{}{}
 			},
 		},
