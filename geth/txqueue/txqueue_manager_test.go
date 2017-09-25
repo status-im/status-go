@@ -57,7 +57,7 @@ func (s *TxQueueTestSuite) TestCompleteTransaction() {
 	// and treat as success.
 	s.nodeManagerMock.EXPECT().LightEthereumService().Return(nil, errTxAssumedSent)
 
-	txQueueManager := NewTxQueueManager(s.nodeManagerMock, s.accountManagerMock)
+	txQueueManager := NewManager(s.nodeManagerMock, s.accountManagerMock)
 
 	txQueueManager.Start()
 	defer txQueueManager.Stop()
@@ -107,7 +107,7 @@ func (s *TxQueueTestSuite) TestCompleteTransactionMultipleTimes() {
 	// and treat as success.
 	s.nodeManagerMock.EXPECT().LightEthereumService().Return(nil, errTxAssumedSent)
 
-	txQueueManager := NewTxQueueManager(s.nodeManagerMock, s.accountManagerMock)
+	txQueueManager := NewManager(s.nodeManagerMock, s.accountManagerMock)
 
 	txQueueManager.Start()
 	defer txQueueManager.Stop()
@@ -161,7 +161,7 @@ func (s *TxQueueTestSuite) TestAccountMismatch() {
 		Address: common.FromAddress(TestConfig.Account2.Address),
 	}, nil)
 
-	txQueueManager := NewTxQueueManager(s.nodeManagerMock, s.accountManagerMock)
+	txQueueManager := NewManager(s.nodeManagerMock, s.accountManagerMock)
 
 	txQueueManager.Start()
 	defer txQueueManager.Stop()
@@ -207,7 +207,7 @@ func (s *TxQueueTestSuite) TestInvalidPassword() {
 	// Set ErrDecrypt error response as expected with a wrong password.
 	s.nodeManagerMock.EXPECT().LightEthereumService().Return(nil, keystore.ErrDecrypt)
 
-	txQueueManager := NewTxQueueManager(s.nodeManagerMock, s.accountManagerMock)
+	txQueueManager := NewManager(s.nodeManagerMock, s.accountManagerMock)
 
 	txQueueManager.Start()
 	defer txQueueManager.Stop()
@@ -242,7 +242,7 @@ func (s *TxQueueTestSuite) TestInvalidPassword() {
 }
 
 func (s *TxQueueTestSuite) TestDiscardTransaction() {
-	txQueueManager := NewTxQueueManager(s.nodeManagerMock, s.accountManagerMock)
+	txQueueManager := NewManager(s.nodeManagerMock, s.accountManagerMock)
 
 	txQueueManager.Start()
 	defer txQueueManager.Stop()
