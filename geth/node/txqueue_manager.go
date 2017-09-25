@@ -14,6 +14,7 @@ import (
 	"github.com/pborman/uuid"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/log"
+	"github.com/status-im/status-go/geth/signal"
 )
 
 const (
@@ -402,7 +403,7 @@ type SendTransactionEvent struct {
 func (m *TxQueueManager) TransactionQueueHandler() func(queuedTx *common.QueuedTx) {
 	return func(queuedTx *common.QueuedTx) {
 		log.Info("calling TransactionQueueHandler")
-		SendSignal(SignalEnvelope{
+		signal.Send(signal.Envelope{
 			Type: EventTransactionQueued,
 			Event: SendTransactionEvent{
 				ID:        string(queuedTx.ID),
@@ -441,7 +442,7 @@ func (m *TxQueueManager) TransactionReturnHandler() func(queuedTx *common.Queued
 		}
 
 		// error occurred, signal up to application
-		SendSignal(SignalEnvelope{
+		signal.Send(signal.Envelope{
 			Type: EventTransactionFailed,
 			Event: ReturnSendTransactionEvent{
 				ID:           string(queuedTx.ID),
