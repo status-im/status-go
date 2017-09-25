@@ -21,10 +21,10 @@ import (
 
 	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/common"
-	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/signal"
 	. "github.com/status-im/status-go/geth/testing"
+	"github.com/status-im/status-go/geth/txqueue"
 	"github.com/status-im/status-go/static"
 	"github.com/stretchr/testify/require"
 )
@@ -746,7 +746,7 @@ func testCompleteTransaction(t *testing.T) bool {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
 		}
-		if envelope.Type == node.EventTransactionQueued {
+		if envelope.Type == txqueue.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
 			t.Logf("transaction queued (will be completed shortly): {id: %s}\n", event["id"].(string))
 
@@ -824,7 +824,7 @@ func testCompleteMultipleQueuedTransactions(t *testing.T) bool {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
 		}
-		if envelope.Type == node.EventTransactionQueued {
+		if envelope.Type == txqueue.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
 			txID = event["id"].(string)
 			t.Logf("transaction queued (will be completed in a single call, once aggregated): {id: %s}\n", txID)
@@ -871,7 +871,7 @@ func testCompleteMultipleQueuedTransactions(t *testing.T) bool {
 		}
 		results := resultsStruct.Results
 
-		if len(results) != (testTxCount+1) || results["invalid-tx-id"].Error != node.ErrQueuedTxIDNotFound.Error() {
+		if len(results) != (testTxCount+1) || results["invalid-tx-id"].Error != txqueue.ErrQueuedTxIDNotFound.Error() {
 			t.Errorf("cannot complete txs: %v", results)
 			return
 		}
@@ -957,7 +957,7 @@ func testDiscardTransaction(t *testing.T) bool {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
 		}
-		if envelope.Type == node.EventTransactionQueued {
+		if envelope.Type == txqueue.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
 			txID = event["id"].(string)
 			t.Logf("transaction queued (will be discarded soon): {id: %s}\n", txID)
@@ -982,7 +982,7 @@ func testDiscardTransaction(t *testing.T) bool {
 
 			// try completing discarded transaction
 			_, err := statusAPI.CompleteTransaction(common.QueuedTxID(txID), TestConfig.Account1.Password)
-			if err != node.ErrQueuedTxIDNotFound {
+			if err != txqueue.ErrQueuedTxIDNotFound {
 				t.Error("expects tx not found, but call to CompleteTransaction succeeded")
 				return
 			}
@@ -996,19 +996,19 @@ func testDiscardTransaction(t *testing.T) bool {
 			completeQueuedTransaction <- struct{}{} // so that timeout is aborted
 		}
 
-		if envelope.Type == node.EventTransactionFailed {
+		if envelope.Type == txqueue.EventTransactionFailed {
 			event := envelope.Event.(map[string]interface{})
 			t.Logf("transaction return event received: {id: %s}\n", event["id"].(string))
 
 			receivedErrMessage := event["error_message"].(string)
-			expectedErrMessage := node.ErrQueuedTxDiscarded.Error()
+			expectedErrMessage := txqueue.ErrQueuedTxDiscarded.Error()
 			if receivedErrMessage != expectedErrMessage {
 				t.Errorf("unexpected error message received: got %v", receivedErrMessage)
 				return
 			}
 
 			receivedErrCode := event["error_code"].(string)
-			if receivedErrCode != node.SendTransactionDiscardedErrorCode {
+			if receivedErrCode != txqueue.SendTransactionDiscardedErrorCode {
 				t.Errorf("unexpected error code received: got %v", receivedErrCode)
 				return
 			}
@@ -1023,7 +1023,7 @@ func testDiscardTransaction(t *testing.T) bool {
 		To:    common.ToAddress(TestConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 	})
-	if err != node.ErrQueuedTxDiscarded {
+	if err != txqueue.ErrQueuedTxDiscarded {
 		t.Errorf("expected error not thrown: %v", err)
 		return false
 	}
@@ -1070,7 +1070,7 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
 		}
-		if envelope.Type == node.EventTransactionQueued {
+		if envelope.Type == txqueue.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
 			txID = event["id"].(string)
 			t.Logf("transaction queued (will be discarded soon): {id: %s}\n", txID)
@@ -1083,19 +1083,19 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool {
 			txIDs <- txID
 		}
 
-		if envelope.Type == node.EventTransactionFailed {
+		if envelope.Type == txqueue.EventTransactionFailed {
 			event := envelope.Event.(map[string]interface{})
 			t.Logf("transaction return event received: {id: %s}\n", event["id"].(string))
 
 			receivedErrMessage := event["error_message"].(string)
-			expectedErrMessage := node.ErrQueuedTxDiscarded.Error()
+			expectedErrMessage := txqueue.ErrQueuedTxDiscarded.Error()
 			if receivedErrMessage != expectedErrMessage {
 				t.Errorf("unexpected error message received: got %v", receivedErrMessage)
 				return
 			}
 
 			receivedErrCode := event["error_code"].(string)
-			if receivedErrCode != node.SendTransactionDiscardedErrorCode {
+			if receivedErrCode != txqueue.SendTransactionDiscardedErrorCode {
 				t.Errorf("unexpected error code received: got %v", receivedErrCode)
 				return
 			}
@@ -1114,7 +1114,7 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool {
 			To:    common.ToAddress(TestConfig.Account2.Address),
 			Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 		})
-		if err != node.ErrQueuedTxDiscarded {
+		if err != txqueue.ErrQueuedTxDiscarded {
 			t.Errorf("expected error not thrown: %v", err)
 			return
 		}
@@ -1145,7 +1145,7 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool {
 		}
 		discardResults := discardResultsStruct.Results
 
-		if len(discardResults) != 1 || discardResults["invalid-tx-id"].Error != node.ErrQueuedTxIDNotFound.Error() {
+		if len(discardResults) != 1 || discardResults["invalid-tx-id"].Error != txqueue.ErrQueuedTxIDNotFound.Error() {
 			t.Errorf("cannot discard txs: %v", discardResults)
 			return
 		}
@@ -1167,7 +1167,7 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool {
 				t.Errorf("tx id not set in result: expected id is %s", txID)
 				return
 			}
-			if txResult.Error != node.ErrQueuedTxIDNotFound.Error() {
+			if txResult.Error != txqueue.ErrQueuedTxIDNotFound.Error() {
 				t.Errorf("invalid error for %s", txResult.Hash)
 				return
 			}
@@ -1349,7 +1349,7 @@ func startTestNode(t *testing.T) <-chan struct{} {
 			return
 		}
 
-		if envelope.Type == node.EventTransactionQueued {
+		if envelope.Type == txqueue.EventTransactionQueued {
 		}
 		if envelope.Type == signal.EventNodeStarted {
 			t.Log("Node started, but we wait till it be ready")
