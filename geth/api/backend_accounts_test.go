@@ -376,3 +376,18 @@ func (s *BackendTestSuite) TestRPCEthAccountsWithUpstream() {
       }`)
 	require.Equal(expectedResponse, resp)
 }
+
+// regression test: eth_getTransactionReceipt with invalid transaction hash should return null
+func (s *BackendTestSuite) TestRegressionGetTransactionReceipt() {
+	require := s.Require()
+
+	s.StartTestBackend(params.RopstenNetworkID)
+	defer s.StopTestBackend()
+
+	rpcClient := s.backend.NodeManager().RPCClient()
+
+	// note: transaction hash is assumed to be invalid
+	got := rpcClient.CallRaw(`{"jsonrpc":"2.0","method":"eth_getTransactionReceipt","params":["0xbbebf28d0a3a3cbb38e6053a5b21f08f82c62b0c145a17b1c4313cac3f68ae7c"],"id":7}`)
+	expected := `{"jsonrpc":"2.0","id":7,"result":null}`
+	require.Equal(expected, got)
+}
