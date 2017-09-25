@@ -313,6 +313,64 @@ func (s *BackendTestSuite) TestCallRPCSendTransaction() {
 	s.Equal(`{"jsonrpc":"2.0","id":1,"result":"`+txHash.String()+`"}`, result)
 }
 
+func (s *BackendTestSuite) TestCallRPCSendTransactionUpstream() {
+	nodeConfig, err := MakeTestNodeConfig(params.RopstenNetworkID)
+	s.NoError(err)
+
+	nodeConfig.UpstreamConfig.Enabled = true
+	nodeConfig.UpstreamConfig.URL = "https://ropsten.infura.io/nKmXgiFgc2KqtoQ8BCGJ"
+
+	nodeStarted, err := s.backend.StartNode(nodeConfig)
+	s.NoError(err)
+	defer s.backend.StopNode()
+
+	<-nodeStarted
+
+	// Allow to sync the blockchain.
+	time.Sleep(TestConfig.Node.SyncSeconds * time.Second)
+
+	err = s.backend.AccountManager().SelectAccount(TestConfig.Account2.Address, TestConfig.Account2.Password)
+	s.NoError(err)
+
+	transactionCompleted := make(chan struct{})
+
+	var txHash gethcommon.Hash
+	node.SetDefaultNodeNotificationHandler(func(rawSignal string) {
+		var signal node.SignalEnvelope
+		err := json.Unmarshal([]byte(rawSignal), &signal)
+		s.NoError(err)
+
+		if signal.Type == node.EventTransactionQueued {
+			event := signal.Event.(map[string]interface{})
+			txID := event["id"].(string)
+			txHash, err = s.backend.CompleteTransaction(common.QueuedTxID(txID), TestConfig.Account2.Password)
+			s.NoError(err, "cannot complete queued transaction %s", txID)
+
+			close(transactionCompleted)
+		}
+	})
+
+	result := s.backend.CallRPC(`{
+		"jsonrpc": "2.0",
+		"id": 1,
+		"method": "eth_sendTransaction",
+		"params": [{
+			"from": "` + TestConfig.Account2.Address + `",
+			"to": "` + TestConfig.Account1.Address + `",
+			"value": "0x9184e72a"
+		}]
+	}`)
+	s.NotContains(result, "error")
+
+	select {
+	case <-transactionCompleted:
+	case <-time.After(time.Minute):
+		s.FailNow("sending transaction timed out")
+	}
+
+	s.Equal(`{"jsonrpc":"2.0","id":1,"result":"`+txHash.String()+`"}`, result)
+}
+
 // FIXME(tiabc): There's also a test with the same name in geth/node/manager_test.go
 // so this test should only check StatusBackend logic with a mocked version of the underlying NodeManager.
 func (s *BackendTestSuite) TestRaceConditions() {
