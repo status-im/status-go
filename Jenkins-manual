@@ -5,7 +5,7 @@ def getVersion(branch, sha, buildNumber) {
     version = branch.replaceAll(/\//, '-')
 
     if (sha?.trim()) {
-        version = version + '-' + sha
+        version = version + '-g' + sha
     }
 
     if (buildNumber?.trim()) {
