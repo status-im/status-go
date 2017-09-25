@@ -133,3 +133,28 @@ func (r RPCCall) ParseGasPrice() *hexutil.Big {
 
 	return (*hexutil.Big)(parsedValue)
 }
+
+// ToSendTxArgs converts RPCCall to SendTxArgs.
+func (r RPCCall) ToSendTxArgs() SendTxArgs {
+	var err error
+	var fromAddr, toAddr gethcommon.Address
+
+	fromAddr, err = r.ParseFromAddress()
+	if err != nil {
+		fromAddr = gethcommon.HexToAddress("0x0")
+	}
+
+	toAddr, err = r.ParseToAddress()
+	if err != nil {
+		toAddr = gethcommon.HexToAddress("0x0")
+	}
+
+	return SendTxArgs{
+		To:       &toAddr,
+		From:     fromAddr,
+		Value:    r.ParseValue(),
+		Data:     r.ParseData(),
+		Gas:      r.ParseGas(),
+		GasPrice: r.ParseGasPrice(),
+	}
+}

@@ -5,7 +5,6 @@ import (
 	"sync"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/les"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/log"
@@ -224,19 +223,9 @@ func (m *StatusBackend) DiscardTransactions(ids []common.QueuedTxID) map[common.
 
 // registerHandlers attaches Status callback handlers to running node
 func (m *StatusBackend) registerHandlers() error {
-	runningNode, err := m.nodeManager.Node()
-	if err != nil {
-		return err
-	}
-
-	var lightEthereum *les.LightEthereum
-	if err := runningNode.Service(&lightEthereum); err != nil {
-		log.Error("Cannot get light ethereum service", "error", err)
-		return err
-	}
-
-	lightEthereum.StatusBackend.SetAccountsFilterHandler(m.accountManager.AccountsListRequestHandler())
-	log.Info("Registered handler", "fn", "AccountsFilterHandler")
+	rpcClient := m.NodeManager().RPCClient()
+	rpcClient.RegisterHandler("eth_accounts", m.accountManager.AccountsRPCHandler())
+	rpcClient.RegisterHandler("eth_sendTransaction", m.txQueueManager.SendTransactionRPCHandler)
 
 	m.txQueueManager.SetTransactionQueueHandler(m.txQueueManager.TransactionQueueHandler())
 	log.Info("Registered handler", "fn", "TransactionQueueHandler")

@@ -225,18 +225,42 @@ func (m *TxQueueManager) completeRemoteTransaction(queuedTx *common.QueuedTx, pa
 		return emptyHash, err
 	}
 
+	args := queuedTx.Args
+
+	if args.GasPrice == nil {
+		value, err := m.gasPrice()
+		if err != nil {
+			return emptyHash, err
+		}
+
+		args.GasPrice = value
+	}
+
 	chainID := big.NewInt(int64(config.NetworkID))
 	nonce := uint64(txCount)
-	gasPrice := (*big.Int)(queuedTx.Args.GasPrice)
-	dataVal := []byte(queuedTx.Args.Data)
-	priceVal := (*big.Int)(queuedTx.Args.Value)
+	gasPrice := (*big.Int)(args.GasPrice)
+	data := []byte(args.Data)
+	value := (*big.Int)(args.Value)
+	toAddr := gethcommon.Address{}
+	if args.To != nil {
+		toAddr = *args.To
+	}
 
-	gas, err := m.estimateGas(queuedTx.Args)
+	gas, err := m.estimateGas(args)
 	if err != nil {
 		return emptyHash, err
 	}
 
-	tx := types.NewTransaction(nonce, *queuedTx.Args.To, priceVal, (*big.Int)(gas), gasPrice, dataVal)
+	log.Info(
+		"preparing raw transaction",
+		"from", args.From.Hex(),
+		"to", toAddr.Hex(),
+		"gas", gas,
+		"gasPrice", gasPrice,
+		"value", value,
+	)
+
+	tx := types.NewTransaction(nonce, toAddr, value, (*big.Int)(gas), gasPrice, data)
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), selectedAcct.AccountKey.PrivateKey)
 	if err != nil {
 		return emptyHash, err
@@ -303,6 +327,20 @@ func (m *TxQueueManager) estimateGas(args common.SendTxArgs) (*hexutil.Big, erro
 	}
 
 	return &estimatedGas, nil
+}
+
+func (m *TxQueueManager) gasPrice() (*hexutil.Big, error) {
+	client := m.nodeManager.RPCClient()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	var gasPrice hexutil.Big
+	if err := client.CallContext(ctx, &gasPrice, "eth_gasPrice"); err != nil {
+		log.Warn("failed to get gas price", "err", err)
+		return nil, err
+	}
+
+	return &gasPrice, nil
 }
 
 // CompleteTransactions instructs backend to complete sending of multiple transactions
@@ -429,4 +467,26 @@ func (m *TxQueueManager) sendTransactionErrorCode(err error) string {
 // Recoverable error is, for instance, wrong password.
 func (m *TxQueueManager) SetTransactionReturnHandler(fn common.EnqueuedTxReturnHandler) {
 	m.txQueue.SetTxReturnHandler(fn)
+}
+
+// SendTransactionRPCHandler is a handler for eth_sendTransaction method.
+// It accepts one param which is a slice with a map of transaction params.
+func (m *TxQueueManager) SendTransactionRPCHandler(ctx context.Context, args ...interface{}) (interface{}, error) {
+	log.Info("SendTransactionRPCHandler called")
+
+	// TODO(adam): it's a hack to parse arguments as common.RPCCall can do that.
+	// We should refactor parsing these params to a separate struct.
+	rpcCall := common.RPCCall{Params: args}
+
+	tx := m.CreateTransaction(ctx, rpcCall.ToSendTxArgs())
+
+	if err := m.QueueTransaction(tx); err != nil {
+		return nil, err
+	}
+
+	if err := m.WaitForTransaction(tx); err != nil {
+		return nil, err
+	}
+
+	return tx.Hash.Hex(), nil
 }

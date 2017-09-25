@@ -125,8 +125,11 @@ type AccountManager interface {
 	// Logout clears whisper identities
 	Logout() error
 
-	// AccountsListRequestHandler returns handler to process account list request
-	AccountsListRequestHandler() func(entities []common.Address) []common.Address
+	// Accounts returns handler to process account list request
+	Accounts() ([]common.Address, error)
+
+	// AccountsRPCHandler returns RPC wrapper for Accounts()
+	AccountsRPCHandler() rpc.Handler
 
 	// AddressToDecryptedAccount tries to load decrypted key for a given account.
 	// The running node, has a keystore directory which is loaded on start. Key file
@@ -223,6 +226,8 @@ type TxQueueManager interface {
 
 	// TODO(adam): might be not needed
 	SetTransactionReturnHandler(fn EnqueuedTxReturnHandler)
+
+	SendTransactionRPCHandler(ctx context.Context, args ...interface{}) (interface{}, error)
 
 	// TransactionReturnHandler returns handler that processes responses from internal tx manager
 	TransactionReturnHandler() func(queuedTx *QueuedTx, err error)

@@ -348,16 +348,29 @@ func (mr *MockAccountManagerMockRecorder) Logout() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Logout", reflect.TypeOf((*MockAccountManager)(nil).Logout))
 }
 
-// AccountsListRequestHandler mocks base method
-func (m *MockAccountManager) AccountsListRequestHandler() func([]common.Address) []common.Address {
-	ret := m.ctrl.Call(m, "AccountsListRequestHandler")
-	ret0, _ := ret[0].(func([]common.Address) []common.Address)
+// Accounts mocks base method
+func (m *MockAccountManager) Accounts() ([]common.Address, error) {
+	ret := m.ctrl.Call(m, "Accounts")
+	ret0, _ := ret[0].([]common.Address)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Accounts indicates an expected call of Accounts
+func (mr *MockAccountManagerMockRecorder) Accounts() *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Accounts", reflect.TypeOf((*MockAccountManager)(nil).Accounts))
+}
+
+// AccountsRPCHandler mocks base method
+func (m *MockAccountManager) AccountsRPCHandler() rpc.Handler {
+	ret := m.ctrl.Call(m, "AccountsRPCHandler")
+	ret0, _ := ret[0].(rpc.Handler)
 	return ret0
 }
 
-// AccountsListRequestHandler indicates an expected call of AccountsListRequestHandler
-func (mr *MockAccountManagerMockRecorder) AccountsListRequestHandler() *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AccountsListRequestHandler", reflect.TypeOf((*MockAccountManager)(nil).AccountsListRequestHandler))
+// AccountsRPCHandler indicates an expected call of AccountsRPCHandler
+func (mr *MockAccountManagerMockRecorder) AccountsRPCHandler() *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AccountsRPCHandler", reflect.TypeOf((*MockAccountManager)(nil).AccountsRPCHandler))
 }
 
 // AddressToDecryptedAccount mocks base method

@@ -2,6 +2,7 @@ package node
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -14,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/status-im/status-go/extkeys"
 	"github.com/status-im/status-go/geth/common"
+	"github.com/status-im/status-go/geth/rpc"
 )
 
 // errors
@@ -303,31 +305,49 @@ func (m *AccountManager) importExtendedKey(extKey *extkeys.ExtendedKey, password
 	return
 }
 
-// AccountsListRequestHandler returns handler to process account list request
-func (m *AccountManager) AccountsListRequestHandler() func(entities []gethcommon.Address) []gethcommon.Address {
-	return func(entities []gethcommon.Address) []gethcommon.Address {
-		if m.selectedAccount == nil {
-			return []gethcommon.Address{}
+// Accounts returns list of addresses for selected account, including
+// subaccounts.
+func (m *AccountManager) Accounts() ([]gethcommon.Address, error) {
+	am, err := m.nodeManager.AccountManager()
+	if err != nil {
+		return nil, err
+	}
+
+	var addresses []gethcommon.Address
+	for _, wallet := range am.Wallets() {
+		for _, account := range wallet.Accounts() {
+			addresses = append(addresses, account.Address)
 		}
+	}
 
-		m.refreshSelectedAccount()
+	if m.selectedAccount == nil {
+		return []gethcommon.Address{}, nil
+	}
 
-		filtered := make([]gethcommon.Address, 0)
-		for _, account := range entities {
-			// main account
-			if m.selectedAccount.Address.Hex() == account.Hex() {
-				filtered = append(filtered, account)
-			} else {
-				// sub accounts
-				for _, subAccount := range m.selectedAccount.SubAccounts {
-					if subAccount.Address.Hex() == account.Hex() {
-						filtered = append(filtered, account)
-					}
+	m.refreshSelectedAccount()
+
+	filtered := make([]gethcommon.Address, 0)
+	for _, account := range addresses {
+		// main account
+		if m.selectedAccount.Address.Hex() == account.Hex() {
+			filtered = append(filtered, account)
+		} else {
+			// sub accounts
+			for _, subAccount := range m.selectedAccount.SubAccounts {
+				if subAccount.Address.Hex() == account.Hex() {
+					filtered = append(filtered, account)
 				}
 			}
 		}
+	}
 
-		return filtered
+	return filtered, nil
+}
+
+// AccountsRPCHandler returns RPC Handler for the Accounts() method.
+func (m *AccountManager) AccountsRPCHandler() rpc.Handler {
+	return func(context.Context, ...interface{}) (interface{}, error) {
+		return m.Accounts()
 	}
 }
 

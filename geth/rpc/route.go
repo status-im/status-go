@@ -35,7 +35,8 @@ func (r *router) routeRemote(method string) bool {
 // remoteMethods contains methods that should be routed to
 // the upstream node; the rest is considered to be routed to
 // the local node.
-// TODO(tiabc): Write a test on each of these methods to ensure they're all routed to the proper node and ensure they really work.
+// TODO(tiabc): Write a test on each of these methods to ensure they're all routed to the proper node and ensure they really work
+// TODO(tiabc: as we already caught https://github.com/status-im/status-go/issues/350 as the result of missing such test.
 // Although it's tempting to only list methods coming to the local node as there're fewer of them
 // but it's deceptive: we want to ensure that only known requests leave our zone of responsibility.
 // Also, we want new requests in newer Geth versions not to be accidentally routed to the upstream.
@@ -47,7 +48,7 @@ var remoteMethods = [...]string{
 	"eth_mining",
 	"eth_hashrate",
 	"eth_gasPrice",
-	//"eth_accounts", // goes to the local because we handle sub-accounts
+	//"eth_accounts", // due to sub-accounts handling
 	"eth_blockNumber",
 	"eth_getBalance",
 	"eth_getStorageAt",
@@ -57,8 +58,8 @@ var remoteMethods = [...]string{
 	"eth_getUncleCountByBlockHash",
 	"eth_getUncleCountByBlockNumber",
 	"eth_getCode",
-	//"eth_sign", // goes to the local because only the local node has an injected account to sign the payload with
-	"eth_sendTransaction",
+	//"eth_sign", // only the local node has an injected account to sign the payload with
+	//"eth_sendTransaction", // we handle this specially calling eth_estimateGas, signing it locally and sending eth_sendRawTransaction afterwards
 	"eth_sendRawTransaction",
 	"eth_call",
 	"eth_estimateGas",

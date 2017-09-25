@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/les"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
@@ -22,14 +21,8 @@ func (s *BackendTestSuite) TestAccountsList() {
 	require.NoError(err)
 	require.NotNil(runningNode)
 
-	var lesService *les.LightEthereum
-	require.NoError(runningNode.Service(&lesService))
-	require.NotNil(lesService)
-
-	accounts := lesService.StatusBackend.AccountManager().Accounts()
-	for _, acc := range accounts {
-		fmt.Println(acc.Hex())
-	}
+	accounts, err := s.backend.AccountManager().Accounts()
+	require.NoError(err)
 
 	// make sure that we start with empty accounts list (nobody has logged in yet)
 	require.Zero(len(accounts), "accounts returned, while there should be none (we haven't logged in yet)")
@@ -39,7 +32,8 @@ func (s *BackendTestSuite) TestAccountsList() {
 	require.NoError(err)
 
 	// ensure that there is still no accounts returned
-	accounts = lesService.StatusBackend.AccountManager().Accounts()
+	accounts, err = s.backend.AccountManager().Accounts()
+	require.NoError(err)
 	require.Zero(len(accounts), "accounts returned, while there should be none (we haven't logged in yet)")
 
 	// select account (sub-accounts will be created for this key)
@@ -47,7 +41,8 @@ func (s *BackendTestSuite) TestAccountsList() {
 	require.NoError(err, "account selection failed")
 
 	// at this point main account should show up
-	accounts = lesService.StatusBackend.AccountManager().Accounts()
+	accounts, err = s.backend.AccountManager().Accounts()
+	require.NoError(err)
 	require.Equal(1, len(accounts), "exactly single account is expected (main account)")
 	require.Equal(string(accounts[0].Hex()), "0x"+address,
 		fmt.Sprintf("main account is not retured as the first key: got %s, expected %s", accounts[0].Hex(), "0x"+address))
@@ -57,7 +52,8 @@ func (s *BackendTestSuite) TestAccountsList() {
 	require.NoError(err, "cannot create sub-account")
 
 	// now we expect to see both main account and sub-account 1
-	accounts = lesService.StatusBackend.AccountManager().Accounts()
+	accounts, err = s.backend.AccountManager().Accounts()
+	require.NoError(err)
 	require.Equal(2, len(accounts), "exactly 2 accounts are expected (main + sub-account 1)")
 	require.Equal(string(accounts[0].Hex()), "0x"+address, "main account is not retured as the first key")
 	require.Equal(string(accounts[1].Hex()), "0x"+subAccount1, "subAcount1 not returned")
@@ -68,7 +64,8 @@ func (s *BackendTestSuite) TestAccountsList() {
 	require.False(subAccount1 == subAccount2 || subPubKey1 == subPubKey2, "sub-account index auto-increament failed")
 
 	// finally, all 3 accounts should show up (main account, sub-accounts 1 and 2)
-	accounts = lesService.StatusBackend.AccountManager().Accounts()
+	accounts, err = s.backend.AccountManager().Accounts()
+	require.NoError(err)
 	require.Equal(3, len(accounts), "unexpected number of accounts")
 	require.Equal(string(accounts[0].Hex()), "0x"+address, "main account is not retured as the first key")
 
