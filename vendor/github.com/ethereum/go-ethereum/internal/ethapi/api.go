@@ -1108,11 +1108,6 @@ func submitTransaction(ctx context.Context, b Backend, tx *types.Transaction) (c
 // transaction pool.
 // @Status
 func (s *PublicTransactionPoolAPI) SendTransactionWithPassphrase(ctx context.Context, args SendTxArgs, passphrase string) (common.Hash, error) {
-	// Set some sanity defaults and terminate on failure
-	if err := args.setDefaults(ctx, s.b); err != nil {
-		return common.Hash{}, err
-	}
-
 	// Look up the wallet containing the requested signer
 	account := accounts.Account{Address: args.From}
 
@@ -1149,11 +1144,6 @@ func (s *PublicTransactionPoolAPI) SendTransactionWithPassphrase(ctx context.Con
 // SendTransaction creates a transaction by unpacking queued transaction, signs it and submits to the
 // transaction pool.
 func (s *PublicTransactionPoolAPI) SendTransaction(ctx context.Context, args SendTxArgs) (common.Hash, error) {
-	// Set some sanity defaults and terminate on failure
-	if err := args.setDefaults(ctx, s.b); err != nil {
-		return common.Hash{}, err
-	}
-
 	// Look up the wallet containing the requested signer
 	account := accounts.Account{Address: args.From}
 
