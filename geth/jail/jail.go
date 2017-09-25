@@ -27,7 +27,6 @@ type Jail struct {
 	// FIXME(tiabc): This mutex handles cells field access and must be renamed appropriately: cellsMutex
 	sync.RWMutex
 	nodeManager    common.NodeManager
-	accountManager common.AccountManager
 	txQueueManager common.TxQueueManager
 	policy         *ExecutionPolicy
 	cells          map[string]*Cell // jail supports running many isolated instances of jailed runtime
@@ -36,15 +35,12 @@ type Jail struct {
 
 // New returns new Jail environment with the associated NodeManager and
 // AccountManager.
-func New(
-	nodeManager common.NodeManager, accountManager common.AccountManager, txQueueManager common.TxQueueManager,
-) *Jail {
-	if nodeManager == nil || accountManager == nil || txQueueManager == nil {
+func New(nodeManager common.NodeManager, txQueueManager common.TxQueueManager) *Jail {
+	if nodeManager == nil || txQueueManager == nil {
 		panic("Jail is missing mandatory dependencies")
 	}
 	return &Jail{
 		nodeManager:    nodeManager,
-		accountManager: accountManager,
 		txQueueManager: txQueueManager,
 		cells:          make(map[string]*Cell),
 		policy:         NewExecutionPolicy(nodeManager, accountManager, txQueueManager),
