@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/node"
@@ -52,7 +53,7 @@ func (s *BackendTestSuite) TestSendContractTx() {
 			)
 			s.EqualError(
 				err,
-				node.ErrNoAccountSelected.Error(),
+				account.ErrNoAccountSelected.Error(),
 				fmt.Sprintf("expected error on queued transaction[%v] not thrown", event["id"]),
 			)
 
@@ -146,7 +147,7 @@ func (s *BackendTestSuite) TestSendEtherTx() {
 			)
 			s.EqualError(
 				err,
-				node.ErrNoAccountSelected.Error(),
+				account.ErrNoAccountSelected.Error(),
 				fmt.Sprintf("expected error on queued transaction[%v] not thrown", event["id"]),
 			)
 
