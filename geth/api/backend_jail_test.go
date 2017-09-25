@@ -388,6 +388,7 @@ func (s *BackendTestSuite) TestJailWhisper() {
 					throw 'message not sent: ' + JSON.stringify(message);
 				}
 
+
 				var filterName = '` + whisperMessage1 + `';
 				var filterId = filter.filterId;
 				if (!filterId) {
@@ -575,13 +576,11 @@ func (s *BackendTestSuite) TestJailWhisper() {
 
 		jailInstance.Parse(testCaseKey, `
 			var shh = web3.shh;
-			// topic must be 4-byte long
 			var makeTopic = function () {
-				var topic = '0x';
-				for (var i = 0; i < 8; i++) {
-					topic += Math.floor(Math.random() * 16).toString(16);
-				}
-				return topic;
+				var min = 1;
+				var max = Math.pow(16, 8);
+				var randInt = Math.floor(Math.random() * (max - min + 1)) + min;
+				return web3.toHex(randInt);
 			};
 		`)
 
