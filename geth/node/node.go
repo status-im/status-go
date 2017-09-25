@@ -179,6 +179,17 @@ func activateEthService(stack *node.Node, config *params.NodeConfig) error {
 		lightEth, err := les.New(ctx, &ethConf)
 		if err == nil {
 			updateCHT(lightEth, config)
+
+			// TODO(influx6): Find a more concrete solution for node sync.
+			// This is a temporary solution to provide a fix for node synchronization
+			// when upstream is enabled. We will need to find something more suitable
+			// later.
+			if config.UpstreamConfig.Enabled {
+				lightEth.Downloader().Terminate()
+				if block := lightEth.BlockChain(); block != nil {
+					block.Stop()
+				}
+			}
 		}
 		return lightEth, err
 	}); err != nil {

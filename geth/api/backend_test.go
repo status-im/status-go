@@ -175,6 +175,12 @@ func (s *BackendTestSuite) TestStartNodeWithUpstreamEnabled() {
 
 	<-nodeStarted
 	require.True(backend.IsNodeRunning())
+
+	// Get lightEthereum service and attempt to download sync.
+	lightEth, err := backend.NodeManager().LightEthereumService()
+	require.NoError(err)
+	time.Sleep(5 * time.Second)
+	require.False(lightEth.Downloader().Synchronising(), "NodeChain synchronization should'nt have started")
 }
 
 // FIXME(tiabc): There's also a test with the same name in geth/node/rpc_test.go
