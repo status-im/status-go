@@ -3,10 +3,11 @@ package node
 import (
 	"fmt"
 	"os"
-	"os/signal"
+	osSignal "os/signal"
 
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/log"
+	"github.com/status-im/status-go/geth/signal"
 )
 
 // HaltOnPanic recovers from panic, logs issue, sends upward notification, and exits
@@ -15,9 +16,9 @@ func HaltOnPanic() {
 		err := fmt.Errorf("%v: %v", ErrNodeRunFailure, r)
 
 		// send signal up to native app
-		SendSignal(SignalEnvelope{
-			Type: EventNodeCrashed,
-			Event: NodeCrashEvent{
+		signal.Send(signal.Envelope{
+			Type: signal.EventNodeCrashed,
+			Event: signal.NodeCrashEvent{
 				Error: err.Error(),
 			},
 		})
@@ -29,8 +30,8 @@ func HaltOnPanic() {
 // HaltOnInterruptSignal stops node and panics if you press Ctrl-C enough times
 func HaltOnInterruptSignal(nodeManager *NodeManager) {
 	sigc := make(chan os.Signal, 1)
-	signal.Notify(sigc, os.Interrupt)
-	defer signal.Stop(sigc)
+	osSignal.Notify(sigc, os.Interrupt)
+	defer osSignal.Stop(sigc)
 	<-sigc
 	if nodeManager.node == nil {
 		return
