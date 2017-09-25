@@ -14,17 +14,15 @@ import (
 // remote/upstream processing and internal node processing.
 type ExecutionPolicy struct {
 	nodeManager    common.NodeManager
-	accountManager common.AccountManager
 	txQueueManager common.TxQueueManager
 }
 
 // NewExecutionPolicy returns a new instance of ExecutionPolicy.
 func NewExecutionPolicy(
-	nodeManager common.NodeManager, accountManager common.AccountManager, txQueueManager common.TxQueueManager,
+	nodeManager common.NodeManager, txQueueManager common.TxQueueManager,
 ) *ExecutionPolicy {
 	return &ExecutionPolicy{
 		nodeManager:    nodeManager,
-		accountManager: accountManager,
 		txQueueManager: txQueueManager,
 	}
 }

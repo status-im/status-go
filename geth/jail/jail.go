@@ -13,24 +13,23 @@ import (
 	"github.com/status-im/status-go/static"
 )
 
-// FIXME(tiabc): Get rid of this global variable. Move it to a constructor or initialization.
-var web3JSCode = static.MustAsset("scripts/web3.js")
-
-// errors
 var (
+	// FIXME(tiabc): Get rid of this global variable. Move it to a constructor or initialization.
+	web3JSCode = static.MustAsset("scripts/web3.js")
+
 	ErrInvalidJail = errors.New("jail environment is not properly initialized")
 )
 
 // Jail represents jailed environment inside of which we hold multiple cells.
 // Each cell is a separate JavaScript VM.
 type Jail struct {
-	// FIXME(tiabc): This mutex handles cells field access and must be renamed appropriately: cellsMutex
-	sync.RWMutex
 	nodeManager    common.NodeManager
 	txQueueManager common.TxQueueManager
 	policy         *ExecutionPolicy
-	cells          map[string]*Cell // jail supports running many isolated instances of jailed runtime
-	baseJSCode     string           // JavaScript used to initialize all new cells with
+	baseJSCode     string // JavaScript used to initialize all new cells with
+
+	cellsMx sync.RWMutex
+	cells   map[string]*Cell // jail supports running many isolated instances of jailed runtime
 }
 
 // New returns new Jail environment with the associated NodeManager and
@@ -43,7 +42,7 @@ func New(nodeManager common.NodeManager, txQueueManager common.TxQueueManager) *
 		nodeManager:    nodeManager,
 		txQueueManager: txQueueManager,
 		cells:          make(map[string]*Cell),
-		policy:         NewExecutionPolicy(nodeManager, accountManager, txQueueManager),
+		policy:         NewExecutionPolicy(nodeManager, txQueueManager),
 	}
 }
 
@@ -65,17 +64,17 @@ func (jail *Jail) NewCell(chatID string) (common.JailCell, error) {
 		return nil, err
 	}
 
-	jail.Lock()
+	jail.cellsMx.Lock()
 	jail.cells[chatID] = cell
-	jail.Unlock()
+	jail.cellsMx.Unlock()
 
 	return cell, nil
 }
 
 // Cell returns the existing instance of Cell.
 func (jail *Jail) Cell(chatID string) (common.JailCell, error) {
-	jail.RLock()
-	defer jail.RUnlock()
+	jail.cellsMx.RLock()
+	defer jail.cellsMx.RUnlock()
 
 	cell, ok := jail.cells[chatID]
 	if !ok {
