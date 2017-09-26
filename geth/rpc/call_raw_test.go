@@ -18,6 +18,8 @@ func TestNewSuccessResponse(t *testing.T) {
 		{"string", json.RawMessage(`"3434=done"`), nil, `{"jsonrpc":"2.0","id":0,"result":"3434=done"}`},
 		{"struct_nil_id", json.RawMessage(`{"field": "value"}`), nil, `{"jsonrpc":"2.0","id":0,"result":{"field":"value"}}`},
 		{"struct_non_nil_id", json.RawMessage(`{"field": "value"}`), json.RawMessage(`42`), `{"jsonrpc":"2.0","id":42,"result":{"field":"value"}}`},
+		{"null", json.RawMessage(`null`), json.RawMessage(`7`), `{"jsonrpc":"2.0","id":7,"result":null}`},
+		{"null_nil", nil, json.RawMessage(`7`), `{"jsonrpc":"2.0","id":7,"result":null}`},
 	}
 
 	for _, test := range cases {
