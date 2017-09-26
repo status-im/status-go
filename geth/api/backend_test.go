@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/keystore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/les"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
@@ -345,6 +346,12 @@ func (s *BackendTestSuite) TestCallRPCSendTransactionUpstream() {
 		if signal.Type == node.EventTransactionQueued {
 			event := signal.Event.(map[string]interface{})
 			txID := event["id"].(string)
+
+			// Complete with a wrong passphrase.
+			txHash, err = s.backend.CompleteTransaction(common.QueuedTxID(txID), "some-invalid-passphrase")
+			s.EqualError(err, keystore.ErrDecrypt.Error(), "should return an error as the passphrase was invalid")
+
+			// Complete with a correct passphrase.
 			txHash, err = s.backend.CompleteTransaction(common.QueuedTxID(txID), TestConfig.Account2.Password)
 			s.NoError(err, "cannot complete queued transaction %s", txID)
 
