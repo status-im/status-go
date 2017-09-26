@@ -10,7 +10,6 @@ import (
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
-	"github.com/status-im/status-go/geth/signal"
 )
 
 // StatusBackend implements Status.im service
@@ -99,8 +98,8 @@ func (m *StatusBackend) onNodeStart(nodeStarted <-chan struct{}, backendReady ch
 	log.Info("Account reselected")
 
 	close(backendReady)
-	signal.Send(signal.Envelope{
-		Type:  signal.EventNodeReady,
+	node.SendSignal(node.SignalEnvelope{
+		Type:  node.EventNodeReady,
 		Event: struct{}{},
 	})
 }

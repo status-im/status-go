@@ -16,7 +16,6 @@ import (
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
-	"github.com/status-im/status-go/geth/signal"
 	. "github.com/status-im/status-go/geth/testing"
 	"github.com/stretchr/testify/suite"
 )
@@ -446,13 +445,13 @@ func (s *ManagerTestSuite) TestNodeStartCrash() {
 
 	// let's listen for node.crashed signal
 	signalReceived := false
-	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+	node.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		log.Info("Notification Received", "event", jsonEvent)
-		var envelope signal.Envelope
+		var envelope node.SignalEnvelope
 		err := json.Unmarshal([]byte(jsonEvent), &envelope)
 		s.NoError(err, fmt.Sprintf("cannot unmarshal JSON: %s", jsonEvent))
 
-		if envelope.Type == signal.EventNodeCrashed {
+		if envelope.Type == node.EventNodeCrashed {
 			signalReceived = true
 		}
 	})
@@ -479,5 +478,5 @@ func (s *ManagerTestSuite) TestNodeStartCrash() {
 
 	// cleanup
 	s.NodeManager.StopNode()
-	signal.ResetDefaultNodeNotificationHandler()
+	node.ResetDefaultNodeNotificationHandler()
 }

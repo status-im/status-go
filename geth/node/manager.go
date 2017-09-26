@@ -16,7 +16,6 @@ import (
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/rpc"
-	"github.com/status-im/status-go/geth/signal"
 )
 
 // errors
@@ -83,9 +82,9 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 			m.Lock()
 			m.nodeStarted = nil
 			m.Unlock()
-			signal.Send(signal.Envelope{
-				Type: signal.EventNodeCrashed,
-				Event: signal.NodeCrashEvent{
+			SendSignal(SignalEnvelope{
+				Type: EventNodeCrashed,
+				Event: NodeCrashEvent{
 					Error: fmt.Errorf("%v: %v", ErrNodeStartFailure, err).Error(),
 				},
 			})
@@ -102,9 +101,9 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 		if err != nil {
 			log.Error("Init RPC client failed:", "error", err)
 			m.Unlock()
-			signal.Send(signal.Envelope{
-				Type: signal.EventNodeCrashed,
-				Event: signal.NodeCrashEvent{
+			SendSignal(SignalEnvelope{
+				Type: EventNodeCrashed,
+				Event: NodeCrashEvent{
 					Error: ErrRPCClient.Error(),
 				},
 			})
@@ -121,8 +120,8 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 
 		// notify all subscribers that Status node is started
 		close(m.nodeStarted)
-		signal.Send(signal.Envelope{
-			Type:  signal.EventNodeStarted,
+		SendSignal(SignalEnvelope{
+			Type:  EventNodeStarted,
 			Event: struct{}{},
 		})
 
@@ -180,8 +179,8 @@ func (m *NodeManager) stopNode() (<-chan struct{}, error) {
 		log.Info("Node manager resets node params")
 
 		// notify application that it can send more requests now
-		signal.Send(signal.Envelope{
-			Type:  signal.EventNodeStopped,
+		SendSignal(SignalEnvelope{
+			Type:  EventNodeStopped,
 			Event: struct{}{},
 		})
 		log.Info("Node manager notifed app, that node has stopped")
@@ -318,8 +317,8 @@ func (m *NodeManager) resetChainData() (<-chan struct{}, error) {
 		return nil, err
 	}
 	// send signal up to native app
-	signal.Send(signal.Envelope{
-		Type:  signal.EventChainDataRemoved,
+	SendSignal(SignalEnvelope{
+		Type:  EventChainDataRemoved,
 		Event: struct{}{},
 	})
 	log.Info("Chain data has been removed", "dir", chainDataDir)

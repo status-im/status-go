@@ -16,7 +16,6 @@ import (
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
-	"github.com/status-im/status-go/geth/signal"
 	. "github.com/status-im/status-go/geth/testing"
 	"github.com/status-im/status-go/static"
 )
@@ -56,8 +55,8 @@ func (s *BackendTestSuite) TestJailSendQueuedTransaction() {
 
 	// replace transaction notification handler
 	requireMessageId := false
-	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var envelope signal.Envelope
+	node.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+		var envelope node.SignalEnvelope
 		err := json.Unmarshal([]byte(jsonEvent), &envelope)
 		s.NoError(err, fmt.Sprintf("cannot unmarshal JSON: %s", jsonEvent))
 
@@ -215,8 +214,8 @@ func (s *BackendTestSuite) TestContractDeployment() {
 
 	// replace transaction notification handler
 	var txHash gethcommon.Hash
-	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var envelope signal.Envelope
+	node.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+		var envelope node.SignalEnvelope
 		var err error
 		err = json.Unmarshal([]byte(jsonEvent), &envelope)
 		require.NoError(err, fmt.Sprintf("cannot unmarshal JSON: %s", jsonEvent))
@@ -718,8 +717,8 @@ func (s *BackendTestSuite) TestJailVMPersistence() {
 	require.NotContains(parseResult, "error", "further will fail if initial parsing failed")
 
 	var wg sync.WaitGroup
-	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var envelope signal.Envelope
+	node.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+		var envelope node.SignalEnvelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			s.T().Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return

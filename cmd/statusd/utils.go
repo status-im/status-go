@@ -22,7 +22,6 @@ import (
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
-	"github.com/status-im/status-go/geth/signal"
 	. "github.com/status-im/status-go/geth/testing"
 	"github.com/status-im/status-go/static"
 	"github.com/stretchr/testify/require"
@@ -739,8 +738,8 @@ func testCompleteTransaction(t *testing.T) bool {
 
 	// replace transaction notification handler
 	var txHash = ""
-	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var envelope signal.Envelope
+	node.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+		var envelope node.SignalEnvelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
@@ -816,9 +815,9 @@ func testCompleteMultipleQueuedTransactions(t *testing.T) bool {
 	allTestTxCompleted := make(chan struct{}, 1)
 
 	// replace transaction notification handler
-	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+	node.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var txID string
-		var envelope signal.Envelope
+		var envelope node.SignalEnvelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
@@ -950,8 +949,8 @@ func testDiscardTransaction(t *testing.T) bool {
 	// replace transaction notification handler
 	var txID string
 	txFailedEventCalled := false
-	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var envelope signal.Envelope
+	node.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+		var envelope node.SignalEnvelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
@@ -1062,9 +1061,9 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool {
 
 	// replace transaction notification handler
 	txFailedEventCallCount := 0
-	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+	node.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var txID string
-		var envelope signal.Envelope
+		var envelope node.SignalEnvelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
@@ -1336,24 +1335,24 @@ func startTestNode(t *testing.T) <-chan struct{} {
 	}
 
 	waitForNodeStart := make(chan struct{}, 1)
-	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+	node.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		t.Log(jsonEvent)
-		var envelope signal.Envelope
+		var envelope node.SignalEnvelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
 		}
-		if envelope.Type == signal.EventNodeCrashed {
-			signal.TriggerDefaultNodeNotificationHandler(jsonEvent)
+		if envelope.Type == node.EventNodeCrashed {
+			node.TriggerDefaultNodeNotificationHandler(jsonEvent)
 			return
 		}
 
 		if envelope.Type == node.EventTransactionQueued {
 		}
-		if envelope.Type == signal.EventNodeStarted {
+		if envelope.Type == node.EventNodeStarted {
 			t.Log("Node started, but we wait till it be ready")
 		}
-		if envelope.Type == signal.EventNodeReady {
+		if envelope.Type == node.EventNodeReady {
 			// manually add static nodes (LES auto-discovery is not stable yet)
 			PopulateStaticPeers()
 

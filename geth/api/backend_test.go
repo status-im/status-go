@@ -15,7 +15,6 @@ import (
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
-	"github.com/status-im/status-go/geth/signal"
 	. "github.com/status-im/status-go/geth/testing"
 	"github.com/stretchr/testify/suite"
 )
@@ -278,8 +277,8 @@ func (s *BackendTestSuite) TestCallRPCSendTransaction() {
 	transactionCompleted := make(chan struct{})
 
 	var txHash gethcommon.Hash
-	signal.SetDefaultNodeNotificationHandler(func(rawSignal string) {
-		var signal signal.Envelope
+	node.SetDefaultNodeNotificationHandler(func(rawSignal string) {
+		var signal node.SignalEnvelope
 		err := json.Unmarshal([]byte(rawSignal), &signal)
 		s.NoError(err)
 
@@ -336,8 +335,8 @@ func (s *BackendTestSuite) TestCallRPCSendTransactionUpstream() {
 	transactionCompleted := make(chan struct{})
 
 	var txHash gethcommon.Hash
-	signal.SetDefaultNodeNotificationHandler(func(rawSignal string) {
-		var signal signal.Envelope
+	node.SetDefaultNodeNotificationHandler(func(rawSignal string) {
+		var signal node.SignalEnvelope
 		err := json.Unmarshal([]byte(rawSignal), &signal)
 		s.NoError(err)
 

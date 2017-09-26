@@ -7,7 +7,6 @@ import (
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/jail/console"
 	"github.com/status-im/status-go/geth/node"
-	"github.com/status-im/status-go/geth/signal"
 )
 
 // signals
@@ -131,7 +130,7 @@ func makeSignalHandler(chatID string) func(call otto.FunctionCall) otto.Value {
 	return func(call otto.FunctionCall) otto.Value {
 		message := call.Argument(0).String()
 
-		signal.Send(signal.Envelope{
+		node.SendSignal(node.SignalEnvelope{
 			Type: EventSignal,
 			Event: SignalEvent{
 				ChatID: chatID,

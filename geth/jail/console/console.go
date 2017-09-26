@@ -6,13 +6,13 @@ import (
 	"strings"
 
 	"github.com/robertkrimen/otto"
-	"github.com/status-im/status-go/geth/signal"
+	"github.com/status-im/status-go/geth/node"
 )
 
 // Write provides the base function to write data to the underline writer
 // for the underline otto vm.
 func Write(fn otto.FunctionCall, w io.Writer, consoleEventName string) otto.Value {
-	signal.Send(signal.Envelope{
+	node.SendSignal(node.SignalEnvelope{
 		Type:  consoleEventName,
 		Event: convertArgs(fn.ArgumentList),
 	})

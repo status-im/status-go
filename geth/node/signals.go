@@ -1,4 +1,4 @@
-package signal
+package node
 
 /*
 #include <stddef.h>
@@ -30,8 +30,8 @@ const (
 	EventChainDataRemoved = "chaindata.removed"
 )
 
-// Envelope is a general signal sent upward from node to RN app
-type Envelope struct {
+// SignalEnvelope is a general signal sent upward from node to RN app
+type SignalEnvelope struct {
 	Type  string      `json:"type"`
 	Event interface{} `json:"event"`
 }
@@ -47,12 +47,12 @@ type NodeNotificationHandler func(jsonEvent string)
 
 var notificationHandler NodeNotificationHandler = TriggerDefaultNodeNotificationHandler
 
-// SetDefaultNodeNotificationHandler sets notification handler to invoke on Send
+// SetDefaultNodeNotificationHandler sets notification handler to invoke on SendSignal
 func SetDefaultNodeNotificationHandler(fn NodeNotificationHandler) {
 	notificationHandler = fn
 }
 
-// ResetDefaultNodeNotificationHandler sets notification handler to default one
+// ReetDefaultNodeNotificationHandler sets notification handler to default one
 func ResetDefaultNodeNotificationHandler() {
 	notificationHandler = TriggerDefaultNodeNotificationHandler
 }
@@ -62,8 +62,8 @@ func TriggerDefaultNodeNotificationHandler(jsonEvent string) {
 	log.Info("Notification received", "event", jsonEvent)
 }
 
-// Send sends application signal (JSON, normally) upwards to application (via default notification handler)
-func Send(signal Envelope) {
+// SendSignal sends application signal (JSON, normally) upwards to application (via default notification handler)
+func SendSignal(signal SignalEnvelope) {
 	data, _ := json.Marshal(&signal)
 	C.StatusServiceSignalEvent(C.CString(string(data)))
 }
