@@ -1,73 +1,76 @@
-package log
+package log_test
 
 import (
-	"bytes"
-	"io/ioutil"
+	"errors"
+	"os"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/stretchr/testify/require"
+	"github.com/status-im/status-go/geth/log"
+	"github.com/status-im/status-go/geth/log/providers/jsonfile"
+	"github.com/stretchr/testify/suite"
 )
 
-const (
-	trace = "trace log message\n"
-	debug = "debug log message\n"
-	info  = "info log message\n"
-	warn  = "warning log message\n"
-	err   = "error log message\n"
-)
-
-func TestLogLevels(t *testing.T) {
-	var tests = []struct {
-		lvl log.Lvl
-		out string
-	}{
-		{log.LvlTrace, trace + debug + info + warn + err},
-		{log.LvlDebug, debug + info + warn + err},
-		{log.LvlInfo, info + warn + err},
-		{log.LvlWarn, warn + err},
-		{log.LvlError, err},
-	}
-
-	var buf bytes.Buffer
-	// log-comaptible handler that writes log in the buffer
-	handler := log.FuncHandler(func(r *log.Record) error {
-		_, err := buf.Write([]byte(r.Msg))
-		return err
-	})
-	for _, test := range tests {
-		buf.Reset()
-
-		setHandler(test.lvl, handler)
-
-		Trace(trace)
-		Debug(debug)
-		Info(info)
-		Warn(warn)
-		Error(err)
-
-		require.Equal(t, test.out, buf.String())
-	}
+func TestJailTestSuite(t *testing.T) {
+	suite.Run(t, new(LogTestSuite))
 }
 
-func TestLogFile(t *testing.T) {
-	file, err := ioutil.TempFile("", "statusim_log_test")
-	require.NoError(t, err)
+type LogTestSuite struct {
+	suite.Suite
+}
 
-	defer file.Close()
+func (s LogTestSuite) TestBatchWriter() {
+	require := s.Require()
 
-	// setup log
-	SetLevel("INFO")
-	SetLogFile(file.Name())
+	bm := log.BatchEmit(1, func(entries []log.Entry) error {
+		for _, en := range entries {
+			if en.Level == log.RedAlertLvl {
+				return errors.New("RedAlert")
+			}
+		}
 
-	// test log output to file
-	Info(info)
-	Debug(debug)
+		return nil
+	})
 
-	data, err := ioutil.ReadAll(file)
-	require.NoError(t, err)
+	defer bm.Close()
 
-	got := string(data)
-	require.Contains(t, got, info)
-	require.NotContains(t, got, debug)
+	err := bm.Emit(log.WithMessage(log.InfoLvl, "Batch emitting data"))
+	require.NoError(err)
+
+	err = bm.Emit(log.WithMessage(log.RedAlertLvl, "Batch emitting data at critical").With("name", "thunder"))
+	require.Error(err, "Expect error to occur")
+}
+
+func (s LogTestSuite) TestJSONFile() {
+	require := s.Require()
+
+	fileName := "log.hjson"
+
+	defer os.RemoveAll(fileName)
+	defer os.RemoveAll(fileName + "_1")
+
+	jsm := jsonfile.JSONFile(fileName, ".", 10, 2)
+
+	go func() {
+		defer jsm.Close()
+
+		err := jsm.Emit(log.WithMessage(log.InfoLvl, "Batch emitting data"))
+		require.NoError(err)
+
+		err = jsm.Emit(log.WithMessage(log.RedAlertLvl, "Batch emitting data at critical").With("name", "thunder"))
+		require.NoError(err)
+
+		err = jsm.Emit(log.WithMessage(log.InfoLvl, "Batch emitting info data").With("name", "thunder"))
+		require.NoError(err)
+
+		err = jsm.Emit(log.WithMessage(log.ErrorLvl, "Batch emitting error data").With("name", "thunder"))
+		require.NoError(err)
+	}()
+
+	jsm.Wait()
+
+	_, err := os.Stat(fileName)
+	require.NoError(err)
+
+	_, err = os.Stat(fileName + "_1")
+	require.NoError(err)
 }
