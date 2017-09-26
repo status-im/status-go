@@ -9,6 +9,7 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/les"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
+	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/jail"
@@ -427,8 +428,8 @@ func (s *BackendTestSuite) TestRaceConditions() {
 			log.Info("AccountManager()")
 			instance := s.backend.AccountManager()
 			s.NotNil(instance)
-			s.IsType(&node.AccountManager{}, instance)
-			s.T().Logf("AccountManager(), result: %v", instance)
+			s.IsType(&account.Manager{}, instance)
+			s.T().Logf("Manager(), result: %v", instance)
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
