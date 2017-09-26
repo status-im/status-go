@@ -216,6 +216,14 @@ func (m *TxQueueManager) completeRemoteTransaction(queuedTx *common.QueuedTx, pa
 		return emptyHash, err
 	}
 
+	if _, err := m.accountManager.VerifyAccountPassword(
+		config.KeyStoreDir,
+		selectedAcct.Address.String(),
+		password,
+	); err != nil {
+		return emptyHash, err
+	}
+
 	// We need to request a new transaction nounce from upstream node.
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
