@@ -1,6 +1,6 @@
 // +build darwin,cgo
 
-package node
+package signal
 
 /*
 #cgo CFLAGS: -x objective-c
