@@ -247,12 +247,12 @@ func injectAccountIntoWhisper(address, password string) error {
 		return err
 	}
 
-	acc, err := common.ParseAccountString(address)
+	acct, err := common.ParseAccountString(address)
 	if err != nil {
 		return account.ErrAddressToAccountMappingFailure
 	}
 
-	_, accountKey, err := keyStore.AccountDecryptedKey(acc, password)
+	_, accountKey, err := keyStore.AccountDecryptedKey(acct, password)
 	if err != nil {
 		return fmt.Errorf("%s: %v", account.ErrAccountToKeyMappingFailure.Error(), err)
 	}

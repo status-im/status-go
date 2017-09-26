@@ -361,14 +361,14 @@ func testCreateChildAccount(t *testing.T) bool {
 	address, pubKey, mnemonic := createAccountResponse.Address, createAccountResponse.PubKey, createAccountResponse.Mnemonic
 	t.Logf("Account created: {address: %s, key: %s, mnemonic:%s}", address, pubKey, mnemonic)
 
-	acc, err := common.ParseAccountString(address)
+	acct, err := common.ParseAccountString(address)
 	if err != nil {
 		t.Errorf("can not get account from address: %v", err)
 		return false
 	}
 
 	// obtain decrypted key, and make sure that extended key (which will be used as root for sub-accounts) is present
-	_, key, err := keyStore.AccountDecryptedKey(acc, TestConfig.Account1.Password)
+	_, key, err := keyStore.AccountDecryptedKey(acct, TestConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("can not obtain decrypted account key: %v", err)
 		return false

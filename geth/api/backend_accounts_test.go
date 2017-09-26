@@ -94,11 +94,11 @@ func (s *BackendTestSuite) TestCreateChildAccount() {
 	require.NoError(err)
 	s.T().Logf("Account created: {address: %s, key: %s, mnemonic:%s}", address, pubKey, mnemonic)
 
-	acc, err := common.ParseAccountString(address)
+	acct, err := common.ParseAccountString(address)
 	require.NoError(err, "can not get account from address")
 
 	// obtain decrypted key, and make sure that extended key (which will be used as root for sub-accounts) is present
-	_, key, err := keyStore.AccountDecryptedKey(acc, TestConfig.Account1.Password)
+	_, key, err := keyStore.AccountDecryptedKey(acct, TestConfig.Account1.Password)
 	require.NoError(err, "can not obtain decrypted account key")
 	require.NotNil(key.ExtendedKey, "CKD#2 has not been generated for new account")
 
