@@ -12,6 +12,7 @@ import (
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/signal"
+	"github.com/status-im/status-go/geth/txqueue"
 )
 
 // StatusBackend implements Status.im service
@@ -31,7 +32,7 @@ func NewStatusBackend() *StatusBackend {
 
 	nodeManager := node.NewNodeManager()
 	accountManager := account.NewManager(nodeManager)
-	txQueueManager := node.NewTxQueueManager(nodeManager, accountManager)
+	txQueueManager := txqueue.NewManager(nodeManager, accountManager)
 
 	return &StatusBackend{
 		nodeManager:    nodeManager,

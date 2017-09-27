@@ -13,6 +13,7 @@ import (
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/signal"
 	. "github.com/status-im/status-go/geth/testing"
+	"github.com/status-im/status-go/geth/txqueue"
 	"github.com/status-im/status-go/static"
 	"github.com/stretchr/testify/suite"
 )
@@ -44,7 +45,7 @@ func (s *JailTestSuite) SetupTest() {
 	accountManager := account.NewManager(nodeManager)
 	require.NotNil(accountManager)
 
-	txQueueManager := node.NewTxQueueManager(nodeManager, accountManager)
+	txQueueManager := txqueue.NewManager(nodeManager, accountManager)
 
 	jail := jail.New(nodeManager, accountManager, txQueueManager)
 	require.NotNil(jail)
