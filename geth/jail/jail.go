@@ -151,7 +151,7 @@ func (jail *Jail) Send(call otto.FunctionCall, vm *vm.VM) otto.Value {
 	}
 
 	rpc := jail.nodeManager.RPCClient()
-	response := rpc.CallRaw(string(request.String()))
+	response := rpc.CallRaw(request.String())
 
 	respValue, err := otto.ToValue(response)
 	if err != nil {
