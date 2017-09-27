@@ -45,6 +45,10 @@ func (s *LogTestSuite) SetupSuite() {
 
 func (s *LogTestSuite) TearDownSuite() {
 	log.InitMetric(nil)
+	s.infoCache = nil
+	s.errCache = nil
+	s.yellowAlertCache = nil
+	s.redAlertCache = nil
 }
 
 func (s *LogTestSuite) TestLogger() {

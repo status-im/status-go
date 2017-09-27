@@ -7,7 +7,7 @@ import (
 
 // vars
 var (
-	ErrMetricNotInitialize = errors.New("Default Metric not initialize")
+	ErrMetricNotInitialized = errors.New("Default Metric not initialize")
 
 	rootMetric = struct {
 		ml     sync.Mutex
@@ -31,5 +31,5 @@ func Send(en Entry) error {
 		return rootMetric.Metric.Emit(en)
 	}
 
-	return ErrMetricNotInitialize
+	return ErrMetricNotInitialized
 }
