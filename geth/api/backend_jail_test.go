@@ -241,6 +241,7 @@ func (s *BackendTestSuite) TestContractDeployment() {
 
 	_, err = cell.Run(`
 		var responseValue = null;
+		var errorValue = null;
 		var testContract = web3.eth.contract([{"constant":true,"inputs":[{"name":"a","type":"int256"}],"name":"double","outputs":[{"name":"","type":"int256"}],"payable":false,"type":"function"}]);
 		var test = testContract.new(
 		{
@@ -249,11 +250,10 @@ func (s *BackendTestSuite) TestContractDeployment() {
 			gas: '` + strconv.Itoa(params.DefaultGas) + `'
 		}, function (e, contract) {
 			// NOTE: The callback will fire twice!
+			errorValue = e;
 			// Once the contract has the transactionHash property set and once its deployed on an address.
-			if (!e) {
-				if (!contract.address) {
-					responseValue = contract.transactionHash;
-				}
+			if (!contract.address) {
+				responseValue = contract.transactionHash;
 			}
 		})
 	`)
@@ -268,6 +268,10 @@ func (s *BackendTestSuite) TestContractDeployment() {
 	// Wait until callback is fired and `responseValue` is set. Hacky but simple.
 	time.Sleep(2 * time.Second)
 
+	errorValue, err := cell.Get("errorValue")
+	require.NoError(err)
+	require.Equal("null", errorValue.String())
+
 	responseValue, err := cell.Get("responseValue")
 	require.NoError(err)
 
@@ -276,7 +280,6 @@ func (s *BackendTestSuite) TestContractDeployment() {
 
 	expectedResponse := txHash.Hex()
 	require.Equal(expectedResponse, response)
-	s.T().Logf("estimation complete: %s", response)
 }
 
 func (s *BackendTestSuite) TestJailWhisper() {
