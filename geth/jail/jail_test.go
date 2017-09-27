@@ -130,6 +130,9 @@ func (s *JailTestSuite) TestFunctionCall() {
 func (s *JailTestSuite) TestJailRPCAsyncSend() {
 	require := s.Require()
 
+	s.StartTestNode(params.RopstenNetworkID)
+	defer s.StopTestNode()
+
 	// load Status JS and add test command to it
 	s.jail.BaseJS(baseStatusJSCode)
 	s.jail.Parse(testChatID, txJSCode)
@@ -155,6 +158,12 @@ func (s *JailTestSuite) TestJailRPCAsyncSend() {
 		}()
 	}
 	wg.Wait()
+
+	// TODO(divan): revisit this test. sendAsync now returns immediately,
+	// and we need no way here to halt jail loop, which executes actual
+	// transaction send in background. For now, just wait a couple of secs
+	// to let tests pass.
+	time.Sleep(2 * time.Second)
 }
 
 func (s *JailTestSuite) TestJailRPCSend() {
@@ -186,7 +195,6 @@ func (s *JailTestSuite) TestJailRPCSend() {
 	balance, err := value.ToFloat()
 	require.NoError(err)
 
-	s.T().Logf("Balance of %.2f ETH found on '%s' account", balance, TestConfig.Account1.Address)
 	require.False(balance < 100, "wrong balance (there should be lots of test Ether on that account)")
 }
 
