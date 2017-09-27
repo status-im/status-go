@@ -154,6 +154,20 @@ func Filter(filterFn FilterFn, vals ...interface{}) Metric {
 	}
 }
 
+// FilterLevelWith returns a Metric will will only emit Entrys that matches provided level.
+func FilterLevelWith(lvl Level, fn DoFn) Metric {
+	return Filter(func(en Entry) bool {
+		return en.Level == lvl
+	}, DoWith(fn))
+}
+
+// FilterLevel returns a Metric will will only emit Entrys that matches provided level.
+func FilterLevel(lvl Level, m ...interface{}) Metric {
+	return Filter(func(en Entry) bool {
+		return en.Level == lvl
+	}, m...)
+}
+
 // DoWith returns a Metric object where all entries are applied to the provided function.
 func DoWith(do DoFn) Metric {
 	return fnMetrics{
