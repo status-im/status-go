@@ -574,15 +574,8 @@ func Test_issue80(t *testing.T) {
                 14018689590001,
                 140186895900001,
                 1401868959000001,
-                1401868959000001.5,
-                14018689590000001,
-                140186895900000001,
-                1401868959000000001,
-                14018689590000000001,
-                140186895900000000001,
-                140186895900000000001.5
             ]);
-        `, "[1401868959,14018689591,140186895901,1401868959001,14018689590001,140186895900001,1401868959000001,1.4018689590000015e+15,14018689590000001,140186895900000001,1401868959000000001,1.401868959e+19,1.401868959e+20,1.401868959e+20]")
+        `, "[1401868959,14018689591,140186895901,1401868959001,14018689590001,140186895900001,1401868959000001]")
 	})
 }
 
@@ -645,5 +638,58 @@ this._hasher;f=g.finalize(f);g.reset();return g.finalize(this._oKey.clone().conc
 		is(err, nil)
 
 		test(`CryptoJS.HmacSHA256("Message", "secret");`, "aa747c502a898200f9e4fa21bac68136f886a0e27aec70ba06daf2e2a5cb5597")
+	})
+}
+
+func Test_S9_3_1_A2(t *testing.T) {
+	tt(t, func() {
+		test, _ := test()
+
+		test(`
+			Number("\u0009\u000C\u0020\u00A0\u000B\u000A\u000D\u2028\u2029\u1680\u180E\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200A\u202F\u205F\u3000") === 0;
+        `, true)
+
+		test(`
+			Number("\u180E") === 0;
+        `, true)
+	})
+}
+
+func Test_S15_1_2_2_A2_T10(t *testing.T) {
+	tt(t, func() {
+		test, _ := test()
+
+		test(`
+			parseInt("\u180E" + "1") === parseInt("1");
+        `, true)
+
+		test(`
+			parseInt("\u180E" + "\u180E" + "\u180E" + "1") === parseInt("1");
+        `, true)
+	})
+}
+
+func Test_S15_1_2_3_A2_T10(t *testing.T) {
+	tt(t, func() {
+		test, _ := test()
+
+		test(`
+			parseFloat("\u180E" + "1.1") === parseFloat("1.1");
+        `, true)
+
+		test(`
+			parseFloat("\u180E" + "\u180E" + "\u180E" + "1.1") === parseFloat("1.1");
+        `, true)
+	})
+}
+
+func Test_issue234(t *testing.T) {
+	tt(t, func() {
+		test, _ := test()
+
+		test(`
+			var abc = "6E6E6EF72905D973E8FEF9F38F01AC4D95A600E6A6E1.C1DBF2F71A5F8C9EB04B75E7A879B4C90C25313A".split("");
+			abc.splice(0, 2);
+		`, "6,E")
 	})
 }

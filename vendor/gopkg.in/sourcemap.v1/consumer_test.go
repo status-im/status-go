@@ -1,6 +1,7 @@
 package sourcemap_test
 
 import (
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -9,13 +10,9 @@ import (
 	"gopkg.in/sourcemap.v1"
 )
 
-const (
-	jqSourceMapURL = "http://code.jquery.com/jquery-2.0.3.min.map"
-)
+const jqSourceMapURL = "http://code.jquery.com/jquery-2.0.3.min.map"
 
-var (
-	jqSourceMapBytes []byte
-)
+var jqSourceMapBytes []byte
 
 func init() {
 	resp, err := http.Get(jqSourceMapURL)
@@ -24,11 +21,10 @@ func init() {
 	}
 	defer resp.Body.Close()
 
-	b, err := ioutil.ReadAll(resp.Body)
+	jqSourceMapBytes, err = ioutil.ReadAll(resp.Body)
 	if err != nil {
 		panic(err)
 	}
-	jqSourceMapBytes = b
 }
 
 type sourceMapTest struct {
@@ -40,22 +36,32 @@ type sourceMapTest struct {
 	wantedCol    int
 }
 
+func (test *sourceMapTest) String() string {
+	return fmt.Sprintf("line=%d col=%d in file=%s", test.genLine, test.genCol, test.wantedSource)
+}
+
 func (test *sourceMapTest) assert(t *testing.T, smap *sourcemap.Consumer) {
 	source, name, line, col, ok := smap.Source(test.genLine, test.genCol)
 	if !ok {
-		t.Fatalf("Source not found for %d, %d", test.genLine, test.genCol)
+		if test.wantedSource == "" &&
+			test.wantedName == "" &&
+			test.wantedLine == 0 &&
+			test.wantedCol == 0 {
+			return
+		}
+		t.Fatalf("Source not found for %s", test)
 	}
 	if source != test.wantedSource {
-		t.Fatalf("got %q, wanted %q", source, test.wantedSource)
+		t.Fatalf("file: got %q, wanted %q (%s)", source, test.wantedSource, test)
 	}
 	if name != test.wantedName {
-		t.Fatalf("got %q, wanted %q", name, test.wantedName)
+		t.Fatalf("func: got %q, wanted %q (%s)", name, test.wantedName, test)
 	}
 	if line != test.wantedLine {
-		t.Fatalf("got %q, wanted %q", line, test.wantedLine)
+		t.Fatalf("line: got %d, wanted %d (%s)", line, test.wantedLine, test)
 	}
 	if col != test.wantedCol {
-		t.Fatalf("got %q, wanted %q", col, test.wantedCol)
+		t.Fatalf("column: got %d, wanted %d (%s)", col, test.wantedCol, test)
 	}
 }
 
@@ -92,7 +98,7 @@ func TestSourceMap(t *testing.T) {
 
 	_, _, _, _, ok := smap.Source(3, 0)
 	if ok {
-		t.Fatal()
+		t.Fatal("source must not exist")
 	}
 }
 
@@ -166,35 +172,17 @@ func TestJQuerySourceMap(t *testing.T) {
 	}
 
 	tests := []*sourceMapTest{
+		{1, 1, "", "", 0, 0},
+		{4, 0, "", "", 0, 0},
+		{4, 1, "http://code.jquery.com/jquery-2.0.3.js", "", 14, 0},
+		{4, 10, "http://code.jquery.com/jquery-2.0.3.js", "window", 14, 11},
 		{5, 6789, "http://code.jquery.com/jquery-2.0.3.js", "apply", 4360, 27},
 		{5, 10006, "http://code.jquery.com/jquery-2.0.3.js", "apply", 4676, 8},
 		{4, 553, "http://code.jquery.com/jquery-2.0.3.js", "ready", 93, 9},
+		{999999, 0, "", "", 0, 0},
 	}
 	for _, test := range tests {
 		test.assert(t, smap)
-	}
-}
-
-func BenchmarkParse(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		_, err := sourcemap.Parse(jqSourceMapURL, jqSourceMapBytes)
-		if err != nil {
-			b.Fatal(err)
-		}
-	}
-}
-
-func BenchmarkSource(b *testing.B) {
-	smap, err := sourcemap.Parse(jqSourceMapURL, jqSourceMapBytes)
-	if err != nil {
-		b.Fatal(err)
-	}
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
-		for j := 0; j < 10; j++ {
-			smap.Source(j, 100*j)
-		}
 	}
 }
 

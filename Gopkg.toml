@@ -1,0 +1,8 @@
+required = [
+  "github.com/golang/mock/mockgen"
+]
+
+[[constraint]]
+  name = "github.com/ethereum/go-ethereum"
+  branch = "status/1.7.0-unstable-dep"
+  source = "https://github.com/status-im/go-ethereum.git"

@@ -8,7 +8,7 @@ import (
 )
 
 func TestEncodeDecode(t *testing.T) {
-	buf := &bytes.Buffer{}
+	buf := new(bytes.Buffer)
 	enc := base64vlq.NewEncoder(buf)
 	dec := base64vlq.NewDecoder(buf)
 
@@ -31,27 +31,27 @@ func TestEncodeDecode(t *testing.T) {
 }
 
 func BenchmarkEncode(b *testing.B) {
-	b.StopTimer()
-	buf := &bytes.Buffer{}
+	buf := new(bytes.Buffer)
 	enc := base64vlq.NewEncoder(buf)
-	b.StartTimer()
+
+	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		if err := enc.Encode(10); err != nil {
+		if err := enc.Encode(1000); err != nil {
 			panic(err)
 		}
 	}
 }
 
 func BenchmarkEncodeDecode(b *testing.B) {
-	b.StopTimer()
-	buf := &bytes.Buffer{}
+	buf := new(bytes.Buffer)
 	enc := base64vlq.NewEncoder(buf)
 	dec := base64vlq.NewDecoder(buf)
-	b.StartTimer()
+
+	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		if err := enc.Encode(10); err != nil {
+		if err := enc.Encode(1000); err != nil {
 			panic(err)
 		}
 

@@ -60,7 +60,6 @@ func SSDPRawSearch(httpu *httpu.HTTPUClient, searchTarget string, maxWaitSeconds
 			continue
 		}
 		if st := response.Header.Get("ST"); st != searchTarget {
-			log.Printf("ssdp: got unexpected search target result %q", st)
 			continue
 		}
 		location, err := response.Location()

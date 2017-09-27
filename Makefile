@@ -111,6 +111,24 @@ lint:
 	@echo "Linter: gosimple\n--------------------"
 	@gometalinter --disable-all --deadline 45s --enable=gosimple extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
 
+install:
+	dep ensure
+
+	mkdir _vendor_keep
+	# keep github.com/karalabe/hid
+	mkdir -p _vendor_keep/github.com/karalabe/hid
+	cp -R vendor/github.com/karalabe/hid/* _vendor_keep/github.com/karalabe/hid
+	# keep github.com/ethereum/go-ethereum/crypto/secp256k1/libsecp256k1
+	mkdir -p _vendor_keep/github.com/ethereum/go-ethereum/crypto/secp256k1
+	cp -R vendor/github.com/ethereum/go-ethereum/crypto/secp256k1/libsecp256k1 _vendor_keep/github.com/ethereum/go-ethereum/crypto/secp256k1
+
+	dep prune
+	# bring back kept packages
+	cp -R _vendor_keep/github.com/karalabe/hid vendor/github.com/karalabe
+	cp -R _vendor_keep/github.com/ethereum/go-ethereum/crypto/secp256k1/libsecp256k1 vendor/github.com/ethereum/go-ethereum/crypto/secp256k1
+	# clean up
+	rm -rf _vendor_keep
+
 mock-install:
 	go get -u github.com/golang/mock/mockgen
 
