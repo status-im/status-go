@@ -149,7 +149,6 @@ func (jail *Jail) Send(call otto.FunctionCall, vm *vm.VM) otto.Value {
 	if err != nil {
 		throwJSException(err)
 	}
-	log.Debug("jai.Send", "req", string(request.String()))
 
 	rpc := jail.nodeManager.RPCClient()
 	response := rpc.CallRaw(string(request.String()))
