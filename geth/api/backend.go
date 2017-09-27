@@ -92,11 +92,11 @@ func (m *StatusBackend) onNodeStart(nodeStarted <-chan struct{}, backendReady ch
 	<-nodeStarted
 
 	if err := m.registerHandlers(); err != nil {
-		log.Error("Handler registration failed", "err", err)
+		log.Send(log.Errorf("Handler registration failed").With("error", err))
 	}
 
 	m.accountManager.ReSelectAccount()
-	log.Info("Account reselected")
+	log.Send(log.Info("Account reselected"))
 
 	close(backendReady)
 	signal.Send(signal.Envelope{
@@ -229,10 +229,10 @@ func (m *StatusBackend) registerHandlers() error {
 	rpcClient.RegisterHandler("eth_sendTransaction", m.txQueueManager.SendTransactionRPCHandler)
 
 	m.txQueueManager.SetTransactionQueueHandler(m.txQueueManager.TransactionQueueHandler())
-	log.Info("Registered handler", "fn", "TransactionQueueHandler")
+	log.Send(log.Info("Registered handler").With("fn", "TransactionQueueHandler"))
 
 	m.txQueueManager.SetTransactionReturnHandler(m.txQueueManager.TransactionReturnHandler())
-	log.Info("Registered handler", "fn", "TransactionReturnHandler")
+	log.Send(log.Info("Registered handler").With("fn", "TransactionReturnHandler"))
 
 	return nil
 }

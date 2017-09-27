@@ -197,7 +197,7 @@ func (api *StatusAPI) JailBaseJS(js string) {
 
 // TODO(oskarth): API package this stuff
 func (api *StatusAPI) Notify(token string) string {
-	log.Debug("Notify", "token", token)
+	log.Send(log.Info("Notify token %q", token))
 
 	var NP fcm.NotificationPayload
 	NP.Title = "Status - new message"
@@ -219,7 +219,7 @@ func (api *StatusAPI) Notify(token string) string {
 
 	_, err := c.Send()
 	if err != nil {
-		log.Error("Notify failed:", err)
+		log.Send(log.Errorf("Notify failed: %+s", err).With("error", err))
 	}
 
 	return token
