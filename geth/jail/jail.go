@@ -153,7 +153,13 @@ func (jail *Jail) Send(call otto.FunctionCall, vm *vm.VM) otto.Value {
 	rpc := jail.nodeManager.RPCClient()
 	response := rpc.CallRaw(request.String())
 
-	respValue, err := otto.ToValue(response)
+	// unmarshal response to pass to otto
+	var resp interface{}
+	err = json.Unmarshal([]byte(response), &resp)
+	if err != nil {
+		throwJSException(fmt.Errorf("Error unmarshalling result: %s", err))
+	}
+	respValue, err := vm.ToValue(resp)
 	if err != nil {
 		throwJSException(fmt.Errorf("Error converting result to Otto's value: %s", err))
 	}
