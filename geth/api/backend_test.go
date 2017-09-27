@@ -6,9 +6,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/keystore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/les"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
+	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/jail"
@@ -17,6 +19,7 @@ import (
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/signal"
 	. "github.com/status-im/status-go/geth/testing"
+	"github.com/status-im/status-go/geth/txqueue"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -283,7 +286,7 @@ func (s *BackendTestSuite) TestCallRPCSendTransaction() {
 		err := json.Unmarshal([]byte(rawSignal), &signal)
 		s.NoError(err)
 
-		if signal.Type == node.EventTransactionQueued {
+		if signal.Type == txqueue.EventTransactionQueued {
 			event := signal.Event.(map[string]interface{})
 			txID := event["id"].(string)
 			txHash, err = s.backend.CompleteTransaction(common.QueuedTxID(txID), TestConfig.Account1.Password)
@@ -341,9 +344,15 @@ func (s *BackendTestSuite) TestCallRPCSendTransactionUpstream() {
 		err := json.Unmarshal([]byte(rawSignal), &signal)
 		s.NoError(err)
 
-		if signal.Type == node.EventTransactionQueued {
+		if signal.Type == txqueue.EventTransactionQueued {
 			event := signal.Event.(map[string]interface{})
 			txID := event["id"].(string)
+
+			// Complete with a wrong passphrase.
+			txHash, err = s.backend.CompleteTransaction(common.QueuedTxID(txID), "some-invalid-passphrase")
+			s.EqualError(err, keystore.ErrDecrypt.Error(), "should return an error as the passphrase was invalid")
+
+			// Complete with a correct passphrase.
 			txHash, err = s.backend.CompleteTransaction(common.QueuedTxID(txID), TestConfig.Account2.Password)
 			s.NoError(err, "cannot complete queued transaction %s", txID)
 
@@ -427,8 +436,8 @@ func (s *BackendTestSuite) TestRaceConditions() {
 			log.Info("AccountManager()")
 			instance := s.backend.AccountManager()
 			s.NotNil(instance)
-			s.IsType(&node.AccountManager{}, instance)
-			s.T().Logf("AccountManager(), result: %v", instance)
+			s.IsType(&account.Manager{}, instance)
+			s.T().Logf("Manager(), result: %v", instance)
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {

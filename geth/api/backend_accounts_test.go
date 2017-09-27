@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/common"
-	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
 	. "github.com/status-im/status-go/geth/testing"
 )
@@ -94,17 +94,17 @@ func (s *BackendTestSuite) TestCreateChildAccount() {
 	require.NoError(err)
 	s.T().Logf("Account created: {address: %s, key: %s, mnemonic:%s}", address, pubKey, mnemonic)
 
-	account, err := common.ParseAccountString(address)
+	acct, err := common.ParseAccountString(address)
 	require.NoError(err, "can not get account from address")
 
 	// obtain decrypted key, and make sure that extended key (which will be used as root for sub-accounts) is present
-	_, key, err := keyStore.AccountDecryptedKey(account, TestConfig.Account1.Password)
+	_, key, err := keyStore.AccountDecryptedKey(acct, TestConfig.Account1.Password)
 	require.NoError(err, "can not obtain decrypted account key")
 	require.NotNil(key.ExtendedKey, "CKD#2 has not been generated for new account")
 
 	// try creating sub-account, w/o selecting main account i.e. w/o login to main account
 	_, _, err = s.backend.AccountManager().CreateChildAccount("", TestConfig.Account1.Password)
-	require.EqualError(node.ErrNoAccountSelected, err.Error(), "expected error is not returned (tried to create sub-account w/o login)")
+	require.EqualError(account.ErrNoAccountSelected, err.Error(), "expected error is not returned (tried to create sub-account w/o login)")
 
 	err = s.backend.AccountManager().SelectAccount(address, TestConfig.Account1.Password)
 	require.NoError(err, "cannot select account")
@@ -265,7 +265,7 @@ func (s *BackendTestSuite) TestSelectedAccountOnRestart() {
 
 	// make sure that no account is selected by default
 	selectedAccount, err := s.backend.AccountManager().SelectedAccount()
-	require.EqualError(node.ErrNoAccountSelected, err.Error(), "account selected, but should not be")
+	require.EqualError(account.ErrNoAccountSelected, err.Error(), "account selected, but should not be")
 	require.Nil(selectedAccount)
 
 	// select account
@@ -329,7 +329,7 @@ func (s *BackendTestSuite) TestSelectedAccountOnRestart() {
 	require.False(whisperService.HasKeyPair(pubKey1), "identity should not be present, but it is still present in whisper")
 
 	selectedAccount, err = s.backend.AccountManager().SelectedAccount()
-	require.EqualError(node.ErrNoAccountSelected, err.Error())
+	require.EqualError(account.ErrNoAccountSelected, err.Error())
 	require.Nil(selectedAccount)
 }
 
