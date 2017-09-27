@@ -250,7 +250,10 @@ func (s *BackendTestSuite) TestContractDeployment() {
 			gas: '` + strconv.Itoa(params.DefaultGas) + `'
 		}, function (e, contract) {
 			// NOTE: The callback will fire twice!
-			errorValue = e;
+			if (e) {
+				errorValue = e;
+				return
+			}
 			// Once the contract has the transactionHash property set and once its deployed on an address.
 			if (!contract.address) {
 				responseValue = contract.transactionHash;
