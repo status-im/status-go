@@ -35,6 +35,35 @@ const (
 	InfoLvl                     // Information for view about code operation (replaces Debug, Notice, Trace).
 )
 
+// YellowAlert returns an Entry with the level set to YellowAlertLvl.
+func YellowAlert(err error, message string, m ...interface{}) Entry {
+	return WithMessage(YellowAlertLvl, message, m...).With("error", err)
+}
+
+// RedAlert returns an Entry with the level set to RedAlertLvl.
+func RedAlert(err error, message string, m ...interface{}) Entry {
+	return WithMessage(RedAlertLvl, message, m...).With("error", err)
+}
+
+// Errorf returns a entry where the message is the provided error.Error() value
+// produced from the message and its provided values
+// and the error is added as a key-value within the Entry fields.
+func Errorf(message string, m ...interface{}) Entry {
+	err := fmt.Errorf(message, m...)
+	return WithMessage(ErrorLvl, err.Error()).With("error", err)
+}
+
+// Error returns a entry where the message is the provided error.Error() value
+// and the error is added as a key-value within the Entry fields.
+func Error(err error) Entry {
+	return WithMessage(ErrorLvl, err.Error()).With("error", err)
+}
+
+// Info returns an Entry with the level set to Info.
+func Info(message string, m ...interface{}) Entry {
+	return WithMessage(InfoLvl, message, m...)
+}
+
 // WithMessage returns a new Entry with the provided Level and message used.
 func WithMessage(level Level, message string, m ...interface{}) Entry {
 	var e Entry
