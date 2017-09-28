@@ -2,7 +2,6 @@ package node_test
 
 import (
 	"encoding/json"
-	"fmt"
 	"math/rand"
 	"testing"
 	"time"
@@ -17,7 +16,7 @@ import (
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/signal"
-	. "github.com/status-im/status-go/geth/testing"
+	"github.com/status-im/status-go/integration"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -26,20 +25,15 @@ func TestManagerTestSuite(t *testing.T) {
 }
 
 type ManagerTestSuite struct {
-	BaseTestSuite
+	integration.NodeManagerTestSuite
 }
 
 func (s *ManagerTestSuite) SetupTest() {
 	s.NodeManager = node.NewNodeManager()
-	s.Require().NotNil(s.NodeManager)
-	s.Require().IsType(&node.NodeManager{}, s.NodeManager)
 }
 
-func (s *ManagerTestSuite) TestReferences() {
-	s.Require().NotNil(s.NodeManager)
-
-	// test for nil values of nodeManager
-	var noNodeTests = []struct {
+func (s *ManagerTestSuite) TestReferencesWithoutStartedNode() {
+	var testCases = []struct {
 		name        string
 		initFn      func() (interface{}, error)
 		expectedErr error
@@ -122,17 +116,19 @@ func (s *ManagerTestSuite) TestReferences() {
 			nil,
 		},
 	}
-	for _, testCase := range noNodeTests {
-		s.T().Log(testCase.name)
-		obj, err := testCase.initFn()
+	for _, tc := range testCases {
+		s.T().Log(tc.name)
+		obj, err := tc.initFn()
 		s.Nil(obj)
-		s.Equal(testCase.expectedErr, err)
+		s.Equal(tc.expectedErr, err)
 	}
+}
 
-	// test with node fully started
+func (s *ManagerTestSuite) TestReferencesWithStartedNode() {
 	s.StartTestNode(params.RinkebyNetworkID)
 	defer s.StopTestNode()
-	var nodeReadyTestCases = []struct {
+
+	var testCases = []struct {
 		name         string
 		initFn       func() (interface{}, error)
 		expectedType interface{}
@@ -187,142 +183,163 @@ func (s *ManagerTestSuite) TestReferences() {
 			&rpc.Client{},
 		},
 	}
-	for _, testCase := range nodeReadyTestCases {
-		obj, err := testCase.initFn()
-		s.T().Log(testCase.name)
+	for _, tc := range testCases {
+		s.T().Log(tc.name)
+		obj, err := tc.initFn()
 		s.NoError(err)
 		s.NotNil(obj)
-		s.IsType(testCase.expectedType, obj)
+		s.IsType(tc.expectedType, obj)
 	}
 }
 
 func (s *ManagerTestSuite) TestNodeStartStop() {
-	require := s.Require()
-	require.NotNil(s.NodeManager)
-
-	nodeConfig, err := MakeTestNodeConfig(params.RopstenNetworkID)
-	require.NoError(err)
+	nodeConfig, err := integration.MakeTestNodeConfig(params.RopstenNetworkID)
+	s.NoError(err)
 
 	// try stopping non-started node
-	require.False(s.NodeManager.IsNodeRunning())
+	s.False(s.NodeManager.IsNodeRunning())
 	_, err = s.NodeManager.StopNode()
-	require.EqualError(err, node.ErrNoRunningNode.Error())
+	s.Equal(err, node.ErrNoRunningNode)
 
-	require.False(s.NodeManager.IsNodeRunning())
+	// start node
+	s.False(s.NodeManager.IsNodeRunning())
 	nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
-	require.NoError(err)
-
-	<-nodeStarted // wait till node is started
-	require.True(s.NodeManager.IsNodeRunning())
+	s.NoError(err)
+	// wait till node is started
+	<-nodeStarted
+	s.True(s.NodeManager.IsNodeRunning())
 
 	// try starting another node (w/o stopping the previously started node)
 	_, err = s.NodeManager.StartNode(nodeConfig)
-	require.EqualError(err, node.ErrNodeExists.Error())
+	s.Equal(err, node.ErrNodeExists)
 
-	// now stop node, and make sure that a new node, on different network can be started
+	// now stop node
 	nodeStopped, err := s.NodeManager.StopNode()
-	require.NoError(err)
+	s.NoError(err)
 	<-nodeStopped
+	s.False(s.NodeManager.IsNodeRunning())
 
 	// start new node with exactly the same config
-	require.False(s.NodeManager.IsNodeRunning())
 	nodeStarted, err = s.NodeManager.StartNode(nodeConfig)
-	require.NoError(err)
-
+	s.NoError(err)
+	// wait till node is started
 	<-nodeStarted
-	require.True(s.NodeManager.IsNodeRunning())
+	s.True(s.NodeManager.IsNodeRunning())
 
-	s.StopTestNode()
+	// finally stop the node
+	nodeStopped, err = s.NodeManager.StopNode()
+	s.NoError(err)
+	<-nodeStopped
 }
 
 func (s *ManagerTestSuite) TestNetworkSwitching() {
-	require := s.Require()
-	require.NotNil(s.NodeManager)
-
 	// get Ropsten config
-	nodeConfig, err := MakeTestNodeConfig(params.RopstenNetworkID)
-	require.NoError(err)
-
-	require.False(s.NodeManager.IsNodeRunning())
+	nodeConfig, err := integration.MakeTestNodeConfig(params.RopstenNetworkID)
+	s.NoError(err)
+	s.False(s.NodeManager.IsNodeRunning())
 	nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
-	require.NoError(err)
+	s.NoError(err)
+	// wait till node is started
+	<-nodeStarted
+	s.True(s.NodeManager.IsNodeRunning())
 
-	<-nodeStarted // wait till node is started
-	require.True(s.NodeManager.IsNodeRunning())
-
-	FirstBlockHash(require, s.NodeManager, "0x41941023680923e0fe4d74a34bdac8141f2540e3ae90623718e47d66d1ca4a2d")
+	firstHash, err := integration.FirstBlockHash(s.NodeManager)
+	s.NoError(err)
+	s.Equal("0x41941023680923e0fe4d74a34bdac8141f2540e3ae90623718e47d66d1ca4a2d", firstHash)
 
 	// now stop node, and make sure that a new node, on different network can be started
 	nodeStopped, err := s.NodeManager.StopNode()
-	require.NoError(err)
+	s.NoError(err)
 	<-nodeStopped
+	s.False(s.NodeManager.IsNodeRunning())
 
 	// start new node with completely different config
-	nodeConfig, err = MakeTestNodeConfig(params.RinkebyNetworkID)
-	require.NoError(err)
-
-	require.False(s.NodeManager.IsNodeRunning())
+	nodeConfig, err = integration.MakeTestNodeConfig(params.RinkebyNetworkID)
+	s.NoError(err)
 	nodeStarted, err = s.NodeManager.StartNode(nodeConfig)
-	require.NoError(err)
-
+	s.NoError(err)
+	// wait till node is started
 	<-nodeStarted
-	require.True(s.NodeManager.IsNodeRunning())
+	s.True(s.NodeManager.IsNodeRunning())
 
 	// make sure we are on another network indeed
-	FirstBlockHash(require, s.NodeManager, "0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177")
+	firstHash, err = integration.FirstBlockHash(s.NodeManager)
+	s.NoError(err)
+	s.Equal("0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177", firstHash)
 
-	s.StopTestNode()
+	nodeStopped, err = s.NodeManager.StopNode()
+	s.NoError(err)
+	<-nodeStopped
 }
 
+func (s *ManagerTestSuite) TestStartNodeWithUpstreamEnabled() {
+	nodeConfig, err := integration.MakeTestNodeConfig(params.RopstenNetworkID)
+	s.NoError(err)
+
+	nodeConfig.UpstreamConfig.Enabled = true
+	nodeConfig.UpstreamConfig.URL = "https://ropsten.infura.io/nKmXgiFgc2KqtoQ8BCGJ"
+
+	nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
+	s.NoError(err)
+	<-nodeStarted
+	s.True(s.NodeManager.IsNodeRunning())
+	nodeStopped, err := s.NodeManager.StopNode()
+	s.NoError(err)
+	<-nodeStopped
+}
+
+// TODO(adam): fix this test to not use a different directory for blockchain data
 func (s *ManagerTestSuite) TestResetChainData() {
-	require := s.Require()
-	require.NotNil(s.NodeManager)
+	s.T().Skip()
 
 	s.StartTestNode(params.RinkebyNetworkID)
 	defer s.StopTestNode()
 
-	time.Sleep(2 * time.Second) // allow to sync for some time
+	// allow to sync for some time
+	time.Sleep(10 * time.Second)
 
-	s.True(s.NodeManager.IsNodeRunning())
+	// reset chain data
 	nodeReady, err := s.NodeManager.ResetChainData()
-	require.NoError(err)
+	s.NoError(err)
+	// new node, with previous config should be running
 	<-nodeReady
-	s.True(s.NodeManager.IsNodeRunning()) // new node, with previous config should be running
+	s.True(s.NodeManager.IsNodeRunning())
 
 	// make sure we can read the first byte, and it is valid (for Rinkeby)
-	FirstBlockHash(require, s.NodeManager, "0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177")
+	firstHash, err := integration.FirstBlockHash(s.NodeManager)
+	s.NoError(err)
+	s.Equal("0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177", firstHash)
 }
 
 func (s *ManagerTestSuite) TestRestartNode() {
-	require := s.Require()
-	require.NotNil(s.NodeManager)
-
 	s.StartTestNode(params.RinkebyNetworkID)
 	defer s.StopTestNode()
 
 	s.True(s.NodeManager.IsNodeRunning())
 	nodeReady, err := s.NodeManager.RestartNode()
-	require.NoError(err)
+	s.NoError(err)
+	// new node, with previous config should be running
 	<-nodeReady
-	s.True(s.NodeManager.IsNodeRunning()) // new node, with previous config should be running
+	s.True(s.NodeManager.IsNodeRunning())
 
 	// make sure we can read the first byte, and it is valid (for Rinkeby)
-	FirstBlockHash(require, s.NodeManager, "0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177")
+	firstHash, err := integration.FirstBlockHash(s.NodeManager)
+	s.NoError(err)
+	s.Equal("0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177", firstHash)
 }
 
+// TODO(adam): race conditions should be tested with -race flag and unit tests, if possible.
+// Research if it's possible to do the same with unit tests.
 func (s *ManagerTestSuite) TestRaceConditions() {
-	require := s.Require()
-	require.NotNil(s.NodeManager)
-
 	cnt := 25
 	progress := make(chan struct{}, cnt)
 	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	nodeConfig1, err := MakeTestNodeConfig(params.RopstenNetworkID)
-	require.NoError(err)
+	nodeConfig1, err := integration.MakeTestNodeConfig(params.RopstenNetworkID)
+	s.NoError(err)
 
-	nodeConfig2, err := MakeTestNodeConfig(params.RinkebyNetworkID)
-	require.NoError(err)
+	nodeConfig2, err := integration.MakeTestNodeConfig(params.RinkebyNetworkID)
+	s.NoError(err)
 
 	nodeConfigs := []*params.NodeConfig{nodeConfig1, nodeConfig2}
 
@@ -355,12 +372,12 @@ func (s *ManagerTestSuite) TestRaceConditions() {
 			s.T().Logf("PopulateStaticPeers(), error: %v", s.NodeManager.PopulateStaticPeers())
 			progress <- struct{}{}
 		},
-		func(config *params.NodeConfig) {
-			log.Info("ResetChainData()")
-			_, err := s.NodeManager.ResetChainData()
-			s.T().Logf("ResetChainData(), error: %v", err)
-			progress <- struct{}{}
-		},
+		// func(config *params.NodeConfig) {
+		// 	log.Info("ResetChainData()")
+		// 	_, err := s.NodeManager.ResetChainData()
+		// 	s.T().Logf("ResetChainData(), error: %v", err)
+		// 	progress <- struct{}{}
+		// },
 		func(config *params.NodeConfig) {
 			log.Info("RestartNode()")
 			_, err := s.NodeManager.RestartNode()
@@ -434,48 +451,53 @@ func (s *ManagerTestSuite) TestRaceConditions() {
 }
 
 func (s *ManagerTestSuite) TestNodeStartCrash() {
-	require := s.Require()
-	require.NotNil(s.NodeManager)
-
-	nodeConfig, err := MakeTestNodeConfig(params.RinkebyNetworkID)
-	require.NoError(err)
-
-	// start node outside the manager (on the same port), so that manager node.Start() method fails
-	outsideNode, err := node.MakeNode(nodeConfig)
-	require.NoError(outsideNode.Start())
-
 	// let's listen for node.crashed signal
-	signalReceived := false
+	signalReceived := make(chan struct{})
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		log.Info("Notification Received", "event", jsonEvent)
 		var envelope signal.Envelope
 		err := json.Unmarshal([]byte(jsonEvent), &envelope)
-		s.NoError(err, fmt.Sprintf("cannot unmarshal JSON: %s", jsonEvent))
+		s.NoError(err)
 
 		if envelope.Type == signal.EventNodeCrashed {
-			signalReceived = true
+			close(signalReceived)
 		}
 	})
 
+	nodeConfig, err := integration.MakeTestNodeConfig(params.RinkebyNetworkID)
+	s.NoError(err)
+
+	// start node outside the manager (on the same port), so that manager node.Start() method fails
+	outsideNode, err := node.MakeNode(nodeConfig)
+	s.NoError(err)
+	err = outsideNode.Start()
+	s.NoError(err)
+
 	// now try starting using node manager
 	nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
-	require.NoError(err) // no error is thrown, as node is started in separate routine
-	<-nodeStarted        // no deadlock either, as manager should close the channel on error
-	require.False(s.NodeManager.IsNodeRunning())
+	s.NoError(err) // no error is thrown, as node is started in separate routine
+	<-nodeStarted  // no deadlock either, as manager should close the channel on error
+	s.False(s.NodeManager.IsNodeRunning())
 
-	time.Sleep(2 * time.Second) // allow signal to propagate
-	require.True(signalReceived, "node crash signal is expected")
+	select {
+	case <-time.After(5 * time.Second):
+		s.FailNow("timed out waiting for signal")
+	case <-signalReceived:
+	}
 
 	// stop outside node, and re-try
-	require.NoError(outsideNode.Stop())
-	signalReceived = false
+	err = outsideNode.Stop()
+	s.NoError(err)
+	signalReceived = make(chan struct{})
 	nodeStarted, err = s.NodeManager.StartNode(nodeConfig)
-	require.NoError(err) // again, no error
-	<-nodeStarted        // no deadlock, and no signal this time, manager should be able to start node
-	require.True(s.NodeManager.IsNodeRunning())
+	s.NoError(err) // again, no error
+	<-nodeStarted  // no deadlock, and no signal this time, manager should be able to start node
+	s.True(s.NodeManager.IsNodeRunning())
 
-	time.Sleep(2 * time.Second) // allow signal to propagate
-	require.False(signalReceived, "node should start w/o crash signal")
+	select {
+	case <-time.After(5 * time.Second):
+	case <-signalReceived:
+		s.FailNow("signal should not be received")
+	}
 
 	// cleanup
 	s.NodeManager.StopNode()

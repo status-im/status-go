@@ -30,6 +30,8 @@ help: ##@other Show this help
 
 # Main targets
 
+UNIT_TEST_PACKAGES := $(shell go list ./...  | grep -v /vendor/ | grep -v /integration/ | grep -v /cmd/)
+
 statusgo: ##@build Build status-go as statusd server
 	build/env.sh go build -i -o $(GOBIN)/statusd -v $(shell build/testnet-flags.sh) ./cmd/statusd
 	@echo "\nCompilation done.\nRun \"build/bin/statusd help\" to view available commands."
@@ -71,15 +73,6 @@ statusgo-ios-mainnet: xgo
 statusgo-ios-simulator-mainnet: xgo
 	build/env.sh $(GOBIN)/xgo --image farazdagi/xgo-ios-simulator --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v $(shell build/mainnet-flags.sh) ./cmd/statusd
 	@echo "iOS framework cross compilation done (mainnet)."
-
-ci: mock
-	build/env.sh go test -timeout 40m -v ./geth/api/...
-	build/env.sh go test -timeout 40m -v ./geth/common
-	build/env.sh go test -timeout 40m -v ./geth/jail
-	build/env.sh go test -timeout 40m -v ./geth/node
-	build/env.sh go test -timeout 40m -v ./geth/params
-	build/env.sh go test -timeout 40m -v ./extkeys
-	build/env.sh go test -timeout 1m -v ./helpers/...
 
 generate: ##@other Regenerate assets and other auto-generated stuff
 	cp ./node_modules/web3/dist/web3.js ./static/scripts/web3.js
@@ -137,65 +130,30 @@ lint: ##@tests Run meta linter on code
 	@echo "Linter: gosimple\n--------------------"
 	@gometalinter --disable-all --deadline 45s --enable=gosimple extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
 
-mock-install:
+mock-install: ##@other Install mocking tools
 	go get -u github.com/golang/mock/mockgen
 
-mock: mock-install ##@other Regenerate mocks
+mock: ##@other Regenerate mocks
 	mockgen -source=geth/common/types.go -destination=geth/common/types_mock.go -package=common
 
-test: ##@tests Run tests
-	@build/env.sh echo "mode: set" > coverage-all.out
-	build/env.sh go test -coverprofile=coverage.out -covermode=set ./geth/api
-	@build/env.sh tail -n +2 coverage.out >> coverage-all.out
-	build/env.sh go test -coverprofile=coverage.out -covermode=set ./geth/common
-	@build/env.sh tail -n +2 coverage.out >> coverage-all.out
-	build/env.sh go test -coverprofile=coverage.out -covermode=set ./geth/jail
-	@build/env.sh tail -n +2 coverage.out >> coverage-all.out
-	build/env.sh go test -coverprofile=coverage.out -covermode=set ./geth/node
-	@build/env.sh tail -n +2 coverage.out >> coverage-all.out
-	build/env.sh go test -coverprofile=coverage.out -covermode=set ./geth/params
-	@build/env.sh tail -n +2 coverage.out >> coverage-all.out
-	build/env.sh go test -coverprofile=coverage.out -covermode=set ./extkeys
-	@build/env.sh tail -n +2 coverage.out >> coverage-all.out
-	build/env.sh go test -coverprofile=coverage.out -covermode=set ./cmd/statusd
-	@build/env.sh tail -n +2 coverage.out >> coverage-all.out
-	@build/env.sh go tool cover -html=coverage-all.out -o coverage.html
-	@build/env.sh go tool cover -func=coverage-all.out
+test-unit: ##@tests Run unit tests
+	build/env.sh go test $(UNIT_TEST_PACKAGES)
 
-test-api:
-	build/env.sh go test -v -coverprofile=coverage.out  -coverpkg=./geth/node ./geth/api
-	@build/env.sh go tool cover -html=coverage.out -o coverage.html
-	@build/env.sh go tool cover -func=coverage.out
+test-unit-coverage: ##@tests Run unit tests with covevare
+	build/env.sh go test -coverpkg= $(UNIT_TEST_PACKAGES)
 
-test-common:
-	build/env.sh go test -v -coverprofile=coverage.out ./geth/common
-	@build/env.sh go tool cover -html=coverage.out -o coverage.html
-	@build/env.sh go tool cover -func=coverage.out
+test-integration: ##@tests Run integration tests
+	# order: reliability then alphabetical
+	build/env.sh go test -timeout 1m ./integration/accounts/...
+	build/env.sh go test -timeout 1m ./integration/api/...
+	build/env.sh go test -timeout 1m ./integration/jail/...
+	build/env.sh go test -timeout 1m ./integration/node/...
+	build/env.sh go test -timeout 1m ./integration/rpc/...
+	build/env.sh go test -timeout 1m ./integration/whisper/...
+	build/env.sh go test -timeout 10m ./integration/transactions/...
+	build/env.sh go test -timeout 10m ./cmd/statusd
 
-test-jail:
-	build/env.sh go test -v -coverprofile=coverage.out ./geth/jail
-	@build/env.sh go tool cover -html=coverage.out -o coverage.html
-	@build/env.sh go tool cover -func=coverage.out
-
-test-node:
-	build/env.sh go test -v -coverprofile=coverage.out ./geth/node
-	@build/env.sh go tool cover -html=coverage.out -o coverage.html
-	@build/env.sh go tool cover -func=coverage.out
-
-test-params:
-	build/env.sh go test -v -coverprofile=coverage.out ./geth/params
-	@build/env.sh go tool cover -html=coverage.out -o coverage.html
-	@build/env.sh go tool cover -func=coverage.out
-
-test-extkeys:
-	build/env.sh go test -v -coverprofile=coverage.out ./extkeys
-	@build/env.sh go tool cover -html=coverage.out -o coverage.html
-	@build/env.sh go tool cover -func=coverage.out
-
-test-cmd:
-	build/env.sh go test -v -coverprofile=coverage.out ./cmd/statusd
-	@build/env.sh go tool cover -html=coverage.out -o coverage.html
-	@build/env.sh go tool cover -func=coverage.out
+ci: mock-install mock test-unit-coverage test-integration
 
 clean: ##@other Cleanup
 	rm -fr build/bin/*

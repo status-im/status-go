@@ -35,9 +35,6 @@ type Jail struct {
 // New returns new Jail environment with the associated NodeManager.
 // It's caller responsibility to call jail.Stop() when jail is not needed.
 func New(nodeManager common.NodeManager) *Jail {
-	if nodeManager == nil {
-		panic("Jail is missing mandatory dependencies")
-	}
 	return &Jail{
 		nodeManager: nodeManager,
 		cells:       make(map[string]*Cell),

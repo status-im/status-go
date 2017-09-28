@@ -13,7 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	gethparams "github.com/ethereum/go-ethereum/params"
 	"github.com/status-im/status-go/geth/params"
-	. "github.com/status-im/status-go/geth/testing"
+	. "github.com/status-im/status-go/testing"
 	"github.com/stretchr/testify/require"
 )
 

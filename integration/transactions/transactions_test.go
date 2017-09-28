@@ -1,36 +1,156 @@
-package api_test
+package transactions
 
 import (
 	"encoding/json"
 	"fmt"
 	"math/big"
 	"reflect"
+	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/status-im/status-go/geth/account"
+	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/geth/accounts"
 	"github.com/status-im/status-go/geth/common"
-	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/signal"
-	. "github.com/status-im/status-go/geth/testing"
 	"github.com/status-im/status-go/geth/txqueue"
+	"github.com/status-im/status-go/integration"
+	. "github.com/status-im/status-go/testing"
+	"github.com/stretchr/testify/suite"
 )
 
-// FIXME(tiabc): Sometimes it fails due to "no suitable peers found".
-func (s *BackendTestSuite) TestSendContractTx() {
-	require := s.Require()
-	require.NotNil(s.backend)
+const (
+	txSendFolder = "testdata/jail/tx-send/"
+	testChatID   = "testChat"
+)
 
+func TestTransactionsTestSuite(t *testing.T) {
+	suite.Run(t, new(TransactionsTestSuite))
+}
+
+type TransactionsTestSuite struct {
+	integration.BackendTestSuite
+}
+
+func (s *TransactionsTestSuite) TestCallRPCSendTransaction() {
+	s.StartTestBackend(params.RopstenNetworkID)
+	defer s.StopTestBackend()
+
+	// Allow to sync the blockchain.
+	time.Sleep(TestConfig.Node.SyncSeconds * time.Second)
+
+	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
+	s.NoError(err)
+
+	transactionCompleted := make(chan struct{})
+
+	var txHash gethcommon.Hash
+	signal.SetDefaultNodeNotificationHandler(func(rawSignal string) {
+		var signal signal.Envelope
+		err := json.Unmarshal([]byte(rawSignal), &signal)
+		s.NoError(err)
+
+		if signal.Type == txqueue.EventTransactionQueued {
+			event := signal.Event.(map[string]interface{})
+			txID := event["id"].(string)
+			txHash, err = s.Backend.CompleteTransaction(common.QueuedTxID(txID), TestConfig.Account1.Password)
+			s.NoError(err, "cannot complete queued transaction %s", txID)
+
+			close(transactionCompleted)
+		}
+	})
+
+	result := s.Backend.CallRPC(`{
+		"jsonrpc": "2.0",
+		"id": 1,
+		"method": "eth_sendTransaction",
+		"params": [{
+			"from": "` + TestConfig.Account1.Address + `",
+			"to": "0xd46e8dd67c5d32be8058bb8eb970870f07244567",
+			"value": "0x9184e72a"
+		}]
+	}`)
+	s.NotContains(result, "error")
+
+	select {
+	case <-transactionCompleted:
+	case <-time.After(time.Minute):
+		s.FailNow("sending transaction timed out")
+	}
+
+	s.Equal(`{"jsonrpc":"2.0","id":1,"result":"`+txHash.String()+`"}`, result)
+}
+
+func (s *TransactionsTestSuite) TestCallRPCSendTransactionUpstream() {
+	s.StartTestBackend(
+		params.RopstenNetworkID,
+		integration.WithUpstream("https://ropsten.infura.io/nKmXgiFgc2KqtoQ8BCGJ"),
+	)
+	defer s.StopTestBackend()
+
+	// Allow to sync the blockchain.
+	time.Sleep(TestConfig.Node.SyncSeconds * time.Second)
+
+	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account2.Address, TestConfig.Account2.Password)
+	s.NoError(err)
+
+	transactionCompleted := make(chan struct{})
+
+	var txHash gethcommon.Hash
+	signal.SetDefaultNodeNotificationHandler(func(rawSignal string) {
+		var signal signal.Envelope
+		err := json.Unmarshal([]byte(rawSignal), &signal)
+		s.NoError(err)
+
+		if signal.Type == txqueue.EventTransactionQueued {
+			event := signal.Event.(map[string]interface{})
+			txID := event["id"].(string)
+
+			// Complete with a wrong passphrase.
+			txHash, err = s.Backend.CompleteTransaction(common.QueuedTxID(txID), "some-invalid-passphrase")
+			s.EqualError(err, keystore.ErrDecrypt.Error(), "should return an error as the passphrase was invalid")
+
+			// Complete with a correct passphrase.
+			txHash, err = s.Backend.CompleteTransaction(common.QueuedTxID(txID), TestConfig.Account2.Password)
+			s.NoError(err, "cannot complete queued transaction %s", txID)
+
+			close(transactionCompleted)
+		}
+	})
+
+	result := s.Backend.CallRPC(`{
+		"jsonrpc": "2.0",
+		"id": 1,
+		"method": "eth_sendTransaction",
+		"params": [{
+			"from": "` + TestConfig.Account2.Address + `",
+			"to": "` + TestConfig.Account1.Address + `",
+			"value": "0x9184e72a"
+		}]
+	}`)
+	s.NotContains(result, "error")
+
+	select {
+	case <-transactionCompleted:
+	case <-time.After(time.Minute):
+		s.FailNow("sending transaction timed out")
+	}
+
+	s.Equal(`{"jsonrpc":"2.0","id":1,"result":"`+txHash.String()+`"}`, result)
+}
+
+// FIXME(tiabc): Sometimes it fails due to "no suitable peers found".
+func (s *TransactionsTestSuite) TestSendContractTx() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
 	time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to sync
 
-	sampleAddress, _, _, err := s.backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
-	require.NoError(err)
+	sampleAddress, _, _, err := s.Backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
+	s.NoError(err)
 
 	completeQueuedTransaction := make(chan struct{})
 
@@ -47,21 +167,21 @@ func (s *BackendTestSuite) TestSendContractTx() {
 
 			// the first call will fail (we are not logged in, but trying to complete tx)
 			log.Info("trying to complete with no user logged in")
-			txHash, err = s.backend.CompleteTransaction(
+			txHash, err = s.Backend.CompleteTransaction(
 				common.QueuedTxID(event["id"].(string)),
 				TestConfig.Account1.Password,
 			)
 			s.EqualError(
 				err,
-				account.ErrNoAccountSelected.Error(),
+				accounts.ErrNoAccountSelected.Error(),
 				fmt.Sprintf("expected error on queued transaction[%v] not thrown", event["id"]),
 			)
 
 			// the second call will also fail (we are logged in as different user)
 			log.Info("trying to complete with invalid user")
-			err = s.backend.AccountManager().SelectAccount(sampleAddress, TestConfig.Account1.Password)
+			err = s.Backend.AccountManager().SelectAccount(sampleAddress, TestConfig.Account1.Password)
 			s.NoError(err)
-			txHash, err = s.backend.CompleteTransaction(
+			txHash, err = s.Backend.CompleteTransaction(
 				common.QueuedTxID(event["id"].(string)),
 				TestConfig.Account1.Password,
 			)
@@ -73,8 +193,8 @@ func (s *BackendTestSuite) TestSendContractTx() {
 
 			// the third call will work as expected (as we are logged in with correct credentials)
 			log.Info("trying to complete with correct user, this should succeed")
-			s.NoError(s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
-			txHash, err = s.backend.CompleteTransaction(
+			s.NoError(s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
+			txHash, err = s.Backend.CompleteTransaction(
 				common.QueuedTxID(event["id"].(string)),
 				TestConfig.Account1.Password,
 			)
@@ -88,9 +208,9 @@ func (s *BackendTestSuite) TestSendContractTx() {
 
 	// this call blocks, up until Complete Transaction is called
 	byteCode, err := hexutil.Decode(`0x6060604052341561000c57fe5b5b60a58061001b6000396000f30060606040526000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff1680636ffa1caa14603a575bfe5b3415604157fe5b60556004808035906020019091905050606b565b6040518082815260200191505060405180910390f35b60008160020290505b9190505600a165627a7a72305820ccdadd737e4ac7039963b54cee5e5afb25fa859a275252bdcf06f653155228210029`)
-	require.NoError(err)
+	s.NoError(err)
 
-	txHashCheck, err := s.backend.SendTransaction(nil, common.SendTxArgs{
+	txHashCheck, err := s.Backend.SendTransaction(nil, common.SendTxArgs{
 		From: common.FromAddress(TestConfig.Account1.Address),
 		To:   nil, // marker, contract creation is expected
 		//Value: (*hexutil.Big)(new(big.Int).Mul(big.NewInt(1), gethcommon.Ether)),
@@ -110,21 +230,18 @@ func (s *BackendTestSuite) TestSendContractTx() {
 	s.Zero(s.TxQueueManager().TransactionQueue().Count(), "tx queue must be empty at this point")
 }
 
-func (s *BackendTestSuite) TestSendEtherTx() {
-	require := s.Require()
-	require.NotNil(s.backend)
-
+func (s *TransactionsTestSuite) TestSendEtherTx() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
 	time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to sync
 
 	backend := s.LightEthereumService().StatusBackend
-	require.NotNil(backend)
+	s.NotNil(backend)
 
 	// create an account
-	sampleAddress, _, _, err := s.backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
-	require.NoError(err)
+	sampleAddress, _, _, err := s.Backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
+	s.NoError(err)
 
 	completeQueuedTransaction := make(chan struct{})
 
@@ -141,21 +258,21 @@ func (s *BackendTestSuite) TestSendEtherTx() {
 
 			// the first call will fail (we are not logged in, but trying to complete tx)
 			log.Info("trying to complete with no user logged in")
-			txHash, err = s.backend.CompleteTransaction(
+			txHash, err = s.Backend.CompleteTransaction(
 				common.QueuedTxID(event["id"].(string)),
 				TestConfig.Account1.Password,
 			)
 			s.EqualError(
 				err,
-				account.ErrNoAccountSelected.Error(),
+				accounts.ErrNoAccountSelected.Error(),
 				fmt.Sprintf("expected error on queued transaction[%v] not thrown", event["id"]),
 			)
 
 			// the second call will also fail (we are logged in as different user)
 			log.Info("trying to complete with invalid user")
-			err = s.backend.AccountManager().SelectAccount(sampleAddress, TestConfig.Account1.Password)
+			err = s.Backend.AccountManager().SelectAccount(sampleAddress, TestConfig.Account1.Password)
 			s.NoError(err)
-			txHash, err = s.backend.CompleteTransaction(
+			txHash, err = s.Backend.CompleteTransaction(
 				common.QueuedTxID(event["id"].(string)), TestConfig.Account1.Password)
 			s.EqualError(
 				err,
@@ -165,8 +282,8 @@ func (s *BackendTestSuite) TestSendEtherTx() {
 
 			// the third call will work as expected (as we are logged in with correct credentials)
 			log.Info("trying to complete with correct user, this should succeed")
-			s.NoError(s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
-			txHash, err = s.backend.CompleteTransaction(
+			s.NoError(s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
+			txHash, err = s.Backend.CompleteTransaction(
 				common.QueuedTxID(event["id"].(string)),
 				TestConfig.Account1.Password,
 			)
@@ -179,7 +296,7 @@ func (s *BackendTestSuite) TestSendEtherTx() {
 	})
 
 	// this call blocks, up until Complete Transaction is called
-	txHashCheck, err := s.backend.SendTransaction(nil, common.SendTxArgs{
+	txHashCheck, err := s.Backend.SendTransaction(nil, common.SendTxArgs{
 		From:  common.FromAddress(TestConfig.Account1.Address),
 		To:    common.ToAddress(TestConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
@@ -194,16 +311,19 @@ func (s *BackendTestSuite) TestSendEtherTx() {
 
 	s.Equal(txHashCheck.Hex(), txHash.Hex(), "transaction hash returned from SendTransaction is invalid")
 	s.False(reflect.DeepEqual(txHashCheck, gethcommon.Hash{}), "transaction was never queued or completed")
-	s.Zero(s.backend.TxQueueManager().TransactionQueue().Count(), "tx queue must be empty at this point")
+	s.Zero(s.Backend.TxQueueManager().TransactionQueue().Count(), "tx queue must be empty at this point")
 }
 
-func (s *BackendTestSuite) TestSendEtherTxUpstream() {
-	s.StartTestBackend(params.RopstenNetworkID, WithUpstream("https://ropsten.infura.io/z6GCTmjdP3FETEJmMBI4"))
+func (s *TransactionsTestSuite) TestSendEtherTxUpstream() {
+	s.StartTestBackend(
+		params.RopstenNetworkID,
+		integration.WithUpstream("https://ropsten.infura.io/z6GCTmjdP3FETEJmMBI4"),
+	)
 	defer s.StopTestBackend()
 
 	time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to sync
 
-	err := s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
+	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	s.NoError(err)
 
 	completeQueuedTransaction := make(chan struct{})
@@ -219,7 +339,7 @@ func (s *BackendTestSuite) TestSendEtherTxUpstream() {
 			event := envelope.Event.(map[string]interface{})
 			log.Info("transaction queued (will be completed shortly)", "id", event["id"].(string))
 
-			txHash, err = s.backend.CompleteTransaction(
+			txHash, err = s.Backend.CompleteTransaction(
 				common.QueuedTxID(event["id"].(string)),
 				TestConfig.Account1.Password,
 			)
@@ -232,7 +352,7 @@ func (s *BackendTestSuite) TestSendEtherTxUpstream() {
 
 	// This call blocks, up until Complete Transaction is called.
 	// Explicitly not setting Gas to get it estimated.
-	txHashCheck, err := s.backend.SendTransaction(nil, common.SendTxArgs{
+	txHashCheck, err := s.Backend.SendTransaction(nil, common.SendTxArgs{
 		From:     common.FromAddress(TestConfig.Account1.Address),
 		To:       common.ToAddress(TestConfig.Account2.Address),
 		GasPrice: (*hexutil.Big)(big.NewInt(28000000000)),
@@ -247,23 +367,20 @@ func (s *BackendTestSuite) TestSendEtherTxUpstream() {
 	}
 
 	s.Equal(txHash.Hex(), txHashCheck.Hex(), "transaction hash returned from SendTransaction is invalid")
-	s.Zero(s.backend.TxQueueManager().TransactionQueue().Count(), "tx queue must be empty at this point")
+	s.Zero(s.Backend.TxQueueManager().TransactionQueue().Count(), "tx queue must be empty at this point")
 }
 
-func (s *BackendTestSuite) TestDoubleCompleteQueuedTransactions() {
-	require := s.Require()
-	require.NotNil(s.backend)
-
+func (s *TransactionsTestSuite) TestDoubleCompleteQueuedTransactions() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
 	time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to sync
 
 	backend := s.LightEthereumService().StatusBackend
-	require.NotNil(backend)
+	s.NotNil(backend)
 
 	// log into account from which transactions will be sent
-	require.NoError(s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
+	s.NoError(s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 
 	completeQueuedTransaction := make(chan struct{})
 
@@ -282,13 +399,13 @@ func (s *BackendTestSuite) TestDoubleCompleteQueuedTransactions() {
 
 			// try with wrong password
 			// make sure that tx is NOT removed from the queue (by re-trying with the correct password)
-			_, err = s.backend.CompleteTransaction(txID, TestConfig.Account1.Password+"wrong")
+			_, err = s.Backend.CompleteTransaction(txID, TestConfig.Account1.Password+"wrong")
 			s.EqualError(err, keystore.ErrDecrypt.Error())
 
 			s.Equal(1, s.TxQueueManager().TransactionQueue().Count(), "txqueue cannot be empty, as tx has failed")
 
 			// now try to complete transaction, but with the correct password
-			txHash, err = s.backend.CompleteTransaction(txID, TestConfig.Account1.Password)
+			txHash, err = s.Backend.CompleteTransaction(txID, TestConfig.Account1.Password)
 			s.NoError(err)
 
 			log.Info("transaction complete", "URL", "https://rinkeby.etherscan.io/tx/"+txHash.Hex())
@@ -311,7 +428,7 @@ func (s *BackendTestSuite) TestDoubleCompleteQueuedTransactions() {
 	})
 
 	// this call blocks, and should return on *second* attempt to CompleteTransaction (w/ the correct password)
-	txHashCheck, err := s.backend.SendTransaction(nil, common.SendTxArgs{
+	txHashCheck, err := s.Backend.SendTransaction(nil, common.SendTxArgs{
 		From:  common.FromAddress(TestConfig.Account1.Address),
 		To:    common.ToAddress(TestConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
@@ -326,27 +443,24 @@ func (s *BackendTestSuite) TestDoubleCompleteQueuedTransactions() {
 
 	s.Equal(txHashCheck.Hex(), txHash.Hex(), "transaction hash returned from SendTransaction is invalid")
 	s.False(reflect.DeepEqual(txHashCheck, gethcommon.Hash{}), "transaction was never queued or completed")
-	s.Zero(s.backend.TxQueueManager().TransactionQueue().Count(), "tx queue must be empty at this point")
+	s.Zero(s.Backend.TxQueueManager().TransactionQueue().Count(), "tx queue must be empty at this point")
 	s.True(txFailedEventCalled, "expected tx failure signal is not received")
 }
 
-func (s *BackendTestSuite) TestDiscardQueuedTransaction() {
-	require := s.Require()
-	require.NotNil(s.backend)
-
+func (s *TransactionsTestSuite) TestDiscardQueuedTransaction() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
 	time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to sync
 
 	backend := s.LightEthereumService().StatusBackend
-	require.NotNil(backend)
+	s.NotNil(backend)
 
 	// reset queue
-	s.backend.TxQueueManager().TransactionQueue().Reset()
+	s.Backend.TxQueueManager().TransactionQueue().Reset()
 
 	// log into account from which transactions will be sent
-	require.NoError(s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
+	s.NoError(s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 
 	completeQueuedTransaction := make(chan struct{})
 
@@ -362,18 +476,18 @@ func (s *BackendTestSuite) TestDiscardQueuedTransaction() {
 			txID := common.QueuedTxID(event["id"].(string))
 			log.Info("transaction queued (will be discarded soon)", "id", txID)
 
-			s.True(s.backend.TxQueueManager().TransactionQueue().Has(txID), "txqueue should still have test tx")
+			s.True(s.Backend.TxQueueManager().TransactionQueue().Has(txID), "txqueue should still have test tx")
 
 			// discard
-			err := s.backend.DiscardTransaction(txID)
+			err := s.Backend.DiscardTransaction(txID)
 			s.NoError(err, "cannot discard tx")
 
 			// try completing discarded transaction
-			_, err = s.backend.CompleteTransaction(txID, TestConfig.Account1.Password)
+			_, err = s.Backend.CompleteTransaction(txID, TestConfig.Account1.Password)
 			s.EqualError(err, "transaction hash not found", "expects tx not found, but call to CompleteTransaction succeeded")
 
 			time.Sleep(1 * time.Second) // make sure that tx complete signal propagates
-			s.False(s.backend.TxQueueManager().TransactionQueue().Has(txID),
+			s.False(s.Backend.TxQueueManager().TransactionQueue().Has(txID),
 				fmt.Sprintf("txqueue should not have test tx at this point (it should be discarded): %s", txID))
 
 			close(completeQueuedTransaction)
@@ -395,7 +509,7 @@ func (s *BackendTestSuite) TestDiscardQueuedTransaction() {
 	})
 
 	// this call blocks, and should return when DiscardQueuedTransaction() is called
-	txHashCheck, err := s.backend.SendTransaction(nil, common.SendTxArgs{
+	txHashCheck, err := s.Backend.SendTransaction(nil, common.SendTxArgs{
 		From:  common.FromAddress(TestConfig.Account1.Address),
 		To:    common.ToAddress(TestConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
@@ -409,14 +523,11 @@ func (s *BackendTestSuite) TestDiscardQueuedTransaction() {
 	}
 
 	s.True(reflect.DeepEqual(txHashCheck, gethcommon.Hash{}), "transaction returned hash, while it shouldn't")
-	s.Zero(s.backend.TxQueueManager().TransactionQueue().Count(), "tx queue must be empty at this point")
+	s.Zero(s.Backend.TxQueueManager().TransactionQueue().Count(), "tx queue must be empty at this point")
 	s.True(txFailedEventCalled, "expected tx failure signal is not received")
 }
 
-func (s *BackendTestSuite) TestCompleteMultipleQueuedTransactions() {
-	require := s.Require()
-	require.NotNil(s.backend)
-
+func (s *TransactionsTestSuite) TestCompleteMultipleQueuedTransactions() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
@@ -426,8 +537,8 @@ func (s *BackendTestSuite) TestCompleteMultipleQueuedTransactions() {
 	s.TxQueueManager().TransactionQueue().Reset()
 
 	// log into account from which transactions will be sent
-	err := s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
-	require.NoError(err)
+	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
+	s.NoError(err)
 
 	testTxCount := 3
 	txIDs := make(chan common.QueuedTxID, testTxCount)
@@ -450,7 +561,7 @@ func (s *BackendTestSuite) TestCompleteMultipleQueuedTransactions() {
 
 	//  this call blocks, and should return when DiscardQueuedTransaction() for a given tx id is called
 	sendTx := func() {
-		txHashCheck, err := s.backend.SendTransaction(nil, common.SendTxArgs{
+		txHashCheck, err := s.Backend.SendTransaction(nil, common.SendTxArgs{
 			From:  common.FromAddress(TestConfig.Account1.Address),
 			To:    common.ToAddress(TestConfig.Account2.Address),
 			Value: (*hexutil.Big)(big.NewInt(1000000000000)),
@@ -462,16 +573,16 @@ func (s *BackendTestSuite) TestCompleteMultipleQueuedTransactions() {
 	// wait for transactions, and complete them in a single call
 	completeTxs := func(txIDs []common.QueuedTxID) {
 		txIDs = append(txIDs, "invalid-tx-id")
-		results := s.backend.CompleteTransactions(txIDs, TestConfig.Account1.Password)
-		require.Len(results, testTxCount+1)
-		require.EqualError(results["invalid-tx-id"].Error, "transaction hash not found")
+		results := s.Backend.CompleteTransactions(txIDs, TestConfig.Account1.Password)
+		s.Len(results, testTxCount+1)
+		s.EqualError(results["invalid-tx-id"].Error, "transaction hash not found")
 
 		for txID, txResult := range results {
-			require.False(
+			s.False(
 				txResult.Error != nil && txID != "invalid-tx-id",
 				"invalid error for %s", txID,
 			)
-			require.False(
+			s.False(
 				txResult.Hash == (gethcommon.Hash{}) && txID != "invalid-tx-id",
 				"invalid hash (expected non empty hash): %s", txID,
 			)
@@ -481,8 +592,8 @@ func (s *BackendTestSuite) TestCompleteMultipleQueuedTransactions() {
 		time.Sleep(1 * time.Second) // make sure that tx complete signal propagates
 
 		for _, txID := range txIDs {
-			require.False(
-				s.backend.TxQueueManager().TransactionQueue().Has(txID),
+			s.False(
+				s.Backend.TxQueueManager().TransactionQueue().Has(txID),
 				"txqueue should not have test tx at this point (it should be completed)",
 			)
 		}
@@ -508,26 +619,23 @@ func (s *BackendTestSuite) TestCompleteMultipleQueuedTransactions() {
 		s.FailNow("test timed out")
 	}
 
-	require.Zero(s.TxQueueManager().TransactionQueue().Count(), "queue should be empty")
+	s.Zero(s.TxQueueManager().TransactionQueue().Count(), "queue should be empty")
 }
 
-func (s *BackendTestSuite) TestDiscardMultipleQueuedTransactions() {
-	require := s.Require()
-	require.NotNil(s.backend)
-
+func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
 	time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to sync
 
 	backend := s.LightEthereumService().StatusBackend
-	require.NotNil(backend)
+	s.NotNil(backend)
 
 	// reset queue
-	s.backend.TxQueueManager().TransactionQueue().Reset()
+	s.Backend.TxQueueManager().TransactionQueue().Reset()
 
 	// log into account from which transactions will be sent
-	require.NoError(s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
+	s.NoError(s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 
 	testTxCount := 3
 	txIDs := make(chan common.QueuedTxID, testTxCount)
@@ -544,7 +652,7 @@ func (s *BackendTestSuite) TestDiscardMultipleQueuedTransactions() {
 			txID := common.QueuedTxID(event["id"].(string))
 			log.Info("transaction queued (will be discarded soon)", "id", txID)
 
-			s.True(s.backend.TxQueueManager().TransactionQueue().Has(txID),
+			s.True(s.Backend.TxQueueManager().TransactionQueue().Has(txID),
 				"txqueue should still have test tx")
 			txIDs <- txID
 		}
@@ -569,7 +677,7 @@ func (s *BackendTestSuite) TestDiscardMultipleQueuedTransactions() {
 
 	//  this call blocks, and should return when DiscardQueuedTransaction() for a given tx id is called
 	sendTx := func() {
-		txHashCheck, err := s.backend.SendTransaction(nil, common.SendTxArgs{
+		txHashCheck, err := s.Backend.SendTransaction(nil, common.SendTxArgs{
 			From:  common.FromAddress(TestConfig.Account1.Address),
 			To:    common.ToAddress(TestConfig.Account2.Address),
 			Value: (*hexutil.Big)(big.NewInt(1000000000000)),
@@ -584,24 +692,24 @@ func (s *BackendTestSuite) TestDiscardMultipleQueuedTransactions() {
 		txIDs = append(txIDs, "invalid-tx-id")
 
 		// discard
-		discardResults := s.backend.DiscardTransactions(txIDs)
-		require.Len(discardResults, 1, "cannot discard txs: %v", discardResults)
-		require.Error(discardResults["invalid-tx-id"].Error, "transaction hash not found", "cannot discard txs: %v", discardResults)
+		discardResults := s.Backend.DiscardTransactions(txIDs)
+		s.Len(discardResults, 1, "cannot discard txs: %v", discardResults)
+		s.Error(discardResults["invalid-tx-id"].Error, "transaction hash not found", "cannot discard txs: %v", discardResults)
 
 		// try completing discarded transaction
-		completeResults := s.backend.CompleteTransactions(txIDs, TestConfig.Account1.Password)
-		require.Len(completeResults, testTxCount+1, "unexpected number of errors (call to CompleteTransaction should not succeed)")
+		completeResults := s.Backend.CompleteTransactions(txIDs, TestConfig.Account1.Password)
+		s.Len(completeResults, testTxCount+1, "unexpected number of errors (call to CompleteTransaction should not succeed)")
 
 		for _, txResult := range completeResults {
-			require.Error(txResult.Error, "transaction hash not found", "invalid error for %s", txResult.Hash.Hex())
-			require.Equal("0x0000000000000000000000000000000000000000000000000000000000000000", txResult.Hash.Hex(), "invalid hash (expected zero): %s", txResult.Hash.Hex())
+			s.Error(txResult.Error, "transaction hash not found", "invalid error for %s", txResult.Hash.Hex())
+			s.Equal("0x0000000000000000000000000000000000000000000000000000000000000000", txResult.Hash.Hex(), "invalid hash (expected zero): %s", txResult.Hash.Hex())
 		}
 
 		time.Sleep(1 * time.Second) // make sure that tx complete signal propagates
 
 		for _, txID := range txIDs {
-			require.False(
-				s.backend.TxQueueManager().TransactionQueue().Has(txID),
+			s.False(
+				s.Backend.TxQueueManager().TransactionQueue().Has(txID),
 				"txqueue should not have test tx at this point (it should be discarded): %s",
 				txID,
 			)
@@ -624,54 +732,48 @@ func (s *BackendTestSuite) TestDiscardMultipleQueuedTransactions() {
 	select {
 	case <-allTestTxDiscarded:
 	case <-time.After(1 * time.Minute):
-		require.FailNow("test timed out")
+		s.FailNow("test timed out")
 	}
 
-	require.Zero(s.backend.TxQueueManager().TransactionQueue().Count(), "tx queue must be empty at this point")
+	s.Zero(s.Backend.TxQueueManager().TransactionQueue().Count(), "tx queue must be empty at this point")
 }
 
-func (s *BackendTestSuite) TestNonExistentQueuedTransactions() {
-	require := s.Require()
-	require.NotNil(s.backend)
-
+func (s *TransactionsTestSuite) TestNonExistentQueuedTransactions() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
 	backend := s.LightEthereumService().StatusBackend
-	require.NotNil(backend)
+	s.NotNil(backend)
 
 	// log into account from which transactions will be sent
-	require.NoError(s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
+	s.NoError(s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 
 	// replace transaction notification handler
 	signal.SetDefaultNodeNotificationHandler(func(string) {})
 
 	// try completing non-existing transaction
-	_, err := s.backend.CompleteTransaction("some-bad-transaction-id", TestConfig.Account1.Password)
+	_, err := s.Backend.CompleteTransaction("some-bad-transaction-id", TestConfig.Account1.Password)
 	s.Error(err, "error expected and not received")
 	s.EqualError(err, txqueue.ErrQueuedTxIDNotFound.Error())
 }
 
-func (s *BackendTestSuite) TestEvictionOfQueuedTransactions() {
-	require := s.Require()
-	require.NotNil(s.backend)
-
+func (s *TransactionsTestSuite) TestEvictionOfQueuedTransactions() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
 	backend := s.LightEthereumService().StatusBackend
-	require.NotNil(backend)
+	s.NotNil(backend)
 
 	// reset queue
-	s.backend.TxQueueManager().TransactionQueue().Reset()
+	s.Backend.TxQueueManager().TransactionQueue().Reset()
 
 	// log into account from which transactions will be sent
-	require.NoError(s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
+	s.NoError(s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 
-	txQueue := s.backend.TxQueueManager().TransactionQueue()
+	txQueue := s.Backend.TxQueueManager().TransactionQueue()
 	var i = 0
 	txIDs := [txqueue.DefaultTxQueueCap + 5 + 10]common.QueuedTxID{}
-	s.backend.TxQueueManager().SetTransactionQueueHandler(func(queuedTx *common.QueuedTx) {
+	s.Backend.TxQueueManager().SetTransactionQueueHandler(func(queuedTx *common.QueuedTx) {
 		log.Info("tx enqueued", "i", i+1, "queue size", txQueue.Count(), "id", queuedTx.ID)
 		txIDs[i] = queuedTx.ID
 		i++
@@ -680,7 +782,7 @@ func (s *BackendTestSuite) TestEvictionOfQueuedTransactions() {
 	s.Zero(txQueue.Count(), "transaction count should be zero")
 
 	for i := 0; i < 10; i++ {
-		go s.backend.SendTransaction(nil, common.SendTxArgs{}) // nolint: errcheck
+		go s.Backend.SendTransaction(nil, common.SendTxArgs{}) // nolint: errcheck
 	}
 	time.Sleep(2 * time.Second) // FIXME(tiabc): more reliable synchronization to ensure all transactions are enqueued
 
@@ -690,15 +792,15 @@ func (s *BackendTestSuite) TestEvictionOfQueuedTransactions() {
 	s.Equal(10, txQueue.Count(), "transaction count should be 10")
 
 	for i := 0; i < txqueue.DefaultTxQueueCap+5; i++ { // stress test by hitting with lots of goroutines
-		go s.backend.SendTransaction(nil, common.SendTxArgs{}) // nolint: errcheck
+		go s.Backend.SendTransaction(nil, common.SendTxArgs{}) // nolint: errcheck
 	}
 	time.Sleep(3 * time.Second)
 
-	require.True(txQueue.Count() <= txqueue.DefaultTxQueueCap, "transaction count should be %d (or %d): got %d", txqueue.DefaultTxQueueCap, txqueue.DefaultTxQueueCap-1, txQueue.Count())
+	s.True(txQueue.Count() <= txqueue.DefaultTxQueueCap, "transaction count should be %d (or %d): got %d", txqueue.DefaultTxQueueCap, txqueue.DefaultTxQueueCap-1, txQueue.Count())
 
 	for _, txID := range txIDs {
 		txQueue.Remove(txID)
 	}
 
-	require.Zero(txQueue.Count(), "transaction count should be zero: %d", txQueue.Count())
+	s.Zero(txQueue.Count(), "transaction count should be zero: %d", txQueue.Count())
 }

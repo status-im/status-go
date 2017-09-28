@@ -11,7 +11,7 @@ import (
 	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
-	. "github.com/status-im/status-go/geth/testing"
+	"github.com/status-im/status-go/integration"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -25,19 +25,13 @@ type APITestSuite struct {
 }
 
 func (s *APITestSuite) SetupTest() {
-	require := s.Require()
-	statusAPI := api.NewStatusAPI()
-	require.NotNil(statusAPI)
-	require.IsType(&api.StatusAPI{}, statusAPI)
-	s.api = statusAPI
+	s.api = api.NewStatusAPI()
+	s.NotNil(s.api)
 }
 
 func (s *APITestSuite) TestCHTUpdate() {
-	require := s.Require()
-	require.NotNil(s.api)
-
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "cht-updates")
-	require.NoError(err)
+	s.NoError(err)
 	defer os.RemoveAll(tmpDir)
 
 	configJSON := `{
@@ -48,7 +42,7 @@ func (s *APITestSuite) TestCHTUpdate() {
 	}`
 	//nodeConfig, err := params.LoadNodeConfig(configJSON)
 	_, err = params.LoadNodeConfig(configJSON)
-	require.NoError(err)
+	s.NoError(err)
 
 	// start node
 	//nodeConfig.DevMode = true
@@ -58,18 +52,15 @@ func (s *APITestSuite) TestCHTUpdate() {
 }
 
 func (s *APITestSuite) TestRaceConditions() {
-	require := s.Require()
-	require.NotNil(s.api)
-
 	cnt := 25
 	progress := make(chan struct{}, cnt)
 	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	nodeConfig1, err := MakeTestNodeConfig(params.RopstenNetworkID)
-	require.NoError(err)
+	nodeConfig1, err := integration.MakeTestNodeConfig(params.RopstenNetworkID)
+	s.NoError(err)
 
-	nodeConfig2, err := MakeTestNodeConfig(params.RinkebyNetworkID)
-	require.NoError(err)
+	nodeConfig2, err := integration.MakeTestNodeConfig(params.RinkebyNetworkID)
+	s.NoError(err)
 
 	nodeConfigs := []*params.NodeConfig{nodeConfig1, nodeConfig2}
 
@@ -92,12 +83,12 @@ func (s *APITestSuite) TestRaceConditions() {
 			s.T().Logf("RestartNodeAsync(), error: %v", err)
 			progress <- struct{}{}
 		},
-		func(config *params.NodeConfig) {
-			log.Info("ResetChainDataAsync()")
-			_, err := s.api.ResetChainDataAsync()
-			s.T().Logf("ResetChainDataAsync(), error: %v", err)
-			progress <- struct{}{}
-		},
+		// func(config *params.NodeConfig) {
+		// 	log.Info("ResetChainDataAsync()")
+		// 	_, err := s.api.ResetChainDataAsync()
+		// 	s.T().Logf("ResetChainDataAsync(), error: %v", err)
+		// 	progress <- struct{}{}
+		// },
 	}
 
 	// increase StartNode()/StopNode() population

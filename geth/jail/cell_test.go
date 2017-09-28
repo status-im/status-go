@@ -6,38 +6,8 @@ import (
 	"time"
 
 	"github.com/robertkrimen/otto"
+	. "github.com/status-im/status-go/geth/testing"
 )
-
-func (s *JailTestSuite) TestJailTimeoutFailure() {
-	require := s.Require()
-
-	cell, err := s.jail.NewCell(testChatID)
-	require.NoError(err)
-	require.NotNil(cell)
-	defer cell.Stop()
-
-	// Attempt to run a timeout string against a Cell.
-	_, err = cell.Run(`
-		var timerCounts = 0;
- 		setTimeout(function(n){		
- 			if (Date.now() - n < 50) {
- 				throw new Error("Timed out");
- 			}
-
-			timerCounts++;
- 		}, 30, Date.now());
- 	`)
-	require.NoError(err)
-
-	// wait at least 10x longer to decrease probability
-	// of false negatives as we using real clock here
-	time.Sleep(300 * time.Millisecond)
-
-	value, err := cell.Get("timerCounts")
-	require.NoError(err)
-	require.True(value.IsNumber())
-	require.Equal("0", value.String())
-}
 
 func (s *JailTestSuite) TestJailTimeout() {
 	require := s.Require()
@@ -50,7 +20,7 @@ func (s *JailTestSuite) TestJailTimeout() {
 	// Attempt to run a timeout string against a Cell.
 	_, err = cell.Run(`
 		var timerCounts = 0;
- 		setTimeout(function(n){		
+ 		setTimeout(function(n){
  			if (Date.now() - n < 50) {
  				throw new Error("Timed out");
  			}

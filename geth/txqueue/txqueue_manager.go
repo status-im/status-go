@@ -198,7 +198,10 @@ func (m *Manager) completeLocalTransaction(queuedTx *common.QueuedTx, password s
 		return gethcommon.Hash{}, err
 	}
 
-	return les.StatusBackend.SendTransaction(context.Background(), status.SendTxArgs(queuedTx.Args), password)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	return les.StatusBackend.SendTransaction(ctx, status.SendTxArgs(queuedTx.Args), password)
 }
 
 func (m *Manager) completeRemoteTransaction(queuedTx *common.QueuedTx, password string) (gethcommon.Hash, error) {
