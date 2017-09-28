@@ -1,10 +1,36 @@
-.PHONY: statusgo all test xgo clean
+.PHONY: statusgo all test xgo clean help
 .PHONY: statusgo-android statusgo-ios
 
 GOBIN = build/bin
 GO ?= latest
 
-statusgo:
+# This is a code for automatic help generator.
+# It supports ANSI colors and categories.
+# To add new item into help output, simply add comments
+# starting with '##'. To add category, use @category.
+GREEN  := $(shell tput -Txterm setaf 2)
+WHITE  := $(shell tput -Txterm setaf 7)
+YELLOW := $(shell tput -Txterm setaf 3)
+RESET  := $(shell tput -Txterm sgr0)
+HELP_FUN = \
+		   %help; \
+		   while(<>) { push @{$$help{$$2 // 'options'}}, [$$1, $$3] if /^([a-zA-Z\-]+)\s*:.*\#\#(?:@([a-zA-Z\-]+))?\s(.*)$$/ }; \
+		   print "Usage: make [target]\n\n"; \
+		   for (sort keys %help) { \
+			   print "${WHITE}$$_:${RESET}\n"; \
+			   for (@{$$help{$$_}}) { \
+				   $$sep = " " x (32 - length $$_->[0]); \
+				   print "  ${YELLOW}$$_->[0]${RESET}$$sep${GREEN}$$_->[1]${RESET}\n"; \
+			   }; \
+			   print "\n"; \
+		   }
+
+help: ##@other Show this help
+	@perl -e '$(HELP_FUN)' $(MAKEFILE_LIST)
+
+# Main targets
+
+statusgo: ##@build Build status-go as statusd server
 	build/env.sh go build -i -o $(GOBIN)/statusd -v $(shell build/testnet-flags.sh) ./cmd/statusd
 	@echo "\nCompilation done.\nRun \"build/bin/statusd help\" to view available commands."
 
@@ -12,15 +38,15 @@ statusgo-cross: statusgo-android statusgo-ios
 	@echo "Full cross compilation done."
 	@ls -ld $(GOBIN)/statusgo-*
 
-statusgo-android: xgo
+statusgo-android: xgo	##@cross-compile Build status-go for Android
 	build/env.sh $(GOBIN)/xgo --image farazdagi/xgo --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=android-16/aar -v $(shell build/testnet-flags.sh) ./cmd/statusd
 	@echo "Android cross compilation done."
 
-statusgo-ios: xgo
+statusgo-ios: xgo	##@cross-compile Build status-go for iOS
 	build/env.sh $(GOBIN)/xgo --image farazdagi/xgo --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v $(shell build/testnet-flags.sh) ./cmd/statusd
 	@echo "iOS framework cross compilation done."
 
-statusgo-ios-simulator: xgo
+statusgo-ios-simulator: xgo	##@cross-compile Build status-go for iOS Simulator
 	@build/env.sh docker pull farazdagi/xgo-ios-simulator
 	build/env.sh $(GOBIN)/xgo --image farazdagi/xgo-ios-simulator --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v $(shell build/testnet-flags.sh) ./cmd/statusd
 	@echo "iOS framework cross compilation done."
@@ -55,7 +81,7 @@ ci: mock
 	build/env.sh go test -timeout 40m -v ./extkeys
 	build/env.sh go test -timeout 1m -v ./helpers/...
 
-generate:
+generate:	##@other Regenerate assets and other auto-generated stuff
 	cp ./node_modules/web3/dist/web3.js ./static/scripts/web3.js
 	build/env.sh go generate ./static
 	rm ./static/scripts/web3.js
@@ -67,7 +93,7 @@ lint-deps:
 lint-cur:
 	gometalinter --disable-all --enable=deadcode extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
 
-lint:
+lint: ##@tests Run meta linter on code
 	@echo "Linter: go vet\n--------------------"
 	@gometalinter --disable-all --enable=vet extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
 	@echo "Linter: go vet --shadow\n--------------------"
@@ -114,10 +140,10 @@ lint:
 mock-install:
 	go get -u github.com/golang/mock/mockgen
 
-mock: mock-install
+mock: mock-install ##@other Regenerate mocks
 	mockgen -source=geth/common/types.go -destination=geth/common/types_mock.go -package=common
 
-test:
+test: ##@tests Run tests
 	@build/env.sh echo "mode: set" > coverage-all.out
 	build/env.sh go test -coverprofile=coverage.out -covermode=set ./geth/api
 	@build/env.sh tail -n +2 coverage.out >> coverage-all.out
@@ -171,6 +197,6 @@ test-cmd:
 	@build/env.sh go tool cover -html=coverage.out -o coverage.html
 	@build/env.sh go tool cover -func=coverage.out
 
-clean:
+clean: ##@other Cleanup
 	rm -fr build/bin/*
 	rm coverage.out coverage-all.out coverage.html
