@@ -73,6 +73,7 @@ func (jail *Jail) Stop() {
 	for _, cell := range jail.cells {
 		cell.Stop()
 	}
+	jail.cells = nil
 	jail.cellsMx.Unlock()
 }
 

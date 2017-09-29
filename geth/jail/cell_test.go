@@ -14,6 +14,7 @@ func (s *JailTestSuite) TestJailTimeoutFailure() {
 	cell, err := s.jail.NewCell(testChatID)
 	require.NoError(err)
 	require.NotNil(cell)
+	defer cell.Stop()
 
 	// Attempt to run a timeout string against a Cell.
 	_, err = cell.Run(`
@@ -44,6 +45,7 @@ func (s *JailTestSuite) TestJailTimeout() {
 	cell, err := s.jail.NewCell(testChatID)
 	require.NoError(err)
 	require.NotNil(cell)
+	defer cell.Stop()
 
 	// Attempt to run a timeout string against a Cell.
 	_, err = cell.Run(`
@@ -78,6 +80,7 @@ func (s *JailTestSuite) TestJailLoopInCall() {
 	cell, err := s.jail.Cell(testChatID)
 	require.NoError(err)
 	require.NotNil(cell)
+	defer cell.Stop()
 
 	items := make(chan string)
 
@@ -116,6 +119,7 @@ func (s *JailTestSuite) TestJailLoopRace() {
 	cell, err := s.jail.NewCell(testChatID)
 	require.NoError(err)
 	require.NotNil(cell)
+	defer cell.Stop()
 
 	items := make(chan struct{})
 
@@ -161,6 +165,7 @@ func (s *JailTestSuite) TestJailFetchPromise() {
 	cell, err := s.jail.NewCell(testChatID)
 	require.NoError(err)
 	require.NotNil(cell)
+	defer cell.Stop()
 
 	dataCh := make(chan otto.Value, 1)
 	errCh := make(chan otto.Value, 1)
@@ -197,6 +202,7 @@ func (s *JailTestSuite) TestJailFetchCatch() {
 	cell, err := s.jail.NewCell(testChatID)
 	require.NoError(err)
 	require.NotNil(cell)
+	defer cell.Stop()
 
 	dataCh := make(chan otto.Value, 1)
 	errCh := make(chan otto.Value, 1)
@@ -245,6 +251,7 @@ func (s *JailTestSuite) TestJailFetchRace() {
 	cell, err := s.jail.NewCell(testChatID)
 	require.NoError(err)
 	require.NotNil(cell)
+	defer cell.Stop()
 
 	dataCh := make(chan otto.Value, 1)
 	errCh := make(chan otto.Value, 1)
