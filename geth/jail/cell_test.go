@@ -299,3 +299,54 @@ func (s *JailTestSuite) TestJailFetchRace() {
 		}
 	}
 }
+
+// TestJailLoopCancel tests that cell.Stop() really cancels event
+// loop and pending tasks.
+func (s *JailTestSuite) TestJailLoopCancel() {
+	require := s.Require()
+
+	// load Status JS and add test command to it
+	s.jail.BaseJS(baseStatusJSCode)
+	s.jail.Parse(testChatID, ``)
+
+	cell, err := s.jail.Cell(testChatID)
+	require.NoError(err)
+	require.NotNil(cell)
+
+	var count int
+	err = cell.Set("__captureResponse", func(val string) otto.Value {
+		count++
+		return otto.UndefinedValue()
+	})
+	require.NoError(err)
+
+	_, err = cell.Run(`
+		function callRunner(val, delay){
+			return setTimeout(function(){
+				__captureResponse(val);
+			}, delay);
+		}
+	`)
+	require.NoError(err)
+
+	// Run 5 timeout tasks to be executed in: 1, 2, 3, 4 and 5 secs
+	for i := 1; i <= 5; i++ {
+		_, err = cell.Call("callRunner", nil, "value", i*1000)
+		require.NoError(err)
+	}
+
+	// Wait 1.5 second (so only one task executed) so far
+	// and stop the cell (event loop should die)
+	time.Sleep(1500 * time.Millisecond)
+	cell.Stop()
+
+	// check that only 1 task has increased counter
+	require.Equal(1, count)
+
+	// wait 2 seconds more (so at least two more tasks would
+	// have been executed if event loop is still running)
+	<-time.After(2 * time.Second)
+
+	// check that counter hasn't increased
+	require.Equal(1, count)
+}
