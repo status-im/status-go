@@ -1,19 +1,25 @@
 package api_test
 
 import (
+	"encoding/json"
 	"math/rand"
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/keystore"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/les"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
+	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/geth/signal"
 	. "github.com/status-im/status-go/geth/testing"
+	"github.com/status-im/status-go/geth/txqueue"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -158,7 +164,7 @@ func (s *BackendTestSuite) TestCallRPC() {
 				"data": "0xd46e8dd67c5d32be8d46e8dd67c5d32be8058bb8eb970870f072445675058bb8eb970870f072445675"}],"id":1}`,
 			func(resultJSON string) {
 				log.Info("eth_sendTransaction")
-				s.T().Log("GOT: ", resultJSON)
+				s.NotContains(resultJSON, "error")
 				progress <- struct{}{}
 			},
 		},
@@ -206,6 +212,125 @@ func (s *BackendTestSuite) TestCallRPC() {
 			break
 		}
 	}
+}
+
+func (s *BackendTestSuite) TestCallRPCSendTransaction() {
+	nodeConfig, err := MakeTestNodeConfig(params.RopstenNetworkID)
+	s.NoError(err)
+
+	nodeStarted, err := s.backend.StartNode(nodeConfig)
+	s.NoError(err)
+	defer s.backend.StopNode()
+
+	<-nodeStarted
+
+	// Allow to sync the blockchain.
+	time.Sleep(TestConfig.Node.SyncSeconds * time.Second)
+
+	err = s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
+	s.NoError(err)
+
+	transactionCompleted := make(chan struct{})
+
+	var txHash gethcommon.Hash
+	signal.SetDefaultNodeNotificationHandler(func(rawSignal string) {
+		var signal signal.Envelope
+		err := json.Unmarshal([]byte(rawSignal), &signal)
+		s.NoError(err)
+
+		if signal.Type == txqueue.EventTransactionQueued {
+			event := signal.Event.(map[string]interface{})
+			txID := event["id"].(string)
+			txHash, err = s.backend.CompleteTransaction(common.QueuedTxID(txID), TestConfig.Account1.Password)
+			s.NoError(err, "cannot complete queued transaction %s", txID)
+
+			close(transactionCompleted)
+		}
+	})
+
+	result := s.backend.CallRPC(`{
+		"jsonrpc": "2.0",
+		"id": 1,
+		"method": "eth_sendTransaction",
+		"params": [{
+			"from": "` + TestConfig.Account1.Address + `",
+			"to": "0xd46e8dd67c5d32be8058bb8eb970870f07244567",
+			"value": "0x9184e72a"
+		}]
+	}`)
+	s.NotContains(result, "error")
+
+	select {
+	case <-transactionCompleted:
+	case <-time.After(time.Minute):
+		s.FailNow("sending transaction timed out")
+	}
+
+	s.Equal(`{"jsonrpc":"2.0","id":1,"result":"`+txHash.String()+`"}`, result)
+}
+
+func (s *BackendTestSuite) TestCallRPCSendTransactionUpstream() {
+	nodeConfig, err := MakeTestNodeConfig(params.RopstenNetworkID)
+	s.NoError(err)
+
+	nodeConfig.UpstreamConfig.Enabled = true
+	nodeConfig.UpstreamConfig.URL = "https://ropsten.infura.io/nKmXgiFgc2KqtoQ8BCGJ"
+
+	nodeStarted, err := s.backend.StartNode(nodeConfig)
+	s.NoError(err)
+	defer s.backend.StopNode()
+
+	<-nodeStarted
+
+	// Allow to sync the blockchain.
+	time.Sleep(TestConfig.Node.SyncSeconds * time.Second)
+
+	err = s.backend.AccountManager().SelectAccount(TestConfig.Account2.Address, TestConfig.Account2.Password)
+	s.NoError(err)
+
+	transactionCompleted := make(chan struct{})
+
+	var txHash gethcommon.Hash
+	signal.SetDefaultNodeNotificationHandler(func(rawSignal string) {
+		var signal signal.Envelope
+		err := json.Unmarshal([]byte(rawSignal), &signal)
+		s.NoError(err)
+
+		if signal.Type == txqueue.EventTransactionQueued {
+			event := signal.Event.(map[string]interface{})
+			txID := event["id"].(string)
+
+			// Complete with a wrong passphrase.
+			txHash, err = s.backend.CompleteTransaction(common.QueuedTxID(txID), "some-invalid-passphrase")
+			s.EqualError(err, keystore.ErrDecrypt.Error(), "should return an error as the passphrase was invalid")
+
+			// Complete with a correct passphrase.
+			txHash, err = s.backend.CompleteTransaction(common.QueuedTxID(txID), TestConfig.Account2.Password)
+			s.NoError(err, "cannot complete queued transaction %s", txID)
+
+			close(transactionCompleted)
+		}
+	})
+
+	result := s.backend.CallRPC(`{
+		"jsonrpc": "2.0",
+		"id": 1,
+		"method": "eth_sendTransaction",
+		"params": [{
+			"from": "` + TestConfig.Account2.Address + `",
+			"to": "` + TestConfig.Account1.Address + `",
+			"value": "0x9184e72a"
+		}]
+	}`)
+	s.NotContains(result, "error")
+
+	select {
+	case <-transactionCompleted:
+	case <-time.After(time.Minute):
+		s.FailNow("sending transaction timed out")
+	}
+
+	s.Equal(`{"jsonrpc":"2.0","id":1,"result":"`+txHash.String()+`"}`, result)
 }
 
 // FIXME(tiabc): There's also a test with the same name in geth/node/manager_test.go
@@ -263,8 +388,8 @@ func (s *BackendTestSuite) TestRaceConditions() {
 			log.Info("AccountManager()")
 			instance := s.backend.AccountManager()
 			s.NotNil(instance)
-			s.IsType(&node.AccountManager{}, instance)
-			s.T().Logf("AccountManager(), result: %v", instance)
+			s.IsType(&account.Manager{}, instance)
+			s.T().Logf("Manager(), result: %v", instance)
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {

@@ -14,9 +14,10 @@ import (
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/log"
-	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/geth/signal"
 	. "github.com/status-im/status-go/geth/testing"
+	"github.com/status-im/status-go/geth/txqueue"
 	"github.com/status-im/status-go/static"
 )
 
@@ -55,12 +56,12 @@ func (s *BackendTestSuite) TestJailSendQueuedTransaction() {
 
 	// replace transaction notification handler
 	requireMessageId := false
-	node.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var envelope node.SignalEnvelope
+	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+		var envelope signal.Envelope
 		err := json.Unmarshal([]byte(jsonEvent), &envelope)
 		s.NoError(err, fmt.Sprintf("cannot unmarshal JSON: %s", jsonEvent))
 
-		if envelope.Type == node.EventTransactionQueued {
+		if envelope.Type == txqueue.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
 			messageId, ok := event["message_id"].(string)
 			s.True(ok, "Message id is required, but not found")
@@ -213,13 +214,13 @@ func (s *BackendTestSuite) TestContractDeployment() {
 
 	// replace transaction notification handler
 	var txHash gethcommon.Hash
-	node.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var envelope node.SignalEnvelope
+	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+		var envelope signal.Envelope
 		var err error
 		err = json.Unmarshal([]byte(jsonEvent), &envelope)
 		require.NoError(err, fmt.Sprintf("cannot unmarshal JSON: %s", jsonEvent))
 
-		if envelope.Type == node.EventTransactionQueued {
+		if envelope.Type == txqueue.EventTransactionQueued {
 			// Use s.* for assertions - require leaves the channel unclosed.
 
 			event := envelope.Event.(map[string]interface{})
@@ -386,7 +387,6 @@ func (s *BackendTestSuite) TestJailWhisper() {
 				if (!sent) {
 					throw 'message not sent: ' + JSON.stringify(message);
 				}
-
 
 				var filterName = '` + whisperMessage1 + `';
 				var filterId = filter.filterId;
@@ -575,11 +575,13 @@ func (s *BackendTestSuite) TestJailWhisper() {
 
 		jailInstance.Parse(testCaseKey, `
 			var shh = web3.shh;
+			// topic must be 4-byte long
 			var makeTopic = function () {
-				var min = 1;
-				var max = Math.pow(16, 8);
-				var randInt = Math.floor(Math.random() * (max - min + 1)) + min;
-				return web3.toHex(randInt);
+				var topic = '0x';
+				for (var i = 0; i < 8; i++) {
+					topic += Math.floor(Math.random() * 16).toString(16);
+				}
+				return topic;
 			};
 		`)
 
@@ -715,13 +717,13 @@ func (s *BackendTestSuite) TestJailVMPersistence() {
 	require.NotContains(parseResult, "error", "further will fail if initial parsing failed")
 
 	var wg sync.WaitGroup
-	node.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var envelope node.SignalEnvelope
+	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+		var envelope signal.Envelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
 			s.T().Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
 		}
-		if envelope.Type == node.EventTransactionQueued {
+		if envelope.Type == txqueue.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
 			s.T().Logf("Transaction queued (will be completed shortly): {id: %s}\n", event["id"].(string))
 

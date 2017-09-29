@@ -5,12 +5,14 @@ import (
 	"sync"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/les"
+	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/geth/signal"
+	"github.com/status-im/status-go/geth/txqueue"
 )
 
 // StatusBackend implements Status.im service
@@ -29,8 +31,8 @@ func NewStatusBackend() *StatusBackend {
 	defer log.Info("Status backend initialized")
 
 	nodeManager := node.NewNodeManager()
-	accountManager := node.NewAccountManager(nodeManager)
-	txQueueManager := node.NewTxQueueManager(nodeManager, accountManager)
+	accountManager := account.NewManager(nodeManager)
+	txQueueManager := txqueue.NewManager(nodeManager, accountManager)
 
 	return &StatusBackend{
 		nodeManager:    nodeManager,
@@ -99,8 +101,8 @@ func (m *StatusBackend) onNodeStart(nodeStarted <-chan struct{}, backendReady ch
 	log.Info("Account reselected")
 
 	close(backendReady)
-	node.SendSignal(node.SignalEnvelope{
-		Type:  node.EventNodeReady,
+	signal.Send(signal.Envelope{
+		Type:  signal.EventNodeReady,
 		Event: struct{}{},
 	})
 }
@@ -224,19 +226,9 @@ func (m *StatusBackend) DiscardTransactions(ids []common.QueuedTxID) map[common.
 
 // registerHandlers attaches Status callback handlers to running node
 func (m *StatusBackend) registerHandlers() error {
-	runningNode, err := m.nodeManager.Node()
-	if err != nil {
-		return err
-	}
-
-	var lightEthereum *les.LightEthereum
-	if err := runningNode.Service(&lightEthereum); err != nil {
-		log.Error("Cannot get light ethereum service", "error", err)
-		return err
-	}
-
-	lightEthereum.StatusBackend.SetAccountsFilterHandler(m.accountManager.AccountsListRequestHandler())
-	log.Info("Registered handler", "fn", "AccountsFilterHandler")
+	rpcClient := m.NodeManager().RPCClient()
+	rpcClient.RegisterHandler("eth_accounts", m.accountManager.AccountsRPCHandler())
+	rpcClient.RegisterHandler("eth_sendTransaction", m.txQueueManager.SendTransactionRPCHandler)
 
 	m.txQueueManager.SetTransactionQueueHandler(m.txQueueManager.TransactionQueueHandler())
 	log.Info("Registered handler", "fn", "TransactionQueueHandler")

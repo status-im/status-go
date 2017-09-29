@@ -4,9 +4,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/les"
+	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/common"
-	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
 	. "github.com/status-im/status-go/geth/testing"
 )
@@ -22,14 +21,8 @@ func (s *BackendTestSuite) TestAccountsList() {
 	require.NoError(err)
 	require.NotNil(runningNode)
 
-	var lesService *les.LightEthereum
-	require.NoError(runningNode.Service(&lesService))
-	require.NotNil(lesService)
-
-	accounts := lesService.StatusBackend.AccountManager().Accounts()
-	for _, acc := range accounts {
-		fmt.Println(acc.Hex())
-	}
+	accounts, err := s.backend.AccountManager().Accounts()
+	require.NoError(err)
 
 	// make sure that we start with empty accounts list (nobody has logged in yet)
 	require.Zero(len(accounts), "accounts returned, while there should be none (we haven't logged in yet)")
@@ -39,7 +32,8 @@ func (s *BackendTestSuite) TestAccountsList() {
 	require.NoError(err)
 
 	// ensure that there is still no accounts returned
-	accounts = lesService.StatusBackend.AccountManager().Accounts()
+	accounts, err = s.backend.AccountManager().Accounts()
+	require.NoError(err)
 	require.Zero(len(accounts), "accounts returned, while there should be none (we haven't logged in yet)")
 
 	// select account (sub-accounts will be created for this key)
@@ -47,7 +41,8 @@ func (s *BackendTestSuite) TestAccountsList() {
 	require.NoError(err, "account selection failed")
 
 	// at this point main account should show up
-	accounts = lesService.StatusBackend.AccountManager().Accounts()
+	accounts, err = s.backend.AccountManager().Accounts()
+	require.NoError(err)
 	require.Equal(1, len(accounts), "exactly single account is expected (main account)")
 	require.Equal(string(accounts[0].Hex()), "0x"+address,
 		fmt.Sprintf("main account is not retured as the first key: got %s, expected %s", accounts[0].Hex(), "0x"+address))
@@ -57,7 +52,8 @@ func (s *BackendTestSuite) TestAccountsList() {
 	require.NoError(err, "cannot create sub-account")
 
 	// now we expect to see both main account and sub-account 1
-	accounts = lesService.StatusBackend.AccountManager().Accounts()
+	accounts, err = s.backend.AccountManager().Accounts()
+	require.NoError(err)
 	require.Equal(2, len(accounts), "exactly 2 accounts are expected (main + sub-account 1)")
 	require.Equal(string(accounts[0].Hex()), "0x"+address, "main account is not retured as the first key")
 	require.Equal(string(accounts[1].Hex()), "0x"+subAccount1, "subAcount1 not returned")
@@ -68,7 +64,8 @@ func (s *BackendTestSuite) TestAccountsList() {
 	require.False(subAccount1 == subAccount2 || subPubKey1 == subPubKey2, "sub-account index auto-increament failed")
 
 	// finally, all 3 accounts should show up (main account, sub-accounts 1 and 2)
-	accounts = lesService.StatusBackend.AccountManager().Accounts()
+	accounts, err = s.backend.AccountManager().Accounts()
+	require.NoError(err)
 	require.Equal(3, len(accounts), "unexpected number of accounts")
 	require.Equal(string(accounts[0].Hex()), "0x"+address, "main account is not retured as the first key")
 
@@ -97,17 +94,17 @@ func (s *BackendTestSuite) TestCreateChildAccount() {
 	require.NoError(err)
 	s.T().Logf("Account created: {address: %s, key: %s, mnemonic:%s}", address, pubKey, mnemonic)
 
-	account, err := common.ParseAccountString(address)
+	acct, err := common.ParseAccountString(address)
 	require.NoError(err, "can not get account from address")
 
 	// obtain decrypted key, and make sure that extended key (which will be used as root for sub-accounts) is present
-	_, key, err := keyStore.AccountDecryptedKey(account, TestConfig.Account1.Password)
+	_, key, err := keyStore.AccountDecryptedKey(acct, TestConfig.Account1.Password)
 	require.NoError(err, "can not obtain decrypted account key")
 	require.NotNil(key.ExtendedKey, "CKD#2 has not been generated for new account")
 
 	// try creating sub-account, w/o selecting main account i.e. w/o login to main account
 	_, _, err = s.backend.AccountManager().CreateChildAccount("", TestConfig.Account1.Password)
-	require.EqualError(node.ErrNoAccountSelected, err.Error(), "expected error is not returned (tried to create sub-account w/o login)")
+	require.EqualError(account.ErrNoAccountSelected, err.Error(), "expected error is not returned (tried to create sub-account w/o login)")
 
 	err = s.backend.AccountManager().SelectAccount(address, TestConfig.Account1.Password)
 	require.NoError(err, "cannot select account")
@@ -268,7 +265,7 @@ func (s *BackendTestSuite) TestSelectedAccountOnRestart() {
 
 	// make sure that no account is selected by default
 	selectedAccount, err := s.backend.AccountManager().SelectedAccount()
-	require.EqualError(node.ErrNoAccountSelected, err.Error(), "account selected, but should not be")
+	require.EqualError(account.ErrNoAccountSelected, err.Error(), "account selected, but should not be")
 	require.Nil(selectedAccount)
 
 	// select account
@@ -332,7 +329,7 @@ func (s *BackendTestSuite) TestSelectedAccountOnRestart() {
 	require.False(whisperService.HasKeyPair(pubKey1), "identity should not be present, but it is still present in whisper")
 
 	selectedAccount, err = s.backend.AccountManager().SelectedAccount()
-	require.EqualError(node.ErrNoAccountSelected, err.Error())
+	require.EqualError(account.ErrNoAccountSelected, err.Error())
 	require.Nil(selectedAccount)
 }
 
@@ -378,4 +375,19 @@ func (s *BackendTestSuite) TestRPCEthAccountsWithUpstream() {
               "params": []
       }`)
 	require.Equal(expectedResponse, resp)
+}
+
+// regression test: eth_getTransactionReceipt with invalid transaction hash should return null
+func (s *BackendTestSuite) TestRegressionGetTransactionReceipt() {
+	require := s.Require()
+
+	s.StartTestBackend(params.RopstenNetworkID)
+	defer s.StopTestBackend()
+
+	rpcClient := s.backend.NodeManager().RPCClient()
+
+	// note: transaction hash is assumed to be invalid
+	got := rpcClient.CallRaw(`{"jsonrpc":"2.0","method":"eth_getTransactionReceipt","params":["0xbbebf28d0a3a3cbb38e6053a5b21f08f82c62b0c145a17b1c4313cac3f68ae7c"],"id":7}`)
+	expected := `{"jsonrpc":"2.0","id":7,"result":null}`
+	require.Equal(expected, got)
 }

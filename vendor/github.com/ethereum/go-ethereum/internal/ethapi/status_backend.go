@@ -45,7 +45,7 @@ func (b *StatusBackend) AccountManager() *status.AccountManager {
 	return b.am
 }
 
-// SendTransaction wraps call to PublicTransactionPoolAPI.SendTransaction
+// SendTransaction wraps call to PublicTransactionPoolAPI.SendTransactionWithPassphrase
 func (b *StatusBackend) SendTransaction(ctx context.Context, args status.SendTxArgs, passphrase string) (common.Hash, error) {
 	if ctx == nil {
 		ctx = context.Background()
@@ -57,7 +57,7 @@ func (b *StatusBackend) SendTransaction(ctx context.Context, args status.SendTxA
 		}
 	}
 
-	return b.txapi.SendTransaction(ctx, SendTxArgs(args), passphrase)
+	return b.txapi.SendTransactionWithPassphrase(ctx, SendTxArgs(args), passphrase)
 }
 
 // EstimateGas uses underlying blockchain API to obtain gas for a given tx arguments

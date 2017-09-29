@@ -1,4 +1,4 @@
-package node_test
+package txqueue
 
 import (
 	"context"
@@ -12,7 +12,6 @@ import (
 	"github.com/golang/mock/gomock"
 
 	"github.com/status-im/status-go/geth/common"
-	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
 	. "github.com/status-im/status-go/geth/testing"
 )
@@ -58,7 +57,7 @@ func (s *TxQueueTestSuite) TestCompleteTransaction() {
 	// and treat as success.
 	s.nodeManagerMock.EXPECT().LightEthereumService().Return(nil, errTxAssumedSent)
 
-	txQueueManager := node.NewTxQueueManager(s.nodeManagerMock, s.accountManagerMock)
+	txQueueManager := NewManager(s.nodeManagerMock, s.accountManagerMock)
 
 	txQueueManager.Start()
 	defer txQueueManager.Stop()
@@ -108,7 +107,7 @@ func (s *TxQueueTestSuite) TestCompleteTransactionMultipleTimes() {
 	// and treat as success.
 	s.nodeManagerMock.EXPECT().LightEthereumService().Return(nil, errTxAssumedSent)
 
-	txQueueManager := NewTxQueueManager(s.nodeManagerMock, s.accountManagerMock)
+	txQueueManager := NewManager(s.nodeManagerMock, s.accountManagerMock)
 
 	txQueueManager.Start()
 	defer txQueueManager.Stop()
@@ -162,7 +161,7 @@ func (s *TxQueueTestSuite) TestAccountMismatch() {
 		Address: common.FromAddress(TestConfig.Account2.Address),
 	}, nil)
 
-	txQueueManager := node.NewTxQueueManager(s.nodeManagerMock, s.accountManagerMock)
+	txQueueManager := NewManager(s.nodeManagerMock, s.accountManagerMock)
 
 	txQueueManager.Start()
 	defer txQueueManager.Stop()
@@ -181,7 +180,7 @@ func (s *TxQueueTestSuite) TestAccountMismatch() {
 	// the return handler is called.
 	txQueueManager.SetTransactionReturnHandler(func(queuedTx *common.QueuedTx, err error) {
 		s.Equal(tx.ID, queuedTx.ID)
-		s.Equal(node.ErrInvalidCompleteTxSender, err)
+		s.Equal(ErrInvalidCompleteTxSender, err)
 		s.Nil(tx.Err)
 	})
 
@@ -189,7 +188,7 @@ func (s *TxQueueTestSuite) TestAccountMismatch() {
 	s.NoError(err)
 
 	_, err = txQueueManager.CompleteTransaction(tx.ID, TestConfig.Account1.Password)
-	s.Equal(err, node.ErrInvalidCompleteTxSender)
+	s.Equal(err, ErrInvalidCompleteTxSender)
 
 	// Transaction should stay in the queue as mismatched accounts
 	// is a recoverable error.
@@ -208,7 +207,7 @@ func (s *TxQueueTestSuite) TestInvalidPassword() {
 	// Set ErrDecrypt error response as expected with a wrong password.
 	s.nodeManagerMock.EXPECT().LightEthereumService().Return(nil, keystore.ErrDecrypt)
 
-	txQueueManager := node.NewTxQueueManager(s.nodeManagerMock, s.accountManagerMock)
+	txQueueManager := NewManager(s.nodeManagerMock, s.accountManagerMock)
 
 	txQueueManager.Start()
 	defer txQueueManager.Stop()
@@ -243,7 +242,7 @@ func (s *TxQueueTestSuite) TestInvalidPassword() {
 }
 
 func (s *TxQueueTestSuite) TestDiscardTransaction() {
-	txQueueManager := node.NewTxQueueManager(s.nodeManagerMock, s.accountManagerMock)
+	txQueueManager := NewManager(s.nodeManagerMock, s.accountManagerMock)
 
 	txQueueManager.Start()
 	defer txQueueManager.Stop()
@@ -260,7 +259,7 @@ func (s *TxQueueTestSuite) TestDiscardTransaction() {
 
 	txQueueManager.SetTransactionReturnHandler(func(queuedTx *common.QueuedTx, err error) {
 		s.Equal(tx.ID, queuedTx.ID)
-		s.Equal(node.ErrQueuedTxDiscarded, err)
+		s.Equal(ErrQueuedTxDiscarded, err)
 	})
 
 	err := txQueueManager.QueueTransaction(tx)
@@ -272,9 +271,9 @@ func (s *TxQueueTestSuite) TestDiscardTransaction() {
 	}()
 
 	err = txQueueManager.WaitForTransaction(tx)
-	s.Equal(node.ErrQueuedTxDiscarded, err)
+	s.Equal(ErrQueuedTxDiscarded, err)
 	// Check that error is assigned to the transaction.
-	s.Equal(node.ErrQueuedTxDiscarded, tx.Err)
+	s.Equal(ErrQueuedTxDiscarded, tx.Err)
 	// Transaction should be already removed from the queue.
 	s.False(txQueueManager.TransactionQueue().Has(tx.ID))
 }

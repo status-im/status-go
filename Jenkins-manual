@@ -16,7 +16,17 @@ def getVersion(branch, sha, buildNumber) {
 }
 
 node('linux') {
-    checkout scm
+    paramBranch = env.branch ? ('*/' + env.branch) : '*/develop'
+
+    checkout(
+        changelog: false,
+        poll: false,
+        scm: [$class: 'GitSCM', branches: [[name: paramBranch]],
+        doGenerateSubmoduleConfigurations: false,
+        extensions: [],
+        submoduleCfg: [],
+        userRemoteConfigs: [[url: 'https://github.com/status-im/status-go']]]
+    )
 
     def remoteOriginRegex = ~/^remotes\/origin\//
 
@@ -40,14 +50,22 @@ node('linux') {
 
         parallel (
             'statusgo-android': {
-                sh 'make statusgo-android'
+                if (env.platform == 'android') {
+                    sh 'make statusgo-android'
+                } else {
+                    print 'Skipping Android'
+                }
             },
             'statusgo-ios-simulator': {
-                sh '''
-                    make statusgo-ios-simulator
-                    cd build/bin/statusgo-ios-9.3-framework/
-                    zip -r status-go-ios.zip Statusgo.framework
-                '''
+                if (env.platform == 'ios-simulator') {
+                    sh '''
+                        make statusgo-ios-simulator
+                        cd build/bin/statusgo-ios-9.3-framework/
+                        zip -r status-go-ios.zip Statusgo.framework
+                    '''
+                } else {
+                    print 'Skipping ios-simulator'
+                }
             }
         )
     }
