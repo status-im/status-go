@@ -151,6 +151,11 @@ func (jail *Jail) Send(call otto.FunctionCall, vm *vm.VM) otto.Value {
 	}
 
 	rpc := jail.nodeManager.RPCClient()
+	// TODO(divan): remove this check as soon as jail cells have
+	// proper cancellation mechanism implemented.
+	if rpc == nil {
+		throwJSException(fmt.Errorf("Error getting RPC client. Node stopped?"))
+	}
 	response := rpc.CallRaw(request.String())
 
 	// unmarshal response to pass to otto
