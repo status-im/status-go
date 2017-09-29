@@ -827,3 +827,13 @@ func (m *MockJailManager) BaseJS(js string) {
 func (mr *MockJailManagerMockRecorder) BaseJS(js interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BaseJS", reflect.TypeOf((*MockJailManager)(nil).BaseJS), js)
 }
+
+// Stop mocks base method
+func (m *MockJailManager) Stop() {
+	m.ctrl.Call(m, "Stop")
+}
+
+// Stop indicates an expected call of Stop
+func (mr *MockJailManagerMockRecorder) Stop() *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Stop", reflect.TypeOf((*MockJailManager)(nil).Stop))
+}

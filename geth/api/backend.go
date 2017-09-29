@@ -124,6 +124,7 @@ func (m *StatusBackend) StopNode() (<-chan struct{}, error) {
 	}
 
 	m.txQueueManager.Stop()
+	m.jailManager.Stop()
 
 	backendStopped := make(chan struct{}, 1)
 	go func() {

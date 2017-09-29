@@ -275,6 +275,9 @@ type JailManager interface {
 
 	// BaseJS allows to setup initial JavaScript to be loaded on each jail.Parse()
 	BaseJS(js string)
+
+	// Stop stops all background activity of jail
+	Stop()
 }
 
 // APIResponse generic response from API
