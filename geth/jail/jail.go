@@ -30,8 +30,8 @@ type Jail struct {
 	cells   map[string]*Cell // jail supports running many isolated instances of jailed runtime
 }
 
-// New returns new Jail environment with the associated NodeManager and
-// AccountManager.
+// New returns new Jail environment with the associated NodeManager.
+// It's caller responsibility to call jail.Stop() when jail is not needed.
 func New(nodeManager common.NodeManager) *Jail {
 	if nodeManager == nil {
 		panic("Jail is missing mandatory dependencies")
@@ -65,6 +65,15 @@ func (jail *Jail) NewCell(chatID string) (common.JailCell, error) {
 	jail.cellsMx.Unlock()
 
 	return cell, nil
+}
+
+// Stop stops jail and all assosiacted cells.
+func (jail *Jail) Stop() {
+	jail.cellsMx.Lock()
+	for _, cell := range jail.cells {
+		cell.Stop()
+	}
+	jail.cellsMx.Unlock()
 }
 
 // Cell returns the existing instance of Cell.

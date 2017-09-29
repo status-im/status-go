@@ -1,6 +1,7 @@
 package loop
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -39,12 +40,11 @@ type Task interface {
 // to finalise on the VM. The channel holding the tasks pending finalising can
 // be buffered or unbuffered.
 type Loop struct {
-	vm     *vm.VM
-	id     int64
-	lock   sync.RWMutex
-	tasks  map[int64]Task
-	ready  chan Task
-	closed bool
+	vm    *vm.VM
+	id    int64
+	lock  sync.RWMutex
+	tasks map[int64]Task
+	ready chan Task
 }
 
 // New creates a new Loop with an unbuffered ready queue on a specific VM.
@@ -98,10 +98,6 @@ func (l *Loop) removeByID(id int64) {
 // Ready signals to the loop that a task is ready to be finalised. This might
 // block if the "ready channel" in the loop is at capacity.
 func (l *Loop) Ready(t Task) {
-	if l.closed {
-		return
-	}
-
 	l.ready <- t
 }
 
@@ -135,19 +131,25 @@ func (l *Loop) processTask(t Task) error {
 
 // Run handles the task scheduling and finalisation.
 // It runs infinitely waiting for new tasks.
-func (l *Loop) Run() error {
-	for t := range l.ready {
-		if t == nil {
-			continue
-		}
+func (l *Loop) Run(ctx context.Context) error {
+	for {
+		select {
+		case t := <-l.ready:
+			if t == nil {
+				continue
+			}
 
-		err := l.processTask(t)
-		if err != nil {
-			// TODO(divan): do we need to report
-			// errors up to the caller?
-			// Ignoring for now, as loop
-			// should keep running.
-			continue
+			err := l.processTask(t)
+			if err != nil {
+				// TODO(divan): do we need to report
+				// errors up to the caller?
+				// Ignoring for now, as loop
+				// should keep running.
+				continue
+			}
+		case <-ctx.Done():
+			fmt.Println(">>>>>>>>>>>> Killing loop: ULTRA KILLLLLLLL")
+			return context.Canceled
 		}
 	}
 	return nil
