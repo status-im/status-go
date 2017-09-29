@@ -3,6 +3,8 @@ package jail_test
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -282,4 +284,58 @@ func (s *JailTestSuite) TestEventSignal() {
 
 	expectedResponse := `{"jsonrpc":"2.0","result":true}`
 	require.Equal(expectedResponse, response)
+}
+
+// TestCallResponseOrder tests for problem in
+// https://github.com/status-im/status-go/issues/372
+func (s *JailTestSuite) TestCallResponseOrder() {
+	require := s.Require()
+
+	s.StartTestNode(params.RopstenNetworkID)
+	defer s.StopTestNode()
+
+	statusJS := baseStatusJSCode + `;
+	_status_catalog.commands["testCommand"] = function (params) {
+		return params.val * params.val;
+	};
+	_status_catalog.commands["calculateGasPrice"] = function (n) {
+		var gasMultiplicator = Math.pow(1.4, n).toFixed(3);
+		var price = 211000000000;
+		try {
+			price = web3.eth.gasPrice;
+		} catch (err) {}
+
+		return price * gasMultiplicator;
+	};
+	`
+	s.jail.Parse(testChatID, statusJS)
+
+	N := 1000
+	errCh := make(chan error, N)
+	var wg sync.WaitGroup
+	for i := 0; i < 1000; i++ {
+		wg.Add(2)
+		go func(i int) {
+			defer wg.Done()
+			res := s.jail.Call(testChatID, `["commands", "testCommand"]`, fmt.Sprintf(`{"val": %d}`, i))
+			if !strings.Contains(res, fmt.Sprintf("result\": %d", i*i)) {
+				errCh <- fmt.Errorf("result should be '%d', got %s", i*i, res)
+			}
+		}(i)
+
+		go func(i int) {
+			defer wg.Done()
+			res := s.jail.Call(testChatID, `["commands", "calculateGasPrice"]`, fmt.Sprintf(`%d`, i))
+			if strings.Contains(res, "error") {
+				errCh <- fmt.Errorf("result should not contain 'error', got %s", res)
+			}
+		}(i)
+	}
+
+	wg.Wait()
+
+	close(errCh)
+	for e := range errCh {
+		require.NoError(e)
+	}
 }
