@@ -148,7 +148,6 @@ func (l *Loop) Run(ctx context.Context) error {
 				continue
 			}
 		case <-ctx.Done():
-			fmt.Println(">>>>>>>>>>>> Killing loop: ULTRA KILLLLLLLL")
 			return context.Canceled
 		}
 	}
