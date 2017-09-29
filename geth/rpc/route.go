@@ -35,6 +35,7 @@ func (r *router) routeRemote(method string) bool {
 // remoteMethods contains methods that should be routed to
 // the upstream node; the rest is considered to be routed to
 // the local node.
+// A list of supported methods: https://infura.io/docs/#supported-json-rpc-methods
 // TODO(tiabc): Write a test on each of these methods to ensure they're all routed to the proper node and ensure they really work
 // TODO(tiabc: as we already caught https://github.com/status-im/status-go/issues/350 as the result of missing such test.
 // Although it's tempting to only list methods coming to the local node as there're fewer of them
@@ -85,4 +86,7 @@ var remoteMethods = [...]string{
 	"eth_getWork",
 	"eth_submitWork",
 	"eth_submitHashrate",
+	"net_version",
+	"net_peerCount",
+	"net_listening",
 }
