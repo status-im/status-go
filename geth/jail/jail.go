@@ -70,11 +70,12 @@ func (jail *Jail) NewCell(chatID string) (common.JailCell, error) {
 // Stop stops jail and all assosiacted cells.
 func (jail *Jail) Stop() {
 	jail.cellsMx.Lock()
+	defer jail.cellsMx.Unlock()
+
 	for _, cell := range jail.cells {
 		cell.Stop()
 	}
 	jail.cells = nil
-	jail.cellsMx.Unlock()
 }
 
 // Cell returns the existing instance of Cell.
