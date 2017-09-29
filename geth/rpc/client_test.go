@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/geth/node"
@@ -149,98 +151,93 @@ func (s *RPCTestSuite) TestCallRPC() {
 	require := s.Require()
 	require.NotNil(s.NodeManager)
 
-	nodeConfig, err := MakeTestNodeConfig(params.RinkebyNetworkID)
-	require.NoError(err)
+	for _, upstreamEnabled := range []bool{false, true} {
+		s.T().Logf("TestCallRPC with upstream: %t", upstreamEnabled)
 
-	nodeConfig.IPCEnabled = false
-	nodeConfig.WSEnabled = false
-	nodeConfig.HTTPHost = "" // to make sure that no HTTP interface is started
+		nodeConfig, err := MakeTestNodeConfig(params.RinkebyNetworkID)
+		require.NoError(err)
 
-	nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
-	require.NoError(err)
-	require.NotNil(nodeConfig)
+		nodeConfig.IPCEnabled = false
+		nodeConfig.WSEnabled = false
+		nodeConfig.HTTPHost = "" // to make sure that no HTTP interface is started
 
-	defer s.NodeManager.StopNode()
+		if upstreamEnabled {
+			nodeConfig.UpstreamConfig.Enabled = true
+			nodeConfig.UpstreamConfig.URL = "https://rinkeby.infura.io/nKmXgiFgc2KqtoQ8BCGJ"
+		}
 
-	<-nodeStarted
+		nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
+		require.NoError(err)
 
-	rpcClient := s.NodeManager.RPCClient()
-	require.NotNil(rpcClient)
+		<-nodeStarted
 
-	progress := make(chan struct{}, 25)
-	type rpcCall struct {
-		inputJSON string
-		validator func(resultJSON string)
-	}
-	var rpcCalls = []rpcCall{
-		{
-			`{"jsonrpc":"2.0","method":"eth_sendTransaction","params":[{
-				"from": "0xb60e8dd61c5d32be8058bb8eb970870f07233155",
-				"to": "0xd46e8dd67c5d32be8058bb8eb970870f07244567",
-				"gas": "0x76c0",
-				"gasPrice": "0x9184e72a000",
-				"value": "0x9184e72a",
-				"data": "0xd46e8dd67c5d32be8d46e8dd67c5d32be8058bb8eb970870f072445675058bb8eb970870f072445675"}],
-				"id": 1
-			}`,
-			func(resultJSON string) {
-				progress <- struct{}{}
+		rpcClient := s.NodeManager.RPCClient()
+		require.NotNil(rpcClient)
+
+		type rpcCall struct {
+			inputJSON string
+			validator func(resultJSON string)
+		}
+		var rpcCalls = []rpcCall{
+			{
+				`{"jsonrpc":"2.0","method":"shh_version","params":[],"id":67}`,
+				func(resultJSON string) {
+					expected := `{"jsonrpc":"2.0","id":67,"result":"5.0"}`
+					s.Equal(expected, resultJSON)
+				},
 			},
-		},
-		{
-			`{"jsonrpc":"2.0","method":"shh_version","params":[],"id":67}`,
-			func(resultJSON string) {
-				expected := `{"jsonrpc":"2.0","id":67,"result":"5.0"}`
-				s.Equal(expected, resultJSON)
-				progress <- struct{}{}
+			{
+				`{"jsonrpc":"2.0","method":"web3_sha3","params":["0x68656c6c6f20776f726c64"],"id":64}`,
+				func(resultJSON string) {
+					expected := `{"jsonrpc":"2.0","id":64,"result":"0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad"}`
+					s.Equal(expected, resultJSON)
+				},
 			},
-		},
-		{
-			`{"jsonrpc":"2.0","method":"web3_sha3","params":["0x68656c6c6f20776f726c64"],"id":64}`,
-			func(resultJSON string) {
-				expected := `{"jsonrpc":"2.0","id":64,"result":"0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad"}`
-				s.Equal(expected, resultJSON)
-				progress <- struct{}{}
+			{
+				`{"jsonrpc":"2.0","method":"net_version","params":[],"id":67}`,
+				func(resultJSON string) {
+					expected := `{"jsonrpc":"2.0","id":67,"result":"4"}`
+					s.Equal(expected, resultJSON)
+				},
 			},
-		},
-		{
-			`{"jsonrpc":"2.0","method":"net_version","params":[],"id":67}`,
-			func(resultJSON string) {
-				expected := `{"jsonrpc":"2.0","id":67,"result":"4"}`
-				s.Equal(expected, resultJSON)
-				progress <- struct{}{}
+			{
+				`[{"jsonrpc":"2.0","method":"net_listening","params":[],"id":67}]`,
+				func(resultJSON string) {
+					expected := `[{"jsonrpc":"2.0","id":67,"result":true}]`
+					s.Equal(expected, resultJSON)
+				},
 			},
-		},
-		{
-			`[{"jsonrpc":"2.0","method":"net_listening","params":[],"id":67}]`,
-			func(resultJSON string) {
-				expected := `[{"jsonrpc":"2.0","id":67,"result":true}]`
-				s.Equal(expected, resultJSON)
-				progress <- struct{}{}
+			{
+				`[{"jsonrpc":"2.0","method":"net_version","params":[],"id":67},{"jsonrpc":"2.0","method":"web3_sha3","params":["0x68656c6c6f20776f726c64"],"id":68}]`,
+				func(resultJSON string) {
+					expected := `[{"jsonrpc":"2.0","id":67,"result":"4"},{"jsonrpc":"2.0","id":68,"result":"0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad"}]`
+					s.Equal(expected, resultJSON)
+				},
 			},
-		},
-		{
-			`[{"jsonrpc":"2.0","method":"net_version","params":[],"id":67},{"jsonrpc":"2.0","method":"web3_sha3","params":["0x68656c6c6f20776f726c64"],"id":68}]`,
-			func(resultJSON string) {
-				expected := `[{"jsonrpc":"2.0","id":67,"result":"4"},{"jsonrpc":"2.0","id":68,"result":"0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad"}]`
-				s.Equal(expected, resultJSON)
-				progress <- struct{}{}
-			},
-		},
-	}
+		}
 
-	cnt := len(rpcCalls) - 1 // send transaction blocks up until complete/discarded/times out
-	for _, r := range rpcCalls {
-		go func(r rpcCall) {
-			resultJSON := rpcClient.CallRaw(r.inputJSON)
-			r.validator(resultJSON)
-		}(r)
-	}
+		var wg sync.WaitGroup
+		for _, r := range rpcCalls {
+			wg.Add(1)
+			go func(r rpcCall) {
+				defer wg.Done()
+				resultJSON := rpcClient.CallRaw(r.inputJSON)
+				r.validator(resultJSON)
+			}(r)
+		}
 
-	for range progress {
-		cnt -= 1
-		if cnt <= 0 {
-			break
+		done := make(chan struct{})
+		go func() {
+			wg.Wait()
+			close(done)
+		}()
+
+		select {
+		case <-time.After(time.Second * 30):
+			s.NodeManager.StopNode()
+			s.FailNow("test timed out")
+		case <-done:
+			s.NodeManager.StopNode()
 		}
 	}
 }
