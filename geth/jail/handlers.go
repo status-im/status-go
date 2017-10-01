@@ -75,11 +75,10 @@ func makeAsyncSendHandler(jail *Jail, cellInt common.JailCell) func(call otto.Fu
 		go func() {
 			response := jail.Send(call, cell.VM)
 
-			if fn := call.Argument(1); fn.Class() == "Function" {
-				cell.Lock()
-				fn.Call(otto.NullValue(), otto.NullValue(), response)
-				cell.Unlock()
-			}
+			// run callback asyncronously with args (error, response)
+			callback := call.Argument(1)
+			err := otto.NullValue()
+			cell.CallAsync(callback, err, response)
 		}()
 		return otto.UndefinedValue()
 	}

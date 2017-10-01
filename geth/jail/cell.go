@@ -6,6 +6,7 @@ import (
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/jail/internal/fetch"
 	"github.com/status-im/status-go/geth/jail/internal/loop"
+	"github.com/status-im/status-go/geth/jail/internal/loop/looptask"
 	"github.com/status-im/status-go/geth/jail/internal/timers"
 	"github.com/status-im/status-go/geth/jail/internal/vm"
 )
@@ -15,6 +16,7 @@ type Cell struct {
 	*vm.VM
 	id     string
 	cancel context.CancelFunc
+	lo     *loop.Loop
 }
 
 // newCell encapsulates what we need to create a new jailCell from the
@@ -32,9 +34,10 @@ func newCell(id string, ottoVM *otto.Otto) (*Cell, error) {
 	go lo.Run(ctx)
 
 	return &Cell{
+		VM:     cellVM,
 		id:     id,
 		cancel: cancel,
-		VM:     cellVM,
+		lo:     lo,
 	}, nil
 }
 
@@ -57,4 +60,13 @@ func registerVMHandlers(v *vm.VM, lo *loop.Loop) error {
 // Stop halts event loop associated with cell.
 func (c *Cell) Stop() {
 	c.cancel()
+}
+
+// CallAsync puts otto's function with given args into
+// event queue loop and schedules for immediate execution.
+// Intended to be used by any cell user that want's to run
+// async call, like callback.
+func (c *Cell) CallAsync(fn otto.Value, args ...interface{}) {
+	task := looptask.NewCallTask(fn, args...)
+	c.lo.Add(task)
 }
