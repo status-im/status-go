@@ -69,4 +69,6 @@ func (c *Cell) Stop() {
 func (c *Cell) CallAsync(fn otto.Value, args ...interface{}) {
 	task := looptask.NewCallTask(fn, args...)
 	c.lo.Add(task)
+	// TODO(divan): review API of `loop` package, it's contrintuitive
+	go c.lo.Ready(task)
 }
