@@ -28,6 +28,8 @@ type Jail struct {
 
 	cellsMx sync.RWMutex
 	cells   map[string]*Cell // jail supports running many isolated instances of jailed runtime
+
+	vm *vm.VM // vm for internal otto related tasks (see Send method)
 }
 
 // New returns new Jail environment with the associated NodeManager.
@@ -39,6 +41,7 @@ func New(nodeManager common.NodeManager) *Jail {
 	return &Jail{
 		nodeManager: nodeManager,
 		cells:       make(map[string]*Cell),
+		vm:          vm.New(otto.New()),
 	}
 }
 
@@ -154,9 +157,13 @@ func (jail *Jail) Call(chatID, this, args string) string {
 }
 
 // Send is a wrapper for executing RPC calls from within Otto VM.
+// It uses own jail's VM instance instead of cell's one to
+// increase safety of cell's vm usage.
+// TODO(divan): investigate if it's possible to do conversions
+// withouth involving otto code at all.
 // nolint: errcheck, unparam
-func (jail *Jail) Send(call otto.FunctionCall, vm *vm.VM) otto.Value {
-	request, err := vm.Call("JSON.stringify", nil, call.Argument(0))
+func (jail *Jail) Send(call otto.FunctionCall) otto.Value {
+	request, err := jail.vm.Call("JSON.stringify", nil, call.Argument(0))
 	if err != nil {
 		throwJSException(err)
 	}
@@ -175,7 +182,7 @@ func (jail *Jail) Send(call otto.FunctionCall, vm *vm.VM) otto.Value {
 	if err != nil {
 		throwJSException(fmt.Errorf("Error unmarshalling result: %s", err))
 	}
-	respValue, err := vm.ToValue(resp)
+	respValue, err := jail.vm.ToValue(resp)
 	if err != nil {
 		throwJSException(fmt.Errorf("Error converting result to Otto's value: %s", err))
 	}

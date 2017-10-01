@@ -73,7 +73,7 @@ func makeAsyncSendHandler(jail *Jail, cellInt common.JailCell) func(call otto.Fu
 	cell := cellInt.(*Cell)
 	return func(call otto.FunctionCall) otto.Value {
 		go func() {
-			response := jail.Send(call, cell.VM)
+			response := jail.Send(call)
 
 			// run callback asyncronously with args (error, response)
 			callback := call.Argument(1)
@@ -96,7 +96,7 @@ func makeSendHandler(jail *Jail, cellInt common.JailCell) func(call otto.Functio
 		cell.Unlock()
 		defer cell.Lock()
 
-		return jail.Send(call, cell.VM)
+		return jail.Send(call)
 	}
 }
 
