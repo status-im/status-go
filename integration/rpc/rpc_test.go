@@ -154,20 +154,17 @@ func (s *RPCTestSuite) TestCallRawResult() {
 // TestCallContextResult checks if result passed to CallContext
 // is set accordingly to its underlying memory layout.
 func (s *RPCTestSuite) TestCallContextResult() {
-	nodeConfig, err := integration.MakeTestNodeConfig(params.RopstenNetworkID)
-	s.NoError(err)
-
-	nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
-	s.NoError(err)
-	defer s.NodeManager.StopNode()
-
-	<-nodeStarted
+	s.StartTestNode(
+		params.RopstenNetworkID,
+		integration.WithUpstream("https://ropsten.infura.io/nKmXgiFgc2KqtoQ8BCGJ"),
+	)
+	defer s.StopTestNode()
 
 	client := s.NodeManager.RPCClient()
 	s.NotNil(client)
 
 	var blockNumber hexutil.Uint
-	err = client.CallContext(context.Background(), &blockNumber, "eth_blockNumber")
+	err := client.CallContext(context.Background(), &blockNumber, "eth_blockNumber")
 	s.NoError(err)
 	s.True(blockNumber > 0, "blockNumber should be higher than 0")
 }
