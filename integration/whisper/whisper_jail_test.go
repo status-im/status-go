@@ -33,12 +33,15 @@ var (
 )
 
 func TestWhisperJailTestSuite(t *testing.T) {
-	suite.Run(t, new(WhisperJailTestSuite))
+	s := new(WhisperJailTestSuite)
+	s.Timeout = time.Minute * 5
+	suite.Run(t, s)
 }
 
 type WhisperJailTestSuite struct {
 	integration.BackendTestSuite
 
+	Timeout    time.Time
 	WhisperAPI *whisper.PublicWhisperAPI
 	Jail       common.JailManager
 }
@@ -328,7 +331,7 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 		go func() {
 			select {
 			case <-done:
-			case <-time.After(time.Minute):
+			case <-time.After(s.Timeout):
 				close(timedOut)
 			}
 		}()
@@ -404,7 +407,7 @@ func (s *WhisperJailTestSuite) TestEncryptedAnonymousMessage() {
 	go func() {
 		select {
 		case <-done:
-		case <-time.After(10 * time.Second):
+		case <-time.After(s.Timeout):
 			close(timedOut)
 		}
 	}()
