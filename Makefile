@@ -38,7 +38,7 @@ statusgo-cross: statusgo-android statusgo-ios
 	@echo "Full cross compilation done."
 	@ls -ld $(GOBIN)/statusgo-*
 
-statusgo-android: xgo	##@cross-compile Build status-go for Android
+statusgo-android: xgo ##@cross-compile Build status-go for Android
 	build/env.sh $(GOBIN)/xgo --image farazdagi/xgo --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=android-16/aar -v $(shell build/testnet-flags.sh) ./cmd/statusd
 	@echo "Android cross compilation done."
 
@@ -81,7 +81,7 @@ ci: mock
 	build/env.sh go test -timeout 40m -v ./extkeys
 	build/env.sh go test -timeout 1m -v ./helpers/...
 
-generate:	##@other Regenerate assets and other auto-generated stuff
+generate: ##@other Regenerate assets and other auto-generated stuff
 	cp ./node_modules/web3/dist/web3.js ./static/scripts/web3.js
 	build/env.sh go generate ./static
 	rm ./static/scripts/web3.js
