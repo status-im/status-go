@@ -22,6 +22,8 @@ It uses Makefile to do most common actions. See `make help` output for available
 
 Integration tests and server require `statusd-data` dir to store synched blockchain and other stuff, so we use `build/env.sh` script before running most of the commands in Makefile (like `go test` or running the server)
 
+status-go uses [forked ethereum-go](https://github.com/status-im/go-ethereum) with [some changes](https://github.com/status-im/go-ethereum/wiki/Rebase-Geth-1.7.0) in it, located under [`vendor/` dir](https://github.com/status-im/status-go/tree/develop/vendor/github.com/ethereum/go-ethereum).
+
 # Build
 There are two main modes status-go can be built:
  - standalone server
