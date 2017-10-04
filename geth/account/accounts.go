@@ -144,7 +144,7 @@ func (m *Manager) RecoverAccount(password, mnemonic string) (address, pubKey str
 	return address, pubKey, nil
 }
 
-type cryptoJSON struct {
+type accountKeyFile struct {
 	Address string `json:"address"`
 }
 
@@ -152,11 +152,11 @@ type cryptoJSON struct {
 // If no error is returned, then account is considered verified.
 func (m *Manager) VerifyAccountPassword(keyStoreDir, address, password string) (*keystore.Key, error) {
 	var err error
-	var keyJSON []byte
+	var foundKeyFile []byte
 
 	addressObj := gethcommon.BytesToAddress(gethcommon.FromHex(address))
 	checkAccountKey := func(path string, fileInfo os.FileInfo) error {
-		if len(keyJSON) > 0 || fileInfo.IsDir() {
+		if len(foundKeyFile) > 0 || fileInfo.IsDir() {
 			return nil
 		}
 
@@ -165,13 +165,13 @@ func (m *Manager) VerifyAccountPassword(keyStoreDir, address, password string) (
 			return fmt.Errorf("invalid account key file: %v", err)
 		}
 
-		var keyFile cryptoJSON
-		if err := json.Unmarshal(rawKeyFile, &keyFile); err != nil {
+		var accountKey accountKeyFile
+		if err := json.Unmarshal(rawKeyFile, &accountKey); err != nil {
 			return fmt.Errorf("failed to read key file: %s", err)
 		}
 
-		if gethcommon.HexToAddress("0x"+keyFile.Address).Hex() == addressObj.Hex() {
-			keyJSON = rawKeyFile
+		if gethcommon.HexToAddress("0x"+accountKey.Address).Hex() == addressObj.Hex() {
+			foundKeyFile = rawKeyFile
 		}
 
 		return nil
@@ -187,11 +187,11 @@ func (m *Manager) VerifyAccountPassword(keyStoreDir, address, password string) (
 		return nil, fmt.Errorf("cannot traverse key store folder: %v", err)
 	}
 
-	if len(keyJSON) == 0 {
+	if len(foundKeyFile) == 0 {
 		return nil, fmt.Errorf("cannot locate account for address: %s", addressObj.Hex())
 	}
 
-	key, err := keystore.DecryptKey(keyJSON, password)
+	key, err := keystore.DecryptKey(foundKeyFile, password)
 	if err != nil {
 		return nil, err
 	}
