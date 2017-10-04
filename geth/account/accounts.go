@@ -1,8 +1,8 @@
 package account
 
 import (
-	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -144,6 +144,10 @@ func (m *Manager) RecoverAccount(password, mnemonic string) (address, pubKey str
 	return address, pubKey, nil
 }
 
+type cryptoJSON struct {
+	Address string `json:"address"`
+}
+
 // VerifyAccountPassword tries to decrypt a given account key file, with a provided password.
 // If no error is returned, then account is considered verified.
 func (m *Manager) VerifyAccountPassword(keyStoreDir, address, password string) (*keystore.Key, error) {
@@ -156,12 +160,18 @@ func (m *Manager) VerifyAccountPassword(keyStoreDir, address, password string) (
 			return nil
 		}
 
-		keyJSON, err = ioutil.ReadFile(path)
+		rawKeyFile, err := ioutil.ReadFile(path)
 		if err != nil {
 			return fmt.Errorf("invalid account key file: %v", err)
 		}
-		if !bytes.Contains(keyJSON, []byte(fmt.Sprintf(`"address":"%s"`, addressObj.Hex()[2:]))) {
-			keyJSON = []byte{}
+
+		var keyFile cryptoJSON
+		if err := json.Unmarshal(rawKeyFile, &keyFile); err != nil {
+			return fmt.Errorf("failed to read key file: %s", err)
+		}
+
+		if gethcommon.HexToAddress("0x"+keyFile.Address).Hex() == addressObj.Hex() {
+			keyJSON = rawKeyFile
 		}
 
 		return nil
