@@ -29,7 +29,6 @@ func (s *RPCClientTestSuite) TestNewClient() {
 
 	nodeStarted, err := s.NodeManager.StartNode(config)
 	s.NoError(err)
-
 	<-nodeStarted
 
 	node, err := s.NodeManager.Node()

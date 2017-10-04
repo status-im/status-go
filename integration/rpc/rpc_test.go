@@ -59,7 +59,6 @@ func (s *RPCTestSuite) TestCallRPC() {
 
 		nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
 		s.NoError(err)
-
 		<-nodeStarted
 
 		rpcClient := s.NodeManager.RPCClient()
@@ -125,11 +124,13 @@ func (s *RPCTestSuite) TestCallRPC() {
 
 		select {
 		case <-time.After(time.Second * 30):
-			s.NodeManager.StopNode()
-			s.FailNow("test timed out")
+			s.Fail("test timed out")
 		case <-done:
-			s.NodeManager.StopNode()
 		}
+
+		stoppedNode, err := s.NodeManager.StopNode()
+		s.NoError(err)
+		<-stoppedNode
 	}
 }
 
@@ -140,8 +141,6 @@ func (s *RPCTestSuite) TestCallRawResult() {
 
 	nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
 	s.NoError(err)
-	defer s.NodeManager.StopNode()
-
 	<-nodeStarted
 
 	client := s.NodeManager.RPCClient()
@@ -149,6 +148,8 @@ func (s *RPCTestSuite) TestCallRawResult() {
 
 	jsonResult := client.CallRaw(`{"jsonrpc":"2.0","method":"shh_version","params":[],"id":67}`)
 	s.Equal(`{"jsonrpc":"2.0","id":67,"result":"5.0"}`, jsonResult)
+
+	s.NodeManager.StopNode()
 }
 
 // TestCallContextResult checks if result passed to CallContext
@@ -163,8 +164,11 @@ func (s *RPCTestSuite) TestCallContextResult() {
 	client := s.NodeManager.RPCClient()
 	s.NotNil(client)
 
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
 	var blockNumber hexutil.Uint
-	err := client.CallContext(context.Background(), &blockNumber, "eth_blockNumber")
+	err := client.CallContext(ctx, &blockNumber, "eth_blockNumber")
 	s.NoError(err)
 	s.True(blockNumber > 0, "blockNumber should be higher than 0")
 }
