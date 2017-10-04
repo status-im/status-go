@@ -41,7 +41,7 @@ func TestWhisperJailTestSuite(t *testing.T) {
 type WhisperJailTestSuite struct {
 	integration.BackendTestSuite
 
-	Timeout    time.Time
+	Timeout    time.Duration
 	WhisperAPI *whisper.PublicWhisperAPI
 	Jail       common.JailManager
 }
