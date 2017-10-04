@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"net/http/httptest"
 	"sync"
 	"testing"
 	"time"
@@ -91,43 +90,18 @@ func (s *RPCTestSuite) TestNewClient() {
 	require.NotNil(err)
 }
 
-func (s *RPCTestSuite) TestRPCSendTransaction() {
+func (s *RPCTestSuite) TestRPCClientHandler() {
 	require := s.Require()
-	expectedResponse := []byte(`{"jsonrpc":"2.0","id":10,"result":"3434=done"}`)
 
-	// httpRPCServer will serve as an upstream server accepting transactions.
-	httpRPCServer := httptest.NewServer(service{
-		Handler: func(w http.ResponseWriter, r *http.Request) {
-			defer r.Body.Close()
-
-			var txReq txRequest
-			err := json.NewDecoder(r.Body).Decode(&txReq)
-			require.NoError(err)
-
-			if txReq.Method == "eth_getTransactionCount" {
-				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(`{"jsonrpc": "2.0", "result": "0x434"}`))
-				return
-			}
-
-			payload := ([]byte)(txReq.Payload)
-
-			var bu []interface{}
-			jserr := json.Unmarshal(payload, &bu)
-			require.NoError(jserr)
-			require.Len(bu, 1)
-			require.IsType(bu[0], (map[string]interface{})(nil))
-
-			w.WriteHeader(http.StatusOK)
-			w.Write(expectedResponse)
-		},
-	})
-
-	s.StartTestNode(params.RopstenNetworkID, WithUpstream(httpRPCServer.URL))
+	s.StartTestNode(params.RopstenNetworkID)
 	defer s.StopTestNode()
 
 	rpcClient := s.NodeManager.RPCClient()
 	require.NotNil(rpcClient)
+
+	rpcClient.RegisterHandler("eth_sendTransaction", func(ctx context.Context, args ...interface{}) (interface{}, error) {
+		return map[string]interface{}{"done": true}, nil
+	})
 
 	response := rpcClient.CallRaw(`{
 		"jsonrpc": "2.0",
@@ -138,13 +112,13 @@ func (s *RPCTestSuite) TestRPCSendTransaction() {
 			"to":       "` + TestConfig.Account2.Address + `",
 			"value":    "0x200",
 			"nonce":    "0x100",
-			"data":     "Will-power",
+			"data":     "` + hexutil.Encode([]byte("Will-power")) + `",
 			"gasPrice": "0x4a817c800",
 			"gasLimit": "0x5208",
 			"chainId":  3391
 		}]
 	}`)
-	require.Equal(response, string(expectedResponse))
+	require.Equal(`{"jsonrpc":"2.0","id":10,"result":{"done":true}}`, response)
 }
 
 func (s *RPCTestSuite) TestCallRPC() {

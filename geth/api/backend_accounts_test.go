@@ -3,6 +3,7 @@ package api_test
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/common"
@@ -345,14 +346,14 @@ func (s *BackendTestSuite) TestRPCEthAccounts() {
 
 	rpcClient := s.backend.NodeManager().RPCClient()
 
-	expectedResponse := `{"jsonrpc":"2.0","id":1,"result":["` + TestConfig.Account1.Address + `"]}`
+	expected := `{"jsonrpc":"2.0","id":1,"result":["` + strings.ToLower(TestConfig.Account1.Address) + `"]}`
 	resp := rpcClient.CallRaw(`{
               "jsonrpc": "2.0",
               "id": 1,
               "method": "eth_accounts",
               "params": []
       }`)
-	require.Equal(expectedResponse, resp)
+	require.Equal(expected, resp)
 }
 
 func (s *BackendTestSuite) TestRPCEthAccountsWithUpstream() {
@@ -367,14 +368,14 @@ func (s *BackendTestSuite) TestRPCEthAccountsWithUpstream() {
 
 	rpcClient := s.backend.NodeManager().RPCClient()
 
-	expectedResponse := `{"jsonrpc":"2.0","id":1,"result":["` + TestConfig.Account1.Address + `"]}`
+	expected := `{"jsonrpc":"2.0","id":1,"result":["` + strings.ToLower(TestConfig.Account1.Address) + `"]}`
 	resp := rpcClient.CallRaw(`{
               "jsonrpc": "2.0",
               "id": 1,
               "method": "eth_accounts",
               "params": []
       }`)
-	require.Equal(expectedResponse, resp)
+	require.Equal(expected, resp)
 }
 
 // regression test: eth_getTransactionReceipt with invalid transaction hash should return null
