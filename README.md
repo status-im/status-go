@@ -9,9 +9,9 @@
 
 # Docs
 
-- [How To Build](https://github.com/status-im/status-go/wiki/Build-Process-Explained)
-- [Notes on Bindings](https://github.com/status-im/status-go/wiki/Notes-on-Bindings)
-- [Developers' Guide](https://github.com/status-im/status-react/wiki/Developers'-Guide)
+- [How To Build](https://www.notion.so/status/Building-status-go-f6b827dd1302436ba0575f4c543a352e)
+- [Notes on Bindings](https://www.notion.so/status/Binding-notes-344f30ce0f2845a2b43e2de70931284a)
+- [Status-go docs](https://www.notion.so/status/status-go-4fbe361e8e75484abeadadc80dd4dcdc)
 
 # Intro
 status-go is a underlying part of status mobile app and handles blockchain and Status accounts related code.
@@ -26,20 +26,22 @@ status-go uses [forked ethereum-go](https://github.com/status-im/go-ethereum) wi
 
 # Build
 There are two main modes status-go can be built:
+
  - standalone server
  - library to link for Android or iOS
 
 Use following Makefile commands:
 
-`make statusgo` (builds binary into `build/bin/statusd`)
-`make statusgo-android`) (builds .aar file `build/android-16/aar`)
-`make statusgo-ios` and `make statusgo-ios-simulator` (builds iOS related artifacts in `build/os-9.3/framework`)
+- `make statusgo` (builds binary into `build/bin/statusd`)
+- `make statusgo-android`) (builds .aar file `build/android-16/aar`)
+- `make statusgo-ios` and `make statusgo-ios-simulator` (builds iOS related artifacts in `build/os-9.3/framework`)
 
 # Testing
 To test statusgo, use:
 `make ci`
 
 If you want to launch specific test - `RPCSendTransactions` for example - use following command:
+
 `./build/env.sh go test -v ./geth/api/ -testify.m RPCSendTransaction$`
 
 # Licence
