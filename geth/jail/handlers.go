@@ -3,6 +3,7 @@ package jail
 import (
 	"os"
 
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/jail/console"
@@ -48,6 +49,11 @@ func registerHandlers(jail *Jail, cell common.JailCell, chatID string) error {
 
 	// register isConnected handler
 	if err = registerHandler("isConnected", makeJethIsConnectedHandler(jail, cell)); err != nil {
+		return err
+	}
+
+	// register accounts handler
+	if err = registerHandler("accounts", makeAccountsHandler(jail, cell)); err != nil {
 		return err
 	}
 
@@ -115,6 +121,22 @@ func makeJethIsConnectedHandler(jail *Jail, cellInt common.JailCell) func(call o
 
 		if !netListeningResult {
 			return newErrorResponseOtto(cell.VM, node.ErrNoRunningNode.Error(), nil)
+		}
+
+		return newResultResponse(call.Otto, true)
+	}
+}
+
+// makeAccountsHandler returns jeth.accounts() handler
+func makeAccountsHandler(jail *Jail, cellInt common.JailCell) func(call otto.FunctionCall) otto.Value {
+	// FIXME(tiabc): Get rid of this.
+	cell := cellInt.(*Cell)
+	return func(call otto.FunctionCall) otto.Value {
+		client := jail.nodeManager.RPCClient()
+
+		var accounts []gethcommon.Address
+		if err := client.Call(&accounts, "accounts"); err != nil {
+			return newErrorResponseOtto(cell.VM, err.Error(), nil)
 		}
 
 		return newResultResponse(call.Otto, true)
