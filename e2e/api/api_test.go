@@ -83,6 +83,8 @@ func (s *APITestSuite) TestRaceConditions() {
 			s.T().Logf("RestartNodeAsync(), error: %v", err)
 			progress <- struct{}{}
 		},
+		// TODO(adam): quarantined until it uses a different datadir
+		// as otherwise it wipes out cached blockchain data.
 		// func(config *params.NodeConfig) {
 		// 	log.Info("ResetChainDataAsync()")
 		// 	_, err := s.api.ResetChainDataAsync()

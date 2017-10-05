@@ -372,6 +372,8 @@ func (s *ManagerTestSuite) TestRaceConditions() {
 			s.T().Logf("PopulateStaticPeers(), error: %v", s.NodeManager.PopulateStaticPeers())
 			progress <- struct{}{}
 		},
+		// TODO(adam): quarantined until it uses a different datadir
+		// as otherwise it wipes out cached blockchain data.
 		// func(config *params.NodeConfig) {
 		// 	log.Info("ResetChainData()")
 		// 	_, err := s.NodeManager.ResetChainData()
