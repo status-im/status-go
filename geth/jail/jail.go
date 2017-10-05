@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/common"
@@ -20,6 +21,8 @@ var web3JSCode = static.MustAsset("scripts/web3.js")
 var (
 	ErrInvalidJail = errors.New("jail environment is not properly initialized")
 )
+
+const cellStoppingTimeoutMs = 5000
 
 // Jail represents jailed environment inside of which we hold multiple cells.
 // Each cell is a separate JavaScript VM.
@@ -213,6 +216,30 @@ func (jail *Jail) Send(call otto.FunctionCall, vm *vm.VM) otto.Value {
 		throwJSException(err)
 	}
 	return v
+}
+
+func (jail *Jail) RemoveCells() {
+	jail.stopCellsSync()
+	jail.cells = make(map[string]*Cell)
+}
+
+func (jail *Jail) stopCellsSync() {
+	var wg sync.WaitGroup
+
+	for _, cell := range jail.cells {
+		wg.Add(1)
+		go func(cell *Cell) {
+			defer wg.Done()
+			select {
+			case <-cell.Stop():
+				return
+			case <-time.After(cellStoppingTimeoutMs * time.Millisecond):
+				log.Warn("Cell Stopping timeout")
+				return
+			}
+		}(cell)
+	}
+	wg.Wait()
 }
 
 func newErrorResponse(msg string, id interface{}) map[string]interface{} {
