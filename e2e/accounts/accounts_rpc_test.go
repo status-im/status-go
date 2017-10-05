@@ -3,8 +3,8 @@ package accounts
 import (
 	"testing"
 
+	"github.com/status-im/status-go/e2e"
 	"github.com/status-im/status-go/geth/params"
-	"github.com/status-im/status-go/integration"
 	. "github.com/status-im/status-go/testing"
 	"github.com/stretchr/testify/suite"
 )
@@ -14,7 +14,7 @@ func TestAccountsRPCTestSuite(t *testing.T) {
 }
 
 type AccountsRPCTestSuite struct {
-	integration.BackendTestSuite
+	e2e.BackendTestSuite
 }
 
 func (s *AccountsTestSuite) TestRPCEthAccounts() {
@@ -41,7 +41,7 @@ func (s *AccountsTestSuite) TestRPCEthAccounts() {
 func (s *AccountsTestSuite) TestRPCEthAccountsWithUpstream() {
 	s.StartTestBackend(
 		params.RopstenNetworkID,
-		integration.WithUpstream("https://ropsten.infura.io/z6GCTmjdP3FETEJmMBI4"),
+		e2e.WithUpstream("https://ropsten.infura.io/z6GCTmjdP3FETEJmMBI4"),
 	)
 	defer s.StopTestBackend()
 

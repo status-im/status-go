@@ -12,12 +12,12 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/e2e"
 	"github.com/status-im/status-go/geth/accounts"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/signal"
 	"github.com/status-im/status-go/geth/txqueue"
-	"github.com/status-im/status-go/integration"
 	. "github.com/status-im/status-go/testing"
 	"github.com/stretchr/testify/suite"
 )
@@ -32,7 +32,7 @@ func TestTransactionsTestSuite(t *testing.T) {
 }
 
 type TransactionsTestSuite struct {
-	integration.BackendTestSuite
+	e2e.BackendTestSuite
 }
 
 func (s *TransactionsTestSuite) TestCallRPCSendTransaction() {
@@ -87,7 +87,7 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransaction() {
 func (s *TransactionsTestSuite) TestCallRPCSendTransactionUpstream() {
 	s.StartTestBackend(
 		params.RopstenNetworkID,
-		integration.WithUpstream("https://ropsten.infura.io/nKmXgiFgc2KqtoQ8BCGJ"),
+		e2e.WithUpstream("https://ropsten.infura.io/nKmXgiFgc2KqtoQ8BCGJ"),
 	)
 	defer s.StopTestBackend()
 
@@ -317,7 +317,7 @@ func (s *TransactionsTestSuite) TestSendEtherTx() {
 func (s *TransactionsTestSuite) TestSendEtherTxUpstream() {
 	s.StartTestBackend(
 		params.RopstenNetworkID,
-		integration.WithUpstream("https://ropsten.infura.io/z6GCTmjdP3FETEJmMBI4"),
+		e2e.WithUpstream("https://ropsten.infura.io/z6GCTmjdP3FETEJmMBI4"),
 	)
 	defer s.StopTestBackend()
 

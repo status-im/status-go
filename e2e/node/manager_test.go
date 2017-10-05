@@ -12,11 +12,11 @@ import (
 	gethnode "github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/rpc"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
+	"github.com/status-im/status-go/e2e"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/signal"
-	"github.com/status-im/status-go/integration"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -25,7 +25,7 @@ func TestManagerTestSuite(t *testing.T) {
 }
 
 type ManagerTestSuite struct {
-	integration.NodeManagerTestSuite
+	e2e.NodeManagerTestSuite
 }
 
 func (s *ManagerTestSuite) SetupTest() {
@@ -193,7 +193,7 @@ func (s *ManagerTestSuite) TestReferencesWithStartedNode() {
 }
 
 func (s *ManagerTestSuite) TestNodeStartStop() {
-	nodeConfig, err := integration.MakeTestNodeConfig(params.RopstenNetworkID)
+	nodeConfig, err := e2e.MakeTestNodeConfig(params.RopstenNetworkID)
 	s.NoError(err)
 
 	// try stopping non-started node
@@ -234,7 +234,7 @@ func (s *ManagerTestSuite) TestNodeStartStop() {
 
 func (s *ManagerTestSuite) TestNetworkSwitching() {
 	// get Ropsten config
-	nodeConfig, err := integration.MakeTestNodeConfig(params.RopstenNetworkID)
+	nodeConfig, err := e2e.MakeTestNodeConfig(params.RopstenNetworkID)
 	s.NoError(err)
 	s.False(s.NodeManager.IsNodeRunning())
 	nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
@@ -243,7 +243,7 @@ func (s *ManagerTestSuite) TestNetworkSwitching() {
 	<-nodeStarted
 	s.True(s.NodeManager.IsNodeRunning())
 
-	firstHash, err := integration.FirstBlockHash(s.NodeManager)
+	firstHash, err := e2e.FirstBlockHash(s.NodeManager)
 	s.NoError(err)
 	s.Equal("0x41941023680923e0fe4d74a34bdac8141f2540e3ae90623718e47d66d1ca4a2d", firstHash)
 
@@ -254,7 +254,7 @@ func (s *ManagerTestSuite) TestNetworkSwitching() {
 	s.False(s.NodeManager.IsNodeRunning())
 
 	// start new node with completely different config
-	nodeConfig, err = integration.MakeTestNodeConfig(params.RinkebyNetworkID)
+	nodeConfig, err = e2e.MakeTestNodeConfig(params.RinkebyNetworkID)
 	s.NoError(err)
 	nodeStarted, err = s.NodeManager.StartNode(nodeConfig)
 	s.NoError(err)
@@ -263,7 +263,7 @@ func (s *ManagerTestSuite) TestNetworkSwitching() {
 	s.True(s.NodeManager.IsNodeRunning())
 
 	// make sure we are on another network indeed
-	firstHash, err = integration.FirstBlockHash(s.NodeManager)
+	firstHash, err = e2e.FirstBlockHash(s.NodeManager)
 	s.NoError(err)
 	s.Equal("0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177", firstHash)
 
@@ -273,7 +273,7 @@ func (s *ManagerTestSuite) TestNetworkSwitching() {
 }
 
 func (s *ManagerTestSuite) TestStartNodeWithUpstreamEnabled() {
-	nodeConfig, err := integration.MakeTestNodeConfig(params.RopstenNetworkID)
+	nodeConfig, err := e2e.MakeTestNodeConfig(params.RopstenNetworkID)
 	s.NoError(err)
 
 	nodeConfig.UpstreamConfig.Enabled = true
@@ -306,7 +306,7 @@ func (s *ManagerTestSuite) TestResetChainData() {
 	s.True(s.NodeManager.IsNodeRunning())
 
 	// make sure we can read the first byte, and it is valid (for Rinkeby)
-	firstHash, err := integration.FirstBlockHash(s.NodeManager)
+	firstHash, err := e2e.FirstBlockHash(s.NodeManager)
 	s.NoError(err)
 	s.Equal("0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177", firstHash)
 }
@@ -323,7 +323,7 @@ func (s *ManagerTestSuite) TestRestartNode() {
 	s.True(s.NodeManager.IsNodeRunning())
 
 	// make sure we can read the first byte, and it is valid (for Rinkeby)
-	firstHash, err := integration.FirstBlockHash(s.NodeManager)
+	firstHash, err := e2e.FirstBlockHash(s.NodeManager)
 	s.NoError(err)
 	s.Equal("0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177", firstHash)
 }
@@ -335,10 +335,10 @@ func (s *ManagerTestSuite) TestRaceConditions() {
 	progress := make(chan struct{}, cnt)
 	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	nodeConfig1, err := integration.MakeTestNodeConfig(params.RopstenNetworkID)
+	nodeConfig1, err := e2e.MakeTestNodeConfig(params.RopstenNetworkID)
 	s.NoError(err)
 
-	nodeConfig2, err := integration.MakeTestNodeConfig(params.RinkebyNetworkID)
+	nodeConfig2, err := e2e.MakeTestNodeConfig(params.RinkebyNetworkID)
 	s.NoError(err)
 
 	nodeConfigs := []*params.NodeConfig{nodeConfig1, nodeConfig2}
@@ -463,7 +463,7 @@ func (s *ManagerTestSuite) TestNodeStartCrash() {
 		}
 	})
 
-	nodeConfig, err := integration.MakeTestNodeConfig(params.RinkebyNetworkID)
+	nodeConfig, err := e2e.MakeTestNodeConfig(params.RinkebyNetworkID)
 	s.NoError(err)
 
 	// start node outside the manager (on the same port), so that manager node.Start() method fails

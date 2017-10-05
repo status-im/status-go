@@ -6,10 +6,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
+	"github.com/status-im/status-go/e2e"
 	"github.com/status-im/status-go/geth/accounts"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
-	"github.com/status-im/status-go/integration"
 	. "github.com/status-im/status-go/testing"
 	"github.com/stretchr/testify/suite"
 )
@@ -19,7 +19,7 @@ func TestWhisperTestSuite(t *testing.T) {
 }
 
 type WhisperTestSuite struct {
-	integration.NodeManagerTestSuite
+	e2e.NodeManagerTestSuite
 }
 
 func (s *WhisperTestSuite) SetupTest() {

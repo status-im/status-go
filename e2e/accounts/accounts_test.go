@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/status-im/status-go/e2e"
 	"github.com/status-im/status-go/geth/accounts"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
-	"github.com/status-im/status-go/integration"
 	. "github.com/status-im/status-go/testing"
 	"github.com/stretchr/testify/suite"
 )
@@ -18,7 +18,7 @@ func TestAccountsTestSuite(t *testing.T) {
 }
 
 type AccountsTestSuite struct {
-	integration.BackendTestSuite
+	e2e.BackendTestSuite
 }
 
 func (s *AccountsTestSuite) TestAccountsList() {

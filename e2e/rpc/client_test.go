@@ -3,15 +3,15 @@ package rpc
 import (
 	"testing"
 
+	"github.com/status-im/status-go/e2e"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/rpc"
-	"github.com/status-im/status-go/integration"
 	"github.com/stretchr/testify/suite"
 )
 
 type RPCClientTestSuite struct {
-	integration.NodeManagerTestSuite
+	e2e.NodeManagerTestSuite
 }
 
 func TestRPCClientTestSuite(t *testing.T) {
@@ -24,7 +24,7 @@ func (s *RPCClientTestSuite) SetupTest() {
 }
 
 func (s *RPCClientTestSuite) TestNewClient() {
-	config, err := integration.MakeTestNodeConfig(params.RinkebyNetworkID)
+	config, err := e2e.MakeTestNodeConfig(params.RinkebyNetworkID)
 	s.NoError(err)
 
 	nodeStarted, err := s.NodeManager.StartNode(config)

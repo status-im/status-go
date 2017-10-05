@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/status-im/status-go/e2e"
 	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
-	"github.com/status-im/status-go/integration"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -56,10 +56,10 @@ func (s *APITestSuite) TestRaceConditions() {
 	progress := make(chan struct{}, cnt)
 	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	nodeConfig1, err := integration.MakeTestNodeConfig(params.RopstenNetworkID)
+	nodeConfig1, err := e2e.MakeTestNodeConfig(params.RopstenNetworkID)
 	s.NoError(err)
 
-	nodeConfig2, err := integration.MakeTestNodeConfig(params.RinkebyNetworkID)
+	nodeConfig2, err := e2e.MakeTestNodeConfig(params.RinkebyNetworkID)
 	s.NoError(err)
 
 	nodeConfigs := []*params.NodeConfig{nodeConfig1, nodeConfig2}

@@ -10,11 +10,11 @@ import (
 	"time"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/status-im/status-go/e2e"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/signal"
 	"github.com/status-im/status-go/geth/txqueue"
-	"github.com/status-im/status-go/integration"
 	. "github.com/status-im/status-go/testing"
 	"github.com/stretchr/testify/suite"
 )
@@ -24,7 +24,7 @@ func TestJailRPCTestSuite(t *testing.T) {
 }
 
 type JailRPCTestSuite struct {
-	integration.BackendTestSuite
+	e2e.BackendTestSuite
 
 	jail common.JailManager
 }

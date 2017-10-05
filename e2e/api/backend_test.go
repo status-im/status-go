@@ -5,13 +5,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/status-im/status-go/e2e"
 	"github.com/status-im/status-go/geth/accounts"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
-	"github.com/status-im/status-go/integration"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -20,7 +20,7 @@ func TestAPIBackendTestSuite(t *testing.T) {
 }
 
 type APIBackendTestSuite struct {
-	integration.BackendTestSuite
+	e2e.BackendTestSuite
 }
 
 // FIXME(tiabc): There's also a test with the same name in geth/node/manager_test.go
@@ -33,10 +33,10 @@ func (s *APIBackendTestSuite) TestRaceConditions() {
 	progress := make(chan struct{}, cnt)
 	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	nodeConfig1, err := integration.MakeTestNodeConfig(params.RopstenNetworkID)
+	nodeConfig1, err := e2e.MakeTestNodeConfig(params.RopstenNetworkID)
 	require.NoError(err)
 
-	nodeConfig2, err := integration.MakeTestNodeConfig(params.RinkebyNetworkID)
+	nodeConfig2, err := e2e.MakeTestNodeConfig(params.RinkebyNetworkID)
 	require.NoError(err)
 
 	nodeConfigs := []*params.NodeConfig{nodeConfig1, nodeConfig2}
@@ -186,7 +186,7 @@ func (s *APIBackendTestSuite) TestRaceConditions() {
 // so this test should only check StatusBackend logic with a mocked version of the underlying NodeManager.
 func (s *APIBackendTestSuite) TestNetworkSwitching() {
 	// get Ropsten config
-	nodeConfig, err := integration.MakeTestNodeConfig(params.RopstenNetworkID)
+	nodeConfig, err := e2e.MakeTestNodeConfig(params.RopstenNetworkID)
 	s.NoError(err)
 
 	s.False(s.Backend.IsNodeRunning())
@@ -196,7 +196,7 @@ func (s *APIBackendTestSuite) TestNetworkSwitching() {
 	<-nodeStarted // wait till node is started
 	s.True(s.Backend.IsNodeRunning())
 
-	firstHash, err := integration.FirstBlockHash(s.Backend.NodeManager())
+	firstHash, err := e2e.FirstBlockHash(s.Backend.NodeManager())
 	s.NoError(err)
 	s.Equal("0x41941023680923e0fe4d74a34bdac8141f2540e3ae90623718e47d66d1ca4a2d", firstHash)
 
@@ -206,7 +206,7 @@ func (s *APIBackendTestSuite) TestNetworkSwitching() {
 	<-nodeStopped
 
 	// start new node with completely different config
-	nodeConfig, err = integration.MakeTestNodeConfig(params.RinkebyNetworkID)
+	nodeConfig, err = e2e.MakeTestNodeConfig(params.RinkebyNetworkID)
 	s.NoError(err)
 
 	s.False(s.Backend.IsNodeRunning())
@@ -217,7 +217,7 @@ func (s *APIBackendTestSuite) TestNetworkSwitching() {
 	s.True(s.Backend.IsNodeRunning())
 
 	// make sure we are on another network indeed
-	firstHash, err = integration.FirstBlockHash(s.Backend.NodeManager())
+	firstHash, err = e2e.FirstBlockHash(s.Backend.NodeManager())
 	s.NoError(err)
 	s.Equal("0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177", firstHash)
 
@@ -246,7 +246,7 @@ func (s *APIBackendTestSuite) TestResetChainData() {
 	s.True(s.Backend.IsNodeRunning()) // new node, with previous config should be running
 
 	// make sure we can read the first byte, and it is valid (for Rinkeby)
-	firstHash, err := integration.FirstBlockHash(s.Backend.NodeManager())
+	firstHash, err := e2e.FirstBlockHash(s.Backend.NodeManager())
 	s.NoError(err)
 	s.Equal("0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177", firstHash)
 }
@@ -260,7 +260,7 @@ func (s *APIBackendTestSuite) TestRestartNode() {
 	s.StartTestBackend(params.RinkebyNetworkID)
 	defer s.StopTestBackend()
 
-	firstHash, err := integration.FirstBlockHash(s.Backend.NodeManager())
+	firstHash, err := e2e.FirstBlockHash(s.Backend.NodeManager())
 	s.NoError(err)
 	s.Equal("0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177", firstHash)
 
@@ -271,7 +271,7 @@ func (s *APIBackendTestSuite) TestRestartNode() {
 	s.True(s.Backend.IsNodeRunning()) // new node, with previous config should be running
 
 	// make sure we can read the first byte, and it is valid (for Rinkeby)
-	firstHash, err = integration.FirstBlockHash(s.Backend.NodeManager())
+	firstHash, err = e2e.FirstBlockHash(s.Backend.NodeManager())
 	s.NoError(err)
 	s.Equal("0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177", firstHash)
 }

@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/status-im/status-go/e2e"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
-	"github.com/status-im/status-go/integration"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -35,7 +35,7 @@ func TestRPCTestSuite(t *testing.T) {
 }
 
 type RPCTestSuite struct {
-	integration.NodeManagerTestSuite
+	e2e.NodeManagerTestSuite
 }
 
 func (s *RPCTestSuite) SetupTest() {
@@ -45,7 +45,7 @@ func (s *RPCTestSuite) SetupTest() {
 
 func (s *RPCTestSuite) TestCallRPC() {
 	for _, upstreamEnabled := range []bool{false, true} {
-		nodeConfig, err := integration.MakeTestNodeConfig(params.RinkebyNetworkID)
+		nodeConfig, err := e2e.MakeTestNodeConfig(params.RinkebyNetworkID)
 		s.NoError(err)
 
 		nodeConfig.IPCEnabled = false
@@ -136,7 +136,7 @@ func (s *RPCTestSuite) TestCallRPC() {
 
 // TestCallRawResult checks if returned response is a valid JSON-RPC response.
 func (s *RPCTestSuite) TestCallRawResult() {
-	nodeConfig, err := integration.MakeTestNodeConfig(params.RopstenNetworkID)
+	nodeConfig, err := e2e.MakeTestNodeConfig(params.RopstenNetworkID)
 	s.NoError(err)
 
 	nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
@@ -157,7 +157,7 @@ func (s *RPCTestSuite) TestCallRawResult() {
 func (s *RPCTestSuite) TestCallContextResult() {
 	s.StartTestNode(
 		params.RopstenNetworkID,
-		integration.WithUpstream("https://ropsten.infura.io/nKmXgiFgc2KqtoQ8BCGJ"),
+		e2e.WithUpstream("https://ropsten.infura.io/nKmXgiFgc2KqtoQ8BCGJ"),
 	)
 	defer s.StopTestNode()
 

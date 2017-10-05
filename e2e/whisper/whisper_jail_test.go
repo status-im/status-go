@@ -11,9 +11,9 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
+	"github.com/status-im/status-go/e2e"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
-	"github.com/status-im/status-go/integration"
 	"github.com/status-im/status-go/static"
 	. "github.com/status-im/status-go/testing"
 	"github.com/stretchr/testify/suite"
@@ -39,14 +39,14 @@ func TestWhisperJailTestSuite(t *testing.T) {
 }
 
 type WhisperJailTestSuite struct {
-	integration.BackendTestSuite
+	e2e.BackendTestSuite
 
 	Timeout    time.Duration
 	WhisperAPI *whisper.PublicWhisperAPI
 	Jail       common.JailManager
 }
 
-func (s *WhisperJailTestSuite) StartTestBackend(networkID int, opts ...integration.TestNodeOption) {
+func (s *WhisperJailTestSuite) StartTestBackend(networkID int, opts ...e2e.TestNodeOption) {
 	s.BackendTestSuite.StartTestBackend(networkID, opts...)
 
 	s.WhisperAPI = whisper.NewPublicWhisperAPI(s.WhisperService())
