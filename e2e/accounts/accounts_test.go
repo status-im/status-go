@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/status-im/status-go/e2e"
-	"github.com/status-im/status-go/geth/accounts"
+	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
 	. "github.com/status-im/status-go/testing"
@@ -105,7 +105,7 @@ func (s *AccountsTestSuite) TestCreateChildAccount() {
 
 	// try creating sub-account, w/o selecting main account i.e. w/o login to main account
 	_, _, err = s.Backend.AccountManager().CreateChildAccount("", TestConfig.Account1.Password)
-	s.EqualError(accounts.ErrNoAccountSelected, err.Error(), "expected error is not returned (tried to create sub-account w/o login)")
+	s.EqualError(account.ErrNoAccountSelected, err.Error(), "expected error is not returned (tried to create sub-account w/o login)")
 
 	err = s.Backend.AccountManager().SelectAccount(address, TestConfig.Account1.Password)
 	s.NoError(err, "cannot select account")
@@ -234,7 +234,7 @@ func (s *AccountsTestSuite) TestSelectedAccountOnRestart() {
 
 	// make sure that no account is selected by default
 	selectedAccount, err := s.Backend.AccountManager().SelectedAccount()
-	s.EqualError(accounts.ErrNoAccountSelected, err.Error(), "account selected, but should not be")
+	s.EqualError(account.ErrNoAccountSelected, err.Error(), "account selected, but should not be")
 	s.Nil(selectedAccount)
 
 	// select account
@@ -297,6 +297,6 @@ func (s *AccountsTestSuite) TestSelectedAccountOnRestart() {
 	s.False(whisperService.HasKeyPair(pubKey1), "identity should not be present, but it is still present in whisper")
 
 	selectedAccount, err = s.Backend.AccountManager().SelectedAccount()
-	s.EqualError(accounts.ErrNoAccountSelected, err.Error())
+	s.EqualError(account.ErrNoAccountSelected, err.Error())
 	s.Nil(selectedAccount)
 }

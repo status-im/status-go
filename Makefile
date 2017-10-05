@@ -30,7 +30,7 @@ help: ##@other Show this help
 
 # Main targets
 
-UNIT_TEST_PACKAGES := $(shell go list ./...  | grep -v /vendor/ | grep -v /integration/ | grep -v /cmd/)
+UNIT_TEST_PACKAGES := $(shell go list ./...  | grep -v /vendor | grep -v /e2e | grep -v /cmd)
 
 statusgo: ##@build Build status-go as statusd server
 	build/env.sh go build -i -o $(GOBIN)/statusd -v $(shell build/testnet-flags.sh) ./cmd/statusd

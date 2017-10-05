@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/status-im/status-go/e2e"
-	"github.com/status-im/status-go/geth/accounts"
+	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/log"
@@ -78,7 +78,7 @@ func (s *APIBackendTestSuite) TestRaceConditions() {
 			log.Info("AccountManager()")
 			instance := s.Backend.AccountManager()
 			s.NotNil(instance)
-			s.IsType(&accounts.Manager{}, instance)
+			s.IsType(&account.Manager{}, instance)
 			s.T().Logf("Manager(), result: %v", instance)
 			progress <- struct{}{}
 		},

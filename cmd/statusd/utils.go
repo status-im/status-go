@@ -19,7 +19,7 @@ import (
 
 	"fmt"
 
-	"github.com/status-im/status-go/geth/accounts"
+	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/signal"
@@ -391,7 +391,7 @@ func testCreateChildAccount(t *testing.T) bool {
 		return false
 	}
 
-	if createSubAccountResponse.Error != accounts.ErrNoAccountSelected.Error() {
+	if createSubAccountResponse.Error != account.ErrNoAccountSelected.Error() {
 		t.Errorf("expected error is not returned (tried to create sub-account w/o login): %v", createSubAccountResponse.Error)
 		return false
 	}

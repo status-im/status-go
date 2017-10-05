@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/status-im/status-go/geth/accounts"
+	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
 	"gopkg.in/urfave/cli.v1"
@@ -249,12 +249,12 @@ func injectAccountIntoWhisper(address, password string) error {
 
 	acct, err := common.ParseAccountString(address)
 	if err != nil {
-		return accounts.ErrAddressToAccountMappingFailure
+		return account.ErrAddressToAccountMappingFailure
 	}
 
 	_, accountKey, err := keyStore.AccountDecryptedKey(acct, password)
 	if err != nil {
-		return fmt.Errorf("%s: %v", accounts.ErrAccountToKeyMappingFailure.Error(), err)
+		return fmt.Errorf("%s: %v", account.ErrAccountToKeyMappingFailure.Error(), err)
 	}
 
 	whisperService, err := nodeManager.WhisperService()
