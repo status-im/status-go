@@ -144,10 +144,6 @@ func (m *Manager) RecoverAccount(password, mnemonic string) (address, pubKey str
 	return address, pubKey, nil
 }
 
-type accountKeyFile struct {
-	Address string `json:"address"`
-}
-
 // VerifyAccountPassword tries to decrypt a given account key file, with a provided password.
 // If no error is returned, then account is considered verified.
 func (m *Manager) VerifyAccountPassword(keyStoreDir, address, password string) (*keystore.Key, error) {
@@ -165,7 +161,9 @@ func (m *Manager) VerifyAccountPassword(keyStoreDir, address, password string) (
 			return fmt.Errorf("invalid account key file: %v", err)
 		}
 
-		var accountKey accountKeyFile
+		var accountKey struct {
+			Address string `json:"address"`
+		}
 		if err := json.Unmarshal(rawKeyFile, &accountKey); err != nil {
 			return fmt.Errorf("failed to read key file: %s", err)
 		}
