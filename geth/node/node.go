@@ -65,22 +65,13 @@ func MakeNode(config *params.NodeConfig) (*node.Node, error) {
 		stackConfig.P2P.PrivateKey = pk
 	}
 
-	// TODO(divan): FIXME: this is rude workaround for #294 issue
-	// we activating ETH/LES service to have RPC handler for `eth_accounts` call
-	// should be removed once proper own RPC and refactoring is completed
-	var activateEthNode bool = true
-	if config.UpstreamConfig.Enabled {
-		stackConfig.P2P.MaxPeers = 0
-		activateEthNode = true // just for clarity that we activate it in both cases, for upstream and local
-		log.Info("Blockchain synchronization is switched off, RPC requests will be proxied to " + config.UpstreamConfig.URL)
-	}
-
 	stack, err := node.New(stackConfig)
 	if err != nil {
 		return nil, ErrNodeMakeFailure
 	}
 
-	if activateEthNode {
+	// Start Ethereum service if we are not expected to use an upstream server.
+	if !config.UpstreamConfig.Enabled {
 		if err := activateEthService(stack, config); err != nil {
 			return nil, fmt.Errorf("%v: %v", ErrEthServiceRegistrationFailure, err)
 		}
