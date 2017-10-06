@@ -53,6 +53,10 @@ func (s *JailTestSuite) SetupTest() {
 	s.NodeManager = nodeManager
 }
 
+func (s *JailTestSuite) TearDownTest() {
+	s.jail.Stop()
+}
+
 func (s *JailTestSuite) TestInit() {
 	require := s.Require()
 
