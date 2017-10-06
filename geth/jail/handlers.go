@@ -86,8 +86,6 @@ func makeAsyncSendHandler(jail *Jail, cellInt common.JailCell) func(call otto.Fu
 
 // makeSendHandler returns jeth.send() and jeth.sendAsync() handler
 func makeSendHandler(jail *Jail, cellInt common.JailCell) func(call otto.FunctionCall) otto.Value {
-	// FIXME(tiabc): Get rid of this.
-	cell := cellInt.(*Cell)
 	return func(call otto.FunctionCall) otto.Value {
 		return jail.Send(call)
 	}
