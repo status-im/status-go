@@ -85,6 +85,7 @@ func makeAsyncSendHandler(jail *Jail, cellInt common.JailCell) func(call otto.Fu
 }
 
 // makeSendHandler returns jeth.send() and jeth.sendAsync() handler
+// TODO(tiabc): get rid of an extra parameter.
 func makeSendHandler(jail *Jail, cellInt common.JailCell) func(call otto.FunctionCall) otto.Value {
 	return func(call otto.FunctionCall) otto.Value {
 		return jail.Send(call)
