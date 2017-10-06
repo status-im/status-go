@@ -89,13 +89,6 @@ func makeSendHandler(jail *Jail, cellInt common.JailCell) func(call otto.Functio
 	// FIXME(tiabc): Get rid of this.
 	cell := cellInt.(*Cell)
 	return func(call otto.FunctionCall) otto.Value {
-		// Send calls are guaranteed to be only invoked from web3 after calling the appropriate
-		// method of jail.Cell and the cell is locked during that call. In order to allow jail.Send
-		// to perform any operations on cell.VM and not hang, we need to unlock the mutex and return
-		// it to the previous state afterwards so that the caller didn't panic doing cell.Unlock().
-		cell.Unlock()
-		defer cell.Lock()
-
 		return jail.Send(call)
 	}
 }
