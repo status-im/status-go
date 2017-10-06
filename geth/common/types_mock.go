@@ -587,6 +587,24 @@ func (mr *MockTxQueueManagerMockRecorder) SetTransactionReturnHandler(fn interfa
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetTransactionReturnHandler", reflect.TypeOf((*MockTxQueueManager)(nil).SetTransactionReturnHandler), fn)
 }
 
+// SendTransactionRPCHandler mocks base method
+func (m *MockTxQueueManager) SendTransactionRPCHandler(ctx context.Context, args ...interface{}) (interface{}, error) {
+	varargs := []interface{}{ctx}
+	for _, a := range args {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "SendTransactionRPCHandler", varargs...)
+	ret0, _ := ret[0].(interface{})
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SendTransactionRPCHandler indicates an expected call of SendTransactionRPCHandler
+func (mr *MockTxQueueManagerMockRecorder) SendTransactionRPCHandler(ctx interface{}, args ...interface{}) *gomock.Call {
+	varargs := append([]interface{}{ctx}, args...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendTransactionRPCHandler", reflect.TypeOf((*MockTxQueueManager)(nil).SendTransactionRPCHandler), varargs...)
+}
+
 // TransactionReturnHandler mocks base method
 func (m *MockTxQueueManager) TransactionReturnHandler() func(*QueuedTx, error) {
 	ret := m.ctrl.Call(m, "TransactionReturnHandler")
@@ -727,6 +745,16 @@ func (mr *MockJailCellMockRecorder) Call(item, this interface{}, args ...interfa
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Call", reflect.TypeOf((*MockJailCell)(nil).Call), varargs...)
 }
 
+// Stop mocks base method
+func (m *MockJailCell) Stop() {
+	m.ctrl.Call(m, "Stop")
+}
+
+// Stop indicates an expected call of Stop
+func (mr *MockJailCellMockRecorder) Stop() *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Stop", reflect.TypeOf((*MockJailCell)(nil).Stop))
+}
+
 // MockJailManager is a mock of JailManager interface
 type MockJailManager struct {
 	ctrl     *gomock.Controller
@@ -808,4 +836,14 @@ func (m *MockJailManager) BaseJS(js string) {
 // BaseJS indicates an expected call of BaseJS
 func (mr *MockJailManagerMockRecorder) BaseJS(js interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BaseJS", reflect.TypeOf((*MockJailManager)(nil).BaseJS), js)
+}
+
+// Stop mocks base method
+func (m *MockJailManager) Stop() {
+	m.ctrl.Call(m, "Stop")
+}
+
+// Stop indicates an expected call of Stop
+func (mr *MockJailManagerMockRecorder) Stop() *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Stop", reflect.TypeOf((*MockJailManager)(nil).Stop))
 }
