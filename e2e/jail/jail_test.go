@@ -163,6 +163,7 @@ func (s *JailTestSuite) TestEventSignal() {
 
 // TestCallResponseOrder tests for problem in
 // https://github.com/status-im/status-go/issues/372
+// TODO(adam): this test can panic.
 func (s *JailTestSuite) TestCallResponseOrder() {
 	statusJS := baseStatusJSCode + `;
 	_status_catalog.commands["testCommand"] = function (params) {
