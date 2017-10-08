@@ -375,9 +375,6 @@ func (s *JailRPCTestSuite) TestJailVMPersistence() {
 // TestCallResponseOrder tests for problem in
 // https://github.com/status-im/status-go/issues/372
 func (s *JailRPCTestSuite) TestCallResponseOrder() {
-	s.StartTestBackend(params.RopstenNetworkID)
-	defer s.StopTestBackend()
-
 	statusJS := baseStatusJSCode + `;
 	_status_catalog.commands["testCommand"] = function (params) {
 		return params.val * params.val;
