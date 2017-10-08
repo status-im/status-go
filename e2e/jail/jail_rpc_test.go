@@ -20,7 +20,7 @@ import (
 )
 
 func TestJailRPCTestSuite(t *testing.T) {
-	suite.Run(t, new(JailTestSuite))
+	suite.Run(t, new(JailRPCTestSuite))
 }
 
 type JailRPCTestSuite struct {
