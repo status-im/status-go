@@ -38,6 +38,9 @@ func (s *JailRPCTestSuite) SetupTest() {
 // TestJailRPCAsyncSend was written to catch race conditions with a weird error message
 // starting from `ReferenceError` as if otto vm were losing symbols.
 func (s *JailRPCTestSuite) TestJailRPCAsyncSend() {
+	s.StartTestBackend(params.RopstenNetworkID)
+	defer s.StopTestBackend()
+
 	// load Status JS and add test command to it
 	s.jail.BaseJS(baseStatusJSCode)
 	s.jail.Parse(testChatID, txJSCode)
