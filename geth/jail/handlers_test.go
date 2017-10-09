@@ -9,27 +9,28 @@ import (
 	"github.com/robertkrimen/otto"
 
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
+	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/rpc"
 	"github.com/status-im/status-go/geth/signal"
 	"github.com/stretchr/testify/suite"
 )
 
-type HandlersTestSuite struct {
-	suite.Suite
-	testServerResponseFixture string
-	ts                        *httptest.Server
-	client                    *gethrpc.Client
-}
-
 func TestHandlersTestSuite(t *testing.T) {
 	suite.Run(t, new(HandlersTestSuite))
 }
 
+type HandlersTestSuite struct {
+	suite.Suite
+	responseFixture string
+	ts              *httptest.Server
+	client          *gethrpc.Client
+}
+
 func (s *HandlersTestSuite) SetupTest() {
-	s.testServerResponseFixture = `{"json-rpc":"2.0","id":10,"result":true}`
+	s.responseFixture = `{"json-rpc":"2.0","id":10,"result":true}`
 	s.ts = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, s.testServerResponseFixture)
+		fmt.Fprintln(w, s.responseFixture)
 	}))
 
 	client, err := gethrpc.Dial(s.ts.URL)
@@ -46,10 +47,12 @@ func (s *HandlersTestSuite) TestWeb3SendHandlerSuccess() {
 	s.NoError(err)
 
 	jail := New(func() *rpc.Client { return client })
+
 	cell, err := jail.CreateCell("cell1")
 	s.NoError(err)
 	jail.InitCell("cell1", "")
 
+	// web3.eth.syncing is an arbitrary web3 sync RPC call.
 	value, err := cell.Run("web3.eth.syncing")
 	s.NoError(err)
 	result, err := value.ToBoolean()
@@ -59,6 +62,7 @@ func (s *HandlersTestSuite) TestWeb3SendHandlerSuccess() {
 
 func (s *HandlersTestSuite) TestWeb3SendHandlerFailure() {
 	jail := New(func() *rpc.Client { return nil })
+
 	cell, err := jail.CreateCell("cell1")
 	s.NoError(err)
 	jail.InitCell("cell1", "")
@@ -109,9 +113,7 @@ func (s *HandlersTestSuite) TestWeb3SendAsyncHandlerFailure() {
 	})
 	s.NoError(err)
 
-	_, err = cell.Run(`web3.eth.getSyncing(function (err, result) {
-		__getSyncingCallback(err, result);
-	})`)
+	_, err = cell.Run(`web3.eth.getSyncing(__getSyncingCallback)`)
 	s.NoError(err)
 
 	errValue := <-errc
@@ -127,6 +129,7 @@ func (s *HandlersTestSuite) TestWeb3IsConnectedHandler() {
 	s.NoError(err)
 
 	jail := New(func() *rpc.Client { return client })
+
 	cell, err := jail.CreateCell("cell1")
 	s.NoError(err)
 	jail.InitCell("cell1", "")
@@ -141,16 +144,17 @@ func (s *HandlersTestSuite) TestWeb3IsConnectedHandler() {
 	s.True(resultBool)
 
 	// When result is false.
-	s.testServerResponseFixture = `{"json-rpc":"2.0","id":10,"result":false}`
+	s.responseFixture = `{"json-rpc":"2.0","id":10,"result":false}`
 	value, err = cell.Run("web3.isConnected()")
 	s.NoError(err)
 	result, err = value.Object().Get("error")
 	s.NoError(err)
-	s.Equal("there is no running node", result.String())
+	s.Equal(node.ErrNoRunningNode.Error(), result.String())
 }
 
 func (s *HandlersTestSuite) TestSendSignalHandler() {
 	jail := New(func() *rpc.Client { return nil })
+
 	cell, err := jail.CreateCell("cell1")
 	s.NoError(err)
 	jail.InitCell("cell1", "")

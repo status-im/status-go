@@ -46,7 +46,7 @@ func (s *CellTestSuite) TestCellLoopRace() {
 	items := make(chan struct{})
 
 	err := cell.Set("__captureResponse", func() otto.Value {
-		go func() { items <- struct{}{} }()
+		items <- struct{}{}
 		return otto.UndefinedValue()
 	})
 	s.NoError(err)
@@ -178,7 +178,7 @@ func (s *CellTestSuite) TestCellLoopCancel() {
 }
 
 func (s *CellTestSuite) TestCellCallAsync() {
-	// Don't use buffered channel as we use CallAsync.
+	// Don't use buffered channel as it's supposed to be an async call.
 	datac := make(chan string)
 
 	err := s.cell.Set("testCallAsync", func(call otto.FunctionCall) otto.Value {
