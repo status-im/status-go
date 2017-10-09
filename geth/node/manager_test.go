@@ -328,77 +328,77 @@ func (s *ManagerTestSuite) TestRaceConditions() {
 
 	var funcsToTest = []func(*params.NodeConfig){
 		func(config *params.NodeConfig) {
-			log.Info("StartNode()")
+			log.Send(log.Info("StartNode()"))
 			_, err := s.NodeManager.StartNode(config)
 			s.T().Logf("StartNode() for network: %d, error: %v", config.NetworkID, err)
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
-			log.Info("StopNode()")
+			log.Send(log.Info("StopNode()"))
 			_, err := s.NodeManager.StopNode()
 			s.T().Logf("StopNode() for network: %d, error: %v", config.NetworkID, err)
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
-			log.Info("Node()")
+			log.Send(log.Info("Node()"))
 			_, err := s.NodeManager.Node()
 			s.T().Logf("Node(), error: %v", err)
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
-			log.Info("IsNodeRunning()")
+			log.Send(log.Info("IsNodeRunning()"))
 			s.T().Logf("IsNodeRunning(), result: %v", s.NodeManager.IsNodeRunning())
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
-			log.Info("PopulateStaticPeers()")
+			log.Send(log.Info("PopulateStaticPeers()"))
 			s.T().Logf("PopulateStaticPeers(), error: %v", s.NodeManager.PopulateStaticPeers())
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
-			log.Info("ResetChainData()")
+			log.Send(log.Info("ResetChainData()"))
 			_, err := s.NodeManager.ResetChainData()
 			s.T().Logf("ResetChainData(), error: %v", err)
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
-			log.Info("RestartNode()")
+			log.Send(log.Info("RestartNode()"))
 			_, err := s.NodeManager.RestartNode()
 			s.T().Logf("RestartNode(), error: %v", err)
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
-			log.Info("NodeConfig()")
+			log.Send(log.Info("NodeConfig()"))
 			_, err := s.NodeManager.NodeConfig()
 			s.T().Logf("NodeConfig(), error: %v", err)
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
-			log.Info("LightEthereumService()")
+			log.Send(log.Info("LightEthereumService()"))
 			_, err := s.NodeManager.LightEthereumService()
 			s.T().Logf("LightEthereumService(), error: %v", err)
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
-			log.Info("WhisperService()")
+			log.Send(log.Info("WhisperService()"))
 			_, err := s.NodeManager.WhisperService()
 			s.T().Logf("WhisperService(), error: %v", err)
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
-			log.Info("AccountManager()")
+			log.Send(log.Info("AccountManager()"))
 			_, err := s.NodeManager.AccountManager()
 			s.T().Logf("AccountManager(), error: %v", err)
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
-			log.Info("AccountKeyStore()")
+			log.Send(log.Info("AccountKeyStore()"))
 			_, err := s.NodeManager.AccountKeyStore()
 			s.T().Logf("AccountKeyStore(), error: %v", err)
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
-			log.Info("RPCClient()")
+			log.Send(log.Info("RPCClient()"))
 			s.NodeManager.RPCClient()
 			progress <- struct{}{}
 		},
@@ -447,7 +447,7 @@ func (s *ManagerTestSuite) TestNodeStartCrash() {
 	// let's listen for node.crashed signal
 	signalReceived := false
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		log.Info("Notification Received", "event", jsonEvent)
+		log.Send(log.Info("Notification Received").With("event", jsonEvent))
 		var envelope signal.Envelope
 		err := json.Unmarshal([]byte(jsonEvent), &envelope)
 		s.NoError(err, fmt.Sprintf("cannot unmarshal JSON: %s", jsonEvent))

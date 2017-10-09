@@ -211,7 +211,7 @@ func (s *BackendTestSuite) TestCallRPC() {
 				"value": "0x9184e72a",
 				"data": "0xd46e8dd67c5d32be8d46e8dd67c5d32be8058bb8eb970870f072445675058bb8eb970870f072445675"}],"id":1}`,
 			func(resultJSON string) {
-				log.Info("eth_sendTransaction")
+				log.Send(log.Info("eth_sendTransaction").With("result", resultJSON))
 				s.NotContains(resultJSON, "error")
 				progress <- struct{}{}
 			},
@@ -401,31 +401,31 @@ func (s *BackendTestSuite) TestRaceConditions() {
 
 	var funcsToTest = []func(*params.NodeConfig){
 		func(config *params.NodeConfig) {
-			log.Info("StartNode()")
+			log.Send(log.Info("StartNode()"))
 			_, err := s.backend.StartNode(config)
 			s.T().Logf("StartNode() for network: %d, error: %v", config.NetworkID, err)
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
-			log.Info("StopNode()")
+			log.Send(log.Info("StopNode()"))
 			_, err := s.backend.StopNode()
 			s.T().Logf("StopNode() for network: %d, error: %v", config.NetworkID, err)
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
-			log.Info("ResetChainData()")
+			log.Send(log.Info("ResetChainData()"))
 			_, err := s.backend.ResetChainData()
 			s.T().Logf("ResetChainData(), error: %v", err)
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
-			log.Info("RestartNode()")
+			log.Send(log.Info("RestartNode()"))
 			_, err := s.backend.RestartNode()
 			s.T().Logf("RestartNode(), error: %v", err)
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
-			log.Info("NodeManager()")
+			log.Send(log.Info("NodeManager()"))
 			instance := s.backend.NodeManager()
 			s.NotNil(instance)
 			s.IsType(&node.NodeManager{}, instance)
@@ -433,7 +433,7 @@ func (s *BackendTestSuite) TestRaceConditions() {
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
-			log.Info("AccountManager()")
+			log.Send(log.Info("AccountManager()"))
 			instance := s.backend.AccountManager()
 			s.NotNil(instance)
 			s.IsType(&account.Manager{}, instance)
@@ -441,7 +441,7 @@ func (s *BackendTestSuite) TestRaceConditions() {
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
-			log.Info("JailManager()")
+			log.Send(log.Info("JailManager()"))
 			instance := s.backend.JailManager()
 			s.NotNil(instance)
 			s.IsType(&jail.Jail{}, instance)
@@ -449,62 +449,62 @@ func (s *BackendTestSuite) TestRaceConditions() {
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
-			log.Info("CreateAccount()")
+			log.Send(log.Info("CreateAccount()"))
 			address, pubKey, mnemonic, err := s.backend.AccountManager().CreateAccount("password")
 			s.T().Logf("CreateAccount(), error: %v (address: %v, pubKey: %v, mnemonic: %v)", err, address, pubKey, mnemonic)
 			if err == nil {
 				// SelectAccount
-				log.Info("CreateAccount()")
+				log.Send(log.Info("CreateAccount()"))
 				err = s.backend.AccountManager().SelectAccount(address, "password")
 				s.T().Logf("SelectAccount(%v, %v), error: %v", address, "password", err)
 
 				// CreateChildAccount
-				log.Info("CreateChildAccount()")
+				log.Send(log.Info("CreateChildAccount()"))
 				address, pubKey, err := s.backend.AccountManager().CreateChildAccount(address, "password")
 				s.T().Logf("CreateAccount(), error: %v (address: %v, pubKey: %v)", err, address, pubKey)
 
 				// RecoverAccount
-				log.Info("RecoverAccount()")
+				log.Send(log.Info("RecoverAccount()"))
 				address, pubKey, err = s.backend.AccountManager().RecoverAccount("password", mnemonic)
 				s.T().Logf("RecoverAccount(), error: %v (address: %v, pubKey: %v)", err, address, pubKey)
 			}
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
-			log.Info("VerifyAccountPassword()")
+			log.Send(log.Info("VerifyAccountPassword()"))
 			_, err := s.backend.AccountManager().VerifyAccountPassword(config.KeyStoreDir, "0x0", "bar")
 			s.T().Logf("VerifyAccountPassword(), err: %v", err)
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
-			log.Info("Logout()")
+			log.Send(log.Info("Logout()"))
 			s.T().Logf("Logout(), result: %v", s.backend.AccountManager().Logout())
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
-			log.Info("IsNodeRunning()")
+			log.Send(log.Info("IsNodeRunning()"))
 			s.T().Logf("IsNodeRunning(), result: %v", s.backend.IsNodeRunning())
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
-			log.Info("CompleteTransaction()")
+			log.Send(log.Info("CompleteTransaction()"))
 			_, err := s.backend.CompleteTransaction("id", "password")
 			s.T().Logf("CompleteTransaction(), error: %v", err)
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
-			log.Info("DiscardTransaction()")
+			log.Send(log.Info("DiscardTransaction()"))
 			s.T().Logf("DiscardTransaction(), error: %v", s.backend.DiscardTransaction("id"))
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
-			log.Info("CompleteTransactions()")
+			log.Send(log.Info("CompleteTransactions()"))
 			ids := []common.QueuedTxID{"id1", "id2"}
 			s.T().Logf("CompleteTransactions(), result: %v", s.backend.CompleteTransactions(ids, "password"))
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
-			log.Info("DiscardTransactions()")
+			log.Send(log.Info("DiscardTransactions()"))
 			ids := []common.QueuedTxID{"id1", "id2"}
 			s.T().Logf("DiscardTransactions(), result: %v", s.backend.DiscardTransactions(ids))
 			progress <- struct{}{}

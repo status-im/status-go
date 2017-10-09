@@ -185,10 +185,10 @@ func (jail *Jail) Send(call otto.FunctionCall, vm *vm.VM) otto.Value {
 
 	// Execute the requests.
 	for _, req := range reqs {
-		log.Info("execute request", "method", req.Method)
+		log.Send(log.Info("execute request").With("method", req.Method))
 		res, err := jail.policy.Execute(req, vm)
 		if err != nil {
-			log.Info("request errored", "error", err.Error())
+			log.Send(log.Errorf("request errored").With("error", err.Error())
 			switch err.(type) {
 			case common.StopRPCCallError:
 				return newErrorResponseOtto(vm, err.Error(), nil)
@@ -246,7 +246,7 @@ func newResultResponse(vm *otto.Otto, result interface{}) otto.Value {
 func throwJSException(msg error) otto.Value {
 	val, err := otto.ToValue(msg.Error())
 	if err != nil {
-		log.Error(fmt.Sprintf("Failed to serialize JavaScript exception %v: %v", msg.Error(), err))
+		log.Send(log.Errorf("Failed to serialize JavaScript exception %v", msg.Error()).With("error", err))
 	}
 	panic(val)
 }

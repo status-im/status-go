@@ -75,7 +75,7 @@ func (s *BackendTestSuite) TestJailSendQueuedTransaction() {
 			txHash, err := s.backend.CompleteTransaction(common.QueuedTxID(txID), TestConfig.Account1.Password)
 			require.NoError(err, "cannot complete queued transaction[%v]", event["id"])
 
-			log.Info("Transaction complete", "URL", "https://ropsten.etherscan.io/tx/%s"+txHash.Hex())
+			log.Send(log.Info("Transaction complete", "URL", "https://ropsten.etherscan.io/tx/%s"+txHash.Hex()))
 
 			txHashes <- txHash
 		}

@@ -100,7 +100,7 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 		// init RPC client for this node
 		m.rpcClient, err = rpc.NewClient(m.node, m.config.UpstreamConfig)
 		if err != nil {
-			log.Error("Init RPC client failed:", "error", err)
+			log.Send(log.Error("Init RPC client failed").With("error", err))
 			m.Unlock()
 			signal.Send(signal.Envelope{
 				Type: signal.EventNodeCrashed,
@@ -115,7 +115,7 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 		// underlying node is started, every method can use it, we use it immediately
 		go func() {
 			if err := m.PopulateStaticPeers(); err != nil {
-				log.Error("Static peers population", "error", err)
+				log.Send(log.Error("Static peers population").With("error", err))
 			}
 		}()
 
@@ -131,7 +131,7 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 
 		// notify m.Stop() that node has been stopped
 		close(m.nodeStopped)
-		log.Info("Node is stopped")
+		log.Send(log.Info("Node is stopped"))
 	}()
 
 	return m.nodeStarted, nil
@@ -164,7 +164,7 @@ func (m *NodeManager) stopNode() (<-chan struct{}, error) {
 	nodeStopped := make(chan struct{}, 1)
 	go func() {
 		<-m.nodeStopped // Status node is stopped (code after Wait() is executed)
-		log.Info("Ready to reset node")
+		log.Send(log.Info("Ready to reset node"))
 
 		// reset node params
 		m.Lock()
@@ -177,14 +177,15 @@ func (m *NodeManager) stopNode() (<-chan struct{}, error) {
 		m.Unlock()
 
 		close(nodeStopped) // Status node is stopped, and we can create another
-		log.Info("Node manager resets node params")
+		log.Send(log.Info("Node manager resets node params"))
 
 		// notify application that it can send more requests now
 		signal.Send(signal.Envelope{
 			Type:  signal.EventNodeStopped,
 			Event: struct{}{},
 		})
-		log.Info("Node manager notifed app, that node has stopped")
+
+		log.Send(log.Info("Node manager notifed app, that node has stopped"))
 	}()
 
 	return nodeStopped, nil
@@ -235,17 +236,17 @@ func (m *NodeManager) PopulateStaticPeers() error {
 // populateStaticPeers connects current node with our publicly available LES/SHH/Swarm cluster
 func (m *NodeManager) populateStaticPeers() error {
 	if !m.config.BootClusterConfig.Enabled {
-		log.Info("Boot cluster is disabled")
+		log.Send(log.Info("Boot cluster is disabled"))
 		return nil
 	}
 
 	for _, enode := range m.config.BootClusterConfig.BootNodes {
 		err := m.addPeer(enode)
 		if err != nil {
-			log.Warn("Boot node addition failed", "error", err)
+			log.Send(log.Info("Boot node addition failed").With("error", err))
 			continue
 		}
-		log.Info("Boot node added", "enode", enode)
+		log.Send(log.Info("Boot node added").With("enode", enode))
 	}
 
 	return nil
@@ -322,7 +323,8 @@ func (m *NodeManager) resetChainData() (<-chan struct{}, error) {
 		Type:  signal.EventChainDataRemoved,
 		Event: struct{}{},
 	})
-	log.Info("Chain data has been removed", "dir", chainDataDir)
+
+	log.Send(log.Info("Chain data has been removed").With("dir", chainDataDir))
 
 	return m.startNode(&prevConfig)
 }
@@ -383,7 +385,7 @@ func (m *NodeManager) LightEthereumService() (*les.LightEthereum, error) {
 
 	if m.lesService == nil {
 		if err := m.node.Service(&m.lesService); err != nil {
-			log.Warn("Cannot obtain LES service", "error", err)
+			log.Send(log.Errorf("Cannot obtain LES service").With("error", err))
 			return nil, ErrInvalidLightEthereumService
 		}
 	}
@@ -408,7 +410,7 @@ func (m *NodeManager) WhisperService() (*whisper.Whisper, error) {
 
 	if m.whisperService == nil {
 		if err := m.node.Service(&m.whisperService); err != nil {
-			log.Warn("Cannot obtain whisper service", "error", err)
+			log.Send(log.Errorf("Cannot obtain whisper service").With("error", err))
 			return nil, ErrInvalidWhisperService
 		}
 	}
@@ -479,14 +481,16 @@ func (m *NodeManager) RPCClient() *rpc.Client {
 // initLog initializes global logger parameters based on
 // provided node configurations.
 func (m *NodeManager) initLog(config *params.NodeConfig) {
-	log.SetLevel(config.LogLevel)
-
-	if config.LogFile != "" {
-		err := log.SetLogFile(config.LogFile)
-		if err != nil {
-			fmt.Println("Failed to open log file, using stdout")
-		}
-	}
+	// TODO(influx6): Come up with proper log printer for desirable format
+	// and intialize logger here.
+	// log.SetLevel(config.LogLevel)
+	//
+	// if config.LogFile != "" {
+	// 	err := log.SetLogFile(config.LogFile)
+	// 	if err != nil {
+	// 		fmt.Println("Failed to open log file, using stdout")
+	// 	}
+	// }
 }
 
 // isNodeAvailable check if we have a node running and make sure is fully started

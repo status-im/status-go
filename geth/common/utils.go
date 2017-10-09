@@ -77,7 +77,7 @@ func ImportTestAccount(keystoreDir, accountFile string) error {
 	if _, err := os.Stat(dst); os.IsNotExist(err) {
 		err = ioutil.WriteFile(dst, static.MustAsset("keys/"+accountFile), 0644)
 		if err != nil {
-			log.Warn("cannot copy test account PK", "error", err)
+			log.Send(log.Errorf("cannot copy test account PK").With("error", err))
 			return err
 		}
 	}
