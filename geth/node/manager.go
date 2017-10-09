@@ -98,9 +98,10 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 		m.config = config
 
 		// init RPC client for this node
-		m.rpcClient, err = rpc.NewClient(m.node, m.config.UpstreamConfig)
-		if err != nil {
-			log.Error("Init RPC client failed:", "error", err)
+		localRPCClient, errRPC := m.node.Attach()
+		m.rpcClient, errRPC = rpc.NewClient(localRPCClient, m.config.UpstreamConfig)
+		if errRPC != nil {
+			log.Error("Init RPC client failed:", "error", errRPC)
 			m.Unlock()
 			signal.Send(signal.Envelope{
 				Type: signal.EventNodeCrashed,

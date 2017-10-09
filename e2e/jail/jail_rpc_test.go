@@ -35,16 +35,46 @@ func (s *JailRPCTestSuite) SetupTest() {
 	s.NotNil(s.jail)
 }
 
+// TestJailRPCAsyncSend was written to catch race conditions with a weird error message
+// starting from `ReferenceError` as if otto vm were losing symbols.
+func (s *JailRPCTestSuite) TestJailRPCAsyncSend() {
+	// load Status JS and add test command to it
+	s.jail.SetBaseJS(baseStatusJSCode)
+	s.jail.CreateCell(testChatID, txJSCode)
+
+	cell, err := s.jail.GetCell(testChatID)
+	s.NoError(err)
+	s.NotNil(cell)
+
+	// internally (since we replaced `web3.send` with `jail.Send`)
+	// all requests to web3 are forwarded to `jail.Send`
+	var wg sync.WaitGroup
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			_, err = cell.Run(`_status_catalog.commands.sendAsync({
+				"from": "` + TestConfig.Account1.Address + `",
+				"to": "` + TestConfig.Account2.Address + `",
+				"value": "0.000001"
+			})`)
+			s.NoError(err, "Request failed to process")
+		}()
+	}
+	wg.Wait()
+}
+
 func (s *JailRPCTestSuite) TestJailRPCSend() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
 	// load Status JS and add test command to it
-	s.jail.BaseJS(baseStatusJSCode)
-	s.jail.Parse(testChatID, ``)
+	s.jail.SetBaseJS(baseStatusJSCode)
+	s.jail.CreateCell(testChatID, ``)
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
-	cell, err := s.jail.Cell(testChatID)
+	cell, err := s.jail.GetCell(testChatID)
 	s.NoError(err)
 	s.NotNil(cell)
 
@@ -70,10 +100,10 @@ func (s *JailRPCTestSuite) TestIsConnected() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	s.jail.Parse(testChatID, "")
+	s.jail.CreateCell(testChatID, "")
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
-	cell, err := s.jail.Cell(testChatID)
+	cell, err := s.jail.GetCell(testChatID)
 	s.NoError(err)
 
 	_, err = cell.Run(`
@@ -114,9 +144,9 @@ func (s *JailRPCTestSuite) TestContractDeployment() {
 	s.EnsureNodeSync()
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
-	s.jail.Parse(testChatID, "")
+	s.jail.CreateCell(testChatID, "")
 
-	cell, err := s.jail.Cell(testChatID)
+	cell, err := s.jail.GetCell(testChatID)
 	s.NoError(err)
 
 	completeQueuedTransaction := make(chan struct{})
@@ -252,9 +282,9 @@ func (s *JailRPCTestSuite) TestJailVMPersistence() {
 	}
 
 	jail := s.Backend.JailManager()
-	jail.BaseJS(baseStatusJSCode)
+	jail.SetBaseJS(baseStatusJSCode)
 
-	parseResult := jail.Parse(testChatID, `
+	parseResult := jail.CreateCell(testChatID, `
 		var total = 0;
 		_status_catalog['ping'] = function(params) {
 			total += Number(params.amount);
@@ -305,7 +335,7 @@ func (s *JailRPCTestSuite) TestJailVMPersistence() {
 
 			s.T().Logf("CALL START: %v %v", tc.command, tc.params)
 			response := jail.Call(testChatID, tc.command, tc.params)
-			if err := tc.validator(response); err != nil {
+			if err := tc.validator(string(response)); err != nil {
 				s.T().Errorf("failed test validation: %v, err: %v", tc.command, err)
 			}
 			s.T().Logf("CALL END: %v %v", tc.command, tc.params)
@@ -329,7 +359,7 @@ func (s *JailRPCTestSuite) TestJailVMPersistence() {
 	time.Sleep(5 * time.Second)
 
 	// Validate total.
-	cell, err := jail.Cell(testChatID)
+	cell, err := jail.GetCell(testChatID)
 	s.NoError(err)
 
 	totalOtto, err := cell.Get("total")

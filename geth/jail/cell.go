@@ -14,43 +14,48 @@ import (
 // Cell represents a single jail cell, which is basically a JavaScript VM.
 type Cell struct {
 	*vm.VM
-	id     string
-	cancel context.CancelFunc
-	lo     *loop.Loop
+	id          string
+	cancel      context.CancelFunc
+	loop        *loop.Loop
+	loopStopped chan struct{}
 }
 
-// newCell encapsulates what we need to create a new jailCell from the
+// NewCell encapsulates what we need to create a new jailCell from the
 // provided vm and eventloop instance.
-func newCell(id string, ottoVM *otto.Otto) (*Cell, error) {
-	cellVM := vm.New(ottoVM)
+func NewCell(id string) *Cell {
+	vm := vm.New(otto.New())
+	lo := loop.New(vm)
 
-	lo := loop.New(cellVM)
-
-	registerVMHandlers(cellVM, lo)
+	registerVMHandlers(vm, lo)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// start event loop in background
-	go lo.Run(ctx)
+	// Start event loop in the background.
+	loopStopped := make(chan struct{})
+	go func() {
+		lo.Run(ctx)
+		close(loopStopped)
+	}()
 
 	return &Cell{
-		VM:     cellVM,
-		id:     id,
-		cancel: cancel,
-		lo:     lo,
-	}, nil
+		VM:          vm,
+		id:          id,
+		cancel:      cancel,
+		loop:        lo,
+		loopStopped: loopStopped,
+	}
 }
 
 // registerHandlers register variuous functions and handlers
 // to the Otto VM, such as Fetch API callbacks or promises.
-func registerVMHandlers(v *vm.VM, lo *loop.Loop) error {
+func registerVMHandlers(vm *vm.VM, lo *loop.Loop) error {
 	// setTimeout/setInterval functions
-	if err := timers.Define(v, lo); err != nil {
+	if err := timers.Define(vm, lo); err != nil {
 		return err
 	}
 
 	// FetchAPI functions
-	if err := fetch.Define(v, lo); err != nil {
+	if err := fetch.Define(vm, lo); err != nil {
 		return err
 	}
 
@@ -60,6 +65,7 @@ func registerVMHandlers(v *vm.VM, lo *loop.Loop) error {
 // Stop halts event loop associated with cell.
 func (c *Cell) Stop() {
 	c.cancel()
+	<-c.loopStopped
 }
 
 // CallAsync puts otto's function with given args into
@@ -68,7 +74,7 @@ func (c *Cell) Stop() {
 // async call, like callback.
 func (c *Cell) CallAsync(fn otto.Value, args ...interface{}) {
 	task := looptask.NewCallTask(fn, args...)
-	c.lo.Add(task)
-	// TODO(divan): review API of `loop` package, it's contrintuitive
-	go c.lo.Ready(task)
+	c.loop.Add(task)
+	// Run the task immediatelly. It's a blocking operation.
+	c.loop.Ready(task)
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/geth/rpc"
 	"github.com/status-im/status-go/geth/signal"
 	"github.com/status-im/status-go/geth/txqueue"
 )
@@ -33,7 +34,9 @@ func NewStatusBackend() *StatusBackend {
 	nodeManager := node.NewNodeManager()
 	accountManager := account.NewManager(nodeManager)
 	txQueueManager := txqueue.NewManager(nodeManager, accountManager)
-	jailManager := jail.New(nodeManager)
+	jailManager := jail.New(func() *rpc.Client {
+		return nodeManager.RPCClient()
+	})
 
 	return &StatusBackend{
 		nodeManager:    nodeManager,

@@ -8,7 +8,6 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/ethereum/go-ethereum/node"
 	"github.com/status-im/status-go/geth/params"
 
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
@@ -38,16 +37,13 @@ type Client struct {
 //
 // Client is safe for concurrent use and will automatically
 // reconnect to the server if connection is lost.
-func NewClient(node *node.Node, upstream params.UpstreamRPCConfig) (*Client, error) {
+func NewClient(client *gethrpc.Client, upstream params.UpstreamRPCConfig) (*Client, error) {
 	c := &Client{
+		local:    client,
 		handlers: make(map[string]Handler),
 	}
 
 	var err error
-	c.local, err = node.Attach()
-	if err != nil {
-		return nil, fmt.Errorf("attach to local node: %s", err)
-	}
 
 	if upstream.Enabled {
 		c.upstreamEnabled = upstream.Enabled

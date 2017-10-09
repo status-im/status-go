@@ -155,5 +155,4 @@ func (l *Loop) Run(ctx context.Context) error {
 			return context.Canceled
 		}
 	}
-	return nil
 }

@@ -21,6 +21,11 @@ func New(vm *otto.Otto) *VM {
 	}
 }
 
+// UnsafeVM returns a thread-unsafe JavaScript VM.
+func (vm *VM) UnsafeVM() *otto.Otto {
+	return vm.vm
+}
+
 // Set sets the value to be keyed by the provided keyname.
 func (vm *VM) Set(key string, val interface{}) error {
 	vm.Lock()
@@ -76,4 +81,12 @@ func (vm *VM) ToValue(value interface{}) (otto.Value, error) {
 	defer vm.Unlock()
 
 	return vm.vm.ToValue(value)
+}
+
+// MakeCustomError allows to create a new Error object.
+func (vm *VM) MakeCustomError(name, message string) otto.Value {
+	vm.Lock()
+	defer vm.Unlock()
+
+	return vm.vm.MakeCustomError(name, message)
 }
