@@ -46,7 +46,11 @@ func (s *JailTestSuite) SetupTest() {
 	})
 }
 
-func (s *JailTestSuite) TestInit() {
+func (s *JailTestSuite) TearDownTest() {
+	s.Jail.Stop()
+}
+
+func (s *JailTestSuite) TestInitWithoutBaseJS() {
 	errorWrapper := func(err error) string {
 		return `{"error":"` + err.Error() + `"}`
 	}
@@ -59,7 +63,7 @@ func (s *JailTestSuite) TestInit() {
 
 	// create VM (w/o properly initializing base JS script)
 	err = errors.New("ReferenceError: '_status_catalog' is not defined")
-	s.Equal(errorWrapper(err), s.Jail.CreateCell(testChatID, ``))
+	s.Equal(errorWrapper(err), s.Jail.CreateAndInitCell(testChatID, ``))
 	err = errors.New("ReferenceError: 'call' is not defined")
 	s.Equal(errorWrapper(err), s.Jail.Call(testChatID, `["commands", "testCommand"]`, `{"val": 12}`))
 
@@ -67,7 +71,9 @@ func (s *JailTestSuite) TestInit() {
 	cell, err = s.Jail.GetCell(testChatID)
 	s.NoError(err)
 	s.NotNil(cell)
+}
 
+func (s *JailTestSuite) TestInitWithBaseJS() {
 	statusJS := baseStatusJSCode + `;
 	_status_catalog.commands["testCommand"] = function (params) {
 		return params.val * params.val;
@@ -75,7 +81,7 @@ func (s *JailTestSuite) TestInit() {
 	s.Jail.SetBaseJS(statusJS)
 
 	// now no error should occur
-	response := s.Jail.CreateCell(testChatID, ``)
+	response := s.Jail.CreateAndInitCell(testChatID, ``)
 	expectedResponse := `{"result": {"commands":{},"responses":{}}}`
 	s.Equal(expectedResponse, response)
 
@@ -85,12 +91,22 @@ func (s *JailTestSuite) TestInit() {
 	s.Equal(expectedResponse, response)
 }
 
-func (s *JailTestSuite) TestParse() {
+func (s *JailTestSuite) TestMultipleInitError() {
+	var response string
+
+	response = s.Jail.CreateAndInitCell(testChatID, ``)
+	s.Equal(`{"error":"ReferenceError: '_status_catalog' is not defined"}`, response)
+
+	response = s.Jail.CreateAndInitCell(testChatID, ``)
+	s.Equal(`{"error":"cell with id 'testChat' already exists"}`, response)
+}
+
+func (s *JailTestSuite) TestCreateAndInitResponse() {
 	extraCode := `
 	var _status_catalog = {
 		foo: 'bar'
 	};`
-	response := s.Jail.CreateCell("newChat", extraCode)
+	response := s.Jail.CreateAndInitCell("newChat", extraCode)
 	expectedResponse := `{"result": {"foo":"bar"}}`
 	s.Equal(expectedResponse, response)
 }
@@ -101,7 +117,7 @@ func (s *JailTestSuite) TestFunctionCall() {
 	_status_catalog.commands["testCommand"] = function (params) {
 		return params.val * params.val;
 	};`
-	s.Jail.CreateCell(testChatID, statusJS)
+	s.Jail.CreateAndInitCell(testChatID, statusJS)
 
 	// call with wrong chat id
 	response := s.Jail.Call("chatIDNonExistent", "", "")
@@ -118,7 +134,7 @@ func (s *JailTestSuite) TestEventSignal() {
 	s.StartTestNode(params.RinkebyNetworkID)
 	defer s.StopTestNode()
 
-	s.Jail.CreateCell(testChatID, "")
+	s.Jail.CreateAndInitCell(testChatID, "")
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
 	cell, err := s.Jail.GetCell(testChatID)
@@ -191,12 +207,12 @@ func (s *JailTestSuite) TestCallResponseOrder() {
 		return price * gasMultiplicator;
 	};
 	`
-	s.Jail.CreateCell(testChatID, statusJS)
+	s.Jail.CreateAndInitCell(testChatID, statusJS)
 
-	N := 1000
+	N := 100
 	errCh := make(chan error, N)
 	var wg sync.WaitGroup
-	for i := 0; i < 1000; i++ {
+	for i := 0; i < 100; i++ {
 		wg.Add(2)
 		go func(i int) {
 			defer wg.Done()

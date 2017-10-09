@@ -40,7 +40,7 @@ func (s *JailRPCTestSuite) SetupTest() {
 func (s *JailRPCTestSuite) TestJailRPCAsyncSend() {
 	// load Status JS and add test command to it
 	s.jail.SetBaseJS(baseStatusJSCode)
-	s.jail.CreateCell(testChatID, txJSCode)
+	s.jail.CreateAndInitCell(testChatID, txJSCode)
 
 	cell, err := s.jail.GetCell(testChatID)
 	s.NoError(err)
@@ -71,7 +71,7 @@ func (s *JailRPCTestSuite) TestJailRPCSend() {
 
 	// load Status JS and add test command to it
 	s.jail.SetBaseJS(baseStatusJSCode)
-	s.jail.CreateCell(testChatID, ``)
+	s.jail.CreateAndInitCell(testChatID, ``)
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
 	cell, err := s.jail.GetCell(testChatID)
@@ -100,7 +100,7 @@ func (s *JailRPCTestSuite) TestIsConnected() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	s.jail.CreateCell(testChatID, "")
+	s.jail.CreateAndInitCell(testChatID, "")
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
 	cell, err := s.jail.GetCell(testChatID)
@@ -144,7 +144,7 @@ func (s *JailRPCTestSuite) TestContractDeployment() {
 	s.EnsureNodeSync()
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
-	s.jail.CreateCell(testChatID, "")
+	s.jail.CreateAndInitCell(testChatID, "")
 
 	cell, err := s.jail.GetCell(testChatID)
 	s.NoError(err)
@@ -284,7 +284,7 @@ func (s *JailRPCTestSuite) TestJailVMPersistence() {
 	jail := s.Backend.JailManager()
 	jail.SetBaseJS(baseStatusJSCode)
 
-	parseResult := jail.CreateCell(testChatID, `
+	parseResult := jail.CreateAndInitCell(testChatID, `
 		var total = 0;
 		_status_catalog['ping'] = function(params) {
 			total += Number(params.amount);

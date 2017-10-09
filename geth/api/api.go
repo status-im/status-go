@@ -187,12 +187,12 @@ func (api *StatusAPI) DiscardTransactions(ids []common.QueuedTxID) map[common.Qu
 // New context executes provided JavaScript code, right after the initialization.
 // TODO(adam): change method name.
 func (api *StatusAPI) JailParse(chatID, js string) string {
-	return string(api.b.jailManager.CreateCell(chatID, js))
+	return api.b.jailManager.CreateAndInitCell(chatID, js)
 }
 
 // JailCall executes given JavaScript function w/i a jail cell context identified by the chatID.
 func (api *StatusAPI) JailCall(chatID, this, args string) string {
-	return string(api.b.jailManager.Call(chatID, this, args))
+	return api.b.jailManager.Call(chatID, this, args)
 }
 
 // JailBaseJS allows to setup initial JavaScript to be loaded on each jail.Parse()

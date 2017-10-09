@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/robertkrimen/otto"
+	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/rpc"
 	"github.com/status-im/status-go/static"
 )
@@ -100,7 +101,7 @@ func (j *Jail) CreateCell(chatID string) (*Cell, error) {
 // InitCell initializes a cell with JavaScript code. In case of a successful result,
 // it returns {"result": any}, otherwise an error: {"error": "some error"}.
 func (j *Jail) InitCell(chatID, code string) string {
-	cell, err := j.GetCell(chatID)
+	cell, err := j.getCell(chatID)
 	if err != nil {
 		return newJailErrorResponse(err)
 	}
@@ -144,8 +145,19 @@ func (j *Jail) InitCell(chatID, code string) string {
 	return newJailResultResponse(value, err)
 }
 
-// GetCell returns a cell by chatID. If it does not exist, error is returned.
-func (j *Jail) GetCell(chatID string) (*Cell, error) {
+// CreateAndInitCell performs CreateCell and InitCell methods
+// and returns a string.
+// TODO(adam): fix API so that this becomes obsolete.
+func (j *Jail) CreateAndInitCell(chatID, code string) string {
+	_, err := j.CreateCell(chatID)
+	if err != nil {
+		return newJailErrorResponse(err)
+	}
+
+	return j.InitCell(chatID, code)
+}
+
+func (j *Jail) getCell(chatID string) (*Cell, error) {
 	j.cellsMx.RLock()
 	defer j.cellsMx.RUnlock()
 
@@ -157,6 +169,12 @@ func (j *Jail) GetCell(chatID string) (*Cell, error) {
 	return cell, nil
 }
 
+// GetCell returns a cell by chatID. If it does not exist, error is returned.
+// Required by the Backend.
+func (j *Jail) GetCell(chatID string) (common.JailCell, error) {
+	return j.getCell(chatID)
+}
+
 // Call executes the `call` function within a cell with chatID.
 // Returns a string being a valid JS code. In case of a successful result,
 // it's {"result": any}. In case of an error: {"error": "some error"}.
@@ -166,7 +184,7 @@ func (j *Jail) GetCell(chatID string) (*Cell, error) {
 // For instance:
 //   `["prop1", "prop2"]` is translated to `_status_catalog["prop1"["prop2"]`.
 func (j *Jail) Call(chatID, commandPath, args string) string {
-	cell, err := j.GetCell(chatID)
+	cell, err := j.getCell(chatID)
 	if err != nil {
 		return newJailErrorResponse(err)
 	}
