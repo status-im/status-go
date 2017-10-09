@@ -59,7 +59,7 @@ func ResetDefaultNodeNotificationHandler() {
 
 // TriggerDefaultNodeNotificationHandler triggers default notification handler (helpful in tests)
 func TriggerDefaultNodeNotificationHandler(jsonEvent string) {
-	log.Info("Notification received", "event", jsonEvent)
+	log.Send(log.Info("Notification received").With("event", jsonEvent))
 }
 
 // Send sends application signal (JSON, normally) upwards to application (via default notification handler)

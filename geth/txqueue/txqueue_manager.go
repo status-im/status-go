@@ -62,13 +62,13 @@ func NewManager(nodeManager common.NodeManager, accountManager common.AccountMan
 
 // Start starts accepting new transactions into the queue.
 func (m *Manager) Start() {
-	log.Info("start Manager")
+	log.Send(log.Info("start Manager"))
 	m.txQueue.Start()
 }
 
 // Stop stops accepting new transactions into the queue.
 func (m *Manager) Stop() {
-	log.Info("stop Manager")
+	log.Send(log.Info("stop Manager"))
 	m.txQueue.Stop()
 }
 
@@ -95,7 +95,7 @@ func (m *Manager) QueueTransaction(tx *common.QueuedTx) error {
 	if tx.Args.To != nil {
 		to = tx.Args.To.Hex()
 	}
-	log.Info("queue a new transaction", "id", tx.ID, "from", tx.Args.From.Hex(), "to", to)
+	log.Send(log.Info("queue a new transaction").With("id", tx.ID).With("from", tx.Args.From.Hex()).With("to", to))
 
 	return m.txQueue.Enqueue(tx)
 }
@@ -103,7 +103,7 @@ func (m *Manager) QueueTransaction(tx *common.QueuedTx) error {
 // WaitForTransaction adds a transaction to the queue and blocks
 // until it's completed, discarded or times out.
 func (m *Manager) WaitForTransaction(tx *common.QueuedTx) error {
-	log.Info("wait for transaction", "id", tx.ID)
+	log.Send(log.Info("wait for transaction").With("id", tx.ID))
 
 	// now wait up until transaction is:
 	// - completed (via CompleteQueuedTransaction),
@@ -131,11 +131,11 @@ func (m *Manager) NotifyOnQueuedTxReturn(queuedTx *common.QueuedTx, err error) {
 // TODO(adam): investigate a possible bug that calling this method multiple times with the same Transaction ID
 // results in sending multiple transactions.
 func (m *Manager) CompleteTransaction(id common.QueuedTxID, password string) (gethcommon.Hash, error) {
-	log.Info("complete transaction", "id", id)
+	log.Send(log.Info("complete transaction").With("id", id))
 
 	queuedTx, err := m.txQueue.Get(id)
 	if err != nil {
-		log.Warn("could not get a queued transaction", "err", err)
+		log.Send(log.YellowAlert(err, "could not get a queued transaction"))
 		return gethcommon.Hash{}, err
 	}
 
@@ -146,20 +146,20 @@ func (m *Manager) CompleteTransaction(id common.QueuedTxID, password string) (ge
 
 	selectedAccount, err := m.accountManager.SelectedAccount()
 	if err != nil {
-		log.Warn("failed to get a selected account", "err", err)
+		log.Send(log.YellowAlert(err, "failed to get a selected account"))
 		return gethcommon.Hash{}, err
 	}
 
 	// make sure that only account which created the tx can complete it
 	if queuedTx.Args.From.Hex() != selectedAccount.Address.Hex() {
-		log.Warn("queued transaction does not belong to the selected account", "err", ErrInvalidCompleteTxSender)
+		log.Send(log.YellowAlert(ErrInvalidCompleteTxSender, "queued transaction does not belong to the selected account"))
 		m.NotifyOnQueuedTxReturn(queuedTx, ErrInvalidCompleteTxSender)
 		return gethcommon.Hash{}, ErrInvalidCompleteTxSender
 	}
 
 	config, err := m.nodeManager.NodeConfig()
 	if err != nil {
-		log.Warn("could not get a node config", "err", err)
+		log.Send(log.YellowAlert(err, "could not get a node config"))
 		return gethcommon.Hash{}, err
 	}
 
@@ -176,12 +176,12 @@ func (m *Manager) CompleteTransaction(id common.QueuedTxID, password string) (ge
 	// when incorrect sender tries to complete the account,
 	// notify and keep tx in queue (so that correct sender can complete)
 	if txErr == keystore.ErrDecrypt {
-		log.Warn("failed to complete transaction", "err", txErr)
+		log.Send(log.YellowAlert(err, "failed to complete transaction", "err", txErr))
 		m.NotifyOnQueuedTxReturn(queuedTx, txErr)
 		return hash, txErr
 	}
 
-	log.Info("finally completed transaction", "id", queuedTx.ID, "hash", hash, "err", txErr)
+	log.Send(log.Info("finally completed transaction").With("id", queuedTx.ID).With("hash", hash).With("err", txErr))
 
 	queuedTx.Hash = hash
 	queuedTx.Err = txErr
@@ -191,7 +191,7 @@ func (m *Manager) CompleteTransaction(id common.QueuedTxID, password string) (ge
 }
 
 func (m *Manager) completeLocalTransaction(queuedTx *common.QueuedTx, password string) (gethcommon.Hash, error) {
-	log.Info("complete transaction using local node", "id", queuedTx.ID)
+	log.Send(log.Info("complete transaction using local node").With("id", queuedTx.ID))
 
 	les, err := m.nodeManager.LightEthereumService()
 	if err != nil {
@@ -202,7 +202,7 @@ func (m *Manager) completeLocalTransaction(queuedTx *common.QueuedTx, password s
 }
 
 func (m *Manager) completeRemoteTransaction(queuedTx *common.QueuedTx, password string) (gethcommon.Hash, error) {
-	log.Info("complete transaction using upstream node", "id", queuedTx.ID)
+	log.Send(log.Info("complete transaction using upstream node").With("id", queuedTx.ID))
 
 	var emptyHash gethcommon.Hash
 
@@ -331,7 +331,7 @@ func (m *Manager) estimateGas(args common.SendTxArgs) (*hexutil.Big, error) {
 		"eth_estimateGas",
 		params,
 	); err != nil {
-		log.Warn("failed to estimate gas", "err", err)
+		log.Send(log.YellowAlert(err, "failed to estimate gas"))
 		return nil, err
 	}
 
@@ -345,7 +345,7 @@ func (m *Manager) gasPrice() (*hexutil.Big, error) {
 
 	var gasPrice hexutil.Big
 	if err := client.CallContext(ctx, &gasPrice, "eth_gasPrice"); err != nil {
-		log.Warn("failed to get gas price", "err", err)
+		log.Send(log.YellowAlert(err, "failed to get gas price"))
 		return nil, err
 	}
 
@@ -410,7 +410,7 @@ type SendTransactionEvent struct {
 // TransactionQueueHandler returns handler that processes incoming tx queue requests
 func (m *Manager) TransactionQueueHandler() func(queuedTx *common.QueuedTx) {
 	return func(queuedTx *common.QueuedTx) {
-		log.Info("calling TransactionQueueHandler")
+		log.Send(log.Info("calling TransactionQueueHandler"))
 		signal.Send(signal.Envelope{
 			Type: EventTransactionQueued,
 			Event: SendTransactionEvent{
@@ -481,7 +481,7 @@ func (m *Manager) SetTransactionReturnHandler(fn common.EnqueuedTxReturnHandler)
 // SendTransactionRPCHandler is a handler for eth_sendTransaction method.
 // It accepts one param which is a slice with a map of transaction params.
 func (m *Manager) SendTransactionRPCHandler(ctx context.Context, args ...interface{}) (interface{}, error) {
-	log.Info("SendTransactionRPCHandler called")
+	log.Send(log.Info("SendTransactionRPCHandler called"))
 
 	// TODO(adam): it's a hack to parse arguments as common.RPCCall can do that.
 	// We should refactor parsing these params to a separate struct.

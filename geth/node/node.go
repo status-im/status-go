@@ -55,10 +55,10 @@ func MakeNode(config *params.NodeConfig) (*node.Node, error) {
 	stackConfig := defaultEmbeddedNodeConfig(config)
 
 	if len(config.NodeKeyFile) > 0 {
-		log.Info("Loading private key file", "file", config.NodeKeyFile)
+		log.Send(log.Info("Loading private key file").With("file", config.NodeKeyFile))
 		pk, err := crypto.LoadECDSA(config.NodeKeyFile)
 		if err != nil {
-			log.Warn(fmt.Sprintf("Failed loading private key file '%s': %v", config.NodeKeyFile, err))
+			log.Send(log.YellowAlert(err, "Failed loading private key file '%s'", config.NodeKeyFile))
 		}
 
 		// override node's private key
@@ -83,7 +83,7 @@ func MakeNode(config *params.NodeConfig) (*node.Node, error) {
 		if err := activateEthService(stack, config); err != nil {
 			return nil, fmt.Errorf("%v: %v", ErrEthServiceRegistrationFailure, err)
 		}
-		log.Info("Blockchain synchronization is switched off, RPC requests will be proxied to " + config.UpstreamConfig.URL)
+		log.Send(log.Info("Blockchain synchronization is switched off, RPC requests will be proxied to %s", config.UpstreamConfig.URL))
 	}
 
 	// start Whisper service
@@ -149,14 +149,13 @@ func updateCHT(eth *les.LightEthereum, config *params.NodeConfig) {
 		Number: uint64(config.BootClusterConfig.RootNumber),
 		Root:   gethcommon.HexToHash(config.BootClusterConfig.RootHash),
 	})
-	log.Info("Added trusted CHT",
-		"develop", config.DevMode, "number", config.BootClusterConfig.RootNumber, "hash", config.BootClusterConfig.RootHash)
+	log.Send(log.Info("Added trusted CHT").With("develop", config.DevMode).With("number", config.BootClusterConfig.RootNumber).With("hash", config.BootClusterConfig.RootHash))
 }
 
 // activateEthService configures and registers the eth.Ethereum service with a given node.
 func activateEthService(stack *node.Node, config *params.NodeConfig) error {
 	if !config.LightEthConfig.Enabled {
-		log.Info("LES protocol is disabled")
+		log.Send(log.Info("LES protocol is disabled"))
 		return nil
 	}
 
@@ -191,7 +190,7 @@ func activateEthService(stack *node.Node, config *params.NodeConfig) error {
 // activateShhService configures Whisper and adds it to the given node.
 func activateShhService(stack *node.Node, config *params.NodeConfig) error {
 	if !config.WhisperConfig.Enabled {
-		log.Info("SHH protocol is disabled")
+		log.Send(log.Info("SHH protocol is disabled"))
 		return nil
 	}
 

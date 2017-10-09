@@ -229,7 +229,7 @@ func CompleteTransaction(id, password *C.char) *C.char {
 	}
 	outBytes, err := json.Marshal(&out)
 	if err != nil {
-		log.Error("failed to marshal CompleteTransaction output", "error", err.Error())
+		log.Send(log.Errorf("failed to marshal CompleteTransaction output").With("error", err.Error()))
 		return makeJSONResponse(err)
 	}
 
@@ -267,7 +267,7 @@ func CompleteTransactions(ids, password *C.char) *C.char {
 
 	outBytes, err := json.Marshal(&out)
 	if err != nil {
-		log.Error("failed to marshal CompleteTransactions output", "error", err.Error())
+		log.Send(log.Errorf("failed to marshal CompleteTransactions output").With("error", err.Error()))
 		return makeJSONResponse(err)
 	}
 
@@ -290,7 +290,7 @@ func DiscardTransaction(id *C.char) *C.char {
 	}
 	outBytes, err := json.Marshal(&out)
 	if err != nil {
-		log.Error("failed to marshal DiscardTransaction output", "error", err.Error())
+		log.Send(log.Errorf("failed to marshal DiscardTransaction output").With("error", err.Error()))
 		return makeJSONResponse(err)
 	}
 
@@ -327,7 +327,7 @@ func DiscardTransactions(ids *C.char) *C.char {
 
 	outBytes, err := json.Marshal(&out)
 	if err != nil {
-		log.Error("failed to marshal DiscardTransactions output", "error", err.Error())
+		log.Send(log.Errorf("failed to marshal DiscardTransactions output").With("error", err.Error()))
 		return makeJSONResponse(err)
 	}
 

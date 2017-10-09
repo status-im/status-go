@@ -188,7 +188,7 @@ func (jail *Jail) Send(call otto.FunctionCall, vm *vm.VM) otto.Value {
 		log.Send(log.Info("execute request").With("method", req.Method))
 		res, err := jail.policy.Execute(req, vm)
 		if err != nil {
-			log.Send(log.Errorf("request errored").With("error", err.Error())
+			log.Send(log.Errorf("request errored").With("error", err.Error()))
 			switch err.(type) {
 			case common.StopRPCCallError:
 				return newErrorResponseOtto(vm, err.Error(), nil)

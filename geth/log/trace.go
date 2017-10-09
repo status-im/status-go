@@ -96,7 +96,7 @@ func NewTraceWithCallDepth(depth int, comments string) *Trace {
 		File:       pkgFile,
 		Comments:   comments,
 		StartTime:  time.Now(),
-		Function:   getFunctionName(333),
+		Function:   getFunctionName(3),
 	}
 }
 

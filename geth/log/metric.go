@@ -9,9 +9,6 @@ import (
 	"strings"
 )
 
-// Level defines a int type which represent the a giving level of entry for a giving entry.
-type Level int
-
 // level constants
 const (
 	RedAlertLvl    Level = iota // Immediately notify everyone by mail level, because this is bad
@@ -20,19 +17,53 @@ const (
 	InfoLvl                     // Information for view about code operation (replaces Debug, Notice, Trace).
 )
 
-const (
-	// MetficKeyDefault defines the default value for the giving metric key.
-	metricKeyDefault = "unknown"
+// Level defines a int type which represent the a giving level of entry for a giving entry.
+type Level int
 
-	// DefaultMessage defines a default message used by SentryJSON where
-	// fields contains no messages to be used.
-	DefaultMessage = "No Message"
-)
+// GetLevel returns Level value for the giving string.
+// It returns -1 if it does not know the level string.
+func GetLevel(lvl string) Level {
+	switch strings.ToLower(lvl) {
+	case "redalert", "redalartlvl":
+		return RedAlertLvl
+	case "yellowalert", "yellowalertlvl":
+		return YellowAlertLvl
+	case "error", "errorlvl":
+		return ErrorLvl
+	case "info", "infolvl":
+		return InfoLvl
+	}
+
+	return -1
+}
+
+// String returns the string version of the Level.
+func (l Level) String() string {
+	switch l {
+	case RedAlertLvl:
+		return "REDALERT"
+	case YellowAlertLvl:
+		return "YELLOWALERT"
+	case ErrorLvl:
+		return "ERROR"
+	case InfoLvl:
+		return "INFO"
+	}
+
+	return "UNKNOWN"
+}
 
 // YellowAlert returns an Entry with the level set to YellowAlertLvl.
 func YellowAlert(err error, message string, m ...interface{}) Entry {
 	return WithMessage(YellowAlertLvl, message, m...).With("error", err)
 }
+
+// // Trace returns an Entry with the level set to TraceLvl.
+// func Trace(message string, m ...interface{}) Entry {
+// 	me := WithMessage(TraceLvl, message, m...).With("error", err)
+// 	tr := NewTraceWithCallDepth(2, me.Message)
+// 	return me.WithTrace(tr.End())
+// }
 
 // RedAlert returns an Entry with the level set to RedAlertLvl.
 func RedAlert(err error, message string, m ...interface{}) Entry {

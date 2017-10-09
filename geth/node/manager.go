@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
@@ -14,6 +15,8 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/log"
+	"github.com/status-im/status-go/geth/log/custom"
+	"github.com/status-im/status-go/geth/log/jsonfile"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/rpc"
 	"github.com/status-im/status-go/geth/signal"
@@ -100,7 +103,7 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 		// init RPC client for this node
 		m.rpcClient, err = rpc.NewClient(m.node, m.config.UpstreamConfig)
 		if err != nil {
-			log.Send(log.Error("Init RPC client failed").With("error", err))
+			log.Send(log.Errorf("Init RPC client failed").With("error", err))
 			m.Unlock()
 			signal.Send(signal.Envelope{
 				Type: signal.EventNodeCrashed,
@@ -115,7 +118,7 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 		// underlying node is started, every method can use it, we use it immediately
 		go func() {
 			if err := m.PopulateStaticPeers(); err != nil {
-				log.Send(log.Error("Static peers population").With("error", err))
+				log.Send(log.Errorf("Static peers population").With("error", err))
 			}
 		}()
 
@@ -481,16 +484,31 @@ func (m *NodeManager) RPCClient() *rpc.Client {
 // initLog initializes global logger parameters based on
 // provided node configurations.
 func (m *NodeManager) initLog(config *params.NodeConfig) {
-	// TODO(influx6): Come up with proper log printer for desirable format
-	// and intialize logger here.
-	// log.SetLevel(config.LogLevel)
-	//
-	// if config.LogFile != "" {
-	// 	err := log.SetLogFile(config.LogFile)
-	// 	if err != nil {
-	// 		fmt.Println("Failed to open log file, using stdout")
-	// 	}
-	// }
+	var level log.Level
+
+	if config.LogLevel != "" {
+		level = log.GetLevel(config.LogLevel)
+		if level == -1 {
+			fmt.Printf("Unknown log level %q using INFO log level\n", config.LogLevel)
+			level = log.InfoLvl
+		}
+	}
+
+	if config.LogFile != "" {
+		var err error
+		var metricStore log.Metrics
+
+		metricStore, err = jsonfile.JSON(config.LogFile, 100, 1*time.Second)
+		if err != nil {
+			metricStore = custom.FlatDisplay(os.Stdout)
+			fmt.Println("Failed to open log file, using stdout")
+		}
+
+		log.Init(log.FilterLevel(level, metricStore))
+		return
+	}
+
+	log.Init(log.FilterLevel(level, custom.FlatDisplay(os.Stdout)))
 }
 
 // isNodeAvailable check if we have a node running and make sure is fully started

@@ -9,7 +9,12 @@ import (
 )
 
 // JSON returns a log.Metric which writes a series of batch entries into a json file.
-func JSON(targetFile string, maxBatchPerWrite int, maxwait time.Duration) *log.BatchEmitter {
+func JSON(targetFile string, maxBatchPerWrite int, maxwait time.Duration) (*log.BatchEmitter, error) {
+	_, err := os.Stat(targetFile)
+	if err != nil && err != os.ErrExist && err != os.ErrNotExist {
+		return nil, err
+	}
+
 	return log.BatchEmit(maxBatchPerWrite, maxwait, func(entries []log.Entry) error {
 		logFile, err := os.OpenFile(targetFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 		if err != nil {
@@ -29,5 +34,5 @@ func JSON(targetFile string, maxBatchPerWrite int, maxwait time.Duration) *log.B
 		logFile.Sync()
 
 		return nil
-	})
+	}), nil
 }
