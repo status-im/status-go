@@ -10,6 +10,7 @@ import (
 	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/node"
+	"github.com/status-im/status-go/geth/notification"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/signal"
 	"github.com/status-im/status-go/geth/txqueue"
@@ -23,7 +24,7 @@ type StatusBackend struct {
 	accountManager common.AccountManager
 	txQueueManager common.TxQueueManager
 	jailManager    common.JailManager
-	// TODO(oskarth): notifer here
+	notification   common.Notification
 }
 
 // NewStatusBackend create a new NewStatusBackend instance
@@ -34,12 +35,14 @@ func NewStatusBackend() *StatusBackend {
 	accountManager := account.NewManager(nodeManager)
 	txQueueManager := txqueue.NewManager(nodeManager, accountManager)
 	jailManager := jail.New(nodeManager)
+	notificationManager := notification.New(notification.NewFCMClient())
 
 	return &StatusBackend{
 		nodeManager:    nodeManager,
 		accountManager: accountManager,
 		jailManager:    jailManager,
 		txQueueManager: txQueueManager,
+		notification:   notificationManager,
 	}
 }
 
