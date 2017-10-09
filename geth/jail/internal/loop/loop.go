@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/status-im/status-go/geth/jail/internal/vm"
 )
@@ -96,12 +95,6 @@ func (l *Loop) removeByID(id int64) {
 	l.lock.Unlock()
 }
 
-func (l *Loop) removeAll() {
-	l.lock.Lock()
-	l.tasks = nil
-	l.lock.Unlock()
-}
-
 // Ready signals to the loop that a task is ready to be finalised. This might
 // block if the "ready channel" in the loop is at capacity.
 func (l *Loop) Ready(t Task) {
@@ -155,28 +148,7 @@ func (l *Loop) Run(ctx context.Context) error {
 				continue
 			}
 		case <-ctx.Done():
-			l.removeAll()
 			return context.Canceled
-		}
-	}
-	return nil
-}
-
-// WaitForStop waits until all tasks are removed or timed out.
-func (l *Loop) WaitForStop() error {
-	ticker := time.NewTicker(50 * time.Millisecond)
-	timeout := time.NewTimer(1 * time.Second)
-	for {
-		select {
-		case <-ticker.C:
-			l.lock.Lock()
-			sz := len(l.tasks)
-			l.lock.Unlock()
-			if sz == 0 {
-				return nil
-			}
-		case <-timeout.C:
-			return fmt.Errorf("timed out")
 		}
 	}
 	return nil
