@@ -5,6 +5,7 @@ import (
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/common"
+	"github.com/status-im/status-go/geth/signal"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -57,6 +58,11 @@ type BackendTestSuite struct {
 func (s *BackendTestSuite) SetupTest() {
 	s.Backend = api.NewStatusBackend()
 	s.NotNil(s.Backend)
+}
+
+// TearDownTest cleans up the packages state.
+func (s *BackendTestSuite) TearDownTest() {
+	signal.ResetDefaultNodeNotificationHandler()
 }
 
 // StartTestBackend imports some keys and starts a node.
