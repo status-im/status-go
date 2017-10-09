@@ -218,7 +218,8 @@ func (m *Manager) SelectAccount(address, password string) error {
 		return err
 	}
 
-	if err := whisperService.SelectKeyPair(accountKey.PrivateKey); err != nil {
+	err = whisperService.SelectKeyPair(accountKey.PrivateKey)
+	if err != nil {
 		return ErrWhisperIdentityInjectionFailure
 	}
 

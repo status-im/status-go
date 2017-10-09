@@ -2,20 +2,11 @@ package loop
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"sync/atomic"
 
 	"github.com/status-im/status-go/geth/jail/internal/vm"
 )
-
-func formatTask(t Task) string {
-	if t == nil {
-		return "<nil>"
-	}
-
-	return fmt.Sprintf("<%T> %d", t, t.GetID())
-}
 
 // Task represents something that the event loop can schedule and run.
 //
@@ -104,11 +95,8 @@ func (l *Loop) Ready(t Task) {
 // Eval executes some code in the VM associated with the loop and returns an
 // error if that execution fails.
 func (l *Loop) Eval(s interface{}) error {
-	if _, err := l.vm.Run(s); err != nil {
-		return err
-	}
-
-	return nil
+	_, err := l.vm.Run(s)
+	return err
 }
 
 func (l *Loop) processTask(t Task) error {
@@ -151,5 +139,4 @@ func (l *Loop) Run(ctx context.Context) error {
 			return context.Canceled
 		}
 	}
-	return nil
 }

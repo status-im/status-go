@@ -38,7 +38,7 @@ func (s *APITestSuite) TestCHTUpdate() {
 
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "cht-updates")
 	require.NoError(err)
-	defer os.RemoveAll(tmpDir)
+	defer os.RemoveAll(tmpDir) //nolint: errcheck
 
 	configJSON := `{
 		"NetworkId": ` + strconv.Itoa(params.RopstenNetworkID) + `,
@@ -123,5 +123,5 @@ func (s *APITestSuite) TestRaceConditions() {
 	}
 
 	time.Sleep(2 * time.Second) // so that we see some logs
-	s.api.StopNode()            // just in case we have a node running
+	_ = s.api.StopNode()        // just in case we have a node running
 }

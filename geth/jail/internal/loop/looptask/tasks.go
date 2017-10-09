@@ -66,6 +66,7 @@ func (e EvalTask) Cancel() {}
 // Execute runs the EvalTask's otto.Script in the vm provided, pushing the
 // resultant return value and error (or nil) into the associated channels.
 // If the execution results in an error, it will return that error.
+// nolint: unparam
 func (e EvalTask) Execute(vm *vm.VM, l *loop.Loop) error {
 	v, err := vm.Run(e.Script)
 	e.Value <- v
@@ -114,6 +115,7 @@ func (c CallTask) Cancel() {}
 // Execute calls the associated function (not necessarily in the given vm),
 // pushing the resultant return value and error (or nil) into the associated
 // channels. If the call results in an error, it will return that error.
+// nolint: unparam
 func (c CallTask) Execute(vm *vm.VM, l *loop.Loop) error {
 	v, err := c.Function.Call(otto.NullValue(), c.Args...)
 	c.Value <- v

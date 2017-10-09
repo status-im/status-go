@@ -14,6 +14,7 @@ var minDelay = map[bool]int64{
 	false: 4,
 }
 
+//Define jail timers
 func Define(vm *vm.VM, l *loop.Loop) error {
 	if v, err := vm.Get("setTimeout"); err != nil {
 		return err
@@ -39,18 +40,26 @@ func Define(vm *vm.VM, l *loop.Loop) error {
 				l.Ready(t)
 			})
 
-			value, err := call.Otto.ToValue(t)
-			if err != nil {
-				panic(err)
+			value, newTimerErr := call.Otto.ToValue(t)
+			if newTimerErr != nil {
+				panic(newTimerErr)
 			}
 
 			return value
 		}
 	}
-	vm.Set("setTimeout", newTimer(false))
-	vm.Set("setInterval", newTimer(true))
 
-	vm.Set("setImmediate", func(call otto.FunctionCall) otto.Value {
+	err := vm.Set("setTimeout", newTimer(false))
+	if err != nil {
+		return err
+	}
+
+	err = vm.Set("setInterval", newTimer(true))
+	if err != nil {
+		return err
+	}
+
+	err = vm.Set("setImmediate", func(call otto.FunctionCall) otto.Value {
 		t := &timerTask{
 			duration: time.Millisecond,
 			call:     call,
@@ -61,13 +70,16 @@ func Define(vm *vm.VM, l *loop.Loop) error {
 			l.Ready(t)
 		})
 
-		value, err := call.Otto.ToValue(t)
+		value, setImmediateErr := call.Otto.ToValue(t)
 		if err != nil {
-			panic(err)
+			panic(setImmediateErr)
 		}
 
 		return value
 	})
+	if err != nil {
+		return err
+	}
 
 	clearTimeout := func(call otto.FunctionCall) otto.Value {
 		v, _ := call.Argument(0).Export()
@@ -79,11 +91,18 @@ func Define(vm *vm.VM, l *loop.Loop) error {
 
 		return otto.UndefinedValue()
 	}
-	vm.Set("clearTimeout", clearTimeout)
-	vm.Set("clearInterval", clearTimeout)
-	vm.Set("clearImmediate", clearTimeout)
+	err = vm.Set("clearTimeout", clearTimeout)
+	if err != nil {
+		return err
+	}
 
-	return nil
+	err = vm.Set("clearInterval", clearTimeout)
+	if err != nil {
+		return err
+	}
+
+	err = vm.Set("clearImmediate", clearTimeout)
+	return err
 }
 
 type timerTask struct {

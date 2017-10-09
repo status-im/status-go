@@ -101,19 +101,19 @@ func CallRPC(inputJSON *C.char) *C.char {
 }
 
 //export ResumeNode
-func ResumeNode() *C.char {
+func ResumeNode() *C.char { //nolint: deadcode
 	err := fmt.Errorf("%v: %v", common.ErrDeprecatedMethod.Error(), "ResumeNode")
 	return makeJSONResponse(err)
 }
 
 //export StopNodeRPCServer
-func StopNodeRPCServer() *C.char {
+func StopNodeRPCServer() *C.char { //nolint: deadcode
 	err := fmt.Errorf("%v: %v", common.ErrDeprecatedMethod.Error(), "StopNodeRPCServer")
 	return makeJSONResponse(err)
 }
 
 //export StartNodeRPCServer
-func StartNodeRPCServer() *C.char {
+func StartNodeRPCServer() *C.char { //nolint: deadcode
 	err := fmt.Errorf("%v: %v", common.ErrDeprecatedMethod.Error(), "StartNodeRPCServer")
 	return makeJSONResponse(err)
 }
@@ -125,7 +125,7 @@ func PopulateStaticPeers() *C.char {
 }
 
 //export AddPeer
-func AddPeer(url *C.char) *C.char {
+func AddPeer(url *C.char) *C.char { //nolint: deadcode, unparam
 	err := fmt.Errorf("%v: %v", common.ErrDeprecatedMethod.Error(), "AddPeer")
 	return makeJSONResponse(err)
 }
@@ -358,13 +358,13 @@ func StartCPUProfile(dataDir *C.char) *C.char {
 }
 
 //export StopCPUProfiling
-func StopCPUProfiling() *C.char {
+func StopCPUProfiling() *C.char { //nolint: deadcode
 	err := profiling.StopCPUProfile()
 	return makeJSONResponse(err)
 }
 
 //export WriteHeapProfile
-func WriteHeapProfile(dataDir *C.char) *C.char {
+func WriteHeapProfile(dataDir *C.char) *C.char { //nolint: deadcode
 	err := profiling.WriteHeapFile(C.GoString(dataDir))
 	return makeJSONResponse(err)
 }

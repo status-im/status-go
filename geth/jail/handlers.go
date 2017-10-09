@@ -37,7 +37,7 @@ func registerHandlers(jail *Jail, cell common.JailCell, chatID string) error {
 	}
 
 	// register send handler
-	if err = registerHandler("send", makeSendHandler(jail, cell)); err != nil {
+	if err = registerHandler("send", makeSendHandler(jail)); err != nil {
 		return err
 	}
 
@@ -60,11 +60,8 @@ func registerHandlers(jail *Jail, cell common.JailCell, chatID string) error {
 		return err
 	}
 	registerHandler = statusSignals.Object().Set
-	if err = registerHandler("sendSignal", makeSignalHandler(chatID)); err != nil {
-		return err
-	}
 
-	return nil
+	return registerHandler("sendSignal", makeSignalHandler(chatID))
 }
 
 // makeAsyncSendHandler returns jeth.sendAsync() handler.
@@ -85,8 +82,7 @@ func makeAsyncSendHandler(jail *Jail, cellInt common.JailCell) func(call otto.Fu
 }
 
 // makeSendHandler returns jeth.send() and jeth.sendAsync() handler
-// TODO(tiabc): get rid of an extra parameter.
-func makeSendHandler(jail *Jail, cellInt common.JailCell) func(call otto.FunctionCall) otto.Value {
+func makeSendHandler(jail *Jail) func(call otto.FunctionCall) otto.Value {
 	return func(call otto.FunctionCall) otto.Value {
 		return jail.Send(call)
 	}

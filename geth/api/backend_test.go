@@ -157,7 +157,7 @@ func (s *BackendTestSuite) TestNodeStartStop() {
 	nodeStarted, err = s.backend.StartNode(nodeConfig)
 	require.NoError(err)
 	require.NotNil(nodeStarted)
-	defer s.backend.StopNode()
+	defer s.backend.StopNode() //nolint: errcheck
 
 	<-nodeStarted
 	require.True(s.backend.IsNodeRunning())
@@ -175,7 +175,7 @@ func (s *BackendTestSuite) TestStartNodeWithUpstreamEnabled() {
 
 	nodeStarted, err := backend.StartNode(nodeConfig)
 	require.NoError(err)
-	defer backend.StopNode()
+	defer backend.StopNode() //nolint: errcheck
 
 	<-nodeStarted
 	require.True(backend.IsNodeRunning())
@@ -193,7 +193,7 @@ func (s *BackendTestSuite) TestCallRPC() {
 	nodeStarted, err := s.backend.StartNode(nodeConfig)
 	require.NoError(err)
 	require.NotNil(nodeStarted)
-	defer s.backend.StopNode()
+	defer s.backend.StopNode() //nolint: errcheck
 	<-nodeStarted
 
 	progress := make(chan struct{}, 25)
@@ -268,7 +268,7 @@ func (s *BackendTestSuite) TestCallRPCSendTransaction() {
 
 	nodeStarted, err := s.backend.StartNode(nodeConfig)
 	s.NoError(err)
-	defer s.backend.StopNode()
+	defer s.backend.StopNode() //nolint: errcheck
 
 	<-nodeStarted
 
@@ -326,7 +326,7 @@ func (s *BackendTestSuite) TestCallRPCSendTransactionUpstream() {
 
 	nodeStarted, err := s.backend.StartNode(nodeConfig)
 	s.NoError(err)
-	defer s.backend.StopNode()
+	defer s.backend.StopNode() //nolint: errcheck
 
 	<-nodeStarted
 

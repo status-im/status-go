@@ -6,6 +6,8 @@ import (
 
 	"github.com/robertkrimen/otto"
 
+	"context"
+
 	"github.com/status-im/status-go/geth/jail/internal/loop"
 	"github.com/status-im/status-go/geth/jail/internal/timers"
 	"github.com/status-im/status-go/geth/jail/internal/vm"
@@ -106,7 +108,7 @@ func (s *TimersSuite) SetupTest() {
 	s.vm = vm.New(o)
 	s.loop = loop.New(s.vm)
 
-	go s.loop.Run()
+	go s.loop.Run(context.TODO()) //nolint: errcheck
 
 	err := timers.Define(s.vm, s.loop)
 	s.NoError(err)

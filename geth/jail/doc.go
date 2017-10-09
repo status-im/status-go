@@ -1,6 +1,4 @@
 /*
-jail - jailed enviroment for executing JS code.
-
 Package jail implements "jailed" enviroment for executing arbitrary
 JavaScript code using Otto JS interpreter (https://github.com/robertkrimen/otto).
 
