@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"time"
 
 	"github.com/status-im/status-go/geth/log"
 )
 
 // JSONFile returns a log.Metric which writes a series of batch entries into a json file.
-func JSONFile(filename string, saveDir string, maxFileSizeEach int, maxBatchPerWrite int) *log.BatchEmitter {
-	return log.BatchEmit(maxBatchPerWrite, func(entries []log.Entry) error {
+func JSONFile(filename string, saveDir string, maxFileSizeEach int, maxBatchPerWrite int, maxwait time.Duration) *log.BatchEmitter {
+	return log.BatchEmit(maxBatchPerWrite, maxwait, func(entries []log.Entry) error {
 		var targetFile string
 		var index int
 

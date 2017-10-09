@@ -16,7 +16,7 @@ Both are used as "singletons" - using global shared variables.
 First, import package into your code:
 
 ```
-import "github.com/status-im/status-go/geth/log
+import "github.com/status-im/status-go/geth/log"
 ```
 
 Then simply use `Info/Error/Debug/etc` functions to log at desired level:

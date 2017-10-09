@@ -1,12 +1,34 @@
+// package log defines a basic structure foundation for handling logs without
+// much hassle, allow more different entries to be created.
+// Inspired by https://medium.com/@tjholowaychuk/apex-log-e8d9627f4a9a.
 package log
 
 import (
+	"errors"
 	"fmt"
+	"strings"
 	"time"
 )
 
-// Field represents a giving map of values associated with a giving field value.
-type Field map[string]interface{}
+// Level defines a int type which represent the a giving level of entry for a giving entry.
+type Level int
+
+// level constants
+const (
+	RedAlertLvl    Level = iota // Immediately notify everyone by mail level, because this is bad
+	YellowAlertLvl              // Immediately notify everyone but we can wait to tomorrow
+	ErrorLvl                    // Error occured with some code due to normal opperation or odd behaviour (not critical)
+	InfoLvl                     // Information for view about code operation (replaces Debug, Notice, Trace).
+)
+
+const (
+	// MetficKeyDefault defines the default value for the giving metric key.
+	metricKeyDefault = "unknown"
+
+	// DefaultMessage defines a default message used by SentryJSON where
+	// fields contains no messages to be used.
+	DefaultMessage = "No Message"
+)
 
 // Timelapse defines a message attached with a giving time value.
 type Timelapse struct {
@@ -23,17 +45,6 @@ func WithTimelapse(message string, f Field) Timelapse {
 		Time:    time.Now(),
 	}
 }
-
-// Level defines a int type which represent the a giving level of entry for a giving entry.
-type Level int
-
-// level constants
-const (
-	RedAlertLvl    Level = iota // Immediately notify everyone by mail level, because this is bad
-	YellowAlertLvl              // Immediately notify everyone but we can wait to tomorrow
-	ErrorLvl                    // Error occured with some code due to normal opperation or odd behaviour (not critical)
-	InfoLvl                     // Information for view about code operation (replaces Debug, Notice, Trace).
-)
 
 // YellowAlert returns an Entry with the level set to YellowAlertLvl.
 func YellowAlert(err error, message string, m ...interface{}) Entry {
@@ -69,8 +80,15 @@ func WithMessage(level Level, message string, m ...interface{}) Entry {
 	var e Entry
 	e.Level = level
 	e.Field = make(Field)
-	e.Message = fmt.Sprintf(message, m...)
+	e.Time = time.Now()
+	e.Function = getFunctionName(4)
 
+	if len(m) == 0 {
+		e.Message = message
+		return e
+	}
+
+	e.Message = fmt.Sprintf(message, m...)
 	return e
 }
 
@@ -79,7 +97,19 @@ func WithMessage(level Level, message string, m ...interface{}) Entry {
 func WithTrace(t *Trace) Entry {
 	var e Entry
 	e.Field = make(Field)
+	e.Time = time.Now()
+	e.Function = getFunctionName(4)
 	e.Trace = t
+	return e
+}
+
+// WithID returns a Entry and set the ID to the provided value.
+func WithID(id string) Entry {
+	var e Entry
+	e.ID = id
+	e.Time = time.Now()
+	e.Function = getFunctionName(4)
+	e.Field = make(Field)
 	return e
 }
 
@@ -87,6 +117,8 @@ func WithTrace(t *Trace) Entry {
 // adds the giving key-value pair to the entry.
 func With(key string, value interface{}) Entry {
 	var e Entry
+	e.Function = getFunctionName(4)
+	e.Time = time.Now()
 	e.Field = make(Field)
 	e.Field[key] = value
 	return e
@@ -97,6 +129,8 @@ func With(key string, value interface{}) Entry {
 func WithFields(f Field) Entry {
 	var e Entry
 	e.Field = make(Field)
+	e.Time = time.Now()
+	e.Function = getFunctionName(4)
 
 	for k, v := range f {
 		e.Field[k] = v
@@ -108,12 +142,24 @@ func WithFields(f Field) Entry {
 // Entry represent a giving record of data at a giving period of time.
 type Entry struct {
 	ID        string      `json:"id"`
+	Function  string      `json:"function"`
 	Level     Level       `json:"level"`
 	Field     Field       `json:"fields"`
 	Time      time.Time   `json:"time"`
 	Message   string      `json:"message"`
 	Trace     *Trace      `json:"trace"`
 	Timelapse []Timelapse `json:"timelapse"`
+}
+
+// WithMessage sets the Entry Message value.
+func (e Entry) WithMessage(message string, m ...interface{}) Entry {
+	if len(m) == 0 {
+		e.Message = message
+		return e
+	}
+
+	e.Message = fmt.Sprintf(message, m...)
+	return e
 }
 
 // WithID sets the Entry ID value.
@@ -158,9 +204,9 @@ func (e Entry) WithFields(f Field) Entry {
 	return e
 }
 
-// Metric defines an interface with a single method for receiving
+// Metrics defines an interface with a single method for receiving
 // new Entry objects.
-type Metric interface {
+type Metrics interface {
 	Emit(Entry) error
 }
 
@@ -173,48 +219,42 @@ type FilterFn func(Entry) bool
 // Augmenter defines a function type which takes a giving Entry returning a new associated entry value.
 type Augmenter func(Entry) Entry
 
-// Filter returns a Metric object with the provided Augmenters and  Metrics
+// Filter returns a Metrics object with the provided Augmenters and  Metrics
 // implemement objects for receiving metric Entries, where entries are filtered
 // out based on a provided function.
-func Filter(filterFn FilterFn, vals ...interface{}) Metric {
+func Filter(filterFn FilterFn, vals ...interface{}) Metrics {
 	return filteredMetrics{
 		filterFn: filterFn,
-		Metric:   New(vals...),
+		Metrics:  New(vals...),
 	}
 }
 
-// FilterLevelWith returns a Metric will will only emit Entrys that matches provided level.
-func FilterLevelWith(lvl Level, fn DoFn) Metric {
-	return Filter(func(en Entry) bool {
-		return en.Level == lvl
-	}, DoWith(fn))
-}
-
-// FilterLevel returns a Metric will will only emit Entrys that matches provided level.
-func FilterLevel(lvl Level, m ...interface{}) Metric {
-	return Filter(func(en Entry) bool {
-		return en.Level == lvl
-	}, m...)
-}
-
-// DoWith returns a Metric object where all entries are applied to the provided function.
-func DoWith(do DoFn) Metric {
+// DoWith returns a Metrics object where all entries are applied to the provided function.
+func DoWith(do DoFn) Metrics {
 	return fnMetrics{
 		do: do,
 	}
 }
 
-// New returns a Metric object with the provided Augmenters and  Metrics
+// Switch returns a new instance of a SwitchMaster.
+func Switch(keyName string, selections map[string]Metrics) Metrics {
+	return switchMaster{
+		key:        keyName,
+		selections: selections,
+	}
+}
+
+// New returns a Metrics object with the provided Augmenters and  Metrics
 // implemement objects for receiving metric Entries.
-func New(vals ...interface{}) Metric {
+func New(vals ...interface{}) Metrics {
 	var augmenters []Augmenter
-	var childmetrics []Metric
+	var childmetrics []Metrics
 
 	for _, val := range vals {
 		switch item := val.(type) {
 		case Augmenter:
 			augmenters = append(augmenters, item)
-		case Metric:
+		case Metrics:
 			childmetrics = append(childmetrics, item)
 		}
 	}
@@ -227,11 +267,11 @@ func New(vals ...interface{}) Metric {
 
 type metrics struct {
 	augmenters []Augmenter
-	metrics    []Metric
+	metrics    []Metrics
 }
 
-// Emit implements the Metric interface and delivers Entry
-// to undeline metrics.
+// Emit implements the Metrics interface and delivers Entry
+// to undeline log.
 func (m metrics) Emit(en Entry) error {
 
 	// Augment Entry with available augmenters.
@@ -253,23 +293,59 @@ type fnMetrics struct {
 	do DoFn
 }
 
-// Emit implements the Metric interface and delivers Entry
-// to undeline metrics.
+// Emit implements the Metrics interface and delivers Entry
+// to undeline log.
 func (m fnMetrics) Emit(en Entry) error {
 	return m.do(en)
 }
 
 type filteredMetrics struct {
-	Metric
+	Metrics
 	filterFn FilterFn
 }
 
-// Emit implements the Metric interface and delivers Entry
-// to undeline metrics.
+// Emit implements the Metrics interface and delivers Entry
+// to undeline log.
 func (m filteredMetrics) Emit(en Entry) error {
 	if !m.filterFn(en) {
 		return nil
 	}
 
-	return m.Metric.Emit(en)
+	return m.Metrics.Emit(en)
+}
+
+// switchMaster defines that mod out Entry objects based on a provided function.
+type switchMaster struct {
+	key        string
+	selections map[string]Metrics
+}
+
+// Emit delivers the giving entry to all available metricss.
+func (fm switchMaster) Emit(e Entry) error {
+	val, ok := e.Field[fm.key].(string)
+	if !ok {
+		return errors.New("Entry.Field has no such key")
+	}
+
+	selector, ok := fm.selections[val]
+	if !ok {
+		return errors.New("Metrics for key not found")
+	}
+
+	return selector.Emit(e)
+}
+
+//==============================================================================
+
+// Hide takes the given message and generates a '***' character sets.
+func Hide(message string) string {
+	mLen := len(message)
+
+	var mval []string
+
+	for i := 0; i < mLen; i++ {
+		mval = append(mval, "*")
+	}
+
+	return strings.Join(mval, "")
 }

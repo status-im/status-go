@@ -19,6 +19,7 @@ type EmitterFunction func([]Entry) error
 // a provided function for procesing.
 type BatchEmitter struct {
 	maxlen     int
+	maxwait    time.Duration
 	closed     bool
 	entrybatch []Entry
 	fnError    chan error
@@ -29,9 +30,10 @@ type BatchEmitter struct {
 }
 
 // BatchEmit returns a new instance of a BatchEmitter.
-func BatchEmit(maxSize int, fn EmitterFunction) *BatchEmitter {
+func BatchEmit(maxSize int, maxwait time.Duration, fn EmitterFunction) *BatchEmitter {
 	var batch BatchEmitter
 	batch.fn = fn
+	batch.maxwait = maxwait
 	batch.maxlen = maxSize
 	batch.stop = make(chan struct{}, 0)
 	batch.entries = make(chan Entry, 0)
@@ -58,11 +60,6 @@ func (bm *BatchEmitter) Emit(en Entry) error {
 	}
 }
 
-// Wait is called to pause current goroutine until BatchEmitter is closed.
-func (bm *BatchEmitter) Wait() {
-	bm.wg.Wait()
-}
-
 // Close ends the operation of the batch emitter and releases all associated resources.
 func (bm *BatchEmitter) Close() error {
 	if bm.closed {
@@ -79,12 +76,31 @@ func (bm *BatchEmitter) Close() error {
 func (bm *BatchEmitter) manage() {
 	defer bm.wg.Done()
 
+	ticker := time.NewTimer(bm.maxwait)
+	defer ticker.Stop()
+
 	for {
 		select {
+		case <-ticker.C:
+			ticker.Reset(bm.maxwait)
+
+			if len(bm.entrybatch) == 0 {
+				continue
+			}
+
+			batch := bm.entrybatch
+			bm.entrybatch = nil
+
+			if err := bm.fn(batch); err != nil {
+				bm.fnError <- err
+			}
+
 		case entry, ok := <-bm.entries:
 			if !ok {
 				return
 			}
+
+			ticker.Reset(bm.maxwait)
 
 			bm.entrybatch = append(bm.entrybatch, entry)
 

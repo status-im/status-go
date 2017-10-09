@@ -1,6 +1,7 @@
 package log
 
 import (
+	"fmt"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -95,8 +96,13 @@ func NewTraceWithCallDepth(depth int, comments ...string) *Trace {
 		File:       pkgFile,
 		Comments:   comments,
 		StartTime:  time.Now(),
-		Function:   getFunctionName(3),
+		Function:   getFunctionName(333),
 	}
+}
+
+// String returns the giving trace timestamp for the execution time.
+func (t *Trace) String() string {
+	return fmt.Sprintf("[Total=%+q, Start=%+q, End=%+q]", t.EndTime.Sub(t.StartTime), t.StartTime, t.EndTime)
 }
 
 // End stops the trace, captures the current stack trace and returns the
@@ -118,13 +124,13 @@ func getFunctionName(depth int) string {
 	// skip 3 levels to get to the caller of whoever called Caller()
 	n := runtime.Callers(depth, fpcs)
 	if n == 0 {
-		return "Unknown()" // proper error here would be better
+		return "Unknown()" // proper error her would be better
 	}
 
 	// get the info of the actual function that's in the pointer
 	fun := runtime.FuncForPC(fpcs[0] - 1)
 	if fun == nil {
-		return "Unknown()" // proper error here would be better
+		return "Unknown()" // proper error her would be better
 	}
 
 	// return its name
