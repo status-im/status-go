@@ -9,6 +9,7 @@ import (
 	"github.com/status-im/status-go/geth/jail/internal/loop/looptask"
 	"github.com/status-im/status-go/geth/jail/internal/timers"
 	"github.com/status-im/status-go/geth/jail/internal/vm"
+	"github.com/status-im/status-go/geth/log"
 )
 
 // Cell represents a single jail cell, which is basically a JavaScript VM.
@@ -60,6 +61,10 @@ func registerVMHandlers(v *vm.VM, lo *loop.Loop) error {
 // Stop halts event loop associated with cell.
 func (c *Cell) Stop() {
 	c.cancel()
+
+	if err := c.lo.WaitForStop(); err != nil {
+		log.Error("Cell stop failed", "id", c.id, "error", err)
+	}
 }
 
 // CallAsync puts otto's function with given args into
