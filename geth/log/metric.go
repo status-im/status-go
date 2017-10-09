@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 )
 
 // Level defines a int type which represent the a giving level of entry for a giving entry.
@@ -29,22 +28,6 @@ const (
 	// fields contains no messages to be used.
 	DefaultMessage = "No Message"
 )
-
-// Timelapse defines a message attached with a giving time value.
-type Timelapse struct {
-	Message string    `json:"message"`
-	Time    time.Time `json:"time"`
-	Field   Field     `json:"fields"`
-}
-
-// WithTimelapse returns a Timelapse with associated field and message.
-func WithTimelapse(message string, f Field) Timelapse {
-	return Timelapse{
-		Field:   f,
-		Message: message,
-		Time:    time.Now(),
-	}
-}
 
 // YellowAlert returns an Entry with the level set to YellowAlertLvl.
 func YellowAlert(err error, message string, m ...interface{}) Entry {
@@ -75,135 +58,6 @@ func Info(message string, m ...interface{}) Entry {
 	return WithMessage(InfoLvl, message, m...)
 }
 
-// WithMessage returns a new Entry with the provided Level and message used.
-func WithMessage(level Level, message string, m ...interface{}) Entry {
-	var e Entry
-	e.Level = level
-	e.Field = make(Field)
-	e.Time = time.Now()
-	e.Function = getFunctionName(4)
-
-	if len(m) == 0 {
-		e.Message = message
-		return e
-	}
-
-	e.Message = fmt.Sprintf(message, m...)
-	return e
-}
-
-// WithTrace returns itself after setting the giving trace value
-// has the method trace for the giving Entry.
-func WithTrace(t *Trace) Entry {
-	var e Entry
-	e.Field = make(Field)
-	e.Time = time.Now()
-	e.Function = getFunctionName(4)
-	e.Trace = t
-	return e
-}
-
-// WithID returns a Entry and set the ID to the provided value.
-func WithID(id string) Entry {
-	var e Entry
-	e.ID = id
-	e.Time = time.Now()
-	e.Function = getFunctionName(4)
-	e.Field = make(Field)
-	return e
-}
-
-// With returns a Entry set to the LogLevel of the previous and
-// adds the giving key-value pair to the entry.
-func With(key string, value interface{}) Entry {
-	var e Entry
-	e.Function = getFunctionName(4)
-	e.Time = time.Now()
-	e.Field = make(Field)
-	e.Field[key] = value
-	return e
-}
-
-// WithFields adds all field key-value pair into associated Entry
-// returning the Entry.
-func WithFields(f Field) Entry {
-	var e Entry
-	e.Field = make(Field)
-	e.Time = time.Now()
-	e.Function = getFunctionName(4)
-
-	for k, v := range f {
-		e.Field[k] = v
-	}
-
-	return e
-}
-
-// Entry represent a giving record of data at a giving period of time.
-type Entry struct {
-	ID        string      `json:"id"`
-	Function  string      `json:"function"`
-	Level     Level       `json:"level"`
-	Field     Field       `json:"fields"`
-	Time      time.Time   `json:"time"`
-	Message   string      `json:"message"`
-	Trace     *Trace      `json:"trace"`
-	Timelapse []Timelapse `json:"timelapse"`
-}
-
-// WithMessage sets the Entry Message value.
-func (e Entry) WithMessage(message string, m ...interface{}) Entry {
-	if len(m) == 0 {
-		e.Message = message
-		return e
-	}
-
-	e.Message = fmt.Sprintf(message, m...)
-	return e
-}
-
-// WithID sets the Entry ID value.
-func (e Entry) WithID(id string) Entry {
-	e.ID = id
-	return e
-}
-
-// WithLevel sets the Entry level.
-func (e Entry) WithLevel(l Level) Entry {
-	e.Level = l
-	return e
-}
-
-// WithTimelapse adds provided Timelapse into Entry.Timelapse slice.
-func (e Entry) WithTimelapse(t Timelapse) Entry {
-	e.Timelapse = append(e.Timelapse, t)
-	return e
-}
-
-// WithTrace returns itself after setting the giving trace value
-// has the method trace for the giving Entry.
-func (e Entry) WithTrace(t *Trace) Entry {
-	e.Trace = t
-	return e
-}
-
-// With returns a Entry set to the LogLevel of the previous and
-// adds the giving key-value pair to the entry.
-func (e Entry) With(key string, value interface{}) Entry {
-	e.Field[key] = value
-	return e
-}
-
-// WithFields adds all field key-value pair into associated Entry
-// returning the Entry.
-func (e Entry) WithFields(f Field) Entry {
-	for k, v := range f {
-		e.Field[k] = v
-	}
-
-	return e
-}
-
 // Metrics defines an interface with a single method for receiving
 // new Entry objects.
 type Metrics interface {
@@ -218,6 +72,15 @@ type FilterFn func(Entry) bool
 
 // Augmenter defines a function type which takes a giving Entry returning a new associated entry value.
 type Augmenter func(Entry) Entry
+
+// FilterLevel will return a metrics where all Entry will be filtered by their Entry.Level
+// if the level giving is greater or equal to the provided, then it will be received by
+// the metrics subscribers.
+func FilterLevel(l Level, vals ...interface{}) Metrics {
+	return Filter(func(en Entry) bool {
+		return en.Level >= l
+	}, vals...)
+}
 
 // Filter returns a Metrics object with the provided Augmenters and  Metrics
 // implemement objects for receiving metric Entries, where entries are filtered

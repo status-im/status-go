@@ -21,17 +21,17 @@ type Trace struct {
 	File       string    `json:"file"`
 	Package    string    `json:"Package"`
 	Function   string    `json:"function"`
+	Comments   string    `json:"comments"`
 	LineNumber int       `json:"line_number"`
 	BeginStack []byte    `json:"begin_stack"`
 	EndStack   []byte    `json:"end_stack"`
-	Comments   []string  `json:"comments"`
 	StartTime  time.Time `json:"start_time"`
 	EndTime    time.Time `json:"end_time"`
 }
 
 // NewTrace returns a Trace object which is used to track the execution and
 // stack details of a given trace call.
-func NewTrace(comments ...string) *Trace {
+func NewTrace(comments string) *Trace {
 	trace := make([]byte, stackSize)
 	trace = trace[:runtime.Stack(trace, false)]
 
@@ -67,7 +67,7 @@ func NewTrace(comments ...string) *Trace {
 
 // NewTraceWithCallDepth returns a Trace object which is used to track the execution and
 // stack details of a given trace call.
-func NewTraceWithCallDepth(depth int, comments ...string) *Trace {
+func NewTraceWithCallDepth(depth int, comments string) *Trace {
 	trace := make([]byte, stackSize)
 	trace = trace[:runtime.Stack(trace, false)]
 
