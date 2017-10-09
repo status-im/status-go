@@ -441,7 +441,7 @@ func (s *ManagerTestSuite) TestNodeStartCrash() {
 	require.NoError(err)
 
 	// start node outside the manager (on the same port), so that manager node.Start() method fails
-	outsideNode, err := node.MakeNode(nodeConfig)
+	outsideNode, _ := node.MakeNode(nodeConfig)
 	require.NoError(outsideNode.Start())
 
 	// let's listen for node.crashed signal
@@ -478,6 +478,6 @@ func (s *ManagerTestSuite) TestNodeStartCrash() {
 	require.False(signalReceived, "node should start w/o crash signal")
 
 	// cleanup
-	s.NodeManager.StopNode()
+	s.NodeManager.StopNode() //nolint: errcheck
 	signal.ResetDefaultNodeNotificationHandler()
 }

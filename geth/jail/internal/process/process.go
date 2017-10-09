@@ -7,6 +7,7 @@ import (
 	"github.com/robertkrimen/otto"
 )
 
+// Define process
 func Define(vm *otto.Otto, argv []string) error {
 	if v, err := vm.Get("process"); err != nil {
 		return err

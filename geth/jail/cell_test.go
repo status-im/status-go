@@ -156,7 +156,7 @@ func (s *JailTestSuite) TestJailFetchPromise() {
 	body := `{"key": "value"}`
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Content-Type", "application/json")
-		w.Write([]byte(body))
+		w.Write([]byte(body)) //nolint: errcheck
 	}))
 	defer server.Close()
 
@@ -243,7 +243,7 @@ func (s *JailTestSuite) TestJailFetchRace() {
 	body := `{"key": "value"}`
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Content-Type", "application/json")
-		w.Write([]byte(body))
+		w.Write([]byte(body)) //nolint: errcheck
 	}))
 	defer server.Close()
 	require := s.Require()
@@ -314,7 +314,7 @@ func (s *JailTestSuite) TestJailLoopCancel() {
 	require.NotNil(cell)
 
 	var count int
-	err = cell.Set("__captureResponse", func(val string) otto.Value {
+	err = cell.Set("__captureResponse", func(val string) otto.Value { //nolint: unparam
 		count++
 		return otto.UndefinedValue()
 	})

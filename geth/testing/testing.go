@@ -11,12 +11,13 @@ import (
 	"strconv"
 	"strings"
 
+	"testing"
+
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
 	assertions "github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"testing"
 )
 
 var (
@@ -168,16 +169,15 @@ func MakeTestNodeConfig(networkID int) (*params.NodeConfig, error) {
 }
 
 // LoadFromFile is useful for loading test data, from testdata/filename into a variable
-// nolint: errcheck
 func LoadFromFile(filename string) string {
 	f, err := os.Open(filename)
 	if err != nil {
 		return ""
 	}
+	defer f.Close() //nolint: errcheck
 
 	buf := bytes.NewBuffer(nil)
-	io.Copy(buf, f)
-	f.Close()
+	io.Copy(buf, f) //nolint: errcheck
 
-	return string(buf.Bytes())
+	return buf.String()
 }

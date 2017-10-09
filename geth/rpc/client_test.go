@@ -98,7 +98,7 @@ func (s *RPCTestSuite) TestRPCSendTransaction() {
 	// httpRPCServer will serve as an upstream server accepting transactions.
 	httpRPCServer := httptest.NewServer(service{
 		Handler: func(w http.ResponseWriter, r *http.Request) {
-			defer r.Body.Close()
+			defer r.Body.Close() //nolint: errcheck
 
 			var txReq txRequest
 			err := json.NewDecoder(r.Body).Decode(&txReq)
@@ -106,7 +106,7 @@ func (s *RPCTestSuite) TestRPCSendTransaction() {
 
 			if txReq.Method == "eth_getTransactionCount" {
 				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(`{"jsonrpc": "2.0", "result": "0x434"}`))
+				w.Write([]byte(`{"jsonrpc": "2.0", "result": "0x434"}`)) //nolint: errcheck
 				return
 			}
 
@@ -119,7 +119,7 @@ func (s *RPCTestSuite) TestRPCSendTransaction() {
 			require.IsType(bu[0], (map[string]interface{})(nil))
 
 			w.WriteHeader(http.StatusOK)
-			w.Write(expectedResponse)
+			w.Write(expectedResponse) //nolint: errcheck
 		},
 	})
 
@@ -234,10 +234,10 @@ func (s *RPCTestSuite) TestCallRPC() {
 
 		select {
 		case <-time.After(time.Second * 30):
-			s.NodeManager.StopNode()
+			s.NodeManager.StopNode() //nolint: errcheck
 			s.FailNow("test timed out")
 		case <-done:
-			s.NodeManager.StopNode()
+			s.NodeManager.StopNode() //nolint: errcheck
 		}
 	}
 }
@@ -249,7 +249,7 @@ func (s *RPCTestSuite) TestCallRawResult() {
 
 	nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
 	s.NoError(err)
-	defer s.NodeManager.StopNode()
+	defer s.NodeManager.StopNode() //nolint: errcheck
 
 	<-nodeStarted
 
@@ -267,7 +267,7 @@ func (s *RPCTestSuite) TestCallContextResult() {
 
 	nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
 	s.NoError(err)
-	defer s.NodeManager.StopNode()
+	defer s.NodeManager.StopNode() //nolint: errcheck
 
 	<-nodeStarted
 

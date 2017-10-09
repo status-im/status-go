@@ -7,6 +7,8 @@ import (
 	"github.com/robertkrimen/otto"
 	"github.com/stretchr/testify/suite"
 
+	"context"
+
 	"github.com/status-im/status-go/geth/jail/internal/loop"
 	"github.com/status-im/status-go/geth/jail/internal/promise"
 	"github.com/status-im/status-go/geth/jail/internal/vm"
@@ -88,7 +90,7 @@ func (s *PromiseSuite) SetupTest() {
 	s.vm = vm.New(o)
 	s.loop = loop.New(s.vm)
 
-	go s.loop.Run()
+	go s.loop.Run(context.TODO()) //nolint: errcheck
 
 	err := promise.Define(s.vm, s.loop)
 	s.NoError(err)

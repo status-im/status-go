@@ -26,7 +26,6 @@ const (
 	whisperMessage3 = `test message 4 ("" -> "", anon broadcast)`
 	whisperMessage4 = `test message 5 ("" -> K1, encrypted anon broadcast)`
 	whisperMessage5 = `test message 6 (K2 -> K1, signed+encrypted, to us)`
-	txSendFolder    = "testdata/jail/tx-send/"
 	testChatID      = "testChat"
 )
 
@@ -56,9 +55,8 @@ func (s *BackendTestSuite) TestContractDeployment() {
 	var txHash gethcommon.Hash
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var envelope signal.Envelope
-		var err error
-		err = json.Unmarshal([]byte(jsonEvent), &envelope)
-		require.NoError(err, fmt.Sprintf("cannot unmarshal JSON: %s", jsonEvent))
+		hErr := json.Unmarshal([]byte(jsonEvent), &envelope)
+		require.NoError(hErr, fmt.Sprintf("cannot unmarshal JSON: %s", jsonEvent))
 
 		if envelope.Type == txqueue.EventTransactionQueued {
 			// Use s.* for assertions - require leaves the channel unclosed.
@@ -69,8 +67,8 @@ func (s *BackendTestSuite) TestContractDeployment() {
 			s.NoError(s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 
 			txID := event["id"].(string)
-			txHash, err = s.backend.CompleteTransaction(common.QueuedTxID(txID), TestConfig.Account1.Password)
-			if s.NoError(err, event["id"]) {
+			txHash, hErr = s.backend.CompleteTransaction(common.QueuedTxID(txID), TestConfig.Account1.Password)
+			if s.NoError(hErr, event["id"]) {
 				s.T().Logf("contract transaction complete, URL: %s", "https://ropsten.etherscan.io/tx/"+txHash.Hex())
 			}
 

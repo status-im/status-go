@@ -7,6 +7,8 @@ import (
 	"reflect"
 	"time"
 
+	"context"
+
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -90,7 +92,7 @@ func (s *BackendTestSuite) TestSendContractTx() {
 	byteCode, err := hexutil.Decode(`0x6060604052341561000c57fe5b5b60a58061001b6000396000f30060606040526000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff1680636ffa1caa14603a575bfe5b3415604157fe5b60556004808035906020019091905050606b565b6040518082815260200191505060405180910390f35b60008160020290505b9190505600a165627a7a72305820ccdadd737e4ac7039963b54cee5e5afb25fa859a275252bdcf06f653155228210029`)
 	require.NoError(err)
 
-	txHashCheck, err := s.backend.SendTransaction(nil, common.SendTxArgs{
+	txHashCheck, err := s.backend.SendTransaction(context.TODO(), common.SendTxArgs{
 		From: common.FromAddress(TestConfig.Account1.Address),
 		To:   nil, // marker, contract creation is expected
 		//Value: (*hexutil.Big)(new(big.Int).Mul(big.NewInt(1), gethcommon.Ether)),
@@ -179,7 +181,7 @@ func (s *BackendTestSuite) TestSendEtherTx() {
 	})
 
 	// this call blocks, up until Complete Transaction is called
-	txHashCheck, err := s.backend.SendTransaction(nil, common.SendTxArgs{
+	txHashCheck, err := s.backend.SendTransaction(context.TODO(), common.SendTxArgs{
 		From:  common.FromAddress(TestConfig.Account1.Address),
 		To:    common.ToAddress(TestConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
@@ -232,7 +234,7 @@ func (s *BackendTestSuite) TestSendEtherTxUpstream() {
 
 	// This call blocks, up until Complete Transaction is called.
 	// Explicitly not setting Gas to get it estimated.
-	txHashCheck, err := s.backend.SendTransaction(nil, common.SendTxArgs{
+	txHashCheck, err := s.backend.SendTransaction(context.TODO(), common.SendTxArgs{
 		From:     common.FromAddress(TestConfig.Account1.Address),
 		To:       common.ToAddress(TestConfig.Account2.Address),
 		GasPrice: (*hexutil.Big)(big.NewInt(28000000000)),
@@ -311,7 +313,7 @@ func (s *BackendTestSuite) TestDoubleCompleteQueuedTransactions() {
 	})
 
 	// this call blocks, and should return on *second* attempt to CompleteTransaction (w/ the correct password)
-	txHashCheck, err := s.backend.SendTransaction(nil, common.SendTxArgs{
+	txHashCheck, err := s.backend.SendTransaction(context.TODO(), common.SendTxArgs{
 		From:  common.FromAddress(TestConfig.Account1.Address),
 		To:    common.ToAddress(TestConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
@@ -395,7 +397,7 @@ func (s *BackendTestSuite) TestDiscardQueuedTransaction() {
 	})
 
 	// this call blocks, and should return when DiscardQueuedTransaction() is called
-	txHashCheck, err := s.backend.SendTransaction(nil, common.SendTxArgs{
+	txHashCheck, err := s.backend.SendTransaction(context.TODO(), common.SendTxArgs{
 		From:  common.FromAddress(TestConfig.Account1.Address),
 		To:    common.ToAddress(TestConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
@@ -450,7 +452,7 @@ func (s *BackendTestSuite) TestCompleteMultipleQueuedTransactions() {
 
 	//  this call blocks, and should return when DiscardQueuedTransaction() for a given tx id is called
 	sendTx := func() {
-		txHashCheck, err := s.backend.SendTransaction(nil, common.SendTxArgs{
+		txHashCheck, err := s.backend.SendTransaction(context.TODO(), common.SendTxArgs{
 			From:  common.FromAddress(TestConfig.Account1.Address),
 			To:    common.ToAddress(TestConfig.Account2.Address),
 			Value: (*hexutil.Big)(big.NewInt(1000000000000)),
@@ -569,7 +571,7 @@ func (s *BackendTestSuite) TestDiscardMultipleQueuedTransactions() {
 
 	//  this call blocks, and should return when DiscardQueuedTransaction() for a given tx id is called
 	sendTx := func() {
-		txHashCheck, err := s.backend.SendTransaction(nil, common.SendTxArgs{
+		txHashCheck, err := s.backend.SendTransaction(context.TODO(), common.SendTxArgs{
 			From:  common.FromAddress(TestConfig.Account1.Address),
 			To:    common.ToAddress(TestConfig.Account2.Address),
 			Value: (*hexutil.Big)(big.NewInt(1000000000000)),
@@ -680,7 +682,7 @@ func (s *BackendTestSuite) TestEvictionOfQueuedTransactions() {
 	s.Zero(txQueue.Count(), "transaction count should be zero")
 
 	for i := 0; i < 10; i++ {
-		go s.backend.SendTransaction(nil, common.SendTxArgs{}) // nolint: errcheck
+		go s.backend.SendTransaction(context.TODO(), common.SendTxArgs{}) // nolint: errcheck
 	}
 	time.Sleep(2 * time.Second) // FIXME(tiabc): more reliable synchronization to ensure all transactions are enqueued
 
@@ -690,7 +692,7 @@ func (s *BackendTestSuite) TestEvictionOfQueuedTransactions() {
 	s.Equal(10, txQueue.Count(), "transaction count should be 10")
 
 	for i := 0; i < txqueue.DefaultTxQueueCap+5; i++ { // stress test by hitting with lots of goroutines
-		go s.backend.SendTransaction(nil, common.SendTxArgs{}) // nolint: errcheck
+		go s.backend.SendTransaction(context.TODO(), common.SendTxArgs{}) // nolint: errcheck
 	}
 	time.Sleep(3 * time.Second)
 
