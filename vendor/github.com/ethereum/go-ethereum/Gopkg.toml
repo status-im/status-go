@@ -1,0 +1,147 @@
+[[constraint]]
+  branch = "master"
+  name = "bazil.org/fuse"
+
+[[constraint]]
+  name = "github.com/Azure/azure-storage-go"
+  version = "0.1.0"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/aristanetworks/goarista"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/btcsuite/btcd"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/cespare/cp"
+
+[[constraint]]
+  name = "github.com/davecgh/go-spew"
+  version = "1.1.0"
+
+[[constraint]]
+  name = "github.com/docker/docker"
+  version = "1.13.1"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/edsrzf/mmap-go"
+
+[[constraint]]
+  name = "github.com/fatih/color"
+  version = "1.5.0"
+
+[[constraint]]
+  name = "github.com/gizak/termui"
+  version = "2.2.0"
+
+[[constraint]]
+  name = "github.com/go-stack/stack"
+  version = "1.6.0"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/golang/protobuf"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/hashicorp/golang-lru"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/huin/goupnp"
+
+[[constraint]]
+  name = "github.com/jackpal/go-nat-pmp"
+  version = "1.0.1"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/karalabe/hid"
+
+[[constraint]]
+  name = "github.com/mattn/go-colorable"
+  version = "0.0.9"
+
+[[constraint]]
+  name = "github.com/naoina/toml"
+  version = "0.1.1"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/olekukonko/tablewriter"
+
+[[constraint]]
+  name = "github.com/pborman/uuid"
+  version = "1.1.0"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/peterh/liner"
+
+[[constraint]]
+  name = "github.com/prometheus/prometheus"
+  version = "1.7.2"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/rcrowley/go-metrics"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/rjeczalik/notify"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/robertkrimen/otto"
+
+[[constraint]]
+  name = "github.com/rs/cors"
+  version = "1.2.0"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/syndtr/goleveldb"
+
+[[constraint]]
+  branch = "master"
+  name = "golang.org/x/crypto"
+
+[[constraint]]
+  branch = "master"
+  name = "golang.org/x/net"
+
+[[constraint]]
+  branch = "master"
+  name = "golang.org/x/sync"
+
+[[constraint]]
+  branch = "master"
+  name = "golang.org/x/sys"
+
+[[constraint]]
+  branch = "master"
+  name = "golang.org/x/tools"
+
+[[constraint]]
+  branch = "v1"
+  name = "gopkg.in/check.v1"
+
+[[constraint]]
+  name = "gopkg.in/fatih/set.v0"
+  version = "0.1.0"
+
+[[constraint]]
+  branch = "v2"
+  name = "gopkg.in/karalabe/cookiejar.v2"
+
+[[constraint]]
+  branch = "v2"
+  name = "gopkg.in/natefinch/npipe.v2"
+
+[[constraint]]
+  name = "gopkg.in/urfave/cli.v1"
+  version = "1.20.0"

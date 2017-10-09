@@ -8,7 +8,7 @@
 .PHONY: geth-darwin geth-darwin-386 geth-darwin-amd64
 .PHONY: geth-windows geth-windows-386 geth-windows-amd64
 
-GOBIN = build/bin
+GOBIN = $(shell pwd)/build/bin
 GO ?= latest
 
 geth:
@@ -20,11 +20,6 @@ swarm:
 	build/env.sh go run build/ci.go install ./cmd/swarm
 	@echo "Done building."
 	@echo "Run \"$(GOBIN)/swarm\" to launch swarm."
-
-evm:
-	build/env.sh go run build/ci.go install ./cmd/evm
-	@echo "Done building."
-	@echo "Run \"$(GOBIN)/evm\" to start the evm."
 
 all:
 	build/env.sh go run build/ci.go install
@@ -45,10 +40,24 @@ test: all
 clean:
 	rm -fr build/_workspace/pkg/ $(GOBIN)/*
 
+install:
+	dep ensure
+	mkdir _vendor_keep
+	# keep github.com/karalabe/hid
+	mkdir -p _vendor_keep/github.com/karalabe/hid
+	cp -R vendor/github.com/karalabe/hid/* _vendor_keep/github.com/karalabe/hid
+	# remove unused packages from projects
+	dep prune
+	# bring back kept packages
+	cp -R _vendor_keep/github.com/karalabe/hid vendor/github.com/karalabe
+	# clean up
+	rm -rf _vendor_keep
+
 # The devtools target installs tools required for 'go generate'.
-# You need to put $GOBIN (or $GOPATH/bin) in your PATH to use 'go generate'.
+# You need to put $GOBIN (or $GOPATH/bin) in your PATH to use 'go generate'.Ż
 
 devtools:
+	env GOBIN= go get -u github.com/golang/dep/cmd/dep
 	env GOBIN= go get -u golang.org/x/tools/cmd/stringer
 	env GOBIN= go get -u github.com/jteeuwen/go-bindata/go-bindata
 	env GOBIN= go get -u github.com/fjl/gencodec

@@ -50,7 +50,7 @@ func (msg *MsgGetBlocks) AddBlockLocatorHash(hash *chainhash.Hash) error {
 
 // BtcDecode decodes r using the bitcoin protocol encoding into the receiver.
 // This is part of the Message interface implementation.
-func (msg *MsgGetBlocks) BtcDecode(r io.Reader, pver uint32) error {
+func (msg *MsgGetBlocks) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error {
 	err := readElement(r, &msg.ProtocolVersion)
 	if err != nil {
 		return err
@@ -80,17 +80,12 @@ func (msg *MsgGetBlocks) BtcDecode(r io.Reader, pver uint32) error {
 		msg.AddBlockLocatorHash(hash)
 	}
 
-	err = readElement(r, &msg.HashStop)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return readElement(r, &msg.HashStop)
 }
 
 // BtcEncode encodes the receiver to w using the bitcoin protocol encoding.
 // This is part of the Message interface implementation.
-func (msg *MsgGetBlocks) BtcEncode(w io.Writer, pver uint32) error {
+func (msg *MsgGetBlocks) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) error {
 	count := len(msg.BlockLocatorHashes)
 	if count > MaxBlockLocatorsPerMsg {
 		str := fmt.Sprintf("too many block locator hashes for message "+
@@ -115,12 +110,7 @@ func (msg *MsgGetBlocks) BtcEncode(w io.Writer, pver uint32) error {
 		}
 	}
 
-	err = writeElement(w, &msg.HashStop)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return writeElement(w, &msg.HashStop)
 }
 
 // Command returns the protocol command string for the message.  This is part

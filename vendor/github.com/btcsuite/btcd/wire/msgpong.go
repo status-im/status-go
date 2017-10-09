@@ -22,7 +22,7 @@ type MsgPong struct {
 
 // BtcDecode decodes r using the bitcoin protocol encoding into the receiver.
 // This is part of the Message interface implementation.
-func (msg *MsgPong) BtcDecode(r io.Reader, pver uint32) error {
+func (msg *MsgPong) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error {
 	// NOTE: <= is not a mistake here.  The BIP0031 was defined as AFTER
 	// the version unlike most others.
 	if pver <= BIP0031Version {
@@ -31,17 +31,12 @@ func (msg *MsgPong) BtcDecode(r io.Reader, pver uint32) error {
 		return messageError("MsgPong.BtcDecode", str)
 	}
 
-	err := readElement(r, &msg.Nonce)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return readElement(r, &msg.Nonce)
 }
 
 // BtcEncode encodes the receiver to w using the bitcoin protocol encoding.
 // This is part of the Message interface implementation.
-func (msg *MsgPong) BtcEncode(w io.Writer, pver uint32) error {
+func (msg *MsgPong) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) error {
 	// NOTE: <= is not a mistake here.  The BIP0031 was defined as AFTER
 	// the version unlike most others.
 	if pver <= BIP0031Version {
@@ -50,12 +45,7 @@ func (msg *MsgPong) BtcEncode(w io.Writer, pver uint32) error {
 		return messageError("MsgPong.BtcEncode", str)
 	}
 
-	err := writeElement(w, msg.Nonce)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return writeElement(w, msg.Nonce)
 }
 
 // Command returns the protocol command string for the message.  This is part

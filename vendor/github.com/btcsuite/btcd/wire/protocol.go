@@ -12,7 +12,7 @@ import (
 
 const (
 	// ProtocolVersion is the latest protocol version this package supports.
-	ProtocolVersion uint32 = 70012
+	ProtocolVersion uint32 = 70013
 
 	// MultipleAddressVersion is the protocol version which added multiple
 	// addresses per message (pver >= MultipleAddressVersion).
@@ -35,6 +35,10 @@ const (
 	// with a relay flag (pver >= BIP0037Version).
 	BIP0037Version uint32 = 70001
 
+	// RejectVersion is the protocol version which added a new reject
+	// message.
+	RejectVersion uint32 = 70002
+
 	// BIP0111Version is the protocol version which added the SFNodeBloom
 	// service flag.
 	BIP0111Version uint32 = 70011
@@ -43,9 +47,9 @@ const (
 	// sendheaders message.
 	SendHeadersVersion uint32 = 70012
 
-	// RejectVersion is the protocol version which added a new reject
-	// message.
-	RejectVersion uint32 = 70002
+	// FeeFilterVersion is the protocol version which added a new
+	// feefilter message.
+	FeeFilterVersion uint32 = 70013
 )
 
 // ServiceFlag identifies services supported by a bitcoin peer.
@@ -59,9 +63,13 @@ const (
 	// getutxos and utxos commands (BIP0064).
 	SFNodeGetUTXO
 
-	// SFNodeBloom is a flag used to indiciate a peer supports bloom
+	// SFNodeBloom is a flag used to indicate a peer supports bloom
 	// filtering.
 	SFNodeBloom
+
+	// SFNodeWitness is a flag used to indicate a peer supports blocks
+	// and transactions including witness data (BIP0144).
+	SFNodeWitness
 )
 
 // Map of service flags back to their constant names for pretty printing.
@@ -69,6 +77,7 @@ var sfStrings = map[ServiceFlag]string{
 	SFNodeNetwork: "SFNodeNetwork",
 	SFNodeGetUTXO: "SFNodeGetUTXO",
 	SFNodeBloom:   "SFNodeBloom",
+	SFNodeWitness: "SFNodeWitness",
 }
 
 // orderedSFStrings is an ordered list of service flags from highest to
@@ -77,6 +86,7 @@ var orderedSFStrings = []ServiceFlag{
 	SFNodeNetwork,
 	SFNodeGetUTXO,
 	SFNodeBloom,
+	SFNodeWitness,
 }
 
 // String returns the ServiceFlag in human-readable form.

@@ -178,7 +178,7 @@ func (m *Manager) VerifyAccountPassword(keyStoreDir, address, password string) (
 	}
 
 	if len(keyJSON) == 0 {
-		return nil, fmt.Errorf("cannot locate account for address: %x", addressObj)
+		return nil, fmt.Errorf("cannot locate account for address: %s", addressObj.Hex())
 	}
 
 	key, err := keystore.DecryptKey(keyJSON, password)
@@ -188,7 +188,7 @@ func (m *Manager) VerifyAccountPassword(keyStoreDir, address, password string) (
 
 	// avoid swap attack
 	if key.Address != addressObj {
-		return nil, fmt.Errorf("account mismatch: have %x, want %x", key.Address, addressObj)
+		return nil, fmt.Errorf("account mismatch: have %s, want %s", key.Address.Hex(), addressObj.Hex())
 	}
 
 	return key, nil
@@ -293,7 +293,7 @@ func (m *Manager) importExtendedKey(extKey *extkeys.ExtendedKey, password string
 	if err != nil {
 		return "", "", err
 	}
-	address = fmt.Sprintf("%x", account.Address)
+	address = account.Address.Hex()
 
 	// obtain public key to return
 	account, key, err := keyStore.AccountDecryptedKey(account, password)

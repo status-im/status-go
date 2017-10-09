@@ -18,6 +18,10 @@ const (
 
 	// Maximum payload size for an inventory vector.
 	maxInvVectPayload = 4 + chainhash.HashSize
+
+	// InvWitnessFlag denotes that the inventory vector type is requesting,
+	// or sending a version which includes witness data.
+	InvWitnessFlag = 1 << 30
 )
 
 // InvType represents the allowed types of inventory vectors.  See InvVect.
@@ -25,18 +29,24 @@ type InvType uint32
 
 // These constants define the various supported inventory vector types.
 const (
-	InvTypeError         InvType = 0
-	InvTypeTx            InvType = 1
-	InvTypeBlock         InvType = 2
-	InvTypeFilteredBlock InvType = 3
+	InvTypeError                InvType = 0
+	InvTypeTx                   InvType = 1
+	InvTypeBlock                InvType = 2
+	InvTypeFilteredBlock        InvType = 3
+	InvTypeWitnessBlock         InvType = InvTypeBlock | InvWitnessFlag
+	InvTypeWitnessTx            InvType = InvTypeTx | InvWitnessFlag
+	InvTypeFilteredWitnessBlock InvType = InvTypeFilteredBlock | InvWitnessFlag
 )
 
 // Map of service flags back to their constant names for pretty printing.
 var ivStrings = map[InvType]string{
-	InvTypeError:         "ERROR",
-	InvTypeTx:            "MSG_TX",
-	InvTypeBlock:         "MSG_BLOCK",
-	InvTypeFilteredBlock: "MSG_FILTERED_BLOCK",
+	InvTypeError:                "ERROR",
+	InvTypeTx:                   "MSG_TX",
+	InvTypeBlock:                "MSG_BLOCK",
+	InvTypeFilteredBlock:        "MSG_FILTERED_BLOCK",
+	InvTypeWitnessBlock:         "MSG_WITNESS_BLOCK",
+	InvTypeWitnessTx:            "MSG_WITNESS_TX",
+	InvTypeFilteredWitnessBlock: "MSG_FILTERED_WITNESS_BLOCK",
 }
 
 // String returns the InvType in human-readable form.
@@ -67,18 +77,10 @@ func NewInvVect(typ InvType, hash *chainhash.Hash) *InvVect {
 // readInvVect reads an encoded InvVect from r depending on the protocol
 // version.
 func readInvVect(r io.Reader, pver uint32, iv *InvVect) error {
-	err := readElements(r, &iv.Type, &iv.Hash)
-	if err != nil {
-		return err
-	}
-	return nil
+	return readElements(r, &iv.Type, &iv.Hash)
 }
 
 // writeInvVect serializes an InvVect to w depending on the protocol version.
 func writeInvVect(w io.Writer, pver uint32, iv *InvVect) error {
-	err := writeElements(w, iv.Type, &iv.Hash)
-	if err != nil {
-		return err
-	}
-	return nil
+	return writeElements(w, iv.Type, &iv.Hash)
 }

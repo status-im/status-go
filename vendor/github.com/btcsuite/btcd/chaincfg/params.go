@@ -6,7 +6,9 @@ package chaincfg
 
 import (
 	"errors"
+	"math"
 	"math/big"
+	"strings"
 	"time"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -50,6 +52,57 @@ type Checkpoint struct {
 	Hash   *chainhash.Hash
 }
 
+// DNSSeed identifies a DNS seed.
+type DNSSeed struct {
+	// Host defines the hostname of the seed.
+	Host string
+
+	// HasFiltering defines whether the seed supports filtering
+	// by service flags (wire.ServiceFlag).
+	HasFiltering bool
+}
+
+// ConsensusDeployment defines details related to a specific consensus rule
+// change that is voted in.  This is part of BIP0009.
+type ConsensusDeployment struct {
+	// BitNumber defines the specific bit number within the block version
+	// this particular soft-fork deployment refers to.
+	BitNumber uint8
+
+	// StartTime is the median block time after which voting on the
+	// deployment starts.
+	StartTime uint64
+
+	// ExpireTime is the median block time after which the attempted
+	// deployment expires.
+	ExpireTime uint64
+}
+
+// Constants that define the deployment offset in the deployments field of the
+// parameters for each deployment.  This is useful to be able to get the details
+// of a specific deployment by name.
+const (
+	// DeploymentTestDummy defines the rule change deployment ID for testing
+	// purposes.
+	DeploymentTestDummy = iota
+
+	// DeploymentCSV defines the rule change deployment ID for the CSV
+	// soft-fork package. The CSV package includes the depolyment of BIPS
+	// 68, 112, and 113.
+	DeploymentCSV
+
+	// DeploymentSegwit defines the rule change deployment ID for the
+	// Segragated Witness (segwit) soft-fork package. The segwit package
+	// includes the deployment of BIPS 141, 142, 144, 145, 147 and 173.
+	DeploymentSegwit
+
+	// NOTE: DefinedDeployments must always come last since it is used to
+	// determine how many defined deployments there currently are.
+
+	// DefinedDeployments is the number of currently defined deployments.
+	DefinedDeployments
+)
+
 // Params defines a Bitcoin network by its parameters.  These parameters may be
 // used by Bitcoin applications to differentiate networks as well as addresses
 // and keys for one network from those intended for use on another network.
@@ -65,7 +118,7 @@ type Params struct {
 
 	// DNSSeeds defines a list of DNS seeds for the network that are used
 	// as one method to discover peers.
-	DNSSeeds []string
+	DNSSeeds []DNSSeed
 
 	// GenesisBlock defines the first block of the chain.
 	GenesisBlock *wire.MsgBlock
@@ -80,6 +133,12 @@ type Params struct {
 	// PowLimitBits defines the highest allowed proof of work value for a
 	// block in compact form.
 	PowLimitBits uint32
+
+	// These fields define the block heights at which the specified softfork
+	// BIP became active.
+	BIP0034Height int32
+	BIP0065Height int32
+	BIP0066Height int32
 
 	// CoinbaseMaturity is the number of blocks required before newly mined
 	// coins (coinbase transactions) can be spent.
@@ -122,24 +181,36 @@ type Params struct {
 	// Checkpoints ordered from oldest to newest.
 	Checkpoints []Checkpoint
 
-	// Enforce current block version once network has
-	// upgraded.  This is part of BIP0034.
-	BlockEnforceNumRequired uint64
-
-	// Reject previous block versions once network has
-	// upgraded.  This is part of BIP0034.
-	BlockRejectNumRequired uint64
-
-	// The number of nodes to check.  This is part of BIP0034.
-	BlockUpgradeNumToCheck uint64
+	// These fields are related to voting on consensus rule changes as
+	// defined by BIP0009.
+	//
+	// RuleChangeActivationThreshold is the number of blocks in a threshold
+	// state retarget window for which a positive vote for a rule change
+	// must be cast in order to lock in a rule change. It should typically
+	// be 95% for the main network and 75% for test networks.
+	//
+	// MinerConfirmationWindow is the number of blocks in each threshold
+	// state retarget window.
+	//
+	// Deployments define the specific consensus rule changes to be voted
+	// on.
+	RuleChangeActivationThreshold uint32
+	MinerConfirmationWindow       uint32
+	Deployments                   [DefinedDeployments]ConsensusDeployment
 
 	// Mempool parameters
 	RelayNonStdTxs bool
 
+	// Human-readable part for Bech32 encoded segwit addresses, as defined
+	// in BIP 173.
+	Bech32HRPSegwit string
+
 	// Address encoding magics
-	PubKeyHashAddrID byte // First byte of a P2PKH address
-	ScriptHashAddrID byte // First byte of a P2SH address
-	PrivateKeyID     byte // First byte of a WIF private key
+	PubKeyHashAddrID        byte // First byte of a P2PKH address
+	ScriptHashAddrID        byte // First byte of a P2SH address
+	PrivateKeyID            byte // First byte of a WIF private key
+	WitnessPubKeyHashAddrID byte // First byte of a P2WPKH address
+	WitnessScriptHashAddrID byte // First byte of a P2WSH address
 
 	// BIP32 hierarchical deterministic extended key magics
 	HDPrivateKeyID [4]byte
@@ -155,14 +226,13 @@ var MainNetParams = Params{
 	Name:        "mainnet",
 	Net:         wire.MainNet,
 	DefaultPort: "8333",
-	DNSSeeds: []string{
-		"seed.bitcoin.sipa.be",
-		"dnsseed.bluematt.me",
-		"dnsseed.bitcoin.dashjr.org",
-		"seed.bitcoinstats.com",
-		"seed.bitnodes.io",
-		"bitseed.xf2.org",
-		"seed.bitcoin.jonasschnelli.ch",
+	DNSSeeds: []DNSSeed{
+		{"seed.bitcoin.sipa.be", true},
+		{"dnsseed.bluematt.me", true},
+		{"dnsseed.bitcoin.dashjr.org", false},
+		{"seed.bitcoinstats.com", true},
+		{"seed.bitnodes.io", false},
+		{"seed.bitcoin.jonasschnelli.ch", true},
 	},
 
 	// Chain parameters
@@ -170,6 +240,9 @@ var MainNetParams = Params{
 	GenesisHash:              &genesisHash,
 	PowLimit:                 mainPowLimit,
 	PowLimitBits:             0x1d00ffff,
+	BIP0034Height:            227931, // 000000000000024b89b42a942fe0d9fea3bb44ab7bd1b19115dd6a759c0808b8
+	BIP0065Height:            388381, // 000000000000000004c2b624ed5d7756c508d90fd0da2c7c679febfa6c4735f0
+	BIP0066Height:            363725, // 00000000000000000379eaa19dce8c9b722d46ae6a57c2f1a988119488b50931
 	CoinbaseMaturity:         100,
 	SubsidyReductionInterval: 210000,
 	TargetTimespan:           time.Hour * 24 * 14, // 14 days
@@ -201,23 +274,43 @@ var MainNetParams = Params{
 		{382320, newHashFromStr("00000000000000000a8dc6ed5b133d0eb2fd6af56203e4159789b092defd8ab2")},
 	},
 
-	// Enforce current block version once majority of the network has
-	// upgraded.
-	// 75% (750 / 1000)
-	// Reject previous block versions once a majority of the network has
-	// upgraded.
-	// 95% (950 / 1000)
-	BlockEnforceNumRequired: 750,
-	BlockRejectNumRequired:  950,
-	BlockUpgradeNumToCheck:  1000,
+	// Consensus rule change deployments.
+	//
+	// The miner confirmation window is defined as:
+	//   target proof of work timespan / target proof of work spacing
+	RuleChangeActivationThreshold: 1916, // 95% of MinerConfirmationWindow
+	MinerConfirmationWindow:       2016, //
+	Deployments: [DefinedDeployments]ConsensusDeployment{
+		DeploymentTestDummy: {
+			BitNumber:  28,
+			StartTime:  1199145601, // January 1, 2008 UTC
+			ExpireTime: 1230767999, // December 31, 2008 UTC
+		},
+		DeploymentCSV: {
+			BitNumber:  0,
+			StartTime:  1462060800, // May 1st, 2016
+			ExpireTime: 1493596800, // May 1st, 2017
+		},
+		DeploymentSegwit: {
+			BitNumber:  1,
+			StartTime:  1479168000, // November 15, 2016 UTC
+			ExpireTime: 1510704000, // November 15, 2017 UTC.
+		},
+	},
 
 	// Mempool parameters
 	RelayNonStdTxs: false,
 
+	// Human-readable part for Bech32 encoded segwit addresses, as defined in
+	// BIP 173.
+	Bech32HRPSegwit: "bc", // always bc for main net
+
 	// Address encoding magics
-	PubKeyHashAddrID: 0x00, // starts with 1
-	ScriptHashAddrID: 0x05, // starts with 3
-	PrivateKeyID:     0x80, // starts with 5 (uncompressed) or K (compressed)
+	PubKeyHashAddrID:        0x00, // starts with 1
+	ScriptHashAddrID:        0x05, // starts with 3
+	PrivateKeyID:            0x80, // starts with 5 (uncompressed) or K (compressed)
+	WitnessPubKeyHashAddrID: 0x06, // starts with p2
+	WitnessScriptHashAddrID: 0x0A, // starts with 7Xh
 
 	// BIP32 hierarchical deterministic extended key magics
 	HDPrivateKeyID: [4]byte{0x04, 0x88, 0xad, 0xe4}, // starts with xprv
@@ -235,7 +328,7 @@ var RegressionNetParams = Params{
 	Name:        "regtest",
 	Net:         wire.TestNet,
 	DefaultPort: "18444",
-	DNSSeeds:    []string{},
+	DNSSeeds:    []DNSSeed{},
 
 	// Chain parameters
 	GenesisBlock:             &regTestGenesisBlock,
@@ -243,6 +336,9 @@ var RegressionNetParams = Params{
 	PowLimit:                 regressionPowLimit,
 	PowLimitBits:             0x207fffff,
 	CoinbaseMaturity:         100,
+	BIP0034Height:            100000000, // Not active - Permit ver 1 blocks
+	BIP0065Height:            1351,      // Used by regression tests
+	BIP0066Height:            1251,      // Used by regression tests
 	SubsidyReductionInterval: 150,
 	TargetTimespan:           time.Hour * 24 * 14, // 14 days
 	TargetTimePerBlock:       time.Minute * 10,    // 10 minutes
@@ -254,18 +350,36 @@ var RegressionNetParams = Params{
 	// Checkpoints ordered from oldest to newest.
 	Checkpoints: nil,
 
-	// Enforce current block version once majority of the network has
-	// upgraded.
-	// 75% (750 / 1000)
-	// Reject previous block versions once a majority of the network has
-	// upgraded.
-	// 95% (950 / 1000)
-	BlockEnforceNumRequired: 750,
-	BlockRejectNumRequired:  950,
-	BlockUpgradeNumToCheck:  1000,
+	// Consensus rule change deployments.
+	//
+	// The miner confirmation window is defined as:
+	//   target proof of work timespan / target proof of work spacing
+	RuleChangeActivationThreshold: 108, // 75%  of MinerConfirmationWindow
+	MinerConfirmationWindow:       144,
+	Deployments: [DefinedDeployments]ConsensusDeployment{
+		DeploymentTestDummy: {
+			BitNumber:  28,
+			StartTime:  0,             // Always available for vote
+			ExpireTime: math.MaxInt64, // Never expires
+		},
+		DeploymentCSV: {
+			BitNumber:  0,
+			StartTime:  0,             // Always available for vote
+			ExpireTime: math.MaxInt64, // Never expires
+		},
+		DeploymentSegwit: {
+			BitNumber:  1,
+			StartTime:  0,             // Always available for vote
+			ExpireTime: math.MaxInt64, // Never expires.
+		},
+	},
 
 	// Mempool parameters
 	RelayNonStdTxs: true,
+
+	// Human-readable part for Bech32 encoded segwit addresses, as defined in
+	// BIP 173.
+	Bech32HRPSegwit: "tb", // always tb for test net
 
 	// Address encoding magics
 	PubKeyHashAddrID: 0x6f, // starts with m or n
@@ -288,10 +402,11 @@ var TestNet3Params = Params{
 	Name:        "testnet3",
 	Net:         wire.TestNet3,
 	DefaultPort: "18333",
-	DNSSeeds: []string{
-		"testnet-seed.bitcoin.schildbach.de",
-		"testnet-seed.bitcoin.petertodd.org",
-		"testnet-seed.bluematt.me",
+	DNSSeeds: []DNSSeed{
+		{"testnet-seed.bitcoin.jonasschnelli.ch", true},
+		{"testnet-seed.bitcoin.schildbach.de", false},
+		{"seed.tbtc.petertodd.org", true},
+		{"testnet-seed.bluematt.me", false},
 	},
 
 	// Chain parameters
@@ -299,6 +414,9 @@ var TestNet3Params = Params{
 	GenesisHash:              &testNet3GenesisHash,
 	PowLimit:                 testNet3PowLimit,
 	PowLimitBits:             0x1d00ffff,
+	BIP0034Height:            21111,  // 0000000023b3a96d3484e5abb3755c413e7d41500f8e2a5c3f0dd01299cd8ef8
+	BIP0065Height:            581885, // 00000000007f6655f22f98e72ed80d8b06dc761d5da09df0fa1dc4be4f861eb6
+	BIP0066Height:            330776, // 000000002104c8c45e99a8853285a3b592602a3ccde2b832481da85e9e4ba182
 	CoinbaseMaturity:         100,
 	SubsidyReductionInterval: 210000,
 	TargetTimespan:           time.Hour * 24 * 14, // 14 days
@@ -311,25 +429,55 @@ var TestNet3Params = Params{
 	// Checkpoints ordered from oldest to newest.
 	Checkpoints: []Checkpoint{
 		{546, newHashFromStr("000000002a936ca763904c3c35fce2f3556c559c0214345d31b1bcebf76acb70")},
+		{100000, newHashFromStr("00000000009e2958c15ff9290d571bf9459e93b19765c6801ddeccadbb160a1e")},
+		{200000, newHashFromStr("0000000000287bffd321963ef05feab753ebe274e1d78b2fd4e2bfe9ad3aa6f2")},
+		{300001, newHashFromStr("0000000000004829474748f3d1bc8fcf893c88be255e6d7f571c548aff57abf4")},
+		{400002, newHashFromStr("0000000005e2c73b8ecb82ae2dbc2e8274614ebad7172b53528aba7501f5a089")},
+		{500011, newHashFromStr("00000000000929f63977fbac92ff570a9bd9e7715401ee96f2848f7b07750b02")},
+		{600002, newHashFromStr("000000000001f471389afd6ee94dcace5ccc44adc18e8bff402443f034b07240")},
+		{700000, newHashFromStr("000000000000406178b12a4dea3b27e13b3c4fe4510994fd667d7c1e6a3f4dc1")},
+		{800010, newHashFromStr("000000000017ed35296433190b6829db01e657d80631d43f5983fa403bfdb4c1")},
+		{900000, newHashFromStr("0000000000356f8d8924556e765b7a94aaebc6b5c8685dcfa2b1ee8b41acd89b")},
+		{1000007, newHashFromStr("00000000001ccb893d8a1f25b70ad173ce955e5f50124261bbbc50379a612ddf")},
 	},
 
-	// Enforce current block version once majority of the network has
-	// upgraded.
-	// 51% (51 / 100)
-	// Reject previous block versions once a majority of the network has
-	// upgraded.
-	// 75% (75 / 100)
-	BlockEnforceNumRequired: 51,
-	BlockRejectNumRequired:  75,
-	BlockUpgradeNumToCheck:  100,
+	// Consensus rule change deployments.
+	//
+	// The miner confirmation window is defined as:
+	//   target proof of work timespan / target proof of work spacing
+	RuleChangeActivationThreshold: 1512, // 75% of MinerConfirmationWindow
+	MinerConfirmationWindow:       2016,
+	Deployments: [DefinedDeployments]ConsensusDeployment{
+		DeploymentTestDummy: {
+			BitNumber:  28,
+			StartTime:  1199145601, // January 1, 2008 UTC
+			ExpireTime: 1230767999, // December 31, 2008 UTC
+		},
+		DeploymentCSV: {
+			BitNumber:  0,
+			StartTime:  1456790400, // March 1st, 2016
+			ExpireTime: 1493596800, // May 1st, 2017
+		},
+		DeploymentSegwit: {
+			BitNumber:  1,
+			StartTime:  1462060800, // May 1, 2016 UTC
+			ExpireTime: 1493596800, // May 1, 2017 UTC.
+		},
+	},
 
 	// Mempool parameters
 	RelayNonStdTxs: true,
 
+	// Human-readable part for Bech32 encoded segwit addresses, as defined in
+	// BIP 173.
+	Bech32HRPSegwit: "tb", // always tb for test net
+
 	// Address encoding magics
-	PubKeyHashAddrID: 0x6f, // starts with m or n
-	ScriptHashAddrID: 0xc4, // starts with 2
-	PrivateKeyID:     0xef, // starts with 9 (uncompressed) or c (compressed)
+	PubKeyHashAddrID:        0x6f, // starts with m or n
+	ScriptHashAddrID:        0xc4, // starts with 2
+	WitnessPubKeyHashAddrID: 0x03, // starts with QW
+	WitnessScriptHashAddrID: 0x28, // starts with T7n
+	PrivateKeyID:            0xef, // starts with 9 (uncompressed) or c (compressed)
 
 	// BIP32 hierarchical deterministic extended key magics
 	HDPrivateKeyID: [4]byte{0x04, 0x35, 0x83, 0x94}, // starts with tprv
@@ -351,13 +499,16 @@ var SimNetParams = Params{
 	Name:        "simnet",
 	Net:         wire.SimNet,
 	DefaultPort: "18555",
-	DNSSeeds:    []string{}, // NOTE: There must NOT be any seeds.
+	DNSSeeds:    []DNSSeed{}, // NOTE: There must NOT be any seeds.
 
 	// Chain parameters
 	GenesisBlock:             &simNetGenesisBlock,
 	GenesisHash:              &simNetGenesisHash,
 	PowLimit:                 simNetPowLimit,
 	PowLimitBits:             0x207fffff,
+	BIP0034Height:            0, // Always active on simnet
+	BIP0065Height:            0, // Always active on simnet
+	BIP0066Height:            0, // Always active on simnet
 	CoinbaseMaturity:         100,
 	SubsidyReductionInterval: 210000,
 	TargetTimespan:           time.Hour * 24 * 14, // 14 days
@@ -370,23 +521,43 @@ var SimNetParams = Params{
 	// Checkpoints ordered from oldest to newest.
 	Checkpoints: nil,
 
-	// Enforce current block version once majority of the network has
-	// upgraded.
-	// 51% (51 / 100)
-	// Reject previous block versions once a majority of the network has
-	// upgraded.
-	// 75% (75 / 100)
-	BlockEnforceNumRequired: 51,
-	BlockRejectNumRequired:  75,
-	BlockUpgradeNumToCheck:  100,
+	// Consensus rule change deployments.
+	//
+	// The miner confirmation window is defined as:
+	//   target proof of work timespan / target proof of work spacing
+	RuleChangeActivationThreshold: 75, // 75% of MinerConfirmationWindow
+	MinerConfirmationWindow:       100,
+	Deployments: [DefinedDeployments]ConsensusDeployment{
+		DeploymentTestDummy: {
+			BitNumber:  28,
+			StartTime:  0,             // Always available for vote
+			ExpireTime: math.MaxInt64, // Never expires
+		},
+		DeploymentCSV: {
+			BitNumber:  0,
+			StartTime:  0,             // Always available for vote
+			ExpireTime: math.MaxInt64, // Never expires
+		},
+		DeploymentSegwit: {
+			BitNumber:  1,
+			StartTime:  0,             // Always available for vote
+			ExpireTime: math.MaxInt64, // Never expires.
+		},
+	},
 
 	// Mempool parameters
 	RelayNonStdTxs: true,
 
+	// Human-readable part for Bech32 encoded segwit addresses, as defined in
+	// BIP 173.
+	Bech32HRPSegwit: "sb", // always sb for sim net
+
 	// Address encoding magics
-	PubKeyHashAddrID: 0x3f, // starts with S
-	ScriptHashAddrID: 0x7b, // starts with s
-	PrivateKeyID:     0x64, // starts with 4 (uncompressed) or F (compressed)
+	PubKeyHashAddrID:        0x3f, // starts with S
+	ScriptHashAddrID:        0x7b, // starts with s
+	PrivateKeyID:            0x64, // starts with 4 (uncompressed) or F (compressed)
+	WitnessPubKeyHashAddrID: 0x19, // starts with Gg
+	WitnessScriptHashAddrID: 0x28, // starts with ?
 
 	// BIP32 hierarchical deterministic extended key magics
 	HDPrivateKeyID: [4]byte{0x04, 0x20, 0xb9, 0x00}, // starts with sprv
@@ -410,11 +581,17 @@ var (
 )
 
 var (
-	registeredNets    = make(map[wire.BitcoinNet]struct{})
-	pubKeyHashAddrIDs = make(map[byte]struct{})
-	scriptHashAddrIDs = make(map[byte]struct{})
-	hdPrivToPubKeyIDs = make(map[[4]byte][]byte)
+	registeredNets       = make(map[wire.BitcoinNet]struct{})
+	pubKeyHashAddrIDs    = make(map[byte]struct{})
+	scriptHashAddrIDs    = make(map[byte]struct{})
+	bech32SegwitPrefixes = make(map[string]struct{})
+	hdPrivToPubKeyIDs    = make(map[[4]byte][]byte)
 )
+
+// String returns the hostname of the DNS seed in human-readable form.
+func (d DNSSeed) String() string {
+	return d.Host
+}
 
 // Register registers the network parameters for a Bitcoin network.  This may
 // error with ErrDuplicateNet if the network is already registered (either
@@ -433,6 +610,10 @@ func Register(params *Params) error {
 	pubKeyHashAddrIDs[params.PubKeyHashAddrID] = struct{}{}
 	scriptHashAddrIDs[params.ScriptHashAddrID] = struct{}{}
 	hdPrivToPubKeyIDs[params.HDPrivateKeyID] = params.HDPublicKeyID[:]
+
+	// A valid Bech32 encoded segwit address always has as prefix the
+	// human-readable part for the given net followed by '1'.
+	bech32SegwitPrefixes[params.Bech32HRPSegwit+"1"] = struct{}{}
 	return nil
 }
 
@@ -463,6 +644,15 @@ func IsPubKeyHashAddrID(id byte) bool {
 // undeterminable (if both return true).
 func IsScriptHashAddrID(id byte) bool {
 	_, ok := scriptHashAddrIDs[id]
+	return ok
+}
+
+// IsBech32SegwitPrefix returns whether the prefix is a known prefix for segwit
+// addresses on any default or registered network.  This is used when decoding
+// an address string into a specific address type.
+func IsBech32SegwitPrefix(prefix string) bool {
+	prefix = strings.ToLower(prefix)
+	_, ok := bech32SegwitPrefixes[prefix]
 	return ok
 }
 
