@@ -332,12 +332,12 @@ func (s *BackendTestSuite) TestDoubleCompleteQueuedTransactions() {
 
 func (s *BackendTestSuite) TestDiscardQueuedTransaction() {
 	require := s.Require()
-	require.NotNil(s.backend)
 
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to sync
+	// Allow to sync the blockchain.
+	time.Sleep(TestConfig.Node.SyncSeconds * time.Second)
 
 	backend := s.LightEthereumService().StatusBackend
 	require.NotNil(backend)
@@ -415,7 +415,6 @@ func (s *BackendTestSuite) TestDiscardQueuedTransaction() {
 
 func (s *BackendTestSuite) TestCompleteMultipleQueuedTransactions() {
 	require := s.Require()
-	require.NotNil(s.backend)
 
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()

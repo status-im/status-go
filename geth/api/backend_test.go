@@ -184,17 +184,8 @@ func (s *BackendTestSuite) TestStartNodeWithUpstreamEnabled() {
 // FIXME(tiabc): There's also a test with the same name in geth/node/rpc_test.go
 // so this test should only check StatusBackend logic with a mocked version of the underlying NodeManager.
 func (s *BackendTestSuite) TestCallRPC() {
-	require := s.Require()
-	require.NotNil(s.backend)
-
-	nodeConfig, err := MakeTestNodeConfig(params.RinkebyNetworkID)
-	require.NoError(err)
-
-	nodeStarted, err := s.backend.StartNode(nodeConfig)
-	require.NoError(err)
-	require.NotNil(nodeStarted)
-	defer s.backend.StopNode()
-	<-nodeStarted
+	s.StartTestBackend(params.RinkebyNetworkID)
+	defer s.StopTestBackend()
 
 	progress := make(chan struct{}, 25)
 	type rpcCall struct {
@@ -263,19 +254,13 @@ func (s *BackendTestSuite) TestCallRPC() {
 }
 
 func (s *BackendTestSuite) TestCallRPCSendTransaction() {
-	nodeConfig, err := MakeTestNodeConfig(params.RopstenNetworkID)
-	s.NoError(err)
-
-	nodeStarted, err := s.backend.StartNode(nodeConfig)
-	s.NoError(err)
-	defer s.backend.StopNode()
-
-	<-nodeStarted
+	s.StartTestBackend(params.RopstenNetworkID)
+	defer s.StopTestBackend()
 
 	// Allow to sync the blockchain.
 	time.Sleep(TestConfig.Node.SyncSeconds * time.Second)
 
-	err = s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
+	err := s.backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	s.NoError(err)
 
 	transactionCompleted := make(chan struct{})
@@ -318,22 +303,17 @@ func (s *BackendTestSuite) TestCallRPCSendTransaction() {
 }
 
 func (s *BackendTestSuite) TestCallRPCSendTransactionUpstream() {
-	nodeConfig, err := MakeTestNodeConfig(params.RopstenNetworkID)
-	s.NoError(err)
-
-	nodeConfig.UpstreamConfig.Enabled = true
-	nodeConfig.UpstreamConfig.URL = "https://ropsten.infura.io/nKmXgiFgc2KqtoQ8BCGJ"
-
-	nodeStarted, err := s.backend.StartNode(nodeConfig)
-	s.NoError(err)
-	defer s.backend.StopNode()
-
-	<-nodeStarted
+	optUpstreamConfig := func(config *params.NodeConfig) {
+		config.UpstreamConfig.Enabled = true
+		config.UpstreamConfig.URL = "https://ropsten.infura.io/nKmXgiFgc2KqtoQ8BCGJ"
+	}
+	s.StartTestBackend(params.RopstenNetworkID, optUpstreamConfig)
+	defer s.StopTestBackend()
 
 	// Allow to sync the blockchain.
 	time.Sleep(TestConfig.Node.SyncSeconds * time.Second)
 
-	err = s.backend.AccountManager().SelectAccount(TestConfig.Account2.Address, TestConfig.Account2.Password)
+	err := s.backend.AccountManager().SelectAccount(TestConfig.Account2.Address, TestConfig.Account2.Password)
 	s.NoError(err)
 
 	transactionCompleted := make(chan struct{})
@@ -544,50 +524,27 @@ func (s *BackendTestSuite) TestRaceConditions() {
 // so this test should only check StatusBackend logic with a mocked version of the underlying NodeManager.
 func (s *BackendTestSuite) TestNetworkSwitching() {
 	require := s.Require()
-	require.NotNil(s.backend)
 
-	// get Ropsten config
-	nodeConfig, err := MakeTestNodeConfig(params.RopstenNetworkID)
-	require.NoError(err)
-
-	require.False(s.backend.IsNodeRunning())
-	nodeStarted, err := s.backend.StartNode(nodeConfig)
-	require.NoError(err)
-
-	<-nodeStarted // wait till node is started
-	require.True(s.backend.IsNodeRunning())
+	// Start with a Ropsten network.
+	s.StartTestBackend(params.RopstenNetworkID)
 
 	FirstBlockHash(require, s.backend.NodeManager(), "0x41941023680923e0fe4d74a34bdac8141f2540e3ae90623718e47d66d1ca4a2d")
 
-	// now stop node, and make sure that a new node, on different network can be started
-	nodeStopped, err := s.backend.StopNode()
-	require.NoError(err)
-	<-nodeStopped
+	// Now stop node, and make sure that a new node, on different network can be started.
+	s.StopTestBackend()
 
-	// start new node with completely different config
-	nodeConfig, err = MakeTestNodeConfig(params.RinkebyNetworkID)
-	require.NoError(err)
+	// Start new node with completely different config.
+	s.StartTestBackend(params.RinkebyNetworkID)
+	defer s.StopTestBackend()
 
-	require.False(s.backend.IsNodeRunning())
-	nodeStarted, err = s.backend.StartNode(nodeConfig)
-	require.NoError(err)
-
-	<-nodeStarted
-	require.True(s.backend.IsNodeRunning())
-
-	// make sure we are on another network indeed
+	// Make sure we are on another network indeed.
 	FirstBlockHash(require, s.backend.NodeManager(), "0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177")
-
-	nodeStopped, err = s.backend.StopNode()
-	require.NoError(err)
-	<-nodeStopped
 }
 
 // FIXME(tiabc): There's also a test with the same name in geth/node/manager_test.go
 // so this test should only check StatusBackend logic with a mocked version of the underlying NodeManager.
 func (s *BackendTestSuite) TestResetChainData() {
 	require := s.Require()
-	require.NotNil(s.backend)
 
 	s.StartTestBackend(params.RinkebyNetworkID)
 	defer s.StopTestBackend()
@@ -608,7 +565,6 @@ func (s *BackendTestSuite) TestResetChainData() {
 // so this test should only check StatusBackend logic with a mocked version of the underlying NodeManager.
 func (s *BackendTestSuite) TestRestartNode() {
 	require := s.Require()
-	require.NotNil(s.backend)
 
 	s.StartTestBackend(params.RinkebyNetworkID)
 	defer s.StopTestBackend()
