@@ -79,14 +79,14 @@ func (s *AccountsTestSuite) TestVerifyAccountPassword() {
 			emptyKeyStoreDir,
 			TestConfig.Account1.Address,
 			TestConfig.Account1.Password,
-			fmt.Errorf("cannot locate account for address: %x", account1Address),
+			fmt.Errorf("cannot locate account for address: %s", account1Address.Hex()),
 		},
 		{
 			"wrong address, correct password",
 			keyStoreDir,
 			"0x79791d3e8f2daa1f7fec29649d152c0ada3cc535",
 			TestConfig.Account1.Password,
-			fmt.Errorf("cannot locate account for address: %s", "79791d3e8f2daa1f7fec29649d152c0ada3cc535"),
+			fmt.Errorf("cannot locate account for address: %s", "0x79791d3E8F2dAa1F7FeC29649d152c0aDA3cc535"),
 		},
 		{
 			"correct address, wrong password",
@@ -108,8 +108,26 @@ func (s *AccountsTestSuite) TestVerifyAccountPassword() {
 			}
 			accountAddress := gethcommon.BytesToAddress(gethcommon.FromHex(testCase.address))
 			if accountKey.Address != accountAddress {
-				s.T().Fatalf("account mismatch: have %x, want %x", accountKey.Address, accountAddress)
+				s.T().Fatalf("account mismatch: have %s, want %s", accountKey.Address.Hex(), accountAddress.Hex())
 			}
 		}
 	}
+}
+
+// TestVerifyAccountPasswordWithAccountBeforeEIP55 verifies if VerifyAccountPassword
+// can handle accounts before introduction of EIP55.
+func (s *AccountsTestSuite) TestVerifyAccountPasswordWithAccountBeforeEIP55() {
+	keyStoreDir, err := ioutil.TempDir("", "status-accounts-test")
+	s.NoError(err)
+	defer os.RemoveAll(keyStoreDir)
+
+	// Import keys and make sure one was created before EIP55 introduction.
+	err = common.ImportTestAccount(keyStoreDir, "test-account1-before-eip55.pk")
+	s.NoError(err)
+
+	acctManager := account.NewManager(nil)
+
+	address := gethcommon.HexToAddress(TestConfig.Account1.Address)
+	_, err = acctManager.VerifyAccountPassword(keyStoreDir, address.Hex(), TestConfig.Account1.Password)
+	s.NoError(err)
 }

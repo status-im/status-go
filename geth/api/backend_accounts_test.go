@@ -3,6 +3,7 @@ package api_test
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/common"
@@ -44,8 +45,8 @@ func (s *BackendTestSuite) TestAccountsList() {
 	accounts, err = s.backend.AccountManager().Accounts()
 	require.NoError(err)
 	require.Equal(1, len(accounts), "exactly single account is expected (main account)")
-	require.Equal(string(accounts[0].Hex()), "0x"+address,
-		fmt.Sprintf("main account is not retured as the first key: got %s, expected %s", accounts[0].Hex(), "0x"+address))
+	require.Equal(string(accounts[0].Hex()), address,
+		fmt.Sprintf("main account is not retured as the first key: got %s, expected %s", accounts[0].Hex(), address))
 
 	// create sub-account 1
 	subAccount1, subPubKey1, err := s.backend.AccountManager().CreateChildAccount("", TestConfig.Account1.Password)
@@ -55,8 +56,8 @@ func (s *BackendTestSuite) TestAccountsList() {
 	accounts, err = s.backend.AccountManager().Accounts()
 	require.NoError(err)
 	require.Equal(2, len(accounts), "exactly 2 accounts are expected (main + sub-account 1)")
-	require.Equal(string(accounts[0].Hex()), "0x"+address, "main account is not retured as the first key")
-	require.Equal(string(accounts[1].Hex()), "0x"+subAccount1, "subAcount1 not returned")
+	require.Equal(string(accounts[0].Hex()), address, "main account is not retured as the first key")
+	require.Equal(string(accounts[1].Hex()), subAccount1, "subAcount1 not returned")
 
 	// create sub-account 2, index automatically progresses
 	subAccount2, subPubKey2, err := s.backend.AccountManager().CreateChildAccount("", TestConfig.Account1.Password)
@@ -67,14 +68,14 @@ func (s *BackendTestSuite) TestAccountsList() {
 	accounts, err = s.backend.AccountManager().Accounts()
 	require.NoError(err)
 	require.Equal(3, len(accounts), "unexpected number of accounts")
-	require.Equal(string(accounts[0].Hex()), "0x"+address, "main account is not retured as the first key")
+	require.Equal(string(accounts[0].Hex()), address, "main account is not retured as the first key")
 
-	subAccount1MatchesKey1 := string(accounts[1].Hex()) != "0x"+subAccount1
-	subAccount1MatchesKey2 := string(accounts[2].Hex()) != "0x"+subAccount1
+	subAccount1MatchesKey1 := string(accounts[1].Hex()) != subAccount1
+	subAccount1MatchesKey2 := string(accounts[2].Hex()) != subAccount1
 	require.False(!subAccount1MatchesKey1 && !subAccount1MatchesKey2, "subAcount1 not returned")
 
-	subAccount2MatchesKey1 := string(accounts[1].Hex()) != "0x"+subAccount2
-	subAccount2MatchesKey2 := string(accounts[2].Hex()) != "0x"+subAccount2
+	subAccount2MatchesKey1 := string(accounts[1].Hex()) != subAccount2
+	subAccount2MatchesKey2 := string(accounts[2].Hex()) != subAccount2
 	require.False(!subAccount2MatchesKey1 && !subAccount2MatchesKey2, "subAcount2 not returned")
 }
 
@@ -295,7 +296,7 @@ func (s *BackendTestSuite) TestSelectedAccountOnRestart() {
 	selectedAccount, err = s.backend.AccountManager().SelectedAccount()
 	require.NoError(err)
 	require.NotNil(selectedAccount)
-	require.Equal(selectedAccount.Address.Hex(), "0x"+address2, "incorrect address selected")
+	require.Equal(selectedAccount.Address.Hex(), address2, "incorrect address selected")
 
 	// resume node
 	nodeStarted, err := s.backend.StartNode(&preservedNodeConfig)
@@ -306,7 +307,7 @@ func (s *BackendTestSuite) TestSelectedAccountOnRestart() {
 	selectedAccount, err = s.backend.AccountManager().SelectedAccount()
 	require.NoError(err)
 	require.NotNil(selectedAccount)
-	require.Equal(selectedAccount.Address.Hex(), "0x"+address2, "incorrect address selected")
+	require.Equal(selectedAccount.Address.Hex(), address2, "incorrect address selected")
 
 	// make sure that Whisper gets identity re-injected
 	whisperService = s.WhisperService()
@@ -345,14 +346,14 @@ func (s *BackendTestSuite) TestRPCEthAccounts() {
 
 	rpcClient := s.backend.NodeManager().RPCClient()
 
-	expectedResponse := `{"jsonrpc":"2.0","id":1,"result":["` + TestConfig.Account1.Address + `"]}`
+	expected := `{"jsonrpc":"2.0","id":1,"result":["` + strings.ToLower(TestConfig.Account1.Address) + `"]}`
 	resp := rpcClient.CallRaw(`{
               "jsonrpc": "2.0",
               "id": 1,
               "method": "eth_accounts",
               "params": []
       }`)
-	require.Equal(expectedResponse, resp)
+	require.Equal(expected, resp)
 }
 
 func (s *BackendTestSuite) TestRPCEthAccountsWithUpstream() {
@@ -367,14 +368,14 @@ func (s *BackendTestSuite) TestRPCEthAccountsWithUpstream() {
 
 	rpcClient := s.backend.NodeManager().RPCClient()
 
-	expectedResponse := `{"jsonrpc":"2.0","id":1,"result":["` + TestConfig.Account1.Address + `"]}`
+	expected := `{"jsonrpc":"2.0","id":1,"result":["` + strings.ToLower(TestConfig.Account1.Address) + `"]}`
 	resp := rpcClient.CallRaw(`{
               "jsonrpc": "2.0",
               "id": 1,
               "method": "eth_accounts",
               "params": []
       }`)
-	require.Equal(expectedResponse, resp)
+	require.Equal(expected, resp)
 }
 
 // regression test: eth_getTransactionReceipt with invalid transaction hash should return null
