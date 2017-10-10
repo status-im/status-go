@@ -1,4 +1,4 @@
-package account
+package account_test
 
 import (
 	"errors"
@@ -6,16 +6,18 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/common"
 	. "github.com/status-im/status-go/testing"
 	"github.com/stretchr/testify/require"
 )
 
 func TestVerifyAccountPassword(t *testing.T) {
-	acctManager := NewManager(nil)
+	acctManager := account.NewManager(nil)
 	keyStoreDir, err := ioutil.TempDir(os.TempDir(), "accounts")
 	require.NoError(t, err)
 	defer os.RemoveAll(keyStoreDir)
@@ -74,18 +76,17 @@ func TestVerifyAccountPassword(t *testing.T) {
 		},
 	}
 	for _, testCase := range testCases {
-		s.T().Log(testCase.name)
-		accountKey, err := accountManager.VerifyAccountPassword(testCase.keyPath, testCase.address, testCase.password)
+		accountKey, err := acctManager.VerifyAccountPassword(testCase.keyPath, testCase.address, testCase.password)
 		if !reflect.DeepEqual(err, testCase.expectedError) {
-			s.FailNow(fmt.Sprintf("unexpected error: expected \n'%v', got \n'%v'", testCase.expectedError, err))
+			require.FailNow(t, fmt.Sprintf("unexpected error: expected \n'%v', got \n'%v'", testCase.expectedError, err))
 		}
 		if err == nil {
 			if accountKey == nil {
-				s.T().Error("no error reported, but account key is missing")
+				require.Fail(t, "no error reported, but account key is missing")
 			}
 			accountAddress := gethcommon.BytesToAddress(gethcommon.FromHex(testCase.address))
 			if accountKey.Address != accountAddress {
-				s.T().Fatalf("account mismatch: have %s, want %s", accountKey.Address.Hex(), accountAddress.Hex())
+				require.Fail(t, "account mismatch: have %s, want %s", accountKey.Address.Hex(), accountAddress.Hex())
 			}
 		}
 	}
@@ -93,18 +94,18 @@ func TestVerifyAccountPassword(t *testing.T) {
 
 // TestVerifyAccountPasswordWithAccountBeforeEIP55 verifies if VerifyAccountPassword
 // can handle accounts before introduction of EIP55.
-func (s *AccountsTestSuite) TestVerifyAccountPasswordWithAccountBeforeEIP55() {
+func TestVerifyAccountPasswordWithAccountBeforeEIP55(t *testing.T) {
 	keyStoreDir, err := ioutil.TempDir("", "status-accounts-test")
-	s.NoError(err)
+	require.NoError(t, err)
 	defer os.RemoveAll(keyStoreDir)
 
 	// Import keys and make sure one was created before EIP55 introduction.
 	err = common.ImportTestAccount(keyStoreDir, "test-account1-before-eip55.pk")
-	s.NoError(err)
+	require.NoError(t, err)
 
 	acctManager := account.NewManager(nil)
 
 	address := gethcommon.HexToAddress(TestConfig.Account1.Address)
 	_, err = acctManager.VerifyAccountPassword(keyStoreDir, address.Hex(), TestConfig.Account1.Password)
-	s.NoError(err)
+	require.NoError(t, err)
 }
