@@ -14,6 +14,12 @@ import (
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/signal"
 	"github.com/status-im/status-go/geth/txqueue"
+	"github.com/NaySoftware/go-fcm"
+)
+
+const (
+	//todo(jeka): should be removed
+	fcmServerKey = "AAAAxwa-r08:APA91bFtMIToDVKGAmVCm76iEXtA4dn9MPvLdYKIZqAlNpLJbd12EgdBI9DSDSXKdqvIAgLodepmRhGVaWvhxnXJzVpE6MoIRuKedDV3kfHSVBhWFqsyoLTwXY4xeufL9Sdzb581U-lx"
 )
 
 // StatusBackend implements Status.im service
@@ -35,7 +41,7 @@ func NewStatusBackend() *StatusBackend {
 	accountManager := account.NewManager(nodeManager)
 	txQueueManager := txqueue.NewManager(nodeManager, accountManager)
 	jailManager := jail.New(nodeManager)
-	notificationManager := notification.New(notification.NewFCMClient())
+	notificationManager := notification.New(notification.NewFCMProvider(fcm.NewFcmClient(fcmServerKey)))
 
 	return &StatusBackend{
 		nodeManager:    nodeManager,

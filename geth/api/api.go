@@ -6,6 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/geth/common"
+	"github.com/status-im/status-go/geth/notification/message"
 	"github.com/status-im/status-go/geth/params"
 )
 
@@ -193,10 +194,21 @@ func (api *StatusAPI) JailBaseJS(js string) {
 	api.b.jailManager.BaseJS(js)
 }
 
-// Notify and send message
+// Notify and send message.
 func (api *StatusAPI) Notify(token string) string {
-	api.b.notification.Notify(token)
-	api.b.notification.Send()
+	// TODO(oskarth): Experiment with this
+	msg := &message.Message{
+		Body: map[string]string{
+			"msg": "Hello World1",
+			"sum": "Happy Day",
+		},
+		Payload: &message.Payload{
+			Title: "Status - new message",
+			Body:  "ping",
+		},
+	}
+
+	api.b.notification.Notify(token, msg)
 
 	return token
 }
