@@ -3,6 +3,8 @@ package jail_test
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -13,7 +15,6 @@ import (
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/signal"
 	. "github.com/status-im/status-go/geth/testing"
-	"github.com/status-im/status-go/geth/txqueue"
 	"github.com/status-im/status-go/static"
 	"github.com/stretchr/testify/suite"
 )
@@ -45,13 +46,15 @@ func (s *JailTestSuite) SetupTest() {
 	accountManager := account.NewManager(nodeManager)
 	require.NotNil(accountManager)
 
-	txQueueManager := txqueue.NewManager(nodeManager, accountManager)
-
-	jail := jail.New(nodeManager, accountManager, txQueueManager)
+	jail := jail.New(nodeManager)
 	require.NotNil(jail)
 
 	s.jail = jail
 	s.NodeManager = nodeManager
+}
+
+func (s *JailTestSuite) TearDownTest() {
+	s.jail.Stop()
 }
 
 func (s *JailTestSuite) TestInit() {
@@ -133,6 +136,9 @@ func (s *JailTestSuite) TestFunctionCall() {
 func (s *JailTestSuite) TestJailRPCAsyncSend() {
 	require := s.Require()
 
+	s.StartTestNode(params.RopstenNetworkID)
+	defer s.StopTestNode()
+
 	// load Status JS and add test command to it
 	s.jail.BaseJS(baseStatusJSCode)
 	s.jail.Parse(testChatID, txJSCode)
@@ -158,6 +164,12 @@ func (s *JailTestSuite) TestJailRPCAsyncSend() {
 		}()
 	}
 	wg.Wait()
+
+	// TODO(divan): revisit this test. sendAsync now returns immediately,
+	// and we need no way here to halt jail loop, which executes actual
+	// transaction send in background. For now, just wait a couple of secs
+	// to let tests pass.
+	time.Sleep(2 * time.Second)
 }
 
 func (s *JailTestSuite) TestJailRPCSend() {
@@ -189,7 +201,6 @@ func (s *JailTestSuite) TestJailRPCSend() {
 	balance, err := value.ToFloat()
 	require.NoError(err)
 
-	s.T().Logf("Balance of %.2f ETH found on '%s' account", balance, TestConfig.Account1.Address)
 	require.False(balance < 100, "wrong balance (there should be lots of test Ether on that account)")
 }
 
@@ -277,4 +288,58 @@ func (s *JailTestSuite) TestEventSignal() {
 
 	expectedResponse := `{"jsonrpc":"2.0","result":true}`
 	require.Equal(expectedResponse, response)
+}
+
+// TestCallResponseOrder tests for problem in
+// https://github.com/status-im/status-go/issues/372
+func (s *JailTestSuite) TestCallResponseOrder() {
+	require := s.Require()
+
+	s.StartTestNode(params.RopstenNetworkID)
+	defer s.StopTestNode()
+
+	statusJS := baseStatusJSCode + `;
+	_status_catalog.commands["testCommand"] = function (params) {
+		return params.val * params.val;
+	};
+	_status_catalog.commands["calculateGasPrice"] = function (n) {
+		var gasMultiplicator = Math.pow(1.4, n).toFixed(3);
+		var price = 211000000000;
+		try {
+			price = web3.eth.gasPrice;
+		} catch (err) {}
+
+		return price * gasMultiplicator;
+	};
+	`
+	s.jail.Parse(testChatID, statusJS)
+
+	N := 1000
+	errCh := make(chan error, N)
+	var wg sync.WaitGroup
+	for i := 0; i < 1000; i++ {
+		wg.Add(2)
+		go func(i int) {
+			defer wg.Done()
+			res := s.jail.Call(testChatID, `["commands", "testCommand"]`, fmt.Sprintf(`{"val": %d}`, i))
+			if !strings.Contains(res, fmt.Sprintf("result\": %d", i*i)) {
+				errCh <- fmt.Errorf("result should be '%d', got %s", i*i, res)
+			}
+		}(i)
+
+		go func(i int) {
+			defer wg.Done()
+			res := s.jail.Call(testChatID, `["commands", "calculateGasPrice"]`, fmt.Sprintf(`%d`, i))
+			if strings.Contains(res, "error") {
+				errCh <- fmt.Errorf("result should not contain 'error', got %s", res)
+			}
+		}(i)
+	}
+
+	wg.Wait()
+
+	close(errCh)
+	for e := range errCh {
+		require.NoError(e)
+	}
 }
