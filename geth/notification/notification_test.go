@@ -31,7 +31,6 @@ func (s *NotificationTestSuite) TearDownTest() {
 func (s *NotificationTestSuite) TestNewNotification() {
 	manager := New(nil)
 	s.Require().NotNil(manager)
-	s.Require().IsType(&Manager{}, manager)
 }
 
 func (s *NotificationTestSuite) TestNotify() {

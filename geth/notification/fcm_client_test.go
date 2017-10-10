@@ -3,7 +3,6 @@ package notification
 import (
 	"testing"
 
-	"github.com/NaySoftware/go-fcm"
 	t "github.com/status-im/status-go/geth/testing"
 	"github.com/stretchr/testify/suite"
 )
@@ -18,6 +17,6 @@ type FCMClientTestSuite struct {
 
 func (s *FCMClientTestSuite) TestNewFCMClient() {
 	fcmClient := NewFCMClient()
+
 	s.Require().NotNil(fcmClient)
-	s.Require().IsType(&fcm.FcmClient{}, fcmClient)
 }
