@@ -86,7 +86,7 @@ func (s *StructLog) OpName() string {
 // if you need to retain them beyond the current call.
 type Tracer interface {
 	CaptureState(env *EVM, pc uint64, op OpCode, gas, cost uint64, memory *Memory, stack *Stack, contract *Contract, depth int, err error) error
-	CaptureEnd(output []byte, gasUsed uint64, t time.Duration) error
+	CaptureEnd(output []byte, gasUsed uint64, t time.Duration, err error) error
 }
 
 // StructLogger is an EVM state logger and implements Tracer.
@@ -128,18 +128,14 @@ func (l *StructLogger) CaptureState(env *EVM, pc uint64, op OpCode, gas, cost ui
 	}
 
 	// capture SSTORE opcodes and determine the changed value and store
-	// it in the local storage container. NOTE: we do not need to do any
-	// range checks here because that's already handler prior to calling
-	// this function.
-	switch op {
-	case SSTORE:
+	// it in the local storage container.
+	if op == SSTORE && stack.len() >= 2 {
 		var (
 			value   = common.BigToHash(stack.data[stack.len()-2])
 			address = common.BigToHash(stack.data[stack.len()-1])
 		)
 		l.changedValues[contract.Address()][address] = value
 	}
-
 	// copy a snapstot of the current memory state to a new buffer
 	var mem []byte
 	if !l.cfg.DisableMemory {
@@ -183,8 +179,11 @@ func (l *StructLogger) CaptureState(env *EVM, pc uint64, op OpCode, gas, cost ui
 	return nil
 }
 
-func (l *StructLogger) CaptureEnd(output []byte, gasUsed uint64, t time.Duration) error {
+func (l *StructLogger) CaptureEnd(output []byte, gasUsed uint64, t time.Duration, err error) error {
 	fmt.Printf("0x%x", output)
+	if err != nil {
+		fmt.Printf(" error: %v\n", err)
+	}
 	return nil
 }
 
@@ -196,20 +195,27 @@ func (l *StructLogger) StructLogs() []StructLog {
 // WriteTrace writes a formatted trace to the given writer
 func WriteTrace(writer io.Writer, logs []StructLog) {
 	for _, log := range logs {
-		fmt.Fprintf(writer, "%-10spc=%08d gas=%v cost=%v", log.Op, log.Pc, log.Gas, log.GasCost)
+		fmt.Fprintf(writer, "%-16spc=%08d gas=%v cost=%v", log.Op, log.Pc, log.Gas, log.GasCost)
 		if log.Err != nil {
 			fmt.Fprintf(writer, " ERROR: %v", log.Err)
 		}
-		fmt.Fprintf(writer, "\n")
+		fmt.Fprintln(writer)
 
-		for i := len(log.Stack) - 1; i >= 0; i-- {
-			fmt.Fprintf(writer, "%08d  %x\n", len(log.Stack)-i-1, math.PaddedBigBytes(log.Stack[i], 32))
+		if len(log.Stack) > 0 {
+			fmt.Fprintln(writer, "Stack:")
+			for i := len(log.Stack) - 1; i >= 0; i-- {
+				fmt.Fprintf(writer, "%08d  %x\n", len(log.Stack)-i-1, math.PaddedBigBytes(log.Stack[i], 32))
+			}
 		}
-
-		fmt.Fprint(writer, hex.Dump(log.Memory))
-
-		for h, item := range log.Storage {
-			fmt.Fprintf(writer, "%x: %x\n", h, item)
+		if len(log.Memory) > 0 {
+			fmt.Fprintln(writer, "Memory:")
+			fmt.Fprint(writer, hex.Dump(log.Memory))
+		}
+		if len(log.Storage) > 0 {
+			fmt.Fprintln(writer, "Storage:")
+			for h, item := range log.Storage {
+				fmt.Fprintf(writer, "%x: %x\n", h, item)
+			}
 		}
 		fmt.Fprintln(writer)
 	}

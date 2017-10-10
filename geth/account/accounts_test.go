@@ -56,14 +56,14 @@ func TestVerifyAccountPassword(t *testing.T) {
 			emptyKeyStoreDir,
 			TestConfig.Account1.Address,
 			TestConfig.Account1.Password,
-			fmt.Errorf("cannot locate account for address: %x", account1Address),
+			fmt.Errorf("cannot locate account for address: %s", account1Address.Hex()),
 		},
 		{
 			"wrong address, correct password",
 			keyStoreDir,
 			"0x79791d3e8f2daa1f7fec29649d152c0ada3cc535",
 			TestConfig.Account1.Password,
-			fmt.Errorf("cannot locate account for address: %s", "79791d3e8f2daa1f7fec29649d152c0ada3cc535"),
+			fmt.Errorf("cannot locate account for address: %s", "0x79791d3E8F2dAa1F7FeC29649d152c0aDA3cc535"),
 		},
 		{
 			"correct address, wrong password",
@@ -73,16 +73,38 @@ func TestVerifyAccountPassword(t *testing.T) {
 			errors.New("could not decrypt key with given passphrase"),
 		},
 	}
-	for _, tc := range testCases {
-		t.Log(tc.name)
-		accountKey, err := acctManager.VerifyAccountPassword(tc.keyPath, tc.address, tc.password)
-		if tc.expectedError == nil {
-			require.Nil(t, err, "err should be nil")
-			require.NotNil(t, accountKey, "accountKey can not be nil if there was no error")
-			accountAddress := gethcommon.BytesToAddress(gethcommon.FromHex(tc.address))
-			require.Equal(t, accountAddress, accountKey.Address)
-		} else {
-			require.EqualError(t, err, tc.expectedError.Error())
+	for _, testCase := range testCases {
+		s.T().Log(testCase.name)
+		accountKey, err := accountManager.VerifyAccountPassword(testCase.keyPath, testCase.address, testCase.password)
+		if !reflect.DeepEqual(err, testCase.expectedError) {
+			s.FailNow(fmt.Sprintf("unexpected error: expected \n'%v', got \n'%v'", testCase.expectedError, err))
+		}
+		if err == nil {
+			if accountKey == nil {
+				s.T().Error("no error reported, but account key is missing")
+			}
+			accountAddress := gethcommon.BytesToAddress(gethcommon.FromHex(testCase.address))
+			if accountKey.Address != accountAddress {
+				s.T().Fatalf("account mismatch: have %s, want %s", accountKey.Address.Hex(), accountAddress.Hex())
+			}
 		}
 	}
+}
+
+// TestVerifyAccountPasswordWithAccountBeforeEIP55 verifies if VerifyAccountPassword
+// can handle accounts before introduction of EIP55.
+func (s *AccountsTestSuite) TestVerifyAccountPasswordWithAccountBeforeEIP55() {
+	keyStoreDir, err := ioutil.TempDir("", "status-accounts-test")
+	s.NoError(err)
+	defer os.RemoveAll(keyStoreDir)
+
+	// Import keys and make sure one was created before EIP55 introduction.
+	err = common.ImportTestAccount(keyStoreDir, "test-account1-before-eip55.pk")
+	s.NoError(err)
+
+	acctManager := account.NewManager(nil)
+
+	address := gethcommon.HexToAddress(TestConfig.Account1.Address)
+	_, err = acctManager.VerifyAccountPassword(keyStoreDir, address.Hex(), TestConfig.Account1.Password)
+	s.NoError(err)
 }
