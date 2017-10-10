@@ -88,6 +88,13 @@ type MailServer interface {
 	DeliverMail(whisperPeer *Peer, request *Envelope)
 }
 
+// DeliveryServer represents a small message status
+// notification system where a message delivery status
+// update event is delivered to it's underline system.
+type DeliveryServer interface {
+	Send(*Envelope, int)
+}
+
 // NotificationServer represents a notification server,
 // capable of screening incoming envelopes for special
 // topics, and once located, subscribe client nodes as

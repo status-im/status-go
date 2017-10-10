@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/message"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
@@ -78,6 +79,7 @@ type Whisper struct {
 	stats   Statistics // Statistics of whisper node
 
 	mailServer         MailServer // MailServer interface
+	deliveryServer     DeliveryServer
 	notificationServer NotificationServer
 }
 
@@ -155,6 +157,11 @@ func (w *Whisper) APIs() []rpc.API {
 // MailServer will process all the incoming messages with p2pRequestCode.
 func (w *Whisper) RegisterServer(server MailServer) {
 	w.mailServer = server
+}
+
+// RegisterDeliveryServer registers notification server with Whisper
+func (w *Whisper) RegisterDeliveryServer(server DeliveryServer) {
+	w.deliveryServer = server
 }
 
 // RegisterNotificationServer registers notification server with Whisper
@@ -643,6 +650,15 @@ func (wh *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 	}
 }
 
+// sendDeliveryEvent delivers envelope with delivery status, if server has being set.
+func (wh *Whisper) sendDelivery(envelope *Envelope, status int) {
+	if wh.deliveryServer == nil {
+		return
+	}
+
+	wh.deliveryServer.Send(envelope, status)
+}
+
 // add inserts a new envelope into the message pool to be distributed within the
 // whisper network. It also inserts the envelope into the expiration pool at the
 // appropriate time-stamp. In case of error, connection should be dropped.
@@ -652,6 +668,7 @@ func (wh *Whisper) add(envelope *Envelope) (bool, error) {
 
 	if sent > now {
 		if sent-SynchAllowance > now {
+			wh.sendDelivery(envelope, message.FutureStatus)
 			return false, fmt.Errorf("envelope created in the future [%x]", envelope.Hash())
 		} else {
 			// recalculate PoW, adjusted for the time difference, plus one second for latency
@@ -660,30 +677,35 @@ func (wh *Whisper) add(envelope *Envelope) (bool, error) {
 	}
 
 	if envelope.Expiry < now {
+		wh.sendDelivery(envelope, message.ExpiredStatus)
 		if envelope.Expiry+SynchAllowance*2 < now {
 			return false, fmt.Errorf("very old message")
-		} else {
-			log.Debug("expired envelope dropped", "hash", envelope.Hash().Hex())
-			return false, nil // drop envelope without error
 		}
+
+		log.Debug("expired envelope dropped", "hash", envelope.Hash().Hex())
+		return false, nil // drop envelope without error
 	}
 
 	if uint32(envelope.size()) > wh.MaxMessageSize() {
+		wh.sendDelivery(envelope, message.OversizedMessageStatus)
 		return false, fmt.Errorf("huge messages are not allowed [%x]", envelope.Hash())
 	}
 
 	if len(envelope.Version) > 4 {
+		wh.sendDelivery(envelope, message.FailedSendingStatus)
 		return false, fmt.Errorf("oversized version [%x]", envelope.Hash())
 	}
 
 	aesNonceSize := len(envelope.AESNonce)
 	if aesNonceSize != 0 && aesNonceSize != AESNonceLength {
+		wh.sendDelivery(envelope, message.FailedSendingStatus)
 		// the standard AES GCM nonce size is 12 bytes,
 		// but constant gcmStandardNonceSize cannot be accessed (not exported)
 		return false, fmt.Errorf("wrong size of AESNonce: %d bytes [env: %x]", aesNonceSize, envelope.Hash())
 	}
 
 	if envelope.PoW() < wh.MinPow() {
+		wh.sendDelivery(envelope, message.FailedSendingStatus)
 		log.Debug("envelope with low PoW dropped", "PoW", envelope.PoW(), "hash", envelope.Hash().Hex())
 		return false, nil // drop envelope without error
 	}
@@ -710,6 +732,7 @@ func (wh *Whisper) add(envelope *Envelope) (bool, error) {
 		wh.statsMu.Lock()
 		wh.stats.memoryUsed += envelope.size()
 		wh.statsMu.Unlock()
+		wh.sendDelivery(envelope, message.SentStatus)
 		wh.postEvent(envelope, false) // notify the local node about the new message
 		if wh.mailServer != nil {
 			wh.mailServer.Archive(envelope)
