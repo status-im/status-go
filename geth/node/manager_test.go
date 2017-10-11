@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/les"
 	gethnode "github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/ethereum/go-ethereum/whisper/delivery"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/node"
@@ -101,6 +102,13 @@ func (s *ManagerTestSuite) TestReferences() {
 			node.ErrNoRunningNode,
 		},
 		{
+			"non-null manager, no running node, get Whisper Delivery Service",
+			func() (interface{}, error) {
+				return s.NodeManager.WhisperDeliveryService()
+			},
+			node.ErrNoRunningNode,
+		},
+		{
 			"non-null manager, no running node, get AccountManager",
 			func() (interface{}, error) {
 				return s.NodeManager.AccountManager()
@@ -164,6 +172,13 @@ func (s *ManagerTestSuite) TestReferences() {
 				return s.NodeManager.WhisperService()
 			},
 			&whisper.Whisper{},
+		},
+		{
+			"node is running, get Whisper Delivery Service",
+			func() (interface{}, error) {
+				return s.NodeManager.WhisperDeliveryService()
+			},
+			&delivery.DeliveryNotification{},
 		},
 		{
 			"node is running, get AccountManager",
@@ -386,6 +401,12 @@ func (s *ManagerTestSuite) TestRaceConditions() {
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
+			log.Send(log.Info("WhisperDeliveryService()"))
+			_, err := s.NodeManager.WhisperDeliveryService()
+			s.T().Logf("WhisperDeliveryService(), error: %v", err)
+			progress <- struct{}{}
+		},
+		func(config *params.NodeConfig) {
 			log.Send(log.Info("AccountManager()"))
 			_, err := s.NodeManager.AccountManager()
 			s.T().Logf("AccountManager(), error: %v", err)
@@ -440,8 +461,10 @@ func (s *ManagerTestSuite) TestNodeStartCrash() {
 	nodeConfig, err := MakeTestNodeConfig(params.RinkebyNetworkID)
 	require.NoError(err)
 
+	var delivery delivery.DeliveryNotification
+
 	// start node outside the manager (on the same port), so that manager node.Start() method fails
-	outsideNode, err := node.MakeNode(nodeConfig)
+	outsideNode, err := node.MakeNode(nodeConfig, &delivery)
 	require.NoError(outsideNode.Start())
 
 	// let's listen for node.crashed signal

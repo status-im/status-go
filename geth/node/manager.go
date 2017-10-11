@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/les"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/discover"
+	"github.com/ethereum/go-ethereum/whisper/delivery"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/log/custom"
@@ -24,14 +25,15 @@ import (
 
 // errors
 var (
-	ErrNodeExists                  = errors.New("node is already running")
-	ErrNoRunningNode               = errors.New("there is no running node")
-	ErrInvalidNodeManager          = errors.New("node manager is not properly initialized")
-	ErrInvalidWhisperService       = errors.New("whisper service is unavailable")
-	ErrInvalidLightEthereumService = errors.New("LES service is unavailable")
-	ErrInvalidAccountManager       = errors.New("could not retrieve account manager")
-	ErrAccountKeyStoreMissing      = errors.New("account key store is not set")
-	ErrRPCClient                   = errors.New("failed to init RPC client")
+	ErrNodeExists                    = errors.New("node is already running")
+	ErrNoRunningNode                 = errors.New("there is no running node")
+	ErrInvalidNodeManager            = errors.New("node manager is not properly initialized")
+	ErrInvalidWhisperService         = errors.New("whisper service is unavailable")
+	ErrInvalidWhisperDeliveryService = errors.New("whisper delivery service is unavailable")
+	ErrInvalidLightEthereumService   = errors.New("LES service is unavailable")
+	ErrInvalidAccountManager         = errors.New("could not retrieve account manager")
+	ErrAccountKeyStoreMissing        = errors.New("account key store is not set")
+	ErrRPCClient                     = errors.New("failed to init RPC client")
 )
 
 // NodeManager manages Status node (which abstracts contained geth node)
@@ -43,7 +45,8 @@ type NodeManager struct {
 	nodeStopped    chan struct{}      // channel to wait for termination notifications
 	whisperService *whisper.Whisper   // reference to Whisper service
 	lesService     *les.LightEthereum // reference to LES service
-	rpcClient      *rpc.Client        // reference to RPC client
+	delService     *delivery.DeliveryNotification
+	rpcClient      *rpc.Client // reference to RPC client
 }
 
 // NewNodeManager makes new instance of node manager
@@ -70,11 +73,14 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 
 	m.initLog(config)
 
-	ethNode, err := MakeNode(config)
+	var del delivery.DeliveryNotification
+
+	ethNode, err := MakeNode(config, &del)
 	if err != nil {
 		return nil, err
 	}
 
+	m.delService = &del
 	m.nodeStarted = make(chan struct{}, 1)
 
 	go func() {
@@ -398,6 +404,24 @@ func (m *NodeManager) LightEthereumService() (*les.LightEthereum, error) {
 	}
 
 	return m.lesService, nil
+}
+
+// WhisperDeliveryService exposes reference to Whisper service running on top of the node
+func (m *NodeManager) WhisperDeliveryService() (*delivery.DeliveryNotification, error) {
+	m.RLock()
+	defer m.RUnlock()
+
+	if err := m.isNodeAvailable(); err != nil {
+		return nil, err
+	}
+
+	<-m.nodeStarted
+
+	if m.delService == nil {
+		return nil, ErrInvalidWhisperDeliveryService
+	}
+
+	return m.delService, nil
 }
 
 // WhisperService exposes reference to Whisper service running on top of the node

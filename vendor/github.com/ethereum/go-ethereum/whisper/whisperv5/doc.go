@@ -33,6 +33,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common/message"
 	"github.com/ethereum/go-ethereum/p2p"
 )
 
@@ -92,7 +93,7 @@ type MailServer interface {
 // notification system where a message delivery status
 // update event is delivered to it's underline system.
 type DeliveryServer interface {
-	Send(*Envelope, int)
+	Send(*Envelope, message.Status)
 }
 
 // NotificationServer represents a notification server,

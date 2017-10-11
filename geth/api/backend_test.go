@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/les"
+	"github.com/ethereum/go-ethereum/whisper/delivery"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/api"
@@ -82,6 +83,17 @@ func (s *BackendTestSuite) WhisperService() *whisper.Whisper {
 	require.NotNil(whisperService)
 
 	return whisperService
+}
+
+func (s *BackendTestSuite) WhisperDeliveryService() *delivery.DeliveryNotification {
+	require := s.Require()
+	require.NotNil(s.backend)
+
+	whisperDeliveryService, err := s.backend.NodeManager().WhisperDeliveryService()
+	require.NoError(err)
+	require.NotNil(whisperDeliveryService)
+
+	return whisperDeliveryService
 }
 
 func (s *BackendTestSuite) LightEthereumService() *les.LightEthereum {

@@ -3,12 +3,13 @@ package delivery
 import (
 	"sync"
 
+	"github.com/ethereum/go-ethereum/common/message"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 )
 
 // MessageDeliveryState holds the current delivery state of a envelope.
 type MessageDeliveryState struct {
-	Status   int
+	Status   message.Status
 	Envelope whisper.Envelope
 }
 
@@ -23,7 +24,7 @@ type DeliveryNotification struct {
 }
 
 // Send delivers envelope with status to all subscribers.
-func (d *DeliveryNotification) Send(env *whisper.Envelope, status int) {
+func (d *DeliveryNotification) Send(env *whisper.Envelope, status message.Status) {
 	d.sml.RLock()
 	defer d.sml.RUnlock()
 
@@ -48,7 +49,7 @@ func (d *DeliveryNotification) Unsubscribe(ind int) {
 
 // FilterUntil filters all messages with a Delivery status below giving status but
 // delivers all messages above or equal to provided status.
-func (d *DeliveryNotification) FilterUntil(status int, sub DeliverySubscriber) int {
+func (d *DeliveryNotification) FilterUntil(status message.Status, sub DeliverySubscriber) int {
 	return d.Subscribe(func(m MessageDeliveryState) {
 		if m.Status >= status {
 			return
@@ -59,7 +60,7 @@ func (d *DeliveryNotification) FilterUntil(status int, sub DeliverySubscriber) i
 }
 
 // Filter filters out messages status events who status does not match provided.
-func (d *DeliveryNotification) Filter(status int, sub DeliverySubscriber) int {
+func (d *DeliveryNotification) Filter(status message.Status, sub DeliverySubscriber) int {
 	return d.Subscribe(func(m MessageDeliveryState) {
 		if m.Status != status {
 			return

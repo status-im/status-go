@@ -11,6 +11,7 @@ import (
 	common "github.com/ethereum/go-ethereum/common"
 	les "github.com/ethereum/go-ethereum/les"
 	node "github.com/ethereum/go-ethereum/node"
+	delivery "github.com/ethereum/go-ethereum/whisper/delivery"
 	whisperv5 "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	gomock "github.com/golang/mock/gomock"
 	otto "github.com/robertkrimen/otto"
@@ -180,6 +181,19 @@ func (m *MockNodeManager) WhisperService() (*whisperv5.Whisper, error) {
 // WhisperService indicates an expected call of WhisperService
 func (mr *MockNodeManagerMockRecorder) WhisperService() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WhisperService", reflect.TypeOf((*MockNodeManager)(nil).WhisperService))
+}
+
+// WhisperDeliveryService mocks base method
+func (m *MockNodeManager) WhisperDeliveryService() (*delivery.DeliveryNotification, error) {
+	ret := m.ctrl.Call(m, "WhisperDeliveryService")
+	ret0, _ := ret[0].(*delivery.DeliveryNotification)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// WhisperDeliveryService indicates an expected call of WhisperDeliveryService
+func (mr *MockNodeManagerMockRecorder) WhisperDeliveryService() *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WhisperDeliveryService", reflect.TypeOf((*MockNodeManager)(nil).WhisperDeliveryService))
 }
 
 // AccountManager mocks base method

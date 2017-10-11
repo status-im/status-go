@@ -40,7 +40,7 @@ var (
 )
 
 // MakeNode create a geth node entity
-func MakeNode(config *params.NodeConfig) (*node.Node, error) {
+func MakeNode(config *params.NodeConfig, del whisper.DeliveryServer) (*node.Node, error) {
 	// make sure data directory exists
 	if err := os.MkdirAll(filepath.Join(config.DataDir), os.ModePerm); err != nil {
 		return nil, err
@@ -78,7 +78,7 @@ func MakeNode(config *params.NodeConfig) (*node.Node, error) {
 	}
 
 	// start Whisper service
-	if err := activateShhService(stack, config); err != nil {
+	if err := activateShhService(stack, config, del); err != nil {
 		return nil, fmt.Errorf("%v: %v", ErrWhisperServiceRegistrationFailure, err)
 	}
 
@@ -179,7 +179,7 @@ func activateEthService(stack *node.Node, config *params.NodeConfig) error {
 }
 
 // activateShhService configures Whisper and adds it to the given node.
-func activateShhService(stack *node.Node, config *params.NodeConfig) error {
+func activateShhService(stack *node.Node, config *params.NodeConfig, del whisper.DeliveryServer) error {
 	if !config.WhisperConfig.Enabled {
 		log.Send(log.Info("SHH protocol is disabled"))
 		return nil
@@ -188,6 +188,11 @@ func activateShhService(stack *node.Node, config *params.NodeConfig) error {
 	serviceConstructor := func(*node.ServiceContext) (node.Service, error) {
 		whisperConfig := config.WhisperConfig
 		whisperService := whisper.New(nil)
+
+		// Set delivery service.
+		if del != nil {
+			whisperService.RegisterDeliveryServer(del)
+		}
 
 		// enable mail service
 		if whisperConfig.MailServerNode {

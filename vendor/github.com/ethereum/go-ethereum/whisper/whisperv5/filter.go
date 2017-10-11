@@ -22,6 +22,7 @@ import (
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/message"
 	"github.com/ethereum/go-ethereum/log"
 )
 
@@ -98,6 +99,7 @@ func (fs *Filters) NotifyWatchers(env *Envelope, p2pMessage bool) {
 	for _, watcher := range fs.watchers {
 		i++
 		if p2pMessage && !watcher.AllowP2P {
+			fs.whisper.sendDelivery(env, message.RejectedStatus)
 			log.Trace(fmt.Sprintf("msg [%x], filter [%d]: p2p messages are not allowed", env.Hash(), i))
 			continue
 		}
@@ -110,6 +112,7 @@ func (fs *Filters) NotifyWatchers(env *Envelope, p2pMessage bool) {
 			if match {
 				msg = env.Open(watcher)
 				if msg == nil {
+					fs.whisper.sendDelivery(env, message.RejectedStatus)
 					log.Trace("processing message: failed to open", "message", env.Hash().Hex(), "filter", i)
 				}
 			} else {
@@ -119,6 +122,7 @@ func (fs *Filters) NotifyWatchers(env *Envelope, p2pMessage bool) {
 
 		if match && msg != nil {
 			log.Trace("processing message: decrypted", "hash", env.Hash().Hex())
+			fs.whisper.sendDelivery(env, message.DeliveredStatus)
 			watcher.Trigger(msg)
 		}
 	}

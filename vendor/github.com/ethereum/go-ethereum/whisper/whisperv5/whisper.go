@@ -239,13 +239,16 @@ func (w *Whisper) RequestHistoricMessages(peerID []byte, envelope *Envelope) err
 func (w *Whisper) SendP2PMessage(peerID []byte, envelope *Envelope) error {
 	p, err := w.getPeer(peerID)
 	if err != nil {
+		w.sendDelivery(envelope, message.RejectedStatus)
 		return err
 	}
+
 	return w.SendP2PDirect(p, envelope)
 }
 
 // SendP2PDirect sends a peer-to-peer message to a specific peer.
 func (w *Whisper) SendP2PDirect(peer *Peer, envelope *Envelope) error {
+	w.sendDelivery(envelope, message.DeliveredStatus)
 	return p2p.Send(peer.ws, p2pCode, envelope)
 }
 
@@ -639,6 +642,7 @@ func (wh *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 					log.Warn("failed to decode p2p request message, peer will be disconnected", "peer", p.peer.ID(), "err", err)
 					return errors.New("invalid p2p request")
 				}
+				wh.sendDelivery(&request, message.SentStatus)
 				wh.mailServer.DeliverMail(p, &request)
 			}
 		default:
@@ -651,7 +655,7 @@ func (wh *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 }
 
 // sendDeliveryEvent delivers envelope with delivery status, if server has being set.
-func (wh *Whisper) sendDelivery(envelope *Envelope, status int) {
+func (wh *Whisper) sendDelivery(envelope *Envelope, status message.Status) {
 	if wh.deliveryServer == nil {
 		return
 	}
@@ -692,20 +696,20 @@ func (wh *Whisper) add(envelope *Envelope) (bool, error) {
 	}
 
 	if len(envelope.Version) > 4 {
-		wh.sendDelivery(envelope, message.FailedSendingStatus)
+		wh.sendDelivery(envelope, message.OversizedVersionStatus)
 		return false, fmt.Errorf("oversized version [%x]", envelope.Hash())
 	}
 
 	aesNonceSize := len(envelope.AESNonce)
 	if aesNonceSize != 0 && aesNonceSize != AESNonceLength {
-		wh.sendDelivery(envelope, message.FailedSendingStatus)
+		wh.sendDelivery(envelope, message.InvalidAESStatus)
 		// the standard AES GCM nonce size is 12 bytes,
 		// but constant gcmStandardNonceSize cannot be accessed (not exported)
 		return false, fmt.Errorf("wrong size of AESNonce: %d bytes [env: %x]", aesNonceSize, envelope.Hash())
 	}
 
 	if envelope.PoW() < wh.MinPow() {
-		wh.sendDelivery(envelope, message.FailedSendingStatus)
+		wh.sendDelivery(envelope, message.LowPowStatus)
 		log.Debug("envelope with low PoW dropped", "PoW", envelope.PoW(), "hash", envelope.Hash().Hex())
 		return false, nil // drop envelope without error
 	}
@@ -727,12 +731,13 @@ func (wh *Whisper) add(envelope *Envelope) (bool, error) {
 
 	if alreadyCached {
 		log.Trace("whisper envelope already cached", "hash", envelope.Hash().Hex())
+		wh.sendDelivery(envelope, message.CachedStatus)
 	} else {
 		log.Trace("cached whisper envelope", "hash", envelope.Hash().Hex())
 		wh.statsMu.Lock()
 		wh.stats.memoryUsed += envelope.size()
 		wh.statsMu.Unlock()
-		wh.sendDelivery(envelope, message.SentStatus)
+		wh.sendDelivery(envelope, message.QueuedStatus)
 		wh.postEvent(envelope, false) // notify the local node about the new message
 		if wh.mailServer != nil {
 			wh.mailServer.Archive(envelope)
@@ -782,9 +787,11 @@ func (w *Whisper) processQueue() {
 			return
 
 		case e = <-w.messageQueue:
+			w.sendDelivery(e, message.SentStatus)
 			w.filters.NotifyWatchers(e, false)
 
 		case e = <-w.p2pMsgQueue:
+			w.sendDelivery(e, message.SentStatus)
 			w.filters.NotifyWatchers(e, true)
 		}
 	}

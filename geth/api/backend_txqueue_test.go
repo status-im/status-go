@@ -80,7 +80,7 @@ func (s *BackendTestSuite) TestSendContractTx() {
 			)
 			s.NoError(err, fmt.Sprintf("cannot complete queued transaction[%v]", event["id"]))
 
-			log.Send(log.Info("contract transaction complete").With("URL", "https://ropsten.etherscan.io/tx/"+txHash.Hex())
+			log.Send(log.Info("contract transaction complete").With("URL", "https://ropsten.etherscan.io/tx/"+txHash.Hex()))
 			close(completeQueuedTransaction)
 			return
 		}
@@ -672,7 +672,7 @@ func (s *BackendTestSuite) TestEvictionOfQueuedTransactions() {
 	var i = 0
 	txIDs := [txqueue.DefaultTxQueueCap + 5 + 10]common.QueuedTxID{}
 	s.backend.TxQueueManager().SetTransactionQueueHandler(func(queuedTx *common.QueuedTx) {
-		log.Send(log.Info("tx enqueued").With("i", i+1,).With("queue size", txQueue.Count()).With("id", queuedTx.ID))
+		log.Send(log.Info("tx enqueued").With("i", i+1).With("queue size", txQueue.Count()).With("id", queuedTx.ID))
 		txIDs[i] = queuedTx.ID
 		i++
 	})
