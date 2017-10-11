@@ -33,14 +33,26 @@ var (
 
 // NodeManager manages Status node (which abstracts contained geth node)
 type NodeManager struct {
-	sync.RWMutex
 	config         *params.NodeConfig // Status node configuration
+	configLock     sync.RWMutex
+
 	node           *node.Node         // reference to Geth P2P stack/node
+	nodeLock     sync.RWMutex
+
 	nodeStarted    chan struct{}      // channel to wait for start up notifications
+	nodeStartedLock     sync.RWMutex
+
 	nodeStopped    chan struct{}      // channel to wait for termination notifications
+	nodeStoppedLock     sync.RWMutex
+
 	whisperService *whisper.Whisper   // reference to Whisper service
+	whisperServiceLock     sync.RWMutex
+
 	lesService     *les.LightEthereum // reference to LES service
+	lesServiceLock     sync.RWMutex
+
 	rpcClient      *rpc.Client        // reference to RPC client
+	rpcClientLock     sync.RWMutex
 }
 
 // NewNodeManager makes new instance of node manager
@@ -53,15 +65,12 @@ func NewNodeManager() *NodeManager {
 
 // StartNode start Status node, fails if node is already started
 func (m *NodeManager) StartNode(config *params.NodeConfig) (<-chan struct{}, error) {
-	m.Lock()
-	defer m.Unlock()
-
 	return m.startNode(config)
 }
 
 // startNode start Status node, fails if node is already started
 func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, error) {
-	if m.node != nil || m.nodeStarted != nil {
+	if m.getNode() != nil || !m.nodeStartedIsNil() {
 		return nil, ErrNodeExists
 	}
 
@@ -72,17 +81,16 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 		return nil, err
 	}
 
-	m.nodeStarted = make(chan struct{}, 1)
+	m.setNodeStarted(make(chan struct{}, 1))
 
 	go func() {
 		defer HaltOnPanic()
 
 		// start underlying node
 		if err := ethNode.Start(); err != nil {
-			close(m.nodeStarted)
-			m.Lock()
-			m.nodeStarted = nil
-			m.Unlock()
+			m.closeNodeStarted()
+			m.setNodeStarted(nil)
+
 			signal.Send(signal.Envelope{
 				Type: signal.EventNodeCrashed,
 				Event: signal.NodeCrashEvent{
@@ -92,16 +100,15 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 			return
 		}
 
-		m.Lock()
-		m.node = ethNode
-		m.nodeStopped = make(chan struct{}, 1)
-		m.config = config
+		m.setNode(ethNode)
+		m.setNodeStopped(make(chan struct{}, 1))
+		m.setConfig(config)
 
 		// init RPC client for this node
-		m.rpcClient, err = rpc.NewClient(m.node, m.config.UpstreamConfig)
+		rpcClient, err := rpc.NewClient(m.getNode(), m.getUpstreamConfig())
 		if err != nil {
 			log.Error("Init RPC client failed:", "error", err)
-			m.Unlock()
+
 			signal.Send(signal.Envelope{
 				Type: signal.EventNodeCrashed,
 				Event: signal.NodeCrashEvent{
@@ -110,7 +117,8 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 			})
 			return
 		}
-		m.Unlock()
+
+		m.setRPCClient(rpcClient)
 
 		// underlying node is started, every method can use it, we use it immediately
 		go func() {
@@ -120,17 +128,19 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 		}()
 
 		// notify all subscribers that Status node is started
-		close(m.nodeStarted)
+		m.closeNodeStarted()
 		signal.Send(signal.Envelope{
 			Type:  signal.EventNodeStarted,
 			Event: struct{}{},
 		})
 
 		// wait up until underlying node is stopped
+		m.nodeLock.RLock()
 		m.node.Wait()
+		m.nodeLock.RUnlock()
 
 		// notify m.Stop() that node has been stopped
-		close(m.nodeStopped)
+		m.closeNodeStopped()
 		log.Info("Node is stopped")
 	}()
 
@@ -139,17 +149,15 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 
 // StopNode stop Status node. Stopped node cannot be resumed.
 func (m *NodeManager) StopNode() (<-chan struct{}, error) {
-	m.Lock()
-	defer m.Unlock()
-
 	if err := m.isNodeAvailable(); err != nil {
 		return nil, err
 	}
-	if m.nodeStopped == nil {
+
+	if m.nodeStoppedIsNil() {
 		return nil, ErrNoRunningNode
 	}
 
-	<-m.nodeStarted // make sure you operate on fully started node
+	m.readNodeStarted() // make sure you operate on fully started node
 
 	return m.stopNode()
 }
@@ -157,25 +165,20 @@ func (m *NodeManager) StopNode() (<-chan struct{}, error) {
 // stopNode stop Status node. Stopped node cannot be resumed.
 func (m *NodeManager) stopNode() (<-chan struct{}, error) {
 	// now attempt to stop
-	if err := m.node.Stop(); err != nil {
+	m.nodeLock.RLock()
+	err := m.node.Stop()
+	m.nodeLock.RUnlock()
+	if err != nil {
 		return nil, err
 	}
 
 	nodeStopped := make(chan struct{}, 1)
 	go func() {
-		<-m.nodeStopped // Status node is stopped (code after Wait() is executed)
+		m.readNodeStopped() // Status node is stopped (code after Wait() is executed)
 		log.Info("Ready to reset node")
 
 		// reset node params
-		m.Lock()
-		m.config = nil
-		m.lesService = nil
-		m.whisperService = nil
-		m.rpcClient = nil
-		m.nodeStarted = nil
-		m.node = nil
-		m.Unlock()
-
+		m.reset()
 		close(nodeStopped) // Status node is stopped, and we can create another
 		log.Info("Node manager resets node params")
 
@@ -192,54 +195,45 @@ func (m *NodeManager) stopNode() (<-chan struct{}, error) {
 
 // IsNodeRunning confirm that node is running
 func (m *NodeManager) IsNodeRunning() bool {
-	m.RLock()
-	defer m.RUnlock()
-
 	if err := m.isNodeAvailable(); err != nil {
 		return false
 	}
 
-	<-m.nodeStarted
+	m.readNodeStarted()
 
 	return true
 }
 
 // Node returns underlying Status node
 func (m *NodeManager) Node() (*node.Node, error) {
-	m.RLock()
-	defer m.RUnlock()
-
 	if err := m.isNodeAvailable(); err != nil {
 		return nil, err
 	}
 
-	<-m.nodeStarted
+	m.readNodeStarted()
 
-	return m.node, nil
+	return m.getNode(), nil
 }
 
 // PopulateStaticPeers connects current node with our publicly available LES/SHH/Swarm cluster
 func (m *NodeManager) PopulateStaticPeers() error {
-	m.RLock()
-	defer m.RUnlock()
-
 	if err := m.isNodeAvailable(); err != nil {
 		return err
 	}
 
-	<-m.nodeStarted
+	m.readNodeStarted()
 
 	return m.populateStaticPeers()
 }
 
 // populateStaticPeers connects current node with our publicly available LES/SHH/Swarm cluster
 func (m *NodeManager) populateStaticPeers() error {
-	if !m.config.BootClusterConfig.Enabled {
+	if !m.getBootClusterEnabled() {
 		log.Info("Boot cluster is disabled")
 		return nil
 	}
 
-	for _, enode := range m.config.BootClusterConfig.BootNodes {
+	for _, enode := range m.getBootNodes() {
 		err := m.addPeer(enode)
 		if err != nil {
 			log.Warn("Boot node addition failed", "error", err)
@@ -253,21 +247,20 @@ func (m *NodeManager) populateStaticPeers() error {
 
 // AddPeer adds new static peer node
 func (m *NodeManager) AddPeer(url string) error {
-	m.RLock()
-	defer m.RUnlock()
-
 	if err := m.isNodeAvailable(); err != nil {
 		return err
 	}
 
-	<-m.nodeStarted
+	m.readNodeStarted()
 
 	return m.addPeer(url)
 }
 
 // addPeer adds new static peer node
 func (m *NodeManager) addPeer(url string) error {
+	m.nodeLock.RLock()
 	server := m.node.Server()
+	m.nodeLock.RUnlock()
 	if server == nil {
 		return ErrNoRunningNode
 	}
@@ -285,14 +278,11 @@ func (m *NodeManager) addPeer(url string) error {
 // ResetChainData remove chain data from data directory.
 // Node is stopped, and new node is started, with clean data directory.
 func (m *NodeManager) ResetChainData() (<-chan struct{}, error) {
-	m.Lock()
-	defer m.Unlock()
-
 	if err := m.isNodeAvailable(); err != nil {
 		return nil, err
 	}
 
-	<-m.nodeStarted
+	m.readNodeStarted()
 
 	return m.resetChainData()
 }
@@ -300,15 +290,13 @@ func (m *NodeManager) ResetChainData() (<-chan struct{}, error) {
 // resetChainData remove chain data from data directory.
 // Node is stopped, and new node is started, with clean data directory.
 func (m *NodeManager) resetChainData() (<-chan struct{}, error) {
-	prevConfig := *m.config
+	prevConfig := m.getConfig()
 	nodeStopped, err := m.stopNode()
 	if err != nil {
 		return nil, err
 	}
 
-	m.Unlock()
 	<-nodeStopped
-	m.Lock()
 
 	chainDataDir := filepath.Join(prevConfig.DataDir, prevConfig.Name, "lightchaindata")
 	if _, err := os.Stat(chainDataDir); os.IsNotExist(err) {
@@ -324,71 +312,65 @@ func (m *NodeManager) resetChainData() (<-chan struct{}, error) {
 	})
 	log.Info("Chain data has been removed", "dir", chainDataDir)
 
-	return m.startNode(&prevConfig)
+	return m.startNode(prevConfig)
 }
 
 // RestartNode restart running Status node, fails if node is not running
 func (m *NodeManager) RestartNode() (<-chan struct{}, error) {
-	m.Lock()
-	defer m.Unlock()
-
 	if err := m.isNodeAvailable(); err != nil {
 		return nil, err
 	}
 
-	<-m.nodeStarted
+	m.readNodeStarted()
 
 	return m.restartNode()
 }
 
 // restartNode restart running Status node, fails if node is not running
 func (m *NodeManager) restartNode() (<-chan struct{}, error) {
-	prevConfig := *m.config
+	prevConfig := m.getConfig()
 	nodeStopped, err := m.stopNode()
 	if err != nil {
 		return nil, err
 	}
 
-	m.Unlock()
 	<-nodeStopped
-	m.Lock()
 
-	return m.startNode(&prevConfig)
+	return m.startNode(prevConfig)
 }
 
 // NodeConfig exposes reference to running node's configuration
 func (m *NodeManager) NodeConfig() (*params.NodeConfig, error) {
-	m.RLock()
-	defer m.RUnlock()
-
 	if err := m.isNodeAvailable(); err != nil {
 		return nil, err
 	}
 
-	<-m.nodeStarted
+	m.readNodeStarted()
 
 	return m.config, nil
 }
 
 // LightEthereumService exposes reference to LES service running on top of the node
 func (m *NodeManager) LightEthereumService() (*les.LightEthereum, error) {
-	m.RLock()
-	defer m.RUnlock()
-
 	if err := m.isNodeAvailable(); err != nil {
 		return nil, err
 	}
 
-	<-m.nodeStarted
+	m.readNodeStarted()
 
-	if m.lesService == nil {
-		if err := m.node.Service(&m.lesService); err != nil {
+	if m.lesServiceIsNil() {
+		les := m.getLesService()
+
+		m.nodeLock.RLock()
+		err := m.node.Service(&les)
+		m.nodeLock.RUnlock()
+		if err != nil {
 			log.Warn("Cannot obtain LES service", "error", err)
 			return nil, ErrInvalidLightEthereumService
 		}
 	}
 
-	if m.lesService == nil {
+	if m.lesServiceIsNil() {
 		return nil, ErrInvalidLightEthereumService
 	}
 
@@ -397,23 +379,24 @@ func (m *NodeManager) LightEthereumService() (*les.LightEthereum, error) {
 
 // WhisperService exposes reference to Whisper service running on top of the node
 func (m *NodeManager) WhisperService() (*whisper.Whisper, error) {
-	m.RLock()
-	defer m.RUnlock()
-
 	if err := m.isNodeAvailable(); err != nil {
 		return nil, err
 	}
 
-	<-m.nodeStarted
+	m.readNodeStarted()
 
-	if m.whisperService == nil {
-		if err := m.node.Service(&m.whisperService); err != nil {
+	if m.whisperServiceIsNil() {
+		whisperService := m.getWhisperService()
+		m.nodeLock.RLock()
+		err := m.node.Service(&whisperService)
+		m.nodeLock.RUnlock()
+		if err != nil {
 			log.Warn("Cannot obtain whisper service", "error", err)
 			return nil, ErrInvalidWhisperService
 		}
 	}
 
-	if m.whisperService == nil {
+	if m.getWhisperService() == nil {
 		return nil, ErrInvalidWhisperService
 	}
 
@@ -422,16 +405,15 @@ func (m *NodeManager) WhisperService() (*whisper.Whisper, error) {
 
 // AccountManager exposes reference to node's accounts manager
 func (m *NodeManager) AccountManager() (*accounts.Manager, error) {
-	m.RLock()
-	defer m.RUnlock()
-
 	if err := m.isNodeAvailable(); err != nil {
 		return nil, err
 	}
 
-	<-m.nodeStarted
+	m.readNodeStarted()
 
+	m.nodeLock.RLock()
 	accountManager := m.node.AccountManager()
+	m.nodeLock.RUnlock()
 	if accountManager == nil {
 		return nil, ErrInvalidAccountManager
 	}
@@ -441,16 +423,15 @@ func (m *NodeManager) AccountManager() (*accounts.Manager, error) {
 
 // AccountKeyStore exposes reference to accounts key store
 func (m *NodeManager) AccountKeyStore() (*keystore.KeyStore, error) {
-	m.RLock()
-	defer m.RUnlock()
-
 	if err := m.isNodeAvailable(); err != nil {
 		return nil, err
 	}
 
-	<-m.nodeStarted
+	m.readNodeStarted()
 
+	m.nodeLock.RLock()
 	accountManager := m.node.AccountManager()
+	m.nodeLock.RUnlock()
 	if accountManager == nil {
 		return nil, ErrInvalidAccountManager
 	}
@@ -470,10 +451,7 @@ func (m *NodeManager) AccountKeyStore() (*keystore.KeyStore, error) {
 
 // RPCClient exposes reference to RPC client connected to the running node.
 func (m *NodeManager) RPCClient() *rpc.Client {
-	m.Lock()
-	defer m.Unlock()
-
-	return m.rpcClient
+	return m.getRPCClient()
 }
 
 // initLog initializes global logger parameters based on
@@ -491,9 +469,210 @@ func (m *NodeManager) initLog(config *params.NodeConfig) {
 
 // isNodeAvailable check if we have a node running and make sure is fully started
 func (m *NodeManager) isNodeAvailable() error {
-	if m.nodeStarted == nil || m.node == nil {
+	if m.nodeStartedIsNil() || m.getNode() == nil {
 		return ErrNoRunningNode
 	}
 
 	return nil
+}
+
+//todo(@jeka): we should use copy generator
+func (m *NodeManager) reset() {
+	m.setConfig(nil)
+	m.setLesService(nil)
+	m.setWhisperService(nil)
+	m.setRPCClient(nil)
+	m.setNodeStarted(nil)
+	m.setNode(nil)
+}
+
+func (m *NodeManager) setConfig(config *params.NodeConfig) {
+	m.configLock.Lock()
+	m.config = config
+	m.configLock.Unlock()
+}
+
+func (m *NodeManager) getConfig() *params.NodeConfig {
+	m.configLock.RLock()
+	defer m.configLock.RUnlock()
+
+	if m.config == nil {
+		return nil
+	}
+
+	config := *m.config
+	return &config
+}
+
+func (m *NodeManager) getBootClusterEnabled() bool {
+	m.configLock.RLock()
+	bootCluster := m.config.BootClusterConfig.Enabled
+	m.configLock.RUnlock()
+
+	return bootCluster
+}
+
+func (m *NodeManager) getUpstreamConfig() params.UpstreamRPCConfig {
+	m.configLock.RLock()
+	upstreamConfig := m.config.UpstreamConfig
+	m.configLock.RUnlock()
+
+	return upstreamConfig
+}
+
+func (m *NodeManager) getBootNodes() []string {
+	m.configLock.RLock()
+	nodes := make([]string, len(m.config.BootClusterConfig.BootNodes))
+	copy(nodes, m.config.BootClusterConfig.BootNodes)
+	m.configLock.RUnlock()
+
+	return nodes
+}
+
+func (m *NodeManager) setNode(node *node.Node) {
+	m.nodeLock.Lock()
+	m.node = node
+	m.nodeLock.Unlock()
+}
+
+func (m *NodeManager) getNode() *node.Node {
+	m.nodeLock.RLock()
+	defer m.nodeLock.RUnlock()
+
+	if m.node == nil {
+		return nil
+	}
+
+	node := *m.node
+	return &node
+}
+
+func (m *NodeManager) setNodeStarted(nodeStarted chan struct{}) {
+	m.nodeStartedLock.Lock()
+	m.nodeStarted = nodeStarted
+	m.nodeStartedLock.Unlock()
+}
+
+func (m *NodeManager) nodeStartedIsNil() bool {
+	m.nodeStartedLock.RLock()
+	ok := m.nodeStarted == nil
+	m.nodeStartedLock.RUnlock()
+
+	return ok
+}
+
+func (m *NodeManager) readNodeStarted() {
+	m.nodeStartedLock.RLock()
+	<-m.nodeStarted
+	m.nodeStartedLock.RUnlock()
+}
+
+func (m *NodeManager) closeNodeStarted() {
+	m.nodeStartedLock.Lock()
+	close(m.nodeStarted)
+	m.nodeStartedLock.Unlock()
+}
+
+func (m *NodeManager) setNodeStopped(nodeStopped chan struct{}) {
+	m.nodeStoppedLock.Lock()
+	m.nodeStopped = nodeStopped
+	m.nodeStoppedLock.Unlock()
+}
+
+func (m *NodeManager) nodeStoppedIsNil() bool {
+	m.nodeStoppedLock.RLock()
+	ok := m.nodeStopped == nil
+	m.nodeStoppedLock.RUnlock()
+
+	return ok
+}
+
+func (m *NodeManager) readNodeStopped() {
+	m.nodeStoppedLock.RLock()
+	<-m.nodeStopped
+	m.nodeStoppedLock.RUnlock()
+}
+
+func (m *NodeManager) closeNodeStopped() {
+	m.nodeStoppedLock.Lock()
+	close(m.nodeStopped)
+	m.nodeStoppedLock.Unlock()
+}
+
+func (m *NodeManager) setWhisperService(whisper *whisper.Whisper) {
+	m.whisperServiceLock.Lock()
+	m.whisperService = whisper
+	m.whisperServiceLock.Unlock()
+}
+
+func (m *NodeManager) getWhisperService() *whisper.Whisper {
+	m.whisperServiceLock.RLock()
+	defer m.whisperServiceLock.RUnlock()
+
+	if m.whisperService == nil {
+		return nil
+	}
+
+	whisper := *m.whisperService
+	return &whisper
+}
+
+func (m *NodeManager) whisperServiceIsNil() bool {
+	m.whisperServiceLock.RLock()
+	ok := m.whisperService == nil
+	m.whisperServiceLock.RUnlock()
+
+	return ok
+}
+
+func (m *NodeManager) setLesService(les *les.LightEthereum) {
+	m.lesServiceLock.Lock()
+	m.lesService = les
+	m.lesServiceLock.Unlock()
+}
+
+func (m *NodeManager) getLesService() *les.LightEthereum {
+	m.lesServiceLock.RLock()
+	defer m.lesServiceLock.RUnlock()
+
+	if m.lesService == nil {
+		return nil
+	}
+
+	les := *m.lesService
+	return &les
+}
+
+func (m *NodeManager) lesServiceIsNil() bool {
+	m.lesServiceLock.RLock()
+	ok := m.lesService == nil
+	m.lesServiceLock.RUnlock()
+
+	return ok
+}
+
+func (m *NodeManager) setRPCClient(rpcClient *rpc.Client) {
+	m.rpcClientLock.Lock()
+	m.rpcClient = rpcClient
+	m.rpcClientLock.Unlock()
+}
+
+func (m *NodeManager) getRPCClient() *rpc.Client {
+	m.rpcClientLock.RLock()
+	defer m.rpcClientLock.RUnlock()
+
+	if m.rpcClient == nil {
+		return nil
+	}
+
+	rpcClient := *m.rpcClient
+	return &rpcClient
+}
+
+func (m *NodeManager) rpcClientIsNil() bool {
+	m.rpcClientLock.RLock()
+	ok := m.rpcClient == nil
+	m.rpcClientLock.RUnlock()
+
+	return ok
 }
