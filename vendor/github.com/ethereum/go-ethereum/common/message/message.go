@@ -13,12 +13,12 @@ const (
 	ExpiredStatus
 	ResendStatus
 	FutureStatus
+	RejectedStatus
+	DeliveredStatus
 	LowPowStatus
 	InvalidAESStatus
 	OversizedMessageStatus
 	OversizedVersionStatus
-	RejectedStatus
-	DeliveredStatus
 )
 
 // String returns the representation of giving state.
@@ -28,18 +28,20 @@ func (s Status) String() string {
 		return "Pending"
 	case QueuedStatus:
 		return "Queued"
+	case CachedStatus:
+		return "Cached"
 	case SentStatus:
 		return "Sent"
-	case RejectedStatus:
-		return "Rejected"
-	case DeliveredStatus:
-		return "Delivered"
 	case ExpiredStatus:
 		return "ExpiredTTL"
 	case ResendStatus:
 		return "Resend"
 	case FutureStatus:
 		return "FutureDelivery"
+	case RejectedStatus:
+		return "Rejected"
+	case DeliveredStatus:
+		return "Delivered"
 	case LowPowStatus:
 		return "LowPOWValue"
 	case InvalidAESStatus:
