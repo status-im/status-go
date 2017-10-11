@@ -11,32 +11,26 @@ import (
 )
 
 func TestFCMClientTestSuite(t *testing.T) {
-	suite.Run(t, new(FCMProviderTestSuite))
+	suite.Run(t, new(NotifierTestSuite))
 }
 
-type FCMProviderTestSuite struct {
+type NotifierTestSuite struct {
 	t.BaseTestSuite
 
 	fcmClientMock     *MockFirebaseClient
 	fcmClientMockCtrl *gomock.Controller
 }
 
-func (s *FCMProviderTestSuite) SetupTest() {
+func (s *NotifierTestSuite) SetupTest() {
 	s.fcmClientMockCtrl = gomock.NewController(s.T())
 	s.fcmClientMock = NewMockFirebaseClient(s.fcmClientMockCtrl)
 }
 
-func (s *FCMProviderTestSuite) TearDownTest() {
+func (s *NotifierTestSuite) TearDownTest() {
 	s.fcmClientMockCtrl.Finish()
 }
 
-func (s *FCMProviderTestSuite) TestNewFCMClient() {
-	fcmClient := Notifier{s.fcmClientMock}
-
-	s.Require().NotNil(fcmClient)
-}
-
-func (s *FCMProviderTestSuite) TestNotifySuccess() {
+func (s *NotifierTestSuite) TestNotifySuccess() {
 	fcmPayload := getPayload()
 	ids := []string{"1"}
 	body := interface{}("body")
@@ -48,12 +42,11 @@ func (s *FCMProviderTestSuite) TestNotifySuccess() {
 
 	err := fcmClient.Notify(body, ids...)
 
-	s.Require().NoError(err)
+	s.NoError(err)
 }
 
-func (s *FCMProviderTestSuite) TestNotifyError() {
+func (s *NotifierTestSuite) TestNotifyError() {
 	expectedError := errors.New("error")
-
 	fcmPayload := getPayload()
 	ids := []string{"1"}
 	body := interface{}("body")
@@ -65,7 +58,7 @@ func (s *FCMProviderTestSuite) TestNotifyError() {
 
 	err := fcmClient.Notify(body, ids...)
 
-	s.Require().Equal(expectedError, err)
+	s.Equal(expectedError, err)
 }
 
 func getPayload() *fcm.NotificationPayload {
