@@ -1,6 +1,7 @@
 package timers_test
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -106,7 +107,7 @@ func (s *TimersSuite) SetupTest() {
 	s.vm = vm.New(o)
 	s.loop = loop.New(s.vm)
 
-	go s.loop.Run()
+	go s.loop.Run(context.Background())
 
 	err := timers.Define(s.vm, s.loop)
 	s.NoError(err)
