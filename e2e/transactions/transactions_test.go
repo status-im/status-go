@@ -39,8 +39,8 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransaction() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	// Allow to sync the blockchain.
-	time.Sleep(TestConfig.Node.SyncSeconds * time.Second)
+	// allow to sync for some time
+	s.EnsureNodeSync()
 
 	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	s.NoError(err)
