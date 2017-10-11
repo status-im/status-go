@@ -1,6 +1,7 @@
 package accounts
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/status-im/status-go/e2e"
@@ -28,7 +29,7 @@ func (s *AccountsTestSuite) TestRPCEthAccounts() {
 	rpcClient := s.Backend.NodeManager().RPCClient()
 	s.NotNil(rpcClient)
 
-	expectedResponse := `{"jsonrpc":"2.0","id":1,"result":["` + TestConfig.Account1.Address + `"]}`
+	expectedResponse := `{"jsonrpc":"2.0","id":1,"result":["` + strings.ToLower(TestConfig.Account1.Address) + `"]}`
 	resp := rpcClient.CallRaw(`{
 		"jsonrpc": "2.0",
 		"id": 1,
@@ -52,7 +53,7 @@ func (s *AccountsTestSuite) TestRPCEthAccountsWithUpstream() {
 	rpcClient := s.Backend.NodeManager().RPCClient()
 	s.NotNil(rpcClient)
 
-	expectedResponse := `{"jsonrpc":"2.0","id":1,"result":["` + TestConfig.Account1.Address + `"]}`
+	expectedResponse := `{"jsonrpc":"2.0","id":1,"result":["` + strings.ToLower(TestConfig.Account1.Address) + `"]}`
 	resp := rpcClient.CallRaw(`{
     	"jsonrpc": "2.0",
     	"id": 1,

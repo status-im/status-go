@@ -13,7 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/e2e"
-	"github.com/status-im/status-go/geth/accounts"
+	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/signal"
@@ -173,7 +173,7 @@ func (s *TransactionsTestSuite) TestSendContractTx() {
 			)
 			s.EqualError(
 				err,
-				accounts.ErrNoAccountSelected.Error(),
+				account.ErrNoAccountSelected.Error(),
 				fmt.Sprintf("expected error on queued transaction[%v] not thrown", event["id"]),
 			)
 
@@ -264,7 +264,7 @@ func (s *TransactionsTestSuite) TestSendEtherTx() {
 			)
 			s.EqualError(
 				err,
-				accounts.ErrNoAccountSelected.Error(),
+				account.ErrNoAccountSelected.Error(),
 				fmt.Sprintf("expected error on queued transaction[%v] not thrown", event["id"]),
 			)
 

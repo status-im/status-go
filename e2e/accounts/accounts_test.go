@@ -48,7 +48,7 @@ func (s *AccountsTestSuite) TestAccountsList() {
 	accounts, err = s.Backend.AccountManager().Accounts()
 	s.NoError(err)
 	s.Equal(1, len(accounts), "exactly single account is expected (main account)")
-	s.Equal(string(accounts[0].Hex()), "0x"+address,
+	s.Equal(string(accounts[0].Hex()), address,
 		fmt.Sprintf("main account is not retured as the first key: got %s, expected %s", accounts[0].Hex(), "0x"+address))
 
 	// create sub-account 1
@@ -59,8 +59,8 @@ func (s *AccountsTestSuite) TestAccountsList() {
 	accounts, err = s.Backend.AccountManager().Accounts()
 	s.NoError(err)
 	s.Equal(2, len(accounts), "exactly 2 accounts are expected (main + sub-account 1)")
-	s.Equal(string(accounts[0].Hex()), "0x"+address, "main account is not retured as the first key")
-	s.Equal(string(accounts[1].Hex()), "0x"+subAccount1, "subAcount1 not returned")
+	s.Equal(string(accounts[0].Hex()), address, "main account is not retured as the first key")
+	s.Equal(string(accounts[1].Hex()), subAccount1, "subAcount1 not returned")
 
 	// create sub-account 2, index automatically progresses
 	subAccount2, subPubKey2, err := s.Backend.AccountManager().CreateChildAccount("", TestConfig.Account1.Password)
@@ -71,7 +71,7 @@ func (s *AccountsTestSuite) TestAccountsList() {
 	accounts, err = s.Backend.AccountManager().Accounts()
 	s.NoError(err)
 	s.Equal(3, len(accounts), "unexpected number of accounts")
-	s.Equal(string(accounts[0].Hex()), "0x"+address, "main account is not retured as the first key")
+	s.Equal(string(accounts[0].Hex()), address, "main account is not retured as the first key")
 
 	subAccount1MatchesKey1 := string(accounts[1].Hex()) != "0x"+subAccount1
 	subAccount1MatchesKey2 := string(accounts[2].Hex()) != "0x"+subAccount1
@@ -263,7 +263,7 @@ func (s *AccountsTestSuite) TestSelectedAccountOnRestart() {
 	selectedAccount, err = s.Backend.AccountManager().SelectedAccount()
 	s.NoError(err)
 	s.NotNil(selectedAccount)
-	s.Equal(selectedAccount.Address.Hex(), "0x"+address2, "incorrect address selected")
+	s.Equal(selectedAccount.Address.Hex(), address2, "incorrect address selected")
 
 	// resume node
 	nodeStarted, err := s.Backend.StartNode(&preservedNodeConfig)
@@ -274,7 +274,7 @@ func (s *AccountsTestSuite) TestSelectedAccountOnRestart() {
 	selectedAccount, err = s.Backend.AccountManager().SelectedAccount()
 	s.NoError(err)
 	s.NotNil(selectedAccount)
-	s.Equal(selectedAccount.Address.Hex(), "0x"+address2, "incorrect address selected")
+	s.Equal(selectedAccount.Address.Hex(), address2, "incorrect address selected")
 
 	// make sure that Whisper gets identity re-injected
 	whisperService = s.WhisperService()
