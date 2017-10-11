@@ -23,9 +23,9 @@ import (
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/signal"
-	. "github.com/status-im/status-go/geth/testing"
 	"github.com/status-im/status-go/geth/txqueue"
 	"github.com/status-im/status-go/static"
+	. "github.com/status-im/status-go/testing"
 	"github.com/stretchr/testify/require"
 )
 
@@ -197,6 +197,29 @@ func testGetDefaultConfig(t *testing.T) bool {
 	return true
 }
 
+// @TODO(adam): quarantined this test until it uses a different directory.
+func testResetChainData(t *testing.T) bool {
+	t.Skip()
+
+	resetChainDataResponse := common.APIResponse{}
+	rawResponse := ResetChainData()
+
+	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &resetChainDataResponse); err != nil {
+		t.Errorf("cannot decode ResetChainData response (%s): %v", C.GoString(rawResponse), err)
+		return false
+	}
+	if resetChainDataResponse.Error != "" {
+		t.Errorf("unexpected error: %s", resetChainDataResponse.Error)
+		return false
+	}
+
+	time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to re-sync blockchain
+
+	testCompleteTransaction(t)
+
+	return true
+}
+
 func testStopResumeNode(t *testing.T) bool {
 	// to make sure that we start with empty account (which might get populated during previous tests)
 	if err := statusAPI.Logout(); err != nil {
@@ -298,7 +321,7 @@ func testStopResumeNode(t *testing.T) bool {
 }
 
 func testCallRPC(t *testing.T) bool {
-	expected := `{"jsonrpc":"2.0","id":64,"result":"0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad"}` + "\n"
+	expected := `{"jsonrpc":"2.0","id":64,"result":"0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad"}`
 	rawResponse := CallRPC(C.CString(`{"jsonrpc":"2.0","method":"web3_sha3","params":["0x68656c6c6f20776f726c64"],"id":64}`))
 	received := C.GoString(rawResponse)
 	if expected != received {

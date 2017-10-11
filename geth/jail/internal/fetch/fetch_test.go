@@ -1,6 +1,7 @@
 package fetch_test
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -210,7 +211,7 @@ func (s *FetchSuite) SetupTest() {
 	s.vm = vm.New(o)
 	s.loop = loop.New(s.vm)
 
-	go s.loop.Run()
+	go s.loop.Run(context.Background())
 }
 
 func (s *FetchSuite) TearDownSuite() {

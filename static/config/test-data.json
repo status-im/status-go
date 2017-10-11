@@ -5,11 +5,11 @@
     "WSPort": 8646
   },
   "Account1": {
-    "Address": "0xadaf150b905cf5e6a778e553e15a139b6618bbb7",
+    "Address": "0xAdAf150b905Cf5E6A778E553E15A139B6618BbB7",
     "Password": "asdfasdf"
   },
   "Account2": {
-    "Address": "0x65c01586aa0ce152835c788ace665e91ab3527b8",
+    "Address": "0x65C01586aa0Ce152835c788aCe665e91Ab3527b8",
     "Password": "asdfasdf"
   }
 }

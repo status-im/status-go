@@ -9,7 +9,7 @@ import (
 
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/jail/console"
-	"github.com/status-im/status-go/geth/node"
+	"github.com/status-im/status-go/geth/signal"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -58,8 +58,7 @@ func (s *ConsoleTestSuite) TestObjectLogging() {
 
 	var customWriter bytes.Buffer
 
-	node.SetDefaultNodeNotificationHandler(func(event string) {
-
+	signal.SetDefaultNodeNotificationHandler(func(event string) {
 		var eventReceived struct {
 			Type  string `json:"type"`
 			Event []struct {

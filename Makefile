@@ -1,10 +1,38 @@
-.PHONY: statusgo all test xgo clean
+.PHONY: statusgo all test xgo clean help
 .PHONY: statusgo-android statusgo-ios
 
 GOBIN = build/bin
 GO ?= latest
 
-statusgo:
+# This is a code for automatic help generator.
+# It supports ANSI colors and categories.
+# To add new item into help output, simply add comments
+# starting with '##'. To add category, use @category.
+GREEN  := $(shell tput -Txterm setaf 2)
+WHITE  := $(shell tput -Txterm setaf 7)
+YELLOW := $(shell tput -Txterm setaf 3)
+RESET  := $(shell tput -Txterm sgr0)
+HELP_FUN = \
+		   %help; \
+		   while(<>) { push @{$$help{$$2 // 'options'}}, [$$1, $$3] if /^([a-zA-Z\-]+)\s*:.*\#\#(?:@([a-zA-Z\-]+))?\s(.*)$$/ }; \
+		   print "Usage: make [target]\n\n"; \
+		   for (sort keys %help) { \
+			   print "${WHITE}$$_:${RESET}\n"; \
+			   for (@{$$help{$$_}}) { \
+				   $$sep = " " x (32 - length $$_->[0]); \
+				   print "  ${YELLOW}$$_->[0]${RESET}$$sep${GREEN}$$_->[1]${RESET}\n"; \
+			   }; \
+			   print "\n"; \
+		   }
+
+help: ##@other Show this help
+	@perl -e '$(HELP_FUN)' $(MAKEFILE_LIST)
+
+# Main targets
+
+UNIT_TEST_PACKAGES := $(shell go list ./...  | grep -v /vendor | grep -v /e2e | grep -v /cmd)
+
+statusgo: ##@build Build status-go as statusd server
 	build/env.sh go build -i -o $(GOBIN)/statusd -v $(shell build/testnet-flags.sh) ./cmd/statusd
 	@echo "\nCompilation done.\nRun \"build/bin/statusd help\" to view available commands."
 
@@ -12,15 +40,15 @@ statusgo-cross: statusgo-android statusgo-ios
 	@echo "Full cross compilation done."
 	@ls -ld $(GOBIN)/statusgo-*
 
-statusgo-android: xgo
+statusgo-android: xgo ##@cross-compile Build status-go for Android
 	build/env.sh $(GOBIN)/xgo --image farazdagi/xgo --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=android-16/aar -v $(shell build/testnet-flags.sh) ./cmd/statusd
 	@echo "Android cross compilation done."
 
-statusgo-ios: xgo
+statusgo-ios: xgo	##@cross-compile Build status-go for iOS
 	build/env.sh $(GOBIN)/xgo --image farazdagi/xgo --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v $(shell build/testnet-flags.sh) ./cmd/statusd
 	@echo "iOS framework cross compilation done."
 
-statusgo-ios-simulator: xgo
+statusgo-ios-simulator: xgo	##@cross-compile Build status-go for iOS Simulator
 	@build/env.sh docker pull farazdagi/xgo-ios-simulator
 	build/env.sh $(GOBIN)/xgo --image farazdagi/xgo-ios-simulator --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v $(shell build/testnet-flags.sh) ./cmd/statusd
 	@echo "iOS framework cross compilation done."
@@ -46,16 +74,7 @@ statusgo-ios-simulator-mainnet: xgo
 	build/env.sh $(GOBIN)/xgo --image farazdagi/xgo-ios-simulator --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v $(shell build/mainnet-flags.sh) ./cmd/statusd
 	@echo "iOS framework cross compilation done (mainnet)."
 
-ci: mock
-	build/env.sh go test -timeout 40m -v ./geth/api/...
-	build/env.sh go test -timeout 40m -v ./geth/common
-	build/env.sh go test -timeout 40m -v ./geth/jail
-	build/env.sh go test -timeout 40m -v ./geth/node
-	build/env.sh go test -timeout 40m -v ./geth/params
-	build/env.sh go test -timeout 40m -v ./extkeys
-	build/env.sh go test -timeout 1m -v ./helpers/...
-
-generate:
+generate: ##@other Regenerate assets and other auto-generated stuff
 	cp ./node_modules/web3/dist/web3.js ./static/scripts/web3.js
 	build/env.sh go generate ./static
 	rm ./static/scripts/web3.js
@@ -67,7 +86,7 @@ lint-deps:
 lint-cur:
 	gometalinter --disable-all --enable=deadcode extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
 
-lint:
+lint: ##@tests Run meta linter on code
 	@echo "Linter: go vet\n--------------------"
 	@gometalinter --disable-all --enable=vet extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
 	@echo "Linter: go vet --shadow\n--------------------"
@@ -111,66 +130,31 @@ lint:
 	@echo "Linter: gosimple\n--------------------"
 	@gometalinter --disable-all --deadline 45s --enable=gosimple extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
 
-mock-install:
+mock-install: ##@other Install mocking tools
 	go get -u github.com/golang/mock/mockgen
 
-mock: mock-install
+mock: ##@other Regenerate mocks
 	mockgen -source=geth/common/types.go -destination=geth/common/types_mock.go -package=common
 
-test:
-	@build/env.sh echo "mode: set" > coverage-all.out
-	build/env.sh go test -coverprofile=coverage.out -covermode=set ./geth/api
-	@build/env.sh tail -n +2 coverage.out >> coverage-all.out
-	build/env.sh go test -coverprofile=coverage.out -covermode=set ./geth/common
-	@build/env.sh tail -n +2 coverage.out >> coverage-all.out
-	build/env.sh go test -coverprofile=coverage.out -covermode=set ./geth/jail
-	@build/env.sh tail -n +2 coverage.out >> coverage-all.out
-	build/env.sh go test -coverprofile=coverage.out -covermode=set ./geth/node
-	@build/env.sh tail -n +2 coverage.out >> coverage-all.out
-	build/env.sh go test -coverprofile=coverage.out -covermode=set ./geth/params
-	@build/env.sh tail -n +2 coverage.out >> coverage-all.out
-	build/env.sh go test -coverprofile=coverage.out -covermode=set ./extkeys
-	@build/env.sh tail -n +2 coverage.out >> coverage-all.out
-	build/env.sh go test -coverprofile=coverage.out -covermode=set ./cmd/statusd
-	@build/env.sh tail -n +2 coverage.out >> coverage-all.out
-	@build/env.sh go tool cover -html=coverage-all.out -o coverage.html
-	@build/env.sh go tool cover -func=coverage-all.out
+test: ##@tests Run unit and integration tests
+	build/env.sh go test $(UNIT_TEST_PACKAGES)
 
-test-api:
-	build/env.sh go test -v -coverprofile=coverage.out  -coverpkg=./geth/node ./geth/api
-	@build/env.sh go tool cover -html=coverage.out -o coverage.html
-	@build/env.sh go tool cover -func=coverage.out
+test-coverage: ##@tests Run unit and integration tests with covevare
+	build/env.sh go test -coverpkg= $(UNIT_TEST_PACKAGES)
 
-test-common:
-	build/env.sh go test -v -coverprofile=coverage.out ./geth/common
-	@build/env.sh go tool cover -html=coverage.out -o coverage.html
-	@build/env.sh go tool cover -func=coverage.out
+test-e2e: ##@tests Run e2e tests
+	# order: reliability then alphabetical
+	build/env.sh go test -timeout 1m ./e2e/accounts/...
+	build/env.sh go test -timeout 1m ./e2e/api/...
+	build/env.sh go test -timeout 1m ./e2e/node/...
+	build/env.sh go test -timeout 15m ./e2e/jail/...
+	build/env.sh go test -timeout 20m ./e2e/rpc/...
+	build/env.sh go test -timeout 10m ./e2e/whisper/...
+	build/env.sh go test -timeout 10m ./e2e/transactions/...
+	build/env.sh go test -timeout 10m ./cmd/statusd
 
-test-jail:
-	build/env.sh go test -v -coverprofile=coverage.out ./geth/jail
-	@build/env.sh go tool cover -html=coverage.out -o coverage.html
-	@build/env.sh go tool cover -func=coverage.out
+ci: mock-install mock test-coverage test-e2e ##@tests Run all tests in CI
 
-test-node:
-	build/env.sh go test -v -coverprofile=coverage.out ./geth/node
-	@build/env.sh go tool cover -html=coverage.out -o coverage.html
-	@build/env.sh go tool cover -func=coverage.out
-
-test-params:
-	build/env.sh go test -v -coverprofile=coverage.out ./geth/params
-	@build/env.sh go tool cover -html=coverage.out -o coverage.html
-	@build/env.sh go tool cover -func=coverage.out
-
-test-extkeys:
-	build/env.sh go test -v -coverprofile=coverage.out ./extkeys
-	@build/env.sh go tool cover -html=coverage.out -o coverage.html
-	@build/env.sh go tool cover -func=coverage.out
-
-test-cmd:
-	build/env.sh go test -v -coverprofile=coverage.out ./cmd/statusd
-	@build/env.sh go tool cover -html=coverage.out -o coverage.html
-	@build/env.sh go tool cover -func=coverage.out
-
-clean:
+clean: ##@other Cleanup
 	rm -fr build/bin/*
 	rm coverage.out coverage-all.out coverage.html

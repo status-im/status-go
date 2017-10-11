@@ -33,11 +33,12 @@ func NewStatusBackend() *StatusBackend {
 	nodeManager := node.NewNodeManager()
 	accountManager := account.NewManager(nodeManager)
 	txQueueManager := txqueue.NewManager(nodeManager, accountManager)
+	jailManager := jail.New(nodeManager)
 
 	return &StatusBackend{
 		nodeManager:    nodeManager,
 		accountManager: accountManager,
-		jailManager:    jail.New(nodeManager, accountManager, txQueueManager),
+		jailManager:    jailManager,
 		txQueueManager: txQueueManager,
 	}
 }
@@ -117,12 +118,13 @@ func (m *StatusBackend) StopNode() (<-chan struct{}, error) {
 	}
 	<-m.nodeReady
 
+	m.txQueueManager.Stop()
+	m.jailManager.Stop()
+
 	nodeStopped, err := m.nodeManager.StopNode()
 	if err != nil {
 		return nil, err
 	}
-
-	m.txQueueManager.Stop()
 
 	backendStopped := make(chan struct{}, 1)
 	go func() {

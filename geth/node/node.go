@@ -70,7 +70,7 @@ func MakeNode(config *params.NodeConfig) (*node.Node, error) {
 		return nil, ErrNodeMakeFailure
 	}
 
-	// start Ethereum service if we are not expected to use an upstream server.
+	// Start Ethereum service if we are not expected to use an upstream server.
 	if !config.UpstreamConfig.Enabled {
 		if err := activateEthService(stack, config); err != nil {
 			return nil, fmt.Errorf("%v: %v", ErrEthServiceRegistrationFailure, err)
@@ -164,7 +164,6 @@ func activateEthService(stack *node.Node, config *params.NodeConfig) error {
 	ethConf.SyncMode = downloader.LightSync
 	ethConf.NetworkId = config.NetworkID
 	ethConf.DatabaseCache = config.LightEthConfig.DatabaseCache
-	ethConf.MaxPeers = config.MaxPeers
 
 	if err := stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
 		lightEth, err := les.New(ctx, &ethConf)

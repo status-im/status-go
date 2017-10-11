@@ -69,3 +69,11 @@ func (vm *VM) CompileWithSourceMap(filename string, src, sm interface{}) (*otto.
 
 	return vm.vm.CompileWithSourceMap(filename, src, sm)
 }
+
+// ToValue will convert an interface{} value to a value digestible by otto/JavaScript.
+func (vm *VM) ToValue(value interface{}) (otto.Value, error) {
+	vm.Lock()
+	defer vm.Unlock()
+
+	return vm.vm.ToValue(value)
+}
