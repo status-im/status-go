@@ -1,7 +1,6 @@
 package node_test
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"math/rand"
@@ -195,37 +194,6 @@ func (s *ManagerTestSuite) TestReferences() {
 		s.NotNil(obj)
 		s.IsType(testCase.expectedType, obj)
 	}
-}
-
-func (s *ManagerTestSuite) TestNodeSyncPoll() {
-	require := s.Require()
-	require.NotNil(s.NodeManager)
-
-	nodeConfig, err := MakeTestNodeConfig(params.RopstenNetworkID)
-	require.NoError(err)
-
-	require.False(s.NodeManager.IsNodeRunning())
-	_, err = s.NodeManager.StopNode()
-	require.EqualError(err, node.ErrNoRunningNode.Error())
-
-	require.False(s.NodeManager.IsNodeRunning())
-	nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
-	require.NoError(err)
-
-	<-nodeStarted // wait till node is started
-	require.True(s.NodeManager.IsNodeRunning())
-
-	lightEth, err := s.NodeManager.LightEthereumService()
-	require.NoError(err)
-	require.NotNil(lightEth)
-
-	syncer := node.NewSyncPoll(lightEth)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
-	defer cancel()
-
-	err = syncer.Poll(ctx)
-	require.NoError(err)
 }
 
 func (s *ManagerTestSuite) TestNodeStartStop() {
