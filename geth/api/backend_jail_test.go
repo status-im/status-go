@@ -11,7 +11,6 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/whisper/delivery"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
@@ -131,15 +130,6 @@ func (s *BackendTestSuite) TestJailWhisper() {
 
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
-
-	deliveryService := s.WhisperDeliveryService()
-
-	var deliveryCount int
-	subId := deliveryService.Subscribe(func(msgState delivery.MessageDeliveryState) {
-		deliveryCount++
-		fmt.Printf("Message: %+q : %d\n", msgState.Status, deliveryCount)
-	})
-	defer deliveryService.Unsubscribe(subId)
 
 	jailInstance := s.backend.JailManager()
 	require.NotNil(jailInstance)

@@ -8,6 +8,9 @@ import (
 )
 
 // MessageDeliveryState holds the current delivery state of a envelope.
+// TODO(influx6): Consider adding a error object or string to provided context.
+// I believe an error object might be more suitable for status that denote failure
+// rejection.
 type MessageDeliveryState struct {
 	Status   message.Status
 	Envelope whisper.Envelope

@@ -116,6 +116,7 @@ func (fs *Filters) NotifyWatchers(env *Envelope, p2pMessage bool) {
 					log.Trace("processing message: failed to open", "message", env.Hash().Hex(), "filter", i)
 				}
 			} else {
+				fs.whisper.sendDelivery(env, message.RejectedStatus)
 				log.Trace("processing message: does not match", "message", env.Hash().Hex(), "filter", i)
 			}
 		}
