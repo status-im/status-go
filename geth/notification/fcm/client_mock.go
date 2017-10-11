@@ -10,43 +10,43 @@ import (
 	reflect "reflect"
 )
 
-// MockFirebaseClient is a mock of FirebaseClient interface
-type MockFirebaseClient struct {
+// MockfirebaseClient is a mock of firebaseClient interface
+type MockfirebaseClient struct {
 	ctrl     *gomock.Controller
-	recorder *MockFirebaseClientMockRecorder
+	recorder *MockfirebaseClientMockRecorder
 }
 
-// MockFirebaseClientMockRecorder is the mock recorder for MockFirebaseClient
-type MockFirebaseClientMockRecorder struct {
-	mock *MockFirebaseClient
+// MockfirebaseClientMockRecorder is the mock recorder for MockfirebaseClient
+type MockfirebaseClientMockRecorder struct {
+	mock *MockfirebaseClient
 }
 
-// NewMockFirebaseClient creates a new mock instance
-func NewMockFirebaseClient(ctrl *gomock.Controller) *MockFirebaseClient {
-	mock := &MockFirebaseClient{ctrl: ctrl}
-	mock.recorder = &MockFirebaseClientMockRecorder{mock}
+// NewMockfirebaseClient creates a new mock instance
+func NewMockfirebaseClient(ctrl *gomock.Controller) *MockfirebaseClient {
+	mock := &MockfirebaseClient{ctrl: ctrl}
+	mock.recorder = &MockfirebaseClientMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use
-func (m *MockFirebaseClient) EXPECT() *MockFirebaseClientMockRecorder {
+func (m *MockfirebaseClient) EXPECT() *MockfirebaseClientMockRecorder {
 	return m.recorder
 }
 
 // NewFcmRegIdsMsg mocks base method
-func (m *MockFirebaseClient) NewFcmRegIdsMsg(tokens []string, body interface{}) *go_fcm.FcmClient {
+func (m *MockfirebaseClient) NewFcmRegIdsMsg(tokens []string, body interface{}) *go_fcm.FcmClient {
 	ret := m.ctrl.Call(m, "NewFcmRegIdsMsg", tokens, body)
 	ret0, _ := ret[0].(*go_fcm.FcmClient)
 	return ret0
 }
 
 // NewFcmRegIdsMsg indicates an expected call of NewFcmRegIdsMsg
-func (mr *MockFirebaseClientMockRecorder) NewFcmRegIdsMsg(tokens, body interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewFcmRegIdsMsg", reflect.TypeOf((*MockFirebaseClient)(nil).NewFcmRegIdsMsg), tokens, body)
+func (mr *MockfirebaseClientMockRecorder) NewFcmRegIdsMsg(tokens, body interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewFcmRegIdsMsg", reflect.TypeOf((*MockfirebaseClient)(nil).NewFcmRegIdsMsg), tokens, body)
 }
 
 // Send mocks base method
-func (m *MockFirebaseClient) Send() (*go_fcm.FcmResponseStatus, error) {
+func (m *MockfirebaseClient) Send() (*go_fcm.FcmResponseStatus, error) {
 	ret := m.ctrl.Call(m, "Send")
 	ret0, _ := ret[0].(*go_fcm.FcmResponseStatus)
 	ret1, _ := ret[1].(error)
@@ -54,18 +54,18 @@ func (m *MockFirebaseClient) Send() (*go_fcm.FcmResponseStatus, error) {
 }
 
 // Send indicates an expected call of Send
-func (mr *MockFirebaseClientMockRecorder) Send() *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Send", reflect.TypeOf((*MockFirebaseClient)(nil).Send))
+func (mr *MockfirebaseClientMockRecorder) Send() *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Send", reflect.TypeOf((*MockfirebaseClient)(nil).Send))
 }
 
 // SetNotificationPayload mocks base method
-func (m *MockFirebaseClient) SetNotificationPayload(payload *go_fcm.NotificationPayload) *go_fcm.FcmClient {
+func (m *MockfirebaseClient) SetNotificationPayload(payload *go_fcm.NotificationPayload) *go_fcm.FcmClient {
 	ret := m.ctrl.Call(m, "SetNotificationPayload", payload)
 	ret0, _ := ret[0].(*go_fcm.FcmClient)
 	return ret0
 }
 
 // SetNotificationPayload indicates an expected call of SetNotificationPayload
-func (mr *MockFirebaseClientMockRecorder) SetNotificationPayload(payload interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetNotificationPayload", reflect.TypeOf((*MockFirebaseClient)(nil).SetNotificationPayload), payload)
+func (mr *MockfirebaseClientMockRecorder) SetNotificationPayload(payload interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetNotificationPayload", reflect.TypeOf((*MockfirebaseClient)(nil).SetNotificationPayload), payload)
 }

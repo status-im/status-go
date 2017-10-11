@@ -7,7 +7,7 @@ import (
 
 // Notifier represents messaging provider for notifications.
 type Notifier struct {
-	FirebaseClient
+	firebaseClient
 }
 
 // NewNotifier Firebase Cloud Messaging client constructor.
@@ -23,7 +23,7 @@ func (p *Notifier) Notify(body interface{}, tokens ...string) error {
 	})
 
 	p.setMessage(body, tokens...)
-	_, err := p.FirebaseClient.Send()
+	_, err := p.firebaseClient.Send()
 
 	return err
 }
