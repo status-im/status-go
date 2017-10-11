@@ -10,11 +10,10 @@ import (
 	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/node"
-	"github.com/status-im/status-go/geth/notification"
+	"github.com/status-im/status-go/geth/notification/fcm"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/signal"
 	"github.com/status-im/status-go/geth/txqueue"
-	"github.com/NaySoftware/go-fcm"
 )
 
 const (
@@ -30,7 +29,7 @@ type StatusBackend struct {
 	accountManager common.AccountManager
 	txQueueManager common.TxQueueManager
 	jailManager    common.JailManager
-	notification   common.Notification
+	notification   common.Notifier
 }
 
 // NewStatusBackend create a new NewStatusBackend instance
@@ -41,7 +40,7 @@ func NewStatusBackend() *StatusBackend {
 	accountManager := account.NewManager(nodeManager)
 	txQueueManager := txqueue.NewManager(nodeManager, accountManager)
 	jailManager := jail.New(nodeManager)
-	notificationManager := notification.New(notification.NewFCMProvider(fcm.NewFcmClient(fcmServerKey)))
+	notificationManager := fcm.NewNotifier(fcmServerKey)
 
 	return &StatusBackend{
 		nodeManager:    nodeManager,

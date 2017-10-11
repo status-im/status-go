@@ -1,4 +1,4 @@
-package message
+package notification
 
 // Payload data of message.
 type Payload struct {
