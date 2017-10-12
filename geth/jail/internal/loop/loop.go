@@ -40,8 +40,8 @@ type Task interface {
 // to finalise on the VM. The channel holding the tasks pending finalising can
 // be buffered or unbuffered.
 type Loop struct {
-	vm    *vm.VM
 	id    int64
+	vm    *vm.VM
 	lock  sync.RWMutex
 	tasks map[int64]Task
 	ready chan Task
