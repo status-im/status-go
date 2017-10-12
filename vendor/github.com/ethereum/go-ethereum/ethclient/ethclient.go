@@ -203,8 +203,6 @@ func (ec *Client) TransactionReceipt(ctx context.Context, txHash common.Hash) (*
 	if err == nil {
 		if r == nil {
 			return nil, ethereum.NotFound
-		} else if len(r.PostState) == 0 {
-			return nil, fmt.Errorf("server returned receipt without post state")
 		}
 	}
 	return r, err
@@ -257,6 +255,19 @@ func (ec *Client) SubscribeNewHead(ctx context.Context, ch chan<- *types.Header)
 }
 
 // State Access
+
+// NetworkID returns the network ID (also known as the chain ID) for this chain.
+func (ec *Client) NetworkID(ctx context.Context) (*big.Int, error) {
+	version := new(big.Int)
+	var ver string
+	if err := ec.c.CallContext(ctx, &ver, "net_version"); err != nil {
+		return nil, err
+	}
+	if _, ok := version.SetString(ver, 10); !ok {
+		return nil, fmt.Errorf("invalid net_version result %q", ver)
+	}
+	return version, nil
+}
 
 // BalanceAt returns the wei balance of the given account.
 // The block number can be nil, in which case the balance is taken from the latest known block.

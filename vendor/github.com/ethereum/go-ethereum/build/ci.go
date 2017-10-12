@@ -119,7 +119,8 @@ var (
 	// Distros for which packages are created.
 	// Note: vivid is unsupported because there is no golang-1.6 package for it.
 	// Note: wily is unsupported because it was officially deprecated on lanchpad.
-	debDistros = []string{"trusty", "xenial", "yakkety", "zesty"}
+	// Note: yakkety is unsupported because it was officially deprecated on lanchpad.
+	debDistros = []string{"trusty", "xenial", "zesty"}
 )
 
 var GOBIN, _ = filepath.Abs(filepath.Join("build", "bin"))
@@ -249,10 +250,7 @@ func goTool(subcmd string, args ...string) *exec.Cmd {
 }
 
 func goToolArch(arch string, subcmd string, args ...string) *exec.Cmd {
-	gocmd := filepath.Join(runtime.GOROOT(), "bin", "go")
-	cmd := exec.Command(gocmd, subcmd)
-	cmd.Args = append(cmd.Args, args...)
-
+	cmd := build.GoTool(subcmd, args...)
 	if subcmd == "build" || subcmd == "install" || subcmd == "test" {
 		// Go CGO has a Windows linker error prior to 1.8 (https://github.com/golang/go/issues/8756).
 		// Work around issue by allowing multiple definitions for <1.8 builds.

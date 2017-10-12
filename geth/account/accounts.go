@@ -1,8 +1,8 @@
 package account
 
 import (
-	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -148,20 +148,28 @@ func (m *Manager) RecoverAccount(password, mnemonic string) (address, pubKey str
 // If no error is returned, then account is considered verified.
 func (m *Manager) VerifyAccountPassword(keyStoreDir, address, password string) (*keystore.Key, error) {
 	var err error
-	var keyJSON []byte
+	var foundKeyFile []byte
 
 	addressObj := gethcommon.BytesToAddress(gethcommon.FromHex(address))
 	checkAccountKey := func(path string, fileInfo os.FileInfo) error {
-		if len(keyJSON) > 0 || fileInfo.IsDir() {
+		if len(foundKeyFile) > 0 || fileInfo.IsDir() {
 			return nil
 		}
 
-		keyJSON, err = ioutil.ReadFile(path)
+		rawKeyFile, err := ioutil.ReadFile(path)
 		if err != nil {
 			return fmt.Errorf("invalid account key file: %v", err)
 		}
-		if !bytes.Contains(keyJSON, []byte(fmt.Sprintf(`"address":"%s"`, addressObj.Hex()[2:]))) {
-			keyJSON = []byte{}
+
+		var accountKey struct {
+			Address string `json:"address"`
+		}
+		if err := json.Unmarshal(rawKeyFile, &accountKey); err != nil {
+			return fmt.Errorf("failed to read key file: %s", err)
+		}
+
+		if gethcommon.HexToAddress("0x"+accountKey.Address).Hex() == addressObj.Hex() {
+			foundKeyFile = rawKeyFile
 		}
 
 		return nil
@@ -177,18 +185,18 @@ func (m *Manager) VerifyAccountPassword(keyStoreDir, address, password string) (
 		return nil, fmt.Errorf("cannot traverse key store folder: %v", err)
 	}
 
-	if len(keyJSON) == 0 {
-		return nil, fmt.Errorf("cannot locate account for address: %x", addressObj)
+	if len(foundKeyFile) == 0 {
+		return nil, fmt.Errorf("cannot locate account for address: %s", addressObj.Hex())
 	}
 
-	key, err := keystore.DecryptKey(keyJSON, password)
+	key, err := keystore.DecryptKey(foundKeyFile, password)
 	if err != nil {
 		return nil, err
 	}
 
 	// avoid swap attack
 	if key.Address != addressObj {
-		return nil, fmt.Errorf("account mismatch: have %x, want %x", key.Address, addressObj)
+		return nil, fmt.Errorf("account mismatch: have %s, want %s", key.Address.Hex(), addressObj.Hex())
 	}
 
 	return key, nil
@@ -293,7 +301,7 @@ func (m *Manager) importExtendedKey(extKey *extkeys.ExtendedKey, password string
 	if err != nil {
 		return "", "", err
 	}
-	address = fmt.Sprintf("%x", account.Address)
+	address = account.Address.Hex()
 
 	// obtain public key to return
 	account, key, err := keyStore.AccountDecryptedKey(account, password)

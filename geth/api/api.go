@@ -147,14 +147,14 @@ func (api *StatusAPI) VerifyAccountPassword(keyStoreDir, address, password strin
 // all previous identities are removed).
 func (api *StatusAPI) SelectAccount(address, password string) error {
 	if account, err := api.b.AccountManager().SelectedAccount(); err == nil && account != nil {
-		api.b.jailManager.RemoveCells()
+		api.b.jailManager.Stop()
 	}
 	return api.b.AccountManager().SelectAccount(address, password)
 }
 
 // Logout clears whisper identities
 func (api *StatusAPI) Logout() error {
-	api.b.JailManager().RemoveCells()
+	api.b.JailManager().Stop()
 	return api.b.AccountManager().Logout()
 }
 

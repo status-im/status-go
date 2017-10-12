@@ -256,8 +256,8 @@ type JailCell interface {
 	Run(interface{}) (otto.Value, error)
 	// Call an arbitrary JS function by name and args.
 	Call(item string, this interface{}, args ...interface{}) (otto.Value, error)
-	// Stop sends command to stop the cell
-	Stop() chan struct{}
+	// Stop stops background execution of cell.
+	Stop()
 }
 
 // JailManager defines methods for managing jailed environments
@@ -278,8 +278,8 @@ type JailManager interface {
 	// BaseJS allows to setup initial JavaScript to be loaded on each jail.Parse()
 	BaseJS(js string)
 
-	// RemoveCells removes the cells after they are stopped
-	RemoveCells()
+	// Stop stops all background activity of jail
+	Stop()
 }
 
 // APIResponse generic response from API

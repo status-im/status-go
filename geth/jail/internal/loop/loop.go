@@ -1,6 +1,7 @@
 package loop
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -39,14 +40,11 @@ type Task interface {
 // to finalise on the VM. The channel holding the tasks pending finalising can
 // be buffered or unbuffered.
 type Loop struct {
-	vm          *vm.VM
-	id          int64
-	lock        sync.RWMutex
-	tasks       map[int64]Task
-	ready       chan Task
-	stopChan    chan struct{}
-	stoppedChan chan struct{}
-	stopped     bool
+	vm    *vm.VM
+	id    int64
+	lock  sync.RWMutex
+	tasks map[int64]Task
+	ready chan Task
 }
 
 // New creates a new Loop with an unbuffered ready queue on a specific VM.
@@ -58,12 +56,9 @@ func New(vm *vm.VM) *Loop {
 // queue, the capacity of which being specified by the backlog argument.
 func NewWithBacklog(vm *vm.VM, backlog int) *Loop {
 	return &Loop{
-		vm:          vm,
-		tasks:       make(map[int64]Task),
-		ready:       make(chan Task, backlog),
-		stopChan:    make(chan struct{}),
-		stoppedChan: make(chan struct{}),
-		stopped:     false,
+		vm:    vm,
+		tasks: make(map[int64]Task),
+		ready: make(chan Task, backlog),
 	}
 }
 
@@ -103,10 +98,6 @@ func (l *Loop) removeByID(id int64) {
 // Ready signals to the loop that a task is ready to be finalised. This might
 // block if the "ready channel" in the loop is at capacity.
 func (l *Loop) Ready(t Task) {
-	if l.stopped {
-		return
-	}
-
 	l.ready <- t
 }
 
@@ -140,14 +131,14 @@ func (l *Loop) processTask(t Task) error {
 
 // Run handles the task scheduling and finalisation.
 // It runs infinitely waiting for new tasks.
-func (l *Loop) Run() error {
-	defer close(l.stoppedChan)
+func (l *Loop) Run(ctx context.Context) error {
 	for {
 		select {
 		case t := <-l.ready:
 			if t == nil {
 				continue
 			}
+
 			err := l.processTask(t)
 			if err != nil {
 				// TODO(divan): do we need to report
@@ -156,25 +147,9 @@ func (l *Loop) Run() error {
 				// should keep running.
 				continue
 			}
-		case <-l.stopChan:
-			l.stop()
-			return nil
+		case <-ctx.Done():
+			return context.Canceled
 		}
 	}
 	return nil
-}
-
-//Stop initializes stopping
-func (l *Loop) Stop() chan struct{} {
-	close(l.stopChan)
-	return l.stoppedChan
-}
-
-//stop method stops tasks processing
-func (l *Loop) stop() {
-	l.lock.Lock()
-	l.tasks = make(map[int64]Task)
-	l.lock.Unlock()
-	l.stopped = true
-	close(l.ready)
 }

@@ -114,7 +114,13 @@ func (c CallTask) Cancel() {}
 // Execute calls the associated function (not necessarily in the given vm),
 // pushing the resultant return value and error (or nil) into the associated
 // channels. If the call results in an error, it will return that error.
-func (c CallTask) Execute(vm *otto.Otto, l *loop.Loop) error {
+func (c CallTask) Execute(vm *vm.VM, l *loop.Loop) error {
+	// vm is not used directly here, but underlying
+	// FunctionCall in CallTask likely does use it,
+	// so we must to guard it here
+	vm.Lock()
+	defer vm.Unlock()
+
 	v, err := c.Function.Call(otto.NullValue(), c.Args...)
 	c.Value <- v
 	c.Error <- err

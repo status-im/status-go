@@ -1,6 +1,7 @@
 package ethapi
 
 import (
+	"context"
 	"errors"
 	"math/big"
 
@@ -8,7 +9,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/les/status"
 	"github.com/ethereum/go-ethereum/log"
-	"golang.org/x/net/context"
 )
 
 // StatusBackend exposes Ethereum internals to support custom semantics in status-go bindings

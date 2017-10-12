@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/common"
@@ -14,43 +13,32 @@ import (
 	"github.com/status-im/status-go/static"
 )
 
-// FIXME(tiabc): Get rid of this global variable. Move it to a constructor or initialization.
-var web3JSCode = static.MustAsset("scripts/web3.js")
-
-// errors
 var (
+	// FIXME(tiabc): Get rid of this global variable. Move it to a constructor or initialization.
+	web3JSCode = static.MustAsset("scripts/web3.js")
+
 	ErrInvalidJail = errors.New("jail environment is not properly initialized")
 )
-
-const cellStoppingTimeoutMs = 5000
 
 // Jail represents jailed environment inside of which we hold multiple cells.
 // Each cell is a separate JavaScript VM.
 type Jail struct {
-	// FIXME(tiabc): This mutex handles cells field access and must be renamed appropriately: cellsMutex
-	sync.RWMutex
-	nodeManager    common.NodeManager
-	accountManager common.AccountManager
-	txQueueManager common.TxQueueManager
-	policy         *ExecutionPolicy
-	cells          map[string]*Cell // jail supports running many isolated instances of jailed runtime
-	baseJSCode     string           // JavaScript used to initialize all new cells with
+	nodeManager common.NodeManager
+	baseJSCode  string // JavaScript used to initialize all new cells with
+
+	cellsMx sync.RWMutex
+	cells   map[string]*Cell // jail supports running many isolated instances of jailed runtime
+
+	vm *vm.VM // vm for internal otto related tasks (see Send method)
 }
 
-// New returns new Jail environment with the associated NodeManager and
-// AccountManager.
-func New(
-	nodeManager common.NodeManager, accountManager common.AccountManager, txQueueManager common.TxQueueManager,
-) *Jail {
-	if nodeManager == nil || accountManager == nil || txQueueManager == nil {
-		panic("Jail is missing mandatory dependencies")
-	}
+// New returns new Jail environment with the associated NodeManager.
+// It's caller responsibility to call jail.Stop() when jail is not needed.
+func New(nodeManager common.NodeManager) *Jail {
 	return &Jail{
-		nodeManager:    nodeManager,
-		accountManager: accountManager,
-		txQueueManager: txQueueManager,
-		cells:          make(map[string]*Cell),
-		policy:         NewExecutionPolicy(nodeManager, accountManager, txQueueManager),
+		nodeManager: nodeManager,
+		cells:       make(map[string]*Cell),
+		vm:          vm.New(otto.New()),
 	}
 }
 
@@ -72,17 +60,28 @@ func (jail *Jail) NewCell(chatID string) (common.JailCell, error) {
 		return nil, err
 	}
 
-	jail.Lock()
+	jail.cellsMx.Lock()
 	jail.cells[chatID] = cell
-	jail.Unlock()
+	jail.cellsMx.Unlock()
 
 	return cell, nil
 }
 
+// Stop stops jail and all assosiacted cells.
+func (jail *Jail) Stop() {
+	jail.cellsMx.Lock()
+	defer jail.cellsMx.Unlock()
+
+	for _, cell := range jail.cells {
+		cell.Stop()
+	}
+	jail.cells = nil
+}
+
 // Cell returns the existing instance of Cell.
 func (jail *Jail) Cell(chatID string) (common.JailCell, error) {
-	jail.RLock()
-	defer jail.RUnlock()
+	jail.cellsMx.RLock()
+	defer jail.cellsMx.RUnlock()
 
 	cell, ok := jail.cells[chatID]
 	if !ok {
@@ -154,92 +153,38 @@ func (jail *Jail) Call(chatID, this, args string) string {
 	return makeResult(res.String(), err)
 }
 
-// Send will serialize the first argument, send it to the node and returns the response.
-// IMPORTANT: Don't use `call.Otto` in this function unless you want to run into race conditions. Use `vm` instead.
+// Send is a wrapper for executing RPC calls from within Otto VM.
+// It uses own jail's VM instance instead of cell's one to
+// increase safety of cell's vm usage.
+// TODO(divan): investigate if it's possible to do conversions
+// withouth involving otto code at all.
 // nolint: errcheck, unparam
-func (jail *Jail) Send(call otto.FunctionCall, vm *vm.VM) otto.Value {
-	reqVal, err := vm.Call("JSON.stringify", nil, call.Argument(0))
+func (jail *Jail) Send(call otto.FunctionCall) otto.Value {
+	request, err := jail.vm.Call("JSON.stringify", nil, call.Argument(0))
 	if err != nil {
 		throwJSException(err)
 	}
 
-	var (
-		rawReq = []byte(reqVal.String())
-		reqs   []common.RPCCall
-		batch  bool
-	)
-
-	if rawReq[0] == '[' {
-		batch = true
-		err = json.Unmarshal(rawReq, &reqs)
-	} else {
-		batch = false
-		reqs = make([]common.RPCCall, 1)
-		err = json.Unmarshal(rawReq, &reqs[0])
+	rpc := jail.nodeManager.RPCClient()
+	// TODO(divan): remove this check as soon as jail cells have
+	// proper cancellation mechanism implemented.
+	if rpc == nil {
+		throwJSException(fmt.Errorf("Error getting RPC client. Node stopped?"))
 	}
+	response := rpc.CallRaw(request.String())
+
+	// unmarshal response to pass to otto
+	var resp interface{}
+	err = json.Unmarshal([]byte(response), &resp)
 	if err != nil {
-		throwJSException(fmt.Errorf("can't unmarshal %v (batch=%v): %s", string(rawReq), batch, err))
+		throwJSException(fmt.Errorf("Error unmarshalling result: %s", err))
 	}
-
-	resps, err := vm.Call("new Array", nil)
+	respValue, err := jail.vm.ToValue(resp)
 	if err != nil {
-		throwJSException(fmt.Errorf("can't create Array: %s", err))
+		throwJSException(fmt.Errorf("Error converting result to Otto's value: %s", err))
 	}
 
-	// Execute the requests.
-	for _, req := range reqs {
-		log.Info("execute request", "method", req.Method)
-		res, err := jail.policy.Execute(req, vm)
-		if err != nil {
-			log.Info("request errored", "error", err.Error())
-			switch err.(type) {
-			case common.StopRPCCallError:
-				return newErrorResponseOtto(vm, err.Error(), nil)
-			default:
-				res = newErrorResponse(err.Error(), &req.ID)
-			}
-		}
-
-		_, err = resps.Object().Call("push", res)
-		if err != nil {
-			throwJSException(fmt.Errorf("can't push result: %s", err))
-		}
-	}
-
-	// Return the responses either to the callback (if supplied)
-	// or directly as the return value.
-	if batch {
-		return resps
-	}
-	v, err := resps.Object().Get("0")
-	if err != nil {
-		throwJSException(err)
-	}
-	return v
-}
-
-func (jail *Jail) RemoveCells() {
-	jail.stopCellsSync()
-	jail.cells = make(map[string]*Cell)
-}
-
-func (jail *Jail) stopCellsSync() {
-	var wg sync.WaitGroup
-
-	for _, cell := range jail.cells {
-		wg.Add(1)
-		go func(cell *Cell) {
-			defer wg.Done()
-			select {
-			case <-cell.Stop():
-				return
-			case <-time.After(cellStoppingTimeoutMs * time.Millisecond):
-				log.Warn("Cell Stopping timeout")
-				return
-			}
-		}(cell)
-	}
-	wg.Wait()
+	return respValue
 }
 
 func newErrorResponse(msg string, id interface{}) map[string]interface{} {
