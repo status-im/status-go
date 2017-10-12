@@ -6,7 +6,6 @@ import (
 
 	"github.com/NaySoftware/go-fcm"
 	"github.com/golang/mock/gomock"
-	t "github.com/status-im/status-go/geth/testing"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -15,7 +14,7 @@ func TestFCMClientTestSuite(t *testing.T) {
 }
 
 type NotifierTestSuite struct {
-	t.BaseTestSuite
+	suite.Suite
 
 	fcmClientMock     *MockfirebaseClient
 	fcmClientMockCtrl *gomock.Controller
