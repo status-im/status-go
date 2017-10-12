@@ -13,7 +13,7 @@ import (
 
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
-	. "github.com/status-im/status-go/geth/testing"
+	. "github.com/status-im/status-go/testing"
 )
 
 var errTxAssumedSent = errors.New("assume tx is done")

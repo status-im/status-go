@@ -1,4 +1,4 @@
-package rpc_test
+package rpc
 
 import (
 	"context"
@@ -9,10 +9,9 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/status-im/status-go/e2e"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
-	"github.com/status-im/status-go/geth/rpc"
-	. "github.com/status-im/status-go/geth/testing"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -36,100 +35,18 @@ func TestRPCTestSuite(t *testing.T) {
 }
 
 type RPCTestSuite struct {
-	BaseTestSuite
+	e2e.NodeManagerTestSuite
 }
 
 func (s *RPCTestSuite) SetupTest() {
-	require := s.Require()
-
-	nodeManager := node.NewNodeManager()
-	require.NotNil(nodeManager)
-	s.NodeManager = nodeManager
-}
-
-func (s *RPCTestSuite) TestNewClient() {
-	require := s.Require()
-
-	config, err := MakeTestNodeConfig(params.RinkebyNetworkID)
-	require.NoError(err)
-
-	nodeStarted, err := s.NodeManager.StartNode(config)
-	require.NoError(err)
-	require.NotNil(config)
-
-	<-nodeStarted
-
-	node, err := s.NodeManager.Node()
-	require.NoError(err)
-
-	// upstream disabled, local node ok
-	_, err = rpc.NewClient(node, config.UpstreamConfig)
-	require.NoError(err)
-
-	// upstream enabled with incorrect URL, local node ok
-	upstreamBad := config.UpstreamConfig
-	upstreamBad.Enabled = true
-	upstreamBad.URL = "///__httphh://///incorrect_urlxxx"
-	_, err = rpc.NewClient(node, upstreamBad)
-	require.NotNil(err)
-
-	// upstream enabled with correct URL, local node ok
-	upstreamGood := config.UpstreamConfig
-	upstreamGood.Enabled = true
-	upstreamGood.URL = "http://example.com/rpc"
-	_, err = rpc.NewClient(node, upstreamGood)
-	require.Nil(err)
-
-	// upstream disabled, local node failed (stopped)
-	nodeStopped, err := s.NodeManager.StopNode()
-	require.NoError(err)
-
-	<-nodeStopped
-
-	_, err = rpc.NewClient(node, config.UpstreamConfig)
-	require.NotNil(err)
-}
-
-func (s *RPCTestSuite) TestRPCClientHandler() {
-	require := s.Require()
-
-	s.StartTestNode(params.RopstenNetworkID)
-	defer s.StopTestNode()
-
-	rpcClient := s.NodeManager.RPCClient()
-	require.NotNil(rpcClient)
-
-	rpcClient.RegisterHandler("eth_sendTransaction", func(ctx context.Context, args ...interface{}) (interface{}, error) {
-		return map[string]interface{}{"done": true}, nil
-	})
-
-	response := rpcClient.CallRaw(`{
-		"jsonrpc": "2.0",
-		"id":10,
-		"method": "eth_sendTransaction",
-		"params": [{
-			"from":     "` + TestConfig.Account1.Address + `",
-			"to":       "` + TestConfig.Account2.Address + `",
-			"value":    "0x200",
-			"nonce":    "0x100",
-			"data":     "` + hexutil.Encode([]byte("Will-power")) + `",
-			"gasPrice": "0x4a817c800",
-			"gasLimit": "0x5208",
-			"chainId":  3391
-		}]
-	}`)
-	require.Equal(`{"jsonrpc":"2.0","id":10,"result":{"done":true}}`, response)
+	s.NodeManager = node.NewNodeManager()
+	s.NotNil(s.NodeManager)
 }
 
 func (s *RPCTestSuite) TestCallRPC() {
-	require := s.Require()
-	require.NotNil(s.NodeManager)
-
 	for _, upstreamEnabled := range []bool{false, true} {
-		s.T().Logf("TestCallRPC with upstream: %t", upstreamEnabled)
-
-		nodeConfig, err := MakeTestNodeConfig(params.RinkebyNetworkID)
-		require.NoError(err)
+		nodeConfig, err := e2e.MakeTestNodeConfig(params.RinkebyNetworkID)
+		s.NoError(err)
 
 		nodeConfig.IPCEnabled = false
 		nodeConfig.WSEnabled = false
@@ -141,12 +58,11 @@ func (s *RPCTestSuite) TestCallRPC() {
 		}
 
 		nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
-		require.NoError(err)
-
+		s.NoError(err)
 		<-nodeStarted
 
 		rpcClient := s.NodeManager.RPCClient()
-		require.NotNil(rpcClient)
+		s.NotNil(rpcClient)
 
 		type rpcCall struct {
 			inputJSON string
@@ -208,47 +124,51 @@ func (s *RPCTestSuite) TestCallRPC() {
 
 		select {
 		case <-time.After(time.Second * 30):
-			s.NodeManager.StopNode()
-			s.FailNow("test timed out")
+			s.Fail("test timed out")
 		case <-done:
-			s.NodeManager.StopNode()
 		}
+
+		stoppedNode, err := s.NodeManager.StopNode()
+		s.NoError(err)
+		<-stoppedNode
 	}
 }
 
 // TestCallRawResult checks if returned response is a valid JSON-RPC response.
 func (s *RPCTestSuite) TestCallRawResult() {
-	nodeConfig, err := MakeTestNodeConfig(params.RopstenNetworkID)
+	nodeConfig, err := e2e.MakeTestNodeConfig(params.RopstenNetworkID)
 	s.NoError(err)
 
 	nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
 	s.NoError(err)
-	defer s.NodeManager.StopNode()
-
 	<-nodeStarted
 
 	client := s.NodeManager.RPCClient()
+	s.NotNil(client)
 
 	jsonResult := client.CallRaw(`{"jsonrpc":"2.0","method":"shh_version","params":[],"id":67}`)
 	s.Equal(`{"jsonrpc":"2.0","id":67,"result":"5.0"}`, jsonResult)
+
+	s.NodeManager.StopNode()
 }
 
 // TestCallContextResult checks if result passed to CallContext
 // is set accordingly to its underlying memory layout.
 func (s *RPCTestSuite) TestCallContextResult() {
-	nodeConfig, err := MakeTestNodeConfig(params.RopstenNetworkID)
-	s.NoError(err)
-
-	nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
-	s.NoError(err)
-	defer s.NodeManager.StopNode()
-
-	<-nodeStarted
+	s.StartTestNode(
+		params.RopstenNetworkID,
+		e2e.WithUpstream("https://ropsten.infura.io/nKmXgiFgc2KqtoQ8BCGJ"),
+	)
+	defer s.StopTestNode()
 
 	client := s.NodeManager.RPCClient()
+	s.NotNil(client)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
 
 	var blockNumber hexutil.Uint
-	err = client.CallContext(context.Background(), &blockNumber, "eth_blockNumber")
+	err := client.CallContext(ctx, &blockNumber, "eth_blockNumber")
 	s.NoError(err)
 	s.True(blockNumber > 0, "blockNumber should be higher than 0")
 }

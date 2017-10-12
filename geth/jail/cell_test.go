@@ -6,40 +6,30 @@ import (
 	"time"
 
 	"github.com/robertkrimen/otto"
+	"github.com/status-im/status-go/geth/jail"
+	"github.com/status-im/status-go/static"
+	"github.com/stretchr/testify/suite"
 )
 
-func (s *JailTestSuite) TestJailTimeoutFailure() {
-	require := s.Require()
+const (
+	testChatID = "testChat"
+)
 
-	cell, err := s.jail.NewCell(testChatID)
-	require.NoError(err)
-	require.NotNil(cell)
-	defer cell.Stop()
+var (
+	baseStatusJSCode = string(static.MustAsset("testdata/jail/status.js"))
+)
 
-	// Attempt to run a timeout string against a Cell.
-	_, err = cell.Run(`
-		var timerCounts = 0;
- 		setTimeout(function(n){		
- 			if (Date.now() - n < 50) {
- 				throw new Error("Timed out");
- 			}
-
-			timerCounts++;
- 		}, 30, Date.now());
- 	`)
-	require.NoError(err)
-
-	// wait at least 10x longer to decrease probability
-	// of false negatives as we using real clock here
-	time.Sleep(300 * time.Millisecond)
-
-	value, err := cell.Get("timerCounts")
-	require.NoError(err)
-	require.True(value.IsNumber())
-	require.Equal("0", value.String())
+type CellTestSuite struct {
+	suite.Suite
+	jail *jail.Jail
 }
 
-func (s *JailTestSuite) TestJailTimeout() {
+func (s *CellTestSuite) SetupTest() {
+	s.jail = jail.New(nil)
+	s.NotNil(s.jail)
+}
+
+func (s *CellTestSuite) TestJailTimeout() {
 	require := s.Require()
 
 	cell, err := s.jail.NewCell(testChatID)
@@ -50,7 +40,7 @@ func (s *JailTestSuite) TestJailTimeout() {
 	// Attempt to run a timeout string against a Cell.
 	_, err = cell.Run(`
 		var timerCounts = 0;
- 		setTimeout(function(n){		
+ 		setTimeout(function(n){
  			if (Date.now() - n < 50) {
  				throw new Error("Timed out");
  			}
@@ -70,7 +60,7 @@ func (s *JailTestSuite) TestJailTimeout() {
 	require.Equal("1", value.String())
 }
 
-func (s *JailTestSuite) TestJailLoopInCall() {
+func (s *CellTestSuite) TestJailLoopInCall() {
 	require := s.Require()
 
 	// load Status JS and add test command to it
@@ -113,7 +103,7 @@ func (s *JailTestSuite) TestJailLoopInCall() {
 
 // TestJailLoopRace tests multiple setTimeout callbacks,
 // supposed to be run with '-race' flag.
-func (s *JailTestSuite) TestJailLoopRace() {
+func (s *CellTestSuite) TestJailLoopRace() {
 	require := s.Require()
 
 	cell, err := s.jail.NewCell(testChatID)
@@ -152,7 +142,7 @@ func (s *JailTestSuite) TestJailLoopRace() {
 	}
 }
 
-func (s *JailTestSuite) TestJailFetchPromise() {
+func (s *CellTestSuite) TestJailFetchPromise() {
 	body := `{"key": "value"}`
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Content-Type", "application/json")
@@ -196,7 +186,7 @@ func (s *JailTestSuite) TestJailFetchPromise() {
 	}
 }
 
-func (s *JailTestSuite) TestJailFetchCatch() {
+func (s *CellTestSuite) TestJailFetchCatch() {
 	require := s.Require()
 
 	cell, err := s.jail.NewCell(testChatID)
@@ -239,7 +229,7 @@ func (s *JailTestSuite) TestJailFetchCatch() {
 
 // TestJailFetchRace tests multiple fetch callbacks,
 // supposed to be run with '-race' flag.
-func (s *JailTestSuite) TestJailFetchRace() {
+func (s *CellTestSuite) TestJailFetchRace() {
 	body := `{"key": "value"}`
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Content-Type", "application/json")
@@ -302,7 +292,7 @@ func (s *JailTestSuite) TestJailFetchRace() {
 
 // TestJailLoopCancel tests that cell.Stop() really cancels event
 // loop and pending tasks.
-func (s *JailTestSuite) TestJailLoopCancel() {
+func (s *CellTestSuite) TestJailLoopCancel() {
 	require := s.Require()
 
 	// load Status JS and add test command to it

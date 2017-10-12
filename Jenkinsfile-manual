@@ -50,22 +50,14 @@ node('linux') {
 
         parallel (
             'statusgo-android': {
-                if (env.platform == 'android') {
-                    sh 'make statusgo-android'
-                } else {
-                    print 'Skipping Android'
-                }
+                sh 'make statusgo-android'
             },
             'statusgo-ios-simulator': {
-                if (env.platform == 'ios-simulator') {
-                    sh '''
-                        make statusgo-ios-simulator
-                        cd build/bin/statusgo-ios-9.3-framework/
-                        zip -r status-go-ios.zip Statusgo.framework
-                    '''
-                } else {
-                    print 'Skipping ios-simulator'
-                }
+                sh '''
+                    make statusgo-ios-simulator
+                    cd build/bin/statusgo-ios-9.3-framework/
+                    zip -r status-go-ios.zip Statusgo.framework
+                '''
             }
         )
     }
