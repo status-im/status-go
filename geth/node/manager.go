@@ -127,6 +127,7 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 
 		// notify all subscribers that Status node is started
 		m.closeNodeStarted()
+		m.setStarted()
 		signal.Send(signal.Envelope{
 			Type:  signal.EventNodeStarted,
 			Event: struct{}{},
@@ -176,8 +177,6 @@ func (m *NodeManager) StopNode() (<-chan struct{}, error) {
 		return nil, err
 	}
 
-	m.readNodeStarted() // make sure you operate on fully started node
-
 	return m.stopNode()
 }
 
@@ -215,8 +214,6 @@ func (m *NodeManager) IsNodeRunning() bool {
 		return false
 	}
 
-	m.readNodeStarted()
-
 	return true
 }
 
@@ -226,8 +223,6 @@ func (m *NodeManager) Node() (*node.Node, error) {
 		return nil, err
 	}
 
-	m.readNodeStarted()
-
 	return m.getNode(), nil
 }
 
@@ -236,8 +231,6 @@ func (m *NodeManager) PopulateStaticPeers() error {
 	if err := m.isNodeAvailable(); err != nil {
 		return err
 	}
-
-	m.readNodeStarted()
 
 	return m.populateStaticPeers()
 }
@@ -267,8 +260,6 @@ func (m *NodeManager) AddPeer(url string) error {
 		return err
 	}
 
-	m.readNodeStarted()
-
 	return m.addPeer(url)
 }
 
@@ -297,8 +288,6 @@ func (m *NodeManager) ResetChainData() (<-chan struct{}, error) {
 	if err := m.isNodeAvailable(); err != nil {
 		return nil, err
 	}
-
-	m.readNodeStarted()
 
 	return m.resetChainData()
 }
@@ -339,8 +328,6 @@ func (m *NodeManager) RestartNode() (<-chan struct{}, error) {
 		return nil, err
 	}
 
-	m.readNodeStarted()
-
 	return m.restartNode()
 }
 
@@ -363,8 +350,6 @@ func (m *NodeManager) NodeConfig() (*params.NodeConfig, error) {
 		return nil, err
 	}
 
-	m.readNodeStarted()
-
 	return m.config, nil
 }
 
@@ -373,8 +358,6 @@ func (m *NodeManager) LightEthereumService() (*les.LightEthereum, error) {
 	if err := m.isNodeAvailable(); err != nil {
 		return nil, err
 	}
-
-	m.readNodeStarted()
 
 	// todo(@jeka): why we can get nil les service? where do we init a les service?
 	if m.lesServiceIsNil() {
@@ -402,8 +385,6 @@ func (m *NodeManager) WhisperService() (*whisper.Whisper, error) {
 		return nil, err
 	}
 
-	m.readNodeStarted()
-
 	// todo(@jeka): why we can get nil whisper service? where do we init a whisper service?
 	if m.whisperServiceIsNil() {
 		whisperService := m.getWhisperService()
@@ -430,8 +411,6 @@ func (m *NodeManager) AccountManager() (*accounts.Manager, error) {
 		return nil, err
 	}
 
-	m.readNodeStarted()
-
 	m.nodeLock.Lock()
 	accountManager := m.node.AccountManager()
 	m.nodeLock.Unlock()
@@ -448,8 +427,6 @@ func (m *NodeManager) AccountKeyStore() (*keystore.KeyStore, error) {
 	if err := m.isNodeAvailable(); err != nil {
 		return nil, err
 	}
-
-	m.readNodeStarted()
 
 	m.nodeLock.Lock()
 	accountManager := m.node.AccountManager()
@@ -492,9 +469,10 @@ func (m *NodeManager) initLog(config *params.NodeConfig) {
 	}
 }
 
+// todo(@jeka): may be we need Wait flag for it to wait until node started
 // isNodeAvailable check if we have a node running and make sure is fully started
 func (m *NodeManager) isNodeAvailable() error {
-	if m.isNodeStarted() {
+	if !m.isNodeStarted() {
 		return ErrNoRunningNode
 	}
 
@@ -514,17 +492,6 @@ func (m *NodeManager) isNodeStarted() bool {
 }
 
 //todo(@jeka): we should use copy generator
-
-//todo(@jeka): remove
-func (m *NodeManager) reset() {
-	m.setConfig(nil)
-	m.setLesService(nil)
-	m.setWhisperService(nil)
-	m.setRPCClient(nil)
-	m.setNodeStarted(nil)
-	m.setNode(nil)
-}
-
 func (m *NodeManager) setConfig(config *params.NodeConfig) {
 	m.configLock.Lock()
 	m.config = config
@@ -603,13 +570,6 @@ func (m *NodeManager) nodeStartedIsNil() bool {
 	return ok
 }
 
-func (m *NodeManager) getNodeStopped() chan struct{} {
-	m.nodeStoppedLock.RLock()
-	defer m.nodeStoppedLock.RUnlock()
-
-	return m.nodeStopped
-}
-
 func (m *NodeManager) readNodeStarted() {
 	m.nodeStartedLock.RLock()
 	<-m.nodeStarted
@@ -620,6 +580,13 @@ func (m *NodeManager) closeNodeStarted() {
 	m.nodeStartedLock.Lock()
 	close(m.nodeStarted)
 	m.nodeStartedLock.Unlock()
+}
+
+func (m *NodeManager) getNodeStopped() chan struct{} {
+	m.nodeStoppedLock.RLock()
+	defer m.nodeStoppedLock.RUnlock()
+
+	return m.nodeStopped
 }
 
 func (m *NodeManager) setNodeStopped(nodeStopped chan struct{}) {
