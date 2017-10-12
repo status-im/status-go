@@ -29,7 +29,7 @@ type StatusBackend struct {
 	accountManager common.AccountManager
 	txQueueManager common.TxQueueManager
 	jailManager    common.JailManager
-	notification   common.Notifier
+	notifier       common.NotifierConstructor
 }
 
 // NewStatusBackend create a new NewStatusBackend instance
@@ -47,7 +47,7 @@ func NewStatusBackend() *StatusBackend {
 		accountManager: accountManager,
 		jailManager:    jailManager,
 		txQueueManager: txQueueManager,
-		notification:   notificationManager,
+		notifier:       notificationManager,
 	}
 }
 

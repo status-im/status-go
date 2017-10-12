@@ -376,6 +376,25 @@ func makeJSONResponse(err error) *C.char {
 // Notify sends push notification by given token
 //export Notify
 func Notify(token *C.char) *C.char {
-	res := statusAPI.Notify(C.GoString(token))
-	return C.CString(res)
+	err := statusAPI.Notify(C.GoString(token))
+
+	res := true
+	errString := ""
+	if err != nil {
+		res = false
+		errString = err.Error()
+	}
+
+	out := common.NotifyResult{
+		Status: res,
+		Error:  errString,
+	}
+
+	outBytes, err := json.Marshal(&out)
+	if err != nil {
+		log.Error("failed to marshal Notify output", "error", err.Error())
+		return makeJSONResponse(err)
+	}
+
+	return C.CString(string(outBytes))
 }

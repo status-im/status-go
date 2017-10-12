@@ -195,7 +195,7 @@ func (api *StatusAPI) JailBaseJS(js string) {
 }
 
 // Notify and send message.
-func (api *StatusAPI) Notify(token string) string {
+func (api *StatusAPI) Notify(token string) error {
 	log.Debug("Notify", "token", token)
 
 	// TODO(oskarth): Experiment with this
@@ -204,10 +204,10 @@ func (api *StatusAPI) Notify(token string) string {
 		"sum": "Happy Day",
 	}
 
-	err := api.b.notification.Notify(msg, token)
+	err := api.b.notifier().Notify(msg, token)
 	if err != nil {
 		log.Error("Notify failed:", err)
 	}
 
-	return token
+	return err
 }
