@@ -75,7 +75,8 @@ func (jail *Jail) Stop() {
 	for _, cell := range jail.cells {
 		cell.Stop()
 	}
-	jail.cells = nil
+	// TODO(tiabc): Move this initialisation to a proper place.
+	jail.cells = make(map[string]*Cell)
 }
 
 // Cell returns the existing instance of Cell.
