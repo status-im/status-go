@@ -372,7 +372,6 @@ func (s *TransactionsTestSuite) TestSendEtherOnStatusChainTx() {
 			)
 			s.NoError(err, fmt.Sprintf("cannot complete queued transaction[%v]", event["id"]))
 
-			log.Info("contract transaction complete", "URL", "https://ropsten.etherscan.io/tx/"+txHash.Hex())
 			close(completeQueuedTransaction)
 			return
 		}
