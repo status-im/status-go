@@ -104,6 +104,35 @@ func (s *BackendTestSuite) RestartTestNode() {
 	s.True(s.Backend.IsNodeRunning())
 }
 
+// EnsureSynchronization makes a test waiting until the LES
+// is synced. It solves "no suitable peers available" issues
+// happen when trying to ask for blockchain information too
+// early.
+// TODO(themue) Integrate into the tests.
+func (s *BackendTestSuite) EnsureSynchronization() {
+	start := time.Now()
+	les, err := s.Backend.NodeManager().LightEthereumService()
++	if err != nil {
++		s.Error(err)
++	}
++
++	// Make sure LES finished synchronization. Actually,
++	// this solves "no suitable peers" issue.
++	// This issue appears only when we try to ask for blockchain information
++	// before LES is synced.
++	for {
++		isSyncing := les.Downloader().Synchronising()
++		progress := les.Downloader().Progress()
++
++		if !isSyncing && progress.HighestBlock > 0 && progress.CurrentBlock >= progress.HighestBlock {
++			break
++		}
++
++		time.Sleep(time.Second * 10)
+		s.True(time.Now().Sub(start) < (5*time.Minute))
++	}
+}
+
 // WhisperService returns a reference to the Whisper service.
 func (s *BackendTestSuite) WhisperService() *whisper.Whisper {
 	whisperService, err := s.Backend.NodeManager().WhisperService()
