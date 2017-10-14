@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/robertkrimen/otto"
-	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/static"
 	"github.com/stretchr/testify/suite"
@@ -340,103 +339,4 @@ func (s *CellTestSuite) TestJailLoopCancel() {
 
 	// check that counter hasn't increased
 	require.Equal(1, count)
-}
-
-// TestJailCellStopSetIntervalBeforeStop checks that after Cell will be stopped,
-// setInterval command (which was appended before)
-// will not execute anything
-func (s *CellTestSuite) TestJailCellStopSetIntervalBeforeStop() {
-	require := s.Require()
-
-	cell, err := s.jail.NewCell(testChatID)
-	require.NoError(err)
-	require.NotNil(cell)
-
-	_, err = cell.Run(`
-		var counter = 1;
- 		setInterval(function(){
- 			counter++;
- 		}, 10);
- 	`)
-	require.NoError(err)
-
-	cell.Stop()
-
-	val1, err := cell.Get("counter")
-	require.NoError(err)
-	require.True(val1.IsNumber())
-	valInt1, err := val1.ToInteger()
-	require.NoError(err)
-	time.Sleep(20 * time.Millisecond)
-	val2, err := cell.Get("counter")
-	require.NoError(err)
-	require.True(val2.IsNumber())
-	valInt2, err := val2.ToInteger()
-	require.Equal(valInt1, valInt2,
-		"Unexpected behavior: Cell stopped but setInterval function was executed again")
-}
-
-// TestJailCellStopSetIntervalAfterStop checks that after Cell will be stopped,
-// commands will not executing
-func (s *CellTestSuite) TestJailCellStopSetIntervalAfterStop() {
-	var (
-		require        = s.Require()
-		getCalledTimes = func(cell *common.JailCell) int64 {
-			ottoValue, err := (*cell).Get("calledTimes")
-			require.NoError(err)
-			require.True(ottoValue.IsNumber())
-			val, err := ottoValue.ToInteger()
-			require.NoError(err)
-			return val
-		}
-	)
-
-	cell, err := s.jail.NewCell(testChatID)
-	require.NoError(err)
-
-	_, err = cell.Run(`
-		var counter = 1;
- 		setInterval(function(){
- 			counter++;
- 		}, 10);
- 	`)
-
-	select {
-	case <-cell.Stop():
-		break
-	case <-time.After(time.Second):
-		require.Fail("Cell Stop timeout")
-	}
-
-	firstValue := getCalledTimes(&cell)
-
-	time.Sleep(40 * time.Millisecond)
-
-	//VM is not removed and we still can get values, but loop stopped and setInterval will not execute
-	secondValue := getCalledTimes(&cell)
-	require.Equal(firstValue, secondValue, "Expected stopped setInterval function")
-}
-
-// TestJailCellStopTwice stops cell twice
-// Expected correct answer
-func (s *CellTestSuite) TestJailCellStopTwice() {
-	require := s.Require()
-
-	cell, err := s.jail.NewCell(testChatID)
-	require.NoError(err)
-	require.NotNil(cell)
-
-	select {
-	case <-cell.Stop():
-		break
-	case <-time.After(100 * time.Millisecond):
-		require.Fail("Expected less than 100ms duration for cell stopping")
-	}
-
-	select {
-	case <-cell.Stop():
-		break
-	case <-time.After(10 * time.Millisecond):
-		require.Fail("Expected less than 10ms duration for trying to stop stopped cell")
-	}
 }
