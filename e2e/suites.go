@@ -1,6 +1,8 @@
 package e2e
 
 import (
+	"time"
+
 	"github.com/ethereum/go-ethereum/les"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/api"
@@ -112,25 +114,25 @@ func (s *BackendTestSuite) RestartTestNode() {
 func (s *BackendTestSuite) EnsureSynchronization() {
 	start := time.Now()
 	les, err := s.Backend.NodeManager().LightEthereumService()
-+	if err != nil {
-+		s.Error(err)
-+	}
-+
-+	// Make sure LES finished synchronization. Actually,
-+	// this solves "no suitable peers" issue.
-+	// This issue appears only when we try to ask for blockchain information
-+	// before LES is synced.
-+	for {
-+		isSyncing := les.Downloader().Synchronising()
-+		progress := les.Downloader().Progress()
-+
-+		if !isSyncing && progress.HighestBlock > 0 && progress.CurrentBlock >= progress.HighestBlock {
-+			break
-+		}
-+
-+		time.Sleep(time.Second * 10)
-		s.True(time.Now().Sub(start) < (5*time.Minute))
-+	}
+	if err != nil {
+		s.Error(err)
+	}
+
+	// Make sure LES finished synchronization. Actually,
+	// this solves "no suitable peers" issue.
+	// This issue appears only when we try to ask for blockchain information
+	// before LES is synced.
+	for {
+		isSyncing := les.Downloader().Synchronising()
+		progress := les.Downloader().Progress()
+
+		if !isSyncing && progress.HighestBlock > 0 && progress.CurrentBlock >= progress.HighestBlock {
+			break
+		}
+
+		time.Sleep(time.Second * 10)
+		s.True(time.Now().Sub(start) < (5 * time.Minute))
+	}
 }
 
 // WhisperService returns a reference to the Whisper service.
