@@ -113,6 +113,7 @@ func (s *BackendTestSuite) RestartTestNode() {
 // TODO(themue) Integrate into the tests.
 func (s *BackendTestSuite) EnsureSynchronization() {
 	start := time.Now()
+	wait := time.Second
 	les, err := s.Backend.NodeManager().LightEthereumService()
 	if err != nil {
 		s.Error(err)
@@ -130,8 +131,10 @@ func (s *BackendTestSuite) EnsureSynchronization() {
 			break
 		}
 
-		time.Sleep(time.Second * 10)
+		time.Sleep(wait)
 		s.True(time.Now().Sub(start) < (5 * time.Minute))
+
+		wait *= 2
 	}
 }
 
