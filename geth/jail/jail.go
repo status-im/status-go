@@ -75,6 +75,7 @@ func (jail *Jail) Stop() {
 	for _, cell := range jail.cells {
 		cell.Stop()
 	}
+	// TODO(tiabc): Move this initialisation to a proper place.
 	jail.cells = make(map[string]*Cell)
 }
 

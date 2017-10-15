@@ -39,9 +39,13 @@ type Task interface {
 // aren't ready yet, keyed by their ID, and a channel of tasks that are ready
 // to finalise on the VM. The channel holding the tasks pending finalising can
 // be buffered or unbuffered.
+//
+// Warning: id must be the first field in this struct as it's accessed atomically.
+// Otherwise, on ARM and x86-32 it will panic.
+// More information: https://golang.org/pkg/sync/atomic/#pkg-note-BUG.
 type Loop struct {
-	vm    *vm.VM
 	id    int64
+	vm    *vm.VM
 	lock  sync.RWMutex
 	tasks map[int64]Task
 	ready chan Task
