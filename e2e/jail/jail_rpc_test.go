@@ -39,6 +39,8 @@ func (s *JailRPCTestSuite) TestJailRPCSend() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
+	s.EnsureSynchronization()
+
 	// load Status JS and add test command to it
 	s.jail.BaseJS(baseStatusJSCode)
 	s.jail.Parse(testChatID, ``)
@@ -70,6 +72,8 @@ func (s *JailRPCTestSuite) TestIsConnected() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
+	s.EnsureSynchronization()
+
 	s.jail.Parse(testChatID, "")
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
@@ -96,6 +100,8 @@ func (s *JailRPCTestSuite) TestIsConnected() {
 func (s *JailRPCTestSuite) TestRegressionGetTransactionReceipt() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
+
+	s.EnsureSynchronization()
 
 	rpcClient := s.Backend.NodeManager().RPCClient()
 	s.NotNil(rpcClient)
@@ -195,7 +201,7 @@ func (s *JailRPCTestSuite) TestJailVMPersistence() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to sync
+	s.EnsureSynchronization()
 
 	// log into account from which transactions will be sent
 	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
