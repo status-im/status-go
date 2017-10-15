@@ -3,6 +3,7 @@ package jail
 import (
 	"testing"
 
+	"github.com/robertkrimen/otto"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
@@ -76,9 +77,9 @@ func (s *JailTestSuite) TestJailCall(t *testing.T) {
 
 	propsc := make(chan string, 1)
 	argsc := make(chan string, 1)
-	err = cell.Set("call", func(props, args string) {
-		propsc <- props
-		argsc <- args
+	err = cell.Set("call", func(call otto.FunctionCall) {
+		propsc <- call.Argument(0).String()
+		argsc <- call.Argument(1).String()
 	})
 	require.NoError(t, err)
 

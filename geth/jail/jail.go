@@ -147,7 +147,7 @@ func (j *Jail) InitCell(chatID, code string) string {
 
 // CreateAndInitCell performs CreateCell and InitCell methods
 // and returns a string.
-// TODO(adam): fix API so that this becomes obsolete.
+// TODO(adam): fix api package so that this becomes obsolete.
 func (j *Jail) CreateAndInitCell(chatID, code string) string {
 	_, err := j.CreateCell(chatID)
 	if err != nil {

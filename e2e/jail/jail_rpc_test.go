@@ -118,7 +118,7 @@ func (s *JailRPCTestSuite) TestIsConnected() {
 	response, err := responseValue.ToString()
 	s.NoError(err, "cannot parse result")
 
-	expectedResponse := `{"jsonrpc":"2.0","result":true}`
+	expectedResponse := `{"result":true}`
 	s.Equal(expectedResponse, response)
 }
 

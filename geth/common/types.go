@@ -257,7 +257,7 @@ type JailCell interface {
 	// Call an arbitrary JS function by name and args.
 	Call(item string, this interface{}, args ...interface{}) (otto.Value, error)
 	// Stop stops background execution of cell.
-	Stop()
+	Stop() error
 }
 
 // JailManager defines methods for managing jailed environments

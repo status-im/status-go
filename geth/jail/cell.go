@@ -2,6 +2,8 @@ package jail
 
 import (
 	"context"
+	"errors"
+	"time"
 
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/jail/internal/fetch"
@@ -17,7 +19,7 @@ type Cell struct {
 	id          string
 	cancel      context.CancelFunc
 	loop        *loop.Loop
-	loopStopped chan struct{}
+	loopStopped chan error
 }
 
 // NewCell encapsulates what we need to create a new jailCell from the
@@ -31,10 +33,9 @@ func NewCell(id string) *Cell {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// Start event loop in the background.
-	loopStopped := make(chan struct{})
+	loopStopped := make(chan error)
 	go func() {
-		lo.Run(ctx)
-		close(loopStopped)
+		loopStopped <- lo.Run(ctx)
 	}()
 
 	return &Cell{
@@ -63,9 +64,15 @@ func registerVMHandlers(vm *vm.VM, lo *loop.Loop) error {
 }
 
 // Stop halts event loop associated with cell.
-func (c *Cell) Stop() {
+func (c *Cell) Stop() error {
 	c.cancel()
-	<-c.loopStopped
+
+	select {
+	case err := <-c.loopStopped:
+		return err
+	case <-time.After(time.Second):
+		return errors.New("stopping the cell timed out")
+	}
 }
 
 // CallAsync puts otto's function with given args into
@@ -74,7 +81,9 @@ func (c *Cell) Stop() {
 // async call, like callback.
 func (c *Cell) CallAsync(fn otto.Value, args ...interface{}) {
 	task := looptask.NewCallTask(fn, args...)
+	// Add a task to the queue.
 	c.loop.Add(task)
-	// Run the task immediatelly. It's a blocking operation.
+	// And run the task immediatelly.
+	// It's a blocking operation.
 	c.loop.Ready(task)
 }
