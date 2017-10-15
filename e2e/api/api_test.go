@@ -11,9 +11,18 @@ import (
 
 	"github.com/status-im/status-go/e2e"
 	"github.com/status-im/status-go/geth/api"
+	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/stretchr/testify/suite"
+)
+
+const (
+	testChatID = "testChat"
+)
+
+var (
+	TestConfig *common.TestConfig
 )
 
 func TestAPI(t *testing.T) {
@@ -26,8 +35,15 @@ type APITestSuite struct {
 }
 
 func (s *APITestSuite) SetupTest() {
+	var err error
+
 	s.api = api.NewStatusAPI()
 	s.NotNil(s.api)
+
+	TestConfig, err = common.LoadTestConfig()
+	if err != nil {
+		panic(err)
+	}
 }
 
 func (s *APITestSuite) TestCHTUpdate() {
@@ -120,7 +136,7 @@ func (s *APITestSuite) TestRaceConditions() {
 	s.api.StopNode()            // just in case we have a node running
 }
 
-func (s *APITestSuite) TestJailRemoveCells() {
+func (s *APITestSuite) TestJailStop() {
 	const itersCount = 5
 	var (
 		wg        sync.WaitGroup
@@ -130,7 +146,7 @@ func (s *APITestSuite) TestJailRemoveCells() {
 		}
 	)
 
-	config, err := MakeTestNodeConfig(params.RopstenNetworkID)
+	config, err := e2e.MakeTestNodeConfig(params.RopstenNetworkID)
 	require.NoError(err)
 	err = s.api.StartNode(config)
 	require.NoError(err)
@@ -178,7 +194,7 @@ func (s *APITestSuite) TestLogoutRemovesCells() {
 		require = s.Require()
 	)
 
-	config, err := MakeTestNodeConfig(params.RopstenNetworkID)
+	config, err := e2e.MakeTestNodeConfig(params.RopstenNetworkID)
 	require.NoError(err)
 	err = s.api.StartNode(config)
 	require.NoError(err)
@@ -190,16 +206,14 @@ func (s *APITestSuite) TestLogoutRemovesCells() {
 	err = s.api.SelectAccount(address1, TestConfig.Account1.Password)
 	require.NoError(err)
 
-	// load Status JS and add test command to it
-	s.api.JailManager().BaseJS(baseStatusJSCode)
 	s.api.JailManager().Parse(testChatID, ``)
 
-	cell, err := s.api.JailManager().NewCell(testChatID)
+	_, err = s.api.JailManager().NewCell(testChatID)
 	require.NoError(err)
 
-	s.api.Logout()
+	err = s.api.Logout()
+	require.NoError(err)
 
-	cell, err = s.api.JailManager().Cell(testChatID)
-	require.Nil(cell, "Expected removed cells")
-	require.Error(err)
+	_, err = s.api.JailManager().Cell(testChatID)
+	require.Error(err, "Expected that cells was removed")
 }
