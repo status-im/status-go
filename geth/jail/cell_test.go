@@ -164,7 +164,8 @@ func (s *CellTestSuite) TestCellLoopCancel() {
 	// Wait 1.5 second (so only one task executed) so far
 	// and stop the cell (event loop should die)
 	time.Sleep(1500 * time.Millisecond)
-	cell.Stop()
+	err = cell.Stop()
+	s.NoError(err)
 
 	// check that only 1 task has increased counter
 	s.Equal(1, count)
@@ -196,7 +197,9 @@ func (s *CellTestSuite) TestCellCallAsync() {
 
 func (s *CellTestSuite) TestCellCallStopMultipleTimes() {
 	s.NotPanics(func() {
-		s.cell.Stop()
-		s.cell.Stop()
+		err := s.cell.Stop()
+		s.NoError(err)
+		err = s.cell.Stop()
+		s.NoError(err)
 	})
 }

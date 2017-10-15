@@ -142,7 +142,7 @@ func (j *Jail) InitCell(chatID, code string) string {
 		return newJailErrorResponse(err)
 	}
 
-	return newJailResultResponse(value, err)
+	return newJailResultResponse(value)
 }
 
 // CreateAndInitCell performs CreateCell and InitCell methods
@@ -182,7 +182,7 @@ func (j *Jail) GetCell(chatID string) (common.JailCell, error) {
 // Call calls commands from `_status_catalog`.
 // commandPath is an array of properties to retrieve a function.
 // For instance:
-//   `["prop1", "prop2"]` is translated to `_status_catalog["prop1"["prop2"]`.
+//   `["prop1", "prop2"]` is translated to `_status_catalog["prop1"]["prop2"]`.
 func (j *Jail) Call(chatID, commandPath, args string) string {
 	cell, err := j.getCell(chatID)
 	if err != nil {
@@ -194,7 +194,7 @@ func (j *Jail) Call(chatID, commandPath, args string) string {
 		return newJailErrorResponse(err)
 	}
 
-	return newJailResultResponse(value, err)
+	return newJailResultResponse(value)
 }
 
 // sendRPCCall executes a raw JSON-RPC request.
@@ -231,12 +231,8 @@ func newJailErrorResponse(err error) string {
 }
 
 // newJailResultResponse returns a string that is a valid JavaScript code.
-// Marshaling is not required as result.String() produces an string
+// Marshaling is not required as result.String() produces a string
 // that is a valid JavaScript code.
-func newJailResultResponse(result otto.Value, err error) string {
-	if err != nil {
-		return newJailErrorResponse(err)
-	}
-
+func newJailResultResponse(result otto.Value) string {
 	return `{"result": ` + result.String() + `}`
 }

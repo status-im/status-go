@@ -16,10 +16,12 @@ import (
 // Cell represents a single jail cell, which is basically a JavaScript VM.
 type Cell struct {
 	*vm.VM
-	id          string
-	cancel      context.CancelFunc
+	id     string
+	cancel context.CancelFunc
+
 	loop        *loop.Loop
-	loopStopped chan error
+	loopStopped chan struct{}
+	loopErr     error
 }
 
 // NewCell encapsulates what we need to create a new jailCell from the
@@ -31,20 +33,26 @@ func NewCell(id string) *Cell {
 	registerVMHandlers(vm, lo)
 
 	ctx, cancel := context.WithCancel(context.Background())
-
-	// Start event loop in the background.
-	loopStopped := make(chan error)
-	go func() {
-		loopStopped <- lo.Run(ctx)
-	}()
-
-	return &Cell{
+	loopStopped := make(chan struct{})
+	cell := Cell{
 		VM:          vm,
 		id:          id,
 		cancel:      cancel,
 		loop:        lo,
 		loopStopped: loopStopped,
 	}
+
+	// Start event loop in the background.
+	go func() {
+		err := lo.Run(ctx)
+		if err != context.Canceled {
+			cell.loopErr = err
+		}
+
+		close(loopStopped)
+	}()
+
+	return &cell
 }
 
 // registerHandlers register variuous functions and handlers
@@ -68,8 +76,8 @@ func (c *Cell) Stop() error {
 	c.cancel()
 
 	select {
-	case err := <-c.loopStopped:
-		return err
+	case <-c.loopStopped:
+		return c.loopErr
 	case <-time.After(time.Second):
 		return errors.New("stopping the cell timed out")
 	}
