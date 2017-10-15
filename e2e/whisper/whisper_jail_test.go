@@ -52,7 +52,7 @@ func (s *WhisperJailTestSuite) StartTestBackend(networkID int, opts ...e2e.TestN
 	s.WhisperAPI = whisper.NewPublicWhisperAPI(s.WhisperService())
 	s.Jail = s.Backend.JailManager()
 	s.NotNil(s.Jail)
-	s.Jail.BaseJS(baseStatusJSCode)
+	s.Jail.SetBaseJS(baseStatusJSCode)
 }
 
 func (s *WhisperJailTestSuite) GetAccountKey(account struct {
@@ -303,7 +303,7 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 
 		chatID := crypto.Keccak256Hash([]byte(tc.name)).Hex()
 
-		s.Jail.Parse(chatID, `
+		s.Jail.CreateAndInitCell(chatID, `
 			var shh = web3.shh;
 			// topic must be 4-byte long
 			var makeTopic = function () {
@@ -315,7 +315,7 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 			};
 		`)
 
-		cell, err := s.Jail.Cell(chatID)
+		cell, err := s.Jail.GetCell(chatID)
 		s.NoError(err, "cannot get VM")
 
 		// Setup filters and post messages.
