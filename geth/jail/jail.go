@@ -75,7 +75,7 @@ func (jail *Jail) Stop() {
 	for _, cell := range jail.cells {
 		cell.Stop()
 	}
-	jail.cells = nil
+	jail.cells = make(map[string]*Cell)
 }
 
 // Cell returns the existing instance of Cell.
