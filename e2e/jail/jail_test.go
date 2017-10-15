@@ -3,6 +3,8 @@ package jail
 import (
 	"encoding/json"
 	"errors"
+	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -156,4 +158,50 @@ func (s *JailTestSuite) TestEventSignal() {
 
 	expectedResponse := `{"jsonrpc":"2.0","result":true}`
 	s.Equal(expectedResponse, response)
+}
+
+func (s *JailTestSuite) TestJailStop() {
+	const loopLen = 5
+	var wg sync.WaitGroup
+
+	getTestCellID := func(id int) string {
+		return testChatID + strconv.Itoa(id)
+	}
+	require := s.Require()
+
+	for i := 0; i < loopLen; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			s.jail.Parse(getTestCellID(i), "")
+			cell, err := s.jail.Cell(getTestCellID(i))
+			require.NoError(err)
+			_, err = cell.Run(`
+				var counter = 1;
+				setInterval(function(){
+					counter++;
+				}, 1000);
+			`)
+		}(i)
+	}
+
+	c := make(chan struct{})
+	go func() {
+		defer close(c)
+		wg.Wait()
+	}()
+
+	select {
+	case <-c:
+		break
+	case <-time.After(5 * time.Second):
+		require.Fail("Cells init timeout")
+	}
+
+	s.jail.Stop()
+
+	for i := 0; i < loopLen; i++ {
+		_, err := s.jail.Cell(getTestCellID(i))
+		require.Error(err, "Expected cells removing (from Jail) after stop")
+	}
 }
