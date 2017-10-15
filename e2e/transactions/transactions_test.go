@@ -315,7 +315,6 @@ func (s *TransactionsTestSuite) TestSendEtherTx() {
 }
 
 func (s *TransactionsTestSuite) TestSendEtherOnStatusChainTx() {
-
 	s.StartTestBackend(params.StatusChainNetworkID)
 	defer s.StopTestBackend()
 
