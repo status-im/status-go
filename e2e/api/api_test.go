@@ -126,7 +126,7 @@ func (s *APITestSuite) TestRaceConditions() {
 	s.api.StopNode()            // just in case we have a node running
 }
 
-func (s *APITestSuite) TestJailStop() {
+func (s *APITestSuite) TestCellsRemovedAfterSwitchAccount() {
 	const itersCount = 5
 	var (
 		wg        sync.WaitGroup
