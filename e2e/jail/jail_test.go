@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"strconv"
-	"sync"
 	"testing"
 	"time"
 
@@ -162,7 +161,6 @@ func (s *JailTestSuite) TestEventSignal() {
 
 func (s *JailTestSuite) TestJailCellsRemovedAfterStop() {
 	const loopLen = 5
-	var wg sync.WaitGroup
 
 	getTestCellID := func(id int) string {
 		return testChatID + strconv.Itoa(id)
@@ -170,32 +168,15 @@ func (s *JailTestSuite) TestJailCellsRemovedAfterStop() {
 	require := s.Require()
 
 	for i := 0; i < loopLen; i++ {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
-			s.jail.Parse(getTestCellID(i), "")
-			cell, err := s.jail.Cell(getTestCellID(i))
-			require.NoError(err)
-			_, err = cell.Run(`
-				var counter = 1;
-				setInterval(function(){
-					counter++;
-				}, 1000);
-			`)
-		}(i)
-	}
-
-	c := make(chan struct{})
-	go func() {
-		defer close(c)
-		wg.Wait()
-	}()
-
-	select {
-	case <-c:
-		break
-	case <-time.After(5 * time.Second):
-		require.Fail("Cells init timeout")
+		s.jail.Parse(getTestCellID(i), "")
+		cell, err := s.jail.Cell(getTestCellID(i))
+		require.NoError(err)
+		_, err = cell.Run(`
+			var counter = 1;
+			setInterval(function(){
+				counter++;
+			}, 1000);
+		`)
 	}
 
 	s.jail.Stop()
