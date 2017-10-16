@@ -160,7 +160,7 @@ func (s *JailTestSuite) TestEventSignal() {
 	s.Equal(expectedResponse, response)
 }
 
-func (s *JailTestSuite) TestJailStop() {
+func (s *JailTestSuite) TestJailCellsRemovedAfterStop() {
 	const loopLen = 5
 	var wg sync.WaitGroup
 
