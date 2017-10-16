@@ -161,8 +161,8 @@ func (s *BackendTestSuite) EnsureSynchronization() {
 			break
 		}
 
+		s.True(time.Now().Sub(start) < (256 * time.Second))
 		time.Sleep(wait)
-		s.True(time.Now().Sub(start) < (5 * time.Minute))
 
 		wait *= 2
 	}

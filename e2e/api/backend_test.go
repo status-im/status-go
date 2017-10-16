@@ -237,10 +237,6 @@ func (s *APIBackendTestSuite) TestResetChainData() {
 	s.StartTestBackend(params.RinkebyNetworkID)
 	defer s.StopTestBackend()
 
-	s.EnsureSynchronization()
-
-	time.Sleep(2 * time.Second) // allow to sync for some time
-
 	s.True(s.Backend.IsNodeRunning())
 	nodeReady, err := s.Backend.ResetChainData()
 	require.NoError(err)
@@ -261,8 +257,6 @@ func (s *APIBackendTestSuite) TestRestartNode() {
 
 	s.StartTestBackend(params.RinkebyNetworkID)
 	defer s.StopTestBackend()
-
-	s.EnsureSynchronization()
 
 	firstHash, err := e2e.FirstBlockHash(s.Backend.NodeManager())
 	s.NoError(err)

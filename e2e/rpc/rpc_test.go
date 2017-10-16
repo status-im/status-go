@@ -161,8 +161,6 @@ func (s *RPCTestSuite) TestCallContextResult() {
 	)
 	defer s.StopTestNode()
 
-	s.EnsureSynchronization()
-
 	client := s.NodeManager.RPCClient()
 	s.NotNil(client)
 

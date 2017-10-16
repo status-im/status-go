@@ -22,8 +22,6 @@ func (s *AccountsTestSuite) TestRPCEthAccounts() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	s.EnsureSynchronization()
-
 	// log into test account
 	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	s.NoError(err)
@@ -47,8 +45,6 @@ func (s *AccountsTestSuite) TestRPCEthAccountsWithUpstream() {
 		e2e.WithUpstream("https://ropsten.infura.io/z6GCTmjdP3FETEJmMBI4"),
 	)
 	defer s.StopTestBackend()
-
-	s.EnsureSynchronization()
 
 	// log into test account
 	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
