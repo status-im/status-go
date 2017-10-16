@@ -296,7 +296,7 @@ func (s *ManagerTestSuite) TestResetChainData() {
 	defer s.StopTestNode()
 
 	// allow to sync for some time
-	time.Sleep(10 * time.Second)
+	s.EnsureNodeSync()
 
 	// reset chain data
 	nodeReady, err := s.NodeManager.ResetChainData()
