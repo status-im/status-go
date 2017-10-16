@@ -184,9 +184,6 @@ func (s *APITestSuite) TestLogoutRemovesCells() {
 
 	s.api.JailManager().Parse(testChatID, ``)
 
-	_, err = s.api.JailManager().NewCell(testChatID)
-	require.NoError(err)
-
 	err = s.api.Logout()
 	require.NoError(err)
 
