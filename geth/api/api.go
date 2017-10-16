@@ -146,11 +146,15 @@ func (api *StatusAPI) VerifyAccountPassword(keyStoreDir, address, password strin
 // using provided password. Once verification is done, decrypted key is injected into Whisper (as a single identity,
 // all previous identities are removed).
 func (api *StatusAPI) SelectAccount(address, password string) error {
+	// FIXME(oleg-raev): This method doesn't make stop, it rather resets its cells to an initial state
+	// and should be properly renamed, for example: ResetCells
+	api.b.jailManager.Stop()
 	return api.b.AccountManager().SelectAccount(address, password)
 }
 
 // Logout clears whisper identities
 func (api *StatusAPI) Logout() error {
+	api.b.jailManager.Stop()
 	return api.b.AccountManager().Logout()
 }
 
