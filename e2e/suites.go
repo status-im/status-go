@@ -22,6 +22,7 @@ type NodeManagerTestSuite struct {
 
 // EnsureNodeSync ensures that synchronization of the node is done once and that it
 // is done properly else, the call will fail.
+// FIXME(tiabc): BackendTestSuite contains the same method, let's sort it out?
 func (s *NodeManagerTestSuite) EnsureNodeSync(forceResync ...bool) {
 	if len(forceResync) > 0 && forceResync[0] {
 		s.nodeSyncCompleted = false
@@ -163,6 +164,7 @@ func (s *BackendTestSuite) TxQueueManager() common.TxQueueManager {
 
 // EnsureNodeSync ensures that synchronization of the node is done once and that it
 // is done properly else, the call will fail.
+// FIXME(tiabc): NodeManagerTestSuite contains the same method, let's sort it out?
 func (s *BackendTestSuite) EnsureNodeSync(forceResync ...bool) {
 	if len(forceResync) > 0 && forceResync[0] {
 		s.nodeSyncCompleted = false

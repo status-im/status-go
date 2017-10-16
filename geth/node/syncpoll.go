@@ -37,7 +37,7 @@ func (n *SyncPoll) Poll(ctx context.Context) error {
 		return err
 	}
 
-	if err := n.pollSyncCompleted(ctx); err != nil {
+	if err := n.waitSyncCompleted(ctx); err != nil {
 		return err
 	}
 
@@ -58,7 +58,7 @@ func (n *SyncPoll) pollSyncStart(ctx context.Context) error {
 	}
 }
 
-func (n *SyncPoll) pollSyncCompleted(ctx context.Context) error {
+func (n *SyncPoll) waitSyncCompleted(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
@@ -73,7 +73,7 @@ func (n *SyncPoll) pollSyncCompleted(ctx context.Context) error {
 			}
 
 			if progress.CurrentBlock >= progress.HighestBlock {
-				log.Info("Block synchronization progress just ended")
+				log.Info("Block synchronization just finished")
 				return nil
 			}
 		}

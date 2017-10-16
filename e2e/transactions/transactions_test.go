@@ -321,7 +321,7 @@ func (s *TransactionsTestSuite) TestSendEtherTxUpstream() {
 	)
 	defer s.StopTestBackend()
 
-	time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to sync
+	s.EnsureNodeSync()
 
 	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	s.NoError(err)

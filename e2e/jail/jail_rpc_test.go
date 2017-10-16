@@ -195,7 +195,7 @@ func (s *JailRPCTestSuite) TestJailVMPersistence() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to sync
+	s.EnsureNodeSync()
 
 	// log into account from which transactions will be sent
 	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
