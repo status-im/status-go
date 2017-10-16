@@ -64,10 +64,12 @@ func (s *NodeManagerTestSuite) StartTestNode(networkID int, opts ...TestNodeOpti
 	s.NoError(importTestAccouns(nodeConfig.KeyStoreDir))
 
 	s.False(s.NodeManager.IsNodeRunning())
+
 	nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
 	s.NoError(err)
 	s.NotNil(nodeStarted)
 	<-nodeStarted
+
 	s.True(s.NodeManager.IsNodeRunning())
 }
 
@@ -75,9 +77,11 @@ func (s *NodeManagerTestSuite) StartTestNode(networkID int, opts ...TestNodeOpti
 func (s *NodeManagerTestSuite) StopTestNode() {
 	s.NotNil(s.NodeManager)
 	s.True(s.NodeManager.IsNodeRunning())
+
 	nodeStopped, err := s.NodeManager.StopNode()
 	s.NoError(err)
 	<-nodeStopped
+
 	s.False(s.NodeManager.IsNodeRunning())
 }
 

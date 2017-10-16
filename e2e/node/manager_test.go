@@ -6,12 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts"
-	"github.com/ethereum/go-ethereum/accounts/keystore"
-	"github.com/ethereum/go-ethereum/les"
-	gethnode "github.com/ethereum/go-ethereum/node"
-	"github.com/ethereum/go-ethereum/rpc"
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/e2e"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/node"
@@ -19,6 +13,8 @@ import (
 	"github.com/status-im/status-go/geth/signal"
 	"github.com/stretchr/testify/suite"
 )
+
+const timeout = 5 * time.Second
 
 func TestManagerTestSuite(t *testing.T) {
 	suite.Run(t, new(ManagerTestSuite))
@@ -118,8 +114,7 @@ func (s *ManagerTestSuite) TestReferencesWithoutStartedNode() {
 	}
 	for _, tc := range testCases {
 		s.T().Log(tc.name)
-		obj, err := tc.initFn()
-		s.Nil(obj)
+		_, err := tc.initFn()
 		s.Equal(tc.expectedErr, err)
 	}
 }
@@ -131,56 +126,48 @@ func (s *ManagerTestSuite) TestReferencesWithStartedNode() {
 	var testCases = []struct {
 		name         string
 		initFn       func() (interface{}, error)
-		expectedType interface{}
 	}{
 		{
 			"node is running, get NodeConfig",
 			func() (interface{}, error) {
 				return s.NodeManager.NodeConfig()
 			},
-			&params.NodeConfig{},
 		},
 		{
 			"node is running, get Node",
 			func() (interface{}, error) {
 				return s.NodeManager.Node()
 			},
-			&gethnode.Node{},
 		},
 		{
 			"node is running, get LES",
 			func() (interface{}, error) {
 				return s.NodeManager.LightEthereumService()
 			},
-			&les.LightEthereum{},
 		},
 		{
 			"node is running, get Whisper",
 			func() (interface{}, error) {
 				return s.NodeManager.WhisperService()
 			},
-			&whisper.Whisper{},
 		},
 		{
 			"node is running, get AccountManager",
 			func() (interface{}, error) {
 				return s.NodeManager.AccountManager()
 			},
-			&accounts.Manager{},
 		},
 		{
 			"node is running, get AccountKeyStore",
 			func() (interface{}, error) {
 				return s.NodeManager.AccountKeyStore()
 			},
-			&keystore.KeyStore{},
 		},
 		{
 			"node is running, get RPC Client",
 			func() (interface{}, error) {
 				return s.NodeManager.RPCClient(), nil
 			},
-			&rpc.Client{},
 		},
 	}
 	for _, tc := range testCases {
@@ -188,7 +175,6 @@ func (s *ManagerTestSuite) TestReferencesWithStartedNode() {
 		obj, err := tc.initFn()
 		s.NoError(err)
 		s.NotNil(obj)
-		s.IsType(tc.expectedType, obj)
 	}
 }
 
@@ -445,14 +431,14 @@ func (s *ManagerTestSuite) TestRaceConditions() {
 		}
 	}
 
-	time.Sleep(2 * time.Second)                // so that we see some logs
+	time.Sleep(timeout)                // so that we see some logs
 	nodeStopped, _ := s.NodeManager.StopNode() // just in case we have a node running
 	if nodeStopped != nil {
 		<-nodeStopped
 	}
 }
 
-func (s *ManagerTestSuite) TestNodeStartCrash() {
+func (s *ManagerTestSuite) TestNodeStartCrash_DoubleStartNode_Error() {
 	// let's listen for node.crashed signal
 	signalReceived := make(chan struct{})
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
@@ -475,13 +461,12 @@ func (s *ManagerTestSuite) TestNodeStartCrash() {
 	s.NoError(err)
 
 	// now try starting using node manager
-	nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
-	s.NoError(err) // no error is thrown, as node is started in separate routine
-	<-nodeStarted  // no deadlock either, as manager should close the channel on error
+	_, err = s.NodeManager.StartNode(nodeConfig)
+	s.Error(err) // no error is thrown, as node is started in separate routine
 	s.False(s.NodeManager.IsNodeRunning())
 
 	select {
-	case <-time.After(5 * time.Second):
+	case <-time.After(timeout):
 		s.FailNow("timed out waiting for signal")
 	case <-signalReceived:
 	}
@@ -489,14 +474,33 @@ func (s *ManagerTestSuite) TestNodeStartCrash() {
 	// stop outside node, and re-try
 	err = outsideNode.Stop()
 	s.NoError(err)
+}
+
+
+func (s *ManagerTestSuite) TestNodeStart_CrashSignal_Success() {
+	// let's listen for node.crashed signal
+	signalReceived := make(chan struct{})
+	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+		var envelope signal.Envelope
+		err := json.Unmarshal([]byte(jsonEvent), &envelope)
+		s.NoError(err)
+
+		if envelope.Type == signal.EventNodeCrashed {
+			close(signalReceived)
+		}
+	})
+
+	nodeConfig, err := e2e.MakeTestNodeConfig(params.RinkebyNetworkID)
+	s.NoError(err)
+
 	signalReceived = make(chan struct{})
-	nodeStarted, err = s.NodeManager.StartNode(nodeConfig)
+	nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
 	s.NoError(err) // again, no error
 	<-nodeStarted  // no deadlock, and no signal this time, manager should be able to start node
 	s.True(s.NodeManager.IsNodeRunning())
 
 	select {
-	case <-time.After(5 * time.Second):
+	case <-time.After(timeout):
 	case <-signalReceived:
 		s.FailNow("signal should not be received")
 	}

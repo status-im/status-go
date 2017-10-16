@@ -63,7 +63,7 @@ type NodeManager interface {
 	IsNodeRunning() bool
 
 	// NodeConfig returns reference to running node's configuration
-	NodeConfig() (*params.NodeConfig, error)
+	NodeConfig() (params.NodeConfig, error)
 
 	// Node returns underlying Status node
 	Node() (*node.Node, error)

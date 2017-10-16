@@ -35,6 +35,7 @@ var (
 const (
 	started = 0
 	stopped = 1
+	pending = 2
 )
 
 // NodeManager manages Status node (which abstracts contained geth node)
@@ -65,7 +66,7 @@ type NodeManager struct {
 
 // NewNodeManager makes new instance of node manager
 func NewNodeManager() *NodeManager {
-	var isStarted int32 = stopped
+	var isStarted int32 = pending
 	m := &NodeManager{isStarted: &isStarted}
 
 	go HaltOnInterruptSignal(m) // allow interrupting running nodes
@@ -75,16 +76,18 @@ func NewNodeManager() *NodeManager {
 
 // StartNode start Status node, fails if node is already started
 func (m *NodeManager) StartNode(config *params.NodeConfig) (<-chan struct{}, error) {
-	return m.startNode(config)
-}
-
-// startNode start Status node, fails if node is already started
-func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, error) {
 	if m.isNodeStarted() {
 		return nil, ErrNodeExists
 	}
 
 	m.initLog(config)
+
+	return m.startNode(config)
+}
+
+// startNode start Status node, fails if node is already started
+func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, error) {
+	m.setPendingStatus()
 
 	m.setNodeStarted(make(chan struct{}, 1))
 
@@ -105,7 +108,7 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 		if err != nil {
 			log.Error("Init RPC client failed:", "error", err)
 
-			m.setStarted()
+			m.setFailed()
 
 			signal.Send(signal.Envelope{
 				Type: signal.EventNodeCrashed,
@@ -115,7 +118,6 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 			})
 			return
 		}
-
 		m.setRPCClient(rpcClient)
 
 		// underlying node is started, every method can use it, we use it immediately
@@ -131,19 +133,9 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 			Type:  signal.EventNodeStarted,
 			Event: struct{}{},
 		})
-
-		// todo(@jeka): why we stop the underlying node
-		// wait up until underlying node is stopped
-		m.nodeLock.RLock()
-		m.node.Wait()
-		m.nodeLock.RUnlock()
-
-		// notify m.Stop() that node has been stopped
-		m.closeNodeStopped()
-		log.Info("Node is stopped")
 	}()
 
-	return m.nodeStarted, nil
+	return m.getNodeStarted(), nil
 }
 
 func (m *NodeManager) newNode(config *params.NodeConfig) (*node.Node, error) {
@@ -157,7 +149,7 @@ func (m *NodeManager) newNode(config *params.NodeConfig) (*node.Node, error) {
 	defer m.nodeLock.Unlock()
 
 	if err = ethNode.Start(); err != nil {
-		m.setStarted()
+		m.setFailed()
 
 		signal.Send(signal.Envelope{
 			Type: signal.EventNodeCrashed,
@@ -192,22 +184,23 @@ func (m *NodeManager) stopNode() (<-chan struct{}, error) {
 		return nil, err
 	}
 
-	nodeStopped := make(chan struct{}, 1)
 	go func() {
-		m.readNodeStopped() // Status node is stopped (code after Wait() is executed)
+		m.node.Wait()
+		m.closeNodeStopped()
 
-		m.setStopped() // Status node is stopped, and we can create another
-		log.Info("Node manager resets node params")
+		m.setStoppedStatus() // Status node is stopped, and we can create another
+		log.Info("Node is stopped")
 
 		// notify application that it can send more requests now
 		signal.Send(signal.Envelope{
 			Type:  signal.EventNodeStopped,
 			Event: struct{}{},
 		})
-		log.Info("Node manager notifed app, that node has stopped")
+
+		log.Info("Node manager notified app, that node has stopped")
 	}()
 
-	return nodeStopped, nil
+	return m.getNodeStopped(), nil
 }
 
 // IsNodeRunning confirm that node is running
@@ -359,12 +352,15 @@ func (m *NodeManager) restartNode() (<-chan struct{}, error) {
 }
 
 // NodeConfig exposes reference to running node's configuration
-func (m *NodeManager) NodeConfig() (*params.NodeConfig, error) {
+func (m *NodeManager) NodeConfig() (params.NodeConfig, error) {
 	if err := m.isNodeAvailable(); err != nil {
-		return nil, err
+		return params.NodeConfig{}, err
 	}
 
-	return m.config, nil
+	m.configLock.Lock()
+	defer m.configLock.Unlock()
+
+	return *m.config, nil
 }
 
 // LightEthereumService exposes reference to LES service running on top of the node
@@ -475,16 +471,28 @@ func (m *NodeManager) isNodeAvailable() error {
 	return nil
 }
 
-func (m *NodeManager) setStopped() {
-	atomic.CompareAndSwapInt32(m.isStarted, started, stopped)
+func (m *NodeManager) setStoppedStatus() {
+	atomic.StoreInt32(m.isStarted, stopped)
 }
 
 func (m *NodeManager) setStartedStatus() {
-	atomic.CompareAndSwapInt32(m.isStarted, stopped, started)
+	atomic.StoreInt32(m.isStarted, started)
+}
+
+func (m *NodeManager) setPendingStatus() {
+	atomic.StoreInt32(m.isStarted, pending)
 }
 
 func (m *NodeManager) isNodeStarted() bool {
 	return atomic.LoadInt32(m.isStarted) == started
+}
+
+func (m *NodeManager) isNodeStopped() bool {
+	return atomic.LoadInt32(m.isStarted) == stopped
+}
+
+func (m *NodeManager) isNodePending() bool {
+	return atomic.LoadInt32(m.isStarted) == pending
 }
 
 //todo(@jeka): we should use copy generator
@@ -577,7 +585,7 @@ func (m *NodeManager) waitNodeStarted() {
 }
 
 func (m *NodeManager) setStarted() {
-	if m.isNodeStarted() {
+	if !m.isNodePending() {
 		return
 	}
 
@@ -586,6 +594,18 @@ func (m *NodeManager) setStarted() {
 	m.nodeStartedLock.Unlock()
 
 	m.setStartedStatus()
+}
+
+func (m *NodeManager) setFailed() {
+	if m.isNodeStarted() {
+		return
+	}
+
+	m.nodeStartedLock.Lock()
+	close(m.nodeStarted)
+	m.nodeStartedLock.Unlock()
+
+	m.setStoppedStatus()
 }
 
 func (m *NodeManager) getNodeStopped() chan struct{} {
@@ -622,7 +642,7 @@ func (m *NodeManager) closeNodeStopped() {
 }
 
 func (m *NodeManager) waitNodeStopped() {
-	m.closeNodeStopped()
+	m.readNodeStopped()
 }
 
 func (m *NodeManager) setWhisperService(whisper *whisper.Whisper) {
