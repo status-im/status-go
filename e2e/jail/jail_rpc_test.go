@@ -39,6 +39,8 @@ func (s *JailRPCTestSuite) TestJailRPCSend() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
+	s.EnsureSynchronization()
+
 	// load Status JS and add test command to it
 	s.jail.BaseJS(baseStatusJSCode)
 	s.jail.Parse(testChatID, ``)
