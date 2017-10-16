@@ -111,7 +111,7 @@ func (s *JailRPCTestSuite) TestContractDeployment() {
 	defer s.StopTestBackend()
 
 	// Allow to sync, otherwise you'll get "Nonce too low."
-	time.Sleep(TestConfig.Node.SyncSeconds * time.Second)
+	s.EnsureNodeSync()
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
 	s.jail.Parse(testChatID, "")
