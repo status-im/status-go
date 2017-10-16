@@ -5,10 +5,8 @@ import (
 	"math/rand"
 	"os"
 	"strconv"
-	"sync"
 	"testing"
 	"time"
-
 
 	"github.com/status-im/status-go/e2e"
 	"github.com/status-im/status-go/geth/api"
@@ -129,7 +127,6 @@ func (s *APITestSuite) TestRaceConditions() {
 func (s *APITestSuite) TestCellsRemovedAfterSwitchAccount() {
 	const itersCount = 5
 	var (
-		wg        sync.WaitGroup
 		require   = s.Require()
 		getChatId = func(id int) string {
 			return testChatID + strconv.Itoa(id)
@@ -152,28 +149,17 @@ func (s *APITestSuite) TestCellsRemovedAfterSwitchAccount() {
 	require.NoError(err)
 
 	for i := 0; i < itersCount; i++ {
-		wg.Add(1)
-		go func(id int) {
-			defer wg.Done()
-			_, err := s.api.JailManager().NewCell(getChatId(id))
-			require.NoError(err)
-		}(i)
+		_, err := s.api.JailManager().NewCell(getChatId(i))
+		require.NoError(err)
 	}
-	wg.Wait()
 
 	err = s.api.SelectAccount(address2, TestConfig.Account2.Password)
 	require.NoError(err)
 
-	wg = sync.WaitGroup{}
 	for i := 0; i < itersCount; i++ {
-		wg.Add(1)
-		go func(id int) {
-			defer wg.Done()
-			_, err := s.api.JailManager().Cell(getChatId(id))
-			require.Error(err)
-		}(i)
+		_, err := s.api.JailManager().Cell(getChatId(i))
+		require.Error(err)
 	}
-	wg.Wait()
 }
 
 // TestLogoutRemovesCells we want be sure that
