@@ -116,6 +116,8 @@ func (s *JailRPCTestSuite) TestContractDeployment() {
 	cell, err := s.jail.Cell(testChatID)
 	s.NoError(err)
 
+	s.EnsureSynchronization()
+
 	completeQueuedTransaction := make(chan struct{})
 
 	var txHash gethcommon.Hash
@@ -195,6 +197,8 @@ func (s *JailRPCTestSuite) TestJailVMPersistence() {
 	// log into account from which transactions will be sent
 	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	s.NoError(err, "cannot select account: %v", TestConfig.Account1.Address)
+
+	s.EnsureSynchronization()
 
 	type testCase struct {
 		command   string
