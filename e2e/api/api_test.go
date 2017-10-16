@@ -9,20 +9,17 @@ import (
 	"testing"
 	"time"
 
+
 	"github.com/status-im/status-go/e2e"
 	"github.com/status-im/status-go/geth/api"
-	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
+	. "github.com/status-im/status-go/testing"
 	"github.com/stretchr/testify/suite"
 )
 
 const (
 	testChatID = "testChat"
-)
-
-var (
-	TestConfig *common.TestConfig
 )
 
 func TestAPI(t *testing.T) {
@@ -35,15 +32,8 @@ type APITestSuite struct {
 }
 
 func (s *APITestSuite) SetupTest() {
-	var err error
-
 	s.api = api.NewStatusAPI()
 	s.NotNil(s.api)
-
-	TestConfig, err = common.LoadTestConfig()
-	if err != nil {
-		panic(err)
-	}
 }
 
 func (s *APITestSuite) TestCHTUpdate() {
