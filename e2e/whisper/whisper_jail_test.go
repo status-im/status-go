@@ -83,6 +83,8 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
+	s.EnsureSynchronization()
+
 	_, accountKey1Hex, err := s.GetAccountKey(TestConfig.Account1)
 	s.NoError(err)
 
@@ -375,6 +377,8 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 func (s *WhisperJailTestSuite) TestEncryptedAnonymousMessage() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
+
+	s.EnsureSynchronization()
 
 	accountKey2, accountKey2Hex, err := s.GetAccountKey(TestConfig.Account2)
 	s.NoError(err)

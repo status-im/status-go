@@ -25,6 +25,8 @@ func (s *AccountsTestSuite) TestAccountsList() {
 	s.StartTestBackend(params.RinkebyNetworkID)
 	defer s.StopTestBackend()
 
+	s.EnsureSynchronization()
+
 	accounts, err := s.Backend.AccountManager().Accounts()
 	s.NoError(err)
 
@@ -85,6 +87,8 @@ func (s *AccountsTestSuite) TestAccountsList() {
 func (s *AccountsTestSuite) TestCreateChildAccount() {
 	s.StartTestBackend(params.RinkebyNetworkID)
 	defer s.StopTestBackend()
+
+	s.EnsureSynchronization()
 
 	keyStore, err := s.Backend.NodeManager().AccountKeyStore()
 	s.NoError(err)

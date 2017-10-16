@@ -116,8 +116,7 @@ func (s *JailRPCTestSuite) TestContractDeployment() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	// Allow to sync, otherwise you'll get "Nonce too low."
-	time.Sleep(TestConfig.Node.SyncSeconds * time.Second)
+	s.EnsureSynchronization()
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
 	s.jail.Parse(testChatID, "")

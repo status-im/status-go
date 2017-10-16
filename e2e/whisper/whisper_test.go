@@ -33,6 +33,8 @@ func (s *WhisperTestSuite) TestWhisperFilterRace() {
 	s.StartTestNode(params.RinkebyNetworkID)
 	defer s.StopTestNode()
 
+	s.EnsureSynchronization()
+
 	whisperService, err := s.NodeManager.WhisperService()
 	s.NoError(err)
 
@@ -97,6 +99,8 @@ func (s *WhisperTestSuite) TestWhisperFilterRace() {
 func (s *WhisperTestSuite) TestLogout() {
 	s.StartTestNode(params.RinkebyNetworkID)
 	defer s.StopTestNode()
+
+	s.EnsureSynchronization()
 
 	whisperService, err := s.NodeManager.WhisperService()
 	s.NoError(err)
