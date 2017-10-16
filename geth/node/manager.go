@@ -86,12 +86,12 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 
 	m.initLog(config)
 
+	m.setNodeStarted(make(chan struct{}, 1))
+
 	ethNode, err := m.newNode(config)
 	if err != nil {
 		return nil, err
 	}
-
-	m.setNodeStarted(make(chan struct{}, 1))
 
 	go func() {
 		defer HaltOnPanic()
@@ -156,6 +156,7 @@ func (m *NodeManager) newNode(config *params.NodeConfig) (*node.Node, error) {
 	// start underlying node
 	m.nodeLock.Lock()
 	defer m.nodeLock.Unlock()
+
 	if err = ethNode.Start(); err != nil {
 		m.closeNodeStarted()
 
@@ -359,23 +360,13 @@ func (m *NodeManager) LightEthereumService() (*les.LightEthereum, error) {
 		return nil, err
 	}
 
-	// todo(@jeka): why we can get nil les service? where do we init a les service?
-	if m.lesServiceIsNil() {
-		les := m.getLesService()
-
-		m.nodeLock.Lock()
-		err := m.node.Service(&les)
-		m.nodeLock.Unlock()
-		if err != nil {
-			log.Warn("Cannot obtain LES service", "error", err)
-			return nil, ErrInvalidLightEthereumService
-		}
+	les, err := m.getLesService()
+	if err != nil {
+		log.Warn("Cannot obtain LES service", "error", err)
+		return nil, err
 	}
 
-	if m.lesServiceIsNil() {
-		return nil, ErrInvalidLightEthereumService
-	}
-
+	m.lesService = les
 	return m.lesService, nil
 }
 
@@ -385,23 +376,13 @@ func (m *NodeManager) WhisperService() (*whisper.Whisper, error) {
 		return nil, err
 	}
 
-	// todo(@jeka): why we can get nil whisper service? where do we init a whisper service?
-	if m.whisperServiceIsNil() {
-		whisperService := m.getWhisperService()
-
-		m.nodeLock.Lock()
-		err := m.node.Service(&whisperService)
-		m.nodeLock.Unlock()
-		if err != nil {
-			log.Warn("Cannot obtain whisper service", "error", err)
-			return nil, ErrInvalidWhisperService
-		}
+	whisperService, err := m.getWhisperService()
+	if err != nil {
+		log.Warn("Cannot obtain whisper service", "error", err)
+		return nil, err
 	}
 
-	if m.getWhisperService() == nil {
-		return nil, ErrInvalidWhisperService
-	}
-
+	m.whisperService = whisperService
 	return m.whisperService, nil
 }
 
@@ -411,10 +392,7 @@ func (m *NodeManager) AccountManager() (*accounts.Manager, error) {
 		return nil, err
 	}
 
-	m.nodeLock.Lock()
 	accountManager := m.node.AccountManager()
-	m.nodeLock.Unlock()
-	// todo(@jeka): how can this happens?
 	if accountManager == nil {
 		return nil, ErrInvalidAccountManager
 	}
@@ -428,9 +406,7 @@ func (m *NodeManager) AccountKeyStore() (*keystore.KeyStore, error) {
 		return nil, err
 	}
 
-	m.nodeLock.Lock()
 	accountManager := m.node.AccountManager()
-	m.nodeLock.Unlock()
 	// todo(@jeka): how can this happens?
 	if accountManager == nil {
 		return nil, ErrInvalidAccountManager
@@ -621,16 +597,22 @@ func (m *NodeManager) setWhisperService(whisper *whisper.Whisper) {
 	m.whisperServiceLock.Unlock()
 }
 
-func (m *NodeManager) getWhisperService() *whisper.Whisper {
+func (m *NodeManager) getWhisperService() (*whisper.Whisper, error) {
 	m.whisperServiceLock.RLock()
 	defer m.whisperServiceLock.RUnlock()
 
-	if m.whisperService == nil {
-		return nil
+	whisper := m.whisperService
+	if whisper != nil {
+		return whisper, nil
 	}
 
-	whisper := *m.whisperService
-	return &whisper
+	err := m.node.Service(whisper)
+	if err != nil {
+		return nil, ErrInvalidWhisperService
+	}
+
+
+	return whisper, nil
 }
 
 func (m *NodeManager) whisperServiceIsNil() bool {
@@ -647,16 +629,21 @@ func (m *NodeManager) setLesService(les *les.LightEthereum) {
 	m.lesServiceLock.Unlock()
 }
 
-func (m *NodeManager) getLesService() *les.LightEthereum {
+func (m *NodeManager) getLesService() (*les.LightEthereum, error) {
 	m.lesServiceLock.RLock()
 	defer m.lesServiceLock.RUnlock()
 
-	if m.lesService == nil {
-		return nil
+	les := m.lesService
+	if les != nil {
+		return les, nil
 	}
 
-	les := *m.lesService
-	return &les
+	err := m.node.Service(les)
+	if err != nil {
+		return nil, ErrInvalidLightEthereumService
+	}
+
+	return les, nil
 }
 
 func (m *NodeManager) lesServiceIsNil() bool {
