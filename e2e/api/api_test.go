@@ -12,7 +12,12 @@ import (
 	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
+	. "github.com/status-im/status-go/testing"
 	"github.com/stretchr/testify/suite"
+)
+
+const (
+	testChatID = "testChat"
 )
 
 func TestAPI(t *testing.T) {
@@ -117,4 +122,71 @@ func (s *APITestSuite) TestRaceConditions() {
 
 	time.Sleep(2 * time.Second) // so that we see some logs
 	s.api.StopNode()            // just in case we have a node running
+}
+
+func (s *APITestSuite) TestCellsRemovedAfterSwitchAccount() {
+	const itersCount = 5
+	var (
+		require   = s.Require()
+		getChatId = func(id int) string {
+			return testChatID + strconv.Itoa(id)
+		}
+	)
+
+	config, err := e2e.MakeTestNodeConfig(params.RopstenNetworkID)
+	require.NoError(err)
+	err = s.api.StartNode(config)
+	require.NoError(err)
+	defer s.api.StopNode()
+
+	address1, _, _, err := s.api.AccountManager().CreateAccount(TestConfig.Account1.Password)
+	require.NoError(err)
+
+	address2, _, _, err := s.api.AccountManager().CreateAccount(TestConfig.Account2.Password)
+	require.NoError(err)
+
+	err = s.api.SelectAccount(address1, TestConfig.Account1.Password)
+	require.NoError(err)
+
+	for i := 0; i < itersCount; i++ {
+		_, err := s.api.JailManager().NewCell(getChatId(i))
+		require.NoError(err)
+	}
+
+	err = s.api.SelectAccount(address2, TestConfig.Account2.Password)
+	require.NoError(err)
+
+	for i := 0; i < itersCount; i++ {
+		_, err := s.api.JailManager().Cell(getChatId(i))
+		require.Error(err)
+	}
+}
+
+// TestLogoutRemovesCells we want be sure that
+// cells will be removed after the API call "Logout"
+func (s *APITestSuite) TestLogoutRemovesCells() {
+	var (
+		err     error
+		require = s.Require()
+	)
+
+	config, err := e2e.MakeTestNodeConfig(params.RopstenNetworkID)
+	require.NoError(err)
+	err = s.api.StartNode(config)
+	require.NoError(err)
+	defer s.api.StopNode()
+
+	address1, _, _, err := s.api.AccountManager().CreateAccount(TestConfig.Account1.Password)
+	require.NoError(err)
+
+	err = s.api.SelectAccount(address1, TestConfig.Account1.Password)
+	require.NoError(err)
+
+	s.api.JailManager().Parse(testChatID, ``)
+
+	err = s.api.Logout()
+	require.NoError(err)
+
+	_, err = s.api.JailManager().Cell(testChatID)
+	require.Error(err, "Expected that cells was removed")
 }
