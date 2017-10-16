@@ -8,7 +8,13 @@
     }
   },
   "config": {
-    "chainId": 777
+    "chainId": 777,
+    "homesteadBlock": 0,
+    "daoForkSupport": true,
+    "byzantiumBlock": 0,
+    "eip150Hash": "0x28c4da1cca48d0107ea5ea29a40ac15fca86899c52d02309fa12ea39b86d219c",
+    "eip155Block": 0,
+    "eip158Block": 0
   },
   "difficulty": "0x100000",
   "extraData": "0x537461747573436861696e20507269766174652054657374696e67204e6574776f726b",
