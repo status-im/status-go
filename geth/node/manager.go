@@ -105,7 +105,7 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 		if err != nil {
 			log.Error("Init RPC client failed:", "error", err)
 
-			m.closeNodeStarted()
+			m.setStarted()
 
 			signal.Send(signal.Envelope{
 				Type: signal.EventNodeCrashed,
@@ -126,7 +126,6 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 		}()
 
 		// notify all subscribers that Status node is started
-		m.closeNodeStarted()
 		m.setStarted()
 		signal.Send(signal.Envelope{
 			Type:  signal.EventNodeStarted,
@@ -158,7 +157,7 @@ func (m *NodeManager) newNode(config *params.NodeConfig) (*node.Node, error) {
 	defer m.nodeLock.Unlock()
 
 	if err = ethNode.Start(); err != nil {
-		m.closeNodeStarted()
+		m.setStarted()
 
 		signal.Send(signal.Envelope{
 			Type: signal.EventNodeCrashed,
@@ -177,6 +176,8 @@ func (m *NodeManager) StopNode() (<-chan struct{}, error) {
 	if err := m.isNodeAvailable(); err != nil {
 		return nil, err
 	}
+
+	m.waitNodeStarted()
 
 	return m.stopNode()
 }
@@ -215,6 +216,8 @@ func (m *NodeManager) IsNodeRunning() bool {
 		return false
 	}
 
+	m.waitNodeStarted()
+
 	return true
 }
 
@@ -224,6 +227,8 @@ func (m *NodeManager) Node() (*node.Node, error) {
 		return nil, err
 	}
 
+	m.waitNodeStarted()
+
 	return m.getNode(), nil
 }
 
@@ -232,6 +237,8 @@ func (m *NodeManager) PopulateStaticPeers() error {
 	if err := m.isNodeAvailable(); err != nil {
 		return err
 	}
+
+	m.waitNodeStarted()
 
 	return m.populateStaticPeers()
 }
@@ -261,6 +268,8 @@ func (m *NodeManager) AddPeer(url string) error {
 		return err
 	}
 
+	m.waitNodeStarted()
+
 	return m.addPeer(url)
 }
 
@@ -289,6 +298,8 @@ func (m *NodeManager) ResetChainData() (<-chan struct{}, error) {
 	if err := m.isNodeAvailable(); err != nil {
 		return nil, err
 	}
+
+	m.waitNodeStarted()
 
 	return m.resetChainData()
 }
@@ -329,6 +340,8 @@ func (m *NodeManager) RestartNode() (<-chan struct{}, error) {
 		return nil, err
 	}
 
+	m.waitNodeStarted()
+
 	return m.restartNode()
 }
 
@@ -360,6 +373,8 @@ func (m *NodeManager) LightEthereumService() (*les.LightEthereum, error) {
 		return nil, err
 	}
 
+	m.waitNodeStarted()
+
 	les, err := m.getLesService()
 	if err != nil {
 		log.Warn("Cannot obtain LES service", "error", err)
@@ -375,6 +390,8 @@ func (m *NodeManager) WhisperService() (*whisper.Whisper, error) {
 	if err := m.isNodeAvailable(); err != nil {
 		return nil, err
 	}
+
+	m.waitNodeStarted()
 
 	whisperService, err := m.getWhisperService()
 	if err != nil {
@@ -392,6 +409,8 @@ func (m *NodeManager) AccountManager() (*accounts.Manager, error) {
 		return nil, err
 	}
 
+	m.waitNodeStarted()
+
 	accountManager := m.node.AccountManager()
 	if accountManager == nil {
 		return nil, ErrInvalidAccountManager
@@ -406,8 +425,9 @@ func (m *NodeManager) AccountKeyStore() (*keystore.KeyStore, error) {
 		return nil, err
 	}
 
+	m.waitNodeStarted()
+
 	accountManager := m.node.AccountManager()
-	// todo(@jeka): how can this happens?
 	if accountManager == nil {
 		return nil, ErrInvalidAccountManager
 	}
@@ -459,7 +479,7 @@ func (m *NodeManager) setStopped() {
 	atomic.CompareAndSwapInt32(m.isStarted, started, stopped)
 }
 
-func (m *NodeManager) setStarted() {
+func (m *NodeManager) setStartedStatus() {
 	atomic.CompareAndSwapInt32(m.isStarted, stopped, started)
 }
 
@@ -552,10 +572,20 @@ func (m *NodeManager) readNodeStarted() {
 	m.nodeStartedLock.RUnlock()
 }
 
-func (m *NodeManager) closeNodeStarted() {
+func (m *NodeManager) waitNodeStarted() {
+	m.readNodeStarted()
+}
+
+func (m *NodeManager) setStarted() {
+	if m.isNodeStarted() {
+		return
+	}
+
 	m.nodeStartedLock.Lock()
 	close(m.nodeStarted)
 	m.nodeStartedLock.Unlock()
+
+	m.setStartedStatus()
 }
 
 func (m *NodeManager) getNodeStopped() chan struct{} {
@@ -591,6 +621,10 @@ func (m *NodeManager) closeNodeStopped() {
 	m.nodeStoppedLock.Unlock()
 }
 
+func (m *NodeManager) waitNodeStopped() {
+	m.closeNodeStopped()
+}
+
 func (m *NodeManager) setWhisperService(whisper *whisper.Whisper) {
 	m.whisperServiceLock.Lock()
 	m.whisperService = whisper
@@ -606,7 +640,7 @@ func (m *NodeManager) getWhisperService() (*whisper.Whisper, error) {
 		return whisper, nil
 	}
 
-	err := m.node.Service(whisper)
+	err := m.node.Service(&whisper)
 	if err != nil {
 		return nil, ErrInvalidWhisperService
 	}
@@ -638,7 +672,7 @@ func (m *NodeManager) getLesService() (*les.LightEthereum, error) {
 		return les, nil
 	}
 
-	err := m.node.Service(les)
+	err := m.node.Service(&les)
 	if err != nil {
 		return nil, ErrInvalidLightEthereumService
 	}
