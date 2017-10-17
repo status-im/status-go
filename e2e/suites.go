@@ -1,14 +1,12 @@
 package e2e
 
 import (
-	"context"
 	"time"
 
 	"github.com/ethereum/go-ethereum/les"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/common"
-	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/signal"
 	"github.com/stretchr/testify/suite"
 )
@@ -54,35 +52,6 @@ func (s *NodeManagerTestSuite) EnsureNodeSync(forceResync ...bool) {
 
 		wait *= 2
 	}
-}
-
-// EnsureNodeSync ensures that synchronization of the node is done once and that it
-// is done properly else, the call will fail.
-// FIXME(tiabc): BackendTestSuite contains the same method, let's sort it out?
-func (s *NodeManagerTestSuite) EnsureNodeSyncNew(forceResync ...bool) {
-	if len(forceResync) > 0 && forceResync[0] {
-		s.nodeSyncCompleted = false
-	}
-
-	if s.nodeSyncCompleted {
-		return
-	}
-
-	require := s.Require()
-
-	ethClient, err := s.NodeManager.LightEthereumService()
-	require.NoError(err)
-	require.NotNil(ethClient)
-
-	sync := node.NewSyncPoll(ethClient)
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
-	defer cancel()
-
-	// Validate that synchronization failed because of time.
-	syncError := sync.Poll(ctx)
-	require.NoError(syncError)
-
-	s.nodeSyncCompleted = true
 }
 
 // StartTestNode initiazes a NodeManager instances with configuration retrieved
@@ -230,32 +199,6 @@ func (s *BackendTestSuite) EnsureNodeSync(forceResync ...bool) {
 
 		wait *= 2
 	}
-}
-
-// EnsureNodeSync ensures that synchronization of the node is done once and that it
-// is done properly else, the call will fail.
-// FIXME(tiabc): NodeManagerTestSuite contains the same method, let's sort it out?
-func (s *BackendTestSuite) EnsureNodeSyncNew(forceResync ...bool) {
-	if len(forceResync) > 0 && forceResync[0] {
-		s.nodeSyncCompleted = false
-	}
-
-	if s.nodeSyncCompleted {
-		return
-	}
-
-	require := s.Require()
-
-	ethClient := s.LightEthereumService()
-	sync := node.NewSyncPoll(ethClient)
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
-	defer cancel()
-
-	// Validate that synchronization failed because of time.
-	syncError := sync.Poll(ctx)
-	require.NoError(syncError)
-
-	s.nodeSyncCompleted = true
 }
 
 func importTestAccouns(keyStoreDir string) (err error) {
