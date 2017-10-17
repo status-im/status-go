@@ -23,9 +23,9 @@ import (
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/signal"
-	. "github.com/status-im/status-go/geth/testing"
 	"github.com/status-im/status-go/geth/txqueue"
 	"github.com/status-im/status-go/static"
+	. "github.com/status-im/status-go/testing"
 	"github.com/stretchr/testify/require"
 )
 
@@ -53,10 +53,6 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 		{
 			"check default configuration",
 			testGetDefaultConfig,
-		},
-		{
-			"reset blockchain data",
-			testResetChainData,
 		},
 		{
 			"stop/resume node",
@@ -201,7 +197,10 @@ func testGetDefaultConfig(t *testing.T) bool {
 	return true
 }
 
+// @TODO(adam): quarantined this test until it uses a different directory.
 func testResetChainData(t *testing.T) bool {
+	t.Skip()
+
 	resetChainDataResponse := common.APIResponse{}
 	rawResponse := ResetChainData()
 
@@ -214,6 +213,7 @@ func testResetChainData(t *testing.T) bool {
 		return false
 	}
 
+	// FIXME(tiabc): EnsureNodeSync the same way as in e2e tests.
 	time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to re-sync blockchain
 
 	testCompleteTransaction(t)
@@ -322,7 +322,7 @@ func testStopResumeNode(t *testing.T) bool {
 }
 
 func testCallRPC(t *testing.T) bool {
-	expected := `{"jsonrpc":"2.0","id":64,"result":"0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad"}` + "\n"
+	expected := `{"jsonrpc":"2.0","id":64,"result":"0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad"}`
 	rawResponse := CallRPC(C.CString(`{"jsonrpc":"2.0","method":"web3_sha3","params":["0x68656c6c6f20776f726c64"],"id":64}`))
 	received := C.GoString(rawResponse)
 	if expected != received {
@@ -1361,6 +1361,7 @@ func startTestNode(t *testing.T) <-chan struct{} {
 			// sync
 			if syncRequired {
 				t.Logf("Sync is required, it will take %d seconds", TestConfig.Node.SyncSeconds)
+				// FIXME(tiabc): EnsureNodeSync the same way as in e2e tests.
 				time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // LES syncs headers, so that we are up do date when it is done
 			} else {
 				time.Sleep(5 * time.Second)

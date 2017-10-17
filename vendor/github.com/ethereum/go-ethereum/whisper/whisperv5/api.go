@@ -38,7 +38,7 @@ const (
 )
 
 var (
-	ErrSymAsym              = errors.New("specify either a symetric or a asymmetric key")
+	ErrSymAsym              = errors.New("specify either a symmetric or an asymmetric key")
 	ErrInvalidSymmetricKey  = errors.New("invalid symmetric key")
 	ErrInvalidPublicKey     = errors.New("invalid public key")
 	ErrInvalidSigningPubKey = errors.New("invalid signing public key")
@@ -251,7 +251,7 @@ func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (bool, er
 		})
 	}
 
-	// user must specify either a symmetric or a asymmetric key
+	// user must specify either a symmetric or an asymmetric key
 	if (symKeyGiven && pubKeyGiven) || (!symKeyGiven && !pubKeyGiven) {
 		if api.w.deliveryServer != nil {
 			api.w.deliveryServer.SendRPCState(RPCMessageState{
@@ -439,7 +439,7 @@ func (api *PublicWhisperAPI) Messages(ctx context.Context, crit Criteria) (*rpc.
 		return nil, rpc.ErrNotificationsUnsupported
 	}
 
-	// user must specify either a symmetric or a asymmetric key
+	// user must specify either a symmetric or an asymmetric key
 	if (symKeyGiven && pubKeyGiven) || (!symKeyGiven && !pubKeyGiven) {
 		return nil, ErrSymAsym
 	}
@@ -629,7 +629,7 @@ func (api *PublicWhisperAPI) NewMessageFilter(req Criteria) (string, error) {
 		err error
 	)
 
-	// user must specify either a symmetric or a asymmetric key
+	// user must specify either a symmetric or an asymmetric key
 	if (symKeyGiven && asymKeyGiven) || (!symKeyGiven && !asymKeyGiven) {
 		return "", ErrSymAsym
 	}

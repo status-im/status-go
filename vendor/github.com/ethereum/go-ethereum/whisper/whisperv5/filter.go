@@ -18,13 +18,14 @@ package whisperv5
 
 import (
 	"crypto/ecdsa"
+	"errors"
 	"fmt"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/message"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/syndtr/goleveldb/leveldb/errors"
 )
 
 type Filter struct {
@@ -68,6 +69,10 @@ func (fs *Filters) Install(watcher *Filter) (string, error) {
 
 	if fs.watchers[id] != nil {
 		return "", fmt.Errorf("failed to generate unique ID")
+	}
+
+	if watcher.expectsSymmetricEncryption() {
+		watcher.SymKeyHash = crypto.Keccak256Hash(watcher.KeySym)
 	}
 
 	fs.watchers[id] = watcher
@@ -148,7 +153,10 @@ func (fs *Filters) NotifyWatchers(env *Envelope, p2pMessage bool) {
 					Status:   message.DeliveredStatus,
 				})
 			}
-			watcher.Trigger(msg)
+
+			if watcher.Src == nil || IsPubKeyEqual(msg.Src, watcher.Src) {
+				watcher.Trigger(msg)
+			}
 		}
 	}
 }
@@ -199,9 +207,6 @@ func (f *Filter) Retrieve() (all []*ReceivedMessage) {
 
 func (f *Filter) MatchMessage(msg *ReceivedMessage) bool {
 	if f.PoW > 0 && msg.PoW < f.PoW {
-		return false
-	}
-	if f.Src != nil && !IsPubKeyEqual(msg.Src, f.Src) {
 		return false
 	}
 

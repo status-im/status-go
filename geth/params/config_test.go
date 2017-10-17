@@ -13,7 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	gethparams "github.com/ethereum/go-ethereum/params"
 	"github.com/status-im/status-go/geth/params"
-	. "github.com/status-im/status-go/geth/testing"
+	. "github.com/status-im/status-go/testing"
 	"github.com/stretchr/testify/require"
 )
 
@@ -245,6 +245,7 @@ var loadConfigTestCases = []struct {
 				"enode://ce6854c2c77a8800fcc12600206c344b8053bb90ee3ba280e6c4f18f3141cdc5ee80bcc3bdb24cbc0e96dffd4b38d7b57546ed528c00af6cd604ab65c4d528f6@163.172.153.124:30303",
 				"enode://00ae60771d9815daba35766d463a82a7b360b3a80e35ab2e0daa25bdc6ca6213ff4c8348025e7e1a908a8f58411a364fe02a0fb3c2aa32008304f063d8aaf1a2@163.172.132.85:30303",
 				"enode://86ebc843aa51669e08e27400e435f957918e39dc540b021a2f3291ab776c88bbda3d97631639219b6e77e375ab7944222c47713bdeb3251b25779ce743a39d70@212.47.254.155:30303",
+				"enode://a1ef9ba5550d5fac27f7cbd4e8d20a643ad75596f307c91cd6e7f85b548b8a6bf215cca436d6ee436d6135f9fe51398f8dd4c0bd6c6a0c332ccb41880f33ec12@51.15.218.125:30303",
 			}
 			require.Equal(t, expectedEnodes, enodes)
 		},
@@ -295,6 +296,7 @@ var loadConfigTestCases = []struct {
 				"enode://ce6854c2c77a8800fcc12600206c344b8053bb90ee3ba280e6c4f18f3141cdc5ee80bcc3bdb24cbc0e96dffd4b38d7b57546ed528c00af6cd604ab65c4d528f6@163.172.153.124:30303",
 				"enode://00ae60771d9815daba35766d463a82a7b360b3a80e35ab2e0daa25bdc6ca6213ff4c8348025e7e1a908a8f58411a364fe02a0fb3c2aa32008304f063d8aaf1a2@163.172.132.85:30303",
 				"enode://86ebc843aa51669e08e27400e435f957918e39dc540b021a2f3291ab776c88bbda3d97631639219b6e77e375ab7944222c47713bdeb3251b25779ce743a39d70@212.47.254.155:30303",
+				"enode://a1ef9ba5550d5fac27f7cbd4e8d20a643ad75596f307c91cd6e7f85b548b8a6bf215cca436d6ee436d6135f9fe51398f8dd4c0bd6c6a0c332ccb41880f33ec12@51.15.218.125:30303",
 			}
 			require.Equal(t, expectedEnodes, enodes)
 		},
@@ -355,11 +357,7 @@ var loadConfigTestCases = []struct {
 			require.True(t, nodeConfig.BootClusterConfig.RootNumber >= 805)
 
 			enodes := nodeConfig.BootClusterConfig.BootNodes
-			expectedEnodes := []string{
-				"enode://93833be81c3d1bdb2ae5cde258c8f82ad1011a1bea8eb49fe50b0af394d4f7f7e45974356870552f36744efd732692a64865d1e8b64114eaf89a1bad0a1903a2@51.15.64.29:30303",
-				"enode://d76854bc54144b2269c5316d5f00f0a194efee2fb8d31e7b1939effd7e17f25773f8dc7fda8c4eb469450799da7f39b4e364e2a278d91b53539dcbb10b139635@51.15.73.37:30303",
-				"enode://57874205931df976079e4ff8ebb5756461030fb00f73486bd5ec4ae6ed6ba98e27d09f58e59bd85281d24084a6062bc8ab514dbcdaa9678fc3001d47772e626e@51.15.75.213:30303",
-			}
+			expectedEnodes := []string{}
 			require.Equal(t, expectedEnodes, enodes)
 		},
 	},
@@ -377,11 +375,7 @@ var loadConfigTestCases = []struct {
 			require.True(t, nodeConfig.BootClusterConfig.RootNumber >= 805)
 
 			enodes := nodeConfig.BootClusterConfig.BootNodes
-			expectedEnodes := []string{
-				"enode://f3b0e5dca730962bae814f3402b8f8a296644c33e8d7a95bd1ab313143a752c77076a03bcb76263570f2f34d4eb530f1daf5054c0990921a872a34eb505dcedf@51.15.73.129:30303",
-				"enode://fce0d1c2292829b0eccce444f8943f88087ce00a5e910b157972ee1658a948d23c7a046f26567f73b2b18d126811509d7ef1de5be9b1decfcbb14738a590c477@51.15.75.187:30303",
-				"enode://3b4b9fa02ae8d54c2db51a674bc93d85649b4775f22400f74ae25e9f1c665baa3bcdd33cadd2c1a93cd08a6af984cb605fbb61ec0d750a11d48d4080298af008@51.15.77.193:30303",
-			}
+			expectedEnodes := []string{}
 			require.Equal(t, expectedEnodes, enodes)
 		},
 	},
@@ -457,7 +451,7 @@ func TestConfigWriteRead(t *testing.T) {
 		refConfigData = strings.Replace(refConfigData, "$TMPDIR", nodeConfig.DataDir, -1)
 		refConfigData = strings.Replace(refConfigData, "$VERSION", params.Version, -1)
 
-		require.EqualValues(t, refConfigData, loadedConfigData)
+		require.Equal(t, strings.TrimSpace(string(refConfigData[:])), strings.TrimSpace(string(loadedConfigData[:])))
 	}
 
 	configReadWrite(params.RinkebyNetworkID, "testdata/config.rinkeby.json")

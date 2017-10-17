@@ -102,4 +102,7 @@ const (
 
 	// RinkebyNetworkID is id of a test network (on PoA)
 	RinkebyNetworkID = 4
+
+	// StatusChainNetworkID is id of a test network (private chain)
+	StatusChainNetworkID = 777
 )

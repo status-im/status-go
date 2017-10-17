@@ -118,13 +118,13 @@ func (m *StatusBackend) StopNode() (<-chan struct{}, error) {
 	}
 	<-m.nodeReady
 
+	m.txQueueManager.Stop()
+	m.jailManager.Stop()
+
 	nodeStopped, err := m.nodeManager.StopNode()
 	if err != nil {
 		return nil, err
 	}
-
-	m.txQueueManager.Stop()
-	m.jailManager.Stop()
 
 	backendStopped := make(chan struct{}, 1)
 	go func() {

@@ -500,6 +500,12 @@ func (c *NodeConfig) updateGenesisConfig() error {
 		genesis = core.DefaultTestnetGenesisBlock()
 	case RinkebyNetworkID:
 		genesis = core.DefaultRinkebyGenesisBlock()
+	case StatusChainNetworkID:
+		var err error
+		genesis, err = c.DefaultStatusChainGenesisBlock()
+		if err != nil {
+			return err
+		}
 	default:
 		return nil
 	}
@@ -512,6 +518,20 @@ func (c *NodeConfig) updateGenesisConfig() error {
 	c.LightEthConfig.Genesis = string(enc)
 
 	return nil
+}
+
+// DefaultStatusChainGenesisBlock returns the StatusChain network genesis block.
+func (c *NodeConfig) DefaultStatusChainGenesisBlock() (*core.Genesis, error) {
+	genesisJSON, err := static.Asset("config/status-chain-genesis.json")
+	if err != nil {
+		return nil, fmt.Errorf("status-chain-genesis.json could not be loaded: %s", err)
+	}
+
+	var genesis *core.Genesis
+	if err := json.Unmarshal([]byte(genesisJSON), &genesis); err != nil {
+		return nil, fmt.Errorf("cannot unmarshal status-chain-genesis.json: %s", err)
+	}
+	return genesis, nil
 }
 
 // updateUpstreamConfig sets the proper UpstreamConfig.URL for the network id being used.

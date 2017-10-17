@@ -1,6 +1,7 @@
 package promise_test
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -88,7 +89,7 @@ func (s *PromiseSuite) SetupTest() {
 	s.vm = vm.New(o)
 	s.loop = loop.New(s.vm)
 
-	go s.loop.Run()
+	go s.loop.Run(context.Background())
 
 	err := promise.Define(s.vm, s.loop)
 	s.NoError(err)
