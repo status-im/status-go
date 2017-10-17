@@ -336,23 +336,26 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 			}
 		}()
 
+		// Use polling because:
+		//   (1) filterId is not assigned immediately,
+		//   (2) messages propagate with some delay.
 	poll_loop:
 		for {
-			// Use polling because:
-			//   (1) filterId is not assigned immediately,
-			//   (2) messages propagate with some delay.
+			filter, err := cell.Get("filter")
+			s.NoError(err, "cannot get filter")
+			filterID, err := filter.Object().Get("filterId")
+			s.NoError(err, "cannot get filterId")
+
 			select {
 			case <-done:
+				ok, err := s.WhisperAPI.DeleteMessageFilter(filterID.String())
+				s.NoError(err)
+				s.True(ok)
 				break poll_loop
 			case <-timedOut:
 				s.FailNow("polling for messages timed out")
 			case <-time.After(time.Second):
 			}
-
-			filter, err := cell.Get("filter")
-			s.NoError(err, "cannot get filter")
-			filterID, err := filter.Object().Get("filterId")
-			s.NoError(err, "cannot get filterId")
 
 			// FilterID is not assigned yet.
 			if filterID.IsNull() {

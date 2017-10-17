@@ -37,7 +37,7 @@ func MakeTestNodeConfig(networkID int) (*params.NodeConfig, error) {
 	// when `go test` invoked with `-v` flag
 	errorLevel := "ERROR"
 	if testing.Verbose() {
-		errorLevel = "TRACE"
+		errorLevel = "INFO"
 	}
 
 	configJSON := `{
