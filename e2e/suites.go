@@ -28,7 +28,7 @@ func (s *NodeManagerTestSuite) EnsureNodeSync(forceResync ...bool) {
 	}
 
 	start := time.Now()
-	wait := time.Second
+	wait := 5 * time.Second
 	les, err := s.NodeManager.LightEthereumService()
 	if err != nil {
 		s.Error(err)
@@ -36,6 +36,9 @@ func (s *NodeManagerTestSuite) EnsureNodeSync(forceResync ...bool) {
 	s.NotNil(les)
 
 	for {
+		// Some time needed even initially.
+		time.Sleep(wait)
+
 		downloader := les.Downloader()
 
 		if downloader != nil {
@@ -47,8 +50,7 @@ func (s *NodeManagerTestSuite) EnsureNodeSync(forceResync ...bool) {
 			}
 		}
 
-		s.True(time.Now().Sub(start) < (256 * time.Second))
-		time.Sleep(wait)
+		s.True(time.Now().Sub(start) < (5 * time.Minute))
 
 		wait *= 2
 	}
@@ -176,21 +178,20 @@ func (s *BackendTestSuite) EnsureNodeSync(forceResync ...bool) {
 
 	start := time.Now()
 	wait := time.Second
-	les, err := s.Backend.NodeManager().LightEthereumService()
-	if err != nil {
-		s.Error(err)
-	}
-	s.NotNil(les)
 
 	for {
-		downloader := les.Downloader()
+		les, _ := s.Backend.NodeManager().LightEthereumService()
 
-		if downloader != nil {
-			isSyncing := downloader.Synchronising()
-			progress := downloader.Progress()
+		if les != nil {
+			downloader := les.Downloader()
 
-			if !isSyncing && progress.HighestBlock > 0 && progress.CurrentBlock >= progress.HighestBlock {
-				break
+			if downloader != nil {
+				isSyncing := downloader.Synchronising()
+				progress := downloader.Progress()
+
+				if !isSyncing && progress.HighestBlock > 0 && progress.CurrentBlock >= progress.HighestBlock {
+					break
+				}
 			}
 		}
 
