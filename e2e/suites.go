@@ -20,10 +20,46 @@ type NodeManagerTestSuite struct {
 	nodeSyncCompleted bool
 }
 
+// EnsureNodeSync ensures that synchronization of the node is done to
+// solve "no suitable peers" issue.
+// TODO(themue): Create issue for combination with same method of
+// BackendTestSuite.
+func (s *NodeManagerTestSuite) EnsureNodeSync(forceResync ...bool) {
+	if len(forceResync) > 0 && !forceResync[0] {
+		return
+	}
+
+	start := time.Now()
+	wait := time.Second
+	les, err := s.NodeManager.LightEthereumService()
+	if err != nil {
+		s.Error(err)
+	}
+	s.NotNil(les)
+
+	for {
+		downloader := les.Downloader()
+
+		if downloader != nil {
+			isSyncing := downloader.Synchronising()
+			progress := downloader.Progress()
+
+			if !isSyncing && progress.HighestBlock > 0 && progress.CurrentBlock >= progress.HighestBlock {
+				break
+			}
+		}
+
+		s.True(time.Now().Sub(start) < (256 * time.Second))
+		time.Sleep(wait)
+
+		wait *= 2
+	}
+}
+
 // EnsureNodeSync ensures that synchronization of the node is done once and that it
 // is done properly else, the call will fail.
 // FIXME(tiabc): BackendTestSuite contains the same method, let's sort it out?
-func (s *NodeManagerTestSuite) EnsureNodeSync(forceResync ...bool) {
+func (s *NodeManagerTestSuite) EnsureNodeSyncNew(forceResync ...bool) {
 	if len(forceResync) > 0 && forceResync[0] {
 		s.nodeSyncCompleted = false
 	}
@@ -162,10 +198,44 @@ func (s *BackendTestSuite) TxQueueManager() common.TxQueueManager {
 	return s.Backend.TxQueueManager()
 }
 
+// EnsureNodeSync ensures that synchronization of the node is done to
+// solve "no suitable peers" issue.
+func (s *BackendTestSuite) EnsureNodeSync(forceResync ...bool) {
+	if len(forceResync) > 0 && !forceResync[0] {
+		return
+	}
+
+	start := time.Now()
+	wait := time.Second
+	les, err := s.Backend.NodeManager().LightEthereumService()
+	if err != nil {
+		s.Error(err)
+	}
+	s.NotNil(les)
+
+	for {
+		downloader := les.Downloader()
+
+		if downloader != nil {
+			isSyncing := downloader.Synchronising()
+			progress := downloader.Progress()
+
+			if !isSyncing && progress.HighestBlock > 0 && progress.CurrentBlock >= progress.HighestBlock {
+				break
+			}
+		}
+
+		s.True(time.Now().Sub(start) < (256 * time.Second))
+		time.Sleep(wait)
+
+		wait *= 2
+	}
+}
+
 // EnsureNodeSync ensures that synchronization of the node is done once and that it
 // is done properly else, the call will fail.
 // FIXME(tiabc): NodeManagerTestSuite contains the same method, let's sort it out?
-func (s *BackendTestSuite) EnsureNodeSync(forceResync ...bool) {
+func (s *BackendTestSuite) EnsureNodeSyncNew(forceResync ...bool) {
 	if len(forceResync) > 0 && forceResync[0] {
 		s.nodeSyncCompleted = false
 	}
