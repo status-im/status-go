@@ -5,9 +5,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/ethereum/go-ethereum/eth/downloader"
-	"github.com/ethereum/go-ethereum/les"
 	"github.com/status-im/status-go/geth/log"
+	"github.com/ethereum/go-ethereum"
 )
 
 // errors
@@ -19,13 +18,18 @@ var (
 // SyncPoll provides a structure that allows us to check the status of
 // ethereum node synchronization.
 type SyncPoll struct {
-	downloader *downloader.Downloader
+	downloader Downloader
+}
+
+type Downloader interface {
+	Synchronising() bool
+	Progress() ethereum.SyncProgress
 }
 
 // NewSyncPoll returns a new instance of SyncPoll.
-func NewSyncPoll(leth *les.LightEthereum) *SyncPoll {
+func NewSyncPoll(d Downloader) *SyncPoll {
 	return &SyncPoll{
-		downloader: leth.Downloader(),
+		downloader: d,
 	}
 }
 

@@ -265,7 +265,7 @@ func (s *AccountsTestSuite) TestSelectedAccountOnRestart() {
 	s.Equal(selectedAccount.Address.Hex(), address2, "incorrect address selected")
 
 	// resume node
-	nodeStarted, err := s.Backend.StartNode(&preservedNodeConfig)
+	nodeStarted, err := s.Backend.StartNode(preservedNodeConfig)
 	s.NoError(err)
 	<-nodeStarted
 

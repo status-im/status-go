@@ -13,13 +13,12 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/les"
-	"github.com/ethereum/go-ethereum/node"
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/rpc"
 	"github.com/status-im/status-go/static"
+	"github.com/status-im/status-go/geth/common/services"
+	"github.com/ethereum/go-ethereum/whisper/whisperv5"
 )
 
 // errors
@@ -63,10 +62,10 @@ type NodeManager interface {
 	IsNodeRunning() bool
 
 	// NodeConfig returns reference to running node's configuration
-	NodeConfig() (params.NodeConfig, error)
+	NodeConfig() (*params.NodeConfig, error)
 
 	// Node returns underlying Status node
-	Node() (*node.Node, error)
+	Node() (services.Node, error)
 
 	// PopulateStaticPeers populates node's list of static bootstrap peers
 	PopulateStaticPeers() error
@@ -75,10 +74,12 @@ type NodeManager interface {
 	AddPeer(url string) error
 
 	// LightEthereumService exposes reference to LES service running on top of the node
-	LightEthereumService() (*les.LightEthereum, error)
+	LightEthereumService() (services.LesService, error)
 
 	// WhisperService returns reference to running Whisper service
-	WhisperService() (*whisper.Whisper, error)
+	WhisperService() (services.Whisper, error)
+
+	PublicWhisperAPI() (*whisperv5.PublicWhisperAPI, error)
 
 	// AccountManager returns reference to node's account manager
 	AccountManager() (*accounts.Manager, error)
@@ -87,7 +88,9 @@ type NodeManager interface {
 	AccountKeyStore() (*keystore.KeyStore, error)
 
 	// RPCClient exposes reference to RPC client connected to the running node
-	RPCClient() *rpc.Client
+	RPCClient() services.RPCClient
+
+	GetStatusBackend() (services.StatusBackend, error)
 }
 
 // AccountManager defines expected methods for managing Status accounts

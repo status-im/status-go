@@ -193,7 +193,7 @@ func (m *Manager) CompleteTransaction(id common.QueuedTxID, password string) (ge
 func (m *Manager) completeLocalTransaction(queuedTx *common.QueuedTx, password string) (gethcommon.Hash, error) {
 	log.Info("complete transaction using local node", "id", queuedTx.ID)
 
-	les, err := m.nodeManager.LightEthereumService()
+	backend, err := m.nodeManager.GetStatusBackend()
 	if err != nil {
 		return gethcommon.Hash{}, err
 	}
@@ -201,7 +201,7 @@ func (m *Manager) completeLocalTransaction(queuedTx *common.QueuedTx, password s
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
-	return les.StatusBackend.SendTransaction(ctx, status.SendTxArgs(queuedTx.Args), password)
+	return backend.SendTransaction(ctx, status.SendTxArgs(queuedTx.Args), password)
 }
 
 func (m *Manager) completeRemoteTransaction(queuedTx *common.QueuedTx, password string) (gethcommon.Hash, error) {

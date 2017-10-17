@@ -4,13 +4,13 @@ import (
 	"context"
 	"time"
 
-	"github.com/ethereum/go-ethereum/les"
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/signal"
 	"github.com/stretchr/testify/suite"
+	"github.com/status-im/status-go/geth/common/services"
+	"github.com/ethereum/go-ethereum/whisper/whisperv5"
 )
 
 // NodeManagerTestSuite defines a test suit with NodeManager.
@@ -38,7 +38,7 @@ func (s *NodeManagerTestSuite) EnsureNodeSync(forceResync ...bool) {
 	require.NoError(err)
 	require.NotNil(ethClient)
 
-	sync := node.NewSyncPoll(ethClient)
+	sync := node.NewSyncPoll(ethClient.Downloader())
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 	defer cancel()
 
@@ -144,7 +144,7 @@ func (s *BackendTestSuite) RestartTestNode() {
 }
 
 // WhisperService returns a reference to the Whisper service.
-func (s *BackendTestSuite) WhisperService() *whisper.Whisper {
+func (s *BackendTestSuite) WhisperService() services.Whisper {
 	whisperService, err := s.Backend.NodeManager().WhisperService()
 	s.NoError(err)
 	s.NotNil(whisperService)
@@ -152,8 +152,16 @@ func (s *BackendTestSuite) WhisperService() *whisper.Whisper {
 	return whisperService
 }
 
+func (s *BackendTestSuite) PublicWhisperAPI() *whisperv5.PublicWhisperAPI {
+	whisperAPI, err := s.Backend.NodeManager().PublicWhisperAPI()
+	s.NoError(err)
+	s.NotNil(whisperAPI)
+
+	return whisperAPI
+}
+
 // LightEthereumService returns a reference to the LES service.
-func (s *BackendTestSuite) LightEthereumService() *les.LightEthereum {
+func (s *BackendTestSuite) LightEthereumService() services.LesService {
 	lightEthereum, err := s.Backend.NodeManager().LightEthereumService()
 	s.NoError(err)
 	s.NotNil(lightEthereum)
@@ -181,7 +189,7 @@ func (s *BackendTestSuite) EnsureNodeSync(forceResync ...bool) {
 	require := s.Require()
 
 	ethClient := s.LightEthereumService()
-	sync := node.NewSyncPoll(ethClient)
+	sync := node.NewSyncPoll(ethClient.Downloader())
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 	defer cancel()
 

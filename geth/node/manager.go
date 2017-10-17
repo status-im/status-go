@@ -6,18 +6,19 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/les"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/discover"
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
+	"github.com/ethereum/go-ethereum/whisper/whisperv5"
+	"github.com/status-im/status-go/geth/common/services"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/rpc"
 	"github.com/status-im/status-go/geth/signal"
-	"sync/atomic"
 )
 
 // errors
@@ -45,7 +46,7 @@ type NodeManager struct {
 	config     *params.NodeConfig // Status node configuration
 	configLock sync.RWMutex
 
-	node     *node.Node // reference to Geth P2P stack/node
+	node     services.Node // reference to Geth P2P stack/node
 	nodeLock sync.RWMutex
 
 	nodeStarted     chan struct{} // channel to wait for start up notifications
@@ -54,13 +55,14 @@ type NodeManager struct {
 	nodeStopped     chan struct{} // channel to wait for termination notifications
 	nodeStoppedLock sync.RWMutex
 
-	whisperService     *whisper.Whisper // reference to Whisper service
+	whisperService     *whisperv5.Whisper // reference to Whisper service
 	whisperServiceLock sync.RWMutex
 
-	lesService     *les.LightEthereum // reference to LES service
+	lesService     services.LesService // reference to LES service
+	statusBackend  services.StatusBackend
 	lesServiceLock sync.RWMutex
 
-	rpcClient     *rpc.Client // reference to RPC client
+	rpcClient     services.RPCClient // reference to RPC client
 	rpcClientLock sync.RWMutex
 }
 
@@ -104,7 +106,7 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 		m.setConfig(config)
 
 		// init RPC client for this node
-		rpcClient, err := rpc.NewClient(m.getNode(), m.getUpstreamConfig())
+		rpcClient, err := rpc.NewClient(ethNode, m.getUpstreamConfig())
 		if err != nil {
 			log.Error("Init RPC client failed:", "error", err)
 
@@ -215,7 +217,7 @@ func (m *NodeManager) IsNodeRunning() bool {
 }
 
 // Node returns underlying Status node
-func (m *NodeManager) Node() (*node.Node, error) {
+func (m *NodeManager) Node() (services.Node, error) {
 	if err := m.isNodeAvailable(); err != nil {
 		return nil, err
 	}
@@ -352,19 +354,20 @@ func (m *NodeManager) restartNode() (<-chan struct{}, error) {
 }
 
 // NodeConfig exposes reference to running node's configuration
-func (m *NodeManager) NodeConfig() (params.NodeConfig, error) {
+func (m *NodeManager) NodeConfig() (*params.NodeConfig, error) {
 	if err := m.isNodeAvailable(); err != nil {
-		return params.NodeConfig{}, err
+		return nil, err
 	}
 
 	m.configLock.Lock()
 	defer m.configLock.Unlock()
 
-	return *m.config, nil
+	config := m.config
+	return config, nil
 }
 
 // LightEthereumService exposes reference to LES service running on top of the node
-func (m *NodeManager) LightEthereumService() (*les.LightEthereum, error) {
+func (m *NodeManager) LightEthereumService() (services.LesService, error) {
 	if err := m.isNodeAvailable(); err != nil {
 		return nil, err
 	}
@@ -382,7 +385,7 @@ func (m *NodeManager) LightEthereumService() (*les.LightEthereum, error) {
 }
 
 // WhisperService exposes reference to Whisper service running on top of the node
-func (m *NodeManager) WhisperService() (*whisper.Whisper, error) {
+func (m *NodeManager) WhisperService() (services.Whisper, error) {
 	if err := m.isNodeAvailable(); err != nil {
 		return nil, err
 	}
@@ -397,6 +400,22 @@ func (m *NodeManager) WhisperService() (*whisper.Whisper, error) {
 
 	m.whisperService = whisperService
 	return m.whisperService, nil
+}
+
+func (m *NodeManager) PublicWhisperAPI() (*whisperv5.PublicWhisperAPI, error) {
+	if err := m.isNodeAvailable(); err != nil {
+		return nil, err
+	}
+
+	m.waitNodeStarted()
+
+	whisperService, err := m.getWhisperService()
+	if err != nil {
+		log.Warn("Cannot obtain whisper service", "error", err)
+		return nil, err
+	}
+
+	return whisperv5.NewPublicWhisperAPI(whisperService), nil
 }
 
 // AccountManager exposes reference to node's accounts manager
@@ -442,7 +461,7 @@ func (m *NodeManager) AccountKeyStore() (*keystore.KeyStore, error) {
 }
 
 // RPCClient exposes reference to RPC client connected to the running node.
-func (m *NodeManager) RPCClient() *rpc.Client {
+func (m *NodeManager) RPCClient() services.RPCClient {
 	return m.getRPCClient()
 }
 
@@ -539,18 +558,17 @@ func (m *NodeManager) getBootNodes() []string {
 	return nodes
 }
 
-func (m *NodeManager) setNode(node *node.Node) {
+func (m *NodeManager) setNode(node services.Node) {
 	m.nodeLock.Lock()
 	m.node = node
 	m.nodeLock.Unlock()
 }
 
-func (m *NodeManager) getNode() *node.Node {
+func (m *NodeManager) getNode() services.Node {
 	m.nodeLock.RLock()
 	defer m.nodeLock.RUnlock()
 
-	node := *m.node
-	return &node
+	return m.node
 }
 
 func (m *NodeManager) setNodeStarted(nodeStarted chan struct{}) {
@@ -564,14 +582,6 @@ func (m *NodeManager) getNodeStarted() chan struct{} {
 	defer m.nodeStartedLock.RUnlock()
 
 	return m.nodeStarted
-}
-
-func (m *NodeManager) nodeStartedIsNil() bool {
-	m.nodeStartedLock.RLock()
-	ok := m.nodeStarted == nil
-	m.nodeStartedLock.RUnlock()
-
-	return ok
 }
 
 func (m *NodeManager) readNodeStarted() {
@@ -597,7 +607,7 @@ func (m *NodeManager) setStarted() {
 }
 
 func (m *NodeManager) setFailed() {
-	if m.isNodeStarted() {
+	if !m.isNodePending() {
 		return
 	}
 
@@ -621,14 +631,6 @@ func (m *NodeManager) setNodeStopped(nodeStopped chan struct{}) {
 	m.nodeStoppedLock.Unlock()
 }
 
-func (m *NodeManager) nodeStoppedIsNil() bool {
-	m.nodeStoppedLock.RLock()
-	ok := m.nodeStopped == nil
-	m.nodeStoppedLock.RUnlock()
-
-	return ok
-}
-
 func (m *NodeManager) readNodeStopped() {
 	m.nodeStoppedLock.RLock()
 	<-m.nodeStopped
@@ -645,76 +647,69 @@ func (m *NodeManager) waitNodeStopped() {
 	m.readNodeStopped()
 }
 
-func (m *NodeManager) setWhisperService(whisper *whisper.Whisper) {
+func (m *NodeManager) getWhisperService() (*whisperv5.Whisper, error) {
 	m.whisperServiceLock.Lock()
-	m.whisperService = whisper
-	m.whisperServiceLock.Unlock()
-}
+	defer m.whisperServiceLock.Unlock()
 
-func (m *NodeManager) getWhisperService() (*whisper.Whisper, error) {
-	m.whisperServiceLock.RLock()
-	defer m.whisperServiceLock.RUnlock()
-
-	whisper := m.whisperService
-	if whisper != nil {
-		return whisper, nil
+	if m.whisperService != nil {
+		return m.whisperService, nil
 	}
 
-	err := m.node.Service(&whisper)
+	var whisperObject *whisperv5.Whisper
+	err := m.node.Service(&whisperObject)
 	if err != nil {
 		return nil, ErrInvalidWhisperService
 	}
+	m.whisperService = whisperObject
 
-
-	return whisper, nil
+	return m.whisperService, nil
 }
 
-func (m *NodeManager) whisperServiceIsNil() bool {
-	m.whisperServiceLock.RLock()
-	ok := m.whisperService == nil
-	m.whisperServiceLock.RUnlock()
-
-	return ok
-}
-
-func (m *NodeManager) setLesService(les *les.LightEthereum) {
+func (m *NodeManager) setLesService(les services.LesService) {
 	m.lesServiceLock.Lock()
 	m.lesService = les
 	m.lesServiceLock.Unlock()
 }
 
-func (m *NodeManager) getLesService() (*les.LightEthereum, error) {
-	m.lesServiceLock.RLock()
-	defer m.lesServiceLock.RUnlock()
+func (m *NodeManager) getLesService() (services.LesService, error) {
+	m.lesServiceLock.Lock()
+	defer m.lesServiceLock.Unlock()
 
-	les := m.lesService
-	if les != nil {
-		return les, nil
+	if m.lesService != nil {
+		return m.lesService, nil
 	}
 
-	err := m.node.Service(&les)
+	var lesObject *les.LightEthereum
+	err := m.node.Service(&lesObject)
 	if err != nil {
 		return nil, ErrInvalidLightEthereumService
 	}
+	m.lesService = lesObject
 
-	return les, nil
+	m.statusBackend = lesObject.StatusBackend
+
+	return m.lesService, nil
 }
 
-func (m *NodeManager) lesServiceIsNil() bool {
-	m.lesServiceLock.RLock()
-	ok := m.lesService == nil
-	m.lesServiceLock.RUnlock()
+func (m *NodeManager) GetStatusBackend() (services.StatusBackend, error) {
+	_, err := m.getLesService()
+	if err != nil {
+		return nil, err
+	}
 
-	return ok
+	m.lesServiceLock.Lock()
+	defer m.lesServiceLock.Unlock()
+
+	return m.statusBackend, nil
 }
 
-func (m *NodeManager) setRPCClient(rpcClient *rpc.Client) {
+func (m *NodeManager) setRPCClient(rpcClient services.RPCClient) {
 	m.rpcClientLock.Lock()
 	m.rpcClient = rpcClient
 	m.rpcClientLock.Unlock()
 }
 
-func (m *NodeManager) getRPCClient() *rpc.Client {
+func (m *NodeManager) getRPCClient() services.RPCClient {
 	m.rpcClientLock.RLock()
 	defer m.rpcClientLock.RUnlock()
 
@@ -722,14 +717,5 @@ func (m *NodeManager) getRPCClient() *rpc.Client {
 		return nil
 	}
 
-	rpcClient := *m.rpcClient
-	return &rpcClient
-}
-
-func (m *NodeManager) rpcClientIsNil() bool {
-	m.rpcClientLock.RLock()
-	ok := m.rpcClient == nil
-	m.rpcClientLock.RUnlock()
-
-	return ok
+	return m.rpcClient
 }

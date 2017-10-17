@@ -27,11 +27,7 @@ func (s *RPCClientTestSuite) TestNewClient() {
 	config, err := e2e.MakeTestNodeConfig(params.RinkebyNetworkID)
 	s.NoError(err)
 
-	nodeStarted, err := s.NodeManager.StartNode(config)
-	s.NoError(err)
-	<-nodeStarted
-
-	node, err := s.NodeManager.Node()
+	node, err := node.MakeNode(config)
 	s.NoError(err)
 
 	// upstream disabled, local node ok

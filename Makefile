@@ -135,6 +135,11 @@ mock-install: ##@other Install mocking tools
 
 mock: ##@other Regenerate mocks
 	mockgen -source=geth/common/types.go -destination=geth/common/types_mock.go -package=common
+	mockgen -source=geth/common/services/les.go -destination=geth/common/services/les_mock.go -package=services
+	mockgen -source=geth/common/services/node.go -destination=geth/common/services/node_mock.go -package=services
+	mockgen -source=geth/common/services/rpc_client.go -destination=geth/common/services/rpc_client_mock.go -package=services
+	mockgen -source=geth/common/services/status_backend.go -destination=geth/common/services/status_backend_mock.go -package=services
+	mockgen -source=geth/common/services/whisper.go -destination=geth/common/services/whisper_mock.go -package=services
 
 test: ##@tests Run unit and integration tests
 	build/env.sh go test $(UNIT_TEST_PACKAGES)

@@ -9,11 +9,10 @@ import (
 	accounts "github.com/ethereum/go-ethereum/accounts"
 	keystore "github.com/ethereum/go-ethereum/accounts/keystore"
 	common "github.com/ethereum/go-ethereum/common"
-	les "github.com/ethereum/go-ethereum/les"
-	node "github.com/ethereum/go-ethereum/node"
 	whisperv5 "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	gomock "github.com/golang/mock/gomock"
 	otto "github.com/robertkrimen/otto"
+	services "github.com/status-im/status-go/geth/common/services"
 	params "github.com/status-im/status-go/geth/params"
 	rpc "github.com/status-im/status-go/geth/rpc"
 	reflect "reflect"
@@ -120,9 +119,9 @@ func (mr *MockNodeManagerMockRecorder) NodeConfig() *gomock.Call {
 }
 
 // Node mocks base method
-func (m *MockNodeManager) Node() (*node.Node, error) {
+func (m *MockNodeManager) Node() (services.Node, error) {
 	ret := m.ctrl.Call(m, "Node")
-	ret0, _ := ret[0].(*node.Node)
+	ret0, _ := ret[0].(services.Node)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -157,9 +156,9 @@ func (mr *MockNodeManagerMockRecorder) AddPeer(url interface{}) *gomock.Call {
 }
 
 // LightEthereumService mocks base method
-func (m *MockNodeManager) LightEthereumService() (*les.LightEthereum, error) {
+func (m *MockNodeManager) LightEthereumService() (services.LesService, error) {
 	ret := m.ctrl.Call(m, "LightEthereumService")
-	ret0, _ := ret[0].(*les.LightEthereum)
+	ret0, _ := ret[0].(services.LesService)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -170,9 +169,9 @@ func (mr *MockNodeManagerMockRecorder) LightEthereumService() *gomock.Call {
 }
 
 // WhisperService mocks base method
-func (m *MockNodeManager) WhisperService() (*whisperv5.Whisper, error) {
+func (m *MockNodeManager) WhisperService() (services.Whisper, error) {
 	ret := m.ctrl.Call(m, "WhisperService")
-	ret0, _ := ret[0].(*whisperv5.Whisper)
+	ret0, _ := ret[0].(services.Whisper)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -180,6 +179,19 @@ func (m *MockNodeManager) WhisperService() (*whisperv5.Whisper, error) {
 // WhisperService indicates an expected call of WhisperService
 func (mr *MockNodeManagerMockRecorder) WhisperService() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WhisperService", reflect.TypeOf((*MockNodeManager)(nil).WhisperService))
+}
+
+// PublicWhisperAPI mocks base method
+func (m *MockNodeManager) PublicWhisperAPI() (*whisperv5.PublicWhisperAPI, error) {
+	ret := m.ctrl.Call(m, "PublicWhisperAPI")
+	ret0, _ := ret[0].(*whisperv5.PublicWhisperAPI)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PublicWhisperAPI indicates an expected call of PublicWhisperAPI
+func (mr *MockNodeManagerMockRecorder) PublicWhisperAPI() *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PublicWhisperAPI", reflect.TypeOf((*MockNodeManager)(nil).PublicWhisperAPI))
 }
 
 // AccountManager mocks base method
@@ -209,15 +221,28 @@ func (mr *MockNodeManagerMockRecorder) AccountKeyStore() *gomock.Call {
 }
 
 // RPCClient mocks base method
-func (m *MockNodeManager) RPCClient() *rpc.Client {
+func (m *MockNodeManager) RPCClient() services.RPCClient {
 	ret := m.ctrl.Call(m, "RPCClient")
-	ret0, _ := ret[0].(*rpc.Client)
+	ret0, _ := ret[0].(services.RPCClient)
 	return ret0
 }
 
 // RPCClient indicates an expected call of RPCClient
 func (mr *MockNodeManagerMockRecorder) RPCClient() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RPCClient", reflect.TypeOf((*MockNodeManager)(nil).RPCClient))
+}
+
+// GetStatusBackend mocks base method
+func (m *MockNodeManager) GetStatusBackend() (services.StatusBackend, error) {
+	ret := m.ctrl.Call(m, "GetStatusBackend")
+	ret0, _ := ret[0].(services.StatusBackend)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetStatusBackend indicates an expected call of GetStatusBackend
+func (mr *MockNodeManagerMockRecorder) GetStatusBackend() *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStatusBackend", reflect.TypeOf((*MockNodeManager)(nil).GetStatusBackend))
 }
 
 // MockAccountManager is a mock of AccountManager interface

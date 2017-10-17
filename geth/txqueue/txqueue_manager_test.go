@@ -7,13 +7,11 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
-	"github.com/stretchr/testify/suite"
-
 	"github.com/golang/mock/gomock"
-
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
 	. "github.com/status-im/status-go/testing"
+	"github.com/stretchr/testify/suite"
 )
 
 var errTxAssumedSent = errors.New("assume tx is done")
