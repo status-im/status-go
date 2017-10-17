@@ -39,7 +39,8 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransaction() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	s.EnsureSynchronization()
+	// allow to sync for some time
+	s.EnsureNodeSync()
 
 	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	s.NoError(err)
@@ -90,7 +91,8 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransactionUpstream() {
 	)
 	defer s.StopTestBackend()
 
-	s.EnsureSynchronization()
+	// Allow to sync the blockchain.
+	s.EnsureNodeSync()
 
 	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account2.Address, TestConfig.Account2.Password)
 	s.NoError(err)
@@ -145,7 +147,7 @@ func (s *TransactionsTestSuite) TestSendContractTx() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	s.EnsureSynchronization()
+	s.EnsureNodeSync()
 
 	sampleAddress, _, _, err := s.Backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
 	s.NoError(err)
@@ -232,7 +234,7 @@ func (s *TransactionsTestSuite) TestSendEtherTx() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	s.EnsureSynchronization()
+	s.EnsureNodeSync()
 
 	backend := s.LightEthereumService().StatusBackend
 	s.NotNil(backend)
@@ -312,6 +314,87 @@ func (s *TransactionsTestSuite) TestSendEtherTx() {
 	s.Zero(s.Backend.TxQueueManager().TransactionQueue().Count(), "tx queue must be empty at this point")
 }
 
+func (s *TransactionsTestSuite) TestSendEtherOnStatusChainTx() {
+	s.StartTestBackend(params.StatusChainNetworkID)
+	defer s.StopTestBackend()
+
+	backend := s.LightEthereumService().StatusBackend
+	s.NotNil(backend)
+
+	// create an account
+	sampleAddress, _, _, err := s.Backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
+	s.NoError(err)
+
+	completeQueuedTransaction := make(chan struct{})
+
+	// replace transaction notification handler
+	var txHash = gethcommon.Hash{}
+	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) { // nolint: dupl
+		var envelope signal.Envelope
+		err := json.Unmarshal([]byte(jsonEvent), &envelope)
+		s.NoError(err, fmt.Sprintf("cannot unmarshal JSON: %s", jsonEvent))
+
+		if envelope.Type == txqueue.EventTransactionQueued {
+			event := envelope.Event.(map[string]interface{})
+			log.Info("transaction queued (will be completed shortly)", "id", event["id"].(string))
+
+			// the first call will fail (we are not logged in, but trying to complete tx)
+			log.Info("trying to complete with no user logged in")
+			txHash, err = s.Backend.CompleteTransaction(
+				common.QueuedTxID(event["id"].(string)),
+				TestConfig.Account1.Password,
+			)
+			s.EqualError(
+				err,
+				account.ErrNoAccountSelected.Error(),
+				fmt.Sprintf("expected error on queued transaction[%v] not thrown", event["id"]),
+			)
+
+			// the second call will also fail (we are logged in as different user)
+			log.Info("trying to complete with invalid user")
+			err = s.Backend.AccountManager().SelectAccount(sampleAddress, TestConfig.Account1.Password)
+			s.NoError(err)
+			txHash, err = s.Backend.CompleteTransaction(
+				common.QueuedTxID(event["id"].(string)), TestConfig.Account1.Password)
+			s.EqualError(
+				err,
+				txqueue.ErrInvalidCompleteTxSender.Error(),
+				fmt.Sprintf("expected error on queued transaction[%v] not thrown", event["id"]),
+			)
+
+			// the third call will work as expected (as we are logged in with correct credentials)
+			log.Info("trying to complete with correct user, this should succeed")
+			s.NoError(s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
+			txHash, err = s.Backend.CompleteTransaction(
+				common.QueuedTxID(event["id"].(string)),
+				TestConfig.Account1.Password,
+			)
+			s.NoError(err, fmt.Sprintf("cannot complete queued transaction[%v]", event["id"]))
+
+			close(completeQueuedTransaction)
+			return
+		}
+	})
+
+	// this call blocks, up until Complete Transaction is called
+	txHashCheck, err := s.Backend.SendTransaction(nil, common.SendTxArgs{
+		From:  common.FromAddress(TestConfig.Account1.Address),
+		To:    common.ToAddress(TestConfig.Account2.Address),
+		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
+	})
+	s.NoError(err, "cannot send transaction")
+
+	select {
+	case <-completeQueuedTransaction:
+	case <-time.After(2 * time.Minute):
+		s.FailNow("completing transaction timed out")
+	}
+
+	s.Equal(txHashCheck.Hex(), txHash.Hex(), "transaction hash returned from SendTransaction is invalid")
+	s.False(reflect.DeepEqual(txHashCheck, gethcommon.Hash{}), "transaction was never queued or completed")
+	s.Zero(s.Backend.TxQueueManager().TransactionQueue().Count(), "tx queue must be empty at this point")
+}
+
 func (s *TransactionsTestSuite) TestSendEtherTxUpstream() {
 	s.StartTestBackend(
 		params.RopstenNetworkID,
@@ -319,7 +402,7 @@ func (s *TransactionsTestSuite) TestSendEtherTxUpstream() {
 	)
 	defer s.StopTestBackend()
 
-	s.EnsureSynchronization()
+	s.EnsureNodeSync()
 
 	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	s.NoError(err)
@@ -372,7 +455,7 @@ func (s *TransactionsTestSuite) TestDoubleCompleteQueuedTransactions() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	s.EnsureSynchronization()
+	s.EnsureNodeSync()
 
 	backend := s.LightEthereumService().StatusBackend
 	s.NotNil(backend)
@@ -449,7 +532,7 @@ func (s *TransactionsTestSuite) TestDiscardQueuedTransaction() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	s.EnsureSynchronization()
+	s.EnsureNodeSync()
 
 	backend := s.LightEthereumService().StatusBackend
 	s.NotNil(backend)
@@ -529,7 +612,7 @@ func (s *TransactionsTestSuite) TestCompleteMultipleQueuedTransactions() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	s.EnsureSynchronization()
+	s.EnsureNodeSync()
 
 	s.TxQueueManager().TransactionQueue().Reset()
 
@@ -623,7 +706,7 @@ func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	s.EnsureSynchronization()
+	s.EnsureNodeSync()
 
 	backend := s.LightEthereumService().StatusBackend
 	s.NotNil(backend)

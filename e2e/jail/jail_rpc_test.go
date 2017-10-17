@@ -39,7 +39,7 @@ func (s *JailRPCTestSuite) TestJailRPCSend() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	s.EnsureSynchronization()
+	s.EnsureNodeSync()
 
 	// load Status JS and add test command to it
 	s.jail.BaseJS(baseStatusJSCode)
@@ -112,13 +112,14 @@ func (s *JailRPCTestSuite) TestContractDeployment() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
+	// Allow to sync, otherwise you'll get "Nonce too low."
+	s.EnsureNodeSync()
+
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
 	s.jail.Parse(testChatID, "")
 
 	cell, err := s.jail.Cell(testChatID)
 	s.NoError(err)
-
-	s.EnsureSynchronization()
 
 	completeQueuedTransaction := make(chan struct{})
 
@@ -196,11 +197,11 @@ func (s *JailRPCTestSuite) TestJailVMPersistence() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
+	s.EnsureNodeSync()
+
 	// log into account from which transactions will be sent
 	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	s.NoError(err, "cannot select account: %v", TestConfig.Account1.Address)
-
-	s.EnsureSynchronization()
 
 	type testCase struct {
 		command   string

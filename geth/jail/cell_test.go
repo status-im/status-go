@@ -3,6 +3,7 @@ package jail_test
 import (
 	"net/http"
 	"net/http/httptest"
+	"testing"
 	"time"
 
 	"github.com/robertkrimen/otto"
@@ -18,6 +19,10 @@ const (
 var (
 	baseStatusJSCode = string(static.MustAsset("testdata/jail/status.js"))
 )
+
+func TestCellTestSuite(t *testing.T) {
+	suite.Run(t, new(CellTestSuite))
+}
 
 type CellTestSuite struct {
 	suite.Suite

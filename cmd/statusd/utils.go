@@ -55,10 +55,6 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 			testGetDefaultConfig,
 		},
 		{
-			"reset blockchain data",
-			testResetChainData,
-		},
-		{
 			"stop/resume node",
 			testStopResumeNode,
 		},
@@ -217,6 +213,7 @@ func testResetChainData(t *testing.T) bool {
 		return false
 	}
 
+	// FIXME(tiabc): EnsureNodeSync the same way as in e2e tests.
 	time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to re-sync blockchain
 
 	testCompleteTransaction(t)
@@ -1364,6 +1361,7 @@ func startTestNode(t *testing.T) <-chan struct{} {
 			// sync
 			if syncRequired {
 				t.Logf("Sync is required, it will take %d seconds", TestConfig.Node.SyncSeconds)
+				// FIXME(tiabc): EnsureNodeSync the same way as in e2e tests.
 				time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // LES syncs headers, so that we are up do date when it is done
 			} else {
 				time.Sleep(5 * time.Second)

@@ -170,6 +170,7 @@ func activateEthService(stack *node.Node, config *params.NodeConfig) error {
 		if err == nil {
 			updateCHT(lightEth, config)
 		}
+
 		return lightEth, err
 	}); err != nil {
 		return fmt.Errorf("%v: %v", ErrLightEthRegistrationFailure, err)

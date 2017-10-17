@@ -1,12 +1,14 @@
 package e2e
 
 import (
+	"context"
 	"time"
 
 	"github.com/ethereum/go-ethereum/les"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/common"
+	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/signal"
 	"github.com/stretchr/testify/suite"
 )
@@ -14,7 +16,37 @@ import (
 // NodeManagerTestSuite defines a test suit with NodeManager.
 type NodeManagerTestSuite struct {
 	suite.Suite
-	NodeManager common.NodeManager
+	NodeManager       common.NodeManager
+	nodeSyncCompleted bool
+}
+
+// EnsureNodeSync ensures that synchronization of the node is done once and that it
+// is done properly else, the call will fail.
+// FIXME(tiabc): BackendTestSuite contains the same method, let's sort it out?
+func (s *NodeManagerTestSuite) EnsureNodeSync(forceResync ...bool) {
+	if len(forceResync) > 0 && forceResync[0] {
+		s.nodeSyncCompleted = false
+	}
+
+	if s.nodeSyncCompleted {
+		return
+	}
+
+	require := s.Require()
+
+	ethClient, err := s.NodeManager.LightEthereumService()
+	require.NoError(err)
+	require.NotNil(ethClient)
+
+	sync := node.NewSyncPoll(ethClient)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+	defer cancel()
+
+	// Validate that synchronization failed because of time.
+	syncError := sync.Poll(ctx)
+	require.NoError(syncError)
+
+	s.nodeSyncCompleted = true
 }
 
 // StartTestNode initiazes a NodeManager instances with configuration retrieved
@@ -49,42 +81,12 @@ func (s *NodeManagerTestSuite) StopTestNode() {
 	s.False(s.NodeManager.IsNodeRunning())
 }
 
-// EnsureSynchronization makes a test waiting until the LES
-// is synced. It solves "no suitable peers available" issues
-// happen when trying to ask for blockchain information too
-// early.
-func (s *NodeManagerTestSuite) EnsureSynchronization() {
-	start := time.Now()
-	wait := time.Second
-	les, err := s.NodeManager.LightEthereumService()
-	if err != nil {
-		s.Error(err)
-	}
-
-	// Make sure LES finished synchronization. Actually,
-	// this solves "no suitable peers" issue.
-	// This issue appears only when we try to ask for blockchain information
-	// before LES is synced.
-	for {
-		isSyncing := les.Downloader().Synchronising()
-		progress := les.Downloader().Progress()
-
-		if !isSyncing && progress.HighestBlock > 0 && progress.CurrentBlock >= progress.HighestBlock {
-			break
-		}
-
-		time.Sleep(wait)
-		s.True(time.Now().Sub(start) < (5 * time.Minute))
-
-		wait *= 2
-	}
-}
-
 // BackendTestSuite is a test suite with api.StatusBackend initialized
 // and a few utility methods to start and stop node or get various services.
 type BackendTestSuite struct {
 	suite.Suite
-	Backend *api.StatusBackend
+	Backend           *api.StatusBackend
+	nodeSyncCompleted bool
 }
 
 // SetupTest initializes Backend.
@@ -137,41 +139,6 @@ func (s *BackendTestSuite) RestartTestNode() {
 	s.True(s.Backend.IsNodeRunning())
 }
 
-// EnsureSynchronization makes a test waiting until the LES
-// is synced. It solves "no suitable peers available" issues
-// happen when trying to ask for blockchain information too
-// early.
-func (s *BackendTestSuite) EnsureSynchronization() {
-	start := time.Now()
-	wait := time.Second
-	les, err := s.Backend.NodeManager().LightEthereumService()
-	if err != nil {
-		s.Error(err)
-	}
-
-	// Make sure LES finished synchronization. Actually,
-	// this solves "no suitable peers" issue.
-	// This issue appears only when we try to ask for blockchain information
-	// before LES is synced.
-	for {
-		downloader := les.Downloader()
-
-		if downloader != nil {
-			isSyncing := downloader.Synchronising()
-			progress := downloader.Progress()
-
-			if !isSyncing && progress.HighestBlock > 0 && progress.CurrentBlock >= progress.HighestBlock {
-				break
-			}
-		}
-
-		s.True(time.Now().Sub(start) < (256 * time.Second))
-		time.Sleep(wait)
-
-		wait *= 2
-	}
-}
-
 // WhisperService returns a reference to the Whisper service.
 func (s *BackendTestSuite) WhisperService() *whisper.Whisper {
 	whisperService, err := s.Backend.NodeManager().WhisperService()
@@ -193,6 +160,32 @@ func (s *BackendTestSuite) LightEthereumService() *les.LightEthereum {
 // TxQueueManager returns a reference to the TxQueueManager.
 func (s *BackendTestSuite) TxQueueManager() common.TxQueueManager {
 	return s.Backend.TxQueueManager()
+}
+
+// EnsureNodeSync ensures that synchronization of the node is done once and that it
+// is done properly else, the call will fail.
+// FIXME(tiabc): NodeManagerTestSuite contains the same method, let's sort it out?
+func (s *BackendTestSuite) EnsureNodeSync(forceResync ...bool) {
+	if len(forceResync) > 0 && forceResync[0] {
+		s.nodeSyncCompleted = false
+	}
+
+	if s.nodeSyncCompleted {
+		return
+	}
+
+	require := s.Require()
+
+	ethClient := s.LightEthereumService()
+	sync := node.NewSyncPoll(ethClient)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+	defer cancel()
+
+	// Validate that synchronization failed because of time.
+	syncError := sync.Poll(ctx)
+	require.NoError(syncError)
+
+	s.nodeSyncCompleted = true
 }
 
 func importTestAccouns(keyStoreDir string) (err error) {

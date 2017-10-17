@@ -237,6 +237,9 @@ func (s *APIBackendTestSuite) TestResetChainData() {
 	s.StartTestBackend(params.RinkebyNetworkID)
 	defer s.StopTestBackend()
 
+	// allow to sync for some time
+	s.EnsureNodeSync()
+
 	s.True(s.Backend.IsNodeRunning())
 	nodeReady, err := s.Backend.ResetChainData()
 	require.NoError(err)
