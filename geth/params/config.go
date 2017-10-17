@@ -290,6 +290,13 @@ type NodeConfig struct {
 	// MessageLogFile is filename where exposed message status notificiation logs get written to.
 	MessageLogFile string
 
+	// LogCollectionMaxPerWrite defines the total number of log entries to wait for before writing.
+	LogCollectionMaxPerWrite int
+
+	// LogWriteInternval defines the max duration in milliseconds to wait for log lines to meet
+	// LogCollectionMaxPerWrite before forcing a write.
+	LogWriteInterval int
+
 	// LogFile is filename where exposed logs get written to
 	LogFile string
 
@@ -318,23 +325,25 @@ type NodeConfig struct {
 // NewNodeConfig creates new node configuration object
 func NewNodeConfig(dataDir string, networkID uint64, devMode bool) (*NodeConfig, error) {
 	nodeConfig := &NodeConfig{
-		DevMode:         devMode,
-		NetworkID:       networkID,
-		DataDir:         dataDir,
-		Name:            ClientIdentifier,
-		Version:         Version,
-		RPCEnabled:      RPCEnabledDefault,
-		HTTPHost:        HTTPHost,
-		HTTPPort:        HTTPPort,
-		APIModules:      APIModules,
-		WSHost:          WSHost,
-		WSPort:          WSPort,
-		MaxPeers:        MaxPeers,
-		MaxPendingPeers: MaxPendingPeers,
-		IPCFile:         IPCFile,
-		LogFile:         LogFile,
-		LogLevel:        LogLevel,
-		LogToStderr:     LogToStderr,
+		DevMode:                  devMode,
+		NetworkID:                networkID,
+		DataDir:                  dataDir,
+		Name:                     ClientIdentifier,
+		Version:                  Version,
+		RPCEnabled:               RPCEnabledDefault,
+		HTTPHost:                 HTTPHost,
+		HTTPPort:                 HTTPPort,
+		APIModules:               APIModules,
+		WSHost:                   WSHost,
+		WSPort:                   WSPort,
+		MaxPeers:                 MaxPeers,
+		LogCollectionMaxPerWrite: MaxLogCollection,
+		LogWriteInterval:         MaxLogCollectionWait,
+		MaxPendingPeers:          MaxPendingPeers,
+		IPCFile:                  IPCFile,
+		LogFile:                  LogFile,
+		LogLevel:                 LogLevel,
+		LogToStderr:              LogToStderr,
 		BootClusterConfig: &BootClusterConfig{
 			Enabled:   true,
 			BootNodes: []string{},

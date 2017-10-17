@@ -3,6 +3,7 @@ package jsonfile
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/status-im/status-go/geth/log"
@@ -10,9 +11,12 @@ import (
 
 // JSON returns a log.Metric which writes a series of batch entries into a json file.
 func JSON(targetFile string, maxBatchPerWrite int, maxwait time.Duration) (*log.BatchEmitter, error) {
-	_, err := os.Stat(targetFile)
-	if err != nil && err != os.ErrExist && err != os.ErrNotExist {
-		return nil, err
+	// If the directory does not exists, create it first.
+	dir := filepath.Dir(targetFile)
+	if dir != "" {
+		if err := os.MkdirAll(dir, 0700); err != nil {
+			return nil, err
+		}
 	}
 
 	return log.BatchEmit(maxBatchPerWrite, maxwait, func(entries []log.Entry) error {

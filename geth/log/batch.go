@@ -54,7 +54,7 @@ func (bm *BatchEmitter) Emit(en Entry) error {
 		select {
 		case err := <-bm.fnError:
 			return err
-		case <-time.After(3 * time.Millisecond):
+		case <-time.After(5 * time.Millisecond):
 			return nil
 		}
 	}

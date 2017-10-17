@@ -57,6 +57,12 @@ const (
 	// LogFile defines where to write logs to
 	LogFile = ""
 
+	// MaxLogCollection defines max entries before writing to log
+	MaxLogCollection = 100
+
+	// MaxLogCollectionWait defines in ms the total time to wait before forcing a write of collected logs.
+	MaxLogCollectionWait = 1000
+
 	// LogLevel defines the minimum log level to report
 	LogLevel = "ERROR"
 
