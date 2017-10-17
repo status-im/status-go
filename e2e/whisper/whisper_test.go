@@ -39,7 +39,8 @@ func (s *WhisperTestSuite) TestWhisperFilterRace() {
 	accountManager := account.NewManager(s.NodeManager)
 	s.NotNil(accountManager)
 
-	whisperAPI := whisper.NewPublicWhisperAPI(whisperService)
+	whisperAPI, err := s.NodeManager.PublicWhisperAPI()
+	s.NoError(err)
 
 	// account1
 	_, accountKey1, err := accountManager.AddressToDecryptedAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
