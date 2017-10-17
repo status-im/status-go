@@ -50,10 +50,9 @@ func (s *TxQueueTestSuite) TestCompleteTransaction() {
 		params.NewNodeConfig("/tmp", params.RopstenNetworkID, true),
 	)
 
-	// TODO(adam): StatusBackend as an interface would allow a better solution.
 	// As we want to avoid network connection, we mock LES with a known error
 	// and treat as success.
-	s.nodeManagerMock.EXPECT().LightEthereumService().Return(nil, errTxAssumedSent)
+	s.nodeManagerMock.EXPECT().GetStatusBackend().Return(nil, errTxAssumedSent)
 
 	txQueueManager := NewManager(s.nodeManagerMock, s.accountManagerMock)
 
@@ -100,10 +99,9 @@ func (s *TxQueueTestSuite) TestCompleteTransactionMultipleTimes() {
 		params.NewNodeConfig("/tmp", params.RopstenNetworkID, true),
 	)
 
-	// TODO(adam): StatusBackend as an interface would allow a better solution.
 	// As we want to avoid network connection, we mock LES with a known error
 	// and treat as success.
-	s.nodeManagerMock.EXPECT().LightEthereumService().Return(nil, errTxAssumedSent)
+	s.nodeManagerMock.EXPECT().GetStatusBackend().Return(nil, errTxAssumedSent)
 
 	txQueueManager := NewManager(s.nodeManagerMock, s.accountManagerMock)
 
@@ -203,7 +201,7 @@ func (s *TxQueueTestSuite) TestInvalidPassword() {
 	)
 
 	// Set ErrDecrypt error response as expected with a wrong password.
-	s.nodeManagerMock.EXPECT().LightEthereumService().Return(nil, keystore.ErrDecrypt)
+	s.nodeManagerMock.EXPECT().GetStatusBackend().Return(nil, keystore.ErrDecrypt)
 
 	txQueueManager := NewManager(s.nodeManagerMock, s.accountManagerMock)
 
