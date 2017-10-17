@@ -154,11 +154,15 @@ func (s *BackendTestSuite) EnsureSynchronization() {
 	// This issue appears only when we try to ask for blockchain information
 	// before LES is synced.
 	for {
-		isSyncing := les.Downloader().Synchronising()
-		progress := les.Downloader().Progress()
+		downloader := les.Downloader()
 
-		if !isSyncing && progress.HighestBlock > 0 && progress.CurrentBlock >= progress.HighestBlock {
-			break
+		if downloader != nil {
+			isSyncing := downloader.Synchronising()
+			progress := downloader.Progress()
+
+			if !isSyncing && progress.HighestBlock > 0 && progress.CurrentBlock >= progress.HighestBlock {
+				break
+			}
 		}
 
 		s.True(time.Now().Sub(start) < (256 * time.Second))

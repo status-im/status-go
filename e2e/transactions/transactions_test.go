@@ -39,8 +39,7 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransaction() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	// Allow to sync the blockchain.
-	time.Sleep(TestConfig.Node.SyncSeconds * time.Second)
+	s.EnsureSynchronization()
 
 	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	s.NoError(err)
@@ -91,8 +90,7 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransactionUpstream() {
 	)
 	defer s.StopTestBackend()
 
-	// Allow to sync the blockchain.
-	time.Sleep(TestConfig.Node.SyncSeconds * time.Second)
+	s.EnsureSynchronization()
 
 	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account2.Address, TestConfig.Account2.Password)
 	s.NoError(err)
@@ -147,7 +145,7 @@ func (s *TransactionsTestSuite) TestSendContractTx() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to sync
+	s.EnsureSynchronization()
 
 	sampleAddress, _, _, err := s.Backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
 	s.NoError(err)
@@ -234,7 +232,7 @@ func (s *TransactionsTestSuite) TestSendEtherTx() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to sync
+	s.EnsureSynchronization()
 
 	backend := s.LightEthereumService().StatusBackend
 	s.NotNil(backend)
@@ -321,7 +319,7 @@ func (s *TransactionsTestSuite) TestSendEtherTxUpstream() {
 	)
 	defer s.StopTestBackend()
 
-	time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to sync
+	s.EnsureSynchronization()
 
 	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	s.NoError(err)
@@ -374,7 +372,7 @@ func (s *TransactionsTestSuite) TestDoubleCompleteQueuedTransactions() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to sync
+	s.EnsureSynchronization()
 
 	backend := s.LightEthereumService().StatusBackend
 	s.NotNil(backend)
@@ -451,8 +449,7 @@ func (s *TransactionsTestSuite) TestDiscardQueuedTransaction() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	// Allow to sync the blockchain.
-	time.Sleep(TestConfig.Node.SyncSeconds * time.Second)
+	s.EnsureSynchronization()
 
 	backend := s.LightEthereumService().StatusBackend
 	s.NotNil(backend)
@@ -532,8 +529,7 @@ func (s *TransactionsTestSuite) TestCompleteMultipleQueuedTransactions() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	// allow to sync
-	time.Sleep(TestConfig.Node.SyncSeconds * time.Second)
+	s.EnsureSynchronization()
 
 	s.TxQueueManager().TransactionQueue().Reset()
 
@@ -627,7 +623,7 @@ func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to sync
+	s.EnsureSynchronization()
 
 	backend := s.LightEthereumService().StatusBackend
 	s.NotNil(backend)
