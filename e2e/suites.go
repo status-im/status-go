@@ -169,6 +169,14 @@ func (s *BackendTestSuite) LightEthereumService() services.LesService {
 	return lightEthereum
 }
 
+func (s *BackendTestSuite) GetStatusBackend() services.StatusBackend {
+	backend, err := s.Backend.NodeManager().GetStatusBackend()
+	s.NoError(err)
+	s.NotNil(backend)
+
+	return backend
+}
+
 // TxQueueManager returns a reference to the TxQueueManager.
 func (s *BackendTestSuite) TxQueueManager() common.TxQueueManager {
 	return s.Backend.TxQueueManager()

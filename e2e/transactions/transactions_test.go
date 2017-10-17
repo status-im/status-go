@@ -315,7 +315,7 @@ func (s *TransactionsTestSuite) TestSendEtherOnStatusChainTx() {
 	s.StartTestBackend(params.StatusChainNetworkID)
 	defer s.StopTestBackend()
 
-	backend := s.LightEthereumService().StatusBackend
+	backend := s.GetStatusBackend()
 	s.NotNil(backend)
 
 	// create an account
