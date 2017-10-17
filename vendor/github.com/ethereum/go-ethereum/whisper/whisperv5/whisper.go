@@ -239,7 +239,13 @@ func (w *Whisper) RequestHistoricMessages(peerID []byte, envelope *Envelope) err
 func (w *Whisper) SendP2PMessage(peerID []byte, envelope *Envelope) error {
 	p, err := w.getPeer(peerID)
 	if err != nil {
-		w.sendDelivery(envelope, message.RejectedStatus)
+		if w.deliveryServer != nil {
+			w.deliveryServer.SendP2PState(P2PMessageState{
+				Reason:   err,
+				Envelope: *envelope,
+				Status:   message.RejectedStatus,
+			})
+		}
 		return err
 	}
 
@@ -248,8 +254,24 @@ func (w *Whisper) SendP2PMessage(peerID []byte, envelope *Envelope) error {
 
 // SendP2PDirect sends a peer-to-peer message to a specific peer.
 func (w *Whisper) SendP2PDirect(peer *Peer, envelope *Envelope) error {
-	w.sendDelivery(envelope, message.DeliveredStatus)
-	return p2p.Send(peer.ws, p2pCode, envelope)
+	if err := p2p.Send(peer.ws, p2pCode, envelope); err != nil {
+		if w.deliveryServer != nil {
+			w.deliveryServer.SendP2PState(P2PMessageState{
+				Reason:   err,
+				Envelope: *envelope,
+				Status:   message.RejectedStatus,
+			})
+		}
+		return err
+	}
+
+	if w.deliveryServer != nil {
+		w.deliveryServer.SendP2PState(P2PMessageState{
+			Envelope: *envelope,
+			Status:   message.DeliveredStatus,
+		})
+	}
+	return nil
 }
 
 // NewKeyPair generates a new cryptographic identity for the client, and injects
@@ -630,8 +652,24 @@ func (wh *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 				var envelope Envelope
 				if err := packet.Decode(&envelope); err != nil {
 					log.Warn("failed to decode direct message, peer will be disconnected", "peer", p.peer.ID(), "err", err)
+					if wh.deliveryServer != nil {
+						wh.deliveryServer.SendP2PState(P2PMessageState{
+							Envelope: envelope,
+							Status:   message.RejectedStatus,
+							Reason:   err,
+						})
+					}
 					return errors.New("invalid direct message")
 				}
+
+				if wh.deliveryServer != nil {
+					wh.deliveryServer.SendP2PState(P2PMessageState{
+						Envelope: envelope,
+						Status:   message.SentStatus,
+						Reason:   fmt.Errorf("Unexpected status message received: %+q", p.peer.ID()),
+					})
+				}
+
 				wh.postEvent(&envelope, true)
 			}
 		case p2pRequestCode:
@@ -640,9 +678,15 @@ func (wh *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 				var request Envelope
 				if err := packet.Decode(&request); err != nil {
 					log.Warn("failed to decode p2p request message, peer will be disconnected", "peer", p.peer.ID(), "err", err)
+					if wh.deliveryServer != nil {
+						wh.deliveryServer.SendP2PState(P2PMessageState{
+							Envelope: request,
+							Status:   message.RejectedStatus,
+							Reason:   err,
+						})
+					}
 					return errors.New("invalid p2p request")
 				}
-				wh.sendDelivery(&request, message.SentStatus)
 				wh.mailServer.DeliverMail(p, &request)
 			}
 		default:
@@ -654,15 +698,6 @@ func (wh *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 	}
 }
 
-// sendDeliveryEvent delivers envelope with delivery status, if server has being set.
-func (wh *Whisper) sendDelivery(envelope *Envelope, status message.Status) {
-	if wh.deliveryServer == nil {
-		return
-	}
-
-	wh.deliveryServer.Send(envelope, status)
-}
-
 // add inserts a new envelope into the message pool to be distributed within the
 // whisper network. It also inserts the envelope into the expiration pool at the
 // appropriate time-stamp. In case of error, connection should be dropped.
@@ -672,7 +707,6 @@ func (wh *Whisper) add(envelope *Envelope) (bool, error) {
 
 	if sent > now {
 		if sent-SynchAllowance > now {
-			wh.sendDelivery(envelope, message.FutureStatus)
 			return false, fmt.Errorf("envelope created in the future [%x]", envelope.Hash())
 		} else {
 			// recalculate PoW, adjusted for the time difference, plus one second for latency
@@ -681,7 +715,6 @@ func (wh *Whisper) add(envelope *Envelope) (bool, error) {
 	}
 
 	if envelope.Expiry < now {
-		wh.sendDelivery(envelope, message.ExpiredStatus)
 		if envelope.Expiry+SynchAllowance*2 < now {
 			return false, fmt.Errorf("very old message")
 		}
@@ -691,25 +724,21 @@ func (wh *Whisper) add(envelope *Envelope) (bool, error) {
 	}
 
 	if uint32(envelope.size()) > wh.MaxMessageSize() {
-		wh.sendDelivery(envelope, message.OversizedMessageStatus)
 		return false, fmt.Errorf("huge messages are not allowed [%x]", envelope.Hash())
 	}
 
 	if len(envelope.Version) > 4 {
-		wh.sendDelivery(envelope, message.OversizedVersionStatus)
 		return false, fmt.Errorf("oversized version [%x]", envelope.Hash())
 	}
 
 	aesNonceSize := len(envelope.AESNonce)
 	if aesNonceSize != 0 && aesNonceSize != AESNonceLength {
-		wh.sendDelivery(envelope, message.InvalidAESStatus)
 		// the standard AES GCM nonce size is 12 bytes,
 		// but constant gcmStandardNonceSize cannot be accessed (not exported)
 		return false, fmt.Errorf("wrong size of AESNonce: %d bytes [env: %x]", aesNonceSize, envelope.Hash())
 	}
 
 	if envelope.PoW() < wh.MinPow() {
-		wh.sendDelivery(envelope, message.LowPowStatus)
 		log.Debug("envelope with low PoW dropped", "PoW", envelope.PoW(), "hash", envelope.Hash().Hex())
 		return false, nil // drop envelope without error
 	}
@@ -731,13 +760,25 @@ func (wh *Whisper) add(envelope *Envelope) (bool, error) {
 
 	if alreadyCached {
 		log.Trace("whisper envelope already cached", "hash", envelope.Hash().Hex())
-		wh.sendDelivery(envelope, message.CachedStatus)
+		if wh.deliveryServer != nil {
+			wh.deliveryServer.SendRPCState(RPCMessageState{
+				Envelope: *envelope,
+				Status:   message.CachedStatus,
+			})
+		}
 	} else {
 		log.Trace("cached whisper envelope", "hash", envelope.Hash().Hex())
 		wh.statsMu.Lock()
 		wh.stats.memoryUsed += envelope.size()
 		wh.statsMu.Unlock()
-		wh.sendDelivery(envelope, message.QueuedStatus)
+
+		if wh.deliveryServer != nil {
+			wh.deliveryServer.SendRPCState(RPCMessageState{
+				Envelope: *envelope,
+				Status:   message.QueuedStatus,
+			})
+		}
+
 		wh.postEvent(envelope, false) // notify the local node about the new message
 		if wh.mailServer != nil {
 			wh.mailServer.Archive(envelope)
@@ -787,11 +828,9 @@ func (w *Whisper) processQueue() {
 			return
 
 		case e = <-w.messageQueue:
-			w.sendDelivery(e, message.SentStatus)
 			w.filters.NotifyWatchers(e, false)
 
 		case e = <-w.p2pMsgQueue:
-			w.sendDelivery(e, message.SentStatus)
 			w.filters.NotifyWatchers(e, true)
 		}
 	}

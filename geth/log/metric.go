@@ -145,6 +145,10 @@ func New(vals ...interface{}) Metrics {
 	var childmetrics []Metrics
 
 	for _, val := range vals {
+		if val == nil {
+			continue
+		}
+
 		switch item := val.(type) {
 		case Augmenter:
 			augmenters = append(augmenters, item)

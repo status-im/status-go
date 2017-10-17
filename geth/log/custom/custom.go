@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fatih/color"
 	"github.com/status-im/status-go/geth/log"
 )
 
@@ -31,6 +32,8 @@ func FlatDisplay(w io.Writer) log.Metrics {
 //  [Header]: We must create new standard behaviour 	Function: BuildPack  |  display: red,  words: 20,
 //
 func FlatDisplayWith(w io.Writer, header string, filterFn func(log.Entry) bool) log.Metrics {
+	green := color.New(color.FgGreen)
+
 	return NewEmitter(w, func(en log.Entry) []byte {
 		if filterFn != nil && !filterFn(en) {
 			return nil
@@ -40,7 +43,7 @@ func FlatDisplayWith(w io.Writer, header string, filterFn func(log.Entry) bool) 
 		bu.WriteString("\n")
 
 		if header != "" {
-			fmt.Fprintf(&bu, "%s %+s", header, en.Message)
+			fmt.Fprintf(&bu, "%s %+s", green.Sprint(header), en.Message)
 		} else {
 			fmt.Fprintf(&bu, "%+s", en.Message)
 		}
@@ -48,15 +51,15 @@ func FlatDisplayWith(w io.Writer, header string, filterFn func(log.Entry) bool) 
 		fmt.Fprint(&bu, printSpaceLine(2))
 
 		if en.Function != "" {
-			fmt.Fprintf(&bu, "Function: %+s", en.Function)
+			fmt.Fprintf(&bu, "%s: %+s", green.Sprint("Function"), en.Function)
 			fmt.Fprint(&bu, printSpaceLine(2))
 		}
 
-		fmt.Fprint(&bu, "|", en.Function)
+		fmt.Fprint(&bu, "|")
 		fmt.Fprint(&bu, printSpaceLine(2))
 
 		for key, value := range en.Field {
-			fmt.Fprintf(&bu, "%+s: %+s", key, printValue(value))
+			fmt.Fprintf(&bu, "%+s: %+s", green.Sprint(key), printValue(value))
 			fmt.Fprint(&bu, printSpaceLine(2))
 		}
 

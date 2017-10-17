@@ -48,6 +48,9 @@ const (
 	// DefaultFileDescriptorLimit is fd limit that database can use
 	DefaultFileDescriptorLimit = uint64(2048)
 
+	// DeliveryNotificationLogKey defines a const key value used to identify a giving entry.
+	DeliveryNotificationLogKey = "STATUSIM_MESSAGE_STATE_NOTIFICATION"
+
 	// DatabaseCache is memory (in MBs) allocated to internal caching (min 16MB / database forced)
 	DatabaseCache = 16
 

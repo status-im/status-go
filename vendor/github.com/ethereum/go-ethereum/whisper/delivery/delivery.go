@@ -7,17 +7,21 @@ import (
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 )
 
-// MessageDeliveryState holds the current delivery state of a envelope.
-// TODO(influx6): Consider adding a error object or string to provided context.
-// I believe an error object might be more suitable for status that denote failure
-// rejection.
-type MessageDeliveryState struct {
-	Status   message.Status
-	Envelope whisper.Envelope
+// DeliveryState holds references to a message delivered through the network.
+type DeliveryState struct {
+	IsP2P bool
+	P2P   *whisper.P2PMessageState
+	RPC   *whisper.RPCMessageState
 }
 
 // DeliverySubscriber defines a function type for subscrubers.
-type DeliverySubscriber func(MessageDeliveryState)
+type DeliverySubscriber func(DeliveryState)
+
+// P2PDeliverySubscriber defines a function type for receiving p2p message status.
+type P2PDeliverySubscriber func(*whisper.P2PMessageState)
+
+// RPCDeliverySubscriber defines a function type for receiving rpc message status.
+type RPCDeliverySubscriber func(*whisper.RPCMessageState)
 
 // DeliveryNotification defines a notification implementation for listening to message status
 // events.
@@ -26,17 +30,23 @@ type DeliveryNotification struct {
 	subs []DeliverySubscriber
 }
 
-// Send delivers envelope with status to all subscribers.
-func (d *DeliveryNotification) Send(env *whisper.Envelope, status message.Status) {
+// SendP2PState delivers a rpc message status to all subscribers.
+func (d *DeliveryNotification) SendP2PState(state whisper.P2PMessageState) {
+	d.sendState(DeliveryState{P2P: &state})
+}
+
+// SendRPCState delivers a rpc message status to all subscribers.
+func (d *DeliveryNotification) SendRPCState(state whisper.RPCMessageState) {
+	d.sendState(DeliveryState{RPC: &state})
+}
+
+// SendState delivers envelope with status to all subscribers.
+func (d *DeliveryNotification) sendState(mds DeliveryState) {
 	d.sml.RLock()
 	defer d.sml.RUnlock()
 
-	var mstatus MessageDeliveryState
-	mstatus.Status = status
-	mstatus.Envelope = *env
-
 	for _, item := range d.subs {
-		item(mstatus)
+		item(mds)
 	}
 }
 
@@ -50,26 +60,43 @@ func (d *DeliveryNotification) Unsubscribe(ind int) {
 	}
 }
 
-// FilterUntil filters all messages with a Delivery status below giving status but
-// delivers all messages above or equal to provided status.
-func (d *DeliveryNotification) FilterUntil(status message.Status, sub DeliverySubscriber) int {
-	return d.Subscribe(func(m MessageDeliveryState) {
-		if m.Status >= status {
+// SubscribeForP2P delivers rpc messages status events to the callback.
+func (d *DeliveryNotification) SubscribeForP2P(sub P2PDeliverySubscriber) int {
+	return d.Subscribe(func(m DeliveryState) {
+		if m.IsP2P || m.P2P == nil {
 			return
 		}
 
-		sub(m)
+		sub(m.P2P)
 	})
 }
 
-// Filter filters out messages status events who status does not match provided.
-func (d *DeliveryNotification) Filter(status message.Status, sub DeliverySubscriber) int {
-	return d.Subscribe(func(m MessageDeliveryState) {
-		if m.Status != status {
+// SubscribeForRPC delivers rpc messages status events to the callback.
+func (d *DeliveryNotification) SubscribeForRPC(sub RPCDeliverySubscriber) int {
+	return d.Subscribe(func(m DeliveryState) {
+		if m.IsP2P || m.RPC == nil {
 			return
 		}
 
-		sub(m)
+		sub(m.RPC)
+	})
+}
+
+// FilterP2P filters out p2p messages status events who status does not match provided.
+func (d *DeliveryNotification) FilterP2P(status message.Status, sub P2PDeliverySubscriber) int {
+	return d.SubscribeForP2P(func(msg *whisper.P2PMessageState) {
+		if msg.Status == status {
+			sub(msg)
+		}
+	})
+}
+
+// FilterPRC filters out prc messages status events who status does not match provided.
+func (d *DeliveryNotification) FilterRPC(status message.Status, sub RPCDeliverySubscriber) int {
+	return d.SubscribeForRPC(func(msg *whisper.RPCMessageState) {
+		if msg.Status == status {
+			sub(msg)
+		}
 	})
 }
 

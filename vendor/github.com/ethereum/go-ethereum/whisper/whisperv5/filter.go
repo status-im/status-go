@@ -24,6 +24,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/message"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/syndtr/goleveldb/leveldb/errors"
 )
 
 type Filter struct {
@@ -99,7 +100,13 @@ func (fs *Filters) NotifyWatchers(env *Envelope, p2pMessage bool) {
 	for _, watcher := range fs.watchers {
 		i++
 		if p2pMessage && !watcher.AllowP2P {
-			fs.whisper.sendDelivery(env, message.RejectedStatus)
+			if fs.whisper.deliveryServer != nil {
+				fs.whisper.deliveryServer.SendP2PState(P2PMessageState{
+					Envelope: *env,
+					Status:   message.RejectedStatus,
+					Reason:   errors.New("Filters not allowed to handle P2p messages"),
+				})
+			}
 			log.Trace(fmt.Sprintf("msg [%x], filter [%d]: p2p messages are not allowed", env.Hash(), i))
 			continue
 		}
@@ -112,18 +119,35 @@ func (fs *Filters) NotifyWatchers(env *Envelope, p2pMessage bool) {
 			if match {
 				msg = env.Open(watcher)
 				if msg == nil {
-					fs.whisper.sendDelivery(env, message.RejectedStatus)
+					if fs.whisper.deliveryServer != nil {
+						fs.whisper.deliveryServer.SendRPCState(RPCMessageState{
+							Envelope: *env,
+							Status:   message.RejectedStatus,
+							Reason:   errors.New("Envelope failed to be opened"),
+						})
+					}
 					log.Trace("processing message: failed to open", "message", env.Hash().Hex(), "filter", i)
 				}
 			} else {
-				fs.whisper.sendDelivery(env, message.RejectedStatus)
+				if fs.whisper.deliveryServer != nil {
+					fs.whisper.deliveryServer.SendRPCState(RPCMessageState{
+						Envelope: *env,
+						Status:   message.RejectedStatus,
+						Reason:   errors.New("processing message: does not match"),
+					})
+				}
 				log.Trace("processing message: does not match", "message", env.Hash().Hex(), "filter", i)
 			}
 		}
 
 		if match && msg != nil {
 			log.Trace("processing message: decrypted", "hash", env.Hash().Hex())
-			fs.whisper.sendDelivery(env, message.DeliveredStatus)
+			if fs.whisper.deliveryServer != nil {
+				fs.whisper.deliveryServer.SendRPCState(RPCMessageState{
+					Envelope: *env,
+					Status:   message.DeliveredStatus,
+				})
+			}
 			watcher.Trigger(msg)
 		}
 	}

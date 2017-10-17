@@ -26,6 +26,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/common/message"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discover"
@@ -243,8 +244,22 @@ func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (bool, er
 		err         error
 	)
 
+	if api.w.deliveryServer != nil {
+		api.w.deliveryServer.SendRPCState(RPCMessageState{
+			Source: req,
+			Status: message.PendingStatus,
+		})
+	}
+
 	// user must specify either a symmetric or a asymmetric key
 	if (symKeyGiven && pubKeyGiven) || (!symKeyGiven && !pubKeyGiven) {
+		if api.w.deliveryServer != nil {
+			api.w.deliveryServer.SendRPCState(RPCMessageState{
+				Source: req,
+				Status: message.RejectedStatus,
+				Reason: ErrSymAsym,
+			})
+		}
 		return false, ErrSymAsym
 	}
 
@@ -260,6 +275,13 @@ func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (bool, er
 	// Set key that is used to sign the message
 	if len(req.Sig) > 0 {
 		if params.Src, err = api.w.GetPrivateKey(req.Sig); err != nil {
+			if api.w.deliveryServer != nil {
+				api.w.deliveryServer.SendRPCState(RPCMessageState{
+					Source: req,
+					Reason: err,
+					Status: message.RejectedStatus,
+				})
+			}
 			return false, err
 		}
 	}
@@ -267,12 +289,33 @@ func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (bool, er
 	// Set symmetric key that is used to encrypt the message
 	if symKeyGiven {
 		if params.Topic == (TopicType{}) { // topics are mandatory with symmetric encryption
+			if api.w.deliveryServer != nil {
+				api.w.deliveryServer.SendRPCState(RPCMessageState{
+					Source: req,
+					Reason: ErrNoTopics,
+					Status: message.RejectedStatus,
+				})
+			}
 			return false, ErrNoTopics
 		}
 		if params.KeySym, err = api.w.GetSymKey(req.SymKeyID); err != nil {
+			if api.w.deliveryServer != nil {
+				api.w.deliveryServer.SendRPCState(RPCMessageState{
+					Source: req,
+					Reason: err,
+					Status: message.RejectedStatus,
+				})
+			}
 			return false, err
 		}
 		if !validateSymmetricKey(params.KeySym) {
+			if api.w.deliveryServer != nil {
+				api.w.deliveryServer.SendRPCState(RPCMessageState{
+					Source: req,
+					Reason: ErrInvalidSymmetricKey,
+					Status: message.RejectedStatus,
+				})
+			}
 			return false, ErrInvalidSymmetricKey
 		}
 	}
@@ -281,6 +324,13 @@ func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (bool, er
 	if pubKeyGiven {
 		params.Dst = crypto.ToECDSAPub(req.PublicKey)
 		if !ValidatePublicKey(params.Dst) {
+			if api.w.deliveryServer != nil {
+				api.w.deliveryServer.SendRPCState(RPCMessageState{
+					Source: req,
+					Reason: ErrInvalidPublicKey,
+					Status: message.RejectedStatus,
+				})
+			}
 			return false, ErrInvalidPublicKey
 		}
 	}
@@ -288,11 +338,25 @@ func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (bool, er
 	// encrypt and sent message
 	whisperMsg, err := NewSentMessage(params)
 	if err != nil {
+		if api.w.deliveryServer != nil {
+			api.w.deliveryServer.SendRPCState(RPCMessageState{
+				Source: req,
+				Reason: err,
+				Status: message.RejectedStatus,
+			})
+		}
 		return false, err
 	}
 
 	env, err := whisperMsg.Wrap(params)
 	if err != nil {
+		if api.w.deliveryServer != nil {
+			api.w.deliveryServer.SendRPCState(RPCMessageState{
+				Source: req,
+				Reason: err,
+				Status: message.RejectedStatus,
+			})
+		}
 		return false, err
 	}
 
@@ -300,6 +364,13 @@ func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (bool, er
 	if len(req.TargetPeer) > 0 {
 		n, err := discover.ParseNode(req.TargetPeer)
 		if err != nil {
+			if api.w.deliveryServer != nil {
+				api.w.deliveryServer.SendRPCState(RPCMessageState{
+					Source: req,
+					Reason: err,
+					Status: message.RejectedStatus,
+				})
+			}
 			return false, fmt.Errorf("failed to parse target peer: %s", err)
 		}
 		return true, api.w.SendP2PMessage(n.ID[:], env)
@@ -307,9 +378,23 @@ func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (bool, er
 
 	// ensure that the message PoW meets the node's minimum accepted PoW
 	if req.PowTarget < api.w.MinPow() {
+		if api.w.deliveryServer != nil {
+			api.w.deliveryServer.SendRPCState(RPCMessageState{
+				Source: req,
+				Reason: ErrTooLowPoW,
+				Status: message.RejectedStatus,
+			})
+		}
 		return false, ErrTooLowPoW
 	}
 
+	if api.w.deliveryServer != nil {
+		api.w.deliveryServer.SendRPCState(RPCMessageState{
+			Source:   req,
+			Envelope: *env,
+			Status:   message.SentStatus,
+		})
+	}
 	return true, api.w.Send(env)
 }
 

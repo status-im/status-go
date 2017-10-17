@@ -287,6 +287,9 @@ type NodeConfig struct {
 	// handshake phase, counted separately for inbound and outbound connections.
 	MaxPendingPeers int
 
+	// MessageLogFile is filename where exposed message status notificiation logs get written to.
+	MessageLogFile string
+
 	// LogFile is filename where exposed logs get written to
 	LogFile string
 

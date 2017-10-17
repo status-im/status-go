@@ -73,18 +73,33 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 
 	m.initLog(config)
 
-	var del delivery.DeliveryNotification
+	deliveryManager := new(delivery.DeliveryNotification)
 
-	ethNode, err := MakeNode(config, &del)
+	ethNode, err := MakeNode(config, deliveryManager)
 	if err != nil {
 		return nil, err
 	}
 
-	m.delService = &del
+	m.delService = deliveryManager
 	m.nodeStarted = make(chan struct{}, 1)
+
+	// Subscribe for message delivery status and log out with special key.
+	messageStateLoggingID := deliveryManager.Subscribe(func(state delivery.DeliveryState) {
+		if state.IsP2P {
+			log.Send(log.Info("P2P Message Status Notification").
+				With(params.DeliveryNotificationLogKey, state.P2P).
+				With("networkID", config.NetworkID))
+			return
+		}
+
+		log.Send(log.Info("RPC Message Status Notification").
+			With(params.DeliveryNotificationLogKey, state.RPC).
+			With("networkID", config.NetworkID))
+	})
 
 	go func() {
 		defer HaltOnPanic()
+		defer deliveryManager.Unsubscribe(messageStateLoggingID)
 
 		// start underlying node
 		if err := ethNode.Start(); err != nil {
@@ -518,6 +533,31 @@ func (m *NodeManager) initLog(config *params.NodeConfig) {
 		}
 	}
 
+	var stateLogs log.Metrics
+
+	if config.MessageLogFile != "" {
+		if messagelogs, err := jsonfile.JSON(config.MessageLogFile, 100, 1*time.Second); err == nil {
+			stateLogs = log.Filter(func(en log.Entry) bool {
+				stateVal, found := en.Field.Get(params.DeliveryNotificationLogKey)
+				if !found {
+					return false
+				}
+
+				if _, ok := stateVal.(whisper.P2PMessageState); !ok {
+					return false
+				}
+
+				if _, ok := stateVal.(whisper.RPCMessageState); !ok {
+					return false
+				}
+
+				return true
+			}, messagelogs)
+		} else {
+			fmt.Printf("Failed to open message state log file, Reason(%+q)\n", err)
+		}
+	}
+
 	if config.LogFile != "" {
 		var err error
 		var metricStore log.Metrics
@@ -528,11 +568,11 @@ func (m *NodeManager) initLog(config *params.NodeConfig) {
 			fmt.Println("Failed to open log file, using stdout")
 		}
 
-		log.Init(log.FilterLevel(level, metricStore))
+		log.Init(log.New(log.FilterLevel(level, metricStore), stateLogs))
 		return
 	}
 
-	log.Init(log.FilterLevel(level, custom.FlatDisplay(os.Stdout)))
+	log.Init(log.New(log.FilterLevel(level, custom.FlatDisplay(os.Stdout)), stateLogs))
 }
 
 // isNodeAvailable check if we have a node running and make sure is fully started

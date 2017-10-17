@@ -89,11 +89,28 @@ type MailServer interface {
 	DeliverMail(whisperPeer *Peer, request *Envelope)
 }
 
+// RPCMessageState holds the current delivery state of a whisper rpc message.
+type RPCMessageState struct {
+	Reason   error          `json:"reason"`
+	Status   message.Status `json:"status"`
+	Envelope Envelope       `json:"envelope"`
+	Source   NewMessage     `josn:"source"`
+}
+
+// P2PMessageState holds the current delivery status of a whisper p2p message.
+type P2PMessageState struct {
+	Reason   error          `json:"reason"`
+	Status   message.Status `json:"status"`
+	Envelope Envelope       `json:"envelope"`
+}
+
 // DeliveryServer represents a small message status
 // notification system where a message delivery status
-// update event is delivered to it's underline system.
+// update event is delivered to it's underline system
+// for both rpc messages and p2p messages.
 type DeliveryServer interface {
-	Send(*Envelope, message.Status)
+	SendRPCState(RPCMessageState)
+	SendP2PState(P2PMessageState)
 }
 
 // NotificationServer represents a notification server,
