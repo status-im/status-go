@@ -224,7 +224,7 @@ func (m *Manager) completeRemoteTransaction(queuedTx *common.QueuedTx, password 
 		selectedAcct.Address.String(),
 		password,
 	); err != nil {
-		log.Warn("failed to verify account", "account", selectedAcct.Address.String(), "error", err.Error())
+		log.Send(log.YellowAlert(err, "failed to verify account").With("account", selectedAcct.Address.String()))
 		return emptyHash, err
 	}
 
