@@ -129,8 +129,8 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 
 				// post message
 				var message = {
-					ttl: 20,
-					powTarget: 0.01,
+					ttl: 60,
+					powTarget: 0.2,
 					powTime: 20,
 					topic: topic,
 					sig: identity1,
@@ -171,8 +171,8 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 
 				// post message
 				var message = {
-					ttl: 20,
-					powTarget: 0.01,
+					ttl: 60,
+					powTarget: 0.2,
 					powTime: 20,
 					topic: topic,
 					sig: identity,
@@ -207,8 +207,8 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 
 				// post message
 				var message = {
-					ttl: 20,
-					powTarget: 0.01,
+					ttl: 60,
+					powTarget: 0.2,
 					powTime: 20,
 					topic: topic,
 					symKeyID: keyid,
@@ -280,13 +280,13 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 
 				// post message
 				var message = {
+					ttl: 60,
+					powTarget: 0.2,
+					powTime: 20,
 				  	sig: identity2,
 				  	pubKey: identity1,
 				  	topic: topic,
-				  	payload: web3.toHex(payload),
-					ttl: 20,
-					powTime: 20,
-					powTarget: 0.01,
+				  	payload: web3.toHex(payload)
 				};
 
 				var sent = shh.post(message)
