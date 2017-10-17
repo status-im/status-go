@@ -30,6 +30,9 @@ func (s *RPCClientTestSuite) TestNewClient() {
 	node, err := node.MakeNode(config)
 	s.NoError(err)
 
+	err = node.Start()
+	s.NoError(err)
+
 	// upstream disabled, local node ok
 	s.False(config.UpstreamConfig.Enabled)
 	_, err = rpc.NewClient(node, config.UpstreamConfig)
@@ -50,9 +53,9 @@ func (s *RPCClientTestSuite) TestNewClient() {
 	s.NoError(err)
 
 	// upstream disabled, local node failed (stopped)
-	nodeStopped, err := s.NodeManager.StopNode()
+	node.Stop()
 	s.NoError(err)
-	<-nodeStopped
+	node.Wait()
 
 	_, err = rpc.NewClient(node, config.UpstreamConfig)
 	s.Error(err)
