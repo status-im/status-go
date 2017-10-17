@@ -129,8 +129,8 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 
 				// post message
 				var message = {
-					ttl: 60,
-					powTarget: 0.2,
+					ttl: 10,
+					powTarget: 1.0,
 					powTime: 20,
 					topic: topic,
 					sig: identity1,
@@ -171,8 +171,8 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 
 				// post message
 				var message = {
-					ttl: 60,
-					powTarget: 0.2,
+					ttl: 10,
+					powTarget: 1.0,
 					powTime: 20,
 					topic: topic,
 					sig: identity,
@@ -207,8 +207,8 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 
 				// post message
 				var message = {
-					ttl: 60,
-					powTarget: 0.2,
+					ttl: 10,
+					powTarget: 1.0,
 					powTime: 20,
 					topic: topic,
 					symKeyID: keyid,
@@ -280,8 +280,8 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 
 				// post message
 				var message = {
-					ttl: 60,
-					powTarget: 0.2,
+					ttl: 10,
+					powTarget: 1.0,
 					powTime: 20,
 				  	sig: identity2,
 				  	pubKey: identity1,
@@ -356,6 +356,7 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 
 			// FilterID is not assigned yet.
 			if filterID.IsNull() {
+				s.T().Log("filterID is null")
 				continue
 			}
 
@@ -364,6 +365,7 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 
 			messages, err := s.WhisperAPI.GetFilterMessages(filterID.String())
 			s.NoError(err)
+			s.T().Logf("messages cpunt %d", len(messages))
 			for _, m := range messages {
 				s.Equal(payload.String(), string(m.Payload))
 				close(done)
