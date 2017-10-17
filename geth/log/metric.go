@@ -1,4 +1,4 @@
-// package log defines a basic structure foundation for handling logs without
+// Package log defines a basic structure foundation for handling logs without
 // much hassle, allow more different entries to be created.
 // Inspired by https://medium.com/@tjholowaychuk/apex-log-e8d9627f4a9a.
 package log

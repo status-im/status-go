@@ -53,6 +53,8 @@ func FlatDisplayWith(w io.Writer, header string, filterFn func(log.Entry) bool) 
 		if en.Function != "" {
 			fmt.Fprintf(&bu, "%s: %+s", green.Sprint("Function"), en.Function)
 			fmt.Fprint(&bu, printSpaceLine(2))
+			fmt.Fprintf(&bu, "%s: %+s:%d", green.Sprint("File"), en.File, en.Line)
+			fmt.Fprint(&bu, printSpaceLine(2))
 		}
 
 		fmt.Fprint(&bu, "|")

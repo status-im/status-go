@@ -27,7 +27,7 @@ func WithMessage(level Level, message string, m ...interface{}) Entry {
 	e.Level = level
 	e.Field = make(Field)
 	e.Time = time.Now()
-	e.Function = getFunctionName(4)
+	e.Function, e.File, e.Line = getFunctionName(4)
 
 	if len(m) == 0 {
 		e.Message = message
@@ -44,8 +44,8 @@ func WithTrace(t *Trace) Entry {
 	var e Entry
 	e.Field = make(Field)
 	e.Time = time.Now()
-	e.Function = getFunctionName(4)
 	e.Trace = t
+	e.Function, e.File, e.Line = getFunctionName(4)
 	return e
 }
 
@@ -54,8 +54,8 @@ func WithID(id string) Entry {
 	var e Entry
 	e.ID = id
 	e.Time = time.Now()
-	e.Function = getFunctionName(4)
 	e.Field = make(Field)
+	e.Function, e.File, e.Line = getFunctionName(4)
 	return e
 }
 
@@ -63,10 +63,10 @@ func WithID(id string) Entry {
 // adds the giving key-value pair to the entry.
 func With(key string, value interface{}) Entry {
 	var e Entry
-	e.Function = getFunctionName(4)
 	e.Time = time.Now()
 	e.Field = make(Field)
 	e.Field[key] = value
+	e.Function, e.File, e.Line = getFunctionName(4)
 	return e
 }
 
@@ -76,7 +76,8 @@ func WithFields(f Field) Entry {
 	var e Entry
 	e.Field = make(Field)
 	e.Time = time.Now()
-	e.Function = getFunctionName(4)
+
+	e.Function, e.File, e.Line = getFunctionName(4)
 
 	for k, v := range f {
 		e.Field[k] = v
@@ -86,17 +87,19 @@ func WithFields(f Field) Entry {
 }
 
 // Entry represent a giving record of data at a giving period of time.
-// TODO(influx6): Currently all Entry methods are on value and return themselves 
-// to safe uses with concurrency, but i do need to decide if its necessary to guard 
+// TODO(influx6): Currently all Entry methods are on value and return themselves
+// to safe uses with concurrency, but i do need to decide if its necessary to guard
 // Entry at all with mutex, and are their cases of race condition in their use.
-// Currenty most usage are a once-off set and send type of situation, but if for 
-// example, we wish to store Timelapse and this will span multiple points, then we 
+// Currenty most usage are a once-off set and send type of situation, but if for
+// example, we wish to store Timelapse and this will span multiple points, then we
 // either ensure people are aware just like with slices to set the new value to the returned
 // variable, else use pointers, but will these not cause issues with concurreny later?
 //
 type Entry struct {
 	ID        string      `json:"id"`
 	Function  string      `json:"function"`
+	File      string      `json:"file"`
+	Line      int         `json:"line"`
 	Level     Level       `json:"level"`
 	Field     Field       `json:"fields"`
 	Time      time.Time   `json:"time"`
@@ -157,4 +160,3 @@ func (e Entry) WithFields(f Field) Entry {
 
 	return e
 }
-
