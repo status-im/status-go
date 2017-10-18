@@ -103,29 +103,23 @@ func (s *BackendTestSuite) StartTestBackend(networkID int, opts ...TestNodeOptio
 	s.NoError(importTestAccouns(nodeConfig.KeyStoreDir))
 
 	// start node
-	s.False(s.Backend.IsNodeRunning())
 	nodeStarted, err := s.Backend.StartNode(nodeConfig)
 	s.NoError(err)
 	<-nodeStarted
-	s.True(s.Backend.IsNodeRunning())
 }
 
 // StopTestBackend stops the node.
 func (s *BackendTestSuite) StopTestBackend() {
-	s.True(s.Backend.IsNodeRunning())
 	backendStopped, err := s.Backend.StopNode()
 	s.NoError(err)
 	<-backendStopped
-	s.False(s.Backend.IsNodeRunning())
 }
 
 // RestartTestNode restarts a currently running node.
 func (s *BackendTestSuite) RestartTestNode() {
-	s.True(s.Backend.IsNodeRunning())
 	nodeRestarted, err := s.Backend.RestartNode()
 	s.NoError(err)
 	<-nodeRestarted
-	s.True(s.Backend.IsNodeRunning())
 }
 
 // WhisperService returns a reference to the Whisper service.

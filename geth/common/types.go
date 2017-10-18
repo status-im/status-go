@@ -67,9 +67,6 @@ type NodeManager interface {
 
 	ResetChainDataWait() error
 
-	// IsNodeRunning confirm that node is running
-	IsNodeRunning() bool
-
 	// NodeConfig returns reference to running node's configuration
 	NodeConfig() (*params.NodeConfig, error)
 

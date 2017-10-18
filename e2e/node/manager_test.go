@@ -187,17 +187,12 @@ func (s *ManagerTestSuite) TestNodeStartStop() {
 	s.NoError(err)
 
 	// try stopping non-started node
-	s.False(s.NodeManager.IsNodeRunning())
 	_, err = s.NodeManager.StopNode()
 	s.Equal(err, node.ErrNoRunningNode)
 
 	// start node
-	s.False(s.NodeManager.IsNodeRunning())
-
 	err = s.NodeManager.StartNodeWait(nodeConfig)
 	s.NoError(err)
-
-	s.True(s.NodeManager.IsNodeRunning())
 
 	// try starting another node (w/o stopping the previously started node)
 	_, err = s.NodeManager.StartNode(nodeConfig)
@@ -207,13 +202,9 @@ func (s *ManagerTestSuite) TestNodeStartStop() {
 	err = s.NodeManager.StopNodeWait()
 	s.NoError(err)
 
-	s.False(s.NodeManager.IsNodeRunning())
-
 	// start new node with exactly the same config
 	err = s.NodeManager.StartNodeWait(nodeConfig)
 	s.NoError(err)
-
-	s.True(s.NodeManager.IsNodeRunning())
 
 	// finally stop the node
 	err = s.NodeManager.StopNodeWait()
@@ -224,12 +215,9 @@ func (s *ManagerTestSuite) TestNetworkSwitching() {
 	// get Ropsten config
 	nodeConfig, err := e2e.MakeTestNodeConfig(params.RopstenNetworkID)
 	s.NoError(err)
-	s.False(s.NodeManager.IsNodeRunning())
 
 	err = s.NodeManager.StartNodeWait(nodeConfig)
 	s.NoError(err)
-
-	s.True(s.NodeManager.IsNodeRunning())
 
 	firstHash, err := e2e.FirstBlockHash(s.NodeManager)
 	s.NoError(err)
@@ -239,16 +227,12 @@ func (s *ManagerTestSuite) TestNetworkSwitching() {
 	err = s.NodeManager.StopNodeWait()
 	s.NoError(err)
 
-	s.False(s.NodeManager.IsNodeRunning())
-
 	// start new node with completely different config
 	nodeConfig, err = e2e.MakeTestNodeConfig(params.RinkebyNetworkID)
 	s.NoError(err)
 
 	err = s.NodeManager.StartNodeWait(nodeConfig)
 	s.NoError(err)
-
-	s.True(s.NodeManager.IsNodeRunning())
 
 	// make sure we are on another network indeed
 	firstHash, err = e2e.FirstBlockHash(s.NodeManager)
@@ -269,8 +253,6 @@ func (s *ManagerTestSuite) TestStartNodeWithUpstreamEnabled() {
 	err = s.NodeManager.StartNodeWait(nodeConfig)
 	s.NoError(err)
 
-	s.True(s.NodeManager.IsNodeRunning())
-
 	err = s.NodeManager.StopNodeWait()
 	s.NoError(err)
 }
@@ -289,9 +271,6 @@ func (s *ManagerTestSuite) TestResetChainData() {
 	err := s.NodeManager.ResetChainDataWait()
 	s.NoError(err)
 
-	// new node, with previous config should be running
-	s.True(s.NodeManager.IsNodeRunning())
-
 	// make sure we can read the first byte, and it is valid (for Rinkeby)
 	firstHash, err := e2e.FirstBlockHash(s.NodeManager)
 	s.NoError(err)
@@ -302,12 +281,8 @@ func (s *ManagerTestSuite) TestRestartNode() {
 	s.StartTestNode(params.RinkebyNetworkID)
 	defer s.StopTestNode()
 
-	s.True(s.NodeManager.IsNodeRunning())
 	err := s.NodeManager.RestartNodeWait()
 	s.NoError(err)
-
-	// new node, with previous config should be running
-	s.True(s.NodeManager.IsNodeRunning())
 
 	// make sure we can read the first byte, and it is valid (for Rinkeby)
 	firstHash, err := e2e.FirstBlockHash(s.NodeManager)
@@ -350,11 +325,6 @@ func (s *ManagerTestSuite) TestRaceConditions() {
 			log.Info("Node()")
 			_, err := s.NodeManager.Node()
 			s.T().Logf("Node(), error: %v", err)
-			progress <- struct{}{}
-		},
-		func(config *params.NodeConfig) {
-			log.Info("IsNodeRunning()")
-			s.T().Logf("IsNodeRunning(), result: %v", s.NodeManager.IsNodeRunning())
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
@@ -467,7 +437,6 @@ func (s *ManagerTestSuite) TestNodeStartCrash_DoubleStartNode_Error() {
 	// now try starting using node manager
 	_, err = s.NodeManager.StartNode(nodeConfig)
 	s.Error(err) // no error is thrown, as node is started in separate routine
-	s.False(s.NodeManager.IsNodeRunning())
 
 	select {
 	case <-time.After(timeout):
@@ -499,9 +468,7 @@ func (s *ManagerTestSuite) TestNodeStart_CrashSignal_Success() {
 	// no deadlock, and no signal this time, manager should be able to start node
 	signalReceived = make(chan struct{})
 	err = s.NodeManager.StartNodeWait(nodeConfig)
-	s.NoError(err) // again, no error
-
-	s.True(s.NodeManager.IsNodeRunning())
+	s.NoError(err)
 
 	select {
 	case <-time.After(timeout):

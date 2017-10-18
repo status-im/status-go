@@ -63,11 +63,6 @@ func (m *StatusBackend) TxQueueManager() common.TxQueueManager {
 	return m.txQueueManager
 }
 
-// IsNodeRunning confirm that node is running
-func (m *StatusBackend) IsNodeRunning() bool {
-	return m.nodeManager.IsNodeRunning()
-}
-
 // StartNode start Status node, fails if node is already started
 func (m *StatusBackend) StartNode(config *params.NodeConfig) (<-chan struct{}, error) {
 	m.Lock()

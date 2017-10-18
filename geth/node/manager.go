@@ -87,6 +87,7 @@ func (m *NodeManager) StartNode(config *params.NodeConfig) (<-chan struct{}, err
 	return m.startNode(config)
 }
 
+// StartNodeWait the same as StartNode, but works in sync mode
 func (m *NodeManager) StartNodeWait(config *params.NodeConfig) error {
 	startedChan, err := m.StartNode(config)
 	if err != nil {
@@ -130,18 +131,6 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 	return m.getNodeStarted(), nil
 }
 
-func (m *NodeManager) initRPCClient(node *node.Node) {
-	rpcClient, err := rpc.NewClient(node, m.getUpstreamConfig())
-	if err != nil {
-		log.Error("Init RPC client failed:", "error", err)
-		m.setFailed(ErrRPCClient)
-
-		return
-	}
-
-	m.setRPCClient(rpcClient)
-}
-
 func (m *NodeManager) newNode(config *params.NodeConfig) (*node.Node, error) {
 	ethNode, err := MakeNode(config)
 	if err != nil {
@@ -160,6 +149,19 @@ func (m *NodeManager) newNode(config *params.NodeConfig) (*node.Node, error) {
 	return ethNode, nil
 }
 
+// initRPCClient up on given node, in case an error stops node
+func (m *NodeManager) initRPCClient(node *node.Node) {
+	rpcClient, err := rpc.NewClient(node, m.getUpstreamConfig())
+	if err != nil {
+		log.Error("Init RPC client failed:", "error", err)
+		m.setFailed(ErrRPCClient)
+
+		return
+	}
+
+	m.setRPCClient(rpcClient)
+}
+
 // StopNode stop Status node. Stopped node cannot be resumed.
 func (m *NodeManager) StopNode() (<-chan struct{}, error) {
 	if err := m.isNodeAvailable(); err != nil {
@@ -171,6 +173,7 @@ func (m *NodeManager) StopNode() (<-chan struct{}, error) {
 	return m.stop()
 }
 
+// StopNodeWait the same as StopNode, but works in sync mode
 func (m *NodeManager) StopNodeWait() error {
 	stoppedChan, err := m.StopNode()
 	if err != nil {
@@ -214,17 +217,6 @@ func (m *NodeManager) stopNode() error {
 	}
 
 	return nil
-}
-
-// IsNodeRunning confirm that node is running
-func (m *NodeManager) IsNodeRunning() bool {
-	if err := m.isNodeAvailable(); err != nil {
-		return false
-	}
-
-	m.waitNodeStarted()
-
-	return true
 }
 
 // Node returns underlying Status node
@@ -310,6 +302,7 @@ func (m *NodeManager) ResetChainData() (<-chan struct{}, error) {
 	return m.resetChainData()
 }
 
+// ResetChainDataWait the same as ResetChainData, but works in sync mode
 func (m *NodeManager) ResetChainDataWait() error {
 	resetChan, err := m.ResetChainData()
 	if err != nil {
@@ -360,6 +353,7 @@ func (m *NodeManager) RestartNode() (<-chan struct{}, error) {
 	return m.restartNode()
 }
 
+// RestartNodeWait the same as RestartNode, but works in sync mode
 func (m *NodeManager) RestartNodeWait() error {
 	restartChan, err := m.RestartNode()
 	if err != nil {

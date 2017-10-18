@@ -142,18 +142,6 @@ func (mr *MockNodeManagerMockRecorder) ResetChainDataWait() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResetChainDataWait", reflect.TypeOf((*MockNodeManager)(nil).ResetChainDataWait))
 }
 
-// IsNodeRunning mocks base method
-func (m *MockNodeManager) IsNodeRunning() bool {
-	ret := m.ctrl.Call(m, "IsNodeRunning")
-	ret0, _ := ret[0].(bool)
-	return ret0
-}
-
-// IsNodeRunning indicates an expected call of IsNodeRunning
-func (mr *MockNodeManagerMockRecorder) IsNodeRunning() *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsNodeRunning", reflect.TypeOf((*MockNodeManager)(nil).IsNodeRunning))
-}
-
 // NodeConfig mocks base method
 func (m *MockNodeManager) NodeConfig() (*params.NodeConfig, error) {
 	ret := m.ctrl.Call(m, "NodeConfig")
