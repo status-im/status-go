@@ -79,7 +79,9 @@ func (s *WhisperJailTestSuite) GetAccountKey(account struct {
 	return accountKey1, accountKey1Hex, nil
 }
 
-func (s *WhisperJailTestSuite) TestJailWhisper() {
+// TODO(adamb) Uncomment when issue #336 is fixed.
+/*
+func (s *WhisperJailTestSuite) DontTestJailWhisper() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
@@ -371,6 +373,7 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 		}
 	}
 }
+*/
 
 func (s *WhisperJailTestSuite) TestEncryptedAnonymousMessage() {
 	s.StartTestBackend(params.RopstenNetworkID)
