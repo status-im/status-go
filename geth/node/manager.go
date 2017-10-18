@@ -59,8 +59,9 @@ type NodeManager struct {
 	whisperServiceLock sync.RWMutex
 
 	lesService     services.LesService // reference to LES service
-	statusBackend  services.StatusBackend
 	lesServiceLock sync.RWMutex
+
+	statusBackend  services.StatusBackend // reference to ethereum backend
 
 	rpcClient     geth.RPCClient // reference to RPC client
 	rpcClientLock sync.RWMutex
@@ -76,7 +77,7 @@ func NewNodeManager() *NodeManager {
 	return m
 }
 
-// StartNode start Status node, fails if node is already started
+// StartNode start Status node, fails if node is already started.
 func (m *NodeManager) StartNode(config *params.NodeConfig) (<-chan struct{}, error) {
 	if m.isNodeStarted() {
 		return nil, ErrNodeExists
@@ -87,7 +88,7 @@ func (m *NodeManager) StartNode(config *params.NodeConfig) (<-chan struct{}, err
 	return m.startNode(config)
 }
 
-// StartNodeWait the same as StartNode, but works in sync mode
+// StartNodeWait the same as StartNode, but works in sync mode.
 func (m *NodeManager) StartNodeWait(config *params.NodeConfig) error {
 	startedChan, err := m.StartNode(config)
 	if err != nil {
@@ -98,7 +99,7 @@ func (m *NodeManager) StartNodeWait(config *params.NodeConfig) error {
 	return nil
 }
 
-// startNode start Status node, fails if node is already started
+// startNode start Status node, fails if node is already started.
 func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, error) {
 	m.setPendingState()
 
@@ -149,7 +150,7 @@ func (m *NodeManager) newNode(config *params.NodeConfig) (*node.Node, error) {
 	return ethNode, nil
 }
 
-// initRPCClient up on given node, in case an error stops node
+// initRPCClient up on given node, in case an error stops node.
 func (m *NodeManager) initRPCClient(node *node.Node) {
 	rpcClient, err := rpc.NewClient(node, m.getUpstreamConfig())
 	if err != nil {
@@ -173,7 +174,7 @@ func (m *NodeManager) StopNode() (<-chan struct{}, error) {
 	return m.stop()
 }
 
-// StopNodeWait the same as StopNode, but works in sync mode
+// StopNodeWait the same as StopNode, but works in sync mode.
 func (m *NodeManager) StopNodeWait() error {
 	stoppedChan, err := m.StopNode()
 	if err != nil {
@@ -219,7 +220,7 @@ func (m *NodeManager) stopNode() error {
 	return nil
 }
 
-// Node returns underlying Status node
+// Node returns underlying Status node.
 func (m *NodeManager) Node() (geth.Node, error) {
 	if err := m.isNodeAvailable(); err != nil {
 		return nil, err
@@ -230,7 +231,7 @@ func (m *NodeManager) Node() (geth.Node, error) {
 	return m.getNode(), nil
 }
 
-// PopulateStaticPeers connects current node with our publicly available LES/SHH/Swarm cluster
+// PopulateStaticPeers connects current node with our publicly available LES/SHH/Swarm cluster.
 func (m *NodeManager) PopulateStaticPeers() error {
 	if err := m.isNodeAvailable(); err != nil {
 		return err
@@ -241,7 +242,7 @@ func (m *NodeManager) PopulateStaticPeers() error {
 	return m.populateStaticPeers()
 }
 
-// populateStaticPeers connects current node with our publicly available LES/SHH/Swarm cluster
+// populateStaticPeers connects current node with our publicly available LES/SHH/Swarm cluster.
 func (m *NodeManager) populateStaticPeers() error {
 	if !m.getBootClusterEnabled() {
 		log.Info("Boot cluster is disabled")
@@ -260,7 +261,7 @@ func (m *NodeManager) populateStaticPeers() error {
 	return nil
 }
 
-// AddPeer adds new static peer node
+// AddPeer adds new static peer node.
 func (m *NodeManager) AddPeer(url string) error {
 	if err := m.isNodeAvailable(); err != nil {
 		return err
@@ -271,7 +272,7 @@ func (m *NodeManager) AddPeer(url string) error {
 	return m.addPeer(url)
 }
 
-// addPeer adds new static peer node
+// addPeer adds new static peer node.
 func (m *NodeManager) addPeer(url string) error {
 	m.nodeLock.Lock()
 	server := m.node.Server()
@@ -302,7 +303,7 @@ func (m *NodeManager) ResetChainData() (<-chan struct{}, error) {
 	return m.resetChainData()
 }
 
-// ResetChainDataWait the same as ResetChainData, but works in sync mode
+// ResetChainDataWait the same as ResetChainData, but works in sync mode.
 func (m *NodeManager) ResetChainDataWait() error {
 	resetChan, err := m.ResetChainData()
 	if err != nil {
@@ -342,7 +343,7 @@ func (m *NodeManager) resetChainData() (<-chan struct{}, error) {
 	return m.startNode(prevConfig)
 }
 
-// RestartNode restart running Status node, fails if node is not running
+// RestartNode restart running Status node, fails if node is not running.
 func (m *NodeManager) RestartNode() (<-chan struct{}, error) {
 	if err := m.isNodeAvailable(); err != nil {
 		return nil, err
@@ -353,7 +354,7 @@ func (m *NodeManager) RestartNode() (<-chan struct{}, error) {
 	return m.restartNode()
 }
 
-// RestartNodeWait the same as RestartNode, but works in sync mode
+// RestartNodeWait the same as RestartNode, but works in sync mode.
 func (m *NodeManager) RestartNodeWait() error {
 	restartChan, err := m.RestartNode()
 	if err != nil {
@@ -364,7 +365,7 @@ func (m *NodeManager) RestartNodeWait() error {
 	return nil
 }
 
-// restartNode restart running Status node, fails if node is not running
+// restartNode restart running Status node, fails if node is not running.
 func (m *NodeManager) restartNode() (<-chan struct{}, error) {
 	prevConfig := m.getConfig()
 
@@ -376,7 +377,7 @@ func (m *NodeManager) restartNode() (<-chan struct{}, error) {
 	return m.startNode(prevConfig)
 }
 
-// NodeConfig exposes reference to running node's configuration
+// NodeConfig exposes reference to running node's configuration.
 func (m *NodeManager) NodeConfig() (*params.NodeConfig, error) {
 	if err := m.isNodeAvailable(); err != nil {
 		return nil, err
@@ -385,7 +386,7 @@ func (m *NodeManager) NodeConfig() (*params.NodeConfig, error) {
 	return m.getConfig(), nil
 }
 
-// LightEthereumService exposes reference to LES service running on top of the node
+// LightEthereumService exposes reference to LES service running on top of the node.
 func (m *NodeManager) LightEthereumService() (services.LesService, error) {
 	if err := m.isNodeAvailable(); err != nil {
 		return nil, err
@@ -403,7 +404,7 @@ func (m *NodeManager) LightEthereumService() (services.LesService, error) {
 	return m.lesService, nil
 }
 
-// WhisperService exposes reference to Whisper service running on top of the node
+// WhisperService exposes reference to Whisper service running on top of the node.
 func (m *NodeManager) WhisperService() (services.Whisper, error) {
 	if err := m.isNodeAvailable(); err != nil {
 		return nil, err
@@ -424,6 +425,7 @@ func (m *NodeManager) WhisperService() (services.Whisper, error) {
 	return m.whisperService, nil
 }
 
+// PublicWhisperAPI exposes reference to public Whisper API.
 func (m *NodeManager) PublicWhisperAPI() (*whisperv5.PublicWhisperAPI, error) {
 	if err := m.isNodeAvailable(); err != nil {
 		return nil, err
@@ -440,7 +442,7 @@ func (m *NodeManager) PublicWhisperAPI() (*whisperv5.PublicWhisperAPI, error) {
 	return whisperv5.NewPublicWhisperAPI(whisperService), nil
 }
 
-// AccountManager exposes reference to node's accounts manager
+// AccountManager exposes reference to node's accounts manager.
 func (m *NodeManager) AccountManager() (*accounts.Manager, error) {
 	if err := m.isNodeAvailable(); err != nil {
 		return nil, err
@@ -456,7 +458,7 @@ func (m *NodeManager) AccountManager() (*accounts.Manager, error) {
 	return accountManager, nil
 }
 
-// AccountKeyStore exposes reference to accounts key store
+// AccountKeyStore exposes reference to accounts key store.
 func (m *NodeManager) AccountKeyStore() (*keystore.KeyStore, error) {
 	if err := m.isNodeAvailable(); err != nil {
 		return nil, err
@@ -487,6 +489,19 @@ func (m *NodeManager) RPCClient() geth.RPCClient {
 	return m.getRPCClient()
 }
 
+// GetStatusBackend exposes StatusBackend interface.
+func (m *NodeManager) GetStatusBackend() (services.StatusBackend, error) {
+	_, err := m.getLesService()
+	if err != nil {
+		return nil, err
+	}
+
+	m.lesServiceLock.Lock()
+	defer m.lesServiceLock.Unlock()
+
+	return m.statusBackend, nil
+}
+
 // initLog initializes global logger parameters based on
 // provided node configurations.
 func (m *NodeManager) initLog(config *params.NodeConfig) {
@@ -502,7 +517,7 @@ func (m *NodeManager) initLog(config *params.NodeConfig) {
 	}
 }
 
-// isNodeAvailable check if we have a node running and make sure is fully started
+// isNodeAvailable check if we have a node running and make sure is fully started.
 func (m *NodeManager) isNodeAvailable() error {
 	if !m.isNodeStarted() {
 		return ErrNoRunningNode
@@ -535,7 +550,6 @@ func (m *NodeManager) isNodePending() bool {
 	return atomic.LoadInt32(m.state) == pending
 }
 
-//todo(@jeka): we should use copy generator
 func (m *NodeManager) setConfig(config *params.NodeConfig) {
 	m.config.Store(*config)
 }
@@ -607,6 +621,7 @@ func (m *NodeManager) waitNodeStarted() {
 	m.nodeStartedLock.RUnlock()
 }
 
+// setStarted sets node into started state: start channel closed, and send Started signal.
 func (m *NodeManager) setStarted() {
 	if !m.isNodePending() {
 		return
@@ -621,6 +636,7 @@ func (m *NodeManager) setStarted() {
 	})
 }
 
+// setStopped sets node into stopped state: start and stop channels closed, and send Stopped signal.
 func (m *NodeManager) setStopped() {
 	if m.isNodeStopped() {
 		return
@@ -641,6 +657,7 @@ func (m *NodeManager) setStopped() {
 	log.Info("Node manager notified app, that node has stopped")
 }
 
+// setFailed sets node into Failed state: stopped state, start and stop channels closed, and send Crash signal.
 func (m *NodeManager) setFailed(err error) {
 	if !m.isNodePending() {
 		return
@@ -679,6 +696,7 @@ func (m *NodeManager) closeNodeStopped() {
 	m.nodeStoppedLock.Unlock()
 }
 
+// getWhisperService returns Whisper service or inits it
 func (m *NodeManager) getWhisperService() (*whisperv5.Whisper, error) {
 	m.whisperServiceLock.Lock()
 	defer m.whisperServiceLock.Unlock()
@@ -697,6 +715,7 @@ func (m *NodeManager) getWhisperService() (*whisperv5.Whisper, error) {
 	return m.whisperService, nil
 }
 
+// getLesService returns LES service or inits both LES and backend
 func (m *NodeManager) getLesService() (services.LesService, error) {
 	m.lesServiceLock.Lock()
 	defer m.lesServiceLock.Unlock()
@@ -715,18 +734,6 @@ func (m *NodeManager) getLesService() (services.LesService, error) {
 	m.statusBackend = lesObject.StatusBackend
 
 	return m.lesService, nil
-}
-
-func (m *NodeManager) GetStatusBackend() (services.StatusBackend, error) {
-	_, err := m.getLesService()
-	if err != nil {
-		return nil, err
-	}
-
-	m.lesServiceLock.Lock()
-	defer m.lesServiceLock.Unlock()
-
-	return m.statusBackend, nil
 }
 
 func (m *NodeManager) setRPCClient(rpcClient geth.RPCClient) {
