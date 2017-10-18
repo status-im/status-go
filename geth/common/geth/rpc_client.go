@@ -6,6 +6,7 @@ import (
 	"github.com/status-im/status-go/geth/rpc"
 )
 
+// RPCClient interface for geth.RPCClient.
 type RPCClient interface {
 	Call(result interface{}, method string, args ...interface{}) error
 	CallRaw(body string) string

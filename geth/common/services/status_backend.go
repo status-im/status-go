@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/les/status"
 )
 
+// StatusBackend interface for Ethereum Backend service.
 type StatusBackend interface {
 	SetAccountsFilterHandler(fn status.AccountsFilterHandler)
 	AccountManager() *status.AccountManager

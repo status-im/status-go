@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
+// LesService interface for LightEthereum service.
 type LesService interface {
 	APIs() []rpc.API
 	ResetWithGenesisBlock(*types.Block)

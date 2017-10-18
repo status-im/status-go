@@ -41,6 +41,7 @@ const (
 )
 
 // NodeManager manages Status node (which abstracts contained geth node)
+// uses interfaces to prevent races on exported objects.
 type NodeManager struct {
 	state *int32
 
@@ -61,7 +62,7 @@ type NodeManager struct {
 	lesService     services.LesService // reference to LES service
 	lesServiceLock sync.RWMutex
 
-	statusBackend  services.StatusBackend // reference to ethereum backend
+	statusBackend services.StatusBackend // reference to ethereum backend
 
 	rpcClient     geth.RPCClient // reference to RPC client
 	rpcClientLock sync.RWMutex

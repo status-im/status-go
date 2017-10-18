@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/node"
 )
 
+// Node interface for geth.Node.
 type Node interface {
 	Register(constructor node.ServiceConstructor) error
 	Start() error

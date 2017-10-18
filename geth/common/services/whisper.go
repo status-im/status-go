@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/whisper/whisperv5"
 )
 
+// Whisper interface for Whisper service.
 type Whisper interface {
 	MinPow() float64
 	MaxMessageSize() uint32
