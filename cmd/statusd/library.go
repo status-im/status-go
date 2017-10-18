@@ -22,7 +22,7 @@ func GenerateConfig(datadir *C.char, networkID C.int, devMode C.int) *C.char {
 		return makeJSONResponse(err)
 	}
 
-	outBytes, err := json.Marshal(&config)
+	outBytes, err := json.Marshal(config)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
@@ -124,7 +124,7 @@ func CreateAccount(password *C.char) *C.char {
 		Mnemonic: mnemonic,
 		Error:    errString,
 	}
-	outBytes, _ := json.Marshal(&out)
+	outBytes, _ := json.Marshal(out)
 	return C.CString(string(outBytes))
 }
 
@@ -144,7 +144,7 @@ func CreateChildAccount(parentAddress, password *C.char) *C.char {
 		PubKey:  pubKey,
 		Error:   errString,
 	}
-	outBytes, _ := json.Marshal(&out)
+	outBytes, _ := json.Marshal(out)
 	return C.CString(string(outBytes))
 }
 
@@ -165,7 +165,7 @@ func RecoverAccount(password, mnemonic *C.char) *C.char {
 		Mnemonic: C.GoString(mnemonic),
 		Error:    errString,
 	}
-	outBytes, _ := json.Marshal(&out)
+	outBytes, _ := json.Marshal(out)
 	return C.CString(string(outBytes))
 }
 
@@ -207,7 +207,7 @@ func CompleteTransaction(id, password *C.char) *C.char {
 		Hash:  txHash.Hex(),
 		Error: errString,
 	}
-	outBytes, err := json.Marshal(&out)
+	outBytes, err := json.Marshal(out)
 	if err != nil {
 		log.Error("failed to marshal CompleteTransaction output", "error", err.Error())
 		return makeJSONResponse(err)
@@ -246,7 +246,7 @@ func CompleteTransactions(ids, password *C.char) *C.char {
 		}
 	}
 
-	outBytes, err := json.Marshal(&out)
+	outBytes, err := json.Marshal(out)
 	if err != nil {
 		log.Error("failed to marshal CompleteTransactions output", "error", err.Error())
 		return makeJSONResponse(err)
@@ -270,7 +270,7 @@ func DiscardTransaction(id *C.char) *C.char {
 		ID:    C.GoString(id),
 		Error: errString,
 	}
-	outBytes, err := json.Marshal(&out)
+	outBytes, err := json.Marshal(out)
 	if err != nil {
 		log.Error("failed to marshal DiscardTransaction output", "error", err.Error())
 		return makeJSONResponse(err)
@@ -308,7 +308,7 @@ func DiscardTransactions(ids *C.char) *C.char {
 		}
 	}
 
-	outBytes, err := json.Marshal(&out)
+	outBytes, err := json.Marshal(out)
 	if err != nil {
 		log.Error("failed to marshal DiscardTransactions output", "error", err.Error())
 		return makeJSONResponse(err)
@@ -368,7 +368,7 @@ func makeJSONResponse(err error) *C.char {
 	out := common.APIResponse{
 		Error: errString,
 	}
-	outBytes, _ := json.Marshal(&out)
+	outBytes, _ := json.Marshal(out)
 
 	return C.CString(string(outBytes))
 }
@@ -390,7 +390,7 @@ func Notify(token *C.char) *C.char {
 		Error:  errString,
 	}
 
-	outBytes, err := json.Marshal(&out)
+	outBytes, err := json.Marshal(out)
 	if err != nil {
 		log.Error("failed to marshal Notify output", "error", err.Error())
 		return makeJSONResponse(err)
