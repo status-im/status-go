@@ -239,7 +239,7 @@ func (s *APIBackendTestSuite) TestResetChainData() {
 	s.StartTestBackend(params.RinkebyNetworkID)
 	defer s.StopTestBackend()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultNodeSyncTimeout)
 	defer cancel()
 	s.Nil(EnsureNodeSync(ctx, s.Backend.NodeManager()), "cannot ensure node synchronization")
 

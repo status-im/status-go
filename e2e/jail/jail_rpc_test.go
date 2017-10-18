@@ -40,7 +40,7 @@ func (s *JailRPCTestSuite) TestJailRPCSend() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultNodeSyncTimeout)
 	defer cancel()
 	s.Nil(EnsureNodeSync(ctx, s.Backend.NodeManager()), "cannot ensure node synchronization")
 
@@ -115,7 +115,7 @@ func (s *JailRPCTestSuite) TestContractDeployment() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultNodeSyncTimeout)
 	defer cancel()
 	s.Nil(EnsureNodeSync(ctx, s.Backend.NodeManager()), "cannot ensure node synchronization")
 
@@ -201,7 +201,7 @@ func (s *JailRPCTestSuite) TestJailVMPersistence() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultNodeSyncTimeout)
 	defer cancel()
 	s.Nil(EnsureNodeSync(ctx, s.Backend.NodeManager()), "cannot ensure node synchronization")
 

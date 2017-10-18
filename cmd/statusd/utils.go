@@ -214,7 +214,7 @@ func testResetChainData(t *testing.T) bool {
 		return false
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultNodeSyncTimeout)
 	defer cancel()
 	if err := EnsureNodeSync(ctx, statusAPI.NodeManager()); err != nil {
 		t.Errorf("cannot ensure node synchronization: %v", err)
@@ -730,7 +730,7 @@ func testCompleteTransaction(t *testing.T) bool {
 
 	txQueue.Reset()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultNodeSyncTimeout)
 	defer cancel()
 	if err := EnsureNodeSync(ctx, statusAPI.NodeManager()); err != nil {
 		t.Errorf("cannot ensure node synchronization: %v", err)
@@ -1263,7 +1263,8 @@ func testJailParseInvalid(t *testing.T) bool {
 	response := C.GoString(Parse(C.CString("CHAT_ID_INIT_TEST"), C.CString(extraInvalidCode)))
 
 	// Assert.
-	expectedResponse := `{"error":"(anonymous): Line 16331:50 Unexpected end of input (and 1 more errors)"}`
+	// expectedResponse := `{"error":"(anonymous): Line 16331:50 Unexpected end of input (and 1 more errors)"}`
+	expectedResponse := `{"error":"(anonymous): Line 16354:50 Unexpected end of input (and 1 more errors)"}`
 	if expectedResponse != response {
 		t.Errorf("unexpected response, expected: %v, got: %v", expectedResponse, response)
 		return false
@@ -1370,7 +1371,7 @@ func startTestNode(t *testing.T) <-chan struct{} {
 
 			if syncRequired {
 				t.Logf("Sync is required")
-				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+				ctx, cancel := context.WithTimeout(context.Background(), DefaultNodeSyncTimeout)
 				defer cancel()
 				if err := EnsureNodeSync(ctx, statusAPI.NodeManager()); err != nil {
 					t.Errorf("cannot ensure node synchronization: %v", err)

@@ -40,7 +40,7 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransaction() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultNodeSyncTimeout)
 	defer cancel()
 	s.Nil(EnsureNodeSync(ctx, s.Backend.NodeManager()), "cannot ensure node synchronization")
 
@@ -146,7 +146,7 @@ func (s *TransactionsTestSuite) TestSendContractTx() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultNodeSyncTimeout)
 	defer cancel()
 	s.Nil(EnsureNodeSync(ctx, s.Backend.NodeManager()), "cannot ensure node synchronization")
 
@@ -235,7 +235,7 @@ func (s *TransactionsTestSuite) TestSendEtherTx() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultNodeSyncTimeout)
 	defer cancel()
 	s.Nil(EnsureNodeSync(ctx, s.Backend.NodeManager()), "cannot ensure node synchronization")
 
@@ -456,7 +456,7 @@ func (s *TransactionsTestSuite) TestDoubleCompleteQueuedTransactions() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultNodeSyncTimeout)
 	defer cancel()
 	s.Nil(EnsureNodeSync(ctx, s.Backend.NodeManager()), "cannot ensure node synchronization")
 
@@ -535,7 +535,7 @@ func (s *TransactionsTestSuite) TestDiscardQueuedTransaction() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultNodeSyncTimeout)
 	defer cancel()
 	s.Nil(EnsureNodeSync(ctx, s.Backend.NodeManager()), "cannot ensure node synchronization")
 
@@ -617,7 +617,7 @@ func (s *TransactionsTestSuite) TestCompleteMultipleQueuedTransactions() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultNodeSyncTimeout)
 	defer cancel()
 	s.Nil(EnsureNodeSync(ctx, s.Backend.NodeManager()), "cannot ensure node synchronization")
 
@@ -713,7 +713,7 @@ func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultNodeSyncTimeout)
 	defer cancel()
 	s.Nil(EnsureNodeSync(ctx, s.Backend.NodeManager()), "cannot ensure node synchronization")
 

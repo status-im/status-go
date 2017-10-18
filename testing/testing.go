@@ -31,6 +31,11 @@ var (
 		params.RinkebyNetworkID:     "Rinkeby",
 		params.StatusChainNetworkID: "StatusChain",
 	}
+
+	// DefaultNodeSyncTimeout will mostly be used as timeout
+	// for contexts of EnsureNodeSync(). Still individual ones
+	// can be set.
+	DefaultNodeSyncTimeout = 5 * time.Minute
 )
 
 func init() {

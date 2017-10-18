@@ -297,7 +297,7 @@ func (s *ManagerTestSuite) TestResetChainData() {
 	s.StartTestNode(params.RinkebyNetworkID)
 	defer s.StopTestNode()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultNodeSyncTimeout)
 	defer cancel()
 	s.Nil(EnsureNodeSync(ctx, s.NodeManager), "cannot ensure node synchronization")
 
