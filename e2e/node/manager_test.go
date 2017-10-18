@@ -29,7 +29,7 @@ func (s *ManagerTestSuite) SetupTest() {
 }
 
 func (s *ManagerTestSuite) TearDownTest() {
-	_ = s.NodeManager.StopNodeWait()
+	s.StopTestNode()
 }
 
 func (s *ManagerTestSuite) TestReferencesWithoutStartedNode() {
@@ -128,8 +128,8 @@ func (s *ManagerTestSuite) TestReferencesWithStartedNode() {
 	defer s.StopTestNode()
 
 	var testCases = []struct {
-		name         string
-		initFn       func() (interface{}, error)
+		name   string
+		initFn func() (interface{}, error)
 	}{
 		{
 			"node is running, get NodeConfig",
@@ -194,12 +194,10 @@ func (s *ManagerTestSuite) TestNodeStartStop() {
 	// start node
 	s.False(s.NodeManager.IsNodeRunning())
 
-
 	err = s.NodeManager.StartNodeWait(nodeConfig)
 	s.NoError(err)
 
 	s.True(s.NodeManager.IsNodeRunning())
-
 
 	// try starting another node (w/o stopping the previously started node)
 	_, err = s.NodeManager.StartNode(nodeConfig)
@@ -210,7 +208,6 @@ func (s *ManagerTestSuite) TestNodeStartStop() {
 	s.NoError(err)
 
 	s.False(s.NodeManager.IsNodeRunning())
-
 
 	// start new node with exactly the same config
 	err = s.NodeManager.StartNodeWait(nodeConfig)
@@ -435,7 +432,7 @@ func (s *ManagerTestSuite) TestRaceConditions() {
 		}
 	}
 
-	time.Sleep(timeout)                // so that we see some logs
+	time.Sleep(timeout)                        // so that we see some logs
 	nodeStopped, _ := s.NodeManager.StopNode() // just in case we have a node running
 	if nodeStopped != nil {
 		<-nodeStopped
@@ -479,7 +476,6 @@ func (s *ManagerTestSuite) TestNodeStartCrash_DoubleStartNode_Error() {
 	err = outsideNode.Stop()
 	s.NoError(err)
 }
-
 
 func (s *ManagerTestSuite) TestNodeStart_CrashSignal_Success() {
 	// let's listen for node.crashed signal

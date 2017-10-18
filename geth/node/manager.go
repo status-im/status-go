@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/whisper/whisperv5"
+	"github.com/status-im/status-go/geth/common/geth"
 	"github.com/status-im/status-go/geth/common/services"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
@@ -45,7 +46,7 @@ type NodeManager struct {
 
 	config atomic.Value // Status node configuration
 
-	node     services.Node // reference to Geth P2P stack/node
+	node     geth.Node // reference to Geth P2P stack/node
 	nodeLock sync.RWMutex
 
 	nodeStarted     chan struct{} // channel to wait for start up notifications
@@ -61,7 +62,7 @@ type NodeManager struct {
 	statusBackend  services.StatusBackend
 	lesServiceLock sync.RWMutex
 
-	rpcClient     services.RPCClient // reference to RPC client
+	rpcClient     geth.RPCClient // reference to RPC client
 	rpcClientLock sync.RWMutex
 }
 
@@ -227,7 +228,7 @@ func (m *NodeManager) IsNodeRunning() bool {
 }
 
 // Node returns underlying Status node
-func (m *NodeManager) Node() (services.Node, error) {
+func (m *NodeManager) Node() (geth.Node, error) {
 	if err := m.isNodeAvailable(); err != nil {
 		return nil, err
 	}
@@ -422,6 +423,9 @@ func (m *NodeManager) WhisperService() (services.Whisper, error) {
 		return nil, err
 	}
 
+	m.whisperServiceLock.Lock()
+	defer m.whisperServiceLock.Unlock()
+
 	m.whisperService = whisperService
 	return m.whisperService, nil
 }
@@ -485,7 +489,7 @@ func (m *NodeManager) AccountKeyStore() (*keystore.KeyStore, error) {
 }
 
 // RPCClient exposes reference to RPC client connected to the running node.
-func (m *NodeManager) RPCClient() services.RPCClient {
+func (m *NodeManager) RPCClient() geth.RPCClient {
 	return m.getRPCClient()
 }
 
@@ -571,13 +575,13 @@ func (m *NodeManager) getBootNodes() []string {
 	return nodes
 }
 
-func (m *NodeManager) setNode(node services.Node) {
+func (m *NodeManager) setNode(node geth.Node) {
 	m.nodeLock.Lock()
 	m.node = node
 	m.nodeLock.Unlock()
 }
 
-func (m *NodeManager) getNode() services.Node {
+func (m *NodeManager) getNode() geth.Node {
 	m.nodeLock.RLock()
 	defer m.nodeLock.RUnlock()
 
@@ -597,12 +601,6 @@ func (m *NodeManager) getNodeStarted() chan struct{} {
 	return m.nodeStarted
 }
 
-func (m *NodeManager) readNodeStarted() {
-	m.nodeStartedLock.RLock()
-	<-m.nodeStarted
-	m.nodeStartedLock.RUnlock()
-}
-
 func (m *NodeManager) closeNodeStarted() {
 	m.nodeStartedLock.Lock()
 	close(m.nodeStarted)
@@ -610,7 +608,9 @@ func (m *NodeManager) closeNodeStarted() {
 }
 
 func (m *NodeManager) waitNodeStarted() {
-	m.readNodeStarted()
+	m.nodeStartedLock.RLock()
+	<-m.nodeStarted
+	m.nodeStartedLock.RUnlock()
 }
 
 func (m *NodeManager) setStarted() {
@@ -735,13 +735,13 @@ func (m *NodeManager) GetStatusBackend() (services.StatusBackend, error) {
 	return m.statusBackend, nil
 }
 
-func (m *NodeManager) setRPCClient(rpcClient services.RPCClient) {
+func (m *NodeManager) setRPCClient(rpcClient geth.RPCClient) {
 	m.rpcClientLock.Lock()
 	m.rpcClient = rpcClient
 	m.rpcClientLock.Unlock()
 }
 
-func (m *NodeManager) getRPCClient() services.RPCClient {
+func (m *NodeManager) getRPCClient() geth.RPCClient {
 	m.rpcClientLock.RLock()
 	defer m.rpcClientLock.RUnlock()
 

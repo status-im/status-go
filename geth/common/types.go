@@ -13,12 +13,13 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/robertkrimen/otto"
+	"github.com/status-im/status-go/geth/common/geth"
+	"github.com/status-im/status-go/geth/common/services"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/rpc"
 	"github.com/status-im/status-go/static"
-	"github.com/status-im/status-go/geth/common/services"
-	"github.com/ethereum/go-ethereum/whisper/whisperv5"
 )
 
 // errors
@@ -73,7 +74,7 @@ type NodeManager interface {
 	NodeConfig() (*params.NodeConfig, error)
 
 	// Node returns underlying Status node
-	Node() (services.Node, error)
+	Node() (geth.Node, error)
 
 	// PopulateStaticPeers populates node's list of static bootstrap peers
 	PopulateStaticPeers() error
@@ -96,7 +97,7 @@ type NodeManager interface {
 	AccountKeyStore() (*keystore.KeyStore, error)
 
 	// RPCClient exposes reference to RPC client connected to the running node
-	RPCClient() services.RPCClient
+	RPCClient() geth.RPCClient
 
 	GetStatusBackend() (services.StatusBackend, error)
 }

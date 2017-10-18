@@ -12,6 +12,7 @@ import (
 	whisperv5 "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	gomock "github.com/golang/mock/gomock"
 	otto "github.com/robertkrimen/otto"
+	geth "github.com/status-im/status-go/geth/common/geth"
 	services "github.com/status-im/status-go/geth/common/services"
 	params "github.com/status-im/status-go/geth/params"
 	rpc "github.com/status-im/status-go/geth/rpc"
@@ -167,9 +168,9 @@ func (mr *MockNodeManagerMockRecorder) NodeConfig() *gomock.Call {
 }
 
 // Node mocks base method
-func (m *MockNodeManager) Node() (services.Node, error) {
+func (m *MockNodeManager) Node() (geth.Node, error) {
 	ret := m.ctrl.Call(m, "Node")
-	ret0, _ := ret[0].(services.Node)
+	ret0, _ := ret[0].(geth.Node)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -269,9 +270,9 @@ func (mr *MockNodeManagerMockRecorder) AccountKeyStore() *gomock.Call {
 }
 
 // RPCClient mocks base method
-func (m *MockNodeManager) RPCClient() services.RPCClient {
+func (m *MockNodeManager) RPCClient() geth.RPCClient {
 	ret := m.ctrl.Call(m, "RPCClient")
-	ret0, _ := ret[0].(services.RPCClient)
+	ret0, _ := ret[0].(geth.RPCClient)
 	return ret0
 }
 

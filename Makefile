@@ -135,9 +135,9 @@ mock-install: ##@other Install mocking tools
 
 mock: ##@other Regenerate mocks
 	mockgen -source=geth/common/types.go -destination=geth/common/types_mock.go -package=common
+	mockgen -source=geth/common/geth/node.go -destination=geth/common/geth/node_mock.go -package=geth
+	mockgen -source=geth/common/geth/rpc_client.go -destination=geth/common/geth/rpc_client_mock.go -package=geth
 	mockgen -source=geth/common/services/les.go -destination=geth/common/services/les_mock.go -package=services
-	mockgen -source=geth/common/services/node.go -destination=geth/common/services/node_mock.go -package=services
-	mockgen -source=geth/common/services/rpc_client.go -destination=geth/common/services/rpc_client_mock.go -package=services
 	mockgen -source=geth/common/services/status_backend.go -destination=geth/common/services/status_backend_mock.go -package=services
 	mockgen -source=geth/common/services/whisper.go -destination=geth/common/services/whisper_mock.go -package=services
 

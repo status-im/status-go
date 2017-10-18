@@ -1,4 +1,4 @@
-package services
+package geth
 
 import (
 	"github.com/ethereum/go-ethereum/accounts"
