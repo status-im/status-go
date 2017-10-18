@@ -1313,7 +1313,7 @@ func testJailFunctionCall(t *testing.T) bool {
 	// call with wrong chat id
 	rawResponse := Call(C.CString("CHAT_IDNON_EXISTENT"), C.CString(""), C.CString(""))
 	parsedResponse := C.GoString(rawResponse)
-	expectedError := `{"error":"Cell[CHAT_IDNON_EXISTENT] doesn't exist."}`
+	expectedError := `{"error":"Cell[CHAT_IDNON_EXISTENT] doesn't exist"}`
 	if parsedResponse != expectedError {
 		t.Errorf("expected error is not returned: expected %s, got %s", expectedError, parsedResponse)
 		return false
