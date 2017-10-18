@@ -6,20 +6,20 @@ import (
 	"github.com/status-im/status-go/geth/notification"
 )
 
-// Notifier represents messaging provider for notifications.
-type Notifier struct {
+// Notification represents messaging provider for notifications.
+type Notification struct {
 	client firebaseClient
 }
 
-// NewNotifier Firebase Cloud Messaging client constructor.
-func NewNotifier(key string) common.NotificationConstructor {
+// NewNotification Firebase Cloud Messaging client constructor.
+func NewNotification(key string) common.NotificationConstructor {
 	return func() common.Notifier {
-		return &Notifier{fcm.NewFcmClient(key)}
+		return &Notification{fcm.NewFcmClient(key)}
 	}
 }
 
 // Send send to the tokens list.
-func (n *Notifier) Send(body interface{}, tokens ...string) error {
+func (n *Notification) Send(body interface{}, tokens ...string) error {
 	n.setPayload(&notification.Payload{
 		Title: "Status - new message",
 		Body:  "ping",
@@ -32,17 +32,17 @@ func (n *Notifier) Send(body interface{}, tokens ...string) error {
 }
 
 // SetMessage to send for given the tokens list.
-func (n *Notifier) setMessage(body interface{}, tokens ...string) {
+func (n *Notification) setMessage(body interface{}, tokens ...string) {
 	n.client.NewFcmRegIdsMsg(tokens, body)
 }
 
 // SetPayload sets payload message information.
-func (n *Notifier) setPayload(payload *notification.Payload) {
+func (n *Notification) setPayload(payload *notification.Payload) {
 	fcmPayload := n.toFCMPayload(payload)
 	n.client.SetNotificationPayload(fcmPayload)
 }
 
-func (n *Notifier) toFCMPayload(payload *notification.Payload) *fcm.NotificationPayload {
+func (n *Notification) toFCMPayload(payload *notification.Payload) *fcm.NotificationPayload {
 	return &fcm.NotificationPayload{
 		Title: payload.Title,
 		Body:  payload.Body,
