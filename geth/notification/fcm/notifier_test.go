@@ -39,7 +39,7 @@ func (s *NotifierTestSuite) TestNotifySuccess() {
 	s.fcmClientMock.EXPECT().Send().Return(nil, nil).Times(1)
 	fcmClient := Notifier{s.fcmClientMock}
 
-	err := fcmClient.Notify(body, ids...)
+	err := fcmClient.Send(body, ids...)
 
 	s.NoError(err)
 }
@@ -55,7 +55,7 @@ func (s *NotifierTestSuite) TestNotifyError() {
 	s.fcmClientMock.EXPECT().Send().Return(nil, expectedError).Times(1)
 	fcmClient := Notifier{s.fcmClientMock}
 
-	err := fcmClient.Notify(body, ids...)
+	err := fcmClient.Send(body, ids...)
 
 	s.Equal(expectedError, err)
 }

@@ -12,14 +12,14 @@ type Notifier struct {
 }
 
 // NewNotifier Firebase Cloud Messaging client constructor.
-func NewNotifier(key string) func() common.Notifier {
+func NewNotifier(key string) common.NotificationConstructor {
 	return func() common.Notifier {
 		return &Notifier{fcm.NewFcmClient(key)}
 	}
 }
 
-// Notify preparation and send to the tokens list.
-func (n *Notifier) Notify(body interface{}, tokens ...string) error {
+// Send send to the tokens list.
+func (n *Notifier) Send(body interface{}, tokens ...string) error {
 	n.setPayload(&notification.Payload{
 		Title: "Status - new message",
 		Body:  "ping",

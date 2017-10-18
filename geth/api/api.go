@@ -204,7 +204,7 @@ func (api *StatusAPI) Notify(token string) error {
 		"sum": "Happy Day",
 	}
 
-	err := api.b.notifier().Notify(msg, token)
+	err := api.b.newNotification().Send(msg, token)
 	if err != nil {
 		log.Error("Notify failed:", err)
 	}

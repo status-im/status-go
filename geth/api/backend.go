@@ -24,12 +24,12 @@ const (
 // StatusBackend implements Status.im service
 type StatusBackend struct {
 	sync.Mutex
-	nodeReady      chan struct{} // channel to wait for when node is fully ready
-	nodeManager    common.NodeManager
-	accountManager common.AccountManager
-	txQueueManager common.TxQueueManager
-	jailManager    common.JailManager
-	notifier       common.NotifierConstructor
+	nodeReady       chan struct{} // channel to wait for when node is fully ready
+	nodeManager     common.NodeManager
+	accountManager  common.AccountManager
+	txQueueManager  common.TxQueueManager
+	jailManager     common.JailManager
+	newNotification common.NotificationConstructor
 }
 
 // NewStatusBackend create a new NewStatusBackend instance
@@ -43,11 +43,11 @@ func NewStatusBackend() *StatusBackend {
 	notificationManager := fcm.NewNotifier(fcmServerKey)
 
 	return &StatusBackend{
-		nodeManager:    nodeManager,
-		accountManager: accountManager,
-		jailManager:    jailManager,
-		txQueueManager: txQueueManager,
-		notifier:       notificationManager,
+		nodeManager:     nodeManager,
+		accountManager:  accountManager,
+		jailManager:     jailManager,
+		txQueueManager:  txQueueManager,
+		newNotification: notificationManager,
 	}
 }
 

@@ -32,19 +32,19 @@ func (m *MockNotifier) EXPECT() *MockNotifierMockRecorder {
 	return m.recorder
 }
 
-// Notify mocks base method
-func (m *MockNotifier) Notify(body interface{}, tokens ...string) error {
+// Send mocks base method
+func (m *MockNotifier) Send(body interface{}, tokens ...string) error {
 	varargs := []interface{}{body}
 	for _, a := range tokens {
 		varargs = append(varargs, a)
 	}
-	ret := m.ctrl.Call(m, "Notify", varargs...)
+	ret := m.ctrl.Call(m, "Send", varargs...)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// Notify indicates an expected call of Notify
-func (mr *MockNotifierMockRecorder) Notify(body interface{}, tokens ...interface{}) *gomock.Call {
+// Send indicates an expected call of Send
+func (mr *MockNotifierMockRecorder) Send(body interface{}, tokens ...interface{}) *gomock.Call {
 	varargs := append([]interface{}{body}, tokens...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Notify", reflect.TypeOf((*MockNotifier)(nil).Notify), varargs...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Send", reflect.TypeOf((*MockNotifier)(nil).Send), varargs...)
 }

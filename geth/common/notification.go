@@ -2,8 +2,8 @@ package common
 
 // Notifier manages Push Notifications.
 type Notifier interface {
-	Notify(body interface{}, tokens ...string) error
+	Send(body interface{}, tokens ...string) error
 }
 
-// NotifierConstructor returns constructor of configured instance Notifier interface.
-type NotifierConstructor func() Notifier
+// NotificationConstructor returns constructor of configured instance Notifier interface.
+type NotificationConstructor func() Notifier
