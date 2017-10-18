@@ -398,7 +398,7 @@ type TestConfig struct {
 // NotifyResult is a JSON returned from notify message
 type NotifyResult struct {
 	Status bool   `json:"status"`
-	Error  string `json:"error"`
+	Error  string `json:"error,omitempty"`
 }
 
 // LoadTestConfig loads test configuration values from disk

@@ -378,15 +378,13 @@ func makeJSONResponse(err error) *C.char {
 func Notify(token *C.char) *C.char {
 	err := statusAPI.Notify(C.GoString(token))
 
-	res := true
 	errString := ""
 	if err != nil {
-		res = false
 		errString = err.Error()
 	}
 
 	out := common.NotifyResult{
-		Status: res,
+		Status: err == nil,
 		Error:  errString,
 	}
 
