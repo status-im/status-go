@@ -254,9 +254,9 @@ func (s *AccountsTestSuite) TestSelectedAccountOnRestart() {
 	// stop node (and all of its sub-protocols)
 	preservedNodeConfig, err := s.Backend.NodeManager().NodeConfig()
 	s.NoError(err)
-	nodeStoped, err := s.Backend.StopNode()
+	nodeStopped, err := s.Backend.StopNode()
 	s.NoError(err)
-	<-nodeStoped
+	<-nodeStopped
 
 	// make sure that account is still selected
 	selectedAccount, err = s.Backend.AccountManager().SelectedAccount()

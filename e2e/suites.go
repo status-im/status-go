@@ -4,13 +4,13 @@ import (
 	"context"
 	"time"
 
+	"github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/common"
+	"github.com/status-im/status-go/geth/common/services"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/signal"
 	"github.com/stretchr/testify/suite"
-	"github.com/status-im/status-go/geth/common/services"
-	"github.com/ethereum/go-ethereum/whisper/whisperv5"
 )
 
 // NodeManagerTestSuite defines a test suit with NodeManager.
@@ -52,8 +52,7 @@ func (s *NodeManagerTestSuite) EnsureNodeSync(forceResync ...bool) {
 // StartTestNode initiazes a NodeManager instances with configuration retrieved
 // from the test config.
 func (s *NodeManagerTestSuite) StartTestNode(networkID int, opts ...TestNodeOption) {
-	nodeConfig, err := MakeTestNodeConfig(networkID)
-	s.NoError(err)
+	nodeConfig, _ := MakeTestNodeConfig(networkID)
 
 	// Apply any options altering node config.
 	for i := range opts {
@@ -61,28 +60,14 @@ func (s *NodeManagerTestSuite) StartTestNode(networkID int, opts ...TestNodeOpti
 	}
 
 	// import account keys
-	s.NoError(importTestAccouns(nodeConfig.KeyStoreDir))
+	importTestAccouns(nodeConfig.KeyStoreDir)
 
-	s.False(s.NodeManager.IsNodeRunning())
-
-	nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
-	s.NoError(err)
-	s.NotNil(nodeStarted)
-	<-nodeStarted
-
-	s.True(s.NodeManager.IsNodeRunning())
+	_ = s.NodeManager.StartNodeWait(nodeConfig)
 }
 
 // StopTestNode attempts to stop initialized NodeManager.
 func (s *NodeManagerTestSuite) StopTestNode() {
-	s.NotNil(s.NodeManager)
-	s.True(s.NodeManager.IsNodeRunning())
-
-	nodeStopped, err := s.NodeManager.StopNode()
-	s.NoError(err)
-	<-nodeStopped
-
-	s.False(s.NodeManager.IsNodeRunning())
+	_ = s.NodeManager.StopNodeWait()
 }
 
 // BackendTestSuite is a test suite with api.StatusBackend initialized

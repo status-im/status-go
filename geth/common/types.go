@@ -47,16 +47,24 @@ type NodeManager interface {
 	// StartNode start Status node, fails if node is already started
 	StartNode(config *params.NodeConfig) (<-chan struct{}, error)
 
+	StartNodeWait(config *params.NodeConfig) error
+
 	// StopNode stop the running Status node.
 	// Stopped node cannot be resumed, one starts a new node instead.
 	StopNode() (<-chan struct{}, error)
 
+	StopNodeWait() error
+
 	// RestartNode restart running Status node, fails if node is not running
 	RestartNode() (<-chan struct{}, error)
+
+	RestartNodeWait() error
 
 	// ResetChainData remove chain data from data directory.
 	// Node is stopped, and new node is started, with clean data directory.
 	ResetChainData() (<-chan struct{}, error)
+
+	ResetChainDataWait() error
 
 	// IsNodeRunning confirm that node is running
 	IsNodeRunning() bool
