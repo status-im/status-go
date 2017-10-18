@@ -91,10 +91,6 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransactionUpstream() {
 	)
 	defer s.StopTestBackend()
 
-	// Allow to sync the blockchain.
-	// TODO(themue): Ensuring node sync here blocks, have to look why.
-	// s.EnsureNodeSync()
-
 	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account2.Address, TestConfig.Account2.Password)
 	s.NoError(err)
 
@@ -402,8 +398,6 @@ func (s *TransactionsTestSuite) TestSendEtherTxUpstream() {
 		e2e.WithUpstream("https://ropsten.infura.io/z6GCTmjdP3FETEJmMBI4"),
 	)
 	defer s.StopTestBackend()
-
-	s.EnsureNodeSync()
 
 	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	s.NoError(err)

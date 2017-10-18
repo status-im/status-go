@@ -213,8 +213,7 @@ func testResetChainData(t *testing.T) bool {
 		return false
 	}
 
-	// FIXME(tiabc): EnsureNodeSync the same way as in e2e tests.
-	time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to re-sync blockchain
+	ensureNodeSync(t, statusAPI.NodeManager())
 
 	testCompleteTransaction(t)
 
@@ -725,7 +724,7 @@ func testCompleteTransaction(t *testing.T) bool {
 
 	txQueue.Reset()
 
-	time.Sleep(5 * time.Second) // allow to sync
+	ensureNodeSync(t, statusAPI.NodeManager())
 
 	// log into account from which transactions will be sent
 	if err := statusAPI.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password); err != nil {
@@ -1358,11 +1357,9 @@ func startTestNode(t *testing.T) <-chan struct{} {
 			// manually add static nodes (LES auto-discovery is not stable yet)
 			PopulateStaticPeers()
 
-			// sync
 			if syncRequired {
-				t.Logf("Sync is required, it will take %d seconds", TestConfig.Node.SyncSeconds)
-				// FIXME(tiabc): EnsureNodeSync the same way as in e2e tests.
-				time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // LES syncs headers, so that we are up do date when it is done
+				t.Logf("Sync is required")
+				ensureNodeSync(t, statusAPI.NodeManager())
 			} else {
 				time.Sleep(5 * time.Second)
 			}
@@ -1396,4 +1393,40 @@ func testValidateNodeConfig(t *testing.T, config string, fn func(common.APIDetai
 	require.NoError(t, err)
 
 	fn(resp)
+}
+
+// ensureNodeSync waits until synchronzation is done and more safe
+// than only waiting a fixed amount of time.
+func ensureNodeSync(t *testing.T, nodeManager common.NodeManager) {
+	start := time.Now()
+	wait := 5 * time.Second
+	les, err := nodeManager.LightEthereumService()
+	if err != nil {
+		t.Error(err)
+	}
+	if les == nil {
+		t.Errorf("LightEthereumService is nil")
+	}
+
+	for {
+		// Some time needed even initially.
+		time.Sleep(wait)
+
+		downloader := les.Downloader()
+
+		if downloader != nil {
+			isSyncing := downloader.Synchronising()
+			progress := downloader.Progress()
+
+			if !isSyncing && progress.HighestBlock > 0 && progress.CurrentBlock >= progress.HighestBlock {
+				break
+			}
+		}
+
+		if time.Now().Sub(start) > (5 * time.Minute) {
+			t.Errorf("timeout")
+		}
+
+		wait *= 2
+	}
 }
