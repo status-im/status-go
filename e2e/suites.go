@@ -1,8 +1,6 @@
 package e2e
 
 import (
-	"time"
-
 	"github.com/ethereum/go-ethereum/les"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/api"
@@ -16,44 +14,6 @@ type NodeManagerTestSuite struct {
 	suite.Suite
 	NodeManager       common.NodeManager
 	nodeSyncCompleted bool
-}
-
-// EnsureNodeSync ensures that synchronization of the node is done to
-// solve "no suitable peers" issue.
-// TODO(themue): Create issue for combination with same method of
-// BackendTestSuite.
-func (s *NodeManagerTestSuite) EnsureNodeSync(forceResync ...bool) {
-	if len(forceResync) > 0 && !forceResync[0] {
-		return
-	}
-
-	start := time.Now()
-	wait := 5 * time.Second
-	les, err := s.NodeManager.LightEthereumService()
-	if err != nil {
-		s.Error(err)
-	}
-	s.NotNil(les)
-
-	for {
-		// Some time needed even initially.
-		time.Sleep(wait)
-
-		downloader := les.Downloader()
-
-		if downloader != nil {
-			isSyncing := downloader.Synchronising()
-			progress := downloader.Progress()
-
-			if !isSyncing && progress.HighestBlock > 0 && progress.CurrentBlock >= progress.HighestBlock {
-				break
-			}
-		}
-
-		s.True(time.Now().Sub(start) < (5 * time.Minute))
-
-		wait *= 2
-	}
 }
 
 // StartTestNode initiazes a NodeManager instances with configuration retrieved
@@ -167,39 +127,6 @@ func (s *BackendTestSuite) LightEthereumService() *les.LightEthereum {
 // TxQueueManager returns a reference to the TxQueueManager.
 func (s *BackendTestSuite) TxQueueManager() common.TxQueueManager {
 	return s.Backend.TxQueueManager()
-}
-
-// EnsureNodeSync ensures that synchronization of the node is done to
-// solve "no suitable peers" issue.
-func (s *BackendTestSuite) EnsureNodeSync(forceResync ...bool) {
-	if len(forceResync) > 0 && !forceResync[0] {
-		return
-	}
-
-	start := time.Now()
-	wait := time.Second
-
-	for {
-		les, _ := s.Backend.NodeManager().LightEthereumService()
-
-		if les != nil {
-			downloader := les.Downloader()
-
-			if downloader != nil {
-				isSyncing := downloader.Synchronising()
-				progress := downloader.Progress()
-
-				if !isSyncing && progress.HighestBlock > 0 && progress.CurrentBlock >= progress.HighestBlock {
-					break
-				}
-			}
-		}
-
-		s.True(time.Now().Sub(start) < (256 * time.Second))
-		time.Sleep(wait)
-
-		wait *= 2
-	}
 }
 
 func importTestAccouns(keyStoreDir string) (err error) {

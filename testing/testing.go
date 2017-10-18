@@ -2,10 +2,13 @@ package integration
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
@@ -64,4 +67,35 @@ func LoadFromFile(filename string) string {
 	f.Close()
 
 	return string(buf.Bytes())
+}
+
+// EnsureNodeSync waits until node synchronzation is done to continue
+// with tests afterwards.
+func EnsureNodeSync(ctx context.Context, nodeManager common.NodeManager) error {
+	les, err := nodeManager.LightEthereumService()
+	if err != nil {
+		return err
+	}
+	if les == nil {
+		return errors.New("LightEthereumService is nil")
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(time.Second):
+			downloader := les.Downloader()
+
+			if downloader != nil {
+				isSyncing := downloader.Synchronising()
+				progress := downloader.Progress()
+
+				if !isSyncing && progress.HighestBlock > 0 && progress.CurrentBlock >= progress.HighestBlock {
+					return nil
+				}
+			}
+
+		}
+	}
 }

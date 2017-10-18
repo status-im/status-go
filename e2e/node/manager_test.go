@@ -1,6 +1,7 @@
 package node_test
 
 import (
+	"context"
 	"encoding/json"
 	"math/rand"
 	"testing"
@@ -17,6 +18,7 @@ import (
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/signal"
+	. "github.com/status-im/status-go/testing"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -295,8 +297,9 @@ func (s *ManagerTestSuite) TestResetChainData() {
 	s.StartTestNode(params.RinkebyNetworkID)
 	defer s.StopTestNode()
 
-	// allow to sync for some time
-	s.EnsureNodeSync()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	s.Nil(EnsureNodeSync(ctx, s.NodeManager), "cannot ensure node synchronization")
 
 	// reset chain data
 	nodeReady, err := s.NodeManager.ResetChainData()
