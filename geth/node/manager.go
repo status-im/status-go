@@ -504,7 +504,6 @@ func (m *NodeManager) initLog(config *params.NodeConfig) {
 	}
 }
 
-// todo(@jeka): may be we need Wait flag for it to wait until node started
 // isNodeAvailable check if we have a node running and make sure is fully started
 func (m *NodeManager) isNodeAvailable() error {
 	if !m.isNodeStarted() {
@@ -680,20 +679,10 @@ func (m *NodeManager) setNodeStopped(nodeStopped chan struct{}) {
 	m.nodeStoppedLock.Unlock()
 }
 
-func (m *NodeManager) readNodeStopped() {
-	m.nodeStoppedLock.RLock()
-	<-m.nodeStopped
-	m.nodeStoppedLock.RUnlock()
-}
-
 func (m *NodeManager) closeNodeStopped() {
 	m.nodeStoppedLock.Lock()
 	close(m.nodeStopped)
 	m.nodeStoppedLock.Unlock()
-}
-
-func (m *NodeManager) waitNodeStopped() {
-	m.readNodeStopped()
 }
 
 func (m *NodeManager) getWhisperService() (*whisperv5.Whisper, error) {
@@ -712,12 +701,6 @@ func (m *NodeManager) getWhisperService() (*whisperv5.Whisper, error) {
 	m.whisperService = whisperObject
 
 	return m.whisperService, nil
-}
-
-func (m *NodeManager) setLesService(les services.LesService) {
-	m.lesServiceLock.Lock()
-	m.lesService = les
-	m.lesServiceLock.Unlock()
 }
 
 func (m *NodeManager) getLesService() (services.LesService, error) {
