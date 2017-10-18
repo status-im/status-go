@@ -47,8 +47,6 @@ type NodeManager struct {
 	lesService     *les.LightEthereum // reference to LES service
 	delService     *delivery.DeliveryNotification
 	rpcClient      *rpc.Client // reference to RPC client
-	normalLog      *log.BatchEmitter
-	messageLog     *log.BatchEmitter
 }
 
 // NewNodeManager makes new instance of node manager
@@ -191,14 +189,6 @@ func (m *NodeManager) stopNode() (<-chan struct{}, error) {
 	go func() {
 		<-m.nodeStopped // Status node is stopped (code after Wait() is executed)
 		log.Send(log.Info("Ready to reset node"))
-
-		if m.messageLog != nil {
-			m.messageLog.Close()
-		}
-
-		if m.normalLog != nil {
-			m.normalLog.Close()
-		}
 
 		// reset node params
 		m.Lock()
@@ -545,39 +535,39 @@ func (m *NodeManager) initLog(config *params.NodeConfig) {
 
 	maxWait := time.Duration(config.LogWriteInterval) * time.Millisecond
 
-	var stateLogs log.Metrics
+	var loggers []log.Metrics
+
+	if config.LogFile != "" {
+		if normalLogs, err := jsonfile.JSON(config.LogFile, config.LogCollectionMaxPerWrite, maxWait); err == nil {
+			go normalLogs.Run(m.nodeStopped)
+			loggers = append(loggers, log.FilterLevel(level, normalLogs))
+		} else {
+			fmt.Println("Failed to open log file, using stdout")
+			loggers = append(loggers, log.FilterLevel(level, custom.FlatDisplay(os.Stdout)))
+		}
+	}
+
 	if config.MessageLogFile != "" {
 		if messagelogs, err := jsonfile.JSON(config.MessageLogFile, config.LogCollectionMaxPerWrite, maxWait); err == nil {
-			m.messageLog = messagelogs
-			stateLogs = log.Filter(func(en log.Entry) bool {
+			go messagelogs.Run(m.nodeStopped)
+
+			loggers = append(loggers, log.Filter(func(en log.Entry) bool {
 				if stateVal, found := en.Field.Get(params.DeliveryNotificationLogKey); found {
 					if _, ok := stateVal.(*whisper.P2PMessageState); ok {
 						return true
 					}
-
 					if _, ok := stateVal.(*whisper.RPCMessageState); ok {
 						return true
 					}
 				}
-
 				return false
-			}, messagelogs)
+			}, messagelogs))
 		} else {
 			fmt.Printf("Failed to open message state log file, Reason(%+q)\n", err)
 		}
 	}
 
-	if config.LogFile != "" {
-		if normalLogs, err := jsonfile.JSON(config.LogFile, config.LogCollectionMaxPerWrite, maxWait); err == nil {
-			m.normalLog = normalLogs
-			log.Init(log.New(log.FilterLevel(level, normalLogs), stateLogs))
-			return
-		}
-
-		fmt.Println("Failed to open log file, using stdout")
-	}
-
-	log.Init(log.New(log.FilterLevel(level, custom.FlatDisplay(os.Stdout)), stateLogs))
+	log.Init(loggers...)
 }
 
 // isNodeAvailable check if we have a node running and make sure is fully started

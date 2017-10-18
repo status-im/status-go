@@ -107,7 +107,7 @@ type Augmenter func(Entry) Entry
 // FilterLevel will return a metrics where all Entry will be filtered by their Entry.Level
 // if the level giving is greater or equal to the provided, then it will be received by
 // the metrics subscribers.
-func FilterLevel(l Level, vals ...interface{}) Metrics {
+func FilterLevel(l Level, vals ...Metrics) Metrics {
 	return Filter(func(en Entry) bool {
 		return en.Level >= l
 	}, vals...)
@@ -116,10 +116,10 @@ func FilterLevel(l Level, vals ...interface{}) Metrics {
 // Filter returns a Metrics object with the provided Augmenters and  Metrics
 // implemement objects for receiving metric Entries, where entries are filtered
 // out based on a provided function.
-func Filter(filterFn FilterFn, vals ...interface{}) Metrics {
+func Filter(filterFn FilterFn, vals ...Metrics) Metrics {
 	return filteredMetrics{
 		filterFn: filterFn,
-		Metrics:  New(vals...),
+		Metrics:  New(vals, nil),
 	}
 }
 
@@ -140,38 +140,21 @@ func Switch(keyName string, selections map[string]Metrics) Metrics {
 
 // New returns a Metrics object with the provided Augmenters and  Metrics
 // implemement objects for receiving metric Entries.
-func New(vals ...interface{}) Metrics {
-	var augmenters []Augmenter
-	var childmetrics []Metrics
-
-	for _, val := range vals {
-		if val == nil {
-			continue
-		}
-
-		switch item := val.(type) {
-		case Augmenter:
-			augmenters = append(augmenters, item)
-		case Metrics:
-			childmetrics = append(childmetrics, item)
-		}
-	}
-
+func New(ms []Metrics, augmenters []Augmenter) Metrics {
 	return &metrics{
+		metrics:    ms,
 		augmenters: augmenters,
-		metrics:    childmetrics,
 	}
 }
 
 type metrics struct {
-	augmenters []Augmenter
 	metrics    []Metrics
+	augmenters []Augmenter
 }
 
 // Emit implements the Metrics interface and delivers Entry
 // to undeline log.
 func (m metrics) Emit(en Entry) error {
-
 	// Augment Entry with available augmenters.
 	for _, aug := range m.augmenters {
 		en = aug(en)

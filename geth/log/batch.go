@@ -2,7 +2,6 @@ package log
 
 import (
 	"errors"
-	"sync"
 	"time"
 )
 
@@ -11,71 +10,82 @@ var (
 	ErrBatchEmitterClosed = errors.New("batcher already closed")
 )
 
-// EmitterFunction defines a function type which is used to process a batch of Entry.
-type EmitterFunction func([]Entry) error
+// CommitFunction defines a function type which is used to process a batch of Entry.
+type CommitFunction func([]Entry) error
 
 // BatchEmitter defines a structure which collects Entry in batch
 // mode until a provide size threshold is met then it's provided against
 // a provided function for procesing.
 type BatchEmitter struct {
-	maxlen     int
-	maxwait    time.Duration
-	closed     bool
-	entrybatch []Entry
-	fnError    chan error
-	entries    chan Entry
-	stop       chan struct{}
-	fn         EmitterFunction
-	wg         sync.WaitGroup
+	maxlen    int
+	commitErr error
+	batch     []Entry
+	actions   chan func()
+	maxwait   time.Duration
+	fn        CommitFunction
 }
 
 // BatchEmit returns a new instance of a BatchEmitter.
-func BatchEmit(maxSize int, maxwait time.Duration, fn EmitterFunction) *BatchEmitter {
+func BatchEmit(maxSize int, maxwait time.Duration, fn CommitFunction) *BatchEmitter {
 	var batch BatchEmitter
 	batch.fn = fn
-	batch.maxwait = maxwait
 	batch.maxlen = maxSize
-	batch.stop = make(chan struct{}, 0)
-	batch.entries = make(chan Entry, 0)
-	batch.fnError = make(chan error, 1)
-
-	batch.wg.Add(1)
-	go batch.manage()
+	batch.maxwait = maxwait
+	batch.actions = make(chan func(), 0)
 
 	return &batch
 }
 
-// Emit takes provided entries and emits giving entries into batch loop.
+// Emit takes provided entries and emits giving entries into batch,
+// returning any error encountered with the addition of the entry
+// or one received during the last commit of the entries.
 func (bm *BatchEmitter) Emit(en Entry) error {
-	select {
-	case <-bm.stop:
-		return ErrBatchEmitterClosed
-	case bm.entries <- en:
-		select {
-		case err := <-bm.fnError:
-			return err
-		case <-time.After(5 * time.Millisecond):
-			return nil
+	if bm.commitErr != nil {
+		return bm.commitErr
+	}
+
+	errChan := make(chan error, 0)
+	action := func() {
+		bm.batch = append(bm.batch, en)
+
+		if len(bm.batch) >= bm.maxlen {
+			batch := bm.batch
+			bm.batch = nil
+
+			if err := bm.fn(batch); err != nil {
+				errChan <- err
+				return
+			}
 		}
+
+		close(errChan)
+	}
+
+	select {
+	case bm.actions <- action:
+		return <-errChan
+	case <-time.After(5 * time.Millisecond):
+		return nil
 	}
 }
 
-// Close ends the operation of the batch emitter and releases all associated resources.
-func (bm *BatchEmitter) Close() error {
-	if bm.closed {
-		return ErrBatchEmitterClosed
+// Emit takes provided entries and emits giving entries into batch loop.
+func (bm *BatchEmitter) commit() {
+	bm.actions <- func() {
+		if len(bm.batch) == 0 {
+			return
+		}
+
+		batch := bm.batch
+		bm.batch = nil
+		bm.commitErr = bm.fn(batch)
 	}
-
-	close(bm.stop)
-	bm.wg.Wait()
-
-	bm.closed = true
-	return nil
 }
 
-func (bm *BatchEmitter) manage() {
-	defer bm.wg.Done()
-
+// Run handles running the necessary logic to add entries into the batch
+// and call the necessary commit call to evaluate the provided function with
+// the collected Entries.
+func (bm *BatchEmitter) Run(closeChan <-chan struct{}) {
 	ticker := time.NewTimer(bm.maxwait)
 	defer ticker.Stop()
 
@@ -83,38 +93,11 @@ func (bm *BatchEmitter) manage() {
 		select {
 		case <-ticker.C:
 			ticker.Reset(bm.maxwait)
-
-			if len(bm.entrybatch) == 0 {
-				continue
-			}
-
-			batch := bm.entrybatch
-			bm.entrybatch = nil
-
-			if err := bm.fn(batch); err != nil {
-				bm.fnError <- err
-			}
-
-		case entry, ok := <-bm.entries:
-			if !ok {
-				return
-			}
-
+			go bm.commit()
+		case action := <-bm.actions:
 			ticker.Reset(bm.maxwait)
-
-			bm.entrybatch = append(bm.entrybatch, entry)
-
-			if len(bm.entrybatch) >= bm.maxlen {
-				batch := bm.entrybatch
-				bm.entrybatch = nil
-
-				if err := bm.fn(batch); err != nil {
-					bm.fnError <- err
-				}
-				continue
-			}
-
-		case <-bm.stop:
+			action()
+		case <-closeChan:
 			return
 		}
 	}

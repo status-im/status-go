@@ -490,16 +490,19 @@ func (s *ManagerTestSuite) TestNodeMessageLogs() {
 	s.NoError(err)
 	<-nodeStarted
 
-	// allow to sync for some time
-	s.EnsureNodeSync()
-
 	client := s.NodeManager.RPCClient()
 	s.NotNil(client)
 
 	jsonResult := client.CallRaw(`{"jsonrpc":"2.0","method":"shh_version","params":[],"id":67}`)
 	s.Equal(`{"jsonrpc":"2.0","id":67,"result":"5.0"}`, jsonResult)
 
-	s.NodeManager.StopNode()
+	nodeStopped, err := s.NodeManager.StopNode()
+	s.NoError(err)
+	<-nodeStopped
+
+	// Log takes a giving max time before it writes, so wait that time.
+	maxWait := time.Duration(nodeConfig.LogWriteInterval) * time.Millisecond
+	<-time.After(maxWait)
 
 	stat, err := os.Stat(logDirFile)
 	s.NoError(err, "File should have existed.")

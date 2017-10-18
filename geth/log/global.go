@@ -17,10 +17,20 @@ var (
 
 // Init initializes the main Metric handler which should be used at package level for
 // logging.
-func Init(m Metrics) {
+func Init(ms ...Metrics) {
+	if len(ms) == 0 {
+		return
+	}
+
 	rootlogger.ml.Lock()
 	defer rootlogger.ml.Unlock()
-	rootlogger.log = m
+
+	if len(ms) == 1 {
+		rootlogger.log = ms[0]
+		return
+	}
+
+	rootlogger.log = New(ms, nil)
 }
 
 // Send delivers giving Entry into underline selected Metric.
