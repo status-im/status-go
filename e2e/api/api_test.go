@@ -71,19 +71,19 @@ func (s *APITestSuite) TestRaceConditions() {
 
 	var funcsToTest = []func(*params.NodeConfig){
 		func(config *params.NodeConfig) {
-			log.Info("StartNodeAsync()")
+			log.Send(log.Info("StartNodeAsync()"))
 			_, err := s.api.StartNodeAsync(config)
 			s.T().Logf("StartNodeAsync() for network: %d, error: %v", config.NetworkID, err)
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
-			log.Info("StopNodeAsync()")
+			log.Send(log.Info("StopNodeAsync()"))
 			_, err := s.api.StopNodeAsync()
 			s.T().Logf("StopNodeAsync(), error: %v", err)
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
-			log.Info("RestartNodeAsync()")
+			log.Send(log.Info("RestartNodeAsync()"))
 			_, err := s.api.RestartNodeAsync()
 			s.T().Logf("RestartNodeAsync(), error: %v", err)
 			progress <- struct{}{}
@@ -91,7 +91,7 @@ func (s *APITestSuite) TestRaceConditions() {
 		// TODO(adam): quarantined until it uses a different datadir
 		// as otherwise it wipes out cached blockchain data.
 		// func(config *params.NodeConfig) {
-		// 	log.Info("ResetChainDataAsync()")
+		// log.Send(log.Info("ResetChainDataAsync()"))
 		// 	_, err := s.api.ResetChainDataAsync()
 		// 	s.T().Logf("ResetChainDataAsync(), error: %v", err)
 		// 	progress <- struct{}{}

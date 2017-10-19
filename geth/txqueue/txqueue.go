@@ -2,7 +2,6 @@ package txqueue
 
 import (
 	"errors"
-	"fmt"
 	"sync"
 	"time"
 
@@ -51,7 +50,7 @@ type TxQueue struct {
 
 // NewTransactionQueue make new transaction queue
 func NewTransactionQueue() *TxQueue {
-	log.Info("initializing transaction queue")
+	log.Send(log.Info("initializing transaction queue"))
 	return &TxQueue{
 		transactions:  make(map[common.QueuedTxID]*common.QueuedTx),
 		evictableIDs:  make(chan common.QueuedTxID, DefaultTxQueueCap), // will be used to evict in FIFO
@@ -62,7 +61,7 @@ func NewTransactionQueue() *TxQueue {
 
 // Start starts enqueue and eviction loops
 func (q *TxQueue) Start() {
-	log.Info("starting transaction queue")
+	log.Send(log.Info("starting transaction queue"))
 
 	if q.stopped != nil {
 		return
@@ -77,7 +76,7 @@ func (q *TxQueue) Start() {
 
 // Stop stops transaction enqueue and eviction loops
 func (q *TxQueue) Stop() {
-	log.Info("stopping transaction queue")
+	log.Send(log.Info("stopping transaction queue"))
 
 	if q.stopped == nil {
 		return
@@ -87,7 +86,7 @@ func (q *TxQueue) Stop() {
 	q.stoppedGroup.Wait()
 	q.stopped = nil
 
-	log.Info("finally stopped transaction queue")
+	log.Send(log.Info("finally stopped transaction queue"))
 }
 
 // evictionLoop frees up queue to accommodate another transaction item
@@ -106,7 +105,7 @@ func (q *TxQueue) evictionLoop() {
 		case <-q.enqueueTicker: // when manually requested
 			evict()
 		case <-q.stopped:
-			log.Info("transaction queue's eviction loop stopped")
+			log.Send(log.Info("transaction queue's eviction loop stopped"))
 			q.stoppedGroup.Done()
 			return
 		}
@@ -121,11 +120,11 @@ func (q *TxQueue) enqueueLoop() {
 	for {
 		select {
 		case queuedTx := <-q.incomingPool:
-			log.Info("transaction enqueued requested", "tx", queuedTx.ID)
+			log.Send(log.Info("transaction enqueued requested").With("tx", queuedTx.ID))
 			q.Enqueue(queuedTx)
-			log.Info("transaction enqueued", "tx", queuedTx.ID)
+			log.Send(log.Info("transaction enqueued").With("tx", queuedTx.ID))
 		case <-q.stopped:
-			log.Info("transaction queue's enqueue loop stopped")
+			log.Send(log.Info("transaction queue's enqueue loop stopped"))
 			q.stoppedGroup.Done()
 			return
 		}
@@ -150,25 +149,25 @@ func (q *TxQueue) EnqueueAsync(tx *common.QueuedTx) error {
 
 // Enqueue enqueues incoming transaction
 func (q *TxQueue) Enqueue(tx *common.QueuedTx) error {
-	log.Info(fmt.Sprintf("enqueue transaction: %s", tx.ID))
+	log.Send(log.Info("enqueue transaction: %s", tx.ID))
 
 	if q.txEnqueueHandler == nil { //discard, until handler is provided
-		log.Info("there is no txEnqueueHandler")
+		log.Send(log.Info("there is no txEnqueueHandler"))
 		return nil
 	}
 
-	log.Info("before enqueueTicker")
+	log.Send(log.Info("before enqueueTicker"))
 	q.enqueueTicker <- struct{}{} // notify eviction loop that we are trying to insert new item
-	log.Info("before evictableIDs")
+	log.Send(log.Info("before evictableIDs"))
 	q.evictableIDs <- tx.ID // this will block when we hit DefaultTxQueueCap
-	log.Info("after evictableIDs")
+	log.Send(log.Info("after evictableIDs"))
 
 	q.mu.Lock()
 	q.transactions[tx.ID] = tx
 	q.mu.Unlock()
 
 	// notify handler
-	log.Info("calling txEnqueueHandler")
+	log.Send(log.Info("calling txEnqueueHandler"))
 	q.txEnqueueHandler(tx)
 
 	return nil

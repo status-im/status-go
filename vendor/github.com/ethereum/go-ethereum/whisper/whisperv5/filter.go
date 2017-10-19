@@ -18,10 +18,12 @@ package whisperv5
 
 import (
 	"crypto/ecdsa"
+	"errors"
 	"fmt"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/message"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 )
@@ -115,15 +117,72 @@ func (fs *Filters) NotifyWatchers(env *Envelope, p2pMessage bool) {
 			if match {
 				msg = env.Open(watcher)
 				if msg == nil {
+					if fs.whisper.deliveryServer != nil {
+						err := errors.New("Envelope failed to be opened")
+						switch p2pMessage {
+						case true:
+							fs.whisper.deliveryServer.SendP2PState(P2PMessageState{
+								Envelope:  *env,
+								Reason:    err,
+								Status:    message.RejectedStatus,
+								Direction: message.IncomingMessage,
+							})
+						case false:
+							fs.whisper.deliveryServer.SendRPCState(RPCMessageState{
+								Envelope:  *env,
+								Reason:    err,
+								Status:    message.RejectedStatus,
+								Direction: message.IncomingMessage,
+							})
+						}
+					}
 					log.Trace("processing message: failed to open", "message", env.Hash().Hex(), "filter", i)
 				}
 			} else {
+				if fs.whisper.deliveryServer != nil {
+					err := errors.New("processing message: does not match")
+					switch p2pMessage {
+					case true:
+						fs.whisper.deliveryServer.SendP2PState(P2PMessageState{
+							Envelope:  *env,
+							Reason:    err,
+							Status:    message.RejectedStatus,
+							Direction: message.IncomingMessage,
+						})
+					case false:
+						fs.whisper.deliveryServer.SendRPCState(RPCMessageState{
+							Envelope:  *env,
+							Reason:    err,
+							Status:    message.RejectedStatus,
+							Direction: message.IncomingMessage,
+						})
+					}
+				}
 				log.Trace("processing message: does not match", "message", env.Hash().Hex(), "filter", i)
 			}
 		}
 
 		if match && msg != nil {
 			log.Trace("processing message: decrypted", "hash", env.Hash().Hex())
+			if fs.whisper.deliveryServer != nil {
+				switch p2pMessage {
+				case true:
+					fs.whisper.deliveryServer.SendP2PState(P2PMessageState{
+						Received:  msg,
+						Envelope:  *env,
+						Status:    message.DeliveredStatus,
+						Direction: message.IncomingMessage,
+					})
+				case false:
+					fs.whisper.deliveryServer.SendRPCState(RPCMessageState{
+						Received:  msg,
+						Envelope:  *env,
+						Status:    message.DeliveredStatus,
+						Direction: message.IncomingMessage,
+					})
+				}
+			}
+
 			if watcher.Src == nil || IsPubKeyEqual(msg.Src, watcher.Src) {
 				watcher.Trigger(msg)
 			}

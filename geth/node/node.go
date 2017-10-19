@@ -40,7 +40,7 @@ var (
 )
 
 // MakeNode create a geth node entity
-func MakeNode(config *params.NodeConfig) (*node.Node, error) {
+func MakeNode(config *params.NodeConfig, del whisper.DeliveryServer) (*node.Node, error) {
 	// make sure data directory exists
 	if err := os.MkdirAll(filepath.Join(config.DataDir), os.ModePerm); err != nil {
 		return nil, err
@@ -55,10 +55,10 @@ func MakeNode(config *params.NodeConfig) (*node.Node, error) {
 	stackConfig := defaultEmbeddedNodeConfig(config)
 
 	if len(config.NodeKeyFile) > 0 {
-		log.Info("Loading private key file", "file", config.NodeKeyFile)
+		log.Send(log.Info("Loading private key file").With("file", config.NodeKeyFile))
 		pk, err := crypto.LoadECDSA(config.NodeKeyFile)
 		if err != nil {
-			log.Warn(fmt.Sprintf("Failed loading private key file '%s': %v", config.NodeKeyFile, err))
+			log.Send(log.YellowAlert(err, "Failed loading private key file '%s'", config.NodeKeyFile))
 		}
 
 		// override node's private key
@@ -78,7 +78,7 @@ func MakeNode(config *params.NodeConfig) (*node.Node, error) {
 	}
 
 	// start Whisper service
-	if err := activateShhService(stack, config); err != nil {
+	if err := activateShhService(stack, config, del); err != nil {
 		return nil, fmt.Errorf("%v: %v", ErrWhisperServiceRegistrationFailure, err)
 	}
 
@@ -140,14 +140,13 @@ func updateCHT(eth *les.LightEthereum, config *params.NodeConfig) {
 		Number: uint64(config.BootClusterConfig.RootNumber),
 		Root:   gethcommon.HexToHash(config.BootClusterConfig.RootHash),
 	})
-	log.Info("Added trusted CHT",
-		"develop", config.DevMode, "number", config.BootClusterConfig.RootNumber, "hash", config.BootClusterConfig.RootHash)
+	log.Send(log.Info("Added trusted CHT").With("develop", config.DevMode).With("number", config.BootClusterConfig.RootNumber).With("hash", config.BootClusterConfig.RootHash))
 }
 
 // activateEthService configures and registers the eth.Ethereum service with a given node.
 func activateEthService(stack *node.Node, config *params.NodeConfig) error {
 	if !config.LightEthConfig.Enabled {
-		log.Info("LES protocol is disabled")
+		log.Send(log.Info("LES protocol is disabled"))
 		return nil
 	}
 
@@ -180,15 +179,20 @@ func activateEthService(stack *node.Node, config *params.NodeConfig) error {
 }
 
 // activateShhService configures Whisper and adds it to the given node.
-func activateShhService(stack *node.Node, config *params.NodeConfig) error {
+func activateShhService(stack *node.Node, config *params.NodeConfig, del whisper.DeliveryServer) error {
 	if !config.WhisperConfig.Enabled {
-		log.Info("SHH protocol is disabled")
+		log.Send(log.Info("SHH protocol is disabled"))
 		return nil
 	}
 
 	serviceConstructor := func(*node.ServiceContext) (node.Service, error) {
 		whisperConfig := config.WhisperConfig
 		whisperService := whisper.New(nil)
+
+		// Set delivery service.
+		if del != nil {
+			whisperService.RegisterDeliveryServer(del)
+		}
 
 		// enable mail service
 		if whisperConfig.MailServerNode {

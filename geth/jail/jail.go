@@ -180,6 +180,7 @@ func (jail *Jail) Send(call otto.FunctionCall) otto.Value {
 	if err != nil {
 		throwJSException(fmt.Errorf("Error unmarshalling result: %s", err))
 	}
+
 	respValue, err := jail.vm.ToValue(resp)
 	if err != nil {
 		throwJSException(fmt.Errorf("Error converting result to Otto's value: %s", err))
@@ -219,7 +220,7 @@ func newResultResponse(vm *otto.Otto, result interface{}) otto.Value {
 func throwJSException(msg error) otto.Value {
 	val, err := otto.ToValue(msg.Error())
 	if err != nil {
-		log.Error(fmt.Sprintf("Failed to serialize JavaScript exception %v: %v", msg.Error(), err))
+		log.Send(log.Errorf("Failed to serialize JavaScript exception %v", msg.Error()).With("error", err))
 	}
 	panic(val)
 }

@@ -90,7 +90,7 @@ func (c *Client) callBatchMethods(ctx context.Context, msgs json.RawMessage) str
 
 	data, err := json.Marshal(responses)
 	if err != nil {
-		log.Error("Failed to marshal batch responses:", err)
+		log.Send(log.Errorf("Failed to marshal batch responses:").With("error", err))
 		return newErrorResponse(errInvalidMessageCode, err, defaultMsgID)
 	}
 

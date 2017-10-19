@@ -28,7 +28,7 @@ type StatusBackend struct {
 
 // NewStatusBackend create a new NewStatusBackend instance
 func NewStatusBackend() *StatusBackend {
-	defer log.Info("Status backend initialized")
+	defer log.Send(log.Info("Status backend initialized"))
 
 	nodeManager := node.NewNodeManager()
 	accountManager := account.NewManager(nodeManager)
@@ -95,11 +95,11 @@ func (m *StatusBackend) onNodeStart(nodeStarted <-chan struct{}, backendReady ch
 	<-nodeStarted
 
 	if err := m.registerHandlers(); err != nil {
-		log.Error("Handler registration failed", "err", err)
+		log.Send(log.Errorf("Handler registration failed").With("error", err))
 	}
 
 	m.accountManager.ReSelectAccount()
-	log.Info("Account reselected")
+	log.Send(log.Info("Account reselected"))
 
 	close(backendReady)
 	signal.Send(signal.Envelope{
@@ -229,14 +229,18 @@ func (m *StatusBackend) DiscardTransactions(ids []common.QueuedTxID) map[common.
 // registerHandlers attaches Status callback handlers to running node
 func (m *StatusBackend) registerHandlers() error {
 	rpcClient := m.NodeManager().RPCClient()
+	if rpcClient == nil {
+		return node.ErrRPCClient
+	}
+
 	rpcClient.RegisterHandler("eth_accounts", m.accountManager.AccountsRPCHandler())
 	rpcClient.RegisterHandler("eth_sendTransaction", m.txQueueManager.SendTransactionRPCHandler)
 
 	m.txQueueManager.SetTransactionQueueHandler(m.txQueueManager.TransactionQueueHandler())
-	log.Info("Registered handler", "fn", "TransactionQueueHandler")
+	log.Send(log.Info("Registered handler").With("fn", "TransactionQueueHandler"))
 
 	m.txQueueManager.SetTransactionReturnHandler(m.txQueueManager.TransactionReturnHandler())
-	log.Info("Registered handler", "fn", "TransactionReturnHandler")
+	log.Send(log.Info("Registered handler").With("fn", "TransactionReturnHandler"))
 
 	return nil
 }

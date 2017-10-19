@@ -85,7 +85,7 @@ var (
 	// LogLevelFlag defines a log reporting level
 	LogLevelFlag = cli.StringFlag{
 		Name:  "log",
-		Usage: `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`,
+		Usage: `Log level, one of: "ERROR", "YELLOWALERT", "INFO", "REDALERT"`,
 		Value: "",
 	}
 

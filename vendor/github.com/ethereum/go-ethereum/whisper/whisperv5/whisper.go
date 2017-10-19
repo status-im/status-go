@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/message"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
@@ -78,6 +79,7 @@ type Whisper struct {
 	stats   Statistics // Statistics of whisper node
 
 	mailServer         MailServer // MailServer interface
+	deliveryServer     DeliveryServer
 	notificationServer NotificationServer
 }
 
@@ -157,6 +159,11 @@ func (w *Whisper) RegisterServer(server MailServer) {
 	w.mailServer = server
 }
 
+// RegisterDeliveryServer registers notification server with Whisper
+func (w *Whisper) RegisterDeliveryServer(server DeliveryServer) {
+	w.deliveryServer = server
+}
+
 // RegisterNotificationServer registers notification server with Whisper
 func (w *Whisper) RegisterNotificationServer(server NotificationServer) {
 	w.notificationServer = server
@@ -234,12 +241,17 @@ func (w *Whisper) SendP2PMessage(peerID []byte, envelope *Envelope) error {
 	if err != nil {
 		return err
 	}
+
 	return w.SendP2PDirect(p, envelope)
 }
 
 // SendP2PDirect sends a peer-to-peer message to a specific peer.
 func (w *Whisper) SendP2PDirect(peer *Peer, envelope *Envelope) error {
-	return p2p.Send(peer.ws, p2pCode, envelope)
+	if err := p2p.Send(peer.ws, p2pCode, envelope); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // NewKeyPair generates a new cryptographic identity for the client, and injects
@@ -620,8 +632,24 @@ func (wh *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 				var envelope Envelope
 				if err := packet.Decode(&envelope); err != nil {
 					log.Warn("failed to decode direct message, peer will be disconnected", "peer", p.peer.ID(), "err", err)
+					if wh.deliveryServer != nil {
+						wh.deliveryServer.SendP2PState(P2PMessageState{
+							Envelope: envelope,
+							Status:   message.RejectedStatus,
+							Reason:   err,
+						})
+					}
 					return errors.New("invalid direct message")
 				}
+
+				if wh.deliveryServer != nil {
+					wh.deliveryServer.SendP2PState(P2PMessageState{
+						Envelope: envelope,
+						Status:   message.SentStatus,
+						Reason:   fmt.Errorf("Unexpected status message received: %+q", p.peer.ID()),
+					})
+				}
+
 				wh.postEvent(&envelope, true)
 			}
 		case p2pRequestCode:
@@ -630,6 +658,13 @@ func (wh *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 				var request Envelope
 				if err := packet.Decode(&request); err != nil {
 					log.Warn("failed to decode p2p request message, peer will be disconnected", "peer", p.peer.ID(), "err", err)
+					if wh.deliveryServer != nil {
+						wh.deliveryServer.SendP2PState(P2PMessageState{
+							Envelope: request,
+							Status:   message.RejectedStatus,
+							Reason:   err,
+						})
+					}
 					return errors.New("invalid p2p request")
 				}
 				wh.mailServer.DeliverMail(p, &request)
@@ -662,10 +697,10 @@ func (wh *Whisper) add(envelope *Envelope) (bool, error) {
 	if envelope.Expiry < now {
 		if envelope.Expiry+SynchAllowance*2 < now {
 			return false, fmt.Errorf("very old message")
-		} else {
-			log.Debug("expired envelope dropped", "hash", envelope.Hash().Hex())
-			return false, nil // drop envelope without error
 		}
+
+		log.Debug("expired envelope dropped", "hash", envelope.Hash().Hex())
+		return false, nil // drop envelope without error
 	}
 
 	if uint32(envelope.size()) > wh.MaxMessageSize() {
@@ -705,11 +740,25 @@ func (wh *Whisper) add(envelope *Envelope) (bool, error) {
 
 	if alreadyCached {
 		log.Trace("whisper envelope already cached", "hash", envelope.Hash().Hex())
+		if wh.deliveryServer != nil {
+			wh.deliveryServer.SendRPCState(RPCMessageState{
+				Envelope: *envelope,
+				Status:   message.CachedStatus,
+			})
+		}
 	} else {
 		log.Trace("cached whisper envelope", "hash", envelope.Hash().Hex())
 		wh.statsMu.Lock()
 		wh.stats.memoryUsed += envelope.size()
 		wh.statsMu.Unlock()
+
+		if wh.deliveryServer != nil {
+			wh.deliveryServer.SendRPCState(RPCMessageState{
+				Envelope: *envelope,
+				Status:   message.QueuedStatus,
+			})
+		}
+
 		wh.postEvent(envelope, false) // notify the local node about the new message
 		if wh.mailServer != nil {
 			wh.mailServer.Archive(envelope)

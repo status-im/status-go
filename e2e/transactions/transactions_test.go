@@ -163,10 +163,10 @@ func (s *TransactionsTestSuite) TestSendContractTx() {
 
 		if envelope.Type == txqueue.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
-			log.Info("transaction queued (will be completed shortly)", "id", event["id"].(string))
+			log.Send(log.Info("transaction queued (will be completed shortly)").With("id", event["id"]))
 
 			// the first call will fail (we are not logged in, but trying to complete tx)
-			log.Info("trying to complete with no user logged in")
+			log.Send(log.Info("trying to complete with no user logged in"))
 			txHash, err = s.Backend.CompleteTransaction(
 				common.QueuedTxID(event["id"].(string)),
 				TestConfig.Account1.Password,
@@ -178,7 +178,7 @@ func (s *TransactionsTestSuite) TestSendContractTx() {
 			)
 
 			// the second call will also fail (we are logged in as different user)
-			log.Info("trying to complete with invalid user")
+			log.Send(log.Info("trying to complete with invalid user"))
 			err = s.Backend.AccountManager().SelectAccount(sampleAddress, TestConfig.Account1.Password)
 			s.NoError(err)
 			txHash, err = s.Backend.CompleteTransaction(
@@ -192,7 +192,7 @@ func (s *TransactionsTestSuite) TestSendContractTx() {
 			)
 
 			// the third call will work as expected (as we are logged in with correct credentials)
-			log.Info("trying to complete with correct user, this should succeed")
+			log.Send(log.Info("trying to complete with correct user, this should succeed"))
 			s.NoError(s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 			txHash, err = s.Backend.CompleteTransaction(
 				common.QueuedTxID(event["id"].(string)),
@@ -200,7 +200,7 @@ func (s *TransactionsTestSuite) TestSendContractTx() {
 			)
 			s.NoError(err, fmt.Sprintf("cannot complete queued transaction[%v]", event["id"]))
 
-			log.Info("contract transaction complete", "URL", "https://ropsten.etherscan.io/tx/"+txHash.Hex())
+			log.Send(log.Info("contract transaction complete").With("URL", "https://ropsten.etherscan.io/tx/"+txHash.Hex()))
 			close(completeQueuedTransaction)
 			return
 		}
@@ -254,10 +254,10 @@ func (s *TransactionsTestSuite) TestSendEtherTx() {
 
 		if envelope.Type == txqueue.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
-			log.Info("transaction queued (will be completed shortly)", "id", event["id"].(string))
+			log.Send(log.Info("transaction queued (will be completed shortly)").With("id", event["id"]))
 
 			// the first call will fail (we are not logged in, but trying to complete tx)
-			log.Info("trying to complete with no user logged in")
+			log.Send(log.Info("trying to complete with no user logged in"))
 			txHash, err = s.Backend.CompleteTransaction(
 				common.QueuedTxID(event["id"].(string)),
 				TestConfig.Account1.Password,
@@ -269,7 +269,7 @@ func (s *TransactionsTestSuite) TestSendEtherTx() {
 			)
 
 			// the second call will also fail (we are logged in as different user)
-			log.Info("trying to complete with invalid user")
+			log.Send(log.Info("trying to complete with invalid user"))
 			err = s.Backend.AccountManager().SelectAccount(sampleAddress, TestConfig.Account1.Password)
 			s.NoError(err)
 			txHash, err = s.Backend.CompleteTransaction(
@@ -281,7 +281,7 @@ func (s *TransactionsTestSuite) TestSendEtherTx() {
 			)
 
 			// the third call will work as expected (as we are logged in with correct credentials)
-			log.Info("trying to complete with correct user, this should succeed")
+			log.Send(log.Info("trying to complete with correct user, this should succeed"))
 			s.NoError(s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 			txHash, err = s.Backend.CompleteTransaction(
 				common.QueuedTxID(event["id"].(string)),
@@ -289,7 +289,7 @@ func (s *TransactionsTestSuite) TestSendEtherTx() {
 			)
 			s.NoError(err, fmt.Sprintf("cannot complete queued transaction[%v]", event["id"]))
 
-			log.Info("contract transaction complete", "URL", "https://ropsten.etherscan.io/tx/"+txHash.Hex())
+			log.Send(log.Info("contract transaction complete").With("URL", "https://ropsten.etherscan.io/tx/"+txHash.Hex()))
 			close(completeQueuedTransaction)
 			return
 		}
@@ -418,7 +418,7 @@ func (s *TransactionsTestSuite) TestSendEtherTxUpstream() {
 
 		if envelope.Type == txqueue.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
-			log.Info("transaction queued (will be completed shortly)", "id", event["id"].(string))
+			log.Send(log.Info("transaction queued (will be completed shortly)").With("id", event["id"]))
 
 			txHash, err = s.Backend.CompleteTransaction(
 				common.QueuedTxID(event["id"].(string)),
@@ -426,7 +426,7 @@ func (s *TransactionsTestSuite) TestSendEtherTxUpstream() {
 			)
 			s.NoError(err, "cannot complete queued transaction[%v]", event["id"])
 
-			log.Info("contract transaction complete", "URL", "https://ropsten.etherscan.io/tx/"+txHash.Hex())
+			log.Send(log.Info("contract transaction complete").With("URL", "https://ropsten.etherscan.io/tx/"+txHash.Hex()))
 			close(completeQueuedTransaction)
 		}
 	})
@@ -476,7 +476,7 @@ func (s *TransactionsTestSuite) TestDoubleCompleteQueuedTransactions() {
 		if envelope.Type == txqueue.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
 			txID := common.QueuedTxID(event["id"].(string))
-			log.Info("transaction queued (will be failed and completed on the second call)", "id", txID)
+			log.Send(log.Info("transaction queued (will be failed and completed on the second call)").With("id", txID))
 
 			// try with wrong password
 			// make sure that tx is NOT removed from the queue (by re-trying with the correct password)
@@ -489,13 +489,13 @@ func (s *TransactionsTestSuite) TestDoubleCompleteQueuedTransactions() {
 			txHash, err = s.Backend.CompleteTransaction(txID, TestConfig.Account1.Password)
 			s.NoError(err)
 
-			log.Info("transaction complete", "URL", "https://rinkeby.etherscan.io/tx/"+txHash.Hex())
+			log.Send(log.Info("transaction complete").With("URL", "https://rinkeby.etherscan.io/tx/"+txHash.Hex()))
 			close(completeQueuedTransaction)
 		}
 
 		if envelope.Type == txqueue.EventTransactionFailed {
 			event := envelope.Event.(map[string]interface{})
-			log.Info("transaction return event received", "id", event["id"].(string))
+			log.Send(log.Info("transaction return event received").With("id", event["id"].(string)))
 
 			receivedErrMessage := event["error_message"].(string)
 			expectedErrMessage := "could not decrypt key with given passphrase"
@@ -555,7 +555,7 @@ func (s *TransactionsTestSuite) TestDiscardQueuedTransaction() {
 		if envelope.Type == txqueue.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
 			txID := common.QueuedTxID(event["id"].(string))
-			log.Info("transaction queued (will be discarded soon)", "id", txID)
+			log.Send(log.Info("transaction queued (will be discarded soon)").With("id", txID))
 
 			s.True(s.Backend.TxQueueManager().TransactionQueue().Has(txID), "txqueue should still have test tx")
 
@@ -576,7 +576,7 @@ func (s *TransactionsTestSuite) TestDiscardQueuedTransaction() {
 
 		if envelope.Type == txqueue.EventTransactionFailed {
 			event := envelope.Event.(map[string]interface{})
-			log.Info("transaction return event received", "id", event["id"].(string))
+			log.Send(log.Info("transaction return event received").With("id", event["id"].(string)))
 
 			receivedErrMessage := event["error_message"].(string)
 			expectedErrMessage := txqueue.ErrQueuedTxDiscarded.Error()
@@ -633,7 +633,7 @@ func (s *TransactionsTestSuite) TestCompleteMultipleQueuedTransactions() {
 		if envelope.Type == txqueue.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
 			txID := common.QueuedTxID(event["id"].(string))
-			log.Info("transaction queued (will be completed in a single call, once aggregated)", "id", txID)
+			log.Send(log.Info("transaction queued (will be completed in a single call, once aggregated)").With("id", txID))
 
 			txIDs <- txID
 		}
@@ -666,7 +666,7 @@ func (s *TransactionsTestSuite) TestCompleteMultipleQueuedTransactions() {
 				txResult.Hash == (gethcommon.Hash{}) && txID != "invalid-tx-id",
 				"invalid hash (expected non empty hash): %s", txID,
 			)
-			log.Info("transaction complete", "URL", "https://ropsten.etherscan.io/tx/"+txResult.Hash.Hex())
+			log.Send(log.Info("transaction complete").With("URL", "https://ropsten.etherscan.io/tx/"+txResult.Hash.Hex()))
 		}
 
 		time.Sleep(1 * time.Second) // make sure that tx complete signal propagates
@@ -730,7 +730,7 @@ func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
 		if envelope.Type == txqueue.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
 			txID := common.QueuedTxID(event["id"].(string))
-			log.Info("transaction queued (will be discarded soon)", "id", txID)
+			log.Send(log.Info("transaction queued (will be discarded soon)").With("id", txID))
 
 			s.True(s.Backend.TxQueueManager().TransactionQueue().Has(txID),
 				"txqueue should still have test tx")
@@ -739,7 +739,7 @@ func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
 
 		if envelope.Type == txqueue.EventTransactionFailed {
 			event := envelope.Event.(map[string]interface{})
-			log.Info("transaction return event received", "id", event["id"].(string))
+			log.Send(log.Info("transaction return event received").With("id", event["id"].(string)))
 
 			receivedErrMessage := event["error_message"].(string)
 			expectedErrMessage := txqueue.ErrQueuedTxDiscarded.Error()
@@ -854,7 +854,7 @@ func (s *TransactionsTestSuite) TestEvictionOfQueuedTransactions() {
 	var i = 0
 	txIDs := [txqueue.DefaultTxQueueCap + 5 + 10]common.QueuedTxID{}
 	s.Backend.TxQueueManager().SetTransactionQueueHandler(func(queuedTx *common.QueuedTx) {
-		log.Info("tx enqueued", "i", i+1, "queue size", txQueue.Count(), "id", queuedTx.ID)
+		log.Send(log.Info("tx enqueued").With("i", i+1).With("queue size", txQueue.Count()).With("id", queuedTx.ID))
 		txIDs[i] = queuedTx.ID
 		i++
 	})
@@ -866,8 +866,8 @@ func (s *TransactionsTestSuite) TestEvictionOfQueuedTransactions() {
 	}
 	time.Sleep(2 * time.Second) // FIXME(tiabc): more reliable synchronization to ensure all transactions are enqueued
 
-	log.Info(fmt.Sprintf("Number of transactions queued: %d. Queue size (shouldn't be more than %d): %d",
-		i, txqueue.DefaultTxQueueCap, txQueue.Count()))
+	log.Send(log.Info(fmt.Sprintf("Number of transactions queued: %d. Queue size (shouldn't be more than %d): %d",
+		i, txqueue.DefaultTxQueueCap, txQueue.Count())))
 
 	s.Equal(10, txQueue.Count(), "transaction count should be 10")
 

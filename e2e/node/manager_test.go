@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/les"
 	gethnode "github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/ethereum/go-ethereum/whisper/notifications"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/e2e"
 	"github.com/status-im/status-go/geth/log"
@@ -95,6 +96,13 @@ func (s *ManagerTestSuite) TestReferencesWithoutStartedNode() {
 			node.ErrNoRunningNode,
 		},
 		{
+			"non-null manager, no running node, get Whisper Delivery Service",
+			func() (interface{}, error) {
+				return s.NodeManager.DeliveryService()
+			},
+			node.ErrNoRunningNode,
+		},
+		{
 			"non-null manager, no running node, get AccountManager",
 			func() (interface{}, error) {
 				return s.NodeManager.AccountManager()
@@ -160,6 +168,13 @@ func (s *ManagerTestSuite) TestReferencesWithStartedNode() {
 				return s.NodeManager.WhisperService()
 			},
 			&whisper.Whisper{},
+		},
+		{
+			"node is running, get Whisper Delivery Service",
+			func() (interface{}, error) {
+				return s.NodeManager.DeliveryService()
+			},
+			&notifications.DeliveryService{},
 		},
 		{
 			"node is running, get AccountManager",
@@ -345,79 +360,85 @@ func (s *ManagerTestSuite) TestRaceConditions() {
 
 	var funcsToTest = []func(*params.NodeConfig){
 		func(config *params.NodeConfig) {
-			log.Info("StartNode()")
+			log.Send(log.Info("StartNode()"))
 			_, err := s.NodeManager.StartNode(config)
 			s.T().Logf("StartNode() for network: %d, error: %v", config.NetworkID, err)
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
-			log.Info("StopNode()")
+			log.Send(log.Info("StopNode()"))
 			_, err := s.NodeManager.StopNode()
 			s.T().Logf("StopNode() for network: %d, error: %v", config.NetworkID, err)
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
-			log.Info("Node()")
+			log.Send(log.Info("Node()"))
 			_, err := s.NodeManager.Node()
 			s.T().Logf("Node(), error: %v", err)
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
-			log.Info("IsNodeRunning()")
+			log.Send(log.Info("IsNodeRunning()"))
 			s.T().Logf("IsNodeRunning(), result: %v", s.NodeManager.IsNodeRunning())
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
-			log.Info("PopulateStaticPeers()")
+			log.Send(log.Info("PopulateStaticPeers()"))
 			s.T().Logf("PopulateStaticPeers(), error: %v", s.NodeManager.PopulateStaticPeers())
 			progress <- struct{}{}
 		},
 		// TODO(adam): quarantined until it uses a different datadir
 		// as otherwise it wipes out cached blockchain data.
 		// func(config *params.NodeConfig) {
-		// 	log.Info("ResetChainData()")
+		// log.Send(log.Info("ResetChainData()"))
 		// 	_, err := s.NodeManager.ResetChainData()
 		// 	s.T().Logf("ResetChainData(), error: %v", err)
 		// 	progress <- struct{}{}
 		// },
 		func(config *params.NodeConfig) {
-			log.Info("RestartNode()")
+			log.Send(log.Info("RestartNode()"))
 			_, err := s.NodeManager.RestartNode()
 			s.T().Logf("RestartNode(), error: %v", err)
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
-			log.Info("NodeConfig()")
+			log.Send(log.Info("NodeConfig()"))
 			_, err := s.NodeManager.NodeConfig()
 			s.T().Logf("NodeConfig(), error: %v", err)
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
-			log.Info("LightEthereumService()")
+			log.Send(log.Info("LightEthereumService()"))
 			_, err := s.NodeManager.LightEthereumService()
 			s.T().Logf("LightEthereumService(), error: %v", err)
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
-			log.Info("WhisperService()")
+			log.Send(log.Info("WhisperService()"))
 			_, err := s.NodeManager.WhisperService()
 			s.T().Logf("WhisperService(), error: %v", err)
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
-			log.Info("AccountManager()")
+			log.Send(log.Info("DeliveryService()"))
+			_, err := s.NodeManager.DeliveryService()
+			s.T().Logf("DeliveryService(), error: %v", err)
+			progress <- struct{}{}
+		},
+		func(config *params.NodeConfig) {
+			log.Send(log.Info("AccountManager()"))
 			_, err := s.NodeManager.AccountManager()
 			s.T().Logf("AccountManager(), error: %v", err)
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
-			log.Info("AccountKeyStore()")
+			log.Send(log.Info("AccountKeyStore()"))
 			_, err := s.NodeManager.AccountKeyStore()
 			s.T().Logf("AccountKeyStore(), error: %v", err)
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
-			log.Info("RPCClient()")
+			log.Send(log.Info("RPCClient()"))
 			s.NodeManager.RPCClient()
 			progress <- struct{}{}
 		},
@@ -468,8 +489,10 @@ func (s *ManagerTestSuite) TestNodeStartCrash() {
 	nodeConfig, err := e2e.MakeTestNodeConfig(params.RinkebyNetworkID)
 	s.NoError(err)
 
+	var delivery notifications.DeliveryService
+
 	// start node outside the manager (on the same port), so that manager node.Start() method fails
-	outsideNode, err := node.MakeNode(nodeConfig)
+	outsideNode, err := node.MakeNode(nodeConfig, &delivery)
 	s.NoError(err)
 	err = outsideNode.Start()
 	s.NoError(err)

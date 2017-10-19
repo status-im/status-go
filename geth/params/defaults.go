@@ -48,11 +48,20 @@ const (
 	// DefaultFileDescriptorLimit is fd limit that database can use
 	DefaultFileDescriptorLimit = uint64(2048)
 
+	// DeliveryNotificationLogKey defines a const key value used to identify a giving entry.
+	DeliveryNotificationLogKey = "STATUSIM_MESSAGE_STATE_NOTIFICATION"
+
 	// DatabaseCache is memory (in MBs) allocated to internal caching (min 16MB / database forced)
 	DatabaseCache = 16
 
 	// LogFile defines where to write logs to
 	LogFile = ""
+
+	// MaxLogCollection defines max entries before writing to log
+	MaxLogCollection = 100
+
+	// MaxLogCollectionWait defines in ms the total time to wait before forcing a write of collected logs.
+	MaxLogCollectionWait = 1000
 
 	// LogLevel defines the minimum log level to report
 	LogLevel = "ERROR"
