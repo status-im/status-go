@@ -41,14 +41,14 @@ func (s *ManagerTestSuite) TestReferencesWithoutStartedNode() {
 		{
 			"non-null manager, no running node, RestartNode()",
 			func() (interface{}, error) {
-				return nil, s.NodeManager.RestartNodeWait()
+				return nil, s.NodeManager.RestartNode()
 			},
 			node.ErrNoRunningNode,
 		},
 		{
 			"non-null manager, no running node, ResetChainData()",
 			func() (interface{}, error) {
-				return nil, s.NodeManager.ResetChainDataWait()
+				return nil, s.NodeManager.ResetChainData()
 			},
 			node.ErrNoRunningNode,
 		},
@@ -187,27 +187,27 @@ func (s *ManagerTestSuite) TestNodeStartStop() {
 	s.NoError(err)
 
 	// try stopping non-started node
-	_, err = s.NodeManager.StopNode()
+	err = s.NodeManager.StopNode()
 	s.Equal(err, node.ErrNoRunningNode)
 
 	// start node
-	err = s.NodeManager.StartNodeWait(nodeConfig)
+	err = s.NodeManager.StartNode(nodeConfig)
 	s.NoError(err)
 
 	// try starting another node (w/o stopping the previously started node)
-	_, err = s.NodeManager.StartNode(nodeConfig)
+	err = s.NodeManager.StartNode(nodeConfig)
 	s.Equal(err, node.ErrNodeExists)
 
 	// now stop node
-	err = s.NodeManager.StopNodeWait()
+	err = s.NodeManager.StopNode()
 	s.NoError(err)
 
 	// start new node with exactly the same config
-	err = s.NodeManager.StartNodeWait(nodeConfig)
+	err = s.NodeManager.StartNode(nodeConfig)
 	s.NoError(err)
 
 	// finally stop the node
-	err = s.NodeManager.StopNodeWait()
+	err = s.NodeManager.StopNode()
 	s.NoError(err)
 }
 
@@ -216,7 +216,7 @@ func (s *ManagerTestSuite) TestNetworkSwitching() {
 	nodeConfig, err := e2e.MakeTestNodeConfig(params.RopstenNetworkID)
 	s.NoError(err)
 
-	err = s.NodeManager.StartNodeWait(nodeConfig)
+	err = s.NodeManager.StartNode(nodeConfig)
 	s.NoError(err)
 
 	firstHash, err := e2e.FirstBlockHash(s.NodeManager)
@@ -224,14 +224,14 @@ func (s *ManagerTestSuite) TestNetworkSwitching() {
 	s.Equal("0x41941023680923e0fe4d74a34bdac8141f2540e3ae90623718e47d66d1ca4a2d", firstHash)
 
 	// now stop node, and make sure that a new node, on different network can be started
-	err = s.NodeManager.StopNodeWait()
+	err = s.NodeManager.StopNode()
 	s.NoError(err)
 
 	// start new node with completely different config
 	nodeConfig, err = e2e.MakeTestNodeConfig(params.RinkebyNetworkID)
 	s.NoError(err)
 
-	err = s.NodeManager.StartNodeWait(nodeConfig)
+	err = s.NodeManager.StartNode(nodeConfig)
 	s.NoError(err)
 
 	// make sure we are on another network indeed
@@ -239,7 +239,7 @@ func (s *ManagerTestSuite) TestNetworkSwitching() {
 	s.NoError(err)
 	s.Equal("0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177", firstHash)
 
-	err = s.NodeManager.StopNodeWait()
+	err = s.NodeManager.StopNode()
 	s.NoError(err)
 }
 
@@ -250,10 +250,10 @@ func (s *ManagerTestSuite) TestStartNodeWithUpstreamEnabled() {
 	nodeConfig.UpstreamConfig.Enabled = true
 	nodeConfig.UpstreamConfig.URL = "https://ropsten.infura.io/nKmXgiFgc2KqtoQ8BCGJ"
 
-	err = s.NodeManager.StartNodeWait(nodeConfig)
+	err = s.NodeManager.StartNode(nodeConfig)
 	s.NoError(err)
 
-	err = s.NodeManager.StopNodeWait()
+	err = s.NodeManager.StopNode()
 	s.NoError(err)
 }
 
@@ -268,7 +268,7 @@ func (s *ManagerTestSuite) TestResetChainData() {
 	s.EnsureNodeSync()
 
 	// reset chain data
-	err := s.NodeManager.ResetChainDataWait()
+	err := s.NodeManager.ResetChainData()
 	s.NoError(err)
 
 	// make sure we can read the first byte, and it is valid (for Rinkeby)
@@ -281,7 +281,7 @@ func (s *ManagerTestSuite) TestRestartNode() {
 	s.StartTestNode(params.RinkebyNetworkID)
 	defer s.StopTestNode()
 
-	err := s.NodeManager.RestartNodeWait()
+	err := s.NodeManager.RestartNode()
 	s.NoError(err)
 
 	// make sure we can read the first byte, and it is valid (for Rinkeby)
@@ -311,13 +311,13 @@ func (s *ManagerTestSuite) TestRaceConditions() {
 	var funcsToTest = []func(*params.NodeConfig){
 		func(config *params.NodeConfig) {
 			log.Info("StartNode()")
-			_, err := s.NodeManager.StartNode(config)
+			err := s.NodeManager.StartNode(config)
 			s.T().Logf("StartNode() for network: %d, error: %v", config.NetworkID, err)
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
 			log.Info("StopNode()")
-			_, err := s.NodeManager.StopNode()
+			err := s.NodeManager.StopNode()
 			s.T().Logf("StopNode() for network: %d, error: %v", config.NetworkID, err)
 			progress <- struct{}{}
 		},
@@ -342,7 +342,7 @@ func (s *ManagerTestSuite) TestRaceConditions() {
 		// },
 		func(config *params.NodeConfig) {
 			log.Info("RestartNode()")
-			_, err := s.NodeManager.RestartNode()
+			err := s.NodeManager.RestartNode()
 			s.T().Logf("RestartNode(), error: %v", err)
 			progress <- struct{}{}
 		},
@@ -405,11 +405,8 @@ func (s *ManagerTestSuite) TestRaceConditions() {
 		}
 	}
 
-	time.Sleep(timeout)                        // so that we see some logs
-	nodeStopped, _ := s.NodeManager.StopNode() // just in case we have a node running
-	if nodeStopped != nil {
-		<-nodeStopped
-	}
+	time.Sleep(timeout)          // so that we see some logs
+	_ = s.NodeManager.StopNode() // just in case we have a node running
 }
 
 func (s *ManagerTestSuite) TestNodeStartCrash_DoubleStartNode_Error() {
@@ -435,7 +432,7 @@ func (s *ManagerTestSuite) TestNodeStartCrash_DoubleStartNode_Error() {
 	s.NoError(err)
 
 	// now try starting using node manager
-	_, err = s.NodeManager.StartNode(nodeConfig)
+	err = s.NodeManager.StartNode(nodeConfig)
 	s.Error(err) // no error is thrown, as node is started in separate routine
 
 	select {
@@ -467,7 +464,7 @@ func (s *ManagerTestSuite) TestNodeStart_CrashSignal_Success() {
 
 	// no deadlock, and no signal this time, manager should be able to start node
 	signalReceived = make(chan struct{})
-	err = s.NodeManager.StartNodeWait(nodeConfig)
+	err = s.NodeManager.StartNode(nodeConfig)
 	s.NoError(err)
 
 	select {

@@ -62,12 +62,12 @@ func (s *NodeManagerTestSuite) StartTestNode(networkID int, opts ...TestNodeOpti
 	// import account keys
 	importTestAccouns(nodeConfig.KeyStoreDir)
 
-	_ = s.NodeManager.StartNodeWait(nodeConfig)
+	_ = s.NodeManager.StartNode(nodeConfig)
 }
 
 // StopTestNode attempts to stop initialized NodeManager.
 func (s *NodeManagerTestSuite) StopTestNode() {
-	_ = s.NodeManager.StopNodeWait()
+	_ = s.NodeManager.StopNode()
 }
 
 // BackendTestSuite is a test suite with api.StatusBackend initialized
