@@ -300,8 +300,8 @@ type NodeConfig struct {
 	// LogFile is filename where exposed logs get written to
 	LogFile string
 
-	// LogLevel defines minimum log level. Valid names are "ERROR", "WARNING", "INFO", "DEBUG".
-	LogLevel string `validate:"eq=ERROR|eq=WARNING|eq=INFO|eq=DEBUG"`
+	// LogLevel defines minimum log level. Valid names are "ERROR", "WARNING", "INFO", "REDALERT".
+	LogLevel string `validate:"eq=ERROR|eq=WARNING|eq=INFO|eq=REDALERT"`
 
 	// LogToStderr defines whether logged info should also be output to os.Stderr
 	LogToStderr bool

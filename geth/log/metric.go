@@ -26,7 +26,7 @@ func GetLevel(lvl string) Level {
 	switch strings.ToLower(lvl) {
 	case "redalert", "redalartlvl":
 		return RedAlertLvl
-	case "yellowalert", "yellowalertlvl":
+	case "yellowalert", "yellowalertlvl", "warning":
 		return YellowAlertLvl
 	case "error", "errorlvl":
 		return ErrorLvl
