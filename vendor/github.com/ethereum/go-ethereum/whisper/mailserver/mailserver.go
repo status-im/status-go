@@ -136,7 +136,6 @@ func (s *WMailServer) processRequest(peer *whisper.Peer, lower, upper uint32, to
 				// used for test purposes
 				ret = append(ret, &envelope)
 			} else {
-
 				err = s.w.SendP2PDirect(peer, &envelope)
 				if err != nil {
 					log.Error(fmt.Sprintf("Failed to send direct message to peer: %s", err))
