@@ -14,10 +14,6 @@ func TestCellTestSuite(t *testing.T) {
 	suite.Run(t, new(CellTestSuite))
 }
 
-func TestCellTestSuite(t *testing.T) {
-	suite.Run(t, new(CellTestSuite))
-}
-
 type CellTestSuite struct {
 	suite.Suite
 	cell *Cell

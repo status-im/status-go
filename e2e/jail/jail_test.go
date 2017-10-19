@@ -249,8 +249,8 @@ func (s *JailTestSuite) TestJailCellsRemovedAfterStop() {
 	require := s.Require()
 
 	for i := 0; i < loopLen; i++ {
-		s.jail.Parse(getTestCellID(i), "")
-		cell, err := s.jail.Cell(getTestCellID(i))
+		s.Jail.CreateAndInitCell(getTestCellID(i), "")
+		cell, err := s.Jail.GetCell(getTestCellID(i))
 		require.NoError(err)
 		_, err = cell.Run(`
 			var counter = 1;
@@ -260,10 +260,10 @@ func (s *JailTestSuite) TestJailCellsRemovedAfterStop() {
 		`)
 	}
 
-	s.jail.Stop()
+	s.Jail.Stop()
 
 	for i := 0; i < loopLen; i++ {
-		_, err := s.jail.Cell(getTestCellID(i))
+		_, err := s.Jail.GetCell(getTestCellID(i))
 		require.Error(err, "Expected cells removing (from Jail) after stop")
 	}
 }
