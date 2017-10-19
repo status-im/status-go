@@ -121,7 +121,7 @@ func createSendAsyncHandler(jail *Jail, cell *Cell) func(call otto.FunctionCall)
 // TODO(adam): remove error wrapping as it should be a custom Error object.
 func createIsConnectedHandler(jail *Jail, cell *Cell) func(call otto.FunctionCall) otto.Value {
 	return func(call otto.FunctionCall) otto.Value {
-		client := jail.rpcClientProvider()
+		client := jail.GetRPCClient()
 		if client == nil {
 			throwJSError(ErrNoRPCClient)
 		}

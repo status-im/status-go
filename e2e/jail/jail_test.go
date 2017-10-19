@@ -15,7 +15,6 @@ import (
 	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
-	"github.com/status-im/status-go/geth/rpc"
 	"github.com/status-im/status-go/geth/signal"
 	"github.com/status-im/status-go/static"
 	"github.com/stretchr/testify/suite"
@@ -41,9 +40,7 @@ type JailTestSuite struct {
 
 func (s *JailTestSuite) SetupTest() {
 	s.NodeManager = node.NewNodeManager()
-	s.Jail = jail.New(func() *rpc.Client {
-		return s.NodeManager.RPCClient()
-	})
+	s.Jail = jail.New(s.NodeManager)
 }
 
 func (s *JailTestSuite) TearDownTest() {

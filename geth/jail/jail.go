@@ -30,11 +30,11 @@ var (
 	ErrNoRPCClient = errors.New("RPC client is not available")
 )
 
-// RPCClientProvider is a function that provides an rpc.Client.
-//
-// Provider is responsible for caching the client and prevent from
-// creating multiple instances.
-type RPCClientProvider func() *rpc.Client
+// RPCClientProvider is an interface that provides a way
+// to obtain an rpc.Client.
+type RPCClientProvider interface {
+	RPCClient() *rpc.Client
+}
 
 // Jail manages multiple JavaScript execution contexts (JavaScript VMs) called cells.
 // Each cell is a separate VM with web3.js set up.
@@ -55,12 +55,6 @@ func New(provider RPCClientProvider) *Jail {
 
 // NewWithBaseJS returns a new Jail with base JS configured.
 func NewWithBaseJS(provider RPCClientProvider, code string) *Jail {
-	if provider == nil {
-		provider = func() *rpc.Client {
-			return nil
-		}
-	}
-
 	return &Jail{
 		rpcClientProvider: provider,
 		baseJS:            code,
@@ -200,9 +194,18 @@ func (j *Jail) Call(chatID, commandPath, args string) string {
 	return newJailResultResponse(value)
 }
 
+// GetRPCClient returns an rpc.Client.
+func (j *Jail) GetRPCClient() *rpc.Client {
+	if j.rpcClientProvider == nil {
+		return nil
+	}
+
+	return j.rpcClientProvider.RPCClient()
+}
+
 // sendRPCCall executes a raw JSON-RPC request.
 func (j *Jail) sendRPCCall(cell *Cell, request string) (interface{}, error) {
-	client := j.rpcClientProvider()
+	client := j.GetRPCClient()
 	if client == nil {
 		return nil, ErrNoRPCClient
 	}

@@ -4,8 +4,17 @@ import (
 	"testing"
 
 	"github.com/robertkrimen/otto"
+	"github.com/status-im/status-go/geth/rpc"
 	"github.com/stretchr/testify/suite"
 )
+
+type testRPCClientProvider struct {
+	rpcClient *rpc.Client
+}
+
+func (p testRPCClientProvider) RPCClient() *rpc.Client {
+	return p.rpcClient
+}
 
 func TestJailTestSuite(t *testing.T) {
 	suite.Run(t, new(JailTestSuite))
@@ -18,11 +27,6 @@ type JailTestSuite struct {
 
 func (s *JailTestSuite) SetupTest() {
 	s.Jail = New(nil)
-}
-
-func (s *JailTestSuite) TestNewJailProvidesDefaultClientProvider() {
-	s.NotNil(s.Jail.rpcClientProvider)
-	s.Nil(s.Jail.rpcClientProvider())
 }
 
 func (s *JailTestSuite) TestJailCreateCell() {

@@ -50,7 +50,7 @@ func (s *HandlersTestSuite) TestWeb3SendHandlerSuccess() {
 	client, err := rpc.NewClient(s.client, params.UpstreamRPCConfig{})
 	s.NoError(err)
 
-	jail := New(func() *rpc.Client { return client })
+	jail := New(&testRPCClientProvider{client})
 
 	cell, err := jail.CreateCell("cell1")
 	s.NoError(err)
@@ -65,7 +65,7 @@ func (s *HandlersTestSuite) TestWeb3SendHandlerSuccess() {
 }
 
 func (s *HandlersTestSuite) TestWeb3SendHandlerFailure() {
-	jail := New(func() *rpc.Client { return nil })
+	jail := New(nil)
 
 	cell, err := jail.CreateCell("cell1")
 	s.NoError(err)
@@ -79,7 +79,7 @@ func (s *HandlersTestSuite) TestWeb3SendAsyncHandlerSuccess() {
 	client, err := rpc.NewClient(s.client, params.UpstreamRPCConfig{})
 	s.NoError(err)
 
-	jail := New(func() *rpc.Client { return client })
+	jail := New(&testRPCClientProvider{client})
 
 	cell, err := jail.CreateCell("cell1")
 	s.NoError(err)
@@ -105,7 +105,7 @@ func (s *HandlersTestSuite) TestWeb3SendAsyncHandlerWithoutCallbackSuccess() {
 	client, err := rpc.NewClient(s.client, params.UpstreamRPCConfig{})
 	s.NoError(err)
 
-	jail := New(func() *rpc.Client { return client })
+	jail := New(&testRPCClientProvider{client})
 
 	cell, err := jail.CreateCell("cell1")
 	s.NoError(err)
@@ -121,7 +121,7 @@ func (s *HandlersTestSuite) TestWeb3SendAsyncHandlerWithoutCallbackSuccess() {
 }
 
 func (s *HandlersTestSuite) TestWeb3SendAsyncHandlerFailure() {
-	jail := New(func() *rpc.Client { return nil })
+	jail := New(nil)
 
 	cell, err := jail.CreateCell("cell1")
 	s.NoError(err)
@@ -151,7 +151,7 @@ func (s *HandlersTestSuite) TestWeb3IsConnectedHandler() {
 	client, err := rpc.NewClient(s.client, params.UpstreamRPCConfig{})
 	s.NoError(err)
 
-	jail := New(func() *rpc.Client { return client })
+	jail := New(&testRPCClientProvider{client})
 
 	cell, err := jail.CreateCell("cell1")
 	s.NoError(err)
@@ -176,7 +176,7 @@ func (s *HandlersTestSuite) TestWeb3IsConnectedHandler() {
 }
 
 func (s *HandlersTestSuite) TestSendSignalHandler() {
-	jail := New(func() *rpc.Client { return nil })
+	jail := New(nil)
 
 	cell, err := jail.CreateCell("cell1")
 	s.NoError(err)
