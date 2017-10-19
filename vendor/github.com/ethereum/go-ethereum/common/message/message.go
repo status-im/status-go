@@ -5,7 +5,7 @@ type Direction int
 
 // consts of all message direction values.
 const (
-	IncomingMessage Direction = iota << 1
+	IncomingMessage Direction = iota + 1
 	OutgoingMessage
 )
 
@@ -27,7 +27,7 @@ type Status int
 
 // consts of all message delivery status.
 const (
-	PendingStatus Status = iota << 2
+	PendingStatus Status = iota << 3
 	QueuedStatus
 	CachedStatus
 	SentStatus

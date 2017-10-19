@@ -85,7 +85,6 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 
 	// Subscribe for message delivery status and log out with special key.
 	messageStateLoggingID := deliveryManager.Subscribe(func(state notifications.DeliveryState) {
-		fmt.Printf("Manager receiving request: %+q\n", state)
 		if state.IsP2P {
 			log.Send(log.Info("P2P Message Status Notification").
 				With(params.DeliveryNotificationLogKey, state.P2P).
@@ -97,7 +96,7 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 		log.Send(log.Info("RPC Message Status Notification").
 			With(params.DeliveryNotificationLogKey, state.RPC).
 			With("networkID", config.NetworkID).
-			With("message_direction", state.P2P.Direction))
+			With("message_direction", state.RPC.Direction))
 	})
 
 	go func() {

@@ -3,7 +3,6 @@ package node_test
 import (
 	"encoding/json"
 	"math/rand"
-	"os"
 	"testing"
 	"time"
 
@@ -472,43 +471,6 @@ func (s *ManagerTestSuite) TestRaceConditions() {
 	if nodeStopped != nil {
 		<-nodeStopped
 	}
-}
-
-// TestNodeMessageLogs validate we can run rpc commands and record message log of operation in file for node.
-func (s *ManagerTestSuite) TestNodeMessageLogs() {
-	// get Ropsten config
-	nodeConfig, err := e2e.MakeTestNodeConfig(params.RopstenNetworkID)
-	s.NoError(err)
-
-	logDirFile := nodeConfig.DataDir + "/messagelogs/states.log"
-	nodeConfig.MessageLogFile = logDirFile
-	nodeConfig.LogWriteInterval = 10
-
-	defer os.Remove(logDirFile)
-
-	s.False(s.NodeManager.IsNodeRunning())
-	nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
-	s.NoError(err)
-	<-nodeStarted
-
-	// s.EnsureNodeSync(true)
-
-	client := s.NodeManager.RPCClient()
-	s.NotNil(client)
-
-	jsonResult := client.CallRaw(`{"jsonrpc":"2.0","method":"shh_version","params":[],"id":67}`)
-	s.Equal(`{"jsonrpc":"2.0","id":67,"result":"5.0"}`, jsonResult)
-
-	nodeStopped, err := s.NodeManager.StopNode()
-	s.NoError(err)
-	<-nodeStopped
-
-	// Log takes a giving max time before it writes, so wait that time.
-	maxWait := time.Duration(nodeConfig.LogWriteInterval) * time.Millisecond
-	<-time.After(maxWait)
-
-	_, err = os.Stat(logDirFile)
-	s.NoError(err, "File should have existed.")
 }
 
 func (s *ManagerTestSuite) TestNodeStartCrash() {
