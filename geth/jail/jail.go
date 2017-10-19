@@ -31,6 +31,9 @@ var (
 )
 
 // RPCClientProvider is a function that provides an rpc.Client.
+//
+// Provider is responsible for caching the client and prevent from
+// creating multiple instances.
 type RPCClientProvider func() *rpc.Client
 
 // Jail manages multiple JavaScript execution contexts (JavaScript VMs) called cells.

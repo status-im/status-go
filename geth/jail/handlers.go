@@ -81,26 +81,32 @@ func createSendHandler(jail *Jail, cell *Cell) func(call otto.FunctionCall) otto
 // createSendAsyncHandler returns jeth.sendAsync() handler.
 func createSendAsyncHandler(jail *Jail, cell *Cell) func(call otto.FunctionCall) otto.Value {
 	return func(call otto.FunctionCall) otto.Value {
+		// As it's a sync call, it's called already from a thread-safe context,
+		// thus using otto.Otto directly. Otherwise, it would try to acquire a lock again
+		// and result in a deadlock.
+		unsafeVM := cell.VM.UnsafeVM()
+
+		request, err := unsafeVM.Call("JSON.stringify", nil, call.Argument(0))
+		if err != nil {
+			throwJSError(err)
+			return otto.UndefinedValue()
+		}
+
 		go func() {
 			// As it's an async call, it's not called from a thread-safe context,
-			// thus using vm.VM.
+			// thus using a thread-safe vm.VM.
 			vm := cell.VM
 			callback := call.Argument(1)
-			isFunction := callback.Class() == "Function"
-
-			request, err := vm.Call("JSON.stringify", nil, call.Argument(0))
-			if err != nil && isFunction {
-				cell.CallAsync(callback, vm.MakeCustomError("Error", err.Error()))
-				return
-			}
-
 			response, err := jail.sendRPCCall(cell, request.String())
-			if err != nil && isFunction {
-				cell.CallAsync(callback, vm.MakeCustomError("Error", err.Error()))
+
+			// If provided callback argument is not a function, don't call it.
+			if callback.Class() != "Function" {
 				return
 			}
 
-			if isFunction {
+			if err != nil {
+				cell.CallAsync(callback, vm.MakeCustomError("Error", err.Error()))
+			} else {
 				cell.CallAsync(callback, nil, response)
 			}
 		}()

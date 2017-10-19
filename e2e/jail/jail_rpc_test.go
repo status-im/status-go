@@ -35,36 +35,6 @@ func (s *JailRPCTestSuite) SetupTest() {
 	s.NotNil(s.jail)
 }
 
-// TestJailRPCAsyncSend was written to catch race conditions with a weird error message
-// starting from `ReferenceError` as if otto vm were losing symbols.
-func (s *JailRPCTestSuite) TestJailRPCAsyncSend() {
-	// load Status JS and add test command to it
-	s.jail.SetBaseJS(baseStatusJSCode)
-	s.jail.CreateAndInitCell(testChatID, txJSCode)
-
-	cell, err := s.jail.GetCell(testChatID)
-	s.NoError(err)
-	s.NotNil(cell)
-
-	// internally (since we replaced `web3.send` with `jail.Send`)
-	// all requests to web3 are forwarded to `jail.Send`
-	var wg sync.WaitGroup
-	for i := 0; i < 100; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-
-			_, err = cell.Run(`_status_catalog.commands.sendAsync({
-				"from": "` + TestConfig.Account1.Address + `",
-				"to": "` + TestConfig.Account2.Address + `",
-				"value": "0.000001"
-			})`)
-			s.NoError(err, "Request failed to process")
-		}()
-	}
-	wg.Wait()
-}
-
 func (s *JailRPCTestSuite) TestJailRPCSend() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()

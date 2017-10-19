@@ -339,9 +339,16 @@ func InitJail(js *C.char) {
 	statusAPI.JailBaseJS(C.GoString(js))
 }
 
+// DEPRECATED. Use CreateAndInitCell instead.
 //export Parse
 func Parse(chatID *C.char, js *C.char) *C.char {
-	res := statusAPI.JailParse(C.GoString(chatID), C.GoString(js))
+	res := statusAPI.CreateAndInitCell(C.GoString(chatID), C.GoString(js))
+	return C.CString(res)
+}
+
+//export Parse
+func CreateAndInitCell(chatID *C.char, js *C.char) *C.char {
+	res := statusAPI.CreateAndInitCell(C.GoString(chatID), C.GoString(js))
 	return C.CString(res)
 }
 

@@ -209,11 +209,11 @@ func (s *JailTestSuite) TestCallResponseOrder() {
 	`
 	s.Jail.CreateAndInitCell(testChatID, statusJS)
 
-	N := 100
+	N := 10
 	errCh := make(chan error, N)
 	var wg sync.WaitGroup
-	for i := 0; i < 100; i++ {
-		wg.Add(2)
+	for i := 0; i < N; i++ {
+		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
 			res := s.Jail.Call(testChatID, `["commands", "testCommand"]`, fmt.Sprintf(`{"val": %d}`, i))
@@ -222,6 +222,7 @@ func (s *JailTestSuite) TestCallResponseOrder() {
 			}
 		}(i)
 
+		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
 			res := s.Jail.Call(testChatID, `["commands", "calculateGasPrice"]`, fmt.Sprintf(`%d`, i))

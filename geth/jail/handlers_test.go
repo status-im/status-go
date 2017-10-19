@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/robertkrimen/otto"
 
@@ -24,12 +25,14 @@ type HandlersTestSuite struct {
 	suite.Suite
 	responseFixture string
 	ts              *httptest.Server
+	tsCalls         int
 	client          *gethrpc.Client
 }
 
 func (s *HandlersTestSuite) SetupTest() {
 	s.responseFixture = `{"json-rpc":"2.0","id":10,"result":true}`
 	s.ts = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		s.tsCalls++
 		fmt.Fprintln(w, s.responseFixture)
 	}))
 
@@ -40,6 +43,7 @@ func (s *HandlersTestSuite) SetupTest() {
 
 func (s *HandlersTestSuite) TearDownTest() {
 	s.ts.Close()
+	s.tsCalls = 0
 }
 
 func (s *HandlersTestSuite) TestWeb3SendHandlerSuccess() {
@@ -95,6 +99,25 @@ func (s *HandlersTestSuite) TestWeb3SendAsyncHandlerSuccess() {
 
 	s.Equal(`null`, <-errc)
 	s.Equal(`true`, <-resultc)
+}
+
+func (s *HandlersTestSuite) TestWeb3SendAsyncHandlerWithoutCallbackSuccess() {
+	client, err := rpc.NewClient(s.client, params.UpstreamRPCConfig{})
+	s.NoError(err)
+
+	jail := New(func() *rpc.Client { return client })
+
+	cell, err := jail.CreateCell("cell1")
+	s.NoError(err)
+	jail.InitCell("cell1", "")
+
+	_, err = cell.Run(`web3.eth.getSyncing()`)
+	s.NoError(err)
+
+	// As there is no callback, it's not possible to detect when
+	// the request hit the server.
+	time.Sleep(time.Millisecond * 100)
+	s.Equal(1, s.tsCalls)
 }
 
 func (s *HandlersTestSuite) TestWeb3SendAsyncHandlerFailure() {
