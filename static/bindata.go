@@ -121,7 +121,7 @@ func scriptsWeb3Js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "scripts/web3.js", size: 497689, mode: os.FileMode(420), modTime: time.Unix(1508342151, 0)}
+	info := bindataFileInfo{name: "scripts/web3.js", size: 497689, mode: os.FileMode(420), modTime: time.Unix(1508419129, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -141,7 +141,7 @@ func configChtJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/cht.json", size: 7418, mode: os.FileMode(420), modTime: time.Unix(1508338623, 0)}
+	info := bindataFileInfo{name: "config/cht.json", size: 7418, mode: os.FileMode(420), modTime: time.Unix(1508419094, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -181,7 +181,7 @@ func configStatusChainGenesisJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/status-chain-genesis.json", size: 610, mode: os.FileMode(420), modTime: time.Unix(1508231709, 0)}
+	info := bindataFileInfo{name: "config/status-chain-genesis.json", size: 610, mode: os.FileMode(420), modTime: time.Unix(1508410633, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
