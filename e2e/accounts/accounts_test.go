@@ -252,7 +252,7 @@ func (s *AccountsTestSuite) TestSelectedAccountOnRestart() {
 	s.False(whisperService.HasKeyPair(pubKey1), "identity should be removed, but it is still present in whisper")
 
 	// stop node (and all of its sub-protocols)
-	preservedNodeConfig, err := s.Backend.NodeManager().NodeConfig()
+	nodeConfig, err := s.Backend.NodeManager().NodeConfig()
 	s.NoError(err)
 	nodeStopped, err := s.Backend.StopNode()
 	s.NoError(err)
@@ -265,7 +265,7 @@ func (s *AccountsTestSuite) TestSelectedAccountOnRestart() {
 	s.Equal(selectedAccount.Address.Hex(), address2, "incorrect address selected")
 
 	// resume node
-	nodeStarted, err := s.Backend.StartNode(preservedNodeConfig)
+	nodeStarted, err := s.Backend.StartNode(nodeConfig)
 	s.NoError(err)
 	<-nodeStarted
 
