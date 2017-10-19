@@ -27,8 +27,6 @@
     },
     "BootClusterConfig": {
         "Enabled": true,
-        "RootNumber": 205,
-        "RootHash": "f946d8f4d46d5b8a68006485cef0d1583db4a45feab83661323d4d52000aa2db",
         "BootNodes": [
             "enode://7512c8f6e7ffdcc723cf77e602a1de9d8cc2e8ad35db309464819122cd773857131aee390fec33894db13da730c8432bb248eed64039e3810e156e979b2847cb@51.15.78.243:30303",
             "enode://1cc27a5a41130a5c8b90db5b2273dc28f7b56f3edfc0dcc57b665d451274b26541e8de49ea7a074281906a82209b9600239c981163b6ff85c3038a8e2bc5d8b8@51.15.68.93:30303",
