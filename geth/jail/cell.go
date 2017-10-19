@@ -26,12 +26,15 @@ func newCell(id string, ottoVM *otto.Otto) (*Cell, error) {
 
 	lo := loop.New(cellVM)
 
-	registerVMHandlers(cellVM, lo)
+	err := registerVMHandlers(cellVM, lo)
+	if err != nil {
+		return nil, err
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// start event loop in background
-	go lo.Run(ctx)
+	go lo.Run(ctx) //nolint: errcheck
 
 	return &Cell{
 		VM:     cellVM,
@@ -50,11 +53,7 @@ func registerVMHandlers(v *vm.VM, lo *loop.Loop) error {
 	}
 
 	// FetchAPI functions
-	if err := fetch.Define(v, lo); err != nil {
-		return err
-	}
-
-	return nil
+	return fetch.Define(v, lo)
 }
 
 // Stop halts event loop associated with cell.

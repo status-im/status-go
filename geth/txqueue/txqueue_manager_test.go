@@ -81,8 +81,8 @@ func (s *TxQueueTestSuite) TestCompleteTransaction() {
 	s.NoError(err)
 
 	go func() {
-		_, err := txQueueManager.CompleteTransaction(tx.ID, TestConfig.Account1.Password)
-		s.Equal(errTxAssumedSent, err)
+		_, errCompleteTransaction := txQueueManager.CompleteTransaction(tx.ID, TestConfig.Account1.Password)
+		s.Equal(errTxAssumedSent, errCompleteTransaction)
 	}()
 
 	err = txQueueManager.WaitForTransaction(tx)
@@ -137,9 +137,9 @@ func (s *TxQueueTestSuite) TestCompleteTransactionMultipleTimes() {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_, err := txQueueManager.CompleteTransaction(tx.ID, TestConfig.Account1.Password)
+			_, errCompleteTransaction := txQueueManager.CompleteTransaction(tx.ID, TestConfig.Account1.Password)
 			mu.Lock()
-			completeTxErrors[err]++
+			completeTxErrors[errCompleteTransaction]++
 			mu.Unlock()
 		}()
 	}
@@ -266,8 +266,8 @@ func (s *TxQueueTestSuite) TestDiscardTransaction() {
 	s.NoError(err)
 
 	go func() {
-		err := txQueueManager.DiscardTransaction(tx.ID)
-		s.NoError(err)
+		discardErr := txQueueManager.DiscardTransaction(tx.ID)
+		s.NoError(discardErr)
 	}()
 
 	err = txQueueManager.WaitForTransaction(tx)

@@ -199,6 +199,7 @@ func (api *StatusAPI) JailBaseJS(js string) {
 	api.b.jailManager.BaseJS(js)
 }
 
+// Notify sends a push notification to the device with the given token.
 // TODO(oskarth): API package this stuff
 func (api *StatusAPI) Notify(token string) string {
 	log.Debug("Notify", "token", token)

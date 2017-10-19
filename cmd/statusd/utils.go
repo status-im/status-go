@@ -19,13 +19,15 @@ import (
 
 	"fmt"
 
+	"context"
+
 	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/signal"
 	"github.com/status-im/status-go/geth/txqueue"
 	"github.com/status-im/status-go/static"
-	. "github.com/status-im/status-go/testing"
+	. "github.com/status-im/status-go/testing" //nolint: golint
 	"github.com/stretchr/testify/require"
 )
 
@@ -197,7 +199,8 @@ func testGetDefaultConfig(t *testing.T) bool {
 	return true
 }
 
-// @TODO(adam): quarantined this test until it uses a different directory.
+//@TODO(adam): quarantined this test until it uses a different directory.
+//nolint: deadcode
 func testResetChainData(t *testing.T) bool {
 	t.Skip()
 
@@ -221,7 +224,7 @@ func testResetChainData(t *testing.T) bool {
 	return true
 }
 
-func testStopResumeNode(t *testing.T) bool {
+func testStopResumeNode(t *testing.T) bool { //nolint: gocyclo
 	// to make sure that we start with empty account (which might get populated during previous tests)
 	if err := statusAPI.Logout(); err != nil {
 		t.Fatal(err)
@@ -326,14 +329,14 @@ func testCallRPC(t *testing.T) bool {
 	rawResponse := CallRPC(C.CString(`{"jsonrpc":"2.0","method":"web3_sha3","params":["0x68656c6c6f20776f726c64"],"id":64}`))
 	received := C.GoString(rawResponse)
 	if expected != received {
-		t.Errorf("unexpected reponse: expected: %v, got: %v", expected, received)
+		t.Errorf("unexpected response: expected: %v, got: %v", expected, received)
 		return false
 	}
 
 	return true
 }
 
-func testCreateChildAccount(t *testing.T) bool {
+func testCreateChildAccount(t *testing.T) bool { //nolint: gocyclo
 	// to make sure that we start with empty account (which might get populated during previous tests)
 	if err := statusAPI.Logout(); err != nil {
 		t.Fatal(err)
@@ -469,7 +472,7 @@ func testCreateChildAccount(t *testing.T) bool {
 	return true
 }
 
-func testRecoverAccount(t *testing.T) bool {
+func testRecoverAccount(t *testing.T) bool { //nolint: gocyclo
 	keyStore, _ := statusAPI.NodeManager().AccountKeyStore()
 
 	// create an account
@@ -582,7 +585,7 @@ func testRecoverAccount(t *testing.T) bool {
 	return true
 }
 
-func testAccountSelect(t *testing.T) bool {
+func testAccountSelect(t *testing.T) bool { //nolint: gocyclo
 	// test to see if the account was injected in whisper
 	whisperService, err := statusAPI.NodeManager().WhisperService()
 	if err != nil {
@@ -770,7 +773,7 @@ func testCompleteTransaction(t *testing.T) bool {
 	})
 
 	// this call blocks, up until Complete Transaction is called
-	txCheckHash, err := statusAPI.SendTransaction(nil, common.SendTxArgs{
+	txCheckHash, err := statusAPI.SendTransaction(context.TODO(), common.SendTxArgs{
 		From:  common.FromAddress(TestConfig.Account1.Address),
 		To:    common.ToAddress(TestConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
@@ -801,7 +804,7 @@ func testCompleteTransaction(t *testing.T) bool {
 	return true
 }
 
-func testCompleteMultipleQueuedTransactions(t *testing.T) bool {
+func testCompleteMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocyclo
 	txQueue := statusAPI.TxQueueManager().TransactionQueue()
 	txQueue.Reset()
 
@@ -835,7 +838,7 @@ func testCompleteMultipleQueuedTransactions(t *testing.T) bool {
 
 	//  this call blocks, and should return when DiscardQueuedTransaction() for a given tx id is called
 	sendTx := func() {
-		txHashCheck, err := statusAPI.SendTransaction(nil, common.SendTxArgs{
+		txHashCheck, err := statusAPI.SendTransaction(context.TODO(), common.SendTxArgs{
 			From:  common.FromAddress(TestConfig.Account1.Address),
 			To:    common.ToAddress(TestConfig.Account2.Address),
 			Value: (*hexutil.Big)(big.NewInt(1000000000000)),
@@ -934,7 +937,7 @@ func testCompleteMultipleQueuedTransactions(t *testing.T) bool {
 	return true
 }
 
-func testDiscardTransaction(t *testing.T) bool {
+func testDiscardTransaction(t *testing.T) bool { //nolint: gocyclo
 	txQueue := statusAPI.TxQueueManager().TransactionQueue()
 	txQueue.Reset()
 
@@ -1018,7 +1021,7 @@ func testDiscardTransaction(t *testing.T) bool {
 	})
 
 	// this call blocks, and should return when DiscardQueuedTransaction() is called
-	txHashCheck, err := statusAPI.SendTransaction(nil, common.SendTxArgs{
+	txHashCheck, err := statusAPI.SendTransaction(context.TODO(), common.SendTxArgs{
 		From:  common.FromAddress(TestConfig.Account1.Address),
 		To:    common.ToAddress(TestConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
@@ -1046,7 +1049,7 @@ func testDiscardTransaction(t *testing.T) bool {
 	return true
 }
 
-func testDiscardMultipleQueuedTransactions(t *testing.T) bool {
+func testDiscardMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocyclo
 	txQueue := statusAPI.TxQueueManager().TransactionQueue()
 	txQueue.Reset()
 
@@ -1109,7 +1112,7 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool {
 
 	// this call blocks, and should return when DiscardQueuedTransaction() for a given tx id is called
 	sendTx := func() {
-		txHashCheck, err := statusAPI.SendTransaction(nil, common.SendTxArgs{
+		txHashCheck, err := statusAPI.SendTransaction(context.TODO(), common.SendTxArgs{
 			From:  common.FromAddress(TestConfig.Account1.Address),
 			To:    common.ToAddress(TestConfig.Account2.Address),
 			Value: (*hexutil.Big)(big.NewInt(1000000000000)),
@@ -1355,9 +1358,6 @@ func startTestNode(t *testing.T) <-chan struct{} {
 			t.Log("Node started, but we wait till it be ready")
 		}
 		if envelope.Type == signal.EventNodeReady {
-			// manually add static nodes (LES auto-discovery is not stable yet)
-			PopulateStaticPeers()
-
 			// sync
 			if syncRequired {
 				t.Logf("Sync is required, it will take %d seconds", TestConfig.Node.SyncSeconds)
@@ -1387,6 +1387,7 @@ func startTestNode(t *testing.T) <-chan struct{} {
 	return waitForNodeStart
 }
 
+//nolint: deadcode
 func testValidateNodeConfig(t *testing.T, config string, fn func(common.APIDetailedResponse)) {
 	result := ValidateNodeConfig(C.CString(config))
 

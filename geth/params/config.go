@@ -525,7 +525,8 @@ func (c *NodeConfig) DefaultStatusChainGenesisBlock() (*core.Genesis, error) {
 	}
 
 	var genesis *core.Genesis
-	if err := json.Unmarshal([]byte(genesisJSON), &genesis); err != nil {
+	err = json.Unmarshal(genesisJSON, &genesis)
+	if err != nil {
 		return nil, fmt.Errorf("cannot unmarshal status-chain-genesis.json: %s", err)
 	}
 	return genesis, nil
