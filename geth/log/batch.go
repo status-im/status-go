@@ -10,24 +10,19 @@ var (
 	ErrBatchEmitterClosed = errors.New("batcher already closed")
 )
 
+// MetricConsumer exposes a interface which allows the consumption of Entries
+// into a underline system, which can be started through it's run method.
+type MetricConsumer interface {
+	Metrics
+	Run(<-chan struct{})
+}
+
 // CommitFunction defines a function type which is used to process a batch of Entry.
 type CommitFunction func([]Entry) error
 
-// BatchEmitter defines a structure which collects Entry in batch
-// mode until a provide size threshold is met then it's provided against
-// a provided function for procesing.
-type BatchEmitter struct {
-	maxlen    int
-	commitErr error
-	batch     []Entry
-	actions   chan func()
-	maxwait   time.Duration
-	fn        CommitFunction
-}
-
-// BatchEmit returns a new instance of a BatchEmitter.
-func BatchEmit(maxSize int, maxwait time.Duration, fn CommitFunction) *BatchEmitter {
-	var batch BatchEmitter
+// BatchConsumer returns a new instance of a batchConsumer.
+func BatchConsumer(maxSize int, maxwait time.Duration, fn CommitFunction) MetricConsumer {
+	var batch batchConsumer
 	batch.fn = fn
 	batch.maxlen = maxSize
 	batch.maxwait = maxwait
@@ -36,10 +31,22 @@ func BatchEmit(maxSize int, maxwait time.Duration, fn CommitFunction) *BatchEmit
 	return &batch
 }
 
+// batchConsumer defines a structure which collects Entry in batch
+// mode until a provide size threshold is met then it's provided against
+// a provided function for procesing.
+type batchConsumer struct {
+	maxlen    int
+	commitErr error
+	batch     []Entry
+	actions   chan func()
+	maxwait   time.Duration
+	fn        CommitFunction
+}
+
 // Emit takes provided entries and emits giving entries into batch,
 // returning any error encountered with the addition of the entry
 // or one received during the last commit of the entries.
-func (bm *BatchEmitter) Emit(en Entry) error {
+func (bm *batchConsumer) Emit(en Entry) error {
 	if bm.commitErr != nil {
 		return bm.commitErr
 	}
@@ -70,7 +77,7 @@ func (bm *BatchEmitter) Emit(en Entry) error {
 }
 
 // Emit takes provided entries and emits giving entries into batch loop.
-func (bm *BatchEmitter) commit() {
+func (bm *batchConsumer) commit() {
 	bm.actions <- func() {
 		if len(bm.batch) == 0 {
 			return
@@ -85,7 +92,7 @@ func (bm *BatchEmitter) commit() {
 // Run handles running the necessary logic to add entries into the batch
 // and call the necessary commit call to evaluate the provided function with
 // the collected Entries.
-func (bm *BatchEmitter) Run(closeChan <-chan struct{}) {
+func (bm *batchConsumer) Run(closeChan <-chan struct{}) {
 	ticker := time.NewTimer(bm.maxwait)
 	defer ticker.Stop()
 

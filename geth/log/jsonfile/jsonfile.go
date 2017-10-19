@@ -10,7 +10,7 @@ import (
 )
 
 // JSON returns a log.Metric which writes a series of batch entries into a json file.
-func JSON(targetFile string, maxBatchPerWrite int, maxwait time.Duration) (*log.BatchEmitter, error) {
+func JSON(targetFile string, maxBatchPerWrite int, maxwait time.Duration) (log.MetricConsumer, error) {
 	// If the directory does not exists, create it first.
 	dir := filepath.Dir(targetFile)
 	if dir != "" {
