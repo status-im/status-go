@@ -59,10 +59,8 @@ type NodeManager struct {
 	whisperService     *whisperv5.Whisper // reference to Whisper service
 	whisperServiceLock sync.RWMutex
 
-	lesService     services.LesService // reference to LES service
+	lesService     *les.LightEthereum // reference to LES service
 	lesServiceLock sync.RWMutex
-
-	statusBackend services.StatusBackend // reference to ethereum backend
 
 	rpcClient     geth.RPCClient // reference to RPC client
 	rpcClientLock sync.RWMutex
@@ -492,15 +490,10 @@ func (m *NodeManager) RPCClient() geth.RPCClient {
 
 // GetStatusBackend exposes StatusBackend interface.
 func (m *NodeManager) GetStatusBackend() (services.StatusBackend, error) {
-	_, err := m.getLesService()
-	if err != nil {
-		return nil, err
-	}
+	m.lesServiceLock.RLock()
+	defer m.lesServiceLock.RUnlock()
 
-	m.lesServiceLock.Lock()
-	defer m.lesServiceLock.Unlock()
-
-	return m.statusBackend, nil
+	return m.lesService.StatusBackend, nil
 }
 
 // initLog initializes global logger parameters based on
@@ -717,7 +710,7 @@ func (m *NodeManager) getWhisperService() (*whisperv5.Whisper, error) {
 }
 
 // getLesService returns LES service or inits both LES and backend
-func (m *NodeManager) getLesService() (services.LesService, error) {
+func (m *NodeManager) getLesService() (*les.LightEthereum, error) {
 	m.lesServiceLock.Lock()
 	defer m.lesServiceLock.Unlock()
 
@@ -731,8 +724,6 @@ func (m *NodeManager) getLesService() (services.LesService, error) {
 		return nil, ErrInvalidLightEthereumService
 	}
 	m.lesService = lesObject
-
-	m.statusBackend = lesObject.StatusBackend
 
 	return m.lesService, nil
 }
