@@ -52,9 +52,8 @@ func (s *HandlersTestSuite) TestWeb3SendHandlerSuccess() {
 
 	jail := New(&testRPCClientProvider{client})
 
-	cell, err := jail.CreateCell("cell1")
+	cell, err := jail.createCell("cell1")
 	s.NoError(err)
-	jail.InitCell("cell1", "")
 
 	// web3.eth.syncing is an arbitrary web3 sync RPC call.
 	value, err := cell.Run("web3.eth.syncing")
@@ -67,9 +66,8 @@ func (s *HandlersTestSuite) TestWeb3SendHandlerSuccess() {
 func (s *HandlersTestSuite) TestWeb3SendHandlerFailure() {
 	jail := New(nil)
 
-	cell, err := jail.CreateCell("cell1")
+	cell, err := jail.createCell("cell1")
 	s.NoError(err)
-	jail.InitCell("cell1", "")
 
 	_, err = cell.Run("web3.eth.syncing")
 	s.Error(err, ErrNoRPCClient.Error())
@@ -81,9 +79,8 @@ func (s *HandlersTestSuite) TestWeb3SendAsyncHandlerSuccess() {
 
 	jail := New(&testRPCClientProvider{client})
 
-	cell, err := jail.CreateCell("cell1")
+	cell, err := jail.createCell("cell1")
 	s.NoError(err)
-	jail.InitCell("cell1", "")
 
 	errc := make(chan string)
 	resultc := make(chan string)
@@ -107,9 +104,8 @@ func (s *HandlersTestSuite) TestWeb3SendAsyncHandlerWithoutCallbackSuccess() {
 
 	jail := New(&testRPCClientProvider{client})
 
-	cell, err := jail.CreateCell("cell1")
+	cell, err := jail.createCell("cell1")
 	s.NoError(err)
-	jail.InitCell("cell1", "")
 
 	_, err = cell.Run(`web3.eth.getSyncing()`)
 	s.NoError(err)
@@ -123,9 +119,8 @@ func (s *HandlersTestSuite) TestWeb3SendAsyncHandlerWithoutCallbackSuccess() {
 func (s *HandlersTestSuite) TestWeb3SendAsyncHandlerFailure() {
 	jail := New(nil)
 
-	cell, err := jail.CreateCell("cell1")
+	cell, err := jail.createCell("cell1")
 	s.NoError(err)
-	jail.InitCell("cell1", "")
 
 	errc := make(chan otto.Value)
 	resultc := make(chan string)
@@ -153,9 +148,8 @@ func (s *HandlersTestSuite) TestWeb3IsConnectedHandler() {
 
 	jail := New(&testRPCClientProvider{client})
 
-	cell, err := jail.CreateCell("cell1")
+	cell, err := jail.createCell("cell1")
 	s.NoError(err)
-	jail.InitCell("cell1", "")
 
 	// When result is true.
 	value, err := cell.Run("web3.isConnected()")
@@ -178,9 +172,8 @@ func (s *HandlersTestSuite) TestWeb3IsConnectedHandler() {
 func (s *HandlersTestSuite) TestSendSignalHandler() {
 	jail := New(nil)
 
-	cell, err := jail.CreateCell("cell1")
+	cell, err := jail.createCell("cell1")
 	s.NoError(err)
-	jail.InitCell("cell1", "")
 
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		s.Contains(jsonEvent, "test signal message")

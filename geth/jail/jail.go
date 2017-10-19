@@ -80,8 +80,8 @@ func (j *Jail) Stop() {
 	j.cells = make(map[string]*Cell)
 }
 
-// CreateCell creates a new cell if it does not exists. Otherwise, it returns an error.
-func (j *Jail) CreateCell(chatID string) (*Cell, error) {
+// createCell creates and initializes a new cell if it does not exists.
+func (j *Jail) createCell(chatID string) (*Cell, error) {
 	j.cellsMx.Lock()
 	defer j.cellsMx.Unlock()
 
@@ -90,27 +90,27 @@ func (j *Jail) CreateCell(chatID string) (*Cell, error) {
 	}
 
 	cell := NewCell(chatID)
+
+	err := j.initCell(cell)
+	if err != nil {
+		return nil, fmt.Errorf("cell init failed: %v", err)
+	}
+
 	j.cells[chatID] = cell
 
 	return cell, nil
 }
 
-// InitCell initializes a cell with JavaScript code. In case of a successful result,
-// it returns {"result": any}, otherwise an error: {"error": "some error"}.
-func (j *Jail) InitCell(chatID, code string) string {
-	cell, err := j.getCell(chatID)
-	if err != nil {
-		return newJailErrorResponse(err)
-	}
-
+// initCell initializes a cell with default JavaScript handlers and user code.
+func (j *Jail) initCell(cell *Cell) error {
 	// Register objects being a bridge between Go and JavaScript.
-	err = registerWeb3Provider(j, cell)
+	err := registerWeb3Provider(j, cell)
 	if err != nil {
-		return newJailErrorResponse(err)
+		return err
 	}
 	err = registerStatusSignals(j, cell)
 	if err != nil {
-		return newJailErrorResponse(err)
+		return err
 	}
 
 	// Run some initial JS code to provide some global objects.
@@ -118,18 +118,42 @@ func (j *Jail) InitCell(chatID, code string) string {
 		j.baseJS,
 		web3Code,
 		web3InstanceCode,
-		code,
 	}
 
 	_, err = cell.Run(strings.Join(c, ";"))
 	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// CreateCell creates and initializes new Cell.
+// It returns response as a JSON string.
+// TODO(adam): fix api package so that this becomes obsolete.
+func (j *Jail) CreateCell(chatID string, code ...string) string {
+	cell, err := j.createCell(chatID)
+	if err != nil {
 		return newJailErrorResponse(err)
 	}
 
-	// Provide `catalog` as a global variable.
-	// TODO(adam): does it need to be a global var as _status_catalog
-	// already is?
-	_, err = cell.Run(`var catalog = JSON.stringify(_status_catalog)`)
+	// Run custom user code
+	for _, js := range code {
+		_, err := cell.Run(js)
+		if err != nil {
+			return newJailErrorResponse(err)
+		}
+	}
+
+	return j.makeCatalogVariable(cell)
+}
+
+// makeCatalogVariable provides `catalog` as a global variable.
+// TODO(divan): this can and should be implemented outside of jail,
+// on a clojure side. Moving this into separate method to nuke it later
+// easier.
+func (j *Jail) makeCatalogVariable(cell *Cell) string {
+	_, err := cell.Run(`var catalog = JSON.stringify(_status_catalog)`)
 	if err != nil {
 		return newJailErrorResponse(err)
 	}
@@ -140,18 +164,6 @@ func (j *Jail) InitCell(chatID, code string) string {
 	}
 
 	return newJailResultResponse(value)
-}
-
-// CreateAndInitCell performs CreateCell and InitCell methods
-// and returns a string.
-// TODO(adam): fix api package so that this becomes obsolete.
-func (j *Jail) CreateAndInitCell(chatID, code string) string {
-	_, err := j.CreateCell(chatID)
-	if err != nil {
-		return newJailErrorResponse(err)
-	}
-
-	return j.InitCell(chatID, code)
 }
 
 func (j *Jail) getCell(chatID string) (*Cell, error) {

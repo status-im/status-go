@@ -30,31 +30,26 @@ func (s *JailTestSuite) SetupTest() {
 }
 
 func (s *JailTestSuite) TestJailCreateCell() {
-	_, err := s.Jail.CreateCell("cell1")
+	_, err := s.Jail.createCell("cell1")
 	s.NoError(err)
-	_, err = s.Jail.CreateCell("cell1")
+	_, err = s.Jail.createCell("cell1")
 	s.EqualError(err, "cell with id 'cell1' already exists")
 
 	// create more cells
-	_, err = s.Jail.CreateCell("cell2")
+	_, err = s.Jail.createCell("cell2")
 	s.NoError(err)
-	_, err = s.Jail.CreateCell("cell3")
+	_, err = s.Jail.createCell("cell3")
 	s.NoError(err)
 
 	s.Len(s.Jail.cells, 3)
 }
 
 func (s *JailTestSuite) TestJailInitCell() {
-	// InitCell on a non-existent cell.
-	result := s.Jail.InitCell("cellNonExistent", "")
-	s.Equal(`{"error":"cell 'cellNonExistent' not found"}`, result)
-
 	// InitCell on an existing cell.
-	cell, err := s.Jail.CreateCell("cell1")
+	cell, err := s.Jail.createCell("cell1")
 	s.NoError(err)
-	result = s.Jail.InitCell("cell1", "")
-	// TODO(adam): this is confusing... There should be a separate method to validate this.
-	s.Equal(`{"error":"ReferenceError: '_status_catalog' is not defined"}`, result)
+	err = s.Jail.initCell(cell)
+	s.NoError(err)
 
 	// web3 should be available
 	value, err := cell.Run("web3.fromAscii('ethereum')")
@@ -63,7 +58,7 @@ func (s *JailTestSuite) TestJailInitCell() {
 }
 
 func (s *JailTestSuite) TestJailStop() {
-	_, err := s.Jail.CreateCell("cell1")
+	_, err := s.Jail.createCell("cell1")
 	s.NoError(err)
 	s.Len(s.Jail.cells, 1)
 
@@ -73,7 +68,7 @@ func (s *JailTestSuite) TestJailStop() {
 }
 
 func (s *JailTestSuite) TestJailCall() {
-	cell, err := s.Jail.CreateCell("cell1")
+	cell, err := s.Jail.createCell("cell1")
 	s.NoError(err)
 
 	propsc := make(chan string, 1)
@@ -93,7 +88,7 @@ func (s *JailTestSuite) TestJailCall() {
 }
 
 func (s *JailTestSuite) TestCreateAndInitCell() {
-	response := s.Jail.CreateAndInitCell("cell1", `var testCreateAndInitCell = true`)
+	response := s.Jail.CreateCell("cell1", `var testCreateAndInitCell = true`)
 	// TODO(adam): confusing, this check should be in another method
 	s.Equal(`{"error":"ReferenceError: '_status_catalog' is not defined"}`, response)
 
