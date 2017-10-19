@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/common/services"
@@ -131,7 +130,7 @@ func (s *BackendTestSuite) WhisperService() services.Whisper {
 	return whisperService
 }
 
-func (s *BackendTestSuite) PublicWhisperAPI() *whisperv5.PublicWhisperAPI {
+func (s *BackendTestSuite) PublicWhisperAPI() services.WhisperAPI {
 	whisperAPI, err := s.Backend.NodeManager().PublicWhisperAPI()
 	s.NoError(err)
 	s.NotNil(whisperAPI)

@@ -1,8 +1,10 @@
 package services
 
 import (
+	"context"
 	"crypto/ecdsa"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/go-ethereum/whisper/whisperv5"
@@ -48,4 +50,31 @@ type Whisper interface {
 	Stats() whisperv5.Statistics
 	Envelopes() []*whisperv5.Envelope
 	Messages(id string) []*whisperv5.ReceivedMessage
+}
+
+type WhisperAPI interface {
+	Version(ctx context.Context) string
+	Info(ctx context.Context) whisperv5.Info
+	SetMaxMessageSize(ctx context.Context, size uint32) (bool, error)
+	SetMinPoW(ctx context.Context, pow float64) (bool, error)
+	MarkTrustedPeer(ctx context.Context, enode string) (bool, error)
+	NewKeyPair(ctx context.Context) (string, error)
+	AddPrivateKey(ctx context.Context, privateKey hexutil.Bytes) (string, error)
+	DeleteKeyPair(ctx context.Context, key string) (bool, error)
+	HasKeyPair(ctx context.Context, id string) bool
+	GetPublicKey(ctx context.Context, id string) (hexutil.Bytes, error)
+	GetPrivateKey(ctx context.Context, id string) (hexutil.Bytes, error)
+	NewSymKey(ctx context.Context) (string, error)
+	AddSymKey(ctx context.Context, key hexutil.Bytes) (string, error)
+	GenerateSymKeyFromPassword(ctx context.Context, passwd string) (string, error)
+	HasSymKey(ctx context.Context, id string) bool
+	GetSymKey(ctx context.Context, id string) (hexutil.Bytes, error)
+	DeleteSymKey(ctx context.Context, id string) bool
+	Post(ctx context.Context, req whisperv5.NewMessage) (bool, error)
+	UninstallFilter(id string)
+	Unsubscribe(id string)
+	Messages(ctx context.Context, crit whisperv5.Criteria) (*rpc.Subscription, error)
+	GetFilterMessages(id string) ([]*whisperv5.Message, error)
+	DeleteMessageFilter(id string) (bool, error)
+	NewMessageFilter(req whisperv5.Criteria) (string, error)
 }

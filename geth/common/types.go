@@ -13,7 +13,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/common/geth"
 	"github.com/status-im/status-go/geth/common/services"
@@ -77,7 +76,7 @@ type NodeManager interface {
 	// WhisperService returns reference to running Whisper service
 	WhisperService() (services.Whisper, error)
 
-	PublicWhisperAPI() (*whisperv5.PublicWhisperAPI, error)
+	PublicWhisperAPI() (services.WhisperAPI, error)
 
 	// AccountManager returns reference to node's account manager
 	AccountManager() (*accounts.Manager, error)

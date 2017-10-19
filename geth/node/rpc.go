@@ -1,17 +1,16 @@
 package node
 
 import (
-	"sync"
-
 	"github.com/status-im/status-go/geth/common/geth"
+	"sync"
 )
 
-type node struct {
-	geth.Node
+type rpc struct {
+	geth.RPCClient // reference to RPC client
 	*sync.RWMutex
 }
 
-func newNode() *node {
+func newRPC() *rpc {
 	m := &sync.RWMutex{}
-	return &node{RWMutex: m}
+	return &rpc{RWMutex: m}
 }

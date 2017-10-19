@@ -5,7 +5,9 @@
 package services
 
 import (
+	context "context"
 	ecdsa "crypto/ecdsa"
+	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
 	p2p "github.com/ethereum/go-ethereum/p2p"
 	rpc "github.com/ethereum/go-ethereum/rpc"
 	whisperv5 "github.com/ethereum/go-ethereum/whisper/whisperv5"
@@ -495,4 +497,328 @@ func (m *MockWhisper) Messages(id string) []*whisperv5.ReceivedMessage {
 // Messages indicates an expected call of Messages
 func (mr *MockWhisperMockRecorder) Messages(id interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Messages", reflect.TypeOf((*MockWhisper)(nil).Messages), id)
+}
+
+// MockWhisperAPI is a mock of WhisperAPI interface
+type MockWhisperAPI struct {
+	ctrl     *gomock.Controller
+	recorder *MockWhisperAPIMockRecorder
+}
+
+// MockWhisperAPIMockRecorder is the mock recorder for MockWhisperAPI
+type MockWhisperAPIMockRecorder struct {
+	mock *MockWhisperAPI
+}
+
+// NewMockWhisperAPI creates a new mock instance
+func NewMockWhisperAPI(ctrl *gomock.Controller) *MockWhisperAPI {
+	mock := &MockWhisperAPI{ctrl: ctrl}
+	mock.recorder = &MockWhisperAPIMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use
+func (m *MockWhisperAPI) EXPECT() *MockWhisperAPIMockRecorder {
+	return m.recorder
+}
+
+// Version mocks base method
+func (m *MockWhisperAPI) Version(ctx context.Context) string {
+	ret := m.ctrl.Call(m, "Version", ctx)
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// Version indicates an expected call of Version
+func (mr *MockWhisperAPIMockRecorder) Version(ctx interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Version", reflect.TypeOf((*MockWhisperAPI)(nil).Version), ctx)
+}
+
+// Info mocks base method
+func (m *MockWhisperAPI) Info(ctx context.Context) whisperv5.Info {
+	ret := m.ctrl.Call(m, "Info", ctx)
+	ret0, _ := ret[0].(whisperv5.Info)
+	return ret0
+}
+
+// Info indicates an expected call of Info
+func (mr *MockWhisperAPIMockRecorder) Info(ctx interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Info", reflect.TypeOf((*MockWhisperAPI)(nil).Info), ctx)
+}
+
+// SetMaxMessageSize mocks base method
+func (m *MockWhisperAPI) SetMaxMessageSize(ctx context.Context, size uint32) (bool, error) {
+	ret := m.ctrl.Call(m, "SetMaxMessageSize", ctx, size)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SetMaxMessageSize indicates an expected call of SetMaxMessageSize
+func (mr *MockWhisperAPIMockRecorder) SetMaxMessageSize(ctx, size interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetMaxMessageSize", reflect.TypeOf((*MockWhisperAPI)(nil).SetMaxMessageSize), ctx, size)
+}
+
+// SetMinPoW mocks base method
+func (m *MockWhisperAPI) SetMinPoW(ctx context.Context, pow float64) (bool, error) {
+	ret := m.ctrl.Call(m, "SetMinPoW", ctx, pow)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SetMinPoW indicates an expected call of SetMinPoW
+func (mr *MockWhisperAPIMockRecorder) SetMinPoW(ctx, pow interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetMinPoW", reflect.TypeOf((*MockWhisperAPI)(nil).SetMinPoW), ctx, pow)
+}
+
+// MarkTrustedPeer mocks base method
+func (m *MockWhisperAPI) MarkTrustedPeer(ctx context.Context, enode string) (bool, error) {
+	ret := m.ctrl.Call(m, "MarkTrustedPeer", ctx, enode)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// MarkTrustedPeer indicates an expected call of MarkTrustedPeer
+func (mr *MockWhisperAPIMockRecorder) MarkTrustedPeer(ctx, enode interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MarkTrustedPeer", reflect.TypeOf((*MockWhisperAPI)(nil).MarkTrustedPeer), ctx, enode)
+}
+
+// NewKeyPair mocks base method
+func (m *MockWhisperAPI) NewKeyPair(ctx context.Context) (string, error) {
+	ret := m.ctrl.Call(m, "NewKeyPair", ctx)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// NewKeyPair indicates an expected call of NewKeyPair
+func (mr *MockWhisperAPIMockRecorder) NewKeyPair(ctx interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewKeyPair", reflect.TypeOf((*MockWhisperAPI)(nil).NewKeyPair), ctx)
+}
+
+// AddPrivateKey mocks base method
+func (m *MockWhisperAPI) AddPrivateKey(ctx context.Context, privateKey hexutil.Bytes) (string, error) {
+	ret := m.ctrl.Call(m, "AddPrivateKey", ctx, privateKey)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// AddPrivateKey indicates an expected call of AddPrivateKey
+func (mr *MockWhisperAPIMockRecorder) AddPrivateKey(ctx, privateKey interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddPrivateKey", reflect.TypeOf((*MockWhisperAPI)(nil).AddPrivateKey), ctx, privateKey)
+}
+
+// DeleteKeyPair mocks base method
+func (m *MockWhisperAPI) DeleteKeyPair(ctx context.Context, key string) (bool, error) {
+	ret := m.ctrl.Call(m, "DeleteKeyPair", ctx, key)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DeleteKeyPair indicates an expected call of DeleteKeyPair
+func (mr *MockWhisperAPIMockRecorder) DeleteKeyPair(ctx, key interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteKeyPair", reflect.TypeOf((*MockWhisperAPI)(nil).DeleteKeyPair), ctx, key)
+}
+
+// HasKeyPair mocks base method
+func (m *MockWhisperAPI) HasKeyPair(ctx context.Context, id string) bool {
+	ret := m.ctrl.Call(m, "HasKeyPair", ctx, id)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// HasKeyPair indicates an expected call of HasKeyPair
+func (mr *MockWhisperAPIMockRecorder) HasKeyPair(ctx, id interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HasKeyPair", reflect.TypeOf((*MockWhisperAPI)(nil).HasKeyPair), ctx, id)
+}
+
+// GetPublicKey mocks base method
+func (m *MockWhisperAPI) GetPublicKey(ctx context.Context, id string) (hexutil.Bytes, error) {
+	ret := m.ctrl.Call(m, "GetPublicKey", ctx, id)
+	ret0, _ := ret[0].(hexutil.Bytes)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetPublicKey indicates an expected call of GetPublicKey
+func (mr *MockWhisperAPIMockRecorder) GetPublicKey(ctx, id interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPublicKey", reflect.TypeOf((*MockWhisperAPI)(nil).GetPublicKey), ctx, id)
+}
+
+// GetPrivateKey mocks base method
+func (m *MockWhisperAPI) GetPrivateKey(ctx context.Context, id string) (hexutil.Bytes, error) {
+	ret := m.ctrl.Call(m, "GetPrivateKey", ctx, id)
+	ret0, _ := ret[0].(hexutil.Bytes)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetPrivateKey indicates an expected call of GetPrivateKey
+func (mr *MockWhisperAPIMockRecorder) GetPrivateKey(ctx, id interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPrivateKey", reflect.TypeOf((*MockWhisperAPI)(nil).GetPrivateKey), ctx, id)
+}
+
+// NewSymKey mocks base method
+func (m *MockWhisperAPI) NewSymKey(ctx context.Context) (string, error) {
+	ret := m.ctrl.Call(m, "NewSymKey", ctx)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// NewSymKey indicates an expected call of NewSymKey
+func (mr *MockWhisperAPIMockRecorder) NewSymKey(ctx interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewSymKey", reflect.TypeOf((*MockWhisperAPI)(nil).NewSymKey), ctx)
+}
+
+// AddSymKey mocks base method
+func (m *MockWhisperAPI) AddSymKey(ctx context.Context, key hexutil.Bytes) (string, error) {
+	ret := m.ctrl.Call(m, "AddSymKey", ctx, key)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// AddSymKey indicates an expected call of AddSymKey
+func (mr *MockWhisperAPIMockRecorder) AddSymKey(ctx, key interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddSymKey", reflect.TypeOf((*MockWhisperAPI)(nil).AddSymKey), ctx, key)
+}
+
+// GenerateSymKeyFromPassword mocks base method
+func (m *MockWhisperAPI) GenerateSymKeyFromPassword(ctx context.Context, passwd string) (string, error) {
+	ret := m.ctrl.Call(m, "GenerateSymKeyFromPassword", ctx, passwd)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GenerateSymKeyFromPassword indicates an expected call of GenerateSymKeyFromPassword
+func (mr *MockWhisperAPIMockRecorder) GenerateSymKeyFromPassword(ctx, passwd interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GenerateSymKeyFromPassword", reflect.TypeOf((*MockWhisperAPI)(nil).GenerateSymKeyFromPassword), ctx, passwd)
+}
+
+// HasSymKey mocks base method
+func (m *MockWhisperAPI) HasSymKey(ctx context.Context, id string) bool {
+	ret := m.ctrl.Call(m, "HasSymKey", ctx, id)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// HasSymKey indicates an expected call of HasSymKey
+func (mr *MockWhisperAPIMockRecorder) HasSymKey(ctx, id interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HasSymKey", reflect.TypeOf((*MockWhisperAPI)(nil).HasSymKey), ctx, id)
+}
+
+// GetSymKey mocks base method
+func (m *MockWhisperAPI) GetSymKey(ctx context.Context, id string) (hexutil.Bytes, error) {
+	ret := m.ctrl.Call(m, "GetSymKey", ctx, id)
+	ret0, _ := ret[0].(hexutil.Bytes)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetSymKey indicates an expected call of GetSymKey
+func (mr *MockWhisperAPIMockRecorder) GetSymKey(ctx, id interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSymKey", reflect.TypeOf((*MockWhisperAPI)(nil).GetSymKey), ctx, id)
+}
+
+// DeleteSymKey mocks base method
+func (m *MockWhisperAPI) DeleteSymKey(ctx context.Context, id string) bool {
+	ret := m.ctrl.Call(m, "DeleteSymKey", ctx, id)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// DeleteSymKey indicates an expected call of DeleteSymKey
+func (mr *MockWhisperAPIMockRecorder) DeleteSymKey(ctx, id interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteSymKey", reflect.TypeOf((*MockWhisperAPI)(nil).DeleteSymKey), ctx, id)
+}
+
+// Post mocks base method
+func (m *MockWhisperAPI) Post(ctx context.Context, req whisperv5.NewMessage) (bool, error) {
+	ret := m.ctrl.Call(m, "Post", ctx, req)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Post indicates an expected call of Post
+func (mr *MockWhisperAPIMockRecorder) Post(ctx, req interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Post", reflect.TypeOf((*MockWhisperAPI)(nil).Post), ctx, req)
+}
+
+// UninstallFilter mocks base method
+func (m *MockWhisperAPI) UninstallFilter(id string) {
+	m.ctrl.Call(m, "UninstallFilter", id)
+}
+
+// UninstallFilter indicates an expected call of UninstallFilter
+func (mr *MockWhisperAPIMockRecorder) UninstallFilter(id interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UninstallFilter", reflect.TypeOf((*MockWhisperAPI)(nil).UninstallFilter), id)
+}
+
+// Unsubscribe mocks base method
+func (m *MockWhisperAPI) Unsubscribe(id string) {
+	m.ctrl.Call(m, "Unsubscribe", id)
+}
+
+// Unsubscribe indicates an expected call of Unsubscribe
+func (mr *MockWhisperAPIMockRecorder) Unsubscribe(id interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Unsubscribe", reflect.TypeOf((*MockWhisperAPI)(nil).Unsubscribe), id)
+}
+
+// Messages mocks base method
+func (m *MockWhisperAPI) Messages(ctx context.Context, crit whisperv5.Criteria) (*rpc.Subscription, error) {
+	ret := m.ctrl.Call(m, "Messages", ctx, crit)
+	ret0, _ := ret[0].(*rpc.Subscription)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Messages indicates an expected call of Messages
+func (mr *MockWhisperAPIMockRecorder) Messages(ctx, crit interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Messages", reflect.TypeOf((*MockWhisperAPI)(nil).Messages), ctx, crit)
+}
+
+// GetFilterMessages mocks base method
+func (m *MockWhisperAPI) GetFilterMessages(id string) ([]*whisperv5.Message, error) {
+	ret := m.ctrl.Call(m, "GetFilterMessages", id)
+	ret0, _ := ret[0].([]*whisperv5.Message)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetFilterMessages indicates an expected call of GetFilterMessages
+func (mr *MockWhisperAPIMockRecorder) GetFilterMessages(id interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFilterMessages", reflect.TypeOf((*MockWhisperAPI)(nil).GetFilterMessages), id)
+}
+
+// DeleteMessageFilter mocks base method
+func (m *MockWhisperAPI) DeleteMessageFilter(id string) (bool, error) {
+	ret := m.ctrl.Call(m, "DeleteMessageFilter", id)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DeleteMessageFilter indicates an expected call of DeleteMessageFilter
+func (mr *MockWhisperAPIMockRecorder) DeleteMessageFilter(id interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteMessageFilter", reflect.TypeOf((*MockWhisperAPI)(nil).DeleteMessageFilter), id)
+}
+
+// NewMessageFilter mocks base method
+func (m *MockWhisperAPI) NewMessageFilter(req whisperv5.Criteria) (string, error) {
+	ret := m.ctrl.Call(m, "NewMessageFilter", req)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// NewMessageFilter indicates an expected call of NewMessageFilter
+func (mr *MockWhisperAPIMockRecorder) NewMessageFilter(req interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewMessageFilter", reflect.TypeOf((*MockWhisperAPI)(nil).NewMessageFilter), req)
 }

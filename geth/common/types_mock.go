@@ -9,7 +9,6 @@ import (
 	accounts "github.com/ethereum/go-ethereum/accounts"
 	keystore "github.com/ethereum/go-ethereum/accounts/keystore"
 	common "github.com/ethereum/go-ethereum/common"
-	whisperv5 "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	gomock "github.com/golang/mock/gomock"
 	otto "github.com/robertkrimen/otto"
 	geth "github.com/status-im/status-go/geth/common/geth"
@@ -167,9 +166,9 @@ func (mr *MockNodeManagerMockRecorder) WhisperService() *gomock.Call {
 }
 
 // PublicWhisperAPI mocks base method
-func (m *MockNodeManager) PublicWhisperAPI() (*whisperv5.PublicWhisperAPI, error) {
+func (m *MockNodeManager) PublicWhisperAPI() (services.WhisperAPI, error) {
 	ret := m.ctrl.Call(m, "PublicWhisperAPI")
-	ret0, _ := ret[0].(*whisperv5.PublicWhisperAPI)
+	ret0, _ := ret[0].(services.WhisperAPI)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
