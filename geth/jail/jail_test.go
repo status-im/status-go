@@ -29,7 +29,7 @@ func (s *JailTestSuite) SetupTest() {
 	s.Jail = New(nil)
 }
 
-func (s *JailTestSuite) TestJailCreateCell() {
+func (s *JailTestSuite) TestJailCreateAndInitCell() {
 	_, err := s.Jail.createCell("cell1")
 	s.NoError(err)
 	_, err = s.Jail.createCell("cell1")
@@ -88,7 +88,7 @@ func (s *JailTestSuite) TestJailCall() {
 }
 
 func (s *JailTestSuite) TestCreateAndInitCell() {
-	response := s.Jail.CreateCell("cell1", `var testCreateAndInitCell = true`)
+	response := s.Jail.CreateAndInitCell("cell1", `var testCreateAndInitCell = true`)
 	// TODO(adam): confusing, this check should be in another method
 	s.Equal(`{"error":"ReferenceError: '_status_catalog' is not defined"}`, response)
 

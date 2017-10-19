@@ -346,7 +346,7 @@ func Parse(chatID *C.char, js *C.char) *C.char {
 	return C.CString(res)
 }
 
-//export Parse
+//export CreateAndInitCell
 func CreateAndInitCell(chatID *C.char, js *C.char) *C.char {
 	res := statusAPI.CreateAndInitCell(C.GoString(chatID), C.GoString(js))
 	return C.CString(res)

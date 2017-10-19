@@ -183,10 +183,10 @@ func (api *StatusAPI) DiscardTransactions(ids []common.QueuedTxID) map[common.Qu
 	return api.b.txQueueManager.DiscardTransactions(ids)
 }
 
-// CreateCell creates a new jail cell context, with the given chatID as identifier.
+// CreateAndInitCell creates a new jail cell context, with the given chatID as identifier.
 // New context executes provided JavaScript code, right after the initialization.
-func (api *StatusAPI) CreateCell(chatID, js string) string {
-	return api.b.jailManager.CreateCell(chatID, js)
+func (api *StatusAPI) CreateAndInitCell(chatID, js string) string {
+	return api.b.jailManager.CreateAndInitCell(chatID, js)
 }
 
 // JailCall executes given JavaScript function w/i a jail cell context identified by the chatID.

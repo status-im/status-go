@@ -128,10 +128,10 @@ func (j *Jail) initCell(cell *Cell) error {
 	return nil
 }
 
-// CreateCell creates and initializes new Cell.
+// CreateAndInitCell creates and initializes new Cell.
 // It returns response as a JSON string.
 // TODO(adam): fix api package so that this becomes obsolete.
-func (j *Jail) CreateCell(chatID string, code ...string) string {
+func (j *Jail) CreateAndInitCell(chatID string, code ...string) string {
 	cell, err := j.createCell(chatID)
 	if err != nil {
 		return newJailErrorResponse(err)

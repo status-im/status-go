@@ -266,7 +266,7 @@ type JailManager interface {
 	Call(chatID, this, args string) string
 
 	// CreateAndInitCell creates a new jail cell.
-	CreateAndInitCell(chatID, code string) string
+	CreateAndInitCell(chatID string, code ...string) string
 
 	// Cell returns an existing instance of JailCell.
 	GetCell(chatID string) (JailCell, error)
