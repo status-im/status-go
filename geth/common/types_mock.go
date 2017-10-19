@@ -11,7 +11,7 @@ import (
 	common "github.com/ethereum/go-ethereum/common"
 	les "github.com/ethereum/go-ethereum/les"
 	node "github.com/ethereum/go-ethereum/node"
-	delivery "github.com/ethereum/go-ethereum/whisper/delivery"
+	notifications "github.com/ethereum/go-ethereum/whisper/notifications"
 	whisperv5 "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	gomock "github.com/golang/mock/gomock"
 	otto "github.com/robertkrimen/otto"
@@ -183,17 +183,17 @@ func (mr *MockNodeManagerMockRecorder) WhisperService() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WhisperService", reflect.TypeOf((*MockNodeManager)(nil).WhisperService))
 }
 
-// WhisperDeliveryService mocks base method
-func (m *MockNodeManager) WhisperDeliveryService() (*delivery.DeliveryNotification, error) {
-	ret := m.ctrl.Call(m, "WhisperDeliveryService")
-	ret0, _ := ret[0].(*delivery.DeliveryNotification)
+// DeliveryService mocks base method
+func (m *MockNodeManager) DeliveryService() (*notifications.DeliveryService, error) {
+	ret := m.ctrl.Call(m, "DeliveryService")
+	ret0, _ := ret[0].(*notifications.DeliveryService)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// WhisperDeliveryService indicates an expected call of WhisperDeliveryService
-func (mr *MockNodeManagerMockRecorder) WhisperDeliveryService() *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WhisperDeliveryService", reflect.TypeOf((*MockNodeManager)(nil).WhisperDeliveryService))
+// DeliveryService indicates an expected call of DeliveryService
+func (mr *MockNodeManagerMockRecorder) DeliveryService() *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeliveryService", reflect.TypeOf((*MockNodeManager)(nil).DeliveryService))
 }
 
 // AccountManager mocks base method

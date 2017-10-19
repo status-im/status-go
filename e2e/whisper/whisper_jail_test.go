@@ -4,12 +4,14 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/whisper/notifications"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/e2e"
 	"github.com/status-im/status-go/geth/common"
@@ -428,4 +430,93 @@ func (s *WhisperJailTestSuite) TestEncryptedAnonymousMessage() {
 			close(done)
 		}
 	}
+}
+
+func (s *WhisperJailTestSuite) TestJailWhisperWithDeliveryService() {
+	s.StartTestBackend(params.RopstenNetworkID)
+	defer s.StopTestBackend()
+
+	_, accountKey1Hex, err := s.GetAccountKey(TestConfig.Account1)
+	s.NoError(err)
+
+	_, accountKey2Hex, err := s.GetAccountKey(TestConfig.Account2)
+	s.NoError(err)
+
+	deliveryService, err := s.Backend.NodeManager().DeliveryService()
+	s.NoError(err)
+	s.NotNil(deliveryService)
+
+	receivedChan := make(chan *whisper.RPCMessageState, 0)
+
+	// var do sync.Once
+	subID := deliveryService.Subscribe(func(msg notifications.DeliveryState) {
+		fmt.Printf("Receiving messsage: %#v\n", msg)
+		// do.Do(func() {
+		// 	receivedChan <- msg
+		// })
+	})
+	defer deliveryService.Unsubscribe(subID)
+
+	{
+		req := `
+				var identity1 = '` + accountKey1Hex + `';
+				if (!shh.hasKeyPair(identity1)) {
+					throw 'idenitity "` + accountKey1Hex + `" not found in whisper';
+				}
+
+				var identity2 = '` + accountKey2Hex + `';
+				if (!shh.hasKeyPair(identity2)) {
+					throw 'identitity "` + accountKey2Hex + `" not found in whisper';
+				}
+
+				var topic = makeTopic();
+				var payload = '` + whisperMessage1 + `';
+
+				// start watching for messages
+				var filter = shh.newMessageFilter({
+					sig: identity1,
+					privateKeyID: identity2,
+					topics: [topic]
+				});
+
+				// post message
+				var message = {
+					ttl: 20,
+					powTarget: 0.01,
+					powTime: 20,
+					topic: topic,
+					sig: identity1,
+					pubKey: identity2,
+			  		payload: web3.toHex(payload),
+				};
+
+				var sent = shh.post(message)
+				if (!sent) {
+					throw 'message not sent: ' + JSON.stringify(message);
+				}
+			`
+
+		chatID := crypto.Keccak256Hash([]byte("JailTest")).Hex()
+		s.Jail.Parse(chatID, `
+			var shh = web3.shh;
+			// topic must be 4-byte long
+			var makeTopic = function () {
+				var topic = '0x';
+				for (var i = 0; i < 8; i++) {
+					topic += Math.floor(Math.random() * 16).toString(16);
+				}
+				return topic;
+			};
+		`)
+
+		cell, err := s.Jail.Cell(chatID)
+		s.NoError(err, "cannot get VM")
+
+		// Setup filters and post messages.
+		_, err = cell.Run(req)
+		s.NoError(err)
+
+	}
+
+	<-receivedChan
 }

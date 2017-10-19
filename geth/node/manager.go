@@ -13,7 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/les"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/discover"
-	"github.com/ethereum/go-ethereum/whisper/delivery"
+	"github.com/ethereum/go-ethereum/whisper/notifications"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/log/custom"
@@ -45,7 +45,7 @@ type NodeManager struct {
 	nodeStopped    chan struct{}      // channel to wait for termination notifications
 	whisperService *whisper.Whisper   // reference to Whisper service
 	lesService     *les.LightEthereum // reference to LES service
-	delService     *delivery.DeliveryNotification
+	delService     *notifications.DeliveryService
 	rpcClient      *rpc.Client // reference to RPC client
 }
 
@@ -73,7 +73,7 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 
 	m.initLog(config)
 
-	deliveryManager := new(delivery.DeliveryNotification)
+	deliveryManager := new(notifications.DeliveryService)
 
 	ethNode, err := MakeNode(config, deliveryManager)
 	if err != nil {
@@ -84,17 +84,20 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 	m.nodeStarted = make(chan struct{}, 1)
 
 	// Subscribe for message delivery status and log out with special key.
-	messageStateLoggingID := deliveryManager.Subscribe(func(state delivery.DeliveryState) {
+	messageStateLoggingID := deliveryManager.Subscribe(func(state notifications.DeliveryState) {
+		fmt.Printf("Manager receiving request: %+q\n", state)
 		if state.IsP2P {
 			log.Send(log.Info("P2P Message Status Notification").
 				With(params.DeliveryNotificationLogKey, state.P2P).
-				With("networkID", config.NetworkID))
+				With("networkID", config.NetworkID).
+				With("message_direction", state.P2P.Direction))
 			return
 		}
 
 		log.Send(log.Info("RPC Message Status Notification").
 			With(params.DeliveryNotificationLogKey, state.RPC).
-			With("networkID", config.NetworkID))
+			With("networkID", config.NetworkID).
+			With("message_direction", state.P2P.Direction))
 	})
 
 	go func() {
@@ -421,8 +424,8 @@ func (m *NodeManager) LightEthereumService() (*les.LightEthereum, error) {
 	return m.lesService, nil
 }
 
-// WhisperDeliveryService exposes reference to Whisper service running on top of the node
-func (m *NodeManager) WhisperDeliveryService() (*delivery.DeliveryNotification, error) {
+// DeliveryService exposes reference to Whisper service running on top of the node
+func (m *NodeManager) DeliveryService() (*notifications.DeliveryService, error) {
 	m.RLock()
 	defer m.RUnlock()
 
@@ -541,10 +544,10 @@ func (m *NodeManager) initLog(config *params.NodeConfig) {
 		if normalLogs, err := jsonfile.JSON(config.LogFile, config.LogCollectionMaxPerWrite, maxWait); err == nil {
 			go normalLogs.Run(m.nodeStopped)
 			loggers = append(loggers, log.FilterLevel(level, normalLogs))
-		} else {
-			fmt.Println("Failed to open log file, using stdout")
-			loggers = append(loggers, log.FilterLevel(level, custom.FlatDisplay(os.Stdout)))
 		}
+	} else {
+		fmt.Println("Failed to open log file, using stdout")
+		loggers = append(loggers, log.FilterLevel(level, custom.FlatDisplay(os.Stdout)))
 	}
 
 	if config.MessageLogFile != "" {
@@ -562,6 +565,7 @@ func (m *NodeManager) initLog(config *params.NodeConfig) {
 				}
 				return false
 			}, messagelogs))
+			fmt.Printf("Using message state log file %+q\n", config.MessageLogFile)
 		} else {
 			fmt.Printf("Failed to open message state log file, Reason(%+q)\n", err)
 		}

@@ -163,6 +163,7 @@ func (m metrics) Emit(en Entry) error {
 	// Deliver augmented Entry to child Metrics
 	for _, met := range m.metrics {
 		if err := met.Emit(en); err != nil {
+			fmt.Printf("Metric failed to emit %#v\n", err)
 			return err
 		}
 	}

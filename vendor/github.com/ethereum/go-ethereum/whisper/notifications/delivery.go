@@ -1,7 +1,8 @@
-package delivery
+package notifications
 
 import (
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common/message"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
@@ -23,25 +24,31 @@ type P2PDeliverySubscriber func(*whisper.P2PMessageState)
 // RPCDeliverySubscriber defines a function type for receiving rpc message status.
 type RPCDeliverySubscriber func(*whisper.RPCMessageState)
 
-// DeliveryNotification defines a notification implementation for listening to message status
+// DeliveryService defines a notification implementation for listening to message status
 // events.
-type DeliveryNotification struct {
+type DeliveryService struct {
 	sml  sync.RWMutex
 	subs []DeliverySubscriber
 }
 
 // SendP2PState delivers a rpc message status to all subscribers.
-func (d *DeliveryNotification) SendP2PState(state whisper.P2PMessageState) {
+func (d *DeliveryService) SendP2PState(state whisper.P2PMessageState) {
+	if state.Timestamp.IsZero() {
+		state.Timestamp = time.Now()
+	}
 	d.sendState(DeliveryState{P2P: &state})
 }
 
 // SendRPCState delivers a rpc message status to all subscribers.
-func (d *DeliveryNotification) SendRPCState(state whisper.RPCMessageState) {
+func (d *DeliveryService) SendRPCState(state whisper.RPCMessageState) {
+	if state.Timestamp.IsZero() {
+		state.Timestamp = time.Now()
+	}
 	d.sendState(DeliveryState{RPC: &state})
 }
 
 // SendState delivers envelope with status to all subscribers.
-func (d *DeliveryNotification) sendState(mds DeliveryState) {
+func (d *DeliveryService) sendState(mds DeliveryState) {
 	d.sml.RLock()
 	defer d.sml.RUnlock()
 
@@ -51,7 +58,7 @@ func (d *DeliveryNotification) sendState(mds DeliveryState) {
 }
 
 // Unsubscribe removes subscriber into delivery subscription list.
-func (d *DeliveryNotification) Unsubscribe(ind int) {
+func (d *DeliveryService) Unsubscribe(ind int) {
 	d.sml.Lock()
 	defer d.sml.Unlock()
 
@@ -61,7 +68,7 @@ func (d *DeliveryNotification) Unsubscribe(ind int) {
 }
 
 // SubscribeForP2P delivers rpc messages status events to the callback.
-func (d *DeliveryNotification) SubscribeForP2P(sub P2PDeliverySubscriber) int {
+func (d *DeliveryService) SubscribeForP2P(sub P2PDeliverySubscriber) int {
 	return d.Subscribe(func(m DeliveryState) {
 		if m.IsP2P || m.P2P == nil {
 			return
@@ -72,7 +79,7 @@ func (d *DeliveryNotification) SubscribeForP2P(sub P2PDeliverySubscriber) int {
 }
 
 // SubscribeForRPC delivers rpc messages status events to the callback.
-func (d *DeliveryNotification) SubscribeForRPC(sub RPCDeliverySubscriber) int {
+func (d *DeliveryService) SubscribeForRPC(sub RPCDeliverySubscriber) int {
 	return d.Subscribe(func(m DeliveryState) {
 		if m.IsP2P || m.RPC == nil {
 			return
@@ -82,8 +89,26 @@ func (d *DeliveryNotification) SubscribeForRPC(sub RPCDeliverySubscriber) int {
 	})
 }
 
-// FilterP2P filters out p2p messages status events who status does not match provided.
-func (d *DeliveryNotification) FilterP2P(status message.Status, sub P2PDeliverySubscriber) int {
+// ByP2PDirection filters out p2p messages status events who status does not match provided.
+func (d *DeliveryService) ByP2PDirection(dir message.Direction, sub P2PDeliverySubscriber) int {
+	return d.SubscribeForP2P(func(msg *whisper.P2PMessageState) {
+		if msg.Direction == dir {
+			sub(msg)
+		}
+	})
+}
+
+// ByRPCDirection filters out prc messages status events who status does not match provided.
+func (d *DeliveryService) ByRPCDirection(dir message.Direction, sub RPCDeliverySubscriber) int {
+	return d.SubscribeForRPC(func(msg *whisper.RPCMessageState) {
+		if msg.Direction == dir {
+			sub(msg)
+		}
+	})
+}
+
+// ByP2PStatus filters out p2p messages status events who status does not match provided.
+func (d *DeliveryService) ByP2PStatus(status message.Status, sub P2PDeliverySubscriber) int {
 	return d.SubscribeForP2P(func(msg *whisper.P2PMessageState) {
 		if msg.Status == status {
 			sub(msg)
@@ -91,8 +116,8 @@ func (d *DeliveryNotification) FilterP2P(status message.Status, sub P2PDeliveryS
 	})
 }
 
-// FilterPRC filters out prc messages status events who status does not match provided.
-func (d *DeliveryNotification) FilterRPC(status message.Status, sub RPCDeliverySubscriber) int {
+// ByRPCStatus filters out prc messages status events who status does not match provided.
+func (d *DeliveryService) ByRPCStatus(status message.Status, sub RPCDeliverySubscriber) int {
 	return d.SubscribeForRPC(func(msg *whisper.RPCMessageState) {
 		if msg.Status == status {
 			sub(msg)
@@ -102,7 +127,7 @@ func (d *DeliveryNotification) FilterRPC(status message.Status, sub RPCDeliveryS
 
 // Subscribe adds subscriber into delivery subscription list.
 // It returns the index of subscription.
-func (d *DeliveryNotification) Subscribe(sub DeliverySubscriber) int {
+func (d *DeliveryService) Subscribe(sub DeliverySubscriber) int {
 	d.sml.Lock()
 	defer d.sml.Unlock()
 

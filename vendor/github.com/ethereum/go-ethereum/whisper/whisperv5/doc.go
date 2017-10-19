@@ -91,17 +91,24 @@ type MailServer interface {
 
 // RPCMessageState holds the current delivery state of a whisper rpc message.
 type RPCMessageState struct {
-	Reason   error          `json:"reason"`
-	Status   message.Status `json:"status"`
-	Envelope Envelope       `json:"envelope"`
-	Source   NewMessage     `josn:"source"`
+	Reason    error             `json:"reason"`
+	Envelope  Envelope          `json:"envelope"`
+	Timestamp time.Time         `json:"timestamp"`
+	Source    NewMessage        `josn:"source"`
+	Status    message.Status    `json:"status"`
+	Direction message.Direction `json:"direction"`
+	Received  *ReceivedMessage  `json:"received"`
 }
 
 // P2PMessageState holds the current delivery status of a whisper p2p message.
 type P2PMessageState struct {
-	Reason   error          `json:"reason"`
-	Status   message.Status `json:"status"`
-	Envelope Envelope       `json:"envelope"`
+	Reason    error             `json:"reason"`
+	Envelope  Envelope          `json:"envelope"`
+	Timestamp time.Time         `json:"timestamp"`
+	Source    NewMessage        `josn:"source"`
+	Status    message.Status    `json:"status"`
+	Direction message.Direction `json:"direction"`
+	Received  *ReceivedMessage  `json:"received"`
 }
 
 // DeliveryServer represents a small message status

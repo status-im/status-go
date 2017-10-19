@@ -239,13 +239,6 @@ func (w *Whisper) RequestHistoricMessages(peerID []byte, envelope *Envelope) err
 func (w *Whisper) SendP2PMessage(peerID []byte, envelope *Envelope) error {
 	p, err := w.getPeer(peerID)
 	if err != nil {
-		if w.deliveryServer != nil {
-			w.deliveryServer.SendP2PState(P2PMessageState{
-				Reason:   err,
-				Envelope: *envelope,
-				Status:   message.RejectedStatus,
-			})
-		}
 		return err
 	}
 
@@ -255,22 +248,9 @@ func (w *Whisper) SendP2PMessage(peerID []byte, envelope *Envelope) error {
 // SendP2PDirect sends a peer-to-peer message to a specific peer.
 func (w *Whisper) SendP2PDirect(peer *Peer, envelope *Envelope) error {
 	if err := p2p.Send(peer.ws, p2pCode, envelope); err != nil {
-		if w.deliveryServer != nil {
-			w.deliveryServer.SendP2PState(P2PMessageState{
-				Reason:   err,
-				Envelope: *envelope,
-				Status:   message.RejectedStatus,
-			})
-		}
 		return err
 	}
 
-	if w.deliveryServer != nil {
-		w.deliveryServer.SendP2PState(P2PMessageState{
-			Envelope: *envelope,
-			Status:   message.DeliveredStatus,
-		})
-	}
 	return nil
 }
 
