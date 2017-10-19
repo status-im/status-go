@@ -63,11 +63,6 @@ func (m *StatusBackend) TxQueueManager() common.TxQueueManager {
 	return m.txQueueManager
 }
 
-// IsNodeRunning confirm that node is running
-func (m *StatusBackend) IsNodeRunning() bool {
-	return m.nodeManager.IsNodeRunning()
-}
-
 // StartNode start Status node, fails if node is already started
 func (m *StatusBackend) StartNode(config *params.NodeConfig) (<-chan struct{}, error) {
 	m.Lock()
@@ -77,7 +72,7 @@ func (m *StatusBackend) StartNode(config *params.NodeConfig) (<-chan struct{}, e
 		return nil, node.ErrNodeExists
 	}
 
-	nodeStarted, err := m.nodeManager.StartNode(config)
+	err := m.nodeManager.StartNode(config)
 	if err != nil {
 		return nil, err
 	}
@@ -85,15 +80,13 @@ func (m *StatusBackend) StartNode(config *params.NodeConfig) (<-chan struct{}, e
 	m.txQueueManager.Start()
 
 	m.nodeReady = make(chan struct{}, 1)
-	go m.onNodeStart(nodeStarted, m.nodeReady) // waits on nodeStarted, writes to backendReady
+	go m.onNodeStart(m.nodeReady) // waits on nodeStarted, writes to backendReady
 
 	return m.nodeReady, err
 }
 
 // onNodeStart does everything required to prepare backend
-func (m *StatusBackend) onNodeStart(nodeStarted <-chan struct{}, backendReady chan struct{}) {
-	<-nodeStarted
-
+func (m *StatusBackend) onNodeStart(backendReady chan struct{}) {
 	if err := m.registerHandlers(); err != nil {
 		log.Error("Handler registration failed", "err", err)
 	}
@@ -121,14 +114,13 @@ func (m *StatusBackend) StopNode() (<-chan struct{}, error) {
 	m.txQueueManager.Stop()
 	m.jailManager.Stop()
 
-	nodeStopped, err := m.nodeManager.StopNode()
+	err := m.nodeManager.StopNode()
 	if err != nil {
 		return nil, err
 	}
 
 	backendStopped := make(chan struct{}, 1)
 	go func() {
-		<-nodeStopped
 		m.Lock()
 		m.nodeReady = nil
 		m.Unlock()
@@ -148,13 +140,13 @@ func (m *StatusBackend) RestartNode() (<-chan struct{}, error) {
 	}
 	<-m.nodeReady
 
-	nodeRestarted, err := m.nodeManager.RestartNode()
+	err := m.nodeManager.RestartNode()
 	if err != nil {
 		return nil, err
 	}
 
 	m.nodeReady = make(chan struct{}, 1)
-	go m.onNodeStart(nodeRestarted, m.nodeReady) // waits on nodeRestarted, writes to backendReady
+	go m.onNodeStart(m.nodeReady) // waits on nodeRestarted, writes to backendReady
 
 	return m.nodeReady, err
 }
@@ -170,13 +162,13 @@ func (m *StatusBackend) ResetChainData() (<-chan struct{}, error) {
 	}
 	<-m.nodeReady
 
-	nodeReset, err := m.nodeManager.ResetChainData()
+	err := m.nodeManager.ResetChainData()
 	if err != nil {
 		return nil, err
 	}
 
 	m.nodeReady = make(chan struct{}, 1)
-	go m.onNodeStart(nodeReset, m.nodeReady) // waits on nodeReset, writes to backendReady
+	go m.onNodeStart(m.nodeReady) // waits on nodeReset, writes to backendReady
 
 	return m.nodeReady, err
 }

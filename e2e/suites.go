@@ -4,10 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/ethereum/go-ethereum/les"
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/common"
+	"github.com/status-im/status-go/geth/common/services"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/signal"
 	"github.com/stretchr/testify/suite"
@@ -38,7 +37,7 @@ func (s *NodeManagerTestSuite) EnsureNodeSync(forceResync ...bool) {
 	require.NoError(err)
 	require.NotNil(ethClient)
 
-	sync := node.NewSyncPoll(ethClient)
+	sync := node.NewSyncPoll(ethClient.Downloader())
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 	defer cancel()
 
@@ -52,8 +51,7 @@ func (s *NodeManagerTestSuite) EnsureNodeSync(forceResync ...bool) {
 // StartTestNode initiazes a NodeManager instances with configuration retrieved
 // from the test config.
 func (s *NodeManagerTestSuite) StartTestNode(networkID int, opts ...TestNodeOption) {
-	nodeConfig, err := MakeTestNodeConfig(networkID)
-	s.NoError(err)
+	nodeConfig, _ := MakeTestNodeConfig(networkID)
 
 	// Apply any options altering node config.
 	for i := range opts {
@@ -61,24 +59,14 @@ func (s *NodeManagerTestSuite) StartTestNode(networkID int, opts ...TestNodeOpti
 	}
 
 	// import account keys
-	s.NoError(importTestAccouns(nodeConfig.KeyStoreDir))
+	importTestAccouns(nodeConfig.KeyStoreDir)
 
-	s.False(s.NodeManager.IsNodeRunning())
-	nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
-	s.NoError(err)
-	s.NotNil(nodeStarted)
-	<-nodeStarted
-	s.True(s.NodeManager.IsNodeRunning())
+	_ = s.NodeManager.StartNode(nodeConfig)
 }
 
 // StopTestNode attempts to stop initialized NodeManager.
 func (s *NodeManagerTestSuite) StopTestNode() {
-	s.NotNil(s.NodeManager)
-	s.True(s.NodeManager.IsNodeRunning())
-	nodeStopped, err := s.NodeManager.StopNode()
-	s.NoError(err)
-	<-nodeStopped
-	s.False(s.NodeManager.IsNodeRunning())
+	_ = s.NodeManager.StopNode()
 }
 
 // BackendTestSuite is a test suite with api.StatusBackend initialized
@@ -114,33 +102,27 @@ func (s *BackendTestSuite) StartTestBackend(networkID int, opts ...TestNodeOptio
 	s.NoError(importTestAccouns(nodeConfig.KeyStoreDir))
 
 	// start node
-	s.False(s.Backend.IsNodeRunning())
 	nodeStarted, err := s.Backend.StartNode(nodeConfig)
 	s.NoError(err)
 	<-nodeStarted
-	s.True(s.Backend.IsNodeRunning())
 }
 
 // StopTestBackend stops the node.
 func (s *BackendTestSuite) StopTestBackend() {
-	s.True(s.Backend.IsNodeRunning())
 	backendStopped, err := s.Backend.StopNode()
 	s.NoError(err)
 	<-backendStopped
-	s.False(s.Backend.IsNodeRunning())
 }
 
 // RestartTestNode restarts a currently running node.
 func (s *BackendTestSuite) RestartTestNode() {
-	s.True(s.Backend.IsNodeRunning())
 	nodeRestarted, err := s.Backend.RestartNode()
 	s.NoError(err)
 	<-nodeRestarted
-	s.True(s.Backend.IsNodeRunning())
 }
 
 // WhisperService returns a reference to the Whisper service.
-func (s *BackendTestSuite) WhisperService() *whisper.Whisper {
+func (s *BackendTestSuite) WhisperService() services.Whisper {
 	whisperService, err := s.Backend.NodeManager().WhisperService()
 	s.NoError(err)
 	s.NotNil(whisperService)
@@ -148,13 +130,29 @@ func (s *BackendTestSuite) WhisperService() *whisper.Whisper {
 	return whisperService
 }
 
+func (s *BackendTestSuite) PublicWhisperAPI() services.WhisperAPI {
+	whisperAPI, err := s.Backend.NodeManager().PublicWhisperAPI()
+	s.NoError(err)
+	s.NotNil(whisperAPI)
+
+	return whisperAPI
+}
+
 // LightEthereumService returns a reference to the LES service.
-func (s *BackendTestSuite) LightEthereumService() *les.LightEthereum {
+func (s *BackendTestSuite) LightEthereumService() services.LesService {
 	lightEthereum, err := s.Backend.NodeManager().LightEthereumService()
 	s.NoError(err)
 	s.NotNil(lightEthereum)
 
 	return lightEthereum
+}
+
+func (s *BackendTestSuite) GetStatusBackend() services.StatusBackend {
+	backend, err := s.Backend.NodeManager().GetStatusBackend()
+	s.NoError(err)
+	s.NotNil(backend)
+
+	return backend
 }
 
 // TxQueueManager returns a reference to the TxQueueManager.
@@ -177,7 +175,7 @@ func (s *BackendTestSuite) EnsureNodeSync(forceResync ...bool) {
 	require := s.Require()
 
 	ethClient := s.LightEthereumService()
-	sync := node.NewSyncPoll(ethClient)
+	sync := node.NewSyncPoll(ethClient.Downloader())
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 	defer cancel()
 

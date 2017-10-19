@@ -236,9 +236,6 @@ func (s *TransactionsTestSuite) TestSendEtherTx() {
 
 	s.EnsureNodeSync()
 
-	backend := s.LightEthereumService().StatusBackend
-	s.NotNil(backend)
-
 	// create an account
 	sampleAddress, _, _, err := s.Backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
 	s.NoError(err)
@@ -318,7 +315,7 @@ func (s *TransactionsTestSuite) TestSendEtherOnStatusChainTx() {
 	s.StartTestBackend(params.StatusChainNetworkID)
 	defer s.StopTestBackend()
 
-	backend := s.LightEthereumService().StatusBackend
+	backend := s.GetStatusBackend()
 	s.NotNil(backend)
 
 	// create an account
@@ -457,9 +454,6 @@ func (s *TransactionsTestSuite) TestDoubleCompleteQueuedTransactions() {
 
 	s.EnsureNodeSync()
 
-	backend := s.LightEthereumService().StatusBackend
-	s.NotNil(backend)
-
 	// log into account from which transactions will be sent
 	s.NoError(s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 
@@ -533,9 +527,6 @@ func (s *TransactionsTestSuite) TestDiscardQueuedTransaction() {
 	defer s.StopTestBackend()
 
 	s.EnsureNodeSync()
-
-	backend := s.LightEthereumService().StatusBackend
-	s.NotNil(backend)
 
 	// reset queue
 	s.Backend.TxQueueManager().TransactionQueue().Reset()
@@ -708,9 +699,6 @@ func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
 
 	s.EnsureNodeSync()
 
-	backend := s.LightEthereumService().StatusBackend
-	s.NotNil(backend)
-
 	// reset queue
 	s.Backend.TxQueueManager().TransactionQueue().Reset()
 
@@ -822,9 +810,6 @@ func (s *TransactionsTestSuite) TestNonExistentQueuedTransactions() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	backend := s.LightEthereumService().StatusBackend
-	s.NotNil(backend)
-
 	// log into account from which transactions will be sent
 	s.NoError(s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 
@@ -840,9 +825,6 @@ func (s *TransactionsTestSuite) TestNonExistentQueuedTransactions() {
 func (s *TransactionsTestSuite) TestEvictionOfQueuedTransactions() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
-
-	backend := s.LightEthereumService().StatusBackend
-	s.NotNil(backend)
 
 	// reset queue
 	s.Backend.TxQueueManager().TransactionQueue().Reset()

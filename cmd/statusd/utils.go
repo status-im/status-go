@@ -3,11 +3,13 @@ package main
 import "C"
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"math/big"
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strconv"
 	"testing"
 	"time"
@@ -16,9 +18,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core"
 	gethparams "github.com/ethereum/go-ethereum/params"
-
-	"fmt"
-
 	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
@@ -1253,8 +1252,9 @@ func testJailParseInvalid(t *testing.T) bool {
 	response := C.GoString(Parse(C.CString("CHAT_ID_INIT_TEST"), C.CString(extraInvalidCode)))
 
 	// Assert.
-	expectedResponse := `{"error":"(anonymous): Line 16331:50 Unexpected end of input (and 1 more errors)"}`
-	if expectedResponse != response {
+	expectedResponse := `{"error":"\(anonymous\): Line \d+:\d+ Unexpected end of input \(and 1 more errors\)"}`
+	match, _ := regexp.MatchString(expectedResponse, response)
+	if !match {
 		t.Errorf("unexpected response, expected: %v, got: %v", expectedResponse, response)
 		return false
 	}
@@ -1302,7 +1302,7 @@ func testJailFunctionCall(t *testing.T) bool {
 	// call with wrong chat id
 	rawResponse := Call(C.CString("CHAT_IDNON_EXISTENT"), C.CString(""), C.CString(""))
 	parsedResponse := C.GoString(rawResponse)
-	expectedError := `{"error":"Cell[CHAT_IDNON_EXISTENT] doesn't exist."}`
+	expectedError := `{"error":"cell[CHAT_IDNON_EXISTENT] doesn't exist"}`
 	if parsedResponse != expectedError {
 		t.Errorf("expected error is not returned: expected %s, got %s", expectedError, parsedResponse)
 		return false

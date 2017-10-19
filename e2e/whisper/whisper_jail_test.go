@@ -49,7 +49,7 @@ type WhisperJailTestSuite struct {
 func (s *WhisperJailTestSuite) StartTestBackend(networkID int, opts ...e2e.TestNodeOption) {
 	s.BackendTestSuite.StartTestBackend(networkID, opts...)
 
-	s.WhisperAPI = whisper.NewPublicWhisperAPI(s.WhisperService())
+	s.WhisperAPI = s.PublicWhisperAPI()
 	s.Jail = s.Backend.JailManager()
 	s.NotNil(s.Jail)
 	s.Jail.BaseJS(baseStatusJSCode)

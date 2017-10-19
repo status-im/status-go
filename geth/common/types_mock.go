@@ -9,11 +9,10 @@ import (
 	accounts "github.com/ethereum/go-ethereum/accounts"
 	keystore "github.com/ethereum/go-ethereum/accounts/keystore"
 	common "github.com/ethereum/go-ethereum/common"
-	les "github.com/ethereum/go-ethereum/les"
-	node "github.com/ethereum/go-ethereum/node"
-	whisperv5 "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	gomock "github.com/golang/mock/gomock"
 	otto "github.com/robertkrimen/otto"
+	geth "github.com/status-im/status-go/geth/common/geth"
+	services "github.com/status-im/status-go/geth/common/services"
 	params "github.com/status-im/status-go/geth/params"
 	rpc "github.com/status-im/status-go/geth/rpc"
 	reflect "reflect"
@@ -43,11 +42,10 @@ func (m *MockNodeManager) EXPECT() *MockNodeManagerMockRecorder {
 }
 
 // StartNode mocks base method
-func (m *MockNodeManager) StartNode(config *params.NodeConfig) (<-chan struct{}, error) {
+func (m *MockNodeManager) StartNode(config *params.NodeConfig) error {
 	ret := m.ctrl.Call(m, "StartNode", config)
-	ret0, _ := ret[0].(<-chan struct{})
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
 // StartNode indicates an expected call of StartNode
@@ -56,11 +54,10 @@ func (mr *MockNodeManagerMockRecorder) StartNode(config interface{}) *gomock.Cal
 }
 
 // StopNode mocks base method
-func (m *MockNodeManager) StopNode() (<-chan struct{}, error) {
+func (m *MockNodeManager) StopNode() error {
 	ret := m.ctrl.Call(m, "StopNode")
-	ret0, _ := ret[0].(<-chan struct{})
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
 // StopNode indicates an expected call of StopNode
@@ -69,11 +66,10 @@ func (mr *MockNodeManagerMockRecorder) StopNode() *gomock.Call {
 }
 
 // RestartNode mocks base method
-func (m *MockNodeManager) RestartNode() (<-chan struct{}, error) {
+func (m *MockNodeManager) RestartNode() error {
 	ret := m.ctrl.Call(m, "RestartNode")
-	ret0, _ := ret[0].(<-chan struct{})
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
 // RestartNode indicates an expected call of RestartNode
@@ -82,28 +78,15 @@ func (mr *MockNodeManagerMockRecorder) RestartNode() *gomock.Call {
 }
 
 // ResetChainData mocks base method
-func (m *MockNodeManager) ResetChainData() (<-chan struct{}, error) {
+func (m *MockNodeManager) ResetChainData() error {
 	ret := m.ctrl.Call(m, "ResetChainData")
-	ret0, _ := ret[0].(<-chan struct{})
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
 // ResetChainData indicates an expected call of ResetChainData
 func (mr *MockNodeManagerMockRecorder) ResetChainData() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResetChainData", reflect.TypeOf((*MockNodeManager)(nil).ResetChainData))
-}
-
-// IsNodeRunning mocks base method
-func (m *MockNodeManager) IsNodeRunning() bool {
-	ret := m.ctrl.Call(m, "IsNodeRunning")
-	ret0, _ := ret[0].(bool)
-	return ret0
-}
-
-// IsNodeRunning indicates an expected call of IsNodeRunning
-func (mr *MockNodeManagerMockRecorder) IsNodeRunning() *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsNodeRunning", reflect.TypeOf((*MockNodeManager)(nil).IsNodeRunning))
 }
 
 // NodeConfig mocks base method
@@ -120,9 +103,9 @@ func (mr *MockNodeManagerMockRecorder) NodeConfig() *gomock.Call {
 }
 
 // Node mocks base method
-func (m *MockNodeManager) Node() (*node.Node, error) {
+func (m *MockNodeManager) Node() (geth.Node, error) {
 	ret := m.ctrl.Call(m, "Node")
-	ret0, _ := ret[0].(*node.Node)
+	ret0, _ := ret[0].(geth.Node)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -157,9 +140,9 @@ func (mr *MockNodeManagerMockRecorder) AddPeer(url interface{}) *gomock.Call {
 }
 
 // LightEthereumService mocks base method
-func (m *MockNodeManager) LightEthereumService() (*les.LightEthereum, error) {
+func (m *MockNodeManager) LightEthereumService() (services.LesService, error) {
 	ret := m.ctrl.Call(m, "LightEthereumService")
-	ret0, _ := ret[0].(*les.LightEthereum)
+	ret0, _ := ret[0].(services.LesService)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -170,9 +153,9 @@ func (mr *MockNodeManagerMockRecorder) LightEthereumService() *gomock.Call {
 }
 
 // WhisperService mocks base method
-func (m *MockNodeManager) WhisperService() (*whisperv5.Whisper, error) {
+func (m *MockNodeManager) WhisperService() (services.Whisper, error) {
 	ret := m.ctrl.Call(m, "WhisperService")
-	ret0, _ := ret[0].(*whisperv5.Whisper)
+	ret0, _ := ret[0].(services.Whisper)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -180,6 +163,19 @@ func (m *MockNodeManager) WhisperService() (*whisperv5.Whisper, error) {
 // WhisperService indicates an expected call of WhisperService
 func (mr *MockNodeManagerMockRecorder) WhisperService() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WhisperService", reflect.TypeOf((*MockNodeManager)(nil).WhisperService))
+}
+
+// PublicWhisperAPI mocks base method
+func (m *MockNodeManager) PublicWhisperAPI() (services.WhisperAPI, error) {
+	ret := m.ctrl.Call(m, "PublicWhisperAPI")
+	ret0, _ := ret[0].(services.WhisperAPI)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PublicWhisperAPI indicates an expected call of PublicWhisperAPI
+func (mr *MockNodeManagerMockRecorder) PublicWhisperAPI() *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PublicWhisperAPI", reflect.TypeOf((*MockNodeManager)(nil).PublicWhisperAPI))
 }
 
 // AccountManager mocks base method
@@ -209,15 +205,28 @@ func (mr *MockNodeManagerMockRecorder) AccountKeyStore() *gomock.Call {
 }
 
 // RPCClient mocks base method
-func (m *MockNodeManager) RPCClient() *rpc.Client {
+func (m *MockNodeManager) RPCClient() geth.RPCClient {
 	ret := m.ctrl.Call(m, "RPCClient")
-	ret0, _ := ret[0].(*rpc.Client)
+	ret0, _ := ret[0].(geth.RPCClient)
 	return ret0
 }
 
 // RPCClient indicates an expected call of RPCClient
 func (mr *MockNodeManagerMockRecorder) RPCClient() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RPCClient", reflect.TypeOf((*MockNodeManager)(nil).RPCClient))
+}
+
+// GetStatusBackend mocks base method
+func (m *MockNodeManager) GetStatusBackend() (services.StatusBackend, error) {
+	ret := m.ctrl.Call(m, "GetStatusBackend")
+	ret0, _ := ret[0].(services.StatusBackend)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetStatusBackend indicates an expected call of GetStatusBackend
+func (mr *MockNodeManagerMockRecorder) GetStatusBackend() *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStatusBackend", reflect.TypeOf((*MockNodeManager)(nil).GetStatusBackend))
 }
 
 // MockAccountManager is a mock of AccountManager interface

@@ -27,11 +27,10 @@ func (s *RPCClientTestSuite) TestNewClient() {
 	config, err := e2e.MakeTestNodeConfig(params.RinkebyNetworkID)
 	s.NoError(err)
 
-	nodeStarted, err := s.NodeManager.StartNode(config)
+	node, err := node.MakeNode(config)
 	s.NoError(err)
-	<-nodeStarted
 
-	node, err := s.NodeManager.Node()
+	err = node.Start()
 	s.NoError(err)
 
 	// upstream disabled, local node ok
@@ -54,9 +53,9 @@ func (s *RPCClientTestSuite) TestNewClient() {
 	s.NoError(err)
 
 	// upstream disabled, local node failed (stopped)
-	nodeStopped, err := s.NodeManager.StopNode()
+	node.Stop()
 	s.NoError(err)
-	<-nodeStopped
+	node.Wait()
 
 	_, err = rpc.NewClient(node, config.UpstreamConfig)
 	s.Error(err)

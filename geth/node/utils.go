@@ -33,7 +33,7 @@ func HaltOnInterruptSignal(nodeManager *NodeManager) {
 	osSignal.Notify(sigc, os.Interrupt)
 	defer osSignal.Stop(sigc)
 	<-sigc
-	if nodeManager.node == nil {
+	if !nodeManager.isNodeStarted() {
 		return
 	}
 	log.Info("Got interrupt, shutting down...")

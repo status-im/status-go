@@ -124,11 +124,6 @@ func (s *APIBackendTestSuite) TestRaceConditions() {
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
-			log.Info("IsNodeRunning()")
-			s.T().Logf("IsNodeRunning(), result: %v", s.Backend.IsNodeRunning())
-			progress <- struct{}{}
-		},
-		func(config *params.NodeConfig) {
 			log.Info("CompleteTransaction()")
 			_, err := s.Backend.CompleteTransaction("id", "password")
 			s.T().Logf("CompleteTransaction(), error: %v", err)
@@ -189,12 +184,10 @@ func (s *APIBackendTestSuite) TestNetworkSwitching() {
 	nodeConfig, err := e2e.MakeTestNodeConfig(params.RopstenNetworkID)
 	s.NoError(err)
 
-	s.False(s.Backend.IsNodeRunning())
 	nodeStarted, err := s.Backend.StartNode(nodeConfig)
 	s.NoError(err)
 
 	<-nodeStarted // wait till node is started
-	s.True(s.Backend.IsNodeRunning())
 
 	firstHash, err := e2e.FirstBlockHash(s.Backend.NodeManager())
 	s.NoError(err)
@@ -209,12 +202,10 @@ func (s *APIBackendTestSuite) TestNetworkSwitching() {
 	nodeConfig, err = e2e.MakeTestNodeConfig(params.RinkebyNetworkID)
 	s.NoError(err)
 
-	s.False(s.Backend.IsNodeRunning())
 	nodeStarted, err = s.Backend.StartNode(nodeConfig)
 	s.NoError(err)
 
 	<-nodeStarted
-	s.True(s.Backend.IsNodeRunning())
 
 	// make sure we are on another network indeed
 	firstHash, err = e2e.FirstBlockHash(s.Backend.NodeManager())
@@ -240,11 +231,9 @@ func (s *APIBackendTestSuite) TestResetChainData() {
 	// allow to sync for some time
 	s.EnsureNodeSync()
 
-	s.True(s.Backend.IsNodeRunning())
 	nodeReady, err := s.Backend.ResetChainData()
 	require.NoError(err)
 	<-nodeReady
-	s.True(s.Backend.IsNodeRunning()) // new node, with previous config should be running
 
 	// make sure we can read the first byte, and it is valid (for Rinkeby)
 	firstHash, err := e2e.FirstBlockHash(s.Backend.NodeManager())
@@ -265,11 +254,9 @@ func (s *APIBackendTestSuite) TestRestartNode() {
 	s.NoError(err)
 	s.Equal("0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177", firstHash)
 
-	s.True(s.Backend.IsNodeRunning())
 	nodeRestarted, err := s.Backend.RestartNode()
 	require.NoError(err)
 	<-nodeRestarted
-	s.True(s.Backend.IsNodeRunning()) // new node, with previous config should be running
 
 	// make sure we can read the first byte, and it is valid (for Rinkeby)
 	firstHash, err = e2e.FirstBlockHash(s.Backend.NodeManager())
