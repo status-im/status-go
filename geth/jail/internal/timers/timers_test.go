@@ -5,8 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/robertkrimen/otto"
-
 	"github.com/status-im/status-go/geth/jail/internal/loop"
 	"github.com/status-im/status-go/geth/jail/internal/timers"
 	"github.com/status-im/status-go/geth/jail/internal/vm"
@@ -103,8 +101,7 @@ type TimersSuite struct {
 }
 
 func (s *TimersSuite) SetupTest() {
-	o := otto.New()
-	s.vm = vm.New(o)
+	s.vm = vm.New()
 	s.loop = loop.New(s.vm)
 
 	go s.loop.Run(context.Background())

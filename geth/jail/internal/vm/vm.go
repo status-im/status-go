@@ -15,9 +15,9 @@ type VM struct {
 }
 
 // New creates new instance of VM.
-func New(vm *otto.Otto) *VM {
+func New() *VM {
 	return &VM{
-		vm: vm,
+		vm: otto.New(),
 	}
 }
 

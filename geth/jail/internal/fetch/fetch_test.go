@@ -207,8 +207,7 @@ func (s *FetchSuite) SetupTest() {
 	s.mux = http.NewServeMux()
 	s.srv = httptest.NewServer(s.mux)
 
-	o := otto.New()
-	s.vm = vm.New(o)
+	s.vm = vm.New()
 	s.loop = loop.New(s.vm)
 
 	go s.loop.Run(context.Background())

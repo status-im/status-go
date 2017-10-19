@@ -27,7 +27,7 @@ type Cell struct {
 // NewCell encapsulates what we need to create a new jailCell from the
 // provided vm and eventloop instance.
 func NewCell(id string) *Cell {
-	vm := vm.New(otto.New())
+	vm := vm.New()
 	lo := loop.New(vm)
 
 	registerVMHandlers(vm, lo)
