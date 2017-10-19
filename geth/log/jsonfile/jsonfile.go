@@ -19,7 +19,7 @@ func JSON(targetFile string, maxBatchPerWrite int, maxwait time.Duration) (log.M
 		}
 	}
 
-	return log.BatchEmit(maxBatchPerWrite, maxwait, func(entries []log.Entry) error {
+	return log.BatchConsumer(maxBatchPerWrite, maxwait, func(entries []log.Entry) error {
 		logFile, err := os.OpenFile(targetFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 		if err != nil {
 			return err
