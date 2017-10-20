@@ -449,7 +449,7 @@ func (s *WhisperJailTestSuite) TestJailWhisperWithDeliveryService() {
 
 	var do sync.Once
 	subID := deliveryService.ByRPCDirection(gethmessage.IncomingMessage, func(msg *whisper.RPCMessageState) {
-		do.Do(func() {
+		go do.Do(func() {
 			receivedChan <- msg
 		})
 	})
@@ -508,10 +508,10 @@ func (s *WhisperJailTestSuite) TestJailWhisperWithDeliveryService() {
 		// Setup filters and post messages.
 		_, err = cell.Run(req)
 		s.NoError(err)
-
 	}
 
 	var received *whisper.RPCMessageState
+
 	select {
 	case received = <-receivedChan:
 	case <-time.After(5 * time.Second):
