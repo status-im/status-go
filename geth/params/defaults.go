@@ -32,6 +32,10 @@ const (
 	// SendTransactionMethodName defines the name for a giving transaction.
 	SendTransactionMethodName = "eth_sendTransaction"
 
+	// MessageStatHeader defines the header value used to mark specific logs
+	// as delivery messate stats.
+	MessageStatHeader = "STATUS_IM_MESSAGE_STATS"
+
 	// WSPort is a WS-RPC port (replaced in unit tests)
 	WSPort = 8546
 

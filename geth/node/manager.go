@@ -1,6 +1,7 @@
 package node
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -9,10 +10,15 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	gethmessage "github.com/ethereum/go-ethereum/common/message"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/les"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/discover"
+	"github.com/ethereum/go-ethereum/whisper/notifications"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
+	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/rpc"
@@ -25,6 +31,7 @@ var (
 	ErrNoRunningNode               = errors.New("there is no running node")
 	ErrInvalidNodeManager          = errors.New("node manager is not properly initialized")
 	ErrInvalidWhisperService       = errors.New("whisper service is unavailable")
+	ErrInvalidDeliveryService      = errors.New("delivery service is unavailable")
 	ErrInvalidLightEthereumService = errors.New("LES service is unavailable")
 	ErrInvalidAccountManager       = errors.New("could not retrieve account manager")
 	ErrAccountKeyStoreMissing      = errors.New("account key store is not set")
@@ -36,13 +43,14 @@ var (
 // should be fixed at https://github.com/status-im/status-go/issues/200
 type NodeManager struct {
 	sync.RWMutex
-	config         *params.NodeConfig // Status node configuration
-	node           *node.Node         // reference to Geth P2P stack/node
-	nodeStarted    chan struct{}      // channel to wait for start up notifications
-	nodeStopped    chan struct{}      // channel to wait for termination notifications
-	whisperService *whisper.Whisper   // reference to Whisper service
-	lesService     *les.LightEthereum // reference to LES service
-	rpcClient      *rpc.Client        // reference to RPC client
+	config          *params.NodeConfig             // Status node configuration
+	node            *node.Node                     // reference to Geth P2P stack/node
+	nodeStarted     chan struct{}                  // channel to wait for start up notifications
+	nodeStopped     chan struct{}                  // channel to wait for termination notifications
+	whisperService  *whisper.Whisper               // reference to Whisper service
+	deliveryService *notifications.DeliveryService // reference to Delivery service
+	lesService      *les.LightEthereum             // reference to LES service
+	rpcClient       *rpc.Client                    // reference to RPC client
 }
 
 // NewNodeManager makes new instance of node manager
@@ -69,14 +77,108 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 
 	m.initLog(config)
 
+	deliveryManager := new(notifications.DeliveryService)
+
 	ethNode, err := MakeNode(config)
 	if err != nil {
 		return nil, err
 	}
 
+	m.deliveryService = deliveryManager
 	m.nodeStarted = make(chan struct{}, 1)
 
+	// Subscribe for message delivery status and log out with special key.
+	messageStateLoggingID := deliveryManager.Subscribe(func(state notifications.DeliveryState) {
+		if state.IsP2P {
+			var payload []byte
+			var from, to string
+
+			if state.P2P.Direction == gethmessage.IncomingMessage {
+				if state.P2P.Received != nil {
+					payload = state.P2P.Received.Payload
+
+					if state.P2P.Received.Src != nil {
+						from = gethcommon.ToHex(crypto.FromECDSAPub(state.P2P.Received.Src))
+					}
+
+					if state.P2P.Received.Dst != nil {
+						to = gethcommon.ToHex(crypto.FromECDSAPub(state.P2P.Received.Dst))
+					}
+				}
+			}
+
+			if state.P2P.Direction == gethmessage.OutgoingMessage {
+				from = state.P2P.Source.Sig
+
+				if len(state.P2P.Source.PublicKey) == 0 {
+					to = string(state.P2P.Source.PublicKey)
+				} else {
+					to = state.P2P.Source.TargetPeer
+				}
+			}
+
+			if stat, err := json.Marshal(common.MessageStat{
+				Payload:         payload,
+				FromDevice:      from,
+				ToDevice:        to,
+				Source:          state.P2P.Source,
+				RejectionReason: state.P2P.Reason,
+				Envelope:        state.P2P.Envelope.Data,
+				Status:          state.P2P.Status.String(),
+				Type:            state.P2P.Direction.String(),
+				Hash:            state.P2P.Envelope.Hash().String(),
+				TimeSent:        state.P2P.Envelope.Expiry - state.P2P.Envelope.TTL,
+			}); err == nil {
+				log.Info(fmt.Sprintf("%s : P2P : %s : %s : %+s", params.MessageStatHeader, state.P2P.Direction.String(), state.P2P.Status.String(), string(stat)))
+			}
+			return
+		}
+
+		var payload []byte
+		var from, to string
+
+		if state.RPC.Direction == gethmessage.IncomingMessage {
+			if state.RPC.Received != nil {
+				payload = state.RPC.Received.Payload
+
+				if state.RPC.Received.Src != nil {
+					from = gethcommon.ToHex(crypto.FromECDSAPub(state.RPC.Received.Src))
+				}
+
+				if state.RPC.Received.Dst != nil {
+					to = gethcommon.ToHex(crypto.FromECDSAPub(state.RPC.Received.Dst))
+				}
+			}
+		}
+
+		if state.RPC.Direction == gethmessage.OutgoingMessage {
+			from = state.RPC.Source.Sig
+
+			if len(state.RPC.Source.PublicKey) == 0 {
+				to = string(state.RPC.Source.PublicKey)
+			} else {
+				to = state.RPC.Source.TargetPeer
+			}
+		}
+
+		if stat, err := json.Marshal(common.MessageStat{
+			Payload:         payload,
+			FromDevice:      from,
+			ToDevice:        to,
+			Source:          state.RPC.Source,
+			RejectionReason: state.RPC.Reason,
+			Envelope:        state.RPC.Envelope.Data,
+			Status:          state.RPC.Status.String(),
+			Type:            state.RPC.Direction.String(),
+			Hash:            state.RPC.Envelope.Hash().String(),
+			TimeSent:        state.RPC.Envelope.Expiry - state.RPC.Envelope.TTL,
+		}); err == nil {
+			log.Info(fmt.Sprintf("%s : RPC : %s : %s : %+s", params.MessageStatHeader, state.RPC.Direction.String(), state.RPC.Status.String(), string(stat)))
+		}
+	})
+
 	go func() {
+		defer deliveryManager.Unsubscribe(messageStateLoggingID)
 		defer HaltOnPanic()
 
 		// start underlying node
@@ -420,6 +522,24 @@ func (m *NodeManager) WhisperService() (*whisper.Whisper, error) {
 	}
 
 	return m.whisperService, nil
+}
+
+// DeliveryService returns reference to running Whisper service
+func (m *NodeManager) DeliveryService() (*notifications.DeliveryService, error) {
+	m.RLock()
+	defer m.RUnlock()
+
+	if err := m.isNodeAvailable(); err != nil {
+		return nil, err
+	}
+
+	<-m.nodeStarted
+
+	if m.deliveryService == nil {
+		return nil, ErrInvalidDeliveryService
+	}
+
+	return m.deliveryService, nil
 }
 
 // AccountManager exposes reference to node's accounts manager

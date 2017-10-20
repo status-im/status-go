@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/les"
 	"github.com/ethereum/go-ethereum/node"
+	"github.com/ethereum/go-ethereum/whisper/notifications"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/params"
@@ -41,6 +42,20 @@ func (k *SelectedExtKey) Hex() string {
 	}
 
 	return k.Address.Hex()
+}
+
+// MessageStat defines a struct to hold given facts about a message stat.
+type MessageStat struct {
+	Type            string             `json:"type"`
+	Status          string             `json:"status"`
+	Envelope        []byte             `json:"envelope"`
+	TimeSent        uint32             `json:"time,omitempty"`
+	Payload         []byte             `json:"payload,omitempty"`
+	Hash            string             `json:"envelope_hash"`
+	FromDevice      string             `json:"from_device,omitempty"`
+	ToDevice        string             `json:"to_device,omitempty"`
+	RejectionReason error              `json:"rejection_reason,omitempty"`
+	Source          whisper.NewMessage `json:"source,omitempty"`
 }
 
 // NodeManager defines expected methods for managing Status node
@@ -79,6 +94,9 @@ type NodeManager interface {
 
 	// WhisperService returns reference to running Whisper service
 	WhisperService() (*whisper.Whisper, error)
+
+	// DeliveryService returns reference to running Whisper service
+	DeliveryService() (*notifications.DeliveryService, error)
 
 	// AccountManager returns reference to node's account manager
 	AccountManager() (*accounts.Manager, error)

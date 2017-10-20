@@ -793,7 +793,7 @@ func (w *Whisper) postEvent(envelope *Envelope, isP2P bool) {
 	if !isP2P {
 		if w.deliveryServer != nil {
 			w.deliveryServer.SendRPCState(RPCMessageState{
-				Envelope:  *e,
+				Envelope:  *envelope,
 				Reason:    fmt.Errorf("Mismatch Envelope version(%d) to wanted Version(%d)", envelope.Ver(), EnvelopeVersion),
 				Direction: message.IncomingMessage,
 				Status:    message.RejectedStatus,
@@ -804,7 +804,7 @@ func (w *Whisper) postEvent(envelope *Envelope, isP2P bool) {
 
 	if w.deliveryServer != nil {
 		w.deliveryServer.SendP2PState(P2PMessageState{
-			Envelope:  *e,
+			Envelope:  *envelope,
 			Reason:    fmt.Errorf("Mismatch Envelope version(%d) to wanted Version(%d)", envelope.Ver(), EnvelopeVersion),
 			Direction: message.IncomingMessage,
 			Status:    message.RejectedStatus,
