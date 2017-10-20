@@ -136,10 +136,12 @@ mock-install: ##@other Install mocking tools
 mock: ##@other Regenerate mocks
 	mockgen -source=geth/common/types.go -destination=geth/common/types_mock.go -package=common
 
-test: ##@tests Run unit and integration tests
+test: test-unit-coverage ##@tests Run basic, short tests during development
+
+test-unit: ##@tests Run unit and integration tests
 	build/env.sh go test $(UNIT_TEST_PACKAGES)
 
-test-coverage: ##@tests Run unit and integration tests with covevare
+test-unit-coverage: ##@tests Run unit and integration tests with coverage
 	build/env.sh go test -coverpkg= $(UNIT_TEST_PACKAGES)
 
 test-e2e: ##@tests Run e2e tests
@@ -153,7 +155,7 @@ test-e2e: ##@tests Run e2e tests
 	build/env.sh go test -timeout 10m ./e2e/transactions/...
 	build/env.sh go test -timeout 10m ./cmd/statusd
 
-ci: mock-install mock test-coverage test-e2e ##@tests Run all tests in CI
+ci: lint mock-install mock test-unit test-e2e ##@tests Run all tests in CI
 
 clean: ##@other Cleanup
 	rm -fr build/bin/*

@@ -9,9 +9,17 @@ dist: trusty
 
 install:
   - go get golang.org/x/tools/cmd/cover
+  - make mock-install
+  - make mock
 
-script:
-  - travis_wait make ci
+jobs:
+  include:
+    - stage: Lint
+      script: make lint
+    - stage: Test unit and integration
+      script: make test-unit-coverage
+    - stage: Test e2e
+      script: travis_wait make test-e2e
 
 cache:
   directories:
