@@ -33,6 +33,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common/message"
 	"github.com/ethereum/go-ethereum/p2p"
 )
 
@@ -98,4 +99,35 @@ type NotificationServer interface {
 
 	// Stop stops notification sending loop, releasing related resources
 	Stop() error
+}
+
+// RPCMessageState holds the current delivery state of a whisper rpc message.
+type RPCMessageState struct {
+	Reason    error             `json:"reason"`
+	Envelope  Envelope          `json:"envelope"`
+	Timestamp time.Time         `json:"timestamp"`
+	Source    NewMessage        `josn:"source"`
+	Status    message.Status    `json:"status"`
+	Direction message.Direction `json:"direction"`
+	Received  *ReceivedMessage  `json:"received"`
+}
+
+// P2PMessageState holds the current delivery status of a whisper p2p message.
+type P2PMessageState struct {
+	Reason    error             `json:"reason"`
+	Envelope  Envelope          `json:"envelope"`
+	Timestamp time.Time         `json:"timestamp"`
+	Source    NewMessage        `josn:"source"`
+	Status    message.Status    `json:"status"`
+	Direction message.Direction `json:"direction"`
+	Received  *ReceivedMessage  `json:"received"`
+}
+
+// DeliveryServer represents a small message status
+// notification system where a message delivery status
+// update event is delivered to it's underline system
+// for both rpc messages and p2p messages.
+type DeliveryServer interface {
+	SendRPCState(RPCMessageState)
+	SendP2PState(P2PMessageState)
 }
