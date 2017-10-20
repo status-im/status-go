@@ -30,7 +30,7 @@ func TestLogLevels(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	// log-comaptible handler that writes log in the buffer
+	// log-compatible handler that writes log in the buffer
 	handler := log.FuncHandler(func(r *log.Record) error {
 		_, err := buf.Write([]byte(r.Msg))
 		return err
@@ -54,11 +54,12 @@ func TestLogFile(t *testing.T) {
 	file, err := ioutil.TempFile("", "statusim_log_test")
 	require.NoError(t, err)
 
-	defer file.Close()
+	defer file.Close() //nolint: errcheck
 
 	// setup log
 	SetLevel("INFO")
-	SetLogFile(file.Name())
+	err = SetLogFile(file.Name())
+	require.NoError(t, err)
 
 	// test log output to file
 	Info(info)

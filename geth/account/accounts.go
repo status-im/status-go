@@ -156,16 +156,16 @@ func (m *Manager) VerifyAccountPassword(keyStoreDir, address, password string) (
 			return nil
 		}
 
-		rawKeyFile, err := ioutil.ReadFile(path)
-		if err != nil {
-			return fmt.Errorf("invalid account key file: %v", err)
+		rawKeyFile, e := ioutil.ReadFile(path)
+		if e != nil {
+			return fmt.Errorf("invalid account key file: %v", e)
 		}
 
 		var accountKey struct {
 			Address string `json:"address"`
 		}
-		if err := json.Unmarshal(rawKeyFile, &accountKey); err != nil {
-			return fmt.Errorf("failed to read key file: %s", err)
+		if e := json.Unmarshal(rawKeyFile, &accountKey); e != nil {
+			return fmt.Errorf("failed to read key file: %s", e)
 		}
 
 		if gethcommon.HexToAddress("0x"+accountKey.Address).Hex() == addressObj.Hex() {
@@ -226,7 +226,8 @@ func (m *Manager) SelectAccount(address, password string) error {
 		return err
 	}
 
-	if err := whisperService.SelectKeyPair(accountKey.PrivateKey); err != nil {
+	err = whisperService.SelectKeyPair(accountKey.PrivateKey)
+	if err != nil {
 		return ErrWhisperIdentityInjectionFailure
 	}
 
