@@ -59,6 +59,38 @@ func TestStartNodeNewNodeError(t *testing.T) {
 	}
 }
 
+func TestStartNodeManyTimesError(t *testing.T) {
+	m := initMocks(t)
+	defer m.ctrl.Finish()
+
+	m.newNode.EXPECT().Start().Times(1).Return(nil)
+	m.newNode.EXPECT().GetNode().AnyTimes().Return(nil)
+	m.managerNode.EXPECT().SetNode(m.newNode.GetNode()).Times(1)
+
+	m.constr.EXPECT().Make().Return(m.newNode, nil)
+	m.constr.EXPECT().SetConfig(m.config).AnyTimes()
+	m.constr.EXPECT().Config().AnyTimes().Return(m.config)
+
+	m.logger.EXPECT().Init(m.config.LogFile, m.config.LogLevel).Times(1).Return()
+	m.rpc.EXPECT().Init(gomock.Any(), gomock.Any()).Times(1).Return(nil)
+
+	err := m.manager.StartNode(m.constr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if *m.manager.state != started {
+		t.FailNow()
+	}
+
+	err = m.manager.StartNode(m.constr)
+	if !reflect.DeepEqual(err, ErrNodeExists) {
+		t.Fatal(err)
+	}
+	if *m.manager.state != started {
+		t.FailNow()
+	}
+}
+
 func testConfig() *params.NodeConfig {
 	return &params.NodeConfig{
 		LogLevel: "ERROR",
