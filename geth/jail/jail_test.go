@@ -29,9 +29,10 @@ func (s *JailTestSuite) SetupTest() {
 	s.Jail = New(nil)
 }
 
-func (s *JailTestSuite) TestJailCreateAndInitCell() {
+func (s *JailTestSuite) TestJailCreateCell() {
 	_, err := s.Jail.createCell("cell1")
 	s.NoError(err)
+	// creating another cell with the same id fails
 	_, err = s.Jail.createCell("cell1")
 	s.EqualError(err, "cell with id 'cell1' already exists")
 
@@ -40,7 +41,6 @@ func (s *JailTestSuite) TestJailCreateAndInitCell() {
 	s.NoError(err)
 	_, err = s.Jail.createCell("cell3")
 	s.NoError(err)
-
 	s.Len(s.Jail.cells, 3)
 }
 
@@ -88,14 +88,19 @@ func (s *JailTestSuite) TestJailCall() {
 }
 
 func (s *JailTestSuite) TestCreateAndInitCell() {
-	response := s.Jail.CreateAndInitCell("cell1", `var testCreateAndInitCell = true`)
-	// TODO(adam): confusing, this check should be in another method
-	s.Equal(`{"error":"ReferenceError: '_status_catalog' is not defined"}`, response)
-
-	cell, err := s.Jail.GetCell("cell1")
+	cell, err := s.Jail.createAndInitCell(
+		"cell1",
+		`var testCreateAndInitCell1 = true`,
+		`var testCreateAndInitCell2 = true`,
+	)
 	s.NoError(err)
+	s.NotNil(cell)
 
-	value, err := cell.Get("testCreateAndInitCell")
+	value, err := cell.Get("testCreateAndInitCell1")
+	s.NoError(err)
+	s.Equal(`true`, value.String())
+
+	value, err = cell.Get("testCreateAndInitCell2")
 	s.NoError(err)
 	s.Equal(`true`, value.String())
 }

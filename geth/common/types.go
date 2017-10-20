@@ -265,7 +265,11 @@ type JailManager interface {
 	// Call executes given JavaScript function w/i a jail cell context identified by the chatID.
 	Call(chatID, this, args string) string
 
-	// CreateAndInitCell creates a new jail cell.
+	// CreateCell creates a new jail cell.
+	CreateCell(chatID string) (JailCell, error)
+
+	// CreateAndInitCell creates a new jail cell and initialize it
+	// with web3 and other handlers.
 	CreateAndInitCell(chatID string, code ...string) string
 
 	// Cell returns an existing instance of JailCell.

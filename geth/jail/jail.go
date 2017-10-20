@@ -80,7 +80,7 @@ func (j *Jail) Stop() {
 	j.cells = make(map[string]*Cell)
 }
 
-// createCell creates and initializes a new cell if it does not exists.
+// createCell creates a new cell if it does not exists.
 func (j *Jail) createCell(chatID string) (*Cell, error) {
 	j.cellsMx.Lock()
 	defer j.cellsMx.Unlock()
@@ -90,15 +90,15 @@ func (j *Jail) createCell(chatID string) (*Cell, error) {
 	}
 
 	cell := NewCell(chatID)
-
-	err := j.initCell(cell)
-	if err != nil {
-		return nil, fmt.Errorf("cell init failed: %v", err)
-	}
-
 	j.cells[chatID] = cell
 
 	return cell, nil
+}
+
+// CreateCell creates a new cell. It returns an error
+// if a cell with a given ID already exists.
+func (j *Jail) CreateCell(chatID string) (common.JailCell, error) {
+	return j.createCell(chatID)
 }
 
 // initCell initializes a cell with default JavaScript handlers and user code.
@@ -128,21 +128,35 @@ func (j *Jail) initCell(cell *Cell) error {
 	return nil
 }
 
-// CreateAndInitCell creates and initializes new Cell.
-// It returns response as a JSON string.
-// TODO(adam): fix api package so that this becomes obsolete.
-func (j *Jail) CreateAndInitCell(chatID string, code ...string) string {
+// CreateAndInitCell creates and initializes a new Cell.
+func (j *Jail) createAndInitCell(chatID string, code ...string) (*Cell, error) {
 	cell, err := j.createCell(chatID)
 	if err != nil {
-		return newJailErrorResponse(err)
+		return nil, err
+	}
+
+	if err := j.initCell(cell); err != nil {
+		return nil, err
 	}
 
 	// Run custom user code
 	for _, js := range code {
 		_, err := cell.Run(js)
 		if err != nil {
-			return newJailErrorResponse(err)
+			return nil, err
 		}
+	}
+
+	return cell, nil
+}
+
+// CreateAndInitCell creates and initializes new Cell. Additionally,
+// it creates a `catalog` variable in the VM.
+// It returns the response as a JSON string.
+func (j *Jail) CreateAndInitCell(chatID string, code ...string) string {
+	cell, err := j.createAndInitCell(chatID, code...)
+	if err != nil {
+		return newJailErrorResponse(err)
 	}
 
 	return j.makeCatalogVariable(cell)
