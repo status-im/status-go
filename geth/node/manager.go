@@ -119,14 +119,19 @@ func (m *NodeManager) startNode(ethNode geth.Node) error {
 }
 
 func (m *NodeManager) newNode() (geth.Node, error) {
+	var err error
+	defer func() {
+		if err != nil {
+			m.setFailed(fmt.Errorf("%v: %v", ErrNodeStartFailure, err))
+		}
+	}()
+
 	ethNode, err := m.constr.Make()
 	if err != nil {
 		return nil, err
 	}
 
 	if err = ethNode.Start(); err != nil {
-		m.setFailed(fmt.Errorf("%v: %v", ErrNodeStartFailure, err))
-
 		return nil, ErrInvalidNodeManager
 	}
 

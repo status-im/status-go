@@ -1,13 +1,13 @@
 package node
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/golang/mock/gomock"
 	"github.com/status-im/status-go/build/_workspace/deps/src/github.com/pkg/errors"
 	"github.com/status-im/status-go/geth/common/geth"
 	"github.com/status-im/status-go/geth/params"
-	"reflect"
 )
 
 func TestStartNodeSuccess(t *testing.T) {
@@ -31,6 +31,10 @@ func TestStartNodeSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	if *m.manager.state != started {
+		t.FailNow()
+	}
 }
 
 func TestStartNodeNewNodeError(t *testing.T) {
@@ -48,6 +52,10 @@ func TestStartNodeNewNodeError(t *testing.T) {
 	//todo: use testify checks
 	if !reflect.DeepEqual(err, expectedErr) {
 		t.Fatal(err, expectedErr)
+	}
+
+	if *m.manager.state != stopped {
+		t.FailNow()
 	}
 }
 
