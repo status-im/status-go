@@ -160,5 +160,5 @@ clean: ##@other Cleanup
 	rm coverage.out coverage-all.out coverage.html
 
 
-LINT_EXCLUDE := --exclude='.*_mock.go'
+LINT_EXCLUDE := --exclude='.*_mock.go' --exclude='geth/jail/doc.go'
 LINT_FOLDERS := extkeys cmd/... geth/... e2e/...
