@@ -8,6 +8,7 @@ import (
 	"github.com/status-im/status-go/geth/signal"
 )
 
+//ErrTxQueueRunFailure - error running transaction queue
 var ErrTxQueueRunFailure = errors.New("error running transaction queue")
 
 // HaltOnPanic recovers from panic, logs issue, sends upward notification, and exits

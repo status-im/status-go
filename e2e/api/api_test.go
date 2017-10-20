@@ -37,7 +37,7 @@ func (s *APITestSuite) SetupTest() {
 func (s *APITestSuite) TestCHTUpdate() {
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "cht-updates")
 	s.NoError(err)
-	defer os.RemoveAll(tmpDir)
+	defer os.RemoveAll(tmpDir) //nolint: errcheck
 
 	configJSON := `{
 		"NetworkId": ` + strconv.Itoa(params.RopstenNetworkID) + `,
@@ -45,14 +45,9 @@ func (s *APITestSuite) TestCHTUpdate() {
 		"LogLevel": "INFO",
 		"RPCEnabled": true
 	}`
-	//nodeConfig, err := params.LoadNodeConfig(configJSON)
+
 	_, err = params.LoadNodeConfig(configJSON)
 	s.NoError(err)
-
-	// start node
-	//nodeConfig.DevMode = true
-	//s.api.StartNode(nodeConfig)
-	//s.api.StopNode()
 	// TODO(tiabc): Test that CHT is really updated.
 }
 
@@ -121,7 +116,8 @@ func (s *APITestSuite) TestRaceConditions() {
 	}
 
 	time.Sleep(2 * time.Second) // so that we see some logs
-	s.api.StopNode()            // just in case we have a node running
+	// just in case we have a node running
+	s.api.StopNode() //nolint: errcheck
 }
 
 func (s *APITestSuite) TestCellsRemovedAfterSwitchAccount() {
@@ -137,7 +133,7 @@ func (s *APITestSuite) TestCellsRemovedAfterSwitchAccount() {
 	require.NoError(err)
 	err = s.api.StartNode(config)
 	require.NoError(err)
-	defer s.api.StopNode()
+	defer s.api.StopNode() //nolint: errcheck
 
 	address1, _, _, err := s.api.AccountManager().CreateAccount(TestConfig.Account1.Password)
 	require.NoError(err)
@@ -149,16 +145,16 @@ func (s *APITestSuite) TestCellsRemovedAfterSwitchAccount() {
 	require.NoError(err)
 
 	for i := 0; i < itersCount; i++ {
-		_, err := s.api.JailManager().NewCell(getChatId(i))
-		require.NoError(err)
+		_, e := s.api.JailManager().NewCell(getChatId(i))
+		require.NoError(e)
 	}
 
 	err = s.api.SelectAccount(address2, TestConfig.Account2.Password)
 	require.NoError(err)
 
 	for i := 0; i < itersCount; i++ {
-		_, err := s.api.JailManager().Cell(getChatId(i))
-		require.Error(err)
+		_, e := s.api.JailManager().Cell(getChatId(i))
+		require.Error(e)
 	}
 }
 
@@ -174,7 +170,7 @@ func (s *APITestSuite) TestLogoutRemovesCells() {
 	require.NoError(err)
 	err = s.api.StartNode(config)
 	require.NoError(err)
-	defer s.api.StopNode()
+	defer s.api.StopNode() //nolint: errcheck
 
 	address1, _, _, err := s.api.AccountManager().CreateAccount(TestConfig.Account1.Password)
 	require.NoError(err)

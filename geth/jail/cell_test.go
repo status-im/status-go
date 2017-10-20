@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/robertkrimen/otto"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -76,7 +77,7 @@ func (s *CellTestSuite) TestCellFetchRace() {
 	body := `{"key": "value"}`
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Content-Type", "application/json")
-		w.Write([]byte(body))
+		w.Write([]byte(body)) //nolint: errcheck
 	}))
 	defer server.Close()
 
@@ -120,9 +121,9 @@ func (s *CellTestSuite) TestCellFetchRace() {
 			s.NoError(err)
 			s.Equal("Error", name.String())
 			_, err = e.Object().Get("message")
-			s.NoError(err)
-		case <-time.After(1 * time.Second):
-			s.Fail("test timed out")
+			require.NoError(err)
+		case <-time.After(5 * time.Second):
+			require.Fail("test timed out")
 			return
 		}
 	}
@@ -136,7 +137,7 @@ func (s *CellTestSuite) TestCellLoopCancel() {
 	var err error
 	var count int
 
-	err = cell.Set("__captureResponse", func() otto.Value {
+	err = cell.Set("__captureResponse", func(call otto.FunctionCall) otto.Value {
 		count++
 		return otto.UndefinedValue()
 	})

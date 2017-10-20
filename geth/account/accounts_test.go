@@ -20,11 +20,11 @@ func TestVerifyAccountPassword(t *testing.T) {
 	acctManager := account.NewManager(nil)
 	keyStoreDir, err := ioutil.TempDir(os.TempDir(), "accounts")
 	require.NoError(t, err)
-	defer os.RemoveAll(keyStoreDir)
+	defer os.RemoveAll(keyStoreDir) //nolint: errcheck
 
 	emptyKeyStoreDir, err := ioutil.TempDir(os.TempDir(), "accounts_empty")
 	require.NoError(t, err)
-	defer os.RemoveAll(emptyKeyStoreDir)
+	defer os.RemoveAll(emptyKeyStoreDir) //nolint: errcheck
 
 	// import account keys
 	require.NoError(t, common.ImportTestAccount(keyStoreDir, "test-account1.pk"))
@@ -97,7 +97,7 @@ func TestVerifyAccountPassword(t *testing.T) {
 func TestVerifyAccountPasswordWithAccountBeforeEIP55(t *testing.T) {
 	keyStoreDir, err := ioutil.TempDir("", "status-accounts-test")
 	require.NoError(t, err)
-	defer os.RemoveAll(keyStoreDir)
+	defer os.RemoveAll(keyStoreDir) //nolint: errcheck
 
 	// Import keys and make sure one was created before EIP55 introduction.
 	err = common.ImportTestAccount(keyStoreDir, "test-account1-before-eip55.pk")

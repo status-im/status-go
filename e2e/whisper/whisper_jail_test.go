@@ -25,7 +25,6 @@ const (
 	whisperMessage3 = `test message 4 ("" -> "", anon broadcast)`
 	whisperMessage4 = `test message 5 ("" -> K1, encrypted anon broadcast)`
 	whisperMessage5 = `test message 6 (K2 -> K1, signed+encrypted, to us)`
-	testChatID      = "testChat"
 )
 
 var (
@@ -61,7 +60,7 @@ func (s *WhisperJailTestSuite) GetAccountKey(account struct {
 }) (*keystore.Key, string, error) {
 	accountManager := s.Backend.AccountManager()
 
-	_, accountKey1, err := accountManager.AddressToDecryptedAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
+	_, accountKey1, err := accountManager.AddressToDecryptedAccount(account.Address, account.Password)
 	if err != nil {
 		return nil, "", err
 	}

@@ -123,8 +123,10 @@ func (s *JailRPCTestSuite) TestContractDeployment() {
 
 	var txHash gethcommon.Hash
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var envelope signal.Envelope
-		var err error
+		var (
+			envelope signal.Envelope
+			err      error
+		)
 
 		err = json.Unmarshal([]byte(jsonEvent), &envelope)
 		s.NoError(err, "cannot unmarshal JSON: %s", jsonEvent)
@@ -280,7 +282,7 @@ func (s *JailRPCTestSuite) TestJailVMPersistence() {
 	var wg sync.WaitGroup
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var envelope signal.Envelope
-		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
+		if e := json.Unmarshal([]byte(jsonEvent), &envelope); e != nil {
 			s.T().Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
 		}
@@ -290,8 +292,8 @@ func (s *JailRPCTestSuite) TestJailVMPersistence() {
 
 			//var txHash common.Hash
 			txID := event["id"].(string)
-			txHash, err := s.Backend.CompleteTransaction(common.QueuedTxID(txID), TestConfig.Account1.Password)
-			s.NoError(err, "cannot complete queued transaction[%v]: %v", event["id"], err)
+			txHash, e := s.Backend.CompleteTransaction(common.QueuedTxID(txID), TestConfig.Account1.Password)
+			s.NoError(e, "cannot complete queued transaction[%v]: %v", event["id"], e)
 
 			s.T().Logf("Transaction complete: https://ropsten.etherscan.io/tx/%s", txHash.Hex())
 		}
@@ -305,8 +307,8 @@ func (s *JailRPCTestSuite) TestJailVMPersistence() {
 
 			s.T().Logf("CALL START: %v %v", tc.command, tc.params)
 			response := jail.Call(testChatID, tc.command, tc.params)
-			if err := tc.validator(string(response)); err != nil {
-				s.T().Errorf("failed test validation: %v, err: %v", tc.command, err)
+			if e := tc.validator(response); e != nil {
+				s.T().Errorf("failed test validation: %v, err: %v", tc.command, e)
 			}
 			s.T().Logf("CALL END: %v %v", tc.command, tc.params)
 		}(tc)

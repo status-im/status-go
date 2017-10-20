@@ -87,7 +87,7 @@ func (s *PromiseSuite) SetupTest() {
 	s.vm = vm.New()
 	s.loop = loop.New(s.vm)
 
-	go s.loop.Run(context.Background())
+	go s.loop.Run(context.Background()) //nolint: errcheck
 
 	err := promise.Define(s.vm, s.loop)
 	s.NoError(err)

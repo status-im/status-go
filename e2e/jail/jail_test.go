@@ -26,7 +26,6 @@ const (
 
 var (
 	baseStatusJSCode = string(static.MustAsset("testdata/jail/status.js"))
-	txJSCode         = string(static.MustAsset("testdata/jail/tx-send/tx-send.js"))
 )
 
 func TestJailTestSuite(t *testing.T) {
@@ -255,6 +254,7 @@ func (s *JailTestSuite) TestJailCellsRemovedAfterStop() {
 				counter++;
 			}, 1000);
 		`)
+		require.NoError(err)
 	}
 
 	s.Jail.Stop()

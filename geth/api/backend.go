@@ -98,7 +98,9 @@ func (m *StatusBackend) onNodeStart(nodeStarted <-chan struct{}, backendReady ch
 		log.Error("Handler registration failed", "err", err)
 	}
 
-	m.accountManager.ReSelectAccount()
+	if err := m.accountManager.ReSelectAccount(); err != nil {
+		log.Error("Reselect account failed", "err", err)
+	}
 	log.Info("Account reselected")
 
 	close(backendReady)

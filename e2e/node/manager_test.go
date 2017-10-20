@@ -335,11 +335,11 @@ func (s *ManagerTestSuite) TestRaceConditions() {
 	progress := make(chan struct{}, cnt)
 	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	nodeConfig1, err := e2e.MakeTestNodeConfig(params.RopstenNetworkID)
-	s.NoError(err)
+	nodeConfig1, e := e2e.MakeTestNodeConfig(params.RopstenNetworkID)
+	s.NoError(e)
 
-	nodeConfig2, err := e2e.MakeTestNodeConfig(params.RinkebyNetworkID)
-	s.NoError(err)
+	nodeConfig2, e := e2e.MakeTestNodeConfig(params.RinkebyNetworkID)
+	s.NoError(e)
 
 	nodeConfigs := []*params.NodeConfig{nodeConfig1, nodeConfig2}
 
@@ -446,7 +446,9 @@ func (s *ManagerTestSuite) TestRaceConditions() {
 	}
 
 	time.Sleep(2 * time.Second)                // so that we see some logs
-	nodeStopped, _ := s.NodeManager.StopNode() // just in case we have a node running
+	nodeStopped, e := s.NodeManager.StopNode() // just in case we have a node running
+	s.NoError(e)
+
 	if nodeStopped != nil {
 		<-nodeStopped
 	}
@@ -502,6 +504,6 @@ func (s *ManagerTestSuite) TestNodeStartCrash() {
 	}
 
 	// cleanup
-	s.NodeManager.StopNode()
+	s.NodeManager.StopNode() //nolint: errcheck
 	signal.ResetDefaultNodeNotificationHandler()
 }

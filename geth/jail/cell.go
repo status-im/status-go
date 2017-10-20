@@ -26,11 +26,14 @@ type Cell struct {
 
 // NewCell encapsulates what we need to create a new jailCell from the
 // provided vm and eventloop instance.
-func NewCell(id string) *Cell {
+func NewCell(id string) (*Cell, error) {
 	vm := vm.New()
 	lo := loop.New(vm)
 
-	registerVMHandlers(vm, lo)
+	err := registerVMHandlers(vm, lo)
+	if err != nil {
+		return nil, err
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	loopStopped := make(chan struct{})
@@ -52,7 +55,7 @@ func NewCell(id string) *Cell {
 		close(loopStopped)
 	}()
 
-	return &cell
+	return &cell, nil
 }
 
 // registerHandlers register variuous functions and handlers
@@ -64,11 +67,7 @@ func registerVMHandlers(vm *vm.VM, lo *loop.Loop) error {
 	}
 
 	// FetchAPI functions
-	if err := fetch.Define(vm, lo); err != nil {
-		return err
-	}
-
-	return nil
+	return fetch.Define(v, lo)
 }
 
 // Stop halts event loop associated with cell.

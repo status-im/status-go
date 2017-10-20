@@ -30,11 +30,7 @@ func registerWeb3Provider(jail *Jail, cell *Cell) error {
 		"isConnected": createIsConnectedHandler(jail, cell),
 	}
 
-	if err := cell.Set("jeth", jeth); err != nil {
-		return err
-	}
-
-	return nil
+	return cell.Set("jeth", jeth)
 }
 
 // registerStatusSignals creates an object called "statusSignals".
@@ -44,11 +40,7 @@ func registerStatusSignals(jail *Jail, cell *Cell) error {
 		"sendSignal": createSendSignalHandler(jail, cell),
 	}
 
-	if err := cell.Set("statusSignals", statusSignals); err != nil {
-		return err
-	}
-
-	return nil
+	return cell.Set("statusSignals", statusSignals)
 }
 
 // createSendHandler returns jeth.send() and jeth.sendAsync() handler

@@ -14,6 +14,7 @@ import (
 	"github.com/status-im/status-go/helpers/profiling"
 )
 
+//GenerateConfig for status node
 //export GenerateConfig
 func GenerateConfig(datadir *C.char, networkID C.int, devMode C.int) *C.char {
 	config, err := params.NewNodeConfig(C.GoString(datadir), uint64(networkID), devMode == 1)
@@ -29,6 +30,7 @@ func GenerateConfig(datadir *C.char, networkID C.int, devMode C.int) *C.char {
 	return C.CString(string(outBytes))
 }
 
+//StartNode - start Status node
 //export StartNode
 func StartNode(configJSON *C.char) *C.char {
 	config, err := params.LoadNodeConfig(C.GoString(configJSON))
@@ -40,12 +42,14 @@ func StartNode(configJSON *C.char) *C.char {
 	return makeJSONResponse(err)
 }
 
+//StopNode - stop status node
 //export StopNode
 func StopNode() *C.char {
 	_, err := statusAPI.StopNodeAsync()
 	return makeJSONResponse(err)
 }
 
+//ValidateNodeConfig validates config for status node
 //export ValidateNodeConfig
 func ValidateNodeConfig(configJSON *C.char) *C.char {
 	var resp common.APIDetailedResponse
@@ -88,52 +92,24 @@ func ValidateNodeConfig(configJSON *C.char) *C.char {
 	return C.CString(string(respJSON))
 }
 
+//ResetChainData remove chain data from data directory
 //export ResetChainData
 func ResetChainData() *C.char {
 	_, err := statusAPI.ResetChainDataAsync()
 	return makeJSONResponse(err)
 }
 
+//CallRPC calls status node via rpc
 //export CallRPC
 func CallRPC(inputJSON *C.char) *C.char {
 	outputJSON := statusAPI.CallRPC(C.GoString(inputJSON))
 	return C.CString(outputJSON)
 }
 
-//export ResumeNode
-func ResumeNode() *C.char {
-	err := fmt.Errorf("%v: %v", common.ErrDeprecatedMethod.Error(), "ResumeNode")
-	return makeJSONResponse(err)
-}
-
-//export StopNodeRPCServer
-func StopNodeRPCServer() *C.char {
-	err := fmt.Errorf("%v: %v", common.ErrDeprecatedMethod.Error(), "StopNodeRPCServer")
-	return makeJSONResponse(err)
-}
-
-//export StartNodeRPCServer
-func StartNodeRPCServer() *C.char {
-	err := fmt.Errorf("%v: %v", common.ErrDeprecatedMethod.Error(), "StartNodeRPCServer")
-	return makeJSONResponse(err)
-}
-
-//export PopulateStaticPeers
-func PopulateStaticPeers() *C.char {
-	err := fmt.Errorf("%v: %v", common.ErrDeprecatedMethod.Error(), "PopulateStaticPeers")
-	return makeJSONResponse(err)
-}
-
-//export AddPeer
-func AddPeer(url *C.char) *C.char {
-	err := fmt.Errorf("%v: %v", common.ErrDeprecatedMethod.Error(), "AddPeer")
-	return makeJSONResponse(err)
-}
-
+//CreateAccount is equivalent to creating an account from the command line,
+// just modified to handle the function arg passing
 //export CreateAccount
 func CreateAccount(password *C.char) *C.char {
-	// This is equivalent to creating an account from the command line,
-	// just modified to handle the function arg passing
 	address, pubKey, mnemonic, err := statusAPI.CreateAccount(C.GoString(password))
 
 	errString := ""
@@ -152,6 +128,7 @@ func CreateAccount(password *C.char) *C.char {
 	return C.CString(string(outBytes))
 }
 
+//CreateChildAccount creates sub-account
 //export CreateChildAccount
 func CreateChildAccount(parentAddress, password *C.char) *C.char {
 	address, pubKey, err := statusAPI.CreateChildAccount(C.GoString(parentAddress), C.GoString(password))
@@ -171,6 +148,7 @@ func CreateChildAccount(parentAddress, password *C.char) *C.char {
 	return C.CString(string(outBytes))
 }
 
+//RecoverAccount re-creates master key using given details
 //export RecoverAccount
 func RecoverAccount(password, mnemonic *C.char) *C.char {
 	address, pubKey, err := statusAPI.RecoverAccount(C.GoString(password), C.GoString(mnemonic))
@@ -191,27 +169,29 @@ func RecoverAccount(password, mnemonic *C.char) *C.char {
 	return C.CString(string(outBytes))
 }
 
+//VerifyAccountPassword verifies account password
 //export VerifyAccountPassword
 func VerifyAccountPassword(keyStoreDir, address, password *C.char) *C.char {
 	_, err := statusAPI.VerifyAccountPassword(C.GoString(keyStoreDir), C.GoString(address), C.GoString(password))
 	return makeJSONResponse(err)
 }
 
+//Login loads a key file (for a given address), tries to decrypt it using the password, to verify ownership
+// if verified, purges all the previous identities from Whisper, and injects verified key as shh identity
 //export Login
 func Login(address, password *C.char) *C.char {
-	// loads a key file (for a given address), tries to decrypt it using the password, to verify ownership
-	// if verified, purges all the previous identities from Whisper, and injects verified key as shh identity
 	err := statusAPI.SelectAccount(C.GoString(address), C.GoString(password))
 	return makeJSONResponse(err)
 }
 
+//Logout is equivalent to clearing whisper identities
 //export Logout
 func Logout() *C.char {
-	// This is equivalent to clearing whisper identities
 	err := statusAPI.Logout()
 	return makeJSONResponse(err)
 }
 
+//CompleteTransaction instructs backend to complete sending of a given transaction
 //export CompleteTransaction
 func CompleteTransaction(id, password *C.char) *C.char {
 	txHash, err := statusAPI.CompleteTransaction(common.QueuedTxID(C.GoString(id)), C.GoString(password))
@@ -236,6 +216,7 @@ func CompleteTransaction(id, password *C.char) *C.char {
 	return C.CString(string(outBytes))
 }
 
+//CompleteTransactions instructs backend to complete sending of multiple transactions
 //export CompleteTransactions
 func CompleteTransactions(ids, password *C.char) *C.char {
 	out := common.CompleteTransactionsResult{}
@@ -274,6 +255,7 @@ func CompleteTransactions(ids, password *C.char) *C.char {
 	return C.CString(string(outBytes))
 }
 
+//DiscardTransaction discards a given transaction from transaction queue
 //export DiscardTransaction
 func DiscardTransaction(id *C.char) *C.char {
 	err := statusAPI.DiscardTransaction(common.QueuedTxID(C.GoString(id)))
@@ -297,6 +279,7 @@ func DiscardTransaction(id *C.char) *C.char {
 	return C.CString(string(outBytes))
 }
 
+//DiscardTransactions discards given multiple transactions from transaction queue
 //export DiscardTransactions
 func DiscardTransactions(ids *C.char) *C.char {
 	out := common.DiscardTransactionsResult{}
@@ -334,44 +317,50 @@ func DiscardTransactions(ids *C.char) *C.char {
 	return C.CString(string(outBytes))
 }
 
+//InitJail setup initial JavaScript
 //export InitJail
 func InitJail(js *C.char) {
 	statusAPI.JailBaseJS(C.GoString(js))
 }
 
-// DEPRECATED. Use CreateAndInitCell instead.
+//Parse is DEPRECATED. Use CreateAndInitCell instead.
 //export Parse
 func Parse(chatID *C.char, js *C.char) *C.char {
 	res := statusAPI.CreateAndInitCell(C.GoString(chatID), C.GoString(js))
 	return C.CString(res)
 }
 
+//CreateAndInitCell creates a new jail cell context and executes provided JavaScript code.
 //export CreateAndInitCell
 func CreateAndInitCell(chatID *C.char, js *C.char) *C.char {
 	res := statusAPI.CreateAndInitCell(C.GoString(chatID), C.GoString(js))
 	return C.CString(res)
 }
 
+//Call executes given JavaScript function
 //export Call
 func Call(chatID *C.char, path *C.char, params *C.char) *C.char {
 	res := statusAPI.JailCall(C.GoString(chatID), C.GoString(path), C.GoString(params))
 	return C.CString(res)
 }
 
+//StartCPUProfile runs pprof for cpu
 //export StartCPUProfile
 func StartCPUProfile(dataDir *C.char) *C.char {
 	err := profiling.StartCPUProfile(C.GoString(dataDir))
 	return makeJSONResponse(err)
 }
 
+//StopCPUProfiling stops pprof for cpu
 //export StopCPUProfiling
-func StopCPUProfiling() *C.char {
+func StopCPUProfiling() *C.char { //nolint: deadcode
 	err := profiling.StopCPUProfile()
 	return makeJSONResponse(err)
 }
 
+//WriteHeapProfile starts pprof for heap
 //export WriteHeapProfile
-func WriteHeapProfile(dataDir *C.char) *C.char {
+func WriteHeapProfile(dataDir *C.char) *C.char { //nolint: deadcode
 	err := profiling.WriteHeapFile(C.GoString(dataDir))
 	return makeJSONResponse(err)
 }
@@ -391,6 +380,7 @@ func makeJSONResponse(err error) *C.char {
 	return C.CString(string(outBytes))
 }
 
+// Notify sends push notification by given token
 //export Notify
 func Notify(token *C.char) *C.char {
 	res := statusAPI.Notify(C.GoString(token))
