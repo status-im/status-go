@@ -2,7 +2,6 @@ package integration
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"io"
 	"os"
@@ -31,11 +30,6 @@ var (
 		params.RinkebyNetworkID:     "Rinkeby",
 		params.StatusChainNetworkID: "StatusChain",
 	}
-
-	// DefaultNodeSyncTimeout will mostly be used as timeout
-	// for contexts of EnsureNodeSync(). Still individual ones
-	// can be set.
-	DefaultNodeSyncTimeout = 5 * time.Minute
 )
 
 func init() {
@@ -75,8 +69,8 @@ func LoadFromFile(filename string) string {
 }
 
 // EnsureNodeSync waits until node synchronzation is done to continue
-// with tests afterwards.
-func EnsureNodeSync(ctx context.Context, nodeManager common.NodeManager) error {
+// with tests afterwards. Returns an error in case of a timeout.
+func EnsureNodeSync(nodeManager common.NodeManager) error {
 	les, err := nodeManager.LightEthereumService()
 	if err != nil {
 		return err
@@ -85,11 +79,16 @@ func EnsureNodeSync(ctx context.Context, nodeManager common.NodeManager) error {
 		return errors.New("LightEthereumService is nil")
 	}
 
+	timeouter := time.NewTimer(20 * time.Minute)
+	defer timeouter.Stop()
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+
 	for {
 		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(time.Second):
+		case <-timeouter.C:
+			return errors.New("timout during node synchronization")
+		case <-ticker.C:
 			downloader := les.Downloader()
 
 			if downloader != nil {

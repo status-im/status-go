@@ -17,6 +17,7 @@ var (
 	// FIXME(tiabc): Get rid of this global variable. Move it to a constructor or initialization.
 	web3JSCode = static.MustAsset("scripts/web3.js")
 
+	//ErrInvalidJail - error jail init env
 	ErrInvalidJail = errors.New("jail environment is not properly initialized")
 )
 
@@ -216,6 +217,7 @@ func newResultResponse(vm *otto.Otto, result interface{}) otto.Value {
 
 // throwJSException panics on an otto.Value. The Otto VM will recover from the
 // Go panic and throw msg as a JavaScript error.
+// nolint: unparam
 func throwJSException(msg error) otto.Value {
 	val, err := otto.ToValue(msg.Error())
 	if err != nil {

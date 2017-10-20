@@ -107,7 +107,7 @@ func (s *TimersSuite) SetupTest() {
 	s.vm = vm.New(o)
 	s.loop = loop.New(s.vm)
 
-	go s.loop.Run(context.Background())
+	go s.loop.Run(context.Background()) //nolint: errcheck
 
 	err := timers.Define(s.vm, s.loop)
 	s.NoError(err)

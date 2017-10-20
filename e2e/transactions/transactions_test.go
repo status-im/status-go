@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"context"
+
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -23,11 +25,6 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-const (
-	txSendFolder = "testdata/jail/tx-send/"
-	testChatID   = "testChat"
-)
-
 func TestTransactionsTestSuite(t *testing.T) {
 	suite.Run(t, new(TransactionsTestSuite))
 }
@@ -40,9 +37,7 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransaction() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	ctx, cancel := context.WithTimeout(context.Background(), DefaultNodeSyncTimeout)
-	defer cancel()
-	s.Nil(EnsureNodeSync(ctx, s.Backend.NodeManager()), "cannot ensure node synchronization")
+	s.NoError(EnsureNodeSync(s.Backend.NodeManager()), "cannot ensure node synchronization")
 
 	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	s.NoError(err)
@@ -51,12 +46,12 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransaction() {
 
 	var txHash gethcommon.Hash
 	signal.SetDefaultNodeNotificationHandler(func(rawSignal string) {
-		var signal signal.Envelope
-		err := json.Unmarshal([]byte(rawSignal), &signal)
+		var sg signal.Envelope
+		err := json.Unmarshal([]byte(rawSignal), &sg)
 		s.NoError(err)
 
-		if signal.Type == txqueue.EventTransactionQueued {
-			event := signal.Event.(map[string]interface{})
+		if sg.Type == txqueue.EventTransactionQueued {
+			event := sg.Event.(map[string]interface{})
 			txID := event["id"].(string)
 			txHash, err = s.Backend.CompleteTransaction(common.QueuedTxID(txID), TestConfig.Account1.Password)
 			s.NoError(err, "cannot complete queued transaction %s", txID)
@@ -146,9 +141,7 @@ func (s *TransactionsTestSuite) TestSendContractTx() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	ctx, cancel := context.WithTimeout(context.Background(), DefaultNodeSyncTimeout)
-	defer cancel()
-	s.Nil(EnsureNodeSync(ctx, s.Backend.NodeManager()), "cannot ensure node synchronization")
+	s.NoError(EnsureNodeSync(s.Backend.NodeManager()), "cannot ensure node synchronization")
 
 	sampleAddress, _, _, err := s.Backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
 	s.NoError(err)
@@ -211,7 +204,7 @@ func (s *TransactionsTestSuite) TestSendContractTx() {
 	byteCode, err := hexutil.Decode(`0x6060604052341561000c57fe5b5b60a58061001b6000396000f30060606040526000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff1680636ffa1caa14603a575bfe5b3415604157fe5b60556004808035906020019091905050606b565b6040518082815260200191505060405180910390f35b60008160020290505b9190505600a165627a7a72305820ccdadd737e4ac7039963b54cee5e5afb25fa859a275252bdcf06f653155228210029`)
 	s.NoError(err)
 
-	txHashCheck, err := s.Backend.SendTransaction(nil, common.SendTxArgs{
+	txHashCheck, err := s.Backend.SendTransaction(context.TODO(), common.SendTxArgs{
 		From: common.FromAddress(TestConfig.Account1.Address),
 		To:   nil, // marker, contract creation is expected
 		//Value: (*hexutil.Big)(new(big.Int).Mul(big.NewInt(1), gethcommon.Ether)),
@@ -235,9 +228,7 @@ func (s *TransactionsTestSuite) TestSendEtherTx() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	ctx, cancel := context.WithTimeout(context.Background(), DefaultNodeSyncTimeout)
-	defer cancel()
-	s.Nil(EnsureNodeSync(ctx, s.Backend.NodeManager()), "cannot ensure node synchronization")
+	s.NoError(EnsureNodeSync(s.Backend.NodeManager()), "cannot ensure node synchronization")
 
 	backend := s.LightEthereumService().StatusBackend
 	s.NotNil(backend)
@@ -299,7 +290,7 @@ func (s *TransactionsTestSuite) TestSendEtherTx() {
 	})
 
 	// this call blocks, up until Complete Transaction is called
-	txHashCheck, err := s.Backend.SendTransaction(nil, common.SendTxArgs{
+	txHashCheck, err := s.Backend.SendTransaction(context.TODO(), common.SendTxArgs{
 		From:  common.FromAddress(TestConfig.Account1.Address),
 		To:    common.ToAddress(TestConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
@@ -380,7 +371,7 @@ func (s *TransactionsTestSuite) TestSendEtherOnStatusChainTx() {
 	})
 
 	// this call blocks, up until Complete Transaction is called
-	txHashCheck, err := s.Backend.SendTransaction(nil, common.SendTxArgs{
+	txHashCheck, err := s.Backend.SendTransaction(context.TODO(), common.SendTxArgs{
 		From:  common.FromAddress(TestConfig.Account1.Address),
 		To:    common.ToAddress(TestConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
@@ -434,7 +425,7 @@ func (s *TransactionsTestSuite) TestSendEtherTxUpstream() {
 
 	// This call blocks, up until Complete Transaction is called.
 	// Explicitly not setting Gas to get it estimated.
-	txHashCheck, err := s.Backend.SendTransaction(nil, common.SendTxArgs{
+	txHashCheck, err := s.Backend.SendTransaction(context.TODO(), common.SendTxArgs{
 		From:     common.FromAddress(TestConfig.Account1.Address),
 		To:       common.ToAddress(TestConfig.Account2.Address),
 		GasPrice: (*hexutil.Big)(big.NewInt(28000000000)),
@@ -456,9 +447,7 @@ func (s *TransactionsTestSuite) TestDoubleCompleteQueuedTransactions() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	ctx, cancel := context.WithTimeout(context.Background(), DefaultNodeSyncTimeout)
-	defer cancel()
-	s.Nil(EnsureNodeSync(ctx, s.Backend.NodeManager()), "cannot ensure node synchronization")
+	s.NoError(EnsureNodeSync(s.Backend.NodeManager()), "cannot ensure node synchronization")
 
 	backend := s.LightEthereumService().StatusBackend
 	s.NotNil(backend)
@@ -512,7 +501,7 @@ func (s *TransactionsTestSuite) TestDoubleCompleteQueuedTransactions() {
 	})
 
 	// this call blocks, and should return on *second* attempt to CompleteTransaction (w/ the correct password)
-	txHashCheck, err := s.Backend.SendTransaction(nil, common.SendTxArgs{
+	txHashCheck, err := s.Backend.SendTransaction(context.TODO(), common.SendTxArgs{
 		From:  common.FromAddress(TestConfig.Account1.Address),
 		To:    common.ToAddress(TestConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
@@ -535,9 +524,7 @@ func (s *TransactionsTestSuite) TestDiscardQueuedTransaction() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	ctx, cancel := context.WithTimeout(context.Background(), DefaultNodeSyncTimeout)
-	defer cancel()
-	s.Nil(EnsureNodeSync(ctx, s.Backend.NodeManager()), "cannot ensure node synchronization")
+	s.NoError(EnsureNodeSync(s.Backend.NodeManager()), "cannot ensure node synchronization")
 
 	backend := s.LightEthereumService().StatusBackend
 	s.NotNil(backend)
@@ -595,7 +582,7 @@ func (s *TransactionsTestSuite) TestDiscardQueuedTransaction() {
 	})
 
 	// this call blocks, and should return when DiscardQueuedTransaction() is called
-	txHashCheck, err := s.Backend.SendTransaction(nil, common.SendTxArgs{
+	txHashCheck, err := s.Backend.SendTransaction(context.TODO(), common.SendTxArgs{
 		From:  common.FromAddress(TestConfig.Account1.Address),
 		To:    common.ToAddress(TestConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
@@ -617,9 +604,7 @@ func (s *TransactionsTestSuite) TestCompleteMultipleQueuedTransactions() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	ctx, cancel := context.WithTimeout(context.Background(), DefaultNodeSyncTimeout)
-	defer cancel()
-	s.Nil(EnsureNodeSync(ctx, s.Backend.NodeManager()), "cannot ensure node synchronization")
+	s.NoError(EnsureNodeSync(s.Backend.NodeManager()), "cannot ensure node synchronization")
 
 	s.TxQueueManager().TransactionQueue().Reset()
 
@@ -648,7 +633,7 @@ func (s *TransactionsTestSuite) TestCompleteMultipleQueuedTransactions() {
 
 	//  this call blocks, and should return when DiscardQueuedTransaction() for a given tx id is called
 	sendTx := func() {
-		txHashCheck, err := s.Backend.SendTransaction(nil, common.SendTxArgs{
+		txHashCheck, err := s.Backend.SendTransaction(context.TODO(), common.SendTxArgs{
 			From:  common.FromAddress(TestConfig.Account1.Address),
 			To:    common.ToAddress(TestConfig.Account2.Address),
 			Value: (*hexutil.Big)(big.NewInt(1000000000000)),
@@ -713,9 +698,7 @@ func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	ctx, cancel := context.WithTimeout(context.Background(), DefaultNodeSyncTimeout)
-	defer cancel()
-	s.Nil(EnsureNodeSync(ctx, s.Backend.NodeManager()), "cannot ensure node synchronization")
+	s.NoError(EnsureNodeSync(s.Backend.NodeManager()), "cannot ensure node synchronization")
 
 	backend := s.LightEthereumService().StatusBackend
 	s.NotNil(backend)
@@ -766,7 +749,7 @@ func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
 
 	//  this call blocks, and should return when DiscardQueuedTransaction() for a given tx id is called
 	sendTx := func() {
-		txHashCheck, err := s.Backend.SendTransaction(nil, common.SendTxArgs{
+		txHashCheck, err := s.Backend.SendTransaction(context.TODO(), common.SendTxArgs{
 			From:  common.FromAddress(TestConfig.Account1.Address),
 			To:    common.ToAddress(TestConfig.Account2.Address),
 			Value: (*hexutil.Big)(big.NewInt(1000000000000)),
@@ -870,8 +853,8 @@ func (s *TransactionsTestSuite) TestEvictionOfQueuedTransactions() {
 
 	s.Zero(txQueue.Count(), "transaction count should be zero")
 
-	for i := 0; i < 10; i++ {
-		go s.Backend.SendTransaction(nil, common.SendTxArgs{}) // nolint: errcheck
+	for j := 0; j < 10; j++ {
+		go s.Backend.SendTransaction(context.TODO(), common.SendTxArgs{}) // nolint: errcheck
 	}
 	time.Sleep(2 * time.Second) // FIXME(tiabc): more reliable synchronization to ensure all transactions are enqueued
 
@@ -881,7 +864,7 @@ func (s *TransactionsTestSuite) TestEvictionOfQueuedTransactions() {
 	s.Equal(10, txQueue.Count(), "transaction count should be 10")
 
 	for i := 0; i < txqueue.DefaultTxQueueCap+5; i++ { // stress test by hitting with lots of goroutines
-		go s.Backend.SendTransaction(nil, common.SendTxArgs{}) // nolint: errcheck
+		go s.Backend.SendTransaction(context.TODO(), common.SendTxArgs{}) // nolint: errcheck
 	}
 	time.Sleep(3 * time.Second)
 

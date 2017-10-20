@@ -2,8 +2,6 @@ package rpc
 
 import (
 	"context"
-	"encoding/json"
-	"net/http"
 	"sync"
 	"testing"
 	"time"
@@ -14,21 +12,6 @@ import (
 	"github.com/status-im/status-go/geth/params"
 	"github.com/stretchr/testify/suite"
 )
-
-type txRequest struct {
-	Method  string          `json:"method"`
-	Version string          `json:"jsonrpc"`
-	ID      int             `json:"id,omitempty"`
-	Payload json.RawMessage `json:"params,omitempty"`
-}
-
-type service struct {
-	Handler http.HandlerFunc
-}
-
-func (s service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	s.Handler(w, r)
-}
 
 func TestRPCTestSuite(t *testing.T) {
 	suite.Run(t, new(RPCTestSuite))
@@ -149,7 +132,7 @@ func (s *RPCTestSuite) TestCallRawResult() {
 	jsonResult := client.CallRaw(`{"jsonrpc":"2.0","method":"shh_version","params":[],"id":67}`)
 	s.Equal(`{"jsonrpc":"2.0","id":67,"result":"5.0"}`, jsonResult)
 
-	s.NodeManager.StopNode()
+	s.NodeManager.StopNode() //nolint: errcheck
 }
 
 // TestCallContextResult checks if result passed to CallContext

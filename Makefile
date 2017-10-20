@@ -84,51 +84,51 @@ lint-deps:
 	gometalinter --install
 
 lint-cur:
-	gometalinter --disable-all --enable=deadcode extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
+	gometalinter --disable-all --enable=deadcode $(LINT_FOLDERS) | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
 
 lint: ##@tests Run meta linter on code
 	@echo "Linter: go vet\n--------------------"
-	@gometalinter --disable-all --enable=vet extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
+	@gometalinter $(LINT_EXCLUDE) --disable-all --enable=vet $(LINT_FOLDERS) | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
 	@echo "Linter: go vet --shadow\n--------------------"
-	@gometalinter --disable-all --enable=vetshadow extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
+	@gometalinter $(LINT_EXCLUDE) --disable-all --enable=vetshadow $(LINT_FOLDERS) | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
 	@echo "Linter: gofmt\n--------------------"
-	@gometalinter --disable-all --enable=gofmt extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
+	@gometalinter $(LINT_EXCLUDE) --disable-all --enable=gofmt $(LINT_FOLDERS) | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
 	@echo "Linter: goimports\n--------------------"
-	@gometalinter --disable-all --enable=goimports extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
+	@gometalinter $(LINT_EXCLUDE) --disable-all --enable=goimports $(LINT_FOLDERS) | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
 	@echo "Linter: golint\n--------------------"
-	@gometalinter --disable-all --enable=golint extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
+	@gometalinter $(LINT_EXCLUDE) --disable-all --enable=golint $(LINT_FOLDERS) | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
 	@echo "Linter: deadcode\n--------------------"
-	@gometalinter --disable-all --enable=deadcode extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
+	@gometalinter $(LINT_EXCLUDE) --disable-all --enable=deadcode $(LINT_FOLDERS) | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
 	@echo "Linter: misspell\n--------------------"
-	@gometalinter --disable-all --enable=misspell extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
+	@gometalinter $(LINT_EXCLUDE) --disable-all --enable=misspell $(LINT_FOLDERS) | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
 	@echo "Linter: unparam\n--------------------"
-	@gometalinter --disable-all --deadline 45s --enable=unparam extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
+	@gometalinter $(LINT_EXCLUDE) --disable-all --deadline 45s --enable=unparam $(LINT_FOLDERS) | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
 	@echo "Linter: unused\n--------------------"
-	@gometalinter --disable-all --deadline 45s --enable=unused extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
+	@gometalinter $(LINT_EXCLUDE) --disable-all --deadline 45s --enable=unused $(LINT_FOLDERS) | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
 	@echo "Linter: gocyclo\n--------------------"
-	@gometalinter --disable-all --enable=gocyclo extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
+	@gometalinter $(LINT_EXCLUDE) --disable-all --enable=gocyclo --cyclo-over=20 $(LINT_FOLDERS) | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
 	@echo "Linter: errcheck\n--------------------"
-	@gometalinter --disable-all --enable=errcheck extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
+	@gometalinter $(LINT_EXCLUDE) --disable-all --enable=errcheck $(LINT_FOLDERS) | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
 	@echo "Linter: dupl\n--------------------"
-	@gometalinter --disable-all --enable=dupl extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
+	@gometalinter $(LINT_EXCLUDE) --exclude='.*_test.go' --disable-all --enable=dupl --dupl-threshold=100  extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
 	@echo "Linter: ineffassign\n--------------------"
-	@gometalinter --disable-all --enable=ineffassign extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
+	@gometalinter $(LINT_EXCLUDE) --disable-all --enable=ineffassign $(LINT_FOLDERS) | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
 	@echo "Linter: interfacer\n--------------------"
-	@gometalinter --disable-all --enable=interfacer extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
+	@gometalinter $(LINT_EXCLUDE) --disable-all --enable=interfacer $(LINT_FOLDERS) | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
 	@echo "Linter: unconvert\n--------------------"
-	@gometalinter --disable-all --enable=unconvert extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
+	@gometalinter $(LINT_EXCLUDE) --disable-all --enable=unconvert $(LINT_FOLDERS) | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
 	@echo "Linter: goconst\n--------------------"
-	@gometalinter --disable-all --enable=goconst extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
+	@gometalinter $(LINT_EXCLUDE) --disable-all --enable=goconst $(LINT_FOLDERS) | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
 	@echo "Linter: staticcheck\n--------------------"
-	@gometalinter --disable-all --deadline 45s --enable=staticcheck extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
+	@gometalinter $(LINT_EXCLUDE) --disable-all --deadline 45s --enable=staticcheck $(LINT_FOLDERS) | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
 	@echo "Linter: gas\n--------------------"
-	@gometalinter --disable-all --enable=gas extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
+	@gometalinter $(LINT_EXCLUDE) --disable-all --enable=gas $(LINT_FOLDERS) | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
 	@echo "Linter: varcheck\n--------------------"
-	@gometalinter --disable-all --deadline 60s --enable=varcheck extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
+	@gometalinter $(LINT_EXCLUDE) --disable-all --deadline 60s --enable=varcheck $(LINT_FOLDERS) | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
 	@echo "Linter: structcheck\n--------------------"
-	@gometalinter --disable-all --enable=structcheck extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
+	@gometalinter $(LINT_EXCLUDE) --disable-all --enable=structcheck $(LINT_FOLDERS) | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
 	@echo "Linter: gosimple\n--------------------"
-	@gometalinter --disable-all --deadline 45s --enable=gosimple extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
+	@gometalinter $(LINT_EXCLUDE) --disable-all --deadline 45s --enable=gosimple $(LINT_FOLDERS) | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
 
 mock-install: ##@other Install mocking tools
 	go get -u github.com/golang/mock/mockgen
@@ -158,3 +158,7 @@ ci: mock-install mock test-coverage test-e2e ##@tests Run all tests in CI
 clean: ##@other Cleanup
 	rm -fr build/bin/*
 	rm coverage.out coverage-all.out coverage.html
+
+
+LINT_EXCLUDE := --exclude='.*_mock.go' --exclude='geth/jail/doc.go'
+LINT_FOLDERS := extkeys cmd/... geth/... e2e/...

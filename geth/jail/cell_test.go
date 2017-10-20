@@ -151,7 +151,7 @@ func (s *CellTestSuite) TestJailFetchPromise() {
 	body := `{"key": "value"}`
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Content-Type", "application/json")
-		w.Write([]byte(body))
+		w.Write([]byte(body)) //nolint: errcheck
 	}))
 	defer server.Close()
 
@@ -227,7 +227,7 @@ func (s *CellTestSuite) TestJailFetchCatch() {
 		require.Equal("Error", name.String())
 		_, err = e.Object().Get("message")
 		require.NoError(err)
-	case <-time.After(1 * time.Second):
+	case <-time.After(3 * time.Second):
 		require.Fail("test timed out")
 	}
 }
@@ -238,7 +238,7 @@ func (s *CellTestSuite) TestJailFetchRace() {
 	body := `{"key": "value"}`
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Content-Type", "application/json")
-		w.Write([]byte(body))
+		w.Write([]byte(body)) //nolint: errcheck
 	}))
 	defer server.Close()
 	require := s.Require()
@@ -288,7 +288,7 @@ func (s *CellTestSuite) TestJailFetchRace() {
 			require.Equal("Error", name.String())
 			_, err = e.Object().Get("message")
 			require.NoError(err)
-		case <-time.After(1 * time.Second):
+		case <-time.After(3 * time.Second):
 			require.Fail("test timed out")
 			return
 		}
@@ -309,7 +309,7 @@ func (s *CellTestSuite) TestJailLoopCancel() {
 	require.NotNil(cell)
 
 	var count int
-	err = cell.Set("__captureResponse", func(val string) otto.Value {
+	err = cell.Set("__captureResponse", func(val string) otto.Value { //nolint: unparam
 		count++
 		return otto.UndefinedValue()
 	})

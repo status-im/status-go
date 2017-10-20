@@ -1,7 +1,6 @@
 package api_test
 
 import (
-	"context"
 	"math/rand"
 	"testing"
 	"time"
@@ -96,22 +95,26 @@ func (s *APIBackendTestSuite) TestRaceConditions() {
 			log.Info("CreateAccount()")
 			address, pubKey, mnemonic, err := s.Backend.AccountManager().CreateAccount("password")
 			s.T().Logf("CreateAccount(), error: %v (address: %v, pubKey: %v, mnemonic: %v)", err, address, pubKey, mnemonic)
-			if err == nil {
-				// SelectAccount
-				log.Info("CreateAccount()")
-				err = s.Backend.AccountManager().SelectAccount(address, "password")
-				s.T().Logf("SelectAccount(%v, %v), error: %v", address, "password", err)
-
-				// CreateChildAccount
-				log.Info("CreateChildAccount()")
-				address, pubKey, err := s.Backend.AccountManager().CreateChildAccount(address, "password")
-				s.T().Logf("CreateAccount(), error: %v (address: %v, pubKey: %v)", err, address, pubKey)
-
-				// RecoverAccount
-				log.Info("RecoverAccount()")
-				address, pubKey, err = s.Backend.AccountManager().RecoverAccount("password", mnemonic)
-				s.T().Logf("RecoverAccount(), error: %v (address: %v, pubKey: %v)", err, address, pubKey)
+			if err != nil {
+				progress <- struct{}{}
+				return
 			}
+
+			// SelectAccount
+			log.Info("CreateAccount()")
+			err = s.Backend.AccountManager().SelectAccount(address, "password")
+			s.T().Logf("SelectAccount(%v, %v), error: %v", address, "password", err)
+
+			// CreateChildAccount
+			log.Info("CreateChildAccount()")
+			address, pubKey, err = s.Backend.AccountManager().CreateChildAccount(address, "password")
+			s.T().Logf("CreateAccount(), error: %v (address: %v, pubKey: %v)", err, address, pubKey)
+
+			// RecoverAccount
+			log.Info("RecoverAccount()")
+			address, pubKey, err = s.Backend.AccountManager().RecoverAccount("password", mnemonic)
+			s.T().Logf("RecoverAccount(), error: %v (address: %v, pubKey: %v)", err, address, pubKey)
+
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
@@ -239,9 +242,7 @@ func (s *APIBackendTestSuite) TestResetChainData() {
 	s.StartTestBackend(params.RinkebyNetworkID)
 	defer s.StopTestBackend()
 
-	ctx, cancel := context.WithTimeout(context.Background(), DefaultNodeSyncTimeout)
-	defer cancel()
-	s.Nil(EnsureNodeSync(ctx, s.Backend.NodeManager()), "cannot ensure node synchronization")
+	s.NoError(EnsureNodeSync(s.Backend.NodeManager()), "cannot ensure node synchronization")
 
 	s.True(s.Backend.IsNodeRunning())
 	nodeReady, err := s.Backend.ResetChainData()

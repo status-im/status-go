@@ -32,6 +32,8 @@ var (
 )
 
 // NodeManager manages Status node (which abstracts contained geth node)
+// nolint: golint
+// should be fixed at https://github.com/status-im/status-go/issues/200
 type NodeManager struct {
 	sync.RWMutex
 	config         *params.NodeConfig // Status node configuration
