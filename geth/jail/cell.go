@@ -67,7 +67,7 @@ func registerVMHandlers(vm *vm.VM, lo *loop.Loop) error {
 	}
 
 	// FetchAPI functions
-	return fetch.Define(v, lo)
+	return fetch.Define(vm, lo)
 }
 
 // Stop halts event loop associated with cell.

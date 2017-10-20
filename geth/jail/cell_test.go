@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/robertkrimen/otto"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -21,7 +20,11 @@ type CellTestSuite struct {
 }
 
 func (s *CellTestSuite) SetupTest() {
-	s.cell = NewCell("testCell1")
+	cell, err := NewCell("testCell1")
+	s.NoError(err)
+	s.NotNil(cell)
+
+	s.cell = cell
 }
 
 func (s *CellTestSuite) TearDownTest() {
@@ -121,9 +124,9 @@ func (s *CellTestSuite) TestCellFetchRace() {
 			s.NoError(err)
 			s.Equal("Error", name.String())
 			_, err = e.Object().Get("message")
-			require.NoError(err)
+			s.NoError(err)
 		case <-time.After(5 * time.Second):
-			require.Fail("test timed out")
+			s.Fail("test timed out")
 			return
 		}
 	}

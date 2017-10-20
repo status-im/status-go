@@ -89,7 +89,11 @@ func (j *Jail) createCell(chatID string) (*Cell, error) {
 		return cell, fmt.Errorf("cell with id '%s' already exists", chatID)
 	}
 
-	cell := NewCell(chatID)
+	cell, err := NewCell(chatID)
+	if err != nil {
+		return nil, err
+	}
+
 	j.cells[chatID] = cell
 
 	return cell, nil
