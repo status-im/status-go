@@ -79,7 +79,7 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 
 	deliveryManager := new(notifications.DeliveryService)
 
-	ethNode, err := MakeNode(config)
+	ethNode, err := MakeNode(config, deliveryManager)
 	if err != nil {
 		return nil, err
 	}
