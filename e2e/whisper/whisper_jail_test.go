@@ -13,6 +13,7 @@ import (
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/e2e"
 	"github.com/status-im/status-go/geth/common"
+	"github.com/status-im/status-go/geth/common/services"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/static"
 	. "github.com/status-im/status-go/testing"
@@ -42,7 +43,7 @@ type WhisperJailTestSuite struct {
 	e2e.BackendTestSuite
 
 	Timeout    time.Duration
-	WhisperAPI *whisper.PublicWhisperAPI
+	WhisperAPI services.WhisperAPI
 	Jail       common.JailManager
 }
 

@@ -5,19 +5,18 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"sync/atomic"
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	eles "github.com/ethereum/go-ethereum/les"
-	enode "github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/common/geth"
 	"github.com/status-im/status-go/geth/common/services"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
-	erpc "github.com/status-im/status-go/geth/rpc"
 	"github.com/status-im/status-go/geth/signal"
 )
 
@@ -43,23 +42,29 @@ const (
 // uses interfaces to prevent races on exported objects.
 type NodeManager struct {
 	state  *int32
-	config atomic.Value // Status node configuration
+	constr geth.NodeConstructor // Status node configuration
+	lock   *sync.RWMutex
 
-	node    *node
+	node    geth.Node
 	les     *les
 	whisper *whisper
-	rpc     *rpc
+	rpc     rpcAccess
+
+	logger logger
 }
 
 // NewNodeManager makes new instance of node manager
 func NewNodeManager() *NodeManager {
 	var isStarted int32 = pending
+
 	m := &NodeManager{
 		state:   &isStarted,
+		lock:    &sync.RWMutex{},
 		node:    newNode(),
 		les:     newLES(),
 		whisper: newWhisper(),
 		rpc:     newRPC(),
+		logger:  newLog(),
 	}
 
 	go HaltOnInterruptSignal(m) // allow interrupting running nodes
@@ -68,29 +73,37 @@ func NewNodeManager() *NodeManager {
 }
 
 // StartNode start Status node, fails if node is already started.
-func (m *NodeManager) StartNode(config *params.NodeConfig) error {
+func (m *NodeManager) StartNode(constr geth.NodeConstructor) error {
 	if m.isNodeStarted() {
 		return ErrNodeExists
 	}
 
-	m.initLog(config)
-
-	return m.startNode(config)
-}
-
-// startNode start Status node, fails if node is already started.
-func (m *NodeManager) startNode(config *params.NodeConfig) error {
+	m.setNodeConstructor(constr)
+	m.initNodeLog()
 	m.setPendingState()
 
-	ethNode, err := m.newNode(config)
+	ethNode, err := m.newNode()
 	if err != nil {
 		return err
 	}
 
+	return m.startNode(ethNode)
+}
+
+func (m *NodeManager) setNodeConstructor(constr geth.NodeConstructor) {
+	m.lock.Lock()
+	m.constr = constr
+	m.lock.Unlock()
+}
+
+// startNode start Status node, fails if node is already started.
+func (m *NodeManager) startNode(ethNode geth.Node) error {
+	m.setPendingState()
+
 	defer HaltOnPanic()
 
-	m.setNode(ethNode)
-	m.setConfig(config)
+	m.node.SetNode(ethNode.GetNode())
+	m.constr.SetConfig(m.constr.Config())
 	m.initRPCClient(ethNode)
 
 	// underlying node is started, every method can use it, we use it immediately
@@ -105,14 +118,11 @@ func (m *NodeManager) startNode(config *params.NodeConfig) error {
 	return nil
 }
 
-func (m *NodeManager) newNode(config *params.NodeConfig) (*enode.Node, error) {
-	ethNode, err := MakeNode(config)
+func (m *NodeManager) newNode() (geth.Node, error) {
+	ethNode, err := m.constr.Make()
 	if err != nil {
 		return nil, err
 	}
-
-	m.node.Lock()
-	defer m.node.Unlock()
 
 	if err = ethNode.Start(); err != nil {
 		m.setFailed(fmt.Errorf("%v: %v", ErrNodeStartFailure, err))
@@ -124,18 +134,14 @@ func (m *NodeManager) newNode(config *params.NodeConfig) (*enode.Node, error) {
 }
 
 // initRPCClient up on given node, in case an error stops node.
-func (m *NodeManager) initRPCClient(node *enode.Node) {
-	rpcClient, err := erpc.NewClient(node, m.getUpstreamConfig())
+func (m *NodeManager) initRPCClient(node geth.Node) {
+	err := m.rpc.Init(node.GetNode(), m.getUpstreamConfig())
 	if err != nil {
 		log.Error("Init RPC client failed:", "error", err)
 		m.setFailed(ErrRPCClient)
 
 		return
 	}
-
-	m.rpc.Lock()
-	m.rpc.RPCClient = rpcClient
-	m.rpc.Unlock()
 }
 
 // StopNode stop Status node. Stopped node cannot be resumed.
@@ -148,9 +154,7 @@ func (m *NodeManager) StopNode() error {
 }
 
 func (m *NodeManager) stop() error {
-	m.node.Lock()
 	err := m.node.Stop()
-	m.node.Unlock()
 	if err != nil {
 		return err
 	}
@@ -166,7 +170,7 @@ func (m *NodeManager) Node() (geth.Node, error) {
 		return nil, err
 	}
 
-	return m.getNode(), nil
+	return m.node, nil
 }
 
 // PopulateStaticPeers connects current node with our publicly available LES/SHH/Swarm cluster.
@@ -208,9 +212,7 @@ func (m *NodeManager) AddPeer(url string) error {
 
 // addPeer adds new static peer node.
 func (m *NodeManager) addPeer(url string) error {
-	m.node.Lock()
 	server := m.node.Server()
-	m.node.Unlock()
 	if server == nil {
 		return ErrNoRunningNode
 	}
@@ -238,9 +240,9 @@ func (m *NodeManager) ResetChainData() error {
 // resetChainData remove chain data from data directory.
 // Node is stopped, and new node is started, with clean data directory.
 func (m *NodeManager) resetChainData() error {
-	prevConfig := m.getConfig()
+	config := m.constr.Config()
 
-	err := m.removeChainData(prevConfig.DataDir, prevConfig.Name)
+	err := m.removeChainData(config.DataDir, config.Name)
 	if err != nil {
 		return err
 	}
@@ -280,14 +282,17 @@ func (m *NodeManager) RestartNode() error {
 
 // restartNode restart running Status node, fails if node is not running.
 func (m *NodeManager) restartNode() error {
-	prevConfig := m.getConfig()
-
 	err := m.stop()
 	if err != nil {
 		return err
 	}
 
-	return m.startNode(prevConfig)
+	ethNode, err := m.newNode()
+	if err != nil {
+		return err
+	}
+
+	return m.startNode(ethNode)
 }
 
 // NodeConfig exposes reference to running node's configuration.
@@ -296,7 +301,7 @@ func (m *NodeManager) NodeConfig() (*params.NodeConfig, error) {
 		return nil, err
 	}
 
-	return m.getConfig(), nil
+	return m.constr.Config(), nil
 }
 
 // LightEthereumService exposes reference to LES service running on top of the node.
@@ -393,14 +398,7 @@ func (m *NodeManager) AccountKeyStore() (*keystore.KeyStore, error) {
 
 // RPCClient exposes reference to RPC client connected to the running node.
 func (m *NodeManager) RPCClient() geth.RPCClient {
-	m.rpc.RLock()
-	defer m.rpc.RUnlock()
-
-	if m.rpc == nil {
-		return nil
-	}
-
-	return m.rpc
+	return m.rpc.Client()
 }
 
 // GetStatusBackend exposes StatusBackend interface.
@@ -413,19 +411,12 @@ func (m *NodeManager) GetStatusBackend() (services.StatusBackend, error) {
 	return les.back, nil
 }
 
-// initLog initializes global logger parameters based on
+// initNodeLog initializes global logger parameters based on
 // provided node configurations.
-func (m *NodeManager) initLog(config *params.NodeConfig) {
-	log.SetLevel(config.LogLevel)
+func (m *NodeManager) initNodeLog() {
+	config := m.constr.Config()
 
-	if config.LogFile == "" {
-		return
-	}
-
-	err := log.SetLogFile(config.LogFile)
-	if err != nil {
-		fmt.Println("Failed to open log file, using stdout")
-	}
+	m.logger.Init(config.LogFile, config.LogLevel)
 }
 
 // isNodeAvailable check if we have a node running and make sure is fully started.
@@ -461,50 +452,26 @@ func (m *NodeManager) isNodePending() bool {
 	return atomic.LoadInt32(m.state) == pending
 }
 
-func (m *NodeManager) setConfig(config *params.NodeConfig) {
-	m.config.Store(*config)
-}
-
-func (m *NodeManager) getConfig() *params.NodeConfig {
-	config := m.config.Load()
-	configValue := config.(params.NodeConfig)
-
-	return &configValue
-}
-
 func (m *NodeManager) getBootClusterEnabled() bool {
-	config := m.getConfig()
+	config := m.constr.Config()
 	bootCluster := config.BootClusterConfig.Enabled
 
 	return bootCluster
 }
 
 func (m *NodeManager) getUpstreamConfig() params.UpstreamRPCConfig {
-	config := m.getConfig()
+	config := m.constr.Config()
 	upstreamConfig := config.UpstreamConfig
 
 	return upstreamConfig
 }
 
 func (m *NodeManager) getBootNodes() []string {
-	config := m.getConfig()
+	config := m.constr.Config()
 	nodes := make([]string, len(config.BootClusterConfig.BootNodes))
 	copy(nodes, config.BootClusterConfig.BootNodes)
 
 	return nodes
-}
-
-func (m *NodeManager) setNode(n geth.Node) {
-	m.node.Lock()
-	m.node.Node = n
-	m.node.Unlock()
-}
-
-func (m *NodeManager) getNode() geth.Node {
-	m.node.RLock()
-	defer m.node.RUnlock()
-
-	return m.node
 }
 
 // setStarted sets node into started state: start channel closed, and send Started signal.

@@ -25,8 +25,10 @@ import (
 	"github.com/ethereum/go-ethereum/whisper/mailserver"
 	"github.com/ethereum/go-ethereum/whisper/notifications"
 	"github.com/ethereum/go-ethereum/whisper/whisperv5"
+	"github.com/status-im/status-go/geth/common/geth"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
+	"sync/atomic"
 )
 
 // node-related errors
@@ -39,8 +41,20 @@ var (
 	ErrNodeStartFailure                  = errors.New("error starting p2p node")
 )
 
-// MakeNode create a geth node entity
-func MakeNode(config *params.NodeConfig) (*enode.Node, error) {
+type nodeConstructor struct {
+	config atomic.Value
+}
+
+func NewNodeConstructor(config *params.NodeConfig) *nodeConstructor {
+	c := &nodeConstructor{}
+	c.SetConfig(config)
+	return c
+}
+
+// Make create a geth node entity
+func (c *nodeConstructor) Make() (geth.Node, error) {
+	config := c.getConfig()
+
 	// make sure data directory exists
 	if err := os.MkdirAll(filepath.Join(config.DataDir), os.ModePerm); err != nil {
 		return nil, err
@@ -51,8 +65,8 @@ func MakeNode(config *params.NodeConfig) (*enode.Node, error) {
 		return nil, err
 	}
 
-	// configure required node (should you need to update node's config, e.g. add bootstrap nodes, see node.Config)
-	stackConfig := defaultEmbeddedNodeConfig(config)
+	// configure required node (should you need to update node's c, e.g. add bootstrap nodes, see node.Config)
+	stackConfig := c.defaultEmbeddedNodeConfig()
 
 	if len(config.NodeKeyFile) > 0 {
 		log.Info("Loading private key file", "file", config.NodeKeyFile)
@@ -72,21 +86,38 @@ func MakeNode(config *params.NodeConfig) (*enode.Node, error) {
 
 	// Start Ethereum service if we are not expected to use an upstream server.
 	if !config.UpstreamConfig.Enabled {
-		if err := activateEthService(stack, config); err != nil {
+		if err := c.activateEthService(stack); err != nil {
 			return nil, fmt.Errorf("%v: %v", ErrEthServiceRegistrationFailure, err)
 		}
 	}
 
 	// start Whisper service
-	if err := activateShhService(stack, config); err != nil {
+	if err := c.activateShhService(stack); err != nil {
 		return nil, fmt.Errorf("%v: %v", ErrWhisperServiceRegistrationFailure, err)
 	}
 
-	return stack, nil
+	return newNode(stack), nil
+}
+
+func (c *nodeConstructor) Config() *params.NodeConfig {
+	return c.getConfig()
+}
+
+func (c *nodeConstructor) SetConfig(config *params.NodeConfig) {
+	c.config.Store(*config)
+}
+
+func (c *nodeConstructor) getConfig() *params.NodeConfig {
+	config := c.config.Load()
+	configValue := config.(params.NodeConfig)
+
+	return &configValue
 }
 
 // defaultEmbeddedNodeConfig returns default stack configuration for mobile client node
-func defaultEmbeddedNodeConfig(config *params.NodeConfig) *enode.Config {
+func (c *nodeConstructor) defaultEmbeddedNodeConfig() *enode.Config {
+	config := c.getConfig()
+
 	nc := &enode.Config{
 		DataDir:           config.DataDir,
 		KeyStoreDir:       config.KeyStoreDir,
@@ -105,10 +136,10 @@ func defaultEmbeddedNodeConfig(config *params.NodeConfig) *enode.Config {
 			MaxPeers:         config.MaxPeers,
 			MaxPendingPeers:  config.MaxPendingPeers,
 		},
-		IPCPath:     makeIPCPath(config),
+		IPCPath:     c.makeIPCPath(),
 		HTTPCors:    []string{"*"},
 		HTTPModules: strings.Split(config.APIModules, ","),
-		WSHost:      makeWSHost(config),
+		WSHost:      c.makeWSHost(),
 		WSPort:      config.WSPort,
 		WSOrigins:   []string{"*"},
 		WSModules:   strings.Split(config.APIModules, ","),
@@ -123,7 +154,9 @@ func defaultEmbeddedNodeConfig(config *params.NodeConfig) *enode.Config {
 }
 
 // updateCHT changes trusted canonical hash trie root
-func updateCHT(eth *eles.LightEthereum, config *params.NodeConfig) {
+func (c *nodeConstructor) updateCHT(eth *eles.LightEthereum) {
+	config := c.getConfig()
+
 	if !config.BootClusterConfig.Enabled {
 		return
 	}
@@ -145,7 +178,9 @@ func updateCHT(eth *eles.LightEthereum, config *params.NodeConfig) {
 }
 
 // activateEthService configures and registers the eth.Ethereum service with a given node.
-func activateEthService(stack *enode.Node, config *params.NodeConfig) error {
+func (c *nodeConstructor) activateEthService(stack *enode.Node) error {
+	config := c.getConfig()
+
 	if !config.LightEthConfig.Enabled {
 		log.Info("LES protocol is disabled")
 		return nil
@@ -168,7 +203,7 @@ func activateEthService(stack *enode.Node, config *params.NodeConfig) error {
 	if err := stack.Register(func(ctx *enode.ServiceContext) (enode.Service, error) {
 		lightEth, err := eles.New(ctx, &ethConf)
 		if err == nil {
-			updateCHT(lightEth, config)
+			c.updateCHT(lightEth)
 		}
 
 		return lightEth, err
@@ -180,7 +215,9 @@ func activateEthService(stack *enode.Node, config *params.NodeConfig) error {
 }
 
 // activateShhService configures Whisper and adds it to the given node.
-func activateShhService(stack *enode.Node, config *params.NodeConfig) error {
+func (c *nodeConstructor) activateShhService(stack *enode.Node) error {
+	config := c.getConfig()
+
 	if !config.WhisperConfig.Enabled {
 		log.Info("SHH protocol is disabled")
 		return nil
@@ -217,7 +254,9 @@ func activateShhService(stack *enode.Node, config *params.NodeConfig) error {
 }
 
 // makeIPCPath returns IPC-RPC filename
-func makeIPCPath(config *params.NodeConfig) string {
+func (c *nodeConstructor) makeIPCPath() string {
+	config := c.getConfig()
+
 	if !config.IPCEnabled {
 		return ""
 	}
@@ -226,7 +265,9 @@ func makeIPCPath(config *params.NodeConfig) string {
 }
 
 // makeWSHost returns WS-RPC Server host, given enabled/disabled flag
-func makeWSHost(config *params.NodeConfig) string {
+func (c *nodeConstructor) makeWSHost() string {
+	config := c.getConfig()
+
 	if !config.WSEnabled {
 		return ""
 	}

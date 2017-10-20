@@ -61,7 +61,8 @@ func (s *NodeManagerTestSuite) StartTestNode(networkID int, opts ...TestNodeOpti
 	// import account keys
 	importTestAccouns(nodeConfig.KeyStoreDir)
 
-	_ = s.NodeManager.StartNode(nodeConfig)
+	err := s.NodeManager.StartNode(node.NewNodeConstructor(nodeConfig))
+	s.NoError(err)
 }
 
 // StopTestNode attempts to stop initialized NodeManager.

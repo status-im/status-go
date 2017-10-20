@@ -57,9 +57,9 @@ func (s *RPCTestSuite) TestCallRPC() {
 			nodeConfig.UpstreamConfig.URL = "https://rinkeby.infura.io/nKmXgiFgc2KqtoQ8BCGJ"
 		}
 
-		nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
+		constr := node.NewNodeConstructor(nodeConfig)
+		err = s.NodeManager.StartNode(constr)
 		s.NoError(err)
-		<-nodeStarted
 
 		rpcClient := s.NodeManager.RPCClient()
 		s.NotNil(rpcClient)
@@ -128,9 +128,8 @@ func (s *RPCTestSuite) TestCallRPC() {
 		case <-done:
 		}
 
-		stoppedNode, err := s.NodeManager.StopNode()
+		err = s.NodeManager.StopNode()
 		s.NoError(err)
-		<-stoppedNode
 	}
 }
 
@@ -139,9 +138,9 @@ func (s *RPCTestSuite) TestCallRawResult() {
 	nodeConfig, err := e2e.MakeTestNodeConfig(params.RopstenNetworkID)
 	s.NoError(err)
 
-	nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
+	constr := node.NewNodeConstructor(nodeConfig)
+	err = s.NodeManager.StartNode(constr)
 	s.NoError(err)
-	<-nodeStarted
 
 	client := s.NodeManager.RPCClient()
 	s.NotNil(client)

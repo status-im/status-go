@@ -72,7 +72,7 @@ func (m *StatusBackend) StartNode(config *params.NodeConfig) (<-chan struct{}, e
 		return nil, node.ErrNodeExists
 	}
 
-	err := m.nodeManager.StartNode(config)
+	err := m.nodeManager.StartNode(node.NewNodeConstructor(config))
 	if err != nil {
 		return nil, err
 	}

@@ -190,12 +190,14 @@ func (s *ManagerTestSuite) TestNodeStartStop() {
 	err = s.NodeManager.StopNode()
 	s.Equal(err, node.ErrNoRunningNode)
 
+	constr := node.NewNodeConstructor(nodeConfig)
+
 	// start node
-	err = s.NodeManager.StartNode(nodeConfig)
+	err = s.NodeManager.StartNode(constr)
 	s.NoError(err)
 
 	// try starting another node (w/o stopping the previously started node)
-	err = s.NodeManager.StartNode(nodeConfig)
+	err = s.NodeManager.StartNode(constr)
 	s.Equal(err, node.ErrNodeExists)
 
 	// now stop node
@@ -203,7 +205,7 @@ func (s *ManagerTestSuite) TestNodeStartStop() {
 	s.NoError(err)
 
 	// start new node with exactly the same config
-	err = s.NodeManager.StartNode(nodeConfig)
+	err = s.NodeManager.StartNode(constr)
 	s.NoError(err)
 
 	// finally stop the node
@@ -216,7 +218,8 @@ func (s *ManagerTestSuite) TestNetworkSwitching() {
 	nodeConfig, err := e2e.MakeTestNodeConfig(params.RopstenNetworkID)
 	s.NoError(err)
 
-	err = s.NodeManager.StartNode(nodeConfig)
+	constr := node.NewNodeConstructor(nodeConfig)
+	err = s.NodeManager.StartNode(constr)
 	s.NoError(err)
 
 	firstHash, err := e2e.FirstBlockHash(s.NodeManager)
@@ -231,7 +234,8 @@ func (s *ManagerTestSuite) TestNetworkSwitching() {
 	nodeConfig, err = e2e.MakeTestNodeConfig(params.RinkebyNetworkID)
 	s.NoError(err)
 
-	err = s.NodeManager.StartNode(nodeConfig)
+	constr = node.NewNodeConstructor(nodeConfig)
+	err = s.NodeManager.StartNode(constr)
 	s.NoError(err)
 
 	// make sure we are on another network indeed
@@ -250,7 +254,7 @@ func (s *ManagerTestSuite) TestStartNodeWithUpstreamEnabled() {
 	nodeConfig.UpstreamConfig.Enabled = true
 	nodeConfig.UpstreamConfig.URL = "https://ropsten.infura.io/nKmXgiFgc2KqtoQ8BCGJ"
 
-	err = s.NodeManager.StartNode(nodeConfig)
+	err = s.NodeManager.StartNode(node.NewNodeConstructor(nodeConfig))
 	s.NoError(err)
 
 	err = s.NodeManager.StopNode()
@@ -311,7 +315,7 @@ func (s *ManagerTestSuite) TestRaceConditions() {
 	var funcsToTest = []func(*params.NodeConfig){
 		func(config *params.NodeConfig) {
 			log.Info("StartNode()")
-			err := s.NodeManager.StartNode(config)
+			err := s.NodeManager.StartNode(node.NewNodeConstructor(config))
 			s.T().Logf("StartNode() for network: %d, error: %v", config.NetworkID, err)
 			progress <- struct{}{}
 		},
@@ -426,13 +430,14 @@ func (s *ManagerTestSuite) TestNodeStartCrash_DoubleStartNode_Error() {
 	s.NoError(err)
 
 	// start node outside the manager (on the same port), so that manager node.Start() method fails
-	outsideNode, err := node.MakeNode(nodeConfig)
+	constr := node.NewNodeConstructor(nodeConfig)
+	outsideNode, err := constr.Make()
 	s.NoError(err)
 	err = outsideNode.Start()
 	s.NoError(err)
 
 	// now try starting using node manager
-	err = s.NodeManager.StartNode(nodeConfig)
+	err = s.NodeManager.StartNode(constr)
 	s.Error(err) // no error is thrown, as node is started in separate routine
 
 	select {
@@ -464,7 +469,8 @@ func (s *ManagerTestSuite) TestNodeStart_CrashSignal_Success() {
 
 	// no deadlock, and no signal this time, manager should be able to start node
 	signalReceived = make(chan struct{})
-	err = s.NodeManager.StartNode(nodeConfig)
+	constr := node.NewNodeConstructor(nodeConfig)
+	err = s.NodeManager.StartNode(constr)
 	s.NoError(err)
 
 	select {

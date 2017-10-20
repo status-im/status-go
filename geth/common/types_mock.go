@@ -42,15 +42,15 @@ func (m *MockNodeManager) EXPECT() *MockNodeManagerMockRecorder {
 }
 
 // StartNode mocks base method
-func (m *MockNodeManager) StartNode(config *params.NodeConfig) error {
-	ret := m.ctrl.Call(m, "StartNode", config)
+func (m *MockNodeManager) StartNode(arg0 geth.NodeConstructor) error {
+	ret := m.ctrl.Call(m, "StartNode", arg0)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // StartNode indicates an expected call of StartNode
-func (mr *MockNodeManagerMockRecorder) StartNode(config interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StartNode", reflect.TypeOf((*MockNodeManager)(nil).StartNode), config)
+func (mr *MockNodeManagerMockRecorder) StartNode(arg0 interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StartNode", reflect.TypeOf((*MockNodeManager)(nil).StartNode), arg0)
 }
 
 // StopNode mocks base method

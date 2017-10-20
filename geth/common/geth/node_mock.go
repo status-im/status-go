@@ -38,6 +38,28 @@ func (m *MockNode) EXPECT() *MockNodeMockRecorder {
 	return m.recorder
 }
 
+// GetNode mocks base method
+func (m *MockNode) GetNode() *node.Node {
+	ret := m.ctrl.Call(m, "GetNode")
+	ret0, _ := ret[0].(*node.Node)
+	return ret0
+}
+
+// GetNode indicates an expected call of GetNode
+func (mr *MockNodeMockRecorder) GetNode() *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNode", reflect.TypeOf((*MockNode)(nil).GetNode))
+}
+
+// SetNode mocks base method
+func (m *MockNode) SetNode(arg0 *node.Node) {
+	m.ctrl.Call(m, "SetNode", arg0)
+}
+
+// SetNode indicates an expected call of SetNode
+func (mr *MockNodeMockRecorder) SetNode(arg0 interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetNode", reflect.TypeOf((*MockNode)(nil).SetNode), arg0)
+}
+
 // Register mocks base method
 func (m *MockNode) Register(constructor node.ServiceConstructor) error {
 	ret := m.ctrl.Call(m, "Register", constructor)

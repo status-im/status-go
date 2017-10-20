@@ -27,7 +27,8 @@ func (s *RPCClientTestSuite) TestNewClient() {
 	config, err := e2e.MakeTestNodeConfig(params.RinkebyNetworkID)
 	s.NoError(err)
 
-	node, err := node.MakeNode(config)
+	constr := node.NewNodeConstructor(config)
+	node, err := constr.Make()
 	s.NoError(err)
 
 	err = node.Start()

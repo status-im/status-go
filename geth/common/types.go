@@ -45,7 +45,7 @@ func (k *SelectedExtKey) Hex() string {
 // NodeManager defines expected methods for managing Status node
 type NodeManager interface {
 	// StartNode start Status node, fails if node is already started
-	StartNode(config *params.NodeConfig) error
+	StartNode(geth.NodeConstructor) error
 
 	// StopNode stop the running Status node.
 	// Stopped node cannot be resumed, one starts a new node instead.
