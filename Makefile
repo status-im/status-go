@@ -73,6 +73,7 @@ statusgo-ios-simulator-mainnet: xgo
 	@echo "iOS framework cross compilation done (mainnet)."
 
 ci: mock
+	build/env.sh go test -timeout 40m -v ./geth/account
 	build/env.sh go test -timeout 40m -v ./geth/api/...
 	build/env.sh go test -timeout 40m -v ./geth/common
 	build/env.sh go test -timeout 40m -v ./geth/jail
@@ -145,6 +146,8 @@ mock: mock-install ##@other Regenerate mocks
 
 test: ##@tests Run tests
 	@build/env.sh echo "mode: set" > coverage-all.out
+	build/env.sh go test -coverprofile=coverage.out -covermode=set ./geth/account
+	@build/env.sh tail -n +2 coverage.out >> coverage-all.out
 	build/env.sh go test -coverprofile=coverage.out -covermode=set ./geth/api
 	@build/env.sh tail -n +2 coverage.out >> coverage-all.out
 	build/env.sh go test -coverprofile=coverage.out -covermode=set ./geth/common
@@ -161,6 +164,11 @@ test: ##@tests Run tests
 	@build/env.sh tail -n +2 coverage.out >> coverage-all.out
 	@build/env.sh go tool cover -html=coverage-all.out -o coverage.html
 	@build/env.sh go tool cover -func=coverage-all.out
+
+test-account:
+	build/env.sh go test -v -coverprofile=coverage.out ./geth/account
+	@build/env.sh go tool cover -html=coverage.out -o coverage.html
+	@build/env.sh go tool cover -func=coverage.out
 
 test-api:
 	build/env.sh go test -v -coverprofile=coverage.out  -coverpkg=./geth/node ./geth/api
