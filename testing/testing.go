@@ -2,10 +2,12 @@ package integration
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
@@ -64,4 +66,40 @@ func LoadFromFile(filename string) string {
 	f.Close()
 
 	return string(buf.Bytes())
+}
+
+// EnsureNodeSync waits until node synchronzation is done to continue
+// with tests afterwards. Returns an error in case of a timeout.
+func EnsureNodeSync(nodeManager common.NodeManager) error {
+	les, err := nodeManager.LightEthereumService()
+	if err != nil {
+		return err
+	}
+	if les == nil {
+		return errors.New("LightEthereumService is nil")
+	}
+
+	timeouter := time.NewTimer(20 * time.Minute)
+	defer timeouter.Stop()
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-timeouter.C:
+			return errors.New("timout during node synchronization")
+		case <-ticker.C:
+			downloader := les.Downloader()
+
+			if downloader != nil {
+				isSyncing := downloader.Synchronising()
+				progress := downloader.Progress()
+
+				if !isSyncing && progress.HighestBlock > 0 && progress.CurrentBlock >= progress.HighestBlock {
+					return nil
+				}
+			}
+
+		}
+	}
 }

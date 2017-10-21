@@ -2,6 +2,7 @@ package main
 
 import "C"
 import (
+	"context"
 	"encoding/json"
 	"io/ioutil"
 	"math/big"
@@ -216,8 +217,10 @@ func testResetChainData(t *testing.T) bool {
 		return false
 	}
 
-	// FIXME(tiabc): EnsureNodeSync the same way as in e2e tests.
-	time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // allow to re-sync blockchain
+	if err := EnsureNodeSync(statusAPI.NodeManager()); err != nil {
+		t.Errorf("cannot ensure node synchronization: %v", err)
+		return false
+	}
 
 	testCompleteTransaction(t)
 
@@ -728,7 +731,10 @@ func testCompleteTransaction(t *testing.T) bool {
 
 	txQueue.Reset()
 
-	time.Sleep(5 * time.Second) // allow to sync
+	if err := EnsureNodeSync(statusAPI.NodeManager()); err != nil {
+		t.Errorf("cannot ensure node synchronization: %v", err)
+		return false
+	}
 
 	// log into account from which transactions will be sent
 	if err := statusAPI.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password); err != nil {
@@ -1256,7 +1262,8 @@ func testJailParseInvalid(t *testing.T) bool {
 	response := C.GoString(Parse(C.CString("CHAT_ID_INIT_TEST"), C.CString(extraInvalidCode)))
 
 	// Assert.
-	expectedResponse := `{"error":"(anonymous): Line 16331:50 Unexpected end of input (and 1 more errors)"}`
+	// expectedResponse := `{"error":"(anonymous): Line 16331:50 Unexpected end of input (and 1 more errors)"}`
+	expectedResponse := `{"error":"(anonymous): Line 16354:50 Unexpected end of input (and 1 more errors)"}`
 	if expectedResponse != response {
 		t.Errorf("unexpected response, expected: %v, got: %v", expectedResponse, response)
 		return false
@@ -1305,7 +1312,7 @@ func testJailFunctionCall(t *testing.T) bool {
 	// call with wrong chat id
 	rawResponse := Call(C.CString("CHAT_IDNON_EXISTENT"), C.CString(""), C.CString(""))
 	parsedResponse := C.GoString(rawResponse)
-	expectedError := `{"error":"Cell[CHAT_IDNON_EXISTENT] doesn't exist."}`
+	expectedError := `{"error":"cell[CHAT_IDNON_EXISTENT] doesn't exist"}`
 	if parsedResponse != expectedError {
 		t.Errorf("expected error is not returned: expected %s, got %s", expectedError, parsedResponse)
 		return false
@@ -1360,9 +1367,11 @@ func startTestNode(t *testing.T) <-chan struct{} {
 		if envelope.Type == signal.EventNodeReady {
 			// sync
 			if syncRequired {
-				t.Logf("Sync is required, it will take %d seconds", TestConfig.Node.SyncSeconds)
-				// FIXME(tiabc): EnsureNodeSync the same way as in e2e tests.
-				time.Sleep(TestConfig.Node.SyncSeconds * time.Second) // LES syncs headers, so that we are up do date when it is done
+				t.Logf("Sync is required")
+				if err := EnsureNodeSync(statusAPI.NodeManager()); err != nil {
+					t.Errorf("cannot ensure node synchronization: %v", err)
+					return
+				}
 			} else {
 				time.Sleep(5 * time.Second)
 			}
