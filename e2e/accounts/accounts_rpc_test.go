@@ -19,7 +19,7 @@ type AccountsRPCTestSuite struct {
 }
 
 func (s *AccountsTestSuite) TestRPCEthAccounts() {
-	s.StartTestBackend(params.RopstenNetworkID)
+	s.StartTestBackend(params.StatusChainNetworkID)
 	defer s.StopTestBackend()
 
 	// log into test account
@@ -40,6 +40,9 @@ func (s *AccountsTestSuite) TestRPCEthAccounts() {
 }
 
 func (s *AccountsTestSuite) TestRPCEthAccountsWithUpstream() {
+	// FIXME(tiabc): Stop skipping after https://github.com/status-im/status-go/issues/424
+	s.T().Skip()
+
 	s.StartTestBackend(
 		params.RopstenNetworkID,
 		e2e.WithUpstream("https://ropsten.infura.io/z6GCTmjdP3FETEJmMBI4"),

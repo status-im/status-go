@@ -4,6 +4,7 @@ import "C"
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"math/big"
 	"os"
@@ -18,10 +19,6 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	gethparams "github.com/ethereum/go-ethereum/params"
 
-	"fmt"
-
-	"context"
-
 	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
@@ -35,7 +32,7 @@ import (
 const zeroHash = "0x0000000000000000000000000000000000000000000000000000000000000000"
 
 var nodeConfigJSON = `{
-	"NetworkId": ` + strconv.Itoa(params.RopstenNetworkID) + `,
+	"NetworkId": ` + strconv.Itoa(params.StatusChainNetworkID) + `,
 	"DataDir": "` + TestDataDir + `",
 	"HTTPPort": ` + strconv.Itoa(TestConfig.Node.HTTPPort) + `,
 	"WSPort": ` + strconv.Itoa(TestConfig.Node.WSPort) + `,
@@ -176,6 +173,7 @@ func testGetDefaultConfig(t *testing.T) bool {
 		{params.MainNetworkID, gethparams.MainnetChainConfig},
 		{params.RopstenNetworkID, gethparams.TestnetChainConfig},
 		{params.RinkebyNetworkID, gethparams.RinkebyChainConfig},
+		// TODO(tiabc): The same for params.StatusChainNetworkID
 	}
 	for i := range networks {
 		network := networks[i]

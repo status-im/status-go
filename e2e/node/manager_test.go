@@ -194,7 +194,7 @@ func (s *ManagerTestSuite) TestReferencesWithStartedNode() {
 }
 
 func (s *ManagerTestSuite) TestNodeStartStop() {
-	nodeConfig, err := e2e.MakeTestNodeConfig(params.RopstenNetworkID)
+	nodeConfig, err := e2e.MakeTestNodeConfig(params.StatusChainNetworkID)
 	s.NoError(err)
 
 	// try stopping non-started node
@@ -335,7 +335,7 @@ func (s *ManagerTestSuite) TestRaceConditions() {
 	progress := make(chan struct{}, cnt)
 	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	nodeConfig1, e := e2e.MakeTestNodeConfig(params.RopstenNetworkID)
+	nodeConfig1, e := e2e.MakeTestNodeConfig(params.StatusChainNetworkID)
 	s.NoError(e)
 
 	nodeConfig2, e := e2e.MakeTestNodeConfig(params.RinkebyNetworkID)
