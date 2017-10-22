@@ -226,7 +226,7 @@ func testResetChainData(t *testing.T) bool {
 }
 
 func testStopResumeNode(t *testing.T) bool { //nolint: gocyclo
-	// to make sure that we start with empty account (which might get populated during previous tests)
+	// to make sure that we start with empty account (which might have gotten populated during previous tests)
 	if err := statusAPI.Logout(); err != nil {
 		t.Fatal(err)
 	}
@@ -270,6 +270,8 @@ func testStopResumeNode(t *testing.T) bool { //nolint: gocyclo
 	// nolint: dupl
 	stopNodeFn := func() bool {
 		response := common.APIResponse{}
+		// FIXME(tiabc): Implement https://github.com/status-im/status-go/issues/254 to avoid
+		// 9-sec timeout below after stopping the node.
 		rawResponse = StopNode()
 
 		if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &response); err != nil {
@@ -287,6 +289,8 @@ func testStopResumeNode(t *testing.T) bool { //nolint: gocyclo
 	// nolint: dupl
 	resumeNodeFn := func() bool {
 		response := common.APIResponse{}
+		// FIXME(tiabc): Implement https://github.com/status-im/status-go/issues/254 to avoid
+		// 10-sec timeout below after resuming the node.
 		rawResponse = StartNode(C.CString(nodeConfigJSON))
 
 		if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &response); err != nil {
@@ -304,11 +308,14 @@ func testStopResumeNode(t *testing.T) bool { //nolint: gocyclo
 	if !stopNodeFn() {
 		return false
 	}
+
+	time.Sleep(9 * time.Second) // allow to stop
+
 	if !resumeNodeFn() {
 		return false
 	}
 
-	time.Sleep(5 * time.Second) // allow to start (instead of using blocking version of start, of filter event)
+	time.Sleep(10 * time.Second) // allow to start (instead of using blocking version of start, of filter event)
 
 	// now, verify that we still have account logged in
 	whisperService, err = statusAPI.NodeManager().WhisperService()
