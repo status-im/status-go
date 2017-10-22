@@ -335,7 +335,7 @@ func (s *ManagerTestSuite) TestRaceConditions() {
 	progress := make(chan struct{}, cnt)
 	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	nodeConfig1, e := e2e.MakeTestNodeConfig(params.StatusChainNetworkID)
+	nodeConfig1, e := e2e.MakeTestNodeConfig(params.RopstenNetworkID)
 	s.NoError(e)
 
 	nodeConfig2, e := e2e.MakeTestNodeConfig(params.RinkebyNetworkID)
@@ -446,8 +446,7 @@ func (s *ManagerTestSuite) TestRaceConditions() {
 	}
 
 	time.Sleep(2 * time.Second)                // so that we see some logs
-	nodeStopped, e := s.NodeManager.StopNode() // just in case we have a node running
-	s.NoError(e)
+	nodeStopped, _ := s.NodeManager.StopNode() // just in case we have a node running
 
 	if nodeStopped != nil {
 		<-nodeStopped
