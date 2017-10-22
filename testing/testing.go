@@ -71,6 +71,15 @@ func LoadFromFile(filename string) string {
 // EnsureNodeSync waits until node synchronzation is done to continue
 // with tests afterwards. Returns an error in case of a timeout.
 func EnsureNodeSync(nodeManager common.NodeManager) error {
+	nc, err := nodeManager.NodeConfig()
+	if err != nil {
+		return errors.New("can't retrieve NodeConfig")
+	}
+	// Don't wait for any blockchain sync for the local private chain as blocks are never mined.
+	if nc.NetworkID == params.StatusChainNetworkID {
+		return nil
+	}
+
 	les, err := nodeManager.LightEthereumService()
 	if err != nil {
 		return err
@@ -81,7 +90,7 @@ func EnsureNodeSync(nodeManager common.NodeManager) error {
 
 	timeouter := time.NewTimer(20 * time.Minute)
 	defer timeouter.Stop()
-	ticker := time.NewTicker(time.Second)
+	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
 	for {
