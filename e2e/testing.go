@@ -2,9 +2,12 @@ package e2e
 
 import (
 	"context"
+	"flag"
+	"fmt"
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"testing"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -17,9 +20,9 @@ var (
 	networkSelected string
 )
 
-func init(
-	flag.StringVar(&networkSelected, "network", "statuschain","Set's the network to be used for testing")
-)
+func init() {
+	flag.StringVar(&networkSelected, "network", "statuschain", "-network=NETWORKNAME or -network=NETWORKID to select network used for tests")
+}
 
 // TestNodeOption is a callback passed to StartTestNode which alters its config.
 type TestNodeOption func(config *params.NodeConfig)
@@ -87,4 +90,21 @@ func FirstBlockHash(nodeManager common.NodeManager) (string, error) {
 	}
 
 	return firstBlock.Hash.Hex(), nil
+}
+
+// GetNetworkID returns appropriate network id for test based on
+// default or provided -network flag.
+func GetNetworkID() int {
+	switch strings.ToLower(networkSelected) {
+	case fmt.Sprintf("%d", params.MainNetworkID), "mainnet":
+		return params.MainNetworkID
+	case fmt.Sprintf("%d", params.RinkebyNetworkID), "rinkeby":
+		return params.RinkebyNetworkID
+	case fmt.Sprintf("%d", params.RopstenNetworkID), "ropsten":
+		return params.RopstenNetworkID
+	case fmt.Sprintf("%d", params.StatusChainNetworkID), "statuschain":
+		return params.StatusChainNetworkID
+	}
+
+	return params.StatusChainNetworkID
 }
