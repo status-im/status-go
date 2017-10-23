@@ -17,12 +17,8 @@ import (
 )
 
 var (
-	networkSelected string
+	networkSelected = flag.String("network", "statuschain", "-network=NETWORKNAME or -network=NETWORKID to select network used for tests")
 )
-
-func init() {
-	flag.StringVar(&networkSelected, "network", "statuschain", "-network=NETWORKNAME or -network=NETWORKID to select network used for tests")
-}
 
 // TestNodeOption is a callback passed to StartTestNode which alters its config.
 type TestNodeOption func(config *params.NodeConfig)
