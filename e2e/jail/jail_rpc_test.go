@@ -36,7 +36,7 @@ func (s *JailRPCTestSuite) SetupTest() {
 }
 
 func (s *JailRPCTestSuite) TestJailRPCSend() {
-	s.StartTestBackend(params.StatusChainNetworkID)
+	s.StartTestBackend()
 	defer s.StopTestBackend()
 
 	s.NoError(EnsureNodeSync(s.Backend.NodeManager()), "cannot ensure node synchronization")
@@ -69,7 +69,7 @@ func (s *JailRPCTestSuite) TestJailRPCSend() {
 }
 
 func (s *JailRPCTestSuite) TestIsConnected() {
-	s.StartTestBackend(params.StatusChainNetworkID)
+	s.StartTestBackend()
 	defer s.StopTestBackend()
 
 	s.jail.Parse(testChatID, "")
@@ -96,7 +96,7 @@ func (s *JailRPCTestSuite) TestIsConnected() {
 
 // regression test: eth_getTransactionReceipt with invalid transaction hash should return null
 func (s *JailRPCTestSuite) TestRegressionGetTransactionReceipt() {
-	s.StartTestBackend(params.StatusChainNetworkID)
+	s.StartTestBackend()
 	defer s.StopTestBackend()
 
 	rpcClient := s.Backend.NodeManager().RPCClient()
@@ -109,7 +109,7 @@ func (s *JailRPCTestSuite) TestRegressionGetTransactionReceipt() {
 }
 
 func (s *JailRPCTestSuite) TestContractDeployment() {
-	s.StartTestBackend(params.StatusChainNetworkID)
+	s.StartTestBackend()
 	defer s.StopTestBackend()
 
 	s.NoError(EnsureNodeSync(s.Backend.NodeManager()), "cannot ensure node synchronization")
@@ -195,7 +195,7 @@ func (s *JailRPCTestSuite) TestContractDeployment() {
 }
 
 func (s *JailRPCTestSuite) TestJailVMPersistence() {
-	s.StartTestBackend(params.StatusChainNetworkID)
+	s.StartTestBackend()
 	defer s.StopTestBackend()
 
 	s.NoError(EnsureNodeSync(s.Backend.NodeManager()), "cannot ensure node synchronization")

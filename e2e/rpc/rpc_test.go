@@ -30,7 +30,7 @@ func (s *RPCTestSuite) SetupTest() {
 
 func (s *RPCTestSuite) TestCallRPC() {
 	for _, upstreamEnabled := range []bool{false, true} {
-		nodeConfig, err := e2e.MakeTestNodeConfig(params.RinkebyNetworkID)
+		nodeConfig, err := e2e.MakeTestNodeConfig(e2e.GetNetworkID())
 		s.NoError(err)
 
 		nodeConfig.IPCEnabled = false
@@ -121,7 +121,7 @@ func (s *RPCTestSuite) TestCallRPC() {
 
 // TestCallRawResult checks if returned response is a valid JSON-RPC response.
 func (s *RPCTestSuite) TestCallRawResult() {
-	nodeConfig, err := e2e.MakeTestNodeConfig(params.StatusChainNetworkID)
+	nodeConfig, err := e2e.MakeTestNodeConfig(e2e.GetNetworkID())
 	s.NoError(err)
 
 	nodeStarted, err := s.NodeManager.StartNode(nodeConfig)

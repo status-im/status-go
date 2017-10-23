@@ -34,10 +34,10 @@ func (s *APIBackendTestSuite) TestRaceConditions() {
 	progress := make(chan struct{}, cnt)
 	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	nodeConfig1, err := e2e.MakeTestNodeConfig(params.StatusChainNetworkID)
+	nodeConfig1, err := e2e.MakeTestNodeConfig(e2e.GetNetworkID())
 	require.NoError(err)
 
-	nodeConfig2, err := e2e.MakeTestNodeConfig(params.RinkebyNetworkID)
+	nodeConfig2, err := e2e.MakeTestNodeConfig(e2e.GetNetworkID())
 	require.NoError(err)
 
 	nodeConfigs := []*params.NodeConfig{nodeConfig1, nodeConfig2}
@@ -191,7 +191,7 @@ func (s *APIBackendTestSuite) TestRaceConditions() {
 // so this test should only check StatusBackend logic with a mocked version of the underlying NodeManager.
 func (s *APIBackendTestSuite) TestNetworkSwitching() {
 	// get Ropsten config
-	nodeConfig, err := e2e.MakeTestNodeConfig(params.RopstenNetworkID)
+	nodeConfig, err := e2e.MakeTestNodeConfig(e2e.GetNetworkID())
 	s.NoError(err)
 
 	s.False(s.Backend.IsNodeRunning())
@@ -211,7 +211,7 @@ func (s *APIBackendTestSuite) TestNetworkSwitching() {
 	<-nodeStopped
 
 	// start new node with completely different config
-	nodeConfig, err = e2e.MakeTestNodeConfig(params.RinkebyNetworkID)
+	nodeConfig, err = e2e.MakeTestNodeConfig(e2e.GetNetworkID())
 	s.NoError(err)
 
 	s.False(s.Backend.IsNodeRunning())
@@ -239,7 +239,7 @@ func (s *APIBackendTestSuite) TestResetChainData() {
 	require := s.Require()
 	require.NotNil(s.Backend)
 
-	s.StartTestBackend(params.RinkebyNetworkID)
+	s.StartTestBackend()
 	defer s.StopTestBackend()
 
 	s.NoError(EnsureNodeSync(s.Backend.NodeManager()), "cannot ensure node synchronization")
@@ -262,7 +262,7 @@ func (s *APIBackendTestSuite) TestRestartNode() {
 	require := s.Require()
 	require.NotNil(s.Backend)
 
-	s.StartTestBackend(params.RinkebyNetworkID)
+	s.StartTestBackend()
 	defer s.StopTestBackend()
 
 	firstHash, err := e2e.FirstBlockHash(s.Backend.NodeManager())

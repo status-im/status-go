@@ -7,6 +7,29 @@ These tests are run against public testnets: Ropsten and Rinkeby.
 
 e2e package contains a few utilities which are described in a [godoc](https://godoc.org/github.com/status-im/status-go/e2e).
 
+### Flags
+
+#### 1. `-network`
+The `-network` flag is used to provide either a network id or network name which specifies the ethereum network to use
+for running all test. It by default uses the `StatusChain` network.
+
+#### Usage
+
+To use the `mainnet` network for testing using network name:
+
+```bash
+go test -v ./e2e/... -args -network=mainnet
+```
+
+To use the `ropsten` network for testing using network id:
+
+```bash
+go test -v ./e2e/... -args -network=3
+```
+
+It's important to ensure before the flag that the `-args` flag is included else
+the `-network` flag or any other custom flag will not be respected or parsed.
+
 ## Run
 
 `make test-e2e`

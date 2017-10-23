@@ -19,7 +19,7 @@ type AccountsRPCTestSuite struct {
 }
 
 func (s *AccountsTestSuite) TestRPCEthAccounts() {
-	s.StartTestBackend(params.StatusChainNetworkID)
+	s.StartTestBackend()
 	defer s.StopTestBackend()
 
 	// log into test account

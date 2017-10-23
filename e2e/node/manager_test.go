@@ -126,7 +126,7 @@ func (s *ManagerTestSuite) TestReferencesWithoutStartedNode() {
 }
 
 func (s *ManagerTestSuite) TestReferencesWithStartedNode() {
-	s.StartTestNode(params.RinkebyNetworkID)
+	s.StartTestNode()
 	defer s.StopTestNode()
 
 	var testCases = []struct {
@@ -194,7 +194,7 @@ func (s *ManagerTestSuite) TestReferencesWithStartedNode() {
 }
 
 func (s *ManagerTestSuite) TestNodeStartStop() {
-	nodeConfig, err := e2e.MakeTestNodeConfig(params.StatusChainNetworkID)
+	nodeConfig, err := e2e.MakeTestNodeConfig(e2e.GetNetworkID())
 	s.NoError(err)
 
 	// try stopping non-started node
@@ -235,7 +235,7 @@ func (s *ManagerTestSuite) TestNodeStartStop() {
 
 func (s *ManagerTestSuite) TestNetworkSwitching() {
 	// get Ropsten config
-	nodeConfig, err := e2e.MakeTestNodeConfig(params.RopstenNetworkID)
+	nodeConfig, err := e2e.MakeTestNodeConfig(e2e.GetNetworkID())
 	s.NoError(err)
 	s.False(s.NodeManager.IsNodeRunning())
 	nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
@@ -255,7 +255,7 @@ func (s *ManagerTestSuite) TestNetworkSwitching() {
 	s.False(s.NodeManager.IsNodeRunning())
 
 	// start new node with completely different config
-	nodeConfig, err = e2e.MakeTestNodeConfig(params.RinkebyNetworkID)
+	nodeConfig, err = e2e.MakeTestNodeConfig(e2e.GetNetworkID())
 	s.NoError(err)
 	nodeStarted, err = s.NodeManager.StartNode(nodeConfig)
 	s.NoError(err)
@@ -274,7 +274,7 @@ func (s *ManagerTestSuite) TestNetworkSwitching() {
 }
 
 func (s *ManagerTestSuite) TestStartNodeWithUpstreamEnabled() {
-	nodeConfig, err := e2e.MakeTestNodeConfig(params.RopstenNetworkID)
+	nodeConfig, err := e2e.MakeTestNodeConfig(e2e.GetNetworkID())
 	s.NoError(err)
 
 	nodeConfig.UpstreamConfig.Enabled = true
@@ -293,7 +293,7 @@ func (s *ManagerTestSuite) TestStartNodeWithUpstreamEnabled() {
 func (s *ManagerTestSuite) TestResetChainData() {
 	s.T().Skip()
 
-	s.StartTestNode(params.RinkebyNetworkID)
+	s.StartTestNode()
 	defer s.StopTestNode()
 
 	s.NoError(EnsureNodeSync(s.NodeManager), "cannot ensure node synchronization")
@@ -312,7 +312,7 @@ func (s *ManagerTestSuite) TestResetChainData() {
 }
 
 func (s *ManagerTestSuite) TestRestartNode() {
-	s.StartTestNode(params.RinkebyNetworkID)
+	s.StartTestNode()
 	defer s.StopTestNode()
 
 	s.True(s.NodeManager.IsNodeRunning())
@@ -335,10 +335,10 @@ func (s *ManagerTestSuite) TestRaceConditions() {
 	progress := make(chan struct{}, cnt)
 	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	nodeConfig1, e := e2e.MakeTestNodeConfig(params.RopstenNetworkID)
+	nodeConfig1, e := e2e.MakeTestNodeConfig(e2e.GetNetworkID())
 	s.NoError(e)
 
-	nodeConfig2, e := e2e.MakeTestNodeConfig(params.RinkebyNetworkID)
+	nodeConfig2, e := e2e.MakeTestNodeConfig(e2e.GetNetworkID())
 	s.NoError(e)
 
 	nodeConfigs := []*params.NodeConfig{nodeConfig1, nodeConfig2}
@@ -466,7 +466,7 @@ func (s *ManagerTestSuite) TestNodeStartCrash() {
 		}
 	})
 
-	nodeConfig, err := e2e.MakeTestNodeConfig(params.RinkebyNetworkID)
+	nodeConfig, err := e2e.MakeTestNodeConfig(e2e.GetNetworkID())
 	s.NoError(err)
 
 	// start node outside the manager (on the same port), so that manager node.Start() method fails

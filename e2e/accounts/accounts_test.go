@@ -22,7 +22,7 @@ type AccountsTestSuite struct {
 }
 
 func (s *AccountsTestSuite) TestAccountsList() {
-	s.StartTestBackend(params.RinkebyNetworkID)
+	s.StartTestBackend()
 	defer s.StopTestBackend()
 
 	accounts, err := s.Backend.AccountManager().Accounts()
@@ -83,7 +83,7 @@ func (s *AccountsTestSuite) TestAccountsList() {
 }
 
 func (s *AccountsTestSuite) TestCreateChildAccount() {
-	s.StartTestBackend(params.RinkebyNetworkID)
+	s.StartTestBackend()
 	defer s.StopTestBackend()
 
 	keyStore, err := s.Backend.NodeManager().AccountKeyStore()
@@ -131,7 +131,7 @@ func (s *AccountsTestSuite) TestCreateChildAccount() {
 }
 
 func (s *AccountsTestSuite) TestRecoverAccount() {
-	s.StartTestBackend(params.RinkebyNetworkID)
+	s.StartTestBackend()
 	defer s.StopTestBackend()
 
 	keyStore, err := s.Backend.NodeManager().AccountKeyStore()
@@ -183,7 +183,7 @@ func (s *AccountsTestSuite) TestRecoverAccount() {
 }
 
 func (s *AccountsTestSuite) TestSelectAccount() {
-	s.StartTestBackend(params.RinkebyNetworkID)
+	s.StartTestBackend()
 	defer s.StopTestBackend()
 
 	// test to see if the account was injected in whisper
@@ -218,7 +218,7 @@ func (s *AccountsTestSuite) TestSelectAccount() {
 }
 
 func (s *AccountsTestSuite) TestSelectedAccountOnRestart() {
-	s.StartTestBackend(params.RinkebyNetworkID)
+	s.StartTestBackend()
 
 	// we need to make sure that selected account is injected as identity into Whisper
 	whisperService := s.WhisperService()

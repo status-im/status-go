@@ -32,7 +32,7 @@ type TransactionsTestSuite struct {
 }
 
 func (s *TransactionsTestSuite) TestCallRPCSendTransaction() {
-	s.StartTestBackend(params.StatusChainNetworkID)
+	s.StartTestBackend()
 	defer s.StopTestBackend()
 
 	s.NoError(EnsureNodeSync(s.Backend.NodeManager()), "cannot ensure node synchronization")
@@ -139,7 +139,7 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransactionUpstream() {
 
 // FIXME(tiabc): Sometimes it fails due to "no suitable peers found".
 func (s *TransactionsTestSuite) TestSendContractTx() {
-	s.StartTestBackend(params.StatusChainNetworkID)
+	s.StartTestBackend()
 	defer s.StopTestBackend()
 
 	s.NoError(EnsureNodeSync(s.Backend.NodeManager()), "cannot ensure node synchronization")
@@ -226,7 +226,7 @@ func (s *TransactionsTestSuite) TestSendContractTx() {
 }
 
 func (s *TransactionsTestSuite) TestSendEther() {
-	s.StartTestBackend(params.StatusChainNetworkID)
+	s.StartTestBackend()
 	defer s.StopTestBackend()
 
 	s.NoError(EnsureNodeSync(s.Backend.NodeManager()))
@@ -366,7 +366,7 @@ func (s *TransactionsTestSuite) TestSendEtherTxUpstream() {
 }
 
 func (s *TransactionsTestSuite) TestDoubleCompleteQueuedTransactions() {
-	s.StartTestBackend(params.StatusChainNetworkID)
+	s.StartTestBackend()
 	defer s.StopTestBackend()
 
 	s.NoError(EnsureNodeSync(s.Backend.NodeManager()), "cannot ensure node synchronization")
@@ -443,7 +443,7 @@ func (s *TransactionsTestSuite) TestDoubleCompleteQueuedTransactions() {
 }
 
 func (s *TransactionsTestSuite) TestDiscardQueuedTransaction() {
-	s.StartTestBackend(params.StatusChainNetworkID)
+	s.StartTestBackend()
 	defer s.StopTestBackend()
 
 	s.NoError(EnsureNodeSync(s.Backend.NodeManager()), "cannot ensure node synchronization")
@@ -523,7 +523,7 @@ func (s *TransactionsTestSuite) TestDiscardQueuedTransaction() {
 }
 
 func (s *TransactionsTestSuite) TestCompleteMultipleQueuedTransactions() {
-	s.StartTestBackend(params.StatusChainNetworkID)
+	s.StartTestBackend()
 	defer s.StopTestBackend()
 
 	s.NoError(EnsureNodeSync(s.Backend.NodeManager()), "cannot ensure node synchronization")
@@ -617,7 +617,7 @@ func (s *TransactionsTestSuite) TestCompleteMultipleQueuedTransactions() {
 }
 
 func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
-	s.StartTestBackend(params.StatusChainNetworkID)
+	s.StartTestBackend()
 	defer s.StopTestBackend()
 
 	s.NoError(EnsureNodeSync(s.Backend.NodeManager()), "cannot ensure node synchronization")
@@ -733,7 +733,7 @@ func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
 }
 
 func (s *TransactionsTestSuite) TestNonExistentQueuedTransactions() {
-	s.StartTestBackend(params.StatusChainNetworkID)
+	s.StartTestBackend()
 	defer s.StopTestBackend()
 
 	backend := s.LightEthereumService().StatusBackend
@@ -752,7 +752,7 @@ func (s *TransactionsTestSuite) TestNonExistentQueuedTransactions() {
 }
 
 func (s *TransactionsTestSuite) TestEvictionOfQueuedTransactions() {
-	s.StartTestBackend(params.StatusChainNetworkID)
+	s.StartTestBackend()
 	defer s.StopTestBackend()
 
 	backend := s.LightEthereumService().StatusBackend
