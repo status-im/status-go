@@ -5,8 +5,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/status-im/status-go/geth/log"
 	"github.com/ethereum/go-ethereum"
+	"github.com/status-im/status-go/geth/log"
 )
 
 // errors

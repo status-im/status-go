@@ -104,7 +104,10 @@ func (m *NodeManager) startNode(ethNode geth.Node) error {
 
 	m.node.SetNode(ethNode.GetNode())
 	m.constr.SetConfig(m.constr.Config())
-	m.initRPCClient(ethNode)
+	err := m.initRPCClient(ethNode)
+	if err != nil {
+		return err
+	}
 
 	// underlying node is started, every method can use it, we use it immediately
 	go func() {
@@ -139,14 +142,16 @@ func (m *NodeManager) newNode() (geth.Node, error) {
 }
 
 // initRPCClient up on given node, in case an error stops node.
-func (m *NodeManager) initRPCClient(node geth.Node) {
+func (m *NodeManager) initRPCClient(node geth.Node) error {
 	err := m.rpc.Init(node.GetNode(), m.getUpstreamConfig())
 	if err != nil {
 		log.Error("Init RPC client failed:", "error", err)
 		m.setFailed(ErrRPCClient)
 
-		return
+		return ErrRPCClient
 	}
+
+	return nil
 }
 
 // StopNode stop Status node. Stopped node cannot be resumed.
@@ -408,6 +413,10 @@ func (m *NodeManager) RPCClient() geth.RPCClient {
 
 // GetStatusBackend exposes StatusBackend interface.
 func (m *NodeManager) GetStatusBackend() (services.StatusBackend, error) {
+	if err := m.isNodeAvailable(); err != nil {
+		return nil, err
+	}
+
 	les, err := m.getLesServices()
 	if err != nil {
 		return nil, err
@@ -556,7 +565,7 @@ func (m *NodeManager) getLesServices() (*les, error) {
 		return m.les, nil
 	}
 
-	var lesObject *eles.LightEthereum
+	lesObject := &eles.LightEthereum{}
 	err := m.node.Service(&lesObject)
 	if err != nil {
 		return nil, ErrInvalidLightEthereumService
