@@ -1,6 +1,7 @@
 package node
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -58,11 +59,12 @@ func logMessageStat(state notifications.DeliveryState) {
 	stat := generateMessageStat(state)
 	statdata, err := json.Marshal(stat)
 	if err != nil {
-		log.Info(fmt.Sprintf("%s : JSON MARHSAL ERROR : %+q", params.MessageStatHeader, err))
+		log.Warn("failed to marshal common.MessageStat", "err", err)
 		return
 	}
 
-	log.Info(fmt.Sprintf("%s : %s : %s : %s : %+s", params.MessageStatHeader, stat.Protocol, stat.Type, stat.Status, string(statdata)))
+	encodedStat := base64.StdEncoding.EncodeToString(statdata)
+	log.Info(fmt.Sprintf("%s : %s : %s : %s : %+s", params.MessageStatHeader, stat.Protocol, stat.Type, stat.Status, encodedStat))
 }
 
 // generateMessageStat returns a common.MessageStat instance after retrieving
@@ -72,8 +74,7 @@ func generateMessageStat(state notifications.DeliveryState) common.MessageStat {
 	var payload []byte
 	var from, to string
 
-	switch state.IsP2P {
-	case true:
+	if state.IsP2P {
 		if state.P2P.Direction == gethmessage.IncomingMessage {
 			if state.P2P.Received != nil {
 				payload = state.P2P.Received.Payload
@@ -110,7 +111,7 @@ func generateMessageStat(state notifications.DeliveryState) common.MessageStat {
 		stat.Hash = state.P2P.Envelope.Hash().String()
 		stat.TimeSent = state.P2P.Envelope.Expiry - state.P2P.Envelope.TTL
 
-	case false:
+	} else {
 		if state.RPC.Direction == gethmessage.IncomingMessage {
 			if state.RPC.Received != nil {
 				payload = state.RPC.Received.Payload

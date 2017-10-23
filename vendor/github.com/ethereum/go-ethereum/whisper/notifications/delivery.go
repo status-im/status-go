@@ -27,7 +27,7 @@ type RPCDeliverySubscriber func(*whisper.RPCMessageState)
 // DeliveryService defines a notification implementation for listening to message status
 // events.
 type DeliveryService struct {
-	sml  sync.RWMutex
+	mu   sync.RWMutex
 	subs []DeliverySubscriber
 }
 
@@ -36,7 +36,7 @@ func (d *DeliveryService) SendP2PState(state whisper.P2PMessageState) {
 	if state.Timestamp.IsZero() {
 		state.Timestamp = time.Now()
 	}
-	d.sendState(DeliveryState{P2P: &state})
+	d.sendState(DeliveryState{P2P: &state, IsP2P: true})
 }
 
 // SendRPCState delivers a rpc message status to all subscribers.
@@ -49,18 +49,18 @@ func (d *DeliveryService) SendRPCState(state whisper.RPCMessageState) {
 
 // SendState delivers envelope with status to all subscribers.
 func (d *DeliveryService) sendState(mds DeliveryState) {
-	d.sml.RLock()
-	defer d.sml.RUnlock()
+	d.mu.RLock()
+	defer d.mu.RUnlock()
 
-	for _, item := range d.subs {
-		item(mds)
+	for _, sub := range d.subs {
+		sub(mds)
 	}
 }
 
 // Unsubscribe removes subscriber into delivery subscription list.
 func (d *DeliveryService) Unsubscribe(ind int) {
-	d.sml.Lock()
-	defer d.sml.Unlock()
+	d.mu.Lock()
+	defer d.mu.Unlock()
 
 	if ind > -1 && ind < len(d.subs) {
 		d.subs = append(d.subs[:ind], d.subs[ind+1:]...)
@@ -70,22 +70,18 @@ func (d *DeliveryService) Unsubscribe(ind int) {
 // SubscribeForP2P delivers rpc messages status events to the callback.
 func (d *DeliveryService) SubscribeForP2P(sub P2PDeliverySubscriber) int {
 	return d.Subscribe(func(m DeliveryState) {
-		if m.IsP2P || m.P2P == nil {
-			return
+		if m.IsP2P && m.P2P != nil {
+			sub(m.P2P)
 		}
-
-		sub(m.P2P)
 	})
 }
 
 // SubscribeForRPC delivers rpc messages status events to the callback.
 func (d *DeliveryService) SubscribeForRPC(sub RPCDeliverySubscriber) int {
 	return d.Subscribe(func(m DeliveryState) {
-		if m.IsP2P || m.RPC == nil {
-			return
+		if !m.IsP2P && m.RPC != nil {
+			sub(m.RPC)
 		}
-
-		sub(m.RPC)
 	})
 }
 
@@ -128,9 +124,10 @@ func (d *DeliveryService) ByRPCStatus(status message.Status, sub RPCDeliverySubs
 // Subscribe adds subscriber into delivery subscription list.
 // It returns the index of subscription.
 func (d *DeliveryService) Subscribe(sub DeliverySubscriber) int {
-	d.sml.Lock()
-	defer d.sml.Unlock()
+	d.mu.Lock()
+	defer d.mu.Unlock()
 
+	index := len(d.subs)
 	d.subs = append(d.subs, sub)
-	return len(d.subs)
+	return index
 }

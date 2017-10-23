@@ -119,15 +119,14 @@ func (fs *Filters) NotifyWatchers(env *Envelope, p2pMessage bool) {
 				if msg == nil {
 					if fs.whisper.deliveryServer != nil {
 						err := errors.New("Envelope failed to be opened")
-						switch p2pMessage {
-						case true:
+						if p2pMessage {
 							fs.whisper.deliveryServer.SendP2PState(P2PMessageState{
 								Envelope:  *env,
 								Reason:    err,
 								Status:    message.RejectedStatus,
 								Direction: message.IncomingMessage,
 							})
-						case false:
+						} else {
 							fs.whisper.deliveryServer.SendRPCState(RPCMessageState{
 								Envelope:  *env,
 								Reason:    err,
@@ -141,15 +140,14 @@ func (fs *Filters) NotifyWatchers(env *Envelope, p2pMessage bool) {
 			} else {
 				if fs.whisper.deliveryServer != nil {
 					err := errors.New("processing message: does not match")
-					switch p2pMessage {
-					case true:
+					if p2pMessage {
 						fs.whisper.deliveryServer.SendP2PState(P2PMessageState{
 							Envelope:  *env,
 							Reason:    err,
 							Status:    message.RejectedStatus,
 							Direction: message.IncomingMessage,
 						})
-					case false:
+					} else {
 						fs.whisper.deliveryServer.SendRPCState(RPCMessageState{
 							Envelope:  *env,
 							Reason:    err,
@@ -165,15 +163,14 @@ func (fs *Filters) NotifyWatchers(env *Envelope, p2pMessage bool) {
 		if match && msg != nil {
 			log.Trace("processing message: decrypted", "hash", env.Hash().Hex())
 			if fs.whisper.deliveryServer != nil {
-				switch p2pMessage {
-				case true:
+				if p2pMessage {
 					fs.whisper.deliveryServer.SendP2PState(P2PMessageState{
 						Received:  msg,
 						Envelope:  *env,
 						Status:    message.DeliveredStatus,
 						Direction: message.IncomingMessage,
 					})
-				case false:
+				} else {
 					fs.whisper.deliveryServer.SendRPCState(RPCMessageState{
 						Received:  msg,
 						Envelope:  *env,
