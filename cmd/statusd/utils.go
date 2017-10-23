@@ -2,7 +2,6 @@ package main
 
 import "C"
 import (
-	"context"
 	"encoding/json"
 	"io/ioutil"
 	"math/big"
