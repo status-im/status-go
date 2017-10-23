@@ -10,6 +10,7 @@ import (
 	gethmessage "github.com/ethereum/go-ethereum/common/message"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/whisper/notifications"
+	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/signal"
