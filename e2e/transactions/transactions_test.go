@@ -229,6 +229,8 @@ func (s *TransactionsTestSuite) TestSendEther() {
 	s.StartTestBackend(params.StatusChainNetworkID)
 	defer s.StopTestBackend()
 
+	s.NoError(EnsureNodeSync(s.Backend.NodeManager()))
+
 	backend := s.LightEthereumService().StatusBackend
 	s.NotNil(backend)
 
