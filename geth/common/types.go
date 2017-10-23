@@ -47,6 +47,7 @@ func (k *SelectedExtKey) Hex() string {
 // MessageStat defines a struct to hold given facts about a message stat.
 type MessageStat struct {
 	Type            string             `json:"type"`
+	Protocol        string             `json:"protocol"`
 	Status          string             `json:"status"`
 	Envelope        []byte             `json:"envelope"`
 	TimeSent        uint32             `json:"time,omitempty"`

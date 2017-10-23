@@ -89,10 +89,12 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 
 	// Subscribe for message delivery status and log out with special key.
 	messageStateLoggingID := deliveryManager.Subscribe(func(state notifications.DeliveryState) {
-		if state.IsP2P {
-			var payload []byte
-			var from, to string
+		var stat common.MessageStat
+		var payload []byte
+		var from, to string
 
+		switch state.IsP2P {
+		case true:
 			if state.P2P.Direction == gethmessage.IncomingMessage {
 				if state.P2P.Received != nil {
 					payload = state.P2P.Received.Payload
@@ -117,64 +119,64 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 				}
 			}
 
-			if stat, err := json.Marshal(common.MessageStat{
-				Payload:         payload,
-				FromDevice:      from,
-				ToDevice:        to,
-				Source:          state.P2P.Source,
-				RejectionReason: state.P2P.Reason,
-				Envelope:        state.P2P.Envelope.Data,
-				Status:          state.P2P.Status.String(),
-				Type:            state.P2P.Direction.String(),
-				Hash:            state.P2P.Envelope.Hash().String(),
-				TimeSent:        state.P2P.Envelope.Expiry - state.P2P.Envelope.TTL,
-			}); err == nil {
-				log.Info(fmt.Sprintf("%s : P2P : %s : %s : %+s", params.MessageStatHeader, state.P2P.Direction.String(), state.P2P.Status.String(), string(stat)))
+			stat.Protocol = "P2P"
+			stat.Payload = payload
+			stat.FromDevice = from
+			stat.ToDevice = to
+			stat.Source = state.P2P.Source
+			stat.RejectionReason = state.P2P.Reason
+			stat.Envelope = state.P2P.Envelope.Data
+			stat.Status = state.P2P.Status.String()
+			stat.Type = state.P2P.Direction.String()
+			stat.Hash = state.P2P.Envelope.Hash().String()
+			stat.TimeSent = state.P2P.Envelope.Expiry - state.P2P.Envelope.TTL
+
+		case false:
+
+			if state.RPC.Direction == gethmessage.IncomingMessage {
+				if state.RPC.Received != nil {
+					payload = state.RPC.Received.Payload
+
+					if state.RPC.Received.Src != nil {
+						from = gethcommon.ToHex(crypto.FromECDSAPub(state.RPC.Received.Src))
+					}
+
+					if state.RPC.Received.Dst != nil {
+						to = gethcommon.ToHex(crypto.FromECDSAPub(state.RPC.Received.Dst))
+					}
+				}
 			}
+
+			if state.RPC.Direction == gethmessage.OutgoingMessage {
+				from = state.RPC.Source.Sig
+
+				if len(state.RPC.Source.PublicKey) == 0 {
+					to = string(state.RPC.Source.PublicKey)
+				} else {
+					to = state.RPC.Source.TargetPeer
+				}
+			}
+
+			stat.Protocol = "RPC"
+			stat.Payload = payload
+			stat.FromDevice = from
+			stat.ToDevice = to
+			stat.Source = state.RPC.Source
+			stat.RejectionReason = state.RPC.Reason
+			stat.Envelope = state.RPC.Envelope.Data
+			stat.Status = state.RPC.Status.String()
+			stat.Type = state.RPC.Direction.String()
+			stat.Hash = state.RPC.Envelope.Hash().String()
+			stat.TimeSent = state.RPC.Envelope.Expiry - state.RPC.Envelope.TTL
+		}
+
+		statdata, err := json.Marshal(stat)
+		if err != nil {
+			log.Info(fmt.Sprintf("%s : JSON MARHSAL ERROR : %+q", params.MessageStatHeader, err))
 			return
 		}
 
-		var payload []byte
-		var from, to string
-
-		if state.RPC.Direction == gethmessage.IncomingMessage {
-			if state.RPC.Received != nil {
-				payload = state.RPC.Received.Payload
-
-				if state.RPC.Received.Src != nil {
-					from = gethcommon.ToHex(crypto.FromECDSAPub(state.RPC.Received.Src))
-				}
-
-				if state.RPC.Received.Dst != nil {
-					to = gethcommon.ToHex(crypto.FromECDSAPub(state.RPC.Received.Dst))
-				}
-			}
-		}
-
-		if state.RPC.Direction == gethmessage.OutgoingMessage {
-			from = state.RPC.Source.Sig
-
-			if len(state.RPC.Source.PublicKey) == 0 {
-				to = string(state.RPC.Source.PublicKey)
-			} else {
-				to = state.RPC.Source.TargetPeer
-			}
-		}
-
-		if stat, err := json.Marshal(common.MessageStat{
-			Payload:         payload,
-			FromDevice:      from,
-			ToDevice:        to,
-			Source:          state.RPC.Source,
-			RejectionReason: state.RPC.Reason,
-			Envelope:        state.RPC.Envelope.Data,
-			Status:          state.RPC.Status.String(),
-			Type:            state.RPC.Direction.String(),
-			Hash:            state.RPC.Envelope.Hash().String(),
-			TimeSent:        state.RPC.Envelope.Expiry - state.RPC.Envelope.TTL,
-		}); err == nil {
-			log.Info(fmt.Sprintf("%s : RPC : %s : %s : %+s", params.MessageStatHeader, state.RPC.Direction.String(), state.RPC.Status.String(), string(stat)))
-		}
+		log.Info(fmt.Sprintf("%s : %s : %s : %s : %+s", params.MessageStatHeader, stat.Protocol, stat.Type, stat.Status, string(statdata)))
 	})
 
 	go func() {

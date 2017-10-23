@@ -471,10 +471,11 @@ func (s *ManagerTestSuite) TestNodeStartCrash() {
 	nodeConfig, err := e2e.MakeTestNodeConfig(params.RinkebyNetworkID)
 	s.NoError(err)
 
-	var delivery notifications.DeliveryService
+	// create instance of DeliveryService for delivery notifications.
+	delivery := new(notifications.DeliveryService)
 
 	// start node outside the manager (on the same port), so that manager node.Start() method fails
-	outsideNode, err := node.MakeNode(nodeConfig, &delivery)
+	outsideNode, err := node.MakeNode(nodeConfig, delivery)
 	s.NoError(err)
 	err = outsideNode.Start()
 	s.NoError(err)
