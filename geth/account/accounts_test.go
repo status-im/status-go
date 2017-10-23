@@ -1,22 +1,26 @@
 package account_test
 
 import (
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path/filepath"
-	"reflect"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
-	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
 	. "github.com/status-im/status-go/geth/testing"
 	"github.com/stretchr/testify/suite"
+)
+
+// TODO (rgeraldes) - remove keystore per iteration vs per test
+
+const (
+	tmpDirName = "empty"
+	account1   = "test-account1.pk"
+	account2   = "test-account2.pk"
 )
 
 func TestAccountsTestSuite(t *testing.T) {
@@ -32,6 +36,8 @@ func (s *AccountsTestSuite) SetupTest() {
 	s.NodeManager = node.NewNodeManager()
 	require.NotNil(s.NodeManager)
 }
+
+/*
 
 func (s *AccountsTestSuite) TestCreateAccount() {
 	require := s.Require()
@@ -200,7 +206,7 @@ func (s *AccountsTestSuite) TestCreateChildAccount() {
 				TestConfig.Account1.Password,
 				account.ErrAddressToAccountMappingFailure,
 			},
-		*/
+
 
 	}
 
@@ -316,7 +322,7 @@ func (s *AccountsTestSuite) TestRecoverAccount() {
 	}
 }
 
-*/
+
 
 func (s *AccountsTestSuite) TestVerifyAccountPassword() {
 	require := s.Require()
@@ -430,6 +436,7 @@ func (s *AccountsTestSuite) TestVerifyAccountPasswordWithAccountBeforeEIP55() {
 
 /*
 
+
 func (s *AccountsTestSuite) TestSelectAccount() {
 	require := s.Require()
 
@@ -442,17 +449,7 @@ func (s *AccountsTestSuite) TestSelectAccount() {
 	emptyKeyStoreDir, err := ioutil.TempDir(os.TempDir(), "empty")
 	require.NoError(err)
 	config.KeyStoreDir = emptyKeyStoreDir
-
-	// start node manager > create & start node
-	nodeStarted, err := s.NodeManager.StartNode(config)
-	require.NoError(err)
-	defer func() {
-		nodeStopped, err := s.NodeManager.StopNode()
-		require.NoError(err)
-		<-nodeStopped
-		os.RemoveAll(emptyKeyStoreDir)
-	}()
-	<-nodeStarted
+	require.NoError(os.RemoveAll(emptyKeyStoreDir))
 
 	// create an instance of the account manager to call
 	// the CreateAccount method
@@ -461,6 +458,7 @@ func (s *AccountsTestSuite) TestSelectAccount() {
 
 	testCases := []struct {
 		context       string
+		launchNode    bool
 		address       string
 		password      string
 		expectedError error
@@ -490,44 +488,86 @@ func (s *AccountsTestSuite) TestSelectAccount() {
 		}
 	}
 }
+*/
 
 func (s *AccountsTestSuite) TestSelectedAccount() {
-	var err error
 	require := s.Require()
+
+	// create node config
+	config, err := MakeTestNodeConfig(params.RinkebyNetworkID)
+	require.NoError(err)
+	require.NotNil(config)
 
 	// account manager
 	accountManager := account.NewManager(s.NodeManager)
 	require.NotNil(accountManager)
 
+	// create empty keyStore
+	emptyKeyStoreDir, err := ioutil.TempDir(os.TempDir(), tmpDirName)
+	require.NoError(err)
+	require.NotEmpty(emptyKeyStoreDir)
+	defer func() {
+		require.NoError(os.RemoveAll(emptyKeyStoreDir))
+	}()
+	config.KeyStoreDir = emptyKeyStoreDir
+
+	// import account key
+	require.NoError(common.ImportTestAccount(emptyKeyStoreDir, account2))
+
+	// test cases
 	testCases := []struct {
-		selectedAccount *common.SelectedExtKey
-		expectedError   error
+		context       string
+		address       string
+		password      string
+		expectedError error
 	}{
-		// selected account = nil
 		{
-			nil,
+			"selected account is nil",
+			"",
+			"",
 			account.ErrNoAccountSelected,
 		},
-		// selected account != nil
 		{
-			nil,
+			"selected account is account2",
+			TestConfig.Account2.Address,
+			TestConfig.Account2.Password,
 			nil,
 		},
 	}
-	for _, test := range testCases {
-		selectedAccount, err := accountManager.SelectedAccount()
-		if !reflect.DeepEqual(err, test.expectedError) {
-			require.FailNow(fmt.Sprintf("unexpected error: expected \n'%v', got \n'%v'", test.expectedError, err))
+
+	// test
+	for _, testCase := range testCases {
+		s.T().Log(testCase.context)
+
+		// select account if details were provided
+		if len(testCase.address) > 0 && len(testCase.password) > 0 {
+			config.WhisperConfig.Enabled = true
+			nodeStarted, err := s.NodeManager.StartNode(config)
+			require.NoError(err)
+			require.NotNil(nodeStarted)
+			<-nodeStarted
+
+			// select account
+			require.NoError(accountManager.SelectAccount(testCase.address, testCase.password))
+
+			// defer
+			nodeStopped, err := s.NodeManager.StopNode()
+			require.NoError(err)
+			require.NotNil(nodeStopped)
+			<-nodeStopped
+		}
+
+		key, err := accountManager.SelectedAccount()
+		if err != testCase.expectedError {
+			s.FailNow(fmt.Sprintf("unexpected error: expected \n'%v', got \n'%v'", testCase.expectedError, err))
 		}
 		if err == nil {
-			require.NotNil(selectedAccount)
+			require.NotNil(key)
 		}
-
 	}
-
 }
 
-func (s *AccountsTestSuite) ReSelectAccount() {
+func (s *AccountsTestSuite) TestReSelectAccount() {
 	require := s.Require()
 
 	// create node config
@@ -536,67 +576,99 @@ func (s *AccountsTestSuite) ReSelectAccount() {
 	require.NotNil(config)
 
 	// create empty keyStore
-	emptyKeyStoreDir, err := ioutil.TempDir(os.TempDir(), "empty")
+	emptyKeyStoreDir, err := ioutil.TempDir(os.TempDir(), tmpDirName)
 	require.NoError(err)
 	require.NotEmpty(emptyKeyStoreDir)
+	defer func() {
+		require.NoError(os.RemoveAll(emptyKeyStoreDir))
+	}()
 	config.KeyStoreDir = emptyKeyStoreDir
 
-	// account manager
-	accountManager := account.NewManager(s.NodeManager)
-	require.NotNil(accountManager)
+	// import account key
+	require.NoError(common.ImportTestAccount(emptyKeyStoreDir, account2))
 
+	// test cases
 	testCases := []struct {
 		context       string
 		launchNode    bool
+		address       string
+		password      string
 		enableWhisper bool
 		expectedError error
 	}{
 		{
-			"selected account equals nil",
-			false,
-			false,
-			nil,
+			context:       "selected account is nil",
+			expectedError: nil,
+		},
+		// Note(rgeraldes): in order to select an account via SelectAccount
+		// the node must be running and the whisper service must be enabled
+		{
+			context:       "selected account is account2, node stopped",
+			launchNode:    false,
+			address:       TestConfig.Account2.Address,
+			password:      TestConfig.Account2.Password,
+			expectedError: node.ErrNoRunningNode,
 		},
 		{
-			"node started, whisper enabled",
+			"selected account is account2, node started, whisper disabled",
 			true,
-			true,
-			nil,
+			TestConfig.Account2.Address,
+			TestConfig.Account2.Password,
+			false,
+			node.ErrInvalidWhisperService,
 		},
 		{
-			"node started, whisper disabled",
+			"selected account is account2, node started, whisper enabled",
 			true,
-			false,
-			nil,
-		},
-		{
-			"node stopped, whisper disabled",
-			false,
-			false,
+			TestConfig.Account2.Address,
+			TestConfig.Account2.Password,
+			true,
 			nil,
 		},
 	}
 
 	for _, testCase := range testCases {
 		func() {
-			if testCase.enableWhisper {
-				config.WhisperConfig.Enabled = true
-			} else {
-				config.WhisperConfig.Enabled = false
-			}
+			s.T().Log(testCase.context)
 
-			if testCase.launchNode {
+			// account manager
+			accountManager := account.NewManager(s.NodeManager)
+			require.NotNil(accountManager)
+
+			// select account if details were provided
+			if len(testCase.address) > 0 && len(testCase.password) > 0 {
+				config.WhisperConfig.Enabled = true
 				nodeStarted, err := s.NodeManager.StartNode(config)
 				require.NoError(err)
 				require.NotNil(nodeStarted)
+				<-nodeStarted
+
+				// select account
+				require.NoError(accountManager.SelectAccount(testCase.address, testCase.password))
+
+				// defer
+				nodeStopped, err := s.NodeManager.StopNode()
+				require.NoError(err)
+				require.NotNil(nodeStopped)
+				<-nodeStopped
+			}
+
+			config.WhisperConfig.Enabled = testCase.enableWhisper
+
+			if testCase.launchNode {
+				// init node
+				nodeStarted, err := s.NodeManager.StartNode(config)
+				require.NoError(err)
+				require.NotNil(nodeStarted)
+				<-nodeStarted
+
+				// defer
 				defer func() {
 					nodeStopped, err := s.NodeManager.StopNode()
 					require.NoError(err)
 					require.NotNil(nodeStopped)
 					<-nodeStopped
-					require.NoError(os.RemoveAll(emptyKeyStoreDir))
 				}()
-				<-nodeStarted
 			}
 
 			err = accountManager.ReSelectAccount()
@@ -607,8 +679,6 @@ func (s *AccountsTestSuite) ReSelectAccount() {
 	}
 }
 
-*/
-
 func (s *AccountsTestSuite) TestLogout() {
 	require := s.Require()
 
@@ -618,7 +688,7 @@ func (s *AccountsTestSuite) TestLogout() {
 	require.NotNil(config)
 
 	// init empty keyStore
-	emptyKeyStoreDir, err := ioutil.TempDir(os.TempDir(), "empty")
+	emptyKeyStoreDir, err := ioutil.TempDir(os.TempDir(), tmpDirName)
 	require.NoError(err)
 	require.NotEmpty(emptyKeyStoreDir)
 	config.KeyStoreDir = emptyKeyStoreDir
@@ -656,6 +726,8 @@ func (s *AccountsTestSuite) TestLogout() {
 	// test
 	for _, testCase := range testCases {
 		func() {
+			s.T().Log(testCase.context)
+
 			config.WhisperConfig.Enabled = testCase.enableWhisper
 
 			if testCase.launchNode {
@@ -683,12 +755,117 @@ func (s *AccountsTestSuite) TestLogout() {
 	}
 }
 
-/*
 func (s *AccountsTestSuite) TestAccounts() {
 	require := s.Require()
 
+	// init node config
+	config, err := MakeTestNodeConfig(params.RinkebyNetworkID)
+	require.NoError(err)
+	require.NotNil(config)
+
+	// init empty keyStore
+	emptyKeyStoreDir, err := ioutil.TempDir(os.TempDir(), tmpDirName)
+	require.NoError(err)
+	require.NotEmpty(emptyKeyStoreDir)
+	defer func() {
+		require.NoError(os.RemoveAll(emptyKeyStoreDir))
+	}()
+	config.KeyStoreDir = emptyKeyStoreDir
+
+	// import account key
+	require.NoError(common.ImportTestAccount(emptyKeyStoreDir, account2))
+
+	// test cases
+	testCases := []struct {
+		context         string
+		launchNode      bool
+		address         string
+		password        string
+		hasChildAccount bool
+		expectedError   error
+		nAddresses      int
+	}{
+		{
+			context:       "node stopped",
+			launchNode:    false,
+			expectedError: node.ErrNoRunningNode,
+		},
+		{
+			context:       "node started, selected account is nill",
+			launchNode:    true,
+			expectedError: nil,
+			nAddresses:    0,
+		},
+		{
+			"node started, selected account is account2 with no child accounts",
+			true,
+			TestConfig.Account2.Address,
+			TestConfig.Account2.Password,
+			false,
+			nil,
+			1,
+		},
+		{
+			"node started, selected account is account2 with 1 child account",
+			true,
+			TestConfig.Account2.Address,
+			TestConfig.Account2.Password,
+			true,
+			nil,
+			2,
+		},
+	}
+
+	// test
+	for _, testCase := range testCases {
+		func() {
+			s.T().Log(testCase.context)
+
+			if testCase.launchNode {
+				// init node
+				nodeStarted, err := s.NodeManager.StartNode(config)
+				require.NoError(err)
+				require.NotNil(nodeStarted)
+				<-nodeStarted
+
+				// defer
+				defer func() {
+					nodeStopped, err := s.NodeManager.StopNode()
+					require.NoError(err)
+					require.NotNil(nodeStopped)
+					<-nodeStopped
+				}()
+			}
+
+			// account manager
+			accountManager := account.NewManager(s.NodeManager)
+			require.NotNil(accountManager)
+
+			// select account if details were provided
+			if len(testCase.address) > 0 && len(testCase.password) > 0 {
+				require.NoError(accountManager.SelectAccount(testCase.address, testCase.password))
+			}
+
+			// create child account for the selected account if requested
+			if testCase.hasChildAccount {
+				address, pubKey, err := accountManager.CreateChildAccount("", testCase.password)
+				require.NoError(err)
+				require.NotEmpty(address)
+				require.NotEmpty(pubKey)
+
+			}
+
+			addresses, err := accountManager.Accounts()
+			if err != testCase.expectedError {
+				require.FailNow(fmt.Sprintf("unexpected error: expected \n'%v', got \n'%v'", testCase.expectedError, err))
+			}
+			if err == nil {
+				require.NotNil(addresses)
+				require.Equal(testCase.nAddresses, len(addresses))
+			}
+		}()
+	}
 }
-*/
 
 func (s *AccountsTestSuite) TestAccountsRPCHandler() {
 	require := s.Require()
@@ -710,7 +887,7 @@ func (s *AccountsTestSuite) TestAddressToDecryptedAccount() {
 	require.NotNil(config)
 
 	// init empty keyStore
-	emptyKeyStoreDir, err := ioutil.TempDir(os.TempDir(), "status-empty-keystore")
+	emptyKeyStoreDir, err := ioutil.TempDir(os.TempDir(), tmpDirName)
 	require.NoError(err)
 	require.NotEmpty(emptyKeyStoreDir)
 	defer func() {
@@ -719,7 +896,7 @@ func (s *AccountsTestSuite) TestAddressToDecryptedAccount() {
 	config.KeyStoreDir = emptyKeyStoreDir
 
 	// import account key
-	require.NoError(common.ImportTestAccount(emptyKeyStoreDir, "test-account1.pk"))
+	require.NoError(common.ImportTestAccount(emptyKeyStoreDir, account1))
 
 	// account manager
 	accountManager := account.NewManager(s.NodeManager)
