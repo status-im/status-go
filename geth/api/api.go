@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 
+	"github.com/NaySoftware/go-fcm"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/geth/common"
@@ -194,17 +195,27 @@ func (api *StatusAPI) JailBaseJS(js string) {
 	api.b.jailManager.BaseJS(js)
 }
 
-// Notify and send message.
-func (api *StatusAPI) Notify(token string) error {
+// Notify sends a push notification to the device with the given token.
+// @deprecated
+func (api *StatusAPI) Notify(token string) string {
 	log.Debug("Notify", "token", token)
+	message := "Hello World1"
 
-	// TODO(oskarth): Experiment with this
-	msg := map[string]string{
-		"msg": "Hello World1",
-		"sum": "Happy Day",
+	tokens := []string{token}
+
+	err := api.b.newNotification().Send(message, fcm.NotificationPayload{}, tokens...)
+	if err != nil {
+		log.Error("Notify failed:", err)
 	}
 
-	err := api.b.newNotification().Send(msg, token)
+	return token
+}
+
+// NotifyUsers send notifications to users.
+func (api *StatusAPI) NotifyUsers(message string, payload fcm.NotificationPayload, tokens ...string) error {
+	log.Debug("Notify", "tokens", tokens)
+
+	err := api.b.newNotification().Send(message, payload, tokens...)
 	if err != nil {
 		log.Error("Notify failed:", err)
 	}

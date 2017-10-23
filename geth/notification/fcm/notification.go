@@ -1,9 +1,10 @@
 package fcm
 
 import (
+	"fmt"
+
 	"github.com/NaySoftware/go-fcm"
 	"github.com/status-im/status-go/geth/common"
-	"github.com/status-im/status-go/geth/notification"
 )
 
 // Notification represents messaging provider for notifications.
@@ -14,42 +15,33 @@ type Notification struct {
 // NewNotification Firebase Cloud Messaging client constructor.
 func NewNotification(key string) common.NotificationConstructor {
 	return func() common.Notifier {
-		return &Notification{fcm.NewFcmClient(key)}
+		client := fcm.NewFcmClient(key).
+			SetDelayWhileIdle(true).
+			SetContentAvailable(true).
+			SetTimeToLive(fcm.MAX_TTL)
+
+		return &Notification{client}
 	}
 }
 
 // Send send to the tokens list.
-func (n *Notification) Send(body interface{}, tokens ...string) error {
-	n.setPayload(&notification.Payload{
-		Title: "Status - new message",
-		Body:  "ping",
-	})
+func (n *Notification) Send(body string, payload fcm.NotificationPayload, tokens ...string) error {
+	data := map[string]string{
+		"msg": body,
+	}
 
-	n.setMessage(body, tokens...)
+	if payload.Title == "" {
+		payload.Title = "Status - new message"
+	}
+	if payload.Body == "" {
+		payload.Body = "ping"
+	}
+
+	fmt.Println(payload.Title, payload.Body)
+
+	n.client.NewFcmRegIdsMsg(tokens, data)
+	n.client.SetNotificationPayload(&payload)
 	_, err := n.client.Send()
 
 	return err
-}
-
-// SetMessage to send for given the tokens list.
-func (n *Notification) setMessage(body interface{}, tokens ...string) {
-	n.client.NewFcmRegIdsMsg(tokens, body)
-}
-
-// SetPayload sets payload message information.
-func (n *Notification) setPayload(payload *notification.Payload) {
-	fcmPayload := n.toFCMPayload(payload)
-	n.client.SetNotificationPayload(fcmPayload)
-}
-
-func (n *Notification) toFCMPayload(payload *notification.Payload) *fcm.NotificationPayload {
-	return &fcm.NotificationPayload{
-		Title: payload.Title,
-		Body:  payload.Body,
-		Icon:  payload.Icon,
-		Sound: payload.Sound,
-		Badge: payload.Badge,
-		Tag:   payload.Tag,
-		Color: payload.Color,
-	}
 }

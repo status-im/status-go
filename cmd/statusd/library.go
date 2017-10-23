@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"os"
 
-	"gopkg.in/go-playground/validator.v9"
-
+	"github.com/NaySoftware/go-fcm"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/helpers/profiling"
+	"gopkg.in/go-playground/validator.v9"
 )
 
 //GenerateConfig for status node
@@ -374,25 +374,56 @@ func makeJSONResponse(err error) *C.char {
 }
 
 // Notify sends push notification by given token
+// @deprecated
 //export Notify
 func Notify(token *C.char) *C.char {
-	err := statusAPI.Notify(C.GoString(token))
+	res := statusAPI.Notify(C.GoString(token))
+	return C.CString(res)
+}
 
+// NotifyUsers sends push notifications by given tokens.
+//export NotifyUsers
+func NotifyUsers(message, payloadJSON, tokensArray *C.char) (outCBytes *C.char) {
+	var (
+		err      error
+		outBytes []byte
+	)
 	errString := ""
+
+	defer func() {
+		out := common.NotifyResult{
+			Status: err == nil,
+			Error:  errString,
+		}
+
+		outBytes, err = json.Marshal(out)
+		if err != nil {
+			log.Error("failed to marshal Notify output", "error", err.Error())
+			outCBytes = makeJSONResponse(err)
+			return
+		}
+
+		outCBytes = C.CString(string(outBytes))
+	}()
+
+	tokens, err := common.ParseJSONArray(C.GoString(tokensArray))
 	if err != nil {
 		errString = err.Error()
+		return
 	}
 
-	out := common.NotifyResult{
-		Status: err == nil,
-		Error:  errString,
-	}
-
-	outBytes, err := json.Marshal(out)
+	var payload fcm.NotificationPayload
+	err = json.Unmarshal([]byte(C.GoString(payloadJSON)), &payload)
 	if err != nil {
-		log.Error("failed to marshal Notify output", "error", err.Error())
-		return makeJSONResponse(err)
+		errString = err.Error()
+		return
 	}
 
-	return C.CString(string(outBytes))
+	err = statusAPI.NotifyUsers(C.GoString(message), payload, tokens...)
+	if err != nil {
+		errString = err.Error()
+		return
+	}
+
+	return
 }

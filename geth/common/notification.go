@@ -1,8 +1,10 @@
 package common
 
+import "github.com/NaySoftware/go-fcm"
+
 // Notifier manages Push Notifications.
 type Notifier interface {
-	Send(body interface{}, tokens ...string) error
+	Send(body string, payload fcm.NotificationPayload, tokens ...string) error
 }
 
 // NotificationConstructor returns constructor of configured instance Notifier interface.

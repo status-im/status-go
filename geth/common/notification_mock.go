@@ -5,6 +5,7 @@
 package common
 
 import (
+	go_fcm "github.com/NaySoftware/go-fcm"
 	gomock "github.com/golang/mock/gomock"
 	reflect "reflect"
 )
@@ -33,8 +34,8 @@ func (m *MockNotifier) EXPECT() *MockNotifierMockRecorder {
 }
 
 // Send mocks base method
-func (m *MockNotifier) Send(body interface{}, tokens ...string) error {
-	varargs := []interface{}{body}
+func (m *MockNotifier) Send(body string, payload go_fcm.NotificationPayload, tokens ...string) error {
+	varargs := []interface{}{body, payload}
 	for _, a := range tokens {
 		varargs = append(varargs, a)
 	}
@@ -44,7 +45,7 @@ func (m *MockNotifier) Send(body interface{}, tokens ...string) error {
 }
 
 // Send indicates an expected call of Send
-func (mr *MockNotifierMockRecorder) Send(body interface{}, tokens ...interface{}) *gomock.Call {
-	varargs := append([]interface{}{body}, tokens...)
+func (mr *MockNotifierMockRecorder) Send(body, payload interface{}, tokens ...interface{}) *gomock.Call {
+	varargs := append([]interface{}{body, payload}, tokens...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Send", reflect.TypeOf((*MockNotifier)(nil).Send), varargs...)
 }
