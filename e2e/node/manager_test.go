@@ -296,7 +296,7 @@ func (s *ManagerTestSuite) TestResetChainData() {
 	s.StartTestNode(params.RinkebyNetworkID)
 	defer s.StopTestNode()
 
-	s.NoError(EnsureNodeSync(s.NodeManager), "cannot ensure node synchronization")
+	EnsureNodeSync(s.NodeManager)
 
 	// reset chain data
 	nodeReady, err := s.NodeManager.ResetChainData()

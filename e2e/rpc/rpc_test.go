@@ -6,13 +6,14 @@ import (
 	"testing"
 	"time"
 
+	"math/big"
+
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/e2e"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
 	. "github.com/status-im/status-go/testing"
 	"github.com/stretchr/testify/suite"
-	"math/big"
 )
 
 func TestRPCTestSuite(t *testing.T) {
@@ -143,7 +144,7 @@ func (s *RPCTestSuite) TestCallContextResult() {
 	s.StartTestNode(params.StatusChainNetworkID)
 	defer s.StopTestNode()
 
-	s.Require().NoError(EnsureNodeSync(s.NodeManager))
+	EnsureNodeSync(s.NodeManager)
 
 	client := s.NodeManager.RPCClient()
 	s.NotNil(client)
