@@ -86,8 +86,8 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 	messageStateLoggingID := deliveryManager.Subscribe(logMessageStat)
 
 	go func() {
-		defer deliveryManager.Unsubscribe(messageStateLoggingID)
 		defer HaltOnPanic()
+		defer deliveryManager.Unsubscribe(messageStateLoggingID)
 
 		// start underlying node
 		if err := ethNode.Start(); err != nil {
