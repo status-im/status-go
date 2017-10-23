@@ -13,7 +13,6 @@ import (
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/e2e"
 	"github.com/status-im/status-go/geth/common"
-	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/static"
 	. "github.com/status-im/status-go/testing"
 	"github.com/stretchr/testify/suite"
@@ -45,8 +44,8 @@ type WhisperJailTestSuite struct {
 	Jail       common.JailManager
 }
 
-func (s *WhisperJailTestSuite) StartTestBackend(networkID int, opts ...e2e.TestNodeOption) {
-	s.BackendTestSuite.StartTestBackend(networkID, opts...)
+func (s *WhisperJailTestSuite) StartTestBackend(opts ...e2e.TestNodeOption) {
+	s.BackendTestSuite.StartTestBackend(opts...)
 
 	s.WhisperAPI = whisper.NewPublicWhisperAPI(s.WhisperService())
 	s.Jail = s.Backend.JailManager()

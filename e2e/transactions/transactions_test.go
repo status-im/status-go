@@ -83,10 +83,7 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransactionUpstream() {
 	// FIXME(tiabc): Stop skipping after https://github.com/status-im/status-go/issues/424
 	s.T().Skip()
 
-	s.StartTestBackend(
-		params.RopstenNetworkID,
-		e2e.WithUpstream("https://ropsten.infura.io/nKmXgiFgc2KqtoQ8BCGJ"),
-	)
+	s.StartTestBackend(e2e.WithUpstream("https://ropsten.infura.io/nKmXgiFgc2KqtoQ8BCGJ"))
 	defer s.StopTestBackend()
 
 	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account2.Address, TestConfig.Account2.Password)

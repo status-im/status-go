@@ -6,13 +6,14 @@ import (
 	"testing"
 	"time"
 
+	"math/big"
+
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/e2e"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
 	. "github.com/status-im/status-go/testing"
 	"github.com/stretchr/testify/suite"
-	"math/big"
 )
 
 func TestRPCTestSuite(t *testing.T) {
@@ -30,7 +31,7 @@ func (s *RPCTestSuite) SetupTest() {
 
 func (s *RPCTestSuite) TestCallRPC() {
 	for _, upstreamEnabled := range []bool{false, true} {
-		nodeConfig, err := e2e.MakeTestNodeConfig(e2e.GetNetworkID())
+		nodeConfig, err := e2e.MakeTestNodeConfig(params.RinkebyNetworkID)
 		s.NoError(err)
 
 		nodeConfig.IPCEnabled = false
@@ -140,7 +141,7 @@ func (s *RPCTestSuite) TestCallRawResult() {
 // TestCallContextResult checks if result passed to CallContext
 // is set accordingly to its underlying memory layout.
 func (s *RPCTestSuite) TestCallContextResult() {
-	s.StartTestNode(params.StatusChainNetworkID)
+	s.StartTestNode()
 	defer s.StopTestNode()
 
 	s.Require().NoError(EnsureNodeSync(s.NodeManager))

@@ -235,7 +235,7 @@ func (s *ManagerTestSuite) TestNodeStartStop() {
 
 func (s *ManagerTestSuite) TestNetworkSwitching() {
 	// get Ropsten config
-	nodeConfig, err := e2e.MakeTestNodeConfig(e2e.GetNetworkID())
+	nodeConfig, err := e2e.MakeTestNodeConfig(params.RopstenNetworkID)
 	s.NoError(err)
 	s.False(s.NodeManager.IsNodeRunning())
 	nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
@@ -255,7 +255,7 @@ func (s *ManagerTestSuite) TestNetworkSwitching() {
 	s.False(s.NodeManager.IsNodeRunning())
 
 	// start new node with completely different config
-	nodeConfig, err = e2e.MakeTestNodeConfig(e2e.GetNetworkID())
+	nodeConfig, err = e2e.MakeTestNodeConfig(params.RinkebyNetworkID)
 	s.NoError(err)
 	nodeStarted, err = s.NodeManager.StartNode(nodeConfig)
 	s.NoError(err)
@@ -308,7 +308,7 @@ func (s *ManagerTestSuite) TestResetChainData() {
 	// make sure we can read the first byte, and it is valid (for Rinkeby)
 	firstHash, err := e2e.FirstBlockHash(s.NodeManager)
 	s.NoError(err)
-	s.Equal("0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177", firstHash)
+	s.Equal("0x28c4da1cca48d0107ea5ea29a40ac15fca86899c52d02309fa12ea39b86d219c", firstHash)
 }
 
 func (s *ManagerTestSuite) TestRestartNode() {
@@ -325,7 +325,7 @@ func (s *ManagerTestSuite) TestRestartNode() {
 	// make sure we can read the first byte, and it is valid (for Rinkeby)
 	firstHash, err := e2e.FirstBlockHash(s.NodeManager)
 	s.NoError(err)
-	s.Equal("0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177", firstHash)
+	s.Equal("0x28c4da1cca48d0107ea5ea29a40ac15fca86899c52d02309fa12ea39b86d219c", firstHash)
 }
 
 // TODO(adam): race conditions should be tested with -race flag and unit tests, if possible.

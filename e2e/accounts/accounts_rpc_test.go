@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/status-im/status-go/e2e"
-	"github.com/status-im/status-go/geth/params"
 	. "github.com/status-im/status-go/testing"
 	"github.com/stretchr/testify/suite"
 )
@@ -43,10 +42,7 @@ func (s *AccountsTestSuite) TestRPCEthAccountsWithUpstream() {
 	// FIXME(tiabc): Stop skipping after https://github.com/status-im/status-go/issues/424
 	s.T().Skip()
 
-	s.StartTestBackend(
-		params.RopstenNetworkID,
-		e2e.WithUpstream("https://ropsten.infura.io/z6GCTmjdP3FETEJmMBI4"),
-	)
+	s.StartTestBackend(e2e.WithUpstream("https://ropsten.infura.io/z6GCTmjdP3FETEJmMBI4"))
 	defer s.StopTestBackend()
 
 	// log into test account
