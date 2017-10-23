@@ -13,6 +13,14 @@ import (
 	. "github.com/status-im/status-go/testing" //nolint: golint
 )
 
+var (
+	networkSelected string
+)
+
+func init(
+	flag.StringVar(&networkSelected, "network", "statuschain","Set's the network to be used for testing")
+)
+
 // TestNodeOption is a callback passed to StartTestNode which alters its config.
 type TestNodeOption func(config *params.NodeConfig)
 
