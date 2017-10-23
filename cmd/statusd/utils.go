@@ -215,11 +215,7 @@ func testResetChainData(t *testing.T) bool {
 		return false
 	}
 
-	if err := EnsureNodeSync(statusAPI.NodeManager()); err != nil {
-		t.Errorf("cannot ensure node synchronization: %v", err)
-		return false
-	}
-
+	EnsureNodeSync(statusAPI.NodeManager())
 	testCompleteTransaction(t)
 
 	return true
@@ -735,11 +731,7 @@ func testCompleteTransaction(t *testing.T) bool {
 	txQueue := txQueueManager.TransactionQueue()
 
 	txQueue.Reset()
-
-	if err := EnsureNodeSync(statusAPI.NodeManager()); err != nil {
-		t.Errorf("cannot ensure node synchronization: %v", err)
-		return false
-	}
+	EnsureNodeSync(statusAPI.NodeManager())
 
 	// log into account from which transactions will be sent
 	if err := statusAPI.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password); err != nil {
@@ -1373,10 +1365,7 @@ func startTestNode(t *testing.T) <-chan struct{} {
 			// sync
 			if syncRequired {
 				t.Logf("Sync is required")
-				if err := EnsureNodeSync(statusAPI.NodeManager()); err != nil {
-					t.Errorf("cannot ensure node synchronization: %v", err)
-					return
-				}
+				EnsureNodeSync(statusAPI.NodeManager())
 			} else {
 				time.Sleep(5 * time.Second)
 			}

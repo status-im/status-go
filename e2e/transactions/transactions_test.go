@@ -35,7 +35,7 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransaction() {
 	s.StartTestBackend(params.StatusChainNetworkID)
 	defer s.StopTestBackend()
 
-	s.NoError(EnsureNodeSync(s.Backend.NodeManager()), "cannot ensure node synchronization")
+	EnsureNodeSync(s.Backend.NodeManager())
 
 	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	s.NoError(err)
@@ -142,7 +142,7 @@ func (s *TransactionsTestSuite) TestSendContractTx() {
 	s.StartTestBackend(params.StatusChainNetworkID)
 	defer s.StopTestBackend()
 
-	s.NoError(EnsureNodeSync(s.Backend.NodeManager()), "cannot ensure node synchronization")
+	EnsureNodeSync(s.Backend.NodeManager())
 
 	sampleAddress, _, _, err := s.Backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
 	s.NoError(err)
@@ -229,7 +229,7 @@ func (s *TransactionsTestSuite) TestSendEther() {
 	s.StartTestBackend(params.StatusChainNetworkID)
 	defer s.StopTestBackend()
 
-	s.NoError(EnsureNodeSync(s.Backend.NodeManager()))
+	EnsureNodeSync(s.Backend.NodeManager())
 
 	backend := s.LightEthereumService().StatusBackend
 	s.NotNil(backend)
@@ -369,7 +369,7 @@ func (s *TransactionsTestSuite) TestDoubleCompleteQueuedTransactions() {
 	s.StartTestBackend(params.StatusChainNetworkID)
 	defer s.StopTestBackend()
 
-	s.NoError(EnsureNodeSync(s.Backend.NodeManager()), "cannot ensure node synchronization")
+	EnsureNodeSync(s.Backend.NodeManager())
 
 	backend := s.LightEthereumService().StatusBackend
 	s.NotNil(backend)
@@ -446,7 +446,7 @@ func (s *TransactionsTestSuite) TestDiscardQueuedTransaction() {
 	s.StartTestBackend(params.StatusChainNetworkID)
 	defer s.StopTestBackend()
 
-	s.NoError(EnsureNodeSync(s.Backend.NodeManager()), "cannot ensure node synchronization")
+	EnsureNodeSync(s.Backend.NodeManager())
 
 	backend := s.LightEthereumService().StatusBackend
 	s.NotNil(backend)
@@ -526,8 +526,7 @@ func (s *TransactionsTestSuite) TestCompleteMultipleQueuedTransactions() {
 	s.StartTestBackend(params.StatusChainNetworkID)
 	defer s.StopTestBackend()
 
-	s.NoError(EnsureNodeSync(s.Backend.NodeManager()), "cannot ensure node synchronization")
-
+	EnsureNodeSync(s.Backend.NodeManager())
 	s.TxQueueManager().TransactionQueue().Reset()
 
 	// log into account from which transactions will be sent
@@ -620,7 +619,7 @@ func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
 	s.StartTestBackend(params.StatusChainNetworkID)
 	defer s.StopTestBackend()
 
-	s.NoError(EnsureNodeSync(s.Backend.NodeManager()), "cannot ensure node synchronization")
+	EnsureNodeSync(s.Backend.NodeManager())
 
 	backend := s.LightEthereumService().StatusBackend
 	s.NotNil(backend)
