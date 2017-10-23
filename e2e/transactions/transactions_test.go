@@ -312,10 +312,7 @@ func (s *TransactionsTestSuite) TestSendEtherTxUpstream() {
 	// FIXME(tiabc): Stop skipping after https://github.com/status-im/status-go/issues/424
 	s.T().Skip()
 
-	s.StartTestBackend(
-		params.RopstenNetworkID,
-		e2e.WithUpstream("https://ropsten.infura.io/z6GCTmjdP3FETEJmMBI4"),
-	)
+	s.StartTestBackend(e2e.WithUpstream("https://ropsten.infura.io/z6GCTmjdP3FETEJmMBI4"))
 	defer s.StopTestBackend()
 
 	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
