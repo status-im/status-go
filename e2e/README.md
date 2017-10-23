@@ -18,17 +18,15 @@ for running all test. It by default uses the `StatusChain` network.
 To use the `mainnet` network for testing using network name:
 
 ```bash
-go test -v ./e2e/... -args -network=mainnet
+go test -v ./e2e/... -network=mainnet
 ```
 
 To use the `ropsten` network for testing using network id:
 
 ```bash
-go test -v ./e2e/... -args -network=3
+go test -v ./e2e/... -network=3
 ```
 
-It's important to ensure before the flag that the `-args` flag is included else
-the `-network` flag or any other custom flag will not be respected or parsed.
 
 ## Run
 

@@ -91,7 +91,7 @@ func FirstBlockHash(nodeManager common.NodeManager) (string, error) {
 // GetNetworkID returns appropriate network id for test based on
 // default or provided -network flag.
 func GetNetworkID() int {
-	switch strings.ToLower(networkSelected) {
+	switch strings.ToLower(*networkSelected) {
 	case fmt.Sprintf("%d", params.MainNetworkID), "mainnet":
 		return params.MainNetworkID
 	case fmt.Sprintf("%d", params.RinkebyNetworkID), "rinkeby":
