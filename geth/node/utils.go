@@ -75,7 +75,8 @@ func generateMessageStat(state notifications.DeliveryState) common.MessageStat {
 	var from, to string
 
 	if state.IsP2P {
-		if state.P2P.Direction == gethmessage.IncomingMessage {
+		switch state.P2P.Direction {
+		case gethmessage.IncomingMessage:
 			if state.P2P.Received != nil {
 				payload = state.P2P.Received.Payload
 
@@ -87,9 +88,7 @@ func generateMessageStat(state notifications.DeliveryState) common.MessageStat {
 					to = gethcommon.ToHex(crypto.FromECDSAPub(state.P2P.Received.Dst))
 				}
 			}
-		}
-
-		if state.P2P.Direction == gethmessage.OutgoingMessage {
+		case gethmessage.OutgoingMessage:
 			from = state.P2P.Source.Sig
 
 			if len(state.P2P.Source.PublicKey) == 0 {
@@ -112,7 +111,8 @@ func generateMessageStat(state notifications.DeliveryState) common.MessageStat {
 		stat.TimeSent = state.P2P.Envelope.Expiry - state.P2P.Envelope.TTL
 
 	} else {
-		if state.RPC.Direction == gethmessage.IncomingMessage {
+		switch state.RPC.Direction {
+		case gethmessage.IncomingMessage:
 			if state.RPC.Received != nil {
 				payload = state.RPC.Received.Payload
 
@@ -124,9 +124,7 @@ func generateMessageStat(state notifications.DeliveryState) common.MessageStat {
 					to = gethcommon.ToHex(crypto.FromECDSAPub(state.RPC.Received.Dst))
 				}
 			}
-		}
-
-		if state.RPC.Direction == gethmessage.OutgoingMessage {
+		case gethmessage.OutgoingMessage:
 			from = state.RPC.Source.Sig
 
 			if len(state.RPC.Source.PublicKey) == 0 {
