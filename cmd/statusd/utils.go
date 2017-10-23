@@ -4,6 +4,7 @@ import "C"
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"math/big"
 	"os"
@@ -18,10 +19,6 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	gethparams "github.com/ethereum/go-ethereum/params"
 
-	"fmt"
-
-	"context"
-
 	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
@@ -35,7 +32,7 @@ import (
 const zeroHash = "0x0000000000000000000000000000000000000000000000000000000000000000"
 
 var nodeConfigJSON = `{
-	"NetworkId": ` + strconv.Itoa(params.RopstenNetworkID) + `,
+	"NetworkId": ` + strconv.Itoa(params.StatusChainNetworkID) + `,
 	"DataDir": "` + TestDataDir + `",
 	"HTTPPort": ` + strconv.Itoa(TestConfig.Node.HTTPPort) + `,
 	"WSPort": ` + strconv.Itoa(TestConfig.Node.WSPort) + `,
@@ -176,6 +173,7 @@ func testGetDefaultConfig(t *testing.T) bool {
 		{params.MainNetworkID, gethparams.MainnetChainConfig},
 		{params.RopstenNetworkID, gethparams.TestnetChainConfig},
 		{params.RinkebyNetworkID, gethparams.RinkebyChainConfig},
+		// TODO(tiabc): The same for params.StatusChainNetworkID
 	}
 	for i := range networks {
 		network := networks[i]
@@ -228,7 +226,7 @@ func testResetChainData(t *testing.T) bool {
 }
 
 func testStopResumeNode(t *testing.T) bool { //nolint: gocyclo
-	// to make sure that we start with empty account (which might get populated during previous tests)
+	// to make sure that we start with empty account (which might have gotten populated during previous tests)
 	if err := statusAPI.Logout(); err != nil {
 		t.Fatal(err)
 	}
@@ -272,6 +270,8 @@ func testStopResumeNode(t *testing.T) bool { //nolint: gocyclo
 	// nolint: dupl
 	stopNodeFn := func() bool {
 		response := common.APIResponse{}
+		// FIXME(tiabc): Implement https://github.com/status-im/status-go/issues/254 to avoid
+		// 9-sec timeout below after stopping the node.
 		rawResponse = StopNode()
 
 		if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &response); err != nil {
@@ -289,6 +289,8 @@ func testStopResumeNode(t *testing.T) bool { //nolint: gocyclo
 	// nolint: dupl
 	resumeNodeFn := func() bool {
 		response := common.APIResponse{}
+		// FIXME(tiabc): Implement https://github.com/status-im/status-go/issues/254 to avoid
+		// 10-sec timeout below after resuming the node.
 		rawResponse = StartNode(C.CString(nodeConfigJSON))
 
 		if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &response); err != nil {
@@ -306,11 +308,14 @@ func testStopResumeNode(t *testing.T) bool { //nolint: gocyclo
 	if !stopNodeFn() {
 		return false
 	}
+
+	time.Sleep(9 * time.Second) // allow to stop
+
 	if !resumeNodeFn() {
 		return false
 	}
 
-	time.Sleep(5 * time.Second) // allow to start (instead of using blocking version of start, of filter event)
+	time.Sleep(10 * time.Second) // allow to start (instead of using blocking version of start, of filter event)
 
 	// now, verify that we still have account logged in
 	whisperService, err = statusAPI.NodeManager().WhisperService()

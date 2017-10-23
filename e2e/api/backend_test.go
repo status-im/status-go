@@ -34,7 +34,7 @@ func (s *APIBackendTestSuite) TestRaceConditions() {
 	progress := make(chan struct{}, cnt)
 	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	nodeConfig1, err := e2e.MakeTestNodeConfig(params.RopstenNetworkID)
+	nodeConfig1, err := e2e.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(err)
 
 	nodeConfig2, err := e2e.MakeTestNodeConfig(params.RinkebyNetworkID)

@@ -194,7 +194,7 @@ func (s *ManagerTestSuite) TestReferencesWithStartedNode() {
 }
 
 func (s *ManagerTestSuite) TestNodeStartStop() {
-	nodeConfig, err := e2e.MakeTestNodeConfig(params.RopstenNetworkID)
+	nodeConfig, err := e2e.MakeTestNodeConfig(params.StatusChainNetworkID)
 	s.NoError(err)
 
 	// try stopping non-started node
@@ -446,8 +446,7 @@ func (s *ManagerTestSuite) TestRaceConditions() {
 	}
 
 	time.Sleep(2 * time.Second)                // so that we see some logs
-	nodeStopped, e := s.NodeManager.StopNode() // just in case we have a node running
-	s.NoError(e)
+	nodeStopped, _ := s.NodeManager.StopNode() // just in case we have a node running
 
 	if nodeStopped != nil {
 		<-nodeStopped
