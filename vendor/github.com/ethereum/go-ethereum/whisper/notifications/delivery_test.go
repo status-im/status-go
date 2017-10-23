@@ -1,7 +1,5 @@
 package notifications_test
 
-package notifications_test
-
 import (
 	"testing"
 	"time"
