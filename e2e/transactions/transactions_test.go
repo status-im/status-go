@@ -1,6 +1,7 @@
 package transactions
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -36,8 +37,7 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransaction() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	// allow to sync for some time
-	s.EnsureNodeSync()
+	s.NoError(EnsureNodeSync(s.Backend.NodeManager()), "cannot ensure node synchronization")
 
 	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	s.NoError(err)
@@ -87,9 +87,6 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransactionUpstream() {
 		e2e.WithUpstream("https://ropsten.infura.io/nKmXgiFgc2KqtoQ8BCGJ"),
 	)
 	defer s.StopTestBackend()
-
-	// Allow to sync the blockchain.
-	s.EnsureNodeSync()
 
 	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account2.Address, TestConfig.Account2.Password)
 	s.NoError(err)
@@ -144,7 +141,7 @@ func (s *TransactionsTestSuite) TestSendContractTx() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	s.EnsureNodeSync()
+	s.NoError(EnsureNodeSync(s.Backend.NodeManager()), "cannot ensure node synchronization")
 
 	sampleAddress, _, _, err := s.Backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
 	s.NoError(err)
@@ -231,7 +228,7 @@ func (s *TransactionsTestSuite) TestSendEtherTx() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	s.EnsureNodeSync()
+	s.NoError(EnsureNodeSync(s.Backend.NodeManager()), "cannot ensure node synchronization")
 
 	backend := s.LightEthereumService().StatusBackend
 	s.NotNil(backend)
@@ -399,8 +396,6 @@ func (s *TransactionsTestSuite) TestSendEtherTxUpstream() {
 	)
 	defer s.StopTestBackend()
 
-	s.EnsureNodeSync()
-
 	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	s.NoError(err)
 
@@ -452,7 +447,7 @@ func (s *TransactionsTestSuite) TestDoubleCompleteQueuedTransactions() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	s.EnsureNodeSync()
+	s.NoError(EnsureNodeSync(s.Backend.NodeManager()), "cannot ensure node synchronization")
 
 	backend := s.LightEthereumService().StatusBackend
 	s.NotNil(backend)
@@ -529,7 +524,7 @@ func (s *TransactionsTestSuite) TestDiscardQueuedTransaction() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	s.EnsureNodeSync()
+	s.NoError(EnsureNodeSync(s.Backend.NodeManager()), "cannot ensure node synchronization")
 
 	backend := s.LightEthereumService().StatusBackend
 	s.NotNil(backend)
@@ -609,7 +604,7 @@ func (s *TransactionsTestSuite) TestCompleteMultipleQueuedTransactions() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	s.EnsureNodeSync()
+	s.NoError(EnsureNodeSync(s.Backend.NodeManager()), "cannot ensure node synchronization")
 
 	s.TxQueueManager().TransactionQueue().Reset()
 
@@ -703,7 +698,7 @@ func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
 	s.StartTestBackend(params.RopstenNetworkID)
 	defer s.StopTestBackend()
 
-	s.EnsureNodeSync()
+	s.NoError(EnsureNodeSync(s.Backend.NodeManager()), "cannot ensure node synchronization")
 
 	backend := s.LightEthereumService().StatusBackend
 	s.NotNil(backend)
