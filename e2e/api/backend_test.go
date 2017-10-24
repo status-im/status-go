@@ -12,6 +12,7 @@ import (
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
+	. "github.com/status-im/status-go/testing"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -33,7 +34,7 @@ func (s *APIBackendTestSuite) TestRaceConditions() {
 	progress := make(chan struct{}, cnt)
 	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	nodeConfig1, err := e2e.MakeTestNodeConfig(params.RopstenNetworkID)
+	nodeConfig1, err := e2e.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(err)
 
 	nodeConfig2, err := e2e.MakeTestNodeConfig(params.RinkebyNetworkID)
@@ -241,8 +242,7 @@ func (s *APIBackendTestSuite) TestResetChainData() {
 	s.StartTestBackend(params.RinkebyNetworkID)
 	defer s.StopTestBackend()
 
-	// allow to sync for some time
-	s.EnsureNodeSync()
+	EnsureNodeSync(s.Backend.NodeManager())
 
 	s.True(s.Backend.IsNodeRunning())
 	nodeReady, err := s.Backend.ResetChainData()

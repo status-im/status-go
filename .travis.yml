@@ -11,7 +11,7 @@ install:
   - go get golang.org/x/tools/cmd/cover
 
 script:
-  - travis_wait make ci
+  - make ci
 
 cache:
   directories:

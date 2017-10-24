@@ -56,7 +56,7 @@ func (s *APITestSuite) TestRaceConditions() {
 	progress := make(chan struct{}, cnt)
 	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	nodeConfig1, err := e2e.MakeTestNodeConfig(params.RopstenNetworkID)
+	nodeConfig1, err := e2e.MakeTestNodeConfig(params.StatusChainNetworkID)
 	s.NoError(err)
 
 	nodeConfig2, err := e2e.MakeTestNodeConfig(params.RinkebyNetworkID)
@@ -129,7 +129,7 @@ func (s *APITestSuite) TestCellsRemovedAfterSwitchAccount() {
 		}
 	)
 
-	config, err := e2e.MakeTestNodeConfig(params.RopstenNetworkID)
+	config, err := e2e.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(err)
 	err = s.api.StartNode(config)
 	require.NoError(err)
@@ -166,7 +166,7 @@ func (s *APITestSuite) TestLogoutRemovesCells() {
 		require = s.Require()
 	)
 
-	config, err := e2e.MakeTestNodeConfig(params.RopstenNetworkID)
+	config, err := e2e.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(err)
 	err = s.api.StartNode(config)
 	require.NoError(err)

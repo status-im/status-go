@@ -6,10 +6,13 @@ import (
 	"testing"
 	"time"
 
+	"math/big"
+
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/e2e"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
+	. "github.com/status-im/status-go/testing"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -119,7 +122,7 @@ func (s *RPCTestSuite) TestCallRPC() {
 
 // TestCallRawResult checks if returned response is a valid JSON-RPC response.
 func (s *RPCTestSuite) TestCallRawResult() {
-	nodeConfig, err := e2e.MakeTestNodeConfig(params.RopstenNetworkID)
+	nodeConfig, err := e2e.MakeTestNodeConfig(params.StatusChainNetworkID)
 	s.NoError(err)
 
 	nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
@@ -138,20 +141,19 @@ func (s *RPCTestSuite) TestCallRawResult() {
 // TestCallContextResult checks if result passed to CallContext
 // is set accordingly to its underlying memory layout.
 func (s *RPCTestSuite) TestCallContextResult() {
-	s.StartTestNode(
-		params.RopstenNetworkID,
-		e2e.WithUpstream("https://ropsten.infura.io/nKmXgiFgc2KqtoQ8BCGJ"),
-	)
+	s.StartTestNode(params.StatusChainNetworkID)
 	defer s.StopTestNode()
+
+	EnsureNodeSync(s.NodeManager)
 
 	client := s.NodeManager.RPCClient()
 	s.NotNil(client)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	defer cancel()
 
-	var blockNumber hexutil.Uint
-	err := client.CallContext(ctx, &blockNumber, "eth_blockNumber")
+	var balance hexutil.Big
+	err := client.CallContext(ctx, &balance, "eth_getBalance", "0xAdAf150b905Cf5E6A778E553E15A139B6618BbB7", "latest")
 	s.NoError(err)
-	s.True(blockNumber > 0, "blockNumber should be higher than 0")
+	s.True(balance.ToInt().Cmp(big.NewInt(0)) > 0, "balance should be higher than 0")
 }
