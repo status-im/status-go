@@ -6,6 +6,7 @@ import (
 	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/signal"
+	. "github.com/status-im/status-go/testing" //nolint: golint
 	"github.com/stretchr/testify/suite"
 )
 

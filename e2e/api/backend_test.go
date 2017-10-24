@@ -262,12 +262,20 @@ func (s *APIBackendTestSuite) TestRestartNode() {
 	require := s.Require()
 	require.NotNil(s.Backend)
 
-	s.StartTestBackend()
-	defer s.StopTestBackend()
+	// get Ropsten config
+	nodeConfig, err := e2e.MakeTestNodeConfig(params.RopstenNetworkID)
+	s.NoError(err)
+
+	s.False(s.Backend.IsNodeRunning())
+	nodeStarted, err := s.Backend.StartNode(nodeConfig)
+	s.NoError(err)
+
+	<-nodeStarted // wait till node is started
+	s.True(s.Backend.IsNodeRunning())
 
 	firstHash, err := e2e.FirstBlockHash(s.Backend.NodeManager())
 	s.NoError(err)
-	s.Equal("0x28c4da1cca48d0107ea5ea29a40ac15fca86899c52d02309fa12ea39b86d219c", firstHash)
+	s.Equal("0x41941023680923e0fe4d74a34bdac8141f2540e3ae90623718e47d66d1ca4a2d", firstHash)
 
 	s.True(s.Backend.IsNodeRunning())
 	nodeRestarted, err := s.Backend.RestartNode()
@@ -278,5 +286,5 @@ func (s *APIBackendTestSuite) TestRestartNode() {
 	// make sure we can read the first byte, and it is valid (for Rinkeby)
 	firstHash, err = e2e.FirstBlockHash(s.Backend.NodeManager())
 	s.NoError(err)
-	s.Equal("0x28c4da1cca48d0107ea5ea29a40ac15fca86899c52d02309fa12ea39b86d219c", firstHash)
+	s.Equal("0x41941023680923e0fe4d74a34bdac8141f2540e3ae90623718e47d66d1ca4a2d", firstHash)
 }

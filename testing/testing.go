@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	networkSelected = flag.Int("network", "statuschain", "-network=NETWORKID to select network used for tests")
+	networkSelected = flag.Int("network", 777, "-network=NETWORKID to select network used for tests")
 
 	// TestConfig defines the default config usable at package-level.
 	TestConfig *common.TestConfig
@@ -119,7 +119,7 @@ func EnsureNodeSync(nodeManager common.NodeManager) error {
 // GetNetworkID returns appropriate network id for test based on
 // default or provided -network flag.
 func GetNetworkID() int {
-	switch strings.ToLower(*networkSelected) {
+	switch *networkSelected {
 	case params.MainNetworkID:
 		return params.MainNetworkID
 	case params.RinkebyNetworkID:
