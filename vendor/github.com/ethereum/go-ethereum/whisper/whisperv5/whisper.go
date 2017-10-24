@@ -628,7 +628,8 @@ func (wh *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 				if err := packet.Decode(&envelope); err != nil {
 					log.Warn("failed to decode direct message, peer will be disconnected", "peer", p.peer.ID(), "err", err)
 					if wh.deliveryServer != nil {
-						wh.deliveryServer.SendP2PState(P2PMessageState{
+						wh.deliveryServer.SendState(MessageState{
+							IsP2P:     true,
 							Envelope:  envelope,
 							Status:    message.RejectedStatus,
 							Reason:    err,
@@ -639,7 +640,8 @@ func (wh *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 				}
 
 				if wh.deliveryServer != nil {
-					wh.deliveryServer.SendP2PState(P2PMessageState{
+					wh.deliveryServer.SendState(MessageState{
+						IsP2P:     true,
 						Envelope:  envelope,
 						Status:    message.SentStatus,
 						Direction: message.IncomingMessage,
@@ -655,7 +657,8 @@ func (wh *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 				if err := packet.Decode(&request); err != nil {
 					log.Warn("failed to decode p2p request message, peer will be disconnected", "peer", p.peer.ID(), "err", err)
 					if wh.deliveryServer != nil {
-						wh.deliveryServer.SendP2PState(P2PMessageState{
+						wh.deliveryServer.SendState(MessageState{
+							IsP2P:     true,
 							Envelope:  request,
 							Direction: message.IncomingMessage,
 							Status:    message.RejectedStatus,
@@ -734,7 +737,7 @@ func (wh *Whisper) add(envelope *Envelope) (bool, error) {
 		}
 
 		if wh.deliveryServer != nil {
-			wh.deliveryServer.SendRPCState(RPCMessageState{
+			wh.deliveryServer.SendState(MessageState{
 				Envelope:  *envelope,
 				Direction: message.IncomingMessage,
 				Status:    message.CachedStatus,
@@ -746,7 +749,7 @@ func (wh *Whisper) add(envelope *Envelope) (bool, error) {
 	if alreadyCached {
 		log.Trace("whisper envelope already cached", "hash", envelope.Hash().Hex())
 		if wh.deliveryServer != nil {
-			wh.deliveryServer.SendRPCState(RPCMessageState{
+			wh.deliveryServer.SendState(MessageState{
 				Envelope:  *envelope,
 				Direction: message.IncomingMessage,
 				Status:    message.ResentStatus,
@@ -759,7 +762,7 @@ func (wh *Whisper) add(envelope *Envelope) (bool, error) {
 		wh.statsMu.Unlock()
 
 		if wh.deliveryServer != nil {
-			wh.deliveryServer.SendRPCState(RPCMessageState{
+			wh.deliveryServer.SendState(MessageState{
 				Envelope:  *envelope,
 				Direction: message.IncomingMessage,
 				Status:    message.QueuedStatus,
@@ -790,21 +793,10 @@ func (w *Whisper) postEvent(envelope *Envelope, isP2P bool) {
 		return
 	}
 
-	if !isP2P {
-		if w.deliveryServer != nil {
-			w.deliveryServer.SendRPCState(RPCMessageState{
-				Envelope:  *envelope,
-				Reason:    fmt.Errorf("Mismatch Envelope version(%d) to wanted Version(%d)", envelope.Ver(), EnvelopeVersion),
-				Direction: message.IncomingMessage,
-				Status:    message.RejectedStatus,
-			})
-		}
-		return
-	}
-
 	if w.deliveryServer != nil {
-		w.deliveryServer.SendP2PState(P2PMessageState{
+		w.deliveryServer.SendState(MessageState{
 			Envelope:  *envelope,
+			IsP2P:     isP2P,
 			Reason:    fmt.Errorf("Mismatch Envelope version(%d) to wanted Version(%d)", envelope.Ver(), EnvelopeVersion),
 			Direction: message.IncomingMessage,
 			Status:    message.RejectedStatus,
@@ -839,7 +831,7 @@ func (w *Whisper) processQueue() {
 
 		case e = <-w.messageQueue:
 			if w.deliveryServer != nil {
-				w.deliveryServer.SendRPCState(RPCMessageState{
+				w.deliveryServer.SendState(MessageState{
 					Envelope:  *e,
 					Direction: message.IncomingMessage,
 					Status:    message.ProcessingStatus,
@@ -849,8 +841,9 @@ func (w *Whisper) processQueue() {
 
 		case e = <-w.p2pMsgQueue:
 			if w.deliveryServer != nil {
-				w.deliveryServer.SendP2PState(P2PMessageState{
+				w.deliveryServer.SendState(MessageState{
 					Envelope:  *e,
+					IsP2P:     true,
 					Direction: message.IncomingMessage,
 					Status:    message.ProcessingStatus,
 				})

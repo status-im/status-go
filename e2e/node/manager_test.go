@@ -11,7 +11,6 @@ import (
 	"github.com/ethereum/go-ethereum/les"
 	gethnode "github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/ethereum/go-ethereum/whisper/notifications"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/e2e"
 	"github.com/status-im/status-go/geth/log"
@@ -471,11 +470,8 @@ func (s *ManagerTestSuite) TestNodeStartCrash() {
 	nodeConfig, err := e2e.MakeTestNodeConfig(params.RinkebyNetworkID)
 	s.NoError(err)
 
-	// create instance of DeliveryService for delivery notifications.
-	delivery := new(notifications.DeliveryService)
-
 	// start node outside the manager (on the same port), so that manager node.Start() method fails
-	outsideNode, err := node.MakeNode(nodeConfig, delivery)
+	outsideNode, err := node.MakeNode(nodeConfig, node.LogDeliveryService{})
 	s.NoError(err)
 	err = outsideNode.Start()
 	s.NoError(err)

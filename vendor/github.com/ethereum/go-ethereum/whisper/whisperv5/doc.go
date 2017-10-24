@@ -101,23 +101,13 @@ type NotificationServer interface {
 	Stop() error
 }
 
-// RPCMessageState holds the current delivery state of a whisper rpc message.
-type RPCMessageState struct {
+// MessageState holds the current delivery status of a whisper p2p message.
+type MessageState struct {
+	IsP2P     bool              `json:"is_p2p"`
 	Reason    error             `json:"reason"`
 	Envelope  Envelope          `json:"envelope"`
 	Timestamp time.Time         `json:"timestamp"`
-	Source    NewMessage        `josn:"source"`
-	Status    message.Status    `json:"status"`
-	Direction message.Direction `json:"direction"`
-	Received  *ReceivedMessage  `json:"received"`
-}
-
-// P2PMessageState holds the current delivery status of a whisper p2p message.
-type P2PMessageState struct {
-	Reason    error             `json:"reason"`
-	Envelope  Envelope          `json:"envelope"`
-	Timestamp time.Time         `json:"timestamp"`
-	Source    NewMessage        `josn:"source"`
+	Source    NewMessage        `json:"source"`
 	Status    message.Status    `json:"status"`
 	Direction message.Direction `json:"direction"`
 	Received  *ReceivedMessage  `json:"received"`
@@ -128,6 +118,5 @@ type P2PMessageState struct {
 // update event is delivered to it's underline system
 // for both rpc messages and p2p messages.
 type DeliveryServer interface {
-	SendRPCState(RPCMessageState)
-	SendP2PState(P2PMessageState)
+	SendState(MessageState)
 }

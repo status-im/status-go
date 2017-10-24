@@ -15,7 +15,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/les"
 	"github.com/ethereum/go-ethereum/node"
-	"github.com/ethereum/go-ethereum/whisper/notifications"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/params"
@@ -95,9 +94,6 @@ type NodeManager interface {
 
 	// WhisperService returns reference to running Whisper service
 	WhisperService() (*whisper.Whisper, error)
-
-	// DeliveryService returns reference to running Whisper service
-	DeliveryService() (*notifications.DeliveryService, error)
 
 	// AccountManager returns reference to node's account manager
 	AccountManager() (*accounts.Manager, error)

@@ -246,14 +246,9 @@ func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (bool, er
 	)
 
 	if api.w.deliveryServer != nil {
-		if isP2PMessage {
-			api.w.deliveryServer.SendP2PState(P2PMessageState{
-				Source:    req,
-				Status:    message.PendingStatus,
-				Direction: message.OutgoingMessage,
-			})
-		} else {
-			api.w.deliveryServer.SendRPCState(RPCMessageState{
+		if api.w.deliveryServer != nil {
+			api.w.deliveryServer.SendState(MessageState{
+				IsP2P:     isP2PMessage,
 				Source:    req,
 				Status:    message.PendingStatus,
 				Direction: message.OutgoingMessage,
@@ -264,21 +259,13 @@ func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (bool, er
 	// user must specify either a symmetric or an asymmetric key
 	if (symKeyGiven && pubKeyGiven) || (!symKeyGiven && !pubKeyGiven) {
 		if api.w.deliveryServer != nil {
-			if isP2PMessage {
-				api.w.deliveryServer.SendP2PState(P2PMessageState{
-					Source:    req,
-					Status:    message.RejectedStatus,
-					Reason:    ErrSymAsym,
-					Direction: message.OutgoingMessage,
-				})
-			} else {
-				api.w.deliveryServer.SendRPCState(RPCMessageState{
-					Source:    req,
-					Status:    message.RejectedStatus,
-					Reason:    ErrSymAsym,
-					Direction: message.OutgoingMessage,
-				})
-			}
+			api.w.deliveryServer.SendState(MessageState{
+				IsP2P:     isP2PMessage,
+				Source:    req,
+				Status:    message.RejectedStatus,
+				Reason:    ErrSymAsym,
+				Direction: message.OutgoingMessage,
+			})
 		}
 		return false, ErrSymAsym
 	}
@@ -296,22 +283,13 @@ func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (bool, er
 	if len(req.Sig) > 0 {
 		if params.Src, err = api.w.GetPrivateKey(req.Sig); err != nil {
 			if api.w.deliveryServer != nil {
-				if isP2PMessage {
-
-					api.w.deliveryServer.SendP2PState(P2PMessageState{
-						Source:    req,
-						Reason:    err,
-						Status:    message.RejectedStatus,
-						Direction: message.OutgoingMessage,
-					})
-				} else {
-					api.w.deliveryServer.SendRPCState(RPCMessageState{
-						Source:    req,
-						Reason:    err,
-						Status:    message.RejectedStatus,
-						Direction: message.OutgoingMessage,
-					})
-				}
+				api.w.deliveryServer.SendState(MessageState{
+					IsP2P:     isP2PMessage,
+					Source:    req,
+					Reason:    err,
+					Status:    message.RejectedStatus,
+					Direction: message.OutgoingMessage,
+				})
 			}
 			return false, err
 		}
@@ -321,64 +299,37 @@ func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (bool, er
 	if symKeyGiven {
 		if params.Topic == (TopicType{}) { // topics are mandatory with symmetric encryption
 			if api.w.deliveryServer != nil {
-				if isP2PMessage {
-
-					api.w.deliveryServer.SendP2PState(P2PMessageState{
-						Source:    req,
-						Reason:    ErrNoTopics,
-						Status:    message.RejectedStatus,
-						Direction: message.OutgoingMessage,
-					})
-				} else {
-					api.w.deliveryServer.SendRPCState(RPCMessageState{
-						Source:    req,
-						Reason:    ErrNoTopics,
-						Status:    message.RejectedStatus,
-						Direction: message.OutgoingMessage,
-					})
-				}
+				api.w.deliveryServer.SendState(MessageState{
+					IsP2P:     isP2PMessage,
+					Source:    req,
+					Reason:    ErrNoTopics,
+					Status:    message.RejectedStatus,
+					Direction: message.OutgoingMessage,
+				})
 			}
 			return false, ErrNoTopics
 		}
 		if params.KeySym, err = api.w.GetSymKey(req.SymKeyID); err != nil {
 			if api.w.deliveryServer != nil {
-				if isP2PMessage {
-
-					api.w.deliveryServer.SendP2PState(P2PMessageState{
-						Source:    req,
-						Reason:    err,
-						Status:    message.RejectedStatus,
-						Direction: message.OutgoingMessage,
-					})
-				} else {
-					api.w.deliveryServer.SendRPCState(RPCMessageState{
-						Source:    req,
-						Reason:    err,
-						Status:    message.RejectedStatus,
-						Direction: message.OutgoingMessage,
-					})
-				}
+				api.w.deliveryServer.SendState(MessageState{
+					Source:    req,
+					Reason:    err,
+					IsP2P:     isP2PMessage,
+					Status:    message.RejectedStatus,
+					Direction: message.OutgoingMessage,
+				})
 			}
 			return false, err
 		}
 		if !validateSymmetricKey(params.KeySym) {
 			if api.w.deliveryServer != nil {
-				if isP2PMessage {
-
-					api.w.deliveryServer.SendP2PState(P2PMessageState{
-						Source:    req,
-						Reason:    ErrInvalidSymmetricKey,
-						Status:    message.RejectedStatus,
-						Direction: message.OutgoingMessage,
-					})
-				} else {
-					api.w.deliveryServer.SendRPCState(RPCMessageState{
-						Source:    req,
-						Reason:    ErrInvalidSymmetricKey,
-						Status:    message.RejectedStatus,
-						Direction: message.OutgoingMessage,
-					})
-				}
+				api.w.deliveryServer.SendState(MessageState{
+					Source:    req,
+					IsP2P:     isP2PMessage,
+					Reason:    ErrInvalidSymmetricKey,
+					Status:    message.RejectedStatus,
+					Direction: message.OutgoingMessage,
+				})
 			}
 			return false, ErrInvalidSymmetricKey
 		}
@@ -389,21 +340,13 @@ func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (bool, er
 		params.Dst = crypto.ToECDSAPub(req.PublicKey)
 		if !ValidatePublicKey(params.Dst) {
 			if api.w.deliveryServer != nil {
-				if isP2PMessage {
-					api.w.deliveryServer.SendP2PState(P2PMessageState{
-						Source:    req,
-						Reason:    ErrInvalidPublicKey,
-						Status:    message.RejectedStatus,
-						Direction: message.OutgoingMessage,
-					})
-				} else {
-					api.w.deliveryServer.SendRPCState(RPCMessageState{
-						Source:    req,
-						Reason:    ErrInvalidPublicKey,
-						Status:    message.RejectedStatus,
-						Direction: message.OutgoingMessage,
-					})
-				}
+				api.w.deliveryServer.SendState(MessageState{
+					Source:    req,
+					IsP2P:     isP2PMessage,
+					Reason:    ErrInvalidPublicKey,
+					Status:    message.RejectedStatus,
+					Direction: message.OutgoingMessage,
+				})
 			}
 			return false, ErrInvalidPublicKey
 		}
@@ -413,21 +356,13 @@ func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (bool, er
 	whisperMsg, err := NewSentMessage(params)
 	if err != nil {
 		if api.w.deliveryServer != nil {
-			if isP2PMessage {
-				api.w.deliveryServer.SendP2PState(P2PMessageState{
-					Source:    req,
-					Reason:    err,
-					Status:    message.RejectedStatus,
-					Direction: message.OutgoingMessage,
-				})
-			} else {
-				api.w.deliveryServer.SendRPCState(RPCMessageState{
-					Source:    req,
-					Reason:    err,
-					Status:    message.RejectedStatus,
-					Direction: message.OutgoingMessage,
-				})
-			}
+			api.w.deliveryServer.SendState(MessageState{
+				Source:    req,
+				Reason:    err,
+				IsP2P:     isP2PMessage,
+				Status:    message.RejectedStatus,
+				Direction: message.OutgoingMessage,
+			})
 		}
 		return false, err
 	}
@@ -435,21 +370,13 @@ func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (bool, er
 	env, err := whisperMsg.Wrap(params)
 	if err != nil {
 		if api.w.deliveryServer != nil {
-			if isP2PMessage {
-				api.w.deliveryServer.SendP2PState(P2PMessageState{
-					Source:    req,
-					Reason:    err,
-					Status:    message.RejectedStatus,
-					Direction: message.OutgoingMessage,
-				})
-			} else {
-				api.w.deliveryServer.SendRPCState(RPCMessageState{
-					Source:    req,
-					Reason:    err,
-					Status:    message.RejectedStatus,
-					Direction: message.OutgoingMessage,
-				})
-			}
+			api.w.deliveryServer.SendState(MessageState{
+				Source:    req,
+				Reason:    err,
+				IsP2P:     isP2PMessage,
+				Status:    message.RejectedStatus,
+				Direction: message.OutgoingMessage,
+			})
 		}
 		return false, err
 	}
@@ -459,9 +386,10 @@ func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (bool, er
 		n, err := discover.ParseNode(req.TargetPeer)
 		if err != nil {
 			if api.w.deliveryServer != nil {
-				api.w.deliveryServer.SendP2PState(P2PMessageState{
+				api.w.deliveryServer.SendState(MessageState{
 					Source:    req,
 					Reason:    err,
+					IsP2P:     isP2PMessage,
 					Status:    message.RejectedStatus,
 					Direction: message.OutgoingMessage,
 				})
@@ -469,24 +397,27 @@ func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (bool, er
 			return false, fmt.Errorf("failed to parse target peer: %s", err)
 		}
 
-		api.w.deliveryServer.SendP2PState(P2PMessageState{
+		api.w.deliveryServer.SendState(MessageState{
 			Source:    req,
+			IsP2P:     isP2PMessage,
 			Status:    message.SentStatus,
 			Direction: message.OutgoingMessage,
 		})
 
 		if err := api.w.SendP2PMessage(n.ID[:], env); err != nil {
-			api.w.deliveryServer.SendP2PState(P2PMessageState{
+			api.w.deliveryServer.SendState(MessageState{
 				Source:    req,
 				Reason:    err,
+				IsP2P:     isP2PMessage,
 				Status:    message.RejectedStatus,
 				Direction: message.OutgoingMessage,
 			})
 			return true, err
 		}
 
-		api.w.deliveryServer.SendP2PState(P2PMessageState{
+		api.w.deliveryServer.SendState(MessageState{
 			Source:    req,
+			IsP2P:     isP2PMessage,
 			Status:    message.DeliveredStatus,
 			Direction: message.OutgoingMessage,
 		})
@@ -497,7 +428,7 @@ func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (bool, er
 	// ensure that the message PoW meets the node's minimum accepted PoW
 	if req.PowTarget < api.w.MinPow() {
 		if api.w.deliveryServer != nil {
-			api.w.deliveryServer.SendRPCState(RPCMessageState{
+			api.w.deliveryServer.SendState(MessageState{
 				Source:    req,
 				Reason:    ErrTooLowPoW,
 				Status:    message.RejectedStatus,
@@ -508,7 +439,7 @@ func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (bool, er
 	}
 
 	if api.w.deliveryServer != nil {
-		api.w.deliveryServer.SendRPCState(RPCMessageState{
+		api.w.deliveryServer.SendState(MessageState{
 			Source:    req,
 			Envelope:  *env,
 			Status:    message.SentStatus,

@@ -12,7 +12,6 @@ import (
 	"github.com/ethereum/go-ethereum/les"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/discover"
-	"github.com/ethereum/go-ethereum/whisper/notifications"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
@@ -38,14 +37,13 @@ var (
 // should be fixed at https://github.com/status-im/status-go/issues/200
 type NodeManager struct {
 	sync.RWMutex
-	config          *params.NodeConfig             // Status node configuration
-	node            *node.Node                     // reference to Geth P2P stack/node
-	nodeStarted     chan struct{}                  // channel to wait for start up notifications
-	nodeStopped     chan struct{}                  // channel to wait for termination notifications
-	whisperService  *whisper.Whisper               // reference to Whisper service
-	deliveryService *notifications.DeliveryService // reference to Delivery service
-	lesService      *les.LightEthereum             // reference to LES service
-	rpcClient       *rpc.Client                    // reference to RPC client
+	config         *params.NodeConfig // Status node configuration
+	node           *node.Node         // reference to Geth P2P stack/node
+	nodeStarted    chan struct{}      // channel to wait for start up notifications
+	nodeStopped    chan struct{}      // channel to wait for termination notifications
+	whisperService *whisper.Whisper   // reference to Whisper service
+	lesService     *les.LightEthereum // reference to LES service
+	rpcClient      *rpc.Client        // reference to RPC client
 }
 
 // NewNodeManager makes new instance of node manager
@@ -72,22 +70,15 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 
 	m.initLog(config)
 
-	deliveryManager := new(notifications.DeliveryService)
-
-	ethNode, err := MakeNode(config, deliveryManager)
+	ethNode, err := MakeNode(config, LogDeliveryService{})
 	if err != nil {
 		return nil, err
 	}
 
-	m.deliveryService = deliveryManager
 	m.nodeStarted = make(chan struct{}, 1)
-
-	// Subscribe for message delivery status and log out with special key.
-	messageStateLoggingID := deliveryManager.Subscribe(logMessageStat)
 
 	go func() {
 		defer HaltOnPanic()
-		defer deliveryManager.Unsubscribe(messageStateLoggingID)
 
 		// start underlying node
 		if err := ethNode.Start(); err != nil {
@@ -430,24 +421,6 @@ func (m *NodeManager) WhisperService() (*whisper.Whisper, error) {
 	}
 
 	return m.whisperService, nil
-}
-
-// DeliveryService returns reference to running Whisper service
-func (m *NodeManager) DeliveryService() (*notifications.DeliveryService, error) {
-	m.RLock()
-	defer m.RUnlock()
-
-	if err := m.isNodeAvailable(); err != nil {
-		return nil, err
-	}
-
-	<-m.nodeStarted
-
-	if m.deliveryService == nil {
-		return nil, ErrInvalidDeliveryService
-	}
-
-	return m.deliveryService, nil
 }
 
 // AccountManager exposes reference to node's accounts manager
