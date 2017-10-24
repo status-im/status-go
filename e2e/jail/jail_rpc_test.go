@@ -15,6 +15,7 @@ import (
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/signal"
 	"github.com/status-im/status-go/geth/txqueue"
+	. "github.com/status-im/status-go/testing"
 	"github.com/stretchr/testify/suite"
 )
 
