@@ -11,6 +11,7 @@ import (
 	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/signal"
 	"github.com/status-im/status-go/static"
+	. "github.com/status-im/status-go/testing" //nolint: golint
 	"github.com/stretchr/testify/suite"
 )
 

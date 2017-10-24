@@ -194,7 +194,7 @@ func (s *ManagerTestSuite) TestReferencesWithStartedNode() {
 }
 
 func (s *ManagerTestSuite) TestNodeStartStop() {
-	nodeConfig, err := e2e.MakeTestNodeConfig(e2e.GetNetworkID())
+	nodeConfig, err := e2e.MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
 
 	// try stopping non-started node
@@ -274,7 +274,7 @@ func (s *ManagerTestSuite) TestNetworkSwitching() {
 }
 
 func (s *ManagerTestSuite) TestStartNodeWithUpstreamEnabled() {
-	nodeConfig, err := e2e.MakeTestNodeConfig(e2e.GetNetworkID())
+	nodeConfig, err := e2e.MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
 
 	nodeConfig.UpstreamConfig.Enabled = true
@@ -335,10 +335,10 @@ func (s *ManagerTestSuite) TestRaceConditions() {
 	progress := make(chan struct{}, cnt)
 	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	nodeConfig1, e := e2e.MakeTestNodeConfig(e2e.GetNetworkID())
+	nodeConfig1, e := e2e.MakeTestNodeConfig(GetNetworkID())
 	s.NoError(e)
 
-	nodeConfig2, e := e2e.MakeTestNodeConfig(e2e.GetNetworkID())
+	nodeConfig2, e := e2e.MakeTestNodeConfig(GetNetworkID())
 	s.NoError(e)
 
 	nodeConfigs := []*params.NodeConfig{nodeConfig1, nodeConfig2}
@@ -466,7 +466,7 @@ func (s *ManagerTestSuite) TestNodeStartCrash() {
 		}
 	})
 
-	nodeConfig, err := e2e.MakeTestNodeConfig(e2e.GetNetworkID())
+	nodeConfig, err := e2e.MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
 
 	// start node outside the manager (on the same port), so that manager node.Start() method fails

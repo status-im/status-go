@@ -15,16 +15,16 @@ for running all test. It by default uses the `StatusChain` network.
 
 #### Usage
 
-To use the `mainnet` network for testing using network name:
-
-```bash
-go test -v ./e2e/... -network=mainnet
-```
-
-To use the `ropsten` network for testing using network id:
+To use the `ropsten` network for testing using network name:
 
 ```bash
 go test -v ./e2e/... -network=3
+```
+
+To use the `rinkeby` network for testing using network id:
+
+```bash
+go test -v ./e2e/... -network=4
 ```
 
 
