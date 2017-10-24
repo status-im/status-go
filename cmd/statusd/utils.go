@@ -2,6 +2,7 @@ package main
 
 import "C"
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -17,6 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core"
 	gethparams "github.com/ethereum/go-ethereum/params"
+	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/common"
@@ -25,7 +27,6 @@ import (
 	"github.com/status-im/status-go/geth/txqueue"
 	"github.com/status-im/status-go/static"
 	. "github.com/status-im/status-go/testing" //nolint: golint
-	"github.com/stretchr/testify/require"
 )
 
 const zeroHash = "0x0000000000000000000000000000000000000000000000000000000000000000"
