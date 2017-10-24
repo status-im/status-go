@@ -1,6 +1,8 @@
-Fixes #. A short summary which serves as a squashed-commit message.
+A short summary which serves as a squashed-commit message.
 
-A full description of what's been implemented.
+A description to understand introduced changes without reading the code.
 
 Important changes:
-- [x] ...
+- [x] Something worth noting for reviewers.
+
+Solves #
