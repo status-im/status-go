@@ -336,6 +336,7 @@ func (s *ManagerTestSuite) TestRestartNode() {
 }
 
 // TODO(adam): race conditions should be tested with -race flag and unit tests, if possible.
+// TODO(boris): remove it after https://github.com/status-im/status-go/pull/412
 // Research if it's possible to do the same with unit tests.
 func (s *ManagerTestSuite) TestRaceConditions() {
 	cnt := 25
@@ -355,12 +356,6 @@ func (s *ManagerTestSuite) TestRaceConditions() {
 			log.Info("StartNode()")
 			_, err := s.NodeManager.StartNode(config)
 			s.T().Logf("StartNode() for network: %d, error: %v", config.NetworkID, err)
-			progress <- struct{}{}
-		},
-		func(config *params.NodeConfig) {
-			log.Info("StopNode()")
-			_, err := s.NodeManager.StopNode()
-			s.T().Logf("StopNode() for network: %d, error: %v", config.NetworkID, err)
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
