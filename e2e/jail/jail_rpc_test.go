@@ -39,7 +39,7 @@ func (s *JailRPCTestSuite) TestJailRPCSend() {
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
-	s.NoError(EnsureNodeSync(s.Backend.NodeManager()), "cannot ensure node synchronization")
+	EnsureNodeSync(s.Backend.NodeManager())
 
 	// load Status JS and add test command to it
 	s.jail.BaseJS(baseStatusJSCode)
@@ -112,7 +112,7 @@ func (s *JailRPCTestSuite) TestContractDeployment() {
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
-	s.NoError(EnsureNodeSync(s.Backend.NodeManager()), "cannot ensure node synchronization")
+	EnsureNodeSync(s.Backend.NodeManager())
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
 	s.jail.Parse(testChatID, "")
@@ -198,7 +198,7 @@ func (s *JailRPCTestSuite) TestJailVMPersistence() {
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
-	s.NoError(EnsureNodeSync(s.Backend.NodeManager()), "cannot ensure node synchronization")
+	EnsureNodeSync(s.Backend.NodeManager())
 
 	// log into account from which transactions will be sent
 	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
