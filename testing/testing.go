@@ -2,7 +2,6 @@ package integration
 
 import (
 	"bytes"
-	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -69,25 +68,34 @@ func LoadFromFile(filename string) string {
 }
 
 // EnsureNodeSync waits until node synchronzation is done to continue
-// with tests afterwards. Returns an error in case of a timeout.
-func EnsureNodeSync(nodeManager common.NodeManager) error {
+// with tests afterwards. Panics in case of an error or a timeout.
+func EnsureNodeSync(nodeManager common.NodeManager) {
+	nc, err := nodeManager.NodeConfig()
+	if err != nil {
+		panic("can't retrieve NodeConfig")
+	}
+	// Don't wait for any blockchain sync for the local private chain as blocks are never mined.
+	if nc.NetworkID == params.StatusChainNetworkID {
+		return
+	}
+
 	les, err := nodeManager.LightEthereumService()
 	if err != nil {
-		return err
+		panic(err)
 	}
 	if les == nil {
-		return errors.New("LightEthereumService is nil")
+		panic("LightEthereumService is nil")
 	}
 
 	timeouter := time.NewTimer(20 * time.Minute)
 	defer timeouter.Stop()
-	ticker := time.NewTicker(time.Second)
+	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-timeouter.C:
-			return errors.New("timout during node synchronization")
+			panic("timout during node synchronization")
 		case <-ticker.C:
 			downloader := les.Downloader()
 
@@ -96,10 +104,9 @@ func EnsureNodeSync(nodeManager common.NodeManager) error {
 				progress := downloader.Progress()
 
 				if !isSyncing && progress.HighestBlock > 0 && progress.CurrentBlock >= progress.HighestBlock {
-					return nil
+					return
 				}
 			}
-
 		}
 	}
 }

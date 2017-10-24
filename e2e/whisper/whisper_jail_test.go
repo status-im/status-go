@@ -20,6 +20,7 @@ import (
 )
 
 const (
+	//nolint: unused, varcheck
 	whisperMessage1 = `test message 1 (K1 -> K2, signed+encrypted, from us)`
 	whisperMessage2 = `test message 3 (K1 -> "", signed broadcast)`
 	whisperMessage3 = `test message 4 ("" -> "", anon broadcast)`
@@ -81,7 +82,7 @@ func (s *WhisperJailTestSuite) GetAccountKey(account struct {
 // TODO(adamb) Uncomment when issue #336 is fixed.
 /*
 func (s *WhisperJailTestSuite) DontTestJailWhisper() {
-	s.StartTestBackend(params.RopstenNetworkID)
+	s.StartTestBackend(params.StatusChainNetworkID)
 	defer s.StopTestBackend()
 
 	_, accountKey1Hex, err := s.GetAccountKey(TestConfig.Account1)
@@ -375,7 +376,7 @@ func (s *WhisperJailTestSuite) DontTestJailWhisper() {
 */
 
 func (s *WhisperJailTestSuite) TestEncryptedAnonymousMessage() {
-	s.StartTestBackend(params.RopstenNetworkID)
+	s.StartTestBackend(params.StatusChainNetworkID)
 	defer s.StopTestBackend()
 
 	accountKey2, accountKey2Hex, err := s.GetAccountKey(TestConfig.Account2)

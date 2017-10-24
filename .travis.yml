@@ -12,11 +12,12 @@ dist: trusty
 
 install:
   - go get golang.org/x/tools/cmd/cover
-  - make mock-install
-  - make mock
+  - make lint-deps
 
 jobs:
   include:
+    - stage: lint
+      script: make lint
     - stage: Lint
       script: make lint
     - stage: Test unit and integration
