@@ -137,41 +137,41 @@ func (s *AccountsTestSuite) TestRecoverAccount() {
 	keyStore, err := s.Backend.NodeManager().AccountKeyStore()
 	s.NoError(err)
 
-	// create an account
+	// create an acc
 	address, pubKey, mnemonic, err := s.Backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
 	s.NoError(err)
 	s.T().Logf("Account created: {address: %s, key: %s, mnemonic:%s}", address, pubKey, mnemonic)
 
 	// try recovering using password + mnemonic
 	addressCheck, pubKeyCheck, err := s.Backend.AccountManager().RecoverAccount(TestConfig.Account1.Password, mnemonic)
-	s.NoError(err, "recover account failed")
+	s.NoError(err, "recover acc failed")
 	s.False(address != addressCheck || pubKey != pubKeyCheck, "incorrect accound details recovered")
 
-	// now test recovering, but make sure that account/key file is removed i.e. simulate recovering on a new device
-	account, err := common.ParseAccountString(address)
-	s.NoError(err, "can not get account from address")
+	// now test recovering, but make sure that acc/key file is removed i.e. simulate recovering on a new device
+	acc, err := common.ParseAccountString(address)
+	s.NoError(err, "can not get acc from address")
 
-	account, key, err := keyStore.AccountDecryptedKey(account, TestConfig.Account1.Password)
-	s.NoError(err, "can not obtain decrypted account key")
+	acc, key, err := keyStore.AccountDecryptedKey(acc, TestConfig.Account1.Password)
+	s.NoError(err, "can not obtain decrypted acc key")
 	extChild2String := key.ExtendedKey.String()
 
-	s.NoError(keyStore.Delete(account, TestConfig.Account1.Password), "cannot remove account")
+	s.NoError(keyStore.Delete(acc, TestConfig.Account1.Password), "cannot remove acc")
 
 	addressCheck, pubKeyCheck, err = s.Backend.AccountManager().RecoverAccount(TestConfig.Account1.Password, mnemonic)
-	s.NoError(err, "recover account failed (for non-cached account)")
+	s.NoError(err, "recover acc failed (for non-cached acc)")
 	s.False(address != addressCheck || pubKey != pubKeyCheck,
-		"incorrect account details recovered (for non-cached account)")
+		"incorrect acc details recovered (for non-cached acc)")
 
 	// make sure that extended key exists and is imported ok too
-	_, key, err = keyStore.AccountDecryptedKey(account, TestConfig.Account1.Password)
+	_, key, err = keyStore.AccountDecryptedKey(acc, TestConfig.Account1.Password)
 	s.NoError(err)
 	s.Equal(extChild2String, key.ExtendedKey.String(), "CKD#2 key mismatch")
 
 	// make sure that calling import several times, just returns from cache (no error is expected)
 	addressCheck, pubKeyCheck, err = s.Backend.AccountManager().RecoverAccount(TestConfig.Account1.Password, mnemonic)
-	s.NoError(err, "recover account failed (for non-cached account)")
+	s.NoError(err, "recover acc failed (for non-cached acc)")
 	s.False(address != addressCheck || pubKey != pubKeyCheck,
-		"incorrect account details recovered (for non-cached account)")
+		"incorrect acc details recovered (for non-cached acc)")
 
 	// time to login with recovered data
 	whisperService := s.WhisperService()
