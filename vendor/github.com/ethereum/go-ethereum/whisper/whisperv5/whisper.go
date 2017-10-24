@@ -737,12 +737,18 @@ func (wh *Whisper) add(envelope *Envelope) (bool, error) {
 
 func (w *Whisper) sendIncomingMessageState(isP2P bool, status message.Status, src NewMessage, env *Envelope, rec *ReceivedMessage, err error) {
 	if w.deliveryServer != nil {
+		var envelope Envelope
+
+		if env != nil {
+			envelope = *env
+		}
+
 		w.deliveryServer.SendState(MessageState{
 			Reason:    err,
 			Received:  rec,
 			IsP2P:     isP2P,
 			Status:    status,
-			Envelope:  *env,
+			Envelope:  envelope,
 			Direction: message.IncomingMessage,
 		})
 	}
@@ -750,12 +756,18 @@ func (w *Whisper) sendIncomingMessageState(isP2P bool, status message.Status, sr
 
 func (w *Whisper) sendOutgoingMessageState(isP2P bool, status message.Status, src NewMessage, env *Envelope, rec *ReceivedMessage, err error) {
 	if w.deliveryServer != nil {
+		var envelope Envelope
+
+		if env != nil {
+			envelope = *env
+		}
+
 		w.deliveryServer.SendState(MessageState{
 			Reason:    err,
 			Received:  rec,
 			IsP2P:     isP2P,
 			Status:    status,
-			Envelope:  *env,
+			Envelope:  envelope,
 			Direction: message.OutgoingMessage,
 		})
 	}
