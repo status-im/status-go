@@ -118,19 +118,19 @@ func (fs *Filters) NotifyWatchers(env *Envelope, p2pMessage bool) {
 				msg = env.Open(watcher)
 				if msg == nil {
 					err := errors.New("Envelope failed to be opened")
-					fs.whisper.sendIncomingMessageState(p2pMessage, message.RejectedStatus, NewMessage{}, env, nil, err)
+					fs.whisper.traceIncomingDelivery(p2pMessage, message.RejectedStatus, NewMessage{}, env, nil, err)
 					log.Trace("processing message: failed to open", "message", env.Hash().Hex(), "filter", i)
 				}
 			} else {
 				err := errors.New("processing message: does not match")
-				fs.whisper.sendIncomingMessageState(p2pMessage, message.RejectedStatus, NewMessage{}, env, nil, err)
+				fs.whisper.traceIncomingDelivery(p2pMessage, message.RejectedStatus, NewMessage{}, env, nil, err)
 				log.Trace("processing message: does not match", "message", env.Hash().Hex(), "filter", i)
 			}
 		}
 
 		if match && msg != nil {
 			log.Trace("processing message: decrypted", "hash", env.Hash().Hex())
-			fs.whisper.sendIncomingMessageState(p2pMessage, message.DeliveredStatus, NewMessage{}, env, msg, nil)
+			fs.whisper.traceIncomingDelivery(p2pMessage, message.DeliveredStatus, NewMessage{}, env, msg, nil)
 			if watcher.Src == nil || IsPubKeyEqual(msg.Src, watcher.Src) {
 				watcher.Trigger(msg)
 			}
