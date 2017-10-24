@@ -627,27 +627,11 @@ func (wh *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 				var envelope Envelope
 				if err := packet.Decode(&envelope); err != nil {
 					log.Warn("failed to decode direct message, peer will be disconnected", "peer", p.peer.ID(), "err", err)
-					if wh.deliveryServer != nil {
-						wh.deliveryServer.SendState(MessageState{
-							IsP2P:     true,
-							Envelope:  envelope,
-							Status:    message.RejectedStatus,
-							Reason:    err,
-							Direction: message.IncomingMessage,
-						})
-					}
+					wh.sendIncomingMessageState(true, message.RejectedStatus, NewMessage{}, &envelope, nil, err)
 					return errors.New("invalid direct message")
 				}
 
-				if wh.deliveryServer != nil {
-					wh.deliveryServer.SendState(MessageState{
-						IsP2P:     true,
-						Envelope:  envelope,
-						Status:    message.SentStatus,
-						Direction: message.IncomingMessage,
-						Reason:    fmt.Errorf("Unexpected status message received: %+q", p.peer.ID()),
-					})
-				}
+				wh.sendIncomingMessageState(true, message.SentStatus, NewMessage{}, &envelope, nil, nil)
 				wh.postEvent(&envelope, true)
 			}
 		case p2pRequestCode:
@@ -656,15 +640,7 @@ func (wh *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 				var request Envelope
 				if err := packet.Decode(&request); err != nil {
 					log.Warn("failed to decode p2p request message, peer will be disconnected", "peer", p.peer.ID(), "err", err)
-					if wh.deliveryServer != nil {
-						wh.deliveryServer.SendState(MessageState{
-							IsP2P:     true,
-							Envelope:  request,
-							Direction: message.IncomingMessage,
-							Status:    message.RejectedStatus,
-							Reason:    err,
-						})
-					}
+					wh.sendIncomingMessageState(true, message.RejectedStatus, NewMessage{}, &request, nil, err)
 					return errors.New("invalid p2p request")
 				}
 				wh.mailServer.DeliverMail(p, &request)
@@ -736,38 +712,20 @@ func (wh *Whisper) add(envelope *Envelope) (bool, error) {
 			wh.expirations[envelope.Expiry].Add(hash)
 		}
 
-		if wh.deliveryServer != nil {
-			wh.deliveryServer.SendState(MessageState{
-				Envelope:  *envelope,
-				Direction: message.IncomingMessage,
-				Status:    message.CachedStatus,
-			})
-		}
+		wh.sendIncomingMessageState(false, message.CachedStatus, NewMessage{}, envelope, nil, nil)
 	}
 	wh.poolMu.Unlock()
 
 	if alreadyCached {
 		log.Trace("whisper envelope already cached", "hash", envelope.Hash().Hex())
-		if wh.deliveryServer != nil {
-			wh.deliveryServer.SendState(MessageState{
-				Envelope:  *envelope,
-				Direction: message.IncomingMessage,
-				Status:    message.ResentStatus,
-			})
-		}
+		wh.sendIncomingMessageState(false, message.ResentStatus, NewMessage{}, envelope, nil, nil)
 	} else {
 		log.Trace("cached whisper envelope", "hash", envelope.Hash().Hex())
 		wh.statsMu.Lock()
 		wh.stats.memoryUsed += envelope.size()
 		wh.statsMu.Unlock()
 
-		if wh.deliveryServer != nil {
-			wh.deliveryServer.SendState(MessageState{
-				Envelope:  *envelope,
-				Direction: message.IncomingMessage,
-				Status:    message.QueuedStatus,
-			})
-		}
+		wh.sendIncomingMessageState(false, message.QueuedStatus, NewMessage{}, envelope, nil, nil)
 
 		wh.postEvent(envelope, false) // notify the local node about the new message
 		if wh.mailServer != nil {
@@ -775,6 +733,32 @@ func (wh *Whisper) add(envelope *Envelope) (bool, error) {
 		}
 	}
 	return true, nil
+}
+
+func (w *Whisper) sendIncomingMessageState(isP2P bool, status message.Status, src NewMessage, env *Envelope, rec *ReceivedMessage, err error) {
+	if w.deliveryServer != nil {
+		w.deliveryServer.SendState(MessageState{
+			Reason:    err,
+			Received:  rec,
+			IsP2P:     isP2P,
+			Status:    status,
+			Envelope:  *env,
+			Direction: message.IncomingMessage,
+		})
+	}
+}
+
+func (w *Whisper) sendOutgoingMessageState(isP2P bool, status message.Status, src NewMessage, env *Envelope, rec *ReceivedMessage, err error) {
+	if w.deliveryServer != nil {
+		w.deliveryServer.SendState(MessageState{
+			Reason:    err,
+			Received:  rec,
+			IsP2P:     isP2P,
+			Status:    status,
+			Envelope:  *env,
+			Direction: message.OutgoingMessage,
+		})
+	}
 }
 
 // postEvent queues the message for further processing.
@@ -794,13 +778,8 @@ func (w *Whisper) postEvent(envelope *Envelope, isP2P bool) {
 	}
 
 	if w.deliveryServer != nil {
-		w.deliveryServer.SendState(MessageState{
-			Envelope:  *envelope,
-			IsP2P:     isP2P,
-			Reason:    fmt.Errorf("Mismatch Envelope version(%d) to wanted Version(%d)", envelope.Ver(), EnvelopeVersion),
-			Direction: message.IncomingMessage,
-			Status:    message.RejectedStatus,
-		})
+		err := fmt.Errorf("Mismatch Envelope version(%d) to wanted Version(%d)", envelope.Ver(), EnvelopeVersion)
+		w.sendIncomingMessageState(isP2P, message.RejectedStatus, NewMessage{}, envelope, nil, err)
 	}
 }
 
@@ -830,24 +809,11 @@ func (w *Whisper) processQueue() {
 			return
 
 		case e = <-w.messageQueue:
-			if w.deliveryServer != nil {
-				w.deliveryServer.SendState(MessageState{
-					Envelope:  *e,
-					Direction: message.IncomingMessage,
-					Status:    message.ProcessingStatus,
-				})
-			}
+			w.sendIncomingMessageState(false, message.ProcessingStatus, NewMessage{}, e, nil, nil)
 			w.filters.NotifyWatchers(e, false)
 
 		case e = <-w.p2pMsgQueue:
-			if w.deliveryServer != nil {
-				w.deliveryServer.SendState(MessageState{
-					Envelope:  *e,
-					IsP2P:     true,
-					Direction: message.IncomingMessage,
-					Status:    message.ProcessingStatus,
-				})
-			}
+			w.sendIncomingMessageState(true, message.ProcessingStatus, NewMessage{}, e, nil, nil)
 			w.filters.NotifyWatchers(e, true)
 		}
 	}
