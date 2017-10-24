@@ -20,6 +20,7 @@ import (
 )
 
 const (
+	//nolint: unused, varcheck
 	whisperMessage1 = `test message 1 (K1 -> K2, signed+encrypted, from us)`
 	whisperMessage2 = `test message 3 (K1 -> "", signed broadcast)`
 	whisperMessage3 = `test message 4 ("" -> "", anon broadcast)`

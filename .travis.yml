@@ -9,10 +9,14 @@ dist: trusty
 
 install:
   - go get golang.org/x/tools/cmd/cover
+  - make lint-deps
 
-script:
-  - make ci
-
+jobs:
+  include:
+    - stage: lint
+      script: make lint
+    - stage: ci
+      script: make ci
 cache:
   directories:
   - .ethereumtest
