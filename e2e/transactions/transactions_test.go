@@ -83,10 +83,12 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransactionUpstream() {
 	// FIXME(tiabc): Stop skipping after https://github.com/status-im/status-go/issues/424
 	s.T().Skip()
 
-	s.StartTestBackend(e2e.WithUpstream("https://ropsten.infura.io/nKmXgiFgc2KqtoQ8BCGJ"))
+	addr, err := GetNetworkURLFromID(params.RopstenNetworkID)
+	s.NoError(err)
+	s.StartTestBackend(e2e.WithUpstream(addr))
 	defer s.StopTestBackend()
 
-	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account2.Address, TestConfig.Account2.Password)
+	err = s.Backend.AccountManager().SelectAccount(TestConfig.Account2.Address, TestConfig.Account2.Password)
 	s.NoError(err)
 
 	transactionCompleted := make(chan struct{})
@@ -309,10 +311,12 @@ func (s *TransactionsTestSuite) TestSendEtherTxUpstream() {
 	// FIXME(tiabc): Stop skipping after https://github.com/status-im/status-go/issues/424
 	s.T().Skip()
 
-	s.StartTestBackend(e2e.WithUpstream("https://ropsten.infura.io/z6GCTmjdP3FETEJmMBI4"))
+	addr, err := GetNetworkURLFromID(params.RopstenNetworkID)
+	s.NoError(err)
+	s.StartTestBackend(e2e.WithUpstream(addr))
 	defer s.StopTestBackend()
 
-	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
+	err = s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	s.NoError(err)
 
 	completeQueuedTransaction := make(chan struct{})
