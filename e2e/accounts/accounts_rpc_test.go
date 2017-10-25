@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/status-im/status-go/e2e"
-	"github.com/status-im/status-go/geth/params"
 	. "github.com/status-im/status-go/testing"
 	"github.com/stretchr/testify/suite"
 )
@@ -43,7 +42,7 @@ func (s *AccountsTestSuite) TestRPCEthAccountsWithUpstream() {
 	// FIXME(tiabc): Stop skipping after https://github.com/status-im/status-go/issues/424
 	s.T().Skip()
 
-	addr, err := GetNetworkURLFromID(params.RopstenNetworkID)
+	addr, err := GetRemoteURLForNetworkID()
 	s.NoError(err)
 	s.StartTestBackend(e2e.WithUpstream(addr))
 	defer s.StopTestBackend()

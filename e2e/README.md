@@ -18,10 +18,10 @@ for running all test. It by default uses the `StatusChain` network.
 To use the `ropsten` network for testing using network name:
 
 ```bash
-go test -v ./e2e/... -network=rinkeby
+go test -v ./e2e/... -network=ropsten
 ```
 
-To use the `rinkeby` network for testing using network id:
+To use the `rinkeby` network with chain id `4` for testing:
 
 ```bash
 go test -v ./e2e/... -network=4

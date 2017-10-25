@@ -119,8 +119,8 @@ func EnsureNodeSync(nodeManager common.NodeManager) {
 	}
 }
 
-// GetNetworkURLFromID returns asociated network url for giving network id.
-func GetNetworkURLFromID(id int) (string, error) {
+// GetRemoteURLFromID returns asociated network url for giving network id.
+func GetRemoteURLFromID(id int) (string, error) {
 	switch id {
 	case params.MainNetworkID:
 		return params.MainnetEthereumNetworkURL, nil
@@ -133,8 +133,8 @@ func GetNetworkURLFromID(id int) (string, error) {
 	return "", ErrStatusPrivateNetwork
 }
 
-// GetNetworkHashFromID returns the hash associated with a given network id.
-func GetNetworkHashFromID(id int) string {
+// GetHeadHashFromNetworkID returns the hash associated with a given network id.
+func GetHeadHashFromNetworkID(id int) string {
 	switch id {
 	case params.RinkebyNetworkID:
 		return "0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177"
@@ -147,9 +147,14 @@ func GetNetworkHashFromID(id int) string {
 	return ""
 }
 
-// GetNetworkHash returns the hash associated with a given network id.
-func GetNetworkHash() string {
-	return GetNetworkHashFromID(GetNetworkID())
+// GetRemoteURLForNetworkID returns the url associated with a given network id.
+func GetRemoteURLForNetworkID() (string, error) {
+	return GetRemoteURLFromID(GetNetworkID())
+}
+
+// GetHeadHashForNetworkID returns the hash associated with a given network id.
+func GetHeadHashForNetworkID() string {
+	return GetHeadHashFromNetworkID(GetNetworkID())
 }
 
 // GetNetworkID returns appropriate network id for test based on

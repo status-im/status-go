@@ -11,7 +11,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/e2e"
 	"github.com/status-im/status-go/geth/node"
-	"github.com/status-im/status-go/geth/params"
 	. "github.com/status-im/status-go/testing"
 	"github.com/stretchr/testify/suite"
 )
@@ -31,7 +30,7 @@ func (s *RPCTestSuite) SetupTest() {
 
 func (s *RPCTestSuite) TestCallRPC() {
 	for _, upstreamEnabled := range []bool{false, true} {
-		nodeConfig, err := e2e.MakeTestNodeConfig(params.RinkebyNetworkID)
+		nodeConfig, err := e2e.MakeTestNodeConfig(GetNetworkID())
 		s.NoError(err)
 
 		nodeConfig.IPCEnabled = false
@@ -39,8 +38,11 @@ func (s *RPCTestSuite) TestCallRPC() {
 		nodeConfig.HTTPHost = "" // to make sure that no HTTP interface is started
 
 		if upstreamEnabled {
+			networkURL, err := GetRemoteURLForNetworkID()
+			s.NoError(err)
+
 			nodeConfig.UpstreamConfig.Enabled = true
-			nodeConfig.UpstreamConfig.URL = "https://rinkeby.infura.io/nKmXgiFgc2KqtoQ8BCGJ"
+			nodeConfig.UpstreamConfig.URL = networkURL
 		}
 
 		nodeStarted, err := s.NodeManager.StartNode(nodeConfig)

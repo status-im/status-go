@@ -191,7 +191,7 @@ func (s *APIBackendTestSuite) TestRaceConditions() {
 // so this test should only check StatusBackend logic with a mocked version of the underlying NodeManager.
 func (s *APIBackendTestSuite) TestNetworkSwitching() {
 	// get Ropsten config
-	nodeConfig, err := e2e.MakeTestNodeConfig(params.RopstenNetworkID)
+	nodeConfig, err := e2e.MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
 
 	s.False(s.Backend.IsNodeRunning())
@@ -203,7 +203,7 @@ func (s *APIBackendTestSuite) TestNetworkSwitching() {
 
 	firstHash, err := e2e.FirstBlockHash(s.Backend.NodeManager())
 	s.NoError(err)
-	s.Equal("0x41941023680923e0fe4d74a34bdac8141f2540e3ae90623718e47d66d1ca4a2d", firstHash)
+	s.Equal(GetHeadHashForNetworkID(), firstHash)
 
 	// now stop node, and make sure that a new node, on different network can be started
 	nodeStopped, err := s.Backend.StopNode()
@@ -211,7 +211,7 @@ func (s *APIBackendTestSuite) TestNetworkSwitching() {
 	<-nodeStopped
 
 	// start new node with completely different config
-	nodeConfig, err = e2e.MakeTestNodeConfig(params.RinkebyNetworkID)
+	nodeConfig, err = e2e.MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
 
 	s.False(s.Backend.IsNodeRunning())
@@ -224,7 +224,7 @@ func (s *APIBackendTestSuite) TestNetworkSwitching() {
 	// make sure we are on another network indeed
 	firstHash, err = e2e.FirstBlockHash(s.Backend.NodeManager())
 	s.NoError(err)
-	s.Equal("0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177", firstHash)
+	s.Equal(GetHeadHashForNetworkID(), firstHash)
 
 	nodeStopped, err = s.Backend.StopNode()
 	s.NoError(err)
@@ -253,7 +253,7 @@ func (s *APIBackendTestSuite) TestResetChainData() {
 	// make sure we can read the first byte, and it is valid (for Rinkeby)
 	firstHash, err := e2e.FirstBlockHash(s.Backend.NodeManager())
 	s.NoError(err)
-	s.Equal("0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177", firstHash)
+	s.Equal(GetHeadHashForNetworkID(), firstHash)
 }
 
 // FIXME(tiabc): There's also a test with the same name in geth/node/manager_test.go
@@ -275,7 +275,7 @@ func (s *APIBackendTestSuite) TestRestartNode() {
 
 	firstHash, err := e2e.FirstBlockHash(s.Backend.NodeManager())
 	s.NoError(err)
-	s.Equal("0x41941023680923e0fe4d74a34bdac8141f2540e3ae90623718e47d66d1ca4a2d", firstHash)
+	s.Equal(GetHeadHashForNetworkID(), firstHash)
 
 	s.True(s.Backend.IsNodeRunning())
 	nodeRestarted, err := s.Backend.RestartNode()
@@ -286,5 +286,5 @@ func (s *APIBackendTestSuite) TestRestartNode() {
 	// make sure we can read the first byte, and it is valid (for Rinkeby)
 	firstHash, err = e2e.FirstBlockHash(s.Backend.NodeManager())
 	s.NoError(err)
-	s.Equal("0x41941023680923e0fe4d74a34bdac8141f2540e3ae90623718e47d66d1ca4a2d", firstHash)
+	s.Equal(GetHeadHashForNetworkID(), firstHash)
 }

@@ -246,7 +246,7 @@ func (s *ManagerTestSuite) TestNetworkSwitching() {
 
 	firstHash, err := e2e.FirstBlockHash(s.NodeManager)
 	s.NoError(err)
-	s.Equal(GetNetworkHash(), firstHash)
+	s.Equal(GetHeadHashForNetworkID(), firstHash)
 
 	// now stop node, and make sure that a new node, on different network can be started
 	nodeStopped, err := s.NodeManager.StopNode()
@@ -266,7 +266,7 @@ func (s *ManagerTestSuite) TestNetworkSwitching() {
 	// make sure we are on another network indeed
 	firstHash, err = e2e.FirstBlockHash(s.NodeManager)
 	s.NoError(err)
-	s.Equal(GetNetworkHashFromID(params.RinkebyNetworkID), firstHash)
+	s.Equal(GetHeadHashFromNetworkID(params.RinkebyNetworkID), firstHash)
 
 	nodeStopped, err = s.NodeManager.StopNode()
 	s.NoError(err)
@@ -277,7 +277,7 @@ func (s *ManagerTestSuite) TestStartNodeWithUpstreamEnabled() {
 	nodeConfig, err := e2e.MakeTestNodeConfig(params.RopstenNetworkID)
 	s.NoError(err)
 
-	networkURL, err := GetNetworkURLFromID(params.RopstenNetworkID)
+	networkURL, err := GetRemoteURLForNetworkID()
 	s.NoError(err)
 
 	nodeConfig.UpstreamConfig.Enabled = true

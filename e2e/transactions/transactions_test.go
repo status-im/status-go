@@ -83,7 +83,7 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransactionUpstream() {
 	// FIXME(tiabc): Stop skipping after https://github.com/status-im/status-go/issues/424
 	s.T().Skip()
 
-	addr, err := GetNetworkURLFromID(params.RopstenNetworkID)
+	addr, err := GetRemoteURLForNetworkID()
 	s.NoError(err)
 	s.StartTestBackend(e2e.WithUpstream(addr))
 	defer s.StopTestBackend()
@@ -311,7 +311,7 @@ func (s *TransactionsTestSuite) TestSendEtherTxUpstream() {
 	// FIXME(tiabc): Stop skipping after https://github.com/status-im/status-go/issues/424
 	s.T().Skip()
 
-	addr, err := GetNetworkURLFromID(params.RopstenNetworkID)
+	addr, err := GetRemoteURLForNetworkID()
 	s.NoError(err)
 	s.StartTestBackend(e2e.WithUpstream(addr))
 	defer s.StopTestBackend()
