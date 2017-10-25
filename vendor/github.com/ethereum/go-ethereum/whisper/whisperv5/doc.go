@@ -110,7 +110,7 @@ type MessageState struct {
 	Source    NewMessage        `json:"source"`
 	Status    message.Status    `json:"status"`
 	Direction message.Direction `json:"direction"`
-	Received  *ReceivedMessage  `json:"received"`
+	Received  ReceivedMessage   `json:"received"`
 }
 
 // DeliveryServer represents a small message status

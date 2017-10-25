@@ -33,17 +33,16 @@ func (ld LogDeliveryService) SendState(state whisper.MessageState) {
 
 	switch state.Direction {
 	case gethmessage.IncomingMessage:
-		if state.Received != nil {
-			payload = state.Received.Payload
+		payload = state.Received.Payload
 
-			if state.Received.Src != nil {
-				from = gethcommon.ToHex(crypto.FromECDSAPub(state.Received.Src))
-			}
-
-			if state.Received.Dst != nil {
-				to = gethcommon.ToHex(crypto.FromECDSAPub(state.Received.Dst))
-			}
+		if state.Received.Src != nil {
+			from = gethcommon.ToHex(crypto.FromECDSAPub(state.Received.Src))
 		}
+
+		if state.Received.Dst != nil {
+			to = gethcommon.ToHex(crypto.FromECDSAPub(state.Received.Dst))
+		}
+
 	case gethmessage.OutgoingMessage:
 		from = state.Source.Sig
 
