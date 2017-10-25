@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -74,7 +75,7 @@ func (s *RPCTestSuite) TestCallRPC() {
 			{
 				`{"jsonrpc":"2.0","method":"net_version","params":[],"id":67}`,
 				func(resultJSON string) {
-					expected := `{"jsonrpc":"2.0","id":67,"result":"4"}`
+					expected := `{"jsonrpc":"2.0","id":67,"result":"` + fmt.Sprintf("%d", GetNetworkID()) + `"}`
 					s.Equal(expected, resultJSON)
 				},
 			},
@@ -88,7 +89,7 @@ func (s *RPCTestSuite) TestCallRPC() {
 			{
 				`[{"jsonrpc":"2.0","method":"net_version","params":[],"id":67},{"jsonrpc":"2.0","method":"web3_sha3","params":["0x68656c6c6f20776f726c64"],"id":68}]`,
 				func(resultJSON string) {
-					expected := `[{"jsonrpc":"2.0","id":67,"result":"4"},{"jsonrpc":"2.0","id":68,"result":"0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad"}]`
+					expected := `[{"jsonrpc":"2.0","id":67,"result":"` + fmt.Sprintf("%d", GetNetworkID()) + `"},{"jsonrpc":"2.0","id":68,"result":"0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad"}]`
 					s.Equal(expected, resultJSON)
 				},
 			},
