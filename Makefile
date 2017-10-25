@@ -77,10 +77,16 @@ statusgo-ios-simulator-mainnet: xgo
 	@echo "iOS framework cross compilation done (mainnet)."
 
 generate: ##@other Regenerate assets and other auto-generated stuff
-	cp ./node_modules/web3/dist/web3.js ./static/scripts/web3.js
+	cp ./build/_workspace/deps/src/github.com/ethereum/go-ethereum/internal/jsre/deps/web3.js ./static/scripts/web3.js
+	find ./static/keys -type f -exec go run ./static/cmd/main.go --input "{}" --output="{}" encrypt \;
 	build/env.sh go generate ./static
 	rm ./static/scripts/web3.js
 
+decrypt:
+	find ./static/keys -type f -exec go run ./static/cmd/main.go --input "{}" --output="{}" decrypt \;
+
+bindata-install:
+	go get -u github.com/jteeuwen/go-bindata/...
 
 mock-install: ##@other Install mocking tools
 	go get -u github.com/golang/mock/mockgen

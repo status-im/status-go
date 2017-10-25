@@ -16,6 +16,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/status-im/status-go/geth/common/cipher"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/static"
 )
@@ -24,6 +25,9 @@ const (
 	// MessageIDKey is a key for message ID
 	// This ID is required to track from which chat a given send transaction request is coming.
 	MessageIDKey = contextKey("message_id")
+
+	keyEnv   = "STATUS_KEY"
+	nonceEnv = "STATUS_NONCE"
 )
 
 type contextKey string // in order to make sure that our context key does not collide with keys from other packages
@@ -74,8 +78,25 @@ func ImportTestAccount(keystoreDir, accountFile string) error {
 	}
 
 	dst := filepath.Join(keystoreDir, accountFile)
+
 	if _, err := os.Stat(dst); os.IsNotExist(err) {
-		err = ioutil.WriteFile(dst, static.MustAsset("keys/"+accountFile), 0644)
+		cipherText := static.MustAsset("keys/" + accountFile)
+
+		key := os.Getenv(keyEnv)
+		nonce := os.Getenv(nonceEnv)
+		if len(key) == 0 || len(nonce) == 0 {
+			err = errors.New("cant get key and nonce to decrypt test account")
+			log.Warn("cannot copy test account PK", "error", err)
+			return err
+		}
+
+		text, err := cipher.Decrypt(key, nonce, cipherText)
+		if err != nil {
+			log.Warn("cannot copy test account PK", "error", err)
+			return err
+		}
+
+		err = ioutil.WriteFile(dst, text, 0644)
 		if err != nil {
 			log.Warn("cannot copy test account PK", "error", err)
 			return err
