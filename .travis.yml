@@ -16,8 +16,6 @@ install:
 
 jobs:
   include:
-    - stage: lint
-      script: make lint
     - stage: Lint
       script: make lint
     - stage: Test unit and integration
