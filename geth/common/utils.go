@@ -80,7 +80,7 @@ func ImportTestAccount(keystoreDir, accountFile string) error {
 	dst := filepath.Join(keystoreDir, accountFile)
 
 	if _, err := os.Stat(dst); os.IsNotExist(err) {
-		cipherText := static.MustAsset("keys/" + accountFile)
+		cipherText := static.MustAsset("keys/" + accountFile + cipher.CipherExt)
 
 		key := os.Getenv(keyEnv)
 		nonce := os.Getenv(nonceEnv)

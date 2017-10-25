@@ -6,6 +6,9 @@ import (
 	"encoding/hex"
 )
 
+// CipherExt defines encrypted files.
+const CipherExt = ".cr"
+
 // Decrypt implements GCM decryption. Key and nonce is in hex representation
 func Decrypt(keyHex, nonceHex string, cipherText []byte) ([]byte, error) {
 	key, err := hex.DecodeString(keyHex)
