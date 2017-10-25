@@ -1,3 +1,6 @@
+notifications:
+  email: false
+
 language: go
 
 go:
@@ -13,10 +16,13 @@ install:
 
 jobs:
   include:
-    - stage: lint
+    - stage: Lint
       script: make lint
-    - stage: ci
-      script: make ci
+    - stage: Test unit and integration
+      script: make test-unit-coverage
+    - stage: Test e2e
+      script: make test-e2e
+
 cache:
   directories:
   - .ethereumtest
