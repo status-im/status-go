@@ -17,7 +17,6 @@ import (
 
 var (
 	networkSelected = flag.String("network", "statuschain", "-network=NETWORKID to select network used for tests")
-	networkURL      = flag.String("networkurl", "", "-networkurl=https://ropsten.bob.com/433JU78sdw= to provide a URL for giving network.")
 
 	// ErrStatusPrivateNetwork is returned when network id is for a private chain network, whoes URL must be provided.
 	ErrStatusPrivateNetwork = errors.New("network id reserves for private chain network, provide URL")
@@ -153,15 +152,6 @@ func GetNetworkHashFromID(id int) string {
 // GetNetworkHash returns the hash associated with a given network id.
 func GetNetworkHash() string {
 	return GetNetworkHashFromID(GetNetworkID())
-}
-
-// GetNetworkURL returns appropriate network
-func GetNetworkURL() (string, error) {
-	if *networkURL != "" {
-		return *networkURL, nil
-	}
-
-	return GetNetworkURLFromID(GetNetworkID())
 }
 
 // GetNetworkID returns appropriate network id for test based on
