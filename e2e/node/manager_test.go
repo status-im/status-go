@@ -311,7 +311,7 @@ func (s *ManagerTestSuite) TestResetChainData() {
 	// make sure we can read the first byte, and it is valid (for Rinkeby)
 	firstHash, err := e2e.FirstBlockHash(s.NodeManager)
 	s.NoError(err)
-	s.Equal(GetNetworkHash(), firstHash)
+	s.Equal(GetHeadHashForNetworkID(), firstHash)
 }
 
 func (s *ManagerTestSuite) TestRestartNode() {
@@ -328,7 +328,7 @@ func (s *ManagerTestSuite) TestRestartNode() {
 	// make sure we can read the first byte, and it is valid (for Rinkeby)
 	firstHash, err := e2e.FirstBlockHash(s.NodeManager)
 	s.NoError(err)
-	s.Equal(GetNetworkHash(), firstHash)
+	s.Equal(GetHeadHashForNetworkID(), firstHash)
 }
 
 // TODO(adam): race conditions should be tested with -race flag and unit tests, if possible.

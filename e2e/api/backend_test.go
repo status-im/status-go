@@ -262,7 +262,7 @@ func (s *APIBackendTestSuite) TestRestartNode() {
 	require := s.Require()
 	require.NotNil(s.Backend)
 
-	// get Ropsten config
+	// get config
 	nodeConfig, err := e2e.MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
 
