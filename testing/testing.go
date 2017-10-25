@@ -2,6 +2,7 @@ package integration
 
 import (
 	"bytes"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -16,6 +17,10 @@ import (
 
 var (
 	networkSelected = flag.String("network", "statuschain", "-network=NETWORKID to select network used for tests")
+	networkURL      = flag.String("networkurl", "", "-networkurl=https://ropsten.bob.com/433JU78sdw= to provide a URL for giving network.")
+
+	// ErrStatusPrivateNetwork is returned when network id is for a private chain network, whoes URL must be provided.
+	ErrStatusPrivateNetwork = errors.New("network id reserves for private chain network, provide URL")
 
 	// TestConfig defines the default config usable at package-level.
 	TestConfig *common.TestConfig
@@ -115,6 +120,50 @@ func EnsureNodeSync(nodeManager common.NodeManager) {
 	}
 }
 
+// GetNetworkURLFromID returns asociated network url for giving network id.
+func GetNetworkURLFromID(id int) (string, error) {
+	switch id {
+	case params.MainNetworkID:
+		return params.MainnetEthereumNetworkURL, nil
+	case params.RinkebyNetworkID:
+		return params.RinkebyEthereumNetworkURL, nil
+	case params.RopstenNetworkID:
+		return params.RopstenEthereumNetworkURL, nil
+	}
+
+	return "", ErrStatusPrivateNetwork
+}
+
+// GetNetworkHashFromID returns the hash associated with a given network id.
+func GetNetworkHashFromID(id int) string {
+	switch id {
+	case params.MainNetworkID:
+		return "0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3"
+	case params.RinkebyNetworkID:
+		return "0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177"
+	case params.RopstenNetworkID:
+		return "0x41941023680923e0fe4d74a34bdac8141f2540e3ae90623718e47d66d1ca4a2d"
+	case params.StatusChainNetworkID:
+		return "0x28c4da1cca48d0107ea5ea29a40ac15fca86899c52d02309fa12ea39b86d219c"
+	}
+
+	return ""
+}
+
+// GetNetworkHash returns the hash associated with a given network id.
+func GetNetworkHash() string {
+	return GetNetworkHashFromID(GetNetworkID())
+}
+
+// GetNetworkURL returns appropriate network
+func GetNetworkURL() (string, error) {
+	if *networkURL != "" {
+		return *networkURL, nil
+	}
+
+	return GetNetworkURLFromID(GetNetworkID())
+}
+
 // GetNetworkID returns appropriate network id for test based on
 // default or provided -network flag.
 func GetNetworkID() int {
@@ -123,7 +172,7 @@ func GetNetworkID() int {
 		return params.MainNetworkID
 	case fmt.Sprintf("%d", params.RinkebyNetworkID), "rinkeby":
 		return params.RinkebyNetworkID
-	case fmt.Sprintf("%d", params.RopstenNetworkID), "ropsten":
+	case fmt.Sprintf("%d", params.RopstenNetworkID), "ropsten", "testnet":
 		return params.RopstenNetworkID
 	case fmt.Sprintf("%d", params.StatusChainNetworkID), "statuschain":
 		return params.StatusChainNetworkID
