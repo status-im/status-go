@@ -27,8 +27,8 @@ func TestVerifyAccountPassword(t *testing.T) {
 	defer os.RemoveAll(emptyKeyStoreDir) //nolint: errcheck
 
 	// import account keys
-	require.NoError(t, common.ImportTestAccount(keyStoreDir, "test-account3.pk"))
-	require.NoError(t, common.ImportTestAccount(keyStoreDir, "test-account4.pk"))
+	require.NoError(t, common.RestoreFile(keyStoreDir, "test-account3.pk"))
+	require.NoError(t, common.RestoreFile(keyStoreDir, "test-account4.pk"))
 
 	account1Address := gethcommon.BytesToAddress(gethcommon.FromHex(TestConfig.Account1.Address))
 
@@ -102,7 +102,7 @@ func TestVerifyAccountPasswordWithAccountBeforeEIP55(t *testing.T) {
 	defer os.RemoveAll(keyStoreDir) //nolint: errcheck
 
 	// Import keys and make sure one was created before EIP55 introduction.
-	err = common.ImportTestAccount(keyStoreDir, "test-account1-before-eip55.pk")
+	err = common.RestoreFile(keyStoreDir, "test-account1-before-eip55.pk")
 	require.NoError(t, err)
 
 	acctManager := account.NewManager(nil)

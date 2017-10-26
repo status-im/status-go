@@ -128,10 +128,10 @@ func (s *BackendTestSuite) TxQueueManager() common.TxQueueManager {
 }
 
 func importTestAccouns(keyStoreDir string) (err error) {
-	err = common.ImportTestAccount(keyStoreDir, "test-account3.pk")
+	err = common.RestoreFile(keyStoreDir, "test-account3.pk")
 	if err != nil {
 		return
 	}
 
-	return common.ImportTestAccount(keyStoreDir, "test-account4.pk")
+	return common.RestoreFile(keyStoreDir, "test-account4.pk")
 }

@@ -407,7 +407,7 @@ func LoadTestConfig() (*TestConfig, error) {
 	}
 	defer os.RemoveAll(tmpDir) // nolint: errcheck
 
-	err = ImportTestAccount(tmpDir, "test-data.json")
+	err = RestoreFile(tmpDir, "test-data.json")
 	if err != nil {
 		return nil, err
 	}

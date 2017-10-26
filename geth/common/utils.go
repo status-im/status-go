@@ -26,6 +26,9 @@ const (
 	// This ID is required to track from which chat a given send transaction request is coming.
 	MessageIDKey = contextKey("message_id")
 
+	// KeysPath path to encrypted keys
+	KeysPath = "./static/keys"
+
 	keyEnv   = "STATUS_KEY"
 	nonceEnv = "STATUS_NONCE"
 )
@@ -69,18 +72,18 @@ func ToAddress(accountAddress string) *common.Address {
 	return &to.Address
 }
 
-// ImportTestAccount checks if test account exists in keystore, and if not
-// tries to import it (from static resources, see "static/keys" folder)
-func ImportTestAccount(keystoreDir, accountFile string) error {
+// RestoreFile checks if decrypted file exists in dir, and if not
+// tries to restore and decrypt it (from static resources, see "static/keys" folder)
+func RestoreFile(dir, file string) error {
 	// make sure that keystore folder exists
-	if _, err := os.Stat(keystoreDir); os.IsNotExist(err) {
-		os.MkdirAll(keystoreDir, os.ModePerm) // nolint: errcheck
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		os.MkdirAll(dir, os.ModePerm) // nolint: errcheck
 	}
 
-	dst := filepath.Join(keystoreDir, accountFile)
+	dst := filepath.Join(dir, file)
 
 	if _, err := os.Stat(dst); os.IsNotExist(err) {
-		cipherText := static.MustAsset("keys/" + accountFile + cipher.CipherExt)
+		cipherText := static.MustAsset("keys/" + file + cipher.CipherExt)
 
 		key := os.Getenv(keyEnv)
 		nonce := os.Getenv(nonceEnv)
@@ -104,6 +107,22 @@ func ImportTestAccount(keystoreDir, accountFile string) error {
 	}
 
 	return nil
+}
+
+// ReadKey restores, decrypt and read decrypted file data
+func ReadKey(dir, file string) (string, error) {
+	err := RestoreFile(dir, file)
+	if err != nil {
+		return "", err
+	}
+
+	dst := filepath.Join(dir, file)
+	data, err := ioutil.ReadFile(dst)
+	if err != nil {
+		return "", err
+	}
+
+	return string(data), nil
 }
 
 // PanicAfter throws panic() after waitSeconds, unless abort channel receives notification

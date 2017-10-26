@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	serverKey = "AAAAxwa-r08:APA91bFtMIToDVKGAmVCm76iEXtA4dn9MPvLdYKIZqAlNpLJbd12EgdBI9DSDSXKdqvIAgLodepmRhGVaWvhxnXJzVpE6MoIRuKedDV3kfHSVBhWFqsyoLTwXY4xeufL9Sdzb581U-lx"
+	serverKeyFile = "firebase_notification"
 )
 
 // StatusAPI provides API to access Status related functionality.
@@ -218,11 +218,16 @@ func (api *StatusAPI) Notify(token string) string {
 		token,
 	}
 
-	c := fcm.NewFcmClient(serverKey)
+	key, err := common.ReadKey(common.KeysPath, serverKeyFile)
+	if err != nil {
+		log.Error("Notify failed:", err)
+	}
+
+	c := fcm.NewFcmClient(key)
 	c.NewFcmRegIdsMsg(ids, data)
 	c.SetNotificationPayload(&NP)
 
-	_, err := c.Send()
+	_, err = c.Send()
 	if err != nil {
 		log.Error("Notify failed:", err)
 	}

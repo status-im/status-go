@@ -4,6 +4,7 @@
 // scripts/web3.js
 // config/cht.json
 // config/status-chain-genesis.json
+// keys/firebase_notification.cr
 // keys/firebaseauthkey.cr
 // keys/test-account1-before-eip55.pk.cr
 // keys/test-account1.pk.cr
@@ -122,7 +123,7 @@ func scriptsWeb3Js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "scripts/web3.js", size: 401234, mode: os.FileMode(420), modTime: time.Unix(1509038794, 0)}
+	info := bindataFileInfo{name: "scripts/web3.js", size: 401234, mode: os.FileMode(420), modTime: time.Unix(1509050124, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -167,6 +168,26 @@ func configStatusChainGenesisJson() (*asset, error) {
 	return a, nil
 }
 
+var _keysFirebase_notificationCr = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x00\xa8\x00\x57\xff\x88\xd3\xec\xc0\x08\x66\x1b\xf3\xff\x94\x13\x8d\x03\x1f\x76\x12\x91\x36\x51\x06\x0c\xef\xd9\x43\x5c\x76\xef\xfc\x67\x57\x57\xa5\xc3\x74\xc3\x85\x01\xfc\x2f\x71\xa2\x75\xee\x1c\x47\x00\x13\x5c\x36\xf6\xdb\x2e\x92\x5e\xcc\x59\x77\x95\xab\x9c\x08\x17\x8b\x11\x75\xcd\x1a\xa9\x75\xcd\xa4\x69\x81\x43\xc3\xe9\xd1\xf8\xc7\x4e\x6f\x0b\x18\x60\xe5\x7d\x40\xde\xd7\xd7\x1a\x04\x69\x77\xc2\x78\x01\x01\xa7\x70\xc4\x92\xa4\x90\x65\x2e\xae\xc5\xc1\x4d\x4b\xcc\x1d\x57\xfd\x09\x4f\x3b\x7b\xbf\xb1\xb4\xfa\xa8\xdb\x0e\x2e\xf6\x08\xf2\x28\x96\xef\xa1\x38\xa4\x2a\xe7\xb4\x2f\xc4\x49\xff\x7e\x27\x56\x42\xa9\x81\x11\xa2\x56\xb2\xd6\x71\x8e\xc7\x78\x6a\xdd\x77\xfd\xfb\xb3\x84\x23\x0e\x0c\x01\x00\x00\xff\xff\x59\xaa\x67\xbe\xa8\x00\x00\x00")
+
+func keysFirebase_notificationCrBytes() ([]byte, error) {
+	return bindataRead(
+		_keysFirebase_notificationCr,
+		"keys/firebase_notification.cr",
+	)
+}
+
+func keysFirebase_notificationCr() (*asset, error) {
+	bytes, err := keysFirebase_notificationCrBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "keys/firebase_notification.cr", size: 168, mode: os.FileMode(420), modTime: time.Unix(1509050131, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
 var _keysFirebaseauthkeyCr = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x00\xa9\x00\x56\xff\x88\xd3\xec\xc0\x38\x5e\x4f\x93\xbe\xc1\x62\x8d\x03\x1f\x76\x12\x91\x36\x51\x07\x35\xc9\xdf\x48\x2e\x19\xea\xca\x1e\x17\x40\x95\xf4\x09\x97\x9b\x09\x9c\x16\x76\xef\x59\xb6\x53\x5c\x05\x11\x7b\x18\xe3\xfc\x15\x83\x77\xc9\x05\x7c\xa8\xbd\xe0\x5b\x05\xeb\x5b\x78\xeb\x4e\xad\x54\xa1\x96\x70\xad\x5f\xda\xd0\xd8\xf8\x9c\x4b\x6c\x38\x11\x6c\xed\x5a\x08\x86\xd2\xd8\x16\x1c\x51\x64\x99\x42\x2a\x36\xb4\x60\x89\xb4\x8c\x9e\x3d\x5b\x97\xc7\xe5\x7e\x59\xeb\x08\x7c\xdf\x55\x12\x33\x7f\xdd\xd2\x95\xdc\x93\xfb\x0f\x25\xbb\x10\xfd\x3e\xab\xdc\xb0\x49\x8e\x23\xfd\xe5\x0f\xb1\x40\xe3\x3d\x68\x04\x4c\xf1\x85\x78\xa5\x5d\x43\xde\x4e\x52\xa3\x60\xab\x3a\x9c\x5a\x22\xa6\x36\x0d\xb5\x2c\x95\x01\x00\x00\xff\xff\xce\xac\xf3\x42\xa9\x00\x00\x00")
 
 func keysFirebaseauthkeyCrBytes() ([]byte, error) {
@@ -182,7 +203,7 @@ func keysFirebaseauthkeyCr() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/firebaseauthkey.cr", size: 169, mode: os.FileMode(420), modTime: time.Unix(1509038795, 0)}
+	info := bindataFileInfo{name: "keys/firebaseauthkey.cr", size: 169, mode: os.FileMode(420), modTime: time.Unix(1509050126, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -202,7 +223,7 @@ func keysTestAccount1BeforeEip55PkCr() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/test-account1-before-eip55.pk.cr", size: 654, mode: os.FileMode(420), modTime: time.Unix(1509038799, 0)}
+	info := bindataFileInfo{name: "keys/test-account1-before-eip55.pk.cr", size: 654, mode: os.FileMode(420), modTime: time.Unix(1509050129, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -222,7 +243,7 @@ func keysTestAccount1PkCr() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/test-account1.pk.cr", size: 654, mode: os.FileMode(420), modTime: time.Unix(1509038802, 0)}
+	info := bindataFileInfo{name: "keys/test-account1.pk.cr", size: 654, mode: os.FileMode(420), modTime: time.Unix(1509050133, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -242,7 +263,7 @@ func keysTestAccount2PkCr() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/test-account2.pk.cr", size: 1090, mode: os.FileMode(420), modTime: time.Unix(1509038796, 0)}
+	info := bindataFileInfo{name: "keys/test-account2.pk.cr", size: 1090, mode: os.FileMode(420), modTime: time.Unix(1509050126, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -262,7 +283,7 @@ func keysTestAccount3PkCr() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/test-account3.pk.cr", size: 507, mode: os.FileMode(420), modTime: time.Unix(1509038801, 0)}
+	info := bindataFileInfo{name: "keys/test-account3.pk.cr", size: 507, mode: os.FileMode(420), modTime: time.Unix(1509050132, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -282,7 +303,7 @@ func keysTestAccount4PkCr() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/test-account4.pk.cr", size: 507, mode: os.FileMode(420), modTime: time.Unix(1509038798, 0)}
+	info := bindataFileInfo{name: "keys/test-account4.pk.cr", size: 507, mode: os.FileMode(420), modTime: time.Unix(1509050129, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -302,7 +323,7 @@ func keysTestDataJsonCr() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/test-data.json.cr", size: 476, mode: os.FileMode(420), modTime: time.Unix(1509038800, 0)}
+	info := bindataFileInfo{name: "keys/test-data.json.cr", size: 476, mode: os.FileMode(420), modTime: time.Unix(1509050130, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -322,7 +343,7 @@ func keysWnodekeyCr() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/wnodekey.cr", size: 81, mode: os.FileMode(420), modTime: time.Unix(1509038797, 0)}
+	info := bindataFileInfo{name: "keys/wnodekey.cr", size: 81, mode: os.FileMode(420), modTime: time.Unix(1509050127, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -342,7 +363,7 @@ func keysWnodepasswordCr() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/wnodepassword.cr", size: 25, mode: os.FileMode(420), modTime: time.Unix(1509038798, 0)}
+	info := bindataFileInfo{name: "keys/wnodepassword.cr", size: 25, mode: os.FileMode(420), modTime: time.Unix(1509050128, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -543,6 +564,7 @@ var _bindata = map[string]func() (*asset, error){
 	"scripts/web3.js":                                   scriptsWeb3Js,
 	"config/cht.json":                                   configChtJson,
 	"config/status-chain-genesis.json":                  configStatusChainGenesisJson,
+	"keys/firebase_notification.cr":                     keysFirebase_notificationCr,
 	"keys/firebaseauthkey.cr":                           keysFirebaseauthkeyCr,
 	"keys/test-account1-before-eip55.pk.cr":             keysTestAccount1BeforeEip55PkCr,
 	"keys/test-account1.pk.cr":                          keysTestAccount1PkCr,
@@ -607,6 +629,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 		"status-chain-genesis.json": &bintree{configStatusChainGenesisJson, map[string]*bintree{}},
 	}},
 	"keys": &bintree{nil, map[string]*bintree{
+		"firebase_notification.cr":         &bintree{keysFirebase_notificationCr, map[string]*bintree{}},
 		"firebaseauthkey.cr":               &bintree{keysFirebaseauthkeyCr, map[string]*bintree{}},
 		"test-account1-before-eip55.pk.cr": &bintree{keysTestAccount1BeforeEip55PkCr, map[string]*bintree{}},
 		"test-account1.pk.cr":              &bintree{keysTestAccount1PkCr, map[string]*bintree{}},
