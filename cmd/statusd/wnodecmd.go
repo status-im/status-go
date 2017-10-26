@@ -133,7 +133,7 @@ func wnode(ctx *cli.Context) error {
 			return err
 		}
 	}
-	if err := statusAPI.StartNode(config); err != nil {
+	if err = statusAPI.StartNode(config); err != nil {
 		return err
 	}
 
@@ -204,7 +204,7 @@ func makeWhisperNodeConfig(ctx *cli.Context) (*params.NodeConfig, error) {
 		if whisperConfig.PasswordFile, err = filepath.Abs(whisperConfig.PasswordFile); err != nil {
 			return nil, err
 		}
-		if _, err := whisperConfig.ReadPasswordFile(); err != nil {
+		if _, err = whisperConfig.ReadPasswordFile(); err != nil {
 			return nil, err
 		}
 	}
@@ -213,7 +213,7 @@ func makeWhisperNodeConfig(ctx *cli.Context) (*params.NodeConfig, error) {
 		if whisperConfig.IdentityFile, err = filepath.Abs(whisperConfig.IdentityFile); err != nil {
 			return nil, err
 		}
-		if _, err := whisperConfig.ReadIdentityFile(); err != nil {
+		if _, err = whisperConfig.ReadIdentityFile(); err != nil {
 			return nil, err
 		}
 	}

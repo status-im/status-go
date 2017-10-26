@@ -124,11 +124,7 @@ func (s *JailRPCTestSuite) TestContractDeployment() {
 
 	var txHash gethcommon.Hash
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var (
-			envelope signal.Envelope
-			err      error
-		)
-
+		var envelope signal.Envelope
 		err = json.Unmarshal([]byte(jsonEvent), &envelope)
 		s.NoError(err, "cannot unmarshal JSON: %s", jsonEvent)
 

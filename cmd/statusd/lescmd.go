@@ -30,7 +30,7 @@ func lesCommandHandler(ctx *cli.Context) error {
 	}
 
 	fmt.Println("Starting Light Status node..")
-	if err := statusAPI.StartNode(config); err != nil {
+	if err = statusAPI.StartNode(config); err != nil {
 		return err
 	}
 
