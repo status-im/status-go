@@ -85,7 +85,6 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransactionUpstream() {
 
 	if GetNetworkID() == params.StatusChainNetworkID {
 		s.T().Skip()
-		return
 	}
 
 	addr, err := GetRemoteURL()
