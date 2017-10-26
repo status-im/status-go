@@ -30,18 +30,32 @@ func (s *JailTestSuite) SetupTest() {
 }
 
 func (s *JailTestSuite) TestJailCreateCell() {
-	_, err := s.Jail.createCell("cell1")
+	cell, err := s.Jail.CreateCell("cell1")
 	s.NoError(err)
+	s.NotNil(cell)
 	// creating another cell with the same id fails
-	_, err = s.Jail.createCell("cell1")
+	_, err = s.Jail.CreateCell("cell1")
 	s.EqualError(err, "cell with id 'cell1' already exists")
 
 	// create more cells
-	_, err = s.Jail.createCell("cell2")
+	_, err = s.Jail.CreateCell("cell2")
 	s.NoError(err)
-	_, err = s.Jail.createCell("cell3")
+	_, err = s.Jail.CreateCell("cell3")
 	s.NoError(err)
 	s.Len(s.Jail.cells, 3)
+}
+
+func (s *JailTestSuite) TestJailGetCell() {
+	// cell1 does not exist
+	_, err := s.Jail.Cell("cell1")
+	s.EqualError(err, "cell 'cell1' not found")
+
+	// cell 1 exists
+	_, err = s.Jail.CreateCell("cell1")
+	s.NoError(err)
+	cell, err := s.Jail.Cell("cell1")
+	s.NoError(err)
+	s.NotNil(cell)
 }
 
 func (s *JailTestSuite) TestJailInitCell() {
@@ -58,7 +72,7 @@ func (s *JailTestSuite) TestJailInitCell() {
 }
 
 func (s *JailTestSuite) TestJailStop() {
-	_, err := s.Jail.createCell("cell1")
+	_, err := s.Jail.CreateCell("cell1")
 	s.NoError(err)
 	s.Len(s.Jail.cells, 1)
 
@@ -68,7 +82,7 @@ func (s *JailTestSuite) TestJailStop() {
 }
 
 func (s *JailTestSuite) TestJailCall() {
-	cell, err := s.Jail.createCell("cell1")
+	cell, err := s.Jail.CreateCell("cell1")
 	s.NoError(err)
 
 	propsc := make(chan string, 1)
@@ -87,6 +101,20 @@ func (s *JailTestSuite) TestJailCall() {
 	s.Equal(`{"result": undefined}`, result)
 }
 
+func (s *JailTestSuite) TestMakeCatalogVariable() {
+	cell, err := s.Jail.createCell("cell1")
+	s.NoError(err)
+
+	// no `_status_catalog` variable
+	response := s.Jail.makeCatalogVariable(cell)
+	s.Equal(`{"error":"ReferenceError: '_status_catalog' is not defined"}`, response)
+
+	// with `_status_catalog` variable
+	cell.Run(`var _status_catalog = { test: true }`)
+	response = s.Jail.makeCatalogVariable(cell)
+	s.Equal(`{"result": {"test":true}}`, response)
+}
+
 func (s *JailTestSuite) TestCreateAndInitCell() {
 	cell, err := s.Jail.createAndInitCell(
 		"cell1",
@@ -103,4 +131,9 @@ func (s *JailTestSuite) TestCreateAndInitCell() {
 	value, err = cell.Get("testCreateAndInitCell2")
 	s.NoError(err)
 	s.Equal(`true`, value.String())
+}
+
+func (s *JailTestSuite) TestPublicCreateAndInitCell() {
+	response := s.Jail.CreateAndInitCell("cell1", `var _status_catalog = { test: true }`)
+	s.Equal(`{"result": {"test":true}}`, response)
 }

@@ -184,7 +184,7 @@ func (j *Jail) makeCatalogVariable(cell *Cell) string {
 	return newJailResultResponse(value)
 }
 
-func (j *Jail) getCell(chatID string) (*Cell, error) {
+func (j *Jail) cell(chatID string) (*Cell, error) {
 	j.cellsMx.RLock()
 	defer j.cellsMx.RUnlock()
 
@@ -196,10 +196,10 @@ func (j *Jail) getCell(chatID string) (*Cell, error) {
 	return cell, nil
 }
 
-// GetCell returns a cell by chatID. If it does not exist, error is returned.
+// Cell returns a cell by chatID. If it does not exist, error is returned.
 // Required by the Backend.
-func (j *Jail) GetCell(chatID string) (common.JailCell, error) {
-	return j.getCell(chatID)
+func (j *Jail) Cell(chatID string) (common.JailCell, error) {
+	return j.cell(chatID)
 }
 
 // Call executes the `call` function within a cell with chatID.
@@ -211,7 +211,7 @@ func (j *Jail) GetCell(chatID string) (common.JailCell, error) {
 // For instance:
 //   `["prop1", "prop2"]` is translated to `_status_catalog["prop1"]["prop2"]`.
 func (j *Jail) Call(chatID, commandPath, args string) string {
-	cell, err := j.getCell(chatID)
+	cell, err := j.cell(chatID)
 	if err != nil {
 		return newJailErrorResponse(err)
 	}

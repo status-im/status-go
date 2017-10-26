@@ -183,12 +183,16 @@ func (s *JailTestSuite) TestEventSignal() {
 	s.Equal(expectedResponse, response)
 }
 
-// TestCallResponseOrder tests for problem in
+// TestCallResponseOrder tests exactly the problem from
 // https://github.com/status-im/status-go/issues/372
-func (s *JailTestSuite) TestCallResponseOrder() {
+func (s *JailTestSuite) TestSendSyncResponseOrder() {
 	s.StartTestNode(params.RinkebyNetworkID)
 	defer s.StopTestNode()
 
+	// `testCommand` is a simple JS function. `calculateGasPrice` makes
+	// an implicit JSON-RPC call via `send` handler (it's a sync call).
+	// `web3.eth.gasPrice` is chosen to call `send` handler under the hood
+	// because it's a simple RPC method and does not require any params.
 	statusJS := baseStatusJSCode + `;
 	_status_catalog.commands["testCommand"] = function (params) {
 		return params.val * params.val;
@@ -205,6 +209,8 @@ func (s *JailTestSuite) TestCallResponseOrder() {
 	`
 	s.Jail.CreateAndInitCell(testChatID, statusJS)
 
+	// Concurrently call `testCommand` and `calculateGasPrice` and do some assertions.
+	// If the code executed in cell's VM is not thread-safe, this test will likely panic.
 	N := 10
 	errCh := make(chan error, N)
 	var wg sync.WaitGroup
