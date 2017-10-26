@@ -96,12 +96,12 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransactionUpstream() {
 
 	var txHash gethcommon.Hash
 	signal.SetDefaultNodeNotificationHandler(func(rawSignal string) {
-		var signal signal.Envelope
-		err := json.Unmarshal([]byte(rawSignal), &signal)
+		var signalEnvelope signal.Envelope
+		err := json.Unmarshal([]byte(rawSignal), &signalEnvelope)
 		s.NoError(err)
 
-		if signal.Type == txqueue.EventTransactionQueued {
-			event := signal.Event.(map[string]interface{})
+		if signalEnvelope.Type == txqueue.EventTransactionQueued {
+			event := signalEnvelope.Event.(map[string]interface{})
 			txID := event["id"].(string)
 
 			// Complete with a wrong passphrase.

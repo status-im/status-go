@@ -1,6 +1,8 @@
 .PHONY: statusgo all test xgo clean help
 .PHONY: statusgo-android statusgo-ios
 
+include ./static/tools/mk/lint.mk
+
 GOBIN = build/bin
 GO ?= latest
 
@@ -79,56 +81,6 @@ generate: ##@other Regenerate assets and other auto-generated stuff
 	build/env.sh go generate ./static
 	rm ./static/scripts/web3.js
 
-lint-deps:
-	go get -u github.com/alecthomas/gometalinter
-	gometalinter --install
-
-lint-cur:
-	gometalinter --disable-all --enable=deadcode $(LINT_FOLDERS) | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
-
-lint: ##@tests Run meta linter on code
-	@echo "Linter: go vet\n--------------------"
-	@gometalinter $(LINT_EXCLUDE) --disable-all --enable=vet $(LINT_FOLDERS) | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
-	@echo "Linter: go vet --shadow\n--------------------"
-	@gometalinter $(LINT_EXCLUDE) --disable-all --enable=vetshadow $(LINT_FOLDERS) | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
-	@echo "Linter: gofmt\n--------------------"
-	@gometalinter $(LINT_EXCLUDE) --disable-all --enable=gofmt $(LINT_FOLDERS) | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
-	@echo "Linter: goimports\n--------------------"
-	@gometalinter $(LINT_EXCLUDE) --disable-all --enable=goimports $(LINT_FOLDERS) | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
-	@echo "Linter: golint\n--------------------"
-	@gometalinter $(LINT_EXCLUDE) --disable-all --enable=golint $(LINT_FOLDERS) | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
-	@echo "Linter: deadcode\n--------------------"
-	@gometalinter $(LINT_EXCLUDE) --disable-all --enable=deadcode $(LINT_FOLDERS) | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
-	@echo "Linter: misspell\n--------------------"
-	@gometalinter $(LINT_EXCLUDE) --disable-all --enable=misspell $(LINT_FOLDERS) | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
-	@echo "Linter: unparam\n--------------------"
-	@gometalinter $(LINT_EXCLUDE) --disable-all --deadline 45s --enable=unparam $(LINT_FOLDERS) | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
-	@echo "Linter: unused\n--------------------"
-	@gometalinter $(LINT_EXCLUDE) --disable-all --deadline 45s --enable=unused $(LINT_FOLDERS) | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
-	@echo "Linter: gocyclo\n--------------------"
-	@gometalinter $(LINT_EXCLUDE) --disable-all --enable=gocyclo --cyclo-over=20 $(LINT_FOLDERS) | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
-	@echo "Linter: errcheck\n--------------------"
-	@gometalinter $(LINT_EXCLUDE) --disable-all --enable=errcheck $(LINT_FOLDERS) | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
-	@echo "Linter: dupl\n--------------------"
-	@gometalinter $(LINT_EXCLUDE) --exclude='.*_test.go' --disable-all --enable=dupl --dupl-threshold=100  extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
-	@echo "Linter: ineffassign\n--------------------"
-	@gometalinter $(LINT_EXCLUDE) --disable-all --enable=ineffassign $(LINT_FOLDERS) | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
-	@echo "Linter: interfacer\n--------------------"
-	@gometalinter $(LINT_EXCLUDE) --disable-all --enable=interfacer $(LINT_FOLDERS) | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
-	@echo "Linter: unconvert\n--------------------"
-	@gometalinter $(LINT_EXCLUDE) --disable-all --enable=unconvert $(LINT_FOLDERS) | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
-	@echo "Linter: goconst\n--------------------"
-	@gometalinter $(LINT_EXCLUDE) --disable-all --enable=goconst $(LINT_FOLDERS) | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
-	@echo "Linter: staticcheck\n--------------------"
-	@gometalinter $(LINT_EXCLUDE) --disable-all --deadline 45s --enable=staticcheck $(LINT_FOLDERS) | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
-	@echo "Linter: gas\n--------------------"
-	@gometalinter $(LINT_EXCLUDE) --disable-all --enable=gas $(LINT_FOLDERS) | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
-	@echo "Linter: varcheck\n--------------------"
-	@gometalinter $(LINT_EXCLUDE) --disable-all --deadline 60s --enable=varcheck $(LINT_FOLDERS) | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
-	@echo "Linter: structcheck\n--------------------"
-	@gometalinter $(LINT_EXCLUDE) --disable-all --enable=structcheck $(LINT_FOLDERS) | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
-	@echo "Linter: gosimple\n--------------------"
-	@gometalinter $(LINT_EXCLUDE) --disable-all --deadline 45s --enable=gosimple $(LINT_FOLDERS) | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
 
 mock-install: ##@other Install mocking tools
 	go get -u github.com/golang/mock/mockgen
@@ -136,10 +88,12 @@ mock-install: ##@other Install mocking tools
 mock: ##@other Regenerate mocks
 	mockgen -source=geth/common/types.go -destination=geth/common/types_mock.go -package=common
 
-test: ##@tests Run unit and integration tests
+test: test-unit-coverage ##@tests Run basic, short tests during development
+
+test-unit: ##@tests Run unit and integration tests
 	build/env.sh go test $(UNIT_TEST_PACKAGES)
 
-test-coverage: ##@tests Run unit and integration tests with covevare
+test-unit-coverage: ##@tests Run unit and integration tests with coverage
 	build/env.sh go test -coverpkg= $(UNIT_TEST_PACKAGES)
 
 test-e2e: ##@tests Run e2e tests
@@ -154,12 +108,8 @@ test-e2e: ##@tests Run e2e tests
 	build/env.sh go test -timeout 10m ./e2e/transactions/...
 	build/env.sh go test -timeout 40m ./cmd/statusd
 
-ci: mock-install mock test-coverage test-e2e ##@tests Run all tests in CI
+ci: lint mock-install mock test-unit test-e2e ##@tests Run all linters and tests at once
 
 clean: ##@other Cleanup
 	rm -fr build/bin/*
 	rm coverage.out coverage-all.out coverage.html
-
-
-LINT_EXCLUDE := --exclude='.*_mock.go' --exclude='geth/jail/doc.go'
-LINT_FOLDERS := extkeys cmd/... geth/... e2e/...

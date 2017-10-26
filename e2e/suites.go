@@ -12,8 +12,7 @@ import (
 // NodeManagerTestSuite defines a test suit with NodeManager.
 type NodeManagerTestSuite struct {
 	suite.Suite
-	NodeManager       common.NodeManager
-	nodeSyncCompleted bool
+	NodeManager common.NodeManager
 }
 
 // StartTestNode initiazes a NodeManager instances with configuration retrieved
@@ -52,8 +51,7 @@ func (s *NodeManagerTestSuite) StopTestNode() {
 // and a few utility methods to start and stop node or get various services.
 type BackendTestSuite struct {
 	suite.Suite
-	Backend           *api.StatusBackend
-	nodeSyncCompleted bool
+	Backend *api.StatusBackend
 }
 
 // SetupTest initializes Backend.
