@@ -6,14 +6,11 @@ lint-deps:
 	go get -u github.com/alecthomas/gometalinter
 	gometalinter --install
 
-lint: lint-vet lint-vetshadow lint-gofmt lint-deadcode lint-misspell lint-unparam lint-unused lint-gocyclo lint-errcheck lint-ineffassign lint-interfacer lint-unconvert lint-staticcheck lint-goconst lint-gas lint-varcheck lint-structcheck lint-gosimple
+lint: lint-vet lint-gofmt lint-deadcode lint-misspell lint-unparam lint-unused lint-gocyclo lint-errcheck lint-ineffassign lint-interfacer lint-unconvert lint-staticcheck lint-goconst lint-gas lint-varcheck lint-structcheck lint-gosimple
 
 lint-vet:
 	@echo "lint-vet"
 	@gometalinter $(LINT_EXCLUDE) --disable-all --enable=vet --deadline=45s  $(LINT_FOLDERS)
-lint-vetshadow:
-	@echo "lint-vetshadow"
-	@gometalinter $(LINT_EXCLUDE) --disable-all --enable=vetshadow --deadline=45s  $(LINT_FOLDERS)
 lint-golint:
 	@echo "lint-golint"
 	@gometalinter $(LINT_EXCLUDE) --disable-all --enable=golint --deadline=45s  $(LINT_FOLDERS)
