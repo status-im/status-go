@@ -543,11 +543,11 @@ func (c *NodeConfig) updateUpstreamConfig() error {
 
 	switch c.NetworkID {
 	case MainNetworkID:
-		c.UpstreamConfig.URL = UpstreamMainNetEthereumNetworkURL
+		c.UpstreamConfig.URL = MainnetEthereumNetworkURL
 	case RopstenNetworkID:
-		c.UpstreamConfig.URL = UpstreamRopstenEthereumNetworkURL
+		c.UpstreamConfig.URL = RopstenEthereumNetworkURL
 	case RinkebyNetworkID:
-		c.UpstreamConfig.URL = UpstreamRinkebyEthereumNetworkURL
+		c.UpstreamConfig.URL = RinkebyEthereumNetworkURL
 	}
 
 	return nil

@@ -239,6 +239,10 @@ func (m *StatusBackend) DiscardTransactions(ids []common.QueuedTxID) map[common.
 // registerHandlers attaches Status callback handlers to running node
 func (m *StatusBackend) registerHandlers() error {
 	rpcClient := m.NodeManager().RPCClient()
+	if rpcClient == nil {
+		return node.ErrRPCClient
+	}
+
 	rpcClient.RegisterHandler("eth_accounts", m.accountManager.AccountsRPCHandler())
 	rpcClient.RegisterHandler("eth_sendTransaction", m.txQueueManager.SendTransactionRPCHandler)
 

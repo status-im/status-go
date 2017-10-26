@@ -13,7 +13,6 @@ import (
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/e2e"
 	"github.com/status-im/status-go/geth/common"
-	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/static"
 	. "github.com/status-im/status-go/testing"
 	"github.com/stretchr/testify/suite"
@@ -46,8 +45,8 @@ type WhisperJailTestSuite struct {
 	Jail       common.JailManager
 }
 
-func (s *WhisperJailTestSuite) StartTestBackend(networkID int, opts ...e2e.TestNodeOption) {
-	s.BackendTestSuite.StartTestBackend(networkID, opts...)
+func (s *WhisperJailTestSuite) StartTestBackend(opts ...e2e.TestNodeOption) {
+	s.BackendTestSuite.StartTestBackend(opts...)
 
 	s.WhisperAPI = whisper.NewPublicWhisperAPI(s.WhisperService())
 	s.Jail = s.Backend.JailManager()
@@ -82,7 +81,7 @@ func (s *WhisperJailTestSuite) GetAccountKey(account struct {
 // TODO(adamb) Uncomment when issue #336 is fixed.
 /*
 func (s *WhisperJailTestSuite) DontTestJailWhisper() {
-	s.StartTestBackend(params.StatusChainNetworkID)
+	s.StartTestBackend()
 	defer s.StopTestBackend()
 
 	_, accountKey1Hex, err := s.GetAccountKey(TestConfig.Account1)
@@ -376,7 +375,7 @@ func (s *WhisperJailTestSuite) DontTestJailWhisper() {
 */
 
 func (s *WhisperJailTestSuite) TestEncryptedAnonymousMessage() {
-	s.StartTestBackend(params.StatusChainNetworkID)
+	s.StartTestBackend()
 	defer s.StopTestBackend()
 
 	accountKey2, accountKey2Hex, err := s.GetAccountKey(TestConfig.Account2)
