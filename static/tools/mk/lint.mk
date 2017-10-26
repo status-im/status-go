@@ -6,7 +6,7 @@ lint-deps:
 	go get -u github.com/alecthomas/gometalinter
 	gometalinter --install
 
-lint: lint-vet lint-vetshadow lint-goimports lint-gofmt lint-deadcode lint-misspell lint-unparam lint-unused lint-gocyclo lint-errcheck lint-ineffassign lint-interfacer lint-unconvert lint-staticcheck lint-goconst lint-gas lint-varcheck lint-structcheck lint-gosimple
+lint: lint-vet lint-vetshadow lint-gofmt lint-deadcode lint-misspell lint-unparam lint-unused lint-gocyclo lint-errcheck lint-ineffassign lint-interfacer lint-unconvert lint-staticcheck lint-goconst lint-gas lint-varcheck lint-structcheck lint-gosimple
 
 lint-vet:
 	@echo "lint-vet"
@@ -14,9 +14,6 @@ lint-vet:
 lint-vetshadow:
 	@echo "lint-vetshadow"
 	@gometalinter $(LINT_EXCLUDE) --disable-all --enable=vetshadow --deadline=45s  $(LINT_FOLDERS)
-lint-goimports:
-	@echo "lint-goimports"
-	@gometalinter $(LINT_EXCLUDE) --disable-all --enable=goimports --deadline=45s  $(LINT_FOLDERS)
 lint-golint:
 	@echo "lint-golint"
 	@gometalinter $(LINT_EXCLUDE) --disable-all --enable=golint --deadline=45s  $(LINT_FOLDERS)
@@ -37,7 +34,7 @@ lint-unused:
 	@gometalinter $(LINT_EXCLUDE) --disable-all --enable=unused --deadline=45s  $(LINT_FOLDERS)
 lint-gocyclo:
 	@echo "lint-gocyclo"
-	@gometalinter $(LINT_EXCLUDE) --disable-all --enable=gocyclo --cyclo-over=20 --deadline=45s  $(LINT_FOLDERS)
+	@gometalinter $(LINT_EXCLUDE) --disable-all --enable=gocyclo --cyclo-over=16 --deadline=45s  $(LINT_FOLDERS)
 lint-errcheck:
 	@echo "lint-errcheck"
 	@gometalinter $(LINT_EXCLUDE) --disable-all --enable=errcheck --deadline=45s  $(LINT_FOLDERS)
