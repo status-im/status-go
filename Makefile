@@ -147,10 +147,10 @@ test-e2e: ##@tests Run e2e tests
 	# order: reliability then alphabetical
 	# TODO(tiabc): make a single command out of them adding `-p 1` flag.
 	build/env.sh go test -timeout 5m ./e2e/accounts/... -network=$(networkid)
-	build/env.sh go test -timeout 5m ./e2e/api/...  -network=$(networkid)
-	build/env.sh go test -timeout 5m ./e2e/node/...  -network=$(networkid)
-	build/env.sh go test -timeout 15m ./e2e/jail/...  -network=$(networkid)
-	build/env.sh go test -timeout 20m ./e2e/rpc/...  -network=$(networkid)
+	build/env.sh go test -timeout 5m ./e2e/api/... -network=$(networkid)
+	build/env.sh go test -timeout 5m ./e2e/node/... -network=$(networkid)
+	build/env.sh go test -timeout 15m ./e2e/jail/... -network=$(networkid)
+	build/env.sh go test -timeout 20m ./e2e/rpc/... -network=$(networkid)
 	build/env.sh go test -timeout 20m ./e2e/whisper/... -network=$(networkid)
 	build/env.sh go test -timeout 10m ./e2e/transactions/... -network=$(networkid)
 	build/env.sh go test -timeout 40m ./cmd/statusd -network=$(networkid)
