@@ -276,7 +276,6 @@ func (s *ManagerTestSuite) TestNetworkSwitching() {
 func (s *ManagerTestSuite) TestStartNodeWithUpstreamEnabled() {
 	if GetNetworkID() == params.StatusChainNetworkID {
 		s.T().Skip()
-		return
 	}
 
 	nodeConfig, err := e2e.MakeTestNodeConfig(GetNetworkID())

@@ -45,7 +45,6 @@ func (s *AccountsTestSuite) TestRPCEthAccountsWithUpstream() {
 
 	if GetNetworkID() == params.StatusChainNetworkID {
 		s.T().Skip()
-		return
 	}
 
 	addr, err := GetRemoteURL()

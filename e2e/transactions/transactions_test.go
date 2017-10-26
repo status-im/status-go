@@ -317,7 +317,6 @@ func (s *TransactionsTestSuite) TestSendEtherTxUpstream() {
 
 	if GetNetworkID() == params.StatusChainNetworkID {
 		s.T().Skip()
-		return
 	}
 
 	addr, err := GetRemoteURL()

@@ -33,7 +33,6 @@ func (s *RPCTestSuite) SetupTest() {
 func (s *RPCTestSuite) TestCallRPC() {
 	if GetNetworkID() == params.StatusChainNetworkID {
 		s.T().Skip()
-		return
 	}
 
 	for _, upstreamEnabled := range []bool{false, true} {
