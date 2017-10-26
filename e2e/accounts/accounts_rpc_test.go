@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/status-im/status-go/e2e"
+	"github.com/status-im/status-go/geth/params"
 	. "github.com/status-im/status-go/testing"
 	"github.com/stretchr/testify/suite"
 )
