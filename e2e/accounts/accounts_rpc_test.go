@@ -42,6 +42,11 @@ func (s *AccountsTestSuite) TestRPCEthAccountsWithUpstream() {
 	// FIXME(tiabc): Stop skipping after https://github.com/status-im/status-go/issues/424
 	s.T().Skip()
 
+	if GetNetworkID() == params.StatusChainNetworkID {
+		s.T().Skip()
+		return
+	}
+
 	addr, err := GetRemoteURLForNetworkID()
 	s.NoError(err)
 	s.StartTestBackend(e2e.WithUpstream(addr))

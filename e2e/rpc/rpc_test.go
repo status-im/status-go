@@ -30,6 +30,11 @@ func (s *RPCTestSuite) SetupTest() {
 }
 
 func (s *RPCTestSuite) TestCallRPC() {
+	if GetNetworkID() == params.StatusChainNetworkID {
+		s.T().Skip()
+		return
+	}
+
 	for _, upstreamEnabled := range []bool{false, true} {
 		nodeConfig, err := e2e.MakeTestNodeConfig(GetNetworkID())
 		s.NoError(err)

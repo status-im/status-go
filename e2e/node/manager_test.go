@@ -274,7 +274,12 @@ func (s *ManagerTestSuite) TestNetworkSwitching() {
 }
 
 func (s *ManagerTestSuite) TestStartNodeWithUpstreamEnabled() {
-	nodeConfig, err := e2e.MakeTestNodeConfig(params.RopstenNetworkID)
+	if GetNetworkID() == params.StatusChainNetworkID {
+		s.T().Skip()
+		return
+	}
+
+	nodeConfig, err := e2e.MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
 
 	networkURL, err := GetRemoteURLForNetworkID()
