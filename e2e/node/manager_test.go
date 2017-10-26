@@ -127,7 +127,10 @@ func (s *ManagerTestSuite) TestReferencesWithoutStartedNode() {
 
 func (s *ManagerTestSuite) TestReferencesWithStartedNode() {
 	s.StartTestNode()
-	defer s.StopTestNode()
+	defer func() {
+		time.Sleep(100 * time.Millisecond)
+		s.StopTestNode()
+	}()
 
 	var testCases = []struct {
 		name         string
@@ -199,6 +202,8 @@ func (s *ManagerTestSuite) TestNodeStartStop() {
 
 	// try stopping non-started node
 	s.False(s.NodeManager.IsNodeRunning())
+
+	time.Sleep(100 * time.Millisecond) //https://github.com/status-im/status-go/issues/429#issuecomment-339663163
 	_, err = s.NodeManager.StopNode()
 	s.Equal(err, node.ErrNoRunningNode)
 
@@ -215,6 +220,7 @@ func (s *ManagerTestSuite) TestNodeStartStop() {
 	s.Equal(err, node.ErrNodeExists)
 
 	// now stop node
+	time.Sleep(100 * time.Millisecond) //https://github.com/status-im/status-go/issues/429#issuecomment-339663163
 	nodeStopped, err := s.NodeManager.StopNode()
 	s.NoError(err)
 	<-nodeStopped
@@ -228,6 +234,7 @@ func (s *ManagerTestSuite) TestNodeStartStop() {
 	s.True(s.NodeManager.IsNodeRunning())
 
 	// finally stop the node
+	time.Sleep(100 * time.Millisecond) //https://github.com/status-im/status-go/issues/429#issuecomment-339663163
 	nodeStopped, err = s.NodeManager.StopNode()
 	s.NoError(err)
 	<-nodeStopped
@@ -249,6 +256,7 @@ func (s *ManagerTestSuite) TestNetworkSwitching() {
 	s.Equal(GetHeadHash(), firstHash)
 
 	// now stop node, and make sure that a new node, on different network can be started
+	time.Sleep(100 * time.Millisecond) //https://github.com/status-im/status-go/issues/429#issuecomment-339663163
 	nodeStopped, err := s.NodeManager.StopNode()
 	s.NoError(err)
 	<-nodeStopped
@@ -268,6 +276,7 @@ func (s *ManagerTestSuite) TestNetworkSwitching() {
 	s.NoError(err)
 	s.Equal(GetHeadHashFromNetworkID(params.RinkebyNetworkID), firstHash)
 
+	time.Sleep(100 * time.Millisecond) //https://github.com/status-im/status-go/issues/429#issuecomment-339663163
 	nodeStopped, err = s.NodeManager.StopNode()
 	s.NoError(err)
 	<-nodeStopped
@@ -291,6 +300,8 @@ func (s *ManagerTestSuite) TestStartNodeWithUpstreamEnabled() {
 	s.NoError(err)
 	<-nodeStarted
 	s.True(s.NodeManager.IsNodeRunning())
+
+	time.Sleep(100 * time.Millisecond) //https://github.com/status-im/status-go/issues/429#issuecomment-339663163
 	nodeStopped, err := s.NodeManager.StopNode()
 	s.NoError(err)
 	<-nodeStopped
@@ -505,6 +516,7 @@ func (s *ManagerTestSuite) TestNodeStartCrash() {
 	}
 
 	// cleanup
+	time.Sleep(100 * time.Millisecond) //https://github.com/status-im/status-go/issues/429#issuecomment-339663163
 	s.NodeManager.StopNode() //nolint: errcheck
 	signal.ResetDefaultNodeNotificationHandler()
 }
