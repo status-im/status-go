@@ -32,7 +32,7 @@ type TransactionsTestSuite struct {
 }
 
 func (s *TransactionsTestSuite) TestCallRPCSendTransaction() {
-	s.StartTestBackend(params.StatusChainNetworkID)
+	s.StartTestBackend()
 	defer s.StopTestBackend()
 
 	EnsureNodeSync(s.Backend.NodeManager())
@@ -83,25 +83,28 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransactionUpstream() {
 	// FIXME(tiabc): Stop skipping after https://github.com/status-im/status-go/issues/424
 	s.T().Skip()
 
-	s.StartTestBackend(
-		params.RopstenNetworkID,
-		e2e.WithUpstream("https://ropsten.infura.io/nKmXgiFgc2KqtoQ8BCGJ"),
-	)
+	if GetNetworkID() == params.StatusChainNetworkID {
+		s.T().Skip()
+	}
+
+	addr, err := GetRemoteURL()
+	s.NoError(err)
+	s.StartTestBackend(e2e.WithUpstream(addr))
 	defer s.StopTestBackend()
 
-	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account2.Address, TestConfig.Account2.Password)
+	err = s.Backend.AccountManager().SelectAccount(TestConfig.Account2.Address, TestConfig.Account2.Password)
 	s.NoError(err)
 
 	transactionCompleted := make(chan struct{})
 
 	var txHash gethcommon.Hash
 	signal.SetDefaultNodeNotificationHandler(func(rawSignal string) {
-		var signal signal.Envelope
-		err := json.Unmarshal([]byte(rawSignal), &signal)
+		var signalEnvelope signal.Envelope
+		err := json.Unmarshal([]byte(rawSignal), &signalEnvelope)
 		s.NoError(err)
 
-		if signal.Type == txqueue.EventTransactionQueued {
-			event := signal.Event.(map[string]interface{})
+		if signalEnvelope.Type == txqueue.EventTransactionQueued {
+			event := signalEnvelope.Event.(map[string]interface{})
 			txID := event["id"].(string)
 
 			// Complete with a wrong passphrase.
@@ -139,7 +142,7 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransactionUpstream() {
 
 // FIXME(tiabc): Sometimes it fails due to "no suitable peers found".
 func (s *TransactionsTestSuite) TestSendContractTx() {
-	s.StartTestBackend(params.StatusChainNetworkID)
+	s.StartTestBackend()
 	defer s.StopTestBackend()
 
 	EnsureNodeSync(s.Backend.NodeManager())
@@ -153,7 +156,7 @@ func (s *TransactionsTestSuite) TestSendContractTx() {
 	var txHash gethcommon.Hash
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) { // nolint :dupl
 		var envelope signal.Envelope
-		err := json.Unmarshal([]byte(jsonEvent), &envelope)
+		err = json.Unmarshal([]byte(jsonEvent), &envelope)
 		s.NoError(err, fmt.Sprintf("cannot unmarshal JSON: %s", jsonEvent))
 
 		if envelope.Type == txqueue.EventTransactionQueued {
@@ -226,7 +229,7 @@ func (s *TransactionsTestSuite) TestSendContractTx() {
 }
 
 func (s *TransactionsTestSuite) TestSendEther() {
-	s.StartTestBackend(params.StatusChainNetworkID)
+	s.StartTestBackend()
 	defer s.StopTestBackend()
 
 	EnsureNodeSync(s.Backend.NodeManager())
@@ -244,7 +247,7 @@ func (s *TransactionsTestSuite) TestSendEther() {
 	var txHash = gethcommon.Hash{}
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) { // nolint: dupl
 		var envelope signal.Envelope
-		err := json.Unmarshal([]byte(jsonEvent), &envelope)
+		err = json.Unmarshal([]byte(jsonEvent), &envelope)
 		s.NoError(err, fmt.Sprintf("cannot unmarshal JSON: %s", jsonEvent))
 
 		if envelope.Type == txqueue.EventTransactionQueued {
@@ -312,13 +315,16 @@ func (s *TransactionsTestSuite) TestSendEtherTxUpstream() {
 	// FIXME(tiabc): Stop skipping after https://github.com/status-im/status-go/issues/424
 	s.T().Skip()
 
-	s.StartTestBackend(
-		params.RopstenNetworkID,
-		e2e.WithUpstream("https://ropsten.infura.io/z6GCTmjdP3FETEJmMBI4"),
-	)
+	if GetNetworkID() == params.StatusChainNetworkID {
+		s.T().Skip()
+	}
+
+	addr, err := GetRemoteURL()
+	s.NoError(err)
+	s.StartTestBackend(e2e.WithUpstream(addr))
 	defer s.StopTestBackend()
 
-	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
+	err = s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	s.NoError(err)
 
 	completeQueuedTransaction := make(chan struct{})
@@ -327,7 +333,7 @@ func (s *TransactionsTestSuite) TestSendEtherTxUpstream() {
 	var txHash = gethcommon.Hash{}
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) { // nolint: dupl
 		var envelope signal.Envelope
-		err := json.Unmarshal([]byte(jsonEvent), &envelope)
+		err = json.Unmarshal([]byte(jsonEvent), &envelope)
 		s.NoError(err, "cannot unmarshal JSON: %s", jsonEvent)
 
 		if envelope.Type == txqueue.EventTransactionQueued {
@@ -366,7 +372,7 @@ func (s *TransactionsTestSuite) TestSendEtherTxUpstream() {
 }
 
 func (s *TransactionsTestSuite) TestDoubleCompleteQueuedTransactions() {
-	s.StartTestBackend(params.StatusChainNetworkID)
+	s.StartTestBackend()
 	defer s.StopTestBackend()
 
 	EnsureNodeSync(s.Backend.NodeManager())
@@ -443,7 +449,7 @@ func (s *TransactionsTestSuite) TestDoubleCompleteQueuedTransactions() {
 }
 
 func (s *TransactionsTestSuite) TestDiscardQueuedTransaction() {
-	s.StartTestBackend(params.StatusChainNetworkID)
+	s.StartTestBackend()
 	defer s.StopTestBackend()
 
 	EnsureNodeSync(s.Backend.NodeManager())
@@ -523,7 +529,7 @@ func (s *TransactionsTestSuite) TestDiscardQueuedTransaction() {
 }
 
 func (s *TransactionsTestSuite) TestCompleteMultipleQueuedTransactions() {
-	s.StartTestBackend(params.StatusChainNetworkID)
+	s.StartTestBackend()
 	defer s.StopTestBackend()
 
 	EnsureNodeSync(s.Backend.NodeManager())
@@ -616,7 +622,7 @@ func (s *TransactionsTestSuite) TestCompleteMultipleQueuedTransactions() {
 }
 
 func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
-	s.StartTestBackend(params.StatusChainNetworkID)
+	s.StartTestBackend()
 	defer s.StopTestBackend()
 
 	EnsureNodeSync(s.Backend.NodeManager())
@@ -732,7 +738,7 @@ func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
 }
 
 func (s *TransactionsTestSuite) TestNonExistentQueuedTransactions() {
-	s.StartTestBackend(params.StatusChainNetworkID)
+	s.StartTestBackend()
 	defer s.StopTestBackend()
 
 	backend := s.LightEthereumService().StatusBackend
@@ -751,7 +757,7 @@ func (s *TransactionsTestSuite) TestNonExistentQueuedTransactions() {
 }
 
 func (s *TransactionsTestSuite) TestEvictionOfQueuedTransactions() {
-	s.StartTestBackend(params.StatusChainNetworkID)
+	s.StartTestBackend()
 	defer s.StopTestBackend()
 
 	backend := s.LightEthereumService().StatusBackend

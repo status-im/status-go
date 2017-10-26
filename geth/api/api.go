@@ -11,10 +11,6 @@ import (
 	"github.com/status-im/status-go/geth/params"
 )
 
-const (
-	serverKeyFile = "firebase_notification"
-)
-
 // StatusAPI provides API to access Status related functionality.
 type StatusAPI struct {
 	b *StatusBackend
@@ -200,37 +196,29 @@ func (api *StatusAPI) JailBaseJS(js string) {
 }
 
 // Notify sends a push notification to the device with the given token.
-// TODO(oskarth): API package this stuff
+// @deprecated
 func (api *StatusAPI) Notify(token string) string {
 	log.Debug("Notify", "token", token)
+	message := "Hello World1"
 
-	var NP fcm.NotificationPayload
-	NP.Title = "Status - new message"
-	NP.Body = "ping"
+	tokens := []string{token}
 
-	// TODO(oskarth): Experiment with this
-	data := map[string]string{
-		"msg": "Hello World1",
-		"sum": "Happy Day",
-	}
-
-	ids := []string{
-		token,
-	}
-
-	key, err := common.ReadKey(common.KeysPath, serverKeyFile)
-	if err != nil {
-		log.Error("Notify failed:", err)
-	}
-
-	c := fcm.NewFcmClient(key)
-	c.NewFcmRegIdsMsg(ids, data)
-	c.SetNotificationPayload(&NP)
-
-	_, err = c.Send()
+	err := api.b.newNotification().Send(message, fcm.NotificationPayload{}, tokens...)
 	if err != nil {
 		log.Error("Notify failed:", err)
 	}
 
 	return token
+}
+
+// NotifyUsers send notifications to users.
+func (api *StatusAPI) NotifyUsers(message string, payload fcm.NotificationPayload, tokens ...string) error {
+	log.Debug("Notify", "tokens", tokens)
+
+	err := api.b.newNotification().Send(message, payload, tokens...)
+	if err != nil {
+		log.Error("Notify failed:", err)
+	}
+
+	return err
 }
