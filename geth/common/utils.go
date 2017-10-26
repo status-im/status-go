@@ -75,54 +75,47 @@ func ToAddress(accountAddress string) *common.Address {
 // RestoreFile checks if decrypted file exists in dir, and if not
 // tries to restore and decrypt it (from static resources, see "static/keys" folder)
 func RestoreFile(dir, file string) error {
-	// make sure that keystore folder exists
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		os.MkdirAll(dir, os.ModePerm) // nolint: errcheck
+	text, err := ReadEncryptedFile(dir, file)
+	if err != nil {
+		return err
+	}
+	if len(text) == 0 {
+		return nil
 	}
 
 	dst := filepath.Join(dir, file)
-
-	if _, err := os.Stat(dst); os.IsNotExist(err) {
-		cipherText := static.MustAsset("keys/" + file + cipher.CipherExt)
-
-		key := os.Getenv(keyEnv)
-		nonce := os.Getenv(nonceEnv)
-		if len(key) == 0 || len(nonce) == 0 {
-			err = errors.New("cant get key and nonce to decrypt test account")
-			log.Warn("cannot copy test account PK", "error", err)
-			return err
-		}
-
-		text, err := cipher.Decrypt(key, nonce, cipherText)
-		if err != nil {
-			log.Warn("cannot copy test account PK", "error", err)
-			return err
-		}
-
-		err = ioutil.WriteFile(dst, text, 0644)
-		if err != nil {
-			log.Warn("cannot copy test account PK", "error", err)
-			return err
-		}
+	err = ioutil.WriteFile(dst, text, 0644)
+	if err != nil {
+		log.Warn("cannot restore file", "error", err)
+		return err
 	}
 
 	return nil
 }
 
-// ReadKey restores, decrypt and read decrypted file data
-func ReadKey(dir, file string) (string, error) {
-	err := RestoreFile(dir, file)
-	if err != nil {
-		return "", err
-	}
-
+// ReadEncryptedFile restores and read encrypted text
+func ReadEncryptedFile(dir, file string) ([]byte, error) {
 	dst := filepath.Join(dir, file)
-	data, err := ioutil.ReadFile(dst)
-	if err != nil {
-		return "", err
+	if _, err := os.Stat(dst); !os.IsNotExist(err) {
+		return nil, nil
 	}
 
-	return string(data), nil
+	key := os.Getenv(keyEnv)
+	nonce := os.Getenv(nonceEnv)
+	if len(key) == 0 || len(nonce) == 0 {
+		err := errors.New("cant get key and nonce to decrypt test account")
+		log.Warn("cannot copy test account PK", "error", err)
+		return nil, err
+	}
+
+	cipherText := static.MustAsset("keys/" + file + cipher.CipherExt)
+	text, err := cipher.Decrypt(key, nonce, cipherText)
+	if err != nil {
+		log.Warn("cannot restore file", "error", err)
+		return nil, err
+	}
+
+	return text, nil
 }
 
 // PanicAfter throws panic() after waitSeconds, unless abort channel receives notification

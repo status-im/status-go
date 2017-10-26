@@ -40,8 +40,8 @@ func NewStatusBackend() *StatusBackend {
 	txQueueManager := txqueue.NewManager(nodeManager, accountManager)
 	jailManager := jail.New(nodeManager)
 
-	key, _ := common.ReadKey(common.KeysPath, fcmKeyFile)
-	notificationManager := fcm.NewNotification(key)
+	key, _ := common.ReadEncryptedFile(common.KeysPath, fcmKeyFile)
+	notificationManager := fcm.NewNotification(string(key))
 
 	return &StatusBackend{
 		nodeManager:     nodeManager,

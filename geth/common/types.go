@@ -423,7 +423,7 @@ func LoadTestConfig() (*TestConfig, error) {
 		return nil, err
 	}
 
-	if err := json.Unmarshal([]byte(configData), &testConfig); err != nil {
+	if err := json.Unmarshal(configData, &testConfig); err != nil {
 		return nil, err
 	}
 

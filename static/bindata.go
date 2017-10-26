@@ -123,7 +123,7 @@ func scriptsWeb3Js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "scripts/web3.js", size: 401234, mode: os.FileMode(420), modTime: time.Unix(1509050738, 0)}
+	info := bindataFileInfo{name: "scripts/web3.js", size: 401234, mode: os.FileMode(420), modTime: time.Unix(1509052397, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
