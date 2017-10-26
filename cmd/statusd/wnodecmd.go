@@ -126,10 +126,10 @@ func wnode(ctx *cli.Context) error {
 
 	// import test accounts
 	if ctx.BoolT(WhisperInjectTestAccounts.Name) {
-		if err = common.ImportTestAccount(filepath.Join(config.DataDir, "keystore"), "test-account1.pk"); err != nil {
+		if err = common.ImportTestAccount(filepath.Join(config.DataDir, "keystore"), "test-account3.pk"); err != nil {
 			return err
 		}
-		if err = common.ImportTestAccount(filepath.Join(config.DataDir, "keystore"), "test-account2.pk"); err != nil {
+		if err = common.ImportTestAccount(filepath.Join(config.DataDir, "keystore"), "test-account4.pk"); err != nil {
 			return err
 		}
 	}

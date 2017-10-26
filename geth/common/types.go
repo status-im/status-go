@@ -6,6 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -19,7 +22,6 @@ import (
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/rpc"
-	"github.com/status-im/status-go/static"
 )
 
 // errors
@@ -385,21 +387,36 @@ type TestConfig struct {
 		HTTPPort    int
 		WSPort      int
 	}
-	Account1 struct {
-		Address  string
-		Password string
-	}
-	Account2 struct {
-		Address  string
-		Password string
-	}
+	Account1 account
+	Account2 account
+	Account3 account
+}
+
+type account struct {
+	Address  string
+	Password string
 }
 
 // LoadTestConfig loads test configuration values from disk
 func LoadTestConfig() (*TestConfig, error) {
 	var testConfig TestConfig
 
-	configData := string(static.MustAsset("config/test-data.json"))
+	tmpDir, err := ioutil.TempDir(os.TempDir(), "cpnfig")
+	if err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(tmpDir) // nolint: errcheck
+
+	err = ImportTestAccount(tmpDir, "test-data.json")
+	if err != nil {
+		return nil, err
+	}
+
+	configData, err := ioutil.ReadFile(filepath.Join(tmpDir, "test-data.json"))
+	if err != nil {
+		return nil, err
+	}
+
 	if err := json.Unmarshal([]byte(configData), &testConfig); err != nil {
 		return nil, err
 	}

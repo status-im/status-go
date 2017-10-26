@@ -27,10 +27,12 @@ func TestVerifyAccountPassword(t *testing.T) {
 	defer os.RemoveAll(emptyKeyStoreDir) //nolint: errcheck
 
 	// import account keys
-	require.NoError(t, common.ImportTestAccount(keyStoreDir, "test-account1.pk"))
-	require.NoError(t, common.ImportTestAccount(keyStoreDir, "test-account2.pk"))
+	require.NoError(t, common.ImportTestAccount(keyStoreDir, "test-account3.pk"))
+	require.NoError(t, common.ImportTestAccount(keyStoreDir, "test-account4.pk"))
 
 	account1Address := gethcommon.BytesToAddress(gethcommon.FromHex(TestConfig.Account1.Address))
+
+	fmt.Println("!!!!!!!!!!!!", TestConfig.Account1)
 
 	testCases := []struct {
 		name          string
@@ -105,7 +107,7 @@ func TestVerifyAccountPasswordWithAccountBeforeEIP55(t *testing.T) {
 
 	acctManager := account.NewManager(nil)
 
-	address := gethcommon.HexToAddress(TestConfig.Account1.Address)
-	_, err = acctManager.VerifyAccountPassword(keyStoreDir, address.Hex(), TestConfig.Account1.Password)
+	address := gethcommon.HexToAddress(TestConfig.Account3.Address)
+	_, err = acctManager.VerifyAccountPassword(keyStoreDir, address.Hex(), TestConfig.Account3.Password)
 	require.NoError(t, err)
 }

@@ -2,6 +2,7 @@ package main
 
 import "C"
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -132,15 +133,15 @@ func testVerifyAccountPassword(t *testing.T) bool {
 	}
 	defer os.RemoveAll(tmpDir) // nolint: errcheck
 
-	if err = common.ImportTestAccount(tmpDir, "test-account1.pk"); err != nil {
+	if err = common.ImportTestAccount(tmpDir, "test-account3.pk"); err != nil {
 		t.Fatal(err)
 	}
-	if err = common.ImportTestAccount(tmpDir, "test-account2.pk"); err != nil {
+	if err = common.ImportTestAccount(tmpDir, "test-account4.pk"); err != nil {
 		t.Fatal(err)
 	}
 
 	// rename account file (to see that file's internals reviewed, when locating account key)
-	accountFilePathOriginal := filepath.Join(tmpDir, "test-account1.pk")
+	accountFilePathOriginal := filepath.Join(tmpDir, "test-account3.pk")
 	accountFilePath := filepath.Join(tmpDir, "foo"+TestConfig.Account1.Address+"bar.pk")
 	if err := os.Rename(accountFilePathOriginal, accountFilePath); err != nil {
 		t.Fatal(err)
@@ -1335,10 +1336,10 @@ func startTestNode(t *testing.T) <-chan struct{} {
 	}
 
 	// inject test accounts
-	if err := common.ImportTestAccount(filepath.Join(TestDataDir, "keystore"), "test-account1.pk"); err != nil {
+	if err := common.ImportTestAccount(filepath.Join(TestDataDir, "keystore"), "test-account3.pk"); err != nil {
 		panic(err)
 	}
-	if err := common.ImportTestAccount(filepath.Join(TestDataDir, "keystore"), "test-account2.pk"); err != nil {
+	if err := common.ImportTestAccount(filepath.Join(TestDataDir, "keystore"), "test-account4.pk"); err != nil {
 		panic(err)
 	}
 
