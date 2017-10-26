@@ -153,7 +153,7 @@ func (s *TransactionsTestSuite) TestSendContractTx() {
 	var txHash gethcommon.Hash
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) { // nolint :dupl
 		var envelope signal.Envelope
-		err := json.Unmarshal([]byte(jsonEvent), &envelope)
+		err = json.Unmarshal([]byte(jsonEvent), &envelope)
 		s.NoError(err, fmt.Sprintf("cannot unmarshal JSON: %s", jsonEvent))
 
 		if envelope.Type == txqueue.EventTransactionQueued {
@@ -244,7 +244,7 @@ func (s *TransactionsTestSuite) TestSendEther() {
 	var txHash = gethcommon.Hash{}
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) { // nolint: dupl
 		var envelope signal.Envelope
-		err := json.Unmarshal([]byte(jsonEvent), &envelope)
+		err = json.Unmarshal([]byte(jsonEvent), &envelope)
 		s.NoError(err, fmt.Sprintf("cannot unmarshal JSON: %s", jsonEvent))
 
 		if envelope.Type == txqueue.EventTransactionQueued {
@@ -327,7 +327,7 @@ func (s *TransactionsTestSuite) TestSendEtherTxUpstream() {
 	var txHash = gethcommon.Hash{}
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) { // nolint: dupl
 		var envelope signal.Envelope
-		err := json.Unmarshal([]byte(jsonEvent), &envelope)
+		err = json.Unmarshal([]byte(jsonEvent), &envelope)
 		s.NoError(err, "cannot unmarshal JSON: %s", jsonEvent)
 
 		if envelope.Type == txqueue.EventTransactionQueued {
