@@ -28,7 +28,8 @@ func (s *CellTestSuite) SetupTest() {
 }
 
 func (s *CellTestSuite) TearDownTest() {
-	s.cell.Stop()
+	err := s.cell.Stop()
+	s.NoError(err)
 }
 
 func (s *CellTestSuite) TestCellRegisteredHandlers() {
@@ -88,9 +89,7 @@ func (s *CellTestSuite) TestCellFetchRace() {
 	dataCh := make(chan otto.Value, 1)
 	errCh := make(chan otto.Value, 1)
 
-	var err error
-
-	err = cell.Set("__captureSuccess", func(res otto.Value) { dataCh <- res })
+	err := cell.Set("__captureSuccess", func(res otto.Value) { dataCh <- res })
 	s.NoError(err)
 	err = cell.Set("__captureError", func(res otto.Value) { errCh <- res })
 	s.NoError(err)

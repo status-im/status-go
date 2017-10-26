@@ -52,7 +52,7 @@ func (s *JailTestSuite) TestInitWithoutBaseJS() {
 	}
 
 	// get cell VM w/o defining cell first
-	cell, err := s.Jail.GetCell(testChatID)
+	cell, err := s.Jail.Cell(testChatID)
 
 	s.EqualError(err, "cell '"+testChatID+"' not found")
 	s.Nil(cell)
@@ -64,7 +64,7 @@ func (s *JailTestSuite) TestInitWithoutBaseJS() {
 	s.Equal(errorWrapper(err), s.Jail.Call(testChatID, `["commands", "testCommand"]`, `{"val": 12}`))
 
 	// get existing cell (even though we got errors, cell was still created)
-	cell, err = s.Jail.GetCell(testChatID)
+	cell, err = s.Jail.Cell(testChatID)
 	s.NoError(err)
 	s.NotNil(cell)
 }
@@ -88,9 +88,7 @@ func (s *JailTestSuite) TestInitWithBaseJS() {
 }
 
 func (s *JailTestSuite) TestMultipleInitError() {
-	var response string
-
-	response = s.Jail.CreateAndInitCell(testChatID, ``)
+	response := s.Jail.CreateAndInitCell(testChatID, ``)
 	s.Equal(`{"error":"ReferenceError: '_status_catalog' is not defined"}`, response)
 
 	response = s.Jail.CreateAndInitCell(testChatID, ``)
@@ -133,7 +131,7 @@ func (s *JailTestSuite) TestEventSignal() {
 	s.Jail.CreateAndInitCell(testChatID, "")
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
-	cell, err := s.Jail.GetCell(testChatID)
+	cell, err := s.Jail.Cell(testChatID)
 	s.NoError(err)
 
 	testData := "foobar"
@@ -252,7 +250,7 @@ func (s *JailTestSuite) TestJailCellsRemovedAfterStop() {
 
 	for i := 0; i < loopLen; i++ {
 		s.Jail.CreateAndInitCell(getTestCellID(i), "")
-		cell, err := s.Jail.GetCell(getTestCellID(i))
+		cell, err := s.Jail.Cell(getTestCellID(i))
 		require.NoError(err)
 		_, err = cell.Run(`
 			var counter = 1;
@@ -266,7 +264,7 @@ func (s *JailTestSuite) TestJailCellsRemovedAfterStop() {
 	s.Jail.Stop()
 
 	for i := 0; i < loopLen; i++ {
-		_, err := s.Jail.GetCell(getTestCellID(i))
+		_, err := s.Jail.Cell(getTestCellID(i))
 		require.Error(err, "Expected cells removing (from Jail) after stop")
 	}
 }

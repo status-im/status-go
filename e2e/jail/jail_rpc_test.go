@@ -46,7 +46,7 @@ func (s *JailRPCTestSuite) TestJailRPCSend() {
 	s.jail.CreateAndInitCell(testChatID, ``)
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
-	cell, err := s.jail.GetCell(testChatID)
+	cell, err := s.jail.Cell(testChatID)
 	s.NoError(err)
 	s.NotNil(cell)
 
@@ -75,7 +75,7 @@ func (s *JailRPCTestSuite) TestIsConnected() {
 	s.jail.CreateAndInitCell(testChatID, "")
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
-	cell, err := s.jail.GetCell(testChatID)
+	cell, err := s.jail.Cell(testChatID)
 	s.NoError(err)
 
 	_, err = cell.Run(`
@@ -117,7 +117,7 @@ func (s *JailRPCTestSuite) TestContractDeployment() {
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
 	s.jail.CreateAndInitCell(testChatID, "")
 
-	cell, err := s.jail.GetCell(testChatID)
+	cell, err := s.jail.Cell(testChatID)
 	s.NoError(err)
 
 	completeQueuedTransaction := make(chan struct{})
@@ -328,7 +328,7 @@ func (s *JailRPCTestSuite) TestJailVMPersistence() {
 	time.Sleep(5 * time.Second)
 
 	// Validate total.
-	cell, err := jail.GetCell(testChatID)
+	cell, err := jail.Cell(testChatID)
 	s.NoError(err)
 
 	totalOtto, err := cell.Get("total")

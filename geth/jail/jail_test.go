@@ -110,7 +110,8 @@ func (s *JailTestSuite) TestMakeCatalogVariable() {
 	s.Equal(`{"error":"ReferenceError: '_status_catalog' is not defined"}`, response)
 
 	// with `_status_catalog` variable
-	cell.Run(`var _status_catalog = { test: true }`)
+	_, err = cell.Run(`var _status_catalog = { test: true }`)
+	s.NoError(err)
 	response = s.Jail.makeCatalogVariable(cell)
 	s.Equal(`{"result": {"test":true}}`, response)
 }

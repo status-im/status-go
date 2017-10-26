@@ -90,7 +90,7 @@ func (c *Cell) CallAsync(fn otto.Value, args ...interface{}) {
 	task := looptask.NewCallTask(fn, args...)
 	// Add a task to the queue.
 	c.loop.Add(task)
-	// And run the task immediatelly.
+	// And run the task immediately.
 	// It's a blocking operation.
 	c.loop.Ready(task)
 }

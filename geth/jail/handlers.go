@@ -35,9 +35,9 @@ func registerWeb3Provider(jail *Jail, cell *Cell) error {
 
 // registerStatusSignals creates an object called "statusSignals".
 // TODO(adam): describe what it is and when it's used.
-func registerStatusSignals(jail *Jail, cell *Cell) error {
+func registerStatusSignals(cell *Cell) error {
 	statusSignals := map[string]interface{}{
-		"sendSignal": createSendSignalHandler(jail, cell),
+		"sendSignal": createSendSignalHandler(cell),
 	}
 
 	return cell.Set("statusSignals", statusSignals)
@@ -56,7 +56,7 @@ func createSendHandler(jail *Jail, cell *Cell) func(call otto.FunctionCall) otto
 			throwJSError(err)
 		}
 
-		response, err := jail.sendRPCCall(cell, request.String())
+		response, err := jail.sendRPCCall(request.String())
 		if err != nil {
 			throwJSError(err)
 		}
@@ -89,7 +89,7 @@ func createSendAsyncHandler(jail *Jail, cell *Cell) func(call otto.FunctionCall)
 			// thus using a thread-safe vm.VM.
 			vm := cell.VM
 			callback := call.Argument(1)
-			response, err := jail.sendRPCCall(cell, request.String())
+			response, err := jail.sendRPCCall(request.String())
 
 			// If provided callback argument is not a function, don't call it.
 			if callback.Class() != "Function" {
@@ -151,7 +151,7 @@ func createIsConnectedHandler(jail *Jail, cell *Cell) func(call otto.FunctionCal
 	}
 }
 
-func createSendSignalHandler(jail *Jail, cell *Cell) func(otto.FunctionCall) otto.Value {
+func createSendSignalHandler(cell *Cell) func(otto.FunctionCall) otto.Value {
 	return func(call otto.FunctionCall) otto.Value {
 		message := call.Argument(0).String()
 

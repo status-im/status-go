@@ -73,7 +73,7 @@ func (j *Jail) Stop() {
 	defer j.cellsMx.Unlock()
 
 	for _, cell := range j.cells {
-		cell.Stop()
+		cell.Stop() //nolint: errcheck
 	}
 
 	// TODO(tiabc): Move this initialisation to a proper place.
@@ -108,12 +108,11 @@ func (j *Jail) CreateCell(chatID string) (common.JailCell, error) {
 // initCell initializes a cell with default JavaScript handlers and user code.
 func (j *Jail) initCell(cell *Cell) error {
 	// Register objects being a bridge between Go and JavaScript.
-	err := registerWeb3Provider(j, cell)
-	if err != nil {
+	if err := registerWeb3Provider(j, cell); err != nil {
 		return err
 	}
-	err = registerStatusSignals(j, cell)
-	if err != nil {
+
+	if err := registerStatusSignals(cell); err != nil {
 		return err
 	}
 
@@ -124,12 +123,8 @@ func (j *Jail) initCell(cell *Cell) error {
 		web3InstanceCode,
 	}
 
-	_, err = cell.Run(strings.Join(c, ";"))
-	if err != nil {
-		return err
-	}
-
-	return nil
+	_, err := cell.Run(strings.Join(c, ";"))
+	return err
 }
 
 // CreateAndInitCell creates and initializes a new Cell.
@@ -234,7 +229,7 @@ func (j *Jail) GetRPCClient() *rpc.Client {
 }
 
 // sendRPCCall executes a raw JSON-RPC request.
-func (j *Jail) sendRPCCall(cell *Cell, request string) (interface{}, error) {
+func (j *Jail) sendRPCCall(request string) (interface{}, error) {
 	client := j.GetRPCClient()
 	if client == nil {
 		return nil, ErrNoRPCClient

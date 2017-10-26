@@ -153,7 +153,7 @@ func (s *APITestSuite) TestCellsRemovedAfterSwitchAccount() {
 	require.NoError(err)
 
 	for i := 0; i < itersCount; i++ {
-		_, e := s.api.JailManager().GetCell(getChatId(i))
+		_, e := s.api.JailManager().Cell(getChatId(i))
 		require.Error(e)
 	}
 }
@@ -183,6 +183,6 @@ func (s *APITestSuite) TestLogoutRemovesCells() {
 	err = s.api.Logout()
 	require.NoError(err)
 
-	_, err = s.api.JailManager().GetCell(testChatID)
+	_, err = s.api.JailManager().Cell(testChatID)
 	require.Error(err, "Expected that cells was removed")
 }
