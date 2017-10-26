@@ -77,15 +77,15 @@ statusgo-ios-simulator-mainnet: xgo
 	@echo "iOS framework cross compilation done (mainnet)."
 
 generate: ##@other Regenerate assets and other auto-generated stuff
-	rm ./static/bindata.go
 	cp ./build/_workspace/deps/src/github.com/ethereum/go-ethereum/internal/jsre/deps/web3.js ./static/scripts/web3.js
 	find ./static/keys -type f -not -name "*.cr" -exec go run ./static/cmd/main.go --input "{}" --output="{}.cr" encrypt \;
 	find ./static/keys -type f -not -name "*.cr" -delete
-	@build/env.sh go generate ./static
+	rm -f ./static/bindata.go
+	build/env.sh go generate ./static
 	rm ./static/scripts/web3.js
 
 decrypt:
-	find ./static/keys/*.cr -type f |rev|cut -c4-|rev| xargs -n1 -i sh -c 'file={}; go run ./static/cmd/main.go --input "$file.cr" --output="$file" decrypt'
+	find ./static/keys/*.cr -type f |rev|cut -c4-|rev| xargs -n1 -i sh -c 'file={}; go run ./static/cmd/main.go --input "$$file.cr" --output="$$file" decrypt'
 
 bindata-install:
 	go get -u github.com/jteeuwen/go-bindata/...
