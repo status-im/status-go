@@ -239,9 +239,9 @@ func (m *Manager) completeRemoteTransaction(queuedTx *common.QueuedTx, password 
 	args := queuedTx.Args
 
 	if args.GasPrice == nil {
-		value, err := m.gasPrice()
-		if err != nil {
-			return emptyHash, err
+		value, gasPriceErr := m.gasPrice()
+		if gasPriceErr != nil {
+			return emptyHash, gasPriceErr
 		}
 
 		args.GasPrice = value
