@@ -88,7 +88,7 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransactionUpstream() {
 		return
 	}
 
-	addr, err := GetRemoteURLForNetworkID()
+	addr, err := GetRemoteURL()
 	s.NoError(err)
 	s.StartTestBackend(e2e.WithUpstream(addr))
 	defer s.StopTestBackend()
@@ -321,7 +321,7 @@ func (s *TransactionsTestSuite) TestSendEtherTxUpstream() {
 		return
 	}
 
-	addr, err := GetRemoteURLForNetworkID()
+	addr, err := GetRemoteURL()
 	s.NoError(err)
 	s.StartTestBackend(e2e.WithUpstream(addr))
 	defer s.StopTestBackend()

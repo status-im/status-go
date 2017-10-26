@@ -16,10 +16,10 @@ import (
 )
 
 var (
-	networkSelected = flag.String("network", "statuschain", "-network=NETWORKID to select network used for tests")
+	networkSelected = flag.String("network", "statuschain", "-network=NETWORKID or -network=NETWORKNAME to select network used for tests")
 
-	// ErrStatusPrivateNetwork is returned when network id is for a private chain network, whoes URL must be provided.
-	ErrStatusPrivateNetwork = errors.New("network id reserves for private chain network, provide URL")
+	// ErrNoRemoteURL is returned when network id has no associated url.
+	ErrNoRemoteURL = errors.New("network id requires a remote URL")
 
 	// TestConfig defines the default config usable at package-level.
 	TestConfig *common.TestConfig
@@ -119,18 +119,19 @@ func EnsureNodeSync(nodeManager common.NodeManager) {
 	}
 }
 
-// GetRemoteURLFromID returns asociated network url for giving network id.
-func GetRemoteURLFromID(id int) (string, error) {
+// GetRemoteURLFromNetworkID returns asociated network url for giving network id.
+func GetRemoteURLFromNetworkID(id int) (url string, err error) {
 	switch id {
 	case params.MainNetworkID:
-		return params.MainnetEthereumNetworkURL, nil
+		url = params.MainnetEthereumNetworkURL
 	case params.RinkebyNetworkID:
-		return params.RinkebyEthereumNetworkURL, nil
+		url = params.RinkebyEthereumNetworkURL
 	case params.RopstenNetworkID:
-		return params.RopstenEthereumNetworkURL, nil
+		url = params.RopstenEthereumNetworkURL
 	}
 
-	return "", ErrStatusPrivateNetwork
+	err = ErrNoRemoteURL
+	return
 }
 
 // GetHeadHashFromNetworkID returns the hash associated with a given network id.
@@ -147,13 +148,13 @@ func GetHeadHashFromNetworkID(id int) string {
 	return ""
 }
 
-// GetRemoteURLForNetworkID returns the url associated with a given network id.
-func GetRemoteURLForNetworkID() (string, error) {
-	return GetRemoteURLFromID(GetNetworkID())
+// GetRemoteURL returns the url associated with a given network id.
+func GetRemoteURL() (string, error) {
+	return GetRemoteURLFromNetworkID(GetNetworkID())
 }
 
-// GetHeadHashForNetworkID returns the hash associated with a given network id.
-func GetHeadHashForNetworkID() string {
+// GetHeadHash returns the hash associated with a given network id.
+func GetHeadHash() string {
 	return GetHeadHashFromNetworkID(GetNetworkID())
 }
 

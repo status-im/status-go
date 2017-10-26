@@ -44,7 +44,7 @@ func (s *RPCTestSuite) TestCallRPC() {
 		nodeConfig.HTTPHost = "" // to make sure that no HTTP interface is started
 
 		if upstreamEnabled {
-			networkURL, err := GetRemoteURLForNetworkID()
+			networkURL, err := GetRemoteURL()
 			s.NoError(err)
 
 			nodeConfig.UpstreamConfig.Enabled = true

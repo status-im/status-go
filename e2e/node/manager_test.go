@@ -246,7 +246,7 @@ func (s *ManagerTestSuite) TestNetworkSwitching() {
 
 	firstHash, err := e2e.FirstBlockHash(s.NodeManager)
 	s.NoError(err)
-	s.Equal(GetHeadHashForNetworkID(), firstHash)
+	s.Equal(GetHeadHash(), firstHash)
 
 	// now stop node, and make sure that a new node, on different network can be started
 	nodeStopped, err := s.NodeManager.StopNode()
@@ -282,7 +282,7 @@ func (s *ManagerTestSuite) TestStartNodeWithUpstreamEnabled() {
 	nodeConfig, err := e2e.MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
 
-	networkURL, err := GetRemoteURLForNetworkID()
+	networkURL, err := GetRemoteURL()
 	s.NoError(err)
 
 	nodeConfig.UpstreamConfig.Enabled = true
@@ -316,7 +316,7 @@ func (s *ManagerTestSuite) TestResetChainData() {
 	// make sure we can read the first byte, and it is valid (for Rinkeby)
 	firstHash, err := e2e.FirstBlockHash(s.NodeManager)
 	s.NoError(err)
-	s.Equal(GetHeadHashForNetworkID(), firstHash)
+	s.Equal(GetHeadHash(), firstHash)
 }
 
 func (s *ManagerTestSuite) TestRestartNode() {
@@ -333,7 +333,7 @@ func (s *ManagerTestSuite) TestRestartNode() {
 	// make sure we can read the first byte, and it is valid (for Rinkeby)
 	firstHash, err := e2e.FirstBlockHash(s.NodeManager)
 	s.NoError(err)
-	s.Equal(GetHeadHashForNetworkID(), firstHash)
+	s.Equal(GetHeadHash(), firstHash)
 }
 
 // TODO(adam): race conditions should be tested with -race flag and unit tests, if possible.

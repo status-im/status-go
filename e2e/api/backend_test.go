@@ -203,7 +203,7 @@ func (s *APIBackendTestSuite) TestNetworkSwitching() {
 
 	firstHash, err := e2e.FirstBlockHash(s.Backend.NodeManager())
 	s.NoError(err)
-	s.Equal(GetHeadHashForNetworkID(), firstHash)
+	s.Equal(GetHeadHash(), firstHash)
 
 	// now stop node, and make sure that a new node, on different network can be started
 	nodeStopped, err := s.Backend.StopNode()
@@ -224,7 +224,7 @@ func (s *APIBackendTestSuite) TestNetworkSwitching() {
 	// make sure we are on another network indeed
 	firstHash, err = e2e.FirstBlockHash(s.Backend.NodeManager())
 	s.NoError(err)
-	s.Equal(GetHeadHashForNetworkID(), firstHash)
+	s.Equal(GetHeadHash(), firstHash)
 
 	nodeStopped, err = s.Backend.StopNode()
 	s.NoError(err)
@@ -253,7 +253,7 @@ func (s *APIBackendTestSuite) TestResetChainData() {
 	// make sure we can read the first byte, and it is valid (for Rinkeby)
 	firstHash, err := e2e.FirstBlockHash(s.Backend.NodeManager())
 	s.NoError(err)
-	s.Equal(GetHeadHashForNetworkID(), firstHash)
+	s.Equal(GetHeadHash(), firstHash)
 }
 
 // FIXME(tiabc): There's also a test with the same name in geth/node/manager_test.go
@@ -275,7 +275,7 @@ func (s *APIBackendTestSuite) TestRestartNode() {
 
 	firstHash, err := e2e.FirstBlockHash(s.Backend.NodeManager())
 	s.NoError(err)
-	s.Equal(GetHeadHashForNetworkID(), firstHash)
+	s.Equal(GetHeadHash(), firstHash)
 
 	s.True(s.Backend.IsNodeRunning())
 	nodeRestarted, err := s.Backend.RestartNode()
@@ -286,5 +286,5 @@ func (s *APIBackendTestSuite) TestRestartNode() {
 	// make sure we can read the first byte, and it is valid (for Rinkeby)
 	firstHash, err = e2e.FirstBlockHash(s.Backend.NodeManager())
 	s.NoError(err)
-	s.Equal(GetHeadHashForNetworkID(), firstHash)
+	s.Equal(GetHeadHash(), firstHash)
 }
