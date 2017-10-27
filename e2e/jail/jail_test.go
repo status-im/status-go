@@ -14,7 +14,6 @@ import (
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/node"
-	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/signal"
 	"github.com/status-im/status-go/static"
 	"github.com/stretchr/testify/suite"
@@ -125,7 +124,7 @@ func (s *JailTestSuite) TestFunctionCall() {
 }
 
 func (s *JailTestSuite) TestEventSignal() {
-	s.StartTestNode(params.RinkebyNetworkID)
+	s.StartTestNode()
 	defer s.StopTestNode()
 
 	s.Jail.CreateAndInitCell(testChatID, "")
@@ -184,7 +183,7 @@ func (s *JailTestSuite) TestEventSignal() {
 // TestCallResponseOrder tests exactly the problem from
 // https://github.com/status-im/status-go/issues/372
 func (s *JailTestSuite) TestSendSyncResponseOrder() {
-	s.StartTestNode(params.RinkebyNetworkID)
+	s.StartTestNode()
 	defer s.StopTestNode()
 
 	// `testCommand` is a simple JS function. `calculateGasPrice` makes
