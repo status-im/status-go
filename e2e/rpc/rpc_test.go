@@ -2,14 +2,18 @@ package rpc
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
+
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/e2e"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
+	. "github.com/status-im/status-go/testing"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -27,8 +31,12 @@ func (s *RPCTestSuite) SetupTest() {
 }
 
 func (s *RPCTestSuite) TestCallRPC() {
+	if GetNetworkID() == params.StatusChainNetworkID {
+		s.T().Skip()
+	}
+
 	for _, upstreamEnabled := range []bool{false, true} {
-		nodeConfig, err := e2e.MakeTestNodeConfig(params.RinkebyNetworkID)
+		nodeConfig, err := e2e.MakeTestNodeConfig(GetNetworkID())
 		s.NoError(err)
 
 		nodeConfig.IPCEnabled = false
@@ -36,8 +44,11 @@ func (s *RPCTestSuite) TestCallRPC() {
 		nodeConfig.HTTPHost = "" // to make sure that no HTTP interface is started
 
 		if upstreamEnabled {
+			networkURL, err := GetRemoteURL()
+			s.NoError(err)
+
 			nodeConfig.UpstreamConfig.Enabled = true
-			nodeConfig.UpstreamConfig.URL = "https://rinkeby.infura.io/nKmXgiFgc2KqtoQ8BCGJ"
+			nodeConfig.UpstreamConfig.URL = networkURL
 		}
 
 		nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
@@ -69,7 +80,7 @@ func (s *RPCTestSuite) TestCallRPC() {
 			{
 				`{"jsonrpc":"2.0","method":"net_version","params":[],"id":67}`,
 				func(resultJSON string) {
-					expected := `{"jsonrpc":"2.0","id":67,"result":"4"}`
+					expected := `{"jsonrpc":"2.0","id":67,"result":"` + fmt.Sprintf("%d", GetNetworkID()) + `"}`
 					s.Equal(expected, resultJSON)
 				},
 			},
@@ -83,7 +94,7 @@ func (s *RPCTestSuite) TestCallRPC() {
 			{
 				`[{"jsonrpc":"2.0","method":"net_version","params":[],"id":67},{"jsonrpc":"2.0","method":"web3_sha3","params":["0x68656c6c6f20776f726c64"],"id":68}]`,
 				func(resultJSON string) {
-					expected := `[{"jsonrpc":"2.0","id":67,"result":"4"},{"jsonrpc":"2.0","id":68,"result":"0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad"}]`
+					expected := `[{"jsonrpc":"2.0","id":67,"result":"` + fmt.Sprintf("%d", GetNetworkID()) + `"},{"jsonrpc":"2.0","id":68,"result":"0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad"}]`
 					s.Equal(expected, resultJSON)
 				},
 			},
@@ -119,7 +130,7 @@ func (s *RPCTestSuite) TestCallRPC() {
 
 // TestCallRawResult checks if returned response is a valid JSON-RPC response.
 func (s *RPCTestSuite) TestCallRawResult() {
-	nodeConfig, err := e2e.MakeTestNodeConfig(params.RopstenNetworkID)
+	nodeConfig, err := e2e.MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
 
 	nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
@@ -138,20 +149,19 @@ func (s *RPCTestSuite) TestCallRawResult() {
 // TestCallContextResult checks if result passed to CallContext
 // is set accordingly to its underlying memory layout.
 func (s *RPCTestSuite) TestCallContextResult() {
-	s.StartTestNode(
-		params.RopstenNetworkID,
-		e2e.WithUpstream("https://ropsten.infura.io/nKmXgiFgc2KqtoQ8BCGJ"),
-	)
+	s.StartTestNode()
 	defer s.StopTestNode()
+
+	EnsureNodeSync(s.NodeManager)
 
 	client := s.NodeManager.RPCClient()
 	s.NotNil(client)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	defer cancel()
 
-	var blockNumber hexutil.Uint
-	err := client.CallContext(ctx, &blockNumber, "eth_blockNumber")
+	var balance hexutil.Big
+	err := client.CallContext(ctx, &balance, "eth_getBalance", "0xAdAf150b905Cf5E6A778E553E15A139B6618BbB7", "latest")
 	s.NoError(err)
-	s.True(blockNumber > 0, "blockNumber should be higher than 0")
+	s.True(balance.ToInt().Cmp(big.NewInt(0)) > 0, "balance should be higher than 0")
 }

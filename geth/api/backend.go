@@ -10,20 +10,26 @@ import (
 	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/node"
+	"github.com/status-im/status-go/geth/notification/fcm"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/signal"
 	"github.com/status-im/status-go/geth/txqueue"
 )
 
+const (
+	//todo(jeka): should be removed
+	fcmServerKey = "AAAAxwa-r08:APA91bFtMIToDVKGAmVCm76iEXtA4dn9MPvLdYKIZqAlNpLJbd12EgdBI9DSDSXKdqvIAgLodepmRhGVaWvhxnXJzVpE6MoIRuKedDV3kfHSVBhWFqsyoLTwXY4xeufL9Sdzb581U-lx"
+)
+
 // StatusBackend implements Status.im service
 type StatusBackend struct {
 	sync.Mutex
-	nodeReady      chan struct{} // channel to wait for when node is fully ready
-	nodeManager    common.NodeManager
-	accountManager common.AccountManager
-	txQueueManager common.TxQueueManager
-	jailManager    common.JailManager
-	// TODO(oskarth): notifer here
+	nodeReady       chan struct{} // channel to wait for when node is fully ready
+	nodeManager     common.NodeManager
+	accountManager  common.AccountManager
+	txQueueManager  common.TxQueueManager
+	jailManager     common.JailManager
+	newNotification common.NotificationConstructor
 }
 
 // NewStatusBackend create a new NewStatusBackend instance
@@ -34,12 +40,14 @@ func NewStatusBackend() *StatusBackend {
 	accountManager := account.NewManager(nodeManager)
 	txQueueManager := txqueue.NewManager(nodeManager, accountManager)
 	jailManager := jail.New(nodeManager)
+	notificationManager := fcm.NewNotification(fcmServerKey)
 
 	return &StatusBackend{
-		nodeManager:    nodeManager,
-		accountManager: accountManager,
-		jailManager:    jailManager,
-		txQueueManager: txQueueManager,
+		nodeManager:     nodeManager,
+		accountManager:  accountManager,
+		jailManager:     jailManager,
+		txQueueManager:  txQueueManager,
+		newNotification: notificationManager,
 	}
 }
 
@@ -231,6 +239,10 @@ func (m *StatusBackend) DiscardTransactions(ids []common.QueuedTxID) map[common.
 // registerHandlers attaches Status callback handlers to running node
 func (m *StatusBackend) registerHandlers() error {
 	rpcClient := m.NodeManager().RPCClient()
+	if rpcClient == nil {
+		return node.ErrRPCClient
+	}
+
 	rpcClient.RegisterHandler("eth_accounts", m.accountManager.AccountsRPCHandler())
 	rpcClient.RegisterHandler("eth_sendTransaction", m.txQueueManager.SendTransactionRPCHandler)
 

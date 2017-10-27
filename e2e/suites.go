@@ -1,58 +1,25 @@
 package e2e
 
 import (
-	"context"
-	"time"
-
 	"github.com/ethereum/go-ethereum/les"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/common"
-	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/signal"
+	. "github.com/status-im/status-go/testing" //nolint: golint
 	"github.com/stretchr/testify/suite"
 )
 
 // NodeManagerTestSuite defines a test suit with NodeManager.
 type NodeManagerTestSuite struct {
 	suite.Suite
-	NodeManager       common.NodeManager
-	nodeSyncCompleted bool
-}
-
-// EnsureNodeSync ensures that synchronization of the node is done once and that it
-// is done properly else, the call will fail.
-// FIXME(tiabc): BackendTestSuite contains the same method, let's sort it out?
-func (s *NodeManagerTestSuite) EnsureNodeSync(forceResync ...bool) {
-	if len(forceResync) > 0 && forceResync[0] {
-		s.nodeSyncCompleted = false
-	}
-
-	if s.nodeSyncCompleted {
-		return
-	}
-
-	require := s.Require()
-
-	ethClient, err := s.NodeManager.LightEthereumService()
-	require.NoError(err)
-	require.NotNil(ethClient)
-
-	sync := node.NewSyncPoll(ethClient)
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
-	defer cancel()
-
-	// Validate that synchronization failed because of time.
-	syncError := sync.Poll(ctx)
-	require.NoError(syncError)
-
-	s.nodeSyncCompleted = true
+	NodeManager common.NodeManager
 }
 
 // StartTestNode initiazes a NodeManager instances with configuration retrieved
 // from the test config.
-func (s *NodeManagerTestSuite) StartTestNode(networkID int, opts ...TestNodeOption) {
-	nodeConfig, err := MakeTestNodeConfig(networkID)
+func (s *NodeManagerTestSuite) StartTestNode(opts ...TestNodeOption) {
+	nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
 
 	// Apply any options altering node config.
@@ -85,8 +52,7 @@ func (s *NodeManagerTestSuite) StopTestNode() {
 // and a few utility methods to start and stop node or get various services.
 type BackendTestSuite struct {
 	suite.Suite
-	Backend           *api.StatusBackend
-	nodeSyncCompleted bool
+	Backend *api.StatusBackend
 }
 
 // SetupTest initializes Backend.
@@ -101,8 +67,8 @@ func (s *BackendTestSuite) TearDownTest() {
 }
 
 // StartTestBackend imports some keys and starts a node.
-func (s *BackendTestSuite) StartTestBackend(networkID int, opts ...TestNodeOption) {
-	nodeConfig, err := MakeTestNodeConfig(networkID)
+func (s *BackendTestSuite) StartTestBackend(opts ...TestNodeOption) {
+	nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
 
 	// Apply any options altering node config.
@@ -160,32 +126,6 @@ func (s *BackendTestSuite) LightEthereumService() *les.LightEthereum {
 // TxQueueManager returns a reference to the TxQueueManager.
 func (s *BackendTestSuite) TxQueueManager() common.TxQueueManager {
 	return s.Backend.TxQueueManager()
-}
-
-// EnsureNodeSync ensures that synchronization of the node is done once and that it
-// is done properly else, the call will fail.
-// FIXME(tiabc): NodeManagerTestSuite contains the same method, let's sort it out?
-func (s *BackendTestSuite) EnsureNodeSync(forceResync ...bool) {
-	if len(forceResync) > 0 && forceResync[0] {
-		s.nodeSyncCompleted = false
-	}
-
-	if s.nodeSyncCompleted {
-		return
-	}
-
-	require := s.Require()
-
-	ethClient := s.LightEthereumService()
-	sync := node.NewSyncPoll(ethClient)
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
-	defer cancel()
-
-	// Validate that synchronization failed because of time.
-	syncError := sync.Poll(ctx)
-	require.NoError(syncError)
-
-	s.nodeSyncCompleted = true
 }
 
 func importTestAccouns(keyStoreDir string) (err error) {

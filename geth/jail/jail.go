@@ -54,9 +54,9 @@ func (jail *Jail) NewCell(chatID string) (common.JailCell, error) {
 		return nil, ErrInvalidJail
 	}
 
-	vm := otto.New()
+	cellVM := otto.New()
 
-	cell, err := newCell(chatID, vm)
+	cell, err := newCell(chatID, cellVM)
 	if err != nil {
 		return nil, err
 	}

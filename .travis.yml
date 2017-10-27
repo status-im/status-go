@@ -1,3 +1,6 @@
+notifications:
+  email: false
+
 language: go
 
 go:
@@ -9,9 +12,16 @@ dist: trusty
 
 install:
   - go get golang.org/x/tools/cmd/cover
+  - make lint-deps
 
-script:
-  - travis_wait make ci
+jobs:
+  include:
+    - stage: Lint
+      script: make lint
+    - stage: Test unit and integration
+      script: make test-unit-coverage
+    - stage: Test e2e
+      script: make test-e2e
 
 cache:
   directories:

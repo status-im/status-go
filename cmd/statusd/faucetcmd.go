@@ -27,7 +27,7 @@ func faucetCommandHandler(ctx *cli.Context) error {
 	}
 
 	fmt.Println("Starting Status Faucet node..")
-	if err := statusAPI.StartNode(config); err != nil {
+	if err = statusAPI.StartNode(config); err != nil {
 		return err
 	}
 

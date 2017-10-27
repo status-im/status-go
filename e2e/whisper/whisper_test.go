@@ -9,7 +9,6 @@ import (
 	"github.com/status-im/status-go/e2e"
 	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/node"
-	"github.com/status-im/status-go/geth/params"
 	. "github.com/status-im/status-go/testing"
 	"github.com/stretchr/testify/suite"
 )
@@ -30,7 +29,7 @@ func (s *WhisperTestSuite) SetupTest() {
 // TODO(adam): can anyone explain what this test is testing?
 // I don't see any race condition testing here.
 func (s *WhisperTestSuite) TestWhisperFilterRace() {
-	s.StartTestNode(params.RinkebyNetworkID)
+	s.StartTestNode()
 	defer s.StopTestNode()
 
 	whisperService, err := s.NodeManager.WhisperService()
@@ -95,7 +94,7 @@ func (s *WhisperTestSuite) TestWhisperFilterRace() {
 }
 
 func (s *WhisperTestSuite) TestLogout() {
-	s.StartTestNode(params.RinkebyNetworkID)
+	s.StartTestNode()
 	defer s.StopTestNode()
 
 	whisperService, err := s.NodeManager.WhisperService()

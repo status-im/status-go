@@ -12,6 +12,7 @@ import (
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
+	. "github.com/status-im/status-go/testing"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -33,10 +34,10 @@ func (s *APIBackendTestSuite) TestRaceConditions() {
 	progress := make(chan struct{}, cnt)
 	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	nodeConfig1, err := e2e.MakeTestNodeConfig(params.RopstenNetworkID)
+	nodeConfig1, err := e2e.MakeTestNodeConfig(GetNetworkID())
 	require.NoError(err)
 
-	nodeConfig2, err := e2e.MakeTestNodeConfig(params.RinkebyNetworkID)
+	nodeConfig2, err := e2e.MakeTestNodeConfig(GetNetworkID())
 	require.NoError(err)
 
 	nodeConfigs := []*params.NodeConfig{nodeConfig1, nodeConfig2}
@@ -190,7 +191,7 @@ func (s *APIBackendTestSuite) TestRaceConditions() {
 // so this test should only check StatusBackend logic with a mocked version of the underlying NodeManager.
 func (s *APIBackendTestSuite) TestNetworkSwitching() {
 	// get Ropsten config
-	nodeConfig, err := e2e.MakeTestNodeConfig(params.RopstenNetworkID)
+	nodeConfig, err := e2e.MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
 
 	s.False(s.Backend.IsNodeRunning())
@@ -202,7 +203,7 @@ func (s *APIBackendTestSuite) TestNetworkSwitching() {
 
 	firstHash, err := e2e.FirstBlockHash(s.Backend.NodeManager())
 	s.NoError(err)
-	s.Equal("0x41941023680923e0fe4d74a34bdac8141f2540e3ae90623718e47d66d1ca4a2d", firstHash)
+	s.Equal(GetHeadHash(), firstHash)
 
 	// now stop node, and make sure that a new node, on different network can be started
 	nodeStopped, err := s.Backend.StopNode()
@@ -210,7 +211,7 @@ func (s *APIBackendTestSuite) TestNetworkSwitching() {
 	<-nodeStopped
 
 	// start new node with completely different config
-	nodeConfig, err = e2e.MakeTestNodeConfig(params.RinkebyNetworkID)
+	nodeConfig, err = e2e.MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
 
 	s.False(s.Backend.IsNodeRunning())
@@ -223,7 +224,7 @@ func (s *APIBackendTestSuite) TestNetworkSwitching() {
 	// make sure we are on another network indeed
 	firstHash, err = e2e.FirstBlockHash(s.Backend.NodeManager())
 	s.NoError(err)
-	s.Equal("0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177", firstHash)
+	s.Equal(GetHeadHash(), firstHash)
 
 	nodeStopped, err = s.Backend.StopNode()
 	s.NoError(err)
@@ -238,11 +239,10 @@ func (s *APIBackendTestSuite) TestResetChainData() {
 	require := s.Require()
 	require.NotNil(s.Backend)
 
-	s.StartTestBackend(params.RinkebyNetworkID)
+	s.StartTestBackend()
 	defer s.StopTestBackend()
 
-	// allow to sync for some time
-	s.EnsureNodeSync()
+	EnsureNodeSync(s.Backend.NodeManager())
 
 	s.True(s.Backend.IsNodeRunning())
 	nodeReady, err := s.Backend.ResetChainData()
@@ -253,7 +253,7 @@ func (s *APIBackendTestSuite) TestResetChainData() {
 	// make sure we can read the first byte, and it is valid (for Rinkeby)
 	firstHash, err := e2e.FirstBlockHash(s.Backend.NodeManager())
 	s.NoError(err)
-	s.Equal("0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177", firstHash)
+	s.Equal(GetHeadHash(), firstHash)
 }
 
 // FIXME(tiabc): There's also a test with the same name in geth/node/manager_test.go
@@ -262,12 +262,20 @@ func (s *APIBackendTestSuite) TestRestartNode() {
 	require := s.Require()
 	require.NotNil(s.Backend)
 
-	s.StartTestBackend(params.RinkebyNetworkID)
-	defer s.StopTestBackend()
+	// get config
+	nodeConfig, err := e2e.MakeTestNodeConfig(GetNetworkID())
+	s.NoError(err)
+
+	s.False(s.Backend.IsNodeRunning())
+	nodeStarted, err := s.Backend.StartNode(nodeConfig)
+	s.NoError(err)
+
+	<-nodeStarted // wait till node is started
+	s.True(s.Backend.IsNodeRunning())
 
 	firstHash, err := e2e.FirstBlockHash(s.Backend.NodeManager())
 	s.NoError(err)
-	s.Equal("0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177", firstHash)
+	s.Equal(GetHeadHash(), firstHash)
 
 	s.True(s.Backend.IsNodeRunning())
 	nodeRestarted, err := s.Backend.RestartNode()
@@ -278,5 +286,5 @@ func (s *APIBackendTestSuite) TestRestartNode() {
 	// make sure we can read the first byte, and it is valid (for Rinkeby)
 	firstHash, err = e2e.FirstBlockHash(s.Backend.NodeManager())
 	s.NoError(err)
-	s.Equal("0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177", firstHash)
+	s.Equal(GetHeadHash(), firstHash)
 }
