@@ -25,7 +25,6 @@ var (
 	ErrNoRunningNode               = errors.New("there is no running node")
 	ErrInvalidNodeManager          = errors.New("node manager is not properly initialized")
 	ErrInvalidWhisperService       = errors.New("whisper service is unavailable")
-	ErrInvalidDeliveryService      = errors.New("delivery service is unavailable")
 	ErrInvalidLightEthereumService = errors.New("LES service is unavailable")
 	ErrInvalidAccountManager       = errors.New("could not retrieve account manager")
 	ErrAccountKeyStoreMissing      = errors.New("account key store is not set")
