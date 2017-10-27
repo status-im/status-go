@@ -97,7 +97,6 @@ func init() {
 	app.HideVersion = true // separate command prints version
 	app.Commands = []cli.Command{
 		versionCommand,
-		faucetCommand,
 		lesCommand,
 		wnodeCommand,
 	}
