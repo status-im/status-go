@@ -1235,9 +1235,9 @@ func testJailInitInvalid(t *testing.T) bool {
 	response := C.GoString(Parse(C.CString("CHAT_ID_INIT_TEST"), C.CString(``)))
 
 	// Assert.
-	expectedSubstr := `"error":"(anonymous): Line 4:3 Unexpected end of input`
+	expectedSubstr := `"error":"(anonymous): Line 4:3 Unexpected identifier`
 	if !strings.Contains(response, expectedSubstr) {
-		t.Errorf("unexpected response, didn't find %s in %s", expectedSubstr, response)
+		t.Errorf("unexpected response, didn't find '%s' in '%s'", expectedSubstr, response)
 		return false
 	}
 	return true
