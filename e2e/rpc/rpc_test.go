@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -30,8 +31,12 @@ func (s *RPCTestSuite) SetupTest() {
 }
 
 func (s *RPCTestSuite) TestCallRPC() {
+	if GetNetworkID() == params.StatusChainNetworkID {
+		s.T().Skip()
+	}
+
 	for _, upstreamEnabled := range []bool{false, true} {
-		nodeConfig, err := e2e.MakeTestNodeConfig(params.RinkebyNetworkID)
+		nodeConfig, err := e2e.MakeTestNodeConfig(GetNetworkID())
 		s.NoError(err)
 
 		nodeConfig.IPCEnabled = false
@@ -39,8 +44,11 @@ func (s *RPCTestSuite) TestCallRPC() {
 		nodeConfig.HTTPHost = "" // to make sure that no HTTP interface is started
 
 		if upstreamEnabled {
+			networkURL, err := GetRemoteURL()
+			s.NoError(err)
+
 			nodeConfig.UpstreamConfig.Enabled = true
-			nodeConfig.UpstreamConfig.URL = "https://rinkeby.infura.io/nKmXgiFgc2KqtoQ8BCGJ"
+			nodeConfig.UpstreamConfig.URL = networkURL
 		}
 
 		nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
@@ -72,7 +80,7 @@ func (s *RPCTestSuite) TestCallRPC() {
 			{
 				`{"jsonrpc":"2.0","method":"net_version","params":[],"id":67}`,
 				func(resultJSON string) {
-					expected := `{"jsonrpc":"2.0","id":67,"result":"4"}`
+					expected := `{"jsonrpc":"2.0","id":67,"result":"` + fmt.Sprintf("%d", GetNetworkID()) + `"}`
 					s.Equal(expected, resultJSON)
 				},
 			},
@@ -86,7 +94,7 @@ func (s *RPCTestSuite) TestCallRPC() {
 			{
 				`[{"jsonrpc":"2.0","method":"net_version","params":[],"id":67},{"jsonrpc":"2.0","method":"web3_sha3","params":["0x68656c6c6f20776f726c64"],"id":68}]`,
 				func(resultJSON string) {
-					expected := `[{"jsonrpc":"2.0","id":67,"result":"4"},{"jsonrpc":"2.0","id":68,"result":"0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad"}]`
+					expected := `[{"jsonrpc":"2.0","id":67,"result":"` + fmt.Sprintf("%d", GetNetworkID()) + `"},{"jsonrpc":"2.0","id":68,"result":"0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad"}]`
 					s.Equal(expected, resultJSON)
 				},
 			},
@@ -122,7 +130,7 @@ func (s *RPCTestSuite) TestCallRPC() {
 
 // TestCallRawResult checks if returned response is a valid JSON-RPC response.
 func (s *RPCTestSuite) TestCallRawResult() {
-	nodeConfig, err := e2e.MakeTestNodeConfig(params.StatusChainNetworkID)
+	nodeConfig, err := e2e.MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
 
 	nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
@@ -141,7 +149,7 @@ func (s *RPCTestSuite) TestCallRawResult() {
 // TestCallContextResult checks if result passed to CallContext
 // is set accordingly to its underlying memory layout.
 func (s *RPCTestSuite) TestCallContextResult() {
-	s.StartTestNode(params.StatusChainNetworkID)
+	s.StartTestNode()
 	defer s.StopTestNode()
 
 	EnsureNodeSync(s.NodeManager)

@@ -5,8 +5,8 @@ import (
 
 	"github.com/status-im/status-go/e2e"
 	"github.com/status-im/status-go/geth/node"
-	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/rpc"
+	. "github.com/status-im/status-go/testing" //nolint: golint
 	"github.com/stretchr/testify/suite"
 )
 
@@ -24,7 +24,7 @@ func (s *RPCClientTestSuite) SetupTest() {
 }
 
 func (s *RPCClientTestSuite) TestNewClient() {
-	config, err := e2e.MakeTestNodeConfig(params.RinkebyNetworkID)
+	config, err := e2e.MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
 
 	// upstream disabled

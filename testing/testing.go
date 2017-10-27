@@ -2,6 +2,9 @@ package integration
 
 import (
 	"bytes"
+	"errors"
+	"flag"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -13,6 +16,11 @@ import (
 )
 
 var (
+	networkSelected = flag.String("network", "statuschain", "-network=NETWORKID or -network=NETWORKNAME to select network used for tests")
+
+	// ErrNoRemoteURL is returned when network id has no associated url.
+	ErrNoRemoteURL = errors.New("network id requires a remote URL")
+
 	// TestConfig defines the default config usable at package-level.
 	TestConfig *common.TestConfig
 
@@ -109,4 +117,58 @@ func EnsureNodeSync(nodeManager common.NodeManager) {
 			}
 		}
 	}
+}
+
+// GetRemoteURLFromNetworkID returns asociated network url for giving network id.
+func GetRemoteURLFromNetworkID(id int) (url string, err error) {
+	switch id {
+	case params.MainNetworkID:
+		url = params.MainnetEthereumNetworkURL
+	case params.RinkebyNetworkID:
+		url = params.RinkebyEthereumNetworkURL
+	case params.RopstenNetworkID:
+		url = params.RopstenEthereumNetworkURL
+	}
+
+	err = ErrNoRemoteURL
+	return
+}
+
+// GetHeadHashFromNetworkID returns the hash associated with a given network id.
+func GetHeadHashFromNetworkID(id int) string {
+	switch id {
+	case params.RinkebyNetworkID:
+		return "0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177"
+	case params.RopstenNetworkID:
+		return "0x41941023680923e0fe4d74a34bdac8141f2540e3ae90623718e47d66d1ca4a2d"
+	case params.StatusChainNetworkID:
+		return "0x28c4da1cca48d0107ea5ea29a40ac15fca86899c52d02309fa12ea39b86d219c"
+	}
+
+	return ""
+}
+
+// GetRemoteURL returns the url associated with a given network id.
+func GetRemoteURL() (string, error) {
+	return GetRemoteURLFromNetworkID(GetNetworkID())
+}
+
+// GetHeadHash returns the hash associated with a given network id.
+func GetHeadHash() string {
+	return GetHeadHashFromNetworkID(GetNetworkID())
+}
+
+// GetNetworkID returns appropriate network id for test based on
+// default or provided -network flag.
+func GetNetworkID() int {
+	switch strings.ToLower(*networkSelected) {
+	case fmt.Sprintf("%d", params.RinkebyNetworkID), "rinkeby":
+		return params.RinkebyNetworkID
+	case fmt.Sprintf("%d", params.RopstenNetworkID), "ropsten", "testnet":
+		return params.RopstenNetworkID
+	case fmt.Sprintf("%d", params.StatusChainNetworkID), "statuschain":
+		return params.StatusChainNetworkID
+	}
+
+	return params.StatusChainNetworkID
 }

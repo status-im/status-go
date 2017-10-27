@@ -19,7 +19,7 @@ type AccountsRPCTestSuite struct {
 }
 
 func (s *AccountsTestSuite) TestRPCEthAccounts() {
-	s.StartTestBackend(params.StatusChainNetworkID)
+	s.StartTestBackend()
 	defer s.StopTestBackend()
 
 	// log into test account
@@ -43,14 +43,17 @@ func (s *AccountsTestSuite) TestRPCEthAccountsWithUpstream() {
 	// FIXME(tiabc): Stop skipping after https://github.com/status-im/status-go/issues/424
 	s.T().Skip()
 
-	s.StartTestBackend(
-		params.RopstenNetworkID,
-		e2e.WithUpstream("https://ropsten.infura.io/z6GCTmjdP3FETEJmMBI4"),
-	)
+	if GetNetworkID() == params.StatusChainNetworkID {
+		s.T().Skip()
+	}
+
+	addr, err := GetRemoteURL()
+	s.NoError(err)
+	s.StartTestBackend(e2e.WithUpstream(addr))
 	defer s.StopTestBackend()
 
 	// log into test account
-	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
+	err = s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	s.NoError(err)
 
 	rpcClient := s.Backend.NodeManager().RPCClient()

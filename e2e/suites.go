@@ -6,6 +6,7 @@ import (
 	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/signal"
+	. "github.com/status-im/status-go/testing" //nolint: golint
 	"github.com/stretchr/testify/suite"
 )
 
@@ -17,8 +18,8 @@ type NodeManagerTestSuite struct {
 
 // StartTestNode initiazes a NodeManager instances with configuration retrieved
 // from the test config.
-func (s *NodeManagerTestSuite) StartTestNode(networkID int, opts ...TestNodeOption) {
-	nodeConfig, err := MakeTestNodeConfig(networkID)
+func (s *NodeManagerTestSuite) StartTestNode(opts ...TestNodeOption) {
+	nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
 
 	// Apply any options altering node config.
@@ -66,8 +67,8 @@ func (s *BackendTestSuite) TearDownTest() {
 }
 
 // StartTestBackend imports some keys and starts a node.
-func (s *BackendTestSuite) StartTestBackend(networkID int, opts ...TestNodeOption) {
-	nodeConfig, err := MakeTestNodeConfig(networkID)
+func (s *BackendTestSuite) StartTestBackend(opts ...TestNodeOption) {
+	nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
 
 	// Apply any options altering node config.

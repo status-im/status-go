@@ -5,6 +5,7 @@ include ./static/tools/mk/lint.mk
 
 GOBIN = build/bin
 GO ?= latest
+networkid ?= 
 
 # This is a code for automatic help generator.
 # It supports ANSI colors and categories.
@@ -87,6 +88,8 @@ mock-install: ##@other Install mocking tools
 
 mock: ##@other Regenerate mocks
 	mockgen -source=geth/common/types.go -destination=geth/common/types_mock.go -package=common
+	mockgen -source=geth/common/notification.go -destination=geth/common/notification_mock.go -package=common -imports fcm=github.com/NaySoftware/go-fcm
+	mockgen -source=geth/notification/fcm/client.go -destination=geth/notification/fcm/client_mock.go -package=fcm -imports fcm=github.com/NaySoftware/go-fcm
 
 test: test-unit-coverage ##@tests Run basic, short tests during development
 
@@ -99,14 +102,14 @@ test-unit-coverage: ##@tests Run unit and integration tests with coverage
 test-e2e: ##@tests Run e2e tests
 	# order: reliability then alphabetical
 	# TODO(tiabc): make a single command out of them adding `-p 1` flag.
-	build/env.sh go test -timeout 5m ./e2e/accounts/...
-	build/env.sh go test -timeout 5m ./e2e/api/...
-	build/env.sh go test -timeout 5m ./e2e/node/...
-	build/env.sh go test -timeout 15m ./e2e/jail/...
-	build/env.sh go test -timeout 20m ./e2e/rpc/...
-	build/env.sh go test -timeout 20m ./e2e/whisper/...
-	build/env.sh go test -timeout 10m ./e2e/transactions/...
-	build/env.sh go test -timeout 40m ./cmd/statusd
+	build/env.sh go test -timeout 5m ./e2e/accounts/... -network=$(networkid)
+	build/env.sh go test -timeout 5m ./e2e/api/... -network=$(networkid)
+	build/env.sh go test -timeout 5m ./e2e/node/... -network=$(networkid)
+	build/env.sh go test -timeout 15m ./e2e/jail/... -network=$(networkid)
+	build/env.sh go test -timeout 20m ./e2e/rpc/... -network=$(networkid)
+	build/env.sh go test -timeout 20m ./e2e/whisper/... -network=$(networkid)
+	build/env.sh go test -timeout 10m ./e2e/transactions/... -network=$(networkid)
+	build/env.sh go test -timeout 40m ./cmd/statusd -network=$(networkid)
 
 ci: lint mock-install mock test-unit test-e2e ##@tests Run all linters and tests at once
 

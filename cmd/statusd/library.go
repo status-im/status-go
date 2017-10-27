@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"os"
 
-	"gopkg.in/go-playground/validator.v9"
-
+	"github.com/NaySoftware/go-fcm"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/helpers/profiling"
+	"gopkg.in/go-playground/validator.v9"
 )
 
 //GenerateConfig for status node
@@ -22,7 +22,7 @@ func GenerateConfig(datadir *C.char, networkID C.int, devMode C.int) *C.char {
 		return makeJSONResponse(err)
 	}
 
-	outBytes, err := json.Marshal(&config)
+	outBytes, err := json.Marshal(config)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
@@ -124,7 +124,7 @@ func CreateAccount(password *C.char) *C.char {
 		Mnemonic: mnemonic,
 		Error:    errString,
 	}
-	outBytes, _ := json.Marshal(&out)
+	outBytes, _ := json.Marshal(out)
 	return C.CString(string(outBytes))
 }
 
@@ -144,7 +144,7 @@ func CreateChildAccount(parentAddress, password *C.char) *C.char {
 		PubKey:  pubKey,
 		Error:   errString,
 	}
-	outBytes, _ := json.Marshal(&out)
+	outBytes, _ := json.Marshal(out)
 	return C.CString(string(outBytes))
 }
 
@@ -165,7 +165,7 @@ func RecoverAccount(password, mnemonic *C.char) *C.char {
 		Mnemonic: C.GoString(mnemonic),
 		Error:    errString,
 	}
-	outBytes, _ := json.Marshal(&out)
+	outBytes, _ := json.Marshal(out)
 	return C.CString(string(outBytes))
 }
 
@@ -207,7 +207,7 @@ func CompleteTransaction(id, password *C.char) *C.char {
 		Hash:  txHash.Hex(),
 		Error: errString,
 	}
-	outBytes, err := json.Marshal(&out)
+	outBytes, err := json.Marshal(out)
 	if err != nil {
 		log.Error("failed to marshal CompleteTransaction output", "error", err.Error())
 		return makeJSONResponse(err)
@@ -246,7 +246,7 @@ func CompleteTransactions(ids, password *C.char) *C.char {
 		}
 	}
 
-	outBytes, err := json.Marshal(&out)
+	outBytes, err := json.Marshal(out)
 	if err != nil {
 		log.Error("failed to marshal CompleteTransactions output", "error", err.Error())
 		return makeJSONResponse(err)
@@ -270,7 +270,7 @@ func DiscardTransaction(id *C.char) *C.char {
 		ID:    C.GoString(id),
 		Error: errString,
 	}
-	outBytes, err := json.Marshal(&out)
+	outBytes, err := json.Marshal(out)
 	if err != nil {
 		log.Error("failed to marshal DiscardTransaction output", "error", err.Error())
 		return makeJSONResponse(err)
@@ -308,7 +308,7 @@ func DiscardTransactions(ids *C.char) *C.char {
 		}
 	}
 
-	outBytes, err := json.Marshal(&out)
+	outBytes, err := json.Marshal(out)
 	if err != nil {
 		log.Error("failed to marshal DiscardTransactions output", "error", err.Error())
 		return makeJSONResponse(err)
@@ -375,14 +375,62 @@ func makeJSONResponse(err error) *C.char {
 	out := common.APIResponse{
 		Error: errString,
 	}
-	outBytes, _ := json.Marshal(&out)
+	outBytes, _ := json.Marshal(out)
 
 	return C.CString(string(outBytes))
 }
 
 // Notify sends push notification by given token
+// @deprecated
 //export Notify
 func Notify(token *C.char) *C.char {
 	res := statusAPI.Notify(C.GoString(token))
 	return C.CString(res)
+}
+
+// NotifyUsers sends push notifications by given tokens.
+//export NotifyUsers
+func NotifyUsers(message, payloadJSON, tokensArray *C.char) (outCBytes *C.char) {
+	var (
+		err      error
+		outBytes []byte
+	)
+	errString := ""
+
+	defer func() {
+		out := common.NotifyResult{
+			Status: err == nil,
+			Error:  errString,
+		}
+
+		outBytes, err = json.Marshal(out)
+		if err != nil {
+			log.Error("failed to marshal Notify output", "error", err.Error())
+			outCBytes = makeJSONResponse(err)
+			return
+		}
+
+		outCBytes = C.CString(string(outBytes))
+	}()
+
+	tokens, err := common.ParseJSONArray(C.GoString(tokensArray))
+	if err != nil {
+		errString = err.Error()
+		return
+	}
+
+	var payload fcm.NotificationPayload
+	err = json.Unmarshal([]byte(C.GoString(payloadJSON)), &payload)
+	if err != nil {
+		errString = err.Error()
+		return
+	}
+
+	err = statusAPI.NotifyUsers(C.GoString(message), payload, tokens...)
+	if err != nil {
+		errString = err.Error()
+		return
+	}
+
+	return
 }
