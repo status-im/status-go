@@ -27,7 +27,7 @@ type Status int
 
 // consts of all message delivery status.
 const (
-	PendingStatus Status = iota + 10
+	PendingStatus Status = iota + 1
 	QueuedStatus
 	CachedStatus
 	SentStatus
