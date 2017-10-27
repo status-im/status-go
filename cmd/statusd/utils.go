@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -1234,9 +1235,9 @@ func testJailInitInvalid(t *testing.T) bool {
 	response := C.GoString(Parse(C.CString("CHAT_ID_INIT_TEST"), C.CString(``)))
 
 	// Assert.
-	expectedResponse := `{"error":"(anonymous): Line 4:3 Unexpected end of input (and 3 more errors)"}`
-	if expectedResponse != response {
-		t.Errorf("unexpected response, expected: %v, got: %v", expectedResponse, response)
+	expectedSubstr := `"error":"(anonymous): Line 4:3 Unexpected end of input`
+	if !strings.Contains(response, expectedSubstr) {
+		t.Errorf("unexpected response, didn't find %s in %s", expectedSubstr, response)
 		return false
 	}
 	return true
