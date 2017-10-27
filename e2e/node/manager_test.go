@@ -517,6 +517,6 @@ func (s *ManagerTestSuite) TestNodeStartCrash() {
 
 	// cleanup
 	time.Sleep(100 * time.Millisecond) //https://github.com/status-im/status-go/issues/429#issuecomment-339663163
-	s.NodeManager.StopNode() //nolint: errcheck
+	s.NodeManager.StopNode()           //nolint: errcheck
 	signal.ResetDefaultNodeNotificationHandler()
 }
