@@ -1232,7 +1232,7 @@ func testJailInitInvalid(t *testing.T) bool {
 
 	// Act.
 	InitJail(C.CString(initInvalidCode))
-	response := C.GoString(Parse(C.CString("CHAT_ID_INIT_TEST"), C.CString(``)))
+	response := C.GoString(Parse(C.CString("CHAT_ID_INIT_INVALID_TEST"), C.CString(``)))
 
 	// Assert.
 	expectedSubstr := `"error":"(anonymous): Line 4:3 Unexpected identifier`
@@ -1257,11 +1257,10 @@ func testJailParseInvalid(t *testing.T) bool {
 	var extraFunc = function (x) {
 	  return x * x;
 	`
-	response := C.GoString(Parse(C.CString("CHAT_ID_INIT_TEST"), C.CString(extraInvalidCode)))
+	response := C.GoString(Parse(C.CString("CHAT_ID_PARSE_INVALID_TEST"), C.CString(extraInvalidCode)))
 
 	// Assert.
-	// expectedResponse := `{"error":"(anonymous): Line 16331:50 Unexpected end of input (and 1 more errors)"}`
-	expectedResponse := `{"error":"(anonymous): Line 16354:50 Unexpected end of input (and 1 more errors)"}`
+	expectedResponse := `{"error":"(anonymous): Line 4:2 Unexpected end of input (and 1 more errors)"}`
 	if expectedResponse != response {
 		t.Errorf("unexpected response, expected: %v, got: %v", expectedResponse, response)
 		return false
@@ -1310,7 +1309,7 @@ func testJailFunctionCall(t *testing.T) bool {
 	// call with wrong chat id
 	rawResponse := Call(C.CString("CHAT_IDNON_EXISTENT"), C.CString(""), C.CString(""))
 	parsedResponse := C.GoString(rawResponse)
-	expectedError := `{"error":"cell[CHAT_IDNON_EXISTENT] doesn't exist"}`
+	expectedError := `{"error":"cell 'CHAT_IDNON_EXISTENT' not found"}`
 	if parsedResponse != expectedError {
 		t.Errorf("expected error is not returned: expected %s, got %s", expectedError, parsedResponse)
 		return false
