@@ -29,10 +29,24 @@ var (
 	ipcEnabled     = flag.Bool("ipc", false, "IPC RPC enpoint enabled")
 	logLevel       = flag.String("log", "", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
 	logFile        = flag.String("logfile", "", "Path to the log file")
+	version        = flag.Bool("version", false, "Print version")
 )
 
 func main() {
 	flag.Parse()
+
+	config := makeNodeConfig()
+	if err = statusAPI.StartNode(config); err != nil {
+		return err
+	}
+
+	// wait till node has been stopped
+	node, err := statusAPI.NodeManager().Node()
+	if err != nil {
+		return nil
+	}
+
+	node.Wait()
 }
 
 // version returns string representing binary version plus
@@ -46,12 +60,14 @@ func version(gitCommit string) string {
 }
 
 // makeNodeConfig parses incoming CLI options and returns node configuration object
-func makeNodeConfig(dataDir string, networkID int, devMode bool) (*params.NodeConfig, error) {
-	nodeConfig, err := params.NewNodeConfig(dataDir, networkID, devMode)
+func makeNodeConfig() (*params.NodeConfig, error) {
+	devMode := !*prodMode
+	nodeConfig, err := params.NewNodeConfig(*dataDir, *networkID, devMode)
 	if err != nil {
 		return nil, err
 	}
 
+	// TODO(divan): move this logic into params package
 	if *nodeKeyFile != "" {
 		nodeConfig.NodeKeyFile = *nodeKeyFile
 	}
@@ -62,6 +78,18 @@ func makeNodeConfig(dataDir string, networkID int, devMode bool) (*params.NodeCo
 	if *logFile != "" {
 		nodeConfig.LogFile = *logFile
 	}
+
+	nodeConfig.LightEthConfig.Enabled = true
+	nodeConfig.RPCEnabled = *httpEnabled
+	nodeConfig.WhisperConfig.Enabled = *whisperEnabled
+	nodeConfig.SwarmConfig.Enabled = *swarmEnabled
+
+	// RPC configuration
+	if !httpEnabled {
+		nodeConfig.HTTPHost = "" // HTTP RPC is disabled
+	}
+	nodeConfig.HTTPPort = *httpPort
+	nodeConfig.IPCEnabled = *ipcEnabled
 
 	return nodeConfig, nil
 }
