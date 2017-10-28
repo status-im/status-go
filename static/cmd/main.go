@@ -6,7 +6,6 @@ import (
 	"os"
 
 	"github.com/status-im/status-go/geth/common/cipher"
-	"github.com/status-im/status-go/geth/params"
 	"gopkg.in/urfave/cli.v1"
 )
 
@@ -33,7 +32,6 @@ var (
 	nonceFlag = cli.StringFlag{
 		Name:   "nonce",
 		EnvVar: "STATUS_NONCE",
-		Value:  params.DataDir,
 	}
 
 	inputFileFlag = cli.StringFlag{
@@ -53,12 +51,12 @@ var (
 	encryptCommand = cli.Command{
 		Action: EncryptCommandHandler,
 		Name:   "encrypt",
-		Usage:  "Print app version",
+		Usage:  "encrypt given file by using AES-128 or AES-256",
 	}
 	decryptCommand = cli.Command{
 		Action: DecryptCommandHandler,
 		Name:   "decrypt",
-		Usage:  "Print app version",
+		Usage:  "decrypt given file by using AES-128 or AES-256",
 	}
 )
 
@@ -79,15 +77,10 @@ func EncryptCommandHandler(ctx *cli.Context) error {
 
 	outputFile := ctx.GlobalString(outputFileFlag.Name)
 	if outputFile == "" {
-		outputFile = "/dev/stdout"
+		outputFile = os.Stdout.Name()
 	}
 
-	err = ioutil.WriteFile(outputFile, cipherText, 0644)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return ioutil.WriteFile(outputFile, cipherText, 0644)
 }
 
 // DecryptCommandHandler handles decrypt command.
@@ -97,7 +90,7 @@ func DecryptCommandHandler(ctx *cli.Context) error {
 		return err
 	}
 
-	cipherText, err := cipher.Decrypt(
+	plainText, err := cipher.Decrypt(
 		ctx.GlobalString(keyFlag.Name),
 		ctx.GlobalString(nonceFlag.Name),
 		text)
@@ -107,15 +100,10 @@ func DecryptCommandHandler(ctx *cli.Context) error {
 
 	outputFile := ctx.GlobalString(outputFileFlag.Name)
 	if outputFile == "" {
-		outputFile = "/dev/stdout"
+		outputFile = os.Stdout.Name()
 	}
 
-	err = ioutil.WriteFile(outputFile, cipherText, 0644)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return ioutil.WriteFile(outputFile, plainText, 0644)
 }
 
 func init() {

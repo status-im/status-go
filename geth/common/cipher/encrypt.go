@@ -7,7 +7,7 @@ import (
 	"errors"
 )
 
-// Encrypt implements GCM encryption. Key and nonce is in hex representation
+// Encrypt implements GCM encryption. Key and nonce are in hex representation.
 func Encrypt(keyHex, nonceHex string, plaintext []byte) ([]byte, error) {
 	// The key argument should be the AES key, either 16 or 32 bytes (32, 64 bytes in hex representation)
 	// to select AES-128 or AES-256.

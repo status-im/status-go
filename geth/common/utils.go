@@ -73,7 +73,7 @@ func ToAddress(accountAddress string) *common.Address {
 }
 
 // RestoreFile checks if decrypted file exists in dir, and if not
-// tries to restore and decrypt it (from static resources, see "static/keys" folder)
+// tries to restore and decrypt it (from static resources, see "static/keys" folder).
 func RestoreFile(dir, file string) error {
 	text, err := ReadEncryptedFile(dir, file)
 	if err != nil {
@@ -93,7 +93,7 @@ func RestoreFile(dir, file string) error {
 	return nil
 }
 
-// ReadEncryptedFile restores and read encrypted text
+// ReadEncryptedFile restores and reads encrypted text.
 func ReadEncryptedFile(dir, file string) ([]byte, error) {
 	dst := filepath.Join(dir, file)
 	if _, err := os.Stat(dst); !os.IsNotExist(err) {
@@ -103,12 +103,12 @@ func ReadEncryptedFile(dir, file string) ([]byte, error) {
 	key := os.Getenv(keyEnv)
 	nonce := os.Getenv(nonceEnv)
 	if len(key) == 0 || len(nonce) == 0 {
-		err := errors.New("cant get key and nonce to decrypt test account")
-		log.Warn("cannot copy test account PK", "error", err)
+		err := errors.New("cant get key and nonce to decrypt file " + dst)
+		log.Warn("ReadEncryptedFile", "error", err)
 		return nil, err
 	}
 
-	cipherText := static.MustAsset("keys/" + file + cipher.CipherExt)
+	cipherText := static.MustAsset(filepath.Join("keys", file) + cipher.CipherExt)
 	text, err := cipher.Decrypt(key, nonce, cipherText)
 	if err != nil {
 		log.Warn("cannot restore file", "error", err)

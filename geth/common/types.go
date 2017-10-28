@@ -380,6 +380,11 @@ type DiscardTransactionsResult struct {
 	Results map[string]DiscardTransactionResult `json:"results"`
 }
 
+type account struct {
+	Address  string
+	Password string
+}
+
 // TestConfig contains shared (among different test packages) parameters
 type TestConfig struct {
 	Node struct {
@@ -392,11 +397,6 @@ type TestConfig struct {
 	Account3 account
 }
 
-type account struct {
-	Address  string
-	Password string
-}
-
 // NotifyResult is a JSON returned from notify message
 type NotifyResult struct {
 	Status bool   `json:"status"`
@@ -407,7 +407,7 @@ type NotifyResult struct {
 func LoadTestConfig() (*TestConfig, error) {
 	var testConfig TestConfig
 
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "cpnfig")
+	tmpDir, err := ioutil.TempDir(os.TempDir(), "config")
 	if err != nil {
 		return nil, err
 	}

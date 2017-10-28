@@ -32,8 +32,6 @@ func TestVerifyAccountPassword(t *testing.T) {
 
 	account1Address := gethcommon.BytesToAddress(gethcommon.FromHex(TestConfig.Account1.Address))
 
-	fmt.Println("!!!!!!!!!!!!", TestConfig.Account1)
-
 	testCases := []struct {
 		name          string
 		keyPath       string
