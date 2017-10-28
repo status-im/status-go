@@ -8,6 +8,10 @@
 /cmd/statusd/statusd-data
 /cmd/statusd/statusd
 
+/wnode-status-data
+/cmd/wnode-status/wnode-status-data
+/cmd/wnode-status/wnode-status
+
 /tmp
 */**/*un~
 */**/*.test

@@ -12,7 +12,7 @@ import (
 var (
 	prodMode    = flag.Bool("production", false, "Whether production settings should be loaded")
 	nodeKeyFile = flag.String("nodekey", "", "P2P node key file (private key)")
-	dataDir     = flag.String("datadir", params.DataDir, "Data directory for the databases and keystore")
+	dataDir     = flag.String("datadir", "wnode-status-data", "Data directory for the databases and keystore")
 	networkID   = flag.Int("networkid", params.RopstenNetworkID, "Network identifier (integer, 1=Homestead, 3=Ropsten, 4=Rinkeby)")
 	httpEnabled = flag.Bool("http", false, "HTTP RPC enpoint enabled (default: false)")
 	httpPort    = flag.Int("httpport", params.HTTPPort, "HTTP RPC server's listening port")
