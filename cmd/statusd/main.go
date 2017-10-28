@@ -15,7 +15,6 @@ import (
 var (
 	gitCommit  = "N/A" // rely on linker: -ldflags -X main.GitCommit"
 	buildStamp = "N/A" // rely on linker: -ldflags -X main.buildStamp"
-	statusAPI  = api.NewStatusAPI()
 )
 
 var (
@@ -47,13 +46,18 @@ func main() {
 		return
 	}
 
-	if err = statusAPI.StartNode(config); err != nil {
+	backend := api.NewStatusBackend()
+	started, err := backend.StartNode(config)
+	if err != nil {
 		log.Fatalf("Node start failed: %v", err)
 		return
 	}
 
+	// wait till node is started
+	<-started
+
 	// wait till node has been stopped
-	node, err := statusAPI.NodeManager().Node()
+	node, err := backend.NodeManager().Node()
 	if err != nil {
 		log.Fatalf("Getting node failed: %v", err)
 		return
