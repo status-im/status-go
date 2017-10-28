@@ -3,17 +3,18 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
 	"os"
-	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/params"
 )
 
 var (
-	gitCommit  = "rely on linker: -ldflags -X main.GitCommit"
-	buildStamp = "rely on linker: -ldflags -X main.buildStamp"
+	gitCommit  = "N/A" // rely on linker: -ldflags -X main.GitCommit"
+	buildStamp = "N/A" // rely on linker: -ldflags -X main.buildStamp"
 	statusAPI  = api.NewStatusAPI()
 )
 
@@ -35,34 +36,36 @@ var (
 func main() {
 	flag.Parse()
 
-	config := makeNodeConfig()
+	config, err := makeNodeConfig()
+	if err != nil {
+		log.Fatalf("Making config failed: %v", err)
+		return
+	}
+
+	if *version {
+		printVersion(config, gitCommit, buildStamp)
+		return
+	}
+
 	if err = statusAPI.StartNode(config); err != nil {
-		return err
+		log.Fatalf("Node start failed: %v", err)
+		return
 	}
 
 	// wait till node has been stopped
 	node, err := statusAPI.NodeManager().Node()
 	if err != nil {
-		return nil
+		log.Fatalf("Getting node failed: %v", err)
+		return
 	}
 
 	node.Wait()
 }
 
-// version returns string representing binary version plus
-// git comming hash, if present.
-func version(gitCommit string) string {
-	version = params.Version
-	if gitCommit != "" {
-		version += "-" + gitCommit[:8]
-	}
-	return version
-}
-
 // makeNodeConfig parses incoming CLI options and returns node configuration object
 func makeNodeConfig() (*params.NodeConfig, error) {
 	devMode := !*prodMode
-	nodeConfig, err := params.NewNodeConfig(*dataDir, *networkID, devMode)
+	nodeConfig, err := params.NewNodeConfig(*dataDir, uint64(*networkID), devMode)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +88,7 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 	nodeConfig.SwarmConfig.Enabled = *swarmEnabled
 
 	// RPC configuration
-	if !httpEnabled {
+	if !*httpEnabled {
 		nodeConfig.HTTPHost = "" // HTTP RPC is disabled
 	}
 	nodeConfig.HTTPPort = *httpPort
@@ -94,13 +97,28 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 	return nodeConfig, nil
 }
 
-// printNodeConfig prints node config
-func printNodeConfig() {
-	nodeConfig, err := makeNodeConfig(*datadir, *networkID, *!prodMode)
-	if err != nil {
-		fmt.Printf("Loaded Config: failed (err: %v)", err)
-		return
+// printVersion prints verbose output about version and config.
+func printVersion(config *params.NodeConfig, gitCommit, buildStamp string) {
+	version := params.Version
+	if gitCommit != "" {
+		version += "-" + gitCommit[:8]
 	}
-	nodeConfig.LightEthConfig.Genesis = "SKIP"
-	fmt.Println("Loaded Config: ", nodeConfig)
+
+	fmt.Println(strings.Title(params.ClientIdentifier))
+	fmt.Println("Version:", params.Version)
+	if gitCommit != "" {
+		fmt.Println("Git Commit:", gitCommit)
+	}
+	if buildStamp != "" {
+		fmt.Println("Build Stamp:", buildStamp)
+	}
+
+	fmt.Println("Network Id:", config.NetworkID)
+	fmt.Println("Go Version:", runtime.Version())
+	fmt.Println("OS:", runtime.GOOS)
+	fmt.Printf("GOPATH=%s\n", os.Getenv("GOPATH"))
+	fmt.Printf("GOROOT=%s\n", runtime.GOROOT())
+
+	config.LightEthConfig.Genesis = "SKIP"
+	fmt.Println("Loaded Config: ", config)
 }
