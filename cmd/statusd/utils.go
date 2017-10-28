@@ -133,10 +133,10 @@ func testVerifyAccountPassword(t *testing.T) bool {
 	}
 	defer os.RemoveAll(tmpDir) // nolint: errcheck
 
-	if err = common.RestoreFile(tmpDir, "test-account3.pk"); err != nil {
+	if err = common.ImportTestAccount(tmpDir, "test-account3.pk"); err != nil {
 		t.Fatal(err)
 	}
-	if err = common.RestoreFile(tmpDir, "test-account4.pk"); err != nil {
+	if err = common.ImportTestAccount(tmpDir, "test-account4.pk"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1336,10 +1336,10 @@ func startTestNode(t *testing.T) <-chan struct{} {
 	}
 
 	// inject test accounts
-	if err := common.RestoreFile(filepath.Join(TestDataDir, "keystore"), "test-account3.pk"); err != nil {
+	if err := common.ImportTestAccount(filepath.Join(TestDataDir, "keystore"), "test-account3.pk"); err != nil {
 		panic(err)
 	}
-	if err := common.RestoreFile(filepath.Join(TestDataDir, "keystore"), "test-account4.pk"); err != nil {
+	if err := common.ImportTestAccount(filepath.Join(TestDataDir, "keystore"), "test-account4.pk"); err != nil {
 		panic(err)
 	}
 

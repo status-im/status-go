@@ -6,9 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -22,6 +19,8 @@ import (
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/rpc"
+	"github.com/status-im/status-go/static"
+	"os"
 )
 
 // errors
@@ -403,29 +402,19 @@ type NotifyResult struct {
 	Error  string `json:"error,omitempty"`
 }
 
+const passKey = "ACCOUNT_PASSWORD"
+
 // LoadTestConfig loads test configuration values from disk
 func LoadTestConfig() (*TestConfig, error) {
 	var testConfig TestConfig
 
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "config")
-	if err != nil {
-		return nil, err
-	}
-	defer os.RemoveAll(tmpDir) // nolint: errcheck
-
-	err = RestoreFile(tmpDir, "test-data.json")
-	if err != nil {
+	configData := string(static.MustAsset("config/test-data.json"))
+	if err := json.Unmarshal([]byte(configData), &testConfig); err != nil {
 		return nil, err
 	}
 
-	configData, err := ioutil.ReadFile(filepath.Join(tmpDir, "test-data.json"))
-	if err != nil {
-		return nil, err
-	}
-
-	if err := json.Unmarshal(configData, &testConfig); err != nil {
-		return nil, err
-	}
+	testConfig.Account1.Password = os.Getenv(passKey)
+	testConfig.Account2.Password = testConfig.Account1.Password
 
 	return &testConfig, nil
 }

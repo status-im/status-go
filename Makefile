@@ -77,21 +77,10 @@ statusgo-ios-simulator-mainnet: xgo
 	build/env.sh $(GOBIN)/xgo --image farazdagi/xgo-ios-simulator --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v $(shell build/mainnet-flags.sh) ./cmd/statusd
 	@echo "iOS framework cross compilation done (mainnet)."
 
-generate: encrypt ##@other Regenerate assets and other auto-generated stuff
-	cp ./build/_workspace/deps/src/github.com/ethereum/go-ethereum/internal/jsre/deps/web3.js ./static/scripts/web3.js
-	rm -f ./static/bindata.go
+generate: ##@other Regenerate assets and other auto-generated stuff
+	cp ./node_modules/web3/dist/web3.js ./static/scripts/web3.js
 	build/env.sh go generate ./static
 	rm ./static/scripts/web3.js
-
-encrypt:
-	find ./static/keys -type f -not -name "*.cr" -exec go run ./static/cmd/main.go --input "{}" --output="{}.cr" encrypt \;
-	find ./static/keys -type f -not -name "*.cr" -delete
-
-decrypt:
-	find ./static/keys/*.cr -type f |rev|cut -c4-|rev| xargs -n1 -i sh -c 'file={}; go run ./static/cmd/main.go --input "$$file.cr" --output="$$file" decrypt'
-
-bindata-install:
-	go get -u github.com/jteeuwen/go-bindata/...
 
 mock-install: ##@other Install mocking tools
 	go get -u github.com/golang/mock/mockgen

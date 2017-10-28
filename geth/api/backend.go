@@ -17,7 +17,8 @@ import (
 )
 
 const (
-	fcmKeyFile = "firebase_notification"
+	//todo(jeka): should be removed
+	fcmServerKey = "AAAAxwa-r08:APA91bFtMIToDVKGAmVCm76iEXtA4dn9MPvLdYKIZqAlNpLJbd12EgdBI9DSDSXKdqvIAgLodepmRhGVaWvhxnXJzVpE6MoIRuKedDV3kfHSVBhWFqsyoLTwXY4xeufL9Sdzb581U-lx"
 )
 
 // StatusBackend implements Status.im service
@@ -39,9 +40,7 @@ func NewStatusBackend() *StatusBackend {
 	accountManager := account.NewManager(nodeManager)
 	txQueueManager := txqueue.NewManager(nodeManager, accountManager)
 	jailManager := jail.New(nodeManager)
-
-	key, _ := common.ReadEncryptedFile(common.KeysPath, fcmKeyFile)
-	notificationManager := fcm.NewNotification(string(key))
+	notificationManager := fcm.NewNotification(fcmServerKey)
 
 	return &StatusBackend{
 		nodeManager:     nodeManager,
