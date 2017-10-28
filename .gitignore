@@ -5,6 +5,8 @@
 #   git config --global core.excludesfile ~/.gitignore_global
 
 /statusd-data
+/cmd/statusd/statusd-data
+/cmd/statusd/statusd
 
 /tmp
 */**/*un~
