@@ -30,6 +30,7 @@ var (
 	logLevel       = flag.String("log", "", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
 	logFile        = flag.String("logfile", "", "Path to the log file")
 	version        = flag.Bool("version", false, "Print version")
+	verbose        = flag.Bool("v", false, "Be verbose to stdout (overrides -logLevel and -logFile)")
 )
 
 func main() {
@@ -39,6 +40,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Making config failed: %v", err)
 		return
+	}
+
+	if *verbose {
+		config.LogLevel = "INFO"
+		config.LogFile = ""
 	}
 
 	if *version {
