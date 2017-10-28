@@ -100,7 +100,7 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 // printVersion prints verbose output about version and config.
 func printVersion(config *params.NodeConfig, gitCommit, buildStamp string) {
 	version := params.Version
-	if gitCommit != "" {
+	if gitCommit != "" && len(gitCommit) > 8 {
 		version += "-" + gitCommit[:8]
 	}
 
