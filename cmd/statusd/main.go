@@ -30,21 +30,16 @@ var (
 	logLevel       = flag.String("log", "INFO", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
 	logFile        = flag.String("logfile", "", "Path to the log file")
 	version        = flag.Bool("version", false, "Print version")
-	verbose        = flag.Bool("v", false, "Be verbose to stdout (overrides -loglevel and -logfile)")
 )
 
 func main() {
+	flag.Usage = printUsage
 	flag.Parse()
 
 	config, err := makeNodeConfig()
 	if err != nil {
 		log.Fatalf("Making config failed: %v", err)
 		return
-	}
-
-	if *verbose {
-		config.LogLevel = "INFO"
-		config.LogFile = ""
 	}
 
 	if *version {
@@ -131,4 +126,18 @@ func printVersion(config *params.NodeConfig, gitCommit, buildStamp string) {
 
 	config.LightEthConfig.Genesis = "SKIP"
 	fmt.Println("Loaded Config: ", config)
+}
+
+func printUsage() {
+	fmt.Fprintln(os.Stderr, "Usage: statusd [options]")
+	fmt.Fprintf(os.Stderr, `
+Examples:
+  statusd               # run status node with defaults
+  statusd -networkid 4  # run node on Rinkeby network
+  statusd -datadir /dir # specify different dir for data
+  statusd -ipc          # enable IPC comminication for usage with "geth attach"
+
+Options:
+`)
+	flag.PrintDefaults()
 }
