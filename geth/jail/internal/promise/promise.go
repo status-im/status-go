@@ -6,6 +6,7 @@ import (
 	"github.com/status-im/status-go/geth/jail/internal/vm"
 )
 
+//Define jail promise
 func Define(vm *vm.VM, l *loop.Loop) error {
 	if v, err := vm.Get("Promise"); err != nil {
 		return err

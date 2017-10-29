@@ -32,6 +32,8 @@ var (
 )
 
 // NodeManager manages Status node (which abstracts contained geth node)
+// nolint: golint
+// should be fixed at https://github.com/status-im/status-go/issues/200
 type NodeManager struct {
 	sync.RWMutex
 	config         *params.NodeConfig // Status node configuration
@@ -78,7 +80,7 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 		defer HaltOnPanic()
 
 		// start underlying node
-		if err := ethNode.Start(); err != nil {
+		if startErr := ethNode.Start(); startErr != nil {
 			close(m.nodeStarted)
 			m.Lock()
 			m.nodeStarted = nil
@@ -86,7 +88,7 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 			signal.Send(signal.Envelope{
 				Type: signal.EventNodeCrashed,
 				Event: signal.NodeCrashEvent{
-					Error: fmt.Errorf("%v: %v", ErrNodeStartFailure, err).Error(),
+					Error: fmt.Errorf("%v: %v", ErrNodeStartFailure, startErr).Error(),
 				},
 			})
 			return

@@ -79,17 +79,17 @@ const (
 	// FirebaseNotificationTriggerURL is URL where FCM notification requests are sent to
 	FirebaseNotificationTriggerURL = "https://fcm.googleapis.com/fcm/send"
 
-	// UpstreamMainNetEthereumNetworkURL is URL where the upstream ethereum network is loaded to
+	// MainnetEthereumNetworkURL is URL where the upstream ethereum network is loaded to
 	// allow us avoid syncing node.
-	UpstreamMainNetEthereumNetworkURL = "https://mainnet.infura.io/nKmXgiFgc2KqtoQ8BCGJ"
+	MainnetEthereumNetworkURL = "https://mainnet.infura.io/nKmXgiFgc2KqtoQ8BCGJ"
 
-	// UpstreamRopstenEthereumNetworkURL is URL where the upstream ethereum network is loaded to
+	// RopstenEthereumNetworkURL is URL where the upstream ethereum network is loaded to
 	// allow us avoid syncing node.
-	UpstreamRopstenEthereumNetworkURL = "https://ropsten.infura.io/nKmXgiFgc2KqtoQ8BCGJ"
+	RopstenEthereumNetworkURL = "https://ropsten.infura.io/nKmXgiFgc2KqtoQ8BCGJ"
 
-	// UpstreamRinkebyEthereumNetworkURL is URL where the upstream ethereum network is loaded to
+	// RinkebyEthereumNetworkURL is URL where the upstream ethereum network is loaded to
 	// allow us avoid syncing node.
-	UpstreamRinkebyEthereumNetworkURL = "https://rinkeby.infura.io/nKmXgiFgc2KqtoQ8BCGJ"
+	RinkebyEthereumNetworkURL = "https://rinkeby.infura.io/nKmXgiFgc2KqtoQ8BCGJ"
 
 	// MainNetworkID is id of the main network
 	MainNetworkID = 1

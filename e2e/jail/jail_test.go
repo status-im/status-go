@@ -20,7 +20,6 @@ const (
 
 var (
 	baseStatusJSCode = string(static.MustAsset("testdata/jail/status.js"))
-	txJSCode         = string(static.MustAsset("testdata/jail/tx-send/tx-send.js"))
 )
 
 func TestJailTestSuite(t *testing.T) {
@@ -118,7 +117,7 @@ func (s *JailTestSuite) TestEventSignal() {
 	// replace transaction notification handler
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var envelope signal.Envelope
-		err := json.Unmarshal([]byte(jsonEvent), &envelope)
+		err = json.Unmarshal([]byte(jsonEvent), &envelope)
 		s.NoError(err)
 
 		if envelope.Type == jail.EventSignal {
@@ -177,6 +176,7 @@ func (s *JailTestSuite) TestJailCellsRemovedAfterStop() {
 				counter++;
 			}, 1000);
 		`)
+		require.NoError(err)
 	}
 
 	s.jail.Stop()

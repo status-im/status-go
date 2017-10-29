@@ -55,32 +55,42 @@ func (t *fetchTask) Execute(vm *vm.VM, l *loop.Loop) error {
 	vm.Lock()
 	defer vm.Unlock()
 
-	t.jsRes.Set("status", t.status)
-	t.jsRes.Set("statusText", t.statusText)
+	err := t.jsRes.Set("status", t.status)
+	if err != nil {
+		return err
+	}
+
+	err = t.jsRes.Set("statusText", t.statusText)
+	if err != nil {
+		return err
+	}
+
 	h := mustValue(t.jsRes.Get("headers")).Object()
 	for k, vs := range t.headers {
 		for _, v := range vs {
-			if _, err := h.Call("append", k, v); err != nil {
+			if _, err = h.Call("append", k, v); err != nil {
 				return err
 			}
 		}
 	}
-	t.jsRes.Set("_body", string(t.body))
-
-	if _, err := t.cb.Call(otto.NullValue(), arguments...); err != nil {
+	err = t.jsRes.Set("_body", string(t.body))
+	if err != nil {
 		return err
 	}
 
-	return nil
+	_, err = t.cb.Call(otto.NullValue(), arguments...)
+	return err
 }
 
 func (t *fetchTask) Cancel() {
 }
 
+// Define fetch
 func Define(vm *vm.VM, l *loop.Loop) error {
 	return DefineWithHandler(vm, l, nil)
 }
 
+//DefineWithHandler fetch with handler
 func DefineWithHandler(vm *vm.VM, l *loop.Loop, h http.Handler) error {
 	if err := promise.Define(vm, l); err != nil {
 		return err
@@ -94,11 +104,12 @@ func DefineWithHandler(vm *vm.VM, l *loop.Loop, h http.Handler) error {
 		return err
 	}
 
-	if _, err := vm.Run(s); err != nil {
+	_, err = vm.Run(s)
+	if err != nil {
 		return err
 	}
 
-	vm.Set("__private__fetch_execute", func(c otto.FunctionCall) otto.Value {
+	err = vm.Set("__private__fetch_execute", func(c otto.FunctionCall) otto.Value {
 		jsReq := c.Argument(0).Object()
 		jsRes := c.Argument(1).Object()
 		cb := c.Argument(2)
@@ -122,9 +133,9 @@ func DefineWithHandler(vm *vm.VM, l *loop.Loop, h http.Handler) error {
 		go func() {
 			defer l.Ready(t)
 
-			req, err := http.NewRequest(method, urlStr, body)
-			if err != nil {
-				t.err = err
+			req, rqErr := http.NewRequest(method, urlStr, body)
+			if rqErr != nil {
+				t.err = rqErr
 				return
 			}
 
@@ -138,15 +149,15 @@ func DefineWithHandler(vm *vm.VM, l *loop.Loop, h http.Handler) error {
 				t.headers = res.Header()
 				t.body = res.Body.Bytes()
 			} else {
-				res, err := http.DefaultClient.Do(req)
-				if err != nil {
-					t.err = err
+				res, e := http.DefaultClient.Do(req)
+				if e != nil {
+					t.err = e
 					return
 				}
 
-				d, err := ioutil.ReadAll(res.Body)
-				if err != nil {
-					t.err = err
+				d, e := ioutil.ReadAll(res.Body)
+				if e != nil {
+					t.err = e
 					return
 				}
 
@@ -160,5 +171,5 @@ func DefineWithHandler(vm *vm.VM, l *loop.Loop, h http.Handler) error {
 		return otto.UndefinedValue()
 	})
 
-	return nil
+	return err
 }

@@ -525,7 +525,8 @@ func (c *NodeConfig) DefaultStatusChainGenesisBlock() (*core.Genesis, error) {
 	}
 
 	var genesis *core.Genesis
-	if err := json.Unmarshal([]byte(genesisJSON), &genesis); err != nil {
+	err = json.Unmarshal(genesisJSON, &genesis)
+	if err != nil {
 		return nil, fmt.Errorf("cannot unmarshal status-chain-genesis.json: %s", err)
 	}
 	return genesis, nil
@@ -542,11 +543,11 @@ func (c *NodeConfig) updateUpstreamConfig() error {
 
 	switch c.NetworkID {
 	case MainNetworkID:
-		c.UpstreamConfig.URL = UpstreamMainNetEthereumNetworkURL
+		c.UpstreamConfig.URL = MainnetEthereumNetworkURL
 	case RopstenNetworkID:
-		c.UpstreamConfig.URL = UpstreamRopstenEthereumNetworkURL
+		c.UpstreamConfig.URL = RopstenEthereumNetworkURL
 	case RinkebyNetworkID:
-		c.UpstreamConfig.URL = UpstreamRinkebyEthereumNetworkURL
+		c.UpstreamConfig.URL = RinkebyEthereumNetworkURL
 	}
 
 	return nil

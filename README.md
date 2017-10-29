@@ -30,6 +30,8 @@ Use following Makefile commands:
 
 # Testing
 To test statusgo, use: `make ci`.
+To test statusgo using a giving network by name, use: `make ci networkid=rinkeby`.
+To test statusgo using a giving network by id number, use: `make ci networkid=3`.
 
 If you want to launch specific test, for instance `RPCSendTransactions`, use the following command:
 ```

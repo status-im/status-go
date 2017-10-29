@@ -22,12 +22,18 @@ const (
 )
 
 var (
-	ErrQueuedTxIDNotFound       = errors.New("transaction hash not found")
-	ErrQueuedTxTimedOut         = errors.New("transaction sending timed out")
-	ErrQueuedTxDiscarded        = errors.New("transaction has been discarded")
-	ErrQueuedTxInProgress       = errors.New("transaction is in progress")
+	//ErrQueuedTxIDNotFound - error transaction hash not found
+	ErrQueuedTxIDNotFound = errors.New("transaction hash not found")
+	//ErrQueuedTxTimedOut - error transaction sending timed out
+	ErrQueuedTxTimedOut = errors.New("transaction sending timed out")
+	//ErrQueuedTxDiscarded - error transaction discarded
+	ErrQueuedTxDiscarded = errors.New("transaction has been discarded")
+	//ErrQueuedTxInProgress - error transaction in progress
+	ErrQueuedTxInProgress = errors.New("transaction is in progress")
+	//ErrQueuedTxAlreadyProcessed - error transaction has already processed
 	ErrQueuedTxAlreadyProcessed = errors.New("transaction has been already processed")
-	ErrInvalidCompleteTxSender  = errors.New("transaction can only be completed by the same account which created it")
+	//ErrInvalidCompleteTxSender - error transaction with invalid sender
+	ErrInvalidCompleteTxSender = errors.New("transaction can only be completed by the same account which created it")
 )
 
 // TxQueue is capped container that holds pending transactions
@@ -122,7 +128,8 @@ func (q *TxQueue) enqueueLoop() {
 		select {
 		case queuedTx := <-q.incomingPool:
 			log.Info("transaction enqueued requested", "tx", queuedTx.ID)
-			q.Enqueue(queuedTx)
+			err := q.Enqueue(queuedTx)
+			log.Warn("transaction enqueued error", "tx", err)
 			log.Info("transaction enqueued", "tx", queuedTx.ID)
 		case <-q.stopped:
 			log.Info("transaction queue's enqueue loop stopped")

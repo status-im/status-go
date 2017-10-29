@@ -69,11 +69,13 @@ func Send(signal Envelope) {
 }
 
 //export NotifyNode
-func NotifyNode(jsonEvent *C.char) { // nolint: golint
+//nolint: golint
+func NotifyNode(jsonEvent *C.char) {
 	notificationHandler(C.GoString(jsonEvent))
 }
 
 //export TriggerTestSignal
-func TriggerTestSignal() { // nolint: golint
+//nolint: golint
+func TriggerTestSignal() {
 	C.StatusServiceSignalEvent(C.CString(`{"answer": 42}`))
 }

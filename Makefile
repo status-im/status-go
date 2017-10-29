@@ -1,8 +1,11 @@
 .PHONY: statusgo all test xgo clean help
 .PHONY: statusgo-android statusgo-ios
 
+include ./static/tools/mk/lint.mk
+
 GOBIN = build/bin
 GO ?= latest
+networkid ?=
 
 # This is a code for automatic help generator.
 # It supports ANSI colors and categories.
@@ -79,81 +82,36 @@ generate: ##@other Regenerate assets and other auto-generated stuff
 	build/env.sh go generate ./static
 	rm ./static/scripts/web3.js
 
-lint-deps:
-	go get -u github.com/alecthomas/gometalinter
-	gometalinter --install
-
-lint-cur:
-	gometalinter --disable-all --enable=deadcode extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
-
-lint: ##@tests Run meta linter on code
-	@echo "Linter: go vet\n--------------------"
-	@gometalinter --disable-all --enable=vet extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
-	@echo "Linter: go vet --shadow\n--------------------"
-	@gometalinter --disable-all --enable=vetshadow extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
-	@echo "Linter: gofmt\n--------------------"
-	@gometalinter --disable-all --enable=gofmt extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
-	@echo "Linter: goimports\n--------------------"
-	@gometalinter --disable-all --enable=goimports extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
-	@echo "Linter: golint\n--------------------"
-	@gometalinter --disable-all --enable=golint extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
-	@echo "Linter: deadcode\n--------------------"
-	@gometalinter --disable-all --enable=deadcode extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
-	@echo "Linter: misspell\n--------------------"
-	@gometalinter --disable-all --enable=misspell extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
-	@echo "Linter: unparam\n--------------------"
-	@gometalinter --disable-all --deadline 45s --enable=unparam extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
-	@echo "Linter: unused\n--------------------"
-	@gometalinter --disable-all --deadline 45s --enable=unused extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
-	@echo "Linter: gocyclo\n--------------------"
-	@gometalinter --disable-all --enable=gocyclo extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
-	@echo "Linter: errcheck\n--------------------"
-	@gometalinter --disable-all --enable=errcheck extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
-	@echo "Linter: dupl\n--------------------"
-	@gometalinter --disable-all --enable=dupl extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
-	@echo "Linter: ineffassign\n--------------------"
-	@gometalinter --disable-all --enable=ineffassign extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
-	@echo "Linter: interfacer\n--------------------"
-	@gometalinter --disable-all --enable=interfacer extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
-	@echo "Linter: unconvert\n--------------------"
-	@gometalinter --disable-all --enable=unconvert extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
-	@echo "Linter: goconst\n--------------------"
-	@gometalinter --disable-all --enable=goconst extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
-	@echo "Linter: staticcheck\n--------------------"
-	@gometalinter --disable-all --deadline 45s --enable=staticcheck extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
-	@echo "Linter: gas\n--------------------"
-	@gometalinter --disable-all --enable=gas extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
-	@echo "Linter: varcheck\n--------------------"
-	@gometalinter --disable-all --deadline 60s --enable=varcheck extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
-	@echo "Linter: structcheck\n--------------------"
-	@gometalinter --disable-all --enable=structcheck extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
-	@echo "Linter: gosimple\n--------------------"
-	@gometalinter --disable-all --deadline 45s --enable=gosimple extkeys cmd/... geth/... | grep -v -f ./static/config/linter_exclude_list.txt || echo "OK!"
 
 mock-install: ##@other Install mocking tools
 	go get -u github.com/golang/mock/mockgen
 
 mock: ##@other Regenerate mocks
 	mockgen -source=geth/common/types.go -destination=geth/common/types_mock.go -package=common
+	mockgen -source=geth/common/notification.go -destination=geth/common/notification_mock.go -package=common -imports fcm=github.com/NaySoftware/go-fcm
+	mockgen -source=geth/notification/fcm/client.go -destination=geth/notification/fcm/client_mock.go -package=fcm -imports fcm=github.com/NaySoftware/go-fcm
 
-test: ##@tests Run unit and integration tests
+test: test-unit-coverage ##@tests Run basic, short tests during development
+
+test-unit: ##@tests Run unit and integration tests
 	build/env.sh go test $(UNIT_TEST_PACKAGES)
 
-test-coverage: ##@tests Run unit and integration tests with covevare
+test-unit-coverage: ##@tests Run unit and integration tests with coverage
 	build/env.sh go test -coverpkg= $(UNIT_TEST_PACKAGES)
 
 test-e2e: ##@tests Run e2e tests
 	# order: reliability then alphabetical
-	# build/env.sh go test -timeout 5m ./e2e/accounts/...
-	# build/env.sh go test -timeout 5m ./e2e/api/...
-	# build/env.sh go test -timeout 5m ./e2e/node/...
-	# build/env.sh go test -timeout 15m ./e2e/jail/...
-	# build/env.sh go test -timeout 20m ./e2e/rpc/...
-	build/env.sh go test -timeout 20m -v ./e2e/whisper/...
-	# build/env.sh go test -timeout 10m ./e2e/transactions/...
-	# build/env.sh go test -timeout 10m ./cmd/statusd
+	# TODO(tiabc): make a single command out of them adding `-p 1` flag.
+	build/env.sh go test -timeout 5m ./e2e/accounts/... -network=$(networkid)
+	build/env.sh go test -timeout 5m ./e2e/api/... -network=$(networkid)
+	build/env.sh go test -timeout 5m ./e2e/node/... -network=$(networkid)
+	build/env.sh go test -timeout 15m ./e2e/jail/... -network=$(networkid)
+	build/env.sh go test -timeout 20m ./e2e/rpc/... -network=$(networkid)
+	build/env.sh go test -timeout 20m ./e2e/whisper/... -network=$(networkid)
+	build/env.sh go test -timeout 10m ./e2e/transactions/... -network=$(networkid)
+	build/env.sh go test -timeout 40m ./cmd/statusd -network=$(networkid)
 
-ci: mock-install mock test-coverage test-e2e ##@tests Run all tests in CI
+ci: lint mock-install mock test-unit test-e2e ##@tests Run all linters and tests at once
 
 clean: ##@other Cleanup
 	rm -fr build/bin/*

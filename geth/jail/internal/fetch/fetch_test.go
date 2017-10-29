@@ -18,7 +18,7 @@ import (
 func (s *FetchSuite) TestFetch() {
 	ch := make(chan struct{})
 	s.mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("hello"))
+		w.Write([]byte("hello")) //nolint: errcheck
 		ch <- struct{}{}
 	})
 
@@ -28,7 +28,7 @@ func (s *FetchSuite) TestFetch() {
 	err = s.loop.Eval(`fetch('` + s.srv.URL + `').then(function(r) {
 		    return r.text();
 		  }).then(function(d) {
-		    if (d.indexOf('hellox') === -1) {
+		    if (d.indexOf('hello') === -1) {
 		      throw new Error('what');
 		    }
 		  });`)
@@ -43,7 +43,7 @@ func (s *FetchSuite) TestFetch() {
 
 func (s *FetchSuite) TestFetchCallback() {
 	s.mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("hello"))
+		w.Write([]byte("hello")) //nolint: errcheck
 	})
 
 	err := fetch.Define(s.vm, s.loop)
@@ -74,7 +74,7 @@ func (s *FetchSuite) TestFetchHeaders() {
 		w.Header().Add("header-two", "2a")
 		w.Header().Add("header-two", "2b")
 
-		w.Write([]byte("hello"))
+		w.Write([]byte("hello")) //nolint: errcheck
 	})
 
 	err := fetch.Define(s.vm, s.loop)
@@ -106,7 +106,7 @@ func (s *FetchSuite) TestFetchJSON() {
 	s.mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		// these spaces are here so we can disambiguate between this and the
 		// re-encoded data the javascript below spits out
-		w.Write([]byte("[ 1 , 2 , 3 ]"))
+		w.Write([]byte("[ 1 , 2 , 3 ]")) //nolint: errcheck
 	})
 
 	err := fetch.Define(s.vm, s.loop)
@@ -135,7 +135,7 @@ func (s *FetchSuite) TestFetchWithHandler() {
 	s.mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		// these spaces are here so we can disambiguate between this and the
 		// re-encoded data the javascript below spits out
-		w.Write([]byte("[ 1 , 2 , 3 ]"))
+		w.Write([]byte("[ 1 , 2 , 3 ]")) //nolint: errcheck
 	})
 
 	err := fetch.DefineWithHandler(s.vm, s.loop, s.mux)
@@ -162,7 +162,7 @@ func (s *FetchSuite) TestFetchWithHandler() {
 
 func (s *FetchSuite) TestFetchWithHandlerParallel() {
 	s.mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("hello"))
+		w.Write([]byte("hello")) //nolint: errcheck
 	})
 
 	err := fetch.DefineWithHandler(s.vm, s.loop, s.mux)
@@ -211,7 +211,7 @@ func (s *FetchSuite) SetupTest() {
 	s.vm = vm.New(o)
 	s.loop = loop.New(s.vm)
 
-	go s.loop.Run(context.Background())
+	go s.loop.Run(context.Background()) //nolint: errcheck
 }
 
 func (s *FetchSuite) TearDownSuite() {

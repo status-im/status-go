@@ -12,19 +12,18 @@ import (
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/e2e"
 	"github.com/status-im/status-go/geth/common"
-	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/static"
 	. "github.com/status-im/status-go/testing"
 	"github.com/stretchr/testify/suite"
 )
 
 const (
+	//nolint: unused, varcheck
 	whisperMessage1 = `test message 1 (K1 -> K2, signed+encrypted, from us)`
 	whisperMessage2 = `test message 3 (K1 -> "", signed broadcast)`
 	whisperMessage3 = `test message 4 ("" -> "", anon broadcast)`
 	whisperMessage4 = `test message 5 ("" -> K1, encrypted anon broadcast)`
 	whisperMessage5 = `test message 6 (K2 -> K1, signed+encrypted, to us)`
-	testChatID      = "testChat"
 )
 
 var (
@@ -45,8 +44,8 @@ type WhisperJailTestSuite struct {
 	Jail       common.JailManager
 }
 
-func (s *WhisperJailTestSuite) StartTestBackend(networkID int, opts ...e2e.TestNodeOption) {
-	s.BackendTestSuite.StartTestBackend(networkID, opts...)
+func (s *WhisperJailTestSuite) StartTestBackend(opts ...e2e.TestNodeOption) {
+	s.BackendTestSuite.StartTestBackend(opts...)
 
 	s.WhisperAPI = whisper.NewPublicWhisperAPI(s.WhisperService())
 	s.Jail = s.Backend.JailManager()
@@ -60,7 +59,7 @@ func (s *WhisperJailTestSuite) GetAccountKey(account struct {
 }) (*keystore.Key, string, error) {
 	accountManager := s.Backend.AccountManager()
 
-	_, accountKey1, err := accountManager.AddressToDecryptedAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
+	_, accountKey1, err := accountManager.AddressToDecryptedAccount(account.Address, account.Password)
 	if err != nil {
 		return nil, "", err
 	}
@@ -78,8 +77,10 @@ func (s *WhisperJailTestSuite) GetAccountKey(account struct {
 	return accountKey1, accountKey1Hex, nil
 }
 
-func (s *WhisperJailTestSuite) TestJailWhisper() {
-	s.StartTestBackend(params.RopstenNetworkID)
+// TODO(adamb) Uncomment when issue #336 is fixed.
+/*
+func (s *WhisperJailTestSuite) DontTestJailWhisper() {
+	s.StartTestBackend()
 	defer s.StopTestBackend()
 
 	_, accountKey1Hex, err := s.GetAccountKey(TestConfig.Account1)
@@ -375,9 +376,10 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 		}
 	}
 }
+*/
 
 // func (s *WhisperJailTestSuite) TestEncryptedAnonymousMessage() {
-// 	s.StartTestBackend(params.RopstenNetworkID)
+// 	s.StartTestBackend()
 // 	defer s.StopTestBackend()
 
 // 	accountKey2, accountKey2Hex, err := s.GetAccountKey(TestConfig.Account2)

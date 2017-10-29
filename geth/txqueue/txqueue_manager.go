@@ -139,7 +139,8 @@ func (m *Manager) CompleteTransaction(id common.QueuedTxID, password string) (ge
 		return gethcommon.Hash{}, err
 	}
 
-	if err := m.txQueue.StartProcessing(queuedTx); err != nil {
+	err = m.txQueue.StartProcessing(queuedTx)
+	if err != nil {
 		return gethcommon.Hash{}, err
 	}
 	defer m.txQueue.StopProcessing(queuedTx)
@@ -165,29 +166,28 @@ func (m *Manager) CompleteTransaction(id common.QueuedTxID, password string) (ge
 
 	// Send the transaction finally.
 	var hash gethcommon.Hash
-	var txErr error
 
 	if config.UpstreamConfig.Enabled {
-		hash, txErr = m.completeRemoteTransaction(queuedTx, password)
+		hash, err = m.completeRemoteTransaction(queuedTx, password)
 	} else {
-		hash, txErr = m.completeLocalTransaction(queuedTx, password)
+		hash, err = m.completeLocalTransaction(queuedTx, password)
 	}
 
 	// when incorrect sender tries to complete the account,
 	// notify and keep tx in queue (so that correct sender can complete)
-	if txErr == keystore.ErrDecrypt {
-		log.Warn("failed to complete transaction", "err", txErr)
-		m.NotifyOnQueuedTxReturn(queuedTx, txErr)
-		return hash, txErr
+	if err == keystore.ErrDecrypt {
+		log.Warn("failed to complete transaction", "err", err)
+		m.NotifyOnQueuedTxReturn(queuedTx, err)
+		return hash, err
 	}
 
-	log.Info("finally completed transaction", "id", queuedTx.ID, "hash", hash, "err", txErr)
+	log.Info("finally completed transaction", "id", queuedTx.ID, "hash", hash, "err", err)
 
 	queuedTx.Hash = hash
-	queuedTx.Err = txErr
+	queuedTx.Err = err
 	queuedTx.Done <- struct{}{}
 
-	return hash, txErr
+	return hash, err
 }
 
 func (m *Manager) completeLocalTransaction(queuedTx *common.QueuedTx, password string) (gethcommon.Hash, error) {
@@ -219,11 +219,8 @@ func (m *Manager) completeRemoteTransaction(queuedTx *common.QueuedTx, password 
 		return emptyHash, err
 	}
 
-	if _, err := m.accountManager.VerifyAccountPassword(
-		config.KeyStoreDir,
-		selectedAcct.Address.String(),
-		password,
-	); err != nil {
+	_, err = m.accountManager.VerifyAccountPassword(config.KeyStoreDir, selectedAcct.Address.String(), password)
+	if err != nil {
 		log.Warn("failed to verify account", "account", selectedAcct.Address.String(), "error", err.Error())
 		return emptyHash, err
 	}
@@ -234,16 +231,17 @@ func (m *Manager) completeRemoteTransaction(queuedTx *common.QueuedTx, password 
 
 	var txCount hexutil.Uint
 	client := m.nodeManager.RPCClient()
-	if err := client.CallContext(ctx, &txCount, "eth_getTransactionCount", queuedTx.Args.From, "pending"); err != nil {
+	err = client.CallContext(ctx, &txCount, "eth_getTransactionCount", queuedTx.Args.From, "pending")
+	if err != nil {
 		return emptyHash, err
 	}
 
 	args := queuedTx.Args
 
 	if args.GasPrice == nil {
-		value, err := m.gasPrice()
-		if err != nil {
-			return emptyHash, err
+		value, gasPriceErr := m.gasPrice()
+		if gasPriceErr != nil {
+			return emptyHash, gasPriceErr
 		}
 
 		args.GasPrice = value
@@ -305,12 +303,12 @@ func (m *Manager) estimateGas(args common.SendTxArgs) (*hexutil.Big, error) {
 
 	var gasPrice hexutil.Big
 	if args.GasPrice != nil {
-		gasPrice = (hexutil.Big)(*args.GasPrice)
+		gasPrice = *args.GasPrice
 	}
 
 	var value hexutil.Big
 	if args.Value != nil {
-		value = (hexutil.Big)(*args.Value)
+		value = *args.Value
 	}
 
 	params := struct {
@@ -476,7 +474,7 @@ func (m *Manager) sendTransactionErrorCode(err error) string {
 }
 
 // SetTransactionReturnHandler sets a handler that will be called
-// when a transaction is about to return or when a recoverable error occured.
+// when a transaction is about to return or when a recoverable error occurred.
 // Recoverable error is, for instance, wrong password.
 func (m *Manager) SetTransactionReturnHandler(fn common.EnqueuedTxReturnHandler) {
 	m.txQueue.SetTxReturnHandler(fn)

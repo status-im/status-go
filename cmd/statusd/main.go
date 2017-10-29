@@ -45,12 +45,6 @@ var (
 		Value: params.RopstenNetworkID,
 	}
 
-	// LightEthEnabledFlag flags whether LES is enabled or not
-	LightEthEnabledFlag = cli.BoolFlag{
-		Name:  "les",
-		Usage: "LES protocol enabled",
-	}
-
 	// WhisperEnabledFlag flags whether Whisper is enabled or not
 	WhisperEnabledFlag = cli.BoolFlag{
 		Name:  "shh",
