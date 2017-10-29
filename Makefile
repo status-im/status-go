@@ -1,6 +1,9 @@
 .PHONY: statusgo all test xgo clean help
 .PHONY: statusgo-android statusgo-ios
 
+help: ##@other Show this help
+	@perl -e '$(HELP_FUN)' $(MAKEFILE_LIST)
+
 include ./static/tools/mk/lint.mk
 
 GOBIN = build/bin
@@ -27,9 +30,6 @@ HELP_FUN = \
 			   }; \
 			   print "\n"; \
 		   }
-
-help: ##@other Show this help
-	@perl -e '$(HELP_FUN)' $(MAKEFILE_LIST)
 
 # Main targets
 
