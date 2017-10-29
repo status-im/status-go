@@ -96,10 +96,8 @@ func verifyPasswordFile(config *params.WhisperConfig) error {
 		return err
 	}
 	config.PasswordFile = absPath
-	if _, err = config.ReadPasswordFile(); err != nil {
-		return err
-	}
-	return nil
+	_, err = config.ReadPasswordFile()
+	return err
 }
 
 // verifyIdentityFile verifies that we can load identity file
@@ -110,8 +108,6 @@ func verifyIdentityFile(config *params.WhisperConfig) error {
 		return err
 	}
 	config.IdentityFile = absPath
-	if _, err = config.ReadIdentityFile(); err != nil {
-		return err
-	}
-	return nil
+	_, err = config.ReadIdentityFile()
+	return err
 }

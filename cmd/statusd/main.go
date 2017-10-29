@@ -104,9 +104,8 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 
 // printVersion prints verbose output about version and config.
 func printVersion(config *params.NodeConfig, gitCommit, buildStamp string) {
-	version := params.Version
 	if gitCommit != "" && len(gitCommit) > 8 {
-		version += "-" + gitCommit[:8]
+		params.Version += "-" + gitCommit[:8]
 	}
 
 	fmt.Println(strings.Title(params.ClientIdentifier))
@@ -135,7 +134,7 @@ Examples:
   statusd               # run status node with defaults
   statusd -networkid 4  # run node on Rinkeby network
   statusd -datadir /dir # specify different dir for data
-  statusd -ipc          # enable IPC comminication for usage with "geth attach"
+  statusd -ipc          # enable IPC for usage with "geth attach"
 
 Options:
 `)

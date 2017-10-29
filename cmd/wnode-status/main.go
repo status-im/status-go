@@ -39,13 +39,14 @@ func main() {
 	config, err := makeNodeConfig()
 	if err != nil {
 		log.Fatalf("Making config failed: %v", err)
-		return
 	}
 
 	printHeader(config)
 
 	if *injectAccounts {
-		LoadTestAccounts(config.DataDir)
+		if err := LoadTestAccounts(config.DataDir); err != nil {
+			log.Fatalf("Failed to load test accounts: %v", err)
+		}
 	}
 
 	backend := api.NewStatusBackend()
@@ -59,7 +60,9 @@ func main() {
 	<-started
 
 	if *injectAccounts {
-		InjectTestAccounts(backend.NodeManager())
+		if err := InjectTestAccounts(backend.NodeManager()); err != nil {
+			log.Fatalf("Failed to inject accounts: %v", err)
+		}
 	}
 
 	// wait till node has been stopped
