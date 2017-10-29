@@ -24,13 +24,13 @@ var (
 	networkID      = flag.Int("networkid", params.RopstenNetworkID, "Network identifier (integer, 1=Homestead, 3=Ropsten, 4=Rinkeby, 777=StatusChain)")
 	whisperEnabled = flag.Bool("shh", false, "SHH protocol enabled")
 	swarmEnabled   = flag.Bool("swarm", false, "Swarm protocol enabled")
-	httpEnabled    = flag.Bool("http", false, "HTTP RPC enpoint enabled (default: false)")
+	httpEnabled    = flag.Bool("http", false, "HTTP RPC endpoint enabled (default: false)")
 	httpPort       = flag.Int("httpport", params.HTTPPort, "HTTP RPC server's listening port")
-	ipcEnabled     = flag.Bool("ipc", false, "IPC RPC enpoint enabled")
-	logLevel       = flag.String("log", "", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
+	ipcEnabled     = flag.Bool("ipc", false, "IPC RPC endpoint enabled")
+	logLevel       = flag.String("log", "INFO", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
 	logFile        = flag.String("logfile", "", "Path to the log file")
 	version        = flag.Bool("version", false, "Print version")
-	verbose        = flag.Bool("v", false, "Be verbose to stdout (overrides -logLevel and -logFile)")
+	verbose        = flag.Bool("v", false, "Be verbose to stdout (overrides -loglevel and -logfile)")
 )
 
 func main() {
