@@ -3,8 +3,8 @@
     "networkID": 3,
     "genesisHash": "0x41941023680923e0fe4d74a34bdac8141f2540e3ae90623718e47d66d1ca4a2d",
     "prod": {
-      "number": 400,
-      "hash": "2a4befa19e4675d939c3dc22dca8c6ae9fcd642be1f04b06bd6e4203cc304660",
+      "number": 478,
+      "hash": "77eedcf6f940940b3615da49109c1ba57b95c3fff8bcf16f20ac579c3ae24e58",
       "bootnodes": [
         "enode://7ab298cedc4185a894d21d8a4615262ec6bdce66c9b6783878258e0d5b31013d30c9038932432f70e5b2b6a5cd323bf820554fcb22fbc7b45367889522e9c449@51.15.63.93:30303",
         "enode://f59e8701f18c79c5cbc7618dc7bb928d44dc2f5405c7d693dad97da2d8585975942ec6fd36d3fe608bfdc7270a34a4dd00f38cfe96b2baa24f7cd0ac28d382a1@51.15.79.88:30303",
@@ -25,8 +25,8 @@
       ]
     },
     "dev": {
-      "number": 400,
-      "hash": "2a4befa19e4675d939c3dc22dca8c6ae9fcd642be1f04b06bd6e4203cc304660",
+      "number": 478,
+      "hash": "77eedcf6f940940b3615da49109c1ba57b95c3fff8bcf16f20ac579c3ae24e58",
       "bootnodes": [
         "enode://7ab298cedc4185a894d21d8a4615262ec6bdce66c9b6783878258e0d5b31013d30c9038932432f70e5b2b6a5cd323bf820554fcb22fbc7b45367889522e9c449@51.15.63.93:30303",
         "enode://f59e8701f18c79c5cbc7618dc7bb928d44dc2f5405c7d693dad97da2d8585975942ec6fd36d3fe608bfdc7270a34a4dd00f38cfe96b2baa24f7cd0ac28d382a1@51.15.79.88:30303",
