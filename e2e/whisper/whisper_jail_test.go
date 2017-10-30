@@ -1,8 +1,6 @@
 package whisper
 
 import (
-	"context"
-	"crypto/rand"
 	"testing"
 	"time"
 
@@ -29,9 +27,7 @@ var (
 )
 
 func TestWhisperJailTestSuite(t *testing.T) {
-	s := new(WhisperJailTestSuite)
-	s.Timeout = time.Minute * 5
-	suite.Run(t, s)
+	suite.Run(t, new(WhisperJailTestSuite))
 }
 
 type WhisperJailTestSuite struct {
@@ -45,9 +41,11 @@ type WhisperJailTestSuite struct {
 func (s *WhisperJailTestSuite) StartTestBackend(opts ...e2e.TestNodeOption) {
 	s.BackendTestSuite.StartTestBackend(opts...)
 
+	s.Timeout = time.Minute * 5
 	s.WhisperAPI = whisper.NewPublicWhisperAPI(s.WhisperService())
 	s.Jail = s.Backend.JailManager()
 	s.NotNil(s.Jail)
+
 	s.Jail.BaseJS(baseStatusJSCode)
 }
 
@@ -205,8 +203,6 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 			`,
 			true,
 		},
-		// @TODO(adam): quarantined as always failing. Check out TestEncryptedAnonymousMessage
-		// as an equivalent test in pure Go which passes. Bug in web3?
 		{
 			"test 4: encrypted anonymous message (From == nil && To != nil)",
 			`
@@ -297,13 +293,12 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 		s.T().Log(tc.name)
 
 		chatID := crypto.Keccak256Hash([]byte(tc.name)).Hex()
-
 		s.Jail.Parse(chatID, makeTopicCode)
 
 		cell, err := s.Jail.Cell(chatID)
 		s.NoError(err, "cannot get VM")
 
-		// Setup filters and post messages.
+		// Run JS code that setups filters and sends messages.
 		_, err = cell.Run(tc.code)
 		s.NoError(err)
 
@@ -344,7 +339,6 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 
 			// FilterID is not assigned yet.
 			if filterID.IsNull() {
-				s.T().Log("filterID is null")
 				continue
 			}
 
@@ -358,72 +352,6 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 				s.Equal(payload.String(), string(m.Payload))
 				close(done)
 			}
-		}
-	}
-}
-
-func (s *WhisperJailTestSuite) TestEncryptedAnonymousMessage() {
-	s.StartTestBackend()
-	defer s.StopTestBackend()
-
-	keyPairID, err := s.AddKeyPair(TestConfig.Account1.Address, TestConfig.Account1.Password)
-	s.NoError(err)
-
-	publicKey, err := s.WhisperAPI.GetPublicKey(context.Background(), keyPairID)
-	s.NoError(err)
-
-	topicSlice := make([]byte, whisper.TopicLength)
-	_, err = rand.Read(topicSlice)
-	s.NoError(err)
-
-	topic := whisper.BytesToTopic(topicSlice)
-
-	filter, err := s.WhisperAPI.NewMessageFilter(whisper.Criteria{
-		PrivateKeyID: keyPairID,
-		Topics:       []whisper.TopicType{topic},
-	})
-	s.NoError(err)
-
-	ok, err := s.WhisperAPI.Post(context.Background(), whisper.NewMessage{
-		TTL:       20,
-		PowTarget: 0.01,
-		PowTime:   20,
-		Topic:     topic,
-		PublicKey: publicKey,
-		Payload:   []byte(whisperMessage4),
-	})
-	s.NoError(err)
-	s.True(ok)
-
-	done := make(chan struct{})
-	timedOut := make(chan struct{})
-	go func() {
-		select {
-		case <-done:
-		case <-time.After(s.Timeout):
-			close(timedOut)
-		}
-	}()
-
-	for {
-		select {
-		case <-done:
-			// remember to remove filter
-			ok, err := s.WhisperAPI.DeleteMessageFilter(filter)
-			s.NoError(err)
-			s.True(ok)
-			return
-		case <-timedOut:
-			s.FailNow("polling for messages timed out")
-		case <-time.After(time.Second):
-		}
-
-		messages, err := s.WhisperAPI.GetFilterMessages(filter)
-		s.NoError(err)
-
-		for _, m := range messages {
-			s.Equal(whisperMessage4, string(m.Payload))
-			close(done)
 		}
 	}
 }
