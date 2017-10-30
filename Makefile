@@ -5,7 +5,6 @@ include ./static/tools/mk/lint.mk
 
 GOBIN = build/bin
 GO ?= latest
-networkid ?= 
 
 # This is a code for automatic help generator.
 # It supports ANSI colors and categories.
