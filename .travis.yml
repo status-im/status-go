@@ -14,8 +14,10 @@ jobs:
     script: make lint
   - stage: Test unit and integration
     script: make test-unit-coverage
-  - stage: Test e2e
+  - stage: Test e2e privite network
     script: make test-e2e
+  - stage: Test e2e public network
+    script: make test-e2e networkid=4
 cache:
   directories:
   - ".ethereumtest"
