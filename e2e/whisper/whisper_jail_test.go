@@ -3,12 +3,9 @@ package whisper
 import (
 	"context"
 	"crypto/rand"
-	"errors"
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts/keystore"
-	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/e2e"
@@ -54,102 +51,25 @@ func (s *WhisperJailTestSuite) StartTestBackend(opts ...e2e.TestNodeOption) {
 	s.Jail.BaseJS(baseStatusJSCode)
 }
 
-func (s *WhisperJailTestSuite) GetAccountKey(account struct {
-	Address  string
-	Password string
-}) (*keystore.Key, string, error) {
+func (s *WhisperJailTestSuite) AddKeyPair(address, password string) (string, error) {
 	accountManager := s.Backend.AccountManager()
 
-	_, accountKey1, err := accountManager.AddressToDecryptedAccount(account.Address, account.Password)
+	_, accountKey, err := accountManager.AddressToDecryptedAccount(address, password)
 	if err != nil {
-		return nil, "", err
-	}
-	accountKey1Hex := gethcommon.ToHex(crypto.FromECDSAPub(&accountKey1.PrivateKey.PublicKey))
-
-	_, err = s.WhisperService().AddKeyPair(accountKey1.PrivateKey)
-	if err != nil {
-		return nil, "", err
+		return "", err
 	}
 
-	if ok := s.WhisperAPI.HasKeyPair(context.Background(), accountKey1Hex); !ok {
-		return nil, "", errors.New("KeyPair should be injected in Whisper")
-	}
-
-	return accountKey1, accountKey1Hex, nil
-}
-
-// TODO(adam): something is wrong with this test. If it runs as the first,
-// TestJailWhisper fails. Maybe filter should be removed first?
-func (s *WhisperJailTestSuite) TestEncryptedAnonymousMessage() {
-	s.StartTestBackend()
-	defer s.StopTestBackend()
-
-	accountKey2, accountKey2Hex, err := s.GetAccountKey(TestConfig.Account2)
-	s.NoError(err)
-
-	topicSlice := make([]byte, whisper.TopicLength)
-	_, err = rand.Read(topicSlice)
-	s.NoError(err)
-
-	topic := whisper.BytesToTopic(topicSlice)
-
-	filter, err := s.WhisperAPI.NewMessageFilter(whisper.Criteria{
-		PrivateKeyID: accountKey2Hex,
-		Topics:       []whisper.TopicType{topic},
-	})
-	s.NoError(err)
-
-	ok, err := s.WhisperAPI.Post(context.Background(), whisper.NewMessage{
-		TTL:       20,
-		PowTarget: 0.01,
-		PowTime:   20,
-		Topic:     topic,
-		PublicKey: crypto.FromECDSAPub(&accountKey2.PrivateKey.PublicKey),
-		Payload:   []byte(whisperMessage4),
-	})
-	s.NoError(err)
-	s.True(ok)
-
-	done := make(chan struct{})
-	timedOut := make(chan struct{})
-	go func() {
-		select {
-		case <-done:
-		case <-time.After(s.Timeout):
-			close(timedOut)
-		}
-	}()
-
-	for {
-		select {
-		case <-done:
-			// remember to remove filter
-			// ok, err := s.WhisperAPI.DeleteMessageFilter(filter)
-			// s.NoError(err)
-			// s.True(ok)
-			return
-		case <-timedOut:
-			s.FailNow("polling for messages timed out")
-		case <-time.After(time.Second):
-		}
-
-		messages, err := s.WhisperAPI.GetFilterMessages(filter)
-		s.NoError(err)
-		for _, m := range messages {
-			s.Equal(whisperMessage4, string(m.Payload))
-			close(done)
-		}
-	}
+	return s.WhisperService().AddKeyPair(accountKey.PrivateKey)
 }
 
 func (s *WhisperJailTestSuite) TestJailWhisper() {
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
-	_, accountKey1Hex, err := s.GetAccountKey(TestConfig.Account1)
+	keyPairID1, err := s.AddKeyPair(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	s.NoError(err)
 
-	_, accountKey2Hex, err := s.GetAccountKey(TestConfig.Account2)
+	keyPairID2, err := s.AddKeyPair(TestConfig.Account2.Address, TestConfig.Account2.Password)
 	s.NoError(err)
 
 	testCases := []struct {
@@ -170,14 +90,14 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 		{
 			"test 1: encrypted signed message from us (From != nil && To != nil)",
 			`
-				var identity1 = '` + accountKey1Hex + `';
+				var identity1 = '` + keyPairID1 + `';
 				if (!shh.hasKeyPair(identity1)) {
-					throw 'idenitity "` + accountKey1Hex + `" not found in whisper';
+					throw 'idenitity "` + keyPairID1 + `" not found in whisper';
 				}
 
-				var identity2 = '` + accountKey2Hex + `';
+				var identity2 = '` + keyPairID2 + `';
 				if (!shh.hasKeyPair(identity2)) {
-					throw 'identitity "` + accountKey2Hex + `" not found in whisper';
+					throw 'identitity "` + keyPairID2 + `" not found in whisper';
 				}
 
 				var topic = makeTopic();
@@ -185,7 +105,7 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 
 				// start watching for messages
 				var filter = shh.newMessageFilter({
-					sig: identity1,
+					sig: shh.getPublicKey(identity1),
 					privateKeyID: identity2,
 					topics: [topic]
 				});
@@ -196,8 +116,8 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 					powTarget: 1.0,
 					powTime: 20,
 					topic: topic,
-					sig: identity1,
-					pubKey: identity2,
+					sig: shh.getPublicKey(identity1),
+					pubKey: shh.getPublicKey(identity2),
 			  		payload: web3.toHex(payload),
 				};
 
@@ -211,9 +131,9 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 		{
 			"test 2: signed (known sender) broadcast (From != nil && To == nil)",
 			`
-				var identity = '` + accountKey1Hex + `';
+				var identity = '` + keyPairID1 + `';
 				if (!shh.hasKeyPair(identity)) {
-					throw 'idenitity "` + accountKey1Hex + `" not found in whisper';
+					throw 'idenitity "` + keyPairID1 + `" not found in whisper';
 				}
 
 				var topic = makeTopic();
@@ -227,7 +147,7 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 
 				// start watching for messages
 				var filter = shh.newMessageFilter({
-					sig: identity,
+					sig: shh.getPublicKey(identity),
 					topics: [topic],
 					symKeyID: keyid
 				});
@@ -238,7 +158,7 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 					powTarget: 1.0,
 					powTime: 20,
 					topic: topic,
-					sig: identity,
+					sig: shh.getPublicKey(identity),
 					symKeyID: keyid,
 			  		payload: web3.toHex(payload),
 				};
@@ -287,57 +207,57 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 		},
 		// @TODO(adam): quarantined as always failing. Check out TestEncryptedAnonymousMessage
 		// as an equivalent test in pure Go which passes. Bug in web3?
-		// {
-		// 	"test 4: encrypted anonymous message (From == nil && To != nil)",
-		// 	`
-		// 		var identity = '` + accountKey2Hex + `';
-		// 		if (!shh.hasKeyPair(identity)) {
-		// 			throw 'idenitity "` + accountKey2Hex + `" not found in whisper';
-		// 		}
+		{
+			"test 4: encrypted anonymous message (From == nil && To != nil)",
+			`
+				var identity = '` + keyPairID1 + `';
+				if (!shh.hasKeyPair(identity)) {
+					throw 'idenitity "` + keyPairID1 + `" not found in whisper';
+				}
 
-		// 		var topic = makeTopic();
-		// 		var payload = '` + whisperMessage4 + `';
+				var topic = makeTopic();
+				var payload = '` + whisperMessage4 + `';
 
-		// 		// start watching for messages
-		// 		var filter = shh.newMessageFilter({
-		// 			privateKeyID: identity,
-		// 			topics: [topic],
-		// 		});
+				// start watching for messages
+				var filter = shh.newMessageFilter({
+					privateKeyID: identity,
+					topics: [topic],
+				});
 
-		// 		// post message
-		// 		var message = {
-		// 			ttl: 20,
-		// 			powTarget: 0.01,
-		// 			powTime: 20,
-		// 			topic: topic,
-		// 			pubKey: identity,
-		// 	  		payload: web3.toHex(payload),
-		// 		};
+				// post message
+				var message = {
+					ttl: 20,
+					powTarget: 0.01,
+					powTime: 20,
+					topic: topic,
+					pubKey: shh.getPublicKey(identity),
+			  		payload: web3.toHex(payload),
+				};
 
-		// 		var sent = shh.post(message)
-		// 		if (!sent) {
-		// 			throw 'message not sent: ' + JSON.stringify(message);
-		// 		}
-		// 	`,
-		// 	true,
-		// },
+				var sent = shh.post(message)
+				if (!sent) {
+					throw 'message not sent: ' + JSON.stringify(message);
+				}
+			`,
+			true,
+		},
 		{
 			"test 5: encrypted signed response to us (From != nil && To != nil)",
 			`
-				var identity1 = '` + accountKey1Hex + `';
+				var identity1 = '` + keyPairID1 + `';
 				if (!shh.hasKeyPair(identity1)) {
-					throw 'idenitity "` + accountKey1Hex + `" not found in whisper';
+					throw 'idenitity "` + keyPairID1 + `" not found in whisper';
 				}
-				var identity2 = '` + accountKey2Hex + `';
+				var identity2 = '` + keyPairID2 + `';
 				if (!shh.hasKeyPair(identity2)) {
-					throw 'idenitity "` + accountKey2Hex + `" not found in whisper';
+					throw 'idenitity "` + keyPairID2 + `" not found in whisper';
 				}
 				var topic = makeTopic();
 				var payload = '` + whisperMessage5 + `';
 				// start watching for messages
 				var filter = shh.newMessageFilter({
 					privateKeyID: identity1,
-					sig: identity2,
+					sig: shh.getPublicKey(identity2),
 					topics: [topic],
 				});
 
@@ -346,8 +266,8 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 					ttl: 10,
 					powTarget: 1.0,
 					powTime: 20,
-				  	sig: identity2,
-				  	pubKey: identity1,
+				  	sig: shh.getPublicKey(identity2),
+				  	pubKey: shh.getPublicKey(identity1),
 				  	topic: topic,
 				  	payload: web3.toHex(payload)
 				};
@@ -361,22 +281,24 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 		},
 	}
 
+	makeTopicCode := `
+		var shh = web3.shh;
+		// topic must be 4-byte long
+		var makeTopic = function () {
+			var topic = '0x';
+			for (var i = 0; i < 8; i++) {
+				topic += Math.floor(Math.random() * 16).toString(16);
+			}
+			return topic;
+		};
+	`
+
 	for _, tc := range testCases {
 		s.T().Log(tc.name)
 
 		chatID := crypto.Keccak256Hash([]byte(tc.name)).Hex()
 
-		s.Jail.Parse(chatID, `
-			var shh = web3.shh;
-			// topic must be 4-byte long
-			var makeTopic = function () {
-				var topic = '0x';
-				for (var i = 0; i < 8; i++) {
-					topic += Math.floor(Math.random() * 16).toString(16);
-				}
-				return topic;
-			};
-		`)
+		s.Jail.Parse(chatID, makeTopicCode)
 
 		cell, err := s.Jail.Cell(chatID)
 		s.NoError(err, "cannot get VM")
@@ -431,11 +353,77 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 
 			messages, err := s.WhisperAPI.GetFilterMessages(filterID.String())
 			s.NoError(err)
-			s.T().Logf("messages cpunt %d", len(messages))
+
 			for _, m := range messages {
 				s.Equal(payload.String(), string(m.Payload))
 				close(done)
 			}
+		}
+	}
+}
+
+func (s *WhisperJailTestSuite) TestEncryptedAnonymousMessage() {
+	s.StartTestBackend()
+	defer s.StopTestBackend()
+
+	keyPairID, err := s.AddKeyPair(TestConfig.Account1.Address, TestConfig.Account1.Password)
+	s.NoError(err)
+
+	publicKey, err := s.WhisperAPI.GetPublicKey(context.Background(), keyPairID)
+	s.NoError(err)
+
+	topicSlice := make([]byte, whisper.TopicLength)
+	_, err = rand.Read(topicSlice)
+	s.NoError(err)
+
+	topic := whisper.BytesToTopic(topicSlice)
+
+	filter, err := s.WhisperAPI.NewMessageFilter(whisper.Criteria{
+		PrivateKeyID: keyPairID,
+		Topics:       []whisper.TopicType{topic},
+	})
+	s.NoError(err)
+
+	ok, err := s.WhisperAPI.Post(context.Background(), whisper.NewMessage{
+		TTL:       20,
+		PowTarget: 0.01,
+		PowTime:   20,
+		Topic:     topic,
+		PublicKey: publicKey,
+		Payload:   []byte(whisperMessage4),
+	})
+	s.NoError(err)
+	s.True(ok)
+
+	done := make(chan struct{})
+	timedOut := make(chan struct{})
+	go func() {
+		select {
+		case <-done:
+		case <-time.After(s.Timeout):
+			close(timedOut)
+		}
+	}()
+
+	for {
+		select {
+		case <-done:
+			// remember to remove filter
+			ok, err := s.WhisperAPI.DeleteMessageFilter(filter)
+			s.NoError(err)
+			s.True(ok)
+			return
+		case <-timedOut:
+			s.FailNow("polling for messages timed out")
+		case <-time.After(time.Second):
+		}
+
+		messages, err := s.WhisperAPI.GetFilterMessages(filter)
+		s.NoError(err)
+
+		for _, m := range messages {
+			s.Equal(whisperMessage4, string(m.Payload))
+			close(done)
 		}
 	}
 }
