@@ -78,6 +78,70 @@ func (s *WhisperJailTestSuite) GetAccountKey(account struct {
 	return accountKey1, accountKey1Hex, nil
 }
 
+// TODO(adam): something is wrong with this test. If it runs as the first,
+// TestJailWhisper fails. Maybe filter should be removed first?
+func (s *WhisperJailTestSuite) TestEncryptedAnonymousMessage() {
+	s.StartTestBackend()
+	defer s.StopTestBackend()
+
+	accountKey2, accountKey2Hex, err := s.GetAccountKey(TestConfig.Account2)
+	s.NoError(err)
+
+	topicSlice := make([]byte, whisper.TopicLength)
+	_, err = rand.Read(topicSlice)
+	s.NoError(err)
+
+	topic := whisper.BytesToTopic(topicSlice)
+
+	filter, err := s.WhisperAPI.NewMessageFilter(whisper.Criteria{
+		PrivateKeyID: accountKey2Hex,
+		Topics:       []whisper.TopicType{topic},
+	})
+	s.NoError(err)
+
+	ok, err := s.WhisperAPI.Post(context.Background(), whisper.NewMessage{
+		TTL:       20,
+		PowTarget: 0.01,
+		PowTime:   20,
+		Topic:     topic,
+		PublicKey: crypto.FromECDSAPub(&accountKey2.PrivateKey.PublicKey),
+		Payload:   []byte(whisperMessage4),
+	})
+	s.NoError(err)
+	s.True(ok)
+
+	done := make(chan struct{})
+	timedOut := make(chan struct{})
+	go func() {
+		select {
+		case <-done:
+		case <-time.After(s.Timeout):
+			close(timedOut)
+		}
+	}()
+
+	for {
+		select {
+		case <-done:
+			// remember to remove filter
+			// ok, err := s.WhisperAPI.DeleteMessageFilter(filter)
+			// s.NoError(err)
+			// s.True(ok)
+			return
+		case <-timedOut:
+			s.FailNow("polling for messages timed out")
+		case <-time.After(time.Second):
+		}
+
+		messages, err := s.WhisperAPI.GetFilterMessages(filter)
+		s.NoError(err)
+		for _, m := range messages {
+			s.Equal(whisperMessage4, string(m.Payload))
+			close(done)
+		}
+	}
+}
+
 func (s *WhisperJailTestSuite) TestJailWhisper() {
 	s.StartTestBackend()
 	defer s.StopTestBackend()
@@ -372,70 +436,6 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 				s.Equal(payload.String(), string(m.Payload))
 				close(done)
 			}
-		}
-	}
-}
-
-// TODO(adam): something is wrong with this test. If it runs as the first,
-// TestJailWhisper fails. Maybe filter should be removed first?
-func (s *WhisperJailTestSuite) TestEncryptedAnonymousMessage() {
-	s.StartTestBackend()
-	defer s.StopTestBackend()
-
-	accountKey2, accountKey2Hex, err := s.GetAccountKey(TestConfig.Account2)
-	s.NoError(err)
-
-	topicSlice := make([]byte, whisper.TopicLength)
-	_, err = rand.Read(topicSlice)
-	s.NoError(err)
-
-	topic := whisper.BytesToTopic(topicSlice)
-
-	filter, err := s.WhisperAPI.NewMessageFilter(whisper.Criteria{
-		PrivateKeyID: accountKey2Hex,
-		Topics:       []whisper.TopicType{topic},
-	})
-	s.NoError(err)
-
-	ok, err := s.WhisperAPI.Post(context.Background(), whisper.NewMessage{
-		TTL:       20,
-		PowTarget: 0.01,
-		PowTime:   20,
-		Topic:     topic,
-		PublicKey: crypto.FromECDSAPub(&accountKey2.PrivateKey.PublicKey),
-		Payload:   []byte(whisperMessage4),
-	})
-	s.NoError(err)
-	s.True(ok)
-
-	done := make(chan struct{})
-	timedOut := make(chan struct{})
-	go func() {
-		select {
-		case <-done:
-		case <-time.After(s.Timeout):
-			close(timedOut)
-		}
-	}()
-
-	for {
-		select {
-		case <-done:
-			// remember to remove filter
-			ok, err := s.WhisperAPI.DeleteMessageFilter(filter)
-			s.NoError(err)
-			s.True(ok)
-			return
-		case <-timedOut:
-			s.FailNow("polling for messages timed out")
-		case <-time.After(time.Second):
-		}
-
-		messages, err := s.WhisperAPI.GetFilterMessages(filter)
-		s.NoError(err)
-		for _, m := range messages {
-			s.Equal(whisperMessage4, string(m.Payload))
-			close(done)
 		}
 	}
 }
