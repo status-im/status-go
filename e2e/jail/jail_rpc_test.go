@@ -174,7 +174,7 @@ func (s *JailRPCTestSuite) TestContractDeployment() {
 	}
 
 	// Wait until callback is fired and `responseValue` is set. Hacky but simple.
-	time.Sleep(2 * time.Second)
+	time.Sleep(60 * time.Second)
 
 	errorValue, err := cell.Get("errorValue")
 	s.NoError(err)

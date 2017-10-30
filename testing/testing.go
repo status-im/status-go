@@ -47,13 +47,16 @@ func init() {
 
 	// setup root directory
 	RootDir = filepath.Dir(pwd)
-	if strings.HasSuffix(RootDir, "geth") || strings.HasSuffix(RootDir, "cmd") { // we need to hop one more level
-		RootDir = filepath.Join(RootDir, "..")
+	pathDirs := strings.Split(RootDir, string(os.PathSeparator))
+	for i := range pathDirs {
+		if pathDirs[i] == "status-go" {
+			RootDir = filepath.Join(pathDirs[:i+1]...)
+			break
+		}
 	}
 
 	// setup auxiliary directories
 	TestDataDir = filepath.Join(RootDir, ".ethereumtest")
-
 	TestConfig, err = common.LoadTestConfig()
 	if err != nil {
 		panic(err)
@@ -95,7 +98,8 @@ func EnsureNodeSync(nodeManager common.NodeManager) {
 		panic("LightEthereumService is nil")
 	}
 
-	timeouter := time.NewTimer(20 * time.Minute)
+	// todo(@jeka): we should extract it into config
+	timeouter := time.NewTimer(20 * time.Hour)
 	defer timeouter.Stop()
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
@@ -103,7 +107,7 @@ func EnsureNodeSync(nodeManager common.NodeManager) {
 	for {
 		select {
 		case <-timeouter.C:
-			panic("timout during node synchronization")
+			panic("timeout during node synchronization")
 		case <-ticker.C:
 			downloader := les.Downloader()
 
