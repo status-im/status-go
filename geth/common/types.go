@@ -45,17 +45,28 @@ func (k *SelectedExtKey) Hex() string {
 
 // MessageState defines a struct to hold given facts about a message stat.
 type MessageState struct {
-	Type            string             `json:"type"`                       // Defines Direction type: Incoming or Outgoing.
-	Protocol        string             `json:"protocol"`                   // Defines means of transmission in whisper: RPC or P2P.
-	Status          string             `json:"status"`                     // Defines current status of message: Pending, Delivered, Rejected, etc.
-	Envelope        []byte             `json:"envelope"`                   // Envelop struct for message.
-	TimeSent        uint32             `json:"time,omitempty"`             // Time in of sent time of message.
-	Payload         []byte             `json:"payload,omitempty"`          // Payload associated with envelope.
-	Hash            string             `json:"envelope_hash"`              // Envelop hash
-	FromDevice      string             `json:"from_device,omitempty"`      // Device sending message if extractable.
-	ToDevice        string             `json:"to_device,omitempty"`        // Device receiving message if extractable.
-	RejectionReason error              `json:"rejection_reason,omitempty"` // Error when message ending with a Rejected status.
-	Source          whisper.NewMessage `json:"source,omitempty"`           // Source of message when type is Outgoing which contains raw rpc data.
+	// Type defines Direction type: IncomingMessage or OutgoingMessage.
+	Type string `json:"type"`
+	// Protocol defines means of transmission in whisper: RPC or P2P.
+	Protocol string `json:"protocol"`
+	// Status defines current status of message: Pending, Delivered, Rejected, etc.
+	Status string `json:"status"`
+	// Envelope struct holding encrypted message.
+	Envelope []byte `json:"envelope"`
+	// Time in of sent time of message.
+	TimeSent uint32 `json:"time,omitempty"`
+	// Payload associated with envelope.
+	Payload []byte `json:"payload,omitempty"`
+	// Hash defines the Envelope's hash
+	Hash string `json:"envelope_hash"`
+	// FromDevice defines the device sending message if value is extractable.
+	FromDevice string `json:"from_device,omitempty"`
+	// ToDevice defines the receiving message if value is extractable.
+	ToDevice string `json:"to_device,omitempty"`
+	// RejectionReason defines the error when message ending with a Rejected status.
+	RejectionReason error `json:"rejection_reason,omitempty"`
+	// Source of message when type is Outgoing which contains raw rpc data.
+	Source whisper.NewMessage `json:"source,omitempty"`
 }
 
 // NodeManager defines expected methods for managing Status node
