@@ -77,9 +77,7 @@ func (s *WhisperJailTestSuite) GetAccountKey(account struct {
 	return accountKey1, accountKey1Hex, nil
 }
 
-// TODO(adamb) Uncomment when issue #336 is fixed.
-/*
-func (s *WhisperJailTestSuite) DontTestJailWhisper() {
+func (s *WhisperJailTestSuite) TestJailWhisper() {
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
@@ -376,8 +374,9 @@ func (s *WhisperJailTestSuite) DontTestJailWhisper() {
 		}
 	}
 }
-*/
 
+// TODO(adam): something is wrong with this test. If it runs as the first,
+// TestJailWhisper fails. Maybe filter should be removed first?
 // func (s *WhisperJailTestSuite) TestEncryptedAnonymousMessage() {
 // 	s.StartTestBackend()
 // 	defer s.StopTestBackend()
@@ -421,6 +420,10 @@ func (s *WhisperJailTestSuite) DontTestJailWhisper() {
 // 	for {
 // 		select {
 // 		case <-done:
+// 			// remember to remove filter
+// 			ok, err := s.WhisperAPI.DeleteMessageFilter(filter)
+// 			s.NoError(err)
+// 			s.True(ok)
 // 			return
 // 		case <-timedOut:
 // 			s.FailNow("polling for messages timed out")
