@@ -80,9 +80,6 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransaction() {
 }
 
 func (s *TransactionsTestSuite) TestCallRPCSendTransactionUpstream() {
-	// FIXME(tiabc): Stop skipping after https://github.com/status-im/status-go/issues/424
-	s.T().Skip()
-
 	if GetNetworkID() == params.StatusChainNetworkID {
 		s.T().Skip()
 	}
@@ -312,9 +309,6 @@ func (s *TransactionsTestSuite) TestSendEther() {
 }
 
 func (s *TransactionsTestSuite) TestSendEtherTxUpstream() {
-	// FIXME(tiabc): Stop skipping after https://github.com/status-im/status-go/issues/424
-	s.T().Skip()
-
 	if GetNetworkID() == params.StatusChainNetworkID {
 		s.T().Skip()
 	}
@@ -793,7 +787,7 @@ func (s *TransactionsTestSuite) TestEvictionOfQueuedTransactions() {
 	for i := 0; i < txqueue.DefaultTxQueueCap+5; i++ { // stress test by hitting with lots of goroutines
 		go s.Backend.SendTransaction(context.TODO(), common.SendTxArgs{}) // nolint: errcheck
 	}
-	time.Sleep(3 * time.Second)
+	time.Sleep(5 * time.Second)
 
 	s.True(txQueue.Count() <= txqueue.DefaultTxQueueCap, "transaction count should be %d (or %d): got %d", txqueue.DefaultTxQueueCap, txqueue.DefaultTxQueueCap-1, txQueue.Count())
 

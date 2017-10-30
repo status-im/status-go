@@ -119,7 +119,7 @@ func EnsureNodeSync(nodeManager common.NodeManager) {
 	}
 }
 
-// GetRemoteURLFromNetworkID returns asociated network url for giving network id.
+// GetRemoteURLFromNetworkID returns associated network url for giving network id.
 func GetRemoteURLFromNetworkID(id int) (url string, err error) {
 	switch id {
 	case params.MainNetworkID:
@@ -128,9 +128,10 @@ func GetRemoteURLFromNetworkID(id int) (url string, err error) {
 		url = params.RinkebyEthereumNetworkURL
 	case params.RopstenNetworkID:
 		url = params.RopstenEthereumNetworkURL
+	default:
+		err = ErrNoRemoteURL
 	}
 
-	err = ErrNoRemoteURL
 	return
 }
 

@@ -65,7 +65,7 @@ func (s *JailRPCTestSuite) TestJailRPCSend() {
 	s.NoError(err)
 
 	s.T().Logf("Balance of %.2f ETH found on '%s' account", balance, TestConfig.Account1.Address)
-	s.False(balance < 100, "wrong balance (there should be lots of test Ether on that account)")
+	s.False(balance < 1, "wrong balance (there should be lots of test Ether on that account)")
 }
 
 func (s *JailRPCTestSuite) TestIsConnected() {
