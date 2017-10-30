@@ -43,19 +43,19 @@ func (k *SelectedExtKey) Hex() string {
 	return k.Address.Hex()
 }
 
-// MessageStat defines a struct to hold given facts about a message stat.
-type MessageStat struct {
-	Type            string             `json:"type"`
-	Protocol        string             `json:"protocol"`
-	Status          string             `json:"status"`
-	Envelope        []byte             `json:"envelope"`
-	TimeSent        uint32             `json:"time,omitempty"`
-	Payload         []byte             `json:"payload,omitempty"`
-	Hash            string             `json:"envelope_hash"`
-	FromDevice      string             `json:"from_device,omitempty"`
-	ToDevice        string             `json:"to_device,omitempty"`
-	RejectionReason error              `json:"rejection_reason,omitempty"`
-	Source          whisper.NewMessage `json:"source,omitempty"`
+// MessageState defines a struct to hold given facts about a message stat.
+type MessageState struct {
+	Type            string             `json:"type"`                       // Defines Direction type: Incoming or Outgoing.
+	Protocol        string             `json:"protocol"`                   // Defines means of transmission in whisper: RPC or P2P.
+	Status          string             `json:"status"`                     // Defines current status of message: Pending, Delivered, Rejected, etc.
+	Envelope        []byte             `json:"envelope"`                   // Envelop struct for message.
+	TimeSent        uint32             `json:"time,omitempty"`             // Time in of sent time of message.
+	Payload         []byte             `json:"payload,omitempty"`          // Payload associated with envelope.
+	Hash            string             `json:"envelope_hash"`              // Envelop hash
+	FromDevice      string             `json:"from_device,omitempty"`      // Device sending message if extractable.
+	ToDevice        string             `json:"to_device,omitempty"`        // Device receiving message if extractable.
+	RejectionReason error              `json:"rejection_reason,omitempty"` // Error when message ending with a Rejected status.
+	Source          whisper.NewMessage `json:"source,omitempty"`           // Source of message when type is Outgoing which contains raw rpc data.
 }
 
 // NodeManager defines expected methods for managing Status node

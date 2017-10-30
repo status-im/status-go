@@ -20,7 +20,7 @@ type LogDeliveryService struct{}
 
 // SendState logs incoming whisper.MesssageState into the log.
 func (ld LogDeliveryService) SendState(state whisper.MessageState) {
-	var stat common.MessageStat
+	var stat common.MessageState
 	var protocol string
 	var payload []byte
 	var from, to string
