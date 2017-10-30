@@ -110,8 +110,8 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 
 				// post message
 				var message = {
-					ttl: 10,
-					powTarget: 1.0,
+					ttl: 20,
+					powTarget: 0.01,
 					powTime: 20,
 					topic: topic,
 					sig: shh.getPublicKey(identity1),
@@ -152,8 +152,8 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 
 				// post message
 				var message = {
-					ttl: 10,
-					powTarget: 1.0,
+					ttl: 20,
+					powTarget: 0.01,
 					powTime: 20,
 					topic: topic,
 					sig: shh.getPublicKey(identity),
@@ -188,8 +188,8 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 
 				// post message
 				var message = {
-					ttl: 10,
-					powTarget: 1.0,
+					ttl: 20,
+					powTarget: 0.01,
 					powTime: 20,
 					topic: topic,
 					symKeyID: keyid,
@@ -259,8 +259,8 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 
 				// post message
 				var message = {
-					ttl: 10,
-					powTarget: 1.0,
+					ttl: 20,
+					powTarget: 0.01,
 					powTime: 20,
 				  	sig: shh.getPublicKey(identity2),
 				  	pubKey: shh.getPublicKey(identity1),
