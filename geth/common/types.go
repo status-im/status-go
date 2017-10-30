@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -20,7 +21,6 @@ import (
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/rpc"
 	"github.com/status-im/status-go/static"
-	"os"
 )
 
 // errors
@@ -402,7 +402,7 @@ type NotifyResult struct {
 	Error  string `json:"error,omitempty"`
 }
 
-const passKey = "ACCOUNT_PASSWORD"
+const passphraseEnvName = "ACCOUNT_PASSWORD"
 
 // LoadTestConfig loads test configuration values from disk
 func LoadTestConfig() (*TestConfig, error) {
@@ -413,8 +413,10 @@ func LoadTestConfig() (*TestConfig, error) {
 		return nil, err
 	}
 
-	testConfig.Account1.Password = os.Getenv(passKey)
-	testConfig.Account2.Password = testConfig.Account1.Password
+	pass := os.Getenv(passphraseEnvName)
+	testConfig.Account1.Password = pass
+	testConfig.Account2.Password = pass
+	testConfig.Account3.Password = pass
 
 	return &testConfig, nil
 }
