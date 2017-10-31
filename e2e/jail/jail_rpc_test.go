@@ -25,6 +25,7 @@ func TestJailRPCTestSuite(t *testing.T) {
 
 type JailRPCTestSuite struct {
 	e2e.BackendTestSuite
+	sync.Once
 
 	jail common.JailManager
 }
@@ -33,6 +34,12 @@ func (s *JailRPCTestSuite) SetupTest() {
 	s.BackendTestSuite.SetupTest()
 	s.jail = s.Backend.JailManager()
 	s.NotNil(s.jail)
+
+	s.Do(func() {
+		s.StartTestBackend()
+		EnsureNodeSync(s.Backend.NodeManager())
+		s.StopTestBackend()
+	})
 }
 
 func (s *JailRPCTestSuite) TestJailRPCSend() {
@@ -174,7 +181,7 @@ func (s *JailRPCTestSuite) TestContractDeployment() {
 	}
 
 	// Wait until callback is fired and `responseValue` is set. Hacky but simple.
-	time.Sleep(60 * time.Second)
+	time.Sleep(5 * time.Second)
 
 	errorValue, err := cell.Get("errorValue")
 	s.NoError(err)

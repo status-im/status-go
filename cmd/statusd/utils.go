@@ -33,7 +33,7 @@ const zeroHash = "0x000000000000000000000000000000000000000000000000000000000000
 
 var nodeConfigJSON = `{
 	"NetworkId": ` + strconv.Itoa(params.StatusChainNetworkID) + `,
-	"DataDir": "` + TestDataDir + `",
+	"DataDir": "` + filepath.Join(TestDataDir, TestNetworkNames[params.StatusChainNetworkID]) + `",
 	"HTTPPort": ` + strconv.Itoa(TestConfig.Node.HTTPPort) + `,
 	"WSPort": ` + strconv.Itoa(TestConfig.Node.WSPort) + `,
 	"LogLevel": "INFO"
@@ -735,7 +735,7 @@ func testCompleteTransaction(t *testing.T) bool {
 
 	// log into account from which transactions will be sent
 	if err := statusAPI.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password); err != nil {
-		t.Errorf("cannot select account: %v", TestConfig.Account1.Address)
+		t.Errorf("cannot select account: %v. Error %q", TestConfig.Account1.Address, err)
 		return false
 	}
 
@@ -749,7 +749,7 @@ func testCompleteTransaction(t *testing.T) bool {
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var envelope signal.Envelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
-			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
+			t.Errorf("cannot unmarshal event's JSON: %s. Error %q", jsonEvent, err)
 			return
 		}
 		if envelope.Type == txqueue.EventTransactionQueued {
@@ -1330,16 +1330,19 @@ func testJailFunctionCall(t *testing.T) bool {
 }
 
 func startTestNode(t *testing.T) <-chan struct{} {
+	testDir := filepath.Join(TestDataDir, TestNetworkNames[GetNetworkID()])
+
 	syncRequired := false
-	if _, err := os.Stat(TestDataDir); os.IsNotExist(err) {
+	if _, err := os.Stat(testDir); os.IsNotExist(err) {
 		syncRequired = true
 	}
 
 	// inject test accounts
-	if err := common.ImportTestAccount(filepath.Join(TestDataDir, "keystore"), "test-account1.pk"); err != nil {
+	testKeyDir := filepath.Join(testDir, "keystore")
+	if err := common.ImportTestAccount(testKeyDir, "test-account1.pk"); err != nil {
 		panic(err)
 	}
-	if err := common.ImportTestAccount(filepath.Join(TestDataDir, "keystore"), "test-account2.pk"); err != nil {
+	if err := common.ImportTestAccount(testKeyDir, "test-account2.pk"); err != nil {
 		panic(err)
 	}
 

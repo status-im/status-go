@@ -116,5 +116,4 @@ clean: ##@other Cleanup
 	rm -f coverage.out coverage-all.out coverage.html
 
 deep-clean: clean
-	ls .ethereumtest
 	rm -Rdf .ethereumtest/StatusChain
