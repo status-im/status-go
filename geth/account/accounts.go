@@ -31,7 +31,8 @@ var (
 
 // Manager represents account manager interface
 type Manager struct {
-	nodeManager     accountNode
+	node            accountNode
+	extKeyImporter  extendedKeyImporter
 	selectedAccount *common.SelectedExtKey // account that was processed during the last call to SelectAccount()
 }
 
@@ -68,10 +69,18 @@ type whisperService interface {
 	SelectKeyPair(key *ecdsa.PrivateKey) error
 }
 
+// importExtendedKey processes incoming extended key, extracts required info and creates corresponding account key.
+// Once account key is formed, that key is put (if not already) into keystore i.e. key is *encoded* into key file.
+type extendedKeyImporter interface {
+	Import(extKey *extkeys.ExtendedKey, password string) (address, pubKey string, err error)
+}
+
 // NewManager returns new node account manager
 func NewManager(nodeManager common.NodeManager) *Manager {
+	node := &accountNodeManager{node: nodeManager}
 	return &Manager{
-		nodeManager: &accountNodeManager{node: nodeManager},
+		node:           node,
+		extKeyImporter: &extendedKeyImport{node: node},
 	}
 }
 
@@ -94,7 +103,7 @@ func (m *Manager) CreateAccount(password string) (address, pubKey, mnemonic stri
 	}
 
 	// import created key into account keystore
-	address, pubKey, err = m.importExtendedKey(extKey, password)
+	address, pubKey, err = m.extKeyImporter.Import(extKey, password)
 	if err != nil {
 		return "", "", "", err
 	}
@@ -106,7 +115,7 @@ func (m *Manager) CreateAccount(password string) (address, pubKey, mnemonic stri
 // CKD#2 is used as root for master accounts (when parentAddress is "").
 // Otherwise (when parentAddress != ""), child is derived directly from parent.
 func (m *Manager) CreateChildAccount(parentAddress, password string) (address, pubKey string, err error) {
-	keyStore, err := m.nodeManager.AccountKeyStore()
+	keyStore, err := m.node.AccountKeyStore()
 	if err != nil {
 		return "", "", err
 	}
@@ -146,7 +155,7 @@ func (m *Manager) CreateChildAccount(parentAddress, password string) (address, p
 	accountKey.SubAccountIndex++
 
 	// import derived key into account keystore
-	address, pubKey, err = m.importExtendedKey(childKey, password)
+	address, pubKey, err = m.extKeyImporter.Import(childKey, password)
 	if err != nil {
 		return
 	}
@@ -170,12 +179,7 @@ func (m *Manager) RecoverAccount(password, mnemonic string) (address, pubKey str
 	}
 
 	// import re-created key into account keystore
-	address, pubKey, err = m.importExtendedKey(extKey, password)
-	if err != nil {
-		return
-	}
-
-	return address, pubKey, nil
+	return m.extKeyImporter.Import(extKey, password)
 }
 
 // VerifyAccountPassword tries to decrypt a given account key file, with a provided password.
@@ -240,7 +244,7 @@ func (m *Manager) VerifyAccountPassword(keyStoreDir, address, password string) (
 // using provided password. Once verification is done, decrypted key is injected into Whisper (as a single identity,
 // all previous identities are removed).
 func (m *Manager) SelectAccount(address, password string) error {
-	keyStore, err := m.nodeManager.AccountKeyStore()
+	keyStore, err := m.node.AccountKeyStore()
 	if err != nil {
 		return err
 	}
@@ -255,7 +259,7 @@ func (m *Manager) SelectAccount(address, password string) error {
 		return fmt.Errorf("%s: %v", ErrAccountToKeyMappingFailure.Error(), err)
 	}
 
-	whisperService, err := m.nodeManager.WhisperService()
+	whisperService, err := m.node.WhisperService()
 	if err != nil {
 		return err
 	}
@@ -294,7 +298,7 @@ func (m *Manager) ReSelectAccount() error {
 		return nil
 	}
 
-	whisperService, err := m.nodeManager.WhisperService()
+	whisperService, err := m.node.WhisperService()
 	if err != nil {
 		return err
 	}
@@ -308,7 +312,7 @@ func (m *Manager) ReSelectAccount() error {
 
 // Logout clears whisper identities
 func (m *Manager) Logout() error {
-	whisperService, err := m.nodeManager.WhisperService()
+	whisperService, err := m.node.WhisperService()
 	if err != nil {
 		return err
 	}
@@ -323,35 +327,10 @@ func (m *Manager) Logout() error {
 	return nil
 }
 
-// importExtendedKey processes incoming extended key, extracts required info and creates corresponding account key.
-// Once account key is formed, that key is put (if not already) into keystore i.e. key is *encoded* into key file.
-func (m *Manager) importExtendedKey(extKey *extkeys.ExtendedKey, password string) (address, pubKey string, err error) {
-	keyStore, err := m.nodeManager.AccountKeyStore()
-	if err != nil {
-		return "", "", err
-	}
-
-	// imports extended key, create key file (if necessary)
-	account, err := keyStore.ImportExtendedKey(extKey, password)
-	if err != nil {
-		return "", "", err
-	}
-	address = account.Address.Hex()
-
-	// obtain public key to return
-	account, key, err := keyStore.AccountDecryptedKey(account, password)
-	if err != nil {
-		return address, "", err
-	}
-	pubKey = gethcommon.ToHex(crypto.FromECDSAPub(&key.PrivateKey.PublicKey))
-
-	return
-}
-
 // Accounts returns list of addresses for selected account, including
 // subaccounts.
 func (m *Manager) Accounts() ([]gethcommon.Address, error) {
-	am, err := m.nodeManager.AccountManager()
+	am, err := m.node.AccountManager()
 	if err != nil {
 		return nil, err
 	}
@@ -421,7 +400,7 @@ func (m *Manager) refreshSelectedAccount() {
 // that belong to the currently selected account.
 // The extKey is CKD#2 := root of sub-accounts of the main account
 func (m *Manager) findSubAccounts(extKey *extkeys.ExtendedKey, subAccountIndex uint32) ([]accounts.Account, error) {
-	keyStore, err := m.nodeManager.AccountKeyStore()
+	keyStore, err := m.node.AccountKeyStore()
 	if err != nil {
 		return []accounts.Account{}, err
 	}
@@ -455,7 +434,7 @@ func (m *Manager) findSubAccounts(extKey *extkeys.ExtendedKey, subAccountIndex u
 // The running node, has a keystore directory which is loaded on start. Key file
 // for a given address is expected to be in that directory prior to node start.
 func (m *Manager) AddressToDecryptedAccount(address, password string) (accounts.Account, *keystore.Key, error) {
-	keyStore, err := m.nodeManager.AccountKeyStore()
+	keyStore, err := m.node.AccountKeyStore()
 	if err != nil {
 		return accounts.Account{}, nil, err
 	}
