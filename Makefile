@@ -90,6 +90,7 @@ mock: ##@other Regenerate mocks
 	mockgen -source=geth/common/types.go -destination=geth/common/types_mock.go -package=common
 	mockgen -source=geth/common/notification.go -destination=geth/common/notification_mock.go -package=common -imports fcm=github.com/NaySoftware/go-fcm
 	mockgen -source=geth/notification/fcm/client.go -destination=geth/notification/fcm/client_mock.go -package=fcm -imports fcm=github.com/NaySoftware/go-fcm
+	mockgen -source=geth/account/accounts.go -destination=geth/account/types_mock_test.go -package=account
 
 test: test-unit-coverage ##@tests Run basic, short tests during development
 

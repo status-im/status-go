@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"crypto/ecdsa"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -30,14 +31,47 @@ var (
 
 // Manager represents account manager interface
 type Manager struct {
-	nodeManager     common.NodeManager
+	nodeManager     accountNode
 	selectedAccount *common.SelectedExtKey // account that was processed during the last call to SelectAccount()
+}
+
+type accountNodeManager struct {
+	node common.NodeManager
+}
+
+func (a *accountNodeManager) AccountKeyStore() (accountKeyStorer, error) {
+	ks, err := a.node.AccountKeyStore()
+	return ks, err
+}
+func (a *accountNodeManager) AccountManager() (*accounts.Manager, error) {
+	return a.node.AccountManager()
+}
+func (a *accountNodeManager) WhisperService() (whisperService, error) {
+	return a.node.WhisperService()
+}
+
+type accountNode interface {
+	AccountKeyStore() (accountKeyStorer, error)
+	AccountManager() (*accounts.Manager, error)
+	WhisperService() (whisperService, error)
+}
+
+type accountKeyStorer interface {
+	AccountDecryptedKey(account accounts.Account, password string) (accounts.Account, *keystore.Key, error)
+	IncSubAccountIndex(account accounts.Account, password string) error
+	ImportExtendedKey(extKey *extkeys.ExtendedKey, password string) (accounts.Account, error)
+	Accounts() []accounts.Account
+}
+
+type whisperService interface {
+	DeleteKeyPairs() error
+	SelectKeyPair(key *ecdsa.PrivateKey) error
 }
 
 // NewManager returns new node account manager
 func NewManager(nodeManager common.NodeManager) *Manager {
 	return &Manager{
-		nodeManager: nodeManager,
+		nodeManager: &accountNodeManager{node: nodeManager},
 	}
 }
 
