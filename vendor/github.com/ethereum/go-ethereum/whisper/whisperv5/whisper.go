@@ -744,7 +744,7 @@ func (w *Whisper) traceOutgoingDelivery(isP2P bool, status message.Status, src *
 }
 
 func (w *Whisper) traceDelivery(isP2P bool, dir message.Direction, status message.Status, newmsg *NewMessage, envelope *Envelope, received *ReceivedMessage, err error) {
-	if w.deliveryServer != nil {
+	if w.deliveryServer == nil {
 		return
 	}
 
