@@ -55,6 +55,8 @@ type MessageState struct {
 	Envelope []byte `json:"envelope"`
 	// Time in of sent time of message.
 	TimeSent uint32 `json:"time,omitempty"`
+	// Received defines time when delivery notification was received
+	Received time.Time `json:"received"`
 	// Payload associated with envelope.
 	Payload []byte `json:"payload,omitempty"`
 	// Hash defines the Envelope's hash

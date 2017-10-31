@@ -772,6 +772,7 @@ func (w *Whisper) traceDelivery(isP2P bool, dir message.Direction, status messag
 		Status:    status,
 		Envelope:  env,
 		Direction: dir,
+		Timestamp: time.Now(),
 	})
 }
 

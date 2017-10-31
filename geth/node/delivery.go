@@ -55,6 +55,7 @@ func (ld LogDeliveryService) SendState(state whisper.MessageState) {
 	stat.Payload = payload
 	stat.FromDevice = from
 	stat.ToDevice = to
+	stat.Received = state.Timestamp
 	stat.Source = state.Source
 	stat.RejectionReason = state.Reason
 	stat.Envelope = state.Envelope.Data
