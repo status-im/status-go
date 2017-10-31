@@ -11,13 +11,13 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/status-im/status-go/e2e"
 	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
 	. "github.com/status-im/status-go/testing"
 	"github.com/stretchr/testify/suite"
-	"github.com/status-im/status-go/e2e"
 )
 
 const (
@@ -28,7 +28,6 @@ const (
 	incorrectAddress  = "incorrect_address"
 	incorrectPassword = "incorrect_password"
 )
-
 
 func TestAccountsNodeTestSuite(t *testing.T) {
 	suite.Run(t, new(AccountsNodeTestSuite))
