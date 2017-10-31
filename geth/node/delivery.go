@@ -3,7 +3,6 @@ package node
 import (
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	gethmessage "github.com/ethereum/go-ethereum/common/message"
@@ -11,7 +10,6 @@ import (
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/log"
-	"github.com/status-im/status-go/geth/params"
 )
 
 // LogDeliveryService implements the whisper.DeliveryServer which logs out
@@ -72,5 +70,5 @@ func (ld LogDeliveryService) SendState(state whisper.MessageState) {
 	}
 
 	encodedStat := base64.StdEncoding.EncodeToString(statdata)
-	log.Info(fmt.Sprintf("%s : %s : %s : %s : %+s", params.MessageStatHeader, stat.Protocol, stat.Type, stat.Status, encodedStat))
+	log.Info("Message delivery notification", "state", encodedStat)
 }
