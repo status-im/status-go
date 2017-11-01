@@ -120,7 +120,7 @@ func scriptsWeb3Js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "scripts/web3.js", size: 497689, mode: os.FileMode(420), modTime: time.Unix(1509365073, 0)}
+	info := bindataFileInfo{name: "scripts/web3.js", size: 497689, mode: os.FileMode(420), modTime: time.Unix(1509559603, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -497,24 +497,24 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
-	"scripts/README.md": scriptsReadmeMd,
-	"scripts/web3.js": scriptsWeb3Js,
-	"config/cht.json": configChtJson,
-	"config/status-chain-genesis.json": configStatusChainGenesisJson,
-	"config/test-data.json": configTestDataJson,
-	"keys/firebaseauthkey": keysFirebaseauthkey,
-	"keys/test-account1.pk": keysTestAccount1Pk,
-	"keys/test-account2.pk": keysTestAccount2Pk,
-	"keys/test-account3-before-eip55.pk": keysTestAccount3BeforeEip55Pk,
-	"keys/wnodekey": keysWnodekey,
-	"keys/wnodepassword": keysWnodepassword,
-	"testdata/jail/commands.js": testdataJailCommandsJs,
-	"testdata/jail/status.js": testdataJailStatusJs,
-	"testdata/jail/tx-send/context-no-message-id.js": testdataJailTxSendContextNoMessageIdJs,
-	"testdata/jail/tx-send/message-id-no-context.js": testdataJailTxSendMessageIdNoContextJs,
+	"scripts/README.md":                                 scriptsReadmeMd,
+	"scripts/web3.js":                                   scriptsWeb3Js,
+	"config/cht.json":                                   configChtJson,
+	"config/status-chain-genesis.json":                  configStatusChainGenesisJson,
+	"config/test-data.json":                             configTestDataJson,
+	"keys/firebaseauthkey":                              keysFirebaseauthkey,
+	"keys/test-account1.pk":                             keysTestAccount1Pk,
+	"keys/test-account2.pk":                             keysTestAccount2Pk,
+	"keys/test-account3-before-eip55.pk":                keysTestAccount3BeforeEip55Pk,
+	"keys/wnodekey":                                     keysWnodekey,
+	"keys/wnodepassword":                                keysWnodepassword,
+	"testdata/jail/commands.js":                         testdataJailCommandsJs,
+	"testdata/jail/status.js":                           testdataJailStatusJs,
+	"testdata/jail/tx-send/context-no-message-id.js":    testdataJailTxSendContextNoMessageIdJs,
+	"testdata/jail/tx-send/message-id-no-context.js":    testdataJailTxSendMessageIdNoContextJs,
 	"testdata/jail/tx-send/no-message-id-or-context.js": testdataJailTxSendNoMessageIdOrContextJs,
-	"testdata/jail/tx-send/tx-send.js": testdataJailTxSendTxSendJs,
-	"testdata/node/test.sol": testdataNodeTestSol,
+	"testdata/jail/tx-send/tx-send.js":                  testdataJailTxSendTxSendJs,
+	"testdata/node/test.sol":                            testdataNodeTestSol,
 }
 
 // AssetDir returns the file names below a certain
@@ -556,33 +556,34 @@ type bintree struct {
 	Func     func() (*asset, error)
 	Children map[string]*bintree
 }
+
 var _bintree = &bintree{nil, map[string]*bintree{
 	"config": &bintree{nil, map[string]*bintree{
-		"cht.json": &bintree{configChtJson, map[string]*bintree{}},
+		"cht.json":                  &bintree{configChtJson, map[string]*bintree{}},
 		"status-chain-genesis.json": &bintree{configStatusChainGenesisJson, map[string]*bintree{}},
-		"test-data.json": &bintree{configTestDataJson, map[string]*bintree{}},
+		"test-data.json":            &bintree{configTestDataJson, map[string]*bintree{}},
 	}},
 	"keys": &bintree{nil, map[string]*bintree{
-		"firebaseauthkey": &bintree{keysFirebaseauthkey, map[string]*bintree{}},
-		"test-account1.pk": &bintree{keysTestAccount1Pk, map[string]*bintree{}},
-		"test-account2.pk": &bintree{keysTestAccount2Pk, map[string]*bintree{}},
+		"firebaseauthkey":               &bintree{keysFirebaseauthkey, map[string]*bintree{}},
+		"test-account1.pk":              &bintree{keysTestAccount1Pk, map[string]*bintree{}},
+		"test-account2.pk":              &bintree{keysTestAccount2Pk, map[string]*bintree{}},
 		"test-account3-before-eip55.pk": &bintree{keysTestAccount3BeforeEip55Pk, map[string]*bintree{}},
-		"wnodekey": &bintree{keysWnodekey, map[string]*bintree{}},
-		"wnodepassword": &bintree{keysWnodepassword, map[string]*bintree{}},
+		"wnodekey":                      &bintree{keysWnodekey, map[string]*bintree{}},
+		"wnodepassword":                 &bintree{keysWnodepassword, map[string]*bintree{}},
 	}},
 	"scripts": &bintree{nil, map[string]*bintree{
 		"README.md": &bintree{scriptsReadmeMd, map[string]*bintree{}},
-		"web3.js": &bintree{scriptsWeb3Js, map[string]*bintree{}},
+		"web3.js":   &bintree{scriptsWeb3Js, map[string]*bintree{}},
 	}},
 	"testdata": &bintree{nil, map[string]*bintree{
 		"jail": &bintree{nil, map[string]*bintree{
 			"commands.js": &bintree{testdataJailCommandsJs, map[string]*bintree{}},
-			"status.js": &bintree{testdataJailStatusJs, map[string]*bintree{}},
+			"status.js":   &bintree{testdataJailStatusJs, map[string]*bintree{}},
 			"tx-send": &bintree{nil, map[string]*bintree{
-				"context-no-message-id.js": &bintree{testdataJailTxSendContextNoMessageIdJs, map[string]*bintree{}},
-				"message-id-no-context.js": &bintree{testdataJailTxSendMessageIdNoContextJs, map[string]*bintree{}},
+				"context-no-message-id.js":    &bintree{testdataJailTxSendContextNoMessageIdJs, map[string]*bintree{}},
+				"message-id-no-context.js":    &bintree{testdataJailTxSendMessageIdNoContextJs, map[string]*bintree{}},
 				"no-message-id-or-context.js": &bintree{testdataJailTxSendNoMessageIdOrContextJs, map[string]*bintree{}},
-				"tx-send.js": &bintree{testdataJailTxSendTxSendJs, map[string]*bintree{}},
+				"tx-send.js":                  &bintree{testdataJailTxSendTxSendJs, map[string]*bintree{}},
 			}},
 		}},
 		"node": &bintree{nil, map[string]*bintree{
@@ -637,4 +638,3 @@ func _filePath(dir, name string) string {
 	cannonicalName := strings.Replace(name, "\\", "/", -1)
 	return filepath.Join(append([]string{dir}, strings.Split(cannonicalName, "/")...)...)
 }
-

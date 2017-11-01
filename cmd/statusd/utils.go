@@ -31,9 +31,11 @@ import (
 
 const zeroHash = "0x0000000000000000000000000000000000000000000000000000000000000000"
 
+var testChainDir = filepath.Join(TestDataDir, TestNetworkNames[params.StatusChainNetworkID])
+
 var nodeConfigJSON = `{
 	"NetworkId": ` + strconv.Itoa(params.StatusChainNetworkID) + `,
-	"DataDir": "` + filepath.Join(TestDataDir, TestNetworkNames[params.StatusChainNetworkID]) + `",
+	"DataDir": "` + testChainDir + `",
 	"HTTPPort": ` + strconv.Itoa(TestConfig.Node.HTTPPort) + `,
 	"WSPort": ` + strconv.Itoa(TestConfig.Node.WSPort) + `,
 	"LogLevel": "INFO"
@@ -42,10 +44,23 @@ var nodeConfigJSON = `{
 // nolint: deadcode
 func testExportedAPI(t *testing.T, done chan struct{}) {
 	<-startTestNode(t)
+	defer func() {
+		done <- struct{}{}
+	}()
+
+	// prepare accounts
+	testKeyDir := filepath.Join(testChainDir, "keystore")
+	if err := common.ImportTestAccount(testKeyDir, "test-account1.pk"); err != nil {
+		panic(err)
+	}
+	if err := common.ImportTestAccount(testKeyDir, "test-account2.pk"); err != nil {
+		panic(err)
+	}
 
 	// FIXME(tiabc): All of that is done because usage of cgo is not supported in tests.
 	// Probably, there should be a cleaner way, for example, test cgo bindings in e2e tests
 	// separately from other internal tests.
+	// FIXME(@jekamas): ATTENTION! this tests depends on each other!
 	tests := []struct {
 		name string
 		fn   func(t *testing.T) bool
@@ -119,11 +134,10 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 	for _, test := range tests {
 		t.Logf("=== RUN   %s", test.name)
 		if ok := test.fn(t); !ok {
+			t.Logf("=== FAILED   %s", test.name)
 			break
 		}
 	}
-
-	done <- struct{}{}
 }
 
 func testVerifyAccountPassword(t *testing.T) bool {

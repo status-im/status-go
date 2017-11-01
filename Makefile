@@ -97,7 +97,7 @@ test-unit: ##@tests Run unit and integration tests
 test-unit-coverage: ##@tests Run unit and integration tests with coverage
 	build/env.sh go test -coverpkg= $(UNIT_TEST_PACKAGES)
 
-test-e2e: ##@tests Run e2e tests
+test-e2e: deep-clean ##@tests Run e2e tests
 	# order: reliability then alphabetical
 	# TODO(tiabc): make a single command out of them adding `-p 1` flag.
 	build/env.sh go test -timeout 5m ./e2e/accounts/... -network=$(networkid)
@@ -113,4 +113,7 @@ ci: lint mock-install mock test-unit test-e2e ##@tests Run all linters and tests
 
 clean: ##@other Cleanup
 	rm -fr build/bin/*
-	rm coverage.out coverage-all.out coverage.html
+	rm -f coverage.out coverage-all.out coverage.html
+
+deep-clean: clean
+	rm -Rdf .ethereumtest/StatusChain
