@@ -102,14 +102,14 @@ func EnsureNodeSync(nodeManager common.NodeManager) {
 	}
 
 	// todo(@jeka): we should extract it into config
-	timeouter := time.NewTimer(20 * time.Minute)
-	defer timeouter.Stop()
+	timeout := time.NewTimer(20 * time.Minute)
+	defer timeout.Stop()
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
 	for {
 		select {
-		case <-timeouter.C:
+		case <-timeout.C:
 			panic("timeout during node synchronization")
 		case <-ticker.C:
 			downloader := les.Downloader()
