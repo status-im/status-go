@@ -5,6 +5,7 @@ import (
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/common"
+	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/signal"
 	. "github.com/status-im/status-go/testing" //nolint: golint
 	"github.com/stretchr/testify/suite"
@@ -14,6 +15,20 @@ import (
 type NodeManagerTestSuite struct {
 	suite.Suite
 	NodeManager common.NodeManager
+}
+
+func init() {
+	for id := range TestNetworkNames {
+		nodeConfig, err := MakeTestNodeConfig(id)
+		if err != nil {
+			panic(err)
+		}
+
+		err = importTestAccouns(nodeConfig.KeyStoreDir)
+		if err != nil {
+			panic(err)
+		}
+	}
 }
 
 // StartTestNode initiazes a NodeManager instances with configuration retrieved
@@ -129,6 +144,8 @@ func (s *BackendTestSuite) TxQueueManager() common.TxQueueManager {
 }
 
 func importTestAccouns(keyStoreDir string) (err error) {
+	log.Info("Import accounts to", keyStoreDir)
+
 	err = common.ImportTestAccount(keyStoreDir, "test-account1.pk")
 	if err != nil {
 		return
