@@ -1,5 +1,6 @@
 generate: dist-fetch/bundle.js
 	go generate .
+	gofmt -s -w dist_fetch.go
 
 dist-fetch/bundle.js: js/bundle.js
 	mkdir -p dist-fetch
