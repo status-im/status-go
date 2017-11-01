@@ -97,8 +97,8 @@ func DefineWithHandler(vm *vm.VM, l *loop.Loop, h http.Handler) error {
 		return err
 	}
 
-	jsData := MustAsset("bundle.js")
-	smData := MustAsset("bundle.js.map")
+	jsData := MustAsset("dist-fetch/bundle.js")
+	smData := MustAsset("dist-fetch/bundle.js.map")
 
 	s, err := vm.CompileWithSourceMap("fetch-bundle.js", jsData, smData)
 	if err != nil {
