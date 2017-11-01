@@ -90,7 +90,7 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 			`
 				var identity1 = '` + keyPairID1 + `';
 				if (!shh.hasKeyPair(identity1)) {
-					throw 'idenitity "` + keyPairID1 + `" not found in whisper';
+					throw 'identity "` + keyPairID1 + `" not found in whisper';
 				}
 
 				var identity2 = '` + keyPairID2 + `';
@@ -131,7 +131,7 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 			`
 				var identity = '` + keyPairID1 + `';
 				if (!shh.hasKeyPair(identity)) {
-					throw 'idenitity "` + keyPairID1 + `" not found in whisper';
+					throw 'identity "` + keyPairID1 + `" not found in whisper';
 				}
 
 				var topic = makeTopic();
@@ -208,7 +208,7 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 			`
 				var identity = '` + keyPairID1 + `';
 				if (!shh.hasKeyPair(identity)) {
-					throw 'idenitity "` + keyPairID1 + `" not found in whisper';
+					throw 'identity "` + keyPairID1 + `" not found in whisper';
 				}
 
 				var topic = makeTopic();
@@ -242,11 +242,11 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 			`
 				var identity1 = '` + keyPairID1 + `';
 				if (!shh.hasKeyPair(identity1)) {
-					throw 'idenitity "` + keyPairID1 + `" not found in whisper';
+					throw 'identity "` + keyPairID1 + `" not found in whisper';
 				}
 				var identity2 = '` + keyPairID2 + `';
 				if (!shh.hasKeyPair(identity2)) {
-					throw 'idenitity "` + keyPairID2 + `" not found in whisper';
+					throw 'identity "` + keyPairID2 + `" not found in whisper';
 				}
 				var topic = makeTopic();
 				var payload = '` + whisperMessage5 + `';
@@ -290,8 +290,6 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 	`
 
 	for _, tc := range testCases {
-		s.T().Log(tc.name)
-
 		chatID := crypto.Keccak256Hash([]byte(tc.name)).Hex()
 		s.Jail.Parse(chatID, makeTopicCode)
 
