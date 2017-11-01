@@ -1,5 +1,7 @@
 package fetch
 
+//go:generate go-bindata -pkg fetch -o dist_fetch.go ./dist-fetch/
+
 import (
 	"io"
 	"io/ioutil"
@@ -7,7 +9,6 @@ import (
 	"net/http/httptest"
 	"strings"
 
-	"github.com/GeertJohan/go.rice"
 	"github.com/robertkrimen/otto"
 
 	"github.com/status-im/status-go/geth/jail/internal/loop"
@@ -96,8 +97,8 @@ func DefineWithHandler(vm *vm.VM, l *loop.Loop, h http.Handler) error {
 		return err
 	}
 
-	jsData := rice.MustFindBox("dist-fetch").MustString("bundle.js")
-	smData := rice.MustFindBox("dist-fetch").MustString("bundle.js.map")
+	jsData := MustAsset("bundle.js")
+	smData := MustAsset("bundle.js.map")
 
 	s, err := vm.CompileWithSourceMap("fetch-bundle.js", jsData, smData)
 	if err != nil {
