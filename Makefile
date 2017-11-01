@@ -103,7 +103,7 @@ test-e2e: deep-clean ##@tests Run e2e tests
 	build/env.sh go test -timeout 5m ./e2e/accounts/... -network=$(networkid)
 	build/env.sh go test -timeout 5m ./e2e/api/... -network=$(networkid)
 	build/env.sh go test -timeout 5m ./e2e/node/... -network=$(networkid)
-	build/env.sh go test -timeout 15m ./e2e/jail/... -network=$(networkid)
+	build/env.sh go test -v -timeout 1500m ./e2e/jail/... -network=$(networkid)
 	build/env.sh go test -timeout 20m ./e2e/rpc/... -network=$(networkid)
 	build/env.sh go test -timeout 20m ./e2e/whisper/... -network=$(networkid)
 	build/env.sh go test -timeout 10m ./e2e/transactions/... -network=$(networkid)
