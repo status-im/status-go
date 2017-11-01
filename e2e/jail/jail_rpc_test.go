@@ -36,6 +36,7 @@ func (s *JailRPCTestSuite) SetupTest() {
 	s.NotNil(s.jail)
 
 	s.Do(func() {
+		// Testnet sync
 		s.StartTestBackend()
 		EnsureNodeSync(s.Backend.NodeManager())
 		s.StopTestBackend()

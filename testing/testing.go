@@ -46,9 +46,8 @@ func init() {
 	}
 
 	// setup root directory
-	RootDir = filepath.Dir(pwd)
-
 	const pathSeparator = string(os.PathSeparator)
+	RootDir = filepath.Dir(pwd)
 	pathDirs := strings.Split(RootDir, pathSeparator)
 	for i := range pathDirs {
 		if pathDirs[i] == "status-go" {
@@ -60,6 +59,7 @@ func init() {
 
 	// setup auxiliary directories
 	TestDataDir = filepath.Join(RootDir, ".ethereumtest")
+
 	TestConfig, err = common.LoadTestConfig()
 	if err != nil {
 		panic(err)
@@ -102,7 +102,7 @@ func EnsureNodeSync(nodeManager common.NodeManager) {
 	}
 
 	// todo(@jeka): we should extract it into config
-	timeouter := time.NewTimer(20 * time.Hour)
+	timeouter := time.NewTimer(20 * time.Minute)
 	defer timeouter.Stop()
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
