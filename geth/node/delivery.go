@@ -51,13 +51,16 @@ func (ld LogDeliveryService) SendState(state whisper.MessageState) {
 		}
 	}
 
+	if state.Reason != nil {
+		stat.RejectionError = state.Reason.Error()
+	}
+
 	stat.Protocol = protocol
 	stat.Payload = payload
 	stat.FromDevice = from
 	stat.ToDevice = to
 	stat.Received = state.Timestamp
 	stat.Source = state.Source
-	stat.RejectionReason = state.Reason
 	stat.Envelope = state.Envelope.Data
 	stat.Status = state.Status.String()
 	stat.Type = state.Direction.String()

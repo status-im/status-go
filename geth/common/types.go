@@ -65,8 +65,8 @@ type MessageState struct {
 	FromDevice string `json:"from_device,omitempty"`
 	// ToDevice defines the receiving message if value is extractable.
 	ToDevice string `json:"to_device,omitempty"`
-	// RejectionReason defines the error when message ending with a Rejected status.
-	RejectionReason error `json:"rejection_reason,omitempty"`
+	// RejectionError defines the error message when message ending with a Rejected status.
+	RejectionError string `json:"rejection_reason,omitempty"`
 	// Source of message when type is Outgoing which contains raw rpc data.
 	Source whisper.NewMessage `json:"source,omitempty"`
 }
