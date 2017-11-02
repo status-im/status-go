@@ -65,8 +65,7 @@ func ToAddress(accountAddress string) *common.Address {
 	return &to.Address
 }
 
-// ImportTestAccount checks if test account exists in keystore, and if not
-// tries to import it (from static resources, see "static/keys" folder)
+// ImportTestAccount imports keystone from static resources, see "static/keys" folder
 func ImportTestAccount(keystoreDir, accountFile string) error {
 	// make sure that keystore folder exists
 	if _, err := os.Stat(keystoreDir); os.IsNotExist(err) {
