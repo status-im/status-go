@@ -102,7 +102,7 @@ func EnsureNodeSync(nodeManager common.NodeManager) {
 	}
 
 	// todo(@jeka): we should extract it into config
-	timeout := time.NewTimer(20 * time.Hour)
+	timeout := time.NewTimer(50 * time.Minute)
 	defer timeout.Stop()
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
