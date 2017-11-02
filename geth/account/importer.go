@@ -6,16 +6,9 @@ import (
 	"github.com/status-im/status-go/extkeys"
 )
 
-type extendedKeyImport struct {
-	node accountNode
-}
+type extendedKeyImporterBase struct{}
 
-func (i *extendedKeyImport) Import(extKey *extkeys.ExtendedKey, password string) (address, pubKey string, err error) {
-	keyStore, err := i.node.AccountKeyStore()
-	if err != nil {
-		return "", "", err
-	}
-
+func (i *extendedKeyImporterBase) Import(keyStore accountKeyStorer, extKey *extkeys.ExtendedKey, password string) (address, pubKey string, err error) {
 	// imports extended key, create key file (if necessary)
 	account, err := keyStore.ImportExtendedKey(extKey, password)
 	if err != nil {

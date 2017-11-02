@@ -1,22 +1,15 @@
 package account
 
 import (
-	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
-	"os"
-	"path/filepath"
 
 	"crypto/ecdsa"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/status-im/status-go/extkeys"
 	"github.com/status-im/status-go/geth/common"
-	"github.com/status-im/status-go/geth/rpc"
 )
 
 // errors
@@ -32,29 +25,20 @@ var (
 // Manager represents account manager interface
 type Manager struct {
 	node            accountNode
-	extKeyImporter  extendedKeyImporter
 	selectedAccount *common.SelectedExtKey // account that was processed during the last call to SelectAccount()
-}
 
-type accountNodeManager struct {
-	node common.NodeManager
-}
-
-func (a *accountNodeManager) AccountKeyStore() (accountKeyStorer, error) {
-	ks, err := a.node.AccountKeyStore()
-	return ks, err
-}
-func (a *accountNodeManager) AccountManager() (*accounts.Manager, error) {
-	return a.node.AccountManager()
-}
-func (a *accountNodeManager) WhisperService() (whisperService, error) {
-	return a.node.WhisperService()
+	extKeyImporter   extendedKeyImporter
+	subAccountFinder subAccountFinder
 }
 
 type accountNode interface {
 	AccountKeyStore() (accountKeyStorer, error)
-	AccountManager() (*accounts.Manager, error)
+	AccountManager() (gethAccountManager, error)
 	WhisperService() (whisperService, error)
+}
+
+type gethAccountManager interface {
+	Wallets() []accounts.Wallet
 }
 
 type accountKeyStorer interface {
@@ -69,18 +53,27 @@ type whisperService interface {
 	SelectKeyPair(key *ecdsa.PrivateKey) error
 }
 
+type subAccountFinder interface {
+	Find(keyStore accountKeyStorer, extKey *extkeys.ExtendedKey, subAccountIndex uint32) ([]accounts.Account, error)
+}
+
+type keyFileFinder interface {
+	Find(keyStoreDir string, addressObj gethcommon.Address) ([]byte, error)
+}
+
 // importExtendedKey processes incoming extended key, extracts required info and creates corresponding account key.
 // Once account key is formed, that key is put (if not already) into keystore i.e. key is *encoded* into key file.
 type extendedKeyImporter interface {
-	Import(extKey *extkeys.ExtendedKey, password string) (address, pubKey string, err error)
+	Import(keyStore accountKeyStorer, extKey *extkeys.ExtendedKey, password string) (address, pubKey string, err error)
 }
 
 // NewManager returns new node account manager
 func NewManager(nodeManager common.NodeManager) *Manager {
-	node := &accountNodeManager{node: nodeManager}
+	node := newAccountNodeManager(nodeManager)
 	return &Manager{
-		node:           node,
-		extKeyImporter: &extendedKeyImport{node: node},
+		node:             node,
+		extKeyImporter:   new(extendedKeyImporterBase),
+		subAccountFinder: new(subAccountFinderBase),
 	}
 }
 
@@ -102,8 +95,13 @@ func (m *Manager) CreateAccount(password string) (address, pubKey, mnemonic stri
 		return "", "", "", fmt.Errorf("can not create master extended key: %v", err)
 	}
 
+	keyStore, err := m.node.AccountKeyStore()
+	if err != nil {
+		return "", "", "", err
+	}
+
 	// import created key into account keystore
-	address, pubKey, err = m.extKeyImporter.Import(extKey, password)
+	address, pubKey, err = m.extKeyImporter.Import(keyStore, extKey, password)
 	if err != nil {
 		return "", "", "", err
 	}
@@ -149,13 +147,14 @@ func (m *Manager) CreateChildAccount(parentAddress, password string) (address, p
 	if err != nil {
 		return "", "", err
 	}
+
 	if err = keyStore.IncSubAccountIndex(account, password); err != nil {
 		return "", "", err
 	}
 	accountKey.SubAccountIndex++
 
 	// import derived key into account keystore
-	address, pubKey, err = m.extKeyImporter.Import(childKey, password)
+	address, pubKey, err = m.extKeyImporter.Import(keyStore, childKey, password)
 	if err != nil {
 		return
 	}
@@ -178,47 +177,22 @@ func (m *Manager) RecoverAccount(password, mnemonic string) (address, pubKey str
 		return "", "", ErrInvalidMasterKeyCreated
 	}
 
+	keyStore, err := m.node.AccountKeyStore()
+	if err != nil {
+		return "", "", err
+	}
+
 	// import re-created key into account keystore
-	return m.extKeyImporter.Import(extKey, password)
+	return m.extKeyImporter.Import(keyStore, extKey, password)
 }
 
 // VerifyAccountPassword tries to decrypt a given account key file, with a provided password.
 // If no error is returned, then account is considered verified.
 func (m *Manager) VerifyAccountPassword(keyStoreDir, address, password string) (*keystore.Key, error) {
-	var err error
-	var foundKeyFile []byte
 
 	addressObj := gethcommon.BytesToAddress(gethcommon.FromHex(address))
-	checkAccountKey := func(path string, fileInfo os.FileInfo) error {
-		if len(foundKeyFile) > 0 || fileInfo.IsDir() {
-			return nil
-		}
 
-		rawKeyFile, e := ioutil.ReadFile(path)
-		if e != nil {
-			return fmt.Errorf("invalid account key file: %v", e)
-		}
-
-		var accountKey struct {
-			Address string `json:"address"`
-		}
-		if e := json.Unmarshal(rawKeyFile, &accountKey); e != nil {
-			return fmt.Errorf("failed to read key file: %s", e)
-		}
-
-		if gethcommon.HexToAddress("0x"+accountKey.Address).Hex() == addressObj.Hex() {
-			foundKeyFile = rawKeyFile
-		}
-
-		return nil
-	}
-	// locate key within key store directory (address should be within the file)
-	err = filepath.Walk(keyStoreDir, func(path string, fileInfo os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		return checkAccountKey(path, fileInfo)
-	})
+	foundKeyFile, err := keyfileFinder.Find(keyStoreDir, addressObj)
 	if err != nil {
 		return nil, fmt.Errorf("cannot traverse key store folder: %v", err)
 	}
@@ -231,7 +205,6 @@ func (m *Manager) VerifyAccountPassword(keyStoreDir, address, password string) (
 	if err != nil {
 		return nil, err
 	}
-
 	// avoid swap attack
 	if key.Address != addressObj {
 		return nil, fmt.Errorf("account mismatch: have %s, want %s", key.Address.Hex(), addressObj.Hex())
@@ -270,7 +243,7 @@ func (m *Manager) SelectAccount(address, password string) error {
 	}
 
 	// persist account key for easier recovery of currently selected key
-	subAccounts, err := m.findSubAccounts(accountKey.ExtendedKey, accountKey.SubAccountIndex)
+	subAccounts, err := m.subAccountFinder.Find(keyStore, accountKey.ExtendedKey, accountKey.SubAccountIndex)
 	if err != nil {
 		return err
 	}
@@ -346,6 +319,7 @@ func (m *Manager) Accounts() ([]gethcommon.Address, error) {
 		return []gethcommon.Address{}, nil
 	}
 
+	//update info about subaccounts into selected account
 	m.refreshSelectedAccount()
 
 	filtered := make([]gethcommon.Address, 0)
@@ -366,13 +340,6 @@ func (m *Manager) Accounts() ([]gethcommon.Address, error) {
 	return filtered, nil
 }
 
-// AccountsRPCHandler returns RPC Handler for the Accounts() method.
-func (m *Manager) AccountsRPCHandler() rpc.Handler {
-	return func(context.Context, ...interface{}) (interface{}, error) {
-		return m.Accounts()
-	}
-}
-
 // refreshSelectedAccount re-populates list of sub-accounts of the currently selected account (if any)
 func (m *Manager) refreshSelectedAccount() {
 	if m.selectedAccount == nil {
@@ -384,8 +351,12 @@ func (m *Manager) refreshSelectedAccount() {
 		return
 	}
 
+	keyStore, err := m.node.AccountKeyStore()
+	if err != nil {
+		return
+	}
 	// re-populate list of sub-accounts
-	subAccounts, err := m.findSubAccounts(accountKey.ExtendedKey, accountKey.SubAccountIndex)
+	subAccounts, err := m.subAccountFinder.Find(keyStore, accountKey.ExtendedKey, accountKey.SubAccountIndex)
 	if err != nil {
 		return
 	}
@@ -394,40 +365,6 @@ func (m *Manager) refreshSelectedAccount() {
 		AccountKey:  m.selectedAccount.AccountKey,
 		SubAccounts: subAccounts,
 	}
-}
-
-// findSubAccounts traverses cached accounts and adds as a sub-accounts any
-// that belong to the currently selected account.
-// The extKey is CKD#2 := root of sub-accounts of the main account
-func (m *Manager) findSubAccounts(extKey *extkeys.ExtendedKey, subAccountIndex uint32) ([]accounts.Account, error) {
-	keyStore, err := m.node.AccountKeyStore()
-	if err != nil {
-		return []accounts.Account{}, err
-	}
-
-	subAccounts := make([]accounts.Account, 0)
-	if extKey.Depth == 5 { // CKD#2 level
-		// gather possible sub-account addresses
-		subAccountAddresses := make([]gethcommon.Address, 0)
-		for i := uint32(0); i < subAccountIndex; i++ {
-			childKey, err := extKey.Child(i)
-			if err != nil {
-				return []accounts.Account{}, err
-			}
-			subAccountAddresses = append(subAccountAddresses, crypto.PubkeyToAddress(childKey.ToECDSA().PublicKey))
-		}
-
-		// see if any of the gathered addresses actually exist in cached accounts list
-		for _, cachedAccount := range keyStore.Accounts() {
-			for _, possibleAddress := range subAccountAddresses {
-				if possibleAddress.Hex() == cachedAccount.Address.Hex() {
-					subAccounts = append(subAccounts, cachedAccount)
-				}
-			}
-		}
-	}
-
-	return subAccounts, nil
 }
 
 // AddressToDecryptedAccount tries to load decrypted key for a given account.
