@@ -95,11 +95,6 @@ mock: ##@other Regenerate mocks
 
 test: test-unit-coverage ##@tests Run basic, short tests during development
 
-test-account:
-	build/env.sh go test -v -coverprofile=coverage.out ./geth/account
-	@build/env.sh go tool cover -html=coverage.out -o coverage.html
-	@build/env.sh go tool cover -func=coverage.out
-
 test-unit: ##@tests Run unit and integration tests
 	build/env.sh go test $(UNIT_TEST_PACKAGES)
 

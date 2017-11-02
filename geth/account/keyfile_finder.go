@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 )
 
-var keyfileFinder keyFileFinder = keyFileFinderBase{}
+var keyFinder keyFileFinder = keyFileFinderBase{}
 
 type keyFileFinderBase struct{}
 

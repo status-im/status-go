@@ -172,6 +172,7 @@ func TestManager_CreateChildAccouAccountKeyStorent_Success(t *testing.T) {
 	accountKeyStoreMock := NewMockaccountKeyStorer(ctrl)
 	accountKeyStoreMock.EXPECT().AccountDecryptedKey(acc, password).Times(1).Return(acc, &key, nil)
 	accountKeyStoreMock.EXPECT().IncSubAccountIndex(acc, password).Times(1).Return(nil)
+
 	nodeMock := NewMockaccountNode(ctrl)
 	nodeMock.EXPECT().AccountKeyStore().Times(1).Return(accountKeyStoreMock, nil)
 
@@ -533,7 +534,7 @@ func TestManager_VerifyAccountPassword_Success(t *testing.T) {
 
 	keyFinderMock := NewMockkeyFileFinder(ctrl)
 	keyFinderMock.EXPECT().Find(dir, addressBytes).Times(1).Return(foundKeyFile, nil)
-	keyfileFinder = keyFinderMock
+	keyFinder = keyFinderMock
 	m := Manager{}
 	key, err := m.VerifyAccountPassword(dir, addr, passwrod)
 
@@ -553,7 +554,7 @@ func TestManager_VerifyAccountPassword_SwapAttack_Fail(t *testing.T) {
 
 	keyFinderMock := NewMockkeyFileFinder(ctrl)
 	keyFinderMock.EXPECT().Find(dir, addressBytes).Times(1).Return(foundKeyFile, nil)
-	keyfileFinder = keyFinderMock
+	keyFinder = keyFinderMock
 	m := Manager{}
 	key, err := m.VerifyAccountPassword(dir, addr, passwrod)
 
@@ -574,7 +575,7 @@ func TestManager_VerifyAccountPassword_WithEmptyKeyfile_Fail(t *testing.T) {
 
 	keyFinderMock := NewMockkeyFileFinder(ctrl)
 	keyFinderMock.EXPECT().Find(dir, addressBytes).Times(1).Return(foundKeyFile, nil)
-	keyfileFinder = keyFinderMock
+	keyFinder = keyFinderMock
 	m := Manager{}
 	key, err := m.VerifyAccountPassword(dir, addr, passwrod)
 
@@ -594,7 +595,7 @@ func TestManager_VerifyAccountPassword_FindErr_Fail(t *testing.T) {
 
 	keyFinderMock := NewMockkeyFileFinder(ctrl)
 	keyFinderMock.EXPECT().Find(dir, addressBytes).Times(1).Return([]byte{}, testErr)
-	keyfileFinder = keyFinderMock
+	keyFinder = keyFinderMock
 	m := Manager{}
 	key, err := m.VerifyAccountPassword(dir, addr, passwrod)
 

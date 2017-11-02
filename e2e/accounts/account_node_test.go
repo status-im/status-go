@@ -21,12 +21,12 @@ import (
 )
 
 const (
-	tmpDirName        = "status-tmp"
-	account1          = "test-account1.pk"
-	account2          = "test-account2.pk"
-	accountEIP55      = "test-account1-before-eip55.pk"
-	incorrectAddress  = "incorrect_address"
-	incorrectPassword = "incorrect_password"
+	tmpDirName         = "status-tmp"
+	account1           = "test-account1.pk"
+	account2           = "test-account2.pk"
+	accountBeforeEIP55 = "test-account1-before-eip55.pk"
+	incorrectAddress   = "incorrect_address"
+	incorrectPassword  = "incorrect_password"
 )
 
 func TestAccountsNodeTestSuite(t *testing.T) {
@@ -101,7 +101,7 @@ func (s *AccountsNodeTestSuite) TestCreateAccount() {
 
 	// test cases
 	testCases := []struct {
-		context       string
+		name          string
 		password      string
 		expectedError error
 	}{
@@ -120,12 +120,8 @@ func (s *AccountsNodeTestSuite) TestCreateAccount() {
 	// test
 	for _, testCase := range testCases {
 		func() {
-			s.T().Log(testCase.context)
-
 			addr, pubKey, mnemonic, err := accountManager.CreateAccount(testCase.password)
-			if err != testCase.expectedError {
-				require.FailNow(fmt.Sprintf("unexpected error: expected \n'%v', got \n'%v'", testCase.expectedError, err))
-			}
+			require.EqualValues(testCase.expectedError, err)
 			if err == nil {
 				require.NotEmpty(addr)
 				require.NotEmpty(pubKey)
@@ -140,7 +136,7 @@ func (s *AccountsNodeTestSuite) TestCreateChildAccount() {
 
 	// test cases
 	testCases := []struct {
-		context            string
+		name               string
 		parentAddress      string
 		parentPassword     string
 		defaultKeyAddress  string
@@ -148,33 +144,33 @@ func (s *AccountsNodeTestSuite) TestCreateChildAccount() {
 		expectedError      error
 	}{
 		{
-			context:        "parent address is empty, no default account",
+			name:           "parent address is empty, no default account",
 			parentAddress:  "",
 			parentPassword: "password",
 			expectedError:  account.ErrNoAccountSelected,
 		},
 		{
-			context:        "parent address is not empty, incorrect address format",
+			name:           "parent address is not empty, incorrect address format",
 			parentAddress:  incorrectAddress,
 			parentPassword: "password",
 			expectedError:  account.ErrAddressToAccountMappingFailure,
 		},
 
 		{
-			context:        "correct parent address, incorrect password",
+			name:           "correct parent address, incorrect password",
 			parentAddress:  TestConfig.Account2.Address,
 			parentPassword: incorrectPassword,
 			expectedError:  errors.New("cannot retrieve a valid key for a given account: could not decrypt key with given passphrase"),
 		},
 
 		{
-			context:        "correct parent address, correct password",
+			name:           "correct parent address, correct password",
 			parentAddress:  TestConfig.Account2.Address,
 			parentPassword: TestConfig.Account2.Password,
 			expectedError:  nil,
 		},
 		{
-			context:            "parent address is empty, default account is not empty, incorrect password",
+			name:               "parent address is empty, default account is not empty, incorrect password",
 			parentAddress:      "",
 			parentPassword:     incorrectPassword,
 			defaultKeyAddress:  TestConfig.Account2.Address,
@@ -182,7 +178,7 @@ func (s *AccountsNodeTestSuite) TestCreateChildAccount() {
 			expectedError:      errors.New("cannot retrieve a valid key for a given account: could not decrypt key with given passphrase"),
 		},
 		{
-			context:            "parent address is empty, selected account is not empty, correct password",
+			name:               "parent address is empty, selected account is not empty, correct password",
 			parentAddress:      "",
 			parentPassword:     TestConfig.Account2.Password,
 			defaultKeyAddress:  TestConfig.Account2.Address,
@@ -193,14 +189,12 @@ func (s *AccountsNodeTestSuite) TestCreateChildAccount() {
 
 	// test
 	for _, testCase := range testCases {
-		s.T().Log(testCase.context)
-
 		// account manager
 		accountManager := account.NewManager(s.NodeManager)
 		require.NotNil(accountManager)
 
 		// select default account if details were provided
-		if len(testCase.defaultKeyAddress) > 0 && len(testCase.defaultKeyPassword) > 0 {
+		if testCase.defaultKeyAddress != "" && testCase.defaultKeyPassword != "" {
 			require.NoError(accountManager.SelectAccount(testCase.defaultKeyAddress, testCase.defaultKeyPassword))
 		}
 
@@ -224,7 +218,7 @@ func (s *AccountsNodeTestSuite) TestRecoverAccount() {
 	require.NotNil(accountManager)
 
 	testCases := []struct {
-		context       string
+		name          string
 		password      string
 		mnemonic      string
 		expectedError error
@@ -238,12 +232,8 @@ func (s *AccountsNodeTestSuite) TestRecoverAccount() {
 	}
 
 	for _, testCase := range testCases {
-		s.T().Log(testCase.context)
-
 		address, key, err := accountManager.RecoverAccount(testCase.password, testCase.mnemonic)
-		if err != testCase.expectedError {
-			require.FailNow(fmt.Sprintf("unexpected error: expected \n'%v', got \n'%v'", testCase.expectedError, err))
-		}
+		require.EqualValues(testCase.expectedError, err)
 		if err == nil {
 			require.NotEmpty(address)
 			require.NotEmpty(key)
@@ -269,7 +259,7 @@ func (s *AccountsNodeTestSuite) TestVerifyAccountPassword() {
 	account1Address := gethcommon.BytesToAddress(gethcommon.FromHex(TestConfig.Account1.Address))
 
 	testCases := []struct {
-		context       string
+		name          string
 		keyPath       string
 		address       string
 		password      string
@@ -312,12 +302,9 @@ func (s *AccountsNodeTestSuite) TestVerifyAccountPassword() {
 		},
 	}
 	for _, testCase := range testCases {
-		s.T().Log(testCase.context)
-
 		accountKey, err := accountManager.VerifyAccountPassword(testCase.keyPath, testCase.address, testCase.password)
-		if !reflect.DeepEqual(err, testCase.expectedError) {
-			s.FailNow(fmt.Sprintf("unexpected error: expected \n'%v', got \n'%v'", testCase.expectedError, err))
-		}
+		require.EqualValues(testCase.expectedError, err)
+
 		if err == nil {
 			if accountKey == nil {
 				s.T().Error("no error reported, but account key is missing")
@@ -336,7 +323,7 @@ func (s *AccountsNodeTestSuite) TestVerifyAccountPasswordWithAccountBeforeEIP55(
 	require := s.Require()
 
 	// import key created before EIP55 introduction.
-	require.NoError(common.ImportTestAccount(s.config.KeyStoreDir, accountEIP55))
+	require.NoError(common.ImportTestAccount(s.config.KeyStoreDir, accountBeforeEIP55))
 
 	// account manager
 	accountManager := account.NewManager(nil)
@@ -355,18 +342,18 @@ func (s *AccountsNodeTestSuite) TestSelectAccount() {
 
 	// testCases
 	testCases := []struct {
-		context       string
+		name          string
 		address       string
 		password      string
 		expectedError error
 	}{
 		{
-			context:       "incorrect address",
+			name:          "incorrect address",
 			address:       incorrectAddress,
 			expectedError: account.ErrAddressToAccountMappingFailure,
 		},
 		{
-			context:       "correct address, incorrect password",
+			name:          "correct address, incorrect password",
 			address:       TestConfig.Account2.Address,
 			password:      incorrectPassword,
 			expectedError: errors.New("cannot retrieve a valid key for a given account: could not decrypt key with given passphrase"),
@@ -381,8 +368,6 @@ func (s *AccountsNodeTestSuite) TestSelectAccount() {
 
 	// test
 	for _, testCase := range testCases {
-		s.T().Log(testCase.context)
-
 		if err := accountManager.SelectAccount(testCase.address, testCase.password); !reflect.DeepEqual(err, testCase.expectedError) {
 			require.FailNow(fmt.Sprintf("unexpected error: expected \n'%v', got \n'%v'", testCase.expectedError, err))
 		}
@@ -398,7 +383,7 @@ func (s *AccountsNodeTestSuite) TestSelectedAccount() {
 
 	// test cases
 	testCases := []struct {
-		context       string
+		name          string
 		address       string
 		password      string
 		expectedError error
@@ -419,17 +404,13 @@ func (s *AccountsNodeTestSuite) TestSelectedAccount() {
 
 	// test
 	for _, testCase := range testCases {
-		s.T().Log(testCase.context)
-
 		// select account if requested
 		if len(testCase.address) > 0 && len(testCase.password) > 0 {
 			require.NoError(accountManager.SelectAccount(testCase.address, testCase.password))
 		}
 
 		key, err := accountManager.SelectedAccount()
-		if err != testCase.expectedError {
-			s.FailNow(fmt.Sprintf("unexpected error: expected \n'%v', got \n'%v'", testCase.expectedError, err))
-		}
+		require.EqualValues(testCase.expectedError, err)
 		if err == nil {
 			require.NotNil(key)
 		}
@@ -441,13 +422,13 @@ func (s *AccountsNodeTestSuite) TestReSelectAccount() {
 
 	// test cases
 	testCases := []struct {
-		context       string
+		name          string
 		address       string
 		password      string
 		expectedError error
 	}{
 		{
-			context:       "selected account is nil",
+			name:          "selected account is nil",
 			expectedError: nil,
 		},
 		{
@@ -459,8 +440,6 @@ func (s *AccountsNodeTestSuite) TestReSelectAccount() {
 	}
 
 	for _, testCase := range testCases {
-		s.T().Log(testCase.context)
-
 		// account manager
 		accountManager := account.NewManager(s.NodeManager)
 		require.NotNil(accountManager)
@@ -485,7 +464,7 @@ func (s *AccountsNodeTestSuite) TestLogout() {
 
 	// test cases
 	testCases := []struct {
-		context       string
+		name          string
 		expectedError error
 	}{
 		{
@@ -496,12 +475,8 @@ func (s *AccountsNodeTestSuite) TestLogout() {
 
 	// test
 	for _, testCase := range testCases {
-		s.T().Log(testCase.context)
-
 		err := accountManager.Logout()
-		if err != testCase.expectedError {
-			s.FailNow(fmt.Sprintf("unexpected error: expected \n'%v', got \n'%v'", testCase.expectedError, err))
-		}
+		require.EqualValues(testCase.expectedError, err)
 	}
 }
 
@@ -510,7 +485,7 @@ func (s *AccountsNodeTestSuite) TestAccounts() {
 
 	// test cases
 	testCases := []struct {
-		context         string
+		name            string
 		address         string
 		password        string
 		hasChildAccount bool
@@ -518,7 +493,7 @@ func (s *AccountsNodeTestSuite) TestAccounts() {
 		nAddresses      int
 	}{
 		{
-			context:       "selected account is nill",
+			name:          "selected account is nill",
 			expectedError: nil,
 			nAddresses:    0,
 		},
@@ -542,8 +517,6 @@ func (s *AccountsNodeTestSuite) TestAccounts() {
 
 	// test
 	for _, testCase := range testCases {
-		s.T().Log(testCase.context)
-
 		// setup account manager
 		accountManager := account.NewManager(s.NodeManager)
 		require.NotNil(accountManager)
@@ -563,9 +536,7 @@ func (s *AccountsNodeTestSuite) TestAccounts() {
 		}
 
 		addresses, err := accountManager.Accounts()
-		if err != testCase.expectedError {
-			require.FailNow(fmt.Sprintf("unexpected error: expected \n'%v', got \n'%v'", testCase.expectedError, err))
-		}
+		require.EqualValues(testCase.expectedError, err)
 		if err == nil {
 			require.NotNil(addresses)
 			require.Equal(testCase.nAddresses, len(addresses))
@@ -596,7 +567,7 @@ func (s *AccountsNodeTestSuite) TestAddressToDecryptedAccount() {
 
 	// test cases
 	testCases := []struct {
-		context       string
+		name          string
 		launchNode    bool
 		address       string
 		password      string
@@ -617,13 +588,13 @@ func (s *AccountsNodeTestSuite) TestAddressToDecryptedAccount() {
 			keystore.ErrDecrypt,
 		},
 		{
-			context:       "incorrect address format",
+			name:          "incorrect address format",
 			launchNode:    true,
 			address:       "12345",
 			expectedError: account.ErrAddressToAccountMappingFailure,
 		},
 		{
-			context:       "address does not exist",
+			name:          "address does not exist",
 			launchNode:    true,
 			address:       TestConfig.Account1.Address,
 			expectedError: keystore.ErrNoMatch,
@@ -632,12 +603,8 @@ func (s *AccountsNodeTestSuite) TestAddressToDecryptedAccount() {
 
 	// test
 	for _, testCase := range testCases {
-		s.T().Log(testCase.context)
-
 		account, key, err := accountManager.AddressToDecryptedAccount(testCase.address, testCase.password)
-		if err != testCase.expectedError {
-			require.FailNow(fmt.Sprintf("unexpected error: expected \n'%v', got \n'%v'", testCase.expectedError, err))
-		}
+		require.EqualValues(testCase.expectedError, err)
 		if err == nil {
 			require.NotNil(account)
 			require.NotNil(key)

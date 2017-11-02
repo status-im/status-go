@@ -154,7 +154,7 @@ func (m *Manager) RecoverAccount(password, mnemonic string) (address, pubKey str
 func (m *Manager) VerifyAccountPassword(keyStoreDir, address, password string) (*keystore.Key, error) {
 	addressObj := gethcommon.BytesToAddress(gethcommon.FromHex(address))
 
-	foundKeyFile, err := keyfileFinder.Find(keyStoreDir, addressObj)
+	foundKeyFile, err := keyFinder.Find(keyStoreDir, addressObj)
 	if err != nil {
 		return nil, fmt.Errorf("cannot traverse key store folder: %v", err)
 	}
