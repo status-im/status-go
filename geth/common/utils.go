@@ -74,15 +74,12 @@ func ImportTestAccount(keystoreDir, accountFile string) error {
 	}
 
 	dst := filepath.Join(keystoreDir, accountFile)
-	if _, err := os.Stat(dst); os.IsNotExist(err) {
-		err = ioutil.WriteFile(dst, static.MustAsset("keys/"+accountFile), 0644)
-		if err != nil {
-			log.Warn("cannot copy test account PK", "error", err)
-			return err
-		}
+	err := ioutil.WriteFile(dst, static.MustAsset("keys/"+accountFile), 0644)
+	if err != nil {
+		log.Warn("cannot copy test account PK", "error", err)
 	}
 
-	return nil
+	return err
 }
 
 // PanicAfter throws panic() after waitSeconds, unless abort channel receives notification
