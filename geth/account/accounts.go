@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 
-	"crypto/ecdsa"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -29,42 +28,6 @@ type Manager struct {
 
 	extKeyImporter   extendedKeyImporter
 	subAccountFinder subAccountFinder
-}
-
-type accountNode interface {
-	AccountKeyStore() (accountKeyStorer, error)
-	AccountManager() (gethAccountManager, error)
-	WhisperService() (whisperService, error)
-}
-
-type gethAccountManager interface {
-	Wallets() []accounts.Wallet
-}
-
-type accountKeyStorer interface {
-	AccountDecryptedKey(account accounts.Account, password string) (accounts.Account, *keystore.Key, error)
-	IncSubAccountIndex(account accounts.Account, password string) error
-	ImportExtendedKey(extKey *extkeys.ExtendedKey, password string) (accounts.Account, error)
-	Accounts() []accounts.Account
-}
-
-type whisperService interface {
-	DeleteKeyPairs() error
-	SelectKeyPair(key *ecdsa.PrivateKey) error
-}
-
-type subAccountFinder interface {
-	Find(keyStore accountKeyStorer, extKey *extkeys.ExtendedKey, subAccountIndex uint32) ([]accounts.Account, error)
-}
-
-type keyFileFinder interface {
-	Find(keyStoreDir string, addressObj gethcommon.Address) ([]byte, error)
-}
-
-// importExtendedKey processes incoming extended key, extracts required info and creates corresponding account key.
-// Once account key is formed, that key is put (if not already) into keystore i.e. key is *encoded* into key file.
-type extendedKeyImporter interface {
-	Import(keyStore accountKeyStorer, extKey *extkeys.ExtendedKey, password string) (address, pubKey string, err error)
 }
 
 // NewManager returns new node account manager
@@ -189,7 +152,6 @@ func (m *Manager) RecoverAccount(password, mnemonic string) (address, pubKey str
 // VerifyAccountPassword tries to decrypt a given account key file, with a provided password.
 // If no error is returned, then account is considered verified.
 func (m *Manager) VerifyAccountPassword(keyStoreDir, address, password string) (*keystore.Key, error) {
-
 	addressObj := gethcommon.BytesToAddress(gethcommon.FromHex(address))
 
 	foundKeyFile, err := keyfileFinder.Find(keyStoreDir, addressObj)
@@ -205,6 +167,7 @@ func (m *Manager) VerifyAccountPassword(keyStoreDir, address, password string) (
 	if err != nil {
 		return nil, err
 	}
+
 	// avoid swap attack
 	if key.Address != addressObj {
 		return nil, fmt.Errorf("account mismatch: have %s, want %s", key.Address.Hex(), addressObj.Hex())
