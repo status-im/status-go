@@ -1,9 +1,9 @@
 package account
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"context"
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
@@ -11,7 +11,6 @@ import (
 	"github.com/status-im/status-go/extkeys"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/rpc"
-
 )
 
 // errors
@@ -349,7 +348,6 @@ func (m *Manager) AddressToDecryptedAccount(address, password string) (accounts.
 
 	return keyStore.AccountDecryptedKey(account, password)
 }
-
 
 // AccountsRPCHandler returns RPC Handler for the Accounts() method.
 func (m *Manager) AccountsRPCHandler() rpc.Handler {

@@ -2,13 +2,11 @@ package account
 
 import (
 	"crypto/ecdsa"
-	"github.com/status-im/status-go/geth/common"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/status-im/status-go/extkeys"
-
+	"github.com/status-im/status-go/geth/common"
 )
-
 
 // accountNode narrows responsibility geth/common.NodeManager interface
 type accountNode interface {
@@ -38,7 +36,6 @@ type whisperService interface {
 	DeleteKeyPairs() error
 	SelectKeyPair(key *ecdsa.PrivateKey) error
 }
-
 
 func newAccountNodeManager(node common.NodeManager) *accountManagerNodeManagerAdapter {
 	return &accountManagerNodeManagerAdapter{node: node}
