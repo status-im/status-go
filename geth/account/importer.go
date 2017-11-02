@@ -6,8 +6,15 @@ import (
 	"github.com/status-im/status-go/extkeys"
 )
 
+// extendedKeyImporter import ECDSA key (obtained from extended key) and returns decrypted key for account
+type extendedKeyImporter interface {
+	Import(keyStore accountKeyStorer, extKey *extkeys.ExtendedKey, password string) (address, pubKey string, err error)
+}
+
 type extendedKeyImporterBase struct{}
 
+// Import processes incoming extended key, extracts required info and creates corresponding account key.
+// Once account key is formed, that key is put (if not already) into keystore i.e. key is *encoded* into key file.
 func (i *extendedKeyImporterBase) Import(keyStore accountKeyStorer, extKey *extkeys.ExtendedKey, password string) (address, pubKey string, err error) {
 	// imports extended key, create key file (if necessary)
 	account, err := keyStore.ImportExtendedKey(extKey, password)
