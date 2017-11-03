@@ -3,13 +3,14 @@ package account
 import (
 	"crypto/ecdsa"
 	"fmt"
+	"testing"
+
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/golang/mock/gomock"
 	"github.com/status-im/status-go/extkeys"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestManager_ImportExtendedKey_Success(t *testing.T) {

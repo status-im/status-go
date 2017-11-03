@@ -3,6 +3,9 @@ package account
 import (
 	"crypto/ecdsa"
 	"fmt"
+	"strings"
+	"testing"
+
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
@@ -10,8 +13,6 @@ import (
 	"github.com/status-im/status-go/extkeys"
 	stcommon "github.com/status-im/status-go/geth/common"
 	"github.com/stretchr/testify/require"
-	"strings"
-	"testing"
 )
 
 var testErr = fmt.Errorf("error")

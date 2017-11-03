@@ -3,22 +3,23 @@ package account
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/ethereum/go-ethereum/common"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+
+	"github.com/ethereum/go-ethereum/common"
 )
 
 var keyFinder keyFileFinder = keyFileFinderBase{}
 
-//keyFileFinder tries find a account key file, for provided address into provided keystone directory
+// keyFileFinder tries find a account key file, for provided address into provided keystone directory.
 type keyFileFinder interface {
 	Find(keyStoreDir string, addressObj common.Address) ([]byte, error)
 }
 
 type keyFileFinderBase struct{}
 
-//Find account key file into keystone directory for provided address
+// Find account key file into keystone directory for provided address.
 func (kf keyFileFinderBase) Find(keyStoreDir string, addressObj common.Address) ([]byte, error) {
 	var err error
 	var foundKeyFile []byte

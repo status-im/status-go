@@ -6,7 +6,7 @@ import (
 	"github.com/status-im/status-go/extkeys"
 )
 
-// extendedKeyImporter import ECDSA key (obtained from extended key) and returns decrypted key for account
+// extendedKeyImporter import ECDSA key (obtained from extended key) and returns decrypted key for account.
 type extendedKeyImporter interface {
 	Import(keyStore accountKeyStorer, extKey *extkeys.ExtendedKey, password string) (address, pubKey string, err error)
 }

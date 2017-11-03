@@ -7,7 +7,7 @@ import (
 	"github.com/status-im/status-go/extkeys"
 )
 
-//subAccountFinder finds sub-accounts by existing extended key
+// subAccountFinder finds sub-accounts by existing extended key.
 type subAccountFinder interface {
 	Find(keyStore accountKeyStorer, extKey *extkeys.ExtendedKey, subAccountIndex uint32) ([]accounts.Account, error)
 }
@@ -16,7 +16,7 @@ type subAccountFinderBase struct{}
 
 // Find traverses cached accounts and adds as a sub-accounts any
 // that belong to the currently selected account.
-// The extKey is CKD#2 := root of sub-accounts of the main account
+// The extKey is CKD#2 := root of sub-accounts of the main account.
 func (m *subAccountFinderBase) Find(keyStore accountKeyStorer, extKey *extkeys.ExtendedKey, subAccountIndex uint32) ([]accounts.Account, error) {
 	subAccounts := make([]accounts.Account, 0)
 	if extKey.Depth == 5 { // CKD#2 level

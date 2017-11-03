@@ -1,13 +1,14 @@
 package account
 
 import (
+	"testing"
+
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/golang/mock/gomock"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestProxy_Base_Success(t *testing.T) {
