@@ -35,7 +35,7 @@ To test statusgo using a giving network by id number, use: `make ci networkid=3`
 
 If you want to launch specific test, for instance `RPCSendTransactions`, use the following command:
 ```
-./build/env.sh go test -v ./geth/api/ -testify.m ^RPCSendTransaction$
+go test -v ./geth/api/ -testify.m ^RPCSendTransaction$
 ```
 
 Note `-testify.m` as [testify/suite](https://godoc.org/github.com/stretchr/testify/suite) is used to group individual tests.

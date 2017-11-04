@@ -6,6 +6,11 @@ help: ##@other Show this help
 
 include ./static/tools/mk/lint.mk
 
+ifndef GOPATH
+$(error GOPATH not set. Please set GOPATH and make sure status-go is located at $$GOPATH/src/github.com/status-im/status-go. For more information about the GOPATH environment variable, see https://golang.org/doc/code.html#GOPATH)
+endif
+
+CGO_CFLAGS=-I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
 GOBIN = build/bin
 GO ?= latest
 networkid ?= 
@@ -36,53 +41,53 @@ HELP_FUN = \
 UNIT_TEST_PACKAGES := $(shell go list ./...  | grep -v /vendor | grep -v /e2e | grep -v /cmd)
 
 statusgo: ##@build Build status-go as statusd server
-	build/env.sh go build -i -o $(GOBIN)/statusd -v $(shell build/testnet-flags.sh) ./cmd/statusd
+	go build -i -o $(GOBIN)/statusd -v $(shell build/testnet-flags.sh) ./cmd/statusd
 	@echo "\nCompilation done.\nRun \"build/bin/statusd -h\" to view available commands."
 
 wnode-status: ##@build Build wnode-status (Whisper 5 debug tool)
-	build/env.sh go build -i -o $(GOBIN)/wnode-status -v $(shell build/testnet-flags.sh) ./cmd/wnode-status
+	go build -i -o $(GOBIN)/wnode-status -v $(shell build/testnet-flags.sh) ./cmd/wnode-status
 
 statusgo-cross: statusgo-android statusgo-ios
 	@echo "Full cross compilation done."
 	@ls -ld $(GOBIN)/statusgo-*
 
 statusgo-android: xgo ##@cross-compile Build status-go for Android
-	build/env.sh $(GOBIN)/xgo --image farazdagi/xgo --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=android-16/aar -v $(shell build/testnet-flags.sh) ./lib
+	$(GOBIN)/xgo --image farazdagi/xgo --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=android-16/aar -v $(shell build/testnet-flags.sh) ./lib
 	@echo "Android cross compilation done."
 
 statusgo-ios: xgo	##@cross-compile Build status-go for iOS
-	build/env.sh $(GOBIN)/xgo --image farazdagi/xgo --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v $(shell build/testnet-flags.sh) ./lib
+	$(GOBIN)/xgo --image farazdagi/xgo --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v $(shell build/testnet-flags.sh) ./lib
 	@echo "iOS framework cross compilation done."
 
 statusgo-ios-simulator: xgo	##@cross-compile Build status-go for iOS Simulator
-	@build/env.sh docker pull farazdagi/xgo-ios-simulator
-	build/env.sh $(GOBIN)/xgo --image farazdagi/xgo-ios-simulator --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v $(shell build/testnet-flags.sh) ./lib
+	@docker pull farazdagi/xgo-ios-simulator
+	$(GOBIN)/xgo --image farazdagi/xgo-ios-simulator --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v $(shell build/testnet-flags.sh) ./lib
 	@echo "iOS framework cross compilation done."
 
 xgo:
-	build/env.sh docker pull farazdagi/xgo
-	build/env.sh go get github.com/karalabe/xgo
+	docker pull farazdagi/xgo
+	go get github.com/karalabe/xgo
 
 statusgo-mainnet:
-	build/env.sh go build -i -o $(GOBIN)/statusgo -v $(shell build/mainnet-flags.sh) ./cmd/statusd
+	go build -i -o $(GOBIN)/statusgo -v $(shell build/mainnet-flags.sh) ./cmd/statusd
 	@echo "status go compilation done (mainnet)."
 	@echo "Run \"build/bin/statusgo\" to view available commands"
 
 statusgo-android-mainnet: xgo
-	build/env.sh $(GOBIN)/xgo --image farazdagi/xgo --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=android-16/aar -v $(shell build/mainnet-flags.sh) ./lib
+	$(GOBIN)/xgo --image farazdagi/xgo --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=android-16/aar -v $(shell build/mainnet-flags.sh) ./lib
 	@echo "Android cross compilation done (mainnet)."
 
 statusgo-ios-mainnet: xgo
-	build/env.sh $(GOBIN)/xgo --image farazdagi/xgo --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v $(shell build/mainnet-flags.sh) ./lib
+	$(GOBIN)/xgo --image farazdagi/xgo --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v $(shell build/mainnet-flags.sh) ./lib
 	@echo "iOS framework cross compilation done (mainnet)."
 
 statusgo-ios-simulator-mainnet: xgo
-	build/env.sh $(GOBIN)/xgo --image farazdagi/xgo-ios-simulator --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v $(shell build/mainnet-flags.sh) ./lib
+	$(GOBIN)/xgo --image farazdagi/xgo-ios-simulator --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v $(shell build/mainnet-flags.sh) ./lib
 	@echo "iOS framework cross compilation done (mainnet)."
 
 generate: ##@other Regenerate assets and other auto-generated stuff
 	cp ./node_modules/web3/dist/web3.js ./static/scripts/web3.js
-	build/env.sh go generate ./static
+	go generate ./static
 	rm ./static/scripts/web3.js
 
 
@@ -97,22 +102,22 @@ mock: ##@other Regenerate mocks
 test: test-unit-coverage ##@tests Run basic, short tests during development
 
 test-unit: ##@tests Run unit and integration tests
-	build/env.sh go test $(UNIT_TEST_PACKAGES)
+	go test $(UNIT_TEST_PACKAGES)
 
 test-unit-coverage: ##@tests Run unit and integration tests with coverage
-	build/env.sh go test -coverpkg= $(UNIT_TEST_PACKAGES)
+	go test -coverpkg= $(UNIT_TEST_PACKAGES)
 
 test-e2e: ##@tests Run e2e tests
 	# order: reliability then alphabetical
 	# TODO(tiabc): make a single command out of them adding `-p 1` flag.
-	build/env.sh go test -timeout 5m ./e2e/accounts/... -network=$(networkid)
-	build/env.sh go test -timeout 5m ./e2e/api/... -network=$(networkid)
-	build/env.sh go test -timeout 5m ./e2e/node/... -network=$(networkid)
-	build/env.sh go test -timeout 15m ./e2e/jail/... -network=$(networkid)
-	build/env.sh go test -timeout 20m ./e2e/rpc/... -network=$(networkid)
-	build/env.sh go test -timeout 20m ./e2e/whisper/... -network=$(networkid)
-	build/env.sh go test -timeout 10m ./e2e/transactions/... -network=$(networkid)
-	build/env.sh go test -timeout 40m ./lib -network=$(networkid)
+	go test -timeout 5m ./e2e/accounts/... -network=$(networkid)
+	go test -timeout 5m ./e2e/api/... -network=$(networkid)
+	go test -timeout 5m ./e2e/node/... -network=$(networkid)
+	go test -timeout 15m ./e2e/jail/... -network=$(networkid)
+	go test -timeout 20m ./e2e/rpc/... -network=$(networkid)
+	go test -timeout 20m ./e2e/whisper/... -network=$(networkid)
+	go test -timeout 10m ./e2e/transactions/... -network=$(networkid)
+	go test -timeout 40m ./lib -network=$(networkid)
 
 ci: lint mock-install mock test-unit test-e2e ##@tests Run all linters and tests at once
 
