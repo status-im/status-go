@@ -102,10 +102,12 @@ func EnsureNodeSync(nodeManager common.NodeManager) {
 	}
 
 	// todo(@jeka): we should extract it into config
-	timeout := time.NewTimer(50 * time.Minute)
+	timeout := time.NewTimer(30 * time.Minute)
 	defer timeout.Stop()
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
+	statusTicker := time.NewTicker(5 * time.Minute)
+	defer statusTicker.Stop()
 
 	for {
 		select {
@@ -122,7 +124,10 @@ func EnsureNodeSync(nodeManager common.NodeManager) {
 					return
 				}
 			}
+		case <-statusTicker.C:
+			fmt.Println("Syncing...")
 		}
+
 	}
 }
 

@@ -144,7 +144,7 @@ func (s *BackendTestSuite) TxQueueManager() common.TxQueueManager {
 }
 
 func importTestAccouns(keyStoreDir string) (err error) {
-	log.Info("Import accounts to", keyStoreDir)
+	log.Debug("Import accounts to", keyStoreDir)
 
 	err = common.ImportTestAccount(keyStoreDir, "test-account1.pk")
 	if err != nil {
