@@ -9,9 +9,8 @@ include ./static/tools/mk/lint.mk
 ifndef GOPATH
 $(error GOPATH not set. Please set GOPATH and make sure status-go is located at $$GOPATH/src/github.com/status-im/status-go. For more information about the GOPATH environment variable, see https://golang.org/doc/code.html#GOPATH)
 endif
- 
-CGO_CFLAGS=-I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
 
+CGO_CFLAGS=-I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
 GOBIN = build/bin
 GO ?= latest
 networkid ?= 
