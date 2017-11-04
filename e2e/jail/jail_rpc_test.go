@@ -35,20 +35,16 @@ func (s *JailRPCTestSuite) SetupTest() {
 	s.jail = s.Backend.JailManager()
 	s.NotNil(s.jail)
 
-	s.Do(func() {
-		// Testnet sync
-		s.StartTestBackend()
-		EnsureNodeSync(s.Backend.NodeManager())
-		s.StopTestBackend()
-	})
+	// Testnet sync
+	s.StartTestBackend()
+	EnsureNodeSync(s.Backend.NodeManager())
+}
+
+func (s *JailRPCTestSuite) TearDownTest() {
+	s.StopTestBackend()
 }
 
 func (s *JailRPCTestSuite) TestJailRPCSend() {
-	s.StartTestBackend()
-	defer s.StopTestBackend()
-
-	EnsureNodeSync(s.Backend.NodeManager())
-
 	// load Status JS and add test command to it
 	s.jail.BaseJS(baseStatusJSCode)
 	s.jail.Parse(testChatID, ``)
@@ -77,9 +73,6 @@ func (s *JailRPCTestSuite) TestJailRPCSend() {
 }
 
 func (s *JailRPCTestSuite) TestIsConnected() {
-	s.StartTestBackend()
-	defer s.StopTestBackend()
-
 	s.jail.Parse(testChatID, "")
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
@@ -104,9 +97,6 @@ func (s *JailRPCTestSuite) TestIsConnected() {
 
 // regression test: eth_getTransactionReceipt with invalid transaction hash should return null
 func (s *JailRPCTestSuite) TestRegressionGetTransactionReceipt() {
-	s.StartTestBackend()
-	defer s.StopTestBackend()
-
 	rpcClient := s.Backend.NodeManager().RPCClient()
 	s.NotNil(rpcClient)
 
@@ -117,11 +107,6 @@ func (s *JailRPCTestSuite) TestRegressionGetTransactionReceipt() {
 }
 
 func (s *JailRPCTestSuite) TestContractDeployment() {
-	s.StartTestBackend()
-	defer s.StopTestBackend()
-
-	EnsureNodeSync(s.Backend.NodeManager())
-
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
 	s.jail.Parse(testChatID, "")
 
@@ -199,11 +184,6 @@ func (s *JailRPCTestSuite) TestContractDeployment() {
 }
 
 func (s *JailRPCTestSuite) TestJailVMPersistence() {
-	s.StartTestBackend()
-	defer s.StopTestBackend()
-
-	EnsureNodeSync(s.Backend.NodeManager())
-
 	// log into account from which transactions will be sent
 	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	s.NoError(err, "cannot select account: %v", TestConfig.Account1.Address)
