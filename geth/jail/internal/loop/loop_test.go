@@ -13,25 +13,8 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-func (s *LoopSuite) TestAddAndReady() {
-	t := looptask.NewIdleTask()
-
-	err := s.loop.Add(t)
-	s.NoError(err)
-
-	err = s.loop.Ready(t)
-	s.NoError(err)
-
-	s.cancel()
-
-	// Wait for the context to cancel and loop to close
-	time.Sleep(100 * time.Millisecond)
-
-	err = s.loop.Add(t)
-	s.Error(err)
-
-	err = s.loop.Ready(t)
-	s.Error(err)
+func TestLoopSuite(t *testing.T) {
+	suite.Run(t, new(LoopSuite))
 }
 
 type LoopSuite struct {
@@ -51,6 +34,23 @@ func (s *LoopSuite) SetupTest() {
 	go s.loop.Run(ctx)
 }
 
-func TestLoopSuite(t *testing.T) {
-	suite.Run(t, new(LoopSuite))
+func (s *LoopSuite) TestAddAndReady() {
+	t := looptask.NewIdleTask()
+
+	err := s.loop.Add(t)
+	s.NoError(err)
+
+	err = s.loop.Ready(t)
+	s.NoError(err)
+
+	s.cancel()
+
+	// Wait for the context to cancel and loop to close
+	time.Sleep(100 * time.Millisecond)
+
+	err = s.loop.Add(t)
+	s.Error(err)
+
+	err = s.loop.Ready(t)
+	s.Error(err)
 }
