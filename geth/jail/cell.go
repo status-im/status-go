@@ -2,6 +2,8 @@ package jail
 
 import (
 	"context"
+	"errors"
+	"time"
 
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/jail/internal/fetch"
@@ -65,9 +67,28 @@ func (c *Cell) Stop() {
 // event queue loop and schedules for immediate execution.
 // Intended to be used by any cell user that want's to run
 // async call, like callback.
-func (c *Cell) CallAsync(fn otto.Value, args ...interface{}) {
+func (c *Cell) CallAsync(fn otto.Value, args ...interface{}) error {
 	task := looptask.NewCallTask(fn, args...)
-	c.lo.Add(task)
-	// TODO(divan): review API of `loop` package, it's contrintuitive
-	go c.lo.Ready(task)
+	ch1 := make(chan error, 1)
+	ch2 := make(chan int)
+
+	go func() {
+		ch1 <- c.lo.Add(task)
+		// TODO(divan): review API of `loop` package, it's contrintuitive
+		ch1 <- c.lo.Ready(task)
+		ch2 <- 1
+	}()
+
+	for {
+		select {
+		case err := <-ch1:
+			if err != nil {
+				return err
+			}
+		case <-ch2:
+			return nil
+		case <-time.After(6000 * time.Millisecond):
+			return errors.New("Timeout")
+		}
+	}
 }
