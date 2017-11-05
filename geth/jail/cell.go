@@ -69,23 +69,25 @@ func (c *Cell) Stop() {
 // async call, like callback.
 func (c *Cell) CallAsync(fn otto.Value, args ...interface{}) error {
 	task := looptask.NewCallTask(fn, args...)
-	ch1 := make(chan error, 1)
-	ch2 := make(chan int)
+	errChan := make(chan error, 1)
+	doneChan := make(chan struct{})
 
 	go func() {
-		ch1 <- c.lo.Add(task)
+		errChan <- c.lo.Add(task)
 		// TODO(divan): review API of `loop` package, it's contrintuitive
-		ch1 <- c.lo.Ready(task)
-		ch2 <- 1
+		errChan <- c.lo.Ready(task)
+		// If both above return with err == nil,
+		// we signal that the for loop can exit without error
+		doneChan <- struct{}{}
 	}()
 
 	for {
 		select {
-		case err := <-ch1:
+		case err := <-errChan:
 			if err != nil {
 				return err
 			}
-		case <-ch2:
+		case <-doneChan:
 			return nil
 		case <-time.After(6000 * time.Millisecond):
 			return errors.New("Timeout")
