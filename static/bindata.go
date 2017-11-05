@@ -120,7 +120,7 @@ func scriptsWeb3Js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "scripts/web3.js", size: 497689, mode: os.FileMode(420), modTime: time.Unix(1509786495, 0)}
+	info := bindataFileInfo{name: "scripts/web3.js", size: 497689, mode: os.FileMode(420), modTime: time.Unix(1509869327, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -160,7 +160,7 @@ func configStatusChainGenesisJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/status-chain-genesis.json", size: 809, mode: os.FileMode(420), modTime: time.Unix(1509785152, 0)}
+	info := bindataFileInfo{name: "config/status-chain-genesis.json", size: 809, mode: os.FileMode(420), modTime: time.Unix(1509802928, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -180,7 +180,7 @@ func configTestDataJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/test-data.json", size: 327, mode: os.FileMode(420), modTime: time.Unix(1509785152, 0)}
+	info := bindataFileInfo{name: "config/test-data.json", size: 327, mode: os.FileMode(420), modTime: time.Unix(1509802928, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -220,7 +220,7 @@ func keysTestAccount1Pk() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/test-account1.pk", size: 491, mode: os.FileMode(420), modTime: time.Unix(1509785152, 0)}
+	info := bindataFileInfo{name: "keys/test-account1.pk", size: 491, mode: os.FileMode(420), modTime: time.Unix(1509802928, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -240,7 +240,7 @@ func keysTestAccount2Pk() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/test-account2.pk", size: 491, mode: os.FileMode(420), modTime: time.Unix(1509785152, 0)}
+	info := bindataFileInfo{name: "keys/test-account2.pk", size: 491, mode: os.FileMode(420), modTime: time.Unix(1509802928, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -260,7 +260,7 @@ func keysTestAccount3BeforeEip55Pk() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/test-account3-before-eip55.pk", size: 491, mode: os.FileMode(420), modTime: time.Unix(1509785152, 0)}
+	info := bindataFileInfo{name: "keys/test-account3-before-eip55.pk", size: 491, mode: os.FileMode(420), modTime: time.Unix(1509802928, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -280,7 +280,7 @@ func keysWnodekey() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/wnodekey", size: 65, mode: os.FileMode(420), modTime: time.Unix(1509785152, 0)}
+	info := bindataFileInfo{name: "keys/wnodekey", size: 65, mode: os.FileMode(420), modTime: time.Unix(1509802928, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
