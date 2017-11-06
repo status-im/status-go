@@ -126,6 +126,11 @@ func EnsureNodeSync(nodeManager common.NodeManager) {
 					return
 				}
 			}
+		// FIXME(tiabc): This is done for travis not to kill the application if syncing is taking
+		// too long. Another approach is to use travis_wait, see:
+		// https://docs.travis-ci.com/user/common-build-problems/#Build-times-out-because-no-output-was-received
+		// However, in case we prefix commands with `travis_wait`, the output is not shown in case
+		// of any error and it's impossible to get what happened. Is there a proper way out of this problem?
 		case <-statusTicker.C:
 			fmt.Println("Syncing...")
 		}
