@@ -26,7 +26,7 @@ func registerWeb3Provider(jail *Jail, cell *Cell) error {
 		},
 		"send":        createSendHandler(jail, cell),
 		"sendAsync":   createSendAsyncHandler(jail, cell),
-		"isConnected": createIsConnectedHandler(jail, cell),
+		"isConnected": createIsConnectedHandler(jail),
 	}
 
 	return cell.Set("jeth", jeth)
@@ -42,7 +42,7 @@ func registerStatusSignals(cell *Cell) error {
 	return cell.Set("statusSignals", statusSignals)
 }
 
-// createSendHandler returns jeth.send() and jeth.sendAsync() handler
+// createSendHandler returns jeth.send().
 func createSendHandler(jail *Jail, cell *Cell) func(call otto.FunctionCall) otto.Value {
 	return func(call otto.FunctionCall) otto.Value {
 		// As it's a sync call, it's called already from a thread-safe context,
@@ -105,11 +105,9 @@ func createSendAsyncHandler(jail *Jail, cell *Cell) func(call otto.FunctionCall)
 	}
 }
 
-// createIsConnectedHandler returns jeth.isConnected() handler
-// TODO(adam): according to https://github.com/ethereum/wiki/wiki/JavaScript-API#web3isconnected
-// this callback should return Boolean instead of an object `{"result": Boolean}`.
-// TODO(adam): remove error wrapping as it should be a custom Error object.
-func createIsConnectedHandler(jail *Jail, cell *Cell) func(call otto.FunctionCall) otto.Value {
+// createIsConnectedHandler returns jeth.isConnected() handler.
+// This handler returns `true` if client is actively listening for network connections.
+func createIsConnectedHandler(jail RPCClientProvider) func(call otto.FunctionCall) otto.Value {
 	return func(call otto.FunctionCall) otto.Value {
 		client := jail.RPCClient()
 		if client == nil {
@@ -181,8 +179,4 @@ func wrapResultInValue(vm *otto.Otto, result interface{}) (value otto.Value, err
 	}
 
 	return
-}
-
-func wrapErrorInValue(vm *otto.Otto, anErr error) (value otto.Value, err error) {
-	return vm.Run(`({"error":"` + anErr.Error() + `"})`)
 }
