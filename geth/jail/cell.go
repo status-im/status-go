@@ -70,7 +70,7 @@ func (c *Cell) Stop() {
 func (c *Cell) CallAsync(fn otto.Value, args ...interface{}) error {
 	task := looptask.NewCallTask(fn, args...)
 	errChan := make(chan error, 1)
-	doneChan := make(chan struct{})
+	doneChan := make(chan struct{}, 1)
 
 	go func() {
 		errChan <- c.lo.Add(task)
@@ -81,6 +81,9 @@ func (c *Cell) CallAsync(fn otto.Value, args ...interface{}) error {
 		doneChan <- struct{}{}
 	}()
 
+	timer := time.NewTimer(6000 * time.Millisecond)
+	defer timer.Stop()
+
 	for {
 		select {
 		case err := <-errChan:
@@ -89,7 +92,7 @@ func (c *Cell) CallAsync(fn otto.Value, args ...interface{}) error {
 			}
 		case <-doneChan:
 			return nil
-		case <-time.After(6000 * time.Millisecond):
+		case <-timer.C:
 			return errors.New("Timeout")
 		}
 	}
