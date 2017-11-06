@@ -45,6 +45,8 @@ func init() {
 		panic(err)
 	}
 
+	flag.Parse()
+
 	// setup root directory
 	const pathSeparator = string(os.PathSeparator)
 	RootDir = filepath.Dir(pwd)

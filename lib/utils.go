@@ -31,15 +31,20 @@ import (
 
 const zeroHash = "0x0000000000000000000000000000000000000000000000000000000000000000"
 
-var testChainDir = filepath.Join(TestDataDir, TestNetworkNames[params.StatusChainNetworkID])
+var testChainDir string
+var nodeConfigJSON string
 
-var nodeConfigJSON = `{
-	"NetworkId": ` + strconv.Itoa(params.StatusChainNetworkID) + `,
+func init() {
+	testChainDir = filepath.Join(TestDataDir, TestNetworkNames[GetNetworkID()])
+
+	nodeConfigJSON = `{
+	"NetworkId": ` + strconv.Itoa(GetNetworkID()) + `,
 	"DataDir": "` + testChainDir + `",
 	"HTTPPort": ` + strconv.Itoa(TestConfig.Node.HTTPPort) + `,
 	"WSPort": ` + strconv.Itoa(TestConfig.Node.WSPort) + `,
 	"LogLevel": "INFO"
 }`
+}
 
 // nolint: deadcode
 func testExportedAPI(t *testing.T, done chan struct{}) {
