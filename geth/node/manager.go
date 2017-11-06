@@ -69,7 +69,7 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 
 	m.initLog(config)
 
-	ethNode, err := MakeNode(config)
+	ethNode, err := MakeNode(config, LogDeliveryService{})
 	if err != nil {
 		return nil, err
 	}
