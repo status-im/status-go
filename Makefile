@@ -98,6 +98,11 @@ mock: ##@other Regenerate mocks
 	mockgen -source=geth/common/types.go -destination=geth/common/types_mock.go -package=common
 	mockgen -source=geth/common/notification.go -destination=geth/common/notification_mock.go -package=common -imports fcm=github.com/NaySoftware/go-fcm
 	mockgen -source=geth/notification/fcm/client.go -destination=geth/notification/fcm/client_mock.go -package=fcm -imports fcm=github.com/NaySoftware/go-fcm
+	mockgen -source=geth/account/adapter.go -destination=geth/account/adapter_mock_test.go -package=account
+	mockgen -source=geth/account/importer.go -destination=geth/account/importer_mock_test.go -package=account
+	mockgen -source=geth/account/keyfile_finder.go -destination=geth/account/keyfile_finder_mock_test.go -package=account
+	mockgen -source=geth/account/subaccount_finder.go -destination=geth/account/subaccount_finder_mock_test.go -package=account
+	mockgen -destination=geth/account/wallet_mock_test.go -package=account github.com/ethereum/go-ethereum/accounts Wallet
 
 test: test-unit-coverage ##@tests Run basic, short tests during development
 
