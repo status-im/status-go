@@ -70,15 +70,18 @@ func (c *Cell) Stop() {
 func (c *Cell) CallAsync(fn otto.Value, args ...interface{}) error {
 	task := looptask.NewCallTask(fn, args...)
 	errChan := make(chan error, 1)
-	doneChan := make(chan struct{}, 1)
 
 	go func() {
-		errChan <- c.lo.Add(task)
+		err := c.lo.Add(task)
+		if err != nil {
+			errChan <- err
+		}
 		// TODO(divan): review API of `loop` package, it's contrintuitive
-		errChan <- c.lo.Ready(task)
-		// If both above return with err == nil,
-		// we signal that the for loop can exit without error
-		doneChan <- struct{}{}
+		err = c.lo.Ready(task)
+		if err != nil {
+			errChan <- err
+		}
+		close(errChan)
 	}()
 
 	timer := time.NewTimer(6000 * time.Millisecond)
@@ -86,12 +89,13 @@ func (c *Cell) CallAsync(fn otto.Value, args ...interface{}) error {
 
 	for {
 		select {
-		case err := <-errChan:
+		case err, ok := <-errChan:
 			if err != nil {
 				return err
 			}
-		case <-doneChan:
-			return nil
+			if !ok {
+				return nil
+			}
 		case <-timer.C:
 			return errors.New("Timeout")
 		}
