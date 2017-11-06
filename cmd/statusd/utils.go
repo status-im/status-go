@@ -1281,13 +1281,13 @@ func testJailInit(t *testing.T) bool {
 	  return x * x;
 	};
 	`
-	rawResponse := Parse(C.CString("CHAT_ID_INIT_TEST"), C.CString(extraCode))
+	rawResponse := CreateAndInitCell(C.CString("CHAT_ID_INIT_TEST"), C.CString(extraCode))
 	parsedResponse := C.GoString(rawResponse)
 
 	expectedResponse := `{"result": {"foo":"bar"}}`
 
 	if !reflect.DeepEqual(expectedResponse, parsedResponse) {
-		t.Error("expected output not returned from jail.Parse()")
+		t.Error("expected output not returned from jail.CreateAndInitCell()")
 		return false
 	}
 

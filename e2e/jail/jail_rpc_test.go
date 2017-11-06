@@ -87,11 +87,9 @@ func (s *JailRPCTestSuite) TestIsConnected() {
 	responseValue, err := cell.Get("responseValue")
 	s.NoError(err, "cannot obtain result of isConnected()")
 
-	response, err := responseValue.ToString()
+	response, err := responseValue.ToBoolean()
 	s.NoError(err, "cannot parse result")
-
-	expectedResponse := `{"result":true}`
-	s.Equal(expectedResponse, response)
+	s.True(response)
 }
 
 // regression test: eth_getTransactionReceipt with invalid transaction hash should return null

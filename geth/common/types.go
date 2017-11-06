@@ -275,7 +275,7 @@ type JailManager interface {
 	// Cell returns an existing instance of JailCell.
 	Cell(chatID string) (JailCell, error)
 
-	// BaseJS allows to setup initial JavaScript to be loaded on each jail.Parse()
+	// SetBaseJS allows to setup initial JavaScript to be loaded on each jail.CreateAndInitCell().
 	SetBaseJS(js string)
 
 	// Stop stops all background activity of jail

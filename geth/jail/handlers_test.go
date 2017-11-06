@@ -10,7 +10,6 @@ import (
 	"github.com/robertkrimen/otto"
 
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
-	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/rpc"
 	"github.com/status-im/status-go/geth/signal"
@@ -154,19 +153,17 @@ func (s *HandlersTestSuite) TestWeb3IsConnectedHandler() {
 	// When result is true.
 	value, err := cell.Run("web3.isConnected()")
 	s.NoError(err)
-	result, err := value.Object().Get("result")
+	valueBoolean, err := value.ToBoolean()
 	s.NoError(err)
-	resultBool, err := result.ToBoolean()
-	s.NoError(err)
-	s.True(resultBool)
+	s.True(valueBoolean)
 
 	// When result is false.
 	s.responseFixture = `{"json-rpc":"2.0","id":10,"result":false}`
 	value, err = cell.Run("web3.isConnected()")
 	s.NoError(err)
-	result, err = value.Object().Get("error")
+	valueBoolean, err = value.ToBoolean()
 	s.NoError(err)
-	s.Equal(node.ErrNoRunningNode.Error(), result.String())
+	s.False(valueBoolean)
 }
 
 func (s *HandlersTestSuite) TestSendSignalHandler() {

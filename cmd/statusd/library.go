@@ -320,7 +320,7 @@ func DiscardTransactions(ids *C.char) *C.char {
 //InitJail setup initial JavaScript
 //export InitJail
 func InitJail(js *C.char) {
-	statusAPI.JailBaseJS(C.GoString(js))
+	statusAPI.SetJailBaseJS(C.GoString(js))
 }
 
 //Parse is DEPRECATED. Use CreateAndInitCell instead.

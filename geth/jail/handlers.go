@@ -5,7 +5,6 @@ import (
 
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/jail/console"
-	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/signal"
 )
 
@@ -81,7 +80,6 @@ func createSendAsyncHandler(jail *Jail, cell *Cell) func(call otto.FunctionCall)
 		request, err := unsafeVM.Call("JSON.stringify", nil, call.Argument(0))
 		if err != nil {
 			throwJSError(err)
-			return otto.UndefinedValue()
 		}
 
 		go func() {
@@ -113,41 +111,21 @@ func createSendAsyncHandler(jail *Jail, cell *Cell) func(call otto.FunctionCall)
 // TODO(adam): remove error wrapping as it should be a custom Error object.
 func createIsConnectedHandler(jail *Jail, cell *Cell) func(call otto.FunctionCall) otto.Value {
 	return func(call otto.FunctionCall) otto.Value {
-		client := jail.GetRPCClient()
+		client := jail.RPCClient()
 		if client == nil {
 			throwJSError(ErrNoRPCClient)
 		}
 
-		// As it's a sync call, it's called already from a thread-safe context,
-		// thus using otto.Otto directly. Otherwise, it would try to acquire a lock again
-		// and result in a deadlock.
-		vm := cell.VM.UnsafeVM()
-
 		var netListeningResult bool
 		if err := client.Call(&netListeningResult, "net_listening"); err != nil {
-			value, err := wrapErrorInValue(vm, err)
-			if err != nil {
-				throwJSError(err)
-			}
-
-			return value
-		}
-
-		if !netListeningResult {
-			value, err := wrapErrorInValue(vm, node.ErrNoRunningNode)
-			if err != nil {
-				throwJSError(err)
-			}
-
-			return value
-		}
-
-		value, err := wrapResultInValue(vm, netListeningResult)
-		if err != nil {
 			throwJSError(err)
 		}
 
-		return value
+		if netListeningResult {
+			return otto.TrueValue()
+		}
+
+		return otto.FalseValue()
 	}
 }
 

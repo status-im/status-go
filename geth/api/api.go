@@ -190,8 +190,8 @@ func (api *StatusAPI) JailCall(chatID, this, args string) string {
 	return api.b.jailManager.Call(chatID, this, args)
 }
 
-// JailBaseJS allows to setup initial JavaScript to be loaded on each jail.Parse()
-func (api *StatusAPI) JailBaseJS(js string) {
+// SetJailBaseJS allows to setup initial JavaScript to be loaded on each jail.CreateAndInitCell().
+func (api *StatusAPI) SetJailBaseJS(js string) {
 	api.b.jailManager.SetBaseJS(js)
 }
 

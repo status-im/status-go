@@ -219,8 +219,8 @@ func (j *Jail) Call(chatID, commandPath, args string) string {
 	return newJailResultResponse(value)
 }
 
-// GetRPCClient returns an rpc.Client.
-func (j *Jail) GetRPCClient() *rpc.Client {
+// RPCClient returns an rpc.Client.
+func (j *Jail) RPCClient() *rpc.Client {
 	if j.rpcClientProvider == nil {
 		return nil
 	}
@@ -230,7 +230,7 @@ func (j *Jail) GetRPCClient() *rpc.Client {
 
 // sendRPCCall executes a raw JSON-RPC request.
 func (j *Jail) sendRPCCall(request string) (interface{}, error) {
-	client := j.GetRPCClient()
+	client := j.RPCClient()
 	if client == nil {
 		return nil, ErrNoRPCClient
 	}
