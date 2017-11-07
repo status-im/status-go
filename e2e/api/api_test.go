@@ -178,7 +178,7 @@ func (s *APITestSuite) TestLogoutRemovesCells() {
 	err = s.api.SelectAccount(address1, TestConfig.Account1.Password)
 	require.NoError(err)
 
-	s.api.JailManager().CreateAndInitCell(testChatID, ``)
+	s.api.JailManager().CreateAndInitCell(testChatID)
 
 	err = s.api.Logout()
 	require.NoError(err)

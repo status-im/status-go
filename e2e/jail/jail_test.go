@@ -76,7 +76,7 @@ func (s *JailTestSuite) TestInitWithBaseJS() {
 	s.Jail.SetBaseJS(statusJS)
 
 	// now no error should occur
-	response := s.Jail.CreateAndInitCell(testChatID, ``)
+	response := s.Jail.CreateAndInitCell(testChatID)
 	expectedResponse := `{"result": {"commands":{},"responses":{}}}`
 	s.Equal(expectedResponse, response)
 
@@ -136,7 +136,7 @@ func (s *JailTestSuite) TestEventSignal() {
 	s.StartTestNode()
 	defer s.StopTestNode()
 
-	s.Jail.CreateAndInitCell(testChatID, "")
+	s.Jail.CreateAndInitCell(testChatID)
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
 	cell, err := s.Jail.Cell(testChatID)
@@ -257,7 +257,7 @@ func (s *JailTestSuite) TestJailCellsRemovedAfterStop() {
 	require := s.Require()
 
 	for i := 0; i < loopLen; i++ {
-		s.Jail.CreateAndInitCell(getTestCellID(i), "")
+		s.Jail.CreateAndInitCell(getTestCellID(i))
 		cell, err := s.Jail.Cell(getTestCellID(i))
 		require.NoError(err)
 		_, err = cell.Run(`
