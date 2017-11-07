@@ -31,7 +31,10 @@ import (
 // makeWizard creates and returns a new puppeth wizard.
 func makeWizard(network string) *wizard {
 	return &wizard{
-		network:  network,
+		network: network,
+		conf: config{
+			Servers: make(map[string][]byte),
+		},
 		servers:  make(map[string]*sshClient),
 		services: make(map[string][]string),
 		in:       bufio.NewReader(os.Stdin),
@@ -77,9 +80,9 @@ func (w *wizard) run() {
 	} else if err := json.Unmarshal(blob, &w.conf); err != nil {
 		log.Crit("Previous configuration corrupted", "path", w.conf.path, "err", err)
 	} else {
-		for _, server := range w.conf.Servers {
+		for server, pubkey := range w.conf.Servers {
 			log.Info("Dialing previously configured server", "server", server)
-			client, err := dial(server)
+			client, err := dial(server, pubkey)
 			if err != nil {
 				log.Error("Previous server unreachable", "server", server, "err", err)
 			}
@@ -95,7 +98,7 @@ func (w *wizard) run() {
 		if w.conf.genesis == nil {
 			fmt.Println(" 2. Configure new genesis")
 		} else {
-			fmt.Println(" 2. Save existing genesis")
+			fmt.Println(" 2. Manage existing genesis")
 		}
 		if len(w.servers) == 0 {
 			fmt.Println(" 3. Track new remote server")
@@ -115,18 +118,10 @@ func (w *wizard) run() {
 			w.networkStats(false)
 
 		case choice == "2":
-			// If we don't have a genesis, make one
 			if w.conf.genesis == nil {
 				w.makeGenesis()
 			} else {
-				// Otherwise just save whatever we currently have
-				fmt.Println()
-				fmt.Printf("Which file to save the genesis into? (default = %s.json)\n", w.network)
-				out, _ := json.MarshalIndent(w.conf.genesis, "", "  ")
-				if err := ioutil.WriteFile(w.readDefaultString(fmt.Sprintf("%s.json", w.network)), out, 0644); err != nil {
-					log.Error("Failed to save genesis file", "err", err)
-				}
-				log.Info("Exported existing genesis block")
+				w.manageGenesis()
 			}
 		case choice == "3":
 			if len(w.servers) == 0 {

@@ -47,8 +47,6 @@ type Key struct {
 	// we only store privkey as pubkey/address can be derived from it
 	// privkey in this struct is always in plaintext
 	PrivateKey *ecdsa.PrivateKey
-	// when enabled, the key will be used as a Whisper identity
-	WhisperEnabled bool
 	// extended key is the root node for new hardened children i.e. sub-accounts
 	ExtendedKey *extkeys.ExtendedKey
 	// next index to be used for sub-account child derivation
@@ -76,7 +74,6 @@ type encryptedKeyJSONV3 struct {
 	Crypto          cryptoJSON `json:"crypto"`
 	Id              string     `json:"id"`
 	Version         int        `json:"version"`
-	WhisperEnabled  bool       `json:"whisperenabled"`
 	ExtendedKey     cryptoJSON `json:"extendedkey"`
 	SubAccountIndex uint32     `json:"subaccountindex"`
 }
@@ -99,14 +96,6 @@ type cryptoJSON struct {
 
 type cipherparamsJSON struct {
 	IV string `json:"iv"`
-}
-
-type scryptParamsJSON struct {
-	N     int    `json:"n"`
-	R     int    `json:"r"`
-	P     int    `json:"p"`
-	DkLen int    `json:"dklen"`
-	Salt  string `json:"salt"`
 }
 
 func (k *Key) MarshalJSON() (j []byte, err error) {
@@ -134,14 +123,13 @@ func (k *Key) UnmarshalJSON(j []byte) (err error) {
 	if err != nil {
 		return err
 	}
-
-	privkey, err := hex.DecodeString(keyJSON.PrivateKey)
+	privkey, err := crypto.HexToECDSA(keyJSON.PrivateKey)
 	if err != nil {
 		return err
 	}
 
 	k.Address = common.BytesToAddress(addr)
-	k.PrivateKey = crypto.ToECDSA(privkey)
+	k.PrivateKey = privkey
 
 	return nil
 }
@@ -182,11 +170,10 @@ func newKeyFromExtendedKey(extKey *extkeys.ExtendedKey) (*Key, error) {
 	privateKeyECDSA := extChild1.ToECDSA()
 	id := uuid.NewRandom()
 	key := &Key{
-		Id:             id,
-		Address:        crypto.PubkeyToAddress(privateKeyECDSA.PublicKey),
-		PrivateKey:     privateKeyECDSA,
-		WhisperEnabled: true,
-		ExtendedKey:    extChild2,
+		Id:          id,
+		Address:     crypto.PubkeyToAddress(privateKeyECDSA.PublicKey),
+		PrivateKey:  privateKeyECDSA,
+		ExtendedKey: extChild2,
 	}
 	return key, nil
 }
@@ -220,12 +207,11 @@ func newKey(rand io.Reader) (*Key, error) {
 	return newKeyFromECDSA(privateKeyECDSA), nil
 }
 
-func storeNewKey(ks keyStore, rand io.Reader, auth string, whisperEnabled bool) (*Key, accounts.Account, error) {
+func storeNewKey(ks keyStore, rand io.Reader, auth string) (*Key, accounts.Account, error) {
 	key, err := newKey(rand)
 	if err != nil {
 		return nil, accounts.Account{}, err
 	}
-	key.WhisperEnabled = whisperEnabled
 	a := accounts.Account{Address: key.Address, URL: accounts.URL{Scheme: KeyStoreScheme, Path: ks.JoinPath(keyFileName(key.Address))}}
 	if err := ks.StoreKey(a.URL.Path, key, auth); err != nil {
 		zeroKey(key.PrivateKey)

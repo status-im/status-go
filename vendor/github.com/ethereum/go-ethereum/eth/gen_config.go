@@ -33,6 +33,7 @@ func (c Config) MarshalTOML() (interface{}, error) {
 		EthashDatasetDir        string
 		EthashDatasetsInMem     int
 		EthashDatasetsOnDisk    int
+		TxPool                  core.TxPoolConfig
 		GPO                     gasprice.Config
 		EnablePreimageRecording bool
 		DocRoot                 string `toml:"-"`
@@ -46,7 +47,6 @@ func (c Config) MarshalTOML() (interface{}, error) {
 	enc.SyncMode = c.SyncMode
 	enc.LightServ = c.LightServ
 	enc.LightPeers = c.LightPeers
-	enc.MaxPeers = c.MaxPeers
 	enc.SkipBcVersionCheck = c.SkipBcVersionCheck
 	enc.DatabaseHandles = c.DatabaseHandles
 	enc.DatabaseCache = c.DatabaseCache
@@ -60,6 +60,7 @@ func (c Config) MarshalTOML() (interface{}, error) {
 	enc.EthashDatasetDir = c.EthashDatasetDir
 	enc.EthashDatasetsInMem = c.EthashDatasetsInMem
 	enc.EthashDatasetsOnDisk = c.EthashDatasetsOnDisk
+	enc.TxPool = c.TxPool
 	enc.GPO = c.GPO
 	enc.EnablePreimageRecording = c.EnablePreimageRecording
 	enc.DocRoot = c.DocRoot
@@ -90,6 +91,7 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 		EthashDatasetDir        *string
 		EthashDatasetsInMem     *int
 		EthashDatasetsOnDisk    *int
+		TxPool                  *core.TxPoolConfig
 		GPO                     *gasprice.Config
 		EnablePreimageRecording *bool
 		DocRoot                 *string `toml:"-"`
@@ -115,9 +117,6 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 	}
 	if dec.LightPeers != nil {
 		c.LightPeers = *dec.LightPeers
-	}
-	if dec.MaxPeers != nil {
-		c.MaxPeers = *dec.MaxPeers
 	}
 	if dec.SkipBcVersionCheck != nil {
 		c.SkipBcVersionCheck = *dec.SkipBcVersionCheck
@@ -157,6 +156,9 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 	}
 	if dec.EthashDatasetsOnDisk != nil {
 		c.EthashDatasetsOnDisk = *dec.EthashDatasetsOnDisk
+	}
+	if dec.TxPool != nil {
+		c.TxPool = *dec.TxPool
 	}
 	if dec.GPO != nil {
 		c.GPO = *dec.GPO

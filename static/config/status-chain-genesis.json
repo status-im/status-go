@@ -1,0 +1,28 @@
+{
+  "alloc": {
+     "AdAf150b905Cf5E6A778E553E15A139B6618BbB7": {
+      "balance": "0x10F0CF064DD59200000"
+    },
+     "65C01586aa0Ce152835c788aCe665e91Ab3527b8": {
+      "balance": "0x1B1AE4D6E2EF500000"
+    },
+     "F35E0325dad87e2661c4eF951d58727e6d583d5c": {
+      "balance": "0x10F0CF064DD59200000"
+    },
+     "A0a19221268d939c3a972bf5461dC10f7980E814": {
+      "balance": "0x10F0CF064DD59200000"
+    }
+  },
+  "config": {
+    "chainId": 777,
+    "homesteadBlock": 0,
+    "daoForkSupport": true,
+    "byzantiumBlock": 0,
+    "eip150Hash": "0x50e6edb4e90d9616ac8bf7119ee37c4048c41ad09328676e1b39dc68a0ecfb3d",
+    "eip155Block": 0,
+    "eip158Block": 0
+  },
+  "difficulty": "0x100000",
+  "extraData": "0x537461747573436861696e20507269766174652054657374696e67204e6574776f726b",
+  "gasLimit": "0x1000000"
+}

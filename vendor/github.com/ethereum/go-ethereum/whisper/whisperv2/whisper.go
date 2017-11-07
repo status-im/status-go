@@ -18,7 +18,6 @@ package whisperv2
 
 import (
 	"crypto/ecdsa"
-	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -30,6 +29,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
+
 	"gopkg.in/fatih/set.v0"
 )
 
@@ -64,8 +64,7 @@ type Whisper struct {
 	protocol p2p.Protocol
 	filters  *filter.Filters
 
-	keys   map[string]*ecdsa.PrivateKey
-	keysMu sync.RWMutex // Mutex to sync identity keys
+	keys map[string]*ecdsa.PrivateKey
 
 	messages    map[common.Hash]*Envelope // Pool of messages currently tracked by this node
 	expirations map[uint32]*set.SetNonTS  // Message expiration pool (TODO: something lighter)
@@ -130,9 +129,7 @@ func (self *Whisper) NewIdentity() *ecdsa.PrivateKey {
 	if err != nil {
 		panic(err)
 	}
-	self.keysMu.Lock()
 	self.keys[string(crypto.FromECDSAPub(&key.PublicKey))] = key
-	self.keysMu.Unlock()
 
 	return key
 }
@@ -147,49 +144,12 @@ func (self *Whisper) AddIdentity(key *ecdsa.PrivateKey) {
 // HasIdentity checks if the the whisper node is configured with the private key
 // of the specified public pair.
 func (self *Whisper) HasIdentity(key *ecdsa.PublicKey) bool {
-	self.keysMu.RLock()
-	defer self.keysMu.RUnlock()
-
 	return self.keys[string(crypto.FromECDSAPub(key))] != nil
 }
 
 // GetIdentity retrieves the private key of the specified public identity.
 func (self *Whisper) GetIdentity(key *ecdsa.PublicKey) *ecdsa.PrivateKey {
-	self.keysMu.RLock()
-	defer self.keysMu.RUnlock()
-
 	return self.keys[string(crypto.FromECDSAPub(key))]
-}
-
-// InjectIdentity injects a manually added identity/key pair into the whisper keys
-func (self *Whisper) InjectIdentity(key *ecdsa.PrivateKey) error {
-	if self.HasIdentity(&key.PublicKey) { // no need to re-inject
-		return nil
-	}
-
-	self.keysMu.Lock()
-	self.keys = make(map[string]*ecdsa.PrivateKey) // reset key store
-	self.keys[string(crypto.FromECDSAPub(&key.PublicKey))] = key
-	self.keysMu.Unlock()
-	if _, ok := self.keys[string(crypto.FromECDSAPub(&key.PublicKey))]; !ok {
-		return errors.New("key insert into keys map failed")
-	}
-
-	log.Info(fmt.Sprintf("Injected identity into whisper: %s\n", common.ToHex(crypto.FromECDSAPub(&key.PublicKey))))
-	return nil
-}
-
-// ClearIdentities clears the current whisper identities in memory
-func (self *Whisper) ClearIdentities() error {
-	self.keysMu.Lock()
-	defer self.keysMu.Unlock()
-
-	self.keys = make(map[string]*ecdsa.PrivateKey)
-	if len(self.keys) != 0 {
-		return errors.New("could not clear keys map")
-	}
-
-	return nil
 }
 
 // Watch installs a new message handler to run in case a matching packet arrives
@@ -220,7 +180,7 @@ func (self *Whisper) Send(envelope *Envelope) error {
 // Start implements node.Service, starting the background data propagation thread
 // of the Whisper protocol.
 func (self *Whisper) Start(*p2p.Server) error {
-	log.Info(fmt.Sprint("Whisper started"))
+	log.Info("Whisper started")
 	go self.update()
 	return nil
 }
@@ -229,7 +189,7 @@ func (self *Whisper) Start(*p2p.Server) error {
 // of the Whisper protocol.
 func (self *Whisper) Stop() error {
 	close(self.quit)
-	log.Info(fmt.Sprint("Whisper stopped"))
+	log.Info("Whisper stopped")
 	return nil
 }
 
@@ -340,9 +300,6 @@ func (self *Whisper) postEvent(envelope *Envelope) {
 // returning the decrypted message and the key used to achieve it. If not keys
 // are configured, open will return the payload as if non encrypted.
 func (self *Whisper) open(envelope *Envelope) *Message {
-	self.keysMu.RLock()
-	defer self.keysMu.RUnlock()
-
 	// Short circuit if no identity is set, and assume clear-text
 	if len(self.keys) == 0 {
 		if message, err := envelope.Open(nil); err == nil {
@@ -352,16 +309,11 @@ func (self *Whisper) open(envelope *Envelope) *Message {
 	// Iterate over the keys and try to decrypt the message
 	for _, key := range self.keys {
 		message, err := envelope.Open(key)
-		switch err {
-		case nil:
+		if err == nil {
 			message.To = &key.PublicKey
 			return message
-		case ecies.ErrInvalidPublicKey:
-			origMessage, err := envelope.Open(nil)
-			if err != nil {
-				return nil
-			}
-			return origMessage
+		} else if err == ecies.ErrInvalidPublicKey {
+			return message
 		}
 	}
 	// Failed to decrypt, don't return anything

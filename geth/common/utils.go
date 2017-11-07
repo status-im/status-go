@@ -16,7 +16,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/static"
 )
 
@@ -65,8 +65,7 @@ func ToAddress(accountAddress string) *common.Address {
 	return &to.Address
 }
 
-// ImportTestAccount checks if test account exists in keystore, and if not
-// tries to import it (from static resources, see "static/keys" folder)
+// ImportTestAccount imports keystore from static resources, see "static/keys" folder
 func ImportTestAccount(keystoreDir, accountFile string) error {
 	// make sure that keystore folder exists
 	if _, err := os.Stat(keystoreDir); os.IsNotExist(err) {
@@ -74,15 +73,12 @@ func ImportTestAccount(keystoreDir, accountFile string) error {
 	}
 
 	dst := filepath.Join(keystoreDir, accountFile)
-	if _, err := os.Stat(dst); os.IsNotExist(err) {
-		err = ioutil.WriteFile(dst, static.MustAsset("keys/"+accountFile), 0644)
-		if err != nil {
-			log.Warn("cannot copy test account PK", "error", err)
-			return err
-		}
+	err := ioutil.WriteFile(dst, static.MustAsset("keys/"+accountFile), 0644)
+	if err != nil {
+		log.Warn("cannot copy test account PK", "error", err)
 	}
 
-	return nil
+	return err
 }
 
 // PanicAfter throws panic() after waitSeconds, unless abort channel receives notification

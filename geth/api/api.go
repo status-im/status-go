@@ -1,9 +1,13 @@
 package api
 
 import (
+	"context"
+
+	"github.com/NaySoftware/go-fcm"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/geth/common"
+	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
 )
 
@@ -32,6 +36,11 @@ func (api *StatusAPI) AccountManager() common.AccountManager {
 // JailManager returns reference to jail
 func (api *StatusAPI) JailManager() common.JailManager {
 	return api.b.JailManager()
+}
+
+// TxQueueManager returns reference to account manager
+func (api *StatusAPI) TxQueueManager() common.TxQueueManager {
+	return api.b.TxQueueManager()
 }
 
 // StartNode start Status node, fails if node is already started
@@ -133,47 +142,88 @@ func (api *StatusAPI) VerifyAccountPassword(keyStoreDir, address, password strin
 // using provided password. Once verification is done, decrypted key is injected into Whisper (as a single identity,
 // all previous identities are removed).
 func (api *StatusAPI) SelectAccount(address, password string) error {
+	// FIXME(oleg-raev): This method doesn't make stop, it rather resets its cells to an initial state
+	// and should be properly renamed, for example: ResetCells
+	api.b.jailManager.Stop()
 	return api.b.AccountManager().SelectAccount(address, password)
 }
 
 // Logout clears whisper identities
 func (api *StatusAPI) Logout() error {
+	api.b.jailManager.Stop()
 	return api.b.AccountManager().Logout()
 }
 
+// SendTransaction creates a new transaction and waits until it's complete.
+func (api *StatusAPI) SendTransaction(ctx context.Context, args common.SendTxArgs) (gethcommon.Hash, error) {
+	return api.b.SendTransaction(ctx, args)
+}
+
 // CompleteTransaction instructs backend to complete sending of a given transaction
-func (api *StatusAPI) CompleteTransaction(id, password string) (gethcommon.Hash, error) {
-	return api.b.CompleteTransaction(id, password)
+func (api *StatusAPI) CompleteTransaction(id common.QueuedTxID, password string) (gethcommon.Hash, error) {
+	return api.b.txQueueManager.CompleteTransaction(id, password)
 }
 
 // CompleteTransactions instructs backend to complete sending of multiple transactions
-func (api *StatusAPI) CompleteTransactions(ids, password string) map[string]common.RawCompleteTransactionResult {
-	return api.b.CompleteTransactions(ids, password)
+func (api *StatusAPI) CompleteTransactions(ids []common.QueuedTxID, password string) map[common.QueuedTxID]common.RawCompleteTransactionResult {
+	return api.b.txQueueManager.CompleteTransactions(ids, password)
 }
 
 // DiscardTransaction discards a given transaction from transaction queue
-func (api *StatusAPI) DiscardTransaction(id string) error {
-	return api.b.DiscardTransaction(id)
+func (api *StatusAPI) DiscardTransaction(id common.QueuedTxID) error {
+	return api.b.txQueueManager.DiscardTransaction(id)
 }
 
 // DiscardTransactions discards given multiple transactions from transaction queue
-func (api *StatusAPI) DiscardTransactions(ids string) map[string]common.RawDiscardTransactionResult {
-	return api.b.DiscardTransactions(ids)
+func (api *StatusAPI) DiscardTransactions(ids []common.QueuedTxID) map[common.QueuedTxID]common.RawDiscardTransactionResult {
+	return api.b.txQueueManager.DiscardTransactions(ids)
 }
 
-// JailParse creates a new jail cell context, with the given chatID as identifier.
+// CreateAndInitCell creates a new jail cell context, with the given chatID as identifier.
 // New context executes provided JavaScript code, right after the initialization.
-func (api *StatusAPI) JailParse(chatID string, js string) string {
-	return api.b.jailManager.Parse(chatID, js)
+func (api *StatusAPI) CreateAndInitCell(chatID, js string) string {
+	return api.b.jailManager.CreateAndInitCell(chatID, js)
 }
 
 // JailCall executes given JavaScript function w/i a jail cell context identified by the chatID.
-// Jail cell is clonned before call is executed i.e. all calls execute w/i their own contexts.
-func (api *StatusAPI) JailCall(chatID string, path string, args string) string {
-	return api.b.jailManager.Call(chatID, path, args)
+func (api *StatusAPI) JailCall(chatID, this, args string) string {
+	return api.b.jailManager.Call(chatID, this, args)
 }
 
-// JailBaseJS allows to setup initial JavaScript to be loaded on each jail.Parse()
-func (api *StatusAPI) JailBaseJS(js string) {
-	api.b.jailManager.BaseJS(js)
+// JailExecute allows to run arbitrary JS code within a jail cell.
+func (api *StatusAPI) JailExecute(chatID, code string) string {
+	return api.b.jailManager.Execute(chatID, code)
+}
+
+// SetJailBaseJS allows to setup initial JavaScript to be loaded on each jail.CreateAndInitCell().
+func (api *StatusAPI) SetJailBaseJS(js string) {
+	api.b.jailManager.SetBaseJS(js)
+}
+
+// Notify sends a push notification to the device with the given token.
+// @deprecated
+func (api *StatusAPI) Notify(token string) string {
+	log.Debug("Notify", "token", token)
+	message := "Hello World1"
+
+	tokens := []string{token}
+
+	err := api.b.newNotification().Send(message, fcm.NotificationPayload{}, tokens...)
+	if err != nil {
+		log.Error("Notify failed:", err)
+	}
+
+	return token
+}
+
+// NotifyUsers send notifications to users.
+func (api *StatusAPI) NotifyUsers(message string, payload fcm.NotificationPayload, tokens ...string) error {
+	log.Debug("Notify", "tokens", tokens)
+
+	err := api.b.newNotification().Send(message, payload, tokens...)
+	if err != nil {
+		log.Error("Notify failed:", err)
+	}
+
+	return err
 }

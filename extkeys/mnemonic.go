@@ -253,7 +253,7 @@ func contains(wordList *WordList, e string) bool {
 	return false
 }
 
-func padByteSlice(slice []byte, length int) []byte {
+func padByteSlice(slice []byte, length int) []byte { //nolint: unparam
 	newSlice := make([]byte, length-len(slice))
 	return append(newSlice, slice...)
 }

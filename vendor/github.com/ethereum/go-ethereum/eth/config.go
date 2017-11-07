@@ -42,8 +42,9 @@ var DefaultConfig = Config{
 	NetworkId:            1,
 	LightPeers:           20,
 	DatabaseCache:        128,
-	GasPrice:             big.NewInt(20 * params.Shannon),
+	GasPrice:             big.NewInt(18 * params.Shannon),
 
+	TxPool: core.DefaultTxPoolConfig,
 	GPO: gasprice.Config{
 		Blocks:     10,
 		Percentile: 50,
@@ -78,7 +79,6 @@ type Config struct {
 	// Light client options
 	LightServ  int `toml:",omitempty"` // Maximum percentage of time allowed for serving LES requests
 	LightPeers int `toml:",omitempty"` // Maximum number of LES client peers
-	MaxPeers   int `toml:"-"`          // Maximum number of global peers
 
 	// Database options
 	SkipBcVersionCheck bool `toml:"-"`
@@ -98,6 +98,9 @@ type Config struct {
 	EthashDatasetDir     string
 	EthashDatasetsInMem  int
 	EthashDatasetsOnDisk int
+
+	// Transaction pool options
+	TxPool core.TxPoolConfig
 
 	// Gas Price Oracle options
 	GPO gasprice.Config

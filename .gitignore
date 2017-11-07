@@ -4,6 +4,14 @@
 # or operating system, you probably want to add a global ignore instead:
 #   git config --global core.excludesfile ~/.gitignore_global
 
+/statusd-data
+/cmd/statusd/statusd-data
+/cmd/statusd/statusd
+
+/wnode-status-data
+/cmd/wnode-status/wnode-status-data
+/cmd/wnode-status/wnode-status
+
 /tmp
 */**/*un~
 */**/*.test
@@ -15,6 +23,7 @@
 */**/*dapps*
 vendor/github.com/ethereum/go-ethereum/vendor
 /node_modules/
+tags
 
 #*
 .#*

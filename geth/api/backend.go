@@ -1,26 +1,35 @@
 package api
 
 import (
+	"context"
 	"sync"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/les"
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/jail"
+	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/node"
+	"github.com/status-im/status-go/geth/notification/fcm"
 	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/geth/signal"
+	"github.com/status-im/status-go/geth/txqueue"
+)
+
+const (
+	//todo(jeka): should be removed
+	fcmServerKey = "AAAAxwa-r08:APA91bFtMIToDVKGAmVCm76iEXtA4dn9MPvLdYKIZqAlNpLJbd12EgdBI9DSDSXKdqvIAgLodepmRhGVaWvhxnXJzVpE6MoIRuKedDV3kfHSVBhWFqsyoLTwXY4xeufL9Sdzb581U-lx"
 )
 
 // StatusBackend implements Status.im service
 type StatusBackend struct {
 	sync.Mutex
-	nodeReady      chan struct{} // channel to wait for when node is fully ready
-	nodeManager    common.NodeManager
-	accountManager common.AccountManager
-	txQueueManager common.TxQueueManager
-	jailManager    common.JailManager
-	rpcManager     common.RPCManager
+	nodeReady       chan struct{} // channel to wait for when node is fully ready
+	nodeManager     common.NodeManager
+	accountManager  common.AccountManager
+	txQueueManager  common.TxQueueManager
+	jailManager     common.JailManager
+	newNotification common.NotificationConstructor
 }
 
 // NewStatusBackend create a new NewStatusBackend instance
@@ -28,13 +37,17 @@ func NewStatusBackend() *StatusBackend {
 	defer log.Info("Status backend initialized")
 
 	nodeManager := node.NewNodeManager()
-	accountManager := node.NewAccountManager(nodeManager)
+	accountManager := account.NewManager(nodeManager)
+	txQueueManager := txqueue.NewManager(nodeManager, accountManager)
+	jailManager := jail.New(nodeManager)
+	notificationManager := fcm.NewNotification(fcmServerKey)
+
 	return &StatusBackend{
-		nodeManager:    nodeManager,
-		accountManager: accountManager,
-		txQueueManager: node.NewTxQueueManager(nodeManager, accountManager),
-		jailManager:    jail.New(nodeManager),
-		rpcManager:     node.NewRPCManager(nodeManager),
+		nodeManager:     nodeManager,
+		accountManager:  accountManager,
+		jailManager:     jailManager,
+		txQueueManager:  txQueueManager,
+		newNotification: notificationManager,
 	}
 }
 
@@ -51,6 +64,11 @@ func (m *StatusBackend) AccountManager() common.AccountManager {
 // JailManager returns reference to jail
 func (m *StatusBackend) JailManager() common.JailManager {
 	return m.jailManager
+}
+
+// TxQueueManager returns reference to jail
+func (m *StatusBackend) TxQueueManager() common.TxQueueManager {
+	return m.txQueueManager
 }
 
 // IsNodeRunning confirm that node is running
@@ -72,6 +90,8 @@ func (m *StatusBackend) StartNode(config *params.NodeConfig) (<-chan struct{}, e
 		return nil, err
 	}
 
+	m.txQueueManager.Start()
+
 	m.nodeReady = make(chan struct{}, 1)
 	go m.onNodeStart(nodeStarted, m.nodeReady) // waits on nodeStarted, writes to backendReady
 
@@ -86,12 +106,14 @@ func (m *StatusBackend) onNodeStart(nodeStarted <-chan struct{}, backendReady ch
 		log.Error("Handler registration failed", "err", err)
 	}
 
-	m.accountManager.ReSelectAccount()
+	if err := m.accountManager.ReSelectAccount(); err != nil {
+		log.Error("Reselect account failed", "err", err)
+	}
 	log.Info("Account reselected")
 
 	close(backendReady)
-	node.SendSignal(node.SignalEnvelope{
-		Type:  node.EventNodeReady,
+	signal.Send(signal.Envelope{
+		Type:  signal.EventNodeReady,
 		Event: struct{}{},
 	})
 }
@@ -105,6 +127,9 @@ func (m *StatusBackend) StopNode() (<-chan struct{}, error) {
 		return nil, node.ErrNoRunningNode
 	}
 	<-m.nodeReady
+
+	m.txQueueManager.Stop()
+	m.jailManager.Stop()
 
 	nodeStopped, err := m.nodeManager.StopNode()
 	if err != nil {
@@ -168,48 +193,63 @@ func (m *StatusBackend) ResetChainData() (<-chan struct{}, error) {
 
 // CallRPC executes RPC request on node's in-proc RPC server
 func (m *StatusBackend) CallRPC(inputJSON string) string {
-	return m.rpcManager.Call(inputJSON)
+	client := m.nodeManager.RPCClient()
+	return client.CallRaw(inputJSON)
+}
+
+// SendTransaction creates a new transaction and waits until it's complete.
+func (m *StatusBackend) SendTransaction(ctx context.Context, args common.SendTxArgs) (gethcommon.Hash, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	tx := m.txQueueManager.CreateTransaction(ctx, args)
+
+	if err := m.txQueueManager.QueueTransaction(tx); err != nil {
+		return gethcommon.Hash{}, err
+	}
+
+	if err := m.txQueueManager.WaitForTransaction(tx); err != nil {
+		return gethcommon.Hash{}, err
+	}
+
+	return tx.Hash, nil
 }
 
 // CompleteTransaction instructs backend to complete sending of a given transaction
-func (m *StatusBackend) CompleteTransaction(id, password string) (gethcommon.Hash, error) {
+func (m *StatusBackend) CompleteTransaction(id common.QueuedTxID, password string) (gethcommon.Hash, error) {
 	return m.txQueueManager.CompleteTransaction(id, password)
 }
 
 // CompleteTransactions instructs backend to complete sending of multiple transactions
-func (m *StatusBackend) CompleteTransactions(ids, password string) map[string]common.RawCompleteTransactionResult {
+func (m *StatusBackend) CompleteTransactions(ids []common.QueuedTxID, password string) map[common.QueuedTxID]common.RawCompleteTransactionResult {
 	return m.txQueueManager.CompleteTransactions(ids, password)
 }
 
 // DiscardTransaction discards a given transaction from transaction queue
-func (m *StatusBackend) DiscardTransaction(id string) error {
+func (m *StatusBackend) DiscardTransaction(id common.QueuedTxID) error {
 	return m.txQueueManager.DiscardTransaction(id)
 }
 
 // DiscardTransactions discards given multiple transactions from transaction queue
-func (m *StatusBackend) DiscardTransactions(ids string) map[string]common.RawDiscardTransactionResult {
+func (m *StatusBackend) DiscardTransactions(ids []common.QueuedTxID) map[common.QueuedTxID]common.RawDiscardTransactionResult {
 	return m.txQueueManager.DiscardTransactions(ids)
 }
 
 // registerHandlers attaches Status callback handlers to running node
 func (m *StatusBackend) registerHandlers() error {
-	runningNode, err := m.nodeManager.Node()
-	if err != nil {
-		return err
+	rpcClient := m.NodeManager().RPCClient()
+	if rpcClient == nil {
+		return node.ErrRPCClient
 	}
 
-	var lightEthereum *les.LightEthereum
-	if err := runningNode.Service(&lightEthereum); err != nil {
-		log.Error("Cannot get light ethereum service", "error", err)
-	}
+	rpcClient.RegisterHandler("eth_accounts", m.accountManager.AccountsRPCHandler())
+	rpcClient.RegisterHandler("eth_sendTransaction", m.txQueueManager.SendTransactionRPCHandler)
 
-	lightEthereum.StatusBackend.SetAccountsFilterHandler(m.accountManager.AccountsListRequestHandler())
-	log.Info("Registered handler", "fn", "AccountsFilterHandler")
-
-	lightEthereum.StatusBackend.SetTransactionQueueHandler(m.txQueueManager.TransactionQueueHandler())
+	m.txQueueManager.SetTransactionQueueHandler(m.txQueueManager.TransactionQueueHandler())
 	log.Info("Registered handler", "fn", "TransactionQueueHandler")
 
-	lightEthereum.StatusBackend.SetTransactionReturnHandler(m.txQueueManager.TransactionReturnHandler())
+	m.txQueueManager.SetTransactionReturnHandler(m.txQueueManager.TransactionReturnHandler())
 	log.Info("Registered handler", "fn", "TransactionReturnHandler")
 
 	return nil

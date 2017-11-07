@@ -10,9 +10,9 @@ describe('Whisper Tests', function () {
     node1.setProvider(new web3.providers.HttpProvider('http://localhost:8645'));
     node2.setProvider(new web3.providers.HttpProvider('http://localhost:8745'));
 
-    console.log('Node is expected: statusd --datadir app1 wnode --http --httpport 8645');
-    console.log('Node is expected: statusd --datadir app2 wnode --http --httpport 8745');
-    console.log('Node is expected: statusd --datadir wnode1 wnode --notify --injectaccounts=false --identity ./static/keys/wnodekey --firebaseauth ./static/keys/firebaseauthkey');
+    console.log('Node is expected: wnode-status -datadir app1 wnode -http -httpport 8645');
+    console.log('Node is expected: wnode-status -datadir app2 wnode -http -httpport 8745');
+    console.log('Node is expected: wnode-status -datadir wnode1 wnode -notify -injectaccounts=false -identity ./static/keys/wnodekey -firebaseauth ./static/keys/firebaseauthkey');
 
     // some common vars
     var topic1 = '0xdeadbeef'; // each topic 4 bytes, as hex
@@ -286,7 +286,7 @@ describe('Whisper Tests', function () {
                 }, 200);
             });
 
-            it('shh.unsubscribe(filterID)', function () {
+            it.skip('shh.unsubscribe(filterID)', function () {
                 node1.shh.unsubscribe(filterid1);
                 node1.shh.unsubscribe(filterid2);
             });

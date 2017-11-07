@@ -48,7 +48,6 @@ type callback struct {
 // service represents a registered object
 type service struct {
 	name          string        // name for service
-	rcvr          reflect.Value // receiver of methods for the service
 	typ           reflect.Type  // receiver type
 	callbacks     callbacks     // registered handlers
 	subscriptions subscriptions // available subscriptions/notifications
@@ -58,23 +57,19 @@ type service struct {
 type serverRequest struct {
 	id            interface{}
 	svcname       string
-	rcvr          reflect.Value
 	callb         *callback
 	args          []reflect.Value
 	isUnsubscribe bool
 	err           Error
 }
 
-type serviceRegistry map[string]*service       // collection of services
-type callbacks map[string]*callback            // collection of RPC callbacks
-type subscriptions map[string]*callback        // collection of subscription callbacks
-type subscriptionRegistry map[string]*callback // collection of subscription callbacks
+type serviceRegistry map[string]*service // collection of services
+type callbacks map[string]*callback      // collection of RPC callbacks
+type subscriptions map[string]*callback  // collection of subscription callbacks
 
 // Server represents a RPC server
 type Server struct {
-	services       serviceRegistry
-	muSubcriptions sync.Mutex // protects subscriptions
-	subscriptions  subscriptionRegistry
+	services serviceRegistry
 
 	run      int32
 	codecsMu sync.Mutex
@@ -104,17 +99,17 @@ type ServerCodec interface {
 	// Read next request
 	ReadRequestHeaders() ([]rpcRequest, bool, Error)
 	// Parse request argument to the given types
-	ParseRequestArguments([]reflect.Type, interface{}) ([]reflect.Value, Error)
+	ParseRequestArguments(argTypes []reflect.Type, params interface{}) ([]reflect.Value, Error)
 	// Assemble success response, expects response id and payload
-	CreateResponse(interface{}, interface{}) interface{}
+	CreateResponse(id interface{}, reply interface{}) interface{}
 	// Assemble error response, expects response id and error
-	CreateErrorResponse(interface{}, Error) interface{}
+	CreateErrorResponse(id interface{}, err Error) interface{}
 	// Assemble error response with extra information about the error through info
 	CreateErrorResponseWithInfo(id interface{}, err Error, info interface{}) interface{}
 	// Create notification response
-	CreateNotification(string, interface{}) interface{}
+	CreateNotification(id, namespace string, event interface{}) interface{}
 	// Write msg to client.
-	Write(interface{}) error
+	Write(msg interface{}) error
 	// Close underlying data stream
 	Close()
 	// Closed when underlying connection is closed

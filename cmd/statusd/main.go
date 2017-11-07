@@ -1,170 +1,142 @@
 package main
 
 import (
+	"flag"
 	"fmt"
+	"log"
 	"os"
-	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/params"
-	"gopkg.in/urfave/cli.v1"
 )
 
 var (
-	gitCommit  = "rely on linker: -ldflags -X main.GitCommit"
-	buildStamp = "rely on linker: -ldflags -X main.buildStamp"
-	app        = makeApp(gitCommit)
-	statusAPI  = api.NewStatusAPI()
+	gitCommit  = "N/A" // rely on linker: -ldflags -X main.GitCommit"
+	buildStamp = "N/A" // rely on linker: -ldflags -X main.buildStamp"
 )
 
 var (
-	// ProdModeFlag is whether we need dev or production settings
-	ProdModeFlag = cli.BoolFlag{
-		Name:  "production",
-		Usage: "Whether production settings should be loaded",
-	}
-
-	// NodeKeyFileFlag is a node key file to be used as node's private key
-	NodeKeyFileFlag = cli.StringFlag{
-		Name:  "nodekey",
-		Usage: "P2P node key file (private key)",
-	}
-
-	// DataDirFlag defines data directory for the node
-	DataDirFlag = cli.StringFlag{
-		Name:  "datadir",
-		Usage: "Data directory for the databases and keystore",
-		Value: params.DataDir,
-	}
-
-	// NetworkIDFlag defines network ID
-	NetworkIDFlag = cli.IntFlag{
-		Name:  "networkid",
-		Usage: "Network identifier (integer, 1=Homestead, 3=Ropsten, 4=Rinkeby)",
-		Value: params.RopstenNetworkID,
-	}
-
-	// LightEthEnabledFlag flags whether LES is enabled or not
-	LightEthEnabledFlag = cli.BoolFlag{
-		Name:  "les",
-		Usage: "LES protocol enabled",
-	}
-
-	// WhisperEnabledFlag flags whether Whisper is enabled or not
-	WhisperEnabledFlag = cli.BoolFlag{
-		Name:  "shh",
-		Usage: "SHH protocol enabled",
-	}
-
-	// SwarmEnabledFlag flags whether Swarm is enabled or not
-	SwarmEnabledFlag = cli.BoolFlag{
-		Name:  "swarm",
-		Usage: "Swarm protocol enabled",
-	}
-
-	// HTTPEnabledFlag defines whether HTTP RPC endpoint should be opened or not
-	HTTPEnabledFlag = cli.BoolFlag{
-		Name:  "http",
-		Usage: "HTTP RPC enpoint enabled",
-	}
-
-	// HTTPPortFlag defines HTTP RPC port to use (if HTTP RPC is enabled)
-	HTTPPortFlag = cli.IntFlag{
-		Name:  "httpport",
-		Usage: "HTTP RPC server's listening port",
-		Value: params.HTTPPort,
-	}
-
-	// IPCEnabledFlag flags whether IPC is enabled or not
-	IPCEnabledFlag = cli.BoolFlag{
-		Name:  "ipc",
-		Usage: "IPC RPC enpoint enabled",
-	}
-
-	// LogLevelFlag defines a log reporting level
-	LogLevelFlag = cli.StringFlag{
-		Name:  "log",
-		Usage: `Log level, one of: ""ERROR", "WARNING", "INFO", "DEBUG", and "TRACE"`,
-		Value: "INFO",
-	}
+	prodMode       = flag.Bool("production", false, "Whether production settings should be loaded")
+	nodeKeyFile    = flag.String("nodekey", "", "P2P node key file (private key)")
+	dataDir        = flag.String("datadir", params.DataDir, "Data directory for the databases and keystore")
+	networkID      = flag.Int("networkid", params.RopstenNetworkID, "Network identifier (integer, 1=Homestead, 3=Ropsten, 4=Rinkeby, 777=StatusChain)")
+	whisperEnabled = flag.Bool("shh", false, "SHH protocol enabled")
+	swarmEnabled   = flag.Bool("swarm", false, "Swarm protocol enabled")
+	httpEnabled    = flag.Bool("http", false, "HTTP RPC endpoint enabled (default: false)")
+	httpPort       = flag.Int("httpport", params.HTTPPort, "HTTP RPC server's listening port")
+	ipcEnabled     = flag.Bool("ipc", false, "IPC RPC endpoint enabled")
+	logLevel       = flag.String("log", "INFO", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
+	logFile        = flag.String("logfile", "", "Path to the log file")
+	version        = flag.Bool("version", false, "Print version")
 )
-
-func init() {
-	// setup the app
-	app.Action = cli.ShowAppHelp
-	app.HideVersion = true // separate command prints version
-	app.Commands = []cli.Command{
-		versionCommand,
-		faucetCommand,
-		lesCommand,
-		wnodeCommand,
-	}
-	app.Flags = []cli.Flag{
-		ProdModeFlag,
-		NodeKeyFileFlag,
-		DataDirFlag,
-		NetworkIDFlag,
-		LogLevelFlag,
-	}
-	app.Before = func(ctx *cli.Context) error {
-		runtime.GOMAXPROCS(runtime.NumCPU())
-		return nil
-	}
-	app.After = func(ctx *cli.Context) error {
-		return nil
-	}
-}
 
 func main() {
-	if err := app.Run(os.Args); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-}
+	flag.Usage = printUsage
+	flag.Parse()
 
-// makeApp creates an app with sane defaults.
-func makeApp(gitCommit string) *cli.App {
-	app := cli.NewApp()
-	app.Name = filepath.Base(os.Args[0])
-	app.Author = ""
-	//app.Authors = nil
-	app.Email = ""
-	app.Version = params.Version
-	if gitCommit != "" {
-		app.Version += "-" + gitCommit[:8]
+	config, err := makeNodeConfig()
+	if err != nil {
+		log.Fatalf("Making config failed: %v", err)
+		return
 	}
-	app.Usage = "CLI for Status nodes management"
-	return app
+
+	if *version {
+		printVersion(config, gitCommit, buildStamp)
+		return
+	}
+
+	backend := api.NewStatusBackend()
+	started, err := backend.StartNode(config)
+	if err != nil {
+		log.Fatalf("Node start failed: %v", err)
+		return
+	}
+
+	// wait till node is started
+	<-started
+
+	// wait till node has been stopped
+	node, err := backend.NodeManager().Node()
+	if err != nil {
+		log.Fatalf("Getting node failed: %v", err)
+		return
+	}
+
+	node.Wait()
 }
 
 // makeNodeConfig parses incoming CLI options and returns node configuration object
-func makeNodeConfig(ctx *cli.Context) (*params.NodeConfig, error) {
-	nodeConfig, err := params.NewNodeConfig(
-		ctx.GlobalString(DataDirFlag.Name),
-		ctx.GlobalUint64(NetworkIDFlag.Name),
-		!ctx.GlobalBool(ProdModeFlag.Name))
+func makeNodeConfig() (*params.NodeConfig, error) {
+	devMode := !*prodMode
+	nodeConfig, err := params.NewNodeConfig(*dataDir, uint64(*networkID), devMode)
 	if err != nil {
 		return nil, err
 	}
 
-	nodeConfig.NodeKeyFile = ctx.GlobalString(NodeKeyFileFlag.Name)
-
-	if logLevel := ctx.GlobalString(LogLevelFlag.Name); len(logLevel) > 0 {
-		nodeConfig.LogEnabled = true
-		nodeConfig.LogLevel = logLevel
+	// TODO(divan): move this logic into params package
+	if *nodeKeyFile != "" {
+		nodeConfig.NodeKeyFile = *nodeKeyFile
 	}
+
+	if *logLevel != "" {
+		nodeConfig.LogLevel = *logLevel
+	}
+	if *logFile != "" {
+		nodeConfig.LogFile = *logFile
+	}
+
+	nodeConfig.LightEthConfig.Enabled = true
+	nodeConfig.RPCEnabled = *httpEnabled
+	nodeConfig.WhisperConfig.Enabled = *whisperEnabled
+	nodeConfig.SwarmConfig.Enabled = *swarmEnabled
+
+	// RPC configuration
+	if !*httpEnabled {
+		nodeConfig.HTTPHost = "" // HTTP RPC is disabled
+	}
+	nodeConfig.HTTPPort = *httpPort
+	nodeConfig.IPCEnabled = *ipcEnabled
 
 	return nodeConfig, nil
 }
 
-// printNodeConfig prints node config
-func printNodeConfig(ctx *cli.Context) {
-	nodeConfig, err := makeNodeConfig(ctx)
-	if err != nil {
-		fmt.Printf("Loaded Config: failed (err: %v)", err)
-		return
+// printVersion prints verbose output about version and config.
+func printVersion(config *params.NodeConfig, gitCommit, buildStamp string) {
+	if gitCommit != "" && len(gitCommit) > 8 {
+		params.Version += "-" + gitCommit[:8]
 	}
-	nodeConfig.LightEthConfig.Genesis = "SKIP"
-	fmt.Println("Loaded Config: ", nodeConfig)
+
+	fmt.Println(strings.Title(params.ClientIdentifier))
+	fmt.Println("Version:", params.Version)
+	if gitCommit != "" {
+		fmt.Println("Git Commit:", gitCommit)
+	}
+	if buildStamp != "" {
+		fmt.Println("Build Stamp:", buildStamp)
+	}
+
+	fmt.Println("Network Id:", config.NetworkID)
+	fmt.Println("Go Version:", runtime.Version())
+	fmt.Println("OS:", runtime.GOOS)
+	fmt.Printf("GOPATH=%s\n", os.Getenv("GOPATH"))
+	fmt.Printf("GOROOT=%s\n", runtime.GOROOT())
+
+	config.LightEthConfig.Genesis = "SKIP"
+	fmt.Println("Loaded Config: ", config)
+}
+
+func printUsage() {
+	fmt.Fprintln(os.Stderr, "Usage: statusd [options]")
+	fmt.Fprintf(os.Stderr, `
+Examples:
+  statusd               # run status node with defaults
+  statusd -networkid 4  # run node on Rinkeby network
+  statusd -datadir /dir # specify different dir for data
+  statusd -ipc          # enable IPC for usage with "geth attach"
+
+Options:
+`)
+	flag.PrintDefaults()
 }

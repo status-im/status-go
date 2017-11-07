@@ -39,16 +39,16 @@ func (w *wizard) networkStats(tips bool) {
 	// Iterate over all the specified hosts and check their status
 	stats := tablewriter.NewWriter(os.Stdout)
 	stats.SetHeader([]string{"Server", "IP", "Status", "Service", "Details"})
-	stats.SetColWidth(128)
+	stats.SetColWidth(100)
 
-	for _, server := range w.conf.Servers {
+	for server, pubkey := range w.conf.Servers {
 		client := w.servers[server]
 		logger := log.New("server", server)
 		logger.Info("Starting remote server health-check")
 
 		// If the server is not connected, try to connect again
 		if client == nil {
-			conn, err := dial(server)
+			conn, err := dial(server, pubkey)
 			if err != nil {
 				logger.Error("Failed to establish remote connection", "err", err)
 				stats.Append([]string{server, "", err.Error(), "", ""})
@@ -129,7 +129,7 @@ func (w *wizard) networkStats(tips bool) {
 		}
 	}
 	// If a genesis block was found, load it into our configs
-	if protips.genesis != "" {
+	if protips.genesis != "" && w.conf.genesis == nil {
 		genesis := new(core.Genesis)
 		if err := json.Unmarshal([]byte(protips.genesis), genesis); err != nil {
 			log.Error("Failed to parse remote genesis", "err", err)

@@ -1,20 +1,25 @@
 package common
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/les"
-	"github.com/ethereum/go-ethereum/les/status"
 	"github.com/ethereum/go-ethereum/node"
-	"github.com/ethereum/go-ethereum/rpc"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/geth/rpc"
 	"github.com/status-im/status-go/static"
 )
 
@@ -37,6 +42,34 @@ func (k *SelectedExtKey) Hex() string {
 	}
 
 	return k.Address.Hex()
+}
+
+// MessageState defines a struct to hold given facts about a message stat.
+type MessageState struct {
+	// Type defines Direction type: IncomingMessage or OutgoingMessage.
+	Type string `json:"type"`
+	// Protocol defines means of transmission in whisper: RPC or P2P.
+	Protocol string `json:"protocol"`
+	// Status defines current status of message: Pending, Delivered, Rejected, etc.
+	Status string `json:"status"`
+	// Envelope struct holding encrypted message.
+	Envelope []byte `json:"envelope"`
+	// Time in of sent time of message.
+	TimeSent uint32 `json:"time,omitempty"`
+	// Received defines time when delivery notification was received
+	Received time.Time `json:"received"`
+	// Payload associated with envelope.
+	Payload []byte `json:"payload,omitempty"`
+	// Hash defines the Envelope's hash
+	Hash string `json:"envelope_hash"`
+	// FromDevice defines the device sending message if value is extractable.
+	FromDevice string `json:"from_device,omitempty"`
+	// ToDevice defines the receiving message if value is extractable.
+	ToDevice string `json:"to_device,omitempty"`
+	// RejectionError defines the error message when message ending with a Rejected status.
+	RejectionError string `json:"rejection_reason,omitempty"`
+	// Source of message when type is Outgoing which contains raw rpc data.
+	Source whisper.NewMessage `json:"source,omitempty"`
 }
 
 // NodeManager defines expected methods for managing Status node
@@ -83,10 +116,7 @@ type NodeManager interface {
 	AccountKeyStore() (*keystore.KeyStore, error)
 
 	// RPCClient exposes reference to RPC client connected to the running node
-	RPCClient() (*rpc.Client, error)
-
-	// RPCServer exposes reference to running node's in-proc RPC server/handler
-	RPCServer() (*rpc.Server, error)
+	RPCClient() *rpc.Client
 }
 
 // AccountManager defines expected methods for managing Status accounts
@@ -124,19 +154,16 @@ type AccountManager interface {
 	// Logout clears whisper identities
 	Logout() error
 
-	// AccountsListRequestHandler returns handler to process account list request
-	AccountsListRequestHandler() func(entities []common.Address) []common.Address
+	// Accounts returns handler to process account list request
+	Accounts() ([]common.Address, error)
+
+	// AccountsRPCHandler returns RPC wrapper for Accounts()
+	AccountsRPCHandler() rpc.Handler
 
 	// AddressToDecryptedAccount tries to load decrypted key for a given account.
 	// The running node, has a keystore directory which is loaded on start. Key file
 	// for a given address is expected to be in that directory prior to node start.
 	AddressToDecryptedAccount(address, password string) (accounts.Account, *keystore.Key, error)
-}
-
-// RPCManager defines expected methods for managing RPC client/server
-type RPCManager interface {
-	// Call executes RPC request on node's in-proc RPC server
-	Call(inputJSON string) string
 }
 
 // RawCompleteTransactionResult is a JSON returned from transaction complete function (used internally)
@@ -150,55 +177,196 @@ type RawDiscardTransactionResult struct {
 	Error error
 }
 
+// QueuedTxID queued transaction identifier
+type QueuedTxID string
+
+// QueuedTx holds enough information to complete the queued transaction.
+type QueuedTx struct {
+	ID         QueuedTxID
+	Hash       common.Hash
+	Context    context.Context
+	Args       SendTxArgs
+	InProgress bool // true if transaction is being sent
+	Done       chan struct{}
+	Discard    chan struct{}
+	Err        error
+}
+
+// SendTxArgs represents the arguments to submit a new transaction into the transaction pool.
+type SendTxArgs struct {
+	From     common.Address  `json:"from"`
+	To       *common.Address `json:"to"`
+	Gas      *hexutil.Big    `json:"gas"`
+	GasPrice *hexutil.Big    `json:"gasPrice"`
+	Value    *hexutil.Big    `json:"value"`
+	Data     hexutil.Bytes   `json:"data"`
+	Nonce    *hexutil.Uint64 `json:"nonce"`
+}
+
+// EnqueuedTxHandler is a function that receives queued/pending transactions, when they get queued
+type EnqueuedTxHandler func(*QueuedTx)
+
+// EnqueuedTxReturnHandler is a function that receives response when tx is complete (both on success and error)
+type EnqueuedTxReturnHandler func(*QueuedTx, error)
+
+// TxQueue is a queue of transactions.
+type TxQueue interface {
+	// Remove removes a transaction from the queue.
+	Remove(id QueuedTxID)
+
+	// Reset resets the state of the queue.
+	Reset()
+
+	// Count returns a number of transactions in the queue.
+	Count() int
+
+	// Has returns true if a transaction is in the queue.
+	Has(id QueuedTxID) bool
+}
+
 // TxQueueManager defines expected methods for managing transaction queue
 type TxQueueManager interface {
+	// Start starts accepting new transaction in the queue.
+	Start()
+
+	// Stop stops accepting new transactions in the queue.
+	Stop()
+
+	// TransactionQueue returns a transaction queue.
+	TransactionQueue() TxQueue
+
+	// CreateTransactoin creates a new transaction.
+	CreateTransaction(ctx context.Context, args SendTxArgs) *QueuedTx
+
+	// QueueTransaction adds a new transaction to the queue.
+	QueueTransaction(tx *QueuedTx) error
+
+	// WaitForTransactions blocks until transaction is completed, discarded or timed out.
+	WaitForTransaction(tx *QueuedTx) error
+
+	// NotifyOnQueuedTxReturn notifies a handler when a transaction returns.
+	NotifyOnQueuedTxReturn(queuedTx *QueuedTx, err error)
+
 	// TransactionQueueHandler returns handler that processes incoming tx queue requests
-	TransactionQueueHandler() func(queuedTx status.QueuedTx)
+	TransactionQueueHandler() func(queuedTx *QueuedTx)
+
+	// TODO(adam): might be not needed
+	SetTransactionQueueHandler(fn EnqueuedTxHandler)
+
+	// TODO(adam): might be not needed
+	SetTransactionReturnHandler(fn EnqueuedTxReturnHandler)
+
+	SendTransactionRPCHandler(ctx context.Context, args ...interface{}) (interface{}, error)
 
 	// TransactionReturnHandler returns handler that processes responses from internal tx manager
-	TransactionReturnHandler() func(queuedTx *status.QueuedTx, err error)
+	TransactionReturnHandler() func(queuedTx *QueuedTx, err error)
 
 	// CompleteTransaction instructs backend to complete sending of a given transaction
-	CompleteTransaction(id, password string) (common.Hash, error)
+	CompleteTransaction(id QueuedTxID, password string) (common.Hash, error)
 
 	// CompleteTransactions instructs backend to complete sending of multiple transactions
-	CompleteTransactions(ids, password string) map[string]RawCompleteTransactionResult
+	CompleteTransactions(ids []QueuedTxID, password string) map[QueuedTxID]RawCompleteTransactionResult
 
 	// DiscardTransaction discards a given transaction from transaction queue
-	DiscardTransaction(id string) error
+	DiscardTransaction(id QueuedTxID) error
 
 	// DiscardTransactions discards given multiple transactions from transaction queue
-	DiscardTransactions(ids string) map[string]RawDiscardTransactionResult
+	DiscardTransactions(ids []QueuedTxID) map[QueuedTxID]RawDiscardTransactionResult
 }
 
 // JailCell represents single jail cell, which is basically a JavaScript VM.
+// It's designed to be a transparent wrapper around otto.VM's methods.
 type JailCell interface {
-	CellVM() *otto.Otto
+	// Set a value inside VM.
+	Set(string, interface{}) error
+	// Get a value from VM.
+	Get(string) (otto.Value, error)
+	// Run an arbitrary JS code. Input maybe string or otto.Script.
+	Run(interface{}) (otto.Value, error)
+	// Call an arbitrary JS function by name and args.
+	Call(item string, this interface{}, args ...interface{}) (otto.Value, error)
+	// Stop stops background execution of cell.
+	Stop() error
 }
 
 // JailManager defines methods for managing jailed environments
 type JailManager interface {
-	// Parse creates a new jail cell context, with the given chatID as identifier.
-	// New context executes provided JavaScript code, right after the initialization.
-	Parse(chatID string, js string) string
-
 	// Call executes given JavaScript function w/i a jail cell context identified by the chatID.
-	// Jail cell is clonned before call is executed i.e. all calls execute w/i their own contexts.
-	Call(chatID string, path string, args string) string
+	Call(chatID, this, args string) string
 
-	// NewJailCell initializes and returns jail cell
-	NewJailCell(id string) JailCell
+	// CreateCell creates a new jail cell.
+	CreateCell(chatID string) (JailCell, error)
 
-	// JailCellVM returns instance of Otto VM (which is persisted w/i jail cell) by chatID
-	JailCellVM(chatID string) (*otto.Otto, error)
+	// CreateAndInitCell creates a new jail cell and initialize it
+	// with web3 and other handlers.
+	CreateAndInitCell(chatID string, code ...string) string
 
-	// BaseJS allows to setup initial JavaScript to be loaded on each jail.Parse()
-	BaseJS(js string)
+	// Cell returns an existing instance of JailCell.
+	Cell(chatID string) (JailCell, error)
+
+	// Execute allows to run arbitrary JS code within a cell.
+	Execute(chatID, code string) string
+
+	// SetBaseJS allows to setup initial JavaScript to be loaded on each jail.CreateAndInitCell().
+	SetBaseJS(js string)
+
+	// Stop stops all background activity of jail
+	Stop()
 }
 
 // APIResponse generic response from API
 type APIResponse struct {
 	Error string `json:"error"`
+}
+
+// APIDetailedResponse represents a generic response
+// with possible errors.
+type APIDetailedResponse struct {
+	Status      bool            `json:"status"`
+	Message     string          `json:"message,omitempty"`
+	FieldErrors []APIFieldError `json:"field_errors,omitempty"`
+}
+
+func (r APIDetailedResponse) Error() string {
+	buf := bytes.NewBufferString("")
+
+	for _, err := range r.FieldErrors {
+		buf.WriteString(err.Error())
+		buf.WriteString("\n")
+	}
+
+	return strings.TrimSpace(buf.String())
+}
+
+// APIFieldError represents a set of errors
+// related to a parameter.
+type APIFieldError struct {
+	Parameter string     `json:"parameter,omitempty"`
+	Errors    []APIError `json:"errors"`
+}
+
+func (e APIFieldError) Error() string {
+	if len(e.Errors) == 0 {
+		return ""
+	}
+
+	buf := bytes.NewBufferString(fmt.Sprintf("Parameter: %s\n", e.Parameter))
+
+	for _, err := range e.Errors {
+		buf.WriteString(err.Error())
+		buf.WriteString("\n")
+	}
+
+	return strings.TrimSpace(buf.String())
+}
+
+// APIError represents a single error.
+type APIError struct {
+	Message string `json:"message"`
+}
+
+func (e APIError) Error() string {
+	return fmt.Sprintf("message=%s", e.Message)
 }
 
 // AccountInfo represents account's info
@@ -207,6 +375,16 @@ type AccountInfo struct {
 	PubKey   string `json:"pubkey"`
 	Mnemonic string `json:"mnemonic"`
 	Error    string `json:"error"`
+}
+
+// StopRPCCallError defines a error type specific for killing a execution process.
+type StopRPCCallError struct {
+	Err error
+}
+
+// Error returns the internal error associated with the critical error.
+func (c StopRPCCallError) Error() string {
+	return c.Err.Error()
 }
 
 // CompleteTransactionResult is a JSON returned from transaction complete function (used in exposed method)
@@ -232,6 +410,11 @@ type DiscardTransactionsResult struct {
 	Results map[string]DiscardTransactionResult `json:"results"`
 }
 
+type account struct {
+	Address  string
+	Password string
+}
+
 // TestConfig contains shared (among different test packages) parameters
 type TestConfig struct {
 	Node struct {
@@ -239,15 +422,18 @@ type TestConfig struct {
 		HTTPPort    int
 		WSPort      int
 	}
-	Account1 struct {
-		Address  string
-		Password string
-	}
-	Account2 struct {
-		Address  string
-		Password string
-	}
+	Account1 account
+	Account2 account
+	Account3 account
 }
+
+// NotifyResult is a JSON returned from notify message
+type NotifyResult struct {
+	Status bool   `json:"status"`
+	Error  string `json:"error,omitempty"`
+}
+
+const passphraseEnvName = "ACCOUNT_PASSWORD"
 
 // LoadTestConfig loads test configuration values from disk
 func LoadTestConfig() (*TestConfig, error) {
@@ -257,6 +443,11 @@ func LoadTestConfig() (*TestConfig, error) {
 	if err := json.Unmarshal([]byte(configData), &testConfig); err != nil {
 		return nil, err
 	}
+
+	pass := os.Getenv(passphraseEnvName)
+	testConfig.Account1.Password = pass
+	testConfig.Account2.Password = pass
+	testConfig.Account3.Password = pass
 
 	return &testConfig, nil
 }

@@ -43,25 +43,23 @@ type ContractBackend struct {
 }
 
 // NewContractBackend creates a new native contract backend using an existing
-// Etheruem object.
+// Ethereum object.
 func NewContractBackend(apiBackend ethapi.Backend) *ContractBackend {
 	return &ContractBackend{
 		eapi:  ethapi.NewPublicEthereumAPI(apiBackend),
 		bcapi: ethapi.NewPublicBlockChainAPI(apiBackend),
-		txapi: ethapi.NewPublicTransactionPoolAPI(apiBackend),
+		txapi: ethapi.NewPublicTransactionPoolAPI(apiBackend, new(ethapi.AddrLocker)),
 	}
 }
 
 // CodeAt retrieves any code associated with the contract from the local API.
 func (b *ContractBackend) CodeAt(ctx context.Context, contract common.Address, blockNum *big.Int) ([]byte, error) {
-	out, err := b.bcapi.GetCode(ctx, contract, toBlockNumber(blockNum))
-	return common.FromHex(out), err
+	return b.bcapi.GetCode(ctx, contract, toBlockNumber(blockNum))
 }
 
 // CodeAt retrieves any code associated with the contract from the local API.
 func (b *ContractBackend) PendingCodeAt(ctx context.Context, contract common.Address) ([]byte, error) {
-	out, err := b.bcapi.GetCode(ctx, contract, rpc.PendingBlockNumber)
-	return common.FromHex(out), err
+	return b.bcapi.GetCode(ctx, contract, rpc.PendingBlockNumber)
 }
 
 // ContractCall implements bind.ContractCaller executing an Ethereum contract

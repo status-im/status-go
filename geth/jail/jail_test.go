@@ -1,251 +1,156 @@
-package jail_test
+package jail
 
 import (
-	"encoding/json"
-	"errors"
 	"testing"
-	"time"
 
-	"github.com/status-im/status-go/geth/jail"
-	"github.com/status-im/status-go/geth/node"
-	"github.com/status-im/status-go/geth/params"
-	. "github.com/status-im/status-go/geth/testing"
-	"github.com/status-im/status-go/static"
+	"github.com/robertkrimen/otto"
+	"github.com/status-im/status-go/geth/rpc"
 	"github.com/stretchr/testify/suite"
 )
 
-const (
-	testChatID = "testChat"
-)
+type testRPCClientProvider struct {
+	rpcClient *rpc.Client
+}
 
-var baseStatusJSCode = string(static.MustAsset("testdata/jail/status.js"))
+func (p testRPCClientProvider) RPCClient() *rpc.Client {
+	return p.rpcClient
+}
 
 func TestJailTestSuite(t *testing.T) {
 	suite.Run(t, new(JailTestSuite))
 }
 
 type JailTestSuite struct {
-	BaseTestSuite
-	jail *jail.Jail
+	suite.Suite
+	Jail *Jail
 }
 
 func (s *JailTestSuite) SetupTest() {
-	s.NodeManager = node.NewNodeManager()
-	s.Require().NotNil(s.NodeManager)
-	s.Require().IsType(&node.NodeManager{}, s.NodeManager)
-	s.jail = jail.New(s.NodeManager)
-	s.Require().NotNil(s.jail)
-	s.Require().IsType(&jail.Jail{}, s.jail)
+	s.Jail = New(nil)
 }
 
-func (s *JailTestSuite) TestInit() {
-	require := s.Require()
-	require.NotNil(s.jail)
-
-	errorWrapper := func(err error) string {
-		return `{"error":"` + err.Error() + `"}`
-	}
-
-	// get cell VM w/o defining cell first
-	vm, err := s.jail.JailCellVM(testChatID)
-	require.EqualError(err, "cell[testChat] doesn't exist")
-	require.Nil(vm)
-
-	// create VM (w/o properly initializing base JS script)
-	err = errors.New("ReferenceError: '_status_catalog' is not defined")
-	require.Equal(errorWrapper(err), s.jail.Parse(testChatID, ``))
-	err = errors.New("ReferenceError: 'call' is not defined")
-	require.Equal(errorWrapper(err), s.jail.Call(testChatID, `["commands", "testCommand"]`, `{"val": 12}`))
-
-	// get existing cell (even though we got errors, cell was still created)
-	vm, err = s.jail.JailCellVM(testChatID)
-	require.NoError(err)
-	require.NotNil(vm)
-
-	statusJS := baseStatusJSCode + `;
-	_status_catalog.commands["testCommand"] = function (params) {
-		return params.val * params.val;
-	};`
-	s.jail.BaseJS(statusJS)
-
-	// now no error should occur
-	response := s.jail.Parse(testChatID, ``)
-	expectedResponse := `{"result": {"commands":{},"responses":{}}}`
-	require.Equal(expectedResponse, response)
-
-	// make sure that Call succeeds even w/o running node
-	response = s.jail.Call(testChatID, `["commands", "testCommand"]`, `{"val": 12}`)
-	expectedResponse = `{"result": 144}`
-	require.Equal(expectedResponse, response)
-}
-
-func (s *JailTestSuite) TestParse() {
-	require := s.Require()
-	require.NotNil(s.jail)
-
-	extraCode := `
-	var _status_catalog = {
-		foo: 'bar'
-	};
-	`
-	response := s.jail.Parse("newChat", extraCode)
-	expectedResponse := `{"result": {"foo":"bar"}}`
-	require.Equal(expectedResponse, response)
-}
-
-func (s *JailTestSuite) TestFunctionCall() {
-	require := s.Require()
-	require.NotNil(s.jail)
-
-	// load Status JS and add test command to it
-	statusJS := baseStatusJSCode + `;
-	_status_catalog.commands["testCommand"] = function (params) {
-		return params.val * params.val;
-	};`
-	s.jail.Parse(testChatID, statusJS)
-
-	// call with wrong chat id
-	response := s.jail.Call("chatIDNonExistent", "", "")
-	expectedError := `{"error":"Cell[chatIDNonExistent] doesn't exist."}`
-	require.Equal(expectedError, response)
-
-	// call extraFunc()
-	response = s.jail.Call(testChatID, `["commands", "testCommand"]`, `{"val": 12}`)
-	expectedResponse := `{"result": 144}`
-	require.Equal(expectedResponse, response)
-}
-
-func (s *JailTestSuite) TestJailRPCSend() {
-	require := s.Require()
-	require.NotNil(s.jail)
-
-	s.StartTestNode(params.RopstenNetworkID)
-	defer s.StopTestNode()
-
-	// load Status JS and add test command to it
-	s.jail.BaseJS(baseStatusJSCode)
-	s.jail.Parse(testChatID, ``)
-
-	// obtain VM for a given chat (to send custom JS to jailed version of Send())
-	vm, err := s.jail.JailCellVM(testChatID)
-	require.NoError(err)
-	require.NotNil(vm)
-
-	// internally (since we replaced `web3.send` with `jail.Send`)
-	// all requests to web3 are forwarded to `jail.Send`
-	_, err = vm.Run(`
-	    var balance = web3.eth.getBalance("` + TestConfig.Account1.Address + `");
-		var sendResult = web3.fromWei(balance, "ether")
-	`)
-	require.NoError(err)
-
-	value, err := vm.Get("sendResult")
-	require.NoError(err, "cannot obtain result of balance check operation")
-
-	balance, err := value.ToFloat()
-	require.NoError(err)
-
-	s.T().Logf("Balance of %.2f ETH found on '%s' account", balance, TestConfig.Account1.Address)
-	require.False(balance < 100, "wrong balance (there should be lots of test Ether on that account)")
-}
-
-func (s *JailTestSuite) TestGetJailCellVM() {
-	expectedError := `cell[nonExistentChat] doesn't exist`
-	_, err := s.jail.JailCellVM("nonExistentChat")
-	s.EqualError(err, expectedError)
-
-	// now let's create VM..
-	s.jail.Parse(testChatID, ``)
-
-	// ..and see if VM becomes available
-	_, err = s.jail.JailCellVM(testChatID)
+func (s *JailTestSuite) TestJailCreateCell() {
+	cell, err := s.Jail.CreateCell("cell1")
 	s.NoError(err)
+	s.NotNil(cell)
+	// creating another cell with the same id fails
+	_, err = s.Jail.CreateCell("cell1")
+	s.EqualError(err, "cell with id 'cell1' already exists")
+
+	// create more cells
+	_, err = s.Jail.CreateCell("cell2")
+	s.NoError(err)
+	_, err = s.Jail.CreateCell("cell3")
+	s.NoError(err)
+	s.Len(s.Jail.cells, 3)
 }
 
-func (s *JailTestSuite) TestIsConnected() {
-	require := s.Require()
-	require.NotNil(s.jail)
+func (s *JailTestSuite) TestJailGetCell() {
+	// cell1 does not exist
+	_, err := s.Jail.Cell("cell1")
+	s.EqualError(err, "cell 'cell1' not found")
 
-	s.StartTestNode(params.RopstenNetworkID)
-	defer s.StopTestNode()
-
-	s.jail.Parse(testChatID, "")
-
-	// obtain VM for a given chat (to send custom JS to jailed version of Send())
-	vm, err := s.jail.JailCellVM(testChatID)
-	require.NoError(err)
-
-	_, err = vm.Run(`
-	    var responseValue = web3.isConnected();
-	    responseValue = JSON.stringify(responseValue);
-	`)
-	require.NoError(err)
-
-	responseValue, err := vm.Get("responseValue")
-	require.NoError(err, "cannot obtain result of isConnected()")
-
-	response, err := responseValue.ToString()
-	require.NoError(err, "cannot parse result")
-
-	expectedResponse := `{"jsonrpc":"2.0","result":true}`
-	require.Equal(expectedResponse, response)
+	// cell 1 exists
+	_, err = s.Jail.CreateCell("cell1")
+	s.NoError(err)
+	cell, err := s.Jail.Cell("cell1")
+	s.NoError(err)
+	s.NotNil(cell)
 }
 
-func (s *JailTestSuite) TestLocalStorageSet() {
-	require := s.Require()
-	require.NotNil(s.jail)
+func (s *JailTestSuite) TestJailInitCell() {
+	// InitCell on an existing cell.
+	cell, err := s.Jail.createCell("cell1")
+	s.NoError(err)
+	err = s.Jail.initCell(cell)
+	s.NoError(err)
 
-	s.jail.Parse(testChatID, "")
+	// web3 should be available
+	value, err := cell.Run("web3.fromAscii('ethereum')")
+	s.NoError(err)
+	s.Equal(`0x657468657265756d`, value.String())
+}
 
-	// obtain VM for a given chat (to send custom JS to jailed version of Send())
-	vm, err := s.jail.JailCellVM(testChatID)
-	require.NoError(err)
+func (s *JailTestSuite) TestJailStop() {
+	_, err := s.Jail.CreateCell("cell1")
+	s.NoError(err)
+	s.Len(s.Jail.cells, 1)
 
-	testData := "foobar"
+	s.Jail.Stop()
 
-	opCompletedSuccessfully := make(chan struct{}, 1)
+	s.Len(s.Jail.cells, 0)
+}
 
-	// replace transaction notification handler
-	node.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var envelope node.SignalEnvelope
-		err := json.Unmarshal([]byte(jsonEvent), &envelope)
-		require.NoError(err)
+func (s *JailTestSuite) TestJailCall() {
+	cell, err := s.Jail.CreateCell("cell1")
+	s.NoError(err)
 
-		if envelope.Type == jail.EventLocalStorageSet {
-			event := envelope.Event.(map[string]interface{})
-			chatID, ok := event["chat_id"].(string)
-			require.True(ok, "chat id is required, but not found")
-			require.Equal(testChatID, chatID, "incorrect chat ID")
+	propsc := make(chan string, 1)
+	argsc := make(chan string, 1)
+	err = cell.Set("call", func(call otto.FunctionCall) otto.Value {
+		propsc <- call.Argument(0).String()
+		argsc <- call.Argument(1).String()
 
-			actualData, ok := event["data"].(string)
-			require.True(ok, "data field is required, but not found")
-			require.Equal(testData, actualData, "incorrect data")
-
-			s.T().Logf("event processed: %s", jsonEvent)
-			close(opCompletedSuccessfully)
-		}
+		return otto.UndefinedValue()
 	})
-
-	_, err = vm.Run(`
-	    var responseValue = localStorage.set("` + testData + `");
-	    responseValue = JSON.stringify(responseValue);
-	`)
 	s.NoError(err)
 
-	// make sure that signal is sent (and its parameters are correct)
-	select {
-	case <-opCompletedSuccessfully:
-		// pass
-	case <-time.After(3 * time.Second):
-		s.Fail("operation timed out")
-	}
+	result := s.Jail.Call("cell1", `["prop1", "prop2"]`, `arg1`)
+	s.Equal(`["prop1", "prop2"]`, <-propsc)
+	s.Equal(`arg1`, <-argsc)
+	s.Equal(`{"result": undefined}`, result)
+}
 
-	responseValue, err := vm.Get("responseValue")
-	s.NoError(err, "cannot obtain result of localStorage.set()")
+func (s *JailTestSuite) TestMakeCatalogVariable() {
+	cell, err := s.Jail.createCell("cell1")
+	s.NoError(err)
 
-	response, err := responseValue.ToString()
-	s.NoError(err, "cannot parse result")
+	// no `_status_catalog` variable
+	response := s.Jail.makeCatalogVariable(cell)
+	s.Equal(`{"error":"ReferenceError: '_status_catalog' is not defined"}`, response)
 
-	expectedResponse := `{"jsonrpc":"2.0","result":true}`
-	s.Equal(expectedResponse, response)
+	// with `_status_catalog` variable
+	_, err = cell.Run(`var _status_catalog = { test: true }`)
+	s.NoError(err)
+	response = s.Jail.makeCatalogVariable(cell)
+	s.Equal(`{"result": {"test":true}}`, response)
+}
+
+func (s *JailTestSuite) TestCreateAndInitCell() {
+	cell, err := s.Jail.createAndInitCell(
+		"cell1",
+		`var testCreateAndInitCell1 = true`,
+		`var testCreateAndInitCell2 = true`,
+	)
+	s.NoError(err)
+	s.NotNil(cell)
+
+	value, err := cell.Get("testCreateAndInitCell1")
+	s.NoError(err)
+	s.Equal(`true`, value.String())
+
+	value, err = cell.Get("testCreateAndInitCell2")
+	s.NoError(err)
+	s.Equal(`true`, value.String())
+}
+
+func (s *JailTestSuite) TestPublicCreateAndInitCell() {
+	response := s.Jail.CreateAndInitCell("cell1", `var _status_catalog = { test: true }`)
+	s.Equal(`{"result": {"test":true}}`, response)
+}
+
+func (s *JailTestSuite) TestExecute() {
+	// cell does not exist
+	response := s.Jail.Execute("cell1", "('some string')")
+	s.Equal(`{"error":"cell 'cell1' not found"}`, response)
+
+	_, err := s.Jail.createCell("cell1")
+	s.NoError(err)
+
+	// cell exists
+	response = s.Jail.Execute("cell1", `
+		var obj = { test: true };
+		JSON.stringify(obj);
+	`)
+	s.Equal(`{"test":true}`, response)
 }

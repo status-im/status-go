@@ -201,15 +201,6 @@ func (hc *HeaderChain) WriteHeader(header *types.Header) (status WriteStatus, er
 // header writes should be protected by the parent chain mutex individually.
 type WhCallback func(*types.Header) error
 
-// InsertHeaderChain attempts to insert the given header chain in to the local
-// chain, possibly creating a reorg. If an error is returned, it will return the
-// index number of the failing header as well an error describing what went wrong.
-//
-// The verify parameter can be used to fine tune whether nonce verification
-// should be done or not. The reason behind the optional check is because some
-// of the header retrieval mechanisms already need to verfy nonces, as well as
-// because nonces can be verified sparsely, not needing to check each.
-
 func (hc *HeaderChain) ValidateHeaderChain(chain []*types.Header, checkFreq int) (int, error) {
 	// Do a sanity check that the provided chain is actually ordered and linked
 	for i := 1; i < len(chain); i++ {
@@ -257,6 +248,14 @@ func (hc *HeaderChain) ValidateHeaderChain(chain []*types.Header, checkFreq int)
 	return 0, nil
 }
 
+// InsertHeaderChain attempts to insert the given header chain in to the local
+// chain, possibly creating a reorg. If an error is returned, it will return the
+// index number of the failing header as well an error describing what went wrong.
+//
+// The verify parameter can be used to fine tune whether nonce verification
+// should be done or not. The reason behind the optional check is because some
+// of the header retrieval mechanisms already need to verfy nonces, as well as
+// because nonces can be verified sparsely, not needing to check each.
 func (hc *HeaderChain) InsertHeaderChain(chain []*types.Header, writeHeader WhCallback, start time.Time) (int, error) {
 	// Collect some import statistics to report on
 	stats := struct{ processed, ignored int }{}
@@ -268,7 +267,7 @@ func (hc *HeaderChain) InsertHeaderChain(chain []*types.Header, writeHeader WhCa
 			return i, errors.New("aborted")
 		}
 		// If the header's already known, skip it, otherwise store
-		if hc.GetHeader(header.Hash(), header.Number.Uint64()) != nil {
+		if hc.HasHeader(header.Hash(), header.Number.Uint64()) {
 			stats.ignored++
 			continue
 		}
@@ -362,10 +361,13 @@ func (hc *HeaderChain) GetHeaderByHash(hash common.Hash) *types.Header {
 	return hc.GetHeader(hash, hc.GetBlockNumber(hash))
 }
 
-// HasHeader checks if a block header is present in the database or not, caching
-// it if present.
-func (hc *HeaderChain) HasHeader(hash common.Hash) bool {
-	return hc.GetHeaderByHash(hash) != nil
+// HasHeader checks if a block header is present in the database or not.
+func (hc *HeaderChain) HasHeader(hash common.Hash, number uint64) bool {
+	if hc.numberCache.Contains(hash) || hc.headerCache.Contains(hash) {
+		return true
+	}
+	ok, _ := hc.chainDb.Has(headerKey(hash, number))
+	return ok
 }
 
 // GetHeaderByNumber retrieves a block header from the database by number,
