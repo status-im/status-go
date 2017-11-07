@@ -303,6 +303,9 @@ type JailManager interface {
 	// Cell returns an existing instance of JailCell.
 	Cell(chatID string) (JailCell, error)
 
+	// Execute allows to run arbitrary JS code within a cell.
+	Execute(chatID, code string) string
+
 	// SetBaseJS allows to setup initial JavaScript to be loaded on each jail.CreateAndInitCell().
 	SetBaseJS(js string)
 

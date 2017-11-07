@@ -115,6 +115,10 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 			"test jailed calls",
 			testJailFunctionCall,
 		},
+		{
+			"test ExecuteJS",
+			testExecuteJS,
+		},
 	}
 
 	for _, test := range tests {
@@ -1232,7 +1236,7 @@ func testJailInitInvalid(t *testing.T) bool {
 
 	// Act.
 	InitJail(C.CString(initInvalidCode))
-	response := C.GoString(Parse(C.CString("CHAT_ID_INIT_INVALID_TEST"), C.CString(``)))
+	response := C.GoString(CreateAndInitCell(C.CString("CHAT_ID_INIT_INVALID_TEST"), C.CString(``)))
 
 	// Assert.
 	expectedSubstr := `"error":"(anonymous): Line 4:3 Unexpected identifier`
@@ -1257,7 +1261,7 @@ func testJailParseInvalid(t *testing.T) bool {
 	var extraFunc = function (x) {
 	  return x * x;
 	`
-	response := C.GoString(Parse(C.CString("CHAT_ID_PARSE_INVALID_TEST"), C.CString(extraInvalidCode)))
+	response := C.GoString(CreateAndInitCell(C.CString("CHAT_ID_PARSE_INVALID_TEST"), C.CString(extraInvalidCode)))
 
 	// Assert.
 	expectedResponse := `{"error":"(anonymous): Line 4:2 Unexpected end of input (and 1 more errors)"}`
@@ -1304,7 +1308,7 @@ func testJailFunctionCall(t *testing.T) bool {
 	_status_catalog.commands["testCommand"] = function (params) {
 		return params.val * params.val;
 	};`
-	Parse(C.CString("CHAT_ID_CALL_TEST"), C.CString(statusJS))
+	CreateAndInitCell(C.CString("CHAT_ID_CALL_TEST"), C.CString(statusJS))
 
 	// call with wrong chat id
 	rawResponse := Call(C.CString("CHAT_IDNON_EXISTENT"), C.CString(""), C.CString(""))
@@ -1325,6 +1329,30 @@ func testJailFunctionCall(t *testing.T) bool {
 	}
 
 	t.Logf("jailed method called: %s", parsedResponse)
+
+	return true
+}
+
+func testExecuteJS(t *testing.T) bool {
+	InitJail(C.CString(""))
+
+	// cell does not exist
+	response := C.GoString(ExecuteJS(C.CString("CHAT_ID_EXECUTE_TEST"), C.CString("('some string')")))
+	expectedResponse := `{"error":"cell 'CHAT_ID_EXECUTE_TEST' not found"}`
+	if response != expectedResponse {
+		t.Errorf("expected '%s' but got '%s'", expectedResponse, response)
+		return false
+	}
+
+	CreateAndInitCell(C.CString("CHAT_ID_EXECUTE_TEST"), C.CString(`var obj = { status: true }`))
+
+	// cell does not exist
+	response = C.GoString(ExecuteJS(C.CString("CHAT_ID_EXECUTE_TEST"), C.CString(`JSON.stringify(obj)`)))
+	expectedResponse = `{"status":true}`
+	if response != expectedResponse {
+		t.Errorf("expected '%s' but got '%s'", expectedResponse, response)
+		return false
+	}
 
 	return true
 }

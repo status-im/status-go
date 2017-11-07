@@ -291,19 +291,9 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 	for _, tc := range testCases {
 		chatID := crypto.Keccak256Hash([]byte(tc.name)).Hex()
 
-		s.Jail.CreateAndInitCell(chatID, `
-			var shh = web3.shh;
-			// topic must be 4-byte long
-			var makeTopic = function () {
-				var topic = '0x';
-				for (var i = 0; i < 8; i++) {
-					topic += Math.floor(Math.random() * 16).toString(16);
-				}
-				return topic;
-			};
-		`)
+		s.Jail.CreateAndInitCell(chatID, makeTopicCode)
 
-		cell, err := s.Jail.GetCell(chatID)
+		cell, err := s.Jail.Cell(chatID)
 		s.NoError(err, "cannot get VM")
 
 		// Run JS code that setups filters and sends messages.

@@ -197,6 +197,21 @@ func (j *Jail) Cell(chatID string) (common.JailCell, error) {
 	return j.cell(chatID)
 }
 
+// Execute allows to run arbitrary JS code within a cell.
+func (j *Jail) Execute(chatID, code string) string {
+	cell, err := j.cell(chatID)
+	if err != nil {
+		return newJailErrorResponse(err)
+	}
+
+	value, err := cell.Run(code)
+	if err != nil {
+		return newJailErrorResponse(err)
+	}
+
+	return value.String()
+}
+
 // Call executes the `call` function within a cell with chatID.
 // Returns a string being a valid JS code. In case of a successful result,
 // it's {"result": any}. In case of an error: {"error": "some error"}.

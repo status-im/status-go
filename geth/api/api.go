@@ -190,6 +190,11 @@ func (api *StatusAPI) JailCall(chatID, this, args string) string {
 	return api.b.jailManager.Call(chatID, this, args)
 }
 
+// JailExecute allows to run arbitrary JS code within a jail cell.
+func (api *StatusAPI) JailExecute(chatID, code string) string {
+	return api.b.jailManager.Execute(chatID, code)
+}
+
 // SetJailBaseJS allows to setup initial JavaScript to be loaded on each jail.CreateAndInitCell().
 func (api *StatusAPI) SetJailBaseJS(js string) {
 	api.b.jailManager.SetBaseJS(js)

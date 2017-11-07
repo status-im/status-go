@@ -138,3 +138,19 @@ func (s *JailTestSuite) TestPublicCreateAndInitCell() {
 	response := s.Jail.CreateAndInitCell("cell1", `var _status_catalog = { test: true }`)
 	s.Equal(`{"result": {"test":true}}`, response)
 }
+
+func (s *JailTestSuite) TestExecute() {
+	// cell does not exist
+	response := s.Jail.Execute("cell1", "('some string')")
+	s.Equal(`{"error":"cell 'cell1' not found"}`, response)
+
+	_, err := s.Jail.createCell("cell1")
+	s.NoError(err)
+
+	// cell exists
+	response = s.Jail.Execute("cell1", `
+		var obj = { test: true };
+		JSON.stringify(obj);
+	`)
+	s.Equal(`{"test":true}`, response)
+}

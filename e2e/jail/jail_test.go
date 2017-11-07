@@ -86,15 +86,24 @@ func (s *JailTestSuite) TestInitWithBaseJS() {
 	s.Equal(expectedResponse, response)
 }
 
-func (s *JailTestSuite) TestMultipleInitError() {
-	response := s.Jail.CreateAndInitCell(testChatID, ``)
+// @TODO(adam): finally, this test should pass as checking existence of `_status_catalog`
+// should be done in status-react.
+func (s *JailTestSuite) TestCreateAndInitCellWithoutStatusCatalog() {
+	response := s.Jail.CreateAndInitCell(testChatID)
 	s.Equal(`{"error":"ReferenceError: '_status_catalog' is not defined"}`, response)
+}
 
-	response = s.Jail.CreateAndInitCell(testChatID, ``)
+// @TODO(adam): remove extra JS when checking `_status_catalog` is move to status-react.
+func (s *JailTestSuite) TestMultipleInitError() {
+	response := s.Jail.CreateAndInitCell(testChatID, `var _status_catalog = {}`)
+	s.Equal(`{"result": {}}`, response)
+
+	response = s.Jail.CreateAndInitCell(testChatID)
 	s.Equal(`{"error":"cell with id 'testChat' already exists"}`, response)
 }
 
-func (s *JailTestSuite) TestCreateAndInitResponse() {
+// @TODO(adam): remove extra JS when checking `_status_catalog` is moved to status-react.
+func (s *JailTestSuite) TestCreateAndInitCellResponse() {
 	extraCode := `
 	var _status_catalog = {
 		foo: 'bar'
