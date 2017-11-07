@@ -345,7 +345,7 @@ func (s *ManagerTestSuite) TestRestartNode() {
 }
 
 // TODO(adam): race conditions should be tested with -race flag and unit tests, if possible.
-// TODO(boris): going via https://github.com/status-im/status-go/pull/433#issuecomment-342232645 . Testing shoudl be with -race flag
+// TODO(boris): going via https://github.com/status-im/status-go/pull/433#issuecomment-342232645 . Testing should be with -race flag
 // Research if it's possible to do the same with unit tests.
 //func (s *ManagerTestSuite) TestRaceConditions() {
 //	cnt := 25
