@@ -13,7 +13,7 @@ endif
 CGO_CFLAGS=-I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
 GOBIN = build/bin
 GO ?= latest
-networkid ?= 
+networkid ?=
 
 # This is a code for automatic help generator.
 # It supports ANSI colors and categories.
