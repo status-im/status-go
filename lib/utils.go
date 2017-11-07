@@ -32,21 +32,41 @@ import (
 
 const zeroHash = "0x0000000000000000000000000000000000000000000000000000000000000000"
 
-var nodeConfigJSON = `{
-	"NetworkId": ` + strconv.Itoa(params.StatusChainNetworkID) + `,
-	"DataDir": "` + TestDataDir + `",
+var testChainDir string
+var nodeConfigJSON string
+
+func init() {
+	testChainDir = filepath.Join(TestDataDir, TestNetworkNames[GetNetworkID()])
+
+	nodeConfigJSON = `{
+	"NetworkId": ` + strconv.Itoa(GetNetworkID()) + `,
+	"DataDir": "` + testChainDir + `",
 	"HTTPPort": ` + strconv.Itoa(TestConfig.Node.HTTPPort) + `,
 	"WSPort": ` + strconv.Itoa(TestConfig.Node.WSPort) + `,
 	"LogLevel": "INFO"
 }`
+}
 
 // nolint: deadcode
 func testExportedAPI(t *testing.T, done chan struct{}) {
 	<-startTestNode(t)
+	defer func() {
+		done <- struct{}{}
+	}()
+
+	// prepare accounts
+	testKeyDir := filepath.Join(testChainDir, "keystore")
+	if err := common.ImportTestAccount(testKeyDir, "test-account1.pk"); err != nil {
+		panic(err)
+	}
+	if err := common.ImportTestAccount(testKeyDir, "test-account2.pk"); err != nil {
+		panic(err)
+	}
 
 	// FIXME(tiabc): All of that is done because usage of cgo is not supported in tests.
 	// Probably, there should be a cleaner way, for example, test cgo bindings in e2e tests
 	// separately from other internal tests.
+	// FIXME(@jekamas): ATTENTION! this tests depends on each other!
 	tests := []struct {
 		name string
 		fn   func(t *testing.T) bool
@@ -124,11 +144,10 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 	for _, test := range tests {
 		t.Logf("=== RUN   %s", test.name)
 		if ok := test.fn(t); !ok {
+			t.Logf("=== FAILED   %s", test.name)
 			break
 		}
 	}
-
-	done <- struct{}{}
 }
 
 func testVerifyAccountPassword(t *testing.T) bool {
@@ -740,7 +759,7 @@ func testCompleteTransaction(t *testing.T) bool {
 
 	// log into account from which transactions will be sent
 	if err := statusAPI.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password); err != nil {
-		t.Errorf("cannot select account: %v", TestConfig.Account1.Address)
+		t.Errorf("cannot select account: %v. Error %q", TestConfig.Account1.Address, err)
 		return false
 	}
 
@@ -754,7 +773,7 @@ func testCompleteTransaction(t *testing.T) bool {
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var envelope signal.Envelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
-			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
+			t.Errorf("cannot unmarshal event's JSON: %s. Error %q", jsonEvent, err)
 			return
 		}
 		if envelope.Type == txqueue.EventTransactionQueued {
@@ -1358,16 +1377,19 @@ func testExecuteJS(t *testing.T) bool {
 }
 
 func startTestNode(t *testing.T) <-chan struct{} {
+	testDir := filepath.Join(TestDataDir, TestNetworkNames[GetNetworkID()])
+
 	syncRequired := false
-	if _, err := os.Stat(TestDataDir); os.IsNotExist(err) {
+	if _, err := os.Stat(testDir); os.IsNotExist(err) {
 		syncRequired = true
 	}
 
 	// inject test accounts
-	if err := common.ImportTestAccount(filepath.Join(TestDataDir, "keystore"), "test-account1.pk"); err != nil {
+	testKeyDir := filepath.Join(testDir, "keystore")
+	if err := common.ImportTestAccount(testKeyDir, "test-account1.pk"); err != nil {
 		panic(err)
 	}
-	if err := common.ImportTestAccount(filepath.Join(TestDataDir, "keystore"), "test-account2.pk"); err != nil {
+	if err := common.ImportTestAccount(testKeyDir, "test-account2.pk"); err != nil {
 		panic(err)
 	}
 

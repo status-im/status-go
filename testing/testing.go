@@ -45,10 +45,18 @@ func init() {
 		panic(err)
 	}
 
+	flag.Parse()
+
 	// setup root directory
+	const pathSeparator = string(os.PathSeparator)
 	RootDir = filepath.Dir(pwd)
-	if strings.HasSuffix(RootDir, "geth") || strings.HasSuffix(RootDir, "cmd") { // we need to hop one more level
-		RootDir = filepath.Join(RootDir, "..")
+	pathDirs := strings.Split(RootDir, pathSeparator)
+	for i := range pathDirs {
+		if pathDirs[i] == "status-go" {
+			RootDir = filepath.Join(pathDirs[:i+1]...)
+			RootDir = filepath.Join(pathSeparator, RootDir)
+			break
+		}
 	}
 
 	// setup auxiliary directories
@@ -95,15 +103,18 @@ func EnsureNodeSync(nodeManager common.NodeManager) {
 		panic("LightEthereumService is nil")
 	}
 
-	timeouter := time.NewTimer(20 * time.Minute)
-	defer timeouter.Stop()
+	// todo(@jeka): we should extract it into config
+	timeout := time.NewTimer(30 * time.Minute)
+	defer timeout.Stop()
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
+	statusTicker := time.NewTicker(5 * time.Minute)
+	defer statusTicker.Stop()
 
 	for {
 		select {
-		case <-timeouter.C:
-			panic("timout during node synchronization")
+		case <-timeout.C:
+			panic("timeout during node synchronization")
 		case <-ticker.C:
 			downloader := les.Downloader()
 
@@ -115,11 +126,19 @@ func EnsureNodeSync(nodeManager common.NodeManager) {
 					return
 				}
 			}
+		// FIXME(tiabc): This is done for travis not to kill the application if syncing is taking
+		// too long. Another approach is to use travis_wait, see:
+		// https://docs.travis-ci.com/user/common-build-problems/#Build-times-out-because-no-output-was-received
+		// However, in case we prefix commands with `travis_wait`, the output is not shown in case
+		// of any error and it's impossible to get what happened. Is there a proper way out of this problem?
+		case <-statusTicker.C:
+			fmt.Println("Syncing...")
 		}
+
 	}
 }
 
-// GetRemoteURLFromNetworkID returns asociated network url for giving network id.
+// GetRemoteURLFromNetworkID returns associated network url for giving network id.
 func GetRemoteURLFromNetworkID(id int) (url string, err error) {
 	switch id {
 	case params.MainNetworkID:
@@ -128,9 +147,10 @@ func GetRemoteURLFromNetworkID(id int) (url string, err error) {
 		url = params.RinkebyEthereumNetworkURL
 	case params.RopstenNetworkID:
 		url = params.RopstenEthereumNetworkURL
+	default:
+		err = ErrNoRemoteURL
 	}
 
-	err = ErrNoRemoteURL
 	return
 }
 
@@ -142,7 +162,7 @@ func GetHeadHashFromNetworkID(id int) string {
 	case params.RopstenNetworkID:
 		return "0x41941023680923e0fe4d74a34bdac8141f2540e3ae90623718e47d66d1ca4a2d"
 	case params.StatusChainNetworkID:
-		return "0x28c4da1cca48d0107ea5ea29a40ac15fca86899c52d02309fa12ea39b86d219c"
+		return "0x50e6edb4e90d9616ac8bf7119ee37c4048c41ad09328676e1b39dc68a0ecfb3d"
 	}
 
 	return ""

@@ -13,7 +13,6 @@ endif
 CGO_CFLAGS=-I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
 GOBIN = build/bin
 GO ?= latest
-networkid ?=
 
 # This is a code for automatic help generator.
 # It supports ANSI colors and categories.
@@ -90,7 +89,6 @@ generate: ##@other Regenerate assets and other auto-generated stuff
 	go generate ./static
 	rm ./static/scripts/web3.js
 
-
 mock-install: ##@other Install mocking tools
 	go get -u github.com/golang/mock/mockgen
 
@@ -113,7 +111,7 @@ test-e2e: ##@tests Run e2e tests
 	go test -timeout 5m ./e2e/accounts/... -network=$(networkid)
 	go test -timeout 5m ./e2e/api/... -network=$(networkid)
 	go test -timeout 5m ./e2e/node/... -network=$(networkid)
-	go test -timeout 15m ./e2e/jail/... -network=$(networkid)
+	go test -timeout 30m ./e2e/jail/... -network=$(networkid)
 	go test -timeout 20m ./e2e/rpc/... -network=$(networkid)
 	go test -timeout 20m ./e2e/whisper/... -network=$(networkid)
 	go test -timeout 10m ./e2e/transactions/... -network=$(networkid)
@@ -123,4 +121,7 @@ ci: lint mock-install mock test-unit test-e2e ##@tests Run all linters and tests
 
 clean: ##@other Cleanup
 	rm -fr build/bin/*
-	rm coverage.out coverage-all.out coverage.html
+	rm -f coverage.out coverage-all.out coverage.html
+
+deep-clean: clean
+	rm -Rdf .ethereumtest/StatusChain

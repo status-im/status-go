@@ -190,6 +190,8 @@ func (m *Manager) CompleteTransaction(id common.QueuedTxID, password string) (ge
 	return hash, err
 }
 
+const cancelTimeout = time.Minute
+
 func (m *Manager) completeLocalTransaction(queuedTx *common.QueuedTx, password string) (gethcommon.Hash, error) {
 	log.Info("complete transaction using local node", "id", queuedTx.ID)
 
@@ -198,7 +200,7 @@ func (m *Manager) completeLocalTransaction(queuedTx *common.QueuedTx, password s
 		return gethcommon.Hash{}, err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), cancelTimeout)
 	defer cancel()
 
 	return les.StatusBackend.SendTransaction(ctx, status.SendTxArgs(queuedTx.Args), password)
@@ -226,7 +228,7 @@ func (m *Manager) completeRemoteTransaction(queuedTx *common.QueuedTx, password 
 	}
 
 	// We need to request a new transaction nounce from upstream node.
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), cancelTimeout)
 	defer cancel()
 
 	var txCount hexutil.Uint
@@ -282,7 +284,7 @@ func (m *Manager) completeRemoteTransaction(queuedTx *common.QueuedTx, password 
 		return emptyHash, err
 	}
 
-	ctx2, cancel2 := context.WithTimeout(context.Background(), time.Minute)
+	ctx2, cancel2 := context.WithTimeout(context.Background(), cancelTimeout)
 	defer cancel2()
 
 	if err := client.CallContext(ctx2, nil, "eth_sendRawTransaction", gethcommon.ToHex(txBytes)); err != nil {
@@ -298,7 +300,7 @@ func (m *Manager) estimateGas(args common.SendTxArgs) (*hexutil.Big, error) {
 	}
 
 	client := m.nodeManager.RPCClient()
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), cancelTimeout)
 	defer cancel()
 
 	var gasPrice hexutil.Big
@@ -342,7 +344,7 @@ func (m *Manager) estimateGas(args common.SendTxArgs) (*hexutil.Big, error) {
 
 func (m *Manager) gasPrice() (*hexutil.Big, error) {
 	client := m.nodeManager.RPCClient()
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), cancelTimeout)
 	defer cancel()
 
 	var gasPrice hexutil.Big

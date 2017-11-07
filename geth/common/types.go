@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -409,6 +410,11 @@ type DiscardTransactionsResult struct {
 	Results map[string]DiscardTransactionResult `json:"results"`
 }
 
+type account struct {
+	Address  string
+	Password string
+}
+
 // TestConfig contains shared (among different test packages) parameters
 type TestConfig struct {
 	Node struct {
@@ -416,14 +422,9 @@ type TestConfig struct {
 		HTTPPort    int
 		WSPort      int
 	}
-	Account1 struct {
-		Address  string
-		Password string
-	}
-	Account2 struct {
-		Address  string
-		Password string
-	}
+	Account1 account
+	Account2 account
+	Account3 account
 }
 
 // NotifyResult is a JSON returned from notify message
@@ -431,6 +432,8 @@ type NotifyResult struct {
 	Status bool   `json:"status"`
 	Error  string `json:"error,omitempty"`
 }
+
+const passphraseEnvName = "ACCOUNT_PASSWORD"
 
 // LoadTestConfig loads test configuration values from disk
 func LoadTestConfig() (*TestConfig, error) {
@@ -440,6 +443,11 @@ func LoadTestConfig() (*TestConfig, error) {
 	if err := json.Unmarshal([]byte(configData), &testConfig); err != nil {
 		return nil, err
 	}
+
+	pass := os.Getenv(passphraseEnvName)
+	testConfig.Account1.Password = pass
+	testConfig.Account2.Password = pass
+	testConfig.Account3.Password = pass
 
 	return &testConfig, nil
 }
