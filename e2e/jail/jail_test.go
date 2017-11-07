@@ -3,12 +3,17 @@ package jail
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strconv"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/status-im/status-go/e2e"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/jail"
+	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/signal"
 	"github.com/status-im/status-go/static"
 	"github.com/stretchr/testify/suite"
@@ -27,60 +32,83 @@ func TestJailTestSuite(t *testing.T) {
 }
 
 type JailTestSuite struct {
-	suite.Suite
-	jail common.JailManager
+	e2e.NodeManagerTestSuite
+	Jail common.JailManager
 }
 
 func (s *JailTestSuite) SetupTest() {
-	s.jail = jail.New(nil)
-	s.NotNil(s.jail)
+	s.NodeManager = node.NewNodeManager()
+	s.Jail = jail.New(s.NodeManager)
 }
 
-func (s *JailTestSuite) TestInit() {
+func (s *JailTestSuite) TearDownTest() {
+	s.Jail.Stop()
+}
+
+func (s *JailTestSuite) TestInitWithoutBaseJS() {
 	errorWrapper := func(err error) string {
 		return `{"error":"` + err.Error() + `"}`
 	}
 
 	// get cell VM w/o defining cell first
-	cell, err := s.jail.Cell(testChatID)
+	cell, err := s.Jail.Cell(testChatID)
 
-	s.EqualError(err, "cell["+testChatID+"] doesn't exist")
+	s.EqualError(err, "cell '"+testChatID+"' not found")
 	s.Nil(cell)
 
 	// create VM (w/o properly initializing base JS script)
 	err = errors.New("ReferenceError: '_status_catalog' is not defined")
-	s.Equal(errorWrapper(err), s.jail.Parse(testChatID, ``))
+	s.Equal(errorWrapper(err), s.Jail.CreateAndInitCell(testChatID, ``))
 	err = errors.New("ReferenceError: 'call' is not defined")
-	s.Equal(errorWrapper(err), s.jail.Call(testChatID, `["commands", "testCommand"]`, `{"val": 12}`))
+	s.Equal(errorWrapper(err), s.Jail.Call(testChatID, `["commands", "testCommand"]`, `{"val": 12}`))
 
 	// get existing cell (even though we got errors, cell was still created)
-	cell, err = s.jail.Cell(testChatID)
+	cell, err = s.Jail.Cell(testChatID)
 	s.NoError(err)
 	s.NotNil(cell)
+}
 
+func (s *JailTestSuite) TestInitWithBaseJS() {
 	statusJS := baseStatusJSCode + `;
 	_status_catalog.commands["testCommand"] = function (params) {
 		return params.val * params.val;
 	};`
-	s.jail.BaseJS(statusJS)
+	s.Jail.SetBaseJS(statusJS)
 
 	// now no error should occur
-	response := s.jail.Parse(testChatID, ``)
+	response := s.Jail.CreateAndInitCell(testChatID)
 	expectedResponse := `{"result": {"commands":{},"responses":{}}}`
 	s.Equal(expectedResponse, response)
 
 	// make sure that Call succeeds even w/o running node
-	response = s.jail.Call(testChatID, `["commands", "testCommand"]`, `{"val": 12}`)
+	response = s.Jail.Call(testChatID, `["commands", "testCommand"]`, `{"val": 12}`)
 	expectedResponse = `{"result": 144}`
 	s.Equal(expectedResponse, response)
 }
 
-func (s *JailTestSuite) TestParse() {
+// @TODO(adam): finally, this test should pass as checking existence of `_status_catalog`
+// should be done in status-react.
+func (s *JailTestSuite) TestCreateAndInitCellWithoutStatusCatalog() {
+	response := s.Jail.CreateAndInitCell(testChatID)
+	s.Equal(`{"error":"ReferenceError: '_status_catalog' is not defined"}`, response)
+}
+
+// @TODO(adam): remove extra JS when checking `_status_catalog` is move to status-react.
+func (s *JailTestSuite) TestMultipleInitError() {
+	response := s.Jail.CreateAndInitCell(testChatID, `var _status_catalog = {}`)
+	s.Equal(`{"result": {}}`, response)
+
+	response = s.Jail.CreateAndInitCell(testChatID)
+	s.Equal(`{"error":"cell with id 'testChat' already exists"}`, response)
+}
+
+// @TODO(adam): remove extra JS when checking `_status_catalog` is moved to status-react.
+func (s *JailTestSuite) TestCreateAndInitCellResponse() {
 	extraCode := `
 	var _status_catalog = {
 		foo: 'bar'
 	};`
-	response := s.jail.Parse("newChat", extraCode)
+	response := s.Jail.CreateAndInitCell("newChat", extraCode)
 	expectedResponse := `{"result": {"foo":"bar"}}`
 	s.Equal(expectedResponse, response)
 }
@@ -91,24 +119,27 @@ func (s *JailTestSuite) TestFunctionCall() {
 	_status_catalog.commands["testCommand"] = function (params) {
 		return params.val * params.val;
 	};`
-	s.jail.Parse(testChatID, statusJS)
+	s.Jail.CreateAndInitCell(testChatID, statusJS)
 
 	// call with wrong chat id
-	response := s.jail.Call("chatIDNonExistent", "", "")
-	expectedError := `{"error":"cell[chatIDNonExistent] doesn't exist"}`
+	response := s.Jail.Call("chatIDNonExistent", "", "")
+	expectedError := `{"error":"cell 'chatIDNonExistent' not found"}`
 	s.Equal(expectedError, response)
 
 	// call extraFunc()
-	response = s.jail.Call(testChatID, `["commands", "testCommand"]`, `{"val": 12}`)
+	response = s.Jail.Call(testChatID, `["commands", "testCommand"]`, `{"val": 12}`)
 	expectedResponse := `{"result": 144}`
 	s.Equal(expectedResponse, response)
 }
 
 func (s *JailTestSuite) TestEventSignal() {
-	s.jail.Parse(testChatID, "")
+	s.StartTestNode()
+	defer s.StopTestNode()
+
+	s.Jail.CreateAndInitCell(testChatID)
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
-	cell, err := s.jail.Cell(testChatID)
+	cell, err := s.Jail.Cell(testChatID)
 	s.NoError(err)
 
 	testData := "foobar"
@@ -154,8 +185,67 @@ func (s *JailTestSuite) TestEventSignal() {
 	response, err := responseValue.ToString()
 	s.NoError(err, "cannot parse result")
 
-	expectedResponse := `{"jsonrpc":"2.0","result":true}`
+	expectedResponse := `{"result":true}`
 	s.Equal(expectedResponse, response)
+}
+
+// TestCallResponseOrder tests exactly the problem from
+// https://github.com/status-im/status-go/issues/372
+func (s *JailTestSuite) TestSendSyncResponseOrder() {
+	s.StartTestNode()
+	defer s.StopTestNode()
+
+	// `testCommand` is a simple JS function. `calculateGasPrice` makes
+	// an implicit JSON-RPC call via `send` handler (it's a sync call).
+	// `web3.eth.gasPrice` is chosen to call `send` handler under the hood
+	// because it's a simple RPC method and does not require any params.
+	statusJS := baseStatusJSCode + `;
+	_status_catalog.commands["testCommand"] = function (params) {
+		return params.val * params.val;
+	};
+	_status_catalog.commands["calculateGasPrice"] = function (n) {
+		var gasMultiplicator = Math.pow(1.4, n).toFixed(3);
+		var price = 211000000000;
+		try {
+			price = web3.eth.gasPrice;
+		} catch (err) {}
+
+		return price * gasMultiplicator;
+	};
+	`
+	s.Jail.CreateAndInitCell(testChatID, statusJS)
+
+	// Concurrently call `testCommand` and `calculateGasPrice` and do some assertions.
+	// If the code executed in cell's VM is not thread-safe, this test will likely panic.
+	N := 10
+	errCh := make(chan error, N)
+	var wg sync.WaitGroup
+	for i := 0; i < N; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			res := s.Jail.Call(testChatID, `["commands", "testCommand"]`, fmt.Sprintf(`{"val": %d}`, i))
+			if !strings.Contains(string(res), fmt.Sprintf("result\": %d", i*i)) {
+				errCh <- fmt.Errorf("result should be '%d', got %s", i*i, res)
+			}
+		}(i)
+
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			res := s.Jail.Call(testChatID, `["commands", "calculateGasPrice"]`, fmt.Sprintf(`%d`, i))
+			if strings.Contains(string(res), "error") {
+				errCh <- fmt.Errorf("result should not contain 'error', got %s", res)
+			}
+		}(i)
+	}
+
+	wg.Wait()
+
+	close(errCh)
+	for e := range errCh {
+		s.NoError(e)
+	}
 }
 
 func (s *JailTestSuite) TestJailCellsRemovedAfterStop() {
@@ -167,8 +257,8 @@ func (s *JailTestSuite) TestJailCellsRemovedAfterStop() {
 	require := s.Require()
 
 	for i := 0; i < loopLen; i++ {
-		s.jail.Parse(getTestCellID(i), "")
-		cell, err := s.jail.Cell(getTestCellID(i))
+		s.Jail.CreateAndInitCell(getTestCellID(i))
+		cell, err := s.Jail.Cell(getTestCellID(i))
 		require.NoError(err)
 		_, err = cell.Run(`
 			var counter = 1;
@@ -179,10 +269,10 @@ func (s *JailTestSuite) TestJailCellsRemovedAfterStop() {
 		require.NoError(err)
 	}
 
-	s.jail.Stop()
+	s.Jail.Stop()
 
 	for i := 0; i < loopLen; i++ {
-		_, err := s.jail.Cell(getTestCellID(i))
+		_, err := s.Jail.Cell(getTestCellID(i))
 		require.Error(err, "Expected cells removing (from Jail) after stop")
 	}
 }

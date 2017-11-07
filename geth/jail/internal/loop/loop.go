@@ -90,6 +90,15 @@ func (l *Loop) removeByID(id int64) {
 	l.lock.Unlock()
 }
 
+func (l *Loop) removeAll() {
+	l.lock.Lock()
+	for _, t := range l.tasks {
+		t.Cancel()
+	}
+	l.tasks = make(map[int64]Task)
+	l.lock.Unlock()
+}
+
 // Ready signals to the loop that a task is ready to be finalised. This might
 // block if the "ready channel" in the loop is at capacity.
 func (l *Loop) Ready(t Task) {
@@ -108,9 +117,7 @@ func (l *Loop) processTask(t Task) error {
 
 	if err := t.Execute(l.vm, l); err != nil {
 		l.lock.RLock()
-		for _, t := range l.tasks {
-			t.Cancel()
-		}
+		t.Cancel()
 		l.lock.RUnlock()
 
 		return err
@@ -127,6 +134,11 @@ func (l *Loop) Run(ctx context.Context) error {
 	for {
 		select {
 		case t := <-l.ready:
+			if ctx.Err() != nil {
+				l.removeAll()
+				return ctx.Err()
+			}
+
 			if t == nil {
 				continue
 			}
@@ -140,7 +152,8 @@ func (l *Loop) Run(ctx context.Context) error {
 				continue
 			}
 		case <-ctx.Done():
-			return context.Canceled
+			l.removeAll()
+			return ctx.Err()
 		}
 	}
 }

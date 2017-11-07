@@ -2,6 +2,8 @@ package jail
 
 import (
 	"context"
+	"errors"
+	"time"
 
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/jail/internal/fetch"
@@ -16,49 +18,68 @@ type Cell struct {
 	*vm.VM
 	id     string
 	cancel context.CancelFunc
-	lo     *loop.Loop
+
+	loop        *loop.Loop
+	loopStopped chan struct{}
+	loopErr     error
 }
 
-// newCell encapsulates what we need to create a new jailCell from the
+// NewCell encapsulates what we need to create a new jailCell from the
 // provided vm and eventloop instance.
-func newCell(id string, ottoVM *otto.Otto) (*Cell, error) {
-	cellVM := vm.New(ottoVM)
+func NewCell(id string) (*Cell, error) {
+	vm := vm.New()
+	lo := loop.New(vm)
 
-	lo := loop.New(cellVM)
-
-	err := registerVMHandlers(cellVM, lo)
+	err := registerVMHandlers(vm, lo)
 	if err != nil {
 		return nil, err
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
+	loopStopped := make(chan struct{})
+	cell := Cell{
+		VM:          vm,
+		id:          id,
+		cancel:      cancel,
+		loop:        lo,
+		loopStopped: loopStopped,
+	}
 
-	// start event loop in background
-	go lo.Run(ctx) //nolint: errcheck
+	// Start event loop in the background.
+	go func() {
+		err := lo.Run(ctx)
+		if err != context.Canceled {
+			cell.loopErr = err
+		}
 
-	return &Cell{
-		VM:     cellVM,
-		id:     id,
-		cancel: cancel,
-		lo:     lo,
-	}, nil
+		close(loopStopped)
+	}()
+
+	return &cell, nil
 }
 
 // registerHandlers register variuous functions and handlers
 // to the Otto VM, such as Fetch API callbacks or promises.
-func registerVMHandlers(v *vm.VM, lo *loop.Loop) error {
+func registerVMHandlers(vm *vm.VM, lo *loop.Loop) error {
 	// setTimeout/setInterval functions
-	if err := timers.Define(v, lo); err != nil {
+	if err := timers.Define(vm, lo); err != nil {
 		return err
 	}
 
 	// FetchAPI functions
-	return fetch.Define(v, lo)
+	return fetch.Define(vm, lo)
 }
 
 // Stop halts event loop associated with cell.
-func (c *Cell) Stop() {
+func (c *Cell) Stop() error {
 	c.cancel()
+
+	select {
+	case <-c.loopStopped:
+		return c.loopErr
+	case <-time.After(time.Second):
+		return errors.New("stopping the cell timed out")
+	}
 }
 
 // CallAsync puts otto's function with given args into
@@ -67,7 +88,9 @@ func (c *Cell) Stop() {
 // async call, like callback.
 func (c *Cell) CallAsync(fn otto.Value, args ...interface{}) {
 	task := looptask.NewCallTask(fn, args...)
-	c.lo.Add(task)
-	// TODO(divan): review API of `loop` package, it's contrintuitive
-	go c.lo.Ready(task)
+	// Add a task to the queue.
+	c.loop.Add(task)
+	// And run the task immediately.
+	// It's a blocking operation.
+	c.loop.Ready(task)
 }

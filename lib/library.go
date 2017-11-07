@@ -320,13 +320,20 @@ func DiscardTransactions(ids *C.char) *C.char {
 //InitJail setup initial JavaScript
 //export InitJail
 func InitJail(js *C.char) {
-	statusAPI.JailBaseJS(C.GoString(js))
+	statusAPI.SetJailBaseJS(C.GoString(js))
 }
 
-//Parse creates a new jail cell context and executes provided JavaScript code
-//export Parse
-func Parse(chatID *C.char, js *C.char) *C.char {
-	res := statusAPI.JailParse(C.GoString(chatID), C.GoString(js))
+//CreateAndInitCell creates a new jail cell context and executes provided JavaScript code.
+//export CreateAndInitCell
+func CreateAndInitCell(chatID *C.char, js *C.char) *C.char {
+	res := statusAPI.CreateAndInitCell(C.GoString(chatID), C.GoString(js))
+	return C.CString(res)
+}
+
+//ExecuteJS allows to run arbitrary JS code within a cell.
+//export ExecuteJS
+func ExecuteJS(chatID *C.char, code *C.char) *C.char {
+	res := statusAPI.JailExecute(C.GoString(chatID), C.GoString(code))
 	return C.CString(res)
 }
 

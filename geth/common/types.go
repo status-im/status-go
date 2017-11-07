@@ -285,26 +285,29 @@ type JailCell interface {
 	// Call an arbitrary JS function by name and args.
 	Call(item string, this interface{}, args ...interface{}) (otto.Value, error)
 	// Stop stops background execution of cell.
-	Stop()
+	Stop() error
 }
 
 // JailManager defines methods for managing jailed environments
 type JailManager interface {
-	// Parse creates a new jail cell context, with the given chatID as identifier.
-	// New context executes provided JavaScript code, right after the initialization.
-	Parse(chatID, js string) string
-
 	// Call executes given JavaScript function w/i a jail cell context identified by the chatID.
 	Call(chatID, this, args string) string
 
-	// NewCell initializes and returns a new jail cell.
-	NewCell(chatID string) (JailCell, error)
+	// CreateCell creates a new jail cell.
+	CreateCell(chatID string) (JailCell, error)
+
+	// CreateAndInitCell creates a new jail cell and initialize it
+	// with web3 and other handlers.
+	CreateAndInitCell(chatID string, code ...string) string
 
 	// Cell returns an existing instance of JailCell.
 	Cell(chatID string) (JailCell, error)
 
-	// BaseJS allows to setup initial JavaScript to be loaded on each jail.Parse()
-	BaseJS(js string)
+	// Execute allows to run arbitrary JS code within a cell.
+	Execute(chatID, code string) string
+
+	// SetBaseJS allows to setup initial JavaScript to be loaded on each jail.CreateAndInitCell().
+	SetBaseJS(js string)
 
 	// Stop stops all background activity of jail
 	Stop()

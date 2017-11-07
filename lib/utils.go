@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -113,6 +114,10 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 		{
 			"test jailed calls",
 			testJailFunctionCall,
+		},
+		{
+			"test ExecuteJS",
+			testExecuteJS,
 		},
 	}
 
@@ -1231,12 +1236,12 @@ func testJailInitInvalid(t *testing.T) bool {
 
 	// Act.
 	InitJail(C.CString(initInvalidCode))
-	response := C.GoString(Parse(C.CString("CHAT_ID_INIT_TEST"), C.CString(``)))
+	response := C.GoString(CreateAndInitCell(C.CString("CHAT_ID_INIT_INVALID_TEST"), C.CString(``)))
 
 	// Assert.
-	expectedResponse := `{"error":"(anonymous): Line 4:3 Unexpected end of input (and 3 more errors)"}`
-	if expectedResponse != response {
-		t.Errorf("unexpected response, expected: %v, got: %v", expectedResponse, response)
+	expectedSubstr := `"error":"(anonymous): Line 4:3 Unexpected identifier`
+	if !strings.Contains(response, expectedSubstr) {
+		t.Errorf("unexpected response, didn't find '%s' in '%s'", expectedSubstr, response)
 		return false
 	}
 	return true
@@ -1256,11 +1261,10 @@ func testJailParseInvalid(t *testing.T) bool {
 	var extraFunc = function (x) {
 	  return x * x;
 	`
-	response := C.GoString(Parse(C.CString("CHAT_ID_INIT_TEST"), C.CString(extraInvalidCode)))
+	response := C.GoString(CreateAndInitCell(C.CString("CHAT_ID_PARSE_INVALID_TEST"), C.CString(extraInvalidCode)))
 
 	// Assert.
-	// expectedResponse := `{"error":"(anonymous): Line 16331:50 Unexpected end of input (and 1 more errors)"}`
-	expectedResponse := `{"error":"(anonymous): Line 16354:50 Unexpected end of input (and 1 more errors)"}`
+	expectedResponse := `{"error":"(anonymous): Line 4:2 Unexpected end of input (and 1 more errors)"}`
 	if expectedResponse != response {
 		t.Errorf("unexpected response, expected: %v, got: %v", expectedResponse, response)
 		return false
@@ -1281,13 +1285,13 @@ func testJailInit(t *testing.T) bool {
 	  return x * x;
 	};
 	`
-	rawResponse := Parse(C.CString("CHAT_ID_INIT_TEST"), C.CString(extraCode))
+	rawResponse := CreateAndInitCell(C.CString("CHAT_ID_INIT_TEST"), C.CString(extraCode))
 	parsedResponse := C.GoString(rawResponse)
 
 	expectedResponse := `{"result": {"foo":"bar"}}`
 
 	if !reflect.DeepEqual(expectedResponse, parsedResponse) {
-		t.Error("expected output not returned from jail.Parse()")
+		t.Error("expected output not returned from jail.CreateAndInitCell()")
 		return false
 	}
 
@@ -1304,12 +1308,12 @@ func testJailFunctionCall(t *testing.T) bool {
 	_status_catalog.commands["testCommand"] = function (params) {
 		return params.val * params.val;
 	};`
-	Parse(C.CString("CHAT_ID_CALL_TEST"), C.CString(statusJS))
+	CreateAndInitCell(C.CString("CHAT_ID_CALL_TEST"), C.CString(statusJS))
 
 	// call with wrong chat id
 	rawResponse := Call(C.CString("CHAT_IDNON_EXISTENT"), C.CString(""), C.CString(""))
 	parsedResponse := C.GoString(rawResponse)
-	expectedError := `{"error":"cell[CHAT_IDNON_EXISTENT] doesn't exist"}`
+	expectedError := `{"error":"cell 'CHAT_IDNON_EXISTENT' not found"}`
 	if parsedResponse != expectedError {
 		t.Errorf("expected error is not returned: expected %s, got %s", expectedError, parsedResponse)
 		return false
@@ -1325,6 +1329,30 @@ func testJailFunctionCall(t *testing.T) bool {
 	}
 
 	t.Logf("jailed method called: %s", parsedResponse)
+
+	return true
+}
+
+func testExecuteJS(t *testing.T) bool {
+	InitJail(C.CString(""))
+
+	// cell does not exist
+	response := C.GoString(ExecuteJS(C.CString("CHAT_ID_EXECUTE_TEST"), C.CString("('some string')")))
+	expectedResponse := `{"error":"cell 'CHAT_ID_EXECUTE_TEST' not found"}`
+	if response != expectedResponse {
+		t.Errorf("expected '%s' but got '%s'", expectedResponse, response)
+		return false
+	}
+
+	CreateAndInitCell(C.CString("CHAT_ID_EXECUTE_TEST"), C.CString(`var obj = { status: true }`))
+
+	// cell does not exist
+	response = C.GoString(ExecuteJS(C.CString("CHAT_ID_EXECUTE_TEST"), C.CString(`JSON.stringify(obj)`)))
+	expectedResponse = `{"status":true}`
+	if response != expectedResponse {
+		t.Errorf("expected '%s' but got '%s'", expectedResponse, response)
+		return false
+	}
 
 	return true
 }

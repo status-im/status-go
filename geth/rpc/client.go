@@ -8,7 +8,6 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/ethereum/go-ethereum/node"
 	"github.com/status-im/status-go/geth/params"
 
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
@@ -38,21 +37,17 @@ type Client struct {
 //
 // Client is safe for concurrent use and will automatically
 // reconnect to the server if connection is lost.
-func NewClient(node *node.Node, upstream params.UpstreamRPCConfig) (*Client, error) {
-	c := &Client{
+func NewClient(client *gethrpc.Client, upstream params.UpstreamRPCConfig) (*Client, error) {
+	c := Client{
+		local:    client,
 		handlers: make(map[string]Handler),
 	}
 
 	var err error
-	c.local, err = node.Attach()
-	if err != nil {
-		return nil, fmt.Errorf("attach to local node: %s", err)
-	}
 
 	if upstream.Enabled {
 		c.upstreamEnabled = upstream.Enabled
 		c.upstreamURL = upstream.URL
-
 		c.upstream, err = gethrpc.Dial(c.upstreamURL)
 		if err != nil {
 			return nil, fmt.Errorf("dial upstream server: %s", err)
@@ -61,7 +56,7 @@ func NewClient(node *node.Node, upstream params.UpstreamRPCConfig) (*Client, err
 
 	c.router = newRouter(c.upstreamEnabled)
 
-	return c, nil
+	return &c, nil
 }
 
 // Call performs a JSON-RPC call with the given arguments and unmarshals into

@@ -42,8 +42,8 @@ func (s *JailRPCTestSuite) TestJailRPCSend() {
 	EnsureNodeSync(s.Backend.NodeManager())
 
 	// load Status JS and add test command to it
-	s.jail.BaseJS(baseStatusJSCode)
-	s.jail.Parse(testChatID, ``)
+	s.jail.SetBaseJS(baseStatusJSCode)
+	s.jail.CreateAndInitCell(testChatID)
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
 	cell, err := s.jail.Cell(testChatID)
@@ -72,7 +72,7 @@ func (s *JailRPCTestSuite) TestIsConnected() {
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
-	s.jail.Parse(testChatID, "")
+	s.jail.CreateAndInitCell(testChatID)
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
 	cell, err := s.jail.Cell(testChatID)
@@ -87,11 +87,9 @@ func (s *JailRPCTestSuite) TestIsConnected() {
 	responseValue, err := cell.Get("responseValue")
 	s.NoError(err, "cannot obtain result of isConnected()")
 
-	response, err := responseValue.ToString()
+	response, err := responseValue.ToBoolean()
 	s.NoError(err, "cannot parse result")
-
-	expectedResponse := `{"jsonrpc":"2.0","result":true}`
-	s.Equal(expectedResponse, response)
+	s.True(response)
 }
 
 // regression test: eth_getTransactionReceipt with invalid transaction hash should return null
@@ -115,7 +113,7 @@ func (s *JailRPCTestSuite) TestContractDeployment() {
 	EnsureNodeSync(s.Backend.NodeManager())
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
-	s.jail.Parse(testChatID, "")
+	s.jail.CreateAndInitCell(testChatID)
 
 	cell, err := s.jail.Cell(testChatID)
 	s.NoError(err)
@@ -251,9 +249,9 @@ func (s *JailRPCTestSuite) TestJailVMPersistence() {
 	}
 
 	jail := s.Backend.JailManager()
-	jail.BaseJS(baseStatusJSCode)
+	jail.SetBaseJS(baseStatusJSCode)
 
-	parseResult := jail.Parse(testChatID, `
+	parseResult := jail.CreateAndInitCell(testChatID, `
 		var total = 0;
 		_status_catalog['ping'] = function(params) {
 			total += Number(params.amount);

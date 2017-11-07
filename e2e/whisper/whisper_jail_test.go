@@ -45,8 +45,7 @@ func (s *WhisperJailTestSuite) StartTestBackend(opts ...e2e.TestNodeOption) {
 	s.WhisperAPI = whisper.NewPublicWhisperAPI(s.WhisperService())
 	s.Jail = s.Backend.JailManager()
 	s.NotNil(s.Jail)
-
-	s.Jail.BaseJS(baseStatusJSCode)
+	s.Jail.SetBaseJS(baseStatusJSCode)
 }
 
 func (s *WhisperJailTestSuite) AddKeyPair(address, password string) (string, error) {
@@ -291,7 +290,8 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 
 	for _, tc := range testCases {
 		chatID := crypto.Keccak256Hash([]byte(tc.name)).Hex()
-		s.Jail.Parse(chatID, makeTopicCode)
+
+		s.Jail.CreateAndInitCell(chatID, makeTopicCode)
 
 		cell, err := s.Jail.Cell(chatID)
 		s.NoError(err, "cannot get VM")
