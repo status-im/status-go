@@ -2,7 +2,6 @@ package node_test
 
 import (
 	"encoding/json"
-	"math/rand"
 	"testing"
 	"time"
 
@@ -13,7 +12,6 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/e2e"
-	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/signal"
@@ -347,124 +345,129 @@ func (s *ManagerTestSuite) TestRestartNode() {
 }
 
 // TODO(adam): race conditions should be tested with -race flag and unit tests, if possible.
-// TODO(boris): remove it after https://github.com/status-im/status-go/pull/412
+// TODO(boris): going via https://github.com/status-im/status-go/pull/433#issuecomment-342232645 . Testing shoudl be with -race flag
 // Research if it's possible to do the same with unit tests.
-func (s *ManagerTestSuite) TestRaceConditions() {
-	cnt := 25
-	progress := make(chan struct{}, cnt)
-	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
-
-	nodeConfig1, e := e2e.MakeTestNodeConfig(GetNetworkID())
-	s.NoError(e)
-
-	nodeConfig2, e := e2e.MakeTestNodeConfig(GetNetworkID())
-	s.NoError(e)
-
-	nodeConfigs := []*params.NodeConfig{nodeConfig1, nodeConfig2}
-
-	var funcsToTest = []func(*params.NodeConfig){
-		func(config *params.NodeConfig) {
-			log.Info("StartNode()")
-			_, err := s.NodeManager.StartNode(config)
-			s.T().Logf("StartNode() for network: %d, error: %v", config.NetworkID, err)
-			progress <- struct{}{}
-		},
-		func(config *params.NodeConfig) {
-			log.Info("Node()")
-			_, err := s.NodeManager.Node()
-			s.T().Logf("Node(), error: %v", err)
-			progress <- struct{}{}
-		},
-		func(config *params.NodeConfig) {
-			log.Info("IsNodeRunning()")
-			s.T().Logf("IsNodeRunning(), result: %v", s.NodeManager.IsNodeRunning())
-			progress <- struct{}{}
-		},
-		func(config *params.NodeConfig) {
-			log.Info("PopulateStaticPeers()")
-			s.T().Logf("PopulateStaticPeers(), error: %v", s.NodeManager.PopulateStaticPeers())
-			progress <- struct{}{}
-		},
-		// TODO(adam): quarantined until it uses a different datadir
-		// as otherwise it wipes out cached blockchain data.
-		// func(config *params.NodeConfig) {
-		// 	log.Info("ResetChainData()")
-		// 	_, err := s.NodeManager.ResetChainData()
-		// 	s.T().Logf("ResetChainData(), error: %v", err)
-		// 	progress <- struct{}{}
-		// },
-		func(config *params.NodeConfig) {
-			log.Info("RestartNode()")
-			_, err := s.NodeManager.RestartNode()
-			s.T().Logf("RestartNode(), error: %v", err)
-			progress <- struct{}{}
-		},
-		func(config *params.NodeConfig) {
-			log.Info("NodeConfig()")
-			_, err := s.NodeManager.NodeConfig()
-			s.T().Logf("NodeConfig(), error: %v", err)
-			progress <- struct{}{}
-		},
-		func(config *params.NodeConfig) {
-			log.Info("LightEthereumService()")
-			_, err := s.NodeManager.LightEthereumService()
-			s.T().Logf("LightEthereumService(), error: %v", err)
-			progress <- struct{}{}
-		},
-		func(config *params.NodeConfig) {
-			log.Info("WhisperService()")
-			_, err := s.NodeManager.WhisperService()
-			s.T().Logf("WhisperService(), error: %v", err)
-			progress <- struct{}{}
-		},
-		func(config *params.NodeConfig) {
-			log.Info("AccountManager()")
-			_, err := s.NodeManager.AccountManager()
-			s.T().Logf("AccountManager(), error: %v", err)
-			progress <- struct{}{}
-		},
-		func(config *params.NodeConfig) {
-			log.Info("AccountKeyStore()")
-			_, err := s.NodeManager.AccountKeyStore()
-			s.T().Logf("AccountKeyStore(), error: %v", err)
-			progress <- struct{}{}
-		},
-		func(config *params.NodeConfig) {
-			log.Info("RPCClient()")
-			s.NodeManager.RPCClient()
-			progress <- struct{}{}
-		},
-	}
-
-	// increase StartNode()/StopNode() population
-	for i := 0; i < 5; i++ {
-		funcsToTest = append(funcsToTest, funcsToTest[0], funcsToTest[1])
-	}
-
-	for i := 0; i < cnt; i++ {
-		randConfig := nodeConfigs[rnd.Intn(len(nodeConfigs))]
-		randFunc := funcsToTest[rnd.Intn(len(funcsToTest))]
-
-		if rnd.Intn(100) > 75 { // introduce random delays
-			time.Sleep(500 * time.Millisecond)
-		}
-		go randFunc(randConfig)
-	}
-
-	for range progress {
-		cnt -= 1
-		if cnt <= 0 {
-			break
-		}
-	}
-
-	time.Sleep(2 * time.Second)                // so that we see some logs
-	nodeStopped, _ := s.NodeManager.StopNode() // just in case we have a node running
-
-	if nodeStopped != nil {
-		<-nodeStopped
-	}
-}
+//func (s *ManagerTestSuite) TestRaceConditions() {
+//	cnt := 25
+//	progress := make(chan struct{}, cnt)
+//	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
+//
+//	nodeConfig1, e := e2e.MakeTestNodeConfig(GetNetworkID())
+//	s.NoError(e)
+//
+//	nodeConfig2, e := e2e.MakeTestNodeConfig(GetNetworkID())
+//	s.NoError(e)
+//
+//	nodeConfigs := []*params.NodeConfig{nodeConfig1, nodeConfig2}
+//
+//	var funcsToTest = []func(*params.NodeConfig){
+//		func(config *params.NodeConfig) {
+//			log.Info("StartNode()")
+//			_, err := s.NodeManager.StartNode(config)
+//			s.T().Logf("StartNode() for network: %d, error: %v", config.NetworkID, err)
+//			progress <- struct{}{}
+//		},
+//		func(config *params.NodeConfig) {
+//			_, err := s.NodeManager.StopNode()
+//			s.T().Logf("StopNode() for network: %d, error: %v", config.NetworkID, err)
+//			progress <- struct{}{}
+//		},
+//		func(config *params.NodeConfig) {
+//			log.Info("Node()")
+//			_, err := s.NodeManager.Node()
+//			s.T().Logf("Node(), error: %v", err)
+//			progress <- struct{}{}
+//		},
+//		func(config *params.NodeConfig) {
+//			log.Info("IsNodeRunning()")
+//			s.T().Logf("IsNodeRunning(), result: %v", s.NodeManager.IsNodeRunning())
+//			progress <- struct{}{}
+//		},
+//		func(config *params.NodeConfig) {
+//			log.Info("PopulateStaticPeers()")
+//			s.T().Logf("PopulateStaticPeers(), error: %v", s.NodeManager.PopulateStaticPeers())
+//			progress <- struct{}{}
+//		},
+//		// TODO(adam): quarantined until it uses a different datadir
+//		// as otherwise it wipes out cached blockchain data.
+//		// func(config *params.NodeConfig) {
+//		// 	log.Info("ResetChainData()")
+//		// 	_, err := s.NodeManager.ResetChainData()
+//		// 	s.T().Logf("ResetChainData(), error: %v", err)
+//		// 	progress <- struct{}{}
+//		// },
+//		func(config *params.NodeConfig) {
+//			log.Info("RestartNode()")
+//			_, err := s.NodeManager.RestartNode()
+//			s.T().Logf("RestartNode(), error: %v", err)
+//			progress <- struct{}{}
+//		},
+//		func(config *params.NodeConfig) {
+//			log.Info("NodeConfig()")
+//			_, err := s.NodeManager.NodeConfig()
+//			s.T().Logf("NodeConfig(), error: %v", err)
+//			progress <- struct{}{}
+//		},
+//		func(config *params.NodeConfig) {
+//			log.Info("LightEthereumService()")
+//			_, err := s.NodeManager.LightEthereumService()
+//			s.T().Logf("LightEthereumService(), error: %v", err)
+//			progress <- struct{}{}
+//		},
+//		func(config *params.NodeConfig) {
+//			log.Info("WhisperService()")
+//			_, err := s.NodeManager.WhisperService()
+//			s.T().Logf("WhisperService(), error: %v", err)
+//			progress <- struct{}{}
+//		},
+//		func(config *params.NodeConfig) {
+//			log.Info("AccountManager()")
+//			_, err := s.NodeManager.AccountManager()
+//			s.T().Logf("AccountManager(), error: %v", err)
+//			progress <- struct{}{}
+//		},
+//		func(config *params.NodeConfig) {
+//			log.Info("AccountKeyStore()")
+//			_, err := s.NodeManager.AccountKeyStore()
+//			s.T().Logf("AccountKeyStore(), error: %v", err)
+//			progress <- struct{}{}
+//		},
+//		func(config *params.NodeConfig) {
+//			log.Info("RPCClient()")
+//			s.NodeManager.RPCClient()
+//			progress <- struct{}{}
+//		},
+//	}
+//
+//	// increase StartNode()/StopNode() population
+//	for i := 0; i < 5; i++ {
+//		funcsToTest = append(funcsToTest, funcsToTest[0], funcsToTest[1])
+//	}
+//
+//	for i := 0; i < cnt; i++ {
+//		randConfig := nodeConfigs[rnd.Intn(len(nodeConfigs))]
+//		randFunc := funcsToTest[rnd.Intn(len(funcsToTest))]
+//
+//		if rnd.Intn(100) > 75 { // introduce random delays
+//			time.Sleep(500 * time.Millisecond)
+//		}
+//		go randFunc(randConfig)
+//	}
+//
+//	for range progress {
+//		cnt -= 1
+//		if cnt <= 0 {
+//			break
+//		}
+//	}
+//
+//	time.Sleep(2 * time.Second)                // so that we see some logs
+//	nodeStopped, _ := s.NodeManager.StopNode() // just in case we have a node running
+//
+//	if nodeStopped != nil {
+//		<-nodeStopped
+//	}
+//}
 
 func (s *ManagerTestSuite) TestNodeStartCrash() {
 	// let's listen for node.crashed signal
