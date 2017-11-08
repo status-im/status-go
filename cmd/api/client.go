@@ -30,19 +30,28 @@ func NewClient(serverAddress, port string) (*Client, error) {
 	return c, nil
 }
 
-// APIStartNode loads the configuration out of the passed string and
+// AdminGetAddresses retrieves the internet addresses of the
+// server.
+func (c *Client) AdminGetAddresses() ([]string, error) {
+	var args NoArgs
+	var reply StringsReply
+	err := c.client.Call("Admin.GetAddresses", args, &reply)
+	return reply.Strings, err
+}
+
+// StatusStartNode loads the configuration out of the passed string and
 // starts a node with it.
-func (c *Client) APIStartNode(config string) error {
+func (c *Client) StatusStartNode(config string) error {
 	args := ConfigArgs{
 		Config: config,
 	}
 	var reply NoReply
-	return c.client.Call("API.StartNode", args, &reply)
+	return c.client.Call("Status.StartNode", args, &reply)
 }
 
-// APIStopNode starts the stopped node.
-func (c *Client) APIStopNode() error {
+// StatusStopNode starts the stopped node.
+func (c *Client) StatusStopNode() error {
 	var args NoArgs
 	var reply NoReply
-	return c.client.Call("API.StopNode", args, &reply)
+	return c.client.Call("Status.StopNode", args, &reply)
 }
