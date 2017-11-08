@@ -17,7 +17,7 @@ jobs:
   - stage: Test e2e on privite network
     script: make test-e2e
   - stage: Test e2e on public network
-    script: make test-e2e networkid=4
+    script: travis_wait 50 make test-e2e networkid=4
 cache:
   directories:
   - ".ethereumtest/Mainnet"
