@@ -21,6 +21,7 @@ import (
 	"github.com/status-im/status-go/geth/txqueue"
 	. "github.com/status-im/status-go/testing"
 	"github.com/stretchr/testify/suite"
+	"sync"
 )
 
 func TestTransactionsTestSuite(t *testing.T) {
@@ -764,12 +765,16 @@ func (s *TransactionsTestSuite) TestEvictionOfQueuedTransactions() {
 	s.NoError(s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 
 	txQueue := s.Backend.TxQueueManager().TransactionQueue()
+
 	var i = 0
 	txIDs := [txqueue.DefaultTxQueueCap + 5 + 10]common.QueuedTxID{}
+	txQueueMutex := sync.RWMutex{}
 	s.Backend.TxQueueManager().SetTransactionQueueHandler(func(queuedTx *common.QueuedTx) {
+		txQueueMutex.Lock()
 		log.Info("tx enqueued", "i", i+1, "queue size", txQueue.Count(), "id", queuedTx.ID)
 		txIDs[i] = queuedTx.ID
 		i++
+		txQueueMutex.Unlock()
 	})
 
 	s.Zero(txQueue.Count(), "transaction count should be zero")
@@ -791,9 +796,11 @@ func (s *TransactionsTestSuite) TestEvictionOfQueuedTransactions() {
 
 	s.True(txQueue.Count() <= txqueue.DefaultTxQueueCap, "transaction count should be %d (or %d): got %d", txqueue.DefaultTxQueueCap, txqueue.DefaultTxQueueCap-1, txQueue.Count())
 
+	txQueueMutex.Lock()
 	for _, txID := range txIDs {
 		txQueue.Remove(txID)
 	}
+	txQueueMutex.Unlock()
 
 	s.Zero(txQueue.Count(), "transaction count should be zero: %d", txQueue.Count())
 }
