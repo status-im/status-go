@@ -22,6 +22,7 @@ import (
 	. "github.com/status-im/status-go/testing"
 	"github.com/stretchr/testify/suite"
 	"sync"
+	"sync/atomic"
 )
 
 func TestTransactionsTestSuite(t *testing.T) {
@@ -636,7 +637,7 @@ func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
 	allTestTxDiscarded := make(chan struct{})
 
 	// replace transaction notification handler
-	txFailedEventCallCount := 0
+	txFailedEventCallCount := int32(0)
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var envelope signal.Envelope
 		err := json.Unmarshal([]byte(jsonEvent), &envelope)
@@ -662,8 +663,7 @@ func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
 			receivedErrCode := event["error_code"].(string)
 			s.Equal("4", receivedErrCode)
 
-			txFailedEventCallCount++
-			if txFailedEventCallCount == testTxCount {
+			if int(atomic.AddInt32(&txFailedEventCallCount, 1)) == testTxCount {
 				close(allTestTxDiscarded)
 			}
 		}
