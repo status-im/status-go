@@ -264,7 +264,6 @@ func (s *TxQueueTestSuite) TestDiscardTransaction() {
 
 	err := txQueueManager.QueueTransaction(tx)
 	s.NoError(err)
-
 	go func() {
 		discardErr := txQueueManager.DiscardTransaction(tx.ID)
 		s.NoError(discardErr)

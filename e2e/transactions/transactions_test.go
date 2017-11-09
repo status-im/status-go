@@ -593,6 +593,9 @@ func (s *TransactionsTestSuite) TestCompleteMultipleQueuedTransactions() {
 			)
 		}
 	}
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
 	go func() {
 		ids := make([]common.QueuedTxID, testTxCount)
 		for i := 0; i < testTxCount; i++ {
@@ -601,11 +604,16 @@ func (s *TransactionsTestSuite) TestCompleteMultipleQueuedTransactions() {
 
 		completeTxs(ids)
 		close(allTestTxCompleted)
+		wg.Done()
 	}()
 
 	// send multiple transactions
 	for i := 0; i < testTxCount; i++ {
-		go sendTx()
+		wg.Add(1)
+		go func() {
+			sendTx()
+			wg.Done()
+		}()
 	}
 
 	select {
@@ -613,6 +621,7 @@ func (s *TransactionsTestSuite) TestCompleteMultipleQueuedTransactions() {
 	case <-time.After(30 * time.Second):
 		s.FailNow("test timed out")
 	}
+	wg.Wait()
 
 	s.Zero(s.TxQueueManager().TransactionQueue().Count(), "queue should be empty")
 }
@@ -788,8 +797,13 @@ func (s *TransactionsTestSuite) TestEvictionOfQueuedTransactions() {
 
 	s.Zero(txQueue.Count(), "transaction count should be zero")
 
+	wg := sync.WaitGroup{}
 	for j := 0; j < 10; j++ {
-		go s.Backend.SendTransaction(context.TODO(), common.SendTxArgs{}) // nolint: errcheck
+		wg.Add(1)
+		go func() {
+			s.Backend.SendTransaction(context.TODO(), common.SendTxArgs{}) // nolint: errcheck
+			wg.Done()
+		}()
 	}
 	time.Sleep(2 * time.Second) // FIXME(tiabc): more reliable synchronization to ensure all transactions are enqueued
 
@@ -799,9 +813,14 @@ func (s *TransactionsTestSuite) TestEvictionOfQueuedTransactions() {
 	s.Equal(10, txQueue.Count(), "transaction count should be 10")
 
 	for i := 0; i < txqueue.DefaultTxQueueCap+5; i++ { // stress test by hitting with lots of goroutines
-		go s.Backend.SendTransaction(context.TODO(), common.SendTxArgs{}) // nolint: errcheck
+		wg.Add(1)
+		go func() {
+			s.Backend.SendTransaction(context.TODO(), common.SendTxArgs{}) // nolint: errcheck
+			wg.Done()
+		}()
 	}
 	time.Sleep(5 * time.Second)
+	wg.Wait()
 
 	s.True(txQueue.Count() <= txqueue.DefaultTxQueueCap, "transaction count should be %d (or %d): got %d", txqueue.DefaultTxQueueCap, txqueue.DefaultTxQueueCap-1, txQueue.Count())
 
