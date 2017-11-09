@@ -25,7 +25,7 @@ func TestTxQueueTestSuite(t *testing.T) {
 type TxQueueTestSuite struct {
 	suite.Suite
 	nodeManagerMockCtrl    *gomock.Controller
-	nodeManagerMock        *common.MockNodeManager
+	nodeManagerMock        *common.MockNodeManager ``
 	accountManagerMockCtrl *gomock.Controller
 	accountManagerMock     *common.MockAccountManager
 }

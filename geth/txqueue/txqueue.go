@@ -38,8 +38,7 @@ var (
 
 // TxQueue is capped container that holds pending transactions
 type TxQueue struct {
-	transactions  map[common.QueuedTxID]*common.QueuedTx
-	mu            sync.RWMutex // to guard transactions map
+	transactions  *transactions
 	evictableIDs  chan common.QueuedTxID
 	enqueueTicker chan struct{}
 	incomingPool  chan *common.QueuedTx
@@ -59,7 +58,7 @@ type TxQueue struct {
 func NewTransactionQueue() *TxQueue {
 	log.Info("initializing transaction queue")
 	return &TxQueue{
-		transactions:  make(map[common.QueuedTxID]*common.QueuedTx),
+		transactions:  newTransactions(),
 		evictableIDs:  make(chan common.QueuedTxID, DefaultTxQueueCap), // will be used to evict in FIFO
 		enqueueTicker: make(chan struct{}),
 		incomingPool:  make(chan *common.QueuedTx, DefaultTxSendQueueCap),
@@ -100,7 +99,7 @@ func (q *TxQueue) Stop() {
 func (q *TxQueue) evictionLoop() {
 	defer HaltOnPanic()
 	evict := func() {
-		if len(q.transactions) >= DefaultTxQueueCap { // eviction is required to accommodate another/last item
+		if q.transactions.len() >= DefaultTxQueueCap { // eviction is required to accommodate another/last item
 			q.Remove(<-q.evictableIDs)
 		}
 	}
@@ -141,10 +140,7 @@ func (q *TxQueue) enqueueLoop() {
 
 // Reset is to be used in tests only, as it simply creates new transaction map, w/o any cleanup of the previous one
 func (q *TxQueue) Reset() {
-	q.mu.Lock()
-	defer q.mu.Unlock()
-
-	q.transactions = make(map[common.QueuedTxID]*common.QueuedTx)
+	q.transactions.reset()
 	q.evictableIDs = make(chan common.QueuedTxID, DefaultTxQueueCap)
 }
 
@@ -170,9 +166,7 @@ func (q *TxQueue) Enqueue(tx *common.QueuedTx) error {
 	q.evictableIDs <- tx.ID // this will block when we hit DefaultTxQueueCap
 	log.Info("after evictableIDs")
 
-	q.mu.Lock()
-	q.transactions[tx.ID] = tx
-	q.mu.Unlock()
+	q.transactions.add(tx.ID, tx)
 
 	// notify handler
 	log.Info("calling txEnqueueHandler")
@@ -183,10 +177,7 @@ func (q *TxQueue) Enqueue(tx *common.QueuedTx) error {
 
 // Get returns transaction by transaction identifier
 func (q *TxQueue) Get(id common.QueuedTxID) (*common.QueuedTx, error) {
-	q.mu.RLock()
-	defer q.mu.RUnlock()
-
-	if tx, ok := q.transactions[id]; ok {
+	if tx, ok := q.transactions.get(id); ok {
 		return tx, nil
 	}
 
@@ -195,18 +186,12 @@ func (q *TxQueue) Get(id common.QueuedTxID) (*common.QueuedTx, error) {
 
 // Remove removes transaction by transaction identifier
 func (q *TxQueue) Remove(id common.QueuedTxID) {
-	q.mu.Lock()
-	defer q.mu.Unlock()
-
-	delete(q.transactions, id)
+	q.transactions.delete(id)
 }
 
 // StartProcessing marks a transaction as in progress. It's thread-safe and
 // prevents from processing the same transaction multiple times.
 func (q *TxQueue) StartProcessing(tx *common.QueuedTx) error {
-	q.mu.Lock()
-	defer q.mu.Unlock()
-
 	if tx.Hash != (gethcommon.Hash{}) || tx.Err != nil {
 		return ErrQueuedTxAlreadyProcessed
 	}
@@ -222,27 +207,17 @@ func (q *TxQueue) StartProcessing(tx *common.QueuedTx) error {
 
 // StopProcessing removes the "InProgress" flag from the transaction.
 func (q *TxQueue) StopProcessing(tx *common.QueuedTx) {
-	q.mu.Lock()
-	defer q.mu.Unlock()
-
 	tx.InProgress = false
 }
 
 // Count returns number of currently queued transactions
 func (q *TxQueue) Count() int {
-	q.mu.RLock()
-	defer q.mu.RUnlock()
-
-	return len(q.transactions)
+	return q.transactions.len()
 }
 
 // Has checks whether transaction with a given identifier exists in queue
 func (q *TxQueue) Has(id common.QueuedTxID) bool {
-	q.mu.RLock()
-	defer q.mu.RUnlock()
-
-	_, ok := q.transactions[id]
-
+	_, ok := q.transactions.get(id)
 	return ok
 }
 
