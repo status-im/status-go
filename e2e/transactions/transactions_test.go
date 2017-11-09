@@ -784,15 +784,17 @@ func (s *TransactionsTestSuite) TestEvictionOfQueuedTransactions() {
 
 	txQueue := s.Backend.TxQueueManager().TransactionQueue()
 
-	var i = 0
+	var i = int32(0)
 	txIDs := [txqueue.DefaultTxQueueCap + 5 + 10]common.QueuedTxID{}
 	txQueueMutex := sync.RWMutex{}
 	s.Backend.TxQueueManager().SetTransactionQueueHandler(func(queuedTx *common.QueuedTx) {
+		n := atomic.LoadInt32(&i)
+		log.Info("tx enqueued", "i", n+1, "queue size", txQueue.Count(), "id", queuedTx.ID)
 		txQueueMutex.Lock()
-		log.Info("tx enqueued", "i", i+1, "queue size", txQueue.Count(), "id", queuedTx.ID)
-		txIDs[i] = queuedTx.ID
-		i++
+		txIDs[n] = queuedTx.ID
 		txQueueMutex.Unlock()
+
+		atomic.AddInt32(&i, 1)
 	})
 
 	s.Zero(txQueue.Count(), "transaction count should be zero")
@@ -807,12 +809,14 @@ func (s *TransactionsTestSuite) TestEvictionOfQueuedTransactions() {
 	}
 	time.Sleep(2 * time.Second) // FIXME(tiabc): more reliable synchronization to ensure all transactions are enqueued
 
+	txQueueMutex.Lock()
 	log.Info(fmt.Sprintf("Number of transactions queued: %d. Queue size (shouldn't be more than %d): %d",
-		i, txqueue.DefaultTxQueueCap, txQueue.Count()))
+		atomic.LoadInt32(&i), txqueue.DefaultTxQueueCap, txQueue.Count()))
+	txQueueMutex.Unlock()
 
 	s.Equal(10, txQueue.Count(), "transaction count should be 10")
 
-	for i := 0; i < txqueue.DefaultTxQueueCap+5; i++ { // stress test by hitting with lots of goroutines
+	for j := 0; j < txqueue.DefaultTxQueueCap+5; j++ { // stress test by hitting with lots of goroutines
 		wg.Add(1)
 		go func() {
 			s.Backend.SendTransaction(context.TODO(), common.SendTxArgs{}) // nolint: errcheck
