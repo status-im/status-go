@@ -268,9 +268,12 @@ func (s *TxQueueTestSuite) TestDiscardTransaction() {
 
 	err := txQueueManager.QueueTransaction(tx)
 	s.NoError(err)
+
+	doneCh := make(chan struct{})
 	go func() {
 		discardErr := txQueueManager.DiscardTransaction(tx.ID)
 		s.NoError(discardErr)
+		close(doneCh)
 	}()
 
 	err = txQueueManager.WaitForTransaction(tx)
@@ -279,4 +282,6 @@ func (s *TxQueueTestSuite) TestDiscardTransaction() {
 	s.Equal(ErrQueuedTxDiscarded, tx.Err)
 	// Transaction should be already removed from the queue.
 	s.False(txQueueManager.TransactionQueue().Has(tx.ID))
+
+	<-doneCh
 }

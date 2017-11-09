@@ -175,16 +175,19 @@ func (q *TxQueue) Enqueue(tx *common.QueuedTx) error {
 	return nil
 }
 
-// Get returns transaction by transaction identifier
+// Get returns transaction by transaction identifier.
 func (q *TxQueue) Get(id common.QueuedTxID) (*common.QueuedTx, error) {
-	if tx, ok := q.transactions.get(id); ok {
-		return tx, nil
+	tx, ok := q.transactions.get(id)
+	if !ok {
+		return nil, ErrQueuedTxIDNotFound
 	}
 
-	return nil, ErrQueuedTxIDNotFound
+	txValue := *tx
+
+	return &txValue, nil
 }
 
-// Remove removes transaction by transaction identifier
+// Remove removes transaction by transaction identifier.
 func (q *TxQueue) Remove(id common.QueuedTxID) {
 	q.transactions.delete(id)
 }
