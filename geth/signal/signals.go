@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 
 	"github.com/status-im/status-go/geth/log"
+	"sync"
 )
 
 const (
@@ -47,14 +48,21 @@ type NodeNotificationHandler func(jsonEvent string)
 
 var notificationHandler NodeNotificationHandler = TriggerDefaultNodeNotificationHandler
 
+// notificationHandlerMutex needs to remove data races on SetDefaultNodeNotificationHandler,ResetDefaultNodeNotificationHandler
+var notificationHandlerMutex sync.RWMutex
+
 // SetDefaultNodeNotificationHandler sets notification handler to invoke on Send
 func SetDefaultNodeNotificationHandler(fn NodeNotificationHandler) {
+	notificationHandlerMutex.Lock()
 	notificationHandler = fn
+	notificationHandlerMutex.Unlock()
 }
 
 // ResetDefaultNodeNotificationHandler sets notification handler to default one
 func ResetDefaultNodeNotificationHandler() {
+	notificationHandlerMutex.Lock()
 	notificationHandler = TriggerDefaultNodeNotificationHandler
+	notificationHandlerMutex.Unlock()
 }
 
 // TriggerDefaultNodeNotificationHandler triggers default notification handler (helpful in tests)
@@ -71,7 +79,9 @@ func Send(signal Envelope) {
 //export NotifyNode
 //nolint: golint
 func NotifyNode(jsonEvent *C.char) {
+	notificationHandlerMutex.RLock()
 	notificationHandler(C.GoString(jsonEvent))
+	notificationHandlerMutex.RUnlock()
 }
 
 //export TriggerTestSignal
