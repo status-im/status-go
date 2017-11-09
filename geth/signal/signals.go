@@ -80,8 +80,8 @@ func Send(signal Envelope) {
 //nolint: golint
 func NotifyNode(jsonEvent *C.char) {
 	notificationHandlerMutex.RLock()
+	defer notificationHandlerMutex.RUnlock()
 	notificationHandler(C.GoString(jsonEvent))
-	notificationHandlerMutex.RUnlock()
 }
 
 //export TriggerTestSignal
