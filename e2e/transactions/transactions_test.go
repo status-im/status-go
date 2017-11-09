@@ -682,16 +682,16 @@ func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
 	}
 
 	// wait for transactions, and discard immediately
-	discardTxs := func(txIDs []common.QueuedTxID) {
-		txIDs = append(txIDs, "invalid-tx-id")
+	discardTxs := func(txIDList []common.QueuedTxID) {
+		txIDList = append(txIDList, "invalid-tx-id")
 
 		// discard
-		discardResults := s.Backend.DiscardTransactions(txIDs)
+		discardResults := s.Backend.DiscardTransactions(txIDList)
 		s.Len(discardResults, 1, "cannot discard txs: %v", discardResults)
 		s.Error(discardResults["invalid-tx-id"].Error, "transaction hash not found", "cannot discard txs: %v", discardResults)
 
 		// try completing discarded transaction
-		completeResults := s.Backend.CompleteTransactions(txIDs, TestConfig.Account1.Password)
+		completeResults := s.Backend.CompleteTransactions(txIDList, TestConfig.Account1.Password)
 		s.Len(completeResults, testTxCount+1, "unexpected number of errors (call to CompleteTransaction should not succeed)")
 
 		for _, txResult := range completeResults {
@@ -701,7 +701,7 @@ func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
 
 		time.Sleep(1 * time.Second) // make sure that tx complete signal propagates
 
-		for _, txID := range txIDs {
+		for _, txID := range txIDList {
 			s.False(
 				s.Backend.TxQueueManager().TransactionQueue().Has(txID),
 				"txqueue should not have test tx at this point (it should be discarded): %s",
@@ -709,6 +709,9 @@ func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
 			)
 		}
 	}
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
 	go func() {
 		ids := make([]common.QueuedTxID, testTxCount)
 		for i := 0; i < testTxCount; i++ {
@@ -716,11 +719,16 @@ func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
 		}
 
 		discardTxs(ids)
+		wg.Done()
 	}()
 
 	// send multiple transactions
 	for i := 0; i < testTxCount; i++ {
-		go sendTx()
+		wg.Add(1)
+		go func() {
+			sendTx()
+			wg.Done()
+		}()
 	}
 
 	select {
@@ -729,6 +737,7 @@ func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
 		s.FailNow("test timed out")
 	}
 
+	wg.Wait()
 	s.Zero(s.Backend.TxQueueManager().TransactionQueue().Count(), "tx queue must be empty at this point")
 }
 
