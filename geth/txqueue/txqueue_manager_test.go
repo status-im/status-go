@@ -25,7 +25,7 @@ func TestTxQueueTestSuite(t *testing.T) {
 type TxQueueTestSuite struct {
 	suite.Suite
 	nodeManagerMockCtrl    *gomock.Controller
-	nodeManagerMock        *common.MockNodeManager ``
+	nodeManagerMock        *common.MockNodeManager
 	accountManagerMockCtrl *gomock.Controller
 	accountManagerMock     *common.MockAccountManager
 }
@@ -80,9 +80,11 @@ func (s *TxQueueTestSuite) TestCompleteTransaction() {
 	err := txQueueManager.QueueTransaction(tx)
 	s.NoError(err)
 
+	completeCh := make(chan struct{})
 	go func() {
 		_, errCompleteTransaction := txQueueManager.CompleteTransaction(tx.ID, TestConfig.Account1.Password)
 		s.Equal(errTxAssumedSent, errCompleteTransaction)
+		close(completeCh)
 	}()
 
 	err = txQueueManager.WaitForTransaction(tx)
@@ -91,6 +93,8 @@ func (s *TxQueueTestSuite) TestCompleteTransaction() {
 	s.Equal(errTxAssumedSent, tx.Err)
 	// Transaction should be already removed from the queue.
 	s.False(txQueueManager.TransactionQueue().Has(tx.ID))
+
+	<-completeCh
 }
 
 func (s *TxQueueTestSuite) TestCompleteTransactionMultipleTimes() {
