@@ -168,13 +168,6 @@ func newSuccessResponse(result json.RawMessage, id json.RawMessage) string {
 		id = defaultMsgID
 	}
 
-	// original response with `null` is lost due to geth RPC client
-	// conversion (unmarshalling). We'll have nil result object in this case,
-	// so handle it specially. `result` is required field in response.
-	if result == nil {
-		result = json.RawMessage("null")
-	}
-
 	msg := &jsonrpcSuccessfulResponse{
 		jsonrpcMessage: jsonrpcMessage{
 			ID:      id,
