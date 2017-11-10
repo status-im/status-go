@@ -42,10 +42,10 @@ func TestUnmarshalMessage(t *testing.T) {
 	got, err := unmarshalMessage(body)
 	require.NoError(t, err)
 
-	expected := &jsonrpcMessage{
-		Version: "2.0",
-		Method:  "subtract",
-		Params:  json.RawMessage(`{"subtrahend": 23, "minuend": 42}`),
+	expected := &jsonrpcRequest{
+		jsonrpcMessage: jsonrpcMessage{Version: "2.0"},
+		Method:         "subtract",
+		Params:         json.RawMessage(`{"subtrahend": 23, "minuend": 42}`),
 	}
 	require.Equal(t, expected, got)
 }

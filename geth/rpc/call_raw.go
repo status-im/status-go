@@ -28,20 +28,31 @@ func (c *Client) CallRaw(body string) string {
 	return c.callRawContext(ctx, json.RawMessage(body))
 }
 
-// jsonrpcMessage represents JSON-RPC request, notification, successful response or
-// error response.
+// jsonrpcMessage represents JSON-RPC message
 type jsonrpcMessage struct {
 	Version string          `json:"jsonrpc"`
-	ID      json.RawMessage `json:"id,omitempty"`
-	Method  string          `json:"method,omitempty"`
-	Params  json.RawMessage `json:"params,omitempty"`
-	Error   *jsonError      `json:"error,omitempty"`
-	Result  json.RawMessage `json:"result,omitempty"`
+	ID      json.RawMessage `json:"id"`
+}
+
+type jsonrpcRequest struct {
+	jsonrpcMessage
+	Method string          `json:"method"`
+	Params json.RawMessage `json:"params,omitempty"`
+}
+
+type jsonrpcSuccessfulResponse struct {
+	jsonrpcMessage
+	Result json.RawMessage `json:"result"`
+}
+
+type jsonrpcErrorResponse struct {
+	jsonrpcMessage
+	Error *jsonError `json:"error,omitempty"`
 }
 
 // jsonError represents Error message for JSON-RPC responses.
 type jsonError struct {
-	Code    int         `json:"code,omitempty"`
+	Code    int         `json:"code"`
 	Message string      `json:"message"`
 	Data    interface{} `json:"data,omitempty"`
 }
@@ -146,8 +157,8 @@ func methodAndParamsFromBody(body json.RawMessage) (string, []interface{}, json.
 }
 
 // unmarshalMessage tries to unmarshal JSON-RPC message.
-func unmarshalMessage(body json.RawMessage) (*jsonrpcMessage, error) {
-	var msg jsonrpcMessage
+func unmarshalMessage(body json.RawMessage) (*jsonrpcRequest, error) {
+	var msg jsonrpcRequest
 	err := json.Unmarshal(body, &msg)
 	return &msg, err
 }
@@ -164,10 +175,12 @@ func newSuccessResponse(result json.RawMessage, id json.RawMessage) string {
 		result = json.RawMessage("null")
 	}
 
-	msg := &jsonrpcMessage{
-		ID:      id,
-		Version: jsonrpcVersion,
-		Result:  result,
+	msg := &jsonrpcSuccessfulResponse{
+		jsonrpcMessage: jsonrpcMessage{
+			ID:      id,
+			Version: jsonrpcVersion,
+		},
+		Result: result,
 	}
 	data, _ := json.Marshal(msg)
 	return string(data)
@@ -178,9 +191,11 @@ func newErrorResponse(code int, err error, id json.RawMessage) string {
 		id = defaultMsgID
 	}
 
-	errMsg := &jsonrpcMessage{
-		Version: jsonrpcVersion,
-		ID:      id,
+	errMsg := &jsonrpcErrorResponse{
+		jsonrpcMessage: jsonrpcMessage{
+			ID:      id,
+			Version: jsonrpcVersion,
+		},
 		Error: &jsonError{
 			Code:    code,
 			Message: err.Error(),
