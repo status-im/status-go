@@ -786,13 +786,10 @@ func (s *TransactionsTestSuite) TestEvictionOfQueuedTransactions() {
 
 	var i = int32(0)
 	txIDs := [txqueue.DefaultTxQueueCap + 5 + 10]common.QueuedTxID{}
-	txQueueMutex := sync.RWMutex{}
 	s.Backend.TxQueueManager().SetTransactionQueueHandler(func(queuedTx *common.QueuedTx) {
 		n := atomic.LoadInt32(&i)
 		log.Info("tx enqueued", "i", n+1, "queue size", txQueue.Count(), "id", queuedTx.ID())
-		txQueueMutex.Lock()
 		txIDs[n] = queuedTx.ID()
-		txQueueMutex.Unlock()
 
 		atomic.AddInt32(&i, 1)
 	})
@@ -809,10 +806,8 @@ func (s *TransactionsTestSuite) TestEvictionOfQueuedTransactions() {
 	}
 	time.Sleep(2 * time.Second) // FIXME(tiabc): more reliable synchronization to ensure all transactions are enqueued
 
-	txQueueMutex.Lock()
 	log.Info(fmt.Sprintf("Number of transactions queued: %d. Queue size (shouldn't be more than %d): %d",
 		atomic.LoadInt32(&i), txqueue.DefaultTxQueueCap, txQueue.Count()))
-	txQueueMutex.Unlock()
 
 	s.Equal(10, txQueue.Count(), "transaction count should be 10")
 
@@ -828,11 +823,9 @@ func (s *TransactionsTestSuite) TestEvictionOfQueuedTransactions() {
 
 	s.True(txQueue.Count() <= txqueue.DefaultTxQueueCap, "transaction count should be %d (or %d): got %d", txqueue.DefaultTxQueueCap, txqueue.DefaultTxQueueCap-1, txQueue.Count())
 
-	txQueueMutex.Lock()
 	for _, txID := range txIDs {
 		txQueue.Remove(txID)
 	}
-	txQueueMutex.Unlock()
 
 	s.Zero(txQueue.Count(), "transaction count should be zero: %d", txQueue.Count())
 }
