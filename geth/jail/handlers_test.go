@@ -14,6 +14,7 @@ import (
 	"github.com/status-im/status-go/geth/rpc"
 	"github.com/status-im/status-go/geth/signal"
 	"github.com/stretchr/testify/suite"
+	"sync/atomic"
 )
 
 func TestHandlersTestSuite(t *testing.T) {
@@ -24,14 +25,14 @@ type HandlersTestSuite struct {
 	suite.Suite
 	responseFixture string
 	ts              *httptest.Server
-	tsCalls         int
+	tsCalls         int32
 	client          *gethrpc.Client
 }
 
 func (s *HandlersTestSuite) SetupTest() {
 	s.responseFixture = `{"json-rpc":"2.0","id":10,"result":true}`
 	s.ts = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		s.tsCalls++
+		atomic.AddInt32(&s.tsCalls,1)
 		fmt.Fprintln(w, s.responseFixture)
 	}))
 
@@ -112,7 +113,7 @@ func (s *HandlersTestSuite) TestWeb3SendAsyncHandlerWithoutCallbackSuccess() {
 	// As there is no callback, it's not possible to detect when
 	// the request hit the server.
 	time.Sleep(time.Millisecond * 100)
-	s.Equal(1, s.tsCalls)
+	s.Equal(int32(1), atomic.LoadInt32(&s.tsCalls))
 }
 
 func (s *HandlersTestSuite) TestWeb3SendAsyncHandlerFailure() {
