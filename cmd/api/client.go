@@ -55,3 +55,20 @@ func (c *Client) StatusStopNode() error {
 	var reply NoReply
 	return c.client.Call("Status.StopNode", args, &reply)
 }
+
+// StatusLogin logs in to the given address.
+func (c *Client) StatusLogin(address, password string) error {
+	args := LoginArgs{
+		Address:  address,
+		Password: password,
+	}
+	var reply NoReply
+	return c.client.Call("Status.Login", args, &reply)
+}
+
+// StatusLogout logs the current user out.
+func (c *Client) StatusLogout() error {
+	var args NoArgs
+	var reply NoReply
+	return c.client.Call("Status.Logout", args, &reply)
+}

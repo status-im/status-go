@@ -52,16 +52,9 @@ func TestConnectClient(t *testing.T) {
 // client command.
 func TestStartStopNode(t *testing.T) {
 	assert := assert.New(t)
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "status-start-stop-node")
+	configJSON, cleanup, err := mkConfigJSON("status-start-stop-node")
 	assert.NoError(err)
-	defer os.RemoveAll(tmpDir) //nolint: errcheck
-
-	configJSON := `{
-		"NetworkId": ` + strconv.Itoa(params.RopstenNetworkID) + `,
-		"DataDir": "` + tmpDir + `",
-		"LogLevel": "INFO",
-		"RPCEnabled": true
-	}`
+	defer cleanup()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -78,4 +71,25 @@ func TestStartStopNode(t *testing.T) {
 	err = clnt.StatusStopNode()
 	assert.NoError(err)
 	assert.NoError(srv.Err())
+}
+
+//-----
+// HELPERS
+//-----
+
+func mkConfigJSON(name string) (string, func(), error) {
+	tmpDir, err := ioutil.TempDir(os.TempDir(), name)
+	if err != nil {
+		return "", nil, err
+	}
+	cleanup := func() {
+		os.RemoveAll(tmpDir) //nolint: errcheck
+	}
+	configJSON := `{
+		"NetworkId": ` + strconv.Itoa(params.RopstenNetworkID) + `,
+		"DataDir": "` + tmpDir + `",
+		"LogLevel": "INFO",
+		"RPCEnabled": true
+	}`
+	return configJSON, cleanup, nil
 }
