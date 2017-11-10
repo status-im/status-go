@@ -123,8 +123,8 @@ func (s *JailRPCTestSuite) TestContractDeployment() {
 	var txHash gethcommon.Hash
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var envelope signal.Envelope
-		err = json.Unmarshal([]byte(jsonEvent), &envelope)
-		s.NoError(err, "cannot unmarshal JSON: %s", jsonEvent)
+		er := json.Unmarshal([]byte(jsonEvent), &envelope)
+		s.NoError(er, "cannot unmarshal JSON: %s", jsonEvent)
 
 		if envelope.Type == txqueue.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
@@ -133,8 +133,8 @@ func (s *JailRPCTestSuite) TestContractDeployment() {
 			s.NoError(s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 
 			txID := event["id"].(string)
-			txHash, err = s.Backend.CompleteTransaction(common.QueuedTxID(txID), TestConfig.Account1.Password)
-			if s.NoError(err, event["id"]) {
+			txHash, er = s.Backend.CompleteTransaction(common.QueuedTxID(txID), TestConfig.Account1.Password)
+			if s.NoError(er, event["id"]) {
 				s.T().Logf("contract transaction complete, URL: %s", "https://ropsten.etherscan.io/tx/"+txHash.Hex())
 			}
 
