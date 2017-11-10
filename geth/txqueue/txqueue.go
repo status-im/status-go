@@ -126,10 +126,10 @@ func (q *TxQueue) enqueueLoop() {
 	for {
 		select {
 		case queuedTx := <-q.incomingPool:
-			log.Info("transaction enqueued requested", "tx", queuedTx.ID)
+			log.Info("transaction enqueued requested", "tx", queuedTx.ID())
 			err := q.Enqueue(queuedTx)
 			log.Warn("transaction enqueued error", "tx", err)
-			log.Info("transaction enqueued", "tx", queuedTx.ID)
+			log.Info("transaction enqueued", "tx", queuedTx.ID())
 		case <-q.stopped:
 			log.Info("transaction queue's enqueue loop stopped")
 			q.stoppedGroup.Done()
@@ -153,7 +153,7 @@ func (q *TxQueue) EnqueueAsync(tx *common.QueuedTx) error {
 
 // Enqueue enqueues incoming transaction
 func (q *TxQueue) Enqueue(tx *common.QueuedTx) error {
-	log.Info(fmt.Sprintf("enqueue transaction: %s", tx.ID))
+	log.Info(fmt.Sprintf("enqueue transaction: %s", tx.ID()))
 
 	if q.txEnqueueHandler == nil { //discard, until handler is provided
 		log.Info("there is no txEnqueueHandler")
@@ -163,10 +163,10 @@ func (q *TxQueue) Enqueue(tx *common.QueuedTx) error {
 	log.Info("before enqueueTicker")
 	q.enqueueTicker <- struct{}{} // notify eviction loop that we are trying to insert new item
 	log.Info("before evictableIDs")
-	q.evictableIDs <- tx.ID // this will block when we hit DefaultTxQueueCap
+	q.evictableIDs <- tx.ID() // this will block when we hit DefaultTxQueueCap
 	log.Info("after evictableIDs")
 
-	q.transactions.add(tx.ID, tx)
+	q.transactions.add(tx.ID(), tx)
 
 	// notify handler
 	log.Info("calling txEnqueueHandler")
@@ -175,19 +175,22 @@ func (q *TxQueue) Enqueue(tx *common.QueuedTx) error {
 	return nil
 }
 
-// Get returns transaction by transaction identifier.
+// Get returns transaction by transaction identifier
 func (q *TxQueue) Get(id common.QueuedTxID) (*common.QueuedTx, error) {
 	tx, ok := q.transactions.get(id)
 	if !ok {
 		return nil, ErrQueuedTxIDNotFound
 	}
 
-	txValue := *tx
-
-	return &txValue, nil
+	return tx, nil
 }
 
-// Remove removes transaction by transaction identifier.
+// Set transaction by transaction identifier
+func (q *TxQueue) Set(id common.QueuedTxID, tx *common.QueuedTx) {
+	q.transactions.add(id, tx)
+}
+
+// Remove removes transaction by transaction identifier
 func (q *TxQueue) Remove(id common.QueuedTxID) {
 	q.transactions.delete(id)
 }
@@ -195,22 +198,22 @@ func (q *TxQueue) Remove(id common.QueuedTxID) {
 // StartProcessing marks a transaction as in progress. It's thread-safe and
 // prevents from processing the same transaction multiple times.
 func (q *TxQueue) StartProcessing(tx *common.QueuedTx) error {
-	if tx.Hash != (gethcommon.Hash{}) || tx.Err != nil {
+	if tx.Hash() != (gethcommon.Hash{}) || tx.Err() != nil {
 		return ErrQueuedTxAlreadyProcessed
 	}
 
-	if tx.InProgress {
+	if tx.InProgress() {
 		return ErrQueuedTxInProgress
 	}
 
-	tx.InProgress = true
+	tx.SetInProgress(true)
 
 	return nil
 }
 
 // StopProcessing removes the "InProgress" flag from the transaction.
 func (q *TxQueue) StopProcessing(tx *common.QueuedTx) {
-	tx.InProgress = false
+	tx.SetInProgress(false)
 }
 
 // Count returns number of currently queued transactions
@@ -248,7 +251,7 @@ func (q *TxQueue) NotifyOnQueuedTxReturn(queuedTx *common.QueuedTx, err error) {
 
 	// on success, remove item from the queue and stop propagating
 	if err == nil {
-		q.Remove(queuedTx.ID)
+		q.Remove(queuedTx.ID())
 		return
 	}
 
@@ -263,7 +266,7 @@ func (q *TxQueue) NotifyOnQueuedTxReturn(queuedTx *common.QueuedTx, err error) {
 		ErrInvalidCompleteTxSender: true, // completing tx create from another account
 	}
 	if !transientErrs[err] { // remove only on unrecoverable errors
-		q.Remove(queuedTx.ID)
+		q.Remove(queuedTx.ID())
 	}
 
 	// notify handler

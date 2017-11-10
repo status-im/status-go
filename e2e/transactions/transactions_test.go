@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"math/big"
 	"reflect"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -21,8 +23,6 @@ import (
 	"github.com/status-im/status-go/geth/txqueue"
 	. "github.com/status-im/status-go/testing"
 	"github.com/stretchr/testify/suite"
-	"sync"
-	"sync/atomic"
 )
 
 func TestTransactionsTestSuite(t *testing.T) {
@@ -789,9 +789,9 @@ func (s *TransactionsTestSuite) TestEvictionOfQueuedTransactions() {
 	txQueueMutex := sync.RWMutex{}
 	s.Backend.TxQueueManager().SetTransactionQueueHandler(func(queuedTx *common.QueuedTx) {
 		n := atomic.LoadInt32(&i)
-		log.Info("tx enqueued", "i", n+1, "queue size", txQueue.Count(), "id", queuedTx.ID)
+		log.Info("tx enqueued", "i", n+1, "queue size", txQueue.Count(), "id", queuedTx.ID())
 		txQueueMutex.Lock()
-		txIDs[n] = queuedTx.ID
+		txIDs[n] = queuedTx.ID()
 		txQueueMutex.Unlock()
 
 		atomic.AddInt32(&i, 1)

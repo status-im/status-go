@@ -213,7 +213,7 @@ func (m *StatusBackend) SendTransaction(ctx context.Context, args common.SendTxA
 		return gethcommon.Hash{}, err
 	}
 
-	return tx.Hash, nil
+	return tx.Hash(), nil
 }
 
 // CompleteTransaction instructs backend to complete sending of a given transaction

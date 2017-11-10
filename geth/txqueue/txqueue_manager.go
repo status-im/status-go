@@ -79,23 +79,16 @@ func (m *Manager) TransactionQueue() common.TxQueue {
 
 // CreateTransaction returns a transaction object.
 func (m *Manager) CreateTransaction(ctx context.Context, args common.SendTxArgs) *common.QueuedTx {
-	return &common.QueuedTx{
-		ID:      common.QueuedTxID(uuid.New()),
-		Hash:    gethcommon.Hash{},
-		Context: ctx,
-		Args:    args,
-		Done:    make(chan struct{}, 1),
-		Discard: make(chan struct{}, 1),
-	}
+	return common.NewQueuedTx(common.QueuedTxID(uuid.New()), ctx, args)
 }
 
 // QueueTransaction puts a transaction into the queue.
 func (m *Manager) QueueTransaction(tx *common.QueuedTx) error {
 	to := "<nil>"
-	if tx.Args.To != nil {
-		to = tx.Args.To.Hex()
+	if tx.Args().To != nil {
+		to = tx.Args().To.Hex()
 	}
-	log.Info("queue a new transaction", "id", tx.ID, "from", tx.Args.From.Hex(), "to", to)
+	log.Info("queue a new transaction", "id", tx.ID(), "from", tx.Args().From.Hex(), "to", to)
 
 	return m.txQueue.Enqueue(tx)
 }
@@ -103,17 +96,18 @@ func (m *Manager) QueueTransaction(tx *common.QueuedTx) error {
 // WaitForTransaction adds a transaction to the queue and blocks
 // until it's completed, discarded or times out.
 func (m *Manager) WaitForTransaction(tx *common.QueuedTx) error {
-	log.Info("wait for transaction", "id", tx.ID)
+	log.Info("wait for transaction", "id", tx.ID())
 
 	// now wait up until transaction is:
 	// - completed (via CompleteQueuedTransaction),
 	// - discarded (via DiscardQueuedTransaction)
 	// - or times out
 	select {
-	case <-tx.Done:
-		m.NotifyOnQueuedTxReturn(tx, tx.Err)
-		return tx.Err
-	case <-tx.Discard:
+	case <-tx.Done():
+		err := tx.Err()
+		m.NotifyOnQueuedTxReturn(tx, err)
+		return tx.Err()
+	case <-tx.Discard():
 		m.NotifyOnQueuedTxReturn(tx, ErrQueuedTxDiscarded)
 		return ErrQueuedTxDiscarded
 	case <-time.After(DefaultTxSendCompletionTimeout * time.Second):
@@ -152,7 +146,7 @@ func (m *Manager) CompleteTransaction(id common.QueuedTxID, password string) (ge
 	}
 
 	// make sure that only account which created the tx can complete it
-	if queuedTx.Args.From.Hex() != selectedAccount.Address.Hex() {
+	if queuedTx.Args().From.Hex() != selectedAccount.Address.Hex() {
 		log.Warn("queued transaction does not belong to the selected account", "err", ErrInvalidCompleteTxSender)
 		m.NotifyOnQueuedTxReturn(queuedTx, ErrInvalidCompleteTxSender)
 		return gethcommon.Hash{}, ErrInvalidCompleteTxSender
@@ -181,11 +175,12 @@ func (m *Manager) CompleteTransaction(id common.QueuedTxID, password string) (ge
 		return hash, err
 	}
 
-	log.Info("finally completed transaction", "id", queuedTx.ID, "hash", hash, "err", err)
+	log.Info("finally completed transaction", "id", queuedTx.ID(), "hash", hash, "err", err)
 
-	queuedTx.Hash = hash
-	queuedTx.Err = err
-	queuedTx.Done <- struct{}{}
+	queuedTx.SetHash(hash)
+	queuedTx.SetErr(err)
+	queuedTx.Done() <- struct{}{}
+	m.txQueue.Set(id, queuedTx)
 
 	return hash, err
 }
@@ -193,7 +188,7 @@ func (m *Manager) CompleteTransaction(id common.QueuedTxID, password string) (ge
 const cancelTimeout = time.Minute
 
 func (m *Manager) completeLocalTransaction(queuedTx *common.QueuedTx, password string) (gethcommon.Hash, error) {
-	log.Info("complete transaction using local node", "id", queuedTx.ID)
+	log.Info("complete transaction using local node", "id", queuedTx.ID())
 
 	les, err := m.nodeManager.LightEthereumService()
 	if err != nil {
@@ -203,11 +198,11 @@ func (m *Manager) completeLocalTransaction(queuedTx *common.QueuedTx, password s
 	ctx, cancel := context.WithTimeout(context.Background(), cancelTimeout)
 	defer cancel()
 
-	return les.StatusBackend.SendTransaction(ctx, status.SendTxArgs(queuedTx.Args), password)
+	return les.StatusBackend.SendTransaction(ctx, status.SendTxArgs(queuedTx.Args()), password)
 }
 
 func (m *Manager) completeRemoteTransaction(queuedTx *common.QueuedTx, password string) (gethcommon.Hash, error) {
-	log.Info("complete transaction using upstream node", "id", queuedTx.ID)
+	log.Info("complete transaction using upstream node", "id", queuedTx.ID())
 
 	var emptyHash gethcommon.Hash
 
@@ -233,12 +228,12 @@ func (m *Manager) completeRemoteTransaction(queuedTx *common.QueuedTx, password 
 
 	var txCount hexutil.Uint
 	client := m.nodeManager.RPCClient()
-	err = client.CallContext(ctx, &txCount, "eth_getTransactionCount", queuedTx.Args.From, "pending")
+	err = client.CallContext(ctx, &txCount, "eth_getTransactionCount", queuedTx.Args().From, "pending")
 	if err != nil {
 		return emptyHash, err
 	}
 
-	args := queuedTx.Args
+	args := queuedTx.Args()
 
 	if args.GasPrice == nil {
 		value, gasPriceErr := m.gasPrice()
@@ -247,6 +242,7 @@ func (m *Manager) completeRemoteTransaction(queuedTx *common.QueuedTx, password 
 		}
 
 		args.GasPrice = value
+		queuedTx.SetArgs(args)
 	}
 
 	chainID := big.NewInt(int64(config.NetworkID))
@@ -379,11 +375,11 @@ func (m *Manager) DiscardTransaction(id common.QueuedTxID) error {
 	}
 
 	// remove from queue, before notifying SendTransaction
-	m.txQueue.Remove(queuedTx.ID)
+	m.txQueue.Remove(queuedTx.ID())
 
 	// allow SendTransaction to return
-	queuedTx.Err = ErrQueuedTxDiscarded
-	queuedTx.Discard <- struct{}{} // sendTransaction() waits on this, notify so that it can return
+	queuedTx.SetErr(ErrQueuedTxDiscarded)
+	queuedTx.Discard() <- struct{}{} // sendTransaction() waits on this, notify so that it can return
 
 	return nil
 }
@@ -418,9 +414,9 @@ func (m *Manager) TransactionQueueHandler() func(queuedTx *common.QueuedTx) {
 		signal.Send(signal.Envelope{
 			Type: EventTransactionQueued,
 			Event: SendTransactionEvent{
-				ID:        string(queuedTx.ID),
-				Args:      queuedTx.Args,
-				MessageID: common.MessageIDFromContext(queuedTx.Context),
+				ID:        string(queuedTx.ID()),
+				Args:      queuedTx.Args(),
+				MessageID: common.MessageIDFromContext(queuedTx.Context()),
 			},
 		})
 	}
@@ -457,9 +453,9 @@ func (m *Manager) TransactionReturnHandler() func(queuedTx *common.QueuedTx, err
 		signal.Send(signal.Envelope{
 			Type: EventTransactionFailed,
 			Event: ReturnSendTransactionEvent{
-				ID:           string(queuedTx.ID),
-				Args:         queuedTx.Args,
-				MessageID:    common.MessageIDFromContext(queuedTx.Context),
+				ID:           string(queuedTx.ID()),
+				Args:         queuedTx.Args(),
+				MessageID:    common.MessageIDFromContext(queuedTx.Context()),
 				ErrorMessage: err.Error(),
 				ErrorCode:    m.sendTransactionErrorCode(err),
 			},
@@ -501,5 +497,5 @@ func (m *Manager) SendTransactionRPCHandler(ctx context.Context, args ...interfa
 		return nil, err
 	}
 
-	return tx.Hash.Hex(), nil
+	return tx.Hash().Hex(), nil
 }

@@ -6,7 +6,7 @@ import (
 	"github.com/status-im/status-go/geth/common"
 )
 
-// transactions holds
+// transactions safely holds queued transactions.
 type transactions struct {
 	m map[common.QueuedTxID]*common.QueuedTx
 	l sync.RWMutex
