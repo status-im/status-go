@@ -48,7 +48,7 @@ type NodeNotificationHandler func(jsonEvent string)
 
 var notificationHandler NodeNotificationHandler = TriggerDefaultNodeNotificationHandler
 
-// notificationHandlerMutex needs to remove data races on SetDefaultNodeNotificationHandler,ResetDefaultNodeNotificationHandler
+// notificationHandlerMutex guards notificationHandler for concurrent calls
 var notificationHandlerMutex sync.RWMutex
 
 // SetDefaultNodeNotificationHandler sets notification handler to invoke on Send
