@@ -77,4 +77,5 @@ func TestStartStopNode(t *testing.T) {
 
 	err = clnt.StatusStopNode()
 	assert.NoError(err)
+	assert.NoError(srv.Err())
 }
