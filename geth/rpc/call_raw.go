@@ -47,7 +47,7 @@ type jsonrpcSuccessfulResponse struct {
 
 type jsonrpcErrorResponse struct {
 	jsonrpcMessage
-	Error *jsonError `json:"error,omitempty"`
+	Error *jsonError `json:"error"`
 }
 
 // jsonError represents Error message for JSON-RPC responses.
