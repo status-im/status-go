@@ -111,7 +111,7 @@ test-e2e: ##@tests Run e2e tests
 	go test -timeout 5m ./e2e/accounts/... -network=$(networkid)
 	go test -timeout 5m ./e2e/api/... -network=$(networkid)
 	go test -timeout 5m ./e2e/node/... -network=$(networkid)
-	go test -timeout 30m ./e2e/jail/... -network=$(networkid)
+	go test -timeout 50m ./e2e/jail/... -network=$(networkid)
 	go test -timeout 20m ./e2e/rpc/... -network=$(networkid)
 	go test -timeout 20m ./e2e/whisper/... -network=$(networkid)
 	go test -timeout 10m ./e2e/transactions/... -network=$(networkid)
