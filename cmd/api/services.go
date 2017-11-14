@@ -7,32 +7,6 @@ import (
 	"github.com/status-im/status-go/geth/params"
 )
 
-// NoArgs has to be used when a remote function needs
-// no concrete argument for its work.
-type NoArgs bool
-
-// NoReply has to be used when a remote function provides
-// no concrete reply beside a potential error.
-type NoReply bool
-
-// ConfigArgs is used to pass a configuration as argument.
-type ConfigArgs struct {
-	Config string
-}
-
-// LoginArgs is used to pass the combination of address and
-// password as argument.
-type LoginArgs struct {
-	Address  string
-	Password string
-}
-
-// StringsReply is used to return a number of strings. Need
-// to be wrapped.
-type StringsReply struct {
-	Strings []string
-}
-
 // adminService exposes functions for administrative tasks.
 type adminService struct{}
 
@@ -76,21 +50,28 @@ func (svc *statusService) StartNode(args *ConfigArgs, reply *NoReply) error {
 		return err
 	}
 
-	_, err = svc.statusAPI.StartNodeAsync(config)
-	return err
+	return svc.statusAPI.StartNode(config)
 }
 
 // StopNode starts the stopped node.
 func (svc *statusService) StopNode(args *NoArgs, reply *NoReply) error {
-	_, err := svc.statusAPI.StopNodeAsync()
-	return err
+	return svc.statusAPI.StopNode()
 }
 
-// Login loads the key file for the given address, tries to decrypt it
-// using the password to verify the ownership. If verified it purges all
-// previous identities from Whisper and injects verified key as ssh
-// identity.
-func (svc *statusService) Login(args *LoginArgs, reply *NoReply) error {
+// CreateAccount creates an internal geth account.
+func (svc *statusService) CreateAccount(args *AccountArgs, reply *AccountReply) error {
+	address, publicKey, mnemonic, err := svc.statusAPI.CreateAccount(args.Password)
+	if err != nil {
+		return err
+	}
+	reply.Address = address
+	reply.PublicKey = publicKey
+	reply.Mnemonic = mnemonic
+	return nil
+}
+
+// SelectAccount selects the addressed account.
+func (svc *statusService) SelectAccount(args *AccountArgs, reply *NoReply) error {
 	return svc.statusAPI.SelectAccount(args.Address, args.Password)
 }
 

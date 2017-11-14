@@ -56,14 +56,27 @@ func (c *Client) StatusStopNode() error {
 	return c.client.Call("Status.StopNode", args, &reply)
 }
 
-// StatusLogin logs in to the given address.
-func (c *Client) StatusLogin(address, password string) error {
-	args := LoginArgs{
+// StatusCreateAccount creates an internal geth account.
+func (c *Client) StatusCreateAccount(password string) (address, publicKey, mnemonic string, err error) {
+	args := AccountArgs{
+		Password: password,
+	}
+	var reply AccountReply
+	err = c.client.Call("Status.CreateAccount", args, &reply)
+	if err != nil {
+		return "", "", "", err
+	}
+	return reply.Address, reply.PublicKey, reply.Mnemonic, nil
+}
+
+// StatusSelectAccount logs in to the given address.
+func (c *Client) StatusSelectAccount(address, password string) error {
+	args := AccountArgs{
 		Address:  address,
 		Password: password,
 	}
 	var reply NoReply
-	return c.client.Call("Status.Login", args, &reply)
+	return c.client.Call("Status.SelectAccount", args, &reply)
 }
 
 // StatusLogout logs the current user out.

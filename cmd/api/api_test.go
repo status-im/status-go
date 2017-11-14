@@ -73,6 +73,73 @@ func TestStartStopNode(t *testing.T) {
 	assert.NoError(srv.Err())
 }
 
+// TestCreateAccount tests creating an account on the server.
+func TestCreateAccount(t *testing.T) {
+	assert := assert.New(t)
+	configJSON, cleanup, err := mkConfigJSON("status-create-account")
+	assert.NoError(err)
+	defer cleanup()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	srv, err := api.NewServer(ctx, "[::1]", "12345")
+	assert.NoError(err)
+
+	clnt, err := api.NewClient("[::1]", "12345")
+	assert.NoError(err)
+
+	err = clnt.StatusStartNode(configJSON)
+	assert.NoError(err)
+	assert.NoError(srv.Err())
+
+	account, publicKey, mnemonic, err := clnt.StatusCreateAccount("password")
+	assert.NoError(err)
+	assert.NotEmpty(account)
+	assert.NotEmpty(publicKey)
+	assert.NotEmpty(mnemonic)
+
+	err = clnt.StatusStopNode()
+	assert.NoError(err)
+	assert.NoError(srv.Err())
+}
+
+// TestSelectAccountLogout tests selecting an account on the server
+// and logging out afterwards.
+func TestSelectAccountLogout(t *testing.T) {
+	assert := assert.New(t)
+	configJSON, cleanup, err := mkConfigJSON("status-create-account")
+	assert.NoError(err)
+	defer cleanup()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	srv, err := api.NewServer(ctx, "[::1]", "12345")
+	assert.NoError(err)
+
+	clnt, err := api.NewClient("[::1]", "12345")
+	assert.NoError(err)
+
+	err = clnt.StatusStartNode(configJSON)
+	assert.NoError(err)
+	assert.NoError(srv.Err())
+
+	address, publicKey, mnemonic, err := clnt.StatusCreateAccount("password")
+	assert.NoError(err)
+	assert.NotEmpty(address)
+	assert.NotEmpty(publicKey)
+	assert.NotEmpty(mnemonic)
+
+	err = clnt.StatusSelectAccount(address, "password")
+	assert.NoError(err)
+
+	err = clnt.StatusLogout()
+	assert.NoError(err)
+
+	err = clnt.StatusStopNode()
+	assert.NoError(err)
+	assert.NoError(srv.Err())
+}
+
 //-----
 // HELPERS
 //-----
