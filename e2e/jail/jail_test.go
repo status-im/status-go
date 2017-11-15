@@ -149,8 +149,8 @@ func (s *JailTestSuite) TestEventSignal() {
 	defer signal.ResetDefaultNodeNotificationHandler()
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var envelope signal.Envelope
-		er := json.Unmarshal([]byte(jsonEvent), &envelope)
-		s.NoError(er)
+		unmarshalErr := json.Unmarshal([]byte(jsonEvent), &envelope)
+		s.NoError(unmarshalErr)
 
 		if envelope.Type == jail.EventSignal {
 			event := envelope.Event.(map[string]interface{})
