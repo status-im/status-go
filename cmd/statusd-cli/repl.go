@@ -2,11 +2,13 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
 	"os"
+	"reflect"
 	"strconv"
 	"strings"
 
@@ -72,18 +74,29 @@ func exprsToArgs(exprs []ast.Expr) []interface{} {
 // REPL implements the read-eval-print loop for the commands
 // to be sent to statusd.
 type REPL struct {
-	client *api.Client
+	server  *api.Server
+	client  *api.Client
+	clientV reflect.Value
 }
 
 // NewREPL creates a REPL instance communicating with the
 // addressed statusd.
 func NewREPL(serverAddress, port string) (*REPL, error) {
-	// client, err := api.NewClient(serverAddress, port)
-	// if err != nil {
-	// 	return nil, err
-	// }
+	// TODO(themue) Server and client together here only temporary
+	// for testing until server is integrated in statusd.
+	srv, err := api.NewServer(context.TODO(), "[::1]", "12345")
+	if err != nil {
+		return nil, err
+	}
+	clnt, err := api.NewClient("[::1]", "12345")
+	if err != nil {
+		return nil, err
+	}
+	clientV := reflect.ValueOf(clnt)
 	return &REPL{
-	// client: client,
+		server:  srv,
+		client:  clnt,
+		clientV: clientV,
 	}, nil
 }
 
@@ -108,10 +121,33 @@ func (r *REPL) Run() error {
 			return nil
 		case strings.HasPrefix(cmd.FuncName, "Status"):
 			fmt.Printf("perform Status API command: %q %v\n", cmd.FuncName, cmd.Args)
+			if err := r.performCommand(cmd); err != nil {
+				return err
+			}
 		case strings.HasPrefix(cmd.FuncName, "Admin"):
 			fmt.Printf("perform administration command: %q %v\n", cmd.FuncName, cmd.Args)
+			if err := r.performCommand(cmd); err != nil {
+				return err
+			}
 		default:
 			fmt.Printf("invalid command: %q\n", cmd.FuncName)
 		}
 	}
+}
+
+// performCommand executes the entered command on the client.
+func (r *REPL) performCommand(cmd *Command) error {
+	method := r.clientV.MethodByName(cmd.FuncName)
+	if !method.IsValid() {
+		return fmt.Errorf("command %q not found", cmd.FuncName)
+	}
+	argsV := make([]reflect.Value, len(cmd.Args))
+	for i, arg := range cmd.Args {
+		argsV[i] = reflect.ValueOf(arg)
+	}
+	repliesV := method.Call(argsV)
+	for i, replyV := range repliesV {
+		fmt.Printf("%d) %v\n", i, replyV)
+	}
+	return nil
 }
