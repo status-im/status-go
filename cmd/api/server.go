@@ -9,6 +9,8 @@ import (
 	"net/rpc/jsonrpc"
 	"strings"
 	"sync"
+
+	"github.com/status-im/status-go/geth/api"
 )
 
 // Server is started on demand by statusd to route JSON-RPC requests
@@ -25,7 +27,7 @@ type Server struct {
 
 // NewServer creates a new server by starting a listener routing
 // the requests to their according handlers.
-func NewServer(ctx context.Context, clientAddress, port string) (*Server, error) {
+func NewServer(ctx context.Context, backend *api.StatusBackend, clientAddress, port string) (*Server, error) {
 	s := &Server{
 		ctx:           ctx,
 		clientAddress: clientAddress,
@@ -40,7 +42,7 @@ func NewServer(ctx context.Context, clientAddress, port string) (*Server, error)
 	s.listener = listener
 	// Register the services.
 	s.server.RegisterName("Admin", newAdminService())
-	s.server.RegisterName("Status", newStatusService())
+	s.server.RegisterName("Status", newStatusService(backend))
 	// Start listening to requests.
 	go s.backend()
 	return s, nil
@@ -64,8 +66,8 @@ func (s *Server) backend() {
 		defer s.mu.Unlock()
 		lerr := s.listener.Close()
 		s.listener = nil
-		// Set possible error, not overwrite a given one.
 		if s.err == nil {
+			// Set possible error, not overwrite a given one.
 			s.err = lerr
 		}
 	}()

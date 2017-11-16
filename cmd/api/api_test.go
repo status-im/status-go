@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/status-im/status-go/cmd/api"
+	gethapi "github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/stretchr/testify/assert"
 )
@@ -18,7 +19,8 @@ import (
 func TestStartStopServer(t *testing.T) {
 	assert := assert.New(t)
 	ctx, cancel := context.WithCancel(context.Background())
-	srv, err := api.NewServer(ctx, "localhost", "12345")
+	backend := gethapi.NewStatusBackend()
+	srv, err := api.NewServer(ctx, backend, "localhost", "12345")
 	assert.NoError(err)
 	assert.NotNil(srv)
 	assert.NoError(srv.Err())
@@ -36,7 +38,7 @@ func TestConnectClient(t *testing.T) {
 	assert := assert.New(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	srv, err := api.NewServer(ctx, "[::1]", "12345")
+	srv, err := api.NewServer(ctx, nil, "[::1]", "12345")
 	assert.NoError(err)
 
 	clnt, err := api.NewClient("[::1]", "12345")
@@ -58,7 +60,7 @@ func TestStartStopNode(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	srv, err := api.NewServer(ctx, "[::1]", "12345")
+	srv, err := api.NewServer(ctx, nil, "[::1]", "12345")
 	assert.NoError(err)
 
 	clnt, err := api.NewClient("[::1]", "12345")
@@ -82,7 +84,7 @@ func TestCreateAccount(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	srv, err := api.NewServer(ctx, "[::1]", "12345")
+	srv, err := api.NewServer(ctx, nil, "[::1]", "12345")
 	assert.NoError(err)
 
 	clnt, err := api.NewClient("[::1]", "12345")
@@ -113,7 +115,7 @@ func TestSelectAccountLogout(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	srv, err := api.NewServer(ctx, "[::1]", "12345")
+	srv, err := api.NewServer(ctx, nil, "[::1]", "12345")
 	assert.NoError(err)
 
 	clnt, err := api.NewClient("[::1]", "12345")

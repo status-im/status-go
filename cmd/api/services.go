@@ -36,9 +36,17 @@ type statusService struct {
 }
 
 // newStatusService creates an instance of the Status service to expose.
-func newStatusService() *statusService {
+// If backend is nil a new StatusAPI will be created, elso one using
+// the backend.
+func newStatusService(backend *api.StatusBackend) *statusService {
+	var statusAPI *api.StatusAPI
+	if backend == nil {
+		statusAPI = api.NewStatusAPI()
+	} else {
+		statusAPI = api.NewStatusAPIWithBackend(backend)
+	}
 	return &statusService{
-		statusAPI: api.NewStatusAPI(),
+		statusAPI: statusAPI,
 	}
 }
 

@@ -16,10 +16,16 @@ type StatusAPI struct {
 	b *StatusBackend
 }
 
-// NewStatusAPI create a new StatusAPI instance
+// NewStatusAPI creates a new StatusAPI instance
 func NewStatusAPI() *StatusAPI {
+	return NewStatusAPIWithBackend(NewStatusBackend())
+}
+
+// NewStatusAPIWithBackend creates a new StatusAPI instance using
+// the passed backend.
+func NewStatusAPIWithBackend(b *StatusBackend) *StatusAPI {
 	return &StatusAPI{
-		b: NewStatusBackend(),
+		b: b,
 	}
 }
 
