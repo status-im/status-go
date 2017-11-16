@@ -17,6 +17,7 @@ jobs:
   - stage: Test e2e on privite network
     script: make test-e2e
   - stage: Test e2e on public network
+    if: type != pull_request
     script: travis_wait 300 make test-e2e networkid=4
 cache:
   directories:

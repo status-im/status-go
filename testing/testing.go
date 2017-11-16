@@ -62,7 +62,7 @@ func init() {
 	// setup auxiliary directories
 	TestDataDir = filepath.Join(RootDir, ".ethereumtest")
 
-	TestConfig, err = common.LoadTestConfig()
+	TestConfig, err = common.LoadTestConfig(GetNetworkID())
 	if err != nil {
 		panic(err)
 	}
@@ -152,7 +152,7 @@ func GetHeadHashFromNetworkID(id int) string {
 	case params.RopstenNetworkID:
 		return "0x41941023680923e0fe4d74a34bdac8141f2540e3ae90623718e47d66d1ca4a2d"
 	case params.StatusChainNetworkID:
-		return "0x50e6edb4e90d9616ac8bf7119ee37c4048c41ad09328676e1b39dc68a0ecfb3d"
+		return "0xa286ebaba3b5c6ea836d1ffdef9d7573b0f5ccdfe2ebc51fa432fb9c58fb9774"
 	}
 
 	return ""
@@ -181,4 +181,24 @@ func GetNetworkID() int {
 	}
 
 	return params.StatusChainNetworkID
+}
+
+// GetAccount1PKFile returns the filename for Account1 keystore based
+// on the current network
+func GetAccount1PKFile() string {
+	if GetNetworkID() == params.StatusChainNetworkID {
+		return "test-account1-status-chain.pk"
+	} else {
+		return "test-account1.pk"
+	}
+}
+
+// GetAccount2PKFile returns the filename for Account2 keystore based
+// on the current network
+func GetAccount2PKFile() string {
+	if GetNetworkID() == params.StatusChainNetworkID {
+		return "test-account2-status-chain.pk"
+	} else {
+		return "test-account2.pk"
+	}
 }

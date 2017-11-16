@@ -1,0 +1,10 @@
+{
+  "Account1": {
+    "Address": "0xbF164ca341326a03b547c05B343b2E21eFAe24b9",
+    "Password": "password"
+  },
+  "Account2": {
+    "Address": "0x205a5d0E72ff65079FCaBB4A63E33d28aA6Def2C",
+    "Password": "password"
+  }
+}
