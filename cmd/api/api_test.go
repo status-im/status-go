@@ -5,8 +5,8 @@ import (
 	"io/ioutil"
 	"os"
 	"strconv"
+	"sync"
 	"testing"
-	"time"
 
 	"github.com/status-im/status-go/cmd/api"
 	gethapi "github.com/status-im/status-go/geth/api"
@@ -14,32 +14,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// TestStartStopServer tests starting the server without any client
-// connection. It is actively killed by using a cancel context.
-func TestStartStopServer(t *testing.T) {
-	assert := assert.New(t)
-	ctx, cancel := context.WithCancel(context.Background())
-	backend := gethapi.NewStatusBackend()
-	srv, err := api.NewServer(ctx, backend, "localhost", "12345")
-	assert.NoError(err)
-	assert.NotNil(srv)
-	assert.NoError(srv.Err())
-
-	// Terminate and wait so that background goroutine can end.
-	cancel()
-	time.Sleep(1 * time.Millisecond)
-
-	assert.Equal(srv.Err(), context.Canceled)
-}
-
 // TestConnectClient test starting the server and connecting it
 // with a client.
 func TestConnectClient(t *testing.T) {
 	assert := assert.New(t)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	srv, err := api.NewServer(ctx, nil, "[::1]", "12345")
-	assert.NoError(err)
+	srv := mkServer(assert)
 
 	clnt, err := api.NewClient("[::1]", "12345")
 	assert.NoError(err)
@@ -58,10 +37,7 @@ func TestStartStopNode(t *testing.T) {
 	assert.NoError(err)
 	defer cleanup()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	srv, err := api.NewServer(ctx, nil, "[::1]", "12345")
-	assert.NoError(err)
+	srv := mkServer(assert)
 
 	clnt, err := api.NewClient("[::1]", "12345")
 	assert.NoError(err)
@@ -82,10 +58,7 @@ func TestCreateAccount(t *testing.T) {
 	assert.NoError(err)
 	defer cleanup()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	srv, err := api.NewServer(ctx, nil, "[::1]", "12345")
-	assert.NoError(err)
+	srv := mkServer(assert)
 
 	clnt, err := api.NewClient("[::1]", "12345")
 	assert.NoError(err)
@@ -113,10 +86,7 @@ func TestSelectAccountLogout(t *testing.T) {
 	assert.NoError(err)
 	defer cleanup()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	srv, err := api.NewServer(ctx, nil, "[::1]", "12345")
-	assert.NoError(err)
+	srv := mkServer(assert)
 
 	clnt, err := api.NewClient("[::1]", "12345")
 	assert.NoError(err)
@@ -146,6 +116,26 @@ func TestSelectAccountLogout(t *testing.T) {
 // HELPERS
 //-----
 
+var (
+	mu  sync.Mutex
+	srv *api.Server
+)
+
+// mkServer lazily creates or reuses a server.
+func mkServer(assert *assert.Assertions) *api.Server {
+	mu.Lock()
+	defer mu.Unlock()
+	if srv == nil {
+		var err error
+		backend := gethapi.NewStatusBackend()
+		srv, err = api.NewServer(context.Background(), backend, "[::1]", "12345")
+		assert.NoError(err)
+	}
+	return srv
+}
+
+// mkConfigJSON creates a configuration matching to
+// a temporary directory and a cleanup for that directory.
 func mkConfigJSON(name string) (string, func(), error) {
 	tmpDir, err := ioutil.TempDir(os.TempDir(), name)
 	if err != nil {
