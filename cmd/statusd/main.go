@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
@@ -8,6 +9,7 @@ import (
 	"runtime"
 	"strings"
 
+	cmdapi "github.com/status-im/status-go/cmd/api"
 	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/params"
 )
@@ -27,6 +29,7 @@ var (
 	httpEnabled    = flag.Bool("http", false, "HTTP RPC endpoint enabled (default: false)")
 	httpPort       = flag.Int("httpport", params.HTTPPort, "HTTP RPC server's listening port")
 	ipcEnabled     = flag.Bool("ipc", false, "IPC RPC endpoint enabled")
+	cliAddr        = flag.String("cli", "", "Enable debugging CLI connection for <address>:<port>")
 	logLevel       = flag.String("log", "INFO", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
 	logFile        = flag.String("logfile", "", "Path to the log file")
 	version        = flag.Bool("version", false, "Print version")
@@ -56,6 +59,18 @@ func main() {
 
 	// wait till node is started
 	<-started
+
+	// Check if CLI connection shall be enabled.
+	if *cliAddr != "" {
+		sepIdx := strings.LastIndex(*cliAddr, ":")
+		clientAddr := (*cliAddr)[:sepIdx]
+		port := (*cliAddr)[sepIdx+1:]
+		_, err := cmdapi.NewServer(context.Background(), backend, clientAddr, port)
+		if err != nil {
+			log.Fatalf("Starting CLI server failed: %v", err)
+			return
+		}
+	}
 
 	// wait till node has been stopped
 	node, err := backend.NodeManager().Node()
@@ -131,10 +146,11 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, "Usage: statusd [options]")
 	fmt.Fprintf(os.Stderr, `
 Examples:
-  statusd               # run status node with defaults
-  statusd -networkid 4  # run node on Rinkeby network
-  statusd -datadir /dir # specify different dir for data
-  statusd -ipc          # enable IPC for usage with "geth attach"
+  statusd                      # run status node with defaults
+  statusd -networkid 4         # run node on Rinkeby network
+  statusd -datadir /dir        # specify different dir for data
+  statusd -ipc                 # enable IPC for usage with "geth attach"
+  statusd -cli localhost:12345 # enable connection by local statusd-cli on port 12345
 
 Options:
 `)

@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"context"
 	"fmt"
 	"go/ast"
 	"go/parser"
@@ -74,7 +73,6 @@ func exprsToArgs(exprs []ast.Expr) []interface{} {
 // REPL implements the read-eval-print loop for the commands
 // to be sent to statusd.
 type REPL struct {
-	server  *api.Server
 	client  *api.Client
 	clientV reflect.Value
 }
@@ -82,19 +80,12 @@ type REPL struct {
 // NewREPL creates a REPL instance communicating with the
 // addressed statusd.
 func NewREPL(serverAddress, port string) (*REPL, error) {
-	// TODO(themue) Server and client together here only temporary
-	// for testing until server is integrated in statusd.
-	srv, err := api.NewServer(context.TODO(), "[::1]", "12345")
-	if err != nil {
-		return nil, err
-	}
-	clnt, err := api.NewClient("[::1]", "12345")
+	clnt, err := api.NewClient(serverAddress, port)
 	if err != nil {
 		return nil, err
 	}
 	clientV := reflect.ValueOf(clnt)
 	return &REPL{
-		server:  srv,
 		client:  clnt,
 		clientV: clientV,
 	}, nil
