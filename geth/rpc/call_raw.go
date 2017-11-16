@@ -47,7 +47,7 @@ type jsonrpcSuccessfulResponse struct {
 
 type jsonrpcErrorResponse struct {
 	jsonrpcMessage
-	Error *jsonError `json:"error"`
+	Error jsonError `json:"error"`
 }
 
 // jsonError represents Error message for JSON-RPC responses.
@@ -189,7 +189,7 @@ func newErrorResponse(code int, err error, id json.RawMessage) string {
 			ID:      id,
 			Version: jsonrpcVersion,
 		},
-		Error: &jsonError{
+		Error: jsonError{
 			Code:    code,
 			Message: err.Error(),
 		},
