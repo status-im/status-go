@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	_ "net/http/pprof"
 	"os"
 	"runtime"
 	"strings"

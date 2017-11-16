@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"fmt"
-	"log"
 	"net"
 	"net/rpc"
 	"net/rpc/jsonrpc"
@@ -11,28 +10,34 @@ import (
 	"sync"
 
 	"github.com/status-im/status-go/geth/api"
+	"github.com/status-im/status-go/geth/log"
 )
 
 // Server is started on demand by statusd to route JSON-RPC requests
 // by the statusd-cli or other clients to the according components.
 type Server struct {
-	ctx           context.Context
-	mu            sync.Mutex
-	clientAddress string
-	port          string
-	server        *rpc.Server
-	listener      net.Listener
-	err           error
+	ctx            context.Context
+	mu             sync.Mutex
+	validAddresses map[string]bool
+	port           string
+	server         *rpc.Server
+	listener       net.Listener
+	err            error
 }
 
 // NewServer creates a new server by starting a listener routing
 // the requests to their according handlers.
 func NewServer(ctx context.Context, backend *api.StatusBackend, clientAddress, port string) (*Server, error) {
 	s := &Server{
-		ctx:           ctx,
-		clientAddress: clientAddress,
-		port:          port,
-		server:        rpc.NewServer(),
+		ctx:    ctx,
+		port:   port,
+		server: rpc.NewServer(),
+	}
+	s.validAddresses = map[string]bool{
+		clientAddress: true,
+		"localhost":   true,
+		"127.0.0.1":   true,
+		"[::1]":       true,
 	}
 	s.server.HandleHTTP("/rpc", "/debug/rpc")
 	listener, err := net.Listen("tcp", ":"+port)
@@ -79,13 +84,14 @@ func (s *Server) backend() {
 		default:
 			conn, err := s.listener.Accept()
 			if err != nil {
-				log.Printf("router cannot establish connection: %v", err)
+				log.Warn("router cannot establish connection", "err", err)
 				continue
 			}
 			remoteAddr := conn.RemoteAddr().String()
 			remoteAddr = remoteAddr[:strings.LastIndex(remoteAddr, ":")]
-			if remoteAddr != s.clientAddress {
-				log.Printf("connection from invalid client '%s' rejected", remoteAddr)
+			log.Info("establishing client connection", "addr", remoteAddr)
+			if !s.validAddresses[remoteAddr] {
+				log.Error("connection from invalid client rejected", "addr", remoteAddr)
 				conn.Close()
 				continue
 			}

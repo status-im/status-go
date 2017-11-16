@@ -17,6 +17,7 @@ func newAdminService() *adminService {
 }
 
 // GetAddresses returns the IP address of the client.
+// nolint: unparam
 func (svc *adminService) GetAddresses(args *NoArgs, reply *StringsReply) error {
 	ifcAddrs, err := net.InterfaceAddrs()
 	if err != nil {
@@ -52,6 +53,7 @@ func newStatusService(backend *api.StatusBackend) *statusService {
 
 // StartNode loads the configuration out of the passed string and
 // starts a node with it.
+// nolint: unparam
 func (svc *statusService) StartNode(args *ConfigArgs, reply *NoReply) error {
 	config, err := params.LoadNodeConfig(args.Config)
 	if err != nil {
@@ -62,11 +64,13 @@ func (svc *statusService) StartNode(args *ConfigArgs, reply *NoReply) error {
 }
 
 // StopNode starts the stopped node.
+// nolint: unparam
 func (svc *statusService) StopNode(args *NoArgs, reply *NoReply) error {
 	return svc.statusAPI.StopNode()
 }
 
 // CreateAccount creates an internal geth account.
+// nolint: unparam
 func (svc *statusService) CreateAccount(args *AccountArgs, reply *AccountReply) error {
 	address, publicKey, mnemonic, err := svc.statusAPI.CreateAccount(args.Password)
 	if err != nil {
@@ -79,11 +83,13 @@ func (svc *statusService) CreateAccount(args *AccountArgs, reply *AccountReply) 
 }
 
 // SelectAccount selects the addressed account.
+// nolint: unparam
 func (svc *statusService) SelectAccount(args *AccountArgs, reply *NoReply) error {
 	return svc.statusAPI.SelectAccount(args.Address, args.Password)
 }
 
 // Logout clears the Whisper identities.
+// nolint: unparam
 func (svc *statusService) Logout(args *NoArgs, reply *NoReply) error {
 	return svc.statusAPI.Logout()
 }
