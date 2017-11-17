@@ -133,7 +133,8 @@ func (s *JailRPCTestSuite) TestContractDeployment() {
 			s.NoError(s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 
 			txID := event["id"].(string)
-			txHash, txErr := s.Backend.CompleteTransaction(common.QueuedTxID(txID), TestConfig.Account1.Password)
+			var txErr error
+			txHash, txErr = s.Backend.CompleteTransaction(common.QueuedTxID(txID), TestConfig.Account1.Password)
 			if s.NoError(txErr, event["id"]) {
 				s.T().Logf("contract transaction complete, URL: %s", "https://ropsten.etherscan.io/tx/"+txHash.Hex())
 			}
