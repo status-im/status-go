@@ -1,11 +1,11 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"log"
-	_ "net/http/pprof"
+	"net/http"
+	"net/http/pprof"
 	"os"
 	"runtime"
 	"strings"
@@ -31,6 +31,7 @@ var (
 	httpPort       = flag.Int("httpport", params.HTTPPort, "HTTP RPC server's listening port")
 	ipcEnabled     = flag.Bool("ipc", false, "IPC RPC endpoint enabled")
 	cliAddr        = flag.String("cli", "", "Enable debugging CLI connection for <address>:<port>")
+	pprofPort      = flag.String("pprof", "", "Enable profiling on port <port>")
 	logLevel       = flag.String("log", "INFO", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
 	logFile        = flag.String("logfile", "", "Path to the log file")
 	version        = flag.Bool("version", false, "Print version")
@@ -63,12 +64,18 @@ func main() {
 
 	// Check if CLI connection shall be enabled.
 	if *cliAddr != "" {
-		sepIdx := strings.LastIndex(*cliAddr, ":")
-		clientAddr := (*cliAddr)[:sepIdx]
-		port := (*cliAddr)[sepIdx+1:]
-		_, err := cmdapi.NewServer(context.Background(), backend, clientAddr, port)
+		err := startAPI(backend)
 		if err != nil {
 			log.Fatalf("Starting CLI server failed: %v", err)
+			return
+		}
+	}
+
+	// Check if pprof shall be enabled.
+	if *pprofPort != "" {
+		err := startPprof()
+		if err != nil {
+			log.Fatalf("Starting of profiling failed: %v", err)
 			return
 		}
 	}
@@ -81,6 +88,30 @@ func main() {
 	}
 
 	node.Wait()
+}
+
+// startAPI starts the API server for remote control.
+func startAPI(backend *api.StatusBackend) error {
+	sepIdx := strings.LastIndex(*cliAddr, ":")
+	clientAddr := (*cliAddr)[:sepIdx]
+	port := (*cliAddr)[sepIdx+1:]
+	_, err := cmdapi.ServeAPI(backend, clientAddr, port)
+	return err
+}
+
+// startPprof starts the PPROF endpoints on the defined port.
+func startPprof() error {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/debug/pprof/", pprof.Index)
+	mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+	s := http.Server{
+		Addr:    ":" + (*pprofPort),
+		Handler: mux,
+	}
+	return s.ListenAndServe()
 }
 
 // makeNodeConfig parses incoming CLI options and returns node configuration object

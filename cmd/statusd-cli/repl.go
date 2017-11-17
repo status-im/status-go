@@ -97,7 +97,7 @@ func (r *REPL) Run() error {
 	reader := bufio.NewReader(os.Stdin)
 	for {
 		// Read and parse command line.
-		fmt.Print(">> ")
+		fmt.Print(">>> ")
 		commandLine, err := reader.ReadString('\n')
 		if err != nil {
 			return err
@@ -112,22 +112,27 @@ func (r *REPL) Run() error {
 			return nil
 		case strings.HasPrefix(cmd.FuncName, "Status"):
 			fmt.Printf("perform Status API command: %q %v\n", cmd.FuncName, cmd.Args)
-			if err := r.performCommand(cmd); err != nil {
-				return err
+			if err := r.execCommand(cmd); err != nil {
+				fmt.Printf("ERR %v\n", err)
 			}
 		case strings.HasPrefix(cmd.FuncName, "Admin"):
 			fmt.Printf("perform administration command: %q %v\n", cmd.FuncName, cmd.Args)
-			if err := r.performCommand(cmd); err != nil {
-				return err
+			if err := r.execCommand(cmd); err != nil {
+				fmt.Printf("ERR %v\n", err)
 			}
 		default:
-			fmt.Printf("invalid command: %q\n", cmd.FuncName)
+			fmt.Printf("ERR invalid command: %q\n", cmd.FuncName)
 		}
 	}
 }
 
-// performCommand executes the entered command on the client.
-func (r *REPL) performCommand(cmd *Command) error {
+// execCommand executes the entered command on the client.
+func (r *REPL) execCommand(cmd *Command) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("invalid command execution: %v", r)
+		}
+	}()
 	method := r.clientV.MethodByName(cmd.FuncName)
 	if !method.IsValid() {
 		return fmt.Errorf("command %q not found", cmd.FuncName)
@@ -138,7 +143,7 @@ func (r *REPL) performCommand(cmd *Command) error {
 	}
 	repliesV := method.Call(argsV)
 	for i, replyV := range repliesV {
-		fmt.Printf("%d) %v\n", i, replyV)
+		fmt.Printf("<<< %d) %v\n", i, replyV)
 	}
 	return nil
 }

@@ -1,7 +1,6 @@
 package api_test
 
 import (
-	"context"
 	"io/ioutil"
 	"os"
 	"strconv"
@@ -18,7 +17,7 @@ import (
 // with a client.
 func TestConnectClient(t *testing.T) {
 	assert := assert.New(t)
-	srv := mkServer(assert)
+	startServer(assert)
 
 	clnt, err := api.NewClient("[::1]", "12345")
 	assert.NoError(err)
@@ -26,7 +25,6 @@ func TestConnectClient(t *testing.T) {
 	addrs, err := clnt.AdminGetAddresses()
 	assert.NoError(err)
 	assert.True(len(addrs) != 0)
-	assert.NoError(srv.Err())
 }
 
 // TestStartNode tests starting a node on the server by a
@@ -37,18 +35,16 @@ func TestStartStopNode(t *testing.T) {
 	assert.NoError(err)
 	defer cleanup()
 
-	srv := mkServer(assert)
+	startServer(assert)
 
 	clnt, err := api.NewClient("[::1]", "12345")
 	assert.NoError(err)
 
 	err = clnt.StatusStartNode(configJSON)
 	assert.NoError(err)
-	assert.NoError(srv.Err())
 
 	err = clnt.StatusStopNode()
 	assert.NoError(err)
-	assert.NoError(srv.Err())
 }
 
 // TestCreateAccount tests creating an account on the server.
@@ -58,14 +54,13 @@ func TestCreateAccount(t *testing.T) {
 	assert.NoError(err)
 	defer cleanup()
 
-	srv := mkServer(assert)
+	startServer(assert)
 
 	clnt, err := api.NewClient("[::1]", "12345")
 	assert.NoError(err)
 
 	err = clnt.StatusStartNode(configJSON)
 	assert.NoError(err)
-	assert.NoError(srv.Err())
 
 	account, publicKey, mnemonic, err := clnt.StatusCreateAccount("password")
 	assert.NoError(err)
@@ -75,7 +70,6 @@ func TestCreateAccount(t *testing.T) {
 
 	err = clnt.StatusStopNode()
 	assert.NoError(err)
-	assert.NoError(srv.Err())
 }
 
 // TestSelectAccountLogout tests selecting an account on the server
@@ -86,14 +80,13 @@ func TestSelectAccountLogout(t *testing.T) {
 	assert.NoError(err)
 	defer cleanup()
 
-	srv := mkServer(assert)
+	startServer(assert)
 
 	clnt, err := api.NewClient("[::1]", "12345")
 	assert.NoError(err)
 
 	err = clnt.StatusStartNode(configJSON)
 	assert.NoError(err)
-	assert.NoError(srv.Err())
 
 	address, publicKey, mnemonic, err := clnt.StatusCreateAccount("password")
 	assert.NoError(err)
@@ -109,7 +102,6 @@ func TestSelectAccountLogout(t *testing.T) {
 
 	err = clnt.StatusStopNode()
 	assert.NoError(err)
-	assert.NoError(srv.Err())
 }
 
 //-----
@@ -121,14 +113,14 @@ var (
 	srv *api.Server
 )
 
-// mkServer lazily creates or reuses a server.
-func mkServer(assert *assert.Assertions) *api.Server {
+// startServer lazily creates or reuses a server.
+func startServer(assert *assert.Assertions) *api.Server {
 	mu.Lock()
 	defer mu.Unlock()
 	if srv == nil {
 		var err error
 		backend := gethapi.NewStatusBackend()
-		srv, err = api.NewServer(context.Background(), backend, "[::1]", "12345")
+		srv, err = api.ServeAPI(backend, "[::1]", "12345")
 		assert.NoError(err)
 	}
 	return srv
