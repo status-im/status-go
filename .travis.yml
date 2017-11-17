@@ -17,6 +17,10 @@ jobs:
   - stage: Test e2e on privite network
     script: make test-e2e
   - stage: Test e2e on public network
+    # disable running this stage for PRs as they do not have access
+    # to the ACCOUNT_PASSWORD env variable needed to unlock the public testnet accounts.
+    # using fork == false may be preferred as it would allow PRs from the origin
+    # to still run, but currently does not work due to a bug
     if: type != pull_request
     script: travis_wait 300 make test-e2e networkid=4
 cache:
