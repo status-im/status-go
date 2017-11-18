@@ -6,5 +6,9 @@
   "Account2": {
     "Address": "0x205a5d0E72ff65079FCaBB4A63E33d28aA6Def2C",
     "Password": "password"
+  },
+  "Account3": {
+    "Address": "0x3ad34e698d4806afd08b359b920f5c6b62b68ee4",
+    "Password": "password"
   }
 }

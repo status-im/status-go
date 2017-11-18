@@ -439,17 +439,22 @@ const passphraseEnvName = "ACCOUNT_PASSWORD"
 func LoadTestConfig(networkId int) (*TestConfig, error) {
 	var testConfig TestConfig
 
-	configData := string(static.MustAsset("config/test-data.json"))
-	if err := json.Unmarshal([]byte(configData), &testConfig); err != nil {
+	configData := static.MustAsset("config/test-data.json")
+	if err := json.Unmarshal(configData, &testConfig); err != nil {
 		return nil, err
 	}
 
 	if networkId == params.StatusChainNetworkID {
-		accountsData := string(static.MustAsset("config/status-chain-accounts.json"))
-		if err := json.Unmarshal([]byte(accountsData), &testConfig); err != nil {
+		accountsData := static.MustAsset("config/status-chain-accounts.json")
+		if err := json.Unmarshal(accountsData, &testConfig); err != nil {
 			return nil, err
 		}
 	} else {
+		accountsData := static.MustAsset("config/public-chain-accounts.json")
+		if err := json.Unmarshal(accountsData, &testConfig); err != nil {
+			return nil, err
+		}
+
 		pass := os.Getenv(passphraseEnvName)
 		testConfig.Account1.Password = pass
 		testConfig.Account2.Password = pass

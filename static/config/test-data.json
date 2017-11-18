@@ -3,15 +3,5 @@
     "SyncSeconds": 30,
     "HTTPPort": 8645,
     "WSPort": 8646
-  },
-  "Account1": {
-    "Address": "0xF35E0325dad87e2661c4eF951d58727e6d583d5c"
-  },
-  "Account2": {
-    "Address": "0xA0a19221268d939c3a972bf5461dC10f7980E814"
-  },
-  "Account3": {
-    "Address": "0x3ad34e698d4806afd08b359b920f5c6b62b68ee4",
-    "Password": "password"
   }
 }

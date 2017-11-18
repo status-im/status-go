@@ -152,7 +152,7 @@ func GetHeadHashFromNetworkID(id int) string {
 	case params.RopstenNetworkID:
 		return "0x41941023680923e0fe4d74a34bdac8141f2540e3ae90623718e47d66d1ca4a2d"
 	case params.StatusChainNetworkID:
-		return "0xa286ebaba3b5c6ea836d1ffdef9d7573b0f5ccdfe2ebc51fa432fb9c58fb9774"
+		return "0xe9d8920a99dc66a9557a87d51f9d14a34ec50aae04298e0f142187427d3c832e"
 	}
 
 	return ""
