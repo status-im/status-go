@@ -56,10 +56,10 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 
 	// prepare accounts
 	testKeyDir := filepath.Join(testChainDir, "keystore")
-	if err := common.ImportTestAccount(testKeyDir, "test-account1.pk"); err != nil {
+	if err := common.ImportTestAccount(testKeyDir, GetAccount1PKFile()); err != nil {
 		panic(err)
 	}
-	if err := common.ImportTestAccount(testKeyDir, "test-account2.pk"); err != nil {
+	if err := common.ImportTestAccount(testKeyDir, GetAccount2PKFile()); err != nil {
 		panic(err)
 	}
 
@@ -157,15 +157,15 @@ func testVerifyAccountPassword(t *testing.T) bool {
 	}
 	defer os.RemoveAll(tmpDir) // nolint: errcheck
 
-	if err = common.ImportTestAccount(tmpDir, "test-account1.pk"); err != nil {
+	if err = common.ImportTestAccount(tmpDir, GetAccount1PKFile()); err != nil {
 		t.Fatal(err)
 	}
-	if err = common.ImportTestAccount(tmpDir, "test-account2.pk"); err != nil {
+	if err = common.ImportTestAccount(tmpDir, GetAccount2PKFile()); err != nil {
 		t.Fatal(err)
 	}
 
 	// rename account file (to see that file's internals reviewed, when locating account key)
-	accountFilePathOriginal := filepath.Join(tmpDir, "test-account1.pk")
+	accountFilePathOriginal := filepath.Join(tmpDir, GetAccount1PKFile())
 	accountFilePath := filepath.Join(tmpDir, "foo"+TestConfig.Account1.Address+"bar.pk")
 	if err := os.Rename(accountFilePathOriginal, accountFilePath); err != nil {
 		t.Fatal(err)
@@ -1386,10 +1386,10 @@ func startTestNode(t *testing.T) <-chan struct{} {
 
 	// inject test accounts
 	testKeyDir := filepath.Join(testDir, "keystore")
-	if err := common.ImportTestAccount(testKeyDir, "test-account1.pk"); err != nil {
+	if err := common.ImportTestAccount(testKeyDir, GetAccount1PKFile()); err != nil {
 		panic(err)
 	}
-	if err := common.ImportTestAccount(testKeyDir, "test-account2.pk"); err != nil {
+	if err := common.ImportTestAccount(testKeyDir, GetAccount2PKFile()); err != nil {
 		panic(err)
 	}
 

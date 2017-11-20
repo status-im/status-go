@@ -22,7 +22,12 @@ func LoadTestAccounts(dataDir string) error {
 
 // InjectTestAccounts injects test accounts into running node
 func InjectTestAccounts(node common.NodeManager) error {
-	testConfig, err := common.LoadTestConfig()
+	nodeConfig, err := node.NodeConfig()
+	if err != nil {
+		return err
+	}
+
+	testConfig, err := common.LoadTestConfig(int(nodeConfig.NetworkID))
 	if err != nil {
 		return err
 	}

@@ -27,8 +27,8 @@ func TestVerifyAccountPassword(t *testing.T) {
 	defer os.RemoveAll(emptyKeyStoreDir) //nolint: errcheck
 
 	// import account keys
-	require.NoError(t, common.ImportTestAccount(keyStoreDir, "test-account1.pk"))
-	require.NoError(t, common.ImportTestAccount(keyStoreDir, "test-account2.pk"))
+	require.NoError(t, common.ImportTestAccount(keyStoreDir, GetAccount1PKFile()))
+	require.NoError(t, common.ImportTestAccount(keyStoreDir, GetAccount2PKFile()))
 
 	account1Address := gethcommon.BytesToAddress(gethcommon.FromHex(TestConfig.Account1.Address))
 
