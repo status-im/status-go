@@ -9,5 +9,4 @@ var statusAPI = api.NewStatusAPI()
 // without main it produces cryptic errors.
 // TODO(divan): investigate the cause of the errors
 // and change this package to be a library if possible.
-func main() {
-}
+func main() {}

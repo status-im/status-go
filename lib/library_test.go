@@ -1,3 +1,9 @@
+// +build e2e_test
+
+// Tests in `./lib` package will run only when `e2e_test` build tag is provided.
+// It's required to prevent some files from being included in the binary.
+// Check out `lib/utils.go` for more details.
+
 package main
 
 import (
