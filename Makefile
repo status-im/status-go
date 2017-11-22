@@ -115,7 +115,8 @@ test-e2e: ##@tests Run e2e tests
 	go test -timeout 20m ./e2e/rpc/... -network=$(networkid)
 	go test -timeout 20m ./e2e/whisper/... -network=$(networkid)
 	go test -timeout 10m ./e2e/transactions/... -network=$(networkid)
-	go test -timeout 40m ./lib -network=$(networkid)
+	# e2e_test tag is required to include some files from ./lib without _test suffix
+	go test -timeout 40m -tags e2e_test ./lib -network=$(networkid)
 
 ci: lint mock-install mock test-unit test-e2e ##@tests Run all linters and tests at once
 
