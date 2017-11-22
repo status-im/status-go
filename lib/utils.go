@@ -1,5 +1,12 @@
 // +build e2e_test
 
+// This is a file with e2e tests for C bindings written in library.go.
+// As a CGO file, it can't have `_test.go` suffix as it's not allowed by Go.
+// At the same time, we don't want this file to be included in the binaries.
+// This is why `e2e_test` tag was introduced. Without it, this file is excluded
+// from the build. Providing this tag will include this file into the build
+// and that's what is done while running e2e tests for `lib/` package.
+
 package main
 
 import "C"
