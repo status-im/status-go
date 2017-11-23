@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	statusdConn = flag.String("statusd", "localhost:12345", "set host and port of statusd")
+	statusdConn = flag.String("statusd", "localhost", "set host of statusd")
 )
 
 // main is the entrypoint for the statusd command line interface.
@@ -18,7 +18,7 @@ func main() {
 	fmt.Printf("statusd-cli connecting statusd on %v\n", *statusdConn)
 
 	// Starting REPL.
-	repl, err := NewREPL("localhost", "12345")
+	repl, err := NewREPL("localhost")
 	if err != nil {
 		fmt.Printf("cannot start REPL: %v\n", err)
 		os.Exit(-1)
@@ -36,7 +36,7 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, "Usage: statusd-cli [options]")
 	fmt.Fprintf(os.Stderr, `
 Examples:
-  statusd-cli -statusd=<host>:<port> # contact statusd on host and port
+  statusd-cli -statusd=<host> # contact statusd on host
   
 Options:
 `)

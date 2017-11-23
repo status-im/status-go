@@ -10,7 +10,7 @@ import (
 	"runtime"
 	"strings"
 
-	cmdapi "github.com/status-im/status-go/cmd/api"
+	"github.com/status-im/status-go/cmd/statusd/debug"
 	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/params"
 )
@@ -30,7 +30,7 @@ var (
 	httpEnabled    = flag.Bool("http", false, "HTTP RPC endpoint enabled (default: false)")
 	httpPort       = flag.Int("httpport", params.HTTPPort, "HTTP RPC server's listening port")
 	ipcEnabled     = flag.Bool("ipc", false, "IPC RPC endpoint enabled")
-	cliAddr        = flag.String("cli", "", "Enable debugging CLI connection for <address>:<port>")
+	cli            = flag.Bool("cli", false, "Enable debugging CLI connection")
 	pprofPort      = flag.String("pprof", "", "Enable profiling on port <port>")
 	logLevel       = flag.String("log", "INFO", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
 	logFile        = flag.String("logfile", "", "Path to the log file")
@@ -62,11 +62,11 @@ func main() {
 	// wait till node is started
 	<-started
 
-	// Check if CLI connection shall be enabled.
-	if *cliAddr != "" {
-		err := startAPI(backend)
+	// Check if debugging CLI connection shall be enabled.
+	if *cli {
+		err := startDebug(backend)
 		if err != nil {
-			log.Fatalf("Starting CLI server failed: %v", err)
+			log.Fatalf("Starting debugging CLI server failed: %v", err)
 			return
 		}
 	}
@@ -90,12 +90,10 @@ func main() {
 	node.Wait()
 }
 
-// startAPI starts the API server for remote control.
-func startAPI(backend *api.StatusBackend) error {
-	sepIdx := strings.LastIndex(*cliAddr, ":")
-	clientAddr := (*cliAddr)[:sepIdx]
-	port := (*cliAddr)[sepIdx+1:]
-	_, err := cmdapi.ServeAPI(backend, clientAddr, port)
+// startDebug starts the debugging API server.
+func startDebug(backend *api.StatusBackend) error {
+	statusAPI := api.NewStatusAPIWithBackend(backend)
+	_, err := debug.New(statusAPI)
 	return err
 }
 
