@@ -179,6 +179,13 @@ func (api *StatusAPI) DiscardTransactions(ids []common.QueuedTxID) map[common.Qu
 	return api.b.txQueueManager.DiscardTransactions(ids)
 }
 
+// JailParse creates a new jail cell context, with the given chatID as identifier.
+// New context executes provided JavaScript code, right after the initialization.
+// DEPRECATED in favour of CreateAndInitCell.
+func (api *StatusAPI) JailParse(chatID string, js string) string {
+	return api.b.jailManager.Parse(chatID, js)
+}
+
 // CreateAndInitCell creates a new jail cell context, with the given chatID as identifier.
 // New context executes provided JavaScript code, right after the initialization.
 func (api *StatusAPI) CreateAndInitCell(chatID, js string) string {

@@ -297,6 +297,11 @@ type JailManager interface {
 	// CreateCell creates a new jail cell.
 	CreateCell(chatID string) (JailCell, error)
 
+	// Parse creates a new jail cell context, with the given chatID as identifier.
+	// New context executes provided JavaScript code, right after the initialization.
+	// DEPRECATED in favour of CreateAndInitCell.
+	Parse(chatID, js string) string
+
 	// CreateAndInitCell creates a new jail cell and initialize it
 	// with web3 and other handlers.
 	CreateAndInitCell(chatID string, code ...string) string
