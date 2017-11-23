@@ -167,14 +167,18 @@ func (j *Jail) CreateAndInitCell(chatID string, code ...string) string {
 func (j *Jail) Parse(chatID, code string) string {
 	cell, err := j.cell(chatID)
 	if err != nil {
-		// cell does not exist
+		// cell does not exist, so create and init it
 		cell, err = j.createAndInitCell(chatID, code)
 	} else {
-		// cell already exist, so just execute the code
-		_, err = cell.Run(code)
+		// cell already exists, so just reinit it
+		err = j.initCell(cell)
 	}
 
 	if err != nil {
+		return newJailErrorResponse(err)
+	}
+
+	if _, err = cell.Run(code); err != nil {
 		return newJailErrorResponse(err)
 	}
 
