@@ -29,6 +29,9 @@ Use following Makefile commands:
 - `make statusgo-ios` and `make statusgo-ios-simulator` (builds iOS related artifacts in `build/os-9.3/framework`)
 
 # Testing
+
+*Note: e2e tests currently fail locally and in travis fork builds.*
+
 To setup accounts passphrase you need to setup an environment variable: `export ACCOUNT_PASSWORD="secret_pass_phrase"`.
 
 To test statusgo, use: `make ci`.
