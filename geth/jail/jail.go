@@ -161,6 +161,26 @@ func (j *Jail) CreateAndInitCell(chatID string, code ...string) string {
 	return j.makeCatalogVariable(cell)
 }
 
+// Parse creates a new jail cell context, with the given chatID as identifier.
+// New context executes provided JavaScript code, right after the initialization.
+// DEPRECATED
+func (j *Jail) Parse(chatID, code string) string {
+	cell, err := j.cell(chatID)
+	if err != nil {
+		// cell does not exist
+		cell, err = j.createAndInitCell(chatID, code)
+	} else {
+		// cell already exist, so just execute the code
+		_, err = cell.Run(code)
+	}
+
+	if err != nil {
+		return newJailErrorResponse(err)
+	}
+
+	return j.makeCatalogVariable(cell)
+}
+
 // makeCatalogVariable provides `catalog` as a global variable.
 // TODO(divan): this can and should be implemented outside of jail,
 // on a clojure side. Moving this into separate method to nuke it later

@@ -323,6 +323,14 @@ func InitJail(js *C.char) {
 	statusAPI.SetJailBaseJS(C.GoString(js))
 }
 
+//Parse creates a new jail cell context and executes provided JavaScript code.
+//DEPRECATED in favour of CreateAndInitCell and ExecuteJS.
+//export Parse
+func Parse(chatID *C.char, js *C.char) *C.char {
+	res := statusAPI.JailParse(C.GoString(chatID), C.GoString(js))
+	return C.CString(res)
+}
+
 //CreateAndInitCell creates a new jail cell context and executes provided JavaScript code.
 //export CreateAndInitCell
 func CreateAndInitCell(chatID *C.char, js *C.char) *C.char {

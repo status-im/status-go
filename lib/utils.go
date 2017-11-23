@@ -148,6 +148,10 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 			"test ExecuteJS",
 			testExecuteJS,
 		},
+		{
+			"test deprecated Parse",
+			testJailParseDeprecated,
+		},
 	}
 
 	for _, test := range tests {
@@ -1324,6 +1328,48 @@ func testJailInit(t *testing.T) bool {
 	}
 
 	t.Logf("jail inited and parsed: %s", parsedResponse)
+
+	return true
+}
+
+func testJailParseDeprecated(t *testing.T) bool {
+	initCode := `
+		var _status_catalog = {
+			foo: 'bar'
+		};
+	`
+	InitJail(C.CString(initCode))
+
+	extraCode := `
+		var extraFunc = function (x) {
+			return x * x;
+		};
+	`
+	rawResponse := Parse(C.CString("CHAT_ID_PARSE_TEST"), C.CString(extraCode))
+	parsedResponse := C.GoString(rawResponse)
+	expectedResponse := `{"result": {"foo":"bar"}}`
+	if !reflect.DeepEqual(expectedResponse, parsedResponse) {
+		t.Error("expected output not returned from Parse()")
+		return false
+	}
+
+	// cell already exists but Parse should not complain
+	rawResponse = Parse(C.CString("CHAT_ID_PARSE_TEST"), C.CString(extraCode))
+	parsedResponse = C.GoString(rawResponse)
+	expectedResponse = `{"result": {"foo":"bar"}}`
+	if !reflect.DeepEqual(expectedResponse, parsedResponse) {
+		t.Error("expected output not returned from Parse()")
+		return false
+	}
+
+	// test extraCode
+	rawResponse = ExecuteJS(C.CString("CHAT_ID_PARSE_TEST"), C.CString(`extraFunc(2)`))
+	parsedResponse = C.GoString(rawResponse)
+	expectedResponse = `4`
+	if !reflect.DeepEqual(expectedResponse, parsedResponse) {
+		t.Error("expected output not returned from ExecuteJS()")
+		return false
+	}
 
 	return true
 }
