@@ -35,7 +35,7 @@ func NewREPL(serverAddress string) (*REPL, error) {
 // execute it via the client, and print the result.
 func (r *REPL) Run() error {
 	defer func() {
-		r.conn.Close()
+		r.conn.Close() //nolint: errcheck
 	}()
 	input := bufio.NewReader(os.Stdin)
 	for {
