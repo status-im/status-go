@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 
@@ -30,12 +31,85 @@ func TestStartStopNode(t *testing.T) {
 	commandLine := fmt.Sprintf("StartNode(%q)", configJSON)
 	replies := sendCommandLine(assert, conn, commandLine)
 	assert.Len(replies, 1)
-	assert.Equal(replies[0], "[0] nil")
+	assert.Equal("[0] <nil>", replies[0])
 
 	commandLine = "StopNode()"
 	replies = sendCommandLine(assert, conn, commandLine)
 	assert.Len(replies, 1)
-	assert.Equal(replies[0], "[0] nil")
+	assert.Equal("[0] <nil>", replies[0])
+}
+
+// TestCreateAccount tests creating an account on the server.
+func TestCreateAccount(t *testing.T) {
+	assert := assert.New(t)
+	configJSON, cleanup, err := mkConfigJSON("status-create-account")
+	assert.NoError(err)
+	defer cleanup()
+
+	startDebugging(assert)
+
+	conn := connectDebug(assert)
+
+	commandLine := fmt.Sprintf("StartNode(%q)", configJSON)
+	replies := sendCommandLine(assert, conn, commandLine)
+	assert.Len(replies, 1)
+	assert.Equal("[0] <nil>", replies[0])
+
+	commandLine = fmt.Sprintf("CreateAccount(%q)", "password")
+	replies = sendCommandLine(assert, conn, commandLine)
+	assert.Len(replies, 4)
+	assert.NotEqual("[0] <nil>", replies[0])
+	assert.NotEqual("[1] <nil>", replies[1])
+	assert.NotEqual("[2] <nil>", replies[2])
+	assert.Equal("[3] <nil>", replies[3])
+
+	commandLine = "StopNode()"
+	replies = sendCommandLine(assert, conn, commandLine)
+	assert.Len(replies, 1)
+	assert.Equal("[0] <nil>", replies[0])
+}
+
+// TestSelectAccountLogout tests selecting an account on the server
+// and logging out afterwards.
+func TestSelectAccountLogout(t *testing.T) {
+	assert := assert.New(t)
+	configJSON, cleanup, err := mkConfigJSON("status-create-account")
+	assert.NoError(err)
+	defer cleanup()
+
+	startDebugging(assert)
+
+	conn := connectDebug(assert)
+
+	commandLine := fmt.Sprintf("StartNode(%q)", configJSON)
+	replies := sendCommandLine(assert, conn, commandLine)
+	assert.Len(replies, 1)
+	assert.Equal("[0] <nil>", replies[0])
+
+	commandLine = fmt.Sprintf("CreateAccount(%q)", "password")
+	replies = sendCommandLine(assert, conn, commandLine)
+	assert.Len(replies, 4)
+	assert.NotEqual("[0] <nil>", replies[0])
+	assert.NotEqual("[1] <nil>", replies[1])
+	assert.NotEqual("[2] <nil>", replies[2])
+	assert.Equal("[3] <nil>", replies[3])
+
+	address := replies[0][4:]
+
+	commandLine = fmt.Sprintf("SelectAccount(%q, %q)", address, "password")
+	replies = sendCommandLine(assert, conn, commandLine)
+	assert.Len(replies, 1)
+	assert.Equal("[0] <nil>", replies[0])
+
+	commandLine = "Logout()"
+	replies = sendCommandLine(assert, conn, commandLine)
+	assert.Len(replies, 1)
+	assert.Equal("[0] <nil>", replies[0])
+
+	commandLine = "StopNode()"
+	replies = sendCommandLine(assert, conn, commandLine)
+	assert.Len(replies, 1)
+	assert.Equal("[0] <nil>", replies[0])
 }
 
 //-----
@@ -87,21 +161,21 @@ func connectDebug(assert *assert.Assertions) net.Conn {
 
 // sendCommandLine sends a command line via the passed connection.
 func sendCommandLine(assert *assert.Assertions, conn net.Conn, commandLine string) []string {
-	buf := bufio.NewReadWriter(
-		bufio.NewReader(conn),
-		bufio.NewWriter(conn),
-	)
-	_, err := buf.WriteString(commandLine)
+	reader := bufio.NewReader(conn)
+	writer := bufio.NewWriter(conn)
+	_, err := writer.WriteString(commandLine + "\n")
 	assert.NoError(err)
-	countStr, err := buf.ReadString('\n')
+	err = writer.Flush()
 	assert.NoError(err)
-	count, err := strconv.Atoi(countStr)
+	countStr, err := reader.ReadString('\n')
+	assert.NoError(err)
+	count, err := strconv.Atoi(strings.TrimSuffix(countStr, "\n"))
 	assert.NoError(err)
 	replies := make([]string, count)
 	for i := 0; i < count; i++ {
-		reply, err := buf.ReadString('\n')
+		reply, err := reader.ReadString('\n')
 		assert.NoError(err)
-		replies[i] = reply
+		replies[i] = strings.TrimSuffix(reply, "\n")
 	}
 	return replies
 }
