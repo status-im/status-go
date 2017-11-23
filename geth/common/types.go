@@ -299,7 +299,7 @@ type JailManager interface {
 
 	// Parse creates a new jail cell context, with the given chatID as identifier.
 	// New context executes provided JavaScript code, right after the initialization.
-	// DEPRECATED
+	// DEPRECATED in favour of CreateAndInitCell.
 	Parse(chatID, js string) string
 
 	// CreateAndInitCell creates a new jail cell and initialize it

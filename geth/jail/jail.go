@@ -163,7 +163,7 @@ func (j *Jail) CreateAndInitCell(chatID string, code ...string) string {
 
 // Parse creates a new jail cell context, with the given chatID as identifier.
 // New context executes provided JavaScript code, right after the initialization.
-// DEPRECATED
+// DEPRECATED in favour of CreateAndInitCell.
 func (j *Jail) Parse(chatID, code string) string {
 	cell, err := j.cell(chatID)
 	if err != nil {
