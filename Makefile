@@ -63,6 +63,13 @@ statusgo-ios-simulator: xgo	##@cross-compile Build status-go for iOS Simulator
 	$(GOPATH)/bin/xgo --image farazdagi/xgo-ios-simulator --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v $(shell build/testnet-flags.sh) ./lib
 	@echo "iOS framework cross compilation done."
 
+statusgo-library: ##@cross-compile Build status-go as static library for current platform
+	@echo "Building static library..."
+	@go build -buildmode=c-archive -o $(GOBIN)/libstatus ./lib
+	@ranlib $(GOBIN)/libstatus.a
+	@echo "Static lib cross compilation done:"
+	@ls -la $(GOBIN)/libstatus.*
+
 xgo:
 	docker pull farazdagi/xgo
 	go get github.com/karalabe/xgo
