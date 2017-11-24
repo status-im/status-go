@@ -336,10 +336,18 @@ func (r *ChtRequest) Validate(db ethdb.Database, msg *Msg) error {
 	var encNumber [8]byte
 	binary.BigEndian.PutUint64(encNumber[:], r.BlockNum)
 
-	value, err := trie.VerifyProof(r.ChtRoot, encNumber[:], proof.Proof)
-	if err != nil {
-		return err
-	}
+    // Issue 320: If no ChtRoot was supplied, extract ChtRoot from the proof and use that
+    if (common.Hash{} == r.ChtRoot) {
+        chtRoot := trie.ExtractChtRoot(encNumber[:], proof.Proof)
+        log.Debug("Setting r.ChtRoot to: ","chtRoot from proof: ", common.ToHex(chtRoot))
+        r.ChtRoot = common.BytesToHash(chtRoot)
+    }
+
+    value, err := trie.VerifyProof(r.ChtRoot, encNumber[:], proof.Proof)
+    if err != nil {
+	    return err
+    }
+
 	var node light.ChtNode
 	if err := rlp.DecodeBytes(value, &node); err != nil {
 		return err

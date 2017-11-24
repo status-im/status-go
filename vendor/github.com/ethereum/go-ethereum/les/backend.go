@@ -75,6 +75,10 @@ type LightEthereum struct {
 	StatusBackend *ethapi.StatusBackend
 }
 
+func (f LightEthereum) LesOdr() *LesOdr  {
+    return f.odr
+}
+
 func New(ctx *node.ServiceContext, config *eth.Config) (*LightEthereum, error) {
 	chainDb, err := eth.CreateDB(ctx, config, "lightchaindata")
 	if err != nil {
