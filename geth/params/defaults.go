@@ -67,9 +67,6 @@ const (
 	// WhisperDataDir is directory where Whisper data is stored, relative to DataDir
 	WhisperDataDir = "wnode"
 
-	// WhisperPort is Whisper node listening port
-	WhisperPort = 30379
-
 	// WhisperMinimumPoW amount of work for Whisper message to be added to sending queue
 	WhisperMinimumPoW = 0.001
 
