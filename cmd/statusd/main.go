@@ -98,6 +98,8 @@ func startDebug(backend *api.StatusBackend) error {
 }
 
 // startPprof starts the PPROF endpoints on the defined port.
+// Manual registration is needed to only start on demand and
+// on the configured port.
 func startPprof() error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/debug/pprof/", pprof.Index)
