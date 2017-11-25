@@ -100,8 +100,7 @@ func updateChtFromPeer(pm *ProtocolManager, peer *peer, ctx context.Context) {
     var peerHeadBlockNum = hbl.Number
     log.Debug("UpdateChtFromPeer","peerHeadBlockNum", peerHeadBlockNum)
 
-    var chtnum uint64 = (peerHeadBlockNum + 1) / light.ChtFrequency
-    chtnum -= 1
+    var chtnum uint64 = ((peerHeadBlockNum + 1) / light.ChtFrequency) -1
     var blocknum uint64 = chtnum*light.ChtFrequency -1
     log.Debug("CHT block values: ", "chtnum",chtnum,"blocknum",blocknum)
 
@@ -117,7 +116,7 @@ func updateChtFromPeer(pm *ProtocolManager, peer *peer, ctx context.Context) {
 		"develop", NodeConfig.DevMode, 
         "number", chtnum, "hash", common.ToHex(req.ChtRoot.Bytes()))
 
-    log.Info("Sanity check: can download some very old block?")
+    log.Info("Sanity check: can download some very old header?")
     var sanityBlock uint64 = blocknum/100
 	sanityHeader,err := light.GetHeaderByNumber(ctx, LightEth.LesOdr(), sanityBlock)
     log.Info("Sanity check result:", "sanityHeader.Number", sanityHeader.Number, "err", err)
