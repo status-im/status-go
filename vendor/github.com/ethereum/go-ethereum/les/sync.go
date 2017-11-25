@@ -106,7 +106,7 @@ func updateChtFromPeer(pm *ProtocolManager, peer *peer, ctx context.Context) {
     log.Debug("CHT block values: ", "chtnum",chtnum,"blocknum",blocknum)
 
     req := &light.ChtRequest{ChtNum: uint64(chtnum), BlockNum: uint64(blocknum)}
-    LightEth.LesOdr().Retrieve(context.Background(), req)
+    LightEth.LesOdr().Retrieve(ctx, req)
     log.Info("Retrieved latest CHT root from peer, got", "ChtRoot",common.ToHex(req.ChtRoot.Bytes()))
 
 	LightEth.WriteTrustedCht(light.TrustedCht{
