@@ -95,7 +95,7 @@ describe('Whisper MailServer', () => {
                     return;
                 }
 
-                console.log('==========', data);
+                done();
             }, (err) => {
                 done(err)
             });
