@@ -100,7 +100,7 @@ func defaultEmbeddedNodeConfig(config *params.NodeConfig) *node.Config {
 			DiscoveryV5Addr:  ":0",
 			BootstrapNodes:   makeBootstrapNodes(),
 			BootstrapNodesV5: makeBootstrapNodesV5(),
-			ListenAddr:       ":0",
+			ListenAddr:       config.ListenAddr,
 			NAT:              nat.Any(),
 			MaxPeers:         config.MaxPeers,
 			MaxPendingPeers:  config.MaxPendingPeers,

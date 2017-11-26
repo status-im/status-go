@@ -230,6 +230,9 @@ type NodeConfig struct {
 	// remote peer identification as well as network traffic encryption.
 	NodeKeyFile string
 
+	// ListenAddr is an IP address and port of this node (e.g. 127.0.0.1:30303).
+	ListenAddr string
+
 	// Name sets the instance name of the node. It must not contain the / character.
 	Name string `validate:"excludes=/"`
 
@@ -312,6 +315,7 @@ func NewNodeConfig(dataDir string, networkID uint64, devMode bool) (*NodeConfig,
 		RPCEnabled:      RPCEnabledDefault,
 		HTTPHost:        HTTPHost,
 		HTTPPort:        HTTPPort,
+		ListenAddr:      ListenAddr,
 		APIModules:      APIModules,
 		WSHost:          WSHost,
 		WSPort:          WSPort,

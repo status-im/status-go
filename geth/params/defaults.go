@@ -23,6 +23,9 @@ const (
 	// HTTPPort is HTTP-RPC port (replaced in unit tests)
 	HTTPPort = 8545
 
+	// ListenAddr is an IP address and port of this node (e.g. 127.0.0.1:30303).
+	ListenAddr = ":0"
+
 	// APIModules is a list of modules to expose via any type of RPC (HTTP, IPC, in-proc)
 	APIModules = "db,eth,net,web3,shh,personal,admin"
 

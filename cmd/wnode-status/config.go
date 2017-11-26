@@ -11,8 +11,9 @@ import (
 
 var (
 	prodMode    = flag.Bool("production", false, "Whether production settings should be loaded")
-	dataDir     = flag.String("datadir", "wnode-status-data", "Data directory for the databases and keystore")
+	dataDir     = flag.String("datadir", "wnode-data", "Data directory for the databases and keystore")
 	networkID   = flag.Int("networkid", params.RopstenNetworkID, "Network identifier (integer, 1=Homestead, 3=Ropsten, 4=Rinkeby)")
+	listenAddr  = flag.String("listenaddr", params.ListenAddr, "IP address and port of this node (e.g. 127.0.0.1:30303)")
 	httpEnabled = flag.Bool("http", false, "HTTP RPC enpoint enabled (default: false)")
 	httpPort    = flag.Int("httpport", params.HTTPPort, "HTTP RPC server's listening port")
 	ipcEnabled  = flag.Bool("ipc", false, "IPC RPC endpoint enabled")
@@ -43,6 +44,8 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	nodeConfig.ListenAddr = *listenAddr
 
 	nodeConfig.LogLevel = *logLevel
 	if filepath.IsAbs(*logFile) {
