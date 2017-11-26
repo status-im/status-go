@@ -66,6 +66,7 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 	whisperConfig.EnablePushNotification = *enablePN
 	whisperConfig.EnableMailServer = *enableMailServer
 	whisperConfig.MinimumPoW = *minPow
+	whisperConfig.TTL = *ttl
 
 	if whisperConfig.EnableMailServer && whisperConfig.PasswordFile == "" {
 		return nil, errors.New("mail server requires -password to be specified")
