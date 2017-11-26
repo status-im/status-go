@@ -73,7 +73,7 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 	}
 
 	if whisperConfig.EnablePushNotification && whisperConfig.IdentityFile == "" {
-		return nil, errors.New("notification server requires either -identity file to be specified")
+		return nil, errors.New("notification server requires -identity file to be specified")
 	}
 
 	if whisperConfig.PasswordFile != "" {
