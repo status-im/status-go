@@ -43,7 +43,8 @@ func (r *REPL) Run() error {
 		fmt.Print(">>> ")
 		command, err := input.ReadString('\n')
 		if err != nil {
-			return err
+			fmt.Printf("ERR %v\n", err)
+			continue
 		}
 		// Check for possible end.
 		if strings.ToLower(command) == "quit" {
@@ -52,25 +53,30 @@ func (r *REPL) Run() error {
 		// Execute on statusd.
 		_, err = r.writer.WriteString(command + "\n")
 		if err != nil {
-			return err
+			fmt.Printf("ERR %v\n", err)
+			continue
 		}
 		err = r.writer.Flush()
 		if err != nil {
-			return err
+			fmt.Printf("ERR %v\n", err)
+			continue
 		}
 		// Print result.
 		countStr, err := r.reader.ReadString('\n')
 		if err != nil {
-			return err
+			fmt.Printf("ERR %v\n", err)
+			continue
 		}
 		count, err := strconv.Atoi(strings.TrimSuffix(countStr, "\n"))
 		if err != nil {
-			return err
+			fmt.Printf("ERR %v\n", err)
+			continue
 		}
 		for i := 0; i < count; i++ {
 			reply, err := r.reader.ReadString('\n')
 			if err != nil {
-				return err
+				fmt.Printf("ERR %v\n", err)
+				continue
 			}
 			fmt.Print("<<< ")
 			fmt.Print(reply)
