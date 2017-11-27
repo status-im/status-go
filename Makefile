@@ -67,7 +67,7 @@ statusgo-library: ##@cross-compile Build status-go as static library for current
 	@echo "Building static library..."
 	@go build -buildmode=c-archive -o $(GOBIN)/libstatus ./lib
 	@ranlib $(GOBIN)/libstatus.a
-	@echo "Static lib cross compilation done:"
+	@echo "Static library built:"
 	@ls -la $(GOBIN)/libstatus.*
 
 xgo:
