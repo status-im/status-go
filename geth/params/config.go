@@ -103,6 +103,7 @@ type WhisperConfig struct {
 	EnablePushNotification bool
 
 	// DataDir is the file system folder Whisper should use for any data storage needs.
+	// For instance, MailServer will use this directory to store its data.
 	DataDir string
 
 	// MinimumPoW minimum PoW for Whisper messages
