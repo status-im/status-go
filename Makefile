@@ -65,8 +65,7 @@ statusgo-ios-simulator: xgo	##@cross-compile Build status-go for iOS Simulator
 
 statusgo-library: ##@cross-compile Build status-go as static library for current platform
 	@echo "Building static library..."
-	@go build -buildmode=c-archive -o $(GOBIN)/libstatus ./lib
-	@ranlib $(GOBIN)/libstatus.a
+	go build -buildmode=c-archive -o $(GOBIN)/libstatus.a ./lib
 	@echo "Static library built:"
 	@ls -la $(GOBIN)/libstatus.*
 
