@@ -34,9 +34,7 @@ func NewREPL(serverAddress string) (*REPL, error) {
 // Run operates the loop to read a command and its arguments,
 // execute it via the client, and print the result.
 func (r *REPL) Run() error {
-	defer func() {
-		r.conn.Close() //nolint: errcheck
-	}()
+	defer r.conn.Close() // nolint: errcheck
 	input := bufio.NewReader(os.Stdin)
 	for {
 		// Read command line.

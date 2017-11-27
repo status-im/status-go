@@ -22,7 +22,7 @@ type Debug struct {
 // New creates a debugger using the oassed Status API.
 // It also starts the server.
 func New(statusAPI *api.StatusAPI) (*Debug, error) {
-	listener, err := net.Listen("tcp", ":51515")
+	listener, err := net.Listen("tcp", ":51515") // nolint
 	if err != nil {
 		return nil, err
 	}
