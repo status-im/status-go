@@ -155,6 +155,5 @@ func ExtractChtRoot(key []byte, proof []rlp.RawValue) []byte {
 	buf := proof[0]
 	sha.Reset()
 	sha.Write(buf)
-    return sha.Sum(nil)
+	return sha.Sum(nil)
 }
-

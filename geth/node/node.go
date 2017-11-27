@@ -144,8 +144,8 @@ func activateEthService(stack *node.Node, config *params.NodeConfig) error {
 	if err := stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
 		lightEth, err := les.New(ctx, &ethConf)
 
-        les.LightEth = lightEth
-        les.NodeConfig = config
+		les.LightEth = lightEth
+		les.NodeConfig = config
 		return lightEth, err
 	}); err != nil {
 		return fmt.Errorf("%v: %v", ErrLightEthRegistrationFailure, err)

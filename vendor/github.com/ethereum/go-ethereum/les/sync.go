@@ -86,39 +86,38 @@ func (pm *ProtocolManager) synchronise(peer *peer) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-    updateChtFromPeer(pm, peer, ctx)
+	updateChtFromPeer(pm, peer, ctx)
 	pm.blockchain.(*light.LightChain).SyncCht(ctx)
 	pm.downloader.Synchronise(peer.id, peer.Head(), peer.Td(), downloader.LightSync)
 }
 
 // Status.im issue 320: Use GetHeaderProofs to download the latest CHT from a peer.
 func updateChtFromPeer(pm *ProtocolManager, peer *peer, ctx context.Context) {
-    log.Info("Downloading latest CHT root from peer", "peer.headBlockInfo", peer.headBlockInfo())
+	log.Info("Downloading latest CHT root from peer", "peer.headBlockInfo", peer.headBlockInfo())
 
-    // Formula from lightchain.go:SyncCht: num := cht.Number*ChtFrequency – 1
+	// Formula from lightchain.go:SyncCht: num := cht.Number*ChtFrequency – 1
 	var hbl = peer.headBlockInfo()
-    var peerHeadBlockNum = hbl.Number
-    log.Debug("UpdateChtFromPeer","peerHeadBlockNum", peerHeadBlockNum)
+	var peerHeadBlockNum = hbl.Number
+	log.Debug("UpdateChtFromPeer", "peerHeadBlockNum", peerHeadBlockNum)
 
-    var chtnum uint64 = ((peerHeadBlockNum + 1) / light.ChtFrequency) -1
-    var blocknum uint64 = chtnum*light.ChtFrequency -1
-    log.Debug("CHT block values: ", "chtnum",chtnum,"blocknum",blocknum)
+	var chtnum uint64 = ((peerHeadBlockNum + 1) / light.ChtFrequency) - 1
+	var blocknum uint64 = chtnum*light.ChtFrequency - 1
+	log.Debug("CHT block values: ", "chtnum", chtnum, "blocknum", blocknum)
 
-    req := &light.ChtRequest{ChtNum: uint64(chtnum), BlockNum: uint64(blocknum)}
-    LightEth.LesOdr().Retrieve(ctx, req)
-    log.Info("Retrieved latest CHT root from peer, got", "ChtRoot",common.ToHex(req.ChtRoot.Bytes()))
+	req := &light.ChtRequest{ChtNum: uint64(chtnum), BlockNum: uint64(blocknum)}
+	LightEth.LesOdr().Retrieve(ctx, req)
+	log.Info("Retrieved latest CHT root from peer, got", "ChtRoot", common.ToHex(req.ChtRoot.Bytes()))
 
 	LightEth.WriteTrustedCht(light.TrustedCht{
-		Number: chtnum, 
-		Root: req.ChtRoot, 
+		Number: chtnum,
+		Root:   req.ChtRoot,
 	})
 	log.Info("Added trusted CHT",
-		"develop", NodeConfig.DevMode, 
-        "number", chtnum, "hash", common.ToHex(req.ChtRoot.Bytes()))
+		"develop", NodeConfig.DevMode,
+		"number", chtnum, "hash", common.ToHex(req.ChtRoot.Bytes()))
 
-    log.Info("Sanity check: can download some very old header?")
-    var sanityBlock uint64 = blocknum/100
-	sanityHeader,err := light.GetHeaderByNumber(ctx, LightEth.LesOdr(), sanityBlock)
-    log.Info("Sanity check result:", "sanityHeader.Number", sanityHeader.Number, "err", err)
+	log.Info("Sanity check: can download some very old header?")
+	var sanityBlock uint64 = blocknum / 100
+	sanityHeader, err := light.GetHeaderByNumber(ctx, LightEth.LesOdr(), sanityBlock)
+	log.Info("Sanity check result:", "sanityHeader.Number", sanityHeader.Number, "err", err)
 }
-
