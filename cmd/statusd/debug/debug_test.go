@@ -128,7 +128,7 @@ func startDebugging(assert *assert.Assertions) {
 	if d == nil {
 		var err error
 		api := api.NewStatusAPI()
-		d, err = debug.New(api)
+		d, err = debug.New(api, debug.CLIPort)
 		assert.NoError(err)
 	}
 }

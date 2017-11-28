@@ -10,6 +10,11 @@ import (
 	"github.com/status-im/status-go/geth/api"
 )
 
+const (
+	// CLIPort is the CLI port.
+	CLIPort = "51515"
+)
+
 // Debug provides a server receiving line based commands from a
 // CLI via the debugging port and executing those on the Status API
 // using reflection. The returned values will be rendered as
@@ -21,17 +26,17 @@ type Debug struct {
 
 // New creates a debugger using the oassed Status API.
 // It also starts the server.
-func New(statusAPI *api.StatusAPI) (*Debug, error) {
-	listener, err := net.Listen("tcp", ":51515") // nolint
+func New(statusAPI *api.StatusAPI, port string) (*Debug, error) {
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%s", port)) // nolint
 	if err != nil {
 		return nil, err
 	}
-	d := &Debug{
+	d := Debug{
 		csv:      reflect.ValueOf(newCommandSet(statusAPI)),
 		listener: listener,
 	}
 	go d.backend()
-	return d, nil
+	return &d, nil
 }
 
 // backend receives the commands and executes them on
@@ -49,15 +54,10 @@ func (d *Debug) backend() {
 
 // handleConnection handles all commands of one connection.
 func (d *Debug) handleConnection(conn net.Conn) {
-	var err error
 	reader := bufio.NewReader(conn)
 	writer := bufio.NewWriter(conn)
 	defer func() {
-		if err != nil {
-			log.Printf("error during debug connection: %v", err)
-		}
-		err = conn.Close()
-		if err != nil {
+		if err := conn.Close(); err != nil {
 			log.Printf("error whil closing debug connection: %v", err)
 		}
 	}()
@@ -65,14 +65,17 @@ func (d *Debug) handleConnection(conn net.Conn) {
 	for {
 		command, err := d.readCommandLine(reader)
 		if err != nil {
+			log.Printf("error during debug command reading: %v", err)
 			return
 		}
 		replies, err := command.execute(d.csv)
 		if err != nil {
+			log.Printf("error during debug command execution: %v", err)
 			return
 		}
 		err = d.writeRplies(writer, replies)
 		if err != nil {
+			log.Printf("error during writing debug replies: %v", err)
 			return
 		}
 	}

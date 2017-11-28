@@ -38,14 +38,14 @@ func newCommand(commandLine string) (*command, error) {
 	}
 }
 
-// exeecute calls the method on the passed command set value.
-func (c *command) execute(csv reflect.Value) (replies []string, err error) {
+// execute calls the method on the passed command set value.
+func (c *command) execute(commandSetValue reflect.Value) (replies []string, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("invalid API call: %v", r)
 		}
 	}()
-	method := csv.MethodByName(c.funcName)
+	method := commandSetValue.MethodByName(c.funcName)
 	if !method.IsValid() {
 		return nil, fmt.Errorf("command %q not found", c.funcName)
 	}

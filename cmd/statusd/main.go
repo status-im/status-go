@@ -30,7 +30,8 @@ var (
 	httpEnabled    = flag.Bool("http", false, "HTTP RPC endpoint enabled (default: false)")
 	httpPort       = flag.Int("httpport", params.HTTPPort, "HTTP RPC server's listening port")
 	ipcEnabled     = flag.Bool("ipc", false, "IPC RPC endpoint enabled")
-	cli            = flag.Bool("cli", false, "Enable debugging CLI connection")
+	cliEnabled     = flag.Bool("cli", false, "Enable debugging CLI server")
+	cliPort        = flag.String("cliport", debug.CLIPort, "CLI server's listening port")
 	pprofPort      = flag.String("pprof", "", "Enable profiling on port <port>")
 	logLevel       = flag.String("log", "INFO", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
 	logFile        = flag.String("logfile", "", "Path to the log file")
@@ -63,7 +64,7 @@ func main() {
 	<-started
 
 	// Check if debugging CLI connection shall be enabled.
-	if *cli {
+	if *cliEnabled {
 		err := startDebug(backend)
 		if err != nil {
 			log.Fatalf("Starting debugging CLI server failed: %v", err)
@@ -73,11 +74,7 @@ func main() {
 
 	// Check if pprof shall be enabled.
 	if *pprofPort != "" {
-		err := startPprof()
-		if err != nil {
-			log.Fatalf("Starting of profiling failed: %v", err)
-			return
-		}
+		startPprof()
 	}
 
 	// wait till node has been stopped
@@ -93,14 +90,14 @@ func main() {
 // startDebug starts the debugging API server.
 func startDebug(backend *api.StatusBackend) error {
 	statusAPI := api.NewStatusAPIWithBackend(backend)
-	_, err := debug.New(statusAPI)
+	_, err := debug.New(statusAPI, *cliPort)
 	return err
 }
 
 // startPprof starts the PPROF endpoints on the defined port.
 // Manual registration is needed to only start on demand and
 // on the configured port.
-func startPprof() error {
+func startPprof() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/debug/pprof/", pprof.Index)
 	mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
@@ -111,7 +108,7 @@ func startPprof() error {
 		Addr:    ":" + (*pprofPort),
 		Handler: mux,
 	}
-	return s.ListenAndServe()
+	go s.ListenAndServe()
 }
 
 // makeNodeConfig parses incoming CLI options and returns node configuration object
@@ -178,11 +175,11 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, "Usage: statusd [options]")
 	fmt.Fprintf(os.Stderr, `
 Examples:
-  statusd                      # run status node with defaults
-  statusd -networkid 4         # run node on Rinkeby network
-  statusd -datadir /dir        # specify different dir for data
-  statusd -ipc                 # enable IPC for usage with "geth attach"
-  statusd -cli localhost:12345 # enable connection by local statusd-cli on port 12345
+  statusd               # run status node with defaults
+  statusd -networkid 4  # run node on Rinkeby network
+  statusd -datadir /dir # specify different dir for data
+  statusd -ipc          # enable IPC for usage with "geth attach"
+  statusd -cli          # enable connection by statusd-cli
 
 Options:
 `)

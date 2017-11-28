@@ -3,11 +3,21 @@ package main
 import (
 	"flag"
 	"fmt"
+	"net"
 	"os"
 )
 
+const (
+	// StatusDHost is the default host to connect to.
+	StatusDHost = "localhost"
+
+	// StatusDPort is the default port to connect to.
+	StatusDPort = "51515"
+)
+
 var (
-	statusdConn = flag.String("statusd", "localhost", "set host of statusd")
+	statusdHost = flag.String("statusd", StatusDHost, "set host of statusd connection")
+	statusdPort = flag.String("statusdport", StatusDPort, "set port of statusd connection")
 )
 
 // main is the entrypoint for the statusd command line interface.
@@ -15,16 +25,13 @@ func main() {
 	flag.Usage = printUsage
 	flag.Parse()
 
-	fmt.Printf("statusd-cli connecting statusd on %v\n", *statusdConn)
+	host := net.JoinHostPort(*statusdHost, *statusdPort)
 
-	// Starting REPL.
-	repl, err := NewREPL("localhost")
-	if err != nil {
-		fmt.Printf("cannot start REPL: %v\n", err)
-		os.Exit(-1)
-	}
+	fmt.Printf("statusd-cli connecting statusd on '%s'\n", host)
 
-	err = repl.Run()
+	// Running REPL.
+	repl := NewREPL(host)
+	err := repl.Run()
 	if err != nil {
 		fmt.Printf("stopped with error: %v\n", err)
 		os.Exit(-1)
