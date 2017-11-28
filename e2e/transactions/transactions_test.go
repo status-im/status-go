@@ -594,7 +594,7 @@ func (s *TransactionsTestSuite) TestCompleteMultipleQueuedTransactions() {
 		}
 	}
 
-	wg := sync.WaitGroup{}
+	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
 		ids := make([]common.QueuedTxID, testTxCount)
