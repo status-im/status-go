@@ -108,7 +108,7 @@ func startPprof() {
 		Addr:    ":" + (*pprofPort),
 		Handler: mux,
 	}
-	go s.ListenAndServe()
+	go s.ListenAndServe() // nolint: errcheck
 }
 
 // makeNodeConfig parses incoming CLI options and returns node configuration object
