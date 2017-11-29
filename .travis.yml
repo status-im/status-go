@@ -7,14 +7,15 @@ sudo: false
 dist: trusty
 install:
 - go get golang.org/x/tools/cmd/cover
-- make lint-deps
+- make mock-install
+- make lint-install
 jobs:
   include:
   - stage: Lint
     script: make lint
   - stage: Test unit and integration
     script: make test-unit-coverage
-  - stage: Test e2e on privite network
+  - stage: Test e2e on private network
     script: make test-e2e
   - stage: Test e2e on public network
     # disable running this stage for PRs as they do not have access
