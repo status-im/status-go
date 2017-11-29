@@ -179,7 +179,7 @@ Examples:
   statusd -networkid 4  # run node on Rinkeby network
   statusd -datadir /dir # specify different dir for data
   statusd -ipc          # enable IPC for usage with "geth attach"
-  statusd -cli          # enable connection by statusd-cli
+  statusd -cli          # enable connection by statusd-cli on default port
 
 Options:
 `)
