@@ -115,7 +115,6 @@ func newCommandSet(statusAPI *api.StatusAPI) *commandSet {
 
 // StartNode loads the configuration out of the passed string and
 // starts a node with it.
-// nolint: unparam
 func (cs *commandSet) StartNode(config string) error {
 	nodeConfig, err := params.LoadNodeConfig(config)
 	if err != nil {
@@ -125,25 +124,42 @@ func (cs *commandSet) StartNode(config string) error {
 }
 
 // StopNode starts the stopped node.
-// nolint: unparam
 func (cs *commandSet) StopNode() error {
 	return cs.statusAPI.StopNode()
 }
 
+// ResetChainData removes chain data from data directory.
+func (cs *commandSet) ResetChainData() error {
+	_, err := cs.statusAPI.ResetChainDataAsync()
+	return err
+}
+
+// CallRPC calls status node via RPC.
+func (cs *commandSet) CallRPC(inputJSON string) string {
+	return cs.statusAPI.CallRPC(inputJSON)
+}
+
 // CreateAccount creates an internal geth account.
-// nolint: unparam
 func (cs *commandSet) CreateAccount(password string) (string, string, string, error) {
 	return cs.statusAPI.CreateAccount(password)
 }
 
+// CreateChildAccount creates a sub-account.
+func (cs *commandSet) CreateChildAccount(parentAddress, password string) (string, string, error) {
+	return cs.statusAPI.CreateChildAccount(parentAddress, password)
+}
+
+// RecoverAccount re-creates the master key using the given details.
+func (cs *commandSet) RecoverAccount(password, mnemonic string) (string, string, error) {
+	return cs.statusAPI.RecoverAccount(password, mnemonic)
+}
+
 // SelectAccount selects the addressed account.
-// nolint: unparam
 func (cs *commandSet) SelectAccount(address, password string) error {
 	return cs.statusAPI.SelectAccount(address, password)
 }
 
 // Logout clears the Whisper identities.
-// nolint: unparam
 func (cs *commandSet) Logout() error {
 	return cs.statusAPI.Logout()
 }
