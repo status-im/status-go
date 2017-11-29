@@ -44,9 +44,15 @@ const (
 
 var writeDelay time.Duration = 0
 
-func init() {
+// NOTE(oskarth): Previously this was an n init function that was called before
+// RN was even started, which meant there was nothing in the environment yet.
+func setWriteDelay() {
 	str, ok := os.LookupEnv("FEATURE_SYNC_DELAY")
+	// XXX(oskarth): INFO not showing up in logs, easily greppable
+	fmt.Println("[FLAG] Set FEATURE_SYNC_DELAY", str)
+	log.Info("[FLAG] Set FEATURE_SYNC_DELAY info", str)
 	if !ok {
+		fmt.Println("[FLAG] Set FEATURE_SYNC_DELAY !ok", ok)
 		return
 	}
 	delay, err := strconv.ParseInt(str, 10, 0)
@@ -278,6 +284,10 @@ func (hc *HeaderChain) ValidateHeaderChain(chain []*types.Header, checkFreq int)
 // of the header retrieval mechanisms already need to verfy nonces, as well as
 // because nonces can be verified sparsely, not needing to check each.
 func (hc *HeaderChain) InsertHeaderChain(chain []*types.Header, writeHeader WhCallback, start time.Time) (int, error) {
+
+	// TODO(oskarth): Init this earlier in chain but after StartNode
+	setWriteDelay()
+
 	// Collect some import statistics to report on
 	stats := struct{ processed, ignored int }{}
 	// All headers passed verification, import them into the database
