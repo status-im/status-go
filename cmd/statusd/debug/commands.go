@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/status-im/status-go/geth/api"
+	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
 )
 
@@ -162,4 +163,13 @@ func (cs *commandSet) SelectAccount(address, password string) error {
 // Logout clears the Whisper identities.
 func (cs *commandSet) Logout() error {
 	return cs.statusAPI.Logout()
+}
+
+// CompleteTransaction instructs API to complete sending of a given transaction.
+func (cs *commandSet) CompleteTransaction(id, password string) (string, error) {
+	txHash, err := cs.statusAPI.CompleteTransaction(common.QueuedTxID(id), password)
+	if err != nil {
+		return "", err
+	}
+	return txHash.Hex(), nil
 }
