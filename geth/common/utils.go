@@ -26,7 +26,7 @@ const (
 	MessageIDKey = contextKey("message_id")
 )
 
-type contextKey string // in order to make sure that our context key does not collide with keys from other packages
+type contextKey string // in order to make sure that our ctx key does not collide with keys from other packages
 
 // errors
 var (
@@ -104,7 +104,7 @@ func NameOf(f interface{}) string {
 	return v.String()
 }
 
-// MessageIDFromContext returns message id from context (if exists)
+// MessageIDFromContext returns message id from ctx (if exists)
 func MessageIDFromContext(ctx context.Context) string {
 	if ctx == nil {
 		return ""

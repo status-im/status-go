@@ -279,7 +279,7 @@ type JailCell interface {
 
 // JailManager defines methods for managing jailed environments
 type JailManager interface {
-	// Call executes given JavaScript function w/i a jail cell context identified by the chatID.
+	// Call executes given JavaScript function w/i a jail cell ctx identified by the chatID.
 	Call(chatID, this, args string) string
 
 	// CreateCell creates a new jail cell.

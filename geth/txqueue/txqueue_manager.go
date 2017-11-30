@@ -79,7 +79,7 @@ func (m *Manager) TransactionQueue() common.TxQueue {
 
 // CreateTransaction returns a transaction object.
 func (m *Manager) CreateTransaction(ctx context.Context, args common.SendTxArgs) *common.QueuedTx {
-	return common.NewQueuedTx(common.QueuedTxID(uuid.New()), ctx, args)
+	return common.NewQueuedTx(ctx, common.QueuedTxID(uuid.New()), args)
 }
 
 // QueueTransaction puts a transaction into the queue.

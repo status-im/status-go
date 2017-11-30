@@ -11,7 +11,7 @@ import (
 type QueuedTx struct {
 	id         QueuedTxID
 	hash       common.Hash
-	context    context.Context
+	ctx        context.Context
 	args       SendTxArgs
 	inProgress bool // true if transaction is being sent
 	done       chan struct{}
@@ -21,14 +21,28 @@ type QueuedTx struct {
 }
 
 // NewQueuedTx QueuedTx constructor.
-func NewQueuedTx(id QueuedTxID, ctx context.Context, args SendTxArgs) *QueuedTx {
+func NewQueuedTx(ctx context.Context, id QueuedTxID, args SendTxArgs) *QueuedTx {
 	return &QueuedTx{
 		id:      id,
-		context: ctx,
+		ctx:     ctx,
 		args:    args,
 		done:    make(chan struct{}, 1),
 		discard: make(chan struct{}, 1),
 	}
+}
+
+// Set updates transaction.
+func (tx *QueuedTx) Set(t *QueuedTx) {
+	t.Lock()
+	defer t.Unlock()
+	tx.Lock()
+	defer tx.Unlock()
+
+	tx.id = t.id
+	tx.ctx = t.ctx
+	tx.args = t.args
+	tx.done = t.done
+	tx.discard = t.discard
 }
 
 // ID gets queued transaction ID.
@@ -63,20 +77,20 @@ func (tx *QueuedTx) SetHash(hash common.Hash) {
 	tx.hash = hash
 }
 
-// Context gets queued transaction context.
+// Context gets queued transaction ctx.
 func (tx *QueuedTx) Context() context.Context {
 	tx.RLock()
 	defer tx.RUnlock()
 
-	return tx.context
+	return tx.ctx
 }
 
-// SetContext sets queued transaction context.
+// SetContext sets queued transaction ctx.
 func (tx *QueuedTx) SetContext(ctx context.Context) {
 	tx.Lock()
 	defer tx.Unlock()
 
-	tx.context = ctx
+	tx.ctx = ctx
 }
 
 // Args gets queued transaction args.

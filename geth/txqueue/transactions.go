@@ -8,8 +8,8 @@ import (
 
 // transactions safely holds queued transactions.
 type transactions struct {
-	m map[common.QueuedTxID]*common.QueuedTx
-	l sync.RWMutex
+	mu sync.RWMutex
+	m  map[common.QueuedTxID]*common.QueuedTx
 }
 
 // newTransactions is a transaction constructor.
@@ -18,42 +18,42 @@ func newTransactions() *transactions {
 }
 
 // reset transactions state.
-func (tr *transactions) reset() {
-	tr.l.Lock()
-	defer tr.l.Unlock()
+func (t *transactions) reset() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 
-	tr.m = make(map[common.QueuedTxID]*common.QueuedTx)
+	t.m = make(map[common.QueuedTxID]*common.QueuedTx)
 }
 
 // add transaction with key ID.
-func (tr *transactions) add(key common.QueuedTxID, value *common.QueuedTx) {
-	tr.l.Lock()
-	defer tr.l.Unlock()
+func (t *transactions) add(key common.QueuedTxID, value *common.QueuedTx) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 
-	tr.m[key] = value
+	t.m[key] = value
 }
 
 // get transaction by a key.
-func (tr *transactions) get(key common.QueuedTxID) (value *common.QueuedTx, ok bool) {
-	tr.l.RLock()
-	defer tr.l.RUnlock()
+func (t *transactions) get(key common.QueuedTxID) (value *common.QueuedTx, ok bool) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
 
-	value, ok = tr.m[key]
+	value, ok = t.m[key]
 	return
 }
 
 // delete transaction by a key.
-func (tr *transactions) delete(key common.QueuedTxID) {
-	tr.l.Lock()
-	defer tr.l.Unlock()
+func (t *transactions) delete(key common.QueuedTxID) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 
-	delete(tr.m, key)
+	delete(t.m, key)
 }
 
 // len counts transactions.
-func (tr *transactions) len() int {
-	tr.l.RLock()
-	defer tr.l.RUnlock()
+func (t *transactions) len() int {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
 
-	return len(tr.m)
+	return len(t.m)
 }

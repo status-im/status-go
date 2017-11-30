@@ -796,7 +796,7 @@ func (s *TransactionsTestSuite) TestEvictionOfQueuedTransactions() {
 
 	s.Zero(txQueue.Count(), "transaction count should be zero")
 
-	wg := sync.WaitGroup{}
+	var wg sync.WaitGroup
 	for j := 0; j < 10; j++ {
 		wg.Add(1)
 		go func() {
