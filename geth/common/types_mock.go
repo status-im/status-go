@@ -805,6 +805,18 @@ func (mr *MockJailManagerMockRecorder) CreateCell(chatID interface{}) *gomock.Ca
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateCell", reflect.TypeOf((*MockJailManager)(nil).CreateCell), chatID)
 }
 
+// Parse mocks base method
+func (m *MockJailManager) Parse(chatID, js string) string {
+	ret := m.ctrl.Call(m, "Parse", chatID, js)
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// Parse indicates an expected call of Parse
+func (mr *MockJailManagerMockRecorder) Parse(chatID, js interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Parse", reflect.TypeOf((*MockJailManager)(nil).Parse), chatID, js)
+}
+
 // CreateAndInitCell mocks base method
 func (m *MockJailManager) CreateAndInitCell(chatID string, code ...string) string {
 	varargs := []interface{}{chatID}
