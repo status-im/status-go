@@ -1,15 +1,9 @@
 {
   "alloc": {
-     "AdAf150b905Cf5E6A778E553E15A139B6618BbB7": {
+     "bF164ca341326a03b547c05B343b2E21eFAe24b9": {
       "balance": "0x10F0CF064DD59200000"
     },
-     "65C01586aa0Ce152835c788aCe665e91Ab3527b8": {
-      "balance": "0x1B1AE4D6E2EF500000"
-    },
-     "F35E0325dad87e2661c4eF951d58727e6d583d5c": {
-      "balance": "0x10F0CF064DD59200000"
-    },
-     "A0a19221268d939c3a972bf5461dC10f7980E814": {
+     "205a5d0e72ff65079fcabb4a63e33d28aa6def2c": {
       "balance": "0x10F0CF064DD59200000"
     }
   },

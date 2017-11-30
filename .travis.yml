@@ -2,21 +2,27 @@ notifications:
   email: false
 language: go
 go:
-- 1.8
+- 1.9
 sudo: false
 dist: trusty
 install:
 - go get golang.org/x/tools/cmd/cover
-- make lint-deps
+- make mock-install
+- make lint-install
 jobs:
   include:
   - stage: Lint
     script: make lint
   - stage: Test unit and integration
     script: make test-unit-coverage
-  - stage: Test e2e on privite network
+  - stage: Test e2e on private network
     script: make test-e2e
   - stage: Test e2e on public network
+    # disable running this stage for PRs as they do not have access
+    # to the ACCOUNT_PASSWORD env variable needed to unlock the public testnet accounts.
+    # using fork == false may be preferred as it would allow PRs from the origin
+    # to still run, but currently does not work due to a bug
+    if: type != pull_request
     script: travis_wait 300 make test-e2e networkid=4
 cache:
   directories:

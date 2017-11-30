@@ -146,10 +146,11 @@ func (s *JailTestSuite) TestEventSignal() {
 	opCompletedSuccessfully := make(chan struct{}, 1)
 
 	// replace transaction notification handler
+	defer signal.ResetDefaultNodeNotificationHandler()
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var envelope signal.Envelope
-		err = json.Unmarshal([]byte(jsonEvent), &envelope)
-		s.NoError(err)
+		unmarshalErr := json.Unmarshal([]byte(jsonEvent), &envelope)
+		s.NoError(unmarshalErr)
 
 		if envelope.Type == jail.EventSignal {
 			event := envelope.Event.(map[string]interface{})

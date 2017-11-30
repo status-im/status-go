@@ -2,7 +2,7 @@ LINT_EXCLUDE := --exclude='.*_mock.go' --exclude='geth/jail/doc.go'
 LINT_FOLDERS := extkeys cmd/... geth/... e2e/...
 LINT_FOLDERS_WITHOUT_TESTS := extkeys cmd/... geth/...
 
-lint-deps:
+lint-install:
 	go get -u github.com/alecthomas/gometalinter
 	gometalinter --install
 

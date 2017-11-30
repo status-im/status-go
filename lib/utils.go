@@ -1,3 +1,12 @@
+// +build e2e_test
+
+// This is a file with e2e tests for C bindings written in library.go.
+// As a CGO file, it can't have `_test.go` suffix as it's not allowed by Go.
+// At the same time, we don't want this file to be included in the binaries.
+// This is why `e2e_test` tag was introduced. Without it, this file is excluded
+// from the build. Providing this tag will include this file into the build
+// and that's what is done while running e2e tests for `lib/` package.
+
 package main
 
 import "C"
@@ -56,10 +65,10 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 
 	// prepare accounts
 	testKeyDir := filepath.Join(testChainDir, "keystore")
-	if err := common.ImportTestAccount(testKeyDir, "test-account1.pk"); err != nil {
+	if err := common.ImportTestAccount(testKeyDir, GetAccount1PKFile()); err != nil {
 		panic(err)
 	}
-	if err := common.ImportTestAccount(testKeyDir, "test-account2.pk"); err != nil {
+	if err := common.ImportTestAccount(testKeyDir, GetAccount2PKFile()); err != nil {
 		panic(err)
 	}
 
@@ -139,6 +148,10 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 			"test ExecuteJS",
 			testExecuteJS,
 		},
+		{
+			"test deprecated Parse",
+			testJailParseDeprecated,
+		},
 	}
 
 	for _, test := range tests {
@@ -157,15 +170,15 @@ func testVerifyAccountPassword(t *testing.T) bool {
 	}
 	defer os.RemoveAll(tmpDir) // nolint: errcheck
 
-	if err = common.ImportTestAccount(tmpDir, "test-account1.pk"); err != nil {
+	if err = common.ImportTestAccount(tmpDir, GetAccount1PKFile()); err != nil {
 		t.Fatal(err)
 	}
-	if err = common.ImportTestAccount(tmpDir, "test-account2.pk"); err != nil {
+	if err = common.ImportTestAccount(tmpDir, GetAccount2PKFile()); err != nil {
 		t.Fatal(err)
 	}
 
 	// rename account file (to see that file's internals reviewed, when locating account key)
-	accountFilePathOriginal := filepath.Join(tmpDir, "test-account1.pk")
+	accountFilePathOriginal := filepath.Join(tmpDir, GetAccount1PKFile())
 	accountFilePath := filepath.Join(tmpDir, "foo"+TestConfig.Account1.Address+"bar.pk")
 	if err := os.Rename(accountFilePathOriginal, accountFilePath); err != nil {
 		t.Fatal(err)
@@ -1319,6 +1332,48 @@ func testJailInit(t *testing.T) bool {
 	return true
 }
 
+func testJailParseDeprecated(t *testing.T) bool {
+	initCode := `
+		var _status_catalog = {
+			foo: 'bar'
+		};
+	`
+	InitJail(C.CString(initCode))
+
+	extraCode := `
+		var extraFunc = function (x) {
+			return x * x;
+		};
+	`
+	rawResponse := Parse(C.CString("CHAT_ID_PARSE_TEST"), C.CString(extraCode))
+	parsedResponse := C.GoString(rawResponse)
+	expectedResponse := `{"result": {"foo":"bar"}}`
+	if !reflect.DeepEqual(expectedResponse, parsedResponse) {
+		t.Error("expected output not returned from Parse()")
+		return false
+	}
+
+	// cell already exists but Parse should not complain
+	rawResponse = Parse(C.CString("CHAT_ID_PARSE_TEST"), C.CString(extraCode))
+	parsedResponse = C.GoString(rawResponse)
+	expectedResponse = `{"result": {"foo":"bar"}}`
+	if !reflect.DeepEqual(expectedResponse, parsedResponse) {
+		t.Error("expected output not returned from Parse()")
+		return false
+	}
+
+	// test extraCode
+	rawResponse = ExecuteJS(C.CString("CHAT_ID_PARSE_TEST"), C.CString(`extraFunc(2)`))
+	parsedResponse = C.GoString(rawResponse)
+	expectedResponse = `4`
+	if !reflect.DeepEqual(expectedResponse, parsedResponse) {
+		t.Error("expected output not returned from ExecuteJS()")
+		return false
+	}
+
+	return true
+}
+
 func testJailFunctionCall(t *testing.T) bool {
 	InitJail(C.CString(""))
 
@@ -1386,10 +1441,10 @@ func startTestNode(t *testing.T) <-chan struct{} {
 
 	// inject test accounts
 	testKeyDir := filepath.Join(testDir, "keystore")
-	if err := common.ImportTestAccount(testKeyDir, "test-account1.pk"); err != nil {
+	if err := common.ImportTestAccount(testKeyDir, GetAccount1PKFile()); err != nil {
 		panic(err)
 	}
-	if err := common.ImportTestAccount(testKeyDir, "test-account2.pk"); err != nil {
+	if err := common.ImportTestAccount(testKeyDir, GetAccount2PKFile()); err != nil {
 		panic(err)
 	}
 

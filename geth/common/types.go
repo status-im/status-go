@@ -285,6 +285,11 @@ type JailManager interface {
 	// CreateCell creates a new jail cell.
 	CreateCell(chatID string) (JailCell, error)
 
+	// Parse creates a new jail cell context, with the given chatID as identifier.
+	// New context executes provided JavaScript code, right after the initialization.
+	// DEPRECATED in favour of CreateAndInitCell.
+	Parse(chatID, js string) string
+
 	// CreateAndInitCell creates a new jail cell and initialize it
 	// with web3 and other handlers.
 	CreateAndInitCell(chatID string, code ...string) string
@@ -424,18 +429,29 @@ type NotifyResult struct {
 const passphraseEnvName = "ACCOUNT_PASSWORD"
 
 // LoadTestConfig loads test configuration values from disk
-func LoadTestConfig() (*TestConfig, error) {
+func LoadTestConfig(networkId int) (*TestConfig, error) {
 	var testConfig TestConfig
 
-	configData := string(static.MustAsset("config/test-data.json"))
-	if err := json.Unmarshal([]byte(configData), &testConfig); err != nil {
+	configData := static.MustAsset("config/test-data.json")
+	if err := json.Unmarshal(configData, &testConfig); err != nil {
 		return nil, err
 	}
 
-	pass := os.Getenv(passphraseEnvName)
-	testConfig.Account1.Password = pass
-	testConfig.Account2.Password = pass
-	testConfig.Account3.Password = pass
+	if networkId == params.StatusChainNetworkID {
+		accountsData := static.MustAsset("config/status-chain-accounts.json")
+		if err := json.Unmarshal(accountsData, &testConfig); err != nil {
+			return nil, err
+		}
+	} else {
+		accountsData := static.MustAsset("config/public-chain-accounts.json")
+		if err := json.Unmarshal(accountsData, &testConfig); err != nil {
+			return nil, err
+		}
+
+		pass := os.Getenv(passphraseEnvName)
+		testConfig.Account1.Password = pass
+		testConfig.Account2.Password = pass
+	}
 
 	return &testConfig, nil
 }
