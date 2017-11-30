@@ -34,8 +34,6 @@ type TransactionsTestSuite struct {
 }
 
 func (s *TransactionsTestSuite) TestCallRPCSendTransaction() {
-	s.T().SkipNow()
-
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
@@ -84,8 +82,6 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransaction() {
 }
 
 func (s *TransactionsTestSuite) TestCallRPCSendTransactionUpstream() {
-	s.T().SkipNow()
-
 	if GetNetworkID() == params.StatusChainNetworkID {
 		s.T().Skip()
 	}
@@ -145,8 +141,6 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransactionUpstream() {
 
 // FIXME(tiabc): Sometimes it fails due to "no suitable peers found".
 func (s *TransactionsTestSuite) TestSendContractTx() {
-	s.T().SkipNow()
-
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
@@ -234,8 +228,6 @@ func (s *TransactionsTestSuite) TestSendContractTx() {
 }
 
 func (s *TransactionsTestSuite) TestSendEther() {
-	s.T().SkipNow()
-
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
@@ -319,8 +311,6 @@ func (s *TransactionsTestSuite) TestSendEther() {
 }
 
 func (s *TransactionsTestSuite) TestSendEtherTxUpstream() {
-	s.T().SkipNow()
-
 	if GetNetworkID() == params.StatusChainNetworkID {
 		s.T().Skip()
 	}
@@ -378,8 +368,6 @@ func (s *TransactionsTestSuite) TestSendEtherTxUpstream() {
 }
 
 func (s *TransactionsTestSuite) TestDoubleCompleteQueuedTransactions() {
-	s.T().SkipNow()
-
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
@@ -457,8 +445,6 @@ func (s *TransactionsTestSuite) TestDoubleCompleteQueuedTransactions() {
 }
 
 func (s *TransactionsTestSuite) TestDiscardQueuedTransaction() {
-	s.T().SkipNow()
-
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
@@ -539,8 +525,6 @@ func (s *TransactionsTestSuite) TestDiscardQueuedTransaction() {
 }
 
 func (s *TransactionsTestSuite) TestCompleteMultipleQueuedTransactions() {
-	s.T().SkipNow()
-
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
@@ -643,8 +627,6 @@ func (s *TransactionsTestSuite) TestCompleteMultipleQueuedTransactions() {
 }
 
 func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
-	s.T().SkipNow()
-
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
@@ -769,8 +751,6 @@ func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
 }
 
 func (s *TransactionsTestSuite) TestNonExistentQueuedTransactions() {
-	s.T().SkipNow()
-
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
@@ -817,28 +797,30 @@ func (s *TransactionsTestSuite) TestEvictionOfQueuedTransactions() {
 	s.Zero(txQueue.Count(), "transaction count should be zero")
 
 	var wg sync.WaitGroup
-	for j := 0; j < 10; j++ {
+	firstBatchSize := 10
+	for j := 0; j < firstBatchSize; j++ {
 		wg.Add(1)
 		go func() {
 			wg.Done()
 			s.Backend.SendTransaction(context.TODO(), common.SendTxArgs{}) // nolint: errcheck
 		}()
 	}
-	time.Sleep(2 * time.Second) // FIXME(tiabc): more reliable synchronization to ensure all transactions are enqueued
+	ensureQueueTx(txQueue, firstBatchSize)
 
 	log.Info(fmt.Sprintf("Number of transactions queued: %d. Queue size (shouldn't be more than %d): %d",
 		atomic.LoadInt32(&i), txqueue.DefaultTxQueueCap, txQueue.Count()))
 
 	s.Equal(10, txQueue.Count(), "transaction count should be 10")
 
-	for j := 0; j < txqueue.DefaultTxQueueCap+5; j++ { // stress test by hitting with lots of goroutines
+	secondBatchSize := txqueue.DefaultTxQueueCap + 5
+	for j := 0; j < secondBatchSize; j++ { // stress test by hitting with lots of goroutines
 		wg.Add(1)
 		go func() {
 			wg.Done()
 			s.Backend.SendTransaction(context.TODO(), common.SendTxArgs{}) // nolint: errcheck
 		}()
 	}
-	time.Sleep(5 * time.Second)
+	ensureQueueTx(txQueue, txqueue.DefaultTxQueueCap-1)
 
 	s.True(txQueue.Count() <= txqueue.DefaultTxQueueCap, "transaction count should be %d (or %d): got %d", txqueue.DefaultTxQueueCap, txqueue.DefaultTxQueueCap-1, txQueue.Count())
 
@@ -848,4 +830,20 @@ func (s *TransactionsTestSuite) TestEvictionOfQueuedTransactions() {
 	wg.Wait()
 
 	s.Zero(txQueue.Count(), "transaction count should be zero: %d", txQueue.Count())
+}
+
+func ensureQueueTx(txQueue common.TxQueue, n int) {
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			if txQueue.Count() == n {
+				return
+			}
+		}
+	}
+
+	return
 }
