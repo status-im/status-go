@@ -820,6 +820,7 @@ func (s *TransactionsTestSuite) TestEvictionOfQueuedTransactions() {
 			s.Backend.SendTransaction(context.TODO(), common.SendTxArgs{}) // nolint: errcheck
 		}()
 	}
+	wg.Wait()
 	ensureQueueTx(txQueue, txqueue.DefaultTxQueueCap-1)
 
 	s.True(txQueue.Count() <= txqueue.DefaultTxQueueCap, "transaction count should be %d (or %d): got %d", txqueue.DefaultTxQueueCap, txqueue.DefaultTxQueueCap-1, txQueue.Count())
@@ -827,7 +828,6 @@ func (s *TransactionsTestSuite) TestEvictionOfQueuedTransactions() {
 	for _, txID := range txIDs {
 		txQueue.Remove(txID)
 	}
-	wg.Wait()
 
 	s.Zero(txQueue.Count(), "transaction count should be zero: %d", txQueue.Count())
 }
@@ -836,14 +836,13 @@ func ensureQueueTx(txQueue common.TxQueue, n int) {
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
-	for {
-		select {
-		case <-ticker.C:
-			if txQueue.Count() == n {
-				return
+	safetyMargin := 2
+	for range ticker.C {
+		if txQueue.Count() == n {
+			for i := 0; i < safetyMargin; i++ {
+				<-ticker.C
 			}
+			return
 		}
 	}
-
-	return
 }
