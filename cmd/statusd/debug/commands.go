@@ -30,8 +30,12 @@ func newCommand(commandLine string) (*command, error) {
 	}
 	switch expr := expr.(type) {
 	case *ast.CallExpr:
+		f, ok := expr.Fun.(*ast.Ident)
+		if !ok {
+			return nil, fmt.Errorf("invalid expression: %q", commandLine)
+		}
 		return &command{
-			funcName: (expr.Fun.(*ast.Ident)).Name,
+			funcName: f.Name,
 			args:     exprsToArgs(expr.Args),
 		}, nil
 	default:
@@ -171,5 +175,5 @@ func (cs *commandSet) CompleteTransaction(id, password string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return txHash.Hex(), nil
+	return txHash.String(), nil
 }

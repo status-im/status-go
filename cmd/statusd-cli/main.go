@@ -12,7 +12,7 @@ const (
 )
 
 var (
-	statusdAddr = flag.String("addr", Addr, "set statusd address (default localhost:51515)")
+	addr = flag.String("addr", Addr, "set statusd address (default localhost:51515)")
 )
 
 // main is the entrypoint for the statusd command line interface.
@@ -20,10 +20,10 @@ func main() {
 	flag.Usage = printUsage
 	flag.Parse()
 
-	fmt.Printf("statusd-cli connecting statusd on '%s'\n", *statusdAddr)
+	fmt.Printf("statusd-cli connecting statusd on '%s'\n", *addr)
 
 	// Running REPL.
-	repl := NewREPL(*statusdAddr)
+	repl := NewREPL(*addr)
 	err := repl.Run()
 	if err != nil {
 		fmt.Printf("stopped with error: %v\n", err)

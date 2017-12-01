@@ -4,8 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"net/http"
-	"net/http/pprof"
 	"os"
 	"runtime"
 	"strings"
@@ -32,7 +30,6 @@ var (
 	ipcEnabled     = flag.Bool("ipc", false, "IPC RPC endpoint enabled")
 	cliEnabled     = flag.Bool("cli", false, "Enable debugging CLI server")
 	cliPort        = flag.String("cliport", debug.CLIPort, "CLI server's listening port")
-	pprofPort      = flag.String("pprof", "", "Enable profiling on port <port>")
 	logLevel       = flag.String("log", "INFO", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
 	logFile        = flag.String("logfile", "", "Path to the log file")
 	version        = flag.Bool("version", false, "Print version")
@@ -72,11 +69,6 @@ func main() {
 		}
 	}
 
-	// Check if pprof shall be enabled.
-	if *pprofPort != "" {
-		startPprof()
-	}
-
 	// wait till node has been stopped
 	node, err := backend.NodeManager().Node()
 	if err != nil {
@@ -92,23 +84,6 @@ func startDebug(backend *api.StatusBackend) error {
 	statusAPI := api.NewStatusAPIWithBackend(backend)
 	_, err := debug.New(statusAPI, *cliPort)
 	return err
-}
-
-// startPprof starts the PPROF endpoints on the defined port.
-// Manual registration is needed to only start on demand and
-// on the configured port.
-func startPprof() {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/debug/pprof/", pprof.Index)
-	mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
-	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
-	s := http.Server{
-		Addr:    ":" + (*pprofPort),
-		Handler: mux,
-	}
-	go s.ListenAndServe() // nolint: errcheck
 }
 
 // makeNodeConfig parses incoming CLI options and returns node configuration object

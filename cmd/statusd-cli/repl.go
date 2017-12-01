@@ -12,30 +12,32 @@ import (
 // REPL implements the read-eval-print loop for the commands
 // to be sent to statusd.
 type REPL struct {
-	host string
+	addr string
 }
 
 // NewREPL creates a REPL instance communicating with the
 // addressed statusd.
-func NewREPL(host string) *REPL {
+func NewREPL(addr string) *REPL {
 	return &REPL{
-		host: host,
+		addr: addr,
 	}
 }
 
 // Run operates the loop to read a command and its arguments,
 // execute it via the client, and print the result.
 func (r *REPL) Run() error {
-	var conn net.Conn
-	var reader *bufio.Reader
-	var writer *bufio.Writer
-	var err error
+	var (
+		conn   net.Conn
+		reader *bufio.Reader
+		writer *bufio.Writer
+		err    error
+	)
 	input := bufio.NewReader(os.Stdin)
 	connect := true
 	for {
 		// Connect first time and after connection errors.
 		if connect {
-			conn, err = net.Dial("tcp", r.host)
+			conn, err = net.Dial("tcp", r.addr)
 			if err != nil {
 				return fmt.Errorf("error connecting to statusd: %v", err)
 			}

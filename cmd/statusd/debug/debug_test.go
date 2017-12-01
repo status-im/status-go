@@ -17,10 +17,43 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// TestInvalidExpressions tests invalid expressions.
+func TestInvalidExpressions(t *testing.T) {
+	assert := assert.New(t)
+
+	startDebugging(assert)
+
+	conn := connectDebug(assert)
+	tests := []struct {
+		commandLine string
+		replies     []string
+	}{
+		{
+			commandLine: "",
+			replies:     []string{"[0] cannot read command: 1:2: expected operand, found 'EOF'"},
+		}, {
+			commandLine: "1 + 1",
+			replies:     []string{"[0] cannot read command: invalid command line: \"1 + 1\\n\""},
+		}, {
+			commandLine: "func() { panic(42) }",
+			replies:     []string{"[0] cannot read command: invalid command line: \"func() { panic(42) }\\n\""},
+		}, {
+			commandLine: "DoesNotExist()",
+			replies:     []string{"[0] cannot execute command: command \"DoesNotExist\" not found"},
+		},
+	}
+
+	for i, test := range tests {
+		fmt.Printf("command line %d: %s", i, test.commandLine)
+		replies := sendCommandLine(assert, conn, test.commandLine)
+		assert.Equal(test.replies, replies)
+	}
+}
+
 // TestStartStopNode tests starting and stopping a node remotely.
 func TestStartStopNode(t *testing.T) {
 	assert := assert.New(t)
-	configJSON, cleanup, err := mkConfigJSON("status-start-stop-node")
+	configJSON, cleanup, err := mkConfigJSON("start-stop-node")
 	assert.NoError(err)
 	defer cleanup()
 
@@ -42,7 +75,7 @@ func TestStartStopNode(t *testing.T) {
 // TestCreateAccount tests creating an account on the server.
 func TestCreateAccount(t *testing.T) {
 	assert := assert.New(t)
-	configJSON, cleanup, err := mkConfigJSON("status-create-account")
+	configJSON, cleanup, err := mkConfigJSON("create-account")
 	assert.NoError(err)
 	defer cleanup()
 
@@ -73,7 +106,7 @@ func TestCreateAccount(t *testing.T) {
 // and logging out afterwards.
 func TestSelectAccountLogout(t *testing.T) {
 	assert := assert.New(t)
-	configJSON, cleanup, err := mkConfigJSON("status-create-account")
+	configJSON, cleanup, err := mkConfigJSON("select-account")
 	assert.NoError(err)
 	defer cleanup()
 
@@ -118,7 +151,7 @@ func TestSelectAccountLogout(t *testing.T) {
 
 var (
 	mu sync.Mutex
-	d  *debug.Debug
+	d  *debug.Server
 )
 
 // startDebugging lazily creates or reuses a debug instance.

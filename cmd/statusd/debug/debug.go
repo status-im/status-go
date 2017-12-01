@@ -15,67 +15,70 @@ const (
 	CLIPort = "51515"
 )
 
-// Debug provides a server receiving line based commands from a
-// CLI via the debugging port and executing those on the Status API
+// Server provides a debug server receiving line based commands from
+// a CLI via the debugging port and executing those on the Status API
 // using reflection. The returned values will be rendered as
 // string and returned to the CLI.
-type Debug struct {
-	csv      reflect.Value
-	listener net.Listener
+type Server struct {
+	commandSetValue reflect.Value
+	listener        net.Listener
 }
 
-// New creates a debugger using the oassed Status API.
+// New creates a debug server using the passed Status API.
 // It also starts the server.
-func New(statusAPI *api.StatusAPI, port string) (*Debug, error) {
+func New(statusAPI *api.StatusAPI, port string) (*Server, error) {
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%s", port)) // nolint
 	if err != nil {
 		return nil, err
 	}
-	d := Debug{
-		csv:      reflect.ValueOf(newCommandSet(statusAPI)),
-		listener: listener,
+	s := Server{
+		commandSetValue: reflect.ValueOf(newCommandSet(statusAPI)),
+		listener:        listener,
 	}
-	go d.backend()
-	return &d, nil
+	go s.backend()
+	return &s, nil
 }
 
 // backend receives the commands and executes them on
 // the Status API.
-func (d *Debug) backend() {
+func (s *Server) backend() {
 	for {
-		conn, err := d.listener.Accept()
+		conn, err := s.listener.Accept()
 		if err != nil {
 			log.Printf("cannot establish debug connection: %v", err)
 			continue
 		}
-		go d.handleConnection(conn)
+		go s.handleConnection(conn)
 	}
 }
 
 // handleConnection handles all commands of one connection.
-func (d *Debug) handleConnection(conn net.Conn) {
+func (s *Server) handleConnection(conn net.Conn) {
 	reader := bufio.NewReader(conn)
 	writer := bufio.NewWriter(conn)
 	defer func() {
 		if err := conn.Close(); err != nil {
-			log.Printf("error whil closing debug connection: %v", err)
+			log.Printf("error while closing debug connection: %v", err)
 		}
 	}()
 	// Read, execute, and respond commands of a session.
 	for {
-		command, err := d.readCommandLine(reader)
+		var (
+			replies []string
+			err     error
+		)
+		command, err := s.readCommandLine(reader)
 		if err != nil {
-			log.Printf("error during debug command reading: %v", err)
-			return
+			replies = []string{fmt.Sprintf("cannot read command: %v", err)}
+		} else {
+			replies, err = command.execute(s.commandSetValue)
+			if err != nil {
+				replies = []string{fmt.Sprintf("cannot execute command: %v", err)}
+			}
 		}
-		replies, err := command.execute(d.csv)
+		err = s.writeReplies(writer, replies)
 		if err != nil {
-			log.Printf("error during debug command execution: %v", err)
-			return
-		}
-		err = d.writeRplies(writer, replies)
-		if err != nil {
-			log.Printf("error during writing debug replies: %v", err)
+			log.Printf("cannot write replies: %v", err)
 			return
 		}
 	}
@@ -83,7 +86,7 @@ func (d *Debug) handleConnection(conn net.Conn) {
 
 // readCommandLine receives a command line via network and
 // parses it into an executable command.
-func (d *Debug) readCommandLine(reader *bufio.Reader) (*command, error) {
+func (s *Server) readCommandLine(reader *bufio.Reader) (*command, error) {
 	commandLine, err := reader.ReadString('\n')
 	if err != nil {
 		return nil, err
@@ -92,7 +95,7 @@ func (d *Debug) readCommandLine(reader *bufio.Reader) (*command, error) {
 }
 
 // writeReplies sends the replies back to the CLI.
-func (d *Debug) writeRplies(writer *bufio.Writer, replies []string) error {
+func (s *Server) writeReplies(writer *bufio.Writer, replies []string) error {
 	_, err := fmt.Fprintf(writer, "%d\n", len(replies))
 	if err != nil {
 		return err
