@@ -5,4 +5,4 @@ A description to understand introduced changes without reading the code.
 Important changes:
 - [x] Something worth noting for reviewers.
 
-Solves #
+Closes #
