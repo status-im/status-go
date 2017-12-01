@@ -7,12 +7,12 @@ import (
 )
 
 const (
-	// StatusdAddr is the default address to connect to.
-	StatusdAddr = "localhost:51515"
+	// Addr is the default statusd address to connect to.
+	Addr = "localhost:51515"
 )
 
 var (
-	statusdAddr = flag.String("statusdaddr", StatusdAddr, "set statusd address (default localhost:51515)")
+	statusdAddr = flag.String("addr", Addr, "set statusd address (default localhost:51515)")
 )
 
 // main is the entrypoint for the statusd command line interface.
@@ -36,7 +36,7 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, "Usage: statusd-cli [options]")
 	fmt.Fprintf(os.Stderr, `
 Examples:
-  statusd-cli -statusdaddr=<address> # contact statusd on <address>
+  statusd-cli -addr=<address> # connect statusd on <address>
   
 Options:
 `)
