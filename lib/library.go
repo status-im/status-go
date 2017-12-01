@@ -442,3 +442,9 @@ func NotifyUsers(message, payloadJSON, tokensArray *C.char) (outCBytes *C.char) 
 
 	return
 }
+
+//export AddEnv
+func AddEnv(key *C.char, value *C.char) *C.char {
+	res := statusAPI.AddEnv(C.GoString(key), C.GoString(value))
+	return C.CString(res)
+}
