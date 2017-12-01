@@ -31,20 +31,6 @@ func NewQueuedTx(ctx context.Context, id QueuedTxID, args SendTxArgs) *QueuedTx 
 	}
 }
 
-// Set updates transaction.
-func (tx *QueuedTx) Set(t *QueuedTx) {
-	t.Lock()
-	defer t.Unlock()
-	tx.Lock()
-	defer tx.Unlock()
-
-	tx.id = t.id
-	tx.ctx = t.ctx
-	tx.args = t.args
-	tx.done = t.done
-	tx.discard = t.discard
-}
-
 // ID gets queued transaction ID.
 func (tx *QueuedTx) ID() QueuedTxID {
 	tx.RLock()
@@ -107,6 +93,21 @@ func (tx *QueuedTx) SetArgs(args SendTxArgs) {
 	defer tx.Unlock()
 
 	tx.args = args
+}
+
+// InProgressCompareAndSwap returns false if given state equals tx.InProgress state, otherwise changes InProgress state
+func (tx *QueuedTx) InProgressCompareAndSwap(state bool) (isSwapped bool) {
+	tx.Lock()
+	defer tx.Unlock()
+
+	if tx.inProgress == state {
+		return
+	}
+
+	tx.inProgress = state
+	isSwapped = true
+
+	return
 }
 
 // InProgress gets queued transaction progress state.

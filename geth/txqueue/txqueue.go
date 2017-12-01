@@ -202,11 +202,9 @@ func (q *TxQueue) StartProcessing(tx *common.QueuedTx) error {
 		return ErrQueuedTxAlreadyProcessed
 	}
 
-	if tx.InProgress() {
+	if !tx.InProgressCompareAndSwap(true) {
 		return ErrQueuedTxInProgress
 	}
-
-	tx.SetInProgress(true)
 
 	return nil
 }
