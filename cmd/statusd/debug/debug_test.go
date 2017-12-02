@@ -40,11 +40,13 @@ func TestInvalidExpressions(t *testing.T) {
 		}, {
 			commandLine: "DoesNotExist()",
 			replies:     []string{"[0] cannot execute command: command \"DoesNotExist\" not found"},
+		}, {
+			commandLine: "node.Start()",
+			replies:     []string{"[0] cannot read command: invalid expression: \"node.Start()\\n\""},
 		},
 	}
 
-	for i, test := range tests {
-		fmt.Printf("command line %d: %s", i, test.commandLine)
+	for _, test := range tests {
 		replies := sendCommandLine(assert, conn, test.commandLine)
 		assert.Equal(test.replies, replies)
 	}
