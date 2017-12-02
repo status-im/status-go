@@ -1,0 +1,4 @@
+{
+    "go.gopath": "/Users/jon/src/status",
+    "go.testFlags": ["-tags","e2e_test"]
+}
