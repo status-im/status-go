@@ -90,7 +90,7 @@ func (s *TxQueueTestSuite) TestCompleteTransaction() {
 	err = txQueueManager.WaitForTransaction(tx)
 	s.Equal(errTxAssumedSent, err)
 	// Check that error is assigned to the transaction.
-	s.Equal(errTxAssumedSent, tx.Err())
+	s.Equal(errTxAssumedSent, tx.Error())
 	// Transaction should be already removed from the queue.
 	s.False(txQueueManager.TransactionQueue().Has(tx.ID()))
 
@@ -151,7 +151,7 @@ func (s *TxQueueTestSuite) TestCompleteTransactionMultipleTimes() {
 	err = txQueueManager.WaitForTransaction(tx)
 	s.Equal(errTxAssumedSent, err)
 	// Check that error is assigned to the transaction.
-	s.Equal(errTxAssumedSent, tx.Err())
+	s.Equal(errTxAssumedSent, tx.Error())
 	// Transaction should be already removed from the queue.
 	s.False(txQueueManager.TransactionQueue().Has(tx.ID()))
 
@@ -185,7 +185,7 @@ func (s *TxQueueTestSuite) TestAccountMismatch() {
 	txQueueManager.SetTransactionReturnHandler(func(queuedTx *common.QueuedTx, err error) {
 		s.Equal(tx.ID(), queuedTx.ID())
 		s.Equal(ErrInvalidCompleteTxSender, err)
-		s.Nil(tx.Err())
+		s.Nil(tx.Error())
 	})
 
 	err := txQueueManager.QueueTransaction(tx)
@@ -231,7 +231,7 @@ func (s *TxQueueTestSuite) TestInvalidPassword() {
 	txQueueManager.SetTransactionReturnHandler(func(queuedTx *common.QueuedTx, err error) {
 		s.Equal(tx.ID(), queuedTx.ID())
 		s.Equal(keystore.ErrDecrypt, err)
-		s.Nil(tx.Err())
+		s.Nil(tx.Error())
 	})
 
 	err := txQueueManager.QueueTransaction(tx)
@@ -263,7 +263,7 @@ func (s *TxQueueTestSuite) TestDiscardTransaction() {
 
 	txQueueManager.SetTransactionReturnHandler(func(queuedTx *common.QueuedTx, err error) {
 		s.Equal(tx.ID(), queuedTx.ID())
-		s.Equal(ErrQueuedTxDiscarded, err)
+		s.Equal(common.ErrQueuedTxDiscarded, err)
 	})
 
 	err := txQueueManager.QueueTransaction(tx)
@@ -277,9 +277,9 @@ func (s *TxQueueTestSuite) TestDiscardTransaction() {
 	}()
 
 	err = txQueueManager.WaitForTransaction(tx)
-	s.Equal(ErrQueuedTxDiscarded, err)
+	s.Equal(common.ErrQueuedTxDiscarded, err)
 	// Check that error is assigned to the transaction.
-	s.Equal(ErrQueuedTxDiscarded, tx.Err())
+	s.Equal(common.ErrQueuedTxDiscarded, tx.Error())
 	// Transaction should be already removed from the queue.
 	s.False(txQueueManager.TransactionQueue().Has(tx.ID()))
 

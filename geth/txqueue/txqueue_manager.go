@@ -38,10 +38,10 @@ const (
 )
 
 var txReturnCodes = map[error]string{ // deliberately strings, in case more meaningful codes are to be returned
-	nil:                  SendTransactionNoErrorCode,
-	keystore.ErrDecrypt:  SendTransactionPasswordErrorCode,
-	ErrQueuedTxTimedOut:  SendTransactionTimeoutErrorCode,
-	ErrQueuedTxDiscarded: SendTransactionDiscardedErrorCode,
+	nil:                         SendTransactionNoErrorCode,
+	keystore.ErrDecrypt:         SendTransactionPasswordErrorCode,
+	ErrQueuedTxTimedOut:         SendTransactionTimeoutErrorCode,
+	common.ErrQueuedTxDiscarded: SendTransactionDiscardedErrorCode,
 }
 
 // Manager provides means to manage internal Status Backend (injected into LES)
@@ -103,13 +103,9 @@ func (m *Manager) WaitForTransaction(tx *common.QueuedTx) error {
 	// - discarded (via DiscardQueuedTransaction)
 	// - or times out
 	select {
-	case <-tx.Done():
-		err := tx.Err()
+	case err := <-tx.Wait():
 		m.NotifyOnQueuedTxReturn(tx, err)
-		return tx.Err()
-	case <-tx.Discard():
-		m.NotifyOnQueuedTxReturn(tx, ErrQueuedTxDiscarded)
-		return ErrQueuedTxDiscarded
+		return err
 	case <-time.After(DefaultTxSendCompletionTimeout * time.Second):
 		m.NotifyOnQueuedTxReturn(tx, ErrQueuedTxTimedOut)
 		return ErrQueuedTxTimedOut
@@ -177,9 +173,7 @@ func (m *Manager) CompleteTransaction(id common.QueuedTxID, password string) (ge
 
 	log.Info("finally completed transaction", "id", queuedTx.ID(), "hash", hash, "err", err)
 
-	queuedTx.SetHash(hash)
-	queuedTx.SetErr(err)
-	queuedTx.Done() <- struct{}{}
+	queuedTx.Done(hash, err)
 	m.txQueue.Set(id, queuedTx)
 
 	return hash, err
@@ -233,23 +227,20 @@ func (m *Manager) completeRemoteTransaction(queuedTx *common.QueuedTx, password 
 		return emptyHash, err
 	}
 
-	args := queuedTx.Args()
-
-	if args.GasPrice == nil {
-		value, gasPriceErr := m.gasPrice()
-		if gasPriceErr != nil {
-			return emptyHash, gasPriceErr
-		}
-
-		args.GasPrice = value
-		queuedTx.SetArgs(args)
+	var gasPrice *big.Int
+	if gasPriceBig, err := queuedTx.UpdateGasPrice(m.gasPrice); err != nil {
+		return emptyHash, err
+	} else {
+		gasPrice = (*big.Int)(gasPriceBig)
 	}
 
 	chainID := big.NewInt(int64(config.NetworkID))
 	nonce := uint64(txCount)
-	gasPrice := (*big.Int)(args.GasPrice)
+
+	args := queuedTx.Args()
 	data := []byte(args.Data)
 	value := (*big.Int)(args.Value)
+
 	toAddr := gethcommon.Address{}
 	if args.To != nil {
 		toAddr = *args.To
@@ -378,8 +369,7 @@ func (m *Manager) DiscardTransaction(id common.QueuedTxID) error {
 	m.txQueue.Remove(queuedTx.ID())
 
 	// allow SendTransaction to return
-	queuedTx.SetErr(ErrQueuedTxDiscarded)
-	queuedTx.Discard() <- struct{}{} // sendTransaction() waits on this, notify so that it can return
+	queuedTx.Discard() // sendTransaction() waits on this, notify so that it can return
 
 	return nil
 }
@@ -416,7 +406,7 @@ func (m *Manager) TransactionQueueHandler() func(queuedTx *common.QueuedTx) {
 			Event: SendTransactionEvent{
 				ID:        string(queuedTx.ID()),
 				Args:      queuedTx.Args(),
-				MessageID: common.MessageIDFromContext(queuedTx.Context()),
+				MessageID: queuedTx.MessageID(),
 			},
 		})
 	}
@@ -455,7 +445,7 @@ func (m *Manager) TransactionReturnHandler() func(queuedTx *common.QueuedTx, err
 			Event: ReturnSendTransactionEvent{
 				ID:           string(queuedTx.ID()),
 				Args:         queuedTx.Args(),
-				MessageID:    common.MessageIDFromContext(queuedTx.Context()),
+				MessageID:    queuedTx.MessageID(),
 				ErrorMessage: err.Error(),
 				ErrorCode:    m.sendTransactionErrorCode(err),
 			},

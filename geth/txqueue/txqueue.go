@@ -26,10 +26,6 @@ var (
 	ErrQueuedTxIDNotFound = errors.New("transaction hash not found")
 	//ErrQueuedTxTimedOut - error transaction sending timed out
 	ErrQueuedTxTimedOut = errors.New("transaction sending timed out")
-	//ErrQueuedTxDiscarded - error transaction discarded
-	ErrQueuedTxDiscarded = errors.New("transaction has been discarded")
-	//ErrQueuedTxInProgress - error transaction in progress
-	ErrQueuedTxInProgress = errors.New("transaction is in progress")
 	//ErrQueuedTxAlreadyProcessed - error transaction has already processed
 	ErrQueuedTxAlreadyProcessed = errors.New("transaction has been already processed")
 	//ErrInvalidCompleteTxSender - error transaction with invalid sender
@@ -198,12 +194,12 @@ func (q *TxQueue) Remove(id common.QueuedTxID) {
 // StartProcessing marks a transaction as in progress. It's thread-safe and
 // prevents from processing the same transaction multiple times.
 func (q *TxQueue) StartProcessing(tx *common.QueuedTx) error {
-	if tx.Hash() != (gethcommon.Hash{}) || tx.Err() != nil {
+	if tx.Hash() != (gethcommon.Hash{}) || tx.Error() != nil {
 		return ErrQueuedTxAlreadyProcessed
 	}
 
-	if !tx.InProgressCompareAndSwap(true) {
-		return ErrQueuedTxInProgress
+	if err := tx.Start(); err != nil {
+		return err
 	}
 
 	return nil
@@ -211,7 +207,7 @@ func (q *TxQueue) StartProcessing(tx *common.QueuedTx) error {
 
 // StopProcessing removes the "InProgress" flag from the transaction.
 func (q *TxQueue) StopProcessing(tx *common.QueuedTx) {
-	tx.SetInProgress(false)
+	tx.Stop()
 }
 
 // Count returns number of currently queued transactions

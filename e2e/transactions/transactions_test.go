@@ -495,7 +495,7 @@ func (s *TransactionsTestSuite) TestDiscardQueuedTransaction() {
 			log.Info("transaction return event received", "id", event["id"].(string))
 
 			receivedErrMessage := event["error_message"].(string)
-			expectedErrMessage := txqueue.ErrQueuedTxDiscarded.Error()
+			expectedErrMessage := common.ErrQueuedTxDiscarded.Error()
 			s.Equal(receivedErrMessage, expectedErrMessage)
 
 			receivedErrCode := event["error_code"].(string)
@@ -511,7 +511,7 @@ func (s *TransactionsTestSuite) TestDiscardQueuedTransaction() {
 		To:    common.ToAddress(TestConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 	})
-	s.EqualError(err, txqueue.ErrQueuedTxDiscarded.Error(), "transaction is expected to be discarded")
+	s.EqualError(err, common.ErrQueuedTxDiscarded.Error(), "transaction is expected to be discarded")
 
 	select {
 	case <-completeQueuedTransaction:
@@ -666,7 +666,7 @@ func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
 			log.Info("transaction return event received", "id", event["id"].(string))
 
 			receivedErrMessage := event["error_message"].(string)
-			expectedErrMessage := txqueue.ErrQueuedTxDiscarded.Error()
+			expectedErrMessage := common.ErrQueuedTxDiscarded.Error()
 			s.Equal(receivedErrMessage, expectedErrMessage)
 
 			receivedErrCode := event["error_code"].(string)
@@ -685,7 +685,7 @@ func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
 			To:    common.ToAddress(TestConfig.Account2.Address),
 			Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 		})
-		s.EqualError(err, txqueue.ErrQueuedTxDiscarded.Error())
+		s.EqualError(err, common.ErrQueuedTxDiscarded.Error())
 
 		s.True(reflect.DeepEqual(txHashCheck, gethcommon.Hash{}), "transaction returned hash, while it shouldn't")
 	}
@@ -836,7 +836,7 @@ func ensureQueueTx(txQueue common.TxQueue, n int) {
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
-	safetyMargin := 2
+	safetyMargin := 3
 	for range ticker.C {
 		if txQueue.Count() == n {
 			for i := 0; i < safetyMargin; i++ {

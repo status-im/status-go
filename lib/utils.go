@@ -1044,7 +1044,7 @@ func testDiscardTransaction(t *testing.T) bool { //nolint: gocyclo
 			t.Logf("transaction return event received: {id: %s}\n", event["id"].(string))
 
 			receivedErrMessage := event["error_message"].(string)
-			expectedErrMessage := txqueue.ErrQueuedTxDiscarded.Error()
+			expectedErrMessage := common.ErrQueuedTxDiscarded.Error()
 			if receivedErrMessage != expectedErrMessage {
 				t.Errorf("unexpected error message received: got %v", receivedErrMessage)
 				return
@@ -1066,7 +1066,7 @@ func testDiscardTransaction(t *testing.T) bool { //nolint: gocyclo
 		To:    common.ToAddress(TestConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 	})
-	if err != txqueue.ErrQueuedTxDiscarded {
+	if err != common.ErrQueuedTxDiscarded {
 		t.Errorf("expected error not thrown: %v", err)
 		return false
 	}
@@ -1131,7 +1131,7 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocycl
 			t.Logf("transaction return event received: {id: %s}\n", event["id"].(string))
 
 			receivedErrMessage := event["error_message"].(string)
-			expectedErrMessage := txqueue.ErrQueuedTxDiscarded.Error()
+			expectedErrMessage := common.ErrQueuedTxDiscarded.Error()
 			if receivedErrMessage != expectedErrMessage {
 				t.Errorf("unexpected error message received: got %v", receivedErrMessage)
 				return
@@ -1157,7 +1157,7 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocycl
 			To:    common.ToAddress(TestConfig.Account2.Address),
 			Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 		})
-		if err != txqueue.ErrQueuedTxDiscarded {
+		if err != common.ErrQueuedTxDiscarded {
 			t.Errorf("expected error not thrown: %v", err)
 			return
 		}

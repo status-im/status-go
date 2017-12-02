@@ -2,9 +2,26 @@ package common
 
 import (
 	"context"
+	"errors"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+)
+
+const (
+	// MessageIDKey is a key for message ID
+	// This ID is required to track from which chat a given send transaction request is coming.
+	MessageIDKey = contextKey("message_id")
+)
+
+type contextKey string // in order to make sure that our ctx key does not collide with keys from other packages
+
+var (
+	//ErrQueuedTxInProgress - error transaction in progress
+	ErrQueuedTxInProgress = errors.New("transaction is in progress")
+	//ErrQueuedTxDiscarded - error transaction discarded
+	ErrQueuedTxDiscarded = errors.New("transaction has been discarded")
 )
 
 // QueuedTx holds enough information to complete the queued transaction.
@@ -14,8 +31,8 @@ type QueuedTx struct {
 	ctx        context.Context
 	args       SendTxArgs
 	inProgress bool // true if transaction is being sent
-	done       chan struct{}
-	discard    chan struct{}
+	done       chan error
+	doneOnce   sync.Once
 	err        error
 	sync.RWMutex
 }
@@ -23,11 +40,10 @@ type QueuedTx struct {
 // NewQueuedTx QueuedTx constructor.
 func NewQueuedTx(ctx context.Context, id QueuedTxID, args SendTxArgs) *QueuedTx {
 	return &QueuedTx{
-		id:      id,
-		ctx:     ctx,
-		args:    args,
-		done:    make(chan struct{}, 1),
-		discard: make(chan struct{}, 1),
+		id:   id,
+		ctx:  ctx,
+		args: args,
+		done: make(chan error, 1),
 	}
 }
 
@@ -39,14 +55,6 @@ func (tx *QueuedTx) ID() QueuedTxID {
 	return tx.id
 }
 
-// SetID sets queued transaction ID.
-func (tx *QueuedTx) SetID(id QueuedTxID) {
-	tx.Lock()
-	defer tx.Unlock()
-
-	tx.id = id
-}
-
 // Hash gets queued transaction hash.
 func (tx *QueuedTx) Hash() common.Hash {
 	tx.RLock()
@@ -55,28 +63,20 @@ func (tx *QueuedTx) Hash() common.Hash {
 	return tx.hash
 }
 
-// SetHash sets queued transaction hash.
-func (tx *QueuedTx) SetHash(hash common.Hash) {
-	tx.Lock()
-	defer tx.Unlock()
-
-	tx.hash = hash
-}
-
-// Context gets queued transaction ctx.
-func (tx *QueuedTx) Context() context.Context {
+// MessageID gets message ID from ctx.
+func (tx *QueuedTx) MessageID() string {
 	tx.RLock()
 	defer tx.RUnlock()
 
-	return tx.ctx
-}
+	if tx.ctx == nil {
+		return ""
+	}
 
-// SetContext sets queued transaction ctx.
-func (tx *QueuedTx) SetContext(ctx context.Context) {
-	tx.Lock()
-	defer tx.Unlock()
+	if messageID, ok := tx.ctx.Value(MessageIDKey).(string); ok {
+		return messageID
+	}
 
-	tx.ctx = ctx
+	return ""
 }
 
 // Args gets queued transaction args.
@@ -87,73 +87,80 @@ func (tx *QueuedTx) Args() SendTxArgs {
 	return tx.args
 }
 
-// SetArgs sets queued transaction args.
-func (tx *QueuedTx) SetArgs(args SendTxArgs) {
+// UpdateGasPrice updates gas price if not set.
+func (tx *QueuedTx) UpdateGasPrice(gasGetter func() (*hexutil.Big, error)) (*hexutil.Big, error) {
 	tx.Lock()
 	defer tx.Unlock()
 
-	tx.args = args
-}
+	if tx.args.GasPrice == nil {
+		value, err := gasGetter()
+		if err != nil {
+			return tx.args.GasPrice, err
+		}
 
-// InProgressCompareAndSwap returns false if given state equals tx.InProgress state, otherwise changes InProgress state
-func (tx *QueuedTx) InProgressCompareAndSwap(state bool) (isSwapped bool) {
-	tx.Lock()
-	defer tx.Unlock()
-
-	if tx.inProgress == state {
-		return
+		tx.args.GasPrice = value
 	}
 
-	tx.inProgress = state
-	isSwapped = true
-
-	return
+	return tx.args.GasPrice, nil
 }
 
-// InProgress gets queued transaction progress state.
-func (tx *QueuedTx) InProgress() bool {
-	tx.RLock()
-	defer tx.RUnlock()
-
-	return tx.inProgress
-}
-
-// SetInProgress sets queued transaction progress state.
-func (tx *QueuedTx) SetInProgress(p bool) {
+// Start marks transaction as started.
+func (tx *QueuedTx) Start() error {
 	tx.Lock()
 	defer tx.Unlock()
 
-	tx.inProgress = p
+	if tx.inProgress {
+		return ErrQueuedTxInProgress
+	}
+
+	tx.inProgress = true
+
+	return nil
 }
 
-// Done gets queued transaction done channel.
-func (tx *QueuedTx) Done() chan struct{} {
-	tx.RLock()
-	defer tx.RUnlock()
+// Stop marks transaction as stopped.
+func (tx *QueuedTx) Stop() {
+	tx.Lock()
+	defer tx.Unlock()
 
+	tx.inProgress = false
+}
+
+// Done transaction with success or error if given.
+func (tx *QueuedTx) Done(hash common.Hash, err ...error) {
+	tx.doneOnce.Do(func() {
+		tx.hash = hash
+
+		if len(err) != 0 {
+			tx.setError(err[0])
+			tx.done <- tx.err
+		}
+		close(tx.done)
+	})
+}
+
+// Wait returns read only channel that signals either success or error transaction finish.
+func (tx *QueuedTx) Wait() <-chan error {
 	return tx.done
 }
 
-// Discard gets queued transaction discard channel.
-func (tx *QueuedTx) Discard() chan struct{} {
-	tx.RLock()
-	defer tx.RUnlock()
-
-	return tx.discard
+// Discard done transaction with discard error.
+func (tx *QueuedTx) Discard() {
+	tx.doneOnce.Do(func() {
+		tx.setError(ErrQueuedTxDiscarded)
+		tx.done <- ErrQueuedTxDiscarded
+	})
 }
 
-// Err gets queued transaction error.
-func (tx *QueuedTx) Err() error {
+// Error gets queued transaction error.
+func (tx *QueuedTx) Error() error {
 	tx.RLock()
 	defer tx.RUnlock()
-
 	return tx.err
 }
 
-// SetErr sets queued transaction error.
-func (tx *QueuedTx) SetErr(err error) {
+func (tx *QueuedTx) setError(err error) {
 	tx.Lock()
 	defer tx.Unlock()
-
 	tx.err = err
 }
