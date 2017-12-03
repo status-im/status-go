@@ -1,0 +1,170 @@
+From c7eb4ddff7b27968d7c75af1c3f09d2db6ab0e54 Mon Sep 17 00:00:00 2001
+From: Victor Farazdagi <simple.square@gmail.com>
+Date: Sun, 18 Sep 2016 15:57:56 +0300
+Subject: [PATCH] build, containers: geth, swarm, wnode
+
+- Status + LES + SHH Docker node
+- Include status-go folder into build/env.sh
+- Swarm image
+- Wnode image
+---
+ build/env.sh                                     |  9 +++++++++
+ cmd/wnode/main.go                                | 25 +++++++++++++++++++++++-
+ containers/docker/status-alpine/geth/Dockerfile  | 20 +++++++++++++++++++
+ containers/docker/status-alpine/swarm/Dockerfile | 19 ++++++++++++++++++
+ containers/docker/status-alpine/wnode/Dockerfile | 19 ++++++++++++++++++
+ 5 files changed, 91 insertions(+), 1 deletion(-)
+ create mode 100644 containers/docker/status-alpine/geth/Dockerfile
+ create mode 100644 containers/docker/status-alpine/swarm/Dockerfile
+ create mode 100644 containers/docker/status-alpine/wnode/Dockerfile
+
+diff --git a/build/env.sh b/build/env.sh
+index 3914555d1..832fb0e86 100755
+--- a/build/env.sh
++++ b/build/env.sh
+@@ -18,6 +18,15 @@ if [ ! -L "$ethdir/go-ethereum" ]; then
+     cd "$root"
+ fi
+ 
++# Link status-go lib
++statusgodir="$workspace/src/github.com/status-im"
++if [ ! -L "$statusgodir/status-go" ]; then
++    mkdir -p "$statusgodir"
++    cd "$statusgodir"
++    ln -s ../../../../../../../status-im/status-go status-go
++    cd "$root"
++fi
++
+ # Set up the environment to use the workspace.
+ GOPATH="$workspace"
+ export GOPATH
+diff --git a/cmd/wnode/main.go b/cmd/wnode/main.go
+index 05e6b2908..235d368ad 100644
+--- a/cmd/wnode/main.go
++++ b/cmd/wnode/main.go
+@@ -98,6 +98,8 @@ var (
+ 	argEnode   = flag.String("boot", "", "bootstrap node you want to connect to (e.g. enode://e454......08d50@52.176.211.200:16428)")
+ 	argTopic   = flag.String("topic", "", "topic in hexadecimal format (e.g. 70a4beef)")
+ 	argSaveDir = flag.String("savedir", "", "directory where incoming messages will be saved as files")
++	argSymPass = flag.String("sympass", "", "SymKey password")
++	argMsPass  = flag.String("mspass", "", "Mailserver password")
+ )
+ 
+ func main() {
+@@ -146,6 +148,13 @@ func processArgs() {
+ 	} else if *fileExMode {
+ 		utils.Fatalf("Parameter 'savedir' is mandatory for file exchange mode")
+ 	}
++	if len(*argSymPass) > 0 {
++		symPass = *argSymPass
++	}
++
++	if len(*argMsPass) > 0 {
++		msPassword = *argMsPass
++	}
+ 
+ 	if *echoMode {
+ 		echo()
+@@ -415,8 +424,22 @@ func run() {
+ 	} else if *fileExMode {
+ 		sendFilesLoop()
+ 	} else {
+-		sendLoop()
++		pingLoop() // instead of sendLoop()
++	}
++}
++
++func pingLoop() {
++	ticker := time.NewTicker(time.Second * 120)
++
++	for {
++		select {
++		case <-ticker.C:
++			fmt.Println("I am alive: ", time.Now())
++		case <-done:
++			return
++		}
+ 	}
++
+ }
+ 
+ func sendLoop() {
+diff --git a/containers/docker/status-alpine/geth/Dockerfile b/containers/docker/status-alpine/geth/Dockerfile
+new file mode 100644
+index 000000000..93c1e0153
+--- /dev/null
++++ b/containers/docker/status-alpine/geth/Dockerfile
+@@ -0,0 +1,20 @@
++FROM alpine:3.5
++
++RUN \
++  apk add --update go git make gcc musl-dev linux-headers ca-certificates  && \
++
++  # clone status-go
++  mkdir -p /usr/lib/go/src/github.com/status-im && \
++  git clone --depth 1 --branch 0.9.7 https://github.com/status-im/status-go.git /usr/lib/go/src/github.com/status-im/status-go && \
++
++  # clone go-ethereum (and install everything)
++  git clone --depth 1 --branch status/1.6.1-stable https://github.com/status-im/go-ethereum && \
++  (cd go-ethereum && make geth) && \
++  cp go-ethereum/build/bin/geth /geth && \
++  apk del go git make gcc musl-dev linux-headers && \
++  rm -rf /go-ethereum && rm -rf /var/cache/apk/*
++
++EXPOSE 8545
++EXPOSE 30303
++
++ENTRYPOINT ["/geth"]
+diff --git a/containers/docker/status-alpine/swarm/Dockerfile b/containers/docker/status-alpine/swarm/Dockerfile
+new file mode 100644
+index 000000000..685bf5ad9
+--- /dev/null
++++ b/containers/docker/status-alpine/swarm/Dockerfile
+@@ -0,0 +1,19 @@
++FROM alpine:3.5
++
++RUN \
++  apk add --update go git make gcc musl-dev linux-headers ca-certificates  && \
++
++  # clone status-go
++  mkdir -p /usr/lib/go/src/github.com/status-im && \
++  git clone --depth 1 --branch develop https://github.com/status-im/status-go.git /usr/lib/go/src/github.com/status-im/status-go && \
++
++  # clone go-ethereum (and install everything)
++  git clone --depth 1 --branch status/1.6.1-stable https://github.com/status-im/go-ethereum && \
++  (cd go-ethereum && build/env.sh go run build/ci.go install ./cmd/swarm) && \
++  cp go-ethereum/build/bin/swarm /swarm && \
++  apk del go git make gcc musl-dev linux-headers && \
++  rm -rf /go-ethereum && rm -rf /var/cache/apk/*
++
++EXPOSE 30399
++
++ENTRYPOINT ["/swarm"]
+diff --git a/containers/docker/status-alpine/wnode/Dockerfile b/containers/docker/status-alpine/wnode/Dockerfile
+new file mode 100644
+index 000000000..e160ff9d7
+--- /dev/null
++++ b/containers/docker/status-alpine/wnode/Dockerfile
+@@ -0,0 +1,19 @@
++FROM alpine:3.5
++
++RUN \
++  apk add --update go git make gcc musl-dev linux-headers ca-certificates  && \
++
++  # clone status-go
++  mkdir -p /usr/lib/go/src/github.com/status-im && \
++  git clone --depth 1 --branch develop https://github.com/status-im/status-go.git /usr/lib/go/src/github.com/status-im/status-go && \
++
++  # clone go-ethereum (and install everything)
++  git clone --depth 1 --branch status/1.6.1-stable https://github.com/status-im/go-ethereum && \
++  (cd go-ethereum && build/env.sh go run build/ci.go install ./cmd/wnode) && \
++  cp go-ethereum/build/bin/wnode /wnode && \
++  apk del go git make gcc musl-dev linux-headers && \
++  rm -rf /go-ethereum && rm -rf /var/cache/apk/*
++
++EXPOSE 30379
++
++ENTRYPOINT ["/wnode"]
+-- 
+2.13.5 (Apple Git-94)
+
