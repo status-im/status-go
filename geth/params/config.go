@@ -95,6 +95,10 @@ type WhisperConfig struct {
 	// (if no account file selected, then this password is used for symmetric encryption)
 	PasswordFile string
 
+	// Password for symmetric encryption
+	// (if no account file selected, then this password is used for symmetric encryption).
+	Password string
+
 	// EchoMode if mode is on, prints some arguments for diagnostics
 	EchoMode bool
 

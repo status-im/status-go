@@ -36,7 +36,7 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 
 	whisperConfig.Enabled = true
 	whisperConfig.IdentityFile = *identity
-	whisperConfig.PasswordFile = *password
+	whisperConfig.PasswordFile = *passwordFile
 	whisperConfig.EchoMode = *echo
 	whisperConfig.BootstrapNode = *bootstrap
 	whisperConfig.ForwarderNode = *forward
@@ -47,7 +47,8 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 	whisperConfig.MinimumPoW = *pow
 
 	if whisperConfig.MailServerNode && whisperConfig.PasswordFile == "" {
-		return nil, errors.New("mail server requires -password to be specified")
+		//fixme(@jekamas): hard coded for mail server MVP - issue https://github.com/status-im/status-go/issues/488
+		whisperConfig.Password = "status-offline-inbox"
 	}
 
 	if whisperConfig.NotificationServerNode && whisperConfig.IdentityFile == "" {
