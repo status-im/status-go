@@ -10,6 +10,7 @@ import (
 )
 
 const (
+	// fixme(@jekamas): does it used anywhere
 	// MessageIDKey is a key for message ID
 	// This ID is required to track from which chat a given send transaction request is coming.
 	MessageIDKey = contextKey("message_id")
@@ -30,7 +31,7 @@ var (
 type QueuedTx struct {
 	id         QueuedTxID
 	hash       common.Hash
-	ctx        context.Context
+	msgID      string
 	args       SendTxArgs
 	inProgress bool
 	done       chan error
@@ -41,10 +42,10 @@ type QueuedTx struct {
 // NewQueuedTx QueuedTx constructor.
 func NewQueuedTx(ctx context.Context, id QueuedTxID, args SendTxArgs) *QueuedTx {
 	return &QueuedTx{
-		id:   id,
-		ctx:  ctx,
-		args: args,
-		done: make(chan error, 1),
+		id:    id,
+		msgID: getMessageID(ctx),
+		args:  args,
+		done:  make(chan error, 1),
 	}
 }
 
@@ -56,28 +57,20 @@ func (tx *QueuedTx) ID() QueuedTxID {
 	return tx.id
 }
 
+// MessageID gets queued transaction message ID.
+func (tx *QueuedTx) MessageID() string {
+	tx.RLock()
+	defer tx.RUnlock()
+
+	return tx.msgID
+}
+
 // Hash gets queued transaction hash.
 func (tx *QueuedTx) Hash() common.Hash {
 	tx.RLock()
 	defer tx.RUnlock()
 
 	return tx.hash
-}
-
-// MessageID gets message ID from ctx.
-func (tx *QueuedTx) MessageID() string {
-	tx.RLock()
-	defer tx.RUnlock()
-
-	if tx.ctx == nil {
-		return ""
-	}
-
-	if messageID, ok := tx.ctx.Value(MessageIDKey).(string); ok {
-		return messageID
-	}
-
-	return ""
 }
 
 // Args gets queued transaction args.
@@ -172,6 +165,21 @@ func (tx *QueuedTx) Error() error {
 	return tx.err
 }
 
+// setError sets transaction error.
 func (tx *QueuedTx) setError(err error) {
 	tx.err = err
+}
+
+// getMessageID gets message ID from ctx.
+func getMessageID(ctx context.Context) (msgID string) {
+	if ctx == nil {
+		return
+	}
+
+	var ok bool
+	if msgID, ok = ctx.Value(MessageIDKey).(string); ok {
+		return
+	}
+
+	return
 }
