@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
-	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/log"
 )
@@ -26,8 +25,6 @@ var (
 	ErrQueuedTxIDNotFound = errors.New("transaction hash not found")
 	//ErrQueuedTxTimedOut - error transaction sending timed out
 	ErrQueuedTxTimedOut = errors.New("transaction sending timed out")
-	//ErrQueuedTxAlreadyProcessed - error transaction has already processed
-	ErrQueuedTxAlreadyProcessed = errors.New("transaction has been already processed")
 	//ErrInvalidCompleteTxSender - error transaction with invalid sender
 	ErrInvalidCompleteTxSender = errors.New("transaction can only be completed by the same account which created it")
 )
@@ -189,25 +186,6 @@ func (q *TxQueue) Set(id common.QueuedTxID, tx *common.QueuedTx) {
 // Remove removes transaction by transaction identifier
 func (q *TxQueue) Remove(id common.QueuedTxID) {
 	q.transactions.delete(id)
-}
-
-// StartProcessing marks a transaction as in progress. It's thread-safe and
-// prevents from processing the same transaction multiple times.
-func (q *TxQueue) StartProcessing(tx *common.QueuedTx) error {
-	if tx.Hash() != (gethcommon.Hash{}) || tx.Error() != nil {
-		return ErrQueuedTxAlreadyProcessed
-	}
-
-	if err := tx.Start(); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// StopProcessing removes the "InProgress" flag from the transaction.
-func (q *TxQueue) StopProcessing(tx *common.QueuedTx) {
-	tx.Stop()
 }
 
 // Count returns number of currently queued transactions

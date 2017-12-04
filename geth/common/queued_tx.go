@@ -22,6 +22,8 @@ var (
 	ErrQueuedTxInProgress = errors.New("transaction is in progress")
 	//ErrQueuedTxDiscarded - error transaction discarded
 	ErrQueuedTxDiscarded = errors.New("transaction has been discarded")
+	//ErrQueuedTxAlreadyProcessed - error transaction has already processed
+	ErrQueuedTxAlreadyProcessed = errors.New("transaction has been already processed")
 )
 
 // QueuedTx holds enough information to complete the queued transaction.
@@ -30,9 +32,8 @@ type QueuedTx struct {
 	hash       common.Hash
 	ctx        context.Context
 	args       SendTxArgs
-	inProgress bool // true if transaction is being sent
+	inProgress bool
 	done       chan error
-	doneOnce   sync.Once
 	err        error
 	sync.RWMutex
 }
@@ -89,25 +90,36 @@ func (tx *QueuedTx) Args() SendTxArgs {
 
 // UpdateGasPrice updates gas price if not set.
 func (tx *QueuedTx) UpdateGasPrice(gasGetter func() (*hexutil.Big, error)) (*hexutil.Big, error) {
-	tx.Lock()
-	defer tx.Unlock()
+	var gasPrice hexutil.Big
 
-	if tx.args.GasPrice == nil {
-		value, err := gasGetter()
-		if err != nil {
-			return tx.args.GasPrice, err
-		}
+	tx.RLock()
+	if tx.args.GasPrice != nil {
+		gasPrice = *tx.args.GasPrice
+		tx.RUnlock()
+		return &gasPrice, nil
+	}
+	tx.RUnlock()
 
-		tx.args.GasPrice = value
+	value, err := gasGetter()
+	if err != nil {
+		return &gasPrice, err
 	}
 
-	return tx.args.GasPrice, nil
+	tx.Lock()
+	tx.args.GasPrice = value
+	tx.Unlock()
+
+	return value, nil
 }
 
 // Start marks transaction as started.
 func (tx *QueuedTx) Start() error {
 	tx.Lock()
 	defer tx.Unlock()
+
+	if tx.hash != (common.Hash{}) || tx.err != nil {
+		return ErrQueuedTxAlreadyProcessed
+	}
 
 	if tx.inProgress {
 		return ErrQueuedTxInProgress
@@ -127,29 +139,30 @@ func (tx *QueuedTx) Stop() {
 }
 
 // Done transaction with success or error if given.
-func (tx *QueuedTx) Done(hash common.Hash, err ...error) {
-	tx.doneOnce.Do(func() {
-		tx.hash = hash
+func (tx *QueuedTx) Done(hash common.Hash, err error) {
+	tx.Lock()
+	defer tx.Unlock()
 
-		if len(err) != 0 {
-			tx.setError(err[0])
-			tx.done <- tx.err
-		}
-		close(tx.done)
-	})
+	tx.hash = hash
+
+	if err != nil {
+		tx.setError(err)
+	}
+	tx.done <- err
+}
+
+// Discard done transaction with discard error.
+func (tx *QueuedTx) Discard() {
+	tx.Lock()
+	defer tx.Unlock()
+
+	tx.setError(ErrQueuedTxDiscarded)
+	tx.done <- ErrQueuedTxDiscarded
 }
 
 // Wait returns read only channel that signals either success or error transaction finish.
 func (tx *QueuedTx) Wait() <-chan error {
 	return tx.done
-}
-
-// Discard done transaction with discard error.
-func (tx *QueuedTx) Discard() {
-	tx.doneOnce.Do(func() {
-		tx.setError(ErrQueuedTxDiscarded)
-		tx.done <- ErrQueuedTxDiscarded
-	})
 }
 
 // Error gets queued transaction error.
@@ -160,7 +173,5 @@ func (tx *QueuedTx) Error() error {
 }
 
 func (tx *QueuedTx) setError(err error) {
-	tx.Lock()
-	defer tx.Unlock()
 	tx.err = err
 }

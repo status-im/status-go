@@ -129,11 +129,11 @@ func (m *Manager) CompleteTransaction(id common.QueuedTxID, password string) (ge
 		return gethcommon.Hash{}, err
 	}
 
-	err = m.txQueue.StartProcessing(queuedTx)
+	err = queuedTx.Start()
 	if err != nil {
 		return gethcommon.Hash{}, err
 	}
-	defer m.txQueue.StopProcessing(queuedTx)
+	defer queuedTx.Stop()
 
 	selectedAccount, err := m.accountManager.SelectedAccount()
 	if err != nil {
@@ -231,7 +231,7 @@ func (m *Manager) completeRemoteTransaction(queuedTx *common.QueuedTx, password 
 	if gasPriceBig, err := queuedTx.UpdateGasPrice(m.gasPrice); err != nil {
 		return emptyHash, err
 	} else {
-		gasPrice = (*big.Int)(gasPriceBig)
+		gasPrice = gasPriceBig.ToInt()
 	}
 
 	chainID := big.NewInt(int64(config.NetworkID))
@@ -260,7 +260,7 @@ func (m *Manager) completeRemoteTransaction(queuedTx *common.QueuedTx, password 
 		"value", value,
 	)
 
-	tx := types.NewTransaction(nonce, toAddr, value, (*big.Int)(gas), gasPrice, data)
+	tx := types.NewTransaction(nonce, toAddr, value, gas.ToInt(), gasPrice, data)
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), selectedAcct.AccountKey.PrivateKey)
 	if err != nil {
 		return emptyHash, err
