@@ -3,7 +3,7 @@ var expect = chai.expect;
 var assert = chai.assert;
 var Web3 = require('web3');
 
-describe('Whisper Tests', function () {
+describe.skip('Whisper Tests', function () {
     var node1 = new Web3();
     var node2 = new Web3();
     var web3 = node1;

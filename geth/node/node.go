@@ -100,7 +100,7 @@ func defaultEmbeddedNodeConfig(config *params.NodeConfig) *node.Config {
 			DiscoveryV5Addr:  ":0",
 			BootstrapNodes:   makeBootstrapNodes(),
 			BootstrapNodesV5: makeBootstrapNodesV5(),
-			ListenAddr:       ":0",
+			ListenAddr:       config.ListenAddr,
 			NAT:              nat.Any(),
 			MaxPeers:         config.MaxPeers,
 			MaxPendingPeers:  config.MaxPendingPeers,
@@ -195,7 +195,7 @@ func activateShhService(stack *node.Node, config *params.NodeConfig, deliverySer
 		}
 
 		// enable mail service
-		if whisperConfig.MailServerNode {
+		if whisperConfig.EnableMailServer {
 			if whisperConfig.Password == "" {
 				password, err := whisperConfig.ReadPasswordFile()
 				if err != nil {
@@ -205,16 +205,19 @@ func activateShhService(stack *node.Node, config *params.NodeConfig, deliverySer
 				whisperConfig.Password = string(password)
 			}
 
+			log.Info("Register MailServer")
+
 			var mailServer mailserver.WMailServer
 			whisperService.RegisterServer(&mailServer)
 			mailServer.Init(whisperService, whisperConfig.DataDir, whisperConfig.Password, whisperConfig.MinimumPoW)
 		}
 
 		// enable notification service
-		if whisperConfig.NotificationServerNode {
+		if whisperConfig.EnablePushNotification {
+			log.Info("Register PushNotification server")
+
 			var notificationServer notifications.NotificationServer
 			whisperService.RegisterNotificationServer(&notificationServer)
-
 			notificationServer.Init(whisperService, whisperConfig)
 		}
 
