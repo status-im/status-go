@@ -32,20 +32,14 @@ import (
 	"github.com/ethereum/go-ethereum/eth/gasprice"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/internal/ethapi"
 	"github.com/ethereum/go-ethereum/light"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
 type LesApiBackend struct {
-	eth           *LightEthereum
-	gpo           *gasprice.Oracle
-	statusBackend *ethapi.StatusBackend
-}
-
-func (b *LesApiBackend) GetStatusBackend() *ethapi.StatusBackend {
-	return b.statusBackend
+	eth *LightEthereum
+	gpo *gasprice.Oracle
 }
 
 func (b *LesApiBackend) ChainConfig() *params.ChainConfig {
@@ -180,8 +174,15 @@ func (b *LesApiBackend) AccountManager() *accounts.Manager {
 }
 
 func (b *LesApiBackend) BloomStatus() (uint64, uint64) {
-	return params.BloomBitsBlocks, 0
+	if b.eth.bloomIndexer == nil {
+		return 0, 0
+	}
+	sections, _, _ := b.eth.bloomIndexer.Sections()
+	return light.BloomTrieFrequency, sections
 }
 
 func (b *LesApiBackend) ServiceFilter(ctx context.Context, session *bloombits.MatcherSession) {
+	for i := 0; i < bloomFilterThreads; i++ {
+		go session.Multiplex(bloomRetrievalBatch, bloomRetrievalWait, b.eth.bloomRequests)
+	}
 }

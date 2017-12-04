@@ -151,9 +151,9 @@ func (s *PublicTxPoolAPI) Inspect() map[string]map[string]map[string]string {
 	// Define a formatter to flatten a transaction into a string
 	var format = func(tx *types.Transaction) string {
 		if to := tx.To(); to != nil {
-			return fmt.Sprintf("%s: %v wei + %v × %v gas", tx.To().Hex(), tx.Value(), tx.Gas(), tx.GasPrice())
+			return fmt.Sprintf("%s: %v wei + %v gas × %v wei", tx.To().Hex(), tx.Value(), tx.Gas(), tx.GasPrice())
 		}
-		return fmt.Sprintf("contract creation: %v wei + %v × %v gas", tx.Value(), tx.Gas(), tx.GasPrice())
+		return fmt.Sprintf("contract creation: %v wei + %v gas × %v wei", tx.Value(), tx.Gas(), tx.GasPrice())
 	}
 	// Flatten the pending transactions
 	for account, txs := range pending {
@@ -178,24 +178,15 @@ func (s *PublicTxPoolAPI) Inspect() map[string]map[string]map[string]string {
 // It offers only methods that can retrieve accounts.
 type PublicAccountAPI struct {
 	am *accounts.Manager
-	b  Backend
 }
 
 // NewPublicAccountAPI creates a new PublicAccountAPI.
-func NewPublicAccountAPI(b Backend) *PublicAccountAPI {
-	return &PublicAccountAPI{
-		am: b.AccountManager(),
-		b:  b,
-	}
+func NewPublicAccountAPI(am *accounts.Manager) *PublicAccountAPI {
+	return &PublicAccountAPI{am: am}
 }
 
 // Accounts returns the collection of accounts this node manages
 func (s *PublicAccountAPI) Accounts() []common.Address {
-	backend := s.b.GetStatusBackend()
-	if backend != nil {
-		return backend.am.Accounts()
-	}
-
 	addresses := make([]common.Address, 0) // return [] instead of nil if empty
 	for _, wallet := range s.am.Wallets() {
 		for _, account := range wallet.Accounts() {
@@ -225,11 +216,6 @@ func NewPrivateAccountAPI(b Backend, nonceLock *AddrLocker) *PrivateAccountAPI {
 
 // ListAccounts will return a list of addresses for accounts this node manages.
 func (s *PrivateAccountAPI) ListAccounts() []common.Address {
-	backend := s.b.GetStatusBackend()
-	if backend != nil {
-		return backend.am.Accounts()
-	}
-
 	addresses := make([]common.Address, 0) // return [] instead of nil if empty
 	for _, wallet := range s.am.Wallets() {
 		for _, account := range wallet.Accounts() {
@@ -663,12 +649,14 @@ func (s *PublicBlockChainAPI) Call(ctx context.Context, args CallArgs, blockNr r
 	return (hexutil.Bytes)(result), err
 }
 
-// EstimateGas returns an estimate of the amount of gas needed to execute the given transaction.
+// EstimateGas returns an estimate of the amount of gas needed to execute the
+// given transaction against the current pending block.
 func (s *PublicBlockChainAPI) EstimateGas(ctx context.Context, args CallArgs) (*hexutil.Big, error) {
-	// Binary search the gas requirement, as it may be higher than the amount used
+	// Determine the lowest and highest possible gas limits to binary search in between
 	var (
-		lo uint64 = params.TxGas - 1
-		hi uint64
+		lo  uint64 = params.TxGas - 1
+		hi  uint64
+		cap uint64
 	)
 	if (*big.Int)(&args.Gas).Uint64() >= params.TxGas {
 		hi = (*big.Int)(&args.Gas).Uint64()
@@ -680,20 +668,31 @@ func (s *PublicBlockChainAPI) EstimateGas(ctx context.Context, args CallArgs) (*
 		}
 		hi = block.GasLimit().Uint64()
 	}
-	for lo+1 < hi {
-		// Take a guess at the gas, and check transaction validity
-		mid := (hi + lo) / 2
-		(*big.Int)(&args.Gas).SetUint64(mid)
+	cap = hi
 
+	// Create a helper to check if a gas allowance results in an executable transaction
+	executable := func(gas uint64) bool {
+		(*big.Int)(&args.Gas).SetUint64(gas)
 		_, _, failed, err := s.doCall(ctx, args, rpc.PendingBlockNumber, vm.Config{})
-
-		// If the transaction became invalid or execution failed, raise the gas limit
 		if err != nil || failed {
-			lo = mid
-			continue
+			return false
 		}
-		// Otherwise assume the transaction succeeded, lower the gas limit
-		hi = mid
+		return true
+	}
+	// Execute the binary search and hone in on an executable gas limit
+	for lo+1 < hi {
+		mid := (hi + lo) / 2
+		if !executable(mid) {
+			lo = mid
+		} else {
+			hi = mid
+		}
+	}
+	// Reject the transaction as invalid if it still fails at the highest allowance
+	if hi == cap {
+		if !executable(hi) {
+			return nil, fmt.Errorf("gas required exceeds allowance or always failing transaction")
+		}
 	}
 	return (*hexutil.Big)(new(big.Int).SetUint64(hi)), nil
 }
@@ -711,45 +710,52 @@ type ExecutionResult struct {
 // StructLogRes stores a structured log emitted by the EVM while replaying a
 // transaction in debug mode
 type StructLogRes struct {
-	Pc      uint64            `json:"pc"`
-	Op      string            `json:"op"`
-	Gas     uint64            `json:"gas"`
-	GasCost uint64            `json:"gasCost"`
-	Depth   int               `json:"depth"`
-	Error   error             `json:"error"`
-	Stack   []string          `json:"stack"`
-	Memory  []string          `json:"memory"`
-	Storage map[string]string `json:"storage"`
+	Pc      uint64             `json:"pc"`
+	Op      string             `json:"op"`
+	Gas     uint64             `json:"gas"`
+	GasCost uint64             `json:"gasCost"`
+	Depth   int                `json:"depth"`
+	Error   error              `json:"error,omitempty"`
+	Stack   *[]string          `json:"stack,omitempty"`
+	Memory  *[]string          `json:"memory,omitempty"`
+	Storage *map[string]string `json:"storage,omitempty"`
 }
 
 // formatLogs formats EVM returned structured logs for json output
-func FormatLogs(structLogs []vm.StructLog) []StructLogRes {
-	formattedStructLogs := make([]StructLogRes, len(structLogs))
-	for index, trace := range structLogs {
-		formattedStructLogs[index] = StructLogRes{
+func FormatLogs(logs []vm.StructLog) []StructLogRes {
+	formatted := make([]StructLogRes, len(logs))
+	for index, trace := range logs {
+		formatted[index] = StructLogRes{
 			Pc:      trace.Pc,
 			Op:      trace.Op.String(),
 			Gas:     trace.Gas,
 			GasCost: trace.GasCost,
 			Depth:   trace.Depth,
 			Error:   trace.Err,
-			Stack:   make([]string, len(trace.Stack)),
-			Storage: make(map[string]string),
 		}
-
-		for i, stackValue := range trace.Stack {
-			formattedStructLogs[index].Stack[i] = fmt.Sprintf("%x", math.PaddedBigBytes(stackValue, 32))
+		if trace.Stack != nil {
+			stack := make([]string, len(trace.Stack))
+			for i, stackValue := range trace.Stack {
+				stack[i] = fmt.Sprintf("%x", math.PaddedBigBytes(stackValue, 32))
+			}
+			formatted[index].Stack = &stack
 		}
-
-		for i := 0; i+32 <= len(trace.Memory); i += 32 {
-			formattedStructLogs[index].Memory = append(formattedStructLogs[index].Memory, fmt.Sprintf("%x", trace.Memory[i:i+32]))
+		if trace.Memory != nil {
+			memory := make([]string, 0, (len(trace.Memory)+31)/32)
+			for i := 0; i+32 <= len(trace.Memory); i += 32 {
+				memory = append(memory, fmt.Sprintf("%x", trace.Memory[i:i+32]))
+			}
+			formatted[index].Memory = &memory
 		}
-
-		for i, storageValue := range trace.Storage {
-			formattedStructLogs[index].Storage[fmt.Sprintf("%x", i)] = fmt.Sprintf("%x", storageValue)
+		if trace.Storage != nil {
+			storage := make(map[string]string)
+			for i, storageValue := range trace.Storage {
+				storage[fmt.Sprintf("%x", i)] = fmt.Sprintf("%x", storageValue)
+			}
+			formatted[index].Storage = &storage
 		}
 	}
-	return formattedStructLogs
+	return formatted
 }
 
 // rpcOutputBlock converts the given block to the RPC output which depends on fullTx. If inclTx is true transactions are
@@ -1116,46 +1122,10 @@ func submitTransaction(ctx context.Context, b Backend, tx *types.Transaction) (c
 	return tx.Hash(), nil
 }
 
-// SendTransactionWithPassphrase creates a transaction by unpacking queued transaction, signs it and submits to the
-// transaction pool.
-// @Status
-func (s *PublicTransactionPoolAPI) SendTransactionWithPassphrase(ctx context.Context, args SendTxArgs, passphrase string) (common.Hash, error) {
-	// Look up the wallet containing the requested signer
-	account := accounts.Account{Address: args.From}
-
-	wallet, err := s.b.AccountManager().Find(account)
-	if err != nil {
-		return common.Hash{}, err
-	}
-
-	if args.Nonce == nil {
-		// Hold the addresse's mutex around signing to prevent concurrent assignment of
-		// the same nonce to multiple accounts.
-		s.nonceLock.LockAddr(args.From)
-		defer s.nonceLock.UnlockAddr(args.From)
-	}
-
-	// Set some sanity defaults and terminate on failure
-	if err := args.setDefaults(ctx, s.b); err != nil {
-		return common.Hash{}, err
-	}
-	// Assemble the transaction and sign with the wallet
-	tx := args.toTransaction()
-
-	var chainID *big.Int
-	if config := s.b.ChainConfig(); config.IsEIP155(s.b.CurrentBlock().Number()) {
-		chainID = config.ChainId
-	}
-	signed, err := wallet.SignTxWithPassphrase(account, passphrase, tx, chainID)
-	if err != nil {
-		return common.Hash{}, err
-	}
-	return submitTransaction(ctx, s.b, signed)
-}
-
-// SendTransaction creates a transaction by unpacking queued transaction, signs it and submits to the
+// SendTransaction creates a transaction for the given argument, sign it and submit it to the
 // transaction pool.
 func (s *PublicTransactionPoolAPI) SendTransaction(ctx context.Context, args SendTxArgs) (common.Hash, error) {
+
 	// Look up the wallet containing the requested signer
 	account := accounts.Account{Address: args.From}
 
