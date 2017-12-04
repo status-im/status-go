@@ -1,7 +1,8 @@
 diff --git a/eth/api_backend.go b/eth/api_backend.go
---- a/eth/api_backend.go	2017-12-04 14:13:07.000000000 +0100
-+++ b/eth/api_backend.go	2017-12-03 19:32:31.000000000 +0100
-@@ -32,14 +32,20 @@
+index 91f392f94..471275de5 100644
+--- a/eth/api_backend.go
++++ b/eth/api_backend.go
+@@ -32,14 +32,20 @@ import (
  	"github.com/ethereum/go-ethereum/eth/gasprice"
  	"github.com/ethereum/go-ethereum/ethdb"
  	"github.com/ethereum/go-ethereum/event"
@@ -25,9 +26,10 @@ diff --git a/eth/api_backend.go b/eth/api_backend.go
  
  func (b *EthApiBackend) ChainConfig() *params.ChainConfig {
 diff --git a/eth/backend.go b/eth/backend.go
---- a/eth/backend.go	2017-12-04 14:13:07.000000000 +0100
-+++ b/eth/backend.go	2017-12-03 19:32:31.000000000 +0100
-@@ -167,7 +167,7 @@
+index 1cd9e8fff..2fbdec4e2 100644
+--- a/eth/backend.go
++++ b/eth/backend.go
+@@ -169,7 +169,7 @@ func New(ctx *node.ServiceContext, config *Config) (*Ethereum, error) {
  	eth.miner = miner.New(eth, eth.chainConfig, eth.EventMux(), eth.engine)
  	eth.miner.SetExtra(makeExtraData(config.ExtraData))
  
@@ -37,9 +39,10 @@ diff --git a/eth/backend.go b/eth/backend.go
  	if gpoParams.Default == nil {
  		gpoParams.Default = config.GasPrice
 diff --git a/internal/ethapi/api.go b/internal/ethapi/api.go
---- a/internal/ethapi/api.go	2017-12-04 14:13:07.000000000 +0100
-+++ b/internal/ethapi/api.go	2017-12-03 19:32:31.000000000 +0100
-@@ -178,15 +178,24 @@
+index 025f42617..d8f48a890 100644
+--- a/internal/ethapi/api.go
++++ b/internal/ethapi/api.go
+@@ -178,15 +178,24 @@ func (s *PublicTxPoolAPI) Inspect() map[string]map[string]map[string]string {
  // It offers only methods that can retrieve accounts.
  type PublicAccountAPI struct {
  	am *accounts.Manager
@@ -66,7 +69,7 @@ diff --git a/internal/ethapi/api.go b/internal/ethapi/api.go
  	addresses := make([]common.Address, 0) // return [] instead of nil if empty
  	for _, wallet := range s.am.Wallets() {
  		for _, account := range wallet.Accounts() {
-@@ -216,6 +225,11 @@
+@@ -216,6 +225,11 @@ func NewPrivateAccountAPI(b Backend, nonceLock *AddrLocker) *PrivateAccountAPI {
  
  // ListAccounts will return a list of addresses for accounts this node manages.
  func (s *PrivateAccountAPI) ListAccounts() []common.Address {
@@ -78,7 +81,7 @@ diff --git a/internal/ethapi/api.go b/internal/ethapi/api.go
  	addresses := make([]common.Address, 0) // return [] instead of nil if empty
  	for _, wallet := range s.am.Wallets() {
  		for _, account := range wallet.Accounts() {
-@@ -1102,10 +1116,46 @@
+@@ -1122,10 +1136,46 @@ func submitTransaction(ctx context.Context, b Backend, tx *types.Transaction) (c
  	return tx.Hash(), nil
  }
  
@@ -128,9 +131,10 @@ diff --git a/internal/ethapi/api.go b/internal/ethapi/api.go
  	account := accounts.Account{Address: args.From}
  
 diff --git a/internal/ethapi/backend.go b/internal/ethapi/backend.go
---- a/internal/ethapi/backend.go	2017-12-04 14:13:07.000000000 +0100
-+++ b/internal/ethapi/backend.go	2017-12-03 19:32:31.000000000 +0100
-@@ -68,6 +68,8 @@
+index 368fa4872..cac58dfc0 100644
+--- a/internal/ethapi/backend.go
++++ b/internal/ethapi/backend.go
+@@ -68,6 +68,8 @@ type Backend interface {
  
  	ChainConfig() *params.ChainConfig
  	CurrentBlock() *types.Block
@@ -139,7 +143,7 @@ diff --git a/internal/ethapi/backend.go b/internal/ethapi/backend.go
  }
  
  func GetAPIs(apiBackend Backend) []rpc.API {
-@@ -105,7 +107,7 @@
+@@ -105,7 +107,7 @@ func GetAPIs(apiBackend Backend) []rpc.API {
  		}, {
  			Namespace: "eth",
  			Version:   "1.0",
@@ -149,8 +153,10 @@ diff --git a/internal/ethapi/backend.go b/internal/ethapi/backend.go
  		}, {
  			Namespace: "personal",
 diff --git a/internal/ethapi/status_backend.go b/internal/ethapi/status_backend.go
---- a/internal/ethapi/status_backend.go	1970-01-01 01:00:00.000000000 +0100
-+++ b/internal/ethapi/status_backend.go	2017-12-03 19:32:31.000000000 +0100
+new file mode 100644
+index 000000000..c4e553cae
+--- /dev/null
++++ b/internal/ethapi/status_backend.go
 @@ -0,0 +1,88 @@
 +package ethapi
 +
@@ -241,9 +247,10 @@ diff --git a/internal/ethapi/status_backend.go b/internal/ethapi/status_backend.
 +	return b.bcapi.EstimateGas(ctx, callArgs)
 +}
 diff --git a/les/api_backend.go b/les/api_backend.go
---- a/les/api_backend.go	2017-12-04 14:13:07.000000000 +0100
-+++ b/les/api_backend.go	2017-12-03 19:32:31.000000000 +0100
-@@ -32,14 +32,20 @@
+index 56f617a7d..f839f24e6 100644
+--- a/les/api_backend.go
++++ b/les/api_backend.go
+@@ -32,14 +32,20 @@ import (
  	"github.com/ethereum/go-ethereum/eth/gasprice"
  	"github.com/ethereum/go-ethereum/ethdb"
  	"github.com/ethereum/go-ethereum/event"
@@ -267,9 +274,10 @@ diff --git a/les/api_backend.go b/les/api_backend.go
  
  func (b *LesApiBackend) ChainConfig() *params.ChainConfig {
 diff --git a/les/backend.go b/les/backend.go
---- a/les/backend.go	2017-12-04 14:13:07.000000000 +0100
-+++ b/les/backend.go	2017-12-03 19:32:31.000000000 +0100
-@@ -71,6 +71,8 @@
+index 333df920e..7d8cf3916 100644
+--- a/les/backend.go
++++ b/les/backend.go
+@@ -75,6 +75,8 @@ type LightEthereum struct {
  	netRPCService *ethapi.PublicNetAPI
  
  	wg sync.WaitGroup
@@ -278,26 +286,26 @@ diff --git a/les/backend.go b/les/backend.go
  }
  
  func New(ctx *node.ServiceContext, config *eth.Config) (*LightEthereum, error) {
-@@ -117,12 +119,17 @@
- 	if eth.protocolManager, err = NewProtocolManager(eth.chainConfig, true, config.NetworkId, eth.eventMux, eth.engine, eth.peers, eth.blockchain, nil, chainDb, eth.odr, eth.relay, quitSync, &eth.wg); err != nil {
+@@ -126,12 +128,17 @@ func New(ctx *node.ServiceContext, config *eth.Config) (*LightEthereum, error) {
+ 	if leth.protocolManager, err = NewProtocolManager(leth.chainConfig, true, ClientProtocolVersions, config.NetworkId, leth.eventMux, leth.engine, leth.peers, leth.blockchain, nil, chainDb, leth.odr, leth.relay, quitSync, &leth.wg); err != nil {
  		return nil, err
  	}
--	eth.ApiBackend = &LesApiBackend{eth, nil}
-+	eth.ApiBackend = &LesApiBackend{eth, nil, nil}
+-	leth.ApiBackend = &LesApiBackend{leth, nil}
++	leth.ApiBackend = &LesApiBackend{leth, nil, nil}
  	gpoParams := config.GPO
  	if gpoParams.Default == nil {
  		gpoParams.Default = config.GasPrice
  	}
- 	eth.ApiBackend.gpo = gasprice.NewOracle(eth.ApiBackend, gpoParams)
+ 	leth.ApiBackend.gpo = gasprice.NewOracle(leth.ApiBackend, gpoParams)
 +
 +	// inject status-im backend
-+	eth.ApiBackend.statusBackend = ethapi.NewStatusBackend(eth.ApiBackend)
-+	eth.StatusBackend = eth.ApiBackend.statusBackend // alias
++	leth.ApiBackend.statusBackend = ethapi.NewStatusBackend(eth.ApiBackend)
++	leth.StatusBackend = eth.ApiBackend.statusBackend // alias
 +
- 	return eth, nil
+ 	return leth, nil
  }
  
-@@ -223,3 +230,8 @@
+@@ -254,3 +261,8 @@ func (s *LightEthereum) Stop() error {
  
  	return nil
  }
@@ -307,8 +315,10 @@ diff --git a/les/backend.go b/les/backend.go
 +	light.WriteTrustedCht(s.chainDb, cht)
 +}
 diff --git a/les/status/accounts.go b/les/status/accounts.go
---- a/les/status/accounts.go	1970-01-01 01:00:00.000000000 +0100
-+++ b/les/status/accounts.go	2017-09-24 13:31:10.000000000 +0200
+new file mode 100644
+index 000000000..78bd2ad92
+--- /dev/null
++++ b/les/status/accounts.go
 @@ -0,0 +1,45 @@
 +package status
 +
@@ -356,8 +366,10 @@ diff --git a/les/status/accounts.go b/les/status/accounts.go
 +	d.accountsFilterHandler = fn
 +}
 diff --git a/les/status/types.go b/les/status/types.go
---- a/les/status/types.go	1970-01-01 01:00:00.000000000 +0100
-+++ b/les/status/types.go	2017-12-03 19:32:31.000000000 +0100
+new file mode 100644
+index 000000000..04437bdb6
+--- /dev/null
++++ b/les/status/types.go
 @@ -0,0 +1,17 @@
 +package status
 +
@@ -376,4 +388,3 @@ diff --git a/les/status/types.go b/les/status/types.go
 +	Data     hexutil.Bytes   `json:"data"`
 +	Nonce    *hexutil.Uint64 `json:"nonce"`
 +}
-

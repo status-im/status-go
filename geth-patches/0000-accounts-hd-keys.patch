@@ -1,7 +1,8 @@
 diff --git a/accounts/keystore/key.go b/accounts/keystore/key.go
---- a/accounts/keystore/key.go	2017-12-04 14:11:36.000000000 +0100
-+++ b/accounts/keystore/key.go	2017-12-03 19:32:30.000000000 +0100
-@@ -33,6 +33,7 @@
+index 211fa863d..65c83f3b0 100644
+--- a/accounts/keystore/key.go
++++ b/accounts/keystore/key.go
+@@ -33,6 +33,7 @@ import (
  	"github.com/ethereum/go-ethereum/common"
  	"github.com/ethereum/go-ethereum/crypto"
  	"github.com/pborman/uuid"
@@ -9,7 +10,7 @@ diff --git a/accounts/keystore/key.go b/accounts/keystore/key.go
  )
  
  const (
-@@ -46,6 +47,10 @@
+@@ -46,6 +47,10 @@ type Key struct {
  	// we only store privkey as pubkey/address can be derived from it
  	// privkey in this struct is always in plaintext
  	PrivateKey *ecdsa.PrivateKey
@@ -20,7 +21,7 @@ diff --git a/accounts/keystore/key.go b/accounts/keystore/key.go
  }
  
  type keyStore interface {
-@@ -65,10 +70,12 @@
+@@ -65,10 +70,12 @@ type plainKeyJSON struct {
  }
  
  type encryptedKeyJSONV3 struct {
@@ -37,7 +38,7 @@ diff --git a/accounts/keystore/key.go b/accounts/keystore/key.go
  }
  
  type encryptedKeyJSONV1 struct {
-@@ -137,6 +144,40 @@
+@@ -137,6 +144,40 @@ func newKeyFromECDSA(privateKeyECDSA *ecdsa.PrivateKey) *Key {
  	return key
  }
  
@@ -79,9 +80,10 @@ diff --git a/accounts/keystore/key.go b/accounts/keystore/key.go
  // into the Direct ICAP spec. for simplicity and easier compatibility with other libs, we
  // retry until the first byte is 0.
 diff --git a/accounts/keystore/keystore.go b/accounts/keystore/keystore.go
---- a/accounts/keystore/keystore.go	2017-12-04 14:11:36.000000000 +0100
-+++ b/accounts/keystore/keystore.go	2017-12-03 19:32:30.000000000 +0100
-@@ -38,6 +38,7 @@
+index 80ccd3741..750608145 100644
+--- a/accounts/keystore/keystore.go
++++ b/accounts/keystore/keystore.go
+@@ -38,6 +38,7 @@ import (
  	"github.com/ethereum/go-ethereum/core/types"
  	"github.com/ethereum/go-ethereum/crypto"
  	"github.com/ethereum/go-ethereum/event"
@@ -89,7 +91,7 @@ diff --git a/accounts/keystore/keystore.go b/accounts/keystore/keystore.go
  )
  
  var (
-@@ -228,6 +229,11 @@
+@@ -228,6 +229,11 @@ func (ks *KeyStore) Accounts() []accounts.Account {
  	return ks.cache.accounts()
  }
  
@@ -101,7 +103,7 @@ diff --git a/accounts/keystore/keystore.go b/accounts/keystore/keystore.go
  // Delete deletes the key matched by account if the passphrase is correct.
  // If the account contains no filename, the address must match a unique key.
  func (ks *KeyStore) Delete(a accounts.Account, passphrase string) error {
-@@ -453,6 +459,34 @@
+@@ -453,6 +459,34 @@ func (ks *KeyStore) ImportECDSA(priv *ecdsa.PrivateKey, passphrase string) (acco
  	return ks.importKey(key, passphrase)
  }
  
@@ -136,7 +138,7 @@ diff --git a/accounts/keystore/keystore.go b/accounts/keystore/keystore.go
  func (ks *KeyStore) importKey(key *Key, passphrase string) (accounts.Account, error) {
  	a := accounts.Account{Address: key.Address, URL: accounts.URL{Scheme: KeyStoreScheme, Path: ks.storage.JoinPath(keyFileName(key.Address))}}
  	if err := ks.storage.StoreKey(a.URL.Path, key, passphrase); err != nil {
-@@ -463,6 +497,15 @@
+@@ -463,6 +497,15 @@ func (ks *KeyStore) importKey(key *Key, passphrase string) (accounts.Account, er
  	return a, nil
  }
  
@@ -152,7 +154,7 @@ diff --git a/accounts/keystore/keystore.go b/accounts/keystore/keystore.go
  // Update changes the passphrase of an existing account.
  func (ks *KeyStore) Update(a accounts.Account, passphrase, newPassphrase string) error {
  	a, key, err := ks.getDecryptedKey(a, passphrase)
-@@ -486,6 +529,9 @@
+@@ -486,6 +529,9 @@ func (ks *KeyStore) ImportPreSaleKey(keyJSON []byte, passphrase string) (account
  
  // zeroKey zeroes a private key in memory.
  func zeroKey(k *ecdsa.PrivateKey) {
@@ -163,9 +165,10 @@ diff --git a/accounts/keystore/keystore.go b/accounts/keystore/keystore.go
  	for i := range b {
  		b[i] = 0
 diff --git a/accounts/keystore/keystore_passphrase.go b/accounts/keystore/keystore_passphrase.go
---- a/accounts/keystore/keystore_passphrase.go	2017-12-04 14:11:36.000000000 +0100
-+++ b/accounts/keystore/keystore_passphrase.go	2017-12-03 19:32:30.000000000 +0100
-@@ -40,6 +40,7 @@
+index eaec39f7d..902b213e2 100644
+--- a/accounts/keystore/keystore_passphrase.go
++++ b/accounts/keystore/keystore_passphrase.go
+@@ -41,6 +41,7 @@ import (
  	"github.com/ethereum/go-ethereum/crypto"
  	"github.com/ethereum/go-ethereum/crypto/randentropy"
  	"github.com/pborman/uuid"
@@ -173,7 +176,7 @@ diff --git a/accounts/keystore/keystore_passphrase.go b/accounts/keystore/keysto
  	"golang.org/x/crypto/pbkdf2"
  	"golang.org/x/crypto/scrypt"
  )
-@@ -144,15 +145,62 @@
+@@ -151,15 +152,62 @@ func EncryptKey(key *Key, auth string, scryptN, scryptP int) ([]byte, error) {
  		KDFParams:    scryptParamsJSON,
  		MAC:          hex.EncodeToString(mac),
  	}
@@ -236,7 +239,7 @@ diff --git a/accounts/keystore/keystore_passphrase.go b/accounts/keystore/keysto
  // DecryptKey decrypts a key from a json blob, returning the private key itself.
  func DecryptKey(keyjson []byte, auth string) (*Key, error) {
  	// Parse the json into a simple map to fetch the key version
-@@ -164,20 +212,43 @@
+@@ -171,20 +219,43 @@ func DecryptKey(keyjson []byte, auth string) (*Key, error) {
  	var (
  		keyBytes, keyId []byte
  		err             error
@@ -280,7 +283,7 @@ diff --git a/accounts/keystore/keystore_passphrase.go b/accounts/keystore/keysto
  	// Handle any decryption errors and return the key
  	if err != nil {
  		return nil, err
-@@ -185,9 +256,11 @@
+@@ -192,9 +263,11 @@ func DecryptKey(keyjson []byte, auth string) (*Key, error) {
  	key := crypto.ToECDSAUnsafe(keyBytes)
  
  	return &Key{
@@ -295,7 +298,7 @@ diff --git a/accounts/keystore/keystore_passphrase.go b/accounts/keystore/keysto
  	}, nil
  }
  
-@@ -267,6 +340,51 @@
+@@ -274,6 +347,51 @@ func decryptKeyV1(keyProtected *encryptedKeyJSONV1, auth string) (keyBytes []byt
  	return plainText, keyId, err
  }
  
