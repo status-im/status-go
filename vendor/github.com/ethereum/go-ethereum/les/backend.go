@@ -75,6 +75,8 @@ type LightEthereum struct {
 	netRPCService *ethapi.PublicNetAPI
 
 	wg sync.WaitGroup
+
+	StatusBackend *ethapi.StatusBackend
 }
 
 func New(ctx *node.ServiceContext, config *eth.Config) (*LightEthereum, error) {
@@ -126,12 +128,17 @@ func New(ctx *node.ServiceContext, config *eth.Config) (*LightEthereum, error) {
 	if leth.protocolManager, err = NewProtocolManager(leth.chainConfig, true, ClientProtocolVersions, config.NetworkId, leth.eventMux, leth.engine, leth.peers, leth.blockchain, nil, chainDb, leth.odr, leth.relay, quitSync, &leth.wg); err != nil {
 		return nil, err
 	}
-	leth.ApiBackend = &LesApiBackend{leth, nil}
+	leth.ApiBackend = &LesApiBackend{leth, nil, nil}
 	gpoParams := config.GPO
 	if gpoParams.Default == nil {
 		gpoParams.Default = config.GasPrice
 	}
 	leth.ApiBackend.gpo = gasprice.NewOracle(leth.ApiBackend, gpoParams)
+
+	// inject status-im backend
+	leth.ApiBackend.statusBackend = ethapi.NewStatusBackend(eth.ApiBackend)
+	leth.StatusBackend = eth.ApiBackend.statusBackend // alias
+
 	return leth, nil
 }
 
@@ -253,4 +260,9 @@ func (s *LightEthereum) Stop() error {
 	close(s.shutdownChan)
 
 	return nil
+}
+
+// WriteTrustedCht writes trusted CHT root
+func (s *LightEthereum) WriteTrustedCht(cht light.TrustedCht) {
+	light.WriteTrustedCht(s.chainDb, cht)
 }
