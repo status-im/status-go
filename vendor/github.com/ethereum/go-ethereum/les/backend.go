@@ -136,8 +136,8 @@ func New(ctx *node.ServiceContext, config *eth.Config) (*LightEthereum, error) {
 	leth.ApiBackend.gpo = gasprice.NewOracle(leth.ApiBackend, gpoParams)
 
 	// inject status-im backend
-	leth.ApiBackend.statusBackend = ethapi.NewStatusBackend(eth.ApiBackend)
-	leth.StatusBackend = eth.ApiBackend.statusBackend // alias
+	leth.ApiBackend.statusBackend = ethapi.NewStatusBackend(leth.ApiBackend)
+	leth.StatusBackend = leth.ApiBackend.statusBackend // alias
 
 	return leth, nil
 }
@@ -260,9 +260,4 @@ func (s *LightEthereum) Stop() error {
 	close(s.shutdownChan)
 
 	return nil
-}
-
-// WriteTrustedCht writes trusted CHT root
-func (s *LightEthereum) WriteTrustedCht(cht light.TrustedCht) {
-	light.WriteTrustedCht(s.chainDb, cht)
 }

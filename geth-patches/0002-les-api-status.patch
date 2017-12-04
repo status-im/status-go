@@ -299,21 +299,12 @@ index 333df920e..7d8cf3916 100644
  	leth.ApiBackend.gpo = gasprice.NewOracle(leth.ApiBackend, gpoParams)
 +
 +	// inject status-im backend
-+	leth.ApiBackend.statusBackend = ethapi.NewStatusBackend(eth.ApiBackend)
-+	leth.StatusBackend = eth.ApiBackend.statusBackend // alias
++	leth.ApiBackend.statusBackend = ethapi.NewStatusBackend(leth.ApiBackend)
++	leth.StatusBackend = leth.ApiBackend.statusBackend // alias
 +
  	return leth, nil
  }
  
-@@ -254,3 +261,8 @@ func (s *LightEthereum) Stop() error {
- 
- 	return nil
- }
-+
-+// WriteTrustedCht writes trusted CHT root
-+func (s *LightEthereum) WriteTrustedCht(cht light.TrustedCht) {
-+	light.WriteTrustedCht(s.chainDb, cht)
-+}
 diff --git a/les/status/accounts.go b/les/status/accounts.go
 new file mode 100644
 index 000000000..78bd2ad92
