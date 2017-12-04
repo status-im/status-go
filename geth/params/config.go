@@ -88,33 +88,23 @@ type WhisperConfig struct {
 	// Enabled flag specifies whether protocol is enabled
 	Enabled bool
 
-	// IdentityFile path to private key, that will be loaded as identity into Whisper
+	// IdentityFile path to private key, that will be loaded as identity into Whisper.
+	// Currently, it's used by Push Notification service.
 	IdentityFile string
 
-	// PasswordFile path to password file, for non-interactive password entry
-	// (if no account file selected, then this password is used for symmetric encryption)
+	// PasswordFile path to password file.
+	// Currently, it's used by MailServer.
 	PasswordFile string
 
-	// EchoMode if mode is on, prints some arguments for diagnostics
-	EchoMode bool
+	// EnableMailServer is mode when node is capable of delivering expired messages on demand
+	EnableMailServer bool
 
-	// BootstrapNode whether node doesn't actively connect to peers, and waits for incoming connections
-	BootstrapNode bool
-
-	// ForwarderNode is mode when node only forwards messages, neither sends nor decrypts messages
-	ForwarderNode bool
-
-	// MailServerNode is mode when node is capable of delivering expired messages on demand
-	MailServerNode bool
-
-	// NotificationServerNode is mode when node is capable of sending Push (and probably other kinds) Notifications
-	NotificationServerNode bool
+	// EnablePushNotification is mode when node is capable of sending Push (and probably other kinds) Notifications
+	EnablePushNotification bool
 
 	// DataDir is the file system folder Whisper should use for any data storage needs.
+	// For instance, MailServer will use this directory to store its data.
 	DataDir string
-
-	// Port Whisper node's listening port
-	Port int
 
 	// MinimumPoW minimum PoW for Whisper messages
 	MinimumPoW float64
@@ -241,6 +231,9 @@ type NodeConfig struct {
 	// remote peer identification as well as network traffic encryption.
 	NodeKeyFile string
 
+	// ListenAddr is an IP address and port of this node (e.g. 127.0.0.1:30303).
+	ListenAddr string
+
 	// Name sets the instance name of the node. It must not contain the / character.
 	Name string `validate:"excludes=/"`
 
@@ -323,6 +316,7 @@ func NewNodeConfig(dataDir string, networkID uint64, devMode bool) (*NodeConfig,
 		RPCEnabled:      RPCEnabledDefault,
 		HTTPHost:        HTTPHost,
 		HTTPPort:        HTTPPort,
+		ListenAddr:      ListenAddr,
 		APIModules:      APIModules,
 		WSHost:          WSHost,
 		WSPort:          WSPort,
@@ -342,7 +336,6 @@ func NewNodeConfig(dataDir string, networkID uint64, devMode bool) (*NodeConfig,
 		},
 		WhisperConfig: &WhisperConfig{
 			Enabled:    true,
-			Port:       WhisperPort,
 			MinimumPoW: WhisperMinimumPoW,
 			TTL:        WhisperTTL,
 			FirebaseConfig: &FirebaseConfig{
