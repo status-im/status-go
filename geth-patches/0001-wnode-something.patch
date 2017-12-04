@@ -1,0 +1,50 @@
+diff --git a/cmd/wnode/main.go b/cmd/wnode/main.go
+--- a/cmd/wnode/main.go	2017-12-03 18:18:01.000000000 +0100
++++ b/cmd/wnode/main.go	2017-09-19 17:03:51.000000000 +0200
+@@ -98,6 +98,8 @@
+ 	argEnode   = flag.String("boot", "", "bootstrap node you want to connect to (e.g. enode://e454......08d50@52.176.211.200:16428)")
+ 	argTopic   = flag.String("topic", "", "topic in hexadecimal format (e.g. 70a4beef)")
+ 	argSaveDir = flag.String("savedir", "", "directory where incoming messages will be saved as files")
++	argSymPass = flag.String("sympass", "", "SymKey password")
++	argMsPass  = flag.String("mspass", "", "Mailserver password")
+ )
+ 
+ func main() {
+@@ -146,6 +148,13 @@
+ 	} else if *fileExMode {
+ 		utils.Fatalf("Parameter 'savedir' is mandatory for file exchange mode")
+ 	}
++	if len(*argSymPass) > 0 {
++		symPass = *argSymPass
++	}
++
++	if len(*argMsPass) > 0 {
++		msPassword = *argMsPass
++	}
+ 
+ 	if *echoMode {
+ 		echo()
+@@ -415,8 +424,22 @@
+ 	} else if *fileExMode {
+ 		sendFilesLoop()
+ 	} else {
+-		sendLoop()
++		pingLoop() // instead of sendLoop()
++	}
++}
++
++func pingLoop() {
++	ticker := time.NewTicker(time.Second * 120)
++
++	for {
++		select {
++		case <-ticker.C:
++			fmt.Println("I am alive: ", time.Now())
++		case <-done:
++			return
++		}
+ 	}
++
+ }
+ 
+ func sendLoop() {
