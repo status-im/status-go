@@ -57,6 +57,7 @@
         "Enabled": true,
         "IdentityFile": "",
         "PasswordFile": "",
+        "Password": "",
         "EchoMode": false,
         "BootstrapNode": false,
         "ForwarderNode": false,
