@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"os"
 
 	"github.com/NaySoftware/go-fcm"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
@@ -239,4 +240,16 @@ func (api *StatusAPI) NotifyUsers(message string, payload fcm.NotificationPayloa
 	}
 
 	return err
+}
+
+// AddEnv loads key-value pairs into ENV, such as flags.
+func (api *StatusAPI) AddEnv(key string, value string) string {
+	log.Debug("AddEnv", key, value)
+
+	err := os.Setenv(key, value)
+	if err != nil {
+		log.Error("AddEnv error:", err)
+	}
+
+	return key
 }
