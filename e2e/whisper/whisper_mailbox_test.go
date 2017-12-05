@@ -123,7 +123,6 @@ func TestRequestMessageFromMailboxAsync(t *testing.T) {
 			}
 		],
 		"id": 1}`)
-	fmt.Println("d", resp)
 
 	//Threre are no messages, because it's sender filter
 	resp = rpcClient.CallRaw(`{
