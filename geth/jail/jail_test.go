@@ -60,7 +60,7 @@ func (s *JailTestSuite) TestJailGetCell() {
 
 func (s *JailTestSuite) TestJailInitCell() {
 	// InitCell on an existing cell.
-	cell, err := s.Jail.createCell("cell1")
+	cell, err := s.Jail.obtainCell("cell1", false)
 	s.NoError(err)
 	err = s.Jail.initCell(cell)
 	s.NoError(err)
@@ -102,7 +102,7 @@ func (s *JailTestSuite) TestJailCall() {
 }
 
 func (s *JailTestSuite) TestMakeCatalogVariable() {
-	cell, err := s.Jail.createCell("cell1")
+	cell, err := s.Jail.obtainCell("cell1", false)
 	s.NoError(err)
 
 	// no `_status_catalog` variable
@@ -144,7 +144,7 @@ func (s *JailTestSuite) TestExecute() {
 	response := s.Jail.Execute("cell1", "('some string')")
 	s.Equal(`{"error":"cell 'cell1' not found"}`, response)
 
-	_, err := s.Jail.createCell("cell1")
+	_, err := s.Jail.obtainCell("cell1", false)
 	s.NoError(err)
 
 	// cell exists
