@@ -92,10 +92,6 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 			testCallRPC,
 		},
 		{
-			"create main and child accounts",
-			testCreateChildAccount,
-		},
-		{
 			"verify account password",
 			testVerifyAccountPassword,
 		},

@@ -1,7 +1,6 @@
 package api_test
 
 import (
-	"encoding/json"
 	"io/ioutil"
 	"math/rand"
 	"os"
@@ -190,138 +189,68 @@ func (s *APITestSuite) TestLogoutRemovesCells() {
 	require.Error(err, "Expected that cells was removed")
 }
 
-func testCreateChildAccount(t *testing.T) bool { //nolint: gocyclo
-	// to make sure that we start with empty account (which might get populated during previous tests)
-	if err := statusAPI.Logout(); err != nil {
-		t.Fatal(err)
-	}
+func (s *APITestSuite) TestCreateChildAccount() bool { //nolint: gocyclo
+	require := s.Require()
 
-	keyStore, err := statusAPI.NodeManager().AccountKeyStore()
-	if err != nil {
-		t.Error(err)
-		return false
-	}
+	config, err := e2e.MakeTestNodeConfig(GetNetworkID())
+	require.NoError(err)
+	err = s.api.StartNode(config)
+	require.NoError(err)
+	defer s.api.StopNode() //nolint: errcheck
+
+	// to make sure that we start with empty account (which might get populated during previous tests)
+	require.NoError(s.api.Logout())
+
+	keyStore, err := s.api.NodeManager().AccountKeyStore()
+	require.NoError(err)
 
 	// create an account
-	createAccountResponse := common.AccountInfo{}
-	rawResponse := CreateAccount(C.CString(TestConfig.Account1.Password))
+	createAccountResponse := s.api.CreateAccount(TestConfig.Account1.Password)
+	require.Empty(createAccountResponse.Error, "could not create account: %s", createAccountResponse.Error)
 
-	if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &createAccountResponse); err != nil {
-		t.Errorf("cannot decode CreateAccount response (%s): %v", C.GoString(rawResponse), err)
-		return false
-	}
-
-	if createAccountResponse.Error != "" {
-		t.Errorf("could not create account: %s", err)
-		return false
-	}
 	address, pubKey, mnemonic := createAccountResponse.Address, createAccountResponse.PubKey, createAccountResponse.Mnemonic
-	t.Logf("Account created: {address: %s, key: %s, mnemonic:%s}", address, pubKey, mnemonic)
+	s.T().Logf("Account created: {address: %s, key: %s, mnemonic:%s}", address, pubKey, mnemonic)
 
 	acct, err := common.ParseAccountString(address)
-	if err != nil {
-		t.Errorf("can not get account from address: %v", err)
-		return false
-	}
+	require.NoError(err, "can not get account from address: %v", err)
 
 	// obtain decrypted key, and make sure that extended key (which will be used as root for sub-accounts) is present
 	_, key, err := keyStore.AccountDecryptedKey(acct, TestConfig.Account1.Password)
-	if err != nil {
-		t.Errorf("can not obtain decrypted account key: %v", err)
-		return false
-	}
-
-	if key.ExtendedKey == nil {
-		t.Error("CKD#2 has not been generated for new account")
-		return false
-	}
+	require.NoError(err, "can not obtain decrypted account key: %v", err)
+	require.NotNil(key.ExtendedKey, "CKD#2 has not been generated for new account")
 
 	// try creating sub-account, w/o selecting main account i.e. w/o login to main account
-	createSubAccountResponse := common.AccountInfo{}
-	rawResponse = CreateChildAccount(C.CString(""), C.CString(TestConfig.Account1.Password))
+	createSubAccountResponse := s.api.CreateChildAccount("", TestConfig.Account1.Password)
+	require.EqualValues(account.ErrNoAccountSelected, createSubAccountResponse.ErrorValue, "expected error is not returned (tried to create sub-account w/o login): %v", createSubAccountResponse.Error)
 
-	if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &createSubAccountResponse); err != nil {
-		t.Errorf("cannot decode CreateChildAccount response (%s): %v", C.GoString(rawResponse), err)
-		return false
-	}
-
-	if createSubAccountResponse.Error != account.ErrNoAccountSelected.Error() {
-		t.Errorf("expected error is not returned (tried to create sub-account w/o login): %v", createSubAccountResponse.Error)
-		return false
-	}
-
-	err = statusAPI.SelectAccount(address, TestConfig.Account1.Password)
-	if err != nil {
-		t.Errorf("Test failed: could not select account: %v", err)
-		return false
-	}
+	err = s.api.SelectAccount(address, TestConfig.Account1.Password)
+	require.NoError(err, "Test failed: could not select account: %v", err)
 
 	// try to create sub-account with wrong password
-	createSubAccountResponse = common.AccountInfo{}
-	rawResponse = CreateChildAccount(C.CString(""), C.CString("wrong password"))
-
-	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &createSubAccountResponse); err != nil {
-		t.Errorf("cannot decode CreateChildAccount response (%s): %v", C.GoString(rawResponse), err)
-		return false
-	}
-
-	if createSubAccountResponse.Error != "cannot retrieve a valid key for a given account: could not decrypt key with given passphrase" {
-		t.Errorf("expected error is not returned (tried to create sub-account with wrong password): %v", createSubAccountResponse.Error)
-		return false
-	}
+	createSubAccountResponse = s.api.CreateChildAccount("", "wrong password")
+	require.EqualError(createSubAccountResponse.ErrorValue, "cannot retrieve a valid key for a given account: could not decrypt key with given passphrase", "expected error is not returned (tried to create sub-account with wrong password): %v", createSubAccountResponse.Error)
 
 	// create sub-account (from implicit parent)
-	createSubAccountResponse1 := common.AccountInfo{}
-	rawResponse = CreateChildAccount(C.CString(""), C.CString(TestConfig.Account1.Password))
-
-	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &createSubAccountResponse1); err != nil {
-		t.Errorf("cannot decode CreateChildAccount response (%s): %v", C.GoString(rawResponse), err)
-		return false
-	}
-
-	if createSubAccountResponse1.Error != "" {
-		t.Errorf("cannot create sub-account: %v", createSubAccountResponse1.Error)
-		return false
-	}
+	createSubAccountResponse1 := s.api.CreateChildAccount("", TestConfig.Account1.Password)
+	require.NoError(createSubAccountResponse1.ErrorValue, "Test failed: could not select account: %v", createSubAccountResponse1.ErrorValue)
 
 	// make sure that sub-account index automatically progresses
-	createSubAccountResponse2 := common.AccountInfo{}
-	rawResponse = CreateChildAccount(C.CString(""), C.CString(TestConfig.Account1.Password))
-
-	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &createSubAccountResponse2); err != nil {
-		t.Errorf("cannot decode CreateChildAccount response (%s): %v", C.GoString(rawResponse), err)
-		return false
-	}
-
-	if createSubAccountResponse2.Error != "" {
-		t.Errorf("cannot create sub-account: %v", createSubAccountResponse2.Error)
-	}
-
-	if createSubAccountResponse1.Address == createSubAccountResponse2.Address || createSubAccountResponse1.PubKey == createSubAccountResponse2.PubKey {
-		t.Error("sub-account index auto-increament failed")
-		return false
-	}
+	createSubAccountResponse2 := s.api.CreateChildAccount("", TestConfig.Account1.Password)
+	require.NoError(createSubAccountResponse2.ErrorValue, "cannot create sub-account: %v", createSubAccountResponse2.ErrorValue)
+	require.NotEqual(createSubAccountResponse1.Address, createSubAccountResponse2.Address, "sub-account index auto-increament failed")
+	require.NotEqual(createSubAccountResponse1.PubKey, createSubAccountResponse2.PubKey, "sub-account index auto-increament failed")
 
 	// create sub-account (from explicit parent)
-	createSubAccountResponse3 := common.AccountInfo{}
-	rawResponse = CreateChildAccount(C.CString(createSubAccountResponse2.Address), C.CString(TestConfig.Account1.Password))
-
-	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &createSubAccountResponse3); err != nil {
-		t.Errorf("cannot decode CreateChildAccount response (%s): %v", C.GoString(rawResponse), err)
-		return false
-	}
-
-	if createSubAccountResponse3.Error != "" {
-		t.Errorf("cannot create sub-account: %v", createSubAccountResponse3.Error)
-	}
+	createSubAccountResponse3 := s.api.CreateChildAccount(createSubAccountResponse2.Address, TestConfig.Account1.Password)
+	require.NoError(createSubAccountResponse3.ErrorValue, "cannot create sub-account: %v", createSubAccountResponse3.ErrorValue)
 
 	subAccount1, subAccount2, subAccount3 := createSubAccountResponse1.Address, createSubAccountResponse2.Address, createSubAccountResponse3.Address
 	subPubKey1, subPubKey2, subPubKey3 := createSubAccountResponse1.PubKey, createSubAccountResponse2.PubKey, createSubAccountResponse3.PubKey
 
-	if subAccount1 == subAccount3 || subPubKey1 == subPubKey3 || subAccount2 == subAccount3 || subPubKey2 == subPubKey3 {
-		t.Error("sub-account index auto-increament failed")
-		return false
-	}
+	require.NotEqual(subAccount1, subAccount3, "sub-account index auto-increament failed: subAccount1 == subAccount3")
+	require.NotEqual(subPubKey1, subPubKey3, "sub-account index auto-increament failed: subPubKey1 == subPubKey3")
+	require.NotEqual(subAccount2, subAccount3, "sub-account index auto-increament failed: subAccount2 == subAccount3")
+	require.NotEqual(subPubKey2, subPubKey3, "sub-account index auto-increament failed: subPubKey2 == subPubKey3")
 
 	return true
 }
