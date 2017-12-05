@@ -23,6 +23,7 @@ var (
 	// Whisper
 	identity     = flag.String("identity", "", "Protocol identity file (private key used for asymmetric encryption)")
 	passwordFile = flag.String("passwordfile", "", "Password file (password is used for symmetric encryption)")
+	standalone   = flag.Bool("standalone", true, "Don't actively connect to peers, wait for incoming connections")
 	minPow       = flag.Float64("pow", params.WhisperMinimumPoW, "PoW for messages to be added to queue, in float format")
 	ttl          = flag.Int("ttl", params.WhisperTTL, "Time to live for messages, in seconds")
 
@@ -63,6 +64,7 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 	whisperConfig.Enabled = true
 	whisperConfig.IdentityFile = *identity
 	whisperConfig.PasswordFile = *passwordFile
+	whisperConfig.Standalone = *standalone
 	whisperConfig.EnablePushNotification = *enablePN
 	whisperConfig.EnableMailServer = *enableMailServer
 	whisperConfig.MinimumPoW = *minPow
@@ -105,6 +107,11 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 	nodeConfig.HTTPPort = *httpPort
 	nodeConfig.IPCEnabled = *ipcEnabled
 	nodeConfig.RPCEnabled = *httpEnabled
+
+	if whisperConfig.Standalone {
+		nodeConfig.BootClusterConfig.Enabled = false
+		nodeConfig.BootClusterConfig.BootNodes = nil
+	}
 
 	return nodeConfig, nil
 }
