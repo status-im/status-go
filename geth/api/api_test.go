@@ -112,7 +112,10 @@ func (sc *StderrCapture) StopCapture() (string, error) {
 	if sc.oldStderr == nil || sc.readPipe == nil {
 		return "", errors.New("StartCapture not called before StopCapture")
 	}
-	os.Stderr.Close()
+	err := os.Stderr.Close()
+	if err != nil {
+		return "", err
+	}
 	os.Stderr = sc.oldStderr
 	bytes, err := ioutil.ReadAll(sc.readPipe)
 	if err != nil {
