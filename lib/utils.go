@@ -270,7 +270,12 @@ func testStopResumeNode(t *testing.T) bool { //nolint: gocyclo
 	}
 
 	// create an account
-	address1, pubKey1, _, err := statusAPI.CreateAccount(TestConfig.Account1.Password)
+	accountInfo := statusAPI.CreateAccount(TestConfig.Account1.Password)
+
+	address1 := accountInfo.Address
+	pubKey1 := accountInfo.PubKey
+	err = accountInfo.ErrorValue
+
 	if err != nil {
 		t.Errorf("could not create account: %v", err)
 		return false
@@ -517,7 +522,13 @@ func testRecoverAccount(t *testing.T) bool { //nolint: gocyclo
 	keyStore, _ := statusAPI.NodeManager().AccountKeyStore()
 
 	// create an account
-	address, pubKey, mnemonic, err := statusAPI.CreateAccount(TestConfig.Account1.Password)
+	accountInfo := statusAPI.CreateAccount(TestConfig.Account1.Password)
+
+	address := accountInfo.Address
+	pubKey := accountInfo.PubKey
+	mnemonic := accountInfo.Mnemonic
+	err := accountInfo.ErrorValue
+
 	if err != nil {
 		t.Errorf("could not create account: %v", err)
 		return false
@@ -634,14 +645,22 @@ func testAccountSelect(t *testing.T) bool { //nolint: gocyclo
 	}
 
 	// create an account
-	address1, pubKey1, _, err := statusAPI.CreateAccount(TestConfig.Account1.Password)
+	accountInfo1 := statusAPI.CreateAccount(TestConfig.Account1.Password)
+	address1 := accountInfo1.Address
+	pubKey1 := accountInfo1.PubKey
+	err = accountInfo1.ErrorValue
+
 	if err != nil {
 		t.Errorf("could not create account: %v", err)
 		return false
 	}
 	t.Logf("Account created: {address: %s, key: %s}", address1, pubKey1)
 
-	address2, pubKey2, _, err := statusAPI.CreateAccount(TestConfig.Account1.Password)
+	accountInfo2 := statusAPI.CreateAccount(TestConfig.Account1.Password)
+	address2 := accountInfo2.Address
+	pubKey2 := accountInfo2.PubKey
+	err = accountInfo2.ErrorValue
+
 	if err != nil {
 		t.Error("Test failed: could not create account")
 		return false
@@ -718,7 +737,11 @@ func testAccountLogout(t *testing.T) bool {
 	}
 
 	// create an account
-	address, pubKey, _, err := statusAPI.CreateAccount(TestConfig.Account1.Password)
+	accountInfo := statusAPI.CreateAccount(TestConfig.Account1.Password)
+	address := accountInfo.Address
+	pubKey := accountInfo.PubKey
+	err = accountInfo.ErrorValue
+
 	if err != nil {
 		t.Errorf("could not create account: %v", err)
 		return false
@@ -1493,16 +1516,4 @@ func startTestNode(t *testing.T) <-chan struct{} {
 	}()
 
 	return waitForNodeStart
-}
-
-//nolint: deadcode
-func testValidateNodeConfig(t *testing.T, config string, fn func(common.APIDetailedResponse)) {
-	result := ValidateNodeConfig(C.CString(config))
-
-	var resp common.APIDetailedResponse
-
-	err := json.Unmarshal([]byte(C.GoString(result)), &resp)
-	require.NoError(t, err)
-
-	fn(resp)
 }
