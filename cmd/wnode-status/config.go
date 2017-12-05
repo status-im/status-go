@@ -68,7 +68,11 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 	whisperConfig.MinimumPoW = *minPow
 	whisperConfig.TTL = *ttl
 
-	if whisperConfig.EnableMailServer && whisperConfig.PasswordFile == "" {
+	if whisperConfig.EnableMailServer && whisperConfig.Password == "" && whisperConfig.PasswordFile == "" {
+		return nil, errors.New("either a password file or a password should be specified for mail server")
+	}
+
+	if whisperConfig.PasswordFile == "" {
 		//fixme(@jekamas): hard coded for mail server MVP - issue https://github.com/status-im/status-go/issues/488
 		whisperConfig.Password = "status-offline-inbox"
 	}
