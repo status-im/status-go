@@ -139,6 +139,23 @@ func (s *JailTestSuite) TestPublicCreateAndInitCell() {
 	s.Equal(`{"result": {"test":true}}`, response)
 }
 
+func (s *JailTestSuite) TestPublicCreateAndInitCellConsecutive() {
+	response1 := s.Jail.CreateAndInitCell("cell1", `var _status_catalog = { test: true }`)
+	cell1, err := s.Jail.Cell("cell1")
+	s.NoError(err)
+
+	// Create it again
+	response2 := s.Jail.CreateAndInitCell("cell1", `var _status_catalog = { test: true, foo: 5 }`)
+	cell2, err := s.Jail.Cell("cell1")
+	s.NoError(err)
+
+	// Second cell has to be the same object as the first one
+	s.Equal(cell1, cell2)
+
+	// Second cell must have been reinitialized
+	s.NotEqual(response1, response2)
+}
+
 func (s *JailTestSuite) TestExecute() {
 	// cell does not exist
 	response := s.Jail.Execute("cell1", "('some string')")
