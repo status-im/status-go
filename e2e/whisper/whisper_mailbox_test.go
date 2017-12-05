@@ -10,70 +10,56 @@ import (
 	"github.com/status-im/status-go/e2e"
 	"github.com/status-im/status-go/geth/api"
 	. "github.com/status-im/status-go/testing"
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 	"strconv"
 	"testing"
 	"time"
 )
 
-func TestRequestMessageFromMailboxAsync(t *testing.T) {
-	//Start mailbox node
-	mailboxBackend := api.NewStatusBackend()
-	mailboxConfig, err := e2e.MakeTestNodeConfig(GetNetworkID())
-	mailboxConfig.LightEthConfig.Enabled = false
-	mailboxConfig.WhisperConfig.Enabled = true
-	mailboxConfig.KeyStoreDir = "../../.ethereumtest/mailbox/"
-	mailboxConfig.WhisperConfig.BootstrapNode = true
-	mailboxConfig.WhisperConfig.ForwarderNode = true
-	mailboxConfig.WhisperConfig.MailServerNode = true
-	mailboxConfig.WhisperConfig.IdentityFile = "../../static/keys/wnodekey"
-	mailboxConfig.WhisperConfig.PasswordFile = "../../static/keys/wnodepassword"
-	mailboxConfig.WhisperConfig.DataDir = "../../.ethereumtest/mailbox/w2"
-	mailboxConfig.DataDir = "../../.ethereumtest/mailbox/"
+type WhisperMailboxSuite struct {
+	suite.Suite
+}
 
-	mailboxNodeStarted, err := mailboxBackend.StartNode(mailboxConfig)
-	require.NoError(t, err)
-	<-mailboxNodeStarted // wait till node is started
-	require.True(t, mailboxBackend.IsNodeRunning())
+func TestWhisperMailboxTestSuite(t *testing.T) {
+	suite.Run(t, new(WhisperMailboxSuite))
+}
 
+func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
+	//arrange
+	mailboxBackend, stop := s.startMailboxBackend()
+	defer stop()
 	mailboxNode, err := mailboxBackend.NodeManager().Node()
+	s.Require().NoError(err)
 	mailboxEnode := mailboxNode.Server().NodeInfo().Enode
 
-	//Start sender node
-	backend := api.NewStatusBackend()
-	nodeConfig, err := e2e.MakeTestNodeConfig(GetNetworkID())
-	require.NoError(t, err)
-	require.False(t, backend.IsNodeRunning())
-	nodeStarted, err := backend.StartNode(nodeConfig)
-	require.NoError(t, err)
-	<-nodeStarted // wait till node is started
-	require.True(t, backend.IsNodeRunning())
-	node, err := backend.NodeManager().Node()
-	require.NoError(t, err)
+	sender, stop := s.startBackend()
+	defer stop()
+	node, err := sender.NodeManager().Node()
+	s.Require().NoError(err)
 
-	require.NotEqual(t, mailboxEnode, node.Server().NodeInfo().Enode)
+	s.Require().NotEqual(mailboxEnode, node.Server().NodeInfo().Enode)
 
-	err = backend.NodeManager().AddPeer(mailboxEnode)
-	require.NoError(t, err)
+	err = sender.NodeManager().AddPeer(mailboxEnode)
+	s.Require().NoError(err)
 	//wait async processes on adding peer
 	time.Sleep(time.Second)
 
-	w, err := backend.NodeManager().WhisperService()
-	require.NoError(t, err)
+	w, err := sender.NodeManager().WhisperService()
+	s.Require().NoError(err)
 
 	//Mark mailbox node trusted
 	p, err := extractIdFromEnode(mailboxNode.Server().NodeInfo().Enode)
-	require.NoError(t, err)
+	s.Require().NoError(err)
 	err = w.AllowP2PMessagesFromPeer(p)
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
 	//Generate mailbox symkey
 	password := "asdfasdf"
 	MailServerKeyID, err := w.AddSymKeyFromPassword(password)
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
-	rpcClient := backend.NodeManager().RPCClient()
-	require.NotNil(t, rpcClient)
+	rpcClient := sender.NodeManager().RPCClient()
+	s.Require().NotNil(rpcClient)
 
 	//create topic
 	topic := whisperv5.BytesToTopic([]byte("topic name"))
@@ -81,7 +67,7 @@ func TestRequestMessageFromMailboxAsync(t *testing.T) {
 	//Add key pair to whisper
 	keyID, err := w.NewKeyPair()
 	key, err := w.GetPrivateKey(keyID)
-	require.NoError(t, err)
+	s.Require().NoError(err)
 	pubkey := hexutil.Bytes(crypto.FromECDSAPub(&key.PublicKey))
 
 	//Create message filter
@@ -95,8 +81,8 @@ func TestRequestMessageFromMailboxAsync(t *testing.T) {
 	msgFilterResp := newMessagesFilterResponse{}
 	err = json.Unmarshal([]byte(resp), &msgFilterResp)
 	messageFilterID := msgFilterResp.Result
-	require.NoError(t, err)
-	require.NotEqual(t, "", messageFilterID)
+	s.Require().NoError(err)
+	s.Require().NotEqual("", messageFilterID)
 
 	//Threre are no messages at filter
 	resp = rpcClient.CallRaw(`{
@@ -106,8 +92,8 @@ func TestRequestMessageFromMailboxAsync(t *testing.T) {
 		"id": 1}`)
 	messages := getFilterMessagesResponse{}
 	err = json.Unmarshal([]byte(resp), &messages)
-	require.NoError(t, err)
-	require.Equal(t, 0, len(messages.Result))
+	s.Require().NoError(err)
+	s.Require().Equal(0, len(messages.Result))
 
 	//Post message
 	resp = rpcClient.CallRaw(`{
@@ -131,8 +117,10 @@ func TestRequestMessageFromMailboxAsync(t *testing.T) {
 		"params": ["` + messageFilterID + `"],
 		"id": 1}`)
 	err = json.Unmarshal([]byte(resp), &messages)
-	require.NoError(t, err)
-	require.Equal(t, 0, len(messages.Result))
+	s.Require().NoError(err)
+	s.Require().Equal(0, len(messages.Result))
+
+	//act
 
 	//Request messages from mailbox
 	resp = rpcClient.CallRaw(`{
@@ -156,9 +144,57 @@ func TestRequestMessageFromMailboxAsync(t *testing.T) {
 		"id": 1}`)
 
 	err = json.Unmarshal([]byte(resp), &messages)
-	require.NoError(t, err)
-	require.Equal(t, 1, len(messages.Result))
+	//assert
+	s.Require().NoError(err)
+	s.Require().Equal(1, len(messages.Result))
+}
 
+func (s *WhisperMailboxSuite) startBackend() (*api.StatusBackend, func()) {
+	//Start sender node
+	backend := api.NewStatusBackend()
+	nodeConfig, err := e2e.MakeTestNodeConfig(GetNetworkID())
+	s.Require().NoError(err)
+	s.Require().False(backend.IsNodeRunning())
+	nodeStarted, err := backend.StartNode(nodeConfig)
+	s.Require().NoError(err)
+	<-nodeStarted // wait till node is started
+	s.Require().True(backend.IsNodeRunning())
+
+	return backend, func() {
+		s.True(backend.IsNodeRunning())
+		backendStopped, err := backend.StopNode()
+		s.NoError(err)
+		<-backendStopped
+		s.False(backend.IsNodeRunning())
+	}
+
+}
+func (s *WhisperMailboxSuite) startMailboxBackend() (*api.StatusBackend, func()) {
+	//Start mailbox node
+	mailboxBackend := api.NewStatusBackend()
+	mailboxConfig, err := e2e.MakeTestNodeConfig(GetNetworkID())
+	mailboxConfig.LightEthConfig.Enabled = false
+	mailboxConfig.WhisperConfig.Enabled = true
+	mailboxConfig.KeyStoreDir = "../../.ethereumtest/mailbox/"
+	mailboxConfig.WhisperConfig.BootstrapNode = true
+	mailboxConfig.WhisperConfig.ForwarderNode = true
+	mailboxConfig.WhisperConfig.MailServerNode = true
+	mailboxConfig.WhisperConfig.IdentityFile = "../../static/keys/wnodekey"
+	mailboxConfig.WhisperConfig.PasswordFile = "../../static/keys/wnodepassword"
+	mailboxConfig.WhisperConfig.DataDir = "../../.ethereumtest/mailbox/w2"
+	mailboxConfig.DataDir = "../../.ethereumtest/mailbox/"
+
+	mailboxNodeStarted, err := mailboxBackend.StartNode(mailboxConfig)
+	s.Require().NoError(err)
+	<-mailboxNodeStarted // wait till node is started
+	s.Require().True(mailboxBackend.IsNodeRunning())
+	return mailboxBackend, func() {
+		s.True(mailboxBackend.IsNodeRunning())
+		backendStopped, err := mailboxBackend.StopNode()
+		s.NoError(err)
+		<-backendStopped
+		s.False(mailboxBackend.IsNodeRunning())
+	}
 }
 
 type getFilterMessagesResponse struct {
