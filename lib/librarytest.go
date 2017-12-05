@@ -34,7 +34,7 @@ func testCreateAccountWithMock(t *testing.T) {
 
 	// Setup Mock StatusAPI
 	ctrl := gomock.NewController(t)
-	status := NewMockStatusAPI(ctrl)
+	status := NewMocklibStatusAPI(ctrl)
 	statusAPI = status
 	accountInfo1 := common.AccountInfo{Address: "add", Mnemonic: "mne", PubKey: "Pub"}
 	accountInfo2 := common.AccountInfo{Error: "Error Message"}
@@ -82,7 +82,7 @@ func testCreateChildAccountWithMock(t *testing.T) {
 
 	// Setup Mock StatusAPI
 	ctrl := gomock.NewController(t)
-	status := NewMockStatusAPI(ctrl)
+	status := NewMocklibStatusAPI(ctrl)
 	statusAPI = status
 
 	accountInfo1 := common.AccountInfo{Address: "add", PubKey: "Pub"}
@@ -136,7 +136,7 @@ func testRecoverAccountWithMock(t *testing.T) {
 
 	// Setup Mock StatusAPI
 	ctrl := gomock.NewController(t)
-	status := NewMockStatusAPI(ctrl)
+	status := NewMocklibStatusAPI(ctrl)
 	statusAPI = status
 
 	accountInfo1 := common.AccountInfo{Address: "add", PubKey: "Pub", Mnemonic: "mnemonic"}
@@ -190,7 +190,7 @@ func testValidateNodeConfigWithMock(t *testing.T) {
 
 	// Setup Mock StatusAPI
 	ctrl := gomock.NewController(t)
-	status := NewMockStatusAPI(ctrl)
+	status := NewMocklibStatusAPI(ctrl)
 	statusAPI = status
 
 	apiDetailedResponse1 := common.APIDetailedResponse{Status: true}
