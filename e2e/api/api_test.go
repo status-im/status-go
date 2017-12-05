@@ -189,7 +189,7 @@ func (s *APITestSuite) TestLogoutRemovesCells() {
 	require.Error(err, "Expected that cells was removed")
 }
 
-func (s *APITestSuite) TestCreateChildAccount() bool { //nolint: gocyclo
+func (s *APITestSuite) TestCreateChildAccount() bool {
 	require := s.Require()
 
 	config, err := e2e.MakeTestNodeConfig(GetNetworkID())
@@ -255,122 +255,77 @@ func (s *APITestSuite) TestCreateChildAccount() bool { //nolint: gocyclo
 	return true
 }
 
+func (s *APITestSuite) TestRecoverAccount() bool {
+	require := s.Require()
 
-func testRecoverAccount(t *testing.T) bool { //nolint: gocyclo
-	keyStore, _ := statusAPI.NodeManager().AccountKeyStore()
+	config, err := e2e.MakeTestNodeConfig(GetNetworkID())
+	require.NoError(err)
+	err = s.api.StartNode(config)
+	require.NoError(err)
+	defer s.api.StopNode() //nolint: errcheck
+
+	keyStore, _ := s.api.NodeManager().AccountKeyStore()
 
 	// create an account
-	accountInfo := statusAPI.CreateAccount(TestConfig.Account1.Password)
-
+	accountInfo := s.api.CreateAccount(TestConfig.Account1.Password)
 	address := accountInfo.Address
 	pubKey := accountInfo.PubKey
 	mnemonic := accountInfo.Mnemonic
-	err := accountInfo.ErrorValue
-
-	if err != nil {
-		t.Errorf("could not create account: %v", err)
-		return false
-	}
-	t.Logf("Account created: {address: %s, key: %s, mnemonic:%s}", address, pubKey, mnemonic)
+	require.NoError(accountInfo.ErrorValue, "could not create account: %v", accountInfo.ErrorValue)
+	s.T().Logf("Account created: {address: %s, key: %s, mnemonic:%s}", address, pubKey, mnemonic)
 
 	// try recovering using password + mnemonic
-	recoverAccountResponse := common.AccountInfo{}
-	rawResponse := RecoverAccount(C.CString(TestConfig.Account1.Password), C.CString(mnemonic))
+	recoverAccountResponse := s.api.RecoverAccount(TestConfig.Account1.Password, mnemonic)
+	require.NoError(recoverAccountResponse.ErrorValue, "recover account failed: %v", recoverAccountResponse.Error)
 
-	if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &recoverAccountResponse); err != nil {
-		t.Errorf("cannot decode RecoverAccount response (%s): %v", C.GoString(rawResponse), err)
-		return false
-	}
-
-	if recoverAccountResponse.Error != "" {
-		t.Errorf("recover account failed: %v", recoverAccountResponse.Error)
-		return false
-	}
 	addressCheck, pubKeyCheck := recoverAccountResponse.Address, recoverAccountResponse.PubKey
-	if address != addressCheck || pubKey != pubKeyCheck {
-		t.Error("recover account details failed to pull the correct details")
-	}
+	require.Equal(address, addressCheck, "recover account details failed to pull the correct details for address")
+	require.Equal(pubKey, pubKeyCheck, "recover account details failed to pull the correct details for pubKey")
 
 	// now test recovering, but make sure that account/key file is removed i.e. simulate recovering on a new device
 	account, err := common.ParseAccountString(address)
-	if err != nil {
-		t.Errorf("can not get account from address: %v", err)
-	}
+	require.NoError(err, "can not get account from address: %v", err)
 
 	account, key, err := keyStore.AccountDecryptedKey(account, TestConfig.Account1.Password)
-	if err != nil {
-		t.Errorf("can not obtain decrypted account key: %v", err)
-		return false
-	}
+	require.NoError(err, "can not obtain decrypted account key: %v", err)
 	extChild2String := key.ExtendedKey.String()
 
-	if err = keyStore.Delete(account, TestConfig.Account1.Password); err != nil {
-		t.Errorf("cannot remove account: %v", err)
-	}
+	err = keyStore.Delete(account, TestConfig.Account1.Password)
+	require.NoError(err, "cannot remove accoun: %v", err)
 
-	recoverAccountResponse = common.AccountInfo{}
-	rawResponse = RecoverAccount(C.CString(TestConfig.Account1.Password), C.CString(mnemonic))
+	recoverAccountResponse = s.api.RecoverAccount(TestConfig.Account1.Password, mnemonic)
+	require.NoError(recoverAccountResponse.ErrorValue, "recover account failed (for non-cached account): %s", recoverAccountResponse.Error)
 
-	if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &recoverAccountResponse); err != nil {
-		t.Errorf("cannot decode RecoverAccount response (%s): %v", C.GoString(rawResponse), err)
-		return false
-	}
-
-	if recoverAccountResponse.Error != "" {
-		t.Errorf("recover account failed (for non-cached account): %v", recoverAccountResponse.Error)
-		return false
-	}
 	addressCheck, pubKeyCheck = recoverAccountResponse.Address, recoverAccountResponse.PubKey
-	if address != addressCheck || pubKey != pubKeyCheck {
-		t.Error("recover account details failed to pull the correct details (for non-cached account)")
-	}
+
+	require.Equal(address, addressCheck, "recover account details failed to pull the correct details (for non-cached account) for address")
+	require.Equal(pubKey, pubKeyCheck, "recover account details failed to pull the correct details (for non-cached account) for pubKey")
 
 	// make sure that extended key exists and is imported ok too
 	_, key, err = keyStore.AccountDecryptedKey(account, TestConfig.Account1.Password)
-	if err != nil {
-		t.Errorf("can not obtain decrypted account key: %v", err)
-		return false
-	}
-	if extChild2String != key.ExtendedKey.String() {
-		t.Errorf("CKD#2 key mismatch, expected: %s, got: %s", extChild2String, key.ExtendedKey.String())
-	}
+	require.NoError(err, "can not obtain decrypted account key: %v", err)
+	require.Equal(extChild2String, key.ExtendedKey.String(), "CKD#2 key mismatch, expected: %s, got: %s", extChild2String, key.ExtendedKey.String())
 
 	// make sure that calling import several times, just returns from cache (no error is expected)
-	recoverAccountResponse = common.AccountInfo{}
-	rawResponse = RecoverAccount(C.CString(TestConfig.Account1.Password), C.CString(mnemonic))
+	recoverAccountResponse = s.api.RecoverAccount(TestConfig.Account1.Password, mnemonic)
+	require.NoError(recoverAccountResponse.ErrorValue, "recover account failed (for non-cached account): %v", recoverAccountResponse.Error)
 
-	if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &recoverAccountResponse); err != nil {
-		t.Errorf("cannot decode RecoverAccount response (%s): %v", C.GoString(rawResponse), err)
-		return false
-	}
-
-	if recoverAccountResponse.Error != "" {
-		t.Errorf("recover account failed (for non-cached account): %v", recoverAccountResponse.Error)
-		return false
-	}
 	addressCheck, pubKeyCheck = recoverAccountResponse.Address, recoverAccountResponse.PubKey
-	if address != addressCheck || pubKey != pubKeyCheck {
-		t.Error("recover account details failed to pull the correct details (for non-cached account)")
-	}
+	require.Equal(address, addressCheck, "recover account details failed to pull the correct details (for non-cached account) for address")
+	require.Equal(pubKey, pubKeyCheck, "recover account details failed to pull the correct details (for non-cached account) for pubKey")
 
 	// time to login with recovered data
-	whisperService, err := statusAPI.NodeManager().WhisperService()
-	if err != nil {
-		t.Errorf("whisper service not running: %v", err)
-	}
+	whisperService, err := s.api.NodeManager().WhisperService()
+	require.NoError(err, "whisper service not running: %v", err)
 
-	// make sure that identity is not (yet injected)
-	if whisperService.HasKeyPair(pubKeyCheck) {
-		t.Error("identity already present in whisper")
-	}
-	err = statusAPI.SelectAccount(addressCheck, TestConfig.Account1.Password)
-	if err != nil {
-		t.Errorf("Test failed: could not select account: %v", err)
-		return false
-	}
-	if !whisperService.HasKeyPair(pubKeyCheck) {
-		t.Errorf("identity not injected into whisper: %v", err)
-	}
+	hasKeyPair := whisperService.HasKeyPair(pubKeyCheck)
+	require.False(hasKeyPair, "identity already present in whisper")
+
+	err = s.api.SelectAccount(addressCheck, TestConfig.Account1.Password)
+	require.NoError(err, "Test failed: could not select account: %v", err)
+
+	hasKeyPair = whisperService.HasKeyPair(pubKeyCheck)
+	require.True(hasKeyPair, "identity not injected into whisper: %v", err)
 
 	return true
 }
