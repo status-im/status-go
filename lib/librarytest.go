@@ -13,10 +13,15 @@
 
 package main
 
+/*
+#include <stdlib.h>
+*/
 import "C"
+
 import (
 	"fmt"
 	"testing"
+	"unsafe"
 
 	"github.com/golang/mock/gomock"
 	"github.com/status-im/status-go/geth/common"
@@ -39,12 +44,18 @@ func testCreateAccountWithMock(t *testing.T) {
 	status.EXPECT().CreateAccount("pass2").Return(accountInfo2)
 
 	// C Strings
-	//TODO should the CStrings be C.free
 	pass1 := C.CString("pass1")
 	pass2 := C.CString("pass2")
 	empty := C.CString("")
 	jsonResult := C.CString(`{"address":"add","pubkey":"Pub","mnemonic":"mne","error":""}`)
 	jsonResultError := C.CString(`{"address":"","pubkey":"","mnemonic":"","error":"Error Message"}`)
+	defer func() {
+		C.free(unsafe.Pointer(pass1))
+		C.free(unsafe.Pointer(pass2))
+		C.free(unsafe.Pointer(empty))
+		C.free(unsafe.Pointer(jsonResult))
+		C.free(unsafe.Pointer(jsonResultError))
+	}()
 
 	tests := []struct {
 		name     string
@@ -81,7 +92,6 @@ func testCreateChildAccountWithMock(t *testing.T) {
 	status.EXPECT().CreateChildAccount("parent2", "pass2").Return(accountInfo2)
 
 	// C Strings
-	//TODO should the CStrings be C.free
 	pass1 := C.CString("pass1")
 	pass2 := C.CString("pass2")
 	parent1 := C.CString("parent1")
@@ -89,6 +99,15 @@ func testCreateChildAccountWithMock(t *testing.T) {
 	empty := C.CString("")
 	jsonResult := C.CString(`{"address":"add","pubkey":"Pub","mnemonic":"","error":""}`)
 	jsonResultError := C.CString(`{"address":"","pubkey":"","mnemonic":"","error":"Error Message"}`)
+	defer func() {
+		C.free(unsafe.Pointer(pass1))
+		C.free(unsafe.Pointer(pass2))
+		C.free(unsafe.Pointer(parent1))
+		C.free(unsafe.Pointer(parent2))
+		C.free(unsafe.Pointer(empty))
+		C.free(unsafe.Pointer(jsonResult))
+		C.free(unsafe.Pointer(jsonResultError))
+	}()
 
 	tests := []struct {
 		name     string
@@ -127,7 +146,6 @@ func testRecoverAccountWithMock(t *testing.T) {
 	status.EXPECT().RecoverAccount("pass2", "mnemonic2").Return(accountInfo2)
 
 	// C Strings
-	//TODO should the CStrings be C.free
 	pass1 := C.CString("pass1")
 	pass2 := C.CString("pass2")
 	mnemonic1 := C.CString("mnemonic1")
@@ -135,6 +153,15 @@ func testRecoverAccountWithMock(t *testing.T) {
 	empty := C.CString("")
 	jsonResult := C.CString(`{"address":"add","pubkey":"Pub","mnemonic":"mnemonic","error":""}`)
 	jsonResultError := C.CString(`{"address":"","pubkey":"","mnemonic":"","error":"Error Message"}`)
+	defer func() {
+		C.free(unsafe.Pointer(pass1))
+		C.free(unsafe.Pointer(pass2))
+		C.free(unsafe.Pointer(mnemonic1))
+		C.free(unsafe.Pointer(mnemonic2))
+		C.free(unsafe.Pointer(empty))
+		C.free(unsafe.Pointer(jsonResult))
+		C.free(unsafe.Pointer(jsonResultError))
+	}()
 
 	tests := []struct {
 		name     string
@@ -185,6 +212,15 @@ func testValidateNodeConfigWithMock(t *testing.T) {
 	jsonResult1 := C.CString(`{"status":true}`)
 	jsonResult2 := C.CString(`{"status":false,"field_errors":[{"parameter":"param1","errors":[{"message":"perror1"},{"message":"perror2"}]},{"parameter":"param2","errors":[{"message":"perror1"}]}]}`)
 	jsonResult3 := C.CString(`{"status":false}`)
+	defer func() {
+		C.free(unsafe.Pointer(config1))
+		C.free(unsafe.Pointer(config2))
+		C.free(unsafe.Pointer(empty))
+		C.free(unsafe.Pointer(jsonResult1))
+		C.free(unsafe.Pointer(jsonResult2))
+		C.free(unsafe.Pointer(jsonResult3))
+	}()
+
 	tests := []struct {
 		name       string
 		configJSON *C.char
