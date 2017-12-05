@@ -96,7 +96,7 @@ type WhisperConfig struct {
 	// Currently, it's used by MailServer.
 	PasswordFile string
 
-	// Password for symmetric encryption
+	// Password for symmetric encryption with MailServer.
 	// (if no account file selected, then this password is used for symmetric encryption).
 	Password string
 
