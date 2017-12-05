@@ -254,3 +254,123 @@ func (s *APITestSuite) TestCreateChildAccount() bool { //nolint: gocyclo
 
 	return true
 }
+
+
+func testRecoverAccount(t *testing.T) bool { //nolint: gocyclo
+	keyStore, _ := statusAPI.NodeManager().AccountKeyStore()
+
+	// create an account
+	accountInfo := statusAPI.CreateAccount(TestConfig.Account1.Password)
+
+	address := accountInfo.Address
+	pubKey := accountInfo.PubKey
+	mnemonic := accountInfo.Mnemonic
+	err := accountInfo.ErrorValue
+
+	if err != nil {
+		t.Errorf("could not create account: %v", err)
+		return false
+	}
+	t.Logf("Account created: {address: %s, key: %s, mnemonic:%s}", address, pubKey, mnemonic)
+
+	// try recovering using password + mnemonic
+	recoverAccountResponse := common.AccountInfo{}
+	rawResponse := RecoverAccount(C.CString(TestConfig.Account1.Password), C.CString(mnemonic))
+
+	if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &recoverAccountResponse); err != nil {
+		t.Errorf("cannot decode RecoverAccount response (%s): %v", C.GoString(rawResponse), err)
+		return false
+	}
+
+	if recoverAccountResponse.Error != "" {
+		t.Errorf("recover account failed: %v", recoverAccountResponse.Error)
+		return false
+	}
+	addressCheck, pubKeyCheck := recoverAccountResponse.Address, recoverAccountResponse.PubKey
+	if address != addressCheck || pubKey != pubKeyCheck {
+		t.Error("recover account details failed to pull the correct details")
+	}
+
+	// now test recovering, but make sure that account/key file is removed i.e. simulate recovering on a new device
+	account, err := common.ParseAccountString(address)
+	if err != nil {
+		t.Errorf("can not get account from address: %v", err)
+	}
+
+	account, key, err := keyStore.AccountDecryptedKey(account, TestConfig.Account1.Password)
+	if err != nil {
+		t.Errorf("can not obtain decrypted account key: %v", err)
+		return false
+	}
+	extChild2String := key.ExtendedKey.String()
+
+	if err = keyStore.Delete(account, TestConfig.Account1.Password); err != nil {
+		t.Errorf("cannot remove account: %v", err)
+	}
+
+	recoverAccountResponse = common.AccountInfo{}
+	rawResponse = RecoverAccount(C.CString(TestConfig.Account1.Password), C.CString(mnemonic))
+
+	if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &recoverAccountResponse); err != nil {
+		t.Errorf("cannot decode RecoverAccount response (%s): %v", C.GoString(rawResponse), err)
+		return false
+	}
+
+	if recoverAccountResponse.Error != "" {
+		t.Errorf("recover account failed (for non-cached account): %v", recoverAccountResponse.Error)
+		return false
+	}
+	addressCheck, pubKeyCheck = recoverAccountResponse.Address, recoverAccountResponse.PubKey
+	if address != addressCheck || pubKey != pubKeyCheck {
+		t.Error("recover account details failed to pull the correct details (for non-cached account)")
+	}
+
+	// make sure that extended key exists and is imported ok too
+	_, key, err = keyStore.AccountDecryptedKey(account, TestConfig.Account1.Password)
+	if err != nil {
+		t.Errorf("can not obtain decrypted account key: %v", err)
+		return false
+	}
+	if extChild2String != key.ExtendedKey.String() {
+		t.Errorf("CKD#2 key mismatch, expected: %s, got: %s", extChild2String, key.ExtendedKey.String())
+	}
+
+	// make sure that calling import several times, just returns from cache (no error is expected)
+	recoverAccountResponse = common.AccountInfo{}
+	rawResponse = RecoverAccount(C.CString(TestConfig.Account1.Password), C.CString(mnemonic))
+
+	if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &recoverAccountResponse); err != nil {
+		t.Errorf("cannot decode RecoverAccount response (%s): %v", C.GoString(rawResponse), err)
+		return false
+	}
+
+	if recoverAccountResponse.Error != "" {
+		t.Errorf("recover account failed (for non-cached account): %v", recoverAccountResponse.Error)
+		return false
+	}
+	addressCheck, pubKeyCheck = recoverAccountResponse.Address, recoverAccountResponse.PubKey
+	if address != addressCheck || pubKey != pubKeyCheck {
+		t.Error("recover account details failed to pull the correct details (for non-cached account)")
+	}
+
+	// time to login with recovered data
+	whisperService, err := statusAPI.NodeManager().WhisperService()
+	if err != nil {
+		t.Errorf("whisper service not running: %v", err)
+	}
+
+	// make sure that identity is not (yet injected)
+	if whisperService.HasKeyPair(pubKeyCheck) {
+		t.Error("identity already present in whisper")
+	}
+	err = statusAPI.SelectAccount(addressCheck, TestConfig.Account1.Password)
+	if err != nil {
+		t.Errorf("Test failed: could not select account: %v", err)
+		return false
+	}
+	if !whisperService.HasKeyPair(pubKeyCheck) {
+		t.Errorf("identity not injected into whisper: %v", err)
+	}
+
+	return true
+}
