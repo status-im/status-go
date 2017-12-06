@@ -261,11 +261,10 @@ func testStopResumeNode(t *testing.T) bool { //nolint: gocyclo
 	}
 
 	// create an account
-	accountInfo := statusAPI.CreateAccount(TestConfig.Account1.Password)
+	accountInfo, err := statusAPI.CreateAccount(TestConfig.Account1.Password)
 
 	address1 := accountInfo.Address
 	pubKey1 := accountInfo.PubKey
-	err = accountInfo.ErrorValue
 
 	if err != nil {
 		t.Errorf("could not create account: %v", err)
@@ -381,10 +380,9 @@ func testAccountSelect(t *testing.T) bool { //nolint: gocyclo
 	}
 
 	// create an account
-	accountInfo1 := statusAPI.CreateAccount(TestConfig.Account1.Password)
+	accountInfo1, err := statusAPI.CreateAccount(TestConfig.Account1.Password)
 	address1 := accountInfo1.Address
 	pubKey1 := accountInfo1.PubKey
-	err = accountInfo1.ErrorValue
 
 	if err != nil {
 		t.Errorf("could not create account: %v", err)
@@ -392,10 +390,9 @@ func testAccountSelect(t *testing.T) bool { //nolint: gocyclo
 	}
 	t.Logf("Account created: {address: %s, key: %s}", address1, pubKey1)
 
-	accountInfo2 := statusAPI.CreateAccount(TestConfig.Account1.Password)
+	accountInfo2, err := statusAPI.CreateAccount(TestConfig.Account1.Password)
 	address2 := accountInfo2.Address
 	pubKey2 := accountInfo2.PubKey
-	err = accountInfo2.ErrorValue
 
 	if err != nil {
 		t.Error("Test failed: could not create account")
@@ -473,10 +470,9 @@ func testAccountLogout(t *testing.T) bool {
 	}
 
 	// create an account
-	accountInfo := statusAPI.CreateAccount(TestConfig.Account1.Password)
+	accountInfo, err := statusAPI.CreateAccount(TestConfig.Account1.Password)
 	address := accountInfo.Address
 	pubKey := accountInfo.PubKey
-	err = accountInfo.ErrorValue
 
 	if err != nil {
 		t.Errorf("could not create account: %v", err)

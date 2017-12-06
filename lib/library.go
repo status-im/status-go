@@ -52,11 +52,7 @@ func StopNode() *C.char {
 //export ValidateNodeConfig
 func ValidateNodeConfig(configJSON *C.char) *C.char {
 	apiDetailedResponse := statusAPI.ValidateJSONConfig(C.GoString(configJSON))
-	respJSON, err := json.Marshal(apiDetailedResponse)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
+	respJSON, _ := json.Marshal(apiDetailedResponse)
 	return C.CString(string(respJSON))
 }
 
@@ -78,7 +74,10 @@ func CallRPC(inputJSON *C.char) *C.char {
 // just modified to handle the function arg passing
 //export CreateAccount
 func CreateAccount(password *C.char) *C.char {
-	accountInfo := statusAPI.CreateAccount(C.GoString(password))
+	accountInfo, err := statusAPI.CreateAccount(C.GoString(password))
+	if err != nil {
+		log.Error("CreateAccount failed", "error", err.Error())
+	}
 	outBytes, _ := json.Marshal(accountInfo)
 	return C.CString(string(outBytes))
 }
@@ -86,7 +85,10 @@ func CreateAccount(password *C.char) *C.char {
 //CreateChildAccount creates sub-account
 //export CreateChildAccount
 func CreateChildAccount(parentAddress, password *C.char) *C.char {
-	accountInfo := statusAPI.CreateChildAccount(C.GoString(parentAddress), C.GoString(password))
+	accountInfo, err := statusAPI.CreateChildAccount(C.GoString(parentAddress), C.GoString(password))
+	if err != nil {
+		log.Error("CreateChildAccount failed", "error", err.Error())
+	}
 	outBytes, _ := json.Marshal(accountInfo)
 	return C.CString(string(outBytes))
 }
@@ -94,7 +96,10 @@ func CreateChildAccount(parentAddress, password *C.char) *C.char {
 //RecoverAccount re-creates master key using given details
 //export RecoverAccount
 func RecoverAccount(password, mnemonic *C.char) *C.char {
-	accountInfo := statusAPI.RecoverAccount(C.GoString(password), C.GoString(mnemonic))
+	accountInfo, err := statusAPI.RecoverAccount(C.GoString(password), C.GoString(mnemonic))
+	if err != nil {
+		log.Error("RecoverAccount failed", "error", err.Error())
+	}
 	outBytes, _ := json.Marshal(accountInfo)
 	return C.CString(string(outBytes))
 }

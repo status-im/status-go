@@ -29,9 +29,9 @@ type jailAPI interface {
 }
 
 type accountAPI interface {
-	CreateAccount(password string) common.AccountInfo
-	CreateChildAccount(parentAddress, password string) common.AccountInfo
-	RecoverAccount(password, mnemonic string) common.AccountInfo
+	CreateAccount(password string) (common.AccountInfo, error)
+	CreateChildAccount(parentAddress, password string) (common.AccountInfo, error)
+	RecoverAccount(password, mnemonic string) (common.AccountInfo, error)
 	VerifyAccountPassword(keyStoreDir, address, password string) (*keystore.Key, error)
 	SelectAccount(address, password string) error
 	Logout() error

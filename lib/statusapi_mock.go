@@ -97,10 +97,11 @@ func (mr *MocklibStatusAPIMockRecorder) CreateAndInitCell(chatID, js interface{}
 }
 
 // CreateAccount mocks base method
-func (m *MocklibStatusAPI) CreateAccount(password string) common0.AccountInfo {
+func (m *MocklibStatusAPI) CreateAccount(password string) (common0.AccountInfo, error) {
 	ret := m.ctrl.Call(m, "CreateAccount", password)
 	ret0, _ := ret[0].(common0.AccountInfo)
-	return ret0
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // CreateAccount indicates an expected call of CreateAccount
@@ -109,10 +110,11 @@ func (mr *MocklibStatusAPIMockRecorder) CreateAccount(password interface{}) *gom
 }
 
 // CreateChildAccount mocks base method
-func (m *MocklibStatusAPI) CreateChildAccount(parentAddress, password string) common0.AccountInfo {
+func (m *MocklibStatusAPI) CreateChildAccount(parentAddress, password string) (common0.AccountInfo, error) {
 	ret := m.ctrl.Call(m, "CreateChildAccount", parentAddress, password)
 	ret0, _ := ret[0].(common0.AccountInfo)
-	return ret0
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // CreateChildAccount indicates an expected call of CreateChildAccount
@@ -121,10 +123,11 @@ func (mr *MocklibStatusAPIMockRecorder) CreateChildAccount(parentAddress, passwo
 }
 
 // RecoverAccount mocks base method
-func (m *MocklibStatusAPI) RecoverAccount(password, mnemonic string) common0.AccountInfo {
+func (m *MocklibStatusAPI) RecoverAccount(password, mnemonic string) (common0.AccountInfo, error) {
 	ret := m.ctrl.Call(m, "RecoverAccount", password, mnemonic)
 	ret0, _ := ret[0].(common0.AccountInfo)
-	return ret0
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // RecoverAccount indicates an expected call of RecoverAccount
@@ -465,10 +468,11 @@ func (m *MockaccountAPI) EXPECT() *MockaccountAPIMockRecorder {
 }
 
 // CreateAccount mocks base method
-func (m *MockaccountAPI) CreateAccount(password string) common0.AccountInfo {
+func (m *MockaccountAPI) CreateAccount(password string) (common0.AccountInfo, error) {
 	ret := m.ctrl.Call(m, "CreateAccount", password)
 	ret0, _ := ret[0].(common0.AccountInfo)
-	return ret0
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // CreateAccount indicates an expected call of CreateAccount
@@ -477,10 +481,11 @@ func (mr *MockaccountAPIMockRecorder) CreateAccount(password interface{}) *gomoc
 }
 
 // CreateChildAccount mocks base method
-func (m *MockaccountAPI) CreateChildAccount(parentAddress, password string) common0.AccountInfo {
+func (m *MockaccountAPI) CreateChildAccount(parentAddress, password string) (common0.AccountInfo, error) {
 	ret := m.ctrl.Call(m, "CreateChildAccount", parentAddress, password)
 	ret0, _ := ret[0].(common0.AccountInfo)
-	return ret0
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // CreateChildAccount indicates an expected call of CreateChildAccount
@@ -489,10 +494,11 @@ func (mr *MockaccountAPIMockRecorder) CreateChildAccount(parentAddress, password
 }
 
 // RecoverAccount mocks base method
-func (m *MockaccountAPI) RecoverAccount(password, mnemonic string) common0.AccountInfo {
+func (m *MockaccountAPI) RecoverAccount(password, mnemonic string) (common0.AccountInfo, error) {
 	ret := m.ctrl.Call(m, "RecoverAccount", password, mnemonic)
 	ret0, _ := ret[0].(common0.AccountInfo)
-	return ret0
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // RecoverAccount indicates an expected call of RecoverAccount

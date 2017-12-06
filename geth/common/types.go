@@ -376,11 +376,10 @@ func (e APIError) Error() string {
 
 // AccountInfo represents account's info
 type AccountInfo struct {
-	Address    string `json:"address"`
-	PubKey     string `json:"pubkey"`
-	Mnemonic   string `json:"mnemonic"`
-	Error      string `json:"error"`
-	ErrorValue error  `json:"-"`
+	Address  string `json:"address"`
+	PubKey   string `json:"pubkey"`
+	Mnemonic string `json:"mnemonic"`
+	Error    string `json:"error"`
 }
 
 // StopRPCCallError defines a error type specific for killing a execution process.
@@ -395,10 +394,9 @@ func (c StopRPCCallError) Error() string {
 
 // CompleteTransactionResult is a JSON returned from transaction complete function (used in exposed method)
 type CompleteTransactionResult struct {
-	ID         string `json:"id"`
-	Hash       string `json:"hash"`
-	Error      string `json:"error"`
-	ErrorValue error  `json:"-"`
+	ID    string `json:"id"`
+	Hash  string `json:"hash"`
+	Error string `json:"error"`
 }
 
 // CompleteTransactionsResult is list of results from CompleteTransactions() (used in exposed method)

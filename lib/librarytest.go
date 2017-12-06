@@ -38,10 +38,10 @@ func testCreateAccountWithMock(t *testing.T) {
 	statusAPI = status
 	accountInfo1 := common.AccountInfo{Address: "add", Mnemonic: "mne", PubKey: "Pub"}
 	accountInfo2 := common.AccountInfo{Error: "Error Message"}
-	status.EXPECT().CreateAccount("pass1").Return(accountInfo1)
-	status.EXPECT().CreateAccount("").Return(accountInfo1)
-	status.EXPECT().CreateAccount(C.GoString(nil)).Return(accountInfo1)
-	status.EXPECT().CreateAccount("pass2").Return(accountInfo2)
+	status.EXPECT().CreateAccount("pass1").Return(accountInfo1, nil)
+	status.EXPECT().CreateAccount("").Return(accountInfo1, nil)
+	status.EXPECT().CreateAccount(C.GoString(nil)).Return(accountInfo1, nil)
+	status.EXPECT().CreateAccount("pass2").Return(accountInfo2, fmt.Errorf("Error Message"))
 
 	// C Strings
 	pass1 := C.CString("pass1")
@@ -86,10 +86,10 @@ func testCreateChildAccountWithMock(t *testing.T) {
 	statusAPI = status
 
 	accountInfo1 := common.AccountInfo{Address: "add", PubKey: "Pub"}
-	accountInfo2 := common.AccountInfo{Error: "Error Message", ErrorValue: fmt.Errorf("Error Message")}
-	status.EXPECT().CreateChildAccount("parent1", "pass1").Return(accountInfo1)
-	status.EXPECT().CreateChildAccount("", "").Return(accountInfo1).AnyTimes()
-	status.EXPECT().CreateChildAccount("parent2", "pass2").Return(accountInfo2)
+	accountInfo2 := common.AccountInfo{Error: "Error Message"}
+	status.EXPECT().CreateChildAccount("parent1", "pass1").Return(accountInfo1, nil)
+	status.EXPECT().CreateChildAccount("", "").Return(accountInfo1, nil).AnyTimes()
+	status.EXPECT().CreateChildAccount("parent2", "pass2").Return(accountInfo2, fmt.Errorf("Error Message"))
 
 	// C Strings
 	pass1 := C.CString("pass1")
@@ -140,10 +140,10 @@ func testRecoverAccountWithMock(t *testing.T) {
 	statusAPI = status
 
 	accountInfo1 := common.AccountInfo{Address: "add", PubKey: "Pub", Mnemonic: "mnemonic"}
-	accountInfo2 := common.AccountInfo{Error: "Error Message", ErrorValue: fmt.Errorf("Error Message")}
-	status.EXPECT().RecoverAccount("pass1", "mnemonic1").Return(accountInfo1)
-	status.EXPECT().RecoverAccount("", "").Return(accountInfo1).AnyTimes()
-	status.EXPECT().RecoverAccount("pass2", "mnemonic2").Return(accountInfo2)
+	accountInfo2 := common.AccountInfo{Error: "Error Message"}
+	status.EXPECT().RecoverAccount("pass1", "mnemonic1").Return(accountInfo1, nil)
+	status.EXPECT().RecoverAccount("", "").Return(accountInfo1, nil).AnyTimes()
+	status.EXPECT().RecoverAccount("pass2", "mnemonic2").Return(accountInfo2, fmt.Errorf("Error Message"))
 
 	// C Strings
 	pass1 := C.CString("pass1")

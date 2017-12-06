@@ -205,8 +205,8 @@ func (s *APITestSuite) TestCreateChildAccount() bool {
 	require.NoError(err)
 
 	// create an account
-	createAccountResponse := s.api.CreateAccount(TestConfig.Account1.Password)
-	require.Empty(createAccountResponse.Error, "could not create account: %s", createAccountResponse.Error)
+	createAccountResponse, err := s.api.CreateAccount(TestConfig.Account1.Password)
+	require.Empty(err, "could not create account: %s", err)
 
 	address, pubKey, mnemonic := createAccountResponse.Address, createAccountResponse.PubKey, createAccountResponse.Mnemonic
 	s.T().Logf("Account created: {address: %s, key: %s, mnemonic:%s}", address, pubKey, mnemonic)
@@ -220,29 +220,29 @@ func (s *APITestSuite) TestCreateChildAccount() bool {
 	require.NotNil(key.ExtendedKey, "CKD#2 has not been generated for new account")
 
 	// try creating sub-account, w/o selecting main account i.e. w/o login to main account
-	createSubAccountResponse := s.api.CreateChildAccount("", TestConfig.Account1.Password)
-	require.EqualValues(account.ErrNoAccountSelected, createSubAccountResponse.ErrorValue, "expected error is not returned (tried to create sub-account w/o login): %v", createSubAccountResponse.Error)
+	_, err = s.api.CreateChildAccount("", TestConfig.Account1.Password)
+	require.EqualValues(account.ErrNoAccountSelected, err, "expected error is not returned (tried to create sub-account w/o login): %v", err)
 
 	err = s.api.SelectAccount(address, TestConfig.Account1.Password)
 	require.NoError(err, "Test failed: could not select account: %v", err)
 
 	// try to create sub-account with wrong password
-	createSubAccountResponse = s.api.CreateChildAccount("", "wrong password")
-	require.EqualError(createSubAccountResponse.ErrorValue, "cannot retrieve a valid key for a given account: could not decrypt key with given passphrase", "expected error is not returned (tried to create sub-account with wrong password): %v", createSubAccountResponse.Error)
+	_, err = s.api.CreateChildAccount("", "wrong password")
+	require.EqualError(err, "cannot retrieve a valid key for a given account: could not decrypt key with given passphrase", "expected error is not returned (tried to create sub-account with wrong password): %v", err)
 
 	// create sub-account (from implicit parent)
-	createSubAccountResponse1 := s.api.CreateChildAccount("", TestConfig.Account1.Password)
-	require.NoError(createSubAccountResponse1.ErrorValue, "Test failed: could not select account: %v", createSubAccountResponse1.ErrorValue)
+	createSubAccountResponse1, err := s.api.CreateChildAccount("", TestConfig.Account1.Password)
+	require.NoError(err, "Test failed: could not select account: %v", err)
 
 	// make sure that sub-account index automatically progresses
-	createSubAccountResponse2 := s.api.CreateChildAccount("", TestConfig.Account1.Password)
-	require.NoError(createSubAccountResponse2.ErrorValue, "cannot create sub-account: %v", createSubAccountResponse2.ErrorValue)
+	createSubAccountResponse2, err := s.api.CreateChildAccount("", TestConfig.Account1.Password)
+	require.NoError(err, "cannot create sub-account: %v", err)
 	require.NotEqual(createSubAccountResponse1.Address, createSubAccountResponse2.Address, "sub-account index auto-increament failed")
 	require.NotEqual(createSubAccountResponse1.PubKey, createSubAccountResponse2.PubKey, "sub-account index auto-increament failed")
 
 	// create sub-account (from explicit parent)
-	createSubAccountResponse3 := s.api.CreateChildAccount(createSubAccountResponse2.Address, TestConfig.Account1.Password)
-	require.NoError(createSubAccountResponse3.ErrorValue, "cannot create sub-account: %v", createSubAccountResponse3.ErrorValue)
+	createSubAccountResponse3, err := s.api.CreateChildAccount(createSubAccountResponse2.Address, TestConfig.Account1.Password)
+	require.NoError(err, "cannot create sub-account: %v", err)
 
 	subAccount1, subAccount2, subAccount3 := createSubAccountResponse1.Address, createSubAccountResponse2.Address, createSubAccountResponse3.Address
 	subPubKey1, subPubKey2, subPubKey3 := createSubAccountResponse1.PubKey, createSubAccountResponse2.PubKey, createSubAccountResponse3.PubKey
@@ -267,16 +267,16 @@ func (s *APITestSuite) TestRecoverAccount() bool {
 	keyStore, _ := s.api.NodeManager().AccountKeyStore()
 
 	// create an account
-	accountInfo := s.api.CreateAccount(TestConfig.Account1.Password)
+	accountInfo, err := s.api.CreateAccount(TestConfig.Account1.Password)
+	require.NoError(err, "could not create account: %v", err)
 	address := accountInfo.Address
 	pubKey := accountInfo.PubKey
 	mnemonic := accountInfo.Mnemonic
-	require.NoError(accountInfo.ErrorValue, "could not create account: %v", accountInfo.ErrorValue)
 	s.T().Logf("Account created: {address: %s, key: %s, mnemonic:%s}", address, pubKey, mnemonic)
 
 	// try recovering using password + mnemonic
-	recoverAccountResponse := s.api.RecoverAccount(TestConfig.Account1.Password, mnemonic)
-	require.NoError(recoverAccountResponse.ErrorValue, "recover account failed: %v", recoverAccountResponse.Error)
+	recoverAccountResponse, err := s.api.RecoverAccount(TestConfig.Account1.Password, mnemonic)
+	require.NoError(err, "recover account failed: %v", err)
 
 	addressCheck, pubKeyCheck := recoverAccountResponse.Address, recoverAccountResponse.PubKey
 	require.Equal(address, addressCheck, "recover account details failed to pull the correct details for address")
@@ -293,8 +293,8 @@ func (s *APITestSuite) TestRecoverAccount() bool {
 	err = keyStore.Delete(account, TestConfig.Account1.Password)
 	require.NoError(err, "cannot remove accoun: %v", err)
 
-	recoverAccountResponse = s.api.RecoverAccount(TestConfig.Account1.Password, mnemonic)
-	require.NoError(recoverAccountResponse.ErrorValue, "recover account failed (for non-cached account): %s", recoverAccountResponse.Error)
+	recoverAccountResponse, err = s.api.RecoverAccount(TestConfig.Account1.Password, mnemonic)
+	require.NoError(err, "recover account failed (for non-cached account): %s", err)
 
 	addressCheck, pubKeyCheck = recoverAccountResponse.Address, recoverAccountResponse.PubKey
 
@@ -307,8 +307,8 @@ func (s *APITestSuite) TestRecoverAccount() bool {
 	require.Equal(extChild2String, key.ExtendedKey.String(), "CKD#2 key mismatch, expected: %s, got: %s", extChild2String, key.ExtendedKey.String())
 
 	// make sure that calling import several times, just returns from cache (no error is expected)
-	recoverAccountResponse = s.api.RecoverAccount(TestConfig.Account1.Password, mnemonic)
-	require.NoError(recoverAccountResponse.ErrorValue, "recover account failed (for non-cached account): %v", recoverAccountResponse.Error)
+	recoverAccountResponse, err = s.api.RecoverAccount(TestConfig.Account1.Password, mnemonic)
+	require.NoError(err, "recover account failed (for non-cached account): %v", err)
 
 	addressCheck, pubKeyCheck = recoverAccountResponse.Address, recoverAccountResponse.PubKey
 	require.Equal(address, addressCheck, "recover account details failed to pull the correct details (for non-cached account) for address")
