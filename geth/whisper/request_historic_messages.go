@@ -2,6 +2,7 @@ package whisper
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"encoding/binary"
 	"fmt"
 	"github.com/ethereum/go-ethereum/p2p/discover"
@@ -24,76 +25,21 @@ func RequestHistoricMessagesHandler(nodeManager common.NodeManager) (rpc.Handler
 	}
 
 	return func(ctx context.Context, args ...interface{}) (interface{}, error) {
-		var (
-			timeLow uint32 = 0
-			timeUpp        = uint32(time.Now().Unix())
-		)
-
-		if len(args) != 1 {
-			return nil, fmt.Errorf("Invalid number of args")
-		}
-
-		historicMessagesArgs, ok := args[0].(map[string]interface{})
-		if ok == false {
-			return nil, fmt.Errorf("Invalid args")
-		}
-
-		if t, ok := historicMessagesArgs["from"]; ok == true {
-			if parsed, ok := t.(uint32); ok {
-				timeLow = parsed
-			}
-		}
-		if t, ok := historicMessagesArgs["to"]; ok == true {
-			if parsed, ok := t.(uint32); ok {
-				timeUpp = parsed
-			}
-		}
-		t, ok := historicMessagesArgs["topic"]
-		if ok == false {
-			return nil, fmt.Errorf("Topic value is not exist")
-		}
-
-		topicStr, ok := t.(string)
-		if ok == false {
-			return nil, fmt.Errorf("Topic value is not string")
-		}
-
-		var topic whisperv5.TopicType
-		topic.UnmarshalText([]byte(topicStr))
-
-		symkeyID, ok := historicMessagesArgs["symKeyID"]
-		if ok == false {
-			return nil, fmt.Errorf("SymkeyID is not exist")
-		}
-
-		symkeyIDstr := symkeyID.(string)
-		symkey, err := whisper.GetSymKey(symkeyIDstr)
+		r, err := parseArgs(args)
 		if err != nil {
 			return nil, err
 		}
 
-		data := make([]byte, 8+whisperv5.TopicLength)
-		binary.BigEndian.PutUint32(data, timeLow)
-		binary.BigEndian.PutUint32(data[4:], timeUpp)
-		copy(data[8:], topic[:])
-
-		var params whisperv5.MessageParams
-		params.PoW = 1
-		params.Payload = data
-		params.KeySym = symkey
-		params.WorkTime = 5
-		params.Src = node.Server().PrivateKey
-
-		msg, err := whisperv5.NewSentMessage(&params)
-		if err != nil {
-			return nil, err
-		}
-		env, err := msg.Wrap(&params)
+		peer, err := extractIdFromEnode(r.Enode)
 		if err != nil {
 			return nil, err
 		}
 
-		peer, err := extractIdFromEnode(historicMessagesArgs["enode"].(string))
+		symkey, err := whisper.GetSymKey(r.SymkeyID)
+		if err != nil {
+			return nil, err
+		}
+		env, err := makeEnvelop(r, symkey, node.Server().PrivateKey)
 		if err != nil {
 			return nil, err
 		}
@@ -105,6 +51,93 @@ func RequestHistoricMessagesHandler(nodeManager common.NodeManager) (rpc.Handler
 
 		return true, nil
 	}, nil
+}
+
+type request struct {
+	TimeLow  uint32
+	TimeUp   uint32
+	Topic    whisperv5.TopicType
+	SymkeyID string
+	Enode    string
+}
+
+func parseArgs(args ...interface{}) (request, error) {
+	var (
+		r = request{
+			TimeLow: 0,
+			TimeUp:  uint32(time.Now().Unix()),
+		}
+	)
+
+	if len(args) != 1 {
+		return request{}, fmt.Errorf("Invalid number of args")
+	}
+
+	historicMessagesArgs, ok := args[0].(map[string]interface{})
+	if ok == false {
+		return request{}, fmt.Errorf("Invalid args")
+	}
+
+	if t, ok := historicMessagesArgs["from"]; ok == true {
+		if parsed, ok := t.(uint32); ok {
+			r.TimeLow = parsed
+		}
+	}
+	if t, ok := historicMessagesArgs["to"]; ok == true {
+		if parsed, ok := t.(uint32); ok {
+			r.TimeUp = parsed
+		}
+	}
+	topicInterfaceValue, ok := historicMessagesArgs["topic"]
+	if ok == false {
+		return request{}, fmt.Errorf("topic value is not exist")
+	}
+
+	topicStringValue, ok := topicInterfaceValue.(string)
+	if ok == false {
+		return request{}, fmt.Errorf("topic value is not string")
+	}
+
+	r.Topic.UnmarshalText([]byte(topicStringValue))
+
+	symkeyIDInterfaceValue, ok := historicMessagesArgs["symKeyID"]
+	if ok == false {
+		return request{}, fmt.Errorf("symKeyID is not exist")
+	}
+	r.SymkeyID, ok = symkeyIDInterfaceValue.(string)
+	if ok == false {
+		return request{}, fmt.Errorf("symKeyID is not string")
+	}
+	enodeInterfaceValue, ok := historicMessagesArgs["enode"]
+	if ok == false {
+		return request{}, fmt.Errorf("enode is not exist")
+	}
+	r.Enode, ok = enodeInterfaceValue.(string)
+	if ok == false {
+		return request{}, fmt.Errorf("enode is not string")
+	}
+
+	return r, nil
+}
+
+func makeEnvelop(r request, symkey []byte, pk *ecdsa.PrivateKey) (*whisperv5.Envelope, error) {
+	data := make([]byte, 8+whisperv5.TopicLength)
+	binary.BigEndian.PutUint32(data, r.TimeLow)
+	binary.BigEndian.PutUint32(data[4:], r.TimeUp)
+	copy(data[8:], r.Topic[:])
+
+	var params whisperv5.MessageParams
+	params.PoW = 1
+	params.Payload = data
+	params.KeySym = symkey
+	params.WorkTime = 5
+	params.Src = pk
+
+	message, err := whisperv5.NewSentMessage(&params)
+	if err != nil {
+		return nil, err
+	}
+	return message.Wrap(&params)
 }
 
 func extractIdFromEnode(s string) ([]byte, error) {
