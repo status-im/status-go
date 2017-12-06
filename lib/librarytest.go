@@ -47,14 +47,14 @@ func testCreateAccountWithMock(t *testing.T) {
 	pass1 := C.CString("pass1")
 	pass2 := C.CString("pass2")
 	empty := C.CString("")
-	jsonResult := C.CString(`{"address":"add","pubkey":"Pub","mnemonic":"mne","error":""}`)
-	jsonResultError := C.CString(`{"address":"","pubkey":"","mnemonic":"","error":"Error Message"}`)
+	accountInfo1JSON := C.CString(`{"address":"add","pubkey":"Pub","mnemonic":"mne","error":""}`)
+	accountInfo2JSON := C.CString(`{"address":"","pubkey":"","mnemonic":"","error":"Error Message"}`)
 	defer func() {
 		C.free(unsafe.Pointer(pass1))
 		C.free(unsafe.Pointer(pass2))
 		C.free(unsafe.Pointer(empty))
-		C.free(unsafe.Pointer(jsonResult))
-		C.free(unsafe.Pointer(jsonResultError))
+		C.free(unsafe.Pointer(accountInfo1JSON))
+		C.free(unsafe.Pointer(accountInfo2JSON))
 	}()
 
 	tests := []struct {
@@ -62,15 +62,15 @@ func testCreateAccountWithMock(t *testing.T) {
 		password *C.char
 		want     *C.char
 	}{
-		{"testCreateAccountWithMock/Normal", pass1, jsonResult},
-		{"testCreateAccountWithMock/EmptyParam", empty, jsonResult},
-		{"testCreateAccountWithMock/NilParam", nil, jsonResult},
-		{"testCreateAccountWithMock/ErrorResult", pass2, jsonResultError},
+		{"testCreateAccountWithMock/Normal", pass1, accountInfo1JSON},
+		{"testCreateAccountWithMock/EmptyParam", empty, accountInfo1JSON},
+		{"testCreateAccountWithMock/NilParam", nil, accountInfo1JSON},
+		{"testCreateAccountWithMock/ErrorResult", pass2, accountInfo2JSON},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := CreateAccount(tt.password); C.GoString(got) != C.GoString(tt.want) {
-				assert.Equal(t, C.GoString(tt.want), C.GoString(got))
+				assert.JSONEq(t, C.GoString(tt.want), C.GoString(got))
 			}
 		})
 	}
@@ -97,16 +97,16 @@ func testCreateChildAccountWithMock(t *testing.T) {
 	parent1 := C.CString("parent1")
 	parent2 := C.CString("parent2")
 	empty := C.CString("")
-	jsonResult := C.CString(`{"address":"add","pubkey":"Pub","mnemonic":"","error":""}`)
-	jsonResultError := C.CString(`{"address":"","pubkey":"","mnemonic":"","error":"Error Message"}`)
+	accountInfo1JSON := C.CString(`{"address":"add","pubkey":"Pub","mnemonic":"","error":""}`)
+	accountInfo2JSON := C.CString(`{"address":"","pubkey":"","mnemonic":"","error":"Error Message"}`)
 	defer func() {
 		C.free(unsafe.Pointer(pass1))
 		C.free(unsafe.Pointer(pass2))
 		C.free(unsafe.Pointer(parent1))
 		C.free(unsafe.Pointer(parent2))
 		C.free(unsafe.Pointer(empty))
-		C.free(unsafe.Pointer(jsonResult))
-		C.free(unsafe.Pointer(jsonResultError))
+		C.free(unsafe.Pointer(accountInfo1JSON))
+		C.free(unsafe.Pointer(accountInfo2JSON))
 	}()
 
 	tests := []struct {
@@ -115,15 +115,15 @@ func testCreateChildAccountWithMock(t *testing.T) {
 		password *C.char
 		want     *C.char
 	}{
-		{"testCreateChildAccountWithMock/Normal", parent1, pass1, jsonResult},
-		{"testCreateChildAccountWithMock/EmptyParam", empty, empty, jsonResult},
-		{"testCreateChildAccountWithMock/NilParam", nil, nil, jsonResult},
-		{"testCreateChildAccountWithMock/ErrorResult", parent2, pass2, jsonResultError},
+		{"testCreateChildAccountWithMock/Normal", parent1, pass1, accountInfo1JSON},
+		{"testCreateChildAccountWithMock/EmptyParam", empty, empty, accountInfo1JSON},
+		{"testCreateChildAccountWithMock/NilParam", nil, nil, accountInfo1JSON},
+		{"testCreateChildAccountWithMock/ErrorResult", parent2, pass2, accountInfo2JSON},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := CreateChildAccount(tt.parrent, tt.password); C.GoString(got) != C.GoString(tt.want) {
-				assert.Equal(t, C.GoString(tt.want), C.GoString(got))
+				assert.JSONEq(t, C.GoString(tt.want), C.GoString(got))
 			}
 		})
 	}
@@ -151,16 +151,16 @@ func testRecoverAccountWithMock(t *testing.T) {
 	mnemonic1 := C.CString("mnemonic1")
 	mnemonic2 := C.CString("mnemonic2")
 	empty := C.CString("")
-	jsonResult := C.CString(`{"address":"add","pubkey":"Pub","mnemonic":"mnemonic","error":""}`)
-	jsonResultError := C.CString(`{"address":"","pubkey":"","mnemonic":"","error":"Error Message"}`)
+	accountInfo1JSON := C.CString(`{"address":"add","pubkey":"Pub","mnemonic":"mnemonic","error":""}`)
+	accountInfo2JSON := C.CString(`{"address":"","pubkey":"","mnemonic":"","error":"Error Message"}`)
 	defer func() {
 		C.free(unsafe.Pointer(pass1))
 		C.free(unsafe.Pointer(pass2))
 		C.free(unsafe.Pointer(mnemonic1))
 		C.free(unsafe.Pointer(mnemonic2))
 		C.free(unsafe.Pointer(empty))
-		C.free(unsafe.Pointer(jsonResult))
-		C.free(unsafe.Pointer(jsonResultError))
+		C.free(unsafe.Pointer(accountInfo1JSON))
+		C.free(unsafe.Pointer(accountInfo2JSON))
 	}()
 
 	tests := []struct {
@@ -169,15 +169,15 @@ func testRecoverAccountWithMock(t *testing.T) {
 		mnemonic *C.char
 		want     *C.char
 	}{
-		{"testRecoverAccountWithMock/Normal", pass1, mnemonic1, jsonResult},
-		{"testRecoverAccountWithMock/EmptyParam", empty, empty, jsonResult},
-		{"testRecoverAccountWithMock/NilParam", nil, nil, jsonResult},
-		{"testRecoverAccountWithMock/ErrorResult", pass2, mnemonic2, jsonResultError},
+		{"testRecoverAccountWithMock/Normal", pass1, mnemonic1, accountInfo1JSON},
+		{"testRecoverAccountWithMock/EmptyParam", empty, empty, accountInfo1JSON},
+		{"testRecoverAccountWithMock/NilParam", nil, nil, accountInfo1JSON},
+		{"testRecoverAccountWithMock/ErrorResult", pass2, mnemonic2, accountInfo2JSON},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := RecoverAccount(tt.password, tt.mnemonic); C.GoString(got) != C.GoString(tt.want) {
-				assert.Equal(t, C.GoString(tt.want), C.GoString(got))
+				assert.JSONEq(t, C.GoString(tt.want), C.GoString(got))
 			}
 		})
 	}
@@ -209,16 +209,16 @@ func testValidateNodeConfigWithMock(t *testing.T) {
 	config1 := C.CString("{json1}")
 	config2 := C.CString("{json2}")
 	empty := C.CString("")
-	jsonResult1 := C.CString(`{"status":true}`)
-	jsonResult2 := C.CString(`{"status":false,"field_errors":[{"parameter":"param1","errors":[{"message":"perror1"},{"message":"perror2"}]},{"parameter":"param2","errors":[{"message":"perror1"}]}]}`)
-	jsonResult3 := C.CString(`{"status":false}`)
+	apiDetailedResponse1JSON := C.CString(`{"status":true}`)
+	apiDetailedResponse2JSON := C.CString(`{"status":false,"field_errors":[{"parameter":"param1","errors":[{"message":"perror1"},{"message":"perror2"}]},{"parameter":"param2","errors":[{"message":"perror1"}]}]}`)
+	apiDetailedResponse3JSON := C.CString(`{"status":false}`)
 	defer func() {
 		C.free(unsafe.Pointer(config1))
 		C.free(unsafe.Pointer(config2))
 		C.free(unsafe.Pointer(empty))
-		C.free(unsafe.Pointer(jsonResult1))
-		C.free(unsafe.Pointer(jsonResult2))
-		C.free(unsafe.Pointer(jsonResult3))
+		C.free(unsafe.Pointer(apiDetailedResponse1JSON))
+		C.free(unsafe.Pointer(apiDetailedResponse2JSON))
+		C.free(unsafe.Pointer(apiDetailedResponse3JSON))
 	}()
 
 	tests := []struct {
@@ -226,15 +226,16 @@ func testValidateNodeConfigWithMock(t *testing.T) {
 		configJSON *C.char
 		want       *C.char
 	}{
-		{"testValidateNodeConfigWithMock/Normal", config1, jsonResult1},
-		{"testValidateNodeConfigWithMock/ValidationErrors", config2, jsonResult2},
-		{"testValidateNodeConfigWithMock/emptyconfig", empty, jsonResult3},
-		{"testValidateNodeConfigWithMock/nilconfig", nil, jsonResult3},
+		{"testValidateNodeConfigWithMock/Normal", config1, apiDetailedResponse1JSON},
+		{"testValidateNodeConfigWithMock/ValidationErrors", config2, apiDetailedResponse2JSON},
+		{"testValidateNodeConfigWithMock/emptyconfig", empty, apiDetailedResponse3JSON},
+		{"testValidateNodeConfigWithMock/nilconfig", nil, apiDetailedResponse3JSON},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := ValidateNodeConfig(tt.configJSON); C.GoString(got) != C.GoString(tt.want) {
-				assert.Equal(t, C.GoString(tt.want), C.GoString(got))
+				assert.JSONEq(t, C.GoString(tt.want), C.GoString(got))
 			}
 		})
 	}
