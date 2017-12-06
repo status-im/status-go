@@ -40,6 +40,10 @@ import (
 )
 
 const zeroHash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+const initJS = `
+	var _status_catalog = {
+		foo: 'bar'
+	};`
 
 var testChainDir string
 var nodeConfigJSON string
@@ -1281,14 +1285,8 @@ func testJailInitInvalid(t *testing.T) bool {
 
 func testJailParseInvalid(t *testing.T) bool {
 	// Arrange.
-	initCode := `
-	var _status_catalog = {
-		foo: 'bar'
-	};
-	`
-
+	InitJail(C.CString(initJS))
 	// Act.
-	InitJail(C.CString(initCode))
 	extraInvalidCode := `
 	var extraFunc = function (x) {
 	  return x * x;
@@ -1305,71 +1303,43 @@ func testJailParseInvalid(t *testing.T) bool {
 }
 
 func testJailInit(t *testing.T) bool {
-	initCode := `
-	var _status_catalog = {
-		foo: 'bar'
-	};
-	`
-	InitJail(C.CString(initCode))
+	InitJail(C.CString(initJS))
 
-	extraCode := `
-	var extraFunc = function (x) {
-	  return x * x;
-	};
-	`
-	rawResponse := CreateAndInitCell(C.CString("CHAT_ID_INIT_TEST"), C.CString(extraCode))
-	parsedResponse := C.GoString(rawResponse)
+	chatID := C.CString("CHAT_ID_INIT_TEST")
 
-	expectedResponse := `{"result": {"foo":"bar"}}`
+	// Cell initialization return the result of the last JS operation provided to it.
+	response := CreateAndInitCell(chatID, C.CString(`var extraFunc = function (x) { return x * x; }; extraFunc(2);`))
+	require.Equal(t, `{"result": 4}`, C.GoString(response), "Unexpected response from jail.CreateAndInitCell()")
 
-	if !reflect.DeepEqual(expectedResponse, parsedResponse) {
-		t.Error("expected output not returned from jail.CreateAndInitCell()")
-		return false
-	}
-
-	t.Logf("jail inited and parsed: %s", parsedResponse)
+	// Commands from the jail initialization are available in any of the created cells.
+	response = ExecuteJS(chatID, C.CString(`JSON.stringify({ result: _status_catalog });`))
+	require.Equal(t, `{"result":{"foo":"bar"}}`, C.GoString(response), "Environment from `InitJail` is not available in the created cell")
 
 	return true
 }
 
 func testJailParseDeprecated(t *testing.T) bool {
-	initCode := `
-		var _status_catalog = {
-			foo: 'bar'
-		};
-	`
-	InitJail(C.CString(initCode))
+	InitJail(C.CString(initJS))
 
 	extraCode := `
 		var extraFunc = function (x) {
 			return x * x;
 		};
+
+		extraFunc(2);
 	`
-	rawResponse := Parse(C.CString("CHAT_ID_PARSE_TEST"), C.CString(extraCode))
-	parsedResponse := C.GoString(rawResponse)
-	expectedResponse := `{"result": {"foo":"bar"}}`
-	if !reflect.DeepEqual(expectedResponse, parsedResponse) {
-		t.Error("expected output not returned from Parse()")
-		return false
-	}
+	chatID := C.CString("CHAT_ID_PARSE_TEST")
+
+	response := Parse(chatID, C.CString(extraCode))
+	require.Equal(t, `{"result": 4}`, C.GoString(response))
 
 	// cell already exists but Parse should not complain
-	rawResponse = Parse(C.CString("CHAT_ID_PARSE_TEST"), C.CString(extraCode))
-	parsedResponse = C.GoString(rawResponse)
-	expectedResponse = `{"result": {"foo":"bar"}}`
-	if !reflect.DeepEqual(expectedResponse, parsedResponse) {
-		t.Error("expected output not returned from Parse()")
-		return false
-	}
+	response = Parse(chatID, C.CString(extraCode))
+	require.Equal(t, `{"result": 4}`, C.GoString(response))
 
 	// test extraCode
-	rawResponse = ExecuteJS(C.CString("CHAT_ID_PARSE_TEST"), C.CString(`extraFunc(2)`))
-	parsedResponse = C.GoString(rawResponse)
-	expectedResponse = `4`
-	if !reflect.DeepEqual(expectedResponse, parsedResponse) {
-		t.Error("expected output not returned from ExecuteJS()")
-		return false
-	}
+	response = ExecuteJS(chatID, C.CString(`extraFunc(10)`))
+	require.Equal(t, `100`, C.GoString(response))
 
 	return true
 }
