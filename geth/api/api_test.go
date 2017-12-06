@@ -58,12 +58,8 @@ func TestValidateNodeConfig(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Logf("TestValidateNodeConfig: %s", tc.Name)
-		testValidateNodeConfig(tc.Config, tc.Callback)
+		statusAPI := StatusAPI{}
+		resp := statusAPI.ValidateJSONConfig(tc.Config)
+		tc.Callback(resp)
 	}
-}
-
-func testValidateNodeConfig(config string, fn func(common.APIDetailedResponse)) {
-	statusAPI := StatusAPI{}
-	resp := statusAPI.ValidateJSONConfig(config)
-	fn(resp)
 }
