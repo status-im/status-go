@@ -66,6 +66,7 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 
 	//Add key pair to whisper
 	keyID, err := w.NewKeyPair()
+	s.Require().NoError(err)
 	key, err := w.GetPrivateKey(keyID)
 	s.Require().NoError(err)
 	pubkey := hexutil.Bytes(crypto.FromECDSAPub(&key.PublicKey))
@@ -96,7 +97,7 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	s.Require().Equal(0, len(messages.Result))
 
 	//Post message
-	resp = rpcClient.CallRaw(`{
+	rpcClient.CallRaw(`{
 		"jsonrpc": "2.0",
 		"method": "shh_post",
 		"params": [
@@ -123,7 +124,7 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	//act
 
 	//Request messages from mailbox
-	resp = rpcClient.CallRaw(`{
+	rpcClient.CallRaw(`{
 		"jsonrpc": "2.0",
 		"id": 1,
 		"method": "shh_requestMessages",
@@ -136,6 +137,8 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 		}]
 	}`)
 
+	//wait to receive message
+	time.Sleep(time.Second)
 	//And we receive message
 	resp = rpcClient.CallRaw(`{
 		"jsonrpc": "2.0",
@@ -173,6 +176,8 @@ func (s *WhisperMailboxSuite) startMailboxBackend() (*api.StatusBackend, func())
 	//Start mailbox node
 	mailboxBackend := api.NewStatusBackend()
 	mailboxConfig, err := e2e.MakeTestNodeConfig(GetNetworkID())
+	s.Require().NoError(err)
+
 	mailboxConfig.LightEthConfig.Enabled = false
 	mailboxConfig.WhisperConfig.Enabled = true
 	mailboxConfig.KeyStoreDir = "../../.ethereumtest/mailbox/"

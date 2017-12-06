@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-//RequestHistoricMessagesHandler returns rpc which send p2p request for expired messages.
+//RequestHistoricMessagesHandler returns rpc which send p2p requestMessagesRequest for expired messages.
 func RequestHistoricMessagesHandler(nodeManager common.NodeManager) (rpc.Handler, error) {
 	whisper, err := nodeManager.WhisperService()
 	if err != nil {
@@ -53,7 +53,7 @@ func RequestHistoricMessagesHandler(nodeManager common.NodeManager) (rpc.Handler
 	}, nil
 }
 
-type request struct {
+type requestMessagesRequest struct {
 	TimeLow  uint32
 	TimeUp   uint32
 	Topic    whisperv5.TopicType
@@ -61,66 +61,68 @@ type request struct {
 	Enode    string
 }
 
-func parseArgs(args ...interface{}) (request, error) {
+func parseArgs(args ...interface{}) (requestMessagesRequest, error) {
 	var (
-		r = request{
+		r = requestMessagesRequest{
 			TimeLow: 0,
 			TimeUp:  uint32(time.Now().Unix()),
 		}
 	)
 
 	if len(args) != 1 {
-		return request{}, fmt.Errorf("Invalid number of args")
+		return requestMessagesRequest{}, fmt.Errorf("Invalid number of args")
 	}
 
 	historicMessagesArgs, ok := args[0].(map[string]interface{})
-	if ok == false {
-		return request{}, fmt.Errorf("Invalid args")
+	if !ok {
+		return requestMessagesRequest{}, fmt.Errorf("Invalid args")
 	}
 
-	if t, ok := historicMessagesArgs["from"]; ok == true {
+	if t, ok := historicMessagesArgs["from"]; ok {
 		if parsed, ok := t.(uint32); ok {
 			r.TimeLow = parsed
 		}
 	}
-	if t, ok := historicMessagesArgs["to"]; ok == true {
+	if t, ok := historicMessagesArgs["to"]; ok {
 		if parsed, ok := t.(uint32); ok {
 			r.TimeUp = parsed
 		}
 	}
 	topicInterfaceValue, ok := historicMessagesArgs["topic"]
-	if ok == false {
-		return request{}, fmt.Errorf("topic value is not exist")
+	if !ok {
+		return requestMessagesRequest{}, fmt.Errorf("topic value is not exist")
 	}
 
 	topicStringValue, ok := topicInterfaceValue.(string)
-	if ok == false {
-		return request{}, fmt.Errorf("topic value is not string")
+	if !ok {
+		return requestMessagesRequest{}, fmt.Errorf("topic value is not string")
 	}
 
-	r.Topic.UnmarshalText([]byte(topicStringValue))
+	if err := r.Topic.UnmarshalText([]byte(topicStringValue)); err != nil {
+		return requestMessagesRequest{}, nil
+	}
 
 	symkeyIDInterfaceValue, ok := historicMessagesArgs["symKeyID"]
-	if ok == false {
-		return request{}, fmt.Errorf("symKeyID is not exist")
+	if !ok {
+		return requestMessagesRequest{}, fmt.Errorf("symKeyID is not exist")
 	}
 	r.SymkeyID, ok = symkeyIDInterfaceValue.(string)
-	if ok == false {
-		return request{}, fmt.Errorf("symKeyID is not string")
+	if !ok {
+		return requestMessagesRequest{}, fmt.Errorf("symKeyID is not string")
 	}
 	enodeInterfaceValue, ok := historicMessagesArgs["enode"]
-	if ok == false {
-		return request{}, fmt.Errorf("enode is not exist")
+	if !ok {
+		return requestMessagesRequest{}, fmt.Errorf("enode is not exist")
 	}
 	r.Enode, ok = enodeInterfaceValue.(string)
-	if ok == false {
-		return request{}, fmt.Errorf("enode is not string")
+	if !ok {
+		return requestMessagesRequest{}, fmt.Errorf("enode is not string")
 	}
 
 	return r, nil
 }
 
-func makeEnvelop(r request, symkey []byte, pk *ecdsa.PrivateKey) (*whisperv5.Envelope, error) {
+func makeEnvelop(r requestMessagesRequest, symkey []byte, pk *ecdsa.PrivateKey) (*whisperv5.Envelope, error) {
 	data := make([]byte, 8+whisperv5.TopicLength)
 	binary.BigEndian.PutUint32(data, r.TimeLow)
 	binary.BigEndian.PutUint32(data[4:], r.TimeUp)
