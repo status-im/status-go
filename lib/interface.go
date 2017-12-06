@@ -1,6 +1,5 @@
-package main
-
 // This is a file contains the interface that the package requires
+package main
 
 import (
 	"context"

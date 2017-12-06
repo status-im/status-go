@@ -57,9 +57,8 @@ func TestValidateNodeConfig(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		t.Logf("TestValidateNodeConfig: %s", tc.Name)
-		statusAPI := StatusAPI{}
-		resp := statusAPI.ValidateJSONConfig(tc.Config)
+		t.Logf("TestvalidateJSONConfig: %s", tc.Name)
+		resp := validateJSONConfig(tc.Config)
 		tc.Callback(resp)
 	}
 }

@@ -275,7 +275,12 @@ func (api *StatusAPI) NotifyUsers(message string, payload fcm.NotificationPayloa
 	return err
 }
 
+//ValidateJSONConfig validates the json configuration without starting the node.
 func (api *StatusAPI) ValidateJSONConfig(configJSON string) common.APIDetailedResponse {
+	return validateJSONConfig(configJSON)
+}
+
+func validateJSONConfig(configJSON string) common.APIDetailedResponse {
 	var resp common.APIDetailedResponse
 	_, err := params.LoadNodeConfig(configJSON)
 
