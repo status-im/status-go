@@ -181,9 +181,7 @@ func (s *WhisperMailboxSuite) startMailboxBackend() (*api.StatusBackend, func())
 	mailboxConfig.LightEthConfig.Enabled = false
 	mailboxConfig.WhisperConfig.Enabled = true
 	mailboxConfig.KeyStoreDir = "../../.ethereumtest/mailbox/"
-	mailboxConfig.WhisperConfig.BootstrapNode = true
-	mailboxConfig.WhisperConfig.ForwarderNode = true
-	mailboxConfig.WhisperConfig.MailServerNode = true
+	mailboxConfig.WhisperConfig.EnableMailServer = true
 	mailboxConfig.WhisperConfig.IdentityFile = "../../static/keys/wnodekey"
 	mailboxConfig.WhisperConfig.PasswordFile = "../../static/keys/wnodepassword"
 	mailboxConfig.WhisperConfig.DataDir = "../../.ethereumtest/mailbox/w2"
