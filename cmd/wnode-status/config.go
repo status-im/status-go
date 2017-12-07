@@ -79,16 +79,16 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 	}
 
 	if whisperConfig.PasswordFile == "" {
-		if whisperConfig.EnableMailServer && whisperConfig.Password == "" {
-			return nil, errors.New("either a password file or a password should be specified for mail server")
+		if whisperConfig.EnableMailServer {
+			return nil, errors.New("password file should be specified for mail server")
 		}
-
-		//fixme(@jekamas): hard coded for mail server MVP - issue https://github.com/status-im/status-go/issues/488
-		whisperConfig.Password = "status-offline-inbox"
-	} else if whisperConfig.Password == "" {
-		if _, err := whisperConfig.ReadPasswordFile(); err != nil {
+	} else {
+		password, err := whisperConfig.ReadPasswordFile()
+		if err != nil {
 			return nil, fmt.Errorf("read password file: %v", err)
 		}
+
+		whisperConfig.Password = string(password)
 	}
 
 	// firebase configuration
