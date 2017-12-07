@@ -141,11 +141,13 @@ func (s *JailTestSuite) TestPublicCreateAndInitCell() {
 
 func (s *JailTestSuite) TestPublicCreateAndInitCellConsecutive() {
 	response1 := s.Jail.CreateAndInitCell("cell1", `var _status_catalog = { test: true }`)
+	s.Contains(response1, "test")
 	cell1, err := s.Jail.Cell("cell1")
 	s.NoError(err)
 
 	// Create it again
 	response2 := s.Jail.CreateAndInitCell("cell1", `var _status_catalog = { test: true, foo: 5 }`)
+	s.Contains(response2, "test", "foo")
 	cell2, err := s.Jail.Cell("cell1")
 	s.NoError(err)
 
