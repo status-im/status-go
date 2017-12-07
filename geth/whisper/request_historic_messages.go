@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/rpc"
+	"reflect"
 )
 
 var (
@@ -26,9 +28,7 @@ var (
 	//ErrMailboxSymkeyIDNotString - error symKeyID is not string type
 	ErrMailboxSymkeyIDNotString = fmt.Errorf("symKeyID is not string")
 	//ErrPeerNotExist - error peer field doesn't exist in request
-	ErrPeerNotExist = fmt.Errorf("peer does not exist")
-	//ErrPeerNotString - error peer is not string type
-	ErrPeerNotString = fmt.Errorf("peer is not string")
+	ErrPeerOrEnode = fmt.Errorf("enode or peer field should be not empty")
 )
 
 const defaultWorkTime = 5
@@ -72,6 +72,7 @@ func RequestHistoricMessagesHandler(nodeManager common.NodeManager) (rpc.Handler
 
 type historicMessagesRequest struct {
 	Peer     []byte              //mailbox peer
+	Enode    string              //mailbox enode
 	TimeLow  uint32              //resend messages from
 	TimeUp   uint32              //resend messages to
 	Topic    whisperv5.TopicType //resend messages by topic
@@ -91,6 +92,9 @@ func parseArgs(args ...interface{}) (historicMessagesRequest, error) {
 		return historicMessagesRequest{}, ErrInvalidNumberOfArgs
 	}
 
+	fmt.Println("args[0]")
+	fmt.Println(args[0])
+	fmt.Println(reflect.TypeOf(args[0]))
 	historicMessagesArgs, ok := args[0].(map[string]interface{})
 	if !ok {
 		return historicMessagesRequest{}, ErrInvalidArgs
@@ -129,13 +133,24 @@ func parseArgs(args ...interface{}) (historicMessagesRequest, error) {
 		return historicMessagesRequest{}, ErrMailboxSymkeyIDNotString
 	}
 
-	peerInterfaceValue, ok := historicMessagesArgs["peer"]
-	if !ok {
-		return historicMessagesRequest{}, ErrPeerNotExist
+	peerInterfaceValue, okPeer := historicMessagesArgs["peer"]
+	enodeInterfaceValue, okEnode := historicMessagesArgs["enode"]
+	if okPeer == okEnode { //only if existing peer or enode
+		return historicMessagesRequest{}, ErrPeerOrEnode
 	}
-	r.Peer, ok = peerInterfaceValue.([]byte)
-	if !ok {
-		return historicMessagesRequest{}, ErrPeerNotString
+	if p, ok := peerInterfaceValue.(string); ok && okPeer {
+		n, err := discover.ParseNode(p)
+		if err != nil {
+			return historicMessagesRequest{}, err
+		}
+		r.Peer = n.ID[:]
+	}
+
+	if str, ok := enodeInterfaceValue.(string); ok && okEnode {
+		r.Enode = str
+	}
+	if r.Enode != "" && len(r.Peer) > 0 {
+		return historicMessagesRequest{}, ErrPeerOrEnode
 	}
 
 	return r, nil
