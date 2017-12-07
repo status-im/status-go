@@ -197,12 +197,7 @@ func activateShhService(stack *node.Node, config *params.NodeConfig, deliverySer
 		// enable mail service
 		if whisperConfig.EnableMailServer {
 			if whisperConfig.Password == "" {
-				password, err := whisperConfig.ReadPasswordFile()
-				if err != nil {
-					return nil, err
-				}
-
-				whisperConfig.Password = string(password)
+				return nil, errors.New("MailServer is enabled but password is missing")
 			}
 
 			log.Info("Register MailServer")

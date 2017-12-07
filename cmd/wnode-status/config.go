@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"path/filepath"
 
 	"github.com/status-im/status-go/geth/params"
@@ -62,7 +64,6 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 	whisperConfig := nodeConfig.WhisperConfig
 	whisperConfig.Enabled = true
 	whisperConfig.IdentityFile = *identity
-	whisperConfig.PasswordFile = *passwordFile
 	whisperConfig.EnablePushNotification = *enablePN
 	whisperConfig.EnableMailServer = *enableMailServer
 	whisperConfig.MinimumPoW = *minPow
@@ -78,14 +79,14 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 		}
 	}
 
-	if whisperConfig.PasswordFile == "" {
-		if whisperConfig.EnableMailServer {
-			return nil, errors.New("password file should be specified for mail server")
+	if whisperConfig.EnableMailServer {
+		if *passwordFile == "" {
+			return nil, errors.New("passwordfile should be specified if MailServer is enabled")
 		}
-	} else {
-		password, err := whisperConfig.ReadPasswordFile()
+
+		password, err := readFile(*passwordFile)
 		if err != nil {
-			return nil, fmt.Errorf("read password file: %v", err)
+			return nil, fmt.Errorf("password file: %v", err)
 		}
 
 		whisperConfig.Password = string(password)
@@ -110,4 +111,18 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 	nodeConfig.RPCEnabled = *httpEnabled
 
 	return nodeConfig, nil
+}
+
+func readFile(path string) ([]byte, error) {
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	data = bytes.TrimRight(data, "\n")
+
+	if len(data) == 0 {
+		return nil, errors.New("file is empty")
+	}
+
+	return data, nil
 }

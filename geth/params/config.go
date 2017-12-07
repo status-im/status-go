@@ -33,8 +33,6 @@ func init() {
 var (
 	ErrMissingDataDir             = errors.New("missing required 'DataDir' parameter")
 	ErrMissingNetworkID           = errors.New("missing required 'NetworkID' parameter")
-	ErrEmptyPasswordFile          = errors.New("password file cannot be empty")
-	ErrNoPasswordFileValueSet     = errors.New("password file path not set")
 	ErrNoIdentityFileValueSet     = errors.New("identity file path not set")
 	ErrEmptyIdentityFile          = errors.New("identity file cannot be empty")
 	ErrEmptyAuthorizationKeyFile  = errors.New("authorization key file cannot be empty")
@@ -92,10 +90,6 @@ type WhisperConfig struct {
 	// Currently, it's used by Push Notification service.
 	IdentityFile string
 
-	// PasswordFile path to password file.
-	// Currently, it's used by MailServer.
-	PasswordFile string
-
 	// Password for symmetric encryption with MailServer.
 	// (if no account file selected, then this password is used for symmetric encryption).
 	Password string
@@ -118,25 +112,6 @@ type WhisperConfig struct {
 
 	// FirebaseConfig extra configuration for Firebase Cloud Messaging
 	FirebaseConfig *FirebaseConfig `json:"FirebaseConfig,"`
-}
-
-// ReadPasswordFile reads and returns content of the password file
-func (c *WhisperConfig) ReadPasswordFile() ([]byte, error) {
-	if len(c.PasswordFile) == 0 {
-		return nil, ErrNoPasswordFileValueSet
-	}
-
-	password, err := ioutil.ReadFile(c.PasswordFile)
-	if err != nil {
-		return nil, err
-	}
-	password = bytes.TrimRight(password, "\n")
-
-	if len(password) == 0 {
-		return nil, ErrEmptyPasswordFile
-	}
-
-	return password, nil
 }
 
 // ReadIdentityFile reads and loads identity private key
