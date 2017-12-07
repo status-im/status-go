@@ -3,6 +3,10 @@ package whisper
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"testing"
+	"time"
+
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p/discover"
@@ -11,9 +15,6 @@ import (
 	"github.com/status-im/status-go/geth/api"
 	. "github.com/status-im/status-go/testing"
 	"github.com/stretchr/testify/suite"
-	"strconv"
-	"testing"
-	"time"
 )
 
 type WhisperMailboxSuite struct {

@@ -5,10 +5,11 @@ import (
 	"crypto/ecdsa"
 	"encoding/binary"
 	"fmt"
+	"time"
+
 	"github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/rpc"
-	"time"
 )
 
 var (
