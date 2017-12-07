@@ -155,6 +155,37 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	//assert
 	s.Require().NoError(err)
 	s.Require().Equal(1, len(messages.Result))
+
+	time.Sleep(time.Second)
+	//Request each one messages from mailbox
+	resp = rpcClient.CallRaw(`{
+		"jsonrpc": "2.0",
+		"id": 1,
+		"method": "shh_requestMessages",
+		"params": [{
+					"enode":"` + mailboxEnode + `",
+					"topic":"` + topic.String() + `",
+					"symKeyID":"` + MailServerKeyID + `",
+					"from":0,
+					"to":` + strconv.FormatInt(time.Now().UnixNano(), 10) + `
+		}]
+	}`)
+	fmt.Println(resp)
+
+	//wait to receive message
+	time.Sleep(time.Second)
+	//And we receive message
+	resp = rpcClient.CallRaw(`{
+		"jsonrpc": "2.0",
+		"method": "shh_getFilterMessages",
+		"params": ["` + messageFilterID + `"],
+		"id": 1}`)
+
+	err = json.Unmarshal([]byte(resp), &messages)
+	//assert
+	s.Require().NoError(err)
+	s.Require().Equal(1, len(messages.Result))
+
 }
 
 func (s *WhisperMailboxSuite) startBackend() (*api.StatusBackend, func()) {
