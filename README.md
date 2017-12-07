@@ -31,7 +31,7 @@ Use following Makefile commands:
 # Testing
 To setup accounts passphrase you need to setup an environment variable: `export ACCOUNT_PASSWORD="secret_pass_phrase"`.
 
-To test statusgo, use: `make ci`. Make sure the `gometalinter` package is installed: `go get -u github.com/alecthomas/gometalinter && go install github.com/alecthomas/gometalinter && export PATH=$PATH:$GOPATH/bin`
+To test statusgo, use: `make ci`. Make sure the `gometalinter` package is installed first by running `make lint-install`
 To test statusgo using a giving network by name, use: `make ci networkid=rinkeby`.
 To test statusgo using a giving network by id number, use: `make ci networkid=3`.
 
