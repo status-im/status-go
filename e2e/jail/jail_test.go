@@ -98,8 +98,9 @@ func (s *JailTestSuite) TestMultipleInitError() {
 	response := s.Jail.CreateAndInitCell(testChatID, `var _status_catalog = {}`)
 	s.Equal(`{"result": {}}`, response)
 
+	// Shouldn't cause an error and reinitialize existing
 	response = s.Jail.CreateAndInitCell(testChatID)
-	s.Equal(`{"error":"cell with id 'testChat' already exists"}`, response)
+	s.Equal(`{"result": {}}`, response)
 }
 
 // @TODO(adam): remove extra JS when checking `_status_catalog` is moved to status-react.
