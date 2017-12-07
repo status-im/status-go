@@ -5,12 +5,32 @@ import (
 	"crypto/ecdsa"
 	"encoding/binary"
 	"fmt"
-	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/rpc"
 	"time"
 )
+
+var (
+	//ErrInvalidNumberOfArgs - error invalid aruments in request
+	ErrInvalidNumberOfArgs = fmt.Errorf("invalid number of arguments, expected 1")
+	//ErrInvalidArgs - error invalid request format
+	ErrInvalidArgs = fmt.Errorf("invalid args")
+	//ErrTopicNotExist - error topic field doesn't exist in request
+	ErrTopicNotExist = fmt.Errorf("topic value does not exist")
+	//ErrTopicNotString - error topic is not string type
+	ErrTopicNotString = fmt.Errorf("topic value is not string")
+	//ErrMailboxSymkeyIDNotExist - error symKeyID field doesn't exist in request
+	ErrMailboxSymkeyIDNotExist = fmt.Errorf("symKeyID does not exist")
+	//ErrMailboxSymkeyIDNotString - error symKeyID is not string type
+	ErrMailboxSymkeyIDNotString = fmt.Errorf("symKeyID is not string")
+	//ErrPeerNotExist - error peer field doesn't exist in request
+	ErrPeerNotExist = fmt.Errorf("peer does not exist")
+	//ErrPeerNotString - error peer is not string type
+	ErrPeerNotString = fmt.Errorf("peer is not string")
+)
+
+const defaultWorkTime = 5
 
 //RequestHistoricMessagesHandler returns an RPC handler which sends a p2p request for historic messages.
 func RequestHistoricMessagesHandler(nodeManager common.NodeManager) (rpc.Handler, error) {
@@ -30,11 +50,6 @@ func RequestHistoricMessagesHandler(nodeManager common.NodeManager) (rpc.Handler
 			return nil, err
 		}
 
-		peer, err := extractIdFromEnode(r.Enode)
-		if err != nil {
-			return nil, err
-		}
-
 		symkey, err := whisper.GetSymKey(r.SymkeyID)
 		if err != nil {
 			return nil, err
@@ -45,7 +60,7 @@ func RequestHistoricMessagesHandler(nodeManager common.NodeManager) (rpc.Handler
 			return nil, err
 		}
 
-		err = whisper.RequestHistoricMessages(peer, env)
+		err = whisper.RequestHistoricMessages(r.Peer, env)
 		if err != nil {
 			return nil, err
 		}
@@ -55,12 +70,12 @@ func RequestHistoricMessagesHandler(nodeManager common.NodeManager) (rpc.Handler
 }
 
 type historicMessagesRequest struct {
-	TimeLow  uint32
-	TimeUp   uint32
-	Topic    whisperv5.TopicType
-	SymkeyID string
-	Enode    string
-	PoW      float64
+	Peer     []byte              //mailbox peer
+	TimeLow  uint32              //resend messages from
+	TimeUp   uint32              //resend messages to
+	Topic    whisperv5.TopicType //resend messages by topic
+	SymkeyID string              //Mailbox symmetric key id
+	PoW      float64             //whisper proof of work
 }
 
 func parseArgs(args ...interface{}) (historicMessagesRequest, error) {
@@ -72,12 +87,12 @@ func parseArgs(args ...interface{}) (historicMessagesRequest, error) {
 	)
 
 	if len(args) != 1 {
-		return historicMessagesRequest{}, fmt.Errorf("invalid number of arguments, expected 1")
+		return historicMessagesRequest{}, ErrInvalidNumberOfArgs
 	}
 
 	historicMessagesArgs, ok := args[0].(map[string]interface{})
 	if !ok {
-		return historicMessagesRequest{}, fmt.Errorf("invalid args")
+		return historicMessagesRequest{}, ErrInvalidArgs
 	}
 
 	if t, ok := historicMessagesArgs["from"]; ok {
@@ -92,12 +107,12 @@ func parseArgs(args ...interface{}) (historicMessagesRequest, error) {
 	}
 	topicInterfaceValue, ok := historicMessagesArgs["topic"]
 	if !ok {
-		return historicMessagesRequest{}, fmt.Errorf("topic value does not exist")
+		return historicMessagesRequest{}, ErrTopicNotExist
 	}
 
 	topicStringValue, ok := topicInterfaceValue.(string)
 	if !ok {
-		return historicMessagesRequest{}, fmt.Errorf("topic value is not string")
+		return historicMessagesRequest{}, ErrTopicNotString
 	}
 
 	if err := r.Topic.UnmarshalText([]byte(topicStringValue)); err != nil {
@@ -106,19 +121,20 @@ func parseArgs(args ...interface{}) (historicMessagesRequest, error) {
 
 	symkeyIDInterfaceValue, ok := historicMessagesArgs["symKeyID"]
 	if !ok {
-		return historicMessagesRequest{}, fmt.Errorf("symKeyID does not exist")
+		return historicMessagesRequest{}, ErrMailboxSymkeyIDNotExist
 	}
 	r.SymkeyID, ok = symkeyIDInterfaceValue.(string)
 	if !ok {
-		return historicMessagesRequest{}, fmt.Errorf("symKeyID is not string")
+		return historicMessagesRequest{}, ErrMailboxSymkeyIDNotString
 	}
-	enodeInterfaceValue, ok := historicMessagesArgs["enode"]
+
+	peerInterfaceValue, ok := historicMessagesArgs["peer"]
 	if !ok {
-		return historicMessagesRequest{}, fmt.Errorf("enode does not exist")
+		return historicMessagesRequest{}, ErrPeerNotExist
 	}
-	r.Enode, ok = enodeInterfaceValue.(string)
+	r.Peer, ok = peerInterfaceValue.([]byte)
 	if !ok {
-		return historicMessagesRequest{}, fmt.Errorf("enode is not string")
+		return historicMessagesRequest{}, ErrPeerNotString
 	}
 
 	return r, nil
@@ -130,7 +146,7 @@ func makeEnvelop(r historicMessagesRequest, symkey []byte, pk *ecdsa.PrivateKey)
 	params.PoW = r.PoW
 	params.Payload = makePayloadData(r)
 	params.KeySym = symkey
-	params.WorkTime = 5
+	params.WorkTime = defaultWorkTime
 	params.Src = pk
 
 	message, err := whisperv5.NewSentMessage(&params)
@@ -147,11 +163,4 @@ func makePayloadData(r historicMessagesRequest) []byte {
 	binary.BigEndian.PutUint32(data[4:], r.TimeUp)
 	copy(data[8:], r.Topic[:])
 	return data
-}
-func extractIdFromEnode(s string) ([]byte, error) {
-	n, err := discover.ParseNode(s)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse enode: %s", err)
-	}
-	return n.ID[:], nil
 }

@@ -48,9 +48,9 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	s.Require().NoError(err)
 
 	//Mark mailbox node trusted
-	p, err := extractIdFromEnode(mailboxNode.Server().NodeInfo().Enode)
+	mailboxPeer, err := extractIdFromEnode(mailboxNode.Server().NodeInfo().Enode)
 	s.Require().NoError(err)
-	err = w.AllowP2PMessagesFromPeer(p)
+	err = w.AllowP2PMessagesFromPeer(mailboxPeer)
 	s.Require().NoError(err)
 
 	//Generate mailbox symkey
@@ -129,7 +129,7 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 		"id": 1,
 		"method": "shh_requestMessages",
 		"params": [{
-					"enode":"` + mailboxNode.Server().NodeInfo().Enode + `",
+					"peer":"` + string(mailboxPeer) + `",
 					"topic":"` + topic.String() + `",
 					"symKeyID":"` + MailServerKeyID + `",
 					"from":0,
