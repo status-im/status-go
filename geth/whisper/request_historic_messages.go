@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-//RequestHistoricMessagesHandler returns rpc which send p2p requestMessagesRequest for expired messages.
+//RequestHistoricMessagesHandler returns an RPC handler which sends a p2p request for historic messages.
 func RequestHistoricMessagesHandler(nodeManager common.NodeManager) (rpc.Handler, error) {
 	whisper, err := nodeManager.WhisperService()
 	if err != nil {
@@ -39,6 +39,7 @@ func RequestHistoricMessagesHandler(nodeManager common.NodeManager) (rpc.Handler
 		if err != nil {
 			return nil, err
 		}
+		r.PoW = whisper.MinPow()
 		env, err := makeEnvelop(r, symkey, node.Server().PrivateKey)
 		if err != nil {
 			return nil, err
@@ -53,29 +54,30 @@ func RequestHistoricMessagesHandler(nodeManager common.NodeManager) (rpc.Handler
 	}, nil
 }
 
-type requestMessagesRequest struct {
+type historicMessagesRequest struct {
 	TimeLow  uint32
 	TimeUp   uint32
 	Topic    whisperv5.TopicType
 	SymkeyID string
 	Enode    string
+	PoW      float64
 }
 
-func parseArgs(args ...interface{}) (requestMessagesRequest, error) {
+func parseArgs(args ...interface{}) (historicMessagesRequest, error) {
 	var (
-		r = requestMessagesRequest{
-			TimeLow: 0,
+		r = historicMessagesRequest{
+			TimeLow: uint32(time.Now().Add(-24 * time.Hour).Unix()),
 			TimeUp:  uint32(time.Now().Unix()),
 		}
 	)
 
 	if len(args) != 1 {
-		return requestMessagesRequest{}, fmt.Errorf("Invalid number of args")
+		return historicMessagesRequest{}, fmt.Errorf("invalid number of arguments, expected 1")
 	}
 
 	historicMessagesArgs, ok := args[0].(map[string]interface{})
 	if !ok {
-		return requestMessagesRequest{}, fmt.Errorf("Invalid args")
+		return historicMessagesRequest{}, fmt.Errorf("invalid args")
 	}
 
 	if t, ok := historicMessagesArgs["from"]; ok {
@@ -90,47 +92,43 @@ func parseArgs(args ...interface{}) (requestMessagesRequest, error) {
 	}
 	topicInterfaceValue, ok := historicMessagesArgs["topic"]
 	if !ok {
-		return requestMessagesRequest{}, fmt.Errorf("topic value is not exist")
+		return historicMessagesRequest{}, fmt.Errorf("topic value does not exist")
 	}
 
 	topicStringValue, ok := topicInterfaceValue.(string)
 	if !ok {
-		return requestMessagesRequest{}, fmt.Errorf("topic value is not string")
+		return historicMessagesRequest{}, fmt.Errorf("topic value is not string")
 	}
 
 	if err := r.Topic.UnmarshalText([]byte(topicStringValue)); err != nil {
-		return requestMessagesRequest{}, nil
+		return historicMessagesRequest{}, nil
 	}
 
 	symkeyIDInterfaceValue, ok := historicMessagesArgs["symKeyID"]
 	if !ok {
-		return requestMessagesRequest{}, fmt.Errorf("symKeyID is not exist")
+		return historicMessagesRequest{}, fmt.Errorf("symKeyID does not exist")
 	}
 	r.SymkeyID, ok = symkeyIDInterfaceValue.(string)
 	if !ok {
-		return requestMessagesRequest{}, fmt.Errorf("symKeyID is not string")
+		return historicMessagesRequest{}, fmt.Errorf("symKeyID is not string")
 	}
 	enodeInterfaceValue, ok := historicMessagesArgs["enode"]
 	if !ok {
-		return requestMessagesRequest{}, fmt.Errorf("enode is not exist")
+		return historicMessagesRequest{}, fmt.Errorf("enode does not exist")
 	}
 	r.Enode, ok = enodeInterfaceValue.(string)
 	if !ok {
-		return requestMessagesRequest{}, fmt.Errorf("enode is not string")
+		return historicMessagesRequest{}, fmt.Errorf("enode is not string")
 	}
 
 	return r, nil
 }
 
-func makeEnvelop(r requestMessagesRequest, symkey []byte, pk *ecdsa.PrivateKey) (*whisperv5.Envelope, error) {
-	data := make([]byte, 8+whisperv5.TopicLength)
-	binary.BigEndian.PutUint32(data, r.TimeLow)
-	binary.BigEndian.PutUint32(data[4:], r.TimeUp)
-	copy(data[8:], r.Topic[:])
-
+//makeEnvelop make envelop for request histtoric messages. symmetric key to authenticate to MailServer node and pk is the current node ID.
+func makeEnvelop(r historicMessagesRequest, symkey []byte, pk *ecdsa.PrivateKey) (*whisperv5.Envelope, error) {
 	var params whisperv5.MessageParams
-	params.PoW = 1
-	params.Payload = data
+	params.PoW = r.PoW
+	params.Payload = makePayloadData(r)
 	params.KeySym = symkey
 	params.WorkTime = 5
 	params.Src = pk
@@ -142,10 +140,18 @@ func makeEnvelop(r requestMessagesRequest, symkey []byte, pk *ecdsa.PrivateKey) 
 	return message.Wrap(&params)
 }
 
+//makePayloadData make specific payload for mailserver
+func makePayloadData(r historicMessagesRequest) []byte {
+	data := make([]byte, 8+whisperv5.TopicLength)
+	binary.BigEndian.PutUint32(data, r.TimeLow)
+	binary.BigEndian.PutUint32(data[4:], r.TimeUp)
+	copy(data[8:], r.Topic[:])
+	return data
+}
 func extractIdFromEnode(s string) ([]byte, error) {
 	n, err := discover.ParseNode(s)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to parse enode: %s", err)
+		return nil, fmt.Errorf("failed to parse enode: %s", err)
 	}
 	return n.ID[:], nil
 }
