@@ -102,9 +102,6 @@ type WhisperConfig struct {
 	// EnablePushNotification is mode when node is capable of sending Push (and probably other kinds) Notifications
 	EnablePushNotification bool
 
-	// Standalone whether node doesn't actively connect to peers, and waits for incoming connections
-	Standalone bool
-
 	// DataDir is the file system folder Whisper should use for any data storage needs.
 	// For instance, MailServer will use this directory to store its data.
 	DataDir string

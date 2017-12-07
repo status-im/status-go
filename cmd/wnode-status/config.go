@@ -64,7 +64,6 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 	whisperConfig.Enabled = true
 	whisperConfig.IdentityFile = *identity
 	whisperConfig.PasswordFile = *passwordFile
-	whisperConfig.Standalone = *standalone
 	whisperConfig.EnablePushNotification = *enablePN
 	whisperConfig.EnableMailServer = *enableMailServer
 	whisperConfig.MinimumPoW = *minPow
@@ -108,7 +107,7 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 	nodeConfig.IPCEnabled = *ipcEnabled
 	nodeConfig.RPCEnabled = *httpEnabled
 
-	if whisperConfig.Standalone {
+	if *standalone {
 		nodeConfig.BootClusterConfig.Enabled = false
 		nodeConfig.BootClusterConfig.BootNodes = nil
 	}
