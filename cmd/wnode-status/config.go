@@ -68,28 +68,26 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 	whisperConfig.MinimumPoW = *minPow
 	whisperConfig.TTL = *ttl
 
-	if whisperConfig.EnableMailServer && whisperConfig.Password == "" && whisperConfig.PasswordFile == "" {
-		return nil, errors.New("either a password file or a password should be specified for mail server")
-	}
-
-	if whisperConfig.PasswordFile == "" {
-		//fixme(@jekamas): hard coded for mail server MVP - issue https://github.com/status-im/status-go/issues/488
-		whisperConfig.Password = "status-offline-inbox"
-	}
-
 	if whisperConfig.EnablePushNotification && whisperConfig.IdentityFile == "" {
 		return nil, errors.New("notification server requires -identity file to be specified")
-	}
-
-	if whisperConfig.PasswordFile != "" && whisperConfig.Password == "" {
-		if _, err := whisperConfig.ReadPasswordFile(); err != nil {
-			return nil, fmt.Errorf("read password file: %v", err)
-		}
 	}
 
 	if whisperConfig.IdentityFile != "" {
 		if _, err := whisperConfig.ReadIdentityFile(); err != nil {
 			return nil, fmt.Errorf("read identity file: %v", err)
+		}
+	}
+
+	if whisperConfig.PasswordFile == "" {
+		if whisperConfig.EnableMailServer && whisperConfig.Password == "" {
+			return nil, errors.New("either a password file or a password should be specified for mail server")
+		}
+
+		//fixme(@jekamas): hard coded for mail server MVP - issue https://github.com/status-im/status-go/issues/488
+		whisperConfig.Password = "status-offline-inbox"
+	} else if whisperConfig.Password == "" {
+		if _, err := whisperConfig.ReadPasswordFile(); err != nil {
+			return nil, fmt.Errorf("read password file: %v", err)
 		}
 	}
 

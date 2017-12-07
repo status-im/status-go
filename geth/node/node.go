@@ -196,20 +196,16 @@ func activateShhService(stack *node.Node, config *params.NodeConfig, deliverySer
 
 		// enable mail service
 		if whisperConfig.EnableMailServer {
-			if whisperConfig.Password == "" {
-				password, err := whisperConfig.ReadPasswordFile()
-				if err != nil {
-					return nil, err
-				}
-
-				whisperConfig.Password = string(password)
+			password, err := whisperConfig.ReadPasswordFile()
+			if err != nil {
+				return nil, err
 			}
 
 			log.Info("Register MailServer")
 
 			var mailServer mailserver.WMailServer
 			whisperService.RegisterServer(&mailServer)
-			mailServer.Init(whisperService, whisperConfig.DataDir, whisperConfig.Password, whisperConfig.MinimumPoW)
+			mailServer.Init(whisperService, whisperConfig.DataDir, string(password), whisperConfig.MinimumPoW)
 		}
 
 		// enable notification service
