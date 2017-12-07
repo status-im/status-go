@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"path/filepath"
 
 	"github.com/status-im/status-go/geth/params"
@@ -63,30 +65,32 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 	whisperConfig := nodeConfig.WhisperConfig
 	whisperConfig.Enabled = true
 	whisperConfig.IdentityFile = *identity
-	whisperConfig.PasswordFile = *passwordFile
 	whisperConfig.EnablePushNotification = *enablePN
 	whisperConfig.EnableMailServer = *enableMailServer
 	whisperConfig.MinimumPoW = *minPow
 	whisperConfig.TTL = *ttl
 
-	if whisperConfig.EnableMailServer && whisperConfig.PasswordFile == "" {
-		return nil, errors.New("mail server requires -password to be specified")
-	}
-
 	if whisperConfig.EnablePushNotification && whisperConfig.IdentityFile == "" {
 		return nil, errors.New("notification server requires -identity file to be specified")
-	}
-
-	if whisperConfig.PasswordFile != "" {
-		if _, err := whisperConfig.ReadPasswordFile(); err != nil {
-			return nil, fmt.Errorf("read password file: %v", err)
-		}
 	}
 
 	if whisperConfig.IdentityFile != "" {
 		if _, err := whisperConfig.ReadIdentityFile(); err != nil {
 			return nil, fmt.Errorf("read identity file: %v", err)
 		}
+	}
+
+	if whisperConfig.EnableMailServer {
+		if *passwordFile == "" {
+			return nil, errors.New("passwordfile should be specified if MailServer is enabled")
+		}
+
+		password, err := readFile(*passwordFile)
+		if err != nil {
+			return nil, fmt.Errorf("password file: %v", err)
+		}
+
+		whisperConfig.Password = string(password)
 	}
 
 	// firebase configuration
@@ -113,4 +117,18 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 	}
 
 	return nodeConfig, nil
+}
+
+func readFile(path string) ([]byte, error) {
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	data = bytes.TrimRight(data, "\n")
+
+	if len(data) == 0 {
+		return nil, errors.New("file is empty")
+	}
+
+	return data, nil
 }

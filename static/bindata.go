@@ -104,7 +104,7 @@ func scriptsReadmeMd() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "scripts/README.md", size: 133, mode: os.FileMode(420), modTime: time.Unix(1505683992, 0)}
+	info := bindataFileInfo{name: "scripts/README.md", size: 133, mode: os.FileMode(420), modTime: time.Unix(1506892492, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -124,7 +124,7 @@ func scriptsWeb3Js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "scripts/web3.js", size: 497689, mode: os.FileMode(420), modTime: time.Unix(1511731628, 0)}
+	info := bindataFileInfo{name: "scripts/web3.js", size: 497689, mode: os.FileMode(420), modTime: time.Unix(1512647894, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -144,7 +144,7 @@ func configChtJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/cht.json", size: 7418, mode: os.FileMode(420), modTime: time.Unix(1511267822, 0)}
+	info := bindataFileInfo{name: "config/cht.json", size: 7418, mode: os.FileMode(420), modTime: time.Unix(1510835921, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -164,7 +164,7 @@ func configPublicChainAccountsJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/public-chain-accounts.json", size: 165, mode: os.FileMode(420), modTime: time.Unix(1511267822, 0)}
+	info := bindataFileInfo{name: "config/public-chain-accounts.json", size: 165, mode: os.FileMode(420), modTime: time.Unix(1512415111, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -184,7 +184,7 @@ func configStatusChainAccountsJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/status-chain-accounts.json", size: 330, mode: os.FileMode(420), modTime: time.Unix(1511267822, 0)}
+	info := bindataFileInfo{name: "config/status-chain-accounts.json", size: 330, mode: os.FileMode(420), modTime: time.Unix(1512415111, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -204,7 +204,7 @@ func configStatusChainGenesisJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/status-chain-genesis.json", size: 612, mode: os.FileMode(420), modTime: time.Unix(1511267822, 0)}
+	info := bindataFileInfo{name: "config/status-chain-genesis.json", size: 612, mode: os.FileMode(420), modTime: time.Unix(1512415111, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -224,7 +224,7 @@ func configTestDataJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/test-data.json", size: 84, mode: os.FileMode(420), modTime: time.Unix(1511267822, 0)}
+	info := bindataFileInfo{name: "config/test-data.json", size: 84, mode: os.FileMode(420), modTime: time.Unix(1512415111, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -244,7 +244,7 @@ func keysFirebaseauthkey() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/firebaseauthkey", size: 153, mode: os.FileMode(420), modTime: time.Unix(1505683992, 0)}
+	info := bindataFileInfo{name: "keys/firebaseauthkey", size: 153, mode: os.FileMode(420), modTime: time.Unix(1509210499, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -264,7 +264,7 @@ func keysTestAccount1StatusChainPk() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/test-account1-status-chain.pk", size: 489, mode: os.FileMode(420), modTime: time.Unix(1511267822, 0)}
+	info := bindataFileInfo{name: "keys/test-account1-status-chain.pk", size: 489, mode: os.FileMode(420), modTime: time.Unix(1512415111, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -284,7 +284,7 @@ func keysTestAccount1Pk() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/test-account1.pk", size: 491, mode: os.FileMode(420), modTime: time.Unix(1511267822, 0)}
+	info := bindataFileInfo{name: "keys/test-account1.pk", size: 491, mode: os.FileMode(420), modTime: time.Unix(1510590781, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -304,7 +304,7 @@ func keysTestAccount2StatusChainPk() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/test-account2-status-chain.pk", size: 489, mode: os.FileMode(420), modTime: time.Unix(1511267822, 0)}
+	info := bindataFileInfo{name: "keys/test-account2-status-chain.pk", size: 489, mode: os.FileMode(420), modTime: time.Unix(1512415111, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -324,7 +324,7 @@ func keysTestAccount2Pk() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/test-account2.pk", size: 491, mode: os.FileMode(420), modTime: time.Unix(1511267822, 0)}
+	info := bindataFileInfo{name: "keys/test-account2.pk", size: 491, mode: os.FileMode(420), modTime: time.Unix(1510590781, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -344,7 +344,7 @@ func keysTestAccount3BeforeEip55Pk() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/test-account3-before-eip55.pk", size: 489, mode: os.FileMode(420), modTime: time.Unix(1511267822, 0)}
+	info := bindataFileInfo{name: "keys/test-account3-before-eip55.pk", size: 489, mode: os.FileMode(420), modTime: time.Unix(1512415111, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -364,12 +364,12 @@ func keysWnodekey() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/wnodekey", size: 65, mode: os.FileMode(420), modTime: time.Unix(1511267822, 0)}
+	info := bindataFileInfo{name: "keys/wnodekey", size: 65, mode: os.FileMode(420), modTime: time.Unix(1510590781, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _keysWnodepassword = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x4a\x2c\x4e\x49\x03\x61\x2e\x40\x00\x00\x00\xff\xff\xc7\x84\xee\x6f\x09\x00\x00\x00")
+var _keysWnodepassword = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x2a\x2e\x49\x2c\x29\x2d\xd6\xcd\x4f\x4b\xcb\xc9\xcc\x4b\xd5\xcd\xcc\x4b\xca\xaf\xe0\x02\x04\x00\x00\xff\xff\xef\xf3\x8b\x45\x15\x00\x00\x00")
 
 func keysWnodepasswordBytes() ([]byte, error) {
 	return bindataRead(
@@ -384,7 +384,7 @@ func keysWnodepassword() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/wnodepassword", size: 9, mode: os.FileMode(420), modTime: time.Unix(1505683992, 0)}
+	info := bindataFileInfo{name: "keys/wnodepassword", size: 21, mode: os.FileMode(420), modTime: time.Unix(1512647198, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -404,7 +404,7 @@ func testdataJailCommandsJs() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "testdata/jail/commands.js", size: 7677, mode: os.FileMode(420), modTime: time.Unix(1505683992, 0)}
+	info := bindataFileInfo{name: "testdata/jail/commands.js", size: 7677, mode: os.FileMode(420), modTime: time.Unix(1506892492, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -424,7 +424,7 @@ func testdataJailStatusJs() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "testdata/jail/status.js", size: 3402, mode: os.FileMode(420), modTime: time.Unix(1505683992, 0)}
+	info := bindataFileInfo{name: "testdata/jail/status.js", size: 3402, mode: os.FileMode(420), modTime: time.Unix(1506892492, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -444,7 +444,7 @@ func testdataJailTxSendContextNoMessageIdJs() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "testdata/jail/tx-send/context-no-message-id.js", size: 1793, mode: os.FileMode(420), modTime: time.Unix(1505683992, 0)}
+	info := bindataFileInfo{name: "testdata/jail/tx-send/context-no-message-id.js", size: 1793, mode: os.FileMode(420), modTime: time.Unix(1506892492, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -464,7 +464,7 @@ func testdataJailTxSendMessageIdNoContextJs() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "testdata/jail/tx-send/message-id-no-context.js", size: 1875, mode: os.FileMode(420), modTime: time.Unix(1505683992, 0)}
+	info := bindataFileInfo{name: "testdata/jail/tx-send/message-id-no-context.js", size: 1875, mode: os.FileMode(420), modTime: time.Unix(1506892492, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -484,7 +484,7 @@ func testdataJailTxSendNoMessageIdOrContextJs() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "testdata/jail/tx-send/no-message-id-or-context.js", size: 1354, mode: os.FileMode(420), modTime: time.Unix(1505683992, 0)}
+	info := bindataFileInfo{name: "testdata/jail/tx-send/no-message-id-or-context.js", size: 1354, mode: os.FileMode(420), modTime: time.Unix(1506892492, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -504,7 +504,7 @@ func testdataJailTxSendTxSendJs() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "testdata/jail/tx-send/tx-send.js", size: 3343, mode: os.FileMode(420), modTime: time.Unix(1505738069, 0)}
+	info := bindataFileInfo{name: "testdata/jail/tx-send/tx-send.js", size: 3343, mode: os.FileMode(420), modTime: time.Unix(1507541314, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -524,7 +524,7 @@ func testdataNodeTestSol() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "testdata/node/test.sol", size: 119, mode: os.FileMode(420), modTime: time.Unix(1505683992, 0)}
+	info := bindataFileInfo{name: "testdata/node/test.sol", size: 119, mode: os.FileMode(420), modTime: time.Unix(1506892492, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -581,28 +581,28 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
-	"scripts/README.md": scriptsReadmeMd,
-	"scripts/web3.js": scriptsWeb3Js,
-	"config/cht.json": configChtJson,
-	"config/public-chain-accounts.json": configPublicChainAccountsJson,
-	"config/status-chain-accounts.json": configStatusChainAccountsJson,
-	"config/status-chain-genesis.json": configStatusChainGenesisJson,
-	"config/test-data.json": configTestDataJson,
-	"keys/firebaseauthkey": keysFirebaseauthkey,
-	"keys/test-account1-status-chain.pk": keysTestAccount1StatusChainPk,
-	"keys/test-account1.pk": keysTestAccount1Pk,
-	"keys/test-account2-status-chain.pk": keysTestAccount2StatusChainPk,
-	"keys/test-account2.pk": keysTestAccount2Pk,
-	"keys/test-account3-before-eip55.pk": keysTestAccount3BeforeEip55Pk,
-	"keys/wnodekey": keysWnodekey,
-	"keys/wnodepassword": keysWnodepassword,
-	"testdata/jail/commands.js": testdataJailCommandsJs,
-	"testdata/jail/status.js": testdataJailStatusJs,
-	"testdata/jail/tx-send/context-no-message-id.js": testdataJailTxSendContextNoMessageIdJs,
-	"testdata/jail/tx-send/message-id-no-context.js": testdataJailTxSendMessageIdNoContextJs,
+	"scripts/README.md":                                 scriptsReadmeMd,
+	"scripts/web3.js":                                   scriptsWeb3Js,
+	"config/cht.json":                                   configChtJson,
+	"config/public-chain-accounts.json":                 configPublicChainAccountsJson,
+	"config/status-chain-accounts.json":                 configStatusChainAccountsJson,
+	"config/status-chain-genesis.json":                  configStatusChainGenesisJson,
+	"config/test-data.json":                             configTestDataJson,
+	"keys/firebaseauthkey":                              keysFirebaseauthkey,
+	"keys/test-account1-status-chain.pk":                keysTestAccount1StatusChainPk,
+	"keys/test-account1.pk":                             keysTestAccount1Pk,
+	"keys/test-account2-status-chain.pk":                keysTestAccount2StatusChainPk,
+	"keys/test-account2.pk":                             keysTestAccount2Pk,
+	"keys/test-account3-before-eip55.pk":                keysTestAccount3BeforeEip55Pk,
+	"keys/wnodekey":                                     keysWnodekey,
+	"keys/wnodepassword":                                keysWnodepassword,
+	"testdata/jail/commands.js":                         testdataJailCommandsJs,
+	"testdata/jail/status.js":                           testdataJailStatusJs,
+	"testdata/jail/tx-send/context-no-message-id.js":    testdataJailTxSendContextNoMessageIdJs,
+	"testdata/jail/tx-send/message-id-no-context.js":    testdataJailTxSendMessageIdNoContextJs,
 	"testdata/jail/tx-send/no-message-id-or-context.js": testdataJailTxSendNoMessageIdOrContextJs,
-	"testdata/jail/tx-send/tx-send.js": testdataJailTxSendTxSendJs,
-	"testdata/node/test.sol": testdataNodeTestSol,
+	"testdata/jail/tx-send/tx-send.js":                  testdataJailTxSendTxSendJs,
+	"testdata/node/test.sol":                            testdataNodeTestSol,
 }
 
 // AssetDir returns the file names below a certain
@@ -644,37 +644,38 @@ type bintree struct {
 	Func     func() (*asset, error)
 	Children map[string]*bintree
 }
+
 var _bintree = &bintree{nil, map[string]*bintree{
 	"config": &bintree{nil, map[string]*bintree{
-		"cht.json": &bintree{configChtJson, map[string]*bintree{}},
+		"cht.json":                   &bintree{configChtJson, map[string]*bintree{}},
 		"public-chain-accounts.json": &bintree{configPublicChainAccountsJson, map[string]*bintree{}},
 		"status-chain-accounts.json": &bintree{configStatusChainAccountsJson, map[string]*bintree{}},
-		"status-chain-genesis.json": &bintree{configStatusChainGenesisJson, map[string]*bintree{}},
-		"test-data.json": &bintree{configTestDataJson, map[string]*bintree{}},
+		"status-chain-genesis.json":  &bintree{configStatusChainGenesisJson, map[string]*bintree{}},
+		"test-data.json":             &bintree{configTestDataJson, map[string]*bintree{}},
 	}},
 	"keys": &bintree{nil, map[string]*bintree{
-		"firebaseauthkey": &bintree{keysFirebaseauthkey, map[string]*bintree{}},
+		"firebaseauthkey":               &bintree{keysFirebaseauthkey, map[string]*bintree{}},
 		"test-account1-status-chain.pk": &bintree{keysTestAccount1StatusChainPk, map[string]*bintree{}},
-		"test-account1.pk": &bintree{keysTestAccount1Pk, map[string]*bintree{}},
+		"test-account1.pk":              &bintree{keysTestAccount1Pk, map[string]*bintree{}},
 		"test-account2-status-chain.pk": &bintree{keysTestAccount2StatusChainPk, map[string]*bintree{}},
-		"test-account2.pk": &bintree{keysTestAccount2Pk, map[string]*bintree{}},
+		"test-account2.pk":              &bintree{keysTestAccount2Pk, map[string]*bintree{}},
 		"test-account3-before-eip55.pk": &bintree{keysTestAccount3BeforeEip55Pk, map[string]*bintree{}},
-		"wnodekey": &bintree{keysWnodekey, map[string]*bintree{}},
-		"wnodepassword": &bintree{keysWnodepassword, map[string]*bintree{}},
+		"wnodekey":                      &bintree{keysWnodekey, map[string]*bintree{}},
+		"wnodepassword":                 &bintree{keysWnodepassword, map[string]*bintree{}},
 	}},
 	"scripts": &bintree{nil, map[string]*bintree{
 		"README.md": &bintree{scriptsReadmeMd, map[string]*bintree{}},
-		"web3.js": &bintree{scriptsWeb3Js, map[string]*bintree{}},
+		"web3.js":   &bintree{scriptsWeb3Js, map[string]*bintree{}},
 	}},
 	"testdata": &bintree{nil, map[string]*bintree{
 		"jail": &bintree{nil, map[string]*bintree{
 			"commands.js": &bintree{testdataJailCommandsJs, map[string]*bintree{}},
-			"status.js": &bintree{testdataJailStatusJs, map[string]*bintree{}},
+			"status.js":   &bintree{testdataJailStatusJs, map[string]*bintree{}},
 			"tx-send": &bintree{nil, map[string]*bintree{
-				"context-no-message-id.js": &bintree{testdataJailTxSendContextNoMessageIdJs, map[string]*bintree{}},
-				"message-id-no-context.js": &bintree{testdataJailTxSendMessageIdNoContextJs, map[string]*bintree{}},
+				"context-no-message-id.js":    &bintree{testdataJailTxSendContextNoMessageIdJs, map[string]*bintree{}},
+				"message-id-no-context.js":    &bintree{testdataJailTxSendMessageIdNoContextJs, map[string]*bintree{}},
 				"no-message-id-or-context.js": &bintree{testdataJailTxSendNoMessageIdOrContextJs, map[string]*bintree{}},
-				"tx-send.js": &bintree{testdataJailTxSendTxSendJs, map[string]*bintree{}},
+				"tx-send.js":                  &bintree{testdataJailTxSendTxSendJs, map[string]*bintree{}},
 			}},
 		}},
 		"node": &bintree{nil, map[string]*bintree{
@@ -729,4 +730,3 @@ func _filePath(dir, name string) string {
 	cannonicalName := strings.Replace(name, "\\", "/", -1)
 	return filepath.Join(append([]string{dir}, strings.Split(cannonicalName, "/")...)...)
 }
-

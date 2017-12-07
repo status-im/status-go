@@ -92,9 +92,12 @@ type WhisperConfig struct {
 	// Currently, it's used by Push Notification service.
 	IdentityFile string
 
-	// PasswordFile path to password file.
-	// Currently, it's used by MailServer.
+	// PasswordFile contains a password for symmetric encryption with MailServer.
 	PasswordFile string
+
+	// Password for symmetric encryption with MailServer.
+	// (if no account file selected, then this password is used for symmetric encryption).
+	Password string
 
 	// EnableMailServer is mode when node is capable of delivering expired messages on demand
 	EnableMailServer bool
@@ -117,22 +120,24 @@ type WhisperConfig struct {
 }
 
 // ReadPasswordFile reads and returns content of the password file
-func (c *WhisperConfig) ReadPasswordFile() ([]byte, error) {
+func (c *WhisperConfig) ReadPasswordFile() error {
 	if len(c.PasswordFile) == 0 {
-		return nil, ErrNoPasswordFileValueSet
+		return ErrNoPasswordFileValueSet
 	}
 
 	password, err := ioutil.ReadFile(c.PasswordFile)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	password = bytes.TrimRight(password, "\n")
 
 	if len(password) == 0 {
-		return nil, ErrEmptyPasswordFile
+		return ErrEmptyPasswordFile
 	}
 
-	return password, nil
+	c.Password = string(password)
+
+	return nil
 }
 
 // ReadIdentityFile reads and loads identity private key
