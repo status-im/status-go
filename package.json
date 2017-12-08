@@ -3,10 +3,13 @@
   "version": "0.9.8",
   "description": "JavaScript tests for RPC API (Whisper/5, Swarm)",
   "main": "index.js",
+  "engines": {
+    "node": ">=8.9.0"
+  },
   "dependencies": {},
   "devDependencies": {
-    "chai": "^3.5.0",
-    "mocha": "^3.5.0",
+    "chai": "^4.1.2",
+    "mocha": "^3.5.3",
     "requirejs": "^2.3.4",
     "web3": "https://github.com/status-im/web3.js#status-develop"
   },

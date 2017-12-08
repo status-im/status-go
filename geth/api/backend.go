@@ -14,6 +14,7 @@ import (
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/signal"
 	"github.com/status-im/status-go/geth/txqueue"
+	"github.com/status-im/status-go/geth/whisper"
 )
 
 const (
@@ -243,9 +244,13 @@ func (m *StatusBackend) registerHandlers() error {
 		return node.ErrRPCClient
 	}
 
+	handler, err := whisper.RequestHistoricMessagesHandler(m.nodeManager)
+	if err != nil {
+		return err
+	}
+	rpcClient.RegisterHandler("shh_requestMessages", handler)
 	rpcClient.RegisterHandler("eth_accounts", m.accountManager.AccountsRPCHandler())
 	rpcClient.RegisterHandler("eth_sendTransaction", m.txQueueManager.SendTransactionRPCHandler)
-
 	m.txQueueManager.SetTransactionQueueHandler(m.txQueueManager.TransactionQueueHandler())
 	log.Info("Registered handler", "fn", "TransactionQueueHandler")
 

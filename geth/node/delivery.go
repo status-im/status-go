@@ -74,5 +74,5 @@ func (ld LogDeliveryService) SendState(state whisper.MessageState) {
 	}
 
 	encodedStat := base64.StdEncoding.EncodeToString(statdata)
-	log.Info("Message delivery notification", "state", encodedStat)
+	log.Debug("Message delivery notification", "state", encodedStat)
 }

@@ -100,7 +100,7 @@ func defaultEmbeddedNodeConfig(config *params.NodeConfig) *node.Config {
 			DiscoveryV5Addr:  ":0",
 			BootstrapNodes:   makeBootstrapNodes(),
 			BootstrapNodesV5: makeBootstrapNodesV5(),
-			ListenAddr:       ":0",
+			ListenAddr:       config.ListenAddr,
 			NAT:              nat.Any(),
 			MaxPeers:         config.MaxPeers,
 			MaxPendingPeers:  config.MaxPendingPeers,
@@ -117,6 +117,11 @@ func defaultEmbeddedNodeConfig(config *params.NodeConfig) *node.Config {
 	if config.RPCEnabled {
 		nc.HTTPHost = config.HTTPHost
 		nc.HTTPPort = config.HTTPPort
+	}
+
+	if !config.BootClusterConfig.Enabled {
+		nc.P2P.BootstrapNodes = nil
+		nc.P2P.BootstrapNodesV5 = nil
 	}
 
 	return nc
@@ -195,22 +200,26 @@ func activateShhService(stack *node.Node, config *params.NodeConfig, deliverySer
 		}
 
 		// enable mail service
-		if whisperConfig.MailServerNode {
-			password, err := whisperConfig.ReadPasswordFile()
-			if err != nil {
-				return nil, err
+		if whisperConfig.EnableMailServer {
+			if whisperConfig.Password == "" {
+				if err := whisperConfig.ReadPasswordFile(); err != nil {
+					return nil, err
+				}
 			}
+
+			log.Info("Register MailServer")
 
 			var mailServer mailserver.WMailServer
 			whisperService.RegisterServer(&mailServer)
-			mailServer.Init(whisperService, whisperConfig.DataDir, string(password), whisperConfig.MinimumPoW)
+			mailServer.Init(whisperService, whisperConfig.DataDir, whisperConfig.Password, whisperConfig.MinimumPoW)
 		}
 
 		// enable notification service
-		if whisperConfig.NotificationServerNode {
+		if whisperConfig.EnablePushNotification {
+			log.Info("Register PushNotification server")
+
 			var notificationServer notifications.NotificationServer
 			whisperService.RegisterNotificationServer(&notificationServer)
-
 			notificationServer.Init(whisperService, whisperConfig)
 		}
 
