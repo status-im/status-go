@@ -166,7 +166,8 @@ func getPeerID(m map[string]interface{}) ([]byte, error) {
 	peerInterfaceValue, okPeer := m["peer"]
 	enodeInterfaceValue, okEnode := m["enode"]
 
-	if okPeer == okEnode { //only if existing peer or enode(!xor)
+	//only if existing peer or enode(!xor)
+	if okPeer == okEnode {
 		return nil, ErrPeerOrEnode
 	}
 	var peerOrEnode string

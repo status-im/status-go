@@ -99,7 +99,7 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	s.Require().Equal(0, len(messages.Result))
 
 	//Post message
-	rpcClient.CallRaw(`{
+	resp = rpcClient.CallRaw(`{
 		"jsonrpc": "2.0",
 		"method": "shh_post",
 		"params": [
@@ -112,6 +112,11 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 			}
 		],
 		"id": 1}`)
+	postResp:=baseRPCResponse{}
+	err = json.Unmarshal([]byte(resp), &postResp)
+	s.Require().NoError(err)
+	s.Require().Nil(postResp.Err)
+
 
 	//There are no messages, because it's a sender filter
 	resp = rpcClient.CallRaw(`{
@@ -126,7 +131,7 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	//act
 
 	//Request messages from mailbox
-	rpcClient.CallRaw(`{
+	reqMessagesBody:=`{
 		"jsonrpc": "2.0",
 		"id": 1,
 		"method": "shh_requestMessages",
@@ -137,7 +142,12 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 					"from":0,
 					"to":` + strconv.FormatInt(time.Now().UnixNano(), 10) + `
 		}]
-	}`)
+	}`
+	resp = rpcClient.CallRaw(reqMessagesBody)
+	reqMessagesResp:=baseRPCResponse{}
+	err = json.Unmarshal([]byte(resp), &reqMessagesResp)
+	s.Require().NoError(err)
+	s.Require().Nil(postResp.Err)
 
 	//wait to receive message
 	time.Sleep(time.Second)
@@ -166,18 +176,12 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	s.Require().Equal(0, len(messages.Result))
 
 	//Request each one messages from mailbox, using same params
-	rpcClient.CallRaw(`{
-		"jsonrpc": "2.0",
-		"id": 2,
-		"method": "shh_requestMessages",
-		"params": [{
-					"peer":"` + mailboxPeerStr + `",
-					"topic":"` + topic.String() + `",
-					"symKeyID":"` + MailServerKeyID + `",
-					"from":0,
-					"to":` + strconv.FormatInt(time.Now().UnixNano(), 10) + `
-		}]
-	}`)
+	resp=rpcClient.CallRaw(reqMessagesBody)
+	reqMessagesResp=baseRPCResponse{}
+	err = json.Unmarshal([]byte(resp), &reqMessagesResp)
+	s.Require().NoError(err)
+	s.Require().Nil(postResp.Err)
+
 
 	//wait to receive message
 	time.Sleep(time.Second)
@@ -196,7 +200,7 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	time.Sleep(time.Second)
 
 	//Request each one messages from mailbox using enode
-	rpcClient.CallRaw(`{
+	resp=rpcClient.CallRaw(`{
 		"jsonrpc": "2.0",
 		"id": 2,
 		"method": "shh_requestMessages",
@@ -208,6 +212,11 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 					"to":` + strconv.FormatInt(time.Now().UnixNano(), 10) + `
 		}]
 	}`)
+	reqMessagesResp=baseRPCResponse{}
+	err = json.Unmarshal([]byte(resp), &reqMessagesResp)
+	s.Require().NoError(err)
+	s.Require().Nil(postResp.Err)
+
 
 	//wait to receive message
 	time.Sleep(time.Second)
@@ -280,5 +289,9 @@ type getFilterMessagesResponse struct {
 
 type newMessagesFilterResponse struct {
 	Result string
+	Err    interface{}
+}
+type baseRPCResponse struct {
+	Result interface{}
 	Err    interface{}
 }
