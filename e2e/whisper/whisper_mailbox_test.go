@@ -54,13 +54,11 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	s.Require().NoError(err)
 	mailboxPeer := parsedNode.ID[:]
 	mailboxPeerStr := parsedNode.ID.String()
-	fmt.Println("mailboxPeerStr")
-	fmt.Println(mailboxPeerStr)
 	err = w.AllowP2PMessagesFromPeer(mailboxPeer)
 	s.Require().NoError(err)
 
 	//Generate mailbox symkey
-	password := "asdfasdf"
+	password := "status-offline-inbox"
 	MailServerKeyID, err := w.AddSymKeyFromPassword(password)
 	s.Require().NoError(err)
 
@@ -117,7 +115,7 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 		],
 		"id": 1}`)
 
-	//Threre are no messages, because it's sender filter
+	//There are no messages, because it's a sender filter
 	resp = rpcClient.CallRaw(`{
 		"jsonrpc": "2.0",
 		"method": "shh_getFilterMessages",
@@ -129,6 +127,7 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 
 	//act
 
+	//Request messages from mailbox
 	rpcClient.CallRaw(`{
 		"jsonrpc": "2.0",
 		"id": 1,
@@ -160,10 +159,10 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	//Request each one messages from mailbox
 	resp = rpcClient.CallRaw(`{
 		"jsonrpc": "2.0",
-		"id": 1,
+		"id": 2,
 		"method": "shh_requestMessages",
 		"params": [{
-					"enode":"` + mailboxEnode + `",
+					"peer":"` + mailboxPeerStr + `",
 					"topic":"` + topic.String() + `",
 					"symKeyID":"` + MailServerKeyID + `",
 					"from":0,

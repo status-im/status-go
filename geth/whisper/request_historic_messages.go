@@ -34,19 +34,19 @@ var (
 const defaultWorkTime = 5
 
 //RequestHistoricMessagesHandler returns an RPC handler which sends a p2p request for historic messages.
-func RequestHistoricMessagesHandler(nodeManager common.NodeManager) (rpc.Handler, error) {
-	whisper, err := nodeManager.WhisperService()
-	if err != nil {
-		return nil, err
-	}
-
-	node, err := nodeManager.Node()
-	if err != nil {
-		return nil, err
-	}
-
+func RequestHistoricMessagesHandler(nodeManager common.NodeManager) rpc.Handler {
 	return func(ctx context.Context, args ...interface{}) (interface{}, error) {
-		r, err := parseArgs(args)
+		whisper, err := nodeManager.WhisperService()
+		if err != nil {
+			return nil, err
+		}
+
+		node, err := nodeManager.Node()
+		if err != nil {
+			return nil, err
+		}
+
+		r, err := parseArgs(args...)
 		if err != nil {
 			return nil, err
 		}
@@ -67,7 +67,7 @@ func RequestHistoricMessagesHandler(nodeManager common.NodeManager) (rpc.Handler
 		}
 
 		return true, nil
-	}, nil
+	}
 }
 
 type historicMessagesRequest struct {
@@ -92,11 +92,12 @@ func parseArgs(args ...interface{}) (historicMessagesRequest, error) {
 		return historicMessagesRequest{}, ErrInvalidNumberOfArgs
 	}
 
-	fmt.Println("args[0]")
-	fmt.Println(args[0])
+	fmt.Println("\n\n############## args[0]\n", args[0])
 	fmt.Println(reflect.TypeOf(args[0]))
+	fmt.Println("\n\n############## args\n", args)
 	historicMessagesArgs, ok := args[0].(map[string]interface{})
 	if !ok {
+		fmt.Println("FAIL in type\n\n")
 		return historicMessagesRequest{}, ErrInvalidArgs
 	}
 
