@@ -112,11 +112,10 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 			}
 		],
 		"id": 1}`)
-	postResp:=baseRPCResponse{}
+	postResp := baseRPCResponse{}
 	err = json.Unmarshal([]byte(resp), &postResp)
 	s.Require().NoError(err)
 	s.Require().Nil(postResp.Err)
-
 
 	//There are no messages, because it's a sender filter
 	resp = rpcClient.CallRaw(`{
@@ -131,7 +130,7 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	//act
 
 	//Request messages from mailbox
-	reqMessagesBody:=`{
+	reqMessagesBody := `{
 		"jsonrpc": "2.0",
 		"id": 1,
 		"method": "shh_requestMessages",
@@ -144,7 +143,7 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 		}]
 	}`
 	resp = rpcClient.CallRaw(reqMessagesBody)
-	reqMessagesResp:=baseRPCResponse{}
+	reqMessagesResp := baseRPCResponse{}
 	err = json.Unmarshal([]byte(resp), &reqMessagesResp)
 	s.Require().NoError(err)
 	s.Require().Nil(postResp.Err)
@@ -176,12 +175,11 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	s.Require().Equal(0, len(messages.Result))
 
 	//Request each one messages from mailbox, using same params
-	resp=rpcClient.CallRaw(reqMessagesBody)
-	reqMessagesResp=baseRPCResponse{}
+	resp = rpcClient.CallRaw(reqMessagesBody)
+	reqMessagesResp = baseRPCResponse{}
 	err = json.Unmarshal([]byte(resp), &reqMessagesResp)
 	s.Require().NoError(err)
 	s.Require().Nil(postResp.Err)
-
 
 	//wait to receive message
 	time.Sleep(time.Second)
@@ -200,7 +198,7 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	time.Sleep(time.Second)
 
 	//Request each one messages from mailbox using enode
-	resp=rpcClient.CallRaw(`{
+	resp = rpcClient.CallRaw(`{
 		"jsonrpc": "2.0",
 		"id": 2,
 		"method": "shh_requestMessages",
@@ -212,11 +210,10 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 					"to":` + strconv.FormatInt(time.Now().UnixNano(), 10) + `
 		}]
 	}`)
-	reqMessagesResp=baseRPCResponse{}
+	reqMessagesResp = baseRPCResponse{}
 	err = json.Unmarshal([]byte(resp), &reqMessagesResp)
 	s.Require().NoError(err)
 	s.Require().Nil(postResp.Err)
-
 
 	//wait to receive message
 	time.Sleep(time.Second)
