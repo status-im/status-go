@@ -11,7 +11,6 @@ import (
 	"github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/rpc"
-	"reflect"
 )
 
 var (
@@ -72,7 +71,6 @@ func RequestHistoricMessagesHandler(nodeManager common.NodeManager) rpc.Handler 
 
 type historicMessagesRequest struct {
 	Peer     []byte              //mailbox peer
-	Enode    string              //mailbox enode
 	TimeLow  uint32              //resend messages from
 	TimeUp   uint32              //resend messages to
 	Topic    whisperv5.TopicType //resend messages by topic
@@ -92,12 +90,8 @@ func parseArgs(args ...interface{}) (historicMessagesRequest, error) {
 		return historicMessagesRequest{}, ErrInvalidNumberOfArgs
 	}
 
-	fmt.Println("\n\n############## args[0]\n", args[0])
-	fmt.Println(reflect.TypeOf(args[0]))
-	fmt.Println("\n\n############## args\n", args)
 	historicMessagesArgs, ok := args[0].(map[string]interface{})
 	if !ok {
-		fmt.Println("FAIL in type\n\n")
 		return historicMessagesRequest{}, ErrInvalidArgs
 	}
 
@@ -134,26 +128,11 @@ func parseArgs(args ...interface{}) (historicMessagesRequest, error) {
 		return historicMessagesRequest{}, ErrMailboxSymkeyIDNotString
 	}
 
-	peerInterfaceValue, okPeer := historicMessagesArgs["peer"]
-	enodeInterfaceValue, okEnode := historicMessagesArgs["enode"]
-	if okPeer == okEnode { //only if existing peer or enode
-		return historicMessagesRequest{}, ErrPeerOrEnode
+	peer, err := getPeerID(historicMessagesArgs)
+	if err != nil {
+		return historicMessagesRequest{}, err
 	}
-	if p, ok := peerInterfaceValue.(string); ok && okPeer {
-		n, err := discover.ParseNode(p)
-		if err != nil {
-			return historicMessagesRequest{}, err
-		}
-		r.Peer = n.ID[:]
-	}
-
-	if str, ok := enodeInterfaceValue.(string); ok && okEnode {
-		r.Enode = str
-	}
-	if r.Enode != "" && len(r.Peer) > 0 {
-		return historicMessagesRequest{}, ErrPeerOrEnode
-	}
-
+	r.Peer = peer
 	return r, nil
 }
 
@@ -180,4 +159,28 @@ func makePayloadData(r historicMessagesRequest) []byte {
 	binary.BigEndian.PutUint32(data[4:], r.TimeUp)
 	copy(data[8:], r.Topic[:])
 	return data
+}
+
+//getPeerID is used to get peerID from string values of peerID or enode
+func getPeerID(m map[string]interface{}) ([]byte, error) {
+	peerInterfaceValue, okPeer := m["peer"]
+	enodeInterfaceValue, okEnode := m["enode"]
+
+	if okPeer == okEnode { //only if existing peer or enode(!xor)
+		return nil, ErrPeerOrEnode
+	}
+	var peerOrEnode string
+	if p, ok := peerInterfaceValue.(string); ok && okPeer {
+		peerOrEnode = p
+	} else if str, ok := enodeInterfaceValue.(string); ok && okEnode {
+		peerOrEnode = str
+	} else {
+		return nil, ErrPeerOrEnode
+	}
+
+	n, err := discover.ParseNode(peerOrEnode)
+	if err != nil {
+		return nil, err
+	}
+	return n.ID[:], nil
 }

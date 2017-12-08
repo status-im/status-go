@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"fmt"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p/discover"
@@ -48,7 +47,6 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	w, err := sender.NodeManager().WhisperService()
 	s.Require().NoError(err)
 
-	//Mark mailbox node trusted
 	//Mark mailbox node trusted
 	parsedNode, err := discover.ParseNode(mailboxNode.Server().NodeInfo().Enode)
 	s.Require().NoError(err)
@@ -155,9 +153,20 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	s.Require().NoError(err)
 	s.Require().Equal(1, len(messages.Result))
 
-	time.Sleep(time.Second)
-	//Request each one messages from mailbox
+	//check that there are no messages
 	resp = rpcClient.CallRaw(`{
+		"jsonrpc": "2.0",
+		"method": "shh_getFilterMessages",
+		"params": ["` + messageFilterID + `"],
+		"id": 1}`)
+
+	err = json.Unmarshal([]byte(resp), &messages)
+	//assert
+	s.Require().NoError(err)
+	s.Require().Equal(0, len(messages.Result))
+
+	//Request each one messages from mailbox, using same params
+	rpcClient.CallRaw(`{
 		"jsonrpc": "2.0",
 		"id": 2,
 		"method": "shh_requestMessages",
@@ -169,7 +178,36 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 					"to":` + strconv.FormatInt(time.Now().UnixNano(), 10) + `
 		}]
 	}`)
-	fmt.Println(resp)
+
+	//wait to receive message
+	time.Sleep(time.Second)
+	//And we receive message
+	resp = rpcClient.CallRaw(`{
+		"jsonrpc": "2.0",
+		"method": "shh_getFilterMessages",
+		"params": ["` + messageFilterID + `"],
+		"id": 1}`)
+
+	err = json.Unmarshal([]byte(resp), &messages)
+	//assert
+	s.Require().NoError(err)
+	s.Require().Equal(1, len(messages.Result))
+
+	time.Sleep(time.Second)
+
+	//Request each one messages from mailbox using enode
+	rpcClient.CallRaw(`{
+		"jsonrpc": "2.0",
+		"id": 2,
+		"method": "shh_requestMessages",
+		"params": [{
+					"enode":"` + mailboxEnode + `",
+					"topic":"` + topic.String() + `",
+					"symKeyID":"` + MailServerKeyID + `",
+					"from":0,
+					"to":` + strconv.FormatInt(time.Now().UnixNano(), 10) + `
+		}]
+	}`)
 
 	//wait to receive message
 	time.Sleep(time.Second)
