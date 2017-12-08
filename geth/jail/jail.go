@@ -80,18 +80,27 @@ func (j *Jail) Stop() {
 	j.cells = make(map[string]*Cell)
 }
 
-// createCell creates a new cell if it does not exists.
-func (j *Jail) createCell(chatID string) (*Cell, error) {
+// obtainCell returns an existing cell for given ID or
+// creates a new one if it does not exist.
+// Passing in true as a second argument will cause a non-nil error if the
+// cell already exists.
+func (j *Jail) obtainCell(chatID string, expectNew bool) (cell *Cell, err error) {
 	j.cellsMx.Lock()
 	defer j.cellsMx.Unlock()
 
-	if cell, ok := j.cells[chatID]; ok {
-		return cell, fmt.Errorf("cell with id '%s' already exists", chatID)
+	var ok bool
+
+	if cell, ok = j.cells[chatID]; ok {
+		// Return a non-nil error if a new cell was expected
+		if expectNew {
+			err = fmt.Errorf("cell with id '%s' already exists", chatID)
+		}
+		return
 	}
 
-	cell, err := NewCell(chatID)
+	cell, err = NewCell(chatID)
 	if err != nil {
-		return nil, err
+		return
 	}
 
 	j.cells[chatID] = cell
@@ -102,7 +111,7 @@ func (j *Jail) createCell(chatID string) (*Cell, error) {
 // CreateCell creates a new cell. It returns an error
 // if a cell with a given ID already exists.
 func (j *Jail) CreateCell(chatID string) (common.JailCell, error) {
-	return j.createCell(chatID)
+	return j.obtainCell(chatID, true)
 }
 
 // initCell initializes a cell with default JavaScript handlers and user code.
@@ -129,7 +138,7 @@ func (j *Jail) initCell(cell *Cell) error {
 
 // CreateAndInitCell creates and initializes a new Cell.
 func (j *Jail) createAndInitCell(chatID string, code ...string) (*Cell, error) {
-	cell, err := j.createCell(chatID)
+	cell, err := j.obtainCell(chatID, false)
 	if err != nil {
 		return nil, err
 	}
