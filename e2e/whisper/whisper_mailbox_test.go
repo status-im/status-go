@@ -139,7 +139,7 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 					"topic":"` + topic.String() + `",
 					"symKeyID":"` + MailServerKeyID + `",
 					"from":0,
-					"to":` + strconv.FormatInt(time.Now().UnixNano(), 10) + `
+					"to":` + strconv.FormatInt(time.Now().UnixNano()/int64(time.Second), 10) + `
 		}]
 	}`
 	resp = rpcClient.CallRaw(reqMessagesBody)
@@ -207,7 +207,7 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 					"topic":"` + topic.String() + `",
 					"symKeyID":"` + MailServerKeyID + `",
 					"from":0,
-					"to":` + strconv.FormatInt(time.Now().UnixNano(), 10) + `
+					"to":` + strconv.FormatInt(time.Now().UnixNano()/int64(time.Second), 10) + `
 		}]
 	}`)
 	reqMessagesResp = baseRPCResponse{}
