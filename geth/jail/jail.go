@@ -4,251 +4,314 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/common"
-	"github.com/status-im/status-go/geth/jail/internal/vm"
-	"github.com/status-im/status-go/geth/log"
+	"github.com/status-im/status-go/geth/rpc"
 	"github.com/status-im/status-go/static"
 )
 
-var (
-	// FIXME(tiabc): Get rid of this global variable. Move it to a constructor or initialization.
-	web3JSCode = static.MustAsset("scripts/web3.js")
-
-	//ErrInvalidJail - error jail init env
-	ErrInvalidJail = errors.New("jail environment is not properly initialized")
+const (
+	web3InstanceCode = `
+		var Web3 = require('web3');
+		var web3 = new Web3(jeth);
+		var Bignumber = require("bignumber.js");
+		function bn(val) {
+			return new Bignumber(val);
+		}
+	`
 )
 
-// Jail represents jailed environment inside of which we hold multiple cells.
-// Each cell is a separate JavaScript VM.
+var (
+	web3Code = string(static.MustAsset("scripts/web3.js"))
+	// ErrNoRPCClient is returned when an RPC client is required but it's nil.
+	ErrNoRPCClient = errors.New("RPC client is not available")
+)
+
+// RPCClientProvider is an interface that provides a way
+// to obtain an rpc.Client.
+type RPCClientProvider interface {
+	RPCClient() *rpc.Client
+}
+
+// Jail manages multiple JavaScript execution contexts (JavaScript VMs) called cells.
+// Each cell is a separate VM with web3.js set up.
+//
+// As rpc.Client might not be available during Jail initialization,
+// a provider function is used.
 type Jail struct {
-	nodeManager common.NodeManager
-	baseJSCode  string // JavaScript used to initialize all new cells with
-
-	cellsMx sync.RWMutex
-	cells   map[string]*Cell // jail supports running many isolated instances of jailed runtime
-
-	vm *vm.VM // vm for internal otto related tasks (see Send method)
+	rpcClientProvider RPCClientProvider
+	baseJS            string
+	cellsMx           sync.RWMutex
+	cells             map[string]*Cell
 }
 
-// New returns new Jail environment with the associated NodeManager.
-// It's caller responsibility to call jail.Stop() when jail is not needed.
-func New(nodeManager common.NodeManager) *Jail {
+// New returns a new Jail.
+func New(provider RPCClientProvider) *Jail {
+	return NewWithBaseJS(provider, "")
+}
+
+// NewWithBaseJS returns a new Jail with base JS configured.
+func NewWithBaseJS(provider RPCClientProvider, code string) *Jail {
 	return &Jail{
-		nodeManager: nodeManager,
-		cells:       make(map[string]*Cell),
-		vm:          vm.New(otto.New()),
+		rpcClientProvider: provider,
+		baseJS:            code,
+		cells:             make(map[string]*Cell),
 	}
 }
 
-// BaseJS allows to setup initial JavaScript to be loaded on each jail.Parse().
-func (jail *Jail) BaseJS(js string) {
-	jail.baseJSCode = js
+// SetBaseJS sets initial JavaScript code loaded to each new cell.
+func (j *Jail) SetBaseJS(js string) {
+	j.baseJS = js
 }
 
-// NewCell initializes and returns a new jail cell.
-func (jail *Jail) NewCell(chatID string) (common.JailCell, error) {
-	if jail == nil {
-		return nil, ErrInvalidJail
+// Stop stops jail and all assosiacted cells.
+func (j *Jail) Stop() {
+	j.cellsMx.Lock()
+	defer j.cellsMx.Unlock()
+
+	for _, cell := range j.cells {
+		cell.Stop() //nolint: errcheck
 	}
 
-	cellVM := otto.New()
+	// TODO(tiabc): Move this initialisation to a proper place.
+	j.cells = make(map[string]*Cell)
+}
 
-	cell, err := newCell(chatID, cellVM)
+// obtainCell returns an existing cell for given ID or
+// creates a new one if it does not exist.
+// Passing in true as a second argument will cause a non-nil error if the
+// cell already exists.
+func (j *Jail) obtainCell(chatID string, expectNew bool) (cell *Cell, err error) {
+	j.cellsMx.Lock()
+	defer j.cellsMx.Unlock()
+
+	var ok bool
+
+	if cell, ok = j.cells[chatID]; ok {
+		// Return a non-nil error if a new cell was expected
+		if expectNew {
+			err = fmt.Errorf("cell with id '%s' already exists", chatID)
+		}
+		return
+	}
+
+	cell, err = NewCell(chatID)
+	if err != nil {
+		return
+	}
+
+	j.cells[chatID] = cell
+
+	return cell, nil
+}
+
+// CreateCell creates a new cell. It returns an error
+// if a cell with a given ID already exists.
+func (j *Jail) CreateCell(chatID string) (common.JailCell, error) {
+	return j.obtainCell(chatID, true)
+}
+
+// initCell initializes a cell with default JavaScript handlers and user code.
+func (j *Jail) initCell(cell *Cell) error {
+	// Register objects being a bridge between Go and JavaScript.
+	if err := registerWeb3Provider(j, cell); err != nil {
+		return err
+	}
+
+	if err := registerStatusSignals(cell); err != nil {
+		return err
+	}
+
+	// Run some initial JS code to provide some global objects.
+	c := []string{
+		j.baseJS,
+		web3Code,
+		web3InstanceCode,
+	}
+
+	_, err := cell.Run(strings.Join(c, ";"))
+	return err
+}
+
+// CreateAndInitCell creates and initializes a new Cell.
+func (j *Jail) createAndInitCell(chatID string, code ...string) (*Cell, error) {
+	cell, err := j.obtainCell(chatID, false)
 	if err != nil {
 		return nil, err
 	}
 
-	jail.cellsMx.Lock()
-	jail.cells[chatID] = cell
-	jail.cellsMx.Unlock()
+	if err := j.initCell(cell); err != nil {
+		return nil, err
+	}
+
+	// Run custom user code
+	for _, js := range code {
+		_, err := cell.Run(js)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	return cell, nil
 }
 
-// Stop stops jail and all assosiacted cells.
-func (jail *Jail) Stop() {
-	jail.cellsMx.Lock()
-	defer jail.cellsMx.Unlock()
-
-	for _, cell := range jail.cells {
-		cell.Stop()
-	}
-	// TODO(tiabc): Move this initialisation to a proper place.
-	jail.cells = make(map[string]*Cell)
-}
-
-// Cell returns the existing instance of Cell.
-func (jail *Jail) Cell(chatID string) (common.JailCell, error) {
-	jail.cellsMx.RLock()
-	defer jail.cellsMx.RUnlock()
-
-	cell, ok := jail.cells[chatID]
-	if !ok {
-		return nil, fmt.Errorf("cell[%s] doesn't exist", chatID)
+// CreateAndInitCell creates and initializes new Cell. Additionally,
+// it creates a `catalog` variable in the VM.
+// It returns the response as a JSON string.
+func (j *Jail) CreateAndInitCell(chatID string, code ...string) string {
+	cell, err := j.createAndInitCell(chatID, code...)
+	if err != nil {
+		return newJailErrorResponse(err)
 	}
 
-	return cell, nil
+	return j.makeCatalogVariable(cell)
 }
 
 // Parse creates a new jail cell context, with the given chatID as identifier.
 // New context executes provided JavaScript code, right after the initialization.
-func (jail *Jail) Parse(chatID, js string) string {
-	if jail == nil {
-		return makeError(ErrInvalidJail.Error())
-	}
-
-	cell, err := jail.Cell(chatID)
+// DEPRECATED in favour of CreateAndInitCell.
+func (j *Jail) Parse(chatID, code string) string {
+	cell, err := j.cell(chatID)
 	if err != nil {
-		if _, mkerr := jail.NewCell(chatID); mkerr != nil {
-			return makeError(mkerr.Error())
-		}
-
-		cell, _ = jail.Cell(chatID)
-	}
-
-	// init jeth and its handlers
-	if err = cell.Set("jeth", struct{}{}); err != nil {
-		return makeError(err.Error())
-	}
-
-	if err = registerHandlers(jail, cell, chatID); err != nil {
-		return makeError(err.Error())
-	}
-
-	initJs := jail.baseJSCode + ";"
-	if _, err = cell.Run(initJs); err != nil {
-		return makeError(err.Error())
-	}
-
-	jjs := string(web3JSCode) + `
-	var Web3 = require('web3');
-	var web3 = new Web3(jeth);
-	var Bignumber = require("bignumber.js");
-        function bn(val){
-            return new Bignumber(val);
-        }
-	` + js + "; var catalog = JSON.stringify(_status_catalog);"
-	if _, err = cell.Run(jjs); err != nil {
-		return makeError(err.Error())
-	}
-
-	res, err := cell.Get("catalog")
-	if err != nil {
-		return makeError(err.Error())
-	}
-
-	return makeResult(res.String(), err)
-}
-
-// Call executes the `call` function w/i a jail cell context identified by the chatID.
-func (jail *Jail) Call(chatID, this, args string) string {
-	cell, err := jail.Cell(chatID)
-	if err != nil {
-		return makeError(err.Error())
-	}
-
-	res, err := cell.Call("call", nil, this, args)
-
-	return makeResult(res.String(), err)
-}
-
-// Send is a wrapper for executing RPC calls from within Otto VM.
-// It uses own jail's VM instance instead of cell's one to
-// increase safety of cell's vm usage.
-// TODO(divan): investigate if it's possible to do conversions
-// withouth involving otto code at all.
-// nolint: errcheck, unparam
-func (jail *Jail) Send(call otto.FunctionCall) otto.Value {
-	request, err := jail.vm.Call("JSON.stringify", nil, call.Argument(0))
-	if err != nil {
-		throwJSException(err)
-	}
-
-	rpc := jail.nodeManager.RPCClient()
-	// TODO(divan): remove this check as soon as jail cells have
-	// proper cancellation mechanism implemented.
-	if rpc == nil {
-		throwJSException(fmt.Errorf("Error getting RPC client. Node stopped?"))
-	}
-	response := rpc.CallRaw(request.String())
-
-	// unmarshal response to pass to otto
-	var resp interface{}
-	err = json.Unmarshal([]byte(response), &resp)
-	if err != nil {
-		throwJSException(fmt.Errorf("Error unmarshalling result: %s", err))
-	}
-	respValue, err := jail.vm.ToValue(resp)
-	if err != nil {
-		throwJSException(fmt.Errorf("Error converting result to Otto's value: %s", err))
-	}
-
-	return respValue
-}
-
-func newErrorResponse(msg string, id interface{}) map[string]interface{} {
-	// Bundle the error into a JSON RPC call response
-	return map[string]interface{}{
-		"jsonrpc": "2.0",
-		"id":      id,
-		"error": map[string]interface{}{
-			"code":    -32603, // Internal JSON-RPC Error, see http://www.jsonrpc.org/specification#error_object
-			"message": msg,
-		},
-	}
-}
-
-func newErrorResponseOtto(vm *vm.VM, msg string, id interface{}) otto.Value {
-	// TODO(tiabc): Handle errors.
-	errResp, _ := json.Marshal(newErrorResponse(msg, id))
-	errRespVal, _ := vm.Run("(" + string(errResp) + ")")
-	return errRespVal
-}
-
-func newResultResponse(vm *otto.Otto, result interface{}) otto.Value {
-	resp, _ := vm.Object(`({"jsonrpc":"2.0"})`)
-	resp.Set("result", result) // nolint: errcheck
-
-	return resp.Value()
-}
-
-// throwJSException panics on an otto.Value. The Otto VM will recover from the
-// Go panic and throw msg as a JavaScript error.
-// nolint: unparam
-func throwJSException(msg error) otto.Value {
-	val, err := otto.ToValue(msg.Error())
-	if err != nil {
-		log.Error(fmt.Sprintf("Failed to serialize JavaScript exception %v: %v", msg.Error(), err))
-	}
-	panic(val)
-}
-
-// JSONError is wrapper around errors, that are sent upwards
-type JSONError struct {
-	Error string `json:"error"`
-}
-
-func makeError(error string) string {
-	str := JSONError{
-		Error: error,
-	}
-	outBytes, _ := json.Marshal(&str)
-	return string(outBytes)
-}
-
-func makeResult(res string, err error) string {
-	var out string
-	if err != nil {
-		out = makeError(err.Error())
+		// cell does not exist, so create and init it
+		cell, err = j.createAndInitCell(chatID, code)
 	} else {
-		if "undefined" == res {
-			res = "null"
-		}
-		out = fmt.Sprintf(`{"result": %s}`, res)
+		// cell already exists, so just reinit it
+		err = j.initCell(cell)
 	}
 
-	return out
+	if err != nil {
+		return newJailErrorResponse(err)
+	}
+
+	if _, err = cell.Run(code); err != nil {
+		return newJailErrorResponse(err)
+	}
+
+	return j.makeCatalogVariable(cell)
+}
+
+// makeCatalogVariable provides `catalog` as a global variable.
+// TODO(divan): this can and should be implemented outside of jail,
+// on a clojure side. Moving this into separate method to nuke it later
+// easier.
+func (j *Jail) makeCatalogVariable(cell *Cell) string {
+	_, err := cell.Run(`var catalog = JSON.stringify(_status_catalog)`)
+	if err != nil {
+		return newJailErrorResponse(err)
+	}
+
+	value, err := cell.Get("catalog")
+	if err != nil {
+		return newJailErrorResponse(err)
+	}
+
+	return newJailResultResponse(value)
+}
+
+func (j *Jail) cell(chatID string) (*Cell, error) {
+	j.cellsMx.RLock()
+	defer j.cellsMx.RUnlock()
+
+	cell, ok := j.cells[chatID]
+	if !ok {
+		return nil, fmt.Errorf("cell '%s' not found", chatID)
+	}
+
+	return cell, nil
+}
+
+// Cell returns a cell by chatID. If it does not exist, error is returned.
+// Required by the Backend.
+func (j *Jail) Cell(chatID string) (common.JailCell, error) {
+	return j.cell(chatID)
+}
+
+// Execute allows to run arbitrary JS code within a cell.
+func (j *Jail) Execute(chatID, code string) string {
+	cell, err := j.cell(chatID)
+	if err != nil {
+		return newJailErrorResponse(err)
+	}
+
+	value, err := cell.Run(code)
+	if err != nil {
+		return newJailErrorResponse(err)
+	}
+
+	return value.String()
+}
+
+// Call executes the `call` function within a cell with chatID.
+// Returns a string being a valid JS code. In case of a successful result,
+// it's {"result": any}. In case of an error: {"error": "some error"}.
+//
+// Call calls commands from `_status_catalog`.
+// commandPath is an array of properties to retrieve a function.
+// For instance:
+//   `["prop1", "prop2"]` is translated to `_status_catalog["prop1"]["prop2"]`.
+func (j *Jail) Call(chatID, commandPath, args string) string {
+	cell, err := j.cell(chatID)
+	if err != nil {
+		return newJailErrorResponse(err)
+	}
+
+	value, err := cell.Call("call", nil, commandPath, args)
+	if err != nil {
+		return newJailErrorResponse(err)
+	}
+
+	return newJailResultResponse(value)
+}
+
+// RPCClient returns an rpc.Client.
+func (j *Jail) RPCClient() *rpc.Client {
+	if j.rpcClientProvider == nil {
+		return nil
+	}
+
+	return j.rpcClientProvider.RPCClient()
+}
+
+// sendRPCCall executes a raw JSON-RPC request.
+func (j *Jail) sendRPCCall(request string) (interface{}, error) {
+	client := j.RPCClient()
+	if client == nil {
+		return nil, ErrNoRPCClient
+	}
+
+	rawResponse := client.CallRaw(request)
+
+	var response interface{}
+	if err := json.Unmarshal([]byte(rawResponse), &response); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal response: %s", err)
+	}
+
+	return response, nil
+}
+
+// newJailErrorResponse returns an error.
+func newJailErrorResponse(err error) string {
+	response := struct {
+		Error string `json:"error"`
+	}{
+		Error: err.Error(),
+	}
+
+	rawResponse, err := json.Marshal(response)
+	if err != nil {
+		return `{"error": "` + err.Error() + `"}`
+	}
+
+	return string(rawResponse)
+}
+
+// newJailResultResponse returns a string that is a valid JavaScript code.
+// Marshaling is not required as result.String() produces a string
+// that is a valid JavaScript code.
+func newJailResultResponse(result otto.Value) string {
+	return `{"result": ` + result.String() + `}`
 }

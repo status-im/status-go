@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/status-im/status-go/cmd/statusd/debug"
 	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/params"
 )
@@ -27,6 +28,8 @@ var (
 	httpEnabled    = flag.Bool("http", false, "HTTP RPC endpoint enabled (default: false)")
 	httpPort       = flag.Int("httpport", params.HTTPPort, "HTTP RPC server's listening port")
 	ipcEnabled     = flag.Bool("ipc", false, "IPC RPC endpoint enabled")
+	cliEnabled     = flag.Bool("cli", false, "Enable debugging CLI server")
+	cliPort        = flag.String("cliport", debug.CLIPort, "CLI server's listening port")
 	logLevel       = flag.String("log", "INFO", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
 	logFile        = flag.String("logfile", "", "Path to the log file")
 	version        = flag.Bool("version", false, "Print version")
@@ -57,6 +60,15 @@ func main() {
 	// wait till node is started
 	<-started
 
+	// Check if debugging CLI connection shall be enabled.
+	if *cliEnabled {
+		err := startDebug(backend)
+		if err != nil {
+			log.Fatalf("Starting debugging CLI server failed: %v", err)
+			return
+		}
+	}
+
 	// wait till node has been stopped
 	node, err := backend.NodeManager().Node()
 	if err != nil {
@@ -65,6 +77,13 @@ func main() {
 	}
 
 	node.Wait()
+}
+
+// startDebug starts the debugging API server.
+func startDebug(backend *api.StatusBackend) error {
+	statusAPI := api.NewStatusAPIWithBackend(backend)
+	_, err := debug.New(statusAPI, *cliPort)
+	return err
 }
 
 // makeNodeConfig parses incoming CLI options and returns node configuration object
@@ -135,6 +154,7 @@ Examples:
   statusd -networkid 4  # run node on Rinkeby network
   statusd -datadir /dir # specify different dir for data
   statusd -ipc          # enable IPC for usage with "geth attach"
+  statusd -cli          # enable connection by statusd-cli on default port
 
 Options:
 `)

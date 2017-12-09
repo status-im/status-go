@@ -1,3 +1,12 @@
+// +build e2e_test
+
+// This is a file with e2e tests for C bindings written in library.go.
+// As a CGO file, it can't have `_test.go` suffix as it's not allowed by Go.
+// At the same time, we don't want this file to be included in the binaries.
+// This is why `e2e_test` tag was introduced. Without it, this file is excluded
+// from the build. Providing this tag will include this file into the build
+// and that's what is done while running e2e tests for `lib/` package.
+
 package main
 
 import "C"
@@ -11,6 +20,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -31,21 +41,41 @@ import (
 
 const zeroHash = "0x0000000000000000000000000000000000000000000000000000000000000000"
 
-var nodeConfigJSON = `{
-	"NetworkId": ` + strconv.Itoa(params.StatusChainNetworkID) + `,
-	"DataDir": "` + TestDataDir + `",
+var testChainDir string
+var nodeConfigJSON string
+
+func init() {
+	testChainDir = filepath.Join(TestDataDir, TestNetworkNames[GetNetworkID()])
+
+	nodeConfigJSON = `{
+	"NetworkId": ` + strconv.Itoa(GetNetworkID()) + `,
+	"DataDir": "` + testChainDir + `",
 	"HTTPPort": ` + strconv.Itoa(TestConfig.Node.HTTPPort) + `,
 	"WSPort": ` + strconv.Itoa(TestConfig.Node.WSPort) + `,
 	"LogLevel": "INFO"
 }`
+}
 
 // nolint: deadcode
 func testExportedAPI(t *testing.T, done chan struct{}) {
 	<-startTestNode(t)
+	defer func() {
+		done <- struct{}{}
+	}()
+
+	// prepare accounts
+	testKeyDir := filepath.Join(testChainDir, "keystore")
+	if err := common.ImportTestAccount(testKeyDir, GetAccount1PKFile()); err != nil {
+		panic(err)
+	}
+	if err := common.ImportTestAccount(testKeyDir, GetAccount2PKFile()); err != nil {
+		panic(err)
+	}
 
 	// FIXME(tiabc): All of that is done because usage of cgo is not supported in tests.
 	// Probably, there should be a cleaner way, for example, test cgo bindings in e2e tests
 	// separately from other internal tests.
+	// FIXME(@jekamas): ATTENTION! this tests depends on each other!
 	tests := []struct {
 		name string
 		fn   func(t *testing.T) bool
@@ -114,16 +144,23 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 			"test jailed calls",
 			testJailFunctionCall,
 		},
+		{
+			"test ExecuteJS",
+			testExecuteJS,
+		},
+		{
+			"test deprecated Parse",
+			testJailParseDeprecated,
+		},
 	}
 
 	for _, test := range tests {
 		t.Logf("=== RUN   %s", test.name)
 		if ok := test.fn(t); !ok {
+			t.Logf("=== FAILED   %s", test.name)
 			break
 		}
 	}
-
-	done <- struct{}{}
 }
 
 func testVerifyAccountPassword(t *testing.T) bool {
@@ -133,15 +170,15 @@ func testVerifyAccountPassword(t *testing.T) bool {
 	}
 	defer os.RemoveAll(tmpDir) // nolint: errcheck
 
-	if err = common.ImportTestAccount(tmpDir, "test-account1.pk"); err != nil {
+	if err = common.ImportTestAccount(tmpDir, GetAccount1PKFile()); err != nil {
 		t.Fatal(err)
 	}
-	if err = common.ImportTestAccount(tmpDir, "test-account2.pk"); err != nil {
+	if err = common.ImportTestAccount(tmpDir, GetAccount2PKFile()); err != nil {
 		t.Fatal(err)
 	}
 
 	// rename account file (to see that file's internals reviewed, when locating account key)
-	accountFilePathOriginal := filepath.Join(tmpDir, "test-account1.pk")
+	accountFilePathOriginal := filepath.Join(tmpDir, GetAccount1PKFile())
 	accountFilePath := filepath.Join(tmpDir, "foo"+TestConfig.Account1.Address+"bar.pk")
 	if err := os.Rename(accountFilePathOriginal, accountFilePath); err != nil {
 		t.Fatal(err)
@@ -735,7 +772,7 @@ func testCompleteTransaction(t *testing.T) bool {
 
 	// log into account from which transactions will be sent
 	if err := statusAPI.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password); err != nil {
-		t.Errorf("cannot select account: %v", TestConfig.Account1.Address)
+		t.Errorf("cannot select account: %v. Error %q", TestConfig.Account1.Address, err)
 		return false
 	}
 
@@ -749,7 +786,7 @@ func testCompleteTransaction(t *testing.T) bool {
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var envelope signal.Envelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
-			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
+			t.Errorf("cannot unmarshal event's JSON: %s. Error %q", jsonEvent, err)
 			return
 		}
 		if envelope.Type == txqueue.EventTransactionQueued {
@@ -1231,12 +1268,12 @@ func testJailInitInvalid(t *testing.T) bool {
 
 	// Act.
 	InitJail(C.CString(initInvalidCode))
-	response := C.GoString(Parse(C.CString("CHAT_ID_INIT_TEST"), C.CString(``)))
+	response := C.GoString(CreateAndInitCell(C.CString("CHAT_ID_INIT_INVALID_TEST"), C.CString(``)))
 
 	// Assert.
-	expectedResponse := `{"error":"(anonymous): Line 4:3 Unexpected end of input (and 3 more errors)"}`
-	if expectedResponse != response {
-		t.Errorf("unexpected response, expected: %v, got: %v", expectedResponse, response)
+	expectedSubstr := `"error":"(anonymous): Line 4:3 Unexpected identifier`
+	if !strings.Contains(response, expectedSubstr) {
+		t.Errorf("unexpected response, didn't find '%s' in '%s'", expectedSubstr, response)
 		return false
 	}
 	return true
@@ -1256,11 +1293,10 @@ func testJailParseInvalid(t *testing.T) bool {
 	var extraFunc = function (x) {
 	  return x * x;
 	`
-	response := C.GoString(Parse(C.CString("CHAT_ID_INIT_TEST"), C.CString(extraInvalidCode)))
+	response := C.GoString(CreateAndInitCell(C.CString("CHAT_ID_PARSE_INVALID_TEST"), C.CString(extraInvalidCode)))
 
 	// Assert.
-	// expectedResponse := `{"error":"(anonymous): Line 16331:50 Unexpected end of input (and 1 more errors)"}`
-	expectedResponse := `{"error":"(anonymous): Line 16354:50 Unexpected end of input (and 1 more errors)"}`
+	expectedResponse := `{"error":"(anonymous): Line 4:2 Unexpected end of input (and 1 more errors)"}`
 	if expectedResponse != response {
 		t.Errorf("unexpected response, expected: %v, got: %v", expectedResponse, response)
 		return false
@@ -1281,17 +1317,59 @@ func testJailInit(t *testing.T) bool {
 	  return x * x;
 	};
 	`
-	rawResponse := Parse(C.CString("CHAT_ID_INIT_TEST"), C.CString(extraCode))
+	rawResponse := CreateAndInitCell(C.CString("CHAT_ID_INIT_TEST"), C.CString(extraCode))
 	parsedResponse := C.GoString(rawResponse)
 
 	expectedResponse := `{"result": {"foo":"bar"}}`
 
 	if !reflect.DeepEqual(expectedResponse, parsedResponse) {
-		t.Error("expected output not returned from jail.Parse()")
+		t.Error("expected output not returned from jail.CreateAndInitCell()")
 		return false
 	}
 
 	t.Logf("jail inited and parsed: %s", parsedResponse)
+
+	return true
+}
+
+func testJailParseDeprecated(t *testing.T) bool {
+	initCode := `
+		var _status_catalog = {
+			foo: 'bar'
+		};
+	`
+	InitJail(C.CString(initCode))
+
+	extraCode := `
+		var extraFunc = function (x) {
+			return x * x;
+		};
+	`
+	rawResponse := Parse(C.CString("CHAT_ID_PARSE_TEST"), C.CString(extraCode))
+	parsedResponse := C.GoString(rawResponse)
+	expectedResponse := `{"result": {"foo":"bar"}}`
+	if !reflect.DeepEqual(expectedResponse, parsedResponse) {
+		t.Error("expected output not returned from Parse()")
+		return false
+	}
+
+	// cell already exists but Parse should not complain
+	rawResponse = Parse(C.CString("CHAT_ID_PARSE_TEST"), C.CString(extraCode))
+	parsedResponse = C.GoString(rawResponse)
+	expectedResponse = `{"result": {"foo":"bar"}}`
+	if !reflect.DeepEqual(expectedResponse, parsedResponse) {
+		t.Error("expected output not returned from Parse()")
+		return false
+	}
+
+	// test extraCode
+	rawResponse = ExecuteJS(C.CString("CHAT_ID_PARSE_TEST"), C.CString(`extraFunc(2)`))
+	parsedResponse = C.GoString(rawResponse)
+	expectedResponse = `4`
+	if !reflect.DeepEqual(expectedResponse, parsedResponse) {
+		t.Error("expected output not returned from ExecuteJS()")
+		return false
+	}
 
 	return true
 }
@@ -1304,12 +1382,12 @@ func testJailFunctionCall(t *testing.T) bool {
 	_status_catalog.commands["testCommand"] = function (params) {
 		return params.val * params.val;
 	};`
-	Parse(C.CString("CHAT_ID_CALL_TEST"), C.CString(statusJS))
+	CreateAndInitCell(C.CString("CHAT_ID_CALL_TEST"), C.CString(statusJS))
 
 	// call with wrong chat id
 	rawResponse := Call(C.CString("CHAT_IDNON_EXISTENT"), C.CString(""), C.CString(""))
 	parsedResponse := C.GoString(rawResponse)
-	expectedError := `{"error":"cell[CHAT_IDNON_EXISTENT] doesn't exist"}`
+	expectedError := `{"error":"cell 'CHAT_IDNON_EXISTENT' not found"}`
 	if parsedResponse != expectedError {
 		t.Errorf("expected error is not returned: expected %s, got %s", expectedError, parsedResponse)
 		return false
@@ -1329,17 +1407,44 @@ func testJailFunctionCall(t *testing.T) bool {
 	return true
 }
 
+func testExecuteJS(t *testing.T) bool {
+	InitJail(C.CString(""))
+
+	// cell does not exist
+	response := C.GoString(ExecuteJS(C.CString("CHAT_ID_EXECUTE_TEST"), C.CString("('some string')")))
+	expectedResponse := `{"error":"cell 'CHAT_ID_EXECUTE_TEST' not found"}`
+	if response != expectedResponse {
+		t.Errorf("expected '%s' but got '%s'", expectedResponse, response)
+		return false
+	}
+
+	CreateAndInitCell(C.CString("CHAT_ID_EXECUTE_TEST"), C.CString(`var obj = { status: true }`))
+
+	// cell does not exist
+	response = C.GoString(ExecuteJS(C.CString("CHAT_ID_EXECUTE_TEST"), C.CString(`JSON.stringify(obj)`)))
+	expectedResponse = `{"status":true}`
+	if response != expectedResponse {
+		t.Errorf("expected '%s' but got '%s'", expectedResponse, response)
+		return false
+	}
+
+	return true
+}
+
 func startTestNode(t *testing.T) <-chan struct{} {
+	testDir := filepath.Join(TestDataDir, TestNetworkNames[GetNetworkID()])
+
 	syncRequired := false
-	if _, err := os.Stat(TestDataDir); os.IsNotExist(err) {
+	if _, err := os.Stat(testDir); os.IsNotExist(err) {
 		syncRequired = true
 	}
 
 	// inject test accounts
-	if err := common.ImportTestAccount(filepath.Join(TestDataDir, "keystore"), "test-account1.pk"); err != nil {
+	testKeyDir := filepath.Join(testDir, "keystore")
+	if err := common.ImportTestAccount(testKeyDir, GetAccount1PKFile()); err != nil {
 		panic(err)
 	}
-	if err := common.ImportTestAccount(filepath.Join(TestDataDir, "keystore"), "test-account2.pk"); err != nil {
+	if err := common.ImportTestAccount(testKeyDir, GetAccount2PKFile()); err != nil {
 		panic(err)
 	}
 

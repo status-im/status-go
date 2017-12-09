@@ -45,16 +45,24 @@ func init() {
 		panic(err)
 	}
 
+	flag.Parse()
+
 	// setup root directory
+	const pathSeparator = string(os.PathSeparator)
 	RootDir = filepath.Dir(pwd)
-	if strings.HasSuffix(RootDir, "geth") || strings.HasSuffix(RootDir, "cmd") { // we need to hop one more level
-		RootDir = filepath.Join(RootDir, "..")
+	pathDirs := strings.Split(RootDir, pathSeparator)
+	for i := range pathDirs {
+		if pathDirs[i] == "status-go" {
+			RootDir = filepath.Join(pathDirs[:i+1]...)
+			RootDir = filepath.Join(pathSeparator, RootDir)
+			break
+		}
 	}
 
 	// setup auxiliary directories
 	TestDataDir = filepath.Join(RootDir, ".ethereumtest")
 
-	TestConfig, err = common.LoadTestConfig()
+	TestConfig, err = common.LoadTestConfig(GetNetworkID())
 	if err != nil {
 		panic(err)
 	}
@@ -95,15 +103,16 @@ func EnsureNodeSync(nodeManager common.NodeManager) {
 		panic("LightEthereumService is nil")
 	}
 
-	timeouter := time.NewTimer(20 * time.Minute)
-	defer timeouter.Stop()
+	// todo(@jeka): we should extract it into config
+	timeout := time.NewTimer(50 * time.Minute)
+	defer timeout.Stop()
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
 	for {
 		select {
-		case <-timeouter.C:
-			panic("timout during node synchronization")
+		case <-timeout.C:
+			panic("timeout during node synchronization")
 		case <-ticker.C:
 			downloader := les.Downloader()
 
@@ -119,7 +128,7 @@ func EnsureNodeSync(nodeManager common.NodeManager) {
 	}
 }
 
-// GetRemoteURLFromNetworkID returns asociated network url for giving network id.
+// GetRemoteURLFromNetworkID returns associated network url for giving network id.
 func GetRemoteURLFromNetworkID(id int) (url string, err error) {
 	switch id {
 	case params.MainNetworkID:
@@ -128,9 +137,10 @@ func GetRemoteURLFromNetworkID(id int) (url string, err error) {
 		url = params.RinkebyEthereumNetworkURL
 	case params.RopstenNetworkID:
 		url = params.RopstenEthereumNetworkURL
+	default:
+		err = ErrNoRemoteURL
 	}
 
-	err = ErrNoRemoteURL
 	return
 }
 
@@ -142,7 +152,7 @@ func GetHeadHashFromNetworkID(id int) string {
 	case params.RopstenNetworkID:
 		return "0x41941023680923e0fe4d74a34bdac8141f2540e3ae90623718e47d66d1ca4a2d"
 	case params.StatusChainNetworkID:
-		return "0x28c4da1cca48d0107ea5ea29a40ac15fca86899c52d02309fa12ea39b86d219c"
+		return "0xe9d8920a99dc66a9557a87d51f9d14a34ec50aae04298e0f142187427d3c832e"
 	}
 
 	return ""
@@ -171,4 +181,26 @@ func GetNetworkID() int {
 	}
 
 	return params.StatusChainNetworkID
+}
+
+// GetAccount1PKFile returns the filename for Account1 keystore based
+// on the current network. This allows running the e2e tests on the
+// private network w/o access to the ACCOUNT_PASSWORD env variable
+func GetAccount1PKFile() string {
+	if GetNetworkID() == params.StatusChainNetworkID {
+		return "test-account1-status-chain.pk"
+	} else {
+		return "test-account1.pk"
+	}
+}
+
+// GetAccount2PKFile returns the filename for Account2 keystore based
+// on the current network. This allows running the e2e tests on the
+// private network w/o access to the ACCOUNT_PASSWORD env variable
+func GetAccount2PKFile() string {
+	if GetNetworkID() == params.StatusChainNetworkID {
+		return "test-account2-status-chain.pk"
+	} else {
+		return "test-account2.pk"
+	}
 }
