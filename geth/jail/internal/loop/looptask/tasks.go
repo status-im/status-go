@@ -121,9 +121,9 @@ func (c CallTask) Execute(vm *vm.VM, l *loop.Loop) error {
 	// FunctionCall in CallTask likely does use it,
 	// so we must to guard it here
 	vm.Lock()
-	defer vm.Unlock()
-
 	v, err := c.Function.Call(otto.NullValue(), c.Args...)
+	vm.Unlock()
+
 	c.Value <- v
 	c.Error <- err
 

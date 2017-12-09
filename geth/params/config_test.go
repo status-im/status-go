@@ -2,6 +2,7 @@ package params_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -13,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	gethparams "github.com/ethereum/go-ethereum/params"
 	"github.com/status-im/status-go/geth/params"
-	. "github.com/status-im/status-go/testing"
 	"github.com/stretchr/testify/require"
 )
 
@@ -429,34 +429,21 @@ func TestLoadNodeConfig(t *testing.T) {
 }
 
 func TestConfigWriteRead(t *testing.T) {
-	configReadWrite := func(networkId uint64, refFile string) {
-		tmpDir, err := ioutil.TempDir(os.TempDir(), "geth-config-tests")
-		require.Nil(t, err)
-		defer os.RemoveAll(tmpDir) // nolint: errcheck
+	tmpDir, err := ioutil.TempDir(os.TempDir(), "geth-config-tests")
+	require.Nil(t, err)
+	defer os.RemoveAll(tmpDir) // nolint: errcheck
 
-		nodeConfig, err := params.NewNodeConfig(tmpDir, networkId, true)
-		require.Nil(t, err, "cannot create new config object")
+	nodeConfig, err := params.NewNodeConfig(tmpDir, params.RopstenNetworkID, true)
+	require.Nil(t, err, "cannot create new config object")
 
-		err = nodeConfig.Save()
-		require.Nil(t, err, "cannot persist configuration")
+	err = nodeConfig.Save()
+	require.Nil(t, err, "cannot persist configuration")
 
-		loadedConfigData, err := ioutil.ReadFile(filepath.Join(nodeConfig.DataDir, "config.json"))
-		require.Nil(t, err, "cannot read configuration from disk")
-
-		refConfigData := LoadFromFile(refFile)
-
-		// Ease updating new config data.
-		//ioutil.WriteFile(fmt.Sprintf("/tmp/chainId.%d.json", networkId), []byte(loadedConfigData), 0777)
-
-		refConfigData = strings.Replace(refConfigData, "$TMPDIR", nodeConfig.DataDir, -1)
-		refConfigData = strings.Replace(refConfigData, "$VERSION", params.Version, -1)
-
-		require.Equal(t, strings.TrimSpace(string(refConfigData[:])), strings.TrimSpace(string(loadedConfigData[:])))
-	}
-
-	configReadWrite(params.RinkebyNetworkID, "testdata/config.rinkeby.json")
-	configReadWrite(params.RopstenNetworkID, "testdata/config.ropsten.json")
-	configReadWrite(params.MainNetworkID, "testdata/config.mainnet.json")
+	loadedConfigData, err := ioutil.ReadFile(filepath.Join(nodeConfig.DataDir, "config.json"))
+	require.Nil(t, err, "cannot read configuration from disk")
+	require.Contains(t, string(loadedConfigData), fmt.Sprintf(`"DevMode": %t`, true))
+	require.Contains(t, string(loadedConfigData), fmt.Sprintf(`"NetworkId": %d`, params.RopstenNetworkID))
+	require.Contains(t, string(loadedConfigData), fmt.Sprintf(`"DataDir": "%s"`, tmpDir))
 }
 
 // TestNodeConfigValidate checks validation of individual fields.

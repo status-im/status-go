@@ -69,7 +69,7 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 
 	m.initLog(config)
 
-	ethNode, err := MakeNode(config)
+	ethNode, err := MakeNode(config, LogDeliveryService{})
 	if err != nil {
 		return nil, err
 	}
@@ -100,9 +100,14 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 		m.config = config
 
 		// init RPC client for this node
-		m.rpcClient, err = rpc.NewClient(m.node, m.config.UpstreamConfig)
-		if err != nil {
-			log.Error("Init RPC client failed:", "error", err)
+		localRPCClient, errRPC := m.node.Attach()
+		if errRPC == nil {
+			m.rpcClient, errRPC = rpc.NewClient(localRPCClient, m.config.UpstreamConfig)
+		}
+
+		if errRPC != nil {
+			log.Error("Failed to create an RPC client", "error", errRPC)
+
 			m.Unlock()
 			signal.Send(signal.Envelope{
 				Type: signal.EventNodeCrashed,
@@ -112,6 +117,7 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 			})
 			return
 		}
+
 		m.Unlock()
 
 		// underlying node is started, every method can use it, we use it immediately

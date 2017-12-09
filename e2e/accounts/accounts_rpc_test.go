@@ -40,9 +40,6 @@ func (s *AccountsTestSuite) TestRPCEthAccounts() {
 }
 
 func (s *AccountsTestSuite) TestRPCEthAccountsWithUpstream() {
-	// FIXME(tiabc): Stop skipping after https://github.com/status-im/status-go/issues/424
-	s.T().Skip()
-
 	if GetNetworkID() == params.StatusChainNetworkID {
 		s.T().Skip()
 	}

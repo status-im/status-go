@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/robertkrimen/otto"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/geth/jail/internal/loop"
@@ -85,8 +84,7 @@ type PromiseSuite struct {
 }
 
 func (s *PromiseSuite) SetupTest() {
-	o := otto.New()
-	s.vm = vm.New(o)
+	s.vm = vm.New()
 	s.loop = loop.New(s.vm)
 
 	go s.loop.Run(context.Background()) //nolint: errcheck

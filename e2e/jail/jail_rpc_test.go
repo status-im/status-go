@@ -42,8 +42,8 @@ func (s *JailRPCTestSuite) TestJailRPCSend() {
 	EnsureNodeSync(s.Backend.NodeManager())
 
 	// load Status JS and add test command to it
-	s.jail.BaseJS(baseStatusJSCode)
-	s.jail.Parse(testChatID, ``)
+	s.jail.SetBaseJS(baseStatusJSCode)
+	s.jail.CreateAndInitCell(testChatID)
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
 	cell, err := s.jail.Cell(testChatID)
@@ -65,14 +65,14 @@ func (s *JailRPCTestSuite) TestJailRPCSend() {
 	s.NoError(err)
 
 	s.T().Logf("Balance of %.2f ETH found on '%s' account", balance, TestConfig.Account1.Address)
-	s.False(balance < 100, "wrong balance (there should be lots of test Ether on that account)")
+	s.False(balance < 1, "wrong balance (there should be lots of test Ether on that account)")
 }
 
 func (s *JailRPCTestSuite) TestIsConnected() {
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
-	s.jail.Parse(testChatID, "")
+	s.jail.CreateAndInitCell(testChatID)
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
 	cell, err := s.jail.Cell(testChatID)
@@ -87,11 +87,9 @@ func (s *JailRPCTestSuite) TestIsConnected() {
 	responseValue, err := cell.Get("responseValue")
 	s.NoError(err, "cannot obtain result of isConnected()")
 
-	response, err := responseValue.ToString()
+	response, err := responseValue.ToBoolean()
 	s.NoError(err, "cannot parse result")
-
-	expectedResponse := `{"jsonrpc":"2.0","result":true}`
-	s.Equal(expectedResponse, response)
+	s.True(response)
 }
 
 // regression test: eth_getTransactionReceipt with invalid transaction hash should return null
@@ -115,7 +113,7 @@ func (s *JailRPCTestSuite) TestContractDeployment() {
 	EnsureNodeSync(s.Backend.NodeManager())
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
-	s.jail.Parse(testChatID, "")
+	s.jail.CreateAndInitCell(testChatID)
 
 	cell, err := s.jail.Cell(testChatID)
 	s.NoError(err)
@@ -125,8 +123,8 @@ func (s *JailRPCTestSuite) TestContractDeployment() {
 	var txHash gethcommon.Hash
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var envelope signal.Envelope
-		err = json.Unmarshal([]byte(jsonEvent), &envelope)
-		s.NoError(err, "cannot unmarshal JSON: %s", jsonEvent)
+		unmarshalErr := json.Unmarshal([]byte(jsonEvent), &envelope)
+		s.NoError(unmarshalErr, "cannot unmarshal JSON: %s", jsonEvent)
 
 		if envelope.Type == txqueue.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
@@ -135,8 +133,9 @@ func (s *JailRPCTestSuite) TestContractDeployment() {
 			s.NoError(s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 
 			txID := event["id"].(string)
-			txHash, err = s.Backend.CompleteTransaction(common.QueuedTxID(txID), TestConfig.Account1.Password)
-			if s.NoError(err, event["id"]) {
+			var txErr error
+			txHash, txErr = s.Backend.CompleteTransaction(common.QueuedTxID(txID), TestConfig.Account1.Password)
+			if s.NoError(txErr, event["id"]) {
 				s.T().Logf("contract transaction complete, URL: %s", "https://ropsten.etherscan.io/tx/"+txHash.Hex())
 			}
 
@@ -174,7 +173,7 @@ func (s *JailRPCTestSuite) TestContractDeployment() {
 	}
 
 	// Wait until callback is fired and `responseValue` is set. Hacky but simple.
-	time.Sleep(2 * time.Second)
+	time.Sleep(5 * time.Second)
 
 	errorValue, err := cell.Get("errorValue")
 	s.NoError(err)
@@ -251,9 +250,9 @@ func (s *JailRPCTestSuite) TestJailVMPersistence() {
 	}
 
 	jail := s.Backend.JailManager()
-	jail.BaseJS(baseStatusJSCode)
+	jail.SetBaseJS(baseStatusJSCode)
 
-	parseResult := jail.Parse(testChatID, `
+	parseResult := jail.CreateAndInitCell(testChatID, `
 		var total = 0;
 		_status_catalog['ping'] = function(params) {
 			total += Number(params.amount);

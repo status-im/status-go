@@ -23,6 +23,8 @@ import (
 	"math"
 	"math/big"
 	mrand "math/rand"
+	"os"
+	"strconv"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -39,6 +41,21 @@ const (
 	tdCacheLimit     = 1024
 	numberCacheLimit = 2048
 )
+
+var writeDelay time.Duration = 0
+
+func init() {
+	str, ok := os.LookupEnv("FEATURE_SYNC_DELAY")
+	if !ok {
+		return
+	}
+	delay, err := strconv.ParseInt(str, 10, 0)
+	if err != nil {
+		panic(fmt.Errorf("FEATURE_SYNC_DELAY value is invalid:", err))
+	}
+
+	writeDelay = time.Duration(delay) * time.Microsecond
+}
 
 // HeaderChain implements the basic block header chain logic that is shared by
 // core.BlockChain and light.LightChain. It is not usable in itself, only as
@@ -102,6 +119,10 @@ func NewHeaderChain(chainDb ethdb.Database, config *params.ChainConfig, engine c
 		}
 	}
 	hc.currentHeaderHash = hc.currentHeader.Hash()
+
+	if writeDelay > 0 {
+		log.Info("Header writes are slowed down", "delay", writeDelay)
+	}
 
 	return hc, nil
 }
@@ -271,6 +292,11 @@ func (hc *HeaderChain) InsertHeaderChain(chain []*types.Header, writeHeader WhCa
 			stats.ignored++
 			continue
 		}
+
+		// introduce delay for the expensive write to
+		// trade off sync time with CPU usage
+		time.Sleep(writeDelay)
+
 		if err := writeHeader(header); err != nil {
 			return i, err
 		}

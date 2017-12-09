@@ -27,37 +27,22 @@ func (s *RPCClientTestSuite) TestNewClient() {
 	config, err := e2e.MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
 
-	nodeStarted, err := s.NodeManager.StartNode(config)
-	s.NoError(err)
-	<-nodeStarted
-
-	node, err := s.NodeManager.Node()
-	s.NoError(err)
-
-	// upstream disabled, local node ok
+	// upstream disabled
 	s.False(config.UpstreamConfig.Enabled)
-	_, err = rpc.NewClient(node, config.UpstreamConfig)
+	_, err = rpc.NewClient(nil, config.UpstreamConfig)
 	s.NoError(err)
 
-	// upstream enabled with incorrect URL, local node ok
-	upstreamBad := config.UpstreamConfig
-	upstreamBad.Enabled = true
-	upstreamBad.URL = "///__httphh://///incorrect_urlxxx"
-	_, err = rpc.NewClient(node, upstreamBad)
-	s.Error(err)
-
-	// upstream enabled with correct URL, local node ok
+	// upstream enabled with correct URL
 	upstreamGood := config.UpstreamConfig
 	upstreamGood.Enabled = true
 	upstreamGood.URL = "http://example.com/rpc"
-	_, err = rpc.NewClient(node, upstreamGood)
+	_, err = rpc.NewClient(nil, upstreamGood)
 	s.NoError(err)
 
-	// upstream disabled, local node failed (stopped)
-	nodeStopped, err := s.NodeManager.StopNode()
-	s.NoError(err)
-	<-nodeStopped
-
-	_, err = rpc.NewClient(node, config.UpstreamConfig)
+	// upstream enabled with incorrect URL
+	upstreamBad := config.UpstreamConfig
+	upstreamBad.Enabled = true
+	upstreamBad.URL = "///__httphh://///incorrect_urlxxx"
+	_, err = rpc.NewClient(nil, upstreamBad)
 	s.Error(err)
 }

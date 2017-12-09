@@ -320,13 +320,28 @@ func DiscardTransactions(ids *C.char) *C.char {
 //InitJail setup initial JavaScript
 //export InitJail
 func InitJail(js *C.char) {
-	statusAPI.JailBaseJS(C.GoString(js))
+	statusAPI.SetJailBaseJS(C.GoString(js))
 }
 
-//Parse creates a new jail cell context and executes provided JavaScript code
+//Parse creates a new jail cell context and executes provided JavaScript code.
+//DEPRECATED in favour of CreateAndInitCell.
 //export Parse
 func Parse(chatID *C.char, js *C.char) *C.char {
-	res := statusAPI.JailParse(C.GoString(chatID), C.GoString(js))
+	res := statusAPI.CreateAndInitCell(C.GoString(chatID), C.GoString(js))
+	return C.CString(res)
+}
+
+//CreateAndInitCell creates a new jail cell context and executes provided JavaScript code.
+//export CreateAndInitCell
+func CreateAndInitCell(chatID *C.char, js *C.char) *C.char {
+	res := statusAPI.CreateAndInitCell(C.GoString(chatID), C.GoString(js))
+	return C.CString(res)
+}
+
+//ExecuteJS allows to run arbitrary JS code within a cell.
+//export ExecuteJS
+func ExecuteJS(chatID *C.char, code *C.char) *C.char {
+	res := statusAPI.JailExecute(C.GoString(chatID), C.GoString(code))
 	return C.CString(res)
 }
 
@@ -426,4 +441,12 @@ func NotifyUsers(message, payloadJSON, tokensArray *C.char) (outCBytes *C.char) 
 	}
 
 	return
+}
+
+//AddPeer adds peer by enode,
+//eg 'enode://da3bf389a031f33fb55c9f5f54fde8473912402d27fffaa50efd74c0d0515f3a61daf6d52151f2876b19c15828e6f670352bff432b5ec457652e74755e8c864f@51.15.62.116:30303'
+//export AddPeer
+func AddPeer(enode *C.char) *C.char {
+	err := statusAPI.NodeManager().AddPeer(C.GoString(enode))
+	return makeJSONResponse(err)
 }

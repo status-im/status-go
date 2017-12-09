@@ -2,7 +2,7 @@ LINT_EXCLUDE := --exclude='.*_mock.go' --exclude='geth/jail/doc.go'
 LINT_FOLDERS := extkeys cmd/... geth/... e2e/...
 LINT_FOLDERS_WITHOUT_TESTS := extkeys cmd/... geth/...
 
-lint-deps:
+lint-install:
 	go get -u github.com/alecthomas/gometalinter
 	gometalinter --install
 
@@ -34,7 +34,7 @@ lint-gocyclo:
 	@gometalinter $(LINT_EXCLUDE) --disable-all --enable=gocyclo --cyclo-over=16 --deadline=45s  $(LINT_FOLDERS)
 lint-errcheck:
 	@echo "lint-errcheck"
-	@gometalinter $(LINT_EXCLUDE) --disable-all --enable=errcheck --deadline=45s  $(LINT_FOLDERS)
+	@gometalinter $(LINT_EXCLUDE) --disable-all --enable=errcheck --deadline=1m  $(LINT_FOLDERS)
 lint-ineffassign:
 	@echo "lint-ineffassign"
 	@gometalinter $(LINT_EXCLUDE) --disable-all --enable=ineffassign --deadline=45s  $(LINT_FOLDERS)

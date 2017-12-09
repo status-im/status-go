@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -41,6 +42,34 @@ func (k *SelectedExtKey) Hex() string {
 	}
 
 	return k.Address.Hex()
+}
+
+// MessageState defines a struct to hold given facts about a message stat.
+type MessageState struct {
+	// Type defines Direction type: IncomingMessage or OutgoingMessage.
+	Type string `json:"type"`
+	// Protocol defines means of transmission in whisper: RPC or P2P.
+	Protocol string `json:"protocol"`
+	// Status defines current status of message: Pending, Delivered, Rejected, etc.
+	Status string `json:"status"`
+	// Envelope struct holding encrypted message.
+	Envelope []byte `json:"envelope"`
+	// Time in of sent time of message.
+	TimeSent uint32 `json:"time,omitempty"`
+	// Received defines time when delivery notification was received
+	Received time.Time `json:"received"`
+	// Payload associated with envelope.
+	Payload []byte `json:"payload,omitempty"`
+	// Hash defines the Envelope's hash
+	Hash string `json:"envelope_hash"`
+	// FromDevice defines the device sending message if value is extractable.
+	FromDevice string `json:"from_device,omitempty"`
+	// ToDevice defines the receiving message if value is extractable.
+	ToDevice string `json:"to_device,omitempty"`
+	// RejectionError defines the error message when message ending with a Rejected status.
+	RejectionError string `json:"rejection_reason,omitempty"`
+	// Source of message when type is Outgoing which contains raw rpc data.
+	Source whisper.NewMessage `json:"source,omitempty"`
 }
 
 // NodeManager defines expected methods for managing Status node
@@ -257,26 +286,34 @@ type JailCell interface {
 	// Call an arbitrary JS function by name and args.
 	Call(item string, this interface{}, args ...interface{}) (otto.Value, error)
 	// Stop stops background execution of cell.
-	Stop()
+	Stop() error
 }
 
 // JailManager defines methods for managing jailed environments
 type JailManager interface {
-	// Parse creates a new jail cell context, with the given chatID as identifier.
-	// New context executes provided JavaScript code, right after the initialization.
-	Parse(chatID, js string) string
-
 	// Call executes given JavaScript function w/i a jail cell context identified by the chatID.
 	Call(chatID, this, args string) string
 
-	// NewCell initializes and returns a new jail cell.
-	NewCell(chatID string) (JailCell, error)
+	// CreateCell creates a new jail cell.
+	CreateCell(chatID string) (JailCell, error)
+
+	// Parse creates a new jail cell context, with the given chatID as identifier.
+	// New context executes provided JavaScript code, right after the initialization.
+	// DEPRECATED in favour of CreateAndInitCell.
+	Parse(chatID, js string) string
+
+	// CreateAndInitCell creates a new jail cell and initialize it
+	// with web3 and other handlers.
+	CreateAndInitCell(chatID string, code ...string) string
 
 	// Cell returns an existing instance of JailCell.
 	Cell(chatID string) (JailCell, error)
 
-	// BaseJS allows to setup initial JavaScript to be loaded on each jail.Parse()
-	BaseJS(js string)
+	// Execute allows to run arbitrary JS code within a cell.
+	Execute(chatID, code string) string
+
+	// SetBaseJS allows to setup initial JavaScript to be loaded on each jail.CreateAndInitCell().
+	SetBaseJS(js string)
 
 	// Stop stops all background activity of jail
 	Stop()
@@ -378,6 +415,11 @@ type DiscardTransactionsResult struct {
 	Results map[string]DiscardTransactionResult `json:"results"`
 }
 
+type account struct {
+	Address  string
+	Password string
+}
+
 // TestConfig contains shared (among different test packages) parameters
 type TestConfig struct {
 	Node struct {
@@ -385,14 +427,9 @@ type TestConfig struct {
 		HTTPPort    int
 		WSPort      int
 	}
-	Account1 struct {
-		Address  string
-		Password string
-	}
-	Account2 struct {
-		Address  string
-		Password string
-	}
+	Account1 account
+	Account2 account
+	Account3 account
 }
 
 // NotifyResult is a JSON returned from notify message
@@ -401,13 +438,31 @@ type NotifyResult struct {
 	Error  string `json:"error,omitempty"`
 }
 
+const passphraseEnvName = "ACCOUNT_PASSWORD"
+
 // LoadTestConfig loads test configuration values from disk
-func LoadTestConfig() (*TestConfig, error) {
+func LoadTestConfig(networkId int) (*TestConfig, error) {
 	var testConfig TestConfig
 
-	configData := string(static.MustAsset("config/test-data.json"))
-	if err := json.Unmarshal([]byte(configData), &testConfig); err != nil {
+	configData := static.MustAsset("config/test-data.json")
+	if err := json.Unmarshal(configData, &testConfig); err != nil {
 		return nil, err
+	}
+
+	if networkId == params.StatusChainNetworkID {
+		accountsData := static.MustAsset("config/status-chain-accounts.json")
+		if err := json.Unmarshal(accountsData, &testConfig); err != nil {
+			return nil, err
+		}
+	} else {
+		accountsData := static.MustAsset("config/public-chain-accounts.json")
+		if err := json.Unmarshal(accountsData, &testConfig); err != nil {
+			return nil, err
+		}
+
+		pass := os.Getenv(passphraseEnvName)
+		testConfig.Account1.Password = pass
+		testConfig.Account2.Password = pass
 	}
 
 	return &testConfig, nil

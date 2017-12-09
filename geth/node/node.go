@@ -40,7 +40,7 @@ var (
 )
 
 // MakeNode create a geth node entity
-func MakeNode(config *params.NodeConfig) (*node.Node, error) {
+func MakeNode(config *params.NodeConfig, deliveryServer whisper.DeliveryServer) (*node.Node, error) {
 	// make sure data directory exists
 	if err := os.MkdirAll(filepath.Join(config.DataDir), os.ModePerm); err != nil {
 		return nil, err
@@ -78,7 +78,7 @@ func MakeNode(config *params.NodeConfig) (*node.Node, error) {
 	}
 
 	// start Whisper service
-	if err := activateShhService(stack, config); err != nil {
+	if err := activateShhService(stack, config, deliveryServer); err != nil {
 		return nil, fmt.Errorf("%v: %v", ErrWhisperServiceRegistrationFailure, err)
 	}
 
@@ -100,7 +100,7 @@ func defaultEmbeddedNodeConfig(config *params.NodeConfig) *node.Config {
 			DiscoveryV5Addr:  ":0",
 			BootstrapNodes:   makeBootstrapNodes(),
 			BootstrapNodesV5: makeBootstrapNodesV5(),
-			ListenAddr:       ":0",
+			ListenAddr:       config.ListenAddr,
 			NAT:              nat.Any(),
 			MaxPeers:         config.MaxPeers,
 			MaxPendingPeers:  config.MaxPendingPeers,
@@ -117,6 +117,11 @@ func defaultEmbeddedNodeConfig(config *params.NodeConfig) *node.Config {
 	if config.RPCEnabled {
 		nc.HTTPHost = config.HTTPHost
 		nc.HTTPPort = config.HTTPPort
+	}
+
+	if !config.BootClusterConfig.Enabled {
+		nc.P2P.BootstrapNodes = nil
+		nc.P2P.BootstrapNodesV5 = nil
 	}
 
 	return nc
@@ -180,7 +185,7 @@ func activateEthService(stack *node.Node, config *params.NodeConfig) error {
 }
 
 // activateShhService configures Whisper and adds it to the given node.
-func activateShhService(stack *node.Node, config *params.NodeConfig) error {
+func activateShhService(stack *node.Node, config *params.NodeConfig, deliveryServer whisper.DeliveryServer) error {
 	if !config.WhisperConfig.Enabled {
 		log.Info("SHH protocol is disabled")
 		return nil
@@ -190,23 +195,31 @@ func activateShhService(stack *node.Node, config *params.NodeConfig) error {
 		whisperConfig := config.WhisperConfig
 		whisperService := whisper.New(nil)
 
+		if deliveryServer != nil {
+			whisperService.RegisterDeliveryServer(deliveryServer)
+		}
+
 		// enable mail service
-		if whisperConfig.MailServerNode {
-			password, err := whisperConfig.ReadPasswordFile()
-			if err != nil {
-				return nil, err
+		if whisperConfig.EnableMailServer {
+			if whisperConfig.Password == "" {
+				if err := whisperConfig.ReadPasswordFile(); err != nil {
+					return nil, err
+				}
 			}
+
+			log.Info("Register MailServer")
 
 			var mailServer mailserver.WMailServer
 			whisperService.RegisterServer(&mailServer)
-			mailServer.Init(whisperService, whisperConfig.DataDir, string(password), whisperConfig.MinimumPoW)
+			mailServer.Init(whisperService, whisperConfig.DataDir, whisperConfig.Password, whisperConfig.MinimumPoW)
 		}
 
 		// enable notification service
-		if whisperConfig.NotificationServerNode {
+		if whisperConfig.EnablePushNotification {
+			log.Info("Register PushNotification server")
+
 			var notificationServer notifications.NotificationServer
 			whisperService.RegisterNotificationServer(&notificationServer)
-
 			notificationServer.Init(whisperService, whisperConfig)
 		}
 
