@@ -37,12 +37,32 @@ type Task interface {
 // Otherwise, on ARM and x86-32 it will panic.
 // More information: https://golang.org/pkg/sync/atomic/#pkg-note-BUG.
 type Loop struct {
-	id        int64
-	vm        *vm.VM
-	lock      sync.RWMutex
-	tasks     map[int64]Task
-	ready     chan Task
-	accepting bool
+	id    int64
+	vm    *vm.VM
+	lock  sync.RWMutex
+	tasks map[int64]Task
+	ready chan Task
+	state
+}
+
+// state encapsulates the loop's open and closedness. This is a boolean variable
+// indicating whether the loop is open for new tasks and a lock to control
+// access to this boolean.
+type state struct {
+	accept bool
+	lock   sync.RWMutex
+}
+
+func (s *state) accepting() bool {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	return s.accept
+}
+
+func (s *state) close() {
+	s.lock.Lock()
+	s.accept = false
+	s.lock.Unlock()
 }
 
 // New creates a new Loop with an unbuffered ready queue on a specific VM.
@@ -54,18 +74,20 @@ func New(vm *vm.VM) *Loop {
 // queue, the capacity of which being specified by the backlog argument.
 func NewWithBacklog(vm *vm.VM, backlog int) *Loop {
 	return &Loop{
-		vm:        vm,
-		tasks:     make(map[int64]Task),
-		ready:     make(chan Task, backlog),
-		accepting: true,
+		vm:    vm,
+		tasks: make(map[int64]Task),
+		ready: make(chan Task, backlog),
+		state: state{
+			accept: true,
+		},
 	}
 }
 
 func (l *Loop) close() {
 	l.lock.Lock()
 	defer l.lock.Unlock()
-	if l.accepting {
-		l.accepting = false
+	if l.accepting() {
+		l.state.close()
 		close(l.ready)
 	}
 }
@@ -81,7 +103,7 @@ func (l *Loop) VM() *vm.VM {
 func (l *Loop) Add(t Task) error {
 	l.lock.Lock()
 	defer l.lock.Unlock()
-	if l.accepting {
+	if l.accepting() {
 		t.SetID(atomic.AddInt64(&l.id, 1))
 		l.tasks[t.GetID()] = t
 		return nil
@@ -112,7 +134,7 @@ func (l *Loop) removeByID(id int64) {
 func (l *Loop) Ready(t Task) error {
 	l.lock.Lock()
 	defer l.lock.Unlock()
-	if l.accepting {
+	if l.accepting() {
 		l.ready <- t
 		return nil
 	}
@@ -147,7 +169,6 @@ func (l *Loop) processTask(t Task) error {
 // Run handles the task scheduling and finalisation.
 // It runs infinitely waiting for new tasks.
 func (l *Loop) Run(ctx context.Context) error {
-	defer l.close()
 	for {
 		select {
 		case t := <-l.ready:
@@ -164,6 +185,7 @@ func (l *Loop) Run(ctx context.Context) error {
 				continue
 			}
 		case <-ctx.Done():
+			l.close()
 			return context.Canceled
 		}
 	}
