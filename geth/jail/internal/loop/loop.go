@@ -54,8 +54,8 @@ type state struct {
 }
 
 func (s *state) accepting() bool {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
+	s.lock.Lock()
+	defer s.lock.Unlock()
 	return s.accept
 }
 
@@ -176,6 +176,7 @@ func (l *Loop) processTask(t Task) error {
 // Run handles the task scheduling and finalisation.
 // It runs infinitely waiting for new tasks.
 func (l *Loop) Run(ctx context.Context) error {
+	defer l.close()
 	for {
 		select {
 		case t := <-l.ready:
@@ -198,7 +199,6 @@ func (l *Loop) Run(ctx context.Context) error {
 			}
 		case <-ctx.Done():
 			l.removeAll()
-			l.close()
 			return ctx.Err()
 		}
 	}

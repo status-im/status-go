@@ -1,14 +1,12 @@
-package loop_test
+package loop
 
 import (
 	"context"
 	"testing"
 	"time"
 
-	"github.com/status-im/status-go/geth/jail/internal/loop/looptask"
+	gomock "github.com/golang/mock/gomock"
 
-	"github.com/robertkrimen/otto"
-	"github.com/status-im/status-go/geth/jail/internal/loop"
 	"github.com/status-im/status-go/geth/jail/internal/vm"
 	"github.com/stretchr/testify/suite"
 )
@@ -20,27 +18,40 @@ func TestLoopSuite(t *testing.T) {
 type LoopSuite struct {
 	suite.Suite
 
-	loop   *loop.Loop
+	id int64
+
+	loop   *Loop
 	cancel context.CancelFunc
+
+	mockTask     *MockTask
+	loopMockCtrl *gomock.Controller
 }
 
 func (s *LoopSuite) SetupTest() {
-	o := otto.New()
-	vm := vm.New(o)
-	s.loop = loop.New(vm)
+	s.loopMockCtrl = gomock.NewController(s.T())
+	s.mockTask = NewMockTask(s.loopMockCtrl)
+
+	vm := vm.New()
+	s.loop = New(vm)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
 	go s.loop.Run(ctx)
 }
 
-func (s *LoopSuite) TestAddAndReady() {
-	t := looptask.NewIdleTask()
+func (s *LoopSuite) TearDownTest() {
+	s.loopMockCtrl.Finish()
+}
 
-	err := s.loop.Add(t)
+func (s *LoopSuite) TestAddAndReady() {
+	s.mockTask.EXPECT().SetID(int64(1)).Times(1)
+	s.mockTask.EXPECT().GetID().Times(1)
+	s.mockTask.EXPECT().Cancel().Times(1)
+
+	err := s.loop.Add(s.mockTask)
 	s.NoError(err)
 
-	err = s.loop.Ready(t)
+	err = s.loop.Ready(s.mockTask)
 	s.NoError(err)
 
 	s.cancel()
@@ -48,9 +59,9 @@ func (s *LoopSuite) TestAddAndReady() {
 	// Wait for the context to cancel and loop to close
 	time.Sleep(100 * time.Millisecond)
 
-	err = s.loop.Add(t)
+	err = s.loop.Add(s.mockTask)
 	s.Error(err)
 
-	err = s.loop.Ready(t)
+	err = s.loop.Ready(s.mockTask)
 	s.Error(err)
 }
