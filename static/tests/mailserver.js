@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 const { expect } = require('chai');
 const Web3 = require('web3');
+const rimraf = require('rimraf');
 
 describe('Whisper MailServer', () => {
     const identityA = '0x04eedbaafd6adf4a9233a13e7b1c3c14461fffeba2e9054b8d456ce5f6ebeafadcbf3dce3716253fbc391277fa5a086b60b283daf61fb5b1f26895f456c2f31ae3';
@@ -26,7 +27,7 @@ describe('Whisper MailServer', () => {
             nodeAProcess.on('exit', (code, signal) => {
                 expect(code).to.be.null;
                 expect(signal).to.equal('SIGTERM');
-                done();
+                rimraf('wnode-data-1', done);
             });
         });
 
@@ -70,7 +71,7 @@ describe('Whisper MailServer', () => {
             nodeBProcess.on('exit', (code, signal) => {
                 expect(code).to.be.null;
                 expect(signal).to.equal('SIGTERM');
-                done();
+                rimraf('wnode-data-2', done);
             });
         });
 
@@ -100,8 +101,8 @@ describe('Whisper MailServer', () => {
                 done(err)
             });
 
-            // (optional)
-            // nodeB.shh.addMailServer({ ... });
+            // add an option to wnode-status
+            nodeB.shh.addPeer({ ... });
 
             // send a request for old messages
             // nodeB.shh.requestMessages({

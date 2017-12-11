@@ -11,6 +11,7 @@
     "chai": "^4.1.2",
     "mocha": "^3.5.3",
     "requirejs": "^2.3.4",
+    "rimraf": "^2.6.2",
     "web3": "https://github.com/status-im/web3.js#status-develop"
   },
   "scripts": {
