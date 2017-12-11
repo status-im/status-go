@@ -1,6 +1,6 @@
-diff --git a/cmd/wnode/main.go b/cmd/wnode/main.go
---- a/cmd/wnode/main.go	2017-12-03 18:18:01.000000000 +0100
-+++ b/cmd/wnode/main.go	2017-09-19 17:03:51.000000000 +0200
+diff --git a/vendor/github.com/ethereum/go-ethereum/cmd/wnode/main.go b/vendor/github.com/ethereum/go-ethereum/cmd/wnode/main.go
+--- a/vendor/github.com/ethereum/go-ethereum/cmd/wnode/main.go	2017-12-03 18:18:01.000000000 +0100
++++ b/vendor/github.com/ethereum/go-ethereum/cmd/wnode/main.go	2017-09-19 17:03:51.000000000 +0200
 @@ -98,6 +98,8 @@
  	argEnode   = flag.String("boot", "", "bootstrap node you want to connect to (e.g. enode://e454......08d50@52.176.211.200:16428)")
  	argTopic   = flag.String("topic", "", "topic in hexadecimal format (e.g. 70a4beef)")

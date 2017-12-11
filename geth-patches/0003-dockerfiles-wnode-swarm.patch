@@ -1,6 +1,6 @@
-diff --git a/containers/docker/status-alpine/geth/Dockerfile b/containers/docker/status-alpine/geth/Dockerfile
---- a/containers/docker/status-alpine/geth/Dockerfile	1970-01-01 01:00:00.000000000 +0100
-+++ b/containers/docker/status-alpine/geth/Dockerfile	2017-09-19 17:03:51.000000000 +0200
+diff --git a/vendor/github.com/ethereum/go-ethereum/containers/docker/status-alpine/geth/Dockerfile b/vendor/github.com/ethereum/go-ethereum/containers/docker/status-alpine/geth/Dockerfile
+--- a/vendor/github.com/ethereum/go-ethereum/containers/docker/status-alpine/geth/Dockerfile	1970-01-01 01:00:00.000000000 +0100
++++ b/vendor/github.com/ethereum/go-ethereum/containers/docker/status-alpine/geth/Dockerfile	2017-09-19 17:03:51.000000000 +0200
 @@ -0,0 +1,20 @@
 +FROM alpine:3.5
 +
@@ -22,9 +22,9 @@ diff --git a/containers/docker/status-alpine/geth/Dockerfile b/containers/docker
 +EXPOSE 30303
 +
 +ENTRYPOINT ["/geth"]
-diff --git a/containers/docker/status-alpine/swarm/Dockerfile b/containers/docker/status-alpine/swarm/Dockerfile
---- a/containers/docker/status-alpine/swarm/Dockerfile	1970-01-01 01:00:00.000000000 +0100
-+++ b/containers/docker/status-alpine/swarm/Dockerfile	2017-09-19 17:03:51.000000000 +0200
+diff --git a/vendor/github.com/ethereum/go-ethereum/containers/docker/status-alpine/swarm/Dockerfile b/vendor/github.com/ethereum/go-ethereum/containers/docker/status-alpine/swarm/Dockerfile
+--- a/vendor/github.com/ethereum/go-ethereum/containers/docker/status-alpine/swarm/Dockerfile	1970-01-01 01:00:00.000000000 +0100
++++ b/vendor/github.com/ethereum/go-ethereum/containers/docker/status-alpine/swarm/Dockerfile	2017-09-19 17:03:51.000000000 +0200
 @@ -0,0 +1,19 @@
 +FROM alpine:3.5
 +
@@ -45,9 +45,9 @@ diff --git a/containers/docker/status-alpine/swarm/Dockerfile b/containers/docke
 +EXPOSE 30399
 +
 +ENTRYPOINT ["/swarm"]
-diff --git a/containers/docker/status-alpine/wnode/Dockerfile b/containers/docker/status-alpine/wnode/Dockerfile
---- a/containers/docker/status-alpine/wnode/Dockerfile	1970-01-01 01:00:00.000000000 +0100
-+++ b/containers/docker/status-alpine/wnode/Dockerfile	2017-09-19 17:03:51.000000000 +0200
+diff --git a/vendor/github.com/ethereum/go-ethereum/containers/docker/status-alpine/wnode/Dockerfile b/vendor/github.com/ethereum/go-ethereum/containers/docker/status-alpine/wnode/Dockerfile
+--- a/vendor/github.com/ethereum/go-ethereum/containers/docker/status-alpine/wnode/Dockerfile	1970-01-01 01:00:00.000000000 +0100
++++ b/vendor/github.com/ethereum/go-ethereum/containers/docker/status-alpine/wnode/Dockerfile	2017-09-19 17:03:51.000000000 +0200
 @@ -0,0 +1,19 @@
 +FROM alpine:3.5
 +

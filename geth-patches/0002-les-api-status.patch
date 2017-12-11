@@ -1,7 +1,7 @@
-diff --git a/eth/api_backend.go b/eth/api_backend.go
+diff --git a/vendor/github.com/ethereum/go-ethereum/eth/api_backend.go b/vendor/github.com/ethereum/go-ethereum/eth/api_backend.go
 index 91f392f94..471275de5 100644
---- a/eth/api_backend.go
-+++ b/eth/api_backend.go
+--- a/vendor/github.com/ethereum/go-ethereum/eth/api_backend.go
++++ b/vendor/github.com/ethereum/go-ethereum/eth/api_backend.go
 @@ -32,14 +32,20 @@ import (
  	"github.com/ethereum/go-ethereum/eth/gasprice"
  	"github.com/ethereum/go-ethereum/ethdb"
@@ -25,10 +25,10 @@ index 91f392f94..471275de5 100644
  }
  
  func (b *EthApiBackend) ChainConfig() *params.ChainConfig {
-diff --git a/eth/backend.go b/eth/backend.go
+diff --git a/vendor/github.com/ethereum/go-ethereum/eth/backend.go b/vendor/github.com/ethereum/go-ethereum/eth/backend.go
 index 1cd9e8fff..2fbdec4e2 100644
---- a/eth/backend.go
-+++ b/eth/backend.go
+--- a/vendor/github.com/ethereum/go-ethereum/eth/backend.go
++++ b/vendor/github.com/ethereum/go-ethereum/eth/backend.go
 @@ -169,7 +169,7 @@ func New(ctx *node.ServiceContext, config *Config) (*Ethereum, error) {
  	eth.miner = miner.New(eth, eth.chainConfig, eth.EventMux(), eth.engine)
  	eth.miner.SetExtra(makeExtraData(config.ExtraData))
@@ -38,10 +38,10 @@ index 1cd9e8fff..2fbdec4e2 100644
  	gpoParams := config.GPO
  	if gpoParams.Default == nil {
  		gpoParams.Default = config.GasPrice
-diff --git a/internal/ethapi/api.go b/internal/ethapi/api.go
+diff --git a/vendor/github.com/ethereum/go-ethereum/internal/ethapi/api.go b/vendor/github.com/ethereum/go-ethereum/internal/ethapi/api.go
 index 025f42617..d8f48a890 100644
---- a/internal/ethapi/api.go
-+++ b/internal/ethapi/api.go
+--- a/vendor/github.com/ethereum/go-ethereum/internal/ethapi/api.go
++++ b/vendor/github.com/ethereum/go-ethereum/internal/ethapi/api.go
 @@ -178,15 +178,24 @@ func (s *PublicTxPoolAPI) Inspect() map[string]map[string]map[string]string {
  // It offers only methods that can retrieve accounts.
  type PublicAccountAPI struct {
@@ -130,10 +130,10 @@ index 025f42617..d8f48a890 100644
  	// Look up the wallet containing the requested signer
  	account := accounts.Account{Address: args.From}
  
-diff --git a/internal/ethapi/backend.go b/internal/ethapi/backend.go
+diff --git a/vendor/github.com/ethereum/go-ethereum/internal/ethapi/backend.go b/vendor/github.com/ethereum/go-ethereum/internal/ethapi/backend.go
 index 368fa4872..cac58dfc0 100644
---- a/internal/ethapi/backend.go
-+++ b/internal/ethapi/backend.go
+--- a/vendor/github.com/ethereum/go-ethereum/internal/ethapi/backend.go
++++ b/vendor/github.com/ethereum/go-ethereum/internal/ethapi/backend.go
 @@ -68,6 +68,8 @@ type Backend interface {
  
  	ChainConfig() *params.ChainConfig
@@ -152,11 +152,11 @@ index 368fa4872..cac58dfc0 100644
  			Public:    true,
  		}, {
  			Namespace: "personal",
-diff --git a/internal/ethapi/status_backend.go b/internal/ethapi/status_backend.go
+diff --git a/vendor/github.com/ethereum/go-ethereum/internal/ethapi/status_backend.go b/vendor/github.com/ethereum/go-ethereum/internal/ethapi/status_backend.go
 new file mode 100644
 index 000000000..c4e553cae
 --- /dev/null
-+++ b/internal/ethapi/status_backend.go
++++ b/vendor/github.com/ethereum/go-ethereum/internal/ethapi/status_backend.go
 @@ -0,0 +1,88 @@
 +package ethapi
 +
@@ -246,10 +246,10 @@ index 000000000..c4e553cae
 +
 +	return b.bcapi.EstimateGas(ctx, callArgs)
 +}
-diff --git a/les/api_backend.go b/les/api_backend.go
+diff --git a/vendor/github.com/ethereum/go-ethereum/les/api_backend.go b/vendor/github.com/ethereum/go-ethereum/les/api_backend.go
 index 56f617a7d..f839f24e6 100644
---- a/les/api_backend.go
-+++ b/les/api_backend.go
+--- a/vendor/github.com/ethereum/go-ethereum/les/api_backend.go
++++ b/vendor/github.com/ethereum/go-ethereum/les/api_backend.go
 @@ -32,14 +32,20 @@ import (
  	"github.com/ethereum/go-ethereum/eth/gasprice"
  	"github.com/ethereum/go-ethereum/ethdb"
@@ -273,10 +273,10 @@ index 56f617a7d..f839f24e6 100644
  }
  
  func (b *LesApiBackend) ChainConfig() *params.ChainConfig {
-diff --git a/les/backend.go b/les/backend.go
+diff --git a/vendor/github.com/ethereum/go-ethereum/les/backend.go b/vendor/github.com/ethereum/go-ethereum/les/backend.go
 index 333df920e..7d8cf3916 100644
---- a/les/backend.go
-+++ b/les/backend.go
+--- a/vendor/github.com/ethereum/go-ethereum/les/backend.go
++++ b/vendor/github.com/ethereum/go-ethereum/les/backend.go
 @@ -75,6 +75,8 @@ type LightEthereum struct {
  	netRPCService *ethapi.PublicNetAPI
  
@@ -305,11 +305,11 @@ index 333df920e..7d8cf3916 100644
  	return leth, nil
  }
  
-diff --git a/les/status/accounts.go b/les/status/accounts.go
+diff --git a/vendor/github.com/ethereum/go-ethereum/les/status/accounts.go b/vendor/github.com/ethereum/go-ethereum/les/status/accounts.go
 new file mode 100644
 index 000000000..78bd2ad92
 --- /dev/null
-+++ b/les/status/accounts.go
++++ b/vendor/github.com/ethereum/go-ethereum/les/status/accounts.go
 @@ -0,0 +1,45 @@
 +package status
 +
@@ -356,11 +356,11 @@ index 000000000..78bd2ad92
 +func (d *AccountManager) SetAccountsFilterHandler(fn AccountsFilterHandler) {
 +	d.accountsFilterHandler = fn
 +}
-diff --git a/les/status/types.go b/les/status/types.go
+diff --git a/vendor/github.com/ethereum/go-ethereum/les/status/types.go b/vendor/github.com/ethereum/go-ethereum/les/status/types.go
 new file mode 100644
 index 000000000..04437bdb6
 --- /dev/null
-+++ b/les/status/types.go
++++ b/vendor/github.com/ethereum/go-ethereum/les/status/types.go
 @@ -0,0 +1,17 @@
 +package status
 +
