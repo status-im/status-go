@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/common"
+	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/rpc"
 )
 
@@ -33,6 +34,8 @@ const defaultWorkTime = 5
 // which sends a p2p request for historic messages.
 func RequestHistoricMessagesHandler(nodeManager common.NodeManager) rpc.Handler {
 	return func(ctx context.Context, args ...interface{}) (interface{}, error) {
+		log.Info("RequestHistoricMessagesHandler", "args", args)
+
 		whisper, err := nodeManager.WhisperService()
 		if err != nil {
 			return nil, err
