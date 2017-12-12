@@ -244,11 +244,7 @@ func (m *StatusBackend) registerHandlers() error {
 		return node.ErrRPCClient
 	}
 
-	handler, err := whisper.RequestHistoricMessagesHandler(m.nodeManager)
-	if err != nil {
-		return err
-	}
-	rpcClient.RegisterHandler("shh_requestMessages", handler)
+	rpcClient.RegisterHandler("shh_requestMessages", whisper.RequestHistoricMessagesHandler(m.nodeManager))
 	rpcClient.RegisterHandler("eth_accounts", m.accountManager.AccountsRPCHandler())
 	rpcClient.RegisterHandler("eth_sendTransaction", m.txQueueManager.SendTransactionRPCHandler)
 	m.txQueueManager.SetTransactionQueueHandler(m.txQueueManager.TransactionQueueHandler())

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/rpc"
@@ -26,27 +27,25 @@ var (
 	//ErrMailboxSymkeyIDNotString - error symKeyID is not string type
 	ErrMailboxSymkeyIDNotString = fmt.Errorf("symKeyID is not string")
 	//ErrPeerNotExist - error peer field doesn't exist in request
-	ErrPeerNotExist = fmt.Errorf("peer does not exist")
-	//ErrPeerNotString - error peer is not string type
-	ErrPeerNotString = fmt.Errorf("peer is not string")
+	ErrPeerOrEnode = fmt.Errorf("enode or peer field should be not empty")
 )
 
 const defaultWorkTime = 5
 
 //RequestHistoricMessagesHandler returns an RPC handler which sends a p2p request for historic messages.
-func RequestHistoricMessagesHandler(nodeManager common.NodeManager) (rpc.Handler, error) {
-	whisper, err := nodeManager.WhisperService()
-	if err != nil {
-		return nil, err
-	}
-
-	node, err := nodeManager.Node()
-	if err != nil {
-		return nil, err
-	}
-
+func RequestHistoricMessagesHandler(nodeManager common.NodeManager) rpc.Handler {
 	return func(ctx context.Context, args ...interface{}) (interface{}, error) {
-		r, err := parseArgs(args)
+		whisper, err := nodeManager.WhisperService()
+		if err != nil {
+			return nil, err
+		}
+
+		node, err := nodeManager.Node()
+		if err != nil {
+			return nil, err
+		}
+
+		r, err := parseArgs(args...)
 		if err != nil {
 			return nil, err
 		}
@@ -67,7 +66,7 @@ func RequestHistoricMessagesHandler(nodeManager common.NodeManager) (rpc.Handler
 		}
 
 		return true, nil
-	}, nil
+	}
 }
 
 type historicMessagesRequest struct {
@@ -129,15 +128,11 @@ func parseArgs(args ...interface{}) (historicMessagesRequest, error) {
 		return historicMessagesRequest{}, ErrMailboxSymkeyIDNotString
 	}
 
-	peerInterfaceValue, ok := historicMessagesArgs["peer"]
-	if !ok {
-		return historicMessagesRequest{}, ErrPeerNotExist
+	peer, err := getPeerID(historicMessagesArgs)
+	if err != nil {
+		return historicMessagesRequest{}, err
 	}
-	r.Peer, ok = peerInterfaceValue.([]byte)
-	if !ok {
-		return historicMessagesRequest{}, ErrPeerNotString
-	}
-
+	r.Peer = peer
 	return r, nil
 }
 
@@ -164,4 +159,29 @@ func makePayloadData(r historicMessagesRequest) []byte {
 	binary.BigEndian.PutUint32(data[4:], r.TimeUp)
 	copy(data[8:], r.Topic[:])
 	return data
+}
+
+//getPeerID is used to get peerID from string values of peerID or enode
+func getPeerID(m map[string]interface{}) ([]byte, error) {
+	peerInterfaceValue, okPeer := m["peer"]
+	enodeInterfaceValue, okEnode := m["enode"]
+
+	//only if existing peer or enode(!xor)
+	if okPeer == okEnode {
+		return nil, ErrPeerOrEnode
+	}
+	var peerOrEnode string
+	if p, ok := peerInterfaceValue.(string); ok && okPeer {
+		peerOrEnode = p
+	} else if str, ok := enodeInterfaceValue.(string); ok && okEnode {
+		peerOrEnode = str
+	} else {
+		return nil, ErrPeerOrEnode
+	}
+
+	n, err := discover.ParseNode(peerOrEnode)
+	if err != nil {
+		return nil, err
+	}
+	return n.ID[:], nil
 }
