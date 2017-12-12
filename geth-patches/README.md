@@ -27,19 +27,29 @@ When a new stable release of `go-ethereum` comes out, we need to upgrade our for
 ## How to update forked version
 Make sure you have `status-go` in your `$GOPATH/src/github.com/status-im/` first.
 
+### From very scratch
+Use this method if you're up to nuke forked repo for some reason and apply patches from scratch:
+
 ```
 # from scratch
 rm -rf $GOPATH/src/github.com/status-im/go-ethereum
 cd $GOPATH/src/github.com/status-im/
 git clone https://github.com/ethereum/go-ethereum
 
-# switch to the latest 1.7 release branch (you may want to checkout the tag here as well)
-git co release/1.7
-
 # update remote url to point to our fork repo
  git remote set-url origin git@github.com:status-im/go-ethereum.git
 
-# apply patches
+```
+
+### Using existing fork repo (recommended)
+
+```
+# merge upstream release branch into local master
+git pull git@github.com:ethereum/go-ethereum.git release/1.7:master
+```
+
+### Apply patches
+```
 for patch in $GOPATH/src/github.com/status-im/status-go/geth-patches/*.patch;
 do
     patch -p1 < $patch;
