@@ -119,8 +119,9 @@ describe('Whisper MailServer', () => {
             }).catch(done);
 
             // send a request for old messages
-            // TODO(adam): statusd client and router are pure go-ethereum and this call returns
+            // TODO(adam): RPC client and router are pure go-ethereum and this call returns
             // "The method shh_requestMessages does not exist/is not available".
+            // In order to get it working, we would need to add shh_requestMessages in go-ethereum.
             axios.post('http://localhost:8591', {
                 'method': 'shh_requestMessages',
                 'params': [{
