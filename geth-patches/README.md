@@ -10,7 +10,6 @@ We try to minimize number and amount of changes in those patches as much as poss
 # Patches
 
  - `0000-accounts-hd-keys.patch` — adds support for HD extended keys (links/docs?)
- - `0001-wnode-something.patch` – adds something to the wnode :) (need to check if it is needed at all)
  - `0002-les-api-status.patch` — adds StatusBackend into LES code (need to be inspected, some things can and should be done outside of les code)
  - `0003-dockerfiles-wnode-swarm.patch` — adds Dockerfiles (who uses this?)
  - `0004-whisper-notifications.patch` — adds Whisper notifications (need to be reviewed and documented)
