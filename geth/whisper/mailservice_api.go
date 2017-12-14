@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/binary"
 	"fmt"
+	"time"
 
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/whisper/whisperv5"
@@ -46,6 +47,12 @@ type MessagesRequest struct {
 // RequestMessages sends a request for historic messages to a MailServer.
 func (api *MailServicePublicAPI) RequestMessages(ctx context.Context, r MessagesRequest) (bool, error) {
 	log.Info("RequestMessages", "request", r)
+
+	// set defaults
+	if r.From == 0 && r.To == 0 {
+		r.From = uint32(time.Now().UTC().Add(-24 * time.Hour).Unix())
+		r.To = uint32(time.Now().UTC().Unix())
+	}
 
 	shh, err := api.nodeManager.WhisperService()
 	if err != nil {
