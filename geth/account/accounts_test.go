@@ -9,7 +9,9 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/accounts/keystore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/golang/mock/gomock"
 	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/common"
 	. "github.com/status-im/status-go/testing"
@@ -108,4 +110,47 @@ func TestVerifyAccountPasswordWithAccountBeforeEIP55(t *testing.T) {
 	address := gethcommon.HexToAddress(TestConfig.Account3.Address)
 	_, err = acctManager.VerifyAccountPassword(keyStoreDir, address.Hex(), TestConfig.Account3.Password)
 	require.NoError(t, err)
+}
+
+func TestCreateAndRecoverAccount(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	nodeManager := common.NewMockNodeManager(ctrl)
+
+	// Create an arbitrary keystore for the process
+	keyStoreDir, err := ioutil.TempDir(os.TempDir(), "accounts")
+	require.NoError(t, err)
+	defer os.RemoveAll(keyStoreDir) //nolint: errcheck
+	keyStore := keystore.NewKeyStore(keyStoreDir, 4, 5)
+
+	manager := account.NewManager(nodeManager)
+	password := "some-pass"
+
+	// Fail if account keystore can't be acquired
+	errString := "Non-nil error string"
+	nodeManager.EXPECT().AccountKeyStore().Return(nil, errors.New(errString))
+	_, _, _, err = manager.CreateAccount(password)
+	require.Equal(t, err.Error(), errString)
+
+	nodeManager.EXPECT().AccountKeyStore().Return(keyStore, nil)
+	addr1, pubKey1, mnemonic, err := manager.CreateAccount(password)
+	require.NoError(t, err)
+
+	// Expect non-nil return values
+	require.NotNil(t, addr1)
+	require.NotNil(t, pubKey1)
+	require.NotNil(t, mnemonic)
+
+	// Now recover the account using the mnemonic seed and the password
+	nodeManager.EXPECT().AccountKeyStore().Return(keyStore, nil)
+	addr2, pubKey2, err := manager.RecoverAccount(password, mnemonic)
+	require.NoError(t, err)
+
+	// Expect the same return values
+	require.Equal(t, addr1, addr2)
+	require.Equal(t, pubKey1, pubKey2)
+
+	// Fail if account keystore can't be acquired
+	nodeManager.EXPECT().AccountKeyStore().Return(nil, errors.New(errString))
+	_, _, err = manager.RecoverAccount(password, mnemonic)
+	require.Equal(t, err.Error(), errString)
 }
