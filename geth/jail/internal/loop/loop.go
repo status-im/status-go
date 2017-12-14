@@ -26,6 +26,28 @@ type Task interface {
 	Cancel()
 }
 
+// state encapsulates the loop's open and closedness. This is a boolean variable
+// indicating whether the loop is open for new tasks and a lock to control
+// access to this boolean.
+type state struct {
+	accept bool
+	mu     sync.RWMutex
+}
+
+// isAccepting indicates whether the loop is currently accepting tasks.
+func (s *state) isAccepting() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.accept
+}
+
+// close changes the loop's state to not accept new tasks.
+func (s *state) close() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.accept = false
+}
+
 // Loop encapsulates the event loop's state. This includes the vm on which the
 // loop operates, a monotonically incrementing event id, a map of tasks that
 // aren't ready yet, keyed by their ID, a channel of tasks that are ready
@@ -43,26 +65,6 @@ type Loop struct {
 	tasks map[int64]Task
 	ready chan Task
 	state
-}
-
-// state encapsulates the loop's open and closedness. This is a boolean variable
-// indicating whether the loop is open for new tasks and a lock to control
-// access to this boolean.
-type state struct {
-	accept bool
-	lock   sync.RWMutex
-}
-
-func (s *state) accepting() bool {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	return s.accept
-}
-
-func (s *state) close() {
-	s.lock.Lock()
-	s.accept = false
-	s.lock.Unlock()
 }
 
 // New creates a new Loop with an unbuffered ready queue on a specific VM.
@@ -83,10 +85,11 @@ func NewWithBacklog(vm *vm.VM, backlog int) *Loop {
 	}
 }
 
+// close the loop so that it no longer accepts tasks.
 func (l *Loop) close() {
 	l.lock.Lock()
 	defer l.lock.Unlock()
-	if l.accepting() {
+	if l.isAccepting() {
 		l.state.close()
 		close(l.ready)
 	}
@@ -103,12 +106,12 @@ func (l *Loop) VM() *vm.VM {
 func (l *Loop) Add(t Task) error {
 	l.lock.Lock()
 	defer l.lock.Unlock()
-	if l.accepting() {
-		t.SetID(atomic.AddInt64(&l.id, 1))
-		l.tasks[t.GetID()] = t
-		return nil
+	if !l.isAccepting() {
+		return errors.New("The loop is closed and no longer accepting tasks")
 	}
-	return errors.New("The loop is closed and no longer accepting tasks")
+	t.SetID(atomic.AddInt64(&l.id, 1))
+	l.tasks[t.GetID()] = t
+	return nil
 }
 
 // Remove takes a task out of the loop. This should not be called if a task
@@ -143,11 +146,11 @@ func (l *Loop) removeAll() {
 func (l *Loop) Ready(t Task) error {
 	l.lock.Lock()
 	defer l.lock.Unlock()
-	if l.accepting() {
-		l.ready <- t
-		return nil
+	if !l.isAccepting() {
+		return errors.New("The loop is closed and no longer accepting tasks")
 	}
-	return errors.New("The loop is closed and no longer accepting tasks")
+	l.ready <- t
+	return nil
 }
 
 // Eval executes some code in the VM associated with the loop and returns an
