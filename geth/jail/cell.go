@@ -13,6 +13,8 @@ import (
 	"github.com/status-im/status-go/geth/jail/internal/vm"
 )
 
+const timeout = 5 * time.Second
+
 // Cell represents a single jail cell, which is basically a JavaScript VM.
 type Cell struct {
 	*vm.VM
@@ -89,21 +91,22 @@ func (c *Cell) Stop() error {
 func (c *Cell) CallAsync(fn otto.Value, args ...interface{}) error {
 	task := looptask.NewCallTask(fn, args...)
 	errChan := make(chan error, 1)
+	defer close(errChan)
 
 	go func() {
 		err := c.loop.Add(task)
 		if err != nil {
 			errChan <- err
+			return
 		}
 
 		err = c.loop.Ready(task)
 		if err != nil {
 			errChan <- err
 		}
-		close(errChan)
 	}()
 
-	timer := time.NewTimer(6000 * time.Millisecond)
+	timer := time.NewTimer(timeout)
 	defer timer.Stop()
 
 	for {
