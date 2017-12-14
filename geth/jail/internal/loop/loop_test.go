@@ -58,8 +58,15 @@ func (s *LoopSuite) TestAddAndReady() {
 
 	// Wait for the context to cancel and loop to close
 	time.Sleep(100 * time.Millisecond)
+}
 
-	err = s.loop.Add(s.mockTask)
+func (s *LoopSuite) TestLoopErrorWhenClosed() {
+	s.cancel()
+
+	// Wait for the context to cancel and loop to close
+	time.Sleep(100 * time.Millisecond)
+
+	err := s.loop.Add(s.mockTask)
 	s.Error(err)
 
 	err = s.loop.Ready(s.mockTask)
