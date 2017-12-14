@@ -6,11 +6,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/stretchr/testify/require"
 )
 
-func TestParseArgs(t *testing.T) {
+func TestParseStringParams(t *testing.T) {
 	testCases := []struct {
 		name    string
 		data    string
@@ -27,7 +28,7 @@ func TestParseArgs(t *testing.T) {
 				"to": 1612515820
 			}]`,
 			historicMessagesRequest{
-				Peer:     "enode://0f51d75c9469de0852571c4618fe151265d4930ea35f968eb1a12e69c12f7cbabed856a12b31268a825ca2c9bafa47ef665b1b17be1ab71de83338c4b7439b24@127.0.0.1:30303",
+				Peer:     mustGetPeer("enode://0f51d75c9469de0852571c4618fe151265d4930ea35f968eb1a12e69c12f7cbabed856a12b31268a825ca2c9bafa47ef665b1b17be1ab71de83338c4b7439b24@127.0.0.1:30303"),
 				Topic:    whisperv5.BytesToTopic([]byte("0xaabb11ee")),
 				SymKeyID: "7963bd35a4534f773aee33bd0aec2d175a9d8d104fc020eb0769b05adeb6dda2",
 				TimeLow:  1612505820,
@@ -68,7 +69,7 @@ func TestParseArgs(t *testing.T) {
 				"symKeyID": "7963bd35a4534f773aee33bd0aec2d175a9d8d104fc020eb0769b05adeb6dda2"
 			}]`,
 			historicMessagesRequest{
-				Peer:     "enode://0f51d75c9469de0852571c4618fe151265d4930ea35f968eb1a12e69c12f7cbabed856a12b31268a825ca2c9bafa47ef665b1b17be1ab71de83338c4b7439b24@127.0.0.1:30303",
+				Peer:     mustGetPeer("enode://0f51d75c9469de0852571c4618fe151265d4930ea35f968eb1a12e69c12f7cbabed856a12b31268a825ca2c9bafa47ef665b1b17be1ab71de83338c4b7439b24@127.0.0.1:30303"),
 				Topic:    whisperv5.BytesToTopic([]byte("0xaabb11ee")),
 				SymKeyID: "7963bd35a4534f773aee33bd0aec2d175a9d8d104fc020eb0769b05adeb6dda2",
 				TimeLow:  uint32(time.Now().Add(-24 * time.Hour).Unix()),
@@ -91,4 +92,35 @@ func TestParseArgs(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestParseMapParams(t *testing.T) {
+	params := map[string]interface{}{
+		"enode":    "enode://0f51d75c9469de0852571c4618fe151265d4930ea35f968eb1a12e69c12f7cbabed856a12b31268a825ca2c9bafa47ef665b1b17be1ab71de83338c4b7439b24@127.0.0.1:30303",
+		"topic":    whisperv5.BytesToTopic([]byte("test-topic")),
+		"symKeyID": "7963bd35a4534f773aee33bd0aec2d175a9d8d104fc020eb0769b05adeb6dda2",
+		"from":     1612505820,
+		"to":       1612515820,
+	}
+	request, err := parseArgs([]interface{}{params})
+	require.NoError(t, err)
+	require.Equal(
+		t,
+		historicMessagesRequest{
+			Peer:     mustGetPeer("enode://0f51d75c9469de0852571c4618fe151265d4930ea35f968eb1a12e69c12f7cbabed856a12b31268a825ca2c9bafa47ef665b1b17be1ab71de83338c4b7439b24@127.0.0.1:30303"),
+			Topic:    whisperv5.BytesToTopic([]byte("test-topic")),
+			SymKeyID: "7963bd35a4534f773aee33bd0aec2d175a9d8d104fc020eb0769b05adeb6dda2",
+			TimeLow:  1612505820,
+			TimeUp:   1612515820,
+		},
+		request,
+	)
+}
+
+func mustGetPeer(enode string) []byte {
+	node, err := discover.ParseNode(enode)
+	if err != nil {
+		panic(err)
+	}
+	return node.ID[:]
 }

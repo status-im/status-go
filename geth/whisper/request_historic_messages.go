@@ -34,7 +34,7 @@ const defaultWorkTime = 5
 // which sends a p2p request for historic messages.
 func RequestHistoricMessagesHandler(nodeManager common.NodeManager) rpc.Handler {
 	return func(ctx context.Context, args ...interface{}) (interface{}, error) {
-		log.Info("RequestHistoricMessagesHandler", "args", args)
+		log.Info("RequestHistoricMessagesHandler start")
 
 		whisper, err := nodeManager.WhisperService()
 		if err != nil {
@@ -53,6 +53,8 @@ func RequestHistoricMessagesHandler(nodeManager common.NodeManager) rpc.Handler 
 
 		r.PoW = whisper.MinPow()
 
+		log.Info("RequestHistoricMessagesHandler parsed request", "request", r)
+
 		symKey, err := whisper.GetSymKey(r.SymKeyID)
 		if err != nil {
 			return nil, err
@@ -63,7 +65,7 @@ func RequestHistoricMessagesHandler(nodeManager common.NodeManager) rpc.Handler 
 			return nil, err
 		}
 
-		err = whisper.RequestHistoricMessages([]byte(r.Peer), envelope)
+		err = whisper.RequestHistoricMessages(r.Peer, envelope)
 		if err != nil {
 			return nil, err
 		}
@@ -74,7 +76,7 @@ func RequestHistoricMessagesHandler(nodeManager common.NodeManager) rpc.Handler 
 
 type historicMessagesRequest struct {
 	// MailServer enode address.
-	Peer string
+	Peer []byte
 
 	// TimeLow is a lower bound of time range (optional).
 	// Default is 24 hours back from now.
@@ -109,23 +111,28 @@ func parseArgs(args []interface{}) (r historicMessagesRequest, err error) {
 	if !ok {
 		return r, errMissingEnode
 	}
-	r.Peer, ok = enodeInterface.(string)
+	enode, ok := enodeInterface.(string)
 	if !ok {
 		return r, errInvalidEnode
 	}
-	if _, err := discover.ParseNode(r.Peer); err != nil {
+	nodeInfo, err := discover.ParseNode(enode)
+	if err != nil {
 		return r, fmt.Errorf("%v: %v", errInvalidEnode, err)
 	}
+	r.Peer = nodeInfo.ID[:]
 
 	topicInterface, ok := param["topic"]
 	if !ok {
 		return r, errMissingTopic
 	}
-	topic, ok := topicInterface.(string)
-	if !ok {
-		return r, errInvalidTopic
+	switch t := topicInterface.(type) {
+	case string:
+		r.Topic = whisperv5.BytesToTopic([]byte(t))
+	case []byte:
+		r.Topic = whisperv5.BytesToTopic(t)
+	case whisperv5.TopicType:
+		r.Topic = t
 	}
-	r.Topic = whisperv5.BytesToTopic([]byte(topic))
 
 	symKeyIDInterface, ok := param["symKeyID"]
 	if !ok {
@@ -140,7 +147,7 @@ func parseArgs(args []interface{}) (r historicMessagesRequest, err error) {
 		if value, ok := parseToUint32(t); ok {
 			r.TimeLow = value
 		} else {
-			return r, errors.New("from value must be unix time in seconds")
+			return r, fmt.Errorf("from value must be unix time in seconds, got: %T", t)
 		}
 	} else {
 		r.TimeLow = uint32(time.Now().UTC().Add(-24 * time.Hour).Unix())
@@ -149,7 +156,7 @@ func parseArgs(args []interface{}) (r historicMessagesRequest, err error) {
 		if value, ok := parseToUint32(t); ok {
 			r.TimeUp = value
 		} else {
-			return r, errors.New("to value must be unix time in seconds")
+			return r, fmt.Errorf("to value must be unix time in seconds, got: %T", t)
 		}
 	} else {
 		r.TimeUp = uint32(time.Now().UTC().Unix())
@@ -164,6 +171,14 @@ func parseArgs(args []interface{}) (r historicMessagesRequest, err error) {
 func parseToUint32(val interface{}) (uint32, bool) {
 	switch t := val.(type) {
 	case float64:
+		if t >= 0 && t < math.MaxUint32 {
+			return uint32(t), true
+		}
+	case int:
+		if t >= 0 && t < math.MaxUint32 {
+			return uint32(t), true
+		}
+	case int64:
 		if t >= 0 && t < math.MaxUint32 {
 			return uint32(t), true
 		}

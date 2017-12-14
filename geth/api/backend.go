@@ -78,7 +78,7 @@ func (m *StatusBackend) IsNodeRunning() bool {
 }
 
 // StartNode start Status node, fails if node is already started
-func (m *StatusBackend) StartNode(config *params.NodeConfig) (<-chan struct{}, error) {
+func (m *StatusBackend) StartNode(config *params.NodeConfig, opts ...common.NodeOption) (<-chan struct{}, error) {
 	m.Lock()
 	defer m.Unlock()
 
@@ -86,7 +86,7 @@ func (m *StatusBackend) StartNode(config *params.NodeConfig) (<-chan struct{}, e
 		return nil, node.ErrNodeExists
 	}
 
-	nodeStarted, err := m.nodeManager.StartNode(config)
+	nodeStarted, err := m.nodeManager.StartNode(config, opts...)
 	if err != nil {
 		return nil, err
 	}

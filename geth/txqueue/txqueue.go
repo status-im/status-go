@@ -100,9 +100,11 @@ func (q *TxQueue) Stop() {
 func (q *TxQueue) evictionLoop() {
 	defer HaltOnPanic()
 	evict := func() {
+		q.mu.Lock()
 		if len(q.transactions) >= DefaultTxQueueCap { // eviction is required to accommodate another/last item
 			q.Remove(<-q.evictableIDs)
 		}
+		q.mu.Unlock()
 	}
 
 	for {

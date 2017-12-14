@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
+	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/rpc"
@@ -54,15 +55,15 @@ func NewNodeManager() *NodeManager {
 }
 
 // StartNode start Status node, fails if node is already started
-func (m *NodeManager) StartNode(config *params.NodeConfig) (<-chan struct{}, error) {
+func (m *NodeManager) StartNode(config *params.NodeConfig, opts ...common.NodeOption) (<-chan struct{}, error) {
 	m.Lock()
 	defer m.Unlock()
 
-	return m.startNode(config)
+	return m.startNode(config, opts)
 }
 
 // startNode start Status node, fails if node is already started
-func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, error) {
+func (m *NodeManager) startNode(config *params.NodeConfig, opts []common.NodeOption) (<-chan struct{}, error) {
 	if m.node != nil || m.nodeStarted != nil {
 		return nil, ErrNodeExists
 	}
@@ -72,6 +73,12 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 	ethNode, err := MakeNode(config, LogDeliveryService{})
 	if err != nil {
 		return nil, err
+	}
+
+	for _, opt := range opts {
+		if err := opt(ethNode); err != nil {
+			return nil, err
+		}
 	}
 
 	m.nodeStarted = make(chan struct{}, 1)
@@ -332,7 +339,7 @@ func (m *NodeManager) resetChainData() (<-chan struct{}, error) {
 	})
 	log.Info("Chain data has been removed", "dir", chainDataDir)
 
-	return m.startNode(&prevConfig)
+	return m.startNode(&prevConfig, nil)
 }
 
 // RestartNode restart running Status node, fails if node is not running
@@ -361,7 +368,7 @@ func (m *NodeManager) restartNode() (<-chan struct{}, error) {
 	<-nodeStopped
 	m.Lock()
 
-	return m.startNode(&prevConfig)
+	return m.startNode(&prevConfig, nil)
 }
 
 // NodeConfig exposes reference to running node's configuration
