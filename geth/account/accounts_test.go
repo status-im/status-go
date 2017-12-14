@@ -133,10 +133,17 @@ func newTestKeyStore(t *testing.T, dir string) (keyStore *keystore.KeyStore, key
 func TestCreateAndRecoverAccountSuccess(t *testing.T) {
 	accManager, nodeManager := newTestAccManager(t)
 
-	password := "some-pass"
+	var password string
 
 	keyStore, keyStoreDir := newTestKeyStore(t, "accounts")
 	defer os.RemoveAll(keyStoreDir) //nolint: errcheck
+
+	// Don't fail on empty password
+	nodeManager.EXPECT().AccountKeyStore().Return(keyStore, nil)
+	_, _, _, err := accManager.CreateAccount(password)
+	require.NoError(t, err)
+
+	password = "some-pass"
 
 	nodeManager.EXPECT().AccountKeyStore().Return(keyStore, nil)
 	addr1, pubKey1, mnemonic, err := accManager.CreateAccount(password)
