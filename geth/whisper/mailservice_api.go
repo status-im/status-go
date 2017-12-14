@@ -45,7 +45,7 @@ type MessagesRequest struct {
 }
 
 // RequestMessages sends a request for historic messages to a MailServer.
-func (api *MailServicePublicAPI) RequestMessages(ctx context.Context, r MessagesRequest) (bool, error) {
+func (api *MailServicePublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (bool, error) {
 	log.Info("RequestMessages", "request", r)
 
 	// set defaults

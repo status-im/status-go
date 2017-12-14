@@ -20,7 +20,6 @@ var (
 	errInvalidNumberOfParams = errors.New("invalid number of parameters, expected 1 parameter")
 	errInvalidParams         = errors.New("invalid parameter data type")
 	errMissingTopic          = errors.New("topic value is required")
-	errInvalidTopic          = errors.New("topic must be a string")
 	errMissingSymKeyID       = errors.New("symKeyID value is required")
 	errInvalidSymKeyID       = errors.New("symKeyID must be a string")
 	errMissingEnode          = errors.New("enode value is missing")
@@ -97,7 +96,7 @@ type historicMessagesRequest struct {
 	PoW float64
 }
 
-func parseArgs(args []interface{}) (r historicMessagesRequest, err error) {
+func parseArgs(args []interface{}) (r historicMessagesRequest, err error) { //nolint: gocyclo
 	if len(args) != 1 {
 		return r, errInvalidNumberOfParams
 	}
