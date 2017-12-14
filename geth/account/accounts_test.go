@@ -112,45 +112,70 @@ func TestVerifyAccountPasswordWithAccountBeforeEIP55(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestCreateAndRecoverAccount(t *testing.T) {
+// newTestAccManager returns the account manager and the mock node manager
+// that's being used within it for testing purposes.
+func newTestAccManager(t *testing.T) (accManager *account.Manager, nodeManager *common.MockNodeManager) {
 	ctrl := gomock.NewController(t)
-	nodeManager := common.NewMockNodeManager(ctrl)
+	nodeManager = common.NewMockNodeManager(ctrl)
+	accManager = account.NewManager(nodeManager)
+	return
+}
 
-	// Create an arbitrary keystore for the process
-	keyStoreDir, err := ioutil.TempDir(os.TempDir(), "accounts")
+// newTestKeyStore returns a key store to use in tests
+func newTestKeyStore(t *testing.T, dir string) (keyStore *keystore.KeyStore, keyStoreDir string) {
+	var err error
+	keyStoreDir, err = ioutil.TempDir(os.TempDir(), dir)
 	require.NoError(t, err)
-	defer os.RemoveAll(keyStoreDir) //nolint: errcheck
-	keyStore := keystore.NewKeyStore(keyStoreDir, 4, 5)
+	keyStore = keystore.NewKeyStore(keyStoreDir, keystore.LightScryptN, keystore.LightScryptP)
+	return
+}
 
-	manager := account.NewManager(nodeManager)
+func TestCreateAndRecoverAccountSuccess(t *testing.T) {
+	accManager, nodeManager := newTestAccManager(t)
+
 	password := "some-pass"
 
-	// Fail if account keystore can't be acquired
-	errString := "Non-nil error string"
-	nodeManager.EXPECT().AccountKeyStore().Return(nil, errors.New(errString))
-	_, _, _, err = manager.CreateAccount(password)
-	require.Equal(t, err.Error(), errString)
+	keyStore, keyStoreDir := newTestKeyStore(t, "accounts")
+	defer os.RemoveAll(keyStoreDir) //nolint: errcheck
 
 	nodeManager.EXPECT().AccountKeyStore().Return(keyStore, nil)
-	addr1, pubKey1, mnemonic, err := manager.CreateAccount(password)
+	addr1, pubKey1, mnemonic, err := accManager.CreateAccount(password)
 	require.NoError(t, err)
 
-	// Expect non-nil return values
 	require.NotNil(t, addr1)
 	require.NotNil(t, pubKey1)
 	require.NotNil(t, mnemonic)
 
 	// Now recover the account using the mnemonic seed and the password
 	nodeManager.EXPECT().AccountKeyStore().Return(keyStore, nil)
-	addr2, pubKey2, err := manager.RecoverAccount(password, mnemonic)
+	addr2, pubKey2, err := accManager.RecoverAccount(password, mnemonic)
 	require.NoError(t, err)
 
-	// Expect the same return values
 	require.Equal(t, addr1, addr2)
 	require.Equal(t, pubKey1, pubKey2)
+}
+
+func TestCreateAndRecoverAccountFail_KeyStore(t *testing.T) {
+	accManager, nodeManager := newTestAccManager(t)
+
+	password := "some-pass"
+
+	keyStore, keyStoreDir := newTestKeyStore(t, "accounts")
+	defer os.RemoveAll(keyStoreDir) //nolint: errcheck
 
 	// Fail if account keystore can't be acquired
-	nodeManager.EXPECT().AccountKeyStore().Return(nil, errors.New(errString))
-	_, _, err = manager.RecoverAccount(password, mnemonic)
-	require.Equal(t, err.Error(), errString)
+
+	expectedErr := errors.New("Non-nil error string")
+	nodeManager.EXPECT().AccountKeyStore().Return(nil, expectedErr)
+	_, _, _, err := accManager.CreateAccount(password)
+	require.Equal(t, err, expectedErr)
+
+	// Create a new account to use the mnemonic seed.
+	nodeManager.EXPECT().AccountKeyStore().Return(keyStore, nil)
+	_, _, mnemonic, err := accManager.CreateAccount(password)
+	require.NoError(t, err)
+
+	nodeManager.EXPECT().AccountKeyStore().Return(nil, expectedErr)
+	_, _, err = accManager.RecoverAccount(password, mnemonic)
+	require.Equal(t, err, expectedErr)
 }
