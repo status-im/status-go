@@ -6,7 +6,6 @@ import (
 	"runtime"
 	"strconv"
 	"testing"
-	"time"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/geth/common"
@@ -80,18 +79,4 @@ func FirstBlockHash(nodeManager common.NodeManager) (string, error) {
 	}
 
 	return firstBlock.Hash.Hex(), nil
-}
-
-// Retry calls `fn` every `duration` until it returns no error
-// or run `fn` more than `times` times.
-func Retry(fn func() error, times int, duration time.Duration) (err error) {
-	for i := 0; i < times; i++ {
-		<-time.After(duration)
-		err = fn()
-		if err == nil {
-			return
-		}
-	}
-
-	return
 }
