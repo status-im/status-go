@@ -103,6 +103,7 @@ func (c *Cell) CallAsync(fn otto.Value, args ...interface{}) error {
 		err = c.loop.Ready(task)
 		if err != nil {
 			errChan <- err
+			return
 		}
 	}()
 
