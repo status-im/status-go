@@ -112,9 +112,9 @@ func TestVerifyAccountPasswordWithAccountBeforeEIP55(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// newTestAccManager returns the account manager and the mock node manager
+// newTestManager returns the account manager and the mock node manager
 // that's being used within it for testing purposes.
-func newTestAccManager(t *testing.T) (accManager *account.Manager, nodeManager *common.MockNodeManager) {
+func newTestManager(t *testing.T) (accManager *account.Manager, nodeManager *common.MockNodeManager) {
 	ctrl := gomock.NewController(t)
 	nodeManager = common.NewMockNodeManager(ctrl)
 	accManager = account.NewManager(nodeManager)
@@ -131,7 +131,7 @@ func newTestKeyStore(t *testing.T, dir string) (keyStore *keystore.KeyStore, key
 }
 
 func TestCreateAndRecoverAccountSuccess(t *testing.T) {
-	accManager, nodeManager := newTestAccManager(t)
+	accManager, nodeManager := newTestManager(t)
 
 	var password string
 
@@ -163,7 +163,7 @@ func TestCreateAndRecoverAccountSuccess(t *testing.T) {
 }
 
 func TestCreateAndRecoverAccountFail_KeyStore(t *testing.T) {
-	accManager, nodeManager := newTestAccManager(t)
+	accManager, nodeManager := newTestManager(t)
 
 	password := "some-pass"
 
