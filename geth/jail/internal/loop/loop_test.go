@@ -18,8 +18,6 @@ func TestLoopSuite(t *testing.T) {
 type LoopSuite struct {
 	suite.Suite
 
-	id int64
-
 	loop   *Loop
 	cancel context.CancelFunc
 
