@@ -21,9 +21,7 @@ func TestRequestMessagesFailures(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	provider := NewMockServiceProvider(ctrl)
 	api := NewPublicAPI(provider)
-	// Create Whisper service.
 	shh := whisper.New(nil)
-
 	// Node is ephemeral (only in memory).
 	nodeA, nodeErr := node.New(&node.Config{NoUSB: true})
 	require.NoError(t, nodeErr)

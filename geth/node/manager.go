@@ -32,9 +32,6 @@ var (
 	ErrRPCClient                   = errors.New("failed to init RPC client")
 )
 
-// NodeOption allows to apply some node configuration before node is started.
-type NodeOption func(*node.Node) error
-
 // NodeManager manages Status node (which abstracts contained geth node)
 // nolint: golint
 // should be fixed at https://github.com/status-im/status-go/issues/200
@@ -62,17 +59,11 @@ func (m *NodeManager) StartNode(config *params.NodeConfig) (<-chan struct{}, err
 	m.Lock()
 	defer m.Unlock()
 
-	return m.startNode(config, []NodeOption{
-		func(n *node.Node) error {
-			return n.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-				return mailservice.New(m), nil
-			})
-		},
-	})
+	return m.startNode(config)
 }
 
 // startNode start Status node, fails if node is already started
-func (m *NodeManager) startNode(config *params.NodeConfig, opts []NodeOption) (<-chan struct{}, error) {
+func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, error) {
 	if m.node != nil || m.nodeStarted != nil {
 		return nil, ErrNodeExists
 	}
@@ -84,10 +75,11 @@ func (m *NodeManager) startNode(config *params.NodeConfig, opts []NodeOption) (<
 		return nil, err
 	}
 
-	for _, opt := range opts {
-		if err := opt(ethNode); err != nil {
-			return nil, err
-		}
+	// activate MailService required for Offline Inboxing
+	if err := ethNode.Register(func(_ *node.ServiceContext) (node.Service, error) {
+		return mailservice.New(m), nil
+	}); err != nil {
+		return nil, nil
 	}
 
 	m.nodeStarted = make(chan struct{}, 1)
@@ -348,7 +340,7 @@ func (m *NodeManager) resetChainData() (<-chan struct{}, error) {
 	})
 	log.Info("Chain data has been removed", "dir", chainDataDir)
 
-	return m.startNode(&prevConfig, nil)
+	return m.startNode(&prevConfig)
 }
 
 // RestartNode restart running Status node, fails if node is not running
@@ -377,7 +369,7 @@ func (m *NodeManager) restartNode() (<-chan struct{}, error) {
 	<-nodeStopped
 	m.Lock()
 
-	return m.startNode(&prevConfig, nil)
+	return m.startNode(&prevConfig)
 }
 
 // NodeConfig exposes reference to running node's configuration

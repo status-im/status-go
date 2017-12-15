@@ -85,7 +85,9 @@ func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (boo
 		return false, fmt.Errorf("%v: %v", ErrInvalidSymKeyID, err)
 	}
 
-	envelope, err := makeEnvelopAPI(makePayloadAPI(r), symKey, node.Server().PrivateKey, shh.MinPow())
+	envelope, err := makeEnvelopAPI(
+		makePayloadAPI(r), symKey, node.Server().PrivateKey, shh.MinPow(), defaultWorkTime,
+	)
 	if err != nil {
 		return false, err
 	}
@@ -100,12 +102,14 @@ func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (boo
 // makeEnvelopAPI makes an envelop for a historic messages request.
 // Symmetric key is used to authenticate to MailServer.
 // PK is the current node ID.
-func makeEnvelopAPI(payload []byte, symKey []byte, nodeID *ecdsa.PrivateKey, pow float64) (*whisper.Envelope, error) {
+func makeEnvelopAPI(
+	payload []byte, symKey []byte, nodeID *ecdsa.PrivateKey, pow float64, workTime uint32,
+) (*whisper.Envelope, error) {
 	params := whisper.MessageParams{
 		PoW:      pow,
 		Payload:  payload,
 		KeySym:   symKey,
-		WorkTime: defaultWorkTime,
+		WorkTime: workTime,
 		Src:      nodeID,
 	}
 	message, err := whisper.NewSentMessage(&params)
