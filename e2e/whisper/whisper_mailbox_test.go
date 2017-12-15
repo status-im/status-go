@@ -417,6 +417,7 @@ func (s *WhisperMailboxSuite) TestRequestMessagesFromMailboxFromGroupChat() {
 
 	msgFilterResp = returnedIDResponse{}
 	err = json.Unmarshal([]byte(resp), &msgFilterResp)
+	s.Require().NoError(err)
 	bobGroupChatMessageFilterID := msgFilterResp.Result
 
 	//charlie receive group chat data and add it to his node
@@ -455,6 +456,7 @@ func (s *WhisperMailboxSuite) TestRequestMessagesFromMailboxFromGroupChat() {
 
 	msgFilterResp = returnedIDResponse{}
 	err = json.Unmarshal([]byte(resp), &msgFilterResp)
+	s.Require().NoError(err)
 	charlieGroupChatMessageFilterID := msgFilterResp.Result
 
 	helloWorldMessage := hexutil.Encode([]byte("Hello world!"))
@@ -522,7 +524,6 @@ func (s *WhisperMailboxSuite) TestRequestMessagesFromMailboxFromGroupChat() {
 	err = json.Unmarshal([]byte(resp), &messages)
 	s.Require().NoError(err)
 	s.Require().Equal(0, len(messages.Result))
-	s.Require().NoError(err)
 
 	//Request each one messages from mailbox using enode
 	resp = bobRpcClient.CallRaw(`{
@@ -537,6 +538,9 @@ func (s *WhisperMailboxSuite) TestRequestMessagesFromMailboxFromGroupChat() {
 					"to":` + strconv.FormatInt(time.Now().UnixNano()/int64(time.Second), 10) + `
 		}]
 	}`)
+	reqMessagesResp := baseRPCResponse{}
+	err = json.Unmarshal([]byte(resp), &reqMessagesResp)
+	s.Require().NoError(err)
 
 	resp = charlieRpcClient.CallRaw(`{
 		"jsonrpc": "2.0",
@@ -550,6 +554,10 @@ func (s *WhisperMailboxSuite) TestRequestMessagesFromMailboxFromGroupChat() {
 					"to":` + strconv.FormatInt(time.Now().UnixNano()/int64(time.Second), 10) + `
 		}]
 	}`)
+	reqMessagesResp = baseRPCResponse{}
+	err = json.Unmarshal([]byte(resp), &reqMessagesResp)
+	s.Require().NoError(err)
+
 	//wait to receive p2p messages
 	time.Sleep(time.Second)
 
