@@ -79,7 +79,7 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 	if err := ethNode.Register(func(_ *node.ServiceContext) (node.Service, error) {
 		return mailservice.New(m), nil
 	}); err != nil {
-		return nil, nil
+		return nil, err
 	}
 
 	m.nodeStarted = make(chan struct{}, 1)
