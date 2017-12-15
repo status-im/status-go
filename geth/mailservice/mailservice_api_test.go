@@ -1,6 +1,7 @@
 package mailservice
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -40,14 +41,14 @@ func TestRequestMessagesFailures(t *testing.T) {
 	// invalid MailServer enode address
 	provider.EXPECT().WhisperService().Return(nil, nil)
 	provider.EXPECT().Node().Return(nil, nil)
-	result, err = api.RequestMessages(nil, MessagesRequest{MailServerPeer: "invalid-address"})
+	result, err = api.RequestMessages(context.TODO(), MessagesRequest{MailServerPeer: "invalid-address"})
 	require.False(t, result)
 	require.EqualError(t, err, "invalid mailServerPeer value: invalid URL scheme, want \"enode\"")
 
 	// non-existent symmetric key
 	provider.EXPECT().WhisperService().Return(shh, nil)
 	provider.EXPECT().Node().Return(nil, nil)
-	result, err = api.RequestMessages(nil, MessagesRequest{
+	result, err = api.RequestMessages(context.TODO(), MessagesRequest{
 		MailServerPeer: mailServerPeer,
 	})
 	require.False(t, result)
@@ -58,7 +59,7 @@ func TestRequestMessagesFailures(t *testing.T) {
 	require.NoError(t, symKeyErr)
 	provider.EXPECT().WhisperService().Return(shh, nil)
 	provider.EXPECT().Node().Return(nodeA, nil)
-	result, err = api.RequestMessages(nil, MessagesRequest{
+	result, err = api.RequestMessages(context.TODO(), MessagesRequest{
 		MailServerPeer: mailServerPeer,
 		SymKeyID:       symKeyID,
 	})

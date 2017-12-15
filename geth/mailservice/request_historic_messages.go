@@ -33,7 +33,7 @@ var (
 const defaultWorkTime = 5
 
 //RequestHistoricMessagesHandler returns an RPC handler which sends a p2p request for historic messages.
-func RequestHistoricMessagesHandler(nodeManager common.NodeManager) rpc.Handler {
+func RequestHistoricMessagesHandler(nodeManager common.NodeManager) rpc.Handler { //nolint: interfacer
 	return func(ctx context.Context, args ...interface{}) (interface{}, error) {
 		whisper, err := nodeManager.WhisperService()
 		if err != nil {
@@ -45,7 +45,7 @@ func RequestHistoricMessagesHandler(nodeManager common.NodeManager) rpc.Handler 
 			return nil, err
 		}
 
-		r, err := parseArgs(args...)
+		r, err := parseArgs(args)
 		if err != nil {
 			return nil, err
 		}
@@ -78,7 +78,7 @@ type historicMessagesRequest struct {
 	PoW      float64             //whisper proof of work
 }
 
-func parseArgs(args ...interface{}) (historicMessagesRequest, error) {
+func parseArgs(args []interface{}) (historicMessagesRequest, error) {
 	var (
 		r = historicMessagesRequest{
 			TimeLow: uint32(time.Now().Add(-24 * time.Hour).Unix()),
