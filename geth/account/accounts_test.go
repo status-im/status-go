@@ -170,8 +170,6 @@ func TestCreateAndRecoverAccountFail_KeyStore(t *testing.T) {
 	keyStore, keyStoreDir := newTestKeyStore(t, "accounts")
 	defer os.RemoveAll(keyStoreDir) //nolint: errcheck
 
-	// Fail if account keystore can't be acquired
-
 	expectedErr := errors.New("Non-nil error string")
 	nodeManager.EXPECT().AccountKeyStore().Return(nil, expectedErr)
 	_, _, _, err := accManager.CreateAccount(password)
