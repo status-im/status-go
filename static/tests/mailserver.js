@@ -8,8 +8,19 @@ const Web3 = require('web3');
 describe('Whisper MailServer', () => {
     const topic = `0x${crypto.randomBytes(4).toString('hex')}`;
     const sharedSymKey = '0x6c32583c0bc13ef90a10b36ed6f66baaa0e537d0677619993bfd72c819cba6f3';
-    const mailServerEnode = 'enode://b7e65e1bedc2499ee6cbd806945af5e7df0e59e4070c96821570bd581473eade24a489f5ec95d060c0db118c879403ab88d827d3766978f28708989d35474f87@[::]:51920';
+    const mailServerEnode = 'enode://b7e65e1bedc2499ee6cbd806945af5e7df0e59e4070c96821570bd581473eade24a489f5ec95d060c0db118c879403ab88d827d3766978f28708989d35474f87@127.0.0.1:8549';
     const messageTTL = 5;
+
+    describe('Check prerequisites', () => {
+        console.log('Expecting MailServer running.')
+        console.log('./build/bin/wnode-status -mailserver -passwordfile=./static/keys/wnodepassword -http -httpport 8540 -listenaddr=127.0.0.1:8549 -identity=./static/keys/wnodekey')
+
+        it('MailServer should be running', () => {
+            const mailServer = new Web3(new Web3.providers.HttpProvider('http://localhost:8540'));
+            const version = mailServer.shh.version();
+            expect(version).to.equal("5.0");
+        });
+    });
 
     describe('NodeA', () => {
         let nodeA;
