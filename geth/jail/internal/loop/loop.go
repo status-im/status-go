@@ -119,7 +119,7 @@ func (l *Loop) Add(t Task) error {
 // broken.
 func (l *Loop) Remove(t Task) {
 	l.remove(t)
-	go l.Ready(nil)
+	go l.Ready(nil) // nolint: errcheck
 }
 
 func (l *Loop) remove(t Task) {
