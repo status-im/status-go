@@ -9,12 +9,12 @@ import (
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/log"
+	"github.com/status-im/status-go/geth/mailservice"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/notification/fcm"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/signal"
 	"github.com/status-im/status-go/geth/txqueue"
-	"github.com/status-im/status-go/geth/whisper"
 )
 
 const (
@@ -78,7 +78,7 @@ func (m *StatusBackend) IsNodeRunning() bool {
 }
 
 // StartNode start Status node, fails if node is already started
-func (m *StatusBackend) StartNode(config *params.NodeConfig, opts ...common.NodeOption) (<-chan struct{}, error) {
+func (m *StatusBackend) StartNode(config *params.NodeConfig) (<-chan struct{}, error) {
 	m.Lock()
 	defer m.Unlock()
 
@@ -86,7 +86,7 @@ func (m *StatusBackend) StartNode(config *params.NodeConfig, opts ...common.Node
 		return nil, node.ErrNodeExists
 	}
 
-	nodeStarted, err := m.nodeManager.StartNode(config, opts...)
+	nodeStarted, err := m.nodeManager.StartNode(config)
 	if err != nil {
 		return nil, err
 	}
@@ -244,7 +244,7 @@ func (m *StatusBackend) registerHandlers() error {
 		return node.ErrRPCClient
 	}
 
-	rpcClient.RegisterHandler("shh_requestMessages", whisper.RequestHistoricMessagesHandler(m.nodeManager))
+	rpcClient.RegisterHandler("shh_requestMessages", mailservice.RequestHistoricMessagesHandler(m.nodeManager))
 	rpcClient.RegisterHandler("eth_accounts", m.accountManager.AccountsRPCHandler())
 	rpcClient.RegisterHandler("eth_sendTransaction", m.txQueueManager.SendTransactionRPCHandler)
 	m.txQueueManager.SetTransactionQueueHandler(m.txQueueManager.TransactionQueueHandler())

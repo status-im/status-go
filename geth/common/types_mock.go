@@ -43,21 +43,16 @@ func (m *MockNodeManager) EXPECT() *MockNodeManagerMockRecorder {
 }
 
 // StartNode mocks base method
-func (m *MockNodeManager) StartNode(config *params.NodeConfig, opts ...NodeOption) (<-chan struct{}, error) {
-	varargs := []interface{}{config}
-	for _, a := range opts {
-		varargs = append(varargs, a)
-	}
-	ret := m.ctrl.Call(m, "StartNode", varargs...)
+func (m *MockNodeManager) StartNode(config *params.NodeConfig) (<-chan struct{}, error) {
+	ret := m.ctrl.Call(m, "StartNode", config)
 	ret0, _ := ret[0].(<-chan struct{})
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // StartNode indicates an expected call of StartNode
-func (mr *MockNodeManagerMockRecorder) StartNode(config interface{}, opts ...interface{}) *gomock.Call {
-	varargs := append([]interface{}{config}, opts...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StartNode", reflect.TypeOf((*MockNodeManager)(nil).StartNode), varargs...)
+func (mr *MockNodeManagerMockRecorder) StartNode(config interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StartNode", reflect.TypeOf((*MockNodeManager)(nil).StartNode), config)
 }
 
 // StopNode mocks base method

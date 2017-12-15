@@ -1,4 +1,4 @@
-package whisper
+package mailservice
 
 import (
 	"encoding/json"

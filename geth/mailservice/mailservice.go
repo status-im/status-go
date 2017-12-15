@@ -1,19 +1,29 @@
-package whisper
+package mailservice
 
 import (
+	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/status-im/status-go/geth/common"
+	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 )
+
+// ServiceProvider provides node and required services.
+type ServiceProvider interface {
+	Node() (*node.Node, error)
+	WhisperService() (*whisper.Whisper, error)
+}
 
 // MailService is a service that provides some additional Whisper API.
 type MailService struct {
-	nodeManager common.NodeManager
+	provider ServiceProvider
 }
 
-// NewMailService returns a new MailService.
-func NewMailService(nodeManager common.NodeManager) *MailService {
-	return &MailService{nodeManager}
+// Make sure that MailService implements node.Service interface.
+var _ node.Service = (*MailService)(nil)
+
+// New returns a new MailService.
+func New(provider ServiceProvider) *MailService {
+	return &MailService{provider}
 }
 
 // Protocols returns a new protocols list. In this case, there are none.
@@ -27,7 +37,7 @@ func (s *MailService) APIs() []rpc.API {
 		{
 			Namespace: "shh",
 			Version:   "1.0",
-			Service:   NewMailServicePublicAPI(s.nodeManager),
+			Service:   NewPublicAPI(s.provider),
 			Public:    true,
 		},
 	}

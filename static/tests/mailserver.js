@@ -8,7 +8,7 @@ const Web3 = require('web3');
 describe('Whisper MailServer', () => {
     const topic = `0x${crypto.randomBytes(4).toString('hex')}`;
     const sharedSymKey = '0x6c32583c0bc13ef90a10b36ed6f66baaa0e537d0677619993bfd72c819cba6f3';
-    const mailServerEnode = 'enode://b7e65e1bedc2499ee6cbd806945af5e7df0e59e4070c96821570bd581473eade24a489f5ec95d060c0db118c879403ab88d827d3766978f28708989d35474f87@[::]:59796';
+    const mailServerEnode = 'enode://b7e65e1bedc2499ee6cbd806945af5e7df0e59e4070c96821570bd581473eade24a489f5ec95d060c0db118c879403ab88d827d3766978f28708989d35474f87@[::]:51920';
     const messageTTL = 5;
 
     describe('NodeA', () => {
@@ -138,7 +138,7 @@ describe('Whisper MailServer', () => {
                 axios.post(nodeB.currentProvider.host, {
                     method: 'shh_requestMessages',
                     params: [{
-                        mailServerPeer: 'enode://b7e65e1bedc2499ee6cbd806945af5e7df0e59e4070c96821570bd581473eade24a489f5ec95d060c0db118c879403ab88d827d3766978f28708989d35474f87@[::]:59796',
+                        mailServerPeer: mailServerEnode,
                         topic: topic,
                         symKeyID: mailServerSymKeyID
                     }],

@@ -72,13 +72,10 @@ type MessageState struct {
 	Source whisper.NewMessage `json:"source,omitempty"`
 }
 
-// NodeOption allows to apply some node configuration before node is started.
-type NodeOption func(*node.Node) error
-
 // NodeManager defines expected methods for managing Status node
 type NodeManager interface {
 	// StartNode start Status node, fails if node is already started
-	StartNode(config *params.NodeConfig, opts ...NodeOption) (<-chan struct{}, error)
+	StartNode(config *params.NodeConfig) (<-chan struct{}, error)
 
 	// StopNode stop the running Status node.
 	// Stopped node cannot be resumed, one starts a new node instead.

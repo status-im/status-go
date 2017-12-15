@@ -13,8 +13,8 @@ import (
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
-	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/log"
+	"github.com/status-im/status-go/geth/mailservice"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/rpc"
 	"github.com/status-im/status-go/geth/signal"
@@ -31,6 +31,9 @@ var (
 	ErrAccountKeyStoreMissing      = errors.New("account key store is not set")
 	ErrRPCClient                   = errors.New("failed to init RPC client")
 )
+
+// NodeOption allows to apply some node configuration before node is started.
+type NodeOption func(*node.Node) error
 
 // NodeManager manages Status node (which abstracts contained geth node)
 // nolint: golint
@@ -55,15 +58,21 @@ func NewNodeManager() *NodeManager {
 }
 
 // StartNode start Status node, fails if node is already started
-func (m *NodeManager) StartNode(config *params.NodeConfig, opts ...common.NodeOption) (<-chan struct{}, error) {
+func (m *NodeManager) StartNode(config *params.NodeConfig) (<-chan struct{}, error) {
 	m.Lock()
 	defer m.Unlock()
 
-	return m.startNode(config, opts)
+	return m.startNode(config, []NodeOption{
+		func(n *node.Node) error {
+			return n.Register(func(ctx *node.ServiceContext) (node.Service, error) {
+				return mailservice.New(m), nil
+			})
+		},
+	})
 }
 
 // startNode start Status node, fails if node is already started
-func (m *NodeManager) startNode(config *params.NodeConfig, opts []common.NodeOption) (<-chan struct{}, error) {
+func (m *NodeManager) startNode(config *params.NodeConfig, opts []NodeOption) (<-chan struct{}, error) {
 	if m.node != nil || m.nodeStarted != nil {
 		return nil, ErrNodeExists
 	}

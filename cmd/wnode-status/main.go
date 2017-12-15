@@ -5,9 +5,6 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/status-im/status-go/geth/whisper"
-
-	"github.com/ethereum/go-ethereum/node"
 	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/params"
 )
@@ -29,11 +26,7 @@ func main() {
 	}
 
 	backend := api.NewStatusBackend()
-	started, err := backend.StartNode(config, func(n *node.Node) error {
-		return n.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-			return whisper.NewMailService(backend.NodeManager()), nil
-		})
-	})
+	started, err := backend.StartNode(config)
 	if err != nil {
 		log.Fatalf("Node start failed: %v", err)
 		return
