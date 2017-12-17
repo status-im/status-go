@@ -180,11 +180,12 @@ func (l *Loop) processTask(t Task) error {
 // It runs infinitely waiting for new tasks.
 func (l *Loop) Run(ctx context.Context) error {
 	defer l.close()
+	defer l.removeAll()
+	var err error
 	for {
 		select {
 		case t := <-l.ready:
 			if ctx.Err() != nil {
-				l.removeAll()
 				return ctx.Err()
 			}
 
@@ -192,16 +193,16 @@ func (l *Loop) Run(ctx context.Context) error {
 				continue
 			}
 
-			err := l.processTask(t)
-			if err != nil {
-				// TODO(divan): do we need to report
-				// errors up to the caller?
-				// Ignoring for now, as loop
-				// should keep running.
-				continue
-			}
+			go func() {
+				err = l.processTask(t)
+				if err != nil {
+					// TODO(divan): do we need to report
+					// errors up to the caller?
+					// Ignoring for now, as loop
+					// should keep running.
+				}
+			}()
 		case <-ctx.Done():
-			l.removeAll()
 			return ctx.Err()
 		}
 	}
