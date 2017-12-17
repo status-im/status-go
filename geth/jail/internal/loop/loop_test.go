@@ -43,8 +43,8 @@ func (s *LoopSuite) TearDownTest() {
 
 func (s *LoopSuite) TestAddAndReady() {
 	s.mockTask.EXPECT().SetID(int64(1)).Times(1)
-	s.mockTask.EXPECT().GetID().Times(1)
-	s.mockTask.EXPECT().Cancel().Times(1)
+	s.mockTask.EXPECT().GetID().Times(2)
+	s.mockTask.EXPECT().Execute(s.loop.vm, s.loop).Times(1)
 
 	err := s.loop.Add(s.mockTask)
 	s.NoError(err)
@@ -52,10 +52,10 @@ func (s *LoopSuite) TestAddAndReady() {
 	err = s.loop.Ready(s.mockTask)
 	s.NoError(err)
 
-	s.cancel()
-
-	// Wait for the context to cancel and loop to close
+	// Wait to process task
 	time.Sleep(100 * time.Millisecond)
+
+	s.cancel()
 }
 
 func (s *LoopSuite) TestLoopErrorWhenClosed() {
