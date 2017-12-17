@@ -181,7 +181,7 @@ func (l *Loop) processTask(t Task) error {
 func (l *Loop) Run(ctx context.Context) error {
 	defer l.close()
 	defer l.removeAll()
-	var err error
+
 	for {
 		select {
 		case t := <-l.ready:
@@ -194,12 +194,13 @@ func (l *Loop) Run(ctx context.Context) error {
 			}
 
 			go func() {
-				err = l.processTask(t)
+				err := l.processTask(t)
 				if err != nil {
 					// TODO(divan): do we need to report
 					// errors up to the caller?
 					// Ignoring for now, as loop
 					// should keep running.
+					return
 				}
 			}()
 		case <-ctx.Done():
