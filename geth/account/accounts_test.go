@@ -11,6 +11,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/golang/mock/gomock"
 	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/common"
@@ -183,4 +184,82 @@ func TestCreateAndRecoverAccountFail_KeyStore(t *testing.T) {
 	nodeManager.EXPECT().AccountKeyStore().Return(nil, expectedErr)
 	_, _, err = accManager.RecoverAccount(password, mnemonic)
 	require.Equal(t, err, expectedErr)
+}
+
+func TestSelectAccount(t *testing.T) {
+	accManager, nodeManager := newTestManager(t)
+
+	password := "some-pass"
+
+	keyStore, keyStoreDir := newTestKeyStore(t, "accounts")
+	defer os.RemoveAll(keyStoreDir) //nolint: errcheck
+
+	nodeManager.EXPECT().AccountKeyStore().Return(keyStore, nil)
+	addr, _, _, err := accManager.CreateAccount(password)
+	require.NoError(t, err)
+
+	w := whisper.New(nil)
+
+	testCases := []struct {
+		name                  string
+		accountKeyStoreReturn []interface{}
+		whisperServiceReturn  []interface{}
+		address               string
+		password              string
+		fail                  bool
+	}{
+		{
+			"success",
+			[]interface{}{keyStore, nil},
+			[]interface{}{w, nil},
+			addr,
+			password,
+			false,
+		},
+		{
+			"fail_keyStore",
+			[]interface{}{nil, errors.New("Can't return you a key store")},
+			[]interface{}{w, nil},
+			addr,
+			password,
+			true,
+		},
+		{
+			"fail_whisperService",
+			[]interface{}{keyStore, nil},
+			[]interface{}{nil, errors.New("Can't return you a whisper service")},
+			addr,
+			password,
+			true,
+		},
+		{
+			"fail_wrongAddress",
+			[]interface{}{keyStore, nil},
+			[]interface{}{w, nil},
+			"wrong-address",
+			password,
+			true,
+		},
+		{
+			"fail_wrongPassword",
+			[]interface{}{keyStore, nil},
+			[]interface{}{w, nil},
+			addr,
+			"wrong-password",
+			true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			nodeManager.EXPECT().AccountKeyStore().Return(testCase.accountKeyStoreReturn...).Times(2)
+			nodeManager.EXPECT().WhisperService().Return(testCase.whisperServiceReturn...)
+			err = accManager.SelectAccount(testCase.address, testCase.password)
+			if testCase.fail {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
 }
