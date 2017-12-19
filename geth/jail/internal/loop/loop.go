@@ -9,6 +9,10 @@ import (
 	"github.com/status-im/status-go/geth/jail/internal/vm"
 )
 
+// ErrClosed represents the error returned when we try to add or ready
+// a task on a closed loop.
+var ErrClosed = errors.New("The loop is closed and no longer accepting tasks")
+
 // Task represents something that the event loop can schedule and run.
 //
 // Task describes two operations that will almost always be boilerplate,
@@ -84,7 +88,7 @@ func (l *Loop) Add(t Task) error {
 	defer l.lock.Unlock()
 	if !l.accepting {
 		t.Cancel()
-		return errors.New("The loop is closed and no longer accepting tasks")
+		return ErrClosed
 	}
 	t.SetID(atomic.AddInt64(&l.id, 1))
 	l.tasks[t.GetID()] = t
@@ -125,7 +129,7 @@ func (l *Loop) Ready(t Task) error {
 	defer l.lock.RUnlock()
 	if !l.accepting {
 		t.Cancel()
-		return errors.New("The loop is closed and no longer accepting tasks")
+		return ErrClosed
 	}
 	l.ready <- t
 	return nil
