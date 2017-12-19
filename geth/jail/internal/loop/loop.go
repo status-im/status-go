@@ -26,28 +26,6 @@ type Task interface {
 	Cancel()
 }
 
-// state encapsulates the loop's open and closedness. This is a boolean variable
-// indicating whether the loop is open for new tasks and a lock to control
-// access to this boolean.
-type state struct {
-	accept bool
-	mu     sync.RWMutex
-}
-
-// isAccepting indicates whether the loop is currently accepting tasks.
-func (s *state) isAccepting() bool {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.accept
-}
-
-// close changes the loop's state to not accept new tasks.
-func (s *state) close() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.accept = false
-}
-
 // Loop encapsulates the event loop's state. This includes the vm on which the
 // loop operates, a monotonically incrementing event id, a map of tasks that
 // aren't ready yet, keyed by their ID, a channel of tasks that are ready
@@ -59,12 +37,12 @@ func (s *state) close() {
 // Otherwise, on ARM and x86-32 it will panic.
 // More information: https://golang.org/pkg/sync/atomic/#pkg-note-BUG.
 type Loop struct {
-	id    int64
-	vm    *vm.VM
-	lock  sync.RWMutex
-	tasks map[int64]Task
-	ready chan Task
-	state
+	id        int64
+	vm        *vm.VM
+	lock      sync.RWMutex
+	tasks     map[int64]Task
+	ready     chan Task
+	accepting bool
 }
 
 // New creates a new Loop with an unbuffered ready queue on a specific VM.
@@ -76,12 +54,10 @@ func New(vm *vm.VM) *Loop {
 // queue, the capacity of which being specified by the backlog argument.
 func NewWithBacklog(vm *vm.VM, backlog int) *Loop {
 	return &Loop{
-		vm:    vm,
-		tasks: make(map[int64]Task),
-		ready: make(chan Task, backlog),
-		state: state{
-			accept: true,
-		},
+		vm:        vm,
+		tasks:     make(map[int64]Task),
+		ready:     make(chan Task, backlog),
+		accepting: true,
 	}
 }
 
@@ -89,8 +65,8 @@ func NewWithBacklog(vm *vm.VM, backlog int) *Loop {
 func (l *Loop) close() {
 	l.lock.Lock()
 	defer l.lock.Unlock()
-	if l.isAccepting() {
-		l.state.close()
+	if l.accepting {
+		l.accepting = false
 		close(l.ready)
 	}
 }
@@ -106,7 +82,8 @@ func (l *Loop) VM() *vm.VM {
 func (l *Loop) Add(t Task) error {
 	l.lock.Lock()
 	defer l.lock.Unlock()
-	if !l.isAccepting() {
+	if !l.accepting {
+		t.Cancel()
 		return errors.New("The loop is closed and no longer accepting tasks")
 	}
 	t.SetID(atomic.AddInt64(&l.id, 1))
@@ -144,7 +121,10 @@ func (l *Loop) removeAll() {
 // Ready signals to the loop that a task is ready to be finalised. This might
 // block if the "ready channel" in the loop is at capacity.
 func (l *Loop) Ready(t Task) error {
-	if !l.isAccepting() {
+	l.lock.RLock()
+	defer l.lock.RUnlock()
+	if !l.accepting {
+		t.Cancel()
 		return errors.New("The loop is closed and no longer accepting tasks")
 	}
 	l.ready <- t
@@ -191,14 +171,15 @@ func (l *Loop) Run(ctx context.Context) error {
 				continue
 			}
 
-			err := l.processTask(t)
-			if err != nil {
-				// TODO(divan): do we need to report
-				// errors up to the caller?
-				// Ignoring for now, as loop
-				// should keep running.
-				continue
-			}
+			go func() {
+				err := l.processTask(t)
+				if err != nil {
+					// TODO(divan): do we need to report
+					// errors up to the caller?
+					// Ignoring for now.
+					return
+				}
+			}()
 		case <-ctx.Done():
 			return ctx.Err()
 		}
