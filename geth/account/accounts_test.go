@@ -17,6 +17,7 @@ import (
 	"github.com/status-im/status-go/geth/common"
 	. "github.com/status-im/status-go/testing"
 	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 )
 
 func TestVerifyAccountPassword(t *testing.T) {
@@ -113,90 +114,83 @@ func TestVerifyAccountPasswordWithAccountBeforeEIP55(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// newTestManager returns the account manager and the mock node manager
-// that's being used within it for testing purposes.
-func newTestManager(t *testing.T) (accManager *account.Manager, nodeManager *common.MockNodeManager) {
+func TestManagerTestSuite(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	nodeManager = common.NewMockNodeManager(ctrl)
-	accManager = account.NewManager(nodeManager)
-	return
-}
+	nodeManager := common.NewMockNodeManager(ctrl)
 
-// newTestKeyStore returns a key store to use in tests
-func newTestKeyStore(t *testing.T, dir string) (keyStore *keystore.KeyStore, keyStoreDir string) {
-	var err error
-	keyStoreDir, err = ioutil.TempDir(os.TempDir(), dir)
+	keyStoreDir, err := ioutil.TempDir(os.TempDir(), "accounts")
 	require.NoError(t, err)
-	keyStore = keystore.NewKeyStore(keyStoreDir, keystore.LightScryptN, keystore.LightScryptP)
-	return
+	keyStore := keystore.NewKeyStore(keyStoreDir, keystore.LightScryptN, keystore.LightScryptP)
+	defer os.RemoveAll(keyStoreDir) //nolint: errcheck
+
+	suite.Run(t, &ManagerTestSuite{
+		nodeManager: nodeManager,
+		accManager:  account.NewManager(nodeManager),
+		password:    "test-password",
+		keyStore:    keyStore,
+		shh:         whisper.New(nil),
+	})
 }
 
-func TestCreateAndRecoverAccountSuccess(t *testing.T) {
-	accManager, nodeManager := newTestManager(t)
+type ManagerTestSuite struct {
+	suite.Suite
+	nodeManager *common.MockNodeManager
+	accManager  *account.Manager
+	password    string
+	keyStore    *keystore.KeyStore
+	shh         *whisper.Whisper
+}
 
-	var password string
-
-	keyStore, keyStoreDir := newTestKeyStore(t, "accounts")
-	defer os.RemoveAll(keyStoreDir) //nolint: errcheck
+func (s *ManagerTestSuite) TestCreateAndRecoverAccountSuccess() {
+	accManager, nodeManager, password, keyStore := s.accManager, s.nodeManager, s.password, s.keyStore
 
 	// Don't fail on empty password
 	nodeManager.EXPECT().AccountKeyStore().Return(keyStore, nil)
 	_, _, _, err := accManager.CreateAccount(password)
-	require.NoError(t, err)
+	s.NoError(err)
 
-	password = "some-pass"
+	password = s.password
 
 	nodeManager.EXPECT().AccountKeyStore().Return(keyStore, nil)
 	addr1, pubKey1, mnemonic, err := accManager.CreateAccount(password)
-	require.NoError(t, err)
-	require.NotNil(t, addr1)
-	require.NotNil(t, pubKey1)
-	require.NotNil(t, mnemonic)
+	s.NoError(err)
+	s.NotNil(addr1)
+	s.NotNil(pubKey1)
+	s.NotNil(mnemonic)
 
 	// Now recover the account using the mnemonic seed and the password
 	nodeManager.EXPECT().AccountKeyStore().Return(keyStore, nil)
 	addr2, pubKey2, err := accManager.RecoverAccount(password, mnemonic)
-	require.NoError(t, err)
-	require.Equal(t, addr1, addr2)
-	require.Equal(t, pubKey1, pubKey2)
+	s.NoError(err)
+	s.Equal(addr1, addr2)
+	s.Equal(pubKey1, pubKey2)
 }
 
-func TestCreateAndRecoverAccountFail_KeyStore(t *testing.T) {
-	accManager, nodeManager := newTestManager(t)
-
-	password := "some-pass"
-
-	keyStore, keyStoreDir := newTestKeyStore(t, "accounts")
-	defer os.RemoveAll(keyStoreDir) //nolint: errcheck
+func (s *ManagerTestSuite) TestCreateAndRecoverAccountFail_KeyStore() {
+	accManager, nodeManager, password, keyStore := s.accManager, s.nodeManager, s.password, s.keyStore
 
 	expectedErr := errors.New("Non-nil error string")
 	nodeManager.EXPECT().AccountKeyStore().Return(nil, expectedErr)
 	_, _, _, err := accManager.CreateAccount(password)
-	require.Equal(t, err, expectedErr)
+	s.Equal(err, expectedErr)
 
 	// Create a new account to use the mnemonic seed.
 	nodeManager.EXPECT().AccountKeyStore().Return(keyStore, nil)
 	_, _, mnemonic, err := accManager.CreateAccount(password)
-	require.NoError(t, err)
+	s.NoError(err)
 
 	nodeManager.EXPECT().AccountKeyStore().Return(nil, expectedErr)
 	_, _, err = accManager.RecoverAccount(password, mnemonic)
-	require.Equal(t, err, expectedErr)
+	s.Equal(err, expectedErr)
 }
 
-func TestSelectAccount(t *testing.T) {
-	accManager, nodeManager := newTestManager(t)
-
-	password := "some-pass"
-
-	keyStore, keyStoreDir := newTestKeyStore(t, "accounts")
-	defer os.RemoveAll(keyStoreDir) //nolint: errcheck
+func (s *ManagerTestSuite) TestSelectAccount() {
+	accManager, nodeManager, password, keyStore := s.accManager, s.nodeManager, s.password, s.keyStore
+	shh := s.shh
 
 	nodeManager.EXPECT().AccountKeyStore().Return(keyStore, nil)
 	addr, _, _, err := accManager.CreateAccount(password)
-	require.NoError(t, err)
-
-	shh := whisper.New(nil)
+	s.NoError(err)
 
 	testCases := []struct {
 		name                  string
@@ -249,14 +243,14 @@ func TestSelectAccount(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
+		s.T().Run(testCase.name, func(t *testing.T) {
 			nodeManager.EXPECT().AccountKeyStore().Return(testCase.accountKeyStoreReturn...).Times(2)
 			nodeManager.EXPECT().WhisperService().Return(testCase.whisperServiceReturn...)
 			err = accManager.SelectAccount(testCase.address, testCase.password)
 			if testCase.fail {
-				require.Error(t, err)
+				s.Error(err)
 			} else {
-				require.NoError(t, err)
+				s.NoError(err)
 			}
 		})
 	}
