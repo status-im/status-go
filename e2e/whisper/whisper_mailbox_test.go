@@ -117,10 +117,20 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	s.Require().NoError(err)
 	s.Require().Nil(postResp.Err)
 
-	// @TODO(adam): if this line is uncommented, the test fails.
-	// time.Sleep(time.Second)
+	// Propagate the sent message.
+	time.Sleep(time.Second)
 
-	//There are no messages, because it's a sender filter
+	// Receive the sent message.
+	resp = rpcClient.CallRaw(`{
+		"jsonrpc": "2.0",
+		"method": "shh_getFilterMessages",
+		"params": ["` + messageFilterID + `"],
+		"id": 1}`)
+	err = json.Unmarshal([]byte(resp), &messages)
+	s.Require().NoError(err)
+	s.Require().Equal(1, len(messages.Result))
+
+	// Make sure there are no new messages.
 	resp = rpcClient.CallRaw(`{
 		"jsonrpc": "2.0",
 		"method": "shh_getFilterMessages",
@@ -129,9 +139,6 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	err = json.Unmarshal([]byte(resp), &messages)
 	s.Require().NoError(err)
 	s.Require().Equal(0, len(messages.Result))
-
-	// Let the message propagate to all nodes.
-	time.Sleep(time.Second)
 
 	//act
 
