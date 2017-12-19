@@ -342,7 +342,7 @@ func (s *ManagerTestSuite) TestCreateChildAccount() {
 	}
 }
 
-func (s *ManagerTestSuite) TestSelectedAccount() {
+func (s *ManagerTestSuite) TestSelectedAndReSelectAccount() {
 	s.reinitMock()
 
 	// Create and select an account
@@ -358,12 +358,30 @@ func (s *ManagerTestSuite) TestSelectedAccount() {
 		acc, err := s.accManager.SelectedAccount()
 		s.NoError(err)
 		s.NotNil(acc)
+
+		err = s.accManager.ReSelectAccount()
+		s.NoError(err)
+	})
+
+	s.T().Run("ReSelect_fail", func(t *testing.T) {
+		s.reinitMock()
+		s.nodeManager.EXPECT().WhisperService().Return(s.shh, errors.New("Can't return a whisper service")).AnyTimes()
+		err = s.accManager.ReSelectAccount()
+		s.Error(err)
 	})
 
 	s.accManager.selectedAccount = nil
+	s.reinitMock()
+	s.nodeManager.EXPECT().AccountKeyStore().Return(s.keyStore, nil).AnyTimes()
+	s.nodeManager.EXPECT().WhisperService().Return(s.shh, errors.New("Can't return a whisper service")).AnyTimes()
 
-	s.T().Run("fail", func(t *testing.T) {
+	s.T().Run("Selected_fail", func(t *testing.T) {
 		_, err := s.accManager.SelectedAccount()
 		s.Equal(ErrNoAccountSelected, err)
+	})
+
+	s.T().Run("ReSelect_success_noAccount", func(t *testing.T) {
+		err = s.accManager.ReSelectAccount()
+		s.NoError(err)
 	})
 }
