@@ -310,6 +310,20 @@ func (s *ManagerTestSuite) TestCreateChildAccount() {
 			[]interface{}{nil, errors.New("Can't return a key store")},
 			true,
 		},
+		{
+			"fail_wrongAddress",
+			"wrong-address",
+			s.password,
+			[]interface{}{s.keyStore, nil},
+			true,
+		},
+		{
+			"fail_wrongPassword",
+			addr,
+			"wrong-password",
+			[]interface{}{s.keyStore, nil},
+			true,
+		},
 	}
 
 	for _, testCase := range testCases {
