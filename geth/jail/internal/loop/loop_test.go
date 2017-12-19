@@ -10,12 +10,18 @@ import (
 )
 
 // DummyTask is something that satisfies the loop.Task interface for testing.
-type DummyTask struct{}
+type DummyTask struct {
+	canceled bool
+	executed bool
+}
 
-func (DummyTask) SetID(int64)                 {}
-func (DummyTask) GetID() int64                { return 1 }
-func (DummyTask) Cancel()                     {}
-func (DummyTask) Execute(*vm.VM, *Loop) error { return nil }
+func (*DummyTask) SetID(int64)  {}
+func (*DummyTask) GetID() int64 { return 1 }
+func (d *DummyTask) Cancel()    { d.canceled = true }
+func (d *DummyTask) Execute(*vm.VM, *Loop) error {
+	d.executed = true
+	return nil
+}
 
 func TestLoopSuite(t *testing.T) {
 	suite.Run(t, new(LoopSuite))
@@ -27,11 +33,11 @@ type LoopSuite struct {
 	loop   *Loop
 	cancel context.CancelFunc
 
-	task DummyTask
+	task *DummyTask
 }
 
 func (s *LoopSuite) SetupTest() {
-	s.task = DummyTask{}
+	s.task = &DummyTask{}
 
 	vm := vm.New()
 	s.loop = New(vm)
@@ -45,12 +51,14 @@ func (s *LoopSuite) TestAddAndReady() {
 
 	err := s.loop.Add(s.task)
 	s.NoError(err)
+	s.False(s.task.canceled)
 
 	err = s.loop.Ready(s.task)
 	s.NoError(err)
 
 	// Wait to process task
 	time.Sleep(100 * time.Millisecond)
+	s.True(s.task.executed)
 
 	s.cancel()
 }
@@ -63,7 +71,10 @@ func (s *LoopSuite) TestLoopErrorWhenClosed() {
 
 	err := s.loop.Add(s.task)
 	s.Error(err)
+	s.True(s.task.canceled)
 
+	s.task.canceled = false
 	err = s.loop.Ready(s.task)
 	s.Error(err)
+	s.True(s.task.canceled)
 }
