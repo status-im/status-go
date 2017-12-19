@@ -341,3 +341,29 @@ func (s *ManagerTestSuite) TestCreateChildAccount() {
 		})
 	}
 }
+
+func (s *ManagerTestSuite) TestSelectedAccount() {
+	s.reinitMock()
+
+	// Create and select an account
+	s.nodeManager.EXPECT().AccountKeyStore().Return(s.keyStore, nil)
+	addr, _, _, err := s.accManager.CreateAccount(s.password)
+	s.NoError(err)
+	s.nodeManager.EXPECT().AccountKeyStore().Return(s.keyStore, nil).AnyTimes()
+	s.nodeManager.EXPECT().WhisperService().Return(s.shh, nil).AnyTimes()
+	err = s.accManager.SelectAccount(addr, s.password)
+	s.NoError(err)
+
+	s.T().Run("success", func(t *testing.T) {
+		acc, err := s.accManager.SelectedAccount()
+		s.NoError(err)
+		s.NotNil(acc)
+	})
+
+	s.accManager.selectedAccount = nil
+
+	s.T().Run("fail", func(t *testing.T) {
+		_, err := s.accManager.SelectedAccount()
+		s.Equal(ErrNoAccountSelected, err)
+	})
+}
