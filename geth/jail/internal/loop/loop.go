@@ -135,6 +135,21 @@ func (l *Loop) Ready(t Task) error {
 	return nil
 }
 
+// AddAndExecute combines Add and Ready for immediate execution.
+func (l *Loop) AddAndExecute(t Task) error {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+	if !l.accepting {
+		t.Cancel()
+		return ErrClosed
+	}
+	t.SetID(atomic.AddInt64(&l.id, 1))
+	l.tasks[t.GetID()] = t
+
+	l.ready <- t
+	return nil
+}
+
 // Eval executes some code in the VM associated with the loop and returns an
 // error if that execution fails.
 func (l *Loop) Eval(s interface{}) error {

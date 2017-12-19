@@ -78,3 +78,30 @@ func (s *LoopSuite) TestLoopErrorWhenClosed() {
 	s.Error(err)
 	s.True(s.task.canceled)
 }
+
+func (s *LoopSuite) TestImmediateExecution() {
+	err := s.loop.AddAndExecute(s.task)
+
+	// Wait for the task to execute
+	time.Sleep(100 * time.Millisecond)
+
+	s.NoError(err)
+	s.True(s.task.executed)
+	s.False(s.task.canceled)
+
+	s.cancel()
+}
+
+func (s *LoopSuite) TestImmediateExecutionErrorWhenClosed() {
+	s.cancel()
+
+	// Wait for the context to cancel and loop to close
+	time.Sleep(100 * time.Millisecond)
+
+	err := s.loop.AddAndExecute(s.task)
+
+	s.Error(err)
+	s.False(s.task.executed)
+	s.True(s.task.canceled)
+
+}
