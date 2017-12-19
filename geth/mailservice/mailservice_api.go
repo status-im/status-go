@@ -13,6 +13,11 @@ import (
 	"github.com/status-im/status-go/geth/log"
 )
 
+const (
+	// defaultWorkTime is a work time reported in messages sent to MailServer nodes.
+	defaultWorkTime = 5
+)
+
 var (
 	// ErrInvalidMailServerPeer is returned when it fails to parse enode from params.
 	ErrInvalidMailServerPeer = errors.New("invalid mailServerPeer value")
