@@ -47,8 +47,7 @@ func (s *MailServiceSuite) TestShhRequestMessagesRPCMethodAvailability() {
 		"params": [{}]
 	}`)))
 	r.NoError(err)
-	httpClient := &http.Client{}
-	resp, err := httpClient.Do(req)
+	resp, err := http.DefaultClient.Do(req)
 	r.NoError(err)
 	defer resp.Body.Close()
 	r.Equal(200, resp.StatusCode)

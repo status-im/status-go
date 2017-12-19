@@ -9,7 +9,6 @@ import (
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/log"
-	"github.com/status-im/status-go/geth/mailservice"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/notification/fcm"
 	"github.com/status-im/status-go/geth/params"
@@ -244,7 +243,6 @@ func (m *StatusBackend) registerHandlers() error {
 		return node.ErrRPCClient
 	}
 
-	rpcClient.RegisterHandler("shh_requestMessages", mailservice.RequestHistoricMessagesHandler(m.nodeManager))
 	rpcClient.RegisterHandler("eth_accounts", m.accountManager.AccountsRPCHandler())
 	rpcClient.RegisterHandler("eth_sendTransaction", m.txQueueManager.SendTransactionRPCHandler)
 	m.txQueueManager.SetTransactionQueueHandler(m.txQueueManager.TransactionQueueHandler())
