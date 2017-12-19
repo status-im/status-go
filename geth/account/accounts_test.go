@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
@@ -127,11 +128,12 @@ func TestManagerTestSuite(t *testing.T) {
 	defer os.RemoveAll(keyStoreDir) //nolint: errcheck
 
 	suite.Run(t, &ManagerTestSuite{
-		nodeManager: nodeManager,
-		accManager:  NewManager(nodeManager),
-		password:    "test-password",
-		keyStore:    keyStore,
-		shh:         whisper.New(nil),
+		nodeManager:    nodeManager,
+		accManager:     NewManager(nodeManager),
+		password:       "test-password",
+		keyStore:       keyStore,
+		shh:            whisper.New(nil),
+		gethAccManager: accounts.NewManager(),
 	})
 }
 
@@ -142,11 +144,12 @@ func newMockNodeManager(t *testing.T) *common.MockNodeManager {
 
 type ManagerTestSuite struct {
 	suite.Suite
-	nodeManager *common.MockNodeManager
-	accManager  *Manager
-	password    string
-	keyStore    *keystore.KeyStore
-	shh         *whisper.Whisper
+	nodeManager    *common.MockNodeManager
+	accManager     *Manager
+	password       string
+	keyStore       *keystore.KeyStore
+	shh            *whisper.Whisper
+	gethAccManager *accounts.Manager
 }
 
 // reinitMock is for reassigning a new mock node manager to account manager.
@@ -401,4 +404,35 @@ func (s *ManagerTestSuite) TestLogout() {
 	s.nodeManager.EXPECT().WhisperService().Return(nil, testErrWhisper)
 	err = s.accManager.Logout()
 	s.Error(err)
+}
+
+func (s *ManagerTestSuite) TestAccounts() {
+	s.reinitMock()
+
+	// Create and select an account
+	s.nodeManager.EXPECT().AccountKeyStore().Return(s.keyStore, nil)
+	addr, _, _, err := s.accManager.CreateAccount(s.password)
+	s.NoError(err)
+	s.nodeManager.EXPECT().AccountKeyStore().Return(s.keyStore, nil).AnyTimes()
+	s.nodeManager.EXPECT().WhisperService().Return(s.shh, nil).AnyTimes()
+	err = s.accManager.SelectAccount(addr, s.password)
+	s.NoError(err)
+
+	// Success
+	s.nodeManager.EXPECT().AccountManager().Return(s.gethAccManager, nil)
+	accs, err := s.accManager.Accounts()
+	s.NoError(err)
+	s.NotNil(accs)
+
+	// Can't get an account manager
+	s.nodeManager.EXPECT().AccountManager().Return(nil, errors.New("Can't return an account manager"))
+	_, err = s.accManager.Accounts()
+	s.Error(err)
+
+	// Selected account is nil but doesn't fail
+	s.accManager.selectedAccount = nil
+	s.nodeManager.EXPECT().AccountManager().Return(s.gethAccManager, nil)
+	accs, err = s.accManager.Accounts()
+	s.NoError(err)
+	s.NotNil(accs)
 }
