@@ -149,7 +149,6 @@ func TestCreateAndRecoverAccountSuccess(t *testing.T) {
 	nodeManager.EXPECT().AccountKeyStore().Return(keyStore, nil)
 	addr1, pubKey1, mnemonic, err := accManager.CreateAccount(password)
 	require.NoError(t, err)
-
 	require.NotNil(t, addr1)
 	require.NotNil(t, pubKey1)
 	require.NotNil(t, mnemonic)
@@ -158,7 +157,6 @@ func TestCreateAndRecoverAccountSuccess(t *testing.T) {
 	nodeManager.EXPECT().AccountKeyStore().Return(keyStore, nil)
 	addr2, pubKey2, err := accManager.RecoverAccount(password, mnemonic)
 	require.NoError(t, err)
-
 	require.Equal(t, addr1, addr2)
 	require.Equal(t, pubKey1, pubKey2)
 }
@@ -198,7 +196,7 @@ func TestSelectAccount(t *testing.T) {
 	addr, _, _, err := accManager.CreateAccount(password)
 	require.NoError(t, err)
 
-	w := whisper.New(nil)
+	shh := whisper.New(nil)
 
 	testCases := []struct {
 		name                  string
@@ -211,7 +209,7 @@ func TestSelectAccount(t *testing.T) {
 		{
 			"success",
 			[]interface{}{keyStore, nil},
-			[]interface{}{w, nil},
+			[]interface{}{shh, nil},
 			addr,
 			password,
 			false,
@@ -219,7 +217,7 @@ func TestSelectAccount(t *testing.T) {
 		{
 			"fail_keyStore",
 			[]interface{}{nil, errors.New("Can't return you a key store")},
-			[]interface{}{w, nil},
+			[]interface{}{shh, nil},
 			addr,
 			password,
 			true,
@@ -235,7 +233,7 @@ func TestSelectAccount(t *testing.T) {
 		{
 			"fail_wrongAddress",
 			[]interface{}{keyStore, nil},
-			[]interface{}{w, nil},
+			[]interface{}{shh, nil},
 			"wrong-address",
 			password,
 			true,
@@ -243,7 +241,7 @@ func TestSelectAccount(t *testing.T) {
 		{
 			"fail_wrongPassword",
 			[]interface{}{keyStore, nil},
-			[]interface{}{w, nil},
+			[]interface{}{shh, nil},
 			addr,
 			"wrong-password",
 			true,
