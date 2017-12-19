@@ -113,6 +113,11 @@ func TestVerifyAccountPasswordWithAccountBeforeEIP55(t *testing.T) {
 	require.NoError(t, err)
 }
 
+var (
+	testErrWhisper  = errors.New("Can't return a whisper service")
+	testErrKeyStore = errors.New("Can't return a key store")
+)
+
 func TestManagerTestSuite(t *testing.T) {
 	nodeManager := newMockNodeManager(t)
 
@@ -218,7 +223,7 @@ func (s *ManagerTestSuite) TestSelectAccount() {
 		},
 		{
 			"fail_keyStore",
-			[]interface{}{nil, errors.New("Can't return a key store")},
+			[]interface{}{nil, testErrKeyStore},
 			[]interface{}{s.shh, nil},
 			addr,
 			s.password,
@@ -227,7 +232,7 @@ func (s *ManagerTestSuite) TestSelectAccount() {
 		{
 			"fail_whisperService",
 			[]interface{}{s.keyStore, nil},
-			[]interface{}{nil, errors.New("Can't return a whisper service")},
+			[]interface{}{nil, testErrWhisper},
 			addr,
 			s.password,
 			true,
@@ -307,7 +312,7 @@ func (s *ManagerTestSuite) TestCreateChildAccount() {
 			"fail_keyStore",
 			addr,
 			s.password,
-			[]interface{}{nil, errors.New("Can't return a key store")},
+			[]interface{}{nil, testErrKeyStore},
 			true,
 		},
 		{
@@ -365,7 +370,7 @@ func (s *ManagerTestSuite) TestSelectedAndReSelectAccount() {
 
 	s.T().Run("ReSelect_fail", func(t *testing.T) {
 		s.reinitMock()
-		s.nodeManager.EXPECT().WhisperService().Return(s.shh, errors.New("Can't return a whisper service")).AnyTimes()
+		s.nodeManager.EXPECT().WhisperService().Return(nil, testErrWhisper).AnyTimes()
 		err = s.accManager.ReSelectAccount()
 		s.Error(err)
 	})
@@ -373,7 +378,7 @@ func (s *ManagerTestSuite) TestSelectedAndReSelectAccount() {
 	s.accManager.selectedAccount = nil
 	s.reinitMock()
 	s.nodeManager.EXPECT().AccountKeyStore().Return(s.keyStore, nil).AnyTimes()
-	s.nodeManager.EXPECT().WhisperService().Return(s.shh, errors.New("Can't return a whisper service")).AnyTimes()
+	s.nodeManager.EXPECT().WhisperService().Return(nil, testErrWhisper).AnyTimes()
 
 	s.T().Run("Selected_fail", func(t *testing.T) {
 		_, err := s.accManager.SelectedAccount()
@@ -384,4 +389,16 @@ func (s *ManagerTestSuite) TestSelectedAndReSelectAccount() {
 		err = s.accManager.ReSelectAccount()
 		s.NoError(err)
 	})
+}
+
+func (s *ManagerTestSuite) TestLogout() {
+	s.reinitMock()
+
+	s.nodeManager.EXPECT().WhisperService().Return(s.shh, nil)
+	err := s.accManager.Logout()
+	s.NoError(err)
+
+	s.nodeManager.EXPECT().WhisperService().Return(nil, testErrWhisper)
+	err = s.accManager.Logout()
+	s.Error(err)
 }
