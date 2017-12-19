@@ -90,7 +90,7 @@ func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (boo
 		return false, fmt.Errorf("%v: %v", ErrInvalidSymKeyID, err)
 	}
 
-	envelope, err := makeEnvelopAPI(makePayloadAPI(r), symKey, node.Server().PrivateKey, shh.MinPow())
+	envelope, err := makeEnvelop(makePayload(r), symKey, node.Server().PrivateKey, shh.MinPow())
 	if err != nil {
 		return false, err
 	}
@@ -102,10 +102,10 @@ func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (boo
 	return true, nil
 }
 
-// makeEnvelopAPI makes an envelop for a historic messages request.
+// makeEnvelop makes an envelop for a historic messages request.
 // Symmetric key is used to authenticate to MailServer.
 // PK is the current node ID.
-func makeEnvelopAPI(payload []byte, symKey []byte, nodeID *ecdsa.PrivateKey, pow float64) (*whisper.Envelope, error) {
+func makeEnvelop(payload []byte, symKey []byte, nodeID *ecdsa.PrivateKey, pow float64) (*whisper.Envelope, error) {
 	params := whisper.MessageParams{
 		PoW:      pow,
 		Payload:  payload,
@@ -120,8 +120,8 @@ func makeEnvelopAPI(payload []byte, symKey []byte, nodeID *ecdsa.PrivateKey, pow
 	return message.Wrap(&params)
 }
 
-// makePayloadAPI makes a specific payload for MailServer to request historic messages.
-func makePayloadAPI(r MessagesRequest) []byte {
+// makePayload makes a specific payload for MailServer to request historic messages.
+func makePayload(r MessagesRequest) []byte {
 	// first 8 bytes are lowed and upper bounds as uint32
 	data := make([]byte, 8+whisper.TopicLength)
 	binary.BigEndian.PutUint32(data, r.From)

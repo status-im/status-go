@@ -24,6 +24,8 @@ func (s *MailServiceSuite) SetupTest() {
 	s.NodeManager = node.NewNodeManager()
 }
 
+// TestShhRequestMessagesRPCMethodAvailability tests if `shh_requestMessages` is available
+// through inproc and HTTP interfaces.
 func (s *MailServiceSuite) TestShhRequestMessagesRPCMethodAvailability() {
 	r := s.Require()
 
@@ -35,11 +37,12 @@ func (s *MailServiceSuite) TestShhRequestMessagesRPCMethodAvailability() {
 	client := s.NodeManager.RPCClient()
 	r.NotNil(client)
 
-	// This error means that the method is defined and validation of params failed.
+	// This error means that the method is available through inproc communication
+	// as the validation of params occurred.
 	err := client.Call(nil, "shh_requestMessages", map[string]interface{}{})
 	r.EqualError(err, `invalid mailServerPeer value: invalid URL scheme, want "enode"`)
 
-	// Do the same but using HTTP.
+	// Do the same but using HTTP interface.
 	req, err := http.NewRequest("POST", "http://localhost:8645", bytes.NewBuffer([]byte(`{
 		"jsonrpc": "2.0",
 		"id": 1,
