@@ -5,11 +5,17 @@ import (
 	"testing"
 	"time"
 
-	gomock "github.com/golang/mock/gomock"
-
 	"github.com/status-im/status-go/geth/jail/internal/vm"
 	"github.com/stretchr/testify/suite"
 )
+
+// DummyTask is something that satisfies the loop.Task interface for testing.
+type DummyTask struct{}
+
+func (DummyTask) SetID(int64)                 {}
+func (DummyTask) GetID() int64                { return 1 }
+func (DummyTask) Cancel()                     {}
+func (DummyTask) Execute(*vm.VM, *Loop) error { return nil }
 
 func TestLoopSuite(t *testing.T) {
 	suite.Run(t, new(LoopSuite))
@@ -21,13 +27,11 @@ type LoopSuite struct {
 	loop   *Loop
 	cancel context.CancelFunc
 
-	mockTask     *MockTask
-	loopMockCtrl *gomock.Controller
+	task DummyTask
 }
 
 func (s *LoopSuite) SetupTest() {
-	s.loopMockCtrl = gomock.NewController(s.T())
-	s.mockTask = NewMockTask(s.loopMockCtrl)
+	s.task = DummyTask{}
 
 	vm := vm.New()
 	s.loop = New(vm)
@@ -37,19 +41,12 @@ func (s *LoopSuite) SetupTest() {
 	go s.loop.Run(ctx)
 }
 
-func (s *LoopSuite) TearDownTest() {
-	s.loopMockCtrl.Finish()
-}
-
 func (s *LoopSuite) TestAddAndReady() {
-	s.mockTask.EXPECT().SetID(int64(1)).Times(1)
-	s.mockTask.EXPECT().GetID().Times(2)
-	s.mockTask.EXPECT().Execute(s.loop.vm, s.loop).Times(1)
 
-	err := s.loop.Add(s.mockTask)
+	err := s.loop.Add(s.task)
 	s.NoError(err)
 
-	err = s.loop.Ready(s.mockTask)
+	err = s.loop.Ready(s.task)
 	s.NoError(err)
 
 	// Wait to process task
@@ -64,9 +61,9 @@ func (s *LoopSuite) TestLoopErrorWhenClosed() {
 	// Wait for the context to cancel and loop to close
 	time.Sleep(100 * time.Millisecond)
 
-	err := s.loop.Add(s.mockTask)
+	err := s.loop.Add(s.task)
 	s.Error(err)
 
-	err = s.loop.Ready(s.mockTask)
+	err = s.loop.Ready(s.task)
 	s.Error(err)
 }
