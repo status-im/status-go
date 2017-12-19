@@ -90,37 +90,24 @@ func (c *Cell) Stop() error {
 // async call, like callback.
 func (c *Cell) CallAsync(fn otto.Value, args ...interface{}) error {
 	task := looptask.NewCallTask(fn, args...)
-	errChan := make(chan error, 1)
-	defer close(errChan)
+	errChan := make(chan error)
 
 	go func() {
-		err := c.loop.Add(task)
+		defer close(errChan)
+		err := c.loop.AddAndExecute(task)
 		if err != nil {
 			errChan <- err
-			return
-		}
-
-		err = c.loop.Ready(task)
-		if err != nil {
-			errChan <- err
-			return
 		}
 	}()
 
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
 
-	for {
-		select {
-		case err, ok := <-errChan:
-			if err != nil {
-				return err
-			}
-			if !ok {
-				return nil
-			}
-		case <-timer.C:
-			return errors.New("Timeout")
-		}
+	select {
+	case err := <-errChan:
+		return err
+
+	case <-timer.C:
+		return errors.New("Timeout")
 	}
 }
