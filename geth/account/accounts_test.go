@@ -436,3 +436,63 @@ func (s *ManagerTestSuite) TestAccounts() {
 	s.NoError(err)
 	s.NotNil(accs)
 }
+
+func (s *ManagerTestSuite) TestAddressToDecryptedAccount() {
+	s.reinitMock()
+
+	s.nodeManager.EXPECT().AccountKeyStore().Return(s.keyStore, nil)
+	addr, _, _, err := s.accManager.CreateAccount(s.password)
+	s.NoError(err)
+
+	testCases := []struct {
+		name                  string
+		accountKeyStoreReturn []interface{}
+		address               string
+		password              string
+		fail                  bool
+	}{
+		{
+			"success",
+			[]interface{}{s.keyStore, nil},
+			addr,
+			s.password,
+			false,
+		},
+		{
+			"fail_keyStore",
+			[]interface{}{nil, testErrKeyStore},
+			addr,
+			s.password,
+			true,
+		},
+		{
+			"fail_wrongAddress",
+			[]interface{}{s.keyStore, nil},
+			"wrong-address",
+			s.password,
+			true,
+		},
+		{
+			"fail_wrongPassword",
+			[]interface{}{s.keyStore, nil},
+			addr,
+			"wrong-password",
+			true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		s.T().Run(testCase.name, func(t *testing.T) {
+			s.reinitMock()
+			s.nodeManager.EXPECT().AccountKeyStore().Return(testCase.accountKeyStoreReturn...).AnyTimes()
+			acc, keyStore, err := s.accManager.AddressToDecryptedAccount(testCase.address, testCase.password)
+			if testCase.fail {
+				s.Error(err)
+			} else {
+				s.NoError(err)
+				s.NotNil(acc)
+				s.NotNil(keyStore)
+			}
+		})
+	}
+}
