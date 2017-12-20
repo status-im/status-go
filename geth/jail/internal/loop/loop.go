@@ -137,17 +137,10 @@ func (l *Loop) Ready(t Task) error {
 
 // AddAndExecute combines Add and Ready for immediate execution.
 func (l *Loop) AddAndExecute(t Task) error {
-	l.lock.Lock()
-	defer l.lock.Unlock()
-	if !l.accepting {
-		t.Cancel()
-		return ErrClosed
+	if err := l.Add(t); err != nil {
+		return err
 	}
-	t.SetID(atomic.AddInt64(&l.id, 1))
-	l.tasks[t.GetID()] = t
-
-	l.ready <- t
-	return nil
+	return l.Ready(t)
 }
 
 // Eval executes some code in the VM associated with the loop and returns an
