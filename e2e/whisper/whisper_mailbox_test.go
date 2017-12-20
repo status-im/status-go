@@ -6,15 +6,17 @@ import (
 	"testing"
 	"time"
 
+	"os"
+
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/e2e"
 	"github.com/status-im/status-go/geth/api"
+	"github.com/status-im/status-go/geth/rpc"
 	. "github.com/status-im/status-go/testing"
 	"github.com/stretchr/testify/suite"
-	"os"
 )
 
 type WhisperMailboxSuite struct {
@@ -75,71 +77,18 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	pubkey := hexutil.Bytes(crypto.FromECDSAPub(&key.PublicKey))
 
 	//Create message filter
-	resp := rpcClient.CallRaw(`{
-		"jsonrpc": "2.0",
-		"method": "shh_newMessageFilter", "params": [
-			{"privateKeyID": "` + keyID + `", "topics": [ "` + topic.String() + `"], "allowP2P":true}
-		],
-		"id": 1
-	}`)
-	msgFilterResp := returnedIDResponse{}
-	err = json.Unmarshal([]byte(resp), &msgFilterResp)
-	messageFilterID := msgFilterResp.Result
-	s.Require().NoError(err)
-	s.Require().NotEqual("", messageFilterID)
+	messageFilterID := s.createPrivateChatMessageFilter(rpcClient, keyID, topic.String())
 
 	//Threre are no messages at filter
-	resp = rpcClient.CallRaw(`{
-		"jsonrpc": "2.0",
-		"method": "shh_getFilterMessages",
-		"params": ["` + messageFilterID + `"],
-		"id": 1}`)
-	messages := getFilterMessagesResponse{}
-	err = json.Unmarshal([]byte(resp), &messages)
-	s.Require().NoError(err)
-	s.Require().Equal(0, len(messages.Result))
+	messages := s.getMessagesByMessageFilterId(rpcClient, messageFilterID)
+	s.Require().Equal(0, len(messages))
 
 	//Post message
-	resp = rpcClient.CallRaw(`{
-		"jsonrpc": "2.0",
-		"method": "shh_post",
-		"params": [
-			{
-			"pubKey": "` + pubkey.String() + `",
-			"topic": "` + topic.String() + `",
-			"payload": "0x73656e74206265666f72652066696c7465722077617320616374697665202873796d6d657472696329",
-			"powTarget": 0.001,
-			"powTime": 2
-			}
-		],
-		"id": 1}`)
-	postResp := baseRPCResponse{}
-	err = json.Unmarshal([]byte(resp), &postResp)
-	s.Require().NoError(err)
-	s.Require().Nil(postResp.Err)
+	s.postMessageToPrivate(rpcClient, pubkey.String(), topic.String(), hexutil.Encode([]byte("Hello world!")))
 
-	// Propagate the sent message.
-	time.Sleep(time.Second)
-
-	// Receive the sent message.
-	resp = rpcClient.CallRaw(`{
-		"jsonrpc": "2.0",
-		"method": "shh_getFilterMessages",
-		"params": ["` + messageFilterID + `"],
-		"id": 1}`)
-	err = json.Unmarshal([]byte(resp), &messages)
-	s.Require().NoError(err)
-	s.Require().Equal(1, len(messages.Result))
-
-	// Make sure there are no new messages.
-	resp = rpcClient.CallRaw(`{
-		"jsonrpc": "2.0",
-		"method": "shh_getFilterMessages",
-		"params": ["` + messageFilterID + `"],
-		"id": 1}`)
-	err = json.Unmarshal([]byte(resp), &messages)
-	s.Require().NoError(err)
-	s.Require().Equal(0, len(messages.Result))
+	//There are no messages, because it's a sender filter
+	messages = s.getMessagesByMessageFilterId(rpcClient, messageFilterID)
+	s.Require().Equal(0, len(messages))
 
 	//act
 
@@ -149,102 +98,50 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 		"id": 1,
 		"method": "shh_requestMessages",
 		"params": [{
-					"mailServerPeer":"` + mailboxPeerStr + `",
+					"peer":"` + mailboxPeerStr + `",
 					"topic":"` + topic.String() + `",
 					"symKeyID":"` + MailServerKeyID + `",
 					"from":0,
-					"to":` + strconv.FormatInt(time.Now().UTC().Unix(), 10) + `
+					"to":` + strconv.FormatInt(time.Now().UnixNano()/int64(time.Second), 10) + `
 		}]
 	}`
-	resp = rpcClient.CallRaw(reqMessagesBody)
+	resp := rpcClient.CallRaw(reqMessagesBody)
 	reqMessagesResp := baseRPCResponse{}
 	err = json.Unmarshal([]byte(resp), &reqMessagesResp)
 	s.Require().NoError(err)
-	s.Require().Nil(postResp.Err)
+	s.Require().Nil(reqMessagesResp.Err)
 
 	//wait to receive message
 	time.Sleep(time.Second)
 	//And we receive message
-	resp = rpcClient.CallRaw(`{
-		"jsonrpc": "2.0",
-		"method": "shh_getFilterMessages",
-		"params": ["` + messageFilterID + `"],
-		"id": 1}`)
-
-	err = json.Unmarshal([]byte(resp), &messages)
-	//assert
-	s.Require().NoError(err)
-	s.Require().Equal(1, len(messages.Result))
+	messages = s.getMessagesByMessageFilterId(rpcClient, messageFilterID)
+	s.Require().Equal(1, len(messages))
 
 	//check that there are no messages
-	resp = rpcClient.CallRaw(`{
-		"jsonrpc": "2.0",
-		"method": "shh_getFilterMessages",
-		"params": ["` + messageFilterID + `"],
-		"id": 1}`)
-
-	err = json.Unmarshal([]byte(resp), &messages)
-	//assert
-	s.Require().NoError(err)
-	s.Require().Equal(0, len(messages.Result))
+	messages = s.getMessagesByMessageFilterId(rpcClient, messageFilterID)
+	s.Require().Equal(0, len(messages))
 
 	//Request each one messages from mailbox, using same params
 	resp = rpcClient.CallRaw(reqMessagesBody)
 	reqMessagesResp = baseRPCResponse{}
 	err = json.Unmarshal([]byte(resp), &reqMessagesResp)
 	s.Require().NoError(err)
-	s.Require().Nil(postResp.Err)
+	s.Require().Nil(reqMessagesResp.Err)
 
 	//wait to receive message
 	time.Sleep(time.Second)
 	//And we receive message
-	resp = rpcClient.CallRaw(`{
-		"jsonrpc": "2.0",
-		"method": "shh_getFilterMessages",
-		"params": ["` + messageFilterID + `"],
-		"id": 1}`)
-
-	err = json.Unmarshal([]byte(resp), &messages)
-	//assert
-	s.Require().NoError(err)
-	s.Require().Equal(1, len(messages.Result))
-
-	//Request each one messages from mailbox using enode
-	resp = rpcClient.CallRaw(reqMessagesBody)
-	reqMessagesResp = baseRPCResponse{}
-	err = json.Unmarshal([]byte(resp), &reqMessagesResp)
-	s.Require().NoError(err)
-	s.Require().Nil(postResp.Err)
-
-	//wait to receive message
-	time.Sleep(time.Second)
-	//And we receive message
-	resp = rpcClient.CallRaw(`{
-		"jsonrpc": "2.0",
-		"method": "shh_getFilterMessages",
-		"params": ["` + messageFilterID + `"],
-		"id": 1}`)
-
-	err = json.Unmarshal([]byte(resp), &messages)
-	//assert
-	s.Require().NoError(err)
-	s.Require().Equal(1, len(messages.Result))
-
+	messages = s.getMessagesByMessageFilterId(rpcClient, messageFilterID)
+	s.Require().Equal(1, len(messages))
 }
 
 func (s *WhisperMailboxSuite) TestRequestMessagesFromMailboxFromGroupChat() {
 	//Start mailbox, alice, bob, charlie node
 	mailboxBackend, stop := s.startMailboxBackend()
 	defer stop()
-	mailboxNode, err := mailboxBackend.NodeManager().Node()
-	s.Require().NoError(err)
-	mailboxEnode := mailboxNode.Server().NodeInfo().Enode
 
 	aliceBackend, stop := s.startBackend("alice")
 	defer stop()
-	aliceNode, err := aliceBackend.NodeManager().Node()
-	s.Require().NoError(err)
-	aliceEnode := aliceNode.Server().NodeInfo().Enode
 
 	bobBackend, stop := s.startBackend("bob")
 	defer stop()
@@ -252,7 +149,10 @@ func (s *WhisperMailboxSuite) TestRequestMessagesFromMailboxFromGroupChat() {
 	charlieBackend, stop := s.startBackend("charlie")
 	defer stop()
 
-	s.Require().NotEqual(mailboxEnode, aliceEnode)
+	//add mailbox to static peers
+	mailboxNode, err := mailboxBackend.NodeManager().Node()
+	s.Require().NoError(err)
+	mailboxEnode := mailboxNode.Server().NodeInfo().Enode
 
 	err = aliceBackend.NodeManager().AddPeer(mailboxEnode)
 	s.Require().NoError(err)
@@ -263,27 +163,24 @@ func (s *WhisperMailboxSuite) TestRequestMessagesFromMailboxFromGroupChat() {
 	//wait async processes on adding peer
 	time.Sleep(time.Second)
 
+	//get whisper service
 	aliceWhisperService, err := aliceBackend.NodeManager().WhisperService()
 	s.Require().NoError(err)
 	bobWhisperService, err := bobBackend.NodeManager().WhisperService()
 	s.Require().NoError(err)
 	charlieWhisperService, err := charlieBackend.NodeManager().WhisperService()
 	s.Require().NoError(err)
+	//get rpc client
+	aliceRpcClient := aliceBackend.NodeManager().RPCClient()
+	bobRpcClient := bobBackend.NodeManager().RPCClient()
+	charlieRpcClient := charlieBackend.NodeManager().RPCClient()
 
-	//add mailserver key
+	//bob and charlie add mailserver key
 	password := "status-offline-inbox"
 	bobMailServerKeyID, err := bobWhisperService.AddSymKeyFromPassword(password)
 	s.Require().NoError(err)
 	charlieMailServerKeyID, err := charlieWhisperService.AddSymKeyFromPassword(password)
 	s.Require().NoError(err)
-
-	//get rpc client
-	aliceRpcClient := aliceBackend.NodeManager().RPCClient()
-	s.Require().NotNil(aliceRpcClient)
-	bobRpcClient := bobBackend.NodeManager().RPCClient()
-	s.Require().NotNil(bobRpcClient)
-	charlieRpcClient := charlieBackend.NodeManager().RPCClient()
-	s.Require().NotNil(charlieRpcClient)
 
 	//generate group chat symkey and topic
 	groupChatKeyID, err := aliceWhisperService.GenerateSymKey()
@@ -312,278 +209,81 @@ func (s *WhisperMailboxSuite) TestRequestMessagesFromMailboxFromGroupChat() {
 	charlieAliceKeySendTopic := whisperv5.BytesToTopic([]byte("charlieAliceKeySendTopic "))
 
 	//bob and charlie create message filter
-	resp := bobRpcClient.CallRaw(`{
-			"jsonrpc": "2.0",
-			"method": "shh_newMessageFilter", "params": [
-				{"privateKeyID": "` + bobKeyID + `", "topics": [ "` + bobAliceKeySendTopic.String() + `"], "allowP2P":true}
-			],
-			"id": 1
-		}`)
-
-	msgFilterResp := returnedIDResponse{}
-	err = json.Unmarshal([]byte(resp), &msgFilterResp)
-	bobMessageFilterID := msgFilterResp.Result
-	s.Require().NoError(err)
-	s.Require().NotEqual("", bobMessageFilterID, resp)
-
-	resp = charlieRpcClient.CallRaw(`{
-			"jsonrpc": "2.0",
-			"method": "shh_newMessageFilter", "params": [
-				{"privateKeyID": "` + charlieKeyID + `", "topics": [ "` + charlieAliceKeySendTopic.String() + `"], "allowP2P":true}
-			],
-			"id": 1
-		}`)
-
-	msgFilterResp = returnedIDResponse{}
-	err = json.Unmarshal([]byte(resp), &msgFilterResp)
-	charlieMessageFilterID := msgFilterResp.Result
-	s.Require().NoError(err)
-	s.Require().NotEqual("", charlieMessageFilterID, resp)
+	bobMessageFilterID := s.createPrivateChatMessageFilter(bobRpcClient, bobKeyID, bobAliceKeySendTopic.String())
+	charlieMessageFilterID := s.createPrivateChatMessageFilter(charlieRpcClient, charlieKeyID, charlieAliceKeySendTopic.String())
 
 	//Alice send message with symkey and topic to bob and charlie
-	resp = aliceRpcClient.CallRaw(`{
-		"jsonrpc": "2.0",
-		"method": "shh_post",
-		"params": [
-			{
-			"pubKey": "` + bobPubkey.String() + `",
-			"topic": "` + bobAliceKeySendTopic.String() + `",
-			"payload": "` + payloadStr + `",
-			"powTarget": 0.001,
-			"powTime": 2
-			}
-		],
-		"id": 1}`)
-	postResp := baseRPCResponse{}
-	err = json.Unmarshal([]byte(resp), &postResp)
-	s.Require().NoError(err)
-	s.Require().Nil(postResp.Err)
+	s.postMessageToPrivate(aliceRpcClient, bobPubkey.String(), bobAliceKeySendTopic.String(), payloadStr)
+	s.postMessageToPrivate(aliceRpcClient, charliePubkey.String(), charlieAliceKeySendTopic.String(), payloadStr)
 
-	resp = aliceRpcClient.CallRaw(`{
-		"jsonrpc": "2.0",
-		"method": "shh_post",
-		"params": [
-			{
-			"pubKey": "` + charliePubkey.String() + `",
-			"topic": "` + charlieAliceKeySendTopic.String() + `",
-			"payload": "` + payloadStr + `",
-			"powTarget": 0.001,
-			"powTime": 2
-			}
-		],
-		"id": 1}`)
-	postResp = baseRPCResponse{}
-	err = json.Unmarshal([]byte(resp), &postResp)
-	s.Require().NoError(err)
-	s.Require().Nil(postResp.Err)
 	//wait to receive
 	time.Sleep(time.Second)
 
 	//bob receive group chat data and add it to his node
 	//1. bob get group chat details
-	resp = bobRpcClient.CallRaw(`{
-		"jsonrpc": "2.0",
-		"method": "shh_getFilterMessages",
-		"params": ["` + bobMessageFilterID + `"],
-		"id": 1}`)
-	messages := getFilterMessagesResponse{}
-	err = json.Unmarshal([]byte(resp), &messages)
-	s.Require().NoError(err)
-	s.Require().Equal(1, len(messages.Result))
-	s.Require().NoError(err)
-
+	messages := s.getMessagesByMessageFilterId(bobRpcClient, bobMessageFilterID)
+	s.Require().Equal(1, len(messages))
 	bobGroupChatData := groupChatParams{}
-	bobGroupChatData.Decode(messages.Result[0]["payload"].(string))
+	bobGroupChatData.Decode(messages[0]["payload"].(string))
 	s.EqualValues(groupChatPayload, bobGroupChatData)
 
 	//2. bob add symkey to his node
-	resp = bobRpcClient.CallRaw(`{"jsonrpc":"2.0","method":"shh_addSymKey",
-			"params":["` + bobGroupChatData.Key + `"],
-			"id":1}`)
-	symkeyAddResp := returnedIDResponse{}
-	err = json.Unmarshal([]byte(resp), &symkeyAddResp)
-	s.Require().NoError(err)
-	bobGroupChatSymkeyID := symkeyAddResp.Result
+	bobGroupChatSymkeyID := s.addSymKey(bobRpcClient, bobGroupChatData.Key)
 	s.Require().NotEmpty(bobGroupChatSymkeyID)
 
 	//3. bob create message filter to node by group chat topic
-	resp = bobRpcClient.CallRaw(`{
-			"jsonrpc": "2.0",
-			"method": "shh_newMessageFilter", "params": [
-				{"symKeyID": "` + bobGroupChatSymkeyID + `", "topics": [ "` + bobGroupChatData.Topic + `"], "allowP2P":true}
-			],
-			"id": 1
-		}`)
-
-	msgFilterResp = returnedIDResponse{}
-	err = json.Unmarshal([]byte(resp), &msgFilterResp)
-	s.Require().NoError(err)
-	bobGroupChatMessageFilterID := msgFilterResp.Result
+	bobGroupChatMessageFilterID := s.createGroupChatMessageFilter(bobRpcClient, bobGroupChatSymkeyID, bobGroupChatData.Topic)
 
 	//charlie receive group chat data and add it to his node
 	//1. charlie get group chat details
-	resp = charlieRpcClient.CallRaw(`{
-		"jsonrpc": "2.0",
-		"method": "shh_getFilterMessages",
-		"params": ["` + charlieMessageFilterID + `"],
-		"id": 1}`)
-	messages = getFilterMessagesResponse{}
-	err = json.Unmarshal([]byte(resp), &messages)
-	s.Require().NoError(err)
-	s.Require().Equal(1, len(messages.Result))
+	messages = s.getMessagesByMessageFilterId(charlieRpcClient, charlieMessageFilterID)
+	s.Require().Equal(1, len(messages))
 	charlieGroupChatData := groupChatParams{}
-	charlieGroupChatData.Decode(messages.Result[0]["payload"].(string))
+	charlieGroupChatData.Decode(messages[0]["payload"].(string))
 	s.EqualValues(groupChatPayload, charlieGroupChatData)
 
 	//2. charlie add symkey to his node
-	resp = charlieRpcClient.CallRaw(`{"jsonrpc":"2.0","method":"shh_addSymKey",
-			"params":["` + bobGroupChatData.Key + `"],
-			"id":1}`)
-	symkeyAddResp = returnedIDResponse{}
-	err = json.Unmarshal([]byte(resp), &symkeyAddResp)
-	s.Require().NoError(err)
-	charlieGroupChatSymkeyID := symkeyAddResp.Result
+	charlieGroupChatSymkeyID := s.addSymKey(charlieRpcClient, charlieGroupChatData.Key)
 	s.Require().NotEmpty(charlieGroupChatSymkeyID)
 
 	//3. charlie create message filter to node by group chat topic
-	resp = charlieRpcClient.CallRaw(`{
-			"jsonrpc": "2.0",
-			"method": "shh_newMessageFilter", "params": [
-				{"symKeyID": "` + charlieGroupChatSymkeyID + `", "topics": [ "` + charlieGroupChatData.Topic + `"], "allowP2P":true}
-			],
-			"id": 1
-		}`)
+	charlieGroupChatMessageFilterID := s.createGroupChatMessageFilter(charlieRpcClient, charlieGroupChatSymkeyID, charlieGroupChatData.Topic)
 
-	msgFilterResp = returnedIDResponse{}
-	err = json.Unmarshal([]byte(resp), &msgFilterResp)
-	s.Require().NoError(err)
-	charlieGroupChatMessageFilterID := msgFilterResp.Result
-
+	//alice send message to group chat
 	helloWorldMessage := hexutil.Encode([]byte("Hello world!"))
-	//Post message
-	resp = aliceRpcClient.CallRaw(`{
-		"jsonrpc": "2.0",
-		"method": "shh_post",
-		"params": [
-			{
-			"symKeyID": "` + groupChatKeyID + `",
-			"topic": "` + groupChatTopic.String() + `",
-			"payload": "` + helloWorldMessage + `",
-			"powTarget": 0.001,
-			"powTime": 2
-			}
-		],
-		"id": 1}`)
-	postResp = baseRPCResponse{}
-	err = json.Unmarshal([]byte(resp), &postResp)
-	s.Require().NoError(err)
-	s.Require().Nil(postResp.Err)
-	time.Sleep(time.Second)
+	s.postMessageToGroup(aliceRpcClient, groupChatKeyID, groupChatTopic.String(), helloWorldMessage)
+	time.Sleep(time.Second) //it need to receive envelopes by bob and charlie nodes
 
-	resp = bobRpcClient.CallRaw(`{
-		"jsonrpc": "2.0",
-		"method": "shh_getFilterMessages",
-		"params": ["` + bobGroupChatMessageFilterID + `"],
-		"id": 1}`)
-	messages = getFilterMessagesResponse{}
-	err = json.Unmarshal([]byte(resp), &messages)
-	s.Require().NoError(err)
-	s.Require().Equal(1, len(messages.Result))
-	s.Require().Equal(helloWorldMessage, messages.Result[0]["payload"].(string))
-	s.Require().NoError(err)
+	//bob receive group chat message
+	messages = s.getMessagesByMessageFilterId(bobRpcClient, bobGroupChatMessageFilterID)
+	s.Require().Equal(1, len(messages))
+	s.Require().Equal(helloWorldMessage, messages[0]["payload"].(string))
 
-	resp = charlieRpcClient.CallRaw(`{
-		"jsonrpc": "2.0",
-		"method": "shh_getFilterMessages",
-		"params": ["` + charlieGroupChatMessageFilterID + `"],
-		"id": 1}`)
-	messages = getFilterMessagesResponse{}
-	err = json.Unmarshal([]byte(resp), &messages)
-	s.Require().NoError(err)
-	s.Require().Equal(1, len(messages.Result))
-	s.Require().Equal(helloWorldMessage, messages.Result[0]["payload"].(string))
-	s.Require().NoError(err)
+	//charlie receive group chat message
+	messages = s.getMessagesByMessageFilterId(charlieRpcClient, charlieGroupChatMessageFilterID)
+	s.Require().Equal(1, len(messages))
+	s.Require().Equal(helloWorldMessage, messages[0]["payload"].(string))
 
-	resp = bobRpcClient.CallRaw(`{
-		"jsonrpc": "2.0",
-		"method": "shh_getFilterMessages",
-		"params": ["` + bobGroupChatMessageFilterID + `"],
-		"id": 1}`)
-	messages = getFilterMessagesResponse{}
-	err = json.Unmarshal([]byte(resp), &messages)
-	s.Require().NoError(err)
-	s.Require().Equal(0, len(messages.Result))
-	s.Require().NoError(err)
-
-	resp = charlieRpcClient.CallRaw(`{
-		"jsonrpc": "2.0",
-		"method": "shh_getFilterMessages",
-		"params": ["` + charlieGroupChatMessageFilterID + `"],
-		"id": 1}`)
-	messages = getFilterMessagesResponse{}
-	err = json.Unmarshal([]byte(resp), &messages)
-	s.Require().NoError(err)
-	s.Require().Equal(0, len(messages.Result))
+	//check that we don't receive messages each one time
+	messages = s.getMessagesByMessageFilterId(bobRpcClient, bobGroupChatMessageFilterID)
+	s.Require().Equal(0, len(messages))
+	messages = s.getMessagesByMessageFilterId(charlieRpcClient, charlieGroupChatMessageFilterID)
+	s.Require().Equal(0, len(messages))
 
 	//Request each one messages from mailbox using enode
-	resp = bobRpcClient.CallRaw(`{
-		"jsonrpc": "2.0",
-		"id": 2,
-		"method": "shh_requestMessages",
-		"params": [{
-					"enode":"` + mailboxEnode + `",
-					"topic":"` + groupChatTopic.String() + `",
-					"symKeyID":"` + bobMailServerKeyID + `",
-					"from":0,
-					"to":` + strconv.FormatInt(time.Now().UnixNano()/int64(time.Second), 10) + `
-		}]
-	}`)
-	reqMessagesResp := baseRPCResponse{}
-	err = json.Unmarshal([]byte(resp), &reqMessagesResp)
-	s.Require().NoError(err)
+	s.requestHistoricMessages(bobRpcClient, mailboxEnode, bobMailServerKeyID, groupChatTopic.String())
+	s.requestHistoricMessages(charlieRpcClient, mailboxEnode, charlieMailServerKeyID, groupChatTopic.String())
+	time.Sleep(time.Second) //wait to receive p2p messages
 
-	resp = charlieRpcClient.CallRaw(`{
-		"jsonrpc": "2.0",
-		"id": 2,
-		"method": "shh_requestMessages",
-		"params": [{
-					"enode":"` + mailboxEnode + `",
-					"topic":"` + groupChatTopic.String() + `",
-					"symKeyID":"` + charlieMailServerKeyID + `",
-					"from":0,
-					"to":` + strconv.FormatInt(time.Now().UnixNano()/int64(time.Second), 10) + `
-		}]
-	}`)
-	reqMessagesResp = baseRPCResponse{}
-	err = json.Unmarshal([]byte(resp), &reqMessagesResp)
-	s.Require().NoError(err)
+	//bob receive p2p message from grop chat filter
+	messages = s.getMessagesByMessageFilterId(bobRpcClient, bobGroupChatMessageFilterID)
+	s.Require().Equal(1, len(messages))
+	s.Require().Equal(helloWorldMessage, messages[0]["payload"].(string))
 
-	//wait to receive p2p messages
-	time.Sleep(time.Second)
-
-	resp = bobRpcClient.CallRaw(`{
-		"jsonrpc": "2.0",
-		"method": "shh_getFilterMessages",
-		"params": ["` + bobGroupChatMessageFilterID + `"],
-		"id": 1}`)
-	messages = getFilterMessagesResponse{}
-	err = json.Unmarshal([]byte(resp), &messages)
-	s.Require().NoError(err)
-	s.Require().Equal(1, len(messages.Result))
-	s.Require().Equal(helloWorldMessage, messages.Result[0]["payload"].(string))
-	s.Require().NoError(err)
-
-	resp = charlieRpcClient.CallRaw(`{
-		"jsonrpc": "2.0",
-		"method": "shh_getFilterMessages",
-		"params": ["` + charlieGroupChatMessageFilterID + `"],
-		"id": 1}`)
-	messages = getFilterMessagesResponse{}
-	err = json.Unmarshal([]byte(resp), &messages)
-	s.Require().NoError(err)
-	s.Require().Equal(1, len(messages.Result))
-	s.Require().Equal(helloWorldMessage, messages.Result[0]["payload"].(string))
-	s.Require().NoError(err)
+	//charlie receive p2p message from grop chat filter
+	messages = s.getMessagesByMessageFilterId(charlieRpcClient, charlieGroupChatMessageFilterID)
+	s.Require().Equal(1, len(messages))
+	s.Require().Equal(helloWorldMessage, messages[0]["payload"].(string))
 }
 
 func newGroupChatParams(symkey []byte, topic whisperv5.TopicType) groupChatParams {
@@ -667,6 +367,132 @@ func (s *WhisperMailboxSuite) startMailboxBackend() (*api.StatusBackend, func())
 		s.False(mailboxBackend.IsNodeRunning())
 		os.RemoveAll(datadir)
 	}
+}
+
+//createPrivateChatMessageFilter create message filter with asymmetric encryption
+func (s *WhisperMailboxSuite) createPrivateChatMessageFilter(rpcCli *rpc.Client, privateKeyID string, topic string) string {
+	resp := rpcCli.CallRaw(`{
+			"jsonrpc": "2.0",
+			"method": "shh_newMessageFilter", "params": [
+				{"privateKeyID": "` + privateKeyID + `", "topics": [ "` + topic + `"], "allowP2P":true}
+			],
+			"id": 1
+		}`)
+
+	msgFilterResp := returnedIDResponse{}
+	err := json.Unmarshal([]byte(resp), &msgFilterResp)
+	messageFilterID := msgFilterResp.Result
+	s.Require().NoError(err)
+	s.Require().Nil(msgFilterResp.Err)
+	s.Require().NotEqual("", messageFilterID, resp)
+	return messageFilterID
+}
+
+//createGroupChatMessageFilter create message filter with symmetric encryption
+func (s *WhisperMailboxSuite) createGroupChatMessageFilter(rpcCli *rpc.Client, symkeyID string, topic string) string {
+	resp := rpcCli.CallRaw(`{
+			"jsonrpc": "2.0",
+			"method": "shh_newMessageFilter", "params": [
+				{"symKeyID": "` + symkeyID + `", "topics": [ "` + topic + `"], "allowP2P":true}
+			],
+			"id": 1
+		}`)
+
+	msgFilterResp := returnedIDResponse{}
+	err := json.Unmarshal([]byte(resp), &msgFilterResp)
+	messageFilterID := msgFilterResp.Result
+	s.Require().NoError(err)
+	s.Require().Nil(msgFilterResp.Err)
+	s.Require().NotEqual("", messageFilterID, resp)
+	return messageFilterID
+}
+
+func (s *WhisperMailboxSuite) postMessageToPrivate(rpcCli *rpc.Client, bobPubkey string, topic string, payload string) {
+	resp := rpcCli.CallRaw(`{
+		"jsonrpc": "2.0",
+		"method": "shh_post",
+		"params": [
+			{
+			"pubKey": "` + bobPubkey + `",
+			"topic": "` + topic + `",
+			"payload": "` + payload + `",
+			"powTarget": 0.001,
+			"powTime": 2
+			}
+		],
+		"id": 1}`)
+	postResp := baseRPCResponse{}
+	err := json.Unmarshal([]byte(resp), &postResp)
+	s.Require().NoError(err)
+	s.Require().Nil(postResp.Err)
+}
+
+func (s *WhisperMailboxSuite) postMessageToGroup(rpcCli *rpc.Client, groupChatKeyID string, topic string, payload string) {
+	resp := rpcCli.CallRaw(`{
+		"jsonrpc": "2.0",
+		"method": "shh_post",
+		"params": [
+			{
+			"symKeyID": "` + groupChatKeyID + `",
+			"topic": "` + topic + `",
+			"payload": "` + payload + `",
+			"powTarget": 0.001,
+			"powTime": 2
+			}
+		],
+		"id": 1}`)
+	postResp := baseRPCResponse{}
+	err := json.Unmarshal([]byte(resp), &postResp)
+	s.Require().NoError(err)
+	s.Require().Nil(postResp.Err)
+}
+
+//getMessagesByMessageFilterId get received messages by messageFilterID
+func (s *WhisperMailboxSuite) getMessagesByMessageFilterId(rpcCli *rpc.Client, messageFilterID string) []map[string]interface{} {
+	resp := rpcCli.CallRaw(`{
+		"jsonrpc": "2.0",
+		"method": "shh_getFilterMessages",
+		"params": ["` + messageFilterID + `"],
+		"id": 1}`)
+	messages := getFilterMessagesResponse{}
+	err := json.Unmarshal([]byte(resp), &messages)
+	s.Require().NoError(err)
+	s.Require().Nil(messages.Err)
+	return messages.Result
+}
+
+//addSymKey added symkey to node and return symkeyID
+func (s *WhisperMailboxSuite) addSymKey(rpcCli *rpc.Client, symkey string) string {
+	resp := rpcCli.CallRaw(`{"jsonrpc":"2.0","method":"shh_addSymKey",
+			"params":["` + symkey + `"],
+			"id":1}`)
+	symkeyAddResp := returnedIDResponse{}
+	err := json.Unmarshal([]byte(resp), &symkeyAddResp)
+	s.Require().NoError(err)
+	s.Require().Nil(symkeyAddResp.Err)
+	symkeyID := symkeyAddResp.Result
+	s.Require().NotEmpty(symkeyID)
+	return symkeyID
+}
+
+//requestHistoricMessages ask mailnode to resend messagess
+func (s *WhisperMailboxSuite) requestHistoricMessages(rpcCli *rpc.Client, mailboxEnode, mailServerKeyID, topic string) {
+	resp := rpcCli.CallRaw(`{
+		"jsonrpc": "2.0",
+		"id": 2,
+		"method": "shh_requestMessages",
+		"params": [{
+					"enode":"` + mailboxEnode + `",
+					"topic":"` + topic + `",
+					"symKeyID":"` + mailServerKeyID + `",
+					"from":0,
+					"to":` + strconv.FormatInt(time.Now().Unix(), 10) + `
+		}]
+	}`)
+	reqMessagesResp := baseRPCResponse{}
+	err := json.Unmarshal([]byte(resp), &reqMessagesResp)
+	s.Require().NoError(err)
+	s.Require().Nil(reqMessagesResp.Err)
 }
 
 type getFilterMessagesResponse struct {
