@@ -125,14 +125,17 @@ func (l *Loop) removeAll() {
 // Ready signals to the loop that a task is ready to be finalised. This might
 // block if the "ready channel" in the loop is at capacity.
 func (l *Loop) Ready(t Task) error {
+	var err error
 	l.lock.RLock()
-	defer l.lock.RUnlock()
 	if !l.accepting {
 		t.Cancel()
-		return ErrClosed
+		err = ErrClosed
 	}
-	l.ready <- t
-	return nil
+	l.lock.RUnlock()
+	if err == nil {
+		l.ready <- t
+	}
+	return err
 }
 
 // AddAndExecute combines Add and Ready for immediate execution.
@@ -183,15 +186,13 @@ func (l *Loop) Run(ctx context.Context) error {
 				continue
 			}
 
-			go func() {
-				err := l.processTask(t)
-				if err != nil {
-					// TODO(divan): do we need to report
-					// errors up to the caller?
-					// Ignoring for now.
-					return
-				}
-			}()
+			err := l.processTask(t)
+			if err != nil {
+				// TODO(divan): do we need to report
+				// errors up to the caller?
+				// Ignoring for now.
+				continue
+			}
 		case <-ctx.Done():
 			return ctx.Err()
 		}
