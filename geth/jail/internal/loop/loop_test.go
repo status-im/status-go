@@ -71,9 +71,7 @@ func (s *LoopSuite) TestLoopErrorWhenClosed() {
 
 	err := s.loop.Add(s.task)
 	s.Error(err)
-	s.True(s.task.canceled)
 
-	s.task.canceled = false
 	err = s.loop.Ready(s.task)
 	s.Error(err)
 	s.True(s.task.canceled)
@@ -102,6 +100,5 @@ func (s *LoopSuite) TestImmediateExecutionErrorWhenClosed() {
 
 	s.Error(err)
 	s.False(s.task.executed)
-	s.True(s.task.canceled)
 
 }
