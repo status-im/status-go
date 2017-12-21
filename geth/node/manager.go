@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/log"
+	"github.com/status-im/status-go/geth/mailservice"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/rpc"
 	"github.com/status-im/status-go/geth/signal"
@@ -71,6 +72,13 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 
 	ethNode, err := MakeNode(config, LogDeliveryService{})
 	if err != nil {
+		return nil, err
+	}
+
+	// activate MailService required for Offline Inboxing
+	if err := ethNode.Register(func(_ *node.ServiceContext) (node.Service, error) {
+		return mailservice.New(m), nil
+	}); err != nil {
 		return nil, err
 	}
 
