@@ -87,7 +87,6 @@ func (l *Loop) Add(t Task) error {
 	l.lock.Lock()
 	defer l.lock.Unlock()
 	if !l.accepting {
-		t.Cancel()
 		return ErrClosed
 	}
 	t.SetID(atomic.AddInt64(&l.id, 1))
