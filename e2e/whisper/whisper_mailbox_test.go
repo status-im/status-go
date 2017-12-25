@@ -98,11 +98,11 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 		"id": 1,
 		"method": "shh_requestMessages",
 		"params": [{
-					"peer":"` + mailboxPeerStr + `",
+					"mailServerPeer":"` + mailboxPeerStr + `",
 					"topic":"` + topic.String() + `",
 					"symKeyID":"` + MailServerKeyID + `",
 					"from":0,
-					"to":` + strconv.FormatInt(time.Now().UnixNano()/int64(time.Second), 10) + `
+					"to":` + strconv.FormatInt(time.Now().Unix(), 10) + `
 		}]
 	}`
 	resp := rpcClient.CallRaw(reqMessagesBody)
@@ -120,19 +120,6 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	//check that there are no messages
 	messages = s.getMessagesByMessageFilterId(rpcClient, messageFilterID)
 	s.Require().Equal(0, len(messages))
-
-	//Request each one messages from mailbox, using same params
-	resp = rpcClient.CallRaw(reqMessagesBody)
-	reqMessagesResp = baseRPCResponse{}
-	err = json.Unmarshal([]byte(resp), &reqMessagesResp)
-	s.Require().NoError(err)
-	s.Require().Nil(reqMessagesResp.Err)
-
-	//wait to receive message
-	time.Sleep(time.Second)
-	//And we receive message
-	messages = s.getMessagesByMessageFilterId(rpcClient, messageFilterID)
-	s.Require().Equal(1, len(messages))
 }
 
 func (s *WhisperMailboxSuite) TestRequestMessagesFromMailboxFromGroupChat() {
@@ -482,7 +469,7 @@ func (s *WhisperMailboxSuite) requestHistoricMessages(rpcCli *rpc.Client, mailbo
 		"id": 2,
 		"method": "shh_requestMessages",
 		"params": [{
-					"enode":"` + mailboxEnode + `",
+					"mailServerPeer":"` + mailboxEnode + `",
 					"topic":"` + topic + `",
 					"symKeyID":"` + mailServerKeyID + `",
 					"from":0,
