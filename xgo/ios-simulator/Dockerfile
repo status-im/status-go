@@ -1,4 +1,4 @@
-FROM farazdagi/xgo
+FROM statusteam/xgo:1.9.2
 
 RUN \
   IOS_SDK_PATH=https://s3.amazonaws.com/farazdagi/status-im/iPhoneSimulator9.3.sdk.tar.gz && \

@@ -14,6 +14,9 @@ endif
 CGO_CFLAGS=-I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
 GOBIN = build/bin
 GO ?= latest
+XGOVERSION ?= 1.9.2
+XGOIMAGE = statusteam/xgo:$(XGOVERSION)
+XGOIMAGEIOSSIM = statusteam/xgo-ios-simulator:$(XGOVERSION)
 
 DOCKER_IMAGE_NAME ?= status-go
 
@@ -52,16 +55,16 @@ statusgo-cross: statusgo-android statusgo-ios
 	@ls -ld $(GOBIN)/statusgo-*
 
 statusgo-android: xgo ##@cross-compile Build status-go for Android
-	$(GOPATH)/bin/xgo --image farazdagi/xgo --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=android-16/aar -v $(shell build/testnet-flags.sh) ./lib
+	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=android-16/aar -v $(shell build/testnet-flags.sh) ./lib
 	@echo "Android cross compilation done."
 
 statusgo-ios: xgo	##@cross-compile Build status-go for iOS
-	$(GOPATH)/bin/xgo --image farazdagi/xgo --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v $(shell build/testnet-flags.sh) ./lib
+	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v $(shell build/testnet-flags.sh) ./lib
 	@echo "iOS framework cross compilation done."
 
 statusgo-ios-simulator: xgo	##@cross-compile Build status-go for iOS Simulator
-	@docker pull farazdagi/xgo-ios-simulator
-	$(GOPATH)/bin/xgo --image farazdagi/xgo-ios-simulator --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v $(shell build/testnet-flags.sh) ./lib
+	@docker pull $(XGOIMAGEIOSSIM)
+	$(GOPATH)/bin/xgo --image $(XGOIMAGEIOSSIM) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v $(shell build/testnet-flags.sh) ./lib
 	@echo "iOS framework cross compilation done."
 
 statusgo-library: ##@cross-compile Build status-go as static library for current platform
@@ -74,8 +77,13 @@ docker-image: ##@docker Build docker image (use DOCKER_IMAGE_NAME to set the ima
 	@echo "Building docker image..."
 	docker build . -t $(DOCKER_IMAGE_NAME)
 
+xgo-docker-images: ##@docker Build xgo docker images
+	@echo "Building xgo docker images..."
+	docker build xgo/base -t $(XGOIMAGE)
+	docker build xgo/ios-simulator -t $(XGOIMAGEIOSSIM)
+
 xgo:
-	docker pull farazdagi/xgo
+	docker pull $(XGOIMAGE)
 	go get github.com/karalabe/xgo
 
 statusgo-mainnet:
@@ -84,15 +92,15 @@ statusgo-mainnet:
 	@echo "Run \"build/bin/statusgo\" to view available commands"
 
 statusgo-android-mainnet: xgo
-	$(GOPATH)/bin/xgo --image farazdagi/xgo --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=android-16/aar -v $(shell build/mainnet-flags.sh) ./lib
+	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=android-16/aar -v $(shell build/mainnet-flags.sh) ./lib
 	@echo "Android cross compilation done (mainnet)."
 
 statusgo-ios-mainnet: xgo
-	$(GOPATH)/bin/xgo --image farazdagi/xgo --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v $(shell build/mainnet-flags.sh) ./lib
+	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v $(shell build/mainnet-flags.sh) ./lib
 	@echo "iOS framework cross compilation done (mainnet)."
 
 statusgo-ios-simulator-mainnet: xgo
-	$(GOPATH)/bin/xgo --image farazdagi/xgo-ios-simulator --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v $(shell build/mainnet-flags.sh) ./lib
+	$(GOPATH)/bin/xgo --image $(XGOIMAGEIOSSIM) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v $(shell build/mainnet-flags.sh) ./lib
 	@echo "iOS framework cross compilation done (mainnet)."
 
 generate: ##@other Regenerate assets and other auto-generated stuff
