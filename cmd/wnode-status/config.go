@@ -22,6 +22,10 @@ var (
 	logLevel    = flag.String("log", "INFO", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
 	logFile     = flag.String("logfile", "", "Path to the log file")
 
+	// stats
+	statsEnabled = flag.Bool("stats", false, "True if stats should be collected")
+	statsAddr    = flag.String("statsaddr", "0.0.0.0:8080", "HTTP address with /metrics endpoint")
+
 	// Whisper
 	identity     = flag.String("identity", "", "Protocol identity file (private key used for asymmetric encryption)")
 	passwordFile = flag.String("passwordfile", "", "Password file (password is used for symmetric encryption)")
