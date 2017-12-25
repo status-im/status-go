@@ -331,15 +331,15 @@ func (s *WhisperMailboxSuite) startMailboxBackend() (*api.StatusBackend, func())
 	mailboxBackend := api.NewStatusBackend()
 	mailboxConfig, err := e2e.MakeTestNodeConfig(GetNetworkID())
 	s.Require().NoError(err)
-	datadir := "../../.ethereumtest/mailbox/mailbox/"
+	datadir := "../../.ethereumtest/mailbox/mailserver/"
 
 	mailboxConfig.LightEthConfig.Enabled = false
 	mailboxConfig.WhisperConfig.Enabled = true
-	mailboxConfig.KeyStoreDir = "../../.ethereumtest/mailbox/mailbox"
+	mailboxConfig.KeyStoreDir = "../../.ethereumtest/mailbox/mailserver"
 	mailboxConfig.WhisperConfig.EnableMailServer = true
 	mailboxConfig.WhisperConfig.IdentityFile = "../../static/keys/wnodekey"
 	mailboxConfig.WhisperConfig.PasswordFile = "../../static/keys/wnodepassword"
-	mailboxConfig.WhisperConfig.DataDir = "../../.ethereumtest/mailbox/mailbox/data"
+	mailboxConfig.WhisperConfig.DataDir = "../../.ethereumtest/mailbox/mailserver/data"
 	mailboxConfig.DataDir = datadir
 
 	mailboxNodeStarted, err := mailboxBackend.StartNode(mailboxConfig)
