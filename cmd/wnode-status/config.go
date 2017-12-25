@@ -24,7 +24,7 @@ var (
 
 	// stats
 	statsEnabled = flag.Bool("stats", false, "True if stats should be collected")
-	statsAddr    = flag.String("statsaddr", "0.0.0.0:8080", "HTTP address with /metrics endpoint")
+	statsAddr    = flag.String("statsaddr", "0.0.0.0:8080", "HTTP address with /debug/vars endpoint")
 
 	// Whisper
 	identity     = flag.String("identity", "", "Protocol identity file (private key used for asymmetric encryption)")
