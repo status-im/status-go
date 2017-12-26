@@ -134,9 +134,9 @@ func TestManagerTestSuite(t *testing.T) {
 	nodeManager.EXPECT().AccountKeyStore().Return(keyStore, nil)
 	addr, pubKey, mnemonic, err := accManager.CreateAccount(testPassword)
 	require.NoError(t, err)
-	require.NotNil(t, addr)
-	require.NotNil(t, pubKey)
-	require.NotNil(t, mnemonic)
+	require.NotEmpty(t, addr)
+	require.NotEmpty(t, pubKey)
+	require.NotEmpty(t, mnemonic)
 
 	s := &ManagerTestSuite{
 		testAccount: testAccount{
@@ -342,8 +342,8 @@ func (s *ManagerTestSuite) TestCreateChildAccount() {
 				s.Error(err)
 			} else {
 				s.NoError(err)
-				s.NotNil(childAddr)
-				s.NotNil(childPubKey)
+				s.NotEmpty(childAddr)
+				s.NotEmpty(childPubKey)
 			}
 		})
 	}
