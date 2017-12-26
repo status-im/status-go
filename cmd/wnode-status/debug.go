@@ -19,7 +19,7 @@ func newMetrics(b *api.StatusBackend) *metrics {
 func (m *metrics) peersInfo() interface{} {
 	node, err := m.backend.NodeManager().Node()
 	if err != nil {
-		log.Warn("Failed to get node", "err", err.Error())
+		log.Warn("Failed to get a node", "err", err.Error())
 		return nil
 	}
 
