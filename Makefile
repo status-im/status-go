@@ -7,12 +7,17 @@ help: ##@other Show this help
 include ./static/tools/mk/lint.mk
 
 ifndef GOPATH
-$(error GOPATH not set. Please set GOPATH and make sure status-go is located at $$GOPATH/src/github.com/status-im/status-go. For more information about the GOPATH environment variable, see https://golang.org/doc/code.html#GOPATH)
+	$(error GOPATH not set. Please set GOPATH and make sure status-go is located at $$GOPATH/src/github.com/status-im/status-go. \
+	For more information about the GOPATH environment variable, see https://golang.org/doc/code.html#GOPATH)
 endif
 
 CGO_CFLAGS=-I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
 GOBIN = build/bin
 GO ?= latest
+
+DCKR_IMAGE_NAME ?= status-go
+
+UNIT_TEST_PACKAGES := $(shell go list ./...  | grep -v /vendor | grep -v /e2e | grep -v /cmd | grep -v /lib)
 
 # This is a code for automatic help generator.
 # It supports ANSI colors and categories.
@@ -34,10 +39,6 @@ HELP_FUN = \
 			   }; \
 			   print "\n"; \
 		   }
-
-# Main targets
-
-UNIT_TEST_PACKAGES := $(shell go list ./...  | grep -v /vendor | grep -v /e2e | grep -v /cmd | grep -v /lib)
 
 statusgo: ##@build Build status-go as statusd server
 	go build -i -o $(GOBIN)/statusd -v $(shell build/testnet-flags.sh) ./cmd/statusd
@@ -68,6 +69,10 @@ statusgo-library: ##@cross-compile Build status-go as static library for current
 	go build -buildmode=c-archive -o $(GOBIN)/libstatus.a ./lib
 	@echo "Static library built:"
 	@ls -la $(GOBIN)/libstatus.*
+
+docker-image: ##@docker Build docker image (use DCKR_IMAGE_NAME to set the image name)
+	@echo "Building docker image..."
+	docker build . -t $(DCKR_IMAGE_NAME)
 
 xgo:
 	docker pull farazdagi/xgo
