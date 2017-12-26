@@ -367,7 +367,7 @@ func (s *ManagerTestSuite) TestSelectedAndReSelectAccount() {
 		s.NoError(err)
 	})
 
-	s.T().Run("ReSelect_fail", func(t *testing.T) {
+	s.T().Run("ReSelect_fail_whisper", func(t *testing.T) {
 		s.reinitMock()
 		s.nodeManager.EXPECT().WhisperService().Return(nil, testErrWhisper).AnyTimes()
 		err = s.accManager.ReSelectAccount()
@@ -377,9 +377,9 @@ func (s *ManagerTestSuite) TestSelectedAndReSelectAccount() {
 	s.accManager.selectedAccount = nil
 	s.reinitMock()
 	s.nodeManager.EXPECT().AccountKeyStore().Return(s.keyStore, nil).AnyTimes()
-	s.nodeManager.EXPECT().WhisperService().Return(nil, testErrWhisper).AnyTimes()
+	s.nodeManager.EXPECT().WhisperService().Return(s.shh, nil).AnyTimes()
 
-	s.T().Run("Selected_fail", func(t *testing.T) {
+	s.T().Run("Selected_fail_noAccount", func(t *testing.T) {
 		_, err := s.accManager.SelectedAccount()
 		s.Equal(ErrNoAccountSelected, err)
 	})
