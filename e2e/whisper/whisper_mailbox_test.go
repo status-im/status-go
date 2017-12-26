@@ -122,7 +122,7 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	s.Require().Equal(0, len(messages))
 }
 
-func (s *WhisperMailboxSuite) TestRequestMessagesFromMailboxFromGroupChat() {
+func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
 	//Start mailbox, alice, bob, charlie node
 	mailboxBackend, stop := s.startMailboxBackend()
 	defer stop()
