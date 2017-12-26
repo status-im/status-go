@@ -474,13 +474,15 @@ func (s *ManagerTestSuite) TestAddressToDecryptedAccount() {
 		s.T().Run(testCase.name, func(t *testing.T) {
 			s.reinitMock()
 			s.nodeManager.EXPECT().AccountKeyStore().Return(testCase.accountKeyStoreReturn...).AnyTimes()
-			acc, keyStore, err := s.accManager.AddressToDecryptedAccount(testCase.address, testCase.password)
+			acc, key, err := s.accManager.AddressToDecryptedAccount(testCase.address, testCase.password)
 			if testCase.fail {
 				s.Error(err)
 			} else {
 				s.NoError(err)
 				s.NotNil(acc)
-				s.NotNil(keyStore)
+				s.NotNil(key)
+				s.Equal(acc.Address, key.Address)
+				s.keyStore.Find(acc)
 			}
 		})
 	}
