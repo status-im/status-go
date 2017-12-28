@@ -13,6 +13,8 @@ import (
 	"github.com/status-im/status-go/geth/jail/internal/vm"
 )
 
+const timeout = 5 * time.Second
+
 // Cell represents a single jail cell, which is basically a JavaScript VM.
 type Cell struct {
 	*vm.VM
@@ -86,11 +88,26 @@ func (c *Cell) Stop() error {
 // event queue loop and schedules for immediate execution.
 // Intended to be used by any cell user that want's to run
 // async call, like callback.
-func (c *Cell) CallAsync(fn otto.Value, args ...interface{}) {
+func (c *Cell) CallAsync(fn otto.Value, args ...interface{}) error {
 	task := looptask.NewCallTask(fn, args...)
-	// Add a task to the queue.
-	c.loop.Add(task)
-	// And run the task immediately.
-	// It's a blocking operation.
-	c.loop.Ready(task)
+	errChan := make(chan error)
+
+	go func() {
+		defer close(errChan)
+		err := c.loop.AddAndExecute(task)
+		if err != nil {
+			errChan <- err
+		}
+	}()
+
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+
+	select {
+	case err := <-errChan:
+		return err
+
+	case <-timer.C:
+		return errors.New("Timeout")
+	}
 }

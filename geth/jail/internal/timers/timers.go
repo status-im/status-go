@@ -34,10 +34,15 @@ func Define(vm *vm.VM, l *loop.Loop) error {
 				call:     call,
 				interval: interval,
 			}
-			l.Add(t)
+
+			// If err is non-nil, then the loop is closed and should not
+			// be used anymore.
+			if err := l.Add(t); err != nil {
+				return otto.UndefinedValue()
+			}
 
 			t.timer = time.AfterFunc(t.duration, func() {
-				l.Ready(t)
+				l.Ready(t) // nolint: errcheck
 			})
 
 			value, newTimerErr := call.Otto.ToValue(t)
@@ -64,10 +69,15 @@ func Define(vm *vm.VM, l *loop.Loop) error {
 			duration: time.Millisecond,
 			call:     call,
 		}
-		l.Add(t)
+
+		// If err is non-nil, then the loop is closed and should not
+		// be used anymore.
+		if err := l.Add(t); err != nil {
+			return otto.UndefinedValue()
+		}
 
 		t.timer = time.AfterFunc(t.duration, func() {
-			l.Ready(t)
+			l.Ready(t) // nolint: errcheck
 		})
 
 		value, setImmediateErr := call.Otto.ToValue(t)
@@ -139,7 +149,9 @@ func (t *timerTask) Execute(vm *vm.VM, l *loop.Loop) error {
 
 	if t.interval && !t.stopped {
 		t.timer.Reset(t.duration)
-		l.Add(t)
+		if err := l.Add(t); err != nil {
+			return err
+		}
 	}
 
 	return nil

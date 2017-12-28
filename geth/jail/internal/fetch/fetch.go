@@ -129,10 +129,14 @@ func DefineWithHandler(vm *vm.VM, l *loop.Loop, h http.Handler) error {
 			cb:    cb,
 		}
 
-		l.Add(t)
+		// If err is non-nil, then the loop is closed
+		// and we shouldn't do anymore with it.
+		if err := l.Add(t); err != nil {
+			return otto.UndefinedValue()
+		}
 
 		go func() {
-			defer l.Ready(t)
+			defer l.Ready(t) // nolint: errcheck
 
 			req, rqErr := http.NewRequest(method, urlStr, body)
 			if rqErr != nil {

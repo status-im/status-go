@@ -94,6 +94,7 @@ func createSendAsyncHandler(jail *Jail, cell *Cell) func(call otto.FunctionCall)
 				return
 			}
 
+			// nolint: errcheck
 			if err != nil {
 				cell.CallAsync(callback, vm.MakeCustomError("Error", err.Error()))
 			} else {

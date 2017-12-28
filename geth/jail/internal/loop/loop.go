@@ -2,11 +2,16 @@ package loop
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"sync/atomic"
 
 	"github.com/status-im/status-go/geth/jail/internal/vm"
 )
+
+// ErrClosed represents the error returned when we try to add or ready
+// a task on a closed loop.
+var ErrClosed = errors.New("The loop is closed and no longer accepting tasks")
 
 // Task represents something that the event loop can schedule and run.
 //
@@ -27,19 +32,21 @@ type Task interface {
 
 // Loop encapsulates the event loop's state. This includes the vm on which the
 // loop operates, a monotonically incrementing event id, a map of tasks that
-// aren't ready yet, keyed by their ID, and a channel of tasks that are ready
-// to finalise on the VM. The channel holding the tasks pending finalising can
-// be buffered or unbuffered.
+// aren't ready yet, keyed by their ID, a channel of tasks that are ready
+// to finalise on the VM, and a boolean that indicates if the loop is still
+// accepting tasks. The channel holding the tasks pending finalising can be
+// buffered or unbuffered.
 //
 // Warning: id must be the first field in this struct as it's accessed atomically.
 // Otherwise, on ARM and x86-32 it will panic.
 // More information: https://golang.org/pkg/sync/atomic/#pkg-note-BUG.
 type Loop struct {
-	id    int64
-	vm    *vm.VM
-	lock  sync.RWMutex
-	tasks map[int64]Task
-	ready chan Task
+	id        int64
+	vm        *vm.VM
+	lock      sync.RWMutex
+	tasks     map[int64]Task
+	ready     chan Task
+	accepting bool
 }
 
 // New creates a new Loop with an unbuffered ready queue on a specific VM.
@@ -51,9 +58,20 @@ func New(vm *vm.VM) *Loop {
 // queue, the capacity of which being specified by the backlog argument.
 func NewWithBacklog(vm *vm.VM, backlog int) *Loop {
 	return &Loop{
-		vm:    vm,
-		tasks: make(map[int64]Task),
-		ready: make(chan Task, backlog),
+		vm:        vm,
+		tasks:     make(map[int64]Task),
+		ready:     make(chan Task, backlog),
+		accepting: true,
+	}
+}
+
+// close the loop so that it no longer accepts tasks.
+func (l *Loop) close() {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+	if l.accepting {
+		l.accepting = false
+		close(l.ready)
 	}
 }
 
@@ -65,11 +83,15 @@ func (l *Loop) VM() *vm.VM {
 // Add puts a task into the loop. This signals to the loop that this task is
 // doing something outside of the JavaScript environment, and that at some
 // point, it will become ready for finalising.
-func (l *Loop) Add(t Task) {
+func (l *Loop) Add(t Task) error {
 	l.lock.Lock()
+	defer l.lock.Unlock()
+	if !l.accepting {
+		return ErrClosed
+	}
 	t.SetID(atomic.AddInt64(&l.id, 1))
 	l.tasks[t.GetID()] = t
-	l.lock.Unlock()
+	return nil
 }
 
 // Remove takes a task out of the loop. This should not be called if a task
@@ -77,7 +99,7 @@ func (l *Loop) Add(t Task) {
 // broken.
 func (l *Loop) Remove(t Task) {
 	l.remove(t)
-	go l.Ready(nil)
+	go l.Ready(nil) // nolint: errcheck
 }
 
 func (l *Loop) remove(t Task) {
@@ -101,8 +123,26 @@ func (l *Loop) removeAll() {
 
 // Ready signals to the loop that a task is ready to be finalised. This might
 // block if the "ready channel" in the loop is at capacity.
-func (l *Loop) Ready(t Task) {
-	l.ready <- t
+func (l *Loop) Ready(t Task) error {
+	var err error
+	l.lock.RLock()
+	if !l.accepting {
+		t.Cancel()
+		err = ErrClosed
+	}
+	l.lock.RUnlock()
+	if err == nil {
+		l.ready <- t
+	}
+	return err
+}
+
+// AddAndExecute combines Add and Ready for immediate execution.
+func (l *Loop) AddAndExecute(t Task) error {
+	if err := l.Add(t); err != nil {
+		return err
+	}
+	return l.Ready(t)
 }
 
 // Eval executes some code in the VM associated with the loop and returns an
@@ -131,11 +171,13 @@ func (l *Loop) processTask(t Task) error {
 // Run handles the task scheduling and finalisation.
 // It runs infinitely waiting for new tasks.
 func (l *Loop) Run(ctx context.Context) error {
+	defer l.close()
+	defer l.removeAll()
+
 	for {
 		select {
 		case t := <-l.ready:
 			if ctx.Err() != nil {
-				l.removeAll()
 				return ctx.Err()
 			}
 
@@ -147,12 +189,10 @@ func (l *Loop) Run(ctx context.Context) error {
 			if err != nil {
 				// TODO(divan): do we need to report
 				// errors up to the caller?
-				// Ignoring for now, as loop
-				// should keep running.
+				// Ignoring for now.
 				continue
 			}
 		case <-ctx.Done():
-			l.removeAll()
 			return ctx.Err()
 		}
 	}
