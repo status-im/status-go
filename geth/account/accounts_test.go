@@ -185,7 +185,7 @@ func (s *ManagerTestSuite) reinitMock() {
 	s.accManager.nodeManager = s.nodeManager
 }
 
-func (s *ManagerTestSuite) TestCreateAndRecoverAccount() {
+func (s *ManagerTestSuite) TestCreateAccount() {
 	s.reinitMock()
 
 	// Don't fail on empty password
@@ -193,16 +193,19 @@ func (s *ManagerTestSuite) TestCreateAndRecoverAccount() {
 	_, _, _, err := s.accManager.CreateAccount(s.password)
 	s.NoError(err)
 
-	// Recover the account using the mnemonic seed and the password
+	s.nodeManager.EXPECT().AccountKeyStore().Return(nil, testErrKeyStore)
+	_, _, _, err = s.accManager.CreateAccount(s.password)
+	s.Equal(err, testErrKeyStore)
+}
+
+func (s *ManagerTestSuite) TestRecoverAccount() {
+	s.reinitMock()
+
 	s.nodeManager.EXPECT().AccountKeyStore().Return(s.keyStore, nil)
 	addr, pubKey, err := s.accManager.RecoverAccount(s.password, s.mnemonic)
 	s.NoError(err)
 	s.Equal(s.address, addr)
 	s.Equal(s.pubKey, pubKey)
-
-	s.nodeManager.EXPECT().AccountKeyStore().Return(nil, testErrKeyStore)
-	_, _, _, err = s.accManager.CreateAccount(s.password)
-	s.Equal(err, testErrKeyStore)
 
 	s.nodeManager.EXPECT().AccountKeyStore().Return(nil, testErrKeyStore)
 	_, _, err = s.accManager.RecoverAccount(s.password, s.mnemonic)
