@@ -196,7 +196,7 @@ func (s *ManagerTestSuite) TestCreateAccount() {
 
 	s.nodeManager.EXPECT().AccountKeyStore().Return(nil, testErrKeyStore)
 	_, _, _, err = s.accManager.CreateAccount(s.password)
-	s.Equal(err, testErrKeyStore)
+	s.Equal(testErrKeyStore, err)
 }
 
 func (s *ManagerTestSuite) TestRecoverAccount() {
@@ -210,7 +210,7 @@ func (s *ManagerTestSuite) TestRecoverAccount() {
 
 	s.nodeManager.EXPECT().AccountKeyStore().Return(nil, testErrKeyStore)
 	_, _, err = s.accManager.RecoverAccount(s.password, s.mnemonic)
-	s.Equal(err, testErrKeyStore)
+	s.Equal(testErrKeyStore, err)
 }
 
 func (s *ManagerTestSuite) TestSelectAccount() {
