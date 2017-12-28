@@ -485,7 +485,6 @@ func (s *ManagerTestSuite) TestAddressToDecryptedAccount() {
 				s.NotNil(acc)
 				s.NotNil(key)
 				s.Equal(acc.Address, key.Address)
-				s.keyStore.Find(acc)
 			}
 		})
 	}
