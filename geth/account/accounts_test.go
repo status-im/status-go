@@ -221,7 +221,7 @@ func (s *ManagerTestSuite) TestSelectAccount() {
 		whisperServiceReturn  []interface{}
 		address               string
 		password              string
-		fail                  bool
+		expectedError         error
 	}{
 		{
 			"success",
@@ -229,7 +229,7 @@ func (s *ManagerTestSuite) TestSelectAccount() {
 			[]interface{}{s.shh, nil},
 			s.address,
 			s.password,
-			false,
+			nil,
 		},
 		{
 			"fail_keyStore",
@@ -237,7 +237,7 @@ func (s *ManagerTestSuite) TestSelectAccount() {
 			[]interface{}{s.shh, nil},
 			s.address,
 			s.password,
-			true,
+			testErrKeyStore,
 		},
 		{
 			"fail_whisperService",
@@ -245,7 +245,7 @@ func (s *ManagerTestSuite) TestSelectAccount() {
 			[]interface{}{nil, testErrWhisper},
 			s.address,
 			s.password,
-			true,
+			testErrWhisper,
 		},
 		{
 			"fail_wrongAddress",
@@ -253,7 +253,7 @@ func (s *ManagerTestSuite) TestSelectAccount() {
 			[]interface{}{s.shh, nil},
 			"wrong-address",
 			s.password,
-			true,
+			ErrAddressToAccountMappingFailure,
 		},
 		{
 			"fail_wrongPassword",
@@ -261,7 +261,7 @@ func (s *ManagerTestSuite) TestSelectAccount() {
 			[]interface{}{s.shh, nil},
 			s.address,
 			"wrong-password",
-			true,
+			errors.New("cannot retrieve a valid key for a given account: could not decrypt key with given passphrase"),
 		},
 	}
 
@@ -271,8 +271,8 @@ func (s *ManagerTestSuite) TestSelectAccount() {
 			s.nodeManager.EXPECT().AccountKeyStore().Return(testCase.accountKeyStoreReturn...).AnyTimes()
 			s.nodeManager.EXPECT().WhisperService().Return(testCase.whisperServiceReturn...).AnyTimes()
 			err := s.accManager.SelectAccount(testCase.address, testCase.password)
-			if testCase.fail {
-				s.Error(err)
+			if testCase.expectedError != nil {
+				s.Equal(testCase.expectedError, err)
 			} else {
 				s.NoError(err)
 			}
@@ -304,35 +304,35 @@ func (s *ManagerTestSuite) TestCreateChildAccount() {
 		address               string
 		password              string
 		accountKeyStoreReturn []interface{}
-		fail                  bool
+		expectedError         error
 	}{
 		{
 			"success",
 			s.address,
 			s.password,
 			[]interface{}{s.keyStore, nil},
-			false,
+			nil,
 		},
 		{
 			"fail_keyStore",
 			s.address,
 			s.password,
 			[]interface{}{nil, testErrKeyStore},
-			true,
+			testErrKeyStore,
 		},
 		{
 			"fail_wrongAddress",
 			"wrong-address",
 			s.password,
 			[]interface{}{s.keyStore, nil},
-			true,
+			ErrAddressToAccountMappingFailure,
 		},
 		{
 			"fail_wrongPassword",
 			s.address,
 			"wrong-password",
 			[]interface{}{s.keyStore, nil},
-			true,
+			errors.New("cannot retrieve a valid key for a given account: could not decrypt key with given passphrase"),
 		},
 	}
 
@@ -341,8 +341,8 @@ func (s *ManagerTestSuite) TestCreateChildAccount() {
 			s.reinitMock()
 			s.nodeManager.EXPECT().AccountKeyStore().Return(testCase.accountKeyStoreReturn...).AnyTimes()
 			childAddr, childPubKey, err := s.accManager.CreateChildAccount(testCase.address, testCase.password)
-			if testCase.fail {
-				s.Error(err)
+			if testCase.expectedError != nil {
+				s.Equal(testCase.expectedError, err)
 			} else {
 				s.NoError(err)
 				s.NotEmpty(childAddr)
@@ -441,35 +441,35 @@ func (s *ManagerTestSuite) TestAddressToDecryptedAccount() {
 		accountKeyStoreReturn []interface{}
 		address               string
 		password              string
-		fail                  bool
+		expectedError         error
 	}{
 		{
 			"success",
 			[]interface{}{s.keyStore, nil},
 			s.address,
 			s.password,
-			false,
+			nil,
 		},
 		{
 			"fail_keyStore",
 			[]interface{}{nil, testErrKeyStore},
 			s.address,
 			s.password,
-			true,
+			testErrKeyStore,
 		},
 		{
 			"fail_wrongAddress",
 			[]interface{}{s.keyStore, nil},
 			"wrong-address",
 			s.password,
-			true,
+			ErrAddressToAccountMappingFailure,
 		},
 		{
 			"fail_wrongPassword",
 			[]interface{}{s.keyStore, nil},
 			s.address,
 			"wrong-password",
-			true,
+			errors.New("could not decrypt key with given passphrase"),
 		},
 	}
 
@@ -478,8 +478,8 @@ func (s *ManagerTestSuite) TestAddressToDecryptedAccount() {
 			s.reinitMock()
 			s.nodeManager.EXPECT().AccountKeyStore().Return(testCase.accountKeyStoreReturn...).AnyTimes()
 			acc, key, err := s.accManager.AddressToDecryptedAccount(testCase.address, testCase.password)
-			if testCase.fail {
-				s.Error(err)
+			if testCase.expectedError != nil {
+				s.Equal(testCase.expectedError, err)
 			} else {
 				s.NoError(err)
 				s.NotNil(acc)
