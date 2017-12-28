@@ -115,8 +115,9 @@ func TestVerifyAccountPasswordWithAccountBeforeEIP55(t *testing.T) {
 }
 
 var (
-	testErrWhisper  = errors.New("Can't return a whisper service")
-	testErrKeyStore = errors.New("Can't return a key store")
+	testErrWhisper    = errors.New("Can't return a whisper service")
+	testErrKeyStore   = errors.New("Can't return a key store")
+	testErrAccManager = errors.New("Can't return an account manager")
 )
 
 func TestManagerTestSuite(t *testing.T) {
@@ -289,7 +290,7 @@ func (s *ManagerTestSuite) TestCreateChildAccount() {
 	s.T().Run("fail_noAccount", func(t *testing.T) {
 		s.nodeManager.EXPECT().AccountKeyStore().Return(s.keyStore, nil).AnyTimes()
 		_, _, err := s.accManager.CreateChildAccount("", s.password)
-		s.Error(err)
+		s.Equal(ErrNoAccountSelected, err)
 	})
 
 	// Now, select the test account for rest of the test cases.
@@ -374,7 +375,7 @@ func (s *ManagerTestSuite) TestSelectedAndReSelectAccount() {
 		s.reinitMock()
 		s.nodeManager.EXPECT().WhisperService().Return(nil, testErrWhisper).AnyTimes()
 		err = s.accManager.ReSelectAccount()
-		s.Error(err)
+		s.Equal(testErrWhisper, err)
 	})
 
 	s.accManager.selectedAccount = nil
@@ -402,7 +403,7 @@ func (s *ManagerTestSuite) TestLogout() {
 
 	s.nodeManager.EXPECT().WhisperService().Return(nil, testErrWhisper)
 	err = s.accManager.Logout()
-	s.Error(err)
+	s.Equal(testErrWhisper, err)
 }
 
 func (s *ManagerTestSuite) TestAccounts() {
@@ -421,9 +422,9 @@ func (s *ManagerTestSuite) TestAccounts() {
 	s.NotNil(accs)
 
 	// Can't get an account manager
-	s.nodeManager.EXPECT().AccountManager().Return(nil, errors.New("Can't return an account manager"))
+	s.nodeManager.EXPECT().AccountManager().Return(nil, testErrAccManager)
 	_, err = s.accManager.Accounts()
-	s.Error(err)
+	s.Equal(testErrAccManager, err)
 
 	// Selected account is nil but doesn't fail
 	s.accManager.selectedAccount = nil
