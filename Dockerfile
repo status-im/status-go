@@ -16,6 +16,5 @@ COPY --from=builder /go/src/github.com/status-im/status-go/build/bin/* /usr/loca
 RUN mkdir -p /static/keys
 COPY --from=builder /go/src/github.com/status-im/status-go/static/keys/* /static/keys/
 
-EXPOSE 8545 30303 30303/udp
-# Discovery v5
-EXPOSE 30304/udp
+# 30304 is used for Discovery v5
+EXPOSE 8080 8545 30303 30303/udp 30304/udp

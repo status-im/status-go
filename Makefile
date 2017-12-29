@@ -15,7 +15,7 @@ CGO_CFLAGS=-I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
 GOBIN = build/bin
 GO ?= latest
 
-DCKR_IMAGE_NAME ?= status-go
+DOCKER_IMAGE_NAME ?= status-go
 
 UNIT_TEST_PACKAGES := $(shell go list ./...  | grep -v /vendor | grep -v /e2e | grep -v /cmd | grep -v /lib)
 
@@ -70,9 +70,9 @@ statusgo-library: ##@cross-compile Build status-go as static library for current
 	@echo "Static library built:"
 	@ls -la $(GOBIN)/libstatus.*
 
-docker-image: ##@docker Build docker image (use DCKR_IMAGE_NAME to set the image name)
+docker-image: ##@docker Build docker image (use DOCKER_IMAGE_NAME to set the image name)
 	@echo "Building docker image..."
-	docker build . -t $(DCKR_IMAGE_NAME)
+	docker build . -t $(DOCKER_IMAGE_NAME)
 
 xgo:
 	docker pull farazdagi/xgo
