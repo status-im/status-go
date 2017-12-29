@@ -1,0 +1,29 @@
+version: "3"
+services:
+  bootnode:
+    image: ethereum/client-go:alltools-latest
+    entrypoint: bootnode
+    command: -addr=:30303 -nodekey /static/keys/bootnode.key
+    volumes:
+      - ./../../static/keys:/static/keys:ro
+    networks:
+      cluster:
+        ipv4_address: 172.16.238.10
+
+  wnode:
+    image: status-go:latest
+    command: wnode-status -listenaddr=:30303 -log DEBUG -stats -standalone=false -bootnodes=enode://0197d97fba1a28b719ddee928025b886eff81928578d05084840eec900de9c93639bea64ca20fda349ce4c19aecef5a8881cb6b8b2a1b465841556342ee1d652@172.16.238.10:30303
+    ports:
+      - 8080
+    networks:
+      cluster:
+    depends_on:
+      - bootnode
+
+networks:
+  cluster:
+    driver: overlay
+    ipam:
+      driver: default
+      config:
+      - subnet: 172.16.238.0/24

@@ -116,7 +116,7 @@ func defaultEmbeddedNodeConfig(config *params.NodeConfig) *node.Config {
 		nc.HTTPPort = config.HTTPPort
 	}
 
-	if config.Discovery {
+	if config.BootClusterConfig.Enabled {
 		nc.P2P.BootstrapNodes = makeBootstrapNodes(config.BootClusterConfig.BootNodes)
 	}
 
