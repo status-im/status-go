@@ -5,12 +5,10 @@ import (
 	"math/big"
 	"time"
 
+	ethereum "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/les/status"
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/pborman/uuid"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/log"
@@ -26,6 +24,10 @@ const (
 
 	// SendTxDefaultErrorCode is sent by default, when error is not nil, but type is unknown/unexpected.
 	SendTxDefaultErrorCode = SendTransactionDefaultErrorCode
+
+	defaultGas = 90000
+
+	cancelTimeout = time.Minute
 )
 
 // Send transaction response codes
@@ -49,6 +51,7 @@ type Manager struct {
 	nodeManager    common.NodeManager
 	accountManager common.AccountManager
 	txQueue        *TxQueue
+	ethTxClient    EthereumTransactor
 }
 
 // NewManager returns a new Manager.
@@ -63,6 +66,7 @@ func NewManager(nodeManager common.NodeManager, accountManager common.AccountMan
 // Start starts accepting new transactions into the queue.
 func (m *Manager) Start() {
 	log.Info("start Manager")
+	m.ethTxClient = NewEthTxClient(m.nodeManager.RPCClient())
 	m.txQueue.Start()
 }
 
@@ -157,21 +161,8 @@ func (m *Manager) CompleteTransaction(id common.QueuedTxID, password string) (ge
 		m.NotifyOnQueuedTxReturn(queuedTx, ErrInvalidCompleteTxSender)
 		return gethcommon.Hash{}, ErrInvalidCompleteTxSender
 	}
-
-	config, err := m.nodeManager.NodeConfig()
-	if err != nil {
-		log.Warn("could not get a node config", "err", err)
-		return gethcommon.Hash{}, err
-	}
-
 	// Send the transaction finally.
-	var hash gethcommon.Hash
-
-	if config.UpstreamConfig.Enabled {
-		hash, err = m.completeRemoteTransaction(queuedTx, password)
-	} else {
-		hash, err = m.completeLocalTransaction(queuedTx, password)
-	}
+	hash, err := m.completeTransaction(selectedAccount, queuedTx, password)
 
 	// when incorrect sender tries to complete the account,
 	// notify and keep tx in queue (so that correct sender can complete)
@@ -190,78 +181,63 @@ func (m *Manager) CompleteTransaction(id common.QueuedTxID, password string) (ge
 	return hash, err
 }
 
-const cancelTimeout = time.Minute
-
-func (m *Manager) completeLocalTransaction(queuedTx *common.QueuedTx, password string) (gethcommon.Hash, error) {
-	log.Info("complete transaction using local node", "id", queuedTx.ID)
-
-	les, err := m.nodeManager.LightEthereumService()
-	if err != nil {
-		return gethcommon.Hash{}, err
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), cancelTimeout)
-	defer cancel()
-
-	return les.StatusBackend.SendTransaction(ctx, status.SendTxArgs(queuedTx.Args), password)
-}
-
-func (m *Manager) completeRemoteTransaction(queuedTx *common.QueuedTx, password string) (gethcommon.Hash, error) {
-	log.Info("complete transaction using upstream node", "id", queuedTx.ID)
-
+func (m *Manager) completeTransaction(selectedAccount *common.SelectedExtKey, queuedTx *common.QueuedTx, password string) (gethcommon.Hash, error) {
+	log.Info("complete transaction", "id", queuedTx.ID)
 	var emptyHash gethcommon.Hash
-
+	log.Info("verifying account password for transaction", "id", queuedTx.ID)
 	config, err := m.nodeManager.NodeConfig()
 	if err != nil {
 		return emptyHash, err
 	}
-
-	selectedAcct, err := m.accountManager.SelectedAccount()
+	_, err = m.accountManager.VerifyAccountPassword(config.KeyStoreDir, selectedAccount.Address.String(), password)
 	if err != nil {
+		log.Warn("failed to verify account", "account", selectedAccount.Address.String(), "error", err.Error())
 		return emptyHash, err
 	}
 
-	_, err = m.accountManager.VerifyAccountPassword(config.KeyStoreDir, selectedAcct.Address.String(), password)
-	if err != nil {
-		log.Warn("failed to verify account", "account", selectedAcct.Address.String(), "error", err.Error())
-		return emptyHash, err
-	}
-
-	// We need to request a new transaction nounce from upstream node.
+	// update transaction with nonce, gas price and gas estimates
 	ctx, cancel := context.WithTimeout(context.Background(), cancelTimeout)
 	defer cancel()
-
-	var txCount hexutil.Uint
-	client := m.nodeManager.RPCClient()
-	err = client.CallContext(ctx, &txCount, "eth_getTransactionCount", queuedTx.Args.From, "pending")
+	nonce, err := m.ethTxClient.PendingNonceAt(ctx, queuedTx.Args.From)
 	if err != nil {
 		return emptyHash, err
 	}
-
 	args := queuedTx.Args
-
+	var gasPrice *big.Int
 	if args.GasPrice == nil {
-		value, gasPriceErr := m.gasPrice()
-		if gasPriceErr != nil {
-			return emptyHash, gasPriceErr
+		ctx, cancel = context.WithTimeout(context.Background(), cancelTimeout)
+		defer cancel()
+		gasPrice, err = m.ethTxClient.SuggestGasPrice(ctx)
+		if err != nil {
+			return emptyHash, err
 		}
 
-		args.GasPrice = value
+	} else {
+		gasPrice = (*big.Int)(args.GasPrice)
 	}
 
 	chainID := big.NewInt(int64(config.NetworkID))
-	nonce := uint64(txCount)
-	gasPrice := (*big.Int)(args.GasPrice)
 	data := []byte(args.Data)
 	value := (*big.Int)(args.Value)
 	toAddr := gethcommon.Address{}
 	if args.To != nil {
 		toAddr = *args.To
 	}
-
-	gas, err := m.estimateGas(args)
+	ctx, cancel = context.WithTimeout(context.Background(), cancelTimeout)
+	defer cancel()
+	gas, err := m.ethTxClient.EstimateGas(ctx, ethereum.CallMsg{
+		From:     args.From,
+		To:       args.To,
+		GasPrice: gasPrice,
+		Value:    value,
+		Data:     data,
+	})
 	if err != nil {
 		return emptyHash, err
+	}
+	if gas.Cmp(big.NewInt(defaultGas)) == -1 {
+		log.Info("default gas will be used. estimated gas", gas, "is lower than", defaultGas)
+		gas = big.NewInt(defaultGas)
 	}
 
 	log.Info(
@@ -272,88 +248,17 @@ func (m *Manager) completeRemoteTransaction(queuedTx *common.QueuedTx, password 
 		"gasPrice", gasPrice,
 		"value", value,
 	)
-
-	tx := types.NewTransaction(nonce, toAddr, value, (*big.Int)(gas), gasPrice, data)
-	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), selectedAcct.AccountKey.PrivateKey)
+	tx := types.NewTransaction(nonce, toAddr, value, gas, gasPrice, data)
+	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), selectedAccount.AccountKey.PrivateKey)
 	if err != nil {
 		return emptyHash, err
 	}
-
-	txBytes, err := rlp.EncodeToBytes(signedTx)
-	if err != nil {
+	ctx, cancel = context.WithTimeout(context.Background(), cancelTimeout)
+	defer cancel()
+	if err := m.ethTxClient.SendTransaction(ctx, signedTx); err != nil {
 		return emptyHash, err
 	}
-
-	ctx2, cancel2 := context.WithTimeout(context.Background(), cancelTimeout)
-	defer cancel2()
-
-	if err := client.CallContext(ctx2, nil, "eth_sendRawTransaction", gethcommon.ToHex(txBytes)); err != nil {
-		return emptyHash, err
-	}
-
 	return signedTx.Hash(), nil
-}
-
-func (m *Manager) estimateGas(args common.SendTxArgs) (*hexutil.Big, error) {
-	if args.Gas != nil {
-		return args.Gas, nil
-	}
-
-	client := m.nodeManager.RPCClient()
-	ctx, cancel := context.WithTimeout(context.Background(), cancelTimeout)
-	defer cancel()
-
-	var gasPrice hexutil.Big
-	if args.GasPrice != nil {
-		gasPrice = *args.GasPrice
-	}
-
-	var value hexutil.Big
-	if args.Value != nil {
-		value = *args.Value
-	}
-
-	params := struct {
-		From     gethcommon.Address  `json:"from"`
-		To       *gethcommon.Address `json:"to"`
-		Gas      hexutil.Big         `json:"gas"`
-		GasPrice hexutil.Big         `json:"gasPrice"`
-		Value    hexutil.Big         `json:"value"`
-		Data     hexutil.Bytes       `json:"data"`
-	}{
-		From:     args.From,
-		To:       args.To,
-		GasPrice: gasPrice,
-		Value:    value,
-		Data:     []byte(args.Data),
-	}
-
-	var estimatedGas hexutil.Big
-	if err := client.CallContext(
-		ctx,
-		&estimatedGas,
-		"eth_estimateGas",
-		params,
-	); err != nil {
-		log.Warn("failed to estimate gas", "err", err)
-		return nil, err
-	}
-
-	return &estimatedGas, nil
-}
-
-func (m *Manager) gasPrice() (*hexutil.Big, error) {
-	client := m.nodeManager.RPCClient()
-	ctx, cancel := context.WithTimeout(context.Background(), cancelTimeout)
-	defer cancel()
-
-	var gasPrice hexutil.Big
-	if err := client.CallContext(ctx, &gasPrice, "eth_gasPrice"); err != nil {
-		log.Warn("failed to get gas price", "err", err)
-		return nil, err
-	}
-
-	return &gasPrice, nil
 }
 
 // CompleteTransactions instructs backend to complete sending of multiple transactions
