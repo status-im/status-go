@@ -272,11 +272,7 @@ func (s *ManagerTestSuite) TestSelectAccount() {
 			s.nodeManager.EXPECT().AccountKeyStore().Return(testCase.accountKeyStoreReturn...).AnyTimes()
 			s.nodeManager.EXPECT().WhisperService().Return(testCase.whisperServiceReturn...).AnyTimes()
 			err := s.accManager.SelectAccount(testCase.address, testCase.password)
-			if testCase.expectedError != nil {
-				s.Equal(testCase.expectedError, err)
-			} else {
-				s.NoError(err)
-			}
+			s.Equal(testCase.expectedError, err)
 		})
 	}
 }
