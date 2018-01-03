@@ -21,13 +21,13 @@ func newMetrics(b *api.StatusBackend) *metrics {
 func (m *metrics) server() *p2p.Server {
 	node, err := m.backend.NodeManager().Node()
 	if err != nil {
-		log.Warn("Failed to get a node", "err", err.Error())
+		log.Error("Failed to get a node", "err", err.Error())
 		return nil
 	}
 
 	server := node.Server()
 	if server == nil {
-		log.Warn("Failed to get a server")
+		log.Error("Failed to get a server")
 		return nil
 	}
 
@@ -42,17 +42,22 @@ func (m *metrics) nodeInfo() interface{} {
 	return nil
 }
 
-func (m *metrics) peersInfo() interface{} {
-	if server := m.server(); server != nil {
-		return server.PeersInfo()
+func (m *metrics) peersIPs() interface{} {
+	server := m.server()
+	if server == nil {
+		return nil
 	}
 
-	return nil
+	var ret []string
+	for _, peer := range server.PeersInfo() {
+		ret = append(ret, peer.Network.RemoteAddress)
+	}
+	return ret
 }
 
 func startDebugServer(addr string, m *metrics) error {
 	expvar.Publish("node_info", expvar.Func(m.nodeInfo))
-	expvar.Publish("peers_info", expvar.Func(m.peersInfo))
+	expvar.Publish("peers_ips", expvar.Func(m.peersIPs))
 
 	return http.ListenAndServe(addr, nil)
 }
