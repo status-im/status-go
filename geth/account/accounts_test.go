@@ -402,6 +402,7 @@ func (s *ManagerTestSuite) TestLogout() {
 	s.Equal(testErrWhisper, err)
 }
 
+// TestAccounts tests cases for (*Manager).Accounts
 func (s *ManagerTestSuite) TestAccounts() {
 	s.reinitMock()
 
