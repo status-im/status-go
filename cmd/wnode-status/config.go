@@ -23,7 +23,7 @@ var (
 	logFile     = flag.String("logfile", "", "Path to the log file")
 
 	// stats
-	statsEnabled = flag.Bool("stats", false, "True if stats should be collected")
+	statsEnabled = flag.Bool("stats", false, "Expose node stats via /debug/vars expvar endpoint")
 	statsAddr    = flag.String("statsaddr", "0.0.0.0:8080", "HTTP address with /debug/vars endpoint")
 
 	// Whisper
