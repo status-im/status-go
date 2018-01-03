@@ -48,6 +48,7 @@ profile.cov
 # tests
 .ethereumtest/
 /vendor/**/*_test.go
+*.test
 
 #
 # golang
