@@ -52,6 +52,7 @@ type Manager struct {
 	accountManager common.AccountManager
 	txQueue        *TxQueue
 	ethTxClient    EthereumTransactor
+	addrLock       *AddrLocker
 }
 
 // NewManager returns a new Manager.
@@ -60,6 +61,7 @@ func NewManager(nodeManager common.NodeManager, accountManager common.AccountMan
 		nodeManager:    nodeManager,
 		accountManager: accountManager,
 		txQueue:        NewTransactionQueue(),
+		addrLock:       &AddrLocker{},
 	}
 }
 
@@ -198,6 +200,8 @@ func (m *Manager) completeTransaction(selectedAccount *common.SelectedExtKey, qu
 	// update transaction with nonce, gas price and gas estimates
 	ctx, cancel := context.WithTimeout(context.Background(), cancelTimeout)
 	defer cancel()
+	m.addrLock.LockAddr(queuedTx.Args.From)
+	defer m.addrLock.UnlockAddr(queuedTx.Args.From)
 	nonce, err := m.ethTxClient.PendingNonceAt(ctx, queuedTx.Args.From)
 	if err != nil {
 		return emptyHash, err
