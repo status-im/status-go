@@ -180,15 +180,19 @@ type testAccount struct {
 
 // reinitMock is for reassigning a new mock node manager to account manager.
 // Stating the amount of times for mock calls kills the flexibility for
-// development so this is a good workaround to use with EXPECT().AnyTimes()
+// development so this is a good workaround to use with EXPECT().Func().AnyTimes()
 func (s *ManagerTestSuite) reinitMock() {
 	s.nodeManager = newMockNodeManager(s.T())
 	s.accManager.nodeManager = s.nodeManager
 }
 
-func (s *ManagerTestSuite) TestCreateAccount() {
+// SetupTest is used here for reinitializing the mock before every
+// test function to avoid faulty execution.
+func (s *ManagerTestSuite) SetupTest() {
 	s.reinitMock()
+}
 
+func (s *ManagerTestSuite) TestCreateAccount() {
 	// Don't fail on empty password
 	s.nodeManager.EXPECT().AccountKeyStore().Return(s.keyStore, nil)
 	_, _, _, err := s.accManager.CreateAccount(s.password)
@@ -200,8 +204,6 @@ func (s *ManagerTestSuite) TestCreateAccount() {
 }
 
 func (s *ManagerTestSuite) TestRecoverAccount() {
-	s.reinitMock()
-
 	s.nodeManager.EXPECT().AccountKeyStore().Return(s.keyStore, nil)
 	addr, pubKey, err := s.accManager.RecoverAccount(s.password, s.mnemonic)
 	s.NoError(err)
@@ -214,8 +216,6 @@ func (s *ManagerTestSuite) TestRecoverAccount() {
 }
 
 func (s *ManagerTestSuite) TestSelectAccount() {
-	s.reinitMock()
-
 	testCases := []struct {
 		name                  string
 		accountKeyStoreReturn []interface{}
@@ -278,8 +278,6 @@ func (s *ManagerTestSuite) TestSelectAccount() {
 }
 
 func (s *ManagerTestSuite) TestCreateChildAccount() {
-	s.reinitMock()
-
 	// First, test the negative case where an account is not selected
 	// and an address is not provided.
 	s.accManager.selectedAccount = nil
@@ -350,8 +348,6 @@ func (s *ManagerTestSuite) TestCreateChildAccount() {
 }
 
 func (s *ManagerTestSuite) TestSelectedAndReSelectAccount() {
-	s.reinitMock()
-
 	// Select the test account
 	s.nodeManager.EXPECT().AccountKeyStore().Return(s.keyStore, nil).AnyTimes()
 	s.nodeManager.EXPECT().WhisperService().Return(s.shh, nil).AnyTimes()
@@ -391,8 +387,6 @@ func (s *ManagerTestSuite) TestSelectedAndReSelectAccount() {
 }
 
 func (s *ManagerTestSuite) TestLogout() {
-	s.reinitMock()
-
 	s.nodeManager.EXPECT().WhisperService().Return(s.shh, nil)
 	err := s.accManager.Logout()
 	s.NoError(err)
@@ -404,8 +398,6 @@ func (s *ManagerTestSuite) TestLogout() {
 
 // TestAccounts tests cases for (*Manager).Accounts
 func (s *ManagerTestSuite) TestAccounts() {
-	s.reinitMock()
-
 	// Select the test account
 	s.nodeManager.EXPECT().AccountKeyStore().Return(s.keyStore, nil).AnyTimes()
 	s.nodeManager.EXPECT().WhisperService().Return(s.shh, nil).AnyTimes()
@@ -432,8 +424,6 @@ func (s *ManagerTestSuite) TestAccounts() {
 }
 
 func (s *ManagerTestSuite) TestAddressToDecryptedAccount() {
-	s.reinitMock()
-
 	testCases := []struct {
 		name                  string
 		accountKeyStoreReturn []interface{}
