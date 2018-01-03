@@ -1,6 +1,6 @@
 // copy of go-ethereum/internal/ethapi/addrlock.go
 
-package txqueue
+package transactions
 
 import (
 	"sync"

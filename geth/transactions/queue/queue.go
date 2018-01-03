@@ -1,4 +1,4 @@
-package txqueue
+package queue
 
 import (
 	"errors"
@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/log"
 )
@@ -15,10 +16,6 @@ import (
 const (
 	// DefaultTxQueueCap defines how many items can be queued.
 	DefaultTxQueueCap = int(35)
-	// DefaultTxSendQueueCap defines how many items can be passed to sendTransaction() w/o blocking.
-	DefaultTxSendQueueCap = int(70)
-	// DefaultTxSendCompletionTimeout defines how many seconds to wait before returning result in sentTransaction().
-	DefaultTxSendCompletionTimeout = 300
 )
 
 var (
@@ -36,33 +33,39 @@ var (
 	ErrInvalidCompleteTxSender = errors.New("transaction can only be completed by the same account which created it")
 )
 
+// remove from queue on any error (except for transient ones) and propagate
+// defined as map[string]bool because errors from ethclient returned wrapped as jsonError
+var transientErrs = map[string]bool{
+	keystore.ErrDecrypt.Error():          true, // wrong password
+	ErrInvalidCompleteTxSender.Error():   true, // completing tx create from another account
+	account.ErrNoAccountSelected.Error(): true, // account not selected
+}
+
+type empty struct{}
+
 // TxQueue is capped container that holds pending transactions
 type TxQueue struct {
-	transactions  map[common.QueuedTxID]*common.QueuedTx
-	mu            sync.RWMutex // to guard transactions map
+	mu           sync.RWMutex // to guard transactions map
+	transactions map[common.QueuedTxID]*common.QueuedTx
+	inprogress   map[common.QueuedTxID]empty
+
+	// TODO(dshulyak) research why eviction is done in separate goroutine
 	evictableIDs  chan common.QueuedTxID
 	enqueueTicker chan struct{}
-	incomingPool  chan *common.QueuedTx
 
 	// when this channel is closed, all queue channels processing must cease (incoming queue, processing queued items etc)
 	stopped      chan struct{}
 	stoppedGroup sync.WaitGroup // to make sure that all routines are stopped
-
-	// when items are enqueued notify subscriber
-	txEnqueueHandler common.EnqueuedTxHandler
-
-	// when tx is returned (either successfully or with error) notify subscriber
-	txReturnHandler common.EnqueuedTxReturnHandler
 }
 
 // NewTransactionQueue make new transaction queue
-func NewTransactionQueue() *TxQueue {
+func NewQueue() *TxQueue {
 	log.Info("initializing transaction queue")
 	return &TxQueue{
 		transactions:  make(map[common.QueuedTxID]*common.QueuedTx),
+		inprogress:    make(map[common.QueuedTxID]empty),
 		evictableIDs:  make(chan common.QueuedTxID, DefaultTxQueueCap), // will be used to evict in FIFO
 		enqueueTicker: make(chan struct{}),
-		incomingPool:  make(chan *common.QueuedTx, DefaultTxSendQueueCap),
 	}
 }
 
@@ -75,10 +78,8 @@ func (q *TxQueue) Start() {
 	}
 
 	q.stopped = make(chan struct{})
-	q.stoppedGroup.Add(2)
-
+	q.stoppedGroup.Add(1)
 	go q.evictionLoop()
-	go q.enqueueLoop()
 }
 
 // Stop stops transaction enqueue and eviction loops
@@ -100,7 +101,7 @@ func (q *TxQueue) Stop() {
 func (q *TxQueue) evictionLoop() {
 	defer HaltOnPanic()
 	evict := func() {
-		if len(q.transactions) >= DefaultTxQueueCap { // eviction is required to accommodate another/last item
+		if q.Count() >= DefaultTxQueueCap { // eviction is required to accommodate another/last item
 			q.Remove(<-q.evictableIDs)
 		}
 	}
@@ -119,26 +120,6 @@ func (q *TxQueue) evictionLoop() {
 	}
 }
 
-// enqueueLoop process incoming enqueue requests
-func (q *TxQueue) enqueueLoop() {
-	defer HaltOnPanic()
-
-	// enqueue incoming transactions
-	for {
-		select {
-		case queuedTx := <-q.incomingPool:
-			log.Info("transaction enqueued requested", "tx", queuedTx.ID)
-			err := q.Enqueue(queuedTx)
-			log.Warn("transaction enqueued error", "tx", err)
-			log.Info("transaction enqueued", "tx", queuedTx.ID)
-		case <-q.stopped:
-			log.Info("transaction queue's enqueue loop stopped")
-			q.stoppedGroup.Done()
-			return
-		}
-	}
-}
-
 // Reset is to be used in tests only, as it simply creates new transaction map, w/o any cleanup of the previous one
 func (q *TxQueue) Reset() {
 	q.mu.Lock()
@@ -146,22 +127,14 @@ func (q *TxQueue) Reset() {
 
 	q.transactions = make(map[common.QueuedTxID]*common.QueuedTx)
 	q.evictableIDs = make(chan common.QueuedTxID, DefaultTxQueueCap)
-}
-
-// EnqueueAsync enqueues incoming transaction in async manner, returns as soon as possible
-func (q *TxQueue) EnqueueAsync(tx *common.QueuedTx) error {
-	q.incomingPool <- tx
-
-	return nil
+	q.inprogress = make(map[common.QueuedTxID]empty)
 }
 
 // Enqueue enqueues incoming transaction
 func (q *TxQueue) Enqueue(tx *common.QueuedTx) error {
 	log.Info(fmt.Sprintf("enqueue transaction: %s", tx.ID))
-
-	if q.txEnqueueHandler == nil { //discard, until handler is provided
-		log.Info("there is no txEnqueueHandler")
-		return nil
+	if (tx.Hash != gethcommon.Hash{} || tx.Err != nil) {
+		return ErrQueuedTxAlreadyProcessed
 	}
 
 	log.Info("before enqueueTicker")
@@ -176,8 +149,6 @@ func (q *TxQueue) Enqueue(tx *common.QueuedTx) error {
 
 	// notify handler
 	log.Info("calling txEnqueueHandler")
-	q.txEnqueueHandler(tx)
-
 	return nil
 }
 
@@ -189,7 +160,21 @@ func (q *TxQueue) Get(id common.QueuedTxID) (*common.QueuedTx, error) {
 	if tx, ok := q.transactions[id]; ok {
 		return tx, nil
 	}
+	return nil, ErrQueuedTxIDNotFound
+}
 
+// LockInprogress returns transcation and locks it as inprogress
+func (q *TxQueue) LockInprogress(id common.QueuedTxID) (*common.QueuedTx, error) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	if tx, ok := q.transactions[id]; ok {
+		if _, inprogress := q.inprogress[id]; inprogress {
+			return tx, ErrQueuedTxInProgress
+		}
+		q.inprogress[id] = empty{}
+		return tx, nil
+	}
 	return nil, ErrQueuedTxIDNotFound
 }
 
@@ -197,42 +182,48 @@ func (q *TxQueue) Get(id common.QueuedTxID) (*common.QueuedTx, error) {
 func (q *TxQueue) Remove(id common.QueuedTxID) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-
-	delete(q.transactions, id)
+	q.remove(id)
 }
 
-// StartProcessing marks a transaction as in progress. It's thread-safe and
-// prevents from processing the same transaction multiple times.
-func (q *TxQueue) StartProcessing(tx *common.QueuedTx) error {
+func (q *TxQueue) remove(id common.QueuedTxID) {
+	delete(q.transactions, id)
+	delete(q.inprogress, id)
+}
+
+// Done removes transaction from queue if no error or error is not transient
+// and notify subscribers
+func (q *TxQueue) Done(id common.QueuedTxID, hash gethcommon.Hash, err error) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-
-	if tx.Hash != (gethcommon.Hash{}) || tx.Err != nil {
-		return ErrQueuedTxAlreadyProcessed
+	if tx, ok := q.transactions[id]; !ok {
+		return ErrQueuedTxIDNotFound
+	} else {
+		q.done(tx, hash, err)
 	}
-
-	if tx.InProgress {
-		return ErrQueuedTxInProgress
-	}
-
-	tx.InProgress = true
-
 	return nil
 }
 
-// StopProcessing removes the "InProgress" flag from the transaction.
-func (q *TxQueue) StopProcessing(tx *common.QueuedTx) {
-	q.mu.Lock()
-	defer q.mu.Unlock()
-
-	tx.InProgress = false
+func (q *TxQueue) done(tx *common.QueuedTx, hash gethcommon.Hash, err error) {
+	delete(q.inprogress, tx.ID)
+	tx.Err = err
+	// hash is updated only if err is nil, but transaction is not removed from a queue
+	if err == nil {
+		q.remove(tx.ID)
+		tx.Hash = hash
+		tx.Done <- struct{}{}
+		return
+	}
+	_, transient := transientErrs[err.Error()]
+	if !transient {
+		q.remove(tx.ID)
+		tx.Done <- struct{}{}
+	}
 }
 
 // Count returns number of currently queued transactions
 func (q *TxQueue) Count() int {
 	q.mu.RLock()
 	defer q.mu.RUnlock()
-
 	return len(q.transactions)
 }
 
@@ -240,54 +231,6 @@ func (q *TxQueue) Count() int {
 func (q *TxQueue) Has(id common.QueuedTxID) bool {
 	q.mu.RLock()
 	defer q.mu.RUnlock()
-
 	_, ok := q.transactions[id]
-
 	return ok
-}
-
-// SetEnqueueHandler sets callback handler, that is triggered on enqueue operation
-func (q *TxQueue) SetEnqueueHandler(fn common.EnqueuedTxHandler) {
-	q.txEnqueueHandler = fn
-}
-
-// SetTxReturnHandler sets callback handler, that is triggered when transaction is finished executing
-func (q *TxQueue) SetTxReturnHandler(fn common.EnqueuedTxReturnHandler) {
-	q.txReturnHandler = fn
-}
-
-// NotifyOnQueuedTxReturn is invoked when transaction is ready to return
-// Transaction can be in error state, or executed successfully at this point.
-func (q *TxQueue) NotifyOnQueuedTxReturn(queuedTx *common.QueuedTx, err error) {
-	if q == nil {
-		return
-	}
-
-	// discard, if transaction is not found
-	if queuedTx == nil {
-		return
-	}
-
-	// on success, remove item from the queue and stop propagating
-	if err == nil {
-		q.Remove(queuedTx.ID)
-		return
-	}
-
-	// error occurred, send upward notification
-	if q.txReturnHandler == nil { // discard, until handler is provided
-		return
-	}
-
-	// remove from queue on any error (except for transient ones) and propagate
-	transientErrs := map[error]bool{
-		keystore.ErrDecrypt:        true, // wrong password
-		ErrInvalidCompleteTxSender: true, // completing tx create from another account
-	}
-	if !transientErrs[err] { // remove only on unrecoverable errors
-		q.Remove(queuedTx.ID)
-	}
-
-	// notify handler
-	q.txReturnHandler(queuedTx, err)
 }

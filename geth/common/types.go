@@ -154,14 +154,12 @@ type QueuedTxID string
 
 // QueuedTx holds enough information to complete the queued transaction.
 type QueuedTx struct {
-	ID         QueuedTxID
-	Hash       common.Hash
-	Context    context.Context
-	Args       SendTxArgs
-	InProgress bool // true if transaction is being sent
-	Done       chan struct{}
-	Discard    chan struct{}
-	Err        error
+	ID      QueuedTxID
+	Hash    common.Hash
+	Context context.Context
+	Args    SendTxArgs
+	Done    chan struct{}
+	Err     error
 }
 
 // SendTxArgs represents the arguments to submit a new transaction into the transaction pool.
@@ -174,12 +172,6 @@ type SendTxArgs struct {
 	Data     hexutil.Bytes   `json:"data"`
 	Nonce    *hexutil.Uint64 `json:"nonce"`
 }
-
-// EnqueuedTxHandler is a function that receives queued/pending transactions, when they get queued
-type EnqueuedTxHandler func(*QueuedTx)
-
-// EnqueuedTxReturnHandler is a function that receives response when tx is complete (both on success and error)
-type EnqueuedTxReturnHandler func(*QueuedTx, error)
 
 // TxQueue is a queue of transactions.
 type TxQueue interface {
@@ -207,31 +199,13 @@ type TxQueueManager interface {
 	// TransactionQueue returns a transaction queue.
 	TransactionQueue() TxQueue
 
-	// CreateTransactoin creates a new transaction.
-	CreateTransaction(ctx context.Context, args SendTxArgs) *QueuedTx
-
 	// QueueTransaction adds a new transaction to the queue.
 	QueueTransaction(tx *QueuedTx) error
 
 	// WaitForTransactions blocks until transaction is completed, discarded or timed out.
 	WaitForTransaction(tx *QueuedTx) error
 
-	// NotifyOnQueuedTxReturn notifies a handler when a transaction returns.
-	NotifyOnQueuedTxReturn(queuedTx *QueuedTx, err error)
-
-	// TransactionQueueHandler returns handler that processes incoming tx queue requests
-	TransactionQueueHandler() func(queuedTx *QueuedTx)
-
-	// TODO(adam): might be not needed
-	SetTransactionQueueHandler(fn EnqueuedTxHandler)
-
-	// TODO(adam): might be not needed
-	SetTransactionReturnHandler(fn EnqueuedTxReturnHandler)
-
 	SendTransactionRPCHandler(ctx context.Context, args ...interface{}) (interface{}, error)
-
-	// TransactionReturnHandler returns handler that processes responses from internal tx manager
-	TransactionReturnHandler() func(queuedTx *QueuedTx, err error)
 
 	// CompleteTransaction instructs backend to complete sending of a given transaction
 	CompleteTransaction(id QueuedTxID, password string) (common.Hash, error)

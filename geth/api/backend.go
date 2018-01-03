@@ -13,7 +13,7 @@ import (
 	"github.com/status-im/status-go/geth/notification/fcm"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/signal"
-	"github.com/status-im/status-go/geth/txqueue"
+	"github.com/status-im/status-go/geth/transactions"
 )
 
 const (
@@ -38,7 +38,7 @@ func NewStatusBackend() *StatusBackend {
 
 	nodeManager := node.NewNodeManager()
 	accountManager := account.NewManager(nodeManager)
-	txQueueManager := txqueue.NewManager(nodeManager, accountManager)
+	txQueueManager := transactions.NewManager(nodeManager, accountManager)
 	jailManager := jail.New(nodeManager)
 	notificationManager := fcm.NewNotification(fcmServerKey)
 
@@ -205,7 +205,7 @@ func (m *StatusBackend) SendTransaction(ctx context.Context, args common.SendTxA
 		ctx = context.Background()
 	}
 
-	tx := m.txQueueManager.CreateTransaction(ctx, args)
+	tx := common.CreateTransaction(ctx, args)
 
 	if err := m.txQueueManager.QueueTransaction(tx); err != nil {
 		return gethcommon.Hash{}, err
@@ -247,11 +247,5 @@ func (m *StatusBackend) registerHandlers() error {
 
 	rpcClient.RegisterHandler("eth_accounts", m.accountManager.AccountsRPCHandler())
 	rpcClient.RegisterHandler("eth_sendTransaction", m.txQueueManager.SendTransactionRPCHandler)
-	m.txQueueManager.SetTransactionQueueHandler(m.txQueueManager.TransactionQueueHandler())
-	log.Info("Registered handler", "fn", "TransactionQueueHandler")
-
-	m.txQueueManager.SetTransactionReturnHandler(m.txQueueManager.TransactionReturnHandler())
-	log.Info("Registered handler", "fn", "TransactionReturnHandler")
-
 	return nil
 }

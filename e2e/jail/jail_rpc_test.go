@@ -14,7 +14,7 @@ import (
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/signal"
-	"github.com/status-im/status-go/geth/txqueue"
+	"github.com/status-im/status-go/geth/transactions"
 	. "github.com/status-im/status-go/testing"
 	"github.com/stretchr/testify/suite"
 )
@@ -126,7 +126,7 @@ func (s *JailRPCTestSuite) TestContractDeployment() {
 		unmarshalErr := json.Unmarshal([]byte(jsonEvent), &envelope)
 		s.NoError(unmarshalErr, "cannot unmarshal JSON: %s", jsonEvent)
 
-		if envelope.Type == txqueue.EventTransactionQueued {
+		if envelope.Type == transactions.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
 			s.T().Logf("transaction queued and will be completed shortly, id: %v", event["id"])
 
@@ -284,7 +284,7 @@ func (s *JailRPCTestSuite) TestJailVMPersistence() {
 			s.T().Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
 		}
-		if envelope.Type == txqueue.EventTransactionQueued {
+		if envelope.Type == transactions.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
 			s.T().Logf("Transaction queued (will be completed shortly): {id: %s}\n", event["id"].(string))
 
