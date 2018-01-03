@@ -12,8 +12,8 @@ import (
 	"github.com/status-im/status-go/geth/rpc"
 )
 
-// EthereumTransactor provides methods to create transactions for ethereum network.
-type EthereumTransactor interface {
+// EthTransactor provides methods to create transactions for ethereum network.
+type EthTransactor interface {
 	PendingNonceAt(ctx context.Context, account common.Address) (uint64, error)
 	ethereum.GasEstimator
 	ethereum.GasPricer

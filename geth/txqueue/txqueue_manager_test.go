@@ -2,10 +2,10 @@ package txqueue
 
 import (
 	"context"
-	"errors"
 	"math/big"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -22,8 +22,6 @@ import (
 	. "github.com/status-im/status-go/testing"
 )
 
-var errTxAssumedSent = errors.New("assume tx is done")
-
 func TestTxQueueTestSuite(t *testing.T) {
 	suite.Run(t, new(TxQueueTestSuite))
 }
@@ -37,7 +35,7 @@ type TxQueueTestSuite struct {
 	server                 *gethrpc.Server
 	client                 *gethrpc.Client
 	txServiceMockCtrl      *gomock.Controller
-	txServiceMock          *fake.MockFakePublicTxApi
+	txServiceMock          *fake.MockFakePublicTransactionPoolAPI
 }
 
 func (s *TxQueueTestSuite) SetupTest() {
@@ -62,81 +60,33 @@ func (s *TxQueueTestSuite) TearDownTest() {
 	s.client.Close()
 }
 
-func (s *TxQueueTestSuite) TestCompleteTransaction() {
-	nodeConfig, nodeErr := params.NewNodeConfig("/tmp", params.RopstenNetworkID, true)
-	password := TestConfig.Account1.Password
-	key, _ := crypto.GenerateKey()
-	account := &common.SelectedExtKey{
-		Address:    common.FromAddress(TestConfig.Account1.Address),
-		AccountKey: &keystore.Key{PrivateKey: key},
-	}
-	s.accountManagerMock.EXPECT().SelectedAccount().Return(account, nil)
-	s.accountManagerMock.EXPECT().VerifyAccountPassword(nodeConfig.KeyStoreDir, account.Address.String(), password).Return(
-		nil, nil)
-	s.nodeManagerMock.EXPECT().NodeConfig().Return(nodeConfig, nodeErr)
-
-	nonce := hexutil.Uint64(10)
+func (s *TxQueueTestSuite) setupTransactionPoolAPI(account *common.SelectedExtKey, nonce hexutil.Uint64, gas hexutil.Big, txErr error) {
 	s.txServiceMock.EXPECT().GetTransactionCount(gomock.Any(), account.Address, gethrpc.PendingBlockNumber).Return(&nonce, nil)
 	s.txServiceMock.EXPECT().GasPrice(gomock.Any()).Return(big.NewInt(10), nil)
-	gas := hexutil.Big(*big.NewInt(defaultGas + 1))
 	s.txServiceMock.EXPECT().EstimateGas(gomock.Any(), gomock.Any()).Return(&gas, nil)
-	s.txServiceMock.EXPECT().SendRawTransaction(gomock.Any(), gomock.Any()).Return(gethcommon.Hash{}, nil)
-
-	txQueueManager := NewManager(s.nodeManagerMock, s.accountManagerMock)
-
-	txQueueManager.Start()
-	defer txQueueManager.Stop()
-
-	tx := txQueueManager.CreateTransaction(context.Background(), common.SendTxArgs{
-		From: common.FromAddress(TestConfig.Account1.Address),
-		To:   common.ToAddress(TestConfig.Account2.Address),
-	})
-
-	// TransactionQueueHandler is required to enqueue a transaction.
-	txQueueManager.SetTransactionQueueHandler(func(queuedTx *common.QueuedTx) {
-		s.Equal(tx.ID, queuedTx.ID)
-	})
-
-	txQueueManager.SetTransactionReturnHandler(func(queuedTx *common.QueuedTx, err error) {
-		s.Equal(tx.ID, queuedTx.ID)
-		s.Equal(errTxAssumedSent, err)
-	})
-
-	err := txQueueManager.QueueTransaction(tx)
-	s.NoError(err)
-
-	go func() {
-		_, errCompleteTransaction := txQueueManager.CompleteTransaction(tx.ID, password)
-		s.NoError(errCompleteTransaction)
-	}()
-
-	err = txQueueManager.WaitForTransaction(tx)
-	s.NoError(err)
-	// Check that error is assigned to the transaction.
-	s.NoError(tx.Err)
-	// Transaction should be already removed from the queue.
-	s.False(txQueueManager.TransactionQueue().Has(tx.ID))
+	s.txServiceMock.EXPECT().SendRawTransaction(gomock.Any(), gomock.Any()).Return(gethcommon.Hash{}, txErr)
 }
 
-func (s *TxQueueTestSuite) TestCompleteTransactionMultipleTimes() {
+func (s *TxQueueTestSuite) setupStatusBackend(account *common.SelectedExtKey, password string, passwordErr error) {
 	nodeConfig, nodeErr := params.NewNodeConfig("/tmp", params.RopstenNetworkID, true)
+	s.nodeManagerMock.EXPECT().NodeConfig().Return(nodeConfig, nodeErr)
+	s.accountManagerMock.EXPECT().SelectedAccount().Return(account, nil)
+	s.accountManagerMock.EXPECT().VerifyAccountPassword(nodeConfig.KeyStoreDir, account.Address.String(), password).Return(
+		nil, passwordErr)
+}
+
+func (s *TxQueueTestSuite) TestCompleteTransaction() {
 	password := TestConfig.Account1.Password
 	key, _ := crypto.GenerateKey()
 	account := &common.SelectedExtKey{
 		Address:    common.FromAddress(TestConfig.Account1.Address),
 		AccountKey: &keystore.Key{PrivateKey: key},
 	}
-	s.accountManagerMock.EXPECT().SelectedAccount().Return(account, nil)
-	s.accountManagerMock.EXPECT().VerifyAccountPassword(nodeConfig.KeyStoreDir, account.Address.String(), password).Return(
-		nil, nil)
-	s.nodeManagerMock.EXPECT().NodeConfig().Return(nodeConfig, nodeErr)
+	s.setupStatusBackend(account, password, nil)
 
 	nonce := hexutil.Uint64(10)
-	s.txServiceMock.EXPECT().GetTransactionCount(gomock.Any(), account.Address, gethrpc.PendingBlockNumber).Return(&nonce, nil)
-	s.txServiceMock.EXPECT().GasPrice(gomock.Any()).Return(big.NewInt(10), nil)
 	gas := hexutil.Big(*big.NewInt(defaultGas + 1))
-	s.txServiceMock.EXPECT().EstimateGas(gomock.Any(), gomock.Any()).Return(&gas, nil)
-	s.txServiceMock.EXPECT().SendRawTransaction(gomock.Any(), gomock.Any()).Return(gethcommon.Hash{}, nil)
+	s.setupTransactionPoolAPI(account, nonce, gas, nil)
 
 	txQueueManager := NewManager(s.nodeManagerMock, s.accountManagerMock)
 
@@ -161,16 +111,79 @@ func (s *TxQueueTestSuite) TestCompleteTransactionMultipleTimes() {
 	err := txQueueManager.QueueTransaction(tx)
 	s.NoError(err)
 
-	var wg sync.WaitGroup
-	var mu sync.Mutex
-	completeTxErrors := map[error]int{}
-	for i := 0; i < 3; i++ {
+	w := make(chan struct{})
+	go func() {
+		hash, err := txQueueManager.CompleteTransaction(tx.ID, password)
+		s.NoError(err)
+		s.Equal(tx.Hash, hash)
+		close(w)
+	}()
+
+	err = txQueueManager.WaitForTransaction(tx)
+	s.NoError(err)
+	// Check that error is assigned to the transaction.
+	s.NoError(tx.Err)
+	// Transaction should be already removed from the queue.
+	s.False(txQueueManager.TransactionQueue().Has(tx.ID))
+	s.NoError(WaitClosed(w, time.Second))
+}
+
+func (s *TxQueueTestSuite) TestCompleteTransactionMultipleTimes() {
+	password := TestConfig.Account1.Password
+	key, _ := crypto.GenerateKey()
+	account := &common.SelectedExtKey{
+		Address:    common.FromAddress(TestConfig.Account1.Address),
+		AccountKey: &keystore.Key{PrivateKey: key},
+	}
+	s.setupStatusBackend(account, password, nil)
+
+	nonce := hexutil.Uint64(10)
+	gas := hexutil.Big(*big.NewInt(defaultGas + 1))
+	s.setupTransactionPoolAPI(account, nonce, gas, nil)
+
+	txQueueManager := NewManager(s.nodeManagerMock, s.accountManagerMock)
+
+	txQueueManager.Start()
+	defer txQueueManager.Stop()
+
+	tx := txQueueManager.CreateTransaction(context.Background(), common.SendTxArgs{
+		From: common.FromAddress(TestConfig.Account1.Address),
+		To:   common.ToAddress(TestConfig.Account2.Address),
+	})
+
+	// TransactionQueueHandler is required to enqueue a transaction.
+	txQueueManager.SetTransactionQueueHandler(func(queuedTx *common.QueuedTx) {
+		s.Equal(tx.ID, queuedTx.ID)
+	})
+
+	txQueueManager.SetTransactionReturnHandler(func(queuedTx *common.QueuedTx, err error) {
+		s.Equal(tx.ID, queuedTx.ID)
+		s.NoError(err)
+	})
+
+	err := txQueueManager.QueueTransaction(tx)
+	s.NoError(err)
+
+	var (
+		wg           sync.WaitGroup
+		mu           sync.Mutex
+		completedTx  int
+		inprogressTx int
+		txCount      = 3
+	)
+	for i := 0; i < txCount; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_, errCompleteTransaction := txQueueManager.CompleteTransaction(tx.ID, password)
+			_, err := txQueueManager.CompleteTransaction(tx.ID, password)
 			mu.Lock()
-			completeTxErrors[errCompleteTransaction]++
+			if err == nil {
+				completedTx++
+			} else if err == ErrQueuedTxInProgress {
+				inprogressTx++
+			} else {
+				s.Fail("tx failed with unexpected error: ", err.Error())
+			}
 			mu.Unlock()
 		}()
 	}
@@ -184,7 +197,8 @@ func (s *TxQueueTestSuite) TestCompleteTransactionMultipleTimes() {
 
 	// Wait for all CompleteTransaction calls.
 	wg.Wait()
-	s.Equal(completeTxErrors[nil], 1)
+	s.Equal(1, completedTx, "only 1 tx expected to be completed")
+	s.Equal(txCount-1, inprogressTx, "txs expected to be reported as inprogress")
 }
 
 func (s *TxQueueTestSuite) TestAccountMismatch() {
@@ -227,24 +241,13 @@ func (s *TxQueueTestSuite) TestAccountMismatch() {
 }
 
 func (s *TxQueueTestSuite) TestInvalidPassword() {
-	nodeConfig, nodeErr := params.NewNodeConfig("/tmp", params.RopstenNetworkID, true)
 	password := "invalid-password"
 	key, _ := crypto.GenerateKey()
 	account := &common.SelectedExtKey{
 		Address:    common.FromAddress(TestConfig.Account1.Address),
 		AccountKey: &keystore.Key{PrivateKey: key},
 	}
-	s.accountManagerMock.EXPECT().SelectedAccount().Return(account, nil)
-	s.accountManagerMock.EXPECT().VerifyAccountPassword(nodeConfig.KeyStoreDir, account.Address.String(), password).Return(
-		nil, nil)
-	s.nodeManagerMock.EXPECT().NodeConfig().Return(nodeConfig, nodeErr)
-
-	nonce := hexutil.Uint64(10)
-	s.txServiceMock.EXPECT().GetTransactionCount(gomock.Any(), account.Address, gethrpc.PendingBlockNumber).Return(&nonce, nil)
-	s.txServiceMock.EXPECT().GasPrice(gomock.Any()).Return(big.NewInt(10), nil)
-	gas := hexutil.Big(*big.NewInt(defaultGas + 1))
-	s.txServiceMock.EXPECT().EstimateGas(gomock.Any(), gomock.Any()).Return(&gas, nil)
-	s.txServiceMock.EXPECT().SendRawTransaction(gomock.Any(), gomock.Any()).Return(gethcommon.Hash{}, keystore.ErrDecrypt)
+	s.setupStatusBackend(account, password, keystore.ErrDecrypt)
 
 	txQueueManager := NewManager(s.nodeManagerMock, s.accountManagerMock)
 
@@ -304,9 +307,11 @@ func (s *TxQueueTestSuite) TestDiscardTransaction() {
 	err := txQueueManager.QueueTransaction(tx)
 	s.NoError(err)
 
+	w := make(chan struct{})
 	go func() {
-		discardErr := txQueueManager.DiscardTransaction(tx.ID)
-		s.NoError(discardErr)
+		err := txQueueManager.DiscardTransaction(tx.ID)
+		s.NoError(err)
+		close(w)
 	}()
 
 	err = txQueueManager.WaitForTransaction(tx)
@@ -315,4 +320,5 @@ func (s *TxQueueTestSuite) TestDiscardTransaction() {
 	s.Equal(ErrQueuedTxDiscarded, tx.Err)
 	// Transaction should be already removed from the queue.
 	s.False(txQueueManager.TransactionQueue().Has(tx.ID))
+	s.NoError(WaitClosed(w, time.Second))
 }

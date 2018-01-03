@@ -1,18 +1,18 @@
 package fake
 
 import (
-	context "context"
-	big "math/big"
+	"context"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rpc"
-	gomock "github.com/golang/mock/gomock"
+	"github.com/golang/mock/gomock"
 )
 
-func NewTestServer(ctrl *gomock.Controller) (*rpc.Server, *MockFakePublicTxApi) {
+func NewTestServer(ctrl *gomock.Controller) (*rpc.Server, *MockFakePublicTransactionPoolAPI) {
 	srv := rpc.NewServer()
-	svc := NewMockFakePublicTxApi(ctrl)
+	svc := NewMockFakePublicTransactionPoolAPI(ctrl)
 	if err := srv.RegisterName("eth", svc); err != nil {
 		panic(err)
 	}
@@ -29,10 +29,10 @@ type CallArgs struct {
 	Data     hexutil.Bytes   `json:"data"`
 }
 
-// FakePublicTxApi used to generate mock by mockgen util.
+// FakePublicTransactionPoolAPI used to generate mock by mockgen util.
 // This was done because PublicTransactionPoolAPI is located in internal/ethapi module
 // and there is no easy way to generate mocks from internal modules.
-type FakePublicTxApi interface {
+type FakePublicTransactionPoolAPI interface {
 	GasPrice(ctx context.Context) (*big.Int, error)
 	EstimateGas(ctx context.Context, args CallArgs) (*hexutil.Big, error)
 	GetTransactionCount(ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (*hexutil.Uint64, error)
