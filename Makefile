@@ -14,7 +14,7 @@ endif
 CGO_CFLAGS=-I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
 GOBIN = build/bin
 GO ?= latest
-XGOVERSION ?= 1.9.2
+XGOVERSION ?= latest
 XGOIMAGE = statusteam/xgo:$(XGOVERSION)
 XGOIMAGEIOSSIM = statusteam/xgo-ios-simulator:$(XGOVERSION)
 
@@ -54,14 +54,19 @@ statusgo-cross: statusgo-android statusgo-ios
 	@echo "Full cross compilation done."
 	@ls -ld $(GOBIN)/statusgo-*
 
+statusgo-android: XGOVERSION = 1.7.1
 statusgo-android: xgo ##@cross-compile Build status-go for Android
+	@docker pull $(XGOIMAGE)
 	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=android-16/aar -v $(shell build/testnet-flags.sh) ./lib
 	@echo "Android cross compilation done."
 
+statusgo-ios: XGOVERSION = 1.7.1
 statusgo-ios: xgo	##@cross-compile Build status-go for iOS
+	@docker pull $(XGOIMAGE)
 	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v $(shell build/testnet-flags.sh) ./lib
 	@echo "iOS framework cross compilation done."
 
+statusgo-ios-simulator: XGOVERSION = 1.7.1
 statusgo-ios-simulator: xgo	##@cross-compile Build status-go for iOS Simulator
 	@docker pull $(XGOIMAGEIOSSIM)
 	$(GOPATH)/bin/xgo --image $(XGOIMAGEIOSSIM) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v $(shell build/testnet-flags.sh) ./lib
@@ -77,13 +82,13 @@ docker-image: ##@docker Build docker image (use DOCKER_IMAGE_NAME to set the ima
 	@echo "Building docker image..."
 	docker build . -t $(DOCKER_IMAGE_NAME)
 
+xgo-docker-images: XGOVERSION = 1.9.2
 xgo-docker-images: ##@docker Build xgo docker images
 	@echo "Building xgo docker images..."
 	docker build xgo/base -t $(XGOIMAGE)
 	docker build xgo/ios-simulator -t $(XGOIMAGEIOSSIM)
 
 xgo:
-	docker pull $(XGOIMAGE)
 	go get github.com/karalabe/xgo
 
 statusgo-mainnet:
