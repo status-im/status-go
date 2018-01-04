@@ -13,6 +13,8 @@ import (
 
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
+
+	_ "github.com/stretchr/testify/suite" // required to register testify flags
 )
 
 var (
