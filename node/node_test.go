@@ -49,7 +49,7 @@ func nodeConfigTest() *params.NodeConfig {
 	}
 }
 
-func newTestNode(t *testing.T) *StatusNode {
+func newTestNode(t *testing.T) Node {
 	config, err := e2e.MakeTestNodeConfig(params.RopstenNetworkID)
 	require.Nil(t, err)
 	sn, err := New(config)
@@ -59,26 +59,15 @@ func newTestNode(t *testing.T) *StatusNode {
 	return sn
 }
 
-func TestNew(t *testing.T) {
+func TestNode_Start(t *testing.T) {
 	sn := newTestNode(t)
-
-	defer func() {
-		if r := recover(); r != nil {
-			t.Fatalf("error closing `Started` channel: %+v", r)
-		}
-	}()
-
-	close(sn.Started)
-}
-
-func TestNode_Start_Stop(t *testing.T) {
-	sn := newTestNode(t)
-	sn.Start()
+	started, err := sn.Start()
+	require.Nil(t, err)
 
 	waitFor := time.Duration(200)
 
 	select {
-	case <-sn.Started:
+	case <-started:
 		t.Log("node started")
 	case <-time.After(time.Millisecond * waitFor):
 		t.Fatalf("node hasn't started after %d milliseconds", waitFor)
