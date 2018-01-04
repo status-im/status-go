@@ -55,13 +55,17 @@ statusgo-cross: statusgo-android statusgo-ios
 	@ls -ld $(GOBIN)/statusgo-*
 
 statusgo-android: xgo ##@cross-compile Build status-go for Android
+	@docker pull $(XGOIMAGE)
 	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=android-16/aar -v $(shell build/testnet-flags.sh) ./lib
 	@echo "Android cross compilation done."
 
+statusgo-ios: XGOVERSION = 1.7.1
 statusgo-ios: xgo	##@cross-compile Build status-go for iOS
+	@docker pull $(XGOIMAGE)
 	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v $(shell build/testnet-flags.sh) ./lib
 	@echo "iOS framework cross compilation done."
 
+statusgo-ios-simulator: XGOVERSION = 1.7.1
 statusgo-ios-simulator: xgo	##@cross-compile Build status-go for iOS Simulator
 	@docker pull $(XGOIMAGEIOSSIM)
 	$(GOPATH)/bin/xgo --image $(XGOIMAGEIOSSIM) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v $(shell build/testnet-flags.sh) ./lib
@@ -83,7 +87,6 @@ xgo-docker-images: ##@docker Build xgo docker images
 	docker build xgo/ios-simulator -t $(XGOIMAGEIOSSIM)
 
 xgo:
-	docker pull $(XGOIMAGE)
 	go get github.com/karalabe/xgo
 
 statusgo-mainnet:
