@@ -14,7 +14,7 @@ endif
 CGO_CFLAGS=-I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
 GOBIN = build/bin
 GO ?= latest
-XGOVERSION ?= latest
+XGOVERSION ?= 1.9.2
 XGOIMAGE = statusteam/xgo:$(XGOVERSION)
 XGOIMAGEIOSSIM = statusteam/xgo-ios-simulator:$(XGOVERSION)
 
@@ -54,7 +54,6 @@ statusgo-cross: statusgo-android statusgo-ios
 	@echo "Full cross compilation done."
 	@ls -ld $(GOBIN)/statusgo-*
 
-statusgo-android: XGOVERSION = 1.9.2
 statusgo-android: xgo ##@cross-compile Build status-go for Android
 	@docker pull $(XGOIMAGE)
 	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=android-16/aar -v $(shell build/testnet-flags.sh) ./lib
@@ -82,7 +81,6 @@ docker-image: ##@docker Build docker image (use DOCKER_IMAGE_NAME to set the ima
 	@echo "Building docker image..."
 	docker build . -t $(DOCKER_IMAGE_NAME)
 
-xgo-docker-images: XGOVERSION = 1.9.2
 xgo-docker-images: ##@docker Build xgo docker images
 	@echo "Building xgo docker images..."
 	docker build xgo/base -t $(XGOIMAGE)
