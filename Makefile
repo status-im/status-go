@@ -54,7 +54,7 @@ statusgo-cross: statusgo-android statusgo-ios
 	@echo "Full cross compilation done."
 	@ls -ld $(GOBIN)/statusgo-*
 
-statusgo-android: XGOVERSION = 1.7.1
+statusgo-android: XGOVERSION = 1.9.2
 statusgo-android: xgo ##@cross-compile Build status-go for Android
 	@docker pull $(XGOIMAGE)
 	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=android-16/aar -v $(shell build/testnet-flags.sh) ./lib
