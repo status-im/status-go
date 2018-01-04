@@ -9,46 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func nodeConfigTest() *params.NodeConfig {
-	return &params.NodeConfig{
-		DevMode:         true,
-		NetworkID:       params.RopstenNetworkID,
-		DataDir:         "./test-data",
-		Name:            params.ClientIdentifier,
-		Version:         "0.0.0.0",
-		RPCEnabled:      params.RPCEnabledDefault,
-		HTTPHost:        params.HTTPHost,
-		HTTPPort:        params.HTTPPort,
-		ListenAddr:      params.ListenAddr,
-		APIModules:      params.APIModules,
-		WSHost:          params.WSHost,
-		WSPort:          params.WSPort,
-		MaxPeers:        params.MaxPeers,
-		MaxPendingPeers: params.MaxPendingPeers,
-		IPCFile:         params.IPCFile,
-		LogFile:         params.LogFile,
-		LogLevel:        params.LogLevel,
-		LogToStderr:     params.LogToStderr,
-		BootClusterConfig: &params.BootClusterConfig{
-			Enabled:   true,
-			BootNodes: []string{},
-		},
-		LightEthConfig: &params.LightEthConfig{
-			Enabled:       true,
-			DatabaseCache: params.DatabaseCache,
-		},
-		WhisperConfig: &params.WhisperConfig{
-			Enabled:    true,
-			MinimumPoW: params.WhisperMinimumPoW,
-			TTL:        params.WhisperTTL,
-			FirebaseConfig: &params.FirebaseConfig{
-				NotificationTriggerURL: params.FirebaseNotificationTriggerURL,
-			},
-		},
-		SwarmConfig: &params.SwarmConfig{},
-	}
-}
-
 func newTestNode(t *testing.T) Node {
 	config, err := e2e.MakeTestNodeConfig(params.RopstenNetworkID)
 	require.Nil(t, err)
