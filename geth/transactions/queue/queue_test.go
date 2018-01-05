@@ -52,15 +52,13 @@ func (s *QueueTestSuite) TestGetTransaction() {
 	}
 }
 
-func (s *QueueTestSuite) TestEnqueueProcessedTransaction() {
-	// enqueue will fail if transaction with hash will be enqueued
+func (s *QueueTestSuite) TestAlreadyEnqueued() {
 	tx := common.CreateTransaction(context.Background(), common.SendTxArgs{})
-	tx.Hash = gethcommon.Hash{1}
-	s.Equal(ErrQueuedTxAlreadyProcessed, s.queue.Enqueue(tx))
-
+	s.NoError(s.queue.Enqueue(tx))
+	s.Equal(ErrQueuedTxExist, s.queue.Enqueue(tx))
+	// try to enqueue another tx to double check locking
 	tx = common.CreateTransaction(context.Background(), common.SendTxArgs{})
-	tx.Err = errors.New("error")
-	s.Equal(ErrQueuedTxAlreadyProcessed, s.queue.Enqueue(tx))
+	s.NoError(s.queue.Enqueue(tx))
 }
 
 func (s *QueueTestSuite) testDone(hash gethcommon.Hash, err error) *common.QueuedTx {
@@ -73,12 +71,12 @@ func (s *QueueTestSuite) testDone(hash gethcommon.Hash, err error) *common.Queue
 func (s *QueueTestSuite) TestDoneSuccess() {
 	hash := gethcommon.Hash{1}
 	tx := s.testDone(hash, nil)
-	s.NoError(tx.Err)
-	s.Equal(hash, tx.Hash)
-	s.False(s.queue.Has(tx.ID))
 	// event is sent only if transaction was removed from a queue
 	select {
-	case <-tx.Done:
+	case rst := <-tx.Result:
+		s.NoError(rst.Error)
+		s.Equal(hash, rst.Hash)
+		s.False(s.queue.Has(tx.ID))
 	default:
 		s.Fail("No event was sent to Done channel")
 	}
@@ -88,22 +86,22 @@ func (s *QueueTestSuite) TestDoneTransientError() {
 	hash := gethcommon.Hash{1}
 	err := keystore.ErrDecrypt
 	tx := s.testDone(hash, err)
-	s.Equal(keystore.ErrDecrypt, tx.Err)
-	s.Equal(gethcommon.Hash{}, tx.Hash)
 	s.True(s.queue.Has(tx.ID))
+	_, inp := s.queue.inprogress[tx.ID]
+	s.False(inp)
 }
 
 func (s *QueueTestSuite) TestDoneError() {
 	hash := gethcommon.Hash{1}
 	err := errors.New("test")
 	tx := s.testDone(hash, err)
-	s.Equal(err, tx.Err)
-	s.NotEqual(hash, tx.Hash)
-	s.Equal(gethcommon.Hash{}, tx.Hash)
-	s.False(s.queue.Has(tx.ID))
 	// event is sent only if transaction was removed from a queue
 	select {
-	case <-tx.Done:
+	case rst := <-tx.Result:
+		s.Equal(err, rst.Error)
+		s.NotEqual(hash, rst.Hash)
+		s.Equal(gethcommon.Hash{}, rst.Hash)
+		s.False(s.queue.Has(tx.ID))
 	default:
 		s.Fail("No event was sent to Done channel")
 	}

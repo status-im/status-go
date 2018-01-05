@@ -17,7 +17,7 @@ const (
 	// SendTxDefaultErrorCode is sent by default, when error is not nil, but type is unknown/unexpected.
 	SendTxDefaultErrorCode = SendTransactionDefaultErrorCode
 	// DefaultTxSendCompletionTimeout defines how many seconds to wait before returning result in sentTransaction().
-	DefaultTxSendCompletionTimeout = 300
+	DefaultTxSendCompletionTimeout = 300 * time.Second
 
 	defaultGas     = 90000
 	defaultTimeout = time.Minute
@@ -25,22 +25,24 @@ const (
 
 // Manager provides means to manage internal Status Backend (injected into LES)
 type Manager struct {
-	nodeManager    common.NodeManager
-	accountManager common.AccountManager
-	txQueue        *queue.TxQueue
-	ethTxClient    EthTransactor
-	addrLock       *AddrLocker
-	notify         bool
+	nodeManager       common.NodeManager
+	accountManager    common.AccountManager
+	txQueue           *queue.TxQueue
+	ethTxClient       EthTransactor
+	addrLock          *AddrLocker
+	notify            bool
+	completionTimeout time.Duration
 }
 
 // NewManager returns a new Manager.
 func NewManager(nodeManager common.NodeManager, accountManager common.AccountManager) *Manager {
 	return &Manager{
-		nodeManager:    nodeManager,
-		accountManager: accountManager,
-		txQueue:        queue.New(),
-		addrLock:       &AddrLocker{},
-		notify:         true,
+		nodeManager:       nodeManager,
+		accountManager:    accountManager,
+		txQueue:           queue.New(),
+		addrLock:          &AddrLocker{},
+		notify:            true,
+		completionTimeout: DefaultTxSendCompletionTimeout,
 	}
 }
 
@@ -75,34 +77,41 @@ func (m *Manager) QueueTransaction(tx *common.QueuedTx) error {
 		to = tx.Args.To.Hex()
 	}
 	log.Info("queue a new transaction", "id", tx.ID, "from", tx.Args.From.Hex(), "to", to)
-	err := m.txQueue.Enqueue(tx)
+	if err := m.txQueue.Enqueue(tx); err != nil {
+		return err
+	}
 	if m.notify {
 		NotifyOnEnqueue(tx)
 	}
-	return err
+	return nil
 }
 
 func (m *Manager) txDone(tx *common.QueuedTx, hash gethcommon.Hash, err error) {
-	m.txQueue.Done(tx.ID, hash, err) //nolint: errcheck
+	if err := m.txQueue.Done(tx.ID, hash, err); err == queue.ErrQueuedTxIDNotFound {
+		log.Warn("transaction is already removed from a queue", tx.ID)
+		return
+	}
 	if m.notify {
-		NotifyOnReturn(tx)
+		NotifyOnReturn(tx, err)
 	}
 }
 
 // WaitForTransaction adds a transaction to the queue and blocks
 // until it's completed, discarded or times out.
-func (m *Manager) WaitForTransaction(tx *common.QueuedTx) error {
+func (m *Manager) WaitForTransaction(tx *common.QueuedTx) common.TransactionResult {
 	log.Info("wait for transaction", "id", tx.ID)
 	// now wait up until transaction is:
 	// - completed (via CompleteQueuedTransaction),
 	// - discarded (via DiscardQueuedTransaction)
 	// - or times out
-	select {
-	case <-tx.Done:
-	case <-time.After(DefaultTxSendCompletionTimeout * time.Second):
-		m.txDone(tx, gethcommon.Hash{}, queue.ErrQueuedTxTimedOut)
+	for {
+		select {
+		case rst := <-tx.Result:
+			return rst
+		case <-time.After(m.completionTimeout):
+			m.txDone(tx, gethcommon.Hash{}, ErrQueuedTxTimedOut)
+		}
 	}
-	return tx.Err
 }
 
 // CompleteTransaction instructs backend to complete sending of a given transaction.
@@ -224,11 +233,11 @@ func (m *Manager) completeTransaction(queuedTx *common.QueuedTx, selectedAccount
 }
 
 // CompleteTransactions instructs backend to complete sending of multiple transactions
-func (m *Manager) CompleteTransactions(ids []common.QueuedTxID, password string) map[common.QueuedTxID]common.RawCompleteTransactionResult {
-	results := make(map[common.QueuedTxID]common.RawCompleteTransactionResult)
+func (m *Manager) CompleteTransactions(ids []common.QueuedTxID, password string) map[common.QueuedTxID]common.TransactionResult {
+	results := make(map[common.QueuedTxID]common.TransactionResult)
 	for _, txID := range ids {
 		txHash, txErr := m.CompleteTransaction(txID, password)
-		results[txID] = common.RawCompleteTransactionResult{
+		results[txID] = common.TransactionResult{
 			Hash:  txHash,
 			Error: txErr,
 		}
@@ -242,9 +251,9 @@ func (m *Manager) DiscardTransaction(id common.QueuedTxID) error {
 	if err != nil {
 		return err
 	}
-	err = m.txQueue.Done(id, gethcommon.Hash{}, queue.ErrQueuedTxDiscarded)
+	err = m.txQueue.Done(id, gethcommon.Hash{}, ErrQueuedTxDiscarded)
 	if m.notify {
-		NotifyOnReturn(tx)
+		NotifyOnReturn(tx, ErrQueuedTxDiscarded)
 	}
 	return err
 }
@@ -269,19 +278,16 @@ func (m *Manager) DiscardTransactions(ids []common.QueuedTxID) map[common.Queued
 // It accepts one param which is a slice with a map of transaction params.
 func (m *Manager) SendTransactionRPCHandler(ctx context.Context, args ...interface{}) (interface{}, error) {
 	log.Info("SendTransactionRPCHandler called")
-
 	// TODO(adam): it's a hack to parse arguments as common.RPCCall can do that.
 	// We should refactor parsing these params to a separate struct.
 	rpcCall := common.RPCCall{Params: args}
 	tx := common.CreateTransaction(ctx, rpcCall.ToSendTxArgs())
-
 	if err := m.QueueTransaction(tx); err != nil {
 		return nil, err
 	}
-
-	if err := m.WaitForTransaction(tx); err != nil {
-		return nil, err
+	rst := m.WaitForTransaction(tx)
+	if rst.Error != nil {
+		return nil, rst.Error
 	}
-
-	return tx.Hash.Hex(), nil
+	return rst.Hash.Hex(), nil
 }

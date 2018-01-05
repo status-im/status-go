@@ -11,9 +11,9 @@ import (
 )
 
 // NewTestServer returns a mocked test server
-func NewTestServer(ctrl *gomock.Controller) (*rpc.Server, *MockFakePublicTransactionPoolAPI) {
+func NewTestServer(ctrl *gomock.Controller) (*rpc.Server, *MockPublicTransactionPoolAPI) {
 	srv := rpc.NewServer()
-	svc := NewMockFakePublicTransactionPoolAPI(ctrl)
+	svc := NewMockPublicTransactionPoolAPI(ctrl)
 	if err := srv.RegisterName("eth", svc); err != nil {
 		panic(err)
 	}

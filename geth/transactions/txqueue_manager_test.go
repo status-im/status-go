@@ -36,7 +36,7 @@ type TxQueueTestSuite struct {
 	server                 *gethrpc.Server
 	client                 *gethrpc.Client
 	txServiceMockCtrl      *gomock.Controller
-	txServiceMock          *fake.MockFakePublicTransactionPoolAPI
+	txServiceMock          *fake.MockPublicTransactionPoolAPI
 }
 
 func (s *TxQueueTestSuite) SetupTest() {
@@ -98,24 +98,26 @@ func (s *TxQueueTestSuite) TestCompleteTransaction() {
 		From: common.FromAddress(TestConfig.Account1.Address),
 		To:   common.ToAddress(TestConfig.Account2.Address),
 	})
-	err := txQueueManager.QueueTransaction(tx)
-	s.NoError(err)
 
+	s.NoError(txQueueManager.QueueTransaction(tx))
 	w := make(chan struct{})
+	var (
+		hash gethcommon.Hash
+		err  error
+	)
 	go func() {
-		hash, err := txQueueManager.CompleteTransaction(tx.ID, password)
+		hash, err = txQueueManager.CompleteTransaction(tx.ID, password)
 		s.NoError(err)
-		s.Equal(tx.Hash, hash)
 		close(w)
 	}()
 
-	err = txQueueManager.WaitForTransaction(tx)
-	s.NoError(err)
+	rst := txQueueManager.WaitForTransaction(tx)
 	// Check that error is assigned to the transaction.
-	s.NoError(tx.Err)
+	s.NoError(rst.Error)
 	// Transaction should be already removed from the queue.
 	s.False(txQueueManager.TransactionQueue().Has(tx.ID))
 	s.NoError(WaitClosed(w, time.Second))
+	s.Equal(hash, rst.Hash)
 }
 
 func (s *TxQueueTestSuite) TestCompleteTransactionMultipleTimes() {
@@ -141,8 +143,7 @@ func (s *TxQueueTestSuite) TestCompleteTransactionMultipleTimes() {
 		To:   common.ToAddress(TestConfig.Account2.Address),
 	})
 
-	err := txQueueManager.QueueTransaction(tx)
-	s.NoError(err)
+	s.NoError(txQueueManager.QueueTransaction(tx))
 
 	var (
 		wg           sync.WaitGroup
@@ -168,10 +169,9 @@ func (s *TxQueueTestSuite) TestCompleteTransactionMultipleTimes() {
 		}()
 	}
 
-	err = txQueueManager.WaitForTransaction(tx)
-	s.NoError(err)
+	rst := txQueueManager.WaitForTransaction(tx)
 	// Check that error is assigned to the transaction.
-	s.NoError(tx.Err)
+	s.NoError(rst.Error)
 	// Transaction should be already removed from the queue.
 	s.False(txQueueManager.TransactionQueue().Has(tx.ID))
 
@@ -197,10 +197,9 @@ func (s *TxQueueTestSuite) TestAccountMismatch() {
 		To:   common.ToAddress(TestConfig.Account2.Address),
 	})
 
-	err := txQueueManager.QueueTransaction(tx)
-	s.NoError(err)
+	s.NoError(txQueueManager.QueueTransaction(tx))
 
-	_, err = txQueueManager.CompleteTransaction(tx.ID, TestConfig.Account1.Password)
+	_, err := txQueueManager.CompleteTransaction(tx.ID, TestConfig.Account1.Password)
 	s.Equal(err, queue.ErrInvalidCompleteTxSender)
 
 	// Transaction should stay in the queue as mismatched accounts
@@ -227,10 +226,9 @@ func (s *TxQueueTestSuite) TestInvalidPassword() {
 		To:   common.ToAddress(TestConfig.Account2.Address),
 	})
 
-	err := txQueueManager.QueueTransaction(tx)
-	s.NoError(err)
+	s.NoError(txQueueManager.QueueTransaction(tx))
 
-	_, err = txQueueManager.CompleteTransaction(tx.ID, password)
+	_, err := txQueueManager.CompleteTransaction(tx.ID, password)
 	s.Equal(err.Error(), keystore.ErrDecrypt.Error())
 
 	// Transaction should stay in the queue as mismatched accounts
@@ -250,20 +248,34 @@ func (s *TxQueueTestSuite) TestDiscardTransaction() {
 		To:   common.ToAddress(TestConfig.Account2.Address),
 	})
 
-	err := txQueueManager.QueueTransaction(tx)
-	s.NoError(err)
-
+	s.NoError(txQueueManager.QueueTransaction(tx))
 	w := make(chan struct{})
 	go func() {
 		s.NoError(txQueueManager.DiscardTransaction(tx.ID))
 		close(w)
 	}()
 
-	err = txQueueManager.WaitForTransaction(tx)
-	s.Equal(queue.ErrQueuedTxDiscarded, err)
-	// Check that error is assigned to the transaction.
-	s.Equal(queue.ErrQueuedTxDiscarded, tx.Err)
+	rst := txQueueManager.WaitForTransaction(tx)
+	s.Equal(ErrQueuedTxDiscarded, rst.Error)
 	// Transaction should be already removed from the queue.
 	s.False(txQueueManager.TransactionQueue().Has(tx.ID))
 	s.NoError(WaitClosed(w, time.Second))
+}
+
+func (s *TxQueueTestSuite) TestCompletionTimedOut() {
+	txQueueManager := NewManager(s.nodeManagerMock, s.accountManagerMock)
+	txQueueManager.DisableNotificactions()
+	txQueueManager.completionTimeout = time.Nanosecond
+
+	txQueueManager.Start()
+	defer txQueueManager.Stop()
+
+	tx := common.CreateTransaction(context.Background(), common.SendTxArgs{
+		From: common.FromAddress(TestConfig.Account1.Address),
+		To:   common.ToAddress(TestConfig.Account2.Address),
+	})
+
+	s.NoError(txQueueManager.QueueTransaction(tx))
+	rst := txQueueManager.WaitForTransaction(tx)
+	s.Equal(ErrQueuedTxTimedOut, rst.Error)
 }
