@@ -81,7 +81,7 @@ func Define(vm *vm.VM, l *loop.Loop) error {
 		})
 
 		value, setImmediateErr := call.Otto.ToValue(t)
-		if err != nil {
+		if setImmediateErr != nil {
 			panic(setImmediateErr)
 		}
 
