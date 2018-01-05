@@ -1,12 +1,9 @@
 package transactions
 
 import (
-	"strconv"
-
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/signal"
-	"github.com/status-im/status-go/geth/transactions/queue"
 )
 
 const (
@@ -30,10 +27,10 @@ const (
 )
 
 var txReturnCodes = map[error]int{
-	nil:                        SendTransactionNoErrorCode,
-	keystore.ErrDecrypt:        SendTransactionPasswordErrorCode,
-	queue.ErrQueuedTxTimedOut:  SendTransactionTimeoutErrorCode,
-	queue.ErrQueuedTxDiscarded: SendTransactionDiscardedErrorCode,
+	nil:                  SendTransactionNoErrorCode,
+	keystore.ErrDecrypt:  SendTransactionPasswordErrorCode,
+	ErrQueuedTxTimedOut:  SendTransactionTimeoutErrorCode,
+	ErrQueuedTxDiscarded: SendTransactionDiscardedErrorCode,
 }
 
 // SendTransactionEvent is a signal sent on a send transaction request
@@ -61,17 +58,17 @@ type ReturnSendTransactionEvent struct {
 	Args         common.SendTxArgs `json:"args"`
 	MessageID    string            `json:"message_id"`
 	ErrorMessage string            `json:"error_message"`
-	ErrorCode    string            `json:"error_code"`
+	ErrorCode    int               `json:"error_code,string"`
 }
 
 // NotifyOnReturn returns handler that processes responses from internal tx manager
-func NotifyOnReturn(queuedTx *common.QueuedTx) {
-	// discard notifications with empty tx
-	if queuedTx == nil {
+func NotifyOnReturn(queuedTx *common.QueuedTx, err error) {
+	// we don't want to notify a user if tx was sent successfully
+	if err == nil {
 		return
 	}
-	// we don't want to notify a user if tx sent successfully
-	if queuedTx.Err == nil {
+	// discard notifications with empty tx
+	if queuedTx == nil {
 		return
 	}
 	signal.Send(signal.Envelope{
@@ -80,8 +77,8 @@ func NotifyOnReturn(queuedTx *common.QueuedTx) {
 			ID:           string(queuedTx.ID),
 			Args:         queuedTx.Args,
 			MessageID:    common.MessageIDFromContext(queuedTx.Context),
-			ErrorMessage: queuedTx.Err.Error(),
-			ErrorCode:    strconv.Itoa(sendTransactionErrorCode(queuedTx.Err)),
+			ErrorMessage: err.Error(),
+			ErrorCode:    sendTransactionErrorCode(err),
 		},
 	})
 }

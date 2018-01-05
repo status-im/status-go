@@ -141,8 +141,8 @@ type AccountManager interface {
 	AddressToDecryptedAccount(address, password string) (accounts.Account, *keystore.Key, error)
 }
 
-// RawCompleteTransactionResult is a JSON returned from transaction complete function (used internally)
-type RawCompleteTransactionResult struct {
+// TransactionResult is a JSON returned from transaction complete function (used internally)
+type TransactionResult struct {
 	Hash  common.Hash
 	Error error
 }
@@ -158,11 +158,9 @@ type QueuedTxID string
 // QueuedTx holds enough information to complete the queued transaction.
 type QueuedTx struct {
 	ID      QueuedTxID
-	Hash    common.Hash
 	Context context.Context
 	Args    SendTxArgs
-	Done    chan struct{}
-	Err     error
+	Result  chan TransactionResult
 }
 
 // SendTxArgs represents the arguments to submit a new transaction into the transaction pool.

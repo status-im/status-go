@@ -157,9 +157,8 @@ func Fatalf(reason interface{}, args ...interface{}) {
 func CreateTransaction(ctx context.Context, args SendTxArgs) *QueuedTx {
 	return &QueuedTx{
 		ID:      QueuedTxID(uuid.New()),
-		Hash:    common.Hash{},
 		Context: ctx,
 		Args:    args,
-		Done:    make(chan struct{}),
+		Result:  make(chan TransactionResult, 1),
 	}
 }

@@ -19,16 +19,12 @@ const (
 )
 
 var (
+	// ErrQueuedTxExist - transaction was already enqueued
+	ErrQueuedTxExist = errors.New("transaction already exist in queue")
 	//ErrQueuedTxIDNotFound - error transaction hash not found
 	ErrQueuedTxIDNotFound = errors.New("transaction hash not found")
-	//ErrQueuedTxTimedOut - error transaction sending timed out
-	ErrQueuedTxTimedOut = errors.New("transaction sending timed out")
-	//ErrQueuedTxDiscarded - error transaction discarded
-	ErrQueuedTxDiscarded = errors.New("transaction has been discarded")
-	//ErrQueuedTxInProgress - error transaction in progress
+	//ErrQueuedTxInProgress - error transaction is in progress
 	ErrQueuedTxInProgress = errors.New("transaction is in progress")
-	//ErrQueuedTxAlreadyProcessed - error transaction has already processed
-	ErrQueuedTxAlreadyProcessed = errors.New("transaction has been already processed")
 	//ErrInvalidCompleteTxSender - error transaction with invalid sender
 	ErrInvalidCompleteTxSender = errors.New("transaction can only be completed by the same account which created it")
 )
@@ -133,15 +129,18 @@ func (q *TxQueue) Reset() {
 // Enqueue enqueues incoming transaction
 func (q *TxQueue) Enqueue(tx *common.QueuedTx) error {
 	log.Info(fmt.Sprintf("enqueue transaction: %s", tx.ID))
-	if (tx.Hash != gethcommon.Hash{} || tx.Err != nil) {
-		return ErrQueuedTxAlreadyProcessed
+	q.mu.RLock()
+	if _, ok := q.transactions[tx.ID]; ok {
+		q.mu.RUnlock()
+		return ErrQueuedTxExist
 	}
+	q.mu.RUnlock()
 
-	log.Info("before enqueueTicker")
+	// we can't hold a lock in this part
+	log.Debug("notifying eviction loop")
 	q.enqueueTicker <- struct{}{} // notify eviction loop that we are trying to insert new item
-	log.Info("before evictableIDs")
-	q.evictableIDs <- tx.ID // this will block when we hit DefaultTxQueueCap
-	log.Info("after evictableIDs")
+	q.evictableIDs <- tx.ID       // this will block when we hit DefaultTxQueueCap
+	log.Debug("notified eviction loop")
 
 	q.mu.Lock()
 	q.transactions[tx.ID] = tx
@@ -204,17 +203,15 @@ func (q *TxQueue) Done(id common.QueuedTxID, hash gethcommon.Hash, err error) er
 
 func (q *TxQueue) done(tx *common.QueuedTx, hash gethcommon.Hash, err error) {
 	delete(q.inprogress, tx.ID)
-	tx.Err = err
 	// hash is updated only if err is nil, but transaction is not removed from a queue
 	if err == nil {
+		q.transactions[tx.ID].Result <- common.TransactionResult{Hash: hash, Error: err}
 		q.remove(tx.ID)
-		tx.Hash = hash
-		close(tx.Done)
 		return
 	}
 	if _, transient := transientErrs[err.Error()]; !transient {
+		q.transactions[tx.ID].Result <- common.TransactionResult{Error: err}
 		q.remove(tx.ID)
-		close(tx.Done)
 	}
 }
 
