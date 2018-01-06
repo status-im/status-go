@@ -3,6 +3,7 @@ package transactions
 import (
 	"context"
 	"math/big"
+	"sync"
 	"time"
 
 	ethereum "github.com/ethereum/go-ethereum"
@@ -10,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/log"
+	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/transactions/queue"
 )
 
@@ -29,10 +31,12 @@ type Manager struct {
 	accountManager    common.AccountManager
 	txQueue           *queue.TxQueue
 	ethTxClient       EthTransactor
-	addrLock          *AddrLocker
 	notify            bool
 	completionTimeout time.Duration
 	rpcCallTimeout    time.Duration
+
+	addrLock   *AddrLocker
+	localNonce sync.Map
 }
 
 // NewManager returns a new Manager.
@@ -45,6 +49,7 @@ func NewManager(nodeManager common.NodeManager, accountManager common.AccountMan
 		notify:            true,
 		completionTimeout: DefaultTxSendCompletionTimeout,
 		rpcCallTimeout:    defaultTimeout,
+		localNonce:        sync.Map{},
 	}
 }
 
@@ -128,19 +133,22 @@ func (m *Manager) CompleteTransaction(id common.QueuedTxID, password string) (ha
 		log.Warn("can't process transaction", "err", err)
 		return hash, err
 	}
-	account, err := m.validateAccount(tx)
+	config, err := m.nodeManager.NodeConfig()
+	if err != nil {
+		return hash, err
+	}
+	account, err := m.validateAccount(config, tx, password)
 	if err != nil {
 		m.txDone(tx, hash, err)
 		return hash, err
 	}
-	// Send the transaction finally.
-	hash, err = m.completeTransaction(tx, account, password)
+	hash, err = m.completeTransaction(config, account, tx)
 	log.Info("finally completed transaction", "id", tx.ID, "hash", hash, "err", err)
 	m.txDone(tx, hash, err)
 	return hash, err
 }
 
-func (m *Manager) validateAccount(tx *common.QueuedTx) (*common.SelectedExtKey, error) {
+func (m *Manager) validateAccount(config *params.NodeConfig, tx *common.QueuedTx, password string) (*common.SelectedExtKey, error) {
 	selectedAccount, err := m.accountManager.SelectedAccount()
 	if err != nil {
 		log.Warn("failed to get a selected account", "err", err)
@@ -151,28 +159,41 @@ func (m *Manager) validateAccount(tx *common.QueuedTx) (*common.SelectedExtKey, 
 		log.Warn("queued transaction does not belong to the selected account", "err", queue.ErrInvalidCompleteTxSender)
 		return nil, queue.ErrInvalidCompleteTxSender
 	}
-	return selectedAccount, nil
-}
-
-func (m *Manager) completeTransaction(queuedTx *common.QueuedTx, selectedAccount *common.SelectedExtKey, password string) (hash gethcommon.Hash, err error) {
-	log.Info("complete transaction", "id", queuedTx.ID)
-	log.Info("verifying account password for transaction", "id", queuedTx.ID)
-	config, err := m.nodeManager.NodeConfig()
-	if err != nil {
-		return hash, err
-	}
 	_, err = m.accountManager.VerifyAccountPassword(config.KeyStoreDir, selectedAccount.Address.String(), password)
 	if err != nil {
 		log.Warn("failed to verify account", "account", selectedAccount.Address.String(), "error", err.Error())
-		return hash, err
+		return nil, err
 	}
+	return selectedAccount, nil
+}
+
+func (m *Manager) completeTransaction(config *params.NodeConfig, selectedAccount *common.SelectedExtKey, queuedTx *common.QueuedTx) (hash gethcommon.Hash, err error) {
+	log.Info("complete transaction", "id", queuedTx.ID)
 	m.addrLock.LockAddr(queuedTx.Args.From)
-	defer m.addrLock.UnlockAddr(queuedTx.Args.From)
+	var localNonce uint64
+	if val, ok := m.localNonce.Load(queuedTx.Args.From); ok {
+		localNonce = val.(uint64)
+	}
+	var nonce uint64
+	defer func() {
+		// nonce should be incremented only if tx completed without error
+		// if upstream node returned nonce higher than ours we will stick to it
+		if err == nil {
+			m.localNonce.Store(queuedTx.Args.From, nonce+1)
+		}
+		m.addrLock.UnlockAddr(queuedTx.Args.From)
+
+	}()
 	ctx, cancel := context.WithTimeout(context.Background(), m.rpcCallTimeout)
 	defer cancel()
-	nonce, err := m.ethTxClient.PendingNonceAt(ctx, queuedTx.Args.From)
+	nonce, err = m.ethTxClient.PendingNonceAt(ctx, queuedTx.Args.From)
 	if err != nil {
 		return hash, err
+	}
+	// if upstream node returned nonce higher than ours we will use it, as it probably means
+	// that another client was used for sending transactions
+	if localNonce > nonce {
+		nonce = localNonce
 	}
 	args := queuedTx.Args
 	gasPrice := (*big.Int)(args.GasPrice)
