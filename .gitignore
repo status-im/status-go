@@ -55,3 +55,9 @@ profile.cov
 coverage.out
 coverage-all.out
 coverage.html
+
+# vim swap files
+[._]*.s[a-v][a-z]
+[._]*.sw[a-p]
+[._]s[a-v][a-z]
+[._]sw[a-p]
