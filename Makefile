@@ -26,10 +26,10 @@ UNIT_TEST_PACKAGES := $(shell go list ./...  | grep -v /vendor | grep -v /e2e | 
 # It supports ANSI colors and categories.
 # To add new item into help output, simply add comments
 # starting with '##'. To add category, use @category.
-GREEN  := $(shell tput -Txterm setaf 2)
-WHITE  := $(shell tput -Txterm setaf 7)
-YELLOW := $(shell tput -Txterm setaf 3)
-RESET  := $(shell tput -Txterm sgr0)
+GREEN  := $(shell echo "\e[32m")
+WHITE  := $(shell echo "\e[37m")
+YELLOW := $(shell echo "\e[33m")
+RESET  := $(shell echo "\e[0m")
 HELP_FUN = \
 		   %help; \
 		   while(<>) { push @{$$help{$$2 // 'options'}}, [$$1, $$3] if /^([a-zA-Z\-]+)\s*:.*\#\#(?:@([a-zA-Z\-]+))?\s(.*)$$/ }; \
