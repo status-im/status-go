@@ -272,6 +272,8 @@ func (s *JailRPCTestSuite) TestJailVMPersistence() {
 			 }
 		  });
 		}
+
+		_status_catalog;
 	`)
 	s.NotContains(parseResult, "error", "further will fail if initial parsing failed")
 

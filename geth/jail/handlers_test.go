@@ -52,7 +52,7 @@ func (s *HandlersTestSuite) TestWeb3SendHandlerSuccess() {
 
 	jail := New(&testRPCClientProvider{client})
 
-	cell, err := jail.createAndInitCell("cell1")
+	cell, _, err := jail.createAndInitCell("cell1")
 	s.NoError(err)
 
 	// web3.eth.syncing is an arbitrary web3 sync RPC call.
@@ -66,7 +66,7 @@ func (s *HandlersTestSuite) TestWeb3SendHandlerSuccess() {
 func (s *HandlersTestSuite) TestWeb3SendHandlerFailure() {
 	jail := New(nil)
 
-	cell, err := jail.createAndInitCell("cell1")
+	cell, _, err := jail.createAndInitCell("cell1")
 	s.NoError(err)
 
 	_, err = cell.Run("web3.eth.syncing")
@@ -79,7 +79,7 @@ func (s *HandlersTestSuite) TestWeb3SendAsyncHandlerSuccess() {
 
 	jail := New(&testRPCClientProvider{client})
 
-	cell, err := jail.createAndInitCell("cell1")
+	cell, _, err := jail.createAndInitCell("cell1")
 	s.NoError(err)
 
 	errc := make(chan string)
@@ -104,7 +104,7 @@ func (s *HandlersTestSuite) TestWeb3SendAsyncHandlerWithoutCallbackSuccess() {
 
 	jail := New(&testRPCClientProvider{client})
 
-	cell, err := jail.createAndInitCell("cell1")
+	cell, _, err := jail.createAndInitCell("cell1")
 	s.NoError(err)
 
 	_, err = cell.Run(`web3.eth.getSyncing()`)
@@ -119,7 +119,7 @@ func (s *HandlersTestSuite) TestWeb3SendAsyncHandlerWithoutCallbackSuccess() {
 func (s *HandlersTestSuite) TestWeb3SendAsyncHandlerFailure() {
 	jail := New(nil)
 
-	cell, err := jail.createAndInitCell("cell1")
+	cell, _, err := jail.createAndInitCell("cell1")
 	s.NoError(err)
 
 	errc := make(chan otto.Value)
@@ -148,7 +148,7 @@ func (s *HandlersTestSuite) TestWeb3IsConnectedHandler() {
 
 	jail := New(&testRPCClientProvider{client})
 
-	cell, err := jail.createAndInitCell("cell1")
+	cell, _, err := jail.createAndInitCell("cell1")
 	s.NoError(err)
 
 	// When result is true.
@@ -170,7 +170,7 @@ func (s *HandlersTestSuite) TestWeb3IsConnectedHandler() {
 func (s *HandlersTestSuite) TestSendSignalHandler() {
 	jail := New(nil)
 
-	cell, err := jail.createAndInitCell("cell1")
+	cell, _, err := jail.createAndInitCell("cell1")
 	s.NoError(err)
 
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
