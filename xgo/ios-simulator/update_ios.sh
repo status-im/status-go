@@ -44,7 +44,7 @@ tar -czf /tmp/$sdk.tar.gz $sdk
 rm -rf $sdk
 
 # Pull the iOS cross compiler tool and build the toolchain
-git clone https://github.com/tpoechtrager/cctools-port.git
+git clone -n https://github.com/tpoechtrager/cctools-port.git
 cd cctools-port
 git reset --hard adf616eee9d41f4961c3a83ba275249ffcb32d33
 cd ..
