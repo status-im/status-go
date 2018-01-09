@@ -91,7 +91,7 @@ func SetLogFile(filename string) error {
 func levelFromString(level string) log.Lvl {
 	lvl, err := log.LvlFromString(strings.ToLower(level))
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Incorrect log level: %s, using defaults\n", level)
+		fmt.Fprintf(os.Stderr, "Incorrect log level: %s, using defaults\n", level) // nolint: gas
 		lvl = log.LvlInfo
 	}
 	return lvl

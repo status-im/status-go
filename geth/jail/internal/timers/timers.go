@@ -64,7 +64,7 @@ func newTimerHandler(l *loop.Loop, interval bool) func(call otto.FunctionCall) o
 		}
 
 		t.timer = time.AfterFunc(t.duration, func() {
-			l.Ready(t) // nolint: errcheck
+			l.Ready(t) // nolint: errcheck, gas
 		})
 
 		value, newTimerErr := call.Otto.ToValue(t)
@@ -90,7 +90,7 @@ func newImmediateTimerHandler(l *loop.Loop) func(call otto.FunctionCall) otto.Va
 		}
 
 		t.timer = time.AfterFunc(t.duration, func() {
-			l.Ready(t) // nolint: errcheck
+			l.Ready(t) // nolint: errcheck, gas
 		})
 
 		value, setImmediateErr := call.Otto.ToValue(t)
@@ -104,7 +104,7 @@ func newImmediateTimerHandler(l *loop.Loop) func(call otto.FunctionCall) otto.Va
 
 func newClearTimeoutHandler(l *loop.Loop) func(call otto.FunctionCall) otto.Value {
 	return func(call otto.FunctionCall) otto.Value {
-		v, _ := call.Argument(0).Export()
+		v, _ := call.Argument(0).Export() // nolint: gas
 		if t, ok := v.(*timerTask); ok {
 			t.stopped = true
 			t.timer.Stop()

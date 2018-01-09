@@ -336,8 +336,7 @@ func (r APIDetailedResponse) Error() string {
 	buf := bytes.NewBufferString("")
 
 	for _, err := range r.FieldErrors {
-		buf.WriteString(err.Error())
-		buf.WriteString("\n")
+		buf.WriteString(err.Error() + "\n") // nolint: gas
 	}
 
 	return strings.TrimSpace(buf.String())
@@ -358,8 +357,7 @@ func (e APIFieldError) Error() string {
 	buf := bytes.NewBufferString(fmt.Sprintf("Parameter: %s\n", e.Parameter))
 
 	for _, err := range e.Errors {
-		buf.WriteString(err.Error())
-		buf.WriteString("\n")
+		buf.WriteString(err.Error() + "\n") // nolint: gas
 	}
 
 	return strings.TrimSpace(buf.String())

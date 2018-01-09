@@ -69,7 +69,7 @@ func ToAddress(accountAddress string) *common.Address {
 func ImportTestAccount(keystoreDir, accountFile string) error {
 	// make sure that keystore folder exists
 	if _, err := os.Stat(keystoreDir); os.IsNotExist(err) {
-		os.MkdirAll(keystoreDir, os.ModePerm) // nolint: errcheck
+		os.MkdirAll(keystoreDir, os.ModePerm) // nolint: errcheck, gas
 	}
 
 	dst := filepath.Join(keystoreDir, accountFile)
@@ -133,8 +133,8 @@ func ParseJSONArray(items string) ([]string, error) {
 func Fatalf(reason interface{}, args ...interface{}) {
 	// decide on output stream
 	w := io.MultiWriter(os.Stdout, os.Stderr)
-	outf, _ := os.Stdout.Stat()
-	errf, _ := os.Stderr.Stat()
+	outf, _ := os.Stdout.Stat() // nolint: gas
+	errf, _ := os.Stderr.Stat() // nolint: gas
 	if outf != nil && errf != nil && os.SameFile(outf, errf) {
 		w = os.Stderr
 	}
@@ -142,9 +142,9 @@ func Fatalf(reason interface{}, args ...interface{}) {
 	// find out whether error or string has been passed as a reason
 	r := reflect.ValueOf(reason)
 	if r.Kind() == reflect.String {
-		fmt.Fprintf(w, "Fatal Failure: "+reason.(string)+"\n", args)
+		fmt.Fprintf(w, "Fatal Failure: "+reason.(string)+"\n", args) //nolint: gas
 	} else {
-		fmt.Fprintf(w, "Fatal Failure: %v\n", reason.(error))
+		fmt.Fprintf(w, "Fatal Failure: %v\n", reason.(error)) //nolint: gas
 	}
 
 	debug.PrintStack()

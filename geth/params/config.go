@@ -160,7 +160,7 @@ func (c *WhisperConfig) ReadIdentityFile() (*ecdsa.PrivateKey, error) {
 
 // String dumps config object as nicely indented JSON
 func (c *WhisperConfig) String() string {
-	data, _ := json.MarshalIndent(c, "", "    ")
+	data, _ := json.MarshalIndent(c, "", "    ") // nolint: gas
 	return string(data)
 }
 
@@ -172,7 +172,7 @@ type SwarmConfig struct {
 
 // String dumps config object as nicely indented JSON
 func (c *SwarmConfig) String() string {
-	data, _ := json.MarshalIndent(c, "", "    ")
+	data, _ := json.MarshalIndent(c, "", "    ") // nolint: gas
 	return string(data)
 }
 
@@ -196,7 +196,7 @@ type BootClusterConfig struct {
 
 // String dumps config object as nicely indented JSON
 func (c *BootClusterConfig) String() string {
-	data, _ := json.MarshalIndent(c, "", "    ")
+	data, _ := json.MarshalIndent(c, "", "    ") // nolint: gas
 	return string(data)
 }
 
