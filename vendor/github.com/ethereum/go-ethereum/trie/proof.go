@@ -147,3 +147,13 @@ func get(tn node, key []byte) ([]byte, node) {
 		}
 	}
 }
+
+// Status.im issue 320: Same code as first part of VerifyProof
+func ExtractChtRoot(key []byte, proof []rlp.RawValue) []byte {
+	key = keybytesToHex(key)
+	sha := sha3.NewKeccak256()
+	buf := proof[0]
+	sha.Reset()
+	sha.Write(buf)
+	return sha.Sum(nil)
+}
