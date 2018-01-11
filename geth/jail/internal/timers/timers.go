@@ -41,7 +41,7 @@ func getDelayWithMin(call otto.FunctionCall, interval bool) int64 {
 		false: 4,
 	}
 
-	delay, _ := call.Argument(1).ToInteger()
+	delay, _ := call.Argument(1).ToInteger() // nolint: gas
 	if delay < minDelay[interval] {
 		return minDelay[interval]
 	}
