@@ -223,21 +223,24 @@ func (m *Manager) completeTransaction(queuedTx *common.QueuedTx, selectedAccount
 	if args.To != nil {
 		toAddr = *args.To
 	}
-	ctx, cancel = context.WithTimeout(context.Background(), defaultTimeout)
-	defer cancel()
-	gas, err := m.ethTxClient.EstimateGas(ctx, ethereum.CallMsg{
-		From:     args.From,
-		To:       args.To,
-		GasPrice: gasPrice,
-		Value:    value,
-		Data:     data,
-	})
-	if err != nil {
-		return emptyHash, err
-	}
-	if gas.Cmp(big.NewInt(defaultGas)) == -1 {
-		log.Info("default gas will be used. estimated gas", gas, "is lower than", defaultGas)
-		gas = big.NewInt(defaultGas)
+	gas := (*big.Int)(args.Gas)
+	if args.Gas == nil {
+		ctx, cancel = context.WithTimeout(context.Background(), defaultTimeout)
+		defer cancel()
+		gas, err = m.ethTxClient.EstimateGas(ctx, ethereum.CallMsg{
+			From:     args.From,
+			To:       args.To,
+			GasPrice: gasPrice,
+			Value:    value,
+			Data:     data,
+		})
+		if err != nil {
+			return emptyHash, err
+		}
+		if gas.Cmp(big.NewInt(defaultGas)) == -1 {
+			log.Info("default gas will be used. estimated gas", gas, "is lower than", defaultGas)
+			gas = big.NewInt(defaultGas)
+		}
 	}
 
 	log.Info(
