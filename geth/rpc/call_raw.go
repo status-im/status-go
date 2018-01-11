@@ -175,7 +175,11 @@ func newSuccessResponse(result json.RawMessage, id json.RawMessage) string {
 		},
 		Result: result,
 	}
-	data, _ := json.Marshal(msg)
+	data, err := json.Marshal(msg)
+	if err != nil {
+		return newErrorResponse(errInvalidMessageCode, err, id)
+	}
+
 	return string(data)
 }
 

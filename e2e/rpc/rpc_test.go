@@ -146,6 +146,26 @@ func (s *RPCTestSuite) TestCallRawResult() {
 	s.NodeManager.StopNode() //nolint: errcheck
 }
 
+// TestCallRawResultGetTransactionReceipt checks if returned response
+// for a not yet mained transaction is null.
+// Issue: https://github.com/status-im/status-go/issues/547
+func (s *RPCTestSuite) TestCallRawResultGetTransactionReceipt() {
+	nodeConfig, err := e2e.MakeTestNodeConfig(GetNetworkID())
+	s.NoError(err)
+
+	nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
+	s.NoError(err)
+	<-nodeStarted
+
+	client := s.NodeManager.RPCClient()
+	s.NotNil(client)
+
+	jsonResult := client.CallRaw(`{"jsonrpc":"2.0","method":"eth_getTransactionReceipt","params":["0x0ca0d8f2422f62bea77e24ed17db5711a77fa72064cccbb8e53c53b699cd3b34"],"id":5}`)
+	s.Equal(`{"jsonrpc":"2.0","id":5,"result":null}`, jsonResult)
+
+	s.NodeManager.StopNode() //nolint: errcheck
+}
+
 // TestCallContextResult checks if result passed to CallContext
 // is set accordingly to its underlying memory layout.
 func (s *RPCTestSuite) TestCallContextResult() {
