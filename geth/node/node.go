@@ -163,6 +163,9 @@ func activateShhService(stack *node.Node, config *params.NodeConfig) error {
 		whisperConfig := config.WhisperConfig
 		whisperService := whisper.New(nil)
 
+		// enable metrics
+		whisperService.RegisterEnvelopeTracer(&WhisperEnvelopeTracer{})
+
 		// enable mail service
 		if whisperConfig.EnableMailServer {
 			if whisperConfig.Password == "" {
