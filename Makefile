@@ -47,9 +47,6 @@ statusgo: ##@build Build status-go as statusd server
 	go build -i -o $(GOBIN)/statusd -v $(shell build/testnet-flags.sh) ./cmd/statusd
 	@echo "\nCompilation done.\nRun \"build/bin/statusd -h\" to view available commands."
 
-wnode-status: ##@build Build wnode-status (Whisper 5 debug tool)
-	go build -i -o $(GOBIN)/wnode-status -v $(shell build/testnet-flags.sh) ./cmd/wnode-status
-
 statusgo-cross: statusgo-android statusgo-ios
 	@echo "Full cross compilation done."
 	@ls -ld $(GOBIN)/statusgo-*
