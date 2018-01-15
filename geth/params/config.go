@@ -183,12 +183,6 @@ type BootClusterConfig struct {
 	// Enabled flag specifies whether feature is enabled
 	Enabled bool
 
-	// RootNumber CHT root number
-	RootNumber int
-
-	// RootHash is hash of CHT root for a given root number
-	RootHash string
-
 	// BootNodes list of bootstrap nodes for a given network (Ropsten, Rinkeby, Homestead),
 	// for a given mode (production vs development)
 	BootNodes []string
@@ -588,12 +582,8 @@ func (c *NodeConfig) updateBootClusterConfig() error {
 
 	for _, cluster := range clusters {
 		if cluster.NetworkID == int(c.NetworkID) {
-			c.BootClusterConfig.RootNumber = cluster.Prod.Number
-			c.BootClusterConfig.RootHash = cluster.Prod.Hash
 			c.BootClusterConfig.BootNodes = cluster.Prod.BootNodes
 			if c.DevMode {
-				c.BootClusterConfig.RootNumber = cluster.Dev.Number
-				c.BootClusterConfig.RootHash = cluster.Dev.Hash
 				c.BootClusterConfig.BootNodes = cluster.Dev.BootNodes
 			}
 			break
