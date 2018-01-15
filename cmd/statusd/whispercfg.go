@@ -16,14 +16,6 @@ func whisperConfig(nodeConfig *params.NodeConfig) (*params.NodeConfig, error) {
 
 	nodeConfig.LogLevel = *logLevel
 
-	// TODO this was in wnode-status ... can it be completely removed ?
-	//if filepath.IsAbs(*logFile) {
-	//	nodeConfig.LogFile = *logFile
-	//} else if *logFile != "" {
-	//	nodeConfig.LogFile = filepath.Join(*dataDir, *logFile)
-	//}
-	// also wnode-data was the setting in wnode-status for -dataDir
-
 	// whisper configuration
 	whisperConfig := nodeConfig.WhisperConfig
 	whisperConfig.Enabled = true
@@ -92,9 +84,4 @@ func readFile(path string) ([]byte, error) {
 	}
 
 	return data, nil
-}
-
-func printWhisperConfig(config *params.NodeConfig) {
-	fmt.Println("Starting Whisper V5 node...")
-	fmt.Printf("Config: %s\n", config.WhisperConfig)
 }

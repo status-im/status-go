@@ -19,34 +19,35 @@ var (
 )
 
 var (
-	prodMode        = flag.Bool("production", false, "Whether production settings should be loaded")
-	nodeKeyFile     = flag.String("nodekey", "", "P2P node key file (private key)")
-	dataDir         = flag.String("datadir", params.DataDir, "Data directory for the databases and keystore")
-	networkID       = flag.Int("networkid", params.RopstenNetworkID, "Network identifier (integer, 1=Homestead, 3=Ropsten, 4=Rinkeby, 777=StatusChain)")
-	whisperEnabled  = flag.Bool("shh", false, "SHH protocol enabled")
-	swarmEnabled    = flag.Bool("swarm", false, "Swarm protocol enabled")
-	httpEnabled     = flag.Bool("http", false, "HTTP RPC endpoint enabled (default: false)")
-	httpPort        = flag.Int("httpport", params.HTTPPort, "HTTP RPC server's listening port")
-	ipcEnabled      = flag.Bool("ipc", false, "IPC RPC endpoint enabled")
-	cliEnabled      = flag.Bool("cli", false, "Enable debugging CLI server")
-	cliPort         = flag.String("cliport", debug.CLIPort, "CLI server's listening port")
-	logLevel        = flag.String("log", "INFO", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
-	logFile         = flag.String("logfile", "", "Path to the log file")
-	version         = flag.Bool("version", false, "Print version")
-	printWhisperCfg = flag.Bool("printwhispcfg", false, "Print whisper config")
-	listenAddr      = flag.String("listenaddr", ":30303", "IP address and port of this node (e.g. 127.0.0.1:30303)")
-	identity        = flag.String("identity", "", "Protocol identity file (private key used for asymmetric encryption)")
-	passwordFile    = flag.String("passwordfile", "", "Password file (password is used for symmetric encryption)")
-	standalone      = flag.Bool("standalone", true, "Don't actively connect to peers, wait for incoming connections")
-	minPow          = flag.Float64("pow", params.WhisperMinimumPoW, "PoW for messages to be added to queue, in float format")
-	ttl             = flag.Int("ttl", params.WhisperTTL, "Time to live for messages, in seconds")
+	prodMode       = flag.Bool("production", false, "Whether production settings should be loaded")
+	nodeKeyFile    = flag.String("nodekey", "", "P2P node key file (private key)")
+	dataDir        = flag.String("datadir", params.DataDir, "Data directory for the databases and keystore")
+	networkID      = flag.Int("networkid", params.RopstenNetworkID, "Network identifier (integer, 1=Homestead, 3=Ropsten, 4=Rinkeby, 777=StatusChain)")
+	whisperEnabled = flag.Bool("shh", false, "SHH protocol enabled")
+	swarmEnabled   = flag.Bool("swarm", false, "Swarm protocol enabled")
+	httpEnabled    = flag.Bool("http", false, "HTTP RPC endpoint enabled (default: false)")
+	httpPort       = flag.Int("httpport", params.HTTPPort, "HTTP RPC server's listening port")
+	ipcEnabled     = flag.Bool("ipc", false, "IPC RPC endpoint enabled")
+	cliEnabled     = flag.Bool("cli", false, "Enable debugging CLI server")
+	cliPort        = flag.String("cliport", debug.CLIPort, "CLI server's listening port")
+	logLevel       = flag.String("log", "INFO", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
+	logFile        = flag.String("logfile", "", "Path to the log file")
+	version        = flag.Bool("version", false, "Print version")
+	les            = flag.Bool("les", false, "LES protocol")
+
+	listenAddr   = flag.String("listenaddr", ":30303", "IP address and port of this node (e.g. 127.0.0.1:30303)")
+	identity     = flag.String("shh.identity", "", "Protocol identity file (private key used for asymmetric encryption)")
+	passwordFile = flag.String("shh.passwordfile", "", "Password file (password is used for symmetric encryption)")
+	standalone   = flag.Bool("standalone", true, "Don't actively connect to peers, wait for incoming connections")
+	minPow       = flag.Float64("shh.pow", params.WhisperMinimumPoW, "PoW for messages to be added to queue, in float format")
+	ttl          = flag.Int("shh.ttl", params.WhisperTTL, "Time to live for messages, in seconds")
 
 	// MailServer
-	enableMailServer = flag.Bool("mailserver", false, "Delivers expired messages on demand")
+	enableMailServer = flag.Bool("shh.mailserver", false, "Delivers expired messages on demand")
 
 	// Push Notification
-	enablePN     = flag.Bool("notify", false, "Node is capable of sending Push Notifications")
-	firebaseAuth = flag.String("firebaseauth", "", "FCM Authorization Key used for sending Push Notifications")
+	enablePN     = flag.Bool("shh.notify", false, "Node is capable of sending Push Notifications")
+	firebaseAuth = flag.String("shh.firebaseauth", "", "FCM Authorization Key used for sending Push Notifications")
 )
 
 func main() {
@@ -62,10 +63,6 @@ func main() {
 	if *version {
 		printVersion(config, gitCommit, buildStamp)
 		return
-	}
-
-	if *printWhisperCfg {
-		printWhisperConfig(config)
 	}
 
 	backend := api.NewStatusBackend()
@@ -130,11 +127,10 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 	nodeConfig.HTTPPort = *httpPort
 	nodeConfig.IPCEnabled = *ipcEnabled
 
-	if *whisperEnabled {
-		// disable les and swarm for wnode
-		nodeConfig.LightEthConfig.Enabled = false
-		nodeConfig.SwarmConfig.Enabled = false
+	nodeConfig.LightEthConfig.Enabled = *les
+	nodeConfig.SwarmConfig.Enabled = *swarmEnabled
 
+	if *whisperEnabled {
 		return whisperConfig(nodeConfig)
 	}
 
@@ -142,9 +138,6 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 	if !*httpEnabled {
 		nodeConfig.HTTPHost = "" // HTTP RPC is disabled
 	}
-
-	nodeConfig.LightEthConfig.Enabled = true
-	nodeConfig.SwarmConfig.Enabled = *swarmEnabled
 
 	return nodeConfig, nil
 }
