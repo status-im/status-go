@@ -1,4 +1,7 @@
-package node
+// +build metrics,prometheus
+
+// Package whisper collects Whisper envelope metrics using Prometheus.
+package whisper
 
 import (
 	"strconv"
@@ -29,11 +32,11 @@ func init() {
 	prometheus.MustRegister(envelopeVolume)
 }
 
-// WhisperEnvelopeTracer traces incoming envelopes.
-type WhisperEnvelopeTracer struct{}
+// EnvelopeTracer traces incoming envelopes.
+type EnvelopeTracer struct{}
 
 // Trace is called for every incoming envelope.
-func (t *WhisperEnvelopeTracer) Trace(envelope *whisper.EnvelopeMeta) {
+func (t *EnvelopeTracer) Trace(envelope *whisper.EnvelopeMeta) {
 	labelValues := []string{
 		envelope.Topic.String(),
 		envelope.SourceString(),
