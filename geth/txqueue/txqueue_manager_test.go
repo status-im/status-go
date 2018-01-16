@@ -69,28 +69,32 @@ func (s *TxQueueTestSuite) TestCompleteTransaction() {
 
 	// TransactionQueueHandler is required to enqueue a transaction.
 	txQueueManager.SetTransactionQueueHandler(func(queuedTx *common.QueuedTx) {
-		s.Equal(tx.ID, queuedTx.ID)
+		s.Equal(tx.ID(), queuedTx.ID())
 	})
 
 	txQueueManager.SetTransactionReturnHandler(func(queuedTx *common.QueuedTx, err error) {
-		s.Equal(tx.ID, queuedTx.ID)
+		s.Equal(tx.ID(), queuedTx.ID())
 		s.Equal(errTxAssumedSent, err)
 	})
 
 	err := txQueueManager.QueueTransaction(tx)
 	s.NoError(err)
 
+	doneCh := make(chan struct{})
 	go func() {
-		_, errCompleteTransaction := txQueueManager.CompleteTransaction(tx.ID, TestConfig.Account1.Password)
+		_, errCompleteTransaction := txQueueManager.CompleteTransaction(tx.ID(), TestConfig.Account1.Password)
 		s.Equal(errTxAssumedSent, errCompleteTransaction)
+		close(doneCh)
 	}()
 
 	err = txQueueManager.WaitForTransaction(tx)
 	s.Equal(errTxAssumedSent, err)
 	// Check that error is assigned to the transaction.
-	s.Equal(errTxAssumedSent, tx.Err)
+	s.Equal(errTxAssumedSent, tx.Error())
 	// Transaction should be already removed from the queue.
-	s.False(txQueueManager.TransactionQueue().Has(tx.ID))
+	s.False(txQueueManager.TransactionQueue().Has(tx.ID()))
+
+	<-doneCh
 }
 
 func (s *TxQueueTestSuite) TestCompleteTransactionMultipleTimes() {
@@ -119,11 +123,11 @@ func (s *TxQueueTestSuite) TestCompleteTransactionMultipleTimes() {
 
 	// TransactionQueueHandler is required to enqueue a transaction.
 	txQueueManager.SetTransactionQueueHandler(func(queuedTx *common.QueuedTx) {
-		s.Equal(tx.ID, queuedTx.ID)
+		s.Equal(tx.ID(), queuedTx.ID())
 	})
 
 	txQueueManager.SetTransactionReturnHandler(func(queuedTx *common.QueuedTx, err error) {
-		s.Equal(tx.ID, queuedTx.ID)
+		s.Equal(tx.ID(), queuedTx.ID())
 		s.Equal(errTxAssumedSent, err)
 	})
 
@@ -137,7 +141,7 @@ func (s *TxQueueTestSuite) TestCompleteTransactionMultipleTimes() {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_, errCompleteTransaction := txQueueManager.CompleteTransaction(tx.ID, TestConfig.Account1.Password)
+			_, errCompleteTransaction := txQueueManager.CompleteTransaction(tx.ID(), TestConfig.Account1.Password)
 			mu.Lock()
 			completeTxErrors[errCompleteTransaction]++
 			mu.Unlock()
@@ -147,9 +151,9 @@ func (s *TxQueueTestSuite) TestCompleteTransactionMultipleTimes() {
 	err = txQueueManager.WaitForTransaction(tx)
 	s.Equal(errTxAssumedSent, err)
 	// Check that error is assigned to the transaction.
-	s.Equal(errTxAssumedSent, tx.Err)
+	s.Equal(errTxAssumedSent, tx.Error())
 	// Transaction should be already removed from the queue.
-	s.False(txQueueManager.TransactionQueue().Has(tx.ID))
+	s.False(txQueueManager.TransactionQueue().Has(tx.ID()))
 
 	// Wait for all CompleteTransaction calls.
 	wg.Wait()
@@ -173,26 +177,26 @@ func (s *TxQueueTestSuite) TestAccountMismatch() {
 
 	// TransactionQueueHandler is required to enqueue a transaction.
 	txQueueManager.SetTransactionQueueHandler(func(queuedTx *common.QueuedTx) {
-		s.Equal(tx.ID, queuedTx.ID)
+		s.Equal(tx.ID(), queuedTx.ID())
 	})
 
 	// Missmatched address is a recoverable error, that's why
 	// the return handler is called.
 	txQueueManager.SetTransactionReturnHandler(func(queuedTx *common.QueuedTx, err error) {
-		s.Equal(tx.ID, queuedTx.ID)
+		s.Equal(tx.ID(), queuedTx.ID())
 		s.Equal(ErrInvalidCompleteTxSender, err)
-		s.Nil(tx.Err)
+		s.Nil(tx.Error())
 	})
 
 	err := txQueueManager.QueueTransaction(tx)
 	s.NoError(err)
 
-	_, err = txQueueManager.CompleteTransaction(tx.ID, TestConfig.Account1.Password)
+	_, err = txQueueManager.CompleteTransaction(tx.ID(), TestConfig.Account1.Password)
 	s.Equal(err, ErrInvalidCompleteTxSender)
 
 	// Transaction should stay in the queue as mismatched accounts
 	// is a recoverable error.
-	s.True(txQueueManager.TransactionQueue().Has(tx.ID))
+	s.True(txQueueManager.TransactionQueue().Has(tx.ID()))
 }
 
 func (s *TxQueueTestSuite) TestInvalidPassword() {
@@ -219,26 +223,26 @@ func (s *TxQueueTestSuite) TestInvalidPassword() {
 
 	// TransactionQueueHandler is required to enqueue a transaction.
 	txQueueManager.SetTransactionQueueHandler(func(queuedTx *common.QueuedTx) {
-		s.Equal(tx.ID, queuedTx.ID)
+		s.Equal(tx.ID(), queuedTx.ID())
 	})
 
 	// Missmatched address is a revocable error, that's why
 	// the return handler is called.
 	txQueueManager.SetTransactionReturnHandler(func(queuedTx *common.QueuedTx, err error) {
-		s.Equal(tx.ID, queuedTx.ID)
+		s.Equal(tx.ID(), queuedTx.ID())
 		s.Equal(keystore.ErrDecrypt, err)
-		s.Nil(tx.Err)
+		s.Nil(tx.Error())
 	})
 
 	err := txQueueManager.QueueTransaction(tx)
 	s.NoError(err)
 
-	_, err = txQueueManager.CompleteTransaction(tx.ID, "invalid-password")
+	_, err = txQueueManager.CompleteTransaction(tx.ID(), "invalid-password")
 	s.Equal(err, keystore.ErrDecrypt)
 
 	// Transaction should stay in the queue as mismatched accounts
 	// is a recoverable error.
-	s.True(txQueueManager.TransactionQueue().Has(tx.ID))
+	s.True(txQueueManager.TransactionQueue().Has(tx.ID()))
 }
 
 func (s *TxQueueTestSuite) TestDiscardTransaction() {
@@ -254,26 +258,30 @@ func (s *TxQueueTestSuite) TestDiscardTransaction() {
 
 	// TransactionQueueHandler is required to enqueue a transaction.
 	txQueueManager.SetTransactionQueueHandler(func(queuedTx *common.QueuedTx) {
-		s.Equal(tx.ID, queuedTx.ID)
+		s.Equal(tx.ID(), queuedTx.ID())
 	})
 
 	txQueueManager.SetTransactionReturnHandler(func(queuedTx *common.QueuedTx, err error) {
-		s.Equal(tx.ID, queuedTx.ID)
-		s.Equal(ErrQueuedTxDiscarded, err)
+		s.Equal(tx.ID(), queuedTx.ID())
+		s.Equal(common.ErrQueuedTxDiscarded, err)
 	})
 
 	err := txQueueManager.QueueTransaction(tx)
 	s.NoError(err)
 
+	doneCh := make(chan struct{})
 	go func() {
-		discardErr := txQueueManager.DiscardTransaction(tx.ID)
+		discardErr := txQueueManager.DiscardTransaction(tx.ID())
 		s.NoError(discardErr)
+		close(doneCh)
 	}()
 
 	err = txQueueManager.WaitForTransaction(tx)
-	s.Equal(ErrQueuedTxDiscarded, err)
+	s.Equal(common.ErrQueuedTxDiscarded, err)
 	// Check that error is assigned to the transaction.
-	s.Equal(ErrQueuedTxDiscarded, tx.Err)
+	s.Equal(common.ErrQueuedTxDiscarded, tx.Error())
 	// Transaction should be already removed from the queue.
-	s.False(txQueueManager.TransactionQueue().Has(tx.ID))
+	s.False(txQueueManager.TransactionQueue().Has(tx.ID()))
+
+	<-doneCh
 }

@@ -1,7 +1,6 @@
 package common
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -19,14 +18,6 @@ import (
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/static"
 )
-
-const (
-	// MessageIDKey is a key for message ID
-	// This ID is required to track from which chat a given send transaction request is coming.
-	MessageIDKey = contextKey("message_id")
-)
-
-type contextKey string // in order to make sure that our context key does not collide with keys from other packages
 
 // errors
 var (
@@ -102,18 +93,6 @@ func NameOf(f interface{}) string {
 		}
 	}
 	return v.String()
-}
-
-// MessageIDFromContext returns message id from context (if exists)
-func MessageIDFromContext(ctx context.Context) string {
-	if ctx == nil {
-		return ""
-	}
-	if messageID, ok := ctx.Value(MessageIDKey).(string); ok {
-		return messageID
-	}
-
-	return ""
 }
 
 // ParseJSONArray parses JSON array into Go array of string

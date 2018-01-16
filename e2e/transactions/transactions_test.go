@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"math/big"
 	"reflect"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -493,7 +495,7 @@ func (s *TransactionsTestSuite) TestDiscardQueuedTransaction() {
 			log.Info("transaction return event received", "id", event["id"].(string))
 
 			receivedErrMessage := event["error_message"].(string)
-			expectedErrMessage := txqueue.ErrQueuedTxDiscarded.Error()
+			expectedErrMessage := common.ErrQueuedTxDiscarded.Error()
 			s.Equal(receivedErrMessage, expectedErrMessage)
 
 			receivedErrCode := event["error_code"].(string)
@@ -509,7 +511,7 @@ func (s *TransactionsTestSuite) TestDiscardQueuedTransaction() {
 		To:    common.ToAddress(TestConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 	})
-	s.EqualError(err, txqueue.ErrQueuedTxDiscarded.Error(), "transaction is expected to be discarded")
+	s.EqualError(err, common.ErrQueuedTxDiscarded.Error(), "transaction is expected to be discarded")
 
 	select {
 	case <-completeQueuedTransaction:
@@ -591,6 +593,9 @@ func (s *TransactionsTestSuite) TestCompleteMultipleQueuedTransactions() {
 			)
 		}
 	}
+
+	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
 		ids := make([]common.QueuedTxID, testTxCount)
 		for i := 0; i < testTxCount; i++ {
@@ -599,11 +604,16 @@ func (s *TransactionsTestSuite) TestCompleteMultipleQueuedTransactions() {
 
 		completeTxs(ids)
 		close(allTestTxCompleted)
+		wg.Done()
 	}()
 
 	// send multiple transactions
 	for i := 0; i < testTxCount; i++ {
-		go sendTx()
+		wg.Add(1)
+		go func() {
+			sendTx()
+			wg.Done()
+		}()
 	}
 
 	select {
@@ -611,6 +621,7 @@ func (s *TransactionsTestSuite) TestCompleteMultipleQueuedTransactions() {
 	case <-time.After(30 * time.Second):
 		s.FailNow("test timed out")
 	}
+	wg.Wait()
 
 	s.Zero(s.TxQueueManager().TransactionQueue().Count(), "queue should be empty")
 }
@@ -635,7 +646,7 @@ func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
 	allTestTxDiscarded := make(chan struct{})
 
 	// replace transaction notification handler
-	txFailedEventCallCount := 0
+	txFailedEventCallCount := int32(0)
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var envelope signal.Envelope
 		err := json.Unmarshal([]byte(jsonEvent), &envelope)
@@ -655,14 +666,13 @@ func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
 			log.Info("transaction return event received", "id", event["id"].(string))
 
 			receivedErrMessage := event["error_message"].(string)
-			expectedErrMessage := txqueue.ErrQueuedTxDiscarded.Error()
+			expectedErrMessage := common.ErrQueuedTxDiscarded.Error()
 			s.Equal(receivedErrMessage, expectedErrMessage)
 
 			receivedErrCode := event["error_code"].(string)
 			s.Equal("4", receivedErrCode)
 
-			txFailedEventCallCount++
-			if txFailedEventCallCount == testTxCount {
+			if int(atomic.AddInt32(&txFailedEventCallCount, 1)) == testTxCount {
 				close(allTestTxDiscarded)
 			}
 		}
@@ -675,22 +685,22 @@ func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
 			To:    common.ToAddress(TestConfig.Account2.Address),
 			Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 		})
-		s.EqualError(err, txqueue.ErrQueuedTxDiscarded.Error())
+		s.EqualError(err, common.ErrQueuedTxDiscarded.Error())
 
 		s.True(reflect.DeepEqual(txHashCheck, gethcommon.Hash{}), "transaction returned hash, while it shouldn't")
 	}
 
 	// wait for transactions, and discard immediately
-	discardTxs := func(txIDs []common.QueuedTxID) {
-		txIDs = append(txIDs, "invalid-tx-id")
+	discardTxs := func(txIDList []common.QueuedTxID) {
+		txIDList = append(txIDList, "invalid-tx-id")
 
 		// discard
-		discardResults := s.Backend.DiscardTransactions(txIDs)
+		discardResults := s.Backend.DiscardTransactions(txIDList)
 		s.Len(discardResults, 1, "cannot discard txs: %v", discardResults)
 		s.Error(discardResults["invalid-tx-id"].Error, "transaction hash not found", "cannot discard txs: %v", discardResults)
 
 		// try completing discarded transaction
-		completeResults := s.Backend.CompleteTransactions(txIDs, TestConfig.Account1.Password)
+		completeResults := s.Backend.CompleteTransactions(txIDList, TestConfig.Account1.Password)
 		s.Len(completeResults, testTxCount+1, "unexpected number of errors (call to CompleteTransaction should not succeed)")
 
 		for _, txResult := range completeResults {
@@ -700,7 +710,7 @@ func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
 
 		time.Sleep(1 * time.Second) // make sure that tx complete signal propagates
 
-		for _, txID := range txIDs {
+		for _, txID := range txIDList {
 			s.False(
 				s.Backend.TxQueueManager().TransactionQueue().Has(txID),
 				"txqueue should not have test tx at this point (it should be discarded): %s",
@@ -708,6 +718,9 @@ func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
 			)
 		}
 	}
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
 	go func() {
 		ids := make([]common.QueuedTxID, testTxCount)
 		for i := 0; i < testTxCount; i++ {
@@ -715,11 +728,16 @@ func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
 		}
 
 		discardTxs(ids)
+		wg.Done()
 	}()
 
 	// send multiple transactions
 	for i := 0; i < testTxCount; i++ {
-		go sendTx()
+		wg.Add(1)
+		go func() {
+			sendTx()
+			wg.Done()
+		}()
 	}
 
 	select {
@@ -728,6 +746,7 @@ func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
 		s.FailNow("test timed out")
 	}
 
+	wg.Wait()
 	s.Zero(s.Backend.TxQueueManager().TransactionQueue().Count(), "tx queue must be empty at this point")
 }
 
@@ -764,30 +783,45 @@ func (s *TransactionsTestSuite) TestEvictionOfQueuedTransactions() {
 	s.NoError(s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 
 	txQueue := s.Backend.TxQueueManager().TransactionQueue()
-	var i = 0
+
+	var i = int32(0)
 	txIDs := [txqueue.DefaultTxQueueCap + 5 + 10]common.QueuedTxID{}
 	s.Backend.TxQueueManager().SetTransactionQueueHandler(func(queuedTx *common.QueuedTx) {
-		log.Info("tx enqueued", "i", i+1, "queue size", txQueue.Count(), "id", queuedTx.ID)
-		txIDs[i] = queuedTx.ID
-		i++
+		n := atomic.LoadInt32(&i)
+		log.Info("tx enqueued", "i", n+1, "queue size", txQueue.Count(), "id", queuedTx.ID())
+		txIDs[n] = queuedTx.ID()
+
+		atomic.AddInt32(&i, 1)
 	})
 
 	s.Zero(txQueue.Count(), "transaction count should be zero")
 
-	for j := 0; j < 10; j++ {
-		go s.Backend.SendTransaction(context.TODO(), common.SendTxArgs{}) // nolint: errcheck
+	var wg sync.WaitGroup
+	firstBatchSize := 10
+	for j := 0; j < firstBatchSize; j++ {
+		wg.Add(1)
+		go func() {
+			wg.Done()
+			s.Backend.SendTransaction(context.TODO(), common.SendTxArgs{}) // nolint: errcheck
+		}()
 	}
-	time.Sleep(2 * time.Second) // FIXME(tiabc): more reliable synchronization to ensure all transactions are enqueued
+	ensureQueueTx(txQueue, firstBatchSize)
 
 	log.Info(fmt.Sprintf("Number of transactions queued: %d. Queue size (shouldn't be more than %d): %d",
-		i, txqueue.DefaultTxQueueCap, txQueue.Count()))
+		atomic.LoadInt32(&i), txqueue.DefaultTxQueueCap, txQueue.Count()))
 
 	s.Equal(10, txQueue.Count(), "transaction count should be 10")
 
-	for i := 0; i < txqueue.DefaultTxQueueCap+5; i++ { // stress test by hitting with lots of goroutines
-		go s.Backend.SendTransaction(context.TODO(), common.SendTxArgs{}) // nolint: errcheck
+	secondBatchSize := txqueue.DefaultTxQueueCap + 5
+	for j := 0; j < secondBatchSize; j++ { // stress test by hitting with lots of goroutines
+		wg.Add(1)
+		go func() {
+			wg.Done()
+			s.Backend.SendTransaction(context.TODO(), common.SendTxArgs{}) // nolint: errcheck
+		}()
 	}
-	time.Sleep(5 * time.Second)
+	wg.Wait()
+	ensureQueueTx(txQueue, txqueue.DefaultTxQueueCap-1)
 
 	s.True(txQueue.Count() <= txqueue.DefaultTxQueueCap, "transaction count should be %d (or %d): got %d", txqueue.DefaultTxQueueCap, txqueue.DefaultTxQueueCap-1, txQueue.Count())
 
@@ -796,4 +830,19 @@ func (s *TransactionsTestSuite) TestEvictionOfQueuedTransactions() {
 	}
 
 	s.Zero(txQueue.Count(), "transaction count should be zero: %d", txQueue.Count())
+}
+
+func ensureQueueTx(txQueue common.TxQueue, n int) {
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	safetyMargin := 3
+	for range ticker.C {
+		if txQueue.Count() == n {
+			for i := 0; i < safetyMargin; i++ {
+				<-ticker.C
+			}
+			return
+		}
+	}
 }
