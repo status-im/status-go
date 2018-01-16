@@ -3,13 +3,12 @@
 package metrics
 
 import (
-	"expvar"
 	"log"
 	"net/http"
 )
 
 // StartMetricsServer starts a new HTTP server with expvar handler.
+// By default, "/debug/vars" handler is registered.
 func StartMetricsServer(addr string) {
-	http.Handle("/debug/vars", expvar.Handler())
 	log.Fatal(http.ListenAndServe(addr, nil))
 }
