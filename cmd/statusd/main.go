@@ -35,10 +35,12 @@ var (
 	version        = flag.Bool("version", false, "Print version")
 	les            = flag.Bool("les", false, "LES protocol")
 
-	listenAddr   = flag.String("listenaddr", ":30303", "IP address and port of this node (e.g. 127.0.0.1:30303)")
-	identity     = flag.String("shh.identity", "", "Protocol identity file (private key used for asymmetric encryption)")
+	listenAddr = flag.String("listenaddr", ":30303", "IP address and port of this node (e.g. 127.0.0.1:30303)")
+	standalone = flag.Bool("standalone", true, "Don't actively connect to peers, wait for incoming connections")
+
+	// shh stuff
+	identityFile = flag.String("shh.identityfile", "", "Protocol identity file (private key used for asymmetric encryption)")
 	passwordFile = flag.String("shh.passwordfile", "", "Password file (password is used for symmetric encryption)")
-	standalone   = flag.Bool("standalone", true, "Don't actively connect to peers, wait for incoming connections")
 	minPow       = flag.Float64("shh.pow", params.WhisperMinimumPoW, "PoW for messages to be added to queue, in float format")
 	ttl          = flag.Int("shh.ttl", params.WhisperTTL, "Time to live for messages, in seconds")
 

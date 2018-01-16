@@ -19,7 +19,7 @@ func whisperConfig(nodeConfig *params.NodeConfig) (*params.NodeConfig, error) {
 	// whisper configuration
 	whisperConfig := nodeConfig.WhisperConfig
 	whisperConfig.Enabled = true
-	whisperConfig.IdentityFile = *identity
+	whisperConfig.IdentityFile = *identityFile
 	whisperConfig.EnablePushNotification = *enablePN
 	whisperConfig.EnableMailServer = *enableMailServer
 	whisperConfig.MinimumPoW = *minPow
