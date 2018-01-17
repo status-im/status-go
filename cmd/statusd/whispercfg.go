@@ -9,7 +9,7 @@ import (
 	"github.com/status-im/status-go/geth/params"
 )
 
-// makeNodeConfig creates node configuration object from flags
+// whisperConfig creates node configuration object from flags
 func whisperConfig(nodeConfig *params.NodeConfig) (*params.NodeConfig, error) {
 
 	nodeConfig.ListenAddr = *listenAddr
