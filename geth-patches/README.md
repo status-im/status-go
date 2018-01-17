@@ -16,6 +16,7 @@ We try to minimize number and amount of changes in those patches as much as poss
  - `0005-whisper-delivery.patch` - adds support for logs/traces of Whisper traffic (questionable, nobody used this functionality so far)
  - `0006-latest-cht.patch` – updates CHT root hashes, should be updated regularly to keep sync fast, until proper Trusted Checkpoint sync is not implemented as part of LES/2 protocol.
  - `0007-README.patch` — update upstream README.md.
+ - `0008-tx-pool-nonce.patch` - On GetTransactionCount request with PendingBlockNumber get the nonce from transaction pool
 
 # Updating upstream version
 
