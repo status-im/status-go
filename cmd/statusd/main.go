@@ -147,8 +147,8 @@ func printVersion(config *params.NodeConfig, gitCommit, buildStamp string) {
 }
 
 func printUsage() {
-	fmt.Fprintln(os.Stderr, "Usage: statusd [options]")
-	fmt.Fprintf(os.Stderr, `
+	usage := `
+Usage: statusd [options]
 Examples:
   statusd               # run status node with defaults
   statusd -networkid 4  # run node on Rinkeby network
@@ -157,6 +157,7 @@ Examples:
   statusd -cli          # enable connection by statusd-cli on default port
 
 Options:
-`)
+`
+	fmt.Fprintf(os.Stderr, usage) // nolint: gas
 	flag.PrintDefaults()
 }

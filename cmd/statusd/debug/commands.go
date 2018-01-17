@@ -74,9 +74,9 @@ func exprsToArgs(exprs []ast.Expr) []interface{} {
 		case *ast.BasicLit:
 			switch expr.Kind {
 			case token.INT:
-				args[i], _ = strconv.ParseInt(expr.Value, 10, 64)
+				args[i], _ = strconv.ParseInt(expr.Value, 10, 64) // nolint: gas
 			case token.FLOAT:
-				args[i], _ = strconv.ParseFloat(expr.Value, 64)
+				args[i], _ = strconv.ParseFloat(expr.Value, 64) // nolint: gas
 			case token.CHAR:
 				args[i] = expr.Value[1]
 			case token.STRING:
