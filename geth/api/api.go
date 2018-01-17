@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/NaySoftware/go-fcm"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
@@ -9,6 +10,7 @@ import (
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
+	validator "gopkg.in/go-playground/validator.v9"
 )
 
 // StatusAPI provides API to access Status related functionality.
@@ -121,21 +123,53 @@ func (api *StatusAPI) CallRPC(inputJSON string) string {
 // BIP44-compatible keys are generated: CKD#1 is stored as account key, CKD#2 stored as sub-account root
 // Public key of CKD#1 is returned, with CKD#2 securely encoded into account key file (to be used for
 // sub-account derivations)
-func (api *StatusAPI) CreateAccount(password string) (address, pubKey, mnemonic string, err error) {
-	return api.b.AccountManager().CreateAccount(password)
+func (api *StatusAPI) CreateAccount(password string) (common.AccountInfo, error) {
+	address, pubKey, mnemonic, err := api.b.AccountManager().CreateAccount(password)
+	if err != nil {
+		return common.AccountInfo{
+			Error: err.Error(),
+		}, err
+	}
+	return common.AccountInfo{
+		Address:  address,
+		PubKey:   pubKey,
+		Mnemonic: mnemonic,
+	}, nil
 }
 
 // CreateChildAccount creates sub-account for an account identified by parent address.
 // CKD#2 is used as root for master accounts (when parentAddress is "").
 // Otherwise (when parentAddress != ""), child is derived directly from parent.
-func (api *StatusAPI) CreateChildAccount(parentAddress, password string) (address, pubKey string, err error) {
-	return api.b.AccountManager().CreateChildAccount(parentAddress, password)
+func (api *StatusAPI) CreateChildAccount(parentAddress, password string) (common.AccountInfo, error) {
+	address, pubKey, err := api.b.AccountManager().CreateChildAccount(parentAddress, password)
+	if err != nil {
+		return common.AccountInfo{
+			Error: err.Error(),
+		}, err
+	}
+	return common.AccountInfo{
+		Address: address,
+		PubKey:  pubKey,
+	}, nil
+
 }
 
 // RecoverAccount re-creates master key using given details.
 // Once master key is re-generated, it is inserted into keystore (if not already there).
-func (api *StatusAPI) RecoverAccount(password, mnemonic string) (address, pubKey string, err error) {
-	return api.b.AccountManager().RecoverAccount(password, mnemonic)
+func (api *StatusAPI) RecoverAccount(password, mnemonic string) (common.AccountInfo, error) {
+	address, pubKey, err := api.b.AccountManager().RecoverAccount(password, mnemonic)
+	if err != nil {
+		return common.AccountInfo{
+			Error: err.Error(),
+		}, err
+	}
+
+	return common.AccountInfo{
+		Address:  address,
+		PubKey:   pubKey,
+		Mnemonic: mnemonic,
+	}, nil
+
 }
 
 // VerifyAccountPassword tries to decrypt a given account key file, with a provided password.
@@ -239,4 +273,44 @@ func (api *StatusAPI) NotifyUsers(message string, payload fcm.NotificationPayloa
 	}
 
 	return err
+}
+
+//ValidateJSONConfig validates the json configuration without starting the node.
+func (api *StatusAPI) ValidateJSONConfig(configJSON string) common.APIDetailedResponse {
+	return validateJSONConfig(configJSON)
+}
+
+func validateJSONConfig(configJSON string) common.APIDetailedResponse {
+	var resp common.APIDetailedResponse
+	_, err := params.LoadNodeConfig(configJSON)
+
+	// Convert errors to common.APIDetailedResponse
+	switch err := err.(type) {
+	case validator.ValidationErrors:
+		resp = common.APIDetailedResponse{
+			Message:     "validation: validation failed",
+			FieldErrors: make([]common.APIFieldError, len(err)),
+		}
+
+		for i, ve := range err {
+			resp.FieldErrors[i] = common.APIFieldError{
+				Parameter: ve.Namespace(),
+				Errors: []common.APIError{
+					{
+						Message: fmt.Sprintf("field validation failed on the '%s' tag", ve.Tag()),
+					},
+				},
+			}
+		}
+	case error:
+		resp = common.APIDetailedResponse{
+			Message: fmt.Sprintf("validation: %s", err.Error()),
+		}
+	case nil:
+		resp = common.APIDetailedResponse{
+			Status: true,
+		}
+	}
+
+	return resp
 }

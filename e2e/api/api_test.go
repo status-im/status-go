@@ -9,7 +9,9 @@ import (
 	"time"
 
 	"github.com/status-im/status-go/e2e"
+	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/api"
+	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
 	. "github.com/status-im/status-go/testing"
@@ -185,4 +187,145 @@ func (s *APITestSuite) TestLogoutRemovesCells() {
 
 	_, err = s.api.JailManager().Cell(testChatID)
 	require.Error(err, "Expected that cells was removed")
+}
+
+func (s *APITestSuite) TestCreateChildAccount() bool {
+	require := s.Require()
+
+	config, err := e2e.MakeTestNodeConfig(GetNetworkID())
+	require.NoError(err)
+	err = s.api.StartNode(config)
+	require.NoError(err)
+	defer s.api.StopNode() //nolint: errcheck
+
+	// to make sure that we start with empty account (which might get populated during previous tests)
+	require.NoError(s.api.Logout())
+
+	keyStore, err := s.api.NodeManager().AccountKeyStore()
+	require.NoError(err)
+
+	// create an account
+	createAccountResponse, err := s.api.CreateAccount(TestConfig.Account1.Password)
+	require.Empty(err, "could not create account: %s", err)
+
+	address, pubKey, mnemonic := createAccountResponse.Address, createAccountResponse.PubKey, createAccountResponse.Mnemonic
+	s.T().Logf("Account created: {address: %s, key: %s, mnemonic:%s}", address, pubKey, mnemonic)
+
+	acct, err := common.ParseAccountString(address)
+	require.NoError(err, "can not get account from address: %v", err)
+
+	// obtain decrypted key, and make sure that extended key (which will be used as root for sub-accounts) is present
+	_, key, err := keyStore.AccountDecryptedKey(acct, TestConfig.Account1.Password)
+	require.NoError(err, "can not obtain decrypted account key: %v", err)
+	require.NotNil(key.ExtendedKey, "CKD#2 has not been generated for new account")
+
+	// try creating sub-account, w/o selecting main account i.e. w/o login to main account
+	_, err = s.api.CreateChildAccount("", TestConfig.Account1.Password)
+	require.EqualValues(account.ErrNoAccountSelected, err, "expected error is not returned (tried to create sub-account w/o login): %v", err)
+
+	err = s.api.SelectAccount(address, TestConfig.Account1.Password)
+	require.NoError(err, "Test failed: could not select account: %v", err)
+
+	// try to create sub-account with wrong password
+	_, err = s.api.CreateChildAccount("", "wrong password")
+	require.EqualError(err, "cannot retrieve a valid key for a given account: could not decrypt key with given passphrase", "expected error is not returned (tried to create sub-account with wrong password): %v", err)
+
+	// create sub-account (from implicit parent)
+	createSubAccountResponse1, err := s.api.CreateChildAccount("", TestConfig.Account1.Password)
+	require.NoError(err, "Test failed: could not select account: %v", err)
+
+	// make sure that sub-account index automatically progresses
+	createSubAccountResponse2, err := s.api.CreateChildAccount("", TestConfig.Account1.Password)
+	require.NoError(err, "cannot create sub-account: %v", err)
+	require.NotEqual(createSubAccountResponse1.Address, createSubAccountResponse2.Address, "sub-account index auto-increament failed")
+	require.NotEqual(createSubAccountResponse1.PubKey, createSubAccountResponse2.PubKey, "sub-account index auto-increament failed")
+
+	// create sub-account (from explicit parent)
+	createSubAccountResponse3, err := s.api.CreateChildAccount(createSubAccountResponse2.Address, TestConfig.Account1.Password)
+	require.NoError(err, "cannot create sub-account: %v", err)
+
+	subAccount1, subAccount2, subAccount3 := createSubAccountResponse1.Address, createSubAccountResponse2.Address, createSubAccountResponse3.Address
+	subPubKey1, subPubKey2, subPubKey3 := createSubAccountResponse1.PubKey, createSubAccountResponse2.PubKey, createSubAccountResponse3.PubKey
+
+	require.NotEqual(subAccount1, subAccount3, "sub-account index auto-increament failed: subAccount1 == subAccount3")
+	require.NotEqual(subPubKey1, subPubKey3, "sub-account index auto-increament failed: subPubKey1 == subPubKey3")
+	require.NotEqual(subAccount2, subAccount3, "sub-account index auto-increament failed: subAccount2 == subAccount3")
+	require.NotEqual(subPubKey2, subPubKey3, "sub-account index auto-increament failed: subPubKey2 == subPubKey3")
+
+	return true
+}
+
+func (s *APITestSuite) TestRecoverAccount() bool {
+	require := s.Require()
+
+	config, err := e2e.MakeTestNodeConfig(GetNetworkID())
+	require.NoError(err)
+	err = s.api.StartNode(config)
+	require.NoError(err)
+	defer s.api.StopNode() //nolint: errcheck
+
+	keyStore, _ := s.api.NodeManager().AccountKeyStore()
+
+	// create an account
+	accountInfo, err := s.api.CreateAccount(TestConfig.Account1.Password)
+	require.NoError(err, "could not create account: %v", err)
+	address := accountInfo.Address
+	pubKey := accountInfo.PubKey
+	mnemonic := accountInfo.Mnemonic
+	s.T().Logf("Account created: {address: %s, key: %s, mnemonic:%s}", address, pubKey, mnemonic)
+
+	// try recovering using password + mnemonic
+	recoverAccountResponse, err := s.api.RecoverAccount(TestConfig.Account1.Password, mnemonic)
+	require.NoError(err, "recover account failed: %v", err)
+
+	addressCheck, pubKeyCheck := recoverAccountResponse.Address, recoverAccountResponse.PubKey
+	require.Equal(address, addressCheck, "recover account details failed to pull the correct details for address")
+	require.Equal(pubKey, pubKeyCheck, "recover account details failed to pull the correct details for pubKey")
+
+	// now test recovering, but make sure that account/key file is removed i.e. simulate recovering on a new device
+	account, err := common.ParseAccountString(address)
+	require.NoError(err, "can not get account from address: %v", err)
+
+	account, key, err := keyStore.AccountDecryptedKey(account, TestConfig.Account1.Password)
+	require.NoError(err, "can not obtain decrypted account key: %v", err)
+	extChild2String := key.ExtendedKey.String()
+
+	err = keyStore.Delete(account, TestConfig.Account1.Password)
+	require.NoError(err, "cannot remove accoun: %v", err)
+
+	recoverAccountResponse, err = s.api.RecoverAccount(TestConfig.Account1.Password, mnemonic)
+	require.NoError(err, "recover account failed (for non-cached account): %s", err)
+
+	addressCheck, pubKeyCheck = recoverAccountResponse.Address, recoverAccountResponse.PubKey
+
+	require.Equal(address, addressCheck, "recover account details failed to pull the correct details (for non-cached account) for address")
+	require.Equal(pubKey, pubKeyCheck, "recover account details failed to pull the correct details (for non-cached account) for pubKey")
+
+	// make sure that extended key exists and is imported ok too
+	_, key, err = keyStore.AccountDecryptedKey(account, TestConfig.Account1.Password)
+	require.NoError(err, "can not obtain decrypted account key: %v", err)
+	require.Equal(extChild2String, key.ExtendedKey.String(), "CKD#2 key mismatch, expected: %s, got: %s", extChild2String, key.ExtendedKey.String())
+
+	// make sure that calling import several times, just returns from cache (no error is expected)
+	recoverAccountResponse, err = s.api.RecoverAccount(TestConfig.Account1.Password, mnemonic)
+	require.NoError(err, "recover account failed (for non-cached account): %v", err)
+
+	addressCheck, pubKeyCheck = recoverAccountResponse.Address, recoverAccountResponse.PubKey
+	require.Equal(address, addressCheck, "recover account details failed to pull the correct details (for non-cached account) for address")
+	require.Equal(pubKey, pubKeyCheck, "recover account details failed to pull the correct details (for non-cached account) for pubKey")
+
+	// time to login with recovered data
+	whisperService, err := s.api.NodeManager().WhisperService()
+	require.NoError(err, "whisper service not running: %v", err)
+
+	hasKeyPair := whisperService.HasKeyPair(pubKeyCheck)
+	require.False(hasKeyPair, "identity already present in whisper")
+
+	err = s.api.SelectAccount(addressCheck, TestConfig.Account1.Password)
+	require.NoError(err, "Test failed: could not select account: %v", err)
+
+	hasKeyPair = whisperService.HasKeyPair(pubKeyCheck)
+	require.True(hasKeyPair, "identity not injected into whisper: %v", err)
+
+	return true
 }

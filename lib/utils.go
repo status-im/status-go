@@ -30,7 +30,6 @@ import (
 	gethparams "github.com/ethereum/go-ethereum/params"
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/signal"
@@ -97,16 +96,8 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 			testCallRPC,
 		},
 		{
-			"create main and child accounts",
-			testCreateChildAccount,
-		},
-		{
 			"verify account password",
 			testVerifyAccountPassword,
-		},
-		{
-			"recover account",
-			testRecoverAccount,
 		},
 		{
 			"account select/login",
@@ -274,7 +265,11 @@ func testStopResumeNode(t *testing.T) bool { //nolint: gocyclo
 	}
 
 	// create an account
-	address1, pubKey1, _, err := statusAPI.CreateAccount(TestConfig.Account1.Password)
+	accountInfo, err := statusAPI.CreateAccount(TestConfig.Account1.Password)
+
+	address1 := accountInfo.Address
+	pubKey1 := accountInfo.PubKey
+
 	if err != nil {
 		t.Errorf("could not create account: %v", err)
 		return false
@@ -381,255 +376,6 @@ func testCallRPC(t *testing.T) bool {
 	return true
 }
 
-func testCreateChildAccount(t *testing.T) bool { //nolint: gocyclo
-	// to make sure that we start with empty account (which might get populated during previous tests)
-	if err := statusAPI.Logout(); err != nil {
-		t.Fatal(err)
-	}
-
-	keyStore, err := statusAPI.NodeManager().AccountKeyStore()
-	if err != nil {
-		t.Error(err)
-		return false
-	}
-
-	// create an account
-	createAccountResponse := common.AccountInfo{}
-	rawResponse := CreateAccount(C.CString(TestConfig.Account1.Password))
-
-	if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &createAccountResponse); err != nil {
-		t.Errorf("cannot decode CreateAccount response (%s): %v", C.GoString(rawResponse), err)
-		return false
-	}
-
-	if createAccountResponse.Error != "" {
-		t.Errorf("could not create account: %s", err)
-		return false
-	}
-	address, pubKey, mnemonic := createAccountResponse.Address, createAccountResponse.PubKey, createAccountResponse.Mnemonic
-	t.Logf("Account created: {address: %s, key: %s, mnemonic:%s}", address, pubKey, mnemonic)
-
-	acct, err := common.ParseAccountString(address)
-	if err != nil {
-		t.Errorf("can not get account from address: %v", err)
-		return false
-	}
-
-	// obtain decrypted key, and make sure that extended key (which will be used as root for sub-accounts) is present
-	_, key, err := keyStore.AccountDecryptedKey(acct, TestConfig.Account1.Password)
-	if err != nil {
-		t.Errorf("can not obtain decrypted account key: %v", err)
-		return false
-	}
-
-	if key.ExtendedKey == nil {
-		t.Error("CKD#2 has not been generated for new account")
-		return false
-	}
-
-	// try creating sub-account, w/o selecting main account i.e. w/o login to main account
-	createSubAccountResponse := common.AccountInfo{}
-	rawResponse = CreateChildAccount(C.CString(""), C.CString(TestConfig.Account1.Password))
-
-	if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &createSubAccountResponse); err != nil {
-		t.Errorf("cannot decode CreateChildAccount response (%s): %v", C.GoString(rawResponse), err)
-		return false
-	}
-
-	if createSubAccountResponse.Error != account.ErrNoAccountSelected.Error() {
-		t.Errorf("expected error is not returned (tried to create sub-account w/o login): %v", createSubAccountResponse.Error)
-		return false
-	}
-
-	err = statusAPI.SelectAccount(address, TestConfig.Account1.Password)
-	if err != nil {
-		t.Errorf("Test failed: could not select account: %v", err)
-		return false
-	}
-
-	// try to create sub-account with wrong password
-	createSubAccountResponse = common.AccountInfo{}
-	rawResponse = CreateChildAccount(C.CString(""), C.CString("wrong password"))
-
-	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &createSubAccountResponse); err != nil {
-		t.Errorf("cannot decode CreateChildAccount response (%s): %v", C.GoString(rawResponse), err)
-		return false
-	}
-
-	if createSubAccountResponse.Error != "cannot retrieve a valid key for a given account: could not decrypt key with given passphrase" {
-		t.Errorf("expected error is not returned (tried to create sub-account with wrong password): %v", createSubAccountResponse.Error)
-		return false
-	}
-
-	// create sub-account (from implicit parent)
-	createSubAccountResponse1 := common.AccountInfo{}
-	rawResponse = CreateChildAccount(C.CString(""), C.CString(TestConfig.Account1.Password))
-
-	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &createSubAccountResponse1); err != nil {
-		t.Errorf("cannot decode CreateChildAccount response (%s): %v", C.GoString(rawResponse), err)
-		return false
-	}
-
-	if createSubAccountResponse1.Error != "" {
-		t.Errorf("cannot create sub-account: %v", createSubAccountResponse1.Error)
-		return false
-	}
-
-	// make sure that sub-account index automatically progresses
-	createSubAccountResponse2 := common.AccountInfo{}
-	rawResponse = CreateChildAccount(C.CString(""), C.CString(TestConfig.Account1.Password))
-
-	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &createSubAccountResponse2); err != nil {
-		t.Errorf("cannot decode CreateChildAccount response (%s): %v", C.GoString(rawResponse), err)
-		return false
-	}
-
-	if createSubAccountResponse2.Error != "" {
-		t.Errorf("cannot create sub-account: %v", createSubAccountResponse2.Error)
-	}
-
-	if createSubAccountResponse1.Address == createSubAccountResponse2.Address || createSubAccountResponse1.PubKey == createSubAccountResponse2.PubKey {
-		t.Error("sub-account index auto-increament failed")
-		return false
-	}
-
-	// create sub-account (from explicit parent)
-	createSubAccountResponse3 := common.AccountInfo{}
-	rawResponse = CreateChildAccount(C.CString(createSubAccountResponse2.Address), C.CString(TestConfig.Account1.Password))
-
-	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &createSubAccountResponse3); err != nil {
-		t.Errorf("cannot decode CreateChildAccount response (%s): %v", C.GoString(rawResponse), err)
-		return false
-	}
-
-	if createSubAccountResponse3.Error != "" {
-		t.Errorf("cannot create sub-account: %v", createSubAccountResponse3.Error)
-	}
-
-	subAccount1, subAccount2, subAccount3 := createSubAccountResponse1.Address, createSubAccountResponse2.Address, createSubAccountResponse3.Address
-	subPubKey1, subPubKey2, subPubKey3 := createSubAccountResponse1.PubKey, createSubAccountResponse2.PubKey, createSubAccountResponse3.PubKey
-
-	if subAccount1 == subAccount3 || subPubKey1 == subPubKey3 || subAccount2 == subAccount3 || subPubKey2 == subPubKey3 {
-		t.Error("sub-account index auto-increament failed")
-		return false
-	}
-
-	return true
-}
-
-func testRecoverAccount(t *testing.T) bool { //nolint: gocyclo
-	keyStore, _ := statusAPI.NodeManager().AccountKeyStore()
-
-	// create an account
-	address, pubKey, mnemonic, err := statusAPI.CreateAccount(TestConfig.Account1.Password)
-	if err != nil {
-		t.Errorf("could not create account: %v", err)
-		return false
-	}
-	t.Logf("Account created: {address: %s, key: %s, mnemonic:%s}", address, pubKey, mnemonic)
-
-	// try recovering using password + mnemonic
-	recoverAccountResponse := common.AccountInfo{}
-	rawResponse := RecoverAccount(C.CString(TestConfig.Account1.Password), C.CString(mnemonic))
-
-	if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &recoverAccountResponse); err != nil {
-		t.Errorf("cannot decode RecoverAccount response (%s): %v", C.GoString(rawResponse), err)
-		return false
-	}
-
-	if recoverAccountResponse.Error != "" {
-		t.Errorf("recover account failed: %v", recoverAccountResponse.Error)
-		return false
-	}
-	addressCheck, pubKeyCheck := recoverAccountResponse.Address, recoverAccountResponse.PubKey
-	if address != addressCheck || pubKey != pubKeyCheck {
-		t.Error("recover account details failed to pull the correct details")
-	}
-
-	// now test recovering, but make sure that account/key file is removed i.e. simulate recovering on a new device
-	account, err := common.ParseAccountString(address)
-	if err != nil {
-		t.Errorf("can not get account from address: %v", err)
-	}
-
-	account, key, err := keyStore.AccountDecryptedKey(account, TestConfig.Account1.Password)
-	if err != nil {
-		t.Errorf("can not obtain decrypted account key: %v", err)
-		return false
-	}
-	extChild2String := key.ExtendedKey.String()
-
-	if err = keyStore.Delete(account, TestConfig.Account1.Password); err != nil {
-		t.Errorf("cannot remove account: %v", err)
-	}
-
-	recoverAccountResponse = common.AccountInfo{}
-	rawResponse = RecoverAccount(C.CString(TestConfig.Account1.Password), C.CString(mnemonic))
-
-	if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &recoverAccountResponse); err != nil {
-		t.Errorf("cannot decode RecoverAccount response (%s): %v", C.GoString(rawResponse), err)
-		return false
-	}
-
-	if recoverAccountResponse.Error != "" {
-		t.Errorf("recover account failed (for non-cached account): %v", recoverAccountResponse.Error)
-		return false
-	}
-	addressCheck, pubKeyCheck = recoverAccountResponse.Address, recoverAccountResponse.PubKey
-	if address != addressCheck || pubKey != pubKeyCheck {
-		t.Error("recover account details failed to pull the correct details (for non-cached account)")
-	}
-
-	// make sure that extended key exists and is imported ok too
-	_, key, err = keyStore.AccountDecryptedKey(account, TestConfig.Account1.Password)
-	if err != nil {
-		t.Errorf("can not obtain decrypted account key: %v", err)
-		return false
-	}
-	if extChild2String != key.ExtendedKey.String() {
-		t.Errorf("CKD#2 key mismatch, expected: %s, got: %s", extChild2String, key.ExtendedKey.String())
-	}
-
-	// make sure that calling import several times, just returns from cache (no error is expected)
-	recoverAccountResponse = common.AccountInfo{}
-	rawResponse = RecoverAccount(C.CString(TestConfig.Account1.Password), C.CString(mnemonic))
-
-	if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &recoverAccountResponse); err != nil {
-		t.Errorf("cannot decode RecoverAccount response (%s): %v", C.GoString(rawResponse), err)
-		return false
-	}
-
-	if recoverAccountResponse.Error != "" {
-		t.Errorf("recover account failed (for non-cached account): %v", recoverAccountResponse.Error)
-		return false
-	}
-	addressCheck, pubKeyCheck = recoverAccountResponse.Address, recoverAccountResponse.PubKey
-	if address != addressCheck || pubKey != pubKeyCheck {
-		t.Error("recover account details failed to pull the correct details (for non-cached account)")
-	}
-
-	// time to login with recovered data
-	whisperService, err := statusAPI.NodeManager().WhisperService()
-	if err != nil {
-		t.Errorf("whisper service not running: %v", err)
-	}
-
-	// make sure that identity is not (yet injected)
-	if whisperService.HasKeyPair(pubKeyCheck) {
-		t.Error("identity already present in whisper")
-	}
-	err = statusAPI.SelectAccount(addressCheck, TestConfig.Account1.Password)
-	if err != nil {
-		t.Errorf("Test failed: could not select account: %v", err)
-		return false
-	}
-	if !whisperService.HasKeyPair(pubKeyCheck) {
-		t.Errorf("identity not injected into whisper: %v", err)
-	}
-
-	return true
-}
-
 func testAccountSelect(t *testing.T) bool { //nolint: gocyclo
 	// test to see if the account was injected in whisper
 	whisperService, err := statusAPI.NodeManager().WhisperService()
@@ -638,14 +384,20 @@ func testAccountSelect(t *testing.T) bool { //nolint: gocyclo
 	}
 
 	// create an account
-	address1, pubKey1, _, err := statusAPI.CreateAccount(TestConfig.Account1.Password)
+	accountInfo1, err := statusAPI.CreateAccount(TestConfig.Account1.Password)
+	address1 := accountInfo1.Address
+	pubKey1 := accountInfo1.PubKey
+
 	if err != nil {
 		t.Errorf("could not create account: %v", err)
 		return false
 	}
 	t.Logf("Account created: {address: %s, key: %s}", address1, pubKey1)
 
-	address2, pubKey2, _, err := statusAPI.CreateAccount(TestConfig.Account1.Password)
+	accountInfo2, err := statusAPI.CreateAccount(TestConfig.Account1.Password)
+	address2 := accountInfo2.Address
+	pubKey2 := accountInfo2.PubKey
+
 	if err != nil {
 		t.Error("Test failed: could not create account")
 		return false
@@ -722,7 +474,10 @@ func testAccountLogout(t *testing.T) bool {
 	}
 
 	// create an account
-	address, pubKey, _, err := statusAPI.CreateAccount(TestConfig.Account1.Password)
+	accountInfo, err := statusAPI.CreateAccount(TestConfig.Account1.Password)
+	address := accountInfo.Address
+	pubKey := accountInfo.PubKey
+
 	if err != nil {
 		t.Errorf("could not create account: %v", err)
 		return false
@@ -1463,16 +1218,4 @@ func startTestNode(t *testing.T) <-chan struct{} {
 	}()
 
 	return waitForNodeStart
-}
-
-//nolint: deadcode
-func testValidateNodeConfig(t *testing.T, config string, fn func(common.APIDetailedResponse)) {
-	result := ValidateNodeConfig(C.CString(config))
-
-	var resp common.APIDetailedResponse
-
-	err := json.Unmarshal([]byte(C.GoString(result)), &resp)
-	require.NoError(t, err)
-
-	fn(resp)
 }

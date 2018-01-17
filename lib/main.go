@@ -2,7 +2,7 @@ package main
 
 import "github.com/status-im/status-go/geth/api"
 
-var statusAPI = api.NewStatusAPI()
+var statusAPI libStatusAPI = api.NewStatusAPI()
 
 // Technically this package supposed to be a lib for
 // cross-compilation and usage with Android/iOS, but

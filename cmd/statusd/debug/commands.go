@@ -146,17 +146,21 @@ func (cs *commandSet) CallRPC(inputJSON string) string {
 
 // CreateAccount creates an internal geth account.
 func (cs *commandSet) CreateAccount(password string) (string, string, string, error) {
-	return cs.statusAPI.CreateAccount(password)
+	accountInfo, err := cs.statusAPI.CreateAccount(password)
+	return accountInfo.Address, accountInfo.PubKey, accountInfo.Mnemonic, err
 }
 
 // CreateChildAccount creates a sub-account.
 func (cs *commandSet) CreateChildAccount(parentAddress, password string) (string, string, error) {
-	return cs.statusAPI.CreateChildAccount(parentAddress, password)
+	accountInfo, err := cs.statusAPI.CreateChildAccount(parentAddress, password)
+	return accountInfo.Address, accountInfo.PubKey, err
+
 }
 
 // RecoverAccount re-creates the master key using the given details.
 func (cs *commandSet) RecoverAccount(password, mnemonic string) (string, string, error) {
-	return cs.statusAPI.RecoverAccount(password, mnemonic)
+	accountInfo, err := cs.statusAPI.RecoverAccount(password, mnemonic)
+	return accountInfo.Address, accountInfo.PubKey, err
 }
 
 // SelectAccount selects the addressed account.

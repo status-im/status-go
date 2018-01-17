@@ -11,7 +11,6 @@ import (
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/helpers/profiling"
-	"gopkg.in/go-playground/validator.v9"
 )
 
 //GenerateConfig for status node
@@ -52,43 +51,8 @@ func StopNode() *C.char {
 //ValidateNodeConfig validates config for status node
 //export ValidateNodeConfig
 func ValidateNodeConfig(configJSON *C.char) *C.char {
-	var resp common.APIDetailedResponse
-
-	_, err := params.LoadNodeConfig(C.GoString(configJSON))
-
-	// Convert errors to common.APIDetailedResponse
-	switch err := err.(type) {
-	case validator.ValidationErrors:
-		resp = common.APIDetailedResponse{
-			Message:     "validation: validation failed",
-			FieldErrors: make([]common.APIFieldError, len(err)),
-		}
-
-		for i, ve := range err {
-			resp.FieldErrors[i] = common.APIFieldError{
-				Parameter: ve.Namespace(),
-				Errors: []common.APIError{
-					{
-						Message: fmt.Sprintf("field validation failed on the '%s' tag", ve.Tag()),
-					},
-				},
-			}
-		}
-	case error:
-		resp = common.APIDetailedResponse{
-			Message: fmt.Sprintf("validation: %s", err.Error()),
-		}
-	case nil:
-		resp = common.APIDetailedResponse{
-			Status: true,
-		}
-	}
-
-	respJSON, err := json.Marshal(resp)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
+	apiDetailedResponse := statusAPI.ValidateJSONConfig(C.GoString(configJSON))
+	respJSON, _ := json.Marshal(apiDetailedResponse)
 	return C.CString(string(respJSON))
 }
 
@@ -110,62 +74,33 @@ func CallRPC(inputJSON *C.char) *C.char {
 // just modified to handle the function arg passing
 //export CreateAccount
 func CreateAccount(password *C.char) *C.char {
-	address, pubKey, mnemonic, err := statusAPI.CreateAccount(C.GoString(password))
-
-	errString := ""
+	accountInfo, err := statusAPI.CreateAccount(C.GoString(password))
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		errString = err.Error()
+		log.Error("CreateAccount failed", "error", err.Error())
 	}
-
-	out := common.AccountInfo{
-		Address:  address,
-		PubKey:   pubKey,
-		Mnemonic: mnemonic,
-		Error:    errString,
-	}
-	outBytes, _ := json.Marshal(out)
+	outBytes, _ := json.Marshal(accountInfo)
 	return C.CString(string(outBytes))
 }
 
 //CreateChildAccount creates sub-account
 //export CreateChildAccount
 func CreateChildAccount(parentAddress, password *C.char) *C.char {
-	address, pubKey, err := statusAPI.CreateChildAccount(C.GoString(parentAddress), C.GoString(password))
-
-	errString := ""
+	accountInfo, err := statusAPI.CreateChildAccount(C.GoString(parentAddress), C.GoString(password))
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		errString = err.Error()
+		log.Error("CreateChildAccount failed", "error", err.Error())
 	}
-
-	out := common.AccountInfo{
-		Address: address,
-		PubKey:  pubKey,
-		Error:   errString,
-	}
-	outBytes, _ := json.Marshal(out)
+	outBytes, _ := json.Marshal(accountInfo)
 	return C.CString(string(outBytes))
 }
 
 //RecoverAccount re-creates master key using given details
 //export RecoverAccount
 func RecoverAccount(password, mnemonic *C.char) *C.char {
-	address, pubKey, err := statusAPI.RecoverAccount(C.GoString(password), C.GoString(mnemonic))
-
-	errString := ""
+	accountInfo, err := statusAPI.RecoverAccount(C.GoString(password), C.GoString(mnemonic))
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		errString = err.Error()
+		log.Error("RecoverAccount failed", "error", err.Error())
 	}
-
-	out := common.AccountInfo{
-		Address:  address,
-		PubKey:   pubKey,
-		Mnemonic: C.GoString(mnemonic),
-		Error:    errString,
-	}
-	outBytes, _ := json.Marshal(out)
+	outBytes, _ := json.Marshal(accountInfo)
 	return C.CString(string(outBytes))
 }
 
