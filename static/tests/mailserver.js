@@ -13,7 +13,7 @@ describe('Whisper MailServer', () => {
 
     describe('Check prerequisites', () => {
         console.log('Expecting MailServer running.')
-        console.log('./build/bin/wnode-status -mailserver -passwordfile=./static/keys/wnodepassword -http -httpport 8540 -listenaddr=127.0.0.1:8549 -identity=./static/keys/wnodekey')
+        console.log('./build/bin/statusd -les=false -shh -shh.mailserver -passwordfile=./static/keys/wnodepassword -http -httpport 8540 -listenaddr=127.0.0.1:8549 -identity=./static/keys/wnodekey')
 
         it('MailServer should be running', () => {
             const mailServer = new Web3(new Web3.providers.HttpProvider('http://localhost:8540'));
@@ -28,8 +28,8 @@ describe('Whisper MailServer', () => {
 
         before((done) => {
             nodeAProcess = spawn(
-                './build/bin/wnode-status',
-                ['-datadir', 'wnode-data-1', '-http', '-httpport', '8590']
+                './build/bin/statusd',
+                ['-shh', '-les=false', '-datadir', 'wnode-data-1', '-http', '-httpport', '8590']
             );
             nodeA = new Web3(new Web3.providers.HttpProvider('http://localhost:8590'));
 
@@ -82,8 +82,8 @@ describe('Whisper MailServer', () => {
 
         before((done) => {
             nodeBProcess = spawn(
-                './build/bin/wnode-status',
-                ['-datadir', 'wnode-data-2', '-http', '-httpport', '8591', '-log', 'INFO', '-logfile', 'wnode-data-2/wnode.log']
+                './build/bin/statusd',
+                ['-shh', '-les=false', '-datadir', 'wnode-data-2', '-http', '-httpport', '8591', '-log', 'INFO', '-logfile', 'wnode-data-2/wnode.log']
             );
             nodeB = new Web3(new Web3.providers.HttpProvider('http://localhost:8591'));
 
