@@ -49,6 +49,7 @@ func (s *MailServiceSuite) TestShhRequestMessagesRPCMethodAvailability() {
 		"method": "shh_requestMessages",
 		"params": [{}]
 	}`)))
+	req.Header.Set("Content-Type", "application/json")
 	r.NoError(err)
 	resp, err := http.DefaultClient.Do(req)
 	r.NoError(err)
