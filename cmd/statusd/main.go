@@ -33,7 +33,7 @@ var (
 	logLevel       = flag.String("log", "INFO", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
 	logFile        = flag.String("logfile", "", "Path to the log file")
 	version        = flag.Bool("version", false, "Print version")
-	les            = flag.Bool("les", false, "LES protocol")
+	lesEnabled     = flag.Bool("les", true, "LES protocol enabled")
 
 	listenAddr = flag.String("listenaddr", ":30303", "IP address and port of this node (e.g. 127.0.0.1:30303)")
 	standalone = flag.Bool("standalone", true, "Don't actively connect to peers, wait for incoming connections")
@@ -129,7 +129,7 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 	nodeConfig.HTTPPort = *httpPort
 	nodeConfig.IPCEnabled = *ipcEnabled
 
-	nodeConfig.LightEthConfig.Enabled = *les
+	nodeConfig.LightEthConfig.Enabled = *lesEnabled
 	nodeConfig.SwarmConfig.Enabled = *swarmEnabled
 
 	if *whisperEnabled {
