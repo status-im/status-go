@@ -12,7 +12,7 @@ services:
 
   wnode:
     image: status-go:latest
-    command: statusd -les=false -shh -listenaddr=:30303 -log DEBUG -stats -standalone=false -bootnodes=enode://0197d97fba1a28b719ddee928025b886eff81928578d05084840eec900de9c93639bea64ca20fda349ce4c19aecef5a8881cb6b8b2a1b465841556342ee1d652@172.16.238.10:30303
+    command: statusd -les=false -shh -listenaddr=:30303 -log DEBUG -stats -standalone=false -bootnodes=enode://3f04db09bedc8d85a198de94c84da73aa7782fafc61b28c525ec5cca5a6cc16be7ebbb5cd001780f71d8408d35a2f6326faa1e524d9d8875294172ebec988743@172.16.238.10:30303
     ports:
       - 8080
     networks:

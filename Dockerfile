@@ -11,6 +11,7 @@ RUN cd /go/src/github.com/status-im/status-go && make statusgo
 FROM alpine:latest
 
 RUN apk add --no-cache ca-certificates bash
+
 COPY --from=builder /go/src/github.com/status-im/status-go/build/bin/* /usr/local/bin/
 
 RUN mkdir -p /static/keys
