@@ -23,6 +23,9 @@ var (
 	// ErrNoRemoteURL is returned when network id has no associated url.
 	ErrNoRemoteURL = errors.New("network id requires a remote URL")
 
+	// ErrTimeout is returned when test times out
+	ErrTimeout = errors.New("timeout")
+
 	// TestConfig defines the default config usable at package-level.
 	TestConfig *common.TestConfig
 
@@ -205,4 +208,17 @@ func GetAccount2PKFile() string {
 	} else {
 		return "test-account2.pk"
 	}
+}
+
+// WaitClosed used to wait on a channel in tests
+func WaitClosed(c chan struct{}, d time.Duration) error {
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-c:
+		return nil
+	case <-timer.C:
+		return ErrTimeout
+	}
+
 }

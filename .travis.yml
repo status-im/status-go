@@ -23,7 +23,7 @@ jobs:
     # using fork == false may be preferred as it would allow PRs from the origin
     # to still run, but currently does not work due to a bug
     if: type != pull_request
-    script: travis_wait 300 make test-e2e networkid=4
+    script: make test-e2e networkid=4
 cache:
   directories:
   - ".ethereumtest/Mainnet"

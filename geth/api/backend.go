@@ -90,8 +90,6 @@ func (m *StatusBackend) StartNode(config *params.NodeConfig) (<-chan struct{}, e
 		return nil, err
 	}
 
-	m.txQueueManager.Start()
-
 	m.nodeReady = make(chan struct{}, 1)
 	go m.onNodeStart(nodeStarted, m.nodeReady) // waits on nodeStarted, writes to backendReady
 
@@ -101,6 +99,10 @@ func (m *StatusBackend) StartNode(config *params.NodeConfig) (<-chan struct{}, e
 // onNodeStart does everything required to prepare backend
 func (m *StatusBackend) onNodeStart(nodeStarted <-chan struct{}, backendReady chan struct{}) {
 	<-nodeStarted
+
+	// tx queue manager should be started after node is started, it depends
+	// on rpc client being created
+	m.txQueueManager.Start()
 
 	if err := m.registerHandlers(); err != nil {
 		log.Error("Handler registration failed", "err", err)
