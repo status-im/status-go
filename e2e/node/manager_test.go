@@ -486,7 +486,7 @@ func (s *ManagerTestSuite) TestNodeStartCrash() {
 	s.NoError(err)
 
 	// start node outside the manager (on the same port), so that manager node.Start() method fails
-	outsideNode, err := node.MakeNode(nodeConfig, node.LogDeliveryService{})
+	outsideNode, err := node.MakeNode(nodeConfig)
 	s.NoError(err)
 	err = outsideNode.Start()
 	s.NoError(err)
