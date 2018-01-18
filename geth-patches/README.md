@@ -13,7 +13,6 @@ We try to minimize number and amount of changes in those patches as much as poss
  - `0002-les-api-status.patch` — adds StatusBackend into LES code (need to be inspected, some things can and should be done outside of les code)
  - `0003-dockerfiles-wnode-swarm.patch` — adds Dockerfiles (who uses this?)
  - `0004-whisper-notifications.patch` — adds Whisper notifications (need to be reviewed and documented)
- - `0005-whisper-delivery.patch` - adds support for logs/traces of Whisper traffic (questionable, nobody used this functionality so far)
  - `0006-latest-cht.patch` – updates CHT root hashes, should be updated regularly to keep sync fast, until proper Trusted Checkpoint sync is not implemented as part of LES/2 protocol.
  - `0007-README.patch` — update upstream README.md.
 
@@ -36,8 +35,7 @@ cd $GOPATH/src/github.com/status-im/
 git clone https://github.com/ethereum/go-ethereum
 
 # update remote url to point to our fork repo
- git remote set-url origin git@github.com:status-im/go-ethereum.git
-
+git remote set-url origin git@github.com:status-im/go-ethereum.git
 ```
 
 ### Using existing fork repo (recommended)
