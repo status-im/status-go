@@ -51,16 +51,16 @@ statusgo-cross: statusgo-android statusgo-ios
 	@ls -ld $(GOBIN)/statusgo-*
 
 statusgo-android: xgo ##@cross-compile Build status-go for Android
-	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=android-16/aar -v $(shell build/testnet-flags.sh) ./lib
+	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=android-16/aar -v -tags '$(BUILD_TAGS)' $(shell build/testnet-flags.sh) ./lib
 	@echo "Android cross compilation done."
 
 statusgo-ios: xgo	##@cross-compile Build status-go for iOS
-	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v $(shell build/testnet-flags.sh) ./lib
+	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v -tags '$(BUILD_TAGS)' $(shell build/testnet-flags.sh) ./lib
 	@echo "iOS framework cross compilation done."
 
 statusgo-ios-simulator: xgo	##@cross-compile Build status-go for iOS Simulator
 	@docker pull $(XGOIMAGEIOSSIM)
-	$(GOPATH)/bin/xgo --image $(XGOIMAGEIOSSIM) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v $(shell build/testnet-flags.sh) ./lib
+	$(GOPATH)/bin/xgo --image $(XGOIMAGEIOSSIM) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v -tags '$(BUILD_TAGS)' $(shell build/testnet-flags.sh) ./lib
 	@echo "iOS framework cross compilation done."
 
 statusgo-library: ##@cross-compile Build status-go as static library for current platform
