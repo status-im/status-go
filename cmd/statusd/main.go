@@ -79,7 +79,7 @@ func main() {
 	}
 
 	// handle interrupt signals
-	haltOnInterruptSignal(backend.NodeManager())
+	go haltOnInterruptSignal(backend.NodeManager())
 
 	// wait till node is started
 	<-started
@@ -206,32 +206,24 @@ Options:
 	flag.PrintDefaults()
 }
 
-func haltOnInterruptSignal(nodeManager common.NodeManager) <-chan struct{} {
-	interruptCh := make(chan struct{})
+func haltOnInterruptSignal(nodeManager common.NodeManager) {
+	signalCh := make(chan os.Signal, 1)
+	signal.Notify(signalCh, os.Interrupt)
+	defer signal.Stop(signalCh)
+	<-signalCh
 
-	go func() {
-		signalCh := make(chan os.Signal, 1)
-		signal.Notify(signalCh, os.Interrupt)
-		defer signal.Stop(signalCh)
-		<-signalCh
+	log.Println("Got interrupt, shutting down...")
 
-		log.Println("Got interrupt, shutting down...")
+	nodeStopped, err := nodeManager.StopNode()
+	if err != nil {
+		log.Printf("Failed to stop node: %v", err.Error())
+		os.Exit(1)
+	}
 
-		close(interruptCh)
-
-		nodeStopped, err := nodeManager.StopNode()
-		if err != nil {
-			log.Printf("Failed to stop node: %v", err.Error())
-			os.Exit(1)
-		}
-
-		select {
-		case <-nodeStopped:
-		case <-time.After(time.Second * 5):
-			log.Printf("Stopping node timed out")
-			os.Exit(1)
-		}
-	}()
-
-	return interruptCh
+	select {
+	case <-nodeStopped:
+	case <-time.After(time.Second * 5):
+		log.Printf("Stopping node timed out")
+		os.Exit(1)
+	}
 }
