@@ -17,9 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discover"
-	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/p2p/nat"
-	gethparams "github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/whisper/mailserver"
 	"github.com/ethereum/go-ethereum/whisper/notifications"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
@@ -93,11 +91,11 @@ func defaultEmbeddedNodeConfig(config *params.NodeConfig) *node.Config {
 		Name:              config.Name,
 		Version:           config.Version,
 		P2P: p2p.Config{
-			NoDiscovery:      true,
+			NoDiscovery:      !config.Discovery,
 			DiscoveryV5:      true,
 			DiscoveryV5Addr:  ":0",
-			BootstrapNodes:   makeBootstrapNodes(),
-			BootstrapNodesV5: makeBootstrapNodesV5(),
+			BootstrapNodes:   nil,
+			BootstrapNodesV5: nil,
 			ListenAddr:       config.ListenAddr,
 			NAT:              nat.Any(),
 			MaxPeers:         config.MaxPeers,
@@ -117,9 +115,8 @@ func defaultEmbeddedNodeConfig(config *params.NodeConfig) *node.Config {
 		nc.HTTPPort = config.HTTPPort
 	}
 
-	if !config.BootClusterConfig.Enabled {
-		nc.P2P.BootstrapNodes = nil
-		nc.P2P.BootstrapNodesV5 = nil
+	if config.Discovery {
+		nc.P2P.BootstrapNodes = makeBootstrapNodes(config.BootClusterConfig.BootNodes)
 	}
 
 	return nc
@@ -215,26 +212,10 @@ func makeWSHost(config *params.NodeConfig) string {
 }
 
 // makeBootstrapNodes returns default (hence bootstrap) list of peers
-func makeBootstrapNodes() []*discover.Node {
-	// on desktops params.TestnetBootnodes and params.MainBootnodes,
-	// on mobile client we deliberately keep this list empty
-	enodes := []string{}
-
+func makeBootstrapNodes(enodes []string) []*discover.Node {
 	var bootstrapNodes []*discover.Node
 	for _, enode := range enodes {
 		bootstrapNodes = append(bootstrapNodes, discover.MustParseNode(enode))
-	}
-
-	return bootstrapNodes
-}
-
-// makeBootstrapNodesV5 returns default (hence bootstrap) list of peers
-func makeBootstrapNodesV5() []*discv5.Node {
-	enodes := gethparams.DiscoveryV5Bootnodes
-
-	var bootstrapNodes []*discv5.Node
-	for _, enode := range enodes {
-		bootstrapNodes = append(bootstrapNodes, discv5.MustParseNode(enode))
 	}
 
 	return bootstrapNodes

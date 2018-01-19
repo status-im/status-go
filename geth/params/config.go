@@ -230,6 +230,9 @@ type NodeConfig struct {
 	// remote peer identification as well as network traffic encryption.
 	NodeKeyFile string
 
+	// Discovery set to true will enabled discovery protocol.
+	Discovery bool
+
 	// ListenAddr is an IP address and port of this node (e.g. 127.0.0.1:30303).
 	ListenAddr string
 

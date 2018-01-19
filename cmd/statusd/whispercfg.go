@@ -64,11 +64,6 @@ func whisperConfig(nodeConfig *params.NodeConfig) (*params.NodeConfig, error) {
 	}
 	nodeConfig.HTTPHost = "0.0.0.0"
 
-	if *standalone {
-		nodeConfig.BootClusterConfig.Enabled = false
-		nodeConfig.BootClusterConfig.BootNodes = nil
-	}
-
 	return nodeConfig, nil
 }
 
