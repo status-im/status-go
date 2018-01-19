@@ -198,6 +198,10 @@ const localHandler = "LocalHandler"
 // List of methods supported by the upstream node:
 // https://github.com/INFURA/infura/blob/master/docs/source/index.html.md#supported-json-rpc-methods
 var RoutingTable = map[string]string{
+	"db_getHex":                               localNode,
+	"db_getString":                            localNode,
+	"db_putHex":                               localNode,
+	"db_putString":                            localNode,
 	"eth_accounts":                            localHandler,
 	"eth_blockNumber":                         upstreamNode,
 	"eth_call":                                upstreamNode,
@@ -244,4 +248,16 @@ var RoutingTable = map[string]string{
 	"net_listening":                           upstreamNode,
 	"net_peerCount":                           upstreamNode,
 	"net_version":                             upstreamNode,
+	"shh_addToGroup":                          localNode,
+	"shh_getFilterChanges":                    localNode,
+	"shh_getMessages":                         localNode,
+	"shh_hasIdentity":                         localNode,
+	"shh_newFilter":                           localNode,
+	"shh_newGroup":                            localNode,
+	"shh_newIdentity":                         localNode,
+	"shh_post":                                localNode,
+	"shh_uninstallFilter":                     localNode,
+	"shh_version":                             localNode,
+	"web3_clientVersion":                      localNode,
+	"web3_sha3":                               localNode,
 }
