@@ -1,9 +1,8 @@
 global:
-  scrape_interval:     15s
-  evaluation_interval: 15s
+  scrape_interval:     5s
+  evaluation_interval: 5s
 
 scrape_configs:
   - job_name: 'wnode'
-    scrape_interval: 5s
     static_configs:
-      - targets: ['docker.for.mac.localhost:8085']
+      - targets: ['docker.for.mac.localhost:32794', 'docker.for.mac.localhost:32792']

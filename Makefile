@@ -10,7 +10,7 @@ ifndef GOPATH
 endif
 
 CGO_CFLAGS=-I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
-BUILD_FLAGS =
+BUILD_TAGS =
 GOBIN = build/bin
 GO ?= latest
 XGOVERSION ?= 1.9.2
@@ -43,7 +43,7 @@ HELP_FUN = \
 		   }
 
 statusgo: ##@build Build status-go as statusd server
-	go build -i -o $(GOBIN)/statusd -v -tags '$(BUILD_FLAGS)' $(shell build/testnet-flags.sh) ./cmd/statusd
+	go build -i -o $(GOBIN)/statusd -v -tags '$(BUILD_TAGS)' $(shell build/testnet-flags.sh) ./cmd/statusd
 	@echo "\nCompilation done.\nRun \"build/bin/statusd -h\" to view available commands."
 
 statusgo-cross: statusgo-android statusgo-ios
@@ -71,7 +71,7 @@ statusgo-library: ##@cross-compile Build status-go as static library for current
 
 docker-image: ##@docker Build docker image (use DOCKER_IMAGE_NAME to set the image name)
 	@echo "Building docker image..."
-	docker build . -t $(DOCKER_IMAGE_NAME)
+	docker build --build-arg "build_tags=$(BUILD_TAGS)" . -t $(DOCKER_IMAGE_NAME)
 
 xgo-docker-images: ##@docker Build xgo docker images
 	@echo "Building xgo docker images..."

@@ -1,11 +1,13 @@
 # Build status-go in a Go builder container
 FROM golang:1.9-alpine as builder
 
+ARG build_tags
+
 RUN apk add --no-cache make gcc musl-dev linux-headers
 
 RUN mkdir -p /go/src/github.com/status-im/status-go
 ADD . /go/src/github.com/status-im/status-go
-RUN cd /go/src/github.com/status-im/status-go && make statusgo
+RUN cd /go/src/github.com/status-im/status-go && make statusgo BUILD_TAGS="$build_tags"
 
 # Copy the binary to the second image
 FROM alpine:latest
