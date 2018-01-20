@@ -197,6 +197,13 @@ const localHandler = "LocalHandler"
 //
 // List of methods supported by the upstream node:
 // https://github.com/INFURA/infura/blob/master/docs/source/index.html.md#supported-json-rpc-methods
+//
+// Note well: shh_getPublicKey, shh_hasKeyPair, shh_hasSymKey, and
+// shh_newSymKey here only because the e2e/rpc tests were segfaulting without
+// them.  It's not clear what their destinations should be.
+//
+// shh_getFilterMessages added to this list because of its use in
+// e2e/whisper/whisper_mailbox_test.go.
 var RoutingTable = map[string]string{
 	"db_getHex":                               localNode,
 	"db_getString":                            localNode,
@@ -250,12 +257,19 @@ var RoutingTable = map[string]string{
 	"net_version":                             upstreamNode,
 	"shh_addToGroup":                          localNode,
 	"shh_getFilterChanges":                    localNode,
+	"shh_getFilterMessages":                   localNode,
 	"shh_getMessages":                         localNode,
+	"shh_getPublicKey":                        localNode,
 	"shh_hasIdentity":                         localNode,
+	"shh_hasKeyPair":                          localNode,
+	"shh_hasSymKey":                           localNode,
 	"shh_newFilter":                           localNode,
 	"shh_newGroup":                            localNode,
 	"shh_newIdentity":                         localNode,
+	"shh_newMessageFilter":                    localNode,
+	"shh_newSymKey":                           localNode,
 	"shh_post":                                localNode,
+	"shh_requestMessages":                     localNode,
 	"shh_uninstallFilter":                     localNode,
 	"shh_version":                             localNode,
 	"web3_clientVersion":                      localNode,
