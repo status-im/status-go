@@ -64,7 +64,7 @@ func (m *Manager) Stop() {
 }
 
 // TransactionQueue returns a reference to the queue.
-func (m *Manager) TransactionQueue() common.TxQueue {
+func (m *Manager) TransactionQueue() *queue.TxQueue {
 	return m.txQueue
 }
 
