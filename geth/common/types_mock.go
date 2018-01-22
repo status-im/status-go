@@ -156,6 +156,18 @@ func (mr *MockNodeManagerMockRecorder) AddPeer(url interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddPeer", reflect.TypeOf((*MockNodeManager)(nil).AddPeer), url)
 }
 
+// PeerCount mocks base method
+func (m *MockNodeManager) PeerCount() int {
+	ret := m.ctrl.Call(m, "PeerCount")
+	ret0, _ := ret[0].(int)
+	return ret0
+}
+
+// PeerCount indicates an expected call of PeerCount
+func (mr *MockNodeManagerMockRecorder) PeerCount() *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PeerCount", reflect.TypeOf((*MockNodeManager)(nil).PeerCount))
+}
+
 // LightEthereumService mocks base method
 func (m *MockNodeManager) LightEthereumService() (*les.LightEthereum, error) {
 	ret := m.ctrl.Call(m, "LightEthereumService")

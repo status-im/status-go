@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/status-im/status-go/geth/common"
+	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
 
 	_ "github.com/stretchr/testify/suite" // required to register testify flags
@@ -113,22 +114,32 @@ func EnsureNodeSync(nodeManager common.NodeManager) {
 	defer timeout.Stop()
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
-
 	for {
 		select {
 		case <-timeout.C:
 			panic("timeout during node synchronization")
 		case <-ticker.C:
 			downloader := les.Downloader()
-
-			if downloader != nil {
-				isSyncing := downloader.Synchronising()
-				progress := downloader.Progress()
-
-				if !isSyncing && progress.HighestBlock > 0 && progress.CurrentBlock >= progress.HighestBlock {
-					return
-				}
+			if downloader == nil {
+				continue
 			}
+			if nodeManager.PeerCount() == 0 {
+				log.Debug("No establishished connections with a peers, continue waiting for a sync")
+				continue
+			}
+			if downloader.Synchronising() {
+				log.Debug("synchronization is in progress")
+				continue
+			}
+			progress := downloader.Progress()
+			if progress.CurrentBlock >= progress.HighestBlock {
+				return
+			}
+			log.Debug(
+				fmt.Sprintf("synchronization is not finished yet: current block %d < highest block %d",
+					progress.CurrentBlock, progress.HighestBlock),
+			)
+
 		}
 	}
 }
