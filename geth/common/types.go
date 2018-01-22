@@ -176,53 +176,6 @@ type SendTxArgs struct {
 	Nonce    *hexutil.Uint64 `json:"nonce"`
 }
 
-// TxQueue is a queue of transactions.
-type TxQueue interface {
-	// Remove removes a transaction from the queue.
-	Remove(id QueuedTxID)
-
-	// Reset resets the state of the queue.
-	Reset()
-
-	// Count returns a number of transactions in the queue.
-	Count() int
-
-	// Has returns true if a transaction is in the queue.
-	Has(id QueuedTxID) bool
-}
-
-// TxQueueManager defines expected methods for managing transaction queue
-type TxQueueManager interface {
-	// Start starts accepting new transaction in the queue.
-	Start()
-
-	// Stop stops accepting new transactions in the queue.
-	Stop()
-
-	// TransactionQueue returns a transaction queue.
-	TransactionQueue() TxQueue
-
-	// QueueTransaction adds a new transaction to the queue.
-	QueueTransaction(tx *QueuedTx) error
-
-	// WaitForTransactions blocks until transaction is completed, discarded or timed out.
-	WaitForTransaction(tx *QueuedTx) error
-
-	SendTransactionRPCHandler(ctx context.Context, args ...interface{}) (interface{}, error)
-
-	// CompleteTransaction instructs backend to complete sending of a given transaction
-	CompleteTransaction(id QueuedTxID, password string) (common.Hash, error)
-
-	// CompleteTransactions instructs backend to complete sending of multiple transactions
-	CompleteTransactions(ids []QueuedTxID, password string) map[QueuedTxID]RawCompleteTransactionResult
-
-	// DiscardTransaction discards a given transaction from transaction queue
-	DiscardTransaction(id QueuedTxID) error
-
-	// DiscardTransactions discards given multiple transactions from transaction queue
-	DiscardTransactions(ids []QueuedTxID) map[QueuedTxID]RawDiscardTransactionResult
-}
-
 // JailCell represents single jail cell, which is basically a JavaScript VM.
 // It's designed to be a transparent wrapper around otto.VM's methods.
 type JailCell interface {

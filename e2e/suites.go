@@ -7,6 +7,7 @@ import (
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/signal"
+	"github.com/status-im/status-go/geth/transactions"
 	. "github.com/status-im/status-go/testing" //nolint: golint
 	"github.com/stretchr/testify/suite"
 )
@@ -139,7 +140,7 @@ func (s *BackendTestSuite) LightEthereumService() *les.LightEthereum {
 }
 
 // TxQueueManager returns a reference to the TxQueueManager.
-func (s *BackendTestSuite) TxQueueManager() common.TxQueueManager {
+func (s *BackendTestSuite) TxQueueManager() *transactions.Manager {
 	return s.Backend.TxQueueManager()
 }
 

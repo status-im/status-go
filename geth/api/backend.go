@@ -27,7 +27,7 @@ type StatusBackend struct {
 	nodeReady       chan struct{} // channel to wait for when node is fully ready
 	nodeManager     common.NodeManager
 	accountManager  common.AccountManager
-	txQueueManager  common.TxQueueManager
+	txQueueManager  *transactions.Manager
 	jailManager     common.JailManager
 	newNotification common.NotificationConstructor
 }
@@ -66,8 +66,8 @@ func (m *StatusBackend) JailManager() common.JailManager {
 	return m.jailManager
 }
 
-// TxQueueManager returns reference to jail
-func (m *StatusBackend) TxQueueManager() common.TxQueueManager {
+// TxQueueManager returns reference to transactions manager
+func (m *StatusBackend) TxQueueManager() *transactions.Manager {
 	return m.txQueueManager
 }
 
