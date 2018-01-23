@@ -194,9 +194,8 @@ func GetNetworkID() int {
 func GetAccount1PKFile() string {
 	if GetNetworkID() == params.StatusChainNetworkID {
 		return "test-account1-status-chain.pk"
-	} else {
-		return "test-account1.pk"
 	}
+	return "test-account1.pk"
 }
 
 // GetAccount2PKFile returns the filename for Account2 keystore based
@@ -205,9 +204,8 @@ func GetAccount1PKFile() string {
 func GetAccount2PKFile() string {
 	if GetNetworkID() == params.StatusChainNetworkID {
 		return "test-account2-status-chain.pk"
-	} else {
-		return "test-account2.pk"
 	}
+	return "test-account2.pk"
 }
 
 // WaitClosed used to wait on a channel in tests

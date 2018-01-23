@@ -80,14 +80,14 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	messageFilterID := s.createPrivateChatMessageFilter(rpcClient, keyID, topic.String())
 
 	//Threre are no messages at filter
-	messages := s.getMessagesByMessageFilterId(rpcClient, messageFilterID)
+	messages := s.getMessagesByMessageFilterID(rpcClient, messageFilterID)
 	s.Require().Equal(0, len(messages))
 
 	//Post message
 	s.postMessageToPrivate(rpcClient, pubkey.String(), topic.String(), hexutil.Encode([]byte("Hello world!")))
 
 	//There are no messages, because it's a sender filter
-	messages = s.getMessagesByMessageFilterId(rpcClient, messageFilterID)
+	messages = s.getMessagesByMessageFilterID(rpcClient, messageFilterID)
 	s.Require().Equal(0, len(messages))
 
 	//act
@@ -114,11 +114,11 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	//wait to receive message
 	time.Sleep(time.Second)
 	//And we receive message
-	messages = s.getMessagesByMessageFilterId(rpcClient, messageFilterID)
+	messages = s.getMessagesByMessageFilterID(rpcClient, messageFilterID)
 	s.Require().Equal(1, len(messages))
 
 	//check that there are no messages
-	messages = s.getMessagesByMessageFilterId(rpcClient, messageFilterID)
+	messages = s.getMessagesByMessageFilterID(rpcClient, messageFilterID)
 	s.Require().Equal(0, len(messages))
 }
 
@@ -158,9 +158,9 @@ func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
 	charlieWhisperService, err := charlieBackend.NodeManager().WhisperService()
 	s.Require().NoError(err)
 	//get rpc client
-	aliceRpcClient := aliceBackend.NodeManager().RPCClient()
-	bobRpcClient := bobBackend.NodeManager().RPCClient()
-	charlieRpcClient := charlieBackend.NodeManager().RPCClient()
+	aliceRPCClient := aliceBackend.NodeManager().RPCClient()
+	bobRPCClient := bobBackend.NodeManager().RPCClient()
+	charlieRPCClient := charlieBackend.NodeManager().RPCClient()
 
 	//bob and charlie add mailserver key
 	password := "status-offline-inbox"
@@ -196,79 +196,79 @@ func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
 	charlieAliceKeySendTopic := whisperv5.BytesToTopic([]byte("charlieAliceKeySendTopic "))
 
 	//bob and charlie create message filter
-	bobMessageFilterID := s.createPrivateChatMessageFilter(bobRpcClient, bobKeyID, bobAliceKeySendTopic.String())
-	charlieMessageFilterID := s.createPrivateChatMessageFilter(charlieRpcClient, charlieKeyID, charlieAliceKeySendTopic.String())
+	bobMessageFilterID := s.createPrivateChatMessageFilter(bobRPCClient, bobKeyID, bobAliceKeySendTopic.String())
+	charlieMessageFilterID := s.createPrivateChatMessageFilter(charlieRPCClient, charlieKeyID, charlieAliceKeySendTopic.String())
 
 	//Alice send message with symkey and topic to bob and charlie
-	s.postMessageToPrivate(aliceRpcClient, bobPubkey.String(), bobAliceKeySendTopic.String(), payloadStr)
-	s.postMessageToPrivate(aliceRpcClient, charliePubkey.String(), charlieAliceKeySendTopic.String(), payloadStr)
+	s.postMessageToPrivate(aliceRPCClient, bobPubkey.String(), bobAliceKeySendTopic.String(), payloadStr)
+	s.postMessageToPrivate(aliceRPCClient, charliePubkey.String(), charlieAliceKeySendTopic.String(), payloadStr)
 
 	//wait to receive
 	time.Sleep(time.Second)
 
 	//bob receive group chat data and add it to his node
 	//1. bob get group chat details
-	messages := s.getMessagesByMessageFilterId(bobRpcClient, bobMessageFilterID)
+	messages := s.getMessagesByMessageFilterID(bobRPCClient, bobMessageFilterID)
 	s.Require().Equal(1, len(messages))
 	bobGroupChatData := groupChatParams{}
 	bobGroupChatData.Decode(messages[0]["payload"].(string))
 	s.EqualValues(groupChatPayload, bobGroupChatData)
 
 	//2. bob add symkey to his node
-	bobGroupChatSymkeyID := s.addSymKey(bobRpcClient, bobGroupChatData.Key)
+	bobGroupChatSymkeyID := s.addSymKey(bobRPCClient, bobGroupChatData.Key)
 	s.Require().NotEmpty(bobGroupChatSymkeyID)
 
 	//3. bob create message filter to node by group chat topic
-	bobGroupChatMessageFilterID := s.createGroupChatMessageFilter(bobRpcClient, bobGroupChatSymkeyID, bobGroupChatData.Topic)
+	bobGroupChatMessageFilterID := s.createGroupChatMessageFilter(bobRPCClient, bobGroupChatSymkeyID, bobGroupChatData.Topic)
 
 	//charlie receive group chat data and add it to his node
 	//1. charlie get group chat details
-	messages = s.getMessagesByMessageFilterId(charlieRpcClient, charlieMessageFilterID)
+	messages = s.getMessagesByMessageFilterID(charlieRPCClient, charlieMessageFilterID)
 	s.Require().Equal(1, len(messages))
 	charlieGroupChatData := groupChatParams{}
 	charlieGroupChatData.Decode(messages[0]["payload"].(string))
 	s.EqualValues(groupChatPayload, charlieGroupChatData)
 
 	//2. charlie add symkey to his node
-	charlieGroupChatSymkeyID := s.addSymKey(charlieRpcClient, charlieGroupChatData.Key)
+	charlieGroupChatSymkeyID := s.addSymKey(charlieRPCClient, charlieGroupChatData.Key)
 	s.Require().NotEmpty(charlieGroupChatSymkeyID)
 
 	//3. charlie create message filter to node by group chat topic
-	charlieGroupChatMessageFilterID := s.createGroupChatMessageFilter(charlieRpcClient, charlieGroupChatSymkeyID, charlieGroupChatData.Topic)
+	charlieGroupChatMessageFilterID := s.createGroupChatMessageFilter(charlieRPCClient, charlieGroupChatSymkeyID, charlieGroupChatData.Topic)
 
 	//alice send message to group chat
 	helloWorldMessage := hexutil.Encode([]byte("Hello world!"))
-	s.postMessageToGroup(aliceRpcClient, groupChatKeyID, groupChatTopic.String(), helloWorldMessage)
+	s.postMessageToGroup(aliceRPCClient, groupChatKeyID, groupChatTopic.String(), helloWorldMessage)
 	time.Sleep(time.Second) //it need to receive envelopes by bob and charlie nodes
 
 	//bob receive group chat message
-	messages = s.getMessagesByMessageFilterId(bobRpcClient, bobGroupChatMessageFilterID)
+	messages = s.getMessagesByMessageFilterID(bobRPCClient, bobGroupChatMessageFilterID)
 	s.Require().Equal(1, len(messages))
 	s.Require().Equal(helloWorldMessage, messages[0]["payload"].(string))
 
 	//charlie receive group chat message
-	messages = s.getMessagesByMessageFilterId(charlieRpcClient, charlieGroupChatMessageFilterID)
+	messages = s.getMessagesByMessageFilterID(charlieRPCClient, charlieGroupChatMessageFilterID)
 	s.Require().Equal(1, len(messages))
 	s.Require().Equal(helloWorldMessage, messages[0]["payload"].(string))
 
 	//check that we don't receive messages each one time
-	messages = s.getMessagesByMessageFilterId(bobRpcClient, bobGroupChatMessageFilterID)
+	messages = s.getMessagesByMessageFilterID(bobRPCClient, bobGroupChatMessageFilterID)
 	s.Require().Equal(0, len(messages))
-	messages = s.getMessagesByMessageFilterId(charlieRpcClient, charlieGroupChatMessageFilterID)
+	messages = s.getMessagesByMessageFilterID(charlieRPCClient, charlieGroupChatMessageFilterID)
 	s.Require().Equal(0, len(messages))
 
 	//Request each one messages from mailbox using enode
-	s.requestHistoricMessages(bobRpcClient, mailboxEnode, bobMailServerKeyID, groupChatTopic.String())
-	s.requestHistoricMessages(charlieRpcClient, mailboxEnode, charlieMailServerKeyID, groupChatTopic.String())
+	s.requestHistoricMessages(bobRPCClient, mailboxEnode, bobMailServerKeyID, groupChatTopic.String())
+	s.requestHistoricMessages(charlieRPCClient, mailboxEnode, charlieMailServerKeyID, groupChatTopic.String())
 	time.Sleep(time.Second) //wait to receive p2p messages
 
 	//bob receive p2p message from grop chat filter
-	messages = s.getMessagesByMessageFilterId(bobRpcClient, bobGroupChatMessageFilterID)
+	messages = s.getMessagesByMessageFilterID(bobRPCClient, bobGroupChatMessageFilterID)
 	s.Require().Equal(1, len(messages))
 	s.Require().Equal(helloWorldMessage, messages[0]["payload"].(string))
 
 	//charlie receive p2p message from grop chat filter
-	messages = s.getMessagesByMessageFilterId(charlieRpcClient, charlieGroupChatMessageFilterID)
+	messages = s.getMessagesByMessageFilterID(charlieRPCClient, charlieGroupChatMessageFilterID)
 	s.Require().Equal(1, len(messages))
 	s.Require().Equal(helloWorldMessage, messages[0]["payload"].(string))
 }
@@ -434,8 +434,8 @@ func (s *WhisperMailboxSuite) postMessageToGroup(rpcCli *rpc.Client, groupChatKe
 	s.Require().Nil(postResp.Err)
 }
 
-//getMessagesByMessageFilterId get received messages by messageFilterID
-func (s *WhisperMailboxSuite) getMessagesByMessageFilterId(rpcCli *rpc.Client, messageFilterID string) []map[string]interface{} {
+//getMessagesByMessageFilterID get received messages by messageFilterID
+func (s *WhisperMailboxSuite) getMessagesByMessageFilterID(rpcCli *rpc.Client, messageFilterID string) []map[string]interface{} {
 	resp := rpcCli.CallRaw(`{
 		"jsonrpc": "2.0",
 		"method": "shh_getFilterMessages",

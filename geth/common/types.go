@@ -411,7 +411,7 @@ type NotifyResult struct {
 const passphraseEnvName = "ACCOUNT_PASSWORD"
 
 // LoadTestConfig loads test configuration values from disk
-func LoadTestConfig(networkId int) (*TestConfig, error) {
+func LoadTestConfig(networkID int) (*TestConfig, error) {
 	var testConfig TestConfig
 
 	configData := static.MustAsset("config/test-data.json")
@@ -419,7 +419,7 @@ func LoadTestConfig(networkId int) (*TestConfig, error) {
 		return nil, err
 	}
 
-	if networkId == params.StatusChainNetworkID {
+	if networkID == params.StatusChainNetworkID {
 		accountsData := static.MustAsset("config/status-chain-accounts.json")
 		if err := json.Unmarshal(accountsData, &testConfig); err != nil {
 			return nil, err
