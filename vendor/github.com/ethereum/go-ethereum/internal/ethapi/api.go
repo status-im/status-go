@@ -1169,6 +1169,7 @@ func (s *PublicTransactionPoolAPI) SendTransactionWithPassphrase(ctx context.Con
 	}
 	// Assemble the transaction and sign with the wallet
 	tx := args.toTransaction()
+
 	var chainID *big.Int
 	if config := s.b.ChainConfig(); config.IsEIP155(s.b.CurrentBlock().Number()) {
 		chainID = config.ChainId

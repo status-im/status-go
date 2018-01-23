@@ -3,6 +3,7 @@ package httpu
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -22,6 +23,20 @@ type HTTPUClient struct {
 // purpose.
 func NewHTTPUClient() (*HTTPUClient, error) {
 	conn, err := net.ListenPacket("udp", ":0")
+	if err != nil {
+		return nil, err
+	}
+	return &HTTPUClient{conn: conn}, nil
+}
+
+// NewHTTPUClientAddr creates a new HTTPUClient which will broadcast packets
+// from the specified address, opening up a new UDP socket for the purpose
+func NewHTTPUClientAddr(addr string) (*HTTPUClient, error) {
+	ip := net.ParseIP(addr)
+	if ip == nil {
+		return nil, errors.New("Invalid listening address")
+	}
+	conn, err := net.ListenPacket("udp", ip.String()+":0")
 	if err != nil {
 		return nil, err
 	}

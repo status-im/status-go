@@ -8,8 +8,8 @@
 // the connection unexpectedly.
 //
 // You may create net/context aware middlewares pretty much the same way as
-// you would do with http.Handler.
-package xhandler
+// you would with http.Handler.
+package xhandler // import "github.com/rs/xhandler"
 
 import (
 	"net/http"
@@ -23,7 +23,7 @@ type HandlerC interface {
 }
 
 // HandlerFuncC type is an adapter to allow the use of ordinary functions
-// as a xhandler.Handler. If f is a function with the appropriate signature,
+// as an xhandler.Handler. If f is a function with the appropriate signature,
 // xhandler.HandlerFuncC(f) is a xhandler.Handler object that calls f.
 type HandlerFuncC func(context.Context, http.ResponseWriter, *http.Request)
 
