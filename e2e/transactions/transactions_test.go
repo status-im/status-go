@@ -790,9 +790,6 @@ func (s *TransactionsTestSuite) TestEvictionOfQueuedTransactions() {
 		go s.Backend.SendTransaction(context.TODO(), common.SendTxArgs{}) // nolint: errcheck
 	}
 	time.Sleep(2 * time.Second)
-
-	log.Info(fmt.Sprintf("Number of transactions sent: %d. Queue size (shouldn't be more than %d): %d",
-		txCount, queue.DefaultTxQueueCap, txQueue.Count()))
 	s.Equal(10, txQueue.Count(), "transaction count should be 10")
 
 	for i := 0; i < queue.DefaultTxQueueCap+5; i++ { // stress test by hitting with lots of goroutines

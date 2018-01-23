@@ -38,7 +38,7 @@ func NewManager(nodeManager common.NodeManager, accountManager common.AccountMan
 	return &Manager{
 		nodeManager:    nodeManager,
 		accountManager: accountManager,
-		txQueue:        queue.NewQueue(),
+		txQueue:        queue.New(),
 		addrLock:       &AddrLocker{},
 		notify:         true,
 	}

@@ -22,7 +22,7 @@ type QueueTestSuite struct {
 }
 
 func (s *QueueTestSuite) SetupTest() {
-	s.queue = NewQueue()
+	s.queue = New()
 	s.queue.Start()
 }
 
@@ -57,6 +57,10 @@ func (s *QueueTestSuite) TestEnqueueProcessedTransaction() {
 	tx := common.CreateTransaction(context.Background(), common.SendTxArgs{})
 	tx.Hash = gethcommon.Hash{1}
 	s.Equal(ErrQueuedTxAlreadyProcessed, s.queue.Enqueue(tx))
+
+	tx = common.CreateTransaction(context.Background(), common.SendTxArgs{})
+	tx.Err = errors.New("error")
+	s.Equal(ErrQueuedTxAlreadyProcessed, s.queue.Enqueue(tx))
 }
 
 func (s *QueueTestSuite) testDone(hash gethcommon.Hash, err error) *common.QueuedTx {
@@ -85,7 +89,6 @@ func (s *QueueTestSuite) TestDoneTransientError() {
 	err := keystore.ErrDecrypt
 	tx := s.testDone(hash, err)
 	s.Equal(keystore.ErrDecrypt, tx.Err)
-	s.NotEqual(hash, tx.Hash)
 	s.Equal(gethcommon.Hash{}, tx.Hash)
 	s.True(s.queue.Has(tx.ID))
 }

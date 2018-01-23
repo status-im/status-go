@@ -160,6 +160,6 @@ func CreateTransaction(ctx context.Context, args SendTxArgs) *QueuedTx {
 		Hash:    common.Hash{},
 		Context: ctx,
 		Args:    args,
-		Done:    make(chan struct{}, 1),
+		Done:    make(chan struct{}),
 	}
 }

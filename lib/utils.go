@@ -1056,7 +1056,7 @@ func testDiscardTransaction(t *testing.T) bool { //nolint: gocyclo
 			}
 
 			receivedErrCode := event["error_code"].(string)
-			if receivedErrCode != transactions.SendTransactionDiscardedErrorCode {
+			if receivedErrCode != strconv.Itoa(transactions.SendTransactionDiscardedErrorCode) {
 				t.Errorf("unexpected error code received: got %v", receivedErrCode)
 				return
 			}
@@ -1143,7 +1143,7 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocycl
 			}
 
 			receivedErrCode := event["error_code"].(string)
-			if receivedErrCode != transactions.SendTransactionDiscardedErrorCode {
+			if receivedErrCode != strconv.Itoa(transactions.SendTransactionDiscardedErrorCode) {
 				t.Errorf("unexpected error code received: got %v", receivedErrCode)
 				return
 			}

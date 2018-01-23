@@ -59,7 +59,7 @@ type TxQueue struct {
 }
 
 // NewTransactionQueue make new transaction queue
-func NewQueue() *TxQueue {
+func New() *TxQueue {
 	log.Info("initializing transaction queue")
 	return &TxQueue{
 		transactions:  make(map[common.QueuedTxID]*common.QueuedTx),
@@ -163,7 +163,7 @@ func (q *TxQueue) Get(id common.QueuedTxID) (*common.QueuedTx, error) {
 	return nil, ErrQueuedTxIDNotFound
 }
 
-// LockInprogress returns transcation and locks it as inprogress
+// LockInprogress returns transation and locks it as inprogress
 func (q *TxQueue) LockInprogress(id common.QueuedTxID) (*common.QueuedTx, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -210,13 +210,12 @@ func (q *TxQueue) done(tx *common.QueuedTx, hash gethcommon.Hash, err error) {
 	if err == nil {
 		q.remove(tx.ID)
 		tx.Hash = hash
-		tx.Done <- struct{}{}
+		close(tx.Done)
 		return
 	}
-	_, transient := transientErrs[err.Error()]
-	if !transient {
+	if _, transient := transientErrs[err.Error()]; !transient {
 		q.remove(tx.ID)
-		tx.Done <- struct{}{}
+		close(tx.Done)
 	}
 }
 

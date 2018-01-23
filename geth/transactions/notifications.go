@@ -1,9 +1,10 @@
 package transactions
 
 import (
+	"strconv"
+
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/status-im/status-go/geth/common"
-	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/signal"
 	"github.com/status-im/status-go/geth/transactions/queue"
 )
@@ -13,15 +14,17 @@ const (
 	EventTransactionQueued = "transaction.queued"
 	// EventTransactionFailed is triggered when send transaction request fails
 	EventTransactionFailed = "transaction.failed"
-
-	SendTransactionNoErrorCode        = "0"
-	SendTransactionDefaultErrorCode   = "1"
-	SendTransactionPasswordErrorCode  = "2"
-	SendTransactionTimeoutErrorCode   = "3"
-	SendTransactionDiscardedErrorCode = "4"
 )
 
-var txReturnCodes = map[error]string{ // deliberately strings, in case more meaningful codes are to be returned
+const (
+	SendTransactionNoErrorCode = iota
+	SendTransactionDefaultErrorCode
+	SendTransactionPasswordErrorCode
+	SendTransactionTimeoutErrorCode
+	SendTransactionDiscardedErrorCode
+)
+
+var txReturnCodes = map[error]int{
 	nil:                        SendTransactionNoErrorCode,
 	keystore.ErrDecrypt:        SendTransactionPasswordErrorCode,
 	queue.ErrQueuedTxTimedOut:  SendTransactionTimeoutErrorCode,
@@ -37,7 +40,6 @@ type SendTransactionEvent struct {
 
 // NotifyOnEnqueue returns handler that processes incoming tx queue requests
 func NotifyOnEnqueue(queuedTx *common.QueuedTx) {
-	log.Info("calling TransactionQueueHandler")
 	signal.Send(signal.Envelope{
 		Type: EventTransactionQueued,
 		Event: SendTransactionEvent{
@@ -59,16 +61,14 @@ type ReturnSendTransactionEvent struct {
 
 // NotifyOnReturn returns handler that processes responses from internal tx manager
 func NotifyOnReturn(queuedTx *common.QueuedTx) {
-	if queuedTx.Err == nil {
-		return
-	}
-
 	// discard notifications with empty tx
 	if queuedTx == nil {
 		return
 	}
-
-	// error occurred, signal up to application
+	// we don't want to notify a user if tx sent successfully
+	if queuedTx.Err == nil {
+		return
+	}
 	signal.Send(signal.Envelope{
 		Type: EventTransactionFailed,
 		Event: ReturnSendTransactionEvent{
@@ -76,12 +76,12 @@ func NotifyOnReturn(queuedTx *common.QueuedTx) {
 			Args:         queuedTx.Args,
 			MessageID:    common.MessageIDFromContext(queuedTx.Context),
 			ErrorMessage: queuedTx.Err.Error(),
-			ErrorCode:    sendTransactionErrorCode(queuedTx.Err),
+			ErrorCode:    strconv.Itoa(sendTransactionErrorCode(queuedTx.Err)),
 		},
 	})
 }
 
-func sendTransactionErrorCode(err error) string {
+func sendTransactionErrorCode(err error) int {
 	if code, ok := txReturnCodes[err]; ok {
 		return code
 	}
