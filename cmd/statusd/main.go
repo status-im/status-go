@@ -5,11 +5,14 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/status-im/status-go/cmd/statusd/debug"
 	"github.com/status-im/status-go/geth/api"
+	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
 )
 
@@ -23,7 +26,8 @@ var (
 	nodeKeyFile    = flag.String("nodekey", "", "P2P node key file (private key)")
 	dataDir        = flag.String("datadir", params.DataDir, "Data directory for the databases and keystore")
 	networkID      = flag.Int("networkid", params.RopstenNetworkID, "Network identifier (integer, 1=Homestead, 3=Ropsten, 4=Rinkeby, 777=StatusChain)")
-	whisperEnabled = flag.Bool("shh", false, "SHH protocol enabled")
+	lesEnabled     = flag.Bool("les", false, "LES protocol enabled (default is disabled)")
+	whisperEnabled = flag.Bool("shh", false, "Whisper protocol enabled (default is disabled)")
 	swarmEnabled   = flag.Bool("swarm", false, "Swarm protocol enabled")
 	httpEnabled    = flag.Bool("http", false, "HTTP RPC endpoint enabled (default: false)")
 	httpPort       = flag.Int("httpport", params.HTTPPort, "HTTP RPC server's listening port")
@@ -33,10 +37,10 @@ var (
 	logLevel       = flag.String("log", "INFO", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
 	logFile        = flag.String("logfile", "", "Path to the log file")
 	version        = flag.Bool("version", false, "Print version")
-	lesEnabled     = flag.Bool("les", true, "LES protocol enabled")
 
 	listenAddr = flag.String("listenaddr", ":30303", "IP address and port of this node (e.g. 127.0.0.1:30303)")
 	standalone = flag.Bool("standalone", true, "Don't actively connect to peers, wait for incoming connections")
+	bootnodes  = flag.String("bootnodes", "", "A list of bootnodes separated by comma")
 
 	// shh stuff
 	identityFile = flag.String("shh.identityfile", "", "Protocol identity file (private key used for asymmetric encryption)")
@@ -73,6 +77,9 @@ func main() {
 		log.Fatalf("Node start failed: %v", err)
 		return
 	}
+
+	// handle interrupt signals
+	go haltOnInterruptSignal(backend.NodeManager())
 
 	// wait till node is started
 	<-started
@@ -132,6 +139,20 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 	nodeConfig.LightEthConfig.Enabled = *lesEnabled
 	nodeConfig.SwarmConfig.Enabled = *swarmEnabled
 
+	if *standalone {
+		nodeConfig.BootClusterConfig.Enabled = false
+		nodeConfig.BootClusterConfig.BootNodes = nil
+	} else {
+		nodeConfig.Discovery = true
+	}
+
+	// Even if standalone is true and discovery is disabled,
+	// it's possible to use bootnodes in NodeManager.PopulateStaticPeers().
+	// TODO(adam): research if we need NodeManager.PopulateStaticPeers() at all.
+	if *bootnodes != "" {
+		nodeConfig.BootClusterConfig.BootNodes = strings.Split(*bootnodes, ",")
+	}
+
 	if *whisperEnabled {
 		return whisperConfig(nodeConfig)
 	}
@@ -183,4 +204,29 @@ Options:
 `
 	fmt.Fprintf(os.Stderr, usage) // nolint: gas
 	flag.PrintDefaults()
+}
+
+// haltOnInterruptSignal catches interrupt signal (SIGINT) and
+// stops the node. It times out after 5 seconds
+// if the node can not be stopped.
+func haltOnInterruptSignal(nodeManager common.NodeManager) {
+	signalCh := make(chan os.Signal, 1)
+	signal.Notify(signalCh, os.Interrupt)
+	defer signal.Stop(signalCh)
+	<-signalCh
+
+	log.Println("Got interrupt, shutting down...")
+
+	nodeStopped, err := nodeManager.StopNode()
+	if err != nil {
+		log.Printf("Failed to stop node: %v", err.Error())
+		os.Exit(1)
+	}
+
+	select {
+	case <-nodeStopped:
+	case <-time.After(time.Second * 5):
+		log.Printf("Stopping node timed out")
+		os.Exit(1)
+	}
 }

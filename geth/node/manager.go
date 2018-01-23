@@ -48,10 +48,7 @@ type NodeManager struct {
 
 // NewNodeManager makes new instance of node manager
 func NewNodeManager() *NodeManager {
-	m := &NodeManager{}
-	go HaltOnInterruptSignal(m) // allow interrupting running nodes
-
-	return m
+	return &NodeManager{}
 }
 
 // StartNode start Status node, fails if node is already started
