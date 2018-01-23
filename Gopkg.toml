@@ -1,0 +1,129 @@
+[prune]
+  unused-packages = true
+  go-tests = true
+
+  [[prune.project]]
+    name = "github.com/karalabe/hid"
+    non-go = false
+    unused-packages = false
+
+  [[prune.project]]
+    name = "github.com/ethereum/go-ethereum"
+    non-go = false
+    unused-packages = false
+
+# * * * * * constrained `status-go` dependencies * * * * *
+# (for the full dependency list see `Gopkg.lock`)
+
+[[constraint]] 
+  # `btcutil` is required to be compatible with `btcd`
+  name = "github.com/btcsuite/btcutil"
+  revision = "dcd4997b0664bcfd6ef48e4ae9da8396e08b1cd9"
+
+[[constraint]]
+  # fork of `go-ethereum` with Status patches
+  name = "github.com/ethereum/go-ethereum"
+  branch = "develop"
+  source = "https://github.com/status-im/go-ethereum.git"
+
+# * * * * * `go-ethereum` dependencies * * * * *
+# Pinned down SHAs from `go-ethereum/vendor/vendor.json`
+# When upgrading upstream, upgrade these values too.
+[[override]]
+  name = "github.com/aristanetworks/goarista"
+  revision = "ea17b1a17847fb6e4c0a91de0b674704693469b0"
+
+[[override]]
+  name = "github.com/btcsuite/btcd"
+  revision = "d06c0bb181529331be8f8d9350288c420d9e60e4"
+
+[[override]]
+  name = "github.com/davecgh/go-spew"
+  revision = "346938d642f2ec3594ed81d874461961cd0faa76"
+
+[[override]]
+  name = "github.com/edsrzf/mmap-go"
+  revision = "935e0e8a636ca4ba70b713f3e38a19e1b77739e8"
+
+[[override]]
+  name = "github.com/go-stack/stack"
+  revision = "54be5f394ed2c3e19dac9134a40a95ba5a017f7b"
+
+[[override]]
+  name = "github.com/golang/protobuf"
+  revision = "748d386b5c1ea99658fd69fe9f03991ce86a90c1"
+
+[[override]]
+  name = "github.com/golang/snappy"
+  revision = "553a641470496b2327abcac10b36396bd98e45c9"
+
+[[override]]
+  name = "github.com/hashicorp/golang-lru"
+  revision = "0a025b7e63adc15a622f29b0b2c4c3848243bbf6"
+
+[[override]]
+  name = "github.com/huin/goupnp"
+  revision = "679507af18f3c7ba2bcc7905392ce23e148661c3"
+
+[[override]]
+  name = "github.com/jackpal/go-nat-pmp"
+  revision = "1fa385a6f45828c83361136b45b1a21a12139493"
+
+[[override]]
+  name = "github.com/karalabe/hid"
+  revision = "f00545f9f3748e591590be3732d913c77525b10f"
+
+[[override]]
+  name = "github.com/mattn/go-colorable"
+  revision = "5411d3eea5978e6cdc258b30de592b60df6aba96"
+
+[[override]]
+  name = "github.com/mattn/go-isatty"
+  revision = "281032e84ae07510239465db46bf442aa44b953a"
+
+[[override]]
+  name = "github.com/pborman/uuid"
+  revision = "1b00554d822231195d1babd97ff4a781231955c9"
+
+[[override]]
+  name = "github.com/pmezard/go-difflib"
+  revision = "792786c7400a136282c1664665ae0a8db921c6c2"
+
+[[override]]
+  name = "github.com/prometheus/prometheus"
+  revision = "3101606756c53221ed58ba94ecba6b26adf89dcc"
+
+[[override]]
+  name = "github.com/rcrowley/go-metrics"
+  revision = "1f30fe9094a513ce4c700b9a54458bbb0c96996c"
+
+[[override]]
+  name = "github.com/rjeczalik/notify"
+  revision = "9d5aa0c3b735c3340018a4627446c3ea5a04a097"
+
+[[override]]
+  name = "github.com/robertkrimen/otto"
+  # (@mandrigin): This supposed to be contrained as:
+  #
+  # revision = "6a77b7cbc37d0c39f7d5fa5766826e541df31fd5"
+  #
+  # but it has relative imports that break everything.
+  # The following revision only differs from the source
+  # with fixing relative imports.
+  revision = "9c716adcc8cedb0c0e3c02be549f4ad20e0b216c"
+
+[[override]]
+  name = "github.com/rs/cors"
+  revision = "a62a804a8a009876ca59105f7899938a1349f4b3"
+
+[[override]]
+  name = "github.com/rs/xhandler"
+  revision = "ed27b6fd65218132ee50cd95f38474a3d8a2cd12"
+
+[[override]]
+  name = "github.com/stretchr/testify"
+  revision = "890a5c3458b43e6104ff5da8dfa139d013d77544"
+
+[[override]]
+  name = "github.com/syndtr/goleveldb"
+  revision = "b89cc31ef7977104127d34c1bd31ebd1a9db2199"
