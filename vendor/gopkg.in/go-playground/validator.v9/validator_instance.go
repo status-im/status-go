@@ -22,8 +22,11 @@ const (
 	structOnlyTag      = "structonly"
 	noStructLevelTag   = "nostructlevel"
 	omitempty          = "omitempty"
+	isdefault          = "isdefault"
 	skipValidationTag  = "-"
 	diveTag            = "dive"
+	keysTag            = "keys"
+	endKeysTag         = "endkeys"
 	requiredTag        = "required"
 	namespaceSeparator = "."
 	leftBracket        = "["
@@ -176,12 +179,8 @@ func (v *Validate) RegisterAlias(alias, tags string) {
 }
 
 // RegisterStructValidation registers a StructLevelFunc against a number of types.
-// This is akin to implementing the 'Validatable' interface, but for structs for which
-// you may not have access or rights to change.
 //
-// NOTES:
-// - if this and the 'Validatable' interface are implemented the Struct Level takes precedence as to enable
-// a struct out of your control's validation to be overridden
+// NOTE:
 // - this method is not thread-safe it is intended that these all be registered prior to any validation
 func (v *Validate) RegisterStructValidation(fn StructLevelFunc, types ...interface{}) {
 	v.RegisterStructValidationCtx(wrapStructLevelFunc(fn), types...)
@@ -189,12 +188,8 @@ func (v *Validate) RegisterStructValidation(fn StructLevelFunc, types ...interfa
 
 // RegisterStructValidationCtx registers a StructLevelFuncCtx against a number of types and allows passing
 // of contextual validation information via context.Context.
-// This is akin to implementing a 'Validatable' interface, but for structs for which
-// you may not have access or rights to change.
 //
-// NOTES:
-// - if this and the 'Validatable' interface are implemented the Struct Level takes precedence as to enable
-// a struct out of your control's validation to be overridden
+// NOTE:
 // - this method is not thread-safe it is intended that these all be registered prior to any validation
 func (v *Validate) RegisterStructValidationCtx(fn StructLevelFuncCtx, types ...interface{}) {
 
@@ -494,9 +489,10 @@ func (v *Validate) StructExceptCtx(ctx context.Context, s interface{}, fields ..
 // var i int
 // validate.Var(i, "gt=1,lt=10")
 //
-// WARNING: a struct can be passed for validation eg. time.Time is a struct or if you have a custom type and have registered
-//          a custom type handler, so must allow it; however unforseen validations will occur if trying to validate a struct
-//          that is meant to be passed to 'validate.Struct'
+// WARNING: a struct can be passed for validation eg. time.Time is a struct or
+// if you have a custom type and have registered a custom type handler, so must
+// allow it; however unforseen validations will occur if trying to validate a
+// struct that is meant to be passed to 'validate.Struct'
 //
 // It returns InvalidValidationError for bad values passed in and nil or ValidationErrors as error otherwise.
 // You will need to assert the error if it's not nil eg. err.(validator.ValidationErrors) to access the array of errors.
@@ -511,9 +507,10 @@ func (v *Validate) Var(field interface{}, tag string) error {
 // var i int
 // validate.Var(i, "gt=1,lt=10")
 //
-// WARNING: a struct can be passed for validation eg. time.Time is a struct or if you have a custom type and have registered
-//          a custom type handler, so must allow it; however unforseen validations will occur if trying to validate a struct
-//          that is meant to be passed to 'validate.Struct'
+// WARNING: a struct can be passed for validation eg. time.Time is a struct or
+// if you have a custom type and have registered a custom type handler, so must
+// allow it; however unforseen validations will occur if trying to validate a
+// struct that is meant to be passed to 'validate.Struct'
 //
 // It returns InvalidValidationError for bad values passed in and nil or ValidationErrors as error otherwise.
 // You will need to assert the error if it's not nil eg. err.(validator.ValidationErrors) to access the array of errors.
@@ -523,36 +520,18 @@ func (v *Validate) VarCtx(ctx context.Context, field interface{}, tag string) (e
 		return nil
 	}
 
-	// find cached tag
-	ctag, ok := v.tagCache.Get(tag)
-	if !ok {
-		v.tagCache.lock.Lock()
-		defer v.tagCache.lock.Unlock()
-
-		// could have been multiple trying to access, but once first is done this ensures tag
-		// isn't parsed again.
-		ctag, ok = v.tagCache.Get(tag)
-		if !ok {
-			ctag, _ = v.parseFieldTagsRecursive(tag, "", "", false)
-			v.tagCache.Set(tag, ctag)
-		}
-	}
-
+	ctag := v.fetchCacheTag(tag)
 	val := reflect.ValueOf(field)
-
 	vd := v.pool.Get().(*validate)
 	vd.top = val
 	vd.isPartial = false
-
 	vd.traverseField(ctx, val, val, vd.ns[0:0], vd.actualNs[0:0], defaultCField, ctag)
 
 	if len(vd.errs) > 0 {
 		err = vd.errs
 		vd.errs = nil
 	}
-
 	v.pool.Put(vd)
-
 	return
 }
 
@@ -562,9 +541,10 @@ func (v *Validate) VarCtx(ctx context.Context, field interface{}, tag string) (e
 // s2 := "abcd"
 // validate.VarWithValue(s1, s2, "eqcsfield") // returns true
 //
-// WARNING: a struct can be passed for validation eg. time.Time is a struct or if you have a custom type and have registered
-//          a custom type handler, so must allow it; however unforseen validations will occur if trying to validate a struct
-//          that is meant to be passed to 'validate.Struct'
+// WARNING: a struct can be passed for validation eg. time.Time is a struct or
+// if you have a custom type and have registered a custom type handler, so must
+// allow it; however unforseen validations will occur if trying to validate a
+// struct that is meant to be passed to 'validate.Struct'
 //
 // It returns InvalidValidationError for bad values passed in and nil or ValidationErrors as error otherwise.
 // You will need to assert the error if it's not nil eg. err.(validator.ValidationErrors) to access the array of errors.
@@ -580,9 +560,10 @@ func (v *Validate) VarWithValue(field interface{}, other interface{}, tag string
 // s2 := "abcd"
 // validate.VarWithValue(s1, s2, "eqcsfield") // returns true
 //
-// WARNING: a struct can be passed for validation eg. time.Time is a struct or if you have a custom type and have registered
-//          a custom type handler, so must allow it; however unforseen validations will occur if trying to validate a struct
-//          that is meant to be passed to 'validate.Struct'
+// WARNING: a struct can be passed for validation eg. time.Time is a struct or
+// if you have a custom type and have registered a custom type handler, so must
+// allow it; however unforseen validations will occur if trying to validate a
+// struct that is meant to be passed to 'validate.Struct'
 //
 // It returns InvalidValidationError for bad values passed in and nil or ValidationErrors as error otherwise.
 // You will need to assert the error if it's not nil eg. err.(validator.ValidationErrors) to access the array of errors.
@@ -591,36 +572,17 @@ func (v *Validate) VarWithValueCtx(ctx context.Context, field interface{}, other
 	if len(tag) == 0 || tag == skipValidationTag {
 		return nil
 	}
-
-	// find cached tag
-	ctag, ok := v.tagCache.Get(tag)
-	if !ok {
-		v.tagCache.lock.Lock()
-		defer v.tagCache.lock.Unlock()
-
-		// could have been multiple trying to access, but once first is done this ensures tag
-		// isn't parsed again.
-		ctag, ok = v.tagCache.Get(tag)
-		if !ok {
-			ctag, _ = v.parseFieldTagsRecursive(tag, "", "", false)
-			v.tagCache.Set(tag, ctag)
-		}
-	}
-
+	ctag := v.fetchCacheTag(tag)
 	otherVal := reflect.ValueOf(other)
-
 	vd := v.pool.Get().(*validate)
 	vd.top = otherVal
 	vd.isPartial = false
-
 	vd.traverseField(ctx, otherVal, reflect.ValueOf(field), vd.ns[0:0], vd.actualNs[0:0], defaultCField, ctag)
 
 	if len(vd.errs) > 0 {
 		err = vd.errs
 		vd.errs = nil
 	}
-
 	v.pool.Put(vd)
-
 	return
 }

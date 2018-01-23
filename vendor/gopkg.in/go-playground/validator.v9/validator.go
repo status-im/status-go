@@ -112,7 +112,7 @@ func (v *validate) traverseField(ctx context.Context, parent reflect.Value, curr
 			return
 		}
 
-		if ct.typeof == typeOmitEmpty {
+		if ct.typeof == typeOmitEmpty || ct.typeof == typeIsDefault {
 			return
 		}
 
@@ -174,6 +174,39 @@ func (v *validate) traverseField(ctx context.Context, parent reflect.Value, curr
 
 				if ct.typeof == typeStructOnly {
 					goto CONTINUE
+				} else if ct.typeof == typeIsDefault {
+					// set Field Level fields
+					v.slflParent = parent
+					v.flField = current
+					v.cf = cf
+					v.ct = ct
+
+					if !ct.fn(ctx, v) {
+						v.str1 = string(append(ns, cf.altName...))
+
+						if v.v.hasTagNameFunc {
+							v.str2 = string(append(structNs, cf.name...))
+						} else {
+							v.str2 = v.str1
+						}
+
+						v.errs = append(v.errs,
+							&fieldError{
+								v:              v.v,
+								tag:            ct.aliasTag,
+								actualTag:      ct.tag,
+								ns:             v.str1,
+								structNs:       v.str2,
+								fieldLen:       uint8(len(cf.altName)),
+								structfieldLen: uint8(len(cf.name)),
+								value:          current.Interface(),
+								param:          ct.param,
+								kind:           kind,
+								typ:            typ,
+							},
+						)
+						return
+					}
 				}
 
 				ct = ct.next
@@ -227,6 +260,9 @@ OUTER:
 			ct = ct.next
 			continue
 
+		case typeEndKeys:
+			return
+
 		case typeDive:
 
 			ct = ct.next
@@ -261,7 +297,6 @@ OUTER:
 
 						reusableCF.altName = string(v.misc)
 					}
-
 					v.traverseField(ctx, parent, current.Index(i), ns, structNs, reusableCF, ct)
 				}
 
@@ -292,7 +327,15 @@ OUTER:
 						reusableCF.altName = string(v.misc)
 					}
 
-					v.traverseField(ctx, parent, current.MapIndex(key), ns, structNs, reusableCF, ct)
+					if ct != nil && ct.typeof == typeKeys && ct.keys != nil {
+						v.traverseField(ctx, parent, key, ns, structNs, reusableCF, ct.keys)
+						// can be nil when just keys being validated
+						if ct.next != nil {
+							v.traverseField(ctx, parent, current.MapIndex(key), ns, structNs, reusableCF, ct.next)
+						}
+					} else {
+						v.traverseField(ctx, parent, current.MapIndex(key), ns, structNs, reusableCF, ct)
+					}
 				}
 
 			default:
@@ -335,14 +378,13 @@ OUTER:
 				v.misc = append(v.misc, '|')
 				v.misc = append(v.misc, ct.tag...)
 
-				if len(ct.param) > 0 {
+				if ct.hasParam {
 					v.misc = append(v.misc, '=')
 					v.misc = append(v.misc, ct.param...)
 				}
 
-				if ct.next == nil || ct.next.typeof != typeOr { // ct.typeof != typeOr
+				if ct.isBlockEnd || ct.next == nil {
 					// if we get here, no valid 'or' value and no more tags
-
 					v.str1 = string(append(ns, cf.altName...))
 
 					if v.v.hasTagNameFunc {
@@ -404,10 +446,6 @@ OUTER:
 			v.cf = cf
 			v.ct = ct
 
-			// // report error interface functions need these
-			// v.ns = ns
-			// v.actualNs = structNs
-
 			if !ct.fn(ctx, v) {
 
 				v.str1 = string(append(ns, cf.altName...))
@@ -435,9 +473,7 @@ OUTER:
 				)
 
 				return
-
 			}
-
 			ct = ct.next
 		}
 	}
