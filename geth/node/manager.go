@@ -299,6 +299,9 @@ func (m *NodeManager) addPeer(url string) error {
 }
 
 func (m *NodeManager) PeerCount() int {
+	if m.node == nil || m.node.Server() == nil {
+		return 0
+	}
 	return m.node.Server().PeerCount()
 }
 
