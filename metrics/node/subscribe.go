@@ -14,7 +14,6 @@ import (
 func SubscribeServerEvents(ctx context.Context, node *node.Node) error {
 	server := node.Server()
 	if server == nil {
-		log.Warn("Failed to get a server")
 		return errors.New("server is unavailable")
 	}
 
@@ -26,7 +25,7 @@ func SubscribeServerEvents(ctx context.Context, node *node.Node) error {
 	for {
 		select {
 		case event := <-ch:
-			if event.Type == p2p.PeerEventTypeAdd || event.Type == p2p.PeerEventTypeDrop {
+			if isAddDropPeerEvent(event.Type) {
 				updateNodeInfo(node)
 				updateNodePeers(node)
 			}
@@ -41,4 +40,8 @@ func SubscribeServerEvents(ctx context.Context, node *node.Node) error {
 			return nil
 		}
 	}
+}
+
+func isAddDropPeerEvent(eventType p2p.PeerEventType) bool {
+	return eventType == p2p.PeerEventTypeAdd || eventType == p2p.PeerEventTypeDrop
 }
