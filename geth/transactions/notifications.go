@@ -17,7 +17,7 @@ const (
 )
 
 const (
-	// SendTransactionNoErrorCode is sent when no error occured.
+	// SendTransactionNoErrorCode is sent when no error occurred.
 	SendTransactionNoErrorCode = iota
 	// SendTransactionDefaultErrorCode is every case when there is no special tx return code.
 	SendTransactionDefaultErrorCode

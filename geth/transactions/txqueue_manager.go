@@ -106,13 +106,15 @@ func (m *Manager) WaitForTransaction(tx *common.QueuedTx) error {
 }
 
 // CompleteTransaction instructs backend to complete sending of a given transaction.
-// TODO(adam): investigate a possible bug that calling this method multiple times with the same Transaction ID
-// results in sending multiple transactions.
 func (m *Manager) CompleteTransaction(id common.QueuedTxID, password string) (hash gethcommon.Hash, err error) {
 	log.Info("complete transaction", "id", id)
-	tx, err := m.txQueue.LockInprogress(id)
+	tx, err := m.txQueue.Get(id)
 	if err != nil {
 		log.Warn("error getting a queued transaction", "err", err)
+		return hash, err
+	}
+	if err := m.txQueue.LockInprogress(id); err != nil {
+		log.Warn("can't process transaction", "err", err)
 		return hash, err
 	}
 	account, err := m.validateAccount(tx)

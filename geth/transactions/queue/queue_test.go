@@ -33,13 +33,13 @@ func (s *QueueTestSuite) TearDownTest() {
 func (s *QueueTestSuite) TestLockInprogressTransaction() {
 	tx := common.CreateTransaction(context.Background(), common.SendTxArgs{})
 	s.NoError(s.queue.Enqueue(tx))
-	enquedTx, err := s.queue.LockInprogress(tx.ID)
+	enquedTx, err := s.queue.Get(tx.ID)
 	s.NoError(err)
+	s.NoError(s.queue.LockInprogress(tx.ID))
 	s.Equal(tx, enquedTx)
 
 	// verify that tx was marked as being inprogress
-	_, err = s.queue.LockInprogress(tx.ID)
-	s.Equal(ErrQueuedTxInProgress, err)
+	s.Equal(ErrQueuedTxInProgress, s.queue.LockInprogress(tx.ID))
 }
 
 func (s *QueueTestSuite) TestGetTransaction() {

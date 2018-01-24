@@ -163,19 +163,18 @@ func (q *TxQueue) Get(id common.QueuedTxID) (*common.QueuedTx, error) {
 	return nil, ErrQueuedTxIDNotFound
 }
 
-// LockInprogress returns transaction and locks it as inprogress
-func (q *TxQueue) LockInprogress(id common.QueuedTxID) (*common.QueuedTx, error) {
+// LockInprogress returns error if transaction is already inprogress.
+func (q *TxQueue) LockInprogress(id common.QueuedTxID) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-
-	if tx, ok := q.transactions[id]; ok {
+	if _, ok := q.transactions[id]; ok {
 		if _, inprogress := q.inprogress[id]; inprogress {
-			return tx, ErrQueuedTxInProgress
+			return ErrQueuedTxInProgress
 		}
 		q.inprogress[id] = empty{}
-		return tx, nil
+		return nil
 	}
-	return nil, ErrQueuedTxIDNotFound
+	return ErrQueuedTxIDNotFound
 }
 
 // Remove removes transaction by transaction identifier
