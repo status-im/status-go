@@ -132,7 +132,7 @@ func startCollectingStats(nodeManager common.NodeManager, interruptCh <-chan str
 		return
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancelSubscription := context.WithCancel(context.Background())
 	go func() {
 		if err := nodeMetrics.SubscribeServerEvents(ctx, node); err != nil {
 			log.Printf("Failed to subscribe server events: %v", err)
@@ -144,10 +144,10 @@ func startCollectingStats(nodeManager common.NodeManager, interruptCh <-chan str
 		log.Printf("Metrics server failed: %v", server.ListenAndServe())
 	}()
 
-	select {
-	case <-interruptCh:
-		cancel()
-		server.Shutdown(context.TODO())
+	<-interruptCh
+	cancelSubscription()
+	if err := server.Shutdown(context.TODO()); err != nil {
+		log.Printf("Failed to shutdown metrics server: %v", err)
 	}
 }
 
