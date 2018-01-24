@@ -58,7 +58,7 @@ type TxQueue struct {
 	stoppedGroup sync.WaitGroup // to make sure that all routines are stopped
 }
 
-// NewTransactionQueue make new transaction queue
+// New creates a transaction queue.
 func New() *TxQueue {
 	log.Info("initializing transaction queue")
 	return &TxQueue{
@@ -163,7 +163,7 @@ func (q *TxQueue) Get(id common.QueuedTxID) (*common.QueuedTx, error) {
 	return nil, ErrQueuedTxIDNotFound
 }
 
-// LockInprogress returns transation and locks it as inprogress
+// LockInprogress returns transaction and locks it as inprogress
 func (q *TxQueue) LockInprogress(id common.QueuedTxID) (*common.QueuedTx, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -195,11 +195,11 @@ func (q *TxQueue) remove(id common.QueuedTxID) {
 func (q *TxQueue) Done(id common.QueuedTxID, hash gethcommon.Hash, err error) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	if tx, ok := q.transactions[id]; !ok {
+	tx, ok := q.transactions[id]
+	if !ok {
 		return ErrQueuedTxIDNotFound
-	} else {
-		q.done(tx, hash, err)
 	}
+	q.done(tx, hash, err)
 	return nil
 }
 

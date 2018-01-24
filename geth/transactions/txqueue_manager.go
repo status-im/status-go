@@ -44,8 +44,8 @@ func NewManager(nodeManager common.NodeManager, accountManager common.AccountMan
 	}
 }
 
-// DisableNotifications turns off notifications on enqueue and return of tx.
-// it is not thread safe and must be called only before manager is started.
+// DisableNotificactions turns off notifications on enqueue and return of tx.
+// It is not thread safe and must be called only before manager is started.
 func (m *Manager) DisableNotificactions() {
 	m.notify = false
 }

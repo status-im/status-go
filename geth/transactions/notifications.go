@@ -17,10 +17,15 @@ const (
 )
 
 const (
+	// SendTransactionNoErrorCode is sent when no error occured.
 	SendTransactionNoErrorCode = iota
+	// SendTransactionDefaultErrorCode is every case when there is no special tx return code.
 	SendTransactionDefaultErrorCode
+	// SendTransactionPasswordErrorCode is sent when account failed verification.
 	SendTransactionPasswordErrorCode
+	// SendTransactionTimeoutErrorCode is sent when tx is timed out.
 	SendTransactionTimeoutErrorCode
+	// SendTransactionDiscardedErrorCode is sent when tx was discarded.
 	SendTransactionDiscardedErrorCode
 )
 
