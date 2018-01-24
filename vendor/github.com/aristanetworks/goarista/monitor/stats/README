@@ -1,3 +1,0 @@
-These files were extracted from gRPC.  See the LICENSE file for copyright
-information.  We had to copy them here because gRPC's stats package also
-imports `testing', which we don't want to pull into our binary.

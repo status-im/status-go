@@ -1,3 +1,7 @@
+[prune]
+  unused-packages = true
+  go-tests = true
+
 [[constraint]] # Required to be compatible with `btcd`
   name = "github.com/btcsuite/btcutil"
   revision = "dcd4997b0664bcfd6ef48e4ae9da8396e08b1cd9"
