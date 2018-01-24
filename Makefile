@@ -4,8 +4,6 @@
 help: ##@other Show this help
 	@perl -e '$(HELP_FUN)' $(MAKEFILE_LIST)
 
-include ./static/tools/mk/lint.mk
-
 ifndef GOPATH
 	$(error GOPATH not set. Please set GOPATH and make sure status-go is located at $$GOPATH/src/github.com/status-im/status-go. \
 	For more information about the GOPATH environment variable, see https://golang.org/doc/code.html#GOPATH)
@@ -135,6 +133,14 @@ test-e2e: ##@tests Run e2e tests
 	go test -timeout 10m ./e2e/transactions/... -network=$(networkid)
 	# e2e_test tag is required to include some files from ./lib without _test suffix
 	go test -timeout 40m -tags e2e_test ./lib -network=$(networkid)
+
+lint-install:
+	go get -u github.com/alecthomas/gometalinter
+	gometalinter --install
+
+lint:
+	@echo "lint"
+	@gometalinter ./...
 
 ci: lint mock test-unit test-e2e ##@tests Run all linters and tests at once
 

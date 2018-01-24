@@ -10,6 +10,7 @@ import (
 	"github.com/golang/mock/gomock"
 )
 
+// NewTestServer returns a mocked test server
 func NewTestServer(ctrl *gomock.Controller) (*rpc.Server, *MockFakePublicTransactionPoolAPI) {
 	srv := rpc.NewServer()
 	svc := NewMockFakePublicTransactionPoolAPI(ctrl)
@@ -29,10 +30,10 @@ type CallArgs struct {
 	Data     hexutil.Bytes   `json:"data"`
 }
 
-// FakePublicTransactionPoolAPI used to generate mock by mockgen util.
+// PublicTransactionPoolAPI used to generate mock by mockgen util.
 // This was done because PublicTransactionPoolAPI is located in internal/ethapi module
 // and there is no easy way to generate mocks from internal modules.
-type FakePublicTransactionPoolAPI interface {
+type PublicTransactionPoolAPI interface {
 	GasPrice(ctx context.Context) (*big.Int, error)
 	EstimateGas(ctx context.Context, args CallArgs) (*hexutil.Big, error)
 	GetTransactionCount(ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (*hexutil.Uint64, error)

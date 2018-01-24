@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
+// AddrLocker provides locks for addresses
 type AddrLocker struct {
 	mu    sync.Mutex
 	locks map[common.Address]*sync.Mutex

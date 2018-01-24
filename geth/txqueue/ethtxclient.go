@@ -25,6 +25,7 @@ type EthTxClient struct {
 	c *rpc.Client
 }
 
+// NewEthTxClient returns a new EthTxClient for client
 func NewEthTxClient(client *rpc.Client) *EthTxClient {
 	return &EthTxClient{c: client}
 }
