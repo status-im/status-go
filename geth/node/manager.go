@@ -295,6 +295,7 @@ func (m *NodeManager) addPeer(url string) error {
 	return nil
 }
 
+// PeerCount returns the number of connected peers.
 func (m *NodeManager) PeerCount() int {
 	if m.node == nil || m.node.Server() == nil {
 		return 0
