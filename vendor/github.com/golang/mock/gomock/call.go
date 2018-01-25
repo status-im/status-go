@@ -17,7 +17,6 @@ package gomock
 import (
 	"fmt"
 	"reflect"
-	"strconv"
 	"strings"
 )
 
@@ -30,7 +29,6 @@ type Call struct {
 	methodType reflect.Type  // the type of the method
 	args       []Matcher     // the args
 	rets       []interface{} // the return values (if any)
-	origin     string        // file and line number of call setup
 
 	preReqs []*Call // prerequisite calls
 
@@ -81,8 +79,8 @@ func (c *Call) Do(f interface{}) *Call {
 func (c *Call) Return(rets ...interface{}) *Call {
 	mt := c.methodType
 	if len(rets) != mt.NumOut() {
-		c.t.Fatalf("wrong number of arguments to Return for %T.%v: got %d, want %d [%s]",
-			c.receiver, c.method, len(rets), mt.NumOut(), c.origin)
+		c.t.Fatalf("wrong number of arguments to Return for %T.%v: got %d, want %d",
+			c.receiver, c.method, len(rets), mt.NumOut())
 	}
 	for i, ret := range rets {
 		if got, want := reflect.TypeOf(ret), mt.Out(i); got == want {
@@ -93,8 +91,8 @@ func (c *Call) Return(rets ...interface{}) *Call {
 			case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Ptr, reflect.Slice:
 				// ok
 			default:
-				c.t.Fatalf("argument %d to Return for %T.%v is nil, but %v is not nillable [%s]",
-					i, c.receiver, c.method, want, c.origin)
+				c.t.Fatalf("argument %d to Return for %T.%v is nil, but %v is not nillable",
+					i, c.receiver, c.method, want)
 			}
 		} else if got.AssignableTo(want) {
 			// Assignable type relation. Make the assignment now so that the generated code
@@ -103,8 +101,8 @@ func (c *Call) Return(rets ...interface{}) *Call {
 			v.Set(reflect.ValueOf(ret))
 			rets[i] = v.Interface()
 		} else {
-			c.t.Fatalf("wrong type of argument %d to Return for %T.%v: %v is not assignable to %v [%s]",
-				i, c.receiver, c.method, got, want, c.origin)
+			c.t.Fatalf("wrong type of argument %d to Return for %T.%v: %v is not assignable to %v",
+				i, c.receiver, c.method, got, want)
 		}
 	}
 
@@ -118,8 +116,7 @@ func (c *Call) Times(n int) *Call {
 }
 
 // SetArg declares an action that will set the nth argument's value,
-// indirected through a pointer. Or, in the case of a slice, SetArg
-// will copy value's elements into the nth argument.
+// indirected through a pointer.
 func (c *Call) SetArg(n int, value interface{}) *Call {
 	if c.setArgs == nil {
 		c.setArgs = make(map[int]reflect.Value)
@@ -128,8 +125,7 @@ func (c *Call) SetArg(n int, value interface{}) *Call {
 	// TODO: This will break on variadic methods.
 	// We will need to check those at invocation time.
 	if n < 0 || n >= mt.NumIn() {
-		c.t.Fatalf("SetArg(%d, ...) called for a method with %d args [%s]",
-			n, mt.NumIn(), c.origin)
+		c.t.Fatalf("SetArg(%d, ...) called for a method with %d args", n, mt.NumIn())
 	}
 	// Permit setting argument through an interface.
 	// In the interface case, we don't (nay, can't) check the type here.
@@ -138,16 +134,12 @@ func (c *Call) SetArg(n int, value interface{}) *Call {
 	case reflect.Ptr:
 		dt := at.Elem()
 		if vt := reflect.TypeOf(value); !vt.AssignableTo(dt) {
-			c.t.Fatalf("SetArg(%d, ...) argument is a %v, not assignable to %v [%s]",
-				n, vt, dt, c.origin)
+			c.t.Fatalf("SetArg(%d, ...) argument is a %v, not assignable to %v", n, vt, dt)
 		}
 	case reflect.Interface:
 		// nothing to do
-	case reflect.Slice:
-		// nothing to do
 	default:
-		c.t.Fatalf("SetArg(%d, ...) referring to argument of non-pointer non-interface non-slice type %v",
-			n, at, c.origin)
+		c.t.Fatalf("SetArg(%d, ...) referring to argument of non-pointer non-interface type %v", n, at)
 	}
 	c.setArgs[n] = reflect.ValueOf(value)
 	return c
@@ -166,7 +158,7 @@ func (c *Call) isPreReq(other *Call) bool {
 // After declares that the call may only match after preReq has been exhausted.
 func (c *Call) After(preReq *Call) *Call {
 	if c == preReq {
-		c.t.Fatalf("A call isn't allowed to be its own prerequisite")
+		c.t.Fatalf("A call isn't allowed to be it's own prerequisite")
 	}
 	if preReq.isPreReq(c) {
 		c.t.Fatalf("Loop in call order: %v is a prerequisite to %v (possibly indirectly).", c, preReq)
@@ -176,7 +168,7 @@ func (c *Call) After(preReq *Call) *Call {
 	return c
 }
 
-// Returns true if the minimum number of calls have been made.
+// Returns true iff the minimum number of calls have been made.
 func (c *Call) satisfied() bool {
 	return c.numCalls >= c.minCalls
 }
@@ -192,35 +184,31 @@ func (c *Call) String() string {
 		args[i] = arg.String()
 	}
 	arguments := strings.Join(args, ", ")
-	return fmt.Sprintf("%T.%v(%s) %s", c.receiver, c.method, arguments, c.origin)
+	return fmt.Sprintf("%T.%v(%s)", c.receiver, c.method, arguments)
 }
 
 // Tests if the given call matches the expected call.
-// If yes, returns nil. If no, returns error with message explaining why it does not match.
-func (c *Call) matches(args []interface{}) error {
+func (c *Call) matches(args []interface{}) bool {
 	if len(args) != len(c.args) {
-		return fmt.Errorf("Expected call at %s has the wrong number of arguments. Got: %s, want: %s",
-			c.origin, strconv.Itoa(len(args)), strconv.Itoa(len(c.args)))
+		return false
 	}
 	for i, m := range c.args {
 		if !m.Matches(args[i]) {
-			return fmt.Errorf("Expected call at %s doesn't match the argument at index %s.\nGot: %v\nWant: %v\n",
-				c.origin, strconv.Itoa(i), args[i], m)
+			return false
 		}
 	}
 
 	// Check that all prerequisite calls have been satisfied.
 	for _, preReqCall := range c.preReqs {
 		if !preReqCall.satisfied() {
-			return fmt.Errorf("Expected call at %s doesn't have a prerequisite call satisfied:\n%v\nshould be called before:\n%v",
-				c.origin, preReqCall, c)
+			return false
 		}
 	}
 
-	return nil
+	return true
 }
 
-// dropPrereqs tells the expected Call to not re-check prerequisite calls any
+// dropPrereqs tells the expected Call to not re-check prerequite calls any
 // longer, and to return its current set.
 func (c *Call) dropPrereqs() (preReqs []*Call) {
 	preReqs = c.preReqs
@@ -246,12 +234,7 @@ func (c *Call) call(args []interface{}) (rets []interface{}, action func()) {
 		action = func() { c.doFunc.Call(doArgs) }
 	}
 	for n, v := range c.setArgs {
-		switch reflect.TypeOf(args[n]).Kind() {
-		case reflect.Slice:
-			setSlice(args[n], v)
-		default:
-			reflect.ValueOf(args[n]).Elem().Set(v)
-		}
+		reflect.ValueOf(args[n]).Elem().Set(v)
 	}
 
 	rets = c.rets
@@ -271,12 +254,5 @@ func (c *Call) call(args []interface{}) (rets []interface{}, action func()) {
 func InOrder(calls ...*Call) {
 	for i := 1; i < len(calls); i++ {
 		calls[i].After(calls[i-1])
-	}
-}
-
-func setSlice(arg interface{}, v reflect.Value) {
-	va := reflect.ValueOf(arg)
-	for i := 0; i < v.Len(); i++ {
-		va.Index(i).Set(v.Index(i))
 	}
 }
