@@ -102,7 +102,7 @@ func main() {
 
 	// Run stats server.
 	if *statsEnabled {
-		go startCollectingStats(backend.NodeManager(), interruptCh)
+		go startCollectingStats(interruptCh, backend.NodeManager())
 	}
 
 	// wait till node has been stopped
@@ -123,7 +123,7 @@ func startDebug(backend *api.StatusBackend) error {
 }
 
 // startCollectingStats collects various stats about the node and other protocols like Whisper.
-func startCollectingStats(nodeManager common.NodeManager, interruptCh <-chan struct{}) {
+func startCollectingStats(interruptCh <-chan struct{}, nodeManager common.NodeManager) {
 	log.Printf("Starting stats on %v", *statsAddr)
 
 	node, err := nodeManager.Node()
@@ -132,7 +132,8 @@ func startCollectingStats(nodeManager common.NodeManager, interruptCh <-chan str
 		return
 	}
 
-	ctx, cancelSubscription := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	go func() {
 		if err := nodeMetrics.SubscribeServerEvents(ctx, node); err != nil {
 			log.Printf("Failed to subscribe server events: %v", err)
@@ -145,7 +146,7 @@ func startCollectingStats(nodeManager common.NodeManager, interruptCh <-chan str
 	}()
 
 	<-interruptCh
-	cancelSubscription()
+
 	if err := server.Shutdown(context.TODO()); err != nil {
 		log.Printf("Failed to shutdown metrics server: %v", err)
 	}
