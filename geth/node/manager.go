@@ -295,6 +295,13 @@ func (m *NodeManager) addPeer(url string) error {
 	return nil
 }
 
+func (m *NodeManager) PeerCount() int {
+	if m.node == nil || m.node.Server() == nil {
+		return 0
+	}
+	return m.node.Server().PeerCount()
+}
+
 // ResetChainData remove chain data from data directory.
 // Node is stopped, and new node is started, with clean data directory.
 func (m *NodeManager) ResetChainData() (<-chan struct{}, error) {

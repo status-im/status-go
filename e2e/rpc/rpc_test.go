@@ -181,7 +181,7 @@ func (s *RPCTestSuite) TestCallContextResult() {
 	defer cancel()
 
 	var balance hexutil.Big
-	err := client.CallContext(ctx, &balance, "eth_getBalance", "0xbF164ca341326a03b547c05B343b2E21eFAe24b9", "latest")
+	err := client.CallContext(ctx, &balance, "eth_getBalance", TestConfig.Account1.Address, "latest")
 	s.NoError(err)
 	s.True(balance.ToInt().Cmp(big.NewInt(0)) > 0, "balance should be higher than 0")
 }

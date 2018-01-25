@@ -75,6 +75,9 @@ type NodeManager interface {
 	// AddPeer adds URL of static peer
 	AddPeer(url string) error
 
+	// PeerCount returns number of connected peers
+	PeerCount() int
+
 	// LightEthereumService exposes reference to LES service running on top of the node
 	LightEthereumService() (*les.LightEthereum, error)
 
