@@ -68,11 +68,8 @@ func (r *router) callContext(ctx context.Context, result interface{}, method str
 		return errors.New("No handler registered for method " + method)
 
 	case upstreamNode:
-		if r.upstreamEnabled {
-			return r.upstream.CallContext(ctx, result, method,
-				args...)
-		}
-		return r.local.CallContext(ctx, result, method, args...)
+		return upstreamIfEnabled().CallContext(ctx, result, method,
+			args...)
 
 	case localNode:
 		return r.local.CallContext(ctx, result, method, args...)
@@ -80,6 +77,14 @@ func (r *router) callContext(ctx context.Context, result interface{}, method str
 	default:
 		return errors.New("Unknown RPC destination '" + method + "'")
 	}
+}
+
+// returns the upstream node if it's enabled, otherwise returns the local one.
+func (r *router) upstreamIfEnabled() callContext {
+	if r.upstreamEnabled {
+		return r.upstream
+	}
+	return r.local
 }
 
 // registerHandler registers local handler for specific RPC method.
