@@ -521,18 +521,6 @@ func (mr *MockTxQueueManagerMockRecorder) TransactionQueue() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TransactionQueue", reflect.TypeOf((*MockTxQueueManager)(nil).TransactionQueue))
 }
 
-// CreateTransaction mocks base method
-func (m *MockTxQueueManager) CreateTransaction(ctx context.Context, args SendTxArgs) *QueuedTx {
-	ret := m.ctrl.Call(m, "CreateTransaction", ctx, args)
-	ret0, _ := ret[0].(*QueuedTx)
-	return ret0
-}
-
-// CreateTransaction indicates an expected call of CreateTransaction
-func (mr *MockTxQueueManagerMockRecorder) CreateTransaction(ctx, args interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateTransaction", reflect.TypeOf((*MockTxQueueManager)(nil).CreateTransaction), ctx, args)
-}
-
 // QueueTransaction mocks base method
 func (m *MockTxQueueManager) QueueTransaction(tx *QueuedTx) error {
 	ret := m.ctrl.Call(m, "QueueTransaction", tx)
@@ -557,48 +545,6 @@ func (mr *MockTxQueueManagerMockRecorder) WaitForTransaction(tx interface{}) *go
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitForTransaction", reflect.TypeOf((*MockTxQueueManager)(nil).WaitForTransaction), tx)
 }
 
-// NotifyOnQueuedTxReturn mocks base method
-func (m *MockTxQueueManager) NotifyOnQueuedTxReturn(queuedTx *QueuedTx, err error) {
-	m.ctrl.Call(m, "NotifyOnQueuedTxReturn", queuedTx, err)
-}
-
-// NotifyOnQueuedTxReturn indicates an expected call of NotifyOnQueuedTxReturn
-func (mr *MockTxQueueManagerMockRecorder) NotifyOnQueuedTxReturn(queuedTx, err interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NotifyOnQueuedTxReturn", reflect.TypeOf((*MockTxQueueManager)(nil).NotifyOnQueuedTxReturn), queuedTx, err)
-}
-
-// TransactionQueueHandler mocks base method
-func (m *MockTxQueueManager) TransactionQueueHandler() func(*QueuedTx) {
-	ret := m.ctrl.Call(m, "TransactionQueueHandler")
-	ret0, _ := ret[0].(func(*QueuedTx))
-	return ret0
-}
-
-// TransactionQueueHandler indicates an expected call of TransactionQueueHandler
-func (mr *MockTxQueueManagerMockRecorder) TransactionQueueHandler() *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TransactionQueueHandler", reflect.TypeOf((*MockTxQueueManager)(nil).TransactionQueueHandler))
-}
-
-// SetTransactionQueueHandler mocks base method
-func (m *MockTxQueueManager) SetTransactionQueueHandler(fn EnqueuedTxHandler) {
-	m.ctrl.Call(m, "SetTransactionQueueHandler", fn)
-}
-
-// SetTransactionQueueHandler indicates an expected call of SetTransactionQueueHandler
-func (mr *MockTxQueueManagerMockRecorder) SetTransactionQueueHandler(fn interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetTransactionQueueHandler", reflect.TypeOf((*MockTxQueueManager)(nil).SetTransactionQueueHandler), fn)
-}
-
-// SetTransactionReturnHandler mocks base method
-func (m *MockTxQueueManager) SetTransactionReturnHandler(fn EnqueuedTxReturnHandler) {
-	m.ctrl.Call(m, "SetTransactionReturnHandler", fn)
-}
-
-// SetTransactionReturnHandler indicates an expected call of SetTransactionReturnHandler
-func (mr *MockTxQueueManagerMockRecorder) SetTransactionReturnHandler(fn interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetTransactionReturnHandler", reflect.TypeOf((*MockTxQueueManager)(nil).SetTransactionReturnHandler), fn)
-}
-
 // SendTransactionRPCHandler mocks base method
 func (m *MockTxQueueManager) SendTransactionRPCHandler(ctx context.Context, args ...interface{}) (interface{}, error) {
 	varargs := []interface{}{ctx}
@@ -615,18 +561,6 @@ func (m *MockTxQueueManager) SendTransactionRPCHandler(ctx context.Context, args
 func (mr *MockTxQueueManagerMockRecorder) SendTransactionRPCHandler(ctx interface{}, args ...interface{}) *gomock.Call {
 	varargs := append([]interface{}{ctx}, args...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendTransactionRPCHandler", reflect.TypeOf((*MockTxQueueManager)(nil).SendTransactionRPCHandler), varargs...)
-}
-
-// TransactionReturnHandler mocks base method
-func (m *MockTxQueueManager) TransactionReturnHandler() func(*QueuedTx, error) {
-	ret := m.ctrl.Call(m, "TransactionReturnHandler")
-	ret0, _ := ret[0].(func(*QueuedTx, error))
-	return ret0
-}
-
-// TransactionReturnHandler indicates an expected call of TransactionReturnHandler
-func (mr *MockTxQueueManagerMockRecorder) TransactionReturnHandler() *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TransactionReturnHandler", reflect.TypeOf((*MockTxQueueManager)(nil).TransactionReturnHandler))
 }
 
 // CompleteTransaction mocks base method
@@ -676,6 +610,16 @@ func (m *MockTxQueueManager) DiscardTransactions(ids []QueuedTxID) map[QueuedTxI
 // DiscardTransactions indicates an expected call of DiscardTransactions
 func (mr *MockTxQueueManagerMockRecorder) DiscardTransactions(ids interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DiscardTransactions", reflect.TypeOf((*MockTxQueueManager)(nil).DiscardTransactions), ids)
+}
+
+// DisableNotificactions mocks base method
+func (m *MockTxQueueManager) DisableNotificactions() {
+	m.ctrl.Call(m, "DisableNotificactions")
+}
+
+// DisableNotificactions indicates an expected call of DisableNotificactions
+func (mr *MockTxQueueManagerMockRecorder) DisableNotificactions() *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DisableNotificactions", reflect.TypeOf((*MockTxQueueManager)(nil).DisableNotificactions))
 }
 
 // MockJailCell is a mock of JailCell interface

@@ -16,6 +16,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/pborman/uuid"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/static"
 )
@@ -150,4 +151,15 @@ func Fatalf(reason interface{}, args ...interface{}) {
 	debug.PrintStack()
 
 	os.Exit(1)
+}
+
+// CreateTransaction returns a transaction object.
+func CreateTransaction(ctx context.Context, args SendTxArgs) *QueuedTx {
+	return &QueuedTx{
+		ID:      QueuedTxID(uuid.New()),
+		Hash:    common.Hash{},
+		Context: ctx,
+		Args:    args,
+		Done:    make(chan struct{}),
+	}
 }

@@ -1,4 +1,4 @@
-package txqueue
+package transactions
 
 import (
 	"context"
