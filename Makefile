@@ -1,4 +1,4 @@
-.PHONY: statusgo all test xgo clean help
+.PHONY: statusgo all test xgo clean help release-branch release-tag
 .PHONY: statusgo-android statusgo-ios
 
 help: ##@other Show this help
@@ -150,3 +150,46 @@ clean: ##@other Cleanup
 
 deep-clean: clean
 	rm -Rdf .ethereumtest/StatusChain
+
+release-branch: ##@release Create release branch and bump development version. Must be on develop branch
+	@if [ `git rev-parse --abbrev-ref HEAD` != develop ]; then \
+				 echo "This should be run from the develop branch"; \
+				 exit; \
+	else \
+				 MAJOR=`sed -n 's/\s*VersionMajor\s*=\s*\([0-9]\+\)/\1/p' geth/params/version.go`; \
+				 MINOR=`sed -n 's/\s*VersionMinor\s*=\s*\([0-9]\+\)/\1/p' geth/params/version.go`; \
+				 git checkout -b release/$$MAJOR.$$MINOR; \
+				 sed -i "s/\(\s*VersionMeta\s*=\)\s*\([^ ]\+\)/\1 \"beta.1\"/" geth/params/version.go; \
+				 git add geth/params/version.go; \
+				 git commit -m "Branch status-go $$MAJOR.$$MINOR"; \
+				 git checkout develop; \
+				 BUMPED_MINOR=$$[$$MINOR + 1]; \
+				 sed -i "s/\(\s*VersionMinor\s*=\)\s*\([0-9]\+\)/\1 $$BUMPED_MINOR/" geth/params/version.go; \
+				 sed -i 's/\(\s*VersionPatch\s*=\)\s*\([0-9]\+\)/\1 0/' geth/params/version.go; \
+				 sed -i "s/\(\s*VersionMeta\s*=\)\s*\([^ ]\+\)/\1 \"alpha.1\"/" geth/params/version.go; \
+				 git add geth/params/version.go; \
+				 git commit -m "Bump status-go development to $$MAJOR.$$BUMPED_MINOR"; \
+				 echo 'Branched a new version of status-go.'; \
+				 echo "DO NOT forget to push the changes on both develop and release/$$MAJOR.$$MINOR branches."; \
+	fi
+
+release-tag: ##@release Create release tag and bump branched version. Must be on a release branch
+	@if [[ `git rev-parse --abbrev-ref HEAD` != release/* ]]; then \
+				 echo "This should be run from a release branch"; \
+				 exit; \
+	else \
+				 MAJOR=`sed -n 's/\s*VersionMajor\s*=\s*\([0-9]\+\)/\1/p' geth/params/version.go`; \
+				 MINOR=`sed -n 's/\s*VersionMinor\s*=\s*\([0-9]\+\)/\1/p' geth/params/version.go`; \
+				 PATCH=`sed -n 's/\s*VersionPatch\s*=\s*\([0-9]\+\)/\1/p' geth/params/version.go`; \
+				 sed -i "s/\(\s*VersionMeta\s*=\)\s*\([^ ]\+\)/\1 \"\"/" geth/params/version.go; \
+				 git add geth/params/version.go; \
+				 git commit -m "Prepare status-go $$MAJOR.$$MINOR.$$PATCH release"; \
+				 git tag $$MAJOR.$$MINOR.$$PATCH -s -m "status-go $$MAJOR.$$MINOR.$$PATCH"; \
+				 BUMPED_PATCH=$$[$$PATCH + 1]; \
+				 sed -i "s/\(\s*VersionPatch\s*=\)\s*\([0-9]\+\)/\1 $$BUMPED_PATCH/" geth/params/version.go; \
+				 sed -i "s/\(\s*VersionMeta\s*=\)\s*\([^ ]\+\)/\1 \"beta.1\"/" geth/params/version.go; \
+				 git add geth/params/version.go; \
+				 git commit -m "Bump status-go $$MAJOR.$$MINOR branch to $$MAJOR.$$MINOR.$$BUMPED_PATCH"; \
+				 echo "Releasing status-go $$MAJOR.$$MINOR.$$PATCH."; \
+				 echo "DO NOT forget to push tags and changes on the current branch."; \
+	fi
