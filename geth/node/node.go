@@ -23,7 +23,7 @@ import (
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
-	whisperMetrics "github.com/status-im/status-go/metrics/whisper"
+	shhmetrics "github.com/status-im/status-go/metrics/whisper"
 )
 
 // node-related errors
@@ -165,7 +165,7 @@ func activateShhService(stack *node.Node, config *params.NodeConfig) error {
 		whisperService := whisper.New(nil)
 
 		// enable metrics
-		whisperService.RegisterEnvelopeTracer(&whisperMetrics.EnvelopeTracer{})
+		whisperService.RegisterEnvelopeTracer(&shhmetrics.EnvelopeTracer{})
 
 		// enable mail service
 		if whisperConfig.EnableMailServer {

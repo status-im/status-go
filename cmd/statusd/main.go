@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"runtime"
@@ -16,7 +17,7 @@ import (
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/metrics"
-	nodeMetrics "github.com/status-im/status-go/metrics/node"
+	nodemetrics "github.com/status-im/status-go/metrics/node"
 )
 
 var (
@@ -47,7 +48,7 @@ var (
 
 	// stats
 	statsEnabled = flag.Bool("stats", false, "Expose node stats via /debug/vars expvar endpoint or Prometheus (log by default)")
-	statsAddr    = flag.String("stats.addr", ":8080", "HTTP address with /debug/vars endpoint")
+	statsAddr    = flag.String("stats.addr", "127.0.0.1:8080", "HTTP address with /debug/vars endpoint")
 
 	// shh stuff
 	identityFile = flag.String("shh.identityfile", "", "Protocol identity file (private key used for asymmetric encryption)")
@@ -135,14 +136,19 @@ func startCollectingStats(interruptCh <-chan struct{}, nodeManager common.NodeMa
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go func() {
-		if err := nodeMetrics.SubscribeServerEvents(ctx, node); err != nil {
+		if err := nodemetrics.SubscribeServerEvents(ctx, node); err != nil {
 			log.Printf("Failed to subscribe server events: %v", err)
 		}
 	}()
 
 	server := metrics.NewMetricsServer(*statsAddr)
 	go func() {
-		log.Printf("Metrics server failed: %v", server.ListenAndServe())
+		err := server.ListenAndServe()
+		switch err {
+		case http.ErrServerClosed:
+		default:
+			log.Printf("Metrics server failed: %v", err)
+		}
 	}()
 
 	<-interruptCh
@@ -266,7 +272,7 @@ func haltOnInterruptSignal(nodeManager common.NodeManager) <-chan struct{} {
 
 		nodeStopped, err := nodeManager.StopNode()
 		if err != nil {
-			log.Printf("Failed to stop node: %v", err.Error())
+			log.Printf("Failed to stop node: %v", err)
 			os.Exit(1)
 		}
 

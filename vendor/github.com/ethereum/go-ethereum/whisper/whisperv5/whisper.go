@@ -77,9 +77,9 @@ type Whisper struct {
 	statsMu sync.Mutex // guard stats
 	stats   Statistics // Statistics of whisper node
 
-	mailServer         MailServer     // MailServer interface
-	envelopeTracer     EnvelopeTracer // Service collecting envelopes metadata
+	mailServer         MailServer // MailServer interface
 	notificationServer NotificationServer
+	envelopeTracer     EnvelopeTracer // Service collecting envelopes metadata
 }
 
 // New creates a Whisper client ready to communicate through the Ethereum P2P network.
@@ -163,6 +163,8 @@ func (w *Whisper) RegisterNotificationServer(server NotificationServer) {
 	w.notificationServer = server
 }
 
+// RegisterEnvelopeTracer registers an EnveloperTracer to collect information
+// about received envelopes.
 func (w *Whisper) RegisterEnvelopeTracer(tracer EnvelopeTracer) {
 	w.envelopeTracer = tracer
 }
@@ -608,9 +610,7 @@ func (wh *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 				log.Warn("failed to decode envelope, peer will be disconnected", "peer", p.peer.ID(), "err", err)
 				return errors.New("invalid envelope")
 			}
-
 			wh.traceEnvelope(&envelope, !wh.isEnvelopeCached(envelope.Hash()), peerSource, p)
-
 			cached, err := wh.add(&envelope)
 			if err != nil {
 				log.Warn("bad envelope received, peer will be disconnected", "peer", p.peer.ID(), "err", err)
@@ -630,10 +630,8 @@ func (wh *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 					log.Warn("failed to decode direct message, peer will be disconnected", "peer", p.peer.ID(), "err", err)
 					return errors.New("invalid direct message")
 				}
-
-				wh.traceEnvelope(&envelope, false, p2pSource, p)
-
 				wh.postEvent(&envelope, true)
+				wh.traceEnvelope(&envelope, false, p2pSource, p)
 			}
 		case p2pRequestCode:
 			// Must be processed if mail server is implemented. Otherwise ignore.
