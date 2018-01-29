@@ -36,6 +36,7 @@ Make sure the dependencies are installed first by running:
 make lint-install
 make mock-install
 ```
+
 To test fully statusgo, use:
 ```
 make ci
@@ -50,6 +51,8 @@ To test statusgo using a given network by number ID, use:
 ```
 make ci networkid=3
 ```
+
+If you have problems running tests on public network we suggest reading [e2e guide](e2e/README.md).
 
 If you want to launch specific test, for instance `RPCSendTransactions`, use the following command:
 ```
