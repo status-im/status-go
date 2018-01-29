@@ -15,6 +15,20 @@ func TestSubscribeServerEventsWithoutServer(t *testing.T) {
 }
 
 func TestSubscribeServerEvents(t *testing.T) {
-	// TODO
-	// start and cancel using event
+	node, err := node.New(&node.Config{})
+	require.NoError(t, err)
+	err = node.Start()
+	require.NoError(t, err)
+	defer node.Stop()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		err := SubscribeServerEvents(ctx, node)
+		require.NoError(t, err)
+		close(done)
+	}()
+
+	cancel()
+	<-done
 }

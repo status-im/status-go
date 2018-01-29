@@ -34,7 +34,7 @@ func SubscribeServerEvents(ctx context.Context, node *node.Node) error {
 				log.Warn("Subscription failed", "err", err.Error())
 			}
 			subscription.Unsubscribe()
-			return nil
+			return err
 		case <-ctx.Done():
 			subscription.Unsubscribe()
 			return nil
