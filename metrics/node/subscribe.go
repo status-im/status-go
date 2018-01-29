@@ -17,7 +17,7 @@ func SubscribeServerEvents(ctx context.Context, node *node.Node) error {
 		return errors.New("server is unavailable")
 	}
 
-	ch := make(chan *p2p.PeerEvent)
+	ch := make(chan *p2p.PeerEvent, server.MaxPeers)
 	subscription := server.SubscribeEvents(ch)
 
 	log.Debug("Subscribed to server events")
