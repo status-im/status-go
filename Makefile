@@ -152,4 +152,5 @@ deep-clean: clean
 	rm -Rdf .ethereumtest/StatusChain
 
 vendor-check:
-	./.validate-vendor.sh
+	@dep ensure
+	./ci/validate-vendor.sh
