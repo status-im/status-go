@@ -38,15 +38,15 @@ func StartNode(configJSON *C.char) *C.char {
 		return makeJSONResponse(err)
 	}
 
-	_, err = statusAPI.StartNodeAsync(config)
-	return makeJSONResponse(err)
+	statusAPI.StartNodeAsync(config)
+	return makeJSONResponse(nil)
 }
 
 //StopNode - stop status node
 //export StopNode
 func StopNode() *C.char {
-	_, err := statusAPI.StopNodeAsync()
-	return makeJSONResponse(err)
+	statusAPI.StopNodeAsync()
+	return makeJSONResponse(nil)
 }
 
 //ValidateNodeConfig validates config for status node
@@ -95,8 +95,8 @@ func ValidateNodeConfig(configJSON *C.char) *C.char {
 //ResetChainData remove chain data from data directory
 //export ResetChainData
 func ResetChainData() *C.char {
-	_, err := statusAPI.ResetChainDataAsync()
-	return makeJSONResponse(err)
+	statusAPI.ResetChainDataAsync()
+	return makeJSONResponse(nil)
 }
 
 //CallRPC calls status node via rpc

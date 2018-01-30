@@ -312,16 +312,12 @@ func (s *WhisperMailboxSuite) startBackend(name string) (*api.StatusBackend, fun
 	nodeConfig.DataDir = datadir
 	s.Require().NoError(err)
 	s.Require().False(backend.IsNodeRunning())
-	nodeStarted, err := backend.StartNode(nodeConfig)
-	s.Require().NoError(err)
-	<-nodeStarted // wait till node is started
+	s.Require().NoError(backend.StartNode(nodeConfig))
 	s.Require().True(backend.IsNodeRunning())
 
 	return backend, func() {
 		s.True(backend.IsNodeRunning())
-		backendStopped, err := backend.StopNode()
-		s.NoError(err)
-		<-backendStopped
+		s.NoError(backend.StopNode())
 		s.False(backend.IsNodeRunning())
 		os.RemoveAll(datadir)
 	}
@@ -344,15 +340,11 @@ func (s *WhisperMailboxSuite) startMailboxBackend() (*api.StatusBackend, func())
 	mailboxConfig.WhisperConfig.DataDir = filepath.Join(datadir, "data")
 	mailboxConfig.DataDir = datadir
 
-	mailboxNodeStarted, err := mailboxBackend.StartNode(mailboxConfig)
-	s.Require().NoError(err)
-	<-mailboxNodeStarted // wait till node is started
+	s.Require().NoError(mailboxBackend.StartNode(mailboxConfig))
 	s.Require().True(mailboxBackend.IsNodeRunning())
 	return mailboxBackend, func() {
 		s.True(mailboxBackend.IsNodeRunning())
-		backendStopped, err := mailboxBackend.StopNode()
-		s.NoError(err)
-		<-backendStopped
+		s.NoError(mailboxBackend.StopNode())
 		s.False(mailboxBackend.IsNodeRunning())
 		os.RemoveAll(datadir)
 	}

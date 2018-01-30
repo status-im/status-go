@@ -135,8 +135,7 @@ func (cs *commandSet) StopNode() error {
 
 // ResetChainData removes chain data from data directory.
 func (cs *commandSet) ResetChainData() error {
-	_, err := cs.statusAPI.ResetChainDataAsync()
-	return err
+	return cs.statusAPI.ResetChainData()
 }
 
 // CallRPC calls status node via RPC.

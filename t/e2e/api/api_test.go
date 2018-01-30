@@ -1,6 +1,7 @@
 package api_test
 
 import (
+	"encoding/json"
 	"io/ioutil"
 	"math/rand"
 	"os"
@@ -10,7 +11,9 @@ import (
 
 	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/log"
+	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/geth/signal"
 	e2e "github.com/status-im/status-go/t/e2e"
 	. "github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/suite"
@@ -27,6 +30,12 @@ func TestAPI(t *testing.T) {
 type APITestSuite struct {
 	suite.Suite
 	api *api.StatusAPI
+}
+
+func (s *APITestSuite) ensureNodeStopped() {
+	if err := s.api.StopNode(); err != node.ErrNoRunningNode && err != nil {
+		s.NoError(err, "unexpected error")
+	}
 }
 
 func (s *APITestSuite) SetupTest() {
@@ -67,29 +76,29 @@ func (s *APITestSuite) TestRaceConditions() {
 	var funcsToTest = []func(*params.NodeConfig){
 		func(config *params.NodeConfig) {
 			log.Info("StartNodeAsync()")
-			_, err := s.api.StartNodeAsync(config)
-			s.T().Logf("StartNodeAsync() for network: %d, error: %v", config.NetworkID, err)
+			s.api.StartNodeAsync(config)
+			s.T().Logf("StartNodeAsync() for network: %d", config.NetworkID)
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
 			log.Info("StopNodeAsync()")
-			_, err := s.api.StopNodeAsync()
-			s.T().Logf("StopNodeAsync(), error: %v", err)
+			s.api.StopNodeAsync()
+			s.T().Logf("StopNodeAsync()")
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
 			log.Info("RestartNodeAsync()")
-			_, err := s.api.RestartNodeAsync()
-			s.T().Logf("RestartNodeAsync(), error: %v", err)
+			s.api.RestartNodeAsync()
+			s.T().Logf("RestartNodeAsync()")
 			progress <- struct{}{}
 		},
 		// TODO(adam): quarantined until it uses a different datadir
 		// as otherwise it wipes out cached blockchain data.
 		// func(config *params.NodeConfig) {
-		// 	log.Info("ResetChainDataAsync()")
-		// 	_, err := s.api.ResetChainDataAsync()
-		// 	s.T().Logf("ResetChainDataAsync(), error: %v", err)
-		// 	progress <- struct{}{}
+		//	log.Info("ResetChainDataAsync()")
+		//	_, err := s.api.ResetChainDataAsync()
+		//	s.T().Logf("ResetChainDataAsync(), error: %v", err)
+		//	progress <- struct{}{}
 		// },
 	}
 
@@ -117,7 +126,7 @@ func (s *APITestSuite) TestRaceConditions() {
 
 	time.Sleep(2 * time.Second) // so that we see some logs
 	// just in case we have a node running
-	s.api.StopNode() //nolint: errcheck
+	s.ensureNodeStopped()
 }
 
 func (s *APITestSuite) TestCellsRemovedAfterSwitchAccount() {
@@ -185,4 +194,51 @@ func (s *APITestSuite) TestLogoutRemovesCells() {
 
 	_, err = s.api.JailManager().Cell(testChatID)
 	require.Error(err, "Expected that cells was removed")
+}
+
+func (s *APITestSuite) TestNodeStartCrash() {
+	// let's listen for node.crashed signal
+	signalReceived := make(chan struct{})
+	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+		var envelope signal.Envelope
+		err := json.Unmarshal([]byte(jsonEvent), &envelope)
+		s.NoError(err)
+
+		if envelope.Type == signal.EventNodeCrashed {
+			close(signalReceived)
+		}
+	})
+	defer signal.ResetDefaultNodeNotificationHandler()
+
+	nodeConfig, err := e2e.MakeTestNodeConfig(GetNetworkID())
+	s.NoError(err)
+
+	// start node outside the manager (on the same port), so that manager node.Start() method fails
+	outsideNode, err := node.MakeNode(nodeConfig)
+	s.NoError(err)
+	err = outsideNode.Start()
+	s.NoError(err)
+
+	// now try starting using node manager, it should fail (error is irrelevant as it is implementation detail)
+	s.Error(<-s.api.StartNodeAsync(nodeConfig))
+
+	select {
+	case <-time.After(500 * time.Millisecond):
+		s.FailNow("timed out waiting for signal")
+	case <-signalReceived:
+	}
+
+	// stop outside node, and re-try
+	s.NoError(outsideNode.Stop())
+	signalReceived = make(chan struct{})
+	s.NoError(<-s.api.StartNodeAsync(nodeConfig))
+
+	select {
+	case <-time.After(500 * time.Millisecond):
+	case <-signalReceived:
+		s.FailNow("signal should not be received")
+	}
+
+	// cleanup
+	s.NoError(s.api.StopNode())
 }
