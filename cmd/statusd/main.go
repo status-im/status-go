@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"runtime"
@@ -14,6 +16,8 @@ import (
 	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/metrics"
+	nodemetrics "github.com/status-im/status-go/metrics/node"
 )
 
 var (
@@ -41,6 +45,10 @@ var (
 	listenAddr = flag.String("listenaddr", ":30303", "IP address and port of this node (e.g. 127.0.0.1:30303)")
 	standalone = flag.Bool("standalone", true, "Don't actively connect to peers, wait for incoming connections")
 	bootnodes  = flag.String("bootnodes", "", "A list of bootnodes separated by comma")
+
+	// stats
+	statsEnabled = flag.Bool("stats", false, "Expose node stats via /debug/vars expvar endpoint or Prometheus (log by default)")
+	statsAddr    = flag.String("stats.addr", "127.0.0.1:8080", "HTTP address with /debug/vars endpoint")
 
 	// shh stuff
 	identityFile = flag.String("shh.identityfile", "", "Protocol identity file (private key used for asymmetric encryption)")
@@ -79,7 +87,7 @@ func main() {
 	}
 
 	// handle interrupt signals
-	go haltOnInterruptSignal(backend.NodeManager())
+	interruptCh := haltOnInterruptSignal(backend.NodeManager())
 
 	// wait till node is started
 	<-started
@@ -91,6 +99,11 @@ func main() {
 			log.Fatalf("Starting debugging CLI server failed: %v", err)
 			return
 		}
+	}
+
+	// Run stats server.
+	if *statsEnabled {
+		go startCollectingStats(interruptCh, backend.NodeManager())
 	}
 
 	// wait till node has been stopped
@@ -108,6 +121,41 @@ func startDebug(backend *api.StatusBackend) error {
 	statusAPI := api.NewStatusAPIWithBackend(backend)
 	_, err := debug.New(statusAPI, *cliPort)
 	return err
+}
+
+// startCollectingStats collects various stats about the node and other protocols like Whisper.
+func startCollectingStats(interruptCh <-chan struct{}, nodeManager common.NodeManager) {
+	log.Printf("Starting stats on %v", *statsAddr)
+
+	node, err := nodeManager.Node()
+	if err != nil {
+		log.Printf("Failed to run metrics because could not get node: %v", err)
+		return
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		if err := nodemetrics.SubscribeServerEvents(ctx, node); err != nil {
+			log.Printf("Failed to subscribe server events: %v", err)
+		}
+	}()
+
+	server := metrics.NewMetricsServer(*statsAddr)
+	go func() {
+		err := server.ListenAndServe()
+		switch err {
+		case http.ErrServerClosed:
+		default:
+			log.Printf("Metrics server failed: %v", err)
+		}
+	}()
+
+	<-interruptCh
+
+	if err := server.Shutdown(context.TODO()); err != nil {
+		log.Printf("Failed to shutdown metrics server: %v", err)
+	}
 }
 
 // makeNodeConfig parses incoming CLI options and returns node configuration object
@@ -209,24 +257,32 @@ Options:
 // haltOnInterruptSignal catches interrupt signal (SIGINT) and
 // stops the node. It times out after 5 seconds
 // if the node can not be stopped.
-func haltOnInterruptSignal(nodeManager common.NodeManager) {
-	signalCh := make(chan os.Signal, 1)
-	signal.Notify(signalCh, os.Interrupt)
-	defer signal.Stop(signalCh)
-	<-signalCh
+func haltOnInterruptSignal(nodeManager common.NodeManager) <-chan struct{} {
+	interruptCh := make(chan struct{})
 
-	log.Println("Got interrupt, shutting down...")
+	go func() {
+		signalCh := make(chan os.Signal, 1)
+		signal.Notify(signalCh, os.Interrupt)
+		defer signal.Stop(signalCh)
+		<-signalCh
 
-	nodeStopped, err := nodeManager.StopNode()
-	if err != nil {
-		log.Printf("Failed to stop node: %v", err.Error())
-		os.Exit(1)
-	}
+		close(interruptCh)
 
-	select {
-	case <-nodeStopped:
-	case <-time.After(time.Second * 5):
-		log.Printf("Stopping node timed out")
-		os.Exit(1)
-	}
+		log.Println("Got interrupt, shutting down...")
+
+		nodeStopped, err := nodeManager.StopNode()
+		if err != nil {
+			log.Printf("Failed to stop node: %v", err)
+			os.Exit(1)
+		}
+
+		select {
+		case <-nodeStopped:
+		case <-time.After(time.Second * 5):
+			log.Printf("Stopping node timed out")
+			os.Exit(1)
+		}
+	}()
+
+	return interruptCh
 }

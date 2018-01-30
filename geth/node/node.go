@@ -23,6 +23,7 @@ import (
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
+	shhmetrics "github.com/status-im/status-go/metrics/whisper"
 )
 
 // node-related errors
@@ -115,7 +116,7 @@ func defaultEmbeddedNodeConfig(config *params.NodeConfig) *node.Config {
 		nc.HTTPPort = config.HTTPPort
 	}
 
-	if config.Discovery {
+	if config.BootClusterConfig.Enabled {
 		nc.P2P.BootstrapNodes = makeBootstrapNodes(config.BootClusterConfig.BootNodes)
 	}
 
@@ -162,6 +163,9 @@ func activateShhService(stack *node.Node, config *params.NodeConfig) error {
 	serviceConstructor := func(*node.ServiceContext) (node.Service, error) {
 		whisperConfig := config.WhisperConfig
 		whisperService := whisper.New(nil)
+
+		// enable metrics
+		whisperService.RegisterEnvelopeTracer(&shhmetrics.EnvelopeTracer{})
 
 		// enable mail service
 		if whisperConfig.EnableMailServer {

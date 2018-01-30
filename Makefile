@@ -10,6 +10,7 @@ ifndef GOPATH
 endif
 
 CGO_CFLAGS=-I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
+BUILD_TAGS =
 GOBIN = build/bin
 GO ?= latest
 XGOVERSION ?= 1.9.2
@@ -42,7 +43,7 @@ HELP_FUN = \
 		   }
 
 statusgo: ##@build Build status-go as statusd server
-	go build -i -o $(GOBIN)/statusd -v $(shell build/testnet-flags.sh) ./cmd/statusd
+	go build -i -o $(GOBIN)/statusd -v -tags '$(BUILD_TAGS)' $(shell build/testnet-flags.sh) ./cmd/statusd
 	@echo "\nCompilation done.\nRun \"build/bin/statusd -h\" to view available commands."
 
 statusgo-cross: statusgo-android statusgo-ios
@@ -50,16 +51,16 @@ statusgo-cross: statusgo-android statusgo-ios
 	@ls -ld $(GOBIN)/statusgo-*
 
 statusgo-android: xgo ##@cross-compile Build status-go for Android
-	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=android-16/aar -v $(shell build/testnet-flags.sh) ./lib
+	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=android-16/aar -v -tags '$(BUILD_TAGS)' $(shell build/testnet-flags.sh) ./lib
 	@echo "Android cross compilation done."
 
 statusgo-ios: xgo	##@cross-compile Build status-go for iOS
-	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v $(shell build/testnet-flags.sh) ./lib
+	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v -tags '$(BUILD_TAGS)' $(shell build/testnet-flags.sh) ./lib
 	@echo "iOS framework cross compilation done."
 
 statusgo-ios-simulator: xgo	##@cross-compile Build status-go for iOS Simulator
 	@docker pull $(XGOIMAGEIOSSIM)
-	$(GOPATH)/bin/xgo --image $(XGOIMAGEIOSSIM) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v $(shell build/testnet-flags.sh) ./lib
+	$(GOPATH)/bin/xgo --image $(XGOIMAGEIOSSIM) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v -tags '$(BUILD_TAGS)' $(shell build/testnet-flags.sh) ./lib
 	@echo "iOS framework cross compilation done."
 
 statusgo-library: ##@cross-compile Build status-go as static library for current platform
@@ -70,7 +71,7 @@ statusgo-library: ##@cross-compile Build status-go as static library for current
 
 docker-image: ##@docker Build docker image (use DOCKER_IMAGE_NAME to set the image name)
 	@echo "Building docker image..."
-	docker build . -t $(DOCKER_IMAGE_NAME)
+	docker build --build-arg "build_tags=$(BUILD_TAGS)" . -t $(DOCKER_IMAGE_NAME)
 
 xgo-docker-images: ##@docker Build xgo docker images
 	@echo "Building xgo docker images..."

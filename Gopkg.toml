@@ -15,7 +15,7 @@
 # * * * * * constrained `status-go` dependencies * * * * *
 # (for the full dependency list see `Gopkg.lock`)
 
-[[constraint]] 
+[[constraint]]
   # `btcutil` is required to be compatible with `btcd`
   name = "github.com/btcsuite/btcutil"
   revision = "dcd4997b0664bcfd6ef48e4ae9da8396e08b1cd9"
@@ -25,6 +25,10 @@
   name = "github.com/ethereum/go-ethereum"
   branch = "develop"
   source = "https://github.com/status-im/go-ethereum.git"
+
+[[constraint]]
+  name = "github.com/prometheus/client_golang"
+  version = "0.8.0"
 
 # * * * * * `go-ethereum` dependencies * * * * *
 # Pinned down SHAs from `go-ethereum/vendor/vendor.json`

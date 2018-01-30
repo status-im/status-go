@@ -1,0 +1,11 @@
+global:
+  scrape_interval:     5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: 'wnode'
+    static_configs:
+      # Targets should be probably changed to appropriate hosts and ports.
+      # In this example, we connect to some addresses on a host machine
+      # which is macOS running Docker for Mac.
+      - targets: ['docker.for.mac.localhost:32794', 'docker.for.mac.localhost:32792']
