@@ -6,8 +6,8 @@
 # This script checks if we changed anything with regard to dependency management
 # for our repo and makes sure that it was done in a valid way.
 #
-# This file is a copy of https://github.com/golang/dep/blob/master/hack/validate-vendor.bash
-# (Only modification is this file refers to global `dep` binary)
+# This file is a slightly modified copy of https://github.com/golang/dep/blob/master/hack/validate-vendor.bash
+# The only change made was checking if `dep` was available and installing it if necessary.
 
 
 set -e -o pipefail
