@@ -150,3 +150,6 @@ clean: ##@other Cleanup
 
 deep-clean: clean
 	rm -Rdf .ethereumtest/StatusChain
+
+vendor-check:
+	./.validate-vendor.sh
