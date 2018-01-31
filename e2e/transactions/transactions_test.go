@@ -539,11 +539,13 @@ func (s *TransactionsTestSuite) TestCompleteMultipleQueuedTransactions() {
 	txIDs := make(chan common.QueuedTxID, testTxCount)
 	allTestTxCompleted := make(chan struct{})
 
+	require := s.Require()
+
 	// replace transaction notification handler
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var envelope signal.Envelope
 		err := json.Unmarshal([]byte(jsonEvent), &envelope)
-		s.NoError(err, fmt.Sprintf("cannot unmarshal JSON: %s", jsonEvent))
+		require.NoError(err, fmt.Sprintf("cannot unmarshal JSON: %s", jsonEvent))
 
 		if envelope.Type == transactions.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
@@ -561,8 +563,8 @@ func (s *TransactionsTestSuite) TestCompleteMultipleQueuedTransactions() {
 			To:    common.ToAddress(TestConfig.Account2.Address),
 			Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 		})
-		s.NoError(err, "cannot send transaction")
-		s.False(reflect.DeepEqual(txHashCheck, gethcommon.Hash{}), "transaction returned empty hash")
+		require.NoError(err, "cannot send transaction")
+		require.NotEqual(gethcommon.Hash{}, txHashCheck, "transaction returned empty hash")
 	}
 
 	// wait for transactions, and complete them in a single call
@@ -670,6 +672,8 @@ func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
 		}
 	})
 
+	require := s.Require()
+
 	//  this call blocks, and should return when DiscardQueuedTransaction() for a given tx id is called
 	sendTx := func() {
 		txHashCheck, err := s.Backend.SendTransaction(context.TODO(), common.SendTxArgs{
@@ -677,34 +681,35 @@ func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
 			To:    common.ToAddress(TestConfig.Account2.Address),
 			Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 		})
-		s.EqualError(err, queue.ErrQueuedTxDiscarded.Error())
-
-		s.True(reflect.DeepEqual(txHashCheck, gethcommon.Hash{}), "transaction returned hash, while it shouldn't")
+		require.EqualError(err, queue.ErrQueuedTxDiscarded.Error())
+		require.Equal(gethcommon.Hash{}, txHashCheck, "transaction returned hash, while it shouldn't")
 	}
+
+	txQueueManager := s.Backend.TxQueueManager()
 
 	// wait for transactions, and discard immediately
 	discardTxs := func(txIDs []common.QueuedTxID) {
 		txIDs = append(txIDs, "invalid-tx-id")
 
 		// discard
-		discardResults := s.Backend.DiscardTransactions(txIDs)
-		s.Len(discardResults, 1, "cannot discard txs: %v", discardResults)
-		s.Error(discardResults["invalid-tx-id"].Error, "transaction hash not found", "cannot discard txs: %v", discardResults)
+		discardResults := txQueueManager.DiscardTransactions(txIDs)
+		require.Len(discardResults, 1, "cannot discard txs: %v", discardResults)
+		require.Error(discardResults["invalid-tx-id"].Error, "transaction hash not found", "cannot discard txs: %v", discardResults)
 
 		// try completing discarded transaction
-		completeResults := s.Backend.CompleteTransactions(txIDs, TestConfig.Account1.Password)
-		s.Len(completeResults, testTxCount+1, "unexpected number of errors (call to CompleteTransaction should not succeed)")
+		completeResults := txQueueManager.CompleteTransactions(txIDs, TestConfig.Account1.Password)
+		require.Len(completeResults, testTxCount+1, "unexpected number of errors (call to CompleteTransaction should not succeed)")
 
 		for _, txResult := range completeResults {
-			s.Error(txResult.Error, "transaction hash not found", "invalid error for %s", txResult.Hash.Hex())
-			s.Equal("0x0000000000000000000000000000000000000000000000000000000000000000", txResult.Hash.Hex(), "invalid hash (expected zero): %s", txResult.Hash.Hex())
+			require.Error(txResult.Error, "transaction hash not found", "invalid error for %s", txResult.Hash.Hex())
+			require.Equal(gethcommon.Hash{}, txResult.Hash, "invalid hash (expected zero): %s", txResult.Hash.Hex())
 		}
 
 		time.Sleep(1 * time.Second) // make sure that tx complete signal propagates
 
 		for _, txID := range txIDs {
-			s.False(
-				s.Backend.TxQueueManager().TransactionQueue().Has(txID),
+			require.False(
+				txQueueManager.TransactionQueue().Has(txID),
 				"txqueue should not have test tx at this point (it should be discarded): %s",
 				txID,
 			)
@@ -799,8 +804,10 @@ func (s *TransactionsTestSuite) TestEvictionOfQueuedTransactions() {
 
 	s.True(txQueue.Count() <= queue.DefaultTxQueueCap, "transaction count should be %d (or %d): got %d", queue.DefaultTxQueueCap, queue.DefaultTxQueueCap-1, txQueue.Count())
 
+	m.Lock()
 	for _, txID := range txIDs {
 		txQueue.Remove(txID)
 	}
+	m.Unlock()
 	s.Zero(txQueue.Count(), "transaction count should be zero: %d", txQueue.Count())
 }
