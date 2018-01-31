@@ -143,9 +143,9 @@ func Fatalf(reason interface{}, args ...interface{}) {
 	// find out whether error or string has been passed as a reason
 	r := reflect.ValueOf(reason)
 	if r.Kind() == reflect.String {
-		fmt.Fprintf(w, "Fatal Failure: "+reason.(string)+"\n", args) //nolint: gas
+		fmt.Fprintf(w, "Fatal Failure: "+reason.(string)+"\n", args)
 	} else {
-		fmt.Fprintf(w, "Fatal Failure: %v\n", reason.(error)) //nolint: gas
+		fmt.Fprintf(w, "Fatal Failure: %v\n", reason.(error))
 	}
 
 	debug.PrintStack()
