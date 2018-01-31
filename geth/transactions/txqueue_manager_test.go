@@ -76,7 +76,7 @@ func (s *TxQueueTestSuite) setupStatusBackend(account *common.SelectedExtKey, pa
 		nil, passwordErr)
 }
 
-func (s *TxQueueTestSuite) TestCompleteTransaction() {
+func (s *TxQueueTestSuite) setupCompleteTransaction(disableNotifications bool, args common.SendTxArgs) (*Manager, *common.QueuedTx, string) {
 	password := TestConfig.Account1.Password
 	key, _ := crypto.GenerateKey()
 	account := &common.SelectedExtKey{
@@ -90,16 +90,25 @@ func (s *TxQueueTestSuite) TestCompleteTransaction() {
 	s.setupTransactionPoolAPI(account, nonce, gas, nil)
 
 	txQueueManager := NewManager(s.nodeManagerMock, s.accountManagerMock)
-
+	if disableNotifications {
+		txQueueManager.DisableNotificactions()
+	}
 	txQueueManager.Start()
 	defer txQueueManager.Stop()
 
-	tx := common.CreateTransaction(context.Background(), common.SendTxArgs{
+	tx := common.CreateTransaction(context.Background(), args)
+
+	err := txQueueManager.QueueTransaction(tx)
+	s.NoError(err)
+
+	return txQueueManager, tx, password
+}
+
+func (s *TxQueueTestSuite) TestCompleteTransaction() {
+	txQueueManager, tx, password := s.setupCompleteTransaction(false, common.SendTxArgs{
 		From: common.FromAddress(TestConfig.Account1.Address),
 		To:   common.ToAddress(TestConfig.Account2.Address),
 	})
-	err := txQueueManager.QueueTransaction(tx)
-	s.NoError(err)
 
 	w := make(chan struct{})
 	go func() {
@@ -109,7 +118,7 @@ func (s *TxQueueTestSuite) TestCompleteTransaction() {
 		close(w)
 	}()
 
-	err = txQueueManager.WaitForTransaction(tx)
+	err := txQueueManager.WaitForTransaction(tx)
 	s.NoError(err)
 	// Check that error is assigned to the transaction.
 	s.NoError(tx.Err)
@@ -119,30 +128,10 @@ func (s *TxQueueTestSuite) TestCompleteTransaction() {
 }
 
 func (s *TxQueueTestSuite) TestCompleteTransactionMultipleTimes() {
-	password := TestConfig.Account1.Password
-	key, _ := crypto.GenerateKey()
-	account := &common.SelectedExtKey{
-		Address:    common.FromAddress(TestConfig.Account1.Address),
-		AccountKey: &keystore.Key{PrivateKey: key},
-	}
-	s.setupStatusBackend(account, password, nil)
-
-	nonce := hexutil.Uint64(10)
-	gas := hexutil.Big(*big.NewInt(defaultGas + 1))
-	s.setupTransactionPoolAPI(account, nonce, gas, nil)
-
-	txQueueManager := NewManager(s.nodeManagerMock, s.accountManagerMock)
-	txQueueManager.DisableNotificactions()
-	txQueueManager.Start()
-	defer txQueueManager.Stop()
-
-	tx := common.CreateTransaction(context.Background(), common.SendTxArgs{
+	txQueueManager, tx, password := s.setupCompleteTransaction(true, common.SendTxArgs{
 		From: common.FromAddress(TestConfig.Account1.Address),
 		To:   common.ToAddress(TestConfig.Account2.Address),
 	})
-
-	err := txQueueManager.QueueTransaction(tx)
-	s.NoError(err)
 
 	var (
 		wg           sync.WaitGroup
@@ -168,7 +157,7 @@ func (s *TxQueueTestSuite) TestCompleteTransactionMultipleTimes() {
 		}()
 	}
 
-	err = txQueueManager.WaitForTransaction(tx)
+	err := txQueueManager.WaitForTransaction(tx)
 	s.NoError(err)
 	// Check that error is assigned to the transaction.
 	s.NoError(tx.Err)
