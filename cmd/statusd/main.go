@@ -250,7 +250,7 @@ Examples:
 
 Options:
 `
-	fmt.Fprintf(os.Stderr, usage) // nolint: gas
+	fmt.Fprint(os.Stderr, usage) // nolint: gas
 	flag.PrintDefaults()
 }
 
