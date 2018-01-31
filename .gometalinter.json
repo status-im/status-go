@@ -5,24 +5,14 @@
     ],
     "Skip": ["helpers", "static"],
     "Vendor": true,
+    "Linters": {
+        "gasv2": {
+          "Command": "gas",
+          "Pattern": "^(?P<path>.*?\\.go),(?P<line>\\d+),(?P<message>[^,]+,[^,]+,[^,]+)"
+        }
+      },
     "Enable": [
-        "deadcode",
-        "errcheck",
-        "gas",
-        "goconst",
-        "gocyclo",
-        "gofmt",
-        "golint",
-        "ineffassign",
-        "interfacer",
-        "megacheck",
-        "misspell",
-        "structcheck",
-        "unconvert",
-        "unparam",
-        "varcheck",
-        "vet"
+        "gasv2"
     ],
-    "Cyclo": 16,
-    "Deadline": "100s"
+    "Cyclo": 16
 }
