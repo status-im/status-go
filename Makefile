@@ -154,3 +154,6 @@ deep-clean: clean
 vendor-check:
 	@dep ensure
 	./ci/validate-vendor.sh
+
+dep-install:
+	go get -u github.com/golang/dep/cmd/dep

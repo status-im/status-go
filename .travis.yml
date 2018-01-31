@@ -9,6 +9,7 @@ install:
 - go get golang.org/x/tools/cmd/cover
 - make mock-install
 - make lint-install
+- make dep-install
 jobs:
   include:
   - stage: Lint

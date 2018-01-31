@@ -13,7 +13,7 @@
 set -e -o pipefail
 
 if [ -z "$VALIDATE_UPSTREAM" ]; then
-    VALIDATE_REPO='https://github.com/status-im/status-go'
+	VALIDATE_REPO='https://github.com/status-im/status-go'
 	VALIDATE_BRANCH='develop'
 
 	VALIDATE_HEAD="$(git rev-parse --verify HEAD)"
@@ -25,7 +25,7 @@ if [ -z "$VALIDATE_UPSTREAM" ]; then
 
 	validate_diff() {
 		if [ "$VALIDATE_UPSTREAM" != "$VALIDATE_HEAD" ]; then
-			git diff "$VALIDATE_COMMIT_DIFF" "$@"
+		    git diff "$VALIDATE_COMMIT_DIFF" "$@"
 		fi
 	}
 fi
@@ -35,12 +35,7 @@ files=( $(validate_diff --diff-filter=ACMR --name-only -- 'Gopkg.toml' 'Gopkg.lo
 unset IFS
 
 if [ ${#files[@]} -gt 0 ]; then
-    if hash dep 2>/dev/null; then
-        dep ensure -vendor-only
-    else
-        go get -u github.com/golang/dep/cmd/dep
-        dep ensure -vendor-only
-    fi
+	dep ensure -vendor-only
 
 	# Let see if the working directory is clean
 	diffs="$(git status --porcelain -- vendor Gopkg.toml Gopkg.lock 2>/dev/null)"
