@@ -1,28 +1,27 @@
-package fcm
+package notification
 
 import (
 	"errors"
 	"testing"
 
-	"github.com/NaySoftware/go-fcm"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/suite"
 )
 
-func TestFCMClientTestSuite(t *testing.T) {
+func TestNotificationClientTestSuite(t *testing.T) {
 	suite.Run(t, new(NotifierTestSuite))
 }
 
 type NotifierTestSuite struct {
 	suite.Suite
 
-	fcmClientMock     *MockfirebaseClient
+	fcmClientMock     *MockClient
 	fcmClientMockCtrl *gomock.Controller
 }
 
 func (s *NotifierTestSuite) SetupTest() {
 	s.fcmClientMockCtrl = gomock.NewController(s.T())
-	s.fcmClientMock = NewMockfirebaseClient(s.fcmClientMockCtrl)
+	s.fcmClientMock = NewMockClient(s.fcmClientMockCtrl)
 }
 
 func (s *NotifierTestSuite) TearDownTest() {
@@ -30,15 +29,14 @@ func (s *NotifierTestSuite) TearDownTest() {
 }
 
 func (s *NotifierTestSuite) TestNotifySuccess() {
-	fcmPayload := getPayload()
+	payload := getPayload()
 	ids := []string{"1"}
-	payload := fcmPayload
 	msg := make(map[string]string)
 	body := "body"
 	msg["msg"] = body
 
-	s.fcmClientMock.EXPECT().SetNotificationPayload(&fcmPayload).Times(1)
-	s.fcmClientMock.EXPECT().NewFcmRegIdsMsg(ids, msg).Times(1)
+	s.fcmClientMock.EXPECT().SetNotificationPayload(payload).Times(1)
+	s.fcmClientMock.EXPECT().NewRegIdsMsg(ids, msg).Times(1)
 	s.fcmClientMock.EXPECT().Send().Return(nil, nil).Times(1)
 	fcmClient := Notification{s.fcmClientMock}
 
@@ -49,15 +47,14 @@ func (s *NotifierTestSuite) TestNotifySuccess() {
 
 func (s *NotifierTestSuite) TestNotifyError() {
 	expectedError := errors.New("error")
-	fcmPayload := getPayload()
+	payload := getPayload()
 	ids := []string{"1"}
-	payload := fcmPayload
 	msg := make(map[string]string)
 	body := "body"
 	msg["msg"] = body
 
-	s.fcmClientMock.EXPECT().SetNotificationPayload(&fcmPayload).Times(1)
-	s.fcmClientMock.EXPECT().NewFcmRegIdsMsg(ids, msg).Times(1)
+	s.fcmClientMock.EXPECT().SetNotificationPayload(&payload).Times(1)
+	s.fcmClientMock.EXPECT().NewRegIdsMsg(ids, msg).Times(1)
 	s.fcmClientMock.EXPECT().Send().Return(nil, expectedError).Times(1)
 	fcmClient := Notification{s.fcmClientMock}
 
@@ -66,6 +63,6 @@ func (s *NotifierTestSuite) TestNotifyError() {
 	s.Equal(expectedError, err)
 }
 
-func getPayload() fcm.NotificationPayload {
-	return fcm.NotificationPayload{Title: "Status - new message", Body: "sum"}
+func getPayload() Payload {
+	return Payload{Title: "Status - new message", Body: "sum"}
 }

@@ -110,8 +110,8 @@ mock-install: ##@other Install mocking tools
 mock: ##@other Regenerate mocks
 	mockgen -source=geth/common/types.go -destination=geth/common/types_mock.go -package=common
 	mockgen -source=geth/mailservice/mailservice.go -destination=geth/mailservice/mailservice_mock.go -package=mailservice
-	mockgen -source=geth/common/notification.go -destination=geth/common/notification_mock.go -package=common -imports fcm=github.com/NaySoftware/go-fcm
-	mockgen -source=geth/notification/fcm/client.go -destination=geth/notification/fcm/client_mock.go -package=fcm -imports fcm=github.com/NaySoftware/go-fcm
+	mockgen -source=geth/notification/notifier_interface.go -destination=geth/notification/notifier_mock.go -package=notification -imports notification=github.com/status-im/status-go/geth/notification
+	mockgen -source=geth/notification/client_interface.go -destination=geth/notification/client_mock.go -package=notification -imports notification=github.com/status-im/status-go/geth/notification
 	mockgen -source=geth/transactions/fake/txservice.go -destination=geth/transactions/fake/mock.go -package=fake
 
 test: test-unit-coverage ##@tests Run basic, short tests during development
