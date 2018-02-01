@@ -29,6 +29,7 @@ type Manager struct {
 	accountManager common.AccountManager
 	txQueue        *queue.TxQueue
 	ethTxClient    EthTransactor
+	txSender       ethereum.TransactionSender
 	addrLock       *AddrLocker
 	notify         bool
 }
@@ -54,6 +55,7 @@ func (m *Manager) DisableNotificactions() {
 func (m *Manager) Start() {
 	log.Info("start Manager")
 	m.ethTxClient = NewEthTxClient(m.nodeManager.RPCClient())
+	m.txSender = m.ethTxClient
 	m.txQueue.Start()
 }
 
@@ -217,7 +219,7 @@ func (m *Manager) completeTransaction(queuedTx *common.QueuedTx, selectedAccount
 	}
 	ctx, cancel = context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
-	if err := m.ethTxClient.SendTransaction(ctx, signedTx); err != nil {
+	if err := m.txSender.SendTransaction(ctx, signedTx); err != nil {
 		return hash, err
 	}
 	return signedTx.Hash(), nil

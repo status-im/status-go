@@ -14,31 +14,31 @@ import (
 	reflect "reflect"
 )
 
-// MockFakePublicTransactionPoolAPI is a mock of FakePublicTransactionPoolAPI interface
-type MockFakePublicTransactionPoolAPI struct {
+// MockPublicTransactionPoolAPI is a mock of PublicTransactionPoolAPI interface
+type MockPublicTransactionPoolAPI struct {
 	ctrl     *gomock.Controller
-	recorder *MockFakePublicTransactionPoolAPIMockRecorder
+	recorder *MockPublicTransactionPoolAPIMockRecorder
 }
 
-// MockFakePublicTransactionPoolAPIMockRecorder is the mock recorder for MockFakePublicTransactionPoolAPI
-type MockFakePublicTransactionPoolAPIMockRecorder struct {
-	mock *MockFakePublicTransactionPoolAPI
+// MockPublicTransactionPoolAPIMockRecorder is the mock recorder for MockPublicTransactionPoolAPI
+type MockPublicTransactionPoolAPIMockRecorder struct {
+	mock *MockPublicTransactionPoolAPI
 }
 
-// NewMockFakePublicTransactionPoolAPI creates a new mock instance
-func NewMockFakePublicTransactionPoolAPI(ctrl *gomock.Controller) *MockFakePublicTransactionPoolAPI {
-	mock := &MockFakePublicTransactionPoolAPI{ctrl: ctrl}
-	mock.recorder = &MockFakePublicTransactionPoolAPIMockRecorder{mock}
+// NewMockPublicTransactionPoolAPI creates a new mock instance
+func NewMockPublicTransactionPoolAPI(ctrl *gomock.Controller) *MockPublicTransactionPoolAPI {
+	mock := &MockPublicTransactionPoolAPI{ctrl: ctrl}
+	mock.recorder = &MockPublicTransactionPoolAPIMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use
-func (m *MockFakePublicTransactionPoolAPI) EXPECT() *MockFakePublicTransactionPoolAPIMockRecorder {
+func (m *MockPublicTransactionPoolAPI) EXPECT() *MockPublicTransactionPoolAPIMockRecorder {
 	return m.recorder
 }
 
 // GasPrice mocks base method
-func (m *MockFakePublicTransactionPoolAPI) GasPrice(ctx context.Context) (*big.Int, error) {
+func (m *MockPublicTransactionPoolAPI) GasPrice(ctx context.Context) (*big.Int, error) {
 	ret := m.ctrl.Call(m, "GasPrice", ctx)
 	ret0, _ := ret[0].(*big.Int)
 	ret1, _ := ret[1].(error)
@@ -46,12 +46,12 @@ func (m *MockFakePublicTransactionPoolAPI) GasPrice(ctx context.Context) (*big.I
 }
 
 // GasPrice indicates an expected call of GasPrice
-func (mr *MockFakePublicTransactionPoolAPIMockRecorder) GasPrice(ctx interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GasPrice", reflect.TypeOf((*MockFakePublicTransactionPoolAPI)(nil).GasPrice), ctx)
+func (mr *MockPublicTransactionPoolAPIMockRecorder) GasPrice(ctx interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GasPrice", reflect.TypeOf((*MockPublicTransactionPoolAPI)(nil).GasPrice), ctx)
 }
 
 // EstimateGas mocks base method
-func (m *MockFakePublicTransactionPoolAPI) EstimateGas(ctx context.Context, args CallArgs) (*hexutil.Big, error) {
+func (m *MockPublicTransactionPoolAPI) EstimateGas(ctx context.Context, args CallArgs) (*hexutil.Big, error) {
 	ret := m.ctrl.Call(m, "EstimateGas", ctx, args)
 	ret0, _ := ret[0].(*hexutil.Big)
 	ret1, _ := ret[1].(error)
@@ -59,12 +59,12 @@ func (m *MockFakePublicTransactionPoolAPI) EstimateGas(ctx context.Context, args
 }
 
 // EstimateGas indicates an expected call of EstimateGas
-func (mr *MockFakePublicTransactionPoolAPIMockRecorder) EstimateGas(ctx, args interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EstimateGas", reflect.TypeOf((*MockFakePublicTransactionPoolAPI)(nil).EstimateGas), ctx, args)
+func (mr *MockPublicTransactionPoolAPIMockRecorder) EstimateGas(ctx, args interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EstimateGas", reflect.TypeOf((*MockPublicTransactionPoolAPI)(nil).EstimateGas), ctx, args)
 }
 
 // GetTransactionCount mocks base method
-func (m *MockFakePublicTransactionPoolAPI) GetTransactionCount(ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (*hexutil.Uint64, error) {
+func (m *MockPublicTransactionPoolAPI) GetTransactionCount(ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (*hexutil.Uint64, error) {
 	ret := m.ctrl.Call(m, "GetTransactionCount", ctx, address, blockNr)
 	ret0, _ := ret[0].(*hexutil.Uint64)
 	ret1, _ := ret[1].(error)
@@ -72,12 +72,12 @@ func (m *MockFakePublicTransactionPoolAPI) GetTransactionCount(ctx context.Conte
 }
 
 // GetTransactionCount indicates an expected call of GetTransactionCount
-func (mr *MockFakePublicTransactionPoolAPIMockRecorder) GetTransactionCount(ctx, address, blockNr interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTransactionCount", reflect.TypeOf((*MockFakePublicTransactionPoolAPI)(nil).GetTransactionCount), ctx, address, blockNr)
+func (mr *MockPublicTransactionPoolAPIMockRecorder) GetTransactionCount(ctx, address, blockNr interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTransactionCount", reflect.TypeOf((*MockPublicTransactionPoolAPI)(nil).GetTransactionCount), ctx, address, blockNr)
 }
 
 // SendRawTransaction mocks base method
-func (m *MockFakePublicTransactionPoolAPI) SendRawTransaction(ctx context.Context, encodedTx hexutil.Bytes) (common.Hash, error) {
+func (m *MockPublicTransactionPoolAPI) SendRawTransaction(ctx context.Context, encodedTx hexutil.Bytes) (common.Hash, error) {
 	ret := m.ctrl.Call(m, "SendRawTransaction", ctx, encodedTx)
 	ret0, _ := ret[0].(common.Hash)
 	ret1, _ := ret[1].(error)
@@ -85,6 +85,6 @@ func (m *MockFakePublicTransactionPoolAPI) SendRawTransaction(ctx context.Contex
 }
 
 // SendRawTransaction indicates an expected call of SendRawTransaction
-func (mr *MockFakePublicTransactionPoolAPIMockRecorder) SendRawTransaction(ctx, encodedTx interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendRawTransaction", reflect.TypeOf((*MockFakePublicTransactionPoolAPI)(nil).SendRawTransaction), ctx, encodedTx)
+func (mr *MockPublicTransactionPoolAPIMockRecorder) SendRawTransaction(ctx, encodedTx interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendRawTransaction", reflect.TypeOf((*MockPublicTransactionPoolAPI)(nil).SendRawTransaction), ctx, encodedTx)
 }
