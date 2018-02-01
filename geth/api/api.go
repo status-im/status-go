@@ -222,7 +222,7 @@ func (api *StatusAPI) Notify(token string) string {
 
 	tokens := []string{token}
 
-	err := api.b.newNotification().Send(message, notification.Payload{}, tokens...)
+	err := api.b.newNotification().Send(message, &notification.Payload{}, tokens...)
 	if err != nil {
 		log.Error("Notify failed:", err)
 	}
@@ -234,7 +234,7 @@ func (api *StatusAPI) Notify(token string) string {
 func (api *StatusAPI) NotifyUsers(message string, payload notification.Payload, tokens ...string) error {
 	log.Debug("Notify", "tokens", tokens)
 
-	err := api.b.newNotification().Send(message, payload, tokens...)
+	err := api.b.newNotification().Send(message, &payload, tokens...)
 	if err != nil {
 		log.Error("Notify failed:", err)
 	}
