@@ -4,6 +4,11 @@ volumes:
     prometheus_data: {}
     grafana_data: {}
 
+networks:
+  default:
+    external:
+      name: wnodetestcluster_cluster
+
 services:
   prometheus:
     image: prom/prometheus:v2.0.0
