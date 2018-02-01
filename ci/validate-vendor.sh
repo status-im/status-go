@@ -14,7 +14,10 @@ set -e -o pipefail
 # Is validate upstream empty ?
 if [ -z "$VALIDATE_UPSTREAM" ]; then
 	VALIDATE_REPO='https://github.com/status-im/status-go'
-	VALIDATE_BRANCH='develop'
+
+	if [ -z "$VALIDATE_BRANCH" ]; then
+		VALIDATE_BRANCH='develop'
+	fi
 
 	VALIDATE_HEAD="$(git rev-parse --verify HEAD)"
 
