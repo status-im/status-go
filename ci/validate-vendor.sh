@@ -6,12 +6,12 @@
 # This script checks if we changed anything with regard to dependency management
 # for our repo and makes sure that it was done in a valid way.
 #
-# This file is a slightly modified copy of https://github.com/golang/dep/blob/master/hack/validate-vendor.bash
-# The only change made was checking if `dep` was available and installing it if necessary.
-
+# This file is a copy of https://github.com/golang/dep/blob/master/hack/validate-vendor.bash
+# with some comments added.
 
 set -e -o pipefail
 
+# Is validate upstream empty ?
 if [ -z "$VALIDATE_UPSTREAM" ]; then
 	VALIDATE_REPO='https://github.com/status-im/status-go'
 	VALIDATE_BRANCH='develop'
@@ -34,6 +34,8 @@ IFS=$'\n'
 files=( $(validate_diff --diff-filter=ACMR --name-only -- 'Gopkg.toml' 'Gopkg.lock' 'vendor/' || true) )
 unset IFS
 
+# `files[@]` splits the content of files by whitespace and returns a list.
+# `#` returns the number of the lines.
 if [ ${#files[@]} -gt 0 ]; then
 	dep ensure -vendor-only
 
@@ -49,9 +51,9 @@ if [ ${#files[@]} -gt 0 ]; then
 			echo
 		} >&2
 		false
-  else
-        echo 'Congratulations! All vendoring changes are done the right way.'
-  fi
+	else
+		echo 'Congratulations! All vendoring changes are done the right way.'
+	fi
 else
     echo 'No vendor changes in diff.'
 fi
