@@ -151,3 +151,10 @@ clean: ##@other Cleanup
 
 deep-clean: clean
 	rm -Rdf .ethereumtest/StatusChain
+
+vendor-check:
+	@dep ensure
+	./ci/validate-vendor.sh
+
+dep-install:
+	go get -u github.com/golang/dep/cmd/dep
