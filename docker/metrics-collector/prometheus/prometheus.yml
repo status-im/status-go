@@ -8,4 +8,4 @@ scrape_configs:
       # Targets should be probably changed to appropriate hosts and ports.
       # In this example, we connect to some addresses on a host machine
       # which is macOS running Docker for Mac.
-      - targets: ['docker.for.mac.localhost:32794', 'docker.for.mac.localhost:32792']
+      - targets: ['wnodetestcluster_wnode_3:8080', 'wnodetestcluster_wnode_2:8080', 'wnodetestcluster_wnode_1:8080']

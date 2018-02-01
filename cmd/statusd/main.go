@@ -48,7 +48,7 @@ var (
 
 	// stats
 	statsEnabled = flag.Bool("stats", false, "Expose node stats via /debug/vars expvar endpoint or Prometheus (log by default)")
-	statsAddr    = flag.String("stats.addr", "127.0.0.1:8080", "HTTP address with /debug/vars endpoint")
+	statsAddr    = flag.String("stats.addr", "0.0.0.0:8080", "HTTP address with /debug/vars endpoint")
 
 	// shh stuff
 	identityFile = flag.String("shh.identityfile", "", "Protocol identity file (private key used for asymmetric encryption)")
