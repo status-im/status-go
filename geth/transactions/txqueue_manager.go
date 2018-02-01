@@ -99,9 +99,7 @@ func (m *Manager) WaitForTransaction(tx *common.QueuedTx) error {
 	// - or times out
 	select {
 	case <-tx.Done:
-	// TODO: Please reconsider this before merging.
-	//case <-time.After(DefaultTxSendCompletionTimeout * time.Second):
-	case <-time.After(time.Second):
+	case <-time.After(DefaultTxSendCompletionTimeout * time.Second):
 		m.txDone(tx, gethcommon.Hash{}, queue.ErrQueuedTxTimedOut)
 	}
 	return tx.Err
