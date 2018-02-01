@@ -63,29 +63,36 @@ func (s *TxQueueTestSuite) TearDownTest() {
 	s.client.Close()
 }
 
-func (s *TxQueueTestSuite) setupTransactionPoolAPI(tx *common.QueuedTx, config *params.NodeConfig, account *common.SelectedExtKey, nonce uint64, gas hexutil.Big, txErr error) {
-	non := hexutil.Uint64(nonce)
+func (s *TxQueueTestSuite) setupTransactionPoolAPI(tx *common.QueuedTx, config *params.NodeConfig, account *common.SelectedExtKey, nonce *hexutil.Uint64, gas *hexutil.Big, txErr error) {
 	// Expect calls to gas functions only if there are no user defined values.
-	s.txServiceMock.EXPECT().GetTransactionCount(gomock.Any(), account.Address, gethrpc.PendingBlockNumber).Return(&non, nil)
+	// And also set the expected gas and gas price for RLP encoding the expected tx.
+	var usedGas, usedGasPrice *big.Int
+	s.txServiceMock.EXPECT().GetTransactionCount(gomock.Any(), account.Address, gethrpc.PendingBlockNumber).Return(nonce, nil)
 	if tx.Args.GasPrice == nil {
-		s.txServiceMock.EXPECT().GasPrice(gomock.Any()).Return(big.NewInt(10), nil)
+		usedGasPrice = big.NewInt(10)
+		s.txServiceMock.EXPECT().GasPrice(gomock.Any()).Return(usedGasPrice, nil)
+	} else {
+		usedGasPrice = (*big.Int)(tx.Args.GasPrice)
 	}
 	if tx.Args.Gas == nil {
-		s.txServiceMock.EXPECT().EstimateGas(gomock.Any(), gomock.Any()).Return(&gas, nil)
+		s.txServiceMock.EXPECT().EstimateGas(gomock.Any(), gomock.Any()).Return(gas, nil)
+		usedGas = (*big.Int)(gas)
+	} else {
+		usedGas = (*big.Int)(tx.Args.Gas)
 	}
-	// Prepare the transaction an RLP encode it.
-	data := s.rlpEncodeTx(tx, config, account, nonce, gas)
+	// Prepare the transaction anD RLP encode it.
+	data := s.rlpEncodeTx(tx, config, account, nonce, usedGas, usedGasPrice)
 	// Expect the RLP encoded transaction.
 	s.txServiceMock.EXPECT().SendRawTransaction(gomock.Any(), data).Return(gethcommon.Hash{}, txErr)
 }
 
-func (s *TxQueueTestSuite) rlpEncodeTx(tx *common.QueuedTx, config *params.NodeConfig, account *common.SelectedExtKey, nonce uint64, gas hexutil.Big) []byte {
+func (s *TxQueueTestSuite) rlpEncodeTx(tx *common.QueuedTx, config *params.NodeConfig, account *common.SelectedExtKey, nonce *hexutil.Uint64, gas, gasPrice *big.Int) hexutil.Bytes {
 	newTx := types.NewTransaction(
-		nonce,
+		uint64(*nonce),
 		gethcommon.Address(*tx.Args.To),
 		tx.Args.Value.ToInt(),
-		gas.ToInt(),
-		tx.Args.GasPrice.ToInt(),
+		gas,
+		gasPrice,
 		tx.Args.Data,
 	)
 	chainID := big.NewInt(int64(config.NetworkID))
@@ -93,7 +100,7 @@ func (s *TxQueueTestSuite) rlpEncodeTx(tx *common.QueuedTx, config *params.NodeC
 	s.NoError(err)
 	data, err := rlp.EncodeToBytes(signedTx)
 	s.NoError(err)
-	return data
+	return hexutil.Bytes(data)
 }
 
 func (s *TxQueueTestSuite) setupStatusBackend(account *common.SelectedExtKey, password string, passwordErr error) *params.NodeConfig {
@@ -119,9 +126,9 @@ func (s *TxQueueTestSuite) TestCompleteTransaction() {
 		To:   common.ToAddress(TestConfig.Account2.Address),
 	})
 
-	nonce := uint64(10)
+	nonce := hexutil.Uint64(10)
 	gas := hexutil.Big(*big.NewInt(defaultGas + 1))
-	s.setupTransactionPoolAPI(tx, config, account, nonce, gas, nil)
+	s.setupTransactionPoolAPI(tx, config, account, &nonce, &gas, nil)
 
 	txQueueManager := NewManager(s.nodeManagerMock, s.accountManagerMock)
 
@@ -162,9 +169,9 @@ func (s *TxQueueTestSuite) TestCompleteTransactionMultipleTimes() {
 		To:   common.ToAddress(TestConfig.Account2.Address),
 	})
 
-	nonce := uint64(10)
+	nonce := hexutil.Uint64(10)
 	gas := hexutil.Big(*big.NewInt(defaultGas + 1))
-	s.setupTransactionPoolAPI(tx, config, account, nonce, gas, nil)
+	s.setupTransactionPoolAPI(tx, config, account, &nonce, &gas, nil)
 
 	txQueueManager := NewManager(s.nodeManagerMock, s.accountManagerMock)
 	txQueueManager.DisableNotificactions()
@@ -210,34 +217,6 @@ func (s *TxQueueTestSuite) TestCompleteTransactionMultipleTimes() {
 	s.Equal(1, completedTx, "only 1 tx expected to be completed")
 	s.Equal(txCount-1, inprogressTx, "txs expected to be reported as inprogress")
 }
-
-/*
-func (s *TxQueueTestSuite) TestCompleteTransactionSignature() {
-	password := TestConfig.Account1.Password
-	key, _ := crypto.GenerateKey()
-	account := &common.SelectedExtKey{
-		Address:    common.FromAddress(TestConfig.Account1.Address),
-		AccountKey: &keystore.Key{PrivateKey: key},
-	}
-	s.setupStatusBackend(account, password, nil)
-
-	nonce := hexutil.Uint64(10)
-	gas := hexutil.Big(*big.NewInt(defaultGas + 1))
-
-	txQueueManager := NewManager(s.nodeManagerMock, s.accountManagerMock)
-
-	txQueueManager.Start()
-	defer txQueueManager.Stop()
-
-	tx := common.CreateTransaction(context.Background(), common.SendTxArgs{
-		From: common.FromAddress(TestConfig.Account1.Address),
-		To:   common.ToAddress(TestConfig.Account2.Address),
-	})
-	err := txQueueManager.QueueTransaction(tx)
-	s.NoError(err)
-
-}
-*/
 
 func (s *TxQueueTestSuite) TestAccountMismatch() {
 	s.accountManagerMock.EXPECT().SelectedAccount().Return(&common.SelectedExtKey{
