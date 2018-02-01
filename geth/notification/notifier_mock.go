@@ -33,7 +33,7 @@ func (m *MockNotifier) EXPECT() *MockNotifierMockRecorder {
 }
 
 // Send mocks base method
-func (m *MockNotifier) Send(body string, payload Payload, tokens ...string) error {
+func (m *MockNotifier) Send(body string, payload *Payload, tokens ...string) error {
 	varargs := []interface{}{body, payload}
 	for _, a := range tokens {
 		varargs = append(varargs, a)

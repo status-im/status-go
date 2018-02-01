@@ -32,39 +32,25 @@ func (m *MockClient) EXPECT() *MockClientMockRecorder {
 	return m.recorder
 }
 
-// NewRegIdsMsg mocks base method
-func (m *MockClient) NewRegIdsMsg(tokens []string, body interface{}) Client {
-	ret := m.ctrl.Call(m, "NewRegIdsMsg", tokens, body)
-	ret0, _ := ret[0].(Client)
-	return ret0
+// AddDevices mocks base method
+func (m *MockClient) AddDevices(deviceIDs []string, body interface{}) {
+	m.ctrl.Call(m, "AddDevices", deviceIDs, body)
 }
 
-// NewRegIdsMsg indicates an expected call of NewRegIdsMsg
-func (mr *MockClientMockRecorder) NewRegIdsMsg(tokens, body interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewRegIdsMsg", reflect.TypeOf((*MockClient)(nil).NewRegIdsMsg), tokens, body)
+// AddDevices indicates an expected call of AddDevices
+func (mr *MockClientMockRecorder) AddDevices(deviceIDs, body interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddDevices", reflect.TypeOf((*MockClient)(nil).AddDevices), deviceIDs, body)
 }
 
 // Send mocks base method
-func (m *MockClient) Send() (*Response, error) {
-	ret := m.ctrl.Call(m, "Send")
+func (m *MockClient) Send(payload *Payload) (*Response, error) {
+	ret := m.ctrl.Call(m, "Send", payload)
 	ret0, _ := ret[0].(*Response)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Send indicates an expected call of Send
-func (mr *MockClientMockRecorder) Send() *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Send", reflect.TypeOf((*MockClient)(nil).Send))
-}
-
-// SetNotificationPayload mocks base method
-func (m *MockClient) SetNotificationPayload(payload *Payload) Client {
-	ret := m.ctrl.Call(m, "SetNotificationPayload", payload)
-	ret0, _ := ret[0].(Client)
-	return ret0
-}
-
-// SetNotificationPayload indicates an expected call of SetNotificationPayload
-func (mr *MockClientMockRecorder) SetNotificationPayload(payload interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetNotificationPayload", reflect.TypeOf((*MockClient)(nil).SetNotificationPayload), payload)
+func (mr *MockClientMockRecorder) Send(payload interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Send", reflect.TypeOf((*MockClient)(nil).Send), payload)
 }

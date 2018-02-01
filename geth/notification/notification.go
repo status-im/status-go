@@ -13,7 +13,7 @@ func NewNotification(client Client) Constructor {
 }
 
 // Send send to the tokens list.
-func (n *Notification) Send(body string, payload Payload, tokens ...string) error {
+func (n *Notification) Send(body string, payload *Payload, deviceIDs ...string) error {
 	data := map[string]string{
 		"msg": body,
 	}
@@ -25,9 +25,8 @@ func (n *Notification) Send(body string, payload Payload, tokens ...string) erro
 		payload.Body = "ping"
 	}
 
-	_, err := n.client.NewRegIdsMsg(tokens, data).
-		SetNotificationPayload(&payload).
-		Send()
+	n.client.AddDevices(deviceIDs, data)
+	_, err := n.client.Send(payload)
 
 	return err
 }

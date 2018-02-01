@@ -9,23 +9,17 @@ type FirebaseClient struct {
 	FcmClient *fcm.FcmClient
 }
 
-// NewRegIdsMsg is a Firebase implementation of notification.Client interface method
-func (fC FirebaseClient) NewRegIdsMsg(tokens []string, body interface{}) Client {
-	fC.FcmClient = fC.FcmClient.NewFcmRegIdsMsg(tokens, body)
-	return fC
+// AddDevices is a Firebase implementation of notification.Client interface method
+func (fC FirebaseClient) AddDevices(deviceIDs []string, body interface{}) {
+	fC.FcmClient.NewFcmRegIdsMsg(deviceIDs, body)
 }
 
 // Send is a Firebase implementation of notification.Client interface method:
-func (fC FirebaseClient) Send() (*Response, error) {
-	resp, err := fC.FcmClient.Send()
+func (fC FirebaseClient) Send(payload *Payload) (*Response, error) {
+	resp, err := fC.FcmClient.SetNotificationPayload(
+		payload.ToFCMNotificationPayload()).Send()
 	if err != nil {
 		return nil, err
 	}
 	return FromFCMResponseStatus(resp), nil
-}
-
-// SetNotificationPayload is a Firebase implementation of notification.Client interface method:
-func (fC FirebaseClient) SetNotificationPayload(payload *Payload) Client {
-	fC.FcmClient = fC.FcmClient.SetNotificationPayload(payload.ToFCMNotificationPayload())
-	return fC
 }

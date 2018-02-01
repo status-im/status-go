@@ -35,12 +35,11 @@ func (s *NotifierTestSuite) TestNotifySuccess() {
 	body := "body"
 	msg["msg"] = body
 
-	s.fcmClientMock.EXPECT().SetNotificationPayload(payload).Times(1)
-	s.fcmClientMock.EXPECT().NewRegIdsMsg(ids, msg).Times(1)
-	s.fcmClientMock.EXPECT().Send().Return(nil, nil).Times(1)
+	s.fcmClientMock.EXPECT().AddDevices(ids, msg).Times(1)
+	s.fcmClientMock.EXPECT().Send(&payload).Return(nil, nil).Times(1)
 	fcmClient := Notification{s.fcmClientMock}
 
-	err := fcmClient.Send(body, payload, ids...)
+	err := fcmClient.Send(body, &payload, ids...)
 
 	s.NoError(err)
 }
@@ -53,12 +52,11 @@ func (s *NotifierTestSuite) TestNotifyError() {
 	body := "body"
 	msg["msg"] = body
 
-	s.fcmClientMock.EXPECT().SetNotificationPayload(&payload).Times(1)
-	s.fcmClientMock.EXPECT().NewRegIdsMsg(ids, msg).Times(1)
-	s.fcmClientMock.EXPECT().Send().Return(nil, expectedError).Times(1)
+	s.fcmClientMock.EXPECT().AddDevices(ids, msg).Times(1)
+	s.fcmClientMock.EXPECT().Send(&payload).Return(nil, expectedError).Times(1)
 	fcmClient := Notification{s.fcmClientMock}
 
-	err := fcmClient.Send(body, payload, ids...)
+	err := fcmClient.Send(body, &payload, ids...)
 
 	s.Equal(expectedError, err)
 }
