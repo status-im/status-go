@@ -109,7 +109,7 @@
     "whisper/notifications",
     "whisper/whisperv5"
   ]
-  revision = "0e836de922116088b7621b86adf630a86d944c07"
+  revision = "f392249eb323a64d188dd53648975b8a5ca25eda"
   source = "https://github.com/status-im/go-ethereum.git"
 
 [[projects]]
@@ -415,6 +415,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "68577fada4194f3b038486eb3ec5289d273f17c3df53418bc824fe8e91dc5ea7"
+  inputs-digest = "1e24f8d3adca6619451ee4406b8064268631ad03c06fdc6323abc00a974797ac"
   solver-name = "gps-cdcl"
   solver-version = 1
