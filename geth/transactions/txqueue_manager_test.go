@@ -119,43 +119,72 @@ func (s *TxQueueTestSuite) TestCompleteTransaction() {
 		Address:    common.FromAddress(TestConfig.Account1.Address),
 		AccountKey: &keystore.Key{PrivateKey: key},
 	}
-	config := s.setupStatusBackend(account, password, nil)
-
-	tx := common.CreateTransaction(context.Background(), common.SendTxArgs{
-		From: common.FromAddress(TestConfig.Account1.Address),
-		To:   common.ToAddress(TestConfig.Account2.Address),
-	})
 
 	nonce := hexutil.Uint64(10)
 	gas := hexutil.Big(*big.NewInt(defaultGas + 1))
-	s.setupTransactionPoolAPI(tx, config, account, &nonce, &gas, nil)
 
-	txQueueManager := NewManager(s.nodeManagerMock, s.accountManagerMock)
-	txQueueManager.completionTimeout = time.Second
-	txQueueManager.ctxTimeout = time.Second
+	testCases := []struct {
+		name     string
+		gas      *hexutil.Big
+		gasPrice *hexutil.Big
+	}{
+		{
+			"noGasDef",
+			nil,
+			nil,
+		},
+		{
+			"gasDefined",
+			(*hexutil.Big)(big.NewInt(100)),
+			nil,
+		},
+		{
+			"gasPriceDefined",
+			nil,
+			(*hexutil.Big)(big.NewInt(100)),
+		},
+	}
 
-	txQueueManager.Start()
-	defer txQueueManager.Stop()
+	for _, testCase := range testCases {
+		s.T().Run(testCase.name, func(t *testing.T) {
+			s.SetupTest()
+			config := s.setupStatusBackend(account, password, nil)
+			tx := common.CreateTransaction(context.Background(), common.SendTxArgs{
+				From:     common.FromAddress(TestConfig.Account1.Address),
+				To:       common.ToAddress(TestConfig.Account2.Address),
+				Gas:      testCase.gas,
+				GasPrice: testCase.gasPrice,
+			})
+			s.setupTransactionPoolAPI(tx, config, account, &nonce, &gas, nil)
 
-	s.NoError(txQueueManager.QueueTransaction(tx))
-	w := make(chan struct{})
-	var (
-		hash gethcommon.Hash
-		err  error
-	)
-	go func() {
-		hash, err = txQueueManager.CompleteTransaction(tx.ID, password)
-		s.NoError(err)
-		close(w)
-	}()
+			txQueueManager := NewManager(s.nodeManagerMock, s.accountManagerMock)
+			txQueueManager.completionTimeout = time.Second
+			txQueueManager.ctxTimeout = time.Second
 
-	rst := txQueueManager.WaitForTransaction(tx)
-	// Check that error is assigned to the transaction.
-	s.NoError(rst.Error)
-	// Transaction should be already removed from the queue.
-	s.False(txQueueManager.TransactionQueue().Has(tx.ID))
-	s.NoError(WaitClosed(w, time.Second))
-	s.Equal(hash, rst.Hash)
+			txQueueManager.Start()
+			defer txQueueManager.Stop()
+
+			s.NoError(txQueueManager.QueueTransaction(tx))
+			w := make(chan struct{})
+			var (
+				hash gethcommon.Hash
+				err  error
+			)
+			go func() {
+				hash, err = txQueueManager.CompleteTransaction(tx.ID, password)
+				s.NoError(err)
+				close(w)
+			}()
+
+			rst := txQueueManager.WaitForTransaction(tx)
+			// Check that error is assigned to the transaction.
+			s.NoError(rst.Error)
+			// Transaction should be already removed from the queue.
+			s.False(txQueueManager.TransactionQueue().Has(tx.ID))
+			s.NoError(WaitClosed(w, time.Second))
+			s.Equal(hash, rst.Hash)
+		})
+	}
 }
 
 func (s *TxQueueTestSuite) TestCompleteTransactionMultipleTimes() {
