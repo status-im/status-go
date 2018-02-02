@@ -44,7 +44,8 @@ HELP_FUN = \
 
 statusgo: ##@build Build status-go as statusd server
 	go build -i -o $(GOBIN)/statusd -v -tags '$(BUILD_TAGS)' $(shell build/testnet-flags.sh) ./cmd/statusd
-	@echo "\nCompilation done.\nRun \"build/bin/statusd -h\" to view available commands."
+	@echo "Compilation done."
+	@echo "Run \"build/bin/statusd -h\" to view available commands."
 
 statusgo-cross: statusgo-android statusgo-ios
 	@echo "Full cross compilation done."
