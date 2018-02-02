@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/NaySoftware/go-fcm"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/log"
+	"github.com/status-im/status-go/geth/notification"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/profiling"
 	"gopkg.in/go-playground/validator.v9"
@@ -427,7 +427,7 @@ func NotifyUsers(message, payloadJSON, tokensArray *C.char) (outCBytes *C.char) 
 		return
 	}
 
-	var payload fcm.NotificationPayload
+	var payload notification.Payload
 	err = json.Unmarshal([]byte(C.GoString(payloadJSON)), &payload)
 	if err != nil {
 		errString = err.Error()

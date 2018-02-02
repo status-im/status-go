@@ -4,13 +4,14 @@ import (
 	"context"
 	"sync"
 
+	"github.com/NaySoftware/go-fcm"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/node"
-	"github.com/status-im/status-go/geth/notification/fcm"
+	"github.com/status-im/status-go/geth/notification"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/signal"
 	"github.com/status-im/status-go/geth/transactions"
@@ -29,7 +30,7 @@ type StatusBackend struct {
 	accountManager  common.AccountManager
 	txQueueManager  *transactions.Manager
 	jailManager     common.JailManager
-	newNotification common.NotificationConstructor
+	newNotification notification.Constructor
 }
 
 // NewStatusBackend create a new NewStatusBackend instance
@@ -40,7 +41,12 @@ func NewStatusBackend() *StatusBackend {
 	accountManager := account.NewManager(nodeManager)
 	txQueueManager := transactions.NewManager(nodeManager, accountManager)
 	jailManager := jail.New(nodeManager)
-	notificationManager := fcm.NewNotification(fcmServerKey)
+
+	notificationManager := notification.NewNotification(
+		notification.FirebaseClient{FcmClient: fcm.NewFcmClient(fcmServerKey).
+			SetDelayWhileIdle(true).
+			SetContentAvailable(true).
+			SetTimeToLive(fcm.MAX_TTL)})
 
 	return &StatusBackend{
 		nodeManager:     nodeManager,

@@ -10,16 +10,16 @@ import (
 // HaltOnPanic recovers from panic, logs issue, sends upward notification, and exits
 func HaltOnPanic() {
 	if r := recover(); r != nil {
-		err := fmt.Errorf("%v: %v", ErrNodeRunFailure, r)
+		strErr := fmt.Sprintf("%v: %v", ErrNodeRunFailure, r)
 
 		// send signal up to native app
 		signal.Send(signal.Envelope{
 			Type: signal.EventNodeCrashed,
 			Event: signal.NodeCrashEvent{
-				Error: err.Error(),
+				Error: strErr,
 			},
 		})
 
-		common.Fatalf(err) // os.exit(1) is called internally
+		common.Fatalf(ErrNodeRunFailure, r) // os.exit(1) is called internally
 	}
 }
