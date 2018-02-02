@@ -9,10 +9,13 @@ install:
 - go get golang.org/x/tools/cmd/cover
 - make mock-install
 - make lint-install
+- make dep-install
 jobs:
   include:
   - stage: Lint
     script: make lint
+  - stage: Vendor Check
+    script: make vendor-check
   - stage: Test unit and integration
     script: make test-unit-coverage
   - stage: Test e2e on private network
