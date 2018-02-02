@@ -10,7 +10,7 @@ import (
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
-	"github.com/status-im/status-go/helpers/profiling"
+	"github.com/status-im/status-go/profiling"
 	"gopkg.in/go-playground/validator.v9"
 )
 
