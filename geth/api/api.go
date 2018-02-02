@@ -9,6 +9,7 @@ import (
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/geth/transactions"
 )
 
 // StatusAPI provides API to access Status related functionality.
@@ -45,7 +46,7 @@ func (api *StatusAPI) JailManager() common.JailManager {
 }
 
 // TxQueueManager returns reference to account manager
-func (api *StatusAPI) TxQueueManager() common.TxQueueManager {
+func (api *StatusAPI) TxQueueManager() *transactions.Manager {
 	return api.b.TxQueueManager()
 }
 
@@ -171,7 +172,7 @@ func (api *StatusAPI) CompleteTransaction(id common.QueuedTxID, password string)
 }
 
 // CompleteTransactions instructs backend to complete sending of multiple transactions
-func (api *StatusAPI) CompleteTransactions(ids []common.QueuedTxID, password string) map[common.QueuedTxID]common.RawCompleteTransactionResult {
+func (api *StatusAPI) CompleteTransactions(ids []common.QueuedTxID, password string) map[common.QueuedTxID]common.TransactionResult {
 	return api.b.txQueueManager.CompleteTransactions(ids, password)
 }
 

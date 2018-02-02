@@ -48,9 +48,16 @@ profile.cov
 # tests
 .ethereumtest/
 /vendor/**/*_test.go
+*.test
 
 #
 # golang
 coverage.out
 coverage-all.out
 coverage.html
+
+# vim swap files
+[._]*.s[a-v][a-z]
+[._]*.sw[a-p]
+[._]s[a-v][a-z]
+[._]sw[a-p]

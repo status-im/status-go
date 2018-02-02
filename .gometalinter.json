@@ -1,0 +1,28 @@
+{
+    "Exclude": [
+        ".*_mock.go",
+        "geth/jail/doc.go"
+    ],
+    "Skip": ["helpers", "static"],
+    "Vendor": true,
+    "Enable": [
+        "deadcode",
+        "errcheck",
+        "gas",
+        "goconst",
+        "gocyclo",
+        "gofmt",
+        "golint",
+        "ineffassign",
+        "interfacer",
+        "megacheck",
+        "misspell",
+        "structcheck",
+        "unconvert",
+        "unparam",
+        "varcheck",
+        "vet"
+    ],
+    "Cyclo": 16,
+    "Deadline": "100s"
+}

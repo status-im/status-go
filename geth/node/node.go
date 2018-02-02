@@ -9,24 +9,21 @@ import (
 	"path/filepath"
 	"strings"
 
-	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/les"
-	"github.com/ethereum/go-ethereum/light"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discover"
-	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/p2p/nat"
-	gethparams "github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/whisper/mailserver"
 	"github.com/ethereum/go-ethereum/whisper/notifications"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
+	shhmetrics "github.com/status-im/status-go/metrics/whisper"
 )
 
 // node-related errors
@@ -40,7 +37,7 @@ var (
 )
 
 // MakeNode create a geth node entity
-func MakeNode(config *params.NodeConfig, deliveryServer whisper.DeliveryServer) (*node.Node, error) {
+func MakeNode(config *params.NodeConfig) (*node.Node, error) {
 	// make sure data directory exists
 	if err := os.MkdirAll(filepath.Join(config.DataDir), os.ModePerm); err != nil {
 		return nil, err
@@ -78,7 +75,7 @@ func MakeNode(config *params.NodeConfig, deliveryServer whisper.DeliveryServer) 
 	}
 
 	// start Whisper service
-	if err := activateShhService(stack, config, deliveryServer); err != nil {
+	if err := activateShhService(stack, config); err != nil {
 		return nil, fmt.Errorf("%v: %v", ErrWhisperServiceRegistrationFailure, err)
 	}
 
@@ -95,11 +92,11 @@ func defaultEmbeddedNodeConfig(config *params.NodeConfig) *node.Config {
 		Name:              config.Name,
 		Version:           config.Version,
 		P2P: p2p.Config{
-			NoDiscovery:      true,
+			NoDiscovery:      !config.Discovery,
 			DiscoveryV5:      true,
 			DiscoveryV5Addr:  ":0",
-			BootstrapNodes:   makeBootstrapNodes(),
-			BootstrapNodesV5: makeBootstrapNodesV5(),
+			BootstrapNodes:   nil,
+			BootstrapNodesV5: nil,
 			ListenAddr:       config.ListenAddr,
 			NAT:              nat.Any(),
 			MaxPeers:         config.MaxPeers,
@@ -119,29 +116,11 @@ func defaultEmbeddedNodeConfig(config *params.NodeConfig) *node.Config {
 		nc.HTTPPort = config.HTTPPort
 	}
 
+	if config.BootClusterConfig.Enabled {
+		nc.P2P.BootstrapNodes = makeBootstrapNodes(config.BootClusterConfig.BootNodes)
+	}
+
 	return nc
-}
-
-// updateCHT changes trusted canonical hash trie root
-func updateCHT(eth *les.LightEthereum, config *params.NodeConfig) {
-	if !config.BootClusterConfig.Enabled {
-		return
-	}
-
-	if config.BootClusterConfig.RootNumber == 0 {
-		return
-	}
-
-	if config.BootClusterConfig.RootHash == "" {
-		return
-	}
-
-	eth.WriteTrustedCht(light.TrustedCht{
-		Number: uint64(config.BootClusterConfig.RootNumber),
-		Root:   gethcommon.HexToHash(config.BootClusterConfig.RootHash),
-	})
-	log.Info("Added trusted CHT",
-		"develop", config.DevMode, "number", config.BootClusterConfig.RootNumber, "hash", config.BootClusterConfig.RootHash)
 }
 
 // activateEthService configures and registers the eth.Ethereum service with a given node.
@@ -166,12 +145,7 @@ func activateEthService(stack *node.Node, config *params.NodeConfig) error {
 	ethConf.DatabaseCache = config.LightEthConfig.DatabaseCache
 
 	if err := stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-		lightEth, err := les.New(ctx, &ethConf)
-		if err == nil {
-			updateCHT(lightEth, config)
-		}
-
-		return lightEth, err
+		return les.New(ctx, &ethConf)
 	}); err != nil {
 		return fmt.Errorf("%v: %v", ErrLightEthRegistrationFailure, err)
 	}
@@ -180,7 +154,7 @@ func activateEthService(stack *node.Node, config *params.NodeConfig) error {
 }
 
 // activateShhService configures Whisper and adds it to the given node.
-func activateShhService(stack *node.Node, config *params.NodeConfig, deliveryServer whisper.DeliveryServer) error {
+func activateShhService(stack *node.Node, config *params.NodeConfig) error {
 	if !config.WhisperConfig.Enabled {
 		log.Info("SHH protocol is disabled")
 		return nil
@@ -190,22 +164,22 @@ func activateShhService(stack *node.Node, config *params.NodeConfig, deliverySer
 		whisperConfig := config.WhisperConfig
 		whisperService := whisper.New(nil)
 
-		if deliveryServer != nil {
-			whisperService.RegisterDeliveryServer(deliveryServer)
-		}
+		// enable metrics
+		whisperService.RegisterEnvelopeTracer(&shhmetrics.EnvelopeTracer{})
 
 		// enable mail service
 		if whisperConfig.EnableMailServer {
-			password, err := whisperConfig.ReadPasswordFile()
-			if err != nil {
-				return nil, err
+			if whisperConfig.Password == "" {
+				if err := whisperConfig.ReadPasswordFile(); err != nil {
+					return nil, err
+				}
 			}
 
 			log.Info("Register MailServer")
 
 			var mailServer mailserver.WMailServer
 			whisperService.RegisterServer(&mailServer)
-			mailServer.Init(whisperService, whisperConfig.DataDir, string(password), whisperConfig.MinimumPoW)
+			mailServer.Init(whisperService, whisperConfig.DataDir, whisperConfig.Password, whisperConfig.MinimumPoW)
 		}
 
 		// enable notification service
@@ -242,26 +216,10 @@ func makeWSHost(config *params.NodeConfig) string {
 }
 
 // makeBootstrapNodes returns default (hence bootstrap) list of peers
-func makeBootstrapNodes() []*discover.Node {
-	// on desktops params.TestnetBootnodes and params.MainBootnodes,
-	// on mobile client we deliberately keep this list empty
-	enodes := []string{}
-
+func makeBootstrapNodes(enodes []string) []*discover.Node {
 	var bootstrapNodes []*discover.Node
 	for _, enode := range enodes {
 		bootstrapNodes = append(bootstrapNodes, discover.MustParseNode(enode))
-	}
-
-	return bootstrapNodes
-}
-
-// makeBootstrapNodesV5 returns default (hence bootstrap) list of peers
-func makeBootstrapNodesV5() []*discv5.Node {
-	enodes := gethparams.DiscoveryV5Bootnodes
-
-	var bootstrapNodes []*discv5.Node
-	for _, enode := range enodes {
-		bootstrapNodes = append(bootstrapNodes, discv5.MustParseNode(enode))
 	}
 
 	return bootstrapNodes

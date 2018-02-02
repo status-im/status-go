@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/log"
+	"github.com/status-im/status-go/geth/mailservice"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/rpc"
 	"github.com/status-im/status-go/geth/signal"
@@ -47,10 +48,7 @@ type NodeManager struct {
 
 // NewNodeManager makes new instance of node manager
 func NewNodeManager() *NodeManager {
-	m := &NodeManager{}
-	go HaltOnInterruptSignal(m) // allow interrupting running nodes
-
-	return m
+	return &NodeManager{}
 }
 
 // StartNode start Status node, fails if node is already started
@@ -69,8 +67,15 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 
 	m.initLog(config)
 
-	ethNode, err := MakeNode(config, LogDeliveryService{})
+	ethNode, err := MakeNode(config)
 	if err != nil {
+		return nil, err
+	}
+
+	// activate MailService required for Offline Inboxing
+	if err := ethNode.Register(func(_ *node.ServiceContext) (node.Service, error) {
+		return mailservice.New(m), nil
+	}); err != nil {
 		return nil, err
 	}
 
@@ -288,6 +293,14 @@ func (m *NodeManager) addPeer(url string) error {
 	server.AddPeer(parsedNode)
 
 	return nil
+}
+
+// PeerCount returns the number of connected peers.
+func (m *NodeManager) PeerCount() int {
+	if m.node == nil || m.node.Server() == nil {
+		return 0
+	}
+	return m.node.Server().PeerCount()
 }
 
 // ResetChainData remove chain data from data directory.

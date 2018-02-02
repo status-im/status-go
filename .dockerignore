@@ -1,1 +1,6 @@
-*
+.git
+.ethereumtest
+.github
+build/bin
+statusd-data
+wnode-data

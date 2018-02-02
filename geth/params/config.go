@@ -92,9 +92,12 @@ type WhisperConfig struct {
 	// Currently, it's used by Push Notification service.
 	IdentityFile string
 
-	// PasswordFile path to password file.
-	// Currently, it's used by MailServer.
+	// PasswordFile contains a password for symmetric encryption with MailServer.
 	PasswordFile string
+
+	// Password for symmetric encryption with MailServer.
+	// (if no account file selected, then this password is used for symmetric encryption).
+	Password string
 
 	// EnableMailServer is mode when node is capable of delivering expired messages on demand
 	EnableMailServer bool
@@ -117,22 +120,24 @@ type WhisperConfig struct {
 }
 
 // ReadPasswordFile reads and returns content of the password file
-func (c *WhisperConfig) ReadPasswordFile() ([]byte, error) {
+func (c *WhisperConfig) ReadPasswordFile() error {
 	if len(c.PasswordFile) == 0 {
-		return nil, ErrNoPasswordFileValueSet
+		return ErrNoPasswordFileValueSet
 	}
 
 	password, err := ioutil.ReadFile(c.PasswordFile)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	password = bytes.TrimRight(password, "\n")
 
 	if len(password) == 0 {
-		return nil, ErrEmptyPasswordFile
+		return ErrEmptyPasswordFile
 	}
 
-	return password, nil
+	c.Password = string(password)
+
+	return nil
 }
 
 // ReadIdentityFile reads and loads identity private key
@@ -155,7 +160,7 @@ func (c *WhisperConfig) ReadIdentityFile() (*ecdsa.PrivateKey, error) {
 
 // String dumps config object as nicely indented JSON
 func (c *WhisperConfig) String() string {
-	data, _ := json.MarshalIndent(c, "", "    ")
+	data, _ := json.MarshalIndent(c, "", "    ") // nolint: gas
 	return string(data)
 }
 
@@ -167,7 +172,7 @@ type SwarmConfig struct {
 
 // String dumps config object as nicely indented JSON
 func (c *SwarmConfig) String() string {
-	data, _ := json.MarshalIndent(c, "", "    ")
+	data, _ := json.MarshalIndent(c, "", "    ") // nolint: gas
 	return string(data)
 }
 
@@ -178,12 +183,6 @@ type BootClusterConfig struct {
 	// Enabled flag specifies whether feature is enabled
 	Enabled bool
 
-	// RootNumber CHT root number
-	RootNumber int
-
-	// RootHash is hash of CHT root for a given root number
-	RootHash string
-
 	// BootNodes list of bootstrap nodes for a given network (Ropsten, Rinkeby, Homestead),
 	// for a given mode (production vs development)
 	BootNodes []string
@@ -191,7 +190,7 @@ type BootClusterConfig struct {
 
 // String dumps config object as nicely indented JSON
 func (c *BootClusterConfig) String() string {
-	data, _ := json.MarshalIndent(c, "", "    ")
+	data, _ := json.MarshalIndent(c, "", "    ") // nolint: gas
 	return string(data)
 }
 
@@ -230,6 +229,9 @@ type NodeConfig struct {
 	// This file should contain a valid secp256k1 private key that will be used for both
 	// remote peer identification as well as network traffic encryption.
 	NodeKeyFile string
+
+	// Discovery set to true will enabled discovery protocol.
+	Discovery bool
 
 	// ListenAddr is an IP address and port of this node (e.g. 127.0.0.1:30303).
 	ListenAddr string
@@ -283,8 +285,8 @@ type NodeConfig struct {
 	// LogFile is filename where exposed logs get written to
 	LogFile string
 
-	// LogLevel defines minimum log level. Valid names are "ERROR", "WARNING", "INFO", "DEBUG", and "TRACE".
-	LogLevel string `validate:"eq=ERROR|eq=WARNING|eq=INFO|eq=DEBUG|eq=TRACE"`
+	// LogLevel defines minimum log level. Valid names are "ERROR", "WARN", "INFO", "DEBUG", and "TRACE".
+	LogLevel string `validate:"eq=ERROR|eq=WARN|eq=INFO|eq=DEBUG|eq=TRACE"`
 
 	// LogToStderr defines whether logged info should also be output to os.Stderr
 	LogToStderr bool
@@ -583,12 +585,8 @@ func (c *NodeConfig) updateBootClusterConfig() error {
 
 	for _, cluster := range clusters {
 		if cluster.NetworkID == int(c.NetworkID) {
-			c.BootClusterConfig.RootNumber = cluster.Prod.Number
-			c.BootClusterConfig.RootHash = cluster.Prod.Hash
 			c.BootClusterConfig.BootNodes = cluster.Prod.BootNodes
 			if c.DevMode {
-				c.BootClusterConfig.RootNumber = cluster.Dev.Number
-				c.BootClusterConfig.RootHash = cluster.Dev.Hash
 				c.BootClusterConfig.BootNodes = cluster.Dev.BootNodes
 			}
 			break

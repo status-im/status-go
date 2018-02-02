@@ -21,5 +21,9 @@ You can also discover more information in https://hackmd.io/s/SkZI0bXIb
 2. Wait for an approve from one of core contributors.
 3. Fork the project and work right in the `develop` branch.
 4. Work on the issue and file a PR back into `develop`.
-5. Wait until your PR is [reviewed](https://hackmd.io/s/B1AenvFU-) by 3 core developers and merged.
+5. Wait until your PR is [reviewed](https://hackmd.io/s/B1AenvFU-) by 2 core developers and merged.
 
+## Code Style
+
+Please, note that we follow [Effective Go](https://golang.org/doc/effective_go.html) and
+[CodeReviewComments](https://github.com/golang/go/wiki/CodeReviewComments) in our code.

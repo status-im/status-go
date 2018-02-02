@@ -5,7 +5,6 @@
 package common
 
 import (
-	context "context"
 	accounts "github.com/ethereum/go-ethereum/accounts"
 	keystore "github.com/ethereum/go-ethereum/accounts/keystore"
 	common "github.com/ethereum/go-ethereum/common"
@@ -154,6 +153,18 @@ func (m *MockNodeManager) AddPeer(url string) error {
 // AddPeer indicates an expected call of AddPeer
 func (mr *MockNodeManagerMockRecorder) AddPeer(url interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddPeer", reflect.TypeOf((*MockNodeManager)(nil).AddPeer), url)
+}
+
+// PeerCount mocks base method
+func (m *MockNodeManager) PeerCount() int {
+	ret := m.ctrl.Call(m, "PeerCount")
+	ret0, _ := ret[0].(int)
+	return ret0
+}
+
+// PeerCount indicates an expected call of PeerCount
+func (mr *MockNodeManagerMockRecorder) PeerCount() *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PeerCount", reflect.TypeOf((*MockNodeManager)(nil).PeerCount))
 }
 
 // LightEthereumService mocks base method
@@ -387,285 +398,6 @@ func (mr *MockAccountManagerMockRecorder) AddressToDecryptedAccount(address, pas
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddressToDecryptedAccount", reflect.TypeOf((*MockAccountManager)(nil).AddressToDecryptedAccount), address, password)
 }
 
-// MockTxQueue is a mock of TxQueue interface
-type MockTxQueue struct {
-	ctrl     *gomock.Controller
-	recorder *MockTxQueueMockRecorder
-}
-
-// MockTxQueueMockRecorder is the mock recorder for MockTxQueue
-type MockTxQueueMockRecorder struct {
-	mock *MockTxQueue
-}
-
-// NewMockTxQueue creates a new mock instance
-func NewMockTxQueue(ctrl *gomock.Controller) *MockTxQueue {
-	mock := &MockTxQueue{ctrl: ctrl}
-	mock.recorder = &MockTxQueueMockRecorder{mock}
-	return mock
-}
-
-// EXPECT returns an object that allows the caller to indicate expected use
-func (m *MockTxQueue) EXPECT() *MockTxQueueMockRecorder {
-	return m.recorder
-}
-
-// Remove mocks base method
-func (m *MockTxQueue) Remove(id QueuedTxID) {
-	m.ctrl.Call(m, "Remove", id)
-}
-
-// Remove indicates an expected call of Remove
-func (mr *MockTxQueueMockRecorder) Remove(id interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Remove", reflect.TypeOf((*MockTxQueue)(nil).Remove), id)
-}
-
-// Reset mocks base method
-func (m *MockTxQueue) Reset() {
-	m.ctrl.Call(m, "Reset")
-}
-
-// Reset indicates an expected call of Reset
-func (mr *MockTxQueueMockRecorder) Reset() *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Reset", reflect.TypeOf((*MockTxQueue)(nil).Reset))
-}
-
-// Count mocks base method
-func (m *MockTxQueue) Count() int {
-	ret := m.ctrl.Call(m, "Count")
-	ret0, _ := ret[0].(int)
-	return ret0
-}
-
-// Count indicates an expected call of Count
-func (mr *MockTxQueueMockRecorder) Count() *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Count", reflect.TypeOf((*MockTxQueue)(nil).Count))
-}
-
-// Has mocks base method
-func (m *MockTxQueue) Has(id QueuedTxID) bool {
-	ret := m.ctrl.Call(m, "Has", id)
-	ret0, _ := ret[0].(bool)
-	return ret0
-}
-
-// Has indicates an expected call of Has
-func (mr *MockTxQueueMockRecorder) Has(id interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Has", reflect.TypeOf((*MockTxQueue)(nil).Has), id)
-}
-
-// MockTxQueueManager is a mock of TxQueueManager interface
-type MockTxQueueManager struct {
-	ctrl     *gomock.Controller
-	recorder *MockTxQueueManagerMockRecorder
-}
-
-// MockTxQueueManagerMockRecorder is the mock recorder for MockTxQueueManager
-type MockTxQueueManagerMockRecorder struct {
-	mock *MockTxQueueManager
-}
-
-// NewMockTxQueueManager creates a new mock instance
-func NewMockTxQueueManager(ctrl *gomock.Controller) *MockTxQueueManager {
-	mock := &MockTxQueueManager{ctrl: ctrl}
-	mock.recorder = &MockTxQueueManagerMockRecorder{mock}
-	return mock
-}
-
-// EXPECT returns an object that allows the caller to indicate expected use
-func (m *MockTxQueueManager) EXPECT() *MockTxQueueManagerMockRecorder {
-	return m.recorder
-}
-
-// Start mocks base method
-func (m *MockTxQueueManager) Start() {
-	m.ctrl.Call(m, "Start")
-}
-
-// Start indicates an expected call of Start
-func (mr *MockTxQueueManagerMockRecorder) Start() *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Start", reflect.TypeOf((*MockTxQueueManager)(nil).Start))
-}
-
-// Stop mocks base method
-func (m *MockTxQueueManager) Stop() {
-	m.ctrl.Call(m, "Stop")
-}
-
-// Stop indicates an expected call of Stop
-func (mr *MockTxQueueManagerMockRecorder) Stop() *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Stop", reflect.TypeOf((*MockTxQueueManager)(nil).Stop))
-}
-
-// TransactionQueue mocks base method
-func (m *MockTxQueueManager) TransactionQueue() TxQueue {
-	ret := m.ctrl.Call(m, "TransactionQueue")
-	ret0, _ := ret[0].(TxQueue)
-	return ret0
-}
-
-// TransactionQueue indicates an expected call of TransactionQueue
-func (mr *MockTxQueueManagerMockRecorder) TransactionQueue() *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TransactionQueue", reflect.TypeOf((*MockTxQueueManager)(nil).TransactionQueue))
-}
-
-// CreateTransaction mocks base method
-func (m *MockTxQueueManager) CreateTransaction(ctx context.Context, args SendTxArgs) *QueuedTx {
-	ret := m.ctrl.Call(m, "CreateTransaction", ctx, args)
-	ret0, _ := ret[0].(*QueuedTx)
-	return ret0
-}
-
-// CreateTransaction indicates an expected call of CreateTransaction
-func (mr *MockTxQueueManagerMockRecorder) CreateTransaction(ctx, args interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateTransaction", reflect.TypeOf((*MockTxQueueManager)(nil).CreateTransaction), ctx, args)
-}
-
-// QueueTransaction mocks base method
-func (m *MockTxQueueManager) QueueTransaction(tx *QueuedTx) error {
-	ret := m.ctrl.Call(m, "QueueTransaction", tx)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// QueueTransaction indicates an expected call of QueueTransaction
-func (mr *MockTxQueueManagerMockRecorder) QueueTransaction(tx interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QueueTransaction", reflect.TypeOf((*MockTxQueueManager)(nil).QueueTransaction), tx)
-}
-
-// WaitForTransaction mocks base method
-func (m *MockTxQueueManager) WaitForTransaction(tx *QueuedTx) error {
-	ret := m.ctrl.Call(m, "WaitForTransaction", tx)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// WaitForTransaction indicates an expected call of WaitForTransaction
-func (mr *MockTxQueueManagerMockRecorder) WaitForTransaction(tx interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitForTransaction", reflect.TypeOf((*MockTxQueueManager)(nil).WaitForTransaction), tx)
-}
-
-// NotifyOnQueuedTxReturn mocks base method
-func (m *MockTxQueueManager) NotifyOnQueuedTxReturn(queuedTx *QueuedTx, err error) {
-	m.ctrl.Call(m, "NotifyOnQueuedTxReturn", queuedTx, err)
-}
-
-// NotifyOnQueuedTxReturn indicates an expected call of NotifyOnQueuedTxReturn
-func (mr *MockTxQueueManagerMockRecorder) NotifyOnQueuedTxReturn(queuedTx, err interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NotifyOnQueuedTxReturn", reflect.TypeOf((*MockTxQueueManager)(nil).NotifyOnQueuedTxReturn), queuedTx, err)
-}
-
-// TransactionQueueHandler mocks base method
-func (m *MockTxQueueManager) TransactionQueueHandler() func(*QueuedTx) {
-	ret := m.ctrl.Call(m, "TransactionQueueHandler")
-	ret0, _ := ret[0].(func(*QueuedTx))
-	return ret0
-}
-
-// TransactionQueueHandler indicates an expected call of TransactionQueueHandler
-func (mr *MockTxQueueManagerMockRecorder) TransactionQueueHandler() *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TransactionQueueHandler", reflect.TypeOf((*MockTxQueueManager)(nil).TransactionQueueHandler))
-}
-
-// SetTransactionQueueHandler mocks base method
-func (m *MockTxQueueManager) SetTransactionQueueHandler(fn EnqueuedTxHandler) {
-	m.ctrl.Call(m, "SetTransactionQueueHandler", fn)
-}
-
-// SetTransactionQueueHandler indicates an expected call of SetTransactionQueueHandler
-func (mr *MockTxQueueManagerMockRecorder) SetTransactionQueueHandler(fn interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetTransactionQueueHandler", reflect.TypeOf((*MockTxQueueManager)(nil).SetTransactionQueueHandler), fn)
-}
-
-// SetTransactionReturnHandler mocks base method
-func (m *MockTxQueueManager) SetTransactionReturnHandler(fn EnqueuedTxReturnHandler) {
-	m.ctrl.Call(m, "SetTransactionReturnHandler", fn)
-}
-
-// SetTransactionReturnHandler indicates an expected call of SetTransactionReturnHandler
-func (mr *MockTxQueueManagerMockRecorder) SetTransactionReturnHandler(fn interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetTransactionReturnHandler", reflect.TypeOf((*MockTxQueueManager)(nil).SetTransactionReturnHandler), fn)
-}
-
-// SendTransactionRPCHandler mocks base method
-func (m *MockTxQueueManager) SendTransactionRPCHandler(ctx context.Context, args ...interface{}) (interface{}, error) {
-	varargs := []interface{}{ctx}
-	for _, a := range args {
-		varargs = append(varargs, a)
-	}
-	ret := m.ctrl.Call(m, "SendTransactionRPCHandler", varargs...)
-	ret0, _ := ret[0].(interface{})
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// SendTransactionRPCHandler indicates an expected call of SendTransactionRPCHandler
-func (mr *MockTxQueueManagerMockRecorder) SendTransactionRPCHandler(ctx interface{}, args ...interface{}) *gomock.Call {
-	varargs := append([]interface{}{ctx}, args...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendTransactionRPCHandler", reflect.TypeOf((*MockTxQueueManager)(nil).SendTransactionRPCHandler), varargs...)
-}
-
-// TransactionReturnHandler mocks base method
-func (m *MockTxQueueManager) TransactionReturnHandler() func(*QueuedTx, error) {
-	ret := m.ctrl.Call(m, "TransactionReturnHandler")
-	ret0, _ := ret[0].(func(*QueuedTx, error))
-	return ret0
-}
-
-// TransactionReturnHandler indicates an expected call of TransactionReturnHandler
-func (mr *MockTxQueueManagerMockRecorder) TransactionReturnHandler() *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TransactionReturnHandler", reflect.TypeOf((*MockTxQueueManager)(nil).TransactionReturnHandler))
-}
-
-// CompleteTransaction mocks base method
-func (m *MockTxQueueManager) CompleteTransaction(id QueuedTxID, password string) (common.Hash, error) {
-	ret := m.ctrl.Call(m, "CompleteTransaction", id, password)
-	ret0, _ := ret[0].(common.Hash)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// CompleteTransaction indicates an expected call of CompleteTransaction
-func (mr *MockTxQueueManagerMockRecorder) CompleteTransaction(id, password interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CompleteTransaction", reflect.TypeOf((*MockTxQueueManager)(nil).CompleteTransaction), id, password)
-}
-
-// CompleteTransactions mocks base method
-func (m *MockTxQueueManager) CompleteTransactions(ids []QueuedTxID, password string) map[QueuedTxID]RawCompleteTransactionResult {
-	ret := m.ctrl.Call(m, "CompleteTransactions", ids, password)
-	ret0, _ := ret[0].(map[QueuedTxID]RawCompleteTransactionResult)
-	return ret0
-}
-
-// CompleteTransactions indicates an expected call of CompleteTransactions
-func (mr *MockTxQueueManagerMockRecorder) CompleteTransactions(ids, password interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CompleteTransactions", reflect.TypeOf((*MockTxQueueManager)(nil).CompleteTransactions), ids, password)
-}
-
-// DiscardTransaction mocks base method
-func (m *MockTxQueueManager) DiscardTransaction(id QueuedTxID) error {
-	ret := m.ctrl.Call(m, "DiscardTransaction", id)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// DiscardTransaction indicates an expected call of DiscardTransaction
-func (mr *MockTxQueueManagerMockRecorder) DiscardTransaction(id interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DiscardTransaction", reflect.TypeOf((*MockTxQueueManager)(nil).DiscardTransaction), id)
-}
-
-// DiscardTransactions mocks base method
-func (m *MockTxQueueManager) DiscardTransactions(ids []QueuedTxID) map[QueuedTxID]RawDiscardTransactionResult {
-	ret := m.ctrl.Call(m, "DiscardTransactions", ids)
-	ret0, _ := ret[0].(map[QueuedTxID]RawDiscardTransactionResult)
-	return ret0
-}
-
-// DiscardTransactions indicates an expected call of DiscardTransactions
-func (mr *MockTxQueueManagerMockRecorder) DiscardTransactions(ids interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DiscardTransactions", reflect.TypeOf((*MockTxQueueManager)(nil).DiscardTransactions), ids)
-}
-
 // MockJailCell is a mock of JailCell interface
 type MockJailCell struct {
 	ctrl     *gomock.Controller
@@ -746,8 +478,10 @@ func (mr *MockJailCellMockRecorder) Call(item, this interface{}, args ...interfa
 }
 
 // Stop mocks base method
-func (m *MockJailCell) Stop() {
-	m.ctrl.Call(m, "Stop")
+func (m *MockJailCell) Stop() error {
+	ret := m.ctrl.Call(m, "Stop")
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
 // Stop indicates an expected call of Stop
@@ -778,18 +512,6 @@ func (m *MockJailManager) EXPECT() *MockJailManagerMockRecorder {
 	return m.recorder
 }
 
-// Parse mocks base method
-func (m *MockJailManager) Parse(chatID, js string) string {
-	ret := m.ctrl.Call(m, "Parse", chatID, js)
-	ret0, _ := ret[0].(string)
-	return ret0
-}
-
-// Parse indicates an expected call of Parse
-func (mr *MockJailManagerMockRecorder) Parse(chatID, js interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Parse", reflect.TypeOf((*MockJailManager)(nil).Parse), chatID, js)
-}
-
 // Call mocks base method
 func (m *MockJailManager) Call(chatID, this, args string) string {
 	ret := m.ctrl.Call(m, "Call", chatID, this, args)
@@ -802,17 +524,46 @@ func (mr *MockJailManagerMockRecorder) Call(chatID, this, args interface{}) *gom
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Call", reflect.TypeOf((*MockJailManager)(nil).Call), chatID, this, args)
 }
 
-// NewCell mocks base method
-func (m *MockJailManager) NewCell(chatID string) (JailCell, error) {
-	ret := m.ctrl.Call(m, "NewCell", chatID)
+// CreateCell mocks base method
+func (m *MockJailManager) CreateCell(chatID string) (JailCell, error) {
+	ret := m.ctrl.Call(m, "CreateCell", chatID)
 	ret0, _ := ret[0].(JailCell)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// NewCell indicates an expected call of NewCell
-func (mr *MockJailManagerMockRecorder) NewCell(chatID interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewCell", reflect.TypeOf((*MockJailManager)(nil).NewCell), chatID)
+// CreateCell indicates an expected call of CreateCell
+func (mr *MockJailManagerMockRecorder) CreateCell(chatID interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateCell", reflect.TypeOf((*MockJailManager)(nil).CreateCell), chatID)
+}
+
+// Parse mocks base method
+func (m *MockJailManager) Parse(chatID, js string) string {
+	ret := m.ctrl.Call(m, "Parse", chatID, js)
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// Parse indicates an expected call of Parse
+func (mr *MockJailManagerMockRecorder) Parse(chatID, js interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Parse", reflect.TypeOf((*MockJailManager)(nil).Parse), chatID, js)
+}
+
+// CreateAndInitCell mocks base method
+func (m *MockJailManager) CreateAndInitCell(chatID string, code ...string) string {
+	varargs := []interface{}{chatID}
+	for _, a := range code {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "CreateAndInitCell", varargs...)
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// CreateAndInitCell indicates an expected call of CreateAndInitCell
+func (mr *MockJailManagerMockRecorder) CreateAndInitCell(chatID interface{}, code ...interface{}) *gomock.Call {
+	varargs := append([]interface{}{chatID}, code...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateAndInitCell", reflect.TypeOf((*MockJailManager)(nil).CreateAndInitCell), varargs...)
 }
 
 // Cell mocks base method
@@ -828,14 +579,26 @@ func (mr *MockJailManagerMockRecorder) Cell(chatID interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Cell", reflect.TypeOf((*MockJailManager)(nil).Cell), chatID)
 }
 
-// BaseJS mocks base method
-func (m *MockJailManager) BaseJS(js string) {
-	m.ctrl.Call(m, "BaseJS", js)
+// Execute mocks base method
+func (m *MockJailManager) Execute(chatID, code string) string {
+	ret := m.ctrl.Call(m, "Execute", chatID, code)
+	ret0, _ := ret[0].(string)
+	return ret0
 }
 
-// BaseJS indicates an expected call of BaseJS
-func (mr *MockJailManagerMockRecorder) BaseJS(js interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BaseJS", reflect.TypeOf((*MockJailManager)(nil).BaseJS), js)
+// Execute indicates an expected call of Execute
+func (mr *MockJailManagerMockRecorder) Execute(chatID, code interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Execute", reflect.TypeOf((*MockJailManager)(nil).Execute), chatID, code)
+}
+
+// SetBaseJS mocks base method
+func (m *MockJailManager) SetBaseJS(js string) {
+	m.ctrl.Call(m, "SetBaseJS", js)
+}
+
+// SetBaseJS indicates an expected call of SetBaseJS
+func (mr *MockJailManagerMockRecorder) SetBaseJS(js interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetBaseJS", reflect.TypeOf((*MockJailManager)(nil).SetBaseJS), js)
 }
 
 // Stop mocks base method

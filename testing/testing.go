@@ -12,7 +12,10 @@ import (
 	"time"
 
 	"github.com/status-im/status-go/geth/common"
+	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
+
+	_ "github.com/stretchr/testify/suite" // required to register testify flags
 )
 
 var (
@@ -20,6 +23,9 @@ var (
 
 	// ErrNoRemoteURL is returned when network id has no associated url.
 	ErrNoRemoteURL = errors.New("network id requires a remote URL")
+
+	// ErrTimeout is returned when test times out
+	ErrTimeout = errors.New("timeout")
 
 	// TestConfig defines the default config usable at package-level.
 	TestConfig *common.TestConfig
@@ -77,10 +83,10 @@ func LoadFromFile(filename string) string {
 	}
 
 	buf := bytes.NewBuffer(nil)
-	io.Copy(buf, f)
-	f.Close()
+	io.Copy(buf, f) // nolint: gas
+	f.Close()       // nolint: gas
 
-	return string(buf.Bytes())
+	return buf.String()
 }
 
 // EnsureNodeSync waits until node synchronzation is done to continue
@@ -108,22 +114,32 @@ func EnsureNodeSync(nodeManager common.NodeManager) {
 	defer timeout.Stop()
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
-
 	for {
 		select {
 		case <-timeout.C:
 			panic("timeout during node synchronization")
 		case <-ticker.C:
 			downloader := les.Downloader()
-
-			if downloader != nil {
-				isSyncing := downloader.Synchronising()
-				progress := downloader.Progress()
-
-				if !isSyncing && progress.HighestBlock > 0 && progress.CurrentBlock >= progress.HighestBlock {
-					return
-				}
+			if downloader == nil {
+				continue
 			}
+			if nodeManager.PeerCount() == 0 {
+				log.Debug("No establishished connections with a peers, continue waiting for a sync")
+				continue
+			}
+			if downloader.Synchronising() {
+				log.Debug("synchronization is in progress")
+				continue
+			}
+			progress := downloader.Progress()
+			if progress.CurrentBlock >= progress.HighestBlock {
+				return
+			}
+			log.Debug(
+				fmt.Sprintf("synchronization is not finished yet: current block %d < highest block %d",
+					progress.CurrentBlock, progress.HighestBlock),
+			)
+
 		}
 	}
 }
@@ -189,9 +205,8 @@ func GetNetworkID() int {
 func GetAccount1PKFile() string {
 	if GetNetworkID() == params.StatusChainNetworkID {
 		return "test-account1-status-chain.pk"
-	} else {
-		return "test-account1.pk"
 	}
+	return "test-account1.pk"
 }
 
 // GetAccount2PKFile returns the filename for Account2 keystore based
@@ -200,7 +215,19 @@ func GetAccount1PKFile() string {
 func GetAccount2PKFile() string {
 	if GetNetworkID() == params.StatusChainNetworkID {
 		return "test-account2-status-chain.pk"
-	} else {
-		return "test-account2.pk"
 	}
+	return "test-account2.pk"
+}
+
+// WaitClosed used to wait on a channel in tests
+func WaitClosed(c chan struct{}, d time.Duration) error {
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-c:
+		return nil
+	case <-timer.C:
+		return ErrTimeout
+	}
+
 }

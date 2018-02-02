@@ -33,7 +33,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common/message"
 	"github.com/ethereum/go-ethereum/p2p"
 )
 
@@ -101,22 +100,39 @@ type NotificationServer interface {
 	Stop() error
 }
 
-// MessageState holds the current delivery status of a whisper p2p message.
-type MessageState struct {
-	IsP2P     bool              `json:"is_p2p"`
-	Reason    error             `json:"reason"`
-	Envelope  Envelope          `json:"envelope"`
-	Timestamp time.Time         `json:"timestamp"`
-	Source    NewMessage        `json:"source"`
-	Status    message.Status    `json:"status"`
-	Direction message.Direction `json:"direction"`
-	Received  ReceivedMessage   `json:"received"`
+type envelopeSource int
+
+const (
+	_ = iota
+	// peerSource indicates a source as a regular peer.
+	peerSource envelopeSource = iota
+	// p2pSource indicates that envelop was received from a trusted peer.
+	p2pSource
+)
+
+// EnvelopeMeta keeps metadata of received envelopes.
+type EnvelopeMeta struct {
+	Hash   string
+	Topic  TopicType
+	Size   uint32
+	Source envelopeSource
+	IsNew  bool
+	Peer   string
 }
 
-// DeliveryServer represents a small message status
-// notification system where a message delivery status
-// update event is delivered to it's underline system
-// for both rpc messages and p2p messages.
-type DeliveryServer interface {
-	SendState(MessageState)
+// SourceString converts source to string.
+func (m *EnvelopeMeta) SourceString() string {
+	switch m.Source {
+	case peerSource:
+		return "peer"
+	case p2pSource:
+		return "p2p"
+	default:
+		return "unknown"
+	}
+}
+
+// EnvelopeTracer tracks received envelopes.
+type EnvelopeTracer interface {
+	Trace(*EnvelopeMeta)
 }

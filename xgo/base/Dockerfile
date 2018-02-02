@@ -1,4 +1,4 @@
-FROM karalabe/xgo-1.7.1
+FROM karalabe/xgo-1.9.2
 
 # Inject the container entry point, the build script (patched for Status bindings conditional builds of C code)
 ADD build.sh /build.sh

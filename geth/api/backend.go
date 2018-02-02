@@ -13,7 +13,7 @@ import (
 	"github.com/status-im/status-go/geth/notification/fcm"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/signal"
-	"github.com/status-im/status-go/geth/txqueue"
+	"github.com/status-im/status-go/geth/transactions"
 )
 
 const (
@@ -27,7 +27,7 @@ type StatusBackend struct {
 	nodeReady       chan struct{} // channel to wait for when node is fully ready
 	nodeManager     common.NodeManager
 	accountManager  common.AccountManager
-	txQueueManager  common.TxQueueManager
+	txQueueManager  *transactions.Manager
 	jailManager     common.JailManager
 	newNotification common.NotificationConstructor
 }
@@ -38,7 +38,7 @@ func NewStatusBackend() *StatusBackend {
 
 	nodeManager := node.NewNodeManager()
 	accountManager := account.NewManager(nodeManager)
-	txQueueManager := txqueue.NewManager(nodeManager, accountManager)
+	txQueueManager := transactions.NewManager(nodeManager, accountManager)
 	jailManager := jail.New(nodeManager)
 	notificationManager := fcm.NewNotification(fcmServerKey)
 
@@ -66,8 +66,8 @@ func (m *StatusBackend) JailManager() common.JailManager {
 	return m.jailManager
 }
 
-// TxQueueManager returns reference to jail
-func (m *StatusBackend) TxQueueManager() common.TxQueueManager {
+// TxQueueManager returns reference to transactions manager
+func (m *StatusBackend) TxQueueManager() *transactions.Manager {
 	return m.txQueueManager
 }
 
@@ -90,8 +90,6 @@ func (m *StatusBackend) StartNode(config *params.NodeConfig) (<-chan struct{}, e
 		return nil, err
 	}
 
-	m.txQueueManager.Start()
-
 	m.nodeReady = make(chan struct{}, 1)
 	go m.onNodeStart(nodeStarted, m.nodeReady) // waits on nodeStarted, writes to backendReady
 
@@ -101,6 +99,10 @@ func (m *StatusBackend) StartNode(config *params.NodeConfig) (<-chan struct{}, e
 // onNodeStart does everything required to prepare backend
 func (m *StatusBackend) onNodeStart(nodeStarted <-chan struct{}, backendReady chan struct{}) {
 	<-nodeStarted
+
+	// tx queue manager should be started after node is started, it depends
+	// on rpc client being created
+	m.txQueueManager.Start()
 
 	if err := m.registerHandlers(); err != nil {
 		log.Error("Handler registration failed", "err", err)
@@ -198,22 +200,19 @@ func (m *StatusBackend) CallRPC(inputJSON string) string {
 }
 
 // SendTransaction creates a new transaction and waits until it's complete.
-func (m *StatusBackend) SendTransaction(ctx context.Context, args common.SendTxArgs) (gethcommon.Hash, error) {
+func (m *StatusBackend) SendTransaction(ctx context.Context, args common.SendTxArgs) (hash gethcommon.Hash, err error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-
-	tx := m.txQueueManager.CreateTransaction(ctx, args)
-
-	if err := m.txQueueManager.QueueTransaction(tx); err != nil {
-		return gethcommon.Hash{}, err
+	tx := common.CreateTransaction(ctx, args)
+	if err = m.txQueueManager.QueueTransaction(tx); err != nil {
+		return hash, err
 	}
-
-	if err := m.txQueueManager.WaitForTransaction(tx); err != nil {
-		return gethcommon.Hash{}, err
+	rst := m.txQueueManager.WaitForTransaction(tx)
+	if rst.Error != nil {
+		return hash, rst.Error
 	}
-
-	return tx.Hash, nil
+	return rst.Hash, nil
 }
 
 // CompleteTransaction instructs backend to complete sending of a given transaction
@@ -222,7 +221,7 @@ func (m *StatusBackend) CompleteTransaction(id common.QueuedTxID, password strin
 }
 
 // CompleteTransactions instructs backend to complete sending of multiple transactions
-func (m *StatusBackend) CompleteTransactions(ids []common.QueuedTxID, password string) map[common.QueuedTxID]common.RawCompleteTransactionResult {
+func (m *StatusBackend) CompleteTransactions(ids []common.QueuedTxID, password string) map[common.QueuedTxID]common.TransactionResult {
 	return m.txQueueManager.CompleteTransactions(ids, password)
 }
 
@@ -245,12 +244,5 @@ func (m *StatusBackend) registerHandlers() error {
 
 	rpcClient.RegisterHandler("eth_accounts", m.accountManager.AccountsRPCHandler())
 	rpcClient.RegisterHandler("eth_sendTransaction", m.txQueueManager.SendTransactionRPCHandler)
-
-	m.txQueueManager.SetTransactionQueueHandler(m.txQueueManager.TransactionQueueHandler())
-	log.Info("Registered handler", "fn", "TransactionQueueHandler")
-
-	m.txQueueManager.SetTransactionReturnHandler(m.txQueueManager.TransactionReturnHandler())
-	log.Info("Registered handler", "fn", "TransactionReturnHandler")
-
 	return nil
 }

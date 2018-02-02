@@ -56,9 +56,9 @@ func (s *JailTestSuite) TestInitWithoutBaseJS() {
 	s.EqualError(err, "cell '"+testChatID+"' not found")
 	s.Nil(cell)
 
-	// create VM (w/o properly initializing base JS script)
-	err = errors.New("ReferenceError: '_status_catalog' is not defined")
-	s.Equal(errorWrapper(err), s.Jail.CreateAndInitCell(testChatID, ``))
+	response := s.Jail.CreateAndInitCell(testChatID)
+	s.Equal(jail.EmptyResponse, response)
+
 	err = errors.New("ReferenceError: 'call' is not defined")
 	s.Equal(errorWrapper(err), s.Jail.Call(testChatID, `["commands", "testCommand"]`, `{"val": 12}`))
 
@@ -77,39 +77,34 @@ func (s *JailTestSuite) TestInitWithBaseJS() {
 
 	// now no error should occur
 	response := s.Jail.CreateAndInitCell(testChatID)
-	expectedResponse := `{"result": {"commands":{},"responses":{}}}`
-	s.Equal(expectedResponse, response)
+	s.Equal(jail.EmptyResponse, response)
 
 	// make sure that Call succeeds even w/o running node
 	response = s.Jail.Call(testChatID, `["commands", "testCommand"]`, `{"val": 12}`)
-	expectedResponse = `{"result": 144}`
+	expectedResponse := `{"result": 144}`
 	s.Equal(expectedResponse, response)
 }
 
-// @TODO(adam): finally, this test should pass as checking existence of `_status_catalog`
-// should be done in status-react.
-func (s *JailTestSuite) TestCreateAndInitCellWithoutStatusCatalog() {
-	response := s.Jail.CreateAndInitCell(testChatID)
-	s.Equal(`{"error":"ReferenceError: '_status_catalog' is not defined"}`, response)
-}
+func (s *JailTestSuite) TestCreateAndInitCell() {
+	// If no custom JS provided -- the default response is returned
+	response := s.Jail.CreateAndInitCell("newChat1")
+	expectedResponse := jail.EmptyResponse
+	s.Equal(expectedResponse, response)
 
-// @TODO(adam): remove extra JS when checking `_status_catalog` is move to status-react.
-func (s *JailTestSuite) TestMultipleInitError() {
-	response := s.Jail.CreateAndInitCell(testChatID, `var _status_catalog = {}`)
-	s.Equal(`{"result": {}}`, response)
+	// If any custom JS provided -- the result of the last op is returned
+	response = s.Jail.CreateAndInitCell("newChat2", "var a = 2", "a")
+	expectedResponse = `{"result": 2}`
+	s.Equal(expectedResponse, response)
 
-	response = s.Jail.CreateAndInitCell(testChatID)
-	s.Equal(`{"error":"cell with id 'testChat' already exists"}`, response)
-}
+	// Reinitialization preserves the JS environment, so the 'test' variable exists
+	// even though we didn't initialize it here (in the second room).
+	response = s.Jail.CreateAndInitCell("newChat2", "a")
+	expectedResponse = `{"result": 2}`
+	s.Equal(expectedResponse, response)
 
-// @TODO(adam): remove extra JS when checking `_status_catalog` is moved to status-react.
-func (s *JailTestSuite) TestCreateAndInitCellResponse() {
-	extraCode := `
-	var _status_catalog = {
-		foo: 'bar'
-	};`
-	response := s.Jail.CreateAndInitCell("newChat", extraCode)
-	expectedResponse := `{"result": {"foo":"bar"}}`
+	// But this variable doesn't leak into other rooms.
+	response = s.Jail.CreateAndInitCell("newChat1", "a")
+	expectedResponse = `{"error":"ReferenceError: 'a' is not defined"}`
 	s.Equal(expectedResponse, response)
 }
 

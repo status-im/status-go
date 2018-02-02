@@ -91,6 +91,29 @@ func (s *TimersSuite) TestClearIntervalImmediately() {
 	<-time.After(100 * time.Millisecond)
 }
 
+func (s *TimersSuite) TestImmediateTimer() {
+	err := s.vm.Set("__done", func() {
+		s.ch <- struct{}{}
+	})
+	s.NoError(err)
+
+	err = s.loop.Eval(`
+		var v = setImmediate(function() {
+			__done();
+		});
+	`)
+	s.NoError(err)
+
+	select {
+	case <-s.ch:
+		value, err := s.vm.Get("v")
+		s.NoError(err)
+		s.NotNil(value)
+	case <-time.After(100 * time.Millisecond):
+		s.Fail("test timed out")
+	}
+}
+
 type TimersSuite struct {
 	suite.Suite
 
