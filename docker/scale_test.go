@@ -116,4 +116,12 @@ func (s *WhisperScaleSuite) TestSymKeyMessaging() {
 		}(c)
 	}
 	wg.Wait()
+	for _, w := range s.whisps {
+		metrics, err := Metrics(w.Metrics)
+		s.NoError(err)
+		envelope := metrics["envelope_counter"]
+		for _, m := range envelope.Metric {
+			fmt.Println(m)
+		}
+	}
 }
