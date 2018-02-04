@@ -92,10 +92,6 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	s.Require().Equal(1, len(messages))
 	s.Require().NoError(err)
 
-	//check that there are no more messages
-	messages = s.getMessagesByMessageFilterID(rpcClient, messageFilterID)
-	s.Require().Equal(0, len(messages))
-
 	//act
 
 	//Request messages (including the previous one, expired) from mailbox
