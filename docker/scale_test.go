@@ -3,6 +3,7 @@ package scale
 import (
 	"context"
 	"fmt"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -61,7 +62,7 @@ func (s *WhisperScaleSuite) SetupTest() {
 	s.NoError(err)
 	s.p = project.New("wnode-test-cluster", cli)
 	s.NoError(s.p.Up(project.UpOpts{
-		Scale: map[string]int{"wnode": 2},
+		Scale: map[string]int{"wnode": 7},
 		Wait:  true,
 	}))
 	containers, err := s.p.Containers(project.FilterOpts{SvcName: "wnode"})
@@ -76,9 +77,9 @@ func (s *WhisperScaleSuite) TearDownTest() {
 }
 
 func (s *WhisperScaleSuite) TestSymKeyMessaging() {
-	msgNum := 10
-	interval := 400 * time.Millisecond
-	whispCount := 2
+	msgNum := 100
+	interval := 500 * time.Millisecond
+	whispCount := 5
 	var wg sync.WaitGroup
 	if len(s.whisps) < whispCount {
 		whispCount = len(s.whisps)
@@ -116,12 +117,50 @@ func (s *WhisperScaleSuite) TestSymKeyMessaging() {
 		}(c)
 	}
 	wg.Wait()
-	for _, w := range s.whisps {
-		metrics, err := Metrics(w.Metrics)
-		s.NoError(err)
-		envelope := metrics["envelope_counter"]
-		for _, m := range envelope.Metric {
-			fmt.Println(m)
-		}
+	// wait for all duplicates to be delivered across the network
+	var (
+		mu                        sync.Mutex
+		sumNew, sumOld, oldPerNew float64
+	)
+	for i, w := range s.whisps {
+		wg.Add(1)
+		go func(i int, w Whisp) {
+			defer wg.Done()
+			var prevOld, prevNew float64
+			for {
+				// wait till no duplicates are received
+				// given that transmission cycle is 200 ms, 5s should be enough
+				whispOld, whispNew, err := getOldNewEnvelopesCount(w.Metrics)
+				s.NoError(err)
+				if err != nil {
+					return
+				}
+				prevNew = whispNew
+				if whispOld > prevOld {
+					prevOld = whispOld
+					time.Sleep(5 * time.Second)
+					continue
+				}
+				break
+			}
+			if i < whispCount {
+				s.Equal(float64(msgNum*(whispCount-1)), prevNew)
+			} else {
+				s.Equal(float64(msgNum*whispCount), prevNew)
+			}
+			mu.Lock()
+			sumNew += prevNew
+			sumOld += prevOld
+			whispOldPerNew := (prevOld / prevNew)
+			oldPerNew += whispOldPerNew
+			mu.Unlock()
+			os.Stdout.Write([]byte(fmt.Sprintln("=== REPORT:", w.Name, prevOld, prevNew, whispOldPerNew)))
+		}(i, w)
 	}
+	wg.Wait()
+	s.True(oldPerNew/float64(len(s.whisps)) < 3.4)
+	os.Stdout.Write([]byte(fmt.Sprintln("=== SUMMARY",
+		"\nduplicates: ", sumOld,
+		"\nnew: ", sumNew,
+		"\nmean old per new for each peer: ", oldPerNew/float64(len(s.whisps)))))
 }
