@@ -90,7 +90,6 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	time.Sleep(1 * time.Second)
 	messages = s.getMessagesByMessageFilterID(rpcClient, messageFilterID)
 	s.Require().Equal(1, len(messages))
-	s.Require().NoError(err)
 
 	//act
 
