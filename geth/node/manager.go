@@ -93,7 +93,7 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 			signal.Send(signal.Envelope{
 				Type: signal.EventNodeCrashed,
 				Event: signal.NodeCrashEvent{
-					Error: fmt.Errorf("%v: %v", ErrNodeStartFailure, startErr).Error(),
+					Error: fmt.Errorf("%v: %v", ErrNodeStartFailure, startErr),
 				},
 			})
 			return
@@ -117,7 +117,7 @@ func (m *NodeManager) startNode(config *params.NodeConfig) (<-chan struct{}, err
 			signal.Send(signal.Envelope{
 				Type: signal.EventNodeCrashed,
 				Event: signal.NodeCrashEvent{
-					Error: ErrRPCClient.Error(),
+					Error: ErrRPCClient,
 				},
 			})
 			return
