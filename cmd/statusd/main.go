@@ -62,6 +62,8 @@ var (
 	// Push Notification
 	enablePN     = flag.Bool("shh.notify", false, "Node is capable of sending Push Notifications")
 	firebaseAuth = flag.String("shh.firebaseauth", "", "FCM Authorization Key used for sending Push Notifications")
+
+	exitWhenSynced = flag.Bool("exit-when-synced", false, "Exit after blockchain sync")
 )
 
 func main() {
@@ -104,6 +106,12 @@ func main() {
 	// Run stats server.
 	if *statsEnabled {
 		go startCollectingStats(interruptCh, backend.NodeManager())
+	}
+
+	// Sync blockchain and stop.
+	if *exitWhenSynced {
+		syncStopErr := backend.NodeManager().SyncAndStopNode(time.Minute * 50)
+		defer handleSyncStopErr(syncStopErr)
 	}
 
 	// wait till node has been stopped
@@ -285,4 +293,21 @@ func haltOnInterruptSignal(nodeManager common.NodeManager) <-chan struct{} {
 	}()
 
 	return interruptCh
+}
+
+func handleSyncStopErr(errChan <-chan error) {
+	var hasErrs bool
+Loop:
+	for {
+		select {
+		case err := <-errChan:
+			log.Println("Sync and stop error: " + err.Error())
+			hasErrs = true
+		default:
+			break Loop
+		}
+	}
+	if hasErrs {
+		log.Fatalln("Sync and stop encountered errors")
+	}
 }

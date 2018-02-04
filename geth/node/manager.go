@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
@@ -517,4 +518,78 @@ func (m *NodeManager) isNodeAvailable() error {
 	}
 
 	return nil
+}
+
+// SyncAndStop waits until node synchronization and exits.
+// Reports errors to returned channel.
+func (m *NodeManager) SyncAndStopNode(timeout time.Duration) (errChan <-chan error) {
+	ch := make(chan error, 2)
+	errChan = ch
+	go m.syncAndStop(timeout, ch)
+	return
+}
+
+func (m *NodeManager) syncAndStop(timeout time.Duration, errChan chan<- error) {
+	// We need to have a larger timeout than ticker delta here.
+	if timeout < time.Second*2 {
+		errChan <- errors.New("Sync timeout is too short, must be at least two seconds")
+		m.stopAndReport(errChan)
+		return
+	}
+
+	// Don't wait for any blockchain sync for the
+	// local private chain as blocks are never mined.
+	if m.config.NetworkID == params.StatusChainNetworkID {
+		m.stopAndReport(errChan)
+		return
+	}
+
+	if m.lesService == nil {
+		errChan <- errors.New("LightEthereumService is nil")
+		m.stopAndReport(errChan)
+		return
+	}
+
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-timer.C:
+			errChan <- errors.New("Timeout during node synchronization")
+			m.stopAndReport(errChan)
+			return
+		case <-ticker.C:
+			downloader := m.lesService.Downloader()
+			if downloader == nil {
+				continue
+			}
+			if m.PeerCount() == 0 {
+				log.Debug("No established connections with any peers, continue waiting for a sync")
+				continue
+			}
+			if downloader.Synchronising() {
+				log.Debug("Synchronization is in progress")
+				continue
+			}
+			progress := downloader.Progress()
+			if progress.CurrentBlock >= progress.HighestBlock {
+				m.stopAndReport(errChan)
+				return
+			}
+			log.Debug(
+				fmt.Sprintf("Synchronization is not finished yet: current block %d < highest block %d",
+					progress.CurrentBlock, progress.HighestBlock),
+			)
+		}
+	}
+}
+
+func (m *NodeManager) stopAndReport(errChan chan<- error) {
+	done, err := m.StopNode()
+	<-done
+	if err != nil {
+		errChan <- err
+	}
 }
