@@ -83,15 +83,16 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	messages := s.getMessagesByMessageFilterID(rpcClient, messageFilterID)
 	s.Require().Equal(0, len(messages))
 
-	//Post message
+	//Post message matching with filter (key and token)
 	s.postMessageToPrivate(rpcClient, pubkey.String(), topic.String(), hexutil.Encode([]byte("Hello world!")))
 
-	//wait to receive message and retrieve it
+	//get message to make sure that it will come from the mailbox later
 	time.Sleep(1 * time.Second)
 	messages = s.getMessagesByMessageFilterID(rpcClient, messageFilterID)
 	s.Require().Equal(1, len(messages))
+	s.Require().NoError(err)
 
-	//check that there are no messages
+	//check that there are no more messages
 	messages = s.getMessagesByMessageFilterID(rpcClient, messageFilterID)
 	s.Require().Equal(0, len(messages))
 
@@ -118,7 +119,7 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 
 	//wait to receive message
 	time.Sleep(time.Second)
-	//And we receive message
+	//And we receive message, it comes from mailbox
 	messages = s.getMessagesByMessageFilterID(rpcClient, messageFilterID)
 	s.Require().Equal(1, len(messages))
 
