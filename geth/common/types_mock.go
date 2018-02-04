@@ -68,16 +68,16 @@ func (mr *MockNodeManagerMockRecorder) StopNode() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StopNode", reflect.TypeOf((*MockNodeManager)(nil).StopNode))
 }
 
-// SyncAndStopNode mocks base method
-func (m *MockNodeManager) SyncAndStopNode(timeout time.Duration) <-chan error {
-	ret := m.ctrl.Call(m, "SyncAndStopNode", timeout)
-	ret0, _ := ret[0].(<-chan error)
+// Sync mocks base method
+func (m *MockNodeManager) Sync(timeout time.Duration) error {
+	ret := m.ctrl.Call(m, "Sync", timeout)
+	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// SyncAndStopNode indicates an expected call of SyncAndStopNode
-func (mr *MockNodeManagerMockRecorder) SyncAndStopNode(timeout interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SyncAndStopNode", reflect.TypeOf((*MockNodeManager)(nil).SyncAndStopNode), timeout)
+// Sync indicates an expected call of Sync
+func (mr *MockNodeManagerMockRecorder) Sync(timeout interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Sync", reflect.TypeOf((*MockNodeManager)(nil).Sync), timeout)
 }
 
 // RestartNode mocks base method

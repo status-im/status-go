@@ -53,8 +53,8 @@ type NodeManager interface {
 	// Stopped node cannot be resumed, one starts a new node instead.
 	StopNode() (<-chan struct{}, error)
 
-	// SyncAndStop node synchronizes the blockchain and stops the node.
-	SyncAndStopNode(timeout time.Duration) (errChan <-chan error)
+	// Sync waits until blockchain is synchronized.
+	Sync(timeout time.Duration) error
 
 	// RestartNode restart running Status node, fails if node is not running
 	RestartNode() (<-chan struct{}, error)
