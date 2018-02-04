@@ -16,6 +16,7 @@ import (
 	params "github.com/status-im/status-go/geth/params"
 	rpc "github.com/status-im/status-go/geth/rpc"
 	reflect "reflect"
+	time "time"
 )
 
 // MockNodeManager is a mock of NodeManager interface
@@ -65,6 +66,18 @@ func (m *MockNodeManager) StopNode() (<-chan struct{}, error) {
 // StopNode indicates an expected call of StopNode
 func (mr *MockNodeManagerMockRecorder) StopNode() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StopNode", reflect.TypeOf((*MockNodeManager)(nil).StopNode))
+}
+
+// SyncAndStopNode mocks base method
+func (m *MockNodeManager) SyncAndStopNode(timeout time.Duration) <-chan error {
+	ret := m.ctrl.Call(m, "SyncAndStopNode", timeout)
+	ret0, _ := ret[0].(<-chan error)
+	return ret0
+}
+
+// SyncAndStopNode indicates an expected call of SyncAndStopNode
+func (mr *MockNodeManagerMockRecorder) SyncAndStopNode(timeout interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SyncAndStopNode", reflect.TypeOf((*MockNodeManager)(nil).SyncAndStopNode), timeout)
 }
 
 // RestartNode mocks base method
