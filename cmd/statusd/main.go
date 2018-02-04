@@ -33,6 +33,7 @@ var (
 	lesEnabled     = flag.Bool("les", false, "LES protocol enabled (default is disabled)")
 	whisperEnabled = flag.Bool("shh", false, "Whisper protocol enabled (default is disabled)")
 	swarmEnabled   = flag.Bool("swarm", false, "Swarm protocol enabled")
+	maxPeers       = flag.Int("maxpeers", 25, "maximum number of p2p peers (including all protocols)")
 	httpEnabled    = flag.Bool("http", false, "HTTP RPC endpoint enabled (default: false)")
 	httpPort       = flag.Int("httpport", params.HTTPPort, "HTTP RPC server's listening port")
 	ipcEnabled     = flag.Bool("ipc", false, "IPC RPC endpoint enabled")
@@ -180,6 +181,7 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 
 	nodeConfig.RPCEnabled = *httpEnabled
 	nodeConfig.WhisperConfig.Enabled = *whisperEnabled
+	nodeConfig.MaxPeers = *maxPeers
 
 	nodeConfig.HTTPPort = *httpPort
 	nodeConfig.IPCEnabled = *ipcEnabled
