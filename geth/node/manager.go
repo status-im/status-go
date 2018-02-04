@@ -520,7 +520,7 @@ func (m *NodeManager) isNodeAvailable() error {
 	return nil
 }
 
-// SyncAndStop waits until node synchronization and exits.
+// SyncAndStopNode waits until node synchronization and exits.
 // Reports errors to returned channel.
 func (m *NodeManager) SyncAndStopNode(timeout time.Duration) (errChan <-chan error) {
 	ch := make(chan error, 2)
