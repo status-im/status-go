@@ -10,7 +10,9 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/rlp"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/suite"
@@ -61,19 +63,59 @@ func (s *TxQueueTestSuite) TearDownTest() {
 	s.client.Close()
 }
 
-func (s *TxQueueTestSuite) setupTransactionPoolAPI(account *common.SelectedExtKey, nonce hexutil.Uint64, gas hexutil.Big, txErr error) {
-	s.txServiceMock.EXPECT().GetTransactionCount(gomock.Any(), account.Address, gethrpc.PendingBlockNumber).Return(&nonce, nil)
-	s.txServiceMock.EXPECT().GasPrice(gomock.Any()).Return(big.NewInt(10), nil)
-	s.txServiceMock.EXPECT().EstimateGas(gomock.Any(), gomock.Any()).Return(&gas, nil)
-	s.txServiceMock.EXPECT().SendRawTransaction(gomock.Any(), gomock.Any()).Return(gethcommon.Hash{}, txErr)
+var (
+	testGas      = (*hexutil.Big)(big.NewInt(defaultGas + 1))
+	testGasPrice = (*hexutil.Big)(big.NewInt(10))
+	testNonce    = hexutil.Uint64(10)
+)
+
+func (s *TxQueueTestSuite) setupTransactionPoolAPI(tx *common.QueuedTx, config *params.NodeConfig, account *common.SelectedExtKey, txErr error) {
+	// Expect calls to gas functions only if there are no user defined values.
+	// And also set the expected gas and gas price for RLP encoding the expected tx.
+	var usedGas, usedGasPrice *big.Int
+	s.txServiceMock.EXPECT().GetTransactionCount(gomock.Any(), account.Address, gethrpc.PendingBlockNumber).Return(&testNonce, nil)
+	if tx.Args.GasPrice == nil {
+		usedGasPrice = (*big.Int)(testGasPrice)
+		s.txServiceMock.EXPECT().GasPrice(gomock.Any()).Return(usedGasPrice, nil)
+	} else {
+		usedGasPrice = (*big.Int)(tx.Args.GasPrice)
+	}
+	if tx.Args.Gas == nil {
+		s.txServiceMock.EXPECT().EstimateGas(gomock.Any(), gomock.Any()).Return(testGas, nil)
+		usedGas = (*big.Int)(testGas)
+	} else {
+		usedGas = (*big.Int)(tx.Args.Gas)
+	}
+	// Prepare the transaction anD RLP encode it.
+	data := s.rlpEncodeTx(tx, config, account, &testNonce, usedGas, usedGasPrice)
+	// Expect the RLP encoded transaction.
+	s.txServiceMock.EXPECT().SendRawTransaction(gomock.Any(), data).Return(gethcommon.Hash{}, txErr)
 }
 
-func (s *TxQueueTestSuite) setupStatusBackend(account *common.SelectedExtKey, password string, passwordErr error) {
+func (s *TxQueueTestSuite) rlpEncodeTx(tx *common.QueuedTx, config *params.NodeConfig, account *common.SelectedExtKey, nonce *hexutil.Uint64, gas, gasPrice *big.Int) hexutil.Bytes {
+	newTx := types.NewTransaction(
+		uint64(*nonce),
+		gethcommon.Address(*tx.Args.To),
+		tx.Args.Value.ToInt(),
+		gas,
+		gasPrice,
+		tx.Args.Data,
+	)
+	chainID := big.NewInt(int64(config.NetworkID))
+	signedTx, err := types.SignTx(newTx, types.NewEIP155Signer(chainID), account.AccountKey.PrivateKey)
+	s.NoError(err)
+	data, err := rlp.EncodeToBytes(signedTx)
+	s.NoError(err)
+	return hexutil.Bytes(data)
+}
+
+func (s *TxQueueTestSuite) setupStatusBackend(account *common.SelectedExtKey, password string, passwordErr error) *params.NodeConfig {
 	nodeConfig, nodeErr := params.NewNodeConfig("/tmp", params.RopstenNetworkID, true)
 	s.nodeManagerMock.EXPECT().NodeConfig().Return(nodeConfig, nodeErr)
 	s.accountManagerMock.EXPECT().SelectedAccount().Return(account, nil)
 	s.accountManagerMock.EXPECT().VerifyAccountPassword(nodeConfig.KeyStoreDir, account.Address.String(), password).Return(
 		nil, passwordErr)
+	return nodeConfig
 }
 
 func (s *TxQueueTestSuite) TestCompleteTransaction() {
@@ -83,41 +125,69 @@ func (s *TxQueueTestSuite) TestCompleteTransaction() {
 		Address:    common.FromAddress(TestConfig.Account1.Address),
 		AccountKey: &keystore.Key{PrivateKey: key},
 	}
-	s.setupStatusBackend(account, password, nil)
 
-	nonce := hexutil.Uint64(10)
-	gas := hexutil.Big(*big.NewInt(defaultGas + 1))
-	s.setupTransactionPoolAPI(account, nonce, gas, nil)
+	testCases := []struct {
+		name     string
+		gas      *hexutil.Big
+		gasPrice *hexutil.Big
+	}{
+		{
+			"noGasDef",
+			nil,
+			nil,
+		},
+		{
+			"gasDefined",
+			testGas,
+			nil,
+		},
+		{
+			"gasPriceDefined",
+			nil,
+			testGasPrice,
+		},
+	}
 
-	txQueueManager := NewManager(s.nodeManagerMock, s.accountManagerMock)
+	for _, testCase := range testCases {
+		s.T().Run(testCase.name, func(t *testing.T) {
+			s.SetupTest()
+			config := s.setupStatusBackend(account, password, nil)
+			tx := common.CreateTransaction(context.Background(), common.SendTxArgs{
+				From:     common.FromAddress(TestConfig.Account1.Address),
+				To:       common.ToAddress(TestConfig.Account2.Address),
+				Gas:      testCase.gas,
+				GasPrice: testCase.gasPrice,
+			})
+			s.setupTransactionPoolAPI(tx, config, account, nil)
 
-	txQueueManager.Start()
-	defer txQueueManager.Stop()
+			txQueueManager := NewManager(s.nodeManagerMock, s.accountManagerMock)
+			txQueueManager.completionTimeout = time.Second
+			txQueueManager.rpcCallTimeout = time.Second
 
-	tx := common.CreateTransaction(context.Background(), common.SendTxArgs{
-		From: common.FromAddress(TestConfig.Account1.Address),
-		To:   common.ToAddress(TestConfig.Account2.Address),
-	})
+			txQueueManager.Start()
+			defer txQueueManager.Stop()
 
-	s.NoError(txQueueManager.QueueTransaction(tx))
-	w := make(chan struct{})
-	var (
-		hash gethcommon.Hash
-		err  error
-	)
-	go func() {
-		hash, err = txQueueManager.CompleteTransaction(tx.ID, password)
-		s.NoError(err)
-		close(w)
-	}()
+			s.NoError(txQueueManager.QueueTransaction(tx))
+			w := make(chan struct{})
+			var (
+				hash gethcommon.Hash
+				err  error
+			)
+			go func() {
+				hash, err = txQueueManager.CompleteTransaction(tx.ID, password)
+				s.NoError(err)
+				close(w)
+			}()
 
-	rst := txQueueManager.WaitForTransaction(tx)
-	// Check that error is assigned to the transaction.
-	s.NoError(rst.Error)
-	// Transaction should be already removed from the queue.
-	s.False(txQueueManager.TransactionQueue().Has(tx.ID))
-	s.NoError(WaitClosed(w, time.Second))
-	s.Equal(hash, rst.Hash)
+			rst := txQueueManager.WaitForTransaction(tx)
+			// Check that error is assigned to the transaction.
+			s.NoError(rst.Error)
+			// Transaction should be already removed from the queue.
+			s.False(txQueueManager.TransactionQueue().Has(tx.ID))
+			s.NoError(WaitClosed(w, time.Second))
+			s.Equal(hash, rst.Hash)
+		})
+	}
 }
 
 func (s *TxQueueTestSuite) TestCompleteTransactionMultipleTimes() {
@@ -127,23 +197,24 @@ func (s *TxQueueTestSuite) TestCompleteTransactionMultipleTimes() {
 		Address:    common.FromAddress(TestConfig.Account1.Address),
 		AccountKey: &keystore.Key{PrivateKey: key},
 	}
-	s.setupStatusBackend(account, password, nil)
-
-	nonce := hexutil.Uint64(10)
-	gas := hexutil.Big(*big.NewInt(defaultGas + 1))
-	s.setupTransactionPoolAPI(account, nonce, gas, nil)
-
-	txQueueManager := NewManager(s.nodeManagerMock, s.accountManagerMock)
-	txQueueManager.DisableNotificactions()
-	txQueueManager.Start()
-	defer txQueueManager.Stop()
+	config := s.setupStatusBackend(account, password, nil)
 
 	tx := common.CreateTransaction(context.Background(), common.SendTxArgs{
 		From: common.FromAddress(TestConfig.Account1.Address),
 		To:   common.ToAddress(TestConfig.Account2.Address),
 	})
 
-	s.NoError(txQueueManager.QueueTransaction(tx))
+	s.setupTransactionPoolAPI(tx, config, account, nil)
+
+	txQueueManager := NewManager(s.nodeManagerMock, s.accountManagerMock)
+	txQueueManager.completionTimeout = time.Second
+	txQueueManager.rpcCallTimeout = time.Second
+	txQueueManager.DisableNotificactions()
+	txQueueManager.Start()
+	defer txQueueManager.Stop()
+
+	err := txQueueManager.QueueTransaction(tx)
+	s.NoError(err)
 
 	var (
 		wg           sync.WaitGroup
@@ -158,6 +229,7 @@ func (s *TxQueueTestSuite) TestCompleteTransactionMultipleTimes() {
 			defer wg.Done()
 			_, err := txQueueManager.CompleteTransaction(tx.ID, password)
 			mu.Lock()
+			defer mu.Unlock()
 			if err == nil {
 				completedTx++
 			} else if err == queue.ErrQueuedTxInProgress {
@@ -165,7 +237,6 @@ func (s *TxQueueTestSuite) TestCompleteTransactionMultipleTimes() {
 			} else {
 				s.Fail("tx failed with unexpected error: ", err.Error())
 			}
-			mu.Unlock()
 		}()
 	}
 

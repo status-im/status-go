@@ -32,6 +32,7 @@ type Manager struct {
 	addrLock          *AddrLocker
 	notify            bool
 	completionTimeout time.Duration
+	rpcCallTimeout    time.Duration
 }
 
 // NewManager returns a new Manager.
@@ -43,6 +44,7 @@ func NewManager(nodeManager common.NodeManager, accountManager common.AccountMan
 		addrLock:          &AddrLocker{},
 		notify:            true,
 		completionTimeout: DefaultTxSendCompletionTimeout,
+		rpcCallTimeout:    defaultTimeout,
 	}
 }
 
@@ -166,7 +168,7 @@ func (m *Manager) completeTransaction(queuedTx *common.QueuedTx, selectedAccount
 	}
 	m.addrLock.LockAddr(queuedTx.Args.From)
 	defer m.addrLock.UnlockAddr(queuedTx.Args.From)
-	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), m.rpcCallTimeout)
 	defer cancel()
 	nonce, err := m.ethTxClient.PendingNonceAt(ctx, queuedTx.Args.From)
 	if err != nil {
@@ -175,7 +177,7 @@ func (m *Manager) completeTransaction(queuedTx *common.QueuedTx, selectedAccount
 	args := queuedTx.Args
 	gasPrice := (*big.Int)(args.GasPrice)
 	if args.GasPrice == nil {
-		ctx, cancel = context.WithTimeout(context.Background(), defaultTimeout)
+		ctx, cancel = context.WithTimeout(context.Background(), m.rpcCallTimeout)
 		defer cancel()
 		gasPrice, err = m.ethTxClient.SuggestGasPrice(ctx)
 		if err != nil {
@@ -193,7 +195,7 @@ func (m *Manager) completeTransaction(queuedTx *common.QueuedTx, selectedAccount
 
 	gas := (*big.Int)(args.Gas)
 	if args.Gas == nil {
-		ctx, cancel = context.WithTimeout(context.Background(), defaultTimeout)
+		ctx, cancel = context.WithTimeout(context.Background(), m.rpcCallTimeout)
 		defer cancel()
 		gas, err = m.ethTxClient.EstimateGas(ctx, ethereum.CallMsg{
 			From:     args.From,
@@ -224,7 +226,7 @@ func (m *Manager) completeTransaction(queuedTx *common.QueuedTx, selectedAccount
 	if err != nil {
 		return hash, err
 	}
-	ctx, cancel = context.WithTimeout(context.Background(), defaultTimeout)
+	ctx, cancel = context.WithTimeout(context.Background(), m.rpcCallTimeout)
 	defer cancel()
 	if err := m.ethTxClient.SendTransaction(ctx, signedTx); err != nil {
 		return hash, err
