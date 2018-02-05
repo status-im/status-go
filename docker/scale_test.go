@@ -62,7 +62,7 @@ func (s *WhisperScaleSuite) SetupTest() {
 	s.NoError(err)
 	s.p = project.New("wnode-test-cluster", cli)
 	s.NoError(s.p.Up(project.UpOpts{
-		Scale: map[string]int{"wnode": 7},
+		Scale: map[string]int{"wnode": 12},
 		Wait:  true,
 	}))
 	containers, err := s.p.Containers(project.FilterOpts{SvcName: "wnode"})
