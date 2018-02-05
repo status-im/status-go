@@ -159,7 +159,7 @@ func (s *TxQueueTestSuite) TestCompleteTransaction() {
 
 			txQueueManager := NewManager(s.nodeManagerMock, s.accountManagerMock)
 			txQueueManager.completionTimeout = time.Second
-			txQueueManager.ctxTimeout = time.Second
+			txQueueManager.rpcCallTimeout = time.Second
 
 			txQueueManager.Start()
 			defer txQueueManager.Stop()
@@ -207,7 +207,7 @@ func (s *TxQueueTestSuite) TestCompleteTransactionMultipleTimes() {
 
 	txQueueManager := NewManager(s.nodeManagerMock, s.accountManagerMock)
 	txQueueManager.completionTimeout = time.Second
-	txQueueManager.ctxTimeout = time.Second
+	txQueueManager.rpcCallTimeout = time.Second
 	txQueueManager.DisableNotificactions()
 	txQueueManager.Start()
 	defer txQueueManager.Stop()
