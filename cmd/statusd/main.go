@@ -109,10 +109,9 @@ func main() {
 	}
 
 	// Sync blockchain and stop.
-	if *syncAndExit > -1 {
-		if ok := syncAndStop(backend.NodeManager()); !ok {
-			return
-		}
+	if *syncAndExit >= 0 {
+		syncAndStop(backend.NodeManager())
+		return
 	}
 
 	// wait till node has been stopped
