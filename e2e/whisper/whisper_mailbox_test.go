@@ -86,7 +86,7 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	//Post message matching with filter (key and token)
 	s.postMessageToPrivate(rpcClient, pubkey.String(), topic.String(), hexutil.Encode([]byte("Hello world!")))
 
-	//get message to make sure that it will come from the mailbox later
+	//Get message to make sure that it will come from the mailbox later
 	time.Sleep(1 * time.Second)
 	messages = s.getMessagesByMessageFilterID(rpcClient, messageFilterID)
 	s.Require().Equal(1, len(messages))
