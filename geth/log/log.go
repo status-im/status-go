@@ -43,13 +43,16 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/log"
+
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 // Logger is a wrapper around log.Logger.
 type Logger struct {
 	log.Logger
-	level   log.Lvl
-	handler log.Handler
+	ljWriter *lumberjack.Logger
+	level    log.Lvl
+	handler  log.Handler
 }
 
 // logger is package scope instance of Logger
@@ -78,11 +81,13 @@ func SetLevel(level string) {
 // SetLogFile configures logger to write output into file.
 // This call preserves current logging level.
 func SetLogFile(filename string) error {
-	handler, err := log.FileHandler(filename, log.TerminalFormat(false))
-	if err != nil {
-		return err
+	logger.ljWriter = &lumberjack.Logger{
+		Filename:   filename,
+		MaxBackups: 3,  // number of backup files
+		MaxAge:     28, // days
 	}
 
+	handler := log.StreamHandler(logger.ljWriter, log.TerminalFormat(false))
 	logger.handler = handler
 	setHandler(logger.level, handler)
 	return nil
@@ -102,6 +107,13 @@ func levelFromString(level string) log.Lvl {
 func setHandler(lvl log.Lvl, handler log.Handler) {
 	h := log.LvlFilterHandler(lvl, handler)
 	logger.SetHandler(h)
+	if logger.ljWriter != nil {
+		if lvl >= log.LvlDebug {
+			logger.ljWriter.MaxSize = 16 // allow more room on each file for debug level logging
+		} else {
+			logger.ljWriter.MaxSize = 2
+		}
+	}
 	log.Root().SetHandler(h) // ethereum-go logger
 }
 
