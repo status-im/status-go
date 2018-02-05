@@ -167,6 +167,7 @@ func startCollectingStats(interruptCh <-chan struct{}, nodeManager common.NodeMa
 }
 
 func syncAndStopNode(nodeManager common.NodeManager) {
+	log.Println("Node will synchronize and exit")
 	err := nodeManager.Sync((time.Duration)(*syncAndExit) * time.Minute)
 	if err != nil {
 		log.Fatalf("Failed while waiting for sync: %v", err)
