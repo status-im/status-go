@@ -63,25 +63,31 @@ func (s *TxQueueTestSuite) TearDownTest() {
 	s.client.Close()
 }
 
-func (s *TxQueueTestSuite) setupTransactionPoolAPI(tx *common.QueuedTx, config *params.NodeConfig, account *common.SelectedExtKey, nonce *hexutil.Uint64, gas *hexutil.Big, txErr error) {
+var (
+	testGas      = (*hexutil.Big)(big.NewInt(defaultGas + 1))
+	testGasPrice = (*hexutil.Big)(big.NewInt(10))
+	testNonce    = hexutil.Uint64(10)
+)
+
+func (s *TxQueueTestSuite) setupTransactionPoolAPI(tx *common.QueuedTx, config *params.NodeConfig, account *common.SelectedExtKey, txErr error) {
 	// Expect calls to gas functions only if there are no user defined values.
 	// And also set the expected gas and gas price for RLP encoding the expected tx.
 	var usedGas, usedGasPrice *big.Int
-	s.txServiceMock.EXPECT().GetTransactionCount(gomock.Any(), account.Address, gethrpc.PendingBlockNumber).Return(nonce, nil)
+	s.txServiceMock.EXPECT().GetTransactionCount(gomock.Any(), account.Address, gethrpc.PendingBlockNumber).Return(&testNonce, nil)
 	if tx.Args.GasPrice == nil {
-		usedGasPrice = big.NewInt(10)
+		usedGasPrice = (*big.Int)(testGasPrice)
 		s.txServiceMock.EXPECT().GasPrice(gomock.Any()).Return(usedGasPrice, nil)
 	} else {
 		usedGasPrice = (*big.Int)(tx.Args.GasPrice)
 	}
 	if tx.Args.Gas == nil {
-		s.txServiceMock.EXPECT().EstimateGas(gomock.Any(), gomock.Any()).Return(gas, nil)
-		usedGas = (*big.Int)(gas)
+		s.txServiceMock.EXPECT().EstimateGas(gomock.Any(), gomock.Any()).Return(testGas, nil)
+		usedGas = (*big.Int)(testGas)
 	} else {
 		usedGas = (*big.Int)(tx.Args.Gas)
 	}
 	// Prepare the transaction anD RLP encode it.
-	data := s.rlpEncodeTx(tx, config, account, nonce, usedGas, usedGasPrice)
+	data := s.rlpEncodeTx(tx, config, account, &testNonce, usedGas, usedGasPrice)
 	// Expect the RLP encoded transaction.
 	s.txServiceMock.EXPECT().SendRawTransaction(gomock.Any(), data).Return(gethcommon.Hash{}, txErr)
 }
@@ -120,9 +126,6 @@ func (s *TxQueueTestSuite) TestCompleteTransaction() {
 		AccountKey: &keystore.Key{PrivateKey: key},
 	}
 
-	nonce := hexutil.Uint64(10)
-	gas := hexutil.Big(*big.NewInt(defaultGas + 1))
-
 	testCases := []struct {
 		name     string
 		gas      *hexutil.Big
@@ -135,13 +138,13 @@ func (s *TxQueueTestSuite) TestCompleteTransaction() {
 		},
 		{
 			"gasDefined",
-			(*hexutil.Big)(big.NewInt(100)),
+			testGas,
 			nil,
 		},
 		{
 			"gasPriceDefined",
 			nil,
-			(*hexutil.Big)(big.NewInt(100)),
+			testGasPrice,
 		},
 	}
 
@@ -155,7 +158,7 @@ func (s *TxQueueTestSuite) TestCompleteTransaction() {
 				Gas:      testCase.gas,
 				GasPrice: testCase.gasPrice,
 			})
-			s.setupTransactionPoolAPI(tx, config, account, &nonce, &gas, nil)
+			s.setupTransactionPoolAPI(tx, config, account, nil)
 
 			txQueueManager := NewManager(s.nodeManagerMock, s.accountManagerMock)
 			txQueueManager.completionTimeout = time.Second
@@ -201,9 +204,7 @@ func (s *TxQueueTestSuite) TestCompleteTransactionMultipleTimes() {
 		To:   common.ToAddress(TestConfig.Account2.Address),
 	})
 
-	nonce := hexutil.Uint64(10)
-	gas := hexutil.Big(*big.NewInt(defaultGas + 1))
-	s.setupTransactionPoolAPI(tx, config, account, &nonce, &gas, nil)
+	s.setupTransactionPoolAPI(tx, config, account, nil)
 
 	txQueueManager := NewManager(s.nodeManagerMock, s.accountManagerMock)
 	txQueueManager.completionTimeout = time.Second
