@@ -520,11 +520,16 @@ func (m *NodeManager) isNodeAvailable() error {
 	return nil
 }
 
+// tickerResolution is the delta to check blockchain sync progress.
+const tickerResolution = time.Second
+
 // Sync waits until blockchain synchronization and returns.
+// Timeout must be at least two seconds and zero timeout
+// means waiting infinitely.
 func (m *NodeManager) Sync(timeout time.Duration) error {
 	// We need to have a larger timeout than ticker delta here
 	// unless we use zero which means infinite timeout.
-	if timeout < time.Second*2 && timeout != 0 {
+	if timeout < tickerResolution*2 && timeout != 0 {
 		return errors.New("Sync timeout can only be zero (infinite) or at least two seconds")
 	}
 	// Don't wait for any blockchain sync for the
@@ -544,7 +549,7 @@ func (m *NodeManager) sync(timeout time.Duration) error {
 		timeout = time.Hour * 8765
 	}
 
-	ticker := time.NewTicker(1 * time.Second)
+	ticker := time.NewTicker(tickerResolution)
 	defer ticker.Stop()
 	for {
 		select {
