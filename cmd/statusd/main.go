@@ -110,7 +110,7 @@ func main() {
 
 	// Sync blockchain and stop.
 	if *syncAndExit >= 0 {
-		syncAndStop(backend.NodeManager())
+		syncAndStopNode(backend.NodeManager())
 		return
 	}
 
@@ -166,19 +166,18 @@ func startCollectingStats(interruptCh <-chan struct{}, nodeManager common.NodeMa
 	}
 }
 
-func syncAndStop(nodeManager common.NodeManager) bool {
+func syncAndStopNode(nodeManager common.NodeManager) {
 	err := nodeManager.Sync((time.Duration)(*syncAndExit) * time.Minute)
 	if err != nil {
 		log.Fatalf("Failed while waiting for sync: %v", err)
-		return false
+		return
 	}
 	done, err := nodeManager.StopNode()
 	<-done
 	if err != nil {
 		log.Fatalf("Failed while stopping the node: %v", err)
-		return false
+		return
 	}
-	return true
 }
 
 // makeNodeConfig parses incoming CLI options and returns node configuration object
