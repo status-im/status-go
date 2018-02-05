@@ -83,16 +83,17 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	messages := s.getMessagesByMessageFilterID(rpcClient, messageFilterID)
 	s.Require().Equal(0, len(messages))
 
-	//Post message
+	//Post message matching with filter (key and token)
 	s.postMessageToPrivate(rpcClient, pubkey.String(), topic.String(), hexutil.Encode([]byte("Hello world!")))
 
-	//There are no messages, because it's a sender filter
+	//Get message to make sure that it will come from the mailbox later
+	time.Sleep(1 * time.Second)
 	messages = s.getMessagesByMessageFilterID(rpcClient, messageFilterID)
-	s.Require().Equal(0, len(messages))
+	s.Require().Equal(1, len(messages))
 
 	//act
 
-	//Request messages from mailbox
+	//Request messages (including the previous one, expired) from mailbox
 	reqMessagesBody := `{
 		"jsonrpc": "2.0",
 		"id": 1,
@@ -113,7 +114,7 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 
 	//wait to receive message
 	time.Sleep(time.Second)
-	//And we receive message
+	//And we receive message, it comes from mailbox
 	messages = s.getMessagesByMessageFilterID(rpcClient, messageFilterID)
 	s.Require().Equal(1, len(messages))
 
