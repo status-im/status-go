@@ -27,7 +27,7 @@ jobs:
     # to still run, but currently does not work due to a bug
     if: type != pull_request
     script:
-      - ./build/bin/statusd -les -networkid 4 -exit-when-synced
+      - ./build/bin/statusd -les -networkid 4 -sync-and-exit
       - make test-e2e networkid=4
 cache:
   directories:

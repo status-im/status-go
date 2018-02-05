@@ -63,7 +63,7 @@ var (
 	enablePN     = flag.Bool("shh.notify", false, "Node is capable of sending Push Notifications")
 	firebaseAuth = flag.String("shh.firebaseauth", "", "FCM Authorization Key used for sending Push Notifications")
 
-	exitWhenSynced = flag.Int("exit-when-synced", -1, "Timeout for blockchain sync and exit in minutes, zero is infinite")
+	syncAndExit = flag.Int("sync-and-exit", -1, "Timeout in minutes for blockchain sync and exit, zero is infinite")
 )
 
 func main() {
@@ -109,16 +109,8 @@ func main() {
 	}
 
 	// Sync blockchain and stop.
-	if *exitWhenSynced > -1 {
-		err = backend.NodeManager().Sync((time.Duration)(*exitWhenSynced) * time.Minute)
-		if err != nil {
-			log.Fatalf("Failed while waiting for sync: %v", err)
-			return
-		}
-		done, err := backend.NodeManager().StopNode()
-		<-done
-		if err != nil {
-			log.Fatalf("Failed while stopping the node: %v", err)
+	if *syncAndExit > -1 {
+		if ok := syncAndStop(backend.NodeManager()); !ok {
 			return
 		}
 	}
@@ -173,6 +165,21 @@ func startCollectingStats(interruptCh <-chan struct{}, nodeManager common.NodeMa
 	if err := server.Shutdown(context.TODO()); err != nil {
 		log.Printf("Failed to shutdown metrics server: %v", err)
 	}
+}
+
+func syncAndStop(nodeManager common.NodeManager) bool {
+	err := nodeManager.Sync((time.Duration)(*syncAndExit) * time.Minute)
+	if err != nil {
+		log.Fatalf("Failed while waiting for sync: %v", err)
+		return false
+	}
+	done, err := nodeManager.StopNode()
+	<-done
+	if err != nil {
+		log.Fatalf("Failed while stopping the node: %v", err)
+		return false
+	}
+	return true
 }
 
 // makeNodeConfig parses incoming CLI options and returns node configuration object
