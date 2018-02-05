@@ -5,6 +5,7 @@
 package common
 
 import (
+	context "context"
 	accounts "github.com/ethereum/go-ethereum/accounts"
 	keystore "github.com/ethereum/go-ethereum/accounts/keystore"
 	common "github.com/ethereum/go-ethereum/common"
@@ -16,7 +17,6 @@ import (
 	params "github.com/status-im/status-go/geth/params"
 	rpc "github.com/status-im/status-go/geth/rpc"
 	reflect "reflect"
-	time "time"
 )
 
 // MockNodeManager is a mock of NodeManager interface
@@ -68,16 +68,16 @@ func (mr *MockNodeManagerMockRecorder) StopNode() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StopNode", reflect.TypeOf((*MockNodeManager)(nil).StopNode))
 }
 
-// Sync mocks base method
-func (m *MockNodeManager) Sync(timeout time.Duration) error {
-	ret := m.ctrl.Call(m, "Sync", timeout)
+// EnsureSync mocks base method
+func (m *MockNodeManager) EnsureSync(ctx context.Context) error {
+	ret := m.ctrl.Call(m, "EnsureSync", ctx)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// Sync indicates an expected call of Sync
-func (mr *MockNodeManagerMockRecorder) Sync(timeout interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Sync", reflect.TypeOf((*MockNodeManager)(nil).Sync), timeout)
+// EnsureSync indicates an expected call of EnsureSync
+func (mr *MockNodeManagerMockRecorder) EnsureSync(ctx interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsureSync", reflect.TypeOf((*MockNodeManager)(nil).EnsureSync), ctx)
 }
 
 // RestartNode mocks base method

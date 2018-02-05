@@ -1,6 +1,7 @@
 package node
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -523,15 +524,9 @@ func (m *NodeManager) isNodeAvailable() error {
 // tickerResolution is the delta to check blockchain sync progress.
 const tickerResolution = time.Second
 
-// Sync waits until blockchain synchronization and returns.
-// Timeout must be at least two seconds and zero timeout
-// means waiting infinitely.
-func (m *NodeManager) Sync(timeout time.Duration) error {
-	// We need to have a larger timeout than ticker delta here
-	// unless we use zero which means infinite timeout.
-	if timeout < tickerResolution*2 && timeout != 0 {
-		return errors.New("Sync timeout can only be zero (infinite) or at least two seconds")
-	}
+// EnsureSync waits until blockchain synchronization
+// is complete and returns.
+func (m *NodeManager) EnsureSync(ctx context.Context) error {
 	// Don't wait for any blockchain sync for the
 	// local private chain as blocks are never mined.
 	if m.config.NetworkID == params.StatusChainNetworkID {
@@ -540,26 +535,27 @@ func (m *NodeManager) Sync(timeout time.Duration) error {
 	if m.lesService == nil {
 		return errors.New("LightEthereumService is nil")
 	}
-	return m.sync(timeout)
+	return m.ensureSync(ctx)
 }
 
-func (m *NodeManager) sync(timeout time.Duration) error {
-	if timeout == 0 {
-		// Wait for a year (infinite).
-		timeout = time.Hour * 8765
+func (m *NodeManager) ensureSync(ctx context.Context) error {
+	downloader := m.lesService.Downloader()
+	if downloader == nil {
+		return errors.New("LightEthereumService downloader is nil")
+	}
+	progress := downloader.Progress()
+	if progress.CurrentBlock >= progress.HighestBlock {
+		log.Debug("Synchronization completed")
+		return nil
 	}
 
 	ticker := time.NewTicker(tickerResolution)
 	defer ticker.Stop()
 	for {
 		select {
-		case <-time.After(timeout):
-			return errors.New("Timeout during node synchronization")
+		case <-ctx.Done():
+			return errors.New("timeout during node synchronization")
 		case <-ticker.C:
-			downloader := m.lesService.Downloader()
-			if downloader == nil {
-				continue
-			}
 			if m.PeerCount() == 0 {
 				log.Debug("No established connections with any peers, continue waiting for a sync")
 				continue
@@ -568,7 +564,7 @@ func (m *NodeManager) sync(timeout time.Duration) error {
 				log.Debug("Synchronization is in progress")
 				continue
 			}
-			progress := downloader.Progress()
+			progress = downloader.Progress()
 			if progress.CurrentBlock >= progress.HighestBlock {
 				log.Debug("Synchronization completed")
 				return nil
