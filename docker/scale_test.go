@@ -163,8 +163,24 @@ func (s *WhisperScaleSuite) TestSymKeyMessaging() {
 		}(i, w)
 	}
 	wg.Wait()
+	var ingress, egress float64
+	for _, w := range s.whisps {
+		wg.Add(1)
+		go func(w Whisp) {
+			defer wg.Done()
+			metrics, err := ethMetrics(w.Rpc)
+			s.NoError(err)
+			mu.Lock()
+			ingress += metrics.Peer2Peer.InboundTraffic.Overall
+			egress += metrics.Peer2Peer.OutboundTraffic.Overall
+			mu.Unlock()
+		}(w)
+	}
+	wg.Wait()
 	s.True(oldPerNew/float64(len(s.whisps)) < 3.4)
 	os.Stdout.Write([]byte(fmt.Sprintln("=== SUMMARY",
+		"\ningress:", ingress/1024/1024, "mb",
+		"\negress:", egress/1024/1024, "mb",
 		"\nduplicates: ", sumOld,
 		"\nnew: ", sumNew,
 		"\nmean old per new for each peer: ", oldPerNew/float64(len(s.whisps)))))
