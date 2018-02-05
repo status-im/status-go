@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -111,9 +110,8 @@ func main() {
 
 	// Sync blockchain and stop.
 	if *syncAndExit >= 0 {
-		if err = syncAndStopNode(backend.NodeManager()); err != nil {
-			log.Fatalf("Node synchronization failed: %v", err)
-		}
+		exitCode := syncAndStopNode(backend.NodeManager(), *syncAndExit)
+		os.Exit(exitCode)
 	}
 
 	// wait till node has been stopped
@@ -168,25 +166,31 @@ func startCollectingStats(interruptCh <-chan struct{}, nodeManager common.NodeMa
 	}
 }
 
-func syncAndStopNode(nodeManager common.NodeManager) (err error) {
+func syncAndStopNode(nodeManager common.NodeManager, timeout int) (exitCode int) {
 	log.Println("Node will synchronize and exit")
-	v := *syncAndExit
-	if v < 0 {
-		return errors.New("negative timeout value")
+	if timeout < 0 {
+		log.Println("Sync and stop error: negative timeout value")
+		return 1
 	}
-	if v == 0 {
+	var err error
+	if timeout == 0 {
 		err = nodeManager.EnsureSync(context.Background())
 	} else {
-		ctx, cancel := context.WithTimeout(context.Background(), (time.Duration)(v)*time.Minute)
+		ctx, cancel := context.WithTimeout(context.Background(), (time.Duration)(timeout)*time.Minute)
 		err = nodeManager.EnsureSync(ctx)
 		defer cancel()
 	}
 	if err != nil {
-		return
+		log.Printf("Sync and stop error: %v\n", err)
+		exitCode = 1
 	}
 	var done <-chan struct{}
 	done, err = nodeManager.StopNode()
 	<-done
+	if err != nil {
+		log.Printf("Sync and stop err: %v\n", err)
+		exitCode = 1
+	}
 	return
 }
 
