@@ -51,6 +51,8 @@ var (
 	statsEnabled = flag.Bool("stats", false, "Expose node stats via /debug/vars expvar endpoint or Prometheus (log by default)")
 	statsAddr    = flag.String("stats.addr", "0.0.0.0:8080", "HTTP address with /debug/vars endpoint")
 
+	// don't change the name of this flag, https://github.com/ethereum/go-ethereum/blob/master/metrics/metrics.go#L41
+	ethereumMetrics = flag.Bool("metrics", false, "Expose ethereum metrics with debug_metrics jsonrpc call.")
 	// shh stuff
 	identityFile = flag.String("shh.identityfile", "", "Protocol identity file (private key used for asymmetric encryption)")
 	passwordFile = flag.String("shh.passwordfile", "", "Password file (password is used for symmetric encryption)")
