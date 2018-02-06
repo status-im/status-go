@@ -229,7 +229,7 @@ func (s *JailRPCTestSuite) TestJailVMPersistence() {
 			`["ping"]`,
 			`{"pong": "Ping1", "amount": 0.42}`,
 			func(response string) error {
-				expectedResponse := `{"result": "Ping1"}`
+				expectedResponse := `{"result":"Ping1"}`
 				if response != expectedResponse {
 					return fmt.Errorf("unexpected response, expected: %v, got: %v", expectedResponse, response)
 				}
@@ -240,7 +240,7 @@ func (s *JailRPCTestSuite) TestJailVMPersistence() {
 			`["ping"]`,
 			`{"pong": "Ping2", "amount": 0.42}`,
 			func(response string) error {
-				expectedResponse := `{"result": "Ping2"}`
+				expectedResponse := `{"result":"Ping2"}`
 				if response != expectedResponse {
 					return fmt.Errorf("unexpected response, expected: %v, got: %v", expectedResponse, response)
 				}

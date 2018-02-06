@@ -157,7 +157,8 @@ func (j *Jail) createAndInitCell(chatID string, extraCode ...string) (*Cell, str
 		if err != nil {
 			return nil, "", err
 		}
-		response = newJailResultResponse(result)
+
+		response = newJailResultResponse(formatOttoValue(result))
 	}
 
 	return cell, response, nil
@@ -295,9 +296,26 @@ func newJailErrorResponse(err error) string {
 	return string(rawResponse)
 }
 
+// formatOttoValue : formats an otto value string to be processed as valid
+// javascript code
+func formatOttoValue(result otto.Value) otto.Value {
+	val := result.String()
+	if result.IsString() {
+		if val != "undefined" {
+			val = fmt.Sprintf(`"%s"`, strings.Replace(val, `"`, `\"`, -1))
+			result, _ = otto.ToValue(val)
+		}
+	}
+	return result
+}
+
 // newJailResultResponse returns a string that is a valid JavaScript code.
 // Marshaling is not required as result.String() produces a string
 // that is a valid JavaScript code.
-func newJailResultResponse(result otto.Value) string {
-	return `{"result": ` + result.String() + `}`
+func newJailResultResponse(value otto.Value) string {
+	res := value.String()
+	if res == "undefined" {
+		res = "null"
+	}
+	return `{"result":` + res + `}`
 }

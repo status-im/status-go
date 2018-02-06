@@ -81,7 +81,7 @@ func (s *JailTestSuite) TestInitWithBaseJS() {
 
 	// make sure that Call succeeds even w/o running node
 	response = s.Jail.Call(testChatID, `["commands", "testCommand"]`, `{"val": 12}`)
-	expectedResponse := `{"result": 144}`
+	expectedResponse := `{"result":144}`
 	s.Equal(expectedResponse, response)
 }
 
@@ -93,13 +93,13 @@ func (s *JailTestSuite) TestCreateAndInitCell() {
 
 	// If any custom JS provided -- the result of the last op is returned
 	response = s.Jail.CreateAndInitCell("newChat2", "var a = 2", "a")
-	expectedResponse = `{"result": 2}`
+	expectedResponse = `{"result":2}`
 	s.Equal(expectedResponse, response)
 
 	// Reinitialization preserves the JS environment, so the 'test' variable exists
 	// even though we didn't initialize it here (in the second room).
 	response = s.Jail.CreateAndInitCell("newChat2", "a")
-	expectedResponse = `{"result": 2}`
+	expectedResponse = `{"result":2}`
 	s.Equal(expectedResponse, response)
 
 	// But this variable doesn't leak into other rooms.
@@ -122,8 +122,22 @@ func (s *JailTestSuite) TestFunctionCall() {
 	s.Equal(expectedError, response)
 
 	// call extraFunc()
-	response = s.Jail.Call(testChatID, `["commands", "testCommand"]`, `{"val": 12}`)
-	expectedResponse := `{"result": 144}`
+	response = s.Jail.Call(testChatID, `["commands", "testCommand"]`, `{"val":12}`)
+	expectedResponse := `{"result":144}`
+	s.Equal(expectedResponse, response)
+}
+
+func (s *JailTestSuite) TestFunctionCallTrue() {
+	// load Status JS and add test command to it
+	statusJS := baseStatusJSCode + `;
+	_status_catalog.commands["testCommandTrue"] = function (params) {
+		return true;
+	};`
+	s.Jail.CreateAndInitCell(testChatID, statusJS)
+
+	// call extraFunc()
+	response := s.Jail.Call(testChatID, `["commands", "testCommandTrue"]`, `{"val":12}`)
+	expectedResponse := `{"result":true}`
 	s.Equal(expectedResponse, response)
 }
 
@@ -220,8 +234,8 @@ func (s *JailTestSuite) TestSendSyncResponseOrder() {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			res := s.Jail.Call(testChatID, `["commands", "testCommand"]`, fmt.Sprintf(`{"val": %d}`, i))
-			if !strings.Contains(string(res), fmt.Sprintf("result\": %d", i*i)) {
+			res := s.Jail.Call(testChatID, `["commands", "testCommand"]`, fmt.Sprintf(`{"val":%d}`, i))
+			if !strings.Contains(string(res), fmt.Sprintf("result\":%d", i*i)) {
 				errCh <- fmt.Errorf("result should be '%d', got %s", i*i, res)
 			}
 		}(i)
