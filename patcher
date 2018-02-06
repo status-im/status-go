@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+
+patches="$(pwd)/geth-patches/*"
+
+# Base path is vendor/github.com/ethereum/go-ethereum
+# unless specified.
+basepath="vendor/github.com/ethereum/go-ethereum"
+while getopts ":p:r" opt; do
+	case $opt in
+	p)
+		basepath=$OPTARG
+    	;;
+	r)
+		# Reverts and exits.
+		for f in $patches; do
+			git apply "$f" --directory="$basepath" -R > /dev/null 2>&1
+		done
+		echo "Reverted all."
+		exit
+		;;
+    \?)
+    	echo "Invalid flag: -$OPTARG" >&2
+		exit
+    	;;
+	esac
+done
+
+applied=()
+
+echo -en "\\n"
+echo "Previously applied:"
+echo "==================="
+# Reverts and applies each patch to see which was previously applied.
+for f in $patches; do
+	git apply "$f" --directory="$basepath" -R > /dev/null 2>&1
+	if [ $? -eq 0 ]; then
+		git apply "$f" --directory="$basepath" > /dev/null 2>&1
+		applied+=("$f")
+		echo "$f"
+	fi
+done
+echo "==================="
+
+echo -en "\\n"
+for f in $patches; do
+	# If applied, don't apply.
+	has=0
+	for patch in "${applied[@]}"; do
+		if [ "$patch" == "$f" ]; then
+			has=1
+			break
+		fi
+	done
+	if [ $has -eq 1 ]; then
+		continue
+	fi
+
+	echo "Applying: $f"
+	git apply "$f" --directory="$basepath"
+	if [ $? -eq 1 ]; then
+		echo -en "\\n"
+		echo "Failed and reverting: $f"
+		git apply "$f" --directory="$basepath" -R > /dev/null 2>&1
+		echo -en "\\n"
+		exit
+	fi
+	echo -en "\\n"
+done
+
+echo -en "\\n"
+echo "Done."
