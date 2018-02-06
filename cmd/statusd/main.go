@@ -181,16 +181,16 @@ func syncAndStopNode(nodeManager common.NodeManager, timeout int) (exitCode int)
 		defer cancel()
 	}
 	if err != nil {
-		log.Printf("Sync and stop error: %v\n", err)
+		log.Printf("Sync error: %v", err)
 		exitCode = 1
 	}
 	var done <-chan struct{}
 	done, err = nodeManager.StopNode()
-	<-done
 	if err != nil {
-		log.Printf("Sync and stop err: %v\n", err)
+		log.Printf("Stop node err: %v", err)
 		exitCode = 1
 	}
+	<-done
 	return
 }
 
