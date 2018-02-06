@@ -188,7 +188,7 @@ func syncAndStopNode(nodeManager common.NodeManager, timeout int) (exitCode int)
 	done, err = nodeManager.StopNode()
 	if err != nil {
 		log.Printf("Stop node err: %v", err)
-		exitCode = 1
+		return 1
 	}
 	<-done
 	return
