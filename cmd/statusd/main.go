@@ -46,6 +46,7 @@ var (
 	listenAddr = flag.String("listenaddr", ":30303", "IP address and port of this node (e.g. 127.0.0.1:30303)")
 	standalone = flag.Bool("standalone", true, "Don't actively connect to peers, wait for incoming connections")
 	bootnodes  = flag.String("bootnodes", "", "A list of bootnodes separated by comma")
+	discovery  = flag.Bool("discovery", false, "Enable discovery protocol")
 
 	// stats
 	statsEnabled = flag.Bool("stats", false, "Expose node stats via /debug/vars expvar endpoint or Prometheus (log by default)")
@@ -169,6 +170,8 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 		return nil, err
 	}
 
+	nodeConfig.ListenAddr = *listenAddr
+
 	// TODO(divan): move this logic into params package
 	if *nodeKeyFile != "" {
 		nodeConfig.NodeKeyFile = *nodeKeyFile
@@ -194,9 +197,9 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 	if *standalone {
 		nodeConfig.BootClusterConfig.Enabled = false
 		nodeConfig.BootClusterConfig.BootNodes = nil
-	} else {
-		nodeConfig.Discovery = true
 	}
+
+	nodeConfig.Discovery = *discovery
 
 	// Even if standalone is true and discovery is disabled,
 	// it's possible to use bootnodes in NodeManager.PopulateStaticPeers().
