@@ -32,9 +32,8 @@ echo "Previously applied:"
 echo "==================="
 # Reverts and applies each patch to see which was previously applied.
 for f in $patches; do
-	git apply "$f" --directory="$basepath" -R > /dev/null 2>&1
+	git apply "$f" --directory="$basepath" -R --check > /dev/null 2>&1
 	if [ $? -eq 0 ]; then
-		git apply "$f" --directory="$basepath" > /dev/null 2>&1
 		applied+=("$f")
 		echo "$f"
 	fi
