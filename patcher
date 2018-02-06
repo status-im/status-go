@@ -60,6 +60,7 @@ for ((i=0; i<${#patches[@]}; i++)); do
 	done
 	if [ $has -eq 0 ]; then
 		echo "Applying new: $f"
+		echo -en "\\n"
 	fi
 	if [ $verbose -eq 1 ]; then
 		git apply "$f" --directory="$basepath"
@@ -67,13 +68,11 @@ for ((i=0; i<${#patches[@]}; i++)); do
 		git apply "$f" --directory="$basepath" > /dev/null 2>&1
 	fi
 	if [ $? -eq 1 ]; then
-		echo -en "\\n"
 		echo "Failed and reverting: $f"
 		git apply "$f" --directory="$basepath" -R > /dev/null 2>&1
 		echo -en "\\n"
 		exit
 	fi
-	echo -en "\\n"
 done
 
 echo -en "\\n"
