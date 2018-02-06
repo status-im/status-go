@@ -1,22 +1,26 @@
 #!/usr/bin/env bash
 
-patches="$(pwd)/geth-patches/*"
+patches=($(pwd)/geth-patches/*.patch)
 
 # Base path is vendor/github.com/ethereum/go-ethereum
 # unless specified.
 basepath="vendor/github.com/ethereum/go-ethereum"
-while getopts ":p:r" opt; do
+verbose=0
+while getopts :prv opt; do
 	case $opt in
 	p)
 		basepath=$OPTARG
     	;;
 	r)
-		# Reverts and exits.
-		for f in $patches; do
-			git apply "$f" --directory="$basepath" -R > /dev/null 2>&1
+		# Reverts in reverse order and exits.
+		for ((i=${#patches[@]}-1; i>=0; i--)); do
+			git apply "${patches[$i]}" --directory="$basepath" -R > /dev/null 2>&1
 		done
 		echo "Reverted all."
 		exit
+		;;
+	v)
+		verbose=1
 		;;
     \?)
     	echo "Invalid flag: -$OPTARG" >&2
@@ -30,19 +34,23 @@ applied=()
 echo -en "\\n"
 echo "Previously applied:"
 echo "==================="
-# Reverts and applies each patch to see which was previously applied.
-for f in $patches; do
-	git apply "$f" --directory="$basepath" -R --check > /dev/null 2>&1
+# Reverts every patch in reverse order to see
+# which was previously applied.
+for ((i=${#patches[@]}-1; i>=0; i--)); do
+	f=${patches[$i]}
+	git apply "$f" --directory="$basepath" -R > /dev/null 2>&1
 	if [ $? -eq 0 ]; then
 		applied+=("$f")
 		echo "$f"
 	fi
 done
 echo "==================="
-
 echo -en "\\n"
-for f in $patches; do
-	# If applied, don't apply.
+
+# Applies every patch from the beginning.
+for ((i=0; i<${#patches[@]}; i++)); do
+	f=${patches[$i]}
+	# If not applied, report it new.
 	has=0
 	for patch in "${applied[@]}"; do
 		if [ "$patch" == "$f" ]; then
@@ -50,12 +58,14 @@ for f in $patches; do
 			break
 		fi
 	done
-	if [ $has -eq 1 ]; then
-		continue
+	if [ $has -eq 0 ]; then
+		echo "Applying new: $f"
 	fi
-
-	echo "Applying: $f"
-	git apply "$f" --directory="$basepath"
+	if [ $verbose -eq 1 ]; then
+		git apply "$f" --directory="$basepath"
+	else
+		git apply "$f" --directory="$basepath" > /dev/null 2>&1
+	fi
 	if [ $? -eq 1 ]; then
 		echo -en "\\n"
 		echo "Failed and reverting: $f"
