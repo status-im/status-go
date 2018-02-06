@@ -1,6 +1,7 @@
 package scale
 
 import (
+	"errors"
 	"net/http"
 
 	dto "github.com/prometheus/client_model/go"
@@ -22,7 +23,10 @@ func getOldNewEnvelopesCount(url string) (old float64, new float64, err error) {
 	if err != nil {
 		return old, new, err
 	}
-	envelope := metrics["envelope_counter"]
+	envelope, ok := metrics["envelope_counter"]
+	if !ok {
+		return old, new, errors.New("envelope_counter metrics is not found")
+	}
 	for _, m := range envelope.Metric {
 		var (
 			isNew bool
