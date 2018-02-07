@@ -22,7 +22,7 @@ type Project struct {
 
 type UpOpts struct {
 	Scale map[string]int
-	Wait  bool
+	Wait  time.Duration
 }
 
 func New(basepath string, client *client.Client) Project {
@@ -48,10 +48,8 @@ func (p Project) Up(opts UpOpts) error {
 	if err != nil {
 		return err
 	}
-	if opts.Wait {
-		return p.Wait()
-	}
-	return nil
+	return p.Wait(opts.Wait)
+
 }
 
 func (p Project) Down() error {
@@ -81,8 +79,8 @@ func (p Project) Containers(f FilterOpts) (rst []types.Container, err error) {
 	return rst, err
 }
 
-func (p Project) Wait() error {
-	timer := time.After(10 * time.Second)
+func (p Project) Wait(timeout time.Duration) error {
+	timer := time.After(timeout)
 	for {
 		containers, err := p.Containers(FilterOpts{})
 		if err != nil {
@@ -97,7 +95,7 @@ func (p Project) Wait() error {
 		time.Sleep(300 * time.Millisecond)
 		select {
 		case <-timer:
-			return errors.New("timeout")
+			return errors.New("docker compose timeout")
 		default:
 		}
 	}

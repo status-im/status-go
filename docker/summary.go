@@ -2,7 +2,7 @@ package scale
 
 import (
 	"fmt"
-	"io"
+	"strings"
 )
 
 type WhispReport struct {
@@ -38,13 +38,12 @@ func (s Summary) String() string {
 	}
 	ingress = ingress / 1024 / 1024
 	egress = egress / 1024 / 1024
-	return fmt.Sprintf(
-		"=== SUMMARY\ningress = %fmb\negress = %fmb\nold envelopes = %f\nnew envelopes %f\nold per new = %f\n",
-		ingress, egress, oldEnv, newEnv, oldPerNew,
-	)
-}
-
-func (s Summary) Write(w io.Writer) error {
-	_, err := w.Write([]byte(s.String()))
-	return err
+	return strings.Join([]string{
+		"=== SUMMARY",
+		fmt.Sprintf("ingress      = %f mb", ingress),
+		fmt.Sprintf("egress       = %f mb", egress),
+		fmt.Sprintf("duplicates   = %f", oldEnv),
+		fmt.Sprintf("new          = %f", newEnv),
+		fmt.Sprintf("dups per new = %f", oldPerNew),
+	}, "\n    ")
 }
