@@ -555,6 +555,10 @@ func (m *NodeManager) ensureSync(ctx context.Context) error {
 
 	ticker := time.NewTicker(tickerResolution)
 	defer ticker.Stop()
+
+	progressTicker := time.NewTicker(time.Minute)
+	defer progressTicker.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -573,10 +577,10 @@ func (m *NodeManager) ensureSync(ctx context.Context) error {
 				log.Debug("Synchronization completed", "current block", progress.CurrentBlock, "highest block", progress.HighestBlock)
 				return nil
 			}
-			log.Debug(
-				fmt.Sprintf("Synchronization is not finished yet: current block %d < highest block %d",
-					progress.CurrentBlock, progress.HighestBlock),
-			)
+			log.Debug("Synchronization is not finished", "current", progress.CurrentBlock, "highest", progress.HighestBlock)
+		case <-progressTicker.C:
+			progress = downloader.Progress()
+			log.Warn("Synchronization is not finished", "current", progress.CurrentBlock, "highest", progress.HighestBlock)
 		}
 	}
 }
