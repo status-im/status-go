@@ -5,7 +5,7 @@ This package contains all e2e tests divided into subpackages which represents (o
 
 These tests are run against public testnets: Ropsten and Rinkeby.
 
-e2e package contains a few utilities which are described in a [godoc](https://godoc.org/github.com/status-im/status-go/e2e).
+e2e package contains a few utilities which are described in a [godoc](https://godoc.org/github.com/status-im/status-go/t/e2e).
 
 ### Flags
 
@@ -23,13 +23,13 @@ Please see Preparation section for details.
 To use the `ropsten` network for testing using network name:
 
 ```bash
-ACCOUNT_PASSWORD=test go test -v ./e2e/... -p=1 -network=ropsten
+ACCOUNT_PASSWORD=test go test -v ./t/e2e/... -p=1 -network=ropsten
 ```
 
 To use the `rinkeby` network with chain id `4` for testing:
 
 ```bash
-ACCOUNT_PASSWORD=test go test -v ./e2e/... -p=1 -network=4
+ACCOUNT_PASSWORD=test go test -v ./t/e2e/... -p=1 -network=4
 ```
 
 #### Preparation
