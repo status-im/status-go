@@ -18,6 +18,7 @@ XGOIMAGE = statusteam/xgo:$(XGOVERSION)
 XGOIMAGEIOSSIM = statusteam/xgo-ios-simulator:$(XGOVERSION)
 
 DOCKER_IMAGE_NAME ?= status-go
+DOCKER_FILE_PATH ?= --file _assets/build/Dockerfile
 
 UNIT_TEST_PACKAGES := $(shell go list ./...  | grep -v /vendor | grep -v /e2e | grep -v /cmd | grep -v /lib)
 
@@ -43,7 +44,7 @@ HELP_FUN = \
 		   }
 
 statusgo: ##@build Build status-go as statusd server
-	go build -i -o $(GOBIN)/statusd -v -tags '$(BUILD_TAGS)' $(shell build/testnet-flags.sh) ./cmd/statusd
+	go build -i -o $(GOBIN)/statusd -v -tags '$(BUILD_TAGS)' $(shell _assets/build/testnet-flags.sh) ./cmd/statusd
 	@echo "Compilation done."
 	@echo "Run \"build/bin/statusd -h\" to view available commands."
 
@@ -52,16 +53,16 @@ statusgo-cross: statusgo-android statusgo-ios
 	@ls -ld $(GOBIN)/statusgo-*
 
 statusgo-android: xgo ##@cross-compile Build status-go for Android
-	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=android-16/aar -v -tags '$(BUILD_TAGS)' $(shell build/testnet-flags.sh) ./lib
+	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=android-16/aar -v -tags '$(BUILD_TAGS)' $(shell _assets/build/testnet-flags.sh) ./lib
 	@echo "Android cross compilation done."
 
 statusgo-ios: xgo	##@cross-compile Build status-go for iOS
-	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v -tags '$(BUILD_TAGS)' $(shell build/testnet-flags.sh) ./lib
+	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v -tags '$(BUILD_TAGS)' $(shell _assets/build/testnet-flags.sh) ./lib
 	@echo "iOS framework cross compilation done."
 
 statusgo-ios-simulator: xgo	##@cross-compile Build status-go for iOS Simulator
 	@docker pull $(XGOIMAGEIOSSIM)
-	$(GOPATH)/bin/xgo --image $(XGOIMAGEIOSSIM) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v -tags '$(BUILD_TAGS)' $(shell build/testnet-flags.sh) ./lib
+	$(GOPATH)/bin/xgo --image $(XGOIMAGEIOSSIM) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v -tags '$(BUILD_TAGS)' $(shell _assets/build/testnet-flags.sh) ./lib
 	@echo "iOS framework cross compilation done."
 
 statusgo-library: ##@cross-compile Build status-go as static library for current platform
@@ -72,32 +73,32 @@ statusgo-library: ##@cross-compile Build status-go as static library for current
 
 docker-image: ##@docker Build docker image (use DOCKER_IMAGE_NAME to set the image name)
 	@echo "Building docker image..."
-	docker build --build-arg "build_tags=$(BUILD_TAGS)" . -t $(DOCKER_IMAGE_NAME)
+	docker build --file $(DOCKER_FILE_PATH) --build-arg "build_tags=$(BUILD_TAGS)" . -t $(DOCKER_IMAGE_NAME)
 
 xgo-docker-images: ##@docker Build xgo docker images
 	@echo "Building xgo docker images..."
-	docker build xgo/base -t $(XGOIMAGE)
-	docker build xgo/ios-simulator -t $(XGOIMAGEIOSSIM)
+	docker build --file $(DOCKER_FILE_PATH) _assets/build/xgo/base -t $(XGOIMAGE)
+	docker build --file $(DOCKER_FILE_PATH) _assets/build/xgo/ios-simulator -t $(XGOIMAGEIOSSIM)
 
 xgo:
 	docker pull $(XGOIMAGE)
 	go get github.com/karalabe/xgo
 
 statusgo-mainnet:
-	go build -i -o $(GOBIN)/statusgo -v $(shell build/mainnet-flags.sh) ./cmd/statusd
+	go build -i -o $(GOBIN)/statusgo -v $(shell _assets/build/mainnet-flags.sh) ./cmd/statusd
 	@echo "status go compilation done (mainnet)."
 	@echo "Run \"build/bin/statusgo\" to view available commands"
 
 statusgo-android-mainnet: xgo
-	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=android-16/aar -v $(shell build/mainnet-flags.sh) ./lib
+	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=android-16/aar -v $(shell _assets/build/mainnet-flags.sh) ./lib
 	@echo "Android cross compilation done (mainnet)."
 
 statusgo-ios-mainnet: xgo
-	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v $(shell build/mainnet-flags.sh) ./lib
+	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v $(shell _assets/build/mainnet-flags.sh) ./lib
 	@echo "iOS framework cross compilation done (mainnet)."
 
 statusgo-ios-simulator-mainnet: xgo
-	$(GOPATH)/bin/xgo --image $(XGOIMAGEIOSSIM) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v $(shell build/mainnet-flags.sh) ./lib
+	$(GOPATH)/bin/xgo --image $(XGOIMAGEIOSSIM) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v $(shell _assets/build/mainnet-flags.sh) ./lib
 	@echo "iOS framework cross compilation done (mainnet)."
 
 generate: ##@other Regenerate assets and other auto-generated stuff
@@ -142,7 +143,7 @@ lint-install:
 
 lint:
 	@echo "lint"
-	@gometalinter ./...
+	@gometalinter --config=_assets/.gometalinter.json ./...
 
 ci: lint mock test-unit test-e2e ##@tests Run all linters and tests at once
 
@@ -155,7 +156,7 @@ deep-clean: clean
 
 vendor-check:
 	@dep ensure
-	./ci/validate-vendor.sh
+	./_assets/ci/validate-vendor.sh
 
 dep-install:
 	go get -u github.com/golang/dep/cmd/dep
