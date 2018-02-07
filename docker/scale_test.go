@@ -3,6 +3,7 @@ package scale
 import (
 	"context"
 	"fmt"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -126,7 +127,7 @@ func runWithRetries(retries int, interval time.Duration, f func() error) error {
 // will be delivered to all peers. After that we will count how many new and old
 // envelopes received by each peer.
 func (s *WhisperScaleSuite) TestSymKeyMessaging() {
-	msgNum := 100
+	msgNum := 10
 	interval := 300 * time.Millisecond
 	whispCount := 8
 	if len(s.whisps) < whispCount {
@@ -214,5 +215,5 @@ func (s *WhisperScaleSuite) TestSymKeyMessaging() {
 		return nil
 	}))
 	s.True(reports.MeanOldPerNew() < 1.5)
-	fmt.Println(reports)
+	reports.Print(os.Stdout)
 }
