@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"time"
 
@@ -38,7 +37,7 @@ func syncAndStopNode(interruptCh <-chan struct{}, nodeManager common.NodeManager
 
 	select {
 	case err := <-errSync:
-		fmt.Printf("syncAndStopNode: failed to sync the chain: %v", err)
+		log.Printf("syncAndStopNode: failed to sync the chain: %v", err)
 		exitCode = 1
 	case <-doneSync:
 	case <-interruptCh:
