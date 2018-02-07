@@ -1,11 +1,13 @@
 package node
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
@@ -517,4 +519,60 @@ func (m *NodeManager) isNodeAvailable() error {
 	}
 
 	return nil
+}
+
+// tickerResolution is the delta to check blockchain sync progress.
+const tickerResolution = time.Second
+
+// EnsureSync waits until blockchain synchronization
+// is complete and returns.
+func (m *NodeManager) EnsureSync(ctx context.Context) error {
+	// Don't wait for any blockchain sync for the
+	// local private chain as blocks are never mined.
+	if m.config.NetworkID == params.StatusChainNetworkID {
+		return nil
+	}
+	if m.lesService == nil {
+		return errors.New("LightEthereumService is nil")
+	}
+	return m.ensureSync(ctx)
+}
+
+func (m *NodeManager) ensureSync(ctx context.Context) error {
+	downloader := m.lesService.Downloader()
+	if downloader == nil {
+		return errors.New("LightEthereumService downloader is nil")
+	}
+	progress := downloader.Progress()
+	if progress.CurrentBlock >= progress.HighestBlock {
+		log.Debug("Synchronization completed")
+		return nil
+	}
+
+	ticker := time.NewTicker(tickerResolution)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return errors.New("timeout during node synchronization")
+		case <-ticker.C:
+			if m.PeerCount() == 0 {
+				log.Debug("No established connections with any peers, continue waiting for a sync")
+				continue
+			}
+			if downloader.Synchronising() {
+				log.Debug("Synchronization is in progress")
+				continue
+			}
+			progress = downloader.Progress()
+			if progress.CurrentBlock >= progress.HighestBlock {
+				log.Debug("Synchronization completed")
+				return nil
+			}
+			log.Debug(
+				fmt.Sprintf("Synchronization is not finished yet: current block %d < highest block %d",
+					progress.CurrentBlock, progress.HighestBlock),
+			)
+		}
+	}
 }

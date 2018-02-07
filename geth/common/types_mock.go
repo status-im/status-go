@@ -5,6 +5,7 @@
 package common
 
 import (
+	context "context"
 	accounts "github.com/ethereum/go-ethereum/accounts"
 	keystore "github.com/ethereum/go-ethereum/accounts/keystore"
 	common "github.com/ethereum/go-ethereum/common"
@@ -65,6 +66,18 @@ func (m *MockNodeManager) StopNode() (<-chan struct{}, error) {
 // StopNode indicates an expected call of StopNode
 func (mr *MockNodeManagerMockRecorder) StopNode() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StopNode", reflect.TypeOf((*MockNodeManager)(nil).StopNode))
+}
+
+// EnsureSync mocks base method
+func (m *MockNodeManager) EnsureSync(ctx context.Context) error {
+	ret := m.ctrl.Call(m, "EnsureSync", ctx)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// EnsureSync indicates an expected call of EnsureSync
+func (mr *MockNodeManagerMockRecorder) EnsureSync(ctx interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsureSync", reflect.TypeOf((*MockNodeManager)(nil).EnsureSync), ctx)
 }
 
 // RestartNode mocks base method
