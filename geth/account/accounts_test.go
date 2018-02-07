@@ -15,7 +15,7 @@ import (
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/golang/mock/gomock"
 	"github.com/status-im/status-go/geth/common"
-	. "github.com/status-im/status-go/testing"
+	. "github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )

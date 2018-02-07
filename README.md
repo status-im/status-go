@@ -52,7 +52,7 @@ To test statusgo using a given network by number ID, use:
 make ci networkid=3
 ```
 
-If you have problems running tests on public network we suggest reading [e2e guide](e2e/README.md).
+If you have problems running tests on public network we suggest reading [e2e guide](t/e2e/README.md).
 
 If you want to launch specific test, for instance `RPCSendTransactions`, use the following command:
 ```

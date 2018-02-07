@@ -1,4 +1,4 @@
-package e2e
+package t
 
 import (
 	"github.com/ethereum/go-ethereum/les"
@@ -8,7 +8,7 @@ import (
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/signal"
 	"github.com/status-im/status-go/geth/transactions"
-	. "github.com/status-im/status-go/testing" //nolint: golint
+	. "github.com/status-im/status-go/t/utils" //nolint: golint
 	"github.com/stretchr/testify/suite"
 )
 

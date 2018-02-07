@@ -23,7 +23,7 @@ Please see Preparation section for details.
 To use the `ropsten` network for testing using network name:
 
 ```bash
-ACCOUNT_PASSWORD=test go test -v ./e2e/... -p= 1 -network=ropsten
+ACCOUNT_PASSWORD=test go test -v ./e2e/... -p=1 -network=ropsten
 ```
 
 To use the `rinkeby` network with chain id `4` for testing:
