@@ -574,7 +574,7 @@ func (m *NodeManager) ensureSync(ctx context.Context) error {
 			}
 			progress = downloader.Progress()
 			if progress.CurrentBlock >= progress.HighestBlock {
-				log.Debug("Synchronization completed", "current block", progress.CurrentBlock, "highest block", progress.HighestBlock)
+				log.Info("Synchronization completed", "current block", progress.CurrentBlock, "highest block", progress.HighestBlock)
 				return nil
 			}
 			log.Debug("Synchronization is not finished", "current", progress.CurrentBlock, "highest", progress.HighestBlock)

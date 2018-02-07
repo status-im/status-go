@@ -29,7 +29,7 @@ jobs:
     script:
       # sync the chain first; it will time out after 20 minutes
       - make statusgo
-      - ./build/bin/statusd -les -networkid=4 -sync-and-exit=20 -log WARN -standalone=false -discovery=false
+      - ./build/bin/statusd -datadir .ethereumtest -les -networkid=4 -sync-and-exit=20 -log WARN -standalone=false -discovery=false
       - make test-e2e networkid=4
 cache:
   directories:
