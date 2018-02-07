@@ -15,9 +15,7 @@ We try to minimize number and amount of changes in those patches as much as poss
  - [`0004-whisper-notifications.patch`](./0004-whisper-notifications.patch) — adds Whisper notifications (need to be reviewed and documented)
  - [`0006-latest-cht.patch`](./0006-latest-cht.patch) – updates CHT root hashes, should be updated regularly to keep sync fast, until proper Trusted Checkpoint sync is not implemented as part of LES/2 protocol.
  - [`0007-README.patch`](./0007-README.patch) — update upstream README.md.
- - [`0008-tx-pool-nonce.patch`](./0008-tx-pool-nonce.patch) - On GetTransactionCount request with PendingBlockNumber get the nonce from transaction pool
- - [`0010-geth-17-fix-npe-in-filter-system.patch`](./0010-geth-17-fix-npe-in-filter-system.patch) - Temp patch for 1.7.x to fix a NPE in the filter system
-
+ - [`0010-geth-17-fix-npe-in-filter-system.patch`](./0010-geth-17-fix-npe-in-filter-system.patch) - Temp patch for 1.7.x to fix a NPE in the filter system.
 # Updating upstream version
 
 When a new stable release of `go-ethereum` comes out, we need to upgrade our fork and vendored copy.
