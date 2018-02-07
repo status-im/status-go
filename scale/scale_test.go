@@ -130,8 +130,8 @@ func runWithRetries(retries int, interval time.Duration, f func() error) error {
 // will be delivered to all peers. After that we will count how many new and old
 // envelopes received by each peer.
 func (s *WhisperScaleSuite) TestSymKeyMessaging() {
-	msgNum := 10
-	interval := 300 * time.Millisecond
+	msgNum := 100
+	interval := 500 * time.Millisecond
 	whispCount := 8
 	if len(s.whisps) < whispCount {
 		whispCount = len(s.whisps)
