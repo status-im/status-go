@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -14,7 +15,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/ethereum/go-ethereum/whisper/shhclient"
 	"github.com/ethereum/go-ethereum/whisper/whisperv5"
-	"github.com/status-im/status-go/docker/project"
+	"github.com/status-im/status-go/scale/project"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -68,8 +69,10 @@ func (w *WhisperScaleSuite) SetupSuite() {
 
 func (s *WhisperScaleSuite) SetupTest() {
 	cli, err := client.NewEnvClient()
-	s.NoError(err)
-	s.p = project.New("wnode-test-cluster", cli)
+	s.Require().NoError(err)
+	cwd, err := os.Getwd()
+	s.Require().NoError(err)
+	s.p = project.New(filepath.Join(filepath.Dir(cwd), "docker", "wnode-test-cluster"), cli)
 	s.NoError(s.p.Up(project.UpOpts{
 		Scale: map[string]int{"wnode": *wnodeScale},
 		Wait:  *dockerTimeout,

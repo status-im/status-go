@@ -25,11 +25,12 @@ type UpOpts struct {
 	Wait  time.Duration
 }
 
-func New(basepath string, client *client.Client) Project {
-	parts := strings.Split(basepath, "-")
-	name := strings.Join(parts, "")
+func New(fullpath string, client *client.Client) Project {
+	projectPathParts := strings.Split(fullpath, "/")
+	projectPath := projectPathParts[len(projectPathParts)-1]
+	name := strings.Join(strings.Split(projectPath, "-"), "")
 	return Project{
-		Path:   filepath.Join(basepath, "docker-compose.yml"),
+		Path:   filepath.Join(fullpath, "docker-compose.yml"),
 		Name:   strings.ToLower(name),
 		client: client,
 	}
