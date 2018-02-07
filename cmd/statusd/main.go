@@ -185,11 +185,6 @@ func startCollectingStats(interruptCh <-chan struct{}, nodeManager common.NodeMa
 func syncAndStopNode(interruptCh <-chan struct{}, nodeManager common.NodeManager, timeout int) (exitCode int) {
 	log.Printf("syncAndStopNode: node will synchronize the chain and exit (timeout %d mins)", timeout)
 
-	if timeout < 0 {
-		log.Println("syncAndStopNode: invalid negative timeout value")
-		return 1
-	}
-
 	var (
 		ctx    context.Context
 		cancel context.CancelFunc
