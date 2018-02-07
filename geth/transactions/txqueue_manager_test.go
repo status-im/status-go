@@ -338,7 +338,7 @@ func (s *TxQueueTestSuite) TestLocalNonce() {
 		Address:    common.FromAddress(TestConfig.Account1.Address),
 		AccountKey: &keystore.Key{PrivateKey: key},
 	}
-	// 5 transactions in total
+	// setup call expectations for 5 transactions in total
 	for i := 0; i < txCount+2; i++ {
 		s.setupStatusBackend(account, password, nil)
 	}
