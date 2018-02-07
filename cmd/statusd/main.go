@@ -114,17 +114,25 @@ func main() {
 
 	// Sync blockchain and stop.
 	if *syncAndExit >= 0 {
-		exitCode := syncAndStopNode(backend.NodeManager(), *syncAndExit)
+		exitCode := syncAndStopNode(interruptCh, backend.NodeManager(), *syncAndExit)
+		// Call was interrupted. Wait for graceful shutdown.
+		if exitCode == -1 {
+			if node, err := backend.NodeManager().Node(); err == nil && node != nil {
+				node.Wait()
+			}
+			return
+		}
+		// Otherwise, exit immediately with a returned exit code.
 		os.Exit(exitCode)
 	}
 
-	// wait till node has been stopped
 	node, err := backend.NodeManager().Node()
 	if err != nil {
 		log.Fatalf("Getting node failed: %v", err)
 		return
 	}
 
+	// wait till node has been stopped
 	node.Wait()
 }
 
@@ -170,31 +178,60 @@ func startCollectingStats(interruptCh <-chan struct{}, nodeManager common.NodeMa
 	}
 }
 
-func syncAndStopNode(nodeManager common.NodeManager, timeout int) (exitCode int) {
-	log.Println("Node will synchronize and exit")
+// syncAndStopNode tries to sync the blockchain and stop the node.
+// It returns an exit code (`0` if successful or `1` in case of error)
+// that can be used in `os.Exit` to exit immediately when the function returns.
+// The special exit code `-1` is used if execution was interrupted.
+func syncAndStopNode(interruptCh <-chan struct{}, nodeManager common.NodeManager, timeout int) (exitCode int) {
+	log.Printf("Node will synchronize the chain and exit (timeout %d mins)", timeout)
+
 	if timeout < 0 {
-		log.Println("Sync and stop error: negative timeout value")
+		log.Println("syncAndStopNode: invalid negative timeout value")
 		return 1
 	}
-	var err error
+
+	var (
+		ctx    context.Context
+		cancel context.CancelFunc
+	)
+
 	if timeout == 0 {
-		err = nodeManager.EnsureSync(context.Background())
+		ctx, cancel = context.WithCancel(context.Background())
+		defer cancel()
 	} else {
-		ctx, cancel := context.WithTimeout(context.Background(), (time.Duration)(timeout)*time.Minute)
-		err = nodeManager.EnsureSync(ctx)
+		ctx, cancel = context.WithTimeout(context.Background(), time.Duration(timeout)*time.Minute)
 		defer cancel()
 	}
-	if err != nil {
-		log.Printf("Sync error: %v", err)
+
+	doneSync := make(chan struct{})
+	errSync := make(chan error)
+	go func() {
+		if err := nodeManager.EnsureSync(ctx); err != nil {
+			errSync <- err
+		}
+
+		close(doneSync)
+	}()
+
+	select {
+	case err := <-errSync:
+		fmt.Printf("Failed to sync the chain: %v", err)
 		exitCode = 1
+	case <-interruptCh:
+		// cancel context and return immediately if interrupted
+		// `-1` is used as a special exit code to denote interruption
+		return -1
 	}
-	var done <-chan struct{}
-	done, err = nodeManager.StopNode()
+
+	<-doneSync
+
+	done, err := nodeManager.StopNode()
 	if err != nil {
 		log.Printf("Stop node err: %v", err)
 		return 1
 	}
 	<-done
+
 	return
 }
 

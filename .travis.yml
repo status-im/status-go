@@ -27,7 +27,8 @@ jobs:
     # to still run, but currently does not work due to a bug
     if: type != pull_request
     script:
-      - ./build/bin/statusd -les -networkid 4 -sync-and-exit
+      # sync the chain first; it will time out after 10 minutes
+      - ./build/bin/statusd -les -networkid=4 -sync-and-exit=10 -log DEBUG -standalone=false -discovery=false
       - make test-e2e networkid=4
 cache:
   directories:
