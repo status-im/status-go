@@ -183,7 +183,7 @@ func startCollectingStats(interruptCh <-chan struct{}, nodeManager common.NodeMa
 // that can be used in `os.Exit` to exit immediately when the function returns.
 // The special exit code `-1` is used if execution was interrupted.
 func syncAndStopNode(interruptCh <-chan struct{}, nodeManager common.NodeManager, timeout int) (exitCode int) {
-	log.Printf("Node will synchronize the chain and exit (timeout %d mins)", timeout)
+	log.Printf("syncAndStopNode: node will synchronize the chain and exit (timeout %d mins)", timeout)
 
 	if timeout < 0 {
 		log.Println("syncAndStopNode: invalid negative timeout value")
@@ -215,19 +215,18 @@ func syncAndStopNode(interruptCh <-chan struct{}, nodeManager common.NodeManager
 
 	select {
 	case err := <-errSync:
-		fmt.Printf("Failed to sync the chain: %v", err)
+		fmt.Printf("syncAndStopNode: failed to sync the chain: %v", err)
 		exitCode = 1
+	case <-doneSync:
 	case <-interruptCh:
 		// cancel context and return immediately if interrupted
 		// `-1` is used as a special exit code to denote interruption
 		return -1
 	}
 
-	<-doneSync
-
 	done, err := nodeManager.StopNode()
 	if err != nil {
-		log.Printf("Stop node err: %v", err)
+		log.Printf("syncAndStopNode: failed to stop the node: %v", err)
 		return 1
 	}
 	<-done
