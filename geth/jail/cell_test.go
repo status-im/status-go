@@ -237,7 +237,7 @@ func (s *CellTestSuite) TestCellCallAsync() {
 	fn, err := s.cell.Get("testCallAsync")
 	s.NoError(err)
 
-	s.cell.CallAsync(fn, "success")
+	_ = s.cell.CallAsync(fn, "success")
 	s.Equal("success", <-datac)
 }
 

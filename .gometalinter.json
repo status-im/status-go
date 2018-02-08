@@ -5,6 +5,7 @@
     ],
     "Skip": ["helpers", "static"],
     "Vendor": true,
+    "Test": true,
     "Enable": [
         "deadcode",
         "errcheck",

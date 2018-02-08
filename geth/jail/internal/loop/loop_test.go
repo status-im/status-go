@@ -53,7 +53,7 @@ func (s *LoopSuite) SetupTest() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
-	go s.loop.Run(ctx)
+	go func() { _ = s.loop.Run(ctx) }()
 }
 
 func (s *LoopSuite) TestAddAndReady() {
