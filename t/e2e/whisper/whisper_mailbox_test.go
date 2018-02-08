@@ -306,7 +306,7 @@ func (d *groupChatParams) Encode() (string, error) {
 
 //Start status node
 func (s *WhisperMailboxSuite) startBackend(name string) (*api.StatusBackend, func()) {
-	datadir := filepath.Join(RootDir, ".ethereumtest/mailbox/") + name
+	datadir := filepath.Join(RootDir, ".ethereumtest/mailbox", name)
 	backend := api.NewStatusBackend()
 	nodeConfig, err := e2e.MakeTestNodeConfig(GetNetworkID())
 	nodeConfig.DataDir = datadir
@@ -341,7 +341,7 @@ func (s *WhisperMailboxSuite) startMailboxBackend() (*api.StatusBackend, func())
 	mailboxConfig.WhisperConfig.EnableMailServer = true
 	mailboxConfig.WhisperConfig.IdentityFile = filepath.Join(RootDir, "/static/keys/wnodekey")
 	mailboxConfig.WhisperConfig.PasswordFile = filepath.Join(RootDir, "/static/keys/wnodepassword")
-	mailboxConfig.WhisperConfig.DataDir = datadir + "/data"
+	mailboxConfig.WhisperConfig.DataDir = filepath.Join(datadir, "data")
 	mailboxConfig.DataDir = datadir
 
 	mailboxNodeStarted, err := mailboxBackend.StartNode(mailboxConfig)
