@@ -203,15 +203,6 @@ func (s *TxQueueTestSuite) TestCompleteTransactionMultipleTimes() {
 	}
 	s.setupStatusBackend(account, password, nil)
 
-	nonce := hexutil.Uint64(11)
-	gas := hexutil.Big(*big.NewInt(defaultGas + 1))
-	s.setupTransactionPoolAPI(account, nonce, gas, nil)
-
-	txQueueManager := NewManager(s.nodeManagerMock, s.accountManagerMock)
-	txQueueManager.DisableNotificactions()
-	txQueueManager.Start()
-	defer txQueueManager.Stop()
-
 	tx := common.CreateTransaction(context.Background(), common.SendTxArgs{
 		From: common.FromAddress(TestConfig.Account1.Address),
 		To:   common.ToAddress(TestConfig.Account2.Address),
