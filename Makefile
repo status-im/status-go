@@ -18,7 +18,6 @@ XGOIMAGE = statusteam/xgo:$(XGOVERSION)
 XGOIMAGEIOSSIM = statusteam/xgo-ios-simulator:$(XGOVERSION)
 
 DOCKER_IMAGE_NAME ?= status-go
-DOCKER_FILE_PATH ?= --file _assets/build/Dockerfile
 
 UNIT_TEST_PACKAGES := $(shell go list ./...  | grep -v /vendor | grep -v /e2e | grep -v /cmd | grep -v /lib)
 
@@ -73,12 +72,12 @@ statusgo-library: ##@cross-compile Build status-go as static library for current
 
 docker-image: ##@docker Build docker image (use DOCKER_IMAGE_NAME to set the image name)
 	@echo "Building docker image..."
-	docker build --file $(DOCKER_FILE_PATH) --build-arg "build_tags=$(BUILD_TAGS)" . -t $(DOCKER_IMAGE_NAME)
+	docker build --file _assets/build/Dockerfile --build-arg "build_tags=$(BUILD_TAGS)" . -t $(DOCKER_IMAGE_NAME)
 
 xgo-docker-images: ##@docker Build xgo docker images
 	@echo "Building xgo docker images..."
-	docker build --file $(DOCKER_FILE_PATH) _assets/build/xgo/base -t $(XGOIMAGE)
-	docker build --file $(DOCKER_FILE_PATH) _assets/build/xgo/ios-simulator -t $(XGOIMAGEIOSSIM)
+	docker build _assets/build/xgo/base -t $(XGOIMAGE)
+	docker build _assets/build/xgo/ios-simulator -t $(XGOIMAGEIOSSIM)
 
 xgo:
 	docker pull $(XGOIMAGE)
