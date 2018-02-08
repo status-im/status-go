@@ -142,7 +142,7 @@ lint-install:
 
 lint:
 	@echo "lint"
-	@gometalinter --config=_assets/.gometalinter.json ./...
+	@gometalinter ./...
 
 ci: lint mock test-unit test-e2e ##@tests Run all linters and tests at once
 
