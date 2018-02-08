@@ -26,7 +26,7 @@ func TestProfilingCPU(t *testing.T) {
 	// Verify that the file has some content.
 	file, err := os.Open(filepath.Join(dir, CPUFilename))
 	require.NoError(t, err)
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	t.Logf("CPU profile saved in %s for %s", filepath.Join(dir, CPUFilename), os.Args[0])
 
@@ -45,7 +45,7 @@ func TestProfilingMem(t *testing.T) {
 	// Verify that the file has some content.
 	file, err := os.Open(filepath.Join(dir, MemFilename))
 	require.NoError(t, err)
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	t.Logf("Memory profile saved in %s for %s", filepath.Join(dir, MemFilename), os.Args[0])
 

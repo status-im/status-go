@@ -151,7 +151,7 @@ func (s *CellTestSuite) TestCellFetchErrorRace() {
 	// Find a free port in localhost
 	freeportListener, err := net.Listen("tcp", "127.0.0.1:0")
 	s.Require().NoError(err)
-	defer freeportListener.Close()
+	defer func() { _ = freeportListener.Close() }()
 
 	// Send an HTTP request to the free port that we found above
 	_, err = cell.Run(fmt.Sprintf(`fetch('%s').then(function(r) {
