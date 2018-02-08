@@ -14,14 +14,14 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/status-im/status-go/e2e"
 	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/signal"
 	"github.com/status-im/status-go/geth/transactions"
 	"github.com/status-im/status-go/geth/transactions/queue"
-	. "github.com/status-im/status-go/testing"
+	e2e "github.com/status-im/status-go/t/e2e"
+	. "github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/suite"
 )
 

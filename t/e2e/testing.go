@@ -1,4 +1,4 @@
-package e2e
+package t
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
-	. "github.com/status-im/status-go/testing" //nolint: golint
+	. "github.com/status-im/status-go/t/utils" //nolint: golint
 )
 
 // TestNodeOption is a callback passed to StartTestNode which alters its config.

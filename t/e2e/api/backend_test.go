@@ -5,14 +5,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/status-im/status-go/e2e"
 	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
-	. "github.com/status-im/status-go/testing"
+	e2e "github.com/status-im/status-go/t/e2e"
+	. "github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/suite"
 )
 

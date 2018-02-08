@@ -23,7 +23,7 @@ import (
 	"github.com/status-im/status-go/geth/rpc"
 	"github.com/status-im/status-go/geth/transactions/fake"
 	"github.com/status-im/status-go/geth/transactions/queue"
-	. "github.com/status-im/status-go/testing"
+	. "github.com/status-im/status-go/t/utils"
 )
 
 func TestTxQueueTestSuite(t *testing.T) {

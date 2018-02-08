@@ -2,6 +2,7 @@ package whisper
 
 import (
 	"encoding/json"
+	"path/filepath"
 	"strconv"
 	"testing"
 	"time"
@@ -12,10 +13,10 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/whisper/whisperv5"
-	"github.com/status-im/status-go/e2e"
 	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/rpc"
-	. "github.com/status-im/status-go/testing"
+	e2e "github.com/status-im/status-go/t/e2e"
+	. "github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -305,7 +306,7 @@ func (d *groupChatParams) Encode() (string, error) {
 
 //Start status node
 func (s *WhisperMailboxSuite) startBackend(name string) (*api.StatusBackend, func()) {
-	datadir := "../../.ethereumtest/mailbox/" + name
+	datadir := filepath.Join(RootDir, ".ethereumtest/mailbox", name)
 	backend := api.NewStatusBackend()
 	nodeConfig, err := e2e.MakeTestNodeConfig(GetNetworkID())
 	nodeConfig.DataDir = datadir
@@ -332,15 +333,15 @@ func (s *WhisperMailboxSuite) startMailboxBackend() (*api.StatusBackend, func())
 	mailboxBackend := api.NewStatusBackend()
 	mailboxConfig, err := e2e.MakeTestNodeConfig(GetNetworkID())
 	s.Require().NoError(err)
-	datadir := "../../.ethereumtest/mailbox/mailserver/"
+	datadir := filepath.Join(RootDir, ".ethereumtest/mailbox/mailserver")
 
 	mailboxConfig.LightEthConfig.Enabled = false
 	mailboxConfig.WhisperConfig.Enabled = true
-	mailboxConfig.KeyStoreDir = "../../.ethereumtest/mailbox/mailserver"
+	mailboxConfig.KeyStoreDir = datadir
 	mailboxConfig.WhisperConfig.EnableMailServer = true
-	mailboxConfig.WhisperConfig.IdentityFile = "../../static/keys/wnodekey"
-	mailboxConfig.WhisperConfig.PasswordFile = "../../static/keys/wnodepassword"
-	mailboxConfig.WhisperConfig.DataDir = "../../.ethereumtest/mailbox/mailserver/data"
+	mailboxConfig.WhisperConfig.IdentityFile = filepath.Join(RootDir, "/static/keys/wnodekey")
+	mailboxConfig.WhisperConfig.PasswordFile = filepath.Join(RootDir, "/static/keys/wnodepassword")
+	mailboxConfig.WhisperConfig.DataDir = filepath.Join(datadir, "data")
 	mailboxConfig.DataDir = datadir
 
 	mailboxNodeStarted, err := mailboxBackend.StartNode(mailboxConfig)

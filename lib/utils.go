@@ -37,7 +37,7 @@ import (
 	"github.com/status-im/status-go/geth/transactions"
 	"github.com/status-im/status-go/geth/transactions/queue"
 	"github.com/status-im/status-go/static"
-	. "github.com/status-im/status-go/testing" //nolint: golint
+	. "github.com/status-im/status-go/t/utils" //nolint: golint
 )
 
 const zeroHash = "0x0000000000000000000000000000000000000000000000000000000000000000"

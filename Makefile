@@ -19,7 +19,7 @@ XGOIMAGEIOSSIM = statusteam/xgo-ios-simulator:$(XGOVERSION)
 
 DOCKER_IMAGE_NAME ?= status-go
 
-UNIT_TEST_PACKAGES := $(shell go list ./...  | grep -v /vendor | grep -v /e2e | grep -v /cmd | grep -v /lib)
+UNIT_TEST_PACKAGES := $(shell go list ./...  | grep -v /vendor | grep -v /t/e2e | grep -v /cmd | grep -v /lib)
 
 # This is a code for automatic help generator.
 # It supports ANSI colors and categories.
@@ -126,13 +126,13 @@ test-unit-coverage: ##@tests Run unit and integration tests with coverage
 test-e2e: ##@tests Run e2e tests
 	# order: reliability then alphabetical
 	# TODO(tiabc): make a single command out of them adding `-p 1` flag.
-	go test -timeout 5m ./e2e/accounts/... -network=$(networkid)
-	go test -timeout 5m ./e2e/api/... -network=$(networkid)
-	go test -timeout 5m ./e2e/node/... -network=$(networkid)
-	go test -timeout 50m ./e2e/jail/... -network=$(networkid)
-	go test -timeout 20m ./e2e/rpc/... -network=$(networkid)
-	go test -timeout 20m ./e2e/whisper/... -network=$(networkid)
-	go test -timeout 10m ./e2e/transactions/... -network=$(networkid)
+	go test -timeout 5m ./t/e2e/accounts/... -network=$(networkid)
+	go test -timeout 5m ./t/e2e/api/... -network=$(networkid)
+	go test -timeout 5m ./t/e2e/node/... -network=$(networkid)
+	go test -timeout 50m ./t/e2e/jail/... -network=$(networkid)
+	go test -timeout 20m ./t/e2e/rpc/... -network=$(networkid)
+	go test -timeout 20m ./t/e2e/whisper/... -network=$(networkid)
+	go test -timeout 10m ./t/e2e/transactions/... -network=$(networkid)
 	# e2e_test tag is required to include some files from ./lib without _test suffix
 	go test -timeout 40m -tags e2e_test ./lib -network=$(networkid)
 
