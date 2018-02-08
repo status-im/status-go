@@ -2,6 +2,7 @@ package loop
 
 import (
 	"context"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -11,16 +12,24 @@ import (
 
 // DummyTask is something that satisfies the loop.Task interface for testing.
 type DummyTask struct {
-	canceled bool
-	executed bool
+	canceled int32
+	executed int32
 }
 
 func (*DummyTask) SetID(int64)  {}
 func (*DummyTask) GetID() int64 { return 1 }
-func (d *DummyTask) Cancel()    { d.canceled = true }
+func (d *DummyTask) Cancel()    { atomic.StoreInt32(&d.canceled, 1) }
 func (d *DummyTask) Execute(*vm.VM, *Loop) error {
-	d.executed = true
+	atomic.StoreInt32(&d.executed, 1)
 	return nil
+}
+
+func (d *DummyTask) Canceled() bool {
+	return atomic.LoadInt32(&d.canceled) == 1
+}
+
+func (d *DummyTask) Executed() bool {
+	return atomic.LoadInt32(&d.executed) == 1
 }
 
 func TestLoopSuite(t *testing.T) {
@@ -51,14 +60,14 @@ func (s *LoopSuite) TestAddAndReady() {
 
 	err := s.loop.Add(s.task)
 	s.NoError(err)
-	s.False(s.task.canceled)
+	s.False(s.task.Canceled())
 
 	err = s.loop.Ready(s.task)
 	s.NoError(err)
 
 	// Wait to process task
 	time.Sleep(100 * time.Millisecond)
-	s.True(s.task.executed)
+	s.True(s.task.Executed())
 
 	s.cancel()
 }
@@ -74,7 +83,7 @@ func (s *LoopSuite) TestLoopErrorWhenClosed() {
 
 	err = s.loop.Ready(s.task)
 	s.Error(err)
-	s.True(s.task.canceled)
+	s.True(s.task.Canceled())
 }
 
 func (s *LoopSuite) TestImmediateExecution() {
@@ -84,8 +93,8 @@ func (s *LoopSuite) TestImmediateExecution() {
 	time.Sleep(100 * time.Millisecond)
 
 	s.NoError(err)
-	s.True(s.task.executed)
-	s.False(s.task.canceled)
+	s.True(s.task.Executed())
+	s.False(s.task.Canceled())
 
 	s.cancel()
 }
@@ -99,6 +108,6 @@ func (s *LoopSuite) TestImmediateExecutionErrorWhenClosed() {
 	err := s.loop.AddAndExecute(s.task)
 
 	s.Error(err)
-	s.False(s.task.executed)
+	s.False(s.task.Executed())
 
 }
