@@ -532,25 +532,33 @@ func (m *NodeManager) EnsureSync(ctx context.Context) error {
 	if m.config.NetworkID == params.StatusChainNetworkID {
 		return nil
 	}
-	if m.lesService == nil {
-		return errors.New("LightEthereumService is nil")
-	}
+
 	return m.ensureSync(ctx)
 }
 
 func (m *NodeManager) ensureSync(ctx context.Context) error {
-	downloader := m.lesService.Downloader()
+	les, err := m.LightEthereumService()
+	if err != nil {
+		return fmt.Errorf("failed to get LES service: %v", err)
+	}
+
+	downloader := les.Downloader()
 	if downloader == nil {
 		return errors.New("LightEthereumService downloader is nil")
 	}
+
 	progress := downloader.Progress()
-	if progress.CurrentBlock >= progress.HighestBlock {
-		log.Debug("Synchronization completed")
+	if m.PeerCount() > 0 && progress.CurrentBlock >= progress.HighestBlock {
+		log.Debug("Synchronization completed", "current block", progress.CurrentBlock, "highest block", progress.HighestBlock)
 		return nil
 	}
 
 	ticker := time.NewTicker(tickerResolution)
 	defer ticker.Stop()
+
+	progressTicker := time.NewTicker(time.Minute)
+	defer progressTicker.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -566,13 +574,13 @@ func (m *NodeManager) ensureSync(ctx context.Context) error {
 			}
 			progress = downloader.Progress()
 			if progress.CurrentBlock >= progress.HighestBlock {
-				log.Debug("Synchronization completed")
+				log.Info("Synchronization completed", "current block", progress.CurrentBlock, "highest block", progress.HighestBlock)
 				return nil
 			}
-			log.Debug(
-				fmt.Sprintf("Synchronization is not finished yet: current block %d < highest block %d",
-					progress.CurrentBlock, progress.HighestBlock),
-			)
+			log.Debug("Synchronization is not finished", "current", progress.CurrentBlock, "highest", progress.HighestBlock)
+		case <-progressTicker.C:
+			progress = downloader.Progress()
+			log.Warn("Synchronization is not finished", "current", progress.CurrentBlock, "highest", progress.HighestBlock)
 		}
 	}
 }

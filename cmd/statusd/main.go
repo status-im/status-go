@@ -114,17 +114,25 @@ func main() {
 
 	// Sync blockchain and stop.
 	if *syncAndExit >= 0 {
-		exitCode := syncAndStopNode(backend.NodeManager(), *syncAndExit)
+		exitCode := syncAndStopNode(interruptCh, backend.NodeManager(), *syncAndExit)
+		// Call was interrupted. Wait for graceful shutdown.
+		if exitCode == -1 {
+			if node, err := backend.NodeManager().Node(); err == nil && node != nil {
+				node.Wait()
+			}
+			return
+		}
+		// Otherwise, exit immediately with a returned exit code.
 		os.Exit(exitCode)
 	}
 
-	// wait till node has been stopped
 	node, err := backend.NodeManager().Node()
 	if err != nil {
 		log.Fatalf("Getting node failed: %v", err)
 		return
 	}
 
+	// wait till node has been stopped
 	node.Wait()
 }
 
@@ -168,34 +176,6 @@ func startCollectingStats(interruptCh <-chan struct{}, nodeManager common.NodeMa
 	if err := server.Shutdown(context.TODO()); err != nil {
 		log.Printf("Failed to shutdown metrics server: %v", err)
 	}
-}
-
-func syncAndStopNode(nodeManager common.NodeManager, timeout int) (exitCode int) {
-	log.Println("Node will synchronize and exit")
-	if timeout < 0 {
-		log.Println("Sync and stop error: negative timeout value")
-		return 1
-	}
-	var err error
-	if timeout == 0 {
-		err = nodeManager.EnsureSync(context.Background())
-	} else {
-		ctx, cancel := context.WithTimeout(context.Background(), (time.Duration)(timeout)*time.Minute)
-		err = nodeManager.EnsureSync(ctx)
-		defer cancel()
-	}
-	if err != nil {
-		log.Printf("Sync error: %v", err)
-		exitCode = 1
-	}
-	var done <-chan struct{}
-	done, err = nodeManager.StopNode()
-	if err != nil {
-		log.Printf("Stop node err: %v", err)
-		return 1
-	}
-	<-done
-	return
 }
 
 // makeNodeConfig parses incoming CLI options and returns node configuration object
