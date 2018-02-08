@@ -160,3 +160,6 @@ vendor-check:
 
 dep-install:
 	go get -u github.com/golang/dep/cmd/dep
+
+patch:
+	./_assets/patches/patcher
