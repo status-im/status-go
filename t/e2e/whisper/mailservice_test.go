@@ -53,7 +53,7 @@ func (s *MailServiceSuite) TestShhRequestMessagesRPCMethodAvailability() {
 	r.NoError(err)
 	resp, err := http.DefaultClient.Do(req)
 	r.NoError(err)
-	defer func() { _ = resp.Body.Close() }()
+	defer resp.Body.Close() //nolint errcheck
 	r.Equal(200, resp.StatusCode)
 	data, err := ioutil.ReadAll(resp.Body)
 	r.NoError(err)

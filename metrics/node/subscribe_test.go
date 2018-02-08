@@ -19,7 +19,7 @@ func TestSubscribeServerEvents(t *testing.T) {
 	require.NoError(t, err)
 	err = node.Start()
 	require.NoError(t, err)
-	defer func() { _ = node.Stop() }()
+	defer node.Stop() //nolint: errcheck
 
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
