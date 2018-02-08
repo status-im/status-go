@@ -41,13 +41,13 @@ type Task interface {
 // Otherwise, on ARM and x86-32 it will panic.
 // More information: https://golang.org/pkg/sync/atomic/#pkg-note-BUG.
 type Loop struct {
-	id        int64
-	vm        *vm.VM
-	lock      sync.RWMutex
-	tasks     map[int64]Task
-	ready     chan Task
-	closer    sync.Once
-	closeChan chan struct{}
+	id         int64
+	vm         *vm.VM
+	lock       sync.RWMutex
+	tasks      map[int64]Task
+	ready      chan Task
+	closer     sync.Once
+	closedChan chan struct{}
 }
 
 // New creates a new Loop with an unbuffered ready queue on a specific VM.
@@ -59,17 +59,17 @@ func New(vm *vm.VM) *Loop {
 // queue, the capacity of which being specified by the backlog argument.
 func NewWithBacklog(vm *vm.VM, backlog int) *Loop {
 	return &Loop{
-		vm:        vm,
-		tasks:     make(map[int64]Task),
-		ready:     make(chan Task, backlog),
-		closeChan: make(chan struct{}),
+		vm:         vm,
+		tasks:      make(map[int64]Task),
+		ready:      make(chan Task, backlog),
+		closedChan: make(chan struct{}),
 	}
 }
 
 // close the loop so that it no longer accepts tasks.
 func (l *Loop) close() {
 	l.closer.Do(func() {
-		close(l.closeChan)
+		close(l.closedChan)
 	})
 }
 
@@ -83,7 +83,7 @@ func (l *Loop) VM() *vm.VM {
 // point, it will become ready for finalising.
 func (l *Loop) Add(t Task) error {
 	select {
-	case <-l.closeChan:
+	case <-l.closedChan:
 		return ErrClosed
 	default:
 	}
@@ -125,7 +125,7 @@ func (l *Loop) removeAll() {
 // block if the "ready channel" in the loop is at capacity.
 func (l *Loop) Ready(t Task) error {
 	select {
-	case <-l.closeChan:
+	case <-l.closedChan:
 		t.Cancel()
 		return ErrClosed
 	case l.ready <- t:
