@@ -1,1 +1,4 @@
-extends: probot-settings
+_extends: probot-settings
+
+github-team:
+  slug: 'go'
