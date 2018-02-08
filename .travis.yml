@@ -27,9 +27,9 @@ jobs:
     # to still run, but currently does not work due to a bug
     if: type != pull_request
     script:
-      # sync the chain first; it will time out after 20 minutes
+      # sync the chain first; it will time out after 20 minutes; Rinkeby is networkid=4
       - make statusgo
-      - ./build/bin/statusd -datadir .ethereumtest -les -networkid=4 -sync-and-exit=20 -log WARN -standalone=false -discovery=false
+      - ./build/bin/statusd -datadir .ethereumtest/Rinkeby -les -networkid=4 -sync-and-exit=20 -log WARN -standalone=false -discovery=false
       - make test-e2e networkid=4
 cache:
   directories:
