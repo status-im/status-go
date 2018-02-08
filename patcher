@@ -1,5 +1,18 @@
 #!/usr/bin/env bash
 
+# Default behaviour:
+# Reverts all patches in patch dir, notes down the ones
+# which were previously applied. Applies all from the beginning
+# and reports about previously unapplied patches. If there's
+# an error, reverts the last one and stops.
+#
+# Usage: ./patcher -p <base_path> -r -v
+# -p: <base_path> is where to apply to (a go-ethereum package)
+# -r: reverts all and exit if this flag is present
+# -v: verbose error reporting about failed patch
+#
+# If -p is not present, default path is as below ($basepath).
+
 patches=($(pwd)/geth-patches/*.patch)
 
 # Base path is vendor/github.com/ethereum/go-ethereum
