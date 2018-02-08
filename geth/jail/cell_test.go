@@ -120,7 +120,7 @@ func (s *CellTestSuite) TestCellFetchRace() {
 		case data := <-dataCh:
 			// Mark the request as successful.
 			expected[data.String()] = true
-		case _ = <-errCh:
+		case <-errCh:
 			s.Fail("fetch failed to complete the request")
 		case <-time.After(5 * time.Second):
 			s.Fail("test timed out")
