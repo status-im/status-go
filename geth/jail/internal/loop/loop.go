@@ -46,6 +46,7 @@ type Loop struct {
 	lock      sync.RWMutex
 	tasks     map[int64]Task
 	ready     chan Task
+	closer    sync.Once
 	closeChan chan struct{}
 }
 
@@ -67,7 +68,9 @@ func NewWithBacklog(vm *vm.VM, backlog int) *Loop {
 
 // close the loop so that it no longer accepts tasks.
 func (l *Loop) close() {
-	close(l.closeChan)
+	l.closer.Do(func() {
+		close(l.closeChan)
+	})
 }
 
 // VM gets the JavaScript interpreter associated with the loop.
@@ -79,13 +82,13 @@ func (l *Loop) VM() *vm.VM {
 // doing something outside of the JavaScript environment, and that at some
 // point, it will become ready for finalising.
 func (l *Loop) Add(t Task) error {
-	l.lock.Lock()
-	defer l.lock.Unlock()
 	select {
 	case <-l.closeChan:
 		return ErrClosed
 	default:
 	}
+	l.lock.Lock()
+	defer l.lock.Unlock()
 	t.SetID(atomic.AddInt64(&l.id, 1))
 	l.tasks[t.GetID()] = t
 	return nil
