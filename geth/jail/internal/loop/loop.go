@@ -46,7 +46,7 @@ type Loop struct {
 	lock      sync.RWMutex
 	tasks     map[int64]Task
 	ready     chan Task
-	accepting bool
+	closeChan chan struct{}
 }
 
 // New creates a new Loop with an unbuffered ready queue on a specific VM.
@@ -61,18 +61,13 @@ func NewWithBacklog(vm *vm.VM, backlog int) *Loop {
 		vm:        vm,
 		tasks:     make(map[int64]Task),
 		ready:     make(chan Task, backlog),
-		accepting: true,
+		closeChan: make(chan struct{}),
 	}
 }
 
 // close the loop so that it no longer accepts tasks.
 func (l *Loop) close() {
-	l.lock.Lock()
-	defer l.lock.Unlock()
-	if l.accepting {
-		l.accepting = false
-		close(l.ready)
-	}
+	close(l.closeChan)
 }
 
 // VM gets the JavaScript interpreter associated with the loop.
@@ -86,8 +81,10 @@ func (l *Loop) VM() *vm.VM {
 func (l *Loop) Add(t Task) error {
 	l.lock.Lock()
 	defer l.lock.Unlock()
-	if !l.accepting {
+	select {
+	case <-l.closeChan:
 		return ErrClosed
+	default:
 	}
 	t.SetID(atomic.AddInt64(&l.id, 1))
 	l.tasks[t.GetID()] = t
@@ -124,17 +121,13 @@ func (l *Loop) removeAll() {
 // Ready signals to the loop that a task is ready to be finalised. This might
 // block if the "ready channel" in the loop is at capacity.
 func (l *Loop) Ready(t Task) error {
-	var err error
-	l.lock.RLock()
-	if !l.accepting {
+	select {
+	case <-l.closeChan:
 		t.Cancel()
-		err = ErrClosed
+		return ErrClosed
+	case l.ready <- t:
+		return nil
 	}
-	l.lock.RUnlock()
-	if err == nil {
-		l.ready <- t
-	}
-	return err
 }
 
 // AddAndExecute combines Add and Ready for immediate execution.
