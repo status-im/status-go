@@ -40,7 +40,7 @@ In our case `<release_branch>` would be `release/1.7` because the current stable
 
 3. Apply patches
 ```bash
-for patch in $GOPATH/src/github.com/status-im/status-go/geth-patches/*.patch;
+for patch in $GOPATH/src/github.com/status-im/status-go/_assets/patches/geth/*.patch;
 do
     patch -p1 < $patch;
 done
