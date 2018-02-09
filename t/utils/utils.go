@@ -220,7 +220,7 @@ func GetAccount2PKFile() string {
 }
 
 // WaitClosed used to wait on a channel in tests
-func WaitClosed(c chan struct{}, d time.Duration) error {
+func WaitClosed(c <-chan struct{}, d time.Duration) error {
 	timer := time.NewTimer(d)
 	defer timer.Stop()
 	select {

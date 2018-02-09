@@ -47,21 +47,14 @@ func (k *SelectedExtKey) Hex() string {
 // NodeManager defines expected methods for managing Status node
 type NodeManager interface {
 	// StartNode start Status node, fails if node is already started
-	StartNode(config *params.NodeConfig) (<-chan struct{}, error)
-
-	// StopNode stop the running Status node.
-	// Stopped node cannot be resumed, one starts a new node instead.
-	StopNode() (<-chan struct{}, error)
+	StartNode(config *params.NodeConfig) error
 
 	// EnsureSync waits until blockchain is synchronized.
 	EnsureSync(ctx context.Context) error
 
-	// RestartNode restart running Status node, fails if node is not running
-	RestartNode() (<-chan struct{}, error)
-
-	// ResetChainData remove chain data from data directory.
-	// Node is stopped, and new node is started, with clean data directory.
-	ResetChainData() (<-chan struct{}, error)
+	// StopNode stop the running Status node.
+	// Stopped node cannot be resumed, one starts a new node instead.
+	StopNode() error
 
 	// IsNodeRunning confirm that node is running
 	IsNodeRunning() bool

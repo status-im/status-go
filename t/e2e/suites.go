@@ -6,6 +6,7 @@ import (
 	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/log"
+	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/signal"
 	"github.com/status-im/status-go/geth/transactions"
 	. "github.com/status-im/status-go/t/utils" //nolint: golint
@@ -15,7 +16,7 @@ import (
 // NodeManagerTestSuite defines a test suit with NodeManager.
 type NodeManagerTestSuite struct {
 	suite.Suite
-	NodeManager common.NodeManager
+	NodeManager *node.NodeManager
 }
 
 func init() {
@@ -47,10 +48,7 @@ func (s *NodeManagerTestSuite) StartTestNode(opts ...TestNodeOption) {
 	s.NoError(importTestAccouns(nodeConfig.KeyStoreDir))
 
 	s.False(s.NodeManager.IsNodeRunning())
-	nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
-	s.NoError(err)
-	s.NotNil(nodeStarted)
-	<-nodeStarted
+	s.NoError(s.NodeManager.StartNode(nodeConfig))
 	s.True(s.NodeManager.IsNodeRunning())
 }
 
@@ -58,9 +56,7 @@ func (s *NodeManagerTestSuite) StartTestNode(opts ...TestNodeOption) {
 func (s *NodeManagerTestSuite) StopTestNode() {
 	s.NotNil(s.NodeManager)
 	s.True(s.NodeManager.IsNodeRunning())
-	nodeStopped, err := s.NodeManager.StopNode()
-	s.NoError(err)
-	<-nodeStopped
+	s.NoError(s.NodeManager.StopNode())
 	s.False(s.NodeManager.IsNodeRunning())
 }
 
@@ -97,27 +93,21 @@ func (s *BackendTestSuite) StartTestBackend(opts ...TestNodeOption) {
 
 	// start node
 	s.False(s.Backend.IsNodeRunning())
-	nodeStarted, err := s.Backend.StartNode(nodeConfig)
-	s.NoError(err)
-	<-nodeStarted
+	s.NoError(s.Backend.StartNode(nodeConfig))
 	s.True(s.Backend.IsNodeRunning())
 }
 
 // StopTestBackend stops the node.
 func (s *BackendTestSuite) StopTestBackend() {
 	s.True(s.Backend.IsNodeRunning())
-	backendStopped, err := s.Backend.StopNode()
-	s.NoError(err)
-	<-backendStopped
+	s.NoError(s.Backend.StopNode())
 	s.False(s.Backend.IsNodeRunning())
 }
 
 // RestartTestNode restarts a currently running node.
 func (s *BackendTestSuite) RestartTestNode() {
 	s.True(s.Backend.IsNodeRunning())
-	nodeRestarted, err := s.Backend.RestartNode()
-	s.NoError(err)
-	<-nodeRestarted
+	s.NoError(s.Backend.RestartNode())
 	s.True(s.Backend.IsNodeRunning())
 }
 

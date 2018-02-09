@@ -45,13 +45,13 @@ func (s *APIBackendTestSuite) TestRaceConditions() {
 	var funcsToTest = []func(*params.NodeConfig){
 		func(config *params.NodeConfig) {
 			log.Info("StartNode()")
-			_, err := s.Backend.StartNode(config)
+			err := s.Backend.StartNode(config)
 			s.T().Logf("StartNode() for network: %d, error: %v", config.NetworkID, err)
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
 			log.Info("StopNode()")
-			_, err := s.Backend.StopNode()
+			err := s.Backend.StopNode()
 			s.T().Logf("StopNode() for network: %d, error: %v", config.NetworkID, err)
 			progress <- struct{}{}
 		},
@@ -63,7 +63,7 @@ func (s *APIBackendTestSuite) TestRaceConditions() {
 		// },
 		func(config *params.NodeConfig) {
 			log.Info("RestartNode()")
-			_, err := s.Backend.RestartNode()
+			err := s.Backend.RestartNode()
 			s.T().Logf("RestartNode(), error: %v", err)
 			progress <- struct{}{}
 		},
@@ -174,16 +174,15 @@ func (s *APIBackendTestSuite) TestRaceConditions() {
 	}
 
 	for range progress {
-		cnt -= 1
+		cnt--
 		if cnt <= 0 {
 			break
 		}
 	}
 
-	time.Sleep(2 * time.Second)            // so that we see some logs
-	nodeStopped, _ := s.Backend.StopNode() // just in case we have a node running
-	if nodeStopped != nil {
-		<-nodeStopped
+	time.Sleep(2 * time.Second) // so that we see some logs
+	if err := s.Backend.StopNode(); err != node.ErrNoRunningNode && err != nil {
+		s.NoError(err, "unexpected error")
 	}
 }
 
@@ -195,10 +194,7 @@ func (s *APIBackendTestSuite) TestNetworkSwitching() {
 	s.NoError(err)
 
 	s.False(s.Backend.IsNodeRunning())
-	nodeStarted, err := s.Backend.StartNode(nodeConfig)
-	s.NoError(err)
-
-	<-nodeStarted // wait till node is started
+	s.NoError(s.Backend.StartNode(nodeConfig))
 	s.True(s.Backend.IsNodeRunning())
 
 	firstHash, err := e2e.FirstBlockHash(s.Backend.NodeManager())
@@ -206,19 +202,14 @@ func (s *APIBackendTestSuite) TestNetworkSwitching() {
 	s.Equal(GetHeadHash(), firstHash)
 
 	// now stop node, and make sure that a new node, on different network can be started
-	nodeStopped, err := s.Backend.StopNode()
-	s.NoError(err)
-	<-nodeStopped
+	s.NoError(s.Backend.StopNode())
 
 	// start new node with completely different config
 	nodeConfig, err = e2e.MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
 
 	s.False(s.Backend.IsNodeRunning())
-	nodeStarted, err = s.Backend.StartNode(nodeConfig)
-	s.NoError(err)
-
-	<-nodeStarted
+	s.NoError(s.Backend.StartNode(nodeConfig))
 	s.True(s.Backend.IsNodeRunning())
 
 	// make sure we are on another network indeed
@@ -226,9 +217,7 @@ func (s *APIBackendTestSuite) TestNetworkSwitching() {
 	s.NoError(err)
 	s.Equal(GetHeadHash(), firstHash)
 
-	nodeStopped, err = s.Backend.StopNode()
-	s.NoError(err)
-	<-nodeStopped
+	s.NoError(s.Backend.StopNode())
 }
 
 // FIXME(tiabc): There's also a test with the same name in geth/node/manager_test.go
@@ -245,9 +234,8 @@ func (s *APIBackendTestSuite) TestResetChainData() {
 	EnsureNodeSync(s.Backend.NodeManager())
 
 	s.True(s.Backend.IsNodeRunning())
-	nodeReady, err := s.Backend.ResetChainData()
-	require.NoError(err)
-	<-nodeReady
+	require.NoError(s.Backend.ResetChainData())
+
 	s.True(s.Backend.IsNodeRunning()) // new node, with previous config should be running
 
 	// make sure we can read the first byte, and it is valid (for Rinkeby)
@@ -267,10 +255,7 @@ func (s *APIBackendTestSuite) TestRestartNode() {
 	s.NoError(err)
 
 	s.False(s.Backend.IsNodeRunning())
-	nodeStarted, err := s.Backend.StartNode(nodeConfig)
-	s.NoError(err)
-
-	<-nodeStarted // wait till node is started
+	s.NoError(s.Backend.StartNode(nodeConfig))
 	s.True(s.Backend.IsNodeRunning())
 
 	firstHash, err := e2e.FirstBlockHash(s.Backend.NodeManager())
@@ -278,9 +263,7 @@ func (s *APIBackendTestSuite) TestRestartNode() {
 	s.Equal(GetHeadHash(), firstHash)
 
 	s.True(s.Backend.IsNodeRunning())
-	nodeRestarted, err := s.Backend.RestartNode()
-	require.NoError(err)
-	<-nodeRestarted
+	require.NoError(s.Backend.RestartNode())
 	s.True(s.Backend.IsNodeRunning()) // new node, with previous config should be running
 
 	// make sure we can read the first byte, and it is valid (for Rinkeby)

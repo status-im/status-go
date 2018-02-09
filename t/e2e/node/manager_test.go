@@ -1,7 +1,6 @@
 package node_test
 
 import (
-	"encoding/json"
 	"testing"
 	"time"
 
@@ -13,7 +12,7 @@ import (
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
-	"github.com/status-im/status-go/geth/signal"
+
 	e2e "github.com/status-im/status-go/t/e2e"
 	. "github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/suite"
@@ -37,20 +36,6 @@ func (s *ManagerTestSuite) TestReferencesWithoutStartedNode() {
 		initFn      func() (interface{}, error)
 		expectedErr error
 	}{
-		{
-			"non-null manager, no running node, RestartNode()",
-			func() (interface{}, error) {
-				return s.NodeManager.RestartNode()
-			},
-			node.ErrNoRunningNode,
-		},
-		{
-			"non-null manager, no running node, ResetChainData()",
-			func() (interface{}, error) {
-				return s.NodeManager.ResetChainData()
-			},
-			node.ErrNoRunningNode,
-		},
 		{
 			"non-null manager, no running node, PopulateStaticPeers()",
 			func() (interface{}, error) {
@@ -200,42 +185,30 @@ func (s *ManagerTestSuite) TestNodeStartStop() {
 
 	// try stopping non-started node
 	s.False(s.NodeManager.IsNodeRunning())
-
 	time.Sleep(100 * time.Millisecond) //https://github.com/status-im/status-go/issues/429#issuecomment-339663163
-	_, err = s.NodeManager.StopNode()
-	s.Equal(err, node.ErrNoRunningNode)
+	s.Equal(node.ErrNoRunningNode, s.NodeManager.StopNode())
 
 	// start node
 	s.False(s.NodeManager.IsNodeRunning())
-	nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
-	s.NoError(err)
+	s.NoError(s.NodeManager.StartNode(nodeConfig))
 	// wait till node is started
-	<-nodeStarted
 	s.True(s.NodeManager.IsNodeRunning())
 
 	// try starting another node (w/o stopping the previously started node)
-	_, err = s.NodeManager.StartNode(nodeConfig)
-	s.Equal(err, node.ErrNodeExists)
+	s.Equal(node.ErrNodeExists, s.NodeManager.StartNode(nodeConfig))
 
 	// now stop node
 	time.Sleep(100 * time.Millisecond) //https://github.com/status-im/status-go/issues/429#issuecomment-339663163
-	nodeStopped, err := s.NodeManager.StopNode()
-	s.NoError(err)
-	<-nodeStopped
+	s.NoError(s.NodeManager.StopNode())
 	s.False(s.NodeManager.IsNodeRunning())
 
 	// start new node with exactly the same config
-	nodeStarted, err = s.NodeManager.StartNode(nodeConfig)
-	s.NoError(err)
-	// wait till node is started
-	<-nodeStarted
+	s.NoError(s.NodeManager.StartNode(nodeConfig))
 	s.True(s.NodeManager.IsNodeRunning())
 
 	// finally stop the node
 	time.Sleep(100 * time.Millisecond) //https://github.com/status-im/status-go/issues/429#issuecomment-339663163
-	nodeStopped, err = s.NodeManager.StopNode()
-	s.NoError(err)
-	<-nodeStopped
+	s.NoError(s.NodeManager.StopNode())
 }
 
 func (s *ManagerTestSuite) TestNetworkSwitching() {
@@ -243,10 +216,8 @@ func (s *ManagerTestSuite) TestNetworkSwitching() {
 	nodeConfig, err := e2e.MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
 	s.False(s.NodeManager.IsNodeRunning())
-	nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
-	s.NoError(err)
+	s.NoError(s.NodeManager.StartNode(nodeConfig))
 	// wait till node is started
-	<-nodeStarted
 	s.True(s.NodeManager.IsNodeRunning())
 
 	firstHash, err := e2e.FirstBlockHash(s.NodeManager)
@@ -255,18 +226,13 @@ func (s *ManagerTestSuite) TestNetworkSwitching() {
 
 	// now stop node, and make sure that a new node, on different network can be started
 	time.Sleep(100 * time.Millisecond) //https://github.com/status-im/status-go/issues/429#issuecomment-339663163
-	nodeStopped, err := s.NodeManager.StopNode()
-	s.NoError(err)
-	<-nodeStopped
+	s.NoError(s.NodeManager.StopNode())
 	s.False(s.NodeManager.IsNodeRunning())
 
 	// start new node with completely different config
 	nodeConfig, err = e2e.MakeTestNodeConfig(params.RinkebyNetworkID)
 	s.NoError(err)
-	nodeStarted, err = s.NodeManager.StartNode(nodeConfig)
-	s.NoError(err)
-	// wait till node is started
-	<-nodeStarted
+	s.NoError(s.NodeManager.StartNode(nodeConfig))
 	s.True(s.NodeManager.IsNodeRunning())
 
 	// make sure we are on another network indeed
@@ -275,9 +241,7 @@ func (s *ManagerTestSuite) TestNetworkSwitching() {
 	s.Equal(GetHeadHashFromNetworkID(params.RinkebyNetworkID), firstHash)
 
 	time.Sleep(100 * time.Millisecond) //https://github.com/status-im/status-go/issues/429#issuecomment-339663163
-	nodeStopped, err = s.NodeManager.StopNode()
-	s.NoError(err)
-	<-nodeStopped
+	s.NoError(s.NodeManager.StopNode())
 }
 
 func (s *ManagerTestSuite) TestStartNodeWithUpstreamEnabled() {
@@ -294,54 +258,11 @@ func (s *ManagerTestSuite) TestStartNodeWithUpstreamEnabled() {
 	nodeConfig.UpstreamConfig.Enabled = true
 	nodeConfig.UpstreamConfig.URL = networkURL
 
-	nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
-	s.NoError(err)
-	<-nodeStarted
+	s.NoError(s.NodeManager.StartNode(nodeConfig))
 	s.True(s.NodeManager.IsNodeRunning())
 
 	time.Sleep(100 * time.Millisecond) //https://github.com/status-im/status-go/issues/429#issuecomment-339663163
-	nodeStopped, err := s.NodeManager.StopNode()
-	s.NoError(err)
-	<-nodeStopped
-}
-
-// TODO(adam): fix this test to not use a different directory for blockchain data
-func (s *ManagerTestSuite) TestResetChainData() {
-	s.T().Skip()
-
-	s.StartTestNode()
-	defer s.StopTestNode()
-
-	EnsureNodeSync(s.NodeManager)
-
-	// reset chain data
-	nodeReady, err := s.NodeManager.ResetChainData()
-	s.NoError(err)
-	// new node, with previous config should be running
-	<-nodeReady
-	s.True(s.NodeManager.IsNodeRunning())
-
-	// make sure we can read the first byte, and it is valid (for Rinkeby)
-	firstHash, err := e2e.FirstBlockHash(s.NodeManager)
-	s.NoError(err)
-	s.Equal(GetHeadHash(), firstHash)
-}
-
-func (s *ManagerTestSuite) TestRestartNode() {
-	s.StartTestNode()
-	defer s.StopTestNode()
-
-	s.True(s.NodeManager.IsNodeRunning())
-	nodeReady, err := s.NodeManager.RestartNode()
-	s.NoError(err)
-	// new node, with previous config should be running
-	<-nodeReady
-	s.True(s.NodeManager.IsNodeRunning())
-
-	// make sure we can read the first byte, and it is valid (for Rinkeby)
-	firstHash, err := e2e.FirstBlockHash(s.NodeManager)
-	s.NoError(err)
-	s.Equal(GetHeadHash(), firstHash)
+	s.NoError(s.NodeManager.StopNode())
 }
 
 // TODO(adam): race conditions should be tested with -race flag and unit tests, if possible.
@@ -391,10 +312,10 @@ func (s *ManagerTestSuite) TestRestartNode() {
 //		// TODO(adam): quarantined until it uses a different datadir
 //		// as otherwise it wipes out cached blockchain data.
 //		// func(config *params.NodeConfig) {
-//		// 	log.Info("ResetChainData()")
-//		// 	_, err := s.NodeManager.ResetChainData()
-//		// 	s.T().Logf("ResetChainData(), error: %v", err)
-//		// 	progress <- struct{}{}
+//		//	log.Info("ResetChainData()")
+//		//	_, err := s.NodeManager.ResetChainData()
+//		//	s.T().Logf("ResetChainData(), error: %v", err)
+//		//	progress <- struct{}{}
 //		// },
 //		func(config *params.NodeConfig) {
 //			log.Info("RestartNode()")
@@ -468,58 +389,3 @@ func (s *ManagerTestSuite) TestRestartNode() {
 //		<-nodeStopped
 //	}
 //}
-
-func (s *ManagerTestSuite) TestNodeStartCrash() {
-	// let's listen for node.crashed signal
-	signalReceived := make(chan struct{})
-	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var envelope signal.Envelope
-		err := json.Unmarshal([]byte(jsonEvent), &envelope)
-		s.NoError(err)
-
-		if envelope.Type == signal.EventNodeCrashed {
-			close(signalReceived)
-		}
-	})
-
-	nodeConfig, err := e2e.MakeTestNodeConfig(GetNetworkID())
-	s.NoError(err)
-
-	// start node outside the manager (on the same port), so that manager node.Start() method fails
-	outsideNode, err := node.MakeNode(nodeConfig)
-	s.NoError(err)
-	err = outsideNode.Start()
-	s.NoError(err)
-
-	// now try starting using node manager
-	nodeStarted, err := s.NodeManager.StartNode(nodeConfig)
-	s.NoError(err) // no error is thrown, as node is started in separate routine
-	<-nodeStarted  // no deadlock either, as manager should close the channel on error
-	s.False(s.NodeManager.IsNodeRunning())
-
-	select {
-	case <-time.After(5 * time.Second):
-		s.FailNow("timed out waiting for signal")
-	case <-signalReceived:
-	}
-
-	// stop outside node, and re-try
-	err = outsideNode.Stop()
-	s.NoError(err)
-	signalReceived = make(chan struct{})
-	nodeStarted, err = s.NodeManager.StartNode(nodeConfig)
-	s.NoError(err) // again, no error
-	<-nodeStarted  // no deadlock, and no signal this time, manager should be able to start node
-	s.True(s.NodeManager.IsNodeRunning())
-
-	select {
-	case <-time.After(5 * time.Second):
-	case <-signalReceived:
-		s.FailNow("signal should not be received")
-	}
-
-	// cleanup
-	time.Sleep(100 * time.Millisecond) //https://github.com/status-im/status-go/issues/429#issuecomment-339663163
-	s.NodeManager.StopNode()           //nolint: errcheck
-	signal.ResetDefaultNodeNotificationHandler()
-}

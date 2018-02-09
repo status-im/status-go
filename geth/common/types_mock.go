@@ -43,29 +43,15 @@ func (m *MockNodeManager) EXPECT() *MockNodeManagerMockRecorder {
 }
 
 // StartNode mocks base method
-func (m *MockNodeManager) StartNode(config *params.NodeConfig) (<-chan struct{}, error) {
+func (m *MockNodeManager) StartNode(config *params.NodeConfig) error {
 	ret := m.ctrl.Call(m, "StartNode", config)
-	ret0, _ := ret[0].(<-chan struct{})
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
 // StartNode indicates an expected call of StartNode
 func (mr *MockNodeManagerMockRecorder) StartNode(config interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StartNode", reflect.TypeOf((*MockNodeManager)(nil).StartNode), config)
-}
-
-// StopNode mocks base method
-func (m *MockNodeManager) StopNode() (<-chan struct{}, error) {
-	ret := m.ctrl.Call(m, "StopNode")
-	ret0, _ := ret[0].(<-chan struct{})
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// StopNode indicates an expected call of StopNode
-func (mr *MockNodeManagerMockRecorder) StopNode() *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StopNode", reflect.TypeOf((*MockNodeManager)(nil).StopNode))
 }
 
 // EnsureSync mocks base method
@@ -80,30 +66,16 @@ func (mr *MockNodeManagerMockRecorder) EnsureSync(ctx interface{}) *gomock.Call 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsureSync", reflect.TypeOf((*MockNodeManager)(nil).EnsureSync), ctx)
 }
 
-// RestartNode mocks base method
-func (m *MockNodeManager) RestartNode() (<-chan struct{}, error) {
-	ret := m.ctrl.Call(m, "RestartNode")
-	ret0, _ := ret[0].(<-chan struct{})
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+// StopNode mocks base method
+func (m *MockNodeManager) StopNode() error {
+	ret := m.ctrl.Call(m, "StopNode")
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
-// RestartNode indicates an expected call of RestartNode
-func (mr *MockNodeManagerMockRecorder) RestartNode() *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RestartNode", reflect.TypeOf((*MockNodeManager)(nil).RestartNode))
-}
-
-// ResetChainData mocks base method
-func (m *MockNodeManager) ResetChainData() (<-chan struct{}, error) {
-	ret := m.ctrl.Call(m, "ResetChainData")
-	ret0, _ := ret[0].(<-chan struct{})
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ResetChainData indicates an expected call of ResetChainData
-func (mr *MockNodeManagerMockRecorder) ResetChainData() *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResetChainData", reflect.TypeOf((*MockNodeManager)(nil).ResetChainData))
+// StopNode indicates an expected call of StopNode
+func (mr *MockNodeManagerMockRecorder) StopNode() *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StopNode", reflect.TypeOf((*MockNodeManager)(nil).StopNode))
 }
 
 // IsNodeRunning mocks base method

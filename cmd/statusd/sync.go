@@ -46,12 +46,9 @@ func syncAndStopNode(interruptCh <-chan struct{}, nodeManager common.NodeManager
 		return -1
 	}
 
-	done, err := nodeManager.StopNode()
-	if err != nil {
+	if err := nodeManager.StopNode(); err != nil {
 		log.Printf("syncAndStopNode: failed to stop the node: %v", err)
 		return 1
 	}
-	<-done
-
 	return
 }
