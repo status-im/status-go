@@ -7,6 +7,15 @@ However, there are a few changes has been made to the upstream, that are specifi
 
 We try to minimize number and amount of changes in those patches as much as possible, and whereas possible, to contribute changes into the upstream.
 
+# Creating patches
+
+Instructions for creating a patch from the command line:
+
+1. Enter the command line at the status-im/go-ethereum repo root
+1. Create the patch:
+    1. If you already have a commit that represents the change, find its SHA1 (e.g. `$COMMIT_SHA1`) and do `git diff $COMMIT_SHA1 > file.patch`
+    1. If the files are staged, do `git diff --cached > file.patch`
+
 # Patches
 
  - [`0000-accounts-hd-keys.patch`](./0000-accounts-hd-keys.patch) — adds support for HD extended keys (links/docs?)
@@ -16,6 +25,7 @@ We try to minimize number and amount of changes in those patches as much as poss
  - [`0006-latest-cht.patch`](./0006-latest-cht.patch) – updates CHT root hashes, should be updated regularly to keep sync fast, until proper Trusted Checkpoint sync is not implemented as part of LES/2 protocol.
  - [`0007-README.patch`](./0007-README.patch) — update upstream README.md.
  - [`0010-geth-17-fix-npe-in-filter-system.patch`](./0010-geth-17-fix-npe-in-filter-system.patch) - Temp patch for 1.7.x to fix a NPE in the filter system.
+
 # Updating upstream version
 
 When a new stable release of `go-ethereum` comes out, we need to upgrade our fork and vendored copy.

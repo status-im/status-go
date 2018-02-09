@@ -1,6 +1,8 @@
 diff --git a/containers/docker/status-alpine/geth/Dockerfile b/containers/docker/status-alpine/geth/Dockerfile
---- a/containers/docker/status-alpine/geth/Dockerfile	1970-01-01 01:00:00.000000000 +0100
-+++ b/containers/docker/status-alpine/geth/Dockerfile	2017-09-19 17:03:51.000000000 +0200
+new file mode 100644
+index 000000000..2cc2177d0
+--- /dev/null
++++ b/containers/docker/status-alpine/geth/Dockerfile
 @@ -0,0 +1,20 @@
 +FROM alpine:3.5
 +
@@ -23,8 +25,10 @@ diff --git a/containers/docker/status-alpine/geth/Dockerfile b/containers/docker
 +
 +ENTRYPOINT ["/geth"]
 diff --git a/containers/docker/status-alpine/swarm/Dockerfile b/containers/docker/status-alpine/swarm/Dockerfile
---- a/containers/docker/status-alpine/swarm/Dockerfile	1970-01-01 01:00:00.000000000 +0100
-+++ b/containers/docker/status-alpine/swarm/Dockerfile	2017-09-19 17:03:51.000000000 +0200
+new file mode 100644
+index 000000000..685bf5ad9
+--- /dev/null
++++ b/containers/docker/status-alpine/swarm/Dockerfile
 @@ -0,0 +1,19 @@
 +FROM alpine:3.5
 +
@@ -46,8 +50,10 @@ diff --git a/containers/docker/status-alpine/swarm/Dockerfile b/containers/docke
 +
 +ENTRYPOINT ["/swarm"]
 diff --git a/containers/docker/status-alpine/wnode/Dockerfile b/containers/docker/status-alpine/wnode/Dockerfile
---- a/containers/docker/status-alpine/wnode/Dockerfile	1970-01-01 01:00:00.000000000 +0100
-+++ b/containers/docker/status-alpine/wnode/Dockerfile	2017-09-19 17:03:51.000000000 +0200
+new file mode 100644
+index 000000000..e160ff9d7
+--- /dev/null
++++ b/containers/docker/status-alpine/wnode/Dockerfile
 @@ -0,0 +1,19 @@
 +FROM alpine:3.5
 +

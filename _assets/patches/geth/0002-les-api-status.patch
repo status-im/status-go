@@ -274,7 +274,7 @@ index 56f617a7d..f839f24e6 100644
  
  func (b *LesApiBackend) ChainConfig() *params.ChainConfig {
 diff --git a/les/backend.go b/les/backend.go
-index 333df920e..7d8cf3916 100644
+index 333df920e..71fbc181b 100644
 --- a/les/backend.go
 +++ b/les/backend.go
 @@ -75,6 +75,8 @@ type LightEthereum struct {

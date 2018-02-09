@@ -1,5 +1,5 @@
 diff --git a/eth/filters/filter_system.go b/eth/filters/filter_system.go
-index e08cedb274..a234709c63 100644
+index e08cedb27..a234709c6 100644
 --- a/eth/filters/filter_system.go
 +++ b/eth/filters/filter_system.go
 @@ -109,7 +109,11 @@ func NewEventSystem(mux *event.TypeMux, backend Backend, lightMode bool) *EventS
@@ -57,4 +57,3 @@ index e08cedb274..a234709c63 100644
  
  	// Unsubscribe all events
  	defer sub.Unsubscribe()
-
