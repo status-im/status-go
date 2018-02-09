@@ -30,6 +30,7 @@ type StatusBackend struct {
 	txQueueManager  *transactions.Manager
 	jailManager     common.JailManager
 	newNotification common.NotificationConstructor
+	connectionState ConnectionState
 }
 
 // NewStatusBackend create a new NewStatusBackend instance
@@ -225,4 +226,13 @@ func (b *StatusBackend) registerHandlers() error {
 	rpcClient.RegisterHandler("eth_accounts", b.accountManager.AccountsRPCHandler())
 	rpcClient.RegisterHandler("eth_sendTransaction", b.txQueueManager.SendTransactionRPCHandler)
 	return nil
+}
+
+// ConnectionChange handles network state changes logic.
+func (m *StatusBackend) ConnectionChange(state ConnectionState) {
+	log.Info("Network state change", "old", m.connectionState, "new", state)
+	m.connectionState = state
+
+	// logic of handling state changes here
+	// restart node? force peers reconnect? etc
 }
