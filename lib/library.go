@@ -449,3 +449,9 @@ func AddPeer(enode *C.char) *C.char {
 	err := statusAPI.NodeManager().AddPeer(C.GoString(enode))
 	return makeJSONResponse(err)
 }
+
+// ConnectionChange handles network state changes as reported
+// by ReactNative (see https://facebook.github.io/react-native/docs/netinfo.html)
+func ConnectionChange(typ *C.char, expensive C.int) {
+	statusAPI.ConnectionChange(C.GoString(typ), expensive == 1)
+}

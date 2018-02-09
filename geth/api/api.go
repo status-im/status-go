@@ -221,3 +221,15 @@ func (api *StatusAPI) NotifyUsers(message string, payload fcm.NotificationPayloa
 
 	return err
 }
+
+// ConnectionChange handles network state changes logic.
+func (api *StatusAPI) ConnectionChange(typ string, expensive bool) {
+	state := ConnectionState{
+		Type:      NewConnectionType(typ),
+		Expensive: expensive,
+	}
+	if typ == "none" {
+		state.Offline = true
+	}
+	api.b.ConnectionChange(state)
+}
