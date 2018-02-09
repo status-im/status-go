@@ -785,7 +785,6 @@ func (srv *Server) runPeer(p *Peer) {
 		Type: PeerEventTypeAdd,
 		Peer: p.ID(),
 	})
-
 	// run the protocol
 	remoteRequested, err := p.run()
 

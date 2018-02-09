@@ -1,4 +1,4 @@
-package t
+package e2e
 
 import (
 	"github.com/ethereum/go-ethereum/les"
