@@ -35,6 +35,8 @@ package whisperv6
 import (
 	"fmt"
 	"time"
+
+	"github.com/ethereum/go-ethereum/p2p"
 )
 
 // Whisper protocol parameters
@@ -67,7 +69,7 @@ const (
 
 	MaxMessageSize        = uint32(10 * 1024 * 1024) // maximum accepted size of a message.
 	DefaultMaxMessageSize = uint32(1024 * 1024)
-	DefaultMinimumPoW     = 0.2
+	DefaultMinimumPoW     = 0.001
 
 	padSizeLimit      = 256 // just an arbitrary number, could be changed without breaking the protocol
 	messageQueueLimit = 1024
@@ -94,4 +96,53 @@ func (e unknownVersionError) Error() string {
 type MailServer interface {
 	Archive(env *Envelope)
 	DeliverMail(whisperPeer *Peer, request *Envelope)
+}
+
+// NotificationServer represents a notification server,
+// capable of screening incoming envelopes for special
+// topics, and once located, subscribe client nodes as
+// recipients to notifications (push notifications atm)
+type NotificationServer interface {
+	// Start initializes notification sending loop
+	Start(server *p2p.Server) error
+
+	// Stop stops notification sending loop, releasing related resources
+	Stop() error
+}
+
+type envelopeSource int
+
+const (
+	_ = iota
+	// peerSource indicates a source as a regular peer.
+	peerSource envelopeSource = iota
+	// p2pSource indicates that envelop was received from a trusted peer.
+	p2pSource
+)
+
+// EnvelopeMeta keeps metadata of received envelopes.
+type EnvelopeMeta struct {
+	Hash   string
+	Topic  TopicType
+	Size   uint32
+	Source envelopeSource
+	IsNew  bool
+	Peer   string
+}
+
+// SourceString converts source to string.
+func (m *EnvelopeMeta) SourceString() string {
+	switch m.Source {
+	case peerSource:
+		return "peer"
+	case p2pSource:
+		return "p2p"
+	default:
+		return "unknown"
+	}
+}
+
+// EnvelopeTracer tracks received envelopes.
+type EnvelopeTracer interface {
+	Trace(*EnvelopeMeta)
 }
