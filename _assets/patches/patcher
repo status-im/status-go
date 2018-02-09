@@ -13,7 +13,7 @@
 #
 # If -p is not present, default path is as below ($basepath).
 
-patches=($(pwd)/_assets/patches/geth/*.patch)
+patches=($( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )/geth/*.patch)
 
 # Base path is vendor/github.com/ethereum/go-ethereum
 # unless specified.
