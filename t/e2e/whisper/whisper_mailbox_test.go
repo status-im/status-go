@@ -325,7 +325,8 @@ func (s *WhisperMailboxSuite) startBackend(name string) (*api.StatusBackend, fun
 		s.NoError(err)
 		<-backendStopped
 		s.False(backend.IsNodeRunning())
-		os.RemoveAll(datadir) //nolint: errcheck
+		err = os.RemoveAll(datadir)
+		s.Require().NoError(err)
 	}
 
 }
@@ -356,7 +357,8 @@ func (s *WhisperMailboxSuite) startMailboxBackend() (*api.StatusBackend, func())
 		s.NoError(err)
 		<-backendStopped
 		s.False(mailboxBackend.IsNodeRunning())
-		os.RemoveAll(datadir) //nolint: errcheck
+		err = os.RemoveAll(datadir)
+		s.Require().NoError(err)
 	}
 }
 
