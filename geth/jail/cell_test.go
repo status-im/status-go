@@ -120,7 +120,7 @@ func (s *CellTestSuite) TestCellFetchRace() {
 		case data := <-dataCh:
 			// Mark the request as successful.
 			expected[data.String()] = true
-		case _ = <-errCh:
+		case <-errCh:
 			s.Fail("fetch failed to complete the request")
 		case <-time.After(5 * time.Second):
 			s.Fail("test timed out")
@@ -164,7 +164,7 @@ func (s *CellTestSuite) TestCellFetchErrorRace() {
 	s.NoError(err)
 
 	select {
-	case _ = <-dataCh:
+	case <-dataCh:
 		s.Fail("fetch didn't return error for nonexistent url")
 	case e := <-errCh:
 		name, err := e.Object().Get("name")
