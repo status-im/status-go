@@ -5,15 +5,15 @@ import "testing"
 func TestConnectionType(t *testing.T) {
 	c := NewConnectionType("wifi")
 	if c != ConnectionWifi {
-		t.Fatalf("Wrong connection type: %s", c)
+		t.Fatalf("Wrong connection type: %v", c)
 	}
 	c = NewConnectionType("cellular")
 	if c != ConnectionCellular {
-		t.Fatalf("Wrong connection type: %s", c)
+		t.Fatalf("Wrong connection type: %v", c)
 	}
 	c = NewConnectionType("bluetooth")
 	if c != ConnectionUnknown {
-		t.Fatalf("Wrong connection type: %s", c)
+		t.Fatalf("Wrong connection type: %v", c)
 	}
 }
 

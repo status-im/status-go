@@ -34,9 +34,10 @@ func NewConnectionType(s string) ConnectionType {
 	return ConnectionUnknown
 }
 
+// ConnectionType constants
 const (
-	ConnectionCellular = iota // default value, LTE, 4G, 3G, EDGE, etc.
-	ConnectionWifi            // WIFI or iOS simulator
+	ConnectionCellular ConnectionType = iota // default value, LTE, 4G, 3G, EDGE, etc.
+	ConnectionWifi                           // WIFI or iOS simulator
 	ConnectionUnknown
 )
 
