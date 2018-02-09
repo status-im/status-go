@@ -14,3 +14,19 @@ index e3c2f4a97..96d895fdc 100644
  )
  
  var (
+diff --git a/whisper/whisperv6/api.go b/whisper/whisperv6/api.go
+index a2c75a41c..4d3662880 100644
+--- a/whisper/whisperv6/api.go
++++ b/whisper/whisperv6/api.go
+@@ -33,7 +33,10 @@ import (
+ )
+ 
+ const (
+-	filterTimeout = 300 // filters are considered timeout out after filterTimeout seconds
++	// HACK: make the filter essentially never timeout (1 year of timeout time)
++	// It's a hack, but that simplifies rebasing process, because the patch consists
++	// only of 1 LoC change (excluding this comment).
++	filterTimeout = 525600 * 60 // filters are considered timeout out after filterTimeout seconds
+ )
+ 
+ // List of errors

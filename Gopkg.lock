@@ -109,7 +109,7 @@
     "whisper/notifications",
     "whisper/whisperv5"
   ]
-  revision = "6bba5c70ba424f5efb448536ae3d000f96e7cc9e"
+  revision = "09f08d50335df2d8c9b9f062b18f0ebd3a84133d"
   source = "https://github.com/status-im/go-ethereum.git"
 
 [[projects]]
