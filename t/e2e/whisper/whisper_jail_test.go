@@ -44,7 +44,7 @@ func (s *WhisperJailTestSuite) StartTestBackend(opts ...e2e.TestNodeOption) {
 	s.Timeout = time.Minute * 5
 	s.WhisperAPI = whisper.NewPublicWhisperAPI(s.WhisperService())
 	s.Jail = s.Backend.JailManager()
-	s.NotNil(s.Jail)
+	s.Require().NotNil(s.Jail)
 	s.Jail.SetBaseJS(baseStatusJSCode)
 }
 
@@ -63,11 +63,13 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
+	r := s.Require()
+
 	keyPairID1, err := s.AddKeyPair(TestConfig.Account1.Address, TestConfig.Account1.Password)
-	s.NoError(err)
+	r.NoError(err)
 
 	keyPairID2, err := s.AddKeyPair(TestConfig.Account2.Address, TestConfig.Account2.Password)
-	s.NoError(err)
+	r.NoError(err)
 
 	testCases := []struct {
 		name      string
@@ -294,11 +296,11 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 		s.Jail.CreateAndInitCell(chatID, makeTopicCode)
 
 		cell, err := s.Jail.Cell(chatID)
-		s.NoError(err, "cannot get VM")
+		r.NoError(err, "cannot get VM")
 
 		// Run JS code that setups filters and sends messages.
 		_, err = cell.Run(tc.code)
-		s.NoError(err)
+		r.NoError(err)
 
 		if !tc.useFilter {
 			continue
@@ -320,15 +322,15 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 	poll_loop:
 		for {
 			filter, err := cell.Get("filter")
-			s.NoError(err, "cannot get filter")
+			r.NoError(err, "cannot get filter")
 			filterID, err := filter.Object().Get("filterId")
-			s.NoError(err, "cannot get filterId")
+			r.NoError(err, "cannot get filterId")
 
 			select {
 			case <-done:
 				ok, err := s.WhisperAPI.DeleteMessageFilter(filterID.String())
-				s.NoError(err)
-				s.True(ok)
+				r.NoError(err)
+				r.True(ok)
 				break poll_loop
 			case <-timedOut:
 				s.FailNow("polling for messages timed out")
@@ -341,13 +343,13 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 			}
 
 			payload, err := cell.Get("payload")
-			s.NoError(err, "cannot get payload")
+			r.NoError(err, "cannot get payload")
 
 			messages, err := s.WhisperAPI.GetFilterMessages(filterID.String())
-			s.NoError(err)
+			r.NoError(err)
 
 			for _, m := range messages {
-				s.Equal(payload.String(), string(m.Payload))
+				r.Equal(payload.String(), string(m.Payload))
 				close(done)
 			}
 		}
