@@ -4,19 +4,19 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
-// LinkUpDownTester removes and restores default route.
-type LinkUpDownTester struct {
+// NetworkConnectionTester removes and restores network connection.
+type NetworkConnectionTester struct {
 	defRoute *netlink.Route
 }
 
 // Setup removes default route.
-func (t *LinkUpDownTester) Setup() error {
+func (t *NetworkConnectionTester) Setup() error {
 	link, err := netlink.LinkByName("eth0")
 	if err != nil {
 		return err
 	}
 	// order is determentistic, but we can remove all routes if necessary
-	routes, err := netlink.RouteList(link, netlink.FAMILY_V4)
+	routes, err := netlink.RouteList(link, 4)
 	if err != nil {
 		return err
 	}
@@ -25,7 +25,7 @@ func (t *LinkUpDownTester) Setup() error {
 }
 
 // TearDown removes default route.
-func (t *LinkUpDownTester) TearDown() error {
+func (t *NetworkConnectionTester) TearDown() error {
 	if t.defRoute != nil {
 		return netlink.RouteAdd(t.defRoute)
 	}

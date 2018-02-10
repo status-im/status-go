@@ -2,6 +2,7 @@ package destructive
 
 import (
 	"testing"
+	"time"
 
 	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/log"
@@ -14,19 +15,19 @@ import (
 )
 
 func TestPeersSuiteLinkUpDown(t *testing.T) {
-	suite.Run(t, &PeersTestSuite{tester: new(LinkUpDownTester)})
+	suite.Run(t, &PeersTestSuite{tester: new(NetworkConnectionTester)})
 }
 
 type PeersTestSuite struct {
 	suite.Suite
 
 	backend *api.StatusBackend
-	tester  *LinkUpDownTester
+	tester  *NetworkConnectionTester
 }
 
 func (s *PeersTestSuite) SetupTest() {
 	netid := GetNetworkID()
-	s.Require().NotEqual(0, netid, "test will work only on public network")
+	s.Require().NotEqual(0, netid, "test suppose to work only on public network")
 	s.backend = api.NewStatusBackend()
 	config, err := e2e.MakeTestNodeConfig(GetNetworkID())
 	// we need to enable atleast 1 protocol, otherwise peers won't connect
@@ -51,6 +52,7 @@ func (s *PeersTestSuite) TestStaticPeersReconnect() {
 
 	node.Server().SubscribeEvents(events)
 	peers := map[discover.NodeID]struct{}{}
+	before := time.Now()
 	for ev := range events {
 		if ev.Type == p2p.PeerEventTypeAdd {
 			log.Info("tests", "event", ev)
@@ -61,7 +63,10 @@ func (s *PeersTestSuite) TestStaticPeersReconnect() {
 			break
 		}
 	}
+	s.WithinDuration(time.Now(), before, 5*time.Second)
+
 	s.Require().NoError(s.tester.Setup())
+	before = time.Now()
 	for ev := range events {
 		if ev.Type == p2p.PeerEventTypeDrop {
 			log.Info("tests", "event", ev)
@@ -71,8 +76,12 @@ func (s *PeersTestSuite) TestStaticPeersReconnect() {
 			break
 		}
 	}
+	s.WithinDuration(time.Now(), before, 31*time.Second)
+
 	s.Require().NoError(s.tester.TearDown())
-	// disconnects would be due to network err
+	before = time.Now()
+	node.Server().ResetHistory()
+	// disconnects would be due to network error
 	for ev := range events {
 		if ev.Type == p2p.PeerEventTypeAdd {
 			log.Info("tests", "event", ev)
@@ -82,4 +91,5 @@ func (s *PeersTestSuite) TestStaticPeersReconnect() {
 			break
 		}
 	}
+	s.WithinDuration(time.Now(), before, 2*time.Second)
 }
