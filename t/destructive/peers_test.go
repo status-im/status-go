@@ -80,8 +80,10 @@ func (s *PeersTestSuite) TestStaticPeersReconnect() {
 
 	s.Require().NoError(s.tester.TearDown())
 	before = time.Now()
-	node.Server().ResetHistory()
-	// disconnects would be due to network error
+	go func() {
+		s.backend.NodeManager().ReconnectStaticPeers()
+	}()
+	// disconnects would be due to the network error
 	for ev := range events {
 		if ev.Type == p2p.PeerEventTypeAdd {
 			log.Info("tests", "event", ev)
