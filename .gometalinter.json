@@ -1,16 +1,19 @@
 {
     "Exclude": [
         ".*_mock.go",
-        "geth/jail/doc.go"
+        "geth/jail/doc.go",
+        ".*Errors unhandled.*fmt.Fprintf.*"
     ],
     "Skip": ["helpers", "static"],
     "Vendor": true,
     "Linters": {
         "gasv2": {
-          "Command": "gas",
-          "Pattern": "^(?P<path>.*?\\.go),(?P<line>\\d+),(?P<message>[^,]+,[^,]+,[^,]+)"
+          "Command": "gas -fmt=csv",
+          "Pattern": "^(?P<path>.*?\\.go),(?P<line>\\d+),(?P<message>[^,]+,[^,]+,[^,]+,\".*\")"
         }
       },
+    "Test": true,
+    "Debug": true,
     "Enable": [
         "gasv2"
     ],
