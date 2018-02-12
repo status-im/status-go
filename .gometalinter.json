@@ -31,6 +31,6 @@
         "varcheck",
         "vet"
     ],
-    "Cyclo": 16
+    "Cyclo": 16,
     "Deadline": "100s"
 }
