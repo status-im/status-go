@@ -213,7 +213,8 @@ func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
 	messages := s.getMessagesByMessageFilterID(bobRPCClient, bobMessageFilterID)
 	s.Require().Equal(1, len(messages))
 	bobGroupChatData := groupChatParams{}
-	bobGroupChatData.Decode(messages[0]["payload"].(string))
+	err = bobGroupChatData.Decode(messages[0]["payload"].(string))
+	s.Require().NoError(err)
 	s.EqualValues(groupChatPayload, bobGroupChatData)
 
 	//2. bob add symkey to his node
@@ -228,7 +229,8 @@ func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
 	messages = s.getMessagesByMessageFilterID(charlieRPCClient, charlieMessageFilterID)
 	s.Require().Equal(1, len(messages))
 	charlieGroupChatData := groupChatParams{}
-	charlieGroupChatData.Decode(messages[0]["payload"].(string))
+	err = charlieGroupChatData.Decode(messages[0]["payload"].(string))
+	s.Require().NoError(err)
 	s.EqualValues(groupChatPayload, charlieGroupChatData)
 
 	//2. charlie add symkey to his node
@@ -319,7 +321,8 @@ func (s *WhisperMailboxSuite) startBackend(name string) (*api.StatusBackend, fun
 		s.True(backend.IsNodeRunning())
 		s.NoError(backend.StopNode())
 		s.False(backend.IsNodeRunning())
-		os.RemoveAll(datadir)
+		err = os.RemoveAll(datadir)
+		s.Require().NoError(err)
 	}
 
 }
@@ -346,7 +349,8 @@ func (s *WhisperMailboxSuite) startMailboxBackend() (*api.StatusBackend, func())
 		s.True(mailboxBackend.IsNodeRunning())
 		s.NoError(mailboxBackend.StopNode())
 		s.False(mailboxBackend.IsNodeRunning())
-		os.RemoveAll(datadir)
+		err = os.RemoveAll(datadir)
+		s.Require().NoError(err)
 	}
 }
 
