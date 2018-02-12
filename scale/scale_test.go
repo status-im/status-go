@@ -140,7 +140,7 @@ func runWithRetries(retries int, interval time.Duration, f func() error) error {
 func (s *WhisperScaleSuite) TestSymKeyMessaging() {
 	msgNum := 100
 	interval := 500 * time.Millisecond
-	whispCount := 9
+	whispCount := 5
 	if len(s.whisps) < whispCount {
 		whispCount = len(s.whisps)
 	}
