@@ -6,16 +6,31 @@
     ],
     "Skip": ["helpers", "static"],
     "Vendor": true,
+    "Test": true,
     "Linters": {
         "gasv2": {
           "Command": "gas -fmt=csv",
           "Pattern": "^(?P<path>.*?\\.go),(?P<line>\\d+),(?P<message>[^,]+,[^,]+,[^,]+,\".*\")"
         }
-      },
-    "Test": true,
-    "Debug": true,
+    },
     "Enable": [
-        "gasv2"
+        "deadcode",
+        "errcheck",
+        "gasv2",
+        "goconst",
+        "gocyclo",
+        "gofmt",
+        "golint",
+        "ineffassign",
+        "interfacer",
+        "megacheck",
+        "misspell",
+        "structcheck",
+        "unconvert",
+        "unparam",
+        "varcheck",
+        "vet"
     ],
     "Cyclo": 16
+    "Deadline": "200s"
 }
