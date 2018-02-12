@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+
+# Default behaviour:
+# Reverts all patches in patch dir, notes down the ones
+# which were previously applied. Applies all from the beginning
+# and reports about previously unapplied patches. If there's
+# an error, reverts the last one and stops.
+#
+# Usage: ./patcher -p <base_path> -r -v
+# -p: <base_path> is where to apply to (a go-ethereum package)
+# -r: reverts all and exit if this flag is present
+# -v: verbose error reporting about failed patch
+#
+# If -p is not present, default path is as below ($basepath).
+
+patches=($( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )/geth/*.patch)
+
+# Base path is vendor/github.com/ethereum/go-ethereum
+# unless specified.
+basepath="vendor/github.com/ethereum/go-ethereum"
+verbose=0
+while getopts :prv opt; do
+	case $opt in
+	p)
+		basepath=$OPTARG
+    	;;
+	r)
+		# Reverts in reverse order and exits.
+		for ((i=${#patches[@]}-1; i>=0; i--)); do
+			git apply "${patches[$i]}" --directory="$basepath" -R > /dev/null 2>&1
+		done
+		echo "Reverted all."
+		exit
+		;;
+	v)
+		verbose=1
+		;;
+    \?)
+    	echo "Invalid flag: -$OPTARG" >&2
+		exit
+    	;;
+	esac
+done
+
+applied=()
+
+echo -en "\\n"
+echo "Previously applied:"
+echo "==================="
+# Reverts every patch in reverse order to see
+# which was previously applied.
+for ((i=${#patches[@]}-1; i>=0; i--)); do
+	f=${patches[$i]}
+	git apply "$f" --directory="$basepath" -R > /dev/null 2>&1
+	if [ $? -eq 0 ]; then
+		applied+=("$f")
+		echo "$f"
+	fi
+done
+echo "==================="
+echo -en "\\n"
+
+# Applies every patch from the beginning.
+for ((i=0; i<${#patches[@]}; i++)); do
+	f=${patches[$i]}
+	# If not applied, report it new.
+	has=0
+	for patch in "${applied[@]}"; do
+		if [ "$patch" == "$f" ]; then
+			has=1
+			break
+		fi
+	done
+	if [ $has -eq 0 ]; then
+		echo "Applying new: $f"
+		echo -en "\\n"
+	fi
+	if [ $verbose -eq 1 ]; then
+		git apply "$f" --directory="$basepath"
+	else
+		git apply "$f" --directory="$basepath" > /dev/null 2>&1
+	fi
+	if [ $? -eq 1 ]; then
+		echo "Failed and reverting: $f"
+		git apply "$f" --directory="$basepath" -R > /dev/null 2>&1
+		echo -en "\\n"
+		exit
+	fi
+done
+
+echo -en "\\n"
+echo "Done."

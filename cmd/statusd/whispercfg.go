@@ -11,12 +11,6 @@ import (
 
 // whisperConfig creates node configuration object from flags
 func whisperConfig(nodeConfig *params.NodeConfig) (*params.NodeConfig, error) {
-
-	nodeConfig.ListenAddr = *listenAddr
-
-	nodeConfig.LogLevel = *logLevel
-
-	// whisper configuration
 	whisperConfig := nodeConfig.WhisperConfig
 	whisperConfig.Enabled = true
 	whisperConfig.IdentityFile = *identityFile
@@ -56,13 +50,6 @@ func whisperConfig(nodeConfig *params.NodeConfig) (*params.NodeConfig, error) {
 			return nil, err
 		}
 	}
-
-	// RPC configuration
-	// TODO(adam): clarify all these IPC/RPC/HTTPHost
-	if !*httpEnabled {
-		nodeConfig.HTTPHost = "" // HTTP RPC is disabled
-	}
-	nodeConfig.HTTPHost = "0.0.0.0"
 
 	return nodeConfig, nil
 }

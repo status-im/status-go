@@ -32,5 +32,5 @@
         "vet"
     ],
     "Cyclo": 16,
-    "Deadline": "100s"
+    "Deadline": "200s"
 }

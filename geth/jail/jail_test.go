@@ -1,6 +1,7 @@
 package jail
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/robertkrimen/otto"
@@ -98,7 +99,7 @@ func (s *JailTestSuite) TestJailCall() {
 	result := s.Jail.Call("cell1", `["prop1", "prop2"]`, `arg1`)
 	s.Equal(`["prop1", "prop2"]`, <-propsc)
 	s.Equal(`arg1`, <-argsc)
-	s.Equal(`{"result": undefined}`, result)
+	s.Equal(`{"result":null}`, result)
 }
 
 func (s *JailTestSuite) TestCreateAndInitCell() {
@@ -110,7 +111,7 @@ func (s *JailTestSuite) TestCreateAndInitCell() {
 	)
 	s.NoError(err)
 	s.NotNil(cell)
-	s.Equal(`{"result": true}`, result)
+	s.Equal(`{"result":true}`, result)
 
 	value, err := cell.Get("testCreateAndInitCell1")
 	s.NoError(err)
@@ -122,13 +123,41 @@ func (s *JailTestSuite) TestCreateAndInitCell() {
 }
 
 func (s *JailTestSuite) TestPublicCreateAndInitCell() {
-	response := s.Jail.CreateAndInitCell("cell1")
-	s.Equal(EmptyResponse, response)
+	var createAndInitTests = []struct {
+		chatID      string
+		input       []string
+		expectation string
+	}{
+		{"cell1", []string{}, EmptyResponse},
+		{"cell1", []string{"var a = 2", "a"}, `{"result":2}`},
+		{"cell1", []string{`var a = "hello"`, "a"}, `{"result":"hello"}`},
+		{"cell1", []string{`var b = "2"; var a = b * b`, "a"}, `{"result":4}`},
+	}
+	for _, v := range createAndInitTests {
+		response := s.Jail.CreateAndInitCell(v.chatID, v.input...)
+		s.Equal(v.expectation, response)
+	}
 }
 
-func (s *JailTestSuite) TestPublicCreateAndInitCellWithJS() {
-	response := s.Jail.CreateAndInitCell("cell1", "var a = 2", "a")
-	s.Equal(`{"result": 2}`, response)
+func (s *JailTestSuite) TestNewJailResultResponseReturnsValidJson() {
+	var newJailResultResponseTests = []interface{}{
+		`Double quoted "success" response`,
+		float64(1),
+		true,
+	}
+	for _, input := range newJailResultResponseTests {
+		v, err := otto.ToValue(input)
+		s.NoError(err)
+
+		output := newJailResultResponse(formatOttoValue(v))
+		var response struct {
+			Result interface{} `json:"result"`
+		}
+		err = json.Unmarshal([]byte(output), &response)
+
+		s.NoError(err)
+		s.Equal(input, response.Result)
+	}
 }
 
 func (s *JailTestSuite) TestPublicCreateAndInitCellConsecutive() {

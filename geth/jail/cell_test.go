@@ -1,6 +1,8 @@
 package jail
 
 import (
+	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -75,16 +77,68 @@ func (s *CellTestSuite) TestCellLoopRace() {
 	}
 }
 
-// TestJailFetchRace tests multiple fetch callbacks,
-// supposed to be run with '-race' flag.
+// TestJailFetchRace tests multiple sending multiple HTTP requests simultaneously in one cell, using `fetch`.
+// Supposed to be run with '-race' flag.
 func (s *CellTestSuite) TestCellFetchRace() {
-	body := `{"key": "value"}`
+	// How many request should the test perform ?
+	const requestCount = 5
+
+	// Create a test server that simply outputs the "i" parameter passed.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Content-Type", "application/json")
-		w.Write([]byte(body)) //nolint: errcheck
+		w.Write([]byte(r.URL.Query()["i"][0])) //nolint: errcheck
 	}))
+
 	defer server.Close()
 
+	cell := s.cell
+	dataCh := make(chan otto.Value, 1)
+	errCh := make(chan otto.Value, 1)
+
+	err := cell.Set("__captureSuccess", func(res otto.Value) { dataCh <- res })
+	s.NoError(err)
+
+	err = cell.Set("__captureError", func(res otto.Value) { errCh <- res })
+	s.NoError(err)
+
+	fetchCode := `fetch('%s?i=%d').then(function(r) {
+ 		return r.text()
+	}).then(function(data) {
+		__captureSuccess(data)
+	}).catch(function (e) {
+		__captureError(e)
+	})`
+
+	for i := 0; i < requestCount; i++ {
+		_, err = cell.Run(fmt.Sprintf(fetchCode, server.URL, i))
+		s.NoError(err)
+	}
+
+	expected := map[string]bool{} // It'll help us verify if every request was successfully completed.
+	for i := 0; i < requestCount; i++ {
+		select {
+		case data := <-dataCh:
+			// Mark the request as successful.
+			expected[data.String()] = true
+		case <-errCh:
+			s.Fail("fetch failed to complete the request")
+		case <-time.After(5 * time.Second):
+			s.Fail("test timed out")
+			return
+		}
+	}
+
+	// Make sure every request was completed successfully.
+	for i := 0; i < requestCount; i++ {
+		s.Equal(expected[fmt.Sprintf("%d", i)], true)
+	}
+
+	// There might be some tasks about to call `ready`,
+	// add a little delay before `TearDownTest` closes the loop.
+	time.Sleep(100 * time.Millisecond)
+}
+
+func (s *CellTestSuite) TestCellFetchErrorRace() {
 	cell := s.cell
 	dataCh := make(chan otto.Value, 1)
 	errCh := make(chan otto.Value, 1)
@@ -94,40 +148,36 @@ func (s *CellTestSuite) TestCellFetchRace() {
 	err = cell.Set("__captureError", func(res otto.Value) { errCh <- res })
 	s.NoError(err)
 
-	// run JS code for fetching valid URL
-	_, err = cell.Run(`fetch('` + server.URL + `').then(function(r) {
+	// Find a free port in localhost
+	freeportListener, err := net.Listen("tcp", "127.0.0.1:0")
+	s.Require().NoError(err)
+	defer func() {
+		err := freeportListener.Close()
+		s.NoError(err)
+	}()
+
+	// Send an HTTP request to the free port that we found above
+	_, err = cell.Run(fmt.Sprintf(`fetch('%s').then(function(r) {
 		return r.text()
 	}).then(function(data) {
 		__captureSuccess(data)
 	}).catch(function (e) {
 		__captureError(e)
-	})`)
+	})`, freeportListener.Addr().String()))
 	s.NoError(err)
 
-	// run JS code for fetching invalid URL
-	_, err = cell.Run(`fetch('http://👽/nonexistent').then(function(r) {
-		return r.text()
-	}).then(function(data) {
-		__captureSuccess(data)
-	}).catch(function (e) {
-		__captureError(e)
-	})`)
-	s.NoError(err)
-
-	for i := 0; i < 2; i++ {
-		select {
-		case data := <-dataCh:
-			s.Equal(body, data.String())
-		case e := <-errCh:
-			name, err := e.Object().Get("name")
-			s.NoError(err)
-			s.Equal("Error", name.String())
-			_, err = e.Object().Get("message")
-			s.NoError(err)
-		case <-time.After(5 * time.Second):
-			s.Fail("test timed out")
-			return
-		}
+	select {
+	case <-dataCh:
+		s.Fail("fetch didn't return error for nonexistent url")
+	case e := <-errCh:
+		name, err := e.Object().Get("name")
+		s.NoError(err)
+		s.Equal("Error", name.String())
+		_, err = e.Object().Get("message")
+		s.NoError(err)
+	case <-time.After(5 * time.Second):
+		s.Fail("test timed out")
+		return
 	}
 }
 
@@ -190,7 +240,8 @@ func (s *CellTestSuite) TestCellCallAsync() {
 	fn, err := s.cell.Get("testCallAsync")
 	s.NoError(err)
 
-	s.cell.CallAsync(fn, "success")
+	err = s.cell.CallAsync(fn, "success")
+	s.NoError(err)
 	s.Equal("success", <-datac)
 }
 

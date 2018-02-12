@@ -1,0 +1,324 @@
+diff --git a/whisper/notifications/utils.go b/whisper/notifications/utils.go
+index 106752186..cca3fba71 100644
+--- a/whisper/notifications/utils.go
++++ b/whisper/notifications/utils.go
+@@ -1,11 +1,12 @@
+ package notifications
+ 
+ import (
++	"crypto/sha256"
+ 	"crypto/sha512"
+ 	"errors"
+-	"crypto/sha256"
+ 
+ 	crand "crypto/rand"
++
+ 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
+ 	"golang.org/x/crypto/pbkdf2"
+ )
+@@ -24,7 +25,7 @@ func makeSessionKey() ([]byte, error) {
+ 	}
+ 
+ 	key := buf[:keyLen]
+-	derived, err := deriveKeyMaterial(key, whisper.EnvelopeVersion)
++	derived, err := deriveKeyMaterial(key, whisper.ProtocolVersion)
+ 	if err != nil {
+ 		return nil, err
+ 	} else if !validateSymmetricKey(derived) {
+@@ -63,7 +64,7 @@ func deriveKeyMaterial(key []byte, version uint64) (derivedKey []byte, err error
+ }
+ 
+ // MakeTopic returns Whisper topic *as bytes array* by generating cryptographic key from the provided password
+-func MakeTopicAsBytes(password []byte) ([]byte) {
++func MakeTopicAsBytes(password []byte) []byte {
+ 	topic := make([]byte, int(whisper.TopicLength))
+ 	x := pbkdf2.Key(password, password, 8196, 128, sha512.New)
+ 	for i := 0; i < len(x); i++ {
+diff --git a/whisper/whisperv6/api.go b/whisper/whisperv6/api.go
+index 8ae2882e1..7c97f0680 100644
+--- a/whisper/whisperv6/api.go
++++ b/whisper/whisperv6/api.go
+@@ -319,6 +319,16 @@ func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (bool, er
+ 	return true, api.w.Send(env)
+ }
+ 
++// UninstallFilter is alias for Unsubscribe
++func (api *PublicWhisperAPI) UninstallFilter(id string) {
++	api.w.Unsubscribe(id)
++}
++
++// Unsubscribe disables and removes an existing filter.
++func (api *PublicWhisperAPI) Unsubscribe(id string) {
++	api.w.Unsubscribe(id)
++}
++
+ //go:generate gencodec -type Criteria -field-override criteriaOverride -out gen_criteria_json.go
+ 
+ // Criteria holds various filter options for inbound messages.
+diff --git a/whisper/whisperv6/doc.go b/whisper/whisperv6/doc.go
+index d5d7fed60..5ad660616 100644
+--- a/whisper/whisperv6/doc.go
++++ b/whisper/whisperv6/doc.go
+@@ -35,6 +35,8 @@ package whisperv6
+ import (
+ 	"fmt"
+ 	"time"
++
++	"github.com/ethereum/go-ethereum/p2p"
+ )
+ 
+ // Whisper protocol parameters
+@@ -67,7 +69,7 @@ const (
+ 
+ 	MaxMessageSize        = uint32(10 * 1024 * 1024) // maximum accepted size of a message.
+ 	DefaultMaxMessageSize = uint32(1024 * 1024)
+-	DefaultMinimumPoW     = 0.2
++	DefaultMinimumPoW     = 0.001
+ 
+ 	padSizeLimit      = 256 // just an arbitrary number, could be changed without breaking the protocol
+ 	messageQueueLimit = 1024
+@@ -95,3 +97,15 @@ type MailServer interface {
+ 	Archive(env *Envelope)
+ 	DeliverMail(whisperPeer *Peer, request *Envelope)
+ }
++
++// NotificationServer represents a notification server,
++// capable of screening incoming envelopes for special
++// topics, and once located, subscribe client nodes as
++// recipients to notifications (push notifications atm)
++type NotificationServer interface {
++	// Start initializes notification sending loop
++	Start(server *p2p.Server) error
++
++	// Stop stops notification sending loop, releasing related resources
++	Stop() error
++}
+diff --git a/whisper/whisperv6/whisper.go b/whisper/whisperv6/whisper.go
+index d75ad04ac..54d7d0f24 100644
+--- a/whisper/whisperv6/whisper.go
++++ b/whisper/whisperv6/whisper.go
+@@ -85,7 +85,8 @@ type Whisper struct {
+ 	statsMu sync.Mutex // guard stats
+ 	stats   Statistics // Statistics of whisper node
+ 
+-	mailServer MailServer // MailServer interface
++	mailServer         MailServer // MailServer interface
++	notificationServer NotificationServer
+ }
+ 
+ // New creates a Whisper client ready to communicate through the Ethereum P2P network.
+@@ -209,6 +210,11 @@ func (whisper *Whisper) RegisterServer(server MailServer) {
+ 	whisper.mailServer = server
+ }
+ 
++// RegisterNotificationServer registers notification server with Whisper
++func (whisper *Whisper) RegisterNotificationServer(server NotificationServer) {
++	whisper.notificationServer = server
++}
++
+ // Protocols returns the whisper sub-protocols ran by this particular client.
+ func (whisper *Whisper) Protocols() []p2p.Protocol {
+ 	return []p2p.Protocol{whisper.protocol}
+@@ -380,9 +386,9 @@ func (whisper *Whisper) NewKeyPair() (string, error) {
+ 		return "", fmt.Errorf("failed to generate valid key")
+ 	}
+ 
+-	id, err := GenerateRandomID()
++	id, err := toDeterministicID(common.ToHex(crypto.FromECDSAPub(&key.PublicKey)), keyIDSize)
+ 	if err != nil {
+-		return "", fmt.Errorf("failed to generate ID: %s", err)
++		return "", err
+ 	}
+ 
+ 	whisper.keyMu.Lock()
+@@ -397,11 +403,16 @@ func (whisper *Whisper) NewKeyPair() (string, error) {
+ 
+ // DeleteKeyPair deletes the specified key if it exists.
+ func (whisper *Whisper) DeleteKeyPair(key string) bool {
++	deterministicID, err := toDeterministicID(key, keyIDSize)
++	if err != nil {
++		return false
++	}
++
+ 	whisper.keyMu.Lock()
+ 	defer whisper.keyMu.Unlock()
+ 
+-	if whisper.privateKeys[key] != nil {
+-		delete(whisper.privateKeys, key)
++	if whisper.privateKeys[deterministicID] != nil {
++		delete(whisper.privateKeys, deterministicID)
+ 		return true
+ 	}
+ 	return false
+@@ -409,31 +420,73 @@ func (whisper *Whisper) DeleteKeyPair(key string) bool {
+ 
+ // AddKeyPair imports a asymmetric private key and returns it identifier.
+ func (whisper *Whisper) AddKeyPair(key *ecdsa.PrivateKey) (string, error) {
+-	id, err := GenerateRandomID()
++	id, err := makeDeterministicID(common.ToHex(crypto.FromECDSAPub(&key.PublicKey)), keyIDSize)
+ 	if err != nil {
+-		return "", fmt.Errorf("failed to generate ID: %s", err)
++		return "", err
++	}
++	if whisper.HasKeyPair(id) {
++		return id, nil // no need to re-inject
+ 	}
+ 
+ 	whisper.keyMu.Lock()
+ 	whisper.privateKeys[id] = key
+ 	whisper.keyMu.Unlock()
++	log.Info("Whisper identity added", "id", id, "pubkey", common.ToHex(crypto.FromECDSAPub(&key.PublicKey)))
+ 
+ 	return id, nil
+ }
+ 
++// SelectKeyPair adds cryptographic identity, and makes sure
++// that it is the only private key known to the node.
++func (whisper *Whisper) SelectKeyPair(key *ecdsa.PrivateKey) error {
++	id, err := makeDeterministicID(common.ToHex(crypto.FromECDSAPub(&key.PublicKey)), keyIDSize)
++	if err != nil {
++		return err
++	}
++
++	whisper.keyMu.Lock()
++	defer whisper.keyMu.Unlock()
++
++	whisper.privateKeys = make(map[string]*ecdsa.PrivateKey) // reset key store
++	whisper.privateKeys[id] = key
++
++	log.Info("Whisper identity selected", "id", id, "key", common.ToHex(crypto.FromECDSAPub(&key.PublicKey)))
++	return nil
++}
++
++// DeleteKeyPairs removes all cryptographic identities known to the node
++func (whisper *Whisper) DeleteKeyPairs() error {
++	whisper.keyMu.Lock()
++	defer whisper.keyMu.Unlock()
++
++	whisper.privateKeys = make(map[string]*ecdsa.PrivateKey)
++
++	return nil
++}
++
+ // HasKeyPair checks if the the whisper node is configured with the private key
+ // of the specified public pair.
+ func (whisper *Whisper) HasKeyPair(id string) bool {
++	deterministicID, err := toDeterministicID(id, keyIDSize)
++	if err != nil {
++		return false
++	}
++
+ 	whisper.keyMu.RLock()
+ 	defer whisper.keyMu.RUnlock()
+-	return whisper.privateKeys[id] != nil
++	return whisper.privateKeys[deterministicID] != nil
+ }
+ 
+ // GetPrivateKey retrieves the private key of the specified identity.
+ func (whisper *Whisper) GetPrivateKey(id string) (*ecdsa.PrivateKey, error) {
++	deterministicID, err := toDeterministicID(id, keyIDSize)
++	if err != nil {
++		return nil, err
++	}
++
+ 	whisper.keyMu.RLock()
+ 	defer whisper.keyMu.RUnlock()
+-	key := whisper.privateKeys[id]
++	key := whisper.privateKeys[deterministicID]
+ 	if key == nil {
+ 		return nil, fmt.Errorf("invalid id")
+ 	}
+@@ -465,6 +518,23 @@ func (whisper *Whisper) GenerateSymKey() (string, error) {
+ 	return id, nil
+ }
+ 
++// AddSymKey stores the key with a given id.
++func (whisper *Whisper) AddSymKey(id string, key []byte) (string, error) {
++	deterministicID, err := toDeterministicID(id, keyIDSize)
++	if err != nil {
++		return "", err
++	}
++
++	whisper.keyMu.Lock()
++	defer whisper.keyMu.Unlock()
++
++	if whisper.symKeys[deterministicID] != nil {
++		return "", fmt.Errorf("key already exists: %v", id)
++	}
++	whisper.symKeys[deterministicID] = key
++	return deterministicID, nil
++}
++
+ // AddSymKeyDirect stores the key, and returns its id.
+ func (whisper *Whisper) AddSymKeyDirect(key []byte) (string, error) {
+ 	if len(key) != aesKeyLength {
+@@ -599,7 +669,7 @@ func (whisper *Whisper) Send(envelope *Envelope) error {
+ 
+ // Start implements node.Service, starting the background data propagation thread
+ // of the Whisper protocol.
+-func (whisper *Whisper) Start(*p2p.Server) error {
++func (whisper *Whisper) Start(stack *p2p.Server) error {
+ 	log.Info("started whisper v." + ProtocolVersionStr)
+ 	go whisper.update()
+ 
+@@ -608,6 +678,12 @@ func (whisper *Whisper) Start(*p2p.Server) error {
+ 		go whisper.processQueue()
+ 	}
+ 
++	if whisper.notificationServer != nil {
++		if err := whisper.notificationServer.Start(stack); err != nil {
++			return err
++		}
++	}
++
+ 	return nil
+ }
+ 
+@@ -615,6 +691,13 @@ func (whisper *Whisper) Start(*p2p.Server) error {
+ // of the Whisper protocol.
+ func (whisper *Whisper) Stop() error {
+ 	close(whisper.quit)
++
++	if whisper.notificationServer != nil {
++		if err := whisper.notificationServer.Stop(); err != nil {
++			return err
++		}
++	}
++
+ 	log.Info("whisper stopped")
+ 	return nil
+ }
+@@ -1035,6 +1118,33 @@ func GenerateRandomID() (id string, err error) {
+ 	return id, err
+ }
+ 
++// makeDeterministicID generates a deterministic ID, based on a given input
++func makeDeterministicID(input string, keyLen int) (id string, err error) {
++	buf := pbkdf2.Key([]byte(input), nil, 4096, keyLen, sha256.New)
++	if !validateDataIntegrity(buf, keyIDSize) {
++		return "", fmt.Errorf("error in GenerateDeterministicID: failed to generate key")
++	}
++	id = common.Bytes2Hex(buf)
++	return id, err
++}
++
++// toDeterministicID reviews incoming id, and transforms it to format
++// expected internally be private key store. Originally, public keys
++// were used as keys, now random keys are being used. And in order to
++// make it easier to consume, we now allow both random IDs and public
++// keys to be passed.
++func toDeterministicID(id string, expectedLen int) (string, error) {
++	if len(id) != (expectedLen * 2) { // we received hex key, so number of chars in id is doubled
++		var err error
++		id, err = makeDeterministicID(id, expectedLen)
++		if err != nil {
++			return "", err
++		}
++	}
++
++	return id, nil
++}
++
+ func isFullNode(bloom []byte) bool {
+ 	if bloom == nil {
+ 		return true

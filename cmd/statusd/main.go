@@ -10,7 +10,6 @@ import (
 	"os/signal"
 	"runtime"
 	"strings"
-	"time"
 
 	"github.com/status-im/status-go/cmd/statusd/debug"
 	"github.com/status-im/status-go/geth/api"
@@ -33,7 +32,9 @@ var (
 	lesEnabled     = flag.Bool("les", false, "LES protocol enabled (default is disabled)")
 	whisperEnabled = flag.Bool("shh", false, "Whisper protocol enabled (default is disabled)")
 	swarmEnabled   = flag.Bool("swarm", false, "Swarm protocol enabled")
+	maxPeers       = flag.Int("maxpeers", 25, "maximum number of p2p peers (including all protocols)")
 	httpEnabled    = flag.Bool("http", false, "HTTP RPC endpoint enabled (default: false)")
+	httpHost       = flag.String("httphost", "127.0.0.1", "HTTP RPC host of the listening socket")
 	httpPort       = flag.Int("httpport", params.HTTPPort, "HTTP RPC server's listening port")
 	ipcEnabled     = flag.Bool("ipc", false, "IPC RPC endpoint enabled")
 	cliEnabled     = flag.Bool("cli", false, "Enable debugging CLI server")
@@ -45,11 +46,14 @@ var (
 	listenAddr = flag.String("listenaddr", ":30303", "IP address and port of this node (e.g. 127.0.0.1:30303)")
 	standalone = flag.Bool("standalone", true, "Don't actively connect to peers, wait for incoming connections")
 	bootnodes  = flag.String("bootnodes", "", "A list of bootnodes separated by comma")
+	discovery  = flag.Bool("discovery", false, "Enable discovery protocol")
 
 	// stats
 	statsEnabled = flag.Bool("stats", false, "Expose node stats via /debug/vars expvar endpoint or Prometheus (log by default)")
-	statsAddr    = flag.String("stats.addr", "127.0.0.1:8080", "HTTP address with /debug/vars endpoint")
+	statsAddr    = flag.String("stats.addr", "0.0.0.0:8080", "HTTP address with /debug/vars endpoint")
 
+	// don't change the name of this flag, https://github.com/ethereum/go-ethereum/blob/master/metrics/metrics.go#L41
+	_ = flag.Bool("metrics", false, "Expose ethereum metrics with debug_metrics jsonrpc call.")
 	// shh stuff
 	identityFile = flag.String("shh.identityfile", "", "Protocol identity file (private key used for asymmetric encryption)")
 	passwordFile = flag.String("shh.passwordfile", "", "Password file (password is used for symmetric encryption)")
@@ -62,6 +66,8 @@ var (
 	// Push Notification
 	enablePN     = flag.Bool("shh.notify", false, "Node is capable of sending Push Notifications")
 	firebaseAuth = flag.String("shh.firebaseauth", "", "FCM Authorization Key used for sending Push Notifications")
+
+	syncAndExit = flag.Int("sync-and-exit", -1, "Timeout in minutes for blockchain sync and exit, zero means no timeout unless sync is finished")
 )
 
 func main() {
@@ -80,7 +86,7 @@ func main() {
 	}
 
 	backend := api.NewStatusBackend()
-	started, err := backend.StartNode(config)
+	err = backend.StartNode(config)
 	if err != nil {
 		log.Fatalf("Node start failed: %v", err)
 		return
@@ -88,10 +94,6 @@ func main() {
 
 	// handle interrupt signals
 	interruptCh := haltOnInterruptSignal(backend.NodeManager())
-
-	// wait till node is started
-	<-started
-
 	// Check if debugging CLI connection shall be enabled.
 	if *cliEnabled {
 		err := startDebug(backend)
@@ -106,13 +108,27 @@ func main() {
 		go startCollectingStats(interruptCh, backend.NodeManager())
 	}
 
-	// wait till node has been stopped
+	// Sync blockchain and stop.
+	if *syncAndExit >= 0 {
+		exitCode := syncAndStopNode(interruptCh, backend.NodeManager(), *syncAndExit)
+		// Call was interrupted. Wait for graceful shutdown.
+		if exitCode == -1 {
+			if node, err := backend.NodeManager().Node(); err == nil && node != nil {
+				node.Wait()
+			}
+			return
+		}
+		// Otherwise, exit immediately with a returned exit code.
+		os.Exit(exitCode)
+	}
+
 	node, err := backend.NodeManager().Node()
 	if err != nil {
 		log.Fatalf("Getting node failed: %v", err)
 		return
 	}
 
+	// wait till node has been stopped
 	node.Wait()
 }
 
@@ -166,6 +182,8 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 		return nil, err
 	}
 
+	nodeConfig.ListenAddr = *listenAddr
+
 	// TODO(divan): move this logic into params package
 	if *nodeKeyFile != "" {
 		nodeConfig.NodeKeyFile = *nodeKeyFile
@@ -180,7 +198,9 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 
 	nodeConfig.RPCEnabled = *httpEnabled
 	nodeConfig.WhisperConfig.Enabled = *whisperEnabled
+	nodeConfig.MaxPeers = *maxPeers
 
+	nodeConfig.HTTPHost = *httpHost
 	nodeConfig.HTTPPort = *httpPort
 	nodeConfig.IPCEnabled = *ipcEnabled
 
@@ -190,9 +210,9 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 	if *standalone {
 		nodeConfig.BootClusterConfig.Enabled = false
 		nodeConfig.BootClusterConfig.BootNodes = nil
-	} else {
-		nodeConfig.Discovery = true
 	}
+
+	nodeConfig.Discovery = *discovery
 
 	// Even if standalone is true and discovery is disabled,
 	// it's possible to use bootnodes in NodeManager.PopulateStaticPeers().
@@ -259,30 +279,17 @@ Options:
 // if the node can not be stopped.
 func haltOnInterruptSignal(nodeManager common.NodeManager) <-chan struct{} {
 	interruptCh := make(chan struct{})
-
 	go func() {
 		signalCh := make(chan os.Signal, 1)
 		signal.Notify(signalCh, os.Interrupt)
 		defer signal.Stop(signalCh)
 		<-signalCh
-
 		close(interruptCh)
-
 		log.Println("Got interrupt, shutting down...")
-
-		nodeStopped, err := nodeManager.StopNode()
-		if err != nil {
-			log.Printf("Failed to stop node: %v", err)
-			os.Exit(1)
-		}
-
-		select {
-		case <-nodeStopped:
-		case <-time.After(time.Second * 5):
-			log.Printf("Stopping node timed out")
+		if err := nodeManager.StopNode(); err != nil {
+			log.Printf("Failed to stop node: %v", err.Error())
 			os.Exit(1)
 		}
 	}()
-
 	return interruptCh
 }

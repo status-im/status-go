@@ -33,7 +33,10 @@ import (
 )
 
 const (
-	filterTimeout = 300 // filters are considered timeout out after filterTimeout seconds
+	// HACK: make the filter essentially never timeout (1 year of timeout time)
+	// It's a hack, but that simplifies rebasing process, because the patch consists
+	// only of 1 LoC change (excluding this comment).
+	filterTimeout = 525600 * 60 // filters are considered timeout out after filterTimeout seconds
 )
 
 var (

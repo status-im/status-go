@@ -37,7 +37,7 @@ import (
 	"github.com/status-im/status-go/geth/transactions"
 	"github.com/status-im/status-go/geth/transactions/queue"
 	"github.com/status-im/status-go/static"
-	. "github.com/status-im/status-go/testing" //nolint: golint
+	. "github.com/status-im/status-go/t/utils" //nolint: golint
 )
 
 const zeroHash = "0x0000000000000000000000000000000000000000000000000000000000000000"
@@ -1049,7 +1049,7 @@ func testDiscardTransaction(t *testing.T) bool { //nolint: gocyclo
 			t.Logf("transaction return event received: {id: %s}\n", event["id"].(string))
 
 			receivedErrMessage := event["error_message"].(string)
-			expectedErrMessage := queue.ErrQueuedTxDiscarded.Error()
+			expectedErrMessage := transactions.ErrQueuedTxDiscarded.Error()
 			if receivedErrMessage != expectedErrMessage {
 				t.Errorf("unexpected error message received: got %v", receivedErrMessage)
 				return
@@ -1071,7 +1071,7 @@ func testDiscardTransaction(t *testing.T) bool { //nolint: gocyclo
 		To:    common.ToAddress(TestConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 	})
-	if err != queue.ErrQueuedTxDiscarded {
+	if err != transactions.ErrQueuedTxDiscarded {
 		t.Errorf("expected error not thrown: %v", err)
 		return false
 	}
@@ -1136,7 +1136,7 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocycl
 			t.Logf("transaction return event received: {id: %s}\n", event["id"].(string))
 
 			receivedErrMessage := event["error_message"].(string)
-			expectedErrMessage := queue.ErrQueuedTxDiscarded.Error()
+			expectedErrMessage := transactions.ErrQueuedTxDiscarded.Error()
 			if receivedErrMessage != expectedErrMessage {
 				t.Errorf("unexpected error message received: got %v", receivedErrMessage)
 				return
@@ -1162,7 +1162,7 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocycl
 			To:    common.ToAddress(TestConfig.Account2.Address),
 			Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 		})
-		if err != queue.ErrQueuedTxDiscarded {
+		if err != transactions.ErrQueuedTxDiscarded {
 			t.Errorf("expected error not thrown: %v", err)
 			return
 		}
@@ -1310,7 +1310,7 @@ func testJailInit(t *testing.T) bool {
 
 	// Cell initialization return the result of the last JS operation provided to it.
 	response := CreateAndInitCell(chatID, C.CString(`var extraFunc = function (x) { return x * x; }; extraFunc(2);`))
-	require.Equal(t, `{"result": 4}`, C.GoString(response), "Unexpected response from jail.CreateAndInitCell()")
+	require.Equal(t, `{"result":4}`, C.GoString(response), "Unexpected response from jail.CreateAndInitCell()")
 
 	// Commands from the jail initialization are available in any of the created cells.
 	response = ExecuteJS(chatID, C.CString(`JSON.stringify({ result: _status_catalog });`))
@@ -1332,11 +1332,11 @@ func testJailParseDeprecated(t *testing.T) bool {
 	chatID := C.CString("CHAT_ID_PARSE_TEST")
 
 	response := Parse(chatID, C.CString(extraCode))
-	require.Equal(t, `{"result": 4}`, C.GoString(response))
+	require.Equal(t, `{"result":4}`, C.GoString(response))
 
 	// cell already exists but Parse should not complain
 	response = Parse(chatID, C.CString(extraCode))
-	require.Equal(t, `{"result": 4}`, C.GoString(response))
+	require.Equal(t, `{"result":4}`, C.GoString(response))
 
 	// test extraCode
 	response = ExecuteJS(chatID, C.CString(`extraFunc(10)`))
@@ -1367,7 +1367,7 @@ func testJailFunctionCall(t *testing.T) bool {
 	// call extraFunc()
 	rawResponse = Call(C.CString("CHAT_ID_CALL_TEST"), C.CString(`["commands", "testCommand"]`), C.CString(`{"val": 12}`))
 	parsedResponse = C.GoString(rawResponse)
-	expectedResponse := `{"result": 144}`
+	expectedResponse := `{"result":144}`
 	if parsedResponse != expectedResponse {
 		t.Errorf("expected response is not returned: expected %s, got %s", expectedResponse, parsedResponse)
 		return false

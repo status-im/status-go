@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"runtime"
 	"runtime/debug"
 	"time"
 
@@ -94,17 +93,6 @@ func PanicAfter(waitSeconds time.Duration, abort chan struct{}, desc string) {
 	}()
 }
 
-// NameOf returns name of caller, at runtime
-func NameOf(f interface{}) string {
-	v := reflect.ValueOf(f)
-	if v.Kind() == reflect.Func {
-		if rf := runtime.FuncForPC(v.Pointer()); rf != nil {
-			return rf.Name()
-		}
-	}
-	return v.String()
-}
-
 // MessageIDFromContext returns message id from context (if exists)
 func MessageIDFromContext(ctx context.Context) string {
 	if ctx == nil {
@@ -157,9 +145,8 @@ func Fatalf(reason interface{}, args ...interface{}) {
 func CreateTransaction(ctx context.Context, args SendTxArgs) *QueuedTx {
 	return &QueuedTx{
 		ID:      QueuedTxID(uuid.New()),
-		Hash:    common.Hash{},
 		Context: ctx,
 		Args:    args,
-		Done:    make(chan struct{}),
+		Result:  make(chan TransactionResult, 1),
 	}
 }

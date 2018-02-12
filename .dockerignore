@@ -4,3 +4,4 @@
 build/bin
 statusd-data
 wnode-data
+**/*.test

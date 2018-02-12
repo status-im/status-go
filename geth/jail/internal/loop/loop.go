@@ -41,12 +41,13 @@ type Task interface {
 // Otherwise, on ARM and x86-32 it will panic.
 // More information: https://golang.org/pkg/sync/atomic/#pkg-note-BUG.
 type Loop struct {
-	id        int64
-	vm        *vm.VM
-	lock      sync.RWMutex
-	tasks     map[int64]Task
-	ready     chan Task
-	accepting bool
+	id         int64
+	vm         *vm.VM
+	lock       sync.RWMutex
+	tasks      map[int64]Task
+	ready      chan Task
+	closer     sync.Once
+	closedChan chan struct{}
 }
 
 // New creates a new Loop with an unbuffered ready queue on a specific VM.
@@ -58,21 +59,18 @@ func New(vm *vm.VM) *Loop {
 // queue, the capacity of which being specified by the backlog argument.
 func NewWithBacklog(vm *vm.VM, backlog int) *Loop {
 	return &Loop{
-		vm:        vm,
-		tasks:     make(map[int64]Task),
-		ready:     make(chan Task, backlog),
-		accepting: true,
+		vm:         vm,
+		tasks:      make(map[int64]Task),
+		ready:      make(chan Task, backlog),
+		closedChan: make(chan struct{}),
 	}
 }
 
 // close the loop so that it no longer accepts tasks.
 func (l *Loop) close() {
-	l.lock.Lock()
-	defer l.lock.Unlock()
-	if l.accepting {
-		l.accepting = false
-		close(l.ready)
-	}
+	l.closer.Do(func() {
+		close(l.closedChan)
+	})
 }
 
 // VM gets the JavaScript interpreter associated with the loop.
@@ -84,11 +82,13 @@ func (l *Loop) VM() *vm.VM {
 // doing something outside of the JavaScript environment, and that at some
 // point, it will become ready for finalising.
 func (l *Loop) Add(t Task) error {
+	select {
+	case <-l.closedChan:
+		return ErrClosed
+	default:
+	}
 	l.lock.Lock()
 	defer l.lock.Unlock()
-	if !l.accepting {
-		return ErrClosed
-	}
 	t.SetID(atomic.AddInt64(&l.id, 1))
 	l.tasks[t.GetID()] = t
 	return nil
@@ -124,17 +124,13 @@ func (l *Loop) removeAll() {
 // Ready signals to the loop that a task is ready to be finalised. This might
 // block if the "ready channel" in the loop is at capacity.
 func (l *Loop) Ready(t Task) error {
-	var err error
-	l.lock.RLock()
-	if !l.accepting {
+	select {
+	case <-l.closedChan:
 		t.Cancel()
-		err = ErrClosed
+		return ErrClosed
+	case l.ready <- t:
+		return nil
 	}
-	l.lock.RUnlock()
-	if err == nil {
-		l.ready <- t
-	}
-	return err
 }
 
 // AddAndExecute combines Add and Ready for immediate execution.
