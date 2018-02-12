@@ -32,7 +32,7 @@ var (
 
 type Whisp struct {
 	Name    string
-	Rpc     string
+	RPC     string
 	Metrics string
 }
 
@@ -44,7 +44,7 @@ func MakeWhisps(containers []types.Container) []Whisp {
 			if port.PrivatePort == 8080 {
 				w.Metrics = fmt.Sprintf("http://%s:%d/metrics", port.IP, port.PublicPort)
 			} else if port.PrivatePort == 8545 {
-				w.Rpc = fmt.Sprintf("http://%s:%d", port.IP, port.PublicPort)
+				w.RPC = fmt.Sprintf("http://%s:%d", port.IP, port.PublicPort)
 			}
 		}
 		whisps = append(whisps, w)
@@ -72,7 +72,7 @@ func (s *WhisperScaleSuite) SetupTest() {
 	s.Require().NoError(err)
 	cwd, err := os.Getwd()
 	s.Require().NoError(err)
-	s.p = project.New(filepath.Join(filepath.Dir(cwd), "docker", "wnode-test-cluster"), cli)
+	s.p = project.New(filepath.Join(filepath.Dir(cwd), "_assets", "compose", "wnode-test-cluster"), cli)
 	s.NoError(s.p.Up(project.UpOpts{
 		Scale: map[string]int{"wnode": *wnodeScale},
 		Wait:  *dockerTimeout,
@@ -137,7 +137,7 @@ func (s *WhisperScaleSuite) TestSymKeyMessaging() {
 		whispCount = len(s.whisps)
 	}
 	s.NoErrors(runConcurrent(s.whisps[:whispCount], func(i int, w Whisp) error {
-		c, err := shhclient.Dial(w.Rpc)
+		c, err := shhclient.Dial(w.RPC)
 		if err != nil {
 			return err
 		}
@@ -207,7 +207,7 @@ func (s *WhisperScaleSuite) TestSymKeyMessaging() {
 	}
 
 	s.NoErrors(runConcurrent(s.whisps, func(i int, w Whisp) error {
-		metrics, err := ethMetrics(w.Rpc)
+		metrics, err := ethMetrics(w.RPC)
 		if err != nil {
 			return err
 		}
