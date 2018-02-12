@@ -45,16 +45,20 @@ func (p Project) Up(opts UpOpts) error {
 		}
 	}
 	cmd := exec.Command("docker-compose", args...)
-	err := cmd.Run()
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return err
+		return errors.New(string(out))
 	}
 	return p.Wait(opts.Wait)
 
 }
 
 func (p Project) Down() error {
-	return exec.Command("docker-compose", "-f", p.Path, "down").Run()
+	out, err := exec.Command("docker-compose", "-f", p.Path, "down").CombinedOutput()
+	if err != nil {
+		return errors.New(string(out))
+	}
+	return nil
 }
 
 type FilterOpts struct {

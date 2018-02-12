@@ -89,9 +89,17 @@ func (s *WhisperScaleSuite) TearDownTest() {
 }
 
 func (s *WhisperScaleSuite) NoErrors(errors []error) {
+	var unexpectedErr bool
 	for i, err := range errors {
-		s.Require().NoError(err, "whisp", s.whisps[i], "received unexpected error")
+		if err != nil {
+			unexpectedErr = true
+		}
+		s.NoError(err, "whisp", s.whisps[i], "received unexpected error")
 	}
+	if unexpectedErr {
+		s.Require().FailNow("no errors expected")
+	}
+
 }
 
 func runConcurrent(whisps []Whisp, f func(i int, w Whisp) error) []error {
@@ -132,7 +140,7 @@ func runWithRetries(retries int, interval time.Duration, f func() error) error {
 func (s *WhisperScaleSuite) TestSymKeyMessaging() {
 	msgNum := 100
 	interval := 500 * time.Millisecond
-	whispCount := 8
+	whispCount := 5
 	if len(s.whisps) < whispCount {
 		whispCount = len(s.whisps)
 	}
