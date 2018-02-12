@@ -218,8 +218,8 @@ func (m *NodeManager) removeStaticPeers() error {
 
 // ReconnectStaticPeers removes and adds static peers to a server.
 func (m *NodeManager) ReconnectStaticPeers() error {
-	m.Lock()
-	defer m.Unlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	if err := m.removeStaticPeers(); err != nil {
 		return err
 	}
