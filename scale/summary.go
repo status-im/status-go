@@ -36,13 +36,14 @@ func (s Summary) Print(w io.Writer) {
 	)
 	tab := tabwriter.NewWriter(w, 0, 8, 1, '\t', 0)
 	fmt.Fprintln(w, "=== SUMMARY")
-	fmt.Fprintln(tab, strings.Join([]string{"HEADERS", "ingress", "egress", "dups", "new", "dups/new"}, "\t|"))
+	fmt.Fprintf(tab, "|%s|\n", strings.Join([]string{"HEADERS", "ingress", "egress", "dups", "new", "dups/new"}, "\t|"))
+	fmt.Fprintf(tab, "|%s|\n", strings.Join([]string{"-", "-", "-", "-", "-", "-"}, "\t|"))
 	for i, r := range s {
 		ingress += r.Ingress
 		egress += r.Egress
 		newEnv += r.NewEnvelopes
 		oldEnv += r.OldEnvelopes
-		fmt.Fprintln(tab, strings.Join([]string{
+		fmt.Fprintf(tab, "|%s|\n", strings.Join([]string{
 			fmt.Sprintf("%d", i),
 			fmt.Sprintf("%f mb", r.Ingress/1024/1024),
 			fmt.Sprintf("%f mb", r.Egress/1024/1024),
@@ -53,7 +54,7 @@ func (s Summary) Print(w io.Writer) {
 	}
 	ingress = ingress / 1024 / 1024
 	egress = egress / 1024 / 1024
-	fmt.Fprintln(tab, strings.Join([]string{
+	fmt.Fprintf(tab, "|%s|\n", strings.Join([]string{
 		"TOTAL",
 		fmt.Sprintf("%f mb", ingress),
 		fmt.Sprintf("%f mb", egress),
