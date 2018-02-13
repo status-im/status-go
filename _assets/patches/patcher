@@ -48,7 +48,6 @@ while getopts :prcv opt; do
 				echo "Unapplied: $f"
 				unapplied+=("$f")
 			else
-				echo "Applied: $f"
 				applied+=("$f")
 			fi
 		done
@@ -58,12 +57,21 @@ while getopts :prcv opt; do
 			git apply "$f" --directory="$basepath" > /dev/null 2>&1
 		done
 		# Sorts out new patches' paths by comparing with "develop" branch.
-		newPatches=($(git diff develop --stat | grep "\\.patch" |
+		fromDevelop=($(git diff develop --stat | grep "\\.patch" |
 			while IFS=" " read -r -a line; do
 				path="$(pwd)/${line[0]}"
 				echo "$path"
 			done
 		))
+		# Also does the same with uncommitted.
+		uncommitted=($(git status -u --porcelain | grep "\\.patch" |
+			while IFS=" " read -r -a line; do
+				length=${#line[@]}
+				path="$(pwd)/${line[$((length - 1))]}"
+				echo "$path"
+			done
+		))
+		newPatches=( "${fromDevelop[@]}" "${uncommitted[@]}" )
 		# Checks new patches and exits with 1 if there are unapplied.
 		hasUnapplied=0
 		for newPatch in "${newPatches[@]}"; do
