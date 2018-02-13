@@ -160,9 +160,17 @@ deep-clean: clean
 vendor-check:
 	@dep ensure
 	./_assets/ci/validate-vendor.sh
+	./_assets/patches/patcher -c
+
+dep-ensure:
+	@dep ensure
+	./_assets/patches/patcher
 
 dep-install:
 	go get -u github.com/golang/dep/cmd/dep
 
 patch:
 	./_assets/patches/patcher
+
+patch-revert:
+	./_assets/patches/patcher -r
