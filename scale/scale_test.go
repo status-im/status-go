@@ -140,7 +140,8 @@ func runWithRetries(retries int, interval time.Duration, f func() error) error {
 func (s *WhisperScaleSuite) TestSymKeyMessaging() {
 	msgNum := 100
 	interval := 500 * time.Millisecond
-	whispCount := 5
+	whispCount := 9
+	payload := make([]byte, 1024)
 	if len(s.whisps) < whispCount {
 		whispCount = len(s.whisps)
 	}
@@ -168,7 +169,7 @@ func (s *WhisperScaleSuite) TestSymKeyMessaging() {
 				PowTarget: info.MinPow,
 				PowTime:   200,
 				Topic:     whisperv5.TopicType{0x03, 0x02, 0x02, 0x05},
-				Payload:   []byte("hello"),
+				Payload:   payload,
 			}); err != nil {
 				return err
 			}
