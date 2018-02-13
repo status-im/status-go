@@ -10,8 +10,8 @@
 # -p: <base_path> is where to apply to (a go-ethereum package)
 # -r: reverts all and exit if this flag is present
 # -c: reverts all to see what's applied, applies all previously applied back again,
-# reports unapplied patches in this branch by comparing with "develop" and
-# exits (with 1 if there are any)
+# reports unapplied patches in this branch by comparing with "develop" including
+# uncommitted ones and exits (with 1 if there are any)
 # -v: verbose error reporting about failed patch
 #
 # If -p is not present, default path is as below ($basepath).
