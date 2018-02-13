@@ -9,7 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/les"
 	gethnode "github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/rpc"
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
+	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
 

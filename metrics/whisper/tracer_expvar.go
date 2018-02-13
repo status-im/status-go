@@ -6,7 +6,7 @@ package whisper
 import (
 	"expvar"
 
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
+	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 )
 
 var (

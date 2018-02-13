@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
+	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/static"
 	e2e "github.com/status-im/status-go/t/e2e"
@@ -85,7 +85,7 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 		{
 			"test 0: ensure correct version of Whisper is used",
 			`
-				var expectedVersion = '5.0';
+				var expectedVersion = '6.0';
 				if (web3.version.whisper != expectedVersion) {
 					throw 'unexpected shh version, expected: ' + expectedVersion + ', got: ' + web3.version.whisper;
 				}

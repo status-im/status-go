@@ -64,7 +64,7 @@ func (s *RPCTestSuite) TestCallRPC() {
 			{
 				`{"jsonrpc":"2.0","method":"shh_version","params":[],"id":67}`,
 				func(resultJSON string) {
-					expected := `{"jsonrpc":"2.0","id":67,"result":"5.0"}`
+					expected := `{"jsonrpc":"2.0","id":67,"result":"6.0"}`
 					s.Equal(expected, resultJSON)
 				},
 			},
@@ -135,7 +135,7 @@ func (s *RPCTestSuite) TestCallRawResult() {
 	s.NotNil(client)
 
 	jsonResult := client.CallRaw(`{"jsonrpc":"2.0","method":"shh_version","params":[],"id":67}`)
-	s.Equal(`{"jsonrpc":"2.0","id":67,"result":"5.0"}`, jsonResult)
+	s.Equal(`{"jsonrpc":"2.0","id":67,"result":"6.0"}`, jsonResult)
 
 	s.NoError(s.NodeManager.StopNode())
 }

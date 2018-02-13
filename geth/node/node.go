@@ -19,7 +19,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/nat"
 	"github.com/ethereum/go-ethereum/whisper/mailserver"
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
+	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
 	shhmetrics "github.com/status-im/status-go/metrics/whisper"

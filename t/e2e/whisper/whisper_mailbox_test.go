@@ -12,7 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p/discover"
-	"github.com/ethereum/go-ethereum/whisper/whisperv5"
+	"github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/rpc"
 	e2e "github.com/status-im/status-go/t/e2e"
@@ -68,7 +68,7 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	s.Require().NotNil(rpcClient)
 
 	//create topic
-	topic := whisperv5.BytesToTopic([]byte("topic name"))
+	topic := whisperv6.BytesToTopic([]byte("topic name"))
 
 	//Add key pair to whisper
 	keyID, err := senderWhisperService.NewKeyPair()
@@ -177,7 +177,7 @@ func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
 	groupChatKey, err := aliceWhisperService.GetSymKey(groupChatKeyID)
 	s.Require().NoError(err)
 	//generate group chat topic
-	groupChatTopic := whisperv5.BytesToTopic([]byte("groupChatTopic"))
+	groupChatTopic := whisperv6.BytesToTopic([]byte("groupChatTopic"))
 	groupChatPayload := newGroupChatParams(groupChatKey, groupChatTopic)
 	payloadStr, err := groupChatPayload.Encode()
 	s.Require().NoError(err)
@@ -188,14 +188,14 @@ func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
 	bobKey, err := bobWhisperService.GetPrivateKey(bobKeyID)
 	s.Require().NoError(err)
 	bobPubkey := hexutil.Bytes(crypto.FromECDSAPub(&bobKey.PublicKey))
-	bobAliceKeySendTopic := whisperv5.BytesToTopic([]byte("bobAliceKeySendTopic "))
+	bobAliceKeySendTopic := whisperv6.BytesToTopic([]byte("bobAliceKeySendTopic "))
 
 	charlieKeyID, err := charlieWhisperService.NewKeyPair()
 	s.Require().NoError(err)
 	charlieKey, err := charlieWhisperService.GetPrivateKey(charlieKeyID)
 	s.Require().NoError(err)
 	charliePubkey := hexutil.Bytes(crypto.FromECDSAPub(&charlieKey.PublicKey))
-	charlieAliceKeySendTopic := whisperv5.BytesToTopic([]byte("charlieAliceKeySendTopic "))
+	charlieAliceKeySendTopic := whisperv6.BytesToTopic([]byte("charlieAliceKeySendTopic "))
 
 	//bob and charlie create message filter
 	bobMessageFilterID := s.createPrivateChatMessageFilter(bobRPCClient, bobKeyID, bobAliceKeySendTopic.String())
@@ -277,7 +277,7 @@ func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
 	s.Require().Equal(helloWorldMessage, messages[0]["payload"].(string))
 }
 
-func newGroupChatParams(symkey []byte, topic whisperv5.TopicType) groupChatParams {
+func newGroupChatParams(symkey []byte, topic whisperv6.TopicType) groupChatParams {
 	groupChatKeyStr := hexutil.Bytes(symkey).String()
 	return groupChatParams{
 		Key:   groupChatKeyStr,
