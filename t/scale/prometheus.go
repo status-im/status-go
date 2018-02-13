@@ -8,7 +8,7 @@ import (
 	"github.com/prometheus/common/expfmt"
 )
 
-func getMetrics(url string) (map[string]*dto.MetricFamily, error) {
+func pullMetrics(url string) (map[string]*dto.MetricFamily, error) {
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, err
@@ -18,8 +18,8 @@ func getMetrics(url string) (map[string]*dto.MetricFamily, error) {
 	return parser.TextToMetricFamilies(resp.Body)
 }
 
-func getOldNewEnvelopesCount(url string) (old float64, new float64, err error) {
-	metrics, err := getMetrics(url)
+func pullOldNewEnvelopesCount(url string) (old float64, new float64, err error) {
+	metrics, err := pullMetrics(url)
 	if err != nil {
 		return old, new, err
 	}

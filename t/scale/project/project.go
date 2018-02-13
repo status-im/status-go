@@ -1,3 +1,9 @@
+/*
+Package project provides light-weight wrapper around docker-compose and docker client.
+
+Main purpose of the package is to bootstrap a docker-compose cluster with parametrized parameters,
+wait till containers in cluster are ready, get containers ip addresses and tear down a cluster.
+*/
 package project
 
 import (
@@ -5,7 +11,6 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -13,6 +18,7 @@ import (
 	"github.com/docker/docker/client"
 )
 
+// Project is a wrapper around docker-compose project.
 type Project struct {
 	Path string
 	Name string
@@ -20,22 +26,22 @@ type Project struct {
 	client *client.Client
 }
 
+// UpOpts used to provide options for docker-compose up.
 type UpOpts struct {
 	Scale map[string]int
 	Wait  time.Duration
 }
 
-func New(fullpath string, client *client.Client) Project {
-	projectPathParts := strings.Split(fullpath, "/")
-	projectPath := projectPathParts[len(projectPathParts)-1]
-	name := strings.Join(strings.Split(projectPath, "-"), "")
+// New initializes a Project.
+func New(fullpath, name string, client *client.Client) Project {
 	return Project{
-		Path:   filepath.Join(fullpath, "docker-compose.yml"),
+		Path:   fullpath,
 		Name:   strings.ToLower(name),
 		client: client,
 	}
 }
 
+// Up runs docker-compose up with options and waits till containers are running.
 func (p Project) Up(opts UpOpts) error {
 	args := []string{"-f", p.Path, "up", "-d"}
 	if len(opts.Scale) > 0 {
@@ -49,10 +55,11 @@ func (p Project) Up(opts UpOpts) error {
 	if err != nil {
 		return errors.New(string(out))
 	}
-	return p.Wait(opts.Wait)
+	return p.wait(opts.Wait)
 
 }
 
+// Down runs docker-compose down.
 func (p Project) Down() error {
 	out, err := exec.Command("docker-compose", "-f", p.Path, "down").CombinedOutput()
 	if err != nil {
@@ -61,10 +68,12 @@ func (p Project) Down() error {
 	return nil
 }
 
+// FilterOpts used to parametrize a query for a list of containers.
 type FilterOpts struct {
 	SvcName string
 }
 
+// Containers queries docker for containers and filters results according to FiltersOpts.
 func (p Project) Containers(f FilterOpts) (rst []types.Container, err error) {
 	containers, err := p.client.ContainerList(context.Background(), types.ContainerListOptions{})
 	if err != nil {
@@ -84,7 +93,7 @@ func (p Project) Containers(f FilterOpts) (rst []types.Container, err error) {
 	return rst, err
 }
 
-func (p Project) Wait(timeout time.Duration) error {
+func (p Project) wait(timeout time.Duration) error {
 	timer := time.After(timeout)
 	for {
 		containers, err := p.Containers(FilterOpts{})

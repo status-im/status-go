@@ -2,6 +2,7 @@ package scale
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,13 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"flag"
-
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/ethereum/go-ethereum/whisper/shhclient"
 	"github.com/ethereum/go-ethereum/whisper/whisperv5"
-	"github.com/status-im/status-go/scale/project"
+	"github.com/status-im/status-go/t/scale/project"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -30,16 +29,16 @@ var (
 	dockerTimeout = flag.Duration("docker-timeout", 5*time.Second, "Docker cluster startup timeout.")
 )
 
-type Whisp struct {
+type containerInfo struct {
 	Name    string
 	RPC     string
 	Metrics string
 }
 
-func MakeWhisps(containers []types.Container) []Whisp {
-	whisps := []Whisp{}
+func makeContainerInfos(containers []types.Container) []containerInfo {
+	whisps := []containerInfo{}
 	for _, container := range containers {
-		w := Whisp{Name: container.Names[0]}
+		w := containerInfo{Name: container.Names[0]}
 		for _, port := range container.Ports {
 			if port.PrivatePort == 8080 {
 				w.Metrics = fmt.Sprintf("http://%s:%d/metrics", port.IP, port.PublicPort)
@@ -59,11 +58,11 @@ func TestWhisperScale(t *testing.T) {
 type WhisperScaleSuite struct {
 	suite.Suite
 
-	p      project.Project
-	whisps []Whisp
+	p          project.Project
+	containers []containerInfo
 }
 
-func (w *WhisperScaleSuite) SetupSuite() {
+func (s *WhisperScaleSuite) SetupSuite() {
 	flag.Parse()
 }
 
@@ -72,14 +71,18 @@ func (s *WhisperScaleSuite) SetupTest() {
 	s.Require().NoError(err)
 	cwd, err := os.Getwd()
 	s.Require().NoError(err)
-	s.p = project.New(filepath.Join(filepath.Dir(cwd), "_assets", "compose", "wnode-test-cluster"), cli)
+	s.p = project.New(
+		filepath.Join(
+			filepath.Dir(filepath.Dir(cwd)), "_assets", "compose", "wnode-test-cluster", "docker-compose.yml"),
+		"wnodetestcluster",
+		cli)
 	s.NoError(s.p.Up(project.UpOpts{
 		Scale: map[string]int{"wnode": *wnodeScale},
 		Wait:  *dockerTimeout,
 	}))
 	containers, err := s.p.Containers(project.FilterOpts{SvcName: "wnode"})
 	s.Require().NoError(err)
-	s.whisps = MakeWhisps(containers)
+	s.containers = makeContainerInfos(containers)
 }
 
 func (s *WhisperScaleSuite) TearDownTest() {
@@ -94,7 +97,7 @@ func (s *WhisperScaleSuite) NoErrors(errors []error) {
 		if err != nil {
 			unexpectedErr = true
 		}
-		s.NoError(err, "whisp", s.whisps[i], "received unexpected error")
+		s.NoError(err, "whisp", s.containers[i], "received unexpected error")
 	}
 	if unexpectedErr {
 		s.Require().FailNow("no errors expected")
@@ -102,12 +105,12 @@ func (s *WhisperScaleSuite) NoErrors(errors []error) {
 
 }
 
-func runConcurrent(whisps []Whisp, f func(i int, w Whisp) error) []error {
+func runConcurrent(whisps []containerInfo, f func(i int, w containerInfo) error) []error {
 	var wg sync.WaitGroup
 	errs := make([]error, len(whisps))
 	for i, w := range whisps {
 		wg.Add(1)
-		go func(i int, w Whisp) {
+		go func(i int, w containerInfo) {
 			defer wg.Done()
 			if err := f(i, w); err != nil {
 				errs[i] = err
@@ -140,12 +143,12 @@ func runWithRetries(retries int, interval time.Duration, f func() error) error {
 func (s *WhisperScaleSuite) TestSymKeyMessaging() {
 	msgNum := 100
 	interval := 500 * time.Millisecond
-	whispCount := 9
+	senderCount := 9
 	payload := make([]byte, 1024)
-	if len(s.whisps) < whispCount {
-		whispCount = len(s.whisps)
+	if len(s.containers) < senderCount {
+		senderCount = len(s.containers)
 	}
-	s.NoErrors(runConcurrent(s.whisps[:whispCount], func(i int, w Whisp) error {
+	s.NoErrors(runConcurrent(s.containers[:senderCount], func(i int, w containerInfo) error {
 		c, err := shhclient.Dial(w.RPC)
 		if err != nil {
 			return err
@@ -179,15 +182,15 @@ func (s *WhisperScaleSuite) TestSymKeyMessaging() {
 	}))
 
 	var mu sync.Mutex
-	reports := make(Summary, len(s.whisps))
-	s.NoErrors(runConcurrent(s.whisps, func(i int, w Whisp) error {
+	reports := make(Summary, len(s.containers))
+	s.NoErrors(runConcurrent(s.containers, func(i int, w containerInfo) error {
 		var prevOldCount, prevNewCount float64
 		for {
 			// wait till no duplicates are received
 			// given that transmission cycle is 200 ms, 5s should be enough
 			var oldCount, newCount float64
 			if err := runWithRetries(defaultRetries, defaultInterval, func() (err error) {
-				oldCount, newCount, err = getOldNewEnvelopesCount(w.Metrics)
+				oldCount, newCount, err = pullOldNewEnvelopesCount(w.Metrics)
 				return err
 			}); err != nil {
 				return err
@@ -208,15 +211,15 @@ func (s *WhisperScaleSuite) TestSymKeyMessaging() {
 	}))
 	for i, report := range reports {
 		// senders messages are not counted
-		if i < whispCount {
-			s.Equal(float64(msgNum*(whispCount-1)), report.NewEnvelopes)
+		if i < senderCount {
+			s.Equal(float64(msgNum*(senderCount-1)), report.NewEnvelopes)
 		} else {
-			s.Equal(float64(msgNum*whispCount), report.NewEnvelopes)
+			s.Equal(float64(msgNum*senderCount), report.NewEnvelopes)
 		}
 	}
 
-	s.NoErrors(runConcurrent(s.whisps, func(i int, w Whisp) error {
-		metrics, err := ethMetrics(w.RPC)
+	s.NoErrors(runConcurrent(s.containers, func(i int, w containerInfo) error {
+		metrics, err := getEthMetrics(w.RPC)
 		if err != nil {
 			return err
 		}
