@@ -121,7 +121,7 @@ func runConcurrent(whisps []containerInfo, f func(i int, w containerInfo) error)
 	return errs
 }
 
-func runWithRetries(retries int, interval time.Duration, f func() error) error {
+func runWithRetries(retries int, interval time.Duration, f func() error) error { // nolint (unparam)
 	for {
 		if err := f(); err != nil {
 			retries--
@@ -230,5 +230,5 @@ func (s *WhisperScaleSuite) TestSymKeyMessaging() {
 		return nil
 	}))
 	s.True(reports.MeanOldPerNew() < 1.5)
-	reports.Print(os.Stdout)
+	s.NoError(reports.Print(os.Stdout))
 }

@@ -13,12 +13,12 @@ func pullMetrics(url string) (map[string]*dto.MetricFamily, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() // nolint (errcheck)
 	var parser expfmt.TextParser
 	return parser.TextToMetricFamilies(resp.Body)
 }
 
-func pullOldNewEnvelopesCount(url string) (old float64, new float64, err error) {
+func pullOldNewEnvelopesCount(url string) (old float64, new float64, err error) { // nolint (deadcode)
 	metrics, err := pullMetrics(url)
 	if err != nil {
 		return old, new, err

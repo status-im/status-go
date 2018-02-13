@@ -50,7 +50,7 @@ func (p Project) Up(opts UpOpts) error {
 			args = append(args, fmt.Sprintf("%s=%d", service, value))
 		}
 	}
-	cmd := exec.Command("docker-compose", args...)
+	cmd := exec.Command("docker-compose", args...) // nolint (gas)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return errors.New(string(out))
@@ -61,7 +61,7 @@ func (p Project) Up(opts UpOpts) error {
 
 // Down runs docker-compose down.
 func (p Project) Down() error {
-	out, err := exec.Command("docker-compose", "-f", p.Path, "down").CombinedOutput()
+	out, err := exec.Command("docker-compose", "-f", p.Path, "down").CombinedOutput() // nolint (gas)
 	if err != nil {
 		return errors.New(string(out))
 	}

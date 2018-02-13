@@ -11,17 +11,22 @@ type asciiTable struct {
 	tab *tabwriter.Writer
 }
 
-func (t *asciiTable) AddHeaders(headers ...string) {
-	fmt.Fprintf(t.tab, "|%s|\n", strings.Join(headers, "\t|"))
+func (t *asciiTable) AddHeaders(headers ...string) error {
+	_, err := fmt.Fprintf(t.tab, "|%s|\n", strings.Join(headers, "\t|"))
+	if err != nil {
+		return err
+	}
 	lines := make([]string, len(headers))
 	for i := range lines {
 		lines[i] = "-"
 	}
-	fmt.Fprintf(t.tab, "|%s|\n", strings.Join(lines, "\t|"))
+	_, err = fmt.Fprintf(t.tab, "|%s|\n", strings.Join(lines, "\t|"))
+	return err
 }
 
-func (t *asciiTable) AddRow(row ...string) {
-	fmt.Fprintf(t.tab, "|%s|\n", strings.Join(row, "\t|"))
+func (t *asciiTable) AddRow(row ...string) error {
+	_, err := fmt.Fprintf(t.tab, "|%s|\n", strings.Join(row, "\t|"))
+	return err
 }
 
 func (t *asciiTable) Flush() error {
@@ -54,7 +59,7 @@ func (s Summary) MeanOldPerNew() float64 {
 }
 
 // Print writes a summary to a given writer.
-func (s Summary) Print(w io.Writer) {
+func (s Summary) Print(w io.Writer) error {
 	var (
 		ingress   float64
 		egress    float64
@@ -63,31 +68,40 @@ func (s Summary) Print(w io.Writer) {
 		oldPerNew = s.MeanOldPerNew()
 	)
 	tab := newASCIITable(w)
-	fmt.Fprintln(w, "=== SUMMARY")
-	tab.AddHeaders("HEADERS", "ingress", "egress", "dups", "new", "dups/new")
+	_, err := fmt.Fprintln(w, "=== SUMMARY")
+	if err != nil {
+		return err
+	}
+	if err := tab.AddHeaders("HEADERS", "ingress", "egress", "dups", "new", "dups/new"); err != nil {
+		return err
+	}
 	for i, r := range s {
 		ingress += r.Ingress
 		egress += r.Egress
 		newEnv += r.NewEnvelopes
 		oldEnv += r.OldEnvelopes
-		tab.AddRow(
+		if err := tab.AddRow(
 			fmt.Sprintf("%d", i),
 			fmt.Sprintf("%f mb", r.Ingress/1024/1024),
 			fmt.Sprintf("%f mb", r.Egress/1024/1024),
 			fmt.Sprintf("%d", int64(r.OldEnvelopes)),
 			fmt.Sprintf("%d", int64(r.NewEnvelopes)),
 			fmt.Sprintf("%f", r.OldEnvelopes/r.NewEnvelopes),
-		)
+		); err != nil {
+			return err
+		}
 	}
 	ingress = ingress / 1024 / 1024
 	egress = egress / 1024 / 1024
-	tab.AddRow(
+	if err := tab.AddRow(
 		"TOTAL",
 		fmt.Sprintf("%f mb", ingress),
 		fmt.Sprintf("%f mb", egress),
 		fmt.Sprintf("%d", int64(oldEnv)),
 		fmt.Sprintf("%d", int64(newEnv)),
 		fmt.Sprintf("%f", oldPerNew),
-	)
-	tab.Flush()
+	); err != nil {
+		return err
+	}
+	return tab.Flush()
 }

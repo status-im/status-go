@@ -18,7 +18,7 @@ type Metrics struct {
 	Peer2Peer P2P `json:"p2p"`
 }
 
-func getEthMetrics(url string) (rst Metrics, err error) {
+func getEthMetrics(url string) (rst Metrics, err error) { // nolint (deadcode)
 	client, err := rpc.Dial(url)
 	if err != nil {
 		return rst, err
