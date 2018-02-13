@@ -32,20 +32,14 @@ import (
 	"github.com/ethereum/go-ethereum/eth/gasprice"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/internal/ethapi"
 	"github.com/ethereum/go-ethereum/light"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
 type LesApiBackend struct {
-	eth           *LightEthereum
-	gpo           *gasprice.Oracle
-	statusBackend *ethapi.StatusBackend
-}
-
-func (b *LesApiBackend) GetStatusBackend() *ethapi.StatusBackend {
-	return b.statusBackend
+	eth *LightEthereum
+	gpo *gasprice.Oracle
 }
 
 func (b *LesApiBackend) ChainConfig() *params.ChainConfig {

@@ -126,7 +126,7 @@
     "whisper/whisperv5",
     "whisper/whisperv6"
   ]
-  revision = "da41a7258d94fb35113f3b2da3635c7c451e5831"
+  revision = "b007412db165e22640eb4cef6cb41013f54ddd32"
 
 [[projects]]
   name = "github.com/go-ole/go-ole"
