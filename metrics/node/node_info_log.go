@@ -1,4 +1,4 @@
-// +build !metrics metrics,prometheus
+// +build !metrics
 
 package node
 

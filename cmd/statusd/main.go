@@ -159,6 +159,12 @@ func startCollectingStats(interruptCh <-chan struct{}, nodeManager common.NodeMa
 
 	server := metrics.NewMetricsServer(*statsAddr)
 	go func() {
+		// server may be nil if `-stats` flag is used
+		// but the binary is compiled without metrics enabled
+		if server == nil {
+			return
+		}
+
 		err := server.ListenAndServe()
 		switch err {
 		case http.ErrServerClosed:
