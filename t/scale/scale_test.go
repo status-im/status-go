@@ -212,9 +212,9 @@ func (s *WhisperScaleSuite) TestSymKeyMessaging() {
 	for i, report := range reports {
 		// senders messages are not counted
 		if i < senderCount {
-			s.Equal(float64(msgNum*(senderCount-1)), report.NewEnvelopes)
+			s.True(report.NewEnvelopes-float64(msgNum*(senderCount-1)) >= 0, "not all envelopes are received")
 		} else {
-			s.Equal(float64(msgNum*senderCount), report.NewEnvelopes)
+			s.True(report.NewEnvelopes-float64(msgNum*senderCount) >= 0, "not all envelopes are received")
 		}
 	}
 
@@ -229,6 +229,6 @@ func (s *WhisperScaleSuite) TestSymKeyMessaging() {
 		mu.Unlock()
 		return nil
 	}))
-	s.True(reports.MeanOldPerNew() < 1.5)
+	s.InDelta(1.5, reports.MeanOldPerNew(), 0.8, "duplicates per new envelopes ratio is different from expected")
 	s.NoError(reports.Print(os.Stdout))
 }
