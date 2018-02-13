@@ -19,9 +19,9 @@ package whisperv6
 import (
 	"bytes"
 	"crypto/ecdsa"
+	crand "crypto/rand"
 	"crypto/sha256"
 	"fmt"
-	"math"
 	"runtime"
 	"sync"
 	"time"
@@ -30,7 +30,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/syndtr/goleveldb/leveldb/errors"
 	"golang.org/x/crypto/pbkdf2"
@@ -38,8 +37,6 @@ import (
 	set "gopkg.in/fatih/set.v0"
 )
 
-// Statistics holds several message-related counter for analytics
-// purposes.
 type Statistics struct {
 	messagesCleared      int
 	memoryCleared        int
@@ -49,12 +46,9 @@ type Statistics struct {
 }
 
 const (
-	maxMsgSizeIdx           = iota // Maximal message length allowed by the whisper node
-	overflowIdx                    // Indicator of message queue overflow
-	minPowIdx                      // Minimal PoW required by the whisper node
-	minPowToleranceIdx             // Minimal PoW tolerated by the whisper node for a limited time
-	bloomFilterIdx                 // Bloom filter for topics of interest for this node
-	bloomFilterToleranceIdx        // Bloom filter tolerated by the whisper node for a limited time
+	minPowIdx     = iota // Minimal PoW required by the whisper node
+	maxMsgSizeIdx = iota // Maximal message length allowed by the whisper node
+	overflowIdx   = iota // Indicator of message queue overflow
 )
 
 // Whisper represents a dark communication interface through the Ethereum
@@ -80,14 +74,10 @@ type Whisper struct {
 
 	settings syncmap.Map // holds configuration settings that can be dynamically changed
 
-	syncAllowance int // maximum time in seconds allowed to process the whisper-related messages
-
 	statsMu sync.Mutex // guard stats
 	stats   Statistics // Statistics of whisper node
 
-	mailServer         MailServer // MailServer interface
-	notificationServer NotificationServer
-	envelopeTracer     EnvelopeTracer // Service collecting envelopes metadata
+	mailServer MailServer // MailServer interface
 }
 
 // New creates a Whisper client ready to communicate through the Ethereum P2P network.
@@ -97,15 +87,14 @@ func New(cfg *Config) *Whisper {
 	}
 
 	whisper := &Whisper{
-		privateKeys:   make(map[string]*ecdsa.PrivateKey),
-		symKeys:       make(map[string][]byte),
-		envelopes:     make(map[common.Hash]*Envelope),
-		expirations:   make(map[uint32]*set.SetNonTS),
-		peers:         make(map[*Peer]struct{}),
-		messageQueue:  make(chan *Envelope, messageQueueLimit),
-		p2pMsgQueue:   make(chan *Envelope, messageQueueLimit),
-		quit:          make(chan struct{}),
-		syncAllowance: DefaultSyncAllowance,
+		privateKeys:  make(map[string]*ecdsa.PrivateKey),
+		symKeys:      make(map[string][]byte),
+		envelopes:    make(map[common.Hash]*Envelope),
+		expirations:  make(map[uint32]*set.SetNonTS),
+		peers:        make(map[*Peer]struct{}),
+		messageQueue: make(chan *Envelope, messageQueueLimit),
+		p2pMsgQueue:  make(chan *Envelope, messageQueueLimit),
+		quit:         make(chan struct{}),
 	}
 
 	whisper.filters = NewFilters(whisper)
@@ -132,74 +121,30 @@ func New(cfg *Config) *Whisper {
 	return whisper
 }
 
-// MinPow returns the PoW value required by this node.
-func (whisper *Whisper) MinPow() float64 {
-	val, exist := whisper.settings.Load(minPowIdx)
-	if !exist || val == nil {
-		return DefaultMinimumPoW
-	}
-	v, ok := val.(float64)
-	if !ok {
-		log.Error("Error loading minPowIdx, using default")
-		return DefaultMinimumPoW
-	}
-	return v
-}
-
-// MinPowTolerance returns the value of minimum PoW which is tolerated for a limited
-// time after PoW was changed. If sufficient time have elapsed or no change of PoW
-// have ever occurred, the return value will be the same as return value of MinPow().
-func (whisper *Whisper) MinPowTolerance() float64 {
-	val, exist := whisper.settings.Load(minPowToleranceIdx)
-	if !exist || val == nil {
-		return DefaultMinimumPoW
-	}
+func (w *Whisper) MinPow() float64 {
+	val, _ := w.settings.Load(minPowIdx)
 	return val.(float64)
 }
 
-// BloomFilter returns the aggregated bloom filter for all the topics of interest.
-// The nodes are required to send only messages that match the advertised bloom filter.
-// If a message does not match the bloom, it will tantamount to spam, and the peer will
-// be disconnected.
-func (whisper *Whisper) BloomFilter() []byte {
-	val, exist := whisper.settings.Load(bloomFilterIdx)
-	if !exist || val == nil {
-		return nil
-	}
-	return val.([]byte)
-}
-
-// BloomFilterTolerance returns the bloom filter which is tolerated for a limited
-// time after new bloom was advertised to the peers. If sufficient time have elapsed
-// or no change of bloom filter have ever occurred, the return value will be the same
-// as return value of BloomFilter().
-func (whisper *Whisper) BloomFilterTolerance() []byte {
-	val, exist := whisper.settings.Load(bloomFilterToleranceIdx)
-	if !exist || val == nil {
-		return nil
-	}
-	return val.([]byte)
-}
-
 // MaxMessageSize returns the maximum accepted message size.
-func (whisper *Whisper) MaxMessageSize() uint32 {
-	val, _ := whisper.settings.Load(maxMsgSizeIdx)
+func (w *Whisper) MaxMessageSize() uint32 {
+	val, _ := w.settings.Load(maxMsgSizeIdx)
 	return val.(uint32)
 }
 
 // Overflow returns an indication if the message queue is full.
-func (whisper *Whisper) Overflow() bool {
-	val, _ := whisper.settings.Load(overflowIdx)
+func (w *Whisper) Overflow() bool {
+	val, _ := w.settings.Load(overflowIdx)
 	return val.(bool)
 }
 
 // APIs returns the RPC descriptors the Whisper implementation offers
-func (whisper *Whisper) APIs() []rpc.API {
+func (w *Whisper) APIs() []rpc.API {
 	return []rpc.API{
 		{
 			Namespace: ProtocolName,
 			Version:   ProtocolVersionStr,
-			Service:   NewPublicWhisperAPI(whisper),
+			Service:   NewPublicWhisperAPI(w),
 			Public:    true,
 		},
 	}
@@ -207,131 +152,43 @@ func (whisper *Whisper) APIs() []rpc.API {
 
 // RegisterServer registers MailServer interface.
 // MailServer will process all the incoming messages with p2pRequestCode.
-func (whisper *Whisper) RegisterServer(server MailServer) {
-	whisper.mailServer = server
-}
-
-// RegisterNotificationServer registers notification server with Whisper
-func (whisper *Whisper) RegisterNotificationServer(server NotificationServer) {
-	whisper.notificationServer = server
-}
-
-// RegisterEnvelopeTracer registers an EnveloperTracer to collect information
-// about received envelopes.
-func (whisper *Whisper) RegisterEnvelopeTracer(tracer EnvelopeTracer) {
-	whisper.envelopeTracer = tracer
+func (w *Whisper) RegisterServer(server MailServer) {
+	w.mailServer = server
 }
 
 // Protocols returns the whisper sub-protocols ran by this particular client.
-func (whisper *Whisper) Protocols() []p2p.Protocol {
-	return []p2p.Protocol{whisper.protocol}
+func (w *Whisper) Protocols() []p2p.Protocol {
+	return []p2p.Protocol{w.protocol}
 }
 
 // Version returns the whisper sub-protocols version number.
-func (whisper *Whisper) Version() uint {
-	return whisper.protocol.Version
+func (w *Whisper) Version() uint {
+	return w.protocol.Version
 }
 
 // SetMaxMessageSize sets the maximal message size allowed by this node
-func (whisper *Whisper) SetMaxMessageSize(size uint32) error {
+func (w *Whisper) SetMaxMessageSize(size uint32) error {
 	if size > MaxMessageSize {
 		return fmt.Errorf("message size too large [%d>%d]", size, MaxMessageSize)
 	}
-	whisper.settings.Store(maxMsgSizeIdx, size)
-	return nil
-}
-
-// SetBloomFilter sets the new bloom filter
-func (whisper *Whisper) SetBloomFilter(bloom []byte) error {
-	if len(bloom) != bloomFilterSize {
-		return fmt.Errorf("invalid bloom filter size: %d", len(bloom))
-	}
-
-	b := make([]byte, bloomFilterSize)
-	copy(b, bloom)
-
-	whisper.settings.Store(bloomFilterIdx, b)
-	whisper.notifyPeersAboutBloomFilterChange(b)
-
-	go func() {
-		// allow some time before all the peers have processed the notification
-		time.Sleep(time.Duration(whisper.syncAllowance) * time.Second)
-		whisper.settings.Store(bloomFilterToleranceIdx, b)
-	}()
-
+	w.settings.Store(maxMsgSizeIdx, size)
 	return nil
 }
 
 // SetMinimumPoW sets the minimal PoW required by this node
-func (whisper *Whisper) SetMinimumPoW(val float64) error {
-	if val < 0.0 {
+func (w *Whisper) SetMinimumPoW(val float64) error {
+	if val <= 0.0 {
 		return fmt.Errorf("invalid PoW: %f", val)
 	}
-
-	whisper.settings.Store(minPowIdx, val)
-	whisper.notifyPeersAboutPowRequirementChange(val)
-
-	go func() {
-		// allow some time before all the peers have processed the notification
-		time.Sleep(time.Duration(whisper.syncAllowance) * time.Second)
-		whisper.settings.Store(minPowToleranceIdx, val)
-	}()
-
+	w.settings.Store(minPowIdx, val)
 	return nil
 }
 
-// SetMinimumPowTest sets the minimal PoW in test environment
-func (whisper *Whisper) SetMinimumPowTest(val float64) {
-	whisper.settings.Store(minPowIdx, val)
-	whisper.notifyPeersAboutPowRequirementChange(val)
-	whisper.settings.Store(minPowToleranceIdx, val)
-}
-
-func (whisper *Whisper) notifyPeersAboutPowRequirementChange(pow float64) {
-	arr := whisper.getPeers()
-	for _, p := range arr {
-		err := p.notifyAboutPowRequirementChange(pow)
-		if err != nil {
-			// allow one retry
-			err = p.notifyAboutPowRequirementChange(pow)
-		}
-		if err != nil {
-			log.Warn("failed to notify peer about new pow requirement", "peer", p.ID(), "error", err)
-		}
-	}
-}
-
-func (whisper *Whisper) notifyPeersAboutBloomFilterChange(bloom []byte) {
-	arr := whisper.getPeers()
-	for _, p := range arr {
-		err := p.notifyAboutBloomFilterChange(bloom)
-		if err != nil {
-			// allow one retry
-			err = p.notifyAboutBloomFilterChange(bloom)
-		}
-		if err != nil {
-			log.Warn("failed to notify peer about new bloom filter", "peer", p.ID(), "error", err)
-		}
-	}
-}
-
-func (whisper *Whisper) getPeers() []*Peer {
-	arr := make([]*Peer, len(whisper.peers))
-	i := 0
-	whisper.peerMu.Lock()
-	for p := range whisper.peers {
-		arr[i] = p
-		i++
-	}
-	whisper.peerMu.Unlock()
-	return arr
-}
-
 // getPeer retrieves peer by ID
-func (whisper *Whisper) getPeer(peerID []byte) (*Peer, error) {
-	whisper.peerMu.Lock()
-	defer whisper.peerMu.Unlock()
-	for p := range whisper.peers {
+func (w *Whisper) getPeer(peerID []byte) (*Peer, error) {
+	w.peerMu.Lock()
+	defer w.peerMu.Unlock()
+	for p := range w.peers {
 		id := p.peer.ID()
 		if bytes.Equal(peerID, id[:]) {
 			return p, nil
@@ -342,8 +199,8 @@ func (whisper *Whisper) getPeer(peerID []byte) (*Peer, error) {
 
 // AllowP2PMessagesFromPeer marks specific peer trusted,
 // which will allow it to send historic (expired) messages.
-func (whisper *Whisper) AllowP2PMessagesFromPeer(peerID []byte) error {
-	p, err := whisper.getPeer(peerID)
+func (w *Whisper) AllowP2PMessagesFromPeer(peerID []byte) error {
+	p, err := w.getPeer(peerID)
 	if err != nil {
 		return err
 	}
@@ -356,8 +213,8 @@ func (whisper *Whisper) AllowP2PMessagesFromPeer(peerID []byte) error {
 // request and respond with a number of peer-to-peer messages (possibly expired),
 // which are not supposed to be forwarded any further.
 // The whisper protocol is agnostic of the format and contents of envelope.
-func (whisper *Whisper) RequestHistoricMessages(peerID []byte, envelope *Envelope) error {
-	p, err := whisper.getPeer(peerID)
+func (w *Whisper) RequestHistoricMessages(peerID []byte, envelope *Envelope) error {
+	p, err := w.getPeer(peerID)
 	if err != nil {
 		return err
 	}
@@ -366,22 +223,22 @@ func (whisper *Whisper) RequestHistoricMessages(peerID []byte, envelope *Envelop
 }
 
 // SendP2PMessage sends a peer-to-peer message to a specific peer.
-func (whisper *Whisper) SendP2PMessage(peerID []byte, envelope *Envelope) error {
-	p, err := whisper.getPeer(peerID)
+func (w *Whisper) SendP2PMessage(peerID []byte, envelope *Envelope) error {
+	p, err := w.getPeer(peerID)
 	if err != nil {
 		return err
 	}
-	return whisper.SendP2PDirect(p, envelope)
+	return w.SendP2PDirect(p, envelope)
 }
 
 // SendP2PDirect sends a peer-to-peer message to a specific peer.
-func (whisper *Whisper) SendP2PDirect(peer *Peer, envelope *Envelope) error {
-	return p2p.Send(peer.ws, p2pMessageCode, envelope)
+func (w *Whisper) SendP2PDirect(peer *Peer, envelope *Envelope) error {
+	return p2p.Send(peer.ws, p2pCode, envelope)
 }
 
 // NewKeyPair generates a new cryptographic identity for the client, and injects
 // it into the known identities for message decryption. Returns ID of the new key pair.
-func (whisper *Whisper) NewKeyPair() (string, error) {
+func (w *Whisper) NewKeyPair() (string, error) {
 	key, err := crypto.GenerateKey()
 	if err != nil || !validatePrivateKey(key) {
 		key, err = crypto.GenerateKey() // retry once
@@ -393,107 +250,60 @@ func (whisper *Whisper) NewKeyPair() (string, error) {
 		return "", fmt.Errorf("failed to generate valid key")
 	}
 
-	id, err := toDeterministicID(common.ToHex(crypto.FromECDSAPub(&key.PublicKey)), keyIDSize)
+	id, err := GenerateRandomID()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to generate ID: %s", err)
 	}
 
-	whisper.keyMu.Lock()
-	defer whisper.keyMu.Unlock()
+	w.keyMu.Lock()
+	defer w.keyMu.Unlock()
 
-	if whisper.privateKeys[id] != nil {
+	if w.privateKeys[id] != nil {
 		return "", fmt.Errorf("failed to generate unique ID")
 	}
-	whisper.privateKeys[id] = key
+	w.privateKeys[id] = key
 	return id, nil
 }
 
 // DeleteKeyPair deletes the specified key if it exists.
-func (whisper *Whisper) DeleteKeyPair(key string) bool {
-	deterministicID, err := toDeterministicID(key, keyIDSize)
-	if err != nil {
-		return false
-	}
+func (w *Whisper) DeleteKeyPair(key string) bool {
+	w.keyMu.Lock()
+	defer w.keyMu.Unlock()
 
-	whisper.keyMu.Lock()
-	defer whisper.keyMu.Unlock()
-
-	if whisper.privateKeys[deterministicID] != nil {
-		delete(whisper.privateKeys, deterministicID)
+	if w.privateKeys[key] != nil {
+		delete(w.privateKeys, key)
 		return true
 	}
 	return false
 }
 
 // AddKeyPair imports a asymmetric private key and returns it identifier.
-func (whisper *Whisper) AddKeyPair(key *ecdsa.PrivateKey) (string, error) {
-	id, err := makeDeterministicID(common.ToHex(crypto.FromECDSAPub(&key.PublicKey)), keyIDSize)
+func (w *Whisper) AddKeyPair(key *ecdsa.PrivateKey) (string, error) {
+	id, err := GenerateRandomID()
 	if err != nil {
-		return "", err
-	}
-	if whisper.HasKeyPair(id) {
-		return id, nil // no need to re-inject
+		return "", fmt.Errorf("failed to generate ID: %s", err)
 	}
 
-	whisper.keyMu.Lock()
-	whisper.privateKeys[id] = key
-	whisper.keyMu.Unlock()
-	log.Info("Whisper identity added", "id", id, "pubkey", common.ToHex(crypto.FromECDSAPub(&key.PublicKey)))
+	w.keyMu.Lock()
+	w.privateKeys[id] = key
+	w.keyMu.Unlock()
 
 	return id, nil
 }
 
-// SelectKeyPair adds cryptographic identity, and makes sure
-// that it is the only private key known to the node.
-func (whisper *Whisper) SelectKeyPair(key *ecdsa.PrivateKey) error {
-	id, err := makeDeterministicID(common.ToHex(crypto.FromECDSAPub(&key.PublicKey)), keyIDSize)
-	if err != nil {
-		return err
-	}
-
-	whisper.keyMu.Lock()
-	defer whisper.keyMu.Unlock()
-
-	whisper.privateKeys = make(map[string]*ecdsa.PrivateKey) // reset key store
-	whisper.privateKeys[id] = key
-
-	log.Info("Whisper identity selected", "id", id, "key", common.ToHex(crypto.FromECDSAPub(&key.PublicKey)))
-	return nil
-}
-
-// DeleteKeyPairs removes all cryptographic identities known to the node
-func (whisper *Whisper) DeleteKeyPairs() error {
-	whisper.keyMu.Lock()
-	defer whisper.keyMu.Unlock()
-
-	whisper.privateKeys = make(map[string]*ecdsa.PrivateKey)
-
-	return nil
-}
-
 // HasKeyPair checks if the the whisper node is configured with the private key
 // of the specified public pair.
-func (whisper *Whisper) HasKeyPair(id string) bool {
-	deterministicID, err := toDeterministicID(id, keyIDSize)
-	if err != nil {
-		return false
-	}
-
-	whisper.keyMu.RLock()
-	defer whisper.keyMu.RUnlock()
-	return whisper.privateKeys[deterministicID] != nil
+func (w *Whisper) HasKeyPair(id string) bool {
+	w.keyMu.RLock()
+	defer w.keyMu.RUnlock()
+	return w.privateKeys[id] != nil
 }
 
 // GetPrivateKey retrieves the private key of the specified identity.
-func (whisper *Whisper) GetPrivateKey(id string) (*ecdsa.PrivateKey, error) {
-	deterministicID, err := toDeterministicID(id, keyIDSize)
-	if err != nil {
-		return nil, err
-	}
-
-	whisper.keyMu.RLock()
-	defer whisper.keyMu.RUnlock()
-	key := whisper.privateKeys[deterministicID]
+func (w *Whisper) GetPrivateKey(id string) (*ecdsa.PrivateKey, error) {
+	w.keyMu.RLock()
+	defer w.keyMu.RUnlock()
+	key := w.privateKeys[id]
 	if key == nil {
 		return nil, fmt.Errorf("invalid id")
 	}
@@ -502,11 +312,12 @@ func (whisper *Whisper) GetPrivateKey(id string) (*ecdsa.PrivateKey, error) {
 
 // GenerateSymKey generates a random symmetric key and stores it under id,
 // which is then returned. Will be used in the future for session key exchange.
-func (whisper *Whisper) GenerateSymKey() (string, error) {
-	key, err := generateSecureRandomData(aesKeyLength)
+func (w *Whisper) GenerateSymKey() (string, error) {
+	key := make([]byte, aesKeyLength)
+	_, err := crand.Read(key)
 	if err != nil {
 		return "", err
-	} else if !validateDataIntegrity(key, aesKeyLength) {
+	} else if !validateSymmetricKey(key) {
 		return "", fmt.Errorf("error in GenerateSymKey: crypto/rand failed to generate random data")
 	}
 
@@ -515,35 +326,18 @@ func (whisper *Whisper) GenerateSymKey() (string, error) {
 		return "", fmt.Errorf("failed to generate ID: %s", err)
 	}
 
-	whisper.keyMu.Lock()
-	defer whisper.keyMu.Unlock()
+	w.keyMu.Lock()
+	defer w.keyMu.Unlock()
 
-	if whisper.symKeys[id] != nil {
+	if w.symKeys[id] != nil {
 		return "", fmt.Errorf("failed to generate unique ID")
 	}
-	whisper.symKeys[id] = key
+	w.symKeys[id] = key
 	return id, nil
 }
 
-// AddSymKey stores the key with a given id.
-func (whisper *Whisper) AddSymKey(id string, key []byte) (string, error) {
-	deterministicID, err := toDeterministicID(id, keyIDSize)
-	if err != nil {
-		return "", err
-	}
-
-	whisper.keyMu.Lock()
-	defer whisper.keyMu.Unlock()
-
-	if whisper.symKeys[deterministicID] != nil {
-		return "", fmt.Errorf("key already exists: %v", id)
-	}
-	whisper.symKeys[deterministicID] = key
-	return deterministicID, nil
-}
-
 // AddSymKeyDirect stores the key, and returns its id.
-func (whisper *Whisper) AddSymKeyDirect(key []byte) (string, error) {
+func (w *Whisper) AddSymKeyDirect(key []byte) (string, error) {
 	if len(key) != aesKeyLength {
 		return "", fmt.Errorf("wrong key size: %d", len(key))
 	}
@@ -553,108 +347,85 @@ func (whisper *Whisper) AddSymKeyDirect(key []byte) (string, error) {
 		return "", fmt.Errorf("failed to generate ID: %s", err)
 	}
 
-	whisper.keyMu.Lock()
-	defer whisper.keyMu.Unlock()
+	w.keyMu.Lock()
+	defer w.keyMu.Unlock()
 
-	if whisper.symKeys[id] != nil {
+	if w.symKeys[id] != nil {
 		return "", fmt.Errorf("failed to generate unique ID")
 	}
-	whisper.symKeys[id] = key
+	w.symKeys[id] = key
 	return id, nil
 }
 
 // AddSymKeyFromPassword generates the key from password, stores it, and returns its id.
-func (whisper *Whisper) AddSymKeyFromPassword(password string) (string, error) {
+func (w *Whisper) AddSymKeyFromPassword(password string) (string, error) {
 	id, err := GenerateRandomID()
 	if err != nil {
 		return "", fmt.Errorf("failed to generate ID: %s", err)
 	}
-	if whisper.HasSymKey(id) {
+	if w.HasSymKey(id) {
 		return "", fmt.Errorf("failed to generate unique ID")
 	}
 
-	// kdf should run no less than 0.1 seconds on an average computer,
-	// because it's an once in a session experience
-	derived := pbkdf2.Key([]byte(password), nil, 65356, aesKeyLength, sha256.New)
+	derived, err := deriveKeyMaterial([]byte(password), EnvelopeVersion)
 	if err != nil {
 		return "", err
 	}
 
-	whisper.keyMu.Lock()
-	defer whisper.keyMu.Unlock()
+	w.keyMu.Lock()
+	defer w.keyMu.Unlock()
 
 	// double check is necessary, because deriveKeyMaterial() is very slow
-	if whisper.symKeys[id] != nil {
+	if w.symKeys[id] != nil {
 		return "", fmt.Errorf("critical error: failed to generate unique ID")
 	}
-	whisper.symKeys[id] = derived
+	w.symKeys[id] = derived
 	return id, nil
 }
 
 // HasSymKey returns true if there is a key associated with the given id.
 // Otherwise returns false.
-func (whisper *Whisper) HasSymKey(id string) bool {
-	whisper.keyMu.RLock()
-	defer whisper.keyMu.RUnlock()
-	return whisper.symKeys[id] != nil
+func (w *Whisper) HasSymKey(id string) bool {
+	w.keyMu.RLock()
+	defer w.keyMu.RUnlock()
+	return w.symKeys[id] != nil
 }
 
 // DeleteSymKey deletes the key associated with the name string if it exists.
-func (whisper *Whisper) DeleteSymKey(id string) bool {
-	whisper.keyMu.Lock()
-	defer whisper.keyMu.Unlock()
-	if whisper.symKeys[id] != nil {
-		delete(whisper.symKeys, id)
+func (w *Whisper) DeleteSymKey(id string) bool {
+	w.keyMu.Lock()
+	defer w.keyMu.Unlock()
+	if w.symKeys[id] != nil {
+		delete(w.symKeys, id)
 		return true
 	}
 	return false
 }
 
 // GetSymKey returns the symmetric key associated with the given id.
-func (whisper *Whisper) GetSymKey(id string) ([]byte, error) {
-	whisper.keyMu.RLock()
-	defer whisper.keyMu.RUnlock()
-	if whisper.symKeys[id] != nil {
-		return whisper.symKeys[id], nil
+func (w *Whisper) GetSymKey(id string) ([]byte, error) {
+	w.keyMu.RLock()
+	defer w.keyMu.RUnlock()
+	if w.symKeys[id] != nil {
+		return w.symKeys[id], nil
 	}
 	return nil, fmt.Errorf("non-existent key ID")
 }
 
 // Subscribe installs a new message handler used for filtering, decrypting
 // and subsequent storing of incoming messages.
-func (whisper *Whisper) Subscribe(f *Filter) (string, error) {
-	s, err := whisper.filters.Install(f)
-	if err == nil {
-		whisper.updateBloomFilter(f)
-	}
-	return s, err
-}
-
-// updateBloomFilter recalculates the new value of bloom filter,
-// and informs the peers if necessary.
-func (whisper *Whisper) updateBloomFilter(f *Filter) {
-	aggregate := make([]byte, bloomFilterSize)
-	for _, t := range f.Topics {
-		top := BytesToTopic(t)
-		b := TopicToBloom(top)
-		aggregate = addBloom(aggregate, b)
-	}
-
-	if !bloomFilterMatch(whisper.BloomFilter(), aggregate) {
-		// existing bloom filter must be updated
-		aggregate = addBloom(whisper.BloomFilter(), aggregate)
-		whisper.SetBloomFilter(aggregate)
-	}
+func (w *Whisper) Subscribe(f *Filter) (string, error) {
+	return w.filters.Install(f)
 }
 
 // GetFilter returns the filter by id.
-func (whisper *Whisper) GetFilter(id string) *Filter {
-	return whisper.filters.Get(id)
+func (w *Whisper) GetFilter(id string) *Filter {
+	return w.filters.Get(id)
 }
 
 // Unsubscribe removes an installed message handler.
-func (whisper *Whisper) Unsubscribe(id string) error {
-	ok := whisper.filters.Uninstall(id)
+func (w *Whisper) Unsubscribe(id string) error {
+	ok := w.filters.Uninstall(id)
 	if !ok {
 		return fmt.Errorf("Unsubscribe: Invalid ID")
 	}
@@ -663,8 +434,8 @@ func (whisper *Whisper) Unsubscribe(id string) error {
 
 // Send injects a message into the whisper send queue, to be distributed in the
 // network in the coming cycles.
-func (whisper *Whisper) Send(envelope *Envelope) error {
-	ok, err := whisper.add(envelope)
+func (w *Whisper) Send(envelope *Envelope) error {
+	ok, err := w.add(envelope)
 	if err != nil {
 		return err
 	}
@@ -676,19 +447,13 @@ func (whisper *Whisper) Send(envelope *Envelope) error {
 
 // Start implements node.Service, starting the background data propagation thread
 // of the Whisper protocol.
-func (whisper *Whisper) Start(stack *p2p.Server) error {
+func (w *Whisper) Start(*p2p.Server) error {
 	log.Info("started whisper v." + ProtocolVersionStr)
-	go whisper.update()
+	go w.update()
 
 	numCPU := runtime.NumCPU()
 	for i := 0; i < numCPU; i++ {
-		go whisper.processQueue()
-	}
-
-	if whisper.notificationServer != nil {
-		if err := whisper.notificationServer.Start(stack); err != nil {
-			return err
-		}
+		go w.processQueue()
 	}
 
 	return nil
@@ -696,33 +461,26 @@ func (whisper *Whisper) Start(stack *p2p.Server) error {
 
 // Stop implements node.Service, stopping the background data propagation thread
 // of the Whisper protocol.
-func (whisper *Whisper) Stop() error {
-	close(whisper.quit)
-
-	if whisper.notificationServer != nil {
-		if err := whisper.notificationServer.Stop(); err != nil {
-			return err
-		}
-	}
-
+func (w *Whisper) Stop() error {
+	close(w.quit)
 	log.Info("whisper stopped")
 	return nil
 }
 
 // HandlePeer is called by the underlying P2P layer when the whisper sub-protocol
 // connection is negotiated.
-func (whisper *Whisper) HandlePeer(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
+func (wh *Whisper) HandlePeer(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
 	// Create the new peer and start tracking it
-	whisperPeer := newPeer(whisper, peer, rw)
+	whisperPeer := newPeer(wh, peer, rw)
 
-	whisper.peerMu.Lock()
-	whisper.peers[whisperPeer] = struct{}{}
-	whisper.peerMu.Unlock()
+	wh.peerMu.Lock()
+	wh.peers[whisperPeer] = struct{}{}
+	wh.peerMu.Unlock()
 
 	defer func() {
-		whisper.peerMu.Lock()
-		delete(whisper.peers, whisperPeer)
-		whisper.peerMu.Unlock()
+		wh.peerMu.Lock()
+		delete(wh.peers, whisperPeer)
+		wh.peerMu.Unlock()
 	}()
 
 	// Run the peer handshake and state updates
@@ -732,11 +490,11 @@ func (whisper *Whisper) HandlePeer(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
 	whisperPeer.start()
 	defer whisperPeer.stop()
 
-	return whisper.runMessageLoop(whisperPeer, rw)
+	return wh.runMessageLoop(whisperPeer, rw)
 }
 
 // runMessageLoop reads and processes inbound messages directly to merge into client-global state.
-func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
+func (wh *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 	for {
 		// fetch the next packet
 		packet, err := rw.ReadMsg()
@@ -744,7 +502,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 			log.Warn("message loop", "peer", p.peer.ID(), "err", err)
 			return err
 		}
-		if packet.Size > whisper.MaxMessageSize() {
+		if packet.Size > wh.MaxMessageSize() {
 			log.Warn("oversized message received", "peer", p.peer.ID())
 			return errors.New("oversized message received")
 		}
@@ -755,54 +513,20 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 			log.Warn("unxepected status message received", "peer", p.peer.ID())
 		case messagesCode:
 			// decode the contained envelopes
-			var envelopes []*Envelope
-			if err := packet.Decode(&envelopes); err != nil {
-				log.Warn("failed to decode envelopes, peer will be disconnected", "peer", p.peer.ID(), "err", err)
-				return errors.New("invalid envelopes")
-			}
-
-			trouble := false
-			for _, env := range envelopes {
-				whisper.traceEnvelope(env, !whisper.isEnvelopeCached(env.Hash()), peerSource, p)
-				cached, err := whisper.add(env)
-				if err != nil {
-					trouble = true
-					log.Error("bad envelope received, peer will be disconnected", "peer", p.peer.ID(), "err", err)
-				}
-				if cached {
-					p.mark(env)
-				}
-			}
-
-			if trouble {
+			var envelope Envelope
+			if err := packet.Decode(&envelope); err != nil {
+				log.Warn("failed to decode envelope, peer will be disconnected", "peer", p.peer.ID(), "err", err)
 				return errors.New("invalid envelope")
 			}
-		case powRequirementCode:
-			s := rlp.NewStream(packet.Payload, uint64(packet.Size))
-			i, err := s.Uint()
+			cached, err := wh.add(&envelope)
 			if err != nil {
-				log.Warn("failed to decode powRequirementCode message, peer will be disconnected", "peer", p.peer.ID(), "err", err)
-				return errors.New("invalid powRequirementCode message")
+				log.Warn("bad envelope received, peer will be disconnected", "peer", p.peer.ID(), "err", err)
+				return errors.New("invalid envelope")
 			}
-			f := math.Float64frombits(i)
-			if math.IsInf(f, 0) || math.IsNaN(f) || f < 0.0 {
-				log.Warn("invalid value in powRequirementCode message, peer will be disconnected", "peer", p.peer.ID(), "err", err)
-				return errors.New("invalid value in powRequirementCode message")
+			if cached {
+				p.mark(&envelope)
 			}
-			p.powRequirement = f
-		case bloomFilterExCode:
-			var bloom []byte
-			err := packet.Decode(&bloom)
-			if err == nil && len(bloom) != bloomFilterSize {
-				err = fmt.Errorf("wrong bloom filter size %d", len(bloom))
-			}
-
-			if err != nil {
-				log.Warn("failed to decode bloom filter exchange message, peer will be disconnected", "peer", p.peer.ID(), "err", err)
-				return errors.New("invalid bloom filter exchange message")
-			}
-			p.setBloomFilter(bloom)
-		case p2pMessageCode:
+		case p2pCode:
 			// peer-to-peer message, sent directly to peer bypassing PoW checks, etc.
 			// this message is not supposed to be forwarded to other peers, and
 			// therefore might not satisfy the PoW, expiry and other requirements.
@@ -813,18 +537,17 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 					log.Warn("failed to decode direct message, peer will be disconnected", "peer", p.peer.ID(), "err", err)
 					return errors.New("invalid direct message")
 				}
-				whisper.postEvent(&envelope, true)
-				whisper.traceEnvelope(&envelope, false, p2pSource, p)
+				wh.postEvent(&envelope, true)
 			}
 		case p2pRequestCode:
 			// Must be processed if mail server is implemented. Otherwise ignore.
-			if whisper.mailServer != nil {
+			if wh.mailServer != nil {
 				var request Envelope
 				if err := packet.Decode(&request); err != nil {
 					log.Warn("failed to decode p2p request message, peer will be disconnected", "peer", p.peer.ID(), "err", err)
 					return errors.New("invalid p2p request")
 				}
-				whisper.mailServer.DeliverMail(p, &request)
+				wh.mailServer.DeliverMail(p, &request)
 			}
 		default:
 			// New message types might be implemented in the future versions of Whisper.
@@ -838,142 +561,130 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 // add inserts a new envelope into the message pool to be distributed within the
 // whisper network. It also inserts the envelope into the expiration pool at the
 // appropriate time-stamp. In case of error, connection should be dropped.
-func (whisper *Whisper) add(envelope *Envelope) (bool, error) {
+func (wh *Whisper) add(envelope *Envelope) (bool, error) {
 	now := uint32(time.Now().Unix())
 	sent := envelope.Expiry - envelope.TTL
 
 	if sent > now {
-		if sent-DefaultSyncAllowance > now {
+		if sent-SynchAllowance > now {
 			return false, fmt.Errorf("envelope created in the future [%x]", envelope.Hash())
+		} else {
+			// recalculate PoW, adjusted for the time difference, plus one second for latency
+			envelope.calculatePoW(sent - now + 1)
 		}
-		// recalculate PoW, adjusted for the time difference, plus one second for latency
-		envelope.calculatePoW(sent - now + 1)
 	}
 
 	if envelope.Expiry < now {
-		if envelope.Expiry+DefaultSyncAllowance*2 < now {
+		if envelope.Expiry+SynchAllowance*2 < now {
 			return false, fmt.Errorf("very old message")
+		} else {
+			log.Debug("expired envelope dropped", "hash", envelope.Hash().Hex())
+			return false, nil // drop envelope without error
 		}
-		log.Debug("expired envelope dropped", "hash", envelope.Hash().Hex())
-		return false, nil // drop envelope without error
 	}
 
-	if uint32(envelope.size()) > whisper.MaxMessageSize() {
+	if uint32(envelope.size()) > wh.MaxMessageSize() {
 		return false, fmt.Errorf("huge messages are not allowed [%x]", envelope.Hash())
 	}
 
-	if envelope.PoW() < whisper.MinPow() {
-		// maybe the value was recently changed, and the peers did not adjust yet.
-		// in this case the previous value is retrieved by MinPowTolerance()
-		// for a short period of peer synchronization.
-		if envelope.PoW() < whisper.MinPowTolerance() {
-			return false, fmt.Errorf("envelope with low PoW received: PoW=%f, hash=[%v]", envelope.PoW(), envelope.Hash().Hex())
-		}
+	if len(envelope.Version) > 4 {
+		return false, fmt.Errorf("oversized version [%x]", envelope.Hash())
 	}
 
-	if !bloomFilterMatch(whisper.BloomFilter(), envelope.Bloom()) {
-		// maybe the value was recently changed, and the peers did not adjust yet.
-		// in this case the previous value is retrieved by BloomFilterTolerance()
-		// for a short period of peer synchronization.
-		if !bloomFilterMatch(whisper.BloomFilterTolerance(), envelope.Bloom()) {
-			return false, fmt.Errorf("envelope does not match bloom filter, hash=[%v], bloom: \n%x \n%x \n%x",
-				envelope.Hash().Hex(), whisper.BloomFilter(), envelope.Bloom(), envelope.Topic)
-		}
+	aesNonceSize := len(envelope.AESNonce)
+	if aesNonceSize != 0 && aesNonceSize != AESNonceLength {
+		// the standard AES GCM nonce size is 12 bytes,
+		// but constant gcmStandardNonceSize cannot be accessed (not exported)
+		return false, fmt.Errorf("wrong size of AESNonce: %d bytes [env: %x]", aesNonceSize, envelope.Hash())
+	}
+
+	if envelope.PoW() < wh.MinPow() {
+		log.Debug("envelope with low PoW dropped", "PoW", envelope.PoW(), "hash", envelope.Hash().Hex())
+		return false, nil // drop envelope without error
 	}
 
 	hash := envelope.Hash()
 
-	whisper.poolMu.Lock()
-	_, alreadyCached := whisper.envelopes[hash]
+	wh.poolMu.Lock()
+	_, alreadyCached := wh.envelopes[hash]
 	if !alreadyCached {
-		whisper.envelopes[hash] = envelope
-		if whisper.expirations[envelope.Expiry] == nil {
-			whisper.expirations[envelope.Expiry] = set.NewNonTS()
+		wh.envelopes[hash] = envelope
+		if wh.expirations[envelope.Expiry] == nil {
+			wh.expirations[envelope.Expiry] = set.NewNonTS()
 		}
-		if !whisper.expirations[envelope.Expiry].Has(hash) {
-			whisper.expirations[envelope.Expiry].Add(hash)
+		if !wh.expirations[envelope.Expiry].Has(hash) {
+			wh.expirations[envelope.Expiry].Add(hash)
 		}
 	}
-	whisper.poolMu.Unlock()
+	wh.poolMu.Unlock()
 
 	if alreadyCached {
 		log.Trace("whisper envelope already cached", "hash", envelope.Hash().Hex())
 	} else {
 		log.Trace("cached whisper envelope", "hash", envelope.Hash().Hex())
-		whisper.statsMu.Lock()
-		whisper.stats.memoryUsed += envelope.size()
-		whisper.statsMu.Unlock()
-		whisper.postEvent(envelope, false) // notify the local node about the new message
-		if whisper.mailServer != nil {
-			whisper.mailServer.Archive(envelope)
+		wh.statsMu.Lock()
+		wh.stats.memoryUsed += envelope.size()
+		wh.statsMu.Unlock()
+		wh.postEvent(envelope, false) // notify the local node about the new message
+		if wh.mailServer != nil {
+			wh.mailServer.Archive(envelope)
 		}
 	}
 	return true, nil
 }
 
-// traceEnvelope collects basic metadata about an envelope and sender peer.
-func (whisper *Whisper) traceEnvelope(envelope *Envelope, isNew bool, source envelopeSource, peer *Peer) {
-	if whisper.envelopeTracer == nil {
-		return
-	}
-
-	whisper.envelopeTracer.Trace(&EnvelopeMeta{
-		Hash:   envelope.Hash().String(),
-		Topic:  BytesToTopic(envelope.Topic[:]),
-		Size:   uint32(envelope.size()),
-		Source: source,
-		IsNew:  isNew,
-		Peer:   peer.peer.Info().ID,
-	})
-}
-
 // postEvent queues the message for further processing.
-func (whisper *Whisper) postEvent(envelope *Envelope, isP2P bool) {
-	if isP2P {
-		whisper.p2pMsgQueue <- envelope
-	} else {
-		whisper.checkOverflow()
-		whisper.messageQueue <- envelope
+func (w *Whisper) postEvent(envelope *Envelope, isP2P bool) {
+	// if the version of incoming message is higher than
+	// currently supported version, we can not decrypt it,
+	// and therefore just ignore this message
+	if envelope.Ver() <= EnvelopeVersion {
+		if isP2P {
+			w.p2pMsgQueue <- envelope
+		} else {
+			w.checkOverflow()
+			w.messageQueue <- envelope
+		}
 	}
 }
 
 // checkOverflow checks if message queue overflow occurs and reports it if necessary.
-func (whisper *Whisper) checkOverflow() {
-	queueSize := len(whisper.messageQueue)
+func (w *Whisper) checkOverflow() {
+	queueSize := len(w.messageQueue)
 
 	if queueSize == messageQueueLimit {
-		if !whisper.Overflow() {
-			whisper.settings.Store(overflowIdx, true)
+		if !w.Overflow() {
+			w.settings.Store(overflowIdx, true)
 			log.Warn("message queue overflow")
 		}
 	} else if queueSize <= messageQueueLimit/2 {
-		if whisper.Overflow() {
-			whisper.settings.Store(overflowIdx, false)
+		if w.Overflow() {
+			w.settings.Store(overflowIdx, false)
 			log.Warn("message queue overflow fixed (back to normal)")
 		}
 	}
 }
 
 // processQueue delivers the messages to the watchers during the lifetime of the whisper node.
-func (whisper *Whisper) processQueue() {
+func (w *Whisper) processQueue() {
 	var e *Envelope
 	for {
 		select {
-		case <-whisper.quit:
+		case <-w.quit:
 			return
 
-		case e = <-whisper.messageQueue:
-			whisper.filters.NotifyWatchers(e, false)
+		case e = <-w.messageQueue:
+			w.filters.NotifyWatchers(e, false)
 
-		case e = <-whisper.p2pMsgQueue:
-			whisper.filters.NotifyWatchers(e, true)
+		case e = <-w.p2pMsgQueue:
+			w.filters.NotifyWatchers(e, true)
 		}
 	}
 }
 
 // update loops until the lifetime of the whisper node, updating its internal
 // state by expiring stale messages from the pool.
-func (whisper *Whisper) update() {
+func (w *Whisper) update() {
 	// Start a ticker to check for expirations
 	expire := time.NewTicker(expirationCycle)
 
@@ -981,9 +692,9 @@ func (whisper *Whisper) update() {
 	for {
 		select {
 		case <-expire.C:
-			whisper.expire()
+			w.expire()
 
-		case <-whisper.quit:
+		case <-w.quit:
 			return
 		}
 	}
@@ -991,46 +702,46 @@ func (whisper *Whisper) update() {
 
 // expire iterates over all the expiration timestamps, removing all stale
 // messages from the pools.
-func (whisper *Whisper) expire() {
-	whisper.poolMu.Lock()
-	defer whisper.poolMu.Unlock()
+func (w *Whisper) expire() {
+	w.poolMu.Lock()
+	defer w.poolMu.Unlock()
 
-	whisper.statsMu.Lock()
-	defer whisper.statsMu.Unlock()
-	whisper.stats.reset()
+	w.statsMu.Lock()
+	defer w.statsMu.Unlock()
+	w.stats.reset()
 	now := uint32(time.Now().Unix())
-	for expiry, hashSet := range whisper.expirations {
+	for expiry, hashSet := range w.expirations {
 		if expiry < now {
 			// Dump all expired messages and remove timestamp
 			hashSet.Each(func(v interface{}) bool {
-				sz := whisper.envelopes[v.(common.Hash)].size()
-				delete(whisper.envelopes, v.(common.Hash))
-				whisper.stats.messagesCleared++
-				whisper.stats.memoryCleared += sz
-				whisper.stats.memoryUsed -= sz
+				sz := w.envelopes[v.(common.Hash)].size()
+				delete(w.envelopes, v.(common.Hash))
+				w.stats.messagesCleared++
+				w.stats.memoryCleared += sz
+				w.stats.memoryUsed -= sz
 				return true
 			})
-			whisper.expirations[expiry].Clear()
-			delete(whisper.expirations, expiry)
+			w.expirations[expiry].Clear()
+			delete(w.expirations, expiry)
 		}
 	}
 }
 
 // Stats returns the whisper node statistics.
-func (whisper *Whisper) Stats() Statistics {
-	whisper.statsMu.Lock()
-	defer whisper.statsMu.Unlock()
+func (w *Whisper) Stats() Statistics {
+	w.statsMu.Lock()
+	defer w.statsMu.Unlock()
 
-	return whisper.stats
+	return w.stats
 }
 
 // Envelopes retrieves all the messages currently pooled by the node.
-func (whisper *Whisper) Envelopes() []*Envelope {
-	whisper.poolMu.RLock()
-	defer whisper.poolMu.RUnlock()
+func (w *Whisper) Envelopes() []*Envelope {
+	w.poolMu.RLock()
+	defer w.poolMu.RUnlock()
 
-	all := make([]*Envelope, 0, len(whisper.envelopes))
-	for _, envelope := range whisper.envelopes {
+	all := make([]*Envelope, 0, len(w.envelopes))
+	for _, envelope := range w.envelopes {
 		all = append(all, envelope)
 	}
 	return all
@@ -1038,13 +749,13 @@ func (whisper *Whisper) Envelopes() []*Envelope {
 
 // Messages iterates through all currently floating envelopes
 // and retrieves all the messages, that this filter could decrypt.
-func (whisper *Whisper) Messages(id string) []*ReceivedMessage {
+func (w *Whisper) Messages(id string) []*ReceivedMessage {
 	result := make([]*ReceivedMessage, 0)
-	whisper.poolMu.RLock()
-	defer whisper.poolMu.RUnlock()
+	w.poolMu.RLock()
+	defer w.poolMu.RUnlock()
 
-	if filter := whisper.filters.Get(id); filter != nil {
-		for _, env := range whisper.envelopes {
+	if filter := w.filters.Get(id); filter != nil {
+		for _, env := range w.envelopes {
 			msg := filter.processEnvelope(env)
 			if msg != nil {
 				result = append(result, msg)
@@ -1055,11 +766,11 @@ func (whisper *Whisper) Messages(id string) []*ReceivedMessage {
 }
 
 // isEnvelopeCached checks if envelope with specific hash has already been received and cached.
-func (whisper *Whisper) isEnvelopeCached(hash common.Hash) bool {
-	whisper.poolMu.Lock()
-	defer whisper.poolMu.Unlock()
+func (w *Whisper) isEnvelopeCached(hash common.Hash) bool {
+	w.poolMu.Lock()
+	defer w.poolMu.Unlock()
 
-	_, exist := whisper.envelopes[hash]
+	_, exist := w.envelopes[hash]
 	return exist
 }
 
@@ -1085,16 +796,9 @@ func validatePrivateKey(k *ecdsa.PrivateKey) bool {
 	return ValidatePublicKey(&k.PublicKey)
 }
 
-// validateDataIntegrity returns false if the data have the wrong or contains all zeros,
-// which is the simplest and the most common bug.
-func validateDataIntegrity(k []byte, expectedSize int) bool {
-	if len(k) != expectedSize {
-		return false
-	}
-	if expectedSize > 3 && containsOnlyZeros(k) {
-		return false
-	}
-	return true
+// validateSymmetricKey returns false if the key contains all zeros
+func validateSymmetricKey(k []byte) bool {
+	return len(k) > 0 && !containsOnlyZeros(k)
 }
 
 // containsOnlyZeros checks if the data contain only zeros.
@@ -1126,78 +830,29 @@ func BytesToUintBigEndian(b []byte) (res uint64) {
 	return res
 }
 
+// deriveKeyMaterial derives symmetric key material from the key or password.
+// pbkdf2 is used for security, in case people use password instead of randomly generated keys.
+func deriveKeyMaterial(key []byte, version uint64) (derivedKey []byte, err error) {
+	if version == 0 {
+		// kdf should run no less than 0.1 seconds on average compute,
+		// because it's a once in a session experience
+		derivedKey := pbkdf2.Key(key, nil, 65356, aesKeyLength, sha256.New)
+		return derivedKey, nil
+	} else {
+		return nil, unknownVersionError(version)
+	}
+}
+
 // GenerateRandomID generates a random string, which is then returned to be used as a key id
 func GenerateRandomID() (id string, err error) {
-	buf, err := generateSecureRandomData(keyIDSize)
+	buf := make([]byte, keyIdSize)
+	_, err = crand.Read(buf)
 	if err != nil {
 		return "", err
 	}
-	if !validateDataIntegrity(buf, keyIDSize) {
+	if !validateSymmetricKey(buf) {
 		return "", fmt.Errorf("error in generateRandomID: crypto/rand failed to generate random data")
 	}
 	id = common.Bytes2Hex(buf)
 	return id, err
-}
-
-// makeDeterministicID generates a deterministic ID, based on a given input
-func makeDeterministicID(input string, keyLen int) (id string, err error) {
-	buf := pbkdf2.Key([]byte(input), nil, 4096, keyLen, sha256.New)
-	if !validateDataIntegrity(buf, keyIDSize) {
-		return "", fmt.Errorf("error in GenerateDeterministicID: failed to generate key")
-	}
-	id = common.Bytes2Hex(buf)
-	return id, err
-}
-
-// toDeterministicID reviews incoming id, and transforms it to format
-// expected internally be private key store. Originally, public keys
-// were used as keys, now random keys are being used. And in order to
-// make it easier to consume, we now allow both random IDs and public
-// keys to be passed.
-func toDeterministicID(id string, expectedLen int) (string, error) {
-	if len(id) != (expectedLen * 2) { // we received hex key, so number of chars in id is doubled
-		var err error
-		id, err = makeDeterministicID(id, expectedLen)
-		if err != nil {
-			return "", err
-		}
-	}
-
-	return id, nil
-}
-
-func isFullNode(bloom []byte) bool {
-	if bloom == nil {
-		return true
-	}
-	for _, b := range bloom {
-		if b != 255 {
-			return false
-		}
-	}
-	return true
-}
-
-func bloomFilterMatch(filter, sample []byte) bool {
-	if filter == nil {
-		return true
-	}
-
-	for i := 0; i < bloomFilterSize; i++ {
-		f := filter[i]
-		s := sample[i]
-		if (f | s) != f {
-			return false
-		}
-	}
-
-	return true
-}
-
-func addBloom(a, b []byte) []byte {
-	c := make([]byte, bloomFilterSize)
-	for i := 0; i < bloomFilterSize; i++ {
-		c[i] = a[i] | b[i]
-	}
-	return c
 }

@@ -43,7 +43,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/nat"
 	"github.com/ethereum/go-ethereum/whisper/mailserver"
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
+	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"golang.org/x/crypto/pbkdf2"
 )
 
@@ -61,15 +61,17 @@ var (
 
 // encryption
 var (
-	symKey     []byte
-	pub        *ecdsa.PublicKey
-	asymKey    *ecdsa.PrivateKey
-	nodeid     *ecdsa.PrivateKey
-	topic      whisper.TopicType
-	asymKeyID  string
-	filterID   string
-	symPass    string
-	msPassword string
+	symKey  []byte
+	pub     *ecdsa.PublicKey
+	asymKey *ecdsa.PrivateKey
+	nodeid  *ecdsa.PrivateKey
+	topic   whisper.TopicType
+
+	asymKeyID    string
+	asymFilterID string
+	symFilterID  string
+	symPass      string
+	msPassword   string
 )
 
 // cmd arguments
@@ -98,8 +100,6 @@ var (
 	argEnode   = flag.String("boot", "", "bootstrap node you want to connect to (e.g. enode://e454......08d50@52.176.211.200:16428)")
 	argTopic   = flag.String("topic", "", "topic in hexadecimal format (e.g. 70a4beef)")
 	argSaveDir = flag.String("savedir", "", "directory where incoming messages will be saved as files")
-	argSymPass = flag.String("sympass", "", "SymKey password")
-	argMsPass  = flag.String("mspass", "", "Mailserver password")
 )
 
 func main() {
@@ -147,13 +147,6 @@ func processArgs() {
 		}
 	} else if *fileExMode {
 		utils.Fatalf("Parameter 'savedir' is mandatory for file exchange mode")
-	}
-	if len(*argSymPass) > 0 {
-		symPass = *argSymPass
-	}
-
-	if len(*argMsPass) > 0 {
-		msPassword = *argMsPass
 	}
 
 	if *echoMode {
@@ -372,13 +365,22 @@ func configureNode() {
 		}
 	}
 
-	filter := whisper.Filter{
+	symFilter := whisper.Filter{
 		KeySym:   symKey,
+		Topics:   [][]byte{topic[:]},
+		AllowP2P: p2pAccept,
+	}
+	symFilterID, err = shh.Subscribe(&symFilter)
+	if err != nil {
+		utils.Fatalf("Failed to install filter: %s", err)
+	}
+
+	asymFilter := whisper.Filter{
 		KeyAsym:  asymKey,
 		Topics:   [][]byte{topic[:]},
 		AllowP2P: p2pAccept,
 	}
-	filterID, err = shh.Subscribe(&filter)
+	asymFilterID, err = shh.Subscribe(&asymFilter)
 	if err != nil {
 		utils.Fatalf("Failed to install filter: %s", err)
 	}
@@ -424,22 +426,8 @@ func run() {
 	} else if *fileExMode {
 		sendFilesLoop()
 	} else {
-		pingLoop() // instead of sendLoop()
+		sendLoop()
 	}
-}
-
-func pingLoop() {
-	ticker := time.NewTicker(time.Second * 120)
-
-	for {
-		select {
-		case <-ticker.C:
-			fmt.Println("I am alive: ", time.Now())
-		case <-done:
-			return
-		}
-	}
-
 }
 
 func sendLoop() {
@@ -545,9 +533,14 @@ func sendMsg(payload []byte) common.Hash {
 }
 
 func messageLoop() {
-	f := shh.GetFilter(filterID)
-	if f == nil {
-		utils.Fatalf("filter is not installed")
+	sf := shh.GetFilter(symFilterID)
+	if sf == nil {
+		utils.Fatalf("symmetric filter is not installed")
+	}
+
+	af := shh.GetFilter(asymFilterID)
+	if af == nil {
+		utils.Fatalf("asymmetric filter is not installed")
 	}
 
 	ticker := time.NewTicker(time.Millisecond * 50)
@@ -555,7 +548,16 @@ func messageLoop() {
 	for {
 		select {
 		case <-ticker.C:
-			messages := f.Retrieve()
+			messages := sf.Retrieve()
+			for _, msg := range messages {
+				if *fileExMode || len(msg.Payload) > 2048 {
+					writeMessageToFile(*argSaveDir, msg)
+				} else {
+					printMessageInfo(msg)
+				}
+			}
+
+			messages = af.Retrieve()
 			for _, msg := range messages {
 				if *fileExMode || len(msg.Payload) > 2048 {
 					writeMessageToFile(*argSaveDir, msg)
@@ -624,7 +626,7 @@ func requestExpiredMessagesLoop() {
 	if err != nil {
 		utils.Fatalf("Failed to save symmetric key for mail request: %s", err)
 	}
-	peerID = extractIdFromEnode(*argEnode)
+	peerID = extractIDFromEnode(*argEnode)
 	shh.AllowP2PMessagesFromPeer(peerID)
 
 	for {
@@ -675,7 +677,7 @@ func requestExpiredMessagesLoop() {
 	}
 }
 
-func extractIdFromEnode(s string) []byte {
+func extractIDFromEnode(s string) []byte {
 	n, err := discover.ParseNode(s)
 	if err != nil {
 		utils.Fatalf("Failed to parse enode: %s", err)

@@ -36,60 +36,76 @@ import (
 // Envelope represents a clear-text data packet to transmit through the Whisper
 // network. Its contents may or may not be encrypted and signed.
 type Envelope struct {
-	Expiry uint32
-	TTL    uint32
-	Topic  TopicType
-	Data   []byte
-	Nonce  uint64
+	Version  []byte
+	Expiry   uint32
+	TTL      uint32
+	Topic    TopicType
+	AESNonce []byte
+	Data     []byte
+	EnvNonce uint64
 
-	pow float64 // Message-specific PoW as described in the Whisper specification.
-
-	// the following variables should not be accessed directly, use the corresponding function instead: Hash(), Bloom()
-	hash  common.Hash // Cached hash of the envelope to avoid rehashing every time.
-	bloom []byte
+	pow  float64     // Message-specific PoW as described in the Whisper specification.
+	hash common.Hash // Cached hash of the envelope to avoid rehashing every time.
+	// Don't access hash directly, use Hash() function instead.
 }
 
 // size returns the size of envelope as it is sent (i.e. public fields only)
 func (e *Envelope) size() int {
-	return EnvelopeHeaderLength + len(e.Data)
+	return 20 + len(e.Version) + len(e.AESNonce) + len(e.Data)
 }
 
 // rlpWithoutNonce returns the RLP encoded envelope contents, except the nonce.
 func (e *Envelope) rlpWithoutNonce() []byte {
-	res, _ := rlp.EncodeToBytes([]interface{}{e.Expiry, e.TTL, e.Topic, e.Data})
+	res, _ := rlp.EncodeToBytes([]interface{}{e.Version, e.Expiry, e.TTL, e.Topic, e.AESNonce, e.Data})
 	return res
 }
 
 // NewEnvelope wraps a Whisper message with expiration and destination data
 // included into an envelope for network forwarding.
-func NewEnvelope(ttl uint32, topic TopicType, msg *sentMessage) *Envelope {
+func NewEnvelope(ttl uint32, topic TopicType, aesNonce []byte, msg *sentMessage) *Envelope {
 	env := Envelope{
-		Expiry: uint32(time.Now().Add(time.Second * time.Duration(ttl)).Unix()),
-		TTL:    ttl,
-		Topic:  topic,
-		Data:   msg.Raw,
-		Nonce:  0,
+		Version:  make([]byte, 1),
+		Expiry:   uint32(time.Now().Add(time.Second * time.Duration(ttl)).Unix()),
+		TTL:      ttl,
+		Topic:    topic,
+		AESNonce: aesNonce,
+		Data:     msg.Raw,
+		EnvNonce: 0,
+	}
+
+	if EnvelopeVersion < 256 {
+		env.Version[0] = byte(EnvelopeVersion)
+	} else {
+		panic("please increase the size of Envelope.Version before releasing this version")
 	}
 
 	return &env
 }
 
+func (e *Envelope) IsSymmetric() bool {
+	return len(e.AESNonce) > 0
+}
+
+func (e *Envelope) isAsymmetric() bool {
+	return !e.IsSymmetric()
+}
+
+func (e *Envelope) Ver() uint64 {
+	return bytesToUintLittleEndian(e.Version)
+}
+
 // Seal closes the envelope by spending the requested amount of time as a proof
 // of work on hashing the data.
 func (e *Envelope) Seal(options *MessageParams) error {
-	if options.PoW == 0 {
-		// PoW is not required
-		return nil
-	}
-
 	var target, bestBit int
-	if options.PoW < 0 {
-		// target is not set - the function should run for a period
-		// of time specified in WorkTime param. Since we can predict
-		// the execution time, we can also adjust Expiry.
+	if options.PoW == 0 {
+		// adjust for the duration of Seal() execution only if execution time is predefined unconditionally
 		e.Expiry += options.WorkTime
 	} else {
 		target = e.powToFirstBit(options.PoW)
+		if target < 1 {
+			target = 1
+		}
 	}
 
 	buf := make([]byte, 64)
@@ -103,7 +119,7 @@ func (e *Envelope) Seal(options *MessageParams) error {
 			d := new(big.Int).SetBytes(crypto.Keccak256(buf))
 			firstBit := math.FirstBitSet(d)
 			if firstBit > bestBit {
-				e.Nonce, bestBit = nonce, firstBit
+				e.EnvNonce, bestBit = nonce, firstBit
 				if target > 0 && bestBit >= target {
 					return nil
 				}
@@ -119,8 +135,6 @@ func (e *Envelope) Seal(options *MessageParams) error {
 	return nil
 }
 
-// PoW computes (if necessary) and returns the proof of work target
-// of the envelope.
 func (e *Envelope) PoW() float64 {
 	if e.pow == 0 {
 		e.calculatePoW(0)
@@ -132,7 +146,7 @@ func (e *Envelope) calculatePoW(diff uint32) {
 	buf := make([]byte, 64)
 	h := crypto.Keccak256(e.rlpWithoutNonce())
 	copy(buf[:32], h)
-	binary.BigEndian.PutUint64(buf[56:], e.Nonce)
+	binary.BigEndian.PutUint64(buf[56:], e.EnvNonce)
 	d := new(big.Int).SetBytes(crypto.Keccak256(buf))
 	firstBit := math.FirstBitSet(d)
 	x := gmath.Pow(2, float64(firstBit))
@@ -147,11 +161,7 @@ func (e *Envelope) powToFirstBit(pow float64) int {
 	x *= float64(e.TTL)
 	bits := gmath.Log2(x)
 	bits = gmath.Ceil(bits)
-	res := int(bits)
-	if res < 1 {
-		res = 1
-	}
-	return res
+	return int(bits)
 }
 
 // Hash returns the SHA3 hash of the envelope, calculating it if not yet done.
@@ -199,7 +209,7 @@ func (e *Envelope) OpenAsymmetric(key *ecdsa.PrivateKey) (*ReceivedMessage, erro
 // OpenSymmetric tries to decrypt an envelope, potentially encrypted with a particular key.
 func (e *Envelope) OpenSymmetric(key []byte) (msg *ReceivedMessage, err error) {
 	msg = &ReceivedMessage{Raw: e.Data}
-	err = msg.decryptSymmetric(key)
+	err = msg.decryptSymmetric(key, e.AESNonce)
 	if err != nil {
 		msg = nil
 	}
@@ -208,17 +218,12 @@ func (e *Envelope) OpenSymmetric(key []byte) (msg *ReceivedMessage, err error) {
 
 // Open tries to decrypt an envelope, and populates the message fields in case of success.
 func (e *Envelope) Open(watcher *Filter) (msg *ReceivedMessage) {
-	// The API interface forbids filters doing both symmetric and asymmetric encryption.
-	if watcher.expectsAsymmetricEncryption() && watcher.expectsSymmetricEncryption() {
-		return nil
-	}
-
-	if watcher.expectsAsymmetricEncryption() {
+	if e.isAsymmetric() {
 		msg, _ = e.OpenAsymmetric(watcher.KeyAsym)
 		if msg != nil {
 			msg.Dst = &watcher.KeyAsym.PublicKey
 		}
-	} else if watcher.expectsSymmetricEncryption() {
+	} else if e.IsSymmetric() {
 		msg, _ = e.OpenSymmetric(watcher.KeySym)
 		if msg != nil {
 			msg.SymKeyHash = crypto.Keccak256Hash(watcher.KeySym)
@@ -226,7 +231,7 @@ func (e *Envelope) Open(watcher *Filter) (msg *ReceivedMessage) {
 	}
 
 	if msg != nil {
-		ok := msg.ValidateAndParse()
+		ok := msg.Validate()
 		if !ok {
 			return nil
 		}
@@ -235,33 +240,7 @@ func (e *Envelope) Open(watcher *Filter) (msg *ReceivedMessage) {
 		msg.TTL = e.TTL
 		msg.Sent = e.Expiry - e.TTL
 		msg.EnvelopeHash = e.Hash()
+		msg.EnvelopeVersion = e.Ver()
 	}
 	return msg
-}
-
-// Bloom maps 4-bytes Topic into 64-byte bloom filter with 3 bits set (at most).
-func (e *Envelope) Bloom() []byte {
-	if e.bloom == nil {
-		e.bloom = TopicToBloom(e.Topic)
-	}
-	return e.bloom
-}
-
-// TopicToBloom converts the topic (4 bytes) to the bloom filter (64 bytes)
-func TopicToBloom(topic TopicType) []byte {
-	b := make([]byte, bloomFilterSize)
-	var index [3]int
-	for j := 0; j < 3; j++ {
-		index[j] = int(topic[j])
-		if (topic[3] & (1 << uint(j))) != 0 {
-			index[j] += 256
-		}
-	}
-
-	for j := 0; j < 3; j++ {
-		byteIndex := index[j] / 8
-		bitIndex := index[j] % 8
-		b[byteIndex] = (1 << uint(bitIndex))
-	}
-	return b
 }

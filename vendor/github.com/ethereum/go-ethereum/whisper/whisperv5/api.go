@@ -33,10 +33,7 @@ import (
 )
 
 const (
-	// HACK: make the filter essentially never timeout (1 year of timeout time)
-	// It's a hack, but that simplifies rebasing process, because the patch consists
-	// only of 1 LoC change (excluding this comment).
-	filterTimeout = 525600 * 60 // filters are considered timeout out after filterTimeout seconds
+	filterTimeout = 300 // filters are considered timeout out after filterTimeout seconds
 )
 
 var (
@@ -575,7 +572,7 @@ func (api *PublicWhisperAPI) NewMessageFilter(req Criteria) (string, error) {
 	}
 
 	if len(req.Topics) > 0 {
-		topics = make([][]byte, 1)
+		topics = make([][]byte, 0, len(req.Topics))
 		for _, topic := range req.Topics {
 			topics = append(topics, topic[:])
 		}

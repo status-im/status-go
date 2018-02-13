@@ -8,6 +8,12 @@
   revision = "2a6c4f48b49f0d5dbfe621589da4c5405157d7c9"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/StackExchange/wmi"
+  packages = ["."]
+  revision = "5d049714c4a64225c3c79a7cf7d02f7fb5b96338"
+
+[[projects]]
   name = "github.com/aristanetworks/goarista"
   packages = ["monotime"]
   revision = "ea17b1a17847fb6e4c0a91de0b674704693469b0"
@@ -47,7 +53,16 @@
   revision = "935e0e8a636ca4ba70b713f3e38a19e1b77739e8"
 
 [[projects]]
-  branch = "develop"
+  name = "github.com/elastic/gosigar"
+  packages = [
+    ".",
+    "sys/windows"
+  ]
+  revision = "16df19fe5efee4ea2938bde5f56c02d9929dc054"
+  version = "v0.8.0"
+
+[[projects]]
+  branch = "master"
   name = "github.com/ethereum/go-ethereum"
   packages = [
     ".",
@@ -58,6 +73,7 @@
     "cmd/utils",
     "common",
     "common/bitutil",
+    "common/fdlimit",
     "common/hexutil",
     "common/math",
     "common/mclock",
@@ -82,6 +98,8 @@
     "eth/fetcher",
     "eth/filters",
     "eth/gasprice",
+    "eth/tracers",
+    "eth/tracers/internal/tracers",
     "ethdb",
     "ethstats",
     "event",
@@ -89,7 +107,6 @@
     "internal/ethapi",
     "les",
     "les/flowcontrol",
-    "les/status",
     "light",
     "log",
     "log/term",
@@ -106,11 +123,19 @@
     "rpc",
     "trie",
     "whisper/mailserver",
-    "whisper/notifications",
-    "whisper/whisperv5"
+    "whisper/whisperv5",
+    "whisper/whisperv6"
   ]
-  revision = "5b2cc44bf2b32bb482def02d7c8fa32ba08d0bf4"
-  source = "https://github.com/status-im/go-ethereum.git"
+  revision = "da41a7258d94fb35113f3b2da3635c7c451e5831"
+
+[[projects]]
+  name = "github.com/go-ole/go-ole"
+  packages = [
+    ".",
+    "oleutil"
+  ]
+  revision = "a41e3c4b706f6ae8dfbff342b06e40fa4d2d0506"
+  version = "v1.2.1"
 
 [[projects]]
   name = "github.com/go-playground/locales"
@@ -202,6 +227,12 @@
   name = "github.com/pborman/uuid"
   packages = ["."]
   revision = "1b00554d822231195d1babd97ff4a781231955c9"
+
+[[projects]]
+  name = "github.com/pkg/errors"
+  packages = ["."]
+  revision = "645ef00459ed84a119197bfb8d8205042c6df63d"
+  version = "v0.8.0"
 
 [[projects]]
   name = "github.com/pmezard/go-difflib"
@@ -343,7 +374,10 @@
 [[projects]]
   branch = "master"
   name = "golang.org/x/sys"
-  packages = ["unix"]
+  packages = [
+    "unix",
+    "windows"
+  ]
   revision = "2c42eef0765b9837fbdab12011af7830f55f88f0"
 
 [[projects]]
@@ -398,6 +432,12 @@
   revision = "c1b8fa8bdccecb0b8db834ee0b92fdbcfa606dd6"
 
 [[projects]]
+  branch = "v3"
+  name = "gopkg.in/olebedev/go-duktape.v3"
+  packages = ["."]
+  revision = "3c4db4ad4f2db84859454dc805d6eb7d8051a8ce"
+
+[[projects]]
   name = "gopkg.in/sourcemap.v1"
   packages = [
     ".",
@@ -415,6 +455,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "1e24f8d3adca6619451ee4406b8064268631ad03c06fdc6323abc00a974797ac"
+  inputs-digest = "cf55bf659fcbff0fadbabac143c1b1bdb2100f92ae34729405c1da8b6d1f2660"
   solver-name = "gps-cdcl"
   solver-version = 1
