@@ -22,16 +22,14 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/ethereum/go-ethereum/trie"
 )
 
 // NodeSet stores a set of trie nodes. It implements trie.Database and can also
 // act as a cache for another trie.Database.
 type NodeSet struct {
-	nodes map[string][]byte
-	order []string
-
+	db       map[string][]byte
 	dataSize int
 	lock     sync.RWMutex
 }
@@ -39,7 +37,7 @@ type NodeSet struct {
 // NewNodeSet creates an empty node set
 func NewNodeSet() *NodeSet {
 	return &NodeSet{
-		nodes: make(map[string][]byte),
+		db: make(map[string][]byte),
 	}
 }
 
@@ -48,15 +46,10 @@ func (db *NodeSet) Put(key []byte, value []byte) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
-	if _, ok := db.nodes[string(key)]; ok {
-		return nil
+	if _, ok := db.db[string(key)]; !ok {
+		db.db[string(key)] = common.CopyBytes(value)
+		db.dataSize += len(value)
 	}
-	keystr := string(key)
-
-	db.nodes[keystr] = common.CopyBytes(value)
-	db.order = append(db.order, keystr)
-	db.dataSize += len(value)
-
 	return nil
 }
 
@@ -65,7 +58,7 @@ func (db *NodeSet) Get(key []byte) ([]byte, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	if entry, ok := db.nodes[string(key)]; ok {
+	if entry, ok := db.db[string(key)]; ok {
 		return entry, nil
 	}
 	return nil, errors.New("not found")
@@ -82,7 +75,7 @@ func (db *NodeSet) KeyCount() int {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	return len(db.nodes)
+	return len(db.db)
 }
 
 // DataSize returns the aggregated data size of nodes in the set
@@ -99,27 +92,27 @@ func (db *NodeSet) NodeList() NodeList {
 	defer db.lock.RUnlock()
 
 	var values NodeList
-	for _, key := range db.order {
-		values = append(values, db.nodes[key])
+	for _, value := range db.db {
+		values = append(values, value)
 	}
 	return values
 }
 
 // Store writes the contents of the set to the given database
-func (db *NodeSet) Store(target ethdb.Putter) {
+func (db *NodeSet) Store(target trie.Database) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	for key, value := range db.nodes {
+	for key, value := range db.db {
 		target.Put([]byte(key), value)
 	}
 }
 
-// NodeList stores an ordered list of trie nodes. It implements ethdb.Putter.
+// NodeList stores an ordered list of trie nodes. It implements trie.DatabaseWriter.
 type NodeList []rlp.RawValue
 
 // Store writes the contents of the list to the given database
-func (n NodeList) Store(db ethdb.Putter) {
+func (n NodeList) Store(db trie.Database) {
 	for _, node := range n {
 		db.Put(crypto.Keccak256(node), node)
 	}

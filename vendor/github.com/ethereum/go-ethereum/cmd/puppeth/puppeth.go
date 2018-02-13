@@ -38,7 +38,7 @@ func main() {
 		},
 		cli.IntFlag{
 			Name:  "loglevel",
-			Value: 3,
+			Value: 4,
 			Usage: "log level to emit to the screen",
 		},
 	}

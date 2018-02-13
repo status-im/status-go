@@ -189,12 +189,17 @@ func (pm *ProtocolManager) synchronise(peer *peer) {
 		mode = downloader.FastSync
 	}
 	// Run the sync cycle, and disable fast sync if we've went past the pivot block
-	if err := pm.downloader.Synchronise(peer.id, pHead, pTd, mode); err != nil {
-		return
-	}
+	err := pm.downloader.Synchronise(peer.id, pHead, pTd, mode)
+
 	if atomic.LoadUint32(&pm.fastSync) == 1 {
-		log.Info("Fast sync complete, auto disabling")
-		atomic.StoreUint32(&pm.fastSync, 0)
+		// Disable fast sync if we indeed have something in our chain
+		if pm.blockchain.CurrentBlock().NumberU64() > 0 {
+			log.Info("Fast sync complete, auto disabling")
+			atomic.StoreUint32(&pm.fastSync, 0)
+		}
+	}
+	if err != nil {
+		return
 	}
 	atomic.StoreUint32(&pm.acceptTxs, 1) // Mark initial sync done
 	if head := pm.blockchain.CurrentBlock(); head.NumberU64() > 0 {

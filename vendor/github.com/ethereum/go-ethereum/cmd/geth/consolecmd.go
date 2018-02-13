@@ -17,10 +17,8 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/cmd/utils"
@@ -114,22 +112,7 @@ func localConsole(ctx *cli.Context) error {
 // console to it.
 func remoteConsole(ctx *cli.Context) error {
 	// Attach to a remotely running geth instance and start the JavaScript console
-	endpoint := ctx.Args().First()
-	if endpoint == "" {
-		path := node.DefaultDataDir()
-		if ctx.GlobalIsSet(utils.DataDirFlag.Name) {
-			path = ctx.GlobalString(utils.DataDirFlag.Name)
-		}
-		if path != "" {
-			if ctx.GlobalBool(utils.TestnetFlag.Name) {
-				path = filepath.Join(path, "testnet")
-			} else if ctx.GlobalBool(utils.RinkebyFlag.Name) {
-				path = filepath.Join(path, "rinkeby")
-			}
-		}
-		endpoint = fmt.Sprintf("%s/geth.ipc", path)
-	}
-	client, err := dialRPC(endpoint)
+	client, err := dialRPC(ctx.Args().First())
 	if err != nil {
 		utils.Fatalf("Unable to attach to remote geth: %v", err)
 	}

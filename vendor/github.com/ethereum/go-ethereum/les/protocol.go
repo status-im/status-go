@@ -41,9 +41,8 @@ const (
 
 // Supported versions of the les protocol (first is primary)
 var (
-	ClientProtocolVersions    = []uint{lpv2, lpv1}
-	ServerProtocolVersions    = []uint{lpv2, lpv1}
-	AdvertiseProtocolVersions = []uint{lpv2} // clients are searching for the first advertised protocol in the list
+	ClientProtocolVersions = []uint{lpv2, lpv1}
+	ServerProtocolVersions = []uint{lpv2, lpv1}
 )
 
 // Number of implemented message corresponding to different protocol versions.
@@ -224,6 +223,6 @@ type proofsData [][]rlp.RawValue
 
 type txStatus struct {
 	Status core.TxStatus
-	Lookup *core.TxLookupEntry `rlp:"nil"`
-	Error  string
+	Lookup *core.TxLookupEntry
+	Error  error
 }

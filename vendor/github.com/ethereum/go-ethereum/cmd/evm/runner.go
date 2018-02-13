@@ -96,9 +96,7 @@ func runCmd(ctx *cli.Context) error {
 	}
 	if ctx.GlobalString(GenesisFlag.Name) != "" {
 		gen := readGenesis(ctx.GlobalString(GenesisFlag.Name))
-		db, _ := ethdb.NewMemDatabase()
-		genesis := gen.ToBlock(db)
-		statedb, _ = state.New(genesis.Root(), state.NewDatabase(db))
+		_, statedb = gen.ToBlock()
 		chainConfig = gen.Config
 	} else {
 		db, _ := ethdb.NewMemDatabase()

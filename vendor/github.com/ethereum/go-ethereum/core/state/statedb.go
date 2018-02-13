@@ -36,14 +36,6 @@ type revision struct {
 	journalIndex int
 }
 
-var (
-	// emptyState is the known hash of an empty state trie entry.
-	emptyState = crypto.Keccak256Hash(nil)
-
-	// emptyCode is the known hash of the empty EVM bytecode.
-	emptyCode = crypto.Keccak256Hash(nil)
-)
-
 // StateDBs within the ethereum protocol are used to store anything
 // within the merkle trie. StateDBs take care of caching and storing
 // nested states. It's the general query interface to retrieve:
@@ -65,7 +57,7 @@ type StateDB struct {
 	dbErr error
 
 	// The refund counter, also used by state transitioning.
-	refund uint64
+	refund *big.Int
 
 	thash, bhash common.Hash
 	txIndex      int
@@ -94,6 +86,7 @@ func New(root common.Hash, db Database) (*StateDB, error) {
 		trie:              tr,
 		stateObjects:      make(map[common.Address]*stateObject),
 		stateObjectsDirty: make(map[common.Address]struct{}),
+		refund:            new(big.Int),
 		logs:              make(map[common.Hash][]*types.Log),
 		preimages:         make(map[common.Hash][]byte),
 	}, nil
@@ -168,9 +161,9 @@ func (self *StateDB) Preimages() map[common.Hash][]byte {
 	return self.preimages
 }
 
-func (self *StateDB) AddRefund(gas uint64) {
-	self.journal = append(self.journal, refundChange{prev: self.refund})
-	self.refund += gas
+func (self *StateDB) AddRefund(gas *big.Int) {
+	self.journal = append(self.journal, refundChange{prev: new(big.Int).Set(self.refund)})
+	self.refund.Add(self.refund, gas)
 }
 
 // Exist reports whether the given account address exists in the state.
@@ -241,11 +234,6 @@ func (self *StateDB) GetState(a common.Address, b common.Hash) common.Hash {
 		return stateObject.GetState(self.db, b)
 	}
 	return common.Hash{}
-}
-
-// Database retrieves the low level database supporting the lower level trie ops.
-func (self *StateDB) Database() Database {
-	return self.db
 }
 
 // StorageTrie returns the storage trie of an account.
@@ -465,10 +453,10 @@ func (self *StateDB) Copy() *StateDB {
 	// Copy all the basic fields, initialize the memory ones
 	state := &StateDB{
 		db:                self.db,
-		trie:              self.db.CopyTrie(self.trie),
+		trie:              self.trie,
 		stateObjects:      make(map[common.Address]*stateObject, len(self.stateObjectsDirty)),
 		stateObjectsDirty: make(map[common.Address]struct{}, len(self.stateObjectsDirty)),
-		refund:            self.refund,
+		refund:            new(big.Int).Set(self.refund),
 		logs:              make(map[common.Hash][]*types.Log, len(self.logs)),
 		logSize:           self.logSize,
 		preimages:         make(map[common.Hash][]byte),
@@ -518,7 +506,9 @@ func (self *StateDB) RevertToSnapshot(revid int) {
 }
 
 // GetRefund returns the current value of the refund counter.
-func (self *StateDB) GetRefund() uint64 {
+// The return value must not be modified by the caller and will become
+// invalid at the next call to AddRefund.
+func (self *StateDB) GetRefund() *big.Int {
 	return self.refund
 }
 
@@ -578,11 +568,11 @@ func (s *StateDB) DeleteSuicides() {
 func (s *StateDB) clearJournalAndRefund() {
 	s.journal = nil
 	s.validRevisions = s.validRevisions[:0]
-	s.refund = 0
+	s.refund = new(big.Int)
 }
 
-// Commit writes the state to the underlying in-memory trie database.
-func (s *StateDB) Commit(deleteEmptyObjects bool) (root common.Hash, err error) {
+// CommitTo writes the state to the given database.
+func (s *StateDB) CommitTo(dbw trie.DatabaseWriter, deleteEmptyObjects bool) (root common.Hash, err error) {
 	defer s.clearJournalAndRefund()
 
 	// Commit objects to the trie.
@@ -596,11 +586,13 @@ func (s *StateDB) Commit(deleteEmptyObjects bool) (root common.Hash, err error) 
 		case isDirty:
 			// Write any contract code associated with the state object
 			if stateObject.code != nil && stateObject.dirtyCode {
-				s.db.TrieDB().Insert(common.BytesToHash(stateObject.CodeHash()), stateObject.code)
+				if err := dbw.Put(stateObject.CodeHash(), stateObject.code); err != nil {
+					return common.Hash{}, err
+				}
 				stateObject.dirtyCode = false
 			}
 			// Write any storage changes in the state object to its storage trie.
-			if err := stateObject.CommitTrie(s.db); err != nil {
+			if err := stateObject.CommitTrie(s.db, dbw); err != nil {
 				return common.Hash{}, err
 			}
 			// Update the object in the main account trie.
@@ -609,20 +601,7 @@ func (s *StateDB) Commit(deleteEmptyObjects bool) (root common.Hash, err error) 
 		delete(s.stateObjectsDirty, addr)
 	}
 	// Write trie changes.
-	root, err = s.trie.Commit(func(leaf []byte, parent common.Hash) error {
-		var account Account
-		if err := rlp.DecodeBytes(leaf, &account); err != nil {
-			return nil
-		}
-		if account.Root != emptyState {
-			s.db.TrieDB().Reference(account.Root, parent)
-		}
-		code := common.BytesToHash(account.CodeHash)
-		if code != emptyCode {
-			s.db.TrieDB().Reference(code, parent)
-		}
-		return nil
-	})
+	root, err = s.trie.CommitTo(dbw)
 	log.Debug("Trie cache stats after commit", "misses", trie.CacheMisses(), "unloads", trie.CacheUnloads())
 	return root, err
 }

@@ -25,6 +25,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/ethereum/go-ethereum/trie"
 )
 
 var emptyCodeHash = crypto.Keccak256(nil)
@@ -237,12 +238,12 @@ func (self *stateObject) updateRoot(db Database) {
 
 // CommitTrie the storage trie of the object to dwb.
 // This updates the trie root.
-func (self *stateObject) CommitTrie(db Database) error {
+func (self *stateObject) CommitTrie(db Database, dbw trie.DatabaseWriter) error {
 	self.updateTrie(db)
 	if self.dbErr != nil {
 		return self.dbErr
 	}
-	root, err := self.trie.Commit(nil)
+	root, err := self.trie.CommitTo(dbw)
 	if err == nil {
 		self.data.Root = root
 	}

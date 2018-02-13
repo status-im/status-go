@@ -29,6 +29,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/sha3"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/p2p/nat"
 	"github.com/ethereum/go-ethereum/p2p/netutil"
 	"github.com/ethereum/go-ethereum/rlp"
 )
@@ -50,8 +51,15 @@ const (
 const testTopic = "foo"
 
 const (
+	printDebugLogs   = false
 	printTestImgLogs = false
 )
+
+func debugLog(s string) {
+	if printDebugLogs {
+		fmt.Println(s)
+	}
+}
 
 // Network manages the table and all protocol interaction.
 type Network struct {
@@ -133,7 +141,7 @@ type timeoutEvent struct {
 	node *Node
 }
 
-func newNetwork(conn transport, ourPubkey ecdsa.PublicKey, dbPath string, netrestrict *netutil.Netlist) (*Network, error) {
+func newNetwork(conn transport, ourPubkey ecdsa.PublicKey, natm nat.Interface, dbPath string, netrestrict *netutil.Netlist) (*Network, error) {
 	ourID := PubkeyID(&ourPubkey)
 
 	var db *nodeDB
@@ -380,14 +388,14 @@ func (net *Network) loop() {
 		}
 	}()
 	resetNextTicket := func() {
-		ticket, timeout := net.ticketStore.nextFilteredTicket()
-		if nextTicket != ticket {
-			nextTicket = ticket
+		t, timeout := net.ticketStore.nextFilteredTicket()
+		if t != nextTicket {
+			nextTicket = t
 			if nextRegisterTimer != nil {
 				nextRegisterTimer.Stop()
 				nextRegisterTime = nil
 			}
-			if ticket != nil {
+			if t != nil {
 				nextRegisterTimer = time.NewTimer(timeout)
 				nextRegisterTime = nextRegisterTimer.C
 			}
@@ -415,13 +423,13 @@ loop:
 
 		select {
 		case <-net.closeReq:
-			log.Trace("<-net.closeReq")
+			debugLog("<-net.closeReq")
 			break loop
 
 		// Ingress packet handling.
 		case pkt := <-net.read:
 			//fmt.Println("read", pkt.ev)
-			log.Trace("<-net.read")
+			debugLog("<-net.read")
 			n := net.internNode(&pkt)
 			prestate := n.state
 			status := "ok"
@@ -436,7 +444,7 @@ loop:
 
 		// State transition timeouts.
 		case timeout := <-net.timeout:
-			log.Trace("<-net.timeout")
+			debugLog("<-net.timeout")
 			if net.timeoutTimers[timeout] == nil {
 				// Stale timer (was aborted).
 				continue
@@ -454,20 +462,20 @@ loop:
 
 		// Querying.
 		case q := <-net.queryReq:
-			log.Trace("<-net.queryReq")
+			debugLog("<-net.queryReq")
 			if !q.start(net) {
 				q.remote.deferQuery(q)
 			}
 
 		// Interacting with the table.
 		case f := <-net.tableOpReq:
-			log.Trace("<-net.tableOpReq")
+			debugLog("<-net.tableOpReq")
 			f()
 			net.tableOpResp <- struct{}{}
 
 		// Topic registration stuff.
 		case req := <-net.topicRegisterReq:
-			log.Trace("<-net.topicRegisterReq")
+			debugLog("<-net.topicRegisterReq")
 			if !req.add {
 				net.ticketStore.removeRegisterTopic(req.topic)
 				continue
@@ -478,7 +486,7 @@ loop:
 			// determination for new topics.
 			// if topicRegisterLookupDone == nil {
 			if topicRegisterLookupTarget.target == (common.Hash{}) {
-				log.Trace("topicRegisterLookupTarget == null")
+				debugLog("topicRegisterLookupTarget == null")
 				if topicRegisterLookupTick.Stop() {
 					<-topicRegisterLookupTick.C
 				}
@@ -488,7 +496,7 @@ loop:
 			}
 
 		case nodes := <-topicRegisterLookupDone:
-			log.Trace("<-topicRegisterLookupDone")
+			debugLog("<-topicRegisterLookupDone")
 			net.ticketStore.registerLookupDone(topicRegisterLookupTarget, nodes, func(n *Node) []byte {
 				net.ping(n, n.addr())
 				return n.pingEcho
@@ -499,7 +507,7 @@ loop:
 			topicRegisterLookupDone = nil
 
 		case <-topicRegisterLookupTick.C:
-			log.Trace("<-topicRegisterLookupTick")
+			debugLog("<-topicRegisterLookupTick")
 			if (topicRegisterLookupTarget.target == common.Hash{}) {
 				target, delay := net.ticketStore.nextRegisterLookup()
 				topicRegisterLookupTarget = target
@@ -512,14 +520,14 @@ loop:
 			}
 
 		case <-nextRegisterTime:
-			log.Trace("<-nextRegisterTime")
+			debugLog("<-nextRegisterTime")
 			net.ticketStore.ticketRegistered(*nextTicket)
 			//fmt.Println("sendTopicRegister", nextTicket.t.node.addr().String(), nextTicket.t.topics, nextTicket.idx, nextTicket.t.pong)
 			net.conn.sendTopicRegister(nextTicket.t.node, nextTicket.t.topics, nextTicket.idx, nextTicket.t.pong)
 
 		case req := <-net.topicSearchReq:
 			if refreshDone == nil {
-				log.Trace("<-net.topicSearchReq")
+				debugLog("<-net.topicSearchReq")
 				info, ok := searchInfo[req.topic]
 				if ok {
 					if req.delay == time.Duration(0) {
@@ -565,8 +573,11 @@ loop:
 			if lookupChn := searchInfo[res.target.topic].lookupChn; lookupChn != nil {
 				lookupChn <- net.ticketStore.radius[res.target.topic].converged
 			}
-			net.ticketStore.searchLookupDone(res.target, res.nodes, func(n *Node, topic Topic) []byte {
-				if n.state != nil && n.state.canQuery {
+			net.ticketStore.searchLookupDone(res.target, res.nodes, func(n *Node) []byte {
+				net.ping(n, n.addr())
+				return n.pingEcho
+			}, func(n *Node, topic Topic) []byte {
+				if n.state == known {
 					return net.conn.send(n, topicQueryPacket, topicQuery{Topic: topic}) // TODO: set expiration
 				} else {
 					if n.state == unknown {
@@ -577,7 +588,7 @@ loop:
 			})
 
 		case <-statsDump.C:
-			log.Trace("<-statsDump.C")
+			debugLog("<-statsDump.C")
 			/*r, ok := net.ticketStore.radius[testTopic]
 			if !ok {
 				fmt.Printf("(%x) no radius @ %v\n", net.tab.self.ID[:8], time.Now())
@@ -606,7 +617,7 @@ loop:
 
 		// Periodic / lookup-initiated bucket refresh.
 		case <-refreshTimer.C:
-			log.Trace("<-refreshTimer.C")
+			debugLog("<-refreshTimer.C")
 			// TODO: ideally we would start the refresh timer after
 			// fallback nodes have been set for the first time.
 			if refreshDone == nil {
@@ -620,7 +631,7 @@ loop:
 				bucketRefreshTimer.Reset(bucketRefreshInterval)
 			}()
 		case newNursery := <-net.refreshReq:
-			log.Trace("<-net.refreshReq")
+			debugLog("<-net.refreshReq")
 			if newNursery != nil {
 				net.nursery = newNursery
 			}
@@ -630,23 +641,18 @@ loop:
 			}
 			net.refreshResp <- refreshDone
 		case <-refreshDone:
-			log.Trace("<-net.refreshDone", "table size", net.tab.count)
-			if net.tab.count != 0 {
-				refreshDone = nil
-				list := searchReqWhenRefreshDone
-				searchReqWhenRefreshDone = nil
-				go func() {
-					for _, req := range list {
-						net.topicSearchReq <- req
-					}
-				}()
-			} else {
-				refreshDone = make(chan struct{})
-				net.refresh(refreshDone)
-			}
+			debugLog("<-net.refreshDone")
+			refreshDone = nil
+			list := searchReqWhenRefreshDone
+			searchReqWhenRefreshDone = nil
+			go func() {
+				for _, req := range list {
+					net.topicSearchReq <- req
+				}
+			}()
 		}
 	}
-	log.Trace("loop stopped")
+	debugLog("loop stopped")
 
 	log.Debug(fmt.Sprintf("shutting down"))
 	if net.conn != nil {
@@ -678,7 +684,7 @@ func (net *Network) refresh(done chan<- struct{}) {
 		seeds = net.nursery
 	}
 	if len(seeds) == 0 {
-		log.Trace("no seed nodes found")
+		log.Trace(fmt.Sprint("no seed nodes found"))
 		close(done)
 		return
 	}
@@ -753,15 +759,7 @@ func (net *Network) internNodeFromNeighbours(sender *net.UDPAddr, rn rpcNode) (n
 		return n, err
 	}
 	if !n.IP.Equal(rn.IP) || n.UDP != rn.UDP || n.TCP != rn.TCP {
-		if n.state == known {
-			// reject address change if node is known by us
-			err = fmt.Errorf("metadata mismatch: got %v, want %v", rn, n)
-		} else {
-			// accept otherwise; this will be handled nicer with signed ENRs
-			n.IP = rn.IP
-			n.UDP = rn.UDP
-			n.TCP = rn.TCP
-		}
+		err = fmt.Errorf("metadata mismatch: got %v, want %v", rn, n)
 	}
 	return n, err
 }
@@ -1111,14 +1109,14 @@ func (net *Network) ping(n *Node, addr *net.UDPAddr) {
 		//fmt.Println(" not sent")
 		return
 	}
-	log.Trace("Pinging remote node", "node", n.ID)
+	debugLog(fmt.Sprintf("ping(node = %x)", n.ID[:8]))
 	n.pingTopics = net.ticketStore.regTopicSet()
 	n.pingEcho = net.conn.sendPing(n, addr, n.pingTopics)
 	net.timedEvent(respTimeout, n, pongTimeout)
 }
 
 func (net *Network) handlePing(n *Node, pkt *ingressPacket) {
-	log.Trace("Handling remote ping", "node", n.ID)
+	debugLog(fmt.Sprintf("handlePing(node = %x)", n.ID[:8]))
 	ping := pkt.data.(*ping)
 	n.TCP = ping.From.TCP
 	t := net.topictab.getTicket(n, ping.Topics)
@@ -1133,7 +1131,7 @@ func (net *Network) handlePing(n *Node, pkt *ingressPacket) {
 }
 
 func (net *Network) handleKnownPong(n *Node, pkt *ingressPacket) error {
-	log.Trace("Handling known pong", "node", n.ID)
+	debugLog(fmt.Sprintf("handleKnownPong(node = %x)", n.ID[:8]))
 	net.abortTimedEvent(n, pongTimeout)
 	now := mclock.Now()
 	ticket, err := pongToTicket(now, n.pingTopics, n, pkt)
@@ -1141,8 +1139,9 @@ func (net *Network) handleKnownPong(n *Node, pkt *ingressPacket) error {
 		// fmt.Printf("(%x) ticket: %+v\n", net.tab.self.ID[:8], pkt.data)
 		net.ticketStore.addTicket(now, pkt.data.(*pong).ReplyTok, ticket)
 	} else {
-		log.Trace("Failed to convert pong to ticket", "err", err)
+		debugLog(fmt.Sprintf(" error: %v", err))
 	}
+
 	n.pingEcho = nil
 	n.pingTopics = nil
 	return err

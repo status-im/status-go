@@ -134,13 +134,6 @@ func (self *Whisper) NewIdentity() *ecdsa.PrivateKey {
 	return key
 }
 
-// AddIdentity adds identity into the known identities list (for message decryption).
-func (self *Whisper) AddIdentity(key *ecdsa.PrivateKey) {
-	self.keysMu.Lock()
-	self.keys[string(crypto.FromECDSAPub(&key.PublicKey))] = key
-	self.keysMu.Unlock()
-}
-
 // HasIdentity checks if the the whisper node is configured with the private key
 // of the specified public pair.
 func (self *Whisper) HasIdentity(key *ecdsa.PublicKey) bool {
@@ -269,7 +262,7 @@ func (self *Whisper) add(envelope *Envelope) error {
 	// Insert the message into the tracked pool
 	hash := envelope.Hash()
 	if _, ok := self.messages[hash]; ok {
-		log.Trace(fmt.Sprintf("whisper envelope already cached: %x\n", hash))
+		log.Trace(fmt.Sprintf("whisper envelope already cached: %x\n", envelope))
 		return nil
 	}
 	self.messages[hash] = envelope
@@ -284,7 +277,7 @@ func (self *Whisper) add(envelope *Envelope) error {
 		// Notify the local node of a message arrival
 		go self.postEvent(envelope)
 	}
-	log.Trace(fmt.Sprintf("cached whisper envelope %x\n", hash))
+	log.Trace(fmt.Sprintf("cached whisper envelope %x\n", envelope))
 	return nil
 }
 

@@ -46,8 +46,6 @@ import (
 )
 
 type LightEthereum struct {
-	config *eth.Config
-
 	odr         *LesOdr
 	relay       *LesTxRelay
 	chainConfig *params.ChainConfig
@@ -77,8 +75,6 @@ type LightEthereum struct {
 	netRPCService *ethapi.PublicNetAPI
 
 	wg sync.WaitGroup
-
-	StatusBackend *ethapi.StatusBackend
 }
 
 func New(ctx *node.ServiceContext, config *eth.Config) (*LightEthereum, error) {
@@ -96,14 +92,13 @@ func New(ctx *node.ServiceContext, config *eth.Config) (*LightEthereum, error) {
 	quitSync := make(chan struct{})
 
 	leth := &LightEthereum{
-		config:           config,
 		chainConfig:      chainConfig,
 		chainDb:          chainDb,
 		eventMux:         ctx.EventMux,
 		peers:            peers,
 		reqDist:          newRequestDistributor(peers, quitSync),
 		accountManager:   ctx.AccountManager,
-		engine:           eth.CreateConsensusEngine(ctx, &config.Ethash, chainConfig, chainDb),
+		engine:           eth.CreateConsensusEngine(ctx, config, chainConfig, chainDb),
 		shutdownChan:     make(chan bool),
 		networkId:        config.NetworkId,
 		bloomRequests:    make(chan chan *bloombits.Retrieval),
@@ -131,17 +126,12 @@ func New(ctx *node.ServiceContext, config *eth.Config) (*LightEthereum, error) {
 	if leth.protocolManager, err = NewProtocolManager(leth.chainConfig, true, ClientProtocolVersions, config.NetworkId, leth.eventMux, leth.engine, leth.peers, leth.blockchain, nil, chainDb, leth.odr, leth.relay, quitSync, &leth.wg); err != nil {
 		return nil, err
 	}
-	leth.ApiBackend = &LesApiBackend{leth, nil, nil}
+	leth.ApiBackend = &LesApiBackend{leth, nil}
 	gpoParams := config.GPO
 	if gpoParams.Default == nil {
 		gpoParams.Default = config.GasPrice
 	}
 	leth.ApiBackend.gpo = gasprice.NewOracle(leth.ApiBackend, gpoParams)
-
-	// inject status-im backend
-	leth.ApiBackend.statusBackend = ethapi.NewStatusBackend(leth.ApiBackend)
-	leth.StatusBackend = leth.ApiBackend.statusBackend // alias
-
 	return leth, nil
 }
 
@@ -231,10 +221,11 @@ func (s *LightEthereum) Start(srvr *p2p.Server) error {
 	s.startBloomHandlers()
 	log.Warn("Light client mode is an experimental feature")
 	s.netRPCService = ethapi.NewPublicNetAPI(srvr, s.networkId)
-	// clients are searching for the first advertised protocol in the list
-	protocolVersion := AdvertiseProtocolVersions[0]
+	// search the topic belonging to the oldest supported protocol because
+	// servers always advertise all supported protocols
+	protocolVersion := ClientProtocolVersions[len(ClientProtocolVersions)-1]
 	s.serverPool.start(srvr, lesTopic(s.blockchain.Genesis().Hash(), protocolVersion))
-	s.protocolManager.Start(s.config.LightPeers)
+	s.protocolManager.Start()
 	return nil
 }
 

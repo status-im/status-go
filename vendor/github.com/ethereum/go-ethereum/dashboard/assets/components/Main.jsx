@@ -1,5 +1,3 @@
-// @flow
-
 // Copyright 2017 The go-ethereum Authors
 // This file is part of the go-ethereum library.
 //
@@ -17,71 +15,95 @@
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 import React, {Component} from 'react';
+import PropTypes from 'prop-types';
+import classNames from 'classnames';
+import {withStyles} from 'material-ui/styles';
 
-import withStyles from 'material-ui/styles/withStyles';
+import {TAGS, DRAWER_WIDTH} from "./Common.jsx";
+import Home from './Home.jsx';
 
-import {MENU} from '../common';
-import Footer from './Footer';
-import type {Content} from '../types/content';
-
-// styles contains the constant styles of the component.
-const styles = {
-	wrapper: {
-		display:       'flex',
-		flexDirection: 'column',
-		width:         '100%',
-	},
-	content: {
-		flex:     1,
-		overflow: 'auto',
-	},
-};
-
-// themeStyles returns the styles generated from the theme for the component.
-const themeStyles = theme => ({
-	content: {
-		backgroundColor: theme.palette.background.default,
-		padding:         theme.spacing.unit * 3,
-	},
-});
-
-export type Props = {
-	classes: Object,
-	active: string,
-	content: Content,
-	shouldUpdate: Object,
-};
-
-// Main renders the chosen content.
-class Main extends Component<Props> {
-	render() {
-		const {
-			classes, active, content, shouldUpdate,
-		} = this.props;
-
-		let children = null;
-		switch (active) {
-		case MENU.get('home').id:
-		case MENU.get('chain').id:
-		case MENU.get('txpool').id:
-		case MENU.get('network').id:
-		case MENU.get('system').id:
-			children = <div>Work in progress.</div>;
-			break;
-		case MENU.get('logs').id:
-			children = <div>{content.logs.log.map((log, index) => <div key={index}>{log}</div>)}</div>;
-		}
-
-		return (
-			<div style={styles.wrapper}>
-				<div className={classes.content} style={styles.content}>{children}</div>
-				<Footer
-					content={content}
-					shouldUpdate={shouldUpdate}
-				/>
-			</div>
-		);
-	}
+// ContentSwitch chooses and renders the proper page content.
+class ContentSwitch extends Component {
+    render() {
+        switch(this.props.active) {
+            case TAGS.home.id:
+                return <Home memory={this.props.memory} traffic={this.props.traffic} shouldUpdate={this.props.shouldUpdate} />;
+            case TAGS.chain.id:
+                return null;
+            case TAGS.transactions.id:
+                return null;
+            case TAGS.network.id:
+                // Only for testing.
+                return null;
+            case TAGS.system.id:
+                return null;
+            case TAGS.logs.id:
+                return <div>{this.props.logs.map((log, index) => <div key={index}>{log}</div>)}</div>;
+        }
+        return null;
+    }
 }
 
-export default withStyles(themeStyles)(Main);
+ContentSwitch.propTypes = {
+    active:       PropTypes.string.isRequired,
+    shouldUpdate: PropTypes.object.isRequired,
+};
+
+// styles contains the styles for the Main component.
+const styles = theme => ({
+    content: {
+        width:           '100%',
+        marginLeft:      -DRAWER_WIDTH,
+        flexGrow:        1,
+        backgroundColor: theme.palette.background.default,
+        padding:         theme.spacing.unit * 3,
+        transition:      theme.transitions.create('margin', {
+            easing:   theme.transitions.easing.sharp,
+            duration: theme.transitions.duration.leavingScreen,
+        }),
+        marginTop:                    56,
+        overflow:                     'auto',
+        [theme.breakpoints.up('sm')]: {
+            content: {
+                height:    'calc(100% - 64px)',
+                marginTop: 64,
+            },
+        },
+    },
+    contentShift: {
+        marginLeft: 0,
+        transition: theme.transitions.create('margin', {
+            easing:   theme.transitions.easing.easeOut,
+            duration: theme.transitions.duration.enteringScreen,
+        }),
+    },
+});
+
+// Main renders a component for the page content.
+class Main extends Component {
+    render() {
+        // The classes property is injected by withStyles().
+        const {classes} = this.props;
+
+        return (
+            <main className={classNames(classes.content, this.props.opened && classes.contentShift)}>
+                <ContentSwitch
+                    active={this.props.active}
+                    memory={this.props.memory}
+                    traffic={this.props.traffic}
+                    logs={this.props.logs}
+                    shouldUpdate={this.props.shouldUpdate}
+                />
+            </main>
+        );
+    }
+}
+
+Main.propTypes = {
+    classes:      PropTypes.object.isRequired,
+    opened:       PropTypes.bool.isRequired,
+    active:       PropTypes.string.isRequired,
+    shouldUpdate: PropTypes.object.isRequired,
+};
+
+export default withStyles(styles)(Main);

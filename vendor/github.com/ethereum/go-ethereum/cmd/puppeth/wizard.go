@@ -28,7 +28,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
@@ -39,11 +38,12 @@ import (
 // config contains all the configurations needed by puppeth that should be saved
 // between sessions.
 type config struct {
-	path      string   // File containing the configuration values
-	bootnodes []string // Bootnodes to always connect to by all nodes
-	ethstats  string   // Ethstats settings to cache for node deploys
+	path      string        // File containing the configuration values
+	genesis   *core.Genesis // Genesis block to cache for node deploys
+	bootFull  []string      // Bootnodes to always connect to by full nodes
+	bootLight []string      // Bootnodes to always connect to by light nodes
+	ethstats  string        // Ethstats settings to cache for node deploys
 
-	Genesis *core.Genesis     `json:"genesis,omitempty"` // Genesis block to cache for node deploys
 	Servers map[string][]byte `json:"servers,omitempty"`
 }
 
@@ -75,8 +75,7 @@ type wizard struct {
 	servers  map[string]*sshClient // SSH connections to servers to administer
 	services map[string][]string   // Ethereum services known to be running on servers
 
-	in   *bufio.Reader // Wrapper around stdin to allow reading user input
-	lock sync.Mutex    // Lock to protect configs during concurrent service discovery
+	in *bufio.Reader // Wrapper around stdin to allow reading user input
 }
 
 // read reads a single line from stdin, trimming if from spaces.

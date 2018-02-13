@@ -1,5 +1,3 @@
-// @flow
-
 // Copyright 2017 The go-ethereum Authors
 // This file is part of the go-ethereum library.
 //
@@ -17,25 +15,22 @@
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 import React from 'react';
-import {render} from 'react-dom';
+import {hydrate} from 'react-dom';
+import {createMuiTheme, MuiThemeProvider} from 'material-ui/styles';
 
-import MuiThemeProvider from 'material-ui/styles/MuiThemeProvider';
-import createMuiTheme from 'material-ui/styles/createMuiTheme';
+import Dashboard from './components/Dashboard.jsx';
 
-import Dashboard from './components/Dashboard';
-
-const theme: Object = createMuiTheme({
-	palette: {
-		type: 'dark',
-	},
+// Theme for the dashboard.
+const theme = createMuiTheme({
+    palette: {
+        type: 'dark',
+    },
 });
-const dashboard = document.getElementById('dashboard');
-if (dashboard) {
-	// Renders the whole dashboard.
-	render(
-		<MuiThemeProvider theme={theme}>
-			<Dashboard />
-		</MuiThemeProvider>,
-		dashboard,
-	);
-}
+
+// Renders the whole dashboard.
+hydrate(
+    <MuiThemeProvider theme={theme}>
+        <Dashboard />
+    </MuiThemeProvider>,
+    document.getElementById('dashboard')
+);

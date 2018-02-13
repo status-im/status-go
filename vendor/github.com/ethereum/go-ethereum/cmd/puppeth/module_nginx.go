@@ -22,7 +22,6 @@ import (
 	"html/template"
 	"math/rand"
 	"path/filepath"
-	"strconv"
 
 	"github.com/ethereum/go-ethereum/log"
 )
@@ -55,7 +54,7 @@ services:
 // deployNginx deploys a new nginx reverse-proxy container to expose one or more
 // HTTP services running on a single host. If an instance with the specified
 // network name already exists there, it will be overwritten!
-func deployNginx(client *sshClient, network string, port int, nocache bool) ([]byte, error) {
+func deployNginx(client *sshClient, network string, port int) ([]byte, error) {
 	log.Info("Deploying nginx reverse-proxy", "server", client.server, "port", port)
 
 	// Generate the content to upload to the server
@@ -79,11 +78,8 @@ func deployNginx(client *sshClient, network string, port int, nocache bool) ([]b
 	}
 	defer client.Run("rm -rf " + workdir)
 
-	// Build and deploy the reverse-proxy service
-	if nocache {
-		return nil, client.Stream(fmt.Sprintf("cd %s && docker-compose -p %s build --pull --no-cache && docker-compose -p %s up -d --force-recreate", workdir, network, network))
-	}
-	return nil, client.Stream(fmt.Sprintf("cd %s && docker-compose -p %s up -d --build --force-recreate", workdir, network))
+	// Build and deploy the ethstats service
+	return nil, client.Stream(fmt.Sprintf("cd %s && docker-compose -p %s up -d --build", workdir, network))
 }
 
 // nginxInfos is returned from an nginx reverse-proxy status check to allow
@@ -92,12 +88,9 @@ type nginxInfos struct {
 	port int
 }
 
-// Report converts the typed struct into a plain string->string map, containing
-// most - but not all - fields for reporting to the user.
-func (info *nginxInfos) Report() map[string]string {
-	return map[string]string{
-		"Shared listener port": strconv.Itoa(info.port),
-	}
+// String implements the stringer interface.
+func (info *nginxInfos) String() string {
+	return fmt.Sprintf("port=%d", info.port)
 }
 
 // checkNginx does a health-check against an nginx reverse-proxy to verify whether

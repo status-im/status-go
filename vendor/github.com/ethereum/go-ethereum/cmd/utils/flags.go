@@ -31,7 +31,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/fdlimit"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/clique"
 	"github.com/ethereum/go-ethereum/consensus/ethash"
@@ -97,7 +96,7 @@ func NewApp(gitCommit, usage string) *cli.App {
 	//app.Authors = nil
 	app.Email = ""
 	app.Version = params.Version
-	if len(gitCommit) >= 8 {
+	if gitCommit != "" {
 		app.Version += "-" + gitCommit[:8]
 	}
 	app.Usage = usage
@@ -170,11 +169,7 @@ var (
 		Usage: `Blockchain sync mode ("fast", "full", or "light")`,
 		Value: &defaultSyncMode,
 	}
-	GCModeFlag = cli.StringFlag{
-		Name:  "gcmode",
-		Usage: `Blockchain garbage collection mode ("full", "archive")`,
-		Value: "full",
-	}
+
 	LightServFlag = cli.IntFlag{
 		Name:  "lightserv",
 		Usage: "Maximum percentage of time allowed for serving LES requests (0-90)",
@@ -183,7 +178,7 @@ var (
 	LightPeersFlag = cli.IntFlag{
 		Name:  "lightpeers",
 		Usage: "Maximum number of LES client peers",
-		Value: eth.DefaultConfig.LightPeers,
+		Value: 20,
 	}
 	LightKDFFlag = cli.BoolFlag{
 		Name:  "lightkdf",
@@ -222,27 +217,27 @@ var (
 	EthashCachesInMemoryFlag = cli.IntFlag{
 		Name:  "ethash.cachesinmem",
 		Usage: "Number of recent ethash caches to keep in memory (16MB each)",
-		Value: eth.DefaultConfig.Ethash.CachesInMem,
+		Value: eth.DefaultConfig.EthashCachesInMem,
 	}
 	EthashCachesOnDiskFlag = cli.IntFlag{
 		Name:  "ethash.cachesondisk",
 		Usage: "Number of recent ethash caches to keep on disk (16MB each)",
-		Value: eth.DefaultConfig.Ethash.CachesOnDisk,
+		Value: eth.DefaultConfig.EthashCachesOnDisk,
 	}
 	EthashDatasetDirFlag = DirectoryFlag{
 		Name:  "ethash.dagdir",
 		Usage: "Directory to store the ethash mining DAGs (default = inside home folder)",
-		Value: DirectoryString{eth.DefaultConfig.Ethash.DatasetDir},
+		Value: DirectoryString{eth.DefaultConfig.EthashDatasetDir},
 	}
 	EthashDatasetsInMemoryFlag = cli.IntFlag{
 		Name:  "ethash.dagsinmem",
 		Usage: "Number of recent ethash mining DAGs to keep in memory (1+GB each)",
-		Value: eth.DefaultConfig.Ethash.DatasetsInMem,
+		Value: eth.DefaultConfig.EthashDatasetsInMem,
 	}
 	EthashDatasetsOnDiskFlag = cli.IntFlag{
 		Name:  "ethash.dagsondisk",
 		Usage: "Number of recent ethash mining DAGs to keep on disk (1+GB each)",
-		Value: eth.DefaultConfig.Ethash.DatasetsOnDisk,
+		Value: eth.DefaultConfig.EthashDatasetsOnDisk,
 	}
 	// Transaction pool settings
 	TxPoolNoLocalsFlag = cli.BoolFlag{
@@ -297,18 +292,8 @@ var (
 	// Performance tuning settings
 	CacheFlag = cli.IntFlag{
 		Name:  "cache",
-		Usage: "Megabytes of memory allocated to internal caching",
-		Value: 1024,
-	}
-	CacheDatabaseFlag = cli.IntFlag{
-		Name:  "cache.database",
-		Usage: "Percentage of cache memory allowance to use for database io",
-		Value: 75,
-	}
-	CacheGCFlag = cli.IntFlag{
-		Name:  "cache.gc",
-		Usage: "Percentage of cache memory allowance to use for trie pruning",
-		Value: 25,
+		Usage: "Megabytes of memory allocated to internal caching (min 16MB / database forced)",
+		Value: 128,
 	}
 	TrieCacheGenFlag = cli.IntFlag{
 		Name:  "trie-cache-gens",
@@ -328,7 +313,7 @@ var (
 	TargetGasLimitFlag = cli.Uint64Flag{
 		Name:  "targetgaslimit",
 		Usage: "Target gas limit sets the artificial target gas floor for the blocks to mine",
-		Value: params.GenesisGasLimit,
+		Value: params.GenesisGasLimit.Uint64(),
 	}
 	EtherbaseFlag = cli.StringFlag{
 		Name:  "etherbase",
@@ -396,11 +381,6 @@ var (
 		Name:  "rpccorsdomain",
 		Usage: "Comma separated list of domains from which to accept cross origin requests (browser enforced)",
 		Value: "",
-	}
-	RPCVirtualHostsFlag = cli.StringFlag{
-		Name:  "rpcvhosts",
-		Usage: "Comma separated list of virtual hostnames from which to accept requests (server enforced). Accepts '*' wildcard.",
-		Value: "localhost",
 	}
 	RPCApiFlag = cli.StringFlag{
 		Name:  "rpcapi",
@@ -604,8 +584,6 @@ func setBootstrapNodes(ctx *cli.Context, cfg *p2p.Config) {
 		urls = params.TestnetBootnodes
 	case ctx.GlobalBool(RinkebyFlag.Name):
 		urls = params.RinkebyBootnodes
-	case cfg.BootstrapNodes != nil:
-		return // already set, don't apply defaults.
 	}
 
 	cfg.BootstrapNodes = make([]*discover.Node, 0, len(urls))
@@ -631,7 +609,7 @@ func setBootstrapNodesV5(ctx *cli.Context, cfg *p2p.Config) {
 			urls = strings.Split(ctx.GlobalString(BootnodesFlag.Name), ",")
 		}
 	case ctx.GlobalBool(RinkebyFlag.Name):
-		urls = params.RinkebyBootnodes
+		urls = params.RinkebyV5Bootnodes
 	case cfg.BootstrapNodesV5 != nil:
 		return // already set, don't apply defaults.
 	}
@@ -652,6 +630,14 @@ func setBootstrapNodesV5(ctx *cli.Context, cfg *p2p.Config) {
 func setListenAddress(ctx *cli.Context, cfg *p2p.Config) {
 	if ctx.GlobalIsSet(ListenPortFlag.Name) {
 		cfg.ListenAddr = fmt.Sprintf(":%d", ctx.GlobalInt(ListenPortFlag.Name))
+	}
+}
+
+// setDiscoveryV5Address creates a UDP listening address string from set command
+// line flags for the V5 discovery protocol.
+func setDiscoveryV5Address(ctx *cli.Context, cfg *p2p.Config) {
+	if ctx.GlobalIsSet(ListenPortFlag.Name) {
+		cfg.DiscoveryV5Addr = fmt.Sprintf(":%d", ctx.GlobalInt(ListenPortFlag.Name)+1)
 	}
 }
 
@@ -695,8 +681,6 @@ func setHTTP(ctx *cli.Context, cfg *node.Config) {
 	if ctx.GlobalIsSet(RPCApiFlag.Name) {
 		cfg.HTTPModules = splitAndTrim(ctx.GlobalString(RPCApiFlag.Name))
 	}
-
-	cfg.HTTPVirtualHosts = splitAndTrim(ctx.GlobalString(RPCVirtualHostsFlag.Name))
 }
 
 // setWS creates the WebSocket RPC listener interface string from the set
@@ -735,14 +719,12 @@ func setIPC(ctx *cli.Context, cfg *node.Config) {
 // makeDatabaseHandles raises out the number of allowed file handles per process
 // for Geth and returns half of the allowance to assign to the database.
 func makeDatabaseHandles() int {
-	limit, err := fdlimit.Current()
+	if err := raiseFdLimit(2048); err != nil {
+		Fatalf("Failed to raise file descriptor allowance: %v", err)
+	}
+	limit, err := getFdLimit()
 	if err != nil {
 		Fatalf("Failed to retrieve file descriptor allowance: %v", err)
-	}
-	if limit < 2048 {
-		if err := fdlimit.Raise(2048); err != nil {
-			Fatalf("Failed to raise file descriptor allowance: %v", err)
-		}
 	}
 	if limit > 2048 { // cap database file descriptors even if more is available
 		limit = 2048
@@ -762,12 +744,6 @@ func MakeAddress(ks *keystore.KeyStore, account string) (accounts.Account, error
 	if err != nil || index < 0 {
 		return accounts.Account{}, fmt.Errorf("invalid account address or index %q", account)
 	}
-	log.Warn("-------------------------------------------------------------------")
-	log.Warn("Referring to accounts by order in the keystore folder is dangerous!")
-	log.Warn("This functionality is deprecated and will be removed in the future!")
-	log.Warn("Please use explicit addresses! (can search via `geth account list`)")
-	log.Warn("-------------------------------------------------------------------")
-
 	accs := ks.Accounts()
 	if len(accs) <= index {
 		return accounts.Account{}, fmt.Errorf("index %d higher than number of accounts %d", index, len(accs))
@@ -784,6 +760,15 @@ func setEtherbase(ctx *cli.Context, ks *keystore.KeyStore, cfg *eth.Config) {
 			Fatalf("Option %q: %v", EtherbaseFlag.Name, err)
 		}
 		cfg.Etherbase = account.Address
+		return
+	}
+	accounts := ks.Accounts()
+	if (cfg.Etherbase == common.Address{}) {
+		if len(accounts) > 0 {
+			cfg.Etherbase = accounts[0].Address
+		} else {
+			log.Warn("No etherbase set and no accounts found as default")
+		}
 	}
 }
 
@@ -809,43 +794,24 @@ func SetP2PConfig(ctx *cli.Context, cfg *p2p.Config) {
 	setNodeKey(ctx, cfg)
 	setNAT(ctx, cfg)
 	setListenAddress(ctx, cfg)
+	setDiscoveryV5Address(ctx, cfg)
 	setBootstrapNodes(ctx, cfg)
 	setBootstrapNodesV5(ctx, cfg)
 
-	lightClient := ctx.GlobalBool(LightModeFlag.Name) || ctx.GlobalString(SyncModeFlag.Name) == "light"
-	lightServer := ctx.GlobalInt(LightServFlag.Name) != 0
-	lightPeers := ctx.GlobalInt(LightPeersFlag.Name)
-
 	if ctx.GlobalIsSet(MaxPeersFlag.Name) {
 		cfg.MaxPeers = ctx.GlobalInt(MaxPeersFlag.Name)
-	} else {
-		if lightServer {
-			cfg.MaxPeers += lightPeers
-		}
-		if lightClient && ctx.GlobalIsSet(LightPeersFlag.Name) && cfg.MaxPeers < lightPeers {
-			cfg.MaxPeers = lightPeers
-		}
 	}
-	if !(lightClient || lightServer) {
-		lightPeers = 0
-	}
-	ethPeers := cfg.MaxPeers - lightPeers
-	if lightClient {
-		ethPeers = 0
-	}
-	log.Info("Maximum peer count", "ETH", ethPeers, "LES", lightPeers, "total", cfg.MaxPeers)
-
 	if ctx.GlobalIsSet(MaxPendingPeersFlag.Name) {
 		cfg.MaxPendingPeers = ctx.GlobalInt(MaxPendingPeersFlag.Name)
 	}
-	if ctx.GlobalIsSet(NoDiscoverFlag.Name) || lightClient {
+	if ctx.GlobalIsSet(NoDiscoverFlag.Name) || ctx.GlobalBool(LightModeFlag.Name) {
 		cfg.NoDiscovery = true
 	}
 
 	// if we're running a light client or server, force enable the v5 peer discovery
 	// unless it is explicitly disabled with --nodiscover note that explicitly specifying
 	// --v5disc overrides --nodiscover, in which case the later only disables v4 discovery
-	forceV5Discovery := (lightClient || lightServer) && !ctx.GlobalBool(NoDiscoverFlag.Name)
+	forceV5Discovery := (ctx.GlobalBool(LightModeFlag.Name) || ctx.GlobalInt(LightServFlag.Name) > 0) && !ctx.GlobalBool(NoDiscoverFlag.Name)
 	if ctx.GlobalIsSet(DiscoveryV5Flag.Name) {
 		cfg.DiscoveryV5 = ctx.GlobalBool(DiscoveryV5Flag.Name)
 	} else if forceV5Discovery {
@@ -864,6 +830,7 @@ func SetP2PConfig(ctx *cli.Context, cfg *p2p.Config) {
 		// --dev mode can't use p2p networking.
 		cfg.MaxPeers = 0
 		cfg.ListenAddr = ":0"
+		cfg.DiscoveryV5Addr = ":0"
 		cfg.NoDiscovery = true
 		cfg.DiscoveryV5 = false
 	}
@@ -943,60 +910,34 @@ func setTxPool(ctx *cli.Context, cfg *core.TxPoolConfig) {
 
 func setEthash(ctx *cli.Context, cfg *eth.Config) {
 	if ctx.GlobalIsSet(EthashCacheDirFlag.Name) {
-		cfg.Ethash.CacheDir = ctx.GlobalString(EthashCacheDirFlag.Name)
+		cfg.EthashCacheDir = ctx.GlobalString(EthashCacheDirFlag.Name)
 	}
 	if ctx.GlobalIsSet(EthashDatasetDirFlag.Name) {
-		cfg.Ethash.DatasetDir = ctx.GlobalString(EthashDatasetDirFlag.Name)
+		cfg.EthashDatasetDir = ctx.GlobalString(EthashDatasetDirFlag.Name)
 	}
 	if ctx.GlobalIsSet(EthashCachesInMemoryFlag.Name) {
-		cfg.Ethash.CachesInMem = ctx.GlobalInt(EthashCachesInMemoryFlag.Name)
+		cfg.EthashCachesInMem = ctx.GlobalInt(EthashCachesInMemoryFlag.Name)
 	}
 	if ctx.GlobalIsSet(EthashCachesOnDiskFlag.Name) {
-		cfg.Ethash.CachesOnDisk = ctx.GlobalInt(EthashCachesOnDiskFlag.Name)
+		cfg.EthashCachesOnDisk = ctx.GlobalInt(EthashCachesOnDiskFlag.Name)
 	}
 	if ctx.GlobalIsSet(EthashDatasetsInMemoryFlag.Name) {
-		cfg.Ethash.DatasetsInMem = ctx.GlobalInt(EthashDatasetsInMemoryFlag.Name)
+		cfg.EthashDatasetsInMem = ctx.GlobalInt(EthashDatasetsInMemoryFlag.Name)
 	}
 	if ctx.GlobalIsSet(EthashDatasetsOnDiskFlag.Name) {
-		cfg.Ethash.DatasetsOnDisk = ctx.GlobalInt(EthashDatasetsOnDiskFlag.Name)
+		cfg.EthashDatasetsOnDisk = ctx.GlobalInt(EthashDatasetsOnDiskFlag.Name)
 	}
 }
 
-// checkExclusive verifies that only a single isntance of the provided flags was
-// set by the user. Each flag might optionally be followed by a string type to
-// specialize it further.
-func checkExclusive(ctx *cli.Context, args ...interface{}) {
+func checkExclusive(ctx *cli.Context, flags ...cli.Flag) {
 	set := make([]string, 0, 1)
-	for i := 0; i < len(args); i++ {
-		// Make sure the next argument is a flag and skip if not set
-		flag, ok := args[i].(cli.Flag)
-		if !ok {
-			panic(fmt.Sprintf("invalid argument, not cli.Flag type: %T", args[i]))
-		}
-		// Check if next arg extends current and expand its name if so
-		name := flag.GetName()
-
-		if i+1 < len(args) {
-			switch option := args[i+1].(type) {
-			case string:
-				// Extended flag, expand the name and shift the arguments
-				if ctx.GlobalString(flag.GetName()) == option {
-					name += "=" + option
-				}
-				i++
-
-			case cli.Flag:
-			default:
-				panic(fmt.Sprintf("invalid argument, not cli.Flag or string extension: %T", args[i+1]))
-			}
-		}
-		// Mark the flag if it's set
+	for _, flag := range flags {
 		if ctx.GlobalIsSet(flag.GetName()) {
-			set = append(set, "--"+name)
+			set = append(set, "--"+flag.GetName())
 		}
 	}
 	if len(set) > 1 {
-		Fatalf("Flags %v can't be used at the same time", strings.Join(set, ", "))
+		Fatalf("flags %v can't be used at the same time", strings.Join(set, ", "))
 	}
 }
 
@@ -1015,8 +956,6 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *eth.Config) {
 	// Avoid conflicting network flags
 	checkExclusive(ctx, DeveloperFlag, TestnetFlag, RinkebyFlag)
 	checkExclusive(ctx, FastSyncFlag, LightModeFlag, SyncModeFlag)
-	checkExclusive(ctx, LightServFlag, LightModeFlag)
-	checkExclusive(ctx, LightServFlag, SyncModeFlag, "light")
 
 	ks := stack.AccountManager().Backends(keystore.KeyStoreType)[0].(*keystore.KeyStore)
 	setEtherbase(ctx, ks, cfg)
@@ -1042,19 +981,11 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *eth.Config) {
 		cfg.NetworkId = ctx.GlobalUint64(NetworkIdFlag.Name)
 	}
 
-	if ctx.GlobalIsSet(CacheFlag.Name) || ctx.GlobalIsSet(CacheDatabaseFlag.Name) {
-		cfg.DatabaseCache = ctx.GlobalInt(CacheFlag.Name) * ctx.GlobalInt(CacheDatabaseFlag.Name) / 100
+	if ctx.GlobalIsSet(CacheFlag.Name) {
+		cfg.DatabaseCache = ctx.GlobalInt(CacheFlag.Name)
 	}
 	cfg.DatabaseHandles = makeDatabaseHandles()
 
-	if gcmode := ctx.GlobalString(GCModeFlag.Name); gcmode != "full" && gcmode != "archive" {
-		Fatalf("--%s must be either 'full' or 'archive'", GCModeFlag.Name)
-	}
-	cfg.NoPruning = ctx.GlobalString(GCModeFlag.Name) == "archive"
-
-	if ctx.GlobalIsSet(CacheFlag.Name) || ctx.GlobalIsSet(CacheGCFlag.Name) {
-		cfg.TrieCache = ctx.GlobalInt(CacheFlag.Name) * ctx.GlobalInt(CacheGCFlag.Name) / 100
-	}
 	if ctx.GlobalIsSet(MinerThreadsFlag.Name) {
 		cfg.MinerThreads = ctx.GlobalInt(MinerThreadsFlag.Name)
 	}
@@ -1145,9 +1076,9 @@ func RegisterEthService(stack *node.Node, cfg *eth.Config) {
 }
 
 // RegisterDashboardService adds a dashboard to the stack.
-func RegisterDashboardService(stack *node.Node, cfg *dashboard.Config, commit string) {
+func RegisterDashboardService(stack *node.Node, cfg *dashboard.Config) {
 	stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-		return dashboard.New(cfg, commit)
+		return dashboard.New(cfg)
 	})
 }
 
@@ -1180,13 +1111,13 @@ func RegisterEthStatsService(stack *node.Node, url string) {
 // SetupNetwork configures the system for either the main net or some test network.
 func SetupNetwork(ctx *cli.Context) {
 	// TODO(fjl): move target gas limit into config
-	params.TargetGasLimit = ctx.GlobalUint64(TargetGasLimitFlag.Name)
+	params.TargetGasLimit = new(big.Int).SetUint64(ctx.GlobalUint64(TargetGasLimitFlag.Name))
 }
 
 // MakeChainDatabase open an LevelDB using the flags passed to the client and will hard crash if it fails.
 func MakeChainDatabase(ctx *cli.Context, stack *node.Node) ethdb.Database {
 	var (
-		cache   = ctx.GlobalInt(CacheFlag.Name) * ctx.GlobalInt(CacheDatabaseFlag.Name) / 100
+		cache   = ctx.GlobalInt(CacheFlag.Name)
 		handles = makeDatabaseHandles()
 	)
 	name := "chaindata"
@@ -1228,29 +1159,14 @@ func MakeChain(ctx *cli.Context, stack *node.Node) (chain *core.BlockChain, chai
 	} else {
 		engine = ethash.NewFaker()
 		if !ctx.GlobalBool(FakePoWFlag.Name) {
-			engine = ethash.New(ethash.Config{
-				CacheDir:       stack.ResolvePath(eth.DefaultConfig.Ethash.CacheDir),
-				CachesInMem:    eth.DefaultConfig.Ethash.CachesInMem,
-				CachesOnDisk:   eth.DefaultConfig.Ethash.CachesOnDisk,
-				DatasetDir:     stack.ResolvePath(eth.DefaultConfig.Ethash.DatasetDir),
-				DatasetsInMem:  eth.DefaultConfig.Ethash.DatasetsInMem,
-				DatasetsOnDisk: eth.DefaultConfig.Ethash.DatasetsOnDisk,
-			})
+			engine = ethash.New(
+				stack.ResolvePath(eth.DefaultConfig.EthashCacheDir), eth.DefaultConfig.EthashCachesInMem, eth.DefaultConfig.EthashCachesOnDisk,
+				stack.ResolvePath(eth.DefaultConfig.EthashDatasetDir), eth.DefaultConfig.EthashDatasetsInMem, eth.DefaultConfig.EthashDatasetsOnDisk,
+			)
 		}
 	}
-	if gcmode := ctx.GlobalString(GCModeFlag.Name); gcmode != "full" && gcmode != "archive" {
-		Fatalf("--%s must be either 'full' or 'archive'", GCModeFlag.Name)
-	}
-	cache := &core.CacheConfig{
-		Disabled:      ctx.GlobalString(GCModeFlag.Name) == "archive",
-		TrieNodeLimit: eth.DefaultConfig.TrieCache,
-		TrieTimeLimit: eth.DefaultConfig.TrieTimeout,
-	}
-	if ctx.GlobalIsSet(CacheFlag.Name) || ctx.GlobalIsSet(CacheGCFlag.Name) {
-		cache.TrieNodeLimit = ctx.GlobalInt(CacheFlag.Name) * ctx.GlobalInt(CacheGCFlag.Name) / 100
-	}
 	vmcfg := vm.Config{EnablePreimageRecording: ctx.GlobalBool(VMEnableDebugFlag.Name)}
-	chain, err = core.NewBlockChain(chainDb, cache, config, engine, vmcfg)
+	chain, err = core.NewBlockChain(chainDb, config, engine, vmcfg)
 	if err != nil {
 		Fatalf("Can't create BlockChain: %v", err)
 	}

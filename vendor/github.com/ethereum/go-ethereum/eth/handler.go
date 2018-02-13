@@ -71,6 +71,7 @@ type ProtocolManager struct {
 
 	txpool      txPool
 	blockchain  *core.BlockChain
+	chaindb     ethdb.Database
 	chainconfig *params.ChainConfig
 	maxPeers    int
 
@@ -105,6 +106,7 @@ func NewProtocolManager(config *params.ChainConfig, mode downloader.SyncMode, ne
 		eventMux:    mux,
 		txpool:      txpool,
 		blockchain:  blockchain,
+		chaindb:     chaindb,
 		chainconfig: config,
 		peers:       newPeerSet(),
 		newPeerCh:   make(chan *peer),
@@ -255,14 +257,8 @@ func (pm *ProtocolManager) handle(p *peer) error {
 	p.Log().Debug("Ethereum peer connected", "name", p.Name())
 
 	// Execute the Ethereum handshake
-	var (
-		genesis = pm.blockchain.Genesis()
-		head    = pm.blockchain.CurrentHeader()
-		hash    = head.Hash()
-		number  = head.Number.Uint64()
-		td      = pm.blockchain.GetTd(hash, number)
-	)
-	if err := p.Handshake(pm.networkId, td, hash, genesis.Hash()); err != nil {
+	td, head, genesis := pm.blockchain.Status()
+	if err := p.Handshake(pm.networkId, td, head, genesis); err != nil {
 		p.Log().Debug("Ethereum handshake failed", "err", err)
 		return err
 	}
@@ -398,14 +394,14 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			case query.Reverse:
 				// Number based traversal towards the genesis block
 				if query.Origin.Number >= query.Skip+1 {
-					query.Origin.Number -= query.Skip + 1
+					query.Origin.Number -= (query.Skip + 1)
 				} else {
 					unknown = true
 				}
 
 			case !query.Reverse:
 				// Number based traversal towards the leaf block
-				query.Origin.Number += query.Skip + 1
+				query.Origin.Number += (query.Skip + 1)
 			}
 		}
 		return p.SendBlockHeaders(headers)
@@ -536,7 +532,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 				return errResp(ErrDecode, "msg %v: %v", msg, err)
 			}
 			// Retrieve the requested state entry, stopping if enough was found
-			if entry, err := pm.blockchain.TrieNode(hash); err == nil {
+			if entry, err := pm.chaindb.Get(hash.Bytes()); err == nil {
 				data = append(data, entry)
 				bytes += len(entry)
 			}
@@ -574,7 +570,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 				return errResp(ErrDecode, "msg %v: %v", msg, err)
 			}
 			// Retrieve the requested block's receipts, skipping if unknown to us
-			results := pm.blockchain.GetReceiptsByHash(hash)
+			results := core.GetBlockReceipts(pm.chaindb, hash, core.GetBlockNumber(pm.chaindb, hash))
 			if results == nil {
 				if header := pm.blockchain.GetHeaderByHash(hash); header == nil || header.ReceiptHash != types.EmptyRootHash {
 					continue
@@ -748,24 +744,22 @@ func (self *ProtocolManager) txBroadcastLoop() {
 	}
 }
 
-// NodeInfo represents a short summary of the Ethereum sub-protocol metadata
-// known about the host peer.
-type NodeInfo struct {
-	Network    uint64              `json:"network"`    // Ethereum network ID (1=Frontier, 2=Morden, Ropsten=3, Rinkeby=4)
-	Difficulty *big.Int            `json:"difficulty"` // Total difficulty of the host's blockchain
-	Genesis    common.Hash         `json:"genesis"`    // SHA3 hash of the host's genesis block
-	Config     *params.ChainConfig `json:"config"`     // Chain configuration for the fork rules
-	Head       common.Hash         `json:"head"`       // SHA3 hash of the host's best owned block
+// EthNodeInfo represents a short summary of the Ethereum sub-protocol metadata known
+// about the host peer.
+type EthNodeInfo struct {
+	Network    uint64      `json:"network"`    // Ethereum network ID (1=Frontier, 2=Morden, Ropsten=3)
+	Difficulty *big.Int    `json:"difficulty"` // Total difficulty of the host's blockchain
+	Genesis    common.Hash `json:"genesis"`    // SHA3 hash of the host's genesis block
+	Head       common.Hash `json:"head"`       // SHA3 hash of the host's best owned block
 }
 
 // NodeInfo retrieves some protocol metadata about the running host node.
-func (self *ProtocolManager) NodeInfo() *NodeInfo {
+func (self *ProtocolManager) NodeInfo() *EthNodeInfo {
 	currentBlock := self.blockchain.CurrentBlock()
-	return &NodeInfo{
+	return &EthNodeInfo{
 		Network:    self.networkId,
 		Difficulty: self.blockchain.GetTd(currentBlock.Hash(), currentBlock.NumberU64()),
 		Genesis:    self.blockchain.Genesis().Hash(),
-		Config:     self.blockchain.Config(),
 		Head:       currentBlock.Hash(),
 	}
 }

@@ -16,11 +16,10 @@
 
 package ens
 
-//go:generate abigen --sol contract/ENS.sol --exc contract/AbstractENS.sol:AbstractENS --pkg contract --out contract/ens.go
-//go:generate abigen --sol contract/FIFSRegistrar.sol --exc contract/AbstractENS.sol:AbstractENS --pkg contract --out contract/fifsregistrar.go
-//go:generate abigen --sol contract/PublicResolver.sol --exc contract/AbstractENS.sol:AbstractENS --pkg contract --out contract/publicresolver.go
+//go:generate abigen --sol contract/ens.sol --pkg contract --out contract/ens.go
 
 import (
+	"math/big"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -59,29 +58,31 @@ func NewENS(transactOpts *bind.TransactOpts, contractAddr common.Address, contra
 }
 
 // DeployENS deploys an instance of the ENS nameservice, with a 'first-in, first-served' root registrar.
-func DeployENS(transactOpts *bind.TransactOpts, contractBackend bind.ContractBackend) (common.Address, *ENS, error) {
-	// Deploy the ENS registry.
-	ensAddr, _, _, err := contract.DeployENS(transactOpts, contractBackend)
+func DeployENS(transactOpts *bind.TransactOpts, contractBackend bind.ContractBackend) (*ENS, error) {
+	// Deploy the ENS registry
+	ensAddr, _, _, err := contract.DeployENS(transactOpts, contractBackend, transactOpts.From)
 	if err != nil {
-		return ensAddr, nil, err
+		return nil, err
 	}
 
 	ens, err := NewENS(transactOpts, ensAddr, contractBackend)
 	if err != nil {
-		return ensAddr, nil, err
+		return nil, err
 	}
 
-	// Deploy the registrar.
+	// Deploy the registrar
 	regAddr, _, _, err := contract.DeployFIFSRegistrar(transactOpts, contractBackend, ensAddr, [32]byte{})
 	if err != nil {
-		return ensAddr, nil, err
-	}
-	// Set the registrar as owner of the ENS root.
-	if _, err = ens.SetOwner([32]byte{}, regAddr); err != nil {
-		return ensAddr, nil, err
+		return nil, err
 	}
 
-	return ensAddr, ens, nil
+	// Set the registrar as owner of the ENS root
+	_, err = ens.SetOwner([32]byte{}, regAddr)
+	if err != nil {
+		return nil, err
+	}
+
+	return ens, nil
 }
 
 func ensParentNode(name string) (common.Hash, common.Hash) {
@@ -155,11 +156,15 @@ func (self *ENS) Resolve(name string) (common.Hash, error) {
 // Only works if the registrar for the parent domain implements the FIFS registrar protocol.
 func (self *ENS) Register(name string) (*types.Transaction, error) {
 	parentNode, label := ensParentNode(name)
+
 	registrar, err := self.getRegistrar(parentNode)
 	if err != nil {
 		return nil, err
 	}
-	return registrar.Contract.Register(&self.TransactOpts, label, self.TransactOpts.From)
+
+	opts := self.TransactOpts
+	opts.GasLimit = big.NewInt(200000)
+	return registrar.Contract.Register(&opts, label, self.TransactOpts.From)
 }
 
 // SetContentHash sets the content hash associated with a name. Only works if the caller
@@ -173,6 +178,6 @@ func (self *ENS) SetContentHash(name string, hash common.Hash) (*types.Transacti
 	}
 
 	opts := self.TransactOpts
-	opts.GasLimit = 200000
+	opts.GasLimit = big.NewInt(200000)
 	return resolver.Contract.SetContent(&opts, node, hash)
 }

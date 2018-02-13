@@ -472,7 +472,7 @@ func opDifficulty(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stac
 }
 
 func opGasLimit(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Stack) ([]byte, error) {
-	stack.push(math.U256(new(big.Int).SetUint64(evm.GasLimit)))
+	stack.push(math.U256(new(big.Int).Set(evm.GasLimit)))
 	return nil, nil
 }
 
@@ -603,20 +603,24 @@ func opCreate(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *S
 }
 
 func opCall(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Stack) ([]byte, error) {
-	// Pop gas. The actual gas in in evm.callGasTemp.
-	evm.interpreter.intPool.put(stack.pop())
-	gas := evm.callGasTemp
-	// Pop other call parameters.
-	addr, value, inOffset, inSize, retOffset, retSize := stack.pop(), stack.pop(), stack.pop(), stack.pop(), stack.pop(), stack.pop()
-	toAddr := common.BigToAddress(addr)
+	gas := stack.pop().Uint64()
+	// pop gas and value of the stack.
+	addr, value := stack.pop(), stack.pop()
 	value = math.U256(value)
-	// Get the arguments from the memory.
+	// pop input size and offset
+	inOffset, inSize := stack.pop(), stack.pop()
+	// pop return size and offset
+	retOffset, retSize := stack.pop(), stack.pop()
+
+	address := common.BigToAddress(addr)
+
+	// Get the arguments from the memory
 	args := memory.Get(inOffset.Int64(), inSize.Int64())
 
 	if value.Sign() != 0 {
 		gas += params.CallStipend
 	}
-	ret, returnGas, err := evm.Call(contract, toAddr, args, gas, value)
+	ret, returnGas, err := evm.Call(contract, address, args, gas, value)
 	if err != nil {
 		stack.push(new(big.Int))
 	} else {
@@ -632,20 +636,25 @@ func opCall(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Sta
 }
 
 func opCallCode(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Stack) ([]byte, error) {
-	// Pop gas. The actual gas is in evm.callGasTemp.
-	evm.interpreter.intPool.put(stack.pop())
-	gas := evm.callGasTemp
-	// Pop other call parameters.
-	addr, value, inOffset, inSize, retOffset, retSize := stack.pop(), stack.pop(), stack.pop(), stack.pop(), stack.pop(), stack.pop()
-	toAddr := common.BigToAddress(addr)
+	gas := stack.pop().Uint64()
+	// pop gas and value of the stack.
+	addr, value := stack.pop(), stack.pop()
 	value = math.U256(value)
-	// Get arguments from the memory.
+	// pop input size and offset
+	inOffset, inSize := stack.pop(), stack.pop()
+	// pop return size and offset
+	retOffset, retSize := stack.pop(), stack.pop()
+
+	address := common.BigToAddress(addr)
+
+	// Get the arguments from the memory
 	args := memory.Get(inOffset.Int64(), inSize.Int64())
 
 	if value.Sign() != 0 {
 		gas += params.CallStipend
 	}
-	ret, returnGas, err := evm.CallCode(contract, toAddr, args, gas, value)
+
+	ret, returnGas, err := evm.CallCode(contract, address, args, gas, value)
 	if err != nil {
 		stack.push(new(big.Int))
 	} else {
@@ -661,13 +670,9 @@ func opCallCode(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack 
 }
 
 func opDelegateCall(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Stack) ([]byte, error) {
-	// Pop gas. The actual gas is in evm.callGasTemp.
-	evm.interpreter.intPool.put(stack.pop())
-	gas := evm.callGasTemp
-	// Pop other call parameters.
-	addr, inOffset, inSize, retOffset, retSize := stack.pop(), stack.pop(), stack.pop(), stack.pop(), stack.pop()
-	toAddr := common.BigToAddress(addr)
-	// Get arguments from the memory.
+	gas, to, inOffset, inSize, outOffset, outSize := stack.pop().Uint64(), stack.pop(), stack.pop(), stack.pop(), stack.pop(), stack.pop()
+
+	toAddr := common.BigToAddress(to)
 	args := memory.Get(inOffset.Int64(), inSize.Int64())
 
 	ret, returnGas, err := evm.DelegateCall(contract, toAddr, args, gas)
@@ -677,25 +682,30 @@ func opDelegateCall(pc *uint64, evm *EVM, contract *Contract, memory *Memory, st
 		stack.push(big.NewInt(1))
 	}
 	if err == nil || err == errExecutionReverted {
-		memory.Set(retOffset.Uint64(), retSize.Uint64(), ret)
+		memory.Set(outOffset.Uint64(), outSize.Uint64(), ret)
 	}
 	contract.Gas += returnGas
 
-	evm.interpreter.intPool.put(addr, inOffset, inSize, retOffset, retSize)
+	evm.interpreter.intPool.put(to, inOffset, inSize, outOffset, outSize)
 	return ret, nil
 }
 
 func opStaticCall(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Stack) ([]byte, error) {
-	// Pop gas. The actual gas is in evm.callGasTemp.
-	evm.interpreter.intPool.put(stack.pop())
-	gas := evm.callGasTemp
-	// Pop other call parameters.
-	addr, inOffset, inSize, retOffset, retSize := stack.pop(), stack.pop(), stack.pop(), stack.pop(), stack.pop()
-	toAddr := common.BigToAddress(addr)
-	// Get arguments from the memory.
+	// pop gas
+	gas := stack.pop().Uint64()
+	// pop address
+	addr := stack.pop()
+	// pop input size and offset
+	inOffset, inSize := stack.pop(), stack.pop()
+	// pop return size and offset
+	retOffset, retSize := stack.pop(), stack.pop()
+
+	address := common.BigToAddress(addr)
+
+	// Get the arguments from the memory
 	args := memory.Get(inOffset.Int64(), inSize.Int64())
 
-	ret, returnGas, err := evm.StaticCall(contract, toAddr, args, gas)
+	ret, returnGas, err := evm.StaticCall(contract, address, args, gas)
 	if err != nil {
 		stack.push(new(big.Int))
 	} else {

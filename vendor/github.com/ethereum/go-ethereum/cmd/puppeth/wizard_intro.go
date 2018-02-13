@@ -24,7 +24,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 
 	"github.com/ethereum/go-ethereum/log"
 )
@@ -64,7 +63,7 @@ func (w *wizard) run() {
 		for {
 			w.network = w.readString()
 			if !strings.Contains(w.network, " ") {
-				fmt.Printf("\nSweet, you can set this via --network=%s next time!\n\n", w.network)
+				fmt.Printf("Sweet, you can set this via --network=%s next time!\n\n", w.network)
 				break
 			}
 			log.Error("I also like to live dangerously, still no spaces")
@@ -81,33 +80,22 @@ func (w *wizard) run() {
 	} else if err := json.Unmarshal(blob, &w.conf); err != nil {
 		log.Crit("Previous configuration corrupted", "path", w.conf.path, "err", err)
 	} else {
-		// Dial all previously known servers concurrently
-		var pend sync.WaitGroup
 		for server, pubkey := range w.conf.Servers {
-			pend.Add(1)
-
-			go func(server string, pubkey []byte) {
-				defer pend.Done()
-
-				log.Info("Dialing previously configured server", "server", server)
-				client, err := dial(server, pubkey)
-				if err != nil {
-					log.Error("Previous server unreachable", "server", server, "err", err)
-				}
-				w.lock.Lock()
-				w.servers[server] = client
-				w.lock.Unlock()
-			}(server, pubkey)
+			log.Info("Dialing previously configured server", "server", server)
+			client, err := dial(server, pubkey)
+			if err != nil {
+				log.Error("Previous server unreachable", "server", server, "err", err)
+			}
+			w.servers[server] = client
 		}
-		pend.Wait()
-		w.networkStats()
+		w.networkStats(false)
 	}
 	// Basics done, loop ad infinitum about what to do
 	for {
 		fmt.Println()
 		fmt.Println("What would you like to do? (default = stats)")
 		fmt.Println(" 1. Show network stats")
-		if w.conf.Genesis == nil {
+		if w.conf.genesis == nil {
 			fmt.Println(" 2. Configure new genesis")
 		} else {
 			fmt.Println(" 2. Manage existing genesis")
@@ -122,14 +110,15 @@ func (w *wizard) run() {
 		} else {
 			fmt.Println(" 4. Manage network components")
 		}
+		//fmt.Println(" 5. ProTips for common usecases")
 
 		choice := w.read()
 		switch {
 		case choice == "" || choice == "1":
-			w.networkStats()
+			w.networkStats(false)
 
 		case choice == "2":
-			if w.conf.Genesis == nil {
+			if w.conf.genesis == nil {
 				w.makeGenesis()
 			} else {
 				w.manageGenesis()
@@ -137,7 +126,7 @@ func (w *wizard) run() {
 		case choice == "3":
 			if len(w.servers) == 0 {
 				if w.makeServer() != "" {
-					w.networkStats()
+					w.networkStats(false)
 				}
 			} else {
 				w.manageServers()
@@ -148,6 +137,9 @@ func (w *wizard) run() {
 			} else {
 				w.manageComponents()
 			}
+
+		case choice == "5":
+			w.networkStats(true)
 
 		default:
 			log.Error("That's not something I can do")

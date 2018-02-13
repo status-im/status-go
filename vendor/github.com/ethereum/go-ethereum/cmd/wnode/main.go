@@ -43,7 +43,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/nat"
 	"github.com/ethereum/go-ethereum/whisper/mailserver"
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
+	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"golang.org/x/crypto/pbkdf2"
 )
 
@@ -61,17 +61,15 @@ var (
 
 // encryption
 var (
-	symKey  []byte
-	pub     *ecdsa.PublicKey
-	asymKey *ecdsa.PrivateKey
-	nodeid  *ecdsa.PrivateKey
-	topic   whisper.TopicType
-
-	asymKeyID    string
-	asymFilterID string
-	symFilterID  string
-	symPass      string
-	msPassword   string
+	symKey     []byte
+	pub        *ecdsa.PublicKey
+	asymKey    *ecdsa.PrivateKey
+	nodeid     *ecdsa.PrivateKey
+	topic      whisper.TopicType
+	asymKeyID  string
+	filterID   string
+	symPass    string
+	msPassword string
 )
 
 // cmd arguments
@@ -365,22 +363,13 @@ func configureNode() {
 		}
 	}
 
-	symFilter := whisper.Filter{
+	filter := whisper.Filter{
 		KeySym:   symKey,
-		Topics:   [][]byte{topic[:]},
-		AllowP2P: p2pAccept,
-	}
-	symFilterID, err = shh.Subscribe(&symFilter)
-	if err != nil {
-		utils.Fatalf("Failed to install filter: %s", err)
-	}
-
-	asymFilter := whisper.Filter{
 		KeyAsym:  asymKey,
 		Topics:   [][]byte{topic[:]},
 		AllowP2P: p2pAccept,
 	}
-	asymFilterID, err = shh.Subscribe(&asymFilter)
+	filterID, err = shh.Subscribe(&filter)
 	if err != nil {
 		utils.Fatalf("Failed to install filter: %s", err)
 	}
@@ -533,14 +522,9 @@ func sendMsg(payload []byte) common.Hash {
 }
 
 func messageLoop() {
-	sf := shh.GetFilter(symFilterID)
-	if sf == nil {
-		utils.Fatalf("symmetric filter is not installed")
-	}
-
-	af := shh.GetFilter(asymFilterID)
-	if af == nil {
-		utils.Fatalf("asymmetric filter is not installed")
+	f := shh.GetFilter(filterID)
+	if f == nil {
+		utils.Fatalf("filter is not installed")
 	}
 
 	ticker := time.NewTicker(time.Millisecond * 50)
@@ -548,16 +532,7 @@ func messageLoop() {
 	for {
 		select {
 		case <-ticker.C:
-			messages := sf.Retrieve()
-			for _, msg := range messages {
-				if *fileExMode || len(msg.Payload) > 2048 {
-					writeMessageToFile(*argSaveDir, msg)
-				} else {
-					printMessageInfo(msg)
-				}
-			}
-
-			messages = af.Retrieve()
+			messages := f.Retrieve()
 			for _, msg := range messages {
 				if *fileExMode || len(msg.Payload) > 2048 {
 					writeMessageToFile(*argSaveDir, msg)
@@ -626,7 +601,7 @@ func requestExpiredMessagesLoop() {
 	if err != nil {
 		utils.Fatalf("Failed to save symmetric key for mail request: %s", err)
 	}
-	peerID = extractIDFromEnode(*argEnode)
+	peerID = extractIdFromEnode(*argEnode)
 	shh.AllowP2PMessagesFromPeer(peerID)
 
 	for {
@@ -677,7 +652,7 @@ func requestExpiredMessagesLoop() {
 	}
 }
 
-func extractIDFromEnode(s string) []byte {
+func extractIdFromEnode(s string) []byte {
 	n, err := discover.ParseNode(s)
 	if err != nil {
 		utils.Fatalf("Failed to parse enode: %s", err)

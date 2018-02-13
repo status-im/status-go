@@ -313,16 +313,6 @@ func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (bool, er
 	return true, api.w.Send(env)
 }
 
-// UninstallFilter is alias for Unsubscribe
-func (api *PublicWhisperAPI) UninstallFilter(id string) {
-	api.w.Unsubscribe(id)
-}
-
-// Unsubscribe disables and removes an existing filter.
-func (api *PublicWhisperAPI) Unsubscribe(id string) {
-	api.w.Unsubscribe(id)
-}
-
 //go:generate gencodec -type Criteria -field-override criteriaOverride -out gen_criteria_json.go
 
 // Criteria holds various filter options for inbound messages.
@@ -572,7 +562,7 @@ func (api *PublicWhisperAPI) NewMessageFilter(req Criteria) (string, error) {
 	}
 
 	if len(req.Topics) > 0 {
-		topics = make([][]byte, 0, len(req.Topics))
+		topics = make([][]byte, 1)
 		for _, topic := range req.Topics {
 			topics = append(topics, topic[:])
 		}

@@ -216,12 +216,8 @@ func (f *Filter) MatchTopic(topic TopicType) bool {
 }
 
 func matchSingleTopic(topic TopicType, bt []byte) bool {
-	if len(bt) > TopicLength {
-		bt = bt[:TopicLength]
-	}
-
-	if len(bt) < TopicLength {
-		return false
+	if len(bt) > 4 {
+		bt = bt[:4]
 	}
 
 	for j, b := range bt {

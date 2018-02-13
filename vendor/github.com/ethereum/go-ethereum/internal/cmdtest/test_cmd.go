@@ -25,7 +25,6 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
-	"strings"
 	"sync"
 	"testing"
 	"text/template"
@@ -142,10 +141,9 @@ func (tt *TestCmd) matchExactOutput(want []byte) error {
 // Note that an arbitrary amount of output may be consumed by the
 // regular expression. This usually means that expect cannot be used
 // after ExpectRegexp.
-func (tt *TestCmd) ExpectRegexp(regex string) (*regexp.Regexp, []string) {
-	regex = strings.TrimPrefix(regex, "\n")
+func (tt *TestCmd) ExpectRegexp(resource string) (*regexp.Regexp, []string) {
 	var (
-		re      = regexp.MustCompile(regex)
+		re      = regexp.MustCompile(resource)
 		rtee    = &runeTee{in: tt.stdout}
 		matches []int
 	)
@@ -153,7 +151,7 @@ func (tt *TestCmd) ExpectRegexp(regex string) (*regexp.Regexp, []string) {
 	output := rtee.buf.Bytes()
 	if matches == nil {
 		tt.Fatalf("Output did not match:\n---------------- (stdout text)\n%s\n---------------- (regular expression)\n%s",
-			output, regex)
+			output, resource)
 		return re, nil
 	}
 	tt.Logf("Matched stdout text:\n%s", output)

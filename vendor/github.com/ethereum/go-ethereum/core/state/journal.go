@@ -62,7 +62,7 @@ type (
 
 	// Changes to other state values.
 	refundChange struct {
-		prev uint64
+		prev *big.Int
 	}
 	addLogChange struct {
 		txhash common.Hash

@@ -62,7 +62,7 @@ func NewAuthNeededError(needed string) error {
 	}
 }
 
-// Error implements the standard error interface.
+// Error implements the standard error interfacel.
 func (err *AuthNeededError) Error() string {
 	return fmt.Sprintf("authentication needed: %s", err.Needed)
 }

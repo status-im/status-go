@@ -24,7 +24,6 @@ import (
 	"sync"
 
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discover"
@@ -83,8 +82,7 @@ func (s *SimAdapter) NewNode(config *NodeConfig) (Node, error) {
 			Dialer:          s,
 			EnableMsgEvents: true,
 		},
-		NoUSB:  true,
-		Logger: log.New("node.id", id.String()),
+		NoUSB: true,
 	})
 	if err != nil {
 		return nil, err

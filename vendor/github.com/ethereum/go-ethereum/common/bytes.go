@@ -17,7 +17,9 @@
 // Package common contains various helper functions.
 package common
 
-import "encoding/hex"
+import (
+	"encoding/hex"
+)
 
 func ToHex(b []byte) string {
 	hex := Bytes2Hex(b)
@@ -33,11 +35,12 @@ func FromHex(s string) []byte {
 		if s[0:2] == "0x" || s[0:2] == "0X" {
 			s = s[2:]
 		}
+		if len(s)%2 == 1 {
+			s = "0" + s
+		}
+		return Hex2Bytes(s)
 	}
-	if len(s)%2 == 1 {
-		s = "0" + s
-	}
-	return Hex2Bytes(s)
+	return nil
 }
 
 // Copy bytes
@@ -53,24 +56,14 @@ func CopyBytes(b []byte) (copiedBytes []byte) {
 	return
 }
 
-func hasHexPrefix(str string) bool {
-	return len(str) >= 2 && str[0] == '0' && (str[1] == 'x' || str[1] == 'X')
+func HasHexPrefix(str string) bool {
+	l := len(str)
+	return l >= 2 && str[0:2] == "0x"
 }
 
-func isHexCharacter(c byte) bool {
-	return ('0' <= c && c <= '9') || ('a' <= c && c <= 'f') || ('A' <= c && c <= 'F')
-}
-
-func isHex(str string) bool {
-	if len(str)%2 != 0 {
-		return false
-	}
-	for _, c := range []byte(str) {
-		if !isHexCharacter(c) {
-			return false
-		}
-	}
-	return true
+func IsHex(str string) bool {
+	l := len(str)
+	return l >= 4 && l%2 == 0 && str[0:2] == "0x"
 }
 
 func Bytes2Hex(d []byte) string {

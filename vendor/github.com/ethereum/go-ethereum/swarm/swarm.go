@@ -220,7 +220,7 @@ func (self *Swarm) Start(srv *p2p.Server) error {
 // stops all component services.
 func (self *Swarm) Stop() error {
 	self.dpa.Stop()
-	err := self.hive.Stop()
+	self.hive.Stop()
 	if ch := self.config.Swap.Chequebook(); ch != nil {
 		ch.Stop()
 		ch.Save()
@@ -230,7 +230,7 @@ func (self *Swarm) Stop() error {
 		self.lstore.DbStore.Close()
 	}
 	self.sfs.Stop()
-	return err
+	return self.config.Save()
 }
 
 // implements the node.Service interface
@@ -301,6 +301,7 @@ func (self *Swarm) SetChequebook(ctx context.Context) error {
 		return err
 	}
 	log.Info(fmt.Sprintf("new chequebook set (%v): saving config file, resetting all connections in the hive", self.config.Swap.Contract.Hex()))
+	self.config.Save()
 	self.hive.DropAll()
 	return nil
 }
@@ -313,9 +314,10 @@ func NewLocalSwarm(datadir, port string) (self *Swarm, err error) {
 		return
 	}
 
-	config := api.NewDefaultConfig()
-	config.Path = datadir
-	config.Init(prvKey)
+	config, err := api.NewConfig(datadir, common.Address{}, prvKey, network.NetworkId)
+	if err != nil {
+		return
+	}
 	config.Port = port
 
 	dpa, err := storage.NewLocalDPA(datadir)

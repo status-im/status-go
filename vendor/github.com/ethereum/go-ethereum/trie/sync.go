@@ -21,7 +21,6 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethdb"
 	"gopkg.in/karalabe/cookiejar.v2/collections/prque"
 )
 
@@ -43,7 +42,7 @@ type request struct {
 	depth   int        // Depth level within the trie the node is located to prioritise DFS
 	deps    int        // Number of dependencies before allowed to commit this node
 
-	callback LeafCallback // Callback to invoke if a leaf node it reached on this branch
+	callback TrieSyncLeafCallback // Callback to invoke if a leaf node it reached on this branch
 }
 
 // SyncResult is a simple list to return missing nodes along with their request
@@ -68,6 +67,11 @@ func newSyncMemBatch() *syncMemBatch {
 	}
 }
 
+// TrieSyncLeafCallback is a callback type invoked when a trie sync reaches a
+// leaf node. It's used by state syncing to check if the leaf node requires some
+// further data syncing.
+type TrieSyncLeafCallback func(leaf []byte, parent common.Hash) error
+
 // TrieSync is the main state trie synchronisation scheduler, which provides yet
 // unknown trie hashes to retrieve, accepts node data associated with said hashes
 // and reconstructs the trie step by step until all is done.
@@ -79,7 +83,7 @@ type TrieSync struct {
 }
 
 // NewTrieSync creates a new trie data download scheduler.
-func NewTrieSync(root common.Hash, database DatabaseReader, callback LeafCallback) *TrieSync {
+func NewTrieSync(root common.Hash, database DatabaseReader, callback TrieSyncLeafCallback) *TrieSync {
 	ts := &TrieSync{
 		database: database,
 		membatch: newSyncMemBatch(),
@@ -91,7 +95,7 @@ func NewTrieSync(root common.Hash, database DatabaseReader, callback LeafCallbac
 }
 
 // AddSubTrie registers a new trie to the sync code, rooted at the designated parent.
-func (s *TrieSync) AddSubTrie(root common.Hash, depth int, parent common.Hash, callback LeafCallback) {
+func (s *TrieSync) AddSubTrie(root common.Hash, depth int, parent common.Hash, callback TrieSyncLeafCallback) {
 	// Short circuit if the trie is empty or already known
 	if root == emptyRoot {
 		return
@@ -213,7 +217,7 @@ func (s *TrieSync) Process(results []SyncResult) (bool, int, error) {
 
 // Commit flushes the data stored in the internal membatch out to persistent
 // storage, returning th enumber of items written and any occurred error.
-func (s *TrieSync) Commit(dbw ethdb.Putter) (int, error) {
+func (s *TrieSync) Commit(dbw DatabaseWriter) (int, error) {
 	// Dump the membatch into a database dbw
 	for i, key := range s.membatch.order {
 		if err := dbw.Put(key[:], s.membatch.batch[key]); err != nil {

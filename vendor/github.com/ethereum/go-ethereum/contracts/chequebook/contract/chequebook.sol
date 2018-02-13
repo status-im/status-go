@@ -1,6 +1,6 @@
 pragma solidity ^0.4.18;
 
-import "./mortal.sol";
+import "https://github.com/ethereum/solidity/std/mortal.sol";
 
 /// @title Chequebook for Ethereum micropayments
 /// @author Daniel A. Nagy <daniel@ethereum.org>
@@ -11,9 +11,6 @@ contract chequebook is mortal {
     /// @notice Overdraft event
     event Overdraft(address deadbeat);
 
-    // Allow sending ether to the chequebook.
-    function() public payable { }
-
     /// @notice Cash cheque
     ///
     /// @param beneficiary beneficiary address
@@ -22,7 +19,8 @@ contract chequebook is mortal {
     /// @param sig_r signature parameter r
     /// @param sig_s signature parameter s
     /// The digital signature is calculated on the concatenated triplet of contract address, beneficiary address and cumulative amount
-    function cash(address beneficiary, uint256 amount, uint8 sig_v, bytes32 sig_r, bytes32 sig_s) public {
+    function cash(address beneficiary, uint256 amount,
+        uint8 sig_v, bytes32 sig_r, bytes32 sig_s) {
         // Check if the cheque is old.
         // Only cheques that are more recent than the last cashed one are considered.
         require(amount > sent[beneficiary]);
@@ -33,7 +31,7 @@ contract chequebook is mortal {
         // and the cumulative amount on the last cashed cheque to beneficiary.
         uint256 diff = amount - sent[beneficiary];
         if (diff <= this.balance) {
-            // update the cumulative amount before sending
+	    // update the cumulative amount before sending
             sent[beneficiary] = amount;
             beneficiary.transfer(diff);
         } else {

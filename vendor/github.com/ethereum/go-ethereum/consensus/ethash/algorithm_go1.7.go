@@ -25,7 +25,7 @@ package ethash
 func cacheSize(block uint64) uint64 {
 	// If we have a pre-generated value, use that
 	epoch := int(block / epochLength)
-	if epoch < maxEpoch {
+	if epoch < len(cacheSizes) {
 		return cacheSizes[epoch]
 	}
 	// We don't have a way to verify primes fast before Go 1.8
@@ -39,7 +39,7 @@ func cacheSize(block uint64) uint64 {
 func datasetSize(block uint64) uint64 {
 	// If we have a pre-generated value, use that
 	epoch := int(block / epochLength)
-	if epoch < maxEpoch {
+	if epoch < len(datasetSizes) {
 		return datasetSizes[epoch]
 	}
 	// We don't have a way to verify primes fast before Go 1.8

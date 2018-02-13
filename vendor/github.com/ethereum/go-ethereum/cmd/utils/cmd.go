@@ -116,6 +116,7 @@ func ImportChain(chain *core.BlockChain, fn string) error {
 			return err
 		}
 	}
+
 	stream := rlp.NewStream(reader, 0)
 
 	// Run actual the import.
@@ -149,34 +150,25 @@ func ImportChain(chain *core.BlockChain, fn string) error {
 		if checkInterrupt() {
 			return fmt.Errorf("interrupted")
 		}
-		missing := missingBlocks(chain, blocks[:i])
-		if len(missing) == 0 {
+		if hasAllBlocks(chain, blocks[:i]) {
 			log.Info("Skipping batch as all blocks present", "batch", batch, "first", blocks[0].Hash(), "last", blocks[i-1].Hash())
 			continue
 		}
-		if _, err := chain.InsertChain(missing); err != nil {
+
+		if _, err := chain.InsertChain(blocks[:i]); err != nil {
 			return fmt.Errorf("invalid block %d: %v", n, err)
 		}
 	}
 	return nil
 }
 
-func missingBlocks(chain *core.BlockChain, blocks []*types.Block) []*types.Block {
-	head := chain.CurrentBlock()
-	for i, block := range blocks {
-		// If we're behind the chain head, only check block, state is available at head
-		if head.NumberU64() > block.NumberU64() {
-			if !chain.HasBlock(block.Hash(), block.NumberU64()) {
-				return blocks[i:]
-			}
-			continue
-		}
-		// If we're above the chain head, state availability is a must
-		if !chain.HasBlockAndState(block.Hash(), block.NumberU64()) {
-			return blocks[i:]
+func hasAllBlocks(chain *core.BlockChain, bs []*types.Block) bool {
+	for _, b := range bs {
+		if !chain.HasBlock(b.Hash(), b.NumberU64()) {
+			return false
 		}
 	}
-	return nil
+	return true
 }
 
 func ExportChain(blockchain *core.BlockChain, fn string) error {
