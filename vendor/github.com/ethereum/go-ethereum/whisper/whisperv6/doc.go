@@ -27,46 +27,58 @@ Whisper is a pure identity-based messaging system. Whisper provides a low-level
 or prejudiced by the low-level hardware attributes and characteristics,
 particularly the notion of singular endpoints.
 */
+
+// Contains the Whisper protocol constant definitions
+
 package whisperv6
 
 import (
 	"fmt"
 	"time"
+
+	"github.com/ethereum/go-ethereum/p2p"
 )
 
+// Whisper protocol parameters
 const (
-	EnvelopeVersion    = uint64(0)
-	ProtocolVersion    = uint64(5)
-	ProtocolVersionStr = "5.0"
-	ProtocolName       = "shh"
+	ProtocolVersion    = uint64(6) // Protocol version number
+	ProtocolVersionStr = "6.0"     // The same, as a string
+	ProtocolName       = "shh"     // Nickname of the protocol in geth
 
-	statusCode           = 0 // used by whisper protocol
-	messagesCode         = 1 // normal whisper message
-	p2pCode              = 2 // peer-to-peer message (to be consumed by the peer, but not forwarded any further)
-	p2pRequestCode       = 3 // peer-to-peer message, used by Dapp protocol
-	NumberOfMessageCodes = 64
+	// whisper protocol message codes, according to EIP-627
+	statusCode           = 0   // used by whisper protocol
+	messagesCode         = 1   // normal whisper message
+	powRequirementCode   = 2   // PoW requirement
+	bloomFilterExCode    = 3   // bloom filter exchange
+	p2pRequestCode       = 126 // peer-to-peer message, used by Dapp protocol
+	p2pMessageCode       = 127 // peer-to-peer message (to be consumed by the peer, but not forwarded any further)
+	NumberOfMessageCodes = 128
 
-	paddingMask   = byte(3)
+	SizeMask      = byte(3) // mask used to extract the size of payload size field from the flags
 	signatureFlag = byte(4)
 
-	TopicLength     = 4
-	signatureLength = 65
-	aesKeyLength    = 32
-	AESNonceLength  = 12
-	keyIdSize       = 32
+	TopicLength     = 4  // in bytes
+	signatureLength = 65 // in bytes
+	aesKeyLength    = 32 // in bytes
+	aesNonceLength  = 12 // in bytes; for more info please see cipher.gcmStandardNonceSize & aesgcm.NonceSize()
+	keyIDSize       = 32 // in bytes
+	bloomFilterSize = 64 // in bytes
+	flagsLength     = 1
+
+	EnvelopeHeaderLength = 20
 
 	MaxMessageSize        = uint32(10 * 1024 * 1024) // maximum accepted size of a message.
 	DefaultMaxMessageSize = uint32(1024 * 1024)
-	DefaultMinimumPoW     = 0.2
+	DefaultMinimumPoW     = 0.001
 
-	padSizeLimit      = 256 // just an arbitrary number, could be changed without breaking the protocol (must not exceed 2^24)
+	padSizeLimit      = 256 // just an arbitrary number, could be changed without breaking the protocol
 	messageQueueLimit = 1024
 
 	expirationCycle   = time.Second
 	transmissionCycle = 300 * time.Millisecond
 
-	DefaultTTL     = 50 // seconds
-	SynchAllowance = 10 // seconds
+	DefaultTTL           = 50 // seconds
+	DefaultSyncAllowance = 10 // seconds
 )
 
 type unknownVersionError uint64
@@ -84,4 +96,53 @@ func (e unknownVersionError) Error() string {
 type MailServer interface {
 	Archive(env *Envelope)
 	DeliverMail(whisperPeer *Peer, request *Envelope)
+}
+
+// NotificationServer represents a notification server,
+// capable of screening incoming envelopes for special
+// topics, and once located, subscribe client nodes as
+// recipients to notifications (push notifications atm)
+type NotificationServer interface {
+	// Start initializes notification sending loop
+	Start(server *p2p.Server) error
+
+	// Stop stops notification sending loop, releasing related resources
+	Stop() error
+}
+
+type envelopeSource int
+
+const (
+	_ = iota
+	// peerSource indicates a source as a regular peer.
+	peerSource envelopeSource = iota
+	// p2pSource indicates that envelop was received from a trusted peer.
+	p2pSource
+)
+
+// EnvelopeMeta keeps metadata of received envelopes.
+type EnvelopeMeta struct {
+	Hash   string
+	Topic  TopicType
+	Size   uint32
+	Source envelopeSource
+	IsNew  bool
+	Peer   string
+}
+
+// SourceString converts source to string.
+func (m *EnvelopeMeta) SourceString() string {
+	switch m.Source {
+	case peerSource:
+		return "peer"
+	case p2pSource:
+		return "p2p"
+	default:
+		return "unknown"
+	}
+}
+
+// EnvelopeTracer tracks received envelopes.
+type EnvelopeTracer interface {
+	Trace(*EnvelopeMeta)
 }

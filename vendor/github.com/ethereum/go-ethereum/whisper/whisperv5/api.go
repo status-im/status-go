@@ -33,7 +33,10 @@ import (
 )
 
 const (
-	filterTimeout = 300 // filters are considered timeout out after filterTimeout seconds
+	// HACK: make the filter essentially never timeout (1 year of timeout time)
+	// It's a hack, but that simplifies rebasing process, because the patch consists
+	// only of 1 LoC change (excluding this comment).
+	filterTimeout = 525600 * 60 // filters are considered timeout out after filterTimeout seconds
 )
 
 var (
@@ -311,6 +314,16 @@ func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (bool, er
 	}
 
 	return true, api.w.Send(env)
+}
+
+// UninstallFilter is alias for Unsubscribe
+func (api *PublicWhisperAPI) UninstallFilter(id string) {
+	api.w.Unsubscribe(id)
+}
+
+// Unsubscribe disables and removes an existing filter.
+func (api *PublicWhisperAPI) Unsubscribe(id string) {
+	api.w.Unsubscribe(id)
 }
 
 //go:generate gencodec -type Criteria -field-override criteriaOverride -out gen_criteria_json.go
