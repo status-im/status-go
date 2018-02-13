@@ -2,7 +2,7 @@
     "Exclude": [
         ".*_mock.go",
         "geth/jail/doc.go",
-        ".*Errors unhandled.*fmt.Fprintf.*"
+        ".*Errors unhandled.*fmt.Fprint.*gasv2.*"
     ],
     "Skip": ["helpers", "static"],
     "Vendor": true,
