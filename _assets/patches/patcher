@@ -76,7 +76,7 @@ while getopts :prcv opt; do
 		for newPatch in "${newPatches[@]}"; do
 			for unapp in "${unapplied[@]}"; do
 				if [ "$unapp" == "$newPatch" ]; then
-					echo "Recently added but not applied: $unapp"
+					echo "Recently added/changed but not applied: $unapp"
 					hasUnapplied=1
 					break
 				fi
