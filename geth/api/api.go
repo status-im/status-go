@@ -58,7 +58,17 @@ func (api *StatusAPI) StartNode(config *params.NodeConfig) error {
 // StartNodeAsync start Status node, fails if node is already started
 // Returns immediately w/o waiting for node to start (see node.ready)
 func (api *StatusAPI) StartNodeAsync(config *params.NodeConfig) <-chan error {
-	return runAsync(func() error { return api.StartNode(config) })
+	if !api.b.IsNodeRunning() {
+		return runAsync(func() error { return api.StartNode(config) })
+	}
+	return runAsync(func() error {
+		node, err := api.b.NodeManager().Node()
+		if err != nil {
+			return err
+		}
+		node.Wait()
+		return api.StartNode(config)
+	})
 }
 
 // StopNode stop Status node. Stopped node cannot be resumed.
