@@ -1,7 +1,9 @@
 package api_test
 
 import (
+	"io/ioutil"
 	"math/rand"
+	"os"
 	"testing"
 	"time"
 
@@ -56,10 +58,10 @@ func (s *APIBackendTestSuite) TestRaceConditions() {
 			progress <- struct{}{}
 		},
 		// func(config *params.NodeConfig) {
-		// 	log.Info("ResetChainData()")
-		// 	_, err := s.Backend.ResetChainData()
-		// 	s.T().Logf("ResetChainData(), error: %v", err)
-		// 	progress <- struct{}{}
+		//	log.Info("ResetChainData()")
+		//	_, err := s.Backend.ResetChainData()
+		//	s.T().Logf("ResetChainData(), error: %v", err)
+		//	progress <- struct{}{}
 		// },
 		func(config *params.NodeConfig) {
 			log.Info("RestartNode()")
@@ -220,20 +222,21 @@ func (s *APIBackendTestSuite) TestNetworkSwitching() {
 	s.NoError(s.Backend.StopNode())
 }
 
-// FIXME(tiabc): There's also a test with the same name in geth/node/manager_test.go
-// so this test should only check StatusBackend logic with a mocked version of the underlying NodeManager.
 func (s *APIBackendTestSuite) TestResetChainData() {
-	s.T().Skip()
-
+	if GetNetworkID() != params.StatusChainNetworkID {
+		s.T().Skip("test must be running on status network")
+	}
 	require := s.Require()
 	require.NotNil(s.Backend)
+	path, err := ioutil.TempDir("/tmp", "status-reset-chain-test")
+	require.NoError(err)
+	defer func() { s.NoError(os.RemoveAll(path)) }()
 
-	s.StartTestBackend()
+	s.StartTestBackend(e2e.WithDataDir(path))
 	defer s.StopTestBackend()
 
 	EnsureNodeSync(s.Backend.NodeManager())
 
-	s.True(s.Backend.IsNodeRunning())
 	require.NoError(s.Backend.ResetChainData())
 
 	s.True(s.Backend.IsNodeRunning()) // new node, with previous config should be running
