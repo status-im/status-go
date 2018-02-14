@@ -18,7 +18,7 @@ func Write(fn otto.FunctionCall, w io.Writer, consoleEventName string) otto.Valu
 	})
 
 	// Next print out the giving values.
-	fmt.Fprintf(w, "%s: %s", consoleEventName, formatForConsole(fn.ArgumentList)) // nolint: gas
+	fmt.Fprintf(w, "%s: %s", consoleEventName, formatForConsole(fn.ArgumentList))
 
 	return otto.UndefinedValue()
 }

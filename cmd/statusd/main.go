@@ -276,7 +276,7 @@ Examples:
 
 Options:
 `
-	fmt.Fprint(os.Stderr, usage) // nolint: gas
+	fmt.Fprintf(os.Stderr, usage)
 	flag.PrintDefaults()
 }
 
