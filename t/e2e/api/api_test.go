@@ -242,3 +242,15 @@ func (s *APITestSuite) TestNodeStartCrash() {
 	// cleanup
 	s.NoError(s.api.StopNode())
 }
+
+func (s *APITestSuite) TestConcurrentStopAndStartNodeAsyncWhenNodeIsRunning() {
+	nodeConfig, err := e2e.MakeTestNodeConfig(GetNetworkID())
+	s.NoError(err)
+	s.NoError(<-s.api.StartNodeAsync(nodeConfig))
+	s.True(s.api.NodeManager().IsNodeRunning())
+	startChan := s.api.StartNodeAsync(nodeConfig)
+	s.NoError(<-s.api.StopNodeAsync())
+	s.NoError(<-startChan)
+	s.True(s.api.NodeManager().IsNodeRunning())
+	s.NoError(s.api.StopNode())
+}
