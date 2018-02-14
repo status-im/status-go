@@ -24,6 +24,13 @@ func WithUpstream(url string) TestNodeOption {
 	}
 }
 
+// WithDataDir returns TestNodeOption that allows to set another data dir.
+func WithDataDir(path string) TestNodeOption {
+	return func(config *params.NodeConfig) {
+		config.DataDir = path
+	}
+}
+
 // MakeTestNodeConfig defines a function to return a giving params.NodeConfig
 // where specific network addresses are assigned based on provieded network id.
 func MakeTestNodeConfig(networkID int) (*params.NodeConfig, error) {

@@ -196,6 +196,39 @@ func (s *APITestSuite) TestLogoutRemovesCells() {
 	require.Error(err, "Expected that cells was removed")
 }
 
+func (s *APITestSuite) TestEventsNodeStartStop() {
+	envelopes := make(chan signal.Envelope, 3)
+	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+		var envelope signal.Envelope
+		err := json.Unmarshal([]byte(jsonEvent), &envelope)
+		s.NoError(err)
+		envelopes <- envelope
+	})
+
+	nodeConfig, err := e2e.MakeTestNodeConfig(GetNetworkID())
+	s.NoError(err)
+	s.NoError(s.api.StartNode(nodeConfig))
+	s.NoError(s.api.StopNode())
+	s.verifyEnvelopes(envelopes, signal.EventNodeStarted, signal.EventNodeReady, signal.EventNodeStopped)
+	s.NoError(s.api.StartNode(nodeConfig))
+	s.verifyEnvelopes(envelopes, signal.EventNodeStarted, signal.EventNodeReady)
+	s.NoError(s.api.RestartNode())
+	s.verifyEnvelopes(envelopes, signal.EventNodeStopped, signal.EventNodeStarted, signal.EventNodeReady)
+	s.NoError(s.api.StopNode())
+	s.verifyEnvelopes(envelopes, signal.EventNodeStopped)
+}
+
+func (s *APITestSuite) verifyEnvelopes(envelopes chan signal.Envelope, envelopeTypes ...string) {
+	for _, envelopeType := range envelopeTypes {
+		select {
+		case env := <-envelopes:
+			s.Equal(envelopeType, env.Type)
+		case <-time.After(1 * time.Second):
+			s.Fail("timeout waiting for envelope")
+		}
+	}
+}
+
 func (s *APITestSuite) TestNodeStartCrash() {
 	// let's listen for node.crashed signal
 	signalReceived := make(chan struct{})

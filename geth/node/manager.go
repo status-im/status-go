@@ -131,13 +131,13 @@ func (m *NodeManager) stopNode() error {
 }
 
 // ResetChainData removes chain data if node is not running.
-func (m *NodeManager) ResetChainData() error {
-	if !m.IsNodeRunning() {
-		return ErrNoRunningNode
+func (m *NodeManager) ResetChainData(config *params.NodeConfig) error {
+	if m.IsNodeRunning() {
+		return ErrNodeExists
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	chainDataDir := filepath.Join(m.config.DataDir, m.config.Name, "lightchaindata")
+	chainDataDir := filepath.Join(config.DataDir, config.Name, "lightchaindata")
 	if _, err := os.Stat(chainDataDir); os.IsNotExist(err) {
 		// is it really an error, if we want to remove it as next step?
 		return err
