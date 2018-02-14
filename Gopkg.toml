@@ -30,6 +30,10 @@
   name = "github.com/prometheus/client_golang"
   version = "0.8.0"
 
+[[constraint]]
+  name = "github.com/docker/docker"
+  version = "1.13.1"
+
 # * * * * * `go-ethereum` dependencies * * * * *
 # Pinned down SHAs from `go-ethereum/vendor/vendor.json`
 # When upgrading upstream, upgrade these values too.

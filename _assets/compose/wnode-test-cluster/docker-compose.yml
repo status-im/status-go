@@ -25,6 +25,8 @@ services:
       - "-http"
       - "-httphost=0.0.0.0"
       - "-log DEBUG"
+      - "-maxpeers=7"
+      - "-metrics"
     ports:
       - 8080
       - 8545
