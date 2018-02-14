@@ -13,6 +13,12 @@
 # 6) Applies stashed changes.
 # 7) Prints the message and exits with the exit code.
 
+timestamp() {
+  date +"%s"
+}
+
+tempBranchName="isolated-vendor-check-$(timestamp)"
+
 # Stash current changes first, apply later before exiting.
 hasChanges=0
 changes=($(git status --porcelain))
@@ -23,7 +29,7 @@ fi
 
 branchName="$(git rev-parse --abbrev-ref HEAD)"
 
-git checkout -b isolated-vendor-check
+git checkout -b $tempBranchName
 
 # Revert all patches.
 $(pwd)/_assets/patches/patcher -r
@@ -39,7 +45,7 @@ git commit -m "vendor check - auto"
 
 # Go back to previous branch, clean and apply stashed.
 git checkout "$branchName"
-git branch -D isolated-vendor-check
+git branch -D $tempBranchName
 if [ $hasChanges -eq 1 ]; then
 	git stash apply > /dev/null 2>&1
 fi
