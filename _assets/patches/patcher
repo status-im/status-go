@@ -59,7 +59,7 @@ while getopts :prcv opt; do
 			f=${applied[$i]}
 			git apply "$f" --directory="$basepath" > /dev/null 2>&1
 		done
-		# Sorts out new patches' paths by comparing with "develop" branch.
+		# Sorts out new patches' paths by comparing with base branch.
 		fromBaseBranch=($(git diff $baseBranch --stat | grep "\\.patch" |
 			while IFS=" " read -r -a line; do
 				path="$(pwd)/${line[0]}"
