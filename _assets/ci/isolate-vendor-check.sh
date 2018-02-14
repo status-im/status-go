@@ -41,7 +41,7 @@ git commit -m "vendor check - auto"
 git checkout "$branchName"
 git branch -D isolated-vendor-check
 if [ $hasChanges -eq 1 ]; then
-	git stash apply
+	git stash apply > /dev/null 2>&1
 fi
 
 echo $msg
