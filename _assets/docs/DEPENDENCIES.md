@@ -4,7 +4,7 @@
 ## How we use `dep`.
 
 1. Transitive dependencies of `go-ethereum`. The most important thing for us is
-   to be in-sync there. We want to reduce the regression scope. 
+   to be in-sync there. We want to reduce the regression scope.
    Hence, we pin down all the dependencies of `go-ethereum` with SHAs in `Gopkg.toml` when
    importing a new version of upstream. (This is considered a bad practice for
    `dep` but we are willing to take the risk to keep consitency with the upstream).
@@ -25,6 +25,7 @@
 ## Checking-out all dependencies
 
 `dep ensure` - download all the dependencies based on `Gopkg.lock`.
+`make dep-ensure` - ensure all patches are applied, too. **(Recommended)**
 
 `Gopkg.lock` is kept inact if it is in-sync with `Gopkg.toml`. If the `toml`
 file is changed, `dep ensure` will re-generate `Gopkg.lock` as well.
