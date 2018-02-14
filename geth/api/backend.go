@@ -133,6 +133,7 @@ func (b *StatusBackend) stopNode() error {
 	}
 	b.txQueueManager.Stop()
 	b.jailManager.Stop()
+	defer signal.Send(signal.Envelope{Type: signal.EventNodeStopped})
 	return b.nodeManager.StopNode()
 }
 
