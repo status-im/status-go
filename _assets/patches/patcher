@@ -19,6 +19,10 @@
 dir=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 patches=("$dir"/geth/*.patch)
 
+# Use this branch as a reference for comparing patches
+# in current branch (-c option).
+baseBranch="develop"
+
 # Base path is vendor/github.com/ethereum/go-ethereum
 # unless specified.
 basepath="vendor/github.com/ethereum/go-ethereum"
@@ -56,7 +60,7 @@ while getopts :prcv opt; do
 			git apply "$f" --directory="$basepath" > /dev/null 2>&1
 		done
 		# Sorts out new patches' paths by comparing with "develop" branch.
-		fromDevelop=($(git diff develop --stat | grep "\\.patch" |
+		fromBaseBranch=($(git diff $baseBranch --stat | grep "\\.patch" |
 			while IFS=" " read -r -a line; do
 				path="$(pwd)/${line[0]}"
 				echo "$path"
@@ -70,7 +74,7 @@ while getopts :prcv opt; do
 				echo "$path"
 			done
 		))
-		newPatches=( "${fromDevelop[@]}" "${uncommitted[@]}" )
+		newPatches=( "${fromBaseBranch[@]}" "${uncommitted[@]}" )
 		# Checks new patches and exits with 1 if there are unapplied.
 		hasUnapplied=0
 		for newPatch in "${newPatches[@]}"; do
