@@ -9,17 +9,25 @@
 # Usage: ./patcher -p <base_path> -r -v
 # -p: <base_path> is where to apply to (a go-ethereum package)
 # -r: reverts all and exit if this flag is present
+# -c: reverts all to see what's applied, applies all previously applied back again,
+# reports unapplied patches in this branch by comparing with "develop" including
+# uncommitted ones and exits (with 1 if there are any)
 # -v: verbose error reporting about failed patch
 #
 # If -p is not present, default path is as below ($basepath).
 
-patches=($( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )/geth/*.patch)
+dir=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+patches=("$dir"/geth/*.patch)
+
+# Use this branch as a reference for comparing patches
+# in current branch (-c option).
+baseBranch="develop"
 
 # Base path is vendor/github.com/ethereum/go-ethereum
 # unless specified.
 basepath="vendor/github.com/ethereum/go-ethereum"
 verbose=0
-while getopts :prv opt; do
+while getopts :prcv opt; do
 	case $opt in
 	p)
 		basepath=$OPTARG
@@ -31,6 +39,54 @@ while getopts :prv opt; do
 		done
 		echo "Reverted all."
 		exit
+		;;
+	c)
+		applied=()
+		unapplied=()
+		# Finds applied patches using reverse order and
+		# notes them down.
+		for ((i=${#patches[@]}-1; i>=0; i--)); do
+			f=${patches[$i]}
+			git apply "$f" --directory="$basepath" -R > /dev/null 2>&1
+			if [ $? -eq 1 ]; then
+				unapplied+=("$f")
+			else
+				applied+=("$f")
+			fi
+		done
+		# Applies reverted patches back again.
+		for ((i=${#applied[@]}-1; i>=0; i--)); do
+			f=${applied[$i]}
+			git apply "$f" --directory="$basepath" > /dev/null 2>&1
+		done
+		# Sorts out new patches' paths by comparing with base branch.
+		fromBaseBranch=($(git diff $baseBranch --stat | grep "\\.patch" |
+			while IFS=" " read -r -a line; do
+				path="$(pwd)/${line[0]}"
+				echo "$path"
+			done
+		))
+		# Also does the same with uncommitted.
+		uncommitted=($(git status -u --porcelain | grep "\\.patch" |
+			while IFS=" " read -r -a line; do
+				length=${#line[@]}
+				path="$(pwd)/${line[$((length - 1))]}"
+				echo "$path"
+			done
+		))
+		newPatches=( "${fromBaseBranch[@]}" "${uncommitted[@]}" )
+		# Checks new patches and exits with 1 if there are unapplied.
+		hasUnapplied=0
+		for newPatch in "${newPatches[@]}"; do
+			for unapp in "${unapplied[@]}"; do
+				if [ "$unapp" == "$newPatch" ]; then
+					echo "Recently added/changed but not applied: $unapp"
+					hasUnapplied=1
+					break
+				fi
+			done
+		done
+		exit $hasUnapplied
 		;;
 	v)
 		verbose=1

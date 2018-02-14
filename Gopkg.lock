@@ -47,7 +47,6 @@
   revision = "935e0e8a636ca4ba70b713f3e38a19e1b77739e8"
 
 [[projects]]
-  branch = "develop"
   name = "github.com/ethereum/go-ethereum"
   packages = [
     ".",
@@ -89,7 +88,6 @@
     "internal/ethapi",
     "les",
     "les/flowcontrol",
-    "les/status",
     "light",
     "log",
     "log/term",
@@ -106,11 +104,10 @@
     "rpc",
     "trie",
     "whisper/mailserver",
-    "whisper/notifications",
     "whisper/whisperv5"
   ]
-  revision = "5b2cc44bf2b32bb482def02d7c8fa32ba08d0bf4"
-  source = "https://github.com/status-im/go-ethereum.git"
+  revision = "4bb3c89d44e372e6a9ab85a8be0c9345265c763a"
+  version = "v1.7.3"
 
 [[projects]]
   name = "github.com/go-playground/locales"
@@ -415,6 +412,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "1e24f8d3adca6619451ee4406b8064268631ad03c06fdc6323abc00a974797ac"
+  inputs-digest = "15f735a948b26a34148ed3fa3a1d21cb1a3c45d0b87eb490a2ca1a514e4b1250"
   solver-name = "gps-cdcl"
   solver-version = 1

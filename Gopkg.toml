@@ -1,3 +1,5 @@
+ignored = ["github.com/ethereum/go-ethereum/whisper/notifications"]
+
 [prune]
   unused-packages = true
   go-tests = true
@@ -21,10 +23,8 @@
   revision = "dcd4997b0664bcfd6ef48e4ae9da8396e08b1cd9"
 
 [[constraint]]
-  # fork of `go-ethereum` with Status patches
   name = "github.com/ethereum/go-ethereum"
-  branch = "develop"
-  source = "https://github.com/status-im/go-ethereum.git"
+  branch = "release/1.7"
 
 [[constraint]]
   name = "github.com/prometheus/client_golang"

@@ -98,8 +98,6 @@ var (
 	argEnode   = flag.String("boot", "", "bootstrap node you want to connect to (e.g. enode://e454......08d50@52.176.211.200:16428)")
 	argTopic   = flag.String("topic", "", "topic in hexadecimal format (e.g. 70a4beef)")
 	argSaveDir = flag.String("savedir", "", "directory where incoming messages will be saved as files")
-	argSymPass = flag.String("sympass", "", "SymKey password")
-	argMsPass  = flag.String("mspass", "", "Mailserver password")
 )
 
 func main() {
@@ -147,13 +145,6 @@ func processArgs() {
 		}
 	} else if *fileExMode {
 		utils.Fatalf("Parameter 'savedir' is mandatory for file exchange mode")
-	}
-	if len(*argSymPass) > 0 {
-		symPass = *argSymPass
-	}
-
-	if len(*argMsPass) > 0 {
-		msPassword = *argMsPass
 	}
 
 	if *echoMode {
@@ -424,22 +415,8 @@ func run() {
 	} else if *fileExMode {
 		sendFilesLoop()
 	} else {
-		pingLoop() // instead of sendLoop()
+		sendLoop()
 	}
-}
-
-func pingLoop() {
-	ticker := time.NewTicker(time.Second * 120)
-
-	for {
-		select {
-		case <-ticker.C:
-			fmt.Println("I am alive: ", time.Now())
-		case <-done:
-			return
-		}
-	}
-
 }
 
 func sendLoop() {

@@ -157,12 +157,19 @@ clean: ##@other Cleanup
 deep-clean: clean
 	rm -Rdf .ethereumtest/StatusChain
 
-vendor-check:
-	@dep ensure
-	./_assets/ci/validate-vendor.sh
+vendor-check: ##@dependencies Require all new patches and disallow other changes
+	./_assets/patches/patcher -c
+	./_assets/ci/isolate-vendor-check.sh
 
-dep-install:
+dep-ensure: ##@dependencies Dep ensure and apply all patches
+	@dep ensure
+	./_assets/patches/patcher
+
+dep-install: ##@dependencies Install vendoring tool
 	go get -u github.com/golang/dep/cmd/dep
 
-patch:
+patch: ##@patching Revert and apply all patches
 	./_assets/patches/patcher
+
+patch-revert: ##@patching Revert all patches only
+	./_assets/patches/patcher -r
