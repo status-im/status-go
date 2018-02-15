@@ -49,10 +49,10 @@ file is changed, `dep ensure` will re-generate `Gopkg.lock` as well.
 
 ## Updating `Geth`
 
-1. Update `develop` branch in [`status-im/go-ethereum`](https://github.com/status-im/go-ethereum/tree/develop).
+1. (for major releases) Update the branch name in `Gopkg.toml`.
 2. Update the `go-ethereum` dependency: `dep ensure -v -update github.com/ethereum/go-ethereum`.
-3. Make sure that `[[constraint]]` statements in `status-go/Gopkg.toml` contains the same SHAs as `go-ethereum/vendor/vendor.json`.
-4. Update vendor files in `status-go`, running `dep ensure`.
+3. Update vendor files in `status-go`, and apply patches by running `make dep-ensure`.
+4. Commit patches.
 5. Commit `Gopkg.lock`, `Gopkg.toml` and `vendor` directories.
 
 
