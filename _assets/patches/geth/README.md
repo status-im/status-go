@@ -20,7 +20,6 @@ Instructions for creating a patch from the command line:
 
 - [`0000-accounts-hd-keys.patch`](./0000-accounts-hd-keys.patch) — adds support for HD extended keys (links/docs?)
 - [`0002-les-api-status.patch`](./0002-les-api-status.patch) — adds StatusBackend into LES code (need to be inspected, some things can and should be done outside of les code
-- [`0003-dockerfiles-wnode-swarm.patch`](./0003-dockerfiles-wnode-swarm.patch) — adds Dockerfiles (who uses this?)
 - [`0004-whisper-notifications.patch`](./0004-whisper-notifications.patch) — adds Whisper notifications (need to be reviewed and documented)
 - [`0006-latest-cht.patch`](./0006-latest-cht.patch) – updates CHT root hashes, should be updated regularly to keep sync fast, until proper Trusted Checkpoint sync is not implemented as part of LES/2 protocol.
 - [`0007-README.patch`](./0007-README.patch) — update upstream README.md.
