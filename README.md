@@ -14,7 +14,7 @@ It's written in Go and requires Go 1.8 or above.
 
 It uses Makefile to do most common actions. See `make help` output for available commands.
 
-status-go uses [ethereum-go](https://github.com/status-im/go-ethereum) with [some patches applied](./_assets/patches/geth) in it, located under [`vendor/`](./vendor/github.com/ethereum/go-ethereum) directory. See [geth patches README](./_assets/patches/geth/README.md) for more info.
+status-go uses [go-ethereum](https://github.com/ethereum/go-ethereum) with [some patches applied](./_assets/patches/geth) in it, located under [`vendor/`](./vendor/github.com/ethereum/go-ethereum) directory. See [geth patches README](./_assets/patches/geth/README.md) for more info.
 
 # Build
 There are two main modes status-go can be built:
