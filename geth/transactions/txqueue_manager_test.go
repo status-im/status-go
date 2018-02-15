@@ -78,7 +78,7 @@ func (s *TxQueueTestSuite) TearDownTest() {
 }
 
 var (
-	testGas      = (*hexutil.Big)(big.NewInt(defaultGas + 1))
+	testGas      = hexutil.Uint64(defaultGas + 1)
 	testGasPrice = (*hexutil.Big)(big.NewInt(10))
 	testNonce    = hexutil.Uint64(10)
 )
@@ -86,7 +86,8 @@ var (
 func (s *TxQueueTestSuite) setupTransactionPoolAPI(tx *common.QueuedTx, returnNonce, resultNonce hexutil.Uint64, account *common.SelectedExtKey, txErr error) {
 	// Expect calls to gas functions only if there are no user defined values.
 	// And also set the expected gas and gas price for RLP encoding the expected tx.
-	var usedGas, usedGasPrice *big.Int
+	var usedGas hexutil.Uint64
+	var usedGasPrice *big.Int
 	s.txServiceMock.EXPECT().GetTransactionCount(gomock.Any(), account.Address, gethrpc.PendingBlockNumber).Return(&returnNonce, nil)
 	if tx.Args.GasPrice == nil {
 		usedGasPrice = (*big.Int)(testGasPrice)
@@ -96,9 +97,9 @@ func (s *TxQueueTestSuite) setupTransactionPoolAPI(tx *common.QueuedTx, returnNo
 	}
 	if tx.Args.Gas == nil {
 		s.txServiceMock.EXPECT().EstimateGas(gomock.Any(), gomock.Any()).Return(testGas, nil)
-		usedGas = (*big.Int)(testGas)
+		usedGas = testGas
 	} else {
-		usedGas = (*big.Int)(tx.Args.Gas)
+		usedGas = *tx.Args.Gas
 	}
 	// Prepare the transaction anD RLP encode it.
 	data := s.rlpEncodeTx(tx, s.nodeConfig, account, &resultNonce, usedGas, usedGasPrice)
@@ -106,14 +107,18 @@ func (s *TxQueueTestSuite) setupTransactionPoolAPI(tx *common.QueuedTx, returnNo
 	s.txServiceMock.EXPECT().SendRawTransaction(gomock.Any(), data).Return(gethcommon.Hash{}, txErr)
 }
 
-func (s *TxQueueTestSuite) rlpEncodeTx(tx *common.QueuedTx, config *params.NodeConfig, account *common.SelectedExtKey, nonce *hexutil.Uint64, gas, gasPrice *big.Int) hexutil.Bytes {
+func (s *TxQueueTestSuite) rlpEncodeTx(tx *common.QueuedTx, config *params.NodeConfig, account *common.SelectedExtKey, nonce *hexutil.Uint64, gas hexutil.Uint64, gasPrice *big.Int) hexutil.Bytes {
+	input := tx.Args.Input
+	if input == nil {
+		input = tx.Args.Data
+	}
 	newTx := types.NewTransaction(
 		uint64(*nonce),
 		gethcommon.Address(*tx.Args.To),
 		tx.Args.Value.ToInt(),
-		gas,
+		uint64(gas),
 		gasPrice,
-		tx.Args.Data,
+		[]byte(*input),
 	)
 	chainID := big.NewInt(int64(config.NetworkID))
 	signedTx, err := types.SignTx(newTx, types.NewEIP155Signer(chainID), account.AccountKey.PrivateKey)
@@ -137,25 +142,41 @@ func (s *TxQueueTestSuite) TestCompleteTransaction() {
 		Address:    common.FromAddress(TestConfig.Account1.Address),
 		AccountKey: &keystore.Key{PrivateKey: key},
 	}
+	input := hexutil.Bytes(make([]byte, 0))
 	testCases := []struct {
 		name     string
-		gas      *hexutil.Big
+		gas      *hexutil.Uint64
 		gasPrice *hexutil.Big
+		data     *hexutil.Bytes
+		input    *hexutil.Bytes
 	}{
 		{
 			"noGasDef",
 			nil,
 			nil,
+			nil,
+			&input,
 		},
 		{
 			"gasDefined",
-			testGas,
+			&testGas,
 			nil,
+			nil,
+			&input,
 		},
 		{
 			"gasPriceDefined",
 			nil,
 			testGasPrice,
+			nil,
+			&input,
+		},
+		{
+			"inputPassedInLegacyDataField",
+			nil,
+			testGasPrice,
+			&input,
+			nil,
 		},
 	}
 
@@ -168,6 +189,8 @@ func (s *TxQueueTestSuite) TestCompleteTransaction() {
 				To:       common.ToAddress(TestConfig.Account2.Address),
 				Gas:      testCase.gas,
 				GasPrice: testCase.gasPrice,
+				Data:     testCase.data,
+				Input:    testCase.input,
 			})
 			s.setupTransactionPoolAPI(tx, testNonce, testNonce, account, nil)
 

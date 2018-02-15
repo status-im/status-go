@@ -207,12 +207,13 @@ func (s *TransactionsTestSuite) TestSendContractTx() {
 	byteCode, err := hexutil.Decode(`0x6060604052341561000c57fe5b5b60a58061001b6000396000f30060606040526000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff1680636ffa1caa14603a575bfe5b3415604157fe5b60556004808035906020019091905050606b565b6040518082815260200191505060405180910390f35b60008160020290505b9190505600a165627a7a72305820ccdadd737e4ac7039963b54cee5e5afb25fa859a275252bdcf06f653155228210029`)
 	s.NoError(err)
 
+	gas := uint64(params.DefaultGas)
 	txHashCheck, err := s.Backend.SendTransaction(context.TODO(), common.SendTxArgs{
 		From: common.FromAddress(TestConfig.Account1.Address),
 		To:   nil, // marker, contract creation is expected
 		//Value: (*hexutil.Big)(new(big.Int).Mul(big.NewInt(1), gethcommon.Ether)),
-		Gas:  (*hexutil.Big)(big.NewInt(params.DefaultGas)),
-		Data: byteCode,
+		Gas:   (*hexutil.Uint64)(&gas),
+		Input: (*hexutil.Bytes)(&byteCode),
 	})
 	s.NoError(err, "cannot send transaction")
 

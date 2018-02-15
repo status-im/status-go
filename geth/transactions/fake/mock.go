@@ -51,9 +51,9 @@ func (mr *MockPublicTransactionPoolAPIMockRecorder) GasPrice(ctx interface{}) *g
 }
 
 // EstimateGas mocks base method
-func (m *MockPublicTransactionPoolAPI) EstimateGas(ctx context.Context, args CallArgs) (*hexutil.Big, error) {
+func (m *MockPublicTransactionPoolAPI) EstimateGas(ctx context.Context, args CallArgs) (hexutil.Uint64, error) {
 	ret := m.ctrl.Call(m, "EstimateGas", ctx, args)
-	ret0, _ := ret[0].(*hexutil.Big)
+	ret0, _ := ret[0].(hexutil.Uint64)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

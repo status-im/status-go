@@ -2,6 +2,7 @@ package transactions
 
 import (
 	"context"
+	"errors"
 	"math/big"
 	"sync"
 	"time"
@@ -207,14 +208,21 @@ func (m *Manager) completeTransaction(config *params.NodeConfig, selectedAccount
 	}
 
 	chainID := big.NewInt(int64(config.NetworkID))
-	data := []byte(args.Data)
+	input := args.Input
+	if input == nil {
+		input = args.Data
+	}
+	if input == nil {
+		return hash, errors.New("Missing Input/Data byte array")
+	}
+	data := []byte(*input)
 	value := (*big.Int)(args.Value)
 	toAddr := gethcommon.Address{}
 	if args.To != nil {
 		toAddr = *args.To
 	}
 
-	gas := (*big.Int)(args.Gas)
+	var gas uint64
 	if args.Gas == nil {
 		ctx, cancel = context.WithTimeout(context.Background(), m.rpcCallTimeout)
 		defer cancel()
@@ -228,10 +236,12 @@ func (m *Manager) completeTransaction(config *params.NodeConfig, selectedAccount
 		if err != nil {
 			return hash, err
 		}
-		if gas.Cmp(big.NewInt(defaultGas)) == -1 {
+		if gas < defaultGas {
 			log.Info("default gas will be used. estimated gas", gas, "is lower than", defaultGas)
-			gas = big.NewInt(defaultGas)
+			gas = defaultGas
 		}
+	} else {
+		gas = uint64(*args.Gas)
 	}
 
 	log.Info(

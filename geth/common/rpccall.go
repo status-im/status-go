@@ -94,7 +94,7 @@ func (r RPCCall) ParseValue() *hexutil.Big {
 
 // ParseGas returns the hex big associated with the call.
 // nolint: dupl
-func (r RPCCall) ParseGas() *hexutil.Big {
+func (r RPCCall) ParseGas() *hexutil.Uint64 {
 	params, ok := r.Params[0].(map[string]interface{})
 	if !ok {
 		return nil
@@ -105,12 +105,13 @@ func (r RPCCall) ParseGas() *hexutil.Big {
 		return nil
 	}
 
-	parsedValue, err := hexutil.DecodeBig(inputValue)
+	parsedValue, err := hexutil.DecodeUint64(inputValue)
 	if err != nil {
 		return nil
 	}
 
-	return (*hexutil.Big)(parsedValue)
+	_v := hexutil.Uint64(parsedValue)
+	return &_v
 }
 
 // ParseGasPrice returns the hex big associated with the call.
@@ -149,11 +150,12 @@ func (r RPCCall) ToSendTxArgs() SendTxArgs {
 		toAddr = gethcommon.HexToAddress("0x0")
 	}
 
+	input := r.ParseData()
 	return SendTxArgs{
 		To:       &toAddr,
 		From:     fromAddr,
 		Value:    r.ParseValue(),
-		Data:     r.ParseData(),
+		Input:    &input,
 		Gas:      r.ParseGas(),
 		GasPrice: r.ParseGasPrice(),
 	}

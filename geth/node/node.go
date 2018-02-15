@@ -93,7 +93,6 @@ func defaultEmbeddedNodeConfig(config *params.NodeConfig) *node.Config {
 		P2P: p2p.Config{
 			NoDiscovery:      !config.Discovery,
 			DiscoveryV5:      true,
-			DiscoveryV5Addr:  ":0",
 			BootstrapNodes:   nil,
 			BootstrapNodesV5: nil,
 			ListenAddr:       config.ListenAddr,

@@ -15,6 +15,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pborman/uuid"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/static"
@@ -143,6 +144,11 @@ func Fatalf(reason interface{}, args ...interface{}) {
 
 // CreateTransaction returns a transaction object.
 func CreateTransaction(ctx context.Context, args SendTxArgs) *QueuedTx {
+	if args.Input == nil && args.Data == nil {
+		// If neither Input nor Data were initialized, let's pass an empty slice in Input
+		emptyByteArray := hexutil.Bytes(make([]byte, 0))
+		args.Input = &emptyByteArray
+	}
 	return &QueuedTx{
 		ID:      QueuedTxID(uuid.New()),
 		Context: ctx,
