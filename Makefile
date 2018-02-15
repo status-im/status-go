@@ -175,6 +175,8 @@ update-geth: ##@dependencies Update geth (use BRANCH to set the branch name)
 	$(MAKE) dep-ensure
 	#Commit patches.
 	#Commit Gopkg.lock, Gopkg.toml and vendor directories.
+	git add Gopkg.lock Gopkg.toml vendor/
+	git add _assets/patches
 
 patch: ##@patching Revert and apply all patches
 	./_assets/patches/patcher
