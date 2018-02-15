@@ -16,13 +16,23 @@ Instructions for creating a patch from the command line:
     1. If you already have a commit that represents the change, find its SHA1 (e.g. `$COMMIT_SHA1`) and do `git diff $COMMIT_SHA1 > file.patch`
     1. If the files are staged, do `git diff --cached > file.patch`
 
+# Updating patches
+
+1. Remove tweak the patch file.
+1. Run `make dep-ensure` to re-apply patches.
+
+# Removing patches
+
+1. Remove the patch file
+1. Remove the link from [this README] (./README.md)
+1. Run `make dep-ensure` to re-apply patches.
+
 # Patches
 
 - [`0000-accounts-hd-keys.patch`](./0000-accounts-hd-keys.patch) — adds support for HD extended keys (links/docs?)
 - [`0002-les-api-status.patch`](./0002-les-api-status.patch) — adds StatusBackend into LES code (need to be inspected, some things can and should be done outside of les code
 - [`0004-whisper-notifications.patch`](./0004-whisper-notifications.patch) — adds Whisper notifications (need to be reviewed and documented)
 - [`0006-latest-cht.patch`](./0006-latest-cht.patch) – updates CHT root hashes, should be updated regularly to keep sync fast, until proper Trusted Checkpoint sync is not implemented as part of LES/2 protocol.
-- [`0007-README.patch`](./0007-README.patch) — update upstream README.md.
 - [`0009-whisper-envelopes-tracing.patch`](./0009-whisper-envelopes-tracing.patch) — adds Whisper envelope tracing (need to be reviewed and documented)
 - [`0010-geth-17-fix-npe-in-filter-system.patch`](./0010-geth-17-fix-npe-in-filter-system.patch) - Temp patch for 1.7.x to fix a NPE in the filter system.
 - [`0011-geth-17-whisperv6-70fbc87.patch`](./0011-geth-17-whisperv6-70fbc87.patch) - Temp patch for 1.7.x to update whisper v6 to the upstream version at the `70fbc87` SHA1.
