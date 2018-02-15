@@ -233,9 +233,6 @@ func (s *TransactionsTestSuite) TestSendEther() {
 
 	EnsureNodeSync(s.Backend.NodeManager())
 
-	backend := s.LightEthereumService().StatusBackend
-	s.NotNil(backend)
-
 	// create an account
 	sampleAddress, _, _, err := s.Backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
 	s.NoError(err)
@@ -373,9 +370,6 @@ func (s *TransactionsTestSuite) TestDoubleCompleteQueuedTransactions() {
 
 	EnsureNodeSync(s.Backend.NodeManager())
 
-	backend := s.LightEthereumService().StatusBackend
-	s.NotNil(backend)
-
 	// log into account from which transactions will be sent
 	s.NoError(s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 
@@ -449,9 +443,6 @@ func (s *TransactionsTestSuite) TestDiscardQueuedTransaction() {
 	defer s.StopTestBackend()
 
 	EnsureNodeSync(s.Backend.NodeManager())
-
-	backend := s.LightEthereumService().StatusBackend
-	s.NotNil(backend)
 
 	// reset queue
 	s.Backend.TxQueueManager().TransactionQueue().Reset()
@@ -542,9 +533,6 @@ func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
 	defer s.StopTestBackend()
 
 	EnsureNodeSync(s.Backend.NodeManager())
-
-	backend := s.LightEthereumService().StatusBackend
-	s.NotNil(backend)
 
 	// reset queue
 	s.Backend.TxQueueManager().TransactionQueue().Reset()
@@ -660,9 +648,6 @@ func (s *TransactionsTestSuite) TestNonExistentQueuedTransactions() {
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
-	backend := s.LightEthereumService().StatusBackend
-	s.NotNil(backend)
-
 	// log into account from which transactions will be sent
 	s.NoError(s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 
@@ -679,8 +664,6 @@ func (s *TransactionsTestSuite) TestEvictionOfQueuedTransactions() {
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
-	backend := s.LightEthereumService().StatusBackend
-	s.NotNil(backend)
 	var m sync.Mutex
 	txCount := 0
 	txIDs := [queue.DefaultTxQueueCap + 5 + 10]common.QueuedTxID{}
@@ -747,9 +730,6 @@ func (s *TransactionsTestSuite) setupLocalNode() {
 	s.StartTestBackend()
 
 	EnsureNodeSync(s.Backend.NodeManager())
-
-	backend := s.LightEthereumService().StatusBackend
-	s.NotNil(backend)
 }
 
 func (s *TransactionsTestSuite) setupUpstreamNode() {
