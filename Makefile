@@ -170,7 +170,7 @@ dep-install: ##@dependencies Install vendoring tool
 
 update-geth: ##@dependencies Update geth (use BRANCH to set the branch name)
 	# Update go-ethereum contraint branch
-	sed 'N;N;s/\(\[\[constraint]]\n  name = "github.com\/ethereum\/go-ethereum"\n  branch =\)\(.*\)/\1 '"\"${BRANCH}\""'/g' Gopkg.toml
+	sed -i 'N;N;s/\(\[\[constraint]]\n  name = "github.com\/ethereum\/go-ethereum"\n  branch =\)\(.*\)/\1 '"\"${BRANCH}\""'/g' Gopkg.toml
 	dep ensure -v -update github.com/ethereum/go-ethereum
 	$(MAKE) dep-ensure
 	git add Gopkg.lock Gopkg.toml vendor/
