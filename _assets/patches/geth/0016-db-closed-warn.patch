@@ -1,0 +1,15 @@
+diff --git a/core/database_util.go b/core/database_util.go
+index c6b125da..3e0cf243 100644
+--- a/core/database_util.go
++++ b/core/database_util.go
+@@ -353,6 +353,10 @@ func WriteCanonicalHash(db ethdb.Putter, hash common.Hash, number uint64) error
+ // WriteHeadHeaderHash stores the head header's hash.
+ func WriteHeadHeaderHash(db ethdb.Putter, hash common.Hash) error {
+ 	if err := db.Put(headHeaderKey, hash.Bytes()); err != nil {
++		if err.Error() == "leveldb: closed" {
++			log.Warn("Failed to store last header's hash", "err", err)
++			return nil
++		}
+ 		log.Crit("Failed to store last header's hash", "err", err)
+ 	}
+ 	return nil
