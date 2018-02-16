@@ -36,9 +36,9 @@ func NewConnectionType(s string) ConnectionType {
 
 // ConnectionType constants
 const (
-	ConnectionCellular ConnectionType = iota // default value, LTE, 4G, 3G, EDGE, etc.
-	ConnectionWifi                           // WIFI or iOS simulator
-	ConnectionUnknown
+	ConnectionUnknown  ConnectionType = iota
+	ConnectionCellular                // cellular, LTE, 4G, 3G, EDGE, etc.
+	ConnectionWifi                    // WIFI or iOS simulator
 )
 
 // String formats ConnectionState for logs. Implements Stringer.

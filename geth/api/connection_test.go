@@ -26,7 +26,7 @@ func TestConnectionState(t *testing.T) {
 		{
 			"zero value",
 			ConnectionState{},
-			"cellular",
+			"unknown",
 		},
 		{
 			"offline",
