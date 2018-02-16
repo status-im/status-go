@@ -4,13 +4,13 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
-// NetworkConnectionTester removes and restores network connection.
-type NetworkConnectionTester struct {
+// NetworkConnectionControler removes and restores network connection.
+type NetworkConnectionController struct {
 	defRoute *netlink.Route
 }
 
 // Setup removes default route.
-func (t *NetworkConnectionTester) Setup() error {
+func (t *NetworkConnectionController) Setup() error {
 	link, err := netlink.LinkByName("eth0")
 	if err != nil {
 		return err
@@ -25,7 +25,7 @@ func (t *NetworkConnectionTester) Setup() error {
 }
 
 // TearDown removes default route.
-func (t *NetworkConnectionTester) TearDown() error {
+func (t *NetworkConnectionController) TearDown() error {
 	if t.defRoute != nil {
 		return netlink.RouteAdd(t.defRoute)
 	}

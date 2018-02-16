@@ -205,11 +205,15 @@ func (m *NodeManager) removeStaticPeers() error {
 		log.Info("Boot cluster is disabled")
 		return nil
 	}
+	server := m.node.Server()
+	if server == nil {
+		return ErrNoRunningNode
+	}
 	for _, enode := range m.config.BootClusterConfig.BootNodes {
-		err := m.delPeer(enode)
+		err := m.removePeer(enode)
 		if err != nil {
 			log.Warn("Boot node deletion failed", "error", err)
-			continue
+			return err
 		}
 		log.Info("Boot node deleted", "enode", enode)
 	}
@@ -247,16 +251,12 @@ func (m *NodeManager) addPeer(url string) error {
 	return nil
 }
 
-func (m *NodeManager) delPeer(url string) error {
-	server := m.node.Server()
-	if server == nil {
-		return ErrNoRunningNode
-	}
+func (m *NodeManager) removePeer(url string) error {
 	parsedNode, err := discover.ParseNode(url)
 	if err != nil {
 		return err
 	}
-	server.RemovePeer(parsedNode)
+	m.node.Server().RemovePeer(parsedNode)
 	return nil
 }
 

@@ -19,11 +19,8 @@ XGOIMAGEIOSSIM = statusteam/xgo-ios-simulator:$(XGOVERSION)
 
 DOCKER_IMAGE_NAME ?= status-go
 
-ROOT_DIR = $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 DOCKER_TEST_WORKDIR = /go/src/github.com/status-im/status-go/
 DOCKER_TEST_IMAGE  = golang:1.9
-DOCKER_TEST_EXEC = docker run --privileged --rm -it -v "$(ROOT_DIR):$(DOCKER_TEST_WORKDIR)" \
-		-w "$(DOCKER_TEST_WORKDIR)" $(DOCKER_TEST_IMAGE)
 
 UNIT_TEST_PACKAGES := $(shell go list ./...  | grep -v /vendor | grep -v /t/e2e | grep -v /cmd | grep -v /lib)
 
@@ -126,7 +123,7 @@ mock: ##@other Regenerate mocks
 	mockgen -source=geth/transactions/fake/txservice.go -destination=geth/transactions/fake/mock.go -package=fake
 
 docker-test:
-	$(DOCKER_TEST_EXEC) go test ${ARGS}
+	docker run --privileged --rm -it -v "$(shell pwd):$(DOCKER_TEST_WORKDIR)" -w "$(DOCKER_TEST_WORKDIR)" $(DOCKER_TEST_IMAGE) go test ${ARGS}
 
 test: test-unit-coverage ##@tests Run basic, short tests during development
 

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/status-im/status-go/geth/api"
+	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/t/e2e"
 	. "github.com/status-im/status-go/t/utils"
 
@@ -15,23 +16,21 @@ import (
 )
 
 const (
-	defaultTimeout = 30 * time.Second
+	defaultTimeout = 40 * time.Second
 )
 
 func TestPeersSuiteLinkUpDown(t *testing.T) {
-	suite.Run(t, &PeersTestSuite{tester: new(NetworkConnectionTester)})
+	suite.Run(t, &PeersTestSuite{controller: new(NetworkConnectionController)})
 }
 
 type PeersTestSuite struct {
 	suite.Suite
 
-	backend *api.StatusBackend
-	tester  *NetworkConnectionTester
+	backend    *api.StatusBackend
+	controller *NetworkConnectionController
 }
 
 func (s *PeersTestSuite) SetupTest() {
-	netid := GetNetworkID()
-	s.Require().NotEqual(0, netid, "test suppose to work only on public network")
 	s.backend = api.NewStatusBackend()
 	config, err := e2e.MakeTestNodeConfig(GetNetworkID())
 	s.Require().NoError(err)
@@ -66,47 +65,42 @@ func (s *PeersTestSuite) TestStaticPeersReconnect() {
 	node, err := s.backend.NodeManager().Node()
 	s.Require().NoError(err)
 
-	node.Server().SubscribeEvents(events)
+	subscription := node.Server().SubscribeEvents(events)
+	defer subscription.Unsubscribe()
 	peers := map[discover.NodeID]struct{}{}
 	before := time.Now()
 	s.Require().NoError(consumeUntil(events, func(ev *p2p.PeerEvent) bool {
+		log.Info("tests", "event", ev)
 		if ev.Type == p2p.PeerEventTypeAdd {
 			peers[ev.Peer] = struct{}{}
 		}
-		if len(peers) == expectedPeersCount {
-			return true
-		}
-		return false
+		return len(peers) == expectedPeersCount
 	}, defaultTimeout))
 	s.WithinDuration(time.Now(), before, 5*time.Second)
 
-	s.Require().NoError(s.tester.Setup())
+	s.Require().NoError(s.controller.Setup())
 	before = time.Now()
 
 	s.Require().NoError(consumeUntil(events, func(ev *p2p.PeerEvent) bool {
+		log.Info("tests", "event", ev)
 		if ev.Type == p2p.PeerEventTypeDrop {
 			delete(peers, ev.Peer)
 		}
-		if len(peers) == 0 {
-			return true
-		}
-		return false
+		return len(peers) == 0
 	}, defaultTimeout))
 	s.WithinDuration(time.Now(), before, 31*time.Second)
 
-	s.Require().NoError(s.tester.TearDown())
+	s.Require().NoError(s.controller.TearDown())
 	before = time.Now()
 	go func() {
 		s.backend.NodeManager().ReconnectStaticPeers()
 	}()
 	s.Require().NoError(consumeUntil(events, func(ev *p2p.PeerEvent) bool {
+		log.Info("tests", "event", ev)
 		if ev.Type == p2p.PeerEventTypeAdd {
 			peers[ev.Peer] = struct{}{}
 		}
-		if len(peers) == expectedPeersCount {
-			return true
-		}
-		return false
+		return len(peers) == expectedPeersCount
 	}, defaultTimeout))
-	s.WithinDuration(time.Now(), before, 2*time.Second)
+	s.WithinDuration(time.Now(), before, 31*time.Second)
 }
