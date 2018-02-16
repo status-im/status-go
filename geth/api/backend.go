@@ -229,9 +229,9 @@ func (b *StatusBackend) registerHandlers() error {
 }
 
 // ConnectionChange handles network state changes logic.
-func (m *StatusBackend) ConnectionChange(state ConnectionState) {
-	log.Info("Network state change", "old", m.connectionState, "new", state)
-	m.connectionState = state
+func (b *StatusBackend) ConnectionChange(state ConnectionState) {
+	log.Info("Network state change", "old", b.connectionState, "new", state)
+	b.connectionState = state
 
 	// logic of handling state changes here
 	// restart node? force peers reconnect? etc
