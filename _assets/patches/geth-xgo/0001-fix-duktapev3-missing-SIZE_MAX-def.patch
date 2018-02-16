@@ -1,0 +1,20 @@
+diff --git a/vendor/gopkg.in/olebedev/go-duktape.v3/duk_minimal_printf.c b/vendor/gopkg.in/olebedev/go-duktape.v3/duk_minimal_printf.c
+index e4b6e43a..baed990d 100755
+--- a/vendor/gopkg.in/olebedev/go-duktape.v3/duk_minimal_printf.c
++++ b/vendor/gopkg.in/olebedev/go-duktape.v3/duk_minimal_printf.c
+@@ -278,6 +278,7 @@ int duk_minimal_snprintf(char *str, size_t size, const char *format, ...) {
+ }
+ 
+ /* Minimal sprintf() entry point. */
++#if 0
+ int duk_minimal_sprintf(char *str, const char *format, ...) {
+ 	va_list ap;
+ 	int ret;
+@@ -288,6 +289,7 @@ int duk_minimal_sprintf(char *str, const char *format, ...) {
+ 
+ 	return ret;
+ }
++#endif
+ 
+ /* Minimal sscanf() entry point. */
+ int duk_minimal_sscanf(const char *str, const char *format, ...) {
