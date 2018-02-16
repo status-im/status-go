@@ -7,8 +7,7 @@ import (
 // ConnectionState represents device connection state and type,
 // as reported by mobile framework.
 //
-// Zero value represents default assumption about network
-// connection until first update — online, on cellular and not expensive.
+// Zero value represents default assumption about network (online and unknown type).
 type ConnectionState struct {
 	Offline   bool           `json:"offline"`
 	Type      ConnectionType `json:"type"`
