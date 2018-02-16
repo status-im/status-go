@@ -10,7 +10,7 @@ type NetworkConnectionController struct {
 }
 
 // Setup removes default route.
-func (t *NetworkConnectionController) Setup() error {
+func (t *NetworkConnectionController) Enable() error {
 	link, err := netlink.LinkByName("eth0")
 	if err != nil {
 		return err
@@ -25,7 +25,7 @@ func (t *NetworkConnectionController) Setup() error {
 }
 
 // TearDown removes default route.
-func (t *NetworkConnectionController) TearDown() error {
+func (t *NetworkConnectionController) Disable() error {
 	if t.defRoute != nil {
 		return netlink.RouteAdd(t.defRoute)
 	}

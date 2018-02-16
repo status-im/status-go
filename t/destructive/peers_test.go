@@ -78,7 +78,7 @@ func (s *PeersTestSuite) TestStaticPeersReconnect() {
 	}, defaultTimeout))
 	s.WithinDuration(time.Now(), before, 5*time.Second)
 
-	s.Require().NoError(s.controller.Setup())
+	s.Require().NoError(s.controller.Enable())
 	before = time.Now()
 
 	s.Require().NoError(consumeUntil(events, func(ev *p2p.PeerEvent) bool {
@@ -90,7 +90,7 @@ func (s *PeersTestSuite) TestStaticPeersReconnect() {
 	}, defaultTimeout))
 	s.WithinDuration(time.Now(), before, 31*time.Second)
 
-	s.Require().NoError(s.controller.TearDown())
+	s.Require().NoError(s.controller.Disable())
 	before = time.Now()
 	go func() {
 		s.backend.NodeManager().ReconnectStaticPeers()
