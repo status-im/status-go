@@ -19,7 +19,7 @@ const (
 	defaultTimeout = 40 * time.Second
 )
 
-func TestPeersSuiteLinkUpDown(t *testing.T) {
+func TestPeersSuiteNetworkConnection(t *testing.T) {
 	suite.Run(t, &PeersTestSuite{controller: new(NetworkConnectionController)})
 }
 
