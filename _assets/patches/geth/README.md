@@ -18,7 +18,7 @@ Instructions for creating a patch from the command line:
 
 # Updating patches
 
-1. Remove tweak the patch file.
+1. Tweak the patch file.
 1. Run `make dep-ensure` to re-apply patches.
 
 # Removing patches
