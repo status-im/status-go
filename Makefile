@@ -168,13 +168,18 @@ dep-ensure: ##@dependencies Dep ensure and apply all patches
 dep-install: ##@dependencies Install vendoring tool
 	go get -u github.com/golang/dep/cmd/dep
 
-update-geth: ##@dependencies Update geth (use BRANCH to set the branch name)
-	# Update go-ethereum contraint branch
-	sed -i 'N;N;s/\(\[\[constraint]]\n  name = "github.com\/ethereum\/go-ethereum"\n  branch =\)\(.*\)/\1 '"\"${BRANCH}\""'/g' Gopkg.toml
+update-geth: ##@dependencies Update geth (use GETH_BRANCH to set the branch name)
+	# Update go-ethereum contraint branch if branch is provided
+ifdef GETH_BRANCH
+		# escape slashes
+		GETH_BRANCH=$(echo $GETH_BRANCH | sed 's@\/@\\\/@g')
+		@echo ${GETH_BRANCH}
+		sed -i 'N;N;s@\(\[\[constraint]]\n  name = "github.com\/ethereum\/go-ethereum"\n  branch =\)\(.*\)@\1 '"\"${GETH_BRANCH}\""'@g' Gopkg.toml
+endif
 	dep ensure -v -update github.com/ethereum/go-ethereum
 	$(MAKE) dep-ensure
-	git add Gopkg.lock Gopkg.toml vendor/
-	git add _assets/patches
+	git add Gopkg.lock Gopkg.toml vendor/ _assets/patches
+	git commit -m "Updating Geth"
 
 patch: ##@patching Revert and apply all patches
 	./_assets/patches/patcher
