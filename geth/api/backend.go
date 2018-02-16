@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/status-im/status-go/extkeys"
 	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/jail"
@@ -173,6 +174,27 @@ func (b *StatusBackend) ResetChainData() error {
 	}
 	signal.Send(signal.Envelope{Type: signal.EventChainDataRemoved})
 	return b.startNode(&newcfg)
+}
+
+func (m *StatusBackend) SeedWhisperSymKey() (string, string, error) {
+	// generate mnemonic phrase
+	mn := extkeys.NewMnemonic(extkeys.Salt)
+	mnemonic, err := mn.MnemonicPhrase(128, extkeys.EnglishLanguage)
+	if err != nil {
+		return "", "", err
+	}
+
+	whisperService, err := m.nodeManager.WhisperService()
+	if err != nil {
+		return "", "", err
+	}
+
+	skid, err := whisperService.AddSymKeyFromPassword(mnemonic)
+	if err != nil {
+		return "", "", err
+	}
+
+	return mnemonic, skid, nil
 }
 
 // CallRPC executes RPC request on node's in-proc RPC server

@@ -113,6 +113,10 @@ func (api *StatusAPI) CreateChildAccount(parentAddress, password string) (addres
 	return api.b.AccountManager().CreateChildAccount(parentAddress, password)
 }
 
+func (api *StatusAPI) SeedWhisperSymKey(password string) (string, string, error) {
+	return api.b.SeedWhisperSymKey()
+}
+
 // RecoverAccount re-creates master key using given details.
 // Once master key is re-generated, it is inserted into keystore (if not already there).
 func (api *StatusAPI) RecoverAccount(password, mnemonic string) (address, pubKey string, err error) {

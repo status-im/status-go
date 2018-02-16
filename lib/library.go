@@ -106,6 +106,15 @@ func CallRPC(inputJSON *C.char) *C.char {
 	return C.CString(outputJSON)
 }
 
+//SeedWhisperSymKey seeds a random mnemonic passphrase and a Whisper symmetric
+//key seeded with that passphrase as its password, returned via output function
+//parameters.
+//export SeedWhisperSymKey
+func SeedWhisperSymKey(passphrase *C.char, symKeyID *C.char) {
+	passphrase, symKeyID, err :=
+		statusAPI.NodeManager().SeedWhisperSymKey()
+}
+
 //CreateAccount is equivalent to creating an account from the command line,
 // just modified to handle the function arg passing
 //export CreateAccount
