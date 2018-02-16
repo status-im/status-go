@@ -53,8 +53,8 @@ func NewStatusBackend() *StatusBackend {
 }
 
 // NodeManager returns reference to node manager
-func (m *StatusBackend) NodeManager() *node.NodeManager {
-	return m.nodeManager
+func (b *StatusBackend) NodeManager() *node.NodeManager {
+	return b.nodeManager
 }
 
 // AccountManager returns reference to account manager
