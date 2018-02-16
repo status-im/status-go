@@ -6,17 +6,19 @@
 # and reports about previously unapplied patches. If there's
 # an error, reverts the last one and stops.
 #
-# Usage: ./patcher -p <base_path> -r -v
-# -p: <base_path> is where to apply to (a go-ethereum package)
+# Usage: ./patcher -b <base_path> -r -v
+# -b: <base_path> is the target location relative to which patches will be applied
+# -p: <patch_path> is where to take the patches from (default is geth)
 # -r: reverts all and exit if this flag is present
 # -c: reverts all to see what's applied, applies all previously applied back again,
 # reports unapplied patches in this branch by comparing with "develop" including
 # uncommitted ones and exits (with 1 if there are any)
 # -v: verbose error reporting about failed patch
 #
-# If -p is not present, default path is as below ($basepath).
+# If -b is not present, default path is as below ($basepath).
 
 dir=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+# Patches path is geth unless specified.
 patches=("$dir"/geth/*.patch)
 
 # Use this branch as a reference for comparing patches
@@ -26,67 +28,54 @@ baseBranch="develop"
 # Base path is vendor/github.com/ethereum/go-ethereum
 # unless specified.
 basepath="vendor/github.com/ethereum/go-ethereum"
+
+gitApply() {
+	f=$1
+	basepath=$2
+	verbose=$3
+
+	if [ $verbose -eq 1 ]; then
+		if [ $basepath == "." ]; then
+			git apply "$f"
+		else
+			git apply "$f" --directory="$basepath"
+		fi
+	else
+		if [ $basepath == "." ]; then
+			git apply "$f" > /dev/null 2>&1
+		else
+			git apply "$f" --directory="$basepath" > /dev/null 2>&1
+		fi
+	fi
+}
+
+gitApplyReverse() {
+	f=$1
+	basepath=$2
+
+	if [ $basepath == "." ]; then
+		git apply "$f" -R > /dev/null 2>&1
+	else
+		git apply "$f" --directory="$basepath" -R > /dev/null 2>&1
+	fi
+}
+
 verbose=0
-while getopts :prcv opt; do
+revert=0
+compare=0
+while getopts b:p:rcv opt; do
 	case $opt in
-	p)
+	b)
 		basepath=$OPTARG
     	;;
+	p)
+		patches=("$dir"/$OPTARG/*.patch)
+    	;;
 	r)
-		# Reverts in reverse order and exits.
-		for ((i=${#patches[@]}-1; i>=0; i--)); do
-			git apply "${patches[$i]}" --directory="$basepath" -R > /dev/null 2>&1
-		done
-		echo "Reverted all."
-		exit
+		revert=1
 		;;
 	c)
-		applied=()
-		unapplied=()
-		# Finds applied patches using reverse order and
-		# notes them down.
-		for ((i=${#patches[@]}-1; i>=0; i--)); do
-			f=${patches[$i]}
-			git apply "$f" --directory="$basepath" -R > /dev/null 2>&1
-			if [ $? -eq 1 ]; then
-				unapplied+=("$f")
-			else
-				applied+=("$f")
-			fi
-		done
-		# Applies reverted patches back again.
-		for ((i=${#applied[@]}-1; i>=0; i--)); do
-			f=${applied[$i]}
-			git apply "$f" --directory="$basepath" > /dev/null 2>&1
-		done
-		# Sorts out new patches' paths by comparing with base branch.
-		fromBaseBranch=($(git diff $baseBranch --stat | grep "\\.patch" |
-			while IFS=" " read -r -a line; do
-				path="$(pwd)/${line[0]}"
-				echo "$path"
-			done
-		))
-		# Also does the same with uncommitted.
-		uncommitted=($(git status -u --porcelain | grep "\\.patch" |
-			while IFS=" " read -r -a line; do
-				length=${#line[@]}
-				path="$(pwd)/${line[$((length - 1))]}"
-				echo "$path"
-			done
-		))
-		newPatches=( "${fromBaseBranch[@]}" "${uncommitted[@]}" )
-		# Checks new patches and exits with 1 if there are unapplied.
-		hasUnapplied=0
-		for newPatch in "${newPatches[@]}"; do
-			for unapp in "${unapplied[@]}"; do
-				if [ "$unapp" == "$newPatch" ]; then
-					echo "Recently added/changed but not applied: $unapp"
-					hasUnapplied=1
-					break
-				fi
-			done
-		done
-		exit $hasUnapplied
+		compare=1
 		;;
 	v)
 		verbose=1
@@ -98,6 +87,63 @@ while getopts :prcv opt; do
 	esac
 done
 
+if [ $revert -eq 1 ]; then
+	# Reverts in reverse order and exits.
+	for ((i=${#patches[@]}-1; i>=0; i--)); do
+		gitApplyReverse "${patches[$i]}" "$basepath" 0
+	done
+	echo "Reverted all."
+	exit
+fi
+if [ $compare -eq 1 ]; then
+	applied=()
+	unapplied=()
+	# Finds applied patches using reverse order and
+	# notes them down.
+	for ((i=${#patches[@]}-1; i>=0; i--)); do
+		f=${patches[$i]}
+		gitApplyReverse "$f" "$basepath"
+		if [ $? -eq 1 ]; then
+			unapplied+=("$f")
+		else
+			applied+=("$f")
+		fi
+	done
+	# Applies reverted patches back again.
+	for ((i=${#applied[@]}-1; i>=0; i--)); do
+		f=${applied[$i]}
+		gitApply "$f" "$basepath" 0
+	done
+	# Sorts out new patches' paths by comparing with base branch.
+	fromBaseBranch=($(git diff $baseBranch --stat | grep "\\.patch" |
+		while IFS=" " read -r -a line; do
+			path="$(pwd)/${line[0]}"
+			echo "$path"
+		done
+	))
+	# Also does the same with uncommitted.
+	uncommitted=($(git status -u --porcelain | grep "\\.patch" |
+		while IFS=" " read -r -a line; do
+			length=${#line[@]}
+			path="$(pwd)/${line[$((length - 1))]}"
+			echo "$path"
+		done
+	))
+	newPatches=( "${fromBaseBranch[@]}" "${uncommitted[@]}" )
+	# Checks new patches and exits with 1 if there are unapplied.
+	hasUnapplied=0
+	for newPatch in "${newPatches[@]}"; do
+		for unapp in "${unapplied[@]}"; do
+			if [ "$unapp" == "$newPatch" ]; then
+				echo "Recently added/changed but not applied: $unapp"
+				hasUnapplied=1
+				break
+			fi
+		done
+	done
+	exit $hasUnapplied
+fi
+
 applied=()
 
 echo -en "\\n"
@@ -107,7 +153,7 @@ echo "==================="
 # which was previously applied.
 for ((i=${#patches[@]}-1; i>=0; i--)); do
 	f=${patches[$i]}
-	git apply "$f" --directory="$basepath" -R > /dev/null 2>&1
+	gitApplyReverse "$f" "$basepath"
 	if [ $? -eq 0 ]; then
 		applied+=("$f")
 		echo "$f"
@@ -131,14 +177,10 @@ for ((i=0; i<${#patches[@]}; i++)); do
 		echo "Applying new: $f"
 		echo -en "\\n"
 	fi
-	if [ $verbose -eq 1 ]; then
-		git apply "$f" --directory="$basepath"
-	else
-		git apply "$f" --directory="$basepath" > /dev/null 2>&1
-	fi
+	gitApply "$f" "$basepath" $verbose
 	if [ $? -eq 1 ]; then
 		echo "Failed and reverting: $f"
-		git apply "$f" --directory="$basepath" -R > /dev/null 2>&1
+		gitApplyReverse "$f" "$basepath"
 		echo -en "\\n"
 		exit
 	fi
