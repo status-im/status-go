@@ -100,13 +100,14 @@ func defaultEmbeddedNodeConfig(config *params.NodeConfig) *node.Config {
 			MaxPeers:         config.MaxPeers,
 			MaxPendingPeers:  config.MaxPendingPeers,
 		},
-		IPCPath:     makeIPCPath(config),
-		HTTPCors:    []string{"*"},
-		HTTPModules: strings.Split(config.APIModules, ","),
-		WSHost:      makeWSHost(config),
-		WSPort:      config.WSPort,
-		WSOrigins:   []string{"*"},
-		WSModules:   strings.Split(config.APIModules, ","),
+		IPCPath:          makeIPCPath(config),
+		HTTPCors:         []string{"*"},
+		HTTPModules:      strings.Split(config.APIModules, ","),
+		HTTPVirtualHosts: []string{"localhost"},
+		WSHost:           makeWSHost(config),
+		WSPort:           config.WSPort,
+		WSOrigins:        []string{"*"},
+		WSModules:        strings.Split(config.APIModules, ","),
 	}
 
 	if config.RPCEnabled {
