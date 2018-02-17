@@ -175,8 +175,8 @@ ifdef GETH_BRANCH
 	@# Update go-ethereum contraint branch
 	@sed -i 'N;N;s@\(\[\[constraint]]\n  name = "github.com\/ethereum\/go-ethereum"\n  branch =\)\(.*\)@\1 '"\"${GETH_BRANCH}\""'@g' Gopkg.toml
 endif
-	@#dep ensure -v -update github.com/ethereum/go-ethereum
-	@#$(MAKE) dep-ensure
+	@dep ensure -v -update github.com/ethereum/go-ethereum
+	@$(MAKE) dep-ensure
 	git add Gopkg.lock Gopkg.toml vendor/ _assets/patches/
 ifeq ($(git diff --cached --quiet), 0)
 		echo "No changes to commit" && exit 1
