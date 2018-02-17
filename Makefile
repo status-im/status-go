@@ -173,7 +173,7 @@ ifdef GETH_BRANCH
 	@# escape slashes
 	GETH_BRANCH=$(echo $GETH_BRANCH | sed 's@\/@\\\/@g')
 	@# Update go-ethereum contraint branch
-	sed -i 'N;N;s@\(\[\[constraint]]\n  name = "github.com\/ethereum\/go-ethereum"\n  branch =\)\(.*\)@\1 '"\"${GETH_BRANCH}\""'@g' Gopkg.toml
+	@sed -i 'N;N;s@\(\[\[constraint]]\n  name = "github.com\/ethereum\/go-ethereum"\n  branch =\)\(.*\)@\1 '"\"${GETH_BRANCH}\""'@g' Gopkg.toml
 endif
 	dep ensure -v -update github.com/ethereum/go-ethereum
 	$(MAKE) dep-ensure
