@@ -1,4 +1,4 @@
-# Status Patches to for geth (go-ethereum)
+# Status Patches for geth (go-ethereum)
 ---
 
 Status-go uses [go-ethereum](https://github.com/ethereum/go-ethereum) (**upstream**) as its dependency. As any other Go dependency `go-ethereum` code is vendored and stored in `vendor/` folder.

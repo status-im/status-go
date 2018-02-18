@@ -26,7 +26,7 @@ func init() {
 			panic(err)
 		}
 
-		err = importTestAccouns(nodeConfig.KeyStoreDir)
+		err = importTestAccounts(nodeConfig.KeyStoreDir)
 		if err != nil {
 			panic(err)
 		}
@@ -45,7 +45,7 @@ func (s *NodeManagerTestSuite) StartTestNode(opts ...TestNodeOption) {
 	}
 
 	// import account keys
-	s.NoError(importTestAccouns(nodeConfig.KeyStoreDir))
+	s.NoError(importTestAccounts(nodeConfig.KeyStoreDir))
 
 	s.False(s.NodeManager.IsNodeRunning())
 	s.NoError(s.NodeManager.StartNode(nodeConfig))
@@ -89,7 +89,7 @@ func (s *BackendTestSuite) StartTestBackend(opts ...TestNodeOption) {
 	}
 
 	// import account keys
-	s.NoError(importTestAccouns(nodeConfig.KeyStoreDir))
+	s.NoError(importTestAccounts(nodeConfig.KeyStoreDir))
 
 	// start node
 	s.False(s.Backend.IsNodeRunning())
@@ -134,7 +134,7 @@ func (s *BackendTestSuite) TxQueueManager() *transactions.Manager {
 	return s.Backend.TxQueueManager()
 }
 
-func importTestAccouns(keyStoreDir string) (err error) {
+func importTestAccounts(keyStoreDir string) (err error) {
 	log.Debug("Import accounts to", keyStoreDir)
 
 	err = common.ImportTestAccount(keyStoreDir, GetAccount1PKFile())
