@@ -161,9 +161,13 @@ func activateShhService(stack *node.Node, config *params.NodeConfig) error {
 	}
 
 	serviceConstructor := func(*node.ServiceContext) (node.Service, error) {
-		whisperConfig := config.WhisperConfig
-		whisperService := whisper.New(nil)
+		whisperServiceConfig := &whisper.Config{
+			MaxMessageSize:     whisper.DefaultMaxMessageSize,
+			MinimumAcceptedPOW: 0.001,
+		}
+		whisperService := whisper.New(whisperServiceConfig)
 
+		whisperConfig := config.WhisperConfig
 		// enable metrics
 		whisperService.RegisterEnvelopeTracer(&shhmetrics.EnvelopeTracer{})
 
