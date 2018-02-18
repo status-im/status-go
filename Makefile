@@ -179,7 +179,7 @@ endif
 	$(MAKE) dep-ensure
 	git add Gopkg.lock Gopkg.toml vendor/ _assets/patches/
 ifeq ($(git diff --cached --quiet), 0)
-	@echo "No changes to commit" && exit 1
+	@echo "No changes to commit. Geth up to date." && exit 1
 endif
 	@git commit --quiet -m "Updating Geth"
 	@echo "Geth updated."
