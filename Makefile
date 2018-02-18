@@ -168,7 +168,7 @@ dep-ensure: ##@dependencies Dep ensure and apply all patches
 dep-install: ##@dependencies Install vendoring tool
 	go get -u github.com/golang/dep/cmd/dep
 
-update-geth: ##@dependencies Update geth (use GETH_BRANCH to set the branch name)
+update-geth: ##@dependencies Update geth (use GETH_BRANCH to optionally set the geth branch name)
 ifdef GETH_BRANCH
 	@# escape slashes
 	@GETH_BRANCH=$(echo $GETH_BRANCH | sed 's@\/@\\\/@g')
