@@ -131,3 +131,7 @@ ignored = ["github.com/ethereum/go-ethereum/whisper/notifications"]
 [[override]]
   name = "github.com/syndtr/goleveldb"
   revision = "b89cc31ef7977104127d34c1bd31ebd1a9db2199"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/vishvananda/netlink"

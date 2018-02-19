@@ -311,6 +311,21 @@
 
 [[projects]]
   branch = "master"
+  name = "github.com/vishvananda/netlink"
+  packages = [
+    ".",
+    "nl"
+  ]
+  revision = "d35d6b58e1cb692b27b94fc403170bf44058ac3e"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/vishvananda/netns"
+  packages = ["."]
+  revision = "be1fbeda19366dea804f00efff2dd73a1642fdcc"
+
+[[projects]]
+  branch = "master"
   name = "golang.org/x/crypto"
   packages = [
     "pbkdf2",
@@ -412,6 +427,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "15f735a948b26a34148ed3fa3a1d21cb1a3c45d0b87eb490a2ca1a514e4b1250"
+  inputs-digest = "74c0b717b81bb33bc09218c02f1077d366c5aa4b8294607695d36dc1cf94adc9"
   solver-name = "gps-cdcl"
   solver-version = 1

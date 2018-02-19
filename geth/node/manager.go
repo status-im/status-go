@@ -200,6 +200,36 @@ func (m *NodeManager) populateStaticPeers() error {
 	return nil
 }
 
+func (m *NodeManager) removeStaticPeers() error {
+	if !m.config.BootClusterConfig.Enabled {
+		log.Info("Boot cluster is disabled")
+		return nil
+	}
+	server := m.node.Server()
+	if server == nil {
+		return ErrNoRunningNode
+	}
+	for _, enode := range m.config.BootClusterConfig.BootNodes {
+		err := m.removePeer(enode)
+		if err != nil {
+			log.Warn("Boot node deletion failed", "error", err)
+			return err
+		}
+		log.Info("Boot node deleted", "enode", enode)
+	}
+	return nil
+}
+
+// ReconnectStaticPeers removes and adds static peers to a server.
+func (m *NodeManager) ReconnectStaticPeers() error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if err := m.removeStaticPeers(); err != nil {
+		return err
+	}
+	return m.populateStaticPeers()
+}
+
 // AddPeer adds new static peer node
 func (m *NodeManager) AddPeer(url string) error {
 	m.mu.RLock()
@@ -218,6 +248,15 @@ func (m *NodeManager) addPeer(url string) error {
 		return err
 	}
 	m.node.Server().AddPeer(parsedNode)
+	return nil
+}
+
+func (m *NodeManager) removePeer(url string) error {
+	parsedNode, err := discover.ParseNode(url)
+	if err != nil {
+		return err
+	}
+	m.node.Server().RemovePeer(parsedNode)
 	return nil
 }
 

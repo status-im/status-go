@@ -19,7 +19,10 @@ XGOIMAGEIOSSIM = statusteam/xgo-ios-simulator:$(XGOVERSION)
 
 DOCKER_IMAGE_NAME ?= status-go
 
-UNIT_TEST_PACKAGES := $(shell go list ./...  | grep -v /vendor | grep -v /t/e2e | grep -v /cmd | grep -v /lib)
+DOCKER_TEST_WORKDIR = /go/src/github.com/status-im/status-go/
+DOCKER_TEST_IMAGE  = golang:1.9
+
+UNIT_TEST_PACKAGES := $(shell go list ./...  | grep -v /vendor | grep -v /t/e2e | grep -v /t/destructive | grep -v /cmd | grep -v /lib)
 
 # This is a code for automatic help generator.
 # It supports ANSI colors and categories.
@@ -118,6 +121,9 @@ mock: ##@other Regenerate mocks
 	mockgen -source=geth/common/notification.go -destination=geth/common/notification_mock.go -package=common -imports fcm=github.com/NaySoftware/go-fcm
 	mockgen -source=geth/notification/fcm/client.go -destination=geth/notification/fcm/client_mock.go -package=fcm -imports fcm=github.com/NaySoftware/go-fcm
 	mockgen -source=geth/transactions/fake/txservice.go -destination=geth/transactions/fake/mock.go -package=fake
+
+docker-test: ##@tests Run tests in a docker container with golang.
+	docker run --privileged --rm -it -v "$(shell pwd):$(DOCKER_TEST_WORKDIR)" -w "$(DOCKER_TEST_WORKDIR)" $(DOCKER_TEST_IMAGE) go test ${ARGS}
 
 test: test-unit-coverage ##@tests Run basic, short tests during development
 
