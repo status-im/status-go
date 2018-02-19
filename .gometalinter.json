@@ -27,7 +27,6 @@
         "misspell",
         "structcheck",
         "unconvert",
-        "unparam",
         "varcheck",
         "vet"
     ],
