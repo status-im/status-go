@@ -4,12 +4,12 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
-// NetworkConnectionControler removes and restores network connection.
+// NetworkConnectionController removes and restores network connection.
 type NetworkConnectionController struct {
 	defRoute *netlink.Route
 }
 
-// Setup removes default route.
+// Enable removes default route.
 func (t *NetworkConnectionController) Enable() error {
 	link, err := netlink.LinkByName("eth0")
 	if err != nil {
@@ -24,7 +24,7 @@ func (t *NetworkConnectionController) Enable() error {
 	return netlink.RouteDel(&routes[0])
 }
 
-// TearDown removes default route.
+// Disable removes default route.
 func (t *NetworkConnectionController) Disable() error {
 	if t.defRoute != nil {
 		return netlink.RouteAdd(t.defRoute)

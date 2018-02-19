@@ -44,7 +44,7 @@ func (s *PeersTestSuite) TearDownTest() {
 	s.Require().NoError(s.backend.StopNode())
 }
 
-func consumeUntil(events <-chan *p2p.PeerEvent, f func(ev *p2p.PeerEvent) bool, timeout time.Duration) error {
+func consumeUntil(events <-chan *p2p.PeerEvent, f func(ev *p2p.PeerEvent) bool, timeout time.Duration) error { // nolint (unparam)
 	timer := time.After(timeout)
 	for {
 		select {
@@ -93,7 +93,7 @@ func (s *PeersTestSuite) TestStaticPeersReconnect() {
 	s.Require().NoError(s.controller.Disable())
 	before = time.Now()
 	go func() {
-		s.backend.NodeManager().ReconnectStaticPeers()
+		s.NoError(s.backend.NodeManager().ReconnectStaticPeers())
 	}()
 	s.Require().NoError(consumeUntil(events, func(ev *p2p.PeerEvent) bool {
 		log.Info("tests", "event", ev)
