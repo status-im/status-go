@@ -44,7 +44,7 @@ func (s *PeersTestSuite) TearDownTest() {
 	s.Require().NoError(s.backend.StopNode())
 }
 
-func consumeUntil(events <-chan *p2p.PeerEvent, f func(ev *p2p.PeerEvent) bool, timeout time.Duration) error { // nolint (unparam)
+func consumeUntil(events <-chan *p2p.PeerEvent, f func(ev *p2p.PeerEvent) bool, timeout time.Duration) error {
 	timer := time.After(timeout)
 	for {
 		select {
