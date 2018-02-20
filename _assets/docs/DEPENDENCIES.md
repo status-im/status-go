@@ -49,12 +49,7 @@ file is changed, `dep ensure` will re-generate `Gopkg.lock` as well.
 
 ## Updating `Geth`
 
-1. (for major releases) Update the branch name in `Gopkg.toml`.
-2. Update the `go-ethereum` dependency: `dep ensure -v -update github.com/ethereum/go-ethereum`.
-3. Update vendor files in `status-go`, and apply patches by running `make dep-ensure`.
-4. Commit patches.
-5. Commit `Gopkg.lock`, `Gopkg.toml` and `vendor` directories.
-
+Use the `update-geth` make target. For major releases, provide the GETH_BRANCH parameter. (e.g. `make update-geth GETH_BRANCH=release/1.9`). If there were any changes made, they will be committed while running this target.
 
 ## Commiting changes
 

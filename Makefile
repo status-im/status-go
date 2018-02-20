@@ -174,6 +174,9 @@ dep-ensure: ##@dependencies Dep ensure and apply all patches
 dep-install: ##@dependencies Install vendoring tool
 	go get -u github.com/golang/dep/cmd/dep
 
+update-geth: ##@dependencies Update geth (use GETH_BRANCH to optionally set the geth branch name)
+	./_assets/ci/update-geth.sh $(GETH_BRANCH)
+
 patch: ##@patching Revert and apply all patches
 	./_assets/patches/patcher
 
