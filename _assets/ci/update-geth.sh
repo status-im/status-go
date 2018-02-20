@@ -14,9 +14,9 @@ fi
 dep ensure -v -update github.com/ethereum/go-ethereum
 make dep-ensure
 git add Gopkg.lock Gopkg.toml vendor/ _assets/patches/
-if $(git diff --cached --quiet); then 
+if $(git diff --cached --quiet); then
 	echo "No changes to commit. Geth up to date."
     exit 0
-fi	
+fi
 git commit --quiet -m "Updating Geth"
 echo "Geth updated."
