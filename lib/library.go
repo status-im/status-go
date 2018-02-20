@@ -452,6 +452,7 @@ func AddPeer(enode *C.char) *C.char {
 
 // ConnectionChange handles network state changes as reported
 // by ReactNative (see https://facebook.github.io/react-native/docs/netinfo.html)
+//export ConnectionChange
 func ConnectionChange(typ *C.char, expensive C.int) {
 	statusAPI.ConnectionChange(C.GoString(typ), expensive == 1)
 }
