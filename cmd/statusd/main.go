@@ -55,9 +55,10 @@ var (
 	// don't change the name of this flag, https://github.com/ethereum/go-ethereum/blob/master/metrics/metrics.go#L41
 	_ = flag.Bool("metrics", false, "Expose ethereum metrics with debug_metrics jsonrpc call.")
 	// shh stuff
-	passwordFile = flag.String("shh.passwordfile", "", "Password file (password is used for symmetric encryption)")
-	minPow       = flag.Float64("shh.pow", params.WhisperMinimumPoW, "PoW for messages to be added to queue, in float format")
-	ttl          = flag.Int("shh.ttl", params.WhisperTTL, "Time to live for messages, in seconds")
+	passwordFile    = flag.String("shh.passwordfile", "", "Password file (password is used for symmetric encryption)")
+	minPow          = flag.Float64("shh.pow", params.WhisperMinimumPoW, "PoW for messages to be added to queue, in float format")
+	ttl             = flag.Int("shh.ttl", params.WhisperTTL, "Time to live for messages, in seconds")
+	whisperMaxPeers = flag.Int("shh.maxpeers", -1, "Maximum amount of whisper peers.")
 
 	// MailServer
 	enableMailServer = flag.Bool("shh.mailserver", false, "Delivers expired messages on demand")
@@ -204,6 +205,11 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 
 	nodeConfig.RPCEnabled = *httpEnabled
 	nodeConfig.WhisperConfig.Enabled = *whisperEnabled
+	if *whisperMaxPeers > 0 {
+		nodeConfig.WhisperConfig.MaxPeers = *whisperMaxPeers
+	} else {
+		nodeConfig.WhisperConfig.MaxPeers = *maxPeers
+	}
 	nodeConfig.MaxPeers = *maxPeers
 
 	nodeConfig.HTTPHost = *httpHost

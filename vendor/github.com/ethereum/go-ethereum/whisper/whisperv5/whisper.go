@@ -77,8 +77,9 @@ type Whisper struct {
 	statsMu sync.Mutex // guard stats
 	stats   Statistics // Statistics of whisper node
 
-	mailServer         MailServer // MailServer interface
-	envelopeTracer     EnvelopeTracer // Service collecting envelopes metadata
+	mailServer     MailServer     // MailServer interface
+	envelopeTracer EnvelopeTracer // Service collecting envelopes metadata
+	maxPeers       int
 }
 
 // New creates a Whisper client ready to communicate through the Ethereum P2P network.
@@ -96,6 +97,7 @@ func New(cfg *Config) *Whisper {
 		messageQueue: make(chan *Envelope, messageQueueLimit),
 		p2pMsgQueue:  make(chan *Envelope, messageQueueLimit),
 		quit:         make(chan struct{}),
+		maxPeers:     cfg.MaxPeers,
 	}
 
 	whisper.filters = NewFilters(whisper)
@@ -211,7 +213,7 @@ func (w *Whisper) AllowP2PMessagesFromPeer(peerID []byte) error {
 	if err != nil {
 		return err
 	}
-	p.trusted = true
+	p.SetTrusted()
 	return nil
 }
 
@@ -225,7 +227,7 @@ func (w *Whisper) RequestHistoricMessages(peerID []byte, envelope *Envelope) err
 	if err != nil {
 		return err
 	}
-	p.trusted = true
+	p.SetTrusted()
 	return p2p.Send(p.ws, p2pRequestCode, envelope)
 }
 
@@ -540,9 +542,40 @@ func (w *Whisper) Stop() error {
 	return nil
 }
 
+// waitForSlot waits until peer is marked as trusted or we have a slot for
+// another peer.
+func (w *Whisper) waitForSlot(peer *Peer) error {
+	timeout := time.After(time.Minute)
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-timeout:
+			return p2p.DiscTooManyPeers
+		case <-ticker.C:
+			if peer.Trusted() {
+				return nil
+			}
+			w.peerMu.Lock()
+			if len(w.peers) == w.maxPeers {
+				w.peerMu.Unlock()
+				return nil
+			}
+			w.peerMu.Unlock()
+		}
+	}
+}
+
 // HandlePeer is called by the underlying P2P layer when the whisper sub-protocol
 // connection is negotiated.
 func (wh *Whisper) HandlePeer(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
+	peersOverflow := false
+	wh.peerMu.RLock()
+	if len(wh.peers) > wh.maxPeers {
+		peersOverflow = true
+	}
+	wh.peerMu.RUnlock()
+
 	// Create the new peer and start tracking it
 	whisperPeer := newPeer(wh, peer, rw)
 
@@ -555,6 +588,15 @@ func (wh *Whisper) HandlePeer(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
 		delete(wh.peers, whisperPeer)
 		wh.peerMu.Unlock()
 	}()
+
+	// we need to leave a window for a peer to become trusted
+	// otherwise we won't be able to connect with mailserver when max peers
+	// barier already reached
+	if peersOverflow {
+		if err := wh.waitForSlot(whisperPeer); err != nil {
+			return err
+		}
+	}
 
 	// Run the peer handshake and state updates
 	if err := whisperPeer.handshake(); err != nil {
@@ -605,7 +647,7 @@ func (wh *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 			// this message is not supposed to be forwarded to other peers, and
 			// therefore might not satisfy the PoW, expiry and other requirements.
 			// these messages are only accepted from the trusted peer.
-			if p.trusted {
+			if p.Trusted() {
 				var envelope Envelope
 				if err := packet.Decode(&envelope); err != nil {
 					log.Warn("failed to decode direct message, peer will be disconnected", "peer", p.peer.ID(), "err", err)

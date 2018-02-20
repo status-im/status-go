@@ -106,6 +106,9 @@ type WhisperConfig struct {
 
 	// FirebaseConfig extra configuration for Firebase Cloud Messaging
 	FirebaseConfig *FirebaseConfig `json:"FirebaseConfig,"`
+
+	// MaxPeers maximum amount of whisper peers.
+	MaxPeers int32
 }
 
 // ReadPasswordFile reads and returns content of the password file
@@ -248,6 +251,9 @@ type NodeConfig struct {
 	// MaxPeers is the maximum number of (global) peers that can be connected.
 	// Set to zero, if only static or trusted peers are allowed to connect.
 	MaxPeers int
+
+	// MaxWhisperPeers maximum amount of whisper peers
+	MaxWhisperPeers int
 
 	// MaxPendingPeers is the maximum number of peers that can be pending in the
 	// handshake phase, counted separately for inbound and outbound connections.
