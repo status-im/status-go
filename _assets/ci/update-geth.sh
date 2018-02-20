@@ -12,7 +12,11 @@ if [ ! -z "$GETH_BRANCH" ]; then
 	sed -i 'N;N;s@\(\[\[constraint]]\n  name = "github.com\/ethereum\/go-ethereum"\n  branch =\)\(.*\)@\1 '"\"${GETH_BRANCH}\""'@g' Gopkg.toml
 fi
 dep ensure -v -update github.com/ethereum/go-ethereum
-make dep-ensure || (echo "Please fix patches and rerun. (dep-ensure failed)" && exit 1)
+if ! make dep-ensure; then
+    echo "Please fix patches and rerun. (dep-ensure failed)"
+    exit 1
+fi
+
 
 git add Gopkg.lock Gopkg.toml vendor/ _assets/patches/
 if $(git diff --cached --quiet); then
