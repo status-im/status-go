@@ -1,0 +1,35 @@
+diff --git a/whisper/whisperv6/peer.go b/whisper/whisperv6/peer.go
+index 4ef0f3c4..6a7ab358 100644
+--- a/whisper/whisperv6/peer.go
++++ b/whisper/whisperv6/peer.go
+@@ -19,6 +19,7 @@ package whisperv6
+ import (
+ 	"fmt"
+ 	"math"
++	"sync"
+ 	"time"
+ 
+ 	"github.com/ethereum/go-ethereum/common"
+@@ -38,6 +39,7 @@ type Peer struct {
+ 	powRequirement float64
++	bloomMu        sync.Mutex
+ 	bloomFilter    []byte
+ 	fullNode       bool
+ 
+ 	known *set.Set // Messages already known by the peer to avoid wasting bandwidth
+ 
+@@ -225,10 +227,14 @@ func (peer *Peer) notifyAboutBloomFilterChange(bloom []byte) error {
+ }
+ 
+ func (peer *Peer) bloomMatch(env *Envelope) bool {
++	peer.bloomMu.Lock()
++	defer peer.bloomMu.Unlock()
+ 	return peer.fullNode || bloomFilterMatch(peer.bloomFilter, env.Bloom())
+ }
+ 
+ func (peer *Peer) setBloomFilter(bloom []byte) {
++	peer.bloomMu.Lock()
++	defer peer.bloomMu.Unlock()
+ 	peer.bloomFilter = bloom
+ 	peer.fullNode = isFullNode(bloom)
+ 	if peer.fullNode && peer.bloomFilter == nil {

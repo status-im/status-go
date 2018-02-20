@@ -35,6 +35,7 @@ Instructions for creating a patch from the command line:
 - [`0010-geth-17-fix-npe-in-filter-system.patch`](./0010-geth-17-fix-npe-in-filter-system.patch) - Temp patch for 1.7.x to fix a NPE in the filter system.
 - [`0014-whisperv6-notifications.patch`](./0014-whisperv6-notifications.patch) — adds Whisper v6 notifications (need to be reviewed and documented)
 - [`0015-whisperv6-envelopes-tracing.patch`](./0015-whisperv6-envelopes-tracing.patch) — adds Whisper v6 envelope tracing (need to be reviewed and documented)
+- [`0018-geth-181-whisperv6-peer-race-cond-fix.patch`](./0018-geth-181-whisperv6-peer-race-cond-fix.patch) — Fixes race condition in Whisper v6. This has been merged upstream and this patch will need to be removed for 1.8.2.
 
 # Updating
 
