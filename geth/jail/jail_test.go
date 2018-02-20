@@ -194,3 +194,26 @@ func (s *JailTestSuite) TestExecute() {
 	`)
 	s.Equal(`{"test":true}`, response)
 }
+
+func (s *JailTestSuite) TestGetObjectValue() {
+	cell, result, err := s.Jail.createAndInitCell(
+		"cell1",
+		`var testCreateAndInitCell1 = {obj: 'objValue'}`,
+		`var testCreateAndInitCell2 = true`,
+		`testCreateAndInitCell2`,
+	)
+	s.NoError(err)
+	s.NotNil(cell)
+	s.Equal(`{"result":true}`, result)
+
+	testCreateAndInitCell1, err := cell.Get("testCreateAndInitCell1")
+	s.NoError(err)
+	s.True(testCreateAndInitCell1.IsObject())
+	value, err := cell.GetObjectValue(testCreateAndInitCell1, "obj")
+	s.NoError(err)
+	s.Equal("objValue", value.String())
+
+	value, err = cell.Get("testCreateAndInitCell2")
+	s.NoError(err)
+	s.Equal(`true`, value.String())
+}

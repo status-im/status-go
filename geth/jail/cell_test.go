@@ -170,10 +170,10 @@ func (s *CellTestSuite) TestCellFetchErrorRace() {
 	case <-dataCh:
 		s.Fail("fetch didn't return error for nonexistent url")
 	case e := <-errCh:
-		name, err := e.Object().Get("name")
+		name, err := cell.GetObjectValue(e, "name")
 		s.NoError(err)
 		s.Equal("Error", name.String())
-		_, err = e.Object().Get("message")
+		_, err = cell.GetObjectValue(e, "message")
 		s.NoError(err)
 	case <-time.After(5 * time.Second):
 		s.Fail("test timed out")

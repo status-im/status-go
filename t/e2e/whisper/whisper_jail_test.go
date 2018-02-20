@@ -323,7 +323,7 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 		for {
 			filter, err := cell.Get("filter")
 			r.NoError(err, "cannot get filter")
-			filterID, err := filter.Object().Get("filterId")
+			filterID, err := cell.GetObjectValue(filter, "filterId")
 			r.NoError(err, "cannot get filterId")
 
 			select {
