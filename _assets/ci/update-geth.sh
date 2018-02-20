@@ -13,7 +13,7 @@ if [ ! -z "$GETH_BRANCH" ]; then
 fi
 dep ensure -v -update github.com/ethereum/go-ethereum
 make dep-ensure
-git add Gopkg.lock Gopkg.toml vendor/
+git add Gopkg.lock Gopkg.toml vendor/ _assets/patches/
 if $(git diff --cached --quiet); then
 	echo "No changes to commit. Geth up to date."
     exit 0
