@@ -23,7 +23,7 @@
 
 [[constraint]]
   name = "github.com/ethereum/go-ethereum"
-  branch = "release/1.7"
+  branch = "release/1.8"
 
 [[constraint]]
   name = "github.com/prometheus/client_golang"
