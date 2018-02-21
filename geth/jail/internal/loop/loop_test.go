@@ -54,8 +54,9 @@ func (s *LoopSuite) SetupTest() {
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
 	go func() {
+		a := s.Assertions // Cache assertions reference as otherwise we'd incur in a race condition
 		err := s.loop.Run(ctx)
-		s.Equal(context.Canceled, err)
+		a.Equal(context.Canceled, err)
 	}()
 }
 

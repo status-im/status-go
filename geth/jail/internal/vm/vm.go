@@ -34,12 +34,20 @@ func (vm *VM) Set(key string, val interface{}) error {
 	return vm.vm.Set(key, val)
 }
 
-// Get returns the giving key's otto.Value from the underline otto vm.
+// Get returns the given key's otto.Value from the underlying otto vm.
 func (vm *VM) Get(key string) (otto.Value, error) {
 	vm.Lock()
 	defer vm.Unlock()
 
 	return vm.vm.Get(key)
+}
+
+// GetObjectValue returns the given name's otto.Value from the given otto.Value v. Should only be needed in tests.
+func (vm *VM) GetObjectValue(v otto.Value, name string) (otto.Value, error) {
+	vm.Lock()
+	defer vm.Unlock()
+
+	return v.Object().Get(name)
 }
 
 // Call attempts to call the internal call function for the giving response associated with the

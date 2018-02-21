@@ -343,6 +343,7 @@ func (s *WhisperMailboxSuite) startMailboxBackend() (*api.StatusBackend, func())
 	mailboxConfig.WhisperConfig.DataDir = filepath.Join(datadir, "data")
 	mailboxConfig.DataDir = datadir
 
+	s.Require().False(mailboxBackend.IsNodeRunning())
 	s.Require().NoError(mailboxBackend.StartNode(mailboxConfig))
 	s.Require().True(mailboxBackend.IsNodeRunning())
 	return mailboxBackend, func() {

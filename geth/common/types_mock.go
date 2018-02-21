@@ -431,6 +431,19 @@ func (mr *MockJailCellMockRecorder) Get(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockJailCell)(nil).Get), arg0)
 }
 
+// GetObjectValue mocks base method
+func (m *MockJailCell) GetObjectValue(arg0 otto.Value, arg1 string) (otto.Value, error) {
+	ret := m.ctrl.Call(m, "GetObjectValue", arg0, arg1)
+	ret0, _ := ret[0].(otto.Value)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetObjectValue indicates an expected call of GetObjectValue
+func (mr *MockJailCellMockRecorder) GetObjectValue(arg0, arg1 interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetObjectValue", reflect.TypeOf((*MockJailCell)(nil).GetObjectValue), arg0, arg1)
+}
+
 // Run mocks base method
 func (m *MockJailCell) Run(arg0 interface{}) (otto.Value, error) {
 	ret := m.ctrl.Call(m, "Run", arg0)

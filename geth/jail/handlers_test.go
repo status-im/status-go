@@ -9,12 +9,13 @@ import (
 
 	"github.com/robertkrimen/otto"
 
+	"sync/atomic"
+
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/rpc"
 	"github.com/status-im/status-go/geth/signal"
 	"github.com/stretchr/testify/suite"
-	"sync/atomic"
 )
 
 func TestHandlersTestSuite(t *testing.T) {
@@ -179,7 +180,7 @@ func (s *HandlersTestSuite) TestSendSignalHandler() {
 
 	value, err := cell.Run(`statusSignals.sendSignal("test signal message")`)
 	s.NoError(err)
-	result, err := value.Object().Get("result")
+	result, err := cell.GetObjectValue(value, "result")
 	s.NoError(err)
 	resultBool, err := result.ToBoolean()
 	s.NoError(err)
