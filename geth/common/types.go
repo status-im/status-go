@@ -177,8 +177,6 @@ type JailCell interface {
 	Set(string, interface{}) error
 	// Get a value from VM.
 	Get(string) (otto.Value, error)
-	// GetObjectValue returns the given name's otto.Value from the given otto.Value v. Should only be needed in tests.
-	GetObjectValue(otto.Value, string) (otto.Value, error)
 	// Run an arbitrary JS code. Input maybe string or otto.Script.
 	Run(interface{}) (otto.Value, error)
 	// Call an arbitrary JS function by name and args.

@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/common"
+	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/static"
 	e2e "github.com/status-im/status-go/t/e2e"
 	. "github.com/status-im/status-go/t/utils"
@@ -295,8 +296,10 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 
 		s.Jail.CreateAndInitCell(chatID, makeTopicCode)
 
-		cell, err := s.Jail.Cell(chatID)
+		jailCell, err := s.Jail.Cell(chatID)
 		r.NoError(err, "cannot get VM")
+
+		cell := jailCell.(*jail.Cell)
 
 		// Run JS code that setups filters and sends messages.
 		_, err = cell.Run(tc.code)

@@ -17,7 +17,7 @@ const timeout = 5 * time.Second
 
 // Cell represents a single jail cell, which is basically a JavaScript VM.
 type Cell struct {
-	*vm.VM
+	jsvm   *vm.VM
 	id     string
 	cancel context.CancelFunc
 
@@ -40,7 +40,7 @@ func NewCell(id string) (*Cell, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	loopStopped := make(chan struct{})
 	cell := Cell{
-		VM:          vm,
+		jsvm:        vm,
 		id:          id,
 		cancel:      cancel,
 		loop:        lo,
@@ -110,4 +110,25 @@ func (c *Cell) CallAsync(fn otto.Value, args ...interface{}) error {
 	case <-timer.C:
 		return errors.New("Timeout")
 	}
+
+}
+
+func (c *Cell) Set(key string, val interface{}) error {
+	return c.jsvm.Set(key, val)
+}
+
+func (c *Cell) Get(key string) (otto.Value, error) {
+	return c.jsvm.Get(key)
+}
+
+func (c *Cell) GetObjectValue(v otto.Value, name string) (otto.Value, error) {
+	return c.jsvm.GetObjectValue(v, name)
+}
+
+func (c *Cell) Run(src interface{}) (otto.Value, error) {
+	return c.jsvm.Run(src)
+}
+
+func (c *Cell) Call(item string, this interface{}, args ...interface{}) (otto.Value, error) {
+	return c.jsvm.Call(item, this, args...)
 }
