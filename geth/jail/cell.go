@@ -113,22 +113,27 @@ func (c *Cell) CallAsync(fn otto.Value, args ...interface{}) error {
 
 }
 
+// Set calls Set on the underlying JavaScript VM.
 func (c *Cell) Set(key string, val interface{}) error {
 	return c.jsvm.Set(key, val)
 }
 
+// Get calls Get on the underlying JavaScript VM.
 func (c *Cell) Get(key string) (otto.Value, error) {
 	return c.jsvm.Get(key)
 }
 
+// GetObjectValue calls GetObjectValue on the underlying JavaScript VM.
 func (c *Cell) GetObjectValue(v otto.Value, name string) (otto.Value, error) {
 	return c.jsvm.GetObjectValue(v, name)
 }
 
+// Run calls Run on the underlying JavaScript VM.
 func (c *Cell) Run(src interface{}) (otto.Value, error) {
 	return c.jsvm.Run(src)
 }
 
+// Call calls Call on the underlying JavaScript VM.
 func (c *Cell) Call(item string, this interface{}, args ...interface{}) (otto.Value, error) {
 	return c.jsvm.Call(item, this, args...)
 }
