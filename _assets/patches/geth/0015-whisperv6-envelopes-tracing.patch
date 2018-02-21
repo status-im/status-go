@@ -2,9 +2,9 @@ diff --git a/whisper/whisperv6/doc.go b/whisper/whisperv6/doc.go
 index 5ad660616..9659e6c46 100644
 --- a/whisper/whisperv6/doc.go
 +++ b/whisper/whisperv6/doc.go
-@@ -109,3 +109,40 @@ type NotificationServer interface {
- 	// Stop stops notification sending loop, releasing related resources
- 	Stop() error
+@@ -95,3 +95,40 @@ type MailServer interface {
+ 	Archive(env *Envelope)
+ 	DeliverMail(whisperPeer *Peer, request *Envelope)
  }
 +
 +type envelopeSource int
@@ -47,16 +47,18 @@ diff --git a/whisper/whisperv6/whisper.go b/whisper/whisperv6/whisper.go
 index 54d7d0f24..ce9405dff 100644
 --- a/whisper/whisperv6/whisper.go
 +++ b/whisper/whisperv6/whisper.go
-@@ -87,6 +87,7 @@ type Whisper struct {
- 
- 	mailServer         MailServer // MailServer interface
- 	notificationServer NotificationServer
+@@ -85,7 +85,8 @@ type Whisper struct {
+ 	statsMu sync.Mutex // guard stats
+ 	stats   Statistics // Statistics of whisper node
+
+-	mailServer MailServer // MailServer interface
++	mailServer         MailServer // MailServer interface
 +	envelopeTracer     EnvelopeTracer // Service collecting envelopes metadata
  }
  
  // New creates a Whisper client ready to communicate through the Ethereum P2P network.
-@@ -215,6 +216,12 @@ func (whisper *Whisper) RegisterNotificationServer(server NotificationServer) {
- 	whisper.notificationServer = server
+@@ -209,6 +210,12 @@ func (whisper *Whisper) RegisterServer(server MailServer) {
+ 	whisper.mailServer = server
  }
  
 +// RegisterEnvelopeTracer registers an EnveloperTracer to collect information
@@ -68,15 +70,15 @@ index 54d7d0f24..ce9405dff 100644
  // Protocols returns the whisper sub-protocols ran by this particular client.
  func (whisper *Whisper) Protocols() []p2p.Protocol {
  	return []p2p.Protocol{whisper.protocol}
-@@ -756,6 +763,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
- 
+@@ -737,6 +744,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
+
  			trouble := false
  			for _, env := range envelopes {
 +				whisper.traceEnvelope(env, !whisper.isEnvelopeCached(env.Hash()), peerSource, p)
  				cached, err := whisper.add(env)
  				if err != nil {
  					trouble = true
-@@ -810,6 +818,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
+@@ -787,6 +795,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
  					return errors.New("invalid direct message")
  				}
  				whisper.postEvent(&envelope, true)
@@ -84,7 +86,7 @@ index 54d7d0f24..ce9405dff 100644
  			}
  		case p2pRequestCode:
  			// Must be processed if mail server is implemented. Otherwise ignore.
-@@ -906,6 +915,22 @@ func (whisper *Whisper) add(envelope *Envelope) (bool, error) {
+@@ -883,6 +892,22 @@ func (whisper *Whisper) add(envelope *Envelope) (bool, error) {
  	return true, nil
  }
  

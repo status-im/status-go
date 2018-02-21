@@ -32,8 +32,6 @@ package whisperv5
 import (
 	"fmt"
 	"time"
-
-	"github.com/ethereum/go-ethereum/p2p"
 )
 
 const (
@@ -86,18 +84,6 @@ func (e unknownVersionError) Error() string {
 type MailServer interface {
 	Archive(env *Envelope)
 	DeliverMail(whisperPeer *Peer, request *Envelope)
-}
-
-// NotificationServer represents a notification server,
-// capable of screening incoming envelopes for special
-// topics, and once located, subscribe client nodes as
-// recipients to notifications (push notifications atm)
-type NotificationServer interface {
-	// Start initializes notification sending loop
-	Start(server *p2p.Server) error
-
-	// Stop stops notification sending loop, releasing related resources
-	Stop() error
 }
 
 type envelopeSource int

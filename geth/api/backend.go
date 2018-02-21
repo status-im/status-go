@@ -11,7 +11,7 @@ import (
 	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/node"
-	"github.com/status-im/status-go/geth/notification/fcm"
+	"github.com/status-im/status-go/geth/notifications/push/fcm"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/signal"
 	"github.com/status-im/status-go/geth/transactions"

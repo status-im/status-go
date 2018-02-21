@@ -2,7 +2,6 @@ package params
 
 import (
 	"bytes"
-	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/static"
 )
@@ -35,8 +33,6 @@ var (
 	ErrMissingNetworkID           = errors.New("missing required 'NetworkID' parameter")
 	ErrEmptyPasswordFile          = errors.New("password file cannot be empty")
 	ErrNoPasswordFileValueSet     = errors.New("password file path not set")
-	ErrNoIdentityFileValueSet     = errors.New("identity file path not set")
-	ErrEmptyIdentityFile          = errors.New("identity file cannot be empty")
 	ErrEmptyAuthorizationKeyFile  = errors.New("authorization key file cannot be empty")
 	ErrAuthorizationKeyFileNotSet = errors.New("authorization key file is not set")
 )
@@ -88,10 +84,6 @@ type WhisperConfig struct {
 	// Enabled flag specifies whether protocol is enabled
 	Enabled bool
 
-	// IdentityFile path to private key, that will be loaded as identity into Whisper.
-	// Currently, it's used by Push Notification service.
-	IdentityFile string
-
 	// PasswordFile contains a password for symmetric encryption with MailServer.
 	PasswordFile string
 
@@ -101,9 +93,6 @@ type WhisperConfig struct {
 
 	// EnableMailServer is mode when node is capable of delivering expired messages on demand
 	EnableMailServer bool
-
-	// EnablePushNotification is mode when node is capable of sending Push (and probably other kinds) Notifications
-	EnablePushNotification bool
 
 	// DataDir is the file system folder Whisper should use for any data storage needs.
 	// For instance, MailServer will use this directory to store its data.
@@ -138,24 +127,6 @@ func (c *WhisperConfig) ReadPasswordFile() error {
 	c.Password = string(password)
 
 	return nil
-}
-
-// ReadIdentityFile reads and loads identity private key
-func (c *WhisperConfig) ReadIdentityFile() (*ecdsa.PrivateKey, error) {
-	if len(c.IdentityFile) == 0 {
-		return nil, ErrNoIdentityFileValueSet
-	}
-
-	identity, err := crypto.LoadECDSA(c.IdentityFile)
-	if err != nil {
-		return nil, err
-	}
-
-	if identity == nil {
-		return nil, ErrEmptyIdentityFile
-	}
-
-	return identity, nil
 }
 
 // String dumps config object as nicely indented JSON

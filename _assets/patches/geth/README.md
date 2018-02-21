@@ -35,7 +35,6 @@ Instructions for creating a patch from the command line:
 - [`0009-whisper-envelopes-tracing.patch`](./0009-whisper-envelopes-tracing.patch) — adds Whisper envelope tracing (need to be reviewed and documented)
 - [`0010-geth-17-fix-npe-in-filter-system.patch`](./0010-geth-17-fix-npe-in-filter-system.patch) - Temp patch for 1.7.x to fix a NPE in the filter system.
 - [`0011-geth-17-whisperv6-70fbc87.patch`](./0011-geth-17-whisperv6-70fbc87.patch) - Temp patch for 1.7.x to update whisper v6 to the upstream version at the `70fbc87` SHA1.
-- [`0013-whisperv6-notifications-envelopeversion.patch`](./0013-whisperv6-notifications-envelopeversion.patch) — replaces usage of EnvelopeVersion with ProtocolVersion in notifications for Whisper v6
 - [`0014-whisperv6-notifications.patch`](./0014-whisperv6-notifications.patch) — adds Whisper v6 notifications (need to be reviewed and documented)
 - [`0015-whisperv6-envelopes-tracing.patch`](./0015-whisperv6-envelopes-tracing.patch) — adds Whisper v6 envelope tracing (need to be reviewed and documented)
 

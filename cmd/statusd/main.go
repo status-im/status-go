@@ -55,7 +55,6 @@ var (
 	// don't change the name of this flag, https://github.com/ethereum/go-ethereum/blob/master/metrics/metrics.go#L41
 	_ = flag.Bool("metrics", false, "Expose ethereum metrics with debug_metrics jsonrpc call.")
 	// shh stuff
-	identityFile = flag.String("shh.identityfile", "", "Protocol identity file (private key used for asymmetric encryption)")
 	passwordFile = flag.String("shh.passwordfile", "", "Password file (password is used for symmetric encryption)")
 	minPow       = flag.Float64("shh.pow", params.WhisperMinimumPoW, "PoW for messages to be added to queue, in float format")
 	ttl          = flag.Int("shh.ttl", params.WhisperTTL, "Time to live for messages, in seconds")
@@ -64,7 +63,6 @@ var (
 	enableMailServer = flag.Bool("shh.mailserver", false, "Delivers expired messages on demand")
 
 	// Push Notification
-	enablePN     = flag.Bool("shh.notify", false, "Node is capable of sending Push Notifications")
 	firebaseAuth = flag.String("shh.firebaseauth", "", "FCM Authorization Key used for sending Push Notifications")
 
 	syncAndExit = flag.Int("sync-and-exit", -1, "Timeout in minutes for blockchain sync and exit, zero means no timeout unless sync is finished")
