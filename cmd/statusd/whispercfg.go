@@ -13,21 +13,9 @@ import (
 func whisperConfig(nodeConfig *params.NodeConfig) (*params.NodeConfig, error) {
 	whisperConfig := nodeConfig.WhisperConfig
 	whisperConfig.Enabled = true
-	whisperConfig.IdentityFile = *identityFile
-	whisperConfig.EnablePushNotification = *enablePN
 	whisperConfig.EnableMailServer = *enableMailServer
 	whisperConfig.MinimumPoW = *minPow
 	whisperConfig.TTL = *ttl
-
-	if whisperConfig.EnablePushNotification && whisperConfig.IdentityFile == "" {
-		return nil, errors.New("notification server requires -identity file to be specified")
-	}
-
-	if whisperConfig.IdentityFile != "" {
-		if _, err := whisperConfig.ReadIdentityFile(); err != nil {
-			return nil, fmt.Errorf("read identity file: %v", err)
-		}
-	}
 
 	if whisperConfig.EnableMailServer {
 		if *passwordFile == "" {

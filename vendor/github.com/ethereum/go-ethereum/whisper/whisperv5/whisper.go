@@ -78,7 +78,6 @@ type Whisper struct {
 	stats   Statistics // Statistics of whisper node
 
 	mailServer         MailServer // MailServer interface
-	notificationServer NotificationServer
 	envelopeTracer     EnvelopeTracer // Service collecting envelopes metadata
 }
 
@@ -156,11 +155,6 @@ func (w *Whisper) APIs() []rpc.API {
 // MailServer will process all the incoming messages with p2pRequestCode.
 func (w *Whisper) RegisterServer(server MailServer) {
 	w.mailServer = server
-}
-
-// RegisterNotificationServer registers notification server with Whisper
-func (w *Whisper) RegisterNotificationServer(server NotificationServer) {
-	w.notificationServer = server
 }
 
 // RegisterEnvelopeTracer registers an EnveloperTracer to collect information
@@ -526,19 +520,13 @@ func (w *Whisper) Send(envelope *Envelope) error {
 
 // Start implements node.Service, starting the background data propagation thread
 // of the Whisper protocol.
-func (w *Whisper) Start(stack *p2p.Server) error {
+func (w *Whisper) Start(*p2p.Server) error {
 	log.Info("started whisper v." + ProtocolVersionStr)
 	go w.update()
 
 	numCPU := runtime.NumCPU()
 	for i := 0; i < numCPU; i++ {
 		go w.processQueue()
-	}
-
-	if w.notificationServer != nil {
-		if err := w.notificationServer.Start(stack); err != nil {
-			return err
-		}
 	}
 
 	return nil
@@ -548,13 +536,6 @@ func (w *Whisper) Start(stack *p2p.Server) error {
 // of the Whisper protocol.
 func (w *Whisper) Stop() error {
 	close(w.quit)
-
-	if w.notificationServer != nil {
-		if err := w.notificationServer.Stop(); err != nil {
-			return err
-		}
-	}
-
 	log.Info("whisper stopped")
 	return nil
 }

@@ -13,7 +13,6 @@
 // keys/test-account2-status-chain.pk
 // keys/test-account2.pk
 // keys/test-account3-before-eip55.pk
-// keys/wnodekey
 // keys/wnodepassword
 // testdata/jail/commands.js
 // testdata/jail/status.js
@@ -349,26 +348,6 @@ func keysTestAccount3BeforeEip55Pk() (*asset, error) {
 	return a, nil
 }
 
-var _keysWnodekey = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x04\xc0\x07\x15\x03\x31\x0c\x03\x50\x04\xe5\xa2\xf4\x29\x1e\x70\xe4\x11\xfe\x10\xee\xbb\xcf\x89\x9b\x76\x47\xa2\x61\xd7\x15\x5d\xe4\x33\xe0\x54\x65\x04\x05\xee\xfc\x5d\xcc\x92\xad\xf0\xe2\xf4\x70\xaf\x9a\xa8\xdf\x17\x00\x00\xff\xff\x28\x09\xef\xd3\x41\x00\x00\x00")
-
-func keysWnodekeyBytes() ([]byte, error) {
-	return bindataRead(
-		_keysWnodekey,
-		"keys/wnodekey",
-	)
-}
-
-func keysWnodekey() (*asset, error) {
-	bytes, err := keysWnodekeyBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	info := bindataFileInfo{name: "keys/wnodekey", size: 65, mode: os.FileMode(420), modTime: time.Unix(1512651934, 0)}
-	a := &asset{bytes: bytes, info: info}
-	return a, nil
-}
-
 var _keysWnodepassword = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x2a\x2e\x49\x2c\x29\x2d\xd6\xcd\x4f\x4b\xcb\xc9\xcc\x4b\xd5\xcd\xcc\x4b\xca\xaf\xe0\x02\x04\x00\x00\xff\xff\xef\xf3\x8b\x45\x15\x00\x00\x00")
 
 func keysWnodepasswordBytes() ([]byte, error) {
@@ -594,7 +573,6 @@ var _bindata = map[string]func() (*asset, error){
 	"keys/test-account2-status-chain.pk": keysTestAccount2StatusChainPk,
 	"keys/test-account2.pk": keysTestAccount2Pk,
 	"keys/test-account3-before-eip55.pk": keysTestAccount3BeforeEip55Pk,
-	"keys/wnodekey": keysWnodekey,
 	"keys/wnodepassword": keysWnodepassword,
 	"testdata/jail/commands.js": testdataJailCommandsJs,
 	"testdata/jail/status.js": testdataJailStatusJs,
@@ -659,7 +637,6 @@ var _bintree = &bintree{nil, map[string]*bintree{
 		"test-account2-status-chain.pk": &bintree{keysTestAccount2StatusChainPk, map[string]*bintree{}},
 		"test-account2.pk": &bintree{keysTestAccount2Pk, map[string]*bintree{}},
 		"test-account3-before-eip55.pk": &bintree{keysTestAccount3BeforeEip55Pk, map[string]*bintree{}},
-		"wnodekey": &bintree{keysWnodekey, map[string]*bintree{}},
 		"wnodepassword": &bintree{keysWnodepassword, map[string]*bintree{}},
 	}},
 	"scripts": &bintree{nil, map[string]*bintree{
