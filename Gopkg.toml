@@ -1,5 +1,3 @@
-ignored = ["github.com/ethereum/go-ethereum/whisper/notifications"]
-
 [prune]
   unused-packages = true
   go-tests = true
