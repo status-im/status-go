@@ -173,8 +173,10 @@ func startCollectingStats(interruptCh <-chan struct{}, nodeManager common.NodeMa
 
 	<-interruptCh
 
-	if err := server.Shutdown(context.TODO()); err != nil {
-		log.Printf("Failed to shutdown metrics server: %v", err)
+	if server != nil {
+		if err := server.Shutdown(context.TODO()); err != nil {
+			log.Printf("Failed to shutdown metrics server: %v", err)
+		}
 	}
 }
 
