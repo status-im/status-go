@@ -119,7 +119,7 @@ mock: ##@other Regenerate mocks
 	mockgen -source=geth/common/types.go -destination=geth/common/types_mock.go -package=common
 	mockgen -source=geth/mailservice/mailservice.go -destination=geth/mailservice/mailservice_mock.go -package=mailservice
 	mockgen -source=geth/common/notification.go -destination=geth/common/notification_mock.go -package=common -imports fcm=github.com/NaySoftware/go-fcm
-	mockgen -source=geth/notification/fcm/client.go -destination=geth/notification/fcm/client_mock.go -package=fcm -imports fcm=github.com/NaySoftware/go-fcm
+	mockgen -source=geth/notifications/push/fcm/client.go -destination=geth/notifications/push/fcm/client_mock.go -package=fcm -imports fcm=github.com/NaySoftware/go-fcm
 	mockgen -source=geth/transactions/fake/txservice.go -destination=geth/transactions/fake/mock.go -package=fake
 
 docker-test: ##@tests Run tests in a docker container with golang.
