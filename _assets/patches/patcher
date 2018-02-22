@@ -103,7 +103,7 @@ if [ $compare -eq 1 ]; then
 	for ((i=${#patches[@]}-1; i>=0; i--)); do
 		f=${patches[$i]}
 		gitApplyReverse "$f" "$basepath"
-		if [ $? -eq 1 ]; then
+		if [ $? -ne 0 ]; then
 			unapplied+=("$f")
 		else
 			applied+=("$f")
@@ -178,7 +178,7 @@ for ((i=0; i<${#patches[@]}; i++)); do
 		echo -en "\\n"
 	fi
 	gitApply "$f" "$basepath" $verbose
-	if [ $? -eq 1 ]; then
+	if [ $? -ne 0 ]; then
 		echo "Failed and reverting: $f"
 		gitApplyReverse "$f" "$basepath"
 		echo -en "\\n"
