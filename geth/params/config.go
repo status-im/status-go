@@ -314,6 +314,7 @@ func NewNodeConfig(dataDir string, networkID uint64, devMode bool) (*NodeConfig,
 			DatabaseCache: DatabaseCache,
 		},
 		WhisperConfig: &WhisperConfig{
+			MaxPeers:   MaxWhisperPeers,
 			Enabled:    true,
 			MinimumPoW: WhisperMinimumPoW,
 			TTL:        WhisperTTL,
