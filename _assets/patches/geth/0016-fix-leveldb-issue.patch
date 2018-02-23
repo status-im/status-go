@@ -1,3 +1,23 @@
+diff --git a/les/backend.go b/les/backend.go
+index 333df920..450d8351 100644
+--- a/les/backend.go
++++ b/les/backend.go
+@@ -20,7 +20,6 @@ package les
+ import (
+ 	"fmt"
+ 	"sync"
+-	"time"
+ 
+ 	"github.com/ethereum/go-ethereum/accounts"
+ 	"github.com/ethereum/go-ethereum/common"
+@@ -248,7 +247,6 @@ func (s *LightEthereum) Stop() error {
+ 
+ 	s.eventMux.Stop()
+ 
+-	time.Sleep(time.Millisecond * 200)
+ 	s.chainDb.Close()
+ 	close(s.shutdownChan)
+ 
 diff --git a/les/handler.go b/les/handler.go
 index 613fbb79..a6ae09ef 100644
 --- a/les/handler.go
@@ -21,7 +41,7 @@ index 613fbb79..a6ae09ef 100644
  	}
  	if odr != nil {
  		manager.retriever = odr.retriever
-@@ -210,9 +215,31 @@ func NewProtocolManager(chainConfig *params.ChainConfig, lightSync bool, protoco
+@@ -210,9 +215,32 @@ func NewProtocolManager(chainConfig *params.ChainConfig, lightSync bool, protoco
  		manager.fetcher = newLightFetcher(manager)
  	}
 
@@ -32,6 +52,7 @@ index 613fbb79..a6ae09ef 100644
 
 +func (pm *ProtocolManager) monitorDownloads() {
 +	sub := pm.eventMux.Subscribe(downloader.StartEvent{}, downloader.DoneEvent{}, downloader.FailedEvent{})
++	defer sub.Unsubscribe()
 +
 +	for {
 +		select {

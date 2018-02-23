@@ -222,6 +222,7 @@ func NewProtocolManager(chainConfig *params.ChainConfig, lightSync bool, protoco
 
 func (pm *ProtocolManager) monitorDownloads() {
 	sub := pm.eventMux.Subscribe(downloader.StartEvent{}, downloader.DoneEvent{}, downloader.FailedEvent{})
+	defer sub.Unsubscribe()
 
 	for {
 		select {
