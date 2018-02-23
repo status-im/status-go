@@ -820,7 +820,7 @@ func (s *TransactionsTestSuite) sendConcurrentTransactions(testTxCount int) {
 
 	select {
 	case <-allTestTxCompleted:
-	case <-time.After(50 * time.Second):
+	case <-time.After(60 * time.Second):
 		s.FailNow("test timed out")
 	}
 
