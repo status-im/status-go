@@ -1,0 +1,166 @@
+diff --git c/whisper/whisperv5/config.go w/whisper/whisperv5/config.go
+index fcc230704..a28c01c86 100644
+--- c/whisper/whisperv5/config.go
++++ w/whisper/whisperv5/config.go
+@@ -19,9 +19,11 @@ package whisperv5
+ type Config struct {
+ 	MaxMessageSize     uint32  `toml:",omitempty"`
+ 	MinimumAcceptedPOW float64 `toml:",omitempty"`
++	MaxPeers           int     `toml:"omitempty"`
+ }
+ 
+ var DefaultConfig = Config{
+ 	MaxMessageSize:     DefaultMaxMessageSize,
+ 	MinimumAcceptedPOW: DefaultMinimumPoW,
++	MaxPeers:           25,
+ }
+diff --git c/whisper/whisperv5/peer.go w/whisper/whisperv5/peer.go
+index 179c93179..0486af2f1 100644
+--- c/whisper/whisperv5/peer.go
++++ w/whisper/whisperv5/peer.go
+@@ -18,6 +18,7 @@ package whisperv5
+ 
+ import (
+ 	"fmt"
++	"sync/atomic"
+ 	"time"
+ 
+ 	"github.com/ethereum/go-ethereum/common"
+@@ -32,7 +33,7 @@ type Peer struct {
+ 	host    *Whisper
+ 	peer    *p2p.Peer
+ 	ws      p2p.MsgReadWriter
+-	trusted bool
++	trusted int32
+ 
+ 	known *set.Set // Messages already known by the peer to avoid wasting bandwidth
+ 
+@@ -45,7 +46,7 @@ func newPeer(host *Whisper, remote *p2p.Peer, rw p2p.MsgReadWriter) *Peer {
+ 		host:    host,
+ 		peer:    remote,
+ 		ws:      rw,
+-		trusted: false,
++		trusted: 0,
+ 		known:   set.New(),
+ 		quit:    make(chan struct{}),
+ 	}
+@@ -172,3 +173,11 @@ func (p *Peer) ID() []byte {
+ 	id := p.peer.ID()
+ 	return id[:]
+ }
++
++func (p *Peer) Trusted() bool {
++	return atomic.LoadInt32(&p.trusted) == 1
++}
++
++func (p *Peer) SetTrusted() {
++	atomic.StoreInt32(&p.trusted, 1)
++}
+diff --git c/whisper/whisperv5/whisper.go w/whisper/whisperv5/whisper.go
+index 6b040befb..73c1d483c 100644
+--- c/whisper/whisperv5/whisper.go
++++ w/whisper/whisperv5/whisper.go
+@@ -77,8 +77,9 @@ type Whisper struct {
+ 	statsMu sync.Mutex // guard stats
+ 	stats   Statistics // Statistics of whisper node
+ 
+-	mailServer         MailServer // MailServer interface
+-	envelopeTracer     EnvelopeTracer // Service collecting envelopes metadata
++	mailServer     MailServer     // MailServer interface
++	envelopeTracer EnvelopeTracer // Service collecting envelopes metadata
++	maxPeers       int
+ }
+ 
+ // New creates a Whisper client ready to communicate through the Ethereum P2P network.
+@@ -96,6 +97,7 @@ func New(cfg *Config) *Whisper {
+ 		messageQueue: make(chan *Envelope, messageQueueLimit),
+ 		p2pMsgQueue:  make(chan *Envelope, messageQueueLimit),
+ 		quit:         make(chan struct{}),
++		maxPeers:     cfg.MaxPeers,
+ 	}
+ 
+ 	whisper.filters = NewFilters(whisper)
+@@ -211,7 +213,7 @@ func (w *Whisper) AllowP2PMessagesFromPeer(peerID []byte) error {
+ 	if err != nil {
+ 		return err
+ 	}
+-	p.trusted = true
++	p.SetTrusted()
+ 	return nil
+ }
+ 
+@@ -225,7 +227,7 @@ func (w *Whisper) RequestHistoricMessages(peerID []byte, envelope *Envelope) err
+ 	if err != nil {
+ 		return err
+ 	}
+-	p.trusted = true
++	p.SetTrusted()
+ 	return p2p.Send(p.ws, p2pRequestCode, envelope)
+ }
+ 
+@@ -540,9 +542,40 @@ func (w *Whisper) Stop() error {
+ 	return nil
+ }
+ 
++// waitForSlot waits until peer is marked as trusted or we have a slot for
++// another peer.
++func (w *Whisper) waitForSlot(peer *Peer) error {
++	timeout := time.After(time.Minute)
++	ticker := time.NewTicker(2 * time.Second)
++	defer ticker.Stop()
++	for {
++		select {
++		case <-timeout:
++			return p2p.DiscTooManyPeers
++		case <-ticker.C:
++			if peer.Trusted() {
++				return nil
++			}
++			w.peerMu.Lock()
++			if len(w.peers) == w.maxPeers {
++				w.peerMu.Unlock()
++				return nil
++			}
++			w.peerMu.Unlock()
++		}
++	}
++}
++
+ // HandlePeer is called by the underlying P2P layer when the whisper sub-protocol
+ // connection is negotiated.
+ func (wh *Whisper) HandlePeer(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
++	peersOverflow := false
++	wh.peerMu.RLock()
++	if len(wh.peers) > wh.maxPeers {
++		peersOverflow = true
++	}
++	wh.peerMu.RUnlock()
++
+ 	// Create the new peer and start tracking it
+ 	whisperPeer := newPeer(wh, peer, rw)
+ 
+@@ -556,6 +589,15 @@ func (wh *Whisper) HandlePeer(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
+ 		wh.peerMu.Unlock()
+ 	}()
+ 
++	// we need to leave a window for a peer to become trusted
++	// otherwise we won't be able to connect with mailserver when max peers
++	// barier already reached
++	if peersOverflow {
++		if err := wh.waitForSlot(whisperPeer); err != nil {
++			return err
++		}
++	}
++
+ 	// Run the peer handshake and state updates
+ 	if err := whisperPeer.handshake(); err != nil {
+ 		return err
+@@ -605,7 +647,7 @@ func (wh *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
+ 			// this message is not supposed to be forwarded to other peers, and
+ 			// therefore might not satisfy the PoW, expiry and other requirements.
+ 			// these messages are only accepted from the trusted peer.
+-			if p.trusted {
++			if p.Trusted() {
+ 				var envelope Envelope
+ 				if err := packet.Decode(&envelope); err != nil {
+ 					log.Warn("failed to decode direct message, peer will be disconnected", "peer", p.peer.ID(), "err", err)

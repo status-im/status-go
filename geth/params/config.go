@@ -108,7 +108,7 @@ type WhisperConfig struct {
 	FirebaseConfig *FirebaseConfig `json:"FirebaseConfig,"`
 
 	// MaxPeers maximum amount of whisper peers.
-	MaxPeers int32
+	MaxPeers int
 }
 
 // ReadPasswordFile reads and returns content of the password file
