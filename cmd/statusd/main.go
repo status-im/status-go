@@ -156,6 +156,17 @@ func startCollectingStats(interruptCh <-chan struct{}, nodeManager common.NodeMa
 	}()
 
 	server := metrics.NewMetricsServer(*statsAddr)
+	defer func() {
+		// server may be nil if `-stats` flag is used
+		// but the binary is compiled without metrics enabled
+		if server == nil {
+			return
+		}
+
+		if err := server.Shutdown(context.TODO()); err != nil {
+			log.Printf("Failed to shutdown metrics server: %v", err)
+		}
+	}()
 	go func() {
 		// server may be nil if `-stats` flag is used
 		// but the binary is compiled without metrics enabled
@@ -172,12 +183,6 @@ func startCollectingStats(interruptCh <-chan struct{}, nodeManager common.NodeMa
 	}()
 
 	<-interruptCh
-
-	if server != nil {
-		if err := server.Shutdown(context.TODO()); err != nil {
-			log.Printf("Failed to shutdown metrics server: %v", err)
-		}
-	}
 }
 
 // makeNodeConfig parses incoming CLI options and returns node configuration object
