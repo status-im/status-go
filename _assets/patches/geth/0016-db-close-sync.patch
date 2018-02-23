@@ -1,0 +1,192 @@
+diff --git a/core/database_util.go b/core/database_util.go
+index c6b125da..ac3bda10 100644
+--- a/core/database_util.go
++++ b/core/database_util.go
+@@ -23,6 +23,7 @@ import (
+ 	"errors"
+ 	"fmt"
+ 	"math/big"
++	"sync"
+
+ 	"github.com/ethereum/go-ethereum/common"
+ 	"github.com/ethereum/go-ethereum/core/types"
+@@ -630,3 +631,22 @@ func FindCommonAncestor(db DatabaseReader, a, b *types.Header) *types.Header {
+ 	}
+ 	return a
+ }
++
++// DbCloseSync is for ensuring there are no Put calls
++// after the database is closed.
++type DbCloseSync struct {
++	dbClosed bool
++	sync.RWMutex
++}
++
++// SetClosed sets state to true i.e. database is closed.
++func (d *DbCloseSync) SetClosed() {
++	d.Lock()
++	d.dbClosed = true
++	d.Unlock()
++}
++
++// State returns the state unsafely. True means closed.
++func (d *DbCloseSync) State() bool {
++	return d.dbClosed
++}
+diff --git a/eth/downloader/downloader.go b/eth/downloader/downloader.go
+index b338129e..359d449e 100644
+--- a/eth/downloader/downloader.go
++++ b/eth/downloader/downloader.go
+@@ -29,6 +29,7 @@ import (
+
+ 	ethereum "github.com/ethereum/go-ethereum"
+ 	"github.com/ethereum/go-ethereum/common"
++	"github.com/ethereum/go-ethereum/core"
+ 	"github.com/ethereum/go-ethereum/core/types"
+ 	"github.com/ethereum/go-ethereum/ethdb"
+ 	"github.com/ethereum/go-ethereum/event"
+@@ -146,6 +147,8 @@ type Downloader struct {
+ 	quitCh   chan struct{} // Quit channel to signal termination
+ 	quitLock sync.RWMutex  // Lock to prevent double closes
+
++	dbCloseSync *core.DbCloseSync
++
+ 	// Testing hooks
+ 	syncInitHook     func(uint64, uint64)  // Method to call upon initiating a new sync run
+ 	bodyFetchHook    func([]*types.Header) // Method to call upon starting a block body fetch
+@@ -201,7 +204,7 @@ type BlockChain interface {
+ }
+
+ // New creates a new downloader to fetch hashes and blocks from remote peers.
+-func New(mode SyncMode, stateDb ethdb.Database, mux *event.TypeMux, chain BlockChain, lightchain LightChain, dropPeer peerDropFn) *Downloader {
++func New(mode SyncMode, stateDb ethdb.Database, dbCloseSync *core.DbCloseSync, mux *event.TypeMux, chain BlockChain, lightchain LightChain, dropPeer peerDropFn) *Downloader {
+ 	if lightchain == nil {
+ 		lightchain = chain
+ 	}
+@@ -224,6 +227,7 @@ func New(mode SyncMode, stateDb ethdb.Database, mux *event.TypeMux, chain BlockC
+ 		receiptWakeCh:  make(chan bool, 1),
+ 		headerProcCh:   make(chan []*types.Header, 1),
+ 		quitCh:         make(chan struct{}),
++		dbCloseSync:    dbCloseSync,
+ 		stateCh:        make(chan dataPack),
+ 		stateSyncStart: make(chan *stateSync),
+ 		trackStateReq:  make(chan *stateReq),
+@@ -1269,6 +1273,11 @@ func (d *Downloader) processHeaders(origin uint64, td *big.Int) error {
+ 					if chunk[len(chunk)-1].Number.Uint64()+uint64(fsHeaderForceVerify) > pivot {
+ 						frequency = 1
+ 					}
++					d.dbCloseSync.RLock()
++					if d.dbCloseSync.State() {
++						d.dbCloseSync.RUnlock()
++						return nil
++					}
+ 					if n, err := d.lightchain.InsertHeaderChain(chunk, frequency); err != nil {
+ 						// If some headers were inserted, add them too to the rollback list
+ 						if n > 0 {
+@@ -1277,6 +1286,7 @@ func (d *Downloader) processHeaders(origin uint64, td *big.Int) error {
+ 						log.Debug("Invalid header encountered", "number", chunk[n].Number, "hash", chunk[n].Hash(), "err", err)
+ 						return errInvalidChain
+ 					}
++					d.dbCloseSync.RUnlock()
+ 					// All verifications passed, store newly found uncertain headers
+ 					rollback = append(rollback, unknown...)
+ 					if len(rollback) > fsHeaderSafetyNet {
+diff --git a/eth/handler.go b/eth/handler.go
+index bec5126d..52c53acc 100644
+--- a/eth/handler.go
++++ b/eth/handler.go
+@@ -92,6 +92,9 @@ type ProtocolManager struct {
+ 	quitSync    chan struct{}
+ 	noMorePeers chan struct{}
+
++	// for ensuring there are no Put calls after DB is closed
++	dbCloseSync *core.DbCloseSync
++
+ 	// wait group is used for graceful shutdowns during downloading
+ 	// and processing
+ 	wg sync.WaitGroup
+@@ -113,6 +116,7 @@ func NewProtocolManager(config *params.ChainConfig, mode downloader.SyncMode, ne
+ 		noMorePeers: make(chan struct{}),
+ 		txsyncCh:    make(chan *txsync),
+ 		quitSync:    make(chan struct{}),
++		dbCloseSync: new(core.DbCloseSync),
+ 	}
+ 	// Figure out whether to allow fast sync or not
+ 	if mode == downloader.FastSync && blockchain.CurrentBlock().NumberU64() > 0 {
+@@ -161,7 +165,7 @@ func NewProtocolManager(config *params.ChainConfig, mode downloader.SyncMode, ne
+ 		return nil, errIncompatibleConfig
+ 	}
+ 	// Construct the different synchronisation mechanisms
+-	manager.downloader = downloader.New(mode, chaindb, manager.eventMux, blockchain, nil, manager.removePeer)
++	manager.downloader = downloader.New(mode, chaindb, manager.dbCloseSync, manager.eventMux, blockchain, nil, manager.removePeer)
+
+ 	validator := func(header *types.Header) error {
+ 		return engine.VerifyHeader(blockchain, header, true)
+diff --git a/les/backend.go b/les/backend.go
+index 333df920..2d603486 100644
+--- a/les/backend.go
++++ b/les/backend.go
+@@ -250,6 +250,7 @@ func (s *LightEthereum) Stop() error {
+
+ 	time.Sleep(time.Millisecond * 200)
+ 	s.chainDb.Close()
++
+ 	close(s.shutdownChan)
+
+ 	return nil
+diff --git a/les/fetcher.go b/les/fetcher.go
+index 3fc4df30..6e26bdbd 100644
+--- a/les/fetcher.go
++++ b/les/fetcher.go
+@@ -491,6 +491,11 @@ func (f *lightFetcher) deliverHeaders(peer *peer, reqID uint64, headers []*types
+
+ // processResponse processes header download request responses, returns true if successful
+ func (f *lightFetcher) processResponse(req fetchRequest, resp fetchResponse) bool {
++	f.pm.dbCloseSync.RLock()
++	defer f.pm.dbCloseSync.RUnlock()
++	if f.pm.dbCloseSync.State() {
++		return true
++	}
+ 	if uint64(len(resp.headers)) != req.amount || resp.headers[0].Hash() != req.hash {
+ 		req.peer.Log().Debug("Response content mismatch", "requested", len(resp.headers), "reqfrom", resp.headers[0], "delivered", req.amount, "delfrom", req.hash)
+ 		return false
+diff --git a/les/handler.go b/les/handler.go
+index 613fbb79..645e83c4 100644
+--- a/les/handler.go
++++ b/les/handler.go
+@@ -121,6 +121,9 @@ type ProtocolManager struct {
+ 	quitSync    chan struct{}
+ 	noMorePeers chan struct{}
+
++	// for ensuring there are no Put calls after DB is closed
++	dbCloseSync *core.DbCloseSync
++
+ 	// wait group is used for graceful shutdowns during downloading
+ 	// and processing
+ 	wg *sync.WaitGroup
+@@ -145,6 +148,7 @@ func NewProtocolManager(chainConfig *params.ChainConfig, lightSync bool, protoco
+ 		quitSync:    quitSync,
+ 		wg:          wg,
+ 		noMorePeers: make(chan struct{}),
++		dbCloseSync: new(core.DbCloseSync),
+ 	}
+ 	if odr != nil {
+ 		manager.retriever = odr.retriever
+@@ -205,7 +209,7 @@ func NewProtocolManager(chainConfig *params.ChainConfig, lightSync bool, protoco
+ 	}
+
+ 	if lightSync {
+-		manager.downloader = downloader.New(downloader.LightSync, chainDb, manager.eventMux, nil, blockchain, removePeer)
++		manager.downloader = downloader.New(downloader.LightSync, chainDb, manager.dbCloseSync, manager.eventMux, nil, blockchain, removePeer)
+ 		manager.peers.notify((*downloaderPeerNotify)(manager))
+ 		manager.fetcher = newLightFetcher(manager)
+ 	}
+@@ -246,6 +250,9 @@ func (pm *ProtocolManager) Stop() {
+ 	// will exit when they try to register.
+ 	pm.peers.Close()
+
++	// Close the database for avoiding further Put calls.
++	pm.dbCloseSync.SetClosed()
++
+ 	// Wait for any process action
+ 	pm.wg.Wait()
