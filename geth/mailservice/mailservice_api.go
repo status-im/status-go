@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/log"
@@ -27,12 +28,21 @@ var (
 
 // PublicAPI defines a MailServer public API.
 type PublicAPI struct {
-	provider ServiceProvider
+	service  *MailService
+	provider ServiceProvider // just a shortcut
+
+	newConnectedPeers chan *discover.Node
 }
 
 // NewPublicAPI returns a new PublicAPI.
-func NewPublicAPI(provider ServiceProvider) *PublicAPI {
-	return &PublicAPI{provider}
+func NewPublicAPI(service *MailService) *PublicAPI {
+	api := &PublicAPI{
+		service:           service,
+		provider:          service.provider,
+		newConnectedPeers: make(chan *discover.Node),
+	}
+	go api.trustedPeersGC(5 * time.Minute)
+	return api
 }
 
 // MessagesRequest is a payload send to a MailServer to get messages.
@@ -64,6 +74,85 @@ func setMessagesRequestDefaults(r *MessagesRequest) {
 	}
 }
 
+func (api *PublicAPI) waitPeerAdded(peer *discover.Node, timeout time.Duration) error {
+	log.Debug("waiting to be added", "peer", peer.String())
+	node, err := api.provider.Node()
+	if err != nil {
+		return err
+	}
+	events := make(chan *p2p.PeerEvent, 10)
+	sub := node.Server().SubscribeEvents(events)
+	defer sub.Unsubscribe()
+	node.Server().AddPeer(peer)
+	for {
+		select {
+		case ev := <-events:
+			if ev.Type != p2p.PeerEventTypeAdd {
+				continue
+			}
+			if ev.Peer == peer.ID {
+				return nil
+			}
+		case <-time.After(timeout):
+			return errors.New("failed to add a peer")
+		}
+	}
+}
+
+func (api *PublicAPI) trustedPeersGC(timeout time.Duration) {
+	connectedPeers := map[*discover.Node]time.Time{}
+	ticker := time.NewTicker(3 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-api.service.quit:
+			return
+		case peer := <-api.newConnectedPeers:
+			connectedPeers[peer] = time.Now()
+		case <-ticker.C:
+			for peer, lastUsed := range connectedPeers {
+				if time.Since(lastUsed) >= timeout {
+					node, err := api.provider.Node()
+					// node was stopped
+					if err != nil {
+						return
+					}
+					node.Server().RemovePeer(peer)
+					delete(connectedPeers, peer)
+				}
+			}
+		}
+	}
+}
+
+func (api *PublicAPI) choosePeer() (*discover.Node, error) {
+	node, err := api.provider.Node()
+	if err != nil {
+		return nil, err
+	}
+	if len(node.Server().Config.TrustedNodes) == 0 {
+		return nil, errors.New("no mailservers are available")
+	}
+	// we are not relying on GC for this to avoid any mismatch between
+	// real data and GC. GC used only to disconnect peers that didn't
+	// disconnect themself
+	connected := map[discover.NodeID]struct{}{}
+	for _, peer := range node.Server().Peers() {
+		connected[peer.ID()] = struct{}{}
+	}
+	for _, trusted := range node.Server().Config.TrustedNodes {
+		if _, exist := connected[trusted.ID]; exist {
+			return trusted, nil
+		}
+	}
+	// todo(dshulyak) choose randomly
+	peer := node.Server().Config.TrustedNodes[0]
+	if err := api.waitPeerAdded(peer, 10*time.Second); err != nil {
+		return nil, err
+	}
+	return peer, nil
+}
+
 // RequestMessages sends a request for historic messages to a MailServer.
 func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (bool, error) {
 	log.Info("RequestMessages", "request", r)
@@ -74,17 +163,19 @@ func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (boo
 	if err != nil {
 		return false, err
 	}
-
 	node, err := api.provider.Node()
 	if err != nil {
 		return false, err
 	}
-
-	mailServerNode, err := discover.ParseNode(r.MailServerPeer)
-	if err != nil {
-		return false, fmt.Errorf("%v: %v", ErrInvalidMailServerPeer, err)
+	if node.Server() == nil {
+		return false, errors.New("server is not running")
 	}
-
+	peer, err := api.choosePeer()
+	if err != nil {
+		return false, err
+	}
+	// renew gc timer
+	api.newConnectedPeers <- peer
 	symKey, err := shh.GetSymKey(r.SymKeyID)
 	if err != nil {
 		return false, fmt.Errorf("%v: %v", ErrInvalidSymKeyID, err)
@@ -94,8 +185,8 @@ func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (boo
 	if err != nil {
 		return false, err
 	}
-
-	if err := shh.RequestHistoricMessages(mailServerNode.ID[:], envelope); err != nil {
+	log.Info("historic", "peer", peer.String())
+	if err := shh.RequestHistoricMessages(peer.ID[:], envelope); err != nil {
 		return false, err
 	}
 

@@ -6,8 +6,11 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/node"
+	"github.com/ethereum/go-ethereum/p2p"
+	"github.com/ethereum/go-ethereum/p2p/discover"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	gomock "github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -18,56 +21,58 @@ func TestRequestMessagesDefaults(t *testing.T) {
 	require.InEpsilon(t, uint32(time.Now().UTC().Unix()), r.To, 1.0)
 }
 
-func TestRequestMessagesFailures(t *testing.T) {
+func TestRequestMessagesNoPeers(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	provider := NewMockServiceProvider(ctrl)
-	api := NewPublicAPI(provider)
+	service := New(provider)
+	require.NoError(t, service.Start(nil))
+	api := NewPublicAPI(service)
+	defer func() { require.NoError(t, service.Stop()) }()
 	shh := whisper.New(nil)
 	// Node is ephemeral (only in memory).
-	nodeA, nodeErr := node.New(&node.Config{NoUSB: true})
-	require.NoError(t, nodeErr)
+	nodeA, err := node.New(&node.Config{
+		NoUSB: true,
+	})
+	require.NoError(t, err)
 	require.NoError(t, nodeA.Start())
-	defer func() {
-		err := nodeA.Stop()
-		require.NoError(t, err)
-	}()
 
+	// without peers
+	provider.EXPECT().WhisperService().Return(shh, nil)
+	provider.EXPECT().Node().Return(nodeA, nil).AnyTimes()
+	result, err := api.RequestMessages(context.TODO(), MessagesRequest{})
+	assert.False(t, result)
+	assert.EqualError(t, err, "no mailservers are available")
+	require.NoError(t, nodeA.Stop())
+}
+
+func TestRequestMessagesFailedToAddPeer(t *testing.T) {
 	const (
 		mailServerPeer = "enode://b7e65e1bedc2499ee6cbd806945af5e7df0e59e4070c96821570bd581473eade24a489f5ec95d060c0db118c879403ab88d827d3766978f28708989d35474f87@[::]:51920"
 	)
+	mailNode, err := discover.ParseNode(mailServerPeer)
+	require.NoError(t, err)
 
-	var (
-		result bool
-		err    error
-	)
+	shh := whisper.New(nil)
+	ctrl := gomock.NewController(t)
+	provider := NewMockServiceProvider(ctrl)
+	service := New(provider)
+	require.NoError(t, service.Start(nil))
+	api := NewPublicAPI(service)
+	defer func() { require.NoError(t, service.Stop()) }()
 
-	// invalid MailServer enode address
-	provider.EXPECT().WhisperService().Return(nil, nil)
-	provider.EXPECT().Node().Return(nil, nil)
-	result, err = api.RequestMessages(context.TODO(), MessagesRequest{MailServerPeer: "invalid-address"})
-	require.False(t, result)
-	require.EqualError(t, err, "invalid mailServerPeer value: invalid URL scheme, want \"enode\"")
-
-	// non-existent symmetric key
-	provider.EXPECT().WhisperService().Return(shh, nil)
-	provider.EXPECT().Node().Return(nil, nil)
-	result, err = api.RequestMessages(context.TODO(), MessagesRequest{
-		MailServerPeer: mailServerPeer,
+	// with peers but peer is not reachable
+	nodeA, err := node.New(&node.Config{
+		NoUSB: true,
+		P2P:   p2p.Config{TrustedNodes: []*discover.Node{mailNode}},
 	})
-	require.False(t, result)
-	require.EqualError(t, err, "invalid symKeyID value: non-existent key ID")
-
-	// with a symmetric key
-	symKeyID, symKeyErr := shh.AddSymKeyFromPassword("some-pass")
-	require.NoError(t, symKeyErr)
+	require.NoError(t, err)
+	require.NoError(t, nodeA.Start())
 	provider.EXPECT().WhisperService().Return(shh, nil)
-	provider.EXPECT().Node().Return(nodeA, nil)
-	result, err = api.RequestMessages(context.TODO(), MessagesRequest{
-		MailServerPeer: mailServerPeer,
-		SymKeyID:       symKeyID,
-	})
-	require.Contains(t, err.Error(), "Could not find peer with ID")
-	require.False(t, result)
+	provider.EXPECT().Node().Return(nodeA, nil).AnyTimes()
+	result, err := api.RequestMessages(context.TODO(), MessagesRequest{})
+	assert.False(t, result)
+	assert.EqualError(t, err, "failed to add a peer")
+	require.NoError(t, nodeA.Stop())
 }
 
 func TestRequestMessagesSuccess(t *testing.T) {
