@@ -225,7 +225,7 @@ var loadConfigTestCases = []struct {
 			require.True(t, nodeConfig.BootClusterConfig.Enabled, "boot cluster is expected to be enabled by default")
 
 			enodes := nodeConfig.BootClusterConfig.BootNodes
-			require.True(t, len(enodes) >= 3)
+			require.Len(t, enodes, 2)
 		},
 	},
 	{
@@ -240,7 +240,7 @@ var loadConfigTestCases = []struct {
 			require.True(t, nodeConfig.BootClusterConfig.Enabled, "boot cluster is expected to be enabled by default")
 
 			enodes := nodeConfig.BootClusterConfig.BootNodes
-			require.True(t, len(enodes) >= 3)
+			require.Len(t, enodes, 2)
 		},
 	},
 	{
