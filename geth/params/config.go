@@ -157,6 +157,9 @@ type BootClusterConfig struct {
 	// BootNodes list of bootstrap nodes for a given network (Ropsten, Rinkeby, Homestead),
 	// for a given mode (production vs development)
 	BootNodes []string
+
+	// List of trusted nodes to use in p2p server.
+	TrustedNodes []string
 }
 
 // String dumps config object as nicely indented JSON

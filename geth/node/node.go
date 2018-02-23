@@ -116,7 +116,9 @@ func defaultEmbeddedNodeConfig(config *params.NodeConfig) *node.Config {
 	}
 
 	if config.BootClusterConfig.Enabled {
-		nc.P2P.BootstrapNodes = makeBootstrapNodes(config.BootClusterConfig.BootNodes)
+		// in original config should be renamed and all consumers should be adjusted
+		nc.P2P.StaticNodes = parseNodes(config.BootClusterConfig.BootNodes)
+		nc.P2P.TrustedNodes = parseNodes(config.BootClusterConfig.TrustedNodes)
 	}
 
 	return nc
@@ -209,12 +211,12 @@ func makeWSHost(config *params.NodeConfig) string {
 	return config.WSHost
 }
 
-// makeBootstrapNodes returns default (hence bootstrap) list of peers
-func makeBootstrapNodes(enodes []string) []*discover.Node {
-	var bootstrapNodes []*discover.Node
+// parseNodes unmarshals enode string into discover.Node object
+func parseNodes(enodes []string) []*discover.Node {
+	var nodes []*discover.Node
 	for _, enode := range enodes {
-		bootstrapNodes = append(bootstrapNodes, discover.MustParseNode(enode))
+		nodes = append(nodes, discover.MustParseNode(enode))
 	}
 
-	return bootstrapNodes
+	return nodes
 }
