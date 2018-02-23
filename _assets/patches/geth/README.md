@@ -35,8 +35,6 @@ Instructions for creating a patch from the command line:
 - [`0010-geth-17-fix-npe-in-filter-system.patch`](./0010-geth-17-fix-npe-in-filter-system.patch) - Temp patch for 1.7.x to fix a NPE in the filter system.
 - [`0014-whisperv6-notifications.patch`](./0014-whisperv6-notifications.patch) — adds Whisper v6 notifications (need to be reviewed and documented)
 - [`0015-whisperv6-envelopes-tracing.patch`](./0015-whisperv6-envelopes-tracing.patch) — adds Whisper v6 envelope tracing (need to be reviewed and documented)
-- [`0017-geth-18-downgrade-to-whisperv5.patch`](./0017-geth-18-downgrade-to-whisperv5.patch) — some files in geth 1.8 import Whisper v6, instead of v5. This patch ensures v5 is used everywhere
-
 
 # Updating
 
