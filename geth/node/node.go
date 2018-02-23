@@ -163,6 +163,7 @@ func activateShhService(stack *node.Node, config *params.NodeConfig) error {
 		whisperServiceConfig := &whisper.Config{
 			MaxMessageSize:     whisper.DefaultMaxMessageSize,
 			MinimumAcceptedPOW: 0.001,
+			MaxPeers:           config.WhisperConfig.MaxPeers,
 		}
 		whisperService := whisper.New(whisperServiceConfig)
 

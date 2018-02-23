@@ -18,6 +18,7 @@ package whisperv5
 
 import (
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -32,7 +33,7 @@ type Peer struct {
 	host    *Whisper
 	peer    *p2p.Peer
 	ws      p2p.MsgReadWriter
-	trusted bool
+	trusted int32
 
 	known *set.Set // Messages already known by the peer to avoid wasting bandwidth
 
@@ -45,7 +46,7 @@ func newPeer(host *Whisper, remote *p2p.Peer, rw p2p.MsgReadWriter) *Peer {
 		host:    host,
 		peer:    remote,
 		ws:      rw,
-		trusted: false,
+		trusted: 0,
 		known:   set.New(),
 		quit:    make(chan struct{}),
 	}
@@ -171,4 +172,12 @@ func (p *Peer) broadcast() error {
 func (p *Peer) ID() []byte {
 	id := p.peer.ID()
 	return id[:]
+}
+
+func (p *Peer) Trusted() bool {
+	return atomic.LoadInt32(&p.trusted) == 1
+}
+
+func (p *Peer) SetTrusted() {
+	atomic.StoreInt32(&p.trusted, 1)
 }

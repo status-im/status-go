@@ -41,6 +41,9 @@ const (
 	// MaxPeers is the maximum number of global peers
 	MaxPeers = 25
 
+	// MaxWhisperPeers is the maximum number of whisper peers
+	MaxWhisperPeers = 25
+
 	// MaxPendingPeers is the maximum number of peers that can be pending in the
 	// handshake phase, counted separately for inbound and outbound connections.
 	MaxPendingPeers = 0
