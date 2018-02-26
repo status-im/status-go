@@ -17,7 +17,7 @@ XGOVERSION ?= 1.9.2
 XGOIMAGE = statusteam/xgo:$(XGOVERSION)
 XGOIMAGEIOSSIM = statusteam/xgo-ios-simulator:$(XGOVERSION)
 
-DOCKER_IMAGE_NAME ?= status-go
+DOCKER_IMAGE_NAME ?= statusteam/status-go
 
 DOCKER_TEST_WORKDIR = /go/src/github.com/status-im/status-go/
 DOCKER_TEST_IMAGE  = golang:1.9

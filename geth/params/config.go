@@ -543,15 +543,15 @@ func (c *NodeConfig) updateBootClusterConfig() error {
 		Dev         subClusterConfig `json:"dev"`
 	}
 
-	chtFile, err := static.Asset("config/cht.json")
+	chtFile, err := static.Asset("config/staticpeers.json")
 	if err != nil {
-		return fmt.Errorf("cht.json could not be loaded: %s", err)
+		return fmt.Errorf("staticpeers.json could not be loaded: %s", err)
 	}
 
 	var clusters []clusterConfig
 	err = json.Unmarshal(chtFile, &clusters)
 	if err != nil {
-		return fmt.Errorf("failed to unmarshal cht.json: %s", err)
+		return fmt.Errorf("failed to unmarshal staticpeers.json: %s", err)
 	}
 
 	for _, cluster := range clusters {
