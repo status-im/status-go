@@ -17,6 +17,11 @@ import (
 const (
 	// defaultWorkTime is a work time reported in messages sent to MailServer nodes.
 	defaultWorkTime = 5
+
+	// gcTimeout defines timeout to release not used connection with meailserver peers.
+	gcTimeout = 5 * time.Minute
+	// gcPeriod defines how often to run garbage collector.
+	gcPeriod = 3 * time.Second
 )
 
 var (
@@ -41,7 +46,7 @@ func NewPublicAPI(service *MailService) *PublicAPI {
 		provider:          service.provider,
 		newConnectedPeers: make(chan *discover.Node),
 	}
-	go api.trustedPeersGC(5 * time.Minute)
+	go api.trustedPeersGC(gcTimeout, gcPeriod)
 	return api
 }
 
@@ -74,6 +79,7 @@ func setMessagesRequestDefaults(r *MessagesRequest) {
 	}
 }
 
+// waitPeerAdded tries to connect with a peer and waits it connection will be established.
 func (api *PublicAPI) waitPeerAdded(peer *discover.Node, timeout time.Duration) error {
 	log.Debug("waiting to be added", "peer", peer.String())
 	node, err := api.provider.Node()
@@ -99,9 +105,11 @@ func (api *PublicAPI) waitPeerAdded(peer *discover.Node, timeout time.Duration) 
 	}
 }
 
-func (api *PublicAPI) trustedPeersGC(timeout time.Duration) {
+// trustedPeersGC removes connection to mailserver peers that were not used
+// for longer than a timeout.
+func (api *PublicAPI) trustedPeersGC(timeout, period time.Duration) {
 	connectedPeers := map[*discover.Node]time.Time{}
-	ticker := time.NewTicker(3 * time.Second)
+	ticker := time.NewTicker(period)
 	defer ticker.Stop()
 	for {
 		select {
@@ -125,6 +133,8 @@ func (api *PublicAPI) trustedPeersGC(timeout time.Duration) {
 	}
 }
 
+// choosePeer loops over trusted nodes, and returns one that is connected or
+// tries to establish a connection.
 func (api *PublicAPI) choosePeer() (*discover.Node, error) {
 	node, err := api.provider.Node()
 	if err != nil {
@@ -185,7 +195,6 @@ func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (boo
 	if err != nil {
 		return false, err
 	}
-	log.Info("historic", "peer", peer.String())
 	if err := shh.RequestHistoricMessages(peer.ID[:], envelope); err != nil {
 		return false, err
 	}

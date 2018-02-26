@@ -27,16 +27,25 @@ func TestWhisperMailboxTestSuite(t *testing.T) {
 	suite.Run(t, new(WhisperMailboxSuite))
 }
 
-func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
+func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsyncIndirect() {
 	//Start mailbox and status node
 	mailboxBackend, stop := s.startMailboxBackend()
 	defer stop()
 	mailboxNode, err := mailboxBackend.NodeManager().Node()
 	s.Require().NoError(err)
 
-	sender, stop := s.startBackend("sender", mailboxNode.Server().NodeInfo().Enode)
+	// connect proxy node to mailserver
+	proxyBackend, stop := s.startBackend("proxy")
 	defer stop()
-	s.Require().NoError(sender.NodeManager().AddPeer(mailboxNode.Server().NodeInfo().Enode))
+	proxyNode, err := proxyBackend.NodeManager().Node()
+	s.Require().NoError(err)
+	s.Require().NoError(proxyBackend.NodeManager().AddPeer(mailboxNode.Server().Self().String()))
+
+	// sender will add mailbox to trusted nodes, but initial messages will be
+	// delivered to mailbox node using connection with proxy node
+	sender, stop := s.startBackend("sender", mailboxNode.Server().Self().String())
+	defer stop()
+	s.Require().NoError(sender.NodeManager().AddPeer(proxyNode.Server().Self().String()))
 
 	senderWhisperService, err := sender.NodeManager().WhisperService()
 	s.Require().NoError(err)
@@ -70,7 +79,7 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	s.postMessageToPrivate(rpcClient, pubkey.String(), topic.String(), hexutil.Encode([]byte("Hello world!")))
 
 	//Get message to make sure that it will come from the mailbox later
-	time.Sleep(5 * time.Second)
+	time.Sleep(time.Second)
 	messages = s.getMessagesByMessageFilterID(rpcClient, messageFilterID)
 	s.Require().Len(messages, 1)
 
@@ -113,19 +122,19 @@ func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
 	s.Require().NoError(err)
 
 	// add mailbox to each peer as trusted node
-	aliceBackend, stop := s.startBackend("alice", mailboxNode.Server().NodeInfo().Enode)
+	aliceBackend, stop := s.startBackend("alice", mailboxNode.Server().Self().String())
 	defer stop()
-	bobBackend, stop := s.startBackend("bob", mailboxNode.Server().NodeInfo().Enode)
+	bobBackend, stop := s.startBackend("bob", mailboxNode.Server().Self().String())
 	defer stop()
-	charlieBackend, stop := s.startBackend("charlie", mailboxNode.Server().NodeInfo().Enode)
+	charlieBackend, stop := s.startBackend("charlie", mailboxNode.Server().Self().String())
 	defer stop()
 
 	// connect mailbox to each peer
-	err = aliceBackend.NodeManager().AddPeer(mailboxNode.Server().NodeInfo().Enode)
+	err = aliceBackend.NodeManager().AddPeer(mailboxNode.Server().Self().String())
 	s.Require().NoError(err)
-	err = bobBackend.NodeManager().AddPeer(mailboxNode.Server().NodeInfo().Enode)
+	err = bobBackend.NodeManager().AddPeer(mailboxNode.Server().Self().String())
 	s.Require().NoError(err)
-	err = charlieBackend.NodeManager().AddPeer(mailboxNode.Server().NodeInfo().Enode)
+	err = charlieBackend.NodeManager().AddPeer(mailboxNode.Server().Self().String())
 	s.Require().NoError(err)
 	//wait async processes on adding peer
 	time.Sleep(time.Second)
@@ -293,6 +302,9 @@ func (s *WhisperMailboxSuite) startBackend(name string, trusted ...string) (*api
 	datadir := filepath.Join(RootDir, ".ethereumtest/mailbox", name)
 	backend := api.NewStatusBackend()
 	nodeConfig, err := e2e.MakeTestNodeConfig(GetNetworkID())
+
+	nodeConfig.LightEthConfig.Enabled = false
+	nodeConfig.WhisperConfig.Enabled = true
 	nodeConfig.DataDir = datadir
 	nodeConfig.BootClusterConfig.TrustedNodes = trusted
 	s.Require().NoError(err)

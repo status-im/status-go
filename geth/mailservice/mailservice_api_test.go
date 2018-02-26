@@ -14,6 +14,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	mailServerPeer = "enode://b7e65e1bedc2499ee6cbd806945af5e7df0e59e4070c96821570bd581473eade24a489f5ec95d060c0db118c879403ab88d827d3766978f28708989d35474f87@[::]:51920"
+)
+
 func TestRequestMessagesDefaults(t *testing.T) {
 	r := MessagesRequest{}
 	setMessagesRequestDefaults(&r)
@@ -46,9 +50,6 @@ func TestRequestMessagesNoPeers(t *testing.T) {
 }
 
 func TestRequestMessagesFailedToAddPeer(t *testing.T) {
-	const (
-		mailServerPeer = "enode://b7e65e1bedc2499ee6cbd806945af5e7df0e59e4070c96821570bd581473eade24a489f5ec95d060c0db118c879403ab88d827d3766978f28708989d35474f87@[::]:51920"
-	)
 	mailNode, err := discover.ParseNode(mailServerPeer)
 	require.NoError(t, err)
 
