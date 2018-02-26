@@ -170,7 +170,7 @@ func GetHeadHashFromNetworkID(id int) string {
 	case params.StatusChainNetworkID:
 		return "0xe9d8920a99dc66a9557a87d51f9d14a34ec50aae04298e0f142187427d3c832e"
 	}
-
+	log.Debug("invalid network id", "networkid", id)
 	return ""
 }
 
@@ -195,7 +195,7 @@ func GetNetworkID() int {
 	case fmt.Sprintf("%d", params.StatusChainNetworkID), "statuschain":
 		return params.StatusChainNetworkID
 	}
-
+	log.Debug("invalid network id, fallback to statuschain", "networkid", *networkSelected)
 	return params.StatusChainNetworkID
 }
 
