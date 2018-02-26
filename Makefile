@@ -108,7 +108,7 @@ statusgo-ios-simulator-mainnet: xgo
 	@echo "iOS framework cross compilation done (mainnet)."
 
 generate: ##@other Regenerate assets and other auto-generated stuff
-	cp ./node_modules/web3/dist/web3.js ./static/scripts/web3.js
+	cp ./_assets/node_modules/web3/dist/web3.min.js ./static/scripts/web3.js
 	go generate ./static
 	rm ./static/scripts/web3.js
 

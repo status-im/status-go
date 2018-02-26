@@ -23,7 +23,7 @@
 */**/*tx_database*
 */**/*dapps*
 vendor/github.com/ethereum/go-ethereum/vendor
-/node_modules/
+node_modules/
 tags
 
 #*
