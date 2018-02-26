@@ -1,0 +1,13 @@
+diff --git i/p2p/server.go w/p2p/server.go
+index d1d578401..73127cd59 100644
+--- i/p2p/server.go
++++ w/p2p/server.go
+@@ -620,7 +620,7 @@ func (srv *Server) protoHandshakeChecks(peers map[discover.NodeID]*Peer, c *conn
+ 
+ func (srv *Server) encHandshakeChecks(peers map[discover.NodeID]*Peer, c *conn) error {
+ 	switch {
+-	case !c.is(trustedConn|staticDialedConn) && len(peers) >= srv.MaxPeers:
++	case !c.is(trustedConn) && len(peers) >= srv.MaxPeers:
+ 		return DiscTooManyPeers
+ 	case peers[c.id] != nil:
+ 		return DiscAlreadyConnected

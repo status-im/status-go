@@ -37,7 +37,7 @@ Instructions for creating a patch from the command line:
 - [`0014-whisperv6-notifications.patch`](./0014-whisperv6-notifications.patch) — adds Whisper v6 notifications (need to be reviewed and documented)
 - [`0015-whisperv6-envelopes-tracing.patch`](./0015-whisperv6-envelopes-tracing.patch) — adds Whisper v6 envelope tracing (need to be reviewed and documented)
 - [`0017-geth-18-downgrade-to-whisperv5.patch`](./0017-geth-18-downgrade-to-whisperv5.patch) — some files in geth 1.8 import Whisper v6, instead of v5. This patch ensures v5 is used everywhere
-
+- [0020-p2p-server-static.patch`](./0020-p2p-server-static.patch) - only trusted peers are allowed to be connected when max peers amount if reached.
 
 # Updating
 
