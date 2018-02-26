@@ -118,8 +118,8 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 				// post message
 				var message = {
 					ttl: 10,
-					powTarget: 1.0,
-					powTime: 20,
+					powTarget: 0.001,
+					powTime: 2,
 					topic: topic,
 					sig: shh.getPublicKey(identity1),
 					pubKey: shh.getPublicKey(identity2),
@@ -196,8 +196,8 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 				// post message
 				var message = {
 					ttl: 10,
-					powTarget: 1.0,
-					powTime: 20,
+					powTarget: 0.001,
+					powTime: 2,
 					topic: topic,
 					symKeyID: keyid,
 			  		payload: web3.toHex(payload),
@@ -267,8 +267,8 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 				// post message
 				var message = {
 					ttl: 10,
-					powTarget: 1.0,
-					powTime: 20,
+					powTarget: 0.001,
+					powTime: 2,
 				  	sig: shh.getPublicKey(identity2),
 				  	pubKey: shh.getPublicKey(identity1),
 				  	topic: topic,
@@ -341,7 +341,7 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 				r.True(ok)
 				break poll_loop
 			case <-timedOut:
-				s.FailNow("polling for messages timed out")
+				s.FailNow("polling for messages timed out. Test case: " + tc.name)
 			case <-time.After(time.Second):
 			}
 
