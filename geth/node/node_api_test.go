@@ -4,15 +4,13 @@ import (
 	"testing"
 
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
-	"github.com/status-im/status-go/geth/params"
 
-	e2e "github.com/status-im/status-go/t/e2e"
 	. "github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/require"
 )
 
 func TestWhisperLightModeEnabledSetsEmptyBloomFilter(t *testing.T) {
-	config, err := e2e.MakeTestNodeConfig(GetNetworkID())
+	config, err := MakeTestNodeConfig(GetNetworkID())
 	require.NoError(t, err)
 	config.WhisperConfig.LightClient = true
 
@@ -35,7 +33,7 @@ func TestWhisperLightModeEnabledSetsEmptyBloomFilter(t *testing.T) {
 }
 
 func TestWhisperLightModeEnabledSetsNilBloomFilter(t *testing.T) {
-	config, err := e2e.MakeTestNodeConfig(GetNetworkID())
+	config, err := MakeTestNodeConfig(GetNetworkID())
 	require.NoError(t, err)
 	config.WhisperConfig.LightClient = false
 

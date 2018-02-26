@@ -36,7 +36,7 @@ func (s *RPCTestSuite) TestCallRPC() {
 	}
 
 	for _, upstreamEnabled := range []bool{false, true} {
-		nodeConfig, err := e2e.MakeTestNodeConfig(GetNetworkID())
+		nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
 		s.NoError(err)
 
 		nodeConfig.IPCEnabled = false
@@ -126,7 +126,7 @@ func (s *RPCTestSuite) TestCallRPC() {
 
 // TestCallRawResult checks if returned response is a valid JSON-RPC response.
 func (s *RPCTestSuite) TestCallRawResult() {
-	nodeConfig, err := e2e.MakeTestNodeConfig(GetNetworkID())
+	nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
 
 	s.NoError(s.NodeManager.StartNode(nodeConfig))
@@ -144,7 +144,7 @@ func (s *RPCTestSuite) TestCallRawResult() {
 // for a not yet mained transaction is "error":{"code":-32000,"message":"unknown transaction"}.
 // Issue: https://github.com/status-im/status-go/issues/547
 func (s *RPCTestSuite) TestCallRawResultGetTransactionReceipt() {
-	nodeConfig, err := e2e.MakeTestNodeConfig(GetNetworkID())
+	nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
 
 	s.NoError(s.NodeManager.StartNode(nodeConfig))

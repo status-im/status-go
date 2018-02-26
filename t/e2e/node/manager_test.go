@@ -180,7 +180,7 @@ func (s *ManagerTestSuite) TestReferencesWithStartedNode() {
 }
 
 func (s *ManagerTestSuite) TestNodeStartStop() {
-	nodeConfig, err := e2e.MakeTestNodeConfig(GetNetworkID())
+	nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
 
 	// try stopping non-started node
@@ -213,7 +213,7 @@ func (s *ManagerTestSuite) TestNodeStartStop() {
 
 func (s *ManagerTestSuite) TestNetworkSwitching() {
 	// get Ropsten config
-	nodeConfig, err := e2e.MakeTestNodeConfig(GetNetworkID())
+	nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
 	s.False(s.NodeManager.IsNodeRunning())
 	s.NoError(s.NodeManager.StartNode(nodeConfig))
@@ -230,7 +230,7 @@ func (s *ManagerTestSuite) TestNetworkSwitching() {
 	s.False(s.NodeManager.IsNodeRunning())
 
 	// start new node with completely different config
-	nodeConfig, err = e2e.MakeTestNodeConfig(params.RinkebyNetworkID)
+	nodeConfig, err = MakeTestNodeConfig(params.RinkebyNetworkID)
 	s.NoError(err)
 	s.NoError(s.NodeManager.StartNode(nodeConfig))
 	s.True(s.NodeManager.IsNodeRunning())
@@ -249,7 +249,7 @@ func (s *ManagerTestSuite) TestStartNodeWithUpstreamEnabled() {
 		s.T().Skip()
 	}
 
-	nodeConfig, err := e2e.MakeTestNodeConfig(GetNetworkID())
+	nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
 
 	networkURL, err := GetRemoteURL()
@@ -273,10 +273,10 @@ func (s *ManagerTestSuite) TestStartNodeWithUpstreamEnabled() {
 //	progress := make(chan struct{}, cnt)
 //	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
 //
-//	nodeConfig1, e := e2e.MakeTestNodeConfig(GetNetworkID())
+//	nodeConfig1, e := MakeTestNodeConfig(GetNetworkID())
 //	s.NoError(e)
 //
-//	nodeConfig2, e := e2e.MakeTestNodeConfig(GetNetworkID())
+//	nodeConfig2, e := MakeTestNodeConfig(GetNetworkID())
 //	s.NoError(e)
 //
 //	nodeConfigs := []*params.NodeConfig{nodeConfig1, nodeConfig2}

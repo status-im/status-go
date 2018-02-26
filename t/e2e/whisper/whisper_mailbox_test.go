@@ -15,7 +15,6 @@ import (
 	"github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/rpc"
-	e2e "github.com/status-im/status-go/t/e2e"
 	. "github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/suite"
 )
@@ -310,7 +309,7 @@ func (d *groupChatParams) Encode() (string, error) {
 func (s *WhisperMailboxSuite) startBackend(name string) (*api.StatusBackend, func()) {
 	datadir := filepath.Join(RootDir, ".ethereumtest/mailbox", name)
 	backend := api.NewStatusBackend()
-	nodeConfig, err := e2e.MakeTestNodeConfig(GetNetworkID())
+	nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
 	nodeConfig.DataDir = datadir
 	s.Require().NoError(err)
 	s.Require().False(backend.IsNodeRunning())
@@ -336,7 +335,7 @@ func (s *WhisperMailboxSuite) startBackend(name string) (*api.StatusBackend, fun
 //Start mailbox node
 func (s *WhisperMailboxSuite) startMailboxBackend() (*api.StatusBackend, func()) {
 	mailboxBackend := api.NewStatusBackend()
-	mailboxConfig, err := e2e.MakeTestNodeConfig(GetNetworkID())
+	mailboxConfig, err := MakeTestNodeConfig(GetNetworkID())
 	s.Require().NoError(err)
 	datadir := filepath.Join(RootDir, ".ethereumtest/mailbox/mailserver")
 
