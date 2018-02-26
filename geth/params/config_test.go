@@ -340,6 +340,20 @@ var loadConfigTestCases = []struct {
 			require.True(t, nodeConfig.BootClusterConfig.Enabled)
 		},
 	},
+	{
+		`explicit WhisperConfig.LightClient = true`,
+		`{
+			"NetworkId": 3,
+			"DataDir": "$TMPDIR",
+			"WhisperConfig": {
+				"LightClient": true
+			}
+		}`,
+		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
+			require.NoError(t, err)
+			require.True(t, nodeConfig.WhisperConfig.LightClient)
+		},
+	},
 }
 
 // TestLoadNodeConfig tests loading JSON configuration and setting default values.

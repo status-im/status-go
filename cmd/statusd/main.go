@@ -58,6 +58,7 @@ var (
 	passwordFile = flag.String("shh.passwordfile", "", "Password file (password is used for symmetric encryption)")
 	minPow       = flag.Float64("shh.pow", params.WhisperMinimumPoW, "PoW for messages to be added to queue, in float format")
 	ttl          = flag.Int("shh.ttl", params.WhisperTTL, "Time to live for messages, in seconds")
+	lightClient  = flag.Bool("shh.lightclient", false, "Start with empty bloom filter, and don't forward messages")
 
 	// MailServer
 	enableMailServer = flag.Bool("shh.mailserver", false, "Delivers expired messages on demand")

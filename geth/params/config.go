@@ -91,6 +91,9 @@ type WhisperConfig struct {
 	// (if no account file selected, then this password is used for symmetric encryption).
 	Password string
 
+	// LightClient should be true if the node should start with an empty bloom filter and not forward messages from other nodes
+	LightClient bool
+
 	// EnableMailServer is mode when node is capable of delivering expired messages on demand
 	EnableMailServer bool
 

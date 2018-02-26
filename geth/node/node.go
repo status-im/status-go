@@ -183,9 +183,9 @@ func activateShhService(stack *node.Node, config *params.NodeConfig) error {
 			var mailServer mailserver.WMailServer
 			whisperService.RegisterServer(&mailServer)
 			mailServer.Init(whisperService, whisperConfig.DataDir, whisperConfig.Password, whisperConfig.MinimumPoW)
-		} else {
-			// HACK: Set an initial empty bloom filter in order to mark us as a light node so we don't receive all messages
-			// We should revisit this at a later point to ensure we are doing this in the best way possible
+		}
+
+		if whisperConfig.LightClient {
 			emptyBloomFilter := make([]byte, 64)
 			if err := whisperService.SetBloomFilter(emptyBloomFilter); err != nil {
 				return nil, err
