@@ -213,7 +213,7 @@ func (s *TransactionsTestSuite) TestSendContractTx() {
 		To:   nil, // marker, contract creation is expected
 		//Value: (*hexutil.Big)(new(big.Int).Mul(big.NewInt(1), gethcommon.Ether)),
 		Gas:   (*hexutil.Uint64)(&gas),
-		Input: (*hexutil.Bytes)(&byteCode),
+		Input: (hexutil.Bytes)(byteCode),
 	})
 	s.NoError(err, "cannot send transaction")
 

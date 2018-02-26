@@ -110,8 +110,8 @@ func (r RPCCall) ParseGas() *hexutil.Uint64 {
 		return nil
 	}
 
-	_v := hexutil.Uint64(parsedValue)
-	return &_v
+	v := hexutil.Uint64(parsedValue)
+	return &v
 }
 
 // ParseGasPrice returns the hex big associated with the call.
@@ -155,7 +155,7 @@ func (r RPCCall) ToSendTxArgs() SendTxArgs {
 		To:       &toAddr,
 		From:     fromAddr,
 		Value:    r.ParseValue(),
-		Input:    &input,
+		Input:    input,
 		Gas:      r.ParseGas(),
 		GasPrice: r.ParseGasPrice(),
 	}

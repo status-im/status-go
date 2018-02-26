@@ -108,17 +108,13 @@ func (s *TxQueueTestSuite) setupTransactionPoolAPI(tx *common.QueuedTx, returnNo
 }
 
 func (s *TxQueueTestSuite) rlpEncodeTx(tx *common.QueuedTx, config *params.NodeConfig, account *common.SelectedExtKey, nonce *hexutil.Uint64, gas hexutil.Uint64, gasPrice *big.Int) hexutil.Bytes {
-	input := tx.Args.Input
-	if input == nil {
-		input = tx.Args.Data
-	}
 	newTx := types.NewTransaction(
 		uint64(*nonce),
 		gethcommon.Address(*tx.Args.To),
 		tx.Args.Value.ToInt(),
 		uint64(gas),
 		gasPrice,
-		[]byte(*input),
+		[]byte(tx.Args.Input),
 	)
 	chainID := big.NewInt(int64(config.NetworkID))
 	signedTx, err := types.SignTx(newTx, types.NewEIP155Signer(chainID), account.AccountKey.PrivateKey)
@@ -142,41 +138,30 @@ func (s *TxQueueTestSuite) TestCompleteTransaction() {
 		Address:    common.FromAddress(TestConfig.Account1.Address),
 		AccountKey: &keystore.Key{PrivateKey: key},
 	}
-	input := hexutil.Bytes(make([]byte, 0))
 	testCases := []struct {
 		name     string
 		gas      *hexutil.Uint64
 		gasPrice *hexutil.Big
-		data     *hexutil.Bytes
-		input    *hexutil.Bytes
 	}{
 		{
 			"noGasDef",
 			nil,
 			nil,
-			nil,
-			&input,
 		},
 		{
 			"gasDefined",
 			&testGas,
 			nil,
-			nil,
-			&input,
 		},
 		{
 			"gasPriceDefined",
 			nil,
 			testGasPrice,
-			nil,
-			&input,
 		},
 		{
 			"inputPassedInLegacyDataField",
 			nil,
 			testGasPrice,
-			&input,
-			nil,
 		},
 	}
 
@@ -189,8 +174,6 @@ func (s *TxQueueTestSuite) TestCompleteTransaction() {
 				To:       common.ToAddress(TestConfig.Account2.Address),
 				Gas:      testCase.gas,
 				GasPrice: testCase.gasPrice,
-				Data:     testCase.data,
-				Input:    testCase.input,
 			})
 			s.setupTransactionPoolAPI(tx, testNonce, testNonce, account, nil)
 

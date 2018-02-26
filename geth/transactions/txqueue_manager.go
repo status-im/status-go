@@ -2,7 +2,6 @@ package transactions
 
 import (
 	"context"
-	"errors"
 	"math/big"
 	"sync"
 	"time"
@@ -208,14 +207,6 @@ func (m *Manager) completeTransaction(config *params.NodeConfig, selectedAccount
 	}
 
 	chainID := big.NewInt(int64(config.NetworkID))
-	input := args.Input
-	if input == nil {
-		input = args.Data
-	}
-	if input == nil {
-		return hash, errors.New("Missing Input/Data byte array")
-	}
-	data := []byte(*input)
 	value := (*big.Int)(args.Value)
 	toAddr := gethcommon.Address{}
 	if args.To != nil {
@@ -231,7 +222,7 @@ func (m *Manager) completeTransaction(config *params.NodeConfig, selectedAccount
 			To:       args.To,
 			GasPrice: gasPrice,
 			Value:    value,
-			Data:     data,
+			Data:     args.Input,
 		})
 		if err != nil {
 			return hash, err
@@ -252,7 +243,7 @@ func (m *Manager) completeTransaction(config *params.NodeConfig, selectedAccount
 		"gasPrice", gasPrice,
 		"value", value,
 	)
-	tx := types.NewTransaction(nonce, toAddr, value, gas, gasPrice, data)
+	tx := types.NewTransaction(nonce, toAddr, value, gas, gasPrice, args.Input)
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), selectedAccount.AccountKey.PrivateKey)
 	if err != nil {
 		return hash, err
