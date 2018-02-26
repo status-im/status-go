@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/les"
 	"github.com/ethereum/go-ethereum/node"
+	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/log"
@@ -163,6 +164,20 @@ func (m *NodeManager) Node() (*node.Node, error) {
 		return nil, err
 	}
 	return m.node, nil
+}
+
+// Server returns p2p server
+func (m *NodeManager) Server() (*p2p.Server, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	if err := m.isNodeAvailable(); err != nil {
+		return nil, err
+	}
+	if m.node.Server() == nil {
+		return nil, ErrNoRunningNode
+	}
+	return m.node.Server(), nil
 }
 
 // PopulateStaticPeers connects current node with our publicly available LES/SHH/Swarm cluster

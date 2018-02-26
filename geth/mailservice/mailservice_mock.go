@@ -5,7 +5,7 @@
 package mailservice
 
 import (
-	node "github.com/ethereum/go-ethereum/node"
+	p2p "github.com/ethereum/go-ethereum/p2p"
 	whisperv5 "github.com/ethereum/go-ethereum/whisper/whisperv5"
 	gomock "github.com/golang/mock/gomock"
 	reflect "reflect"
@@ -34,17 +34,17 @@ func (m *MockServiceProvider) EXPECT() *MockServiceProviderMockRecorder {
 	return m.recorder
 }
 
-// Node mocks base method
-func (m *MockServiceProvider) Node() (*node.Node, error) {
-	ret := m.ctrl.Call(m, "Node")
-	ret0, _ := ret[0].(*node.Node)
+// Server mocks base method
+func (m *MockServiceProvider) Server() (*p2p.Server, error) {
+	ret := m.ctrl.Call(m, "Server")
+	ret0, _ := ret[0].(*p2p.Server)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// Node indicates an expected call of Node
-func (mr *MockServiceProviderMockRecorder) Node() *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Node", reflect.TypeOf((*MockServiceProvider)(nil).Node))
+// Server indicates an expected call of Server
+func (mr *MockServiceProviderMockRecorder) Server() *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Server", reflect.TypeOf((*MockServiceProvider)(nil).Server))
 }
 
 // WhisperService mocks base method

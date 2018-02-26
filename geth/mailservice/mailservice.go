@@ -7,9 +7,9 @@ import (
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
 )
 
-// ServiceProvider provides node and required services.
+// ServiceProvider provides server and required services.
 type ServiceProvider interface {
-	Node() (*node.Node, error)
+	Server() (*p2p.Server, error)
 	WhisperService() (*whisper.Whisper, error)
 }
 

@@ -22,6 +22,9 @@ const (
 	gcTimeout = 5 * time.Minute
 	// gcPeriod defines how often to run garbage collector.
 	gcPeriod = 3 * time.Second
+
+	// peerConnectTimeout defines timeout to connect with a peer.
+	peerConnectTimeout = 10 * time.Second
 )
 
 var (
@@ -79,17 +82,17 @@ func setMessagesRequestDefaults(r *MessagesRequest) {
 	}
 }
 
-// waitPeerAdded tries to connect with a peer and waits it connection will be established.
+// waitPeerAdded tries to connect with a peer and waits till connection will be established.
 func (api *PublicAPI) waitPeerAdded(peer *discover.Node, timeout time.Duration) error {
 	log.Debug("waiting to be added", "peer", peer.String())
-	node, err := api.provider.Node()
+	server, err := api.provider.Server()
 	if err != nil {
 		return err
 	}
 	events := make(chan *p2p.PeerEvent, 10)
-	sub := node.Server().SubscribeEvents(events)
+	sub := server.SubscribeEvents(events)
 	defer sub.Unsubscribe()
-	node.Server().AddPeer(peer)
+	server.AddPeer(peer)
 	for {
 		select {
 		case ev := <-events:
@@ -105,8 +108,8 @@ func (api *PublicAPI) waitPeerAdded(peer *discover.Node, timeout time.Duration) 
 	}
 }
 
-// trustedPeersGC removes connection to mailserver peers that were not used
-// for longer than a timeout.
+// trustedPeersGC collects connections that weren't used for defined
+// garbage collector timeout.
 func (api *PublicAPI) trustedPeersGC(timeout, period time.Duration) {
 	connectedPeers := map[*discover.Node]time.Time{}
 	ticker := time.NewTicker(period)
@@ -120,12 +123,12 @@ func (api *PublicAPI) trustedPeersGC(timeout, period time.Duration) {
 		case <-ticker.C:
 			for peer, lastUsed := range connectedPeers {
 				if time.Since(lastUsed) >= timeout {
-					node, err := api.provider.Node()
+					server, err := api.provider.Server()
 					// node was stopped
 					if err != nil {
 						return
 					}
-					node.Server().RemovePeer(peer)
+					server.RemovePeer(peer)
 					delete(connectedPeers, peer)
 				}
 			}
@@ -136,28 +139,28 @@ func (api *PublicAPI) trustedPeersGC(timeout, period time.Duration) {
 // choosePeer loops over trusted nodes, and returns one that is connected or
 // tries to establish a connection.
 func (api *PublicAPI) choosePeer() (*discover.Node, error) {
-	node, err := api.provider.Node()
+	server, err := api.provider.Server()
 	if err != nil {
 		return nil, err
 	}
-	if len(node.Server().Config.TrustedNodes) == 0 {
+	if len(server.Config.TrustedNodes) == 0 {
 		return nil, errors.New("no mailservers are available")
 	}
 	// we are not relying on GC for this to avoid any mismatch between
 	// real data and GC. GC used only to disconnect peers that didn't
 	// disconnect themself
 	connected := map[discover.NodeID]struct{}{}
-	for _, peer := range node.Server().Peers() {
+	for _, peer := range server.Peers() {
 		connected[peer.ID()] = struct{}{}
 	}
-	for _, trusted := range node.Server().Config.TrustedNodes {
+	for _, trusted := range server.Config.TrustedNodes {
 		if _, exist := connected[trusted.ID]; exist {
 			return trusted, nil
 		}
 	}
 	// todo(dshulyak) choose randomly
-	peer := node.Server().Config.TrustedNodes[0]
-	if err := api.waitPeerAdded(peer, 10*time.Second); err != nil {
+	peer := server.Config.TrustedNodes[0]
+	if err := api.waitPeerAdded(peer, peerConnectTimeout); err != nil {
 		return nil, err
 	}
 	return peer, nil
@@ -173,12 +176,9 @@ func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (boo
 	if err != nil {
 		return false, err
 	}
-	node, err := api.provider.Node()
+	server, err := api.provider.Server()
 	if err != nil {
 		return false, err
-	}
-	if node.Server() == nil {
-		return false, errors.New("server is not running")
 	}
 	peer, err := api.choosePeer()
 	if err != nil {
@@ -191,7 +191,7 @@ func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (boo
 		return false, fmt.Errorf("%v: %v", ErrInvalidSymKeyID, err)
 	}
 
-	envelope, err := makeEnvelop(makePayload(r), symKey, node.Server().PrivateKey, shh.MinPow())
+	envelope, err := makeEnvelop(makePayload(r), symKey, server.PrivateKey, shh.MinPow())
 	if err != nil {
 		return false, err
 	}
