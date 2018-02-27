@@ -24,7 +24,7 @@ func NewTestServer(ctrl *gomock.Controller) (*rpc.Server, *MockPublicTransaction
 type CallArgs struct {
 	From     common.Address  `json:"from"`
 	To       *common.Address `json:"to"`
-	Gas      hexutil.Big     `json:"gas"`
+	Gas      hexutil.Uint64  `json:"gas"`
 	GasPrice hexutil.Big     `json:"gasPrice"`
 	Value    hexutil.Big     `json:"value"`
 	Data     hexutil.Bytes   `json:"data"`
@@ -35,7 +35,7 @@ type CallArgs struct {
 // and there is no easy way to generate mocks from internal modules.
 type PublicTransactionPoolAPI interface {
 	GasPrice(ctx context.Context) (*big.Int, error)
-	EstimateGas(ctx context.Context, args CallArgs) (*hexutil.Big, error)
+	EstimateGas(ctx context.Context, args CallArgs) (hexutil.Uint64, error)
 	GetTransactionCount(ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (*hexutil.Uint64, error)
 	SendRawTransaction(ctx context.Context, encodedTx hexutil.Bytes) (common.Hash, error)
 }

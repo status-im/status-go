@@ -206,7 +206,7 @@ func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
 	s.postMessageToPrivate(aliceRPCClient, charliePubkey.String(), charlieAliceKeySendTopic.String(), payloadStr)
 
 	//wait to receive
-	time.Sleep(time.Second)
+	time.Sleep(5 * time.Second)
 
 	//bob receive group chat data and add it to his node
 	//1. bob get group chat details
@@ -243,7 +243,7 @@ func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
 	//alice send message to group chat
 	helloWorldMessage := hexutil.Encode([]byte("Hello world!"))
 	s.postMessageToGroup(aliceRPCClient, groupChatKeyID, groupChatTopic.String(), helloWorldMessage)
-	time.Sleep(time.Second) //it need to receive envelopes by bob and charlie nodes
+	time.Sleep(5 * time.Second) //it need to receive envelopes by bob and charlie nodes
 
 	//bob receive group chat message
 	messages = s.getMessagesByMessageFilterID(bobRPCClient, bobGroupChatMessageFilterID)
@@ -264,7 +264,7 @@ func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
 	//Request each one messages from mailbox using enode
 	s.requestHistoricMessages(bobRPCClient, mailboxEnode, bobMailServerKeyID, groupChatTopic.String())
 	s.requestHistoricMessages(charlieRPCClient, mailboxEnode, charlieMailServerKeyID, groupChatTopic.String())
-	time.Sleep(time.Second) //wait to receive p2p messages
+	time.Sleep(5 * time.Second) //wait to receive p2p messages
 
 	//bob receive p2p message from grop chat filter
 	messages = s.getMessagesByMessageFilterID(bobRPCClient, bobGroupChatMessageFilterID)
@@ -314,6 +314,12 @@ func (s *WhisperMailboxSuite) startBackend(name string) (*api.StatusBackend, fun
 	nodeConfig.DataDir = datadir
 	s.Require().NoError(err)
 	s.Require().False(backend.IsNodeRunning())
+
+	if addr, err := GetRemoteURL(); err == nil {
+		nodeConfig.UpstreamConfig.Enabled = true
+		nodeConfig.UpstreamConfig.URL = addr
+	}
+
 	s.Require().NoError(backend.StartNode(nodeConfig))
 	s.Require().True(backend.IsNodeRunning())
 

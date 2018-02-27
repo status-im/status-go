@@ -3,8 +3,8 @@ index e7e513880..dc6562be8 100644
 --- a/light/postprocess.go
 +++ b/light/postprocess.go
 @@ -66,12 +66,20 @@ var (
- 		chtRoot:       common.HexToHash("6f56dc61936752cc1f8c84b4addabdbe6a1c19693de3f21cb818362df2117f03"),
- 		bloomTrieRoot: common.HexToHash("aca7d7c504d22737242effc3fdc604a762a0af9ced898036b5986c3a15220208"),
+ 		chtRoot:       common.HexToHash("71d60207af74e5a22a3e1cfbfc89f9944f91b49aa980c86fba94d568369eaf44"),
+ 		bloomTrieRoot: common.HexToHash("70aca4b3b6d08dde8704c95cedb1420394453c1aec390947751e69ff8c436360"),
  	}
 +
 +	statusRopstenCheckpoint = trustedCheckpoint{
