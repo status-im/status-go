@@ -558,7 +558,7 @@ func (c *NodeConfig) updateStaticPeersConfig() error {
 	type subClusterConfig struct {
 		Number      int      `json:"number"`
 		Hash        string   `json:"hash"`
-		StaticPeers []string `json:"bootnodes"`
+		StaticPeers []string `json:"staticpeers"`
 	}
 	type clusterConfig struct {
 		NetworkID int              `json:"networkID"`

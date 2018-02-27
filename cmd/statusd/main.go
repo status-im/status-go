@@ -219,8 +219,8 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 	nodeConfig.SwarmConfig.Enabled = *swarmEnabled
 
 	if *standalone {
-		nodeConfig.BootClusterConfig.Enabled = false
-		nodeConfig.BootClusterConfig.BootNodes = nil
+		nodeConfig.StaticPeersConfig.Enabled = false
+		nodeConfig.StaticPeersConfig.StaticPeers = nil
 	}
 
 	nodeConfig.Discovery = *discovery
@@ -229,7 +229,7 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 	// it's possible to use bootnodes in NodeManager.PopulateStaticPeers().
 	// TODO(adam): research if we need NodeManager.PopulateStaticPeers() at all.
 	if *bootnodes != "" {
-		nodeConfig.BootClusterConfig.BootNodes = strings.Split(*bootnodes, ",")
+		nodeConfig.StaticPeersConfig.StaticPeers = strings.Split(*bootnodes, ",")
 	}
 
 	if *whisperEnabled {
