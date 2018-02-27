@@ -165,8 +165,7 @@ func GetRemoteURLFromNetworkID(id int) (url string, err error) {
 func GetHeadHashFromNetworkID(id int) string {
 	switch id {
 	case params.MainNetworkID:
-		log.Error("tests should not be run on the main network")
-		return ""
+		panic("tests should not be run on the main network")
 	case params.RinkebyNetworkID:
 		return "0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177"
 	case params.RopstenNetworkID:
@@ -194,8 +193,7 @@ func GetHeadHash() string {
 func GetNetworkID() int {
 	switch strings.ToLower(*networkSelected) {
 	case fmt.Sprintf("%d", params.MainNetworkID), "mainnet":
-		log.Error("tests should not be run on the main network, fallback to StatusChain")
-		return params.StatusChainNetworkID
+		panic("tests should not be run on the main network")
 	case fmt.Sprintf("%d", params.RinkebyNetworkID), "rinkeby":
 		return params.RinkebyNetworkID
 	case fmt.Sprintf("%d", params.RopstenNetworkID), "ropsten", "testnet":
