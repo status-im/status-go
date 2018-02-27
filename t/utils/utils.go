@@ -161,6 +161,7 @@ func GetRemoteURLFromNetworkID(id int) (url string, err error) {
 }
 
 // GetHeadHashFromNetworkID returns the hash associated with a given network id.
+// Mainnet is not supported for tests.
 func GetHeadHashFromNetworkID(id int) string {
 	switch id {
 	case params.RinkebyNetworkID:
@@ -185,7 +186,8 @@ func GetHeadHash() string {
 }
 
 // GetNetworkID returns appropriate network id for test based on
-// default or provided -network flag.
+// default or provided -network flag. Mainnet is not supported for
+// tests.
 func GetNetworkID() int {
 	switch strings.ToLower(*networkSelected) {
 	case fmt.Sprintf("%d", params.RinkebyNetworkID), "rinkeby":
