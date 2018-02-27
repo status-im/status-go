@@ -253,8 +253,8 @@ func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
 	s.Require().Equal(0, len(messages))
 
 	//Request each one messages from mailbox using enode
-	s.requestHistoricMessages(bobRPCClient, mailboxEnode, bobMailServerKeyID, groupChatTopic.String())
-	s.requestHistoricMessages(charlieRPCClient, mailboxEnode, charlieMailServerKeyID, groupChatTopic.String())
+	s.requestHistoricMessages(bobRPCClient, bobMailServerKeyID, groupChatTopic.String())
+	s.requestHistoricMessages(charlieRPCClient, charlieMailServerKeyID, groupChatTopic.String())
 	time.Sleep(5 * time.Second) //wait to receive p2p messages
 
 	//bob receive p2p message from grop chat filter
