@@ -561,10 +561,9 @@ func (c *NodeConfig) updateStaticPeersConfig() error {
 		StaticPeers []string `json:"bootnodes"`
 	}
 	type clusterConfig struct {
-		NetworkID   int              `json:"networkID"`
-		GenesisHash string           `json:"genesisHash"`
-		Prod        subClusterConfig `json:"prod"`
-		Dev         subClusterConfig `json:"dev"`
+		NetworkID int              `json:"networkID"`
+		Prod      subClusterConfig `json:"prod"`
+		Dev       subClusterConfig `json:"dev"`
 	}
 
 	chtFile, err := static.Asset("config/staticpeers.json")

@@ -352,7 +352,7 @@ func TestLoadNodeConfig(t *testing.T) {
 
 	// create sample static peers config
 	staticPeersConfig := []byte(`["enode://foobar@41.41.41.41:30300", "enode://foobaz@42.42.42.42:30302"]`)
-	err = ioutil.WriteFile(filepath.Join(tmpDir, "static-peers.json"), staticPeersConfig, os.ModePerm)
+	err = ioutil.WriteFile(filepath.Join(tmpDir, "staticpeers.json"), staticPeersConfig, os.ModePerm)
 	require.NoError(t, err)
 	t.Log(tmpDir)
 
