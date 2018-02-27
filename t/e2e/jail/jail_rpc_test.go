@@ -27,7 +27,7 @@ func TestJailRPCTestSuite(t *testing.T) {
 type JailRPCTestSuite struct {
 	e2e.BackendTestSuite
 
-	jail jail.JailManager
+	jail jail.Manager
 }
 
 func (s *JailRPCTestSuite) SetupTest() {

@@ -15,8 +15,8 @@ import (
 
 const timeout = 5 * time.Second
 
-// JailManager defines methods for managing jailed environments
-type JailManager interface {
+// Manager defines methods for managing jailed environments
+type Manager interface {
 	// Call executes given JavaScript function w/i a jail cell context identified by the chatID.
 	Call(chatID, this, args string) string
 

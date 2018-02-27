@@ -349,7 +349,7 @@ func (s *TxQueueTestSuite) TestLocalNonce() {
 			To:   common.ToAddress(TestConfig.Account2.Address),
 		})
 		s.setupTransactionPoolAPI(tx, nonce, hexutil.Uint64(i), account, nil)
-		s.NoError(s.manager.QueueTransaction(tx))
+		s.NoError(s.manager.QueueTraTnsaction(tx))
 		hash, err := s.manager.CompleteTransaction(tx.ID, password)
 		rst := s.manager.WaitForTransaction(tx)
 		// simple sanity checks

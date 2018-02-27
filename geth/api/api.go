@@ -42,7 +42,7 @@ func (api *StatusAPI) AccountManager() common.AccountManager {
 }
 
 // JailManager returns reference to jail
-func (api *StatusAPI) JailManager() jail.JailManager {
+func (api *StatusAPI) JailManager() jail.Manager {
 	return api.b.JailManager()
 }
 

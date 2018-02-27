@@ -32,7 +32,7 @@ func TestJailTestSuite(t *testing.T) {
 
 type JailTestSuite struct {
 	e2e.NodeManagerTestSuite
-	Jail jail.JailManager
+	Jail jail.Manager
 }
 
 func (s *JailTestSuite) SetupTest() {
