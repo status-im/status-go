@@ -6,7 +6,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
-	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/static"
 	e2e "github.com/status-im/status-go/t/e2e"
@@ -36,7 +35,7 @@ type WhisperJailTestSuite struct {
 
 	Timeout    time.Duration
 	WhisperAPI *whisper.PublicWhisperAPI
-	Jail       common.JailManager
+	Jail       jail.JailManager
 }
 
 func (s *WhisperJailTestSuite) StartTestBackend(opts ...e2e.TestNodeOption) {

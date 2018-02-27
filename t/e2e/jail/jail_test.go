@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/signal"
@@ -33,7 +32,7 @@ func TestJailTestSuite(t *testing.T) {
 
 type JailTestSuite struct {
 	e2e.NodeManagerTestSuite
-	Jail common.JailManager
+	Jail jail.JailManager
 }
 
 func (s *JailTestSuite) SetupTest() {

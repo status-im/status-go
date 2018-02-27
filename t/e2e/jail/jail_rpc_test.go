@@ -11,6 +11,7 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/geth/common"
+	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/signal"
 	"github.com/status-im/status-go/geth/transactions"
@@ -26,7 +27,7 @@ func TestJailRPCTestSuite(t *testing.T) {
 type JailRPCTestSuite struct {
 	e2e.BackendTestSuite
 
-	jail common.JailManager
+	jail jail.JailManager
 }
 
 func (s *JailRPCTestSuite) SetupTest() {
