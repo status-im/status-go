@@ -215,16 +215,16 @@ var loadConfigTestCases = []struct {
 		},
 	},
 	{
-		`default boot cluster (Ropsten Dev)`,
+		`default static peers (Ropsten Dev)`,
 		`{
 			"NetworkId": 3,
 			"DataDir": "$TMPDIR"
 		}`,
 		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
 			require.NoError(t, err)
-			require.True(t, nodeConfig.BootClusterConfig.Enabled, "boot cluster is expected to be enabled by default")
+			require.True(t, nodeConfig.StaticPeersConfig.Enabled, "static peers are expected to be enabled by default")
 
-			enodes := nodeConfig.BootClusterConfig.BootNodes
+			enodes := nodeConfig.StaticPeersConfig.StaticPeers
 			require.True(t, len(enodes) >= 3)
 		},
 	},
@@ -237,9 +237,9 @@ var loadConfigTestCases = []struct {
 		}`,
 		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
 			require.NoError(t, err)
-			require.True(t, nodeConfig.BootClusterConfig.Enabled, "boot cluster is expected to be enabled by default")
+			require.True(t, nodeConfig.StaticPeersConfig.Enabled, "static peers are expected to be enabled by default")
 
-			enodes := nodeConfig.BootClusterConfig.BootNodes
+			enodes := nodeConfig.StaticPeersConfig.StaticPeers
 			require.True(t, len(enodes) >= 3)
 		},
 	},
@@ -248,13 +248,13 @@ var loadConfigTestCases = []struct {
 		`{
 			"NetworkId": 311,
 			"DataDir": "$TMPDIR",
-			"BootClusterConfig": {
+			"StaticPeersConfig": {
 				"Enabled": false
 			}
 		}`,
 		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
 			require.NoError(t, err)
-			require.False(t, nodeConfig.BootClusterConfig.Enabled, "boot cluster is expected to be disabled")
+			require.False(t, nodeConfig.StaticPeersConfig.Enabled, "static peers are expected to be disabled")
 		},
 	},
 	{
@@ -265,9 +265,9 @@ var loadConfigTestCases = []struct {
 		}`,
 		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
 			require.NoError(t, err)
-			require.True(t, nodeConfig.BootClusterConfig.Enabled, "boot cluster is expected to be enabled by default")
+			require.True(t, nodeConfig.StaticPeersConfig.Enabled, "static peers are expected to be enabled by default")
 
-			enodes := nodeConfig.BootClusterConfig.BootNodes
+			enodes := nodeConfig.StaticPeersConfig.StaticPeers
 			require.True(t, len(enodes) >= 3)
 		},
 	},
@@ -280,9 +280,9 @@ var loadConfigTestCases = []struct {
 		}`,
 		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
 			require.NoError(t, err)
-			require.True(t, nodeConfig.BootClusterConfig.Enabled, "boot cluster is expected to be enabled by default")
+			require.True(t, nodeConfig.StaticPeersConfig.Enabled, "static peers are expected to be enabled by default")
 
-			enodes := nodeConfig.BootClusterConfig.BootNodes
+			enodes := nodeConfig.StaticPeersConfig.StaticPeers
 			require.True(t, len(enodes) >= 3)
 		},
 	},
@@ -294,9 +294,9 @@ var loadConfigTestCases = []struct {
 		}`,
 		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
 			require.NoError(t, err)
-			require.True(t, nodeConfig.BootClusterConfig.Enabled, "boot cluster is expected to be enabled by default")
+			require.True(t, nodeConfig.StaticPeersConfig.Enabled, "static peers are expected to be enabled by default")
 
-			enodes := nodeConfig.BootClusterConfig.BootNodes
+			enodes := nodeConfig.StaticPeersConfig.StaticPeers
 			require.True(t, len(enodes) >= 2)
 		},
 	},
@@ -309,9 +309,9 @@ var loadConfigTestCases = []struct {
 		}`,
 		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
 			require.NoError(t, err)
-			require.True(t, nodeConfig.BootClusterConfig.Enabled, "boot cluster is expected to be enabled by default")
+			require.True(t, nodeConfig.StaticPeersConfig.Enabled, "static peers are expected to be enabled by default")
 
-			enodes := nodeConfig.BootClusterConfig.BootNodes
+			enodes := nodeConfig.StaticPeersConfig.StaticPeers
 			require.True(t, len(enodes) >= 2)
 		},
 	},
@@ -324,7 +324,7 @@ var loadConfigTestCases = []struct {
 		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
 			require.NoError(t, err)
 			require.True(t, nodeConfig.DevMode)
-			require.True(t, nodeConfig.BootClusterConfig.Enabled)
+			require.True(t, nodeConfig.StaticPeersConfig.Enabled)
 		},
 	},
 	{
@@ -337,7 +337,7 @@ var loadConfigTestCases = []struct {
 		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
 			require.NoError(t, err)
 			require.False(t, nodeConfig.DevMode)
-			require.True(t, nodeConfig.BootClusterConfig.Enabled)
+			require.True(t, nodeConfig.StaticPeersConfig.Enabled)
 		},
 	},
 }
@@ -350,9 +350,9 @@ func TestLoadNodeConfig(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir) // nolint: errcheck
 
-	// create sample Bootstrap Cluster Config
-	bootstrapConfig := []byte(`["enode://foobar@41.41.41.41:30300", "enode://foobaz@42.42.42.42:30302"]`)
-	err = ioutil.WriteFile(filepath.Join(tmpDir, "bootstrap-cluster.json"), bootstrapConfig, os.ModePerm)
+	// create sample static peers config
+	staticPeersConfig := []byte(`["enode://foobar@41.41.41.41:30300", "enode://foobaz@42.42.42.42:30302"]`)
+	err = ioutil.WriteFile(filepath.Join(tmpDir, "static-peers.json"), staticPeersConfig, os.ModePerm)
 	require.NoError(t, err)
 	t.Log(tmpDir)
 

@@ -37,6 +37,10 @@ var (
 	ErrAuthorizationKeyFileNotSet = errors.New("authorization key file is not set")
 )
 
+// ----------
+// LightEthConfig
+// ----------
+
 // LightEthConfig holds LES-related configuration
 // Status nodes are always lightweight clients (due to mobile platform constraints)
 type LightEthConfig struct {
@@ -49,6 +53,10 @@ type LightEthConfig struct {
 	// DatabaseCache is memory (in MBs) allocated to internal caching (min 16MB / database forced)
 	DatabaseCache int
 }
+
+// ----------
+// FirebaseConfig
+// ----------
 
 // FirebaseConfig holds FCM-related configuration
 type FirebaseConfig struct {
@@ -78,6 +86,10 @@ func (c *FirebaseConfig) ReadAuthorizationKeyFile() ([]byte, error) {
 
 	return key, nil
 }
+
+// ----------
+// WhisperConfig
+// ----------
 
 // WhisperConfig holds SHH-related configuration
 type WhisperConfig struct {
@@ -135,6 +147,10 @@ func (c *WhisperConfig) String() string {
 	return string(data)
 }
 
+// ----------
+// SwarmConfig
+// ----------
+
 // SwarmConfig holds Swarm-related configuration
 type SwarmConfig struct {
 	// Enabled flag specifies whether protocol is enabled
@@ -147,25 +163,31 @@ func (c *SwarmConfig) String() string {
 	return string(data)
 }
 
-// BootClusterConfig holds configuration for supporting boot cluster, which is a temporary
+// ----------
+// StaticPeersConfig
+// ----------
+
+// StaticPeersConfig holds configuration for supporting static peers, which is a temporary
 // means for mobile devices to get connected to Ethereum network (UDP-based discovery
 // may not be available, so we need means to discover the network manually).
-type BootClusterConfig struct {
+type StaticPeersConfig struct {
 	// Enabled flag specifies whether feature is enabled
 	Enabled bool
 
-	// BootNodes list of bootstrap nodes for a given network (Ropsten, Rinkeby, Homestead),
+	// StaticPeers list of static peer nodes for a given network (Ropsten, Rinkeby, Homestead),
 	// for a given mode (production vs development)
-	BootNodes []string
+	StaticPeers []string
 }
 
 // String dumps config object as nicely indented JSON
-func (c *BootClusterConfig) String() string {
+func (c *StaticPeersConfig) String() string {
 	data, _ := json.MarshalIndent(c, "", "    ") // nolint: gas
 	return string(data)
 }
 
-//=====================================================================================
+// ----------
+// UpstreamRPCConfig
+// ----------
 
 // UpstreamRPCConfig stores configuration for upstream rpc connection.
 type UpstreamRPCConfig struct {
@@ -177,7 +199,9 @@ type UpstreamRPCConfig struct {
 	URL string
 }
 
-//=====================================================================================
+// ----------
+// NodeConfig
+// ----------
 
 // NodeConfig stores configuration options for a node
 type NodeConfig struct {
@@ -265,8 +289,8 @@ type NodeConfig struct {
 	// UpstreamConfig extra config for providing upstream infura server.
 	UpstreamConfig UpstreamRPCConfig `json:"UpstreamConfig"`
 
-	// BootClusterConfig extra configuration for supporting cluster
-	BootClusterConfig *BootClusterConfig `json:"BootClusterConfig," validate:"structonly"`
+	// StaticPeersConfig extra configuration for supporting cluster
+	StaticPeersConfig *StaticPeersConfig `json:"StaticPeersConfig," validate:"structonly"`
 
 	// LightEthConfig extra configuration for LES
 	LightEthConfig *LightEthConfig `json:"LightEthConfig," validate:"structonly"`
@@ -299,9 +323,9 @@ func NewNodeConfig(dataDir string, networkID uint64, devMode bool) (*NodeConfig,
 		LogFile:         LogFile,
 		LogLevel:        LogLevel,
 		LogToStderr:     LogToStderr,
-		BootClusterConfig: &BootClusterConfig{
-			Enabled:   true,
-			BootNodes: []string{},
+		StaticPeersConfig: &StaticPeersConfig{
+			Enabled:     true,
+			StaticPeers: []string{},
 		},
 		LightEthConfig: &LightEthConfig{
 			Enabled:       true,
@@ -383,8 +407,8 @@ func (c *NodeConfig) Validate() error {
 		return err
 	}
 
-	if c.BootClusterConfig.Enabled {
-		if err := validate.Struct(c.BootClusterConfig); err != nil {
+	if c.StaticPeersConfig.Enabled {
+		if err := validate.Struct(c.StaticPeersConfig); err != nil {
 			return err
 		}
 	}
@@ -441,7 +465,7 @@ func (c *NodeConfig) updateConfig() error {
 		return err
 	}
 
-	if err := c.updateBootClusterConfig(); err != nil {
+	if err := c.updateStaticPeersConfig(); err != nil {
 		return err
 	}
 
@@ -519,11 +543,11 @@ func (c *NodeConfig) updateUpstreamConfig() error {
 	return nil
 }
 
-// updateBootClusterConfig loads boot nodes and CHT for a given network and mode.
+// updateStaticPeersConfig loads static peer nodes and CHT for a given network and mode.
 // This is necessary until we have LES protocol support CHT sync, and better node
 // discovery on mobile devices)
-func (c *NodeConfig) updateBootClusterConfig() error {
-	if !c.BootClusterConfig.Enabled {
+func (c *NodeConfig) updateStaticPeersConfig() error {
+	if !c.StaticPeersConfig.Enabled {
 		return nil
 	}
 
@@ -532,9 +556,9 @@ func (c *NodeConfig) updateBootClusterConfig() error {
 	// decentralized solution. For now, in order to avoid forcing users to long sync times
 	// we use central static resource
 	type subClusterConfig struct {
-		Number    int      `json:"number"`
-		Hash      string   `json:"hash"`
-		BootNodes []string `json:"bootnodes"`
+		Number      int      `json:"number"`
+		Hash        string   `json:"hash"`
+		StaticPeers []string `json:"bootnodes"`
 	}
 	type clusterConfig struct {
 		NetworkID   int              `json:"networkID"`
@@ -556,9 +580,9 @@ func (c *NodeConfig) updateBootClusterConfig() error {
 
 	for _, cluster := range clusters {
 		if cluster.NetworkID == int(c.NetworkID) {
-			c.BootClusterConfig.BootNodes = cluster.Prod.BootNodes
+			c.StaticPeersConfig.StaticPeers = cluster.Prod.StaticPeers
 			if c.DevMode {
-				c.BootClusterConfig.BootNodes = cluster.Dev.BootNodes
+				c.StaticPeersConfig.StaticPeers = cluster.Dev.StaticPeers
 			}
 			break
 		}
