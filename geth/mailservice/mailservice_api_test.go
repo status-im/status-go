@@ -75,7 +75,7 @@ func TestRequestMessagesFailedToAddPeer(t *testing.T) {
 	provider.EXPECT().Server().Return(nodeA.Server(), nil).AnyTimes()
 	result, err := api.RequestMessages(context.TODO(), MessagesRequest{})
 	assert.False(t, result)
-	assert.EqualError(t, err, "failed to add a peer")
+	assert.Contains(t, err.Error(), "failed to add a peer")
 	require.NoError(t, nodeA.Stop())
 }
 
@@ -127,10 +127,9 @@ func TestGarbageCollector(t *testing.T) {
 	require.NoError(t, service.Start(nil))
 	api := &PublicAPI{
 		service:           service,
-		provider:          provider,
 		newConnectedPeers: make(chan *discover.Node, 1),
 	}
-	go api.trustedPeersGC(200*time.Millisecond, 100*time.Millisecond)
+	go api.runTrustedPeersGC(200*time.Millisecond, 100*time.Millisecond)
 	defer func() { require.NoError(t, service.Stop()) }()
 	provider.EXPECT().Server().Return(servers[0], nil).AnyTimes()
 	events := make(chan *p2p.PeerEvent, 1)

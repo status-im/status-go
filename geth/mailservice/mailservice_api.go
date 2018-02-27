@@ -18,7 +18,7 @@ const (
 	// defaultWorkTime is a work time reported in messages sent to MailServer nodes.
 	defaultWorkTime = 5
 
-	// gcTimeout defines timeout to release not used connection with meailserver peers.
+	// gcTimeout defines timeout to release not used connection with mailserver peers.
 	gcTimeout = 5 * time.Minute
 	// gcPeriod defines how often to run garbage collector.
 	gcPeriod = 3 * time.Second
@@ -32,12 +32,13 @@ var (
 	ErrInvalidMailServerPeer = errors.New("invalid mailServerPeer value")
 	// ErrInvalidSymKeyID is returned when it fails to get a symmetric key.
 	ErrInvalidSymKeyID = errors.New("invalid symKeyID value")
+	// ErrNoServersInConfig is returned when no trusted peers are configured for p2p.Server
+	ErrNoServersInConfig = errors.New("no mailservers are available")
 )
 
 // PublicAPI defines a MailServer public API.
 type PublicAPI struct {
-	service  *MailService
-	provider ServiceProvider // just a shortcut
+	service *MailService
 
 	newConnectedPeers chan *discover.Node
 }
@@ -46,11 +47,134 @@ type PublicAPI struct {
 func NewPublicAPI(service *MailService) *PublicAPI {
 	api := &PublicAPI{
 		service:           service,
-		provider:          service.provider,
 		newConnectedPeers: make(chan *discover.Node),
 	}
-	go api.trustedPeersGC(gcTimeout, gcPeriod)
+	go api.runTrustedPeersGC(gcTimeout, gcPeriod)
 	return api
+}
+
+func (api *PublicAPI) provider() ServiceProvider {
+	return api.service.provider
+}
+
+// addPeer tries to connect with a peer and waits till connection will be established.
+func (api *PublicAPI) addPeer(peer *discover.Node, timeout time.Duration) error {
+	log.Debug("adding a peer", "peer", peer.String())
+	server, err := api.provider().Server()
+	if err != nil {
+		return err
+	}
+	events := make(chan *p2p.PeerEvent, 10)
+	sub := server.SubscribeEvents(events)
+	defer sub.Unsubscribe()
+	server.AddPeer(peer)
+	for {
+		select {
+		case ev := <-events:
+			if ev.Type == p2p.PeerEventTypeAdd && ev.Peer == peer.ID {
+				log.Debug("peer added", "peer", peer.String())
+				return nil
+			}
+		case <-time.After(timeout):
+			return fmt.Errorf("failed to add a peer: %s", peer.String())
+		}
+	}
+}
+
+// runTrustedPeersGC collects connections that weren't used for defined
+// garbage collector timeout.
+func (api *PublicAPI) runTrustedPeersGC(timeout, period time.Duration) {
+	connectedPeers := map[*discover.Node]time.Time{}
+	ticker := time.NewTicker(period)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-api.service.quit:
+			log.Debug("shutdown mailserver api gc")
+			return
+		case peer := <-api.newConnectedPeers:
+			connectedPeers[peer] = time.Now()
+		case <-ticker.C:
+			for peer, lastUsed := range connectedPeers {
+				if time.Since(lastUsed) >= timeout {
+					server, err := api.provider().Server()
+					// node was stopped
+					if err != nil {
+						log.Debug("exit from mailserver api gc. failed to get a server", "error", err)
+						return
+					}
+					server.RemovePeer(peer)
+					delete(connectedPeers, peer)
+				}
+			}
+		}
+	}
+}
+
+// choosePeer loops over trusted nodes, and returns one that is connected or
+// tries to establish a connection.
+func (api *PublicAPI) choosePeer() (*discover.Node, error) {
+	server, err := api.provider().Server()
+	if err != nil {
+		return nil, err
+	}
+	if len(server.Config.TrustedNodes) == 0 {
+		return nil, ErrNoServersInConfig
+	}
+	// we are not relying on GC for this to avoid any mismatch between
+	// real data and GC. GC used only to disconnect peers that didn't
+	// disconnect themself
+	connected := map[discover.NodeID]struct{}{}
+	for _, peer := range server.Peers() {
+		connected[peer.ID()] = struct{}{}
+	}
+	for _, trusted := range server.Config.TrustedNodes {
+		if _, exist := connected[trusted.ID]; exist {
+			return trusted, nil
+		}
+	}
+	// TODO(dshulyak) choose randomly
+	peer := server.Config.TrustedNodes[0]
+	if err := api.addPeer(peer, peerConnectTimeout); err != nil {
+		return nil, err
+	}
+	return peer, nil
+}
+
+// RequestMessages sends a request for historic messages to a MailServer.
+func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (bool, error) {
+	log.Info("RequestMessages", "request", r)
+
+	setMessagesRequestDefaults(&r)
+
+	shh, err := api.provider().WhisperService()
+	if err != nil {
+		return false, err
+	}
+	server, err := api.provider().Server()
+	if err != nil {
+		return false, err
+	}
+	peer, err := api.choosePeer()
+	if err != nil {
+		return false, err
+	}
+	// renew gc timer
+	api.newConnectedPeers <- peer
+	symKey, err := shh.GetSymKey(r.SymKeyID)
+	if err != nil {
+		return false, fmt.Errorf("%v: %v", ErrInvalidSymKeyID, err)
+	}
+
+	envelope, err := makeEnvelop(makePayload(r), symKey, server.PrivateKey, shh.MinPow())
+	if err != nil {
+		return false, err
+	}
+	if err := shh.RequestHistoricMessages(peer.ID[:], envelope); err != nil {
+		return false, err
+	}
+
+	return true, nil
 }
 
 // MessagesRequest is a payload send to a MailServer to get messages.
@@ -80,126 +204,6 @@ func setMessagesRequestDefaults(r *MessagesRequest) {
 		r.From = uint32(time.Now().UTC().Add(-24 * time.Hour).Unix())
 		r.To = uint32(time.Now().UTC().Unix())
 	}
-}
-
-// waitPeerAdded tries to connect with a peer and waits till connection will be established.
-func (api *PublicAPI) waitPeerAdded(peer *discover.Node, timeout time.Duration) error {
-	log.Debug("waiting to be added", "peer", peer.String())
-	server, err := api.provider.Server()
-	if err != nil {
-		return err
-	}
-	events := make(chan *p2p.PeerEvent, 10)
-	sub := server.SubscribeEvents(events)
-	defer sub.Unsubscribe()
-	server.AddPeer(peer)
-	for {
-		select {
-		case ev := <-events:
-			if ev.Type != p2p.PeerEventTypeAdd {
-				continue
-			}
-			if ev.Peer == peer.ID {
-				return nil
-			}
-		case <-time.After(timeout):
-			return errors.New("failed to add a peer")
-		}
-	}
-}
-
-// trustedPeersGC collects connections that weren't used for defined
-// garbage collector timeout.
-func (api *PublicAPI) trustedPeersGC(timeout, period time.Duration) {
-	connectedPeers := map[*discover.Node]time.Time{}
-	ticker := time.NewTicker(period)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-api.service.quit:
-			return
-		case peer := <-api.newConnectedPeers:
-			connectedPeers[peer] = time.Now()
-		case <-ticker.C:
-			for peer, lastUsed := range connectedPeers {
-				if time.Since(lastUsed) >= timeout {
-					server, err := api.provider.Server()
-					// node was stopped
-					if err != nil {
-						return
-					}
-					server.RemovePeer(peer)
-					delete(connectedPeers, peer)
-				}
-			}
-		}
-	}
-}
-
-// choosePeer loops over trusted nodes, and returns one that is connected or
-// tries to establish a connection.
-func (api *PublicAPI) choosePeer() (*discover.Node, error) {
-	server, err := api.provider.Server()
-	if err != nil {
-		return nil, err
-	}
-	if len(server.Config.TrustedNodes) == 0 {
-		return nil, errors.New("no mailservers are available")
-	}
-	// we are not relying on GC for this to avoid any mismatch between
-	// real data and GC. GC used only to disconnect peers that didn't
-	// disconnect themself
-	connected := map[discover.NodeID]struct{}{}
-	for _, peer := range server.Peers() {
-		connected[peer.ID()] = struct{}{}
-	}
-	for _, trusted := range server.Config.TrustedNodes {
-		if _, exist := connected[trusted.ID]; exist {
-			return trusted, nil
-		}
-	}
-	// todo(dshulyak) choose randomly
-	peer := server.Config.TrustedNodes[0]
-	if err := api.waitPeerAdded(peer, peerConnectTimeout); err != nil {
-		return nil, err
-	}
-	return peer, nil
-}
-
-// RequestMessages sends a request for historic messages to a MailServer.
-func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (bool, error) {
-	log.Info("RequestMessages", "request", r)
-
-	setMessagesRequestDefaults(&r)
-
-	shh, err := api.provider.WhisperService()
-	if err != nil {
-		return false, err
-	}
-	server, err := api.provider.Server()
-	if err != nil {
-		return false, err
-	}
-	peer, err := api.choosePeer()
-	if err != nil {
-		return false, err
-	}
-	// renew gc timer
-	api.newConnectedPeers <- peer
-	symKey, err := shh.GetSymKey(r.SymKeyID)
-	if err != nil {
-		return false, fmt.Errorf("%v: %v", ErrInvalidSymKeyID, err)
-	}
-
-	envelope, err := makeEnvelop(makePayload(r), symKey, server.PrivateKey, shh.MinPow())
-	if err != nil {
-		return false, err
-	}
-	if err := shh.RequestHistoricMessages(peer.ID[:], envelope); err != nil {
-		return false, err
-	}
-
-	return true, nil
 }
 
 // makeEnvelop makes an envelop for a historic messages request.
