@@ -220,7 +220,7 @@ type NodeConfig struct {
 	// If KeyStoreDir is empty, the default location is the "keystore" subdirectory of DataDir.
 	KeyStoreDir string
 
-	// PrivateKeyFile is a filename with node ID (private key)
+	// NodeKeyFile is a filename with node ID (private key)
 	// This file should contain a valid secp256k1 private key that will be used for both
 	// remote peer identification as well as network traffic encryption.
 	NodeKeyFile string
@@ -289,6 +289,10 @@ type NodeConfig struct {
 	// UpstreamConfig extra config for providing upstream infura server.
 	UpstreamConfig UpstreamRPCConfig `json:"UpstreamConfig"`
 
+	// ClusterConfigFile contains the file name of the cluster configuration. If
+	// empty the statical configuration data will be taken.
+	ClusterConfigFile string `json:"ClusterConfigFile"`
+
 	// StaticPeersConfig extra configuration for supporting cluster
 	StaticPeersConfig *StaticPeersConfig `json:"StaticPeersConfig," validate:"structonly"`
 
@@ -303,26 +307,27 @@ type NodeConfig struct {
 }
 
 // NewNodeConfig creates new node configuration object
-func NewNodeConfig(dataDir string, networkID uint64, devMode bool) (*NodeConfig, error) {
+func NewNodeConfig(dataDir string, clstrCfgFile string, networkID uint64, devMode bool) (*NodeConfig, error) {
 	nodeConfig := &NodeConfig{
-		DevMode:         devMode,
-		NetworkID:       networkID,
-		DataDir:         dataDir,
-		Name:            ClientIdentifier,
-		Version:         Version,
-		RPCEnabled:      RPCEnabledDefault,
-		HTTPHost:        HTTPHost,
-		HTTPPort:        HTTPPort,
-		ListenAddr:      ListenAddr,
-		APIModules:      APIModules,
-		WSHost:          WSHost,
-		WSPort:          WSPort,
-		MaxPeers:        MaxPeers,
-		MaxPendingPeers: MaxPendingPeers,
-		IPCFile:         IPCFile,
-		LogFile:         LogFile,
-		LogLevel:        LogLevel,
-		LogToStderr:     LogToStderr,
+		DevMode:           devMode,
+		NetworkID:         networkID,
+		DataDir:           dataDir,
+		Name:              ClientIdentifier,
+		Version:           Version,
+		RPCEnabled:        RPCEnabledDefault,
+		HTTPHost:          HTTPHost,
+		HTTPPort:          HTTPPort,
+		ListenAddr:        ListenAddr,
+		APIModules:        APIModules,
+		WSHost:            WSHost,
+		WSPort:            WSPort,
+		MaxPeers:          MaxPeers,
+		MaxPendingPeers:   MaxPendingPeers,
+		IPCFile:           IPCFile,
+		LogFile:           LogFile,
+		LogLevel:          LogLevel,
+		LogToStderr:       LogToStderr,
+		ClusterConfigFile: clstrCfgFile,
 		StaticPeersConfig: &StaticPeersConfig{
 			Enabled:     true,
 			StaticPeers: []string{},
@@ -365,7 +370,7 @@ func LoadNodeConfig(configJSON string) (*NodeConfig, error) {
 }
 
 func loadNodeConfig(configJSON string) (*NodeConfig, error) {
-	nodeConfig, err := NewNodeConfig("", 0, true)
+	nodeConfig, err := NewNodeConfig("", "", 0, true)
 	if err != nil {
 		return nil, err
 	}
@@ -465,7 +470,7 @@ func (c *NodeConfig) updateConfig() error {
 		return err
 	}
 
-	if err := c.updateStaticPeersConfig(); err != nil {
+	if err := c.updateClusterConfig(); err != nil {
 		return err
 	}
 
@@ -543,10 +548,10 @@ func (c *NodeConfig) updateUpstreamConfig() error {
 	return nil
 }
 
-// updateStaticPeersConfig loads static peer nodes and CHT for a given network and mode.
+// updateClusterConfig loads static peer nodes and CHT for a given network and mode.
 // This is necessary until we have LES protocol support CHT sync, and better node
 // discovery on mobile devices)
-func (c *NodeConfig) updateStaticPeersConfig() error {
+func (c *NodeConfig) updateClusterConfig() error {
 	if !c.StaticPeersConfig.Enabled {
 		return nil
 	}
@@ -566,15 +571,27 @@ func (c *NodeConfig) updateStaticPeersConfig() error {
 		Dev       subClusterConfig `json:"dev"`
 	}
 
-	chtFile, err := static.Asset("config/staticpeers.json")
-	if err != nil {
-		return fmt.Errorf("staticpeers.json could not be loaded: %s", err)
+	var chtFile []byte
+	var err error
+
+	if c.ClusterConfigFile != "" {
+		// Load cluster configuration from external file.
+		chtFile, err = ioutil.ReadFile(c.ClusterConfigFile)
+		if err != nil {
+			return fmt.Errorf("cluster configuration file '%s' could not be loaded: %s", c.ClusterConfigFile, err)
+		}
+	} else {
+		// Fallback to embedded file.
+		chtFile, err = static.Asset("config/staticpeers.json")
+		if err != nil {
+			return fmt.Errorf("staticpeers.json could not be loaded: %s", err)
+		}
 	}
 
 	var clusters []clusterConfig
 	err = json.Unmarshal(chtFile, &clusters)
 	if err != nil {
-		return fmt.Errorf("failed to unmarshal staticpeers.json: %s", err)
+		return fmt.Errorf("failed to unmarshal cluster configuration file: %s", err)
 	}
 
 	for _, cluster := range clusters {

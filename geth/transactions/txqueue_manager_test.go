@@ -57,7 +57,7 @@ func (s *TxQueueTestSuite) SetupTest() {
 	s.client = gethrpc.DialInProc(s.server)
 	rpclient, _ := rpc.NewClient(s.client, params.UpstreamRPCConfig{})
 	s.nodeManagerMock.EXPECT().RPCClient().Return(rpclient)
-	nodeConfig, err := params.NewNodeConfig("/tmp", params.RopstenNetworkID, true)
+	nodeConfig, err := params.NewNodeConfig("/tmp", "", params.RopstenNetworkID, true)
 	s.Require().NoError(err)
 	s.nodeConfig = nodeConfig
 

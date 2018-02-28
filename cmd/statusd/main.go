@@ -188,7 +188,7 @@ func startCollectingStats(interruptCh <-chan struct{}, nodeManager common.NodeMa
 // makeNodeConfig parses incoming CLI options and returns node configuration object
 func makeNodeConfig() (*params.NodeConfig, error) {
 	devMode := !*prodMode
-	nodeConfig, err := params.NewNodeConfig(*dataDir, uint64(*networkID), devMode)
+	nodeConfig, err := params.NewNodeConfig(*dataDir, "", uint64(*networkID), devMode)
 	if err != nil {
 		return nil, err
 	}
