@@ -56,7 +56,7 @@ popd
 
 Update config for tests with new accounts `static/config/public-chain-accounts.json`:
 
-```
+```json
 {
   "Account1": {
     "Address": "0xb6120ddd881593537c2bd4280bae509ec94b1a6b"
@@ -70,11 +70,12 @@ Update config for tests with new accounts `static/config/public-chain-accounts.j
 Embed keys as a binary data, you will need to install `npm` tool and web3.js lib:
 
 ```bash
-npm install web3
+(cd _assets && npm install web3)
 make generate
 ```
 
 As a final step request funds from faucet for a chosen network:
+
 - [Rinkeby](https://faucet.rinkeby.io/)
 - [Ropsten](http://faucet.ropsten.be:3001/)
 

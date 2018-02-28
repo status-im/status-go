@@ -218,7 +218,7 @@ func (s *ManagerTestSuite) TestNetworkSwitching() {
 	s.False(s.NodeManager.IsNodeRunning())
 	s.NoError(s.NodeManager.StartNode(nodeConfig))
 	// wait till node is started
-	s.True(s.NodeManager.IsNodeRunning())
+	s.Require().True(s.NodeManager.IsNodeRunning())
 
 	firstHash, err := e2e.FirstBlockHash(s.NodeManager)
 	s.NoError(err)

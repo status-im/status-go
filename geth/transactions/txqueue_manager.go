@@ -207,14 +207,13 @@ func (m *Manager) completeTransaction(config *params.NodeConfig, selectedAccount
 	}
 
 	chainID := big.NewInt(int64(config.NetworkID))
-	data := []byte(args.Data)
 	value := (*big.Int)(args.Value)
 	toAddr := gethcommon.Address{}
 	if args.To != nil {
 		toAddr = *args.To
 	}
 
-	gas := (*big.Int)(args.Gas)
+	var gas uint64
 	if args.Gas == nil {
 		ctx, cancel = context.WithTimeout(context.Background(), m.rpcCallTimeout)
 		defer cancel()
@@ -223,15 +222,17 @@ func (m *Manager) completeTransaction(config *params.NodeConfig, selectedAccount
 			To:       args.To,
 			GasPrice: gasPrice,
 			Value:    value,
-			Data:     data,
+			Data:     args.Input,
 		})
 		if err != nil {
 			return hash, err
 		}
-		if gas.Cmp(big.NewInt(defaultGas)) == -1 {
+		if gas < defaultGas {
 			log.Info("default gas will be used. estimated gas", gas, "is lower than", defaultGas)
-			gas = big.NewInt(defaultGas)
+			gas = defaultGas
 		}
+	} else {
+		gas = uint64(*args.Gas)
 	}
 
 	log.Info(
@@ -242,7 +243,7 @@ func (m *Manager) completeTransaction(config *params.NodeConfig, selectedAccount
 		"gasPrice", gasPrice,
 		"value", value,
 	)
-	tx := types.NewTransaction(nonce, toAddr, value, gas, gasPrice, data)
+	tx := types.NewTransaction(nonce, toAddr, value, gas, gasPrice, args.Input)
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), selectedAccount.AccountKey.PrivateKey)
 	if err != nil {
 		return hash, err

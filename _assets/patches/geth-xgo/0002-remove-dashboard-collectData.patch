@@ -1,0 +1,131 @@
+diff --git a/vendor/github.com/ethereum/go-ethereum/dashboard/dashboard.go b/vendor/github.com/ethereum/go-ethereum/dashboard/dashboard.go
+index 09038638..070ecca3 100644
+--- a/vendor/github.com/ethereum/go-ethereum/dashboard/dashboard.go
++++ b/vendor/github.com/ethereum/go-ethereum/dashboard/dashboard.go
+@@ -29,17 +29,14 @@ import (
+ 	"net"
+ 	"net/http"
+ 	"path/filepath"
+-	"runtime"
+ 	"sync"
+ 	"sync/atomic"
+ 	"time"
+ 
+-	"github.com/elastic/gosigar"
+ 	"github.com/ethereum/go-ethereum/log"
+ 	"github.com/ethereum/go-ethereum/p2p"
+ 	"github.com/ethereum/go-ethereum/params"
+ 	"github.com/ethereum/go-ethereum/rpc"
+-	"github.com/rcrowley/go-metrics"
+ 	"golang.org/x/net/websocket"
+ )
+ 
+@@ -274,108 +271,6 @@ func (db *Dashboard) apiHandler(conn *websocket.Conn) {
+ // collectData collects the required data to plot on the dashboard.
+ func (db *Dashboard) collectData() {
+ 	defer db.wg.Done()
+-	systemCPUUsage := gosigar.Cpu{}
+-	systemCPUUsage.Get()
+-	var (
+-		prevNetworkIngress = metrics.DefaultRegistry.Get("p2p/InboundTraffic").(metrics.Meter).Count()
+-		prevNetworkEgress  = metrics.DefaultRegistry.Get("p2p/OutboundTraffic").(metrics.Meter).Count()
+-		prevProcessCPUTime = getProcessCPUTime()
+-		prevSystemCPUUsage = systemCPUUsage
+-		prevDiskRead       = metrics.DefaultRegistry.Get("eth/db/chaindata/compact/input").(metrics.Meter).Count()
+-		prevDiskWrite      = metrics.DefaultRegistry.Get("eth/db/chaindata/compact/output").(metrics.Meter).Count()
+-
+-		frequency = float64(db.config.Refresh / time.Second)
+-		numCPU    = float64(runtime.NumCPU())
+-	)
+-
+-	for {
+-		select {
+-		case errc := <-db.quit:
+-			errc <- nil
+-			return
+-		case <-time.After(db.config.Refresh):
+-			systemCPUUsage.Get()
+-			var (
+-				curNetworkIngress = metrics.DefaultRegistry.Get("p2p/InboundTraffic").(metrics.Meter).Count()
+-				curNetworkEgress  = metrics.DefaultRegistry.Get("p2p/OutboundTraffic").(metrics.Meter).Count()
+-				curProcessCPUTime = getProcessCPUTime()
+-				curSystemCPUUsage = systemCPUUsage
+-				curDiskRead       = metrics.DefaultRegistry.Get("eth/db/chaindata/compact/input").(metrics.Meter).Count()
+-				curDiskWrite      = metrics.DefaultRegistry.Get("eth/db/chaindata/compact/output").(metrics.Meter).Count()
+-
+-				deltaNetworkIngress = float64(curNetworkIngress - prevNetworkIngress)
+-				deltaNetworkEgress  = float64(curNetworkEgress - prevNetworkEgress)
+-				deltaProcessCPUTime = curProcessCPUTime - prevProcessCPUTime
+-				deltaSystemCPUUsage = systemCPUUsage.Delta(prevSystemCPUUsage)
+-				deltaDiskRead       = curDiskRead - prevDiskRead
+-				deltaDiskWrite      = curDiskWrite - prevDiskWrite
+-			)
+-			prevNetworkIngress = curNetworkIngress
+-			prevNetworkEgress = curNetworkEgress
+-			prevProcessCPUTime = curProcessCPUTime
+-			prevSystemCPUUsage = curSystemCPUUsage
+-			prevDiskRead = curDiskRead
+-			prevDiskWrite = curDiskWrite
+-
+-			now := time.Now()
+-
+-			var mem runtime.MemStats
+-			runtime.ReadMemStats(&mem)
+-			activeMemory := &ChartEntry{
+-				Time:  now,
+-				Value: float64(mem.Alloc) / frequency,
+-			}
+-			virtualMemory := &ChartEntry{
+-				Time:  now,
+-				Value: float64(mem.Sys) / frequency,
+-			}
+-			networkIngress := &ChartEntry{
+-				Time:  now,
+-				Value: deltaNetworkIngress / frequency,
+-			}
+-			networkEgress := &ChartEntry{
+-				Time:  now,
+-				Value: deltaNetworkEgress / frequency,
+-			}
+-			processCPU := &ChartEntry{
+-				Time:  now,
+-				Value: deltaProcessCPUTime / frequency / numCPU * 100,
+-			}
+-			systemCPU := &ChartEntry{
+-				Time:  now,
+-				Value: float64(deltaSystemCPUUsage.Sys+deltaSystemCPUUsage.User) / frequency / numCPU,
+-			}
+-			diskRead := &ChartEntry{
+-				Time:  now,
+-				Value: float64(deltaDiskRead) / frequency,
+-			}
+-			diskWrite := &ChartEntry{
+-				Time:  now,
+-				Value: float64(deltaDiskWrite) / frequency,
+-			}
+-			db.charts.ActiveMemory = append(db.charts.ActiveMemory[1:], activeMemory)
+-			db.charts.VirtualMemory = append(db.charts.VirtualMemory[1:], virtualMemory)
+-			db.charts.NetworkIngress = append(db.charts.NetworkIngress[1:], networkIngress)
+-			db.charts.NetworkEgress = append(db.charts.NetworkEgress[1:], networkEgress)
+-			db.charts.ProcessCPU = append(db.charts.ProcessCPU[1:], processCPU)
+-			db.charts.SystemCPU = append(db.charts.SystemCPU[1:], systemCPU)
+-			db.charts.DiskRead = append(db.charts.DiskRead[1:], diskRead)
+-			db.charts.DiskWrite = append(db.charts.DiskRead[1:], diskWrite)
+-
+-			db.sendToAll(&Message{
+-				Home: &HomeMessage{
+-					ActiveMemory:   ChartEntries{activeMemory},
+-					VirtualMemory:  ChartEntries{virtualMemory},
+-					NetworkIngress: ChartEntries{networkIngress},
+-					NetworkEgress:  ChartEntries{networkEgress},
+-					ProcessCPU:     ChartEntries{processCPU},
+-					SystemCPU:      ChartEntries{systemCPU},
+-					DiskRead:       ChartEntries{diskRead},
+-					DiskWrite:      ChartEntries{diskWrite},
+-				},
+-			})
+-		}
+-	}
+ }
+ 
+ // collectLogs collects and sends the logs to the active dashboards.

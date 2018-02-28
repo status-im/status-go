@@ -1,0 +1,26 @@
+diff --git a/cmd/wnode/main.go b/cmd/wnode/main.go
+index 971b1c0ab..d42409db5 100644
+--- a/cmd/wnode/main.go
++++ b/cmd/wnode/main.go
+@@ -43,7 +43,7 @@ import (
+ 	"github.com/ethereum/go-ethereum/p2p/discover"
+ 	"github.com/ethereum/go-ethereum/p2p/nat"
+ 	"github.com/ethereum/go-ethereum/whisper/mailserver"
+-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
++	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
+ 	"golang.org/x/crypto/pbkdf2"
+ )
+ 
+diff --git a/whisper/mailserver/mailserver.go b/whisper/mailserver/mailserver.go
+index 6555fd5c0..0ec6ec570 100644
+--- a/whisper/mailserver/mailserver.go
++++ b/whisper/mailserver/mailserver.go
+@@ -26,7 +26,7 @@ import (
+ 	"github.com/ethereum/go-ethereum/crypto"
+ 	"github.com/ethereum/go-ethereum/log"
+ 	"github.com/ethereum/go-ethereum/rlp"
+-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
++	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
+ 	"github.com/syndtr/goleveldb/leveldb"
+ 	"github.com/syndtr/goleveldb/leveldb/util"
+ )

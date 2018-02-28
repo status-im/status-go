@@ -94,7 +94,7 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 	if err != nil {
 		switch err.(type) {
 		case node.RPCClientError:
-			err = node.ErrRPCClient
+			err = fmt.Errorf("%v: %v", node.ErrRPCClient, err)
 		case node.EthNodeError:
 			err = fmt.Errorf("%v: %v", node.ErrNodeStartFailure, err)
 		}

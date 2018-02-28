@@ -31,10 +31,10 @@ func (n *Notification) Send(body string, payload fcm.NotificationPayload, tokens
 	}
 
 	if payload.Title == "" {
-		payload.Title = "Status - new message"
+		payload.Title = "Status"
 	}
 	if payload.Body == "" {
-		payload.Body = "ping"
+		payload.Body = "You have a new message"
 	}
 
 	fmt.Println(payload.Title, payload.Body)
