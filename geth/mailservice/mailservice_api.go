@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math/rand"
 	"time"
 
 	"github.com/ethereum/go-ethereum/p2p"
@@ -41,6 +42,7 @@ type PublicAPI struct {
 	service *MailService
 
 	newConnectedPeers chan *discover.Node
+	peerRand          *rand.Rand
 }
 
 // NewPublicAPI returns a new PublicAPI.
@@ -48,6 +50,7 @@ func NewPublicAPI(service *MailService) *PublicAPI {
 	api := &PublicAPI{
 		service:           service,
 		newConnectedPeers: make(chan *discover.Node),
+		peerRand:          rand.New(rand.NewSource(time.Now().Unix())),
 	}
 	go api.runTrustedPeersGC(gcTimeout, gcPeriod)
 	return api
@@ -133,8 +136,8 @@ func (api *PublicAPI) choosePeer() (*discover.Node, error) {
 			return trusted, nil
 		}
 	}
-	// TODO(dshulyak) choose randomly
-	peer := server.Config.TrustedNodes[0]
+	// poor man load balancing
+	peer := server.Config.TrustedNodes[api.peerRand.Intn(len(server.Config.TrustedNodes))]
 	if err := api.addPeer(peer, peerConnectTimeout); err != nil {
 		return nil, err
 	}
