@@ -191,7 +191,7 @@ func (s *JailTestSuite) TestEventSignal() {
 	responseValue, err := cell.Get("responseValue")
 	s.NoError(err, "cannot obtain result of localStorage.set()")
 
-	response, err := responseValue.ToString().Value()
+	response, err := responseValue.Value().ToString()
 	s.NoError(err, "cannot parse result")
 
 	expectedResponse := `{"result":true}`

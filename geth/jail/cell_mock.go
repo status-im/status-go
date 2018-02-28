@@ -9,68 +9,68 @@ import (
 	reflect "reflect"
 )
 
-// MockJailManager is a mock of JailManager interface
-type MockJailManager struct {
+// MockManager is a mock of Manager interface
+type MockManager struct {
 	ctrl     *gomock.Controller
-	recorder *MockJailManagerMockRecorder
+	recorder *MockManagerMockRecorder
 }
 
-// MockJailManagerMockRecorder is the mock recorder for MockJailManager
-type MockJailManagerMockRecorder struct {
-	mock *MockJailManager
+// MockManagerMockRecorder is the mock recorder for MockManager
+type MockManagerMockRecorder struct {
+	mock *MockManager
 }
 
-// NewMockJailManager creates a new mock instance
-func NewMockJailManager(ctrl *gomock.Controller) *MockJailManager {
-	mock := &MockJailManager{ctrl: ctrl}
-	mock.recorder = &MockJailManagerMockRecorder{mock}
+// NewMockManager creates a new mock instance
+func NewMockManager(ctrl *gomock.Controller) *MockManager {
+	mock := &MockManager{ctrl: ctrl}
+	mock.recorder = &MockManagerMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use
-func (m *MockJailManager) EXPECT() *MockJailManagerMockRecorder {
+func (m *MockManager) EXPECT() *MockManagerMockRecorder {
 	return m.recorder
 }
 
 // Call mocks base method
-func (m *MockJailManager) Call(chatID, this, args string) string {
+func (m *MockManager) Call(chatID, this, args string) string {
 	ret := m.ctrl.Call(m, "Call", chatID, this, args)
 	ret0, _ := ret[0].(string)
 	return ret0
 }
 
 // Call indicates an expected call of Call
-func (mr *MockJailManagerMockRecorder) Call(chatID, this, args interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Call", reflect.TypeOf((*MockJailManager)(nil).Call), chatID, this, args)
+func (mr *MockManagerMockRecorder) Call(chatID, this, args interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Call", reflect.TypeOf((*MockManager)(nil).Call), chatID, this, args)
 }
 
 // CreateCell mocks base method
-func (m *MockJailManager) CreateCell(chatID string) (JailCell, error) {
+func (m *MockManager) CreateCell(chatID string) (JCell, error) {
 	ret := m.ctrl.Call(m, "CreateCell", chatID)
-	ret0, _ := ret[0].(JailCell)
+	ret0, _ := ret[0].(JCell)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CreateCell indicates an expected call of CreateCell
-func (mr *MockJailManagerMockRecorder) CreateCell(chatID interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateCell", reflect.TypeOf((*MockJailManager)(nil).CreateCell), chatID)
+func (mr *MockManagerMockRecorder) CreateCell(chatID interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateCell", reflect.TypeOf((*MockManager)(nil).CreateCell), chatID)
 }
 
 // Parse mocks base method
-func (m *MockJailManager) Parse(chatID, js string) string {
+func (m *MockManager) Parse(chatID, js string) string {
 	ret := m.ctrl.Call(m, "Parse", chatID, js)
 	ret0, _ := ret[0].(string)
 	return ret0
 }
 
 // Parse indicates an expected call of Parse
-func (mr *MockJailManagerMockRecorder) Parse(chatID, js interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Parse", reflect.TypeOf((*MockJailManager)(nil).Parse), chatID, js)
+func (mr *MockManagerMockRecorder) Parse(chatID, js interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Parse", reflect.TypeOf((*MockManager)(nil).Parse), chatID, js)
 }
 
 // CreateAndInitCell mocks base method
-func (m *MockJailManager) CreateAndInitCell(chatID string, code ...string) string {
+func (m *MockManager) CreateAndInitCell(chatID string, code ...string) string {
 	varargs := []interface{}{chatID}
 	for _, a := range code {
 		varargs = append(varargs, a)
@@ -81,93 +81,93 @@ func (m *MockJailManager) CreateAndInitCell(chatID string, code ...string) strin
 }
 
 // CreateAndInitCell indicates an expected call of CreateAndInitCell
-func (mr *MockJailManagerMockRecorder) CreateAndInitCell(chatID interface{}, code ...interface{}) *gomock.Call {
+func (mr *MockManagerMockRecorder) CreateAndInitCell(chatID interface{}, code ...interface{}) *gomock.Call {
 	varargs := append([]interface{}{chatID}, code...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateAndInitCell", reflect.TypeOf((*MockJailManager)(nil).CreateAndInitCell), varargs...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateAndInitCell", reflect.TypeOf((*MockManager)(nil).CreateAndInitCell), varargs...)
 }
 
 // Cell mocks base method
-func (m *MockJailManager) Cell(chatID string) (JailCell, error) {
+func (m *MockManager) Cell(chatID string) (JCell, error) {
 	ret := m.ctrl.Call(m, "Cell", chatID)
-	ret0, _ := ret[0].(JailCell)
+	ret0, _ := ret[0].(JCell)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Cell indicates an expected call of Cell
-func (mr *MockJailManagerMockRecorder) Cell(chatID interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Cell", reflect.TypeOf((*MockJailManager)(nil).Cell), chatID)
+func (mr *MockManagerMockRecorder) Cell(chatID interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Cell", reflect.TypeOf((*MockManager)(nil).Cell), chatID)
 }
 
 // Execute mocks base method
-func (m *MockJailManager) Execute(chatID, code string) string {
+func (m *MockManager) Execute(chatID, code string) string {
 	ret := m.ctrl.Call(m, "Execute", chatID, code)
 	ret0, _ := ret[0].(string)
 	return ret0
 }
 
 // Execute indicates an expected call of Execute
-func (mr *MockJailManagerMockRecorder) Execute(chatID, code interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Execute", reflect.TypeOf((*MockJailManager)(nil).Execute), chatID, code)
+func (mr *MockManagerMockRecorder) Execute(chatID, code interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Execute", reflect.TypeOf((*MockManager)(nil).Execute), chatID, code)
 }
 
 // SetBaseJS mocks base method
-func (m *MockJailManager) SetBaseJS(js string) {
+func (m *MockManager) SetBaseJS(js string) {
 	m.ctrl.Call(m, "SetBaseJS", js)
 }
 
 // SetBaseJS indicates an expected call of SetBaseJS
-func (mr *MockJailManagerMockRecorder) SetBaseJS(js interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetBaseJS", reflect.TypeOf((*MockJailManager)(nil).SetBaseJS), js)
+func (mr *MockManagerMockRecorder) SetBaseJS(js interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetBaseJS", reflect.TypeOf((*MockManager)(nil).SetBaseJS), js)
 }
 
 // Stop mocks base method
-func (m *MockJailManager) Stop() {
+func (m *MockManager) Stop() {
 	m.ctrl.Call(m, "Stop")
 }
 
 // Stop indicates an expected call of Stop
-func (mr *MockJailManagerMockRecorder) Stop() *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Stop", reflect.TypeOf((*MockJailManager)(nil).Stop))
+func (mr *MockManagerMockRecorder) Stop() *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Stop", reflect.TypeOf((*MockManager)(nil).Stop))
 }
 
-// MockJailCell is a mock of JailCell interface
-type MockJailCell struct {
+// MockJCell is a mock of JCell interface
+type MockJCell struct {
 	ctrl     *gomock.Controller
-	recorder *MockJailCellMockRecorder
+	recorder *MockJCellMockRecorder
 }
 
-// MockJailCellMockRecorder is the mock recorder for MockJailCell
-type MockJailCellMockRecorder struct {
-	mock *MockJailCell
+// MockJCellMockRecorder is the mock recorder for MockJCell
+type MockJCellMockRecorder struct {
+	mock *MockJCell
 }
 
-// NewMockJailCell creates a new mock instance
-func NewMockJailCell(ctrl *gomock.Controller) *MockJailCell {
-	mock := &MockJailCell{ctrl: ctrl}
-	mock.recorder = &MockJailCellMockRecorder{mock}
+// NewMockJCell creates a new mock instance
+func NewMockJCell(ctrl *gomock.Controller) *MockJCell {
+	mock := &MockJCell{ctrl: ctrl}
+	mock.recorder = &MockJCellMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use
-func (m *MockJailCell) EXPECT() *MockJailCellMockRecorder {
+func (m *MockJCell) EXPECT() *MockJCellMockRecorder {
 	return m.recorder
 }
 
 // Set mocks base method
-func (m *MockJailCell) Set(arg0 string, arg1 interface{}) error {
+func (m *MockJCell) Set(arg0 string, arg1 interface{}) error {
 	ret := m.ctrl.Call(m, "Set", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Set indicates an expected call of Set
-func (mr *MockJailCellMockRecorder) Set(arg0, arg1 interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Set", reflect.TypeOf((*MockJailCell)(nil).Set), arg0, arg1)
+func (mr *MockJCellMockRecorder) Set(arg0, arg1 interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Set", reflect.TypeOf((*MockJCell)(nil).Set), arg0, arg1)
 }
 
 // Get mocks base method
-func (m *MockJailCell) Get(arg0 string) (JSValue, error) {
+func (m *MockJCell) Get(arg0 string) (JSValue, error) {
 	ret := m.ctrl.Call(m, "Get", arg0)
 	ret0, _ := ret[0].(JSValue)
 	ret1, _ := ret[1].(error)
@@ -175,12 +175,12 @@ func (m *MockJailCell) Get(arg0 string) (JSValue, error) {
 }
 
 // Get indicates an expected call of Get
-func (mr *MockJailCellMockRecorder) Get(arg0 interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockJailCell)(nil).Get), arg0)
+func (mr *MockJCellMockRecorder) Get(arg0 interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockJCell)(nil).Get), arg0)
 }
 
 // Run mocks base method
-func (m *MockJailCell) Run(arg0 interface{}) (JSValue, error) {
+func (m *MockJCell) Run(arg0 interface{}) (JSValue, error) {
 	ret := m.ctrl.Call(m, "Run", arg0)
 	ret0, _ := ret[0].(JSValue)
 	ret1, _ := ret[1].(error)
@@ -188,12 +188,12 @@ func (m *MockJailCell) Run(arg0 interface{}) (JSValue, error) {
 }
 
 // Run indicates an expected call of Run
-func (mr *MockJailCellMockRecorder) Run(arg0 interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Run", reflect.TypeOf((*MockJailCell)(nil).Run), arg0)
+func (mr *MockJCellMockRecorder) Run(arg0 interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Run", reflect.TypeOf((*MockJCell)(nil).Run), arg0)
 }
 
 // Call mocks base method
-func (m *MockJailCell) Call(item string, this interface{}, args ...interface{}) (JSValue, error) {
+func (m *MockJCell) Call(item string, this interface{}, args ...interface{}) (JSValue, error) {
 	varargs := []interface{}{item, this}
 	for _, a := range args {
 		varargs = append(varargs, a)
@@ -205,19 +205,19 @@ func (m *MockJailCell) Call(item string, this interface{}, args ...interface{}) 
 }
 
 // Call indicates an expected call of Call
-func (mr *MockJailCellMockRecorder) Call(item, this interface{}, args ...interface{}) *gomock.Call {
+func (mr *MockJCellMockRecorder) Call(item, this interface{}, args ...interface{}) *gomock.Call {
 	varargs := append([]interface{}{item, this}, args...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Call", reflect.TypeOf((*MockJailCell)(nil).Call), varargs...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Call", reflect.TypeOf((*MockJCell)(nil).Call), varargs...)
 }
 
 // Stop mocks base method
-func (m *MockJailCell) Stop() error {
+func (m *MockJCell) Stop() error {
 	ret := m.ctrl.Call(m, "Stop")
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Stop indicates an expected call of Stop
-func (mr *MockJailCellMockRecorder) Stop() *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Stop", reflect.TypeOf((*MockJailCell)(nil).Stop))
+func (mr *MockJCellMockRecorder) Stop() *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Stop", reflect.TypeOf((*MockJCell)(nil).Stop))
 }

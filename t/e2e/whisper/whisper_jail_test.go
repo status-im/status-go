@@ -325,12 +325,12 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 		for {
 			filter, err := cell.Get("filter")
 			r.NoError(err, "cannot get filter")
-			filterID, err := cell.GetObjectValue(filter, "filterId")
+			filterID, err := cell.GetObjectValue(filter.Value(), "filterId")
 			r.NoError(err, "cannot get filterId")
 
 			select {
 			case <-done:
-				ok, err := s.WhisperAPI.DeleteMessageFilter(filterID.String())
+				ok, err := s.WhisperAPI.DeleteMessageFilter(filterID.Value().String())
 				r.NoError(err)
 				r.True(ok)
 				break poll_loop
@@ -340,18 +340,18 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 			}
 
 			// FilterID is not assigned yet.
-			if filterID.IsNull() {
+			if filterID.Value().IsNull() {
 				continue
 			}
 
 			payload, err := cell.Get("payload")
 			r.NoError(err, "cannot get payload")
 
-			messages, err := s.WhisperAPI.GetFilterMessages(filterID.String())
+			messages, err := s.WhisperAPI.GetFilterMessages(filterID.Value().String())
 			r.NoError(err)
 
 			for _, m := range messages {
-				r.Equal(payload.String(), string(m.Payload))
+				r.Equal(payload.Value().String(), string(m.Payload))
 				close(done)
 			}
 		}

@@ -112,7 +112,7 @@ func (j *Jail) obtainCell(chatID string, expectNew bool) (cell *Cell, err error)
 
 // CreateCell creates a new cell. It returns an error
 // if a cell with a given ID already exists.
-func (j *Jail) CreateCell(chatID string) (JailCell, error) {
+func (j *Jail) CreateCell(chatID string) (JCell, error) {
 	return j.obtainCell(chatID, true)
 }
 
@@ -212,7 +212,7 @@ func (j *Jail) cell(chatID string) (*Cell, error) {
 
 // Cell returns a cell by chatID. If it does not exist, error is returned.
 // Required by the Backend.
-func (j *Jail) Cell(chatID string) (JailCell, error) {
+func (j *Jail) Cell(chatID string) (JCell, error) {
 	return j.cell(chatID)
 }
 
