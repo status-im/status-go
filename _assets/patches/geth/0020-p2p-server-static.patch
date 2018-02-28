@@ -5,9 +5,9 @@ index 90e92dc05..541709daf 100644
 @@ -705,7 +705,7 @@ func (srv *Server) protoHandshakeChecks(peers map[discover.NodeID]*Peer, inbound
  
  func (srv *Server) encHandshakeChecks(peers map[discover.NodeID]*Peer, inboundCount int, c *conn) error {
-        switch {
--       case !c.is(trustedConn|staticDialedConn) && len(peers) >= srv.MaxPeers:
-+       case !c.is(trustedConn) && len(peers) >= srv.MaxPeers:
-                return DiscTooManyPeers
-        case !c.is(trustedConn) && c.is(inboundConn) && inboundCount >= srv.maxInboundConns():
-                return DiscTooManyPeers
+ 	switch {
+-	case !c.is(trustedConn|staticDialedConn) && len(peers) >= srv.MaxPeers:
++	case !c.is(trustedConn) && len(peers) >= srv.MaxPeers:
+ 		return DiscTooManyPeers
+ 	case !c.is(trustedConn) && c.is(inboundConn) && inboundCount >= srv.maxInboundConns():
+ 		return DiscTooManyPeers
