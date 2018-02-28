@@ -21,7 +21,7 @@ type Manager interface {
 	Call(chatID, this, args string) string
 
 	// CreateCell creates a new jail cell.
-	CreateCell(chatID string) (JCell, error)
+	CreateCell(chatID string) (JSCell, error)
 
 	// Parse creates a new jail cell context, with the given chatID as identifier.
 	// New context executes provided JavaScript code, right after the initialization.
@@ -32,8 +32,8 @@ type Manager interface {
 	// with web3 and other handlers.
 	CreateAndInitCell(chatID string, code ...string) string
 
-	// Cell returns an existing instance of JCell.
-	Cell(chatID string) (JCell, error)
+	// Cell returns an existing instance of JSCell.
+	Cell(chatID string) (JSCell, error)
 
 	// Execute allows to run arbitrary JS code within a cell.
 	Execute(chatID, code string) string
@@ -55,9 +55,9 @@ func (v *JSValue) Value() otto.Value {
 	return v.value
 }
 
-// JCell represents single jail cell, which is basically a JavaScript VM.
+// JSCell represents single jail cell, which is basically a JavaScript VM.
 // It's designed to be a transparent wrapper around otto.VM's methods.
-type JCell interface {
+type JSCell interface {
 	// Set a value inside VM.
 	Set(string, interface{}) error
 	// Get a value from VM.
