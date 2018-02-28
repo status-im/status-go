@@ -35,7 +35,7 @@ type WhisperJailTestSuite struct {
 
 	Timeout    time.Duration
 	WhisperAPI *whisper.PublicWhisperAPI
-	Jail       jail.JailManager
+	Jail       jail.Manager
 }
 
 func (s *WhisperJailTestSuite) StartTestBackend(opts ...e2e.TestNodeOption) {

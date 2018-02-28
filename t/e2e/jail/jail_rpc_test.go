@@ -62,7 +62,7 @@ func (s *JailRPCTestSuite) TestJailRPCSend() {
 	value, err := cell.Get("sendResult")
 	s.NoError(err, "cannot obtain result of balance check operation")
 
-	balance, err := value.ToFloat()
+	balance, err := value.Value().ToFloat()
 	s.NoError(err)
 
 	s.T().Logf("Balance of %.2f ETH found on '%s' account", balance, TestConfig.Account1.Address)
@@ -88,7 +88,7 @@ func (s *JailRPCTestSuite) TestIsConnected() {
 	responseValue, err := cell.Get("responseValue")
 	s.NoError(err, "cannot obtain result of isConnected()")
 
-	response, err := responseValue.ToBoolean()
+	response, err := responseValue.Value().ToBoolean()
 	s.NoError(err, "cannot parse result")
 	s.True(response)
 }
@@ -178,12 +178,12 @@ func (s *JailRPCTestSuite) TestContractDeployment() {
 
 	errorValue, err := cell.Get("errorValue")
 	s.NoError(err)
-	s.Equal("null", errorValue.String())
+	s.Equal("null", errorValue.Value().String())
 
 	responseValue, err := cell.Get("responseValue")
 	s.NoError(err)
 
-	response, err := responseValue.ToString()
+	response, err := responseValue.Value().ToString()
 	s.NoError(err)
 
 	expectedResponse := txHash.Hex()
@@ -336,7 +336,7 @@ func (s *JailRPCTestSuite) TestJailVMPersistence() {
 	totalOtto, err := cell.Get("total")
 	s.NoError(err)
 
-	total, err := totalOtto.ToFloat()
+	total, err := totalOtto.Value().ToFloat()
 	s.NoError(err)
 
 	s.T().Log(total)
