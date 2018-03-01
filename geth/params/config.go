@@ -319,7 +319,7 @@ func NewNodeConfig(dataDir string, networkID uint64, devMode bool) (*NodeConfig,
 	}
 
 	// adjust dependent values
-	if err := nodeConfig.updateConfig(); err != nil {
+	if err := nodeConfig.validateAndUpdateConfig(); err != nil {
 		return nil, err
 	}
 
@@ -354,7 +354,7 @@ func loadNodeConfig(configJSON string) (*NodeConfig, error) {
 	}
 
 	// repopulate
-	if err := nodeConfig.updateConfig(); err != nil {
+	if err := nodeConfig.validateAndUpdateConfig(); err != nil {
 		return nil, err
 	}
 
@@ -430,9 +430,15 @@ func (c *NodeConfig) Save() error {
 	return nil
 }
 
-// updateConfig traverses configuration and adjusts dependent fields
+// validateAndUpdateConfig traverses configuration and adjusts dependent fields
 // (we have a development/production and mobile/full node dependent configurations)
-func (c *NodeConfig) updateConfig() error {
+func (c *NodeConfig) validateAndUpdateConfig() error {
+	// Validate config
+	if !UseMainnet && c.NetworkID == MainNetworkID {
+		return errors.New("code not compiled for use of mainnet")
+	}
+
+	// Update separate configurations.
 	if err := c.updateGenesisConfig(); err != nil {
 		return err
 	}
