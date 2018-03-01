@@ -1,6 +1,7 @@
 package whisper
 
 import (
+	"runtime"
 	"testing"
 	"time"
 
@@ -64,6 +65,11 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 	defer s.StopTestBackend()
 
 	r := s.Require()
+
+	// Increase number of OS threads that can run go code simultaneously.
+	// Some test cases (namely test 3) require a higher number of parallel
+	// go routines to successfully complete without hanging.
+	runtime.GOMAXPROCS(3)
 
 	keyPairID1, err := s.AddKeyPair(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	r.NoError(err)
