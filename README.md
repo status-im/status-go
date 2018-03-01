@@ -5,9 +5,8 @@
 
 # Docs
 
-- [How To Build](https://www.notion.so/status/Building-status-go-f6b827dd1302436ba0575f4c543a352e)
-- [Notes on Bindings](https://www.notion.so/status/Binding-notes-344f30ce0f2845a2b43e2de70931284a)
-- [Status-go docs](https://www.notion.so/status/status-go-4fbe361e8e75484abeadadc80dd4dcdc)
+- [How To Build](https://wiki.status.im/Building_status-go)
+- [Notes on Bindings](https://wiki.status.im/Status-go_Binding_notes)
 
 # Intro
 
