@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/geth/common"
+	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/transactions"
@@ -41,7 +42,7 @@ func (api *StatusAPI) AccountManager() common.AccountManager {
 }
 
 // JailManager returns reference to jail
-func (api *StatusAPI) JailManager() common.JailManager {
+func (api *StatusAPI) JailManager() jail.Manager {
 	return api.b.JailManager()
 }
 

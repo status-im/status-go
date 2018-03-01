@@ -28,7 +28,7 @@ type StatusBackend struct {
 	nodeManager     *node.NodeManager
 	accountManager  common.AccountManager
 	txQueueManager  *transactions.Manager
-	jailManager     common.JailManager
+	jailManager     jail.Manager
 	newNotification common.NotificationConstructor
 	connectionState ConnectionState
 }
@@ -63,7 +63,7 @@ func (b *StatusBackend) AccountManager() common.AccountManager {
 }
 
 // JailManager returns reference to jail
-func (b *StatusBackend) JailManager() common.JailManager {
+func (b *StatusBackend) JailManager() jail.Manager {
 	return b.jailManager
 }
 

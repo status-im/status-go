@@ -29,7 +29,7 @@ func registerWeb3Provider(jail *Jail, cell *Cell) error {
 		"isConnected": createIsConnectedHandler(jail),
 	}
 
-	return cell.Set("jeth", jeth)
+	return cell.jsvm.Set("jeth", jeth)
 }
 
 // registerStatusSignals creates an object called "statusSignals".
@@ -39,7 +39,7 @@ func registerStatusSignals(cell *Cell) error {
 		"sendSignal": createSendSignalHandler(cell),
 	}
 
-	return cell.Set("statusSignals", statusSignals)
+	return cell.jsvm.Set("statusSignals", statusSignals)
 }
 
 // createSendHandler returns jeth.send().
@@ -48,7 +48,7 @@ func createSendHandler(jail *Jail, cell *Cell) func(call otto.FunctionCall) otto
 		// As it's a sync call, it's called already from a thread-safe context,
 		// thus using otto.Otto directly. Otherwise, it would try to acquire a lock again
 		// and result in a deadlock.
-		vm := cell.VM.UnsafeVM()
+		vm := cell.jsvm.UnsafeVM()
 
 		request, err := vm.Call("JSON.stringify", nil, call.Argument(0))
 		if err != nil {
@@ -75,7 +75,7 @@ func createSendAsyncHandler(jail *Jail, cell *Cell) func(call otto.FunctionCall)
 		// As it's a sync call, it's called already from a thread-safe context,
 		// thus using otto.Otto directly. Otherwise, it would try to acquire a lock again
 		// and result in a deadlock.
-		unsafeVM := cell.VM.UnsafeVM()
+		unsafeVM := cell.jsvm.UnsafeVM()
 
 		request, err := unsafeVM.Call("JSON.stringify", nil, call.Argument(0))
 		if err != nil {
@@ -85,7 +85,7 @@ func createSendAsyncHandler(jail *Jail, cell *Cell) func(call otto.FunctionCall)
 		go func() {
 			// As it's an async call, it's not called from a thread-safe context,
 			// thus using a thread-safe vm.VM.
-			vm := cell.VM
+			vm := cell.jsvm
 			callback := call.Argument(1)
 			response, err := jail.sendRPCCall(request.String())
 
@@ -146,7 +146,7 @@ func createSendSignalHandler(cell *Cell) func(otto.FunctionCall) otto.Value {
 		// As it's a sync call, it's called already from a thread-safe context,
 		// thus using otto.Otto directly. Otherwise, it would try to acquire a lock again
 		// and result in a deadlock.
-		vm := cell.VM.UnsafeVM()
+		vm := cell.jsvm.UnsafeVM()
 
 		value, err := wrapResultInValue(vm, otto.TrueValue())
 		if err != nil {

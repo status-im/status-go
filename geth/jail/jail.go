@@ -8,7 +8,6 @@ import (
 	"sync"
 
 	"github.com/robertkrimen/otto"
-	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/rpc"
 	"github.com/status-im/status-go/static"
 )
@@ -113,7 +112,7 @@ func (j *Jail) obtainCell(chatID string, expectNew bool) (cell *Cell, err error)
 
 // CreateCell creates a new cell. It returns an error
 // if a cell with a given ID already exists.
-func (j *Jail) CreateCell(chatID string) (common.JailCell, error) {
+func (j *Jail) CreateCell(chatID string) (JSCell, error) {
 	return j.obtainCell(chatID, true)
 }
 
@@ -158,7 +157,7 @@ func (j *Jail) createAndInitCell(chatID string, extraCode ...string) (*Cell, str
 			return nil, "", err
 		}
 
-		response = newJailResultResponse(formatOttoValue(result))
+		response = newJailResultResponse(formatOttoValue(result.Value()))
 	}
 
 	return cell, response, nil
@@ -213,7 +212,7 @@ func (j *Jail) cell(chatID string) (*Cell, error) {
 
 // Cell returns a cell by chatID. If it does not exist, error is returned.
 // Required by the Backend.
-func (j *Jail) Cell(chatID string) (common.JailCell, error) {
+func (j *Jail) Cell(chatID string) (JSCell, error) {
 	return j.cell(chatID)
 }
 
@@ -229,7 +228,7 @@ func (j *Jail) Execute(chatID, code string) string {
 		return newJailErrorResponse(err)
 	}
 
-	return value.String()
+	return value.Value().String()
 }
 
 // Call executes the `call` function within a cell with chatID.
@@ -251,7 +250,7 @@ func (j *Jail) Call(chatID, commandPath, args string) string {
 		return newJailErrorResponse(err)
 	}
 
-	return newJailResultResponse(value)
+	return newJailResultResponse(value.Value())
 }
 
 // RPCClient returns an rpc.Client.

@@ -17,7 +17,6 @@ import (
 	"github.com/ethereum/go-ethereum/les"
 	"github.com/ethereum/go-ethereum/node"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
-	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/rpc"
 	"github.com/status-im/status-go/static"
@@ -170,53 +169,6 @@ type SendTxArgs struct {
 	Value    *hexutil.Big    `json:"value"`
 	Nonce    *hexutil.Uint64 `json:"nonce"`
 	Input    hexutil.Bytes   `json:"input"`
-}
-
-// JailCell represents single jail cell, which is basically a JavaScript VM.
-// It's designed to be a transparent wrapper around otto.VM's methods.
-type JailCell interface {
-	// Set a value inside VM.
-	Set(string, interface{}) error
-	// Get a value from VM.
-	Get(string) (otto.Value, error)
-	// GetObjectValue returns the given name's otto.Value from the given otto.Value v. Should only be needed in tests.
-	GetObjectValue(otto.Value, string) (otto.Value, error)
-	// Run an arbitrary JS code. Input maybe string or otto.Script.
-	Run(interface{}) (otto.Value, error)
-	// Call an arbitrary JS function by name and args.
-	Call(item string, this interface{}, args ...interface{}) (otto.Value, error)
-	// Stop stops background execution of cell.
-	Stop() error
-}
-
-// JailManager defines methods for managing jailed environments
-type JailManager interface {
-	// Call executes given JavaScript function w/i a jail cell context identified by the chatID.
-	Call(chatID, this, args string) string
-
-	// CreateCell creates a new jail cell.
-	CreateCell(chatID string) (JailCell, error)
-
-	// Parse creates a new jail cell context, with the given chatID as identifier.
-	// New context executes provided JavaScript code, right after the initialization.
-	// DEPRECATED in favour of CreateAndInitCell.
-	Parse(chatID, js string) string
-
-	// CreateAndInitCell creates a new jail cell and initialize it
-	// with web3 and other handlers.
-	CreateAndInitCell(chatID string, code ...string) string
-
-	// Cell returns an existing instance of JailCell.
-	Cell(chatID string) (JailCell, error)
-
-	// Execute allows to run arbitrary JS code within a cell.
-	Execute(chatID, code string) string
-
-	// SetBaseJS allows to setup initial JavaScript to be loaded on each jail.CreateAndInitCell().
-	SetBaseJS(js string)
-
-	// Stop stops all background activity of jail
-	Stop()
 }
 
 // APIResponse generic response from API
