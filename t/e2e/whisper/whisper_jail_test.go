@@ -183,16 +183,15 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 
 				// generate symmetric key
 				var keyid = shh.newSymKey();
+				if (!shh.hasSymKey(keyid)) {
+					throw new Error('key not found');
+				}
 
 				// start watching for messages
 				var filter = shh.newMessageFilter({
 					topics: [topic],
 					symKeyID: keyid
 				});
-
-				if (!shh.hasSymKey(keyid)) {
-					throw new Error('key not found');
-				}
 
 				// post message
 				var message = {
