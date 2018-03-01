@@ -164,8 +164,6 @@ func GetRemoteURLFromNetworkID(id int) (url string, err error) {
 // Mainnet is not supported for tests.
 func GetHeadHashFromNetworkID(id int) string {
 	switch id {
-	case params.MainNetworkID:
-		panic("tests should not be run on the main network")
 	case params.RinkebyNetworkID:
 		return "0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177"
 	case params.RopstenNetworkID:
@@ -173,8 +171,8 @@ func GetHeadHashFromNetworkID(id int) string {
 	case params.StatusChainNetworkID:
 		return "0xe9d8920a99dc66a9557a87d51f9d14a34ec50aae04298e0f142187427d3c832e"
 	}
-	log.Debug("invalid network id", "networkid", id)
-	return ""
+	// Every other ID must break the test.
+	panic(fmt.Sprintf("invalid network id: %d", id))
 }
 
 // GetRemoteURL returns the url associated with a given network id.
@@ -192,8 +190,6 @@ func GetHeadHash() string {
 // tests.
 func GetNetworkID() int {
 	switch strings.ToLower(*networkSelected) {
-	case fmt.Sprintf("%d", params.MainNetworkID), "mainnet":
-		panic("tests should not be run on the main network")
 	case fmt.Sprintf("%d", params.RinkebyNetworkID), "rinkeby":
 		return params.RinkebyNetworkID
 	case fmt.Sprintf("%d", params.RopstenNetworkID), "ropsten", "testnet":
@@ -201,8 +197,8 @@ func GetNetworkID() int {
 	case fmt.Sprintf("%d", params.StatusChainNetworkID), "statuschain":
 		return params.StatusChainNetworkID
 	}
-	log.Debug("invalid network id, fallback to StatusChain", "networkid", *networkSelected)
-	return params.StatusChainNetworkID
+	// Every other selected network must break the test.
+	panic(fmt.Sprintf("invalid selected network: %q", *networkSelected))
 }
 
 // GetAccount1PKFile returns the filename for Account1 keystore based
