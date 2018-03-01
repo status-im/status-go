@@ -40,7 +40,7 @@ func (s *MailServiceSuite) TestShhRequestMessagesRPCMethodAvailability() {
 	// This error means that the method is available through inproc communication
 	// as the validation of params occurred.
 	err := client.Call(nil, "shh_requestMessages", map[string]interface{}{})
-	r.EqualError(err, `invalid mailServerPeer value: invalid URL scheme, want "enode"`)
+	r.EqualError(err, `no mailservers are available`)
 
 	// Do the same but using HTTP interface.
 	req, err := http.NewRequest("POST", "http://localhost:8645", bytes.NewBuffer([]byte(`{
@@ -60,5 +60,5 @@ func (s *MailServiceSuite) TestShhRequestMessagesRPCMethodAvailability() {
 	r.Equal(200, resp.StatusCode)
 	data, err := ioutil.ReadAll(resp.Body)
 	r.NoError(err)
-	r.Contains(string(data), `invalid mailServerPeer value`)
+	r.Contains(string(data), `no mailservers are available`)
 }

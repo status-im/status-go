@@ -11,7 +11,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/whisper/whisperv5"
 	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/rpc"
@@ -28,35 +27,27 @@ func TestWhisperMailboxTestSuite(t *testing.T) {
 	suite.Run(t, new(WhisperMailboxSuite))
 }
 
-func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
+func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsyncIndirect() {
 	//Start mailbox and status node
 	mailboxBackend, stop := s.startMailboxBackend()
 	defer stop()
 	mailboxNode, err := mailboxBackend.NodeManager().Node()
 	s.Require().NoError(err)
-	mailboxEnode := mailboxNode.Server().NodeInfo().Enode
 
-	sender, stop := s.startBackend("sender")
+	// connect proxy node to mailserver
+	proxyBackend, stop := s.startBackend("proxy")
 	defer stop()
-	node, err := sender.NodeManager().Node()
+	proxyNode, err := proxyBackend.NodeManager().Node()
 	s.Require().NoError(err)
+	s.Require().NoError(proxyBackend.NodeManager().AddPeer(mailboxNode.Server().Self().String()))
 
-	s.Require().NotEqual(mailboxEnode, node.Server().NodeInfo().Enode)
-
-	err = sender.NodeManager().AddPeer(mailboxEnode)
-	s.Require().NoError(err)
-	//wait async processes on adding peer
-	time.Sleep(time.Second)
+	// sender will add mailbox to trusted nodes, but initial messages will be
+	// delivered to mailbox node using connection with proxy node
+	sender, stop := s.startBackend("sender", mailboxNode.Server().Self().String())
+	defer stop()
+	s.Require().NoError(sender.NodeManager().AddPeer(proxyNode.Server().Self().String()))
 
 	senderWhisperService, err := sender.NodeManager().WhisperService()
-	s.Require().NoError(err)
-
-	//Mark mailbox node trusted
-	parsedNode, err := discover.ParseNode(mailboxNode.Server().NodeInfo().Enode)
-	s.Require().NoError(err)
-	mailboxPeer := parsedNode.ID[:]
-	mailboxPeerStr := parsedNode.ID.String()
-	err = senderWhisperService.AllowP2PMessagesFromPeer(mailboxPeer)
 	s.Require().NoError(err)
 
 	//Generate mailbox symkey
@@ -82,15 +73,15 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 
 	//Threre are no messages at filter
 	messages := s.getMessagesByMessageFilterID(rpcClient, messageFilterID)
-	s.Require().Equal(0, len(messages))
+	s.Require().Len(messages, 0)
 
 	//Post message matching with filter (key and token)
 	s.postMessageToPrivate(rpcClient, pubkey.String(), topic.String(), hexutil.Encode([]byte("Hello world!")))
 
 	//Get message to make sure that it will come from the mailbox later
-	time.Sleep(1 * time.Second)
+	time.Sleep(time.Second)
 	messages = s.getMessagesByMessageFilterID(rpcClient, messageFilterID)
-	s.Require().Equal(1, len(messages))
+	s.Require().Len(messages, 1)
 
 	//act
 
@@ -100,7 +91,6 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 		"id": 1,
 		"method": "shh_requestMessages",
 		"params": [{
-					"mailServerPeer":"` + mailboxPeerStr + `",
 					"topic":"` + topic.String() + `",
 					"symKeyID":"` + MailServerKeyID + `",
 					"from":0,
@@ -117,40 +107,41 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	time.Sleep(time.Second)
 	//And we receive message, it comes from mailbox
 	messages = s.getMessagesByMessageFilterID(rpcClient, messageFilterID)
-	s.Require().Equal(1, len(messages))
+	s.Require().Len(messages, 1)
 
 	//check that there are no messages
 	messages = s.getMessagesByMessageFilterID(rpcClient, messageFilterID)
-	s.Require().Equal(0, len(messages))
+	s.Require().Len(messages, 0)
 }
 
 func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
 	//Start mailbox, alice, bob, charlie node
 	mailboxBackend, stop := s.startMailboxBackend()
 	defer stop()
-
-	aliceBackend, stop := s.startBackend("alice")
-	defer stop()
-
-	bobBackend, stop := s.startBackend("bob")
-	defer stop()
-
-	charlieBackend, stop := s.startBackend("charlie")
-	defer stop()
-
-	//add mailbox to static peers
 	mailboxNode, err := mailboxBackend.NodeManager().Node()
 	s.Require().NoError(err)
-	mailboxEnode := mailboxNode.Server().NodeInfo().Enode
 
-	err = aliceBackend.NodeManager().AddPeer(mailboxEnode)
+	// add mailbox to each peer as trusted node
+	aliceBackend, stop := s.startBackend("alice", mailboxNode.Server().Self().String())
+	defer stop()
+	bobBackend, stop := s.startBackend("bob", mailboxNode.Server().Self().String())
+	defer stop()
+	charlieBackend, stop := s.startBackend("charlie", mailboxNode.Server().Self().String())
+	defer stop()
+
+	// connect mailbox to each peer
+	err = aliceBackend.NodeManager().AddPeer(mailboxNode.Server().Self().String())
 	s.Require().NoError(err)
-	err = bobBackend.NodeManager().AddPeer(mailboxEnode)
+	err = bobBackend.NodeManager().AddPeer(mailboxNode.Server().Self().String())
 	s.Require().NoError(err)
-	err = charlieBackend.NodeManager().AddPeer(mailboxEnode)
+	err = charlieBackend.NodeManager().AddPeer(mailboxNode.Server().Self().String())
 	s.Require().NoError(err)
 	//wait async processes on adding peer
 	time.Sleep(time.Second)
+
+	bobNode, err := bobBackend.NodeManager().Node()
+	s.Require().NoError(err)
+	s.Require().Len(bobNode.Server().Peers(), 1)
 
 	//get whisper service
 	aliceWhisperService, err := aliceBackend.NodeManager().WhisperService()
@@ -262,8 +253,8 @@ func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
 	s.Require().Equal(0, len(messages))
 
 	//Request each one messages from mailbox using enode
-	s.requestHistoricMessages(bobRPCClient, mailboxEnode, bobMailServerKeyID, groupChatTopic.String())
-	s.requestHistoricMessages(charlieRPCClient, mailboxEnode, charlieMailServerKeyID, groupChatTopic.String())
+	s.requestHistoricMessages(bobRPCClient, bobMailServerKeyID, groupChatTopic.String())
+	s.requestHistoricMessages(charlieRPCClient, charlieMailServerKeyID, groupChatTopic.String())
 	time.Sleep(5 * time.Second) //wait to receive p2p messages
 
 	//bob receive p2p message from grop chat filter
@@ -307,11 +298,15 @@ func (d *groupChatParams) Encode() (string, error) {
 }
 
 //Start status node
-func (s *WhisperMailboxSuite) startBackend(name string) (*api.StatusBackend, func()) {
+func (s *WhisperMailboxSuite) startBackend(name string, trusted ...string) (*api.StatusBackend, func()) {
 	datadir := filepath.Join(RootDir, ".ethereumtest/mailbox", name)
 	backend := api.NewStatusBackend()
 	nodeConfig, err := e2e.MakeTestNodeConfig(GetNetworkID())
+
+	nodeConfig.LightEthConfig.Enabled = false
+	nodeConfig.WhisperConfig.Enabled = true
 	nodeConfig.DataDir = datadir
+	nodeConfig.BootClusterConfig.TrustedNodes = trusted
 	s.Require().NoError(err)
 	s.Require().False(backend.IsNodeRunning())
 
@@ -467,13 +462,12 @@ func (s *WhisperMailboxSuite) addSymKey(rpcCli *rpc.Client, symkey string) strin
 }
 
 //requestHistoricMessages ask mailnode to resend messagess
-func (s *WhisperMailboxSuite) requestHistoricMessages(rpcCli *rpc.Client, mailboxEnode, mailServerKeyID, topic string) {
+func (s *WhisperMailboxSuite) requestHistoricMessages(rpcCli *rpc.Client, mailServerKeyID, topic string) {
 	resp := rpcCli.CallRaw(`{
 		"jsonrpc": "2.0",
 		"id": 2,
 		"method": "shh_requestMessages",
 		"params": [{
-					"mailServerPeer":"` + mailboxEnode + `",
 					"topic":"` + topic + `",
 					"symKeyID":"` + mailServerKeyID + `",
 					"from":0,

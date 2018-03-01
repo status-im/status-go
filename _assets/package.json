@@ -13,7 +13,7 @@
     "mocha": "^3.5.3",
     "requirejs": "^2.3.4",
     "rimraf": "^2.6.2",
-    "web3": "https://github.com/status-im/web3.js#status-develop"
+    "web3": "git+https://github.com/status-im/web3.js.git#status-develop"
   },
   "scripts": {
     "test": "mocha --bail --slow 1000 --full-trace static/tests"

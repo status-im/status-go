@@ -157,6 +157,9 @@ type BootClusterConfig struct {
 	// BootNodes list of bootstrap nodes for a given network (Ropsten, Rinkeby, Homestead),
 	// for a given mode (production vs development)
 	BootNodes []string
+
+	// List of trusted nodes to use in p2p server.
+	TrustedNodes []string
 }
 
 // String dumps config object as nicely indented JSON
@@ -532,9 +535,10 @@ func (c *NodeConfig) updateBootClusterConfig() error {
 	// decentralized solution. For now, in order to avoid forcing users to long sync times
 	// we use central static resource
 	type subClusterConfig struct {
-		Number    int      `json:"number"`
-		Hash      string   `json:"hash"`
-		BootNodes []string `json:"bootnodes"`
+		Number       int      `json:"number"`
+		Hash         string   `json:"hash"`
+		BootNodes    []string `json:"bootnodes"`
+		TrustedNodes []string `json:"trustednodes"`
 	}
 	type clusterConfig struct {
 		NetworkID   int              `json:"networkID"`
@@ -557,8 +561,10 @@ func (c *NodeConfig) updateBootClusterConfig() error {
 	for _, cluster := range clusters {
 		if cluster.NetworkID == int(c.NetworkID) {
 			c.BootClusterConfig.BootNodes = cluster.Prod.BootNodes
+			c.BootClusterConfig.TrustedNodes = cluster.Dev.TrustedNodes
 			if c.DevMode {
 				c.BootClusterConfig.BootNodes = cluster.Dev.BootNodes
+				c.BootClusterConfig.TrustedNodes = cluster.Dev.TrustedNodes
 			}
 			break
 		}
