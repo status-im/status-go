@@ -59,7 +59,7 @@ func (s *HandlersTestSuite) TestWeb3SendHandlerSuccess() {
 	// web3.eth.syncing is an arbitrary web3 sync RPC call.
 	value, err := cell.Run("web3.eth.syncing")
 	s.NoError(err)
-	result, err := value.ToBoolean()
+	result, err := value.Value().ToBoolean()
 	s.NoError(err)
 	s.True(result)
 }
@@ -155,7 +155,7 @@ func (s *HandlersTestSuite) TestWeb3IsConnectedHandler() {
 	// When result is true.
 	value, err := cell.Run("web3.isConnected()")
 	s.NoError(err)
-	valueBoolean, err := value.ToBoolean()
+	valueBoolean, err := value.Value().ToBoolean()
 	s.NoError(err)
 	s.True(valueBoolean)
 
@@ -163,7 +163,7 @@ func (s *HandlersTestSuite) TestWeb3IsConnectedHandler() {
 	s.responseFixture = `{"json-rpc":"2.0","id":10,"result":false}`
 	value, err = cell.Run("web3.isConnected()")
 	s.NoError(err)
-	valueBoolean, err = value.ToBoolean()
+	valueBoolean, err = value.Value().ToBoolean()
 	s.NoError(err)
 	s.False(valueBoolean)
 }
@@ -180,9 +180,9 @@ func (s *HandlersTestSuite) TestSendSignalHandler() {
 
 	value, err := cell.Run(`statusSignals.sendSignal("test signal message")`)
 	s.NoError(err)
-	result, err := cell.GetObjectValue(value, "result")
+	result, err := cell.GetObjectValue(value.Value(), "result")
 	s.NoError(err)
-	resultBool, err := result.ToBoolean()
+	resultBool, err := result.Value().ToBoolean()
 	s.NoError(err)
 	s.True(resultBool)
 }

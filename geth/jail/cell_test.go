@@ -172,7 +172,7 @@ func (s *CellTestSuite) TestCellFetchErrorRace() {
 	case e := <-errCh:
 		name, err := cell.GetObjectValue(e, "name")
 		s.NoError(err)
-		s.Equal("Error", name.String())
+		s.Equal("Error", name.Value().String())
 		_, err = cell.GetObjectValue(e, "message")
 		s.NoError(err)
 	case <-time.After(5 * time.Second):
@@ -240,7 +240,7 @@ func (s *CellTestSuite) TestCellCallAsync() {
 	fn, err := s.cell.Get("testCallAsync")
 	s.NoError(err)
 
-	err = s.cell.CallAsync(fn, "success")
+	err = s.cell.CallAsync(fn.Value(), "success")
 	s.NoError(err)
 	s.Equal("success", <-datac)
 }

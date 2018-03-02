@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/signal"
@@ -33,7 +32,7 @@ func TestJailTestSuite(t *testing.T) {
 
 type JailTestSuite struct {
 	e2e.NodeManagerTestSuite
-	Jail common.JailManager
+	Jail jail.Manager
 }
 
 func (s *JailTestSuite) SetupTest() {
@@ -192,7 +191,7 @@ func (s *JailTestSuite) TestEventSignal() {
 	responseValue, err := cell.Get("responseValue")
 	s.NoError(err, "cannot obtain result of localStorage.set()")
 
-	response, err := responseValue.ToString()
+	response, err := responseValue.Value().ToString()
 	s.NoError(err, "cannot parse result")
 
 	expectedResponse := `{"result":true}`

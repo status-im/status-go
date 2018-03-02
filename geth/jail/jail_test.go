@@ -69,7 +69,7 @@ func (s *JailTestSuite) TestJailInitCell() {
 	// web3 should be available
 	value, err := cell.Run("web3.fromAscii('ethereum')")
 	s.NoError(err)
-	s.Equal(`0x657468657265756d`, value.String())
+	s.Equal(`0x657468657265756d`, value.Value().String())
 }
 
 func (s *JailTestSuite) TestJailStop() {
@@ -115,11 +115,11 @@ func (s *JailTestSuite) TestCreateAndInitCell() {
 
 	value, err := cell.Get("testCreateAndInitCell1")
 	s.NoError(err)
-	s.Equal(`true`, value.String())
+	s.Equal(`true`, value.Value().String())
 
 	value, err = cell.Get("testCreateAndInitCell2")
 	s.NoError(err)
-	s.Equal(`true`, value.String())
+	s.Equal(`true`, value.Value().String())
 }
 
 func (s *JailTestSuite) TestPublicCreateAndInitCell() {
@@ -208,12 +208,12 @@ func (s *JailTestSuite) TestGetObjectValue() {
 
 	testCreateAndInitCell1, err := cell.Get("testCreateAndInitCell1")
 	s.NoError(err)
-	s.True(testCreateAndInitCell1.IsObject())
-	value, err := cell.GetObjectValue(testCreateAndInitCell1, "obj")
+	s.True(testCreateAndInitCell1.Value().IsObject())
+	value, err := cell.GetObjectValue(testCreateAndInitCell1.Value(), "obj")
 	s.NoError(err)
-	s.Equal("objValue", value.String())
+	s.Equal("objValue", value.Value().String())
 
 	value, err = cell.Get("testCreateAndInitCell2")
 	s.NoError(err)
-	s.Equal(`true`, value.String())
+	s.Equal(`true`, value.Value().String())
 }

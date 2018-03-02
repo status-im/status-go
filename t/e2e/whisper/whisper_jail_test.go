@@ -1,12 +1,13 @@
 package whisper
 
 import (
+	"runtime"
 	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
-	"github.com/status-im/status-go/geth/common"
+	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/static"
 	e2e "github.com/status-im/status-go/t/e2e"
 	. "github.com/status-im/status-go/t/utils"
@@ -35,7 +36,7 @@ type WhisperJailTestSuite struct {
 
 	Timeout    time.Duration
 	WhisperAPI *whisper.PublicWhisperAPI
-	Jail       common.JailManager
+	Jail       jail.Manager
 }
 
 func (s *WhisperJailTestSuite) StartTestBackend(opts ...e2e.TestNodeOption) {
@@ -64,6 +65,11 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 	defer s.StopTestBackend()
 
 	r := s.Require()
+
+	// Increase number of OS threads that can run go code simultaneously.
+	// Some test cases (namely test 3) require a higher number of parallel
+	// go routines to successfully complete without hanging.
+	runtime.GOMAXPROCS(3)
 
 	keyPairID1, err := s.AddKeyPair(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	r.NoError(err)
@@ -295,8 +301,10 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 
 		s.Jail.CreateAndInitCell(chatID, makeTopicCode)
 
-		cell, err := s.Jail.Cell(chatID)
+		jailCell, err := s.Jail.Cell(chatID)
 		r.NoError(err, "cannot get VM")
+
+		cell := jailCell.(*jail.Cell)
 
 		// Run JS code that setups filters and sends messages.
 		_, err = cell.Run(tc.code)
@@ -323,12 +331,12 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 		for {
 			filter, err := cell.Get("filter")
 			r.NoError(err, "cannot get filter")
-			filterID, err := cell.GetObjectValue(filter, "filterId")
+			filterID, err := cell.GetObjectValue(filter.Value(), "filterId")
 			r.NoError(err, "cannot get filterId")
 
 			select {
 			case <-done:
-				ok, err := s.WhisperAPI.DeleteMessageFilter(filterID.String())
+				ok, err := s.WhisperAPI.DeleteMessageFilter(filterID.Value().String())
 				r.NoError(err)
 				r.True(ok)
 				break poll_loop
@@ -338,18 +346,18 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 			}
 
 			// FilterID is not assigned yet.
-			if filterID.IsNull() {
+			if filterID.Value().IsNull() {
 				continue
 			}
 
 			payload, err := cell.Get("payload")
 			r.NoError(err, "cannot get payload")
 
-			messages, err := s.WhisperAPI.GetFilterMessages(filterID.String())
+			messages, err := s.WhisperAPI.GetFilterMessages(filterID.Value().String())
 			r.NoError(err)
 
 			for _, m := range messages {
-				r.Equal(payload.String(), string(m.Payload))
+				r.Equal(payload.Value().String(), string(m.Payload))
 				close(done)
 			}
 		}
