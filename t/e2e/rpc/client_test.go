@@ -24,7 +24,7 @@ func (s *RPCClientTestSuite) SetupTest() {
 }
 
 func (s *RPCClientTestSuite) TestNewClient() {
-	config, err := e2e.MakeTestNodeConfig(GetNetworkID())
+	config, err := MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
 
 	// upstream disabled

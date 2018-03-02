@@ -225,7 +225,7 @@ var loadConfigTestCases = []struct {
 			require.True(t, nodeConfig.BootClusterConfig.Enabled, "boot cluster is expected to be enabled by default")
 
 			enodes := nodeConfig.BootClusterConfig.BootNodes
-			require.True(t, len(enodes) >= 3)
+			require.Len(t, enodes, 2)
 		},
 	},
 	{
@@ -240,7 +240,7 @@ var loadConfigTestCases = []struct {
 			require.True(t, nodeConfig.BootClusterConfig.Enabled, "boot cluster is expected to be enabled by default")
 
 			enodes := nodeConfig.BootClusterConfig.BootNodes
-			require.True(t, len(enodes) >= 3)
+			require.Len(t, enodes, 2)
 		},
 	},
 	{
@@ -338,6 +338,20 @@ var loadConfigTestCases = []struct {
 			require.NoError(t, err)
 			require.False(t, nodeConfig.DevMode)
 			require.True(t, nodeConfig.BootClusterConfig.Enabled)
+		},
+	},
+	{
+		`explicit WhisperConfig.LightClient = true`,
+		`{
+			"NetworkId": 3,
+			"DataDir": "$TMPDIR",
+			"WhisperConfig": {
+				"LightClient": true
+			}
+		}`,
+		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
+			require.NoError(t, err)
+			require.True(t, nodeConfig.WhisperConfig.LightClient)
 		},
 	},
 }

@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
+	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/static"
 	e2e "github.com/status-im/status-go/t/e2e"
@@ -85,7 +85,7 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 		{
 			"test 0: ensure correct version of Whisper is used",
 			`
-				var expectedVersion = '5.0';
+				var expectedVersion = '6.0';
 				if (web3.version.whisper != expectedVersion) {
 					throw 'unexpected shh version, expected: ' + expectedVersion + ', got: ' + web3.version.whisper;
 				}
@@ -118,8 +118,8 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 				// post message
 				var message = {
 					ttl: 10,
-					powTarget: 1.0,
-					powTime: 20,
+					powTarget: 0.001,
+					powTime: 2,
 					topic: topic,
 					sig: shh.getPublicKey(identity1),
 					pubKey: shh.getPublicKey(identity2),
@@ -196,8 +196,8 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 				// post message
 				var message = {
 					ttl: 10,
-					powTarget: 1.0,
-					powTime: 20,
+					powTarget: 0.001,
+					powTime: 2,
 					topic: topic,
 					symKeyID: keyid,
 			  		payload: web3.toHex(payload),
@@ -267,8 +267,8 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 				// post message
 				var message = {
 					ttl: 10,
-					powTarget: 1.0,
-					powTime: 20,
+					powTarget: 0.001,
+					powTime: 2,
 				  	sig: shh.getPublicKey(identity2),
 				  	pubKey: shh.getPublicKey(identity1),
 				  	topic: topic,
@@ -341,7 +341,7 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 				r.True(ok)
 				break poll_loop
 			case <-timedOut:
-				s.FailNow("polling for messages timed out")
+				s.FailNow("polling for messages timed out. Test case: " + tc.name)
 			case <-time.After(time.Second):
 			}
 

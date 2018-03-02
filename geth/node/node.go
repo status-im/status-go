@@ -19,7 +19,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/nat"
 	"github.com/ethereum/go-ethereum/whisper/mailserver"
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
+	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
 	shhmetrics "github.com/status-im/status-go/metrics/whisper"
@@ -183,6 +183,13 @@ func activateShhService(stack *node.Node, config *params.NodeConfig) error {
 			var mailServer mailserver.WMailServer
 			whisperService.RegisterServer(&mailServer)
 			mailServer.Init(whisperService, whisperConfig.DataDir, whisperConfig.Password, whisperConfig.MinimumPoW)
+		}
+
+		if whisperConfig.LightClient {
+			emptyBloomFilter := make([]byte, 64)
+			if err := whisperService.SetBloomFilter(emptyBloomFilter); err != nil {
+				return nil, err
+			}
 		}
 
 		return whisperService, nil

@@ -8,7 +8,10 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strconv"
 	"strings"
+	"testing"
 	"time"
 
 	"github.com/status-im/status-go/geth/common"
@@ -229,5 +232,35 @@ func WaitClosed(c <-chan struct{}, d time.Duration) error {
 	case <-timer.C:
 		return ErrTimeout
 	}
+}
 
+// MakeTestNodeConfig defines a function to return a giving params.NodeConfig
+// where specific network addresses are assigned based on provided network id.
+func MakeTestNodeConfig(networkID int) (*params.NodeConfig, error) {
+	testDir := filepath.Join(TestDataDir, TestNetworkNames[networkID])
+
+	if runtime.GOOS == "windows" {
+		testDir = filepath.ToSlash(testDir)
+	}
+
+	// run tests with "INFO" log level only
+	// when `go test` invoked with `-v` flag
+	errorLevel := "ERROR"
+	if testing.Verbose() {
+		errorLevel = "INFO"
+	}
+
+	configJSON := `{
+		"NetworkId": ` + strconv.Itoa(networkID) + `,
+		"DataDir": "` + testDir + `",
+		"HTTPPort": ` + strconv.Itoa(TestConfig.Node.HTTPPort) + `,
+		"WSPort": ` + strconv.Itoa(TestConfig.Node.WSPort) + `,
+		"LogLevel": "` + errorLevel + `"
+	}`
+
+	nodeConfig, err := params.LoadNodeConfig(configJSON)
+	if err != nil {
+		return nil, err
+	}
+	return nodeConfig, nil
 }
