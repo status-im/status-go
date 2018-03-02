@@ -10,7 +10,7 @@
 
 # Intro
 
-status-go is an underlying part of [Status](status.im) - a browser, messenger, and gateway to a decentralized world.
+status-go is an underlying part of [Status](https://status.im/) - a browser, messenger, and gateway to a decentralized world.
 
 It's written in Go and requires Go 1.8 or above.
 
