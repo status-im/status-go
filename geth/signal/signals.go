@@ -11,7 +11,7 @@ import (
 
 	"sync"
 
-	"github.com/status-im/status-go/geth/log"
+	"github.com/ethereum/go-ethereum/log"
 )
 
 const (
@@ -77,7 +77,8 @@ func ResetDefaultNodeNotificationHandler() {
 
 // TriggerDefaultNodeNotificationHandler triggers default notification handler (helpful in tests)
 func TriggerDefaultNodeNotificationHandler(jsonEvent string) {
-	log.Info("Notification received", "event", jsonEvent)
+	logger := log.New("package", "status-go/geth/signal")
+	logger.Info("Notification received", "event", jsonEvent)
 }
 
 // Send sends application signal (JSON, normally) upwards to application (via default notification handler)

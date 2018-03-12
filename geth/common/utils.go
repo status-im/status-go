@@ -15,8 +15,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/pborman/uuid"
-	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/static"
 )
 
@@ -75,7 +75,8 @@ func ImportTestAccount(keystoreDir, accountFile string) error {
 	dst := filepath.Join(keystoreDir, accountFile)
 	err := ioutil.WriteFile(dst, static.MustAsset("keys/"+accountFile), 0644)
 	if err != nil {
-		log.Warn("cannot copy test account PK", "error", err)
+		logger := log.New("package", "status-go/geth/common")
+		logger.Warn("cannot copy test account PK", "error", err)
 	}
 
 	return err

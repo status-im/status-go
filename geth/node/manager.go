@@ -12,10 +12,11 @@ import (
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/les"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
-	"github.com/status-im/status-go/geth/log"
+
 	"github.com/status-im/status-go/geth/mailservice"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/rpc"
@@ -50,11 +51,14 @@ type NodeManager struct {
 	whisperService *whisper.Whisper   // reference to Whisper service
 	lesService     *les.LightEthereum // reference to LES service
 	rpcClient      *rpc.Client        // reference to RPC client
+	log            log.Logger
 }
 
 // NewNodeManager makes new instance of node manager
 func NewNodeManager() *NodeManager {
-	return &NodeManager{}
+	return &NodeManager{
+		log: log.New("package", "status-go/geth/node.NodeManager"),
+	}
 }
 
 // StartNode start Status node, fails if node is already started
@@ -69,7 +73,6 @@ func (m *NodeManager) startNode(config *params.NodeConfig) error {
 	if err := m.isNodeAvailable(); err == nil {
 		return ErrNodeExists
 	}
-	m.initLog(config)
 
 	ethNode, err := MakeNode(config)
 	if err != nil {
@@ -95,13 +98,13 @@ func (m *NodeManager) startNode(config *params.NodeConfig) error {
 		m.rpcClient, err = rpc.NewClient(localRPCClient, m.config.UpstreamConfig)
 	}
 	if err != nil {
-		log.Error("Failed to create an RPC client", "error", err)
+		m.log.Error("Failed to create an RPC client", "error", err)
 		return RPCClientError(err)
 	}
 	// populate static peers exits when node stopped
 	go func() {
 		if err := m.PopulateStaticPeers(); err != nil {
-			log.Error("Static peers population", "error", err)
+			m.log.Error("Static peers population", "error", err)
 		}
 	}()
 	return nil
@@ -144,7 +147,7 @@ func (m *NodeManager) ResetChainData(config *params.NodeConfig) error {
 	}
 	err := os.RemoveAll(chainDataDir)
 	if err == nil {
-		log.Info("Chain data has been removed", "dir", chainDataDir)
+		m.log.Info("Chain data has been removed", "dir", chainDataDir)
 	}
 	return err
 }
@@ -184,17 +187,17 @@ func (m *NodeManager) populateStaticPeers() error {
 		return err
 	}
 	if !m.config.BootClusterConfig.Enabled {
-		log.Info("Boot cluster is disabled")
+		m.log.Info("Boot cluster is disabled")
 		return nil
 	}
 
 	for _, enode := range m.config.BootClusterConfig.BootNodes {
 		err := m.addPeer(enode)
 		if err != nil {
-			log.Warn("Boot node addition failed", "error", err)
+			m.log.Warn("Boot node addition failed", "error", err)
 			continue
 		}
-		log.Info("Boot node added", "enode", enode)
+		m.log.Info("Boot node added", "enode", enode)
 	}
 
 	return nil
@@ -202,7 +205,7 @@ func (m *NodeManager) populateStaticPeers() error {
 
 func (m *NodeManager) removeStaticPeers() error {
 	if !m.config.BootClusterConfig.Enabled {
-		log.Info("Boot cluster is disabled")
+		m.log.Info("Boot cluster is disabled")
 		return nil
 	}
 	server := m.node.Server()
@@ -212,10 +215,10 @@ func (m *NodeManager) removeStaticPeers() error {
 	for _, enode := range m.config.BootClusterConfig.BootNodes {
 		err := m.removePeer(enode)
 		if err != nil {
-			log.Warn("Boot node deletion failed", "error", err)
+			m.log.Warn("Boot node deletion failed", "error", err)
 			return err
 		}
-		log.Info("Boot node deleted", "enode", enode)
+		m.log.Info("Boot node deleted", "enode", enode)
 	}
 	return nil
 }
@@ -289,7 +292,7 @@ func (m *NodeManager) LightEthereumService() (*les.LightEthereum, error) {
 	}
 	if m.lesService == nil {
 		if err := m.node.Service(&m.lesService); err != nil {
-			log.Warn("Cannot obtain LES service", "error", err)
+			m.log.Warn("Cannot obtain LES service", "error", err)
 			return nil, ErrInvalidLightEthereumService
 		}
 	}
@@ -309,7 +312,7 @@ func (m *NodeManager) WhisperService() (*whisper.Whisper, error) {
 	}
 	if m.whisperService == nil {
 		if err := m.node.Service(&m.whisperService); err != nil {
-			log.Warn("Cannot obtain whisper service", "error", err)
+			m.log.Warn("Cannot obtain whisper service", "error", err)
 			return nil, ErrInvalidWhisperService
 		}
 	}
@@ -367,19 +370,6 @@ func (m *NodeManager) RPCClient() *rpc.Client {
 	return m.rpcClient
 }
 
-// initLog initializes global logger parameters based on
-// provided node configurations.
-func (m *NodeManager) initLog(config *params.NodeConfig) {
-	log.SetLevel(config.LogLevel)
-
-	if config.LogFile != "" {
-		err := log.SetLogFile(config.LogFile)
-		if err != nil {
-			fmt.Println("Failed to open log file, using stdout")
-		}
-	}
-}
-
 // isNodeAvailable check if we have a node running and make sure is fully started
 func (m *NodeManager) isNodeAvailable() error {
 	if m.node == nil || m.node.Server() == nil {
@@ -416,7 +406,7 @@ func (m *NodeManager) ensureSync(ctx context.Context) error {
 
 	progress := downloader.Progress()
 	if m.PeerCount() > 0 && progress.CurrentBlock >= progress.HighestBlock {
-		log.Debug("Synchronization completed", "current block", progress.CurrentBlock, "highest block", progress.HighestBlock)
+		m.log.Debug("Synchronization completed", "current block", progress.CurrentBlock, "highest block", progress.HighestBlock)
 		return nil
 	}
 
@@ -432,22 +422,22 @@ func (m *NodeManager) ensureSync(ctx context.Context) error {
 			return errors.New("timeout during node synchronization")
 		case <-ticker.C:
 			if m.PeerCount() == 0 {
-				log.Debug("No established connections with any peers, continue waiting for a sync")
+				m.log.Debug("No established connections with any peers, continue waiting for a sync")
 				continue
 			}
 			if downloader.Synchronising() {
-				log.Debug("Synchronization is in progress")
+				m.log.Debug("Synchronization is in progress")
 				continue
 			}
 			progress = downloader.Progress()
 			if progress.CurrentBlock >= progress.HighestBlock {
-				log.Info("Synchronization completed", "current block", progress.CurrentBlock, "highest block", progress.HighestBlock)
+				m.log.Info("Synchronization completed", "current block", progress.CurrentBlock, "highest block", progress.HighestBlock)
 				return nil
 			}
-			log.Debug("Synchronization is not finished", "current", progress.CurrentBlock, "highest", progress.HighestBlock)
+			m.log.Debug("Synchronization is not finished", "current", progress.CurrentBlock, "highest", progress.HighestBlock)
 		case <-progressTicker.C:
 			progress = downloader.Progress()
-			log.Warn("Synchronization is not finished", "current", progress.CurrentBlock, "highest", progress.HighestBlock)
+			m.log.Warn("Synchronization is not finished", "current", progress.CurrentBlock, "highest", progress.HighestBlock)
 		}
 	}
 }

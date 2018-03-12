@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/core"
-	"github.com/status-im/status-go/geth/log"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/static"
 )
 
@@ -256,6 +256,8 @@ type NodeConfig struct {
 	// handshake phase, counted separately for inbound and outbound connections.
 	MaxPendingPeers int
 
+	log log.Logger
+
 	// LogFile is filename where exposed logs get written to
 	LogFile string
 
@@ -299,6 +301,7 @@ func NewNodeConfig(dataDir string, networkID uint64, devMode bool) (*NodeConfig,
 		MaxPeers:        MaxPeers,
 		MaxPendingPeers: MaxPendingPeers,
 		IPCFile:         IPCFile,
+		log:             log.New("package", "status-go/geth/params.NodeConfig"),
 		LogFile:         LogFile,
 		LogLevel:        LogLevel,
 		LogToStderr:     LogToStderr,

@@ -8,9 +8,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discover"
+
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
-	"github.com/status-im/status-go/geth/log"
 )
 
 const (
@@ -28,11 +29,15 @@ var (
 // PublicAPI defines a MailServer public API.
 type PublicAPI struct {
 	provider ServiceProvider
+	log      log.Logger
 }
 
 // NewPublicAPI returns a new PublicAPI.
 func NewPublicAPI(provider ServiceProvider) *PublicAPI {
-	return &PublicAPI{provider}
+	return &PublicAPI{
+		provider: provider,
+		log:      log.New("package", "status-go/geth/mailservice.PublicAPI"),
+	}
 }
 
 // MessagesRequest is a payload send to a MailServer to get messages.
@@ -66,7 +71,7 @@ func setMessagesRequestDefaults(r *MessagesRequest) {
 
 // RequestMessages sends a request for historic messages to a MailServer.
 func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (bool, error) {
-	log.Info("RequestMessages", "request", r)
+	api.log.Info("RequestMessages", "request", r)
 
 	setMessagesRequestDefaults(&r)
 

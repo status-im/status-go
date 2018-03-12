@@ -3,9 +3,9 @@
 package node
 
 import (
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/status-im/status-go/geth/log"
 )
 
 var (

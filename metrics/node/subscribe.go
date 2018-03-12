@@ -4,15 +4,17 @@ import (
 	"context"
 	"errors"
 
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
-	"github.com/status-im/status-go/geth/log"
 )
 
 // SubscribeServerEvents subscribes to server and listens to
 // PeerEventTypeAdd and PeerEventTypeDrop events.
 func SubscribeServerEvents(ctx context.Context, node *node.Node) error {
 	server := node.Server()
+	logger := log.New("package", "status-go/geth/node")
+
 	if server == nil {
 		return errors.New("server is unavailable")
 	}
@@ -20,7 +22,7 @@ func SubscribeServerEvents(ctx context.Context, node *node.Node) error {
 	ch := make(chan *p2p.PeerEvent, server.MaxPeers)
 	subscription := server.SubscribeEvents(ch)
 
-	log.Debug("Subscribed to server events")
+	logger.Debug("Subscribed to server events")
 
 	for {
 		select {
@@ -31,7 +33,7 @@ func SubscribeServerEvents(ctx context.Context, node *node.Node) error {
 			}
 		case err := <-subscription.Err():
 			if err != nil {
-				log.Warn("Subscription failed", "err", err.Error())
+				logger.Warn("Subscription failed", "err", err.Error())
 			}
 			subscription.Unsubscribe()
 			return err

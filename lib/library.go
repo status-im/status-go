@@ -7,8 +7,8 @@ import (
 	"os"
 
 	"github.com/NaySoftware/go-fcm"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/geth/common"
-	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/profiling"
 	"gopkg.in/go-playground/validator.v9"
@@ -209,7 +209,8 @@ func CompleteTransaction(id, password *C.char) *C.char {
 	}
 	outBytes, err := json.Marshal(out)
 	if err != nil {
-		log.Error("failed to marshal CompleteTransaction output", "error", err.Error())
+		logger := log.New("package", "status-go/lib")
+		logger.Error("failed to marshal CompleteTransaction output", "error", err.Error())
 		return makeJSONResponse(err)
 	}
 
@@ -248,7 +249,8 @@ func CompleteTransactions(ids, password *C.char) *C.char {
 
 	outBytes, err := json.Marshal(out)
 	if err != nil {
-		log.Error("failed to marshal CompleteTransactions output", "error", err.Error())
+		logger := log.New("package", "status-go/lib")
+		logger.Error("failed to marshal CompleteTransactions output", "error", err.Error())
 		return makeJSONResponse(err)
 	}
 
@@ -310,7 +312,8 @@ func DiscardTransactions(ids *C.char) *C.char {
 
 	outBytes, err := json.Marshal(out)
 	if err != nil {
-		log.Error("failed to marshal DiscardTransactions output", "error", err.Error())
+		logger := log.New("package", "status-go/lib")
+		logger.Error("failed to marshal DiscardTransactions output", "error", err.Error())
 		return makeJSONResponse(err)
 	}
 
@@ -413,7 +416,8 @@ func NotifyUsers(message, payloadJSON, tokensArray *C.char) (outCBytes *C.char) 
 
 		outBytes, err = json.Marshal(out)
 		if err != nil {
-			log.Error("failed to marshal Notify output", "error", err.Error())
+			logger := log.New("package", "status-go/lib")
+			logger.Error("failed to marshal Notify output", "error", err.Error())
 			outCBytes = makeJSONResponse(err)
 			return
 		}

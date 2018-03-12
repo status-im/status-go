@@ -4,13 +4,13 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"runtime"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/cmd/statusd/debug"
 	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/common"
@@ -73,9 +73,11 @@ func main() {
 	flag.Usage = printUsage
 	flag.Parse()
 
+	logger := log.New("package", "status-go/cmd/statusd")
+
 	config, err := makeNodeConfig()
 	if err != nil {
-		log.Fatalf("Making config failed: %v", err)
+		logger.Error("Making config failed: %v", err)
 		return
 	}
 
@@ -87,7 +89,7 @@ func main() {
 	backend := api.NewStatusBackend()
 	err = backend.StartNode(config)
 	if err != nil {
-		log.Fatalf("Node start failed: %v", err)
+		logger.Error("Node start failed: %v", err)
 		return
 	}
 
@@ -97,7 +99,7 @@ func main() {
 	if *cliEnabled {
 		err := startDebug(backend)
 		if err != nil {
-			log.Fatalf("Starting debugging CLI server failed: %v", err)
+			logger.Error("Starting debugging CLI server failed: %v", err)
 			return
 		}
 	}
@@ -123,7 +125,7 @@ func main() {
 
 	node, err := backend.NodeManager().Node()
 	if err != nil {
-		log.Fatalf("Getting node failed: %v", err)
+		logger.Error("Getting node failed: %v", err)
 		return
 	}
 
@@ -140,11 +142,14 @@ func startDebug(backend *api.StatusBackend) error {
 
 // startCollectingStats collects various stats about the node and other protocols like Whisper.
 func startCollectingStats(interruptCh <-chan struct{}, nodeManager common.NodeManager) {
-	log.Printf("Starting stats on %v", *statsAddr)
+
+	logger := logger.New("package", "status-go/cmd/statusd")
+
+	logger.Info("Starting stats on %v", *statsAddr)
 
 	node, err := nodeManager.Node()
 	if err != nil {
-		log.Printf("Failed to run metrics because could not get node: %v", err)
+		logger.Error("Failed to run metrics because could not get node: %v", err)
 		return
 	}
 
@@ -152,7 +157,7 @@ func startCollectingStats(interruptCh <-chan struct{}, nodeManager common.NodeMa
 	defer cancel()
 	go func() {
 		if err := nodemetrics.SubscribeServerEvents(ctx, node); err != nil {
-			log.Printf("Failed to subscribe server events: %v", err)
+			logger.Error("Failed to subscribe server events: %v", err)
 		}
 	}()
 
@@ -165,7 +170,7 @@ func startCollectingStats(interruptCh <-chan struct{}, nodeManager common.NodeMa
 		}
 
 		if err := server.Shutdown(context.TODO()); err != nil {
-			log.Printf("Failed to shutdown metrics server: %v", err)
+			logger.Error("Failed to shutdown metrics server: %v", err)
 		}
 	}()
 	go func() {
@@ -179,7 +184,7 @@ func startCollectingStats(interruptCh <-chan struct{}, nodeManager common.NodeMa
 		switch err {
 		case http.ErrServerClosed:
 		default:
-			log.Printf("Metrics server failed: %v", err)
+			logger.Error("Metrics server failed: %v", err)
 		}
 	}()
 
@@ -290,6 +295,9 @@ Options:
 // stops the node. It times out after 5 seconds
 // if the node can not be stopped.
 func haltOnInterruptSignal(nodeManager common.NodeManager) <-chan struct{} {
+
+	logger := logger.New("package", "status-go/cmd/statusd")
+
 	interruptCh := make(chan struct{})
 	go func() {
 		signalCh := make(chan os.Signal, 1)
@@ -297,9 +305,9 @@ func haltOnInterruptSignal(nodeManager common.NodeManager) <-chan struct{} {
 		defer signal.Stop(signalCh)
 		<-signalCh
 		close(interruptCh)
-		log.Println("Got interrupt, shutting down...")
+		logger.Info("Got interrupt, shutting down...")
 		if err := nodeManager.StopNode(); err != nil {
-			log.Printf("Failed to stop node: %v", err.Error())
+			logger.Error("Failed to stop node: %v", err.Error())
 			os.Exit(1)
 		}
 	}()
