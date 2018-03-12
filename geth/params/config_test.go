@@ -389,6 +389,7 @@ func TestLoadNodeConfig(t *testing.T) {
 
 	for _, testCase := range loadConfigTestCases {
 		t.Log("test: " + testCase.name)
+		params.UseMainnet = testCase.useMainnetFlag
 		testCase.configJSON = strings.Replace(testCase.configJSON, "$TMPDIR", tmpDir, -1)
 		nodeConfig, err := params.LoadNodeConfig(testCase.configJSON)
 		testCase.validator(t, tmpDir, nodeConfig, err)
