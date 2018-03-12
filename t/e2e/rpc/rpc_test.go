@@ -36,7 +36,7 @@ func (s *RPCTestSuite) TestCallRPC() {
 	}
 
 	for _, upstreamEnabled := range []bool{false, true} {
-		nodeConfig, err := e2e.MakeTestNodeConfig(GetNetworkID())
+		nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
 		s.NoError(err)
 
 		nodeConfig.IPCEnabled = false
@@ -64,7 +64,7 @@ func (s *RPCTestSuite) TestCallRPC() {
 			{
 				`{"jsonrpc":"2.0","method":"shh_version","params":[],"id":67}`,
 				func(resultJSON string) {
-					expected := `{"jsonrpc":"2.0","id":67,"result":"5.0"}`
+					expected := `{"jsonrpc":"2.0","id":67,"result":"6.0"}`
 					s.Equal(expected, resultJSON)
 				},
 			},
@@ -126,7 +126,7 @@ func (s *RPCTestSuite) TestCallRPC() {
 
 // TestCallRawResult checks if returned response is a valid JSON-RPC response.
 func (s *RPCTestSuite) TestCallRawResult() {
-	nodeConfig, err := e2e.MakeTestNodeConfig(GetNetworkID())
+	nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
 
 	s.NoError(s.NodeManager.StartNode(nodeConfig))
@@ -135,7 +135,7 @@ func (s *RPCTestSuite) TestCallRawResult() {
 	s.NotNil(client)
 
 	jsonResult := client.CallRaw(`{"jsonrpc":"2.0","method":"shh_version","params":[],"id":67}`)
-	s.Equal(`{"jsonrpc":"2.0","id":67,"result":"5.0"}`, jsonResult)
+	s.Equal(`{"jsonrpc":"2.0","id":67,"result":"6.0"}`, jsonResult)
 
 	s.NoError(s.NodeManager.StopNode())
 }
@@ -144,7 +144,7 @@ func (s *RPCTestSuite) TestCallRawResult() {
 // for a not yet mained transaction is "error":{"code":-32000,"message":"unknown transaction"}.
 // Issue: https://github.com/status-im/status-go/issues/547
 func (s *RPCTestSuite) TestCallRawResultGetTransactionReceipt() {
-	nodeConfig, err := e2e.MakeTestNodeConfig(GetNetworkID())
+	nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
 
 	s.NoError(s.NodeManager.StartNode(nodeConfig))

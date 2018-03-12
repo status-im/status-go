@@ -6,7 +6,7 @@ package mailservice
 
 import (
 	node "github.com/ethereum/go-ethereum/node"
-	whisperv5 "github.com/ethereum/go-ethereum/whisper/whisperv5"
+	whisperv6 "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	gomock "github.com/golang/mock/gomock"
 	reflect "reflect"
 )
@@ -48,9 +48,9 @@ func (mr *MockServiceProviderMockRecorder) Node() *gomock.Call {
 }
 
 // WhisperService mocks base method
-func (m *MockServiceProvider) WhisperService() (*whisperv5.Whisper, error) {
+func (m *MockServiceProvider) WhisperService() (*whisperv6.Whisper, error) {
 	ret := m.ctrl.Call(m, "WhisperService")
-	ret0, _ := ret[0].(*whisperv5.Whisper)
+	ret0, _ := ret[0].(*whisperv6.Whisper)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

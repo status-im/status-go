@@ -36,10 +36,10 @@ func (s *APIBackendTestSuite) TestRaceConditions() {
 	progress := make(chan struct{}, cnt)
 	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	nodeConfig1, err := e2e.MakeTestNodeConfig(GetNetworkID())
+	nodeConfig1, err := MakeTestNodeConfig(GetNetworkID())
 	require.NoError(err)
 
-	nodeConfig2, err := e2e.MakeTestNodeConfig(GetNetworkID())
+	nodeConfig2, err := MakeTestNodeConfig(GetNetworkID())
 	require.NoError(err)
 
 	nodeConfigs := []*params.NodeConfig{nodeConfig1, nodeConfig2}
@@ -192,7 +192,7 @@ func (s *APIBackendTestSuite) TestRaceConditions() {
 // so this test should only check StatusBackend logic with a mocked version of the underlying NodeManager.
 func (s *APIBackendTestSuite) TestNetworkSwitching() {
 	// get Ropsten config
-	nodeConfig, err := e2e.MakeTestNodeConfig(GetNetworkID())
+	nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
 
 	s.False(s.Backend.IsNodeRunning())
@@ -207,7 +207,7 @@ func (s *APIBackendTestSuite) TestNetworkSwitching() {
 	s.NoError(s.Backend.StopNode())
 
 	// start new node with completely different config
-	nodeConfig, err = e2e.MakeTestNodeConfig(GetNetworkID())
+	nodeConfig, err = MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
 
 	s.False(s.Backend.IsNodeRunning())
@@ -254,7 +254,7 @@ func (s *APIBackendTestSuite) TestRestartNode() {
 	require.NotNil(s.Backend)
 
 	// get config
-	nodeConfig, err := e2e.MakeTestNodeConfig(GetNetworkID())
+	nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
 
 	s.False(s.Backend.IsNodeRunning())

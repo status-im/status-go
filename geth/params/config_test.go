@@ -22,12 +22,13 @@ var clusterConfigData = []byte(`[
     "networkID": 3,
     "prod": {
       "staticpeers": [
+      "bootodes": [
         "enode://7ab298cedc4185a894d21d8a4615262ec6bdce66c9b6783878258e0d5b31013d30c9038932432f70e5b2b6a5cd323bf820554fcb22fbc7b45367889522e9c449@10.1.1.1:30303",
         "enode://f59e8701f18c79c5cbc7618dc7bb928d44dc2f5405c7d693dad97da2d8585975942ec6fd36d3fe608bfdc7270a34a4dd00f38cfe96b2baa24f7cd0ac28d382a1@10.1.1.2:30303"
 	  ]
 	},
     "dev": {
-      "staticpeers": [
+      "bootodes": [
         "enode://7ab298cedc4185a894d21d8a4615262ec6bdce66c9b6783878258e0d5b31013d30c9038932432f70e5b2b6a5cd323bf820554fcb22fbc7b45367889522e9c449@10.1.1.1:30303",
         "enode://f59e8701f18c79c5cbc7618dc7bb928d44dc2f5405c7d693dad97da2d8585975942ec6fd36d3fe608bfdc7270a34a4dd00f38cfe96b2baa24f7cd0ac28d382a1@10.1.1.2:30303"
 	  ]
@@ -242,8 +243,8 @@ var loadConfigTestCases = []struct {
 			require.NoError(t, err)
 			require.True(t, nodeConfig.StaticPeersConfig.Enabled, "static peers are expected to be enabled by default")
 
-			enodes := nodeConfig.StaticPeersConfig.StaticPeers
-			require.True(t, len(enodes) >= 3)
+			enodes := nodeConfig.BootClusterConfig.BootNodes
+			require.Len(t, enodes, 4)
 		},
 	},
 	{
@@ -283,8 +284,8 @@ var loadConfigTestCases = []struct {
 			require.NoError(t, err)
 			require.True(t, nodeConfig.StaticPeersConfig.Enabled, "static peers are expected to be enabled by default")
 
-			enodes := nodeConfig.StaticPeersConfig.StaticPeers
-			require.True(t, len(enodes) >= 3)
+			enodes := nodeConfig.BootClusterConfig.BootNodes
+			require.Len(t, enodes, 4)
 		},
 	},
 	{
@@ -382,6 +383,20 @@ var loadConfigTestCases = []struct {
 			require.NoError(t, err)
 			require.False(t, nodeConfig.DevMode)
 			require.True(t, nodeConfig.StaticPeersConfig.Enabled)
+		},
+	},
+	{
+		`explicit WhisperConfig.LightClient = true`,
+		`{
+			"NetworkId": 3,
+			"DataDir": "$TMPDIR",
+			"WhisperConfig": {
+				"LightClient": true
+			}
+		}`,
+		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
+			require.NoError(t, err)
+			require.True(t, nodeConfig.WhisperConfig.LightClient)
 		},
 	},
 }
