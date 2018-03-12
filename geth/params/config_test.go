@@ -19,7 +19,7 @@ import (
 
 var loadConfigTestCases = []struct {
 	name           string
-	useMainnetFlag bool
+	useMainnetFlag bool // nolint
 	configJSON     string
 	validator      func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error)
 }{
