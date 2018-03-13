@@ -53,6 +53,11 @@ var Languages = [...]string{
 	"Russian",
 }
 
+// ErrInvalidEntropyStrength is the error returned by MnemonicPhrase
+// when the entropy strength is not valid.
+// Valid entropy strength values are multiple of 32 between 128 and 256.
+var ErrInvalidEntropyStrength = errors.New("The mnemonic must encode entropy in a multiple of 32 bits, The recommended size of ENT is 128-256 bits")
+
 var (
 	last11BitsMask          = big.NewInt(2047)
 	rightShift11BitsDivider = big.NewInt(2048)
@@ -118,7 +123,7 @@ func (m *Mnemonic) MnemonicSeed(mnemonic string, password string) []byte {
 }
 
 // MnemonicPhrase returns a human readable seed for BIP32 Hierarchical Deterministic Wallets
-func (m *Mnemonic) MnemonicPhrase(strength, language Language) (string, error) {
+func (m *Mnemonic) MnemonicPhrase(strength int, language Language) (string, error) {
 	wordList, err := m.WordList(language)
 	if err != nil {
 		return "", err
@@ -128,8 +133,8 @@ func (m *Mnemonic) MnemonicPhrase(strength, language Language) (string, error) {
 	// With more entropy security is improved but the sentence length increases.
 	// We refer to the initial entropy length as ENT. The recommended size of ENT is 128-256 bits.
 
-	if strength%32 > 0 && strength < 128 && strength > 256 {
-		return "", errors.New("The mnemonic must encode entropy in a multiple of 32 bits, The recommended size of ENT is 128-256 bits")
+	if strength%32 > 0 || strength < 128 || strength > 256 {
+		return "", ErrInvalidEntropyStrength
 	}
 
 	// First, an initial entropy of ENT bits is generated
