@@ -54,7 +54,7 @@ func TestMnemonicPhrase(t *testing.T) {
 	t.Log("Test against pre-computed seed vectors:")
 	stats := map[string]int{}
 	for _, vector := range vectorsFile.vectors {
-		stats[vector.language] += 1
+		stats[vector.language]++
 		mnemonic := NewMnemonic(vector.salt)
 		seed := mnemonic.MnemonicSeed(vector.mnemonic, vector.password)
 		if fmt.Sprintf("%x", seed) != vector.seed {
