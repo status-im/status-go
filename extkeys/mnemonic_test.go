@@ -26,7 +26,7 @@ func TestMnemonicPhrase(t *testing.T) {
 	for _, s := range strengths {
 		_, err := mnemonic.MnemonicPhrase(s, EnglishLanguage)
 		if err != ErrInvalidEntropyStrength {
-			t.Errorf("Entropy strength `%d` should be invalid", s)
+			t.Errorf("Entropy strength '%d' should be invalid", s)
 		}
 	}
 
