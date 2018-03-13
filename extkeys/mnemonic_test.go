@@ -23,6 +23,15 @@ func TestMnemonicPhrase(t *testing.T) {
 
 	mnemonic := extkeys.NewMnemonic(extkeys.Salt)
 
+	// test strength validation
+	strengths := []int{127, 129, 257}
+	for _, s := range strengths {
+		_, err := mnemonic.MnemonicPhrase(s, extkeys.EnglishLanguage)
+		if err != extkeys.ErrInvalidEntropyStrength {
+			t.Errorf("Entropy strength `%d` should be invalid", s)
+		}
+	}
+
 	// test mnemonic generation
 	t.Log("Test mnemonic generation:")
 	for _, language := range mnemonic.AvailableLanguages() {
