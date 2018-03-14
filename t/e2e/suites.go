@@ -7,6 +7,7 @@ import (
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/node"
+	"github.com/status-im/status-go/geth/provider"
 	"github.com/status-im/status-go/geth/signal"
 	"github.com/status-im/status-go/geth/transactions"
 	. "github.com/status-im/status-go/t/utils" //nolint: golint
@@ -17,6 +18,7 @@ import (
 type NodeManagerTestSuite struct {
 	suite.Suite
 	NodeManager *node.NodeManager
+	Provider    *provider.ServiceProvider
 }
 
 func init() {

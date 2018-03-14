@@ -388,7 +388,7 @@ func testCreateChildAccount(t *testing.T) bool { //nolint: gocyclo
 		t.Fatal(err)
 	}
 
-	keyStore, err := statusAPI.NodeManager().AccountKeyStore()
+	keyStore, err := statusAPI.AccountManager().AccountKeyStore()
 	if err != nil {
 		t.Error(err)
 		return false
@@ -410,7 +410,7 @@ func testCreateChildAccount(t *testing.T) bool { //nolint: gocyclo
 	address, pubKey, mnemonic := createAccountResponse.Address, createAccountResponse.PubKey, createAccountResponse.Mnemonic
 	t.Logf("Account created: {address: %s, key: %s, mnemonic:%s}", address, pubKey, mnemonic)
 
-	acct, err := common.ParseAccountString(address)
+	acct, err := account.ParseAccountString(address)
 	if err != nil {
 		t.Errorf("can not get account from address: %v", err)
 		return false
@@ -519,7 +519,7 @@ func testCreateChildAccount(t *testing.T) bool { //nolint: gocyclo
 }
 
 func testRecoverAccount(t *testing.T) bool { //nolint: gocyclo
-	keyStore, _ := statusAPI.NodeManager().AccountKeyStore()
+	keyStore, _ := statusAPI.AccountManager().AccountKeyStore()
 
 	// create an account
 	address, pubKey, mnemonic, err := statusAPI.CreateAccount(TestConfig.Account1.Password)
@@ -548,7 +548,7 @@ func testRecoverAccount(t *testing.T) bool { //nolint: gocyclo
 	}
 
 	// now test recovering, but make sure that account/key file is removed i.e. simulate recovering on a new device
-	account, err := common.ParseAccountString(address)
+	account, err := account.ParseAccountString(address)
 	if err != nil {
 		t.Errorf("can not get account from address: %v", err)
 	}

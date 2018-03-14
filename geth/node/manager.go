@@ -9,8 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts"
-	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/les"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/discover"
@@ -28,8 +26,6 @@ var (
 	ErrInvalidNodeManager          = errors.New("node manager is not properly initialized")
 	ErrInvalidWhisperService       = errors.New("whisper service is unavailable")
 	ErrInvalidLightEthereumService = errors.New("LES service is unavailable")
-	ErrInvalidAccountManager       = errors.New("could not retrieve account manager")
-	ErrAccountKeyStoreMissing      = errors.New("account key store is not set")
 	ErrRPCClient                   = errors.New("failed to init RPC client")
 )
 
@@ -317,47 +313,6 @@ func (m *NodeManager) WhisperService() (*whisper.Whisper, error) {
 		return nil, ErrInvalidWhisperService
 	}
 	return m.whisperService, nil
-}
-
-// AccountManager exposes reference to node's accounts manager
-func (m *NodeManager) AccountManager() (*accounts.Manager, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	if err := m.isNodeAvailable(); err != nil {
-		return nil, err
-	}
-	accountManager := m.node.AccountManager()
-	if accountManager == nil {
-		return nil, ErrInvalidAccountManager
-	}
-	return accountManager, nil
-}
-
-// AccountKeyStore exposes reference to accounts key store
-func (m *NodeManager) AccountKeyStore() (*keystore.KeyStore, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	if err := m.isNodeAvailable(); err != nil {
-		return nil, err
-	}
-	accountManager := m.node.AccountManager()
-	if accountManager == nil {
-		return nil, ErrInvalidAccountManager
-	}
-
-	backends := accountManager.Backends(keystore.KeyStoreType)
-	if len(backends) == 0 {
-		return nil, ErrAccountKeyStoreMissing
-	}
-
-	keyStore, ok := backends[0].(*keystore.KeyStore)
-	if !ok {
-		return nil, ErrAccountKeyStoreMissing
-	}
-
-	return keyStore, nil
 }
 
 // RPCClient exposes reference to RPC client connected to the running node.

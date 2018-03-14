@@ -104,7 +104,7 @@ func (s *APIBackendTestSuite) TestRaceConditions() {
 
 			// SelectAccount
 			log.Info("CreateAccount()")
-			err = s.Backend.AccountManager().SelectAccount(address, "password")
+			err = s.Backend.SelectAccount(address, "password")
 			s.T().Logf("SelectAccount(%v, %v), error: %v", address, "password", err)
 
 			// CreateChildAccount

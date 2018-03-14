@@ -18,6 +18,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/rpc"
@@ -83,7 +84,7 @@ var (
 	testNonce    = hexutil.Uint64(10)
 )
 
-func (s *TxQueueTestSuite) setupTransactionPoolAPI(tx *common.QueuedTx, returnNonce, resultNonce hexutil.Uint64, account *common.SelectedExtKey, txErr error) {
+func (s *TxQueueTestSuite) setupTransactionPoolAPI(tx *common.QueuedTx, returnNonce, resultNonce hexutil.Uint64, account *account.SelectedExtKey, txErr error) {
 	// Expect calls to gas functions only if there are no user defined values.
 	// And also set the expected gas and gas price for RLP encoding the expected tx.
 	var usedGas hexutil.Uint64
@@ -107,7 +108,7 @@ func (s *TxQueueTestSuite) setupTransactionPoolAPI(tx *common.QueuedTx, returnNo
 	s.txServiceMock.EXPECT().SendRawTransaction(gomock.Any(), data).Return(gethcommon.Hash{}, txErr)
 }
 
-func (s *TxQueueTestSuite) rlpEncodeTx(tx *common.QueuedTx, config *params.NodeConfig, account *common.SelectedExtKey, nonce *hexutil.Uint64, gas hexutil.Uint64, gasPrice *big.Int) hexutil.Bytes {
+func (s *TxQueueTestSuite) rlpEncodeTx(tx *common.QueuedTx, config *params.NodeConfig, account *account.SelectedExtKey, nonce *hexutil.Uint64, gas hexutil.Uint64, gasPrice *big.Int) hexutil.Bytes {
 	newTx := types.NewTransaction(
 		uint64(*nonce),
 		gethcommon.Address(*tx.Args.To),
@@ -124,7 +125,7 @@ func (s *TxQueueTestSuite) rlpEncodeTx(tx *common.QueuedTx, config *params.NodeC
 	return hexutil.Bytes(data)
 }
 
-func (s *TxQueueTestSuite) setupStatusBackend(account *common.SelectedExtKey, password string, passwordErr error) {
+func (s *TxQueueTestSuite) setupStatusBackend(account *account.SelectedExtKey, password string, passwordErr error) {
 	s.nodeManagerMock.EXPECT().NodeConfig().Return(s.nodeConfig, nil)
 	s.accountManagerMock.EXPECT().SelectedAccount().Return(account, nil)
 	s.accountManagerMock.EXPECT().VerifyAccountPassword(s.nodeConfig.KeyStoreDir, account.Address.String(), password).Return(
@@ -134,7 +135,7 @@ func (s *TxQueueTestSuite) setupStatusBackend(account *common.SelectedExtKey, pa
 func (s *TxQueueTestSuite) TestCompleteTransaction() {
 	password := TestConfig.Account1.Password
 	key, _ := crypto.GenerateKey()
-	account := &common.SelectedExtKey{
+	account := &account.SelectedExtKey{
 		Address:    common.FromAddress(TestConfig.Account1.Address),
 		AccountKey: &keystore.Key{PrivateKey: key},
 	}
@@ -203,7 +204,7 @@ func (s *TxQueueTestSuite) TestCompleteTransaction() {
 func (s *TxQueueTestSuite) TestCompleteTransactionMultipleTimes() {
 	password := TestConfig.Account1.Password
 	key, _ := crypto.GenerateKey()
-	account := &common.SelectedExtKey{
+	account := &account.SelectedExtKey{
 		Address:    common.FromAddress(TestConfig.Account1.Address),
 		AccountKey: &keystore.Key{PrivateKey: key},
 	}
@@ -257,7 +258,7 @@ func (s *TxQueueTestSuite) TestCompleteTransactionMultipleTimes() {
 
 func (s *TxQueueTestSuite) TestAccountMismatch() {
 	s.nodeManagerMock.EXPECT().NodeConfig().Return(s.nodeConfig, nil)
-	s.accountManagerMock.EXPECT().SelectedAccount().Return(&common.SelectedExtKey{
+	s.accountManagerMock.EXPECT().SelectedAccount().Return(&account.SelectedExtKey{
 		Address: common.FromAddress(TestConfig.Account2.Address),
 	}, nil)
 
@@ -279,7 +280,7 @@ func (s *TxQueueTestSuite) TestAccountMismatch() {
 func (s *TxQueueTestSuite) TestInvalidPassword() {
 	password := "invalid-password"
 	key, _ := crypto.GenerateKey()
-	account := &common.SelectedExtKey{
+	account := &account.SelectedExtKey{
 		Address:    common.FromAddress(TestConfig.Account1.Address),
 		AccountKey: &keystore.Key{PrivateKey: key},
 	}
@@ -340,7 +341,7 @@ func (s *TxQueueTestSuite) TestLocalNonce() {
 	txCount := 3
 	password := TestConfig.Account1.Password
 	key, _ := crypto.GenerateKey()
-	account := &common.SelectedExtKey{
+	account := &account.SelectedExtKey{
 		Address:    common.FromAddress(TestConfig.Account1.Address),
 		AccountKey: &keystore.Key{PrivateKey: key},
 	}

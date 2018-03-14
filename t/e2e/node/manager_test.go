@@ -12,6 +12,7 @@ import (
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/geth/provider"
 
 	e2e "github.com/status-im/status-go/t/e2e"
 	. "github.com/status-im/status-go/t/utils"
@@ -28,6 +29,7 @@ type ManagerTestSuite struct {
 
 func (s *ManagerTestSuite) SetupTest() {
 	s.NodeManager = node.NewNodeManager()
+	s.Provider = provider.New(s.NodeManager)
 }
 
 func (s *ManagerTestSuite) TestReferencesWithoutStartedNode() {
@@ -81,14 +83,14 @@ func (s *ManagerTestSuite) TestReferencesWithoutStartedNode() {
 		{
 			"non-null manager, no running node, get AccountManager",
 			func() (interface{}, error) {
-				return s.NodeManager.AccountManager()
+				return s.Provider.Account()
 			},
 			node.ErrNoRunningNode,
 		},
 		{
 			"non-null manager, no running node, get AccountKeyStore",
 			func() (interface{}, error) {
-				return s.NodeManager.AccountKeyStore()
+				return s.Provider.AccountKeyStore()
 			},
 			node.ErrNoRunningNode,
 		},
@@ -151,14 +153,14 @@ func (s *ManagerTestSuite) TestReferencesWithStartedNode() {
 		{
 			"node is running, get AccountManager",
 			func() (interface{}, error) {
-				return s.NodeManager.AccountManager()
+				return s.Provider.Account()
 			},
 			&accounts.Manager{},
 		},
 		{
 			"node is running, get AccountKeyStore",
 			func() (interface{}, error) {
-				return s.NodeManager.AccountKeyStore()
+				return s.Provider.AccountKeyStore()
 			},
 			&keystore.KeyStore{},
 		},

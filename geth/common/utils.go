@@ -3,7 +3,6 @@ package common
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -13,9 +12,9 @@ import (
 	"runtime/debug"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pborman/uuid"
+	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/static"
 )
@@ -28,25 +27,10 @@ const (
 
 type contextKey string // in order to make sure that our context key does not collide with keys from other packages
 
-// errors
-var (
-	ErrInvalidAccountAddressOrKey = errors.New("cannot parse address or key to valid account address")
-)
-
-// ParseAccountString parses hex encoded string and returns is as accounts.Account.
-func ParseAccountString(account string) (accounts.Account, error) {
-	// valid address, convert to account
-	if common.IsHexAddress(account) {
-		return accounts.Account{Address: common.HexToAddress(account)}, nil
-	}
-
-	return accounts.Account{}, ErrInvalidAccountAddressOrKey
-}
-
 // FromAddress converts account address from string to common.Address.
 // The function is useful to format "From" field of send transaction struct.
 func FromAddress(accountAddress string) common.Address {
-	from, err := ParseAccountString(accountAddress)
+	from, err := account.ParseAccountString(accountAddress)
 	if err != nil {
 		return common.Address{}
 	}
@@ -57,7 +41,7 @@ func FromAddress(accountAddress string) common.Address {
 // ToAddress converts account address from string to *common.Address.
 // The function is useful to format "To" field of send transaction struct.
 func ToAddress(accountAddress string) *common.Address {
-	to, err := ParseAccountString(accountAddress)
+	to, err := account.ParseAccountString(accountAddress)
 	if err != nil {
 		return nil
 	}

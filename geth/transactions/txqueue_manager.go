@@ -9,6 +9,7 @@ import (
 	ethereum "github.com/ethereum/go-ethereum"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
@@ -148,7 +149,7 @@ func (m *Manager) CompleteTransaction(id common.QueuedTxID, password string) (ha
 	return hash, err
 }
 
-func (m *Manager) validateAccount(config *params.NodeConfig, tx *common.QueuedTx, password string) (*common.SelectedExtKey, error) {
+func (m *Manager) validateAccount(config *params.NodeConfig, tx *common.QueuedTx, password string) (*account.SelectedExtKey, error) {
 	selectedAccount, err := m.accountManager.SelectedAccount()
 	if err != nil {
 		log.Warn("failed to get a selected account", "err", err)
@@ -167,7 +168,7 @@ func (m *Manager) validateAccount(config *params.NodeConfig, tx *common.QueuedTx
 	return selectedAccount, nil
 }
 
-func (m *Manager) completeTransaction(config *params.NodeConfig, selectedAccount *common.SelectedExtKey, queuedTx *common.QueuedTx) (hash gethcommon.Hash, err error) {
+func (m *Manager) completeTransaction(config *params.NodeConfig, selectedAccount *account.SelectedExtKey, queuedTx *common.QueuedTx) (hash gethcommon.Hash, err error) {
 	log.Info("complete transaction", "id", queuedTx.ID)
 	m.addrLock.LockAddr(queuedTx.Args.From)
 	var localNonce uint64
