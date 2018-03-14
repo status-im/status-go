@@ -16,6 +16,19 @@ type Vector struct {
 	language, salt, password, input, mnemonic, seed, xprv string
 }
 
+func TestNewMnemonic(t *testing.T) {
+	m1 := NewMnemonic("")
+	if m1.salt != Salt {
+		t.Errorf("expected default salt, got: %q", m1.salt)
+	}
+
+	customSalt := "custom-salt"
+	m2 := NewMnemonic(customSalt)
+	if m2.salt != customSalt {
+		t.Errorf("expected %q, got: %q", customSalt, m2.salt)
+	}
+}
+
 // TestMnemonicPhrase
 func TestMnemonicPhrase(t *testing.T) {
 
