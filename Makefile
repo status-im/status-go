@@ -142,15 +142,15 @@ test-unit-coverage: ##@tests Run unit and integration tests with coverage
 test-e2e: ##@tests Run e2e tests
 	# order: reliability then alphabetical
 	# TODO(tiabc): make a single command out of them adding `-p 1` flag.
-	go test -timeout 5m ./t/e2e/accounts/... -network=$(networkid)
-	go test -timeout 5m ./t/e2e/api/... -network=$(networkid)
-	go test -timeout 5m ./t/e2e/node/... -network=$(networkid)
-	go test -timeout 50m ./t/e2e/jail/... -network=$(networkid)
-	go test -timeout 20m ./t/e2e/rpc/... -network=$(networkid)
-	go test -timeout 20m ./t/e2e/whisper/... -network=$(networkid)
-	go test -timeout 10m ./t/e2e/transactions/... -network=$(networkid)
+	go test -timeout 5m ./t/e2e/accounts/... -network=$(or $(networkid),default StatusChain)
+	go test -timeout 5m ./t/e2e/api/... -network=$(or $(networkid),default StatusChain)
+	go test -timeout 5m ./t/e2e/node/... -network=$(or $(networkid),default StatusChain)
+	go test -timeout 50m ./t/e2e/jail/... -network=$(or $(networkid),default StatusChain)
+	go test -timeout 20m ./t/e2e/rpc/... -network=$(or $(networkid),default StatusChain)
+	go test -timeout 20m ./t/e2e/whisper/... -network=$(or $(networkid),default StatusChain)
+	go test -timeout 10m ./t/e2e/transactions/... -network=$(or $(networkid),default StatusChain)
 	# e2e_test tag is required to include some files from ./lib without _test suffix
-	go test -timeout 40m -tags e2e_test ./lib -network=$(networkid)
+	go test -timeout 40m -tags e2e_test ./lib -network=$(or $(networkid),default StatusChain)
 
 lint-install:
 	go get -u github.com/alecthomas/gometalinter
