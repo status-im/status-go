@@ -11,7 +11,8 @@ endif
 
 CGO_CFLAGS=-I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
 BUILD_TAGS =
-GOBIN = build/bin
+GOBIN=$(dir $(realpath $(firstword $(MAKEFILE_LIST))))build/bin
+
 GO ?= latest
 XGOVERSION ?= 1.9.2
 XGOIMAGE = statusteam/xgo:$(XGOVERSION)

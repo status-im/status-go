@@ -13,7 +13,6 @@ import (
 
 	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/log"
-	"github.com/status-im/status-go/t/e2e"
 	. "github.com/status-im/status-go/t/utils"
 )
 
@@ -32,7 +31,7 @@ type SyncTestSuite struct {
 
 func (s *SyncTestSuite) SetupTest() {
 	s.backend = api.NewStatusBackend()
-	config, err := e2e.MakeTestNodeConfig(GetNetworkID())
+	config, err := MakeTestNodeConfig(GetNetworkID())
 	s.Require().NoError(err)
 	s.tempDir, err = ioutil.TempDir("/tmp", "status-sync-chain")
 	s.Require().NoError(err)

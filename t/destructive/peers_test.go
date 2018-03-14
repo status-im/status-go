@@ -7,7 +7,6 @@ import (
 
 	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/log"
-	"github.com/status-im/status-go/t/e2e"
 	. "github.com/status-im/status-go/t/utils"
 
 	"github.com/ethereum/go-ethereum/p2p"
@@ -32,7 +31,7 @@ type PeersTestSuite struct {
 
 func (s *PeersTestSuite) SetupTest() {
 	s.backend = api.NewStatusBackend()
-	config, err := e2e.MakeTestNodeConfig(GetNetworkID())
+	config, err := MakeTestNodeConfig(GetNetworkID())
 	s.Require().NoError(err)
 	// we need to enable atleast 1 protocol, otherwise peers won't connect
 	config.LightEthConfig.Enabled = false

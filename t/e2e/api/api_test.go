@@ -14,7 +14,6 @@ import (
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/signal"
-	e2e "github.com/status-im/status-go/t/e2e"
 	. "github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/suite"
 )
@@ -65,10 +64,10 @@ func (s *APITestSuite) TestRaceConditions() {
 	progress := make(chan struct{}, cnt)
 	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	nodeConfig1, err := e2e.MakeTestNodeConfig(GetNetworkID())
+	nodeConfig1, err := MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
 
-	nodeConfig2, err := e2e.MakeTestNodeConfig(GetNetworkID())
+	nodeConfig2, err := MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
 
 	nodeConfigs := []*params.NodeConfig{nodeConfig1, nodeConfig2}
@@ -138,7 +137,7 @@ func (s *APITestSuite) TestCellsRemovedAfterSwitchAccount() {
 		}
 	)
 
-	config, err := e2e.MakeTestNodeConfig(GetNetworkID())
+	config, err := MakeTestNodeConfig(GetNetworkID())
 	require.NoError(err)
 	err = s.api.StartNode(config)
 	require.NoError(err)
@@ -175,7 +174,7 @@ func (s *APITestSuite) TestLogoutRemovesCells() {
 		require = s.Require()
 	)
 
-	config, err := e2e.MakeTestNodeConfig(GetNetworkID())
+	config, err := MakeTestNodeConfig(GetNetworkID())
 	require.NoError(err)
 	err = s.api.StartNode(config)
 	require.NoError(err)
@@ -205,7 +204,7 @@ func (s *APITestSuite) TestEventsNodeStartStop() {
 		envelopes <- envelope
 	})
 
-	nodeConfig, err := e2e.MakeTestNodeConfig(GetNetworkID())
+	nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
 	s.NoError(s.api.StartNode(nodeConfig))
 	s.NoError(s.api.StopNode())
@@ -243,7 +242,7 @@ func (s *APITestSuite) TestNodeStartCrash() {
 	})
 	defer signal.ResetDefaultNodeNotificationHandler()
 
-	nodeConfig, err := e2e.MakeTestNodeConfig(GetNetworkID())
+	nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
 
 	// start node outside the manager (on the same port), so that manager node.Start() method fails

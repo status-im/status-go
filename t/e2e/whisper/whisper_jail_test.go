@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
-	"github.com/status-im/status-go/geth/common"
+	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
+	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/static"
 	e2e "github.com/status-im/status-go/t/e2e"
 	. "github.com/status-im/status-go/t/utils"
@@ -35,7 +35,7 @@ type WhisperJailTestSuite struct {
 
 	Timeout    time.Duration
 	WhisperAPI *whisper.PublicWhisperAPI
-	Jail       common.JailManager
+	Jail       jail.Manager
 }
 
 func (s *WhisperJailTestSuite) StartTestBackend(opts ...e2e.TestNodeOption) {
@@ -79,7 +79,7 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 		{
 			"test 0: ensure correct version of Whisper is used",
 			`
-				var expectedVersion = '5.0';
+				var expectedVersion = '6.0';
 				if (web3.version.whisper != expectedVersion) {
 					throw 'unexpected shh version, expected: ' + expectedVersion + ', got: ' + web3.version.whisper;
 				}
@@ -112,12 +112,12 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 				// post message
 				var message = {
 					ttl: 10,
-					powTarget: 1.0,
-					powTime: 20,
+					powTarget: 0.001,
+					powTime: 2,
 					topic: topic,
 					sig: shh.getPublicKey(identity1),
 					pubKey: shh.getPublicKey(identity2),
-			  		payload: web3.toHex(payload),
+					payload: web3.toHex(payload),
 				};
 
 				var sent = shh.post(message)
@@ -159,7 +159,7 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 					topic: topic,
 					sig: shh.getPublicKey(identity),
 					symKeyID: keyid,
-			  		payload: web3.toHex(payload),
+					payload: web3.toHex(payload),
 				};
 
 				var sent = shh.post(message)
@@ -186,21 +186,23 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 					topics: [topic],
 					symKeyID: keyid
 				});
-
-				// post message
-				var message = {
+				// creating a filter is an async operation
+				setTimeout(function() {
+				  // post message
+				  var message = {
 					ttl: 10,
-					powTarget: 1.0,
-					powTime: 20,
+					powTarget: 0.001,
+					powTime: 2,
 					topic: topic,
 					symKeyID: keyid,
-			  		payload: web3.toHex(payload),
-				};
+					payload: web3.toHex(payload),
+				  };
 
-				var sent = shh.post(message)
-				if (!sent) {
+				  var sent = shh.post(message)
+				  if (!sent) {
 					throw 'message not sent: ' + JSON.stringify(message);
-				}
+				  }
+				}, 0)
 			`,
 			true,
 		},
@@ -228,7 +230,7 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 					powTime: 20,
 					topic: topic,
 					pubKey: shh.getPublicKey(identity),
-			  		payload: web3.toHex(payload),
+					payload: web3.toHex(payload),
 				};
 
 				var sent = shh.post(message)
@@ -261,12 +263,12 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 				// post message
 				var message = {
 					ttl: 10,
-					powTarget: 1.0,
-					powTime: 20,
-				  	sig: shh.getPublicKey(identity2),
-				  	pubKey: shh.getPublicKey(identity1),
-				  	topic: topic,
-				  	payload: web3.toHex(payload)
+					powTarget: 0.001,
+					powTime: 2,
+					sig: shh.getPublicKey(identity2),
+					pubKey: shh.getPublicKey(identity1),
+					topic: topic,
+					payload: web3.toHex(payload)
 				};
 
 				var sent = shh.post(message)
@@ -295,8 +297,10 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 
 		s.Jail.CreateAndInitCell(chatID, makeTopicCode)
 
-		cell, err := s.Jail.Cell(chatID)
+		jailCell, err := s.Jail.Cell(chatID)
 		r.NoError(err, "cannot get VM")
+
+		cell := jailCell.(*jail.Cell)
 
 		// Run JS code that setups filters and sends messages.
 		_, err = cell.Run(tc.code)
@@ -323,33 +327,33 @@ func (s *WhisperJailTestSuite) TestJailWhisper() {
 		for {
 			filter, err := cell.Get("filter")
 			r.NoError(err, "cannot get filter")
-			filterID, err := cell.GetObjectValue(filter, "filterId")
+			filterID, err := cell.GetObjectValue(filter.Value(), "filterId")
 			r.NoError(err, "cannot get filterId")
 
 			select {
 			case <-done:
-				ok, err := s.WhisperAPI.DeleteMessageFilter(filterID.String())
+				ok, err := s.WhisperAPI.DeleteMessageFilter(filterID.Value().String())
 				r.NoError(err)
 				r.True(ok)
 				break poll_loop
 			case <-timedOut:
-				s.FailNow("polling for messages timed out")
+				s.FailNow("polling for messages timed out. Test case: " + tc.name)
 			case <-time.After(time.Second):
 			}
 
 			// FilterID is not assigned yet.
-			if filterID.IsNull() {
+			if filterID.Value().IsNull() {
 				continue
 			}
 
 			payload, err := cell.Get("payload")
 			r.NoError(err, "cannot get payload")
 
-			messages, err := s.WhisperAPI.GetFilterMessages(filterID.String())
+			messages, err := s.WhisperAPI.GetFilterMessages(filterID.Value().String())
 			r.NoError(err)
 
 			for _, m := range messages {
-				r.Equal(payload.String(), string(m.Payload))
+				r.Equal(payload.Value().String(), string(m.Payload))
 				close(done)
 			}
 		}

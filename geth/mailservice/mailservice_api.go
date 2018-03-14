@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/p2p/discover"
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
+	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"github.com/status-im/status-go/geth/log"
 )
 

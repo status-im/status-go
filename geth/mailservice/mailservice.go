@@ -4,7 +4,7 @@ import (
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
+	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 )
 
 // ServiceProvider provides node and required services.

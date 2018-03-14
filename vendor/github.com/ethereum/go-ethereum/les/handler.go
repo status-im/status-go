@@ -123,10 +123,6 @@ type ProtocolManager struct {
 	// wait group is used for graceful shutdowns during downloading
 	// and processing
 	wg *sync.WaitGroup
-
-	// wait group is used for waiting for currend download
-	// to finish (if running)
-	downloads *sync.WaitGroup
 }
 
 // NewProtocolManager returns a new ethereum sub protocol manager. The Ethereum sub protocol manages peers capable
@@ -148,7 +144,6 @@ func NewProtocolManager(chainConfig *params.ChainConfig, lightSync bool, protoco
 		quitSync:    quitSync,
 		wg:          wg,
 		noMorePeers: make(chan struct{}),
-		downloads:   &sync.WaitGroup{},
 	}
 	if odr != nil {
 		manager.retriever = odr.retriever
@@ -214,30 +209,7 @@ func NewProtocolManager(chainConfig *params.ChainConfig, lightSync bool, protoco
 		manager.fetcher = newLightFetcher(manager)
 	}
 
-	go manager.monitorDownloads()
-
 	return manager, nil
-}
-
-func (pm *ProtocolManager) monitorDownloads() {
-	sub := pm.eventMux.Subscribe(downloader.StartEvent{}, downloader.DoneEvent{}, downloader.FailedEvent{})
-	defer sub.Unsubscribe()
-
-	for {
-		select {
-		case event := <-sub.Chan():
-			if event == nil {
-				return
-			}
-
-			switch event.Data.(type) {
-			case downloader.StartEvent:
-				pm.downloads.Add(1)
-			case downloader.DoneEvent, downloader.FailedEvent:
-				pm.downloads.Done()
-			}
-		}
-	}
 }
 
 // removePeer initiates disconnection from a peer by removing it from the peer set
@@ -269,7 +241,8 @@ func (pm *ProtocolManager) Stop() {
 
 	close(pm.quitSync) // quits syncer, fetcher
 
-	pm.downloads.Wait() // Wait until current downloads are finished.
+	// Stop downloader and make sure that all the running downloads are complete.
+	pm.downloader.Terminate()
 
 	// Disconnect existing sessions.
 	// This also closes the gate for any new registrations on the peer set.
