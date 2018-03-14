@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/ethereum/go-ethereum/accounts"
+	"github.com/ethereum/go-ethereum/accounts/keystore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
-
+	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/jail"
@@ -27,32 +29,26 @@ const (
 type StatusBackend struct {
 	mu              sync.Mutex
 	nodeManager     *node.NodeManager
-	accountManager  common.AccountManager
-	txQueueManager  *transactions.Manager
-	jailManager     jail.Manager
-	newNotification common.NotificationConstructor
+	accountManager  account.Accounter
+	txQueue         *transactions.Manager
+	jail            jail.Manager
 	connectionState ConnectionState
 	log             log.Logger
+	newNotification fcm.NotificationConstructor
 }
 
 // NewStatusBackend create a new NewStatusBackend instance
 func NewStatusBackend() *StatusBackend {
 	defer log.Info("Status backend initialized")
 
-	nodeManager := node.NewNodeManager()
-	accountManager := account.NewManager(nodeManager)
-	txQueueManager := transactions.NewManager(nodeManager, accountManager)
-	jailManager := jail.New(nodeManager)
-	notificationManager := fcm.NewNotification(fcmServerKey)
-
-	return &StatusBackend{
-		nodeManager:     nodeManager,
-		accountManager:  accountManager,
-		jailManager:     jailManager,
-		txQueueManager:  txQueueManager,
-		newNotification: notificationManager,
+	backend := StatusBackend{
+		nodeManager:     node.NewNodeManager(),
+		newNotification: fcm.NewNotification(fcmServerKey),
 		log:             log.New("package", "status-go/geth/api.StatusBackend"),
 	}
+	backend.accountManager = account.NewManager(&backend)
+
+	return &backend
 }
 
 // NodeManager returns reference to node manager
@@ -60,19 +56,53 @@ func (b *StatusBackend) NodeManager() *node.NodeManager {
 	return b.nodeManager
 }
 
+// Account get the underlying accounts.Manager under account.Manager
+func (b *StatusBackend) Account() (*accounts.Manager, error) {
+	node, err := b.nodeManager.Node()
+	if err != nil {
+		return nil, err
+	}
+	return node.AccountManager(), nil
+}
+
+// AccountKeyStore exposes reference to accounts key store
+func (b *StatusBackend) AccountKeyStore() (*keystore.KeyStore, error) {
+	am, err := b.Account()
+	if err != nil {
+		return nil, err
+	}
+
+	backends := am.Backends(keystore.KeyStoreType)
+	if len(backends) == 0 {
+		return nil, account.ErrAccountKeyStoreMissing
+	}
+
+	keyStore, ok := backends[0].(*keystore.KeyStore)
+	if !ok {
+		return nil, account.ErrAccountKeyStoreMissing
+	}
+
+	return keyStore, nil
+}
+
 // AccountManager returns reference to account manager
-func (b *StatusBackend) AccountManager() common.AccountManager {
+func (b *StatusBackend) AccountManager() account.Accounter {
 	return b.accountManager
 }
 
 // JailManager returns reference to jail
 func (b *StatusBackend) JailManager() jail.Manager {
-	return b.jailManager
+	return b.jail
 }
 
 // TxQueueManager returns reference to transactions manager
 func (b *StatusBackend) TxQueueManager() *transactions.Manager {
-	return b.txQueueManager
+	return b.txQueue
+}
+
+// Whisper gets a WhisperService
+func (b *StatusBackend) Whisper() (*whisper.Whisper, error) {
+	return b.nodeManager.WhisperService()
 }
 
 // IsNodeRunning confirm that node is running
@@ -93,7 +123,9 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 			err = fmt.Errorf("node crashed on start: %v", err)
 		}
 	}()
+
 	err = b.nodeManager.StartNode(config)
+
 	if err != nil {
 		switch err.(type) {
 		case node.RPCClientError:
@@ -107,20 +139,47 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 				Error: err,
 			},
 		})
+
 		return err
 	}
+
+	b.txQueue = transactions.NewManager(b.nodeManager, b.accountManager)
+	b.jail = jail.New(b.nodeManager)
+
 	signal.Send(signal.Envelope{Type: signal.EventNodeStarted})
 	// tx queue manager should be started after node is started, it depends
 	// on rpc client being created
-	b.txQueueManager.Start()
+	b.txQueue.Start()
 	if err := b.registerHandlers(); err != nil {
 		b.log.Error("Handler registration failed", "err", err)
 	}
-	if err := b.accountManager.ReSelectAccount(); err != nil {
+	if err := b.ReselectAccount(); err != nil {
 		b.log.Error("Reselect account failed", "err", err)
 	}
+
 	b.log.Info("Account reselected")
 	signal.Send(signal.Envelope{Type: signal.EventNodeReady})
+
+	return nil
+}
+
+// ReselectAccount reselects the previous account if any
+func (b *StatusBackend) ReselectAccount() error {
+	selectedAccount, err := b.AccountManager().SelectedAccount()
+	if err != nil {
+		return nil
+	}
+
+	w, err := b.Whisper()
+	if err != nil {
+		return fmt.Errorf("%s: %v", account.ErrWhisperClearIdentitiesFailure, err)
+	}
+
+	err = w.SelectKeyPair(selectedAccount.AccountKey.PrivateKey)
+	if err != nil {
+		return account.ErrWhisperIdentityInjectionFailure
+	}
+
 	return nil
 }
 
@@ -128,6 +187,7 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 func (b *StatusBackend) StopNode() error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+
 	return b.stopNode()
 }
 
@@ -135,8 +195,8 @@ func (b *StatusBackend) stopNode() error {
 	if !b.IsNodeRunning() {
 		return node.ErrNoRunningNode
 	}
-	b.txQueueManager.Stop()
-	b.jailManager.Stop()
+	b.txQueue.Stop()
+	b.jail.Stop()
 	defer signal.Send(signal.Envelope{Type: signal.EventNodeStopped})
 	return b.nodeManager.StopNode()
 }
@@ -190,10 +250,10 @@ func (b *StatusBackend) SendTransaction(ctx context.Context, args common.SendTxA
 		ctx = context.Background()
 	}
 	tx := common.CreateTransaction(ctx, args)
-	if err = b.txQueueManager.QueueTransaction(tx); err != nil {
+	if err = b.txQueue.QueueTransaction(tx); err != nil {
 		return hash, err
 	}
-	rst := b.txQueueManager.WaitForTransaction(tx)
+	rst := b.txQueue.WaitForTransaction(tx)
 	if rst.Error != nil {
 		return hash, rst.Error
 	}
@@ -202,32 +262,35 @@ func (b *StatusBackend) SendTransaction(ctx context.Context, args common.SendTxA
 
 // CompleteTransaction instructs backend to complete sending of a given transaction
 func (b *StatusBackend) CompleteTransaction(id common.QueuedTxID, password string) (gethcommon.Hash, error) {
-	return b.txQueueManager.CompleteTransaction(id, password)
+	return b.txQueue.CompleteTransaction(id, password)
 }
 
 // CompleteTransactions instructs backend to complete sending of multiple transactions
 func (b *StatusBackend) CompleteTransactions(ids []common.QueuedTxID, password string) map[common.QueuedTxID]common.TransactionResult {
-	return b.txQueueManager.CompleteTransactions(ids, password)
+	return b.txQueue.CompleteTransactions(ids, password)
 }
 
 // DiscardTransaction discards a given transaction from transaction queue
 func (b *StatusBackend) DiscardTransaction(id common.QueuedTxID) error {
-	return b.txQueueManager.DiscardTransaction(id)
+	return b.txQueue.DiscardTransaction(id)
 }
 
 // DiscardTransactions discards given multiple transactions from transaction queue
 func (b *StatusBackend) DiscardTransactions(ids []common.QueuedTxID) map[common.QueuedTxID]common.RawDiscardTransactionResult {
-	return b.txQueueManager.DiscardTransactions(ids)
+	return b.txQueue.DiscardTransactions(ids)
 }
 
 // registerHandlers attaches Status callback handlers to running node
 func (b *StatusBackend) registerHandlers() error {
-	rpcClient := b.NodeManager().RPCClient()
+	rpcClient := b.nodeManager.RPCClient()
 	if rpcClient == nil {
 		return node.ErrRPCClient
 	}
-	rpcClient.RegisterHandler("eth_accounts", b.accountManager.AccountsRPCHandler())
-	rpcClient.RegisterHandler("eth_sendTransaction", b.txQueueManager.SendTransactionRPCHandler)
+
+	rpcClient.RegisterHandler("eth_accounts", func(context.Context, ...interface{}) (interface{}, error) {
+		return b.AccountManager().Accounts()
+	})
+	rpcClient.RegisterHandler("eth_sendTransaction", b.txQueue.SendTransactionRPCHandler)
 	return nil
 }
 
@@ -246,4 +309,46 @@ func (b *StatusBackend) AppStateChange(state AppState) {
 
 	// TODO: put node in low-power mode if the app is in background (or inactive)
 	// and normal mode if the app is in foreground.
+}
+
+// SelectAccount selects current account, by verifying that address has corresponding account which can be decrypted
+// using provided password. Once verification is done, decrypted key is injected into Whisper (as a single identity,
+// all previous identities are removed).
+func (b *StatusBackend) SelectAccount(address, password string) error {
+	if err := b.AccountManager().SelectAccount(address, password); err != nil {
+		return err
+	}
+	if err := b.ReselectAccount(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Logout clears whisper identities
+func (b *StatusBackend) Logout() error {
+	if err := b.DeleteWhisperKeyPairs(); err != nil {
+		return err
+	}
+
+	return b.AccountManager().Logout()
+}
+
+// SetNodeManager Node manager setter
+func (b *StatusBackend) SetNodeManager(nodeManager *node.NodeManager) {
+	b.nodeManager = nodeManager
+}
+
+// DeleteWhisperKeyPairs removes all cryptographic identities known to the node
+func (b *StatusBackend) DeleteWhisperKeyPairs() error {
+	w, err := b.Whisper()
+
+	if w == nil || err != nil {
+		return account.ErrWhisperIdentityInjectionFailure
+	}
+
+	if err := w.DeleteKeyPairs(); err != nil {
+		return fmt.Errorf("%s: %v", account.ErrWhisperClearIdentitiesFailure, err)
+	}
+	return nil
 }

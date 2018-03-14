@@ -388,7 +388,7 @@ func testCreateChildAccount(t *testing.T) bool { //nolint: gocyclo
 		t.Fatal(err)
 	}
 
-	keyStore, err := statusAPI.NodeManager().AccountKeyStore()
+	keyStore, err := statusAPI.AccountKeyStore()
 	if err != nil {
 		t.Error(err)
 		return false
@@ -410,7 +410,7 @@ func testCreateChildAccount(t *testing.T) bool { //nolint: gocyclo
 	address, pubKey, mnemonic := createAccountResponse.Address, createAccountResponse.PubKey, createAccountResponse.Mnemonic
 	t.Logf("Account created: {address: %s, key: %s, mnemonic:%s}", address, pubKey, mnemonic)
 
-	acct, err := common.ParseAccountString(address)
+	acct, err := account.ParseAccountString(address)
 	if err != nil {
 		t.Errorf("can not get account from address: %v", err)
 		return false
@@ -519,7 +519,7 @@ func testCreateChildAccount(t *testing.T) bool { //nolint: gocyclo
 }
 
 func testRecoverAccount(t *testing.T) bool { //nolint: gocyclo
-	keyStore, _ := statusAPI.NodeManager().AccountKeyStore()
+	keyStore, _ := statusAPI.AccountKeyStore()
 
 	// create an account
 	address, pubKey, mnemonic, err := statusAPI.CreateAccount(TestConfig.Account1.Password)
@@ -548,7 +548,7 @@ func testRecoverAccount(t *testing.T) bool { //nolint: gocyclo
 	}
 
 	// now test recovering, but make sure that account/key file is removed i.e. simulate recovering on a new device
-	account, err := common.ParseAccountString(address)
+	account, err := account.ParseAccountString(address)
 	if err != nil {
 		t.Errorf("can not get account from address: %v", err)
 	}
@@ -819,8 +819,8 @@ func testCompleteTransaction(t *testing.T) bool {
 
 	// this call blocks, up until Complete Transaction is called
 	txCheckHash, err := statusAPI.SendTransaction(context.TODO(), common.SendTxArgs{
-		From:  common.FromAddress(TestConfig.Account1.Address),
-		To:    common.ToAddress(TestConfig.Account2.Address),
+		From:  account.FromAddress(TestConfig.Account1.Address),
+		To:    account.ToAddress(TestConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 	})
 	if err != nil {
@@ -884,8 +884,8 @@ func testCompleteMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocyc
 	//  this call blocks, and should return when DiscardQueuedTransaction() for a given tx id is called
 	sendTx := func() {
 		txHashCheck, err := statusAPI.SendTransaction(context.TODO(), common.SendTxArgs{
-			From:  common.FromAddress(TestConfig.Account1.Address),
-			To:    common.ToAddress(TestConfig.Account2.Address),
+			From:  account.FromAddress(TestConfig.Account1.Address),
+			To:    account.ToAddress(TestConfig.Account2.Address),
 			Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 		})
 		if err != nil {
@@ -1067,8 +1067,8 @@ func testDiscardTransaction(t *testing.T) bool { //nolint: gocyclo
 
 	// this call blocks, and should return when DiscardQueuedTransaction() is called
 	txHashCheck, err := statusAPI.SendTransaction(context.TODO(), common.SendTxArgs{
-		From:  common.FromAddress(TestConfig.Account1.Address),
-		To:    common.ToAddress(TestConfig.Account2.Address),
+		From:  account.FromAddress(TestConfig.Account1.Address),
+		To:    account.ToAddress(TestConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 	})
 	if err != transactions.ErrQueuedTxDiscarded {
@@ -1158,8 +1158,8 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocycl
 	// this call blocks, and should return when DiscardQueuedTransaction() for a given tx id is called
 	sendTx := func() {
 		txHashCheck, err := statusAPI.SendTransaction(context.TODO(), common.SendTxArgs{
-			From:  common.FromAddress(TestConfig.Account1.Address),
-			To:    common.ToAddress(TestConfig.Account2.Address),
+			From:  account.FromAddress(TestConfig.Account1.Address),
+			To:    account.ToAddress(TestConfig.Account2.Address),
 			Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 		})
 		if err != transactions.ErrQueuedTxDiscarded {

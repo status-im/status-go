@@ -6,8 +6,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
-	"github.com/status-im/status-go/geth/account"
-	"github.com/status-im/status-go/geth/node"
 	e2e "github.com/status-im/status-go/t/e2e"
 	. "github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/suite"
@@ -18,30 +16,31 @@ func TestWhisperTestSuite(t *testing.T) {
 }
 
 type WhisperTestSuite struct {
-	e2e.NodeManagerTestSuite
+	e2e.BackendTestSuite
 }
 
 func (s *WhisperTestSuite) SetupTest() {
-	s.NodeManager = node.NewNodeManager()
-	s.NotNil(s.NodeManager)
+	s.BackendTestSuite.SetupTest()
 }
 
 // TODO(adam): can anyone explain what this test is testing?
 // I don't see any race condition testing here.
 func (s *WhisperTestSuite) TestWhisperFilterRace() {
-	s.StartTestNode()
-	defer s.StopTestNode()
+	s.StartTestBackend()
+	defer s.StopTestBackend()
 
-	whisperService, err := s.NodeManager.WhisperService()
+	address, _, _, err := s.Backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
 	s.NoError(err)
+	// select account (sub-accounts will be created for this key)
+	err = s.Backend.SelectAccount(address, TestConfig.Account1.Password)
+	s.NoError(err, "account selection failed")
 
-	accountManager := account.NewManager(s.NodeManager)
-	s.NotNil(accountManager)
-
+	whisperService, err := s.Backend.Whisper()
+	s.NoError(err)
 	whisperAPI := whisper.NewPublicWhisperAPI(whisperService)
 
 	// account1
-	_, accountKey1, err := accountManager.AddressToDecryptedAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
+	_, accountKey1, err := s.Backend.AccountManager().AddressToDecryptedAccount(address, TestConfig.Account1.Password)
 	s.NoError(err)
 	accountKey1Byte := crypto.FromECDSAPub(&accountKey1.PrivateKey.PublicKey)
 
@@ -51,7 +50,7 @@ func (s *WhisperTestSuite) TestWhisperFilterRace() {
 	s.True(ok, "identity not injected")
 
 	// account2
-	_, accountKey2, err := accountManager.AddressToDecryptedAccount(TestConfig.Account2.Address, TestConfig.Account2.Password)
+	_, accountKey2, err := s.Backend.AccountManager().AddressToDecryptedAccount(address, TestConfig.Account2.Password)
 	s.NoError(err)
 	key2ID, err := whisperService.AddKeyPair(accountKey2.PrivateKey)
 	s.NoError(err)
@@ -94,13 +93,14 @@ func (s *WhisperTestSuite) TestWhisperFilterRace() {
 }
 
 func (s *WhisperTestSuite) TestLogout() {
-	s.StartTestNode()
-	defer s.StopTestNode()
+	s.StartTestBackend()
+	defer s.StopTestBackend()
 
-	whisperService, err := s.NodeManager.WhisperService()
+	whisperService, err := s.Backend.Whisper()
 	s.NoError(err)
 
-	accountManager := account.NewManager(s.NodeManager)
+	accountManager := s.Backend.AccountManager()
+	s.Nil(err)
 	s.NotNil(accountManager)
 
 	// create an account
@@ -109,9 +109,9 @@ func (s *WhisperTestSuite) TestLogout() {
 
 	// make sure that identity doesn't exist (yet) in Whisper
 	s.False(whisperService.HasKeyPair(pubKey), "identity already present in whisper")
-	s.NoError(accountManager.SelectAccount(address, TestConfig.Account1.Password))
+	s.NoError(s.Backend.SelectAccount(address, TestConfig.Account1.Password))
 	s.True(whisperService.HasKeyPair(pubKey), "identity not injected into whisper")
 
-	s.NoError(accountManager.Logout())
+	s.NoError(s.Backend.Logout())
 	s.False(whisperService.HasKeyPair(pubKey), "identity not cleared from whisper")
 }

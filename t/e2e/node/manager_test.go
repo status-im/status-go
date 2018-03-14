@@ -4,8 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts"
-	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/les"
 	gethnode "github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -79,20 +77,6 @@ func (s *ManagerTestSuite) TestReferencesWithoutStartedNode() {
 			node.ErrNoRunningNode,
 		},
 		{
-			"non-null manager, no running node, get AccountManager",
-			func() (interface{}, error) {
-				return s.NodeManager.AccountManager()
-			},
-			node.ErrNoRunningNode,
-		},
-		{
-			"non-null manager, no running node, get AccountKeyStore",
-			func() (interface{}, error) {
-				return s.NodeManager.AccountKeyStore()
-			},
-			node.ErrNoRunningNode,
-		},
-		{
 			"non-null manager, no running node, get RPC Client",
 			func() (interface{}, error) {
 				return s.NodeManager.RPCClient(), nil
@@ -147,20 +131,6 @@ func (s *ManagerTestSuite) TestReferencesWithStartedNode() {
 				return s.NodeManager.WhisperService()
 			},
 			&whisper.Whisper{},
-		},
-		{
-			"node is running, get AccountManager",
-			func() (interface{}, error) {
-				return s.NodeManager.AccountManager()
-			},
-			&accounts.Manager{},
-		},
-		{
-			"node is running, get AccountKeyStore",
-			func() (interface{}, error) {
-				return s.NodeManager.AccountKeyStore()
-			},
-			&keystore.KeyStore{},
 		},
 		{
 			"node is running, get RPC Client",

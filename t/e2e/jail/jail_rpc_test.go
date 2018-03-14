@@ -11,7 +11,6 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/geth/common"
-	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/signal"
 	"github.com/status-im/status-go/geth/transactions"
@@ -26,14 +25,10 @@ func TestJailRPCTestSuite(t *testing.T) {
 
 type JailRPCTestSuite struct {
 	e2e.BackendTestSuite
-
-	jail jail.Manager
 }
 
 func (s *JailRPCTestSuite) SetupTest() {
 	s.BackendTestSuite.SetupTest()
-	s.jail = s.Backend.JailManager()
-	s.NotNil(s.jail)
 }
 
 func (s *JailRPCTestSuite) TestJailRPCSend() {
@@ -43,11 +38,11 @@ func (s *JailRPCTestSuite) TestJailRPCSend() {
 	EnsureNodeSync(s.Backend.NodeManager())
 
 	// load Status JS and add test command to it
-	s.jail.SetBaseJS(baseStatusJSCode)
-	s.jail.CreateAndInitCell(testChatID)
+	s.Backend.JailManager().SetBaseJS(baseStatusJSCode)
+	s.Backend.JailManager().CreateAndInitCell(testChatID)
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
-	cell, err := s.jail.Cell(testChatID)
+	cell, err := s.Backend.JailManager().Cell(testChatID)
 	s.NoError(err)
 	s.NotNil(cell)
 
@@ -73,10 +68,10 @@ func (s *JailRPCTestSuite) TestIsConnected() {
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
-	s.jail.CreateAndInitCell(testChatID)
+	s.Backend.JailManager().CreateAndInitCell(testChatID)
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
-	cell, err := s.jail.Cell(testChatID)
+	cell, err := s.Backend.JailManager().Cell(testChatID)
 	s.NoError(err)
 
 	_, err = cell.Run(`
@@ -114,9 +109,9 @@ func (s *JailRPCTestSuite) TestContractDeployment() {
 	EnsureNodeSync(s.Backend.NodeManager())
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
-	s.jail.CreateAndInitCell(testChatID)
+	s.Backend.JailManager().CreateAndInitCell(testChatID)
 
-	cell, err := s.jail.Cell(testChatID)
+	cell, err := s.Backend.JailManager().Cell(testChatID)
 	s.NoError(err)
 
 	completeQueuedTransaction := make(chan struct{})
@@ -131,7 +126,7 @@ func (s *JailRPCTestSuite) TestContractDeployment() {
 			event := envelope.Event.(map[string]interface{})
 			s.T().Logf("transaction queued and will be completed shortly, id: %v", event["id"])
 
-			s.NoError(s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
+			s.NoError(s.Backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 
 			txID := event["id"].(string)
 			var txErr error
@@ -197,7 +192,7 @@ func (s *JailRPCTestSuite) TestJailVMPersistence() {
 	EnsureNodeSync(s.Backend.NodeManager())
 
 	// log into account from which transactions will be sent
-	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
+	err := s.Backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	s.NoError(err, "cannot select account: %v", TestConfig.Account1.Address)
 
 	type testCase struct {

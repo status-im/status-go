@@ -39,10 +39,11 @@ func (s *APIBackendTestSuite) TestRaceConditions() {
 	nodeConfig1, err := MakeTestNodeConfig(GetNetworkID())
 	require.NoError(err)
 
-	nodeConfig2, err := MakeTestNodeConfig(GetNetworkID())
-	require.NoError(err)
+	nodeConfigs := []*params.NodeConfig{nodeConfig1}
 
-	nodeConfigs := []*params.NodeConfig{nodeConfig1, nodeConfig2}
+	s.False(s.Backend.IsNodeRunning())
+	s.NoError(s.Backend.StartNode(nodeConfig1))
+	s.True(s.Backend.IsNodeRunning())
 
 	var funcsToTest = []func(*params.NodeConfig){
 		func(config *params.NodeConfig) {
@@ -104,7 +105,7 @@ func (s *APIBackendTestSuite) TestRaceConditions() {
 
 			// SelectAccount
 			log.Info("CreateAccount()")
-			err = s.Backend.AccountManager().SelectAccount(address, "password")
+			err = s.Backend.SelectAccount(address, "password")
 			s.T().Logf("SelectAccount(%v, %v), error: %v", address, "password", err)
 
 			// CreateChildAccount
