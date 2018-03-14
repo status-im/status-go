@@ -41,6 +41,21 @@ const (
 	totalAvailableLanguages
 )
 
+type entropyStrength int
+
+const (
+	// EntropyStrength128 defines an entropy strength of 128 bits
+	EntropyStrength128 = entropyStrength(128)
+	// EntropyStrength160 defines an entropy strength of 160 bits
+	EntropyStrength160 = entropyStrength(160)
+	// EntropyStrength192 defines an entropy strength of 192 bits
+	EntropyStrength192 = entropyStrength(192)
+	// EntropyStrength224 defines an entropy strength of 224 bits
+	EntropyStrength224 = entropyStrength(224)
+	// EntropyStrength256 defines an entropy strength of 256 bits
+	EntropyStrength256 = entropyStrength(256)
+)
+
 // Languages is a list of supported languages for which mnemonic keys can be generated
 var Languages = [...]string{
 	"English",
@@ -123,7 +138,7 @@ func (m *Mnemonic) MnemonicSeed(mnemonic string, password string) []byte {
 }
 
 // MnemonicPhrase returns a human readable seed for BIP32 Hierarchical Deterministic Wallets
-func (m *Mnemonic) MnemonicPhrase(strength int, language Language) (string, error) {
+func (m *Mnemonic) MnemonicPhrase(strength entropyStrength, language Language) (string, error) {
 	wordList, err := m.WordList(language)
 	if err != nil {
 		return "", err

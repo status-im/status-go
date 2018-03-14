@@ -22,7 +22,7 @@ func TestMnemonicPhrase(t *testing.T) {
 	mnemonic := NewMnemonic(Salt)
 
 	// test strength validation
-	strengths := []int{127, 129, 257}
+	strengths := []entropyStrength{127, 129, 257}
 	for _, s := range strengths {
 		_, err := mnemonic.MnemonicPhrase(s, EnglishLanguage)
 		if err != ErrInvalidEntropyStrength {
@@ -33,7 +33,7 @@ func TestMnemonicPhrase(t *testing.T) {
 	// test mnemonic generation
 	t.Log("Test mnemonic generation:")
 	for _, language := range mnemonic.AvailableLanguages() {
-		phrase, err := mnemonic.MnemonicPhrase(128, language)
+		phrase, err := mnemonic.MnemonicPhrase(EntropyStrength128, language)
 		t.Logf("Mnemonic (%s): %s", Languages[language], phrase)
 
 		if err != nil {
