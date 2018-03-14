@@ -18,14 +18,12 @@ import (
 )
 
 var loadConfigTestCases = []struct {
-	name           string
-	useMainnetFlag bool // nolint
-	configJSON     string
-	validator      func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error)
+	name       string
+	configJSON string
+	validator  func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error)
 }{
 	{
 		`invalid input JSON (missing comma at the end of key:value pair)`,
-		false,
 		`{
 			"NetworkId": 3
 			"DataDir": "$TMPDIR"
@@ -36,7 +34,6 @@ var loadConfigTestCases = []struct {
 	},
 	{
 		`check static DataDir passing`,
-		false,
 		`{
 			"NetworkId": 3,
 			"DataDir": "/storage/emulated/0/ethereum/"
@@ -48,7 +45,6 @@ var loadConfigTestCases = []struct {
 	},
 	{
 		`use default KeyStoreDir`,
-		false,
 		`{
 			"NetworkId": 3,
 			"DataDir": "$TMPDIR"
@@ -65,7 +61,6 @@ var loadConfigTestCases = []struct {
 	},
 	{
 		`use non-default KeyStoreDir`,
-		false,
 		`{
 			"NetworkId": 3,
 			"DataDir": "$TMPDIR",
@@ -79,7 +74,6 @@ var loadConfigTestCases = []struct {
 	},
 	{
 		`test Upstream config setting`,
-		false,
 		`{
 			"NetworkId": 3,
 			"DataDir": "$TMPDIR",
@@ -112,7 +106,6 @@ var loadConfigTestCases = []struct {
 	},
 	{
 		`test parameter overriding`,
-		false,
 		`{
 			"NetworkId": 3,
 			"DataDir": "$TMPDIR",
@@ -141,7 +134,6 @@ var loadConfigTestCases = []struct {
 	},
 	{
 		`test loading Testnet config`,
-		false,
 		`{
 			"NetworkId": 3,
 			"DataDir": "$TMPDIR",
@@ -177,7 +169,6 @@ var loadConfigTestCases = []struct {
 	},
 	{
 		`test loading Mainnet config`,
-		true,
 		`{
 			"NetworkId": 1,
 			"DataDir": "$TMPDIR",
@@ -210,7 +201,6 @@ var loadConfigTestCases = []struct {
 	},
 	{
 		`test loading Privatenet config`,
-		false,
 		`{
 			"NetworkId": 311,
 			"DataDir": "$TMPDIR",
@@ -226,7 +216,6 @@ var loadConfigTestCases = []struct {
 	},
 	{
 		`default boot cluster (Ropsten Dev)`,
-		false,
 		`{
 			"NetworkId": 3,
 			"DataDir": "$TMPDIR"
@@ -241,7 +230,6 @@ var loadConfigTestCases = []struct {
 	},
 	{
 		`default boot cluster (Ropsten Prod)`,
-		false,
 		`{
 			"NetworkId": 3,
 			"DataDir": "$TMPDIR",
@@ -257,7 +245,6 @@ var loadConfigTestCases = []struct {
 	},
 	{
 		`disabled boot cluster`,
-		false,
 		`{
 			"NetworkId": 311,
 			"DataDir": "$TMPDIR",
@@ -272,7 +259,6 @@ var loadConfigTestCases = []struct {
 	},
 	{
 		`select boot cluster (Rinkeby Dev)`,
-		false,
 		`{
 			"NetworkId": 4,
 			"DataDir": "$TMPDIR"
@@ -287,7 +273,6 @@ var loadConfigTestCases = []struct {
 	},
 	{
 		`select boot cluster (Rinkeby Prod)`,
-		false,
 		`{
 			"NetworkId": 4,
 			"DataDir": "$TMPDIR",
@@ -303,7 +288,6 @@ var loadConfigTestCases = []struct {
 	},
 	{
 		`select boot cluster (Mainnet dev)`,
-		true,
 		`{
 			"NetworkId": 1,
 			"DataDir": "$TMPDIR"
@@ -318,7 +302,6 @@ var loadConfigTestCases = []struct {
 	},
 	{
 		`select boot cluster (Mainnet Prod)`,
-		true,
 		`{
 			"NetworkId": 1,
 			"DataDir": "$TMPDIR",
@@ -333,20 +316,7 @@ var loadConfigTestCases = []struct {
 		},
 	},
 	{
-		`select Mainnet without flag`,
-		false,
-		`{
-			"NetworkId": 1,
-			"DataDir": "$TMPDIR",
-			"DevMode": false
-		}`,
-		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
-			require.EqualError(t, err, "code not compiled for use of mainnet")
-		},
-	},
-	{
 		`default DevMode (true)`,
-		false,
 		`{
 			"NetworkId": 311,
 			"DataDir": "$TMPDIR"
@@ -359,7 +329,6 @@ var loadConfigTestCases = []struct {
 	},
 	{
 		`explicit DevMode = false`,
-		false,
 		`{
 			"NetworkId": 3,
 			"DataDir": "$TMPDIR",
@@ -389,7 +358,6 @@ func TestLoadNodeConfig(t *testing.T) {
 
 	for _, testCase := range loadConfigTestCases {
 		t.Log("test: " + testCase.name)
-		params.UseMainnet = testCase.useMainnetFlag
 		testCase.configJSON = strings.Replace(testCase.configJSON, "$TMPDIR", tmpDir, -1)
 		nodeConfig, err := params.LoadNodeConfig(testCase.configJSON)
 		testCase.validator(t, tmpDir, nodeConfig, err)

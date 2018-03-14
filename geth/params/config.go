@@ -15,18 +15,6 @@ import (
 	"github.com/status-im/status-go/static"
 )
 
-// default node configuration options
-var (
-	UseMainnetFlag = "false" // to be overridden via -ldflags '-X geth/params.UseMainnetFlag'
-	UseMainnet     = false
-)
-
-func init() {
-	if UseMainnetFlag == "true" { // set at compile time, here we make sure to set corresponding boolean flag
-		UseMainnet = true
-	}
-}
-
 // errors
 var (
 	ErrMissingDataDir             = errors.New("missing required 'DataDir' parameter")
@@ -319,7 +307,7 @@ func NewNodeConfig(dataDir string, networkID uint64, devMode bool) (*NodeConfig,
 	}
 
 	// adjust dependent values
-	if err := nodeConfig.validateAndUpdateConfig(); err != nil {
+	if err := nodeConfig.updateConfig(); err != nil {
 		return nil, err
 	}
 
@@ -354,7 +342,7 @@ func loadNodeConfig(configJSON string) (*NodeConfig, error) {
 	}
 
 	// repopulate
-	if err := nodeConfig.validateAndUpdateConfig(); err != nil {
+	if err := nodeConfig.updateConfig(); err != nil {
 		return nil, err
 	}
 
@@ -430,14 +418,9 @@ func (c *NodeConfig) Save() error {
 	return nil
 }
 
-// validateAndUpdateConfig traverses configuration and adjusts dependent fields
+// updateConfig traverses configuration and adjusts dependent fields
 // (we have a development/production and mobile/full node dependent configurations)
-func (c *NodeConfig) validateAndUpdateConfig() error {
-	// Validate config
-	if !UseMainnet && c.NetworkID == MainNetworkID {
-		return errors.New("code not compiled for use of mainnet")
-	}
-
+func (c *NodeConfig) updateConfig() error {
 	// Update separate configurations.
 	if err := c.updateGenesisConfig(); err != nil {
 		return err
