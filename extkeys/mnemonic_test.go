@@ -30,7 +30,7 @@ func TestNewMnemonic(t *testing.T) {
 }
 
 func TestMnemonic_WordList(t *testing.T) {
-	m := NewMnemonic("")
+	m := NewMnemonic(Salt)
 	_, err := m.WordList(EnglishLanguage)
 	if err != nil {
 		t.Errorf("expected WordList to return WordList without errors, got: %s", err)
