@@ -240,7 +240,7 @@ func (m *Mnemonic) ValidMnemonic(mnemonic string, language Language) bool {
 
 // WordList returns list of words for a given language
 func (m *Mnemonic) WordList(language Language) (*WordList, error) {
-	if m.wordLists[language] == nil {
+	if int(language) < 0 || int(language) > len(m.wordLists)-1 || m.wordLists[language] == nil {
 		return nil, fmt.Errorf("language word list is missing (language id: %d)", language)
 	}
 	return m.wordLists[language], nil

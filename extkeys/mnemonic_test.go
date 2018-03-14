@@ -29,6 +29,22 @@ func TestNewMnemonic(t *testing.T) {
 	}
 }
 
+func TestMnemonic_WordList(t *testing.T) {
+	m := NewMnemonic("")
+	_, err := m.WordList(EnglishLanguage)
+	if err != nil {
+		t.Errorf("expected WordList to return WordList without errors, got: %s", err)
+	}
+
+	indexes := []Language{-1, Language(len(m.wordLists))}
+	for _, index := range indexes {
+		_, err := m.WordList(index)
+		if err == nil {
+			t.Errorf("expected WordList to return an error with index %d", index)
+		}
+	}
+}
+
 // TestMnemonicPhrase
 func TestMnemonicPhrase(t *testing.T) {
 
