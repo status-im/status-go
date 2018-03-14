@@ -160,7 +160,7 @@ lint:
 	@echo "lint"
 	@gometalinter ./...
 
-ci: lint mock test-unit test-e2e ##@tests Run all linters and tests at once
+ci: statusgo-mainnet lint mock test-unit test-e2e ##@tests Run all linters and tests at once
 
 clean: ##@other Cleanup
 	rm -fr build/bin/*
