@@ -139,7 +139,7 @@ test-unit: ##@tests Run unit and integration tests
 test-unit-coverage: ##@tests Run unit and integration tests with coverage
 	go test -coverpkg= $(UNIT_TEST_PACKAGES)
 
-test-e2e: ##@tests Run e2e tests
+test-e2e: statusgo-mainnet ##@tests Run e2e tests
 	# order: reliability then alphabetical
 	# TODO(tiabc): make a single command out of them adding `-p 1` flag.
 	go test -timeout 5m ./t/e2e/accounts/... -network=$(or $(networkid),StatusChain)
@@ -160,7 +160,7 @@ lint:
 	@echo "lint"
 	@gometalinter ./...
 
-ci: statusgo-mainnet lint mock test-unit test-e2e ##@tests Run all linters and tests at once
+ci: lint mock test-unit test-e2e ##@tests Run all linters and tests at once
 
 clean: ##@other Cleanup
 	rm -fr build/bin/*
