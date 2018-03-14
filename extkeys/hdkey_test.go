@@ -438,6 +438,7 @@ func TestErrors(t *testing.T) {
 		err       error
 		neuter    bool
 		neuterErr error
+		extKey    *ExtendedKey
 	}{
 		{
 			name: "invalid key length",
@@ -461,6 +462,22 @@ func TestErrors(t *testing.T) {
 			neuter:    true,
 			neuterErr: chaincfg.ErrUnknownHDKeyID,
 		},
+		{
+			name:      "zeroed extended key",
+			key:       EmptyExtendedKeyString,
+			err:       nil,
+			neuter:    false,
+			neuterErr: nil,
+			extKey:    &ExtendedKey{},
+		},
+		{
+			name:      "empty string",
+			key:       "",
+			err:       nil,
+			neuter:    false,
+			neuterErr: nil,
+			extKey:    &ExtendedKey{},
+		},
 	}
 
 	for i, test := range tests {
@@ -474,6 +491,13 @@ func TestErrors(t *testing.T) {
 			_, err := extKey.Neuter()
 			if !reflect.DeepEqual(err, test.neuterErr) {
 				t.Errorf("Neuter #%d (%s): mismatched error -- got: %v, want: %v", i, test.name, err, test.neuterErr)
+				continue
+			}
+		}
+
+		if test.extKey != nil {
+			if !reflect.DeepEqual(extKey, test.extKey) {
+				t.Errorf("ExtKey #%d (%s): mismatched extended key -- got: %+v, want: %+v", i, test.name, extKey, test.extKey)
 				continue
 			}
 		}
