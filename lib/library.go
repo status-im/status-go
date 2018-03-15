@@ -456,3 +456,9 @@ func AddPeer(enode *C.char) *C.char {
 func ConnectionChange(typ *C.char, expensive C.int) {
 	statusAPI.ConnectionChange(C.GoString(typ), expensive == 1)
 }
+
+// AppStateChange handles app state changes (background/foreground).
+//export AppStateChange
+func AppStateChange(state *C.char) {
+	statusAPI.AppStateChange(C.GoString(state))
+}
