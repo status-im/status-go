@@ -48,7 +48,7 @@ func NewManager(nodeManager common.NodeManager) *Manager {
 func (m *Manager) CreateAccount(password string) (address, pubKey, mnemonic string, err error) {
 	// generate mnemonic phrase
 	mn := extkeys.NewMnemonic(extkeys.Salt)
-	mnemonic, err = mn.MnemonicPhrase(128, extkeys.EnglishLanguage)
+	mnemonic, err = mn.MnemonicPhrase(extkeys.EntropyStrength128, extkeys.EnglishLanguage)
 	if err != nil {
 		return "", "", "", fmt.Errorf("can not create mnemonic seed: %v", err)
 	}
