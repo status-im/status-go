@@ -1,28 +1,20 @@
 {
   "name": "status-js",
-  "version": "0.9.8",
-  "description": "JavaScript tests for RPC API (Whisper/5, Swarm)",
-  "main": "index.js",
+  "version": "0.0.1",
+  "description": "Package file for NPM packages required by make generate, to be included in Go static assets",
   "engines": {
     "node": ">=8.9.0"
   },
   "dependencies": {},
   "devDependencies": {
-    "axios": "^0.17.1",
-    "chai": "^4.1.2",
-    "mocha": "^3.5.3",
     "requirejs": "^2.3.4",
-    "rimraf": "^2.6.2",
     "web3": "https://github.com/status-im/web3.js#status-develop"
-  },
-  "scripts": {
-    "test": "mocha --bail --slow 1000 --full-trace static/tests"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/status-im/status-go.git"
   },
-  "author": "Victor Farazdagi",
+  "author": "Pedro Pombeiro",
   "license": "ISC",
   "bugs": {
     "url": "https://github.com/status-im/status-go/issues"
