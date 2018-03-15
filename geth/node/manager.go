@@ -98,12 +98,6 @@ func (m *NodeManager) startNode(config *params.NodeConfig) error {
 		log.Error("Failed to create an RPC client", "error", err)
 		return RPCClientError(err)
 	}
-	// populate static peers exits when node stopped
-	go func() {
-		if err := m.PopulateStaticPeers(); err != nil {
-			log.Error("Static peers population", "error", err)
-		}
-	}()
 	return nil
 }
 
