@@ -12,6 +12,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/status-im/status-go/static"
 )
 
@@ -179,6 +180,9 @@ func (c *ClusterConfig) String() string {
 	return string(data)
 }
 
+// Limits represent min and max amount of peers
+type Limits [2]int
+
 // ----------
 // UpstreamRPCConfig
 // ----------
@@ -300,6 +304,9 @@ type NodeConfig struct {
 
 	// SwarmConfig extra configuration for Swarm and ENS
 	SwarmConfig *SwarmConfig `json:"SwarmConfig," validate:"structonly"`
+
+	RegisterTopics []discv5.Topic          `json:"RegisterTopics"`
+	RequireTopics  map[discv5.Topic]Limits `json:"RequireTopics"`
 }
 
 // NewNodeConfig creates new node configuration object

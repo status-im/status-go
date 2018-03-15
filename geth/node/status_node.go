@@ -16,9 +16,12 @@ import (
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
+	"github.com/syndtr/goleveldb/leveldb"
 
+	"github.com/status-im/status-go/geth/db"
 	"github.com/status-im/status-go/geth/mailservice"
 	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/geth/peers"
 	"github.com/status-im/status-go/geth/rpc"
 )
 
@@ -46,8 +49,14 @@ type StatusNode struct {
 	config   *params.NodeConfig // Status node configuration
 	gethNode *node.Node         // reference to Geth P2P stack/node
 
-	rpcClient *rpc.Client // reference to RPC client
-	log       log.Logger
+	register *peers.Register
+	peerPool *peers.PeerPool
+	db       *leveldb.DB
+
+	whisperService *whisper.Whisper   // reference to Whisper service
+	lesService     *les.LightEthereum // reference to LES service
+	rpcClient      *rpc.Client        // reference to RPC client
+	log            log.Logger
 }
 
 // New makes new instance of StatusNode.
@@ -97,6 +106,28 @@ func (n *StatusNode) start(config *params.NodeConfig) error {
 		n.log.Error("Failed to create an RPC client", "error", err)
 		return RPCClientError(err)
 	}
+	if ethNode.Server().DiscV5 != nil {
+		statusDB, err := db.CreateDatabase(filepath.Join(n.config.DataDir, params.StatusDatabase))
+		if err != nil {
+			return err
+		}
+		n.db = statusDB
+		n.register = peers.NewRegister(n.config.RegisterTopics...)
+		// TODO(dshulyak) consider adding a flag to define this behaviour
+		stopOnMax := len(n.config.RegisterTopics) == 0
+		n.peerPool = peers.NewPeerPool(n.config.RequireTopics,
+			peers.DefaultFastSync,
+			peers.DefaultSlowSync,
+			peers.NewCache(n.db),
+			stopOnMax,
+		)
+		if err := n.register.Start(ethNode.Server()); err != nil {
+			return err
+		}
+		if err := n.peerPool.Start(ethNode.Server()); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -111,6 +142,13 @@ func (n *StatusNode) Stop() error {
 func (n *StatusNode) stop() error {
 	if err := n.isAvailable(); err != nil {
 		return err
+	}
+	if n.gethNode.Server().DiscV5 != nil {
+		n.register.Stop()
+		n.peerPool.Stop()
+		if err := n.db.Close(); err != nil {
+			n.log.Error("error closing status db", "error", err)
+		}
 	}
 	if err := n.gethNode.Stop(); err != nil {
 		return err
