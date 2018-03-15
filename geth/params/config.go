@@ -155,23 +155,23 @@ func (c *SwarmConfig) String() string {
 }
 
 // ----------
-// StaticPeersConfig
+// BootClusterConfig
 // ----------
 
-// StaticPeersConfig holds configuration for supporting static peers, which is a temporary
+// BootClusterConfig holds configuration for supporting cluster peers, which is a temporary
 // means for mobile devices to get connected to Ethereum network (UDP-based discovery
 // may not be available, so we need means to discover the network manually).
-type StaticPeersConfig struct {
+type BootClusterConfig struct {
 	// Enabled flag specifies whether feature is enabled
 	Enabled bool
 
-	// StaticPeers list of static peer nodes for a given network (Ropsten, Rinkeby, Homestead),
+	// BootNodes list of cluster peer nodes for a given network (Ropsten, Rinkeby, Homestead),
 	// for a given mode (production vs development)
-	StaticPeers []string
+	BootNodes []string
 }
 
 // String dumps config object as nicely indented JSON
-func (c *StaticPeersConfig) String() string {
+func (c *BootClusterConfig) String() string {
 	data, _ := json.MarshalIndent(c, "", "    ") // nolint: gas
 	return string(data)
 }
@@ -284,8 +284,8 @@ type NodeConfig struct {
 	// empty the statical configuration data will be taken.
 	ClusterConfigFile string `json:"ClusterConfigFile"`
 
-	// StaticPeersConfig extra configuration for supporting cluster
-	StaticPeersConfig *StaticPeersConfig `json:"StaticPeersConfig," validate:"structonly"`
+	// BootClusterConfig extra configuration for supporting cluster peers.
+	BootClusterConfig *BootClusterConfig `json:"BootClusterConfig," validate:"structonly"`
 
 	// LightEthConfig extra configuration for LES
 	LightEthConfig *LightEthConfig `json:"LightEthConfig," validate:"structonly"`
@@ -319,9 +319,9 @@ func NewNodeConfig(dataDir string, clstrCfgFile string, networkID uint64, devMod
 		LogLevel:          LogLevel,
 		LogToStderr:       LogToStderr,
 		ClusterConfigFile: clstrCfgFile,
-		StaticPeersConfig: &StaticPeersConfig{
-			Enabled:     true,
-			StaticPeers: []string{},
+		BootClusterConfig: &BootClusterConfig{
+			Enabled:   true,
+			BootNodes: []string{},
 		},
 		LightEthConfig: &LightEthConfig{
 			Enabled:       true,
@@ -403,8 +403,8 @@ func (c *NodeConfig) Validate() error {
 		return err
 	}
 
-	if c.StaticPeersConfig.Enabled {
-		if err := validate.Struct(c.StaticPeersConfig); err != nil {
+	if c.BootClusterConfig.Enabled {
+		if err := validate.Struct(c.BootClusterConfig); err != nil {
 			return err
 		}
 	}
@@ -544,7 +544,7 @@ func (c *NodeConfig) updateUpstreamConfig() error {
 // This is necessary until we have LES protocol support CHT sync, and better node
 // discovery on mobile devices)
 func (c *NodeConfig) updateClusterConfig() error {
-	if !c.StaticPeersConfig.Enabled {
+	if !c.BootClusterConfig.Enabled {
 		return nil
 	}
 
@@ -553,9 +553,9 @@ func (c *NodeConfig) updateClusterConfig() error {
 	// decentralized solution. For now, in order to avoid forcing users to long sync times
 	// we use central static resource
 	type subClusterConfig struct {
-		Number      int      `json:"number"`
-		Hash        string   `json:"hash"`
-		StaticPeers []string `json:"staticpeers"`
+		Number    int      `json:"number"`
+		Hash      string   `json:"hash"`
+		BootNodes []string `json:"bootnodes"`
 	}
 	type clusterConfig struct {
 		NetworkID int              `json:"networkID"`
@@ -574,9 +574,9 @@ func (c *NodeConfig) updateClusterConfig() error {
 		}
 	} else {
 		// Fallback to embedded file.
-		chtFile, err = static.Asset("config/staticpeers.json")
+		chtFile, err = static.Asset("config/cluster.json")
 		if err != nil {
-			return fmt.Errorf("staticpeers.json could not be loaded: %s", err)
+			return fmt.Errorf("cluster.json could not be loaded: %s", err)
 		}
 	}
 
@@ -588,9 +588,9 @@ func (c *NodeConfig) updateClusterConfig() error {
 
 	for _, cluster := range clusters {
 		if cluster.NetworkID == int(c.NetworkID) {
-			c.StaticPeersConfig.StaticPeers = cluster.Prod.StaticPeers
+			c.BootClusterConfig.BootNodes = cluster.Prod.BootNodes
 			if c.DevMode {
-				c.StaticPeersConfig.StaticPeers = cluster.Dev.StaticPeers
+				c.BootClusterConfig.BootNodes = cluster.Dev.BootNodes
 			}
 			break
 		}
