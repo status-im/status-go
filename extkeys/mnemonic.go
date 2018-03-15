@@ -41,6 +41,17 @@ const (
 	totalAvailableLanguages
 )
 
+type entropyStrength int
+
+// Valid entropy strengths
+const (
+	EntropyStrength128 entropyStrength = 128 + 32*iota
+	EntropyStrength160
+	EntropyStrength192
+	EntropyStrength224
+	EntropyStrength256
+)
+
 // Languages is a list of supported languages for which mnemonic keys can be generated
 var Languages = [...]string{
 	"English",
@@ -52,6 +63,11 @@ var Languages = [...]string{
 	"Italian",
 	"Russian",
 }
+
+// ErrInvalidEntropyStrength is the error returned by MnemonicPhrase
+// when the entropy strength is not valid.
+// Valid entropy strength values are multiple of 32 between 128 and 256.
+var ErrInvalidEntropyStrength = errors.New("The mnemonic must encode entropy in a multiple of 32 bits, The recommended size of ENT is 128-256 bits")
 
 var (
 	last11BitsMask          = big.NewInt(2047)
@@ -118,7 +134,7 @@ func (m *Mnemonic) MnemonicSeed(mnemonic string, password string) []byte {
 }
 
 // MnemonicPhrase returns a human readable seed for BIP32 Hierarchical Deterministic Wallets
-func (m *Mnemonic) MnemonicPhrase(strength, language Language) (string, error) {
+func (m *Mnemonic) MnemonicPhrase(strength entropyStrength, language Language) (string, error) {
 	wordList, err := m.WordList(language)
 	if err != nil {
 		return "", err
@@ -128,8 +144,8 @@ func (m *Mnemonic) MnemonicPhrase(strength, language Language) (string, error) {
 	// With more entropy security is improved but the sentence length increases.
 	// We refer to the initial entropy length as ENT. The recommended size of ENT is 128-256 bits.
 
-	if strength%32 > 0 && strength < 128 && strength > 256 {
-		return "", errors.New("The mnemonic must encode entropy in a multiple of 32 bits, The recommended size of ENT is 128-256 bits")
+	if strength%32 > 0 || strength < 128 || strength > 256 {
+		return "", ErrInvalidEntropyStrength
 	}
 
 	// First, an initial entropy of ENT bits is generated
@@ -220,7 +236,7 @@ func (m *Mnemonic) ValidMnemonic(mnemonic string, language Language) bool {
 
 // WordList returns list of words for a given language
 func (m *Mnemonic) WordList(language Language) (*WordList, error) {
-	if m.wordLists[language] == nil {
+	if int(language) < 0 || int(language) > len(m.wordLists)-1 || m.wordLists[language] == nil {
 		return nil, fmt.Errorf("language word list is missing (language id: %d)", language)
 	}
 	return m.wordLists[language], nil
