@@ -10,13 +10,17 @@ ifndef GOPATH
 endif
 
 CGO_CFLAGS=-I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
-BUILD_TAGS =
 GOBIN=$(dir $(realpath $(firstword $(MAKEFILE_LIST))))build/bin
+
+BUILD_TAGS =
+BUILD_FLAGS := $(shell echo "-ldflags '-X main.buildStamp=`date -u '+%Y-%m-%d.%H:%M:%S'` -X main.gitCommit=$(git rev-parse HEAD)'")
 
 GO ?= latest
 XGOVERSION ?= 1.9.2
 XGOIMAGE = statusteam/xgo:$(XGOVERSION)
 XGOIMAGEIOSSIM = statusteam/xgo-ios-simulator:$(XGOVERSION)
+
+networkid ?= StatusChain
 
 DOCKER_IMAGE_NAME ?= statusteam/status-go
 
@@ -47,7 +51,7 @@ HELP_FUN = \
 		   }
 
 statusgo: ##@build Build status-go as statusd server
-	go build -i -o $(GOBIN)/statusd -v -tags '$(BUILD_TAGS)' ./cmd/statusd
+	go build -i -o $(GOBIN)/statusd -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/statusd
 	@echo "Compilation done."
 	@echo "Run \"build/bin/statusd -h\" to view available commands."
 
@@ -57,20 +61,20 @@ statusgo-cross: statusgo-android statusgo-ios
 
 statusgo-android: xgo ##@cross-compile Build status-go for Android
 	./_assets/patches/patcher -b . -p geth-xgo
-	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=android-16/aar -v -tags '$(BUILD_TAGS)' ./lib
+	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=android-16/aar -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./lib
 	./_assets/patches/patcher -b . -p geth-xgo -r
 	@echo "Android cross compilation done."
 
 statusgo-ios: xgo	##@cross-compile Build status-go for iOS
 	./_assets/patches/patcher -b . -p geth-xgo
-	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v -tags '$(BUILD_TAGS)' ./lib
+	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./lib
 	./_assets/patches/patcher -b . -p geth-xgo -r
 	@echo "iOS framework cross compilation done."
 
 statusgo-ios-simulator: xgo	##@cross-compile Build status-go for iOS Simulator
 	@docker pull $(XGOIMAGEIOSSIM)
 	./_assets/patches/patcher -b . -p geth-xgo
-	$(GOPATH)/bin/xgo --image $(XGOIMAGEIOSSIM) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v -tags '$(BUILD_TAGS)' ./lib
+	$(GOPATH)/bin/xgo --image $(XGOIMAGEIOSSIM) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./lib
 	./_assets/patches/patcher -b . -p geth-xgo -r
 	@echo "iOS framework cross compilation done."
 
@@ -126,15 +130,15 @@ test-unit-coverage: ##@tests Run unit and integration tests with coverage
 test-e2e: ##@tests Run e2e tests
 	# order: reliability then alphabetical
 	# TODO(tiabc): make a single command out of them adding `-p 1` flag.
-	go test -timeout 5m ./t/e2e/accounts/... -network=$(or $(networkid),StatusChain)
-	go test -timeout 5m ./t/e2e/api/... -network=$(or $(networkid),StatusChain)
-	go test -timeout 5m ./t/e2e/node/... -network=$(or $(networkid),StatusChain)
-	go test -timeout 50m ./t/e2e/jail/... -network=$(or $(networkid),StatusChain)
-	go test -timeout 20m ./t/e2e/rpc/... -network=$(or $(networkid),StatusChain)
-	go test -timeout 20m ./t/e2e/whisper/... -network=$(or $(networkid),StatusChain)
-	go test -timeout 10m ./t/e2e/transactions/... -network=$(or $(networkid),StatusChain)
+	go test -timeout 5m ./t/e2e/accounts/... -network=$(networkid)
+	go test -timeout 5m ./t/e2e/api/... -network=$(networkid)
+	go test -timeout 5m ./t/e2e/node/... -network=$(networkid)
+	go test -timeout 50m ./t/e2e/jail/... -network=$(networkid)
+	go test -timeout 20m ./t/e2e/rpc/... -network=$(networkid)
+	go test -timeout 20m ./t/e2e/whisper/... -network=$(networkid)
+	go test -timeout 10m ./t/e2e/transactions/... -network=$(networkid)
 	# e2e_test tag is required to include some files from ./lib without _test suffix
-	go test -timeout 40m -tags e2e_test ./lib -network=$(or $(networkid),StatusChain)
+	go test -timeout 40m -tags e2e_test ./lib -network=$(networkid)
 
 lint-install:
 	go get -u github.com/alecthomas/gometalinter
