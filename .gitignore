@@ -64,3 +64,4 @@ coverage.html
 
 Session.vim
 .undodir/*
+/.idea/
