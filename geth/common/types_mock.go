@@ -116,16 +116,16 @@ func (mr *MockNodeManagerMockRecorder) Node() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Node", reflect.TypeOf((*MockNodeManager)(nil).Node))
 }
 
-// PopulateBootNodes mocks base method
-func (m *MockNodeManager) PopulateBootNodes() error {
-	ret := m.ctrl.Call(m, "PopulateBootNodes")
+// PopulateStaticPeers mocks base method
+func (m *MockNodeManager) PopulateStaticPeers() error {
+	ret := m.ctrl.Call(m, "PopulateStaticPeers")
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// PopulateBootNodes indicates an expected call of PopulateBootNodes
-func (mr *MockNodeManagerMockRecorder) PopulateBootNodes() *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PopulateBootNodes", reflect.TypeOf((*MockNodeManager)(nil).PopulateBootNodes))
+// PopulateStaticPeers indicates an expected call of PopulateStaticPeers
+func (mr *MockNodeManagerMockRecorder) PopulateStaticPeers() *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PopulateStaticPeers", reflect.TypeOf((*MockNodeManager)(nil).PopulateStaticPeers))
 }
 
 // AddPeer mocks base method

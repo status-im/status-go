@@ -165,15 +165,15 @@ func (m *NodeManager) Node() (*node.Node, error) {
 	return m.node, nil
 }
 
-// PopulateBootNodes connects current node with our publicly available LES/SHH/Swarm cluster
-func (m *NodeManager) PopulateBootNodes() error {
+// PopulateStaticPeers connects current node with our publicly available LES/SHH/Swarm cluster
+func (m *NodeManager) PopulateStaticPeers() error {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return m.populateBootNodes()
+	return m.populateStaticPeers()
 }
 
-// populateBootNodes connects current node with our publicly available LES/SHH/Swarm cluster
-func (m *NodeManager) populateBootNodes() error {
+// populateStaticPeers connects current node with our publicly available LES/SHH/Swarm cluster
+func (m *NodeManager) populateStaticPeers() error {
 	if err := m.isNodeAvailable(); err != nil {
 		return err
 	}
@@ -194,9 +194,9 @@ func (m *NodeManager) populateBootNodes() error {
 	return nil
 }
 
-func (m *NodeManager) removeBootNodes() error {
+func (m *NodeManager) removeStaticPeers() error {
 	if !m.config.BootClusterConfig.Enabled {
-		log.Info("boot cluster is disabled")
+		log.Info("static peers are disabled")
 		return nil
 	}
 	server := m.node.Server()
@@ -206,25 +206,25 @@ func (m *NodeManager) removeBootNodes() error {
 	for _, enode := range m.config.BootClusterConfig.BootNodes {
 		err := m.removePeer(enode)
 		if err != nil {
-			log.Warn("boot node deletion failed", "error", err)
+			log.Warn("static peer deletion failed", "error", err)
 			return err
 		}
-		log.Info("boot node deleted", "enode", enode)
+		log.Info("static peer deleted", "enode", enode)
 	}
 	return nil
 }
 
-// ReconnectBootNodes removes and adds boot nodes to a server.
-func (m *NodeManager) ReconnectBootNodes() error {
+// ReconnectStaticPeers removes and adds static peers to a server.
+func (m *NodeManager) ReconnectStaticPeers() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if err := m.removeBootNodes(); err != nil {
+	if err := m.removeStaticPeers(); err != nil {
 		return err
 	}
-	return m.populateBootNodes()
+	return m.populateStaticPeers()
 }
 
-// AddPeer adds new boot node
+// AddPeer adds new static peer node
 func (m *NodeManager) AddPeer(url string) error {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -234,7 +234,7 @@ func (m *NodeManager) AddPeer(url string) error {
 	return m.addPeer(url)
 }
 
-// addPeer adds new boot node
+// addPeer adds new static peer node
 func (m *NodeManager) addPeer(url string) error {
 	// Try to add the url as a static peer and return
 	parsedNode, err := discover.ParseNode(url)

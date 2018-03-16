@@ -64,8 +64,8 @@ type NodeManager interface {
 	// Node returns underlying Status node
 	Node() (*node.Node, error)
 
-	// PopulateBootNodes populates node's list of boot nodes
-	PopulateBootNodes() error
+	// PopulateStaticPeers populates node's list of static bootstrap peers
+	PopulateStaticPeers() error
 
 	// AddPeer adds URL of static peer
 	AddPeer(url string) error

@@ -37,9 +37,9 @@ func (s *ManagerTestSuite) TestReferencesWithoutStartedNode() {
 		expectedErr error
 	}{
 		{
-			"non-null manager, no running node, PopulateBootNodes()",
+			"non-null manager, no running node, PopulateStaticPeers()",
 			func() (interface{}, error) {
-				return nil, s.NodeManager.PopulateBootNodes()
+				return nil, s.NodeManager.PopulateStaticPeers()
 			},
 			node.ErrNoRunningNode,
 		},
@@ -305,8 +305,8 @@ func (s *ManagerTestSuite) TestStartNodeWithUpstreamEnabled() {
 //			progress <- struct{}{}
 //		},
 //		func(config *params.NodeConfig) {
-//			log.Info("PopulateBootNodes()")
-//			s.T().Logf("PopulateBootNodes(), error: %v", s.NodeManager.PopulateBootNodes())
+//			log.Info("PopulateStaticPeers()")
+//			s.T().Logf("PopulateBootNodes(), error: %v", s.NodeManager.PopulateStaticPeers())
 //			progress <- struct{}{}
 //		},
 //		// TODO(adam): quarantined until it uses a different datadir
