@@ -15,10 +15,10 @@ func TestParseAppType(t *testing.T) {
 		}
 	}
 
-	check("foreground", AppStateForeground, false)
+	check("active", AppStateForeground, false)
 	check("background", AppStateBackground, false)
 	check("inactive", AppStateInactive, false)
-	check(" forEGROUnd ", AppStateForeground, false)
+	check(" acTIVE ", AppStateForeground, false)
 	check("    backGROUND  ", AppStateBackground, false)
 	check("   INACTIVE   ", AppStateInactive, false)
 	check("", AppStateInvalid, true)
