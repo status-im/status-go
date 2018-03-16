@@ -552,15 +552,15 @@ func (c *NodeConfig) updateClusterConfig() error {
 	// Once CHT sync sub-protocol is working in LES, we will rely on it, as it provides
 	// decentralized solution. For now, in order to avoid forcing users to long sync times
 	// we use central static resource
-	type subClusterConfig struct {
+	type subClusterData struct {
 		Number    int      `json:"number"`
 		Hash      string   `json:"hash"`
 		BootNodes []string `json:"bootnodes"`
 	}
-	type clusterConfig struct {
-		NetworkID int              `json:"networkID"`
-		Prod      subClusterConfig `json:"prod"`
-		Dev       subClusterConfig `json:"dev"`
+	type clusterData struct {
+		NetworkID int            `json:"networkID"`
+		Prod      subClusterData `json:"prod"`
+		Dev       subClusterData `json:"dev"`
 	}
 
 	var chtFile []byte
@@ -580,7 +580,7 @@ func (c *NodeConfig) updateClusterConfig() error {
 		}
 	}
 
-	var clusters []clusterConfig
+	var clusters []clusterData
 	err = json.Unmarshal(chtFile, &clusters)
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal cluster configuration file: %s", err)
