@@ -240,7 +240,7 @@ func (api *StatusAPI) ConnectionChange(typ string, expensive bool) {
 func (api *StatusAPI) AppStateChange(state string) {
 	appState, err := ParseAppState(state)
 	if err != nil {
-		log.Error("AppStateChange failed, ignoring it:", err)
+		log.Error("AppStateChange failed, ignoring it.", "err", err)
 		return // and do nothing
 	}
 	api.b.AppStateChange(appState)

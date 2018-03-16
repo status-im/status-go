@@ -15,7 +15,7 @@ func (a AppState) String() string {
 // Specific app states
 // see https://facebook.github.io/react-native/docs/appstate.html
 const (
-	AppStateForeground = AppState("foreground")
+	AppStateForeground = AppState("active") // these constant values are kept in sync with React Native
 	AppStateBackground = AppState("background")
 	AppStateInactive   = AppState("inactive")
 
