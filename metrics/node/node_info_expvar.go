@@ -29,7 +29,7 @@ func updateNodePeers(node *node.Node) {
 	server := node.Server()
 	if server == nil {
 		logger := log.New("package", "status-go/metrics/node")
-		log.Warn("Failed to get a server")
+		logger.Warn("Failed to get a server")
 		return
 	}
 

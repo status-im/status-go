@@ -143,7 +143,7 @@ func startDebug(backend *api.StatusBackend) error {
 // startCollectingStats collects various stats about the node and other protocols like Whisper.
 func startCollectingStats(interruptCh <-chan struct{}, nodeManager common.NodeManager) {
 
-	logger := logger.New("package", "status-go/cmd/statusd")
+	logger := log.New("package", "status-go/cmd/statusd")
 
 	logger.Info("Starting stats on %v", *statsAddr)
 
@@ -296,7 +296,7 @@ Options:
 // if the node can not be stopped.
 func haltOnInterruptSignal(nodeManager common.NodeManager) <-chan struct{} {
 
-	logger := logger.New("package", "status-go/cmd/statusd")
+	logger := log.New("package", "status-go/cmd/statusd")
 
 	interruptCh := make(chan struct{})
 	go func() {
