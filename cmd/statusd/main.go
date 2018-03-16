@@ -228,8 +228,8 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 	nodeConfig.Discovery = *discovery
 
 	// Even if standalone is true and discovery is disabled,
-	// it's possible to use bootnodes in NodeManager.PopulateStaticPeers().
-	// TODO(adam): research if we need NodeManager.PopulateStaticPeers() at all.
+	// it's possible to use bootnodes in NodeManager.PopulateBootNodes().
+	// TODO(adam): research if we need NodeManager.PopulateBootNodes() at all.
 	if *bootnodes != "" {
 		nodeConfig.BootClusterConfig.BootNodes = strings.Split(*bootnodes, ",")
 	}

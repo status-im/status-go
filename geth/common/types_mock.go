@@ -6,6 +6,8 @@ package common
 
 import (
 	context "context"
+	reflect "reflect"
+
 	accounts "github.com/ethereum/go-ethereum/accounts"
 	keystore "github.com/ethereum/go-ethereum/accounts/keystore"
 	common "github.com/ethereum/go-ethereum/common"
@@ -15,7 +17,6 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	params "github.com/status-im/status-go/geth/params"
 	rpc "github.com/status-im/status-go/geth/rpc"
-	reflect "reflect"
 )
 
 // MockNodeManager is a mock of NodeManager interface
@@ -115,16 +116,16 @@ func (mr *MockNodeManagerMockRecorder) Node() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Node", reflect.TypeOf((*MockNodeManager)(nil).Node))
 }
 
-// PopulateStaticPeers mocks base method
-func (m *MockNodeManager) PopulateStaticPeers() error {
-	ret := m.ctrl.Call(m, "PopulateStaticPeers")
+// PopulateBootNodes mocks base method
+func (m *MockNodeManager) PopulateBootNodes() error {
+	ret := m.ctrl.Call(m, "PopulateBootNodes")
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// PopulateStaticPeers indicates an expected call of PopulateStaticPeers
-func (mr *MockNodeManagerMockRecorder) PopulateStaticPeers() *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PopulateStaticPeers", reflect.TypeOf((*MockNodeManager)(nil).PopulateStaticPeers))
+// PopulateBootNodes indicates an expected call of PopulateBootNodes
+func (mr *MockNodeManagerMockRecorder) PopulateBootNodes() *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PopulateBootNodes", reflect.TypeOf((*MockNodeManager)(nil).PopulateBootNodes))
 }
 
 // AddPeer mocks base method

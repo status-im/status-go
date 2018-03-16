@@ -266,7 +266,7 @@ var loadConfigTestCases = []struct {
 		}`,
 		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
 			require.NoError(t, err)
-			require.True(t, nodeConfig.BootClusterConfig.Enabled, "bootnodes are expected to be enabled after loading file")
+			require.True(t, nodeConfig.BootClusterConfig.Enabled, "boot cluser is expected to be enabled after loading file")
 
 			enodes := nodeConfig.BootClusterConfig.BootNodes
 			require.True(t, len(enodes) == 2)
@@ -281,7 +281,7 @@ var loadConfigTestCases = []struct {
 		}`,
 		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
 			require.NoError(t, err)
-			require.True(t, nodeConfig.BootClusterConfig.Enabled, "bootnodes are expected to be enabled by default")
+			require.True(t, nodeConfig.BootClusterConfig.Enabled, "boot cluser is expected to be enabled by default")
 
 			enodes := nodeConfig.BootClusterConfig.BootNodes
 			require.Len(t, enodes, 2)
@@ -298,7 +298,7 @@ var loadConfigTestCases = []struct {
 		}`,
 		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
 			require.NoError(t, err)
-			require.False(t, nodeConfig.BootClusterConfig.Enabled, "bootnodes are expected to be disabled")
+			require.False(t, nodeConfig.BootClusterConfig.Enabled, "boot cluser is expected to be disabled")
 		},
 	},
 	{
@@ -309,7 +309,7 @@ var loadConfigTestCases = []struct {
 		}`,
 		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
 			require.NoError(t, err)
-			require.True(t, nodeConfig.BootClusterConfig.Enabled, "bootnodes are expected to be enabled by default")
+			require.True(t, nodeConfig.BootClusterConfig.Enabled, "boot cluser is expected to be enabled by default")
 
 			enodes := nodeConfig.BootClusterConfig.BootNodes
 			require.True(t, len(enodes) >= 3)
@@ -324,7 +324,7 @@ var loadConfigTestCases = []struct {
 		}`,
 		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
 			require.NoError(t, err)
-			require.True(t, nodeConfig.BootClusterConfig.Enabled, "bootnodes are expected to be enabled by default")
+			require.True(t, nodeConfig.BootClusterConfig.Enabled, "boot cluser is expected to be enabled by default")
 
 			enodes := nodeConfig.BootClusterConfig.BootNodes
 			require.True(t, len(enodes) >= 3)
@@ -338,7 +338,7 @@ var loadConfigTestCases = []struct {
 		}`,
 		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
 			require.NoError(t, err)
-			require.True(t, nodeConfig.BootClusterConfig.Enabled, "bootnodes are expected to be enabled by default")
+			require.True(t, nodeConfig.BootClusterConfig.Enabled, "boot cluser is expected to be enabled by default")
 
 			enodes := nodeConfig.BootClusterConfig.BootNodes
 			require.True(t, len(enodes) >= 2)
@@ -353,7 +353,7 @@ var loadConfigTestCases = []struct {
 		}`,
 		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
 			require.NoError(t, err)
-			require.True(t, nodeConfig.BootClusterConfig.Enabled, "bootnodes are expected to be enabled by default")
+			require.True(t, nodeConfig.BootClusterConfig.Enabled, "boot cluser is expected to be enabled by default")
 
 			enodes := nodeConfig.BootClusterConfig.BootNodes
 			require.True(t, len(enodes) >= 2)
