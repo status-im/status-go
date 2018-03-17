@@ -15,18 +15,6 @@ import (
 	"github.com/status-im/status-go/static"
 )
 
-// default node configuration options
-var (
-	UseMainnetFlag = "false" // to be overridden via -ldflags '-X geth/params.UseMainnetFlag'
-	UseMainnet     = false
-)
-
-func init() {
-	if UseMainnetFlag == "true" { // set at compile time, here we make sure to set corresponding boolean flag
-		UseMainnet = true
-	}
-}
-
 // errors
 var (
 	ErrMissingDataDir             = errors.New("missing required 'DataDir' parameter")
@@ -439,6 +427,7 @@ func (c *NodeConfig) Save() error {
 // updateConfig traverses configuration and adjusts dependent fields
 // (we have a development/production and mobile/full node dependent configurations)
 func (c *NodeConfig) updateConfig() error {
+	// Update separate configurations.
 	if err := c.updateGenesisConfig(); err != nil {
 		return err
 	}

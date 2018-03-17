@@ -236,3 +236,14 @@ func (api *StatusAPI) ConnectionChange(typ string, expensive bool) {
 	}
 	api.b.ConnectionChange(state)
 }
+
+// AppStateChange handles app state changes (background/foreground).
+// state values: see https://facebook.github.io/react-native/docs/appstate.html
+func (api *StatusAPI) AppStateChange(state string) {
+	appState, err := ParseAppState(state)
+	if err != nil {
+		log.Error("AppStateChange failed, ignoring it:", err)
+		return // and do nothing
+	}
+	api.b.AppStateChange(appState)
+}

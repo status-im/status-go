@@ -10,13 +10,17 @@ ifndef GOPATH
 endif
 
 CGO_CFLAGS=-I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
-BUILD_TAGS =
 GOBIN=$(dir $(realpath $(firstword $(MAKEFILE_LIST))))build/bin
+
+BUILD_TAGS =
+BUILD_FLAGS := $(shell echo "-ldflags '-X main.buildStamp=`date -u '+%Y-%m-%d.%H:%M:%S'` -X main.gitCommit=$(git rev-parse HEAD)'")
 
 GO ?= latest
 XGOVERSION ?= 1.9.2
 XGOIMAGE = statusteam/xgo:$(XGOVERSION)
 XGOIMAGEIOSSIM = statusteam/xgo-ios-simulator:$(XGOVERSION)
+
+networkid ?= StatusChain
 
 DOCKER_IMAGE_NAME ?= statusteam/status-go
 
@@ -47,7 +51,7 @@ HELP_FUN = \
 		   }
 
 statusgo: ##@build Build status-go as statusd server
-	go build -i -o $(GOBIN)/statusd -v -tags '$(BUILD_TAGS)' $(shell _assets/build/testnet-flags.sh) ./cmd/statusd
+	go build -i -o $(GOBIN)/statusd -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/statusd
 	@echo "Compilation done."
 	@echo "Run \"build/bin/statusd -h\" to view available commands."
 
@@ -57,20 +61,20 @@ statusgo-cross: statusgo-android statusgo-ios
 
 statusgo-android: xgo ##@cross-compile Build status-go for Android
 	./_assets/patches/patcher -b . -p geth-xgo
-	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=android-16/aar -v -tags '$(BUILD_TAGS)' $(shell _assets/build/testnet-flags.sh) ./lib
+	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=android-16/aar -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./lib
 	./_assets/patches/patcher -b . -p geth-xgo -r
 	@echo "Android cross compilation done."
 
 statusgo-ios: xgo	##@cross-compile Build status-go for iOS
 	./_assets/patches/patcher -b . -p geth-xgo
-	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v -tags '$(BUILD_TAGS)' $(shell _assets/build/testnet-flags.sh) ./lib
+	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./lib
 	./_assets/patches/patcher -b . -p geth-xgo -r
 	@echo "iOS framework cross compilation done."
 
 statusgo-ios-simulator: xgo	##@cross-compile Build status-go for iOS Simulator
 	@docker pull $(XGOIMAGEIOSSIM)
 	./_assets/patches/patcher -b . -p geth-xgo
-	$(GOPATH)/bin/xgo --image $(XGOIMAGEIOSSIM) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v -tags '$(BUILD_TAGS)' $(shell _assets/build/testnet-flags.sh) ./lib
+	$(GOPATH)/bin/xgo --image $(XGOIMAGEIOSSIM) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./lib
 	./_assets/patches/patcher -b . -p geth-xgo -r
 	@echo "iOS framework cross compilation done."
 
@@ -97,25 +101,9 @@ xgo:
 	docker pull $(XGOIMAGE)
 	go get github.com/karalabe/xgo
 
-statusgo-mainnet:
-	go build -i -o $(GOBIN)/statusgo -v $(shell _assets/build/mainnet-flags.sh) ./cmd/statusd
-	@echo "status go compilation done (mainnet)."
-	@echo "Run \"build/bin/statusgo\" to view available commands"
-
-statusgo-android-mainnet: xgo
-	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=android-16/aar -v $(shell _assets/build/mainnet-flags.sh) ./lib
-	@echo "Android cross compilation done (mainnet)."
-
-statusgo-ios-mainnet: xgo
-	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v $(shell _assets/build/mainnet-flags.sh) ./lib
-	@echo "iOS framework cross compilation done (mainnet)."
-
-statusgo-ios-simulator-mainnet: xgo
-	$(GOPATH)/bin/xgo --image $(XGOIMAGEIOSSIM) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v $(shell _assets/build/mainnet-flags.sh) ./lib
-	@echo "iOS framework cross compilation done (mainnet)."
-
 generate: ##@other Regenerate assets and other auto-generated stuff
-	cp ./_assets/node_modules/web3/dist/web3.min.js ./static/scripts/web3.js
+	cd _assets/static && npm install
+	cp ./_assets/static/node_modules/web3/dist/web3.min.js ./static/scripts/web3.js
 	go generate ./static
 	rm ./static/scripts/web3.js
 
