@@ -9,7 +9,7 @@ import (
 
 func updateNodeInfo(node *node.Node) {
 	server := node.Server()
-	logger := log.New("package", "status-go/metrics/whisper")
+	logger := log.New("package", "status-go/metrics/node")
 	if server == nil {
 		logger.Warn("Failed to get a server")
 		return
@@ -20,7 +20,7 @@ func updateNodeInfo(node *node.Node) {
 
 func updateNodePeers(node *node.Node) {
 	server := node.Server()
-	logger := log.New("package", "status-go/metrics/whisper")
+	logger := log.New("package", "status-go/metrics/node")
 	if server == nil {
 		logger.Warn("Failed to get a server")
 		return

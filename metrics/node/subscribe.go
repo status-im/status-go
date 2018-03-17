@@ -13,7 +13,7 @@ import (
 // PeerEventTypeAdd and PeerEventTypeDrop events.
 func SubscribeServerEvents(ctx context.Context, node *node.Node) error {
 	server := node.Server()
-	logger := log.New("package", "status-go/geth/node")
+	logger := log.New("package", "status-go/metrics/node")
 
 	if server == nil {
 		return errors.New("server is unavailable")

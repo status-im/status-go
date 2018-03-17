@@ -432,7 +432,7 @@ func (c *NodeConfig) Save() error {
 		return err
 	}
 
-	log.Info(fmt.Sprintf("config file saved: %v", configFilePath))
+	c.log.Info(fmt.Sprintf("config file saved: %v", configFilePath))
 	return nil
 }
 

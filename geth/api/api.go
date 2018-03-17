@@ -28,7 +28,8 @@ func NewStatusAPI() *StatusAPI {
 // the passed backend.
 func NewStatusAPIWithBackend(b *StatusBackend) *StatusAPI {
 	return &StatusAPI{
-		b: b,
+		b:   b,
+		log: log.New("package", "status-go/geth/api.StatusAPI"),
 	}
 }
 
@@ -206,7 +207,7 @@ func (api *StatusAPI) Notify(token string) string {
 
 	err := api.b.newNotification().Send(message, fcm.NotificationPayload{}, tokens...)
 	if err != nil {
-		log.Error("Notify failed:", err)
+		api.log.Error("Notify failed:", err)
 	}
 
 	return token
@@ -218,7 +219,7 @@ func (api *StatusAPI) NotifyUsers(message string, payload fcm.NotificationPayloa
 
 	err := api.b.newNotification().Send(message, payload, tokens...)
 	if err != nil {
-		api.log.Error("Notify failed:", err)
+		api.log.Error("Notify failed: %v", err)
 	}
 
 	return err
