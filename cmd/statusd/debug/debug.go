@@ -47,7 +47,7 @@ func (s *Server) backend() {
 	for {
 		conn, err := s.listener.Accept()
 		if err != nil {
-			s.log.Error("cannot establish debug connection: %v", err)
+			s.log.Error("cannot establish debug connection", "error", err)
 			continue
 		}
 		go s.handleConnection(conn)
@@ -60,7 +60,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 	writer := bufio.NewWriter(conn)
 	defer func() {
 		if err := conn.Close(); err != nil {
-			s.log.Error("error while closing debug connection: %v", err)
+			s.log.Error("error while closing debug connection", "error", err)
 		}
 	}()
 	// Read, execute, and respond commands of a session.
@@ -80,7 +80,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 		}
 		err = s.writeReplies(writer, replies)
 		if err != nil {
-			s.log.Error("cannot write replies: %v", err)
+			s.log.Error("cannot write replies", "error", err)
 			return
 		}
 	}

@@ -2,7 +2,6 @@ package queue
 
 import (
 	"errors"
-	"fmt"
 	"sync"
 	"time"
 
@@ -133,7 +132,7 @@ func (q *TxQueue) Reset() {
 
 // Enqueue enqueues incoming transaction
 func (q *TxQueue) Enqueue(tx *common.QueuedTx) error {
-	q.log.Info(fmt.Sprintf("enqueue transaction: %s", tx.ID))
+	q.log.Info("enqueue transaction", "ID", tx.ID)
 	q.mu.RLock()
 	if _, ok := q.transactions[tx.ID]; ok {
 		q.mu.RUnlock()

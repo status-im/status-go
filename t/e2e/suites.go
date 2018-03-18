@@ -137,7 +137,7 @@ func (s *BackendTestSuite) TxQueueManager() *transactions.Manager {
 
 func importTestAccounts(keyStoreDir string) (err error) {
 	logger := log.New("package", "status-go/t/e2e")
-	logger.Debug("Import accounts to", keyStoreDir)
+	logger.Debug("Import accounts to", "dir", keyStoreDir)
 
 	err = common.ImportTestAccount(keyStoreDir, GetAccount1PKFile())
 	if err != nil {

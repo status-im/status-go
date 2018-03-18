@@ -77,7 +77,7 @@ func main() {
 
 	config, err := makeNodeConfig()
 	if err != nil {
-		logger.Error("Making config failed: %v", err)
+		logger.Error("Making config failed", "error", err)
 		return
 	}
 
@@ -89,7 +89,7 @@ func main() {
 	backend := api.NewStatusBackend()
 	err = backend.StartNode(config)
 	if err != nil {
-		logger.Error("Node start failed: %v", err)
+		logger.Error("Node start failed", "error", err)
 		return
 	}
 
@@ -99,7 +99,7 @@ func main() {
 	if *cliEnabled {
 		err := startDebug(backend)
 		if err != nil {
-			logger.Error("Starting debugging CLI server failed: %v", err)
+			logger.Error("Starting debugging CLI server failed", "error", err)
 			return
 		}
 	}
@@ -125,7 +125,7 @@ func main() {
 
 	node, err := backend.NodeManager().Node()
 	if err != nil {
-		logger.Error("Getting node failed: %v", err)
+		logger.Error("Getting node failed", "error", err)
 		return
 	}
 
@@ -145,11 +145,11 @@ func startCollectingStats(interruptCh <-chan struct{}, nodeManager common.NodeMa
 
 	logger := log.New("package", "status-go/cmd/statusd")
 
-	logger.Info("Starting stats on %v", *statsAddr)
+	logger.Info("Starting stats", "stats", *statsAddr)
 
 	node, err := nodeManager.Node()
 	if err != nil {
-		logger.Error("Failed to run metrics because could not get node: %v", err)
+		logger.Error("Failed to run metrics because could not get node", "error", err)
 		return
 	}
 
@@ -157,7 +157,7 @@ func startCollectingStats(interruptCh <-chan struct{}, nodeManager common.NodeMa
 	defer cancel()
 	go func() {
 		if err := nodemetrics.SubscribeServerEvents(ctx, node); err != nil {
-			logger.Error("Failed to subscribe server events: %v", err)
+			logger.Error("Failed to subscribe server events", "error", err)
 		}
 	}()
 
@@ -170,7 +170,7 @@ func startCollectingStats(interruptCh <-chan struct{}, nodeManager common.NodeMa
 		}
 
 		if err := server.Shutdown(context.TODO()); err != nil {
-			logger.Error("Failed to shutdown metrics server: %v", err)
+			logger.Error("Failed to shutdown metrics server", "error", err)
 		}
 	}()
 	go func() {
@@ -184,7 +184,7 @@ func startCollectingStats(interruptCh <-chan struct{}, nodeManager common.NodeMa
 		switch err {
 		case http.ErrServerClosed:
 		default:
-			logger.Error("Metrics server failed: %v", err)
+			logger.Error("Metrics server failed", "error", err)
 		}
 	}()
 
@@ -307,7 +307,7 @@ func haltOnInterruptSignal(nodeManager common.NodeManager) <-chan struct{} {
 		close(interruptCh)
 		logger.Info("Got interrupt, shutting down...")
 		if err := nodeManager.StopNode(); err != nil {
-			logger.Error("Failed to stop node: %v", err.Error())
+			logger.Error("Failed to stop node", "error", err)
 			os.Exit(1)
 		}
 	}()

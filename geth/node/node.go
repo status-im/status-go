@@ -55,7 +55,7 @@ func MakeNode(config *params.NodeConfig) (*node.Node, error) {
 		logger.Info("Loading private key file", "file", config.NodeKeyFile)
 		pk, err := crypto.LoadECDSA(config.NodeKeyFile)
 		if err != nil {
-			logger.Warn(fmt.Sprintf("Failed loading private key file '%s': %v", config.NodeKeyFile, err))
+			logger.Error("Failed loading private key file", "file", config.NodeKeyFile, "error", err)
 		}
 
 		// override node's private key

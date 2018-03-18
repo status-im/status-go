@@ -23,7 +23,7 @@ func createContextFromTimeout(timeout int) (context.Context, context.CancelFunc)
 func syncAndStopNode(interruptCh <-chan struct{}, nodeManager common.NodeManager, timeout int) (exitCode int) {
 
 	logger := log.New("package", "status-go/cmd/statusd")
-	logger.Info("syncAndStopNode: node will synchronize the chain and exit (timeout %d mins)", timeout)
+	logger.Info("syncAndStopNode: node will synchronize the chain and exit", "timeoutInMins", timeout)
 
 	ctx, cancel := createContextFromTimeout(timeout)
 	defer cancel()
@@ -39,7 +39,7 @@ func syncAndStopNode(interruptCh <-chan struct{}, nodeManager common.NodeManager
 
 	select {
 	case err := <-errSync:
-		logger.Error("syncAndStopNode: failed to sync the chain: %v", err)
+		logger.Error("syncAndStopNode: failed to sync the chain", "error", err)
 		exitCode = 1
 	case <-doneSync:
 	case <-interruptCh:
@@ -49,7 +49,7 @@ func syncAndStopNode(interruptCh <-chan struct{}, nodeManager common.NodeManager
 	}
 
 	if err := nodeManager.StopNode(); err != nil {
-		logger.Error("syncAndStopNode: failed to stop the node: %v", err)
+		logger.Error("syncAndStopNode: failed to stop the node", "error", err)
 		return 1
 	}
 	return

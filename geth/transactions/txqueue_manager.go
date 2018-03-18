@@ -98,7 +98,7 @@ func (m *Manager) QueueTransaction(tx *common.QueuedTx) error {
 
 func (m *Manager) txDone(tx *common.QueuedTx, hash gethcommon.Hash, err error) {
 	if err := m.txQueue.Done(tx.ID, hash, err); err == queue.ErrQueuedTxIDNotFound {
-		m.log.Warn("transaction is already removed from a queue", tx.ID)
+		m.log.Warn("transaction is already removed from a queue", "ID", tx.ID)
 		return
 	}
 	if m.notify {
@@ -164,7 +164,7 @@ func (m *Manager) validateAccount(config *params.NodeConfig, tx *common.QueuedTx
 	}
 	_, err = m.accountManager.VerifyAccountPassword(config.KeyStoreDir, selectedAccount.Address.String(), password)
 	if err != nil {
-		m.log.Warn("failed to verify account", "account", selectedAccount.Address.String(), "error", err.Error())
+		m.log.Warn("failed to verify account", "account", selectedAccount.Address.String(), "error", err)
 		return nil, err
 	}
 	return selectedAccount, nil

@@ -207,7 +207,7 @@ func (api *StatusAPI) Notify(token string) string {
 
 	err := api.b.newNotification().Send(message, fcm.NotificationPayload{}, tokens...)
 	if err != nil {
-		api.log.Error("Notify failed:", err)
+		api.log.Error("Notify failed", "error", err)
 	}
 
 	return token
@@ -219,7 +219,7 @@ func (api *StatusAPI) NotifyUsers(message string, payload fcm.NotificationPayloa
 
 	err := api.b.newNotification().Send(message, payload, tokens...)
 	if err != nil {
-		api.log.Error("Notify failed: %v", err)
+		api.log.Error("Notify failed", "error", err)
 	}
 
 	return err
@@ -242,7 +242,7 @@ func (api *StatusAPI) ConnectionChange(typ string, expensive bool) {
 func (api *StatusAPI) AppStateChange(state string) {
 	appState, err := ParseAppState(state)
 	if err != nil {
-		log.Error("AppStateChange failed, ignoring it:", err)
+		log.Error("AppStateChange failed, ignoring", "error", err)
 		return // and do nothing
 	}
 	api.b.AppStateChange(appState)
