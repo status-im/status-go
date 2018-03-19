@@ -102,7 +102,8 @@ xgo:
 	go get github.com/karalabe/xgo
 
 generate: ##@other Regenerate assets and other auto-generated stuff
-	cp ./_assets/node_modules/web3/dist/web3.min.js ./static/scripts/web3.js
+	cd _assets/static && npm install
+	cp ./_assets/static/node_modules/web3/dist/web3.min.js ./static/scripts/web3.js
 	go generate ./static
 	rm ./static/scripts/web3.js
 
