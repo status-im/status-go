@@ -563,25 +563,25 @@ func (c *NodeConfig) updateClusterConfig() error {
 		Dev       subClusterData `json:"dev"`
 	}
 
-	var chtFile []byte
+	var configFile []byte
 	var err error
 
 	if c.ClusterConfigFile != "" {
 		// Load cluster configuration from external file.
-		chtFile, err = ioutil.ReadFile(c.ClusterConfigFile)
+		configFile, err = ioutil.ReadFile(c.ClusterConfigFile)
 		if err != nil {
 			return fmt.Errorf("cluster configuration file '%s' could not be loaded: %s", c.ClusterConfigFile, err)
 		}
 	} else {
 		// Fallback to embedded file.
-		chtFile, err = static.Asset("config/cluster.json")
+		configFile, err = static.Asset("config/cluster.json")
 		if err != nil {
 			return fmt.Errorf("cluster.json could not be loaded: %s", err)
 		}
 	}
 
 	var clusters []clusterData
-	err = json.Unmarshal(chtFile, &clusters)
+	err = json.Unmarshal(configFile, &clusters)
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal cluster configuration file: %s", err)
 	}
