@@ -9,11 +9,13 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 )
 
+// All general log messages in this package should be routed through this logger.
+var logger = log.New("package", "status-go/metrics/node")
+
 // SubscribeServerEvents subscribes to server and listens to
 // PeerEventTypeAdd and PeerEventTypeDrop events.
 func SubscribeServerEvents(ctx context.Context, node *node.Node) error {
 	server := node.Server()
-	logger := log.New("package", "status-go/metrics/node")
 
 	if server == nil {
 		return errors.New("server is unavailable")

@@ -14,6 +14,9 @@ import (
 	"gopkg.in/go-playground/validator.v9"
 )
 
+// All general log messages in this package should be routed through this logger.
+var logger = log.New("package", "status-go/lib")
+
 //GenerateConfig for status node
 //export GenerateConfig
 func GenerateConfig(datadir *C.char, networkID C.int, devMode C.int) *C.char {
@@ -209,7 +212,6 @@ func CompleteTransaction(id, password *C.char) *C.char {
 	}
 	outBytes, err := json.Marshal(out)
 	if err != nil {
-		logger := log.New("package", "status-go/lib")
 		logger.Error("failed to marshal CompleteTransaction output", "error", err)
 		return makeJSONResponse(err)
 	}
@@ -249,7 +251,6 @@ func CompleteTransactions(ids, password *C.char) *C.char {
 
 	outBytes, err := json.Marshal(out)
 	if err != nil {
-		logger := log.New("package", "status-go/lib")
 		logger.Error("failed to marshal CompleteTransactions output", "error", err)
 		return makeJSONResponse(err)
 	}
@@ -312,7 +313,6 @@ func DiscardTransactions(ids *C.char) *C.char {
 
 	outBytes, err := json.Marshal(out)
 	if err != nil {
-		logger := log.New("package", "status-go/lib")
 		logger.Error("failed to marshal DiscardTransactions output", "error", err)
 		return makeJSONResponse(err)
 	}
@@ -416,7 +416,6 @@ func NotifyUsers(message, payloadJSON, tokensArray *C.char) (outCBytes *C.char) 
 
 		outBytes, err = json.Marshal(out)
 		if err != nil {
-			logger := log.New("package", "status-go/lib")
 			logger.Error("failed to marshal Notify output", "error", err)
 			outCBytes = makeJSONResponse(err)
 			return

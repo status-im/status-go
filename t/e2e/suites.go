@@ -1,12 +1,13 @@
 package e2e
 
 import (
+	"log"
+
 	"github.com/ethereum/go-ethereum/les"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/common"
 
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/signal"
 	"github.com/status-im/status-go/geth/transactions"
@@ -19,6 +20,9 @@ type NodeManagerTestSuite struct {
 	suite.Suite
 	NodeManager *node.NodeManager
 }
+
+// All general log messages in this package should be routed through this logger.
+var logger = log.New("package", "status-go/t/e2e")
 
 func init() {
 	for id := range TestNetworkNames {
@@ -136,7 +140,6 @@ func (s *BackendTestSuite) TxQueueManager() *transactions.Manager {
 }
 
 func importTestAccounts(keyStoreDir string) (err error) {
-	logger := log.New("package", "status-go/t/e2e")
 	logger.Debug("Import accounts to", "dir", keyStoreDir)
 
 	err = common.ImportTestAccount(keyStoreDir, GetAccount1PKFile())

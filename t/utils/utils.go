@@ -46,6 +46,9 @@ var (
 		params.RinkebyNetworkID:     "Rinkeby",
 		params.StatusChainNetworkID: "StatusChain",
 	}
+
+	// All general log messages in this package should be routed through this logger.
+	logger = log.New("package", "status-go/t/utils")
 )
 
 func init() {
@@ -111,8 +114,6 @@ func EnsureNodeSync(nodeManager common.NodeManager) {
 	if les == nil {
 		panic("LightEthereumService is nil")
 	}
-
-	logger := log.New("package", "status-go/t/utils")
 
 	// todo(@jeka): we should extract it into config
 	timeout := time.NewTimer(50 * time.Minute)

@@ -43,6 +43,9 @@ type NodeCrashEvent struct {
 	Error error `json:"error"`
 }
 
+// All general log messages in this package should be routed through this logger.
+var logger = log.New("package", "status-go/geth/signal")
+
 // MarshalJSON implements the json.Marshaller interface.
 func (e NodeCrashEvent) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
@@ -77,7 +80,6 @@ func ResetDefaultNodeNotificationHandler() {
 
 // TriggerDefaultNodeNotificationHandler triggers default notification handler (helpful in tests)
 func TriggerDefaultNodeNotificationHandler(jsonEvent string) {
-	logger := log.New("package", "status-go/geth/signal")
 	logger.Info("Notification received", "event", jsonEvent)
 }
 

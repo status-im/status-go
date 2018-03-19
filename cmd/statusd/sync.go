@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/geth/common"
 )
 
@@ -22,7 +21,6 @@ func createContextFromTimeout(timeout int) (context.Context, context.CancelFunc)
 // The special exit code `-1` is used if execution was interrupted.
 func syncAndStopNode(interruptCh <-chan struct{}, nodeManager common.NodeManager, timeout int) (exitCode int) {
 
-	logger := log.New("package", "status-go/cmd/statusd")
 	logger.Info("syncAndStopNode: node will synchronize the chain and exit", "timeoutInMins", timeout)
 
 	ctx, cancel := createContextFromTimeout(timeout)

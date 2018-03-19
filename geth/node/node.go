@@ -35,6 +35,9 @@ var (
 	ErrNodeStartFailure                  = errors.New("error starting p2p node")
 )
 
+// All general log messages in this package should be routed through this logger.
+var logger = log.New("package", "status-go/geth/node")
+
 // MakeNode create a geth node entity
 func MakeNode(config *params.NodeConfig) (*node.Node, error) {
 	// make sure data directory exists
@@ -51,7 +54,6 @@ func MakeNode(config *params.NodeConfig) (*node.Node, error) {
 	stackConfig := defaultEmbeddedNodeConfig(config)
 
 	if len(config.NodeKeyFile) > 0 {
-		logger := log.New("package", "geth/node")
 		logger.Info("Loading private key file", "file", config.NodeKeyFile)
 		pk, err := crypto.LoadECDSA(config.NodeKeyFile)
 		if err != nil {
@@ -126,7 +128,6 @@ func defaultEmbeddedNodeConfig(config *params.NodeConfig) *node.Config {
 // activateEthService configures and registers the eth.Ethereum service with a given node.
 func activateEthService(stack *node.Node, config *params.NodeConfig) error {
 	if !config.LightEthConfig.Enabled {
-		logger := log.New("package", "geth/node")
 		logger.Info("LES protocol is disabled")
 		return nil
 	}
@@ -156,7 +157,6 @@ func activateEthService(stack *node.Node, config *params.NodeConfig) error {
 
 // activateShhService configures Whisper and adds it to the given node.
 func activateShhService(stack *node.Node, config *params.NodeConfig) error {
-	logger := log.New("package", "geth/node")
 
 	if !config.WhisperConfig.Enabled {
 		logger.Info("SHH protocol is disabled")

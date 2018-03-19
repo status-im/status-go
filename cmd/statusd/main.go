@@ -69,11 +69,12 @@ var (
 	syncAndExit = flag.Int("sync-and-exit", -1, "Timeout in minutes for blockchain sync and exit, zero means no timeout unless sync is finished")
 )
 
+// All general log messages in this package should be routed through this logger.
+var logger = log.New("package", "status-go/cmd/statusd")
+
 func main() {
 	flag.Usage = printUsage
 	flag.Parse()
-
-	logger := log.New("package", "status-go/cmd/statusd")
 
 	config, err := makeNodeConfig()
 	if err != nil {
@@ -142,8 +143,6 @@ func startDebug(backend *api.StatusBackend) error {
 
 // startCollectingStats collects various stats about the node and other protocols like Whisper.
 func startCollectingStats(interruptCh <-chan struct{}, nodeManager common.NodeManager) {
-
-	logger := log.New("package", "status-go/cmd/statusd")
 
 	logger.Info("Starting stats", "stats", *statsAddr)
 
@@ -295,9 +294,6 @@ Options:
 // stops the node. It times out after 5 seconds
 // if the node can not be stopped.
 func haltOnInterruptSignal(nodeManager common.NodeManager) <-chan struct{} {
-
-	logger := log.New("package", "status-go/cmd/statusd")
-
 	interruptCh := make(chan struct{})
 	go func() {
 		signalCh := make(chan os.Signal, 1)
