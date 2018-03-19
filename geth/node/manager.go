@@ -98,12 +98,6 @@ func (m *NodeManager) startNode(config *params.NodeConfig) error {
 		log.Error("Failed to create an RPC client", "error", err)
 		return RPCClientError(err)
 	}
-	// populate static peers exits when node stopped
-	go func() {
-		if err := m.PopulateStaticPeers(); err != nil {
-			log.Error("Static peers population", "error", err)
-		}
-	}()
 	return nil
 }
 
@@ -202,7 +196,7 @@ func (m *NodeManager) populateStaticPeers() error {
 
 func (m *NodeManager) removeStaticPeers() error {
 	if !m.config.BootClusterConfig.Enabled {
-		log.Info("Boot cluster is disabled")
+		log.Info("static peers are disabled")
 		return nil
 	}
 	server := m.node.Server()
@@ -212,10 +206,10 @@ func (m *NodeManager) removeStaticPeers() error {
 	for _, enode := range m.config.BootClusterConfig.BootNodes {
 		err := m.removePeer(enode)
 		if err != nil {
-			log.Warn("Boot node deletion failed", "error", err)
+			log.Warn("static peer deletion failed", "error", err)
 			return err
 		}
-		log.Info("Boot node deleted", "enode", enode)
+		log.Info("static peer deleted", "enode", enode)
 	}
 	return nil
 }

@@ -6,6 +6,8 @@ package common
 
 import (
 	context "context"
+	reflect "reflect"
+
 	accounts "github.com/ethereum/go-ethereum/accounts"
 	keystore "github.com/ethereum/go-ethereum/accounts/keystore"
 	common "github.com/ethereum/go-ethereum/common"
@@ -15,7 +17,6 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	params "github.com/status-im/status-go/geth/params"
 	rpc "github.com/status-im/status-go/geth/rpc"
-	reflect "reflect"
 )
 
 // MockNodeManager is a mock of NodeManager interface

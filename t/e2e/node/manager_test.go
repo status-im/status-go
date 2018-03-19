@@ -306,7 +306,7 @@ func (s *ManagerTestSuite) TestStartNodeWithUpstreamEnabled() {
 //		},
 //		func(config *params.NodeConfig) {
 //			log.Info("PopulateStaticPeers()")
-//			s.T().Logf("PopulateStaticPeers(), error: %v", s.NodeManager.PopulateStaticPeers())
+//			s.T().Logf("PopulateBootNodes(), error: %v", s.NodeManager.PopulateStaticPeers())
 //			progress <- struct{}{}
 //		},
 //		// TODO(adam): quarantined until it uses a different datadir

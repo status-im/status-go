@@ -1,7 +1,6 @@
 [
   {
     "networkID": 3,
-    "genesisHash": "0x41941023680923e0fe4d74a34bdac8141f2540e3ae90623718e47d66d1ca4a2d",
     "prod": {
       "bootnodes": [
         "enode://dffef3874011709b12d1e540d83ddb19a9db8614ad9151d05bcf813585e45cbebba5aaea223fe315786c401d8cecb1ad2de9f179680c536ea30311fb21fa934b@188.166.100.178:30303",
@@ -17,7 +16,6 @@
   },
   {
     "networkID": 4,
-    "genesisHash": "0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177",
     "prod": {
       "bootnodes": [
         "enode://fda3f6273a0f2da4ac5858d1f52e5afaf9def281121be3d37558c67d4d9ca26c6ad7a0520b2cd7454120fb770e86d5760487c9924b2166e65485f606e56d60fc@51.15.69.144:30303",
@@ -35,7 +33,6 @@
   },
   {
     "networkID": 1,
-    "genesisHash": "0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3",
     "prod": {
       "bootnodes": [
         "enode://71bb01b58165e3262aea2d3b06dbf9abb8d5512d96e5000e7e41ab2138b47be685935d3eb119fc25e1413db00d8db231fd9d59555a1cd75229821559b6a4eb51@51.15.85.243:30303",
