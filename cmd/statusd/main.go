@@ -25,23 +25,24 @@ var (
 )
 
 var (
-	prodMode       = flag.Bool("production", false, "Whether production settings should be loaded")
-	nodeKeyFile    = flag.String("nodekey", "", "P2P node key file (private key)")
-	dataDir        = flag.String("datadir", params.DataDir, "Data directory for the databases and keystore")
-	networkID      = flag.Int("networkid", params.RopstenNetworkID, "Network identifier (integer, 1=Homestead, 3=Ropsten, 4=Rinkeby, 777=StatusChain)")
-	lesEnabled     = flag.Bool("les", false, "LES protocol enabled (default is disabled)")
-	whisperEnabled = flag.Bool("shh", false, "Whisper protocol enabled (default is disabled)")
-	swarmEnabled   = flag.Bool("swarm", false, "Swarm protocol enabled")
-	maxPeers       = flag.Int("maxpeers", 25, "maximum number of p2p peers (including all protocols)")
-	httpEnabled    = flag.Bool("http", false, "HTTP RPC endpoint enabled (default: false)")
-	httpHost       = flag.String("httphost", "127.0.0.1", "HTTP RPC host of the listening socket")
-	httpPort       = flag.Int("httpport", params.HTTPPort, "HTTP RPC server's listening port")
-	ipcEnabled     = flag.Bool("ipc", false, "IPC RPC endpoint enabled")
-	cliEnabled     = flag.Bool("cli", false, "Enable debugging CLI server")
-	cliPort        = flag.String("cliport", debug.CLIPort, "CLI server's listening port")
-	logLevel       = flag.String("log", "INFO", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
-	logFile        = flag.String("logfile", "", "Path to the log file")
-	version        = flag.Bool("version", false, "Print version")
+	clusterConfigFile = flag.String("clusterconfig", "", "Cluster configuration file")
+	prodMode          = flag.Bool("production", false, "Whether production settings should be loaded")
+	nodeKeyFile       = flag.String("nodekey", "", "P2P node key file (private key)")
+	dataDir           = flag.String("datadir", params.DataDir, "Data directory for the databases and keystore")
+	networkID         = flag.Int("networkid", params.RopstenNetworkID, "Network identifier (integer, 1=Homestead, 3=Ropsten, 4=Rinkeby, 777=StatusChain)")
+	lesEnabled        = flag.Bool("les", false, "LES protocol enabled (default is disabled)")
+	whisperEnabled    = flag.Bool("shh", false, "Whisper protocol enabled (default is disabled)")
+	swarmEnabled      = flag.Bool("swarm", false, "Swarm protocol enabled")
+	maxPeers          = flag.Int("maxpeers", 25, "maximum number of p2p peers (including all protocols)")
+	httpEnabled       = flag.Bool("http", false, "HTTP RPC endpoint enabled (default: false)")
+	httpHost          = flag.String("httphost", "127.0.0.1", "HTTP RPC host of the listening socket")
+	httpPort          = flag.Int("httpport", params.HTTPPort, "HTTP RPC server's listening port")
+	ipcEnabled        = flag.Bool("ipc", false, "IPC RPC endpoint enabled")
+	cliEnabled        = flag.Bool("cli", false, "Enable debugging CLI server")
+	cliPort           = flag.String("cliport", debug.CLIPort, "CLI server's listening port")
+	logLevel          = flag.String("log", "INFO", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
+	logFile           = flag.String("logfile", "", "Path to the log file")
+	version           = flag.Bool("version", false, "Print version")
 
 	listenAddr = flag.String("listenaddr", ":30303", "IP address and port of this node (e.g. 127.0.0.1:30303)")
 	standalone = flag.Bool("standalone", true, "Don't actively connect to peers, wait for incoming connections")
@@ -193,7 +194,7 @@ func startCollectingStats(interruptCh <-chan struct{}, nodeManager common.NodeMa
 // makeNodeConfig parses incoming CLI options and returns node configuration object
 func makeNodeConfig() (*params.NodeConfig, error) {
 	devMode := !*prodMode
-	nodeConfig, err := params.NewNodeConfig(*dataDir, uint64(*networkID), devMode)
+	nodeConfig, err := params.NewNodeConfig(*dataDir, *clusterConfigFile, uint64(*networkID), devMode)
 	if err != nil {
 		return nil, err
 	}

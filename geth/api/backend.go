@@ -242,7 +242,7 @@ func (b *StatusBackend) ConnectionChange(state ConnectionState) {
 
 // AppStateChange handles app state changes (background/foreground).
 func (b *StatusBackend) AppStateChange(state AppState) {
-	b.log.Info("App State changed: %s", state)
+	b.log.Info("App State changed.", "new-state", state)
 
 	// TODO: put node in low-power mode if the app is in background (or inactive)
 	// and normal mode if the app is in foreground.

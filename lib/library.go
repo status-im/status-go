@@ -20,7 +20,7 @@ var logger = log.New("package", "status-go/lib")
 //GenerateConfig for status node
 //export GenerateConfig
 func GenerateConfig(datadir *C.char, networkID C.int, devMode C.int) *C.char {
-	config, err := params.NewNodeConfig(C.GoString(datadir), uint64(networkID), devMode == 1)
+	config, err := params.NewNodeConfig(C.GoString(datadir), "", uint64(networkID), devMode == 1)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
