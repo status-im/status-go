@@ -6,8 +6,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
-	"github.com/status-im/status-go/geth/account"
+	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/node"
+	"github.com/status-im/status-go/geth/provider"
 	e2e "github.com/status-im/status-go/t/e2e"
 	. "github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/suite"
@@ -35,7 +36,9 @@ func (s *WhisperTestSuite) TestWhisperFilterRace() {
 	whisperService, err := s.NodeManager.WhisperService()
 	s.NoError(err)
 
-	accountManager := account.NewManager(s.NodeManager)
+	p := provider.New(s.NodeManager)
+	accountManager, err := p.AccountManager()
+	s.Nil(err)
 	s.NotNil(accountManager)
 
 	whisperAPI := whisper.NewPublicWhisperAPI(whisperService)
@@ -97,10 +100,14 @@ func (s *WhisperTestSuite) TestLogout() {
 	s.StartTestNode()
 	defer s.StopTestNode()
 
-	whisperService, err := s.NodeManager.WhisperService()
+	backend := api.StatusBackend{}
+	backend.Provider = provider.New(s.NodeManager)
+
+	whisperService, err := backend.Provider.Whisper()
 	s.NoError(err)
 
-	accountManager := account.NewManager(s.NodeManager)
+	accountManager := backend.AccountManager()
+	s.Nil(err)
 	s.NotNil(accountManager)
 
 	// create an account
@@ -109,9 +116,9 @@ func (s *WhisperTestSuite) TestLogout() {
 
 	// make sure that identity doesn't exist (yet) in Whisper
 	s.False(whisperService.HasKeyPair(pubKey), "identity already present in whisper")
-	s.NoError(accountManager.SelectAccount(address, TestConfig.Account1.Password))
+	s.NoError(backend.SelectAccount(address, TestConfig.Account1.Password))
 	s.True(whisperService.HasKeyPair(pubKey), "identity not injected into whisper")
 
-	s.NoError(accountManager.Logout())
+	s.NoError(backend.Logout())
 	s.False(whisperService.HasKeyPair(pubKey), "identity not cleared from whisper")
 }

@@ -15,6 +15,7 @@ import (
 	node "github.com/ethereum/go-ethereum/node"
 	whisperv6 "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	gomock "github.com/golang/mock/gomock"
+	account "github.com/status-im/status-go/geth/account"
 	params "github.com/status-im/status-go/geth/params"
 	rpc "github.com/status-im/status-go/geth/rpc"
 )
@@ -178,32 +179,6 @@ func (mr *MockNodeManagerMockRecorder) WhisperService() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WhisperService", reflect.TypeOf((*MockNodeManager)(nil).WhisperService))
 }
 
-// AccountManager mocks base method
-func (m *MockNodeManager) AccountManager() (*accounts.Manager, error) {
-	ret := m.ctrl.Call(m, "AccountManager")
-	ret0, _ := ret[0].(*accounts.Manager)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// AccountManager indicates an expected call of AccountManager
-func (mr *MockNodeManagerMockRecorder) AccountManager() *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AccountManager", reflect.TypeOf((*MockNodeManager)(nil).AccountManager))
-}
-
-// AccountKeyStore mocks base method
-func (m *MockNodeManager) AccountKeyStore() (*keystore.KeyStore, error) {
-	ret := m.ctrl.Call(m, "AccountKeyStore")
-	ret0, _ := ret[0].(*keystore.KeyStore)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// AccountKeyStore indicates an expected call of AccountKeyStore
-func (mr *MockNodeManagerMockRecorder) AccountKeyStore() *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AccountKeyStore", reflect.TypeOf((*MockNodeManager)(nil).AccountKeyStore))
-}
-
 // RPCClient mocks base method
 func (m *MockNodeManager) RPCClient() *rpc.Client {
 	ret := m.ctrl.Call(m, "RPCClient")
@@ -320,9 +295,9 @@ func (mr *MockAccountManagerMockRecorder) ReSelectAccount() *gomock.Call {
 }
 
 // SelectedAccount mocks base method
-func (m *MockAccountManager) SelectedAccount() (*SelectedExtKey, error) {
+func (m *MockAccountManager) SelectedAccount() (*account.SelectedExtKey, error) {
 	ret := m.ctrl.Call(m, "SelectedAccount")
-	ret0, _ := ret[0].(*SelectedExtKey)
+	ret0, _ := ret[0].(*account.SelectedExtKey)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -357,18 +332,6 @@ func (mr *MockAccountManagerMockRecorder) Accounts() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Accounts", reflect.TypeOf((*MockAccountManager)(nil).Accounts))
 }
 
-// AccountsRPCHandler mocks base method
-func (m *MockAccountManager) AccountsRPCHandler() rpc.Handler {
-	ret := m.ctrl.Call(m, "AccountsRPCHandler")
-	ret0, _ := ret[0].(rpc.Handler)
-	return ret0
-}
-
-// AccountsRPCHandler indicates an expected call of AccountsRPCHandler
-func (mr *MockAccountManagerMockRecorder) AccountsRPCHandler() *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AccountsRPCHandler", reflect.TypeOf((*MockAccountManager)(nil).AccountsRPCHandler))
-}
-
 // AddressToDecryptedAccount mocks base method
 func (m *MockAccountManager) AddressToDecryptedAccount(address, password string) (accounts.Account, *keystore.Key, error) {
 	ret := m.ctrl.Call(m, "AddressToDecryptedAccount", address, password)
@@ -381,4 +344,30 @@ func (m *MockAccountManager) AddressToDecryptedAccount(address, password string)
 // AddressToDecryptedAccount indicates an expected call of AddressToDecryptedAccount
 func (mr *MockAccountManagerMockRecorder) AddressToDecryptedAccount(address, password interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddressToDecryptedAccount", reflect.TypeOf((*MockAccountManager)(nil).AddressToDecryptedAccount), address, password)
+}
+
+// AccountManager mocks base method
+func (m *MockAccountManager) AccountManager() (*accounts.Manager, error) {
+	ret := m.ctrl.Call(m, "AccountManager")
+	ret0, _ := ret[0].(*accounts.Manager)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// AccountManager indicates an expected call of AccountManager
+func (mr *MockAccountManagerMockRecorder) AccountManager() *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AccountManager", reflect.TypeOf((*MockAccountManager)(nil).AccountManager))
+}
+
+// AccountKeyStore mocks base method
+func (m *MockAccountManager) AccountKeyStore() (*keystore.KeyStore, error) {
+	ret := m.ctrl.Call(m, "AccountKeyStore")
+	ret0, _ := ret[0].(*keystore.KeyStore)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// AccountKeyStore indicates an expected call of AccountKeyStore
+func (mr *MockAccountManagerMockRecorder) AccountKeyStore() *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AccountKeyStore", reflect.TypeOf((*MockAccountManager)(nil).AccountKeyStore))
 }

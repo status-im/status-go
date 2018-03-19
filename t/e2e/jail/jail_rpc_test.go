@@ -131,7 +131,7 @@ func (s *JailRPCTestSuite) TestContractDeployment() {
 			event := envelope.Event.(map[string]interface{})
 			s.T().Logf("transaction queued and will be completed shortly, id: %v", event["id"])
 
-			s.NoError(s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
+			s.NoError(s.Backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 
 			txID := event["id"].(string)
 			var txErr error
@@ -197,7 +197,7 @@ func (s *JailRPCTestSuite) TestJailVMPersistence() {
 	EnsureNodeSync(s.Backend.NodeManager())
 
 	// log into account from which transactions will be sent
-	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
+	err := s.Backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	s.NoError(err, "cannot select account: %v", TestConfig.Account1.Address)
 
 	type testCase struct {

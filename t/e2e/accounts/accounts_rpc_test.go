@@ -22,14 +22,18 @@ func (s *AccountsTestSuite) TestRPCEthAccounts() {
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
+	address, _, _, err := s.Backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
+	s.NoError(err)
+
 	// log into test account
-	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
+	err = s.Backend.SelectAccount(address, TestConfig.Account1.Password)
+
 	s.NoError(err)
 
 	rpcClient := s.Backend.NodeManager().RPCClient()
 	s.NotNil(rpcClient)
 
-	expectedResponse := `{"jsonrpc":"2.0","id":1,"result":["` + strings.ToLower(TestConfig.Account1.Address) + `"]}`
+	expectedResponse := `{"jsonrpc":"2.0","id":1,"result":["` + strings.ToLower(address) + `"]}`
 	resp := rpcClient.CallRaw(`{
 		"jsonrpc": "2.0",
 		"id": 1,
@@ -49,14 +53,17 @@ func (s *AccountsTestSuite) TestRPCEthAccountsWithUpstream() {
 	s.StartTestBackend(e2e.WithUpstream(addr))
 	defer s.StopTestBackend()
 
+	address, _, _, err := s.Backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
+	s.NoError(err)
+
 	// log into test account
-	err = s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
+	err = s.Backend.SelectAccount(address, TestConfig.Account1.Password)
 	s.NoError(err)
 
 	rpcClient := s.Backend.NodeManager().RPCClient()
 	s.NotNil(rpcClient)
 
-	expectedResponse := `{"jsonrpc":"2.0","id":1,"result":["` + strings.ToLower(TestConfig.Account1.Address) + `"]}`
+	expectedResponse := `{"jsonrpc":"2.0","id":1,"result":["` + strings.ToLower(address) + `"]}`
 	resp := rpcClient.CallRaw(`{
     	"jsonrpc": "2.0",
     	"id": 1,

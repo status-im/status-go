@@ -17,6 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/les"
 	"github.com/ethereum/go-ethereum/node"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
+	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/rpc"
 	"github.com/status-im/status-go/static"
@@ -26,22 +27,6 @@ import (
 var (
 	ErrDeprecatedMethod = errors.New("Method is depricated and will be removed in future release")
 )
-
-// SelectedExtKey is a container for currently selected (logged in) account
-type SelectedExtKey struct {
-	Address     common.Address
-	AccountKey  *keystore.Key
-	SubAccounts []accounts.Account
-}
-
-// Hex dumps address of a given extended key as hex string
-func (k *SelectedExtKey) Hex() string {
-	if k == nil {
-		return "0x0"
-	}
-
-	return k.Address.Hex()
-}
 
 // NodeManager defines expected methods for managing Status node
 type NodeManager interface {
@@ -79,12 +64,6 @@ type NodeManager interface {
 	// WhisperService returns reference to running Whisper service
 	WhisperService() (*whisper.Whisper, error)
 
-	// AccountManager returns reference to node's account manager
-	AccountManager() (*accounts.Manager, error)
-
-	// AccountKeyStore returns reference to account manager's keystore
-	AccountKeyStore() (*keystore.KeyStore, error)
-
 	// RPCClient exposes reference to RPC client connected to the running node
 	RPCClient() *rpc.Client
 }
@@ -119,7 +98,7 @@ type AccountManager interface {
 	ReSelectAccount() error
 
 	// SelectedAccount returns currently selected account
-	SelectedAccount() (*SelectedExtKey, error)
+	SelectedAccount() (*account.SelectedExtKey, error)
 
 	// Logout clears whisper identities
 	Logout() error
@@ -127,13 +106,16 @@ type AccountManager interface {
 	// Accounts returns handler to process account list request
 	Accounts() ([]common.Address, error)
 
-	// AccountsRPCHandler returns RPC wrapper for Accounts()
-	AccountsRPCHandler() rpc.Handler
-
 	// AddressToDecryptedAccount tries to load decrypted key for a given account.
 	// The running node, has a keystore directory which is loaded on start. Key file
 	// for a given address is expected to be in that directory prior to node start.
 	AddressToDecryptedAccount(address, password string) (accounts.Account, *keystore.Key, error)
+
+	// AccountManager returns reference to node's account manager
+	AccountManager() (*accounts.Manager, error)
+
+	// AccountKeyStore returns reference to account manager's keystore
+	AccountKeyStore() (*keystore.KeyStore, error)
 }
 
 // TransactionResult is a JSON returned from transaction complete function (used internally)
@@ -265,7 +247,7 @@ type DiscardTransactionsResult struct {
 	Results map[string]DiscardTransactionResult `json:"results"`
 }
 
-type account struct {
+type accountType struct {
 	Address  string
 	Password string
 }
@@ -277,9 +259,9 @@ type TestConfig struct {
 		HTTPPort    int
 		WSPort      int
 	}
-	Account1 account
-	Account2 account
-	Account3 account
+	Account1 accountType
+	Account2 accountType
+	Account3 accountType
 }
 
 // NotifyResult is a JSON returned from notify message
