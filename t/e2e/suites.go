@@ -1,7 +1,7 @@
 package e2e
 
 import (
-	"log"
+	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/ethereum/go-ethereum/les"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
