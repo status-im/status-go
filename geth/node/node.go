@@ -117,6 +117,7 @@ func defaultEmbeddedNodeConfig(config *params.NodeConfig) *node.Config {
 
 	if config.BootClusterConfig.Enabled {
 		nc.P2P.StaticNodes = makeBootstrapNodes(config.BootClusterConfig.BootNodes)
+		nc.P2P.BootstrapNodes = makeBootstrapNodes(config.BootClusterConfig.BootNodes)
 	}
 
 	return nc
