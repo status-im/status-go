@@ -155,15 +155,18 @@ func (c *SwarmConfig) String() string {
 }
 
 // ----------
-// BootClusterConfig
+// ClusterConfig
 // ----------
 
-// BootClusterConfig holds configuration for supporting cluster peers, which is a temporary
+// ClusterConfig holds configuration for supporting cluster peers, which is a temporary
 // means for mobile devices to get connected to Ethereum network (UDP-based discovery
 // may not be available, so we need means to discover the network manually).
-type BootClusterConfig struct {
+type ClusterConfig struct {
 	// Enabled flag specifies whether feature is enabled
 	Enabled bool
+
+	// StaticNodes lists the static nodes taken from compiled or passed cluster.json
+	StaticNodes []string
 
 	// BootNodes list of cluster peer nodes for a given network (Ropsten, Rinkeby, Homestead),
 	// for a given mode (production vs development)
@@ -171,7 +174,7 @@ type BootClusterConfig struct {
 }
 
 // String dumps config object as nicely indented JSON
-func (c *BootClusterConfig) String() string {
+func (c *ClusterConfig) String() string {
 	data, _ := json.MarshalIndent(c, "", "    ") // nolint: gas
 	return string(data)
 }
@@ -286,8 +289,8 @@ type NodeConfig struct {
 	// empty the statical configuration data will be taken.
 	ClusterConfigFile string `json:"ClusterConfigFile"`
 
-	// BootClusterConfig extra configuration for supporting cluster peers.
-	BootClusterConfig *BootClusterConfig `json:"BootClusterConfig," validate:"structonly"`
+	// ClusterConfig extra configuration for supporting cluster peers.
+	ClusterConfig *ClusterConfig `json:"ClusterConfig," validate:"structonly"`
 
 	// LightEthConfig extra configuration for LES
 	LightEthConfig *LightEthConfig `json:"LightEthConfig," validate:"structonly"`
@@ -322,9 +325,10 @@ func NewNodeConfig(dataDir string, clstrCfgFile string, networkID uint64, devMod
 		LogLevel:          LogLevel,
 		LogToStderr:       LogToStderr,
 		ClusterConfigFile: clstrCfgFile,
-		BootClusterConfig: &BootClusterConfig{
-			Enabled:   true,
-			BootNodes: []string{},
+		ClusterConfig: &ClusterConfig{
+			Enabled:     true,
+			StaticNodes: []string{},
+			BootNodes:   []string{},
 		},
 		LightEthConfig: &LightEthConfig{
 			Enabled:       true,
@@ -406,8 +410,8 @@ func (c *NodeConfig) Validate() error {
 		return err
 	}
 
-	if c.BootClusterConfig.Enabled {
-		if err := validate.Struct(c.BootClusterConfig); err != nil {
+	if c.ClusterConfig.Enabled {
+		if err := validate.Struct(c.ClusterConfig); err != nil {
 			return err
 		}
 	}
@@ -547,7 +551,7 @@ func (c *NodeConfig) updateUpstreamConfig() error {
 // This is necessary until we have LES protocol support CHT sync, and better node
 // discovery on mobile devices)
 func (c *NodeConfig) updateClusterConfig() error {
-	if !c.BootClusterConfig.Enabled {
+	if !c.ClusterConfig.Enabled {
 		return nil
 	}
 
@@ -556,9 +560,9 @@ func (c *NodeConfig) updateClusterConfig() error {
 	// decentralized solution. For now, in order to avoid forcing users to long sync times
 	// we use central static resource
 	type subClusterData struct {
-		Number    int      `json:"number"`
-		Hash      string   `json:"hash"`
-		BootNodes []string `json:"bootnodes"`
+		Number      int      `json:"number"`
+		Hash        string   `json:"hash"`
+		StaticNodes []string `json:"staticnodes"`
 	}
 	type clusterData struct {
 		NetworkID int            `json:"networkID"`
@@ -591,9 +595,9 @@ func (c *NodeConfig) updateClusterConfig() error {
 
 	for _, cluster := range clusters {
 		if cluster.NetworkID == int(c.NetworkID) {
-			c.BootClusterConfig.BootNodes = cluster.Prod.BootNodes
+			c.ClusterConfig.StaticNodes = cluster.Prod.StaticNodes
 			if c.DevMode {
-				c.BootClusterConfig.BootNodes = cluster.Dev.BootNodes
+				c.ClusterConfig.StaticNodes = cluster.Dev.StaticNodes
 			}
 			break
 		}
