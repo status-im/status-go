@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"sync"
 
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/geth/params"
 
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
@@ -30,6 +31,7 @@ type Client struct {
 
 	handlersMx sync.RWMutex       // mx guards handlers
 	handlers   map[string]Handler // locally registered handlers
+	log        log.Logger
 }
 
 // NewClient initializes Client and tries to connect to both,
@@ -41,6 +43,7 @@ func NewClient(client *gethrpc.Client, upstream params.UpstreamRPCConfig) (*Clie
 	c := Client{
 		local:    client,
 		handlers: make(map[string]Handler),
+		log:      log.New("package", "status-go/geth/rpc.Client"),
 	}
 
 	var err error

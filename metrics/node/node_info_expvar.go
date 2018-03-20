@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"expvar"
 
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
-	"github.com/status-im/status-go/geth/log"
 )
 
 var (
@@ -28,7 +28,7 @@ func updateNodeInfo(node *node.Node) {
 func updateNodePeers(node *node.Node) {
 	server := node.Server()
 	if server == nil {
-		log.Warn("Failed to get a server")
+		logger.Warn("Failed to get a server")
 		return
 	}
 

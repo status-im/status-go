@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/geth/common"
-	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
 
 	_ "github.com/stretchr/testify/suite" // required to register testify flags
@@ -46,6 +46,9 @@ var (
 		params.RinkebyNetworkID:     "Rinkeby",
 		params.StatusChainNetworkID: "StatusChain",
 	}
+
+	// All general log messages in this package should be routed through this logger.
+	logger = log.New("package", "status-go/t/utils")
 )
 
 func init() {
@@ -127,18 +130,18 @@ func EnsureNodeSync(nodeManager common.NodeManager) {
 				continue
 			}
 			if nodeManager.PeerCount() == 0 {
-				log.Debug("No establishished connections with a peers, continue waiting for a sync")
+				logger.Debug("No establishished connections with a peers, continue waiting for a sync")
 				continue
 			}
 			if downloader.Synchronising() {
-				log.Debug("synchronization is in progress")
+				logger.Debug("synchronization is in progress")
 				continue
 			}
 			progress := downloader.Progress()
 			if progress.CurrentBlock >= progress.HighestBlock {
 				return
 			}
-			log.Debug(
+			logger.Debug(
 				fmt.Sprintf("synchronization is not finished yet: current block %d < highest block %d",
 					progress.CurrentBlock, progress.HighestBlock),
 			)

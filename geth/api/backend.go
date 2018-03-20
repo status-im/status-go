@@ -6,10 +6,11 @@ import (
 	"sync"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/log"
+
 	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/jail"
-	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/notifications/push/fcm"
 	"github.com/status-im/status-go/geth/params"
@@ -31,6 +32,7 @@ type StatusBackend struct {
 	jailManager     jail.Manager
 	newNotification common.NotificationConstructor
 	connectionState ConnectionState
+	log             log.Logger
 }
 
 // NewStatusBackend create a new NewStatusBackend instance
@@ -49,6 +51,7 @@ func NewStatusBackend() *StatusBackend {
 		jailManager:     jailManager,
 		txQueueManager:  txQueueManager,
 		newNotification: notificationManager,
+		log:             log.New("package", "status-go/geth/api.StatusBackend"),
 	}
 }
 
@@ -111,12 +114,12 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 	// on rpc client being created
 	b.txQueueManager.Start()
 	if err := b.registerHandlers(); err != nil {
-		log.Error("Handler registration failed", "err", err)
+		b.log.Error("Handler registration failed", "err", err)
 	}
 	if err := b.accountManager.ReSelectAccount(); err != nil {
-		log.Error("Reselect account failed", "err", err)
+		b.log.Error("Reselect account failed", "err", err)
 	}
-	log.Info("Account reselected")
+	b.log.Info("Account reselected")
 	signal.Send(signal.Envelope{Type: signal.EventNodeReady})
 	return nil
 }
@@ -230,7 +233,7 @@ func (b *StatusBackend) registerHandlers() error {
 
 // ConnectionChange handles network state changes logic.
 func (b *StatusBackend) ConnectionChange(state ConnectionState) {
-	log.Info("Network state change", "old", b.connectionState, "new", state)
+	b.log.Info("Network state change", "old", b.connectionState, "new", state)
 	b.connectionState = state
 
 	// logic of handling state changes here
@@ -239,7 +242,7 @@ func (b *StatusBackend) ConnectionChange(state ConnectionState) {
 
 // AppStateChange handles app state changes (background/foreground).
 func (b *StatusBackend) AppStateChange(state AppState) {
-	log.Info("App State changed.", "new-state", state)
+	b.log.Info("App State changed.", "new-state", state)
 
 	// TODO: put node in low-power mode if the app is in background (or inactive)
 	// and normal mode if the app is in foreground.

@@ -11,7 +11,7 @@ import (
 
 	"sync"
 
-	"github.com/status-im/status-go/geth/log"
+	"github.com/ethereum/go-ethereum/log"
 )
 
 const (
@@ -42,6 +42,9 @@ type Envelope struct {
 type NodeCrashEvent struct {
 	Error error `json:"error"`
 }
+
+// All general log messages in this package should be routed through this logger.
+var logger = log.New("package", "status-go/geth/signal")
 
 // MarshalJSON implements the json.Marshaller interface.
 func (e NodeCrashEvent) MarshalJSON() ([]byte, error) {
@@ -77,7 +80,7 @@ func ResetDefaultNodeNotificationHandler() {
 
 // TriggerDefaultNodeNotificationHandler triggers default notification handler (helpful in tests)
 func TriggerDefaultNodeNotificationHandler(jsonEvent string) {
-	log.Info("Notification received", "event", jsonEvent)
+	logger.Info("Notification received", "event", jsonEvent)
 }
 
 // Send sends application signal (JSON, normally) upwards to application (via default notification handler)

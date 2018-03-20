@@ -8,9 +8,10 @@ import (
 
 	ethereum "github.com/ethereum/go-ethereum"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/log"
+
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/status-im/status-go/geth/common"
-	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/transactions/queue"
 )
@@ -37,6 +38,7 @@ type Manager struct {
 
 	addrLock   *AddrLocker
 	localNonce sync.Map
+	log        log.Logger
 }
 
 // NewManager returns a new Manager.
@@ -50,6 +52,7 @@ func NewManager(nodeManager common.NodeManager, accountManager common.AccountMan
 		completionTimeout: DefaultTxSendCompletionTimeout,
 		rpcCallTimeout:    defaultTimeout,
 		localNonce:        sync.Map{},
+		log:               log.New("package", "status-go/geth/transactions.Manager"),
 	}
 }
 
@@ -61,14 +64,14 @@ func (m *Manager) DisableNotificactions() {
 
 // Start starts accepting new transactions into the queue.
 func (m *Manager) Start() {
-	log.Info("start Manager")
+	m.log.Info("start Manager")
 	m.ethTxClient = NewEthTxClient(m.nodeManager.RPCClient())
 	m.txQueue.Start()
 }
 
 // Stop stops accepting new transactions into the queue.
 func (m *Manager) Stop() {
-	log.Info("stop Manager")
+	m.log.Info("stop Manager")
 	m.txQueue.Stop()
 }
 
@@ -83,7 +86,7 @@ func (m *Manager) QueueTransaction(tx *common.QueuedTx) error {
 	if tx.Args.To != nil {
 		to = tx.Args.To.Hex()
 	}
-	log.Info("queue a new transaction", "id", tx.ID, "from", tx.Args.From.Hex(), "to", to)
+	m.log.Info("queue a new transaction", "id", tx.ID, "from", tx.Args.From.Hex(), "to", to)
 	if err := m.txQueue.Enqueue(tx); err != nil {
 		return err
 	}
@@ -95,7 +98,7 @@ func (m *Manager) QueueTransaction(tx *common.QueuedTx) error {
 
 func (m *Manager) txDone(tx *common.QueuedTx, hash gethcommon.Hash, err error) {
 	if err := m.txQueue.Done(tx.ID, hash, err); err == queue.ErrQueuedTxIDNotFound {
-		log.Warn("transaction is already removed from a queue", tx.ID)
+		m.log.Warn("transaction is already removed from a queue", "ID", tx.ID)
 		return
 	}
 	if m.notify {
@@ -106,7 +109,7 @@ func (m *Manager) txDone(tx *common.QueuedTx, hash gethcommon.Hash, err error) {
 // WaitForTransaction adds a transaction to the queue and blocks
 // until it's completed, discarded or times out.
 func (m *Manager) WaitForTransaction(tx *common.QueuedTx) common.TransactionResult {
-	log.Info("wait for transaction", "id", tx.ID)
+	m.log.Info("wait for transaction", "id", tx.ID)
 	// now wait up until transaction is:
 	// - completed (via CompleteQueuedTransaction),
 	// - discarded (via DiscardQueuedTransaction)
@@ -123,14 +126,14 @@ func (m *Manager) WaitForTransaction(tx *common.QueuedTx) common.TransactionResu
 
 // CompleteTransaction instructs backend to complete sending of a given transaction.
 func (m *Manager) CompleteTransaction(id common.QueuedTxID, password string) (hash gethcommon.Hash, err error) {
-	log.Info("complete transaction", "id", id)
+	m.log.Info("complete transaction", "id", id)
 	tx, err := m.txQueue.Get(id)
 	if err != nil {
-		log.Warn("error getting a queued transaction", "err", err)
+		m.log.Warn("error getting a queued transaction", "err", err)
 		return hash, err
 	}
 	if err := m.txQueue.LockInprogress(id); err != nil {
-		log.Warn("can't process transaction", "err", err)
+		m.log.Warn("can't process transaction", "err", err)
 		return hash, err
 	}
 	config, err := m.nodeManager.NodeConfig()
@@ -143,7 +146,7 @@ func (m *Manager) CompleteTransaction(id common.QueuedTxID, password string) (ha
 		return hash, err
 	}
 	hash, err = m.completeTransaction(config, account, tx)
-	log.Info("finally completed transaction", "id", tx.ID, "hash", hash, "err", err)
+	m.log.Info("finally completed transaction", "id", tx.ID, "hash", hash, "err", err)
 	m.txDone(tx, hash, err)
 	return hash, err
 }
@@ -151,24 +154,24 @@ func (m *Manager) CompleteTransaction(id common.QueuedTxID, password string) (ha
 func (m *Manager) validateAccount(config *params.NodeConfig, tx *common.QueuedTx, password string) (*common.SelectedExtKey, error) {
 	selectedAccount, err := m.accountManager.SelectedAccount()
 	if err != nil {
-		log.Warn("failed to get a selected account", "err", err)
+		m.log.Warn("failed to get a selected account", "err", err)
 		return nil, err
 	}
 	// make sure that only account which created the tx can complete it
 	if tx.Args.From.Hex() != selectedAccount.Address.Hex() {
-		log.Warn("queued transaction does not belong to the selected account", "err", queue.ErrInvalidCompleteTxSender)
+		m.log.Warn("queued transaction does not belong to the selected account", "err", queue.ErrInvalidCompleteTxSender)
 		return nil, queue.ErrInvalidCompleteTxSender
 	}
 	_, err = m.accountManager.VerifyAccountPassword(config.KeyStoreDir, selectedAccount.Address.String(), password)
 	if err != nil {
-		log.Warn("failed to verify account", "account", selectedAccount.Address.String(), "error", err.Error())
+		m.log.Warn("failed to verify account", "account", selectedAccount.Address.String(), "error", err)
 		return nil, err
 	}
 	return selectedAccount, nil
 }
 
 func (m *Manager) completeTransaction(config *params.NodeConfig, selectedAccount *common.SelectedExtKey, queuedTx *common.QueuedTx) (hash gethcommon.Hash, err error) {
-	log.Info("complete transaction", "id", queuedTx.ID)
+	m.log.Info("complete transaction", "id", queuedTx.ID)
 	m.addrLock.LockAddr(queuedTx.Args.From)
 	var localNonce uint64
 	if val, ok := m.localNonce.Load(queuedTx.Args.From); ok {
@@ -228,14 +231,14 @@ func (m *Manager) completeTransaction(config *params.NodeConfig, selectedAccount
 			return hash, err
 		}
 		if gas < defaultGas {
-			log.Info("default gas will be used. estimated gas", gas, "is lower than", defaultGas)
+			m.log.Info("default gas will be used. estimated gas", gas, "is lower than", defaultGas)
 			gas = defaultGas
 		}
 	} else {
 		gas = uint64(*args.Gas)
 	}
 
-	log.Info(
+	m.log.Info(
 		"preparing raw transaction",
 		"from", args.From.Hex(),
 		"to", toAddr.Hex(),
@@ -301,7 +304,7 @@ func (m *Manager) DiscardTransactions(ids []common.QueuedTxID) map[common.Queued
 // SendTransactionRPCHandler is a handler for eth_sendTransaction method.
 // It accepts one param which is a slice with a map of transaction params.
 func (m *Manager) SendTransactionRPCHandler(ctx context.Context, args ...interface{}) (interface{}, error) {
-	log.Info("SendTransactionRPCHandler called")
+	m.log.Info("SendTransactionRPCHandler called")
 	// TODO(adam): it's a hack to parse arguments as common.RPCCall can do that.
 	// We should refactor parsing these params to a separate struct.
 	rpcCall := common.RPCCall{Params: args}

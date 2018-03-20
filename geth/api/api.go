@@ -6,16 +6,17 @@ import (
 	"github.com/NaySoftware/go-fcm"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/jail"
-	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/transactions"
 )
 
 // StatusAPI provides API to access Status related functionality.
 type StatusAPI struct {
-	b *StatusBackend
+	b   *StatusBackend
+	log log.Logger
 }
 
 // NewStatusAPI creates a new StatusAPI instance
@@ -27,7 +28,8 @@ func NewStatusAPI() *StatusAPI {
 // the passed backend.
 func NewStatusAPIWithBackend(b *StatusBackend) *StatusAPI {
 	return &StatusAPI{
-		b: b,
+		b:   b,
+		log: log.New("package", "status-go/geth/api.StatusAPI"),
 	}
 }
 
@@ -198,14 +200,14 @@ func (api *StatusAPI) SetJailBaseJS(js string) {
 // Notify sends a push notification to the device with the given token.
 // @deprecated
 func (api *StatusAPI) Notify(token string) string {
-	log.Debug("Notify", "token", token)
+	api.log.Debug("Notify", "token", token)
 	message := "Hello World1"
 
 	tokens := []string{token}
 
 	err := api.b.newNotification().Send(message, fcm.NotificationPayload{}, tokens...)
 	if err != nil {
-		log.Error("Notify failed:", err)
+		api.log.Error("Notify failed", "error", err)
 	}
 
 	return token
@@ -213,11 +215,11 @@ func (api *StatusAPI) Notify(token string) string {
 
 // NotifyUsers send notifications to users.
 func (api *StatusAPI) NotifyUsers(message string, payload fcm.NotificationPayload, tokens ...string) error {
-	log.Debug("Notify", "tokens", tokens)
+	api.log.Debug("Notify", "tokens", tokens)
 
 	err := api.b.newNotification().Send(message, payload, tokens...)
 	if err != nil {
-		log.Error("Notify failed:", err)
+		api.log.Error("Notify failed", "error", err)
 	}
 
 	return err
@@ -240,7 +242,7 @@ func (api *StatusAPI) ConnectionChange(typ string, expensive bool) {
 func (api *StatusAPI) AppStateChange(state string) {
 	appState, err := ParseAppState(state)
 	if err != nil {
-		log.Error("AppStateChange failed, ignoring it.", "err", err)
+		log.Error("AppStateChange failed, ignoring", "error", err)
 		return // and do nothing
 	}
 	api.b.AppStateChange(appState)

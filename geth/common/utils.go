@@ -15,8 +15,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/pborman/uuid"
-	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/static"
 )
 
@@ -32,6 +32,9 @@ type contextKey string // in order to make sure that our context key does not co
 var (
 	ErrInvalidAccountAddressOrKey = errors.New("cannot parse address or key to valid account address")
 )
+
+// All general log messages in this package should be routed through this logger.
+var logger = log.New("package", "status-go/geth/common")
 
 // ParseAccountString parses hex encoded string and returns is as accounts.Account.
 func ParseAccountString(account string) (accounts.Account, error) {
@@ -75,7 +78,7 @@ func ImportTestAccount(keystoreDir, accountFile string) error {
 	dst := filepath.Join(keystoreDir, accountFile)
 	err := ioutil.WriteFile(dst, static.MustAsset("keys/"+accountFile), 0644)
 	if err != nil {
-		log.Warn("cannot copy test account PK", "error", err)
+		logger.Warn("cannot copy test account PK", "error", err)
 	}
 
 	return err
