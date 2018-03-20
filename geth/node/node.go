@@ -115,8 +115,11 @@ func defaultEmbeddedNodeConfig(config *params.NodeConfig) *node.Config {
 		nc.HTTPPort = config.HTTPPort
 	}
 
-	if config.BootClusterConfig.Enabled {
-		nc.P2P.StaticNodes = makeBootstrapNodes(config.BootClusterConfig.BootNodes)
+	if config.ClusterConfig.Enabled {
+		// TODO(themue) Should static nodes always be set? Had been done via
+		// PopulateStaticPeers() before.
+		nc.P2P.StaticNodes = parseNodes(config.ClusterConfig.StaticNodes)
+		nc.P2P.BootstrapNodes = parseNodes(config.ClusterConfig.BootNodes)
 	}
 
 	return nc
@@ -216,12 +219,11 @@ func makeWSHost(config *params.NodeConfig) string {
 	return config.WSHost
 }
 
-// makeBootstrapNodes returns default (hence bootstrap) list of peers
-func makeBootstrapNodes(enodes []string) []*discover.Node {
-	var bootstrapNodes []*discover.Node
-	for _, enode := range enodes {
-		bootstrapNodes = append(bootstrapNodes, discover.MustParseNode(enode))
+// parseNodes creates list of discover.Node out of enode strings.
+func parseNodes(enodes []string) []*discover.Node {
+	nodes := make([]*discover.Node, len(enodes))
+	for i, enode := range enodes {
+		nodes[i] = discover.MustParseNode(enode)
 	}
-
-	return bootstrapNodes
+	return nodes
 }

@@ -177,39 +177,39 @@ func (m *NodeManager) populateStaticPeers() error {
 	if err := m.isNodeAvailable(); err != nil {
 		return err
 	}
-	if !m.config.BootClusterConfig.Enabled {
-		log.Info("Boot cluster is disabled")
+	if !m.config.ClusterConfig.Enabled {
+		log.Info("Static peers are disabled")
 		return nil
 	}
 
-	for _, enode := range m.config.BootClusterConfig.BootNodes {
+	for _, enode := range m.config.ClusterConfig.StaticNodes {
 		err := m.addPeer(enode)
 		if err != nil {
-			log.Warn("Boot node addition failed", "error", err)
+			log.Warn("Static peer addition failed", "error", err)
 			continue
 		}
-		log.Info("Boot node added", "enode", enode)
+		log.Info("Static peer added", "enode", enode)
 	}
 
 	return nil
 }
 
 func (m *NodeManager) removeStaticPeers() error {
-	if !m.config.BootClusterConfig.Enabled {
-		log.Info("static peers are disabled")
+	if !m.config.ClusterConfig.Enabled {
+		log.Info("Static peers are disabled")
 		return nil
 	}
 	server := m.node.Server()
 	if server == nil {
 		return ErrNoRunningNode
 	}
-	for _, enode := range m.config.BootClusterConfig.BootNodes {
+	for _, enode := range m.config.ClusterConfig.StaticNodes {
 		err := m.removePeer(enode)
 		if err != nil {
-			log.Warn("static peer deletion failed", "error", err)
+			log.Warn("Static peer deletion failed", "error", err)
 			return err
 		}
-		log.Info("static peer deleted", "enode", enode)
+		log.Info("Static peer deleted", "enode", enode)
 	}
 	return nil
 }

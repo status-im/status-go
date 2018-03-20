@@ -21,13 +21,13 @@ var clusterConfigData = []byte(`[
   {
     "networkID": 3,
     "prod": {
-      "bootnodes": [
+      "staticnodes": [
         "enode://7ab298cedc4185a894d21d8a4615262ec6bdce66c9b6783878258e0d5b31013d30c9038932432f70e5b2b6a5cd323bf820554fcb22fbc7b45367889522e9c449@10.1.1.1:30303",
         "enode://f59e8701f18c79c5cbc7618dc7bb928d44dc2f5405c7d693dad97da2d8585975942ec6fd36d3fe608bfdc7270a34a4dd00f38cfe96b2baa24f7cd0ac28d382a1@10.1.1.2:30303"
 	  ]
 	},
     "dev": {
-      "bootnodes": [
+      "staticnodes": [
         "enode://7ab298cedc4185a894d21d8a4615262ec6bdce66c9b6783878258e0d5b31013d30c9038932432f70e5b2b6a5cd323bf820554fcb22fbc7b45367889522e9c449@10.1.1.1:30303",
         "enode://f59e8701f18c79c5cbc7618dc7bb928d44dc2f5405c7d693dad97da2d8585975942ec6fd36d3fe608bfdc7270a34a4dd00f38cfe96b2baa24f7cd0ac28d382a1@10.1.1.2:30303"
 	  ]
@@ -233,21 +233,22 @@ var loadConfigTestCases = []struct {
 		},
 	},
 	{
-		`default boot nodes (Ropsten Dev)`,
+		`default static nodes (Ropsten Dev)`,
 		`{
 			"NetworkId": 3,
 			"DataDir": "$TMPDIR"
 		}`,
 		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
 			require.NoError(t, err)
-			require.True(t, nodeConfig.BootClusterConfig.Enabled, "boot nodes are expected to be enabled by default")
+			require.True(t, nodeConfig.ClusterConfig.Enabled, "static nodes are expected to be enabled by default")
 
-			enodes := nodeConfig.BootClusterConfig.BootNodes
+			enodes := nodeConfig.ClusterConfig.StaticNodes
+			t.Logf("LEN SN %d", len(enodes))
 			require.Len(t, enodes, 2)
 		},
 	},
 	{
-		`illegal cluster config file`,
+		`illegal cluster configuration file`,
 		`{
 			"NetworkId": 3,
 			"DataDir": "$TMPDIR",
@@ -258,7 +259,7 @@ var loadConfigTestCases = []struct {
 		},
 	},
 	{
-		`valid cluster config file`,
+		`valid cluster configuration file`,
 		`{
 			"NetworkId": 3,
 			"DataDir": "$TMPDIR",
@@ -266,14 +267,14 @@ var loadConfigTestCases = []struct {
 		}`,
 		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
 			require.NoError(t, err)
-			require.True(t, nodeConfig.BootClusterConfig.Enabled, "boot cluster is expected to be enabled after loading file")
+			require.True(t, nodeConfig.ClusterConfig.Enabled, "cluster configuration is expected to be enabled after loading file")
 
-			enodes := nodeConfig.BootClusterConfig.BootNodes
+			enodes := nodeConfig.ClusterConfig.StaticNodes
 			require.True(t, len(enodes) == 2)
 		},
 	},
 	{
-		`default boot cluster (Ropsten Prod)`,
+		`default cluster configuration (Ropsten Prod)`,
 		`{
 			"NetworkId": 3,
 			"DataDir": "$TMPDIR",
@@ -281,42 +282,42 @@ var loadConfigTestCases = []struct {
 		}`,
 		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
 			require.NoError(t, err)
-			require.True(t, nodeConfig.BootClusterConfig.Enabled, "boot cluster is expected to be enabled by default")
+			require.True(t, nodeConfig.ClusterConfig.Enabled, "cluster configuration is expected to be enabled by default")
 
-			enodes := nodeConfig.BootClusterConfig.BootNodes
+			enodes := nodeConfig.ClusterConfig.StaticNodes
 			require.Len(t, enodes, 2)
 		},
 	},
 	{
-		`disabled boot cluster`,
+		`disabled cluster configuration`,
 		`{
 			"NetworkId": 311,
 			"DataDir": "$TMPDIR",
-			"BootClusterConfig": {
+			"ClusterConfig": {
 				"Enabled": false
 			}
 		}`,
 		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
 			require.NoError(t, err)
-			require.False(t, nodeConfig.BootClusterConfig.Enabled, "boot cluster is expected to be disabled")
+			require.False(t, nodeConfig.ClusterConfig.Enabled, "cluster configuration is expected to be disabled")
 		},
 	},
 	{
-		`select boot cluster (Rinkeby Dev)`,
+		`select cluster configuration (Rinkeby Dev)`,
 		`{
 			"NetworkId": 4,
 			"DataDir": "$TMPDIR"
 		}`,
 		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
 			require.NoError(t, err)
-			require.True(t, nodeConfig.BootClusterConfig.Enabled, "boot cluster is expected to be enabled by default")
+			require.True(t, nodeConfig.ClusterConfig.Enabled, "cluster configuration is expected to be enabled by default")
 
-			enodes := nodeConfig.BootClusterConfig.BootNodes
+			enodes := nodeConfig.ClusterConfig.StaticNodes
 			require.True(t, len(enodes) >= 3)
 		},
 	},
 	{
-		`select boot cluster (Rinkeby Prod)`,
+		`select cluster configuration (Rinkeby Prod)`,
 		`{
 			"NetworkId": 4,
 			"DataDir": "$TMPDIR",
@@ -324,28 +325,28 @@ var loadConfigTestCases = []struct {
 		}`,
 		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
 			require.NoError(t, err)
-			require.True(t, nodeConfig.BootClusterConfig.Enabled, "boot cluster is expected to be enabled by default")
+			require.True(t, nodeConfig.ClusterConfig.Enabled, "cluster configuration is expected to be enabled by default")
 
-			enodes := nodeConfig.BootClusterConfig.BootNodes
+			enodes := nodeConfig.ClusterConfig.StaticNodes
 			require.True(t, len(enodes) >= 3)
 		},
 	},
 	{
-		`select boot cluster (Mainnet dev)`,
+		`select cluster configuration (Mainnet dev)`,
 		`{
 			"NetworkId": 1,
 			"DataDir": "$TMPDIR"
 		}`,
 		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
 			require.NoError(t, err)
-			require.True(t, nodeConfig.BootClusterConfig.Enabled, "boot cluster is expected to be enabled by default")
+			require.True(t, nodeConfig.ClusterConfig.Enabled, "cluster configuration is expected to be enabled by default")
 
-			enodes := nodeConfig.BootClusterConfig.BootNodes
+			enodes := nodeConfig.ClusterConfig.StaticNodes
 			require.True(t, len(enodes) >= 2)
 		},
 	},
 	{
-		`select boot cluster (Mainnet Prod)`,
+		`select cluster configuration (Mainnet Prod)`,
 		`{
 			"NetworkId": 1,
 			"DataDir": "$TMPDIR",
@@ -353,9 +354,9 @@ var loadConfigTestCases = []struct {
 		}`,
 		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
 			require.NoError(t, err)
-			require.True(t, nodeConfig.BootClusterConfig.Enabled, "boot cluster is expected to be enabled by default")
+			require.True(t, nodeConfig.ClusterConfig.Enabled, "cluster confguration is expected to be enabled by default")
 
-			enodes := nodeConfig.BootClusterConfig.BootNodes
+			enodes := nodeConfig.ClusterConfig.StaticNodes
 			require.True(t, len(enodes) >= 2)
 		},
 	},
@@ -368,7 +369,7 @@ var loadConfigTestCases = []struct {
 		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
 			require.NoError(t, err)
 			require.True(t, nodeConfig.DevMode)
-			require.True(t, nodeConfig.BootClusterConfig.Enabled)
+			require.True(t, nodeConfig.ClusterConfig.Enabled)
 		},
 	},
 	{
@@ -381,7 +382,7 @@ var loadConfigTestCases = []struct {
 		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
 			require.NoError(t, err)
 			require.False(t, nodeConfig.DevMode)
-			require.True(t, nodeConfig.BootClusterConfig.Enabled)
+			require.True(t, nodeConfig.ClusterConfig.Enabled)
 		},
 	},
 	{
