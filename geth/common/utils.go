@@ -3,7 +3,6 @@ package common
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -13,8 +12,6 @@ import (
 	"runtime/debug"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/pborman/uuid"
 	"github.com/status-im/status-go/static"
@@ -28,45 +25,8 @@ const (
 
 type contextKey string // in order to make sure that our context key does not collide with keys from other packages
 
-// errors
-var (
-	ErrInvalidAccountAddressOrKey = errors.New("cannot parse address or key to valid account address")
-)
-
 // All general log messages in this package should be routed through this logger.
 var logger = log.New("package", "status-go/geth/common")
-
-// ParseAccountString parses hex encoded string and returns is as accounts.Account.
-func ParseAccountString(account string) (accounts.Account, error) {
-	// valid address, convert to account
-	if common.IsHexAddress(account) {
-		return accounts.Account{Address: common.HexToAddress(account)}, nil
-	}
-
-	return accounts.Account{}, ErrInvalidAccountAddressOrKey
-}
-
-// FromAddress converts account address from string to common.Address.
-// The function is useful to format "From" field of send transaction struct.
-func FromAddress(accountAddress string) common.Address {
-	from, err := ParseAccountString(accountAddress)
-	if err != nil {
-		return common.Address{}
-	}
-
-	return from.Address
-}
-
-// ToAddress converts account address from string to *common.Address.
-// The function is useful to format "To" field of send transaction struct.
-func ToAddress(accountAddress string) *common.Address {
-	to, err := ParseAccountString(accountAddress)
-	if err != nil {
-		return nil
-	}
-
-	return &to.Address
-}
 
 // ImportTestAccount imports keystore from static resources, see "static/keys" folder
 func ImportTestAccount(keystoreDir, accountFile string) error {

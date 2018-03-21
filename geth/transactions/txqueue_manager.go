@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/transactions/queue"
@@ -29,7 +30,7 @@ const (
 // Manager provides means to manage internal Status Backend (injected into LES)
 type Manager struct {
 	nodeManager       common.NodeManager
-	accountManager    common.AccountManager
+	accountManager    account.Accounter
 	txQueue           *queue.TxQueue
 	ethTxClient       EthTransactor
 	notify            bool
@@ -42,7 +43,7 @@ type Manager struct {
 }
 
 // NewManager returns a new Manager.
-func NewManager(nodeManager common.NodeManager, accountManager common.AccountManager) *Manager {
+func NewManager(nodeManager common.NodeManager, accountManager account.Accounter) *Manager {
 	return &Manager{
 		nodeManager:       nodeManager,
 		accountManager:    accountManager,
@@ -151,7 +152,7 @@ func (m *Manager) CompleteTransaction(id common.QueuedTxID, password string) (ha
 	return hash, err
 }
 
-func (m *Manager) validateAccount(config *params.NodeConfig, tx *common.QueuedTx, password string) (*common.SelectedExtKey, error) {
+func (m *Manager) validateAccount(config *params.NodeConfig, tx *common.QueuedTx, password string) (*account.SelectedExtKey, error) {
 	selectedAccount, err := m.accountManager.SelectedAccount()
 	if err != nil {
 		m.log.Warn("failed to get a selected account", "err", err)
@@ -170,7 +171,7 @@ func (m *Manager) validateAccount(config *params.NodeConfig, tx *common.QueuedTx
 	return selectedAccount, nil
 }
 
-func (m *Manager) completeTransaction(config *params.NodeConfig, selectedAccount *common.SelectedExtKey, queuedTx *common.QueuedTx) (hash gethcommon.Hash, err error) {
+func (m *Manager) completeTransaction(config *params.NodeConfig, selectedAccount *account.SelectedExtKey, queuedTx *common.QueuedTx) (hash gethcommon.Hash, err error) {
 	m.log.Info("complete transaction", "id", queuedTx.ID)
 	m.addrLock.LockAddr(queuedTx.Args.From)
 	var localNonce uint64
@@ -276,6 +277,7 @@ func (m *Manager) CompleteTransactions(ids []common.QueuedTxID, password string)
 func (m *Manager) DiscardTransaction(id common.QueuedTxID) error {
 	tx, err := m.txQueue.Get(id)
 	if err != nil {
+		println(err.Error())
 		return err
 	}
 	err = m.txQueue.Done(id, gethcommon.Hash{}, ErrQueuedTxDiscarded)

@@ -39,7 +39,7 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransaction() {
 
 	EnsureNodeSync(s.Backend.NodeManager())
 
-	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
+	err := s.Backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	s.NoError(err)
 
 	transactionCompleted := make(chan struct{})
@@ -91,7 +91,7 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransactionUpstream() {
 	s.StartTestBackend(e2e.WithUpstream(addr))
 	defer s.StopTestBackend()
 
-	err = s.Backend.AccountManager().SelectAccount(TestConfig.Account2.Address, TestConfig.Account2.Password)
+	err = s.Backend.SelectAccount(TestConfig.Account2.Address, TestConfig.Account2.Password)
 	s.NoError(err)
 
 	transactionCompleted := make(chan struct{})
@@ -176,7 +176,7 @@ func (s *TransactionsTestSuite) TestSendContractTx() {
 
 			// the second call will also fail (we are logged in as different user)
 			log.Info("trying to complete with invalid user")
-			err = s.Backend.AccountManager().SelectAccount(sampleAddress, TestConfig.Account1.Password)
+			err = s.Backend.SelectAccount(sampleAddress, TestConfig.Account1.Password)
 			s.NoError(err)
 			txHash, err = s.Backend.CompleteTransaction(
 				common.QueuedTxID(event["id"].(string)),
@@ -190,7 +190,7 @@ func (s *TransactionsTestSuite) TestSendContractTx() {
 
 			// the third call will work as expected (as we are logged in with correct credentials)
 			log.Info("trying to complete with correct user, this should succeed")
-			s.NoError(s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
+			s.NoError(s.Backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 			txHash, err = s.Backend.CompleteTransaction(
 				common.QueuedTxID(event["id"].(string)),
 				TestConfig.Account1.Password,
@@ -209,7 +209,7 @@ func (s *TransactionsTestSuite) TestSendContractTx() {
 
 	gas := uint64(params.DefaultGas)
 	txHashCheck, err := s.Backend.SendTransaction(context.TODO(), common.SendTxArgs{
-		From: common.FromAddress(TestConfig.Account1.Address),
+		From: account.FromAddress(TestConfig.Account1.Address),
 		To:   nil, // marker, contract creation is expected
 		//Value: (*hexutil.Big)(new(big.Int).Mul(big.NewInt(1), gethcommon.Ether)),
 		Gas:   (*hexutil.Uint64)(&gas),
@@ -265,7 +265,7 @@ func (s *TransactionsTestSuite) TestSendEther() {
 
 			// the second call will also fail (we are logged in as different user)
 			log.Info("trying to complete with invalid user")
-			err = s.Backend.AccountManager().SelectAccount(sampleAddress, TestConfig.Account1.Password)
+			err = s.Backend.SelectAccount(sampleAddress, TestConfig.Account1.Password)
 			s.NoError(err)
 			txHash, err = s.Backend.CompleteTransaction(
 				common.QueuedTxID(event["id"].(string)), TestConfig.Account1.Password)
@@ -277,7 +277,7 @@ func (s *TransactionsTestSuite) TestSendEther() {
 
 			// the third call will work as expected (as we are logged in with correct credentials)
 			log.Info("trying to complete with correct user, this should succeed")
-			s.NoError(s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
+			s.NoError(s.Backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 			txHash, err = s.Backend.CompleteTransaction(
 				common.QueuedTxID(event["id"].(string)),
 				TestConfig.Account1.Password,
@@ -291,8 +291,8 @@ func (s *TransactionsTestSuite) TestSendEther() {
 
 	// this call blocks, up until Complete Transaction is called
 	txHashCheck, err := s.Backend.SendTransaction(context.TODO(), common.SendTxArgs{
-		From:  common.FromAddress(TestConfig.Account1.Address),
-		To:    common.ToAddress(TestConfig.Account2.Address),
+		From:  account.FromAddress(TestConfig.Account1.Address),
+		To:    account.ToAddress(TestConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 	})
 	s.NoError(err, "cannot send transaction")
@@ -318,7 +318,7 @@ func (s *TransactionsTestSuite) TestSendEtherTxUpstream() {
 	s.StartTestBackend(e2e.WithUpstream(addr))
 	defer s.StopTestBackend()
 
-	err = s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
+	err = s.Backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	s.NoError(err)
 
 	completeQueuedTransaction := make(chan struct{})
@@ -348,8 +348,8 @@ func (s *TransactionsTestSuite) TestSendEtherTxUpstream() {
 	// This call blocks, up until Complete Transaction is called.
 	// Explicitly not setting Gas to get it estimated.
 	txHashCheck, err := s.Backend.SendTransaction(context.TODO(), common.SendTxArgs{
-		From:     common.FromAddress(TestConfig.Account1.Address),
-		To:       common.ToAddress(TestConfig.Account2.Address),
+		From:     account.FromAddress(TestConfig.Account1.Address),
+		To:       account.ToAddress(TestConfig.Account2.Address),
 		GasPrice: (*hexutil.Big)(big.NewInt(28000000000)),
 		Value:    (*hexutil.Big)(big.NewInt(1000000000000)),
 	})
@@ -372,7 +372,7 @@ func (s *TransactionsTestSuite) TestDoubleCompleteQueuedTransactions() {
 	EnsureNodeSync(s.Backend.NodeManager())
 
 	// log into account from which transactions will be sent
-	s.NoError(s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
+	s.NoError(s.Backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 
 	completeQueuedTransaction := make(chan struct{})
 
@@ -421,8 +421,8 @@ func (s *TransactionsTestSuite) TestDoubleCompleteQueuedTransactions() {
 
 	// this call blocks, and should return on *second* attempt to CompleteTransaction (w/ the correct password)
 	txHashCheck, err := s.Backend.SendTransaction(context.TODO(), common.SendTxArgs{
-		From:  common.FromAddress(TestConfig.Account1.Address),
-		To:    common.ToAddress(TestConfig.Account2.Address),
+		From:  account.FromAddress(TestConfig.Account1.Address),
+		To:    account.ToAddress(TestConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 	})
 	s.NoError(err, "cannot send transaction")
@@ -449,7 +449,7 @@ func (s *TransactionsTestSuite) TestDiscardQueuedTransaction() {
 	s.Backend.TxQueueManager().TransactionQueue().Reset()
 
 	// log into account from which transactions will be sent
-	s.NoError(s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
+	s.NoError(s.Backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 
 	completeQueuedTransaction := make(chan struct{})
 
@@ -499,8 +499,8 @@ func (s *TransactionsTestSuite) TestDiscardQueuedTransaction() {
 
 	// this call blocks, and should return when DiscardQueuedTransaction() is called
 	txHashCheck, err := s.Backend.SendTransaction(context.TODO(), common.SendTxArgs{
-		From:  common.FromAddress(TestConfig.Account1.Address),
-		To:    common.ToAddress(TestConfig.Account2.Address),
+		From:  account.FromAddress(TestConfig.Account1.Address),
+		To:    account.ToAddress(TestConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 	})
 	s.EqualError(err, transactions.ErrQueuedTxDiscarded.Error(), "transaction is expected to be discarded")
@@ -523,7 +523,7 @@ func (s *TransactionsTestSuite) TestCompleteMultipleQueuedTransactions() {
 	s.TxQueueManager().TransactionQueue().Reset()
 
 	// log into account from which transactions will be sent
-	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
+	err := s.Backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	s.NoError(err)
 
 	s.sendConcurrentTransactions(3)
@@ -539,7 +539,7 @@ func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
 	s.Backend.TxQueueManager().TransactionQueue().Reset()
 
 	// log into account from which transactions will be sent
-	s.NoError(s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
+	s.NoError(s.Backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 
 	testTxCount := 3
 	txIDs := make(chan common.QueuedTxID, testTxCount)
@@ -584,8 +584,8 @@ func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
 	//  this call blocks, and should return when DiscardQueuedTransaction() for a given tx id is called
 	sendTx := func() {
 		txHashCheck, err := s.Backend.SendTransaction(context.TODO(), common.SendTxArgs{
-			From:  common.FromAddress(TestConfig.Account1.Address),
-			To:    common.ToAddress(TestConfig.Account2.Address),
+			From:  account.FromAddress(TestConfig.Account1.Address),
+			To:    account.ToAddress(TestConfig.Account2.Address),
 			Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 		})
 		require.EqualError(err, transactions.ErrQueuedTxDiscarded.Error())
@@ -650,7 +650,7 @@ func (s *TransactionsTestSuite) TestNonExistentQueuedTransactions() {
 	defer s.StopTestBackend()
 
 	// log into account from which transactions will be sent
-	s.NoError(s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
+	s.NoError(s.Backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 
 	// replace transaction notification handler
 	signal.SetDefaultNodeNotificationHandler(func(string) {})
@@ -688,7 +688,7 @@ func (s *TransactionsTestSuite) TestEvictionOfQueuedTransactions() {
 	s.Backend.TxQueueManager().TransactionQueue().Reset()
 
 	// log into account from which transactions will be sent
-	s.NoError(s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
+	s.NoError(s.Backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 
 	txQueue := s.Backend.TxQueueManager().TransactionQueue()
 	s.Zero(txQueue.Count(), "transaction count should be zero")
@@ -721,7 +721,7 @@ func (s *TransactionsTestSuite) TestCompleteMultipleQueuedTransactionsUpstream()
 	s.TxQueueManager().TransactionQueue().Reset()
 
 	// log into account from which transactions will be sent
-	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
+	err := s.Backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	s.NoError(err)
 
 	s.sendConcurrentTransactions(30)
@@ -767,8 +767,8 @@ func (s *TransactionsTestSuite) sendConcurrentTransactions(testTxCount int) {
 	//  this call blocks, and should return when DiscardQueuedTransaction() for a given tx id is called
 	sendTx := func() {
 		txHashCheck, err := s.Backend.SendTransaction(context.TODO(), common.SendTxArgs{
-			From:  common.FromAddress(TestConfig.Account1.Address),
-			To:    common.ToAddress(TestConfig.Account2.Address),
+			From:  account.FromAddress(TestConfig.Account1.Address),
+			To:    account.ToAddress(TestConfig.Account2.Address),
 			Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 		})
 		require.NoError(err, "cannot send transaction")

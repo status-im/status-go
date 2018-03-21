@@ -4,8 +4,15 @@ import (
 	"fmt"
 
 	"github.com/NaySoftware/go-fcm"
-	"github.com/status-im/status-go/geth/common"
 )
+
+// Notifier manages Push Notifications.
+type Notifier interface {
+	Send(body string, payload fcm.NotificationPayload, tokens ...string) error
+}
+
+// NotificationConstructor returns constructor of configured instance Notifier interface.
+type NotificationConstructor func() Notifier
 
 // Notification represents messaging provider for notifications.
 type Notification struct {
@@ -13,8 +20,8 @@ type Notification struct {
 }
 
 // NewNotification Firebase Cloud Messaging client constructor.
-func NewNotification(key string) common.NotificationConstructor {
-	return func() common.Notifier {
+func NewNotification(key string) NotificationConstructor {
+	return func() Notifier {
 		client := fcm.NewFcmClient(key).
 			SetDelayWhileIdle(true).
 			SetContentAvailable(true).

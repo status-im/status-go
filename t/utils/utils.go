@@ -145,7 +145,6 @@ func EnsureNodeSync(nodeManager common.NodeManager) {
 				fmt.Sprintf("synchronization is not finished yet: current block %d < highest block %d",
 					progress.CurrentBlock, progress.HighestBlock),
 			)
-
 		}
 	}
 }
