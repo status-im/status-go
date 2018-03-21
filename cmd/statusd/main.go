@@ -30,14 +30,14 @@ var (
 	nodeKeyFile       = flag.String("nodekey", "", "P2P node key file (private key)")
 	dataDir           = flag.String("datadir", params.DataDir, "Data directory for the databases and keystore")
 	networkID         = flag.Int("networkid", params.RopstenNetworkID, "Network identifier (integer, 1=Homestead, 3=Ropsten, 4=Rinkeby, 777=StatusChain)")
-	lesEnabled        = flag.Bool("les", false, "LES protocol enabled (default is disabled)")
-	whisperEnabled    = flag.Bool("shh", false, "Whisper protocol enabled (default is disabled)")
-	swarmEnabled      = flag.Bool("swarm", false, "Swarm protocol enabled")
+	lesEnabled        = flag.Bool("les", false, "Enable LES protocol")
+	whisperEnabled    = flag.Bool("shh", false, "Enable Whisper protocol")
+	swarmEnabled      = flag.Bool("swarm", false, "Enable Swarm protocol")
 	maxPeers          = flag.Int("maxpeers", 25, "maximum number of p2p peers (including all protocols)")
-	httpEnabled       = flag.Bool("http", false, "HTTP RPC endpoint enabled (default: false)")
+	httpEnabled       = flag.Bool("http", false, "Enable HTTP RPC endpoint")
 	httpHost          = flag.String("httphost", "127.0.0.1", "HTTP RPC host of the listening socket")
 	httpPort          = flag.Int("httpport", params.HTTPPort, "HTTP RPC server's listening port")
-	ipcEnabled        = flag.Bool("ipc", false, "IPC RPC endpoint enabled")
+	ipcEnabled        = flag.Bool("ipc", false, "Enable IPC RPC endpoint")
 	cliEnabled        = flag.Bool("cli", false, "Enable debugging CLI server")
 	cliPort           = flag.String("cliport", debug.CLIPort, "CLI server's listening port")
 	logLevel          = flag.String("log", "INFO", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
@@ -50,7 +50,7 @@ var (
 	discovery  = flag.Bool("discovery", false, "Enable discovery protocol")
 
 	// stats
-	statsEnabled = flag.Bool("stats", false, "Expose node stats via /debug/vars expvar endpoint or Prometheus (log by default)")
+	statsEnabled = flag.Bool("stats", false, "Expose node stats via /debug/vars expvar endpoint or Prometheus")
 	statsAddr    = flag.String("stats.addr", "0.0.0.0:8080", "HTTP address with /debug/vars endpoint")
 
 	// don't change the name of this flag, https://github.com/ethereum/go-ethereum/blob/master/metrics/metrics.go#L41
