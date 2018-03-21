@@ -73,6 +73,15 @@ var (
 // All general log messages in this package should be routed through this logger.
 var logger = log.New("package", "status-go/cmd/statusd")
 
+func levelFromString(level string) log.Lvl {
+	lvl, err := log.LvlFromString(strings.ToLower(level))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Incorrect log level: %s, using defaults\n", level)
+		lvl = log.LvlInfo
+	}
+	return lvl
+}
+
 func main() {
 	flag.Usage = printUsage
 	flag.Parse()
@@ -87,6 +96,11 @@ func main() {
 		printVersion(config, gitCommit, buildStamp)
 		return
 	}
+
+	handler := log.StreamHandler(os.Stdout, log.TerminalFormat(true))
+	level := levelFromString(config.LogLevel)
+	filteredHandler := log.LvlFilterHandler(level, handler)
+	log.Root().SetHandler(filteredHandler)
 
 	backend := api.NewStatusBackend()
 	err = backend.StartNode(config)
