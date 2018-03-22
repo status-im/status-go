@@ -104,7 +104,7 @@ func scriptsReadmeMd() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "scripts/README.md", size: 133, mode: os.FileMode(420), modTime: time.Unix(1521487633, 0)}
+	info := bindataFileInfo{name: "scripts/README.md", size: 133, mode: os.FileMode(420), modTime: time.Unix(1505683992, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -124,12 +124,12 @@ func scriptsWeb3Js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "scripts/web3.js", size: 140892, mode: os.FileMode(420), modTime: time.Unix(1521545541, 0)}
+	info := bindataFileInfo{name: "scripts/web3.js", size: 140892, mode: os.FileMode(420), modTime: time.Unix(1521714319, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _configClusterJson = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\xec\x96\xbd\xaa\x67\x57\x72\xc5\xf3\x7e\x8a\xcb\x8d\xc5\x55\x7d\x7f\x74\xa4\xc0\x89\x9f\x41\x28\xa8\xda\x55\x1b\x8c\x41\x32\x92\xb0\x03\xe3\x77\x37\x47\x73\x25\x06\xd4\x2d\x06\x21\x98\x60\x3a\xfa\xff\xd9\x9c\xc3\xf9\x55\xad\x55\xab\xf6\xb7\x1f\x5e\x5e\xfe\xf7\xc3\xcb\xcb\xcb\xcb\xeb\xf7\xfb\xf3\xff\xfc\xf0\xe3\x7f\xfe\xfb\xbf\xbd\x7e\x7c\xe1\xaf\xfe\x76\xf6\x5f\x3f\xfe\x30\xaf\x1f\xdf\x9f\x78\x79\x79\xfd\xe9\xe7\xfa\xf9\x3f\xce\xf7\x3f\xcc\xfe\xf4\xfa\xf1\xe5\xdb\xf7\xe3\x97\x97\xd7\x7d\xce\x3e\x7e\xfd\xf5\xdc\xbb\x97\xc3\x05\x10\x1d\xb2\x91\x06\x57\x05\x26\x78\xa6\x31\x2b\xa7\xc3\x50\x6a\x12\x15\x07\xb4\xcf\x0d\x64\x0d\x5d\xd1\xd3\xdb\x5d\x5a\xb5\x45\xc4\x77\x19\xd5\xc3\x8e\x00\x4e\x9c\x3d\x8d\x35\x34\x9b\x17\x3d\x2d\xe0\x28\xdb\x16\x03\x23\xde\x26\xbc\x95\x2c\xfd\x0d\x46\xbc\xa1\xd9\x1b\x02\xbc\xa1\xc7\x47\x06\x06\x7e\xfd\xea\xf7\xa4\xc0\x97\xcd\xd0\xc2\x86\x41\x21\xc7\x08\xa7\x57\x77\x69\x19\x82\x92\xf8\x92\x6e\xca\x1d\xc1\xa2\x99\x98\x61\xe9\x46\x2a\x38\xb2\x71\x7b\x56\x89\xc4\x8f\x1d\xd5\x0d\x9b\x43\x90\x15\xeb\x47\x4a\x6b\xd5\x40\xe3\x98\x5e\x6f\x40\x67\x19\xae\x76\x0e\x8c\x16\x59\x2a\xfe\x8d\x94\xf9\x4d\xfc\x9d\xf3\x1d\xf3\xbb\x5f\x7e\xff\xef\x5d\x84\xd9\xff\xfe\xa2\xc1\x3f\x4b\x83\x0f\xef\x3a\x7c\x62\x48\xe4\xcf\x0e\xc9\x9d\xe2\x6b\xe4\x5c\x70\x69\x4a\xea\x68\x68\x0c\x5e\xa5\xd5\xba\x75\x73\xf6\x52\x20\x12\xf6\xf2\xb0\xeb\x53\x85\x8f\x4c\x9e\x22\x3b\x56\xe3\x05\x4a\xd0\x74\xc6\x45\x05\x09\x6e\xbb\xc3\xd3\x01\x75\x03\x09\x3f\x99\x24\x4d\x68\xb6\xa6\x12\x7a\x0d\x6c\xd5\xc6\xe0\x9e\x6f\x14\xdf\x50\xdf\x2c\xdf\x50\xe4\xf3\xea\x74\x09\x56\x3d\x2a\x84\x17\x54\x82\xdb\x64\xdf\xbb\x93\x7e\xe2\x2c\xad\x24\x76\x66\x38\x53\xc4\xc9\x8d\xb0\x8b\x76\x47\x5d\x19\xac\x8e\x1d\x53\x9b\x96\xdb\x37\x50\xae\x56\x02\x61\xed\x01\x90\x7b\x2b\x0f\xd4\x86\x29\xdc\xa4\x3b\x08\x07\x69\xb7\xfd\xb0\x89\x26\x6f\xf3\xdf\x63\xfa\xe7\x31\x29\xf6\x5c\x25\xa7\x56\x83\x53\xa9\x78\xe5\x8c\x5f\xdc\x8e\x1e\xa3\x29\x0d\xe5\x06\xb2\x96\x87\x86\xe9\xc8\x63\x87\xf4\xab\x0d\x88\x12\x98\x05\x09\xe5\x54\xcf\x7b\x4c\x16\xca\xa6\x7b\x26\x16\x40\x14\xc0\xe5\x16\x98\x33\x70\xd6\xde\x45\xb8\x7c\xdb\xcc\xf6\xf9\xf3\x8e\xe9\xf6\x46\x92\x7f\xe5\x1c\xbb\x22\x9d\xb8\xb6\x7e\xef\x9c\xe3\xc4\xe7\xba\xaf\x01\x15\xce\xe6\xc4\x39\xb4\x51\xc3\x3a\xcd\x90\x62\x4f\x25\x48\x8f\x27\x9c\x43\x1d\x19\x6b\x97\x13\xee\x1e\xe6\x48\x99\x46\x9e\x72\x86\x13\xc2\xd4\x4d\x12\xbb\x63\x02\x9c\xcb\x81\xb0\xa8\xb6\xe9\xd9\x14\xe2\xa7\x7f\x2d\x2c\xde\x48\xf8\xf3\xfd\xc7\x73\xc8\x4b\x4b\x10\x19\x4a\x4f\x74\xc2\xb4\x36\x91\xf3\x1c\x8a\xeb\xad\x76\x79\xe7\x1e\x98\x73\xd4\xdb\x4c\x47\x14\xc9\xa5\xc9\x54\x70\x63\x56\x72\xcb\x0b\x5c\x28\x30\xc1\x2a\x88\x20\x3b\x0d\x80\x38\x4f\x06\xa2\x71\xdb\xbd\xa1\x87\x81\xa3\x62\xa9\x8f\x4e\x74\xfc\x6a\x93\x78\xcb\x3f\xa0\xf4\x8c\x41\x07\x13\x14\xec\xb8\x11\x73\x1d\x03\x28\x2a\x1e\xeb\xa4\xf0\xe0\xe9\x58\x4b\x6b\x9e\x6a\x35\xc5\x3c\x0e\xed\xde\x38\x2c\x96\xad\xd6\x76\xe5\x2c\x7b\x84\xa8\x9b\x58\x40\x5c\x3d\x4e\x99\x9b\x88\x66\x64\x97\x28\xf0\x32\x74\x6a\x2a\x79\xa7\x65\x39\xae\xfc\xe6\x12\x7d\xa3\xdf\x66\xee\x1f\x4e\x1a\xfc\xb3\x49\xe3\xd8\x0d\xd8\x1a\x68\xba\x4c\x46\x4f\xac\x0f\x37\xd8\xf4\xcd\xea\x8e\x51\x45\x9a\xb4\x55\x00\x58\x5f\xc1\x6a\x42\x8e\x16\xef\xb5\xd0\x64\x1d\xde\x46\xcc\x7b\x48\x17\x05\x79\x1a\x60\x62\x9a\x18\xef\xe4\x68\xaa\x6a\xe1\x19\x57\xa2\x0c\x42\xd5\x6c\x2b\xd9\x56\x7c\xaf\x3a\xf4\x8f\x2d\xe4\x75\x07\x31\x8f\x4a\x96\x57\x03\x35\x5f\xef\x71\xdf\xcb\x92\xd0\x36\x66\x30\x7a\x24\x07\x9c\xa5\xe0\x44\x3f\x9f\x4f\x3d\x3b\x52\x67\xa1\xaf\x9e\x59\x73\x3e\xa3\xe7\x0e\xf8\xb3\x2b\x5c\x93\xdc\x2f\x4f\x08\xc4\xf6\x63\x47\x3e\x84\xde\xbd\x00\x17\x80\x7c\xc0\x76\x37\x7f\x8f\xa9\x9f\xc2\x9c\x8a\xba\x10\x96\x2b\x1b\x20\x7e\x09\x0f\xd6\x01\xb4\x4e\x29\x6f\x9f\xd8\xa7\x5f\x33\x43\x31\x42\x4e\x37\xa2\xf0\x6c\xed\xfa\x41\x5d\x9f\xdd\x93\x6d\x77\x30\x75\x87\xfb\x08\xbb\x44\x24\x23\xe2\xf6\xa5\x26\xf1\xbc\x57\xa4\x02\x48\xeb\x91\x27\xe3\xf2\x49\x6f\x8d\x4f\x60\xfa\xeb\x57\x1f\x7e\xcf\x19\x70\x16\x1b\xef\x80\x38\x0f\xd6\xb9\x74\x52\x06\x4e\x28\x6d\x59\x39\x70\x49\x89\x72\x54\xd1\x72\x06\xcb\x13\x6d\xa9\x83\xb3\x07\x98\xda\xb1\xe8\x32\x5b\x9c\x2d\x00\x61\x14\xad\x90\x1b\x37\x9f\x7a\xfc\x6e\xa6\x84\x38\xf8\x3e\x4d\xc7\x21\xde\x26\x6f\xf7\x24\x25\xf9\x06\x8d\xdf\xd0\xe9\x0d\x9f\x50\xa4\xcf\xeb\x1e\x55\xa6\x50\xeb\x28\x7a\xd6\x34\x51\x0f\x3e\x06\x18\xb6\xac\xbc\xe7\x72\xa3\xf5\x49\xa6\x32\xe0\xc1\xbe\xb9\x73\x3d\x08\x10\x5a\xa5\xa0\xc0\xb2\xfb\x18\x78\xf1\xb9\x4c\x6b\x22\xe4\x16\x41\x07\x46\x3b\x9b\xc6\xd7\x7b\xca\x8f\x17\xc2\x1a\xab\xa2\xba\x58\x59\xd5\x27\x41\x3f\xa9\x3c\xb9\xb7\x47\x5a\x1b\x77\xd5\xea\x85\x5f\x2e\x46\x3a\x8f\xed\x24\x91\x4a\x55\x56\xa1\x2e\xf3\x81\xea\x3d\x9d\x5a\x67\xd4\xe0\x71\xda\xb5\x67\x6f\x5c\x52\xcb\x69\x82\x16\xc4\x7b\x5a\xf9\xdc\xe1\xbc\xb0\x35\x4b\xde\x71\xd4\x01\xac\x21\xa5\x65\x9e\x9c\x4b\xdc\x41\x16\x8d\x4f\x81\xfa\x5f\xb4\x65\xbe\x44\xc4\x97\x88\xf8\x12\x11\xff\x12\x11\xf1\x5c\x31\x3e\x7c\xf7\xe1\xff\x03\x00\x00\xff\xff\x4a\xf2\xfc\x84\xf5\x0f\x00\x00")
+var _configClusterJson = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\xec\x96\xb9\xaa\x2e\xc7\xb5\xc7\xf3\xf3\x14\x9b\x13\x8b\xad\x35\x0f\x27\x52\x70\x93\xfb\x0c\x42\x41\xad\xa1\xc0\x18\x24\x23\x09\x3b\x30\x7e\x77\xd3\xf2\x96\x30\x3e\xde\x42\xd8\x06\x27\x8e\xbe\xaf\x8b\x6e\xfa\x57\xf5\x1f\x56\x7f\xfd\xe1\xe5\xe5\xcf\x1f\x5e\x5e\x5e\x5e\x3e\x7e\xbb\x3f\xfe\xe9\xbb\xef\x7f\xff\xff\xff\xf7\xf1\xd3\x0b\x7f\xf1\xb7\xb5\x3f\x7c\xff\xdd\x7c\xfc\xf4\x76\xc7\xcb\xcb\xc7\x1f\x7e\x3c\x3f\xfe\xae\xbf\xfd\x6e\xf6\x87\x8f\x9f\x5e\xbe\x7e\x5b\x7e\x79\xf9\xb8\xcf\xda\xa7\x2f\xbf\x9c\x7b\xf7\x72\xb8\x00\xa2\x43\x16\xd2\xe0\xaa\xc0\x04\xcf\x14\xe6\xc9\xa9\x30\x94\x33\x89\x8a\x03\x5a\x7d\x03\x59\x43\x57\xb4\x6b\xab\x8e\x9e\xb3\x87\x88\xef\x32\xaa\x87\xb5\x00\x4e\xf4\x76\xe1\x19\x9a\xcd\x8b\x9e\x16\xd0\xca\xb6\x87\x81\x11\x6f\x11\xde\x93\x2c\xf5\x15\x46\xbc\xa2\xd9\x2b\x02\xbc\xa2\xc7\x27\x06\x06\xfe\xf8\xc5\xe7\xa4\xc0\x97\xcd\xd0\xc2\x86\x41\x21\xc7\x08\xa7\x56\x77\x69\x19\x82\x92\xf8\x92\x6e\xca\x1d\xc1\x43\x33\x31\xc3\x52\x85\x74\xa0\x65\xe3\xd6\xac\x12\x89\xb7\xb5\xea\x86\x4d\x13\xe4\x89\xf5\x96\xa3\x67\xd5\x40\xa3\x4d\xaf\x17\xa0\xb3\x0c\x9f\x72\x0e\x8c\x12\x59\x3a\xfc\x0b\x29\xf3\xab\xf8\x1b\xe7\x1b\xe6\x37\x3f\xfd\xfe\xe5\x4d\x84\xd9\x3f\xfe\x4f\x83\xff\x96\x06\x1f\xde\x74\xf8\x27\x21\x91\x7f\x35\x24\x77\x0e\x5f\x23\xe7\x03\x97\xe6\xc8\x69\x0d\x8d\xc1\xab\xb4\x7a\xee\xb9\x39\x7b\x29\x10\x09\x6b\x79\xd8\xf5\xd9\x85\x8f\x4c\xf6\x21\x6b\x3b\xe3\x07\x94\xa0\xa8\xc7\x45\x05\x09\x6e\xb9\xc3\x73\x02\xea\x06\x12\xde\x99\x24\x45\x68\xb6\xa6\x12\x7a\x0d\x6c\xd5\xc6\xe0\xf6\x57\x8a\xaf\xa8\xaf\x96\xaf\x28\xf2\xbe\x3a\x75\x04\xcf\x79\x54\x08\x3f\x70\x12\xdc\x26\xeb\xde\x9d\xf4\x8e\x5e\x5a\x49\xac\xcc\x70\xa6\x88\xce\x8d\xb0\x8b\x76\x47\x5d\x19\xec\xb4\xb5\xa9\x4d\xc9\xad\x1b\x28\x57\x4f\x02\xe1\xd9\x06\x90\x7b\x4f\x36\x9c\x0d\x53\xb8\x49\x77\x10\x1a\x69\xb7\xbc\xd9\x44\x93\xb7\xf8\xef\x31\xfd\x7d\x4c\x8a\xed\xab\xe4\x54\x6a\xd0\x27\x15\xaf\xf4\xf8\xc5\xad\xa8\x31\x9a\xa3\xa1\x5c\x40\x56\xf2\xd0\x30\xb5\x3c\x76\x48\xbf\x5a\x80\x28\x81\x79\x20\xe1\x38\x9d\xe7\x39\x26\x0b\x65\xd3\xed\x89\x05\x10\x05\x70\xb9\x07\xcc\x19\x38\xcf\xde\x45\xb8\x7c\xcb\xcc\xf6\xf9\xf3\x86\xe9\xf6\x4a\x92\xff\xc9\x1c\xbb\x22\x75\x5c\x5b\xbf\x77\xba\x9d\xb8\xaf\xfb\x1a\xd0\xc1\xd9\x9c\xe8\xa6\x8d\x33\xac\x53\x0c\x29\xf6\xec\x04\xe9\xf1\x84\x73\xa8\x23\xe3\xd9\xe5\x84\xbb\xcd\x1c\x29\x53\xc8\x73\x9c\xa1\x43\x98\xaa\x48\x62\x77\x4c\x80\x73\x39\x10\x16\xd5\x36\x3d\x8b\x42\xbc\xeb\xe7\x8d\xc5\x2b\x09\xbf\x7f\xfe\xd8\x4d\x7e\xf4\x08\x22\xc3\xd1\x8e\x4a\x98\xd2\x22\x72\x9e\xa6\xb8\x5e\x6a\x97\x77\x6e\xc3\x74\xab\x97\x99\x8e\x28\x92\x4b\x91\xa9\xe0\xc6\xac\xe4\x1e\x3f\xe0\x42\x81\x09\x76\x82\x08\xb2\xd2\x00\x88\xb3\x33\x10\x8d\xcb\xee\x0d\x6d\x06\x8e\x13\x4b\xd5\x3a\x51\xf1\xb3\x4d\xe2\x35\x7f\x85\xd2\x33\x06\x1d\x4c\x50\xb0\xe2\x46\xcc\x75\x0c\xa0\x38\xf1\x58\x27\x85\x07\xbb\x62\x2d\xad\x78\x4e\xa9\x29\x66\x3b\x94\x7b\xe1\xb0\x58\x96\x5a\xd9\x95\x5e\xf6\x08\x51\x37\xb1\x80\xb8\xda\x4e\x99\x9b\x88\x66\x64\x97\x28\xf0\x32\x54\x6a\x2a\x79\xa5\xe5\x71\x5c\xf9\xc5\x25\xfa\x4a\xbf\x64\xee\x37\x37\x0d\xfe\xb6\xa6\xf9\xf7\xec\xc6\x67\xcf\xbd\x10\x16\x85\xb9\xc0\xf7\xd4\x32\xef\x63\xf2\xee\x20\x84\x94\x45\x03\xac\x15\xd9\x19\xbb\xa2\xcb\x17\xd0\x71\x27\x4d\x16\xd9\x88\x57\x9e\x3e\xa8\x99\xb1\x56\x74\x06\x19\x3a\xa2\x73\xd7\x6c\x8e\xe2\x8a\x17\x2d\xe2\x68\xb6\x14\x43\x8f\xc1\x63\x4c\xe1\xf9\x0a\x8d\x5f\xd1\xe9\x15\x9f\x28\xd1\xfb\x52\x5a\x38\x0b\x4b\x70\xff\xe4\x39\x3a\x68\x9d\xa7\xcc\x4b\x72\x33\xd3\x0f\xcb\x36\xc7\x4c\xd9\x8c\x41\x5d\xd1\x9b\x07\xf6\x48\x2b\xb0\xd1\x4d\x20\x55\x9e\x40\x3e\x57\xe4\x14\xf6\x14\x89\xdd\xe6\x90\x91\x76\x29\x11\xf6\x46\xed\xbd\xcb\x55\xb0\xe1\xc5\x99\x53\xa5\x55\x9f\x83\xca\x3b\xcd\x74\x78\xac\xb1\xc3\x54\x2c\x18\x57\xab\xc8\x42\xee\x85\x1d\x9b\x64\xac\x39\x7d\xb9\xad\x87\x45\x1e\x77\x2a\x1d\x5c\x8f\x16\x14\xa1\xe1\x68\x23\x7e\x86\xb8\xa1\xeb\xf4\x1e\x53\xf4\xd4\xbc\x02\xa7\x3d\xf2\xba\xb1\x1a\x4b\x2c\x1c\xf4\x5d\x7d\xae\xba\xe6\xd2\x94\xc4\xe7\xa0\xfa\x4e\x38\xb0\x0a\xb0\x34\xd0\x74\x99\x8c\x9e\xe9\x3f\x5c\x60\x53\x37\x4f\x55\x8c\x2a\xd2\xa4\xad\x02\xc0\xfa\x0a\x9e\x22\xe4\x28\xf1\x5a\x0b\x4d\xd6\xe1\x2d\xc4\xbc\x4d\xba\x28\xc8\x53\x00\x13\x53\xc4\x78\x27\x47\x53\x55\x0f\xf6\xb8\x12\x65\x10\xaa\x66\xd9\x91\x2d\xc5\xb7\x70\x84\xfe\x7a\xd3\xf8\xb9\x83\x98\xad\x92\xc7\x4f\x01\x15\x5f\xaf\x71\xdf\xcb\x92\x50\x36\x66\x30\xda\x92\x03\xce\x72\xa0\xa3\x9e\xd7\xa7\xf6\x8e\x9c\x5e\xa8\xab\x3d\x6b\xce\x3d\xda\x77\xc0\x9f\x4f\x0a\xd7\x24\xf7\xcb\x13\x02\xb1\xf5\xb4\x16\x37\xa1\x57\x2d\xc0\x05\x20\x1f\xb0\xdd\xcd\x7f\xc4\x7c\x47\xf6\x39\x71\x9e\x1c\xe5\xca\x06\x88\x5f\xc2\xc6\xd3\x80\x56\x29\xc7\xcb\x27\xf6\x39\xaf\x99\xa1\x18\x21\xa7\x1b\x71\xb0\xf7\xec\x3e\xa6\x5b\x9f\xdd\xce\xb2\x3b\x98\xba\xc3\xd5\xc2\x2e\x11\xc9\x88\xb8\x75\xa9\x48\x3c\xef\x63\xdd\x00\xd2\xf3\xc8\x93\x71\xb9\xd3\x4b\xe3\x33\xcc\xf7\x44\xdf\x3a\xc7\xce\x33\xc8\x55\xfc\x22\x2c\xcb\x3d\x95\xdd\x6a\x64\x15\x36\xe6\xc9\x72\xc2\x16\x6f\xb1\xa1\x68\x43\x45\xde\x6e\xaf\x64\xd4\x19\x1b\x38\xd1\xad\x01\x31\x88\x47\xb5\xa6\x51\xda\xe3\x5e\x73\x7d\x66\xb1\xcd\xdd\x56\x0e\xf6\x92\x8b\x27\x9d\x93\x0a\x75\x9b\x7e\x1e\xef\xac\xaf\x88\xf0\x6e\x23\x7e\xf8\xe6\xc3\x5f\x03\x00\x00\xff\xff\x8b\x2d\x29\x93\xa4\x0c\x00\x00")
 
 func configClusterJsonBytes() ([]byte, error) {
 	return bindataRead(
@@ -144,7 +144,7 @@ func configClusterJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/cluster.json", size: 4085, mode: os.FileMode(420), modTime: time.Unix(1521542958, 0)}
+	info := bindataFileInfo{name: "config/cluster.json", size: 3236, mode: os.FileMode(420), modTime: time.Unix(1521709555, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -164,7 +164,7 @@ func configPublicChainAccountsJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/public-chain-accounts.json", size: 165, mode: os.FileMode(420), modTime: time.Unix(1521487633, 0)}
+	info := bindataFileInfo{name: "config/public-chain-accounts.json", size: 165, mode: os.FileMode(420), modTime: time.Unix(1518722857, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -184,7 +184,7 @@ func configStatusChainAccountsJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/status-chain-accounts.json", size: 330, mode: os.FileMode(420), modTime: time.Unix(1521487633, 0)}
+	info := bindataFileInfo{name: "config/status-chain-accounts.json", size: 330, mode: os.FileMode(420), modTime: time.Unix(1511267822, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -204,7 +204,7 @@ func configStatusChainGenesisJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/status-chain-genesis.json", size: 612, mode: os.FileMode(420), modTime: time.Unix(1521487633, 0)}
+	info := bindataFileInfo{name: "config/status-chain-genesis.json", size: 612, mode: os.FileMode(420), modTime: time.Unix(1511267822, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -224,7 +224,7 @@ func configTestDataJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/test-data.json", size: 84, mode: os.FileMode(420), modTime: time.Unix(1521487633, 0)}
+	info := bindataFileInfo{name: "config/test-data.json", size: 84, mode: os.FileMode(420), modTime: time.Unix(1513343345, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -244,7 +244,7 @@ func keysBootnodeKey() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/bootnode.key", size: 65, mode: os.FileMode(420), modTime: time.Unix(1521487633, 0)}
+	info := bindataFileInfo{name: "keys/bootnode.key", size: 65, mode: os.FileMode(420), modTime: time.Unix(1518088538, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -264,7 +264,7 @@ func keysFirebaseauthkey() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/firebaseauthkey", size: 153, mode: os.FileMode(420), modTime: time.Unix(1521487633, 0)}
+	info := bindataFileInfo{name: "keys/firebaseauthkey", size: 153, mode: os.FileMode(420), modTime: time.Unix(1505683992, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -284,7 +284,7 @@ func keysTestAccount1StatusChainPk() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/test-account1-status-chain.pk", size: 489, mode: os.FileMode(420), modTime: time.Unix(1521487633, 0)}
+	info := bindataFileInfo{name: "keys/test-account1-status-chain.pk", size: 489, mode: os.FileMode(420), modTime: time.Unix(1511267822, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -304,7 +304,7 @@ func keysTestAccount1Pk() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/test-account1.pk", size: 491, mode: os.FileMode(420), modTime: time.Unix(1521487633, 0)}
+	info := bindataFileInfo{name: "keys/test-account1.pk", size: 491, mode: os.FileMode(420), modTime: time.Unix(1518722857, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -324,7 +324,7 @@ func keysTestAccount2StatusChainPk() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/test-account2-status-chain.pk", size: 489, mode: os.FileMode(420), modTime: time.Unix(1521487633, 0)}
+	info := bindataFileInfo{name: "keys/test-account2-status-chain.pk", size: 489, mode: os.FileMode(420), modTime: time.Unix(1511267822, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -344,7 +344,7 @@ func keysTestAccount2Pk() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/test-account2.pk", size: 491, mode: os.FileMode(420), modTime: time.Unix(1521487633, 0)}
+	info := bindataFileInfo{name: "keys/test-account2.pk", size: 491, mode: os.FileMode(420), modTime: time.Unix(1518722857, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -364,7 +364,7 @@ func keysTestAccount3BeforeEip55Pk() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/test-account3-before-eip55.pk", size: 489, mode: os.FileMode(420), modTime: time.Unix(1521487633, 0)}
+	info := bindataFileInfo{name: "keys/test-account3-before-eip55.pk", size: 489, mode: os.FileMode(420), modTime: time.Unix(1511267822, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -384,7 +384,7 @@ func keysWnodepassword() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/wnodepassword", size: 21, mode: os.FileMode(420), modTime: time.Unix(1521487633, 0)}
+	info := bindataFileInfo{name: "keys/wnodepassword", size: 21, mode: os.FileMode(420), modTime: time.Unix(1512728162, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -404,7 +404,7 @@ func testdataJailCommandsJs() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "testdata/jail/commands.js", size: 7677, mode: os.FileMode(420), modTime: time.Unix(1521487633, 0)}
+	info := bindataFileInfo{name: "testdata/jail/commands.js", size: 7677, mode: os.FileMode(420), modTime: time.Unix(1505683992, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -424,7 +424,7 @@ func testdataJailStatusJs() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "testdata/jail/status.js", size: 3402, mode: os.FileMode(420), modTime: time.Unix(1521487633, 0)}
+	info := bindataFileInfo{name: "testdata/jail/status.js", size: 3402, mode: os.FileMode(420), modTime: time.Unix(1505683992, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -444,7 +444,7 @@ func testdataJailTxSendContextNoMessageIdJs() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "testdata/jail/tx-send/context-no-message-id.js", size: 1793, mode: os.FileMode(420), modTime: time.Unix(1521487633, 0)}
+	info := bindataFileInfo{name: "testdata/jail/tx-send/context-no-message-id.js", size: 1793, mode: os.FileMode(420), modTime: time.Unix(1505683992, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -464,7 +464,7 @@ func testdataJailTxSendMessageIdNoContextJs() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "testdata/jail/tx-send/message-id-no-context.js", size: 1875, mode: os.FileMode(420), modTime: time.Unix(1521487633, 0)}
+	info := bindataFileInfo{name: "testdata/jail/tx-send/message-id-no-context.js", size: 1875, mode: os.FileMode(420), modTime: time.Unix(1505683992, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -484,7 +484,7 @@ func testdataJailTxSendNoMessageIdOrContextJs() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "testdata/jail/tx-send/no-message-id-or-context.js", size: 1354, mode: os.FileMode(420), modTime: time.Unix(1521487633, 0)}
+	info := bindataFileInfo{name: "testdata/jail/tx-send/no-message-id-or-context.js", size: 1354, mode: os.FileMode(420), modTime: time.Unix(1505683992, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -504,7 +504,7 @@ func testdataJailTxSendTxSendJs() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "testdata/jail/tx-send/tx-send.js", size: 3343, mode: os.FileMode(420), modTime: time.Unix(1521487633, 0)}
+	info := bindataFileInfo{name: "testdata/jail/tx-send/tx-send.js", size: 3343, mode: os.FileMode(420), modTime: time.Unix(1505738069, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -524,7 +524,7 @@ func testdataNodeTestSol() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "testdata/node/test.sol", size: 119, mode: os.FileMode(420), modTime: time.Unix(1521487633, 0)}
+	info := bindataFileInfo{name: "testdata/node/test.sol", size: 119, mode: os.FileMode(420), modTime: time.Unix(1505683992, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -581,28 +581,28 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
-	"scripts/README.md":                                 scriptsReadmeMd,
-	"scripts/web3.js":                                   scriptsWeb3Js,
-	"config/cluster.json":                               configClusterJson,
-	"config/public-chain-accounts.json":                 configPublicChainAccountsJson,
-	"config/status-chain-accounts.json":                 configStatusChainAccountsJson,
-	"config/status-chain-genesis.json":                  configStatusChainGenesisJson,
-	"config/test-data.json":                             configTestDataJson,
-	"keys/bootnode.key":                                 keysBootnodeKey,
-	"keys/firebaseauthkey":                              keysFirebaseauthkey,
-	"keys/test-account1-status-chain.pk":                keysTestAccount1StatusChainPk,
-	"keys/test-account1.pk":                             keysTestAccount1Pk,
-	"keys/test-account2-status-chain.pk":                keysTestAccount2StatusChainPk,
-	"keys/test-account2.pk":                             keysTestAccount2Pk,
-	"keys/test-account3-before-eip55.pk":                keysTestAccount3BeforeEip55Pk,
-	"keys/wnodepassword":                                keysWnodepassword,
-	"testdata/jail/commands.js":                         testdataJailCommandsJs,
-	"testdata/jail/status.js":                           testdataJailStatusJs,
-	"testdata/jail/tx-send/context-no-message-id.js":    testdataJailTxSendContextNoMessageIdJs,
-	"testdata/jail/tx-send/message-id-no-context.js":    testdataJailTxSendMessageIdNoContextJs,
+	"scripts/README.md": scriptsReadmeMd,
+	"scripts/web3.js": scriptsWeb3Js,
+	"config/cluster.json": configClusterJson,
+	"config/public-chain-accounts.json": configPublicChainAccountsJson,
+	"config/status-chain-accounts.json": configStatusChainAccountsJson,
+	"config/status-chain-genesis.json": configStatusChainGenesisJson,
+	"config/test-data.json": configTestDataJson,
+	"keys/bootnode.key": keysBootnodeKey,
+	"keys/firebaseauthkey": keysFirebaseauthkey,
+	"keys/test-account1-status-chain.pk": keysTestAccount1StatusChainPk,
+	"keys/test-account1.pk": keysTestAccount1Pk,
+	"keys/test-account2-status-chain.pk": keysTestAccount2StatusChainPk,
+	"keys/test-account2.pk": keysTestAccount2Pk,
+	"keys/test-account3-before-eip55.pk": keysTestAccount3BeforeEip55Pk,
+	"keys/wnodepassword": keysWnodepassword,
+	"testdata/jail/commands.js": testdataJailCommandsJs,
+	"testdata/jail/status.js": testdataJailStatusJs,
+	"testdata/jail/tx-send/context-no-message-id.js": testdataJailTxSendContextNoMessageIdJs,
+	"testdata/jail/tx-send/message-id-no-context.js": testdataJailTxSendMessageIdNoContextJs,
 	"testdata/jail/tx-send/no-message-id-or-context.js": testdataJailTxSendNoMessageIdOrContextJs,
-	"testdata/jail/tx-send/tx-send.js":                  testdataJailTxSendTxSendJs,
-	"testdata/node/test.sol":                            testdataNodeTestSol,
+	"testdata/jail/tx-send/tx-send.js": testdataJailTxSendTxSendJs,
+	"testdata/node/test.sol": testdataNodeTestSol,
 }
 
 // AssetDir returns the file names below a certain
@@ -644,38 +644,37 @@ type bintree struct {
 	Func     func() (*asset, error)
 	Children map[string]*bintree
 }
-
 var _bintree = &bintree{nil, map[string]*bintree{
 	"config": &bintree{nil, map[string]*bintree{
-		"cluster.json":               &bintree{configClusterJson, map[string]*bintree{}},
+		"cluster.json": &bintree{configClusterJson, map[string]*bintree{}},
 		"public-chain-accounts.json": &bintree{configPublicChainAccountsJson, map[string]*bintree{}},
 		"status-chain-accounts.json": &bintree{configStatusChainAccountsJson, map[string]*bintree{}},
-		"status-chain-genesis.json":  &bintree{configStatusChainGenesisJson, map[string]*bintree{}},
-		"test-data.json":             &bintree{configTestDataJson, map[string]*bintree{}},
+		"status-chain-genesis.json": &bintree{configStatusChainGenesisJson, map[string]*bintree{}},
+		"test-data.json": &bintree{configTestDataJson, map[string]*bintree{}},
 	}},
 	"keys": &bintree{nil, map[string]*bintree{
-		"bootnode.key":                  &bintree{keysBootnodeKey, map[string]*bintree{}},
-		"firebaseauthkey":               &bintree{keysFirebaseauthkey, map[string]*bintree{}},
+		"bootnode.key": &bintree{keysBootnodeKey, map[string]*bintree{}},
+		"firebaseauthkey": &bintree{keysFirebaseauthkey, map[string]*bintree{}},
 		"test-account1-status-chain.pk": &bintree{keysTestAccount1StatusChainPk, map[string]*bintree{}},
-		"test-account1.pk":              &bintree{keysTestAccount1Pk, map[string]*bintree{}},
+		"test-account1.pk": &bintree{keysTestAccount1Pk, map[string]*bintree{}},
 		"test-account2-status-chain.pk": &bintree{keysTestAccount2StatusChainPk, map[string]*bintree{}},
-		"test-account2.pk":              &bintree{keysTestAccount2Pk, map[string]*bintree{}},
+		"test-account2.pk": &bintree{keysTestAccount2Pk, map[string]*bintree{}},
 		"test-account3-before-eip55.pk": &bintree{keysTestAccount3BeforeEip55Pk, map[string]*bintree{}},
-		"wnodepassword":                 &bintree{keysWnodepassword, map[string]*bintree{}},
+		"wnodepassword": &bintree{keysWnodepassword, map[string]*bintree{}},
 	}},
 	"scripts": &bintree{nil, map[string]*bintree{
 		"README.md": &bintree{scriptsReadmeMd, map[string]*bintree{}},
-		"web3.js":   &bintree{scriptsWeb3Js, map[string]*bintree{}},
+		"web3.js": &bintree{scriptsWeb3Js, map[string]*bintree{}},
 	}},
 	"testdata": &bintree{nil, map[string]*bintree{
 		"jail": &bintree{nil, map[string]*bintree{
 			"commands.js": &bintree{testdataJailCommandsJs, map[string]*bintree{}},
-			"status.js":   &bintree{testdataJailStatusJs, map[string]*bintree{}},
+			"status.js": &bintree{testdataJailStatusJs, map[string]*bintree{}},
 			"tx-send": &bintree{nil, map[string]*bintree{
-				"context-no-message-id.js":    &bintree{testdataJailTxSendContextNoMessageIdJs, map[string]*bintree{}},
-				"message-id-no-context.js":    &bintree{testdataJailTxSendMessageIdNoContextJs, map[string]*bintree{}},
+				"context-no-message-id.js": &bintree{testdataJailTxSendContextNoMessageIdJs, map[string]*bintree{}},
+				"message-id-no-context.js": &bintree{testdataJailTxSendMessageIdNoContextJs, map[string]*bintree{}},
 				"no-message-id-or-context.js": &bintree{testdataJailTxSendNoMessageIdOrContextJs, map[string]*bintree{}},
-				"tx-send.js":                  &bintree{testdataJailTxSendTxSendJs, map[string]*bintree{}},
+				"tx-send.js": &bintree{testdataJailTxSendTxSendJs, map[string]*bintree{}},
 			}},
 		}},
 		"node": &bintree{nil, map[string]*bintree{
@@ -730,3 +729,4 @@ func _filePath(dir, name string) string {
 	cannonicalName := strings.Replace(name, "\\", "/", -1)
 	return filepath.Join(append([]string{dir}, strings.Split(cannonicalName, "/")...)...)
 }
+
