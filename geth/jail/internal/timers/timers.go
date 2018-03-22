@@ -9,12 +9,7 @@ import (
 	"github.com/status-im/status-go/geth/jail/internal/vm"
 )
 
-var minDelay = map[bool]int64{
-	true:  10,
-	false: 4,
-}
-
-//Define jail timers
+// Define jail timers
 func Define(vm *vm.VM, l *loop.Loop) error {
 	if v, err := vm.Get("setTimeout"); err != nil {
 		return err
@@ -22,67 +17,94 @@ func Define(vm *vm.VM, l *loop.Loop) error {
 		return nil
 	}
 
-	newTimer := func(interval bool) func(call otto.FunctionCall) otto.Value {
-		return func(call otto.FunctionCall) otto.Value {
-			delay, _ := call.Argument(1).ToInteger()
-			if delay < minDelay[interval] {
-				delay = minDelay[interval]
-			}
+	timeHandlers := map[string]func(call otto.FunctionCall) otto.Value{
+		"setInterval":    newTimerHandler(l, true),
+		"setTimeout":     newTimerHandler(l, false),
+		"setImmediate":   newImmediateTimerHandler(l),
+		"clearTimeout":   newClearTimeoutHandler(l),
+		"clearInterval":  newClearTimeoutHandler(l),
+		"clearImmediate": newClearTimeoutHandler(l),
+	}
 
-			t := &timerTask{
-				duration: time.Duration(delay) * time.Millisecond,
-				call:     call,
-				interval: interval,
-			}
-			l.Add(t)
-
-			t.timer = time.AfterFunc(t.duration, func() {
-				l.Ready(t)
-			})
-
-			value, newTimerErr := call.Otto.ToValue(t)
-			if newTimerErr != nil {
-				panic(newTimerErr)
-			}
-
-			return value
+	for k, handler := range timeHandlers {
+		if err := vm.Set(k, handler); err != nil {
+			return err
 		}
 	}
 
-	err := vm.Set("setTimeout", newTimer(false))
-	if err != nil {
-		return err
+	return nil
+}
+
+func getDelayWithMin(call otto.FunctionCall, interval bool) int64 {
+	var minDelay = map[bool]int64{
+		true:  10,
+		false: 4,
 	}
 
-	err = vm.Set("setInterval", newTimer(true))
-	if err != nil {
-		return err
+	delay, _ := call.Argument(1).ToInteger() // nolint: gas
+	if delay < minDelay[interval] {
+		return minDelay[interval]
 	}
+	return delay
+}
 
-	err = vm.Set("setImmediate", func(call otto.FunctionCall) otto.Value {
+func newTimerHandler(l *loop.Loop, interval bool) func(call otto.FunctionCall) otto.Value {
+	return func(call otto.FunctionCall) otto.Value {
+		delay := getDelayWithMin(call, interval)
+
+		t := &timerTask{
+			duration: time.Duration(delay) * time.Millisecond,
+			call:     call,
+			interval: interval,
+		}
+		// If err is non-nil, then the loop is closed and should not
+		// be used anymore.
+		if err := l.Add(t); err != nil {
+			return otto.UndefinedValue()
+		}
+
+		t.timer = time.AfterFunc(t.duration, func() {
+			l.Ready(t) // nolint: errcheck, gas
+		})
+
+		value, newTimerErr := call.Otto.ToValue(t)
+		if newTimerErr != nil {
+			panic(newTimerErr)
+		}
+
+		return value
+	}
+}
+
+func newImmediateTimerHandler(l *loop.Loop) func(call otto.FunctionCall) otto.Value {
+	return func(call otto.FunctionCall) otto.Value {
 		t := &timerTask{
 			duration: time.Millisecond,
 			call:     call,
 		}
-		l.Add(t)
+
+		// If err is non-nil, then the loop is closed and should not
+		// be used anymore.
+		if err := l.Add(t); err != nil {
+			return otto.UndefinedValue()
+		}
 
 		t.timer = time.AfterFunc(t.duration, func() {
-			l.Ready(t)
+			l.Ready(t) // nolint: errcheck, gas
 		})
 
 		value, setImmediateErr := call.Otto.ToValue(t)
-		if err != nil {
+		if setImmediateErr != nil {
 			panic(setImmediateErr)
 		}
 
 		return value
-	})
-	if err != nil {
-		return err
 	}
+}
 
-	clearTimeout := func(call otto.FunctionCall) otto.Value {
-		v, _ := call.Argument(0).Export()
+func newClearTimeoutHandler(l *loop.Loop) func(call otto.FunctionCall) otto.Value {
+	return func(call otto.FunctionCall) otto.Value {
+		v, _ := call.Argument(0).Export() // nolint: gas
 		if t, ok := v.(*timerTask); ok {
 			t.stopped = true
 			t.timer.Stop()
@@ -91,60 +113,4 @@ func Define(vm *vm.VM, l *loop.Loop) error {
 
 		return otto.UndefinedValue()
 	}
-	err = vm.Set("clearTimeout", clearTimeout)
-	if err != nil {
-		return err
-	}
-
-	err = vm.Set("clearInterval", clearTimeout)
-	if err != nil {
-		return err
-	}
-
-	err = vm.Set("clearImmediate", clearTimeout)
-	return err
-}
-
-type timerTask struct {
-	id       int64
-	timer    *time.Timer
-	duration time.Duration
-	interval bool
-	call     otto.FunctionCall
-	stopped  bool
-}
-
-func (t *timerTask) SetID(id int64) { t.id = id }
-func (t *timerTask) GetID() int64   { return t.id }
-
-func (t *timerTask) Execute(vm *vm.VM, l *loop.Loop) error {
-	var arguments []interface{}
-
-	if len(t.call.ArgumentList) > 2 {
-		tmp := t.call.ArgumentList[2:]
-		arguments = make([]interface{}, 2+len(tmp))
-
-		for i, value := range tmp {
-			arguments[i+2] = value
-		}
-	} else {
-		arguments = make([]interface{}, 1)
-	}
-
-	arguments[0] = t.call.ArgumentList[0]
-
-	if _, err := vm.Call(`Function.call.call`, nil, arguments...); err != nil {
-		return err
-	}
-
-	if t.interval && !t.stopped {
-		t.timer.Reset(t.duration)
-		l.Add(t)
-	}
-
-	return nil
-}
-
-func (t *timerTask) Cancel() {
-	t.timer.Stop()
 }

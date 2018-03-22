@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
-	"github.com/status-im/status-go/geth/log"
 )
 
 const (
@@ -101,7 +100,7 @@ func (c *Client) callBatchMethods(ctx context.Context, msgs json.RawMessage) str
 
 	data, err := json.Marshal(responses)
 	if err != nil {
-		log.Error("Failed to marshal batch responses:", err)
+		c.log.Error("Failed to marshal batch responses:", "error", err)
 		return newErrorResponse(errInvalidMessageCode, err, defaultMsgID)
 	}
 
@@ -175,7 +174,11 @@ func newSuccessResponse(result json.RawMessage, id json.RawMessage) string {
 		},
 		Result: result,
 	}
-	data, _ := json.Marshal(msg)
+	data, err := json.Marshal(msg)
+	if err != nil {
+		return newErrorResponse(errInvalidMessageCode, err, id)
+	}
+
 	return string(data)
 }
 

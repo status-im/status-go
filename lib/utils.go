@@ -34,12 +34,17 @@ import (
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/signal"
-	"github.com/status-im/status-go/geth/txqueue"
+	"github.com/status-im/status-go/geth/transactions"
+	"github.com/status-im/status-go/geth/transactions/queue"
 	"github.com/status-im/status-go/static"
-	. "github.com/status-im/status-go/testing" //nolint: golint
+	. "github.com/status-im/status-go/t/utils" //nolint: golint
 )
 
 const zeroHash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+const initJS = `
+	var _status_catalog = {
+		foo: 'bar'
+	};`
 
 var testChainDir string
 var nodeConfigJSON string
@@ -789,7 +794,7 @@ func testCompleteTransaction(t *testing.T) bool {
 			t.Errorf("cannot unmarshal event's JSON: %s. Error %q", jsonEvent, err)
 			return
 		}
-		if envelope.Type == txqueue.EventTransactionQueued {
+		if envelope.Type == transactions.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
 			t.Logf("transaction queued (will be completed shortly): {id: %s}\n", event["id"].(string))
 
@@ -867,7 +872,7 @@ func testCompleteMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocyc
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
 		}
-		if envelope.Type == txqueue.EventTransactionQueued {
+		if envelope.Type == transactions.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
 			txID = event["id"].(string)
 			t.Logf("transaction queued (will be completed in a single call, once aggregated): {id: %s}\n", txID)
@@ -914,7 +919,7 @@ func testCompleteMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocyc
 		}
 		results := resultsStruct.Results
 
-		if len(results) != (testTxCount+1) || results["invalid-tx-id"].Error != txqueue.ErrQueuedTxIDNotFound.Error() {
+		if len(results) != (testTxCount+1) || results["invalid-tx-id"].Error != queue.ErrQueuedTxIDNotFound.Error() {
 			t.Errorf("cannot complete txs: %v", results)
 			return
 		}
@@ -1000,7 +1005,7 @@ func testDiscardTransaction(t *testing.T) bool { //nolint: gocyclo
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
 		}
-		if envelope.Type == txqueue.EventTransactionQueued {
+		if envelope.Type == transactions.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
 			txID = event["id"].(string)
 			t.Logf("transaction queued (will be discarded soon): {id: %s}\n", txID)
@@ -1025,7 +1030,7 @@ func testDiscardTransaction(t *testing.T) bool { //nolint: gocyclo
 
 			// try completing discarded transaction
 			_, err := statusAPI.CompleteTransaction(common.QueuedTxID(txID), TestConfig.Account1.Password)
-			if err != txqueue.ErrQueuedTxIDNotFound {
+			if err != queue.ErrQueuedTxIDNotFound {
 				t.Error("expects tx not found, but call to CompleteTransaction succeeded")
 				return
 			}
@@ -1039,19 +1044,19 @@ func testDiscardTransaction(t *testing.T) bool { //nolint: gocyclo
 			completeQueuedTransaction <- struct{}{} // so that timeout is aborted
 		}
 
-		if envelope.Type == txqueue.EventTransactionFailed {
+		if envelope.Type == transactions.EventTransactionFailed {
 			event := envelope.Event.(map[string]interface{})
 			t.Logf("transaction return event received: {id: %s}\n", event["id"].(string))
 
 			receivedErrMessage := event["error_message"].(string)
-			expectedErrMessage := txqueue.ErrQueuedTxDiscarded.Error()
+			expectedErrMessage := transactions.ErrQueuedTxDiscarded.Error()
 			if receivedErrMessage != expectedErrMessage {
 				t.Errorf("unexpected error message received: got %v", receivedErrMessage)
 				return
 			}
 
 			receivedErrCode := event["error_code"].(string)
-			if receivedErrCode != txqueue.SendTransactionDiscardedErrorCode {
+			if receivedErrCode != strconv.Itoa(transactions.SendTransactionDiscardedErrorCode) {
 				t.Errorf("unexpected error code received: got %v", receivedErrCode)
 				return
 			}
@@ -1066,7 +1071,7 @@ func testDiscardTransaction(t *testing.T) bool { //nolint: gocyclo
 		To:    common.ToAddress(TestConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 	})
-	if err != txqueue.ErrQueuedTxDiscarded {
+	if err != transactions.ErrQueuedTxDiscarded {
 		t.Errorf("expected error not thrown: %v", err)
 		return false
 	}
@@ -1113,7 +1118,7 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocycl
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
 		}
-		if envelope.Type == txqueue.EventTransactionQueued {
+		if envelope.Type == transactions.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
 			txID = event["id"].(string)
 			t.Logf("transaction queued (will be discarded soon): {id: %s}\n", txID)
@@ -1126,19 +1131,19 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocycl
 			txIDs <- txID
 		}
 
-		if envelope.Type == txqueue.EventTransactionFailed {
+		if envelope.Type == transactions.EventTransactionFailed {
 			event := envelope.Event.(map[string]interface{})
 			t.Logf("transaction return event received: {id: %s}\n", event["id"].(string))
 
 			receivedErrMessage := event["error_message"].(string)
-			expectedErrMessage := txqueue.ErrQueuedTxDiscarded.Error()
+			expectedErrMessage := transactions.ErrQueuedTxDiscarded.Error()
 			if receivedErrMessage != expectedErrMessage {
 				t.Errorf("unexpected error message received: got %v", receivedErrMessage)
 				return
 			}
 
 			receivedErrCode := event["error_code"].(string)
-			if receivedErrCode != txqueue.SendTransactionDiscardedErrorCode {
+			if receivedErrCode != strconv.Itoa(transactions.SendTransactionDiscardedErrorCode) {
 				t.Errorf("unexpected error code received: got %v", receivedErrCode)
 				return
 			}
@@ -1157,7 +1162,7 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocycl
 			To:    common.ToAddress(TestConfig.Account2.Address),
 			Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 		})
-		if err != txqueue.ErrQueuedTxDiscarded {
+		if err != transactions.ErrQueuedTxDiscarded {
 			t.Errorf("expected error not thrown: %v", err)
 			return
 		}
@@ -1188,7 +1193,7 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocycl
 		}
 		discardResults := discardResultsStruct.Results
 
-		if len(discardResults) != 1 || discardResults["invalid-tx-id"].Error != txqueue.ErrQueuedTxIDNotFound.Error() {
+		if len(discardResults) != 1 || discardResults["invalid-tx-id"].Error != queue.ErrQueuedTxIDNotFound.Error() {
 			t.Errorf("cannot discard txs: %v", discardResults)
 			return
 		}
@@ -1210,7 +1215,7 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocycl
 				t.Errorf("tx id not set in result: expected id is %s", txID)
 				return
 			}
-			if txResult.Error != txqueue.ErrQueuedTxIDNotFound.Error() {
+			if txResult.Error != queue.ErrQueuedTxIDNotFound.Error() {
 				t.Errorf("invalid error for %s", txResult.Hash)
 				return
 			}
@@ -1281,14 +1286,8 @@ func testJailInitInvalid(t *testing.T) bool {
 
 func testJailParseInvalid(t *testing.T) bool {
 	// Arrange.
-	initCode := `
-	var _status_catalog = {
-		foo: 'bar'
-	};
-	`
-
+	InitJail(C.CString(initJS))
 	// Act.
-	InitJail(C.CString(initCode))
 	extraInvalidCode := `
 	var extraFunc = function (x) {
 	  return x * x;
@@ -1305,71 +1304,43 @@ func testJailParseInvalid(t *testing.T) bool {
 }
 
 func testJailInit(t *testing.T) bool {
-	initCode := `
-	var _status_catalog = {
-		foo: 'bar'
-	};
-	`
-	InitJail(C.CString(initCode))
+	InitJail(C.CString(initJS))
 
-	extraCode := `
-	var extraFunc = function (x) {
-	  return x * x;
-	};
-	`
-	rawResponse := CreateAndInitCell(C.CString("CHAT_ID_INIT_TEST"), C.CString(extraCode))
-	parsedResponse := C.GoString(rawResponse)
+	chatID := C.CString("CHAT_ID_INIT_TEST")
 
-	expectedResponse := `{"result": {"foo":"bar"}}`
+	// Cell initialization return the result of the last JS operation provided to it.
+	response := CreateAndInitCell(chatID, C.CString(`var extraFunc = function (x) { return x * x; }; extraFunc(2);`))
+	require.Equal(t, `{"result":4}`, C.GoString(response), "Unexpected response from jail.CreateAndInitCell()")
 
-	if !reflect.DeepEqual(expectedResponse, parsedResponse) {
-		t.Error("expected output not returned from jail.CreateAndInitCell()")
-		return false
-	}
-
-	t.Logf("jail inited and parsed: %s", parsedResponse)
+	// Commands from the jail initialization are available in any of the created cells.
+	response = ExecuteJS(chatID, C.CString(`JSON.stringify({ result: _status_catalog });`))
+	require.Equal(t, `{"result":{"foo":"bar"}}`, C.GoString(response), "Environment from `InitJail` is not available in the created cell")
 
 	return true
 }
 
 func testJailParseDeprecated(t *testing.T) bool {
-	initCode := `
-		var _status_catalog = {
-			foo: 'bar'
-		};
-	`
-	InitJail(C.CString(initCode))
+	InitJail(C.CString(initJS))
 
 	extraCode := `
 		var extraFunc = function (x) {
 			return x * x;
 		};
+
+		extraFunc(2);
 	`
-	rawResponse := Parse(C.CString("CHAT_ID_PARSE_TEST"), C.CString(extraCode))
-	parsedResponse := C.GoString(rawResponse)
-	expectedResponse := `{"result": {"foo":"bar"}}`
-	if !reflect.DeepEqual(expectedResponse, parsedResponse) {
-		t.Error("expected output not returned from Parse()")
-		return false
-	}
+	chatID := C.CString("CHAT_ID_PARSE_TEST")
+
+	response := Parse(chatID, C.CString(extraCode))
+	require.Equal(t, `{"result":4}`, C.GoString(response))
 
 	// cell already exists but Parse should not complain
-	rawResponse = Parse(C.CString("CHAT_ID_PARSE_TEST"), C.CString(extraCode))
-	parsedResponse = C.GoString(rawResponse)
-	expectedResponse = `{"result": {"foo":"bar"}}`
-	if !reflect.DeepEqual(expectedResponse, parsedResponse) {
-		t.Error("expected output not returned from Parse()")
-		return false
-	}
+	response = Parse(chatID, C.CString(extraCode))
+	require.Equal(t, `{"result":4}`, C.GoString(response))
 
 	// test extraCode
-	rawResponse = ExecuteJS(C.CString("CHAT_ID_PARSE_TEST"), C.CString(`extraFunc(2)`))
-	parsedResponse = C.GoString(rawResponse)
-	expectedResponse = `4`
-	if !reflect.DeepEqual(expectedResponse, parsedResponse) {
-		t.Error("expected output not returned from ExecuteJS()")
-		return false
-	}
+	response = ExecuteJS(chatID, C.CString(`extraFunc(10)`))
+	require.Equal(t, `100`, C.GoString(response))
 
 	return true
 }
@@ -1396,7 +1367,7 @@ func testJailFunctionCall(t *testing.T) bool {
 	// call extraFunc()
 	rawResponse = Call(C.CString("CHAT_ID_CALL_TEST"), C.CString(`["commands", "testCommand"]`), C.CString(`{"val": 12}`))
 	parsedResponse = C.GoString(rawResponse)
-	expectedResponse := `{"result": 144}`
+	expectedResponse := `{"result":144}`
 	if parsedResponse != expectedResponse {
 		t.Errorf("expected response is not returned: expected %s, got %s", expectedResponse, parsedResponse)
 		return false
@@ -1461,7 +1432,7 @@ func startTestNode(t *testing.T) <-chan struct{} {
 			return
 		}
 
-		if envelope.Type == txqueue.EventTransactionQueued {
+		if envelope.Type == transactions.EventTransactionQueued {
 		}
 		if envelope.Type == signal.EventNodeStarted {
 			t.Log("Node started, but we wait till it be ready")

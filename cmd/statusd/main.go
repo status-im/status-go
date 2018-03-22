@@ -1,16 +1,22 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
-	"log"
+	"net/http"
 	"os"
+	"os/signal"
 	"runtime"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/cmd/statusd/debug"
 	"github.com/status-im/status-go/geth/api"
+	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/metrics"
+	nodemetrics "github.com/status-im/status-go/metrics/node"
 )
 
 var (
@@ -19,21 +25,53 @@ var (
 )
 
 var (
-	prodMode       = flag.Bool("production", false, "Whether production settings should be loaded")
-	nodeKeyFile    = flag.String("nodekey", "", "P2P node key file (private key)")
-	dataDir        = flag.String("datadir", params.DataDir, "Data directory for the databases and keystore")
-	networkID      = flag.Int("networkid", params.RopstenNetworkID, "Network identifier (integer, 1=Homestead, 3=Ropsten, 4=Rinkeby, 777=StatusChain)")
-	whisperEnabled = flag.Bool("shh", false, "SHH protocol enabled")
-	swarmEnabled   = flag.Bool("swarm", false, "Swarm protocol enabled")
-	httpEnabled    = flag.Bool("http", false, "HTTP RPC endpoint enabled (default: false)")
-	httpPort       = flag.Int("httpport", params.HTTPPort, "HTTP RPC server's listening port")
-	ipcEnabled     = flag.Bool("ipc", false, "IPC RPC endpoint enabled")
-	cliEnabled     = flag.Bool("cli", false, "Enable debugging CLI server")
-	cliPort        = flag.String("cliport", debug.CLIPort, "CLI server's listening port")
-	logLevel       = flag.String("log", "INFO", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
-	logFile        = flag.String("logfile", "", "Path to the log file")
-	version        = flag.Bool("version", false, "Print version")
+	clusterConfigFile = flag.String("clusterconfig", "", "Cluster configuration file")
+	prodMode          = flag.Bool("production", false, "Whether production settings should be loaded")
+	nodeKeyFile       = flag.String("nodekey", "", "P2P node key file (private key)")
+	dataDir           = flag.String("datadir", params.DataDir, "Data directory for the databases and keystore")
+	networkID         = flag.Int("networkid", params.RopstenNetworkID, "Network identifier (integer, 1=Homestead, 3=Ropsten, 4=Rinkeby, 777=StatusChain)")
+	lesEnabled        = flag.Bool("les", false, "Enable LES protocol")
+	whisperEnabled    = flag.Bool("shh", false, "Enable Whisper protocol")
+	swarmEnabled      = flag.Bool("swarm", false, "Enable Swarm protocol")
+	maxPeers          = flag.Int("maxpeers", 25, "maximum number of p2p peers (including all protocols)")
+	httpEnabled       = flag.Bool("http", false, "Enable HTTP RPC endpoint")
+	httpHost          = flag.String("httphost", "127.0.0.1", "HTTP RPC host of the listening socket")
+	httpPort          = flag.Int("httpport", params.HTTPPort, "HTTP RPC server's listening port")
+	ipcEnabled        = flag.Bool("ipc", false, "Enable IPC RPC endpoint")
+	cliEnabled        = flag.Bool("cli", false, "Enable debugging CLI server")
+	cliPort           = flag.String("cliport", debug.CLIPort, "CLI server's listening port")
+	logLevel          = flag.String("log", "INFO", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
+	logFile           = flag.String("logfile", "", "Path to the log file")
+	version           = flag.Bool("version", false, "Print version")
+
+	listenAddr = flag.String("listenaddr", ":30303", "IP address and port of this node (e.g. 127.0.0.1:30303)")
+	standalone = flag.Bool("standalone", true, "Don't actively connect to peers, wait for incoming connections")
+	bootnodes  = flag.String("bootnodes", "", "A list of bootnodes separated by comma")
+	discovery  = flag.Bool("discovery", false, "Enable discovery protocol")
+
+	// stats
+	statsEnabled = flag.Bool("stats", false, "Expose node stats via /debug/vars expvar endpoint or Prometheus")
+	statsAddr    = flag.String("stats.addr", "0.0.0.0:8080", "HTTP address with /debug/vars endpoint")
+
+	// don't change the name of this flag, https://github.com/ethereum/go-ethereum/blob/master/metrics/metrics.go#L41
+	_ = flag.Bool("metrics", false, "Expose ethereum metrics with debug_metrics jsonrpc call.")
+	// shh stuff
+	passwordFile = flag.String("shh.passwordfile", "", "Password file (password is used for symmetric encryption)")
+	minPow       = flag.Float64("shh.pow", params.WhisperMinimumPoW, "PoW for messages to be added to queue, in float format")
+	ttl          = flag.Int("shh.ttl", params.WhisperTTL, "Time to live for messages, in seconds")
+	lightClient  = flag.Bool("shh.lightclient", false, "Start with empty bloom filter, and don't forward messages")
+
+	// MailServer
+	enableMailServer = flag.Bool("shh.mailserver", false, "Delivers expired messages on demand")
+
+	// Push Notification
+	firebaseAuth = flag.String("shh.firebaseauth", "", "FCM Authorization Key used for sending Push Notifications")
+
+	syncAndExit = flag.Int("sync-and-exit", -1, "Timeout in minutes for blockchain sync and exit, zero means no timeout unless sync is finished")
 )
+
+// All general log messages in this package should be routed through this logger.
+var logger = log.New("package", "status-go/cmd/statusd")
 
 func main() {
 	flag.Usage = printUsage
@@ -41,7 +79,7 @@ func main() {
 
 	config, err := makeNodeConfig()
 	if err != nil {
-		log.Fatalf("Making config failed: %v", err)
+		logger.Error("Making config failed", "error", err)
 		return
 	}
 
@@ -51,31 +89,49 @@ func main() {
 	}
 
 	backend := api.NewStatusBackend()
-	started, err := backend.StartNode(config)
+	err = backend.StartNode(config)
 	if err != nil {
-		log.Fatalf("Node start failed: %v", err)
+		logger.Error("Node start failed", "error", err)
 		return
 	}
 
-	// wait till node is started
-	<-started
-
+	// handle interrupt signals
+	interruptCh := haltOnInterruptSignal(backend.NodeManager())
 	// Check if debugging CLI connection shall be enabled.
 	if *cliEnabled {
 		err := startDebug(backend)
 		if err != nil {
-			log.Fatalf("Starting debugging CLI server failed: %v", err)
+			logger.Error("Starting debugging CLI server failed", "error", err)
 			return
 		}
 	}
 
-	// wait till node has been stopped
+	// Run stats server.
+	if *statsEnabled {
+		go startCollectingStats(interruptCh, backend.NodeManager())
+	}
+
+	// Sync blockchain and stop.
+	if *syncAndExit >= 0 {
+		exitCode := syncAndStopNode(interruptCh, backend.NodeManager(), *syncAndExit)
+		// Call was interrupted. Wait for graceful shutdown.
+		if exitCode == -1 {
+			if node, err := backend.NodeManager().Node(); err == nil && node != nil {
+				node.Wait()
+			}
+			return
+		}
+		// Otherwise, exit immediately with a returned exit code.
+		os.Exit(exitCode)
+	}
+
 	node, err := backend.NodeManager().Node()
 	if err != nil {
-		log.Fatalf("Getting node failed: %v", err)
+		logger.Error("Getting node failed", "error", err)
 		return
 	}
 
+	// wait till node has been stopped
 	node.Wait()
 }
 
@@ -86,13 +142,64 @@ func startDebug(backend *api.StatusBackend) error {
 	return err
 }
 
+// startCollectingStats collects various stats about the node and other protocols like Whisper.
+func startCollectingStats(interruptCh <-chan struct{}, nodeManager common.NodeManager) {
+
+	logger.Info("Starting stats", "stats", *statsAddr)
+
+	node, err := nodeManager.Node()
+	if err != nil {
+		logger.Error("Failed to run metrics because could not get node", "error", err)
+		return
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		if err := nodemetrics.SubscribeServerEvents(ctx, node); err != nil {
+			logger.Error("Failed to subscribe server events", "error", err)
+		}
+	}()
+
+	server := metrics.NewMetricsServer(*statsAddr)
+	defer func() {
+		// server may be nil if `-stats` flag is used
+		// but the binary is compiled without metrics enabled
+		if server == nil {
+			return
+		}
+
+		if err := server.Shutdown(context.TODO()); err != nil {
+			logger.Error("Failed to shutdown metrics server", "error", err)
+		}
+	}()
+	go func() {
+		// server may be nil if `-stats` flag is used
+		// but the binary is compiled without metrics enabled
+		if server == nil {
+			return
+		}
+
+		err := server.ListenAndServe()
+		switch err {
+		case http.ErrServerClosed:
+		default:
+			logger.Error("Metrics server failed", "error", err)
+		}
+	}()
+
+	<-interruptCh
+}
+
 // makeNodeConfig parses incoming CLI options and returns node configuration object
 func makeNodeConfig() (*params.NodeConfig, error) {
 	devMode := !*prodMode
-	nodeConfig, err := params.NewNodeConfig(*dataDir, uint64(*networkID), devMode)
+	nodeConfig, err := params.NewNodeConfig(*dataDir, *clusterConfigFile, uint64(*networkID), devMode)
 	if err != nil {
 		return nil, err
 	}
+
+	nodeConfig.ListenAddr = *listenAddr
 
 	// TODO(divan): move this logic into params package
 	if *nodeKeyFile != "" {
@@ -106,17 +213,38 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 		nodeConfig.LogFile = *logFile
 	}
 
-	nodeConfig.LightEthConfig.Enabled = true
 	nodeConfig.RPCEnabled = *httpEnabled
 	nodeConfig.WhisperConfig.Enabled = *whisperEnabled
+	nodeConfig.MaxPeers = *maxPeers
+
+	nodeConfig.HTTPHost = *httpHost
+	nodeConfig.HTTPPort = *httpPort
+	nodeConfig.IPCEnabled = *ipcEnabled
+
+	nodeConfig.LightEthConfig.Enabled = *lesEnabled
 	nodeConfig.SwarmConfig.Enabled = *swarmEnabled
+
+	if *standalone {
+		nodeConfig.ClusterConfig.Enabled = false
+		nodeConfig.ClusterConfig.BootNodes = nil
+	}
+
+	nodeConfig.Discovery = *discovery
+
+	// Even if standalone is true and discovery is disabled,
+	// it's possible to use bootnodes.
+	if *bootnodes != "" {
+		nodeConfig.ClusterConfig.BootNodes = strings.Split(*bootnodes, ",")
+	}
+
+	if *whisperEnabled {
+		return whisperConfig(nodeConfig)
+	}
 
 	// RPC configuration
 	if !*httpEnabled {
 		nodeConfig.HTTPHost = "" // HTTP RPC is disabled
 	}
-	nodeConfig.HTTPPort = *httpPort
-	nodeConfig.IPCEnabled = *ipcEnabled
 
 	return nodeConfig, nil
 }
@@ -147,8 +275,8 @@ func printVersion(config *params.NodeConfig, gitCommit, buildStamp string) {
 }
 
 func printUsage() {
-	fmt.Fprintln(os.Stderr, "Usage: statusd [options]")
-	fmt.Fprintf(os.Stderr, `
+	usage := `
+Usage: statusd [options]
 Examples:
   statusd               # run status node with defaults
   statusd -networkid 4  # run node on Rinkeby network
@@ -157,6 +285,27 @@ Examples:
   statusd -cli          # enable connection by statusd-cli on default port
 
 Options:
-`)
+`
+	fmt.Fprintf(os.Stderr, usage)
 	flag.PrintDefaults()
+}
+
+// haltOnInterruptSignal catches interrupt signal (SIGINT) and
+// stops the node. It times out after 5 seconds
+// if the node can not be stopped.
+func haltOnInterruptSignal(nodeManager common.NodeManager) <-chan struct{} {
+	interruptCh := make(chan struct{})
+	go func() {
+		signalCh := make(chan os.Signal, 1)
+		signal.Notify(signalCh, os.Interrupt)
+		defer signal.Stop(signalCh)
+		<-signalCh
+		close(interruptCh)
+		logger.Info("Got interrupt, shutting down...")
+		if err := nodeManager.StopNode(); err != nil {
+			logger.Error("Failed to stop node", "error", err)
+			os.Exit(1)
+		}
+	}()
+	return interruptCh
 }

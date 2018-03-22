@@ -25,6 +25,7 @@ import (
 	"sync"
 	"time"
 
+	ethereum "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -75,7 +76,7 @@ type subscription struct {
 	id        rpc.ID
 	typ       Type
 	created   time.Time
-	logsCrit  FilterCriteria
+	logsCrit  ethereum.FilterQuery
 	logs      chan []*types.Log
 	hashes    chan common.Hash
 	headers   chan *types.Header
@@ -109,7 +110,11 @@ func NewEventSystem(mux *event.TypeMux, backend Backend, lightMode bool) *EventS
 		uninstall: make(chan *subscription),
 	}
 
-	go m.eventLoop()
+	eventLoopInit := sync.WaitGroup{}
+	eventLoopInit.Add(1)
+
+	go m.eventLoop(&eventLoopInit)
+	eventLoopInit.Wait() // Wait until eventLoop is properly initialized
 
 	return m
 }
@@ -162,7 +167,7 @@ func (es *EventSystem) subscribe(sub *subscription) *Subscription {
 // SubscribeLogs creates a subscription that will write all logs matching the
 // given criteria to the given logs channel. Default value for the from and to
 // block is "latest". If the fromBlock > toBlock an error is returned.
-func (es *EventSystem) SubscribeLogs(crit FilterCriteria, logs chan []*types.Log) (*Subscription, error) {
+func (es *EventSystem) SubscribeLogs(crit ethereum.FilterQuery, logs chan []*types.Log) (*Subscription, error) {
 	var from, to rpc.BlockNumber
 	if crit.FromBlock == nil {
 		from = rpc.LatestBlockNumber
@@ -200,7 +205,7 @@ func (es *EventSystem) SubscribeLogs(crit FilterCriteria, logs chan []*types.Log
 
 // subscribeMinedPendingLogs creates a subscription that returned mined and
 // pending logs that match the given criteria.
-func (es *EventSystem) subscribeMinedPendingLogs(crit FilterCriteria, logs chan []*types.Log) *Subscription {
+func (es *EventSystem) subscribeMinedPendingLogs(crit ethereum.FilterQuery, logs chan []*types.Log) *Subscription {
 	sub := &subscription{
 		id:        rpc.NewID(),
 		typ:       MinedAndPendingLogsSubscription,
@@ -217,7 +222,7 @@ func (es *EventSystem) subscribeMinedPendingLogs(crit FilterCriteria, logs chan 
 
 // subscribeLogs creates a subscription that will write all logs matching the
 // given criteria to the given logs channel.
-func (es *EventSystem) subscribeLogs(crit FilterCriteria, logs chan []*types.Log) *Subscription {
+func (es *EventSystem) subscribeLogs(crit ethereum.FilterQuery, logs chan []*types.Log) *Subscription {
 	sub := &subscription{
 		id:        rpc.NewID(),
 		typ:       LogsSubscription,
@@ -234,7 +239,7 @@ func (es *EventSystem) subscribeLogs(crit FilterCriteria, logs chan []*types.Log
 
 // subscribePendingLogs creates a subscription that writes transaction hashes for
 // transactions that enter the transaction pool.
-func (es *EventSystem) subscribePendingLogs(crit FilterCriteria, logs chan []*types.Log) *Subscription {
+func (es *EventSystem) subscribePendingLogs(crit ethereum.FilterQuery, logs chan []*types.Log) *Subscription {
 	sub := &subscription{
 		id:        rpc.NewID(),
 		typ:       PendingLogsSubscription,
@@ -393,23 +398,33 @@ func (es *EventSystem) lightFilterLogs(header *types.Header, addresses []common.
 }
 
 // eventLoop (un)installs filters and processes mux events.
-func (es *EventSystem) eventLoop() {
+func (es *EventSystem) eventLoop(initWaitGroup *sync.WaitGroup) {
 	var (
-		index = make(filterIndex)
-		sub   = es.mux.Subscribe(core.PendingLogsEvent{})
+		sub                                   *event.TypeMuxSubscription
+		txSub, rmLogsSub, logsSub, chainEvSub event.Subscription
+
+		index     = make(filterIndex)
+		txCh      = make(chan core.TxPreEvent, txChanSize)
+		rmLogsCh  = make(chan core.RemovedLogsEvent, rmLogsChanSize)
+		logsCh    = make(chan []*types.Log, logsChanSize)
+		chainEvCh = make(chan core.ChainEvent, chainEvChanSize)
+	)
+
+	// To guarantee that `initWaitGroup.Done()` is called even if any of the subscriptions
+	// will panic. Otherwise, it will deadlock `NewEventSystem`.
+	func() {
+		defer initWaitGroup.Done()
+
+		sub = es.mux.Subscribe(core.PendingLogsEvent{})
 		// Subscribe TxPreEvent form txpool
-		txCh  = make(chan core.TxPreEvent, txChanSize)
 		txSub = es.backend.SubscribeTxPreEvent(txCh)
 		// Subscribe RemovedLogsEvent
-		rmLogsCh  = make(chan core.RemovedLogsEvent, rmLogsChanSize)
 		rmLogsSub = es.backend.SubscribeRemovedLogsEvent(rmLogsCh)
 		// Subscribe []*types.Log
-		logsCh  = make(chan []*types.Log, logsChanSize)
 		logsSub = es.backend.SubscribeLogsEvent(logsCh)
 		// Subscribe ChainEvent
-		chainEvCh  = make(chan core.ChainEvent, chainEvChanSize)
 		chainEvSub = es.backend.SubscribeChainEvent(chainEvCh)
-	)
+	}()
 
 	// Unsubscribe all events
 	defer sub.Unsubscribe()

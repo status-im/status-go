@@ -7,17 +7,20 @@ import (
 	"os"
 
 	"github.com/NaySoftware/go-fcm"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/geth/common"
-	"github.com/status-im/status-go/geth/log"
 	"github.com/status-im/status-go/geth/params"
-	"github.com/status-im/status-go/helpers/profiling"
+	"github.com/status-im/status-go/profiling"
 	"gopkg.in/go-playground/validator.v9"
 )
+
+// All general log messages in this package should be routed through this logger.
+var logger = log.New("package", "status-go/lib")
 
 //GenerateConfig for status node
 //export GenerateConfig
 func GenerateConfig(datadir *C.char, networkID C.int, devMode C.int) *C.char {
-	config, err := params.NewNodeConfig(C.GoString(datadir), uint64(networkID), devMode == 1)
+	config, err := params.NewNodeConfig(C.GoString(datadir), "", uint64(networkID), devMode == 1)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
@@ -38,15 +41,15 @@ func StartNode(configJSON *C.char) *C.char {
 		return makeJSONResponse(err)
 	}
 
-	_, err = statusAPI.StartNodeAsync(config)
-	return makeJSONResponse(err)
+	statusAPI.StartNodeAsync(config)
+	return makeJSONResponse(nil)
 }
 
 //StopNode - stop status node
 //export StopNode
 func StopNode() *C.char {
-	_, err := statusAPI.StopNodeAsync()
-	return makeJSONResponse(err)
+	statusAPI.StopNodeAsync()
+	return makeJSONResponse(nil)
 }
 
 //ValidateNodeConfig validates config for status node
@@ -95,8 +98,8 @@ func ValidateNodeConfig(configJSON *C.char) *C.char {
 //ResetChainData remove chain data from data directory
 //export ResetChainData
 func ResetChainData() *C.char {
-	_, err := statusAPI.ResetChainDataAsync()
-	return makeJSONResponse(err)
+	statusAPI.ResetChainDataAsync()
+	return makeJSONResponse(nil)
 }
 
 //CallRPC calls status node via rpc
@@ -209,7 +212,7 @@ func CompleteTransaction(id, password *C.char) *C.char {
 	}
 	outBytes, err := json.Marshal(out)
 	if err != nil {
-		log.Error("failed to marshal CompleteTransaction output", "error", err.Error())
+		logger.Error("failed to marshal CompleteTransaction output", "error", err)
 		return makeJSONResponse(err)
 	}
 
@@ -248,7 +251,7 @@ func CompleteTransactions(ids, password *C.char) *C.char {
 
 	outBytes, err := json.Marshal(out)
 	if err != nil {
-		log.Error("failed to marshal CompleteTransactions output", "error", err.Error())
+		logger.Error("failed to marshal CompleteTransactions output", "error", err)
 		return makeJSONResponse(err)
 	}
 
@@ -272,7 +275,7 @@ func DiscardTransaction(id *C.char) *C.char {
 	}
 	outBytes, err := json.Marshal(out)
 	if err != nil {
-		log.Error("failed to marshal DiscardTransaction output", "error", err.Error())
+		log.Error("failed to marshal DiscardTransaction output", "error", err)
 		return makeJSONResponse(err)
 	}
 
@@ -310,7 +313,7 @@ func DiscardTransactions(ids *C.char) *C.char {
 
 	outBytes, err := json.Marshal(out)
 	if err != nil {
-		log.Error("failed to marshal DiscardTransactions output", "error", err.Error())
+		logger.Error("failed to marshal DiscardTransactions output", "error", err)
 		return makeJSONResponse(err)
 	}
 
@@ -327,7 +330,7 @@ func InitJail(js *C.char) {
 //DEPRECATED in favour of CreateAndInitCell.
 //export Parse
 func Parse(chatID *C.char, js *C.char) *C.char {
-	res := statusAPI.JailParse(C.GoString(chatID), C.GoString(js))
+	res := statusAPI.CreateAndInitCell(C.GoString(chatID), C.GoString(js))
 	return C.CString(res)
 }
 
@@ -413,7 +416,7 @@ func NotifyUsers(message, payloadJSON, tokensArray *C.char) (outCBytes *C.char) 
 
 		outBytes, err = json.Marshal(out)
 		if err != nil {
-			log.Error("failed to marshal Notify output", "error", err.Error())
+			logger.Error("failed to marshal Notify output", "error", err)
 			outCBytes = makeJSONResponse(err)
 			return
 		}
@@ -441,4 +444,24 @@ func NotifyUsers(message, payloadJSON, tokensArray *C.char) (outCBytes *C.char) 
 	}
 
 	return
+}
+
+// AddPeer adds an enode as a peer.
+//export AddPeer
+func AddPeer(enode *C.char) *C.char {
+	err := statusAPI.NodeManager().AddPeer(C.GoString(enode))
+	return makeJSONResponse(err)
+}
+
+// ConnectionChange handles network state changes as reported
+// by ReactNative (see https://facebook.github.io/react-native/docs/netinfo.html)
+//export ConnectionChange
+func ConnectionChange(typ *C.char, expensive C.int) {
+	statusAPI.ConnectionChange(C.GoString(typ), expensive == 1)
+}
+
+// AppStateChange handles app state changes (background/foreground).
+//export AppStateChange
+func AppStateChange(state *C.char) {
+	statusAPI.AppStateChange(C.GoString(state))
 }

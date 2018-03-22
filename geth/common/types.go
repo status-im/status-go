@@ -16,8 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/les"
 	"github.com/ethereum/go-ethereum/node"
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv5"
-	"github.com/robertkrimen/otto"
+	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/rpc"
 	"github.com/status-im/status-go/static"
@@ -44,49 +43,17 @@ func (k *SelectedExtKey) Hex() string {
 	return k.Address.Hex()
 }
 
-// MessageState defines a struct to hold given facts about a message stat.
-type MessageState struct {
-	// Type defines Direction type: IncomingMessage or OutgoingMessage.
-	Type string `json:"type"`
-	// Protocol defines means of transmission in whisper: RPC or P2P.
-	Protocol string `json:"protocol"`
-	// Status defines current status of message: Pending, Delivered, Rejected, etc.
-	Status string `json:"status"`
-	// Envelope struct holding encrypted message.
-	Envelope []byte `json:"envelope"`
-	// Time in of sent time of message.
-	TimeSent uint32 `json:"time,omitempty"`
-	// Received defines time when delivery notification was received
-	Received time.Time `json:"received"`
-	// Payload associated with envelope.
-	Payload []byte `json:"payload,omitempty"`
-	// Hash defines the Envelope's hash
-	Hash string `json:"envelope_hash"`
-	// FromDevice defines the device sending message if value is extractable.
-	FromDevice string `json:"from_device,omitempty"`
-	// ToDevice defines the receiving message if value is extractable.
-	ToDevice string `json:"to_device,omitempty"`
-	// RejectionError defines the error message when message ending with a Rejected status.
-	RejectionError string `json:"rejection_reason,omitempty"`
-	// Source of message when type is Outgoing which contains raw rpc data.
-	Source whisper.NewMessage `json:"source,omitempty"`
-}
-
 // NodeManager defines expected methods for managing Status node
 type NodeManager interface {
 	// StartNode start Status node, fails if node is already started
-	StartNode(config *params.NodeConfig) (<-chan struct{}, error)
+	StartNode(config *params.NodeConfig) error
+
+	// EnsureSync waits until blockchain is synchronized.
+	EnsureSync(ctx context.Context) error
 
 	// StopNode stop the running Status node.
 	// Stopped node cannot be resumed, one starts a new node instead.
-	StopNode() (<-chan struct{}, error)
-
-	// RestartNode restart running Status node, fails if node is not running
-	RestartNode() (<-chan struct{}, error)
-
-	// ResetChainData remove chain data from data directory.
-	// Node is stopped, and new node is started, with clean data directory.
-	ResetChainData() (<-chan struct{}, error)
+	StopNode() error
 
 	// IsNodeRunning confirm that node is running
 	IsNodeRunning() bool
@@ -102,6 +69,9 @@ type NodeManager interface {
 
 	// AddPeer adds URL of static peer
 	AddPeer(url string) error
+
+	// PeerCount returns number of connected peers
+	PeerCount() int
 
 	// LightEthereumService exposes reference to LES service running on top of the node
 	LightEthereumService() (*les.LightEthereum, error)
@@ -166,8 +136,8 @@ type AccountManager interface {
 	AddressToDecryptedAccount(address, password string) (accounts.Account, *keystore.Key, error)
 }
 
-// RawCompleteTransactionResult is a JSON returned from transaction complete function (used internally)
-type RawCompleteTransactionResult struct {
+// TransactionResult is a JSON returned from transaction complete function (used internally)
+type TransactionResult struct {
 	Hash  common.Hash
 	Error error
 }
@@ -182,141 +152,23 @@ type QueuedTxID string
 
 // QueuedTx holds enough information to complete the queued transaction.
 type QueuedTx struct {
-	ID         QueuedTxID
-	Hash       common.Hash
-	Context    context.Context
-	Args       SendTxArgs
-	InProgress bool // true if transaction is being sent
-	Done       chan struct{}
-	Discard    chan struct{}
-	Err        error
+	ID      QueuedTxID
+	Context context.Context
+	Args    SendTxArgs
+	Result  chan TransactionResult
 }
 
 // SendTxArgs represents the arguments to submit a new transaction into the transaction pool.
+// This struct is based on go-ethereum's type in internal/ethapi/api.go, but we have freedom
+// over the exact layout of this struct.
 type SendTxArgs struct {
 	From     common.Address  `json:"from"`
 	To       *common.Address `json:"to"`
-	Gas      *hexutil.Big    `json:"gas"`
+	Gas      *hexutil.Uint64 `json:"gas"`
 	GasPrice *hexutil.Big    `json:"gasPrice"`
 	Value    *hexutil.Big    `json:"value"`
-	Data     hexutil.Bytes   `json:"data"`
 	Nonce    *hexutil.Uint64 `json:"nonce"`
-}
-
-// EnqueuedTxHandler is a function that receives queued/pending transactions, when they get queued
-type EnqueuedTxHandler func(*QueuedTx)
-
-// EnqueuedTxReturnHandler is a function that receives response when tx is complete (both on success and error)
-type EnqueuedTxReturnHandler func(*QueuedTx, error)
-
-// TxQueue is a queue of transactions.
-type TxQueue interface {
-	// Remove removes a transaction from the queue.
-	Remove(id QueuedTxID)
-
-	// Reset resets the state of the queue.
-	Reset()
-
-	// Count returns a number of transactions in the queue.
-	Count() int
-
-	// Has returns true if a transaction is in the queue.
-	Has(id QueuedTxID) bool
-}
-
-// TxQueueManager defines expected methods for managing transaction queue
-type TxQueueManager interface {
-	// Start starts accepting new transaction in the queue.
-	Start()
-
-	// Stop stops accepting new transactions in the queue.
-	Stop()
-
-	// TransactionQueue returns a transaction queue.
-	TransactionQueue() TxQueue
-
-	// CreateTransactoin creates a new transaction.
-	CreateTransaction(ctx context.Context, args SendTxArgs) *QueuedTx
-
-	// QueueTransaction adds a new transaction to the queue.
-	QueueTransaction(tx *QueuedTx) error
-
-	// WaitForTransactions blocks until transaction is completed, discarded or timed out.
-	WaitForTransaction(tx *QueuedTx) error
-
-	// NotifyOnQueuedTxReturn notifies a handler when a transaction returns.
-	NotifyOnQueuedTxReturn(queuedTx *QueuedTx, err error)
-
-	// TransactionQueueHandler returns handler that processes incoming tx queue requests
-	TransactionQueueHandler() func(queuedTx *QueuedTx)
-
-	// TODO(adam): might be not needed
-	SetTransactionQueueHandler(fn EnqueuedTxHandler)
-
-	// TODO(adam): might be not needed
-	SetTransactionReturnHandler(fn EnqueuedTxReturnHandler)
-
-	SendTransactionRPCHandler(ctx context.Context, args ...interface{}) (interface{}, error)
-
-	// TransactionReturnHandler returns handler that processes responses from internal tx manager
-	TransactionReturnHandler() func(queuedTx *QueuedTx, err error)
-
-	// CompleteTransaction instructs backend to complete sending of a given transaction
-	CompleteTransaction(id QueuedTxID, password string) (common.Hash, error)
-
-	// CompleteTransactions instructs backend to complete sending of multiple transactions
-	CompleteTransactions(ids []QueuedTxID, password string) map[QueuedTxID]RawCompleteTransactionResult
-
-	// DiscardTransaction discards a given transaction from transaction queue
-	DiscardTransaction(id QueuedTxID) error
-
-	// DiscardTransactions discards given multiple transactions from transaction queue
-	DiscardTransactions(ids []QueuedTxID) map[QueuedTxID]RawDiscardTransactionResult
-}
-
-// JailCell represents single jail cell, which is basically a JavaScript VM.
-// It's designed to be a transparent wrapper around otto.VM's methods.
-type JailCell interface {
-	// Set a value inside VM.
-	Set(string, interface{}) error
-	// Get a value from VM.
-	Get(string) (otto.Value, error)
-	// Run an arbitrary JS code. Input maybe string or otto.Script.
-	Run(interface{}) (otto.Value, error)
-	// Call an arbitrary JS function by name and args.
-	Call(item string, this interface{}, args ...interface{}) (otto.Value, error)
-	// Stop stops background execution of cell.
-	Stop() error
-}
-
-// JailManager defines methods for managing jailed environments
-type JailManager interface {
-	// Call executes given JavaScript function w/i a jail cell context identified by the chatID.
-	Call(chatID, this, args string) string
-
-	// CreateCell creates a new jail cell.
-	CreateCell(chatID string) (JailCell, error)
-
-	// Parse creates a new jail cell context, with the given chatID as identifier.
-	// New context executes provided JavaScript code, right after the initialization.
-	// DEPRECATED in favour of CreateAndInitCell.
-	Parse(chatID, js string) string
-
-	// CreateAndInitCell creates a new jail cell and initialize it
-	// with web3 and other handlers.
-	CreateAndInitCell(chatID string, code ...string) string
-
-	// Cell returns an existing instance of JailCell.
-	Cell(chatID string) (JailCell, error)
-
-	// Execute allows to run arbitrary JS code within a cell.
-	Execute(chatID, code string) string
-
-	// SetBaseJS allows to setup initial JavaScript to be loaded on each jail.CreateAndInitCell().
-	SetBaseJS(js string)
-
-	// Stop stops all background activity of jail
-	Stop()
+	Input    hexutil.Bytes   `json:"input"`
 }
 
 // APIResponse generic response from API
@@ -336,8 +188,7 @@ func (r APIDetailedResponse) Error() string {
 	buf := bytes.NewBufferString("")
 
 	for _, err := range r.FieldErrors {
-		buf.WriteString(err.Error())
-		buf.WriteString("\n")
+		buf.WriteString(err.Error() + "\n") // nolint: gas
 	}
 
 	return strings.TrimSpace(buf.String())
@@ -358,8 +209,7 @@ func (e APIFieldError) Error() string {
 	buf := bytes.NewBufferString(fmt.Sprintf("Parameter: %s\n", e.Parameter))
 
 	for _, err := range e.Errors {
-		buf.WriteString(err.Error())
-		buf.WriteString("\n")
+		buf.WriteString(err.Error() + "\n") // nolint: gas
 	}
 
 	return strings.TrimSpace(buf.String())
@@ -441,7 +291,7 @@ type NotifyResult struct {
 const passphraseEnvName = "ACCOUNT_PASSWORD"
 
 // LoadTestConfig loads test configuration values from disk
-func LoadTestConfig(networkId int) (*TestConfig, error) {
+func LoadTestConfig(networkID int) (*TestConfig, error) {
 	var testConfig TestConfig
 
 	configData := static.MustAsset("config/test-data.json")
@@ -449,7 +299,7 @@ func LoadTestConfig(networkId int) (*TestConfig, error) {
 		return nil, err
 	}
 
-	if networkId == params.StatusChainNetworkID {
+	if networkID == params.StatusChainNetworkID {
 		accountsData := static.MustAsset("config/status-chain-accounts.json")
 		if err := json.Unmarshal(accountsData, &testConfig); err != nil {
 			return nil, err

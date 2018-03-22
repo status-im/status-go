@@ -2,7 +2,6 @@ package params
 
 import (
 	"bytes"
-	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,22 +11,9 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/status-im/status-go/geth/log"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/static"
 )
-
-// default node configuration options
-var (
-	UseMainnetFlag = "false" // to be overridden via -ldflags '-X geth/params.UseMainnetFlag'
-	UseMainnet     = false
-)
-
-func init() {
-	if UseMainnetFlag == "true" { // set at compile time, here we make sure to set corresponding boolean flag
-		UseMainnet = true
-	}
-}
 
 // errors
 var (
@@ -35,11 +21,13 @@ var (
 	ErrMissingNetworkID           = errors.New("missing required 'NetworkID' parameter")
 	ErrEmptyPasswordFile          = errors.New("password file cannot be empty")
 	ErrNoPasswordFileValueSet     = errors.New("password file path not set")
-	ErrNoIdentityFileValueSet     = errors.New("identity file path not set")
-	ErrEmptyIdentityFile          = errors.New("identity file cannot be empty")
 	ErrEmptyAuthorizationKeyFile  = errors.New("authorization key file cannot be empty")
 	ErrAuthorizationKeyFileNotSet = errors.New("authorization key file is not set")
 )
+
+// ----------
+// LightEthConfig
+// ----------
 
 // LightEthConfig holds LES-related configuration
 // Status nodes are always lightweight clients (due to mobile platform constraints)
@@ -53,6 +41,10 @@ type LightEthConfig struct {
 	// DatabaseCache is memory (in MBs) allocated to internal caching (min 16MB / database forced)
 	DatabaseCache int
 }
+
+// ----------
+// FirebaseConfig
+// ----------
 
 // FirebaseConfig holds FCM-related configuration
 type FirebaseConfig struct {
@@ -83,38 +75,31 @@ func (c *FirebaseConfig) ReadAuthorizationKeyFile() ([]byte, error) {
 	return key, nil
 }
 
+// ----------
+// WhisperConfig
+// ----------
+
 // WhisperConfig holds SHH-related configuration
 type WhisperConfig struct {
 	// Enabled flag specifies whether protocol is enabled
 	Enabled bool
 
-	// IdentityFile path to private key, that will be loaded as identity into Whisper
-	IdentityFile string
-
-	// PasswordFile path to password file, for non-interactive password entry
-	// (if no account file selected, then this password is used for symmetric encryption)
+	// PasswordFile contains a password for symmetric encryption with MailServer.
 	PasswordFile string
 
-	// EchoMode if mode is on, prints some arguments for diagnostics
-	EchoMode bool
+	// Password for symmetric encryption with MailServer.
+	// (if no account file selected, then this password is used for symmetric encryption).
+	Password string
 
-	// BootstrapNode whether node doesn't actively connect to peers, and waits for incoming connections
-	BootstrapNode bool
+	// LightClient should be true if the node should start with an empty bloom filter and not forward messages from other nodes
+	LightClient bool
 
-	// ForwarderNode is mode when node only forwards messages, neither sends nor decrypts messages
-	ForwarderNode bool
-
-	// MailServerNode is mode when node is capable of delivering expired messages on demand
-	MailServerNode bool
-
-	// NotificationServerNode is mode when node is capable of sending Push (and probably other kinds) Notifications
-	NotificationServerNode bool
+	// EnableMailServer is mode when node is capable of delivering expired messages on demand
+	EnableMailServer bool
 
 	// DataDir is the file system folder Whisper should use for any data storage needs.
+	// For instance, MailServer will use this directory to store its data.
 	DataDir string
-
-	// Port Whisper node's listening port
-	Port int
 
 	// MinimumPoW minimum PoW for Whisper messages
 	MinimumPoW float64
@@ -127,47 +112,35 @@ type WhisperConfig struct {
 }
 
 // ReadPasswordFile reads and returns content of the password file
-func (c *WhisperConfig) ReadPasswordFile() ([]byte, error) {
+func (c *WhisperConfig) ReadPasswordFile() error {
 	if len(c.PasswordFile) == 0 {
-		return nil, ErrNoPasswordFileValueSet
+		return ErrNoPasswordFileValueSet
 	}
 
 	password, err := ioutil.ReadFile(c.PasswordFile)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	password = bytes.TrimRight(password, "\n")
 
 	if len(password) == 0 {
-		return nil, ErrEmptyPasswordFile
+		return ErrEmptyPasswordFile
 	}
 
-	return password, nil
-}
+	c.Password = string(password)
 
-// ReadIdentityFile reads and loads identity private key
-func (c *WhisperConfig) ReadIdentityFile() (*ecdsa.PrivateKey, error) {
-	if len(c.IdentityFile) == 0 {
-		return nil, ErrNoIdentityFileValueSet
-	}
-
-	identity, err := crypto.LoadECDSA(c.IdentityFile)
-	if err != nil {
-		return nil, err
-	}
-
-	if identity == nil {
-		return nil, ErrEmptyIdentityFile
-	}
-
-	return identity, nil
+	return nil
 }
 
 // String dumps config object as nicely indented JSON
 func (c *WhisperConfig) String() string {
-	data, _ := json.MarshalIndent(c, "", "    ")
+	data, _ := json.MarshalIndent(c, "", "    ") // nolint: gas
 	return string(data)
 }
+
+// ----------
+// SwarmConfig
+// ----------
 
 // SwarmConfig holds Swarm-related configuration
 type SwarmConfig struct {
@@ -177,35 +150,38 @@ type SwarmConfig struct {
 
 // String dumps config object as nicely indented JSON
 func (c *SwarmConfig) String() string {
-	data, _ := json.MarshalIndent(c, "", "    ")
+	data, _ := json.MarshalIndent(c, "", "    ") // nolint: gas
 	return string(data)
 }
 
-// BootClusterConfig holds configuration for supporting boot cluster, which is a temporary
+// ----------
+// ClusterConfig
+// ----------
+
+// ClusterConfig holds configuration for supporting cluster peers, which is a temporary
 // means for mobile devices to get connected to Ethereum network (UDP-based discovery
 // may not be available, so we need means to discover the network manually).
-type BootClusterConfig struct {
+type ClusterConfig struct {
 	// Enabled flag specifies whether feature is enabled
 	Enabled bool
 
-	// RootNumber CHT root number
-	RootNumber int
+	// StaticNodes lists the static nodes taken from compiled or passed cluster.json
+	StaticNodes []string
 
-	// RootHash is hash of CHT root for a given root number
-	RootHash string
-
-	// BootNodes list of bootstrap nodes for a given network (Ropsten, Rinkeby, Homestead),
+	// BootNodes list of cluster peer nodes for a given network (Ropsten, Rinkeby, Homestead),
 	// for a given mode (production vs development)
 	BootNodes []string
 }
 
 // String dumps config object as nicely indented JSON
-func (c *BootClusterConfig) String() string {
-	data, _ := json.MarshalIndent(c, "", "    ")
+func (c *ClusterConfig) String() string {
+	data, _ := json.MarshalIndent(c, "", "    ") // nolint: gas
 	return string(data)
 }
 
-//=====================================================================================
+// ----------
+// UpstreamRPCConfig
+// ----------
 
 // UpstreamRPCConfig stores configuration for upstream rpc connection.
 type UpstreamRPCConfig struct {
@@ -217,7 +193,9 @@ type UpstreamRPCConfig struct {
 	URL string
 }
 
-//=====================================================================================
+// ----------
+// NodeConfig
+// ----------
 
 // NodeConfig stores configuration options for a node
 type NodeConfig struct {
@@ -236,10 +214,16 @@ type NodeConfig struct {
 	// If KeyStoreDir is empty, the default location is the "keystore" subdirectory of DataDir.
 	KeyStoreDir string
 
-	// PrivateKeyFile is a filename with node ID (private key)
+	// NodeKeyFile is a filename with node ID (private key)
 	// This file should contain a valid secp256k1 private key that will be used for both
 	// remote peer identification as well as network traffic encryption.
 	NodeKeyFile string
+
+	// Discovery set to true will enabled discovery protocol.
+	Discovery bool
+
+	// ListenAddr is an IP address and port of this node (e.g. 127.0.0.1:30303).
+	ListenAddr string
 
 	// Name sets the instance name of the node. It must not contain the / character.
 	Name string `validate:"excludes=/"`
@@ -287,11 +271,13 @@ type NodeConfig struct {
 	// handshake phase, counted separately for inbound and outbound connections.
 	MaxPendingPeers int
 
+	log log.Logger
+
 	// LogFile is filename where exposed logs get written to
 	LogFile string
 
-	// LogLevel defines minimum log level. Valid names are "ERROR", "WARNING", "INFO", "DEBUG", and "TRACE".
-	LogLevel string `validate:"eq=ERROR|eq=WARNING|eq=INFO|eq=DEBUG|eq=TRACE"`
+	// LogLevel defines minimum log level. Valid names are "ERROR", "WARN", "INFO", "DEBUG", and "TRACE".
+	LogLevel string `validate:"eq=ERROR|eq=WARN|eq=INFO|eq=DEBUG|eq=TRACE"`
 
 	// LogToStderr defines whether logged info should also be output to os.Stderr
 	LogToStderr bool
@@ -299,8 +285,12 @@ type NodeConfig struct {
 	// UpstreamConfig extra config for providing upstream infura server.
 	UpstreamConfig UpstreamRPCConfig `json:"UpstreamConfig"`
 
-	// BootClusterConfig extra configuration for supporting cluster
-	BootClusterConfig *BootClusterConfig `json:"BootClusterConfig," validate:"structonly"`
+	// ClusterConfigFile contains the file name of the cluster configuration. If
+	// empty the statical configuration data will be taken.
+	ClusterConfigFile string `json:"ClusterConfigFile"`
+
+	// ClusterConfig extra configuration for supporting cluster peers.
+	ClusterConfig *ClusterConfig `json:"ClusterConfig," validate:"structonly"`
 
 	// LightEthConfig extra configuration for LES
 	LightEthConfig *LightEthConfig `json:"LightEthConfig," validate:"structonly"`
@@ -313,28 +303,32 @@ type NodeConfig struct {
 }
 
 // NewNodeConfig creates new node configuration object
-func NewNodeConfig(dataDir string, networkID uint64, devMode bool) (*NodeConfig, error) {
+func NewNodeConfig(dataDir string, clstrCfgFile string, networkID uint64, devMode bool) (*NodeConfig, error) {
 	nodeConfig := &NodeConfig{
-		DevMode:         devMode,
-		NetworkID:       networkID,
-		DataDir:         dataDir,
-		Name:            ClientIdentifier,
-		Version:         Version,
-		RPCEnabled:      RPCEnabledDefault,
-		HTTPHost:        HTTPHost,
-		HTTPPort:        HTTPPort,
-		APIModules:      APIModules,
-		WSHost:          WSHost,
-		WSPort:          WSPort,
-		MaxPeers:        MaxPeers,
-		MaxPendingPeers: MaxPendingPeers,
-		IPCFile:         IPCFile,
-		LogFile:         LogFile,
-		LogLevel:        LogLevel,
-		LogToStderr:     LogToStderr,
-		BootClusterConfig: &BootClusterConfig{
-			Enabled:   true,
-			BootNodes: []string{},
+		DevMode:           devMode,
+		NetworkID:         networkID,
+		DataDir:           dataDir,
+		Name:              ClientIdentifier,
+		Version:           Version,
+		RPCEnabled:        RPCEnabledDefault,
+		HTTPHost:          HTTPHost,
+		HTTPPort:          HTTPPort,
+		ListenAddr:        ListenAddr,
+		APIModules:        APIModules,
+		WSHost:            WSHost,
+		WSPort:            WSPort,
+		MaxPeers:          MaxPeers,
+		MaxPendingPeers:   MaxPendingPeers,
+		IPCFile:           IPCFile,
+		log:               log.New("package", "status-go/geth/params.NodeConfig"),
+		LogFile:           LogFile,
+		LogLevel:          LogLevel,
+		LogToStderr:       LogToStderr,
+		ClusterConfigFile: clstrCfgFile,
+		ClusterConfig: &ClusterConfig{
+			Enabled:     true,
+			StaticNodes: []string{},
+			BootNodes:   []string{},
 		},
 		LightEthConfig: &LightEthConfig{
 			Enabled:       true,
@@ -342,7 +336,6 @@ func NewNodeConfig(dataDir string, networkID uint64, devMode bool) (*NodeConfig,
 		},
 		WhisperConfig: &WhisperConfig{
 			Enabled:    true,
-			Port:       WhisperPort,
 			MinimumPoW: WhisperMinimumPoW,
 			TTL:        WhisperTTL,
 			FirebaseConfig: &FirebaseConfig{
@@ -375,7 +368,7 @@ func LoadNodeConfig(configJSON string) (*NodeConfig, error) {
 }
 
 func loadNodeConfig(configJSON string) (*NodeConfig, error) {
-	nodeConfig, err := NewNodeConfig("", 0, true)
+	nodeConfig, err := NewNodeConfig("", "", 0, true)
 	if err != nil {
 		return nil, err
 	}
@@ -417,8 +410,8 @@ func (c *NodeConfig) Validate() error {
 		return err
 	}
 
-	if c.BootClusterConfig.Enabled {
-		if err := validate.Struct(c.BootClusterConfig); err != nil {
+	if c.ClusterConfig.Enabled {
+		if err := validate.Struct(c.ClusterConfig); err != nil {
 			return err
 		}
 	}
@@ -460,13 +453,14 @@ func (c *NodeConfig) Save() error {
 		return err
 	}
 
-	log.Info(fmt.Sprintf("config file saved: %v", configFilePath))
+	c.log.Info("config file saved", "path", configFilePath)
 	return nil
 }
 
 // updateConfig traverses configuration and adjusts dependent fields
 // (we have a development/production and mobile/full node dependent configurations)
 func (c *NodeConfig) updateConfig() error {
+	// Update separate configurations.
 	if err := c.updateGenesisConfig(); err != nil {
 		return err
 	}
@@ -475,7 +469,7 @@ func (c *NodeConfig) updateConfig() error {
 		return err
 	}
 
-	if err := c.updateBootClusterConfig(); err != nil {
+	if err := c.updateClusterConfig(); err != nil {
 		return err
 	}
 
@@ -553,11 +547,11 @@ func (c *NodeConfig) updateUpstreamConfig() error {
 	return nil
 }
 
-// updateBootClusterConfig loads boot nodes and CHT for a given network and mode.
+// updateClusterConfig loads static peer nodes and CHT for a given network and mode.
 // This is necessary until we have LES protocol support CHT sync, and better node
 // discovery on mobile devices)
-func (c *NodeConfig) updateBootClusterConfig() error {
-	if !c.BootClusterConfig.Enabled {
+func (c *NodeConfig) updateClusterConfig() error {
+	if !c.ClusterConfig.Enabled {
 		return nil
 	}
 
@@ -565,38 +559,45 @@ func (c *NodeConfig) updateBootClusterConfig() error {
 	// Once CHT sync sub-protocol is working in LES, we will rely on it, as it provides
 	// decentralized solution. For now, in order to avoid forcing users to long sync times
 	// we use central static resource
-	type subClusterConfig struct {
-		Number    int      `json:"number"`
-		Hash      string   `json:"hash"`
-		BootNodes []string `json:"bootnodes"`
+	type subClusterData struct {
+		Number      int      `json:"number"`
+		Hash        string   `json:"hash"`
+		StaticNodes []string `json:"staticnodes"`
 	}
-	type clusterConfig struct {
-		NetworkID   int              `json:"networkID"`
-		GenesisHash string           `json:"genesisHash"`
-		Prod        subClusterConfig `json:"prod"`
-		Dev         subClusterConfig `json:"dev"`
-	}
-
-	chtFile, err := static.Asset("config/cht.json")
-	if err != nil {
-		return fmt.Errorf("cht.json could not be loaded: %s", err)
+	type clusterData struct {
+		NetworkID int            `json:"networkID"`
+		Prod      subClusterData `json:"prod"`
+		Dev       subClusterData `json:"dev"`
 	}
 
-	var clusters []clusterConfig
-	err = json.Unmarshal(chtFile, &clusters)
+	var configFile []byte
+	var err error
+
+	if c.ClusterConfigFile != "" {
+		// Load cluster configuration from external file.
+		configFile, err = ioutil.ReadFile(c.ClusterConfigFile)
+		if err != nil {
+			return fmt.Errorf("cluster configuration file '%s' could not be loaded: %s", c.ClusterConfigFile, err)
+		}
+	} else {
+		// Fallback to embedded file.
+		configFile, err = static.Asset("config/cluster.json")
+		if err != nil {
+			return fmt.Errorf("cluster.json could not be loaded: %s", err)
+		}
+	}
+
+	var clusters []clusterData
+	err = json.Unmarshal(configFile, &clusters)
 	if err != nil {
-		return fmt.Errorf("failed to unmarshal cht.json: %s", err)
+		return fmt.Errorf("failed to unmarshal cluster configuration file: %s", err)
 	}
 
 	for _, cluster := range clusters {
 		if cluster.NetworkID == int(c.NetworkID) {
-			c.BootClusterConfig.RootNumber = cluster.Prod.Number
-			c.BootClusterConfig.RootHash = cluster.Prod.Hash
-			c.BootClusterConfig.BootNodes = cluster.Prod.BootNodes
+			c.ClusterConfig.StaticNodes = cluster.Prod.StaticNodes
 			if c.DevMode {
-				c.BootClusterConfig.RootNumber = cluster.Dev.Number
-				c.BootClusterConfig.RootHash = cluster.Dev.Hash
-				c.BootClusterConfig.BootNodes = cluster.Dev.BootNodes
+				c.ClusterConfig.StaticNodes = cluster.Dev.StaticNodes
 			}
 			break
 		}

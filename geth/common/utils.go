@@ -10,13 +10,13 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"runtime"
 	"runtime/debug"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/status-im/status-go/geth/log"
+	"github.com/ethereum/go-ethereum/log"
+	"github.com/pborman/uuid"
 	"github.com/status-im/status-go/static"
 )
 
@@ -32,6 +32,9 @@ type contextKey string // in order to make sure that our context key does not co
 var (
 	ErrInvalidAccountAddressOrKey = errors.New("cannot parse address or key to valid account address")
 )
+
+// All general log messages in this package should be routed through this logger.
+var logger = log.New("package", "status-go/geth/common")
 
 // ParseAccountString parses hex encoded string and returns is as accounts.Account.
 func ParseAccountString(account string) (accounts.Account, error) {
@@ -69,13 +72,13 @@ func ToAddress(accountAddress string) *common.Address {
 func ImportTestAccount(keystoreDir, accountFile string) error {
 	// make sure that keystore folder exists
 	if _, err := os.Stat(keystoreDir); os.IsNotExist(err) {
-		os.MkdirAll(keystoreDir, os.ModePerm) // nolint: errcheck
+		os.MkdirAll(keystoreDir, os.ModePerm) // nolint: errcheck, gas
 	}
 
 	dst := filepath.Join(keystoreDir, accountFile)
 	err := ioutil.WriteFile(dst, static.MustAsset("keys/"+accountFile), 0644)
 	if err != nil {
-		log.Warn("cannot copy test account PK", "error", err)
+		logger.Warn("cannot copy test account PK", "error", err)
 	}
 
 	return err
@@ -91,17 +94,6 @@ func PanicAfter(waitSeconds time.Duration, abort chan struct{}, desc string) {
 			panic("whatever you were doing takes toooo long: " + desc)
 		}
 	}()
-}
-
-// NameOf returns name of caller, at runtime
-func NameOf(f interface{}) string {
-	v := reflect.ValueOf(f)
-	if v.Kind() == reflect.Func {
-		if rf := runtime.FuncForPC(v.Pointer()); rf != nil {
-			return rf.Name()
-		}
-	}
-	return v.String()
 }
 
 // MessageIDFromContext returns message id from context (if exists)
@@ -133,8 +125,8 @@ func ParseJSONArray(items string) ([]string, error) {
 func Fatalf(reason interface{}, args ...interface{}) {
 	// decide on output stream
 	w := io.MultiWriter(os.Stdout, os.Stderr)
-	outf, _ := os.Stdout.Stat()
-	errf, _ := os.Stderr.Stat()
+	outf, _ := os.Stdout.Stat() // nolint: gas
+	errf, _ := os.Stderr.Stat() // nolint: gas
 	if outf != nil && errf != nil && os.SameFile(outf, errf) {
 		w = os.Stderr
 	}
@@ -142,7 +134,7 @@ func Fatalf(reason interface{}, args ...interface{}) {
 	// find out whether error or string has been passed as a reason
 	r := reflect.ValueOf(reason)
 	if r.Kind() == reflect.String {
-		fmt.Fprintf(w, "Fatal Failure: "+reason.(string)+"\n", args)
+		fmt.Fprintf(w, "Fatal Failure: %v\n%v\n", reason.(string), args)
 	} else {
 		fmt.Fprintf(w, "Fatal Failure: %v\n", reason.(error))
 	}
@@ -150,4 +142,14 @@ func Fatalf(reason interface{}, args ...interface{}) {
 	debug.PrintStack()
 
 	os.Exit(1)
+}
+
+// CreateTransaction returns a transaction object.
+func CreateTransaction(ctx context.Context, args SendTxArgs) *QueuedTx {
+	return &QueuedTx{
+		ID:      QueuedTxID(uuid.New()),
+		Context: ctx,
+		Args:    args,
+		Result:  make(chan TransactionResult, 1),
+	}
 }

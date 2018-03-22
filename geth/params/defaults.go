@@ -23,8 +23,11 @@ const (
 	// HTTPPort is HTTP-RPC port (replaced in unit tests)
 	HTTPPort = 8545
 
+	// ListenAddr is an IP address and port of this node (e.g. 127.0.0.1:30303).
+	ListenAddr = ":0"
+
 	// APIModules is a list of modules to expose via any type of RPC (HTTP, IPC, in-proc)
-	APIModules = "db,eth,net,web3,shh,personal,admin"
+	APIModules = "db,eth,net,web3,shh,personal,admin,debug"
 
 	// WSHost is a host interface for the websocket RPC server
 	WSHost = "localhost"
@@ -66,9 +69,6 @@ const (
 
 	// WhisperDataDir is directory where Whisper data is stored, relative to DataDir
 	WhisperDataDir = "wnode"
-
-	// WhisperPort is Whisper node listening port
-	WhisperPort = 30379
 
 	// WhisperMinimumPoW amount of work for Whisper message to be added to sending queue
 	WhisperMinimumPoW = 0.001
