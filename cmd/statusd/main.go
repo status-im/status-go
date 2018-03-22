@@ -17,6 +17,7 @@ import (
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/metrics"
 	nodemetrics "github.com/status-im/status-go/metrics/node"
+	"github.com/status-im/status-go/profiling"
 )
 
 var (
@@ -40,6 +41,8 @@ var (
 	ipcEnabled        = flag.Bool("ipc", false, "Enable IPC RPC endpoint")
 	cliEnabled        = flag.Bool("cli", false, "Enable debugging CLI server")
 	cliPort           = flag.String("cliport", debug.CLIPort, "CLI server's listening port")
+	pprofEnabled      = flag.Bool("pprof", false, "Enable runtime profiling via pprof")
+	pprofPort         = flag.Int("pprofport", 52525, "Port for runtime profiling via pprof")
 	logLevel          = flag.String("log", "INFO", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
 	logFile           = flag.String("logfile", "", "Path to the log file")
 	version           = flag.Bool("version", false, "Print version")
@@ -97,6 +100,7 @@ func main() {
 
 	// handle interrupt signals
 	interruptCh := haltOnInterruptSignal(backend.NodeManager())
+
 	// Check if debugging CLI connection shall be enabled.
 	if *cliEnabled {
 		err := startDebug(backend)
@@ -104,6 +108,12 @@ func main() {
 			logger.Error("Starting debugging CLI server failed", "error", err)
 			return
 		}
+	}
+
+	// Check if profiling shall be enabled.
+	if *pprofEnabled {
+		pprof := profiling.NewProfiler(*pprofPort)
+		pprof.Run()
 	}
 
 	// Run stats server.
