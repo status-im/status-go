@@ -357,7 +357,7 @@ var loadConfigTestCases = []struct {
 			require.True(t, nodeConfig.ClusterConfig.Enabled, "cluster confguration is expected to be enabled by default")
 
 			enodes := nodeConfig.ClusterConfig.StaticNodes
-			require.True(t, len(enodes) >= 2)
+			require.True(t, len(enodes) == 0)
 		},
 	},
 	{
