@@ -12,7 +12,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"github.com/golang/mock/gomock"
 	"github.com/status-im/status-go/geth/common"
 	. "github.com/status-im/status-go/t/utils"
@@ -115,7 +114,6 @@ func TestVerifyAccountPasswordWithAccountBeforeEIP55(t *testing.T) {
 }
 
 var (
-	errWhisper    = errors.New("Can't return a whisper service")
 	errKeyStore   = errors.New("Can't return a key store")
 	errAccManager = errors.New("Can't return an account manager")
 )
@@ -149,7 +147,6 @@ func TestManagerTestSuite(t *testing.T) {
 		nodeManager:    nodeManager,
 		accManager:     accManager,
 		keyStore:       keyStore,
-		shh:            whisper.New(nil),
 		gethAccManager: accounts.NewManager(),
 	}
 
@@ -167,7 +164,6 @@ type ManagerTestSuite struct {
 	nodeManager    *common.MockNodeManager
 	accManager     *Manager
 	keyStore       *keystore.KeyStore
-	shh            *whisper.Whisper
 	gethAccManager *accounts.Manager
 }
 
@@ -183,7 +179,7 @@ type testAccount struct {
 // development so this is a good workaround to use with EXPECT().Func().AnyTimes()
 func (s *ManagerTestSuite) reinitMock() {
 	s.nodeManager = newMockNodeManager(s.T())
-	s.accManager.nodeManager = s.nodeManager
+	s.accManager.geth = s.nodeManager
 }
 
 // SetupTest is used here for reinitializing the mock before every
@@ -219,7 +215,6 @@ func (s *ManagerTestSuite) TestSelectAccount() {
 	testCases := []struct {
 		name                  string
 		accountKeyStoreReturn []interface{}
-		whisperServiceReturn  []interface{}
 		address               string
 		password              string
 		expectedError         error
@@ -227,7 +222,6 @@ func (s *ManagerTestSuite) TestSelectAccount() {
 		{
 			"success",
 			[]interface{}{s.keyStore, nil},
-			[]interface{}{s.shh, nil},
 			s.address,
 			s.password,
 			nil,
@@ -235,23 +229,13 @@ func (s *ManagerTestSuite) TestSelectAccount() {
 		{
 			"fail_keyStore",
 			[]interface{}{nil, errKeyStore},
-			[]interface{}{s.shh, nil},
 			s.address,
 			s.password,
 			errKeyStore,
 		},
 		{
-			"fail_whisperService",
-			[]interface{}{s.keyStore, nil},
-			[]interface{}{nil, errWhisper},
-			s.address,
-			s.password,
-			errWhisper,
-		},
-		{
 			"fail_wrongAddress",
 			[]interface{}{s.keyStore, nil},
-			[]interface{}{s.shh, nil},
 			"wrong-address",
 			s.password,
 			ErrAddressToAccountMappingFailure,
@@ -259,7 +243,6 @@ func (s *ManagerTestSuite) TestSelectAccount() {
 		{
 			"fail_wrongPassword",
 			[]interface{}{s.keyStore, nil},
-			[]interface{}{s.shh, nil},
 			s.address,
 			"wrong-password",
 			errors.New("cannot retrieve a valid key for a given account: could not decrypt key with given passphrase"),
@@ -270,7 +253,6 @@ func (s *ManagerTestSuite) TestSelectAccount() {
 		s.T().Run(testCase.name, func(t *testing.T) {
 			s.reinitMock()
 			s.nodeManager.EXPECT().AccountKeyStore().Return(testCase.accountKeyStoreReturn...).AnyTimes()
-			s.nodeManager.EXPECT().WhisperService().Return(testCase.whisperServiceReturn...).AnyTimes()
 			err := s.accManager.SelectAccount(testCase.address, testCase.password)
 			s.Equal(testCase.expectedError, err)
 		})
@@ -290,7 +272,6 @@ func (s *ManagerTestSuite) TestCreateChildAccount() {
 	// Now, select the test account for rest of the test cases.
 	s.reinitMock()
 	s.nodeManager.EXPECT().AccountKeyStore().Return(s.keyStore, nil).AnyTimes()
-	s.nodeManager.EXPECT().WhisperService().Return(s.shh, nil).AnyTimes()
 	err := s.accManager.SelectAccount(s.address, s.password)
 	s.NoError(err)
 
@@ -347,60 +328,16 @@ func (s *ManagerTestSuite) TestCreateChildAccount() {
 	}
 }
 
-func (s *ManagerTestSuite) TestSelectedAndReSelectAccount() {
-	// Select the test account
-	s.nodeManager.EXPECT().AccountKeyStore().Return(s.keyStore, nil).AnyTimes()
-	s.nodeManager.EXPECT().WhisperService().Return(s.shh, nil).AnyTimes()
-	err := s.accManager.SelectAccount(s.address, s.password)
-	s.NoError(err)
-
-	s.T().Run("success", func(t *testing.T) {
-		acc, err := s.accManager.SelectedAccount()
-		s.NoError(err)
-		s.NotNil(acc)
-
-		err = s.accManager.ReSelectAccount()
-		s.NoError(err)
-	})
-
-	s.T().Run("ReSelect_fail_whisper", func(t *testing.T) {
-		s.reinitMock()
-		s.nodeManager.EXPECT().WhisperService().Return(nil, errWhisper).AnyTimes()
-		err = s.accManager.ReSelectAccount()
-		s.Equal(errWhisper, err)
-	})
-
-	s.accManager.selectedAccount = nil
-	s.reinitMock()
-	s.nodeManager.EXPECT().AccountKeyStore().Return(s.keyStore, nil).AnyTimes()
-	s.nodeManager.EXPECT().WhisperService().Return(s.shh, nil).AnyTimes()
-
-	s.T().Run("Selected_fail_noAccount", func(t *testing.T) {
-		_, err := s.accManager.SelectedAccount()
-		s.Equal(ErrNoAccountSelected, err)
-	})
-
-	s.T().Run("ReSelect_success_noAccount", func(t *testing.T) {
-		err = s.accManager.ReSelectAccount()
-		s.NoError(err)
-	})
-}
-
 func (s *ManagerTestSuite) TestLogout() {
-	s.nodeManager.EXPECT().WhisperService().Return(s.shh, nil)
 	err := s.accManager.Logout()
-	s.NoError(err)
-
-	s.nodeManager.EXPECT().WhisperService().Return(nil, errWhisper)
-	err = s.accManager.Logout()
-	s.Equal(errWhisper, err)
+	s.Nil(err)
+	s.Nil(s.accManager.selectedAccount)
 }
 
 // TestAccounts tests cases for (*Manager).Accounts.
 func (s *ManagerTestSuite) TestAccounts() {
 	// Select the test account
 	s.nodeManager.EXPECT().AccountKeyStore().Return(s.keyStore, nil).AnyTimes()
-	s.nodeManager.EXPECT().WhisperService().Return(s.shh, nil).AnyTimes()
 	err := s.accManager.SelectAccount(s.address, s.password)
 	s.NoError(err)
 
