@@ -3,10 +3,11 @@ package profiling
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	hpprof "net/http/pprof"
 	"sync"
+
+	"github.com/ethereum/go-ethereum/log"
 )
 
 // Profiler runs and controls a HTTP pprof interface.
@@ -38,8 +39,9 @@ func (p *Profiler) Run() {
 	go func() {
 		p.mu.Lock()
 		defer p.mu.Unlock()
-		log.Printf("debug server stopped: %v", p.server.ListenAndServe())
+		log.Info("debug server stopped", "err", p.server.ListenAndServe())
 	}()
+	log.Info("debug server started")
 }
 
 // Shutdown stops the pprof server.
