@@ -86,7 +86,7 @@ func enhanceLogger(logger *log.Logger, config *params.NodeConfig) error {
 			return err
 		}
 	} else {
-		handler = log.StreamHandler(os.Stdout, log.TerminalFormat(true))
+		handler = log.StreamHandler(os.Stderr, log.TerminalFormat(true))
 	}
 
 	level, err := log.LvlFromString(strings.ToLower(config.LogLevel))
