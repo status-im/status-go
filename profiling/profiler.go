@@ -5,14 +5,12 @@ import (
 	"fmt"
 	"net/http"
 	hpprof "net/http/pprof"
-	"sync"
 
 	"github.com/ethereum/go-ethereum/log"
 )
 
 // Profiler runs and controls a HTTP pprof interface.
 type Profiler struct {
-	mu     sync.Mutex
 	server *http.Server
 }
 
@@ -37,8 +35,6 @@ func NewProfiler(port int) *Profiler {
 // Run starts the HTTP pprof in the background.
 func (p *Profiler) Run() {
 	go func() {
-		p.mu.Lock()
-		defer p.mu.Unlock()
 		log.Info("debug server stopped", "err", p.server.ListenAndServe())
 	}()
 	log.Info("debug server started")
@@ -46,7 +42,5 @@ func (p *Profiler) Run() {
 
 // Shutdown stops the pprof server.
 func (p *Profiler) Shutdown(ctx context.Context) error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
 	return p.server.Shutdown(ctx)
 }
