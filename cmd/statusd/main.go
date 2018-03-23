@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	stdlog "log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -73,19 +74,48 @@ var (
 // All general log messages in this package should be routed through this logger.
 var logger = log.New("package", "status-go/cmd/statusd")
 
+func enhanceLogger(logger *log.Logger, config *params.NodeConfig) error {
+	var (
+		handler log.Handler
+		err     error
+	)
+
+	if config.LogFile != "" {
+		handler, err = log.FileHandler(config.LogFile, log.LogfmtFormat())
+		if err != nil {
+			return err
+		}
+	} else {
+		handler = log.StreamHandler(os.Stderr, log.TerminalFormat(true))
+	}
+
+	level, err := log.LvlFromString(strings.ToLower(config.LogLevel))
+	if err != nil {
+		return err
+	}
+
+	filteredHandler := log.LvlFilterHandler(level, handler)
+	log.Root().SetHandler(filteredHandler)
+
+	return nil
+}
+
 func main() {
 	flag.Usage = printUsage
 	flag.Parse()
 
 	config, err := makeNodeConfig()
 	if err != nil {
-		logger.Error("Making config failed", "error", err)
-		return
+		stdlog.Fatalf("Making config failed %s", err)
 	}
 
 	if *version {
 		printVersion(config, gitCommit, buildStamp)
 		return
+	}
+
+	if err := enhanceLogger(&logger, config); err != nil {
+		stdlog.Fatalf("Error initializing logger: %s", err)
 	}
 
 	backend := api.NewStatusBackend()
