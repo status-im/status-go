@@ -107,7 +107,6 @@ func main() {
 	config, err := makeNodeConfig()
 	if err != nil {
 		stdlog.Fatalf("Making config failed %s", err)
-		return
 	}
 
 	if *version {
