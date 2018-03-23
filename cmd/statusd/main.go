@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	stdlog "log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -73,13 +74,30 @@ var (
 // All general log messages in this package should be routed through this logger.
 var logger = log.New("package", "status-go/cmd/statusd")
 
-func levelFromString(level string) log.Lvl {
-	lvl, err := log.LvlFromString(strings.ToLower(level))
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Incorrect log level: %s, using defaults\n", level)
-		lvl = log.LvlInfo
+func enhanceLogger(logger *log.Logger, config *params.NodeConfig) error {
+	var (
+		handler log.Handler
+		err     error
+	)
+
+	if config.LogFile != "" {
+		handler, err = log.FileHandler(config.LogFile, log.LogfmtFormat())
+		if err != nil {
+			return err
+		}
+	} else {
+		handler = log.StreamHandler(os.Stdout, log.TerminalFormat(true))
 	}
-	return lvl
+
+	level, err := log.LvlFromString(strings.ToLower(config.LogLevel))
+	if err != nil {
+		return err
+	}
+
+	filteredHandler := log.LvlFilterHandler(level, handler)
+	log.Root().SetHandler(filteredHandler)
+
+	return nil
 }
 
 func main() {
@@ -88,7 +106,7 @@ func main() {
 
 	config, err := makeNodeConfig()
 	if err != nil {
-		logger.Error("Making config failed", "error", err)
+		stdlog.Fatalf("Making config failed %s", err)
 		return
 	}
 
@@ -97,10 +115,9 @@ func main() {
 		return
 	}
 
-	handler := log.StreamHandler(os.Stdout, log.TerminalFormat(true))
-	level := levelFromString(config.LogLevel)
-	filteredHandler := log.LvlFilterHandler(level, handler)
-	log.Root().SetHandler(filteredHandler)
+	if err := enhanceLogger(&logger, config); err != nil {
+		stdlog.Fatalf("Error initializing logger: %s", err)
+	}
 
 	backend := api.NewStatusBackend()
 	err = backend.StartNode(config)
