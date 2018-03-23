@@ -9,10 +9,11 @@ currentBranch=$(git rev-parse --abbrev-ref HEAD)
 
 function finish {
    git checkout --quiet $currentBranch
-   git branch --quiet -D autogen-test-branch
+   git branch --quiet -D autogen-test-branch || true
 }
 trap finish EXIT
 
+go get -u github.com/jteeuwen/go-bindata/...
 git branch -D --quiet autogen-test-branch || true
 git checkout -b autogen-test-branch
 make -s generate
