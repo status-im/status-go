@@ -23,7 +23,7 @@ func (s *AccountsTestSuite) TestRPCEthAccounts() {
 	defer s.StopTestBackend()
 
 	// log into test account
-	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
+	err := s.Backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	s.NoError(err)
 
 	rpcClient := s.Backend.NodeManager().RPCClient()
@@ -50,7 +50,7 @@ func (s *AccountsTestSuite) TestRPCEthAccountsWithUpstream() {
 	defer s.StopTestBackend()
 
 	// log into test account
-	err = s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
+	err = s.Backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	s.NoError(err)
 
 	rpcClient := s.Backend.NodeManager().RPCClient()

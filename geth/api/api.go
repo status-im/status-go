@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/params"
@@ -39,7 +40,7 @@ func (api *StatusAPI) NodeManager() common.NodeManager {
 }
 
 // AccountManager returns reference to account manager
-func (api *StatusAPI) AccountManager() common.AccountManager {
+func (api *StatusAPI) AccountManager() *account.Manager {
 	return api.b.AccountManager()
 }
 
@@ -135,13 +136,13 @@ func (api *StatusAPI) SelectAccount(address, password string) error {
 	// FIXME(oleg-raev): This method doesn't make stop, it rather resets its cells to an initial state
 	// and should be properly renamed, for example: ResetCells
 	api.b.jailManager.Stop()
-	return api.b.AccountManager().SelectAccount(address, password)
+	return api.b.SelectAccount(address, password)
 }
 
 // Logout clears whisper identities
 func (api *StatusAPI) Logout() error {
 	api.b.jailManager.Stop()
-	return api.b.AccountManager().Logout()
+	return api.b.Logout()
 }
 
 // SendTransaction creates a new transaction and waits until it's complete.

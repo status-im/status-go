@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -23,11 +24,18 @@ const (
 	fcmServerKey = "AAAAxwa-r08:APA91bFtMIToDVKGAmVCm76iEXtA4dn9MPvLdYKIZqAlNpLJbd12EgdBI9DSDSXKdqvIAgLodepmRhGVaWvhxnXJzVpE6MoIRuKedDV3kfHSVBhWFqsyoLTwXY4xeufL9Sdzb581U-lx"
 )
 
+var (
+	// ErrWhisperClearIdentitiesFailure clearing whisper identities has failed.
+	ErrWhisperClearIdentitiesFailure = errors.New("failed to clear whisper identities")
+	// ErrWhisperIdentityInjectionFailure injecting whisper identities has failed.
+	ErrWhisperIdentityInjectionFailure = errors.New("failed to inject identity into Whisper")
+)
+
 // StatusBackend implements Status.im service
 type StatusBackend struct {
 	mu              sync.Mutex
 	nodeManager     *node.NodeManager
-	accountManager  common.AccountManager
+	accountManager  *account.Manager
 	txQueueManager  *transactions.Manager
 	jailManager     jail.Manager
 	newNotification fcm.NotificationConstructor
@@ -61,7 +69,7 @@ func (b *StatusBackend) NodeManager() *node.NodeManager {
 }
 
 // AccountManager returns reference to account manager
-func (b *StatusBackend) AccountManager() common.AccountManager {
+func (b *StatusBackend) AccountManager() *account.Manager {
 	return b.accountManager
 }
 
@@ -116,7 +124,7 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 	if err := b.registerHandlers(); err != nil {
 		b.log.Error("Handler registration failed", "err", err)
 	}
-	if err := b.accountManager.ReSelectAccount(); err != nil {
+	if err := b.ReSelectAccount(); err != nil {
 		b.log.Error("Reselect account failed", "err", err)
 	}
 	b.log.Info("Account reselected")
@@ -226,7 +234,9 @@ func (b *StatusBackend) registerHandlers() error {
 	if rpcClient == nil {
 		return node.ErrRPCClient
 	}
-	rpcClient.RegisterHandler("eth_accounts", b.accountManager.AccountsRPCHandler())
+	rpcClient.RegisterHandler("eth_accounts", func(context.Context, ...interface{}) (interface{}, error) {
+		return b.AccountManager().Accounts()
+	})
 	rpcClient.RegisterHandler("eth_sendTransaction", b.txQueueManager.SendTransactionRPCHandler)
 	return nil
 }
@@ -246,4 +256,61 @@ func (b *StatusBackend) AppStateChange(state AppState) {
 
 	// TODO: put node in low-power mode if the app is in background (or inactive)
 	// and normal mode if the app is in foreground.
+}
+
+// Logout clears whisper identities.
+func (b *StatusBackend) Logout() error {
+	whisperService, err := b.nodeManager.WhisperService()
+	if err != nil {
+		return err
+	}
+	err = whisperService.DeleteKeyPairs()
+	if err != nil {
+		return fmt.Errorf("%s: %v", ErrWhisperClearIdentitiesFailure, err)
+	}
+
+	return b.AccountManager().Logout()
+}
+
+// ReSelectAccount selects previously selected account, often, after node restart.
+func (b *StatusBackend) ReSelectAccount() error {
+	selectedAccount, err := b.AccountManager().SelectedAccount()
+	if selectedAccount == nil || err == account.ErrNoAccountSelected {
+		return nil
+	}
+	whisperService, err := b.nodeManager.WhisperService()
+	if err != nil {
+		return err
+	}
+
+	if err := whisperService.SelectKeyPair(selectedAccount.AccountKey.PrivateKey); err != nil {
+		return ErrWhisperIdentityInjectionFailure
+	}
+	return nil
+}
+
+// SelectAccount selects current account, by verifying that address has corresponding account which can be decrypted
+// using provided password. Once verification is done, decrypted key is injected into Whisper (as a single identity,
+// all previous identities are removed).
+func (b *StatusBackend) SelectAccount(address, password string) error {
+	err := b.accountManager.SelectAccount(address, password)
+	if err != nil {
+		return err
+	}
+	acc, err := b.accountManager.SelectedAccount()
+	if err != nil {
+		return err
+	}
+
+	whisperService, err := b.nodeManager.WhisperService()
+	if err != nil {
+		return err
+	}
+
+	err = whisperService.SelectKeyPair(acc.AccountKey.PrivateKey)
+	if err != nil {
+		return ErrWhisperIdentityInjectionFailure
+	}
+
+	return nil
 }

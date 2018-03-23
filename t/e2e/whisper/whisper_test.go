@@ -92,26 +92,3 @@ func (s *WhisperTestSuite) TestWhisperFilterRace() {
 
 	<-allFiltersAdded
 }
-
-func (s *WhisperTestSuite) TestLogout() {
-	s.StartTestNode()
-	defer s.StopTestNode()
-
-	whisperService, err := s.NodeManager.WhisperService()
-	s.NoError(err)
-
-	accountManager := account.NewManager(s.NodeManager)
-	s.NotNil(accountManager)
-
-	// create an account
-	address, pubKey, _, err := accountManager.CreateAccount(TestConfig.Account1.Password)
-	s.NoError(err)
-
-	// make sure that identity doesn't exist (yet) in Whisper
-	s.False(whisperService.HasKeyPair(pubKey), "identity already present in whisper")
-	s.NoError(accountManager.SelectAccount(address, TestConfig.Account1.Password))
-	s.True(whisperService.HasKeyPair(pubKey), "identity not injected into whisper")
-
-	s.NoError(accountManager.Logout())
-	s.False(whisperService.HasKeyPair(pubKey), "identity not cleared from whisper")
-}
