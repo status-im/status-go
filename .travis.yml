@@ -12,7 +12,7 @@ install:
 - make dep-install
 jobs:
   include:
-    stage: GenerateCheck
+  - stage: GenerateCheck
     script: make generate-check
   - stage: Lint
     script: make lint
