@@ -89,6 +89,9 @@ func (m *Manager) TransactionQueue() *queue.TxQueue {
 
 // QueueTransaction puts a transaction into the queue.
 func (m *Manager) QueueTransaction(tx *common.QueuedTx) error {
+	if !tx.Args.Valid() {
+		return common.ErrInvalidSendTxArgs
+	}
 	to := "<nil>"
 	if tx.Args.To != nil {
 		to = tx.Args.To.Hex()
@@ -213,6 +216,9 @@ func (m *Manager) completeTransaction(selectedAccount *account.SelectedExtKey, q
 		nonce = localNonce
 	}
 	args := queuedTx.Args
+	if !args.Valid() {
+		return hash, common.ErrInvalidSendTxArgs
+	}
 	gasPrice := (*big.Int)(args.GasPrice)
 	if args.GasPrice == nil {
 		ctx, cancel = context.WithTimeout(context.Background(), m.rpcCallTimeout)
@@ -239,7 +245,7 @@ func (m *Manager) completeTransaction(selectedAccount *account.SelectedExtKey, q
 			To:       args.To,
 			GasPrice: gasPrice,
 			Value:    value,
-			Data:     args.Input,
+			Data:     args.GetInput(),
 		})
 		if err != nil {
 			return hash, err
@@ -260,7 +266,7 @@ func (m *Manager) completeTransaction(selectedAccount *account.SelectedExtKey, q
 		"gasPrice", gasPrice,
 		"value", value,
 	)
-	tx := types.NewTransaction(nonce, toAddr, value, gas, gasPrice, args.Input)
+	tx := types.NewTransaction(nonce, toAddr, value, gas, gasPrice, args.GetInput())
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), selectedAccount.AccountKey.PrivateKey)
 	if err != nil {
 		return hash, err
