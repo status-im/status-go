@@ -25,6 +25,8 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
+type initFunc func([]byte, *common.SendTxArgs)
+
 func TestTransactionsTestSuite(t *testing.T) {
 	suite.Run(t, new(TransactionsTestSuite))
 }
@@ -139,8 +141,51 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransactionUpstream() {
 	s.Equal(`{"jsonrpc":"2.0","id":1,"result":"`+txHash.String()+`"}`, result)
 }
 
-// FIXME(tiabc): Sometimes it fails due to "no suitable peers found".
+// TestSendContractCompat tries to send transaction using the legacy "Data"
+// field, which is supported for backward compatibility reasons.
+func (s *TransactionsTestSuite) TestSendContractTxCompat() {
+	initFunc := func(byteCode []byte, args *common.SendTxArgs) {
+		args.Data = (hexutil.Bytes)(byteCode)
+	}
+	s.testSendContractTx(initFunc, nil, "")
+}
+
+// TestSendContractCompat tries to send transaction using both the legacy
+// "Data" and "Input" fields. Also makes sure that the error is returned if
+// they have different values.
+func (s *TransactionsTestSuite) TestSendContractTxCollision() {
+	// Scenario 1: Both fields are filled and have the same value, expect success
+	initFunc := func(byteCode []byte, args *common.SendTxArgs) {
+		args.Input = (hexutil.Bytes)(byteCode)
+		args.Data = (hexutil.Bytes)(byteCode)
+	}
+	s.testSendContractTx(initFunc, nil, "")
+
+	// Scenario 2: Both fields are filled with different values, expect an error
+	inverted := func(source []byte) []byte {
+		inverse := make([]byte, len(source))
+		copy(inverse, source)
+		for i, b := range inverse {
+			inverse[i] = b ^ 0xFF
+		}
+		return inverse
+	}
+
+	initFunc2 := func(byteCode []byte, args *common.SendTxArgs) {
+		args.Input = (hexutil.Bytes)(byteCode)
+		args.Data = (hexutil.Bytes)(inverted(byteCode))
+	}
+	s.testSendContractTx(initFunc2, common.ErrInvalidSendTxArgs, "expected error when invalid tx args are sent")
+}
+
 func (s *TransactionsTestSuite) TestSendContractTx() {
+	initFunc := func(byteCode []byte, args *common.SendTxArgs) {
+		args.Input = (hexutil.Bytes)(byteCode)
+	}
+	s.testSendContractTx(initFunc, nil, "")
+}
+
+func (s *TransactionsTestSuite) testSendContractTx(setInputAndDataValue initFunc, expectedError error, expectedErrorDescription string) {
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
@@ -208,13 +253,20 @@ func (s *TransactionsTestSuite) TestSendContractTx() {
 	s.NoError(err)
 
 	gas := uint64(params.DefaultGas)
-	txHashCheck, err := s.Backend.SendTransaction(context.TODO(), common.SendTxArgs{
+	args := common.SendTxArgs{
 		From: account.FromAddress(TestConfig.Account1.Address),
 		To:   nil, // marker, contract creation is expected
 		//Value: (*hexutil.Big)(new(big.Int).Mul(big.NewInt(1), gethcommon.Ether)),
-		Gas:   (*hexutil.Uint64)(&gas),
-		Input: (hexutil.Bytes)(byteCode),
-	})
+		Gas: (*hexutil.Uint64)(&gas),
+	}
+
+	setInputAndDataValue(byteCode, &args)
+	txHashCheck, err := s.Backend.SendTransaction(context.TODO(), args)
+
+	if expectedError != nil {
+		s.Equal(expectedError, err, expectedErrorDescription)
+		return
+	}
 	s.NoError(err, "cannot send transaction")
 
 	select {

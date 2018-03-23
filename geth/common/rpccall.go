@@ -50,14 +50,13 @@ func (r RPCCall) ParseToAddress() (gethcommon.Address, error) {
 	return gethcommon.HexToAddress(to), nil
 }
 
-// ParseData returns the bytes associated with the call.
-func (r RPCCall) ParseData() hexutil.Bytes {
+func (r RPCCall) parseDataField(fieldName string) hexutil.Bytes {
 	params, ok := r.Params[0].(map[string]interface{})
 	if !ok {
 		return hexutil.Bytes("0x")
 	}
 
-	data, ok := params["data"].(string)
+	data, ok := params[fieldName].(string)
 	if !ok {
 		data = "0x"
 	}
@@ -68,6 +67,16 @@ func (r RPCCall) ParseData() hexutil.Bytes {
 	}
 
 	return byteCode
+}
+
+// ParseData returns the bytes associated with the call in the deprecated "data" field.
+func (r RPCCall) ParseData() hexutil.Bytes {
+	return r.parseDataField("data")
+}
+
+// ParseInput returns the bytes associated with the call.
+func (r RPCCall) ParseInput() hexutil.Bytes {
+	return r.parseDataField("input")
 }
 
 // ParseValue returns the hex big associated with the call.
@@ -150,12 +159,14 @@ func (r RPCCall) ToSendTxArgs() SendTxArgs {
 		toAddr = gethcommon.HexToAddress("0x0")
 	}
 
-	input := r.ParseData()
+	input := r.ParseInput()
+	data := r.ParseData()
 	return SendTxArgs{
 		To:       &toAddr,
 		From:     fromAddr,
 		Value:    r.ParseValue(),
 		Input:    input,
+		Data:     data,
 		Gas:      r.ParseGas(),
 		GasPrice: r.ParseGasPrice(),
 	}
