@@ -30,7 +30,7 @@ type StatusBackend struct {
 	accountManager  common.AccountManager
 	txQueueManager  *transactions.Manager
 	jailManager     jail.Manager
-	newNotification common.NotificationConstructor
+	newNotification fcm.NotificationConstructor
 	connectionState ConnectionState
 	log             log.Logger
 }
