@@ -1,7 +1,6 @@
 package profiling
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	hpprof "net/http/pprof"
@@ -32,15 +31,10 @@ func NewProfiler(port int) *Profiler {
 	return &p
 }
 
-// Run starts the HTTP pprof in the background.
-func (p *Profiler) Run() {
+// Go starts the HTTP pprof in the background.
+func (p *Profiler) Go() {
 	go func() {
 		log.Info("debug server stopped", "err", p.server.ListenAndServe())
 	}()
 	log.Info("debug server started")
-}
-
-// Shutdown stops the pprof server.
-func (p *Profiler) Shutdown(ctx context.Context) error {
-	return p.server.Shutdown(ctx)
 }

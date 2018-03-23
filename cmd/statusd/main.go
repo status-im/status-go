@@ -112,8 +112,7 @@ func main() {
 
 	// Check if profiling shall be enabled.
 	if *pprofEnabled {
-		pprof := profiling.NewProfiler(*pprofPort)
-		pprof.Run()
+		profiling.NewProfiler(*pprofPort).Go()
 	}
 
 	// Run stats server.
