@@ -852,7 +852,7 @@ func (whisper *Whisper) add(envelope *Envelope) (bool, error) {
 		}
 	}
 
-	if !bloomFilterMatch(whisper.BloomFilter(), envelope.Bloom()) {
+	if !envelope.self && !bloomFilterMatch(whisper.BloomFilter(), envelope.Bloom()) {
 		// maybe the value was recently changed, and the peers did not adjust yet.
 		// in this case the previous value is retrieved by BloomFilterTolerance()
 		// for a short period of peer synchronization.
