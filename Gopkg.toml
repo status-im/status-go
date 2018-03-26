@@ -26,6 +26,7 @@
   version = "1.8.1"
 
 [[constraint]]
+  # used only to embed web3js code with particular version
   name = "github.com/status-im/go-web3js"
   version = "0.20.1"
 
