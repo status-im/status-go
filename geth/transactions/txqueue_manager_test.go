@@ -33,26 +33,22 @@ func TestTxQueueTestSuite(t *testing.T) {
 
 type TxQueueTestSuite struct {
 	suite.Suite
-	nodeManagerMockCtrl    *gomock.Controller
-	nodeManagerMock        *common.MockNodeManager
-	accountManagerMockCtrl *gomock.Controller
-	accountManagerMock     *MockAccountManager
-	server                 *gethrpc.Server
-	client                 *gethrpc.Client
-	txServiceMockCtrl      *gomock.Controller
-	txServiceMock          *fake.MockPublicTransactionPoolAPI
-	nodeConfig             *params.NodeConfig
+	nodeManagerMockCtrl *gomock.Controller
+	nodeManagerMock     *common.MockNodeManager
+	server              *gethrpc.Server
+	client              *gethrpc.Client
+	txServiceMockCtrl   *gomock.Controller
+	txServiceMock       *fake.MockPublicTransactionPoolAPI
+	nodeConfig          *params.NodeConfig
 
 	manager *Manager
 }
 
 func (s *TxQueueTestSuite) SetupTest() {
 	s.nodeManagerMockCtrl = gomock.NewController(s.T())
-	s.accountManagerMockCtrl = gomock.NewController(s.T())
 	s.txServiceMockCtrl = gomock.NewController(s.T())
 
 	s.nodeManagerMock = common.NewMockNodeManager(s.nodeManagerMockCtrl)
-	s.accountManagerMock = NewMockAccountManager(s.accountManagerMockCtrl)
 
 	s.server, s.txServiceMock = fake.NewTestServer(s.txServiceMockCtrl)
 	s.client = gethrpc.DialInProc(s.server)
@@ -62,17 +58,16 @@ func (s *TxQueueTestSuite) SetupTest() {
 	s.Require().NoError(err)
 	s.nodeConfig = nodeConfig
 
-	s.manager = NewManager(s.nodeManagerMock, s.accountManagerMock)
+	s.manager = NewManager(s.nodeManagerMock)
 	s.manager.DisableNotificactions()
 	s.manager.completionTimeout = time.Second
 	s.manager.rpcCallTimeout = time.Second
-	s.manager.Start()
+	s.manager.Start(params.RopstenNetworkID)
 }
 
 func (s *TxQueueTestSuite) TearDownTest() {
 	s.manager.Stop()
 	s.nodeManagerMockCtrl.Finish()
-	s.accountManagerMockCtrl.Finish()
 	s.txServiceMockCtrl.Finish()
 	s.server.Stop()
 	s.client.Close()
@@ -125,15 +120,7 @@ func (s *TxQueueTestSuite) rlpEncodeTx(tx *common.QueuedTx, config *params.NodeC
 	return hexutil.Bytes(data)
 }
 
-func (s *TxQueueTestSuite) setupStatusBackend(account *account.SelectedExtKey, password string, passwordErr error) {
-	s.nodeManagerMock.EXPECT().NodeConfig().Return(s.nodeConfig, nil)
-	s.accountManagerMock.EXPECT().SelectedAccount().Return(account, nil)
-	s.accountManagerMock.EXPECT().VerifyAccountPassword(s.nodeConfig.KeyStoreDir, account.Address.String(), password).Return(
-		nil, passwordErr)
-}
-
 func (s *TxQueueTestSuite) TestCompleteTransaction() {
-	password := TestConfig.Account1.Password
 	key, _ := crypto.GenerateKey()
 	selectedAccount := &account.SelectedExtKey{
 		Address:    account.FromAddress(TestConfig.Account1.Address),
@@ -169,7 +156,6 @@ func (s *TxQueueTestSuite) TestCompleteTransaction() {
 	for _, testCase := range testCases {
 		s.T().Run(testCase.name, func(t *testing.T) {
 			s.SetupTest()
-			s.setupStatusBackend(selectedAccount, password, nil)
 			tx := common.CreateTransaction(context.Background(), common.SendTxArgs{
 				From:     account.FromAddress(TestConfig.Account1.Address),
 				To:       account.ToAddress(TestConfig.Account2.Address),
@@ -185,7 +171,7 @@ func (s *TxQueueTestSuite) TestCompleteTransaction() {
 				err  error
 			)
 			go func() {
-				hash, err = s.manager.CompleteTransaction(tx.ID, password)
+				hash, err = s.manager.CompleteTransaction(tx.ID, selectedAccount)
 				s.NoError(err)
 				close(w)
 			}()
@@ -202,13 +188,11 @@ func (s *TxQueueTestSuite) TestCompleteTransaction() {
 }
 
 func (s *TxQueueTestSuite) TestCompleteTransactionMultipleTimes() {
-	password := TestConfig.Account1.Password
 	key, _ := crypto.GenerateKey()
 	selectedAccount := &account.SelectedExtKey{
 		Address:    account.FromAddress(TestConfig.Account1.Address),
 		AccountKey: &keystore.Key{PrivateKey: key},
 	}
-	s.setupStatusBackend(selectedAccount, password, nil)
 
 	tx := common.CreateTransaction(context.Background(), common.SendTxArgs{
 		From: account.FromAddress(TestConfig.Account1.Address),
@@ -231,7 +215,7 @@ func (s *TxQueueTestSuite) TestCompleteTransactionMultipleTimes() {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_, err := s.manager.CompleteTransaction(tx.ID, password)
+			_, err := s.manager.CompleteTransaction(tx.ID, selectedAccount)
 			mu.Lock()
 			defer mu.Unlock()
 			if err == nil {
@@ -257,42 +241,19 @@ func (s *TxQueueTestSuite) TestCompleteTransactionMultipleTimes() {
 }
 
 func (s *TxQueueTestSuite) TestAccountMismatch() {
-	s.nodeManagerMock.EXPECT().NodeConfig().Return(s.nodeConfig, nil)
-	s.accountManagerMock.EXPECT().SelectedAccount().Return(&account.SelectedExtKey{
-		Address: account.FromAddress(TestConfig.Account2.Address),
-	}, nil)
-
-	tx := common.CreateTransaction(context.Background(), common.SendTxArgs{
-		From: account.FromAddress(TestConfig.Account1.Address),
-		To:   account.ToAddress(TestConfig.Account2.Address),
-	})
-
-	s.NoError(s.manager.QueueTransaction(tx))
-
-	_, err := s.manager.CompleteTransaction(tx.ID, TestConfig.Account1.Password)
-	s.Equal(err, queue.ErrInvalidCompleteTxSender)
-
-	// Transaction should stay in the queue as mismatched accounts
-	// is a recoverable error.
-	s.True(s.manager.TransactionQueue().Has(tx.ID))
-}
-
-func (s *TxQueueTestSuite) TestInvalidPassword() {
-	password := "invalid-password"
-	key, _ := crypto.GenerateKey()
 	selectedAccount := &account.SelectedExtKey{
-		Address:    account.FromAddress(TestConfig.Account1.Address),
-		AccountKey: &keystore.Key{PrivateKey: key},
+		Address: account.FromAddress(TestConfig.Account2.Address),
 	}
-	s.setupStatusBackend(selectedAccount, password, keystore.ErrDecrypt)
+
 	tx := common.CreateTransaction(context.Background(), common.SendTxArgs{
 		From: account.FromAddress(TestConfig.Account1.Address),
 		To:   account.ToAddress(TestConfig.Account2.Address),
 	})
 
 	s.NoError(s.manager.QueueTransaction(tx))
-	_, err := s.manager.CompleteTransaction(tx.ID, password)
-	s.Equal(err.Error(), keystore.ErrDecrypt.Error())
+
+	_, err := s.manager.CompleteTransaction(tx.ID, selectedAccount)
+	s.Equal(err, queue.ErrInvalidCompleteTxSender)
 
 	// Transaction should stay in the queue as mismatched accounts
 	// is a recoverable error.
@@ -319,6 +280,54 @@ func (s *TxQueueTestSuite) TestDiscardTransaction() {
 	s.NoError(WaitClosed(w, time.Second))
 }
 
+func (s *TxQueueTestSuite) TestDiscardTransactions() {
+	tx := common.CreateTransaction(context.Background(), common.SendTxArgs{
+		From: account.FromAddress(TestConfig.Account1.Address),
+		To:   account.ToAddress(TestConfig.Account2.Address),
+	})
+	var ids []common.QueuedTxID
+	ids = append(ids, tx.ID)
+
+	s.NoError(s.manager.QueueTransaction(tx))
+	w := make(chan struct{})
+	go func() {
+		result := s.manager.DiscardTransactions(ids)
+		s.Equal(0, len(result))
+		close(w)
+	}()
+
+	rst := s.manager.WaitForTransaction(tx)
+	s.Equal(ErrQueuedTxDiscarded, rst.Error)
+	// Transaction should be already removed from the queue.
+	s.False(s.manager.TransactionQueue().Has(tx.ID))
+	s.NoError(WaitClosed(w, time.Second))
+}
+
+func (s *TxQueueTestSuite) TestDiscardTransactionsOnError() {
+	fakeTxID := common.QueuedTxID("7ab94f26-a866-4aba-1234-b4bbe98737a9")
+	tx := common.CreateTransaction(context.Background(), common.SendTxArgs{
+		From: account.FromAddress(TestConfig.Account1.Address),
+		To:   account.ToAddress(TestConfig.Account2.Address),
+	})
+	var ids []common.QueuedTxID
+	ids = append(ids, fakeTxID)
+
+	s.NoError(s.manager.QueueTransaction(tx))
+	w := make(chan struct{})
+	go func() {
+		result := s.manager.DiscardTransactions(ids)
+		s.Equal(1, len(result))
+		s.Equal(queue.ErrQueuedTxIDNotFound, result[fakeTxID].Error)
+		close(w)
+	}()
+
+	rst := s.manager.WaitForTransaction(tx)
+	s.Equal(ErrQueuedTxTimedOut, rst.Error)
+	// Transaction should be already removed from the queue.
+	s.False(s.manager.TransactionQueue().Has(tx.ID))
+	s.NoError(WaitClosed(w, time.Second))
+}
+
 func (s *TxQueueTestSuite) TestCompletionTimedOut() {
 	tx := common.CreateTransaction(context.Background(), common.SendTxArgs{
 		From: account.FromAddress(TestConfig.Account1.Address),
@@ -339,15 +348,10 @@ func (s *TxQueueTestSuite) TestCompletionTimedOut() {
 // as the last step, we verify that if tx failed nonce is not updated
 func (s *TxQueueTestSuite) TestLocalNonce() {
 	txCount := 3
-	password := TestConfig.Account1.Password
 	key, _ := crypto.GenerateKey()
 	selectedAccount := &account.SelectedExtKey{
 		Address:    account.FromAddress(TestConfig.Account1.Address),
 		AccountKey: &keystore.Key{PrivateKey: key},
-	}
-	// setup call expectations for 5 transactions in total
-	for i := 0; i < txCount+2; i++ {
-		s.setupStatusBackend(selectedAccount, password, nil)
 	}
 	nonce := hexutil.Uint64(0)
 	for i := 0; i < txCount; i++ {
@@ -357,7 +361,7 @@ func (s *TxQueueTestSuite) TestLocalNonce() {
 		})
 		s.setupTransactionPoolAPI(tx, nonce, hexutil.Uint64(i), selectedAccount, nil)
 		s.NoError(s.manager.QueueTransaction(tx))
-		hash, err := s.manager.CompleteTransaction(tx.ID, password)
+		hash, err := s.manager.CompleteTransaction(tx.ID, selectedAccount)
 		rst := s.manager.WaitForTransaction(tx)
 		// simple sanity checks
 		s.NoError(err)
@@ -373,7 +377,7 @@ func (s *TxQueueTestSuite) TestLocalNonce() {
 	})
 	s.setupTransactionPoolAPI(tx, nonce, nonce, selectedAccount, nil)
 	s.NoError(s.manager.QueueTransaction(tx))
-	hash, err := s.manager.CompleteTransaction(tx.ID, password)
+	hash, err := s.manager.CompleteTransaction(tx.ID, selectedAccount)
 	rst := s.manager.WaitForTransaction(tx)
 	s.NoError(err)
 	s.NoError(rst.Error)
@@ -388,7 +392,7 @@ func (s *TxQueueTestSuite) TestLocalNonce() {
 		To:   account.ToAddress(TestConfig.Account2.Address),
 	})
 	s.NoError(s.manager.QueueTransaction(tx))
-	_, err = s.manager.CompleteTransaction(tx.ID, password)
+	_, err = s.manager.CompleteTransaction(tx.ID, selectedAccount)
 	rst = s.manager.WaitForTransaction(tx)
 	s.EqualError(testErr, err.Error())
 	s.EqualError(testErr, rst.Error.Error())

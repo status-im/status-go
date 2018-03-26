@@ -49,7 +49,7 @@ func NewStatusBackend() *StatusBackend {
 
 	nodeManager := node.NewNodeManager()
 	accountManager := account.NewManager(nodeManager)
-	txQueueManager := transactions.NewManager(nodeManager, accountManager)
+	txQueueManager := transactions.NewManager(nodeManager)
 	jailManager := jail.New(nodeManager)
 	notificationManager := fcm.NewNotification(fcmServerKey)
 
@@ -120,7 +120,7 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 	signal.Send(signal.Envelope{Type: signal.EventNodeStarted})
 	// tx queue manager should be started after node is started, it depends
 	// on rpc client being created
-	b.txQueueManager.Start()
+	b.txQueueManager.Start(config.NetworkID)
 	if err := b.registerHandlers(); err != nil {
 		b.log.Error("Handler registration failed", "err", err)
 	}
@@ -208,14 +208,46 @@ func (b *StatusBackend) SendTransaction(ctx context.Context, args common.SendTxA
 	return rst.Hash, nil
 }
 
+func (b *StatusBackend) getVerifiedAccount(password string) (*account.SelectedExtKey, error) {
+	selectedAccount, err := b.accountManager.SelectedAccount()
+	if err != nil {
+		b.log.Error("failed to get a selected account", "err", err)
+		return nil, err
+	}
+	config, err := b.NodeManager().NodeConfig()
+	if err != nil {
+		return nil, err
+	}
+	_, err = b.accountManager.VerifyAccountPassword(config.KeyStoreDir, selectedAccount.Address.String(), password)
+	if err != nil {
+		b.log.Error("failed to verify account", "account", selectedAccount.Address.String(), "error", err)
+		return nil, err
+	}
+	return selectedAccount, nil
+}
+
 // CompleteTransaction instructs backend to complete sending of a given transaction
-func (b *StatusBackend) CompleteTransaction(id common.QueuedTxID, password string) (gethcommon.Hash, error) {
-	return b.txQueueManager.CompleteTransaction(id, password)
+func (b *StatusBackend) CompleteTransaction(id common.QueuedTxID, password string) (hash gethcommon.Hash, err error) {
+	selectedAccount, err := b.getVerifiedAccount(password)
+	if err != nil {
+		_ = b.txQueueManager.NotifyErrored(id, err)
+		return hash, err
+	}
+
+	return b.txQueueManager.CompleteTransaction(id, selectedAccount)
 }
 
 // CompleteTransactions instructs backend to complete sending of multiple transactions
 func (b *StatusBackend) CompleteTransactions(ids []common.QueuedTxID, password string) map[common.QueuedTxID]common.TransactionResult {
-	return b.txQueueManager.CompleteTransactions(ids, password)
+	results := make(map[common.QueuedTxID]common.TransactionResult)
+	for _, txID := range ids {
+		txHash, txErr := b.CompleteTransaction(txID, password)
+		results[txID] = common.TransactionResult{
+			Hash:  txHash,
+			Error: txErr,
+		}
+	}
+	return results
 }
 
 // DiscardTransaction discards a given transaction from transaction queue
