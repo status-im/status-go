@@ -555,42 +555,19 @@ func (c *NodeConfig) updateClusterConfig() error {
 		return nil
 	}
 
-	// TODO: Remove this thing as this is an ugly hack.
-	// Once CHT sync sub-protocol is working in LES, we will rely on it, as it provides
-	// decentralized solution. For now, in order to avoid forcing users to long sync times
-	// we use central static resource
-	type subClusterData struct {
-		Number      int      `json:"number"`
-		Hash        string   `json:"hash"`
-		StaticNodes []string `json:"staticnodes"`
-	}
-	type clusterData struct {
-		NetworkID int            `json:"networkID"`
-		Prod      subClusterData `json:"prod"`
-		Dev       subClusterData `json:"dev"`
-	}
-
-	var configFile []byte
-	var err error
-
+	var clusters []clusterData
 	if c.ClusterConfigFile != "" {
 		// Load cluster configuration from external file.
-		configFile, err = ioutil.ReadFile(c.ClusterConfigFile)
+		configFile, err := ioutil.ReadFile(c.ClusterConfigFile)
 		if err != nil {
 			return fmt.Errorf("cluster configuration file '%s' could not be loaded: %s", c.ClusterConfigFile, err)
 		}
-	} else {
-		// Fallback to embedded file.
-		configFile, err = static.Asset("config/cluster.json")
+		err = json.Unmarshal(configFile, &clusters)
 		if err != nil {
-			return fmt.Errorf("cluster.json could not be loaded: %s", err)
+			return fmt.Errorf("failed to unmarshal cluster configuration file: %s", err)
 		}
-	}
-
-	var clusters []clusterData
-	err = json.Unmarshal(configFile, &clusters)
-	if err != nil {
-		return fmt.Errorf("failed to unmarshal cluster configuration file: %s", err)
+	} else {
+		clusters = defaultClusters
 	}
 
 	for _, cluster := range clusters {
