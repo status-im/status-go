@@ -1,0 +1,58 @@
+diff --git a/whisper/whisperv6/api.go b/whisper/whisperv6/api.go
+index 16db034e..9d5ebf84 100644
+--- a/whisper/whisperv6/api.go
++++ b/whisper/whisperv6/api.go
+@@ -264,6 +264,7 @@ func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (bool, er
+ 		WorkTime: req.PowTime,
+ 		PoW:      req.PowTarget,
+ 		Topic:    req.Topic,
++		self:     true,
+ 	}
+ 
+ 	// Set key that is used to sign the message
+diff --git a/whisper/whisperv6/envelope.go b/whisper/whisperv6/envelope.go
+index c7bea2bb..5218d755 100644
+--- a/whisper/whisperv6/envelope.go
++++ b/whisper/whisperv6/envelope.go
+@@ -47,6 +47,7 @@ type Envelope struct {
+ 	// the following variables should not be accessed directly, use the corresponding function instead: Hash(), Bloom()
+ 	hash  common.Hash // Cached hash of the envelope to avoid rehashing every time.
+ 	bloom []byte
++	self  bool
+ }
+ 
+ // size returns the size of envelope as it is sent (i.e. public fields only)
+diff --git a/whisper/whisperv6/message.go b/whisper/whisperv6/message.go
+index b8318cbe..a31dcbe1 100644
+--- a/whisper/whisperv6/message.go
++++ b/whisper/whisperv6/message.go
+@@ -46,6 +46,8 @@ type MessageParams struct {
+ 	PoW      float64
+ 	Payload  []byte
+ 	Padding  []byte
++
++	self bool
+ }
+ 
+ // SentMessage represents an end-user data packet to transmit through the
+@@ -258,6 +260,7 @@ func (msg *sentMessage) Wrap(options *MessageParams) (envelope *Envelope, err er
+ 	if err = envelope.Seal(options); err != nil {
+ 		return nil, err
+ 	}
++	envelope.self = options.self
+ 	return envelope, nil
+ }
+ 
+diff --git a/whisper/whisperv6/whisper.go b/whisper/whisperv6/whisper.go
+index a9e12d4a..94b9a42f 100644
+--- a/whisper/whisperv6/whisper.go
++++ b/whisper/whisperv6/whisper.go
+@@ -852,7 +852,7 @@ func (whisper *Whisper) add(envelope *Envelope) (bool, error) {
+ 		}
+ 	}
+ 
+-	if !bloomFilterMatch(whisper.BloomFilter(), envelope.Bloom()) {
++	if !envelope.self && !bloomFilterMatch(whisper.BloomFilter(), envelope.Bloom()) {
+ 		// maybe the value was recently changed, and the peers did not adjust yet.
+ 		// in this case the previous value is retrieved by BloomFilterTolerance()
+ 		// for a short period of peer synchronization.
