@@ -105,10 +105,7 @@ xgo:
 setup: lint-install mock-install ##@other Prepare project for first build
 
 generate: ##@other Regenerate assets and other auto-generated stuff
-	cd _assets/static && npm install
-	cp ./_assets/static/node_modules/web3/dist/web3.min.js ./static/scripts/web3.js
 	go generate ./static
-	rm ./static/scripts/web3.js
 
 mock-install: ##@other Install mocking tools
 	go get -u github.com/golang/mock/mockgen
