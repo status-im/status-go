@@ -280,8 +280,8 @@ func (s *WhisperMailboxSuite) TestSendMessageWithoutSubscription() {
 	aliceBackend, stop := s.startBackend("alice")
 	defer stop()
 
-	// we need to wain >= whisper.DefaultSyncAllowance seconds to update
-	time.Sleep(12 * time.Second)
+	// we need to wait >= whisper.DefaultSyncAllowance seconds to update Bloom filter tolerated
+	time.Sleep((whisper.DefaultSyncAllowance + 1) * time.Second)
 
 	//get whisper service
 	aliceWhisperService, err := aliceBackend.NodeManager().WhisperService()
@@ -298,7 +298,6 @@ func (s *WhisperMailboxSuite) TestSendMessageWithoutSubscription() {
 	//alice send message to group chat
 	helloWorldMessage := hexutil.Encode([]byte("Hello world!"))
 	s.postMessageToGroup(aliceRPCClient, groupChatKeyID, groupChatTopic.String(), helloWorldMessage)
-	time.Sleep(5 * time.Second) //it need to receive envelopes by bob and charlie nodes
 }
 
 func newGroupChatParams(symkey []byte, topic whisper.TopicType) groupChatParams {
