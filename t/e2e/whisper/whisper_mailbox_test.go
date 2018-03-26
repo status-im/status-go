@@ -110,7 +110,7 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	reqMessagesResp := baseRPCResponse{}
 	err = json.Unmarshal([]byte(resp), &reqMessagesResp)
 	s.Require().NoError(err)
-	s.Require().Nil(reqMessagesResp.Err)
+	s.Require().Nil(reqMessagesResp.Error)
 
 	//wait to receive message
 	time.Sleep(time.Second)
@@ -276,6 +276,31 @@ func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
 	s.Require().Equal(helloWorldMessage, messages[0]["payload"].(string))
 }
 
+func (s *WhisperMailboxSuite) TestSendMessageWithoutSubscription() {
+	aliceBackend, stop := s.startBackend("alice")
+	defer stop()
+
+	// we need to wain >= whisper.DefaultSyncAllowance seconds to update
+	time.Sleep(12 * time.Second)
+
+	//get whisper service
+	aliceWhisperService, err := aliceBackend.NodeManager().WhisperService()
+	s.Require().NoError(err)
+	//get rpc client
+	aliceRPCClient := aliceBackend.NodeManager().RPCClient()
+
+	//generate group chat symkey and topic
+	groupChatKeyID, err := aliceWhisperService.GenerateSymKey()
+	s.Require().NoError(err)
+	//generate group chat topic
+	groupChatTopic := whisper.BytesToTopic([]byte("groupChatTopic"))
+
+	//alice send message to group chat
+	helloWorldMessage := hexutil.Encode([]byte("Hello world!"))
+	s.postMessageToGroup(aliceRPCClient, groupChatKeyID, groupChatTopic.String(), helloWorldMessage)
+	time.Sleep(5 * time.Second) //it need to receive envelopes by bob and charlie nodes
+}
+
 func newGroupChatParams(symkey []byte, topic whisper.TopicType) groupChatParams {
 	groupChatKeyStr := hexutil.Bytes(symkey).String()
 	return groupChatParams{
@@ -313,6 +338,8 @@ func (s *WhisperMailboxSuite) startBackend(name string) (*api.StatusBackend, fun
 	nodeConfig.DataDir = datadir
 	s.Require().NoError(err)
 	s.Require().False(backend.IsNodeRunning())
+
+	nodeConfig.WhisperConfig.LightClient = true
 
 	if addr, err := GetRemoteURL(); err == nil {
 		nodeConfig.UpstreamConfig.Enabled = true
@@ -373,7 +400,7 @@ func (s *WhisperMailboxSuite) createPrivateChatMessageFilter(rpcCli *rpc.Client,
 	err := json.Unmarshal([]byte(resp), &msgFilterResp)
 	messageFilterID := msgFilterResp.Result
 	s.Require().NoError(err)
-	s.Require().Nil(msgFilterResp.Err)
+	s.Require().Nil(msgFilterResp.Error)
 	s.Require().NotEqual("", messageFilterID, resp)
 	return messageFilterID
 }
@@ -392,7 +419,7 @@ func (s *WhisperMailboxSuite) createGroupChatMessageFilter(rpcCli *rpc.Client, s
 	err := json.Unmarshal([]byte(resp), &msgFilterResp)
 	messageFilterID := msgFilterResp.Result
 	s.Require().NoError(err)
-	s.Require().Nil(msgFilterResp.Err)
+	s.Require().Nil(msgFilterResp.Error)
 	s.Require().NotEqual("", messageFilterID, resp)
 	return messageFilterID
 }
@@ -414,7 +441,7 @@ func (s *WhisperMailboxSuite) postMessageToPrivate(rpcCli *rpc.Client, bobPubkey
 	postResp := baseRPCResponse{}
 	err := json.Unmarshal([]byte(resp), &postResp)
 	s.Require().NoError(err)
-	s.Require().Nil(postResp.Err)
+	s.Require().Nil(postResp.Error)
 }
 
 func (s *WhisperMailboxSuite) postMessageToGroup(rpcCli *rpc.Client, groupChatKeyID string, topic string, payload string) {
@@ -434,7 +461,7 @@ func (s *WhisperMailboxSuite) postMessageToGroup(rpcCli *rpc.Client, groupChatKe
 	postResp := baseRPCResponse{}
 	err := json.Unmarshal([]byte(resp), &postResp)
 	s.Require().NoError(err)
-	s.Require().Nil(postResp.Err)
+	s.Require().Nil(postResp.Error)
 }
 
 //getMessagesByMessageFilterID get received messages by messageFilterID
@@ -447,7 +474,7 @@ func (s *WhisperMailboxSuite) getMessagesByMessageFilterID(rpcCli *rpc.Client, m
 	messages := getFilterMessagesResponse{}
 	err := json.Unmarshal([]byte(resp), &messages)
 	s.Require().NoError(err)
-	s.Require().Nil(messages.Err)
+	s.Require().Nil(messages.Error)
 	return messages.Result
 }
 
@@ -459,7 +486,7 @@ func (s *WhisperMailboxSuite) addSymKey(rpcCli *rpc.Client, symkey string) strin
 	symkeyAddResp := returnedIDResponse{}
 	err := json.Unmarshal([]byte(resp), &symkeyAddResp)
 	s.Require().NoError(err)
-	s.Require().Nil(symkeyAddResp.Err)
+	s.Require().Nil(symkeyAddResp.Error)
 	symkeyID := symkeyAddResp.Result
 	s.Require().NotEmpty(symkeyID)
 	return symkeyID
@@ -482,19 +509,19 @@ func (s *WhisperMailboxSuite) requestHistoricMessages(rpcCli *rpc.Client, mailbo
 	reqMessagesResp := baseRPCResponse{}
 	err := json.Unmarshal([]byte(resp), &reqMessagesResp)
 	s.Require().NoError(err)
-	s.Require().Nil(reqMessagesResp.Err)
+	s.Require().Nil(reqMessagesResp.Error)
 }
 
 type getFilterMessagesResponse struct {
 	Result []map[string]interface{}
-	Err    interface{}
+	Error  interface{}
 }
 
 type returnedIDResponse struct {
 	Result string
-	Err    interface{}
+	Error  interface{}
 }
 type baseRPCResponse struct {
 	Result interface{}
-	Err    interface{}
+	Error  interface{}
 }
