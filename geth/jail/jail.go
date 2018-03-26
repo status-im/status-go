@@ -8,8 +8,8 @@ import (
 	"sync"
 
 	"github.com/robertkrimen/otto"
+	web3js "github.com/status-im/go-web3js"
 	"github.com/status-im/status-go/geth/rpc"
-	"github.com/status-im/status-go/static"
 )
 
 const (
@@ -27,7 +27,6 @@ const (
 )
 
 var (
-	web3Code = string(static.MustAsset("scripts/web3.js"))
 	// ErrNoRPCClient is returned when an RPC client is required but it's nil.
 	ErrNoRPCClient = errors.New("RPC client is not available")
 )
@@ -130,7 +129,7 @@ func (j *Jail) initCell(cell *Cell) error {
 	// Run some initial JS code to provide some global objects.
 	c := []string{
 		j.baseJS,
-		web3Code,
+		string(web3js.Web3CODE),
 		web3InstanceCode,
 	}
 
