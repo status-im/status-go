@@ -321,6 +321,12 @@
   revision = "ed27b6fd65218132ee50cd95f38474a3d8a2cd12"
 
 [[projects]]
+  name = "github.com/status-im/go-web3js"
+  packages = ["."]
+  revision = "a136c82b1e1f30b5b24118eeff1caa71924e4e3a"
+  version = "0.20.1"
+
+[[projects]]
   name = "github.com/stretchr/testify"
   packages = [
     "assert",
@@ -483,6 +489,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "fd11e2094673d9a89cee7b47b626c2c18c7dd80b6e86835d88a2d8d28e5e9fa7"
+  inputs-digest = "c3c6facfce434b6e6c2c5b676526dcfb0c6bde11fffb616b18c90d16fbfb2e73"
   solver-name = "gps-cdcl"
   solver-version = 1
