@@ -36,6 +36,8 @@ Instructions for creating a patch from the command line:
 - [`0014-whisperv6-notifications.patch`](./0014-whisperv6-notifications.patch) — adds Whisper v6 notifications (need to be reviewed and documented)
 - [`0015-whisperv6-envelopes-tracing.patch`](./0015-whisperv6-envelopes-tracing.patch) — adds Whisper v6 envelope tracing (need to be reviewed and documented)
 - [`0018-geth-181-whisperv6-peer-race-cond-fix.patch`](./0018-geth-181-whisperv6-peer-race-cond-fix.patch) — Fixes race condition in Whisper v6. This has been merged upstream and this patch will need to be removed for 1.8.2.
+- [`0019-whisperv6-send-self-messages-without-subscribe.patch`](./0019-whisperv6-send-self-messages-without-subscribe.patch) — Allows user to send own messages without the subscription to it's topic
+
 
 # Updating
 
