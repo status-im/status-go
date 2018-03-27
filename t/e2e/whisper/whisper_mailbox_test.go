@@ -79,11 +79,11 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	//Create message filter
 	messageFilterID := s.createPrivateChatMessageFilter(rpcClient, keyID, topic.String())
 
-	//Threre are no messages at filter
+	//There are no messages at filter
 	messages := s.getMessagesByMessageFilterID(rpcClient, messageFilterID)
 	s.Require().Equal(0, len(messages))
 
-	//Post message matching with filter (key and token)
+	//Post message matching with filter (key and topic)
 	s.postMessageToPrivate(rpcClient, pubkey.String(), topic.String(), hexutil.Encode([]byte("Hello world!")))
 
 	//Get message to make sure that it will come from the mailbox later
