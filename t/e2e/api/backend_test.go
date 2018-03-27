@@ -191,7 +191,7 @@ func (s *APIBackendTestSuite) TestRaceConditions() {
 // FIXME(tiabc): There's also a test with the same name in geth/node/manager_test.go
 // so this test should only check StatusBackend logic with a mocked version of the underlying NodeManager.
 func (s *APIBackendTestSuite) TestNetworkSwitching() {
-	// get Ropsten config
+	// Get test node configuration.
 	nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
 
