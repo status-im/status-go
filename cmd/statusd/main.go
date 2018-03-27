@@ -14,7 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/cmd/statusd/debug"
 	"github.com/status-im/status-go/geth/api"
-	"github.com/status-im/status-go/geth/common"
+	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/metrics"
 	nodemetrics "github.com/status-im/status-go/metrics/node"
@@ -182,7 +182,7 @@ func startDebug(backend *api.StatusBackend) error {
 }
 
 // startCollectingStats collects various stats about the node and other protocols like Whisper.
-func startCollectingStats(interruptCh <-chan struct{}, nodeManager common.NodeManager) {
+func startCollectingStats(interruptCh <-chan struct{}, nodeManager *node.Manager) {
 
 	logger.Info("Starting stats", "stats", *statsAddr)
 
@@ -332,7 +332,7 @@ Options:
 // haltOnInterruptSignal catches interrupt signal (SIGINT) and
 // stops the node. It times out after 5 seconds
 // if the node can not be stopped.
-func haltOnInterruptSignal(nodeManager common.NodeManager) <-chan struct{} {
+func haltOnInterruptSignal(nodeManager *node.Manager) <-chan struct{} {
 	interruptCh := make(chan struct{})
 	go func() {
 		signalCh := make(chan os.Signal, 1)

@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/les"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
@@ -95,10 +96,22 @@ func LoadFromFile(filename string) string {
 	return buf.String()
 }
 
+// LightEthereumProvider interface to be used on EnsureNodeSync
+// TODO (adriacidre) This interface name should be reviewed as it has a lot
+// of unrelated methods.
+type LightEthereumProvider interface {
+	// NodeConfig returns reference to running node's configuration
+	NodeConfig() (*params.NodeConfig, error)
+	// LightEthereumService exposes reference to LES service running on top of the node
+	LightEthereumService() (*les.LightEthereum, error)
+	// PeerCount returns number of connected peers
+	PeerCount() int
+}
+
 // EnsureNodeSync waits until node synchronzation is done to continue
 // with tests afterwards. Panics in case of an error or a timeout.
-func EnsureNodeSync(nodeManager common.NodeManager) {
-	nc, err := nodeManager.NodeConfig()
+func EnsureNodeSync(lesProvider LightEthereumProvider) {
+	nc, err := lesProvider.NodeConfig()
 	if err != nil {
 		panic("can't retrieve NodeConfig")
 	}
@@ -107,7 +120,7 @@ func EnsureNodeSync(nodeManager common.NodeManager) {
 		return
 	}
 
-	les, err := nodeManager.LightEthereumService()
+	les, err := lesProvider.LightEthereumService()
 	if err != nil {
 		panic(err)
 	}
@@ -129,7 +142,7 @@ func EnsureNodeSync(nodeManager common.NodeManager) {
 			if downloader == nil {
 				continue
 			}
-			if nodeManager.PeerCount() == 0 {
+			if lesProvider.PeerCount() == 0 {
 				logger.Debug("No establishished connections with a peers, continue waiting for a sync")
 				continue
 			}

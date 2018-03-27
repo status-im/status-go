@@ -73,7 +73,7 @@ func (s *APIBackendTestSuite) TestRaceConditions() {
 			log.Info("NodeManager()")
 			instance := s.Backend.NodeManager()
 			s.NotNil(instance)
-			s.IsType(&node.NodeManager{}, instance)
+			s.IsType(&node.Manager{}, instance)
 			s.T().Logf("NodeManager(), result: %v", instance)
 			progress <- struct{}{}
 		},

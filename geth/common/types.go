@@ -10,15 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts"
-	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/les"
-	"github.com/ethereum/go-ethereum/node"
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"github.com/status-im/status-go/geth/params"
-	"github.com/status-im/status-go/geth/rpc"
 	"github.com/status-im/status-go/static"
 )
 
@@ -26,52 +20,6 @@ import (
 var (
 	ErrDeprecatedMethod = errors.New("Method is depricated and will be removed in future release")
 )
-
-// NodeManager defines expected methods for managing Status node
-type NodeManager interface {
-	// StartNode start Status node, fails if node is already started
-	StartNode(config *params.NodeConfig) error
-
-	// EnsureSync waits until blockchain is synchronized.
-	EnsureSync(ctx context.Context) error
-
-	// StopNode stop the running Status node.
-	// Stopped node cannot be resumed, one starts a new node instead.
-	StopNode() error
-
-	// IsNodeRunning confirm that node is running
-	IsNodeRunning() bool
-
-	// NodeConfig returns reference to running node's configuration
-	NodeConfig() (*params.NodeConfig, error)
-
-	// Node returns underlying Status node
-	Node() (*node.Node, error)
-
-	// PopulateStaticPeers populates node's list of static bootstrap peers
-	PopulateStaticPeers() error
-
-	// AddPeer adds URL of static peer
-	AddPeer(url string) error
-
-	// PeerCount returns number of connected peers
-	PeerCount() int
-
-	// LightEthereumService exposes reference to LES service running on top of the node
-	LightEthereumService() (*les.LightEthereum, error)
-
-	// WhisperService returns reference to running Whisper service
-	WhisperService() (*whisper.Whisper, error)
-
-	// AccountManager returns reference to node's account manager
-	AccountManager() (*accounts.Manager, error)
-
-	// AccountKeyStore returns reference to account manager's keystore
-	AccountKeyStore() (*keystore.KeyStore, error)
-
-	// RPCClient exposes reference to RPC client connected to the running node
-	RPCClient() *rpc.Client
-}
 
 // TransactionResult is a JSON returned from transaction complete function (used internally)
 type TransactionResult struct {

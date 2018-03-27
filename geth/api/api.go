@@ -10,6 +10,7 @@ import (
 	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/jail"
+	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/transactions"
 )
@@ -35,7 +36,7 @@ func NewStatusAPIWithBackend(b *StatusBackend) *StatusAPI {
 }
 
 // NodeManager returns reference to node manager
-func (api *StatusAPI) NodeManager() common.NodeManager {
+func (api *StatusAPI) NodeManager() *node.Manager {
 	return api.b.NodeManager()
 }
 

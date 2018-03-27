@@ -21,7 +21,7 @@ type MailServiceSuite struct {
 }
 
 func (s *MailServiceSuite) SetupTest() {
-	s.NodeManager = node.NewNodeManager()
+	s.NodeManager = node.NewManager()
 }
 
 // TestShhRequestMessagesRPCMethodAvailability tests if `shh_requestMessages` is available

@@ -40,10 +40,10 @@ type RPCClientError error
 // EthNodeError is reported when node crashed on start up.
 type EthNodeError error
 
-// NodeManager manages Status node (which abstracts contained geth node)
+// Manager manages Status node (which abstracts contained geth node)
 // nolint: golint
 // should be fixed at https://github.com/status-im/status-go/issues/200
-type NodeManager struct {
+type Manager struct {
 	mu     sync.RWMutex
 	config *params.NodeConfig // Status node configuration
 	node   *node.Node         // reference to Geth P2P stack/node
@@ -54,22 +54,22 @@ type NodeManager struct {
 	log            log.Logger
 }
 
-// NewNodeManager makes new instance of node manager
-func NewNodeManager() *NodeManager {
-	return &NodeManager{
-		log: log.New("package", "status-go/geth/node.NodeManager"),
+// NewManager makes new instance of node manager
+func NewManager() *Manager {
+	return &Manager{
+		log: log.New("package", "status-go/geth/node.Manager"),
 	}
 }
 
 // StartNode start Status node, fails if node is already started
-func (m *NodeManager) StartNode(config *params.NodeConfig) error {
+func (m *Manager) StartNode(config *params.NodeConfig) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.startNode(config)
 }
 
 // startNode start Status node, fails if node is already started
-func (m *NodeManager) startNode(config *params.NodeConfig) error {
+func (m *Manager) startNode(config *params.NodeConfig) error {
 	if err := m.isNodeAvailable(); err == nil {
 		return ErrNodeExists
 	}
@@ -105,14 +105,14 @@ func (m *NodeManager) startNode(config *params.NodeConfig) error {
 }
 
 // StopNode stop Status node. Stopped node cannot be resumed.
-func (m *NodeManager) StopNode() error {
+func (m *Manager) StopNode() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.stopNode()
 }
 
 // stopNode stop Status node. Stopped node cannot be resumed.
-func (m *NodeManager) stopNode() error {
+func (m *Manager) stopNode() error {
 	if err := m.isNodeAvailable(); err != nil {
 		return err
 	}
@@ -128,7 +128,7 @@ func (m *NodeManager) stopNode() error {
 }
 
 // ResetChainData removes chain data if node is not running.
-func (m *NodeManager) ResetChainData(config *params.NodeConfig) error {
+func (m *Manager) ResetChainData(config *params.NodeConfig) error {
 	if m.IsNodeRunning() {
 		return ErrNodeExists
 	}
@@ -147,7 +147,7 @@ func (m *NodeManager) ResetChainData(config *params.NodeConfig) error {
 }
 
 // IsNodeRunning confirm that node is running
-func (m *NodeManager) IsNodeRunning() bool {
+func (m *Manager) IsNodeRunning() bool {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -158,7 +158,7 @@ func (m *NodeManager) IsNodeRunning() bool {
 }
 
 // Node returns underlying Status node
-func (m *NodeManager) Node() (*node.Node, error) {
+func (m *Manager) Node() (*node.Node, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -169,14 +169,14 @@ func (m *NodeManager) Node() (*node.Node, error) {
 }
 
 // PopulateStaticPeers connects current node with our publicly available LES/SHH/Swarm cluster
-func (m *NodeManager) PopulateStaticPeers() error {
+func (m *Manager) PopulateStaticPeers() error {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.populateStaticPeers()
 }
 
 // populateStaticPeers connects current node with our publicly available LES/SHH/Swarm cluster
-func (m *NodeManager) populateStaticPeers() error {
+func (m *Manager) populateStaticPeers() error {
 	if err := m.isNodeAvailable(); err != nil {
 		return err
 	}
@@ -197,7 +197,7 @@ func (m *NodeManager) populateStaticPeers() error {
 	return nil
 }
 
-func (m *NodeManager) removeStaticPeers() error {
+func (m *Manager) removeStaticPeers() error {
 	if !m.config.ClusterConfig.Enabled {
 		m.log.Info("Static peers are disabled")
 		return nil
@@ -218,7 +218,7 @@ func (m *NodeManager) removeStaticPeers() error {
 }
 
 // ReconnectStaticPeers removes and adds static peers to a server.
-func (m *NodeManager) ReconnectStaticPeers() error {
+func (m *Manager) ReconnectStaticPeers() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if err := m.removeStaticPeers(); err != nil {
@@ -228,7 +228,7 @@ func (m *NodeManager) ReconnectStaticPeers() error {
 }
 
 // AddPeer adds new static peer node
-func (m *NodeManager) AddPeer(url string) error {
+func (m *Manager) AddPeer(url string) error {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	if err := m.isNodeAvailable(); err != nil {
@@ -238,7 +238,7 @@ func (m *NodeManager) AddPeer(url string) error {
 }
 
 // addPeer adds new static peer node
-func (m *NodeManager) addPeer(url string) error {
+func (m *Manager) addPeer(url string) error {
 	// Try to add the url as a static peer and return
 	parsedNode, err := discover.ParseNode(url)
 	if err != nil {
@@ -248,7 +248,7 @@ func (m *NodeManager) addPeer(url string) error {
 	return nil
 }
 
-func (m *NodeManager) removePeer(url string) error {
+func (m *Manager) removePeer(url string) error {
 	parsedNode, err := discover.ParseNode(url)
 	if err != nil {
 		return err
@@ -258,7 +258,7 @@ func (m *NodeManager) removePeer(url string) error {
 }
 
 // PeerCount returns the number of connected peers.
-func (m *NodeManager) PeerCount() int {
+func (m *Manager) PeerCount() int {
 	if !m.IsNodeRunning() {
 		return 0
 	}
@@ -266,7 +266,7 @@ func (m *NodeManager) PeerCount() int {
 }
 
 // NodeConfig exposes reference to running node's configuration
-func (m *NodeManager) NodeConfig() (*params.NodeConfig, error) {
+func (m *Manager) NodeConfig() (*params.NodeConfig, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -277,7 +277,7 @@ func (m *NodeManager) NodeConfig() (*params.NodeConfig, error) {
 }
 
 // LightEthereumService exposes reference to LES service running on top of the node
-func (m *NodeManager) LightEthereumService() (*les.LightEthereum, error) {
+func (m *Manager) LightEthereumService() (*les.LightEthereum, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -297,7 +297,7 @@ func (m *NodeManager) LightEthereumService() (*les.LightEthereum, error) {
 }
 
 // WhisperService exposes reference to Whisper service running on top of the node
-func (m *NodeManager) WhisperService() (*whisper.Whisper, error) {
+func (m *Manager) WhisperService() (*whisper.Whisper, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -317,7 +317,7 @@ func (m *NodeManager) WhisperService() (*whisper.Whisper, error) {
 }
 
 // AccountManager exposes reference to node's accounts manager
-func (m *NodeManager) AccountManager() (*accounts.Manager, error) {
+func (m *Manager) AccountManager() (*accounts.Manager, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -332,7 +332,7 @@ func (m *NodeManager) AccountManager() (*accounts.Manager, error) {
 }
 
 // AccountKeyStore exposes reference to accounts key store
-func (m *NodeManager) AccountKeyStore() (*keystore.KeyStore, error) {
+func (m *Manager) AccountKeyStore() (*keystore.KeyStore, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -358,14 +358,14 @@ func (m *NodeManager) AccountKeyStore() (*keystore.KeyStore, error) {
 }
 
 // RPCClient exposes reference to RPC client connected to the running node.
-func (m *NodeManager) RPCClient() *rpc.Client {
+func (m *Manager) RPCClient() *rpc.Client {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.rpcClient
 }
 
 // isNodeAvailable check if we have a node running and make sure is fully started
-func (m *NodeManager) isNodeAvailable() error {
+func (m *Manager) isNodeAvailable() error {
 	if m.node == nil || m.node.Server() == nil {
 		return ErrNoRunningNode
 	}
@@ -377,7 +377,7 @@ const tickerResolution = time.Second
 
 // EnsureSync waits until blockchain synchronization
 // is complete and returns.
-func (m *NodeManager) EnsureSync(ctx context.Context) error {
+func (m *Manager) EnsureSync(ctx context.Context) error {
 	// Don't wait for any blockchain sync for the
 	// local private chain as blocks are never mined.
 	if m.config.NetworkID == params.StatusChainNetworkID {
@@ -387,7 +387,7 @@ func (m *NodeManager) EnsureSync(ctx context.Context) error {
 	return m.ensureSync(ctx)
 }
 
-func (m *NodeManager) ensureSync(ctx context.Context) error {
+func (m *Manager) ensureSync(ctx context.Context) error {
 	les, err := m.LightEthereumService()
 	if err != nil {
 		return fmt.Errorf("failed to get LES service: %v", err)
