@@ -21,7 +21,7 @@ XGOIMAGE = statusteam/xgo:$(XGOVERSION)
 XGOIMAGEIOSSIM = statusteam/xgo-ios-simulator:$(XGOVERSION)
 
 networkid ?= StatusChain
-e2e_extraflags =
+gotest_extraflags =
 
 DOCKER_IMAGE_NAME ?= statusteam/status-go
 
@@ -123,26 +123,29 @@ docker-test: ##@tests Run tests in a docker container with golang.
 test: test-unit-coverage ##@tests Run basic, short tests during development
 
 test-unit: ##@tests Run unit and integration tests
-	go test $(UNIT_TEST_PACKAGES)
+	go test $(UNIT_TEST_PACKAGES) $(gotest_extraflags)
 
 test-unit-coverage: ##@tests Run unit and integration tests with coverage
-	go test -coverpkg= $(UNIT_TEST_PACKAGES)
+	go test -coverpkg= $(UNIT_TEST_PACKAGES) $(gotest_extraflags)
+
+test-unit-race: gotest_extraflags=-race
+test-unit-race: test-unit ##@tests Run unit and integration tests with -race flag
 
 test-e2e: ##@tests Run e2e tests
 	# order: reliability then alphabetical
 	# TODO(tiabc): make a single command out of them adding `-p 1` flag.
-	go test -timeout 5m ./t/e2e/accounts/... -network=$(networkid) $(e2e_extraflags)
-	go test -timeout 5m ./t/e2e/api/... -network=$(networkid) $(e2e_extraflags)
-	go test -timeout 5m ./t/e2e/node/... -network=$(networkid) $(e2e_extraflags)
-	go test -timeout 50m ./t/e2e/jail/... -network=$(networkid) $(e2e_extraflags)
-	go test -timeout 20m ./t/e2e/rpc/... -network=$(networkid) $(e2e_extraflags)
-	go test -timeout 20m ./t/e2e/whisper/... -network=$(networkid) $(e2e_extraflags)
-	go test -timeout 10m ./t/e2e/transactions/... -network=$(networkid) $(e2e_extraflags)
+	go test -timeout 5m ./t/e2e/accounts/... -network=$(networkid) $(gotest_extraflags)
+	go test -timeout 5m ./t/e2e/api/... -network=$(networkid) $(gotest_extraflags)
+	go test -timeout 5m ./t/e2e/node/... -network=$(networkid) $(gotest_extraflags)
+	go test -timeout 50m ./t/e2e/jail/... -network=$(networkid) $(gotest_extraflags)
+	go test -timeout 20m ./t/e2e/rpc/... -network=$(networkid) $(gotest_extraflags)
+	go test -timeout 20m ./t/e2e/whisper/... -network=$(networkid) $(gotest_extraflags)
+	go test -timeout 10m ./t/e2e/transactions/... -network=$(networkid) $(gotest_extraflags)
 	# e2e_test tag is required to include some files from ./lib without _test suffix
-	go test -timeout 40m -tags e2e_test ./lib -network=$(networkid) $(e2e_extraflags)
+	go test -timeout 40m -tags e2e_test ./lib -network=$(networkid) $(gotest_extraflags)
 
-race-check: e2e_extraflags=-race ##@tests Run e2e tests with -race flag
-race-check: test-e2e
+race-check: gotest_extraflags=-race
+race-check: test-e2e ##@tests Run e2e tests with -race flag
 
 lint-install:
 	go get -u github.com/alecthomas/gometalinter
