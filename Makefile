@@ -39,7 +39,7 @@ YELLOW := $(shell echo "\e[33m")
 RESET  := $(shell echo "\e[0m")
 HELP_FUN = \
 		   %help; \
-		   while(<>) { push @{$$help{$$2 // 'options'}}, [$$1, $$3] if /^([a-zA-Z\-]+)\s*:.*\#\#(?:@([a-zA-Z\-]+))?\s(.*)$$/ }; \
+		   while(<>) { push @{$$help{$$2 // 'options'}}, [$$1, $$3] if /^([a-zA-Z0-9\-]+)\s*:.*\#\#(?:@([a-zA-Z\-]+))?\s(.*)$$/ }; \
 		   print "Usage: make [target]\n\n"; \
 		   for (sort keys %help) { \
 			   print "${WHITE}$$_:${RESET}\n"; \
@@ -102,6 +102,8 @@ xgo:
 	docker pull $(XGOIMAGE)
 	go get github.com/karalabe/xgo
 
+setup: lint-install mock-install ##@other Prepare project for first build
+
 generate: ##@other Regenerate assets and other auto-generated stuff
 	cd _assets/static && npm install
 	cp ./_assets/static/node_modules/web3/dist/web3.min.js ./static/scripts/web3.js
@@ -144,8 +146,8 @@ test-e2e: ##@tests Run e2e tests
 	# e2e_test tag is required to include some files from ./lib without _test suffix
 	go test -timeout 40m -tags e2e_test ./lib -network=$(networkid) $(gotest_extraflags)
 
-race-check: gotest_extraflags=-race
-race-check: test-e2e ##@tests Run e2e tests with -race flag
+test-e2e-race: gotest_extraflags=-race
+test-e2e-race: test-e2e ##@tests Run e2e tests with -race flag
 
 lint-install:
 	go get -u github.com/alecthomas/gometalinter
