@@ -12,7 +12,6 @@ endif
 CGO_CFLAGS=-I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
 GOBIN=$(dir $(realpath $(firstword $(MAKEFILE_LIST))))build/bin
 
-BUILD_TAGS =
 BUILD_FLAGS := $(shell echo "-ldflags '-X main.buildStamp=`date -u '+%Y-%m-%d.%H:%M:%S'` -X main.gitCommit=$(git rev-parse HEAD)'")
 
 GO ?= latest
@@ -21,11 +20,12 @@ XGOIMAGE = statusteam/xgo:$(XGOVERSION)
 XGOIMAGEIOSSIM = statusteam/xgo-ios-simulator:$(XGOVERSION)
 
 networkid ?= StatusChain
+gotest_extraflags =
 
 DOCKER_IMAGE_NAME ?= statusteam/status-go
 
 DOCKER_TEST_WORKDIR = /go/src/github.com/status-im/status-go/
-DOCKER_TEST_IMAGE  = golang:1.9
+DOCKER_TEST_IMAGE = golang:1.9
 
 UNIT_TEST_PACKAGES := $(shell go list ./...  | grep -v /vendor | grep -v /t/e2e | grep -v /t/destructive | grep -v /cmd | grep -v /lib)
 
@@ -39,7 +39,7 @@ YELLOW := $(shell echo "\e[33m")
 RESET  := $(shell echo "\e[0m")
 HELP_FUN = \
 		   %help; \
-		   while(<>) { push @{$$help{$$2 // 'options'}}, [$$1, $$3] if /^([a-zA-Z\-]+)\s*:.*\#\#(?:@([a-zA-Z\-]+))?\s(.*)$$/ }; \
+		   while(<>) { push @{$$help{$$2 // 'options'}}, [$$1, $$3] if /^([a-zA-Z0-9\-]+)\s*:.*\#\#(?:@([a-zA-Z\-]+))?\s(.*)$$/ }; \
 		   print "Usage: make [target]\n\n"; \
 		   for (sort keys %help) { \
 			   print "${WHITE}$$_:${RESET}\n"; \
@@ -84,6 +84,7 @@ statusgo-library: ##@cross-compile Build status-go as static library for current
 	@echo "Static library built:"
 	@ls -la $(GOBIN)/libstatus.*
 
+docker-image: BUILD_TAGS ?= metrics prometheus
 docker-image: ##@docker Build docker image (use DOCKER_IMAGE_NAME to set the image name)
 	@echo "Building docker image..."
 	docker build --file _assets/build/Dockerfile --build-arg "build_tags=$(BUILD_TAGS)" . -t $(DOCKER_IMAGE_NAME):latest
@@ -100,6 +101,8 @@ xgo-docker-images: ##@docker Build xgo docker images
 xgo:
 	docker pull $(XGOIMAGE)
 	go get github.com/karalabe/xgo
+
+setup: lint-install mock-install ##@other Prepare project for first build
 
 generate: ##@other Regenerate assets and other auto-generated stuff
 	cd _assets/static && npm install
@@ -122,23 +125,29 @@ docker-test: ##@tests Run tests in a docker container with golang.
 test: test-unit-coverage ##@tests Run basic, short tests during development
 
 test-unit: ##@tests Run unit and integration tests
-	go test $(UNIT_TEST_PACKAGES)
+	go test $(UNIT_TEST_PACKAGES) $(gotest_extraflags)
 
 test-unit-coverage: ##@tests Run unit and integration tests with coverage
-	go test -coverpkg= $(UNIT_TEST_PACKAGES)
+	go test -coverpkg= $(UNIT_TEST_PACKAGES) $(gotest_extraflags)
+
+test-unit-race: gotest_extraflags=-race
+test-unit-race: test-unit ##@tests Run unit and integration tests with -race flag
 
 test-e2e: ##@tests Run e2e tests
 	# order: reliability then alphabetical
 	# TODO(tiabc): make a single command out of them adding `-p 1` flag.
-	go test -timeout 5m ./t/e2e/accounts/... -network=$(networkid)
-	go test -timeout 5m ./t/e2e/api/... -network=$(networkid)
-	go test -timeout 5m ./t/e2e/node/... -network=$(networkid)
-	go test -timeout 50m ./t/e2e/jail/... -network=$(networkid)
-	go test -timeout 20m ./t/e2e/rpc/... -network=$(networkid)
-	go test -timeout 20m ./t/e2e/whisper/... -network=$(networkid)
-	go test -timeout 10m ./t/e2e/transactions/... -network=$(networkid)
+	go test -timeout 5m ./t/e2e/accounts/... -network=$(networkid) $(gotest_extraflags)
+	go test -timeout 5m ./t/e2e/api/... -network=$(networkid) $(gotest_extraflags)
+	go test -timeout 5m ./t/e2e/node/... -network=$(networkid) $(gotest_extraflags)
+	go test -timeout 50m ./t/e2e/jail/... -network=$(networkid) $(gotest_extraflags)
+	go test -timeout 20m ./t/e2e/rpc/... -network=$(networkid) $(gotest_extraflags)
+	go test -timeout 20m ./t/e2e/whisper/... -network=$(networkid) $(gotest_extraflags)
+	go test -timeout 10m ./t/e2e/transactions/... -network=$(networkid) $(gotest_extraflags)
 	# e2e_test tag is required to include some files from ./lib without _test suffix
-	go test -timeout 40m -tags e2e_test ./lib -network=$(networkid)
+	go test -timeout 40m -tags e2e_test ./lib -network=$(networkid) $(gotest_extraflags)
+
+test-e2e-race: gotest_extraflags=-race
+test-e2e-race: test-e2e ##@tests Run e2e tests with -race flag
 
 lint-install:
 	go get -u github.com/alecthomas/gometalinter

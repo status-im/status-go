@@ -63,7 +63,7 @@ func init() {
 	const pathSeparator = string(os.PathSeparator)
 	RootDir = filepath.Dir(pwd)
 	pathDirs := strings.Split(RootDir, pathSeparator)
-	for i := range pathDirs {
+	for i := len(pathDirs) - 1; i >= 0; i-- {
 		if pathDirs[i] == "status-go" {
 			RootDir = filepath.Join(pathDirs[:i+1]...)
 			RootDir = filepath.Join(pathSeparator, RootDir)
