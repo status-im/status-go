@@ -658,7 +658,7 @@ func (whisper *Whisper) Unsubscribe(id string) error {
 // Send injects a message into the whisper send queue, to be distributed in the
 // network in the coming cycles.
 func (whisper *Whisper) Send(envelope *Envelope) error {
-	ok, err := whisper.add(envelope)
+	ok, err := whisper.add(envelope, false)
 	if err != nil {
 		return err
 	}
@@ -745,7 +745,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 			trouble := false
 			for _, env := range envelopes {
 				whisper.traceEnvelope(env, !whisper.isEnvelopeCached(env.Hash()), peerSource, p)
-				cached, err := whisper.add(env)
+				cached, err := whisper.add(env, true)
 				if err != nil {
 					trouble = true
 					log.Error("bad envelope received, peer will be disconnected", "peer", p.peer.ID(), "err", err)
@@ -819,7 +819,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 // add inserts a new envelope into the message pool to be distributed within the
 // whisper network. It also inserts the envelope into the expiration pool at the
 // appropriate time-stamp. In case of error, connection should be dropped.
-func (whisper *Whisper) add(envelope *Envelope) (bool, error) {
+func (whisper *Whisper) add(envelope *Envelope, isForwarded bool) (bool, error) {
 	now := uint32(time.Now().Unix())
 	sent := envelope.Expiry - envelope.TTL
 
@@ -852,7 +852,7 @@ func (whisper *Whisper) add(envelope *Envelope) (bool, error) {
 		}
 	}
 
-	if !envelope.self && !bloomFilterMatch(whisper.BloomFilter(), envelope.Bloom()) {
+	if isForwarded && !bloomFilterMatch(whisper.BloomFilter(), envelope.Bloom()) {
 		// maybe the value was recently changed, and the peers did not adjust yet.
 		// in this case the previous value is retrieved by BloomFilterTolerance()
 		// for a short period of peer synchronization.

@@ -264,7 +264,6 @@ func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (bool, er
 		WorkTime: req.PowTime,
 		PoW:      req.PowTarget,
 		Topic:    req.Topic,
-		self:     true,
 	}
 
 	// Set key that is used to sign the message

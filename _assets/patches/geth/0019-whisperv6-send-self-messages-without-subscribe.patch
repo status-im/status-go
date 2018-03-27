@@ -1,58 +1,40 @@
-diff --git a/whisper/whisperv6/api.go b/whisper/whisperv6/api.go
-index 16db034e..9d5ebf84 100644
---- a/whisper/whisperv6/api.go
-+++ b/whisper/whisperv6/api.go
-@@ -264,6 +264,7 @@ func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (bool, er
- 		WorkTime: req.PowTime,
- 		PoW:      req.PowTarget,
- 		Topic:    req.Topic,
-+		self:     true,
- 	}
- 
- 	// Set key that is used to sign the message
-diff --git a/whisper/whisperv6/envelope.go b/whisper/whisperv6/envelope.go
-index c7bea2bb..5218d755 100644
---- a/whisper/whisperv6/envelope.go
-+++ b/whisper/whisperv6/envelope.go
-@@ -47,6 +47,7 @@ type Envelope struct {
- 	// the following variables should not be accessed directly, use the corresponding function instead: Hash(), Bloom()
- 	hash  common.Hash // Cached hash of the envelope to avoid rehashing every time.
- 	bloom []byte
-+	self  bool
- }
- 
- // size returns the size of envelope as it is sent (i.e. public fields only)
-diff --git a/whisper/whisperv6/message.go b/whisper/whisperv6/message.go
-index b8318cbe..a31dcbe1 100644
---- a/whisper/whisperv6/message.go
-+++ b/whisper/whisperv6/message.go
-@@ -46,6 +46,8 @@ type MessageParams struct {
- 	PoW      float64
- 	Payload  []byte
- 	Padding  []byte
-+
-+	self bool
- }
- 
- // SentMessage represents an end-user data packet to transmit through the
-@@ -258,6 +260,7 @@ func (msg *sentMessage) Wrap(options *MessageParams) (envelope *Envelope, err er
- 	if err = envelope.Seal(options); err != nil {
- 		return nil, err
- 	}
-+	envelope.self = options.self
- 	return envelope, nil
- }
- 
 diff --git a/whisper/whisperv6/whisper.go b/whisper/whisperv6/whisper.go
-index a9e12d4a..94b9a42f 100644
+index a9e12d4a..ee82ac6d 100644
 --- a/whisper/whisperv6/whisper.go
 +++ b/whisper/whisperv6/whisper.go
+@@ -658,7 +658,7 @@ func (whisper *Whisper) Unsubscribe(id string) error {
+ // Send injects a message into the whisper send queue, to be distributed in the
+ // network in the coming cycles.
+ func (whisper *Whisper) Send(envelope *Envelope) error {
+-	ok, err := whisper.add(envelope)
++	ok, err := whisper.add(envelope, false)
+ 	if err != nil {
+ 		return err
+ 	}
+@@ -745,7 +745,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
+ 			trouble := false
+ 			for _, env := range envelopes {
+ 				whisper.traceEnvelope(env, !whisper.isEnvelopeCached(env.Hash()), peerSource, p)
+-				cached, err := whisper.add(env)
++				cached, err := whisper.add(env, true)
+ 				if err != nil {
+ 					trouble = true
+ 					log.Error("bad envelope received, peer will be disconnected", "peer", p.peer.ID(), "err", err)
+@@ -819,7 +819,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
+ // add inserts a new envelope into the message pool to be distributed within the
+ // whisper network. It also inserts the envelope into the expiration pool at the
+ // appropriate time-stamp. In case of error, connection should be dropped.
+-func (whisper *Whisper) add(envelope *Envelope) (bool, error) {
++func (whisper *Whisper) add(envelope *Envelope, isForwarded bool) (bool, error) {
+ 	now := uint32(time.Now().Unix())
+ 	sent := envelope.Expiry - envelope.TTL
+
 @@ -852,7 +852,7 @@ func (whisper *Whisper) add(envelope *Envelope) (bool, error) {
  		}
  	}
- 
+
 -	if !bloomFilterMatch(whisper.BloomFilter(), envelope.Bloom()) {
-+	if !envelope.self && !bloomFilterMatch(whisper.BloomFilter(), envelope.Bloom()) {
++	if isForwarded && !bloomFilterMatch(whisper.BloomFilter(), envelope.Bloom()) {
  		// maybe the value was recently changed, and the peers did not adjust yet.
  		// in this case the previous value is retrieved by BloomFilterTolerance()
  		// for a short period of peer synchronization.

@@ -46,8 +46,6 @@ type MessageParams struct {
 	PoW      float64
 	Payload  []byte
 	Padding  []byte
-
-	self bool
 }
 
 // SentMessage represents an end-user data packet to transmit through the
@@ -260,7 +258,6 @@ func (msg *sentMessage) Wrap(options *MessageParams) (envelope *Envelope, err er
 	if err = envelope.Seal(options); err != nil {
 		return nil, err
 	}
-	envelope.self = options.self
 	return envelope, nil
 }
 
