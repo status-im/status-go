@@ -599,12 +599,12 @@ func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
 		txIDs = append(txIDs, "invalid-tx-id")
 
 		// discard
-		discardResults := txQueueManager.DiscardTransactions(txIDs)
+		discardResults := s.Backend.DiscardTransactions(txIDs)
 		require.Len(discardResults, 1, "cannot discard txs: %v", discardResults)
 		require.Error(discardResults["invalid-tx-id"].Error, "transaction hash not found", "cannot discard txs: %v", discardResults)
 
 		// try completing discarded transaction
-		completeResults := txQueueManager.CompleteTransactions(txIDs, TestConfig.Account1.Password)
+		completeResults := s.Backend.CompleteTransactions(txIDs, TestConfig.Account1.Password)
 		require.Len(completeResults, testTxCount+1, "unexpected number of errors (call to CompleteTransaction should not succeed)")
 
 		for _, txResult := range completeResults {
