@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 func TestBIP32Vectors(t *testing.T) {
@@ -531,6 +532,38 @@ func TestBIP44ChildDerivation(t *testing.T) {
 		t.Errorf("BIP44Child: key mismatch -- got: %v, want: %v", accounKey2.String(), derivedKey2String)
 	}
 	t.Logf("Account 1 key: %s", accounKey2.String())
+}
+
+func TestHDWalletCompatibility(t *testing.T) {
+	password := "TREZOR"
+	mnemonic := NewMnemonic()
+	mnemonicPhrase := "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
+	seed := mnemonic.MnemonicSeed(mnemonicPhrase, password)
+	rootKey, err := NewMaster(seed)
+	if err != nil {
+		t.Errorf("couldn't create master extended key: %v", err)
+	}
+
+	expectedAddresses := []string{
+		"0x9c32F71D4DB8Fb9e1A58B0a80dF79935e7256FA6",
+		"0x7AF7283bd1462C3b957e8FAc28Dc19cBbF2FAdfe",
+		"0x05f48E30fCb69ADcd2A591Ebc7123be8BE72D7a1",
+		"0xbfE91Bc05cE66013660D7Eb742F74BD324DA5F92",
+	}
+
+	for i := 0; i < len(expectedAddresses); i++ {
+		key, err := rootKey.BIP44Child(CoinTypeETH, uint32(i))
+		if err != nil {
+			t.Error("Error deriving BIP44-compliant key: %s", err)
+		}
+
+		privateKeyECDSA := key.ToECDSA()
+		address := crypto.PubkeyToAddress(privateKeyECDSA.PublicKey).Hex()
+
+		if address != expectedAddresses[i] {
+			t.Errorf("wrong address generated. expected %s, got %s", expectedAddresses[i], address)
+		}
+	}
 }
 
 //func TestNewKey(t *testing.T) {
