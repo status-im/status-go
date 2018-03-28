@@ -51,7 +51,7 @@ func NewManager(geth GethServiceProvider) *Manager {
 // sub-account derivations)
 func (m *Manager) CreateAccount(password string) (address, pubKey, mnemonic string, err error) {
 	// generate mnemonic phrase
-	mn := extkeys.NewMnemonic(extkeys.Salt)
+	mn := extkeys.NewMnemonic()
 	mnemonic, err = mn.MnemonicPhrase(extkeys.EntropyStrength128, extkeys.EnglishLanguage)
 	if err != nil {
 		return "", "", "", fmt.Errorf("can not create mnemonic seed: %v", err)
@@ -136,7 +136,7 @@ func (m *Manager) CreateChildAccount(parentAddress, password string) (address, p
 // Once master key is re-generated, it is inserted into keystore (if not already there).
 func (m *Manager) RecoverAccount(password, mnemonic string) (address, pubKey string, err error) {
 	// re-create extended key (see BIP32)
-	mn := extkeys.NewMnemonic(extkeys.Salt)
+	mn := extkeys.NewMnemonic()
 	extKey, err := extkeys.NewMaster(mn.MnemonicSeed(mnemonic, password))
 	if err != nil {
 		return "", "", ErrInvalidMasterKeyCreated

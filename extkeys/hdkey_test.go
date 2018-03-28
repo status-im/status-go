@@ -394,7 +394,7 @@ func TestErrors(t *testing.T) {
 	}
 
 	// Generate a new key and neuter it to a public extended key.
-	mnemonic := NewMnemonic(Salt)
+	mnemonic := NewMnemonic()
 
 	phrase, err := mnemonic.MnemonicPhrase(128, EnglishLanguage)
 	if err != nil {

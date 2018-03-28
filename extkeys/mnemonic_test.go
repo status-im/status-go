@@ -13,24 +13,18 @@ type VectorsFile struct {
 }
 
 type Vector struct {
-	language, salt, password, input, mnemonic, seed, xprv string
+	language, password, input, mnemonic, seed, xprv string
 }
 
 func TestNewMnemonic(t *testing.T) {
-	m1 := NewMnemonic("")
+	m1 := NewMnemonic()
 	if m1.salt != Salt {
 		t.Errorf("expected default salt, got: %q", m1.salt)
-	}
-
-	customSalt := "custom-salt"
-	m2 := NewMnemonic(customSalt)
-	if m2.salt != customSalt {
-		t.Errorf("expected %q, got: %q", customSalt, m2.salt)
 	}
 }
 
 func TestMnemonic_WordList(t *testing.T) {
-	m := NewMnemonic(Salt)
+	m := NewMnemonic()
 	_, err := m.WordList(EnglishLanguage)
 	if err != nil {
 		t.Errorf("expected WordList to return WordList without errors, got: %s", err)
@@ -48,7 +42,7 @@ func TestMnemonic_WordList(t *testing.T) {
 // TestMnemonicPhrase
 func TestMnemonicPhrase(t *testing.T) {
 
-	mnemonic := NewMnemonic(Salt)
+	mnemonic := NewMnemonic()
 
 	// test strength validation
 	strengths := []entropyStrength{127, 129, 257}
@@ -84,7 +78,7 @@ func TestMnemonicPhrase(t *testing.T) {
 	stats := map[string]int{}
 	for _, vector := range vectorsFile.vectors {
 		stats[vector.language]++
-		mnemonic := NewMnemonic(vector.salt)
+		mnemonic := NewMnemonic()
 		seed := mnemonic.MnemonicSeed(vector.mnemonic, vector.password)
 		if fmt.Sprintf("%x", seed) != vector.seed {
 			t.Errorf("Test failed (%s): incorrect seed (%x) generated (expected: %s)", vector.language, seed, vector.seed)
@@ -120,7 +114,7 @@ func LoadVectorsFile(path string) (*VectorsFile, error) {
 	// load data into Vector structs
 	for language, data := range vectorsFile.Data {
 		for _, item := range data {
-			vectorsFile.vectors = append(vectorsFile.vectors, &Vector{language, item[0], item[1], item[2], item[3], item[4], item[5]})
+			vectorsFile.vectors = append(vectorsFile.vectors, &Vector{language, item[0], item[1], item[2], item[3], item[4]})
 		}
 	}
 
@@ -128,6 +122,6 @@ func LoadVectorsFile(path string) (*VectorsFile, error) {
 }
 
 func (v *Vector) String() string {
-	return fmt.Sprintf("{salt: %s, password: %s, input: %s, mnemonic: %s, seed: %s, xprv: %s}",
-		v.salt, v.password, v.input, v.mnemonic, v.seed, v.xprv)
+	return fmt.Sprintf("{password: %s, input: %s, mnemonic: %s, seed: %s, xprv: %s}",
+		v.password, v.input, v.mnemonic, v.seed, v.xprv)
 }
