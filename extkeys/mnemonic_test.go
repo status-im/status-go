@@ -91,6 +91,15 @@ func TestMnemonicPhrase(t *testing.T) {
 			return
 		}
 		//t.Logf("Test passed: correct seed (%x) generated (expected: %s)", seed, vector.seed)
+
+		rootKey, err := NewMaster(seed)
+		if err != nil {
+			t.Error(err)
+		}
+
+		if fmt.Sprintf("%s", rootKey) != vector.xprv {
+			t.Errorf("Test failed (%s): incorrect xprv (%s) generated (expected: %s)", vector.language, rootKey, vector.xprv)
+		}
 	}
 	for language, count := range stats {
 		t.Logf("[%s]: %d tests completed", language, count)

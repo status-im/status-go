@@ -114,7 +114,7 @@ tests:
 			continue
 		}
 
-		extKey, err := NewMaster(seed, []byte("Bitcoin seed"))
+		extKey, err := NewMaster(seed)
 		if err != nil {
 			t.Errorf("NewMasterKey #%d (%s): %v", i, test.name, err)
 			continue
@@ -380,14 +380,14 @@ func TestChildDerivation(t *testing.T) {
 
 func TestErrors(t *testing.T) {
 	// Should get an error when seed has too few bytes.
-	_, err := NewMaster(bytes.Repeat([]byte{0x00}, 15), []byte{0x00})
+	_, err := NewMaster(bytes.Repeat([]byte{0x00}, 15))
 	if err != ErrInvalidSeedLen {
 		t.Errorf("NewMaster: mismatched error -- got: %v, want: %v",
 			err, ErrInvalidSeedLen)
 	}
 
 	// Should get an error when seed has too many bytes.
-	_, err = NewMaster(bytes.Repeat([]byte{0x00}, 65), []byte{0x00})
+	_, err = NewMaster(bytes.Repeat([]byte{0x00}, 65))
 	if err != ErrInvalidSeedLen {
 		t.Errorf("NewMaster: mismatched error -- got: %v, want: %v",
 			err, ErrInvalidSeedLen)
@@ -402,7 +402,7 @@ func TestErrors(t *testing.T) {
 	}
 
 	password := "badpassword"
-	extKey, err := NewMaster(mnemonic.MnemonicSeed(phrase, password), []byte(Salt))
+	extKey, err := NewMaster(mnemonic.MnemonicSeed(phrase, password))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 		return
@@ -543,7 +543,7 @@ func TestBIP44ChildDerivation(t *testing.T) {
 //
 //	password := "badpassword"
 //	mnemonic.salt = "Bitcoin seed"
-//	key, err := NewMaster(mnemonic.MnemonicSeed(phrase, password), []byte(mnemonic.salt))
+//	key, err := NewMaster(mnemonic.MnemonicSeed(phrase, password))
 //	if err != nil {
 //		t.Error(err)
 //	}
