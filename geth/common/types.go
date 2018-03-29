@@ -5,9 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -83,67 +81,6 @@ func (args SendTxArgs) GetInput() hexutil.Bytes {
 
 func isNilOrEmpty(bytes hexutil.Bytes) bool {
 	return bytes == nil || len(bytes) == 0
-}
-
-// APIResponse generic response from API
-type APIResponse struct {
-	Error string `json:"error"`
-}
-
-// APIDetailedResponse represents a generic response
-// with possible errors.
-type APIDetailedResponse struct {
-	Status      bool            `json:"status"`
-	Message     string          `json:"message,omitempty"`
-	FieldErrors []APIFieldError `json:"field_errors,omitempty"`
-}
-
-func (r APIDetailedResponse) Error() string {
-	buf := bytes.NewBufferString("")
-
-	for _, err := range r.FieldErrors {
-		buf.WriteString(err.Error() + "\n") // nolint: gas
-	}
-
-	return strings.TrimSpace(buf.String())
-}
-
-// APIFieldError represents a set of errors
-// related to a parameter.
-type APIFieldError struct {
-	Parameter string     `json:"parameter,omitempty"`
-	Errors    []APIError `json:"errors"`
-}
-
-func (e APIFieldError) Error() string {
-	if len(e.Errors) == 0 {
-		return ""
-	}
-
-	buf := bytes.NewBufferString(fmt.Sprintf("Parameter: %s\n", e.Parameter))
-
-	for _, err := range e.Errors {
-		buf.WriteString(err.Error() + "\n") // nolint: gas
-	}
-
-	return strings.TrimSpace(buf.String())
-}
-
-// APIError represents a single error.
-type APIError struct {
-	Message string `json:"message"`
-}
-
-func (e APIError) Error() string {
-	return fmt.Sprintf("message=%s", e.Message)
-}
-
-// AccountInfo represents account's info
-type AccountInfo struct {
-	Address  string `json:"address"`
-	PubKey   string `json:"pubkey"`
-	Mnemonic string `json:"mnemonic"`
-	Error    string `json:"error"`
 }
 
 // StopRPCCallError defines a error type specific for killing a execution process.

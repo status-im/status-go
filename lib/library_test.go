@@ -9,7 +9,6 @@ package main
 import (
 	"testing"
 
-	"github.com/status-im/status-go/geth/common"
 	"github.com/stretchr/testify/require"
 )
 
@@ -23,7 +22,7 @@ func TestExportedAPI(t *testing.T) {
 }
 
 func TestValidateNodeConfig(t *testing.T) {
-	noErrorsCallback := func(resp common.APIDetailedResponse) {
+	noErrorsCallback := func(resp APIDetailedResponse) {
 		require.True(t, resp.Status, "expected status equal true")
 		require.Empty(t, resp.FieldErrors)
 		require.Empty(t, resp.Message)
@@ -32,7 +31,7 @@ func TestValidateNodeConfig(t *testing.T) {
 	testCases := []struct {
 		Name     string
 		Config   string
-		Callback func(common.APIDetailedResponse)
+		Callback func(APIDetailedResponse)
 	}{
 		{
 			Name: "response for valid config",
@@ -45,7 +44,7 @@ func TestValidateNodeConfig(t *testing.T) {
 		{
 			Name:   "response for invalid JSON string",
 			Config: `{"Network": }`,
-			Callback: func(resp common.APIDetailedResponse) {
+			Callback: func(resp APIDetailedResponse) {
 				require.False(t, resp.Status)
 				require.Contains(t, resp.Message, "validation: invalid character '}'")
 			},
@@ -53,7 +52,7 @@ func TestValidateNodeConfig(t *testing.T) {
 		{
 			Name:   "response for config with multiple errors",
 			Config: `{}`,
-			Callback: func(resp common.APIDetailedResponse) {
+			Callback: func(resp APIDetailedResponse) {
 				required := map[string]string{
 					"NodeConfig.NetworkID": "required",
 					"NodeConfig.DataDir":   "required",
