@@ -1,14 +1,15 @@
-package common
+package rpc
 
 import (
 	"errors"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/status-im/status-go/geth/common"
 )
 
-// RPCCall represents a unit of a rpc request which is to be executed.
-type RPCCall struct {
+// Call represents a unit of a rpc request which is to be executed.
+type Call struct {
 	ID     int64
 	Method string
 	Params []interface{}
@@ -20,9 +21,9 @@ var (
 	ErrInvalidToAddress   = errors.New("Failed to parse To Address")
 )
 
-// ParseFromAddress returns the address associated with the RPCCall.
-func (r RPCCall) ParseFromAddress() (gethcommon.Address, error) {
-	params, ok := r.Params[0].(map[string]interface{})
+// ParseFromAddress returns the address associated with the Call.
+func (c Call) ParseFromAddress() (gethcommon.Address, error) {
+	params, ok := c.Params[0].(map[string]interface{})
 	if !ok {
 		return gethcommon.HexToAddress("0x"), ErrInvalidFromAddress
 	}
@@ -36,8 +37,8 @@ func (r RPCCall) ParseFromAddress() (gethcommon.Address, error) {
 }
 
 // ParseToAddress returns the gethcommon.Address associated with the call.
-func (r RPCCall) ParseToAddress() (gethcommon.Address, error) {
-	params, ok := r.Params[0].(map[string]interface{})
+func (c Call) ParseToAddress() (gethcommon.Address, error) {
+	params, ok := c.Params[0].(map[string]interface{})
 	if !ok {
 		return gethcommon.HexToAddress("0x"), ErrInvalidToAddress
 	}
@@ -50,8 +51,8 @@ func (r RPCCall) ParseToAddress() (gethcommon.Address, error) {
 	return gethcommon.HexToAddress(to), nil
 }
 
-func (r RPCCall) parseDataField(fieldName string) hexutil.Bytes {
-	params, ok := r.Params[0].(map[string]interface{})
+func (c Call) parseDataField(fieldName string) hexutil.Bytes {
+	params, ok := c.Params[0].(map[string]interface{})
 	if !ok {
 		return hexutil.Bytes("0x")
 	}
@@ -70,19 +71,19 @@ func (r RPCCall) parseDataField(fieldName string) hexutil.Bytes {
 }
 
 // ParseData returns the bytes associated with the call in the deprecated "data" field.
-func (r RPCCall) ParseData() hexutil.Bytes {
-	return r.parseDataField("data")
+func (c Call) ParseData() hexutil.Bytes {
+	return c.parseDataField("data")
 }
 
 // ParseInput returns the bytes associated with the call.
-func (r RPCCall) ParseInput() hexutil.Bytes {
-	return r.parseDataField("input")
+func (c Call) ParseInput() hexutil.Bytes {
+	return c.parseDataField("input")
 }
 
 // ParseValue returns the hex big associated with the call.
 // nolint: dupl
-func (r RPCCall) ParseValue() *hexutil.Big {
-	params, ok := r.Params[0].(map[string]interface{})
+func (c Call) ParseValue() *hexutil.Big {
+	params, ok := c.Params[0].(map[string]interface{})
 	if !ok {
 		return nil
 		//return (*hexutil.Big)(big.NewInt("0x0"))
@@ -103,8 +104,8 @@ func (r RPCCall) ParseValue() *hexutil.Big {
 
 // ParseGas returns the hex big associated with the call.
 // nolint: dupl
-func (r RPCCall) ParseGas() *hexutil.Uint64 {
-	params, ok := r.Params[0].(map[string]interface{})
+func (c Call) ParseGas() *hexutil.Uint64 {
+	params, ok := c.Params[0].(map[string]interface{})
 	if !ok {
 		return nil
 	}
@@ -125,8 +126,8 @@ func (r RPCCall) ParseGas() *hexutil.Uint64 {
 
 // ParseGasPrice returns the hex big associated with the call.
 // nolint: dupl
-func (r RPCCall) ParseGasPrice() *hexutil.Big {
-	params, ok := r.Params[0].(map[string]interface{})
+func (c Call) ParseGasPrice() *hexutil.Big {
+	params, ok := c.Params[0].(map[string]interface{})
 	if !ok {
 		return nil
 	}
@@ -144,30 +145,30 @@ func (r RPCCall) ParseGasPrice() *hexutil.Big {
 	return (*hexutil.Big)(parsedValue)
 }
 
-// ToSendTxArgs converts RPCCall to SendTxArgs.
-func (r RPCCall) ToSendTxArgs() SendTxArgs {
+// ToSendTxArgs converts Call to SendTxArgs.
+func (c Call) ToSendTxArgs() common.SendTxArgs {
 	var err error
 	var fromAddr, toAddr gethcommon.Address
 
-	fromAddr, err = r.ParseFromAddress()
+	fromAddr, err = c.ParseFromAddress()
 	if err != nil {
 		fromAddr = gethcommon.HexToAddress("0x0")
 	}
 
-	toAddr, err = r.ParseToAddress()
+	toAddr, err = c.ParseToAddress()
 	if err != nil {
 		toAddr = gethcommon.HexToAddress("0x0")
 	}
 
-	input := r.ParseInput()
-	data := r.ParseData()
-	return SendTxArgs{
+	input := c.ParseInput()
+	data := c.ParseData()
+	return common.SendTxArgs{
 		To:       &toAddr,
 		From:     fromAddr,
-		Value:    r.ParseValue(),
+		Value:    c.ParseValue(),
 		Input:    input,
 		Data:     data,
-		Gas:      r.ParseGas(),
-		GasPrice: r.ParseGasPrice(),
+		Gas:      c.ParseGas(),
+		GasPrice: c.ParseGasPrice(),
 	}
 }
