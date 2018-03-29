@@ -91,7 +91,7 @@ func TestMnemonicPhrase(t *testing.T) {
 			t.Error(err)
 		}
 
-		if fmt.Sprintf("%s", rootKey) != vector.xprv {
+		if rootKey.String() != vector.xprv {
 			t.Errorf("Test failed (%s): incorrect xprv (%s) generated (expected: %s)", vector.language, rootKey, vector.xprv)
 		}
 	}
