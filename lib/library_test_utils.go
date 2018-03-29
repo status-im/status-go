@@ -1477,3 +1477,16 @@ func testValidateNodeConfig(t *testing.T, config string, fn func(APIDetailedResp
 
 	fn(resp)
 }
+
+// PanicAfter throws panic() after waitSeconds, unless abort channel receives
+// notification.
+func PanicAfter(waitSeconds time.Duration, abort chan struct{}, desc string) {
+	go func() {
+		select {
+		case <-abort:
+			return
+		case <-time.After(waitSeconds):
+			panic("whatever you were doing takes toooo long: " + desc)
+		}
+	}()
+}
