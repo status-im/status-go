@@ -55,22 +55,22 @@ func StopNode() *C.char {
 //ValidateNodeConfig validates config for status node
 //export ValidateNodeConfig
 func ValidateNodeConfig(configJSON *C.char) *C.char {
-	var resp common.APIDetailedResponse
+	var resp APIDetailedResponse
 
 	_, err := params.LoadNodeConfig(C.GoString(configJSON))
 
-	// Convert errors to common.APIDetailedResponse
+	// Convert errors to APIDetailedResponse
 	switch err := err.(type) {
 	case validator.ValidationErrors:
-		resp = common.APIDetailedResponse{
+		resp = APIDetailedResponse{
 			Message:     "validation: validation failed",
-			FieldErrors: make([]common.APIFieldError, len(err)),
+			FieldErrors: make([]APIFieldError, len(err)),
 		}
 
 		for i, ve := range err {
-			resp.FieldErrors[i] = common.APIFieldError{
+			resp.FieldErrors[i] = APIFieldError{
 				Parameter: ve.Namespace(),
-				Errors: []common.APIError{
+				Errors: []APIError{
 					{
 						Message: fmt.Sprintf("field validation failed on the '%s' tag", ve.Tag()),
 					},
@@ -78,11 +78,11 @@ func ValidateNodeConfig(configJSON *C.char) *C.char {
 			}
 		}
 	case error:
-		resp = common.APIDetailedResponse{
+		resp = APIDetailedResponse{
 			Message: fmt.Sprintf("validation: %s", err.Error()),
 		}
 	case nil:
-		resp = common.APIDetailedResponse{
+		resp = APIDetailedResponse{
 			Status: true,
 		}
 	}
@@ -121,7 +121,7 @@ func CreateAccount(password *C.char) *C.char {
 		errString = err.Error()
 	}
 
-	out := common.AccountInfo{
+	out := AccountInfo{
 		Address:  address,
 		PubKey:   pubKey,
 		Mnemonic: mnemonic,
@@ -142,7 +142,7 @@ func CreateChildAccount(parentAddress, password *C.char) *C.char {
 		errString = err.Error()
 	}
 
-	out := common.AccountInfo{
+	out := AccountInfo{
 		Address: address,
 		PubKey:  pubKey,
 		Error:   errString,
@@ -162,7 +162,7 @@ func RecoverAccount(password, mnemonic *C.char) *C.char {
 		errString = err.Error()
 	}
 
-	out := common.AccountInfo{
+	out := AccountInfo{
 		Address:  address,
 		PubKey:   pubKey,
 		Mnemonic: C.GoString(mnemonic),
@@ -225,7 +225,7 @@ func CompleteTransactions(ids, password *C.char) *C.char {
 	out := common.CompleteTransactionsResult{}
 	out.Results = make(map[string]common.CompleteTransactionResult)
 
-	parsedIDs, err := common.ParseJSONArray(C.GoString(ids))
+	parsedIDs, err := ParseJSONArray(C.GoString(ids))
 	if err != nil {
 		out.Results["none"] = common.CompleteTransactionResult{
 			Error: err.Error(),
@@ -288,7 +288,7 @@ func DiscardTransactions(ids *C.char) *C.char {
 	out := common.DiscardTransactionsResult{}
 	out.Results = make(map[string]common.DiscardTransactionResult)
 
-	parsedIDs, err := common.ParseJSONArray(C.GoString(ids))
+	parsedIDs, err := ParseJSONArray(C.GoString(ids))
 	if err != nil {
 		out.Results["none"] = common.DiscardTransactionResult{
 			Error: err.Error(),
@@ -383,7 +383,7 @@ func makeJSONResponse(err error) *C.char {
 		errString = err.Error()
 	}
 
-	out := common.APIResponse{
+	out := APIResponse{
 		Error: errString,
 	}
 	outBytes, _ := json.Marshal(out)
@@ -409,7 +409,7 @@ func NotifyUsers(message, payloadJSON, tokensArray *C.char) (outCBytes *C.char) 
 	errString := ""
 
 	defer func() {
-		out := common.NotifyResult{
+		out := NotifyResult{
 			Status: err == nil,
 			Error:  errString,
 		}
@@ -424,7 +424,7 @@ func NotifyUsers(message, payloadJSON, tokensArray *C.char) (outCBytes *C.char) 
 		outCBytes = C.CString(string(outBytes))
 	}()
 
-	tokens, err := common.ParseJSONArray(C.GoString(tokensArray))
+	tokens, err := ParseJSONArray(C.GoString(tokensArray))
 	if err != nil {
 		errString = err.Error()
 		return

@@ -2,7 +2,6 @@ package common
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -10,7 +9,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime/debug"
-	"time"
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/pborman/uuid"
@@ -44,18 +42,6 @@ func ImportTestAccount(keystoreDir, accountFile string) error {
 	return err
 }
 
-// PanicAfter throws panic() after waitSeconds, unless abort channel receives notification
-func PanicAfter(waitSeconds time.Duration, abort chan struct{}, desc string) {
-	go func() {
-		select {
-		case <-abort:
-			return
-		case <-time.After(waitSeconds):
-			panic("whatever you were doing takes toooo long: " + desc)
-		}
-	}()
-}
-
 // MessageIDFromContext returns message id from context (if exists)
 func MessageIDFromContext(ctx context.Context) string {
 	if ctx == nil {
@@ -66,17 +52,6 @@ func MessageIDFromContext(ctx context.Context) string {
 	}
 
 	return ""
-}
-
-// ParseJSONArray parses JSON array into Go array of string
-func ParseJSONArray(items string) ([]string, error) {
-	var parsedItems []string
-	err := json.Unmarshal([]byte(items), &parsedItems)
-	if err != nil {
-		return nil, err
-	}
-
-	return parsedItems, nil
 }
 
 // Fatalf is used to halt the execution.
