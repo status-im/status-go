@@ -312,9 +312,7 @@ func (m *Manager) DiscardTransactions(ids []common.QueuedTxID) map[common.Queued
 // It accepts one param which is a slice with a map of transaction params.
 func (m *Manager) SendTransactionRPCHandler(ctx context.Context, args ...interface{}) (interface{}, error) {
 	m.log.Info("SendTransactionRPCHandler called")
-	// TODO(adam): it's a hack to parse arguments as common.RPCCall can do that.
-	// We should refactor parsing these params to a separate struct.
-	rpcCall := common.RPCCall{Params: args}
+	rpcCall := rpc.Call{Params: args}
 	tx := common.CreateTransaction(ctx, rpcCall.ToSendTxArgs())
 	if err := m.QueueTransaction(tx); err != nil {
 		return nil, err
