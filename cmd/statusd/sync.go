@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/status-im/status-go/geth/common"
+	"github.com/status-im/status-go/geth/node"
 )
 
 func createContextFromTimeout(timeout int) (context.Context, context.CancelFunc) {
@@ -19,7 +19,7 @@ func createContextFromTimeout(timeout int) (context.Context, context.CancelFunc)
 // It returns an exit code (`0` if successful or `1` in case of error)
 // that can be used in `os.Exit` to exit immediately when the function returns.
 // The special exit code `-1` is used if execution was interrupted.
-func syncAndStopNode(interruptCh <-chan struct{}, nodeManager common.NodeManager, timeout int) (exitCode int) {
+func syncAndStopNode(interruptCh <-chan struct{}, nodeManager *node.Manager, timeout int) (exitCode int) {
 
 	logger.Info("syncAndStopNode: node will synchronize the chain and exit", "timeoutInMins", timeout)
 

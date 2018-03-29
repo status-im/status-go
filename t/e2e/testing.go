@@ -4,7 +4,7 @@ import (
 	"context"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/status-im/status-go/geth/common"
+	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
 )
 
@@ -27,7 +27,7 @@ func WithDataDir(path string) TestNodeOption {
 }
 
 // FirstBlockHash validates Attach operation for the NodeManager.
-func FirstBlockHash(nodeManager common.NodeManager) (string, error) {
+func FirstBlockHash(nodeManager *node.Manager) (string, error) {
 	// obtain RPC client for running node
 	runningNode, err := nodeManager.Node()
 	if err != nil {

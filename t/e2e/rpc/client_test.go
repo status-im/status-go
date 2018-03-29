@@ -19,7 +19,7 @@ func TestRPCClientTestSuite(t *testing.T) {
 }
 
 func (s *RPCClientTestSuite) SetupTest() {
-	s.NodeManager = node.NewNodeManager()
+	s.NodeManager = node.NewManager()
 	s.NotNil(s.NodeManager)
 }
 

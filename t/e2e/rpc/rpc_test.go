@@ -26,7 +26,7 @@ type RPCTestSuite struct {
 }
 
 func (s *RPCTestSuite) SetupTest() {
-	s.NodeManager = node.NewNodeManager()
+	s.NodeManager = node.NewManager()
 	s.NotNil(s.NodeManager)
 }
 

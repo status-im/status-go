@@ -27,7 +27,7 @@ type ManagerTestSuite struct {
 }
 
 func (s *ManagerTestSuite) SetupTest() {
-	s.NodeManager = node.NewNodeManager()
+	s.NodeManager = node.NewManager()
 }
 
 func (s *ManagerTestSuite) TestReferencesWithoutStartedNode() {

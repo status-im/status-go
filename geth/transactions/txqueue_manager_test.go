@@ -27,38 +27,34 @@ import (
 	. "github.com/status-im/status-go/t/utils"
 )
 
-func TestTxQueueTestSuite(t *testing.T) {
-	suite.Run(t, new(TxQueueTestSuite))
-}
-
 type TxQueueTestSuite struct {
 	suite.Suite
-	nodeManagerMockCtrl *gomock.Controller
-	nodeManagerMock     *common.MockNodeManager
-	server              *gethrpc.Server
-	client              *gethrpc.Client
-	txServiceMockCtrl   *gomock.Controller
-	txServiceMock       *fake.MockPublicTransactionPoolAPI
-	nodeConfig          *params.NodeConfig
+	rpcClientMockCtrl *gomock.Controller
+	rpcClientMock     *MocktestRPCClientProvider
+	server            *gethrpc.Server
+	client            *gethrpc.Client
+	txServiceMockCtrl *gomock.Controller
+	txServiceMock     *fake.MockPublicTransactionPoolAPI
+	nodeConfig        *params.NodeConfig
 
 	manager *Manager
 }
 
 func (s *TxQueueTestSuite) SetupTest() {
-	s.nodeManagerMockCtrl = gomock.NewController(s.T())
+	s.rpcClientMockCtrl = gomock.NewController(s.T())
 	s.txServiceMockCtrl = gomock.NewController(s.T())
 
-	s.nodeManagerMock = common.NewMockNodeManager(s.nodeManagerMockCtrl)
+	s.rpcClientMock = NewMocktestRPCClientProvider(s.rpcClientMockCtrl)
 
 	s.server, s.txServiceMock = fake.NewTestServer(s.txServiceMockCtrl)
 	s.client = gethrpc.DialInProc(s.server)
 	rpclient, _ := rpc.NewClient(s.client, params.UpstreamRPCConfig{})
-	s.nodeManagerMock.EXPECT().RPCClient().Return(rpclient)
+	s.rpcClientMock.EXPECT().RPCClient().Return(rpclient)
 	nodeConfig, err := params.NewNodeConfig("/tmp", "", params.RopstenNetworkID, true)
 	s.Require().NoError(err)
 	s.nodeConfig = nodeConfig
 
-	s.manager = NewManager(s.nodeManagerMock)
+	s.manager = NewManager(s.rpcClientMock)
 	s.manager.DisableNotificactions()
 	s.manager.completionTimeout = time.Second
 	s.manager.rpcCallTimeout = time.Second
@@ -67,7 +63,7 @@ func (s *TxQueueTestSuite) SetupTest() {
 
 func (s *TxQueueTestSuite) TearDownTest() {
 	s.manager.Stop()
-	s.nodeManagerMockCtrl.Finish()
+	s.rpcClientMockCtrl.Finish()
 	s.txServiceMockCtrl.Finish()
 	s.server.Stop()
 	s.client.Close()

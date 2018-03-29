@@ -36,7 +36,7 @@ type JailTestSuite struct {
 }
 
 func (s *JailTestSuite) SetupTest() {
-	s.NodeManager = node.NewNodeManager()
+	s.NodeManager = node.NewManager()
 	s.Jail = jail.New(s.NodeManager)
 }
 

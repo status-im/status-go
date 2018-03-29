@@ -34,7 +34,7 @@ var (
 // StatusBackend implements Status.im service
 type StatusBackend struct {
 	mu              sync.Mutex
-	nodeManager     *node.NodeManager
+	nodeManager     *node.Manager
 	accountManager  *account.Manager
 	txQueueManager  *transactions.Manager
 	jailManager     jail.Manager
@@ -47,7 +47,7 @@ type StatusBackend struct {
 func NewStatusBackend() *StatusBackend {
 	defer log.Info("Status backend initialized")
 
-	nodeManager := node.NewNodeManager()
+	nodeManager := node.NewManager()
 	accountManager := account.NewManager(nodeManager)
 	txQueueManager := transactions.NewManager(nodeManager)
 	jailManager := jail.New(nodeManager)
@@ -64,7 +64,7 @@ func NewStatusBackend() *StatusBackend {
 }
 
 // NodeManager returns reference to node manager
-func (b *StatusBackend) NodeManager() *node.NodeManager {
+func (b *StatusBackend) NodeManager() *node.Manager {
 	return b.nodeManager
 }
 
