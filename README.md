@@ -8,6 +8,16 @@
 - [How To Build](https://wiki.status.im/Building_status-go)
 - [Notes on Bindings](https://wiki.status.im/Status-go_Binding_notes)
 
+# Notes on Git/GitHub workflow
+
+1. Squash PR before merging.
+   You can do it either with GitHub api or locally if you want to preserve signature.
+   Don't use `Create merge commit` option on GitHub. It pollutes history with meaningless information.
+   It is ok to merge multiple commits with `Rebase and merge` if they are logically separate.
+
+2. Preserve as much history as possible.
+   If you need to re-name file use `git mv` - it will preserve git history.
+
 # Intro
 
 status-go is an underlying part of [Status](https://status.im/) - a browser, messenger, and gateway to a decentralized world.
