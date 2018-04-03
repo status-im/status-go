@@ -10,7 +10,6 @@ import (
 	"time"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/signal"
@@ -135,7 +134,7 @@ func (s *JailRPCTestSuite) TestContractDeployment() {
 
 			txID := event["id"].(string)
 			var txErr error
-			txHash, txErr = s.Backend.CompleteTransaction(common.QueuedTxID(txID), TestConfig.Account1.Password)
+			txHash, txErr = s.Backend.CompleteTransaction(txID, TestConfig.Account1.Password)
 			if s.NoError(txErr, event["id"]) {
 				s.T().Logf("contract transaction complete, URL: %s", "https://ropsten.etherscan.io/tx/"+txHash.Hex())
 			}
@@ -291,7 +290,7 @@ func (s *JailRPCTestSuite) TestJailVMPersistence() {
 
 			//var txHash common.Hash
 			txID := event["id"].(string)
-			txHash, e := s.Backend.CompleteTransaction(common.QueuedTxID(txID), TestConfig.Account1.Password)
+			txHash, e := s.Backend.CompleteTransaction(txID, TestConfig.Account1.Password)
 			s.NoError(e, "cannot complete queued transaction[%v]: %v", event["id"], e)
 
 			s.T().Logf("Transaction complete: https://ropsten.etherscan.io/tx/%s", txHash.Hex())

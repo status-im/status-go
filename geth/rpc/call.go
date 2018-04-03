@@ -5,7 +5,6 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/status-im/status-go/geth/common"
 )
 
 // Call represents a unit of a rpc request which is to be executed.
@@ -143,32 +142,4 @@ func (c Call) ParseGasPrice() *hexutil.Big {
 	}
 
 	return (*hexutil.Big)(parsedValue)
-}
-
-// ToSendTxArgs converts Call to SendTxArgs.
-func (c Call) ToSendTxArgs() common.SendTxArgs {
-	var err error
-	var fromAddr, toAddr gethcommon.Address
-
-	fromAddr, err = c.ParseFromAddress()
-	if err != nil {
-		fromAddr = gethcommon.HexToAddress("0x0")
-	}
-
-	toAddr, err = c.ParseToAddress()
-	if err != nil {
-		toAddr = gethcommon.HexToAddress("0x0")
-	}
-
-	input := c.ParseInput()
-	data := c.ParseData()
-	return common.SendTxArgs{
-		To:       &toAddr,
-		From:     fromAddr,
-		Value:    c.ParseValue(),
-		Input:    input,
-		Data:     data,
-		Gas:      c.ParseGas(),
-		GasPrice: c.ParseGasPrice(),
-	}
 }

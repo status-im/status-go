@@ -31,11 +31,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/geth/account"
-	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/signal"
 	"github.com/status-im/status-go/geth/transactions"
-	"github.com/status-im/status-go/geth/transactions/queue"
 	"github.com/status-im/status-go/static"
 	. "github.com/status-im/status-go/t/utils" //nolint: golint
 )
@@ -70,10 +68,10 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 
 	// prepare accounts
 	testKeyDir := filepath.Join(testChainDir, "keystore")
-	if err := common.ImportTestAccount(testKeyDir, GetAccount1PKFile()); err != nil {
+	if err := ImportTestAccount(testKeyDir, GetAccount1PKFile()); err != nil {
 		panic(err)
 	}
-	if err := common.ImportTestAccount(testKeyDir, GetAccount2PKFile()); err != nil {
+	if err := ImportTestAccount(testKeyDir, GetAccount2PKFile()); err != nil {
 		panic(err)
 	}
 
@@ -175,10 +173,10 @@ func testVerifyAccountPassword(t *testing.T) bool {
 	}
 	defer os.RemoveAll(tmpDir) // nolint: errcheck
 
-	if err = common.ImportTestAccount(tmpDir, GetAccount1PKFile()); err != nil {
+	if err = ImportTestAccount(tmpDir, GetAccount1PKFile()); err != nil {
 		t.Fatal(err)
 	}
-	if err = common.ImportTestAccount(tmpDir, GetAccount2PKFile()); err != nil {
+	if err = ImportTestAccount(tmpDir, GetAccount2PKFile()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -798,7 +796,7 @@ func testCompleteTransaction(t *testing.T) bool {
 			event := envelope.Event.(map[string]interface{})
 			t.Logf("transaction queued (will be completed shortly): {id: %s}\n", event["id"].(string))
 
-			completeTxResponse := common.CompleteTransactionResult{}
+			completeTxResponse := CompleteTransactionResult{}
 			rawResponse := CompleteTransaction(C.CString(event["id"].(string)), C.CString(TestConfig.Account1.Password))
 
 			if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &completeTxResponse); err != nil {
@@ -818,7 +816,7 @@ func testCompleteTransaction(t *testing.T) bool {
 	})
 
 	// this call blocks, up until Complete Transaction is called
-	txCheckHash, err := statusAPI.SendTransaction(context.TODO(), common.SendTxArgs{
+	txCheckHash, err := statusAPI.SendTransaction(context.TODO(), transactions.SendTxArgs{
 		From:  account.FromAddress(TestConfig.Account1.Address),
 		To:    account.ToAddress(TestConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
@@ -883,7 +881,7 @@ func testCompleteMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocyc
 
 	//  this call blocks, and should return when DiscardQueuedTransaction() for a given tx id is called
 	sendTx := func() {
-		txHashCheck, err := statusAPI.SendTransaction(context.TODO(), common.SendTxArgs{
+		txHashCheck, err := statusAPI.SendTransaction(context.TODO(), transactions.SendTxArgs{
 			From:  account.FromAddress(TestConfig.Account1.Address),
 			To:    account.ToAddress(TestConfig.Account2.Address),
 			Value: (*hexutil.Big)(big.NewInt(1000000000000)),
@@ -912,14 +910,14 @@ func testCompleteMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocyc
 
 		// complete
 		resultsString := CompleteTransactions(C.CString(string(updatedTxIDStrings)), C.CString(TestConfig.Account1.Password))
-		resultsStruct := common.CompleteTransactionsResult{}
+		resultsStruct := CompleteTransactionsResult{}
 		if err := json.Unmarshal([]byte(C.GoString(resultsString)), &resultsStruct); err != nil {
 			t.Error(err)
 			return
 		}
 		results := resultsStruct.Results
 
-		if len(results) != (testTxCount+1) || results["invalid-tx-id"].Error != queue.ErrQueuedTxIDNotFound.Error() {
+		if len(results) != (testTxCount+1) || results["invalid-tx-id"].Error != transactions.ErrQueuedTxIDNotFound.Error() {
 			t.Errorf("cannot complete txs: %v", results)
 			return
 		}
@@ -944,7 +942,7 @@ func testCompleteMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocyc
 
 		time.Sleep(1 * time.Second) // make sure that tx complete signal propagates
 		for _, txID := range parsedIDs {
-			if txQueue.Has(common.QueuedTxID(txID)) {
+			if txQueue.Has(string(txID)) {
 				t.Errorf("txqueue should not have test tx at this point (it should be completed): %s", txID)
 				return
 			}
@@ -1010,13 +1008,13 @@ func testDiscardTransaction(t *testing.T) bool { //nolint: gocyclo
 			txID = event["id"].(string)
 			t.Logf("transaction queued (will be discarded soon): {id: %s}\n", txID)
 
-			if !txQueue.Has(common.QueuedTxID(txID)) {
+			if !txQueue.Has(string(txID)) {
 				t.Errorf("txqueue should still have test tx: %s", txID)
 				return
 			}
 
 			// discard
-			discardResponse := common.DiscardTransactionResult{}
+			discardResponse := DiscardTransactionResult{}
 			rawResponse := DiscardTransaction(C.CString(txID))
 
 			if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &discardResponse); err != nil {
@@ -1029,14 +1027,14 @@ func testDiscardTransaction(t *testing.T) bool { //nolint: gocyclo
 			}
 
 			// try completing discarded transaction
-			_, err := statusAPI.CompleteTransaction(common.QueuedTxID(txID), TestConfig.Account1.Password)
-			if err != queue.ErrQueuedTxIDNotFound {
+			_, err := statusAPI.CompleteTransaction(string(txID), TestConfig.Account1.Password)
+			if err != transactions.ErrQueuedTxIDNotFound {
 				t.Error("expects tx not found, but call to CompleteTransaction succeeded")
 				return
 			}
 
 			time.Sleep(1 * time.Second) // make sure that tx complete signal propagates
-			if txQueue.Has(common.QueuedTxID(txID)) {
+			if txQueue.Has(string(txID)) {
 				t.Errorf("txqueue should not have test tx at this point (it should be discarded): %s", txID)
 				return
 			}
@@ -1066,7 +1064,7 @@ func testDiscardTransaction(t *testing.T) bool { //nolint: gocyclo
 	})
 
 	// this call blocks, and should return when DiscardQueuedTransaction() is called
-	txHashCheck, err := statusAPI.SendTransaction(context.TODO(), common.SendTxArgs{
+	txHashCheck, err := statusAPI.SendTransaction(context.TODO(), transactions.SendTxArgs{
 		From:  account.FromAddress(TestConfig.Account1.Address),
 		To:    account.ToAddress(TestConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
@@ -1123,7 +1121,7 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocycl
 			txID = event["id"].(string)
 			t.Logf("transaction queued (will be discarded soon): {id: %s}\n", txID)
 
-			if !txQueue.Has(common.QueuedTxID(txID)) {
+			if !txQueue.Has(string(txID)) {
 				t.Errorf("txqueue should still have test tx: %s", txID)
 				return
 			}
@@ -1157,7 +1155,7 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocycl
 
 	// this call blocks, and should return when DiscardQueuedTransaction() for a given tx id is called
 	sendTx := func() {
-		txHashCheck, err := statusAPI.SendTransaction(context.TODO(), common.SendTxArgs{
+		txHashCheck, err := statusAPI.SendTransaction(context.TODO(), transactions.SendTxArgs{
 			From:  account.FromAddress(TestConfig.Account1.Address),
 			To:    account.ToAddress(TestConfig.Account2.Address),
 			Value: (*hexutil.Big)(big.NewInt(1000000000000)),
@@ -1186,21 +1184,21 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocycl
 
 		// discard
 		discardResultsString := DiscardTransactions(C.CString(string(updatedTxIDStrings)))
-		discardResultsStruct := common.DiscardTransactionsResult{}
+		discardResultsStruct := DiscardTransactionsResult{}
 		if err := json.Unmarshal([]byte(C.GoString(discardResultsString)), &discardResultsStruct); err != nil {
 			t.Error(err)
 			return
 		}
 		discardResults := discardResultsStruct.Results
 
-		if len(discardResults) != 1 || discardResults["invalid-tx-id"].Error != queue.ErrQueuedTxIDNotFound.Error() {
+		if len(discardResults) != 1 || discardResults["invalid-tx-id"].Error != transactions.ErrQueuedTxIDNotFound.Error() {
 			t.Errorf("cannot discard txs: %v", discardResults)
 			return
 		}
 
 		// try completing discarded transaction
 		completeResultsString := CompleteTransactions(C.CString(string(updatedTxIDStrings)), C.CString(TestConfig.Account1.Password))
-		completeResultsStruct := common.CompleteTransactionsResult{}
+		completeResultsStruct := CompleteTransactionsResult{}
 		if err := json.Unmarshal([]byte(C.GoString(completeResultsString)), &completeResultsStruct); err != nil {
 			t.Error(err)
 			return
@@ -1215,7 +1213,7 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocycl
 				t.Errorf("tx id not set in result: expected id is %s", txID)
 				return
 			}
-			if txResult.Error != queue.ErrQueuedTxIDNotFound.Error() {
+			if txResult.Error != transactions.ErrQueuedTxIDNotFound.Error() {
 				t.Errorf("invalid error for %s", txResult.Hash)
 				return
 			}
@@ -1227,7 +1225,7 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocycl
 
 		time.Sleep(1 * time.Second) // make sure that tx complete signal propagates
 		for _, txID := range parsedIDs {
-			if txQueue.Has(common.QueuedTxID(txID)) {
+			if txQueue.Has(string(txID)) {
 				t.Errorf("txqueue should not have test tx at this point (it should be discarded): %s", txID)
 				return
 			}
@@ -1412,10 +1410,10 @@ func startTestNode(t *testing.T) <-chan struct{} {
 
 	// inject test accounts
 	testKeyDir := filepath.Join(testDir, "keystore")
-	if err := common.ImportTestAccount(testKeyDir, GetAccount1PKFile()); err != nil {
+	if err := ImportTestAccount(testKeyDir, GetAccount1PKFile()); err != nil {
 		panic(err)
 	}
-	if err := common.ImportTestAccount(testKeyDir, GetAccount2PKFile()); err != nil {
+	if err := ImportTestAccount(testKeyDir, GetAccount2PKFile()); err != nil {
 		panic(err)
 	}
 

@@ -1,18 +1,16 @@
-package common
+package transactions
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
-	"path/filepath"
 	"reflect"
 	"runtime/debug"
 
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/pborman/uuid"
-	"github.com/status-im/status-go/static"
+	"github.com/status-im/status-go/geth/signal"
 )
 
 const (
@@ -23,27 +21,28 @@ const (
 
 type contextKey string // in order to make sure that our context key does not collide with keys from other packages
 
-// All general log messages in this package should be routed through this logger.
-var logger = log.New("package", "status-go/geth/common")
+//ErrTxQueueRunFailure - error running transaction queue
+var ErrTxQueueRunFailure = errors.New("error running transaction queue")
 
-// ImportTestAccount imports keystore from static resources, see "static/keys" folder
-func ImportTestAccount(keystoreDir, accountFile string) error {
-	// make sure that keystore folder exists
-	if _, err := os.Stat(keystoreDir); os.IsNotExist(err) {
-		os.MkdirAll(keystoreDir, os.ModePerm) // nolint: errcheck, gas
+// haltOnPanic recovers from panic, logs issue, sends upward notification, and exits
+func haltOnPanic() {
+	if r := recover(); r != nil {
+		err := fmt.Errorf("%v: %v", ErrTxQueueRunFailure, r)
+
+		// send signal up to native app
+		signal.Send(signal.Envelope{
+			Type: signal.EventNodeCrashed,
+			Event: signal.NodeCrashEvent{
+				Error: err,
+			},
+		})
+
+		fatalf(err) // os.exit(1) is called internally
 	}
-
-	dst := filepath.Join(keystoreDir, accountFile)
-	err := ioutil.WriteFile(dst, static.MustAsset("keys/"+accountFile), 0644)
-	if err != nil {
-		logger.Warn("cannot copy test account PK", "error", err)
-	}
-
-	return err
 }
 
-// MessageIDFromContext returns message id from context (if exists)
-func MessageIDFromContext(ctx context.Context) string {
+// messageIDFromContext returns message id from context (if exists)
+func messageIDFromContext(ctx context.Context) string {
 	if ctx == nil {
 		return ""
 	}
@@ -54,10 +53,10 @@ func MessageIDFromContext(ctx context.Context) string {
 	return ""
 }
 
-// Fatalf is used to halt the execution.
+// fatalf is used to halt the execution.
 // When called the function prints stack end exits.
 // Failure is logged into both StdErr and StdOut.
-func Fatalf(reason interface{}, args ...interface{}) {
+func fatalf(reason interface{}, args ...interface{}) {
 	// decide on output stream
 	w := io.MultiWriter(os.Stdout, os.Stderr)
 	outf, _ := os.Stdout.Stat() // nolint: gas
@@ -79,12 +78,12 @@ func Fatalf(reason interface{}, args ...interface{}) {
 	os.Exit(1)
 }
 
-// CreateTransaction returns a transaction object.
-func CreateTransaction(ctx context.Context, args SendTxArgs) *QueuedTx {
+// Create returns a transaction object.
+func Create(ctx context.Context, args SendTxArgs) *QueuedTx {
 	return &QueuedTx{
-		ID:      QueuedTxID(uuid.New()),
+		ID:      uuid.New(),
 		Context: ctx,
 		Args:    args,
-		Result:  make(chan TransactionResult, 1),
+		Result:  make(chan Result, 1),
 	}
 }

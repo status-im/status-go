@@ -13,7 +13,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/golang/mock/gomock"
-	"github.com/status-im/status-go/geth/common"
 	. "github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -30,8 +29,8 @@ func TestVerifyAccountPassword(t *testing.T) {
 	defer os.RemoveAll(emptyKeyStoreDir) //nolint: errcheck
 
 	// import account keys
-	require.NoError(t, common.ImportTestAccount(keyStoreDir, GetAccount1PKFile()))
-	require.NoError(t, common.ImportTestAccount(keyStoreDir, GetAccount2PKFile()))
+	require.NoError(t, ImportTestAccount(keyStoreDir, GetAccount1PKFile()))
+	require.NoError(t, ImportTestAccount(keyStoreDir, GetAccount2PKFile()))
 
 	account1Address := gethcommon.BytesToAddress(gethcommon.FromHex(TestConfig.Account1.Address))
 
@@ -103,7 +102,7 @@ func TestVerifyAccountPasswordWithAccountBeforeEIP55(t *testing.T) {
 	defer os.RemoveAll(keyStoreDir) //nolint: errcheck
 
 	// Import keys and make sure one was created before EIP55 introduction.
-	err = common.ImportTestAccount(keyStoreDir, "test-account3-before-eip55.pk")
+	err = ImportTestAccount(keyStoreDir, "test-account3-before-eip55.pk")
 	require.NoError(t, err)
 
 	accManager := NewManager(nil)

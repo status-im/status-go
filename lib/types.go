@@ -75,3 +75,26 @@ type NotifyResult struct {
 	Status bool   `json:"status"`
 	Error  string `json:"error,omitempty"`
 }
+
+// CompleteTransactionResult is a JSON returned from transaction complete function (used in exposed method)
+type CompleteTransactionResult struct {
+	ID    string `json:"id"`
+	Hash  string `json:"hash"`
+	Error string `json:"error"`
+}
+
+// CompleteTransactionsResult is list of results from CompleteTransactions() (used in exposed method)
+type CompleteTransactionsResult struct {
+	Results map[string]CompleteTransactionResult `json:"results"`
+}
+
+// DiscardTransactionResult is a JSON returned from transaction discard function
+type DiscardTransactionResult struct {
+	ID    string `json:"id"`
+	Error string `json:"error"`
+}
+
+// DiscardTransactionsResult is a list of results from DiscardTransactions()
+type DiscardTransactionsResult struct {
+	Results map[string]DiscardTransactionResult `json:"results"`
+}
