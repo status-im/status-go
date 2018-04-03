@@ -20,7 +20,7 @@ import (
 	"github.com/status-im/status-go/geth/signal"
 	"github.com/status-im/status-go/geth/transactions"
 	"github.com/status-im/status-go/geth/transactions/queue"
-	e2e "github.com/status-im/status-go/t/e2e"
+	"github.com/status-im/status-go/t/e2e"
 	. "github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/suite"
 )
@@ -309,7 +309,8 @@ func (s *TransactionsTestSuite) TestSendEther() {
 }
 
 func (s *TransactionsTestSuite) TestSendEtherTxUpstream() {
-	if GetNetworkID() == params.StatusChainNetworkID {
+	// Only works on Ropsten.
+	if GetNetworkID() != params.RopstenNetworkID {
 		s.T().Skip()
 	}
 
