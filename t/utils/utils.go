@@ -2,10 +2,12 @@ package utils
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -16,8 +18,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/les"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/static"
 
 	_ "github.com/stretchr/testify/suite" // required to register testify flags
 )
@@ -32,7 +34,7 @@ var (
 	ErrTimeout = errors.New("timeout")
 
 	// TestConfig defines the default config usable at package-level.
-	TestConfig *common.TestConfig
+	TestConfig *testConfig
 
 	// RootDir is the main application directory
 	RootDir string
@@ -75,7 +77,7 @@ func init() {
 	// setup auxiliary directories
 	TestDataDir = filepath.Join(RootDir, ".ethereumtest")
 
-	TestConfig, err = common.LoadTestConfig(GetNetworkID())
+	TestConfig, err = loadTestConfig(GetNetworkID())
 	if err != nil {
 		panic(err)
 	}
@@ -281,4 +283,67 @@ func MakeTestNodeConfig(networkID int) (*params.NodeConfig, error) {
 		return nil, err
 	}
 	return nodeConfig, nil
+}
+
+type account struct {
+	Address  string
+	Password string
+}
+
+// testConfig contains shared (among different test packages) parameters
+type testConfig struct {
+	Node struct {
+		SyncSeconds time.Duration
+		HTTPPort    int
+		WSPort      int
+	}
+	Account1 account
+	Account2 account
+	Account3 account
+}
+
+const passphraseEnvName = "ACCOUNT_PASSWORD"
+
+// loadTestConfig loads test configuration values from disk
+func loadTestConfig(networkID int) (*testConfig, error) {
+	var config testConfig
+
+	configData := static.MustAsset("config/test-data.json")
+	if err := json.Unmarshal(configData, &config); err != nil {
+		return nil, err
+	}
+
+	if networkID == params.StatusChainNetworkID {
+		accountsData := static.MustAsset("config/status-chain-accounts.json")
+		if err := json.Unmarshal(accountsData, &config); err != nil {
+			return nil, err
+		}
+	} else {
+		accountsData := static.MustAsset("config/public-chain-accounts.json")
+		if err := json.Unmarshal(accountsData, &config); err != nil {
+			return nil, err
+		}
+
+		pass := os.Getenv(passphraseEnvName)
+		config.Account1.Password = pass
+		config.Account2.Password = pass
+	}
+
+	return &config, nil
+}
+
+// ImportTestAccount imports keystore from static resources, see "static/keys" folder
+func ImportTestAccount(keystoreDir, accountFile string) error {
+	// make sure that keystore folder exists
+	if _, err := os.Stat(keystoreDir); os.IsNotExist(err) {
+		os.MkdirAll(keystoreDir, os.ModePerm) // nolint: errcheck, gas
+	}
+
+	dst := filepath.Join(keystoreDir, accountFile)
+	err := ioutil.WriteFile(dst, static.MustAsset("keys/"+accountFile), 0644)
+	if err != nil {
+		logger.Warn("cannot copy test account PK", "error", err)
+	}
+
+	return err
 }

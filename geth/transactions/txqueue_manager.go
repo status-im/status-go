@@ -12,9 +12,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/status-im/status-go/geth/account"
-	"github.com/status-im/status-go/geth/common"
+
 	"github.com/status-im/status-go/geth/rpc"
-	"github.com/status-im/status-go/geth/transactions/queue"
 )
 
 const (
@@ -36,7 +35,7 @@ type RPCClientProvider interface {
 // Manager provides means to manage internal Status Backend (injected into LES)
 type Manager struct {
 	rpcClientProvider RPCClientProvider
-	txQueue           *queue.TxQueue
+	txQueue           *TxQueue
 	ethTxClient       EthTransactor
 	notify            bool
 	completionTimeout time.Duration
@@ -52,7 +51,7 @@ type Manager struct {
 func NewManager(rpcClientProvider RPCClientProvider) *Manager {
 	return &Manager{
 		rpcClientProvider: rpcClientProvider,
-		txQueue:           queue.New(),
+		txQueue:           newQueue(),
 		addrLock:          &AddrLocker{},
 		notify:            true,
 		completionTimeout: DefaultTxSendCompletionTimeout,
@@ -83,14 +82,14 @@ func (m *Manager) Stop() {
 }
 
 // TransactionQueue returns a reference to the queue.
-func (m *Manager) TransactionQueue() *queue.TxQueue {
+func (m *Manager) TransactionQueue() *TxQueue {
 	return m.txQueue
 }
 
 // QueueTransaction puts a transaction into the queue.
-func (m *Manager) QueueTransaction(tx *common.QueuedTx) error {
+func (m *Manager) QueueTransaction(tx *QueuedTx) error {
 	if !tx.Args.Valid() {
-		return common.ErrInvalidSendTxArgs
+		return ErrInvalidSendTxArgs
 	}
 	to := "<nil>"
 	if tx.Args.To != nil {
@@ -106,8 +105,8 @@ func (m *Manager) QueueTransaction(tx *common.QueuedTx) error {
 	return nil
 }
 
-func (m *Manager) txDone(tx *common.QueuedTx, hash gethcommon.Hash, err error) {
-	if err := m.txQueue.Done(tx.ID, hash, err); err == queue.ErrQueuedTxIDNotFound {
+func (m *Manager) txDone(tx *QueuedTx, hash gethcommon.Hash, err error) {
+	if err := m.txQueue.Done(tx.ID, hash, err); err == ErrQueuedTxIDNotFound {
 		m.log.Warn("transaction is already removed from a queue", "ID", tx.ID)
 		return
 	}
@@ -118,7 +117,7 @@ func (m *Manager) txDone(tx *common.QueuedTx, hash gethcommon.Hash, err error) {
 
 // WaitForTransaction adds a transaction to the queue and blocks
 // until it's completed, discarded or times out.
-func (m *Manager) WaitForTransaction(tx *common.QueuedTx) common.TransactionResult {
+func (m *Manager) WaitForTransaction(tx *QueuedTx) Result {
 	m.log.Info("wait for transaction", "id", tx.ID)
 	// now wait up until transaction is:
 	// - completed (via CompleteQueuedTransaction),
@@ -135,7 +134,7 @@ func (m *Manager) WaitForTransaction(tx *common.QueuedTx) common.TransactionResu
 }
 
 // NotifyErrored sends a notification for the given transaction
-func (m *Manager) NotifyErrored(id common.QueuedTxID, inputError error) error {
+func (m *Manager) NotifyErrored(id string, inputError error) error {
 	tx, err := m.txQueue.Get(id)
 	if err != nil {
 		m.log.Warn("error getting a queued transaction", "err", err)
@@ -150,7 +149,7 @@ func (m *Manager) NotifyErrored(id common.QueuedTxID, inputError error) error {
 }
 
 // CompleteTransaction instructs backend to complete sending of a given transaction.
-func (m *Manager) CompleteTransaction(id common.QueuedTxID, account *account.SelectedExtKey) (hash gethcommon.Hash, err error) {
+func (m *Manager) CompleteTransaction(id string, account *account.SelectedExtKey) (hash gethcommon.Hash, err error) {
 	m.log.Info("complete transaction", "id", id)
 	tx, err := m.txQueue.Get(id)
 	if err != nil {
@@ -173,21 +172,21 @@ func (m *Manager) CompleteTransaction(id common.QueuedTxID, account *account.Sel
 }
 
 // make sure that only account which created the tx can complete it
-func (m *Manager) validateAccount(tx *common.QueuedTx, selectedAccount *account.SelectedExtKey) error {
+func (m *Manager) validateAccount(tx *QueuedTx, selectedAccount *account.SelectedExtKey) error {
 	if selectedAccount == nil {
 		return account.ErrNoAccountSelected
 	}
 
 	// make sure that only account which created the tx can complete it
 	if tx.Args.From.Hex() != selectedAccount.Address.Hex() {
-		m.log.Warn("queued transaction does not belong to the selected account", "err", queue.ErrInvalidCompleteTxSender)
-		return queue.ErrInvalidCompleteTxSender
+		m.log.Warn("queued transaction does not belong to the selected account", "err", ErrInvalidCompleteTxSender)
+		return ErrInvalidCompleteTxSender
 	}
 
 	return nil
 }
 
-func (m *Manager) completeTransaction(selectedAccount *account.SelectedExtKey, queuedTx *common.QueuedTx) (hash gethcommon.Hash, err error) {
+func (m *Manager) completeTransaction(selectedAccount *account.SelectedExtKey, queuedTx *QueuedTx) (hash gethcommon.Hash, err error) {
 	m.log.Info("complete transaction", "id", queuedTx.ID)
 	m.addrLock.LockAddr(queuedTx.Args.From)
 	var localNonce uint64
@@ -217,7 +216,7 @@ func (m *Manager) completeTransaction(selectedAccount *account.SelectedExtKey, q
 	}
 	args := queuedTx.Args
 	if !args.Valid() {
-		return hash, common.ErrInvalidSendTxArgs
+		return hash, ErrInvalidSendTxArgs
 	}
 	gasPrice := (*big.Int)(args.GasPrice)
 	if args.GasPrice == nil {
@@ -280,7 +279,7 @@ func (m *Manager) completeTransaction(selectedAccount *account.SelectedExtKey, q
 }
 
 // DiscardTransaction discards a given transaction from transaction queue
-func (m *Manager) DiscardTransaction(id common.QueuedTxID) error {
+func (m *Manager) DiscardTransaction(id string) error {
 	tx, err := m.txQueue.Get(id)
 	if err != nil {
 		return err
@@ -292,28 +291,11 @@ func (m *Manager) DiscardTransaction(id common.QueuedTxID) error {
 	return err
 }
 
-// DiscardTransactions discards given multiple transactions from transaction queue
-func (m *Manager) DiscardTransactions(ids []common.QueuedTxID) map[common.QueuedTxID]common.RawDiscardTransactionResult {
-	results := make(map[common.QueuedTxID]common.RawDiscardTransactionResult)
-
-	for _, txID := range ids {
-		err := m.DiscardTransaction(txID)
-		if err != nil {
-			results[txID] = common.RawDiscardTransactionResult{
-				Error: err,
-			}
-		}
-	}
-
-	return results
-}
-
 // SendTransactionRPCHandler is a handler for eth_sendTransaction method.
 // It accepts one param which is a slice with a map of transaction params.
 func (m *Manager) SendTransactionRPCHandler(ctx context.Context, args ...interface{}) (interface{}, error) {
 	m.log.Info("SendTransactionRPCHandler called")
-	rpcCall := rpc.Call{Params: args}
-	tx := common.CreateTransaction(ctx, rpcCall.ToSendTxArgs())
+	tx := Create(ctx, m.rpcCalltoSendTxArgs(args...))
 	if err := m.QueueTransaction(tx); err != nil {
 		return nil, err
 	}
@@ -322,4 +304,32 @@ func (m *Manager) SendTransactionRPCHandler(ctx context.Context, args ...interfa
 		return nil, rst.Error
 	}
 	return rst.Hash.Hex(), nil
+}
+
+func (m *Manager) rpcCalltoSendTxArgs(args ...interface{}) SendTxArgs {
+	var err error
+	var fromAddr, toAddr gethcommon.Address
+
+	rpcCall := rpc.Call{Params: args}
+	fromAddr, err = rpcCall.ParseFromAddress()
+	if err != nil {
+		fromAddr = gethcommon.HexToAddress("0x0")
+	}
+
+	toAddr, err = rpcCall.ParseToAddress()
+	if err != nil {
+		toAddr = gethcommon.HexToAddress("0x0")
+	}
+
+	input := rpcCall.ParseInput()
+	data := rpcCall.ParseData()
+	return SendTxArgs{
+		To:       &toAddr,
+		From:     fromAddr,
+		Value:    rpcCall.ParseValue(),
+		Input:    input,
+		Data:     data,
+		Gas:      rpcCall.ParseGas(),
+		GasPrice: rpcCall.ParseGasPrice(),
+	}
 }

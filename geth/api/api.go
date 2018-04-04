@@ -8,7 +8,6 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/geth/account"
-	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
@@ -147,28 +146,28 @@ func (api *StatusAPI) Logout() error {
 }
 
 // SendTransaction creates a new transaction and waits until it's complete.
-func (api *StatusAPI) SendTransaction(ctx context.Context, args common.SendTxArgs) (gethcommon.Hash, error) {
+func (api *StatusAPI) SendTransaction(ctx context.Context, args transactions.SendTxArgs) (gethcommon.Hash, error) {
 	return api.b.SendTransaction(ctx, args)
 }
 
 // CompleteTransaction instructs backend to complete sending of a given transaction
-func (api *StatusAPI) CompleteTransaction(id common.QueuedTxID, password string) (gethcommon.Hash, error) {
+func (api *StatusAPI) CompleteTransaction(id string, password string) (gethcommon.Hash, error) {
 	return api.b.CompleteTransaction(id, password)
 }
 
 // CompleteTransactions instructs backend to complete sending of multiple transactions
-func (api *StatusAPI) CompleteTransactions(ids []common.QueuedTxID, password string) map[common.QueuedTxID]common.TransactionResult {
+func (api *StatusAPI) CompleteTransactions(ids []string, password string) map[string]transactions.Result {
 	return api.b.CompleteTransactions(ids, password)
 }
 
 // DiscardTransaction discards a given transaction from transaction queue
-func (api *StatusAPI) DiscardTransaction(id common.QueuedTxID) error {
-	return api.b.txQueueManager.DiscardTransaction(id)
+func (api *StatusAPI) DiscardTransaction(id string) error {
+	return api.b.DiscardTransaction(id)
 }
 
 // DiscardTransactions discards given multiple transactions from transaction queue
-func (api *StatusAPI) DiscardTransactions(ids []common.QueuedTxID) map[common.QueuedTxID]common.RawDiscardTransactionResult {
-	return api.b.txQueueManager.DiscardTransactions(ids)
+func (api *StatusAPI) DiscardTransactions(ids []string) map[string]error {
+	return api.b.DiscardTransactions(ids)
 }
 
 // JailParse creates a new jail cell context, with the given chatID as identifier.

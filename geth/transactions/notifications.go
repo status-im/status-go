@@ -2,7 +2,6 @@ package transactions
 
 import (
 	"github.com/ethereum/go-ethereum/accounts/keystore"
-	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/signal"
 )
 
@@ -35,34 +34,34 @@ var txReturnCodes = map[error]int{
 
 // SendTransactionEvent is a signal sent on a send transaction request
 type SendTransactionEvent struct {
-	ID        string            `json:"id"`
-	Args      common.SendTxArgs `json:"args"`
-	MessageID string            `json:"message_id"`
+	ID        string     `json:"id"`
+	Args      SendTxArgs `json:"args"`
+	MessageID string     `json:"message_id"`
 }
 
 // NotifyOnEnqueue returns handler that processes incoming tx queue requests
-func NotifyOnEnqueue(queuedTx *common.QueuedTx) {
+func NotifyOnEnqueue(queuedTx *QueuedTx) {
 	signal.Send(signal.Envelope{
 		Type: EventTransactionQueued,
 		Event: SendTransactionEvent{
-			ID:        string(queuedTx.ID),
+			ID:        queuedTx.ID,
 			Args:      queuedTx.Args,
-			MessageID: common.MessageIDFromContext(queuedTx.Context),
+			MessageID: messageIDFromContext(queuedTx.Context),
 		},
 	})
 }
 
 // ReturnSendTransactionEvent is a JSON returned whenever transaction send is returned
 type ReturnSendTransactionEvent struct {
-	ID           string            `json:"id"`
-	Args         common.SendTxArgs `json:"args"`
-	MessageID    string            `json:"message_id"`
-	ErrorMessage string            `json:"error_message"`
-	ErrorCode    int               `json:"error_code,string"`
+	ID           string     `json:"id"`
+	Args         SendTxArgs `json:"args"`
+	MessageID    string     `json:"message_id"`
+	ErrorMessage string     `json:"error_message"`
+	ErrorCode    int        `json:"error_code,string"`
 }
 
 // NotifyOnReturn returns handler that processes responses from internal tx manager
-func NotifyOnReturn(queuedTx *common.QueuedTx, err error) {
+func NotifyOnReturn(queuedTx *QueuedTx, err error) {
 	// we don't want to notify a user if tx was sent successfully
 	if err == nil {
 		return
@@ -74,9 +73,9 @@ func NotifyOnReturn(queuedTx *common.QueuedTx, err error) {
 	signal.Send(signal.Envelope{
 		Type: EventTransactionFailed,
 		Event: ReturnSendTransactionEvent{
-			ID:           string(queuedTx.ID),
+			ID:           queuedTx.ID,
 			Args:         queuedTx.Args,
-			MessageID:    common.MessageIDFromContext(queuedTx.Context),
+			MessageID:    messageIDFromContext(queuedTx.Context),
 			ErrorMessage: err.Error(),
 			ErrorCode:    sendTransactionErrorCode(err),
 		},
