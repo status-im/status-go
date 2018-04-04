@@ -44,6 +44,7 @@ type peerInfo struct {
 	discoveredTime mclock.AbsTime
 	// connected is true if node is added as a static peer
 	connected bool
+	requested bool
 
 	node *discv5.Node
 }
@@ -95,22 +96,55 @@ func (p *PeerPool) Start(server *p2p.Server) error {
 // handleServerPeers watches server peer events, notifies topic pools about changes
 // in the peer set and stops the discv5 if all topic pools collected enough peers.
 func (p *PeerPool) handleServerPeers(server *p2p.Server, events <-chan *p2p.PeerEvent) {
+	var (
+		toSearch    []*TopicPool
+		retryDiscv5 <-chan time.Time
+	)
+	runListener := func() {
+		if server.DiscV5 == nil {
+			ntab, err := StartDiscv5(server)
+			if err != nil {
+				log.Error("starting discv5 failed", "error", err)
+				retryDiscv5 = time.After(2 * time.Second)
+				return
+			}
+			log.Debug("restarted discovery from peer pool")
+			server.DiscV5 = ntab
+		}
+		for _, t := range toSearch {
+			_ = t.StartSearch(server)
+		}
+		toSearch = nil
+	}
+
 	for {
 		select {
 		case <-p.quit:
 			return
+		case <-retryDiscv5:
+			runListener()
 		case event := <-events:
 			switch event.Type {
 			case p2p.PeerEventTypeDrop:
 				p.mu.Lock()
+				log.Debug("confirm peer dropped", "ID", event.Peer)
 				for _, t := range p.topics {
-					t.ConfirmDropped(server, event.Peer, event.Error)
-					// TODO(dshulyak) restart discv5 if peers number dropped too low
+					// if dropped peer is ignored by a topic pool we should ignore it too
+					_, ignored := t.ConfirmDropped(server, event.Peer, event.Error)
+					// if it was min and one peer is dropped then current connections are below limit
+					log.Debug("search", "topic", t.topic, "below min", t.BelowMin(), "ignored", ignored)
+					if t.BelowMin() && !ignored {
+						toSearch = append(toSearch, t)
+					}
+				}
+				if len(toSearch) != 0 && p.stopOnMax {
+					runListener()
 				}
 				p.mu.Unlock()
 			case p2p.PeerEventTypeAdd:
 				p.mu.Lock()
 				total := 0
+				log.Debug("confirm peer added", "ID", event.Peer)
 				for _, t := range p.topics {
 					t.ConfirmAdded(server, event.Peer)
 					if p.stopOnMax && t.MaxReached() {
@@ -119,8 +153,9 @@ func (p *PeerPool) handleServerPeers(server *p2p.Server, events <-chan *p2p.Peer
 					}
 				}
 				if p.stopOnMax && total == len(p.config) {
-					log.Debug("closing discv5 connection")
+					log.Debug("closing discv5 connection", "server", server.Self())
 					server.DiscV5.Close()
+					server.DiscV5 = nil
 				}
 				p.mu.Unlock()
 			}
