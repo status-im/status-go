@@ -27,3 +27,12 @@ You can also discover more information in https://hackmd.io/s/SkZI0bXIb
 
 Please, note that we follow [Effective Go](https://golang.org/doc/effective_go.html) and
 [CodeReviewComments](https://github.com/golang/go/wiki/CodeReviewComments) in our code.
+
+## Keep history clean
+
+1. Squash PR before merging.
+   You can do it either with GitHub API by merging with "Squash and merge" or locally if you want to preserve your signature.
+   It is ok to merge multiple commits with "Rebase and merge" if they are logically separate.
+
+2. Preserve as much history as possible.
+   If you need to re-name file use `git mv` - it will preserve git history.
