@@ -16,13 +16,13 @@ func TestFCMClientTestSuite(t *testing.T) {
 type NotifierTestSuite struct {
 	suite.Suite
 
-	fcmClientMock     *MockfirebaseClient
+	fcmClientMock     *MockFirebaseClient
 	fcmClientMockCtrl *gomock.Controller
 }
 
 func (s *NotifierTestSuite) SetupTest() {
 	s.fcmClientMockCtrl = gomock.NewController(s.T())
-	s.fcmClientMock = NewMockfirebaseClient(s.fcmClientMockCtrl)
+	s.fcmClientMock = NewMockFirebaseClient(s.fcmClientMockCtrl)
 }
 
 func (s *NotifierTestSuite) TearDownTest() {

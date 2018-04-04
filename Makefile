@@ -114,9 +114,9 @@ mock-install: ##@other Install mocking tools
 	go get -u github.com/golang/mock/mockgen
 
 mock: ##@other Regenerate mocks
-	mockgen -source=geth/mailservice/mailservice.go -destination=geth/mailservice/mailservice_mock.go -package=mailservice
-	mockgen -source=geth/notifications/push/fcm/client.go -destination=geth/notifications/push/fcm/client_mock.go -package=fcm -imports fcm=github.com/NaySoftware/go-fcm
-	mockgen -source=geth/transactions/fake/txservice.go -destination=geth/transactions/fake/mock.go -package=fake
+	mockgen -package=mailservice -destination=geth/mailservice/mailservice_mock.go       github.com/status-im/status-go/geth/mailservice ServiceProvider
+	mockgen -package=fcm         -destination=geth/notifications/push/fcm/client_mock.go github.com/status-im/status-go/geth/notifications/push/fcm FirebaseClient,Notifier
+	mockgen -package=fake        -destination=geth/transactions/fake/mock.go             github.com/status-im/status-go/geth/transactions/fake PublicTransactionPoolAPI
 
 docker-test: ##@tests Run tests in a docker container with golang.
 	docker run --privileged --rm -it -v "$(shell pwd):$(DOCKER_TEST_WORKDIR)" -w "$(DOCKER_TEST_WORKDIR)" $(DOCKER_TEST_IMAGE) go test ${ARGS}

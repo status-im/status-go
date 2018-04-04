@@ -17,9 +17,18 @@ def getVersion(branch, sha, buildNumber) {
 
 node('linux') {
     env.GOPATH = "${env.WORKSPACE}"
+    env.PATH = "${env.PATH}:${env.GOPATH}/bin"
 
     cloneDir = 'src/github.com/status-im/status-go'
     paramBranch = env.branch ? ('*/' + env.branch) : '*/develop'
+
+    dir(cloneDir) {
+        try {
+            deleteDir()
+        } catch (err) {
+            echo "failure while cleaning the directory"
+        }
+    }
 
     checkout(
         changelog: false,
@@ -48,12 +57,10 @@ node('linux') {
     }
 
     stage('Test') {
-        sh '''
-            make lint-install
-            make mock-install
-
-            make ci
-        '''
+        dir(cloneDir) {
+            sh 'make setup'
+            sh 'make ci'
+        }
     }
 
     stage('Build') {
