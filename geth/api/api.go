@@ -34,9 +34,9 @@ func NewStatusAPIWithBackend(b *StatusBackend) *StatusAPI {
 	}
 }
 
-// NodeManager returns reference to node manager
-func (api *StatusAPI) NodeManager() *node.Manager {
-	return api.b.NodeManager()
+// StatusNode returns reference to StatusNode.
+func (api *StatusAPI) StatusNode() *node.StatusNode {
+	return api.b.StatusNode()
 }
 
 // AccountManager returns reference to account manager

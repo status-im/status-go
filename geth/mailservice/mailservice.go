@@ -9,7 +9,7 @@ import (
 
 // ServiceProvider provides node and required services.
 type ServiceProvider interface {
-	Node() (*node.Node, error)
+	GethNode() (*node.Node, error)
 	WhisperService() (*whisper.Whisper, error)
 }
 

@@ -19,7 +19,7 @@ func createContextFromTimeout(timeout int) (context.Context, context.CancelFunc)
 // It returns an exit code (`0` if successful or `1` in case of error)
 // that can be used in `os.Exit` to exit immediately when the function returns.
 // The special exit code `-1` is used if execution was interrupted.
-func syncAndStopNode(interruptCh <-chan struct{}, nodeManager *node.Manager, timeout int) (exitCode int) {
+func syncAndStopNode(interruptCh <-chan struct{}, statusNode *node.StatusNode, timeout int) (exitCode int) {
 
 	logger.Info("syncAndStopNode: node will synchronize the chain and exit", "timeoutInMins", timeout)
 
@@ -29,7 +29,7 @@ func syncAndStopNode(interruptCh <-chan struct{}, nodeManager *node.Manager, tim
 	doneSync := make(chan struct{})
 	errSync := make(chan error)
 	go func() {
-		if err := nodeManager.EnsureSync(ctx); err != nil {
+		if err := statusNode.EnsureSync(ctx); err != nil {
 			errSync <- err
 		}
 		close(doneSync)
@@ -46,7 +46,7 @@ func syncAndStopNode(interruptCh <-chan struct{}, nodeManager *node.Manager, tim
 		return -1
 	}
 
-	if err := nodeManager.StopNode(); err != nil {
+	if err := statusNode.Stop(); err != nil {
 		logger.Error("syncAndStopNode: failed to stop the node", "error", err)
 		return 1
 	}

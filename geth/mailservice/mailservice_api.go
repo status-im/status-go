@@ -80,7 +80,7 @@ func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (boo
 		return false, err
 	}
 
-	node, err := api.provider.Node()
+	node, err := api.provider.GethNode()
 	if err != nil {
 		return false, err
 	}

@@ -11,7 +11,7 @@ import (
 )
 
 type RPCClientTestSuite struct {
-	e2e.NodeManagerTestSuite
+	e2e.StatusNodeTestSuite
 }
 
 func TestRPCClientTestSuite(t *testing.T) {
@@ -19,8 +19,8 @@ func TestRPCClientTestSuite(t *testing.T) {
 }
 
 func (s *RPCClientTestSuite) SetupTest() {
-	s.NodeManager = node.NewManager()
-	s.NotNil(s.NodeManager)
+	s.StatusNode = node.New()
+	s.NotNil(s.StatusNode)
 }
 
 func (s *RPCClientTestSuite) TestNewClient() {

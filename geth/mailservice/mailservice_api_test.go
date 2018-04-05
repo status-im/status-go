@@ -43,14 +43,14 @@ func TestRequestMessagesFailures(t *testing.T) {
 
 	// invalid MailServer enode address
 	provider.EXPECT().WhisperService().Return(nil, nil)
-	provider.EXPECT().Node().Return(nil, nil)
+	provider.EXPECT().GethNode().Return(nil, nil)
 	result, err = api.RequestMessages(context.TODO(), MessagesRequest{MailServerPeer: "invalid-address"})
 	require.False(t, result)
 	require.EqualError(t, err, "invalid mailServerPeer value: invalid URL scheme, want \"enode\"")
 
 	// non-existent symmetric key
 	provider.EXPECT().WhisperService().Return(shh, nil)
-	provider.EXPECT().Node().Return(nil, nil)
+	provider.EXPECT().GethNode().Return(nil, nil)
 	result, err = api.RequestMessages(context.TODO(), MessagesRequest{
 		MailServerPeer: mailServerPeer,
 	})
@@ -61,7 +61,7 @@ func TestRequestMessagesFailures(t *testing.T) {
 	symKeyID, symKeyErr := shh.AddSymKeyFromPassword("some-pass")
 	require.NoError(t, symKeyErr)
 	provider.EXPECT().WhisperService().Return(shh, nil)
-	provider.EXPECT().Node().Return(nodeA, nil)
+	provider.EXPECT().GethNode().Return(nodeA, nil)
 	result, err = api.RequestMessages(context.TODO(), MessagesRequest{
 		MailServerPeer: mailServerPeer,
 		SymKeyID:       symKeyID,

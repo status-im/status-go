@@ -31,23 +31,23 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	// Start mailbox and status node.
 	mailboxBackend, stop := s.startMailboxBackend()
 	defer stop()
-	mailboxNode, err := mailboxBackend.NodeManager().Node()
+	mailboxNode, err := mailboxBackend.StatusNode().GethNode()
 	s.Require().NoError(err)
 	mailboxEnode := mailboxNode.Server().NodeInfo().Enode
 
 	sender, stop := s.startBackend("sender")
 	defer stop()
-	node, err := sender.NodeManager().Node()
+	node, err := sender.StatusNode().GethNode()
 	s.Require().NoError(err)
 
 	s.Require().NotEqual(mailboxEnode, node.Server().NodeInfo().Enode)
 
-	err = sender.NodeManager().AddPeer(mailboxEnode)
+	err = sender.StatusNode().AddPeer(mailboxEnode)
 	s.Require().NoError(err)
 	// Wait async processes on adding peer.
 	time.Sleep(time.Second)
 
-	senderWhisperService, err := sender.NodeManager().WhisperService()
+	senderWhisperService, err := sender.StatusNode().WhisperService()
 	s.Require().NoError(err)
 
 	// Mark mailbox node trusted.
@@ -63,7 +63,7 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	MailServerKeyID, err := senderWhisperService.AddSymKeyFromPassword(password)
 	s.Require().NoError(err)
 
-	rpcClient := sender.NodeManager().RPCClient()
+	rpcClient := sender.StatusNode().RPCClient()
 	s.Require().NotNil(rpcClient)
 
 	// Create topic.
@@ -138,30 +138,30 @@ func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
 	defer stop()
 
 	// Add mailbox to static peers.
-	mailboxNode, err := mailboxBackend.NodeManager().Node()
+	mailboxNode, err := mailboxBackend.StatusNode().GethNode()
 	s.Require().NoError(err)
 	mailboxEnode := mailboxNode.Server().NodeInfo().Enode
 
-	err = aliceBackend.NodeManager().AddPeer(mailboxEnode)
+	err = aliceBackend.StatusNode().AddPeer(mailboxEnode)
 	s.Require().NoError(err)
-	err = bobBackend.NodeManager().AddPeer(mailboxEnode)
+	err = bobBackend.StatusNode().AddPeer(mailboxEnode)
 	s.Require().NoError(err)
-	err = charlieBackend.NodeManager().AddPeer(mailboxEnode)
+	err = charlieBackend.StatusNode().AddPeer(mailboxEnode)
 	s.Require().NoError(err)
 	// Wait async processes on adding peer.
 	time.Sleep(time.Second)
 
 	// Get whisper service.
-	aliceWhisperService, err := aliceBackend.NodeManager().WhisperService()
+	aliceWhisperService, err := aliceBackend.StatusNode().WhisperService()
 	s.Require().NoError(err)
-	bobWhisperService, err := bobBackend.NodeManager().WhisperService()
+	bobWhisperService, err := bobBackend.StatusNode().WhisperService()
 	s.Require().NoError(err)
-	charlieWhisperService, err := charlieBackend.NodeManager().WhisperService()
+	charlieWhisperService, err := charlieBackend.StatusNode().WhisperService()
 	s.Require().NoError(err)
 	// Get rpc client.
-	aliceRPCClient := aliceBackend.NodeManager().RPCClient()
-	bobRPCClient := bobBackend.NodeManager().RPCClient()
-	charlieRPCClient := charlieBackend.NodeManager().RPCClient()
+	aliceRPCClient := aliceBackend.StatusNode().RPCClient()
+	bobRPCClient := bobBackend.StatusNode().RPCClient()
+	charlieRPCClient := charlieBackend.StatusNode().RPCClient()
 
 	// Bob and charlie add the mailserver key.
 	password := "status-offline-inbox"
@@ -286,11 +286,11 @@ func (s *WhisperMailboxSuite) TestSendMessageWithoutSubscription() {
 	time.Sleep((whisper.DefaultSyncAllowance + 1) * time.Second)
 
 	// Get whisper service.
-	aliceWhisperService, err := aliceBackend.NodeManager().WhisperService()
+	aliceWhisperService, err := aliceBackend.StatusNode().WhisperService()
 	s.Require().NoError(err)
 
 	// Get rpc client.
-	aliceRPCClient := aliceBackend.NodeManager().RPCClient()
+	aliceRPCClient := aliceBackend.StatusNode().RPCClient()
 
 	// Generate group chat symkey and topic.
 	groupChatKeyID, err := aliceWhisperService.GenerateSymKey()

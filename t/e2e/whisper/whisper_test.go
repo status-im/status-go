@@ -27,10 +27,10 @@ func (s *WhisperTestSuite) TestWhisperFilterRace() {
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
-	whisperService, err := s.Backend.NodeManager().WhisperService()
+	whisperService, err := s.Backend.StatusNode().WhisperService()
 	s.NoError(err)
 
-	accountManager := account.NewManager(s.Backend.NodeManager())
+	accountManager := account.NewManager(s.Backend.StatusNode())
 	s.NotNil(accountManager)
 
 	whisperAPI := whisper.NewPublicWhisperAPI(whisperService)
@@ -92,7 +92,7 @@ func (s *WhisperTestSuite) TestSelectAccount() {
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
-	whisperService, err := s.Backend.NodeManager().WhisperService()
+	whisperService, err := s.Backend.StatusNode().WhisperService()
 	s.NoError(err)
 
 	// create an acc
@@ -116,7 +116,7 @@ func (s *WhisperTestSuite) TestLogout() {
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
-	whisperService, err := s.Backend.NodeManager().WhisperService()
+	whisperService, err := s.Backend.StatusNode().WhisperService()
 	s.NoError(err)
 
 	// create an account
@@ -167,7 +167,7 @@ func (s *WhisperTestSuite) TestSelectedAccountOnRestart() {
 	s.False(whisperService.HasKeyPair(pubKey1), "identity should be removed, but it is still present in whisper")
 
 	// stop node (and all of its sub-protocols)
-	nodeConfig, err := s.Backend.NodeManager().NodeConfig()
+	nodeConfig, err := s.Backend.StatusNode().Config()
 	s.NoError(err)
 	preservedNodeConfig := *nodeConfig
 	s.NoError(s.Backend.StopNode())

@@ -26,10 +26,10 @@ func WithDataDir(path string) TestNodeOption {
 	}
 }
 
-// FirstBlockHash validates Attach operation for the NodeManager.
-func FirstBlockHash(nodeManager *node.Manager) (string, error) {
+// FirstBlockHash validates Attach operation for the StatusNode.
+func FirstBlockHash(statusNode *node.StatusNode) (string, error) {
 	// obtain RPC client for running node
-	runningNode, err := nodeManager.Node()
+	runningNode, err := statusNode.GethNode()
 	if err != nil {
 		return "", err
 	}
