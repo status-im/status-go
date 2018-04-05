@@ -84,7 +84,7 @@ func (s *AccountsTestSuite) TestCreateChildAccount() {
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
-	keyStore, err := s.Backend.NodeManager().AccountKeyStore()
+	keyStore, err := s.Backend.StatusNode().AccountKeyStore()
 	s.NoError(err)
 	s.NotNil(keyStore)
 
@@ -132,7 +132,7 @@ func (s *AccountsTestSuite) TestRecoverAccount() {
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
-	keyStore, err := s.Backend.NodeManager().AccountKeyStore()
+	keyStore, err := s.Backend.StatusNode().AccountKeyStore()
 	s.NoError(err)
 
 	// create an acc
@@ -219,7 +219,7 @@ func (s *AccountsTestSuite) TestSelectedAccountOnRestart() {
 	s.NoError(s.Backend.SelectAccount(address2, TestConfig.Account1.Password))
 
 	// stop node (and all of its sub-protocols)
-	nodeConfig, err := s.Backend.NodeManager().NodeConfig()
+	nodeConfig, err := s.Backend.StatusNode().Config()
 	s.NoError(err)
 	preservedNodeConfig := *nodeConfig
 	s.NoError(s.Backend.StopNode())

@@ -119,8 +119,6 @@ func defaultEmbeddedNodeConfig(config *params.NodeConfig) *node.Config {
 	}
 
 	if config.ClusterConfig.Enabled {
-		// TODO(themue) Should static nodes always be set? Had been done via
-		// PopulateStaticPeers() before.
 		nc.P2P.StaticNodes = parseNodes(config.ClusterConfig.StaticNodes)
 		nc.P2P.BootstrapNodes = parseNodes(config.ClusterConfig.BootNodes)
 	}

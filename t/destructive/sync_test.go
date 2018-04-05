@@ -76,7 +76,7 @@ func (s *SyncTestSuite) consumeExpectedEvent(subscription *event.TypeMuxSubscrip
 }
 
 func (s *SyncTestSuite) TestSyncChain() {
-	les, err := s.backend.NodeManager().LightEthereumService()
+	les, err := s.backend.StatusNode().LightEthereumService()
 	s.Require().NoError(err)
 	subscription := les.EventMux().Subscribe(
 		downloader.StartEvent{}, downloader.DoneEvent{}, downloader.FailedEvent{})

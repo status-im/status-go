@@ -445,7 +445,7 @@ func NotifyUsers(message, payloadJSON, tokensArray *C.char) (outCBytes *C.char) 
 // AddPeer adds an enode as a peer.
 //export AddPeer
 func AddPeer(enode *C.char) *C.char {
-	err := statusAPI.NodeManager().AddPeer(C.GoString(enode))
+	err := statusAPI.StatusNode().AddPeer(C.GoString(enode))
 	return makeJSONResponse(err)
 }
 

@@ -103,7 +103,7 @@ func LoadFromFile(filename string) string {
 // of unrelated methods.
 type LightEthereumProvider interface {
 	// NodeConfig returns reference to running node's configuration
-	NodeConfig() (*params.NodeConfig, error)
+	Config() (*params.NodeConfig, error)
 	// LightEthereumService exposes reference to LES service running on top of the node
 	LightEthereumService() (*les.LightEthereum, error)
 	// PeerCount returns number of connected peers
@@ -113,7 +113,7 @@ type LightEthereumProvider interface {
 // EnsureNodeSync waits until node synchronzation is done to continue
 // with tests afterwards. Panics in case of an error or a timeout.
 func EnsureNodeSync(lesProvider LightEthereumProvider) {
-	nc, err := lesProvider.NodeConfig()
+	nc, err := lesProvider.Config()
 	if err != nil {
 		panic("can't retrieve NodeConfig")
 	}

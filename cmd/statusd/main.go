@@ -129,7 +129,7 @@ func main() {
 	}
 
 	// handle interrupt signals
-	interruptCh := haltOnInterruptSignal(backend.NodeManager())
+	interruptCh := haltOnInterruptSignal(backend.StatusNode())
 
 	// Check if debugging CLI connection shall be enabled.
 	if *cliEnabled {
@@ -147,15 +147,15 @@ func main() {
 
 	// Run stats server.
 	if *statsEnabled {
-		go startCollectingStats(interruptCh, backend.NodeManager())
+		go startCollectingStats(interruptCh, backend.StatusNode())
 	}
 
 	// Sync blockchain and stop.
 	if *syncAndExit >= 0 {
-		exitCode := syncAndStopNode(interruptCh, backend.NodeManager(), *syncAndExit)
+		exitCode := syncAndStopNode(interruptCh, backend.StatusNode(), *syncAndExit)
 		// Call was interrupted. Wait for graceful shutdown.
 		if exitCode == -1 {
-			if node, err := backend.NodeManager().Node(); err == nil && node != nil {
+			if node, err := backend.StatusNode().GethNode(); err == nil && node != nil {
 				node.Wait()
 			}
 			return
@@ -164,7 +164,7 @@ func main() {
 		os.Exit(exitCode)
 	}
 
-	node, err := backend.NodeManager().Node()
+	node, err := backend.StatusNode().GethNode()
 	if err != nil {
 		logger.Error("Getting node failed", "error", err)
 		return
@@ -182,11 +182,11 @@ func startDebug(backend *api.StatusBackend) error {
 }
 
 // startCollectingStats collects various stats about the node and other protocols like Whisper.
-func startCollectingStats(interruptCh <-chan struct{}, nodeManager *node.Manager) {
+func startCollectingStats(interruptCh <-chan struct{}, statusNode *node.StatusNode) {
 
 	logger.Info("Starting stats", "stats", *statsAddr)
 
-	node, err := nodeManager.Node()
+	node, err := statusNode.GethNode()
 	if err != nil {
 		logger.Error("Failed to run metrics because could not get node", "error", err)
 		return
@@ -332,7 +332,7 @@ Options:
 // haltOnInterruptSignal catches interrupt signal (SIGINT) and
 // stops the node. It times out after 5 seconds
 // if the node can not be stopped.
-func haltOnInterruptSignal(nodeManager *node.Manager) <-chan struct{} {
+func haltOnInterruptSignal(statusNode *node.StatusNode) <-chan struct{} {
 	interruptCh := make(chan struct{})
 	go func() {
 		signalCh := make(chan os.Signal, 1)
@@ -341,7 +341,7 @@ func haltOnInterruptSignal(nodeManager *node.Manager) <-chan struct{} {
 		<-signalCh
 		close(interruptCh)
 		logger.Info("Got interrupt, shutting down...")
-		if err := nodeManager.StopNode(); err != nil {
+		if err := statusNode.Stop(); err != nil {
 			logger.Error("Failed to stop node", "error", err)
 			os.Exit(1)
 		}

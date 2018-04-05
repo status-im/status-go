@@ -33,7 +33,7 @@ var (
 // StatusBackend implements Status.im service
 type StatusBackend struct {
 	mu              sync.Mutex
-	nodeManager     *node.Manager
+	statusNode      *node.StatusNode
 	accountManager  *account.Manager
 	txQueueManager  *transactions.Manager
 	jailManager     jail.Manager
@@ -46,14 +46,14 @@ type StatusBackend struct {
 func NewStatusBackend() *StatusBackend {
 	defer log.Info("Status backend initialized")
 
-	nodeManager := node.NewManager()
-	accountManager := account.NewManager(nodeManager)
-	txQueueManager := transactions.NewManager(nodeManager)
-	jailManager := jail.New(nodeManager)
+	statusNode := node.New()
+	accountManager := account.NewManager(statusNode)
+	txQueueManager := transactions.NewManager(statusNode)
+	jailManager := jail.New(statusNode)
 	notificationManager := fcm.NewNotification(fcmServerKey)
 
 	return &StatusBackend{
-		nodeManager:     nodeManager,
+		statusNode:      statusNode,
 		accountManager:  accountManager,
 		jailManager:     jailManager,
 		txQueueManager:  txQueueManager,
@@ -62,9 +62,9 @@ func NewStatusBackend() *StatusBackend {
 	}
 }
 
-// NodeManager returns reference to node manager
-func (b *StatusBackend) NodeManager() *node.Manager {
-	return b.nodeManager
+// StatusNode returns reference to node manager
+func (b *StatusBackend) StatusNode() *node.StatusNode {
+	return b.statusNode
 }
 
 // AccountManager returns reference to account manager
@@ -84,7 +84,7 @@ func (b *StatusBackend) TxQueueManager() *transactions.Manager {
 
 // IsNodeRunning confirm that node is running
 func (b *StatusBackend) IsNodeRunning() bool {
-	return b.nodeManager.IsNodeRunning()
+	return b.statusNode.IsRunning()
 }
 
 // StartNode start Status node, fails if node is already started
@@ -100,7 +100,7 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 			err = fmt.Errorf("node crashed on start: %v", err)
 		}
 	}()
-	err = b.nodeManager.StartNode(config)
+	err = b.statusNode.Start(config)
 	if err != nil {
 		switch err.(type) {
 		case node.RPCClientError:
@@ -145,7 +145,7 @@ func (b *StatusBackend) stopNode() error {
 	b.txQueueManager.Stop()
 	b.jailManager.Stop()
 	defer signal.Send(signal.Envelope{Type: signal.EventNodeStopped})
-	return b.nodeManager.StopNode()
+	return b.statusNode.Stop()
 }
 
 // RestartNode restart running Status node, fails if node is not running
@@ -153,7 +153,7 @@ func (b *StatusBackend) RestartNode() error {
 	if !b.IsNodeRunning() {
 		return node.ErrNoRunningNode
 	}
-	config, err := b.nodeManager.NodeConfig()
+	config, err := b.statusNode.Config()
 	if err != nil {
 		return err
 	}
@@ -169,7 +169,7 @@ func (b *StatusBackend) RestartNode() error {
 func (b *StatusBackend) ResetChainData() error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	config, err := b.nodeManager.NodeConfig()
+	config, err := b.statusNode.Config()
 	if err != nil {
 		return err
 	}
@@ -178,7 +178,7 @@ func (b *StatusBackend) ResetChainData() error {
 		return err
 	}
 	// config is cleaned when node is stopped
-	if err := b.nodeManager.ResetChainData(&newcfg); err != nil {
+	if err := b.statusNode.ResetChainData(&newcfg); err != nil {
 		return err
 	}
 	signal.Send(signal.Envelope{Type: signal.EventChainDataRemoved})
@@ -187,7 +187,7 @@ func (b *StatusBackend) ResetChainData() error {
 
 // CallRPC executes RPC request on node's in-proc RPC server
 func (b *StatusBackend) CallRPC(inputJSON string) string {
-	client := b.nodeManager.RPCClient()
+	client := b.statusNode.RPCClient()
 	return client.CallRaw(inputJSON)
 }
 
@@ -213,7 +213,7 @@ func (b *StatusBackend) getVerifiedAccount(password string) (*account.SelectedEx
 		b.log.Error("failed to get a selected account", "err", err)
 		return nil, err
 	}
-	config, err := b.NodeManager().NodeConfig()
+	config, err := b.StatusNode().Config()
 	if err != nil {
 		return nil, err
 	}
@@ -269,7 +269,7 @@ func (b *StatusBackend) DiscardTransactions(ids []string) map[string]error {
 
 // registerHandlers attaches Status callback handlers to running node
 func (b *StatusBackend) registerHandlers() error {
-	rpcClient := b.NodeManager().RPCClient()
+	rpcClient := b.StatusNode().RPCClient()
 	if rpcClient == nil {
 		return node.ErrRPCClient
 	}
@@ -299,7 +299,7 @@ func (b *StatusBackend) AppStateChange(state AppState) {
 
 // Logout clears whisper identities.
 func (b *StatusBackend) Logout() error {
-	whisperService, err := b.nodeManager.WhisperService()
+	whisperService, err := b.statusNode.WhisperService()
 	if err != nil {
 		return err
 	}
@@ -317,7 +317,7 @@ func (b *StatusBackend) ReSelectAccount() error {
 	if selectedAccount == nil || err == account.ErrNoAccountSelected {
 		return nil
 	}
-	whisperService, err := b.nodeManager.WhisperService()
+	whisperService, err := b.statusNode.WhisperService()
 	if err != nil {
 		return err
 	}
@@ -341,7 +341,7 @@ func (b *StatusBackend) SelectAccount(address, password string) error {
 		return err
 	}
 
-	whisperService, err := b.nodeManager.WhisperService()
+	whisperService, err := b.statusNode.WhisperService()
 	if err != nil {
 		return err
 	}

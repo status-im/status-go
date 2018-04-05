@@ -255,7 +255,7 @@ func testResetChainData(t *testing.T) bool {
 		return false
 	}
 
-	EnsureNodeSync(statusAPI.NodeManager())
+	EnsureNodeSync(statusAPI.StatusNode())
 	testCompleteTransaction(t)
 
 	return true
@@ -267,7 +267,7 @@ func testStopResumeNode(t *testing.T) bool { //nolint: gocyclo
 		t.Fatal(err)
 	}
 
-	whisperService, err := statusAPI.NodeManager().WhisperService()
+	whisperService, err := statusAPI.StatusNode().WhisperService()
 	if err != nil {
 		t.Errorf("whisper service not running: %v", err)
 	}
@@ -354,7 +354,7 @@ func testStopResumeNode(t *testing.T) bool { //nolint: gocyclo
 	time.Sleep(10 * time.Second) // allow to start (instead of using blocking version of start, of filter event)
 
 	// now, verify that we still have account logged in
-	whisperService, err = statusAPI.NodeManager().WhisperService()
+	whisperService, err = statusAPI.StatusNode().WhisperService()
 	if err != nil {
 		t.Errorf("whisper service not running: %v", err)
 	}
@@ -386,7 +386,7 @@ func testCreateChildAccount(t *testing.T) bool { //nolint: gocyclo
 		t.Fatal(err)
 	}
 
-	keyStore, err := statusAPI.NodeManager().AccountKeyStore()
+	keyStore, err := statusAPI.StatusNode().AccountKeyStore()
 	if err != nil {
 		t.Error(err)
 		return false
@@ -517,7 +517,7 @@ func testCreateChildAccount(t *testing.T) bool { //nolint: gocyclo
 }
 
 func testRecoverAccount(t *testing.T) bool { //nolint: gocyclo
-	keyStore, _ := statusAPI.NodeManager().AccountKeyStore()
+	keyStore, _ := statusAPI.StatusNode().AccountKeyStore()
 
 	// create an account
 	address, pubKey, mnemonic, err := statusAPI.CreateAccount(TestConfig.Account1.Password)
@@ -608,7 +608,7 @@ func testRecoverAccount(t *testing.T) bool { //nolint: gocyclo
 	}
 
 	// time to login with recovered data
-	whisperService, err := statusAPI.NodeManager().WhisperService()
+	whisperService, err := statusAPI.StatusNode().WhisperService()
 	if err != nil {
 		t.Errorf("whisper service not running: %v", err)
 	}
@@ -631,7 +631,7 @@ func testRecoverAccount(t *testing.T) bool { //nolint: gocyclo
 
 func testAccountSelect(t *testing.T) bool { //nolint: gocyclo
 	// test to see if the account was injected in whisper
-	whisperService, err := statusAPI.NodeManager().WhisperService()
+	whisperService, err := statusAPI.StatusNode().WhisperService()
 	if err != nil {
 		t.Errorf("whisper service not running: %v", err)
 	}
@@ -714,7 +714,7 @@ func testAccountSelect(t *testing.T) bool { //nolint: gocyclo
 }
 
 func testAccountLogout(t *testing.T) bool {
-	whisperService, err := statusAPI.NodeManager().WhisperService()
+	whisperService, err := statusAPI.StatusNode().WhisperService()
 	if err != nil {
 		t.Errorf("whisper service not running: %v", err)
 		return false
@@ -771,7 +771,7 @@ func testCompleteTransaction(t *testing.T) bool {
 	txQueue := txQueueManager.TransactionQueue()
 
 	txQueue.Reset()
-	EnsureNodeSync(statusAPI.NodeManager())
+	EnsureNodeSync(statusAPI.StatusNode())
 
 	// log into account from which transactions will be sent
 	if err := statusAPI.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password); err != nil {
@@ -1439,7 +1439,7 @@ func startTestNode(t *testing.T) <-chan struct{} {
 			// sync
 			if syncRequired {
 				t.Logf("Sync is required")
-				EnsureNodeSync(statusAPI.NodeManager())
+				EnsureNodeSync(statusAPI.StatusNode())
 			} else {
 				time.Sleep(5 * time.Second)
 			}

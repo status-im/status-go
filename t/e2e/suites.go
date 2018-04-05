@@ -14,10 +14,10 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-// NodeManagerTestSuite defines a test suit with NodeManager.
-type NodeManagerTestSuite struct {
+// StatusNodeTestSuite defines a test suite with StatusNode.
+type StatusNodeTestSuite struct {
 	suite.Suite
-	NodeManager *node.Manager
+	StatusNode *node.StatusNode
 }
 
 // All general log messages in this package should be routed through this logger.
@@ -37,9 +37,9 @@ func init() {
 	}
 }
 
-// StartTestNode initiazes a NodeManager instances with configuration retrieved
+// StartTestNode initiazes a StatusNode instances with configuration retrieved
 // from the test config.
-func (s *NodeManagerTestSuite) StartTestNode(opts ...TestNodeOption) {
+func (s *StatusNodeTestSuite) StartTestNode(opts ...TestNodeOption) {
 	nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
 
@@ -51,17 +51,17 @@ func (s *NodeManagerTestSuite) StartTestNode(opts ...TestNodeOption) {
 	// import account keys
 	s.NoError(importTestAccounts(nodeConfig.KeyStoreDir))
 
-	s.False(s.NodeManager.IsNodeRunning())
-	s.NoError(s.NodeManager.StartNode(nodeConfig))
-	s.True(s.NodeManager.IsNodeRunning())
+	s.False(s.StatusNode.IsRunning())
+	s.NoError(s.StatusNode.Start(nodeConfig))
+	s.True(s.StatusNode.IsRunning())
 }
 
-// StopTestNode attempts to stop initialized NodeManager.
-func (s *NodeManagerTestSuite) StopTestNode() {
-	s.NotNil(s.NodeManager)
-	s.True(s.NodeManager.IsNodeRunning())
-	s.NoError(s.NodeManager.StopNode())
-	s.False(s.NodeManager.IsNodeRunning())
+// StopTestNode attempts to stop initialized StatusNode.
+func (s *StatusNodeTestSuite) StopTestNode() {
+	s.NotNil(s.StatusNode)
+	s.True(s.StatusNode.IsRunning())
+	s.NoError(s.StatusNode.Stop())
+	s.False(s.StatusNode.IsRunning())
 }
 
 // BackendTestSuite is a test suite with api.StatusBackend initialized
@@ -117,7 +117,7 @@ func (s *BackendTestSuite) RestartTestNode() {
 
 // WhisperService returns a reference to the Whisper service.
 func (s *BackendTestSuite) WhisperService() *whisper.Whisper {
-	whisperService, err := s.Backend.NodeManager().WhisperService()
+	whisperService, err := s.Backend.StatusNode().WhisperService()
 	s.NoError(err)
 	s.NotNil(whisperService)
 
@@ -126,7 +126,7 @@ func (s *BackendTestSuite) WhisperService() *whisper.Whisper {
 
 // LightEthereumService returns a reference to the LES service.
 func (s *BackendTestSuite) LightEthereumService() *les.LightEthereum {
-	lightEthereum, err := s.Backend.NodeManager().LightEthereumService()
+	lightEthereum, err := s.Backend.StatusNode().LightEthereumService()
 	s.NoError(err)
 	s.NotNil(lightEthereum)
 

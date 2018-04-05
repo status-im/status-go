@@ -26,7 +26,7 @@ func (s *AccountsTestSuite) TestRPCEthAccounts() {
 	err := s.Backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	s.NoError(err)
 
-	rpcClient := s.Backend.NodeManager().RPCClient()
+	rpcClient := s.Backend.StatusNode().RPCClient()
 	s.NotNil(rpcClient)
 
 	expectedResponse := `{"jsonrpc":"2.0","id":1,"result":["` + strings.ToLower(TestConfig.Account1.Address) + `"]}`
@@ -53,7 +53,7 @@ func (s *AccountsTestSuite) TestRPCEthAccountsWithUpstream() {
 	err = s.Backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	s.NoError(err)
 
-	rpcClient := s.Backend.NodeManager().RPCClient()
+	rpcClient := s.Backend.StatusNode().RPCClient()
 	s.NotNil(rpcClient)
 
 	expectedResponse := `{"jsonrpc":"2.0","id":1,"result":["` + strings.ToLower(TestConfig.Account1.Address) + `"]}`

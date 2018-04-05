@@ -22,12 +22,12 @@ func TestRPCTestSuite(t *testing.T) {
 }
 
 type RPCTestSuite struct {
-	e2e.NodeManagerTestSuite
+	e2e.StatusNodeTestSuite
 }
 
 func (s *RPCTestSuite) SetupTest() {
-	s.NodeManager = node.NewManager()
-	s.NotNil(s.NodeManager)
+	s.StatusNode = node.New()
+	s.NotNil(s.StatusNode)
 }
 
 func (s *RPCTestSuite) TestCallRPC() {
@@ -51,9 +51,9 @@ func (s *RPCTestSuite) TestCallRPC() {
 			nodeConfig.UpstreamConfig.URL = networkURL
 		}
 
-		s.NoError(s.NodeManager.StartNode(nodeConfig))
+		s.NoError(s.StatusNode.Start(nodeConfig))
 
-		rpcClient := s.NodeManager.RPCClient()
+		rpcClient := s.StatusNode.RPCClient()
 		s.NotNil(rpcClient)
 
 		type rpcCall struct {
@@ -120,7 +120,7 @@ func (s *RPCTestSuite) TestCallRPC() {
 		case <-done:
 		}
 
-		s.NoError(s.NodeManager.StopNode())
+		s.NoError(s.StatusNode.Stop())
 	}
 }
 
@@ -129,15 +129,15 @@ func (s *RPCTestSuite) TestCallRawResult() {
 	nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
 
-	s.NoError(s.NodeManager.StartNode(nodeConfig))
+	s.NoError(s.StatusNode.Start(nodeConfig))
 
-	client := s.NodeManager.RPCClient()
+	client := s.StatusNode.RPCClient()
 	s.NotNil(client)
 
 	jsonResult := client.CallRaw(`{"jsonrpc":"2.0","method":"shh_version","params":[],"id":67}`)
 	s.Equal(`{"jsonrpc":"2.0","id":67,"result":"6.0"}`, jsonResult)
 
-	s.NoError(s.NodeManager.StopNode())
+	s.NoError(s.StatusNode.Stop())
 }
 
 // TestCallRawResultGetTransactionReceipt checks if returned response
@@ -147,15 +147,15 @@ func (s *RPCTestSuite) TestCallRawResultGetTransactionReceipt() {
 	nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
 
-	s.NoError(s.NodeManager.StartNode(nodeConfig))
+	s.NoError(s.StatusNode.Start(nodeConfig))
 
-	client := s.NodeManager.RPCClient()
+	client := s.StatusNode.RPCClient()
 	s.NotNil(client)
 
 	jsonResult := client.CallRaw(`{"jsonrpc":"2.0","method":"eth_getTransactionReceipt","params":["0x0ca0d8f2422f62bea77e24ed17db5711a77fa72064cccbb8e53c53b699cd3b34"],"id":5}`)
 	s.Equal(`{"jsonrpc":"2.0","id":5,"error":{"code":-32000,"message":"unknown transaction"}}`, jsonResult)
 
-	s.NoError(s.NodeManager.StopNode())
+	s.NoError(s.StatusNode.Stop())
 }
 
 // TestCallContextResult checks if result passed to CallContext
@@ -164,9 +164,9 @@ func (s *RPCTestSuite) TestCallContextResult() {
 	s.StartTestNode()
 	defer s.StopTestNode()
 
-	EnsureNodeSync(s.NodeManager)
+	EnsureNodeSync(s.StatusNode)
 
-	client := s.NodeManager.RPCClient()
+	client := s.StatusNode.RPCClient()
 	s.NotNil(client)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
