@@ -104,8 +104,7 @@ type ExtendedKey struct {
 	CachedPubKeyData []byte // (non-serialized) used for memoization of public key (calculated from a private key)
 }
 
-// MasterSecret is a constant used as hmac key when generating a new master key.
-const MasterSecret = "Bitcoin seed"
+const masterSecret = "Bitcoin seed"
 
 // NewMaster creates new master node, root of HD chain/tree.
 // Both master and child nodes are of ExtendedKey type, and all the children derive from the root node.
@@ -116,7 +115,7 @@ func NewMaster(seed []byte) (*ExtendedKey, error) {
 		return nil, ErrInvalidSeedLen
 	}
 
-	secretKey, chainCode, err := splitHMAC(seed, []byte(MasterSecret))
+	secretKey, chainCode, err := splitHMAC(seed, []byte(masterSecret))
 	if err != nil {
 		return nil, err
 	}

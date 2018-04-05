@@ -18,7 +18,7 @@ type Vector struct {
 
 func TestNewMnemonic(t *testing.T) {
 	m1 := NewMnemonic()
-	if m1.salt != Salt {
+	if m1.salt != defaultSalt {
 		t.Errorf("expected default salt, got: %q", m1.salt)
 	}
 }
