@@ -11,8 +11,9 @@ endif
 
 CGO_CFLAGS=-I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
 GOBIN=$(dir $(realpath $(firstword $(MAKEFILE_LIST))))build/bin
+GIT_COMMIT := $(shell git rev-parse --short HEAD)
 
-BUILD_FLAGS := $(shell echo "-ldflags '-X main.buildStamp=`date -u '+%Y-%m-%d.%H:%M:%S'` -X main.gitCommit=$(git rev-parse HEAD)'")
+BUILD_FLAGS := $(shell echo "-ldflags '-X main.buildStamp=`date -u '+%Y-%m-%d.%H:%M:%S'` -X main.gitCommit=$(GIT_COMMIT)  -X github.com/status-im/status-go/geth/params.VersionMeta=$(GIT_COMMIT)'")
 
 GO ?= latest
 XGOVERSION ?= 1.9.2
