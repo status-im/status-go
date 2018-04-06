@@ -37,7 +37,7 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransaction() {
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
-	EnsureNodeSync(s.Backend.StatusNode())
+	EnsureNodeSync(s.Backend.StatusNode().EnsureSync)
 
 	err := s.Backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	s.NoError(err)
@@ -187,7 +187,7 @@ func (s *TransactionsTestSuite) testSendContractTx(setInputAndDataValue initFunc
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
-	EnsureNodeSync(s.Backend.StatusNode())
+	EnsureNodeSync(s.Backend.StatusNode().EnsureSync)
 
 	sampleAddress, _, _, err := s.Backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
 	s.NoError(err)
@@ -282,7 +282,7 @@ func (s *TransactionsTestSuite) TestSendEther() {
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
-	EnsureNodeSync(s.Backend.StatusNode())
+	EnsureNodeSync(s.Backend.StatusNode().EnsureSync)
 
 	// create an account
 	sampleAddress, _, _, err := s.Backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
@@ -419,7 +419,7 @@ func (s *TransactionsTestSuite) TestDoubleCompleteQueuedTransactions() {
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
-	EnsureNodeSync(s.Backend.StatusNode())
+	EnsureNodeSync(s.Backend.StatusNode().EnsureSync)
 
 	// log into account from which transactions will be sent
 	s.NoError(s.Backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
@@ -493,7 +493,7 @@ func (s *TransactionsTestSuite) TestDiscardQueuedTransaction() {
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
-	EnsureNodeSync(s.Backend.StatusNode())
+	EnsureNodeSync(s.Backend.StatusNode().EnsureSync)
 
 	// reset queue
 	s.Backend.TxQueueManager().TransactionQueue().Reset()
@@ -583,7 +583,7 @@ func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
-	EnsureNodeSync(s.Backend.StatusNode())
+	EnsureNodeSync(s.Backend.StatusNode().EnsureSync)
 
 	// reset queue
 	s.Backend.TxQueueManager().TransactionQueue().Reset()
@@ -780,7 +780,7 @@ func (s *TransactionsTestSuite) TestCompleteMultipleQueuedTransactionsUpstream()
 func (s *TransactionsTestSuite) setupLocalNode() {
 	s.StartTestBackend()
 
-	EnsureNodeSync(s.Backend.StatusNode())
+	EnsureNodeSync(s.Backend.StatusNode().EnsureSync)
 }
 
 func (s *TransactionsTestSuite) setupUpstreamNode() {

@@ -24,14 +24,13 @@ import (
 
 // errors
 var (
-	ErrNodeExists                  = errors.New("node is already running")
-	ErrNoRunningNode               = errors.New("there is no running node")
-	ErrInvalidStatusNode           = errors.New("status node is not properly initialized")
-	ErrInvalidWhisperService       = errors.New("whisper service is unavailable")
-	ErrInvalidLightEthereumService = errors.New("LES service is unavailable")
-	ErrInvalidAccountManager       = errors.New("could not retrieve account manager")
-	ErrAccountKeyStoreMissing      = errors.New("account key store is not set")
-	ErrRPCClient                   = errors.New("failed to init RPC client")
+	ErrNodeExists             = errors.New("node is already running")
+	ErrNoRunningNode          = errors.New("there is no running node")
+	ErrInvalidStatusNode      = errors.New("status node is not properly initialized")
+	ErrInvalidService         = errors.New("service is unavailable")
+	ErrInvalidAccountManager  = errors.New("could not retrieve account manager")
+	ErrAccountKeyStoreMissing = errors.New("account key store is not set")
+	ErrRPCClient              = errors.New("failed to init RPC client")
 )
 
 // RPCClientError reported when rpc client is initialized.
@@ -43,14 +42,12 @@ type EthNodeError error
 // StatusNode abstracts contained geth node and provides helper methods to
 // interact with it.
 type StatusNode struct {
-	mu     sync.RWMutex
-	config *params.NodeConfig // Status node configuration
-	node   *node.Node         // reference to Geth P2P stack/node
+	mu       sync.RWMutex
+	config   *params.NodeConfig // Status node configuration
+	gethNode *node.Node         // reference to Geth P2P stack/node
 
-	whisperService *whisper.Whisper   // reference to Whisper service
-	lesService     *les.LightEthereum // reference to LES service
-	rpcClient      *rpc.Client        // reference to RPC client
-	log            log.Logger
+	rpcClient *rpc.Client // reference to RPC client
+	log       log.Logger
 }
 
 // New makes new instance of StatusNode.
@@ -77,7 +74,7 @@ func (n *StatusNode) start(config *params.NodeConfig) error {
 	if err != nil {
 		return err
 	}
-	n.node = ethNode
+	n.gethNode = ethNode
 	n.config = config
 
 	// activate MailService required for Offline Inboxing
@@ -92,7 +89,7 @@ func (n *StatusNode) start(config *params.NodeConfig) error {
 		return EthNodeError(err)
 	}
 	// init RPC client for this node
-	localRPCClient, err := n.node.Attach()
+	localRPCClient, err := n.gethNode.Attach()
 	if err == nil {
 		n.rpcClient, err = rpc.NewClient(localRPCClient, n.config.UpstreamConfig)
 	}
@@ -115,13 +112,11 @@ func (n *StatusNode) stop() error {
 	if err := n.isAvailable(); err != nil {
 		return err
 	}
-	if err := n.node.Stop(); err != nil {
+	if err := n.gethNode.Stop(); err != nil {
 		return err
 	}
-	n.node = nil
+	n.gethNode = nil
 	n.config = nil
-	n.lesService = nil
-	n.whisperService = nil
 	n.rpcClient = nil
 	return nil
 }
@@ -164,7 +159,7 @@ func (n *StatusNode) GethNode() (*node.Node, error) {
 	if err := n.isAvailable(); err != nil {
 		return nil, err
 	}
-	return n.node, nil
+	return n.gethNode, nil
 }
 
 // populateStaticPeers connects current node with our publicly available LES/SHH/Swarm cluster
@@ -194,7 +189,7 @@ func (n *StatusNode) removeStaticPeers() error {
 		n.log.Info("Static peers are disabled")
 		return nil
 	}
-	server := n.node.Server()
+	server := n.gethNode.Server()
 	if server == nil {
 		return ErrNoRunningNode
 	}
@@ -236,7 +231,7 @@ func (n *StatusNode) addPeer(url string) error {
 	if err != nil {
 		return err
 	}
-	n.node.Server().AddPeer(parsedNode)
+	n.gethNode.Server().AddPeer(parsedNode)
 	return nil
 }
 
@@ -245,7 +240,7 @@ func (n *StatusNode) removePeer(url string) error {
 	if err != nil {
 		return err
 	}
-	n.node.Server().RemovePeer(parsedNode)
+	n.gethNode.Server().RemovePeer(parsedNode)
 	return nil
 }
 
@@ -254,7 +249,7 @@ func (n *StatusNode) PeerCount() int {
 	if !n.IsRunning() {
 		return 0
 	}
-	return n.node.Server().PeerCount()
+	return n.gethNode.Server().PeerCount()
 }
 
 // Config exposes reference to running node's configuration
@@ -268,44 +263,28 @@ func (n *StatusNode) Config() (*params.NodeConfig, error) {
 	return n.config, nil
 }
 
-// LightEthereumService exposes reference to LES service running on top of the node
-func (n *StatusNode) LightEthereumService() (*les.LightEthereum, error) {
-	n.mu.RLock()
-	defer n.mu.RUnlock()
-
+// gethService is a wrapper for gethNode.Service which retrieves a currently
+// running service registered of a specific type.
+func (n *StatusNode) gethService(serviceInstance interface{}, serviceName string) error {
 	if err := n.isAvailable(); err != nil {
-		return nil, err
+		return err
 	}
-	if n.lesService == nil {
-		if err := n.node.Service(&n.lesService); err != nil {
-			n.log.Warn("Cannot obtain LES service", "error", err)
-			return nil, ErrInvalidLightEthereumService
-		}
+	if err := n.gethNode.Service(serviceInstance); err != nil || serviceInstance == nil {
+		n.log.Warn("Cannot obtain ", serviceName, " service", "error", err)
+		return ErrInvalidService
 	}
-	if n.lesService == nil {
-		return nil, ErrInvalidLightEthereumService
-	}
-	return n.lesService, nil
+
+	return nil
+}
+
+// LightEthereumService exposes reference to LES service running on top of the node
+func (n *StatusNode) LightEthereumService() (l *les.LightEthereum, err error) {
+	return l, n.gethService(&l, "LES")
 }
 
 // WhisperService exposes reference to Whisper service running on top of the node
-func (n *StatusNode) WhisperService() (*whisper.Whisper, error) {
-	n.mu.RLock()
-	defer n.mu.RUnlock()
-
-	if err := n.isAvailable(); err != nil {
-		return nil, err
-	}
-	if n.whisperService == nil {
-		if err := n.node.Service(&n.whisperService); err != nil {
-			n.log.Warn("Cannot obtain whisper service", "error", err)
-			return nil, ErrInvalidWhisperService
-		}
-	}
-	if n.whisperService == nil {
-		return nil, ErrInvalidWhisperService
-	}
-	return n.whisperService, nil
+func (n *StatusNode) WhisperService() (w *whisper.Whisper, err error) {
+	return w, n.gethService(&w, "whisper")
 }
 
 // AccountManager exposes reference to node's accounts manager
@@ -316,7 +295,7 @@ func (n *StatusNode) AccountManager() (*accounts.Manager, error) {
 	if err := n.isAvailable(); err != nil {
 		return nil, err
 	}
-	accountManager := n.node.AccountManager()
+	accountManager := n.gethNode.AccountManager()
 	if accountManager == nil {
 		return nil, ErrInvalidAccountManager
 	}
@@ -331,7 +310,7 @@ func (n *StatusNode) AccountKeyStore() (*keystore.KeyStore, error) {
 	if err := n.isAvailable(); err != nil {
 		return nil, err
 	}
-	accountManager := n.node.AccountManager()
+	accountManager := n.gethNode.AccountManager()
 	if accountManager == nil {
 		return nil, ErrInvalidAccountManager
 	}
@@ -358,7 +337,7 @@ func (n *StatusNode) RPCClient() *rpc.Client {
 
 // isAvailable check if we have a node running and make sure is fully started
 func (n *StatusNode) isAvailable() error {
-	if n.node == nil || n.node.Server() == nil {
+	if n.gethNode == nil || n.gethNode.Server() == nil {
 		return ErrNoRunningNode
 	}
 	return nil

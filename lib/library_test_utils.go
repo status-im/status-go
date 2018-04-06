@@ -255,7 +255,7 @@ func testResetChainData(t *testing.T) bool {
 		return false
 	}
 
-	EnsureNodeSync(statusAPI.StatusNode())
+	EnsureNodeSync(statusAPI.StatusNode().EnsureSync)
 	testCompleteTransaction(t)
 
 	return true
@@ -771,7 +771,7 @@ func testCompleteTransaction(t *testing.T) bool {
 	txQueue := txQueueManager.TransactionQueue()
 
 	txQueue.Reset()
-	EnsureNodeSync(statusAPI.StatusNode())
+	EnsureNodeSync(statusAPI.StatusNode().EnsureSync)
 
 	// log into account from which transactions will be sent
 	if err := statusAPI.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password); err != nil {
@@ -1439,7 +1439,7 @@ func startTestNode(t *testing.T) <-chan struct{} {
 			// sync
 			if syncRequired {
 				t.Logf("Sync is required")
-				EnsureNodeSync(statusAPI.StatusNode())
+				EnsureNodeSync(statusAPI.StatusNode().EnsureSync)
 			} else {
 				time.Sleep(5 * time.Second)
 			}

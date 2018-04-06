@@ -3,7 +3,6 @@ package e2e
 import (
 	"github.com/ethereum/go-ethereum/log"
 
-	"github.com/ethereum/go-ethereum/les"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"github.com/status-im/status-go/geth/api"
 
@@ -122,15 +121,6 @@ func (s *BackendTestSuite) WhisperService() *whisper.Whisper {
 	s.NotNil(whisperService)
 
 	return whisperService
-}
-
-// LightEthereumService returns a reference to the LES service.
-func (s *BackendTestSuite) LightEthereumService() *les.LightEthereum {
-	lightEthereum, err := s.Backend.StatusNode().LightEthereumService()
-	s.NoError(err)
-	s.NotNil(lightEthereum)
-
-	return lightEthereum
 }
 
 // TxQueueManager returns a reference to the TxQueueManager.
