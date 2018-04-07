@@ -8,11 +8,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/contracts/ens/contract"
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
+	gethparams "github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/golang/mock/gomock"
@@ -24,6 +28,10 @@ import (
 	"github.com/status-im/status-go/geth/transactions/fake"
 	. "github.com/status-im/status-go/t/utils"
 )
+
+func TestTxQueueTestSuite(t *testing.T) {
+	suite.Run(t, new(TxQueueTestSuite))
+}
 
 type TxQueueTestSuite struct {
 	suite.Suite
@@ -48,7 +56,9 @@ func (s *TxQueueTestSuite) SetupTest() {
 	s.client = gethrpc.DialInProc(s.server)
 	rpclient, _ := rpc.NewClient(s.client, params.UpstreamRPCConfig{})
 	s.rpcClientMock.EXPECT().RPCClient().Return(rpclient)
-	nodeConfig, err := params.NewNodeConfig("/tmp", "", params.RopstenNetworkID, true)
+	// expected by simulated backend
+	chainID := gethparams.AllEthashProtocolChanges.ChainId.Uint64()
+	nodeConfig, err := params.NewNodeConfig("/tmp", "", chainID, true)
 	s.Require().NoError(err)
 	s.nodeConfig = nodeConfig
 
@@ -56,7 +66,7 @@ func (s *TxQueueTestSuite) SetupTest() {
 	s.manager.DisableNotificactions()
 	s.manager.completionTimeout = time.Second
 	s.manager.rpcCallTimeout = time.Second
-	s.manager.Start(params.RopstenNetworkID)
+	s.manager.Start(chainID)
 }
 
 func (s *TxQueueTestSuite) TearDownTest() {
@@ -344,4 +354,29 @@ func (s *TxQueueTestSuite) TestLocalNonce() {
 	s.EqualError(testErr, rst.Error.Error())
 	resultNonce, _ = s.manager.localNonce.Load(tx.Args.From)
 	s.Equal(uint64(nonce)+1, resultNonce.(uint64))
+}
+
+func (s *TxQueueTestSuite) TestContractCreation() {
+	key, _ := crypto.GenerateKey()
+	testaddr := crypto.PubkeyToAddress(key.PublicKey)
+	genesis := core.GenesisAlloc{
+		testaddr: {Balance: big.NewInt(100000000000)},
+	}
+	backend := backends.NewSimulatedBackend(genesis)
+	selectedAccount := &account.SelectedExtKey{
+		Address:    testaddr,
+		AccountKey: &keystore.Key{PrivateKey: key},
+	}
+	s.manager.ethTxClient = backend
+	tx := Create(context.Background(), SendTxArgs{
+		From:  testaddr,
+		Input: hexutil.Bytes(gethcommon.FromHex(contract.ENSBin)),
+	})
+	s.NoError(s.manager.QueueTransaction(tx))
+	hash, err := s.manager.CompleteTransaction(tx.ID, selectedAccount)
+	s.NoError(err)
+	backend.Commit()
+	receipt, err := backend.TransactionReceipt(context.TODO(), hash)
+	s.NoError(err)
+	s.Equal(crypto.CreateAddress(testaddr, 0), receipt.ContractAddress)
 }

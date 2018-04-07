@@ -139,6 +139,50 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransactionUpstream() {
 	s.Equal(`{"jsonrpc":"2.0","id":1,"result":"`+txHash.String()+`"}`, result)
 }
 
+func (s *TransactionsTestSuite) TestEmptyToFieldPreserved() {
+	s.StartTestBackend()
+	defer s.StopTestBackend()
+
+	EnsureNodeSync(s.Backend.StatusNode())
+	err := s.Backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
+	s.NoError(err)
+
+	transactionCompleted := make(chan struct{})
+	signal.SetDefaultNodeNotificationHandler(func(rawSignal string) {
+		var sg struct {
+			Type  string
+			Event json.RawMessage
+		}
+		err := json.Unmarshal([]byte(rawSignal), &sg)
+		s.NoError(err)
+		if sg.Type == transactions.EventTransactionQueued {
+			var event transactions.SendTransactionEvent
+			s.NoError(json.Unmarshal(sg.Event, &event))
+			s.NotNil(event.Args.From)
+			s.Nil(event.Args.To)
+			_, err := s.Backend.CompleteTransaction(event.ID, TestConfig.Account1.Password)
+			s.NoError(err)
+			close(transactionCompleted)
+		}
+	})
+
+	result := s.Backend.CallRPC(`{
+		"jsonrpc": "2.0",
+		"id": 1,
+		"method": "eth_sendTransaction",
+		"params": [{
+			"from": "` + TestConfig.Account1.Address + `"
+		}]
+	}`)
+	s.NotContains(result, "error")
+
+	select {
+	case <-transactionCompleted:
+	case <-time.After(10 * time.Second):
+		s.FailNow("sending transaction timed out")
+	}
+}
+
 // TestSendContractCompat tries to send transaction using the legacy "Data"
 // field, which is supported for backward compatibility reasons.
 func (s *TransactionsTestSuite) TestSendContractTxCompat() {

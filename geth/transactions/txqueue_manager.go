@@ -2,12 +2,15 @@ package transactions
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"math/big"
 	"sync"
 	"time"
 
 	ethereum "github.com/ethereum/go-ethereum"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/ethereum/go-ethereum/core/types"
@@ -24,6 +27,11 @@ const (
 
 	defaultGas     = 90000
 	defaultTimeout = time.Minute
+)
+
+var (
+	// ErrUnexpectedArgs returned when args are of unexpected length.
+	ErrUnexpectedArgs = errors.New("unexpected args")
 )
 
 // RPCClientProvider is an interface that provides a way
@@ -230,10 +238,6 @@ func (m *Manager) completeTransaction(selectedAccount *account.SelectedExtKey, q
 
 	chainID := big.NewInt(int64(m.networkID))
 	value := (*big.Int)(args.Value)
-	toAddr := gethcommon.Address{}
-	if args.To != nil {
-		toAddr = *args.To
-	}
 
 	var gas uint64
 	if args.Gas == nil {
@@ -256,16 +260,27 @@ func (m *Manager) completeTransaction(selectedAccount *account.SelectedExtKey, q
 	} else {
 		gas = uint64(*args.Gas)
 	}
-
-	m.log.Info(
-		"preparing raw transaction",
-		"from", args.From.Hex(),
-		"to", toAddr.Hex(),
-		"gas", gas,
-		"gasPrice", gasPrice,
-		"value", value,
-	)
-	tx := types.NewTransaction(nonce, toAddr, value, gas, gasPrice, args.GetInput())
+	var tx *types.Transaction
+	if args.To != nil {
+		m.log.Info("New transaction",
+			"From", args.From,
+			"To", *args.To,
+			"Gas", gas,
+			"GasPrice", gasPrice,
+			"Value", value,
+		)
+		tx = types.NewTransaction(nonce, *args.To, value, gas, gasPrice, args.GetInput())
+	} else {
+		// contract creation is rare enough to log an expected address
+		m.log.Info("New contract",
+			"From", args.From,
+			"Gas", gas,
+			"GasPrice", gasPrice,
+			"Value", value,
+			"Contract address", crypto.CreateAddress(args.From, nonce),
+		)
+		tx = types.NewContractCreation(nonce, value, gas, gasPrice, args.GetInput())
+	}
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), selectedAccount.AccountKey.PrivateKey)
 	if err != nil {
 		return hash, err
@@ -294,8 +309,19 @@ func (m *Manager) DiscardTransaction(id string) error {
 // SendTransactionRPCHandler is a handler for eth_sendTransaction method.
 // It accepts one param which is a slice with a map of transaction params.
 func (m *Manager) SendTransactionRPCHandler(ctx context.Context, args ...interface{}) (interface{}, error) {
-	m.log.Info("SendTransactionRPCHandler called")
-	tx := Create(ctx, m.rpcCalltoSendTxArgs(args...))
+	m.log.Debug("SendTransactionRPCHandler called", "ARGS", args)
+	if len(args) != 1 {
+		return nil, ErrUnexpectedArgs
+	}
+	data, err := json.Marshal(args[0])
+	if err != nil {
+		return nil, err
+	}
+	var txArgs SendTxArgs
+	if err := json.Unmarshal(data, &txArgs); err != nil {
+		return nil, err
+	}
+	tx := Create(ctx, txArgs)
 	if err := m.QueueTransaction(tx); err != nil {
 		return nil, err
 	}
@@ -304,32 +330,4 @@ func (m *Manager) SendTransactionRPCHandler(ctx context.Context, args ...interfa
 		return nil, rst.Error
 	}
 	return rst.Hash.Hex(), nil
-}
-
-func (m *Manager) rpcCalltoSendTxArgs(args ...interface{}) SendTxArgs {
-	var err error
-	var fromAddr, toAddr gethcommon.Address
-
-	rpcCall := rpc.Call{Params: args}
-	fromAddr, err = rpcCall.ParseFromAddress()
-	if err != nil {
-		fromAddr = gethcommon.HexToAddress("0x0")
-	}
-
-	toAddr, err = rpcCall.ParseToAddress()
-	if err != nil {
-		toAddr = gethcommon.HexToAddress("0x0")
-	}
-
-	input := rpcCall.ParseInput()
-	data := rpcCall.ParseData()
-	return SendTxArgs{
-		To:       &toAddr,
-		From:     fromAddr,
-		Value:    rpcCall.ParseValue(),
-		Input:    input,
-		Data:     data,
-		Gas:      rpcCall.ParseGas(),
-		GasPrice: rpcCall.ParseGasPrice(),
-	}
 }
