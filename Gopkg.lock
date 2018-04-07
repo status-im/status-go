@@ -66,6 +66,9 @@
   packages = [
     ".",
     "accounts",
+    "accounts/abi",
+    "accounts/abi/bind",
+    "accounts/abi/bind/backends",
     "accounts/keystore",
     "accounts/usbwallet",
     "accounts/usbwallet/internal/trezor",
@@ -80,6 +83,7 @@
     "consensus/clique",
     "consensus/ethash",
     "consensus/misc",
+    "contracts/ens/contract",
     "core",
     "core/bloombits",
     "core/state",
@@ -423,6 +427,15 @@
   revision = "e19ae1496984b1c655b8044a65c0300a3c878dd3"
 
 [[projects]]
+  branch = "master"
+  name = "golang.org/x/tools"
+  packages = [
+    "go/ast/astutil",
+    "imports"
+  ]
+  revision = "ac136b6c2db7c4d43955e4bc7174db36dc0539c0"
+
+[[projects]]
   branch = "v0.1.1"
   name = "gopkg.in/fatih/set.v0"
   packages = ["."]
@@ -470,6 +483,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "29b8637c1c6198d24f34a9882acf15d3203d8a9cdd6439464967ecff798efba1"
+  inputs-digest = "fd11e2094673d9a89cee7b47b626c2c18c7dd80b6e86835d88a2d8d28e5e9fa7"
   solver-name = "gps-cdcl"
   solver-version = 1
