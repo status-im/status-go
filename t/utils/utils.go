@@ -2,6 +2,7 @@ package utils
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -16,7 +17,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/les"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/static"
@@ -52,6 +52,8 @@ var (
 
 	// All general log messages in this package should be routed through this logger.
 	logger = log.New("package", "status-go/t/utils")
+
+	syncTimeout = 50 * time.Minute
 )
 
 func init() {
@@ -77,7 +79,7 @@ func init() {
 	// setup auxiliary directories
 	TestDataDir = filepath.Join(RootDir, ".ethereumtest")
 
-	TestConfig, err = loadTestConfig(GetNetworkID())
+	TestConfig, err = loadTestConfig()
 	if err != nil {
 		panic(err)
 	}
@@ -98,70 +100,17 @@ func LoadFromFile(filename string) string {
 	return buf.String()
 }
 
-// LightEthereumProvider interface to be used on EnsureNodeSync
-// TODO (adriacidre) This interface name should be reviewed as it has a lot
-// of unrelated methods.
-type LightEthereumProvider interface {
-	// NodeConfig returns reference to running node's configuration
-	Config() (*params.NodeConfig, error)
-	// LightEthereumService exposes reference to LES service running on top of the node
-	LightEthereumService() (*les.LightEthereum, error)
-	// PeerCount returns number of connected peers
-	PeerCount() int
-}
+// EnsureSync waits until blockchain synchronization is complete and returns.
+type EnsureSync func(context.Context) error
 
 // EnsureNodeSync waits until node synchronzation is done to continue
 // with tests afterwards. Panics in case of an error or a timeout.
-func EnsureNodeSync(lesProvider LightEthereumProvider) {
-	nc, err := lesProvider.Config()
-	if err != nil {
-		panic("can't retrieve NodeConfig")
-	}
-	// Don't wait for any blockchain sync for the local private chain as blocks are never mined.
-	if nc.NetworkID == params.StatusChainNetworkID {
-		return
-	}
+func EnsureNodeSync(ensureSync EnsureSync) {
+	ctx, cancel := context.WithTimeout(context.Background(), syncTimeout)
+	defer cancel()
 
-	les, err := lesProvider.LightEthereumService()
-	if err != nil {
+	if err := ensureSync(ctx); err != nil {
 		panic(err)
-	}
-	if les == nil {
-		panic("LightEthereumService is nil")
-	}
-
-	// todo(@jeka): we should extract it into config
-	timeout := time.NewTimer(50 * time.Minute)
-	defer timeout.Stop()
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-timeout.C:
-			panic("timeout during node synchronization")
-		case <-ticker.C:
-			downloader := les.Downloader()
-			if downloader == nil {
-				continue
-			}
-			if lesProvider.PeerCount() == 0 {
-				logger.Debug("No establishished connections with a peers, continue waiting for a sync")
-				continue
-			}
-			if downloader.Synchronising() {
-				logger.Debug("synchronization is in progress")
-				continue
-			}
-			progress := downloader.Progress()
-			if progress.CurrentBlock >= progress.HighestBlock {
-				return
-			}
-			logger.Debug(
-				fmt.Sprintf("synchronization is not finished yet: current block %d < highest block %d",
-					progress.CurrentBlock, progress.HighestBlock),
-			)
-
-		}
 	}
 }
 
@@ -305,7 +254,7 @@ type testConfig struct {
 const passphraseEnvName = "ACCOUNT_PASSWORD"
 
 // loadTestConfig loads test configuration values from disk
-func loadTestConfig(networkID int) (*testConfig, error) {
+func loadTestConfig() (*testConfig, error) {
 	var config testConfig
 
 	configData := static.MustAsset("config/test-data.json")
@@ -313,7 +262,7 @@ func loadTestConfig(networkID int) (*testConfig, error) {
 		return nil, err
 	}
 
-	if networkID == params.StatusChainNetworkID {
+	if GetNetworkID() == params.StatusChainNetworkID {
 		accountsData := static.MustAsset("config/status-chain-accounts.json")
 		if err := json.Unmarshal(accountsData, &config); err != nil {
 			return nil, err

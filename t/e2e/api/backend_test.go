@@ -234,7 +234,7 @@ func (s *APIBackendTestSuite) TestResetChainData() {
 	s.StartTestBackend(e2e.WithDataDir(path))
 	defer s.StopTestBackend()
 
-	EnsureNodeSync(s.Backend.StatusNode())
+	EnsureNodeSync(s.Backend.StatusNode().EnsureSync)
 
 	require.NoError(s.Backend.ResetChainData())
 

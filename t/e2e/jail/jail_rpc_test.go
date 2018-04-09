@@ -39,7 +39,7 @@ func (s *JailRPCTestSuite) TestJailRPCSend() {
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
-	EnsureNodeSync(s.Backend.StatusNode())
+	EnsureNodeSync(s.Backend.StatusNode().EnsureSync)
 
 	// load Status JS and add test command to it
 	s.jail.SetBaseJS(baseStatusJSCode)
@@ -110,7 +110,7 @@ func (s *JailRPCTestSuite) TestContractDeployment() {
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
-	EnsureNodeSync(s.Backend.StatusNode())
+	EnsureNodeSync(s.Backend.StatusNode().EnsureSync)
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
 	s.jail.CreateAndInitCell(testChatID)
@@ -193,7 +193,7 @@ func (s *JailRPCTestSuite) TestJailVMPersistence() {
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
-	EnsureNodeSync(s.Backend.StatusNode())
+	EnsureNodeSync(s.Backend.StatusNode().EnsureSync)
 
 	// log into account from which transactions will be sent
 	err := s.Backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
