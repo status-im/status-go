@@ -105,28 +105,30 @@ func (n *StatusNode) start(config *params.NodeConfig) error {
 		return RPCClientError(err)
 	}
 	if ethNode.Server().DiscV5 != nil {
-		statusDB, err := db.CreateDatabase(filepath.Join(n.config.DataDir, params.StatusDatabase))
-		if err != nil {
-			return err
-		}
-		n.db = statusDB
-		n.register = peers.NewRegister(n.config.RegisterTopics...)
-		// TODO(dshulyak) consider adding a flag to define this behaviour
-		stopOnMax := len(n.config.RegisterTopics) == 0
-		n.peerPool = peers.NewPeerPool(n.config.RequireTopics,
-			peers.DefaultFastSync,
-			peers.DefaultSlowSync,
-			peers.NewCache(n.db),
-			stopOnMax,
-		)
-		if err := n.register.Start(ethNode.Server()); err != nil {
-			return err
-		}
-		if err := n.peerPool.Start(ethNode.Server()); err != nil {
-			return err
-		}
+		return n.startPeerPool()
 	}
 	return nil
+}
+
+func (n *StatusNode) startPeerPool() error {
+	statusDB, err := db.Create(filepath.Join(n.config.DataDir, params.StatusDatabase))
+	if err != nil {
+		return err
+	}
+	n.db = statusDB
+	n.register = peers.NewRegister(n.config.RegisterTopics...)
+	// TODO(dshulyak) consider adding a flag to define this behaviour
+	stopOnMax := len(n.config.RegisterTopics) == 0
+	n.peerPool = peers.NewPeerPool(n.config.RequireTopics,
+		peers.DefaultFastSync,
+		peers.DefaultSlowSync,
+		peers.NewCache(n.db),
+		stopOnMax,
+	)
+	if err := n.register.Start(n.gethNode.Server()); err != nil {
+		return err
+	}
+	return n.peerPool.Start(n.gethNode.Server())
 }
 
 // Stop will stop current StatusNode. A stopped node cannot be resumed.
@@ -142,11 +144,7 @@ func (n *StatusNode) stop() error {
 		return err
 	}
 	if n.gethNode.Server().DiscV5 != nil {
-		n.register.Stop()
-		n.peerPool.Stop()
-		if err := n.db.Close(); err != nil {
-			n.log.Error("error closing status db", "error", err)
-		}
+		n.stopPeerPool()
 	}
 	if err := n.gethNode.Stop(); err != nil {
 		return err
@@ -155,6 +153,14 @@ func (n *StatusNode) stop() error {
 	n.config = nil
 	n.rpcClient = nil
 	return nil
+}
+
+func (n *StatusNode) stopPeerPool() {
+	n.register.Stop()
+	n.peerPool.Stop()
+	if err := n.db.Close(); err != nil {
+		n.log.Error("error closing status db", "error", err)
+	}
 }
 
 // ResetChainData removes chain data if node is not running.

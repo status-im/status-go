@@ -18,7 +18,7 @@ func TestPeersRange(t *testing.T) {
 	defer func() {
 		require.NoError(t, os.RemoveAll(path))
 	}()
-	rootDB, err := db.CreateDatabase(path)
+	rootDB, err := db.Create(path)
 	require.NoError(t, err)
 	defer func() {
 		assert.NoError(t, rootDB.Close())

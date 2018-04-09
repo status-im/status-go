@@ -48,7 +48,7 @@ func (d *Cache) GetPeersRange(topic discv5.Topic, limit int) (nodes []*discv5.No
 	iterator := d.db.NewIterator(&util.Range{Start: key}, nil)
 	defer iterator.Release()
 	count := 0
-	for iterator.Next() {
+	for iterator.Next() && count < limit {
 		node := discv5.Node{}
 		value := iterator.Value()
 		if err := node.UnmarshalText(value); err != nil {
@@ -57,9 +57,6 @@ func (d *Cache) GetPeersRange(topic discv5.Topic, limit int) (nodes []*discv5.No
 		}
 		nodes = append(nodes, &node)
 		count++
-		if count == limit {
-			return nodes
-		}
 	}
 	return nodes
 }
