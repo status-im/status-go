@@ -143,7 +143,7 @@ func (s *TransactionsTestSuite) TestEmptyToFieldPreserved() {
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
-	EnsureNodeSync(s.Backend.StatusNode())
+	EnsureNodeSync(s.Backend.StatusNode().EnsureSync)
 	err := s.Backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	s.NoError(err)
 
