@@ -12,6 +12,7 @@ import (
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/transactions"
+	"github.com/status-im/status-go/sign"
 )
 
 // StatusAPI provides API to access Status related functionality.
@@ -49,9 +50,14 @@ func (api *StatusAPI) JailManager() jail.Manager {
 	return api.b.JailManager()
 }
 
-// TxQueueManager returns reference to account manager
-func (api *StatusAPI) TxQueueManager() *transactions.Manager {
-	return api.b.TxQueueManager()
+// Transactor returns reference to a status transactor
+func (api *StatusAPI) Transactor() *transactions.Transactor {
+	return api.b.Transactor()
+}
+
+// PendingSignRequests returns reference to a list of current sign requests
+func (api *StatusAPI) PendingSignRequests() *sign.PendingRequests {
+	return api.b.PendingSignRequests()
 }
 
 // StartNode start Status node, fails if node is already started
@@ -156,7 +162,7 @@ func (api *StatusAPI) CompleteTransaction(id string, password string) (gethcommo
 }
 
 // CompleteTransactions instructs backend to complete sending of multiple transactions
-func (api *StatusAPI) CompleteTransactions(ids []string, password string) map[string]transactions.Result {
+func (api *StatusAPI) CompleteTransactions(ids []string, password string) map[string]sign.Result {
 	return api.b.CompleteTransactions(ids, password)
 }
 

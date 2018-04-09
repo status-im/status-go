@@ -34,6 +34,10 @@ const (
 
 	// SendTransactionMethodName defines the name for a giving transaction.
 	SendTransactionMethodName = "eth_sendTransaction"
+	// AccountsMethodName defines the name for listing the currently signed accounts.
+	AccountsMethodName = "eth_accounts"
+	// PersonalSignMethodName defines the name for `personal.sign` API.
+	PersonalSignMethodName = "personal_sign"
 
 	// WSPort is a WS-RPC port (replaced in unit tests)
 	WSPort = 8546
