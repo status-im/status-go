@@ -65,3 +65,7 @@ coverage.html
 Session.vim
 .undodir/*
 /.idea/
+
+# SDK examples
+/sdk/examples/ponger/data/
+/sdk/examples/pinger/data/
