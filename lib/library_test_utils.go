@@ -34,6 +34,7 @@ import (
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/signal"
 	"github.com/status-im/status-go/geth/transactions"
+	"github.com/status-im/status-go/sign"
 	"github.com/status-im/status-go/static"
 	. "github.com/status-im/status-go/t/utils" //nolint: golint
 )
@@ -767,10 +768,8 @@ func testAccountLogout(t *testing.T) bool {
 }
 
 func testCompleteTransaction(t *testing.T) bool {
-	txQueueManager := statusAPI.TxQueueManager()
-	txQueue := txQueueManager.TransactionQueue()
+	signRequests := statusAPI.PendingSignRequests()
 
-	txQueue.Reset()
 	EnsureNodeSync(statusAPI.StatusNode().EnsureSync)
 
 	// log into account from which transactions will be sent
@@ -792,7 +791,7 @@ func testCompleteTransaction(t *testing.T) bool {
 			t.Errorf("cannot unmarshal event's JSON: %s. Error %q", jsonEvent, err)
 			return
 		}
-		if envelope.Type == transactions.EventTransactionQueued {
+		if envelope.Type == sign.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
 			t.Logf("transaction queued (will be completed shortly): {id: %s}\n", event["id"].(string))
 
@@ -839,7 +838,7 @@ func testCompleteTransaction(t *testing.T) bool {
 		return false
 	}
 
-	if txQueue.Count() != 0 {
+	if signRequests.Count() != 0 {
 		t.Error("tx queue must be empty at this point")
 		return false
 	}
@@ -848,8 +847,7 @@ func testCompleteTransaction(t *testing.T) bool {
 }
 
 func testCompleteMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocyclo
-	txQueue := statusAPI.TxQueueManager().TransactionQueue()
-	txQueue.Reset()
+	signRequests := statusAPI.PendingSignRequests()
 
 	// log into account from which transactions will be sent
 	if err := statusAPI.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password); err != nil {
@@ -870,7 +868,7 @@ func testCompleteMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocyc
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
 		}
-		if envelope.Type == transactions.EventTransactionQueued {
+		if envelope.Type == sign.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
 			txID = event["id"].(string)
 			t.Logf("transaction queued (will be completed in a single call, once aggregated): {id: %s}\n", txID)
@@ -917,7 +915,7 @@ func testCompleteMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocyc
 		}
 		results := resultsStruct.Results
 
-		if len(results) != (testTxCount+1) || results["invalid-tx-id"].Error != transactions.ErrQueuedTxIDNotFound.Error() {
+		if len(results) != (testTxCount+1) || results["invalid-tx-id"].Error != sign.ErrSignReqNotFound.Error() {
 			t.Errorf("cannot complete txs: %v", results)
 			return
 		}
@@ -942,7 +940,7 @@ func testCompleteMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocyc
 
 		time.Sleep(1 * time.Second) // make sure that tx complete signal propagates
 		for _, txID := range parsedIDs {
-			if txQueue.Has(string(txID)) {
+			if signRequests.Has(string(txID)) {
 				t.Errorf("txqueue should not have test tx at this point (it should be completed): %s", txID)
 				return
 			}
@@ -972,7 +970,7 @@ func testCompleteMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocyc
 		return false
 	}
 
-	if txQueue.Count() != 0 {
+	if signRequests.Count() != 0 {
 		t.Error("tx queue must be empty at this point")
 		return false
 	}
@@ -981,8 +979,7 @@ func testCompleteMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocyc
 }
 
 func testDiscardTransaction(t *testing.T) bool { //nolint: gocyclo
-	txQueue := statusAPI.TxQueueManager().TransactionQueue()
-	txQueue.Reset()
+	signRequests := statusAPI.PendingSignRequests()
 
 	// log into account from which transactions will be sent
 	if err := statusAPI.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password); err != nil {
@@ -1003,12 +1000,12 @@ func testDiscardTransaction(t *testing.T) bool { //nolint: gocyclo
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
 		}
-		if envelope.Type == transactions.EventTransactionQueued {
+		if envelope.Type == sign.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
 			txID = event["id"].(string)
 			t.Logf("transaction queued (will be discarded soon): {id: %s}\n", txID)
 
-			if !txQueue.Has(string(txID)) {
+			if !signRequests.Has(string(txID)) {
 				t.Errorf("txqueue should still have test tx: %s", txID)
 				return
 			}
@@ -1028,13 +1025,12 @@ func testDiscardTransaction(t *testing.T) bool { //nolint: gocyclo
 
 			// try completing discarded transaction
 			_, err := statusAPI.CompleteTransaction(string(txID), TestConfig.Account1.Password)
-			if err != transactions.ErrQueuedTxIDNotFound {
+			if err != sign.ErrSignReqNotFound {
 				t.Error("expects tx not found, but call to CompleteTransaction succeeded")
 				return
 			}
 
-			time.Sleep(1 * time.Second) // make sure that tx complete signal propagates
-			if txQueue.Has(string(txID)) {
+			if signRequests.Has(string(txID)) {
 				t.Errorf("txqueue should not have test tx at this point (it should be discarded): %s", txID)
 				return
 			}
@@ -1042,19 +1038,19 @@ func testDiscardTransaction(t *testing.T) bool { //nolint: gocyclo
 			completeQueuedTransaction <- struct{}{} // so that timeout is aborted
 		}
 
-		if envelope.Type == transactions.EventTransactionFailed {
+		if envelope.Type == sign.EventTransactionFailed {
 			event := envelope.Event.(map[string]interface{})
 			t.Logf("transaction return event received: {id: %s}\n", event["id"].(string))
 
 			receivedErrMessage := event["error_message"].(string)
-			expectedErrMessage := transactions.ErrQueuedTxDiscarded.Error()
+			expectedErrMessage := sign.ErrSignReqDiscarded.Error()
 			if receivedErrMessage != expectedErrMessage {
 				t.Errorf("unexpected error message received: got %v", receivedErrMessage)
 				return
 			}
 
 			receivedErrCode := event["error_code"].(string)
-			if receivedErrCode != strconv.Itoa(transactions.SendTransactionDiscardedErrorCode) {
+			if receivedErrCode != strconv.Itoa(sign.SendTransactionDiscardedErrorCode) {
 				t.Errorf("unexpected error code received: got %v", receivedErrCode)
 				return
 			}
@@ -1069,7 +1065,8 @@ func testDiscardTransaction(t *testing.T) bool { //nolint: gocyclo
 		To:    account.ToAddress(TestConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 	})
-	if err != transactions.ErrQueuedTxDiscarded {
+	time.Sleep(1 * time.Second)
+	if err != sign.ErrSignReqDiscarded {
 		t.Errorf("expected error not thrown: %v", err)
 		return false
 	}
@@ -1079,7 +1076,7 @@ func testDiscardTransaction(t *testing.T) bool { //nolint: gocyclo
 		return false
 	}
 
-	if txQueue.Count() != 0 {
+	if signRequests.Count() != 0 {
 		t.Error("tx queue must be empty at this point")
 		return false
 	}
@@ -1093,8 +1090,7 @@ func testDiscardTransaction(t *testing.T) bool { //nolint: gocyclo
 }
 
 func testDiscardMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocyclo
-	txQueue := statusAPI.TxQueueManager().TransactionQueue()
-	txQueue.Reset()
+	signRequests := statusAPI.PendingSignRequests()
 
 	// log into account from which transactions will be sent
 	if err := statusAPI.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password); err != nil {
@@ -1116,12 +1112,12 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocycl
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
 		}
-		if envelope.Type == transactions.EventTransactionQueued {
+		if envelope.Type == sign.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
 			txID = event["id"].(string)
 			t.Logf("transaction queued (will be discarded soon): {id: %s}\n", txID)
 
-			if !txQueue.Has(string(txID)) {
+			if !signRequests.Has(string(txID)) {
 				t.Errorf("txqueue should still have test tx: %s", txID)
 				return
 			}
@@ -1129,19 +1125,19 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocycl
 			txIDs <- txID
 		}
 
-		if envelope.Type == transactions.EventTransactionFailed {
+		if envelope.Type == sign.EventTransactionFailed {
 			event := envelope.Event.(map[string]interface{})
 			t.Logf("transaction return event received: {id: %s}\n", event["id"].(string))
 
 			receivedErrMessage := event["error_message"].(string)
-			expectedErrMessage := transactions.ErrQueuedTxDiscarded.Error()
+			expectedErrMessage := sign.ErrSignReqDiscarded.Error()
 			if receivedErrMessage != expectedErrMessage {
 				t.Errorf("unexpected error message received: got %v", receivedErrMessage)
 				return
 			}
 
 			receivedErrCode := event["error_code"].(string)
-			if receivedErrCode != strconv.Itoa(transactions.SendTransactionDiscardedErrorCode) {
+			if receivedErrCode != strconv.Itoa(sign.SendTransactionDiscardedErrorCode) {
 				t.Errorf("unexpected error code received: got %v", receivedErrCode)
 				return
 			}
@@ -1160,7 +1156,7 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocycl
 			To:    account.ToAddress(TestConfig.Account2.Address),
 			Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 		})
-		if err != transactions.ErrQueuedTxDiscarded {
+		if err != sign.ErrSignReqDiscarded {
 			t.Errorf("expected error not thrown: %v", err)
 			return
 		}
@@ -1191,7 +1187,7 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocycl
 		}
 		discardResults := discardResultsStruct.Results
 
-		if len(discardResults) != 1 || discardResults["invalid-tx-id"].Error != transactions.ErrQueuedTxIDNotFound.Error() {
+		if len(discardResults) != 1 || discardResults["invalid-tx-id"].Error != sign.ErrSignReqNotFound.Error() {
 			t.Errorf("cannot discard txs: %v", discardResults)
 			return
 		}
@@ -1213,7 +1209,7 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocycl
 				t.Errorf("tx id not set in result: expected id is %s", txID)
 				return
 			}
-			if txResult.Error != transactions.ErrQueuedTxIDNotFound.Error() {
+			if txResult.Error != sign.ErrSignReqNotFound.Error() {
 				t.Errorf("invalid error for %s", txResult.Hash)
 				return
 			}
@@ -1225,7 +1221,7 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocycl
 
 		time.Sleep(1 * time.Second) // make sure that tx complete signal propagates
 		for _, txID := range parsedIDs {
-			if txQueue.Has(string(txID)) {
+			if signRequests.Has(string(txID)) {
 				t.Errorf("txqueue should not have test tx at this point (it should be discarded): %s", txID)
 				return
 			}
@@ -1254,7 +1250,7 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocycl
 		return false
 	}
 
-	if txQueue.Count() != 0 {
+	if signRequests.Count() != 0 {
 		t.Error("tx queue must be empty at this point")
 		return false
 	}
@@ -1430,7 +1426,7 @@ func startTestNode(t *testing.T) <-chan struct{} {
 			return
 		}
 
-		if envelope.Type == transactions.EventTransactionQueued {
+		if envelope.Type == sign.EventTransactionQueued {
 		}
 		if envelope.Type == signal.EventNodeStarted {
 			t.Log("Node started, but we wait till it be ready")

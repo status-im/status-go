@@ -3,29 +3,30 @@ package transactions
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 
+	ethereum "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 )
 
-// errors
 var (
+	// ErrInvalidSendTxArgs is returned when the structure of SendTxArgs is ambigious.
 	ErrInvalidSendTxArgs = errors.New("Transaction arguments are invalid (are both 'input' and 'data' fields used?)")
+	// ErrUnexpectedArgs returned when args are of unexpected length.
+	ErrUnexpectedArgs = errors.New("unexpected args")
 )
 
-// Result is a JSON returned from transaction complete function (used internally)
-type Result struct {
-	Hash  common.Hash
-	Error error
+// PendingNonceProvider provides information about nonces.
+type PendingNonceProvider interface {
+	PendingNonceAt(ctx context.Context, account common.Address) (uint64, error)
 }
 
-// QueuedTx holds enough information to complete the queued transaction.
-type QueuedTx struct {
-	ID      string
-	Context context.Context
-	Args    SendTxArgs
-	Result  chan Result
+// GasCalculator provides methods for estimating and pricing gas.
+type GasCalculator interface {
+	ethereum.GasEstimator
+	ethereum.GasPricer
 }
 
 // SendTxArgs represents the arguments to submit a new transaction into the transaction pool.
@@ -67,4 +68,21 @@ func (args SendTxArgs) GetInput() hexutil.Bytes {
 
 func isNilOrEmpty(bytes hexutil.Bytes) bool {
 	return bytes == nil || len(bytes) == 0
+}
+
+// RPCCalltoSendTxArgs creates SendTxArgs based on RPC parameters
+func RPCCalltoSendTxArgs(args ...interface{}) (SendTxArgs, error) {
+	var txArgs SendTxArgs
+	if len(args) != 1 {
+		return txArgs, ErrUnexpectedArgs
+	}
+	data, err := json.Marshal(args[0])
+	if err != nil {
+		return txArgs, err
+	}
+	if err := json.Unmarshal(data, &txArgs); err != nil {
+		return txArgs, err
+	}
+
+	return txArgs, nil
 }
