@@ -27,18 +27,8 @@ func TestPeerPoolSimulationSuite(t *testing.T) {
 	suite.Run(t, new(PeerPoolSimulationSuite))
 }
 
-func (s *PeerPoolSimulationSuite) freePort() int {
-	addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
-	s.Require().NoError(err)
-	l, err := net.ListenTCP("tcp", addr)
-	s.Require().NoError(err)
-	return l.Addr().(*net.TCPAddr).Port
-}
-
 func (s *PeerPoolSimulationSuite) SetupTest() {
-	// :0 can't be passed to p2p config, cause it will be used for Self()
-	// which breaks things
-	port := s.freePort()
+	port := 33731
 	key, _ := crypto.GenerateKey()
 	name := common.MakeName("bootnode", "1.0")
 	// 127.0.0.1 is invalidated by discovery v5
@@ -46,12 +36,13 @@ func (s *PeerPoolSimulationSuite) SetupTest() {
 		Config: p2p.Config{
 			MaxPeers:    10,
 			Name:        name,
-			ListenAddr:  fmt.Sprintf("0.0.0.0:%d", port),
+			ListenAddr:  fmt.Sprintf("0.0.0.0:%d", 33731),
 			PrivateKey:  key,
 			DiscoveryV5: true,
 			NoDiscovery: true,
 		},
 	}
+	port++
 	s.Require().NoError(s.bootnode.Start())
 	bootnodeV5 := discv5.NewNode(s.bootnode.DiscV5.Self().ID, net.ParseIP("127.0.0.1"), uint16(port), uint16(port))
 
@@ -62,13 +53,14 @@ func (s *PeerPoolSimulationSuite) SetupTest() {
 			Config: p2p.Config{
 				MaxPeers:         10,
 				Name:             common.MakeName("peer-"+strconv.Itoa(i), "1.0"),
-				ListenAddr:       fmt.Sprintf("0.0.0.0:%d", s.freePort()),
+				ListenAddr:       fmt.Sprintf("0.0.0.0:%d", port),
 				PrivateKey:       key,
 				DiscoveryV5:      true,
 				NoDiscovery:      true,
 				BootstrapNodesV5: []*discv5.Node{bootnodeV5},
 			},
 		}
+		port++
 		s.NoError(peer.Start())
 		s.peers[i] = peer
 	}
