@@ -53,10 +53,8 @@ type StatusNode struct {
 	peerPool *peers.PeerPool
 	db       *leveldb.DB
 
-	whisperService *whisper.Whisper   // reference to Whisper service
-	lesService     *les.LightEthereum // reference to LES service
-	rpcClient      *rpc.Client        // reference to RPC client
-	log            log.Logger
+	rpcClient *rpc.Client // reference to RPC client
+	log       log.Logger
 }
 
 // New makes new instance of StatusNode.
