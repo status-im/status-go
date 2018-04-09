@@ -35,7 +35,7 @@ type TopicPool struct {
 	running int32
 
 	mu         sync.RWMutex
-	discvWG    sync.WaitGroup
+	discWG     sync.WaitGroup
 	consumerWG sync.WaitGroup
 	connected  int
 	peers      map[discv5.NodeID]*peerInfo
@@ -155,10 +155,10 @@ func (t *TopicPool) StartSearch(server *p2p.Server) error {
 			found <- peer
 		}
 	}
-	t.discvWG.Add(1)
+	t.discWG.Add(1)
 	go func() {
 		server.DiscV5.SearchTopic(t.topic, t.period, found, lookup)
-		t.discvWG.Done()
+		t.discWG.Done()
 	}()
 	t.consumerWG.Add(1)
 	go func() {
@@ -239,5 +239,5 @@ func (t *TopicPool) StopSearch() {
 	t.consumerWG.Wait()
 	atomic.StoreInt32(&t.running, 0)
 	close(t.period)
-	t.discvWG.Wait()
+	t.discWG.Wait()
 }
