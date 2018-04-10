@@ -18,6 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discover"
+	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/p2p/nat"
 	"github.com/ethereum/go-ethereum/whisper/mailserver"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
@@ -94,14 +95,12 @@ func defaultEmbeddedNodeConfig(config *params.NodeConfig) *node.Config {
 		Name:              config.Name,
 		Version:           config.Version,
 		P2P: p2p.Config{
-			NoDiscovery:      !config.Discovery,
-			DiscoveryV5:      config.Discovery,
-			BootstrapNodes:   nil,
-			BootstrapNodesV5: nil,
-			ListenAddr:       config.ListenAddr,
-			NAT:              nat.Any(),
-			MaxPeers:         config.MaxPeers,
-			MaxPendingPeers:  config.MaxPendingPeers,
+			NoDiscovery:     true,
+			DiscoveryV5:     config.Discovery,
+			ListenAddr:      config.ListenAddr,
+			NAT:             nat.Any(),
+			MaxPeers:        config.MaxPeers,
+			MaxPendingPeers: config.MaxPendingPeers,
 		},
 		IPCPath:          makeIPCPath(config),
 		HTTPCors:         []string{"*"},
@@ -120,7 +119,7 @@ func defaultEmbeddedNodeConfig(config *params.NodeConfig) *node.Config {
 
 	if config.ClusterConfig.Enabled {
 		nc.P2P.StaticNodes = parseNodes(config.ClusterConfig.StaticNodes)
-		nc.P2P.BootstrapNodes = parseNodes(config.ClusterConfig.BootNodes)
+		nc.P2P.BootstrapNodesV5 = parseNodesV5(config.ClusterConfig.BootNodes)
 	}
 
 	return nc
@@ -226,6 +225,15 @@ func parseNodes(enodes []string) []*discover.Node {
 	nodes := make([]*discover.Node, len(enodes))
 	for i, enode := range enodes {
 		nodes[i] = discover.MustParseNode(enode)
+	}
+	return nodes
+}
+
+// parseNodesV5 creates list of discv5.Node out of enode strings.
+func parseNodesV5(enodes []string) []*discv5.Node {
+	nodes := make([]*discv5.Node, len(enodes))
+	for i, enode := range enodes {
+		nodes[i] = discv5.MustParseNode(enode)
 	}
 	return nodes
 }

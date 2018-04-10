@@ -16,9 +16,12 @@ import (
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
+	"github.com/syndtr/goleveldb/leveldb"
 
+	"github.com/status-im/status-go/geth/db"
 	"github.com/status-im/status-go/geth/mailservice"
 	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/geth/peers"
 	"github.com/status-im/status-go/geth/rpc"
 )
 
@@ -45,6 +48,10 @@ type StatusNode struct {
 	mu       sync.RWMutex
 	config   *params.NodeConfig // Status node configuration
 	gethNode *node.Node         // reference to Geth P2P stack/node
+
+	register *peers.Register
+	peerPool *peers.PeerPool
+	db       *leveldb.DB
 
 	rpcClient *rpc.Client // reference to RPC client
 	log       log.Logger
@@ -97,7 +104,31 @@ func (n *StatusNode) start(config *params.NodeConfig) error {
 		n.log.Error("Failed to create an RPC client", "error", err)
 		return RPCClientError(err)
 	}
+	if ethNode.Server().DiscV5 != nil {
+		return n.startPeerPool()
+	}
 	return nil
+}
+
+func (n *StatusNode) startPeerPool() error {
+	statusDB, err := db.Create(filepath.Join(n.config.DataDir, params.StatusDatabase))
+	if err != nil {
+		return err
+	}
+	n.db = statusDB
+	n.register = peers.NewRegister(n.config.RegisterTopics...)
+	// TODO(dshulyak) consider adding a flag to define this behaviour
+	stopOnMax := len(n.config.RegisterTopics) == 0
+	n.peerPool = peers.NewPeerPool(n.config.RequireTopics,
+		peers.DefaultFastSync,
+		peers.DefaultSlowSync,
+		peers.NewCache(n.db),
+		stopOnMax,
+	)
+	if err := n.register.Start(n.gethNode.Server()); err != nil {
+		return err
+	}
+	return n.peerPool.Start(n.gethNode.Server())
 }
 
 // Stop will stop current StatusNode. A stopped node cannot be resumed.
@@ -112,6 +143,9 @@ func (n *StatusNode) stop() error {
 	if err := n.isAvailable(); err != nil {
 		return err
 	}
+	if n.gethNode.Server().DiscV5 != nil {
+		n.stopPeerPool()
+	}
 	if err := n.gethNode.Stop(); err != nil {
 		return err
 	}
@@ -119,6 +153,14 @@ func (n *StatusNode) stop() error {
 	n.config = nil
 	n.rpcClient = nil
 	return nil
+}
+
+func (n *StatusNode) stopPeerPool() {
+	n.register.Stop()
+	n.peerPool.Stop()
+	if err := n.db.Close(); err != nil {
+		n.log.Error("error closing status db", "error", err)
+	}
 }
 
 // ResetChainData removes chain data if node is not running.

@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/status-im/status-go/cmd/statusd/debug"
 	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/node"
@@ -72,6 +73,10 @@ var (
 	firebaseAuth = flag.String("shh.firebaseauth", "", "FCM Authorization Key used for sending Push Notifications")
 
 	syncAndExit = flag.Int("sync-and-exit", -1, "Timeout in minutes for blockchain sync and exit, zero means no timeout unless sync is finished")
+
+	// Topics that will be search and registered by discovery v5.
+	searchTopics   = topicLimitsFlag{}
+	registerTopics = topicsFlag{}
 )
 
 // All general log messages in this package should be routed through this logger.
@@ -104,6 +109,9 @@ func enhanceLogger(logger *log.Logger, config *params.NodeConfig) error {
 }
 
 func main() {
+	flag.Var(&searchTopics, "topic.search", "Topic that will be searched in discovery v5, e.g (mailserver=1,1)")
+	flag.Var(&registerTopics, "topic.register", "Topic that will be registered using discovery v5.")
+
 	flag.Usage = printUsage
 	flag.Parse()
 
@@ -269,6 +277,8 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 	}
 
 	nodeConfig.Discovery = *discovery
+	nodeConfig.RequireTopics = map[discv5.Topic]params.Limits(searchTopics)
+	nodeConfig.RegisterTopics = []discv5.Topic(registerTopics)
 
 	// Even if standalone is true and discovery is disabled,
 	// it's possible to use bootnodes.
