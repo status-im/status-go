@@ -82,12 +82,6 @@ var (
 	testNonce    = hexutil.Uint64(10)
 )
 
-func (s *TxQueueTestSuite) completeFunc(args SendTxArgs) func(acc *account.SelectedExtKey) (gethcommon.Hash, error) {
-	return func(acc *account.SelectedExtKey) (gethcommon.Hash, error) {
-		return s.manager.validateAndPropagate(acc, args)
-	}
-}
-
 func (s *TxQueueTestSuite) setupTransactionPoolAPI(args SendTxArgs, returnNonce, resultNonce hexutil.Uint64, account *account.SelectedExtKey, txErr error) {
 	// Expect calls to gas functions only if there are no user defined values.
 	// And also set the expected gas and gas price for RLP encoding the expected tx.
