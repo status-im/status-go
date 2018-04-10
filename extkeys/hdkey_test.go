@@ -590,7 +590,7 @@ func TestHDWalletCompatibility(t *testing.T) {
 			t.Errorf("wrong public key generated. expected %s, got %s", expectedAddresses[i].pubKey, pubKey)
 		}
 
-		privKey := fmt.Sprintf("0x%x", privateKeyECDSA.D.Bytes())
+		privKey := fmt.Sprintf("0x%x", crypto.FromECDSA(privateKeyECDSA))
 		if privKey != expectedAddresses[i].privKey {
 			t.Errorf("wrong private key generated. expected %s, got %s", expectedAddresses[i].privKey, privKey)
 		}
