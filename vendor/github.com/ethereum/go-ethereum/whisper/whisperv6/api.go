@@ -246,65 +246,10 @@ type newMessageOverride struct {
 
 // Post a message on the Whisper network.
 func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (bool, error) {
-	var (
-		symKeyGiven = len(req.SymKeyID) > 0
-		pubKeyGiven = len(req.PublicKey) > 0
-		err         error
-	)
-
-	// user must specify either a symmetric or an asymmetric key
-	if (symKeyGiven && pubKeyGiven) || (!symKeyGiven && !pubKeyGiven) {
-		return false, ErrSymAsym
-	}
-
-	params := &MessageParams{
-		TTL:      req.TTL,
-		Payload:  req.Payload,
-		Padding:  req.Padding,
-		WorkTime: req.PowTime,
-		PoW:      req.PowTarget,
-		Topic:    req.Topic,
-	}
-
-	// Set key that is used to sign the message
-	if len(req.Sig) > 0 {
-		if params.Src, err = api.w.GetPrivateKey(req.Sig); err != nil {
-			return false, err
-		}
-	}
-
-	// Set symmetric key that is used to encrypt the message
-	if symKeyGiven {
-		if params.Topic == (TopicType{}) { // topics are mandatory with symmetric encryption
-			return false, ErrNoTopics
-		}
-		if params.KeySym, err = api.w.GetSymKey(req.SymKeyID); err != nil {
-			return false, err
-		}
-		if !validateDataIntegrity(params.KeySym, aesKeyLength) {
-			return false, ErrInvalidSymmetricKey
-		}
-	}
-
-	// Set asymmetric key that is used to encrypt the message
-	if pubKeyGiven {
-		params.Dst = crypto.ToECDSAPub(req.PublicKey)
-		if !ValidatePublicKey(params.Dst) {
-			return false, ErrInvalidPublicKey
-		}
-	}
-
-	// encrypt and sent message
-	whisperMsg, err := NewSentMessage(params)
+	env, err := MakeEnvelope(api.w, req)
 	if err != nil {
 		return false, err
 	}
-
-	env, err := whisperMsg.Wrap(params)
-	if err != nil {
-		return false, err
-	}
-
 	// send to specific node (skip PoW check)
 	if len(req.TargetPeer) > 0 {
 		n, err := discover.ParseNode(req.TargetPeer)
@@ -320,6 +265,69 @@ func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (bool, er
 	}
 
 	return true, api.w.Send(env)
+}
+
+// MakeEnvelope create envelopes from request.
+func MakeEnvelope(w *Whisper, req NewMessage) (*Envelope, error) {
+	var (
+		symKeyGiven = len(req.SymKeyID) > 0
+		pubKeyGiven = len(req.PublicKey) > 0
+		err         error
+	)
+
+	// user must specify either a symmetric or an asymmetric key
+	if (symKeyGiven && pubKeyGiven) || (!symKeyGiven && !pubKeyGiven) {
+		return nil, ErrSymAsym
+	}
+
+	params := &MessageParams{
+		TTL:      req.TTL,
+		Payload:  req.Payload,
+		Padding:  req.Padding,
+		WorkTime: req.PowTime,
+		PoW:      req.PowTarget,
+		Topic:    req.Topic,
+	}
+
+	// Set key that is used to sign the message
+	if len(req.Sig) > 0 {
+		if params.Src, err = w.GetPrivateKey(req.Sig); err != nil {
+			return nil, err
+		}
+	}
+
+	// Set symmetric key that is used to encrypt the message
+	if symKeyGiven {
+		if params.Topic == (TopicType{}) { // topics are mandatory with symmetric encryption
+			return nil, ErrNoTopics
+		}
+		if params.KeySym, err = w.GetSymKey(req.SymKeyID); err != nil {
+			return nil, err
+		}
+		if !validateDataIntegrity(params.KeySym, aesKeyLength) {
+			return nil, ErrInvalidSymmetricKey
+		}
+	}
+
+	// Set asymmetric key that is used to encrypt the message
+	if pubKeyGiven {
+		params.Dst = crypto.ToECDSAPub(req.PublicKey)
+		if !ValidatePublicKey(params.Dst) {
+			return nil, ErrInvalidPublicKey
+		}
+	}
+
+	// encrypt and sent message
+	whisperMsg, err := NewSentMessage(params)
+	if err != nil {
+		return nil, err
+	}
+
+	env, err := whisperMsg.Wrap(params)
+	if err != nil {
+		return nil, err
+	}
+	return env, nil
 }
 
 // UninstallFilter is alias for Unsubscribe

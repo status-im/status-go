@@ -30,6 +30,9 @@ const (
 
 	// EventChainDataRemoved is triggered when node's chain data is removed
 	EventChainDataRemoved = "chaindata.removed"
+
+	// EventEnvelopeSent is triggered when envelope was sent atleast to a one peer.
+	EventEnvelopeSent = "envelope.sent"
 )
 
 // Envelope is a general signal sent upward from node to RN app
