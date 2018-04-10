@@ -260,7 +260,7 @@ func (n *Node) startRPC(services map[reflect.Type]Service) error {
 	if err := n.startInProc(apis); err != nil {
 		return err
 	}
-	if err := n.startPublicInProc(apis); err != nil {
+	if err := n.startPublicInProc(apis, n.config.HTTPModules); err != nil {
 		n.stopInProc()
 		return err
 	}
@@ -310,17 +310,22 @@ func (n *Node) stopInProc() {
 }
 
 // startPublicInProc initializes an in-process RPC endpoint for public APIs.
-func (n *Node) startPublicInProc(apis []rpc.API) error {
+func (n *Node) startPublicInProc(apis []rpc.API, modules []string) error {
+	// Generate the whitelist based on the allowed modules
+	whitelist := make(map[string]bool)
+	for _, module := range modules {
+		whitelist[module] = true
+	}
+
 	// Register all the public APIs exposed by the services
 	handler := rpc.NewServer()
 	for _, api := range apis {
-		if !api.Public {
-			continue
+		if whitelist[api.Namespace] || (len(whitelist) == 0 && api.Public) {
+			if err := handler.RegisterName(api.Namespace, api.Service); err != nil {
+				return err
+			}
+			n.log.Debug("InProc public registered", "service", api.Service, "namespace", api.Namespace)
 		}
-		if err := handler.RegisterName(api.Namespace, api.Service); err != nil {
-			return err
-		}
-		n.log.Debug("InProc public registered", "service", api.Service, "namespace", api.Namespace)
 	}
 	n.inprocPublicHandler = handler
 	return nil
