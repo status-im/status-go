@@ -301,6 +301,14 @@ func (n *Node) startInProc(apis []rpc.API) error {
 	return nil
 }
 
+// stopInProc terminates the in-process RPC endpoint.
+func (n *Node) stopInProc() {
+	if n.inprocHandler != nil {
+		n.inprocHandler.Stop()
+		n.inprocHandler = nil
+	}
+}
+
 // startPublicInProc initializes an in-process RPC endpoint for public APIs.
 func (n *Node) startPublicInProc(apis []rpc.API) error {
 	// Register all the public APIs exposed by the services
@@ -316,14 +324,6 @@ func (n *Node) startPublicInProc(apis []rpc.API) error {
 	}
 	n.inprocPublicHandler = handler
 	return nil
-}
-
-// stopInProc terminates the in-process RPC endpoint.
-func (n *Node) stopInProc() {
-	if n.inprocHandler != nil {
-		n.inprocHandler.Stop()
-		n.inprocHandler = nil
-	}
 }
 
 // stopPublicInProc terminates the in-process RPC endpoint for public APIs.
