@@ -167,11 +167,11 @@ func (cs *commandSet) Logout() error {
 	return cs.statusAPI.Logout()
 }
 
-// CompleteTransaction instructs API to complete sending of a given transaction.
-func (cs *commandSet) CompleteTransaction(id, password string) (string, error) {
-	txHash, err := cs.statusAPI.CompleteTransaction(id, password)
-	if err != nil {
-		return "", err
+// ApproveSignRequest instructs API to complete sending of a given transaction.
+func (cs *commandSet) ApproveSignRequest(id, password string) (string, error) {
+	result := cs.statusAPI.ApproveSignRequest(id, password)
+	if result.Error != nil {
+		return "", result.Error
 	}
-	return txHash.String(), nil
+	return result.Response.Hex(), nil
 }

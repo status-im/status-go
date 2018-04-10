@@ -16,6 +16,9 @@ var (
 	ErrInvalidSendTxArgs = errors.New("Transaction arguments are invalid (are both 'input' and 'data' fields used?)")
 	// ErrUnexpectedArgs returned when args are of unexpected length.
 	ErrUnexpectedArgs = errors.New("unexpected args")
+
+	//ErrInvalidCompleteTxSender - error transaction with invalid sender
+	ErrInvalidCompleteTxSender = errors.New("transaction can only be completed by its creator")
 )
 
 // PendingNonceProvider provides information about nonces.
