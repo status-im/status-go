@@ -28,6 +28,7 @@ var (
 	ErrNodeStopped    = errors.New("node not started")
 	ErrNodeRunning    = errors.New("node already running")
 	ErrServiceUnknown = errors.New("unknown service")
+	ErrHTTPDisabled   = errors.New("http interface is disabled")
 
 	datadirInUseErrnos = map[uint]bool{11: true, 32: true, 35: true}
 )

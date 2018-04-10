@@ -8,9 +8,11 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
+	gethnode "github.com/ethereum/go-ethereum/node"
 
 	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/jail"
+	"github.com/status-im/status-go/geth/mailservice"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/notifications/push/fcm"
 	"github.com/status-im/status-go/geth/params"
@@ -109,7 +111,14 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 			err = fmt.Errorf("node crashed on start: %v", err)
 		}
 	}()
-	err = b.statusNode.Start(config)
+
+	services := []gethnode.ServiceConstructor{
+		func(_ *gethnode.ServiceContext) (gethnode.Service, error) {
+			return mailservice.New(b.statusNode), nil
+		},
+	}
+
+	err = b.statusNode.Start(config, services...)
 	if err != nil {
 		switch err.(type) {
 		case node.RPCClientError:
