@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/status-im/status-go/cmd/statusd/debug"
+	"github.com/status-im/status-go/cmd/statusd/topics"
 	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
@@ -75,8 +76,8 @@ var (
 	syncAndExit = flag.Int("sync-and-exit", -1, "Timeout in minutes for blockchain sync and exit, zero means no timeout unless sync is finished")
 
 	// Topics that will be search and registered by discovery v5.
-	searchTopics   = topicLimitsFlag{}
-	registerTopics = topicsFlag{}
+	searchTopics   = topics.TopicLimitsFlag{}
+	registerTopics = topics.TopicFlag{}
 )
 
 // All general log messages in this package should be routed through this logger.

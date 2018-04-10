@@ -1,4 +1,4 @@
-package main
+package topics
 
 import (
 	"errors"
@@ -9,24 +9,28 @@ import (
 	"github.com/status-im/status-go/geth/params"
 )
 
-type topicsFlag []discv5.Topic
+// TopicFlag used to parse discv5 topics.
+type TopicFlag []discv5.Topic
 
-func (f *topicsFlag) String() string {
+func (f *TopicFlag) String() string {
 	return "discv5 topics"
 }
 
-func (f *topicsFlag) Set(value string) error {
+// Set parses single topic.
+func (f *TopicFlag) Set(value string) error {
 	*f = append(*f, discv5.Topic(strings.TrimSpace(value)))
 	return nil
 }
 
-type topicLimitsFlag map[discv5.Topic]params.Limits
+// TopicLimitsFlag used to parse limits for discv5 topics.
+type TopicLimitsFlag map[discv5.Topic]params.Limits
 
-func (f *topicLimitsFlag) String() string {
+func (f *TopicLimitsFlag) String() string {
 	return "disv5 topics to limits map"
 }
 
-func (f *topicLimitsFlag) Set(value string) error {
+// Set parses single limit for a topic.
+func (f *TopicLimitsFlag) Set(value string) error {
 	parts := strings.Split(strings.TrimSpace(value), "=")
 	if len(parts) != 2 {
 		return errors.New("topic must be separated by '=' from limits, e.g. 'topic1=1,1'")
