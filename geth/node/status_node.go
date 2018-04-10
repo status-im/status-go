@@ -49,9 +49,10 @@ type StatusNode struct {
 	config    *params.NodeConfig // Status node configuration
 	gethNode  *node.Node         // reference to Geth P2P stack/node
 	rpcClient *rpc.Client        // reference to public RPC client
-	register  *peers.Register
-	peerPool  *peers.PeerPool
-	db        *leveldb.DB // used as a cache for PeerPool
+
+	register *peers.Register
+	peerPool *peers.PeerPool
+	db       *leveldb.DB // used as a cache for PeerPool
 
 	log log.Logger
 }
