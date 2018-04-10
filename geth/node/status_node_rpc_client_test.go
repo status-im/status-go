@@ -9,7 +9,9 @@ import (
 	gethnode "github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
+
 	"github.com/status-im/status-go/geth/node"
+	"github.com/status-im/status-go/geth/params"
 	. "github.com/status-im/status-go/t/utils"
 )
 
@@ -50,19 +52,24 @@ func (s *testService) Stop() error {
 	return nil
 }
 
-func TestRPCClientCanNotCallPrivateService(t *testing.T) {
-	var err error
-
-	config, err := MakeTestNodeConfig(GetNetworkID())
-	require.NoError(t, err)
-
+func createStatusNode(config *params.NodeConfig) (*node.StatusNode, error) {
 	services := []gethnode.ServiceConstructor{
 		func(_ *gethnode.ServiceContext) (gethnode.Service, error) {
 			return &testService{}, nil
 		},
 	}
 	statusNode := node.New()
-	err = statusNode.Start(config, services...)
+	return statusNode, statusNode.Start(config, services...)
+}
+
+func TestNodeRPCClientCallOnlyPublicAPIs(t *testing.T) {
+	var err error
+
+	config, err := MakeTestNodeConfig(GetNetworkID())
+	require.NoError(t, err)
+	config.APIModules = "" // no whitelisted API modules; use only public APIs
+
+	statusNode, err := createStatusNode(config)
 	require.NoError(t, err)
 	defer func() {
 		err := statusNode.Stop()
@@ -82,4 +89,28 @@ func TestRPCClientCanNotCallPrivateService(t *testing.T) {
 	// call private API
 	err = client.Call(&result, "pri_someMethod")
 	require.EqualError(t, err, "The method pri_someMethod does not exist/is not available")
+}
+
+func TestNodeRPCClientCallWhitelistedPrivateService(t *testing.T) {
+	var err error
+
+	config, err := MakeTestNodeConfig(GetNetworkID())
+	require.NoError(t, err)
+	config.APIModules = "pri"
+
+	statusNode, err := createStatusNode(config)
+	require.NoError(t, err)
+	defer func() {
+		err := statusNode.Stop()
+		require.NoError(t, err)
+	}()
+
+	client := statusNode.RPCClient()
+	require.NotNil(t, client)
+
+	// call private API
+	var result string
+	err = client.Call(&result, "pri_someMethod")
+	require.NoError(t, err)
+	require.Equal(t, "some method result", result)
 }

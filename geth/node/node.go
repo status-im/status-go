@@ -7,7 +7,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"strings"
 
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -104,12 +103,12 @@ func defaultEmbeddedNodeConfig(config *params.NodeConfig) *node.Config {
 		},
 		IPCPath:          makeIPCPath(config),
 		HTTPCors:         []string{"*"},
-		HTTPModules:      strings.Split(config.APIModules, ","),
+		HTTPModules:      config.FormatAPIModules(),
 		HTTPVirtualHosts: []string{"localhost"},
 		WSHost:           makeWSHost(config),
 		WSPort:           config.WSPort,
 		WSOrigins:        []string{"*"},
-		WSModules:        strings.Split(config.APIModules, ","),
+		WSModules:        config.FormatAPIModules(),
 	}
 
 	if config.RPCEnabled {

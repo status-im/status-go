@@ -615,3 +615,12 @@ func (c *NodeConfig) String() string {
 	data, _ := json.MarshalIndent(c, "", "    ")
 	return string(data)
 }
+
+// FormatAPIModules returns a slice of APIModules.
+func (c *NodeConfig) FormatAPIModules() []string {
+	if len(c.APIModules) == 0 {
+		return nil
+	}
+
+	return strings.Split(c.APIModules, ",")
+}
