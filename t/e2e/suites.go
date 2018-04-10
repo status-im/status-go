@@ -3,13 +3,14 @@ package e2e
 import (
 	"github.com/ethereum/go-ethereum/log"
 
+	gethnode "github.com/ethereum/go-ethereum/node"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
-	"github.com/status-im/status-go/geth/api"
-	"github.com/status-im/status-go/sign"
 
+	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/signal"
 	"github.com/status-im/status-go/geth/transactions"
+	"github.com/status-im/status-go/sign"
 	. "github.com/status-im/status-go/t/utils" //nolint: golint
 	"github.com/stretchr/testify/suite"
 )
@@ -18,6 +19,7 @@ import (
 type StatusNodeTestSuite struct {
 	suite.Suite
 	StatusNode *node.StatusNode
+	Services   []gethnode.ServiceConstructor
 }
 
 // All general log messages in this package should be routed through this logger.
@@ -52,7 +54,7 @@ func (s *StatusNodeTestSuite) StartTestNode(opts ...TestNodeOption) {
 	s.NoError(importTestAccounts(nodeConfig.KeyStoreDir))
 
 	s.False(s.StatusNode.IsRunning())
-	s.NoError(s.StatusNode.Start(nodeConfig))
+	s.NoError(s.StatusNode.Start(nodeConfig, s.Services...))
 	s.True(s.StatusNode.IsRunning())
 }
 
