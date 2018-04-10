@@ -8,23 +8,23 @@ import (
 )
 
 const (
-	// EventTransactionQueued is triggered when send transaction request is queued
-	EventTransactionQueued = "transaction.queued"
-	// EventTransactionFailed is triggered when send transaction request fails
-	EventTransactionFailed = "transaction.failed"
+	// EventSignRequestAdded is triggered when send transaction request is queued
+	EventSignRequestAdded = "sign-request.queued"
+	// EventSignRequestFailed is triggered when send transaction request fails
+	EventSignRequestFailed = "sign-request.failed"
 )
 
 const (
-	// SendTransactionNoErrorCode is sent when no error occurred.
-	SendTransactionNoErrorCode = iota
-	// SendTransactionDefaultErrorCode is every case when there is no special tx return code.
-	SendTransactionDefaultErrorCode
-	// SendTransactionPasswordErrorCode is sent when account failed verification.
-	SendTransactionPasswordErrorCode
-	// SendTransactionTimeoutErrorCode is sent when tx is timed out.
-	SendTransactionTimeoutErrorCode
-	// SendTransactionDiscardedErrorCode is sent when tx was discarded.
-	SendTransactionDiscardedErrorCode
+	// SignRequestNoErrorCode is sent when no error occurred.
+	SignRequestNoErrorCode = iota
+	// SignRequestDefaultErrorCode is every case when there is no special tx return code.
+	SignRequestDefaultErrorCode
+	// SignRequestPasswordErrorCode is sent when account failed verification.
+	SignRequestPasswordErrorCode
+	// SignRequestTimeoutErrorCode is sent when tx is timed out.
+	SignRequestTimeoutErrorCode
+	// SignRequestDiscardedErrorCode is sent when tx was discarded.
+	SignRequestDiscardedErrorCode
 )
 
 const (
@@ -48,52 +48,55 @@ func messageIDFromContext(ctx context.Context) string {
 }
 
 var txReturnCodes = map[error]int{
-	nil:                 SendTransactionNoErrorCode,
-	keystore.ErrDecrypt: SendTransactionPasswordErrorCode,
-	ErrSignReqTimedOut:  SendTransactionTimeoutErrorCode,
-	ErrSignReqDiscarded: SendTransactionDiscardedErrorCode,
+	nil:                 SignRequestNoErrorCode,
+	keystore.ErrDecrypt: SignRequestPasswordErrorCode,
+	ErrSignReqTimedOut:  SignRequestTimeoutErrorCode,
+	ErrSignReqDiscarded: SignRequestDiscardedErrorCode,
 }
 
-// SendTransactionEvent is a signal sent on a send transaction request
-type SendTransactionEvent struct {
+// PendingRequestEvent is a signal sent when a sign request is added
+type PendingRequestEvent struct {
 	ID        string      `json:"id"`
+	Method    string      `json:"method"`
 	Args      interface{} `json:"args"`
 	MessageID string      `json:"message_id"`
 }
 
-// NotifyOnEnqueue returns handler that processes incoming tx queue requests
+// NotifyOnEnqueue sends a signal when a sign request is added
 func NotifyOnEnqueue(request *Request) {
 	signal.Send(signal.Envelope{
-		Type: EventTransactionQueued,
-		Event: SendTransactionEvent{
+		Type: EventSignRequestAdded,
+		Event: PendingRequestEvent{
 			ID:        request.ID,
 			Args:      request.Meta,
+			Method:    request.Method,
 			MessageID: messageIDFromContext(request.context),
 		},
 	})
 }
 
-// ReturnSendTransactionEvent is a JSON returned whenever transaction send is returned
-type ReturnSendTransactionEvent struct {
-	ID           string      `json:"id"`
-	Args         interface{} `json:"args"`
-	MessageID    string      `json:"message_id"`
-	ErrorMessage string      `json:"error_message"`
-	ErrorCode    int         `json:"error_code,string"`
+// PendingRequestErrorEvent is a signal sent when sign request has failed
+type PendingRequestErrorEvent struct {
+	PendingRequestEvent
+	ErrorMessage string `json:"error_message"`
+	ErrorCode    int    `json:"error_code,string"`
 }
 
-// NotifyOnReturn returns handler that processes responses from internal tx manager
-func NotifyOnReturn(request *Request, err error) {
+// NotifyIfError sends a signal only if error had happened
+func NotifyIfError(request *Request, err error) {
 	// we don't want to notify a user if tx was sent successfully
 	if err == nil {
 		return
 	}
 	signal.Send(signal.Envelope{
-		Type: EventTransactionFailed,
-		Event: ReturnSendTransactionEvent{
-			ID:           request.ID,
-			Args:         request.Meta,
-			MessageID:    messageIDFromContext(request.context),
+		Type: EventSignRequestFailed,
+		Event: PendingRequestErrorEvent{
+			PendingRequestEvent: PendingRequestEvent{
+				ID:        request.ID,
+				Args:      request.Meta,
+				Method:    request.Method,
+				MessageID: messageIDFromContext(request.context),
+			},
 			ErrorMessage: err.Error(),
 			ErrorCode:    sendTransactionErrorCode(err),
 		},
@@ -104,5 +107,5 @@ func sendTransactionErrorCode(err error) int {
 	if code, ok := txReturnCodes[err]; ok {
 		return code
 	}
-	return SendTransactionDefaultErrorCode
+	return SignRequestDefaultErrorCode
 }

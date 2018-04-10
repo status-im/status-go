@@ -161,24 +161,24 @@ func (api *StatusAPI) SendTransaction(ctx context.Context, args transactions.Sen
 	return api.b.SendTransaction(ctx, args)
 }
 
-// CompleteTransaction instructs backend to complete sending of a given transaction
-func (api *StatusAPI) CompleteTransaction(id string, password string) (gethcommon.Hash, error) {
-	return api.b.CompleteTransaction(id, password)
+// ApproveSignRequest instructs backend to complete sending of a given transaction
+func (api *StatusAPI) ApproveSignRequest(id string, password string) sign.Result {
+	return api.b.ApproveSignRequest(id, password)
 }
 
-// CompleteTransactions instructs backend to complete sending of multiple transactions
-func (api *StatusAPI) CompleteTransactions(ids []string, password string) map[string]sign.Result {
-	return api.b.CompleteTransactions(ids, password)
+// ApproveSignRequests instructs backend to complete sending of multiple transactions
+func (api *StatusAPI) ApproveSignRequests(ids []string, password string) map[string]sign.Result {
+	return api.b.ApproveSignRequests(ids, password)
 }
 
-// DiscardTransaction discards a given transaction from transaction queue
-func (api *StatusAPI) DiscardTransaction(id string) error {
-	return api.b.DiscardTransaction(id)
+// DiscardSignRequest discards a given transaction from transaction queue
+func (api *StatusAPI) DiscardSignRequest(id string) error {
+	return api.b.DiscardSignRequest(id)
 }
 
-// DiscardTransactions discards given multiple transactions from transaction queue
-func (api *StatusAPI) DiscardTransactions(ids []string) map[string]error {
-	return api.b.DiscardTransactions(ids)
+// DiscardSignRequests discards given multiple transactions from transaction queue
+func (api *StatusAPI) DiscardSignRequests(ids []string) map[string]error {
+	return api.b.DiscardSignRequests(ids)
 }
 
 // JailParse creates a new jail cell context, with the given chatID as identifier.

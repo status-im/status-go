@@ -24,14 +24,16 @@ import (
 	"github.com/status-im/status-go/geth/mailservice"
 	"github.com/status-im/status-go/geth/params"
 	shhmetrics "github.com/status-im/status-go/metrics/whisper"
-	"github.com/status-im/status-go/shhext"
+	"github.com/status-im/status-go/services/personal"
+	"github.com/status-im/status-go/services/shhext"
 )
 
 // Errors related to node and services creation.
 var (
-	ErrNodeMakeFailure                   = errors.New("error creating p2p node")
-	ErrWhisperServiceRegistrationFailure = errors.New("failed to register the Whisper service")
-	ErrLightEthRegistrationFailure       = errors.New("failed to register the LES service")
+	ErrNodeMakeFailure                    = errors.New("error creating p2p node")
+	ErrWhisperServiceRegistrationFailure  = errors.New("failed to register the Whisper service")
+	ErrLightEthRegistrationFailure        = errors.New("failed to register the LES service")
+	ErrPersonalServiceRegistrationFailure = errors.New("failed to register the personal api service")
 )
 
 // All general log messages in this package should be routed through this logger.
@@ -75,6 +77,15 @@ func MakeNode(config *params.NodeConfig) (*node.Node, error) {
 	if !config.UpstreamConfig.Enabled {
 		if err := activateLightEthService(stack, config); err != nil {
 			return nil, fmt.Errorf("%v: %v", ErrLightEthRegistrationFailure, err)
+		}
+	} else {
+		// `personal_sign` and `personal_recover` methods are important to
+		// keep DApps working.
+		// Usually, they are provided by an ETH or a LES service, but when using
+		// upstream, we don't start any of these, so we need to start our own
+		// implementation.
+		if err := activatePersonalService(stack, config); err != nil {
+			return nil, fmt.Errorf("%v: %v", ErrPersonalServiceRegistrationFailure, err)
 		}
 	}
 
@@ -145,6 +156,13 @@ func activateLightEthService(stack *node.Node, config *params.NodeConfig) error 
 
 	return stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
 		return les.New(ctx, &ethConf)
+	})
+}
+
+func activatePersonalService(stack *node.Node, config *params.NodeConfig) error {
+	return stack.Register(func(*node.ServiceContext) (node.Service, error) {
+		svc := personal.New(stack.AccountManager())
+		return svc, nil
 	})
 }
 

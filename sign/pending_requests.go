@@ -5,7 +5,6 @@ import (
 	"sync"
 	"time"
 
-	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/geth/account"
 )
@@ -31,11 +30,11 @@ func NewPendingRequests() *PendingRequests {
 }
 
 // Add a new signing request.
-func (rs *PendingRequests) Add(ctx context.Context, meta Meta, completeFunc completeFunc) (*Request, error) {
+func (rs *PendingRequests) Add(ctx context.Context, method string, meta Meta, completeFunc CompleteFunc) (*Request, error) {
 	rs.mu.Lock()
 	defer rs.mu.Unlock()
 
-	request := newRequest(ctx, meta, completeFunc)
+	request := newRequest(ctx, method, meta, completeFunc)
 	rs.requests[request.ID] = request
 	rs.log.Info("signing request is created", "ID", request.ID)
 
@@ -68,26 +67,29 @@ func (rs *PendingRequests) First() *Request {
 }
 
 // Approve a signing request by it's ID. Requires a valid password and a verification function.
-func (rs *PendingRequests) Approve(id string, password string, verify verifyFunc) (hash gethcommon.Hash, err error) {
-	rs.log.Info("complete transaction", "id", id)
+func (rs *PendingRequests) Approve(id string, password string, verify verifyFunc) Result {
+	rs.log.Info("complete sign request", "id", id)
 	request, err := rs.tryLock(id)
 	if err != nil {
 		rs.log.Warn("can't process transaction", "err", err)
-		return hash, err
+		return newErrResult(err)
 	}
 
 	selectedAccount, err := verify(password)
 	if err != nil {
-		rs.complete(request, hash, err)
-		return hash, err
+		rs.complete(request, EmptyResponse, err)
+		return newErrResult(err)
 	}
 
-	hash, err = request.completeFunc(selectedAccount)
-	rs.log.Info("finally completed transaction", "id", request.ID, "hash", hash, "err", err)
+	response, err := request.completeFunc(selectedAccount, password)
+	rs.log.Info("completed sign request ", "id", request.ID, "response", response, "err", err)
 
-	rs.complete(request, hash, err)
+	rs.complete(request, response, err)
 
-	return hash, err
+	return Result{
+		Response: response,
+		Error:    err,
+	}
 }
 
 // Discard remove a signing request from the list of pending requests.
@@ -97,7 +99,7 @@ func (rs *PendingRequests) Discard(id string) error {
 		return err
 	}
 
-	rs.complete(request, gethcommon.Hash{}, ErrSignReqDiscarded)
+	rs.complete(request, EmptyResponse, ErrSignReqDiscarded)
 	return nil
 }
 
@@ -105,14 +107,14 @@ func (rs *PendingRequests) Discard(id string) error {
 func (rs *PendingRequests) Wait(id string, timeout time.Duration) Result {
 	request, err := rs.Get(id)
 	if err != nil {
-		return Result{Error: err}
+		return newErrResult(err)
 	}
 	for {
 		select {
 		case rst := <-request.result:
 			return rst
 		case <-time.After(timeout):
-			rs.complete(request, gethcommon.Hash{}, ErrSignReqTimedOut)
+			rs.complete(request, EmptyResponse, ErrSignReqTimedOut)
 		}
 	}
 }
@@ -148,13 +150,13 @@ func (rs *PendingRequests) tryLock(id string) (*Request, error) {
 }
 
 // complete removes the request from the list if there is no error or an error is non-transient
-func (rs *PendingRequests) complete(request *Request, hash gethcommon.Hash, err error) {
+func (rs *PendingRequests) complete(request *Request, response Response, err error) {
 	rs.mu.Lock()
 	defer rs.mu.Unlock()
 
 	request.locked = false
 
-	go NotifyOnReturn(request, err)
+	go NotifyIfError(request, err)
 
 	if err != nil && isTransient(err) {
 		return
@@ -162,10 +164,10 @@ func (rs *PendingRequests) complete(request *Request, hash gethcommon.Hash, err 
 
 	delete(rs.requests, request.ID)
 
-	// hash is updated only if err is nil, but transaction is not removed from a queue
+	// response is updated only if err is nil, but transaction is not removed from a queue
 	result := Result{Error: err}
 	if err == nil {
-		result.Hash = hash
+		result.Response = response
 	}
 
 	request.result <- result

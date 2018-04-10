@@ -25,6 +25,10 @@ import (
 
 type initFunc func([]byte, *transactions.SendTxArgs)
 
+func txURLString(result sign.Result) string {
+	return fmt.Sprintf("https://ropsten.etherscan.io/tx/%s", result.Response.Hash().Hex())
+}
+
 func TestTransactionsTestSuite(t *testing.T) {
 	suite.Run(t, new(TransactionsTestSuite))
 }
@@ -44,17 +48,21 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransaction() {
 
 	transactionCompleted := make(chan struct{})
 
-	var txHash gethcommon.Hash
+	var signResult sign.Result
 	signal.SetDefaultNodeNotificationHandler(func(rawSignal string) {
 		var sg signal.Envelope
 		err := json.Unmarshal([]byte(rawSignal), &sg)
 		s.NoError(err)
 
-		if sg.Type == sign.EventTransactionQueued {
+		if sg.Type == sign.EventSignRequestAdded {
 			event := sg.Event.(map[string]interface{})
+			//check for the correct method name
+			method := event["method"].(string)
+			s.Equal(params.SendTransactionMethodName, method)
+
 			txID := event["id"].(string)
-			txHash, err = s.Backend.CompleteTransaction(string(txID), TestConfig.Account1.Password)
-			s.NoError(err, "cannot complete queued transaction %s", txID)
+			signResult = s.Backend.ApproveSignRequest(string(txID), TestConfig.Account1.Password)
+			s.NoError(signResult.Error, "cannot complete queued transaction %s", txID)
 			close(transactionCompleted)
 		}
 	})
@@ -77,7 +85,7 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransaction() {
 		s.FailNow("sending transaction timed out")
 	}
 
-	s.Equal(`{"jsonrpc":"2.0","id":1,"result":"`+txHash.String()+`"}`, result)
+	s.Equal(`{"jsonrpc":"2.0","id":1,"result":"`+signResult.Response.Hash().Hex()+`"}`, result)
 }
 
 func (s *TransactionsTestSuite) TestCallRPCSendTransactionUpstream() {
@@ -95,23 +103,23 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransactionUpstream() {
 
 	transactionCompleted := make(chan struct{})
 
-	var txHash gethcommon.Hash
+	var signResult sign.Result
 	signal.SetDefaultNodeNotificationHandler(func(rawSignal string) {
 		var signalEnvelope signal.Envelope
 		err := json.Unmarshal([]byte(rawSignal), &signalEnvelope)
 		s.NoError(err)
 
-		if signalEnvelope.Type == sign.EventTransactionQueued {
+		if signalEnvelope.Type == sign.EventSignRequestAdded {
 			event := signalEnvelope.Event.(map[string]interface{})
 			txID := event["id"].(string)
 
 			// Complete with a wrong passphrase.
-			txHash, err = s.Backend.CompleteTransaction(string(txID), "some-invalid-passphrase")
-			s.EqualError(err, keystore.ErrDecrypt.Error(), "should return an error as the passphrase was invalid")
+			signResult = s.Backend.ApproveSignRequest(string(txID), "some-invalid-passphrase")
+			s.EqualError(signResult.Error, keystore.ErrDecrypt.Error(), "should return an error as the passphrase was invalid")
 
 			// Complete with a correct passphrase.
-			txHash, err = s.Backend.CompleteTransaction(string(txID), TestConfig.Account2.Password)
-			s.NoError(err, "cannot complete queued transaction %s", txID)
+			signResult = s.Backend.ApproveSignRequest(string(txID), TestConfig.Account2.Password)
+			s.NoError(signResult.Error, "cannot complete queued transaction %s", txID)
 
 			close(transactionCompleted)
 		}
@@ -135,7 +143,7 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransactionUpstream() {
 		s.FailNow("sending transaction timed out")
 	}
 
-	s.Equal(`{"jsonrpc":"2.0","id":1,"result":"`+txHash.String()+`"}`, result)
+	s.Equal(`{"jsonrpc":"2.0","id":1,"result":"`+signResult.Response.Hash().Hex()+`"}`, result)
 }
 
 func (s *TransactionsTestSuite) TestEmptyToFieldPreserved() {
@@ -154,14 +162,14 @@ func (s *TransactionsTestSuite) TestEmptyToFieldPreserved() {
 		}
 		err := json.Unmarshal([]byte(rawSignal), &sg)
 		s.NoError(err)
-		if sg.Type == sign.EventTransactionQueued {
-			var event sign.SendTransactionEvent
+		if sg.Type == sign.EventSignRequestAdded {
+			var event sign.PendingRequestEvent
 			s.NoError(json.Unmarshal(sg.Event, &event))
 			args := event.Args.(map[string]interface{})
 			s.NotNil(args["from"])
 			s.Nil(args["to"])
-			_, err := s.Backend.CompleteTransaction(event.ID, TestConfig.Account1.Password)
-			s.NoError(err)
+			signResult := s.Backend.ApproveSignRequest(event.ID, TestConfig.Account1.Password)
+			s.NoError(signResult.Error)
 			close(transactionCompleted)
 		}
 	})
@@ -229,6 +237,64 @@ func (s *TransactionsTestSuite) TestSendContractTx() {
 	s.testSendContractTx(initFunc, nil, "")
 }
 
+func (s *TransactionsTestSuite) setDefaultNodeNotificationHandler(signRequestResult *[]byte, sampleAddress string, done chan struct{}, expectedError error) {
+	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) { // nolint :dupl
+		var envelope signal.Envelope
+		err := json.Unmarshal([]byte(jsonEvent), &envelope)
+		s.NoError(err, fmt.Sprintf("cannot unmarshal JSON: %s", jsonEvent))
+
+		if envelope.Type == sign.EventSignRequestAdded {
+			event := envelope.Event.(map[string]interface{})
+			log.Info("transaction queued (will be completed shortly)", "id", event["id"].(string))
+
+			// the first call will fail (we are not logged in, but trying to complete tx)
+			log.Info("trying to complete with no user logged in")
+			err = s.Backend.ApproveSignRequest(
+				string(event["id"].(string)),
+				TestConfig.Account1.Password,
+			).Error
+			s.EqualError(
+				err,
+				account.ErrNoAccountSelected.Error(),
+				fmt.Sprintf("expected error on queued transaction[%v] not thrown", event["id"]),
+			)
+
+			// the second call will also fail (we are logged in as different user)
+			log.Info("trying to complete with invalid user")
+			err = s.Backend.SelectAccount(sampleAddress, TestConfig.Account1.Password)
+			s.NoError(err)
+			err = s.Backend.ApproveSignRequest(
+				string(event["id"].(string)),
+				TestConfig.Account1.Password,
+			).Error
+			s.EqualError(
+				err,
+				transactions.ErrInvalidCompleteTxSender.Error(),
+				fmt.Sprintf("expected error on queued transaction[%v] not thrown", event["id"]),
+			)
+
+			// the third call will work as expected (as we are logged in with correct credentials)
+			log.Info("trying to complete with correct user, this should succeed")
+			s.NoError(s.Backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
+			result := s.Backend.ApproveSignRequest(
+				string(event["id"].(string)),
+				TestConfig.Account1.Password,
+			)
+			if expectedError != nil {
+				s.Equal(expectedError, result.Error)
+			} else {
+				s.NoError(result.Error, fmt.Sprintf("cannot complete queued transaction[%v]", event["id"]))
+			}
+
+			*signRequestResult = result.Response.Bytes()[:]
+
+			log.Info("contract transaction complete", "URL", txURLString(result))
+			close(done)
+			return
+		}
+	})
+}
+
 func (s *TransactionsTestSuite) testSendContractTx(setInputAndDataValue initFunc, expectedError error, expectedErrorDescription string) {
 	s.StartTestBackend()
 	defer s.StopTestBackend()
@@ -241,60 +307,8 @@ func (s *TransactionsTestSuite) testSendContractTx(setInputAndDataValue initFunc
 	completeQueuedTransaction := make(chan struct{})
 
 	// replace transaction notification handler
-	var txHash gethcommon.Hash
-	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) { // nolint :dupl
-		var envelope signal.Envelope
-		err = json.Unmarshal([]byte(jsonEvent), &envelope)
-		s.NoError(err, fmt.Sprintf("cannot unmarshal JSON: %s", jsonEvent))
-
-		if envelope.Type == sign.EventTransactionQueued {
-			event := envelope.Event.(map[string]interface{})
-			log.Info("transaction queued (will be completed shortly)", "id", event["id"].(string))
-
-			// the first call will fail (we are not logged in, but trying to complete tx)
-			log.Info("trying to complete with no user logged in")
-			txHash, err = s.Backend.CompleteTransaction(
-				string(event["id"].(string)),
-				TestConfig.Account1.Password,
-			)
-			s.EqualError(
-				err,
-				account.ErrNoAccountSelected.Error(),
-				fmt.Sprintf("expected error on queued transaction[%v] not thrown", event["id"]),
-			)
-
-			// the second call will also fail (we are logged in as different user)
-			log.Info("trying to complete with invalid user")
-			err = s.Backend.SelectAccount(sampleAddress, TestConfig.Account1.Password)
-			s.NoError(err)
-			txHash, err = s.Backend.CompleteTransaction(
-				string(event["id"].(string)),
-				TestConfig.Account1.Password,
-			)
-			s.EqualError(
-				err,
-				sign.ErrInvalidCompleteTxSender.Error(),
-				fmt.Sprintf("expected error on queued transaction[%v] not thrown", event["id"]),
-			)
-
-			// the third call will work as expected (as we are logged in with correct credentials)
-			log.Info("trying to complete with correct user, this should succeed")
-			s.NoError(s.Backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
-			txHash, err = s.Backend.CompleteTransaction(
-				string(event["id"].(string)),
-				TestConfig.Account1.Password,
-			)
-			if expectedError != nil {
-				s.Equal(expectedError, err)
-			} else {
-				s.NoError(err, fmt.Sprintf("cannot complete queued transaction[%v]", event["id"]))
-			}
-
-			log.Info("contract transaction complete", "URL", "https://ropsten.etherscan.io/tx/"+txHash.Hex())
-			close(completeQueuedTransaction)
-			return
-		}
-	})
+	var signRequestResult []byte
+	s.setDefaultNodeNotificationHandler(&signRequestResult, sampleAddress, completeQueuedTransaction, expectedError)
 
 	// this call blocks, up until Complete Transaction is called
 	byteCode, err := hexutil.Decode(`0x6060604052341561000c57fe5b5b60a58061001b6000396000f30060606040526000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff1680636ffa1caa14603a575bfe5b3415604157fe5b60556004808035906020019091905050606b565b6040518082815260200191505060405180910390f35b60008160020290505b9190505600a165627a7a72305820ccdadd737e4ac7039963b54cee5e5afb25fa859a275252bdcf06f653155228210029`)
@@ -323,7 +337,7 @@ func (s *TransactionsTestSuite) testSendContractTx(setInputAndDataValue initFunc
 		s.FailNow("completing transaction timed out")
 	}
 
-	s.Equal(txHashCheck.Hex(), txHash.Hex(), "transaction hash returned from SendTransaction is invalid")
+	s.Equal(txHashCheck.Bytes(), signRequestResult, "transaction hash returned from SendTransaction is invalid")
 	s.False(reflect.DeepEqual(txHashCheck, gethcommon.Hash{}), "transaction was never queued or completed")
 	s.Zero(s.PendingSignRequests().Count(), "tx queue must be empty at this point")
 }
@@ -341,53 +355,8 @@ func (s *TransactionsTestSuite) TestSendEther() {
 	completeQueuedTransaction := make(chan struct{})
 
 	// replace transaction notification handler
-	var txHash = gethcommon.Hash{}
-	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) { // nolint: dupl
-		var envelope signal.Envelope
-		err = json.Unmarshal([]byte(jsonEvent), &envelope)
-		s.NoError(err, fmt.Sprintf("cannot unmarshal JSON: %s", jsonEvent))
-
-		if envelope.Type == sign.EventTransactionQueued {
-			event := envelope.Event.(map[string]interface{})
-			log.Info("transaction queued (will be completed shortly)", "id", event["id"].(string))
-
-			// the first call will fail (we are not logged in, but trying to complete tx)
-			log.Info("trying to complete with no user logged in")
-			txHash, err = s.Backend.CompleteTransaction(
-				string(event["id"].(string)),
-				TestConfig.Account1.Password,
-			)
-			s.EqualError(
-				err,
-				account.ErrNoAccountSelected.Error(),
-				fmt.Sprintf("expected error on queued transaction[%v] not thrown", event["id"]),
-			)
-
-			// the second call will also fail (we are logged in as different user)
-			log.Info("trying to complete with invalid user")
-			err = s.Backend.SelectAccount(sampleAddress, TestConfig.Account1.Password)
-			s.NoError(err)
-			txHash, err = s.Backend.CompleteTransaction(
-				string(event["id"].(string)), TestConfig.Account1.Password)
-			s.EqualError(
-				err,
-				sign.ErrInvalidCompleteTxSender.Error(),
-				fmt.Sprintf("expected error on queued transaction[%v] not thrown", event["id"]),
-			)
-
-			// the third call will work as expected (as we are logged in with correct credentials)
-			log.Info("trying to complete with correct user, this should succeed")
-			s.NoError(s.Backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
-			txHash, err = s.Backend.CompleteTransaction(
-				string(event["id"].(string)),
-				TestConfig.Account1.Password,
-			)
-			s.NoError(err, fmt.Sprintf("cannot complete queued transaction[%v]", event["id"]))
-
-			close(completeQueuedTransaction)
-			return
-		}
-	})
+	var signRequestResult []byte
+	s.setDefaultNodeNotificationHandler(&signRequestResult, sampleAddress, completeQueuedTransaction, nil)
 
 	// this call blocks, up until Complete Transaction is called
 	txHashCheck, err := s.Backend.SendTransaction(context.TODO(), transactions.SendTxArgs{
@@ -403,7 +372,7 @@ func (s *TransactionsTestSuite) TestSendEther() {
 		s.FailNow("completing transaction timed out")
 	}
 
-	s.Equal(txHashCheck.Hex(), txHash.Hex(), "transaction hash returned from SendTransaction is invalid")
+	s.Equal(txHashCheck.Bytes(), signRequestResult, "transaction hash returned from SendTransaction is invalid")
 	s.False(reflect.DeepEqual(txHashCheck, gethcommon.Hash{}), "transaction was never queued or completed")
 	s.Zero(s.Backend.PendingSignRequests().Count(), "tx queue must be empty at this point")
 }
@@ -430,17 +399,18 @@ func (s *TransactionsTestSuite) TestSendEtherTxUpstream() {
 		err = json.Unmarshal([]byte(jsonEvent), &envelope)
 		s.NoError(err, "cannot unmarshal JSON: %s", jsonEvent)
 
-		if envelope.Type == sign.EventTransactionQueued {
+		if envelope.Type == sign.EventSignRequestAdded {
 			event := envelope.Event.(map[string]interface{})
 			log.Info("transaction queued (will be completed shortly)", "id", event["id"].(string))
 
-			txHash, err = s.Backend.CompleteTransaction(
+			signResult := s.Backend.ApproveSignRequest(
 				string(event["id"].(string)),
 				TestConfig.Account1.Password,
 			)
-			s.NoError(err, "cannot complete queued transaction[%v]", event["id"])
+			s.NoError(signResult.Error, "cannot complete queued transaction[%v]", event["id"])
 
-			log.Info("contract transaction complete", "URL", "https://ropsten.etherscan.io/tx/"+txHash.Hex())
+			txHash = signResult.Response.Hash()
+			log.Info("contract transaction complete", "URL", txURLString(signResult))
 			close(completeQueuedTransaction)
 		}
 	})
@@ -478,33 +448,36 @@ func (s *TransactionsTestSuite) TestDoubleCompleteQueuedTransactions() {
 
 	// replace transaction notification handler
 	txFailedEventCalled := false
-	txHash := gethcommon.Hash{}
+	signHash := gethcommon.Hash{}
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var envelope signal.Envelope
 		err := json.Unmarshal([]byte(jsonEvent), &envelope)
 		s.NoError(err, fmt.Sprintf("cannot unmarshal JSON: %s", jsonEvent))
 
-		if envelope.Type == sign.EventTransactionQueued {
+		if envelope.Type == sign.EventSignRequestAdded {
 			event := envelope.Event.(map[string]interface{})
 			txID := string(event["id"].(string))
 			log.Info("transaction queued (will be failed and completed on the second call)", "id", txID)
 
 			// try with wrong password
 			// make sure that tx is NOT removed from the queue (by re-trying with the correct password)
-			_, err = s.Backend.CompleteTransaction(txID, TestConfig.Account1.Password+"wrong")
+			err = s.Backend.ApproveSignRequest(txID, TestConfig.Account1.Password+"wrong").Error
 			s.EqualError(err, keystore.ErrDecrypt.Error())
 
 			s.Equal(1, s.PendingSignRequests().Count(), "txqueue cannot be empty, as tx has failed")
 
 			// now try to complete transaction, but with the correct password
-			txHash, err = s.Backend.CompleteTransaction(txID, TestConfig.Account1.Password)
-			s.NoError(err)
+			signResult := s.Backend.ApproveSignRequest(txID, TestConfig.Account1.Password)
+			s.NoError(signResult.Error)
 
-			log.Info("transaction complete", "URL", "https://rinkeby.etherscan.io/tx/"+txHash.Hex())
+			log.Info("transaction complete", "URL", txURLString(signResult))
+
+			signHash = signResult.Response.Hash()
+
 			close(completeQueuedTransaction)
 		}
 
-		if envelope.Type == sign.EventTransactionFailed {
+		if envelope.Type == sign.EventSignRequestFailed {
 			event := envelope.Event.(map[string]interface{})
 			log.Info("transaction return event received", "id", event["id"].(string))
 
@@ -519,8 +492,8 @@ func (s *TransactionsTestSuite) TestDoubleCompleteQueuedTransactions() {
 		}
 	})
 
-	// this call blocks, and should return on *second* attempt to CompleteTransaction (w/ the correct password)
-	txHashCheck, err := s.Backend.SendTransaction(context.TODO(), transactions.SendTxArgs{
+	// this call blocks, and should return on *second* attempt to ApproveSignRequest (w/ the correct password)
+	sendTxHash, err := s.Backend.SendTransaction(context.TODO(), transactions.SendTxArgs{
 		From:  account.FromAddress(TestConfig.Account1.Address),
 		To:    account.ToAddress(TestConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
@@ -533,8 +506,8 @@ func (s *TransactionsTestSuite) TestDoubleCompleteQueuedTransactions() {
 		s.FailNow("test timed out")
 	}
 
-	s.Equal(txHashCheck.Hex(), txHash.Hex(), "transaction hash returned from SendTransaction is invalid")
-	s.False(reflect.DeepEqual(txHashCheck, gethcommon.Hash{}), "transaction was never queued or completed")
+	s.Equal(sendTxHash, signHash, "transaction hash returned from SendTransaction is invalid")
+	s.False(reflect.DeepEqual(sendTxHash, gethcommon.Hash{}), "transaction was never queued or completed")
 	s.Zero(s.Backend.PendingSignRequests().Count(), "tx queue must be empty at this point")
 	s.True(txFailedEventCalled, "expected tx failure signal is not received")
 }
@@ -557,7 +530,7 @@ func (s *TransactionsTestSuite) TestDiscardQueuedTransaction() {
 		err := json.Unmarshal([]byte(jsonEvent), &envelope)
 		s.NoError(err, fmt.Sprintf("cannot unmarshal JSON: %s", jsonEvent))
 
-		if envelope.Type == sign.EventTransactionQueued {
+		if envelope.Type == sign.EventSignRequestAdded {
 			event := envelope.Event.(map[string]interface{})
 			txID := string(event["id"].(string))
 			log.Info("transaction queued (will be discarded soon)", "id", txID)
@@ -565,12 +538,12 @@ func (s *TransactionsTestSuite) TestDiscardQueuedTransaction() {
 			s.True(s.Backend.PendingSignRequests().Has(txID), "txqueue should still have test tx")
 
 			// discard
-			err := s.Backend.DiscardTransaction(txID)
+			err := s.Backend.DiscardSignRequest(txID)
 			s.NoError(err, "cannot discard tx")
 
 			// try completing discarded transaction
-			_, err = s.Backend.CompleteTransaction(txID, TestConfig.Account1.Password)
-			s.EqualError(err, "transaction hash not found", "expects tx not found, but call to CompleteTransaction succeeded")
+			err = s.Backend.ApproveSignRequest(txID, TestConfig.Account1.Password).Error
+			s.EqualError(err, sign.ErrSignReqNotFound.Error(), "expects tx not found, but call to ApproveSignRequest succeeded")
 
 			time.Sleep(1 * time.Second) // make sure that tx complete signal propagates
 			s.False(s.Backend.PendingSignRequests().Has(txID),
@@ -579,7 +552,7 @@ func (s *TransactionsTestSuite) TestDiscardQueuedTransaction() {
 			close(completeQueuedTransaction)
 		}
 
-		if envelope.Type == sign.EventTransactionFailed {
+		if envelope.Type == sign.EventSignRequestFailed {
 			event := envelope.Event.(map[string]interface{})
 			log.Info("transaction return event received", "id", event["id"].(string))
 
@@ -643,7 +616,7 @@ func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
 		var envelope signal.Envelope
 		err := json.Unmarshal([]byte(jsonEvent), &envelope)
 		s.NoError(err)
-		if envelope.Type == sign.EventTransactionQueued {
+		if envelope.Type == sign.EventSignRequestAdded {
 			event := envelope.Event.(map[string]interface{})
 			txID := string(event["id"].(string))
 			log.Info("transaction queued (will be discarded soon)", "id", txID)
@@ -653,7 +626,7 @@ func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
 			txIDs <- txID
 		}
 
-		if envelope.Type == sign.EventTransactionFailed {
+		if envelope.Type == sign.EventSignRequestFailed {
 			event := envelope.Event.(map[string]interface{})
 			log.Info("transaction return event received", "id", event["id"].(string))
 
@@ -691,17 +664,17 @@ func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
 		txIDs = append(txIDs, "invalid-tx-id")
 
 		// discard
-		discardResults := s.Backend.DiscardTransactions(txIDs)
+		discardResults := s.Backend.DiscardSignRequests(txIDs)
 		require.Len(discardResults, 1, "cannot discard txs: %v", discardResults)
-		require.Error(discardResults["invalid-tx-id"], "transaction hash not found", "cannot discard txs: %v", discardResults)
+		require.Error(discardResults["invalid-tx-id"], sign.ErrSignReqNotFound, "cannot discard txs: %v", discardResults)
 
 		// try completing discarded transaction
-		completeResults := s.Backend.CompleteTransactions(txIDs, TestConfig.Account1.Password)
-		require.Len(completeResults, testTxCount+1, "unexpected number of errors (call to CompleteTransaction should not succeed)")
+		completeResults := s.Backend.ApproveSignRequests(txIDs, TestConfig.Account1.Password)
+		require.Len(completeResults, testTxCount+1, "unexpected number of errors (call to ApproveSignRequest should not succeed)")
 
 		for _, txResult := range completeResults {
-			require.Error(txResult.Error, "transaction hash not found", "invalid error for %s", txResult.Hash.Hex())
-			require.Equal(gethcommon.Hash{}, txResult.Hash, "invalid hash (expected zero): %s", txResult.Hash.Hex())
+			require.Error(txResult.Error, sign.ErrSignReqNotFound, "invalid error for %s", txResult.Response.Hex())
+			require.Equal(sign.EmptyResponse, txResult.Response, "invalid hash (expected zero): %s", txResult.Response.Hex())
 		}
 
 		time.Sleep(1 * time.Second) // make sure that tx complete signal propagates
@@ -749,7 +722,7 @@ func (s *TransactionsTestSuite) TestNonExistentQueuedTransactions() {
 	signal.SetDefaultNodeNotificationHandler(func(string) {})
 
 	// try completing non-existing transaction
-	_, err := s.Backend.CompleteTransaction("some-bad-transaction-id", TestConfig.Account1.Password)
+	err := s.Backend.ApproveSignRequest("some-bad-transaction-id", TestConfig.Account1.Password).Error
 	s.Error(err, "error expected and not received")
 	s.EqualError(err, sign.ErrSignReqNotFound.Error())
 }
@@ -793,7 +766,7 @@ func (s *TransactionsTestSuite) sendConcurrentTransactions(testTxCount int) {
 		err := json.Unmarshal([]byte(jsonEvent), &envelope)
 		require.NoError(err, fmt.Sprintf("cannot unmarshal JSON: %s", jsonEvent))
 
-		if envelope.Type == sign.EventTransactionQueued {
+		if envelope.Type == sign.EventSignRequestAdded {
 			event := envelope.Event.(map[string]interface{})
 			txID := string(event["id"].(string))
 			log.Info("transaction queued (will be completed in a single call, once aggregated)", "id", txID)
@@ -816,9 +789,9 @@ func (s *TransactionsTestSuite) sendConcurrentTransactions(testTxCount int) {
 	// wait for transactions, and complete them in a single call
 	completeTxs := func(txIDs []string) {
 		txIDs = append(txIDs, "invalid-tx-id")
-		results := s.Backend.CompleteTransactions(txIDs, TestConfig.Account1.Password)
+		results := s.Backend.ApproveSignRequests(txIDs, TestConfig.Account1.Password)
 		s.Len(results, testTxCount+1)
-		s.EqualError(results["invalid-tx-id"].Error, "transaction hash not found")
+		s.EqualError(results["invalid-tx-id"].Error, sign.ErrSignReqNotFound.Error())
 
 		for txID, txResult := range results {
 			s.False(
@@ -826,10 +799,10 @@ func (s *TransactionsTestSuite) sendConcurrentTransactions(testTxCount int) {
 				"invalid error for %s", txID,
 			)
 			s.False(
-				txResult.Hash == (gethcommon.Hash{}) && txID != "invalid-tx-id",
+				len(txResult.Response.Bytes()) < 1 && txID != "invalid-tx-id",
 				"invalid hash (expected non empty hash): %s", txID,
 			)
-			log.Info("transaction complete", "URL", "https://ropsten.etherscan.io/tx/"+txResult.Hash.Hex())
+			log.Info("transaction complete", "URL", txURLString(txResult))
 		}
 
 		time.Sleep(1 * time.Second) // make sure that tx complete signal propagates
