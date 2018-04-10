@@ -104,16 +104,18 @@ type ExtendedKey struct {
 	CachedPubKeyData []byte // (non-serialized) used for memoization of public key (calculated from a private key)
 }
 
+const masterSecret = "Bitcoin seed"
+
 // NewMaster creates new master node, root of HD chain/tree.
 // Both master and child nodes are of ExtendedKey type, and all the children derive from the root node.
-func NewMaster(seed, salt []byte) (*ExtendedKey, error) {
+func NewMaster(seed []byte) (*ExtendedKey, error) {
 	// Ensure seed is within expected limits
 	lseed := len(seed)
 	if lseed < MinSeedBytes || lseed > MaxSeedBytes {
 		return nil, ErrInvalidSeedLen
 	}
 
-	secretKey, chainCode, err := splitHMAC(seed, salt)
+	secretKey, chainCode, err := splitHMAC(seed, []byte(masterSecret))
 	if err != nil {
 		return nil, err
 	}
