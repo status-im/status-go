@@ -6,10 +6,13 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/status-im/status-go/geth/mailservice"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
-	e2e "github.com/status-im/status-go/t/e2e"
+	"github.com/status-im/status-go/t/e2e"
 	"github.com/stretchr/testify/suite"
+
+	gethnode "github.com/ethereum/go-ethereum/node"
 )
 
 func TestMailServiceSuite(t *testing.T) {
@@ -22,6 +25,11 @@ type MailServiceSuite struct {
 
 func (s *MailServiceSuite) SetupTest() {
 	s.StatusNode = node.New()
+	s.Services = []gethnode.ServiceConstructor{
+		func(_ *gethnode.ServiceContext) (gethnode.Service, error) {
+			return mailservice.New(s.StatusNode), nil
+		},
+	}
 }
 
 // TestShhRequestMessagesRPCMethodAvailability tests if `shh_requestMessages` is available
