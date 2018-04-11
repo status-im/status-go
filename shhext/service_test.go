@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
@@ -29,17 +28,14 @@ func (s *ShhExtSuite) SetupTest() {
 	s.nodes = make([]*node.Node, 2)
 	s.services = make([]*Service, 2)
 	s.whisper = make([]*whisper.Whisper, 2)
-	port := 32139
+	port := 21313
 	for i := range s.nodes {
 		i := i // bind i to be usable in service constructors
-		key, err := crypto.GenerateKey()
-		s.NoError(err)
 		cfg := &node.Config{
 			Name: fmt.Sprintf("node-%d", i),
 			P2P: p2p.Config{
 				NoDiscovery: true,
 				MaxPeers:    20,
-				PrivateKey:  key,
 				ListenAddr:  fmt.Sprintf(":%d", port+i),
 			},
 		}
@@ -49,7 +45,7 @@ func (s *ShhExtSuite) SetupTest() {
 		s.NoError(stack.Register(func(n *node.ServiceContext) (node.Service, error) {
 			return s.whisper[i], nil
 		}))
-		s.services[i] = New(nil, s.whisper[i])
+		s.services[i] = New(s.whisper[i], nil)
 		s.NoError(stack.Register(func(n *node.ServiceContext) (node.Service, error) {
 			return s.services[i], nil
 		}))
@@ -109,20 +105,20 @@ type TrackerSuite struct {
 func (s *TrackerSuite) SetupTest() {
 	s.tracker = &tracker{
 		handler: func(common.Hash) {},
-		cache:   map[common.Hash]bool{},
+		cache:   map[common.Hash]EnvelopeState{},
 	}
 }
 
 func (s *TrackerSuite) TestConfirmed() {
 	s.tracker.Add(testHash)
 	s.Contains(s.tracker.cache, testHash)
-	s.False(s.tracker.cache[testHash])
+	s.Equal(EnvelopePosted, s.tracker.cache[testHash])
 	s.tracker.handleEvent(whisper.EnvelopeEvent{
 		Event: whisper.EventEnvelopeSent,
 		Hash:  testHash,
 	})
 	s.Contains(s.tracker.cache, testHash)
-	s.True(s.tracker.cache[testHash])
+	s.Equal(EnvelopeSent, s.tracker.cache[testHash])
 }
 
 func (s *TrackerSuite) TestIgnored() {

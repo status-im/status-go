@@ -203,7 +203,7 @@ func activateShhService(stack *node.Node, config *params.NodeConfig) error {
 	}
 	// TODO(dshulyak) add a config option to enable it by default, but disable if app is started from statusd
 	return stack.Register(func(*node.ServiceContext) (node.Service, error) {
-		svc := shhext.New(shhext.SendEnvelopeSentSignal, whisperService)
+		svc := shhext.New(whisperService, shhext.SendEnvelopeSentSignal)
 		return svc, nil
 	})
 }

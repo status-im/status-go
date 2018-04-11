@@ -11,6 +11,16 @@ import (
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 )
 
+// EnvelopeState in local tracker
+type EnvelopeState int
+
+const (
+	// EnvelopePosted is set when envelope was added to a local whisper queue.
+	EnvelopePosted EnvelopeState = iota
+	// EnvelopeSent is set when envelope is sent to atleast one peer.
+	EnvelopeSent
+)
+
 // ConfirmationHandler used as a callback for confirming that envelopes were sent.
 type ConfirmationHandler func(common.Hash)
 
@@ -24,11 +34,11 @@ type Service struct {
 var _ node.Service = (*Service)(nil)
 
 // New returns a new Service.
-func New(handler ConfirmationHandler, w *whisper.Whisper) *Service {
+func New(w *whisper.Whisper, handler ConfirmationHandler) *Service {
 	track := &tracker{
 		w:       w,
 		handler: handler,
-		cache:   map[common.Hash]bool{},
+		cache:   map[common.Hash]EnvelopeState{},
 	}
 	return &Service{
 		w:       w,
@@ -74,7 +84,7 @@ type tracker struct {
 	handler ConfirmationHandler
 
 	mu    sync.Mutex
-	cache map[common.Hash]bool
+	cache map[common.Hash]EnvelopeState
 
 	wg   sync.WaitGroup
 	quit chan struct{}
@@ -100,7 +110,7 @@ func (t *tracker) Stop() {
 func (t *tracker) Add(hash common.Hash) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	t.cache[hash] = false
+	t.cache[hash] = EnvelopePosted
 }
 
 // handleEnvelopeEvents processes whisper envelope events
@@ -125,16 +135,16 @@ func (t *tracker) handleEvent(event whisper.EnvelopeEvent) {
 	defer t.mu.Unlock()
 	switch event.Event {
 	case whisper.EventEnvelopeSent:
-		confirmed, ok := t.cache[event.Hash]
+		state, ok := t.cache[event.Hash]
 		// if we didn't send a message using extension - skip it
 		// if message was already confirmed - skip it
-		if !ok || confirmed {
+		if !ok || state == EnvelopeSent {
 			return
 		}
 		if t.handler != nil {
 			log.Debug("envelope is sent", "hash", event.Hash, "peer", event.Peer)
 			t.handler(event.Hash)
-			t.cache[event.Hash] = true
+			t.cache[event.Hash] = EnvelopeSent
 		}
 	case whisper.EventEnvelopeExpired:
 		if _, ok := t.cache[event.Hash]; ok {
