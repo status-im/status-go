@@ -204,6 +204,11 @@ func (peer *Peer) broadcast() error {
 		// mark envelopes only if they were successfully sent
 		for _, e := range bundle {
 			peer.mark(e)
+			peer.host.envelopeFeed.Send(EnvelopeEvent{
+				Event: EventEnvelopeSent,
+				Hash:  e.Hash(),
+				Peer:  peer.peer.ID(), // specifically discover.NodeID because it can be pretty printed
+			})
 		}
 
 		log.Trace("broadcast", "num. messages", len(bundle))

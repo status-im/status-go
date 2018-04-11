@@ -28,6 +28,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -85,8 +86,10 @@ type Whisper struct {
 	statsMu sync.Mutex // guard stats
 	stats   Statistics // Statistics of whisper node
 
-	mailServer         MailServer // MailServer interface
-	envelopeTracer     EnvelopeTracer // Service collecting envelopes metadata
+	mailServer     MailServer     // MailServer interface
+	envelopeTracer EnvelopeTracer // Service collecting envelopes metadata
+
+	envelopeFeed event.Feed
 }
 
 // New creates a Whisper client ready to communicate through the Ethereum P2P network.
@@ -129,6 +132,12 @@ func New(cfg *Config) *Whisper {
 	}
 
 	return whisper
+}
+
+// SubscribeEnvelopeEvents subscribes to envelopes feed.
+// In order to prevent blocking whisper producers events must be amply buffered.
+func (whisper *Whisper) SubscribeEnvelopeEvents(events chan<- EnvelopeEvent) event.Subscription {
+	return whisper.envelopeFeed.Subscribe(events)
 }
 
 // MinPow returns the PoW value required by this node.
@@ -986,6 +995,10 @@ func (whisper *Whisper) expire() {
 			hashSet.Each(func(v interface{}) bool {
 				sz := whisper.envelopes[v.(common.Hash)].size()
 				delete(whisper.envelopes, v.(common.Hash))
+				whisper.envelopeFeed.Send(EnvelopeEvent{
+					Hash:  v.(common.Hash),
+					Event: EventEnvelopeExpired,
+				})
 				whisper.stats.messagesCleared++
 				whisper.stats.memoryCleared += sz
 				whisper.stats.memoryUsed -= sz

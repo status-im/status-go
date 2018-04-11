@@ -24,6 +24,7 @@ import (
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"github.com/status-im/status-go/geth/params"
 	shhmetrics "github.com/status-im/status-go/metrics/whisper"
+	"github.com/status-im/status-go/shhext"
 )
 
 // node-related errors
@@ -162,13 +163,13 @@ func activateShhService(stack *node.Node, config *params.NodeConfig) error {
 		logger.Info("SHH protocol is disabled")
 		return nil
 	}
-
-	serviceConstructor := func(*node.ServiceContext) (node.Service, error) {
+	var whisperService *whisper.Whisper
+	if err := stack.Register(func(*node.ServiceContext) (node.Service, error) {
 		whisperServiceConfig := &whisper.Config{
 			MaxMessageSize:     whisper.DefaultMaxMessageSize,
 			MinimumAcceptedPOW: 0.001,
 		}
-		whisperService := whisper.New(whisperServiceConfig)
+		whisperService = whisper.New(whisperServiceConfig)
 
 		whisperConfig := config.WhisperConfig
 		// enable metrics
@@ -197,9 +198,14 @@ func activateShhService(stack *node.Node, config *params.NodeConfig) error {
 		}
 
 		return whisperService, nil
+	}); err != nil {
+		return err
 	}
-
-	return stack.Register(serviceConstructor)
+	// TODO(dshulyak) add a config option to enable it by default, but disable if app is started from statusd
+	return stack.Register(func(*node.ServiceContext) (node.Service, error) {
+		svc := shhext.New(whisperService, shhext.SendEnvelopeSentSignal)
+		return svc, nil
+	})
 }
 
 // makeIPCPath returns IPC-RPC filename
