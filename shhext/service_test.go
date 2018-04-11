@@ -31,7 +31,7 @@ func (s *ShhExtSuite) SetupTest() {
 	s.whisper = make([]*whisper.Whisper, 2)
 	port := 32139
 	for i := range s.nodes {
-		i := i // bind i to be usable in service contructors
+		i := i // bind i to be usable in service constructors
 		key, err := crypto.GenerateKey()
 		s.NoError(err)
 		cfg := &node.Config{

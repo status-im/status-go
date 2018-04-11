@@ -67,7 +67,7 @@ func (s *Service) Stop() error {
 	return nil
 }
 
-// tracker reponsible for processing events for envelopes that we are interested in
+// tracker responsible for processing events for envelopes that we are interested in
 // and calling specified handler.
 type tracker struct {
 	w       *whisper.Whisper

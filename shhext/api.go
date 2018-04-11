@@ -9,10 +9,6 @@ import (
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 )
 
-const (
-	aesKeyLength = 32 // in bytes
-)
-
 // NewPublicAPI returns instance of the public API.
 func NewPublicAPI(w *whisper.Whisper, tracker *tracker) *PublicAPI {
 	return &PublicAPI{
@@ -21,7 +17,7 @@ func NewPublicAPI(w *whisper.Whisper, tracker *tracker) *PublicAPI {
 	}
 }
 
-// PublicAPI extendes whisper public API.
+// PublicAPI extends whisper public API.
 type PublicAPI struct {
 	w       *whisper.Whisper
 	tracker *tracker
