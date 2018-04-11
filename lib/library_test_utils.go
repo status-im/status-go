@@ -97,6 +97,14 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 			testCallRPC,
 		},
 		{
+			"call private API using RPC",
+			testCallRPCWithPrivateAPI,
+		},
+		{
+			"call private API using private RPC client",
+			testCallPrivateRPCWithPrivateAPI,
+		},
+		{
 			"create main and child accounts",
 			testCreateChildAccount,
 		},
@@ -372,6 +380,30 @@ func testStopResumeNode(t *testing.T) bool { //nolint: gocyclo
 func testCallRPC(t *testing.T) bool {
 	expected := `{"jsonrpc":"2.0","id":64,"result":"0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad"}`
 	rawResponse := CallRPC(C.CString(`{"jsonrpc":"2.0","method":"web3_sha3","params":["0x68656c6c6f20776f726c64"],"id":64}`))
+	received := C.GoString(rawResponse)
+	if expected != received {
+		t.Errorf("unexpected response: expected: %v, got: %v", expected, received)
+		return false
+	}
+
+	return true
+}
+
+func testCallRPCWithPrivateAPI(t *testing.T) bool {
+	expected := `{"jsonrpc":"2.0","id":64,"error":{"code":-32601,"message":"The method admin_peers does not exist/is not available"}}`
+	rawResponse := CallRPC(C.CString(`{"jsonrpc":"2.0","method":"admin_peers","params":[],"id":64}`))
+	received := C.GoString(rawResponse)
+	if expected != received {
+		t.Errorf("unexpected response: expected: %v, got: %v", expected, received)
+		return false
+	}
+
+	return true
+}
+
+func testCallPrivateRPCWithPrivateAPI(t *testing.T) bool {
+	expected := `{"jsonrpc":"2.0","id":64,"result":[]}`
+	rawResponse := CallPrivateRPC(C.CString(`{"jsonrpc":"2.0","method":"admin_peers","params":[],"id":64}`))
 	received := C.GoString(rawResponse)
 	if expected != received {
 		t.Errorf("unexpected response: expected: %v, got: %v", expected, received)

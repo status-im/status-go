@@ -46,9 +46,10 @@ type EthNodeError error
 type StatusNode struct {
 	mu sync.RWMutex
 
-	config    *params.NodeConfig // Status node configuration
-	gethNode  *node.Node         // reference to Geth P2P stack/node
-	rpcClient *rpc.Client        // reference to public RPC client
+	config           *params.NodeConfig // Status node configuration
+	gethNode         *node.Node         // reference to Geth P2P stack/node
+	rpcClient        *rpc.Client        // reference to public RPC client
+	rpcPrivateClient *rpc.Client        // reference to private RPC client (can call private APIs)
 
 	register *peers.Register
 	peerPool *peers.PeerPool
@@ -95,19 +96,40 @@ func (n *StatusNode) start(config *params.NodeConfig, services []node.ServiceCon
 	if err := ethNode.Start(); err != nil {
 		return EthNodeError(err)
 	}
+
 	// init RPC client for this node
-	localRPCClient, err := n.gethNode.AttachPublic()
-	if err == nil {
-		n.rpcClient, err = rpc.NewClient(localRPCClient, n.config.UpstreamConfig)
-	}
-	if err != nil {
+	if err := n.setupRPCClient(); err != nil {
 		n.log.Error("Failed to create an RPC client", "error", err)
 		return RPCClientError(err)
 	}
+
+	// start peer pool only if Discovery V5 is enabled
 	if ethNode.Server().DiscV5 != nil {
 		return n.startPeerPool()
 	}
+
 	return nil
+}
+
+func (n *StatusNode) setupRPCClient() (err error) {
+	// setup public RPC client
+	gethNodeClient, err := n.gethNode.AttachPublic()
+	if err != nil {
+		return
+	}
+	n.rpcClient, err = rpc.NewClient(gethNodeClient, n.config.UpstreamConfig)
+	if err != nil {
+		return
+	}
+
+	// setup private RPC client
+	gethNodePrivateClient, err := n.gethNode.Attach()
+	if err != nil {
+		return
+	}
+	n.rpcPrivateClient, err = rpc.NewClient(gethNodePrivateClient, n.config.UpstreamConfig)
+
+	return
 }
 
 func (n *StatusNode) startPeerPool() error {
@@ -152,6 +174,7 @@ func (n *StatusNode) stop() error {
 	n.gethNode = nil
 	n.config = nil
 	n.rpcClient = nil
+	n.rpcPrivateClient = nil
 	return nil
 }
 
@@ -375,6 +398,14 @@ func (n *StatusNode) RPCClient() *rpc.Client {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	return n.rpcClient
+}
+
+// RPCPrivateClient exposes reference to RPC client connected to the running node
+// that can call both public and private APIs.
+func (n *StatusNode) RPCPrivateClient() *rpc.Client {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	return n.rpcPrivateClient
 }
 
 // isAvailable check if we have a node running and make sure is fully started
