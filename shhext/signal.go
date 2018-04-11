@@ -7,7 +7,7 @@ import (
 
 // EnvelopeSentSignal includes hash of the sent envelope.
 type EnvelopeSentSignal struct {
-	Hash common.Hash
+	Hash common.Hash `json:"hash"`
 }
 
 // SendEnvelopeSentSignal sends an envelope.sent signal with hash of the envelope.
