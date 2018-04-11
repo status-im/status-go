@@ -91,3 +91,54 @@ func (s *ShhExtSuite) TearDown() {
 		s.NoError(n.Stop())
 	}
 }
+
+var (
+	testHash = common.Hash{0x01}
+)
+
+func TestTrackerSuite(t *testing.T) {
+	suite.Run(t, new(TrackerSuite))
+}
+
+type TrackerSuite struct {
+	suite.Suite
+
+	tracker *tracker
+}
+
+func (s *TrackerSuite) SetupTest() {
+	s.tracker = &tracker{
+		handler: func(common.Hash) {},
+		cache:   map[common.Hash]bool{},
+	}
+}
+
+func (s *TrackerSuite) TestConfirmed() {
+	s.tracker.Add(testHash)
+	s.Contains(s.tracker.cache, testHash)
+	s.False(s.tracker.cache[testHash])
+	s.tracker.handleEvent(whisper.EnvelopeEvent{
+		Event: whisper.EventEnvelopeSent,
+		Hash:  testHash,
+	})
+	s.Contains(s.tracker.cache, testHash)
+	s.True(s.tracker.cache[testHash])
+}
+
+func (s *TrackerSuite) TestIgnored() {
+	s.tracker.handleEvent(whisper.EnvelopeEvent{
+		Event: whisper.EventEnvelopeSent,
+		Hash:  testHash,
+	})
+	s.NotContains(s.tracker.cache, testHash)
+}
+
+func (s *TrackerSuite) TestRemoved() {
+	s.tracker.Add(testHash)
+	s.Contains(s.tracker.cache, testHash)
+	s.tracker.handleEvent(whisper.EnvelopeEvent{
+		Event: whisper.EventEnvelopeExpired,
+		Hash:  testHash,
+	})
+	s.NotContains(s.tracker.cache, testHash)
+}
