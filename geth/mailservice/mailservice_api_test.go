@@ -2,12 +2,14 @@ package mailservice
 
 import (
 	"context"
+	"math"
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
+	"github.com/ethereum/go-ethereum/p2p"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
-	gomock "github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -18,39 +20,48 @@ func TestRequestMessagesDefaults(t *testing.T) {
 	require.InEpsilon(t, uint32(time.Now().UTC().Unix()), r.To, 1.0)
 }
 
-func TestRequestMessagesFailures(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	provider := NewMockServiceProvider(ctrl)
-	api := NewPublicAPI(provider)
+func TestRequestMessages(t *testing.T) {
+	var err error
+
+	logger := log.New()
+	logger.SetHandler(log.LvlFilterHandler(log.LvlDebug, log.StderrHandler))
+
 	shh := whisper.New(nil)
-	// Node is ephemeral (only in memory).
-	nodeA, nodeErr := node.New(&node.Config{NoUSB: true})
-	require.NoError(t, nodeErr)
-	require.NoError(t, nodeA.Start())
+	aNode, err := node.New(&node.Config{
+		NoUSB: true,
+		P2P: p2p.Config{
+			MaxPeers:    math.MaxInt32,
+			NoDiscovery: true,
+		},
+		Logger: logger,
+	}) // in-memory node as no data dir
+	require.NoError(t, err)
+	aNode.Register(func(_ *node.ServiceContext) (node.Service, error) {
+		return shh, nil
+	})
+
+	err = aNode.Start()
+	require.NoError(t, err)
 	defer func() {
-		err := nodeA.Stop()
+		err := aNode.Stop()
 		require.NoError(t, err)
 	}()
+
+	service := New(aNode, shh)
+	api := NewPublicAPI(service)
 
 	const (
 		mailServerPeer = "enode://b7e65e1bedc2499ee6cbd806945af5e7df0e59e4070c96821570bd581473eade24a489f5ec95d060c0db118c879403ab88d827d3766978f28708989d35474f87@[::]:51920"
 	)
 
-	var (
-		result bool
-		err    error
-	)
+	var result bool
 
 	// invalid MailServer enode address
-	provider.EXPECT().WhisperService().Return(nil, nil)
-	provider.EXPECT().GethNode().Return(nil, nil)
 	result, err = api.RequestMessages(context.TODO(), MessagesRequest{MailServerPeer: "invalid-address"})
 	require.False(t, result)
 	require.EqualError(t, err, "invalid mailServerPeer value: invalid URL scheme, want \"enode\"")
 
 	// non-existent symmetric key
-	provider.EXPECT().WhisperService().Return(shh, nil)
-	provider.EXPECT().GethNode().Return(nil, nil)
 	result, err = api.RequestMessages(context.TODO(), MessagesRequest{
 		MailServerPeer: mailServerPeer,
 	})
@@ -60,19 +71,43 @@ func TestRequestMessagesFailures(t *testing.T) {
 	// with a symmetric key
 	symKeyID, symKeyErr := shh.AddSymKeyFromPassword("some-pass")
 	require.NoError(t, symKeyErr)
-	provider.EXPECT().WhisperService().Return(shh, nil)
-	provider.EXPECT().GethNode().Return(nodeA, nil)
 	result, err = api.RequestMessages(context.TODO(), MessagesRequest{
 		MailServerPeer: mailServerPeer,
 		SymKeyID:       symKeyID,
 	})
 	require.Contains(t, err.Error(), "Could not find peer with ID")
 	require.False(t, result)
-}
 
-func TestRequestMessagesSuccess(t *testing.T) {
-	// TODO(adam): next step would be to run a successful test, however,
-	// it requires to set up emepheral nodes that can discover each other
-	// without syncing blockchain. It requires a bit research how to do that.
-	t.Skip()
+	// with a peer acting line a mailserver
+	// prepare a node first
+	mailNode, err := node.New(&node.Config{
+		NoUSB: true,
+		P2P: p2p.Config{
+			MaxPeers:    math.MaxInt32,
+			NoDiscovery: true,
+			ListenAddr:  ":0",
+		},
+	}) // in-memory node as no data dir
+	require.NoError(t, err)
+	mailNode.Register(func(_ *node.ServiceContext) (node.Service, error) {
+		return whisper.New(nil), nil
+	})
+	err = mailNode.Start()
+	require.NoError(t, err)
+	defer func() {
+		err := mailNode.Stop()
+		require.NoError(t, err)
+	}()
+
+	// add mailPeer as a peer
+	aNode.Server().AddPeer(mailNode.Server().Self())
+	time.Sleep(time.Second * 10)
+
+	// send a request
+	result, err = api.RequestMessages(context.TODO(), MessagesRequest{
+		MailServerPeer: mailNode.Server().Self().String(),
+		SymKeyID:       symKeyID,
+	})
+	require.NoError(t, err)
+	require.True(t, result)
 }

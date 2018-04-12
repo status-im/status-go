@@ -1,29 +1,26 @@
 package mailservice
 
 import (
+	"crypto/ecdsa"
+
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 )
 
-// ServiceProvider provides node and required services.
-type ServiceProvider interface {
-	GethNode() (*node.Node, error)
-	WhisperService() (*whisper.Whisper, error)
-}
-
 // MailService is a service that provides some additional Whisper API.
 type MailService struct {
-	provider ServiceProvider
+	node    *node.Node
+	whisper *whisper.Whisper
 }
 
 // Make sure that MailService implements node.Service interface.
 var _ node.Service = (*MailService)(nil)
 
 // New returns a new MailService.
-func New(provider ServiceProvider) *MailService {
-	return &MailService{provider}
+func New(node *node.Node, w *whisper.Whisper) *MailService {
+	return &MailService{node, w}
 }
 
 // Protocols returns a new protocols list. In this case, there are none.
@@ -37,7 +34,7 @@ func (s *MailService) APIs() []rpc.API {
 		{
 			Namespace: "shh",
 			Version:   "1.0",
-			Service:   NewPublicAPI(s.provider),
+			Service:   NewPublicAPI(s),
 			Public:    true,
 		},
 	}
@@ -53,4 +50,8 @@ func (s *MailService) Start(server *p2p.Server) error {
 // It does nothing in this case but is required by `node.Service` interface.
 func (s *MailService) Stop() error {
 	return nil
+}
+
+func (s *MailService) nodeID() *ecdsa.PrivateKey {
+	return s.node.Server().PrivateKey
 }
