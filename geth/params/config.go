@@ -480,11 +480,7 @@ func (c *NodeConfig) updateConfig() error {
 		return err
 	}
 
-	if err := c.updateRelativeDirsConfig(); err != nil {
-		return err
-	}
-
-	return nil
+	return c.updateRelativeDirsConfig()
 }
 
 // updateGenesisConfig does necessary adjustments to config object (depending on network node will be running on)
