@@ -28,15 +28,15 @@ var (
 
 // PublicAPI defines a MailServer public API.
 type PublicAPI struct {
-	provider ServiceProvider
-	log      log.Logger
+	service *MailService
+	log     log.Logger
 }
 
 // NewPublicAPI returns a new PublicAPI.
-func NewPublicAPI(provider ServiceProvider) *PublicAPI {
+func NewPublicAPI(s *MailService) *PublicAPI {
 	return &PublicAPI{
-		provider: provider,
-		log:      log.New("package", "status-go/geth/mailservice.PublicAPI"),
+		service: s,
+		log:     log.New("package", "status-go/geth/mailservice.PublicAPI"),
 	}
 }
 
@@ -75,15 +75,7 @@ func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (boo
 
 	setMessagesRequestDefaults(&r)
 
-	shh, err := api.provider.WhisperService()
-	if err != nil {
-		return false, err
-	}
-
-	node, err := api.provider.GethNode()
-	if err != nil {
-		return false, err
-	}
+	shh := api.service.whisper
 
 	mailServerNode, err := discover.ParseNode(r.MailServerPeer)
 	if err != nil {
@@ -95,7 +87,7 @@ func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (boo
 		return false, fmt.Errorf("%v: %v", ErrInvalidSymKeyID, err)
 	}
 
-	envelope, err := makeEnvelop(makePayload(r), symKey, node.Server().PrivateKey, shh.MinPow())
+	envelope, err := makeEnvelop(makePayload(r), symKey, api.service.nodeID, shh.MinPow())
 	if err != nil {
 		return false, err
 	}
