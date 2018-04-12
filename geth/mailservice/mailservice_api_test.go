@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
@@ -23,9 +22,6 @@ func TestRequestMessagesDefaults(t *testing.T) {
 func TestRequestMessages(t *testing.T) {
 	var err error
 
-	logger := log.New()
-	logger.SetHandler(log.LvlFilterHandler(log.LvlDebug, log.StderrHandler))
-
 	shh := whisper.New(nil)
 	aNode, err := node.New(&node.Config{
 		NoUSB: true,
@@ -33,7 +29,6 @@ func TestRequestMessages(t *testing.T) {
 			MaxPeers:    math.MaxInt32,
 			NoDiscovery: true,
 		},
-		Logger: logger,
 	}) // in-memory node as no data dir
 	require.NoError(t, err)
 	aNode.Register(func(_ *node.ServiceContext) (node.Service, error) {
