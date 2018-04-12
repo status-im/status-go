@@ -221,7 +221,7 @@ func activateShhService(stack *node.Node, config *params.NodeConfig) (err error)
 			return nil, err
 		}
 
-		return mailservice.New(stack, whisper), nil
+		return mailservice.New(whisper), nil
 	})
 }
 

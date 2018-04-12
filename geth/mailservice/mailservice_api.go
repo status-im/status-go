@@ -87,7 +87,7 @@ func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (boo
 		return false, fmt.Errorf("%v: %v", ErrInvalidSymKeyID, err)
 	}
 
-	envelope, err := makeEnvelop(makePayload(r), symKey, api.service.nodeID(), shh.MinPow())
+	envelope, err := makeEnvelop(makePayload(r), symKey, api.service.nodeID, shh.MinPow())
 	if err != nil {
 		return false, err
 	}

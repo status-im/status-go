@@ -11,16 +11,16 @@ import (
 
 // MailService is a service that provides some additional Whisper API.
 type MailService struct {
-	node    *node.Node
 	whisper *whisper.Whisper
+	nodeID  *ecdsa.PrivateKey
 }
 
 // Make sure that MailService implements node.Service interface.
 var _ node.Service = (*MailService)(nil)
 
 // New returns a new MailService.
-func New(node *node.Node, w *whisper.Whisper) *MailService {
-	return &MailService{node, w}
+func New(w *whisper.Whisper) *MailService {
+	return &MailService{whisper: w}
 }
 
 // Protocols returns a new protocols list. In this case, there are none.
@@ -43,6 +43,7 @@ func (s *MailService) APIs() []rpc.API {
 // Start is run when a service is started.
 // It does nothing in this case but is required by `node.Service` interface.
 func (s *MailService) Start(server *p2p.Server) error {
+	s.nodeID = server.PrivateKey
 	return nil
 }
 
@@ -50,8 +51,4 @@ func (s *MailService) Start(server *p2p.Server) error {
 // It does nothing in this case but is required by `node.Service` interface.
 func (s *MailService) Stop() error {
 	return nil
-}
-
-func (s *MailService) nodeID() *ecdsa.PrivateKey {
-	return s.node.Server().PrivateKey
 }

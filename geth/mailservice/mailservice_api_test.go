@@ -24,7 +24,6 @@ func TestRequestMessages(t *testing.T) {
 
 	shh := whisper.New(nil)
 	aNode, err := node.New(&node.Config{
-		NoUSB: true,
 		P2P: p2p.Config{
 			MaxPeers:    math.MaxInt32,
 			NoDiscovery: true,
@@ -43,7 +42,7 @@ func TestRequestMessages(t *testing.T) {
 		require.NoError(t, err)
 	}()
 
-	service := New(aNode, shh)
+	service := New(shh)
 	api := NewPublicAPI(service)
 
 	const (
@@ -77,7 +76,6 @@ func TestRequestMessages(t *testing.T) {
 	// with a peer acting line a mailserver
 	// prepare a node first
 	mailNode, err := node.New(&node.Config{
-		NoUSB: true,
 		P2P: p2p.Config{
 			MaxPeers:    math.MaxInt32,
 			NoDiscovery: true,
@@ -98,7 +96,7 @@ func TestRequestMessages(t *testing.T) {
 
 	// add mailPeer as a peer
 	aNode.Server().AddPeer(mailNode.Server().Self())
-	time.Sleep(time.Second * 10)
+	time.Sleep(time.Second) // wait for the peer to be added
 
 	// send a request
 	result, err = api.RequestMessages(context.TODO(), MessagesRequest{
