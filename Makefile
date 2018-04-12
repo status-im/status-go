@@ -112,7 +112,6 @@ mock-install: ##@other Install mocking tools
 	go get -u github.com/golang/mock/mockgen
 
 mock: ##@other Regenerate mocks
-	mockgen -package=mailservice -destination=geth/mailservice/mailservice_mock.go       github.com/status-im/status-go/geth/mailservice ServiceProvider
 	mockgen -package=fcm         -destination=geth/notifications/push/fcm/client_mock.go github.com/status-im/status-go/geth/notifications/push/fcm FirebaseClient,Notifier
 	mockgen -package=fake        -destination=geth/transactions/fake/mock.go             github.com/status-im/status-go/geth/transactions/fake PublicTransactionPoolAPI
 

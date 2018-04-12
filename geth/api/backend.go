@@ -109,6 +109,7 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 			err = fmt.Errorf("node crashed on start: %v", err)
 		}
 	}()
+
 	err = b.statusNode.Start(config)
 	if err != nil {
 		switch err.(type) {

@@ -7,7 +7,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"strings"
 
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -22,6 +21,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/nat"
 	"github.com/ethereum/go-ethereum/whisper/mailserver"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
+	"github.com/status-im/status-go/geth/mailservice"
 	"github.com/status-im/status-go/geth/params"
 	shhmetrics "github.com/status-im/status-go/metrics/whisper"
 	"github.com/status-im/status-go/shhext"
@@ -105,12 +105,12 @@ func defaultEmbeddedNodeConfig(config *params.NodeConfig) *node.Config {
 		},
 		IPCPath:          makeIPCPath(config),
 		HTTPCors:         []string{"*"},
-		HTTPModules:      strings.Split(config.APIModules, ","),
+		HTTPModules:      config.FormatAPIModules(),
 		HTTPVirtualHosts: []string{"localhost"},
 		WSHost:           makeWSHost(config),
 		WSPort:           config.WSPort,
 		WSOrigins:        []string{"*"},
-		WSModules:        strings.Split(config.APIModules, ","),
+		WSModules:        config.FormatAPIModules(),
 	}
 
 	if config.RPCEnabled {
@@ -157,28 +157,26 @@ func activateEthService(stack *node.Node, config *params.NodeConfig) error {
 }
 
 // activateShhService configures Whisper and adds it to the given node.
-func activateShhService(stack *node.Node, config *params.NodeConfig) error {
-
+func activateShhService(stack *node.Node, config *params.NodeConfig) (err error) {
 	if !config.WhisperConfig.Enabled {
 		logger.Info("SHH protocol is disabled")
 		return nil
 	}
-	var whisperService *whisper.Whisper
-	if err := stack.Register(func(*node.ServiceContext) (node.Service, error) {
+
+	err = stack.Register(func(*node.ServiceContext) (node.Service, error) {
 		whisperServiceConfig := &whisper.Config{
 			MaxMessageSize:     whisper.DefaultMaxMessageSize,
 			MinimumAcceptedPOW: 0.001,
 		}
-		whisperService = whisper.New(whisperServiceConfig)
+		whisperService := whisper.New(whisperServiceConfig)
 
-		whisperConfig := config.WhisperConfig
 		// enable metrics
 		whisperService.RegisterEnvelopeTracer(&shhmetrics.EnvelopeTracer{})
 
 		// enable mail service
-		if whisperConfig.EnableMailServer {
-			if whisperConfig.Password == "" {
-				if err := whisperConfig.ReadPasswordFile(); err != nil {
+		if config.WhisperConfig.EnableMailServer {
+			if config.WhisperConfig.Password == "" {
+				if err := config.WhisperConfig.ReadPasswordFile(); err != nil {
 					return nil, err
 				}
 			}
@@ -187,10 +185,15 @@ func activateShhService(stack *node.Node, config *params.NodeConfig) error {
 
 			var mailServer mailserver.WMailServer
 			whisperService.RegisterServer(&mailServer)
-			mailServer.Init(whisperService, whisperConfig.DataDir, whisperConfig.Password, whisperConfig.MinimumPoW)
+			mailServer.Init(
+				whisperService,
+				config.WhisperConfig.DataDir,
+				config.WhisperConfig.Password,
+				config.WhisperConfig.MinimumPoW,
+			)
 		}
 
-		if whisperConfig.LightClient {
+		if config.WhisperConfig.LightClient {
 			emptyBloomFilter := make([]byte, 64)
 			if err := whisperService.SetBloomFilter(emptyBloomFilter); err != nil {
 				return nil, err
@@ -198,13 +201,32 @@ func activateShhService(stack *node.Node, config *params.NodeConfig) error {
 		}
 
 		return whisperService, nil
-	}); err != nil {
-		return err
+	})
+	if err != nil {
+		return
 	}
+
 	// TODO(dshulyak) add a config option to enable it by default, but disable if app is started from statusd
-	return stack.Register(func(*node.ServiceContext) (node.Service, error) {
-		svc := shhext.New(whisperService, shhext.SendEnvelopeSentSignal)
+	err = stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
+		var whisper *whisper.Whisper
+		if err := ctx.Service(&whisper); err != nil {
+			return nil, err
+		}
+
+		svc := shhext.New(whisper, shhext.SendEnvelopeSentSignal)
 		return svc, nil
+	})
+	if err != nil {
+		return
+	}
+
+	return stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
+		var whisper *whisper.Whisper
+		if err := ctx.Service(&whisper); err != nil {
+			return nil, err
+		}
+
+		return mailservice.New(whisper), nil
 	})
 }
 

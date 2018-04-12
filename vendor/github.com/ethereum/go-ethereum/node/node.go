@@ -51,8 +51,9 @@ type Node struct {
 	serviceFuncs []ServiceConstructor     // Service constructors (in dependency order)
 	services     map[reflect.Type]Service // Currently running services
 
-	rpcAPIs       []rpc.API   // List of APIs currently provided by the node
-	inprocHandler *rpc.Server // In-process RPC request handler to process the API requests
+	rpcAPIs             []rpc.API   // List of APIs currently provided by the node
+	inprocHandler       *rpc.Server // In-process RPC request handler to process the API requests
+	inprocPublicHandler *rpc.Server // In-process RPC request handler to process the public API requests
 
 	ipcEndpoint string       // IPC endpoint to listen at (empty = IPC disabled)
 	ipcListener net.Listener // IPC RPC listener socket to serve API requests
@@ -259,18 +260,25 @@ func (n *Node) startRPC(services map[reflect.Type]Service) error {
 	if err := n.startInProc(apis); err != nil {
 		return err
 	}
+	if err := n.startPublicInProc(apis, n.config.HTTPModules); err != nil {
+		n.stopInProc()
+		return err
+	}
 	if err := n.startIPC(apis); err != nil {
+		n.stopPublicInProc()
 		n.stopInProc()
 		return err
 	}
 	if err := n.startHTTP(n.httpEndpoint, apis, n.config.HTTPModules, n.config.HTTPCors, n.config.HTTPVirtualHosts); err != nil {
 		n.stopIPC()
+		n.stopPublicInProc()
 		n.stopInProc()
 		return err
 	}
 	if err := n.startWS(n.wsEndpoint, apis, n.config.WSModules, n.config.WSOrigins, n.config.WSExposeAll); err != nil {
 		n.stopHTTP()
 		n.stopIPC()
+		n.stopPublicInProc()
 		n.stopInProc()
 		return err
 	}
@@ -298,6 +306,36 @@ func (n *Node) stopInProc() {
 	if n.inprocHandler != nil {
 		n.inprocHandler.Stop()
 		n.inprocHandler = nil
+	}
+}
+
+// startPublicInProc initializes an in-process RPC endpoint for public APIs.
+func (n *Node) startPublicInProc(apis []rpc.API, modules []string) error {
+	// Generate the whitelist based on the allowed modules
+	whitelist := make(map[string]bool)
+	for _, module := range modules {
+		whitelist[module] = true
+	}
+
+	// Register all the public APIs exposed by the services
+	handler := rpc.NewServer()
+	for _, api := range apis {
+		if whitelist[api.Namespace] || (len(whitelist) == 0 && api.Public) {
+			if err := handler.RegisterName(api.Namespace, api.Service); err != nil {
+				return err
+			}
+			n.log.Debug("InProc public registered", "service", api.Service, "namespace", api.Namespace)
+		}
+	}
+	n.inprocPublicHandler = handler
+	return nil
+}
+
+// stopPublicInProc terminates the in-process RPC endpoint for public APIs.
+func (n *Node) stopPublicInProc() {
+	if n.inprocPublicHandler != nil {
+		n.inprocPublicHandler.Stop()
+		n.inprocPublicHandler = nil
 	}
 }
 
@@ -560,6 +598,18 @@ func (n *Node) Attach() (*rpc.Client, error) {
 		return nil, ErrNodeStopped
 	}
 	return rpc.DialInProc(n.inprocHandler), nil
+}
+
+// AttachPublic creates an RPC client attached to an in-process Public API handler.
+func (n *Node) AttachPublic() (*rpc.Client, error) {
+	n.lock.RLock()
+	defer n.lock.RUnlock()
+
+	if n.server == nil {
+		return nil, ErrNodeStopped
+	}
+
+	return rpc.DialInProc(n.inprocPublicHandler), nil
 }
 
 // RPCHandler returns the in-process RPC request handler.

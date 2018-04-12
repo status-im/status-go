@@ -19,7 +19,6 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 
 	"github.com/status-im/status-go/geth/db"
-	"github.com/status-im/status-go/geth/mailservice"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/peers"
 	"github.com/status-im/status-go/geth/rpc"
@@ -45,16 +44,17 @@ type EthNodeError error
 // StatusNode abstracts contained geth node and provides helper methods to
 // interact with it.
 type StatusNode struct {
-	mu       sync.RWMutex
-	config   *params.NodeConfig // Status node configuration
-	gethNode *node.Node         // reference to Geth P2P stack/node
+	mu sync.RWMutex
+
+	config    *params.NodeConfig // Status node configuration
+	gethNode  *node.Node         // reference to Geth P2P stack/node
+	rpcClient *rpc.Client        // reference to public RPC client
 
 	register *peers.Register
 	peerPool *peers.PeerPool
-	db       *leveldb.DB
+	db       *leveldb.DB // used as a cache for PeerPool
 
-	rpcClient *rpc.Client // reference to RPC client
-	log       log.Logger
+	log log.Logger
 }
 
 // New makes new instance of StatusNode.
@@ -65,18 +65,19 @@ func New() *StatusNode {
 }
 
 // Start starts current StatusNode, will fail if it's already started.
-func (n *StatusNode) Start(config *params.NodeConfig) error {
+func (n *StatusNode) Start(config *params.NodeConfig, services ...node.ServiceConstructor) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	return n.start(config)
-}
 
-// start starts current StatusNode, will fail if it's already started.
-func (n *StatusNode) start(config *params.NodeConfig) error {
 	if err := n.isAvailable(); err == nil {
 		return ErrNodeExists
 	}
 
+	return n.start(config, services)
+}
+
+// start starts current StatusNode, will fail if it's already started.
+func (n *StatusNode) start(config *params.NodeConfig, services []node.ServiceConstructor) error {
 	ethNode, err := MakeNode(config)
 	if err != nil {
 		return err
@@ -84,11 +85,10 @@ func (n *StatusNode) start(config *params.NodeConfig) error {
 	n.gethNode = ethNode
 	n.config = config
 
-	// activate MailService required for Offline Inboxing
-	if err := ethNode.Register(func(_ *node.ServiceContext) (node.Service, error) {
-		return mailservice.New(n), nil
-	}); err != nil {
-		return err
+	for _, service := range services {
+		if err := ethNode.Register(service); err != nil {
+			return err
+		}
 	}
 
 	// start underlying node
@@ -96,7 +96,7 @@ func (n *StatusNode) start(config *params.NodeConfig) error {
 		return EthNodeError(err)
 	}
 	// init RPC client for this node
-	localRPCClient, err := n.gethNode.Attach()
+	localRPCClient, err := n.gethNode.AttachPublic()
 	if err == nil {
 		n.rpcClient, err = rpc.NewClient(localRPCClient, n.config.UpstreamConfig)
 	}
