@@ -31,9 +31,10 @@ func TestRequestMessages(t *testing.T) {
 		},
 	}) // in-memory node as no data dir
 	require.NoError(t, err)
-	aNode.Register(func(_ *node.ServiceContext) (node.Service, error) {
+	err = aNode.Register(func(_ *node.ServiceContext) (node.Service, error) {
 		return shh, nil
 	})
+	require.NoError(t, err)
 
 	err = aNode.Start()
 	require.NoError(t, err)
@@ -84,9 +85,10 @@ func TestRequestMessages(t *testing.T) {
 		},
 	}) // in-memory node as no data dir
 	require.NoError(t, err)
-	mailNode.Register(func(_ *node.ServiceContext) (node.Service, error) {
+	err = mailNode.Register(func(_ *node.ServiceContext) (node.Service, error) {
 		return whisper.New(nil), nil
 	})
+	require.NoError(t, err)
 	err = mailNode.Start()
 	require.NoError(t, err)
 	defer func() {

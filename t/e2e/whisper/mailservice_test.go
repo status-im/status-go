@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	gethnode "github.com/ethereum/go-ethereum/node"
+	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 )
 
 func TestMailServiceSuite(t *testing.T) {
@@ -26,8 +27,18 @@ type MailServiceSuite struct {
 func (s *MailServiceSuite) SetupTest() {
 	s.StatusNode = node.New()
 	s.Services = []gethnode.ServiceConstructor{
-		func(_ *gethnode.ServiceContext) (gethnode.Service, error) {
-			return mailservice.New(s.StatusNode), nil
+		func(ctx *gethnode.ServiceContext) (gethnode.Service, error) {
+			gethNode, err := s.StatusNode.GethNode()
+			if err != nil {
+				return nil, err
+			}
+
+			var whisper *whisper.Whisper
+			if err := ctx.Service(&whisper); err != nil {
+				return nil, err
+			}
+
+			return mailservice.New(gethNode, whisper), nil
 		},
 	}
 }
