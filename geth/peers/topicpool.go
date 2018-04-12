@@ -107,17 +107,19 @@ func (t *TopicPool) ConfirmAdded(server *p2p.Server, nodeID discover.NodeID) {
 // 2. If disconnect request - we could drop that peer ourselves.
 // 3. If connected number will drop below min limit - switch to fast mode.
 // 4. Delete a peer from cache and peer table.
-func (t *TopicPool) ConfirmDropped(server *p2p.Server, nodeID discover.NodeID) (confirmed bool) {
+// Returns false if peer is not in our table or we requested removal of this peer.
+// Otherwise peer is removed and true is returned.
+func (t *TopicPool) ConfirmDropped(server *p2p.Server, nodeID discover.NodeID) bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	// either inbound or connected from another topic
 	peer, exist := t.peers[discv5.NodeID(nodeID)]
 	if !exist {
-		return
+		return false
 	}
 	log.Debug("disconnect", "ID", nodeID)
 	if peer.requested {
-		return
+		return false
 	}
 	if t.SearchRunning() && t.connected == t.limits[0] {
 		t.period <- t.fastSync

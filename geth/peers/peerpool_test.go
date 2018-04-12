@@ -47,6 +47,7 @@ func (s *PeerPoolSimulationSuite) SetupTest() {
 	s.Require().NoError(s.bootnode.Start())
 	bootnodeV5 := discv5.NewNode(s.bootnode.DiscV5.Self().ID, net.ParseIP("127.0.0.1"), uint16(port), uint16(port))
 
+	// 1 peer to initiate connection, 1 peer as a first candidate, 1 peer - for failover
 	s.peers = make([]*p2p.Server, 3)
 	for i := range s.peers {
 		key, _ := crypto.GenerateKey()

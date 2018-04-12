@@ -123,9 +123,7 @@ func (p *PeerPool) restartDiscovery(server *p2p.Server) error {
 // handleServerPeers watches server peer events, notifies topic pools about changes
 // in the peer set and stops the discv5 if all topic pools collected enough peers.
 func (p *PeerPool) handleServerPeers(server *p2p.Server, events <-chan *p2p.PeerEvent) {
-	var (
-		retryDiscv5 <-chan time.Time
-	)
+	var retryDiscv5 <-chan time.Time
 
 	for {
 		select {
@@ -139,7 +137,6 @@ func (p *PeerPool) handleServerPeers(server *p2p.Server, events <-chan *p2p.Peer
 			switch event.Type {
 			case p2p.PeerEventTypeDrop:
 				log.Debug("confirm peer dropped", "ID", event.Peer)
-				// if any peer is below min limit and search is not running
 				if p.stopOnMax && p.handleDroppedPeer(server, event.Peer) {
 					retryDiscv5 = time.After(0)
 				}
@@ -171,7 +168,7 @@ func (p *PeerPool) handleAddedPeer(server *p2p.Server, nodeID discover.NodeID) (
 	return all
 }
 
-// handleDroppedPeer notifies every topics peer and return true if any peer have connections
+// handleDroppedPeer notifies every topic about dropped peer and returns true if any peer have connections
 // below min limit
 func (p *PeerPool) handleDroppedPeer(server *p2p.Server, nodeID discover.NodeID) (any bool) {
 	p.mu.Lock()
