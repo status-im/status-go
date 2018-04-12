@@ -63,7 +63,7 @@ func (s *TopicPoolSuite) TestSyncSwitches() {
 	s.topicPool.ConfirmAdded(s.peer, discover.NodeID(testPeer.ID))
 	s.AssertConsumed(s.topicPool.period, s.topicPool.slowSync, time.Second)
 	s.True(s.topicPool.peers[testPeer.ID].connected)
-	s.topicPool.ConfirmDropped(s.peer, discover.NodeID(testPeer.ID), p2p.DiscProtocolError.Error())
+	s.topicPool.ConfirmDropped(s.peer, discover.NodeID(testPeer.ID))
 	s.AssertConsumed(s.topicPool.period, s.topicPool.fastSync, time.Second)
 }
 
@@ -82,15 +82,24 @@ func (s *TopicPoolSuite) TestNewPeerSelectedOnDrop() {
 	s.topicPool.ConfirmAdded(s.peer, discover.NodeID(peer3.ID))
 	s.False(s.topicPool.peers[peer3.ID].connected)
 
-	s.True(s.topicPool.ConfirmDropped(s.peer, discover.NodeID(peer1.ID), p2p.DiscNetworkError.Error()))
+	s.True(s.topicPool.ConfirmDropped(s.peer, discover.NodeID(peer1.ID)))
+	s.Equal(peer3.ID, s.topicPool.AddPeerFromTable(s.peer).ID)
 }
 
 func (s *TopicPoolSuite) TestRequestedDoesntRemove() {
+	// max limit is 1 because we test that 2nd peer will stay in local table
+	// when we request to drop it
+	s.topicPool.limits = params.Limits{1, 1}
 	peer1 := discv5.NewNode(discv5.NodeID{1}, s.peer.Self().IP, 32311, 32311)
+	peer2 := discv5.NewNode(discv5.NodeID{2}, s.peer.Self().IP, 32311, 32311)
 	s.topicPool.processFoundNode(s.peer, peer1)
+	s.topicPool.processFoundNode(s.peer, peer2)
 	s.topicPool.ConfirmAdded(s.peer, discover.NodeID(peer1.ID))
-	s.topicPool.ConfirmDropped(s.peer, discover.NodeID(peer1.ID), p2p.DiscRequested.Error())
-	s.Contains(s.topicPool.peers, peer1.ID)
-	s.topicPool.ConfirmDropped(s.peer, discover.NodeID(peer1.ID), p2p.DiscProtocolError.Error())
+	s.topicPool.ConfirmAdded(s.peer, discover.NodeID(peer2.ID))
+	s.False(s.topicPool.peers[peer1.ID].requested)
+	s.True(s.topicPool.peers[peer2.ID].requested)
+	s.topicPool.ConfirmDropped(s.peer, discover.NodeID(peer2.ID))
+	s.Contains(s.topicPool.peers, peer2.ID)
+	s.topicPool.ConfirmDropped(s.peer, discover.NodeID(peer1.ID))
 	s.NotContains(s.topicPool.peers, peer1.ID)
 }
