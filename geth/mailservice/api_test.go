@@ -73,7 +73,7 @@ func TestRequestMessages(t *testing.T) {
 	require.Contains(t, err.Error(), "Could not find peer with ID")
 	require.False(t, result)
 
-	// with a peer acting line a mailserver
+	// with a peer acting as a mailserver
 	// prepare a node first
 	mailNode, err := node.New(&node.Config{
 		P2P: p2p.Config{

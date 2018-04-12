@@ -185,7 +185,12 @@ func activateShhService(stack *node.Node, config *params.NodeConfig) (err error)
 
 			var mailServer mailserver.WMailServer
 			whisperService.RegisterServer(&mailServer)
-			mailServer.Init(whisperService, config.WhisperConfig.DataDir, config.WhisperConfig.Password, config.WhisperConfig.MinimumPoW)
+			mailServer.Init(
+				whisperService,
+				config.WhisperConfig.DataDir,
+				config.WhisperConfig.Password,
+				config.WhisperConfig.MinimumPoW,
+			)
 		}
 
 		if config.WhisperConfig.LightClient {
