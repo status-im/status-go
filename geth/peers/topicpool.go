@@ -107,18 +107,17 @@ func (t *TopicPool) ConfirmAdded(server *p2p.Server, nodeID discover.NodeID) {
 // 2. If disconnect request - we could drop that peer ourselves.
 // 3. If connected number will drop below min limit - switch to fast mode.
 // 4. Delete a peer from cache and peer table.
-// 5. Connect with another valid peer, if such is available.
-func (t *TopicPool) ConfirmDropped(server *p2p.Server, nodeID discover.NodeID, reason string) (info *peerInfo, ignored bool) {
+func (t *TopicPool) ConfirmDropped(server *p2p.Server, nodeID discover.NodeID) (confirmed bool) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	// either inbound or connected from another topic
 	peer, exist := t.peers[discv5.NodeID(nodeID)]
 	if !exist {
-		return nil, true
+		return
 	}
-	log.Debug("disconnect reason", "ID", nodeID, "reason", reason)
+	log.Debug("disconnect", "ID", nodeID)
 	if peer.requested {
-		return nil, true
+		return
 	}
 	if t.SearchRunning() && t.connected == t.limits[0] {
 		t.period <- t.fastSync
@@ -131,14 +130,21 @@ func (t *TopicPool) ConfirmDropped(server *p2p.Server, nodeID discover.NodeID, r
 			log.Error("failed to remove peer from cache", "error", err)
 		}
 	}
+	return true
+}
+
+// AddPeerFromTable checks if there is a valid peer in local table and adds it to a server.
+func (t *TopicPool) AddPeerFromTable(server *p2p.Server) *peerInfo {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
 	// TODO use a heap queue and always get a peer that was discovered recently
 	for _, peer := range t.peers {
 		if !peer.connected && mclock.Now() < peer.discoveredTime+mclock.AbsTime(expirationPeriod) {
 			t.addPeer(server, peer)
-			return peer, false
+			return peer
 		}
 	}
-	return nil, false
+	return nil
 }
 
 // StartSearch creates discv5 queries and runs a loop to consume found peers.

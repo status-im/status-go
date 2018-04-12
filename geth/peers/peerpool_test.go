@@ -67,11 +67,24 @@ func (s *PeerPoolSimulationSuite) SetupTest() {
 	}
 }
 
+func (s *PeerPoolSimulationSuite) getPeerFromEvent(events <-chan *p2p.PeerEvent, etype p2p.PeerEventType) (nodeID discover.NodeID) {
+	select {
+	case ev := <-events:
+		if ev.Type == etype {
+			return ev.Peer
+		}
+	case <-time.After(5 * time.Second):
+		s.Fail("timed out waiting for a peer")
+		return
+	}
+	return
+}
+
 func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailover() {
 	topic := discv5.Topic("cap=test")
 	// simulation should only rely on fast sync
 	config := map[discv5.Topic]params.Limits{
-		topic: {1, 1},
+		topic: {1, 1}, // limits a chosen for simplicity of the simulation
 	}
 	peerPool := NewPeerPool(config, 100*time.Millisecond, 100*time.Millisecond, nil, true)
 	register := NewRegister(topic)
@@ -84,40 +97,19 @@ func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailover() {
 	defer subscription.Unsubscribe()
 	s.NoError(peerPool.Start(s.peers[1]))
 	defer peerPool.Stop()
-	var connected discover.NodeID
-	select {
-	case ev := <-events:
-		if ev.Type == p2p.PeerEventTypeAdd {
-			connected = ev.Peer
-		}
-	case <-time.After(5 * time.Second):
-	}
+	connected := s.getPeerFromEvent(events, p2p.PeerEventTypeAdd)
 	s.Equal(s.peers[0].Self().ID, connected)
 	time.Sleep(100 * time.Millisecond)
 	s.Require().Nil(s.peers[1].DiscV5)
 	s.peers[0].Stop()
-	var disconnected discover.NodeID
-	select {
-	case ev := <-events:
-		if ev.Type == p2p.PeerEventTypeDrop {
-			disconnected = ev.Peer
-		}
-	case <-time.After(5 * time.Second):
-	}
+	disconnected := s.getPeerFromEvent(events, p2p.PeerEventTypeDrop)
 	s.Equal(connected, disconnected)
 	time.Sleep(100 * time.Millisecond)
 	s.Require().NotNil(s.peers[1].DiscV5)
 	register = NewRegister(topic)
 	s.Require().NoError(register.Start(s.peers[2]))
 	defer register.Stop()
-	var newConnected discover.NodeID
-	select {
-	case ev := <-events:
-		if ev.Type == p2p.PeerEventTypeAdd {
-			newConnected = ev.Peer
-		}
-	case <-time.After(10 * time.Second):
-	}
+	newConnected := s.getPeerFromEvent(events, p2p.PeerEventTypeAdd)
 	s.Equal(s.peers[2].Self().ID, newConnected)
 }
 
