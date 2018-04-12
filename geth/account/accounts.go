@@ -55,7 +55,7 @@ func (m *Manager) CreateAccount(password string) (address, pubKey, mnemonic stri
 	}
 
 	// generate extended master key (see BIP32)
-	extKey, err := extkeys.NewMaster(mn.MnemonicSeed(mnemonic, password))
+	extKey, err := extkeys.NewMaster(mn.MnemonicSeed(mnemonic, ""))
 	if err != nil {
 		return "", "", "", fmt.Errorf("can not create master extended key: %v", err)
 	}
@@ -131,7 +131,7 @@ func (m *Manager) CreateChildAccount(parentAddress, password string) (address, p
 func (m *Manager) RecoverAccount(password, mnemonic string) (address, pubKey string, err error) {
 	// re-create extended key (see BIP32)
 	mn := extkeys.NewMnemonic()
-	extKey, err := extkeys.NewMaster(mn.MnemonicSeed(mnemonic, password))
+	extKey, err := extkeys.NewMaster(mn.MnemonicSeed(mnemonic, ""))
 	if err != nil {
 		return "", "", ErrInvalidMasterKeyCreated
 	}
