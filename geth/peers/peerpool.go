@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
+	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 
 	"github.com/status-im/status-go/geth/params"
@@ -137,41 +138,14 @@ func (p *PeerPool) handleServerPeers(server *p2p.Server, events <-chan *p2p.Peer
 		case event := <-events:
 			switch event.Type {
 			case p2p.PeerEventTypeDrop:
-				any := false // if any peer is below min limit and search is not running
 				log.Debug("confirm peer dropped", "ID", event.Peer)
-				p.mu.Lock()
-				for _, t := range p.topics {
-					confirmed := t.ConfirmDropped(server, event.Peer)
-					if confirmed {
-						newPeer := t.AddPeerFromTable(server)
-						if newPeer != nil {
-							log.Debug("added peer from local table", "ID", newPeer.node.ID)
-						}
-					}
-					log.Debug("search", "topic", t.topic, "below min", t.BelowMin())
-					if t.BelowMin() && !t.SearchRunning() {
-						any = true
-					}
-				}
-				p.mu.Unlock()
-				if p.stopOnMax && any {
+				// if any peer is below min limit and search is not running
+				if p.stopOnMax && p.handleDroppedPeer(server, event.Peer) {
 					retryDiscv5 = time.After(0)
 				}
 			case p2p.PeerEventTypeAdd:
-				all := false // if all peers reached max limit
 				log.Debug("confirm peer added", "ID", event.Peer)
-				p.mu.Lock()
-				for _, t := range p.topics {
-					t.ConfirmAdded(server, event.Peer)
-					if p.stopOnMax && t.MaxReached() {
-						all = true
-						t.StopSearch()
-					} else {
-						all = false
-					}
-				}
-				p.mu.Unlock()
-				if p.stopOnMax && all {
+				if p.stopOnMax && p.handleAddedPeer(server, event.Peer) {
 					log.Debug("closing discv5 connection", "server", server.Self())
 					server.DiscV5.Close()
 					server.DiscV5 = nil
@@ -179,6 +153,43 @@ func (p *PeerPool) handleServerPeers(server *p2p.Server, events <-chan *p2p.Peer
 			}
 		}
 	}
+}
+
+// handleAddedPeer notifies all topics about added peer and return true if all topics has max limit of connections
+func (p *PeerPool) handleAddedPeer(server *p2p.Server, nodeID discover.NodeID) (all bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	all = true
+	for _, t := range p.topics {
+		t.ConfirmAdded(server, nodeID)
+		if p.stopOnMax && t.MaxReached() {
+			t.StopSearch()
+		} else {
+			all = false
+		}
+	}
+	return all
+}
+
+// handleDroppedPeer notifies every topics peer and return true if any peer have connections
+// below min limit
+func (p *PeerPool) handleDroppedPeer(server *p2p.Server, nodeID discover.NodeID) (any bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for _, t := range p.topics {
+		confirmed := t.ConfirmDropped(server, nodeID)
+		if confirmed {
+			newPeer := t.AddPeerFromTable(server)
+			if newPeer != nil {
+				log.Debug("added peer from local table", "ID", newPeer.ID)
+			}
+		}
+		log.Debug("search", "topic", t.topic, "below min", t.BelowMin())
+		if t.BelowMin() && !t.SearchRunning() {
+			any = true
+		}
+	}
+	return any
 }
 
 // Stop closes pool quit channel and all channels that are watched by search queries

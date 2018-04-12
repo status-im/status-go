@@ -134,14 +134,14 @@ func (t *TopicPool) ConfirmDropped(server *p2p.Server, nodeID discover.NodeID) (
 }
 
 // AddPeerFromTable checks if there is a valid peer in local table and adds it to a server.
-func (t *TopicPool) AddPeerFromTable(server *p2p.Server) *peerInfo {
+func (t *TopicPool) AddPeerFromTable(server *p2p.Server) *discv5.Node {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 	// TODO use a heap queue and always get a peer that was discovered recently
 	for _, peer := range t.peers {
 		if !peer.connected && mclock.Now() < peer.discoveredTime+mclock.AbsTime(expirationPeriod) {
 			t.addPeer(server, peer)
-			return peer
+			return peer.node
 		}
 	}
 	return nil

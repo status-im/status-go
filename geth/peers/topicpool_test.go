@@ -83,7 +83,7 @@ func (s *TopicPoolSuite) TestNewPeerSelectedOnDrop() {
 	s.False(s.topicPool.peers[peer3.ID].connected)
 
 	s.True(s.topicPool.ConfirmDropped(s.peer, discover.NodeID(peer1.ID)))
-	s.Equal(peer3.ID, s.topicPool.AddPeerFromTable(s.peer).node.ID)
+	s.Equal(peer3.ID, s.topicPool.AddPeerFromTable(s.peer).ID)
 }
 
 func (s *TopicPoolSuite) TestRequestedDoesntRemove() {
