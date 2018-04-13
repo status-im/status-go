@@ -12,7 +12,6 @@ import (
 
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
-	. "github.com/status-im/status-go/t/utils"
 )
 
 type TestServiceAPI struct{}
@@ -66,7 +65,6 @@ func TestNodeRPCClientCallOnlyPublicAPIs(t *testing.T) {
 	var err error
 
 	statusNode, err := createAndStartStatusNode(&params.NodeConfig{
-		NetworkID:  uint64(GetNetworkID()),
 		APIModules: "", // no whitelisted API modules; use only public APIs
 	})
 	require.NoError(t, err)
@@ -94,7 +92,6 @@ func TestNodeRPCClientCallWhitelistedPrivateService(t *testing.T) {
 	var err error
 
 	statusNode, err := createAndStartStatusNode(&params.NodeConfig{
-		NetworkID:  uint64(GetNetworkID()),
 		APIModules: "pri",
 	})
 	require.NoError(t, err)

@@ -27,14 +27,11 @@ import (
 	"github.com/status-im/status-go/shhext"
 )
 
-// node-related errors
+// Errors related to node and services creation.
 var (
-	ErrEthServiceRegistrationFailure     = errors.New("failed to register the Ethereum service")
+	ErrNodeMakeFailure                   = errors.New("error creating p2p node")
 	ErrWhisperServiceRegistrationFailure = errors.New("failed to register the Whisper service")
 	ErrLightEthRegistrationFailure       = errors.New("failed to register the LES service")
-	ErrNodeMakeFailure                   = errors.New("error creating p2p node")
-	ErrNodeRunFailure                    = errors.New("error running p2p node")
-	ErrNodeStartFailure                  = errors.New("error starting p2p node")
 )
 
 // All general log messages in this package should be routed through this logger.
@@ -76,8 +73,8 @@ func MakeNode(config *params.NodeConfig) (*node.Node, error) {
 
 	// start Ethereum service if we are not expected to use an upstream server
 	if !config.UpstreamConfig.Enabled {
-		if err := activateEthService(stack, config); err != nil {
-			return nil, fmt.Errorf("%v: %v", ErrEthServiceRegistrationFailure, err)
+		if err := activateLightEthService(stack, config); err != nil {
+			return nil, fmt.Errorf("%v: %v", ErrLightEthRegistrationFailure, err)
 		}
 	}
 
@@ -125,8 +122,8 @@ func defaultEmbeddedNodeConfig(config *params.NodeConfig) *node.Config {
 	return nc
 }
 
-// activateEthService configures and registers the eth.Ethereum service with a given node.
-func activateEthService(stack *node.Node, config *params.NodeConfig) error {
+// activateLightEthService configures and registers the eth.Ethereum service with a given node.
+func activateLightEthService(stack *node.Node, config *params.NodeConfig) error {
 	if config.LightEthConfig == nil || !config.LightEthConfig.Enabled {
 		logger.Info("LES protocol is disabled")
 		return nil
@@ -146,13 +143,9 @@ func activateEthService(stack *node.Node, config *params.NodeConfig) error {
 	ethConf.NetworkId = config.NetworkID
 	ethConf.DatabaseCache = config.LightEthConfig.DatabaseCache
 
-	if err := stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
+	return stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
 		return les.New(ctx, &ethConf)
-	}); err != nil {
-		return fmt.Errorf("%v: %v", ErrLightEthRegistrationFailure, err)
-	}
-
-	return nil
+	})
 }
 
 // activateShhService configures Whisper and adds it to the given node.

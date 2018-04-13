@@ -6,13 +6,11 @@ import (
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 
 	"github.com/status-im/status-go/geth/params"
-	. "github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/require"
 )
 
 func TestWhisperLightModeEnabledSetsEmptyBloomFilter(t *testing.T) {
 	config := params.NodeConfig{
-		NetworkID: uint64(GetNetworkID()),
 		WhisperConfig: &params.WhisperConfig{
 			Enabled:     true,
 			LightClient: true,
@@ -35,7 +33,6 @@ func TestWhisperLightModeEnabledSetsEmptyBloomFilter(t *testing.T) {
 
 func TestWhisperLightModeEnabledSetsNilBloomFilter(t *testing.T) {
 	config := params.NodeConfig{
-		NetworkID: uint64(GetNetworkID()),
 		WhisperConfig: &params.WhisperConfig{
 			Enabled:     true,
 			LightClient: false,

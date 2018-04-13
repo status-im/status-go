@@ -86,7 +86,6 @@ func (n *StatusNode) Start(config *params.NodeConfig, services ...node.ServiceCo
 	if err := n.createNode(config); err != nil {
 		return err
 	}
-
 	n.config = config
 
 	if err := n.start(services); err != nil {
@@ -221,7 +220,7 @@ func (n *StatusNode) isRunning() bool {
 
 // populateStaticPeers connects current node with our publicly available LES/SHH/Swarm cluster
 func (n *StatusNode) populateStaticPeers() error {
-	if !n.config.ClusterConfig.Enabled {
+	if n.config.ClusterConfig == nil || !n.config.ClusterConfig.Enabled {
 		n.log.Info("Static peers are disabled")
 		return nil
 	}
@@ -238,7 +237,7 @@ func (n *StatusNode) populateStaticPeers() error {
 }
 
 func (n *StatusNode) removeStaticPeers() error {
-	if !n.config.ClusterConfig.Enabled {
+	if n.config.ClusterConfig == nil || !n.config.ClusterConfig.Enabled {
 		n.log.Info("Static peers are disabled")
 		return nil
 	}
@@ -257,6 +256,10 @@ func (n *StatusNode) removeStaticPeers() error {
 func (n *StatusNode) ReconnectStaticPeers() error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
+
+	if !n.isRunning() {
+		return ErrNoRunningNode
+	}
 
 	if err := n.removeStaticPeers(); err != nil {
 		return err
@@ -388,7 +391,7 @@ func (n *StatusNode) RPCClient() *rpc.Client {
 func (n *StatusNode) EnsureSync(ctx context.Context) error {
 	// Don't wait for any blockchain sync for the
 	// local private chain as blocks are never mined.
-	if n.config.NetworkID == params.StatusChainNetworkID {
+	if n.config.NetworkID == 0 || n.config.NetworkID == params.StatusChainNetworkID {
 		return nil
 	}
 
