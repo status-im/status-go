@@ -52,24 +52,27 @@ func (s *testService) Stop() error {
 	return nil
 }
 
-func createStatusNode(config *params.NodeConfig) (*node.StatusNode, error) {
+func createAndStartStatusNode(config *params.NodeConfig) (*node.StatusNode, error) {
+	gethNode, err := gethnode.New(node.MakeGethNodeConfig(config))
+	if err != nil {
+		return nil, err
+	}
 	services := []gethnode.ServiceConstructor{
 		func(_ *gethnode.ServiceContext) (gethnode.Service, error) {
 			return &testService{}, nil
 		},
 	}
-	statusNode := node.New()
+	statusNode := node.NewWithGethNode(gethNode)
 	return statusNode, statusNode.Start(config, services...)
 }
 
 func TestNodeRPCClientCallOnlyPublicAPIs(t *testing.T) {
 	var err error
 
-	config, err := MakeTestNodeConfig(GetNetworkID())
-	require.NoError(t, err)
-	config.APIModules = "" // no whitelisted API modules; use only public APIs
-
-	statusNode, err := createStatusNode(config)
+	statusNode, err := createAndStartStatusNode(&params.NodeConfig{
+		NetworkID:  uint64(GetNetworkID()),
+		APIModules: "", // no whitelisted API modules; use only public APIs
+	})
 	require.NoError(t, err)
 	defer func() {
 		err := statusNode.Stop()
@@ -94,11 +97,10 @@ func TestNodeRPCClientCallOnlyPublicAPIs(t *testing.T) {
 func TestNodeRPCClientCallWhitelistedPrivateService(t *testing.T) {
 	var err error
 
-	config, err := MakeTestNodeConfig(GetNetworkID())
-	require.NoError(t, err)
-	config.APIModules = "pri"
-
-	statusNode, err := createStatusNode(config)
+	statusNode, err := createAndStartStatusNode(&params.NodeConfig{
+		NetworkID:  uint64(GetNetworkID()),
+		APIModules: "pri",
+	})
 	require.NoError(t, err)
 	defer func() {
 		err := statusNode.Stop()

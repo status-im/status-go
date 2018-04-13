@@ -44,12 +44,12 @@ var logger = log.New("package", "status-go/geth/node")
 func MakeNode(config *params.NodeConfig) (*node.Node, error) {
 	// make sure data directory exists
 	if err := os.MkdirAll(filepath.Join(config.DataDir), os.ModePerm); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("make node: make data directory: %v", err)
 	}
 
 	// make sure keys directory exists
 	if err := os.MkdirAll(filepath.Join(config.KeyStoreDir), os.ModePerm); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("make node: make keys directory: %v", err)
 	}
 
 	// configure required node (should you need to update node's config, e.g. add bootstrap nodes, see node.Config)
@@ -86,6 +86,11 @@ func MakeNode(config *params.NodeConfig) (*node.Node, error) {
 	return stack, nil
 }
 
+// MakeGethNodeConfig converts params.NodeConfig to node.Config.
+func MakeGethNodeConfig(config *params.NodeConfig) *node.Config {
+	return defaultEmbeddedNodeConfig(config)
+}
+
 // defaultEmbeddedNodeConfig returns default stack configuration for mobile client node
 func defaultEmbeddedNodeConfig(config *params.NodeConfig) *node.Config {
 	nc := &node.Config{
@@ -118,7 +123,7 @@ func defaultEmbeddedNodeConfig(config *params.NodeConfig) *node.Config {
 		nc.HTTPPort = config.HTTPPort
 	}
 
-	if config.ClusterConfig.Enabled {
+	if config.ClusterConfig != nil && config.ClusterConfig.Enabled {
 		nc.P2P.StaticNodes = parseNodes(config.ClusterConfig.StaticNodes)
 		nc.P2P.BootstrapNodesV5 = parseNodesV5(config.ClusterConfig.BootNodes)
 	}

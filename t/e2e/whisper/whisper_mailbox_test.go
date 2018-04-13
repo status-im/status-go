@@ -28,17 +28,18 @@ func TestWhisperMailboxTestSuite(t *testing.T) {
 }
 
 func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
+	var err error
 	// Start mailbox and status node.
 	mailboxBackend, stop := s.startMailboxBackend()
 	defer stop()
-	mailboxNode, err := mailboxBackend.StatusNode().GethNode()
-	s.Require().NoError(err)
+	s.Require().True(mailboxBackend.IsNodeRunning())
+	mailboxNode := mailboxBackend.StatusNode().GethNode()
 	mailboxEnode := mailboxNode.Server().NodeInfo().Enode
 
 	sender, stop := s.startBackend("sender")
 	defer stop()
-	node, err := sender.StatusNode().GethNode()
-	s.Require().NoError(err)
+	s.Require().True(sender.IsNodeRunning())
+	node := sender.StatusNode().GethNode()
 
 	s.Require().NotEqual(mailboxEnode, node.Server().NodeInfo().Enode)
 
@@ -138,9 +139,11 @@ func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
 	defer stop()
 
 	// Add mailbox to static peers.
-	mailboxNode, err := mailboxBackend.StatusNode().GethNode()
-	s.Require().NoError(err)
+	s.Require().True(mailboxBackend.IsNodeRunning())
+	mailboxNode := mailboxBackend.StatusNode().GethNode()
 	mailboxEnode := mailboxNode.Server().NodeInfo().Enode
+
+	var err error
 
 	err = aliceBackend.StatusNode().AddPeer(mailboxEnode)
 	s.Require().NoError(err)

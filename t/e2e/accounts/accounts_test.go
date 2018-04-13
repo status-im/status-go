@@ -219,8 +219,8 @@ func (s *AccountsTestSuite) TestSelectedAccountOnRestart() {
 	s.NoError(s.Backend.SelectAccount(address2, TestConfig.Account1.Password))
 
 	// stop node (and all of its sub-protocols)
-	nodeConfig, err := s.Backend.StatusNode().Config()
-	s.NoError(err)
+	nodeConfig := s.Backend.StatusNode().Config()
+	s.NotNil(nodeConfig)
 	preservedNodeConfig := *nodeConfig
 	s.NoError(s.Backend.StopNode())
 

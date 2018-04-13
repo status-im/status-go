@@ -40,11 +40,11 @@ func (s *WhisperExtentionSuite) SetupTest() {
 		s.nodes[i] = node.New()
 		s.Require().NoError(s.nodes[i].Start(cfg))
 	}
-	node1, err := s.nodes[0].GethNode()
-	s.NoError(err)
-	node2, err := s.nodes[1].GethNode()
-	s.NoError(err)
-	node1.Server().AddPeer(node2.Server().Self())
+	s.True(s.nodes[0].IsRunning())
+	s.True(s.nodes[1].IsRunning())
+	s.nodes[0].GethNode().Server().AddPeer(
+		s.nodes[1].GethNode().Server().Self(),
+	)
 }
 
 func (s *WhisperExtentionSuite) TestRecievedSignal() {
@@ -86,8 +86,8 @@ func (s *WhisperExtentionSuite) TestRecievedSignal() {
 
 func (s *WhisperExtentionSuite) TearDown() {
 	for _, n := range s.nodes {
-		cfg, err := n.Config()
-		s.NoError(err)
+		cfg := n.Config()
+		s.NotNil(cfg)
 		s.NoError(n.Stop())
 		s.NoError(os.Remove(cfg.DataDir))
 	}
