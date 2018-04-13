@@ -33,6 +33,10 @@ const (
 
 	// EventEnvelopeSent is triggered when envelope was sent atleast to a one peer.
 	EventEnvelopeSent = "envelope.sent"
+
+	// EventEnvelopeExpired is triggered when envelop was dropped by a whisper without being sent
+	// to any peer
+	EventEnvelopeExpired = "envelope.expired"
 )
 
 // Envelope is a general signal sent upward from node to RN app
