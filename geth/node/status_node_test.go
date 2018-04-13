@@ -125,7 +125,7 @@ func TestStatusNodeServiceGetters(t *testing.T) {
 	}
 }
 
-func TestStatusNodePeers(t *testing.T) {
+func TestStatusNodeAddPeer(t *testing.T) {
 	var err error
 
 	peer, err := gethnode.New(&gethnode.Config{
