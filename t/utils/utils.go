@@ -195,7 +195,7 @@ func GetAccount1PKFile() string {
 // GetAccount2PKFile returns the filename for Account2 keystore based
 // on the current network. This allows running the e2e tests on the
 // private network w/o access to the ACCOUNT_PASSWORD env variable
-func GetAccount2PKFilea() string {
+func GetAccount2PKFile() string {
 	if GetNetworkID() == params.StatusChainNetworkID {
 		return "test-account2-status-chain.pk"
 	}
