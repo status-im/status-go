@@ -158,9 +158,11 @@ func TestStatusNodeAddPeer(t *testing.T) {
 		require.NoError(t, n.Stop())
 	}()
 
+	errCh := waitForPeerAsync(n, peerURL, time.Second*5)
+
 	// checks after node is started
 	require.NoError(t, n.AddPeer(peerURL))
-	require.NoError(t, waitForPeer(n, peerURL, time.Second*5))
+	require.NoError(t, <-errCh)
 	require.Equal(t, 1, n.PeerCount())
 }
 
