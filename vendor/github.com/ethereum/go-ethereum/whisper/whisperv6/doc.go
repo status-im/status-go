@@ -104,6 +104,9 @@ const (
 	peerSource envelopeSource = iota
 	// p2pSource indicates that envelop was received from a trusted peer.
 	p2pSource
+
+	forwarded = true
+	inHouse = false
 )
 
 // EnvelopeMeta keeps metadata of received envelopes.

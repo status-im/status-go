@@ -120,11 +120,7 @@ func (c *Client) callMethod(ctx context.Context, result interface{}, handler Han
 		return nil
 	}
 
-	if err := setResultFromRPCResponse(result, response); err != nil {
-		return err
-	}
-
-	return nil
+	return setResultFromRPCResponse(result, response)
 }
 
 // handler is a concurrently safe method to get registered handler by name.

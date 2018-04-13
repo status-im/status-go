@@ -12,9 +12,11 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/status-im/status-go/cmd/statusd/debug"
+	"github.com/status-im/status-go/cmd/statusd/topics"
 	"github.com/status-im/status-go/geth/api"
-	"github.com/status-im/status-go/geth/common"
+	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/metrics"
 	nodemetrics "github.com/status-im/status-go/metrics/node"
@@ -72,6 +74,10 @@ var (
 	firebaseAuth = flag.String("shh.firebaseauth", "", "FCM Authorization Key used for sending Push Notifications")
 
 	syncAndExit = flag.Int("sync-and-exit", -1, "Timeout in minutes for blockchain sync and exit, zero means no timeout unless sync is finished")
+
+	// Topics that will be search and registered by discovery v5.
+	searchTopics   = topics.TopicLimitsFlag{}
+	registerTopics = topics.TopicFlag{}
 )
 
 // All general log messages in this package should be routed through this logger.
@@ -104,6 +110,9 @@ func enhanceLogger(logger *log.Logger, config *params.NodeConfig) error {
 }
 
 func main() {
+	flag.Var(&searchTopics, "topic.search", "Topic that will be searched in discovery v5, e.g (mailserver=1,1)")
+	flag.Var(&registerTopics, "topic.register", "Topic that will be registered using discovery v5.")
+
 	flag.Usage = printUsage
 	flag.Parse()
 
@@ -129,7 +138,7 @@ func main() {
 	}
 
 	// handle interrupt signals
-	interruptCh := haltOnInterruptSignal(backend.NodeManager())
+	interruptCh := haltOnInterruptSignal(backend.StatusNode())
 
 	// Check if debugging CLI connection shall be enabled.
 	if *cliEnabled {
@@ -147,15 +156,15 @@ func main() {
 
 	// Run stats server.
 	if *statsEnabled {
-		go startCollectingStats(interruptCh, backend.NodeManager())
+		go startCollectingStats(interruptCh, backend.StatusNode())
 	}
 
 	// Sync blockchain and stop.
 	if *syncAndExit >= 0 {
-		exitCode := syncAndStopNode(interruptCh, backend.NodeManager(), *syncAndExit)
+		exitCode := syncAndStopNode(interruptCh, backend.StatusNode(), *syncAndExit)
 		// Call was interrupted. Wait for graceful shutdown.
 		if exitCode == -1 {
-			if node, err := backend.NodeManager().Node(); err == nil && node != nil {
+			if node, err := backend.StatusNode().GethNode(); err == nil && node != nil {
 				node.Wait()
 			}
 			return
@@ -164,7 +173,7 @@ func main() {
 		os.Exit(exitCode)
 	}
 
-	node, err := backend.NodeManager().Node()
+	node, err := backend.StatusNode().GethNode()
 	if err != nil {
 		logger.Error("Getting node failed", "error", err)
 		return
@@ -182,11 +191,11 @@ func startDebug(backend *api.StatusBackend) error {
 }
 
 // startCollectingStats collects various stats about the node and other protocols like Whisper.
-func startCollectingStats(interruptCh <-chan struct{}, nodeManager common.NodeManager) {
+func startCollectingStats(interruptCh <-chan struct{}, statusNode *node.StatusNode) {
 
 	logger.Info("Starting stats", "stats", *statsAddr)
 
-	node, err := nodeManager.Node()
+	node, err := statusNode.GethNode()
 	if err != nil {
 		logger.Error("Failed to run metrics because could not get node", "error", err)
 		return
@@ -269,6 +278,8 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 	}
 
 	nodeConfig.Discovery = *discovery
+	nodeConfig.RequireTopics = map[discv5.Topic]params.Limits(searchTopics)
+	nodeConfig.RegisterTopics = []discv5.Topic(registerTopics)
 
 	// Even if standalone is true and discovery is disabled,
 	// it's possible to use bootnodes.
@@ -332,7 +343,7 @@ Options:
 // haltOnInterruptSignal catches interrupt signal (SIGINT) and
 // stops the node. It times out after 5 seconds
 // if the node can not be stopped.
-func haltOnInterruptSignal(nodeManager common.NodeManager) <-chan struct{} {
+func haltOnInterruptSignal(statusNode *node.StatusNode) <-chan struct{} {
 	interruptCh := make(chan struct{})
 	go func() {
 		signalCh := make(chan os.Signal, 1)
@@ -341,7 +352,7 @@ func haltOnInterruptSignal(nodeManager common.NodeManager) <-chan struct{} {
 		<-signalCh
 		close(interruptCh)
 		logger.Info("Got interrupt, shutting down...")
-		if err := nodeManager.StopNode(); err != nil {
+		if err := statusNode.Stop(); err != nil {
 			logger.Error("Failed to stop node", "error", err)
 			os.Exit(1)
 		}

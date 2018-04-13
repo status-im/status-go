@@ -7,7 +7,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"strings"
 
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -18,11 +17,14 @@ import (
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discover"
+	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/p2p/nat"
 	"github.com/ethereum/go-ethereum/whisper/mailserver"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
+	"github.com/status-im/status-go/geth/mailservice"
 	"github.com/status-im/status-go/geth/params"
 	shhmetrics "github.com/status-im/status-go/metrics/whisper"
+	"github.com/status-im/status-go/shhext"
 )
 
 // node-related errors
@@ -94,23 +96,21 @@ func defaultEmbeddedNodeConfig(config *params.NodeConfig) *node.Config {
 		Name:              config.Name,
 		Version:           config.Version,
 		P2P: p2p.Config{
-			NoDiscovery:      !config.Discovery,
-			DiscoveryV5:      config.Discovery,
-			BootstrapNodes:   nil,
-			BootstrapNodesV5: nil,
-			ListenAddr:       config.ListenAddr,
-			NAT:              nat.Any(),
-			MaxPeers:         config.MaxPeers,
-			MaxPendingPeers:  config.MaxPendingPeers,
+			NoDiscovery:     true,
+			DiscoveryV5:     config.Discovery,
+			ListenAddr:      config.ListenAddr,
+			NAT:             nat.Any(),
+			MaxPeers:        config.MaxPeers,
+			MaxPendingPeers: config.MaxPendingPeers,
 		},
 		IPCPath:          makeIPCPath(config),
 		HTTPCors:         []string{"*"},
-		HTTPModules:      strings.Split(config.APIModules, ","),
+		HTTPModules:      config.FormatAPIModules(),
 		HTTPVirtualHosts: []string{"localhost"},
 		WSHost:           makeWSHost(config),
 		WSPort:           config.WSPort,
 		WSOrigins:        []string{"*"},
-		WSModules:        strings.Split(config.APIModules, ","),
+		WSModules:        config.FormatAPIModules(),
 	}
 
 	if config.RPCEnabled {
@@ -119,10 +119,8 @@ func defaultEmbeddedNodeConfig(config *params.NodeConfig) *node.Config {
 	}
 
 	if config.ClusterConfig.Enabled {
-		// TODO(themue) Should static nodes always be set? Had been done via
-		// PopulateStaticPeers() before.
 		nc.P2P.StaticNodes = parseNodes(config.ClusterConfig.StaticNodes)
-		nc.P2P.BootstrapNodes = parseNodes(config.ClusterConfig.BootNodes)
+		nc.P2P.BootstrapNodesV5 = parseNodesV5(config.ClusterConfig.BootNodes)
 	}
 
 	return nc
@@ -159,28 +157,26 @@ func activateEthService(stack *node.Node, config *params.NodeConfig) error {
 }
 
 // activateShhService configures Whisper and adds it to the given node.
-func activateShhService(stack *node.Node, config *params.NodeConfig) error {
-
+func activateShhService(stack *node.Node, config *params.NodeConfig) (err error) {
 	if !config.WhisperConfig.Enabled {
 		logger.Info("SHH protocol is disabled")
 		return nil
 	}
 
-	serviceConstructor := func(*node.ServiceContext) (node.Service, error) {
+	err = stack.Register(func(*node.ServiceContext) (node.Service, error) {
 		whisperServiceConfig := &whisper.Config{
 			MaxMessageSize:     whisper.DefaultMaxMessageSize,
 			MinimumAcceptedPOW: 0.001,
 		}
 		whisperService := whisper.New(whisperServiceConfig)
 
-		whisperConfig := config.WhisperConfig
 		// enable metrics
 		whisperService.RegisterEnvelopeTracer(&shhmetrics.EnvelopeTracer{})
 
 		// enable mail service
-		if whisperConfig.EnableMailServer {
-			if whisperConfig.Password == "" {
-				if err := whisperConfig.ReadPasswordFile(); err != nil {
+		if config.WhisperConfig.EnableMailServer {
+			if config.WhisperConfig.Password == "" {
+				if err := config.WhisperConfig.ReadPasswordFile(); err != nil {
 					return nil, err
 				}
 			}
@@ -189,10 +185,15 @@ func activateShhService(stack *node.Node, config *params.NodeConfig) error {
 
 			var mailServer mailserver.WMailServer
 			whisperService.RegisterServer(&mailServer)
-			mailServer.Init(whisperService, whisperConfig.DataDir, whisperConfig.Password, whisperConfig.MinimumPoW)
+			mailServer.Init(
+				whisperService,
+				config.WhisperConfig.DataDir,
+				config.WhisperConfig.Password,
+				config.WhisperConfig.MinimumPoW,
+			)
 		}
 
-		if whisperConfig.LightClient {
+		if config.WhisperConfig.LightClient {
 			emptyBloomFilter := make([]byte, 64)
 			if err := whisperService.SetBloomFilter(emptyBloomFilter); err != nil {
 				return nil, err
@@ -200,9 +201,33 @@ func activateShhService(stack *node.Node, config *params.NodeConfig) error {
 		}
 
 		return whisperService, nil
+	})
+	if err != nil {
+		return
 	}
 
-	return stack.Register(serviceConstructor)
+	// TODO(dshulyak) add a config option to enable it by default, but disable if app is started from statusd
+	err = stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
+		var whisper *whisper.Whisper
+		if err := ctx.Service(&whisper); err != nil {
+			return nil, err
+		}
+
+		svc := shhext.New(whisper, shhext.SendEnvelopeSentSignal)
+		return svc, nil
+	})
+	if err != nil {
+		return
+	}
+
+	return stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
+		var whisper *whisper.Whisper
+		if err := ctx.Service(&whisper); err != nil {
+			return nil, err
+		}
+
+		return mailservice.New(whisper), nil
+	})
 }
 
 // makeIPCPath returns IPC-RPC filename
@@ -228,6 +253,15 @@ func parseNodes(enodes []string) []*discover.Node {
 	nodes := make([]*discover.Node, len(enodes))
 	for i, enode := range enodes {
 		nodes[i] = discover.MustParseNode(enode)
+	}
+	return nodes
+}
+
+// parseNodesV5 creates list of discv5.Node out of enode strings.
+func parseNodesV5(enodes []string) []*discv5.Node {
+	nodes := make([]*discv5.Node, len(enodes))
+	for i, enode := range enodes {
+		nodes[i] = discv5.MustParseNode(enode)
 	}
 	return nodes
 }

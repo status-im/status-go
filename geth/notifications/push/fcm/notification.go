@@ -16,7 +16,7 @@ type NotificationConstructor func() Notifier
 
 // Notification represents messaging provider for notifications.
 type Notification struct {
-	client firebaseClient
+	client FirebaseClient
 }
 
 // NewNotification Firebase Cloud Messaging client constructor.

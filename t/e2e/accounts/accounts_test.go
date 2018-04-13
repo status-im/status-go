@@ -84,7 +84,7 @@ func (s *AccountsTestSuite) TestCreateChildAccount() {
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
-	keyStore, err := s.Backend.NodeManager().AccountKeyStore()
+	keyStore, err := s.Backend.StatusNode().AccountKeyStore()
 	s.NoError(err)
 	s.NotNil(keyStore)
 
@@ -132,7 +132,7 @@ func (s *AccountsTestSuite) TestRecoverAccount() {
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
-	keyStore, err := s.Backend.NodeManager().AccountKeyStore()
+	keyStore, err := s.Backend.StatusNode().AccountKeyStore()
 	s.NoError(err)
 
 	// create an acc
@@ -170,22 +170,11 @@ func (s *AccountsTestSuite) TestRecoverAccount() {
 	s.NoError(err, "recover acc failed (for non-cached acc)")
 	s.False(address != addressCheck || pubKey != pubKeyCheck,
 		"incorrect acc details recovered (for non-cached acc)")
-
-	// time to login with recovered data
-	whisperService := s.WhisperService()
-
-	// make sure that identity is not (yet injected)
-	s.False(whisperService.HasKeyPair(pubKeyCheck), "identity already present in whisper")
-	s.NoError(s.Backend.SelectAccount(addressCheck, TestConfig.Account1.Password))
-	s.True(whisperService.HasKeyPair(pubKeyCheck), "identity not injected into whisper")
 }
 
 func (s *AccountsTestSuite) TestSelectAccount() {
 	s.StartTestBackend()
 	defer s.StopTestBackend()
-
-	// test to see if the account was injected in whisper
-	whisperService := s.WhisperService()
 
 	// create an account
 	address1, pubKey1, _, err := s.Backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
@@ -196,9 +185,6 @@ func (s *AccountsTestSuite) TestSelectAccount() {
 	s.NoError(err)
 	s.T().Logf("Account created: {address: %s, key: %s}", address2, pubKey2)
 
-	// make sure that identity is not (yet injected)
-	s.False(whisperService.HasKeyPair(pubKey1), "identity already present in whisper")
-
 	// try selecting with wrong password
 	err = s.Backend.SelectAccount(address1, "wrongPassword")
 	expectedErr := errors.New("cannot retrieve a valid key for a given account: could not decrypt key with given passphrase")
@@ -206,29 +192,19 @@ func (s *AccountsTestSuite) TestSelectAccount() {
 
 	err = s.Backend.SelectAccount(address1, TestConfig.Account1.Password)
 	s.NoError(err)
-	s.True(whisperService.HasKeyPair(pubKey1), "identity not injected into whisper")
 
 	// select another account, make sure that previous account is wiped out from Whisper cache
-	s.False(whisperService.HasKeyPair(pubKey2), "identity already present in whisper")
 	s.NoError(s.Backend.SelectAccount(address2, TestConfig.Account1.Password))
-	s.True(whisperService.HasKeyPair(pubKey2), "identity not injected into whisper")
-	s.False(whisperService.HasKeyPair(pubKey1), "identity should be removed, but it is still present in whisper")
 }
 
 func (s *AccountsTestSuite) TestSelectedAccountOnRestart() {
 	s.StartTestBackend()
 
-	// we need to make sure that selected account is injected as identity into Whisper
-	whisperService := s.WhisperService()
-
 	// create test accounts
-	address1, pubKey1, _, err := s.Backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
+	address1, _, _, err := s.Backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
 	s.NoError(err)
-	address2, pubKey2, _, err := s.Backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
+	address2, _, _, err := s.Backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
 	s.NoError(err)
-
-	// make sure that identity is not (yet injected)
-	s.False(whisperService.HasKeyPair(pubKey1), "identity already present in whisper")
 
 	// make sure that no account is selected by default
 	selectedAccount, err := s.Backend.AccountManager().SelectedAccount()
@@ -240,17 +216,10 @@ func (s *AccountsTestSuite) TestSelectedAccountOnRestart() {
 	expectedErr := errors.New("cannot retrieve a valid key for a given account: could not decrypt key with given passphrase")
 	s.EqualError(expectedErr, err.Error())
 
-	s.NoError(s.Backend.SelectAccount(address1, TestConfig.Account1.Password))
-	s.True(whisperService.HasKeyPair(pubKey1), "identity not injected into whisper")
-
-	// select another account, make sure that previous account is wiped out from Whisper cache
-	s.False(whisperService.HasKeyPair(pubKey2), "identity already present in whisper")
 	s.NoError(s.Backend.SelectAccount(address2, TestConfig.Account1.Password))
-	s.True(whisperService.HasKeyPair(pubKey2), "identity not injected into whisper")
-	s.False(whisperService.HasKeyPair(pubKey1), "identity should be removed, but it is still present in whisper")
 
 	// stop node (and all of its sub-protocols)
-	nodeConfig, err := s.Backend.NodeManager().NodeConfig()
+	nodeConfig, err := s.Backend.StatusNode().Config()
 	s.NoError(err)
 	preservedNodeConfig := *nodeConfig
 	s.NoError(s.Backend.StopNode())
@@ -270,25 +239,13 @@ func (s *AccountsTestSuite) TestSelectedAccountOnRestart() {
 	s.NotNil(selectedAccount)
 	s.Equal(selectedAccount.Address.Hex(), address2, "incorrect address selected")
 
-	// make sure that Whisper gets identity re-injected
-	whisperService = s.WhisperService()
-	s.True(whisperService.HasKeyPair(pubKey2), "identity not injected into whisper")
-	s.False(whisperService.HasKeyPair(pubKey1), "identity should not be present, but it is still present in whisper")
-
 	// now restart node using RestartNode() method, and make sure that account is still available
 	s.RestartTestNode()
 	defer s.StopTestBackend()
 
-	whisperService = s.WhisperService()
-	s.True(whisperService.HasKeyPair(pubKey2), "identity not injected into whisper")
-	s.False(whisperService.HasKeyPair(pubKey1), "identity should not be present, but it is still present in whisper")
-
 	// now logout, and make sure that on restart no account is selected (i.e. logout works properly)
 	s.NoError(s.Backend.AccountManager().Logout())
 	s.RestartTestNode()
-	whisperService = s.WhisperService()
-	s.False(whisperService.HasKeyPair(pubKey2), "identity not injected into whisper")
-	s.False(whisperService.HasKeyPair(pubKey1), "identity should not be present, but it is still present in whisper")
 
 	selectedAccount, err = s.Backend.AccountManager().SelectedAccount()
 	s.EqualError(account.ErrNoAccountSelected, err.Error())

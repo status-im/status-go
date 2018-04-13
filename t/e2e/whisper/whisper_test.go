@@ -2,13 +2,13 @@ package whisper
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"github.com/status-im/status-go/geth/account"
-	"github.com/status-im/status-go/geth/node"
-	"github.com/status-im/status-go/t/e2e"
+	e2e "github.com/status-im/status-go/t/e2e"
 	. "github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/suite"
 )
@@ -18,24 +18,19 @@ func TestWhisperTestSuite(t *testing.T) {
 }
 
 type WhisperTestSuite struct {
-	e2e.NodeManagerTestSuite
-}
-
-func (s *WhisperTestSuite) SetupTest() {
-	s.NodeManager = node.NewNodeManager()
-	s.NotNil(s.NodeManager)
+	e2e.BackendTestSuite
 }
 
 // TODO(adam): can anyone explain what this test is testing?
 // I don't see any race condition testing here.
 func (s *WhisperTestSuite) TestWhisperFilterRace() {
-	s.StartTestNode()
-	defer s.StopTestNode()
+	s.StartTestBackend()
+	defer s.StopTestBackend()
 
-	whisperService, err := s.NodeManager.WhisperService()
+	whisperService, err := s.Backend.StatusNode().WhisperService()
 	s.NoError(err)
 
-	accountManager := account.NewManager(s.NodeManager)
+	accountManager := account.NewManager(s.Backend.StatusNode())
 	s.NotNil(accountManager)
 
 	whisperAPI := whisper.NewPublicWhisperAPI(whisperService)
@@ -91,4 +86,122 @@ func (s *WhisperTestSuite) TestWhisperFilterRace() {
 	}
 
 	<-allFiltersAdded
+}
+
+func (s *WhisperTestSuite) TestSelectAccount() {
+	s.StartTestBackend()
+	defer s.StopTestBackend()
+
+	whisperService, err := s.Backend.StatusNode().WhisperService()
+	s.NoError(err)
+
+	// create an acc
+	address, pubKey, _, err := s.Backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
+	s.NoError(err)
+
+	// make sure that identity is not (yet injected)
+	s.False(whisperService.HasKeyPair(pubKey), "identity already present in whisper")
+
+	// try selecting with wrong password
+	err = s.Backend.SelectAccount(address, "wrongPassword")
+	s.NotNil(err)
+
+	// select another account, make sure that previous account is wiped out from Whisper cache
+	s.False(whisperService.HasKeyPair(pubKey), "identity already present in whisper")
+	s.NoError(s.Backend.SelectAccount(address, TestConfig.Account1.Password))
+	s.True(whisperService.HasKeyPair(pubKey), "identity not injected into whisper")
+}
+
+func (s *WhisperTestSuite) TestLogout() {
+	s.StartTestBackend()
+	defer s.StopTestBackend()
+
+	whisperService, err := s.Backend.StatusNode().WhisperService()
+	s.NoError(err)
+
+	// create an account
+	address, pubKey, _, err := s.Backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
+	s.NoError(err)
+
+	// make sure that identity doesn't exist (yet) in Whisper
+	s.False(whisperService.HasKeyPair(pubKey), "identity already present in whisper")
+	s.NoError(s.Backend.SelectAccount(address, TestConfig.Account1.Password))
+	s.True(whisperService.HasKeyPair(pubKey), "identity not injected into whisper")
+
+	s.NoError(s.Backend.Logout())
+	s.False(whisperService.HasKeyPair(pubKey), "identity not cleared from whisper")
+}
+
+func (s *WhisperTestSuite) TestSelectedAccountOnRestart() {
+	s.StartTestBackend()
+
+	// we need to make sure that selected account is injected as identity into Whisper
+	whisperService := s.WhisperService()
+
+	// create test accounts
+	address1, pubKey1, _, err := s.Backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
+	s.NoError(err)
+	address2, pubKey2, _, err := s.Backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
+	s.NoError(err)
+
+	// make sure that identity is not (yet injected)
+	s.False(whisperService.HasKeyPair(pubKey1), "identity already present in whisper")
+
+	// make sure that no account is selected by default
+	selectedAccount, err := s.Backend.AccountManager().SelectedAccount()
+	s.EqualError(account.ErrNoAccountSelected, err.Error(), "account selected, but should not be")
+	s.Nil(selectedAccount)
+
+	// select account
+	err = s.Backend.SelectAccount(address1, "wrongPassword")
+	expectedErr := errors.New("cannot retrieve a valid key for a given account: could not decrypt key with given passphrase")
+	s.EqualError(expectedErr, err.Error())
+
+	s.NoError(s.Backend.SelectAccount(address1, TestConfig.Account1.Password))
+	s.True(whisperService.HasKeyPair(pubKey1), "identity not injected into whisper")
+
+	// select another account, make sure that previous account is wiped out from Whisper cache
+	s.False(whisperService.HasKeyPair(pubKey2), "identity already present in whisper")
+	s.NoError(s.Backend.SelectAccount(address2, TestConfig.Account1.Password))
+	s.True(whisperService.HasKeyPair(pubKey2), "identity not injected into whisper")
+	s.False(whisperService.HasKeyPair(pubKey1), "identity should be removed, but it is still present in whisper")
+
+	// stop node (and all of its sub-protocols)
+	nodeConfig, err := s.Backend.StatusNode().Config()
+	s.NoError(err)
+	preservedNodeConfig := *nodeConfig
+	s.NoError(s.Backend.StopNode())
+
+	// resume node
+	s.NoError(s.Backend.StartNode(&preservedNodeConfig))
+
+	// re-check selected account (account2 MUST be selected)
+	selectedAccount, err = s.Backend.AccountManager().SelectedAccount()
+	s.NoError(err)
+	s.NotNil(selectedAccount)
+	s.Equal(selectedAccount.Address.Hex(), address2, "incorrect address selected")
+
+	// make sure that Whisper gets identity re-injected
+	whisperService = s.WhisperService()
+	s.True(whisperService.HasKeyPair(pubKey2), "identity not injected into whisper")
+	s.False(whisperService.HasKeyPair(pubKey1), "identity should not be present, but it is still present in whisper")
+
+	// now restart node using RestartNode() method, and make sure that account is still available
+	s.RestartTestNode()
+	defer s.StopTestBackend()
+
+	whisperService = s.WhisperService()
+	s.True(whisperService.HasKeyPair(pubKey2), "identity not injected into whisper")
+	s.False(whisperService.HasKeyPair(pubKey1), "identity should not be present, but it is still present in whisper")
+
+	// now logout, and make sure that on restart no account is selected (i.e. logout works properly)
+	s.NoError(s.Backend.AccountManager().Logout())
+	s.RestartTestNode()
+	whisperService = s.WhisperService()
+	s.False(whisperService.HasKeyPair(pubKey2), "identity not injected into whisper")
+	s.False(whisperService.HasKeyPair(pubKey1), "identity should not be present, but it is still present in whisper")
+
+	selectedAccount, err = s.Backend.AccountManager().SelectedAccount()
+	s.EqualError(account.ErrNoAccountSelected, err.Error())
+	s.Nil(selectedAccount)
 }

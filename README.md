@@ -7,6 +7,7 @@
 
 - [How To Build](https://wiki.status.im/Building_status-go)
 - [Notes on Bindings](https://wiki.status.im/Status-go_Binding_notes)
+- [How To Contribute](CONTRIBUTING.md)
 
 # Intro
 

@@ -2,10 +2,13 @@ package utils
 
 import (
 	"bytes"
+	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -15,8 +18,8 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/static"
 
 	_ "github.com/stretchr/testify/suite" // required to register testify flags
 )
@@ -31,7 +34,7 @@ var (
 	ErrTimeout = errors.New("timeout")
 
 	// TestConfig defines the default config usable at package-level.
-	TestConfig *common.TestConfig
+	TestConfig *testConfig
 
 	// RootDir is the main application directory
 	RootDir string
@@ -49,6 +52,8 @@ var (
 
 	// All general log messages in this package should be routed through this logger.
 	logger = log.New("package", "status-go/t/utils")
+
+	syncTimeout = 50 * time.Minute
 )
 
 func init() {
@@ -63,7 +68,7 @@ func init() {
 	const pathSeparator = string(os.PathSeparator)
 	RootDir = filepath.Dir(pwd)
 	pathDirs := strings.Split(RootDir, pathSeparator)
-	for i := range pathDirs {
+	for i := len(pathDirs) - 1; i >= 0; i-- {
 		if pathDirs[i] == "status-go" {
 			RootDir = filepath.Join(pathDirs[:i+1]...)
 			RootDir = filepath.Join(pathSeparator, RootDir)
@@ -74,7 +79,7 @@ func init() {
 	// setup auxiliary directories
 	TestDataDir = filepath.Join(RootDir, ".ethereumtest")
 
-	TestConfig, err = common.LoadTestConfig(GetNetworkID())
+	TestConfig, err = loadTestConfig()
 	if err != nil {
 		panic(err)
 	}
@@ -95,58 +100,17 @@ func LoadFromFile(filename string) string {
 	return buf.String()
 }
 
+// EnsureSync waits until blockchain synchronization is complete and returns.
+type EnsureSync func(context.Context) error
+
 // EnsureNodeSync waits until node synchronzation is done to continue
 // with tests afterwards. Panics in case of an error or a timeout.
-func EnsureNodeSync(nodeManager common.NodeManager) {
-	nc, err := nodeManager.NodeConfig()
-	if err != nil {
-		panic("can't retrieve NodeConfig")
-	}
-	// Don't wait for any blockchain sync for the local private chain as blocks are never mined.
-	if nc.NetworkID == params.StatusChainNetworkID {
-		return
-	}
+func EnsureNodeSync(ensureSync EnsureSync) {
+	ctx, cancel := context.WithTimeout(context.Background(), syncTimeout)
+	defer cancel()
 
-	les, err := nodeManager.LightEthereumService()
-	if err != nil {
+	if err := ensureSync(ctx); err != nil {
 		panic(err)
-	}
-	if les == nil {
-		panic("LightEthereumService is nil")
-	}
-
-	// todo(@jeka): we should extract it into config
-	timeout := time.NewTimer(50 * time.Minute)
-	defer timeout.Stop()
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-timeout.C:
-			panic("timeout during node synchronization")
-		case <-ticker.C:
-			downloader := les.Downloader()
-			if downloader == nil {
-				continue
-			}
-			if nodeManager.PeerCount() == 0 {
-				logger.Debug("No establishished connections with a peers, continue waiting for a sync")
-				continue
-			}
-			if downloader.Synchronising() {
-				logger.Debug("synchronization is in progress")
-				continue
-			}
-			progress := downloader.Progress()
-			if progress.CurrentBlock >= progress.HighestBlock {
-				return
-			}
-			logger.Debug(
-				fmt.Sprintf("synchronization is not finished yet: current block %d < highest block %d",
-					progress.CurrentBlock, progress.HighestBlock),
-			)
-
-		}
 	}
 }
 
@@ -266,4 +230,67 @@ func MakeTestNodeConfig(networkID int) (*params.NodeConfig, error) {
 		return nil, err
 	}
 	return nodeConfig, nil
+}
+
+type account struct {
+	Address  string
+	Password string
+}
+
+// testConfig contains shared (among different test packages) parameters
+type testConfig struct {
+	Node struct {
+		SyncSeconds time.Duration
+		HTTPPort    int
+		WSPort      int
+	}
+	Account1 account
+	Account2 account
+	Account3 account
+}
+
+const passphraseEnvName = "ACCOUNT_PASSWORD"
+
+// loadTestConfig loads test configuration values from disk
+func loadTestConfig() (*testConfig, error) {
+	var config testConfig
+
+	configData := static.MustAsset("config/test-data.json")
+	if err := json.Unmarshal(configData, &config); err != nil {
+		return nil, err
+	}
+
+	if GetNetworkID() == params.StatusChainNetworkID {
+		accountsData := static.MustAsset("config/status-chain-accounts.json")
+		if err := json.Unmarshal(accountsData, &config); err != nil {
+			return nil, err
+		}
+	} else {
+		accountsData := static.MustAsset("config/public-chain-accounts.json")
+		if err := json.Unmarshal(accountsData, &config); err != nil {
+			return nil, err
+		}
+
+		pass := os.Getenv(passphraseEnvName)
+		config.Account1.Password = pass
+		config.Account2.Password = pass
+	}
+
+	return &config, nil
+}
+
+// ImportTestAccount imports keystore from static resources, see "static/keys" folder
+func ImportTestAccount(keystoreDir, accountFile string) error {
+	// make sure that keystore folder exists
+	if _, err := os.Stat(keystoreDir); os.IsNotExist(err) {
+		os.MkdirAll(keystoreDir, os.ModePerm) // nolint: errcheck, gas
+	}
+
+	dst := filepath.Join(keystoreDir, accountFile)
+	err := ioutil.WriteFile(dst, static.MustAsset("keys/"+accountFile), 0644)
+	if err != nil {
+		logger.Warn("cannot copy test account PK", "error", err)
+	}
+
+	return err
 }

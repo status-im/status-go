@@ -23,7 +23,12 @@
 
 [[constraint]]
   name = "github.com/ethereum/go-ethereum"
-  branch = "release/1.8"
+  version = "1.8.1"
+
+[[constraint]]
+  # used only to embed web3js code with particular version
+  name = "github.com/status-im/go-web3js"
+  version = "0.20.1"
 
 [[constraint]]
   name = "github.com/prometheus/client_golang"

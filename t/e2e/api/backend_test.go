@@ -9,7 +9,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/geth/account"
-	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
@@ -27,7 +26,7 @@ type APIBackendTestSuite struct {
 }
 
 // FIXME(tiabc): There's also a test with the same name in geth/node/manager_test.go
-// so this test should only check StatusBackend logic with a mocked version of the underlying NodeManager.
+// so this test should only check StatusBackend logic with a mocked version of the underlying StatusNode.
 func (s *APIBackendTestSuite) TestRaceConditions() {
 	require := s.Require()
 	require.NotNil(s.Backend)
@@ -70,11 +69,11 @@ func (s *APIBackendTestSuite) TestRaceConditions() {
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
-			log.Info("NodeManager()")
-			instance := s.Backend.NodeManager()
+			log.Info("StatusNode()")
+			instance := s.Backend.StatusNode()
 			s.NotNil(instance)
-			s.IsType(&node.NodeManager{}, instance)
-			s.T().Logf("NodeManager(), result: %v", instance)
+			s.IsType(&node.StatusNode{}, instance)
+			s.T().Logf("StatusNode(), result: %v", instance)
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
@@ -148,13 +147,13 @@ func (s *APIBackendTestSuite) TestRaceConditions() {
 		},
 		func(config *params.NodeConfig) {
 			log.Info("CompleteTransactions()")
-			ids := []common.QueuedTxID{"id1", "id2"}
+			ids := []string{"id1", "id2"}
 			s.T().Logf("CompleteTransactions(), result: %v", s.Backend.CompleteTransactions(ids, "password"))
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
 			log.Info("DiscardTransactions()")
-			ids := []common.QueuedTxID{"id1", "id2"}
+			ids := []string{"id1", "id2"}
 			s.T().Logf("DiscardTransactions(), result: %v", s.Backend.DiscardTransactions(ids))
 			progress <- struct{}{}
 		},
@@ -189,7 +188,7 @@ func (s *APIBackendTestSuite) TestRaceConditions() {
 }
 
 // FIXME(tiabc): There's also a test with the same name in geth/node/manager_test.go
-// so this test should only check StatusBackend logic with a mocked version of the underlying NodeManager.
+// so this test should only check StatusBackend logic with a mocked version of the underlying StatusNode.
 func (s *APIBackendTestSuite) TestNetworkSwitching() {
 	// Get test node configuration.
 	nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
@@ -199,7 +198,7 @@ func (s *APIBackendTestSuite) TestNetworkSwitching() {
 	s.NoError(s.Backend.StartNode(nodeConfig))
 	s.True(s.Backend.IsNodeRunning())
 
-	firstHash, err := e2e.FirstBlockHash(s.Backend.NodeManager())
+	firstHash, err := e2e.FirstBlockHash(s.Backend.StatusNode())
 	s.NoError(err)
 	s.Equal(GetHeadHash(), firstHash)
 
@@ -215,7 +214,7 @@ func (s *APIBackendTestSuite) TestNetworkSwitching() {
 	s.True(s.Backend.IsNodeRunning())
 
 	// make sure we are on another network indeed
-	firstHash, err = e2e.FirstBlockHash(s.Backend.NodeManager())
+	firstHash, err = e2e.FirstBlockHash(s.Backend.StatusNode())
 	s.NoError(err)
 	s.Equal(GetHeadHash(), firstHash)
 
@@ -235,20 +234,20 @@ func (s *APIBackendTestSuite) TestResetChainData() {
 	s.StartTestBackend(e2e.WithDataDir(path))
 	defer s.StopTestBackend()
 
-	EnsureNodeSync(s.Backend.NodeManager())
+	EnsureNodeSync(s.Backend.StatusNode().EnsureSync)
 
 	require.NoError(s.Backend.ResetChainData())
 
 	s.True(s.Backend.IsNodeRunning()) // new node, with previous config should be running
 
 	// make sure we can read the first byte, and it is valid (for Rinkeby)
-	firstHash, err := e2e.FirstBlockHash(s.Backend.NodeManager())
+	firstHash, err := e2e.FirstBlockHash(s.Backend.StatusNode())
 	s.NoError(err)
 	s.Equal(GetHeadHash(), firstHash)
 }
 
 // FIXME(tiabc): There's also a test with the same name in geth/node/manager_test.go
-// so this test should only check StatusBackend logic with a mocked version of the underlying NodeManager.
+// so this test should only check StatusBackend logic with a mocked version of the underlying StatusNode.
 func (s *APIBackendTestSuite) TestRestartNode() {
 	require := s.Require()
 	require.NotNil(s.Backend)
@@ -261,7 +260,7 @@ func (s *APIBackendTestSuite) TestRestartNode() {
 	s.NoError(s.Backend.StartNode(nodeConfig))
 	s.True(s.Backend.IsNodeRunning())
 
-	firstHash, err := e2e.FirstBlockHash(s.Backend.NodeManager())
+	firstHash, err := e2e.FirstBlockHash(s.Backend.StatusNode())
 	s.NoError(err)
 	s.Equal(GetHeadHash(), firstHash)
 
@@ -270,7 +269,7 @@ func (s *APIBackendTestSuite) TestRestartNode() {
 	s.True(s.Backend.IsNodeRunning()) // new node, with previous config should be running
 
 	// make sure we can read the first byte, and it is valid (for Rinkeby)
-	firstHash, err = e2e.FirstBlockHash(s.Backend.NodeManager())
+	firstHash, err = e2e.FirstBlockHash(s.Backend.StatusNode())
 	s.NoError(err)
 	s.Equal(GetHeadHash(), firstHash)
 }

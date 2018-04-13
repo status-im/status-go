@@ -17,11 +17,11 @@ func TestMailServiceSuite(t *testing.T) {
 }
 
 type MailServiceSuite struct {
-	e2e.NodeManagerTestSuite
+	e2e.StatusNodeTestSuite
 }
 
 func (s *MailServiceSuite) SetupTest() {
-	s.NodeManager = node.NewNodeManager()
+	s.StatusNode = node.New()
 }
 
 // TestShhRequestMessagesRPCMethodAvailability tests if `shh_requestMessages` is available
@@ -34,7 +34,7 @@ func (s *MailServiceSuite) TestShhRequestMessagesRPCMethodAvailability() {
 	})
 	defer s.StopTestNode()
 
-	client := s.NodeManager.RPCClient()
+	client := s.StatusNode.RPCClient()
 	r.NotNil(client)
 
 	// This error means that the method is available through inproc communication

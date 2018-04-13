@@ -8,7 +8,6 @@ import (
 
 	"github.com/NaySoftware/go-fcm"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/profiling"
 	"gopkg.in/go-playground/validator.v9"
@@ -55,22 +54,22 @@ func StopNode() *C.char {
 //ValidateNodeConfig validates config for status node
 //export ValidateNodeConfig
 func ValidateNodeConfig(configJSON *C.char) *C.char {
-	var resp common.APIDetailedResponse
+	var resp APIDetailedResponse
 
 	_, err := params.LoadNodeConfig(C.GoString(configJSON))
 
-	// Convert errors to common.APIDetailedResponse
+	// Convert errors to APIDetailedResponse
 	switch err := err.(type) {
 	case validator.ValidationErrors:
-		resp = common.APIDetailedResponse{
+		resp = APIDetailedResponse{
 			Message:     "validation: validation failed",
-			FieldErrors: make([]common.APIFieldError, len(err)),
+			FieldErrors: make([]APIFieldError, len(err)),
 		}
 
 		for i, ve := range err {
-			resp.FieldErrors[i] = common.APIFieldError{
+			resp.FieldErrors[i] = APIFieldError{
 				Parameter: ve.Namespace(),
-				Errors: []common.APIError{
+				Errors: []APIError{
 					{
 						Message: fmt.Sprintf("field validation failed on the '%s' tag", ve.Tag()),
 					},
@@ -78,11 +77,11 @@ func ValidateNodeConfig(configJSON *C.char) *C.char {
 			}
 		}
 	case error:
-		resp = common.APIDetailedResponse{
+		resp = APIDetailedResponse{
 			Message: fmt.Sprintf("validation: %s", err.Error()),
 		}
 	case nil:
-		resp = common.APIDetailedResponse{
+		resp = APIDetailedResponse{
 			Status: true,
 		}
 	}
@@ -121,7 +120,7 @@ func CreateAccount(password *C.char) *C.char {
 		errString = err.Error()
 	}
 
-	out := common.AccountInfo{
+	out := AccountInfo{
 		Address:  address,
 		PubKey:   pubKey,
 		Mnemonic: mnemonic,
@@ -142,7 +141,7 @@ func CreateChildAccount(parentAddress, password *C.char) *C.char {
 		errString = err.Error()
 	}
 
-	out := common.AccountInfo{
+	out := AccountInfo{
 		Address: address,
 		PubKey:  pubKey,
 		Error:   errString,
@@ -162,7 +161,7 @@ func RecoverAccount(password, mnemonic *C.char) *C.char {
 		errString = err.Error()
 	}
 
-	out := common.AccountInfo{
+	out := AccountInfo{
 		Address:  address,
 		PubKey:   pubKey,
 		Mnemonic: C.GoString(mnemonic),
@@ -197,7 +196,7 @@ func Logout() *C.char {
 //CompleteTransaction instructs backend to complete sending of a given transaction
 //export CompleteTransaction
 func CompleteTransaction(id, password *C.char) *C.char {
-	txHash, err := statusAPI.CompleteTransaction(common.QueuedTxID(C.GoString(id)), C.GoString(password))
+	txHash, err := statusAPI.CompleteTransaction(C.GoString(id), C.GoString(password))
 
 	errString := ""
 	if err != nil {
@@ -205,7 +204,7 @@ func CompleteTransaction(id, password *C.char) *C.char {
 		errString = err.Error()
 	}
 
-	out := common.CompleteTransactionResult{
+	out := CompleteTransactionResult{
 		ID:    C.GoString(id),
 		Hash:  txHash.Hex(),
 		Error: errString,
@@ -222,30 +221,30 @@ func CompleteTransaction(id, password *C.char) *C.char {
 //CompleteTransactions instructs backend to complete sending of multiple transactions
 //export CompleteTransactions
 func CompleteTransactions(ids, password *C.char) *C.char {
-	out := common.CompleteTransactionsResult{}
-	out.Results = make(map[string]common.CompleteTransactionResult)
+	out := CompleteTransactionsResult{}
+	out.Results = make(map[string]CompleteTransactionResult)
 
-	parsedIDs, err := common.ParseJSONArray(C.GoString(ids))
+	parsedIDs, err := ParseJSONArray(C.GoString(ids))
 	if err != nil {
-		out.Results["none"] = common.CompleteTransactionResult{
+		out.Results["none"] = CompleteTransactionResult{
 			Error: err.Error(),
 		}
 	} else {
-		txIDs := make([]common.QueuedTxID, len(parsedIDs))
+		txIDs := make([]string, len(parsedIDs))
 		for i, id := range parsedIDs {
-			txIDs[i] = common.QueuedTxID(id)
+			txIDs[i] = id
 		}
 
 		results := statusAPI.CompleteTransactions(txIDs, C.GoString(password))
 		for txID, result := range results {
-			txResult := common.CompleteTransactionResult{
-				ID:   string(txID),
+			txResult := CompleteTransactionResult{
+				ID:   txID,
 				Hash: result.Hash.Hex(),
 			}
 			if result.Error != nil {
 				txResult.Error = result.Error.Error()
 			}
-			out.Results[string(txID)] = txResult
+			out.Results[txID] = txResult
 		}
 	}
 
@@ -261,7 +260,7 @@ func CompleteTransactions(ids, password *C.char) *C.char {
 //DiscardTransaction discards a given transaction from transaction queue
 //export DiscardTransaction
 func DiscardTransaction(id *C.char) *C.char {
-	err := statusAPI.DiscardTransaction(common.QueuedTxID(C.GoString(id)))
+	err := statusAPI.DiscardTransaction(C.GoString(id))
 
 	errString := ""
 	if err != nil {
@@ -269,7 +268,7 @@ func DiscardTransaction(id *C.char) *C.char {
 		errString = err.Error()
 	}
 
-	out := common.DiscardTransactionResult{
+	out := DiscardTransactionResult{
 		ID:    C.GoString(id),
 		Error: errString,
 	}
@@ -285,29 +284,26 @@ func DiscardTransaction(id *C.char) *C.char {
 //DiscardTransactions discards given multiple transactions from transaction queue
 //export DiscardTransactions
 func DiscardTransactions(ids *C.char) *C.char {
-	out := common.DiscardTransactionsResult{}
-	out.Results = make(map[string]common.DiscardTransactionResult)
+	out := DiscardTransactionsResult{}
+	out.Results = make(map[string]DiscardTransactionResult)
 
-	parsedIDs, err := common.ParseJSONArray(C.GoString(ids))
+	parsedIDs, err := ParseJSONArray(C.GoString(ids))
 	if err != nil {
-		out.Results["none"] = common.DiscardTransactionResult{
+		out.Results["none"] = DiscardTransactionResult{
 			Error: err.Error(),
 		}
 	} else {
-		txIDs := make([]common.QueuedTxID, len(parsedIDs))
+		txIDs := make([]string, len(parsedIDs))
 		for i, id := range parsedIDs {
-			txIDs[i] = common.QueuedTxID(id)
+			txIDs[i] = id
 		}
 
 		results := statusAPI.DiscardTransactions(txIDs)
-		for txID, result := range results {
-			txResult := common.DiscardTransactionResult{
-				ID: string(txID),
+		for txID, err := range results {
+			out.Results[txID] = DiscardTransactionResult{
+				ID:    txID,
+				Error: err.Error(),
 			}
-			if result.Error != nil {
-				txResult.Error = result.Error.Error()
-			}
-			out.Results[string(txID)] = txResult
 		}
 	}
 
@@ -383,7 +379,7 @@ func makeJSONResponse(err error) *C.char {
 		errString = err.Error()
 	}
 
-	out := common.APIResponse{
+	out := APIResponse{
 		Error: errString,
 	}
 	outBytes, _ := json.Marshal(out)
@@ -409,7 +405,7 @@ func NotifyUsers(message, payloadJSON, tokensArray *C.char) (outCBytes *C.char) 
 	errString := ""
 
 	defer func() {
-		out := common.NotifyResult{
+		out := NotifyResult{
 			Status: err == nil,
 			Error:  errString,
 		}
@@ -424,7 +420,7 @@ func NotifyUsers(message, payloadJSON, tokensArray *C.char) (outCBytes *C.char) 
 		outCBytes = C.CString(string(outBytes))
 	}()
 
-	tokens, err := common.ParseJSONArray(C.GoString(tokensArray))
+	tokens, err := ParseJSONArray(C.GoString(tokensArray))
 	if err != nil {
 		errString = err.Error()
 		return
@@ -449,7 +445,7 @@ func NotifyUsers(message, payloadJSON, tokensArray *C.char) (outCBytes *C.char) 
 // AddPeer adds an enode as a peer.
 //export AddPeer
 func AddPeer(enode *C.char) *C.char {
-	err := statusAPI.NodeManager().AddPeer(C.GoString(enode))
+	err := statusAPI.StatusNode().AddPeer(C.GoString(enode))
 	return makeJSONResponse(err)
 }
 

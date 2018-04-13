@@ -8,10 +8,11 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/geth/account"
-	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/jail"
+	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/transactions"
+	"github.com/status-im/status-go/sign"
 )
 
 // StatusAPI provides API to access Status related functionality.
@@ -34,9 +35,9 @@ func NewStatusAPIWithBackend(b *StatusBackend) *StatusAPI {
 	}
 }
 
-// NodeManager returns reference to node manager
-func (api *StatusAPI) NodeManager() common.NodeManager {
-	return api.b.NodeManager()
+// StatusNode returns reference to StatusNode.
+func (api *StatusAPI) StatusNode() *node.StatusNode {
+	return api.b.StatusNode()
 }
 
 // AccountManager returns reference to account manager
@@ -49,9 +50,14 @@ func (api *StatusAPI) JailManager() jail.Manager {
 	return api.b.JailManager()
 }
 
-// TxQueueManager returns reference to account manager
-func (api *StatusAPI) TxQueueManager() *transactions.Manager {
-	return api.b.TxQueueManager()
+// Transactor returns reference to a status transactor
+func (api *StatusAPI) Transactor() *transactions.Transactor {
+	return api.b.Transactor()
+}
+
+// PendingSignRequests returns reference to a list of current sign requests
+func (api *StatusAPI) PendingSignRequests() *sign.PendingRequests {
+	return api.b.PendingSignRequests()
 }
 
 // StartNode start Status node, fails if node is already started
@@ -146,28 +152,28 @@ func (api *StatusAPI) Logout() error {
 }
 
 // SendTransaction creates a new transaction and waits until it's complete.
-func (api *StatusAPI) SendTransaction(ctx context.Context, args common.SendTxArgs) (gethcommon.Hash, error) {
+func (api *StatusAPI) SendTransaction(ctx context.Context, args transactions.SendTxArgs) (gethcommon.Hash, error) {
 	return api.b.SendTransaction(ctx, args)
 }
 
 // CompleteTransaction instructs backend to complete sending of a given transaction
-func (api *StatusAPI) CompleteTransaction(id common.QueuedTxID, password string) (gethcommon.Hash, error) {
-	return api.b.txQueueManager.CompleteTransaction(id, password)
+func (api *StatusAPI) CompleteTransaction(id string, password string) (gethcommon.Hash, error) {
+	return api.b.CompleteTransaction(id, password)
 }
 
 // CompleteTransactions instructs backend to complete sending of multiple transactions
-func (api *StatusAPI) CompleteTransactions(ids []common.QueuedTxID, password string) map[common.QueuedTxID]common.TransactionResult {
-	return api.b.txQueueManager.CompleteTransactions(ids, password)
+func (api *StatusAPI) CompleteTransactions(ids []string, password string) map[string]sign.Result {
+	return api.b.CompleteTransactions(ids, password)
 }
 
 // DiscardTransaction discards a given transaction from transaction queue
-func (api *StatusAPI) DiscardTransaction(id common.QueuedTxID) error {
-	return api.b.txQueueManager.DiscardTransaction(id)
+func (api *StatusAPI) DiscardTransaction(id string) error {
+	return api.b.DiscardTransaction(id)
 }
 
 // DiscardTransactions discards given multiple transactions from transaction queue
-func (api *StatusAPI) DiscardTransactions(ids []common.QueuedTxID) map[common.QueuedTxID]common.RawDiscardTransactionResult {
-	return api.b.txQueueManager.DiscardTransactions(ids)
+func (api *StatusAPI) DiscardTransactions(ids []string) map[string]error {
+	return api.b.DiscardTransactions(ids)
 }
 
 // JailParse creates a new jail cell context, with the given chatID as identifier.

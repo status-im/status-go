@@ -7,6 +7,9 @@ const (
 	// DataDir is default data directory used by statusd executable
 	DataDir = "statusd-data"
 
+	// StatusDatabase path relative to DataDir.
+	StatusDatabase = "status-db"
+
 	// KeyStoreDir is default directory where private keys are stored, relative to DataDir
 	KeyStoreDir = "keystore"
 
@@ -27,13 +30,19 @@ const (
 	ListenAddr = ":0"
 
 	// APIModules is a list of modules to expose via any type of RPC (HTTP, IPC, in-proc)
-	APIModules = "db,eth,net,web3,shh,personal,admin,debug"
+	APIModules = "eth,net,web3,shh,shhext"
 
 	// WSHost is a host interface for the websocket RPC server
 	WSHost = "localhost"
 
 	// SendTransactionMethodName defines the name for a giving transaction.
 	SendTransactionMethodName = "eth_sendTransaction"
+
+	// AccountsMethodName defines the name for listing the currently signed accounts.
+	AccountsMethodName = "eth_accounts"
+
+	// PersonalSignMethodName defines the name for `personal.sign` API.
+	PersonalSignMethodName = "personal_sign"
 
 	// WSPort is a WS-RPC port (replaced in unit tests)
 	WSPort = 8546

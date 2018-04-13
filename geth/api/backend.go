@@ -10,13 +10,13 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/status-im/status-go/geth/account"
-	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/notifications/push/fcm"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/signal"
 	"github.com/status-im/status-go/geth/transactions"
+	"github.com/status-im/status-go/sign"
 )
 
 const (
@@ -33,39 +33,42 @@ var (
 
 // StatusBackend implements Status.im service
 type StatusBackend struct {
-	mu              sync.Mutex
-	nodeManager     *node.NodeManager
-	accountManager  *account.Manager
-	txQueueManager  *transactions.Manager
-	jailManager     jail.Manager
-	newNotification fcm.NotificationConstructor
-	connectionState ConnectionState
-	log             log.Logger
+	mu                  sync.Mutex
+	statusNode          *node.StatusNode
+	pendingSignRequests *sign.PendingRequests
+	accountManager      *account.Manager
+	transactor          *transactions.Transactor
+	jailManager         jail.Manager
+	newNotification     fcm.NotificationConstructor
+	connectionState     ConnectionState
+	log                 log.Logger
 }
 
 // NewStatusBackend create a new NewStatusBackend instance
 func NewStatusBackend() *StatusBackend {
 	defer log.Info("Status backend initialized")
 
-	nodeManager := node.NewNodeManager()
-	accountManager := account.NewManager(nodeManager)
-	txQueueManager := transactions.NewManager(nodeManager, accountManager)
-	jailManager := jail.New(nodeManager)
+	statusNode := node.New()
+	pendingSignRequests := sign.NewPendingRequests()
+	accountManager := account.NewManager(statusNode)
+	transactor := transactions.NewTransactor(pendingSignRequests)
+	jailManager := jail.New(statusNode)
 	notificationManager := fcm.NewNotification(fcmServerKey)
 
 	return &StatusBackend{
-		nodeManager:     nodeManager,
-		accountManager:  accountManager,
-		jailManager:     jailManager,
-		txQueueManager:  txQueueManager,
-		newNotification: notificationManager,
-		log:             log.New("package", "status-go/geth/api.StatusBackend"),
+		pendingSignRequests: pendingSignRequests,
+		statusNode:          statusNode,
+		accountManager:      accountManager,
+		jailManager:         jailManager,
+		transactor:          transactor,
+		newNotification:     notificationManager,
+		log:                 log.New("package", "status-go/geth/api.StatusBackend"),
 	}
 }
 
-// NodeManager returns reference to node manager
-func (b *StatusBackend) NodeManager() *node.NodeManager {
-	return b.nodeManager
+// StatusNode returns reference to node manager
+func (b *StatusBackend) StatusNode() *node.StatusNode {
+	return b.statusNode
 }
 
 // AccountManager returns reference to account manager
@@ -78,14 +81,19 @@ func (b *StatusBackend) JailManager() jail.Manager {
 	return b.jailManager
 }
 
-// TxQueueManager returns reference to transactions manager
-func (b *StatusBackend) TxQueueManager() *transactions.Manager {
-	return b.txQueueManager
+// Transactor returns reference to a status transactor
+func (b *StatusBackend) Transactor() *transactions.Transactor {
+	return b.transactor
+}
+
+// PendingSignRequests returns reference to a list of current sign requests
+func (b *StatusBackend) PendingSignRequests() *sign.PendingRequests {
+	return b.pendingSignRequests
 }
 
 // IsNodeRunning confirm that node is running
 func (b *StatusBackend) IsNodeRunning() bool {
-	return b.nodeManager.IsNodeRunning()
+	return b.statusNode.IsRunning()
 }
 
 // StartNode start Status node, fails if node is already started
@@ -101,7 +109,8 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 			err = fmt.Errorf("node crashed on start: %v", err)
 		}
 	}()
-	err = b.nodeManager.StartNode(config)
+
+	err = b.statusNode.Start(config)
 	if err != nil {
 		switch err.(type) {
 		case node.RPCClientError:
@@ -118,9 +127,9 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 		return err
 	}
 	signal.Send(signal.Envelope{Type: signal.EventNodeStarted})
-	// tx queue manager should be started after node is started, it depends
-	// on rpc client being created
-	b.txQueueManager.Start()
+
+	b.transactor.SetNetworkID(config.NetworkID)
+	b.transactor.SetRPCClient(b.statusNode.RPCClient())
 	if err := b.registerHandlers(); err != nil {
 		b.log.Error("Handler registration failed", "err", err)
 	}
@@ -143,10 +152,9 @@ func (b *StatusBackend) stopNode() error {
 	if !b.IsNodeRunning() {
 		return node.ErrNoRunningNode
 	}
-	b.txQueueManager.Stop()
 	b.jailManager.Stop()
 	defer signal.Send(signal.Envelope{Type: signal.EventNodeStopped})
-	return b.nodeManager.StopNode()
+	return b.statusNode.Stop()
 }
 
 // RestartNode restart running Status node, fails if node is not running
@@ -154,7 +162,7 @@ func (b *StatusBackend) RestartNode() error {
 	if !b.IsNodeRunning() {
 		return node.ErrNoRunningNode
 	}
-	config, err := b.nodeManager.NodeConfig()
+	config, err := b.statusNode.Config()
 	if err != nil {
 		return err
 	}
@@ -170,7 +178,7 @@ func (b *StatusBackend) RestartNode() error {
 func (b *StatusBackend) ResetChainData() error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	config, err := b.nodeManager.NodeConfig()
+	config, err := b.statusNode.Config()
 	if err != nil {
 		return err
 	}
@@ -179,7 +187,7 @@ func (b *StatusBackend) ResetChainData() error {
 		return err
 	}
 	// config is cleaned when node is stopped
-	if err := b.nodeManager.ResetChainData(&newcfg); err != nil {
+	if err := b.statusNode.ResetChainData(&newcfg); err != nil {
 		return err
 	}
 	signal.Send(signal.Envelope{Type: signal.EventChainDataRemoved})
@@ -188,58 +196,98 @@ func (b *StatusBackend) ResetChainData() error {
 
 // CallRPC executes RPC request on node's in-proc RPC server
 func (b *StatusBackend) CallRPC(inputJSON string) string {
-	client := b.nodeManager.RPCClient()
+	client := b.statusNode.RPCClient()
 	return client.CallRaw(inputJSON)
 }
 
 // SendTransaction creates a new transaction and waits until it's complete.
-func (b *StatusBackend) SendTransaction(ctx context.Context, args common.SendTxArgs) (hash gethcommon.Hash, err error) {
-	if ctx == nil {
-		ctx = context.Background()
+func (b *StatusBackend) SendTransaction(ctx context.Context, args transactions.SendTxArgs) (hash gethcommon.Hash, err error) {
+	return b.transactor.SendTransaction(ctx, args)
+}
+
+func (b *StatusBackend) getVerifiedAccount(password string) (*account.SelectedExtKey, error) {
+	selectedAccount, err := b.accountManager.SelectedAccount()
+	if err != nil {
+		b.log.Error("failed to get a selected account", "err", err)
+		return nil, err
 	}
-	tx := common.CreateTransaction(ctx, args)
-	if err = b.txQueueManager.QueueTransaction(tx); err != nil {
-		return hash, err
+	config, err := b.StatusNode().Config()
+	if err != nil {
+		return nil, err
 	}
-	rst := b.txQueueManager.WaitForTransaction(tx)
-	if rst.Error != nil {
-		return hash, rst.Error
+	_, err = b.accountManager.VerifyAccountPassword(config.KeyStoreDir, selectedAccount.Address.String(), password)
+	if err != nil {
+		b.log.Error("failed to verify account", "account", selectedAccount.Address.String(), "error", err)
+		return nil, err
 	}
-	return rst.Hash, nil
+	return selectedAccount, nil
 }
 
 // CompleteTransaction instructs backend to complete sending of a given transaction
-func (b *StatusBackend) CompleteTransaction(id common.QueuedTxID, password string) (gethcommon.Hash, error) {
-	return b.txQueueManager.CompleteTransaction(id, password)
+func (b *StatusBackend) CompleteTransaction(id string, password string) (hash gethcommon.Hash, err error) {
+	return b.pendingSignRequests.Approve(id, password, b.getVerifiedAccount)
 }
 
 // CompleteTransactions instructs backend to complete sending of multiple transactions
-func (b *StatusBackend) CompleteTransactions(ids []common.QueuedTxID, password string) map[common.QueuedTxID]common.TransactionResult {
-	return b.txQueueManager.CompleteTransactions(ids, password)
+func (b *StatusBackend) CompleteTransactions(ids []string, password string) map[string]sign.Result {
+	results := make(map[string]sign.Result)
+	for _, txID := range ids {
+		txHash, txErr := b.CompleteTransaction(txID, password)
+		results[txID] = sign.Result{
+			Hash:  txHash,
+			Error: txErr,
+		}
+	}
+	return results
 }
 
 // DiscardTransaction discards a given transaction from transaction queue
-func (b *StatusBackend) DiscardTransaction(id common.QueuedTxID) error {
-	return b.txQueueManager.DiscardTransaction(id)
+func (b *StatusBackend) DiscardTransaction(id string) error {
+	return b.pendingSignRequests.Discard(id)
 }
 
 // DiscardTransactions discards given multiple transactions from transaction queue
-func (b *StatusBackend) DiscardTransactions(ids []common.QueuedTxID) map[common.QueuedTxID]common.RawDiscardTransactionResult {
-	return b.txQueueManager.DiscardTransactions(ids)
+func (b *StatusBackend) DiscardTransactions(ids []string) map[string]error {
+	results := make(map[string]error)
+	for _, txID := range ids {
+		err := b.DiscardTransaction(txID)
+		if err != nil {
+			results[txID] = err
+		}
+	}
+
+	return results
 }
 
 // registerHandlers attaches Status callback handlers to running node
 func (b *StatusBackend) registerHandlers() error {
-	rpcClient := b.NodeManager().RPCClient()
+	rpcClient := b.StatusNode().RPCClient()
 	if rpcClient == nil {
 		return node.ErrRPCClient
 	}
-	rpcClient.RegisterHandler("eth_accounts", func(context.Context, ...interface{}) (interface{}, error) {
+
+	rpcClient.RegisterHandler(params.AccountsMethodName, func(context.Context, ...interface{}) (interface{}, error) {
 		return b.AccountManager().Accounts()
 	})
-	rpcClient.RegisterHandler("eth_sendTransaction", b.txQueueManager.SendTransactionRPCHandler)
+
+	rpcClient.RegisterHandler(params.SendTransactionMethodName, func(ctx context.Context, rpcParams ...interface{}) (interface{}, error) {
+		txArgs, err := transactions.RPCCalltoSendTxArgs(rpcParams...)
+		if err != nil {
+			return nil, err
+		}
+
+		hash, err := b.SendTransaction(ctx, txArgs)
+		if err != nil {
+			return nil, err
+		}
+
+		return hash.Hex(), err
+	})
+
 	return nil
 }
+
+//
 
 // ConnectionChange handles network state changes logic.
 func (b *StatusBackend) ConnectionChange(state ConnectionState) {
@@ -260,7 +308,7 @@ func (b *StatusBackend) AppStateChange(state AppState) {
 
 // Logout clears whisper identities.
 func (b *StatusBackend) Logout() error {
-	whisperService, err := b.nodeManager.WhisperService()
+	whisperService, err := b.statusNode.WhisperService()
 	if err != nil {
 		return err
 	}
@@ -278,7 +326,7 @@ func (b *StatusBackend) ReSelectAccount() error {
 	if selectedAccount == nil || err == account.ErrNoAccountSelected {
 		return nil
 	}
-	whisperService, err := b.nodeManager.WhisperService()
+	whisperService, err := b.statusNode.WhisperService()
 	if err != nil {
 		return err
 	}
@@ -302,7 +350,7 @@ func (b *StatusBackend) SelectAccount(address, password string) error {
 		return err
 	}
 
-	whisperService, err := b.nodeManager.WhisperService()
+	whisperService, err := b.statusNode.WhisperService()
 	if err != nil {
 		return err
 	}

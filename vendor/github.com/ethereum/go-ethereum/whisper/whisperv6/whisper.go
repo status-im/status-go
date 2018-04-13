@@ -28,6 +28,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -85,8 +86,10 @@ type Whisper struct {
 	statsMu sync.Mutex // guard stats
 	stats   Statistics // Statistics of whisper node
 
-	mailServer         MailServer // MailServer interface
-	envelopeTracer     EnvelopeTracer // Service collecting envelopes metadata
+	mailServer     MailServer     // MailServer interface
+	envelopeTracer EnvelopeTracer // Service collecting envelopes metadata
+
+	envelopeFeed event.Feed
 }
 
 // New creates a Whisper client ready to communicate through the Ethereum P2P network.
@@ -129,6 +132,12 @@ func New(cfg *Config) *Whisper {
 	}
 
 	return whisper
+}
+
+// SubscribeEnvelopeEvents subscribes to envelopes feed.
+// In order to prevent blocking whisper producers events must be amply buffered.
+func (whisper *Whisper) SubscribeEnvelopeEvents(events chan<- EnvelopeEvent) event.Subscription {
+	return whisper.envelopeFeed.Subscribe(events)
 }
 
 // MinPow returns the PoW value required by this node.
@@ -658,7 +667,7 @@ func (whisper *Whisper) Unsubscribe(id string) error {
 // Send injects a message into the whisper send queue, to be distributed in the
 // network in the coming cycles.
 func (whisper *Whisper) Send(envelope *Envelope) error {
-	ok, err := whisper.add(envelope)
+	ok, err := whisper.add(envelope, inHouse)
 	if err != nil {
 		return err
 	}
@@ -745,7 +754,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 			trouble := false
 			for _, env := range envelopes {
 				whisper.traceEnvelope(env, !whisper.isEnvelopeCached(env.Hash()), peerSource, p)
-				cached, err := whisper.add(env)
+				cached, err := whisper.add(env, forwarded)
 				if err != nil {
 					trouble = true
 					log.Error("bad envelope received, peer will be disconnected", "peer", p.peer.ID(), "err", err)
@@ -819,7 +828,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 // add inserts a new envelope into the message pool to be distributed within the
 // whisper network. It also inserts the envelope into the expiration pool at the
 // appropriate time-stamp. In case of error, connection should be dropped.
-func (whisper *Whisper) add(envelope *Envelope) (bool, error) {
+func (whisper *Whisper) add(envelope *Envelope, isForwarded bool) (bool, error) {
 	now := uint32(time.Now().Unix())
 	sent := envelope.Expiry - envelope.TTL
 
@@ -852,7 +861,7 @@ func (whisper *Whisper) add(envelope *Envelope) (bool, error) {
 		}
 	}
 
-	if !bloomFilterMatch(whisper.BloomFilter(), envelope.Bloom()) {
+	if isForwarded && !bloomFilterMatch(whisper.BloomFilter(), envelope.Bloom()) {
 		// maybe the value was recently changed, and the peers did not adjust yet.
 		// in this case the previous value is retrieved by BloomFilterTolerance()
 		// for a short period of peer synchronization.
@@ -986,6 +995,10 @@ func (whisper *Whisper) expire() {
 			hashSet.Each(func(v interface{}) bool {
 				sz := whisper.envelopes[v.(common.Hash)].size()
 				delete(whisper.envelopes, v.(common.Hash))
+				whisper.envelopeFeed.Send(EnvelopeEvent{
+					Hash:  v.(common.Hash),
+					Event: EventEnvelopeExpired,
+				})
 				whisper.stats.messagesCleared++
 				whisper.stats.memoryCleared += sz
 				whisper.stats.memoryUsed -= sz

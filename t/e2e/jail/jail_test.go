@@ -31,13 +31,13 @@ func TestJailTestSuite(t *testing.T) {
 }
 
 type JailTestSuite struct {
-	e2e.NodeManagerTestSuite
+	e2e.StatusNodeTestSuite
 	Jail jail.Manager
 }
 
 func (s *JailTestSuite) SetupTest() {
-	s.NodeManager = node.NewNodeManager()
-	s.Jail = jail.New(s.NodeManager)
+	s.StatusNode = node.New()
+	s.Jail = jail.New(s.StatusNode)
 }
 
 func (s *JailTestSuite) TearDownTest() {

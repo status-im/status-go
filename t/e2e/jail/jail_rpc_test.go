@@ -10,12 +10,11 @@ import (
 	"time"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/status-im/status-go/geth/common"
 	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/signal"
-	"github.com/status-im/status-go/geth/transactions"
-	"github.com/status-im/status-go/t/e2e"
+	"github.com/status-im/status-go/sign"
+	e2e "github.com/status-im/status-go/t/e2e"
 	. "github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/suite"
 )
@@ -40,7 +39,7 @@ func (s *JailRPCTestSuite) TestJailRPCSend() {
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
-	EnsureNodeSync(s.Backend.NodeManager())
+	EnsureNodeSync(s.Backend.StatusNode().EnsureSync)
 
 	// load Status JS and add test command to it
 	s.jail.SetBaseJS(baseStatusJSCode)
@@ -98,7 +97,7 @@ func (s *JailRPCTestSuite) TestRegressionGetTransactionReceipt() {
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
-	rpcClient := s.Backend.NodeManager().RPCClient()
+	rpcClient := s.Backend.StatusNode().RPCClient()
 	s.NotNil(rpcClient)
 
 	// note: transaction hash is assumed to be invalid
@@ -111,7 +110,7 @@ func (s *JailRPCTestSuite) TestContractDeployment() {
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
-	EnsureNodeSync(s.Backend.NodeManager())
+	EnsureNodeSync(s.Backend.StatusNode().EnsureSync)
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
 	s.jail.CreateAndInitCell(testChatID)
@@ -127,7 +126,7 @@ func (s *JailRPCTestSuite) TestContractDeployment() {
 		unmarshalErr := json.Unmarshal([]byte(jsonEvent), &envelope)
 		s.NoError(unmarshalErr, "cannot unmarshal JSON: %s", jsonEvent)
 
-		if envelope.Type == transactions.EventTransactionQueued {
+		if envelope.Type == sign.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
 			s.T().Logf("transaction queued and will be completed shortly, id: %v", event["id"])
 
@@ -135,7 +134,7 @@ func (s *JailRPCTestSuite) TestContractDeployment() {
 
 			txID := event["id"].(string)
 			var txErr error
-			txHash, txErr = s.Backend.CompleteTransaction(common.QueuedTxID(txID), TestConfig.Account1.Password)
+			txHash, txErr = s.Backend.CompleteTransaction(txID, TestConfig.Account1.Password)
 			if s.NoError(txErr, event["id"]) {
 				s.T().Logf("contract transaction complete, URL: %s", "https://ropsten.etherscan.io/tx/"+txHash.Hex())
 			}
@@ -194,7 +193,7 @@ func (s *JailRPCTestSuite) TestJailVMPersistence() {
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
-	EnsureNodeSync(s.Backend.NodeManager())
+	EnsureNodeSync(s.Backend.StatusNode().EnsureSync)
 
 	// log into account from which transactions will be sent
 	err := s.Backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
@@ -285,13 +284,13 @@ func (s *JailRPCTestSuite) TestJailVMPersistence() {
 			s.T().Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
 		}
-		if envelope.Type == transactions.EventTransactionQueued {
+		if envelope.Type == sign.EventTransactionQueued {
 			event := envelope.Event.(map[string]interface{})
 			s.T().Logf("Transaction queued (will be completed shortly): {id: %s}\n", event["id"].(string))
 
 			//var txHash common.Hash
 			txID := event["id"].(string)
-			txHash, e := s.Backend.CompleteTransaction(common.QueuedTxID(txID), TestConfig.Account1.Password)
+			txHash, e := s.Backend.CompleteTransaction(txID, TestConfig.Account1.Password)
 			s.NoError(e, "cannot complete queued transaction[%v]: %v", event["id"], e)
 
 			s.T().Logf("Transaction complete: https://ropsten.etherscan.io/tx/%s", txHash.Hex())

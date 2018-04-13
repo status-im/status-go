@@ -3,22 +3,21 @@ package e2e
 import (
 	"github.com/ethereum/go-ethereum/log"
 
-	"github.com/ethereum/go-ethereum/les"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
-	"github.com/status-im/status-go/geth/api"
-	"github.com/status-im/status-go/geth/common"
 
+	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/signal"
 	"github.com/status-im/status-go/geth/transactions"
+	"github.com/status-im/status-go/sign"
 	. "github.com/status-im/status-go/t/utils" //nolint: golint
 	"github.com/stretchr/testify/suite"
 )
 
-// NodeManagerTestSuite defines a test suit with NodeManager.
-type NodeManagerTestSuite struct {
+// StatusNodeTestSuite defines a test suite with StatusNode.
+type StatusNodeTestSuite struct {
 	suite.Suite
-	NodeManager *node.NodeManager
+	StatusNode *node.StatusNode
 }
 
 // All general log messages in this package should be routed through this logger.
@@ -38,9 +37,9 @@ func init() {
 	}
 }
 
-// StartTestNode initiazes a NodeManager instances with configuration retrieved
+// StartTestNode initiazes a StatusNode instances with configuration retrieved
 // from the test config.
-func (s *NodeManagerTestSuite) StartTestNode(opts ...TestNodeOption) {
+func (s *StatusNodeTestSuite) StartTestNode(opts ...TestNodeOption) {
 	nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
 
@@ -52,17 +51,17 @@ func (s *NodeManagerTestSuite) StartTestNode(opts ...TestNodeOption) {
 	// import account keys
 	s.NoError(importTestAccounts(nodeConfig.KeyStoreDir))
 
-	s.False(s.NodeManager.IsNodeRunning())
-	s.NoError(s.NodeManager.StartNode(nodeConfig))
-	s.True(s.NodeManager.IsNodeRunning())
+	s.False(s.StatusNode.IsRunning())
+	s.NoError(s.StatusNode.Start(nodeConfig))
+	s.True(s.StatusNode.IsRunning())
 }
 
-// StopTestNode attempts to stop initialized NodeManager.
-func (s *NodeManagerTestSuite) StopTestNode() {
-	s.NotNil(s.NodeManager)
-	s.True(s.NodeManager.IsNodeRunning())
-	s.NoError(s.NodeManager.StopNode())
-	s.False(s.NodeManager.IsNodeRunning())
+// StopTestNode attempts to stop initialized StatusNode.
+func (s *StatusNodeTestSuite) StopTestNode() {
+	s.NotNil(s.StatusNode)
+	s.True(s.StatusNode.IsRunning())
+	s.NoError(s.StatusNode.Stop())
+	s.False(s.StatusNode.IsRunning())
 }
 
 // BackendTestSuite is a test suite with api.StatusBackend initialized
@@ -118,34 +117,30 @@ func (s *BackendTestSuite) RestartTestNode() {
 
 // WhisperService returns a reference to the Whisper service.
 func (s *BackendTestSuite) WhisperService() *whisper.Whisper {
-	whisperService, err := s.Backend.NodeManager().WhisperService()
+	whisperService, err := s.Backend.StatusNode().WhisperService()
 	s.NoError(err)
 	s.NotNil(whisperService)
 
 	return whisperService
 }
 
-// LightEthereumService returns a reference to the LES service.
-func (s *BackendTestSuite) LightEthereumService() *les.LightEthereum {
-	lightEthereum, err := s.Backend.NodeManager().LightEthereumService()
-	s.NoError(err)
-	s.NotNil(lightEthereum)
-
-	return lightEthereum
+// Transactor returns a reference to the Transactor.
+func (s *BackendTestSuite) Transactor() *transactions.Transactor {
+	return s.Backend.Transactor()
 }
 
-// TxQueueManager returns a reference to the TxQueueManager.
-func (s *BackendTestSuite) TxQueueManager() *transactions.Manager {
-	return s.Backend.TxQueueManager()
+// PendingSignRequests returns a reference to PendingSignRequests.
+func (s *BackendTestSuite) PendingSignRequests() *sign.PendingRequests {
+	return s.Backend.PendingSignRequests()
 }
 
 func importTestAccounts(keyStoreDir string) (err error) {
 	logger.Debug("Import accounts to", "dir", keyStoreDir)
 
-	err = common.ImportTestAccount(keyStoreDir, GetAccount1PKFile())
+	err = ImportTestAccount(keyStoreDir, GetAccount1PKFile())
 	if err != nil {
 		return
 	}
 
-	return common.ImportTestAccount(keyStoreDir, GetAccount2PKFile())
+	return ImportTestAccount(keyStoreDir, GetAccount2PKFile())
 }
