@@ -20,7 +20,7 @@ import (
 )
 
 func TestJailRPCTestSuite(t *testing.T) {
-	utils.SecureMainnetTests()
+	SecureMainnetTests()
 	suite.Run(t, new(JailRPCTestSuite))
 }
 

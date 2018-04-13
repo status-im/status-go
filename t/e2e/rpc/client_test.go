@@ -15,7 +15,7 @@ type RPCClientTestSuite struct {
 }
 
 func TestRPCClientTestSuite(t *testing.T) {
-	utils.SecureMainnetTests()
+	SecureMainnetTests()
 	suite.Run(t, new(RPCClientTestSuite))
 }
 

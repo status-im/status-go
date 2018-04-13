@@ -26,7 +26,7 @@ import (
 type initFunc func([]byte, *transactions.SendTxArgs)
 
 func TestTransactionsTestSuite(t *testing.T) {
-	utils.SecureMainnetTests()
+	SecureMainnetTests()
 	suite.Run(t, new(TransactionsTestSuite))
 }
 

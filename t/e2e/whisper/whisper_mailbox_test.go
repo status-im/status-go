@@ -24,7 +24,7 @@ type WhisperMailboxSuite struct {
 }
 
 func TestWhisperMailboxTestSuite(t *testing.T) {
-	utils.SecureMainnetTests()
+	SecureMainnetTests()
 	suite.Run(t, new(WhisperMailboxSuite))
 }
 

@@ -19,7 +19,7 @@ import (
 )
 
 func TestManagerTestSuite(t *testing.T) {
-	utils.SecureMainnetTests()
+	SecureMainnetTests()
 	suite.Run(t, new(ManagerTestSuite))
 }
 
