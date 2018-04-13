@@ -25,7 +25,8 @@ import (
 )
 
 var (
-	networkSelected = flag.String("network", "statuschain", "-network=NETWORKID or -network=NETWORKNAME to select network used for tests")
+	networkSelected  = flag.String("network", "statuschain", "-network=NETWORKID or -network=NETWORKNAME to select network used for tests")
+	transactionTests = flag.Bool("transactions", true, "-transactions=true or -network=transactions=false to signal if tests perform transactions")
 
 	// ErrNoRemoteURL is returned when network id has no associated url.
 	ErrNoRemoteURL = errors.New("network id requires a remote URL")
@@ -133,6 +134,9 @@ func GetRemoteURLFromNetworkID(id int) (url string, err error) {
 // GetHeadHashFromNetworkID returns the hash associated with a given network id.
 func GetHeadHashFromNetworkID(id int) string {
 	switch id {
+	case params.MainNetworkID:
+		// TODO(themue) Set mainnet hash.
+		return "0x0000000000000000000000000000000000000000000000000000000000000000"
 	case params.RinkebyNetworkID:
 		return "0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177"
 	case params.RopstenNetworkID:
@@ -158,6 +162,8 @@ func GetHeadHash() string {
 // default or provided -network flag.
 func GetNetworkID() int {
 	switch strings.ToLower(*networkSelected) {
+	case fmt.Sprintf("%d", params.MainNetworkID), "mainnet":
+		return params.MainNetworkID
 	case fmt.Sprintf("%d", params.RinkebyNetworkID), "rinkeby":
 		return params.RinkebyNetworkID
 	case fmt.Sprintf("%d", params.RopstenNetworkID), "ropsten", "testnet":
@@ -167,6 +173,13 @@ func GetNetworkID() int {
 	}
 	// Every other selected network must break the test.
 	panic(fmt.Sprintf("invalid selected network: %q", *networkSelected))
+}
+
+// SecureMainnetTests ensures, that no transactional tests run on Mainnet.
+func SecureMainnetTests() {
+	if GetNetworkID() == params.MainNetworkID && *transactionTests {
+		panic("no tests of transactions on mainnet")
+	}
 }
 
 // GetAccount1PKFile returns the filename for Account1 keystore based
@@ -182,7 +195,7 @@ func GetAccount1PKFile() string {
 // GetAccount2PKFile returns the filename for Account2 keystore based
 // on the current network. This allows running the e2e tests on the
 // private network w/o access to the ACCOUNT_PASSWORD env variable
-func GetAccount2PKFile() string {
+func GetAccount2PKFilea() string {
 	if GetNetworkID() == params.StatusChainNetworkID {
 		return "test-account2-status-chain.pk"
 	}

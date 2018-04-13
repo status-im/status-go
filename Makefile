@@ -134,15 +134,15 @@ test-unit-race: test-unit ##@tests Run unit and integration tests with -race fla
 test-e2e: ##@tests Run e2e tests
 	# order: reliability then alphabetical
 	# TODO(tiabc): make a single command out of them adding `-p 1` flag.
-	go test -timeout 5m ./t/e2e/accounts/... -network=$(networkid) $(gotest_extraflags)
-	go test -timeout 5m ./t/e2e/api/... -network=$(networkid) $(gotest_extraflags)
-	go test -timeout 5m ./t/e2e/node/... -network=$(networkid) $(gotest_extraflags)
-	go test -timeout 50m ./t/e2e/jail/... -network=$(networkid) $(gotest_extraflags)
-	go test -timeout 20m ./t/e2e/rpc/... -network=$(networkid) $(gotest_extraflags)
-	go test -timeout 20m ./t/e2e/whisper/... -network=$(networkid) $(gotest_extraflags)
-	go test -timeout 10m ./t/e2e/transactions/... -network=$(networkid) $(gotest_extraflags)
+	go test -timeout 5m ./t/e2e/accounts/... -network=$(networkid) -transactions=true $(gotest_extraflags)
+	go test -timeout 5m ./t/e2e/api/... -network=$(networkid) -transactions=false $(gotest_extraflags)
+	go test -timeout 5m ./t/e2e/node/... -network=$(networkid) -transactions=false $(gotest_extraflags)
+	go test -timeout 50m ./t/e2e/jail/... -network=$(networkid) -transactions=true $(gotest_extraflags)
+	go test -timeout 20m ./t/e2e/rpc/... -network=$(networkid) -transactions=false $(gotest_extraflags)
+	go test -timeout 20m ./t/e2e/whisper/... -network=$(networkid) -transactions=false $(gotest_extraflags)
+	go test -timeout 10m ./t/e2e/transactions/... -network=$(networkid) -transactions=true $(gotest_extraflags)
 	# e2e_test tag is required to include some files from ./lib without _test suffix
-	go test -timeout 40m -tags e2e_test ./lib -network=$(networkid) $(gotest_extraflags)
+	go test -timeout 40m -tags e2e_test ./lib -network=$(networkid) -transactions=true $(gotest_extraflags)
 
 test-e2e-race: gotest_extraflags=-race
 test-e2e-race: test-e2e ##@tests Run e2e tests with -race flag

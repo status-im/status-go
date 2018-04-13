@@ -9,10 +9,12 @@ import (
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/t/e2e"
+	"github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/suite"
 )
 
 func TestMailServiceSuite(t *testing.T) {
+	utils.SecureMainnetTests()
 	suite.Run(t, new(MailServiceSuite))
 }
 

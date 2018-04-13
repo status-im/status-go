@@ -18,6 +18,7 @@ import (
 )
 
 func TestAPIBackendTestSuite(t *testing.T) {
+	utils.SecureMainnetTests()
 	suite.Run(t, new(APIBackendTestSuite))
 }
 

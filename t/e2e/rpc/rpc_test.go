@@ -18,6 +18,7 @@ import (
 )
 
 func TestRPCTestSuite(t *testing.T) {
+	utils.SecureMainnetTests()
 	suite.Run(t, new(RPCTestSuite))
 }
 
