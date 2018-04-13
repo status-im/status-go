@@ -81,6 +81,16 @@ func (s *PeerPoolSimulationSuite) getPeerFromEvent(events <-chan *p2p.PeerEvent,
 	return
 }
 
+func (s *PeerPoolSimulationSuite) getPoolEvent(events <-chan PoolEvent) PoolEvent {
+	select {
+	case ev := <-events:
+		return ev
+	case <-time.After(200 * time.Millisecond):
+		s.Fail("timed out waiting for a peer")
+		return ""
+	}
+}
+
 func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailover() {
 	topic := discv5.Topic("cap=test")
 	// simulation should only rely on fast sync
@@ -98,14 +108,17 @@ func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailover() {
 	defer subscription.Unsubscribe()
 	s.NoError(peerPool.Start(s.peers[1]))
 	defer peerPool.Stop()
+	poolEvents := make(chan PoolEvent)
+	poolSub := peerPool.feed.Subscribe(poolEvents)
+	defer poolSub.Unsubscribe()
 	connected := s.getPeerFromEvent(events, p2p.PeerEventTypeAdd)
 	s.Equal(s.peers[0].Self().ID, connected)
-	time.Sleep(100 * time.Millisecond)
+	s.Equal(Discv5Closed, s.getPoolEvent(poolEvents))
 	s.Require().Nil(s.peers[1].DiscV5)
 	s.peers[0].Stop()
 	disconnected := s.getPeerFromEvent(events, p2p.PeerEventTypeDrop)
 	s.Equal(connected, disconnected)
-	time.Sleep(100 * time.Millisecond)
+	s.Equal(Discv5Started, s.getPoolEvent(poolEvents))
 	s.Require().NotNil(s.peers[1].DiscV5)
 	register = NewRegister(topic)
 	s.Require().NoError(register.Start(s.peers[2]))
