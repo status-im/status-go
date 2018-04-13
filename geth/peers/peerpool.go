@@ -20,6 +20,9 @@ var (
 	ErrDiscv5NotRunning = errors.New("Discovery v5 is not running")
 )
 
+// PoolEvent is a type used to for peer pool events.
+type PoolEvent string
+
 const (
 	// expirationPeriod is an amount of time while peer is considered as a connectable
 	expirationPeriod = 60 * time.Minute
@@ -29,6 +32,11 @@ const (
 	DefaultFastSync = 3 * time.Second
 	// DefaultSlowSync is a recommended value for slow (background) peers search.
 	DefaultSlowSync = 30 * time.Minute
+
+	// Discv5Closed is sent when discv5 is closed
+	Discv5Closed PoolEvent = "discv5.closed"
+	// Discv5Started is sent when discv5 is started
+	Discv5Started PoolEvent = "discv5.started"
 )
 
 // NewPeerPool creates instance of PeerPool
@@ -68,6 +76,8 @@ type PeerPool struct {
 	quit               chan struct{}
 
 	wg sync.WaitGroup
+
+	feed event.Feed
 }
 
 // Start creates topic pool for each topic in config and subscribes to server events.
@@ -107,6 +117,7 @@ func (p *PeerPool) restartDiscovery(server *p2p.Server) error {
 		}
 		log.Debug("restarted discovery from peer pool")
 		server.DiscV5 = ntab
+		p.feed.Send(Discv5Started)
 	}
 	for _, t := range p.topics {
 		if !t.BelowMin() || t.SearchRunning() {
@@ -146,6 +157,7 @@ func (p *PeerPool) handleServerPeers(server *p2p.Server, events <-chan *p2p.Peer
 					log.Debug("closing discv5 connection", "server", server.Self())
 					server.DiscV5.Close()
 					server.DiscV5 = nil
+					p.feed.Send(Discv5Closed)
 				}
 			}
 		}
@@ -204,8 +216,10 @@ func (p *PeerPool) Stop() {
 		close(p.quit)
 	}
 	p.serverSubscription.Unsubscribe()
+	// wait before closing topic pools, otherwise there is chance that
+	// they will be concurrently started while we are exiting.
+	p.wg.Wait()
 	for _, t := range p.topics {
 		t.StopSearch()
 	}
-	p.wg.Wait()
 }
