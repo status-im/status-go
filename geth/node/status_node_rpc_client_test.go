@@ -53,16 +53,12 @@ func (s *testService) Stop() error {
 }
 
 func createAndStartStatusNode(config *params.NodeConfig) (*node.StatusNode, error) {
-	gethNode, err := gethnode.New(node.MakeGethNodeConfig(config))
-	if err != nil {
-		return nil, err
-	}
 	services := []gethnode.ServiceConstructor{
 		func(_ *gethnode.ServiceContext) (gethnode.Service, error) {
 			return &testService{}, nil
 		},
 	}
-	statusNode := node.NewWithGethNode(gethNode)
+	statusNode := node.New()
 	return statusNode, statusNode.Start(config, services...)
 }
 

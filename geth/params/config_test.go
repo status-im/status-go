@@ -144,8 +144,6 @@ var loadConfigTestCases = []struct {
 			require.Equal(t, params.HTTPPort, nodeConfig.HTTPPort)
 			require.Equal(t, params.HTTPHost, nodeConfig.HTTPHost)
 			require.True(t, nodeConfig.RPCEnabled)
-			require.False(t, nodeConfig.WSEnabled)
-			require.Equal(t, 4242, nodeConfig.WSPort)
 			require.True(t, nodeConfig.IPCEnabled)
 			require.Equal(t, 64, nodeConfig.LightEthConfig.DatabaseCache)
 		},

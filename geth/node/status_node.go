@@ -58,14 +58,6 @@ func New() *StatusNode {
 	}
 }
 
-// NewWithGethNode creates a new StatusNode with a given Geth Node.
-func NewWithGethNode(gethNode *node.Node) *StatusNode {
-	return &StatusNode{
-		gethNode: gethNode,
-		log:      log.New("package", "status-go/geth/node.StatusNode"),
-	}
-}
-
 // Config exposes reference to running node's configuration
 func (n *StatusNode) Config() *params.NodeConfig {
 	n.mu.RLock()
@@ -91,10 +83,8 @@ func (n *StatusNode) Start(config *params.NodeConfig, services ...node.ServiceCo
 		return ErrNodeRunning
 	}
 
-	if n.gethNode == nil {
-		if err := n.createNode(config); err != nil {
-			return err
-		}
+	if err := n.createNode(config); err != nil {
+		return err
 	}
 
 	n.config = config
