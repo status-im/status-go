@@ -153,37 +153,42 @@ func (n *StatusNode) Stop() error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
+	if !n.isRunning() {
+		return ErrNoRunningNode
+	}
+
 	return n.stop()
 }
 
 // stop will stop current StatusNode. A stopped node cannot be resumed.
 func (n *StatusNode) stop() error {
-	if n.gethNode == nil || n.gethNode.Server() == nil {
-		return ErrNoRunningNode
+	if err := n.stopPeerPool(); err != nil {
+		n.log.Error("Error stopping the PeerPool", "error", err)
 	}
-
-	if n.gethNode.Server().DiscV5 != nil {
-		n.stopPeerPool()
-	}
+	n.register = nil
+	n.peerPool = nil
+	n.db = nil
 
 	if err := n.gethNode.Stop(); err != nil {
 		return err
 	}
 
 	n.rpcClient = nil
-	// We need to clear it because config is passed to start
-	// and may change the network, data dir etc.
+	// We need to clear `gethNode`` because config is passed to `Start()`
+	// and may be completely different.
 	n.gethNode = nil
 
 	return nil
 }
 
-func (n *StatusNode) stopPeerPool() {
+func (n *StatusNode) stopPeerPool() error {
+	if n.gethNode.Server().DiscV5 == nil {
+		return nil
+	}
+
 	n.register.Stop()
 	n.peerPool.Stop()
-	if err := n.db.Close(); err != nil {
-		n.log.Error("error closing status db", "error", err)
-	}
+	return n.db.Close()
 }
 
 // ResetChainData removes chain data if node is not running.

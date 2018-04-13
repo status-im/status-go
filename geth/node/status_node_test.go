@@ -53,6 +53,8 @@ func TestStatusNodeStart(t *testing.T) {
 
 	// stop node
 	require.NoError(t, n.Stop())
+	// try to stop already stopped node
+	require.EqualError(t, n.Stop(), ErrNoRunningNode.Error())
 
 	// checks after node is stopped
 	require.Nil(t, n.GethNode())
