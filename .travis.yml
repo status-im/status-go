@@ -24,7 +24,7 @@ jobs:
     # We only want to check if tests on public testnet pass in a merge build.
     # Also, disable for fork builds as they do not have access to
     # ACCOUNT_PASSWORD environment variable anyway.
-    if: (NOT (type IS push)) AND (NOT (fork IS true))
+    if: (type != push) AND (fork = false)
     script:
       # Sync the chain first. It will time out after 20 minutes. Used network: Rinkeby.
       - make statusgo
