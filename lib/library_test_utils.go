@@ -390,8 +390,8 @@ func testCallRPC(t *testing.T) bool {
 }
 
 func testCallRPCWithPrivateAPI(t *testing.T) bool {
-	expected := `{"jsonrpc":"2.0","id":64,"error":{"code":-32601,"message":"The method admin_peers does not exist/is not available"}}`
-	rawResponse := CallRPC(C.CString(`{"jsonrpc":"2.0","method":"admin_peers","params":[],"id":64}`))
+	expected := `{"jsonrpc":"2.0","id":64,"error":{"code":-32601,"message":"The method admin_nodeInfo does not exist/is not available"}}`
+	rawResponse := CallRPC(C.CString(`{"jsonrpc":"2.0","method":"admin_nodeInfo","params":[],"id":64}`))
 	received := C.GoString(rawResponse)
 	if expected != received {
 		t.Errorf("unexpected response: expected: %v, got: %v", expected, received)
@@ -402,11 +402,10 @@ func testCallRPCWithPrivateAPI(t *testing.T) bool {
 }
 
 func testCallPrivateRPCWithPrivateAPI(t *testing.T) bool {
-	expected := `{"jsonrpc":"2.0","id":64,"result":[]}`
-	rawResponse := CallPrivateRPC(C.CString(`{"jsonrpc":"2.0","method":"admin_peers","params":[],"id":64}`))
+	rawResponse := CallPrivateRPC(C.CString(`{"jsonrpc":"2.0","method":"admin_nodeInfo","params":[],"id":64}`))
 	received := C.GoString(rawResponse)
-	if expected != received {
-		t.Errorf("unexpected response: expected: %v, got: %v", expected, received)
+	if strings.Contains(received, "error") {
+		t.Errorf("unexpected response containing error: %v", received)
 		return false
 	}
 
