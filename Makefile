@@ -152,7 +152,7 @@ lint-install:
 
 lint:
 	@echo "lint"
-	@gometalinter -debug ./...
+	@gometalinter ./...
 
 ci: lint mock test-unit test-e2e ##@tests Run all linters and tests at once
 
