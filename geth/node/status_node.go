@@ -334,7 +334,7 @@ func (n *StatusNode) PeerCount() int {
 	defer n.mu.RUnlock()
 
 	if !n.isRunning() {
-		return -1
+		return 0
 	}
 
 	return n.gethNode.Server().PeerCount()

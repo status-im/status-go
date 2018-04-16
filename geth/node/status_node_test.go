@@ -27,7 +27,7 @@ func TestStatusNodeStart(t *testing.T) {
 	require.Nil(t, n.GethNode())
 	require.Nil(t, n.Config())
 	require.Nil(t, n.RPCClient())
-	require.Equal(t, -1, n.PeerCount())
+	require.Equal(t, 0, n.PeerCount())
 	_, err = n.AccountManager()
 	require.EqualError(t, err, ErrNoGethNode.Error())
 	_, err = n.AccountKeyStore()
@@ -59,7 +59,7 @@ func TestStatusNodeStart(t *testing.T) {
 	// checks after node is stopped
 	require.Nil(t, n.GethNode())
 	require.Nil(t, n.RPCClient())
-	require.Equal(t, -1, n.PeerCount())
+	require.Equal(t, 0, n.PeerCount())
 	_, err = n.AccountManager()
 	require.EqualError(t, err, ErrNoGethNode.Error())
 	_, err = n.AccountKeyStore()
@@ -185,6 +185,8 @@ func TestStatusNodeReconnectStaticPeers(t *testing.T) {
 
 	n := New()
 
+	var errCh <-chan error
+
 	// checks before node is started
 	require.EqualError(t, n.ReconnectStaticPeers(), ErrNoRunningNode.Error())
 
@@ -196,15 +198,13 @@ func TestStatusNodeReconnectStaticPeers(t *testing.T) {
 			StaticNodes: []string{peerURL},
 		},
 	}
+	errCh = waitForPeerAsync(n, peerURL, time.Second*30)
 	require.NoError(t, n.Start(&config))
 	defer func() {
 		require.NoError(t, n.Stop())
 	}()
 
-	var errCh <-chan error
-
 	// checks after node is started
-	errCh = waitForPeerAsync(n, peerURL, time.Second*5)
 	require.NoError(t, <-errCh)
 	require.Equal(t, 1, n.PeerCount())
 
@@ -227,7 +227,7 @@ func waitForPeer(node *StatusNode, peerURL string, timeout time.Duration) error 
 	}
 
 	server := node.GethNode().Server()
-	ch := make(chan *p2p.PeerEvent, server.MaxPeers)
+	ch := make(chan *p2p.PeerEvent)
 	subscription := server.SubscribeEvents(ch)
 	defer subscription.Unsubscribe()
 
@@ -242,6 +242,14 @@ func waitForPeer(node *StatusNode, peerURL string, timeout time.Duration) error 
 				return err
 			}
 		case <-time.After(timeout):
+			// it may happen that the peer is already connected
+			// but even was not received
+			for _, p := range node.GethNode().Server().Peers() {
+				if p.ID() == parsedPeer.ID {
+					return nil
+				}
+			}
+
 			return errors.New("wait for peer: timeout")
 		}
 	}
@@ -250,7 +258,10 @@ func waitForPeer(node *StatusNode, peerURL string, timeout time.Duration) error 
 func waitForPeerAsync(node *StatusNode, peerURL string, timeout time.Duration) <-chan error {
 	errCh := make(chan error)
 	go func() {
-		errCh <- waitForPeer(node, peerURL, timeout)
+		if err := waitForPeer(node, peerURL, timeout); err != nil {
+			errCh <- err
+		}
+		close(errCh)
 	}()
 
 	return errCh
