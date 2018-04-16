@@ -14,7 +14,6 @@ import (
 )
 
 func TestWhisperTestSuite(t *testing.T) {
-	SecureMainnetTests()
 	suite.Run(t, new(WhisperTestSuite))
 }
 

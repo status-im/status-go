@@ -23,7 +23,6 @@ const (
 )
 
 func TestAPI(t *testing.T) {
-	SecureMainnetTests()
 	suite.Run(t, new(APITestSuite))
 }
 

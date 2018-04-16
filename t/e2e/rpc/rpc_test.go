@@ -18,7 +18,6 @@ import (
 )
 
 func TestRPCTestSuite(t *testing.T) {
-	SecureMainnetTests()
 	suite.Run(t, new(RPCTestSuite))
 }
 
@@ -145,6 +144,9 @@ func (s *RPCTestSuite) TestCallRawResult() {
 // for a not yet mained transaction is "error":{"code":-32000,"message":"unknown transaction"}.
 // Issue: https://github.com/status-im/status-go/issues/547
 func (s *RPCTestSuite) TestCallRawResultGetTransactionReceipt() {
+	if SkipTransactionTest() {
+		s.T().Skip("test must not run on mainnet or status chain")
+	}
 	nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
 
@@ -162,6 +164,9 @@ func (s *RPCTestSuite) TestCallRawResultGetTransactionReceipt() {
 // TestCallContextResult checks if result passed to CallContext
 // is set accordingly to its underlying memory layout.
 func (s *RPCTestSuite) TestCallContextResult() {
+	if SkipTransactionTest() {
+		s.T().Skip("test must not run on mainnet or status chain")
+	}
 	s.StartTestNode()
 	defer s.StopTestNode()
 

@@ -25,8 +25,7 @@ import (
 )
 
 var (
-	networkSelected  = flag.String("network", "statuschain", "-network=NETWORKID or -network=NETWORKNAME to select network used for tests")
-	transactionTests = flag.Bool("transactions", true, "-transactions=true or -network=transactions=false to signal if tests perform transactions")
+	networkSelected = flag.String("network", "statuschain", "-network=NETWORKID or -network=NETWORKNAME to select network used for tests")
 
 	// ErrNoRemoteURL is returned when network id has no associated url.
 	ErrNoRemoteURL = errors.New("network id requires a remote URL")
@@ -175,11 +174,14 @@ func GetNetworkID() int {
 	panic(fmt.Sprintf("invalid selected network: %q", *networkSelected))
 }
 
-// SecureMainnetTests ensures, that no transactional tests run on Mainnet.
-func SecureMainnetTests() {
-	if GetNetworkID() == params.MainNetworkID && *transactionTests {
-		panic("no tests of transactions on mainnet")
+// SkipTransactionTest is used inside tests performing transactions.
+// In case of Mainnet or StatusChain it return true to signal skipping.
+func SkipTransactionTest() bool {
+	id := GetNetworkID()
+	if id == params.MainNetworkID || id == params.StatusChainNetworkID {
+		return true
 	}
+	return false
 }
 
 // GetAccount1PKFile returns the filename for Account1 keystore based

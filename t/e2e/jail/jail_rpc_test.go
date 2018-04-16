@@ -20,7 +20,6 @@ import (
 )
 
 func TestJailRPCTestSuite(t *testing.T) {
-	SecureMainnetTests()
 	suite.Run(t, new(JailRPCTestSuite))
 }
 
@@ -37,6 +36,9 @@ func (s *JailRPCTestSuite) SetupTest() {
 }
 
 func (s *JailRPCTestSuite) TestJailRPCSend() {
+	if SkipTransactionTest() {
+		s.T().Skip("test must not run on mainnet or status chain")
+	}
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
@@ -95,6 +97,9 @@ func (s *JailRPCTestSuite) TestIsConnected() {
 
 // regression test: eth_getTransactionReceipt with invalid transaction hash should return "error":{"code":-32000,"message":"unknown transaction"}
 func (s *JailRPCTestSuite) TestRegressionGetTransactionReceipt() {
+	if SkipTransactionTest() {
+		s.T().Skip("test must not run on mainnet or status chain")
+	}
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
@@ -108,6 +113,9 @@ func (s *JailRPCTestSuite) TestRegressionGetTransactionReceipt() {
 }
 
 func (s *JailRPCTestSuite) TestContractDeployment() {
+	if SkipTransactionTest() {
+		s.T().Skip("test must not run on mainnet or status chain")
+	}
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
@@ -191,6 +199,9 @@ func (s *JailRPCTestSuite) TestContractDeployment() {
 }
 
 func (s *JailRPCTestSuite) TestJailVMPersistence() {
+	if SkipTransactionTest() {
+		s.T().Skip("test must not run on mainnet or status chain")
+	}
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 

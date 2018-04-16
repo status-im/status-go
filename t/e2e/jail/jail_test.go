@@ -15,7 +15,6 @@ import (
 	"github.com/status-im/status-go/geth/signal"
 	"github.com/status-im/status-go/static"
 	"github.com/status-im/status-go/t/e2e"
-	"github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -28,7 +27,6 @@ var (
 )
 
 func TestJailTestSuite(t *testing.T) {
-	utils.SecureMainnetTests()
 	suite.Run(t, new(JailTestSuite))
 }
 

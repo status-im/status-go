@@ -19,7 +19,6 @@ import (
 )
 
 func TestManagerTestSuite(t *testing.T) {
-	SecureMainnetTests()
 	suite.Run(t, new(ManagerTestSuite))
 }
 

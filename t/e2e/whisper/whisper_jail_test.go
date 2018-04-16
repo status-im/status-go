@@ -27,7 +27,6 @@ var (
 )
 
 func TestWhisperJailTestSuite(t *testing.T) {
-	SecureMainnetTests()
 	suite.Run(t, new(WhisperJailTestSuite))
 }
 

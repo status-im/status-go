@@ -11,7 +11,6 @@ import (
 )
 
 func TestAccountsRPCTestSuite(t *testing.T) {
-	SecureMainnetTests()
 	suite.Run(t, new(AccountsRPCTestSuite))
 }
 
