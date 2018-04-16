@@ -258,10 +258,7 @@ func waitForPeer(node *StatusNode, peerURL string, timeout time.Duration) error 
 func waitForPeerAsync(node *StatusNode, peerURL string, timeout time.Duration) <-chan error {
 	errCh := make(chan error)
 	go func() {
-		if err := waitForPeer(node, peerURL, timeout); err != nil {
-			errCh <- err
-		}
-		close(errCh)
+		errCh <- waitForPeer(node, peerURL, timeout)
 	}()
 
 	return errCh
