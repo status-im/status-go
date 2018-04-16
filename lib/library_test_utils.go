@@ -97,6 +97,14 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 			testCallRPC,
 		},
 		{
+			"call private API using RPC",
+			testCallRPCWithPrivateAPI,
+		},
+		{
+			"call private API using private RPC client",
+			testCallPrivateRPCWithPrivateAPI,
+		},
+		{
 			"create main and child accounts",
 			testCreateChildAccount,
 		},
@@ -375,6 +383,29 @@ func testCallRPC(t *testing.T) bool {
 	received := C.GoString(rawResponse)
 	if expected != received {
 		t.Errorf("unexpected response: expected: %v, got: %v", expected, received)
+		return false
+	}
+
+	return true
+}
+
+func testCallRPCWithPrivateAPI(t *testing.T) bool {
+	expected := `{"jsonrpc":"2.0","id":64,"error":{"code":-32601,"message":"The method admin_nodeInfo does not exist/is not available"}}`
+	rawResponse := CallRPC(C.CString(`{"jsonrpc":"2.0","method":"admin_nodeInfo","params":[],"id":64}`))
+	received := C.GoString(rawResponse)
+	if expected != received {
+		t.Errorf("unexpected response: expected: %v, got: %v", expected, received)
+		return false
+	}
+
+	return true
+}
+
+func testCallPrivateRPCWithPrivateAPI(t *testing.T) bool {
+	rawResponse := CallPrivateRPC(C.CString(`{"jsonrpc":"2.0","method":"admin_nodeInfo","params":[],"id":64}`))
+	received := C.GoString(rawResponse)
+	if strings.Contains(received, "error") {
+		t.Errorf("unexpected response containing error: %v", received)
 		return false
 	}
 
