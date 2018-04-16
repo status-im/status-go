@@ -103,9 +103,14 @@ func (api *StatusAPI) ResetChainDataAsync() <-chan error {
 	return runAsync(api.ResetChainData)
 }
 
-// CallRPC executes RPC request on node's in-proc RPC server
+// CallRPC executes public RPC requests on node's in-proc RPC server.
 func (api *StatusAPI) CallRPC(inputJSON string) string {
 	return api.b.CallRPC(inputJSON)
+}
+
+// CallPrivateRPC executes public and private RPC requests on node's in-proc RPC server.
+func (api *StatusAPI) CallPrivateRPC(inputJSON string) string {
+	return api.b.CallPrivateRPC(inputJSON)
 }
 
 // CreateAccount creates an internal geth account

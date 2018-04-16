@@ -101,10 +101,17 @@ func ResetChainData() *C.char {
 	return makeJSONResponse(nil)
 }
 
-//CallRPC calls status node via rpc
+//CallRPC calls public APIs via RPC
 //export CallRPC
 func CallRPC(inputJSON *C.char) *C.char {
 	outputJSON := statusAPI.CallRPC(C.GoString(inputJSON))
+	return C.CString(outputJSON)
+}
+
+//CallPrivateRPC calls both public and private APIs via RPC
+//export CallPrivateRPC
+func CallPrivateRPC(inputJSON *C.char) *C.char {
+	outputJSON := statusAPI.CallPrivateRPC(C.GoString(inputJSON))
 	return C.CString(outputJSON)
 }
 
