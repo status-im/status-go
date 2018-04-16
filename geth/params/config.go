@@ -248,15 +248,6 @@ type NodeConfig struct {
 	// HTTPPort is the TCP port number on which to start the Geth's HTTP RPC server.
 	HTTPPort int
 
-	// WSHost is a host interface for the WebSocket RPC server
-	WSHost string
-
-	// WSPort is the TCP port number on which to start the Geth's WebSocket RPC server.
-	WSPort int
-
-	// WSEnabled specifies whether WS-RPC Server is enabled or not
-	WSEnabled bool
-
 	// IPCFile is filename of exposed IPC RPC Server
 	IPCFile string
 
@@ -322,8 +313,6 @@ func NewNodeConfig(dataDir string, clstrCfgFile string, networkID uint64, devMod
 		HTTPPort:          HTTPPort,
 		ListenAddr:        ListenAddr,
 		APIModules:        APIModules,
-		WSHost:            WSHost,
-		WSPort:            WSPort,
 		MaxPeers:          MaxPeers,
 		MaxPendingPeers:   MaxPendingPeers,
 		IPCFile:           IPCFile,

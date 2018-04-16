@@ -12,7 +12,6 @@ import (
 
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
-	. "github.com/status-im/status-go/t/utils"
 )
 
 type TestServiceAPI struct{}
@@ -52,7 +51,7 @@ func (s *testService) Stop() error {
 	return nil
 }
 
-func createStatusNode(config *params.NodeConfig) (*node.StatusNode, error) {
+func createAndStartStatusNode(config *params.NodeConfig) (*node.StatusNode, error) {
 	services := []gethnode.ServiceConstructor{
 		func(_ *gethnode.ServiceContext) (gethnode.Service, error) {
 			return &testService{}, nil
@@ -65,11 +64,9 @@ func createStatusNode(config *params.NodeConfig) (*node.StatusNode, error) {
 func TestNodeRPCClientCallOnlyPublicAPIs(t *testing.T) {
 	var err error
 
-	config, err := MakeTestNodeConfig(GetNetworkID())
-	require.NoError(t, err)
-	config.APIModules = "" // no whitelisted API modules; use only public APIs
-
-	statusNode, err := createStatusNode(config)
+	statusNode, err := createAndStartStatusNode(&params.NodeConfig{
+		APIModules: "", // no whitelisted API modules; use only public APIs
+	})
 	require.NoError(t, err)
 	defer func() {
 		err := statusNode.Stop()
@@ -94,11 +91,9 @@ func TestNodeRPCClientCallOnlyPublicAPIs(t *testing.T) {
 func TestNodeRPCClientCallWhitelistedPrivateService(t *testing.T) {
 	var err error
 
-	config, err := MakeTestNodeConfig(GetNetworkID())
-	require.NoError(t, err)
-	config.APIModules = "pri"
-
-	statusNode, err := createStatusNode(config)
+	statusNode, err := createAndStartStatusNode(&params.NodeConfig{
+		APIModules: "pri",
+	})
 	require.NoError(t, err)
 	defer func() {
 		err := statusNode.Stop()
@@ -118,10 +113,7 @@ func TestNodeRPCClientCallWhitelistedPrivateService(t *testing.T) {
 func TestNodeRPCPrivateClientCallPrivateService(t *testing.T) {
 	var err error
 
-	config, err := MakeTestNodeConfig(GetNetworkID())
-	require.NoError(t, err)
-
-	statusNode, err := createStatusNode(config)
+	statusNode, err := createAndStartStatusNode(&params.NodeConfig{})
 	require.NoError(t, err)
 	defer func() {
 		err := statusNode.Stop()

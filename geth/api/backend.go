@@ -112,12 +112,6 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 
 	err = b.statusNode.Start(config)
 	if err != nil {
-		switch err.(type) {
-		case node.RPCClientError:
-			err = fmt.Errorf("%v: %v", node.ErrRPCClient, err)
-		case node.EthNodeError:
-			err = fmt.Errorf("%v: %v", node.ErrNodeStartFailure, err)
-		}
 		signal.Send(signal.Envelope{
 			Type: signal.EventNodeCrashed,
 			Event: signal.NodeCrashEvent{
@@ -162,11 +156,7 @@ func (b *StatusBackend) RestartNode() error {
 	if !b.IsNodeRunning() {
 		return node.ErrNoRunningNode
 	}
-	config, err := b.statusNode.Config()
-	if err != nil {
-		return err
-	}
-	newcfg := *config
+	newcfg := *(b.statusNode.Config())
 	if err := b.stopNode(); err != nil {
 		return err
 	}
@@ -178,11 +168,7 @@ func (b *StatusBackend) RestartNode() error {
 func (b *StatusBackend) ResetChainData() error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	config, err := b.statusNode.Config()
-	if err != nil {
-		return err
-	}
-	newcfg := *config
+	newcfg := *(b.statusNode.Config())
 	if err := b.stopNode(); err != nil {
 		return err
 	}
@@ -217,10 +203,7 @@ func (b *StatusBackend) getVerifiedAccount(password string) (*account.SelectedEx
 		b.log.Error("failed to get a selected account", "err", err)
 		return nil, err
 	}
-	config, err := b.StatusNode().Config()
-	if err != nil {
-		return nil, err
-	}
+	config := b.StatusNode().Config()
 	_, err = b.accountManager.VerifyAccountPassword(config.KeyStoreDir, selectedAccount.Address.String(), password)
 	if err != nil {
 		b.log.Error("failed to verify account", "account", selectedAccount.Address.String(), "error", err)
@@ -269,7 +252,7 @@ func (b *StatusBackend) DiscardTransactions(ids []string) map[string]error {
 func (b *StatusBackend) registerHandlers() error {
 	rpcClient := b.StatusNode().RPCClient()
 	if rpcClient == nil {
-		return node.ErrRPCClient
+		return errors.New("RPC client unavailable")
 	}
 
 	rpcClient.RegisterHandler(params.AccountsMethodName, func(context.Context, ...interface{}) (interface{}, error) {

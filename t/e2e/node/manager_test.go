@@ -46,16 +46,16 @@ func (s *ManagerTestSuite) TestReferencesWithoutStartedNode() {
 		{
 			"non-null manager, no running node, get NodeConfig",
 			func() (interface{}, error) {
-				return s.StatusNode.Config()
+				return s.StatusNode.Config(), nil
 			},
-			node.ErrNoRunningNode,
+			nil,
 		},
 		{
 			"non-null manager, no running node, get Node",
 			func() (interface{}, error) {
-				return s.StatusNode.GethNode()
+				return s.StatusNode.GethNode(), nil
 			},
-			node.ErrNoRunningNode,
+			nil,
 		},
 		{
 			"non-null manager, no running node, get LES",
@@ -76,14 +76,14 @@ func (s *ManagerTestSuite) TestReferencesWithoutStartedNode() {
 			func() (interface{}, error) {
 				return s.StatusNode.AccountManager()
 			},
-			node.ErrNoRunningNode,
+			node.ErrNoGethNode,
 		},
 		{
 			"non-null manager, no running node, get AccountKeyStore",
 			func() (interface{}, error) {
 				return s.StatusNode.AccountKeyStore()
 			},
-			node.ErrNoRunningNode,
+			node.ErrNoGethNode,
 		},
 		{
 			"non-null manager, no running node, get RPC Client",
@@ -116,14 +116,14 @@ func (s *ManagerTestSuite) TestReferencesWithStartedNode() {
 		{
 			"node is running, get NodeConfig",
 			func() (interface{}, error) {
-				return s.StatusNode.Config()
+				return s.StatusNode.Config(), nil
 			},
 			&params.NodeConfig{},
 		},
 		{
 			"node is running, get Node",
 			func() (interface{}, error) {
-				return s.StatusNode.GethNode()
+				return s.StatusNode.GethNode(), nil
 			},
 			&gethnode.Node{},
 		},
@@ -188,7 +188,7 @@ func (s *ManagerTestSuite) TestNodeStartStop() {
 	s.True(s.StatusNode.IsRunning())
 
 	// try starting another node (w/o stopping the previously started node)
-	s.Equal(node.ErrNodeExists, s.StatusNode.Start(nodeConfig))
+	s.Equal(node.ErrNodeRunning, s.StatusNode.Start(nodeConfig))
 
 	// now stop node
 	time.Sleep(100 * time.Millisecond) //https://github.com/status-im/status-go/issues/429#issuecomment-339663163

@@ -29,9 +29,9 @@ func WithDataDir(path string) TestNodeOption {
 // FirstBlockHash validates Attach operation for the StatusNode.
 func FirstBlockHash(statusNode *node.StatusNode) (string, error) {
 	// obtain RPC client for running node
-	runningNode, err := statusNode.GethNode()
-	if err != nil {
-		return "", err
+	runningNode := statusNode.GethNode()
+	if runningNode == nil {
+		return "", node.ErrNoGethNode
 	}
 
 	rpcClient, err := runningNode.Attach()

@@ -43,10 +43,10 @@ func (s *WhisperExtensionSuite) SetupTest() {
 }
 
 func (s *WhisperExtensionSuite) TestSentSignal() {
-	node1, err := s.nodes[0].GethNode()
-	s.NoError(err)
-	node2, err := s.nodes[1].GethNode()
-	s.NoError(err)
+	node1 := s.nodes[0].GethNode()
+	s.NotNil(node1)
+	node2 := s.nodes[1].GethNode()
+	s.NotNil(node2)
 	node1.Server().AddPeer(node2.Server().Self())
 	confirmed := make(chan common.Hash, 1)
 	signal.SetDefaultNodeNotificationHandler(func(rawSignal string) {
@@ -125,8 +125,8 @@ func (s *WhisperExtensionSuite) TestExpiredSignal() {
 
 func (s *WhisperExtensionSuite) TearDown() {
 	for _, n := range s.nodes {
-		cfg, err := n.Config()
-		s.NoError(err)
+		cfg := n.Config()
+		s.NotNil(cfg)
 		s.NoError(n.Stop())
 		s.NoError(os.Remove(cfg.DataDir))
 	}
