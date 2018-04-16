@@ -152,15 +152,24 @@ func (p *PeerPool) handleServerPeers(server *p2p.Server, events <-chan *p2p.Peer
 					retryDiscv5 = time.After(0)
 				}
 			case p2p.PeerEventTypeAdd:
-				log.Debug("confirm peer added", "ID", event.Peer)
-				if p.stopOnMax && p.handleAddedPeer(server, event.Peer) {
-					log.Debug("closing discv5 connection", "server", server.Self())
-					server.DiscV5.Close()
-					server.DiscV5 = nil
-					p.feed.Send(Discv5Closed)
-				}
+				p.handleAddedEvent(server, event)
 			}
 		}
+	}
+}
+
+// handledAddedEvent maintains logic of stopping discovery server and added mainly
+// for easier testing.
+func (p *PeerPool) handleAddedEvent(server *p2p.Server, event *p2p.PeerEvent) {
+	log.Debug("confirm peer added", "ID", event.Peer)
+	if p.stopOnMax && p.handleAddedPeer(server, event.Peer) {
+		if server.DiscV5 == nil {
+			return
+		}
+		log.Debug("closing discv5 connection", "server", server.Self())
+		server.DiscV5.Close()
+		server.DiscV5 = nil
+		p.feed.Send(Discv5Closed)
 	}
 }
 
