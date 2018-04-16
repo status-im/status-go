@@ -40,25 +40,14 @@ func (s *WhisperExtensionSuite) SetupTest() {
 		s.nodes[i] = node.New()
 		s.Require().NoError(s.nodes[i].Start(cfg))
 	}
-<<<<<<< HEAD
-	s.True(s.nodes[0].IsRunning())
-	s.True(s.nodes[1].IsRunning())
-	s.nodes[0].GethNode().Server().AddPeer(
-		s.nodes[1].GethNode().Server().Self(),
-	)
-}
-
-func (s *WhisperExtentionSuite) TestRecievedSignal() {
-=======
 }
 
 func (s *WhisperExtensionSuite) TestSentSignal() {
-	node1, err := s.nodes[0].GethNode()
-	s.NoError(err)
-	node2, err := s.nodes[1].GethNode()
-	s.NoError(err)
+	node1 := s.nodes[0].GethNode()
+	s.NotNil(node1)
+	node2 := s.nodes[1].GethNode()
+	s.NotNil(node2)
 	node1.Server().AddPeer(node2.Server().Self())
->>>>>>> develop
 	confirmed := make(chan common.Hash, 1)
 	signal.SetDefaultNodeNotificationHandler(func(rawSignal string) {
 		var sg struct {

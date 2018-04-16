@@ -125,6 +125,8 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 }
 
 func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
+	var err error
+
 	// Start mailbox, alice, bob, charlie node.
 	mailboxBackend, stop := s.startMailboxBackend()
 	defer stop()
@@ -142,8 +144,6 @@ func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
 	s.Require().True(mailboxBackend.IsNodeRunning())
 	mailboxNode := mailboxBackend.StatusNode().GethNode()
 	mailboxEnode := mailboxNode.Server().NodeInfo().Enode
-
-	var err error
 
 	err = aliceBackend.StatusNode().AddPeer(mailboxEnode)
 	s.Require().NoError(err)

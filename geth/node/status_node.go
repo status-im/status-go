@@ -414,14 +414,6 @@ func (n *StatusNode) RPCPrivateClient() *rpc.Client {
 	return n.rpcPrivateClient
 }
 
-// isAvailable check if we have a node running and make sure is fully started
-func (n *StatusNode) isAvailable() error {
-	if n.gethNode == nil || n.gethNode.Server() == nil {
-		return ErrNoRunningNode
-	}
-	return nil
-}
-
 // EnsureSync waits until blockchain synchronization
 // is complete and returns.
 func (n *StatusNode) EnsureSync(ctx context.Context) error {

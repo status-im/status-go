@@ -65,8 +65,8 @@ func (s *PeersTestSuite) TestStaticPeersReconnect() {
 	// both on rinkeby and ropsten we can expect atleast 2 peers connected
 	expectedPeersCount := 2
 	events := make(chan *p2p.PeerEvent, 10)
-	node, err := s.backend.StatusNode().GethNode()
-	s.Require().NoError(err)
+	node := s.backend.StatusNode().GethNode()
+	s.Require().NotNil(node)
 
 	subscription := node.Server().SubscribeEvents(events)
 	defer subscription.Unsubscribe()
