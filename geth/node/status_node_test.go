@@ -2,7 +2,10 @@ package node
 
 import (
 	"errors"
+	"io/ioutil"
 	"math"
+	"os"
+	"path"
 	"reflect"
 	"testing"
 	"time"
@@ -64,6 +67,30 @@ func TestStatusNodeStart(t *testing.T) {
 	require.EqualError(t, err, ErrNoGethNode.Error())
 	_, err = n.AccountKeyStore()
 	require.EqualError(t, err, ErrNoGethNode.Error())
+}
+
+func TestStatusNodeWithDataDir(t *testing.T) {
+	var err error
+
+	dir, err := ioutil.TempDir("", "status-node-test")
+	require.NoError(t, err)
+	defer func() {
+		require.NoError(t, os.RemoveAll(dir))
+	}()
+
+	// keystore directory
+	keyStoreDir := path.Join(dir, "keystore")
+	err = os.MkdirAll(keyStoreDir, os.ModePerm)
+	require.NoError(t, err)
+
+	config := params.NodeConfig{
+		DataDir:     dir,
+		KeyStoreDir: keyStoreDir,
+	}
+	n := New()
+
+	require.NoError(t, n.Start(&config))
+	require.NoError(t, n.Stop())
 }
 
 func TestStatusNodeServiceGetters(t *testing.T) {

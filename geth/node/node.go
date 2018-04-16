@@ -43,12 +43,12 @@ func MakeNode(config *params.NodeConfig) (*node.Node, error) {
 	// keeping data only in memory.
 	if config.DataDir != "" {
 		// make sure data directory exists
-		if err := os.MkdirAll(filepath.Join(config.DataDir), os.ModePerm); err != nil {
+		if err := os.MkdirAll(filepath.Clean(config.DataDir), os.ModePerm); err != nil {
 			return nil, fmt.Errorf("make node: make data directory: %v", err)
 		}
 
 		// make sure keys directory exists
-		if err := os.MkdirAll(filepath.Join(config.KeyStoreDir), os.ModePerm); err != nil {
+		if err := os.MkdirAll(filepath.Clean(config.KeyStoreDir), os.ModePerm); err != nil {
 			return nil, fmt.Errorf("make node: make keys directory: %v", err)
 		}
 	}
