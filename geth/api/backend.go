@@ -180,9 +180,15 @@ func (b *StatusBackend) ResetChainData() error {
 	return b.startNode(&newcfg)
 }
 
-// CallRPC executes RPC request on node's in-proc RPC server
+// CallRPC executes public RPC requests on node's in-proc RPC server.
 func (b *StatusBackend) CallRPC(inputJSON string) string {
 	client := b.statusNode.RPCClient()
+	return client.CallRaw(inputJSON)
+}
+
+// CallPrivateRPC executes public and private RPC requests on node's in-proc RPC server.
+func (b *StatusBackend) CallPrivateRPC(inputJSON string) string {
+	client := b.statusNode.RPCPrivateClient()
 	return client.CallRaw(inputJSON)
 }
 

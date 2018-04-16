@@ -205,7 +205,7 @@ func activateShhService(stack *node.Node, config *params.NodeConfig) (err error)
 			return nil, err
 		}
 
-		svc := shhext.New(whisper, shhext.SendEnvelopeSentSignal)
+		svc := shhext.New(whisper, shhext.EnvelopeSignalHandler{})
 		return svc, nil
 	})
 	if err != nil {

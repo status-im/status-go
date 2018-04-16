@@ -83,7 +83,7 @@ func TestNodeRPCClientCallOnlyPublicAPIs(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "some method result", result)
 
-	// call private API
+	// call private API with public RPC client
 	err = client.Call(&result, "pri_someMethod")
 	require.EqualError(t, err, "The method pri_someMethod does not exist/is not available")
 }
@@ -104,6 +104,26 @@ func TestNodeRPCClientCallWhitelistedPrivateService(t *testing.T) {
 	require.NotNil(t, client)
 
 	// call private API
+	var result string
+	err = client.Call(&result, "pri_someMethod")
+	require.NoError(t, err)
+	require.Equal(t, "some method result", result)
+}
+
+func TestNodeRPCPrivateClientCallPrivateService(t *testing.T) {
+	var err error
+
+	statusNode, err := createAndStartStatusNode(&params.NodeConfig{})
+	require.NoError(t, err)
+	defer func() {
+		err := statusNode.Stop()
+		require.NoError(t, err)
+	}()
+
+	client := statusNode.RPCPrivateClient()
+	require.NotNil(t, client)
+
+	// call private API with private RPC client
 	var result string
 	err = client.Call(&result, "pri_someMethod")
 	require.NoError(t, err)

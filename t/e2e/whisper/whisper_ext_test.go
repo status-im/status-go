@@ -17,17 +17,17 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-func TestWhisperExtentionSuite(t *testing.T) {
-	suite.Run(t, new(WhisperExtentionSuite))
+func TestWhisperExtensionSuite(t *testing.T) {
+	suite.Run(t, new(WhisperExtensionSuite))
 }
 
-type WhisperExtentionSuite struct {
+type WhisperExtensionSuite struct {
 	suite.Suite
 
 	nodes []*node.StatusNode
 }
 
-func (s *WhisperExtentionSuite) SetupTest() {
+func (s *WhisperExtensionSuite) SetupTest() {
 	s.nodes = make([]*node.StatusNode, 2)
 	for i := range s.nodes {
 		dir, err := ioutil.TempDir("", "test-shhext-")
@@ -40,6 +40,7 @@ func (s *WhisperExtentionSuite) SetupTest() {
 		s.nodes[i] = node.New()
 		s.Require().NoError(s.nodes[i].Start(cfg))
 	}
+<<<<<<< HEAD
 	s.True(s.nodes[0].IsRunning())
 	s.True(s.nodes[1].IsRunning())
 	s.nodes[0].GethNode().Server().AddPeer(
@@ -48,6 +49,16 @@ func (s *WhisperExtentionSuite) SetupTest() {
 }
 
 func (s *WhisperExtentionSuite) TestRecievedSignal() {
+=======
+}
+
+func (s *WhisperExtensionSuite) TestSentSignal() {
+	node1, err := s.nodes[0].GethNode()
+	s.NoError(err)
+	node2, err := s.nodes[1].GethNode()
+	s.NoError(err)
+	node1.Server().AddPeer(node2.Server().Self())
+>>>>>>> develop
 	confirmed := make(chan common.Hash, 1)
 	signal.SetDefaultNodeNotificationHandler(func(rawSignal string) {
 		var sg struct {
@@ -57,7 +68,7 @@ func (s *WhisperExtentionSuite) TestRecievedSignal() {
 		s.NoError(json.Unmarshal([]byte(rawSignal), &sg))
 
 		if sg.Type == signal.EventEnvelopeSent {
-			var event shhext.EnvelopeSentSignal
+			var event shhext.EnvelopeSignal
 			s.NoError(json.Unmarshal(sg.Event, &event))
 			confirmed <- event.Hash
 		}
@@ -84,7 +95,46 @@ func (s *WhisperExtentionSuite) TestRecievedSignal() {
 	}
 }
 
-func (s *WhisperExtentionSuite) TearDown() {
+func (s *WhisperExtensionSuite) TestExpiredSignal() {
+	expired := make(chan common.Hash, 1)
+	signal.SetDefaultNodeNotificationHandler(func(rawSignal string) {
+		var sg struct {
+			Type  string
+			Event json.RawMessage
+		}
+		fmt.Println(string(rawSignal))
+		s.NoError(json.Unmarshal([]byte(rawSignal), &sg))
+
+		if sg.Type == signal.EventEnvelopeExpired {
+			var event shhext.EnvelopeSignal
+			s.NoError(json.Unmarshal(sg.Event, &event))
+			expired <- event.Hash
+		}
+	})
+	client := s.nodes[0].RPCClient()
+	s.NotNil(client)
+	var symID string
+	s.NoError(client.Call(&symID, "shh_newSymKey"))
+	msg := whisper.NewMessage{
+		SymKeyID:  symID,
+		PowTarget: whisper.DefaultMinimumPoW,
+		PowTime:   200,
+		TTL:       1,
+		Topic:     whisper.TopicType{0x01, 0x01, 0x01, 0x01},
+		Payload:   []byte("hello"),
+	}
+	var hash common.Hash
+	s.NoError(client.Call(&hash, "shhext_post", msg))
+	s.NotEqual(common.Hash{}, hash)
+	select {
+	case exp := <-expired:
+		s.Equal(hash, exp)
+	case <-time.After(3 * time.Second):
+		s.Fail("timed out while waiting for expiration")
+	}
+}
+
+func (s *WhisperExtensionSuite) TearDown() {
 	for _, n := range s.nodes {
 		cfg := n.Config()
 		s.NotNil(cfg)

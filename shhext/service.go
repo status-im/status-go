@@ -21,8 +21,11 @@ const (
 	EnvelopeSent
 )
 
-// ConfirmationHandler used as a callback for confirming that envelopes were sent.
-type ConfirmationHandler func(common.Hash)
+// EnvelopeEventsHandler used for two different event types.
+type EnvelopeEventsHandler interface {
+	EnvelopeSent(common.Hash)
+	EnvelopeExpired(common.Hash)
+}
 
 // Service is a service that provides some additional Whisper API.
 type Service struct {
@@ -34,7 +37,7 @@ type Service struct {
 var _ node.Service = (*Service)(nil)
 
 // New returns a new Service.
-func New(w *whisper.Whisper, handler ConfirmationHandler) *Service {
+func New(w *whisper.Whisper, handler EnvelopeEventsHandler) *Service {
 	track := &tracker{
 		w:       w,
 		handler: handler,
@@ -81,7 +84,7 @@ func (s *Service) Stop() error {
 // and calling specified handler.
 type tracker struct {
 	w       *whisper.Whisper
-	handler ConfirmationHandler
+	handler EnvelopeEventsHandler
 
 	mu    sync.Mutex
 	cache map[common.Hash]EnvelopeState
@@ -141,15 +144,21 @@ func (t *tracker) handleEvent(event whisper.EnvelopeEvent) {
 		if !ok || state == EnvelopeSent {
 			return
 		}
+		log.Debug("envelope is sent", "hash", event.Hash, "peer", event.Peer)
+		t.cache[event.Hash] = EnvelopeSent
 		if t.handler != nil {
-			log.Debug("envelope is sent", "hash", event.Hash, "peer", event.Peer)
-			t.handler(event.Hash)
-			t.cache[event.Hash] = EnvelopeSent
+			t.handler.EnvelopeSent(event.Hash)
 		}
 	case whisper.EventEnvelopeExpired:
-		if _, ok := t.cache[event.Hash]; ok {
-			log.Debug("envelope expired", "hash", event.Hash)
+		if state, ok := t.cache[event.Hash]; ok {
+			log.Debug("envelope expired", "hash", event.Hash, "state", state)
 			delete(t.cache, event.Hash)
+			if state == EnvelopeSent {
+				return
+			}
+			if t.handler != nil {
+				t.handler.EnvelopeExpired(event.Hash)
+			}
 		}
 	}
 }

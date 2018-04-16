@@ -40,9 +40,10 @@ var (
 type StatusNode struct {
 	mu sync.RWMutex
 
-	config    *params.NodeConfig // Status node configuration
-	gethNode  *node.Node         // reference to Geth P2P stack/node
-	rpcClient *rpc.Client        // reference to public RPC client
+	config           *params.NodeConfig // Status node configuration
+	gethNode         *node.Node         // reference to Geth P2P stack/node
+	rpcClient        *rpc.Client        // reference to public RPC client
+	rpcPrivateClient *rpc.Client        // reference to private RPC client (can call private APIs)
 
 	register *peers.Register
 	peerPool *peers.PeerPool
@@ -119,12 +120,25 @@ func (n *StatusNode) start(services []node.ServiceConstructor) error {
 	return n.gethNode.Start()
 }
 
-func (n *StatusNode) setupRPCClient() error {
-	localRPCClient, err := n.gethNode.AttachPublic()
-	if err == nil {
-		n.rpcClient, err = rpc.NewClient(localRPCClient, n.config.UpstreamConfig)
+func (n *StatusNode) setupRPCClient() (err error) {
+	// setup public RPC client
+	gethNodeClient, err := n.gethNode.AttachPublic()
+	if err != nil {
+		return
 	}
-	return err
+	n.rpcClient, err = rpc.NewClient(gethNodeClient, n.config.UpstreamConfig)
+	if err != nil {
+		return
+	}
+
+	// setup private RPC client
+	gethNodePrivateClient, err := n.gethNode.Attach()
+	if err != nil {
+		return
+	}
+	n.rpcPrivateClient, err = rpc.NewClient(gethNodePrivateClient, n.config.UpstreamConfig)
+
+	return
 }
 
 func (n *StatusNode) startPeerPool() error {
@@ -174,9 +188,11 @@ func (n *StatusNode) stop() error {
 	}
 
 	n.rpcClient = nil
-	// We need to clear `gethNode`` because config is passed to `Start()`
-	// and may be completely different.
+	n.rpcPrivateClient = nil
+	// We need to clear `gethNode` because config is passed to `Start()`
+	// and may be completely different. Similarly with `config`.
 	n.gethNode = nil
+	n.config = nil
 
 	return nil
 }
@@ -387,8 +403,23 @@ func (n *StatusNode) AccountKeyStore() (*keystore.KeyStore, error) {
 func (n *StatusNode) RPCClient() *rpc.Client {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-
 	return n.rpcClient
+}
+
+// RPCPrivateClient exposes reference to RPC client connected to the running node
+// that can call both public and private APIs.
+func (n *StatusNode) RPCPrivateClient() *rpc.Client {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	return n.rpcPrivateClient
+}
+
+// isAvailable check if we have a node running and make sure is fully started
+func (n *StatusNode) isAvailable() error {
+	if n.gethNode == nil || n.gethNode.Server() == nil {
+		return ErrNoRunningNode
+	}
+	return nil
 }
 
 // EnsureSync waits until blockchain synchronization

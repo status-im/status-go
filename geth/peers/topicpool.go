@@ -245,7 +245,7 @@ func (t *TopicPool) removePeer(server *p2p.Server, info *peerInfo) {
 
 // StopSearch stops the closes stop
 func (t *TopicPool) StopSearch() {
-	if !t.SearchRunning() {
+	if !atomic.CompareAndSwapInt32(&t.running, 1, 0) {
 		return
 	}
 	if t.quit == nil {
@@ -259,7 +259,6 @@ func (t *TopicPool) StopSearch() {
 		close(t.quit)
 	}
 	t.consumerWG.Wait()
-	atomic.StoreInt32(&t.running, 0)
 	close(t.period)
 	t.discWG.Wait()
 }
