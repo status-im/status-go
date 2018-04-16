@@ -6,7 +6,7 @@ go:
 sudo: false
 dist: trusty
 before_install:
-- ulimit -s 2165536
+- ulimit -s unlimited
 install:
 - make mock-install
 - make lint-install
