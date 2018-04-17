@@ -25,8 +25,6 @@ const (
 	defaultGas = 90000
 )
 
-func unused() {}
-
 // Transactor validates, signs transactions.
 // It uses upstream to propagate transactions to the Ethereum network.
 type Transactor struct {
