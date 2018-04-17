@@ -5,8 +5,6 @@ go:
 - 1.9.x
 sudo: false
 dist: trusty
-before_install:
-- ulimit -s unlimited
 install:
 - make mock-install
 - make lint-install
