@@ -9,8 +9,6 @@ install:
 - make mock-install
 - make lint-install
 - make dep-install
-before_script:
-
 jobs:
   include:
   - stage: Lint & Vendor Check
@@ -20,7 +18,7 @@ jobs:
   - stage: Test unit and integration
     env:
       # When develop is run by cron, test with `-race` flag.
-      - EXTRA_FLAGS=$([[ "${TRAVIS_EVENT_TYPE}" == "cron" && "${TRAVIS_BRANCH}" == "develop" ]] && echo '-race' || echo '')
+      - EXTRA_FLAGS=$([[ "${TRAVIS_EVENT_TYPE}" == "push" && "${TRAVIS_BRANCH}" == "chore/run-test-with-race" ]] && echo '-race' || echo '')
     script: make test-unit-coverage gotest_extraflags="$EXTRA_FLAGS"
   - stage: Test e2e on private network
     script: make test-e2e
