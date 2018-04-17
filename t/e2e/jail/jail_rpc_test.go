@@ -36,7 +36,7 @@ func (s *JailRPCTestSuite) SetupTest() {
 }
 
 func (s *JailRPCTestSuite) TestJailRPCSend() {
-	if SkipTransactionTest() {
+	if SkipTransactionTest(BothNetworks) {
 		s.T().Skip("test must not run on mainnet or status chain")
 	}
 	s.StartTestBackend()
@@ -97,9 +97,6 @@ func (s *JailRPCTestSuite) TestIsConnected() {
 
 // regression test: eth_getTransactionReceipt with invalid transaction hash should return "error":{"code":-32000,"message":"unknown transaction"}
 func (s *JailRPCTestSuite) TestRegressionGetTransactionReceipt() {
-	if SkipTransactionTest() {
-		s.T().Skip("test must not run on mainnet or status chain")
-	}
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
@@ -113,7 +110,7 @@ func (s *JailRPCTestSuite) TestRegressionGetTransactionReceipt() {
 }
 
 func (s *JailRPCTestSuite) TestContractDeployment() {
-	if SkipTransactionTest() {
+	if SkipTransactionTest(BothNetworks) {
 		s.T().Skip("test must not run on mainnet or status chain")
 	}
 	s.StartTestBackend()
@@ -199,8 +196,8 @@ func (s *JailRPCTestSuite) TestContractDeployment() {
 }
 
 func (s *JailRPCTestSuite) TestJailVMPersistence() {
-	if SkipTransactionTest() {
-		s.T().Skip("test must not run on mainnet or status chain")
+	if SkipTransactionTest(MainnetOnly) {
+		s.T().Skip("test must not run on mainnet")
 	}
 	s.StartTestBackend()
 	defer s.StopTestBackend()

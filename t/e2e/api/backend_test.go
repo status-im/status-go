@@ -28,9 +28,6 @@ type APIBackendTestSuite struct {
 // FIXME(tiabc): There's also a test with the same name in geth/node/manager_test.go
 // so this test should only check StatusBackend logic with a mocked version of the underlying StatusNode.
 func (s *APIBackendTestSuite) TestRaceConditions() {
-	if GetNetworkID() == params.MainNetworkID {
-		s.T().Skip("test must not run on mainnet")
-	}
 	require := s.Require()
 	require.NotNil(s.Backend)
 

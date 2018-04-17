@@ -34,8 +34,8 @@ type TransactionsTestSuite struct {
 }
 
 func (s *TransactionsTestSuite) TestCallRPCSendTransaction() {
-	if SkipTransactionTest() {
-		s.T().Skip("test must not run on mainnet or status chain")
+	if SkipTransactionTest(MainnetOnly) {
+		s.T().Skip("test must not run on mainnet")
 	}
 	s.StartTestBackend()
 	defer s.StopTestBackend()
@@ -84,7 +84,7 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransaction() {
 }
 
 func (s *TransactionsTestSuite) TestCallRPCSendTransactionUpstream() {
-	if SkipTransactionTest() {
+	if SkipTransactionTest(BothNetworks) {
 		s.T().Skip("test must not run on mainnet or status chain")
 	}
 
@@ -142,8 +142,8 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransactionUpstream() {
 }
 
 func (s *TransactionsTestSuite) TestEmptyToFieldPreserved() {
-	if SkipTransactionTest() {
-		s.T().Skip("test must not run on mainnet or status chain")
+	if SkipTransactionTest(MainnetOnly) {
+		s.T().Skip("test must not run on mainnet")
 	}
 	s.StartTestBackend()
 	defer s.StopTestBackend()
@@ -192,7 +192,7 @@ func (s *TransactionsTestSuite) TestEmptyToFieldPreserved() {
 // TestSendContractCompat tries to send transaction using the legacy "Data"
 // field, which is supported for backward compatibility reasons.
 func (s *TransactionsTestSuite) TestSendContractTxCompat() {
-	if SkipTransactionTest() {
+	if SkipTransactionTest(BothNetworks) {
 		s.T().Skip("test must not run on mainnet or status chain")
 	}
 	initFunc := func(byteCode []byte, args *transactions.SendTxArgs) {
@@ -205,7 +205,7 @@ func (s *TransactionsTestSuite) TestSendContractTxCompat() {
 // "Data" and "Input" fields. Also makes sure that the error is returned if
 // they have different values.
 func (s *TransactionsTestSuite) TestSendContractTxCollision() {
-	if SkipTransactionTest() {
+	if SkipTransactionTest(BothNetworks) {
 		s.T().Skip("test must not run on mainnet or status chain")
 	}
 	// Scenario 1: Both fields are filled and have the same value, expect success
@@ -235,7 +235,7 @@ func (s *TransactionsTestSuite) TestSendContractTxCollision() {
 }
 
 func (s *TransactionsTestSuite) TestSendContractTx() {
-	if SkipTransactionTest() {
+	if SkipTransactionTest(BothNetworks) {
 		s.T().Skip("test must not run on mainnet or status chain")
 	}
 	initFunc := func(byteCode []byte, args *transactions.SendTxArgs) {
@@ -344,7 +344,7 @@ func (s *TransactionsTestSuite) testSendContractTx(setInputAndDataValue initFunc
 }
 
 func (s *TransactionsTestSuite) TestSendEther() {
-	if SkipTransactionTest() {
+	if SkipTransactionTest(BothNetworks) {
 		s.T().Skip("test must not run on mainnet or status chain")
 	}
 	s.StartTestBackend()
@@ -427,7 +427,7 @@ func (s *TransactionsTestSuite) TestSendEther() {
 }
 
 func (s *TransactionsTestSuite) TestSendEtherTxUpstream() {
-	if SkipTransactionTest() {
+	if SkipTransactionTest(BothNetworks) {
 		s.T().Skip("test must not run on mainnet or status chain")
 	}
 	addr, err := GetRemoteURL()
@@ -483,7 +483,7 @@ func (s *TransactionsTestSuite) TestSendEtherTxUpstream() {
 }
 
 func (s *TransactionsTestSuite) TestDoubleCompleteQueuedTransactions() {
-	if SkipTransactionTest() {
+	if SkipTransactionTest(BothNetworks) {
 		s.T().Skip("test must not run on mainnet or status chain")
 	}
 	s.StartTestBackend()
@@ -560,7 +560,7 @@ func (s *TransactionsTestSuite) TestDoubleCompleteQueuedTransactions() {
 }
 
 func (s *TransactionsTestSuite) TestDiscardQueuedTransaction() {
-	if SkipTransactionTest() {
+	if SkipTransactionTest(BothNetworks) {
 		s.T().Skip("test must not run on mainnet or status chain")
 	}
 	s.StartTestBackend()
@@ -637,7 +637,7 @@ func (s *TransactionsTestSuite) TestDiscardQueuedTransaction() {
 }
 
 func (s *TransactionsTestSuite) TestCompleteMultipleQueuedTransactions() {
-	if SkipTransactionTest() {
+	if SkipTransactionTest(BothNetworks) {
 		s.T().Skip("test must not run on mainnet or status chain")
 	}
 	s.setupLocalNode()
@@ -651,7 +651,7 @@ func (s *TransactionsTestSuite) TestCompleteMultipleQueuedTransactions() {
 }
 
 func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
-	if SkipTransactionTest() {
+	if SkipTransactionTest(BothNetworks) {
 		s.T().Skip("test must not run on mainnet or status chain")
 	}
 	s.StartTestBackend()
@@ -784,7 +784,7 @@ func (s *TransactionsTestSuite) TestNonExistentQueuedTransactions() {
 }
 
 func (s *TransactionsTestSuite) TestCompleteMultipleQueuedTransactionsUpstream() {
-	if SkipTransactionTest() {
+	if SkipTransactionTest(BothNetworks) {
 		s.T().Skip("test must not run on mainnet or status chain")
 	}
 	s.setupUpstreamNode()

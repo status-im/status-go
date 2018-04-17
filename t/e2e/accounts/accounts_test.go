@@ -81,9 +81,6 @@ func (s *AccountsTestSuite) TestAccountsList() {
 }
 
 func (s *AccountsTestSuite) TestCreateChildAccount() {
-	if SkipTransactionTest() {
-		s.T().Skip("test must not run on mainnet or status chain")
-	}
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 

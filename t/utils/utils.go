@@ -134,8 +134,7 @@ func GetRemoteURLFromNetworkID(id int) (url string, err error) {
 func GetHeadHashFromNetworkID(id int) string {
 	switch id {
 	case params.MainNetworkID:
-		// TODO(themue) Set mainnet hash.
-		return "0x0000000000000000000000000000000000000000000000000000000000000000"
+		return "0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3"
 	case params.RinkebyNetworkID:
 		return "0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177"
 	case params.RopstenNetworkID:
@@ -174,11 +173,17 @@ func GetNetworkID() int {
 	panic(fmt.Sprintf("invalid selected network: %q", *networkSelected))
 }
 
+// Deciding if test skipping is for mainnet and status chain.
+const (
+	MainnetOnly  = false
+	BothNetworks = true
+)
+
 // SkipTransactionTest is used inside tests performing transactions.
 // In case of Mainnet or StatusChain it return true to signal skipping.
-func SkipTransactionTest() bool {
+func SkipTransactionTest(skipStatus bool) bool {
 	id := GetNetworkID()
-	if id == params.MainNetworkID || id == params.StatusChainNetworkID {
+	if id == params.MainNetworkID || (skipStatus && id == params.StatusChainNetworkID) {
 		return true
 	}
 	return false
