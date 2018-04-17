@@ -135,26 +135,26 @@ func (s *APIBackendTestSuite) TestRaceConditions() {
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
-			log.Info("CompleteTransaction()")
-			_, err := s.Backend.CompleteTransaction("id", "password")
-			s.T().Logf("CompleteTransaction(), error: %v", err)
+			log.Info("ApproveSignRequest()")
+			result := s.Backend.ApproveSignRequest("id", "password")
+			s.T().Logf("ApproveSignRequest(), error: %v", result.Error)
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
-			log.Info("DiscardTransaction()")
-			s.T().Logf("DiscardTransaction(), error: %v", s.Backend.DiscardTransaction("id"))
+			log.Info("DiscardSignRequest()")
+			s.T().Logf("DiscardSignRequest(), error: %v", s.Backend.DiscardSignRequest("id"))
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
-			log.Info("CompleteTransactions()")
+			log.Info("ApproveSignRequests()")
 			ids := []string{"id1", "id2"}
-			s.T().Logf("CompleteTransactions(), result: %v", s.Backend.CompleteTransactions(ids, "password"))
+			s.T().Logf("ApproveSignRequests(), result: %v", s.Backend.ApproveSignRequests(ids, "password"))
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
-			log.Info("DiscardTransactions()")
+			log.Info("DiscardSignRequests()")
 			ids := []string{"id1", "id2"}
-			s.T().Logf("DiscardTransactions(), result: %v", s.Backend.DiscardTransactions(ids))
+			s.T().Logf("DiscardSignRequests(), result: %v", s.Backend.DiscardSignRequests(ids))
 			progress <- struct{}{}
 		},
 	}

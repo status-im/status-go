@@ -7,11 +7,17 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/geth/params"
 
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
+)
+
+const (
+	// DefaultCallTimeout is a default timeout for an RPC call
+	DefaultCallTimeout = time.Minute
 )
 
 // Handler defines handler for RPC methods.
@@ -81,15 +87,28 @@ func (c *Client) Call(result interface{}, method string, args ...interface{}) er
 // can also pass nil, in which case the result is ignored.
 //
 // It uses custom routing scheme for calls.
+// If there are any local handlers registered for this call, they will handle it.
 func (c *Client) CallContext(ctx context.Context, result interface{}, method string, args ...interface{}) error {
 	// check locally registered handlers first
 	if handler, ok := c.handler(method); ok {
 		return c.callMethod(ctx, result, handler, args...)
 	}
 
+	return c.CallContextIgnoringLocalHandlers(ctx, result, method, args...)
+}
+
+// CallContextIgnoringLocalHandlers performs a JSON-RPC call with the given
+// arguments.
+//
+// If there are local handlers registered for this call, they would
+// be ignored. It is useful if the call is happening from within a local
+// handler itself.
+// Upstream calls routing will be used anyway.
+func (c *Client) CallContextIgnoringLocalHandlers(ctx context.Context, result interface{}, method string, args ...interface{}) error {
 	if c.router.routeRemote(method) {
 		return c.upstream.CallContext(ctx, result, method, args...)
 	}
+
 	return c.local.CallContext(ctx, result, method, args...)
 }
 

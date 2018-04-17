@@ -40,7 +40,6 @@ func (s *RPCTestSuite) TestCallRPC() {
 		s.NoError(err)
 
 		nodeConfig.IPCEnabled = false
-		nodeConfig.WSEnabled = false
 		nodeConfig.HTTPHost = "" // to make sure that no HTTP interface is started
 
 		if upstreamEnabled {
