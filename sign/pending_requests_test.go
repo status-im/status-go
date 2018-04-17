@@ -209,16 +209,17 @@ func (s PendingRequestsSuite) TestWaitFail() {
 }
 
 func (s PendingRequestsSuite) TestWaitTimeout() {
-	req, err := s.pendingRequests.Add(context.Background(), "", nil, s.delayedCompleteFunc())
+	req, err := s.pendingRequests.Add(context.Background(), "", nil, s.defaultCompleteFunc())
 	s.NoError(err)
 
 	s.True(s.pendingRequests.Has(req.ID), "sign request should exist")
 
 	go func() {
+		time.Sleep(10 * time.Microsecond)
 		result := s.pendingRequests.Approve(req.ID, correctPassword, testVerifyFunc)
-		s.NoError(result.Error)
+		s.NotNil(result.Error)
 	}()
 
 	result := s.pendingRequests.Wait(req.ID, 0*time.Second)
-	s.Equal(result.Error, ErrSignReqTimedOut)
+	s.Equal(ErrSignReqTimedOut, result.Error)
 }
