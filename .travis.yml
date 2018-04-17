@@ -21,15 +21,15 @@ jobs:
   - stage: Test e2e on private network
     script: make test-e2e
   - stage: Test e2e on public network
-    # disable running this stage for PRs as they do not have access
-    # to the ACCOUNT_PASSWORD env variable needed to unlock the public testnet accounts.
-    # using fork == false may be preferred as it would allow PRs from the origin
-    # to still run, but currently does not work due to a bug
-    if: type != pull_request
+    # Disable running this stage for pushes as it's not needed to run it twice.
+    # We only want to check if tests on public testnet pass in a merge build.
+    # Also, disable for fork builds as they do not have access to
+    # ACCOUNT_PASSWORD environment variable anyway.
+    if: (type != push) AND (fork = false)
     script:
-      # sync the chain first; it will time out after 20 minutes; Rinkeby is networkid=4
+      # Sync the chain first. It will time out after 20 minutes. Used network: Rinkeby.
       - make statusgo
-      - ./build/bin/statusd -datadir .ethereumtest/Rinkeby -les -networkid=4 -sync-and-exit=20 -log WARN -standalone=false -discovery=false
+      - ./build/bin/statusd -datadir=.ethereumtest/Rinkeby -les -networkid=4 -sync-and-exit=20 -log=WARN -standalone=false -discovery=false
       - make test-e2e networkid=4
 cache:
   directories:

@@ -126,16 +126,16 @@ func (s *JailRPCTestSuite) TestContractDeployment() {
 		unmarshalErr := json.Unmarshal([]byte(jsonEvent), &envelope)
 		s.NoError(unmarshalErr, "cannot unmarshal JSON: %s", jsonEvent)
 
-		if envelope.Type == sign.EventTransactionQueued {
+		if envelope.Type == sign.EventSignRequestAdded {
 			event := envelope.Event.(map[string]interface{})
 			s.T().Logf("transaction queued and will be completed shortly, id: %v", event["id"])
 
 			s.NoError(s.Backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 
 			txID := event["id"].(string)
-			var txErr error
-			txHash, txErr = s.Backend.CompleteTransaction(txID, TestConfig.Account1.Password)
-			if s.NoError(txErr, event["id"]) {
+			result := s.Backend.ApproveSignRequest(txID, TestConfig.Account1.Password)
+			txHash.SetBytes(result.Response.Bytes())
+			if s.NoError(result.Error, event["id"]) {
 				s.T().Logf("contract transaction complete, URL: %s", "https://ropsten.etherscan.io/tx/"+txHash.Hex())
 			}
 
@@ -284,14 +284,16 @@ func (s *JailRPCTestSuite) TestJailVMPersistence() {
 			s.T().Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
 		}
-		if envelope.Type == sign.EventTransactionQueued {
+		if envelope.Type == sign.EventSignRequestAdded {
 			event := envelope.Event.(map[string]interface{})
 			s.T().Logf("Transaction queued (will be completed shortly): {id: %s}\n", event["id"].(string))
 
-			//var txHash common.Hash
+			var txHash gethcommon.Hash
 			txID := event["id"].(string)
-			txHash, e := s.Backend.CompleteTransaction(txID, TestConfig.Account1.Password)
-			s.NoError(e, "cannot complete queued transaction[%v]: %v", event["id"], e)
+			result := s.Backend.ApproveSignRequest(txID, TestConfig.Account1.Password)
+			s.NoError(result.Error, "cannot complete queued transaction[%v]: %v", event["id"], result.Error)
+
+			txHash.SetBytes(result.Response.Bytes())
 
 			s.T().Logf("Transaction complete: https://ropsten.etherscan.io/tx/%s", txHash.Hex())
 		}

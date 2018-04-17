@@ -19,42 +19,37 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 
 	"github.com/status-im/status-go/geth/db"
-	"github.com/status-im/status-go/geth/mailservice"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/peers"
 	"github.com/status-im/status-go/geth/rpc"
 )
 
+// tickerResolution is the delta to check blockchain sync progress.
+const tickerResolution = time.Second
+
 // errors
 var (
-	ErrNodeExists             = errors.New("node is already running")
+	ErrNodeRunning            = errors.New("node is already running")
+	ErrNoGethNode             = errors.New("geth node is not available")
 	ErrNoRunningNode          = errors.New("there is no running node")
-	ErrInvalidStatusNode      = errors.New("status node is not properly initialized")
-	ErrInvalidService         = errors.New("service is unavailable")
-	ErrInvalidAccountManager  = errors.New("could not retrieve account manager")
 	ErrAccountKeyStoreMissing = errors.New("account key store is not set")
-	ErrRPCClient              = errors.New("failed to init RPC client")
 )
-
-// RPCClientError reported when rpc client is initialized.
-type RPCClientError error
-
-// EthNodeError is reported when node crashed on start up.
-type EthNodeError error
 
 // StatusNode abstracts contained geth node and provides helper methods to
 // interact with it.
 type StatusNode struct {
-	mu       sync.RWMutex
-	config   *params.NodeConfig // Status node configuration
-	gethNode *node.Node         // reference to Geth P2P stack/node
+	mu sync.RWMutex
+
+	config           *params.NodeConfig // Status node configuration
+	gethNode         *node.Node         // reference to Geth P2P stack/node
+	rpcClient        *rpc.Client        // reference to public RPC client
+	rpcPrivateClient *rpc.Client        // reference to private RPC client (can call private APIs)
 
 	register *peers.Register
 	peerPool *peers.PeerPool
-	db       *leveldb.DB
+	db       *leveldb.DB // used as a cache for PeerPool
 
-	rpcClient *rpc.Client // reference to RPC client
-	log       log.Logger
+	log log.Logger
 }
 
 // New makes new instance of StatusNode.
@@ -64,50 +59,86 @@ func New() *StatusNode {
 	}
 }
 
+// Config exposes reference to running node's configuration
+func (n *StatusNode) Config() *params.NodeConfig {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+
+	return n.config
+}
+
+// GethNode returns underlying geth node.
+func (n *StatusNode) GethNode() *node.Node {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+
+	return n.gethNode
+}
+
 // Start starts current StatusNode, will fail if it's already started.
-func (n *StatusNode) Start(config *params.NodeConfig) error {
+func (n *StatusNode) Start(config *params.NodeConfig, services ...node.ServiceConstructor) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	return n.start(config)
+
+	if n.isRunning() {
+		return ErrNodeRunning
+	}
+
+	if err := n.createNode(config); err != nil {
+		return err
+	}
+	n.config = config
+
+	if err := n.start(services); err != nil {
+		return err
+	}
+
+	if err := n.setupRPCClient(); err != nil {
+		return err
+	}
+
+	if n.gethNode.Server().DiscV5 != nil {
+		return n.startPeerPool()
+	}
+
+	return nil
+}
+
+func (n *StatusNode) createNode(config *params.NodeConfig) (err error) {
+	n.gethNode, err = MakeNode(config)
+	return
 }
 
 // start starts current StatusNode, will fail if it's already started.
-func (n *StatusNode) start(config *params.NodeConfig) error {
-	if err := n.isAvailable(); err == nil {
-		return ErrNodeExists
+func (n *StatusNode) start(services []node.ServiceConstructor) error {
+	for _, service := range services {
+		if err := n.gethNode.Register(service); err != nil {
+			return err
+		}
 	}
 
-	ethNode, err := MakeNode(config)
+	return n.gethNode.Start()
+}
+
+func (n *StatusNode) setupRPCClient() (err error) {
+	// setup public RPC client
+	gethNodeClient, err := n.gethNode.AttachPublic()
 	if err != nil {
-		return err
+		return
 	}
-	n.gethNode = ethNode
-	n.config = config
-
-	// activate MailService required for Offline Inboxing
-	if err := ethNode.Register(func(_ *node.ServiceContext) (node.Service, error) {
-		return mailservice.New(n), nil
-	}); err != nil {
-		return err
-	}
-
-	// start underlying node
-	if err := ethNode.Start(); err != nil {
-		return EthNodeError(err)
-	}
-	// init RPC client for this node
-	localRPCClient, err := n.gethNode.Attach()
-	if err == nil {
-		n.rpcClient, err = rpc.NewClient(localRPCClient, n.config.UpstreamConfig)
-	}
+	n.rpcClient, err = rpc.NewClient(gethNodeClient, n.config.UpstreamConfig)
 	if err != nil {
-		n.log.Error("Failed to create an RPC client", "error", err)
-		return RPCClientError(err)
+		return
 	}
-	if ethNode.Server().DiscV5 != nil {
-		return n.startPeerPool()
+
+	// setup private RPC client
+	gethNodePrivateClient, err := n.gethNode.Attach()
+	if err != nil {
+		return
 	}
-	return nil
+	n.rpcPrivateClient, err = rpc.NewClient(gethNodePrivateClient, n.config.UpstreamConfig)
+
+	return
 }
 
 func (n *StatusNode) startPeerPool() error {
@@ -135,44 +166,58 @@ func (n *StatusNode) startPeerPool() error {
 func (n *StatusNode) Stop() error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
+
+	if !n.isRunning() {
+		return ErrNoRunningNode
+	}
+
 	return n.stop()
 }
 
 // stop will stop current StatusNode. A stopped node cannot be resumed.
 func (n *StatusNode) stop() error {
-	if err := n.isAvailable(); err != nil {
-		return err
+	if err := n.stopPeerPool(); err != nil {
+		n.log.Error("Error stopping the PeerPool", "error", err)
 	}
-	if n.gethNode.Server().DiscV5 != nil {
-		n.stopPeerPool()
-	}
+	n.register = nil
+	n.peerPool = nil
+	n.db = nil
+
 	if err := n.gethNode.Stop(); err != nil {
 		return err
 	}
+
+	n.rpcClient = nil
+	n.rpcPrivateClient = nil
+	// We need to clear `gethNode` because config is passed to `Start()`
+	// and may be completely different. Similarly with `config`.
 	n.gethNode = nil
 	n.config = nil
-	n.rpcClient = nil
+
 	return nil
 }
 
-func (n *StatusNode) stopPeerPool() {
+func (n *StatusNode) stopPeerPool() error {
+	if n.gethNode.Server().DiscV5 == nil {
+		return nil
+	}
+
 	n.register.Stop()
 	n.peerPool.Stop()
-	if err := n.db.Close(); err != nil {
-		n.log.Error("error closing status db", "error", err)
-	}
+	return n.db.Close()
 }
 
 // ResetChainData removes chain data if node is not running.
 func (n *StatusNode) ResetChainData(config *params.NodeConfig) error {
-	if n.IsRunning() {
-		return ErrNodeExists
-	}
 	n.mu.Lock()
 	defer n.mu.Unlock()
+
+	if n.isRunning() {
+		return ErrNodeRunning
+	}
+
 	chainDataDir := filepath.Join(config.DataDir, config.Name, "lightchaindata")
 	if _, err := os.Stat(chainDataDir); os.IsNotExist(err) {
-		// is it really an error, if we want to remove it as next step?
 		return err
 	}
 	err := os.RemoveAll(chainDataDir)
@@ -187,38 +232,24 @@ func (n *StatusNode) IsRunning() bool {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 
-	if err := n.isAvailable(); err != nil {
-		return false
-	}
-	return true
+	return n.isRunning()
 }
 
-// GethNode returns underlying geth node.
-func (n *StatusNode) GethNode() (*node.Node, error) {
-	n.mu.RLock()
-	defer n.mu.RUnlock()
-
-	if err := n.isAvailable(); err != nil {
-		return nil, err
-	}
-	return n.gethNode, nil
+func (n *StatusNode) isRunning() bool {
+	return n.gethNode != nil && n.gethNode.Server() != nil
 }
 
 // populateStaticPeers connects current node with our publicly available LES/SHH/Swarm cluster
 func (n *StatusNode) populateStaticPeers() error {
-	if err := n.isAvailable(); err != nil {
-		return err
-	}
-	if !n.config.ClusterConfig.Enabled {
+	if n.config.ClusterConfig == nil || !n.config.ClusterConfig.Enabled {
 		n.log.Info("Static peers are disabled")
 		return nil
 	}
 
 	for _, enode := range n.config.ClusterConfig.StaticNodes {
-		err := n.addPeer(enode)
-		if err != nil {
-			n.log.Warn("Static peer addition failed", "error", err)
-			continue
+		if err := n.addPeer(enode); err != nil {
+			n.log.Error("Static peer addition failed", "error", err)
+			return err
 		}
 		n.log.Info("Static peer added", "enode", enode)
 	}
@@ -227,18 +258,14 @@ func (n *StatusNode) populateStaticPeers() error {
 }
 
 func (n *StatusNode) removeStaticPeers() error {
-	if !n.config.ClusterConfig.Enabled {
+	if n.config.ClusterConfig == nil || !n.config.ClusterConfig.Enabled {
 		n.log.Info("Static peers are disabled")
 		return nil
 	}
-	server := n.gethNode.Server()
-	if server == nil {
-		return ErrNoRunningNode
-	}
+
 	for _, enode := range n.config.ClusterConfig.StaticNodes {
-		err := n.removePeer(enode)
-		if err != nil {
-			n.log.Warn("Static peer deletion failed", "error", err)
+		if err := n.removePeer(enode); err != nil {
+			n.log.Error("Static peer deletion failed", "error", err)
 			return err
 		}
 		n.log.Info("Static peer deleted", "enode", enode)
@@ -250,9 +277,15 @@ func (n *StatusNode) removeStaticPeers() error {
 func (n *StatusNode) ReconnectStaticPeers() error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
+
+	if !n.isRunning() {
+		return ErrNoRunningNode
+	}
+
 	if err := n.removeStaticPeers(); err != nil {
 		return err
 	}
+
 	return n.populateStaticPeers()
 }
 
@@ -260,20 +293,23 @@ func (n *StatusNode) ReconnectStaticPeers() error {
 func (n *StatusNode) AddPeer(url string) error {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	if err := n.isAvailable(); err != nil {
-		return err
-	}
+
 	return n.addPeer(url)
 }
 
 // addPeer adds new static peer node
 func (n *StatusNode) addPeer(url string) error {
-	// Try to add the url as a static peer and return
 	parsedNode, err := discover.ParseNode(url)
 	if err != nil {
 		return err
 	}
+
+	if !n.isRunning() {
+		return ErrNoRunningNode
+	}
+
 	n.gethNode.Server().AddPeer(parsedNode)
+
 	return nil
 }
 
@@ -282,38 +318,37 @@ func (n *StatusNode) removePeer(url string) error {
 	if err != nil {
 		return err
 	}
+
+	if !n.isRunning() {
+		return ErrNoRunningNode
+	}
+
 	n.gethNode.Server().RemovePeer(parsedNode)
+
 	return nil
 }
 
 // PeerCount returns the number of connected peers.
 func (n *StatusNode) PeerCount() int {
-	if !n.IsRunning() {
-		return 0
-	}
-	return n.gethNode.Server().PeerCount()
-}
-
-// Config exposes reference to running node's configuration
-func (n *StatusNode) Config() (*params.NodeConfig, error) {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 
-	if err := n.isAvailable(); err != nil {
-		return nil, err
+	if !n.isRunning() {
+		return 0
 	}
-	return n.config, nil
+
+	return n.gethNode.Server().PeerCount()
 }
 
 // gethService is a wrapper for gethNode.Service which retrieves a currently
 // running service registered of a specific type.
-func (n *StatusNode) gethService(serviceInstance interface{}, serviceName string) error {
-	if err := n.isAvailable(); err != nil {
-		return err
+func (n *StatusNode) gethService(serviceInstance interface{}) error {
+	if !n.isRunning() {
+		return ErrNoRunningNode
 	}
-	if err := n.gethNode.Service(serviceInstance); err != nil || serviceInstance == nil {
-		n.log.Warn("Cannot obtain ", serviceName, " service", "error", err)
-		return ErrInvalidService
+
+	if err := n.gethNode.Service(serviceInstance); err != nil {
+		return fmt.Errorf("service unavailable: %v", err)
 	}
 
 	return nil
@@ -321,12 +356,12 @@ func (n *StatusNode) gethService(serviceInstance interface{}, serviceName string
 
 // LightEthereumService exposes reference to LES service running on top of the node
 func (n *StatusNode) LightEthereumService() (l *les.LightEthereum, err error) {
-	return l, n.gethService(&l, "LES")
+	return l, n.gethService(&l)
 }
 
 // WhisperService exposes reference to Whisper service running on top of the node
 func (n *StatusNode) WhisperService() (w *whisper.Whisper, err error) {
-	return w, n.gethService(&w, "whisper")
+	return w, n.gethService(&w)
 }
 
 // AccountManager exposes reference to node's accounts manager
@@ -334,14 +369,11 @@ func (n *StatusNode) AccountManager() (*accounts.Manager, error) {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 
-	if err := n.isAvailable(); err != nil {
-		return nil, err
+	if n.gethNode == nil {
+		return nil, ErrNoGethNode
 	}
-	accountManager := n.gethNode.AccountManager()
-	if accountManager == nil {
-		return nil, ErrInvalidAccountManager
-	}
-	return accountManager, nil
+
+	return n.gethNode.AccountManager(), nil
 }
 
 // AccountKeyStore exposes reference to accounts key store
@@ -349,14 +381,11 @@ func (n *StatusNode) AccountKeyStore() (*keystore.KeyStore, error) {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 
-	if err := n.isAvailable(); err != nil {
-		return nil, err
-	}
-	accountManager := n.gethNode.AccountManager()
-	if accountManager == nil {
-		return nil, ErrInvalidAccountManager
+	if n.gethNode == nil {
+		return nil, ErrNoGethNode
 	}
 
+	accountManager := n.gethNode.AccountManager()
 	backends := accountManager.Backends(keystore.KeyStoreType)
 	if len(backends) == 0 {
 		return nil, ErrAccountKeyStoreMissing
@@ -377,23 +406,20 @@ func (n *StatusNode) RPCClient() *rpc.Client {
 	return n.rpcClient
 }
 
-// isAvailable check if we have a node running and make sure is fully started
-func (n *StatusNode) isAvailable() error {
-	if n.gethNode == nil || n.gethNode.Server() == nil {
-		return ErrNoRunningNode
-	}
-	return nil
+// RPCPrivateClient exposes reference to RPC client connected to the running node
+// that can call both public and private APIs.
+func (n *StatusNode) RPCPrivateClient() *rpc.Client {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	return n.rpcPrivateClient
 }
-
-// tickerResolution is the delta to check blockchain sync progress.
-const tickerResolution = time.Second
 
 // EnsureSync waits until blockchain synchronization
 // is complete and returns.
 func (n *StatusNode) EnsureSync(ctx context.Context) error {
 	// Don't wait for any blockchain sync for the
 	// local private chain as blocks are never mined.
-	if n.config.NetworkID == params.StatusChainNetworkID {
+	if n.config.NetworkID == 0 || n.config.NetworkID == params.StatusChainNetworkID {
 		return nil
 	}
 

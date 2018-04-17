@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
+	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 
 	"github.com/status-im/status-go/geth/params"
@@ -19,13 +20,23 @@ var (
 	ErrDiscv5NotRunning = errors.New("Discovery v5 is not running")
 )
 
+// PoolEvent is a type used to for peer pool events.
+type PoolEvent string
+
 const (
 	// expirationPeriod is an amount of time while peer is considered as a connectable
 	expirationPeriod = 60 * time.Minute
+	// discoveryRestartTimeout defines how often loop will try to start discovery server
+	discoveryRestartTimeout = 2 * time.Second
 	// DefaultFastSync is a recommended value for aggressive peers search.
 	DefaultFastSync = 3 * time.Second
 	// DefaultSlowSync is a recommended value for slow (background) peers search.
 	DefaultSlowSync = 30 * time.Minute
+
+	// Discv5Closed is sent when discv5 is closed
+	Discv5Closed PoolEvent = "discv5.closed"
+	// Discv5Started is sent when discv5 is started
+	Discv5Started PoolEvent = "discv5.started"
 )
 
 // NewPeerPool creates instance of PeerPool
@@ -44,6 +55,8 @@ type peerInfo struct {
 	discoveredTime mclock.AbsTime
 	// connected is true if node is added as a static peer
 	connected bool
+	// requested is true when our node requested a disconnect
+	requested bool
 
 	node *discv5.Node
 }
@@ -63,6 +76,8 @@ type PeerPool struct {
 	quit               chan struct{}
 
 	wg sync.WaitGroup
+
+	feed event.Feed
 }
 
 // Start creates topic pool for each topic in config and subscribes to server events.
@@ -92,40 +107,98 @@ func (p *PeerPool) Start(server *p2p.Server) error {
 	return nil
 }
 
+// restartDiscovery and search for topics that have peer count below min
+func (p *PeerPool) restartDiscovery(server *p2p.Server) error {
+	if server.DiscV5 == nil {
+		ntab, err := StartDiscv5(server)
+		if err != nil {
+			log.Error("starting discv5 failed", "error", err, "retry in", discoveryRestartTimeout)
+			return err
+		}
+		log.Debug("restarted discovery from peer pool")
+		server.DiscV5 = ntab
+		p.feed.Send(Discv5Started)
+	}
+	for _, t := range p.topics {
+		if !t.BelowMin() || t.SearchRunning() {
+			continue
+		}
+		err := t.StartSearch(server)
+		if err != nil {
+			log.Error("search failed to start", "error", err)
+		}
+	}
+	return nil
+}
+
 // handleServerPeers watches server peer events, notifies topic pools about changes
 // in the peer set and stops the discv5 if all topic pools collected enough peers.
 func (p *PeerPool) handleServerPeers(server *p2p.Server, events <-chan *p2p.PeerEvent) {
+	var retryDiscv5 <-chan time.Time
+
 	for {
 		select {
 		case <-p.quit:
 			return
+		case <-retryDiscv5:
+			if err := p.restartDiscovery(server); err != nil {
+				retryDiscv5 = time.After(discoveryRestartTimeout)
+			}
 		case event := <-events:
 			switch event.Type {
 			case p2p.PeerEventTypeDrop:
-				p.mu.Lock()
-				for _, t := range p.topics {
-					t.ConfirmDropped(server, event.Peer, event.Error)
-					// TODO(dshulyak) restart discv5 if peers number dropped too low
+				log.Debug("confirm peer dropped", "ID", event.Peer)
+				if p.stopOnMax && p.handleDroppedPeer(server, event.Peer) {
+					retryDiscv5 = time.After(0)
 				}
-				p.mu.Unlock()
 			case p2p.PeerEventTypeAdd:
-				p.mu.Lock()
-				total := 0
-				for _, t := range p.topics {
-					t.ConfirmAdded(server, event.Peer)
-					if p.stopOnMax && t.MaxReached() {
-						total++
-						t.StopSearch()
-					}
-				}
-				if p.stopOnMax && total == len(p.config) {
-					log.Debug("closing discv5 connection")
+				log.Debug("confirm peer added", "ID", event.Peer)
+				if p.stopOnMax && p.handleAddedPeer(server, event.Peer) {
+					log.Debug("closing discv5 connection", "server", server.Self())
 					server.DiscV5.Close()
+					server.DiscV5 = nil
+					p.feed.Send(Discv5Closed)
 				}
-				p.mu.Unlock()
 			}
 		}
 	}
+}
+
+// handleAddedPeer notifies all topics about added peer and return true if all topics has max limit of connections
+func (p *PeerPool) handleAddedPeer(server *p2p.Server, nodeID discover.NodeID) (all bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	all = true
+	for _, t := range p.topics {
+		t.ConfirmAdded(server, nodeID)
+		if p.stopOnMax && t.MaxReached() {
+			t.StopSearch()
+		} else {
+			all = false
+		}
+	}
+	return all
+}
+
+// handleDroppedPeer notifies every topic about dropped peer and returns true if any peer have connections
+// below min limit
+func (p *PeerPool) handleDroppedPeer(server *p2p.Server, nodeID discover.NodeID) (any bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for _, t := range p.topics {
+		confirmed := t.ConfirmDropped(server, nodeID)
+		if confirmed {
+			newPeer := t.AddPeerFromTable(server)
+			if newPeer != nil {
+				log.Debug("added peer from local table", "ID", newPeer.ID)
+			}
+		}
+		log.Debug("search", "topic", t.topic, "below min", t.BelowMin())
+		if t.BelowMin() && !t.SearchRunning() {
+			any = true
+		}
+	}
+	return any
 }
 
 // Stop closes pool quit channel and all channels that are watched by search queries
@@ -143,8 +216,10 @@ func (p *PeerPool) Stop() {
 		close(p.quit)
 	}
 	p.serverSubscription.Unsubscribe()
+	// wait before closing topic pools, otherwise there is chance that
+	// they will be concurrently started while we are exiting.
+	p.wg.Wait()
 	for _, t := range p.topics {
 		t.StopSearch()
 	}
-	p.wg.Wait()
 }

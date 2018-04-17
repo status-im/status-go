@@ -164,7 +164,7 @@ func main() {
 		exitCode := syncAndStopNode(interruptCh, backend.StatusNode(), *syncAndExit)
 		// Call was interrupted. Wait for graceful shutdown.
 		if exitCode == -1 {
-			if node, err := backend.StatusNode().GethNode(); err == nil && node != nil {
+			if node := backend.StatusNode().GethNode(); node != nil {
 				node.Wait()
 			}
 			return
@@ -173,14 +173,11 @@ func main() {
 		os.Exit(exitCode)
 	}
 
-	node, err := backend.StatusNode().GethNode()
-	if err != nil {
-		logger.Error("Getting node failed", "error", err)
-		return
+	node := backend.StatusNode().GethNode()
+	if node != nil {
+		// wait till node has been stopped
+		node.Wait()
 	}
-
-	// wait till node has been stopped
-	node.Wait()
 }
 
 // startDebug starts the debugging API server.
@@ -195,9 +192,9 @@ func startCollectingStats(interruptCh <-chan struct{}, statusNode *node.StatusNo
 
 	logger.Info("Starting stats", "stats", *statsAddr)
 
-	node, err := statusNode.GethNode()
-	if err != nil {
-		logger.Error("Failed to run metrics because could not get node", "error", err)
+	node := statusNode.GethNode()
+	if node == nil {
+		logger.Error("Failed to run metrics because it could not get the node")
 		return
 	}
 

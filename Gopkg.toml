@@ -1,3 +1,6 @@
+# These packages are introduced by patching go-ethereum, so there isn't any point in forcing dep to find them.
+ignored = [ "github.com/ethereum/go-ethereum/ethapi" ]
+
 [prune]
   unused-packages = true
   go-tests = true
@@ -12,6 +15,7 @@
     name = "github.com/ethereum/go-ethereum"
     unused-packages = false
     non-go = false
+
 
 # * * * * * constrained `status-go` dependencies * * * * *
 # (for the full dependency list see `Gopkg.lock`)

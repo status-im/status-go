@@ -167,8 +167,8 @@ func (s *WhisperTestSuite) TestSelectedAccountOnRestart() {
 	s.False(whisperService.HasKeyPair(pubKey1), "identity should be removed, but it is still present in whisper")
 
 	// stop node (and all of its sub-protocols)
-	nodeConfig, err := s.Backend.StatusNode().Config()
-	s.NoError(err)
+	nodeConfig := s.Backend.StatusNode().Config()
+	s.NotNil(nodeConfig)
 	preservedNodeConfig := *nodeConfig
 	s.NoError(s.Backend.StopNode())
 

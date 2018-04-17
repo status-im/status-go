@@ -39,14 +39,16 @@ import (
 	. "github.com/status-im/status-go/t/utils" //nolint: golint
 )
 
-const zeroHash = "0x0000000000000000000000000000000000000000000000000000000000000000"
 const initJS = `
 	var _status_catalog = {
 		foo: 'bar'
 	};`
 
-var testChainDir string
-var nodeConfigJSON string
+var (
+	zeroHash       = sign.EmptyResponse.Hex()
+	testChainDir   string
+	nodeConfigJSON string
+)
 
 func init() {
 	testChainDir = filepath.Join(TestDataDir, TestNetworkNames[GetNetworkID()])
@@ -95,6 +97,14 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 		{
 			"call RPC on in-proc handler",
 			testCallRPC,
+		},
+		{
+			"call private API using RPC",
+			testCallRPCWithPrivateAPI,
+		},
+		{
+			"call private API using private RPC client",
+			testCallPrivateRPCWithPrivateAPI,
 		},
 		{
 			"create main and child accounts",
@@ -375,6 +385,29 @@ func testCallRPC(t *testing.T) bool {
 	received := C.GoString(rawResponse)
 	if expected != received {
 		t.Errorf("unexpected response: expected: %v, got: %v", expected, received)
+		return false
+	}
+
+	return true
+}
+
+func testCallRPCWithPrivateAPI(t *testing.T) bool {
+	expected := `{"jsonrpc":"2.0","id":64,"error":{"code":-32601,"message":"The method admin_nodeInfo does not exist/is not available"}}`
+	rawResponse := CallRPC(C.CString(`{"jsonrpc":"2.0","method":"admin_nodeInfo","params":[],"id":64}`))
+	received := C.GoString(rawResponse)
+	if expected != received {
+		t.Errorf("unexpected response: expected: %v, got: %v", expected, received)
+		return false
+	}
+
+	return true
+}
+
+func testCallPrivateRPCWithPrivateAPI(t *testing.T) bool {
+	rawResponse := CallPrivateRPC(C.CString(`{"jsonrpc":"2.0","method":"admin_nodeInfo","params":[],"id":64}`))
+	received := C.GoString(rawResponse)
+	if strings.Contains(received, "error") {
+		t.Errorf("unexpected response containing error: %v", received)
 		return false
 	}
 
@@ -791,12 +824,12 @@ func testCompleteTransaction(t *testing.T) bool {
 			t.Errorf("cannot unmarshal event's JSON: %s. Error %q", jsonEvent, err)
 			return
 		}
-		if envelope.Type == sign.EventTransactionQueued {
+		if envelope.Type == sign.EventSignRequestAdded {
 			event := envelope.Event.(map[string]interface{})
 			t.Logf("transaction queued (will be completed shortly): {id: %s}\n", event["id"].(string))
 
-			completeTxResponse := CompleteTransactionResult{}
-			rawResponse := CompleteTransaction(C.CString(event["id"].(string)), C.CString(TestConfig.Account1.Password))
+			completeTxResponse := SignRequestResult{}
+			rawResponse := ApproveSignRequest(C.CString(event["id"].(string)), C.CString(TestConfig.Account1.Password))
 
 			if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &completeTxResponse); err != nil {
 				t.Errorf("cannot decode RecoverAccount response (%s): %v", C.GoString(rawResponse), err)
@@ -868,7 +901,7 @@ func testCompleteMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocyc
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
 		}
-		if envelope.Type == sign.EventTransactionQueued {
+		if envelope.Type == sign.EventSignRequestAdded {
 			event := envelope.Event.(map[string]interface{})
 			txID = event["id"].(string)
 			t.Logf("transaction queued (will be completed in a single call, once aggregated): {id: %s}\n", txID)
@@ -907,8 +940,8 @@ func testCompleteMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocyc
 		updatedTxIDStrings, _ := json.Marshal(parsedIDs)
 
 		// complete
-		resultsString := CompleteTransactions(C.CString(string(updatedTxIDStrings)), C.CString(TestConfig.Account1.Password))
-		resultsStruct := CompleteTransactionsResult{}
+		resultsString := ApproveSignRequests(C.CString(string(updatedTxIDStrings)), C.CString(TestConfig.Account1.Password))
+		resultsStruct := SignRequestsResult{}
 		if err := json.Unmarshal([]byte(C.GoString(resultsString)), &resultsStruct); err != nil {
 			t.Error(err)
 			return
@@ -1000,7 +1033,7 @@ func testDiscardTransaction(t *testing.T) bool { //nolint: gocyclo
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
 		}
-		if envelope.Type == sign.EventTransactionQueued {
+		if envelope.Type == sign.EventSignRequestAdded {
 			event := envelope.Event.(map[string]interface{})
 			txID = event["id"].(string)
 			t.Logf("transaction queued (will be discarded soon): {id: %s}\n", txID)
@@ -1011,8 +1044,8 @@ func testDiscardTransaction(t *testing.T) bool { //nolint: gocyclo
 			}
 
 			// discard
-			discardResponse := DiscardTransactionResult{}
-			rawResponse := DiscardTransaction(C.CString(txID))
+			discardResponse := DiscardSignRequestResult{}
+			rawResponse := DiscardSignRequest(C.CString(txID))
 
 			if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &discardResponse); err != nil {
 				t.Errorf("cannot decode RecoverAccount response (%s): %v", C.GoString(rawResponse), err)
@@ -1024,7 +1057,7 @@ func testDiscardTransaction(t *testing.T) bool { //nolint: gocyclo
 			}
 
 			// try completing discarded transaction
-			_, err := statusAPI.CompleteTransaction(string(txID), TestConfig.Account1.Password)
+			err := statusAPI.ApproveSignRequest(string(txID), TestConfig.Account1.Password).Error
 			if err != sign.ErrSignReqNotFound {
 				t.Error("expects tx not found, but call to CompleteTransaction succeeded")
 				return
@@ -1038,7 +1071,7 @@ func testDiscardTransaction(t *testing.T) bool { //nolint: gocyclo
 			completeQueuedTransaction <- struct{}{} // so that timeout is aborted
 		}
 
-		if envelope.Type == sign.EventTransactionFailed {
+		if envelope.Type == sign.EventSignRequestFailed {
 			event := envelope.Event.(map[string]interface{})
 			t.Logf("transaction return event received: {id: %s}\n", event["id"].(string))
 
@@ -1050,7 +1083,7 @@ func testDiscardTransaction(t *testing.T) bool { //nolint: gocyclo
 			}
 
 			receivedErrCode := event["error_code"].(string)
-			if receivedErrCode != strconv.Itoa(sign.SendTransactionDiscardedErrorCode) {
+			if receivedErrCode != strconv.Itoa(sign.SignRequestDiscardedErrorCode) {
 				t.Errorf("unexpected error code received: got %v", receivedErrCode)
 				return
 			}
@@ -1112,7 +1145,7 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocycl
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
 		}
-		if envelope.Type == sign.EventTransactionQueued {
+		if envelope.Type == sign.EventSignRequestAdded {
 			event := envelope.Event.(map[string]interface{})
 			txID = event["id"].(string)
 			t.Logf("transaction queued (will be discarded soon): {id: %s}\n", txID)
@@ -1125,7 +1158,7 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocycl
 			txIDs <- txID
 		}
 
-		if envelope.Type == sign.EventTransactionFailed {
+		if envelope.Type == sign.EventSignRequestFailed {
 			event := envelope.Event.(map[string]interface{})
 			t.Logf("transaction return event received: {id: %s}\n", event["id"].(string))
 
@@ -1137,7 +1170,7 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocycl
 			}
 
 			receivedErrCode := event["error_code"].(string)
-			if receivedErrCode != strconv.Itoa(sign.SendTransactionDiscardedErrorCode) {
+			if receivedErrCode != strconv.Itoa(sign.SignRequestDiscardedErrorCode) {
 				t.Errorf("unexpected error code received: got %v", receivedErrCode)
 				return
 			}
@@ -1179,8 +1212,8 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocycl
 		updatedTxIDStrings, _ := json.Marshal(parsedIDs)
 
 		// discard
-		discardResultsString := DiscardTransactions(C.CString(string(updatedTxIDStrings)))
-		discardResultsStruct := DiscardTransactionsResult{}
+		discardResultsString := DiscardSignRequests(C.CString(string(updatedTxIDStrings)))
+		discardResultsStruct := DiscardSignRequestsResult{}
 		if err := json.Unmarshal([]byte(C.GoString(discardResultsString)), &discardResultsStruct); err != nil {
 			t.Error(err)
 			return
@@ -1193,8 +1226,8 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocycl
 		}
 
 		// try completing discarded transaction
-		completeResultsString := CompleteTransactions(C.CString(string(updatedTxIDStrings)), C.CString(TestConfig.Account1.Password))
-		completeResultsStruct := CompleteTransactionsResult{}
+		completeResultsString := ApproveSignRequests(C.CString(string(updatedTxIDStrings)), C.CString(TestConfig.Account1.Password))
+		completeResultsStruct := SignRequestsResult{}
 		if err := json.Unmarshal([]byte(C.GoString(completeResultsString)), &completeResultsStruct); err != nil {
 			t.Error(err)
 			return
@@ -1202,7 +1235,7 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocycl
 		completeResults := completeResultsStruct.Results
 
 		if len(completeResults) != (testTxCount + 1) {
-			t.Error("unexpected number of errors (call to CompleteTransaction should not succeed)")
+			t.Error("unexpected number of errors (call to ApproveSignRequest should not succeed)")
 		}
 		for txID, txResult := range completeResults {
 			if txID != txResult.ID {
@@ -1214,7 +1247,7 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocycl
 				return
 			}
 			if txResult.Hash != zeroHash {
-				t.Errorf("invalid hash (expected zero): %s", txResult.Hash)
+				t.Errorf("invalid hash (expected zero): '%s'", txResult.Hash)
 				return
 			}
 		}
@@ -1426,7 +1459,7 @@ func startTestNode(t *testing.T) <-chan struct{} {
 			return
 		}
 
-		if envelope.Type == sign.EventTransactionQueued {
+		if envelope.Type == sign.EventSignRequestAdded {
 		}
 		if envelope.Type == signal.EventNodeStarted {
 			t.Log("Node started, but we wait till it be ready")

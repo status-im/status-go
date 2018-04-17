@@ -101,10 +101,17 @@ func ResetChainData() *C.char {
 	return makeJSONResponse(nil)
 }
 
-//CallRPC calls status node via rpc
+//CallRPC calls public APIs via RPC
 //export CallRPC
 func CallRPC(inputJSON *C.char) *C.char {
 	outputJSON := statusAPI.CallRPC(C.GoString(inputJSON))
+	return C.CString(outputJSON)
+}
+
+//CallPrivateRPC calls both public and private APIs via RPC
+//export CallPrivateRPC
+func CallPrivateRPC(inputJSON *C.char) *C.char {
+	outputJSON := statusAPI.CallPrivateRPC(C.GoString(inputJSON))
 	return C.CString(outputJSON)
 }
 
@@ -193,40 +200,40 @@ func Logout() *C.char {
 	return makeJSONResponse(err)
 }
 
-//CompleteTransaction instructs backend to complete sending of a given transaction
-//export CompleteTransaction
-func CompleteTransaction(id, password *C.char) *C.char {
-	txHash, err := statusAPI.CompleteTransaction(C.GoString(id), C.GoString(password))
+//ApproveSignRequest instructs backend to complete sending of a given transaction
+//export ApproveSignRequest
+func ApproveSignRequest(id, password *C.char) *C.char {
+	result := statusAPI.ApproveSignRequest(C.GoString(id), C.GoString(password))
 
 	errString := ""
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		errString = err.Error()
+	if result.Error != nil {
+		fmt.Fprintln(os.Stderr, result.Error)
+		errString = result.Error.Error()
 	}
 
-	out := CompleteTransactionResult{
+	out := SignRequestResult{
 		ID:    C.GoString(id),
-		Hash:  txHash.Hex(),
+		Hash:  result.Response.Hex(),
 		Error: errString,
 	}
 	outBytes, err := json.Marshal(out)
 	if err != nil {
-		logger.Error("failed to marshal CompleteTransaction output", "error", err)
+		logger.Error("failed to marshal ApproveSignRequest output", "error", err)
 		return makeJSONResponse(err)
 	}
 
 	return C.CString(string(outBytes))
 }
 
-//CompleteTransactions instructs backend to complete sending of multiple transactions
-//export CompleteTransactions
-func CompleteTransactions(ids, password *C.char) *C.char {
-	out := CompleteTransactionsResult{}
-	out.Results = make(map[string]CompleteTransactionResult)
+//ApproveSignRequests instructs backend to complete sending of multiple transactions
+//export ApproveSignRequests
+func ApproveSignRequests(ids, password *C.char) *C.char {
+	out := SignRequestsResult{}
+	out.Results = make(map[string]SignRequestResult)
 
 	parsedIDs, err := ParseJSONArray(C.GoString(ids))
 	if err != nil {
-		out.Results["none"] = CompleteTransactionResult{
+		out.Results["none"] = SignRequestResult{
 			Error: err.Error(),
 		}
 	} else {
@@ -235,11 +242,11 @@ func CompleteTransactions(ids, password *C.char) *C.char {
 			txIDs[i] = id
 		}
 
-		results := statusAPI.CompleteTransactions(txIDs, C.GoString(password))
+		results := statusAPI.ApproveSignRequests(txIDs, C.GoString(password))
 		for txID, result := range results {
-			txResult := CompleteTransactionResult{
+			txResult := SignRequestResult{
 				ID:   txID,
-				Hash: result.Hash.Hex(),
+				Hash: result.Response.Hex(),
 			}
 			if result.Error != nil {
 				txResult.Error = result.Error.Error()
@@ -250,17 +257,17 @@ func CompleteTransactions(ids, password *C.char) *C.char {
 
 	outBytes, err := json.Marshal(out)
 	if err != nil {
-		logger.Error("failed to marshal CompleteTransactions output", "error", err)
+		logger.Error("failed to marshal ApproveSignRequests output", "error", err)
 		return makeJSONResponse(err)
 	}
 
 	return C.CString(string(outBytes))
 }
 
-//DiscardTransaction discards a given transaction from transaction queue
-//export DiscardTransaction
-func DiscardTransaction(id *C.char) *C.char {
-	err := statusAPI.DiscardTransaction(C.GoString(id))
+//DiscardSignRequest discards a given transaction from transaction queue
+//export DiscardSignRequest
+func DiscardSignRequest(id *C.char) *C.char {
+	err := statusAPI.DiscardSignRequest(C.GoString(id))
 
 	errString := ""
 	if err != nil {
@@ -268,28 +275,28 @@ func DiscardTransaction(id *C.char) *C.char {
 		errString = err.Error()
 	}
 
-	out := DiscardTransactionResult{
+	out := DiscardSignRequestResult{
 		ID:    C.GoString(id),
 		Error: errString,
 	}
 	outBytes, err := json.Marshal(out)
 	if err != nil {
-		log.Error("failed to marshal DiscardTransaction output", "error", err)
+		log.Error("failed to marshal DiscardSignRequest output", "error", err)
 		return makeJSONResponse(err)
 	}
 
 	return C.CString(string(outBytes))
 }
 
-//DiscardTransactions discards given multiple transactions from transaction queue
-//export DiscardTransactions
-func DiscardTransactions(ids *C.char) *C.char {
-	out := DiscardTransactionsResult{}
-	out.Results = make(map[string]DiscardTransactionResult)
+//DiscardSignRequests discards given multiple transactions from transaction queue
+//export DiscardSignRequests
+func DiscardSignRequests(ids *C.char) *C.char {
+	out := DiscardSignRequestsResult{}
+	out.Results = make(map[string]DiscardSignRequestResult)
 
 	parsedIDs, err := ParseJSONArray(C.GoString(ids))
 	if err != nil {
-		out.Results["none"] = DiscardTransactionResult{
+		out.Results["none"] = DiscardSignRequestResult{
 			Error: err.Error(),
 		}
 	} else {
@@ -298,9 +305,9 @@ func DiscardTransactions(ids *C.char) *C.char {
 			txIDs[i] = id
 		}
 
-		results := statusAPI.DiscardTransactions(txIDs)
+		results := statusAPI.DiscardSignRequests(txIDs)
 		for txID, err := range results {
-			out.Results[txID] = DiscardTransactionResult{
+			out.Results[txID] = DiscardSignRequestResult{
 				ID:    txID,
 				Error: err.Error(),
 			}
@@ -309,7 +316,7 @@ func DiscardTransactions(ids *C.char) *C.char {
 
 	outBytes, err := json.Marshal(out)
 	if err != nil {
-		logger.Error("failed to marshal DiscardTransactions output", "error", err)
+		logger.Error("failed to marshal DiscardSignRequests output", "error", err)
 		return makeJSONResponse(err)
 	}
 

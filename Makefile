@@ -112,9 +112,10 @@ mock-install: ##@other Install mocking tools
 	go get -u github.com/golang/mock/mockgen
 
 mock: ##@other Regenerate mocks
-	mockgen -package=mailservice -destination=geth/mailservice/mailservice_mock.go       github.com/status-im/status-go/geth/mailservice ServiceProvider
-	mockgen -package=fcm         -destination=geth/notifications/push/fcm/client_mock.go github.com/status-im/status-go/geth/notifications/push/fcm FirebaseClient,Notifier
-	mockgen -package=fake        -destination=geth/transactions/fake/mock.go             github.com/status-im/status-go/geth/transactions/fake PublicTransactionPoolAPI
+	mockgen -package=fcm          -destination=geth/notifications/push/fcm/client_mock.go -source=geth/notifications/push/fcm/client.go
+	mockgen -package=fake         -destination=geth/transactions/fake/mock.go             -source=geth/transactions/fake/txservice.go
+	mockgen -package=account      -destination=geth/account/accounts_mock.go              -source=geth/account/accounts.go
+	mockgen -package=jail         -destination=geth/jail/cell_mock.go                     -source=geth/jail/cell.go
 
 docker-test: ##@tests Run tests in a docker container with golang.
 	docker run --privileged --rm -it -v "$(shell pwd):$(DOCKER_TEST_WORKDIR)" -w "$(DOCKER_TEST_WORKDIR)" $(DOCKER_TEST_IMAGE) go test ${ARGS}
@@ -140,6 +141,7 @@ test-e2e: ##@tests Run e2e tests
 	go test -timeout 20m ./t/e2e/rpc/... -network=$(networkid) $(gotest_extraflags)
 	go test -timeout 20m ./t/e2e/whisper/... -network=$(networkid) $(gotest_extraflags)
 	go test -timeout 10m ./t/e2e/transactions/... -network=$(networkid) $(gotest_extraflags)
+	go test -timeout 10m ./t/e2e/services/... -network=$(networkid) $(gotest_extraflags)
 	# e2e_test tag is required to include some files from ./lib without _test suffix
 	go test -timeout 40m -tags e2e_test ./lib -network=$(networkid) $(gotest_extraflags)
 

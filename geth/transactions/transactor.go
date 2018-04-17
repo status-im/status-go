@@ -13,14 +13,14 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/status-im/status-go/geth/account"
+	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/rpc"
 	"github.com/status-im/status-go/sign"
 )
 
 const (
 	// sendTxTimeout defines how many seconds to wait before returning result in sentTransaction().
-	sendTxTimeout  = 300 * time.Second
-	rpcCallTimeout = time.Minute
+	sendTxTimeout = 300 * time.Second
 
 	defaultGas = 90000
 )
@@ -47,7 +47,6 @@ func NewTransactor(signRequests *sign.PendingRequests) *Transactor {
 		pendingSignRequests: signRequests,
 		addrLock:            &AddrLocker{},
 		sendTxTimeout:       sendTxTimeout,
-		rpcCallTimeout:      rpcCallTimeout,
 		localNonce:          sync.Map{},
 		log:                 log.New("package", "status-go/geth/transactions.Manager"),
 	}
@@ -58,12 +57,13 @@ func (t *Transactor) SetNetworkID(networkID uint64) {
 	t.networkID = networkID
 }
 
-// SetRPCClient an RPC client.
-func (t *Transactor) SetRPCClient(rpcClient *rpc.Client) {
+// SetRPC sets RPC params, a client and a timeout
+func (t *Transactor) SetRPC(rpcClient *rpc.Client, timeout time.Duration) {
 	rpcWrapper := newRPCWrapper(rpcClient)
 	t.sender = rpcWrapper
 	t.pendingNonceProvider = rpcWrapper
 	t.gasCalculator = rpcWrapper
+	t.rpcCallTimeout = timeout
 }
 
 // SendTransaction is an implementation of eth_sendTransaction. It queues the tx to the sign queue.
@@ -72,18 +72,19 @@ func (t *Transactor) SendTransaction(ctx context.Context, args SendTxArgs) (geth
 		ctx = context.Background()
 	}
 
-	completeFunc := func(acc *account.SelectedExtKey) (gethcommon.Hash, error) {
-		return t.validateAndPropagate(acc, args)
+	completeFunc := func(acc *account.SelectedExtKey, password string) (sign.Response, error) {
+		hash, err := t.validateAndPropagate(acc, args)
+		return sign.Response(hash.Bytes()), err
 	}
 
-	request, err := t.pendingSignRequests.Add(ctx, args, completeFunc)
+	request, err := t.pendingSignRequests.Add(ctx, params.SendTransactionMethodName, args, completeFunc)
 
 	if err != nil {
 		return gethcommon.Hash{}, err
 	}
 
-	rst := t.pendingSignRequests.Wait(request.ID, t.sendTxTimeout)
-	return rst.Hash, rst.Error
+	result := t.pendingSignRequests.Wait(request.ID, t.sendTxTimeout)
+	return result.Response.Hash(), result.Error
 }
 
 // make sure that only account which created the tx can complete it
@@ -93,7 +94,7 @@ func (t *Transactor) validateAccount(args SendTxArgs, selectedAccount *account.S
 	}
 
 	if args.From.Hex() != selectedAccount.Address.Hex() {
-		err := sign.ErrInvalidCompleteTxSender
+		err := sign.NewTransientError(ErrInvalidCompleteTxSender)
 		t.log.Error("queued transaction does not belong to the selected account", "err", err)
 		return err
 	}
@@ -102,8 +103,6 @@ func (t *Transactor) validateAccount(args SendTxArgs, selectedAccount *account.S
 }
 
 func (t *Transactor) validateAndPropagate(selectedAccount *account.SelectedExtKey, args SendTxArgs) (hash gethcommon.Hash, err error) {
-	// TODO (mandrigin): Send sign request ID as a parameter to this function and uncoment the log message
-	// m.log.Info("complete transaction", "id", queuedTx.ID)
 	if err := t.validateAccount(args, selectedAccount); err != nil {
 		return hash, err
 	}

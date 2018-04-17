@@ -14,8 +14,10 @@ import (
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/notifications/push/fcm"
 	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/geth/rpc"
 	"github.com/status-im/status-go/geth/signal"
 	"github.com/status-im/status-go/geth/transactions"
+	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/sign"
 )
 
@@ -36,6 +38,7 @@ type StatusBackend struct {
 	mu                  sync.Mutex
 	statusNode          *node.StatusNode
 	pendingSignRequests *sign.PendingRequests
+	personalAPI         *personal.PublicAPI
 	accountManager      *account.Manager
 	transactor          *transactions.Transactor
 	jailManager         jail.Manager
@@ -52,6 +55,7 @@ func NewStatusBackend() *StatusBackend {
 	pendingSignRequests := sign.NewPendingRequests()
 	accountManager := account.NewManager(statusNode)
 	transactor := transactions.NewTransactor(pendingSignRequests)
+	personalAPI := personal.NewAPI(pendingSignRequests)
 	jailManager := jail.New(statusNode)
 	notificationManager := fcm.NewNotification(fcmServerKey)
 
@@ -61,6 +65,7 @@ func NewStatusBackend() *StatusBackend {
 		accountManager:      accountManager,
 		jailManager:         jailManager,
 		transactor:          transactor,
+		personalAPI:         personalAPI,
 		newNotification:     notificationManager,
 		log:                 log.New("package", "status-go/geth/api.StatusBackend"),
 	}
@@ -79,6 +84,11 @@ func (b *StatusBackend) AccountManager() *account.Manager {
 // JailManager returns reference to jail
 func (b *StatusBackend) JailManager() jail.Manager {
 	return b.jailManager
+}
+
+// PersonalAPI returns reference to personal APIs
+func (b *StatusBackend) PersonalAPI() *personal.PublicAPI {
+	return b.personalAPI
 }
 
 // Transactor returns reference to a status transactor
@@ -109,14 +119,9 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 			err = fmt.Errorf("node crashed on start: %v", err)
 		}
 	}()
+
 	err = b.statusNode.Start(config)
 	if err != nil {
-		switch err.(type) {
-		case node.RPCClientError:
-			err = fmt.Errorf("%v: %v", node.ErrRPCClient, err)
-		case node.EthNodeError:
-			err = fmt.Errorf("%v: %v", node.ErrNodeStartFailure, err)
-		}
 		signal.Send(signal.Envelope{
 			Type: signal.EventNodeCrashed,
 			Event: signal.NodeCrashEvent{
@@ -128,7 +133,8 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 	signal.Send(signal.Envelope{Type: signal.EventNodeStarted})
 
 	b.transactor.SetNetworkID(config.NetworkID)
-	b.transactor.SetRPCClient(b.statusNode.RPCClient())
+	b.transactor.SetRPC(b.statusNode.RPCClient(), rpc.DefaultCallTimeout)
+	b.personalAPI.SetRPC(b.statusNode.RPCClient(), rpc.DefaultCallTimeout)
 	if err := b.registerHandlers(); err != nil {
 		b.log.Error("Handler registration failed", "err", err)
 	}
@@ -161,11 +167,7 @@ func (b *StatusBackend) RestartNode() error {
 	if !b.IsNodeRunning() {
 		return node.ErrNoRunningNode
 	}
-	config, err := b.statusNode.Config()
-	if err != nil {
-		return err
-	}
-	newcfg := *config
+	newcfg := *(b.statusNode.Config())
 	if err := b.stopNode(); err != nil {
 		return err
 	}
@@ -177,11 +179,7 @@ func (b *StatusBackend) RestartNode() error {
 func (b *StatusBackend) ResetChainData() error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	config, err := b.statusNode.Config()
-	if err != nil {
-		return err
-	}
-	newcfg := *config
+	newcfg := *(b.statusNode.Config())
 	if err := b.stopNode(); err != nil {
 		return err
 	}
@@ -193,9 +191,15 @@ func (b *StatusBackend) ResetChainData() error {
 	return b.startNode(&newcfg)
 }
 
-// CallRPC executes RPC request on node's in-proc RPC server
+// CallRPC executes public RPC requests on node's in-proc RPC server.
 func (b *StatusBackend) CallRPC(inputJSON string) string {
 	client := b.statusNode.RPCClient()
+	return client.CallRaw(inputJSON)
+}
+
+// CallPrivateRPC executes public and private RPC requests on node's in-proc RPC server.
+func (b *StatusBackend) CallPrivateRPC(inputJSON string) string {
+	client := b.statusNode.RPCPrivateClient()
 	return client.CallRaw(inputJSON)
 }
 
@@ -210,10 +214,7 @@ func (b *StatusBackend) getVerifiedAccount(password string) (*account.SelectedEx
 		b.log.Error("failed to get a selected account", "err", err)
 		return nil, err
 	}
-	config, err := b.StatusNode().Config()
-	if err != nil {
-		return nil, err
-	}
+	config := b.StatusNode().Config()
 	_, err = b.accountManager.VerifyAccountPassword(config.KeyStoreDir, selectedAccount.Address.String(), password)
 	if err != nil {
 		b.log.Error("failed to verify account", "account", selectedAccount.Address.String(), "error", err)
@@ -222,34 +223,30 @@ func (b *StatusBackend) getVerifiedAccount(password string) (*account.SelectedEx
 	return selectedAccount, nil
 }
 
-// CompleteTransaction instructs backend to complete sending of a given transaction
-func (b *StatusBackend) CompleteTransaction(id string, password string) (hash gethcommon.Hash, err error) {
+// ApproveSignRequest instructs backend to complete sending of a given transaction
+func (b *StatusBackend) ApproveSignRequest(id string, password string) sign.Result {
 	return b.pendingSignRequests.Approve(id, password, b.getVerifiedAccount)
 }
 
-// CompleteTransactions instructs backend to complete sending of multiple transactions
-func (b *StatusBackend) CompleteTransactions(ids []string, password string) map[string]sign.Result {
+// ApproveSignRequests instructs backend to complete sending of multiple transactions
+func (b *StatusBackend) ApproveSignRequests(ids []string, password string) map[string]sign.Result {
 	results := make(map[string]sign.Result)
 	for _, txID := range ids {
-		txHash, txErr := b.CompleteTransaction(txID, password)
-		results[txID] = sign.Result{
-			Hash:  txHash,
-			Error: txErr,
-		}
+		results[txID] = b.ApproveSignRequest(txID, password)
 	}
 	return results
 }
 
-// DiscardTransaction discards a given transaction from transaction queue
-func (b *StatusBackend) DiscardTransaction(id string) error {
+// DiscardSignRequest discards a given transaction from transaction queue
+func (b *StatusBackend) DiscardSignRequest(id string) error {
 	return b.pendingSignRequests.Discard(id)
 }
 
-// DiscardTransactions discards given multiple transactions from transaction queue
-func (b *StatusBackend) DiscardTransactions(ids []string) map[string]error {
+// DiscardSignRequests discards given multiple transactions from transaction queue
+func (b *StatusBackend) DiscardSignRequests(ids []string) map[string]error {
 	results := make(map[string]error)
 	for _, txID := range ids {
-		err := b.DiscardTransaction(txID)
+		err := b.DiscardSignRequest(txID)
 		if err != nil {
 			results[txID] = err
 		}
@@ -262,7 +259,7 @@ func (b *StatusBackend) DiscardTransactions(ids []string) map[string]error {
 func (b *StatusBackend) registerHandlers() error {
 	rpcClient := b.StatusNode().RPCClient()
 	if rpcClient == nil {
-		return node.ErrRPCClient
+		return errors.New("RPC client unavailable")
 	}
 
 	rpcClient.RegisterHandler(params.AccountsMethodName, func(context.Context, ...interface{}) (interface{}, error) {
@@ -282,6 +279,8 @@ func (b *StatusBackend) registerHandlers() error {
 
 		return hash.Hex(), err
 	})
+
+	rpcClient.RegisterHandler(params.PersonalSignMethodName, b.PersonalAPI().Sign)
 
 	return nil
 }

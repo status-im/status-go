@@ -65,9 +65,8 @@ func (s *TxQueueTestSuite) SetupTest() {
 
 	s.manager = NewTransactor(sign.NewPendingRequests())
 	s.manager.sendTxTimeout = time.Second
-	s.manager.rpcCallTimeout = time.Second
 	s.manager.SetNetworkID(chainID)
-	s.manager.SetRPCClient(rpcClient)
+	s.manager.SetRPC(rpcClient, time.Second)
 }
 
 func (s *TxQueueTestSuite) TearDownTest() {
@@ -168,10 +167,7 @@ func (s *TxQueueTestSuite) TestCompleteTransaction() {
 			s.setupTransactionPoolAPI(args, testNonce, testNonce, selectedAccount, nil)
 
 			w := make(chan struct{})
-			var (
-				sendHash gethcommon.Hash
-				err      error
-			)
+			var sendHash gethcommon.Hash
 			go func() {
 				var sendErr error
 				sendHash, sendErr = s.manager.SendTransaction(context.Background(), args)
@@ -188,13 +184,13 @@ func (s *TxQueueTestSuite) TestCompleteTransaction() {
 
 			req := s.manager.pendingSignRequests.First()
 			s.NotNil(req)
-			approveHash, err := s.manager.pendingSignRequests.Approve(req.ID, "", simpleVerifyFunc(selectedAccount))
-			s.NoError(err)
+			approveResult := s.manager.pendingSignRequests.Approve(req.ID, "", simpleVerifyFunc(selectedAccount))
+			s.NoError(approveResult.Error)
 			s.NoError(WaitClosed(w, time.Second))
 
 			// Transaction should be already removed from the queue.
 			s.False(s.manager.pendingSignRequests.Has(req.ID))
-			s.Equal(sendHash, approveHash)
+			s.Equal(sendHash.Bytes(), approveResult.Response.Bytes())
 		})
 	}
 }
@@ -222,8 +218,8 @@ func (s *TxQueueTestSuite) TestAccountMismatch() {
 
 	req := s.manager.pendingSignRequests.First()
 	s.NotNil(req)
-	_, err := s.manager.pendingSignRequests.Approve(req.ID, "", simpleVerifyFunc(selectedAccount))
-	s.Equal(err, sign.ErrInvalidCompleteTxSender)
+	result := s.manager.pendingSignRequests.Approve(req.ID, "", simpleVerifyFunc(selectedAccount))
+	s.EqualError(result.Error, ErrInvalidCompleteTxSender.Error())
 
 	// Transaction should stay in the queue as mismatched accounts
 	// is a recoverable error.

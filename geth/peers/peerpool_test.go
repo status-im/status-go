@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p"
+	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/stretchr/testify/suite"
 
@@ -46,7 +47,8 @@ func (s *PeerPoolSimulationSuite) SetupTest() {
 	s.Require().NoError(s.bootnode.Start())
 	bootnodeV5 := discv5.NewNode(s.bootnode.DiscV5.Self().ID, net.ParseIP("127.0.0.1"), uint16(port), uint16(port))
 
-	s.peers = make([]*p2p.Server, 2)
+	// 1 peer to initiate connection, 1 peer as a first candidate, 1 peer - for failover
+	s.peers = make([]*p2p.Server, 3)
 	for i := range s.peers {
 		key, _ := crypto.GenerateKey()
 		peer := &p2p.Server{
@@ -66,14 +68,36 @@ func (s *PeerPoolSimulationSuite) SetupTest() {
 	}
 }
 
-func (s *PeerPoolSimulationSuite) TestSingleTopicDiscovery() {
+func (s *PeerPoolSimulationSuite) getPeerFromEvent(events <-chan *p2p.PeerEvent, etype p2p.PeerEventType) (nodeID discover.NodeID) {
+	select {
+	case ev := <-events:
+		if ev.Type == etype {
+			return ev.Peer
+		}
+	case <-time.After(5 * time.Second):
+		s.Fail("timed out waiting for a peer")
+		return
+	}
+	return
+}
+
+func (s *PeerPoolSimulationSuite) getPoolEvent(events <-chan PoolEvent) PoolEvent {
+	select {
+	case ev := <-events:
+		return ev
+	case <-time.After(200 * time.Millisecond):
+		s.Fail("timed out waiting for a peer")
+		return ""
+	}
+}
+
+func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailover() {
 	topic := discv5.Topic("cap=test")
-	expectedConnections := 1
 	// simulation should only rely on fast sync
 	config := map[discv5.Topic]params.Limits{
-		topic: {expectedConnections, expectedConnections},
+		topic: {1, 1}, // limits a chosen for simplicity of the simulation
 	}
-	peerPool := NewPeerPool(config, 100*time.Millisecond, 100*time.Millisecond, nil, false)
+	peerPool := NewPeerPool(config, 100*time.Millisecond, 100*time.Millisecond, nil, true)
 	register := NewRegister(topic)
 	s.Require().NoError(register.Start(s.peers[0]))
 	defer register.Stop()
@@ -84,20 +108,23 @@ func (s *PeerPoolSimulationSuite) TestSingleTopicDiscovery() {
 	defer subscription.Unsubscribe()
 	s.NoError(peerPool.Start(s.peers[1]))
 	defer peerPool.Stop()
-	connected := 0
-	for {
-		select {
-		case ev := <-events:
-			if ev.Type == p2p.PeerEventTypeAdd {
-				connected++
-			}
-		case <-time.After(5 * time.Second):
-			s.Require().FailNowf("waiting for peers timed out", strconv.Itoa(connected))
-		}
-		if connected == expectedConnections {
-			break
-		}
-	}
+	poolEvents := make(chan PoolEvent)
+	poolSub := peerPool.feed.Subscribe(poolEvents)
+	defer poolSub.Unsubscribe()
+	connected := s.getPeerFromEvent(events, p2p.PeerEventTypeAdd)
+	s.Equal(s.peers[0].Self().ID, connected)
+	s.Equal(Discv5Closed, s.getPoolEvent(poolEvents))
+	s.Require().Nil(s.peers[1].DiscV5)
+	s.peers[0].Stop()
+	disconnected := s.getPeerFromEvent(events, p2p.PeerEventTypeDrop)
+	s.Equal(connected, disconnected)
+	s.Equal(Discv5Started, s.getPoolEvent(poolEvents))
+	s.Require().NotNil(s.peers[1].DiscV5)
+	register = NewRegister(topic)
+	s.Require().NoError(register.Start(s.peers[2]))
+	defer register.Stop()
+	newConnected := s.getPeerFromEvent(events, p2p.PeerEventTypeAdd)
+	s.Equal(s.peers[2].Self().ID, newConnected)
 }
 
 func (s *PeerPoolSimulationSuite) TearDown() {
