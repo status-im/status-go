@@ -182,6 +182,12 @@ func (t *TopicPool) ConfirmDropped(server *p2p.Server, nodeID discover.NodeID) b
 
 	log.Debug("disconnect", "ID", nodeID, "dismissed", peer.dismissed)
 
+	// switch to fast mode as the number of connected peers is about to drop
+	// below the lower limit
+	if t.SearchRunning() && len(t.connectedPeers) == t.limits[0] {
+		t.period <- t.fastSync
+	}
+
 	delete(t.connectedPeers, discV5NodeID)
 
 	if peer.dismissed {
@@ -194,10 +200,6 @@ func (t *TopicPool) ConfirmDropped(server *p2p.Server, nodeID discover.NodeID) b
 		if err := t.cache.RemovePeer(discV5NodeID, t.topic); err != nil {
 			log.Error("failed to remove peer from cache", "error", err)
 		}
-	}
-
-	if t.SearchRunning() && len(t.connectedPeers) < t.limits[0] {
-		t.period <- t.fastSync
 	}
 
 	return true
