@@ -54,6 +54,9 @@ type TopicPool struct {
 }
 
 func (t *TopicPool) addToPeerPool(peer *peerInfo) {
+	if _, ok := t.peerPool[peer.node.ID]; ok {
+		return
+	}
 	item := &peerInfoItem{peerInfo: peer}
 	t.peerPool[peer.node.ID] = item
 	heap.Push(&t.peerPoolQueue, item)
@@ -141,15 +144,16 @@ func (t *TopicPool) ConfirmAdded(server *p2p.Server, nodeID discover.NodeID) {
 		}
 	}
 
-	// move peer from pool to connected peers
-	t.movePeerFromPoolToConnected(discV5NodeID)
-
-	// when max limit is reached drop every peer after
-	if len(t.connectedPeers) > t.limits[1] {
+	// if the upper limit is already reached, drop this peer
+	if len(t.connectedPeers) == t.limits[1] {
 		log.Debug("max limit is reached drop the peer", "ID", nodeID, "topic", t.topic)
 		peer.dismissed = true
 		t.removeServerPeer(server, peer.peerInfo)
+		return
 	}
+
+	// move peer from pool to connected peers
+	t.movePeerFromPoolToConnected(discV5NodeID)
 
 	// when the lower limit is reached, we can switch to slow mode
 	if t.SearchRunning() && len(t.connectedPeers) == t.limits[0] {
