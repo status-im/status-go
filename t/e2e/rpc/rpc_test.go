@@ -160,9 +160,8 @@ func (s *RPCTestSuite) TestCallRawResultGetTransactionReceipt() {
 // TestCallContextResult checks if result passed to CallContext
 // is set accordingly to its underlying memory layout.
 func (s *RPCTestSuite) TestCallContextResult() {
-	if SkipTransactionTest(MainnetOnly) {
-		s.T().Skip("test must not run on mainnet")
-	}
+	CheckTestSkipForNetworks(s.T(), params.MainNetworkID)
+
 	s.StartTestNode()
 	defer s.StopTestNode()
 

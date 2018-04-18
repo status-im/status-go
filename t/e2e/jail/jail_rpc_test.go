@@ -36,9 +36,8 @@ func (s *JailRPCTestSuite) SetupTest() {
 }
 
 func (s *JailRPCTestSuite) TestJailRPCSend() {
-	if SkipTransactionTest(BothNetworks) {
-		s.T().Skip("test must not run on mainnet or status chain")
-	}
+	CheckTestSkipForNetworks(s.T(), params.MainNetworkID)
+
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
@@ -110,9 +109,8 @@ func (s *JailRPCTestSuite) TestRegressionGetTransactionReceipt() {
 }
 
 func (s *JailRPCTestSuite) TestContractDeployment() {
-	if SkipTransactionTest(BothNetworks) {
-		s.T().Skip("test must not run on mainnet or status chain")
-	}
+	CheckTestSkipForNetworks(s.T(), params.MainNetworkID)
+
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
@@ -196,9 +194,8 @@ func (s *JailRPCTestSuite) TestContractDeployment() {
 }
 
 func (s *JailRPCTestSuite) TestJailVMPersistence() {
-	if SkipTransactionTest(MainnetOnly) {
-		s.T().Skip("test must not run on mainnet")
-	}
+	CheckTestSkipForNetworks(s.T(), params.MainNetworkID)
+
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 

@@ -173,20 +173,15 @@ func GetNetworkID() int {
 	panic(fmt.Sprintf("invalid selected network: %q", *networkSelected))
 }
 
-// Deciding if test skipping is for mainnet and status chain.
-const (
-	MainnetOnly  = false
-	BothNetworks = true
-)
-
-// SkipTransactionTest is used inside tests performing transactions.
-// In case of Mainnet or StatusChain it return true to signal skipping.
-func SkipTransactionTest(skipStatus bool) bool {
+// CheckTestSkipForNetworks checks if network for test is one of the
+// prohibited ones and skips the test in this case.
+func CheckTestSkipForNetworks(t *testing.T, networks ...int) {
 	id := GetNetworkID()
-	if id == params.MainNetworkID || (skipStatus && id == params.StatusChainNetworkID) {
-		return true
+	for _, network := range networks {
+		if network == id {
+			t.Skipf("skipping test for network %d", network)
+		}
 	}
-	return false
 }
 
 // GetAccount1PKFile returns the filename for Account1 keystore based
