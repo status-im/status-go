@@ -32,15 +32,45 @@ func GenerateConfig(datadir *C.char, networkID C.int, devMode C.int) *C.char {
 	return C.CString(string(outBytes))
 }
 
+func initLogger(config *params.NodeConfig) error {
+	var (
+		handler log.Handler
+		err     error
+	)
+
+	if config.LogFile != "" {
+		handler, err = log.FileHandler(config.LogFile, log.LogfmtFormat())
+		if err != nil {
+			return err
+		}
+	} else {
+		handler = log.StreamHandler(os.Stderr, log.TerminalFormat(true))
+	}
+
+	// level, err := log.LvlFromString(strings.ToLower(config.LogLevel))
+	level, err := log.LvlFromString("trace")
+	if err != nil {
+		return err
+	}
+
+	filteredHandler := log.LvlFilterHandler(level, handler)
+	log.Root().SetHandler(filteredHandler)
+
+	return nil
+}
+
 //StartNode - start Status node
 //export StartNode
 func StartNode(configJSON *C.char) *C.char {
 	config, err := params.LoadNodeConfig(C.GoString(configJSON))
+
 	if err != nil {
 		return makeJSONResponse(err)
 	}
 
+	initLogger(config)
 	statusAPI.StartNodeAsync(config)
+
 	return makeJSONResponse(nil)
 }
 

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
@@ -76,32 +75,6 @@ func (n *StatusNode) GethNode() *node.Node {
 	return n.gethNode
 }
 
-func enhanceLogger(logger *log.Logger, config *params.NodeConfig) error {
-	var (
-		handler log.Handler
-		err     error
-	)
-
-	if config.LogFile != "" {
-		handler, err = log.FileHandler(config.LogFile, log.LogfmtFormat())
-		if err != nil {
-			return err
-		}
-	} else {
-		handler = log.StreamHandler(os.Stderr, log.TerminalFormat(true))
-	}
-
-	level, err := log.LvlFromString(strings.ToLower(config.LogLevel))
-	if err != nil {
-		return err
-	}
-
-	filteredHandler := log.LvlFilterHandler(level, handler)
-	log.Root().SetHandler(filteredHandler)
-
-	return nil
-}
-
 // Start starts current StatusNode, will fail if it's already started.
 func (n *StatusNode) Start(config *params.NodeConfig, services ...node.ServiceConstructor) error {
 	n.mu.Lock()
@@ -115,10 +88,6 @@ func (n *StatusNode) Start(config *params.NodeConfig, services ...node.ServiceCo
 		return err
 	}
 	n.config = config
-
-	if err := enhanceLogger(&n.log, config); err != nil {
-		n.log.Error("Error initializing logger: %s", err)
-	}
 
 	if err := n.start(services); err != nil {
 		return err
