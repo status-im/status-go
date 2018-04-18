@@ -41,7 +41,7 @@ func TestPeerPriorityQueueSorting(t *testing.T) {
 	for q.Len() > 0 {
 		newItem := heap.Pop(&q).(*peerInfoItem)
 		if item != nil {
-			require.True(t, item.discoveredTime < newItem.discoveredTime)
+			require.True(t, item.discoveredTime > newItem.discoveredTime)
 		}
 		item = newItem
 	}
@@ -65,15 +65,15 @@ func TestPeerPriorityQueueIndexUpdating(t *testing.T) {
 	}
 
 	// insert older item first
-	heap.Push(&q, item2)
-	require.Equal(t, item2.index, 0)
 	heap.Push(&q, item1)
 	require.Equal(t, item1.index, 0)
-	require.Equal(t, item2.index, 1)
+	heap.Push(&q, item2)
+	require.Equal(t, item2.index, 0)
+	require.Equal(t, item1.index, 1)
 
 	// poping should reset index
 	popedItem := heap.Pop(&q)
-	require.Equal(t, item1, popedItem)
-	require.Equal(t, item1.index, -1)
-	require.Equal(t, item2.index, 0)
+	require.Equal(t, item2, popedItem)
+	require.Equal(t, item2.index, -1)
+	require.Equal(t, item1.index, 0)
 }

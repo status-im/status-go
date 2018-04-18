@@ -16,7 +16,7 @@ var _ heap.Interface = (*peerPriorityQueue)(nil)
 func (q peerPriorityQueue) Len() int { return len(q) }
 
 func (q peerPriorityQueue) Less(i, j int) bool {
-	return q[i].discoveredTime < q[j].discoveredTime
+	return q[i].discoveredTime > q[j].discoveredTime
 }
 
 func (q peerPriorityQueue) Swap(i, j int) {
