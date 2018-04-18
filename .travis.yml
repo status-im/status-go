@@ -16,7 +16,10 @@ jobs:
       - make lint
       - make vendor-check
   - stage: Test unit and integration
-    script: make test-unit-coverage
+    env:
+      # When develop is run by cron, test with `-race` flag.
+      - EXTRA_FLAGS=$([[ "${TRAVIS_EVENT_TYPE}" == "cron" && "${TRAVIS_BRANCH}" == "develop" ]] && echo '-race' || echo '')
+    script: make test-unit-coverage gotest_extraflags="$EXTRA_FLAGS"
   - stage: Test e2e on private network
     script: make test-e2e
   - stage: Test e2e on public network
