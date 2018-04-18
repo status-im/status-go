@@ -32,7 +32,7 @@ func GenerateConfig(datadir *C.char, networkID C.int, devMode C.int) *C.char {
 	return C.CString(string(outBytes))
 }
 
-func initLogger(config *params.NodeConfig) error {
+func initLogger(config *params.NodeConfig) {
 	var (
 		handler log.Handler
 		err     error
@@ -41,7 +41,7 @@ func initLogger(config *params.NodeConfig) error {
 	if config.LogFile != "" {
 		handler, err = log.FileHandler(config.LogFile, log.LogfmtFormat())
 		if err != nil {
-			return err
+			return
 		}
 	} else {
 		handler = log.StreamHandler(os.Stderr, log.TerminalFormat(true))
@@ -50,13 +50,13 @@ func initLogger(config *params.NodeConfig) error {
 	// level, err := log.LvlFromString(strings.ToLower(config.LogLevel))
 	level, err := log.LvlFromString("trace")
 	if err != nil {
-		return err
+		return
 	}
 
 	filteredHandler := log.LvlFilterHandler(level, handler)
 	log.Root().SetHandler(filteredHandler)
 
-	return nil
+	return
 }
 
 //StartNode - start Status node
