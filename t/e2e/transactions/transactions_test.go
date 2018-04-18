@@ -39,6 +39,8 @@ type TransactionsTestSuite struct {
 }
 
 func (s *TransactionsTestSuite) TestCallRPCSendTransaction() {
+	CheckTestSkipForNetworks(s.T(), params.MainNetworkID)
+
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
@@ -90,9 +92,7 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransaction() {
 }
 
 func (s *TransactionsTestSuite) TestCallRPCSendTransactionUpstream() {
-	if GetNetworkID() == params.StatusChainNetworkID {
-		s.T().Skip()
-	}
+	CheckTestSkipForNetworks(s.T(), params.MainNetworkID, params.StatusChainNetworkID)
 
 	addr, err := GetRemoteURL()
 	s.NoError(err)
@@ -148,6 +148,8 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransactionUpstream() {
 }
 
 func (s *TransactionsTestSuite) TestEmptyToFieldPreserved() {
+	CheckTestSkipForNetworks(s.T(), params.MainNetworkID)
+
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
@@ -195,6 +197,8 @@ func (s *TransactionsTestSuite) TestEmptyToFieldPreserved() {
 // TestSendContractCompat tries to send transaction using the legacy "Data"
 // field, which is supported for backward compatibility reasons.
 func (s *TransactionsTestSuite) TestSendContractTxCompat() {
+	CheckTestSkipForNetworks(s.T(), params.MainNetworkID)
+
 	initFunc := func(byteCode []byte, args *transactions.SendTxArgs) {
 		args.Data = (hexutil.Bytes)(byteCode)
 	}
@@ -205,6 +209,8 @@ func (s *TransactionsTestSuite) TestSendContractTxCompat() {
 // "Data" and "Input" fields. Also makes sure that the error is returned if
 // they have different values.
 func (s *TransactionsTestSuite) TestSendContractTxCollision() {
+	CheckTestSkipForNetworks(s.T(), params.MainNetworkID)
+
 	// Scenario 1: Both fields are filled and have the same value, expect success
 	initFunc := func(byteCode []byte, args *transactions.SendTxArgs) {
 		args.Input = (hexutil.Bytes)(byteCode)
@@ -232,6 +238,8 @@ func (s *TransactionsTestSuite) TestSendContractTxCollision() {
 }
 
 func (s *TransactionsTestSuite) TestSendContractTx() {
+	CheckTestSkipForNetworks(s.T(), params.MainNetworkID)
+
 	initFunc := func(byteCode []byte, args *transactions.SendTxArgs) {
 		args.Input = (hexutil.Bytes)(byteCode)
 	}
@@ -344,6 +352,8 @@ func (s *TransactionsTestSuite) testSendContractTx(setInputAndDataValue initFunc
 }
 
 func (s *TransactionsTestSuite) TestSendEther() {
+	CheckTestSkipForNetworks(s.T(), params.MainNetworkID)
+
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
@@ -379,9 +389,7 @@ func (s *TransactionsTestSuite) TestSendEther() {
 }
 
 func (s *TransactionsTestSuite) TestSendEtherTxUpstream() {
-	if GetNetworkID() == params.StatusChainNetworkID {
-		s.T().Skip()
-	}
+	CheckTestSkipForNetworks(s.T(), params.MainNetworkID, params.StatusChainNetworkID)
 
 	addr, err := GetRemoteURL()
 	s.NoError(err)
@@ -437,6 +445,8 @@ func (s *TransactionsTestSuite) TestSendEtherTxUpstream() {
 }
 
 func (s *TransactionsTestSuite) TestDoubleCompleteQueuedTransactions() {
+	CheckTestSkipForNetworks(s.T(), params.MainNetworkID)
+
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
@@ -514,6 +524,8 @@ func (s *TransactionsTestSuite) TestDoubleCompleteQueuedTransactions() {
 }
 
 func (s *TransactionsTestSuite) TestDiscardQueuedTransaction() {
+	CheckTestSkipForNetworks(s.T(), params.MainNetworkID)
+
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
@@ -588,6 +600,8 @@ func (s *TransactionsTestSuite) TestDiscardQueuedTransaction() {
 }
 
 func (s *TransactionsTestSuite) TestCompleteMultipleQueuedTransactions() {
+	CheckTestSkipForNetworks(s.T(), params.MainNetworkID)
+
 	s.setupLocalNode()
 	defer s.StopTestBackend()
 
@@ -599,6 +613,8 @@ func (s *TransactionsTestSuite) TestCompleteMultipleQueuedTransactions() {
 }
 
 func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
+	CheckTestSkipForNetworks(s.T(), params.MainNetworkID)
+
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
@@ -729,6 +745,8 @@ func (s *TransactionsTestSuite) TestNonExistentQueuedTransactions() {
 }
 
 func (s *TransactionsTestSuite) TestCompleteMultipleQueuedTransactionsUpstream() {
+	CheckTestSkipForNetworks(s.T(), params.MainNetworkID)
+
 	s.setupUpstreamNode()
 	defer s.StopTestBackend()
 

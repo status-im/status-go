@@ -12,7 +12,7 @@ import (
 	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
-	e2e "github.com/status-im/status-go/t/e2e"
+	"github.com/status-im/status-go/t/e2e"
 	. "github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/suite"
 )
@@ -190,7 +190,7 @@ func (s *APIBackendTestSuite) TestRaceConditions() {
 // FIXME(tiabc): There's also a test with the same name in geth/node/manager_test.go
 // so this test should only check StatusBackend logic with a mocked version of the underlying StatusNode.
 func (s *APIBackendTestSuite) TestNetworkSwitching() {
-	// get Ropsten config
+	// Get test node configuration.
 	nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
 

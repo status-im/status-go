@@ -131,9 +131,10 @@ func GetRemoteURLFromNetworkID(id int) (url string, err error) {
 }
 
 // GetHeadHashFromNetworkID returns the hash associated with a given network id.
-// Mainnet is not supported for tests.
 func GetHeadHashFromNetworkID(id int) string {
 	switch id {
+	case params.MainNetworkID:
+		return "0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3"
 	case params.RinkebyNetworkID:
 		return "0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177"
 	case params.RopstenNetworkID:
@@ -156,10 +157,11 @@ func GetHeadHash() string {
 }
 
 // GetNetworkID returns appropriate network id for test based on
-// default or provided -network flag. Mainnet is not supported for
-// tests.
+// default or provided -network flag.
 func GetNetworkID() int {
 	switch strings.ToLower(*networkSelected) {
+	case fmt.Sprintf("%d", params.MainNetworkID), "mainnet":
+		return params.MainNetworkID
 	case fmt.Sprintf("%d", params.RinkebyNetworkID), "rinkeby":
 		return params.RinkebyNetworkID
 	case fmt.Sprintf("%d", params.RopstenNetworkID), "ropsten", "testnet":
@@ -169,6 +171,17 @@ func GetNetworkID() int {
 	}
 	// Every other selected network must break the test.
 	panic(fmt.Sprintf("invalid selected network: %q", *networkSelected))
+}
+
+// CheckTestSkipForNetworks checks if network for test is one of the
+// prohibited ones and skips the test in this case.
+func CheckTestSkipForNetworks(t *testing.T, networks ...int) {
+	id := GetNetworkID()
+	for _, network := range networks {
+		if network == id {
+			t.Skipf("skipping test for network %d", network)
+		}
+	}
 }
 
 // GetAccount1PKFile returns the filename for Account1 keystore based

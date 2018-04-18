@@ -12,7 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
-	e2e "github.com/status-im/status-go/t/e2e"
+	"github.com/status-im/status-go/t/e2e"
 	. "github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/suite"
 )
@@ -160,6 +160,8 @@ func (s *RPCTestSuite) TestCallRawResultGetTransactionReceipt() {
 // TestCallContextResult checks if result passed to CallContext
 // is set accordingly to its underlying memory layout.
 func (s *RPCTestSuite) TestCallContextResult() {
+	CheckTestSkipForNetworks(s.T(), params.MainNetworkID)
+
 	s.StartTestNode()
 	defer s.StopTestNode()
 

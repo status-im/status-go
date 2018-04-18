@@ -8,7 +8,7 @@ import (
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/static"
-	e2e "github.com/status-im/status-go/t/e2e"
+	"github.com/status-im/status-go/t/e2e"
 	. "github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/suite"
 )
