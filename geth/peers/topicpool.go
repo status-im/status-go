@@ -72,10 +72,8 @@ func (t *TopicPool) popFromPeerPool() *peerInfo {
 	if t.peerPoolQueue.Len() == 0 {
 		return nil
 	}
-
 	item := heap.Pop(&t.peerPoolQueue).(*peerInfoItem)
 	delete(t.peerPool, item.node.ID)
-
 	return item.peerInfo
 }
 
@@ -209,7 +207,7 @@ func (t *TopicPool) AddPeerFromTable(server *p2p.Server) *discv5.Node {
 	// The most recently added peer is removed from the queue.
 	// If it did not expire yet, it will be added to the server.
 	// TODO(adam): investigate if it's worth to keep the peer in the queue
-	// until server confirms it is added and only adjust priority until then.
+	// until the server confirms it is added and in the meanwhile only adjust its priority.
 	peer := t.popFromPeerPool()
 	if peer != nil && mclock.Now() < peer.discoveredTime+mclock.AbsTime(expirationPeriod) {
 		t.addServerPeer(server, peer)
