@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"reflect"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -447,7 +448,7 @@ func (s *TransactionsTestSuite) TestDoubleCompleteQueuedTransactions() {
 	completeQueuedTransaction := make(chan struct{})
 
 	// replace transaction notification handler
-	txFailedEventCalled := false
+	var isTxFailedEventCalled int32 // using int32 as bool to avoid data race: 0 is `false`, 1 is `true`
 	signHash := gethcommon.Hash{}
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var envelope signal.Envelope
@@ -488,7 +489,7 @@ func (s *TransactionsTestSuite) TestDoubleCompleteQueuedTransactions() {
 			receivedErrCode := event["error_code"].(string)
 			s.Equal("2", receivedErrCode)
 
-			txFailedEventCalled = true
+			atomic.AddInt32(&isTxFailedEventCalled, 1)
 		}
 	})
 
@@ -509,7 +510,7 @@ func (s *TransactionsTestSuite) TestDoubleCompleteQueuedTransactions() {
 	s.Equal(sendTxHash, signHash, "transaction hash returned from SendTransaction is invalid")
 	s.False(reflect.DeepEqual(sendTxHash, gethcommon.Hash{}), "transaction was never queued or completed")
 	s.Zero(s.Backend.PendingSignRequests().Count(), "tx queue must be empty at this point")
-	s.True(txFailedEventCalled, "expected tx failure signal is not received")
+	s.True(atomic.LoadInt32(&isTxFailedEventCalled) > 0, "expected tx failure signal is not received")
 }
 
 func (s *TransactionsTestSuite) TestDiscardQueuedTransaction() {
@@ -524,7 +525,7 @@ func (s *TransactionsTestSuite) TestDiscardQueuedTransaction() {
 	completeQueuedTransaction := make(chan struct{})
 
 	// replace transaction notification handler
-	txFailedEventCalled := false
+	var isTxFailedEventCalled int32 // using int32 as bool to avoid data race: 0 = `false`, 1 = `true`
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var envelope signal.Envelope
 		err := json.Unmarshal([]byte(jsonEvent), &envelope)
@@ -563,7 +564,7 @@ func (s *TransactionsTestSuite) TestDiscardQueuedTransaction() {
 			receivedErrCode := event["error_code"].(string)
 			s.Equal("4", receivedErrCode)
 
-			txFailedEventCalled = true
+			atomic.AddInt32(&isTxFailedEventCalled, 1)
 		}
 	})
 
@@ -583,7 +584,7 @@ func (s *TransactionsTestSuite) TestDiscardQueuedTransaction() {
 
 	s.True(reflect.DeepEqual(txHashCheck, gethcommon.Hash{}), "transaction returned hash, while it shouldn't")
 	s.Zero(s.Backend.PendingSignRequests().Count(), "tx queue must be empty at this point")
-	s.True(txFailedEventCalled, "expected tx failure signal is not received")
+	s.True(atomic.LoadInt32(&isTxFailedEventCalled) > 0, "expected tx failure signal is not received")
 }
 
 func (s *TransactionsTestSuite) TestCompleteMultipleQueuedTransactions() {
@@ -611,7 +612,7 @@ func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
 	allTestTxDiscarded := make(chan struct{})
 
 	// replace transaction notification handler
-	txFailedEventCallCount := 0
+	var txFailedEventCallCount int32
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var envelope signal.Envelope
 		err := json.Unmarshal([]byte(jsonEvent), &envelope)
@@ -637,8 +638,8 @@ func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
 			receivedErrCode := event["error_code"].(string)
 			s.Equal("4", receivedErrCode)
 
-			txFailedEventCallCount++
-			if txFailedEventCallCount == testTxCount {
+			newCount := atomic.AddInt32(&txFailedEventCallCount, 1)
+			if newCount == int32(testTxCount) {
 				close(allTestTxDiscarded)
 			}
 		}
