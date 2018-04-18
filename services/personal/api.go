@@ -62,6 +62,16 @@ func (api *PublicAPI) SetRPC(rpcClient *rpc.Client, timeout time.Duration) {
 	api.rpcTimeout = timeout
 }
 
+// Recover is an implementation of `personal_ecRecover` or `web3.personal.ecRecover` API
+func (api *PublicAPI) Recover(context context.Context, rpcParams ...interface{}) (interface{}, error) {
+	var response interface{}
+
+	err := api.rpcClient.CallContextIgnoringLocalHandlers(
+		context, &response, params.PersonalRecoverMethodName, rpcParams...)
+
+	return response, err
+}
+
 // Sign is an implementation of `personal_sign` or `web3.personal.sign` API
 func (api *PublicAPI) Sign(context context.Context, rpcParams ...interface{}) (interface{}, error) {
 	metadata, err := newMetadata(rpcParams)
