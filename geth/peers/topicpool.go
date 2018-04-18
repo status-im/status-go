@@ -1,6 +1,7 @@
 package peers
 
 import (
+	"container/heap"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -15,13 +16,18 @@ import (
 
 // NewTopicPool returns instance of TopicPool
 func NewTopicPool(topic discv5.Topic, limits params.Limits, slowSync, fastSync time.Duration) *TopicPool {
-	return &TopicPool{
-		topic:    topic,
-		limits:   limits,
-		slowSync: slowSync,
-		fastSync: fastSync,
-		peers:    map[discv5.NodeID]*peerInfo{},
+	pool := TopicPool{
+		topic:     topic,
+		limits:    limits,
+		slowSync:  slowSync,
+		fastSync:  fastSync,
+		peers:     make(map[discv5.NodeID]*peerInfoItem),
+		peersHeap: make(peerPriorityQueue, 0),
 	}
+
+	heap.Init(&pool.peersHeap)
+
+	return &pool
 }
 
 // TopicPool manages peers for topic.
@@ -38,10 +44,35 @@ type TopicPool struct {
 	discWG     sync.WaitGroup
 	consumerWG sync.WaitGroup
 	connected  int
-	peers      map[discv5.NodeID]*peerInfo
+	peers      map[discv5.NodeID]*peerInfoItem
+	peersHeap  peerPriorityQueue
 	period     chan time.Duration
 
 	cache *Cache
+}
+
+func (t *TopicPool) add(peer *peerInfo) {
+	item := &peerInfoItem{
+		peerInfo: peer,
+	}
+	t.peers[peer.node.ID] = item
+	heap.Push(&t.peersHeap, item)
+}
+
+func (t *TopicPool) remove(nodeID discover.NodeID) {
+	discV5NodeID := discv5.NodeID(nodeID)
+	peer, ok := t.peers[discV5NodeID]
+	if !ok {
+		return
+	}
+
+	delete(t.peers, discV5NodeID)
+	heap.Remove(&t.peersHeap, peer.index)
+}
+
+func (t *TopicPool) update(item *peerInfoItem, time mclock.AbsTime) {
+	item.discoveredTime = mclock.Now()
+	heap.Fix(&t.peersHeap, item.index)
 }
 
 // SearchRunning returns true if search is running
@@ -88,7 +119,7 @@ func (t *TopicPool) ConfirmAdded(server *p2p.Server, nodeID discover.NodeID) {
 	if t.connected == t.limits[1] {
 		log.Debug("max limit is reached drop the peer", "ID", nodeID, "topic", t.topic)
 		peer.requested = true
-		t.removePeer(server, peer)
+		t.removeServerPeer(server, peer.peerInfo)
 		return
 	}
 	// don't count same peer twice
@@ -125,8 +156,8 @@ func (t *TopicPool) ConfirmDropped(server *p2p.Server, nodeID discover.NodeID) b
 		t.period <- t.fastSync
 	}
 	t.connected--
-	t.removePeer(server, peer)
-	delete(t.peers, discv5.NodeID(nodeID))
+	t.removeServerPeer(server, peer.peerInfo)
+	t.remove(nodeID)
 	if t.cache != nil {
 		if err := t.cache.RemovePeer(discv5.NodeID(nodeID), t.topic); err != nil {
 			log.Error("failed to remove peer from cache", "error", err)
@@ -139,10 +170,17 @@ func (t *TopicPool) ConfirmDropped(server *p2p.Server, nodeID discover.NodeID) b
 func (t *TopicPool) AddPeerFromTable(server *p2p.Server) *discv5.Node {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
-	// TODO use a heap queue and always get a peer that was discovered recently
-	for _, peer := range t.peers {
-		if !peer.connected && mclock.Now() < peer.discoveredTime+mclock.AbsTime(expirationPeriod) {
-			t.addPeer(server, peer)
+
+	for t.peersHeap.Len() > 0 {
+		// TODO(adam): it's invalid as we loose peers
+		peer := heap.Pop(&t.peersHeap).(*peerInfoItem).peerInfo
+		// TODO(adam): connected should be reflected in the priority
+		if peer.connected {
+			continue
+		}
+		// TODO(adam): even if peer is expired, it's not removed
+		if mclock.Now() < peer.discoveredTime+mclock.AbsTime(expirationPeriod) {
+			t.addServerPeer(server, peer)
 			return peer.node
 		}
 	}
@@ -212,20 +250,20 @@ func (t *TopicPool) processFoundNode(server *p2p.Server, node *discv5.Node) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if info, exist := t.peers[node.ID]; exist {
-		info.discoveredTime = mclock.Now()
+		t.update(info, mclock.Now())
 	} else {
-		t.peers[node.ID] = &peerInfo{
+		t.add(&peerInfo{
 			discoveredTime: mclock.Now(),
 			node:           node,
-		}
+		})
 	}
 	if t.connected < t.limits[1] && !t.peers[node.ID].connected {
 		log.Debug("peer found", "ID", node.ID, "topic", t.topic)
-		t.addPeer(server, t.peers[node.ID])
+		t.addServerPeer(server, t.peers[node.ID].peerInfo)
 	}
 }
 
-func (t *TopicPool) addPeer(server *p2p.Server, info *peerInfo) {
+func (t *TopicPool) addServerPeer(server *p2p.Server, info *peerInfo) {
 	server.AddPeer(discover.NewNode(
 		discover.NodeID(info.node.ID),
 		info.node.IP,
@@ -234,7 +272,7 @@ func (t *TopicPool) addPeer(server *p2p.Server, info *peerInfo) {
 	))
 }
 
-func (t *TopicPool) removePeer(server *p2p.Server, info *peerInfo) {
+func (t *TopicPool) removeServerPeer(server *p2p.Server, info *peerInfo) {
 	server.RemovePeer(discover.NewNode(
 		discover.NodeID(info.node.ID),
 		info.node.IP,
