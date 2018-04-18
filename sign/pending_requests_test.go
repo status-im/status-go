@@ -3,6 +3,7 @@ package sign
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -138,16 +139,16 @@ func (s PendingRequestsSuite) TestConcurrentComplete() {
 
 	s.True(s.pendingRequests.Has(req.ID), "sign request should exist")
 
-	approved := 0
-	tried := 0
+	var approved int32
+	var tried int32
 
 	for i := 10; i > 0; i-- {
 		go func() {
 			result := s.pendingRequests.Approve(req.ID, correctPassword, testVerifyFunc)
 			if result.Error == nil {
-				approved++
+				atomic.AddInt32(&approved, 1)
 			}
-			tried++
+			atomic.AddInt32(&tried, 1)
 		}()
 	}
 
@@ -155,8 +156,8 @@ func (s PendingRequestsSuite) TestConcurrentComplete() {
 
 	s.False(s.pendingRequests.Has(req.ID), "sign request should exist")
 
-	s.Equal(approved, 1, "request should be approved only once")
-	s.Equal(tried, 10, "request should be tried to approve 10 times")
+	s.EqualValues(atomic.LoadInt32(&approved), 1, "request should be approved only once")
+	s.EqualValues(atomic.LoadInt32(&tried), 10, "request should be tried to approve 10 times")
 }
 
 func (s PendingRequestsSuite) TestWaitSuccess() {
@@ -209,16 +210,15 @@ func (s PendingRequestsSuite) TestWaitFail() {
 }
 
 func (s PendingRequestsSuite) TestWaitTimeout() {
-	req, err := s.pendingRequests.Add(context.Background(), "", nil, s.delayedCompleteFunc())
+	req, err := s.pendingRequests.Add(context.Background(), "", nil, s.defaultCompleteFunc())
 	s.NoError(err)
 
 	s.True(s.pendingRequests.Has(req.ID), "sign request should exist")
 
-	go func() {
-		result := s.pendingRequests.Approve(req.ID, correctPassword, testVerifyFunc)
-		s.NoError(result.Error)
-	}()
-
 	result := s.pendingRequests.Wait(req.ID, 0*time.Second)
-	s.Equal(result.Error, ErrSignReqTimedOut)
+	s.Equal(ErrSignReqTimedOut, result.Error)
+
+	// Try approving the timeouted request, it will fail
+	result = s.pendingRequests.Approve(req.ID, correctPassword, testVerifyFunc)
+	s.NotNil(result.Error)
 }
