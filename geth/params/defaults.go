@@ -30,7 +30,8 @@ const (
 	ListenAddr = ":0"
 
 	// APIModules is a list of modules to expose via any type of RPC (HTTP, IPC, in-proc)
-	APIModules = "eth,net,web3,shh,shhext,personal"
+	// we also expose 2 limited personal APIs by overriding them in `api/backend.go`
+	APIModules = "eth,net,web3,shh,shhext"
 
 	// SendTransactionMethodName defines the name for a giving transaction.
 	SendTransactionMethodName = "eth_sendTransaction"
@@ -40,6 +41,9 @@ const (
 
 	// PersonalSignMethodName defines the name for `personal.sign` API.
 	PersonalSignMethodName = "personal_sign"
+
+	// PersonalRecoverMethodName defines the name for `personal.recover` API.
+	PersonalRecoverMethodName = "personal_ecRecover"
 
 	// MaxPeers is the maximum number of global peers
 	MaxPeers = 25

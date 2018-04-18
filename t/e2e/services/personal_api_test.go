@@ -3,6 +3,7 @@ package services
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
@@ -12,14 +13,22 @@ import (
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/sign"
 	e2e "github.com/status-im/status-go/t/e2e"
-	. "github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/suite"
+
+	. "github.com/status-im/status-go/t/utils"
 )
 
 const (
 	signDataString   = "0xBAADBEEF"
 	accountNotExists = "0x00164ca341326a03b547c05B343b2E21eFAe2400"
+
+	// see vendor/github.com/ethereum/go-ethereum/rpc/errors.go:L27
+	methodNotFoundErrorCode = -32601
 )
+
+type rpcError struct {
+	Code int `json:"code"`
+}
 
 type testParams struct {
 	Title             string
@@ -46,6 +55,48 @@ func TestPersonalSignSuiteUpstream(t *testing.T) {
 type PersonalSignSuite struct {
 	e2e.BackendTestSuite
 	upstream bool
+}
+
+func (s *PersonalSignSuite) TestRestrictedPersonalAPIs() {
+	if s.upstream && GetNetworkID() == params.StatusChainNetworkID {
+		s.T().Skip()
+		return
+	}
+
+	err := s.initTest(s.upstream)
+	s.NoError(err)
+	defer func() {
+		err := s.Backend.StopNode()
+		s.NoError(err)
+	}()
+	// These personal APIs should be available
+	s.testAPIExported("personal_sign", true)
+	s.testAPIExported("personal_ecRecover", true)
+	// These personal APIs shouldn't be exported
+	s.testAPIExported("personal_sendTransaction", false)
+	s.testAPIExported("personal_unlockAccount", false)
+	s.testAPIExported("personal_newAccount", false)
+	s.testAPIExported("personal_lockAccount", false)
+	s.testAPIExported("personal_listAccounts", false)
+	s.testAPIExported("personal_importRawKey", false)
+}
+
+func (s *PersonalSignSuite) testAPIExported(method string, expectExported bool) {
+	cmd := fmt.Sprintf(`{"jsonrpc":"2.0", "method": "%s", "params": []}`, method)
+
+	result := s.Backend.CallRPC(cmd)
+
+	var response struct {
+		Error *rpcError `json:"error"`
+	}
+
+	s.NoError(json.Unmarshal([]byte(result), &response))
+
+	hidden := (response.Error != nil && response.Error.Code == methodNotFoundErrorCode)
+
+	s.Equal(expectExported, !hidden,
+		"method %s should be %s, but it isn't",
+		method, map[bool]string{true: "exported", false: "hidden"}[expectExported])
 }
 
 func (s *PersonalSignSuite) TestPersonalSignSuccess() {
@@ -128,24 +179,6 @@ func (s *PersonalSignSuite) notificationHandlerNoAccountSelected(account string,
 	}
 }
 
-func (s *PersonalSignSuite) initTest(upstreamEnabled bool) error {
-	nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
-	s.NoError(err)
-
-	nodeConfig.IPCEnabled = false
-	nodeConfig.HTTPHost = "" // to make sure that no HTTP interface is started
-
-	if upstreamEnabled {
-		networkURL, err := GetRemoteURL()
-		s.NoError(err)
-
-		nodeConfig.UpstreamConfig.Enabled = true
-		nodeConfig.UpstreamConfig.URL = networkURL
-	}
-
-	return s.Backend.StartNode(nodeConfig)
-}
-
 func (s *PersonalSignSuite) notificationHandler(account string, pass string, expectedError error) func(string) {
 	return func(jsonEvent string) {
 		envelope := unmarshalEnvelope(jsonEvent)
@@ -173,11 +206,11 @@ func (s *PersonalSignSuite) notificationHandler(account string, pass string, exp
 	}
 }
 
-func (s *PersonalSignSuite) testPersonalSign(testParams testParams) {
+func (s *PersonalSignSuite) testPersonalSign(testParams testParams) string {
 	// Test upstream if that's not StatusChain
 	if s.upstream && GetNetworkID() == params.StatusChainNetworkID {
 		s.T().Skip()
-		return
+		return ""
 	}
 
 	if testParams.HandlerFactory == nil {
@@ -207,9 +240,11 @@ func (s *PersonalSignSuite) testPersonalSign(testParams testParams) {
 	result := s.Backend.CallRPC(basicCall)
 	if testParams.ExpectedError == nil {
 		s.NotContains(result, "error")
-	} else {
-		s.Contains(result, testParams.ExpectedError.Error())
+		return s.extractResultFromRPCResponse(result)
 	}
+
+	s.Contains(result, testParams.ExpectedError.Error())
+	return ""
 }
 
 func unmarshalEnvelope(jsonEvent string) signal.Envelope {
@@ -218,4 +253,65 @@ func unmarshalEnvelope(jsonEvent string) signal.Envelope {
 		panic(e)
 	}
 	return envelope
+}
+
+func (s *PersonalSignSuite) TestPersonalRecoverSuccess() {
+
+	// 1. Sign
+	signedData := s.testPersonalSign(testParams{
+		Account:  TestConfig.Account1.Address,
+		Password: TestConfig.Account1.Password,
+	})
+
+	// Test upstream if that's not StatusChain
+	if s.upstream && GetNetworkID() == params.StatusChainNetworkID {
+		s.T().Skip()
+		return
+	}
+
+	err := s.initTest(s.upstream)
+	s.NoError(err)
+	defer func() {
+		err := s.Backend.StopNode()
+		s.NoError(err)
+	}()
+
+	// 2. Test recover
+	basicCall := fmt.Sprintf(
+		`{"jsonrpc":"2.0","method":"personal_ecRecover","params":["%s", "%s"],"id":67}`,
+		signDataString,
+		signedData)
+
+	response := s.Backend.CallRPC(basicCall)
+
+	result := s.extractResultFromRPCResponse(response)
+
+	s.True(strings.EqualFold(result, TestConfig.Account1.Address))
+}
+
+func (s *PersonalSignSuite) initTest(upstreamEnabled bool) error {
+	nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
+	s.NoError(err)
+
+	nodeConfig.IPCEnabled = false
+	nodeConfig.HTTPHost = "" // to make sure that no HTTP interface is started
+
+	if upstreamEnabled {
+		networkURL, err := GetRemoteURL()
+		s.NoError(err)
+
+		nodeConfig.UpstreamConfig.Enabled = true
+		nodeConfig.UpstreamConfig.URL = networkURL
+	}
+
+	return s.Backend.StartNode(nodeConfig)
+}
+
+func (s *PersonalSignSuite) extractResultFromRPCResponse(response string) string {
+	var r struct {
+		Result string `json:"result"`
+	}
+	s.NoError(json.Unmarshal([]byte(response), &r))
+
+	return r.Result
 }

@@ -134,7 +134,7 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 
 	b.transactor.SetNetworkID(config.NetworkID)
 	b.transactor.SetRPC(b.statusNode.RPCClient(), rpc.DefaultCallTimeout)
-	b.personalAPI.SetRPC(b.statusNode.RPCClient(), rpc.DefaultCallTimeout)
+	b.personalAPI.SetRPC(b.statusNode.RPCPrivateClient(), rpc.DefaultCallTimeout)
 	if err := b.registerHandlers(); err != nil {
 		b.log.Error("Handler registration failed", "err", err)
 	}
@@ -281,6 +281,7 @@ func (b *StatusBackend) registerHandlers() error {
 	})
 
 	rpcClient.RegisterHandler(params.PersonalSignMethodName, b.PersonalAPI().Sign)
+	rpcClient.RegisterHandler(params.PersonalRecoverMethodName, b.PersonalAPI().Recover)
 
 	return nil
 }
