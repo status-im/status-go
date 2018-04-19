@@ -40,3 +40,4 @@ checks:
       threshold: # language-specific defaults. an override will affect all languages.
 exclude_paths:
   - vendor/
+  - static/
