@@ -1,0 +1,31 @@
+version: "2"         # required to adjust maintainability checks
+checks:
+  argument-count:
+    config:
+      threshold: 5
+  complex-logic:
+    config:
+      threshold: 4
+  file-lines:
+    config:
+      threshold: 1500
+  method-complexity:
+    enabled: false
+  method-count:
+    enabled: false
+  method-lines:
+    config:
+      threshold: 200
+  nested-control-flow:
+    config:
+      threshold: 4
+  return-statements:
+    enabled: false
+  similar-code:
+    config:
+      threshold: # language-specific defaults. an override will affect all languages.
+  identical-code:
+    config:
+      threshold: # language-specific defaults. an override will affect all languages
+exclude_paths:
+  - vendor/
