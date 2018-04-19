@@ -53,10 +53,8 @@ func NewPeerPool(config map[discv5.Topic]params.Limits, fastSync, slowSync time.
 type peerInfo struct {
 	// discoveredTime last time when node was found by v5
 	discoveredTime mclock.AbsTime
-	// connected is true if node is added as a static peer
-	connected bool
-	// requested is true when our node requested a disconnect
-	requested bool
+	// dismissed is true when our node requested a disconnect
+	dismissed bool
 
 	node *discv5.Node
 }

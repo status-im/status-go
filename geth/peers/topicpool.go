@@ -1,6 +1,7 @@
 package peers
 
 import (
+	"container/heap"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -15,13 +16,19 @@ import (
 
 // NewTopicPool returns instance of TopicPool
 func NewTopicPool(topic discv5.Topic, limits params.Limits, slowSync, fastSync time.Duration) *TopicPool {
-	return &TopicPool{
-		topic:    topic,
-		limits:   limits,
-		slowSync: slowSync,
-		fastSync: fastSync,
-		peers:    map[discv5.NodeID]*peerInfo{},
+	pool := TopicPool{
+		topic:          topic,
+		limits:         limits,
+		slowSync:       slowSync,
+		fastSync:       fastSync,
+		peerPool:       make(map[discv5.NodeID]*peerInfoItem),
+		peerPoolQueue:  make(peerPriorityQueue, 0),
+		connectedPeers: make(map[discv5.NodeID]*peerInfo),
 	}
+
+	heap.Init(&pool.peerPoolQueue)
+
+	return &pool
 }
 
 // TopicPool manages peers for topic.
@@ -37,11 +44,58 @@ type TopicPool struct {
 	mu         sync.RWMutex
 	discWG     sync.WaitGroup
 	consumerWG sync.WaitGroup
-	connected  int
-	peers      map[discv5.NodeID]*peerInfo
 	period     chan time.Duration
 
+	peerPool       map[discv5.NodeID]*peerInfoItem // found but not connected peers
+	peerPoolQueue  peerPriorityQueue               // priority queue to find the most recent peer
+	connectedPeers map[discv5.NodeID]*peerInfo     // currently connected peers
+
 	cache *Cache
+}
+
+func (t *TopicPool) addToPeerPool(peer *peerInfo) {
+	if _, ok := t.peerPool[peer.node.ID]; ok {
+		return
+	}
+	item := &peerInfoItem{peerInfo: peer}
+	t.peerPool[peer.node.ID] = item
+	heap.Push(&t.peerPoolQueue, item)
+}
+
+func (t *TopicPool) removeFromPeerPool(nodeID discv5.NodeID) {
+	peer, ok := t.peerPool[nodeID]
+	if !ok {
+		return
+	}
+	delete(t.peerPool, nodeID)
+	heap.Remove(&t.peerPoolQueue, peer.index)
+}
+
+func (t *TopicPool) popFromPeerPool() *peerInfo {
+	if t.peerPoolQueue.Len() == 0 {
+		return nil
+	}
+	item := heap.Pop(&t.peerPoolQueue).(*peerInfoItem)
+	delete(t.peerPool, item.node.ID)
+	return item.peerInfo
+}
+
+func (t *TopicPool) updatePeerInPool(nodeID discv5.NodeID, time mclock.AbsTime) {
+	peer, ok := t.peerPool[nodeID]
+	if !ok {
+		return
+	}
+	peer.discoveredTime = mclock.Now()
+	heap.Fix(&t.peerPoolQueue, peer.index)
+}
+
+func (t *TopicPool) movePeerFromPoolToConnected(nodeID discv5.NodeID) {
+	peer, ok := t.peerPool[nodeID]
+	if !ok {
+		return
+	}
+	t.removeFromPeerPool(nodeID)
+	t.connectedPeers[nodeID] = peer.peerInfo
 }
 
 // SearchRunning returns true if search is running
@@ -53,14 +107,14 @@ func (t *TopicPool) SearchRunning() bool {
 func (t *TopicPool) MaxReached() bool {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
-	return t.connected == t.limits[1]
+	return len(t.connectedPeers) == t.limits[1]
 }
 
 // BelowMin returns true if current number of peers is below min limit.
 func (t *TopicPool) BelowMin() bool {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
-	return t.connected < t.limits[0]
+	return len(t.connectedPeers) < t.limits[0]
 }
 
 // ConfirmAdded called when peer was added by p2p Server.
@@ -73,31 +127,38 @@ func (t *TopicPool) BelowMin() bool {
 func (t *TopicPool) ConfirmAdded(server *p2p.Server, nodeID discover.NodeID) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
+
+	discV5NodeID := discv5.NodeID(nodeID)
+
 	// inbound connection
-	peer, exist := t.peers[discv5.NodeID(nodeID)]
+	peer, exist := t.peerPool[discV5NodeID]
 	if !exist {
 		return
 	}
-	// established connection means that the node is a viable candidate for a connection and can be cached
+
+	// established connection means that the node
+	// is a viable candidate for a connection and can be cached
 	if t.cache != nil {
 		if err := t.cache.AddPeer(peer.node, t.topic); err != nil {
 			log.Error("failed to persist a peer", "error", err)
 		}
 	}
-	// when max limit is reached drop every peer after
-	if t.connected == t.limits[1] {
+
+	// if the upper limit is already reached, drop this peer
+	if len(t.connectedPeers) == t.limits[1] {
 		log.Debug("max limit is reached drop the peer", "ID", nodeID, "topic", t.topic)
-		peer.requested = true
-		t.removePeer(server, peer)
+		peer.dismissed = true
+		t.removeServerPeer(server, peer.peerInfo)
 		return
 	}
-	// don't count same peer twice
-	if !peer.connected {
-		log.Debug("marking as connected", "ID", nodeID)
-		peer.connected = true
-		t.connected++
-	}
-	if t.SearchRunning() && t.connected == t.limits[0] {
+
+	// move peer from pool to connected peers
+	t.movePeerFromPoolToConnected(discV5NodeID)
+	// make sure `dismissed` is restarted
+	peer.dismissed = false
+
+	// when the lower limit is reached, we can switch to slow mode
+	if t.SearchRunning() && len(t.connectedPeers) == t.limits[0] {
 		t.period <- t.slowSync
 	}
 }
@@ -112,26 +173,44 @@ func (t *TopicPool) ConfirmAdded(server *p2p.Server, nodeID discover.NodeID) {
 func (t *TopicPool) ConfirmDropped(server *p2p.Server, nodeID discover.NodeID) bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
+
+	discV5NodeID := discv5.NodeID(nodeID)
+
 	// either inbound or connected from another topic
-	peer, exist := t.peers[discv5.NodeID(nodeID)]
+	peer, exist := t.connectedPeers[discV5NodeID]
 	if !exist {
 		return false
 	}
-	log.Debug("disconnect", "ID", nodeID)
-	if peer.requested {
+
+	log.Debug("disconnect", "ID", nodeID, "dismissed", peer.dismissed)
+
+	// Peer was removed by us because exceeded the limit.
+	// Add it back to the pool as it can be useful in the future.
+	if peer.dismissed {
+		t.addToPeerPool(peer)
 		return false
 	}
-	if t.SearchRunning() && t.connected == t.limits[0] {
+
+	// switch to fast mode as the number of connected peers is about to drop
+	// below the lower limit
+	if t.SearchRunning() && len(t.connectedPeers) == t.limits[0] {
 		t.period <- t.fastSync
 	}
-	t.connected--
-	t.removePeer(server, peer)
-	delete(t.peers, discv5.NodeID(nodeID))
+
+	// If there was a network error, this event will be received
+	// but the peer won't be removed from the static nodes set.
+	// That's why we need to call `removeServerPeer` manually.
+	t.removeServerPeer(server, peer)
+
+	delete(t.connectedPeers, discV5NodeID)
+
+	// remove from cache only if the peer dropped by itself
 	if t.cache != nil {
-		if err := t.cache.RemovePeer(discv5.NodeID(nodeID), t.topic); err != nil {
+		if err := t.cache.RemovePeer(discV5NodeID, t.topic); err != nil {
 			log.Error("failed to remove peer from cache", "error", err)
 		}
 	}
+
 	return true
 }
 
@@ -139,13 +218,17 @@ func (t *TopicPool) ConfirmDropped(server *p2p.Server, nodeID discover.NodeID) b
 func (t *TopicPool) AddPeerFromTable(server *p2p.Server) *discv5.Node {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
-	// TODO use a heap queue and always get a peer that was discovered recently
-	for _, peer := range t.peers {
-		if !peer.connected && mclock.Now() < peer.discoveredTime+mclock.AbsTime(expirationPeriod) {
-			t.addPeer(server, peer)
-			return peer.node
-		}
+
+	// The most recently added peer is removed from the queue.
+	// If it did not expire yet, it will be added to the server.
+	// TODO(adam): investigate if it's worth to keep the peer in the queue
+	// until the server confirms it is added and in the meanwhile only adjust its priority.
+	peer := t.popFromPeerPool()
+	if peer != nil && mclock.Now() < peer.discoveredTime+mclock.AbsTime(expirationPeriod) {
+		t.addServerPeer(server, peer)
+		return peer.node
 	}
+
 	return nil
 }
 
@@ -184,7 +267,7 @@ func (t *TopicPool) StartSearch(server *p2p.Server) error {
 }
 
 func (t *TopicPool) handleFoundPeers(server *p2p.Server, found <-chan *discv5.Node, lookup <-chan bool) {
-	if t.connected >= t.limits[0] {
+	if len(t.connectedPeers) >= t.limits[0] {
 		t.period <- t.slowSync
 	} else {
 		t.period <- t.fastSync
@@ -211,21 +294,31 @@ func (t *TopicPool) handleFoundPeers(server *p2p.Server, found <-chan *discv5.No
 func (t *TopicPool) processFoundNode(server *p2p.Server, node *discv5.Node) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	if info, exist := t.peers[node.ID]; exist {
-		info.discoveredTime = mclock.Now()
+
+	log.Debug("peer found", "ID", node.ID, "topic", t.topic)
+
+	// peer is already connected so update only discoveredTime
+	if peer, ok := t.connectedPeers[node.ID]; ok {
+		peer.discoveredTime = mclock.Now()
+		return
+	}
+
+	if _, ok := t.peerPool[node.ID]; ok {
+		t.updatePeerInPool(node.ID, mclock.Now())
 	} else {
-		t.peers[node.ID] = &peerInfo{
+		t.addToPeerPool(&peerInfo{
 			discoveredTime: mclock.Now(),
 			node:           node,
-		}
+		})
 	}
-	if t.connected < t.limits[1] && !t.peers[node.ID].connected {
-		log.Debug("peer found", "ID", node.ID, "topic", t.topic)
-		t.addPeer(server, t.peers[node.ID])
+
+	// the upper limit is not reached, so let's add this peer
+	if len(t.connectedPeers) < t.limits[1] {
+		t.addServerPeer(server, t.peerPool[node.ID].peerInfo)
 	}
 }
 
-func (t *TopicPool) addPeer(server *p2p.Server, info *peerInfo) {
+func (t *TopicPool) addServerPeer(server *p2p.Server, info *peerInfo) {
 	server.AddPeer(discover.NewNode(
 		discover.NodeID(info.node.ID),
 		info.node.IP,
@@ -234,7 +327,7 @@ func (t *TopicPool) addPeer(server *p2p.Server, info *peerInfo) {
 	))
 }
 
-func (t *TopicPool) removePeer(server *p2p.Server, info *peerInfo) {
+func (t *TopicPool) removeServerPeer(server *p2p.Server, info *peerInfo) {
 	server.RemovePeer(discover.NewNode(
 		discover.NodeID(info.node.ID),
 		info.node.IP,
