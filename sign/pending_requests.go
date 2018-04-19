@@ -114,7 +114,11 @@ func (rs *PendingRequests) Wait(id string, timeout time.Duration) Result {
 		case rst := <-request.result:
 			return rst
 		case <-time.After(timeout):
-			rs.complete(request, EmptyResponse, ErrSignReqTimedOut)
+			_, err := rs.tryLock(request.ID)
+			// if request is not already in progress, we complete it.
+			if err == nil {
+				rs.complete(request, EmptyResponse, ErrSignReqTimedOut)
+			}
 		}
 	}
 }

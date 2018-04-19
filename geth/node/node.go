@@ -79,7 +79,7 @@ func MakeNode(config *params.NodeConfig) (*node.Node, error) {
 			return nil, fmt.Errorf("%v: %v", ErrLightEthRegistrationFailure, err)
 		}
 	} else {
-		// `personal_sign` and `personal_recover` methods are important to
+		// `personal_sign` and `personal_ecRecover` methods are important to
 		// keep DApps working.
 		// Usually, they are provided by an ETH or a LES service, but when using
 		// upstream, we don't start any of these, so we need to start our own

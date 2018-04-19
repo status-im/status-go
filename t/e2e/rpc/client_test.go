@@ -5,7 +5,7 @@ import (
 
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/rpc"
-	e2e "github.com/status-im/status-go/t/e2e"
+	"github.com/status-im/status-go/t/e2e"
 	. "github.com/status-im/status-go/t/utils" //nolint: golint
 	"github.com/stretchr/testify/suite"
 )

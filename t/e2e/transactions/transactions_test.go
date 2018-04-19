@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"reflect"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -38,6 +39,8 @@ type TransactionsTestSuite struct {
 }
 
 func (s *TransactionsTestSuite) TestCallRPCSendTransaction() {
+	CheckTestSkipForNetworks(s.T(), params.MainNetworkID)
+
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
@@ -89,9 +92,7 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransaction() {
 }
 
 func (s *TransactionsTestSuite) TestCallRPCSendTransactionUpstream() {
-	if GetNetworkID() == params.StatusChainNetworkID {
-		s.T().Skip()
-	}
+	CheckTestSkipForNetworks(s.T(), params.MainNetworkID, params.StatusChainNetworkID)
 
 	addr, err := GetRemoteURL()
 	s.NoError(err)
@@ -147,6 +148,8 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransactionUpstream() {
 }
 
 func (s *TransactionsTestSuite) TestEmptyToFieldPreserved() {
+	CheckTestSkipForNetworks(s.T(), params.MainNetworkID)
+
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
@@ -194,6 +197,8 @@ func (s *TransactionsTestSuite) TestEmptyToFieldPreserved() {
 // TestSendContractCompat tries to send transaction using the legacy "Data"
 // field, which is supported for backward compatibility reasons.
 func (s *TransactionsTestSuite) TestSendContractTxCompat() {
+	CheckTestSkipForNetworks(s.T(), params.MainNetworkID)
+
 	initFunc := func(byteCode []byte, args *transactions.SendTxArgs) {
 		args.Data = (hexutil.Bytes)(byteCode)
 	}
@@ -204,6 +209,8 @@ func (s *TransactionsTestSuite) TestSendContractTxCompat() {
 // "Data" and "Input" fields. Also makes sure that the error is returned if
 // they have different values.
 func (s *TransactionsTestSuite) TestSendContractTxCollision() {
+	CheckTestSkipForNetworks(s.T(), params.MainNetworkID)
+
 	// Scenario 1: Both fields are filled and have the same value, expect success
 	initFunc := func(byteCode []byte, args *transactions.SendTxArgs) {
 		args.Input = (hexutil.Bytes)(byteCode)
@@ -231,6 +238,8 @@ func (s *TransactionsTestSuite) TestSendContractTxCollision() {
 }
 
 func (s *TransactionsTestSuite) TestSendContractTx() {
+	CheckTestSkipForNetworks(s.T(), params.MainNetworkID)
+
 	initFunc := func(byteCode []byte, args *transactions.SendTxArgs) {
 		args.Input = (hexutil.Bytes)(byteCode)
 	}
@@ -343,6 +352,8 @@ func (s *TransactionsTestSuite) testSendContractTx(setInputAndDataValue initFunc
 }
 
 func (s *TransactionsTestSuite) TestSendEther() {
+	CheckTestSkipForNetworks(s.T(), params.MainNetworkID)
+
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
@@ -378,9 +389,7 @@ func (s *TransactionsTestSuite) TestSendEther() {
 }
 
 func (s *TransactionsTestSuite) TestSendEtherTxUpstream() {
-	if GetNetworkID() == params.StatusChainNetworkID {
-		s.T().Skip()
-	}
+	CheckTestSkipForNetworks(s.T(), params.MainNetworkID, params.StatusChainNetworkID)
 
 	addr, err := GetRemoteURL()
 	s.NoError(err)
@@ -436,6 +445,8 @@ func (s *TransactionsTestSuite) TestSendEtherTxUpstream() {
 }
 
 func (s *TransactionsTestSuite) TestDoubleCompleteQueuedTransactions() {
+	CheckTestSkipForNetworks(s.T(), params.MainNetworkID)
+
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
@@ -447,7 +458,7 @@ func (s *TransactionsTestSuite) TestDoubleCompleteQueuedTransactions() {
 	completeQueuedTransaction := make(chan struct{})
 
 	// replace transaction notification handler
-	txFailedEventCalled := false
+	var isTxFailedEventCalled int32 // using int32 as bool to avoid data race: 0 is `false`, 1 is `true`
 	signHash := gethcommon.Hash{}
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var envelope signal.Envelope
@@ -488,7 +499,7 @@ func (s *TransactionsTestSuite) TestDoubleCompleteQueuedTransactions() {
 			receivedErrCode := event["error_code"].(string)
 			s.Equal("2", receivedErrCode)
 
-			txFailedEventCalled = true
+			atomic.AddInt32(&isTxFailedEventCalled, 1)
 		}
 	})
 
@@ -509,10 +520,12 @@ func (s *TransactionsTestSuite) TestDoubleCompleteQueuedTransactions() {
 	s.Equal(sendTxHash, signHash, "transaction hash returned from SendTransaction is invalid")
 	s.False(reflect.DeepEqual(sendTxHash, gethcommon.Hash{}), "transaction was never queued or completed")
 	s.Zero(s.Backend.PendingSignRequests().Count(), "tx queue must be empty at this point")
-	s.True(txFailedEventCalled, "expected tx failure signal is not received")
+	s.True(atomic.LoadInt32(&isTxFailedEventCalled) > 0, "expected tx failure signal is not received")
 }
 
 func (s *TransactionsTestSuite) TestDiscardQueuedTransaction() {
+	CheckTestSkipForNetworks(s.T(), params.MainNetworkID)
+
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
@@ -524,7 +537,7 @@ func (s *TransactionsTestSuite) TestDiscardQueuedTransaction() {
 	completeQueuedTransaction := make(chan struct{})
 
 	// replace transaction notification handler
-	txFailedEventCalled := false
+	var isTxFailedEventCalled int32 // using int32 as bool to avoid data race: 0 = `false`, 1 = `true`
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var envelope signal.Envelope
 		err := json.Unmarshal([]byte(jsonEvent), &envelope)
@@ -563,7 +576,7 @@ func (s *TransactionsTestSuite) TestDiscardQueuedTransaction() {
 			receivedErrCode := event["error_code"].(string)
 			s.Equal("4", receivedErrCode)
 
-			txFailedEventCalled = true
+			atomic.AddInt32(&isTxFailedEventCalled, 1)
 		}
 	})
 
@@ -583,10 +596,12 @@ func (s *TransactionsTestSuite) TestDiscardQueuedTransaction() {
 
 	s.True(reflect.DeepEqual(txHashCheck, gethcommon.Hash{}), "transaction returned hash, while it shouldn't")
 	s.Zero(s.Backend.PendingSignRequests().Count(), "tx queue must be empty at this point")
-	s.True(txFailedEventCalled, "expected tx failure signal is not received")
+	s.True(atomic.LoadInt32(&isTxFailedEventCalled) > 0, "expected tx failure signal is not received")
 }
 
 func (s *TransactionsTestSuite) TestCompleteMultipleQueuedTransactions() {
+	CheckTestSkipForNetworks(s.T(), params.MainNetworkID)
+
 	s.setupLocalNode()
 	defer s.StopTestBackend()
 
@@ -598,6 +613,8 @@ func (s *TransactionsTestSuite) TestCompleteMultipleQueuedTransactions() {
 }
 
 func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
+	CheckTestSkipForNetworks(s.T(), params.MainNetworkID)
+
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
@@ -611,7 +628,7 @@ func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
 	allTestTxDiscarded := make(chan struct{})
 
 	// replace transaction notification handler
-	txFailedEventCallCount := 0
+	var txFailedEventCallCount int32
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var envelope signal.Envelope
 		err := json.Unmarshal([]byte(jsonEvent), &envelope)
@@ -637,8 +654,8 @@ func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
 			receivedErrCode := event["error_code"].(string)
 			s.Equal("4", receivedErrCode)
 
-			txFailedEventCallCount++
-			if txFailedEventCallCount == testTxCount {
+			newCount := atomic.AddInt32(&txFailedEventCallCount, 1)
+			if newCount == int32(testTxCount) {
 				close(allTestTxDiscarded)
 			}
 		}
@@ -728,6 +745,8 @@ func (s *TransactionsTestSuite) TestNonExistentQueuedTransactions() {
 }
 
 func (s *TransactionsTestSuite) TestCompleteMultipleQueuedTransactionsUpstream() {
+	CheckTestSkipForNetworks(s.T(), params.MainNetworkID)
+
 	s.setupUpstreamNode()
 	defer s.StopTestBackend()
 

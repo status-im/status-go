@@ -169,7 +169,7 @@ type ClusterConfig struct {
 	// StaticNodes lists the static nodes taken from compiled or passed cluster.json
 	StaticNodes []string
 
-	// BootNodes list of cluster peer nodes for a given network (Ropsten, Rinkeby, Homestead),
+	// BootNodes list of cluster peer nodes for a given network (Mainnet, Ropsten, Rinkeby, Homestead),
 	// for a given mode (production vs development)
 	BootNodes []string
 }

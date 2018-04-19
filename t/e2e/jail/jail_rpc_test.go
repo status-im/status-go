@@ -36,6 +36,8 @@ func (s *JailRPCTestSuite) SetupTest() {
 }
 
 func (s *JailRPCTestSuite) TestJailRPCSend() {
+	CheckTestSkipForNetworks(s.T(), params.MainNetworkID)
+
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
@@ -107,6 +109,8 @@ func (s *JailRPCTestSuite) TestRegressionGetTransactionReceipt() {
 }
 
 func (s *JailRPCTestSuite) TestContractDeployment() {
+	CheckTestSkipForNetworks(s.T(), params.MainNetworkID)
+
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
@@ -190,6 +194,8 @@ func (s *JailRPCTestSuite) TestContractDeployment() {
 }
 
 func (s *JailRPCTestSuite) TestJailVMPersistence() {
+	CheckTestSkipForNetworks(s.T(), params.MainNetworkID)
+
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
