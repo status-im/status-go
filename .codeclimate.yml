@@ -1,31 +1,44 @@
 version: "2"         # required to adjust maintainability checks
 checks:
+  # Methods or functions defined with a high number of arguments
   argument-count:
     config:
       threshold: 5
+  # Boolean logic that may be hard to understand
   complex-logic:
     config:
       threshold: 4
+  # Excessive lines of code within a single file
   file-lines:
     config:
       threshold: 1500
+  # Functions or methods that may be hard to understand. This is disabled as it doesn't appear to be a reliable metric.
   method-complexity:
-    enabled: false
+    config:
+      threshold: 20
+  # Classes defined with a high number of functions or methods. 
   method-count:
-    enabled: false
+    config:
+      threshold: 20
+  # Excessive lines of code within a single function or method
   method-lines:
     config:
       threshold: 200
+  #  Deeply nested control structures like if or case
   nested-control-flow:
     config:
       threshold: 4
+  # Functions or methods with a high number of return statements
   return-statements:
-    enabled: false
+    config:
+      threshold: 4
+  # Duplicate code which is not identical but shares the same structure (e.g. variable names may differ)
   similar-code:
     config:
       threshold: # language-specific defaults. an override will affect all languages.
+  # Code that is identical in structure
   identical-code:
     config:
-      threshold: # language-specific defaults. an override will affect all languages
+      threshold: # language-specific defaults. an override will affect all languages.
 exclude_paths:
   - vendor/
