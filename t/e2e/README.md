@@ -70,7 +70,6 @@ Update config for tests with new accounts `static/config/public-chain-accounts.j
 Embed keys as a binary data, you will need to install `npm` tool and web3.js lib:
 
 ```bash
-(cd _assets && npm install web3)
 make generate
 ```
 
