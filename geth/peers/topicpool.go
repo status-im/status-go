@@ -184,18 +184,25 @@ func (t *TopicPool) ConfirmDropped(server *p2p.Server, nodeID discover.NodeID) b
 
 	log.Debug("disconnect", "ID", nodeID, "dismissed", peer.dismissed)
 
+	// Peer was removed by us because exceeded the limit.
+	// Add it back to the pool as it can be useful in the future.
+	if peer.dismissed {
+		t.addToPeerPool(peer)
+		return false
+	}
+
 	// switch to fast mode as the number of connected peers is about to drop
 	// below the lower limit
 	if t.SearchRunning() && len(t.connectedPeers) == t.limits[0] {
 		t.period <- t.fastSync
 	}
 
-	delete(t.connectedPeers, discV5NodeID)
+	// If there was a network error, this event will be received
+	// but the peer won't be removed from the static nodes set.
+	// That's why we need to call `removeServerPeer` manually.
+	t.removeServerPeer(server, peer)
 
-	if peer.dismissed {
-		t.addToPeerPool(peer)
-		return false
-	}
+	delete(t.connectedPeers, discV5NodeID)
 
 	// remove from cache only if the peer dropped by itself
 	if t.cache != nil {
