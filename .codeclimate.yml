@@ -3,7 +3,7 @@ checks:
   # Methods or functions defined with a high number of arguments
   argument-count:
     config:
-      threshold: 5
+      threshold: 6
   # Boolean logic that may be hard to understand
   complex-logic:
     config:
@@ -14,8 +14,7 @@ checks:
       threshold: 1500
   # Functions or methods that may be hard to understand. This is disabled as it doesn't appear to be a reliable metric.
   method-complexity:
-    config:
-      threshold: 20
+    enabled: false
   # Classes defined with a high number of functions or methods. 
   method-count:
     config:
@@ -23,15 +22,14 @@ checks:
   # Excessive lines of code within a single function or method
   method-lines:
     config:
-      threshold: 200
+      threshold: 500
   #  Deeply nested control structures like if or case
   nested-control-flow:
     config:
       threshold: 4
-  # Functions or methods with a high number of return statements
+  # Functions or methods with a high number of return statements. This is disabled because Go encourages early returns.
   return-statements:
-    config:
-      threshold: 4
+    enabled: false
   # Duplicate code which is not identical but shares the same structure (e.g. variable names may differ)
   similar-code:
     config:
