@@ -105,7 +105,7 @@ func (s *TopicPoolSuite) TestRequestedDoesntRemove() {
 	s.topicPool.ConfirmAdded(s.peer, discover.NodeID(peer1.ID))
 	s.topicPool.ConfirmAdded(s.peer, discover.NodeID(peer2.ID))
 	s.False(s.topicPool.connectedPeers[peer1.ID].dismissed)
-	s.True(s.topicPool.connectedPeers[peer2.ID].dismissed)
+	s.True(s.topicPool.peerPool[peer2.ID].dismissed)
 	s.topicPool.ConfirmDropped(s.peer, discover.NodeID(peer2.ID))
 	s.Contains(s.topicPool.peerPool, peer2.ID)
 	s.NotContains(s.topicPool.connectedPeers, peer2.ID)
