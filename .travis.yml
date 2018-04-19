@@ -12,6 +12,7 @@ install:
 jobs:
   include:
   - stage: Lint & Vendor Check
+    sudo: required
     script:
       - make lint
       - make vendor-check
