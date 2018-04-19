@@ -71,9 +71,9 @@ func TestPeerPriorityQueueIndexUpdating(t *testing.T) {
 	require.Equal(t, item2.index, 0)
 	require.Equal(t, item1.index, 1)
 
-	// poping should reset index
-	popedItem := heap.Pop(&q)
-	require.Equal(t, item2, popedItem)
+	// pop operation should reset index
+	poppedItem := heap.Pop(&q)
+	require.Equal(t, item2, poppedItem)
 	require.Equal(t, item2.index, -1)
 	require.Equal(t, item1.index, 0)
 }
