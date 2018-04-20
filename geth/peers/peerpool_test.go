@@ -96,7 +96,7 @@ func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailover() {
 	topic := discv5.Topic("cap=test")
 	// simulation should only rely on fast sync
 	config := map[discv5.Topic]params.Limits{
-		topic: {1, 1}, // limits a chosen for simplicity of the simulation
+		topic: params.NewLimits(1, 1), // limits a chosen for simplicity of the simulation
 	}
 	peerPool := NewPeerPool(config, 100*time.Millisecond, 100*time.Millisecond, nil, true)
 	register := NewRegister(topic)

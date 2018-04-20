@@ -107,14 +107,14 @@ func (t *TopicPool) SearchRunning() bool {
 func (t *TopicPool) MaxReached() bool {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
-	return len(t.connectedPeers) == t.limits[1]
+	return len(t.connectedPeers) == t.limits.Max
 }
 
 // BelowMin returns true if current number of peers is below min limit.
 func (t *TopicPool) BelowMin() bool {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
-	return len(t.connectedPeers) < t.limits[0]
+	return len(t.connectedPeers) < t.limits.Min
 }
 
 // ConfirmAdded called when peer was added by p2p Server.
@@ -145,7 +145,7 @@ func (t *TopicPool) ConfirmAdded(server *p2p.Server, nodeID discover.NodeID) {
 	}
 
 	// if the upper limit is already reached, drop this peer
-	if len(t.connectedPeers) == t.limits[1] {
+	if len(t.connectedPeers) == t.limits.Max {
 		log.Debug("max limit is reached drop the peer", "ID", nodeID, "topic", t.topic)
 		peer.dismissed = true
 		t.removeServerPeer(server, peer.peerInfo)
@@ -158,7 +158,7 @@ func (t *TopicPool) ConfirmAdded(server *p2p.Server, nodeID discover.NodeID) {
 	peer.dismissed = false
 
 	// when the lower limit is reached, we can switch to slow mode
-	if t.SearchRunning() && len(t.connectedPeers) == t.limits[0] {
+	if t.SearchRunning() && len(t.connectedPeers) == t.limits.Min {
 		t.period <- t.slowSync
 	}
 }
@@ -193,7 +193,7 @@ func (t *TopicPool) ConfirmDropped(server *p2p.Server, nodeID discover.NodeID) b
 
 	// switch to fast mode as the number of connected peers is about to drop
 	// below the lower limit
-	if t.SearchRunning() && len(t.connectedPeers) == t.limits[0] {
+	if t.SearchRunning() && len(t.connectedPeers) == t.limits.Min {
 		t.period <- t.fastSync
 	}
 
@@ -267,7 +267,7 @@ func (t *TopicPool) StartSearch(server *p2p.Server) error {
 }
 
 func (t *TopicPool) handleFoundPeers(server *p2p.Server, found <-chan *discv5.Node, lookup <-chan bool) {
-	if len(t.connectedPeers) >= t.limits[0] {
+	if len(t.connectedPeers) >= t.limits.Min {
 		t.period <- t.slowSync
 	} else {
 		t.period <- t.fastSync
@@ -313,7 +313,7 @@ func (t *TopicPool) processFoundNode(server *p2p.Server, node *discv5.Node) {
 	}
 
 	// the upper limit is not reached, so let's add this peer
-	if len(t.connectedPeers) < t.limits[1] {
+	if len(t.connectedPeers) < t.limits.Max {
 		t.addServerPeer(server, t.peerPool[node.ID].peerInfo)
 	}
 }
