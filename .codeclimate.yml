@@ -37,8 +37,7 @@ checks:
   identical-code:
     config:
       threshold: # language-specific defaults. an override will affect all languages.
-      exclude_patterns:
-        - "**/*_test.go"
 exclude_paths:
   - vendor/
   - static/
+  - t/
