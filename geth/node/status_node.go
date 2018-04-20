@@ -33,6 +33,7 @@ var (
 	ErrNoGethNode             = errors.New("geth node is not available")
 	ErrNoRunningNode          = errors.New("there is no running node")
 	ErrAccountKeyStoreMissing = errors.New("account key store is not set")
+	ErrServiceUnknown         = errors.New("service unknown")
 )
 
 // StatusNode abstracts contained geth node and provides helper methods to
@@ -348,7 +349,7 @@ func (n *StatusNode) gethService(serviceInstance interface{}) error {
 	}
 
 	if err := n.gethNode.Service(serviceInstance); err != nil {
-		return fmt.Errorf("service unavailable: %v", err)
+		return err
 	}
 
 	return nil
@@ -356,12 +357,28 @@ func (n *StatusNode) gethService(serviceInstance interface{}) error {
 
 // LightEthereumService exposes reference to LES service running on top of the node
 func (n *StatusNode) LightEthereumService() (l *les.LightEthereum, err error) {
-	return l, n.gethService(&l)
+	err = n.gethService(&l)
+	switch err {
+	case node.ErrServiceUnknown:
+		err = ErrServiceUnknown
+	default:
+		err = fmt.Errorf("service '%s' unavailable: %v", "les", err)
+	}
+
+	return
 }
 
 // WhisperService exposes reference to Whisper service running on top of the node
 func (n *StatusNode) WhisperService() (w *whisper.Whisper, err error) {
-	return w, n.gethService(&w)
+	err = n.gethService(&w)
+	switch err {
+	case node.ErrServiceUnknown:
+		err = ErrServiceUnknown
+	default:
+		err = fmt.Errorf("service '%s' unavailable: %v", "shh", err)
+	}
+
+	return
 }
 
 // AccountManager exposes reference to node's accounts manager

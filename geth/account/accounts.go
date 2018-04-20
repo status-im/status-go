@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
@@ -31,7 +32,9 @@ type GethServiceProvider interface {
 
 // Manager represents account manager interface.
 type Manager struct {
-	geth            GethServiceProvider
+	geth GethServiceProvider
+
+	mu              sync.RWMutex
 	selectedAccount *SelectedExtKey // account that was processed during the last call to SelectAccount()
 }
 
@@ -73,6 +76,9 @@ func (m *Manager) CreateAccount(password string) (address, pubKey, mnemonic stri
 // CKD#2 is used as root for master accounts (when parentAddress is "").
 // Otherwise (when parentAddress != ""), child is derived directly from parent.
 func (m *Manager) CreateChildAccount(parentAddress, password string) (address, pubKey string, err error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	keyStore, err := m.geth.AccountKeyStore()
 	if err != nil {
 		return "", "", err
@@ -206,6 +212,9 @@ func (m *Manager) VerifyAccountPassword(keyStoreDir, address, password string) (
 // SelectAccount selects current account, by verifying that address has corresponding account which can be decrypted
 // using provided password. Once verification is done, all previous identities are removed).
 func (m *Manager) SelectAccount(address, password string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	keyStore, err := m.geth.AccountKeyStore()
 	if err != nil {
 		return err
@@ -237,6 +246,9 @@ func (m *Manager) SelectAccount(address, password string) error {
 
 // SelectedAccount returns currently selected account
 func (m *Manager) SelectedAccount() (*SelectedExtKey, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
 	if m.selectedAccount == nil {
 		return nil, ErrNoAccountSelected
 	}
@@ -244,10 +256,10 @@ func (m *Manager) SelectedAccount() (*SelectedExtKey, error) {
 }
 
 // Logout clears selectedAccount.
-func (m *Manager) Logout() error {
+func (m *Manager) Logout() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.selectedAccount = nil
-
-	return nil
 }
 
 // importExtendedKey processes incoming extended key, extracts required info and creates corresponding account key.
@@ -278,6 +290,9 @@ func (m *Manager) importExtendedKey(extKey *extkeys.ExtendedKey, password string
 // Accounts returns list of addresses for selected account, including
 // subaccounts.
 func (m *Manager) Accounts() ([]gethcommon.Address, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
 	am, err := m.geth.AccountManager()
 	if err != nil {
 		return nil, err
