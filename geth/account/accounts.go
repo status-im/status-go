@@ -259,6 +259,7 @@ func (m *Manager) SelectedAccount() (*SelectedExtKey, error) {
 func (m *Manager) Logout() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	
 	m.selectedAccount = nil
 }
 
