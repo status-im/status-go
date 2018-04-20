@@ -123,7 +123,7 @@ docker-test: ##@tests Run tests in a docker container with golang.
 test: test-unit-coverage ##@tests Run basic, short tests during development
 
 test-unit: ##@tests Run unit and integration tests
-	go test $(UNIT_TEST_PACKAGES) $(gotest_extraflags)
+	go test -v $(UNIT_TEST_PACKAGES) $(gotest_extraflags)
 
 test-unit-coverage: ##@tests Run unit and integration tests with coverage
 	go test -coverpkg= $(UNIT_TEST_PACKAGES) $(gotest_extraflags)

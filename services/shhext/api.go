@@ -121,6 +121,15 @@ func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (boo
 	return true, nil
 }
 
+// GetNewFilterMessages is a prototype method with deduplication
+func (api *PublicAPI) GetNewFilterMessages(filterID string) ([]*whisper.Message, error) {
+	msgs, err := api.publicAPI.GetFilterMessages(filterID)
+	if err != nil {
+		return nil, err
+	}
+	return api.service.Deduplicator.Deduplicate(msgs), err
+}
+
 // -----
 // HELPER
 // -----
@@ -151,5 +160,4 @@ func makePayload(r MessagesRequest) []byte {
 	binary.BigEndian.PutUint32(data[4:], r.To)
 	copy(data[8:], whisper.TopicToBloom(r.Topic))
 	return data
-
 }

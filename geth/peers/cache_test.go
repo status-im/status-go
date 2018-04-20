@@ -1,9 +1,7 @@
 package peers
 
 import (
-	"io/ioutil"
 	"net"
-	"os"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/p2p/discv5"
@@ -13,12 +11,7 @@ import (
 )
 
 func TestPeersRange(t *testing.T) {
-	path, err := ioutil.TempDir("/tmp", "status-peers-test-")
-	require.NoError(t, err)
-	defer func() {
-		require.NoError(t, os.RemoveAll(path))
-	}()
-	rootDB, err := db.Create(path)
+	rootDB, err := db.Create("", "status-peers-test")
 	require.NoError(t, err)
 	defer func() {
 		assert.NoError(t, rootDB.Close())
