@@ -30,10 +30,9 @@ checks:
   # Functions or methods with a high number of return statements. This is disabled because Go encourages early returns.
   return-statements:
     enabled: false
-  # Duplicate code which is not identical but shares the same structure (e.g. variable names may differ)
+  # Duplicate code which is not identical but shares the same structure (e.g. variable names may differ). This is disabled due to too many false trips.
   similar-code:
-    config:
-      threshold: # language-specific defaults. an override will affect all languages.
+    enabled: false
   # Code that is identical in structure
   identical-code:
     config:
