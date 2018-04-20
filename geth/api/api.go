@@ -144,15 +144,11 @@ func (api *StatusAPI) VerifyAccountPassword(keyStoreDir, address, password strin
 // using provided password. Once verification is done, decrypted key is injected into Whisper (as a single identity,
 // all previous identities are removed).
 func (api *StatusAPI) SelectAccount(address, password string) error {
-	// FIXME(oleg-raev): This method doesn't make stop, it rather resets its cells to an initial state
-	// and should be properly renamed, for example: ResetCells
-	api.b.jailManager.Stop()
 	return api.b.SelectAccount(address, password)
 }
 
 // Logout clears whisper identities
 func (api *StatusAPI) Logout() error {
-	api.b.jailManager.Stop()
 	return api.b.Logout()
 }
 
@@ -209,53 +205,18 @@ func (api *StatusAPI) SetJailBaseJS(js string) {
 	api.b.jailManager.SetBaseJS(js)
 }
 
-// Notify sends a push notification to the device with the given token.
-// @deprecated
-func (api *StatusAPI) Notify(token string) string {
-	api.log.Debug("Notify", "token", token)
-	message := "Hello World1"
-
-	tokens := []string{token}
-
-	err := api.b.newNotification().Send(message, fcm.NotificationPayload{}, tokens...)
-	if err != nil {
-		api.log.Error("Notify failed", "error", err)
-	}
-
-	return token
-}
-
 // NotifyUsers send notifications to users.
 func (api *StatusAPI) NotifyUsers(message string, payload fcm.NotificationPayload, tokens ...string) error {
-	api.log.Debug("Notify", "tokens", tokens)
-
-	err := api.b.newNotification().Send(message, payload, tokens...)
-	if err != nil {
-		api.log.Error("Notify failed", "error", err)
-	}
-
-	return err
+	return api.b.NotifyUsers(message, payload, tokens...)
 }
 
 // ConnectionChange handles network state changes logic.
 func (api *StatusAPI) ConnectionChange(typ string, expensive bool) {
-	state := ConnectionState{
-		Type:      NewConnectionType(typ),
-		Expensive: expensive,
-	}
-	if typ == "none" {
-		state.Offline = true
-	}
-	api.b.ConnectionChange(state)
+	api.b.ConnectionChange(typ, expensive)
 }
 
 // AppStateChange handles app state changes (background/foreground).
 // state values: see https://facebook.github.io/react-native/docs/appstate.html
 func (api *StatusAPI) AppStateChange(state string) {
-	appState, err := ParseAppState(state)
-	if err != nil {
-		log.Error("AppStateChange failed, ignoring", "error", err)
-		return // and do nothing
-	}
-	api.b.AppStateChange(appState)
+	api.b.AppStateChange(state)
 }
