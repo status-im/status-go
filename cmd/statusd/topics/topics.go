@@ -47,6 +47,6 @@ func (f *TopicLimitsFlag) Set(value string) error {
 	if err != nil {
 		return err
 	}
-	(*f)[discv5.Topic(parts[0])] = params.Limits{minL, maxL}
+	(*f)[discv5.Topic(parts[0])] = params.NewLimits(minL, maxL)
 	return nil
 }

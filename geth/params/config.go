@@ -181,7 +181,17 @@ func (c *ClusterConfig) String() string {
 }
 
 // Limits represent min and max amount of peers
-type Limits [2]int
+type Limits struct {
+	Min, Max int
+}
+
+// NewLimits creates new Limits config with given min and max values.
+func NewLimits(min, max int) Limits {
+	return Limits{
+		Min: min,
+		Max: max,
+	}
+}
 
 // ----------
 // UpstreamRPCConfig

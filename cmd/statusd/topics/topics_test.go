@@ -52,17 +52,17 @@ func TestTopicLimitsFlag(t *testing.T) {
 		{
 			shortcut: "single",
 			flags:    []string{"whisper=1,1"},
-			expected: TopicLimitsFlag{"whisper": params.Limits{1, 1}},
+			expected: TopicLimitsFlag{"whisper": params.NewLimits(1, 1)},
 		},
 		{
 			shortcut: "multiple",
 			flags:    []string{"whisper=1,1", "les=2,3"},
-			expected: TopicLimitsFlag{"whisper": params.Limits{1, 1}, "les": params.Limits{2, 3}},
+			expected: TopicLimitsFlag{"whisper": params.NewLimits(1, 1), "les": params.NewLimits(2, 3)},
 		},
 		{
 			shortcut: "corrupted",
 			flags:    []string{" whisper=1,1 ", " les=2,3"},
-			expected: TopicLimitsFlag{"whisper": params.Limits{1, 1}, "les": params.Limits{2, 3}},
+			expected: TopicLimitsFlag{"whisper": params.NewLimits(1, 1), "les": params.NewLimits(2, 3)},
 		},
 		{
 			shortcut:  "badseparator",
