@@ -22,6 +22,7 @@ import (
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/peers"
 	"github.com/status-im/status-go/geth/rpc"
+	"github.com/status-im/status-go/services/shhext"
 )
 
 // tickerResolution is the delta to check blockchain sync progress.
@@ -98,11 +99,36 @@ func (n *StatusNode) Start(config *params.NodeConfig, services ...node.ServiceCo
 		return err
 	}
 
+	statusDB, err := db.Create(n.config.DataDir, params.StatusDatabase)
+	if err != nil {
+		return err
+	}
+
+	n.db = statusDB
+
+	if err := n.setupDeduplicator(); err != nil {
+		return err
+	}
+
 	if n.config.Discovery {
 		return n.startPeerPool()
 	}
 
 	return nil
+}
+
+func (n *StatusNode) setupDeduplicator() error {
+	var s shhext.Service
+
+	err := n.gethService(&s)
+	if err == node.ErrServiceUnknown {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	return s.Deduplicator.Start(n.db)
 }
 
 func (n *StatusNode) createNode(config *params.NodeConfig) (err error) {
@@ -143,11 +169,6 @@ func (n *StatusNode) setupRPCClient() (err error) {
 }
 
 func (n *StatusNode) startPeerPool() error {
-	statusDB, err := db.Create(filepath.Join(n.config.DataDir, params.StatusDatabase))
-	if err != nil {
-		return err
-	}
-	n.db = statusDB
 	n.register = peers.NewRegister(n.config.RegisterTopics...)
 	// TODO(dshulyak) consider adding a flag to define this behaviour
 	stopOnMax := len(n.config.RegisterTopics) == 0
@@ -182,7 +203,6 @@ func (n *StatusNode) stop() error {
 	}
 	n.register = nil
 	n.peerPool = nil
-	n.db = nil
 
 	if err := n.gethNode.Stop(); err != nil {
 		return err
@@ -195,6 +215,11 @@ func (n *StatusNode) stop() error {
 	n.gethNode = nil
 	n.config = nil
 
+	if err := n.db.Close(); err != nil {
+		return err
+	}
+	n.db = nil
+
 	return nil
 }
 
@@ -205,7 +230,7 @@ func (n *StatusNode) stopPeerPool() error {
 
 	n.register.Stop()
 	n.peerPool.Stop()
-	return n.db.Close()
+	return nil
 }
 
 // ResetChainData removes chain data if node is not running.

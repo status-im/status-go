@@ -1177,3 +1177,15 @@ func addBloom(a, b []byte) []byte {
 	}
 	return c
 }
+
+// SelectedKeyPairID returns the id of currently selected key pair.
+// It helps distinguish between different users w/o exposing the user identity itself.
+func (whisper *Whisper) SelectedKeyPairID() string {
+	whisper.keyMu.RLock()
+	defer whisper.keyMu.RUnlock()
+
+	for id := range whisper.privateKeys {
+		return id
+	}
+	return ""
+}
