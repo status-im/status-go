@@ -135,8 +135,8 @@ test-e2e: ##@tests Run e2e tests
 	# order: reliability then alphabetical
 	# TODO(tiabc): make a single command out of them adding `-p 1` flag.
 	go test -timeout 5m ./t/e2e/accounts/... -network=$(networkid) $(gotest_extraflags)
-	go test -timeout 5m -v ./t/e2e/api/... -network=$(networkid) $(gotest_extraflags)
-	go test -timeout 5m -v ./t/e2e/node/... -network=$(networkid) $(gotest_extraflags)
+	go test -timeout 5m ./t/e2e/api/... -network=$(networkid) $(gotest_extraflags)
+	go test -timeout 5m ./t/e2e/node/... -network=$(networkid) $(gotest_extraflags)
 	go test -timeout 50m ./t/e2e/jail/... -network=$(networkid) $(gotest_extraflags)
 	go test -timeout 20m ./t/e2e/rpc/... -network=$(networkid) $(gotest_extraflags)
 	go test -timeout 20m ./t/e2e/whisper/... -network=$(networkid) $(gotest_extraflags)
