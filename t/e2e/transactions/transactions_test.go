@@ -218,8 +218,6 @@ func (s *TransactionsTestSuite) TestSendContractTxCollision() {
 	}
 	s.testSendContractTx(initFunc, nil, "")
 
-	s.NoError(s.Backend.AccountManager().Logout())
-
 	// Scenario 2: Both fields are filled with different values, expect an error
 	inverted := func(source []byte) []byte {
 		inverse := make([]byte, len(source))
@@ -349,6 +347,8 @@ func (s *TransactionsTestSuite) testSendContractTx(setInputAndDataValue initFunc
 	s.Equal(txHashCheck.Bytes(), signRequestResult, "transaction hash returned from SendTransaction is invalid")
 	s.False(reflect.DeepEqual(txHashCheck, gethcommon.Hash{}), "transaction was never queued or completed")
 	s.Zero(s.PendingSignRequests().Count(), "tx queue must be empty at this point")
+
+	s.NoError(s.Backend.Logout())
 }
 
 func (s *TransactionsTestSuite) TestSendEther() {

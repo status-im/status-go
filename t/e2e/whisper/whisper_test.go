@@ -195,7 +195,7 @@ func (s *WhisperTestSuite) TestSelectedAccountOnRestart() {
 	s.False(whisperService.HasKeyPair(pubKey1), "identity should not be present, but it is still present in whisper")
 
 	// now logout, and make sure that on restart no account is selected (i.e. logout works properly)
-	s.NoError(s.Backend.AccountManager().Logout())
+	s.NoError(s.Backend.Logout())
 	s.RestartTestNode()
 	whisperService = s.WhisperService()
 	s.False(whisperService.HasKeyPair(pubKey2), "identity not injected into whisper")
