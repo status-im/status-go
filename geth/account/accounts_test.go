@@ -328,8 +328,7 @@ func (s *ManagerTestSuite) TestCreateChildAccount() {
 }
 
 func (s *ManagerTestSuite) TestLogout() {
-	err := s.accManager.Logout()
-	s.Nil(err)
+	s.accManager.Logout()
 	s.Nil(s.accManager.selectedAccount)
 }
 

@@ -110,7 +110,19 @@ func (b *StatusBackend) IsNodeRunning() bool {
 func (b *StatusBackend) StartNode(config *params.NodeConfig) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	return b.startNode(config)
+
+	if err := b.startNode(config); err != nil {
+		signal.Send(signal.Envelope{
+			Type: signal.EventNodeCrashed,
+			Event: signal.NodeCrashEvent{
+				Error: err,
+			},
+		})
+
+		return err
+	}
+
+	return nil
 }
 
 func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
@@ -120,29 +132,29 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 		}
 	}()
 
-	err = b.statusNode.Start(config)
-	if err != nil {
-		signal.Send(signal.Envelope{
-			Type: signal.EventNodeCrashed,
-			Event: signal.NodeCrashEvent{
-				Error: err,
-			},
-		})
-		return err
+	if err = b.statusNode.Start(config); err != nil {
+		return
 	}
 	signal.Send(signal.Envelope{Type: signal.EventNodeStarted})
 
 	b.transactor.SetNetworkID(config.NetworkID)
 	b.transactor.SetRPC(b.statusNode.RPCClient(), rpc.DefaultCallTimeout)
 	b.personalAPI.SetRPC(b.statusNode.RPCPrivateClient(), rpc.DefaultCallTimeout)
-	if err := b.registerHandlers(); err != nil {
+
+	if err = b.registerHandlers(); err != nil {
 		b.log.Error("Handler registration failed", "err", err)
+		return
 	}
-	if err := b.ReSelectAccount(); err != nil {
+	b.log.Info("Handlers registered")
+
+	if err = b.ReSelectAccount(); err != nil {
 		b.log.Error("Reselect account failed", "err", err)
+		return
 	}
 	b.log.Info("Account reselected")
+
 	signal.Send(signal.Envelope{Type: signal.EventNodeReady})
+
 	return nil
 }
 
@@ -164,9 +176,13 @@ func (b *StatusBackend) stopNode() error {
 
 // RestartNode restart running Status node, fails if node is not running
 func (b *StatusBackend) RestartNode() error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
 	if !b.IsNodeRunning() {
 		return node.ErrNoRunningNode
 	}
+
 	newcfg := *(b.statusNode.Config())
 	if err := b.stopNode(); err != nil {
 		return err
@@ -290,6 +306,9 @@ func (b *StatusBackend) registerHandlers() error {
 
 // ConnectionChange handles network state changes logic.
 func (b *StatusBackend) ConnectionChange(state ConnectionState) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
 	b.log.Info("Network state change", "old", b.connectionState, "new", state)
 	b.connectionState = state
 
@@ -308,15 +327,19 @@ func (b *StatusBackend) AppStateChange(state AppState) {
 // Logout clears whisper identities.
 func (b *StatusBackend) Logout() error {
 	whisperService, err := b.statusNode.WhisperService()
-	if err != nil {
+	switch err {
+	case node.ErrServiceUnknown: // Whisper was never registered
+	case nil:
+		if err := whisperService.DeleteKeyPairs(); err != nil {
+			return fmt.Errorf("%s: %v", ErrWhisperClearIdentitiesFailure, err)
+		}
+	default:
 		return err
 	}
-	err = whisperService.DeleteKeyPairs()
-	if err != nil {
-		return fmt.Errorf("%s: %v", ErrWhisperClearIdentitiesFailure, err)
-	}
 
-	return b.AccountManager().Logout()
+	b.AccountManager().Logout()
+
+	return nil
 }
 
 // ReSelectAccount selects previously selected account, often, after node restart.
@@ -326,13 +349,16 @@ func (b *StatusBackend) ReSelectAccount() error {
 		return nil
 	}
 	whisperService, err := b.statusNode.WhisperService()
-	if err != nil {
+	switch err {
+	case node.ErrServiceUnknown: // Whisper was never registered
+	case nil:
+		if err := whisperService.SelectKeyPair(selectedAccount.AccountKey.PrivateKey); err != nil {
+			return ErrWhisperIdentityInjectionFailure
+		}
+	default:
 		return err
 	}
 
-	if err := whisperService.SelectKeyPair(selectedAccount.AccountKey.PrivateKey); err != nil {
-		return ErrWhisperIdentityInjectionFailure
-	}
 	return nil
 }
 
@@ -350,13 +376,14 @@ func (b *StatusBackend) SelectAccount(address, password string) error {
 	}
 
 	whisperService, err := b.statusNode.WhisperService()
-	if err != nil {
+	switch err {
+	case node.ErrServiceUnknown: // Whisper was never registered
+	case nil:
+		if err := whisperService.SelectKeyPair(acc.AccountKey.PrivateKey); err != nil {
+			return ErrWhisperIdentityInjectionFailure
+		}
+	default:
 		return err
-	}
-
-	err = whisperService.SelectKeyPair(acc.AccountKey.PrivateKey)
-	if err != nil {
-		return ErrWhisperIdentityInjectionFailure
 	}
 
 	return nil
