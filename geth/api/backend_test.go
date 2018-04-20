@@ -8,6 +8,7 @@ import (
 
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -58,7 +59,7 @@ func TestBackendRestartNodeConcurrently(t *testing.T) {
 
 	for i := 0; i < count; i++ {
 		go func(idx int) {
-			require.NoError(t, backend.RestartNode())
+			assert.NoError(t, backend.RestartNode())
 			wg.Done()
 		}(i)
 	}
@@ -82,49 +83,49 @@ func TestBackendGettersConcurrently(t *testing.T) {
 
 	wg.Add(1)
 	go func() {
-		require.NotNil(t, backend.StatusNode())
+		assert.NotNil(t, backend.StatusNode())
 		wg.Done()
 	}()
 
 	wg.Add(1)
 	go func() {
-		require.NotNil(t, backend.AccountManager())
+		assert.NotNil(t, backend.AccountManager())
 		wg.Done()
 	}()
 
 	wg.Add(1)
 	go func() {
-		require.NotNil(t, backend.JailManager())
+		assert.NotNil(t, backend.JailManager())
 		wg.Done()
 	}()
 
 	wg.Add(1)
 	go func() {
-		require.NotNil(t, backend.PersonalAPI())
+		assert.NotNil(t, backend.PersonalAPI())
 		wg.Done()
 	}()
 
 	wg.Add(1)
 	go func() {
-		require.NotNil(t, backend.Transactor())
+		assert.NotNil(t, backend.Transactor())
 		wg.Done()
 	}()
 
 	wg.Add(1)
 	go func() {
-		require.NotNil(t, backend.PendingSignRequests())
+		assert.NotNil(t, backend.PendingSignRequests())
 		wg.Done()
 	}()
 
 	wg.Add(1)
 	go func() {
-		require.True(t, backend.IsNodeRunning())
+		assert.True(t, backend.IsNodeRunning())
 		wg.Done()
 	}()
 
 	wg.Add(1)
 	go func() {
-		require.True(t, backend.IsNodeRunning())
+		assert.True(t, backend.IsNodeRunning())
 		wg.Done()
 	}()
 
@@ -150,7 +151,7 @@ func TestBackendAccountsConcurrently(t *testing.T) {
 		wgCreateAccounts.Add(1)
 		go func(pass string) {
 			address, _, _, err := backend.AccountManager().CreateAccount(pass)
-			require.NoError(t, err)
+			assert.NoError(t, err)
 			addressCh <- [...]string{address, pass}
 			wgCreateAccounts.Done()
 		}("password-00" + string(i))
@@ -165,23 +166,20 @@ func TestBackendAccountsConcurrently(t *testing.T) {
 	for tuple := range addressCh {
 		wg.Add(1)
 		go func(tuple [2]string) {
-			err := backend.SelectAccount(tuple[0], tuple[1])
+			assert.NoError(t, backend.SelectAccount(tuple[0], tuple[1]))
 			wg.Done()
-			require.NoError(t, err)
 		}(tuple)
 
 		wg.Add(1)
 		go func() {
-			err := backend.ReSelectAccount()
+			assert.NoError(t, backend.ReSelectAccount())
 			wg.Done()
-			require.NoError(t, err)
 		}()
 
 		wg.Add(1)
 		go func() {
-			err := backend.Logout()
+			assert.NoError(t, backend.Logout())
 			wg.Done()
-			require.NoError(t, err)
 		}()
 	}
 
@@ -198,13 +196,13 @@ func TestBackendConnectionChangesConcurrently(t *testing.T) {
 	for i := 0; i < count; i++ {
 		wg.Add(1)
 		go func() {
-			defer wg.Done()
 			connIdx := rand.Intn(len(connections))
 			backend.ConnectionChange(ConnectionState{
 				Offline:   false,
 				Type:      connections[connIdx],
 				Expensive: false,
 			})
+			wg.Done()
 		}()
 	}
 
@@ -214,6 +212,7 @@ func TestBackendConnectionChangesConcurrently(t *testing.T) {
 func TestBackendCallRPCConcurrently(t *testing.T) {
 	backend := NewStatusBackend()
 	config := params.NodeConfig{}
+	count := 3
 
 	err := backend.StartNode(&config)
 	require.NoError(t, err)
@@ -223,25 +222,25 @@ func TestBackendCallRPCConcurrently(t *testing.T) {
 
 	var wg sync.WaitGroup
 
-	for i := 0; i < 3; i++ {
+	for i := 0; i < count; i++ {
 		wg.Add(1)
 		go func(idx int) {
-			defer wg.Done()
 			result := backend.CallRPC(fmt.Sprintf(
 				`{"jsonrpc":"2.0","method":"web3_clientVersion","params":[],"id":%d}`,
 				idx+1,
 			))
-			require.NotContains(t, result, "error")
+			assert.NotContains(t, result, "error")
+			wg.Done()
 		}(i)
 
 		wg.Add(1)
 		go func(idx int) {
-			defer wg.Done()
 			result := backend.CallPrivateRPC(fmt.Sprintf(
 				`{"jsonrpc":"2.0","method":"web3_clientVersion","params":[],"id":%d}`,
 				idx+1,
 			))
-			require.NotContains(t, result, "error")
+			assert.NotContains(t, result, "error")
+			wg.Done()
 		}(i)
 	}
 

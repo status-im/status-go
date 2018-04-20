@@ -176,9 +176,13 @@ func (b *StatusBackend) stopNode() error {
 
 // RestartNode restart running Status node, fails if node is not running
 func (b *StatusBackend) RestartNode() error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
 	if !b.IsNodeRunning() {
 		return node.ErrNoRunningNode
 	}
+
 	newcfg := *(b.statusNode.Config())
 	if err := b.stopNode(); err != nil {
 		return err
