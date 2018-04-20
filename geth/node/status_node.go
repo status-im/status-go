@@ -358,11 +358,8 @@ func (n *StatusNode) gethService(serviceInstance interface{}) error {
 // LightEthereumService exposes reference to LES service running on top of the node
 func (n *StatusNode) LightEthereumService() (l *les.LightEthereum, err error) {
 	err = n.gethService(&l)
-	switch err {
-	case node.ErrServiceUnknown:
+	if err == node.ErrServiceUnknown {
 		err = ErrServiceUnknown
-	default:
-		err = fmt.Errorf("service '%s' unavailable: %v", "les", err)
 	}
 
 	return
@@ -371,11 +368,8 @@ func (n *StatusNode) LightEthereumService() (l *les.LightEthereum, err error) {
 // WhisperService exposes reference to Whisper service running on top of the node
 func (n *StatusNode) WhisperService() (w *whisper.Whisper, err error) {
 	err = n.gethService(&w)
-	switch err {
-	case node.ErrServiceUnknown:
+	if err == node.ErrServiceUnknown {
 		err = ErrServiceUnknown
-	default:
-		err = fmt.Errorf("service '%s' unavailable: %v", "shh", err)
 	}
 
 	return
