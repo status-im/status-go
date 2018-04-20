@@ -244,7 +244,7 @@ func (s *AccountsTestSuite) TestSelectedAccountOnRestart() {
 	defer s.StopTestBackend()
 
 	// now logout, and make sure that on restart no account is selected (i.e. logout works properly)
-	s.NoError(s.Backend.AccountManager().Logout())
+	s.NoError(s.Backend.Logout())
 	s.RestartTestNode()
 
 	selectedAccount, err = s.Backend.AccountManager().SelectedAccount()

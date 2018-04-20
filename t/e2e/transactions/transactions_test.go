@@ -218,7 +218,7 @@ func (s *TransactionsTestSuite) TestSendContractTxCollision() {
 	}
 	s.testSendContractTx(initFunc, nil, "")
 
-	s.NoError(s.Backend.AccountManager().Logout())
+	s.NoError(s.Backend.Logout())
 
 	// Scenario 2: Both fields are filled with different values, expect an error
 	inverted := func(source []byte) []byte {

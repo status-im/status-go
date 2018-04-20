@@ -58,7 +58,7 @@ func TestBackendRestartNodeConcurrently(t *testing.T) {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
-			backend.RestartNode()
+			require.NoError(t, backend.RestartNode())
 		}(i)
 	}
 
