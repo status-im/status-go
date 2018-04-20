@@ -206,6 +206,7 @@ type NodeConfig struct {
 	// DevMode is true when given configuration is to be used during development.
 	// For production, this flag should be turned off, so that more strict requirements
 	// are applied to node's configuration
+	// DEPRECATED.
 	DevMode bool
 
 	// NetworkID sets network to use for selecting peers to connect to
@@ -338,7 +339,9 @@ func NewNodeConfig(dataDir string, clstrCfgFile string, networkID uint64, devMod
 				NotificationTriggerURL: FirebaseNotificationTriggerURL,
 			},
 		},
-		SwarmConfig: &SwarmConfig{},
+		SwarmConfig:    &SwarmConfig{},
+		RegisterTopics: []discv5.Topic{},
+		RequireTopics:  map[discv5.Topic]Limits{},
 	}
 
 	// adjust dependent values
@@ -468,7 +471,7 @@ func (c *NodeConfig) updateConfig() error {
 	if err := c.updateClusterConfig(); err != nil {
 		return err
 	}
-
+	c.updatePeerLimits()
 	return c.updateRelativeDirsConfig()
 }
 
@@ -547,7 +550,7 @@ func (c *NodeConfig) updateClusterConfig() error {
 		return nil
 	}
 
-	var clusters []clusterData
+	var clusters []cluster
 	if c.ClusterConfigFile != "" {
 		// Load cluster configuration from external file.
 		configFile, err := ioutil.ReadFile(c.ClusterConfigFile)
@@ -564,10 +567,9 @@ func (c *NodeConfig) updateClusterConfig() error {
 
 	for _, cluster := range clusters {
 		if cluster.NetworkID == int(c.NetworkID) {
-			c.ClusterConfig.StaticNodes = cluster.Prod.StaticNodes
-			if c.DevMode {
-				c.ClusterConfig.StaticNodes = cluster.Dev.StaticNodes
-			}
+			c.Discovery = cluster.Discovery
+			c.ClusterConfig.BootNodes = cluster.BootNodes
+			c.ClusterConfig.StaticNodes = cluster.StaticNodes
 			break
 		}
 	}
@@ -593,6 +595,17 @@ func (c *NodeConfig) updateRelativeDirsConfig() error {
 	}
 
 	return nil
+}
+
+// updatePeerLimits will set default peer limits expectations based on enabled services.
+func (c *NodeConfig) updatePeerLimits() {
+	if !c.Discovery {
+		return
+	}
+	if c.WhisperConfig.Enabled {
+		c.RequireTopics[WhisperDiscv5Topic] = WhisperDiscv5Limits
+		// TODO(dshulyak) register mailserver limits when we will change how they are handled.
+	}
 }
 
 // String dumps config object as nicely indented JSON

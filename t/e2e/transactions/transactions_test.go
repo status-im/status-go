@@ -494,7 +494,7 @@ func (s *TransactionsTestSuite) TestDoubleCompleteQueuedTransactions() {
 
 			receivedErrMessage := event["error_message"].(string)
 			expectedErrMessage := "could not decrypt key with given passphrase"
-			s.Equal(receivedErrMessage, expectedErrMessage)
+			s.Equal(expectedErrMessage, receivedErrMessage)
 
 			receivedErrCode := event["error_code"].(string)
 			s.Equal("2", receivedErrCode)

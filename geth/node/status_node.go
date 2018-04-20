@@ -97,7 +97,7 @@ func (n *StatusNode) Start(config *params.NodeConfig, services ...node.ServiceCo
 		return err
 	}
 
-	if n.gethNode.Server().DiscV5 != nil {
+	if n.config.Discovery {
 		return n.startPeerPool()
 	}
 
@@ -198,7 +198,7 @@ func (n *StatusNode) stop() error {
 }
 
 func (n *StatusNode) stopPeerPool() error {
-	if n.gethNode.Server().DiscV5 == nil {
+	if !n.config.Discovery {
 		return nil
 	}
 
