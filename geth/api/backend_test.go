@@ -45,6 +45,7 @@ func TestBackendStartNodeConcurrently(t *testing.T) {
 func TestBackendRestartNodeConcurrently(t *testing.T) {
 	backend := NewStatusBackend()
 	config := params.NodeConfig{}
+	count := 3
 
 	err := backend.StartNode(&config)
 	require.NoError(t, err)
@@ -53,12 +54,12 @@ func TestBackendRestartNodeConcurrently(t *testing.T) {
 	}()
 
 	var wg sync.WaitGroup
+	wg.Add(count)
 
-	for i := 0; i < 3; i++ {
-		wg.Add(1)
+	for i := 0; i < count; i++ {
 		go func(idx int) {
-			defer wg.Done()
 			require.NoError(t, backend.RestartNode())
+			wg.Done()
 		}(i)
 	}
 
