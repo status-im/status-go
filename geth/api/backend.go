@@ -344,6 +344,10 @@ func (b *StatusBackend) AppStateChange(state string) {
 
 // Logout clears whisper identities.
 func (b *StatusBackend) Logout() error {
+	// FIXME(oleg-raev): This method doesn't make stop, it rather resets its cells to an initial state
+	// and should be properly renamed, for example: ResetCells
+	b.jailManager.Stop()
+
 	whisperService, err := b.statusNode.WhisperService()
 	switch err {
 	case node.ErrServiceUnknown: // Whisper was never registered
@@ -356,10 +360,6 @@ func (b *StatusBackend) Logout() error {
 	}
 
 	b.AccountManager().Logout()
-
-	// FIXME(oleg-raev): This method doesn't make stop, it rather resets its cells to an initial state
-	// and should be properly renamed, for example: ResetCells
-	b.jailManager.Stop()
 
 	return nil
 }
@@ -388,6 +388,10 @@ func (b *StatusBackend) ReSelectAccount() error {
 // using provided password. Once verification is done, decrypted key is injected into Whisper (as a single identity,
 // all previous identities are removed).
 func (b *StatusBackend) SelectAccount(address, password string) error {
+	// FIXME(oleg-raev): This method doesn't make stop, it rather resets its cells to an initial state
+	// and should be properly renamed, for example: ResetCells
+	b.jailManager.Stop()
+
 	err := b.accountManager.SelectAccount(address, password)
 	if err != nil {
 		return err
@@ -407,10 +411,6 @@ func (b *StatusBackend) SelectAccount(address, password string) error {
 	default:
 		return err
 	}
-
-	// FIXME(oleg-raev): This method doesn't make stop, it rather resets its cells to an initial state
-	// and should be properly renamed, for example: ResetCells
-	b.jailManager.Stop()
 
 	return nil
 }

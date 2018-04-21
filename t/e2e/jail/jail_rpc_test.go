@@ -10,6 +10,7 @@ import (
 	"time"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
+
 	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/signal"
@@ -114,6 +115,8 @@ func (s *JailRPCTestSuite) TestContractDeployment() {
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
+	s.NoError(s.Backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
+
 	EnsureNodeSync(s.Backend.StatusNode().EnsureSync)
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
@@ -133,8 +136,6 @@ func (s *JailRPCTestSuite) TestContractDeployment() {
 		if envelope.Type == sign.EventSignRequestAdded {
 			event := envelope.Event.(map[string]interface{})
 			s.T().Logf("transaction queued and will be completed shortly, id: %v", event["id"])
-
-			s.NoError(s.Backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 
 			txID := event["id"].(string)
 			result := s.Backend.ApproveSignRequest(txID, TestConfig.Account1.Password)
