@@ -38,7 +38,7 @@ func (s *TopicPoolSuite) SetupTest() {
 	}
 	s.Require().NoError(s.peer.Start())
 	topic := discv5.Topic("cap=cap1")
-	limits := params.Limits{1, 2}
+	limits := params.NewLimits(1, 2)
 	s.topicPool = NewTopicPool(topic, limits, 100*time.Millisecond, 200*time.Millisecond)
 	s.topicPool.period = make(chan time.Duration, 2)
 	s.topicPool.running = 1
@@ -97,7 +97,7 @@ func (s *TopicPoolSuite) TestNewPeerSelectedOnDrop() {
 func (s *TopicPoolSuite) TestRequestedDoesntRemove() {
 	// max limit is 1 because we test that 2nd peer will stay in local table
 	// when we request to drop it
-	s.topicPool.limits = params.Limits{1, 1}
+	s.topicPool.limits = params.NewLimits(1, 1)
 	peer1 := discv5.NewNode(discv5.NodeID{1}, s.peer.Self().IP, 32311, 32311)
 	peer2 := discv5.NewNode(discv5.NodeID{2}, s.peer.Self().IP, 32311, 32311)
 	s.topicPool.processFoundNode(s.peer, peer1)
@@ -115,7 +115,7 @@ func (s *TopicPoolSuite) TestRequestedDoesntRemove() {
 }
 
 func (s *TopicPoolSuite) TestTheMostRecentPeerIsSelected() {
-	s.topicPool.limits = params.Limits{1, 1}
+	s.topicPool.limits = params.NewLimits(1, 1)
 
 	peer1 := discv5.NewNode(discv5.NodeID{1}, s.peer.Self().IP, 32311, 32311)
 	peer2 := discv5.NewNode(discv5.NodeID{2}, s.peer.Self().IP, 32311, 32311)
