@@ -9,6 +9,7 @@ import (
 	"github.com/NaySoftware/go-fcm"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/profiling"
 	"gopkg.in/go-playground/validator.v9"
 )
@@ -32,43 +33,18 @@ func GenerateConfig(datadir *C.char, networkID C.int, devMode C.int) *C.char {
 	return C.CString(string(outBytes))
 }
 
-func initLogger(config *params.NodeConfig) {
-	var (
-		handler log.Handler
-		err     error
-	)
-
-	if config.LogFile != "" {
-		handler, err = log.FileHandler(config.LogFile, log.LogfmtFormat())
-		if err != nil {
-			return
-		}
-	} else {
-		handler = log.StreamHandler(os.Stderr, log.TerminalFormat(true))
-	}
-
-	// level, err := log.LvlFromString(strings.ToLower(config.LogLevel))
-	level, err := log.LvlFromString("trace")
-	if err != nil {
-		return
-	}
-
-	filteredHandler := log.LvlFilterHandler(level, handler)
-	log.Root().SetHandler(filteredHandler)
-
-	return
-}
-
 //StartNode - start Status node
 //export StartNode
 func StartNode(configJSON *C.char) *C.char {
 	config, err := params.LoadNodeConfig(C.GoString(configJSON))
-
 	if err != nil {
 		return makeJSONResponse(err)
 	}
 
-	initLogger(config)
+	if err := logutils.OverrideRootLog(config.LogLevel, config.LogFile, false); err != nil {
+		return makeJSONResponse(err)
+	}
+
 	statusAPI.StartNodeAsync(config)
 
 	return makeJSONResponse(nil)
