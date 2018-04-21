@@ -190,7 +190,7 @@ func (s *JailRPCTestSuite) TestContractDeployment() {
 	s.NoError(err)
 
 	expectedResponse := txHash.Hex()
-	s.NotEqual(expectedResponse, response)
+	s.Equal(expectedResponse, response)
 }
 
 func (s *JailRPCTestSuite) TestJailVMPersistence() {
