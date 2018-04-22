@@ -36,10 +36,9 @@ checks:
   # Code that is identical in structure
   identical-code:
     config:
-      exclude_patterns:
-        - "t/"
       threshold: # language-specific defaults. an override will affect all languages.
-
+      exclude_patterns:
+        - t/
 exclude_patterns:
   - vendor/
   - static/
