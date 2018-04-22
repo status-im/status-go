@@ -17,6 +17,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/status-im/status-go/logutils"
+
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/static"
@@ -26,7 +28,10 @@ import (
 
 var (
 	networkSelected = flag.String("network", "statuschain", "-network=NETWORKID or -network=NETWORKNAME to select network used for tests")
+	logLevel        = flag.String("log", "INFO", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
+)
 
+var (
 	// ErrNoRemoteURL is returned when network id has no associated url.
 	ErrNoRemoteURL = errors.New("network id requires a remote URL")
 
@@ -63,6 +68,11 @@ func init() {
 	}
 
 	flag.Parse()
+
+	// set up logger
+	if err := logutils.OverrideRootLog(*logLevel, "", true); err != nil {
+		panic(err)
+	}
 
 	// setup root directory
 	const pathSeparator = string(os.PathSeparator)

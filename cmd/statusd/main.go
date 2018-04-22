@@ -11,6 +11,8 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/status-im/status-go/logutils"
+
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/status-im/status-go/cmd/statusd/debug"
@@ -83,32 +85,6 @@ var (
 // All general log messages in this package should be routed through this logger.
 var logger = log.New("package", "status-go/cmd/statusd")
 
-func enhanceLogger(logger *log.Logger, config *params.NodeConfig) error {
-	var (
-		handler log.Handler
-		err     error
-	)
-
-	if config.LogFile != "" {
-		handler, err = log.FileHandler(config.LogFile, log.LogfmtFormat())
-		if err != nil {
-			return err
-		}
-	} else {
-		handler = log.StreamHandler(os.Stderr, log.TerminalFormat(true))
-	}
-
-	level, err := log.LvlFromString(strings.ToLower(config.LogLevel))
-	if err != nil {
-		return err
-	}
-
-	filteredHandler := log.LvlFilterHandler(level, handler)
-	log.Root().SetHandler(filteredHandler)
-
-	return nil
-}
-
 func main() {
 	flag.Var(&searchTopics, "topic.search", "Topic that will be searched in discovery v5, e.g (mailserver=1,1)")
 	flag.Var(&registerTopics, "topic.register", "Topic that will be registered using discovery v5.")
@@ -126,7 +102,7 @@ func main() {
 		return
 	}
 
-	if err := enhanceLogger(&logger, config); err != nil {
+	if err := logutils.OverrideRootLog(config.LogLevel, config.LogFile, true); err != nil {
 		stdlog.Fatalf("Error initializing logger: %s", err)
 	}
 
