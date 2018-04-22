@@ -11,7 +11,7 @@ checks:
   # Excessive lines of code within a single file
   file-lines:
     config:
-      threshold: 750
+      threshold: 900
   # Functions or methods that may be hard to understand. This is disabled as it doesn't appear to be a reliable metric.
   method-complexity:
     enabled: false
@@ -40,4 +40,3 @@ checks:
 exclude_paths:
   - vendor/
   - static/
-  - t/
