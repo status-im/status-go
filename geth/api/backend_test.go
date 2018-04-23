@@ -187,7 +187,7 @@ func TestBackendAccountsConcurrently(t *testing.T) {
 }
 
 func TestBackendConnectionChangesConcurrently(t *testing.T) {
-	connections := []ConnectionType{ConnectionUnknown, ConnectionCellular, ConnectionWifi}
+	connections := [...]string{"wifi", "cellular"}
 	backend := NewStatusBackend()
 	count := 3
 
@@ -197,11 +197,7 @@ func TestBackendConnectionChangesConcurrently(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			connIdx := rand.Intn(len(connections))
-			backend.ConnectionChange(ConnectionState{
-				Offline:   false,
-				Type:      connections[connIdx],
-				Expensive: false,
-			})
+			backend.ConnectionChange(connections[connIdx], false)
 			wg.Done()
 		}()
 	}

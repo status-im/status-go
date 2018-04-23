@@ -9,6 +9,8 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 
+	fcmlib "github.com/NaySoftware/go-fcm"
+
 	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/node"
@@ -305,11 +307,20 @@ func (b *StatusBackend) registerHandlers() error {
 //
 
 // ConnectionChange handles network state changes logic.
-func (b *StatusBackend) ConnectionChange(state ConnectionState) {
+func (b *StatusBackend) ConnectionChange(typ string, expensive bool) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
+	state := ConnectionState{
+		Type:      NewConnectionType(typ),
+		Expensive: expensive,
+	}
+	if typ == "none" {
+		state.Offline = true
+	}
+
 	b.log.Info("Network state change", "old", b.connectionState, "new", state)
+
 	b.connectionState = state
 
 	// logic of handling state changes here
@@ -317,8 +328,15 @@ func (b *StatusBackend) ConnectionChange(state ConnectionState) {
 }
 
 // AppStateChange handles app state changes (background/foreground).
-func (b *StatusBackend) AppStateChange(state AppState) {
-	b.log.Info("App State changed.", "new-state", state)
+// state values: see https://facebook.github.io/react-native/docs/appstate.html
+func (b *StatusBackend) AppStateChange(state string) {
+	appState, err := ParseAppState(state)
+	if err != nil {
+		log.Error("AppStateChange failed, ignoring", "error", err)
+		return // and do nothing
+	}
+
+	b.log.Info("App State changed", "new-state", appState)
 
 	// TODO: put node in low-power mode if the app is in background (or inactive)
 	// and normal mode if the app is in foreground.
@@ -326,6 +344,10 @@ func (b *StatusBackend) AppStateChange(state AppState) {
 
 // Logout clears whisper identities.
 func (b *StatusBackend) Logout() error {
+	// FIXME(oleg-raev): This method doesn't make stop, it rather resets its cells to an initial state
+	// and should be properly renamed, for example: ResetCells
+	b.jailManager.Stop()
+
 	whisperService, err := b.statusNode.WhisperService()
 	switch err {
 	case node.ErrServiceUnknown: // Whisper was never registered
@@ -366,6 +388,10 @@ func (b *StatusBackend) ReSelectAccount() error {
 // using provided password. Once verification is done, decrypted key is injected into Whisper (as a single identity,
 // all previous identities are removed).
 func (b *StatusBackend) SelectAccount(address, password string) error {
+	// FIXME(oleg-raev): This method doesn't make stop, it rather resets its cells to an initial state
+	// and should be properly renamed, for example: ResetCells
+	b.jailManager.Stop()
+
 	err := b.accountManager.SelectAccount(address, password)
 	if err != nil {
 		return err
@@ -387,4 +413,14 @@ func (b *StatusBackend) SelectAccount(address, password string) error {
 	}
 
 	return nil
+}
+
+// NotifyUsers sends push notifications to users.
+func (b *StatusBackend) NotifyUsers(message string, payload fcmlib.NotificationPayload, tokens ...string) error {
+	err := b.newNotification().Send(message, payload, tokens...)
+	if err != nil {
+		b.log.Error("Notify failed", "error", err)
+	}
+
+	return err
 }

@@ -400,14 +400,6 @@ func makeJSONResponse(err error) *C.char {
 	return C.CString(string(outBytes))
 }
 
-// Notify sends push notification by given token
-// @deprecated
-//export Notify
-func Notify(token *C.char) *C.char {
-	res := statusAPI.Notify(C.GoString(token))
-	return C.CString(res)
-}
-
 // NotifyUsers sends push notifications by given tokens.
 //export NotifyUsers
 func NotifyUsers(message, payloadJSON, tokensArray *C.char) (outCBytes *C.char) {
