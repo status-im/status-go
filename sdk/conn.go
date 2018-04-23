@@ -12,8 +12,10 @@ import (
 // Conn : TODO ...
 type Conn struct {
 	statusNode *node.StatusNode
+	store      AccountStorer
 	address    string
 	userName   string
+	channels   []*Channel
 }
 
 func New() *Conn {
@@ -23,6 +25,9 @@ func New() *Conn {
 func (c *Conn) Start(config *Config) error {
 	statusNode := node.New()
 	log.Println("Starting node...")
+
+	// Setup the storage
+	c.store = &AccountStore{}
 
 	err := statusNode.Start(config.NodeConfig)
 	if err != nil {
@@ -53,6 +58,12 @@ func Connect(user, password string) (*Conn, error) {
 	return c, c.SignupOrLogin(user, password)
 }
 
+func (c *Conn) Close() {
+	for _, channel := range c.channels {
+		channel.Close()
+	}
+}
+
 // Login logs in to the network with the given credentials
 func (c *Conn) Login(user, password string) error {
 	am := account.NewManager(c.statusNode)
@@ -61,7 +72,11 @@ func (c *Conn) Login(user, password string) error {
 		return err
 	}
 
-	addr := getAccountAddress()
+	addr, err := c.store.GetAddress(c.userName)
+	if err != nil {
+		return err
+	}
+
 	_, accountKey, err := am.AddressToDecryptedAccount(addr, password)
 	if err != nil {
 		return err
@@ -79,6 +94,10 @@ func (c *Conn) Login(user, password string) error {
 	return am.SelectAccount(addr, password)
 }
 
+func (c *Conn) SetStore(store AccountStorer) {
+	c.store = store
+}
+
 // Signup creates a new account with the given credentials
 func (c *Conn) Signup(user, password string) error {
 	am := account.NewManager(c.statusNode)
@@ -86,9 +105,8 @@ func (c *Conn) Signup(user, password string) error {
 	if err != nil {
 		log.Fatalf("could not create an account. ERR: %v", err)
 	}
-	saveAccountAddress(address)
 
-	return nil
+	return c.store.SetAddress(c.userName, address)
 }
 
 // SignupOrLogin will attempt to login with given credentials, in first instance
@@ -104,7 +122,12 @@ func (c *Conn) SignupOrLogin(user, password string) error {
 
 // Join a specific channel by name
 func (c *Conn) Join(channelName string) (*Channel, error) {
-	return c.joinPublicChannel(channelName)
+	ch, err := c.joinPublicChannel(channelName)
+	if err != nil {
+		c.channels = append(c.channels, ch)
+	}
+
+	return ch, err
 }
 
 func (c *Conn) joinPublicChannel(channelName string) (*Channel, error) {
@@ -114,7 +137,6 @@ func (c *Conn) joinPublicChannel(channelName string) (*Channel, error) {
 	key := f.(map[string]interface{})["result"].(string)
 	id := int(f.(map[string]interface{})["id"].(float64))
 
-	// 	p := "0x68656c6c6f20776f726c64"
 	src := []byte(channelName)
 	p := "0x" + hex.EncodeToString(src)
 
