@@ -1117,12 +1117,11 @@ func testDiscardTransaction(t *testing.T) bool { //nolint: gocyclo
 
 	select {
 	case <-txFailedEventCalled:
+		return true
 	default:
 		t.Error("expected tx failure signal is not received")
 		return false
 	}
-
-	return true
 }
 
 func testDiscardMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocyclo
