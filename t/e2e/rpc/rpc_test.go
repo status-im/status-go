@@ -140,7 +140,7 @@ func (s *RPCTestSuite) TestCallRawResult() {
 }
 
 // TestCallRawResultGetTransactionReceipt checks if returned response
-// for a not yet mained transaction is "error":{"code":-32000,"message":"unknown transaction"}.
+// for a not yet mined transaction is "result": null.
 // Issue: https://github.com/status-im/status-go/issues/547
 func (s *RPCTestSuite) TestCallRawResultGetTransactionReceipt() {
 	nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
@@ -152,7 +152,7 @@ func (s *RPCTestSuite) TestCallRawResultGetTransactionReceipt() {
 	s.NotNil(client)
 
 	jsonResult := client.CallRaw(`{"jsonrpc":"2.0","method":"eth_getTransactionReceipt","params":["0x0ca0d8f2422f62bea77e24ed17db5711a77fa72064cccbb8e53c53b699cd3b34"],"id":5}`)
-	s.Equal(`{"jsonrpc":"2.0","id":5,"error":{"code":-32000,"message":"unknown transaction"}}`, jsonResult)
+	s.Equal(`{"jsonrpc":"2.0","id":5,"result":null}`, jsonResult)
 
 	s.NoError(s.StatusNode.Stop())
 }
