@@ -110,11 +110,7 @@ func NewEventSystem(mux *event.TypeMux, backend Backend, lightMode bool) *EventS
 		uninstall: make(chan *subscription),
 	}
 
-	eventLoopInit := sync.WaitGroup{}
-	eventLoopInit.Add(1)
-
-	go m.eventLoop(&eventLoopInit)
-	eventLoopInit.Wait() // Wait until eventLoop is properly initialized
+	go m.eventLoop()
 
 	return m
 }
@@ -379,52 +375,58 @@ func (es *EventSystem) lightFilterLogs(header *types.Header, addresses []common.
 		// Get the logs of the block
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()
-		receipts, err := es.backend.GetReceipts(ctx, header.Hash())
+		logsList, err := es.backend.GetLogs(ctx, header.Hash())
 		if err != nil {
 			return nil
 		}
 		var unfiltered []*types.Log
-		for _, receipt := range receipts {
-			for _, log := range receipt.Logs {
+		for _, logs := range logsList {
+			for _, log := range logs {
 				logcopy := *log
 				logcopy.Removed = remove
 				unfiltered = append(unfiltered, &logcopy)
 			}
 		}
 		logs := filterLogs(unfiltered, nil, nil, addresses, topics)
+		if len(logs) > 0 && logs[0].TxHash == (common.Hash{}) {
+			// We have matching but non-derived logs
+			receipts, err := es.backend.GetReceipts(ctx, header.Hash())
+			if err != nil {
+				return nil
+			}
+			unfiltered = unfiltered[:0]
+			for _, receipt := range receipts {
+				for _, log := range receipt.Logs {
+					logcopy := *log
+					logcopy.Removed = remove
+					unfiltered = append(unfiltered, &logcopy)
+				}
+			}
+			logs = filterLogs(unfiltered, nil, nil, addresses, topics)
+		}
 		return logs
 	}
 	return nil
 }
 
 // eventLoop (un)installs filters and processes mux events.
-func (es *EventSystem) eventLoop(initWaitGroup *sync.WaitGroup) {
+func (es *EventSystem) eventLoop() {
 	var (
-		sub                                   *event.TypeMuxSubscription
-		txSub, rmLogsSub, logsSub, chainEvSub event.Subscription
-
-		index     = make(filterIndex)
-		txCh      = make(chan core.TxPreEvent, txChanSize)
-		rmLogsCh  = make(chan core.RemovedLogsEvent, rmLogsChanSize)
-		logsCh    = make(chan []*types.Log, logsChanSize)
-		chainEvCh = make(chan core.ChainEvent, chainEvChanSize)
-	)
-
-	// To guarantee that `initWaitGroup.Done()` is called even if any of the subscriptions
-	// will panic. Otherwise, it will deadlock `NewEventSystem`.
-	func() {
-		defer initWaitGroup.Done()
-
-		sub = es.mux.Subscribe(core.PendingLogsEvent{})
+		index = make(filterIndex)
+		sub   = es.mux.Subscribe(core.PendingLogsEvent{})
 		// Subscribe TxPreEvent form txpool
+		txCh  = make(chan core.TxPreEvent, txChanSize)
 		txSub = es.backend.SubscribeTxPreEvent(txCh)
 		// Subscribe RemovedLogsEvent
+		rmLogsCh  = make(chan core.RemovedLogsEvent, rmLogsChanSize)
 		rmLogsSub = es.backend.SubscribeRemovedLogsEvent(rmLogsCh)
 		// Subscribe []*types.Log
+		logsCh  = make(chan []*types.Log, logsChanSize)
 		logsSub = es.backend.SubscribeLogsEvent(logsCh)
 		// Subscribe ChainEvent
+		chainEvCh  = make(chan core.ChainEvent, chainEvChanSize)
 		chainEvSub = es.backend.SubscribeChainEvent(chainEvCh)
-	}()
+	)
 
 	// Unsubscribe all events
 	defer sub.Unsubscribe()

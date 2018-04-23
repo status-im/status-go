@@ -32,13 +32,6 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
-const (
-	// HACK: make the filter essentially never timeout (1 year of timeout time)
-	// It's a hack, but that simplifies rebasing process, because the patch consists
-	// only of 1 LoC change (excluding this comment).
-	filterTimeout = 525600 * 60 // filters are considered timeout out after filterTimeout seconds
-)
-
 // List of errors
 var (
 	ErrSymAsym              = errors.New("specify either a symmetric or an asymmetric key")
@@ -64,30 +57,7 @@ func NewPublicWhisperAPI(w *Whisper) *PublicWhisperAPI {
 		w:        w,
 		lastUsed: make(map[string]time.Time),
 	}
-
-	go api.run()
 	return api
-}
-
-// run the api event loop.
-// this loop deletes filter that have not been used within filterTimeout
-func (api *PublicWhisperAPI) run() {
-	timeout := time.NewTicker(2 * time.Minute)
-	for {
-		<-timeout.C
-
-		api.mu.Lock()
-		for id, lastUsed := range api.lastUsed {
-			if time.Since(lastUsed).Seconds() >= filterTimeout {
-				delete(api.lastUsed, id)
-				if err := api.w.Unsubscribe(id); err != nil {
-					log.Error("could not unsubscribe whisper filter", "error", err)
-				}
-				log.Debug("delete whisper filter (timeout)", "id", id)
-			}
-		}
-		api.mu.Unlock()
-	}
 }
 
 // Version returns the Whisper sub-protocol version.
@@ -222,6 +192,19 @@ func (api *PublicWhisperAPI) DeleteSymKey(ctx context.Context, id string) bool {
 	return api.w.DeleteSymKey(id)
 }
 
+// MakeLightClient turns the node into light client, which does not forward
+// any incoming messages, and sends only messages originated in this node.
+func (api *PublicWhisperAPI) MakeLightClient(ctx context.Context) bool {
+	api.w.lightClient = true
+	return api.w.lightClient
+}
+
+// CancelLightClient cancels light client mode.
+func (api *PublicWhisperAPI) CancelLightClient(ctx context.Context) bool {
+	api.w.lightClient = false
+	return !api.w.lightClient
+}
+
 //go:generate gencodec -type NewMessage -field-override newMessageOverride -out gen_newmessage_json.go
 
 // NewMessage represents a new whisper message that is posted through the RPC.
@@ -244,31 +227,9 @@ type newMessageOverride struct {
 	Padding   hexutil.Bytes
 }
 
-// Post a message on the Whisper network.
-func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (bool, error) {
-	env, err := MakeEnvelope(api.w, req)
-	if err != nil {
-		return false, err
-	}
-	// send to specific node (skip PoW check)
-	if len(req.TargetPeer) > 0 {
-		n, err := discover.ParseNode(req.TargetPeer)
-		if err != nil {
-			return false, fmt.Errorf("failed to parse target peer: %s", err)
-		}
-		return true, api.w.SendP2PMessage(n.ID[:], env)
-	}
-
-	// ensure that the message PoW meets the node's minimum accepted PoW
-	if req.PowTarget < api.w.MinPow() {
-		return false, ErrTooLowPoW
-	}
-
-	return true, api.w.Send(env)
-}
-
-// MakeEnvelope create envelopes from request.
-func MakeEnvelope(w *Whisper, req NewMessage) (*Envelope, error) {
+// Post posts a message on the Whisper network.
+// returns the hash of the message in case of success.
+func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (hexutil.Bytes, error) {
 	var (
 		symKeyGiven = len(req.SymKeyID) > 0
 		pubKeyGiven = len(req.PublicKey) > 0
@@ -291,7 +252,7 @@ func MakeEnvelope(w *Whisper, req NewMessage) (*Envelope, error) {
 
 	// Set key that is used to sign the message
 	if len(req.Sig) > 0 {
-		if params.Src, err = w.GetPrivateKey(req.Sig); err != nil {
+		if params.Src, err = api.w.GetPrivateKey(req.Sig); err != nil {
 			return nil, err
 		}
 	}
@@ -301,7 +262,7 @@ func MakeEnvelope(w *Whisper, req NewMessage) (*Envelope, error) {
 		if params.Topic == (TopicType{}) { // topics are mandatory with symmetric encryption
 			return nil, ErrNoTopics
 		}
-		if params.KeySym, err = w.GetSymKey(req.SymKeyID); err != nil {
+		if params.KeySym, err = api.w.GetSymKey(req.SymKeyID); err != nil {
 			return nil, err
 		}
 		if !validateDataIntegrity(params.KeySym, aesKeyLength) {
@@ -323,21 +284,37 @@ func MakeEnvelope(w *Whisper, req NewMessage) (*Envelope, error) {
 		return nil, err
 	}
 
+	var result []byte
 	env, err := whisperMsg.Wrap(params)
 	if err != nil {
 		return nil, err
 	}
-	return env, nil
-}
 
-// UninstallFilter is alias for Unsubscribe
-func (api *PublicWhisperAPI) UninstallFilter(id string) {
-	api.w.Unsubscribe(id)
-}
+	// send to specific node (skip PoW check)
+	if len(req.TargetPeer) > 0 {
+		n, err := discover.ParseNode(req.TargetPeer)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse target peer: %s", err)
+		}
+		err = api.w.SendP2PMessage(n.ID[:], env)
+		if err == nil {
+			hash := env.Hash()
+			result = hash[:]
+		}
+		return result, err
+	}
 
-// Unsubscribe disables and removes an existing filter.
-func (api *PublicWhisperAPI) Unsubscribe(id string) {
-	api.w.Unsubscribe(id)
+	// ensure that the message PoW meets the node's minimum accepted PoW
+	if req.PowTarget < api.w.MinPow() {
+		return nil, ErrTooLowPoW
+	}
+
+	err = api.w.Send(env)
+	if err == nil {
+		hash := env.Hash()
+		result = hash[:]
+	}
+	return result, err
 }
 
 //go:generate gencodec -type Criteria -field-override criteriaOverride -out gen_criteria_json.go
@@ -589,9 +566,10 @@ func (api *PublicWhisperAPI) NewMessageFilter(req Criteria) (string, error) {
 	}
 
 	if len(req.Topics) > 0 {
-		topics = make([][]byte, 0, len(req.Topics))
-		for _, topic := range req.Topics {
-			topics = append(topics, topic[:])
+		topics = make([][]byte, len(req.Topics))
+		for i, topic := range req.Topics {
+			topics[i] = make([]byte, TopicLength)
+			copy(topics[i], topic[:])
 		}
 	}
 
