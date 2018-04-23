@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -1026,7 +1027,7 @@ func testDiscardTransaction(t *testing.T) bool { //nolint: gocyclo
 
 	// replace transaction notification handler
 	var txID string
-	txFailedEventCalled := false
+	txFailedEventCalled := make(chan struct{})
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var envelope signal.Envelope
 		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
@@ -1088,7 +1089,7 @@ func testDiscardTransaction(t *testing.T) bool { //nolint: gocyclo
 				return
 			}
 
-			txFailedEventCalled = true
+			close(txFailedEventCalled)
 		}
 	})
 
@@ -1114,7 +1115,9 @@ func testDiscardTransaction(t *testing.T) bool { //nolint: gocyclo
 		return false
 	}
 
-	if !txFailedEventCalled {
+	select {
+	case <-txFailedEventCalled:
+	default:
 		t.Error("expected tx failure signal is not received")
 		return false
 	}
@@ -1134,10 +1137,11 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocycl
 	// make sure you panic if transaction complete doesn't return
 	testTxCount := 3
 	txIDs := make(chan string, testTxCount)
-	allTestTxDiscarded := make(chan struct{}, 1)
+
+	var testTxDiscarded sync.WaitGroup
+	testTxDiscarded.Add(testTxCount)
 
 	// replace transaction notification handler
-	txFailedEventCallCount := 0
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var txID string
 		var envelope signal.Envelope
@@ -1175,10 +1179,7 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocycl
 				return
 			}
 
-			txFailedEventCallCount++
-			if txFailedEventCallCount == testTxCount {
-				allTestTxDiscarded <- struct{}{}
-			}
+			testTxDiscarded.Done()
 		}
 	})
 
@@ -1275,8 +1276,11 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocycl
 		go sendTx()
 	}
 
+	done := make(chan struct{})
+	go func() { testTxDiscarded.Wait(); close(done) }()
+
 	select {
-	case <-allTestTxDiscarded:
+	case <-done:
 		// pass
 	case <-time.After(20 * time.Second):
 		t.Error("test timed out")
