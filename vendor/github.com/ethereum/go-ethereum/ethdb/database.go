@@ -55,6 +55,7 @@ type LDBDatabase struct {
 
 	quitLock sync.Mutex      // Mutex protecting the quit channel access
 	quitChan chan chan error // Quit channel to stop the metrics collection before closing the database
+	wg       sync.WaitGroup  // WaitGroup waits till all metering collections will exit.
 
 	log log.Logger // Contextual logger tracking the database path
 }
@@ -134,14 +135,11 @@ func (db *LDBDatabase) Close() {
 	// Stop the metrics collection to avoid internal database races
 	db.quitLock.Lock()
 	defer db.quitLock.Unlock()
-
 	if db.quitChan != nil {
-		errc := make(chan error)
-		db.quitChan <- errc
-		if err := <-errc; err != nil {
-			db.log.Error("Metrics collection failed", "err", err)
-		}
+		close(db.quitChan)
 	}
+	db.wg.Wait()
+	db.quitChan = nil
 	err := db.db.Close()
 	if err == nil {
 		db.log.Info("Database closed")
@@ -173,7 +171,11 @@ func (db *LDBDatabase) Meter(prefix string) {
 	db.quitChan = make(chan chan error)
 	db.quitLock.Unlock()
 
-	go db.meter(3 * time.Second)
+	db.wg.Add(1)
+	go func() {
+		db.wg.Done()
+		db.meter(3 * time.Second)
+	}()
 }
 
 // meter periodically retrieves internal leveldb counters and reports them to
