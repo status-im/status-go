@@ -37,8 +37,8 @@ checks:
   identical-code:
     config:
       threshold: # language-specific defaults. an override will affect all languages.
-    exclude_patterns:
-      - t/
 exclude_patterns:
   - vendor/
   - static/
+  - t/
+  
