@@ -281,32 +281,6 @@ func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
 	s.Require().Equal(helloWorldMessage, messages[0]["payload"].(string))
 }
 
-func (s *WhisperMailboxSuite) TestSendMessageWithoutSubscription() {
-	aliceBackend, stop := s.startBackend("alice")
-	defer stop()
-
-	// We need to wait >= whisper.DefaultSyncAllowance seconds to update Bloom filter tolerated.
-	time.Sleep((whisper.DefaultSyncAllowance + 1) * time.Second)
-
-	// Get whisper service.
-	aliceWhisperService, err := aliceBackend.StatusNode().WhisperService()
-	s.Require().NoError(err)
-
-	// Get rpc client.
-	aliceRPCClient := aliceBackend.StatusNode().RPCClient()
-
-	// Generate group chat symkey and topic.
-	groupChatKeyID, err := aliceWhisperService.GenerateSymKey()
-	s.Require().NoError(err)
-
-	// Generate group chat topic.
-	groupChatTopic := whisper.BytesToTopic([]byte("groupChatTopic"))
-
-	// Alice send message to group chat.
-	helloWorldMessage := hexutil.Encode([]byte("Hello world!"))
-	s.postMessageToGroup(aliceRPCClient, groupChatKeyID, groupChatTopic.String(), helloWorldMessage)
-}
-
 func newGroupChatParams(symkey []byte, topic whisper.TopicType) groupChatParams {
 	groupChatKeyStr := hexutil.Bytes(symkey).String()
 	return groupChatParams{
