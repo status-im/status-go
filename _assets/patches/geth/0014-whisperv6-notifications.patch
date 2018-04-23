@@ -1,11 +1,11 @@
-diff --git a/whisper/whisperv6/api.go b/whisper/whisperv6/api.go
-index 8ae2882e1..7c97f0680 100644
---- a/whisper/whisperv6/api.go
-+++ b/whisper/whisperv6/api.go
-@@ -319,6 +319,16 @@ func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (bool, er
- 	return true, api.w.Send(env)
+diff --git i/whisper/whisperv6/api.go w/whisper/whisperv6/api.go
+index c60bc46a1..2de99f293 100644
+--- i/whisper/whisperv6/api.go
++++ w/whisper/whisperv6/api.go
+@@ -317,6 +317,16 @@ func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (hexutil.
+ 	return result, err
  }
-
+ 
 +// UninstallFilter is alias for Unsubscribe
 +func (api *PublicWhisperAPI) UninstallFilter(id string) {
 +	api.w.Unsubscribe(id)
@@ -17,26 +17,26 @@ index 8ae2882e1..7c97f0680 100644
 +}
 +
  //go:generate gencodec -type Criteria -field-override criteriaOverride -out gen_criteria_json.go
-
+ 
  // Criteria holds various filter options for inbound messages.
-diff --git a/whisper/whisperv6/whisper.go b/whisper/whisperv6/whisper.go
-index d75ad04ac..54d7d0f24 100644
---- a/whisper/whisperv6/whisper.go
-+++ b/whisper/whisperv6/whisper.go
-@@ -380,9 +386,9 @@ func (whisper *Whisper) NewKeyPair() (string, error) {
+diff --git i/whisper/whisperv6/whisper.go w/whisper/whisperv6/whisper.go
+index 880cced09..702556079 100644
+--- i/whisper/whisperv6/whisper.go
++++ w/whisper/whisperv6/whisper.go
+@@ -382,9 +382,9 @@ func (whisper *Whisper) NewKeyPair() (string, error) {
  		return "", fmt.Errorf("failed to generate valid key")
  	}
-
+ 
 -	id, err := GenerateRandomID()
 +	id, err := toDeterministicID(common.ToHex(crypto.FromECDSAPub(&key.PublicKey)), keyIDSize)
  	if err != nil {
 -		return "", fmt.Errorf("failed to generate ID: %s", err)
 +		return "", err
  	}
-
+ 
  	whisper.keyMu.Lock()
-@@ -397,11 +403,16 @@ func (whisper *Whisper) NewKeyPair() (string, error) {
-
+@@ -399,11 +399,16 @@ func (whisper *Whisper) NewKeyPair() (string, error) {
+ 
  // DeleteKeyPair deletes the specified key if it exists.
  func (whisper *Whisper) DeleteKeyPair(key string) bool {
 +	deterministicID, err := toDeterministicID(key, keyIDSize)
@@ -46,7 +46,7 @@ index d75ad04ac..54d7d0f24 100644
 +
  	whisper.keyMu.Lock()
  	defer whisper.keyMu.Unlock()
-
+ 
 -	if whisper.privateKeys[key] != nil {
 -		delete(whisper.privateKeys, key)
 +	if whisper.privateKeys[deterministicID] != nil {
@@ -54,8 +54,8 @@ index d75ad04ac..54d7d0f24 100644
  		return true
  	}
  	return false
-@@ -409,31 +420,73 @@ func (whisper *Whisper) DeleteKeyPair(key string) bool {
-
+@@ -411,31 +416,73 @@ func (whisper *Whisper) DeleteKeyPair(key string) bool {
+ 
  // AddKeyPair imports a asymmetric private key and returns it identifier.
  func (whisper *Whisper) AddKeyPair(key *ecdsa.PrivateKey) (string, error) {
 -	id, err := GenerateRandomID()
@@ -67,15 +67,15 @@ index d75ad04ac..54d7d0f24 100644
 +	if whisper.HasKeyPair(id) {
 +		return id, nil // no need to re-inject
  	}
-
+ 
  	whisper.keyMu.Lock()
  	whisper.privateKeys[id] = key
  	whisper.keyMu.Unlock()
 +	log.Info("Whisper identity added", "id", id, "pubkey", common.ToHex(crypto.FromECDSAPub(&key.PublicKey)))
-
+ 
  	return id, nil
  }
-
+ 
 +// SelectKeyPair adds cryptographic identity, and makes sure
 +// that it is the only private key known to the node.
 +func (whisper *Whisper) SelectKeyPair(key *ecdsa.PrivateKey) error {
@@ -117,7 +117,7 @@ index d75ad04ac..54d7d0f24 100644
 -	return whisper.privateKeys[id] != nil
 +	return whisper.privateKeys[deterministicID] != nil
  }
-
+ 
  // GetPrivateKey retrieves the private key of the specified identity.
  func (whisper *Whisper) GetPrivateKey(id string) (*ecdsa.PrivateKey, error) {
 +	deterministicID, err := toDeterministicID(id, keyIDSize)
@@ -132,10 +132,10 @@ index d75ad04ac..54d7d0f24 100644
  	if key == nil {
  		return nil, fmt.Errorf("invalid id")
  	}
-@@ -465,6 +518,23 @@ func (whisper *Whisper) GenerateSymKey() (string, error) {
+@@ -467,6 +514,23 @@ func (whisper *Whisper) GenerateSymKey() (string, error) {
  	return id, nil
  }
-
+ 
 +// AddSymKey stores the key with a given id.
 +func (whisper *Whisper) AddSymKey(id string, key []byte) (string, error) {
 +	deterministicID, err := toDeterministicID(id, keyIDSize)
@@ -156,10 +156,10 @@ index d75ad04ac..54d7d0f24 100644
  // AddSymKeyDirect stores the key, and returns its id.
  func (whisper *Whisper) AddSymKeyDirect(key []byte) (string, error) {
  	if len(key) != aesKeyLength {
-@@ -1035,6 +1118,33 @@ func GenerateRandomID() (id string, err error) {
+@@ -1013,6 +1077,33 @@ func GenerateRandomID() (id string, err error) {
  	return id, err
  }
-
+ 
 +// makeDeterministicID generates a deterministic ID, based on a given input
 +func makeDeterministicID(input string, keyLen int) (id string, err error) {
 +	buf := pbkdf2.Key([]byte(input), nil, 4096, keyLen, sha256.New)
