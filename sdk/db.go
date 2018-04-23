@@ -1,39 +1,46 @@
 package sdk
 
 import (
-	"log"
+	"errors"
 	"os"
 
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
-// TODO : this should be received as an input
-const KEY_ADDRESS = "hnny.address.lol"
-
-func getAccountAddress() string {
-	cwd, _ := os.Getwd()
-	println(cwd + "/data")
-	db, err := leveldb.OpenFile(cwd+"/data", nil)
-	if err != nil {
-		log.Fatal("can't open levelDB file. ERR: ", err)
-	}
-	defer db.Close()
-
-	addressBytes, err := db.Get([]byte(KEY_ADDRESS), nil)
-	if err != nil {
-		log.Printf("Error while getting address: %v", err)
-		return ""
-	}
-	return string(addressBytes)
+type AccountStorer interface {
+	GetAddress(string) (string, error)
+	SetAddress(string, string) error
 }
 
-func saveAccountAddress(address string) {
+type AccountStore struct {
+	keyAddress string
+}
+
+func (a *AccountStore) GetAddress(keyAddress string) (string, error) {
 	cwd, _ := os.Getwd()
 	db, err := leveldb.OpenFile(cwd+"/data", nil)
 	if err != nil {
-		log.Fatal("can't open levelDB file. ERR: ", err)
+		return "", errors.New("Can't open levelDB file. ERR: " + err.Error())
 	}
 	defer db.Close()
 
-	db.Put([]byte(KEY_ADDRESS), []byte(address), nil)
+	addressBytes, err := db.Get([]byte(keyAddress), nil)
+	if err != nil {
+		return "", errors.New("Error while getting address: " + err.Error())
+	}
+
+	return string(addressBytes), nil
+}
+
+func (a *AccountStore) SetAddress(keyAddress string, address string) error {
+	cwd, _ := os.Getwd()
+	db, err := leveldb.OpenFile(cwd+"/data", nil)
+	if err != nil {
+		return errors.New("can't open levelDB file. ERR: " + err.Error())
+	}
+	defer db.Close()
+
+	db.Put([]byte(keyAddress), []byte(address), nil)
+
+	return nil
 }

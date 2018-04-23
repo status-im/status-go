@@ -6,6 +6,10 @@ import (
 	"time"
 )
 
+// MsgHandler is a callback function that processes messages delivered to
+// asynchronous subscribers.
+type MsgHandler func(msg *Msg)
+
 type Subscription struct {
 	unsubscribe chan bool
 	channel     *Channel

@@ -15,23 +15,24 @@ type Channel struct {
 	subscriptions []*Subscription
 }
 
-// Publish : ...
+// Publish : Publishes a message with the given body on the current channel
 func (c *Channel) Publish(body string) error {
-	cfg, _ := c.conn.statusNode.Config()
-	powTime := cfg.WhisperConfig.MinimumPoW
+	cfg, err := c.conn.statusNode.Config()
+	if err != nil {
+		return err
+	}
 
 	message := NewMsg(c.conn.userName, body, c.channelName)
-	cmd := fmt.Sprintf(standardMessageFormat, c.conn.address, c.channelKey, message.ToPayload(), c.topic, powTime)
+	cmd := fmt.Sprintf(standardMessageFormat,
+		c.conn.address,
+		c.channelKey,
+		message.ToPayload(),
+		c.topic, cfg.WhisperConfig.MinimumPoW)
 
-	log.Println("-> Sending:", cmd)
-	log.Println("-> SENT:", c.conn.statusNode.RPCClient().CallRaw(cmd))
+	c.conn.statusNode.RPCClient().CallRaw(cmd)
 
 	return nil
 }
-
-// MsgHandler is a callback function that processes messages delivered to
-// asynchronous subscribers.
-type MsgHandler func(msg *Msg)
 
 // Subscribe : ...
 func (c *Channel) Subscribe(fn MsgHandler) (*Subscription, error) {
@@ -41,6 +42,13 @@ func (c *Channel) Subscribe(fn MsgHandler) (*Subscription, error) {
 	c.subscriptions = append(c.subscriptions, subscription)
 
 	return subscription, nil
+}
+
+// Close current channel and all its subscriptions
+func (c *Channel) Close() {
+	for _, sub := range c.subscriptions {
+		c.removeSubscription(sub)
+	}
 }
 
 func (c *Channel) removeSubscription(sub *Subscription) {
