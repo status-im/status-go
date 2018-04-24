@@ -1,6 +1,7 @@
 package shhext
 
 import (
+	"crypto/ecdsa"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -31,6 +32,7 @@ type EnvelopeEventsHandler interface {
 type Service struct {
 	w       *whisper.Whisper
 	tracker *tracker
+	nodeID  *ecdsa.PrivateKey
 }
 
 // Make sure that Service implements node.Service interface.
@@ -60,7 +62,7 @@ func (s *Service) APIs() []rpc.API {
 		{
 			Namespace: "shhext",
 			Version:   "1.0",
-			Service:   NewPublicAPI(s.w, s.tracker),
+			Service:   NewPublicAPI(s),
 			Public:    true,
 		},
 	}
@@ -70,6 +72,7 @@ func (s *Service) APIs() []rpc.API {
 // It does nothing in this case but is required by `node.Service` interface.
 func (s *Service) Start(server *p2p.Server) error {
 	s.tracker.Start()
+	s.nodeID = server.PrivateKey
 	return nil
 }
 
