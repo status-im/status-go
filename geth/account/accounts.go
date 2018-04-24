@@ -57,7 +57,11 @@ func (m *Manager) CreateAccount(password string) (address, pubKey, mnemonic stri
 		return "", "", "", fmt.Errorf("can not create mnemonic seed: %v", err)
 	}
 
-	// generate extended master key (see BIP32)
+	// Generate extended master key (see BIP32)
+	// We call extkeys.NewMaster with a seed generated with the 12 mnemonic words
+	// but without using the optional password as an extra entropy as described in BIP39.
+	// Future ideas/iterations in Status can add an an advanced options
+	// for expert users, to be able to add a passphrase to the generation of the seed.
 	extKey, err := extkeys.NewMaster(mn.MnemonicSeed(mnemonic, ""))
 	if err != nil {
 		return "", "", "", fmt.Errorf("can not create master extended key: %v", err)
