@@ -24,7 +24,7 @@ func (s *MailServiceSuite) SetupTest() {
 	s.StatusNode = node.New()
 }
 
-// TestShhextRequestMessagesRPCMethodAvailability tests if `shh_requestMessages` is available
+// TestShhextRequestMessagesRPCMethodAvailability tests if `shhext_requestMessages` is available
 // through inproc and HTTP interfaces.
 func (s *MailServiceSuite) TestShhextRequestMessagesRPCMethodAvailability() {
 	r := s.Require()
