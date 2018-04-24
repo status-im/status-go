@@ -24,9 +24,9 @@ func (s *MailServiceSuite) SetupTest() {
 	s.StatusNode = node.New()
 }
 
-// TestShhRequestMessagesRPCMethodAvailability tests if `shh_requestMessages` is available
+// TestShhextRequestMessagesRPCMethodAvailability tests if `shh_requestMessages` is available
 // through inproc and HTTP interfaces.
-func (s *MailServiceSuite) TestShhRequestMessagesRPCMethodAvailability() {
+func (s *MailServiceSuite) TestShhextRequestMessagesRPCMethodAvailability() {
 	r := s.Require()
 
 	s.StartTestNode(func(config *params.NodeConfig) {
@@ -39,14 +39,14 @@ func (s *MailServiceSuite) TestShhRequestMessagesRPCMethodAvailability() {
 
 	// This error means that the method is available through inproc communication
 	// as the validation of params occurred.
-	err := client.Call(nil, "shh_requestMessages", map[string]interface{}{})
+	err := client.Call(nil, "shhext_requestMessages", map[string]interface{}{})
 	r.EqualError(err, `invalid mailServerPeer value: invalid URL scheme, want "enode"`)
 
 	// Do the same but using HTTP interface.
 	req, err := http.NewRequest("POST", "http://localhost:8645", bytes.NewBuffer([]byte(`{
 		"jsonrpc": "2.0",
 		"id": 1,
-		"method": "shh_requestMessages",
+		"method": "shhext_requestMessages",
 		"params": [{}]
 	}`)))
 	req.Header.Set("Content-Type", "application/json")

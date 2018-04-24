@@ -98,7 +98,7 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	reqMessagesBody := `{
 		"jsonrpc": "2.0",
 		"id": 1,
-		"method": "shh_requestMessages",
+		"method": "shhext_requestMessages",
 		"params": [{
 					"mailServerPeer":"` + mailboxPeerStr + `",
 					"topic":"` + topic.String() + `",
@@ -503,7 +503,7 @@ func (s *WhisperMailboxSuite) requestHistoricMessages(rpcCli *rpc.Client, mailbo
 	resp := rpcCli.CallRaw(`{
 		"jsonrpc": "2.0",
 		"id": 2,
-		"method": "shh_requestMessages",
+		"method": "shhext_requestMessages",
 		"params": [{
 					"mailServerPeer":"` + mailboxEnode + `",
 					"topic":"` + topic + `",
