@@ -27,16 +27,16 @@ import (
 	"mime"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/rs/cors"
-	"strings"
 )
 
 const (
-	contentType                 = "application/json"
-	maxHTTPRequestContentLength = 1024 * 128
+	contentType             = "application/json"
+	maxRequestContentLength = 1024 * 128
 )
 
 var nullAddr, _ = net.ResolveTCPAddr("tcp", "127.0.0.1:0")
@@ -90,10 +90,19 @@ func DialHTTP(endpoint string) (*Client, error) {
 func (c *Client) sendHTTP(ctx context.Context, op *requestOp, msg interface{}) error {
 	hc := c.writeConn.(*httpConn)
 	respBody, err := hc.doRequest(ctx, msg)
+	if respBody != nil {
+		defer respBody.Close()
+	}
+
 	if err != nil {
+		if respBody != nil {
+			buf := new(bytes.Buffer)
+			if _, err2 := buf.ReadFrom(respBody); err2 == nil {
+				return fmt.Errorf("%v %v", err, buf.String())
+			}
+		}
 		return err
 	}
-	defer respBody.Close()
 	var respmsg jsonrpcMessage
 	if err := json.NewDecoder(respBody).Decode(&respmsg); err != nil {
 		return err
@@ -132,6 +141,9 @@ func (hc *httpConn) doRequest(ctx context.Context, msg interface{}) (io.ReadClos
 	if err != nil {
 		return nil, err
 	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return resp.Body, errors.New(resp.Status)
+	}
 	return resp.Body, nil
 }
 
@@ -169,11 +181,17 @@ func (srv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// All checks passed, create a codec that reads direct from the request body
 	// untilEOF and writes the response to w and order the server to process a
 	// single request.
-	codec := NewJSONCodec(&httpReadWriteNopCloser{r.Body, w})
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, "remote", r.RemoteAddr)
+	ctx = context.WithValue(ctx, "scheme", r.Proto)
+	ctx = context.WithValue(ctx, "local", r.Host)
+
+	body := io.LimitReader(r.Body, maxRequestContentLength)
+	codec := NewJSONCodec(&httpReadWriteNopCloser{body, w})
 	defer codec.Close()
 
 	w.Header().Set("content-type", contentType)
-	srv.ServeSingleRequest(codec, OptionMethodInvocation)
+	srv.ServeSingleRequest(codec, OptionMethodInvocation, ctx)
 }
 
 // validateRequest returns a non-zero response code and error message if the
@@ -182,8 +200,8 @@ func validateRequest(r *http.Request) (int, error) {
 	if r.Method == http.MethodPut || r.Method == http.MethodDelete {
 		return http.StatusMethodNotAllowed, errors.New("method not allowed")
 	}
-	if r.ContentLength > maxHTTPRequestContentLength {
-		err := fmt.Errorf("content length too large (%d>%d)", r.ContentLength, maxHTTPRequestContentLength)
+	if r.ContentLength > maxRequestContentLength {
+		err := fmt.Errorf("content length too large (%d>%d)", r.ContentLength, maxRequestContentLength)
 		return http.StatusRequestEntityTooLarge, err
 	}
 	mt, _, err := mime.ParseMediaType(r.Header.Get("content-type"))

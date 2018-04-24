@@ -9,8 +9,8 @@ index 000000000..1092935cf
 +import "github.com/ethereum/go-ethereum/metrics"
 +
 +var (
-+	ingressTrafficMeter = metrics.NewMeter("discv5/InboundTraffic")
-+	egressTrafficMeter  = metrics.NewMeter("discv5/OutboundTraffic")
++	ingressTrafficMeter = metrics.NewRegisteredMeter("discv5/InboundTraffic", nil)
++	egressTrafficMeter  = metrics.NewRegisteredMeter("discv5/OutboundTraffic", nil)
 +)
 diff --git c/p2p/discv5/udp.go w/p2p/discv5/udp.go
 index 6ce72d2c1..308cf8637 100644
