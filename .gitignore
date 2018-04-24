@@ -8,6 +8,7 @@
 /cmd/statusd/statusd-data
 /cmd/statusd/statusd
 /cmd/statusd-cli/statusd-cli
+/cmd/notifier/statusd-data
 
 /wnode-status-data
 /cmd/wnode-status/wnode-status-data
