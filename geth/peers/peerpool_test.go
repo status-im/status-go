@@ -1,6 +1,7 @@
 package peers
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"strconv"
@@ -12,10 +13,12 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
+	"github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/geth/signal"
 )
 
 type PeerPoolSimulationSuite struct {
@@ -52,6 +55,7 @@ func (s *PeerPoolSimulationSuite) SetupTest() {
 	s.peers = make([]*p2p.Server, 3)
 	for i := range s.peers {
 		key, _ := crypto.GenerateKey()
+		whisper := whisperv6.New(nil)
 		peer := &p2p.Server{
 			Config: p2p.Config{
 				MaxPeers:         10,
@@ -61,6 +65,7 @@ func (s *PeerPoolSimulationSuite) SetupTest() {
 				DiscoveryV5:      true,
 				NoDiscovery:      true,
 				BootstrapNodesV5: []*discv5.Node{bootnodeV5},
+				Protocols:        whisper.Protocols(),
 			},
 		}
 		port++
@@ -82,21 +87,43 @@ func (s *PeerPoolSimulationSuite) getPeerFromEvent(events <-chan *p2p.PeerEvent,
 	return
 }
 
-func (s *PeerPoolSimulationSuite) getPoolEvent(events <-chan PoolEvent) PoolEvent {
+func (s *PeerPoolSimulationSuite) getPoolEvent(events <-chan string) string {
 	select {
 	case ev := <-events:
 		return ev
-	case <-time.After(200 * time.Millisecond):
+	case <-time.After(time.Second):
 		s.Fail("timed out waiting for a peer")
 		return ""
 	}
 }
 
 func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailover() {
+	poolEvents := make(chan string, 1)
+	summaries := make(chan map[string]int, 1)
+	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+		fmt.Println(jsonEvent)
+		var envelope struct {
+			Type  string
+			Event json.RawMessage
+		}
+		s.NoError(json.Unmarshal([]byte(jsonEvent), &envelope))
+		switch envelope.Type {
+		case DiscoveryStarted:
+			poolEvents <- envelope.Type
+		case DiscoveryStopped:
+			poolEvents <- envelope.Type
+		case DiscoverySummary:
+			poolEvents <- envelope.Type
+			var summary map[string]int
+			s.NoError(json.Unmarshal(envelope.Event, &summary))
+			summaries <- summary
+		}
+
+	})
 	topic := discv5.Topic("cap=test")
 	// simulation should only rely on fast sync
 	config := map[discv5.Topic]params.Limits{
-		topic: params.NewLimits(1, 1), // limits a chosen for simplicity of the simulation
+		topic: params.NewLimits(1, 1), // limits are chosen for simplicity of the simulation
 	}
 	peerPool := NewPeerPool(config, 100*time.Millisecond, 100*time.Millisecond, nil, true)
 	register := NewRegister(topic)
@@ -109,23 +136,39 @@ func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailover() {
 	defer subscription.Unsubscribe()
 	s.NoError(peerPool.Start(s.peers[1]))
 	defer peerPool.Stop()
-	poolEvents := make(chan PoolEvent)
-	poolSub := peerPool.feed.Subscribe(poolEvents)
-	defer poolSub.Unsubscribe()
+	s.Equal(DiscoveryStarted, s.getPoolEvent(poolEvents))
 	connected := s.getPeerFromEvent(events, p2p.PeerEventTypeAdd)
 	s.Equal(s.peers[0].Self().ID, connected)
-	s.Equal(Discv5Closed, s.getPoolEvent(poolEvents))
+	s.Equal(DiscoveryStopped, s.getPoolEvent(poolEvents))
 	s.Require().Nil(s.peers[1].DiscV5)
+
+	s.Require().Equal(DiscoverySummary, s.getPoolEvent(poolEvents))
+	summary := <-summaries
+	s.Len(summary, 1)
+	s.Contains(summary, "shh/6")
+	s.Equal(summary["shh/6"], 1)
+
 	s.peers[0].Stop()
 	disconnected := s.getPeerFromEvent(events, p2p.PeerEventTypeDrop)
 	s.Equal(connected, disconnected)
-	s.Equal(Discv5Started, s.getPoolEvent(poolEvents))
+
+	s.Require().Equal(DiscoverySummary, s.getPoolEvent(poolEvents))
+	summary = <-summaries
+	s.Len(summary, 0)
+
+	s.Equal(DiscoveryStarted, s.getPoolEvent(poolEvents))
 	s.Require().NotNil(s.peers[1].DiscV5)
 	register = NewRegister(topic)
 	s.Require().NoError(register.Start(s.peers[2]))
 	defer register.Stop()
-	newConnected := s.getPeerFromEvent(events, p2p.PeerEventTypeAdd)
-	s.Equal(s.peers[2].Self().ID, newConnected)
+	s.Equal(s.peers[2].Self().ID, s.getPeerFromEvent(events, p2p.PeerEventTypeAdd))
+
+	s.Equal(DiscoveryStopped, s.getPoolEvent(poolEvents))
+	s.Require().Equal(DiscoverySummary, s.getPoolEvent(poolEvents))
+	summary = <-summaries
+	s.Len(summary, 1)
+	s.Contains(summary, "shh/6")
+	s.Equal(summary["shh/6"], 1)
 }
 
 func (s *PeerPoolSimulationSuite) TearDown() {
