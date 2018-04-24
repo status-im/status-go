@@ -21,7 +21,6 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/nat"
 	"github.com/ethereum/go-ethereum/whisper/mailserver"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
-	"github.com/status-im/status-go/geth/mailservice"
 	"github.com/status-im/status-go/geth/params"
 	shhmetrics "github.com/status-im/status-go/metrics/whisper"
 	"github.com/status-im/status-go/services/personal"
@@ -215,7 +214,7 @@ func activateShhService(stack *node.Node, config *params.NodeConfig) (err error)
 	}
 
 	// TODO(dshulyak) add a config option to enable it by default, but disable if app is started from statusd
-	err = stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
+	return stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
 		var whisper *whisper.Whisper
 		if err := ctx.Service(&whisper); err != nil {
 			return nil, err
@@ -223,18 +222,6 @@ func activateShhService(stack *node.Node, config *params.NodeConfig) (err error)
 
 		svc := shhext.New(whisper, shhext.EnvelopeSignalHandler{})
 		return svc, nil
-	})
-	if err != nil {
-		return
-	}
-
-	return stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-		var whisper *whisper.Whisper
-		if err := ctx.Service(&whisper); err != nil {
-			return nil, err
-		}
-
-		return mailservice.New(whisper), nil
 	})
 }
 
