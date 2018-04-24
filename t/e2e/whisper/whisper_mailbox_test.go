@@ -180,6 +180,8 @@ func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
 	s.Require().NoError(err)
 	// Generate a group chat topic.
 	groupChatTopic := whisper.BytesToTopic([]byte("groupChatTopic"))
+	// sender must be subscribed to message topic it sends
+	s.NotNil(s.createGroupChatMessageFilter(aliceRPCClient, groupChatKeyID, groupChatTopic.String()))
 	groupChatPayload := newGroupChatParams(groupChatKey, groupChatTopic)
 	payloadStr, err := groupChatPayload.Encode()
 	s.Require().NoError(err)
