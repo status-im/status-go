@@ -282,6 +282,9 @@ type NodeConfig struct {
 	// LogFile is filename where exposed logs get written to
 	LogFile string
 
+	// LogEnabled enables the logger
+	LogEnabled bool `json:"LogEnabled"`
+
 	// LogLevel defines minimum log level. Valid names are "ERROR", "WARN", "INFO", "DEBUG", and "TRACE".
 	LogLevel string `validate:"eq=ERROR|eq=WARN|eq=INFO|eq=DEBUG|eq=TRACE"`
 
