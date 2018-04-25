@@ -146,9 +146,10 @@ func makeEnvelop(payload []byte, symKey []byte, nodeID *ecdsa.PrivateKey, pow fl
 // makePayload makes a specific payload for MailServer to request historic messages.
 func makePayload(r MessagesRequest) []byte {
 	// first 8 bytes are lowed and upper bounds as uint32
-	data := make([]byte, 8+whisper.TopicLength)
+	data := make([]byte, 8+whisper.BloomFilterSize)
 	binary.BigEndian.PutUint32(data, r.From)
 	binary.BigEndian.PutUint32(data[4:], r.To)
-	copy(data[8:], r.Topic[:])
+	copy(data[8:], whisper.TopicToBloom(r.Topic))
 	return data
+
 }
