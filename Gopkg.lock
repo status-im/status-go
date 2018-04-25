@@ -19,6 +19,12 @@
   revision = "ea17b1a17847fb6e4c0a91de0b674704693469b0"
 
 [[projects]]
+  name = "github.com/beevik/ntp"
+  packages = ["."]
+  revision = "62c80a04de2086884d8296004b6d74ee1846c582"
+  version = "v0.2.0"
+
+[[projects]]
   branch = "master"
   name = "github.com/beorn7/perks"
   packages = ["quantile"]
@@ -376,10 +382,14 @@
   branch = "master"
   name = "golang.org/x/net"
   packages = [
+    "bpf",
     "context",
     "html",
     "html/atom",
     "html/charset",
+    "internal/iana",
+    "internal/socket",
+    "ipv4",
     "websocket"
   ]
   revision = "5ccada7d0a7ba9aeb5d3aca8d3501b4c2a509fec"

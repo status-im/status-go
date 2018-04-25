@@ -143,3 +143,7 @@ ignored = [ "github.com/ethereum/go-ethereum/ethapi" ]
 [[constraint]]
   branch = "master"
   name = "github.com/vishvananda/netlink"
+
+[[constraint]]
+  name = "github.com/beevik/ntp"
+  version = "0.2.0"
