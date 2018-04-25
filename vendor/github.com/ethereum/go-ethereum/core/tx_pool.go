@@ -38,8 +38,6 @@ import (
 const (
 	// chainHeadChanSize is the size of channel listening to ChainHeadEvent.
 	chainHeadChanSize = 10
-	// rmTxChanSize is the size of channel listening to RemovedTransactionEvent.
-	rmTxChanSize = 10
 )
 
 var (
@@ -87,20 +85,20 @@ var (
 
 var (
 	// Metrics for the pending pool
-	pendingDiscardCounter   = metrics.NewCounter("txpool/pending/discard")
-	pendingReplaceCounter   = metrics.NewCounter("txpool/pending/replace")
-	pendingRateLimitCounter = metrics.NewCounter("txpool/pending/ratelimit") // Dropped due to rate limiting
-	pendingNofundsCounter   = metrics.NewCounter("txpool/pending/nofunds")   // Dropped due to out-of-funds
+	pendingDiscardCounter   = metrics.NewRegisteredCounter("txpool/pending/discard", nil)
+	pendingReplaceCounter   = metrics.NewRegisteredCounter("txpool/pending/replace", nil)
+	pendingRateLimitCounter = metrics.NewRegisteredCounter("txpool/pending/ratelimit", nil) // Dropped due to rate limiting
+	pendingNofundsCounter   = metrics.NewRegisteredCounter("txpool/pending/nofunds", nil)   // Dropped due to out-of-funds
 
 	// Metrics for the queued pool
-	queuedDiscardCounter   = metrics.NewCounter("txpool/queued/discard")
-	queuedReplaceCounter   = metrics.NewCounter("txpool/queued/replace")
-	queuedRateLimitCounter = metrics.NewCounter("txpool/queued/ratelimit") // Dropped due to rate limiting
-	queuedNofundsCounter   = metrics.NewCounter("txpool/queued/nofunds")   // Dropped due to out-of-funds
+	queuedDiscardCounter   = metrics.NewRegisteredCounter("txpool/queued/discard", nil)
+	queuedReplaceCounter   = metrics.NewRegisteredCounter("txpool/queued/replace", nil)
+	queuedRateLimitCounter = metrics.NewRegisteredCounter("txpool/queued/ratelimit", nil) // Dropped due to rate limiting
+	queuedNofundsCounter   = metrics.NewRegisteredCounter("txpool/queued/nofunds", nil)   // Dropped due to out-of-funds
 
 	// General tx metrics
-	invalidTxCounter     = metrics.NewCounter("txpool/invalid")
-	underpricedTxCounter = metrics.NewCounter("txpool/underpriced")
+	invalidTxCounter     = metrics.NewRegisteredCounter("txpool/invalid", nil)
+	underpricedTxCounter = metrics.NewRegisteredCounter("txpool/underpriced", nil)
 )
 
 // TxStatus is the current status of a transaction as seen by the pool.
@@ -320,7 +318,7 @@ func (pool *TxPool) loop() {
 				// Any non-locals old enough should be removed
 				if time.Since(pool.beats[addr]) > pool.config.Lifetime {
 					for _, tx := range pool.queue[addr].Flatten() {
-						pool.removeTx(tx.Hash())
+						pool.removeTx(tx.Hash(), true)
 					}
 				}
 			}
@@ -468,7 +466,7 @@ func (pool *TxPool) SetGasPrice(price *big.Int) {
 
 	pool.gasPrice = price
 	for _, tx := range pool.priced.Cap(price, pool.locals) {
-		pool.removeTx(tx.Hash())
+		pool.removeTx(tx.Hash(), false)
 	}
 	log.Info("Transaction pool price threshold updated", "price", price)
 }
@@ -630,7 +628,7 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (bool, error) {
 		for _, tx := range drop {
 			log.Trace("Discarding freshly underpriced transaction", "hash", tx.Hash(), "price", tx.GasPrice())
 			underpricedTxCounter.Inc(1)
-			pool.removeTx(tx.Hash())
+			pool.removeTx(tx.Hash(), false)
 		}
 	}
 	// If the transaction is replacing an already pending one, do directly
@@ -695,8 +693,10 @@ func (pool *TxPool) enqueueTx(hash common.Hash, tx *types.Transaction) (bool, er
 		pool.priced.Removed()
 		queuedReplaceCounter.Inc(1)
 	}
-	pool.all[hash] = tx
-	pool.priced.Put(tx)
+	if pool.all[hash] == nil {
+		pool.all[hash] = tx
+		pool.priced.Put(tx)
+	}
 	return old != nil, nil
 }
 
@@ -862,7 +862,7 @@ func (pool *TxPool) Get(hash common.Hash) *types.Transaction {
 
 // removeTx removes a single transaction from the queue, moving all subsequent
 // transactions back to the future queue.
-func (pool *TxPool) removeTx(hash common.Hash) {
+func (pool *TxPool) removeTx(hash common.Hash, outofbound bool) {
 	// Fetch the transaction we wish to delete
 	tx, ok := pool.all[hash]
 	if !ok {
@@ -872,20 +872,20 @@ func (pool *TxPool) removeTx(hash common.Hash) {
 
 	// Remove it from the list of known transactions
 	delete(pool.all, hash)
-	pool.priced.Removed()
-
+	if outofbound {
+		pool.priced.Removed()
+	}
 	// Remove the transaction from the pending lists and reset the account nonce
 	if pending := pool.pending[addr]; pending != nil {
 		if removed, invalids := pending.Remove(tx); removed {
-			// If no more transactions are left, remove the list
+			// If no more pending transactions are left, remove the list
 			if pending.Empty() {
 				delete(pool.pending, addr)
 				delete(pool.beats, addr)
-			} else {
-				// Otherwise postpone any invalidated transactions
-				for _, tx := range invalids {
-					pool.enqueueTx(tx.Hash(), tx)
-				}
+			}
+			// Postpone any invalidated transactions
+			for _, tx := range invalids {
+				pool.enqueueTx(tx.Hash(), tx)
 			}
 			// Update the account nonce if needed
 			if nonce := tx.Nonce(); pool.pendingState.GetNonce(addr) > nonce {
@@ -1053,7 +1053,7 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) {
 			// Drop all transactions if they are less than the overflow
 			if size := uint64(list.Len()); size <= drop {
 				for _, tx := range list.Flatten() {
-					pool.removeTx(tx.Hash())
+					pool.removeTx(tx.Hash(), true)
 				}
 				drop -= size
 				queuedRateLimitCounter.Inc(int64(size))
@@ -1062,7 +1062,7 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) {
 			// Otherwise drop only last few transactions
 			txs := list.Flatten()
 			for i := len(txs) - 1; i >= 0 && drop > 0; i-- {
-				pool.removeTx(txs[i].Hash())
+				pool.removeTx(txs[i].Hash(), true)
 				drop--
 				queuedRateLimitCounter.Inc(1)
 			}

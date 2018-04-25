@@ -3,6 +3,6 @@ package discv5
 import "github.com/ethereum/go-ethereum/metrics"
 
 var (
-	ingressTrafficMeter = metrics.NewMeter("discv5/InboundTraffic")
-	egressTrafficMeter  = metrics.NewMeter("discv5/OutboundTraffic")
+	ingressTrafficMeter = metrics.NewRegisteredMeter("discv5/InboundTraffic", nil)
+	egressTrafficMeter  = metrics.NewRegisteredMeter("discv5/OutboundTraffic", nil)
 )

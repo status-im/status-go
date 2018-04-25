@@ -201,6 +201,14 @@ func (s *APITestSuite) TestEventsNodeStartStop() {
 		var envelope signal.Envelope
 		err := json.Unmarshal([]byte(jsonEvent), &envelope)
 		s.NoError(err)
+		// whitelist types that we are interested in
+		switch envelope.Type {
+		case signal.EventNodeStarted:
+		case signal.EventNodeStopped:
+		case signal.EventNodeReady:
+		default:
+			return
+		}
 		envelopes <- envelope
 	})
 

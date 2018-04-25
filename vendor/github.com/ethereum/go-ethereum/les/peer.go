@@ -543,24 +543,21 @@ func (ps *peerSet) notify(n peerSetNotify) {
 // Register injects a new peer into the working set, or returns an error if the
 // peer is already known.
 func (ps *peerSet) Register(p *peer) error {
-	peers, err := func() ([]peerSetNotify, error) {
-		ps.lock.Lock()
-		defer ps.lock.Unlock()
-		if ps.closed {
-			return nil, errClosed
-		}
-		if _, ok := ps.peers[p.id]; ok {
-			return nil, errAlreadyRegistered
-		}
-		ps.peers[p.id] = p
-		p.sendQueue = newExecQueue(100)
-		peers := make([]peerSetNotify, len(ps.notifyList))
-		copy(peers, ps.notifyList)
-		return peers, nil
-	}()
-	if err != nil {
-		return err
+	ps.lock.Lock()
+	if ps.closed {
+		ps.lock.Unlock()
+		return errClosed
 	}
+	if _, ok := ps.peers[p.id]; ok {
+		ps.lock.Unlock()
+		return errAlreadyRegistered
+	}
+	ps.peers[p.id] = p
+	p.sendQueue = newExecQueue(100)
+	peers := make([]peerSetNotify, len(ps.notifyList))
+	copy(peers, ps.notifyList)
+	ps.lock.Unlock()
+
 	for _, n := range peers {
 		n.registerPeer(p)
 	}
