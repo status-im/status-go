@@ -92,6 +92,8 @@ type Whisper struct {
 	envelopeTracer EnvelopeTracer // Service collecting envelopes metadata
 
 	envelopeFeed event.Feed
+
+	timeSource func() time.Time // source of time for whisper
 }
 
 // New creates a Whisper client ready to communicate through the Ethereum P2P network.
@@ -110,6 +112,7 @@ func New(cfg *Config) *Whisper {
 		p2pMsgQueue:   make(chan *Envelope, messageQueueLimit),
 		quit:          make(chan struct{}),
 		syncAllowance: DefaultSyncAllowance,
+		timeSource:    time.Now,
 	}
 
 	whisper.filters = NewFilters(whisper)
@@ -213,6 +216,11 @@ func (whisper *Whisper) APIs() []rpc.API {
 			Public:    true,
 		},
 	}
+}
+
+// SetTimeSource sets time source used by whisper for envelopes time and expiration logic.
+func (whisper *Whisper) SetTimeSource(timeSource func() time.Time) {
+	whisper.timeSource = timeSource
 }
 
 // RegisterServer registers MailServer interface.
@@ -829,7 +837,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 // appropriate time-stamp. In case of error, connection should be dropped.
 // param isP2P indicates whether the message is peer-to-peer (should not be forwarded).
 func (whisper *Whisper) add(envelope *Envelope, isP2P bool) (bool, error) {
-	now := uint32(time.Now().Unix())
+	now := uint32(whisper.timeSource().Unix())
 	sent := envelope.Expiry - envelope.TTL
 
 	if sent > now {
@@ -988,7 +996,7 @@ func (whisper *Whisper) expire() {
 	whisper.statsMu.Lock()
 	defer whisper.statsMu.Unlock()
 	whisper.stats.reset()
-	now := uint32(time.Now().Unix())
+	now := uint32(whisper.timeSource().Unix())
 	for expiry, hashSet := range whisper.expirations {
 		if expiry < now {
 			// Dump all expired messages and remove timestamp
