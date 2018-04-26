@@ -230,6 +230,7 @@ func New(mode SyncMode, stateDb ethdb.Database, mux *event.TypeMux, chain BlockC
 		},
 		trackStateReq: make(chan *stateReq),
 	}
+	dl.downloads.Add(1) // Add a sentinel value to avoid waiting with zero count and getting a race condition signaled when terminating Downloader before starting sync
 	go dl.qosTuner()
 	go dl.stateFetcher()
 	return dl
@@ -543,6 +544,9 @@ func (d *Downloader) Terminate() {
 
 	// Cancel any pending download requests
 	d.Cancel()
+
+	// Remove sentinel value from WaitGroup before calling Wait()
+	go func() { d.downloads.Done() }()
 
 	// Wait, so external dependencies aren't destroyed
 	// until the download processing is done.
