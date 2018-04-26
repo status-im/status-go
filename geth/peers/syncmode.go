@@ -83,6 +83,7 @@ func (s *syncStrategy) Start() <-chan time.Duration {
 		}
 	}()
 
+	// init with fast mode
 	s.mode <- s.fastMode
 
 	return s.period

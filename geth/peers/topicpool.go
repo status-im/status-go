@@ -241,7 +241,7 @@ func (t *TopicPool) StartSearch(server *p2p.Server) error {
 	found := make(chan *discv5.Node, 5) // 5 reasonable number for concurrently found nodes
 	lookup := make(chan bool, 10)       // sufficiently buffered channel, just prevents blocking because of lookup
 
-	// start syncing strategy
+	// start syncing mode strategy
 	period := t.sync.Start()
 
 	if t.cache != nil {
