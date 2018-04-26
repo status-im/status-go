@@ -114,7 +114,9 @@ func (p *PeerPool) restartDiscovery(server *p2p.Server) error {
 			return err
 		}
 		log.Debug("restarted discovery from peer pool")
+		p.mu.Lock()
 		server.DiscV5 = ntab
+		p.mu.Unlock()
 		p.feed.Send(Discv5Started)
 	}
 	for _, t := range p.topics {

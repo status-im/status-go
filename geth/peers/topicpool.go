@@ -19,8 +19,7 @@ func NewTopicPool(topic discv5.Topic, limits params.Limits, slowSync, fastSync t
 	pool := TopicPool{
 		topic:          topic,
 		limits:         limits,
-		slowSync:       slowSync,
-		fastSync:       fastSync,
+		sync:           newSyncStrategy(fastSync, slowSync, time.Minute*5),
 		peerPool:       make(map[discv5.NodeID]*peerInfoItem),
 		peerPoolQueue:  make(peerPriorityQueue, 0),
 		connectedPeers: make(map[discv5.NodeID]*peerInfo),
@@ -33,24 +32,20 @@ func NewTopicPool(topic discv5.Topic, limits params.Limits, slowSync, fastSync t
 
 // TopicPool manages peers for topic.
 type TopicPool struct {
-	topic    discv5.Topic
-	limits   params.Limits
-	slowSync time.Duration
-	fastSync time.Duration
+	topic  discv5.Topic
+	limits params.Limits
 
+	mu      sync.RWMutex
+	wg      sync.WaitGroup // wait group for all goroutines spawn during TopicPool operation
 	quit    chan struct{}
 	running int32
-
-	mu         sync.RWMutex
-	discWG     sync.WaitGroup
-	consumerWG sync.WaitGroup
-	period     chan time.Duration
 
 	peerPool       map[discv5.NodeID]*peerInfoItem // found but not connected peers
 	peerPoolQueue  peerPriorityQueue               // priority queue to find the most recent peer
 	connectedPeers map[discv5.NodeID]*peerInfo     // currently connected peers
 
 	cache *Cache
+	sync  *syncStrategy
 }
 
 func (t *TopicPool) addToPeerPool(peer *peerInfo) {
@@ -154,12 +149,12 @@ func (t *TopicPool) ConfirmAdded(server *p2p.Server, nodeID discover.NodeID) {
 
 	// move peer from pool to connected peers
 	t.movePeerFromPoolToConnected(discV5NodeID)
-	// make sure `dismissed` is restarted
+	// make sure `dismissed` is reset
 	peer.dismissed = false
 
 	// when the lower limit is reached, we can switch to slow mode
-	if t.SearchRunning() && len(t.connectedPeers) == t.limits.Min {
-		t.period <- t.slowSync
+	if t.SearchRunning() {
+		t.sync.Update(len(t.connectedPeers), t.limits.Min, t.limits.Max)
 	}
 }
 
@@ -191,24 +186,21 @@ func (t *TopicPool) ConfirmDropped(server *p2p.Server, nodeID discover.NodeID) b
 		return false
 	}
 
-	// switch to fast mode as the number of connected peers is about to drop
-	// below the lower limit
-	if t.SearchRunning() && len(t.connectedPeers) == t.limits.Min {
-		t.period <- t.fastSync
-	}
-
 	// If there was a network error, this event will be received
 	// but the peer won't be removed from the static nodes set.
 	// That's why we need to call `removeServerPeer` manually.
 	t.removeServerPeer(server, peer)
 
 	delete(t.connectedPeers, discV5NodeID)
-
-	// remove from cache only if the peer dropped by itself
 	if t.cache != nil {
 		if err := t.cache.RemovePeer(discV5NodeID, t.topic); err != nil {
 			log.Error("failed to remove peer from cache", "error", err)
 		}
+	}
+
+	// As we removed a peer, check if we need to switch a sync strategy.
+	if t.SearchRunning() {
+		t.sync.Update(len(t.connectedPeers), t.limits.Min, t.limits.Max)
 	}
 
 	return true
@@ -240,38 +232,40 @@ func (t *TopicPool) StartSearch(server *p2p.Server) error {
 	if server.DiscV5 == nil {
 		return ErrDiscv5NotRunning
 	}
+	atomic.StoreInt32(&t.running, 1)
+
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	atomic.StoreInt32(&t.running, 1)
+
 	t.quit = make(chan struct{})
-	t.period = make(chan time.Duration, 2) // 2 allows to send slow and then fast without blocking a producer
-	found := make(chan *discv5.Node, 5)    // 5 reasonable number for concurrently found nodes
-	lookup := make(chan bool, 10)          // sufficiently buffered channel, just prevents blocking because of lookup
+	found := make(chan *discv5.Node, 5) // 5 reasonable number for concurrently found nodes
+	lookup := make(chan bool, 10)       // sufficiently buffered channel, just prevents blocking because of lookup
+
+	// start syncing strategy
+	period := t.sync.Start()
+
 	if t.cache != nil {
 		for _, peer := range t.cache.GetPeersRange(t.topic, 5) {
 			log.Debug("adding a peer from cache", "peer", peer)
 			found <- peer
 		}
 	}
-	t.discWG.Add(1)
+
+	t.wg.Add(1)
 	go func() {
-		server.DiscV5.SearchTopic(t.topic, t.period, found, lookup)
-		t.discWG.Done()
+		server.DiscV5.SearchTopic(t.topic, period, found, lookup)
+		t.wg.Done()
 	}()
-	t.consumerWG.Add(1)
+	t.wg.Add(1)
 	go func() {
 		t.handleFoundPeers(server, found, lookup)
-		t.consumerWG.Done()
+		t.wg.Done()
 	}()
+
 	return nil
 }
 
 func (t *TopicPool) handleFoundPeers(server *p2p.Server, found <-chan *discv5.Node, lookup <-chan bool) {
-	if len(t.connectedPeers) >= t.limits.Min {
-		t.period <- t.slowSync
-	} else {
-		t.period <- t.fastSync
-	}
 	selfID := discv5.NodeID(server.Self().ID)
 	for {
 		select {
@@ -351,7 +345,6 @@ func (t *TopicPool) StopSearch() {
 		log.Debug("stoping search", "topic", t.topic)
 		close(t.quit)
 	}
-	t.consumerWG.Wait()
-	close(t.period)
-	t.discWG.Wait()
+	t.sync.Stop()
+	t.wg.Wait()
 }

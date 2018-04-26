@@ -40,15 +40,16 @@ func (s *TopicPoolSuite) SetupTest() {
 	topic := discv5.Topic("cap=cap1")
 	limits := params.NewLimits(1, 2)
 	s.topicPool = NewTopicPool(topic, limits, 100*time.Millisecond, 200*time.Millisecond)
-	s.topicPool.period = make(chan time.Duration, 2)
 	s.topicPool.running = 1
+	s.topicPool.sync.Start()
+	s.AssertConsumed(s.topicPool.sync.period, s.topicPool.sync.fastMode, time.Second)
 }
 
 func (s *TopicPoolSuite) TearDown() {
 	s.peer.Stop()
 }
 
-func (s *TopicPoolSuite) AssertConsumed(channel chan time.Duration, expected time.Duration, timeout time.Duration) {
+func (s *TopicPoolSuite) AssertConsumed(channel <-chan time.Duration, expected time.Duration, timeout time.Duration) {
 	select {
 	case received := <-channel:
 		s.Equal(expected, received)
@@ -61,10 +62,10 @@ func (s *TopicPoolSuite) TestSyncSwitches() {
 	testPeer := discv5.NewNode(discv5.NodeID{1}, s.peer.Self().IP, 32311, 32311)
 	s.topicPool.processFoundNode(s.peer, testPeer)
 	s.topicPool.ConfirmAdded(s.peer, discover.NodeID(testPeer.ID))
-	s.AssertConsumed(s.topicPool.period, s.topicPool.slowSync, time.Second)
+	s.AssertConsumed(s.topicPool.sync.period, s.topicPool.sync.slowMode, time.Second)
 	s.NotNil(s.topicPool.connectedPeers[testPeer.ID])
 	s.topicPool.ConfirmDropped(s.peer, discover.NodeID(testPeer.ID))
-	s.AssertConsumed(s.topicPool.period, s.topicPool.fastSync, time.Second)
+	s.AssertConsumed(s.topicPool.sync.period, s.topicPool.sync.fastMode, time.Second)
 }
 
 func (s *TopicPoolSuite) TestNewPeerSelectedOnDrop() {
