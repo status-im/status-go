@@ -70,7 +70,7 @@ func init() {
 	flag.Parse()
 
 	// set up logger
-	if err := logutils.OverrideRootLog(*logLevel, "", true); err != nil {
+	if err := logutils.OverrideRootLog(true, *logLevel, "", true); err != nil {
 		panic(err)
 	}
 
