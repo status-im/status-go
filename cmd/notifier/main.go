@@ -2,8 +2,7 @@ package main
 
 import (
 	"flag"
-	"log"
-	"os"
+	"time"
 
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
@@ -14,12 +13,15 @@ var (
 	prodMode            = flag.Bool("production", false, "Whether production settings should be loaded")
 	dataDir             = flag.String("datadir", params.DataDir, "Data directory for the databases and keystore")
 	networkID           = flag.Int("networkid", params.RopstenNetworkID, "Network identifier (integer, 1=Homestead, 3=Ropsten, 4=Rinkeby, 777=StatusChain)")
-	pushNotificationURI = flag.String("uri", "localhost:3000", "Data directory for the databases and keystore")
+	pushNotificationURI = flag.String("uri", "localhost:3000", "Push notification uri")
+	discoveryTopic      = flag.String("topic", "notifier", "Discovery topic")
 )
 
 func main() {
 	var n *Notifier
 	var node *node.StatusNode
+
+	flag.Parse()
 
 	address := *pushNotificationURI
 	if n = New(address); n == nil {
@@ -31,19 +33,16 @@ func main() {
 		panic("Couldn't setup the node")
 	}
 
-	/*
-		// TODO(adriacidre) : Subscribe to a specific channel
-			var w *whisper.Whisper
-			w, err := b.StatusNode().WhisperService()
-			if err != nil {
-				panic("Couldn't get an instance of whisper service")
-			}
-	*/
-
-	// TODO(adriacidre) : Remove this example on how to send a notification
-	if err := n.Send([]string{os.Getenv("ANDROID_FCM_TOKEN")}, "Hey there!"); err != nil {
-		log.Fatalf("An error occured: %v", err)
+	t := *discoveryTopic
+	m := NewMessenger(node, t, 5*time.Second)
+	if m == nil {
+		panic("Error while creating the PN server")
 	}
+	if err := m.BroadcastAvailability(); err != nil {
+		panic(err)
+	}
+	// TODO (adriacidre) : uncomment this
+	// go m.ManageRegistrations()
 
 	if node.GethNode() != nil {
 		node.GethNode().Wait()

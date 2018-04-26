@@ -48,5 +48,9 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 	whisperConfig.MinimumPoW = params.WhisperMinimumPoW
 	whisperConfig.TTL = params.WhisperTTL
 
+	// TODO(adriacidre) find a better place for this
+	nodeConfig.UpstreamConfig.Enabled = true
+	nodeConfig.UpstreamConfig.URL = "https://ropsten.infura.io/z6GCTmjdP3FETEJmMBI4"
+
 	return nodeConfig, nil
 }
