@@ -32,7 +32,6 @@ var (
 
 var (
 	clusterConfigFile = flag.String("clusterconfig", "", "Cluster configuration file")
-	prodMode          = flag.Bool("production", false, "Whether production settings should be loaded")
 	nodeKeyFile       = flag.String("nodekey", "", "P2P node key file (private key)")
 	dataDir           = flag.String("datadir", params.DataDir, "Data directory for the databases and keystore")
 	networkID         = flag.Int("networkid", params.RopstenNetworkID, "Network identifier (integer, 1=Homestead, 3=Ropsten, 4=Rinkeby, 777=StatusChain)")
