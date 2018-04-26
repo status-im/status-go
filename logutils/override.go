@@ -9,7 +9,20 @@ import (
 
 // OverrideRootLog overrides root logger with file handler, if defined,
 // and log level (defaults to INFO).
-func OverrideRootLog(levelStr, logFile string, terminal bool) error {
+func OverrideRootLog(enabled bool, levelStr string, logFile string, terminal bool) error {
+	if !enabled {
+		disableRootLog()
+		return nil
+	}
+
+	return enableRootLog(levelStr, logFile, terminal)
+}
+
+func disableRootLog() {
+	log.Root().SetHandler(log.DiscardHandler())
+}
+
+func enableRootLog(levelStr string, logFile string, terminal bool) error {
 	var (
 		handler log.Handler
 		err     error

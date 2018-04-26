@@ -41,7 +41,7 @@ func StartNode(configJSON *C.char) *C.char {
 		return makeJSONResponse(err)
 	}
 
-	if err := logutils.OverrideRootLog(config.LogLevel, config.LogFile, false); err != nil {
+	if err := logutils.OverrideRootLog(config.LogEnabled, config.LogLevel, config.LogFile, false); err != nil {
 		return makeJSONResponse(err)
 	}
 

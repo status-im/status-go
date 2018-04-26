@@ -279,6 +279,9 @@ type NodeConfig struct {
 
 	log log.Logger
 
+	// LogEnabled enables the logger
+	LogEnabled bool `json:"LogEnabled"`
+
 	// LogFile is filename where exposed logs get written to
 	LogFile string
 

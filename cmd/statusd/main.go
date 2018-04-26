@@ -102,7 +102,7 @@ func main() {
 		return
 	}
 
-	if err := logutils.OverrideRootLog(config.LogLevel, config.LogFile, true); err != nil {
+	if err := logutils.OverrideRootLog(config.LogEnabled, config.LogLevel, config.LogFile, true); err != nil {
 		stdlog.Fatalf("Error initializing logger: %s", err)
 	}
 
@@ -230,8 +230,13 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 	if *logLevel != "" {
 		nodeConfig.LogLevel = *logLevel
 	}
+
 	if *logFile != "" {
 		nodeConfig.LogFile = *logFile
+	}
+
+	if *logLevel != "" || *logFile != "" {
+		nodeConfig.LogEnabled = true
 	}
 
 	nodeConfig.RPCEnabled = *httpEnabled
