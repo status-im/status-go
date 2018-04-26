@@ -269,8 +269,7 @@ var loadConfigTestCases = []struct {
 		`default cluster configuration (Ropsten Prod)`,
 		`{
 			"NetworkId": 3,
-			"DataDir": "$TMPDIR",
-			"DevMode": false
+			"DataDir": "$TMPDIR"
 		}`,
 		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
 			require.NoError(t, err)
@@ -319,31 +318,6 @@ var loadConfigTestCases = []struct {
 
 			enodes := nodeConfig.ClusterConfig.StaticNodes
 			require.True(t, len(enodes) >= 2)
-		},
-	},
-	{
-		`default DevMode (true)`,
-		`{
-			"NetworkId": 311,
-			"DataDir": "$TMPDIR"
-		}`,
-		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
-			require.NoError(t, err)
-			require.True(t, nodeConfig.DevMode)
-			require.True(t, nodeConfig.ClusterConfig.Enabled)
-		},
-	},
-	{
-		`explicit DevMode = false`,
-		`{
-			"NetworkId": 3,
-			"DataDir": "$TMPDIR",
-			"DevMode": false
-		}`,
-		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
-			require.NoError(t, err)
-			require.False(t, nodeConfig.DevMode)
-			require.True(t, nodeConfig.ClusterConfig.Enabled)
 		},
 	},
 	{
@@ -403,7 +377,7 @@ func TestConfigWriteRead(t *testing.T) {
 	require.Nil(t, err)
 	defer os.RemoveAll(tmpDir) // nolint: errcheck
 
-	nodeConfig, err := params.NewNodeConfig(tmpDir, "", params.RopstenNetworkID, true)
+	nodeConfig, err := params.NewNodeConfig(tmpDir, "", params.RopstenNetworkID)
 	require.Nil(t, err, "cannot create new config object")
 
 	err = nodeConfig.Save()
@@ -411,7 +385,6 @@ func TestConfigWriteRead(t *testing.T) {
 
 	loadedConfigData, err := ioutil.ReadFile(filepath.Join(nodeConfig.DataDir, "config.json"))
 	require.Nil(t, err, "cannot read configuration from disk")
-	require.Contains(t, string(loadedConfigData), fmt.Sprintf(`"DevMode": %t`, true))
 	require.Contains(t, string(loadedConfigData), fmt.Sprintf(`"NetworkId": %d`, params.RopstenNetworkID))
 	require.Contains(t, string(loadedConfigData), fmt.Sprintf(`"DataDir": "%s"`, tmpDir))
 }

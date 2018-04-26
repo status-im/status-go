@@ -59,7 +59,7 @@ func (s *TxQueueTestSuite) SetupTest() {
 	rpcClient, _ := rpc.NewClient(s.client, params.UpstreamRPCConfig{})
 	// expected by simulated backend
 	chainID := gethparams.AllEthashProtocolChanges.ChainId.Uint64()
-	nodeConfig, err := params.NewNodeConfig("/tmp", "", chainID, true)
+	nodeConfig, err := params.NewNodeConfig("/tmp", "", chainID)
 	s.Require().NoError(err)
 	s.nodeConfig = nodeConfig
 
