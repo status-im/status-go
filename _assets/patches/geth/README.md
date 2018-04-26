@@ -27,18 +27,6 @@ Instructions for creating a patch from the command line:
 1. Remove the link from [this README] (./README.md)
 1. Run `make dep-ensure` to re-apply patches.
 
-# Patches
-
-- [`0000-accounts-hd-keys.patch`](./0000-accounts-hd-keys.patch) — adds support for HD extended keys (links/docs?)
-- [`0004-whisper-notifications.patch`](./0004-whisper-notifications.patch) — adds Whisper notifications (need to be reviewed and documented)
-- [`0009-whisper-envelopes-tracing.patch`](./0009-whisper-envelopes-tracing.patch) — adds Whisper envelope tracing (need to be reviewed and documented)
-- [`0010-geth-17-fix-npe-in-filter-system.patch`](./0010-geth-17-fix-npe-in-filter-system.patch) - Temp patch for 1.7.x to fix a NPE in the filter system.
-- [`0014-whisperv6-notifications.patch`](./0014-whisperv6-notifications.patch) — adds Whisper v6 notifications (need to be reviewed and documented)
-- [`0015-whisperv6-envelopes-tracing.patch`](./0015-whisperv6-envelopes-tracing.patch) — adds Whisper v6 envelope tracing (need to be reviewed and documented)
-- [`0018-geth-181-whisperv6-peer-race-cond-fix.patch`](./0018-geth-181-whisperv6-peer-race-cond-fix.patch) — Fixes race condition in Whisper v6. This has been merged upstream and this patch will need to be removed for 1.8.2.
-- [`0019-whisperv6-send-self-messages-without-subscribe.patch`](./0019-whisperv6-send-self-messages-without-subscribe.patch) — Allows user to send own messages without the subscription to it's topic
-
-
 # Updating
 
 When a new stable release of `go-ethereum` comes out, we need to upgrade our vendored copy. We use `dep` for vendoring, so for upgrading:

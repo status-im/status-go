@@ -32,11 +32,6 @@ const (
 	DefaultFastSync = 3 * time.Second
 	// DefaultSlowSync is a recommended value for slow (background) peers search.
 	DefaultSlowSync = 30 * time.Minute
-
-	// Discv5Closed is sent when discv5 is closed
-	Discv5Closed PoolEvent = "discv5.closed"
-	// Discv5Started is sent when discv5 is started
-	Discv5Started PoolEvent = "discv5.started"
 )
 
 // NewPeerPool creates instance of PeerPool
@@ -74,8 +69,6 @@ type PeerPool struct {
 	quit               chan struct{}
 
 	wg sync.WaitGroup
-
-	feed event.Feed
 }
 
 // Start creates topic pool for each topic in config and subscribes to server events.
@@ -94,6 +87,7 @@ func (p *PeerPool) Start(server *p2p.Server) error {
 		}
 		p.topics = append(p.topics, topicPool)
 	}
+	SendDiscoveryStarted() // discovery must be started when pool is started
 
 	events := make(chan *p2p.PeerEvent, 20)
 	p.serverSubscription = server.SubscribeEvents(events)
@@ -117,7 +111,7 @@ func (p *PeerPool) restartDiscovery(server *p2p.Server) error {
 		p.mu.Lock()
 		server.DiscV5 = ntab
 		p.mu.Unlock()
-		p.feed.Send(Discv5Started)
+		SendDiscoveryStarted()
 	}
 	for _, t := range p.topics {
 		if !t.BelowMin() || t.SearchRunning() {
@@ -154,6 +148,7 @@ func (p *PeerPool) handleServerPeers(server *p2p.Server, events <-chan *p2p.Peer
 			case p2p.PeerEventTypeAdd:
 				p.handleAddedEvent(server, event)
 			}
+			SendDiscoverySummary(server.PeersInfo())
 		}
 	}
 }
@@ -169,7 +164,7 @@ func (p *PeerPool) handleAddedEvent(server *p2p.Server, event *p2p.PeerEvent) {
 		log.Debug("closing discv5 connection", "server", server.Self())
 		server.DiscV5.Close()
 		server.DiscV5 = nil
-		p.feed.Send(Discv5Closed)
+		SendDiscoveryStopped()
 	}
 }
 

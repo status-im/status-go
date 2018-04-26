@@ -1,17 +1,17 @@
-diff --git a/node/node.go b/node/node.go
-index b02aecfa..7913e93d 100644
---- a/node/node.go
-+++ b/node/node.go
+diff --git i/node/node.go w/node/node.go
+index 83b6c4c07..fe42b8bbd 100644
+--- i/node/node.go
++++ w/node/node.go
 @@ -51,8 +51,9 @@ type Node struct {
  	serviceFuncs []ServiceConstructor     // Service constructors (in dependency order)
  	services     map[reflect.Type]Service // Currently running services
-
+ 
 -	rpcAPIs       []rpc.API   // List of APIs currently provided by the node
 -	inprocHandler *rpc.Server // In-process RPC request handler to process the API requests
 +	rpcAPIs             []rpc.API   // List of APIs currently provided by the node
 +	inprocHandler       *rpc.Server // In-process RPC request handler to process the API requests
 +	inprocPublicHandler *rpc.Server // In-process RPC request handler to process the public API requests
-
+ 
  	ipcEndpoint string       // IPC endpoint to listen at (empty = IPC disabled)
  	ipcListener net.Listener // IPC RPC listener socket to serve API requests
 @@ -259,18 +260,25 @@ func (n *Node) startRPC(services map[reflect.Type]Service) error {
@@ -43,7 +43,7 @@ index b02aecfa..7913e93d 100644
 @@ -301,6 +309,36 @@ func (n *Node) stopInProc() {
  	}
  }
-
+ 
 +// startPublicInProc initializes an in-process RPC endpoint for public APIs.
 +func (n *Node) startPublicInProc(apis []rpc.API, modules []string) error {
 +	// Generate the whitelist based on the allowed modules
@@ -76,11 +76,11 @@ index b02aecfa..7913e93d 100644
 +
  // startIPC initializes and starts the IPC RPC endpoint.
  func (n *Node) startIPC(apis []rpc.API) error {
- 	// Short circuit if the IPC endpoint isn't being exposed
-@@ -562,6 +600,18 @@ func (n *Node) Attach() (*rpc.Client, error) {
+ 	if n.ipcEndpoint == "" {
+@@ -487,6 +525,18 @@ func (n *Node) Attach() (*rpc.Client, error) {
  	return rpc.DialInProc(n.inprocHandler), nil
  }
-
+ 
 +// AttachPublic creates an RPC client attached to an in-process Public API handler.
 +func (n *Node) AttachPublic() (*rpc.Client, error) {
 +	n.lock.RLock()

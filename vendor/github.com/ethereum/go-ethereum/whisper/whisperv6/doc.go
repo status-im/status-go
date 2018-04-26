@@ -60,7 +60,7 @@ const (
 	aesKeyLength    = 32 // in bytes
 	aesNonceLength  = 12 // in bytes; for more info please see cipher.gcmStandardNonceSize & aesgcm.NonceSize()
 	keyIDSize       = 32 // in bytes
-	bloomFilterSize = 64 // in bytes
+	BloomFilterSize = 64 // in bytes
 	flagsLength     = 1
 
 	EnvelopeHeaderLength = 20
@@ -104,9 +104,6 @@ const (
 	peerSource envelopeSource = iota
 	// p2pSource indicates that envelop was received from a trusted peer.
 	p2pSource
-
-	forwarded = true
-	inHouse = false
 )
 
 // EnvelopeMeta keeps metadata of received envelopes.

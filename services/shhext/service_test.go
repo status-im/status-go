@@ -1,7 +1,9 @@
 package shhext
 
 import (
+	"context"
 	"fmt"
+	"math"
 	"testing"
 	"time"
 
@@ -124,6 +126,102 @@ func (s *ShhExtSuite) TestWaitMessageExpired() {
 	case <-time.After(2 * time.Second):
 		s.Fail("timed out while waiting for confirmation")
 	}
+}
+
+func (s *ShhExtSuite) TestRequestMessagesDefaults() {
+	r := MessagesRequest{}
+	r.setDefaults()
+	s.NotZero(r.From)
+	s.InEpsilon(uint32(time.Now().UTC().Unix()), r.To, 1.0)
+}
+
+func (s *ShhExtSuite) TestRequestMessages() {
+	var err error
+
+	shh := whisper.New(nil)
+	aNode, err := node.New(&node.Config{
+		P2P: p2p.Config{
+			MaxPeers:    math.MaxInt32,
+			NoDiscovery: true,
+		},
+	}) // in-memory node as no data dir
+	s.NoError(err)
+	err = aNode.Register(func(_ *node.ServiceContext) (node.Service, error) {
+		return shh, nil
+	})
+	s.NoError(err)
+
+	err = aNode.Start()
+	s.NoError(err)
+	defer func() {
+		err := aNode.Stop()
+		s.NoError(err)
+	}()
+
+	mock := newHandlerMock(1)
+	service := New(shh, mock)
+	api := NewPublicAPI(service)
+
+	const (
+		mailServerPeer = "enode://b7e65e1bedc2499ee6cbd806945af5e7df0e59e4070c96821570bd581473eade24a489f5ec95d060c0db118c879403ab88d827d3766978f28708989d35474f87@[::]:51920"
+	)
+
+	var result bool
+
+	// invalid MailServer enode address
+	result, err = api.RequestMessages(context.TODO(), MessagesRequest{MailServerPeer: "invalid-address"})
+	s.False(result)
+	s.EqualError(err, "invalid mailServerPeer value: invalid URL scheme, want \"enode\"")
+
+	// non-existent symmetric key
+	result, err = api.RequestMessages(context.TODO(), MessagesRequest{
+		MailServerPeer: mailServerPeer,
+	})
+	s.False(result)
+	s.EqualError(err, "invalid symKeyID value: non-existent key ID")
+
+	// with a symmetric key
+	symKeyID, symKeyErr := shh.AddSymKeyFromPassword("some-pass")
+	s.NoError(symKeyErr)
+	result, err = api.RequestMessages(context.TODO(), MessagesRequest{
+		MailServerPeer: mailServerPeer,
+		SymKeyID:       symKeyID,
+	})
+	s.Contains(err.Error(), "Could not find peer with ID")
+	s.False(result)
+
+	// with a peer acting as a mailserver
+	// prepare a node first
+	mailNode, err := node.New(&node.Config{
+		P2P: p2p.Config{
+			MaxPeers:    math.MaxInt32,
+			NoDiscovery: true,
+			ListenAddr:  ":0",
+		},
+	}) // in-memory node as no data dir
+	s.NoError(err)
+	err = mailNode.Register(func(_ *node.ServiceContext) (node.Service, error) {
+		return whisper.New(nil), nil
+	})
+	s.NoError(err)
+	err = mailNode.Start()
+	s.NoError(err)
+	defer func() {
+		err := mailNode.Stop()
+		s.NoError(err)
+	}()
+
+	// add mailPeer as a peer
+	aNode.Server().AddPeer(mailNode.Server().Self())
+	time.Sleep(time.Second) // wait for the peer to be added
+
+	// send a request
+	result, err = api.RequestMessages(context.TODO(), MessagesRequest{
+		MailServerPeer: mailNode.Server().Self().String(),
+		SymKeyID:       symKeyID,
+	})
+	s.NoError(err)
+	s.True(result)
 }
 
 func (s *ShhExtSuite) TearDown() {
