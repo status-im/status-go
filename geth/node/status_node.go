@@ -117,13 +117,9 @@ func (n *StatusNode) Start(config *params.NodeConfig, services ...node.ServiceCo
 	if n.config.Discovery {
 		return n.startPeerPool()
 	}
-	n.timeManager = timeskew.NewDefaultTimeSource()
-	n.timeManager.Start()
-	w, err := n.WhisperService()
-	if err != nil {
-		return err
+	if n.config.WhisperConfig != nil && n.config.WhisperConfig.Enabled {
+		return n.setupWhisper()
 	}
-	w.SetTimeSource(n.timeManager.Now)
 	return nil
 }
 
@@ -155,6 +151,19 @@ func (n *StatusNode) start(services []node.ServiceConstructor) error {
 	}
 
 	return n.gethNode.Start()
+}
+
+func (n *StatusNode) setupWhisper() error {
+	var w *whisper.Whisper
+	err := n.gethService(&w)
+	if err != nil {
+		return err
+	}
+	log.Debug("Using time skew manager as a source of time in whisper.")
+	n.timeManager = timeskew.NewDefaultTimeSource()
+	n.timeManager.Start()
+	w.SetTimeSource(n.timeManager.Now)
+	return nil
 }
 
 func (n *StatusNode) setupRPCClient() (err error) {
@@ -214,7 +223,11 @@ func (n *StatusNode) stop() error {
 	n.register = nil
 	n.peerPool = nil
 
-	n.timeManager.Stop() // no need to nullify it
+	if n.config.WhisperConfig != nil && n.config.WhisperConfig.Enabled {
+		log.Debug("Stopping time skew manager")
+		n.timeManager.Stop()
+		n.timeManager = nil
+	}
 	if err := n.gethNode.Stop(); err != nil {
 		return err
 	}

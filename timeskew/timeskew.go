@@ -79,7 +79,9 @@ func (s *TimeSource) updateOffset() {
 	offset, err := computeOffset(s.queryMethod, s.server, s.attempts)
 	if err != nil {
 		log.Error("failed to compute offset", "error", err)
+		return
 	}
+	log.Info("Difference with ntp servers", "offset", offset)
 	s.mu.Lock()
 	s.latestOffset = offset
 	s.mu.Unlock()
@@ -107,6 +109,9 @@ func (s *TimeSource) Start() {
 
 // Stop goroutine that updates time source.
 func (s *TimeSource) Stop() {
+	if s.quit == nil {
+		return
+	}
 	close(s.quit)
 	s.wg.Wait()
 }
