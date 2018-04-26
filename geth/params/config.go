@@ -213,12 +213,6 @@ type UpstreamRPCConfig struct {
 
 // NodeConfig stores configuration options for a node
 type NodeConfig struct {
-	// DevMode is true when given configuration is to be used during development.
-	// For production, this flag should be turned off, so that more strict requirements
-	// are applied to node's configuration
-	// DEPRECATED.
-	DevMode bool
-
 	// NetworkID sets network to use for selecting peers to connect to
 	NetworkID uint64 `json:"NetworkId" validate:"required"`
 
@@ -312,9 +306,8 @@ type NodeConfig struct {
 }
 
 // NewNodeConfig creates new node configuration object
-func NewNodeConfig(dataDir string, clstrCfgFile string, networkID uint64, devMode bool) (*NodeConfig, error) {
+func NewNodeConfig(dataDir string, clstrCfgFile string, networkID uint64) (*NodeConfig, error) {
 	nodeConfig := &NodeConfig{
-		DevMode:           devMode,
 		NetworkID:         networkID,
 		DataDir:           dataDir,
 		Name:              ClientIdentifier,
@@ -377,7 +370,7 @@ func LoadNodeConfig(configJSON string) (*NodeConfig, error) {
 }
 
 func loadNodeConfig(configJSON string) (*NodeConfig, error) {
-	nodeConfig, err := NewNodeConfig("", "", 0, true)
+	nodeConfig, err := NewNodeConfig("", "", 0)
 	if err != nil {
 		return nil, err
 	}

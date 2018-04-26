@@ -214,8 +214,7 @@ func startCollectingStats(interruptCh <-chan struct{}, statusNode *node.StatusNo
 
 // makeNodeConfig parses incoming CLI options and returns node configuration object
 func makeNodeConfig() (*params.NodeConfig, error) {
-	devMode := !*prodMode
-	nodeConfig, err := params.NewNodeConfig(*dataDir, *clusterConfigFile, uint64(*networkID), devMode)
+	nodeConfig, err := params.NewNodeConfig(*dataDir, *clusterConfigFile, uint64(*networkID))
 	if err != nil {
 		return nil, err
 	}
