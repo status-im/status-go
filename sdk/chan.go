@@ -17,10 +17,7 @@ type Channel struct {
 
 // Publish : Publishes a message with the given body on the current channel
 func (c *Channel) Publish(body string) error {
-	cfg, err := c.conn.statusNode.Config()
-	if err != nil {
-		return err
-	}
+	cfg := c.conn.statusNode.Config()
 
 	message := NewMsg(c.conn.userName, body, c.channelName)
 	cmd := fmt.Sprintf(standardMessageFormat,
