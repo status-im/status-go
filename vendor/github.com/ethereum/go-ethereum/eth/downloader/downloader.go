@@ -230,7 +230,6 @@ func New(mode SyncMode, stateDb ethdb.Database, mux *event.TypeMux, chain BlockC
 		},
 		trackStateReq: make(chan *stateReq),
 	}
-	dl.downloads.Add(1) // Add a sentinel value to avoid waiting with zero count and getting a race condition signaled when terminating Downloader before starting sync
 	go dl.qosTuner()
 	go dl.stateFetcher()
 	return dl
@@ -476,12 +475,17 @@ func (d *Downloader) syncWithPeer(p *peerConnection, hash common.Hash, td *big.I
 	} else if d.mode == FullSync {
 		fetchers = append(fetchers, d.processFullSyncContent)
 	}
-	return d.spawnSync(fetchers)
+	return d.spawnSync(errCancelHeaderFetch, fetchers)
 }
 
 // spawnSync runs d.process and all given fetcher functions to completion in
 // separate goroutines, returning the first error that appears.
-func (d *Downloader) spawnSync(fetchers []func() error) error {
+func (d *Downloader) spawnSync(errCancel error, fetchers []func() error) error {
+	select {
+	case <-d.cancelCh:
+		return errCancel
+	default:
+	}
 	errc := make(chan error, len(fetchers))
 	d.cancelWg.Add(len(fetchers))
 	for _, fn := range fetchers {
@@ -544,9 +548,6 @@ func (d *Downloader) Terminate() {
 
 	// Cancel any pending download requests
 	d.Cancel()
-
-	// Remove sentinel value from WaitGroup before calling Wait()
-	go func() { d.downloads.Done() }()
 
 	// Wait, so external dependencies aren't destroyed
 	// until the download processing is done.
