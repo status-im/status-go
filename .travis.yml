@@ -16,10 +16,10 @@ jobs:
     script:
       - make lint
       - make vendor-check
-  - stage: Test unit and integration
-    script: make test-unit-coverage
-  - stage: Test e2e on private network
-    script: make test-e2e
+  - stage: Test unit, integration and e2e on private network
+    script:
+      - make test-unit-coverage
+      - make test-e2e
   - stage: Test e2e on public network
     # Disable running this stage for pushes as it's not needed to run it twice.
     # We only want to check if tests on public testnet pass in a merge build.
