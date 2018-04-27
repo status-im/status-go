@@ -9,18 +9,33 @@ install:
 - make mock-install
 - make lint-install
 - make dep-install
-jobs:
+matrix:
   include:
-  - stage: Lint & Vendor Check
+  - os: linux
     sudo: required
+    env:
+      - lint
     script:
       - make lint
+  - os: linux
+    sudo: required
+    env:
+      - vendor-check
+    script:
       - make vendor-check
-  - stage: Test unit and integration
-    script: make test-unit-coverage
-  - stage: Test e2e on private network
-    script: make test-e2e
-  - stage: Test e2e on public network
+  - os: linux
+    env:
+      - test-unit-coverage
+    script:
+      - make test-unit-coverage
+  - os: linux
+    env:
+      - test-e2e
+    script:
+      - make test-e2e
+  - os: linux
+    env:
+      - make test-e2e networkid=4
     # Disable running this stage for pushes as it's not needed to run it twice.
     # We only want to check if tests on public testnet pass in a merge build.
     # Also, disable for fork builds as they do not have access to
