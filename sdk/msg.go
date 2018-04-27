@@ -24,7 +24,7 @@ func NewMsg(from, text, channel string) *Msg {
 		From:        from,
 		Text:        text,
 		ChannelName: channel,
-		Timestamp:   time.Now().Unix(),
+		Timestamp:   time.Now().Unix() * 1000,
 	}
 }
 
