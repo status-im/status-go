@@ -275,7 +275,6 @@ func TestPeerPoolDiscV5Timeout(t *testing.T) {
 	require.Equal(t, DiscoveryStarted, <-signals)
 	require.NotNil(t, server.DiscV5)
 	pool.events <- &p2p.PeerEvent{Type: p2p.PeerEventTypeDrop} // required to turn the loop and pick up new timeout
-	require.Equal(t, DiscoverySummary, <-signals)
 	select {
 	case sig := <-signals:
 		require.Equal(t, DiscoveryStopped, sig)
