@@ -232,7 +232,12 @@ func TestPeerPoolDiscV5Timeout(t *testing.T) {
 		// it won't ever block, for example, if two events were expected
 		// but received more.
 		// In this case, a strange PeerEventTypeDrop event was emitted.
-		go func() { signals <- envelope.Type }()
+		go func() {
+			switch typ := envelope.Type; typ {
+			case DiscoveryStarted, DiscoveryStopped:
+				signals <- envelope.Type
+			}
+		}()
 	})
 	defer signal.ResetDefaultNodeNotificationHandler()
 
