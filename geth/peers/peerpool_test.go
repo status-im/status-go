@@ -223,9 +223,15 @@ func TestPeerPoolDiscV5Timeout(t *testing.T) {
 	signals := make(chan string)
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var envelope struct {
-			Type string
+			Type  string
+			Event json.RawMessage
 		}
 		require.NoError(t, json.Unmarshal([]byte(jsonEvent), &envelope))
+		// Send signal asynchronously to avoid blocking.
+		// It's better than sending to a buffered channel because
+		// it won't ever block, for example, if two events were expected
+		// but received more.
+		// In this case, a strange PeerEventTypeDrop event was emitted.
 		go func() { signals <- envelope.Type }()
 	})
 	defer signal.ResetDefaultNodeNotificationHandler()

@@ -202,6 +202,8 @@ func (p *PeerPool) handleServerPeers(server *p2p.Server, events <-chan *p2p.Peer
 					log.Debug("closing discv5 connection because all topics reached max limit", "server", server.Self())
 					p.stopDiscovery(server)
 				}
+			default: // skip other events
+				continue
 			}
 			SendDiscoverySummary(server.PeersInfo())
 		}
