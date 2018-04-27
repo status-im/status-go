@@ -2,27 +2,12 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"log"
 	"time"
 
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/messenger"
 )
-
-const (
-	// defaultWorkTime is a work time reported in messages sent to MailServer nodes.
-	defaultWorkTime = 5
-)
-
-var (
-	// ErrInvalidSymKeyID is returned when it fails to get a symmetric key.
-	ErrInvalidSymKeyID = errors.New("invalid symKeyID value")
-)
-
-type BroadcastMsg struct {
-	PubKey string `json:"pubkey"`
-}
 
 // RegistrationRequestMsg : peers wanting to use this notification server will
 // send anonymous whisper messages with the device registration token, and
@@ -35,7 +20,6 @@ type RegistrationRequestMsg struct {
 
 // Messenger : whisper interface for the notifier
 type Messenger struct {
-	symKey         []byte
 	discoveryTopic string
 	pollInterval   time.Duration
 	addressKey     string
@@ -91,8 +75,10 @@ func (m *Messenger) BroadcastAvailability() error {
 func (m *Messenger) ManageRegistrations() {
 	log.Println("Subscribed to discovery topic :", m.discoveryTopic)
 	filterID, _, _ := m.client.JoinPublicChannel(m.discoveryTopic)
-	m.client.Subscribe(filterID, func(msg *messenger.Msg) {
-		m.processRegistration(msg.Text)
+	m.client.Subscribe([]string{filterID}, func(msg *messenger.Msg) {
+		if err := m.processRegistration(msg.Text); err != nil {
+			log.Println("Error processing registration : " + err.Error())
+		}
 	})
 }
 
@@ -102,7 +88,7 @@ func (m *Messenger) processRegistration(r string) error {
 	log.Println("Processing registration")
 	var req RegistrationRequestMsg
 
-	if err := json.Unmarshal([]byte(r), req); err != nil {
+	if err := json.Unmarshal([]byte(r), &req); err != nil {
 		return err
 	}
 	go m.subscribeSecureChannel(req)
@@ -114,8 +100,10 @@ func (m *Messenger) subscribeSecureChannel(registration RegistrationRequestMsg) 
 	log.Println("Subscribed to secure channel", registration.SecureChannel)
 	// TODO (adriacidre) : this is likely to not work as its not a public channel
 	filterID, _, _ := m.client.JoinPublicChannel(m.discoveryTopic)
-	m.client.Subscribe(filterID, func(msg *messenger.Msg) {
-		m.notify(registration.DeviceRegistrationToken, msg.Text)
+	m.client.Subscribe([]string{filterID}, func(msg *messenger.Msg) {
+		if err := m.notify(registration.DeviceRegistrationToken, msg.Text); err != nil {
+			log.Println("Error notifying over a secure channel : " + err.Error())
+		}
 	})
 }
 
@@ -123,9 +111,6 @@ func (m *Messenger) notify(deviceToken, data string) error {
 	log.Println("Processing notification")
 	// TODO (adriacidre) we should link here development from @PombeirP
 	var req NotificationRequestMsg
-	if err := json.Unmarshal([]byte(data), req); err != nil {
-		return err
-	}
 
-	return nil
+	return json.Unmarshal([]byte(data), &req)
 }

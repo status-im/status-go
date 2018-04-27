@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"log"
 	"time"
 
 	"github.com/status-im/status-go/geth/node"
@@ -27,7 +28,11 @@ func main() {
 	if n = New(address); n == nil {
 		panic("Couldn't connect to push notification server on " + address)
 	}
-	defer n.Close()
+	defer func() {
+		if err := n.Close(); err != nil {
+			log.Println("Error closing connection : " + err.Error())
+		}
+	}()
 
 	if node = statusNode(); node == nil {
 		panic("Couldn't setup the node")

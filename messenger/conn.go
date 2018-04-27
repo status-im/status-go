@@ -26,10 +26,12 @@ var (
 	seenMsg                    = `["~#c5",["%s","%s"]]`
 )
 
+// Messenger : interface to manage status communications throygh whisper
 type Messenger struct {
 	sn *node.StatusNode
 }
 
+// New : Messenger constructor
 func New(sn *node.StatusNode) *Messenger {
 	return &Messenger{sn: sn}
 }
@@ -75,7 +77,11 @@ func (c *Messenger) Login(addr, password string) (string, error) {
 // JoinPublicChannel joins a public channel
 func (c *Messenger) JoinPublicChannel(channelName string) (string, string, string) {
 	cmd := fmt.Sprintf(generateSymKeyFromPasswordFormat, channelName)
-	f := unmarshalJSON(c.sn.RPCClient().CallRaw(cmd))
+	f, err := unmarshalJSON(c.sn.RPCClient().CallRaw(cmd))
+	if err != nil {
+		// TODO (adriacidre) return this error
+		return "", "", ""
+	}
 
 	key := f.(map[string]interface{})["result"].(string)
 	id := int(f.(map[string]interface{})["id"].(float64))
@@ -84,14 +90,22 @@ func (c *Messenger) JoinPublicChannel(channelName string) (string, string, strin
 	p := "0x" + hex.EncodeToString(src)
 
 	cmd = fmt.Sprintf(web3ShaFormat, p, id)
-	f1 := unmarshalJSON(c.sn.RPCClient().CallRaw(cmd))
+	f1, err := unmarshalJSON(c.sn.RPCClient().CallRaw(cmd))
+	if err != nil {
+		// TODO (adriacidre) return this error
+		return "", "", ""
+	}
 	topic := f1.(map[string]interface{})["result"].(string)
 	topic = topic[0:10]
 
 	cmd = fmt.Sprintf(newMessageFilterFormat, topic, key)
 	res := c.sn.RPCClient().CallRaw(cmd)
-	f3 := unmarshalJSON(res)
+	f3, err := unmarshalJSON(res)
 	filterID := f3.(map[string]interface{})["result"].(string)
+	if err != nil {
+		// TODO (adriacidre) return this error
+		return "", "", ""
+	}
 
 	return filterID, topic, key
 }
@@ -113,20 +127,19 @@ func (c *Messenger) Publish(addressKeyID, chName, chKey, chTopic, body, username
 	return nil
 }
 
-// Subscribe : subscribes to a specific whisper bloom filter and executes the
-// given logic for each matching message
-func (c *Messenger) Subscribe(filterID string, fn MsgHandler) *Subscription {
-	s := Subscription{
-		sn: c.sn,
-	}
-	go s.Subscribe(filterID, fn)
-	return &s
+// Subscribe : subscribes to the given whisper filters and executes the
+// given logic for each supported matching message
+func (c *Messenger) Subscribe(filters []string, fn MsgHandler) *Subscription {
+	// TODO (adriacidre) store and allow subsrcription management
+	s := NewSubscription(c.sn, filters, fn)
+	go s.Subscribe()
+
+	return s
 }
 
-func unmarshalJSON(j string) interface{} {
+func unmarshalJSON(j string) (interface{}, error) {
 	var v interface{}
-	json.Unmarshal([]byte(j), &v)
-	return v
+	return v, json.Unmarshal([]byte(j), &v)
 }
 
 // NewContactKeyRequest : First message that is sent to a future contact. At that

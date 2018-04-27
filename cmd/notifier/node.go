@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	stdlog "log"
 
 	"github.com/ethereum/go-ethereum/log"
@@ -20,7 +21,12 @@ func statusNode() *node.StatusNode {
 	var logger = log.New("package", "status-go/cmd/statusd")
 
 	backend := api.NewStatusBackend()
-	err = backend.StartNode(config)
+	cfg, err := loadNodeConfig(config)
+	if err != nil {
+		logger.Error("Node start failed", "error", err)
+		return nil
+	}
+	err = backend.StartNode(cfg)
 	if err != nil {
 		logger.Error("Node start failed", "error", err)
 		return nil
@@ -48,9 +54,18 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 	whisperConfig.MinimumPoW = params.WhisperMinimumPoW
 	whisperConfig.TTL = params.WhisperTTL
 
-	// TODO(adriacidre) find a better place for this
-	nodeConfig.UpstreamConfig.Enabled = true
-	nodeConfig.UpstreamConfig.URL = "https://ropsten.infura.io/z6GCTmjdP3FETEJmMBI4"
+	// TODO(adriacidre) remove this as shouldn't be needed since introduction of loadNodeConfig
+	// nodeConfig.UpstreamConfig.Enabled = true
+	// nodeConfig.UpstreamConfig.URL = "https://ropsten.infura.io/z6GCTmjdP3FETEJmMBI4"
 
 	return nodeConfig, nil
+}
+
+func loadNodeConfig(config *params.NodeConfig) (*params.NodeConfig, error) {
+	cfg, err := json.Marshal(config)
+	if err != nil {
+		return nil, err
+	}
+
+	return params.LoadNodeConfig(string(cfg))
 }

@@ -26,7 +26,7 @@ func New(address string) *Notifier {
 
 	c := proto.NewGorushClient(conn)
 
-	return &Notifier{conn: conn, c: c}
+	return &Notifier{conn: conn, c: c, address: address}
 }
 
 // Send : Sends a push notification to given devices
@@ -42,6 +42,6 @@ func (n *Notifier) Send(tokens []string, message string) error {
 }
 
 // Close the current connection
-func (n *Notifier) Close() {
-	n.conn.Close()
+func (n *Notifier) Close() error {
+	return n.conn.Close()
 }

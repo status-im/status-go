@@ -1,32 +1,50 @@
 package messenger
 
 import (
-	"crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"io"
 	"time"
+
+	"github.com/ethereum/go-ethereum/crypto/sha3"
 )
+
+// supportedMessage : check if the message type is supported
+func supportedMessage(msgType string) bool {
+	_, ok := map[string]string{
+		"~#c1": "newContactKeyPrefix",
+		"~#c2": "contactRequestPrefix",
+		"~#c3": "confirmedContactRequestPrefix",
+		"~#c4": "standardMessagePrefix",
+		"~#c5": "seenPrefix",
+		"~#c6": "contactUpdatePrefix",
+	}[msgType]
+
+	return ok
+}
 
 // Msg is a structure used by Subscribers and Publish().
 type Msg struct {
-	ID          string `json:"id"`
 	From        string `json:"from"`
 	Text        string `json:"text"`
 	ChannelName string `json:"channel"`
 	Timestamp   int64  `json:"ts"`
 	Raw         string `json:"-"`
+	Type        string `json:"-"`
 }
 
 // NewMsg : Creates a new Msg with a generated UUID
 func NewMsg(from, text, channel string) *Msg {
 	return &Msg{
-		ID:          newUUID(),
 		From:        from,
 		Text:        text,
 		ChannelName: channel,
 		Timestamp:   time.Now().Unix(),
 	}
+}
+
+// ID : get the message id
+func (m *Msg) ID() string {
+	return fmt.Sprintf("%X", sha3.Sum256([]byte(m.Raw)))
 }
 
 // ToPayload  converts current struct to a valid payload
@@ -38,20 +56,6 @@ func (m *Msg) ToPayload() string {
 	println(message)
 
 	return rawrChatMessage(message)
-}
-
-// newUUID generates a random UUID according to RFC 4122
-func newUUID() string {
-	uuid := make([]byte, 16)
-	n, err := io.ReadFull(rand.Reader, uuid)
-	if n != len(uuid) || err != nil {
-		panic(err)
-	}
-	// variant bits; see section 4.1.1
-	uuid[8] = uuid[8]&^0xc0 | 0x80
-	// version 4 (pseudo-random); see section 4.1.3
-	uuid[6] = uuid[6]&^0xf0 | 0x40
-	return fmt.Sprintf("%x-%x-%x-%x-%x", uuid[0:4], uuid[4:6], uuid[6:8], uuid[8:10], uuid[10:])
 }
 
 func rawrChatMessage(raw string) string {

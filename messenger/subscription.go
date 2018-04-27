@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/status-im/status-go/geth/node"
@@ -14,75 +15,103 @@ import (
 // asynchronous subscribers.
 type MsgHandler func(msg *Msg)
 
-var (
-	newContactKeyPrefix           = "~#c1"
-	contactRequestPrefix          = "~#c2"
-	confirmedContactRequestPrefix = "~#c3"
-	messagePrefix                 = "~#c4"
-	seenPrefix                    = "~#c5"
-	contactUpdatePrefix           = "~#c6"
-)
-
+// Subscription : allows you manage subscriptions to a specific topic
 type Subscription struct {
+	filters     []string
+	handler     MsgHandler
 	sn          *node.StatusNode
 	unsubscribe chan bool
 }
 
-func (s *Subscription) Subscribe(filterID string, fn MsgHandler) {
+// NewSubscription : creates a new subsription object
+func NewSubscription(sn *node.StatusNode, filters []string, handler MsgHandler) *Subscription {
+	return &Subscription{
+		sn:      sn,
+		filters: filters,
+		handler: handler,
+	}
+}
+
+// Subscribe : Listens to a specific topic and executes the given function for
+// each message
+func (s *Subscription) Subscribe() {
 	s.unsubscribe = make(chan bool)
 	for {
 		select {
 		case <-s.unsubscribe:
 			return
 		default:
-			cmd := fmt.Sprintf(getFilterMessagesFormat, filterID)
-			response := s.sn.RPCClient().CallRaw(cmd)
-			f := unmarshalJSON(response)
-			v := f.(map[string]interface{})["result"]
-			switch vv := v.(type) {
+			switch messages := s.pollMessagesResult().(type) {
 			case []interface{}:
-				for _, u := range vv {
-					payload := u.(map[string]interface{})["payload"]
-					message, err := MessageFromPayload(payload.(string))
-					if err != nil {
-						log.Println(err)
-					} else {
-						fn(message)
-					}
-				}
+				s.handleMessageList(messages)
 			default:
-				log.Println(v, "is of a type I don't know how to handle")
+				log.Println("unsupported message format")
 			}
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
 }
 
+// Unsubscribe : stop polling on this Subscription topic
 func (s *Subscription) Unsubscribe() {
 	s.unsubscribe <- true
 }
 
-// MessageFromPayload : TODO ...
-func MessageFromPayload(payload string) (*Msg, error) {
-	message, err := unrawrChatMessage(payload)
+func (s *Subscription) pollMessagesResult() interface{} {
+	filters := strings.Join(s.filters, ",")
+	cmd := fmt.Sprintf(getFilterMessagesFormat, filters)
+
+	response := s.sn.RPCClient().CallRaw(cmd)
+	f, err := unmarshalJSON(response)
+	if err != nil {
+		// TODO (adriacidre) return this error
+		return nil
+	}
+
+	return f.(map[string]interface{})["result"]
+}
+
+func (s *Subscription) handleMessageList(messages []interface{}) {
+	for _, message := range messages {
+		payload := message.(map[string]interface{})["payload"]
+		message, err := messageFromPayload(payload.(string))
+		if err != nil {
+			log.Println(err)
+		} else {
+			s.handler(message)
+		}
+	}
+}
+
+// messageFromPayload : builds a valid Msg from the given payload
+func messageFromPayload(payload string) (*Msg, error) {
+	var msg []interface{}
+
+	rawMsg, err := unrawrChatMessage(payload)
 	if err != nil {
 		return nil, err
 	}
-	var x []interface{}
-	json.Unmarshal([]byte(message), &x)
-	if len(x) < 1 {
+
+	if err = json.Unmarshal(rawMsg, &msg); err != nil {
+		return nil, err
+	}
+
+	if len(msg) < 1 {
+		return nil, errors.New("unknown message format")
+	}
+
+	msgType := msg[0].(string)
+	if !supportedMessage(msgType) {
 		return nil, errors.New("unsupported message type")
 	}
-	// TODO (adriacidre) add support for other message types
-	if x[0].(string) != messagePrefix {
-		return nil, errors.New("unsupported message type")
-	}
-	properties := x[1].([]interface{})
+
+	properties := msg[1].([]interface{})
 
 	return &Msg{
+		Type:      msg[0].(string),
 		From:      "TODO : someone",
 		Text:      properties[0].(string),
 		Timestamp: int64(properties[3].(float64)),
-		Raw:       string(message),
+		Raw:       string(rawMsg),
 	}, nil
 }
