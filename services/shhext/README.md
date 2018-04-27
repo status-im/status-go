@@ -12,6 +12,24 @@ Accepts same input as shh_post (see https://github.com/ethereum/wiki/wiki/JSON-R
 
 `DATA`, 32 Bytes - the envelope hash
 
+#### shhext_requestMessages
+
+Sends a request for historic messages to a mail server.
+
+##### Parameters
+
+1. `Object` - The message request object:
+
+- `mailServerPeer`:`URL` - Mail servers' enode addess
+- `from`:`QUANTITY` - (optional) Lower bound of time range as unix timestamp, default is 24 hours back from now
+- `to`:`QUANTITY`- (optional) Upper bound of time range as unix timestamp, default is now
+- `topic`:`DATA`, 4 Bytes - Regular whisper topic
+- `symKeyID`:`DATA`- ID of a symmetric key to authenticate to mail server, derived form mail server password
+
+##### Returns
+
+`Boolean` - returns `true` if the request was send, otherwise `false`.
+
 Signals
 -------
 
