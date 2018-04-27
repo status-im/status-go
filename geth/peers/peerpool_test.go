@@ -220,13 +220,13 @@ func TestPeerPoolMaxPeersOverflow(t *testing.T) {
 }
 
 func TestPeerPoolDiscV5Timeout(t *testing.T) {
-	signals := make(chan string, 1)
+	signals := make(chan string)
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var envelope struct {
 			Type string
 		}
 		require.NoError(t, json.Unmarshal([]byte(jsonEvent), &envelope))
-		signals <- envelope.Type
+		go func() { signals <- envelope.Type }()
 	})
 	defer signal.ResetDefaultNodeNotificationHandler()
 
