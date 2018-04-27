@@ -253,12 +253,7 @@ func (msg *sentMessage) Wrap(options *MessageParams) (envelope *Envelope, err er
 	if err != nil {
 		return nil, err
 	}
-
-	envelope = NewEnvelope(options.TTL, options.Topic, msg)
-	if err = envelope.Seal(options); err != nil {
-		return nil, err
-	}
-	return envelope, nil
+	return NewEnvelope(options.TTL, options.Topic, msg), nil
 }
 
 // decryptSymmetric decrypts a message with a topic key, using AES-GCM-256.

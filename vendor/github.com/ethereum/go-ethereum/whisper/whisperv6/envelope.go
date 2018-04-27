@@ -64,11 +64,10 @@ func (e *Envelope) rlpWithoutNonce() []byte {
 // included into an envelope for network forwarding.
 func NewEnvelope(ttl uint32, topic TopicType, msg *sentMessage) *Envelope {
 	env := Envelope{
-		Expiry: uint32(time.Now().Add(time.Second * time.Duration(ttl)).Unix()),
-		TTL:    ttl,
-		Topic:  topic,
-		Data:   msg.Raw,
-		Nonce:  0,
+		TTL:   ttl,
+		Topic: topic,
+		Data:  msg.Raw,
+		Nonce: 0,
 	}
 
 	return &env

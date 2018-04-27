@@ -289,6 +289,10 @@ func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (hexutil.
 	if err != nil {
 		return nil, err
 	}
+	env.Expiry = uint32(api.w.GetCurrentTime().Add(time.Second * time.Duration(params.TTL)).Unix())
+	if err := env.Seal(params); err != nil {
+		return nil, err
+	}
 
 	// send to specific node (skip PoW check)
 	if len(req.TargetPeer) > 0 {

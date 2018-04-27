@@ -223,6 +223,11 @@ func (whisper *Whisper) SetTimeSource(timeSource func() time.Time) {
 	whisper.timeSource = timeSource
 }
 
+// GetCurrentTime returns current time.
+func (whisper *Whisper) GetCurrentTime() time.Time {
+	return whisper.timeSource()
+}
+
 // RegisterServer registers MailServer interface.
 // MailServer will process all the incoming messages with p2pRequestCode.
 func (whisper *Whisper) RegisterServer(server MailServer) {
