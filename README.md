@@ -47,6 +47,10 @@ Run
 adb shell tail -f sdcard/Download/geth.log
 ```
 
+## IDE Debugging
+
+If you're using Visual Studio Code, you can rename the `.vscode/launch.example.json` file to `launch.json` so that you can run the app with the debugger attached.
+
 # Testing
 
 To setup accounts passphrase you need to setup an environment variable: `export ACCOUNT_PASSWORD="secret_pass_phrase"`.
