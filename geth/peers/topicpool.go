@@ -19,7 +19,7 @@ func NewTopicPool(topic discv5.Topic, limits params.Limits, slowSync, fastSync t
 	pool := TopicPool{
 		topic:          topic,
 		limits:         limits,
-		sync:           newSyncStrategy(fastSync, slowSync, time.Minute*5),
+		sync:           newSyncStrategy(fastSync, slowSync, DefaultTopicFastModeTimeout),
 		peerPool:       make(map[discv5.NodeID]*peerInfoItem),
 		peerPoolQueue:  make(peerPriorityQueue, 0),
 		connectedPeers: make(map[discv5.NodeID]*peerInfo),

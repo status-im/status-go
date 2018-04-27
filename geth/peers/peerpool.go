@@ -31,17 +31,22 @@ const (
 	// DefaultFastSync is a recommended value for aggressive peers search.
 	DefaultFastSync = 3 * time.Second
 	// DefaultSlowSync is a recommended value for slow (background) peers search.
-	DefaultSlowSync = 30 * time.Minute
+	DefaultSlowSync = 30 * time.Second
+	// DefaultDiscV5Timeout is a timeout after which Discv5 is stopped.
+	DefaultDiscV5Timeout = 3 * time.Minute
+	// DefaultTopicFastModeTimeout is a timeout after which sync mode is switched to slow mode.
+	DefaultTopicFastModeTimeout = 30 * time.Second
 )
 
 // NewPeerPool creates instance of PeerPool
 func NewPeerPool(config map[discv5.Topic]params.Limits, fastSync, slowSync time.Duration, cache *Cache, stopOnMax bool) *PeerPool {
 	return &PeerPool{
-		config:    config,
-		fastSync:  fastSync,
-		slowSync:  slowSync,
-		cache:     cache,
-		stopOnMax: stopOnMax,
+		config:            config,
+		fastSync:          fastSync,
+		slowSync:          slowSync,
+		discServerTimeout: DefaultDiscV5Timeout,
+		cache:             cache,
+		stopOnMax:         stopOnMax,
 	}
 }
 
@@ -57,18 +62,19 @@ type peerInfo struct {
 // PeerPool manages discovered peers and connects them to p2p server
 type PeerPool struct {
 	// config can be set only once per pool life cycle
-	config    map[discv5.Topic]params.Limits
-	fastSync  time.Duration
-	slowSync  time.Duration
-	cache     *Cache
-	stopOnMax bool
+	config            map[discv5.Topic]params.Limits
+	fastSync          time.Duration
+	slowSync          time.Duration
+	discServerTimeout time.Duration
+	cache             *Cache
+	stopOnMax         bool
 
 	mu                 sync.RWMutex
 	topics             []*TopicPool
 	serverSubscription event.Subscription
+	events             chan *p2p.PeerEvent
 	quit               chan struct{}
-
-	wg sync.WaitGroup
+	timeout            <-chan time.Time
 }
 
 // Start creates topic pool for each topic in config and subscribes to server events.
@@ -79,6 +85,7 @@ func (p *PeerPool) Start(server *p2p.Server) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.quit = make(chan struct{})
+	p.timeout = time.After(p.discServerTimeout)
 	p.topics = make([]*TopicPool, 0, len(p.config))
 	for topic, limits := range p.config {
 		topicPool := NewTopicPool(topic, limits, p.slowSync, p.fastSync)
@@ -87,31 +94,62 @@ func (p *PeerPool) Start(server *p2p.Server) error {
 		}
 		p.topics = append(p.topics, topicPool)
 	}
-	SendDiscoveryStarted() // discovery must be started when pool is started
 
-	events := make(chan *p2p.PeerEvent, 20)
-	p.serverSubscription = server.SubscribeEvents(events)
-	p.wg.Add(1)
+	// discovery must be already started when pool is started
+	SendDiscoveryStarted()
+
+	p.events = make(chan *p2p.PeerEvent, 20)
+	p.serverSubscription = server.SubscribeEvents(p.events)
 	go func() {
-		p.handleServerPeers(server, events)
-		p.wg.Done()
+		p.handleServerPeers(server, p.events)
 	}()
 	return nil
+}
+
+func (p *PeerPool) startDiscovery(server *p2p.Server) error {
+	if server.DiscV5 != nil {
+		return nil
+	}
+
+	ntab, err := StartDiscv5(server)
+	if err != nil {
+		return err
+	}
+	p.mu.Lock()
+	server.DiscV5 = ntab
+	p.timeout = time.After(p.discServerTimeout)
+	p.mu.Unlock()
+
+	SendDiscoveryStarted()
+
+	return nil
+}
+
+func (p *PeerPool) stopDiscovery(server *p2p.Server) {
+	if server.DiscV5 == nil {
+		return
+	}
+
+	p.mu.Lock()
+	server.DiscV5.Close()
+	server.DiscV5 = nil
+	p.timeout = nil
+	p.mu.Unlock()
+
+	for _, t := range p.topics {
+		t.StopSearch()
+	}
+
+	SendDiscoveryStopped()
 }
 
 // restartDiscovery and search for topics that have peer count below min
 func (p *PeerPool) restartDiscovery(server *p2p.Server) error {
 	if server.DiscV5 == nil {
-		ntab, err := StartDiscv5(server)
-		if err != nil {
-			log.Error("starting discv5 failed", "error", err, "retry in", discoveryRestartTimeout)
+		if err := p.startDiscovery(server); err != nil {
 			return err
 		}
 		log.Debug("restarted discovery from peer pool")
-		p.mu.Lock()
-		server.DiscV5 = ntab
-		p.mu.Unlock()
-		SendDiscoveryStarted()
 	}
 	for _, t := range p.topics {
 		if !t.BelowMin() || t.SearchRunning() {
@@ -127,44 +165,46 @@ func (p *PeerPool) restartDiscovery(server *p2p.Server) error {
 
 // handleServerPeers watches server peer events, notifies topic pools about changes
 // in the peer set and stops the discv5 if all topic pools collected enough peers.
+//
+// @TODO(adam): split it into peers and discovery management loops. This should
+// simplify the whole logic and allow to remove `timeout` field from `PeerPool`.
 func (p *PeerPool) handleServerPeers(server *p2p.Server, events <-chan *p2p.PeerEvent) {
 	var retryDiscv5 <-chan time.Time
 
 	for {
+		p.mu.RLock()
+		timeout := p.timeout
+		p.mu.RUnlock()
+
 		select {
 		case <-p.quit:
+			log.Debug("stopping DiscV5 because of quit", "server", server.Self())
+			p.stopDiscovery(server)
 			return
+		case <-timeout:
+			log.Debug("DiscV5 timed out", "server", server.Self())
+			p.stopDiscovery(server)
 		case <-retryDiscv5:
 			if err := p.restartDiscovery(server); err != nil {
 				retryDiscv5 = time.After(discoveryRestartTimeout)
+				log.Error("starting discv5 failed", "error", err, "retry", discoveryRestartTimeout)
 			}
 		case event := <-events:
 			switch event.Type {
 			case p2p.PeerEventTypeDrop:
 				log.Debug("confirm peer dropped", "ID", event.Peer)
-				if p.stopOnMax && p.handleDroppedPeer(server, event.Peer) {
+				if p.handleDroppedPeer(server, event.Peer) {
 					retryDiscv5 = time.After(0)
 				}
 			case p2p.PeerEventTypeAdd:
-				p.handleAddedEvent(server, event)
+				log.Debug("confirm peer added", "ID", event.Peer)
+				if p.stopOnMax && p.handleAddedPeer(server, event.Peer) {
+					log.Debug("closing discv5 connection because all topics reached max limit", "server", server.Self())
+					p.stopDiscovery(server)
+				}
 			}
 			SendDiscoverySummary(server.PeersInfo())
 		}
-	}
-}
-
-// handledAddedEvent maintains logic of stopping discovery server and added mainly
-// for easier testing.
-func (p *PeerPool) handleAddedEvent(server *p2p.Server, event *p2p.PeerEvent) {
-	log.Debug("confirm peer added", "ID", event.Peer)
-	if p.stopOnMax && p.handleAddedPeer(server, event.Peer) {
-		if server.DiscV5 == nil {
-			return
-		}
-		log.Debug("closing discv5 connection", "server", server.Self())
-		server.DiscV5.Close()
-		server.DiscV5 = nil
-		SendDiscoveryStopped()
 	}
 }
 
@@ -220,10 +260,4 @@ func (p *PeerPool) Stop() {
 		close(p.quit)
 	}
 	p.serverSubscription.Unsubscribe()
-	// wait before closing topic pools, otherwise there is chance that
-	// they will be concurrently started while we are exiting.
-	p.wg.Wait()
-	for _, t := range p.topics {
-		t.StopSearch()
-	}
 }

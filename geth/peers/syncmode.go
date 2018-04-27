@@ -11,7 +11,7 @@ type syncStrategy struct {
 	fastModeLimit time.Duration
 
 	mode        chan time.Duration // for internal usage
-	currentMode time.Duration      // can only be read or write in Start() goroutine
+	currentMode time.Duration      // access managed in loop()
 	period      chan time.Duration // deduped and returned by Start()
 
 	mu   sync.RWMutex
@@ -53,40 +53,42 @@ func (s *syncStrategy) Start() <-chan time.Duration {
 
 	s.wg.Add(1)
 	go func() {
-		// This goroutine is used to sync access to `currentMode`
-		// and all channels of `syncStrategy`.
-		defer s.wg.Done()
-
-		for {
-			select {
-			case mode := <-s.mode:
-				if mode == s.currentMode {
-					continue
-				}
-
-				s.period <- mode
-				s.currentMode = mode
-
-				if s.currentMode == s.fastMode {
-					s.limitFastMode(s.fastModeLimit, s.quit)
-				}
-			case <-s.quit:
-				// period must be closed as otherwise SearchTopic() form DiscV5 won't exit
-				if s.period != nil {
-					close(s.period)
-					s.period = nil
-				}
-				s.currentMode = 0
-				s.quit = nil
-				return
-			}
-		}
+		s.loop()
+		s.wg.Done()
 	}()
 
 	// init with fast mode
 	s.mode <- s.fastMode
 
 	return s.period
+}
+
+// loop syncs access to `currentMode` and all the channels.
+func (s *syncStrategy) loop() {
+	for {
+		select {
+		case mode := <-s.mode:
+			if mode == s.currentMode {
+				continue
+			}
+
+			s.period <- mode
+			s.currentMode = mode
+
+			if s.currentMode == s.fastMode {
+				s.limitFastMode(s.fastModeLimit, s.quit)
+			}
+		case <-s.quit:
+			// period must be closed as otherwise SearchTopic() form DiscV5 won't exit
+			if s.period != nil {
+				close(s.period)
+				s.period = nil
+			}
+			s.currentMode = 0
+			s.quit = nil
+			return
+		}
+	}
 }
 
 func (s *syncStrategy) Stop() {
