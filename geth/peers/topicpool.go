@@ -147,12 +147,10 @@ func (t *TopicPool) ConfirmAdded(server *p2p.Server, nodeID discover.NodeID) {
 		return
 	}
 
-	// move peer from pool to connected peers
 	t.movePeerFromPoolToConnected(discV5NodeID)
 	// make sure `dismissed` is reset
 	peer.dismissed = false
 
-	// when the lower limit is reached, we can switch to slow mode
 	if t.SearchRunning() {
 		t.sync.Update(len(t.connectedPeers), t.limits.Min, t.limits.Max)
 	}

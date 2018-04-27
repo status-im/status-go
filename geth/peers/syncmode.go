@@ -5,6 +5,8 @@ import (
 	"time"
 )
 
+// syncStrategy manages fast and slow modes.
+// It also takes care of limiting the time spent if fast mode.
 type syncStrategy struct {
 	fastMode      time.Duration
 	slowMode      time.Duration
@@ -42,6 +44,9 @@ func (s *syncStrategy) limitFastMode(timeout time.Duration, cancel <-chan struct
 	}()
 }
 
+// Start will start the sync mode selection strategy.
+// The initial sync mode is fast mode.
+// `period` is returned for the consumer.
 func (s *syncStrategy) Start() <-chan time.Duration {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -64,6 +69,7 @@ func (s *syncStrategy) Start() <-chan time.Duration {
 }
 
 // loop syncs access to `currentMode` and all the channels.
+// Mode change is deduped.
 func (s *syncStrategy) loop() {
 	for {
 		select {
@@ -91,6 +97,7 @@ func (s *syncStrategy) loop() {
 	}
 }
 
+// Stop stops the sync selection strategy.
 func (s *syncStrategy) Stop() {
 	if s.quit == nil {
 		return
