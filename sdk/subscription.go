@@ -24,8 +24,12 @@ func (s *Subscription) Subscribe(channel *Channel, fn MsgHandler) {
 			return
 		default:
 			cmd := fmt.Sprintf(getFilterMessagesFormat, channel.filterID)
-			response := channel.conn.statusNode.RPCClient().CallRaw(cmd)
-			f := unmarshalJSON(response)
+			response, err := channel.conn.rpc.Call(cmd)
+			if err != nil {
+				log.Fatalf("Error when sending request to server: %s", err)
+			}
+
+			f := unmarshalJSON(response.(string))
 			v := f.(map[string]interface{})["result"]
 			switch vv := v.(type) {
 			case []interface{}:

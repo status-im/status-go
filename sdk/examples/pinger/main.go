@@ -8,9 +8,9 @@ import (
 )
 
 func main() {
-	conn, err := sdk.Connect("supu", "password")
-	if err != nil {
-		panic("Couldn't connect to status")
+	conn := sdk.New("rpc.server.addr:12345")
+	if err := conn.Signup("111222333"); err != nil {
+		panic("Couldn't create an account")
 	}
 
 	ch, err := conn.Join("supu")
