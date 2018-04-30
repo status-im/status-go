@@ -25,6 +25,7 @@ import (
 	shhmetrics "github.com/status-im/status-go/metrics/whisper"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/shhext"
+	"github.com/status-im/status-go/services/status"
 )
 
 // Errors related to node and services creation.
@@ -33,6 +34,7 @@ var (
 	ErrWhisperServiceRegistrationFailure  = errors.New("failed to register the Whisper service")
 	ErrLightEthRegistrationFailure        = errors.New("failed to register the LES service")
 	ErrPersonalServiceRegistrationFailure = errors.New("failed to register the personal api service")
+	ErrStatusServiceRegistrationFailure   = errors.New("failed to register the Status service")
 )
 
 // All general log messages in this package should be routed through this logger.
@@ -91,6 +93,11 @@ func MakeNode(config *params.NodeConfig) (*node.Node, error) {
 	// start Whisper service.
 	if err := activateShhService(stack, config); err != nil {
 		return nil, fmt.Errorf("%v: %v", ErrWhisperServiceRegistrationFailure, err)
+	}
+
+	// start status service.
+	if err := activateStatusService(stack, config); err != nil {
+		return nil, fmt.Errorf("%v: %v", ErrStatusServiceRegistrationFailure, err)
 	}
 
 	return stack, nil
@@ -159,6 +166,22 @@ func activateLightEthService(stack *node.Node, config *params.NodeConfig) error 
 func activatePersonalService(stack *node.Node, config *params.NodeConfig) error {
 	return stack.Register(func(*node.ServiceContext) (node.Service, error) {
 		svc := personal.New(stack.AccountManager())
+		return svc, nil
+	})
+}
+
+func activateStatusService(stack *node.Node, config *params.NodeConfig) error {
+	if !config.StatusServiceEnabled {
+		logger.Info("Status service api is disabled")
+		return nil
+	}
+
+	return stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
+		var whisper *whisper.Whisper
+		if err := ctx.Service(&whisper); err != nil {
+			return nil, err
+		}
+		svc := status.New(whisper)
 		return svc, nil
 	})
 }
