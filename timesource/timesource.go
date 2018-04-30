@@ -1,6 +1,7 @@
 package timesource
 
 import (
+	"bytes"
 	"sort"
 	"sync"
 	"time"
@@ -23,24 +24,64 @@ const (
 
 type ntpQuery func(string) (*ntp.Response, error)
 
-func computeOffset(timeQuery ntpQuery, server string, attempts int) (time.Duration, error) {
-	offsets := make([]time.Duration, 5)
-	// lowest and highest will be cutoff to prevent reading data from out of sync ntp servers
-	for i := 0; i < attempts+2; i++ {
-		response, err := timeQuery(server)
-		if err != nil {
-			return 0, err
+type queryResponse struct {
+	Offset time.Duration
+	Error  error
+}
+
+type multiRPCError []error
+
+func (e multiRPCError) Error() string {
+	var b bytes.Buffer
+	b.WriteString("RPC failed: ")
+	more := false
+	for _, err := range e {
+		if more {
+			b.WriteString("; ")
 		}
-		offsets[i] = response.ClockOffset
+		b.WriteString(err.Error())
+		more = true
+	}
+	b.WriteString(".")
+	return b.String()
+}
+
+func computeOffset(timeQuery ntpQuery, server string, attempts int) (time.Duration, error) {
+	responses := make(chan queryResponse, attempts)
+	for i := 0; i < attempts; i++ {
+		go func() {
+			// ntp.Query default timeout is 5s
+			response, err := timeQuery(server)
+			if err != nil {
+				responses <- queryResponse{Error: err}
+				return
+			}
+			responses <- queryResponse{Offset: response.ClockOffset}
+		}()
+	}
+	var (
+		rpcErrors multiRPCError
+		offsets   []time.Duration
+		collected int
+	)
+	for response := range responses {
+		if response.Error != nil {
+			rpcErrors = append(rpcErrors, response.Error)
+		} else {
+			offsets = append(offsets, response.Offset)
+		}
+		collected++
+		if collected == attempts {
+			break
+		}
+	}
+	if len(rpcErrors) != 0 {
+		return 0, rpcErrors
 	}
 	sort.SliceStable(offsets, func(i, j int) bool {
 		return offsets[i] > offsets[j]
 	})
-	var sum time.Duration
-	for i := 1; i <= attempts; i++ {
-		sum += offsets[i]
-	}
-	return sum / time.Duration(attempts), nil
+	return offsets[attempts/2], nil
 }
 
 // Default initializes time source with default config values.

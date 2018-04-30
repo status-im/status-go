@@ -24,7 +24,7 @@ import (
 	"github.com/status-im/status-go/geth/rpc"
 	"github.com/status-im/status-go/services/shhext"
 	"github.com/status-im/status-go/services/status"
-	"github.com/status-im/status-go/timeskew"
+	"github.com/status-im/status-go/timesource"
 )
 
 // tickerResolution is the delta to check blockchain sync progress.
@@ -53,7 +53,7 @@ type StatusNode struct {
 	peerPool *peers.PeerPool
 	db       *leveldb.DB // used as a cache for PeerPool
 
-	timeManager *timeskew.TimeSource
+	timeManager *timesource.NTPTimeSource
 
 	log log.Logger
 }
@@ -118,7 +118,7 @@ func (n *StatusNode) Start(config *params.NodeConfig, services ...node.ServiceCo
 		return n.startPeerPool()
 	}
 	if n.config.WhisperConfig != nil && n.config.WhisperConfig.Enabled {
-		return n.setupWhisper()
+		return n.setupWhisperTimeSource()
 	}
 	return nil
 }
@@ -153,14 +153,14 @@ func (n *StatusNode) start(services []node.ServiceConstructor) error {
 	return n.gethNode.Start()
 }
 
-func (n *StatusNode) setupWhisper() error {
+func (n *StatusNode) setupWhisperTimeSource() error {
 	var w *whisper.Whisper
 	err := n.gethService(&w)
 	if err != nil {
 		return err
 	}
-	log.Debug("Using time skew manager as a source of time in whisper.")
-	n.timeManager = timeskew.NewDefaultTimeSource()
+	log.Debug("Using ntp time source manager as a source of time in whisper.")
+	n.timeManager = timesource.Default()
 	n.timeManager.Start()
 	w.SetTimeSource(n.timeManager.Now)
 	return nil
@@ -223,8 +223,8 @@ func (n *StatusNode) stop() error {
 	n.register = nil
 	n.peerPool = nil
 
-	if n.config.WhisperConfig != nil && n.config.WhisperConfig.Enabled {
-		log.Debug("Stopping time skew manager")
+	if n.timeManager != nil {
+		log.Debug("Stopping time source manager")
 		n.timeManager.Stop()
 		n.timeManager = nil
 	}
