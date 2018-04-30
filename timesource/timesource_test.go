@@ -1,4 +1,4 @@
-package timeskew
+package timesource
 
 import (
 	"testing"
@@ -30,7 +30,7 @@ func TestComputeOffset(t *testing.T) {
 	assert.Equal(t, time.Duration(1), offset)
 }
 
-func TestTimeSource(t *testing.T) {
+func TestNTPTimeSource(t *testing.T) {
 	madeOffset := 30 * time.Second
 	responses := make([]*ntp.Response, 5)
 	for i := range responses {
@@ -41,7 +41,7 @@ func TestTimeSource(t *testing.T) {
 		defer func() { actualAttempts++ }()
 		return responses[actualAttempts], nil
 	}
-	source := &TimeSource{
+	source := &NTPTimeSource{
 		attempts:    3,
 		queryMethod: queryMethod,
 	}

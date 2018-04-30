@@ -1,4 +1,4 @@
-package timeskew
+package timesource
 
 import (
 	"sort"
@@ -23,11 +23,11 @@ const (
 
 type ntpQuery func(string) (*ntp.Response, error)
 
-func computeOffset(queryMethod ntpQuery, server string, attempts int) (time.Duration, error) {
+func computeOffset(timeQuery ntpQuery, server string, attempts int) (time.Duration, error) {
 	offsets := make([]time.Duration, 5)
 	// lowest and highest will be cutoff to prevent reading data from out of sync ntp servers
 	for i := 0; i < attempts+2; i++ {
-		response, err := queryMethod(server)
+		response, err := timeQuery(server)
 		if err != nil {
 			return 0, err
 		}
@@ -43,23 +43,23 @@ func computeOffset(queryMethod ntpQuery, server string, attempts int) (time.Dura
 	return sum / time.Duration(attempts), nil
 }
 
-// NewDefaultTimeSource initializes time source with default config values.
-func NewDefaultTimeSource() *TimeSource {
-	return &TimeSource{
+// Default initializes time source with default config values.
+func Default() *NTPTimeSource {
+	return &NTPTimeSource{
 		server:       DefaultServer,
 		attempts:     DefaultAttempts,
 		updatePeriod: DefaultUpdatePeriod,
-		queryMethod:  ntp.Query,
+		timeQuery:    ntp.Query,
 	}
 }
 
-// TimeSource provides source of time that tries to be resistant to time skews.
+// NTPTimeSource provides source of time that tries to be resistant to time skews.
 // It does so by periodically querying time offset from ntp servers.
-type TimeSource struct {
+type NTPTimeSource struct {
 	server       string
 	attempts     int
 	updatePeriod time.Duration
-	queryMethod  ntpQuery // for ease of testing
+	timeQuery    ntpQuery // for ease of testing
 
 	quit chan struct{}
 	wg   sync.WaitGroup
@@ -69,14 +69,14 @@ type TimeSource struct {
 }
 
 // Now returns time adjusted by latest known offset
-func (s *TimeSource) Now() time.Time {
+func (s *NTPTimeSource) Now() time.Time {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return time.Now().Add(s.latestOffset)
 }
 
-func (s *TimeSource) updateOffset() {
-	offset, err := computeOffset(s.queryMethod, s.server, s.attempts)
+func (s *NTPTimeSource) updateOffset() {
+	offset, err := computeOffset(s.timeQuery, s.server, s.attempts)
 	if err != nil {
 		log.Error("failed to compute offset", "error", err)
 		return
@@ -88,7 +88,7 @@ func (s *TimeSource) updateOffset() {
 }
 
 // Start runs a goroutine that updates local offset every updatePeriod.
-func (s *TimeSource) Start() {
+func (s *NTPTimeSource) Start() {
 	s.quit = make(chan struct{})
 	ticker := time.NewTicker(s.updatePeriod)
 	// we try to do it synchronously so that user can have reliable messages right away
@@ -108,7 +108,7 @@ func (s *TimeSource) Start() {
 }
 
 // Stop goroutine that updates time source.
-func (s *TimeSource) Stop() {
+func (s *NTPTimeSource) Stop() {
 	if s.quit == nil {
 		return
 	}
