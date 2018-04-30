@@ -104,7 +104,7 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 					"topic":"` + topic.String() + `",
 					"symKeyID":"` + MailServerKeyID + `",
 					"from":0,
-					"to":` + strconv.FormatInt(time.Now().Unix(), 10) + `
+					"to":` + strconv.FormatInt(senderWhisperService.GetCurrentTime().Unix(), 10) + `
 		}]
 	}`
 	resp := rpcClient.CallRaw(reqMessagesBody)
@@ -267,8 +267,8 @@ func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
 	s.Require().Equal(0, len(messages))
 
 	// Request each one messages from mailbox using enode.
-	s.requestHistoricMessages(bobRPCClient, mailboxEnode, bobMailServerKeyID, groupChatTopic.String())
-	s.requestHistoricMessages(charlieRPCClient, mailboxEnode, charlieMailServerKeyID, groupChatTopic.String())
+	s.requestHistoricMessages(bobWhisperService, bobRPCClient, mailboxEnode, bobMailServerKeyID, groupChatTopic.String())
+	s.requestHistoricMessages(charlieWhisperService, charlieRPCClient, mailboxEnode, charlieMailServerKeyID, groupChatTopic.String())
 	// Wait to receive p2p messages.
 	time.Sleep(5 * time.Second)
 
@@ -475,7 +475,7 @@ func (s *WhisperMailboxSuite) addSymKey(rpcCli *rpc.Client, symkey string) strin
 }
 
 // requestHistoricMessages asks a mailnode to resend messages.
-func (s *WhisperMailboxSuite) requestHistoricMessages(rpcCli *rpc.Client, mailboxEnode, mailServerKeyID, topic string) {
+func (s *WhisperMailboxSuite) requestHistoricMessages(w *whisper.Whisper, rpcCli *rpc.Client, mailboxEnode, mailServerKeyID, topic string) {
 	resp := rpcCli.CallRaw(`{
 		"jsonrpc": "2.0",
 		"id": 2,
@@ -485,7 +485,7 @@ func (s *WhisperMailboxSuite) requestHistoricMessages(rpcCli *rpc.Client, mailbo
 					"topic":"` + topic + `",
 					"symKeyID":"` + mailServerKeyID + `",
 					"from":0,
-					"to":` + strconv.FormatInt(time.Now().Unix(), 10) + `
+					"to":` + strconv.FormatInt(w.GetCurrentTime().Unix(), 10) + `
 		}]
 	}`)
 	reqMessagesResp := baseRPCResponse{}
