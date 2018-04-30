@@ -17,16 +17,16 @@ type Channel struct {
 
 // Publish : Publishes a message with the given body on the current channel
 func (c *Channel) Publish(body string) error {
-	cfg := c.conn.statusNode.Config()
-
 	message := NewMsg(c.conn.userName, body, c.channelName)
 	cmd := fmt.Sprintf(standardMessageFormat,
 		c.conn.address,
 		c.channelKey,
 		message.ToPayload(),
-		c.topic, cfg.WhisperConfig.MinimumPoW)
+		c.topic,
+		c.conn.minimumPoW,
+	)
 
-	c.conn.statusNode.RPCClient().CallRaw(cmd)
+	c.conn.rpc.Call(cmd)
 
 	return nil
 }

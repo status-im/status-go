@@ -5,6 +5,10 @@ var (
 	newMessageFilterFormat           = `{"jsonrpc":"2.0","id":2,"method":"shh_newMessageFilter","params":[{"allowP2P":true,"topics":["%s"],"type":"sym","symKeyID":"%s"}]}`
 	getFilterMessagesFormat          = `{"jsonrpc":"2.0","id":2968,"method":"shh_getFilterMessages","params":["%s"]}`
 	standardMessageFormat            = `{"jsonrpc":"2.0","id":633,"method":"shh_post","params":[{"sig":"%s","symKeyID":"%s","payload":"%s","topic":"%s","ttl":10,"powTarget":%g,"powTime":1}]}`
-	messagePayloadFormat             = `["~#c4",["%s","text/plain","~:public-group-user-message",%d,%d]]`
 	web3ShaFormat                    = `{"jsonrpc":"2.0","method":"web3_sha3","params":["%s"],"id":%d}`
+	statusLoginFormat                = `{"jsonrpc":"2.0","method":"status_login","params":["%s","%s"]}`
+	statusSignupFormat               = `{"jsonrpc":"2.0","method":"status_signup","params":["%s","%s"]}`
+	statusJoinPublicChannel          = `{"jsonrpc":"2.0","method":"status_joinpublicchannel","params":["%s"]}`
+
+	messagePayloadFormat = `["~#c4",["%s","text/plain","~:public-group-user-message",%d,%d]]`
 )

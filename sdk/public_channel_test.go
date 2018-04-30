@@ -14,7 +14,8 @@ func (s *PublicChannelTestSuite) SetupTest() {
 }
 
 func (s *PublicChannelTestSuite) TestConnect() {
-	c, err := Connect("My user name", "111222333")
+	c := New("rpc.server.addr:12345")
+	err := c.Signup("111222333")
 	defer c.Close()
 	s.Nil(err)
 	s.NotNil(c)
