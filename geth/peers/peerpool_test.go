@@ -99,7 +99,7 @@ func (s *PeerPoolSimulationSuite) getPoolEvent(events <-chan string) string {
 	case ev := <-events:
 		return ev
 	case <-time.After(time.Second):
-		s.Fail("timed out waiting for a peer")
+		s.FailNow("timed out waiting for a peer")
 		return ""
 	}
 }
@@ -135,7 +135,6 @@ func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailover() {
 	peerPool := NewPeerPool(config, 100*time.Millisecond, 100*time.Millisecond, nil, true)
 	register := NewRegister(topic)
 	s.Require().NoError(register.Start(s.peers[0]))
-	defer register.Stop()
 	// need to wait for topic to get registered, discv5 can query same node
 	// for a topic only once a minute
 	events := make(chan *p2p.PeerEvent, 20)
@@ -155,6 +154,7 @@ func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailover() {
 	s.Contains(summary, "shh/6")
 	s.Equal(summary["shh/6"], 1)
 
+	register.Stop()
 	s.peers[0].Stop()
 	disconnected := s.getPeerFromEvent(events, p2p.PeerEventTypeDrop)
 	s.Equal(connected, disconnected)

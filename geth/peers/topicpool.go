@@ -15,14 +15,16 @@ import (
 )
 
 // NewTopicPool returns instance of TopicPool
-func NewTopicPool(topic discv5.Topic, limits params.Limits, slowSync, fastSync time.Duration) *TopicPool {
+func NewTopicPool(topic discv5.Topic, limits params.Limits, slowMode, fastMode time.Duration) *TopicPool {
 	pool := TopicPool{
-		topic:          topic,
-		limits:         limits,
-		sync:           newSyncStrategy(fastSync, slowSync, DefaultTopicFastModeTimeout),
-		peerPool:       make(map[discv5.NodeID]*peerInfoItem),
-		peerPoolQueue:  make(peerPriorityQueue, 0),
-		connectedPeers: make(map[discv5.NodeID]*peerInfo),
+		topic:           topic,
+		limits:          limits,
+		fastMode:        fastMode,
+		slowMode:        slowMode,
+		fastModeTimeout: DefaultTopicFastModeTimeout,
+		peerPool:        make(map[discv5.NodeID]*peerInfoItem),
+		peerPoolQueue:   make(peerPriorityQueue, 0),
+		connectedPeers:  make(map[discv5.NodeID]*peerInfo),
 	}
 
 	heap.Init(&pool.peerPoolQueue)
@@ -32,20 +34,28 @@ func NewTopicPool(topic discv5.Topic, limits params.Limits, slowSync, fastSync t
 
 // TopicPool manages peers for topic.
 type TopicPool struct {
-	topic  discv5.Topic
-	limits params.Limits
+	// configuration
+	topic           discv5.Topic
+	limits          params.Limits
+	fastMode        time.Duration
+	slowMode        time.Duration
+	fastModeTimeout time.Duration
 
-	mu      sync.RWMutex
-	wg      sync.WaitGroup // wait group for all goroutines spawn during TopicPool operation
-	quit    chan struct{}
+	mu   sync.RWMutex
+	wg   sync.WaitGroup // wait group for all goroutines spawn during TopicPool operation
+	quit chan struct{}
+
 	running int32
+
+	currentMode           time.Duration
+	period                chan time.Duration
+	fastModeTimeoutCancel chan struct{}
 
 	peerPool       map[discv5.NodeID]*peerInfoItem // found but not connected peers
 	peerPoolQueue  peerPriorityQueue               // priority queue to find the most recent peer
 	connectedPeers map[discv5.NodeID]*peerInfo     // currently connected peers
 
 	cache *Cache
-	sync  *syncStrategy
 }
 
 func (t *TopicPool) addToPeerPool(peer *peerInfo) {
@@ -112,6 +122,56 @@ func (t *TopicPool) BelowMin() bool {
 	return len(t.connectedPeers) < t.limits.Min
 }
 
+// updateSyncMode changes the sync mode depending on the current number
+// of connected peers and limits.
+func (t *TopicPool) updateSyncMode() {
+	newMode := t.slowMode
+	if len(t.connectedPeers) < t.limits.Min {
+		newMode = t.fastMode
+	}
+
+	t.setSyncMode(newMode)
+}
+
+func (t *TopicPool) setSyncMode(mode time.Duration) {
+	if mode == t.currentMode {
+		return
+	}
+
+	t.period <- mode
+	t.currentMode = mode
+
+	if mode == t.fastMode {
+		t.limitFastMode(t.fastModeTimeout)
+	}
+}
+
+func (t *TopicPool) limitFastMode(timeout time.Duration) {
+	if timeout == 0 {
+		return
+	}
+
+	if t.fastModeTimeoutCancel != nil {
+		close(t.fastModeTimeoutCancel)
+	}
+	cancel := make(chan struct{})
+	t.fastModeTimeoutCancel = cancel
+
+	t.wg.Add(1)
+	go func() {
+		defer t.wg.Done()
+
+		select {
+		case <-time.After(timeout):
+			t.mu.Lock()
+			t.setSyncMode(t.slowMode)
+			t.mu.Unlock()
+		case <-cancel:
+			return
+		}
+	}()
+}
+
 // ConfirmAdded called when peer was added by p2p Server.
 // 1. Skip a peer if it not in our peer table
 // 2. Add a peer to a cache.
@@ -151,8 +211,9 @@ func (t *TopicPool) ConfirmAdded(server *p2p.Server, nodeID discover.NodeID) {
 	// make sure `dismissed` is reset
 	peer.dismissed = false
 
+	// A peer was added so check if we can switch to slow mode.
 	if t.SearchRunning() {
-		t.sync.Update(len(t.connectedPeers), t.limits.Min, t.limits.Max)
+		t.updateSyncMode()
 	}
 }
 
@@ -196,9 +257,9 @@ func (t *TopicPool) ConfirmDropped(server *p2p.Server, nodeID discover.NodeID) b
 		}
 	}
 
-	// As we removed a peer, check if we need to switch a sync strategy.
+	// As we removed a peer, update a sync strategy if needed.
 	if t.SearchRunning() {
-		t.sync.Update(len(t.connectedPeers), t.limits.Min, t.limits.Max)
+		t.updateSyncMode()
 	}
 
 	return true
@@ -236,11 +297,15 @@ func (t *TopicPool) StartSearch(server *p2p.Server) error {
 	defer t.mu.Unlock()
 
 	t.quit = make(chan struct{})
+
+	// `period` is used to notify about the current sync mode.
+	t.period = make(chan time.Duration, 2)
+	// use fast sync mode at the beginning
+	t.setSyncMode(t.fastMode)
+
+	// peers management
 	found := make(chan *discv5.Node, 5) // 5 reasonable number for concurrently found nodes
 	lookup := make(chan bool, 10)       // sufficiently buffered channel, just prevents blocking because of lookup
-
-	// start syncing mode strategy
-	period := t.sync.Start()
 
 	if t.cache != nil {
 		for _, peer := range t.cache.GetPeersRange(t.topic, 5) {
@@ -251,7 +316,7 @@ func (t *TopicPool) StartSearch(server *p2p.Server) error {
 
 	t.wg.Add(1)
 	go func() {
-		server.DiscV5.SearchTopic(t.topic, period, found, lookup)
+		server.DiscV5.SearchTopic(t.topic, t.period, found, lookup)
 		t.wg.Done()
 	}()
 	t.wg.Add(1)
@@ -341,8 +406,14 @@ func (t *TopicPool) StopSearch() {
 		return
 	default:
 		log.Debug("stoping search", "topic", t.topic)
+		if t.fastModeTimeoutCancel != nil {
+			close(t.fastModeTimeoutCancel)
+			t.fastModeTimeoutCancel = nil
+		}
+		close(t.period)
+		t.period = nil
+		t.currentMode = 0
 		close(t.quit)
 	}
-	t.sync.Stop()
 	t.wg.Wait()
 }
