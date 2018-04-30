@@ -1,6 +1,59 @@
-diff --git i/whisper/whisperv6/whisper.go w/whisper/whisperv6/whisper.go
-index eb637b4ca..f0d042c86 100644
---- i/whisper/whisperv6/whisper.go
+diff --git c/whisper/whisperv6/api.go w/whisper/whisperv6/api.go
+index 2de99f293..28086e75e 100644
+--- c/whisper/whisperv6/api.go
++++ w/whisper/whisperv6/api.go
+@@ -289,6 +289,10 @@ func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (hexutil.
+ 	if err != nil {
+ 		return nil, err
+ 	}
++	env.Expiry = uint32(api.w.GetCurrentTime().Add(time.Second * time.Duration(params.TTL)).Unix())
++	if err := env.Seal(params); err != nil {
++		return nil, err
++	}
+ 
+ 	// send to specific node (skip PoW check)
+ 	if len(req.TargetPeer) > 0 {
+diff --git c/whisper/whisperv6/envelope.go w/whisper/whisperv6/envelope.go
+index c42d1fa8a..bcab5b5ea 100644
+--- c/whisper/whisperv6/envelope.go
++++ w/whisper/whisperv6/envelope.go
+@@ -64,11 +64,10 @@ func (e *Envelope) rlpWithoutNonce() []byte {
+ // included into an envelope for network forwarding.
+ func NewEnvelope(ttl uint32, topic TopicType, msg *sentMessage) *Envelope {
+ 	env := Envelope{
+-		Expiry: uint32(time.Now().Add(time.Second * time.Duration(ttl)).Unix()),
+-		TTL:    ttl,
+-		Topic:  topic,
+-		Data:   msg.Raw,
+-		Nonce:  0,
++		TTL:   ttl,
++		Topic: topic,
++		Data:  msg.Raw,
++		Nonce: 0,
+ 	}
+ 
+ 	return &env
+diff --git c/whisper/whisperv6/message.go w/whisper/whisperv6/message.go
+index 2d4e86244..c91496820 100644
+--- c/whisper/whisperv6/message.go
++++ w/whisper/whisperv6/message.go
+@@ -253,12 +253,7 @@ func (msg *sentMessage) Wrap(options *MessageParams) (envelope *Envelope, err er
+ 	if err != nil {
+ 		return nil, err
+ 	}
+-
+-	envelope = NewEnvelope(options.TTL, options.Topic, msg)
+-	if err = envelope.Seal(options); err != nil {
+-		return nil, err
+-	}
+-	return envelope, nil
++	return NewEnvelope(options.TTL, options.Topic, msg), nil
+ }
+ 
+ // decryptSymmetric decrypts a message with a topic key, using AES-GCM-256.
+diff --git c/whisper/whisperv6/whisper.go w/whisper/whisperv6/whisper.go
+index eb637b4ca..2be6a8c0f 100644
+--- c/whisper/whisperv6/whisper.go
 +++ w/whisper/whisperv6/whisper.go
 @@ -92,6 +92,8 @@ type Whisper struct {
  	envelopeTracer EnvelopeTracer // Service collecting envelopes metadata
@@ -19,7 +72,7 @@ index eb637b4ca..f0d042c86 100644
  	}
  
  	whisper.filters = NewFilters(whisper)
-@@ -215,6 +218,11 @@ func (whisper *Whisper) APIs() []rpc.API {
+@@ -215,6 +218,16 @@ func (whisper *Whisper) APIs() []rpc.API {
  	}
  }
  
@@ -28,10 +81,15 @@ index eb637b4ca..f0d042c86 100644
 +	whisper.timeSource = timeSource
 +}
 +
++// GetCurrentTime returns current time.
++func (whisper *Whisper) GetCurrentTime() time.Time {
++	return whisper.timeSource()
++}
++
  // RegisterServer registers MailServer interface.
  // MailServer will process all the incoming messages with p2pRequestCode.
  func (whisper *Whisper) RegisterServer(server MailServer) {
-@@ -829,7 +837,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
+@@ -829,7 +842,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
  // appropriate time-stamp. In case of error, connection should be dropped.
  // param isP2P indicates whether the message is peer-to-peer (should not be forwarded).
  func (whisper *Whisper) add(envelope *Envelope, isP2P bool) (bool, error) {
@@ -40,7 +98,7 @@ index eb637b4ca..f0d042c86 100644
  	sent := envelope.Expiry - envelope.TTL
  
  	if sent > now {
-@@ -988,7 +996,7 @@ func (whisper *Whisper) expire() {
+@@ -988,7 +1001,7 @@ func (whisper *Whisper) expire() {
  	whisper.statsMu.Lock()
  	defer whisper.statsMu.Unlock()
  	whisper.stats.reset()
