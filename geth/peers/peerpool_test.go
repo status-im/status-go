@@ -74,6 +74,13 @@ func (s *PeerPoolSimulationSuite) SetupTest() {
 	}
 }
 
+func (s *PeerPoolSimulationSuite) TearDown() {
+	s.bootnode.Stop()
+	for _, p := range s.peers {
+		p.Stop()
+	}
+}
+
 func (s *PeerPoolSimulationSuite) getPeerFromEvent(events <-chan *p2p.PeerEvent, etype p2p.PeerEventType) (nodeID discover.NodeID) {
 	select {
 	case ev := <-events:
@@ -92,7 +99,7 @@ func (s *PeerPoolSimulationSuite) getPoolEvent(events <-chan string) string {
 	case ev := <-events:
 		return ev
 	case <-time.After(time.Second):
-		s.Fail("timed out waiting for a peer")
+		s.FailNow("timed out waiting for a peer")
 		return ""
 	}
 }
@@ -101,7 +108,6 @@ func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailover() {
 	poolEvents := make(chan string, 1)
 	summaries := make(chan map[string]int, 1)
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		fmt.Println(jsonEvent)
 		var envelope struct {
 			Type  string
 			Event json.RawMessage
@@ -120,6 +126,7 @@ func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailover() {
 		}
 
 	})
+	defer signal.ResetDefaultNodeNotificationHandler()
 	topic := discv5.Topic("cap=test")
 	// simulation should only rely on fast sync
 	config := map[discv5.Topic]params.Limits{
@@ -128,7 +135,6 @@ func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailover() {
 	peerPool := NewPeerPool(config, 100*time.Millisecond, 100*time.Millisecond, nil, true)
 	register := NewRegister(topic)
 	s.Require().NoError(register.Start(s.peers[0]))
-	defer register.Stop()
 	// need to wait for topic to get registered, discv5 can query same node
 	// for a topic only once a minute
 	events := make(chan *p2p.PeerEvent, 20)
@@ -148,6 +154,7 @@ func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailover() {
 	s.Contains(summary, "shh/6")
 	s.Equal(summary["shh/6"], 1)
 
+	register.Stop()
 	s.peers[0].Stop()
 	disconnected := s.getPeerFromEvent(events, p2p.PeerEventTypeDrop)
 	s.Equal(connected, disconnected)
@@ -171,20 +178,23 @@ func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailover() {
 	s.Equal(summary["shh/6"], 1)
 }
 
-func (s *PeerPoolSimulationSuite) TearDown() {
-	s.bootnode.Stop()
-	for _, p := range s.peers {
-		p.Stop()
-	}
-}
-
-// TestMaxPeersOverflow verifies that following scenario will not occur:
+// TestPeerPoolMaxPeersOverflow verifies that following scenario will not occur:
 // - found peer A and B in the same kademlia cycle
 // - process peer A
 // - max limit is reached -> closed discv5 and set it to nil
 // - process peer B
 // - panic because discv5 is nil!!!
-func TestMaxPeersOverflow(t *testing.T) {
+func TestPeerPoolMaxPeersOverflow(t *testing.T) {
+	signals := make(chan string, 1)
+	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+		var envelope struct {
+			Type string
+		}
+		require.NoError(t, json.Unmarshal([]byte(jsonEvent), &envelope))
+		signals <- envelope.Type
+	})
+	defer signal.ResetDefaultNodeNotificationHandler()
+
 	key, err := crypto.GenerateKey()
 	require.NoError(t, err)
 	peer := &p2p.Server{
@@ -197,8 +207,79 @@ func TestMaxPeersOverflow(t *testing.T) {
 	require.NoError(t, peer.Start())
 	defer peer.Stop()
 	require.NotNil(t, peer.DiscV5)
+
 	pool := NewPeerPool(nil, DefaultFastSync, DefaultSlowSync, nil, true)
-	pool.handleAddedEvent(peer, &p2p.PeerEvent{})
+	require.NoError(t, pool.Start(peer))
+	require.Equal(t, DiscoveryStarted, <-signals)
+	// without config, it will stop the discovery because all topic pools are satisfied
+	pool.events <- &p2p.PeerEvent{Type: p2p.PeerEventTypeAdd}
+	require.Equal(t, DiscoveryStopped, <-signals)
 	require.Nil(t, peer.DiscV5)
-	pool.handleAddedEvent(peer, &p2p.PeerEvent{})
+	// another peer added after discovery is stopped should not panic
+	pool.events <- &p2p.PeerEvent{Type: p2p.PeerEventTypeAdd}
+}
+
+func TestPeerPoolDiscV5Timeout(t *testing.T) {
+	signals := make(chan string)
+	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+		var envelope struct {
+			Type  string
+			Event json.RawMessage
+		}
+		require.NoError(t, json.Unmarshal([]byte(jsonEvent), &envelope))
+		// Send signal asynchronously to avoid blocking.
+		// It's better than sending to a buffered channel because
+		// it won't ever block, for example, if two events were expected
+		// but received more.
+		// In this case, a strange PeerEventTypeDrop event was emitted.
+		go func() {
+			switch typ := envelope.Type; typ {
+			case DiscoveryStarted, DiscoveryStopped:
+				signals <- envelope.Type
+			}
+		}()
+	})
+	defer signal.ResetDefaultNodeNotificationHandler()
+
+	// start server
+	key, err := crypto.GenerateKey()
+	require.NoError(t, err)
+	server := &p2p.Server{
+		Config: p2p.Config{
+			PrivateKey:  key,
+			DiscoveryV5: true,
+			NoDiscovery: true,
+		},
+	}
+	require.NoError(t, server.Start())
+	defer server.Stop()
+	require.NotNil(t, server.DiscV5)
+
+	// start PeerPool
+	pool := NewPeerPool(nil, DefaultFastSync, DefaultSlowSync, nil, true)
+	pool.discServerTimeout = time.Millisecond * 100
+	require.NoError(t, pool.Start(server))
+	require.Equal(t, DiscoveryStarted, <-signals)
+
+	// timeout after finding no peers
+	select {
+	case sig := <-signals:
+		require.Equal(t, DiscoveryStopped, sig)
+	case <-time.After(pool.discServerTimeout * 2):
+		t.Fatal("timed out")
+	}
+	require.Nil(t, server.DiscV5)
+
+	// timeout after discovery restart
+	require.NoError(t, pool.restartDiscovery(server))
+	require.Equal(t, DiscoveryStarted, <-signals)
+	require.NotNil(t, server.DiscV5)
+	pool.events <- &p2p.PeerEvent{Type: p2p.PeerEventTypeDrop} // required to turn the loop and pick up new timeout
+	select {
+	case sig := <-signals:
+		require.Equal(t, DiscoveryStopped, sig)
+	case <-time.After(pool.discServerTimeout * 2):
+		t.Fatal("timed out")
+	}
+	require.Nil(t, server.DiscV5)
 }
