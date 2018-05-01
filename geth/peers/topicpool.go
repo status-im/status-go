@@ -129,7 +129,6 @@ func (t *TopicPool) updateSyncMode() {
 	if len(t.connectedPeers) < t.limits.Min {
 		newMode = t.fastMode
 	}
-
 	t.setSyncMode(newMode)
 }
 
@@ -141,21 +140,24 @@ func (t *TopicPool) setSyncMode(mode time.Duration) {
 	t.period <- mode
 	t.currentMode = mode
 
-	if mode == t.fastMode {
-		t.limitFastMode(t.fastModeTimeout)
+	// if selected mode is fast mode and fast mode timeout was not set yet,
+	// do it now
+	if mode == t.fastMode && t.fastModeTimeoutCancel == nil {
+		t.fastModeTimeoutCancel = t.limitFastMode(t.fastModeTimeout)
+	}
+	// remove fast mode timeout as slow mode is selected now
+	if mode == t.slowMode && t.fastModeTimeoutCancel != nil {
+		close(t.fastModeTimeoutCancel)
+		t.fastModeTimeoutCancel = nil
 	}
 }
 
-func (t *TopicPool) limitFastMode(timeout time.Duration) {
+func (t *TopicPool) limitFastMode(timeout time.Duration) chan struct{} {
 	if timeout == 0 {
-		return
+		return nil
 	}
 
-	if t.fastModeTimeoutCancel != nil {
-		close(t.fastModeTimeoutCancel)
-	}
 	cancel := make(chan struct{})
-	t.fastModeTimeoutCancel = cancel
 
 	t.wg.Add(1)
 	go func() {
@@ -170,6 +172,8 @@ func (t *TopicPool) limitFastMode(timeout time.Duration) {
 			return
 		}
 	}()
+
+	return cancel
 }
 
 // ConfirmAdded called when peer was added by p2p Server.

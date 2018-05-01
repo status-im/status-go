@@ -75,7 +75,9 @@ func (s *TopicPoolSuite) TestTimeoutFastMode() {
 	s.topicPool.fastModeTimeout = time.Millisecond * 50
 
 	// set fast mode
+	s.topicPool.mu.Lock()
 	s.topicPool.setSyncMode(s.topicPool.fastMode)
+	s.topicPool.mu.Unlock()
 	s.Equal(s.topicPool.fastMode, <-s.topicPool.period)
 
 	// switch to slow mode after `fastModeTimeout`
@@ -88,8 +90,9 @@ func (s *TopicPoolSuite) TestTimeoutFastMode() {
 }
 
 func (s *TopicPoolSuite) TestSetSyncMode() {
-	// init with fast sync mode
 	s.topicPool.fastModeTimeout = 0
+
+	// set fast mode
 	s.topicPool.setSyncMode(s.topicPool.fastMode)
 	s.Equal(s.topicPool.fastMode, <-s.topicPool.period)
 	s.Equal(s.topicPool.fastMode, s.topicPool.currentMode)
@@ -101,6 +104,19 @@ func (s *TopicPoolSuite) TestSetSyncMode() {
 		s.FailNow("should not have update the mode")
 	default:
 		// pass
+	}
+
+	// switch to slow mode
+	cancel := make(chan struct{})
+	s.topicPool.fastModeTimeoutCancel = cancel // should be set to nil
+	s.topicPool.setSyncMode(s.topicPool.slowMode)
+	s.Equal(s.topicPool.slowMode, <-s.topicPool.period)
+	s.Equal(s.topicPool.slowMode, s.topicPool.currentMode)
+	select {
+	case <-cancel:
+		s.Nil(s.topicPool.fastModeTimeoutCancel)
+	default:
+		s.FailNow("cancel should be closed")
 	}
 }
 
