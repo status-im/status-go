@@ -3,15 +3,17 @@ package messenger
 import (
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/node"
 )
 
 // TODO(adriacidre) Probably better move this to structs
-var (
+const (
 	generateSymKeyFromPasswordFormat = `{"jsonrpc":"2.0","id":2950,"method":"shh_generateSymKeyFromPassword","params":["%s"]}`
 	newMessageFilterFormat           = `{"jsonrpc":"2.0","id":2,"method":"shh_newMessageFilter","params":[{"allowP2P":true,"topics":["%s"],"type":"sym","symKeyID":"%s"}]}`
 	getFilterMessagesFormat          = `{"jsonrpc":"2.0","id":2968,"method":"shh_getFilterMessages","params":["%s"]}`
@@ -60,7 +62,6 @@ func (c *Messenger) Login(addr, password string) (string, error) {
 		return "", err
 	}
 
-	log.Println("ADDING PRIVATE KEY :", accountKey.PrivateKey)
 	keyID, err := w.AddKeyPair(accountKey.PrivateKey)
 	if err != nil {
 		return "", err
@@ -83,7 +84,7 @@ func (c *Messenger) JoinPublicChannel(channelName string) (string, string, strin
 		return "", "", ""
 	}
 
-	key := f.(map[string]interface{})["result"].(string)
+	keyID := f.(map[string]interface{})["result"].(string)
 	id := int(f.(map[string]interface{})["id"].(float64))
 
 	src := []byte(channelName)
@@ -95,10 +96,10 @@ func (c *Messenger) JoinPublicChannel(channelName string) (string, string, strin
 		// TODO (adriacidre) return this error
 		return "", "", ""
 	}
-	topic := f1.(map[string]interface{})["result"].(string)
-	topic = topic[0:10]
+	topicID := f1.(map[string]interface{})["result"].(string)
+	topicID = topicID[0:10]
 
-	cmd = fmt.Sprintf(newMessageFilterFormat, topic, key)
+	cmd = fmt.Sprintf(newMessageFilterFormat, topicID, keyID)
 	res := c.sn.RPCClient().CallRaw(cmd)
 	f3, err := unmarshalJSON(res)
 	filterID := f3.(map[string]interface{})["result"].(string)
@@ -107,7 +108,7 @@ func (c *Messenger) JoinPublicChannel(channelName string) (string, string, strin
 		return "", "", ""
 	}
 
-	return filterID, topic, key
+	return filterID, topicID, keyID
 }
 
 // Publish : The typical message exchanged between 2 users.
@@ -130,7 +131,7 @@ func (c *Messenger) Publish(addressKeyID, chName, chKey, chTopic, body, username
 // Subscribe : subscribes to the given whisper filters and executes the
 // given logic for each supported matching message
 func (c *Messenger) Subscribe(filters []string, fn MsgHandler) *Subscription {
-	// TODO (adriacidre) store and allow subsrcription management
+	// TODO (adriacidre) store and allow subscription management
 	s := NewSubscription(c.sn, filters, fn)
 	go s.Subscribe()
 
@@ -140,6 +141,20 @@ func (c *Messenger) Subscribe(filters []string, fn MsgHandler) *Subscription {
 func unmarshalJSON(j string) (interface{}, error) {
 	var v interface{}
 	return v, json.Unmarshal([]byte(j), &v)
+}
+
+func parseErrorFromJSON(json string) error {
+	if strings.Contains(json, "error\":") {
+		f, err := unmarshalJSON(json)
+		if err == nil {
+			errorObject := f.(map[string]interface{})["error"].(interface{})
+			errMessage := errorObject.(map[string]interface{})["message"].(string)
+			err = errors.New(errMessage)
+		}
+		return err
+	}
+
+	return nil
 }
 
 // NewContactKeyRequest : First message that is sent to a future contact. At that
@@ -153,32 +168,38 @@ func unmarshalJSON(j string) (interface{}, error) {
 // metadata.
 // When one of the contacts recovers his account, a NewContactKey message is
 // sent as well to change the symmetric key and topic.
-func (c *Messenger) NewContactKeyRequest(addressKeyID, chTopic, chKey, username string) {
+func (c *Messenger) NewContactKeyRequest(addressKeyID, chTopic, chKey, username string) error {
 	contactRequest := fmt.Sprintf(contactRequestMsg, username, "", "", "")
 	msg := fmt.Sprintf(newContactKeyMsg, addressKeyID, chTopic, contactRequest)
 
-	c.callStandardMsg(msg, addressKeyID, chKey, chTopic)
+	err := parseErrorFromJSON(c.callStandardMsg(msg, addressKeyID, chKey, chTopic))
+
+	return err
 }
 
 // ContactRequest : Wrapped in a NewContactKey message when initiating a contact request.
-func (c *Messenger) ContactRequest(addressKeyID, chKey, chTopic, username, image string) {
+func (c *Messenger) ContactRequest(addressKeyID, chKey, chTopic, username, image string) error {
 	msg := fmt.Sprintf(contactRequestMsg, username, image, addressKeyID, "")
-	c.callStandardMsg(msg, addressKeyID, chKey, chTopic)
+	err := parseErrorFromJSON(c.callStandardMsg(msg, addressKeyID, chKey, chTopic))
+
+	return err
 }
 
 // ConfirmedContactRequest : This is the message that will be sent when the
 // contact accepts the contact request. It will be sent on the topic that
 // was provided in the NewContactKey message and use the sym-key.
 // Both users will therefore have the same filter.
-func (c *Messenger) ConfirmedContactRequest(addressKeyID, chKey, chTopic, username, image string) {
+func (c *Messenger) ConfirmedContactRequest(addressKeyID, chKey, chTopic, username, image string) error {
 	msg := fmt.Sprintf(confirmedContactRequestMsg, username, image, addressKeyID, "")
-	c.callStandardMsg(msg, addressKeyID, chKey, chTopic)
+	err := parseErrorFromJSON(c.callStandardMsg(msg, addressKeyID, chKey, chTopic))
+
+	return err
 }
 
 // ContactUpdateRequest : Sent when the user changes his name or profile-image.
-func (c *Messenger) ContactUpdateRequest(addressKeyID, chKey, chTopic, username, image string) {
+func (c *Messenger) ContactUpdateRequest(addressKeyID, chKey, chTopic, username, image string) error {
 	msg := fmt.Sprintf(contactUpdateMsg, username, image)
-	c.callStandardMsg(msg, addressKeyID, chKey, chTopic)
+	return parseErrorFromJSON(c.callStandardMsg(msg, addressKeyID, chKey, chTopic))
 }
 
 // SeenRequest : Sent when a user sees a message (opens the chat and loads the
@@ -189,13 +210,14 @@ func (c *Messenger) SeenRequest(addressKeyID, chKey, chTopic string, ids []strin
 		return err
 	}
 
+	// TODO (pombeirp): Fix number of arguments to Sprintf
 	msg := fmt.Sprintf(seenMsg, body)
-	c.callStandardMsg(msg, addressKeyID, chKey, chTopic)
+	err = parseErrorFromJSON(c.callStandardMsg(msg, addressKeyID, chKey, chTopic))
 
-	return nil
+	return err
 }
 
-func (c *Messenger) callStandardMsg(input, addressKeyID, chKey, chTopic string) {
+func (c *Messenger) callStandardMsg(input, addressKeyID, chKey, chTopic string) string {
 	cfg := c.sn.Config()
 	msg := rawrChatMessage(input)
 
@@ -206,5 +228,5 @@ func (c *Messenger) callStandardMsg(input, addressKeyID, chKey, chTopic string) 
 		chTopic,
 		cfg.WhisperConfig.MinimumPoW)
 
-	c.sn.RPCClient().CallRaw(cmd)
+	return c.sn.RPCClient().CallRaw(cmd)
 }

@@ -7,6 +7,7 @@ import (
 
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/notifier"
 )
 
 var (
@@ -18,13 +19,13 @@ var (
 )
 
 func main() {
-	var n *Notifier
+	var n *notifier.Notifier
 	var node *node.StatusNode
 
 	flag.Parse()
 
 	address := *pushNotificationURI
-	if n = New(address); n == nil {
+	if n = notifier.New(address); n == nil {
 		panic("Couldn't connect to push notification server on " + address)
 	}
 	defer func() {
@@ -33,12 +34,12 @@ func main() {
 		}
 	}()
 
-	if node = statusNode(); node == nil {
+	if node = notifier.NewStatusNode(*dataDir, *clusterConfigFile, uint64(*networkID)); node == nil {
 		panic("Couldn't setup the node")
 	}
 
 	t := *discoveryTopic
-	m := NewMessenger(node, t, 5*time.Second)
+	m := notifier.NewMessenger(node, t, 5*time.Second)
 	if m == nil {
 		panic("Error while creating the PN server")
 	}

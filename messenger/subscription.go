@@ -23,19 +23,19 @@ type Subscription struct {
 	unsubscribe chan bool
 }
 
-// NewSubscription : creates a new subsription object
+// NewSubscription : creates a new subscription object
 func NewSubscription(sn *node.StatusNode, filters []string, handler MsgHandler) *Subscription {
 	return &Subscription{
-		sn:      sn,
-		filters: filters,
-		handler: handler,
+		sn:          sn,
+		filters:     filters,
+		handler:     handler,
+		unsubscribe: make(chan bool),
 	}
 }
 
 // Subscribe : Listens to a specific topic and executes the given function for
 // each message
 func (s *Subscription) Subscribe() {
-	s.unsubscribe = make(chan bool)
 	for {
 		select {
 		case <-s.unsubscribe:
