@@ -12,7 +12,7 @@ import (
 
 	"github.com/status-im/status-go/geth/jail"
 	"github.com/status-im/status-go/geth/node"
-	"github.com/status-im/status-go/geth/signal"
+	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/static"
 	"github.com/status-im/status-go/t/e2e"
 	"github.com/stretchr/testify/suite"
@@ -160,7 +160,7 @@ func (s *JailTestSuite) TestEventSignal() {
 		unmarshalErr := json.Unmarshal([]byte(jsonEvent), &envelope)
 		s.NoError(unmarshalErr)
 
-		if envelope.Type == jail.EventSignal {
+		if envelope.Type == signal.EventJailSignal {
 			event := envelope.Event.(map[string]interface{})
 			chatID, ok := event["chat_id"].(string)
 			s.True(ok, "chat id is required, but not found")

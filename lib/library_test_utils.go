@@ -33,9 +33,9 @@ import (
 
 	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/params"
-	"github.com/status-im/status-go/geth/signal"
 	"github.com/status-im/status-go/geth/transactions"
 	"github.com/status-im/status-go/sign"
+	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/static"
 	. "github.com/status-im/status-go/t/utils" //nolint: golint
 )
@@ -825,7 +825,7 @@ func testCompleteTransaction(t *testing.T) bool {
 			t.Errorf("cannot unmarshal event's JSON: %s. Error %q", jsonEvent, err)
 			return
 		}
-		if envelope.Type == sign.EventSignRequestAdded {
+		if envelope.Type == signal.EventSignRequestAdded {
 			event := envelope.Event.(map[string]interface{})
 			t.Logf("transaction queued (will be completed shortly): {id: %s}\n", event["id"].(string))
 
@@ -902,7 +902,7 @@ func testCompleteMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocyc
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
 		}
-		if envelope.Type == sign.EventSignRequestAdded {
+		if envelope.Type == signal.EventSignRequestAdded {
 			event := envelope.Event.(map[string]interface{})
 			txID = event["id"].(string)
 			t.Logf("transaction queued (will be completed in a single call, once aggregated): {id: %s}\n", txID)
@@ -1034,7 +1034,7 @@ func testDiscardTransaction(t *testing.T) bool { //nolint: gocyclo
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
 		}
-		if envelope.Type == sign.EventSignRequestAdded {
+		if envelope.Type == signal.EventSignRequestAdded {
 			event := envelope.Event.(map[string]interface{})
 			txID = event["id"].(string)
 			t.Logf("transaction queued (will be discarded soon): {id: %s}\n", txID)
@@ -1072,7 +1072,7 @@ func testDiscardTransaction(t *testing.T) bool { //nolint: gocyclo
 			completeQueuedTransaction <- struct{}{} // so that timeout is aborted
 		}
 
-		if envelope.Type == sign.EventSignRequestFailed {
+		if envelope.Type == signal.EventSignRequestFailed {
 			event := envelope.Event.(map[string]interface{})
 			t.Logf("transaction return event received: {id: %s}\n", event["id"].(string))
 
@@ -1148,7 +1148,7 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocycl
 			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
 			return
 		}
-		if envelope.Type == sign.EventSignRequestAdded {
+		if envelope.Type == signal.EventSignRequestAdded {
 			event := envelope.Event.(map[string]interface{})
 			txID = event["id"].(string)
 			t.Logf("transaction queued (will be discarded soon): {id: %s}\n", txID)
@@ -1161,7 +1161,7 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocycl
 			txIDs <- txID
 		}
 
-		if envelope.Type == sign.EventSignRequestFailed {
+		if envelope.Type == signal.EventSignRequestFailed {
 			event := envelope.Event.(map[string]interface{})
 			t.Logf("transaction return event received: {id: %s}\n", event["id"].(string))
 
@@ -1462,7 +1462,7 @@ func startTestNode(t *testing.T) <-chan struct{} {
 			return
 		}
 
-		if envelope.Type == sign.EventSignRequestAdded {
+		if envelope.Type == signal.EventSignRequestAdded {
 		}
 		if envelope.Type == signal.EventNodeStarted {
 			t.Log("Node started, but we wait till it be ready")

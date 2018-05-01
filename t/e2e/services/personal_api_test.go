@@ -9,9 +9,8 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	acc "github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/params"
-	"github.com/status-im/status-go/geth/signal"
 	"github.com/status-im/status-go/services/personal"
-	"github.com/status-im/status-go/sign"
+	"github.com/status-im/status-go/signal"
 	e2e "github.com/status-im/status-go/t/e2e"
 	"github.com/stretchr/testify/suite"
 
@@ -171,7 +170,7 @@ func (s *PersonalSignSuite) notificationHandlerNoAccountSelected(account string,
 	return func(jsonEvent string) {
 		s.notificationHandler(account, pass, acc.ErrNoAccountSelected)(jsonEvent)
 		envelope := unmarshalEnvelope(jsonEvent)
-		if envelope.Type == sign.EventSignRequestAdded {
+		if envelope.Type == signal.EventSignRequestAdded {
 			err := s.Backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 			s.NoError(err)
 		}
@@ -182,7 +181,7 @@ func (s *PersonalSignSuite) notificationHandlerNoAccountSelected(account string,
 func (s *PersonalSignSuite) notificationHandler(account string, pass string, expectedError error) func(string) {
 	return func(jsonEvent string) {
 		envelope := unmarshalEnvelope(jsonEvent)
-		if envelope.Type == sign.EventSignRequestAdded {
+		if envelope.Type == signal.EventSignRequestAdded {
 			event := envelope.Event.(map[string]interface{})
 			id := event["id"].(string)
 			s.T().Logf("Sign request added (will be completed shortly): {id: %s}\n", id)

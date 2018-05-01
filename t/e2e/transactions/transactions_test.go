@@ -16,9 +16,9 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/geth/account"
 	"github.com/status-im/status-go/geth/params"
-	"github.com/status-im/status-go/geth/signal"
 	"github.com/status-im/status-go/geth/transactions"
 	"github.com/status-im/status-go/sign"
+	"github.com/status-im/status-go/signal"
 	e2e "github.com/status-im/status-go/t/e2e"
 	. "github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/suite"
@@ -57,7 +57,7 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransaction() {
 		err := json.Unmarshal([]byte(rawSignal), &sg)
 		s.NoError(err)
 
-		if sg.Type == sign.EventSignRequestAdded {
+		if sg.Type == signal.EventSignRequestAdded {
 			event := sg.Event.(map[string]interface{})
 			//check for the correct method name
 			method := event["method"].(string)
@@ -110,7 +110,7 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransactionUpstream() {
 		err := json.Unmarshal([]byte(rawSignal), &signalEnvelope)
 		s.NoError(err)
 
-		if signalEnvelope.Type == sign.EventSignRequestAdded {
+		if signalEnvelope.Type == signal.EventSignRequestAdded {
 			event := signalEnvelope.Event.(map[string]interface{})
 			txID := event["id"].(string)
 
@@ -165,8 +165,8 @@ func (s *TransactionsTestSuite) TestEmptyToFieldPreserved() {
 		}
 		err := json.Unmarshal([]byte(rawSignal), &sg)
 		s.NoError(err)
-		if sg.Type == sign.EventSignRequestAdded {
-			var event sign.PendingRequestEvent
+		if sg.Type == signal.EventSignRequestAdded {
+			var event signal.PendingRequestEvent
 			s.NoError(json.Unmarshal(sg.Event, &event))
 			args := event.Args.(map[string]interface{})
 			s.NotNil(args["from"])
@@ -250,7 +250,7 @@ func (s *TransactionsTestSuite) setDefaultNodeNotificationHandler(signRequestRes
 		err := json.Unmarshal([]byte(jsonEvent), &envelope)
 		s.NoError(err, fmt.Sprintf("cannot unmarshal JSON: %s", jsonEvent))
 
-		if envelope.Type == sign.EventSignRequestAdded {
+		if envelope.Type == signal.EventSignRequestAdded {
 			event := envelope.Event.(map[string]interface{})
 			log.Info("transaction queued (will be completed shortly)", "id", event["id"].(string))
 
@@ -408,7 +408,7 @@ func (s *TransactionsTestSuite) TestSendEtherTxUpstream() {
 		err = json.Unmarshal([]byte(jsonEvent), &envelope)
 		s.NoError(err, "cannot unmarshal JSON: %s", jsonEvent)
 
-		if envelope.Type == sign.EventSignRequestAdded {
+		if envelope.Type == signal.EventSignRequestAdded {
 			event := envelope.Event.(map[string]interface{})
 			log.Info("transaction queued (will be completed shortly)", "id", event["id"].(string))
 
@@ -465,7 +465,7 @@ func (s *TransactionsTestSuite) TestDoubleCompleteQueuedTransactions() {
 		err := json.Unmarshal([]byte(jsonEvent), &envelope)
 		s.NoError(err, fmt.Sprintf("cannot unmarshal JSON: %s", jsonEvent))
 
-		if envelope.Type == sign.EventSignRequestAdded {
+		if envelope.Type == signal.EventSignRequestAdded {
 			event := envelope.Event.(map[string]interface{})
 			txID := string(event["id"].(string))
 			log.Info("transaction queued (will be failed and completed on the second call)", "id", txID)
@@ -488,7 +488,7 @@ func (s *TransactionsTestSuite) TestDoubleCompleteQueuedTransactions() {
 			close(completeQueuedTransaction)
 		}
 
-		if envelope.Type == sign.EventSignRequestFailed {
+		if envelope.Type == signal.EventSignRequestFailed {
 			event := envelope.Event.(map[string]interface{})
 			log.Info("transaction return event received", "id", event["id"].(string))
 
@@ -543,7 +543,7 @@ func (s *TransactionsTestSuite) TestDiscardQueuedTransaction() {
 		err := json.Unmarshal([]byte(jsonEvent), &envelope)
 		s.NoError(err, fmt.Sprintf("cannot unmarshal JSON: %s", jsonEvent))
 
-		if envelope.Type == sign.EventSignRequestAdded {
+		if envelope.Type == signal.EventSignRequestAdded {
 			event := envelope.Event.(map[string]interface{})
 			txID := string(event["id"].(string))
 			log.Info("transaction queued (will be discarded soon)", "id", txID)
@@ -565,7 +565,7 @@ func (s *TransactionsTestSuite) TestDiscardQueuedTransaction() {
 			close(completeQueuedTransaction)
 		}
 
-		if envelope.Type == sign.EventSignRequestFailed {
+		if envelope.Type == signal.EventSignRequestFailed {
 			event := envelope.Event.(map[string]interface{})
 			log.Info("transaction return event received", "id", event["id"].(string))
 
@@ -633,7 +633,7 @@ func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
 		var envelope signal.Envelope
 		err := json.Unmarshal([]byte(jsonEvent), &envelope)
 		s.NoError(err)
-		if envelope.Type == sign.EventSignRequestAdded {
+		if envelope.Type == signal.EventSignRequestAdded {
 			event := envelope.Event.(map[string]interface{})
 			txID := string(event["id"].(string))
 			log.Info("transaction queued (will be discarded soon)", "id", txID)
@@ -643,7 +643,7 @@ func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
 			txIDs <- txID
 		}
 
-		if envelope.Type == sign.EventSignRequestFailed {
+		if envelope.Type == signal.EventSignRequestFailed {
 			event := envelope.Event.(map[string]interface{})
 			log.Info("transaction return event received", "id", event["id"].(string))
 
@@ -785,7 +785,7 @@ func (s *TransactionsTestSuite) sendConcurrentTransactions(testTxCount int) {
 		err := json.Unmarshal([]byte(jsonEvent), &envelope)
 		require.NoError(err, fmt.Sprintf("cannot unmarshal JSON: %s", jsonEvent))
 
-		if envelope.Type == sign.EventSignRequestAdded {
+		if envelope.Type == signal.EventSignRequestAdded {
 			event := envelope.Event.(map[string]interface{})
 			txID := string(event["id"].(string))
 			log.Info("transaction queued (will be completed in a single call, once aggregated)", "id", txID)

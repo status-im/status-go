@@ -12,8 +12,7 @@ import (
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
-	"github.com/status-im/status-go/geth/signal"
-	"github.com/status-im/status-go/services/shhext"
+	"github.com/status-im/status-go/signal"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -57,7 +56,7 @@ func (s *WhisperExtensionSuite) TestSentSignal() {
 		s.NoError(json.Unmarshal([]byte(rawSignal), &sg))
 
 		if sg.Type == signal.EventEnvelopeSent {
-			var event shhext.EnvelopeSignal
+			var event signal.EnvelopeSignal
 			s.NoError(json.Unmarshal(sg.Event, &event))
 			confirmed <- event.Hash
 		}
@@ -95,7 +94,7 @@ func (s *WhisperExtensionSuite) TestExpiredSignal() {
 		s.NoError(json.Unmarshal([]byte(rawSignal), &sg))
 
 		if sg.Type == signal.EventEnvelopeExpired {
-			var event shhext.EnvelopeSignal
+			var event signal.EnvelopeSignal
 			s.NoError(json.Unmarshal(sg.Event, &event))
 			expired <- event.Hash
 		}

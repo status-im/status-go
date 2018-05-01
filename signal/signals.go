@@ -15,7 +15,7 @@ import (
 )
 
 // All general log messages in this package should be routed through this logger.
-var logger = log.New("package", "status-go/geth/signal")
+var logger = log.New("package", "status-go/signal")
 
 // Envelope is a general signal sent upward from node to RN app
 type Envelope struct {
