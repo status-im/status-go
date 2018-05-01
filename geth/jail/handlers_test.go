@@ -14,7 +14,7 @@ import (
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/rpc"
-	"github.com/status-im/status-go/geth/signal"
+	"github.com/status-im/status-go/signal"
 	"github.com/stretchr/testify/suite"
 )
 

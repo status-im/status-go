@@ -9,7 +9,7 @@ import (
 
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/jail/console"
-	"github.com/status-im/status-go/geth/signal"
+	"github.com/status-im/status-go/signal"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -41,7 +41,7 @@ func (s *ConsoleTestSuite) TestConsoleLog() {
 
 	err := s.vm.Set("console", map[string]interface{}{
 		"log": func(fn otto.FunctionCall) otto.Value {
-			return console.Write(fn, &customWriter, "vm.console")
+			return console.Write(fn, &customWriter)
 		},
 	})
 	require.NoError(err)
@@ -70,7 +70,7 @@ func (s *ConsoleTestSuite) TestObjectLogging() {
 		err := json.Unmarshal([]byte(event), &eventReceived)
 		require.NoError(err)
 
-		require.Equal(eventReceived.Type, "vm.console")
+		require.Equal(eventReceived.Type, signal.EventVmConsole)
 		require.NotEmpty(eventReceived.Event)
 
 		objectReceived := eventReceived.Event[0]
@@ -80,7 +80,7 @@ func (s *ConsoleTestSuite) TestObjectLogging() {
 
 	err := s.vm.Set("console", map[string]interface{}{
 		"log": func(fn otto.FunctionCall) otto.Value {
-			return console.Write(fn, &customWriter, "vm.console")
+			return console.Write(fn, &customWriter)
 		},
 	})
 	require.NoError(err)

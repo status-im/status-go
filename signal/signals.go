@@ -95,9 +95,15 @@ func TriggerDefaultNodeNotificationHandler(jsonEvent string) {
 	logger.Info("Notification received", "event", jsonEvent)
 }
 
-// Send sends application signal (JSON, normally) upwards to application (via default notification handler)
-func Send(signal Envelope) {
-	data, _ := json.Marshal(&signal)
+// TODO: remove this after refactoring
+func Send(e Envelope) { sendSignal(e) }
+
+// sendSignal sends application signal (JSON, normally) upwards to application (via default notification handler)
+func sendSignal(signal Envelope) {
+	data, err := json.Marshal(&signal)
+	if err != nil {
+		logger.Error("Marshalling signal envelope", "error", err)
+	}
 	C.StatusServiceSignalEvent(C.CString(string(data)))
 }
 

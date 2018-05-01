@@ -5,14 +5,7 @@ import (
 
 	"github.com/robertkrimen/otto"
 	"github.com/status-im/status-go/geth/jail/console"
-	"github.com/status-im/status-go/geth/signal"
-)
-
-const (
-	// EventSignal is a signal from jail.
-	EventSignal = "jail.signal"
-	// eventConsoleLog defines the event type for the console.log call.
-	eventConsoleLog = "vm.console.log"
+	"github.com/status-im/status-go/signal"
 )
 
 // registerWeb3Provider creates an object called "jeth",
@@ -21,7 +14,7 @@ func registerWeb3Provider(jail *Jail, cell *Cell) error {
 	jeth := map[string]interface{}{
 		"console": map[string]interface{}{
 			"log": func(fn otto.FunctionCall) otto.Value {
-				return console.Write(fn, os.Stdout, eventConsoleLog)
+				return console.Write(fn, os.Stdout)
 			},
 		},
 		"send":        createSendHandler(jail, cell),
@@ -132,16 +125,7 @@ func createSendSignalHandler(cell *Cell) func(otto.FunctionCall) otto.Value {
 	return func(call otto.FunctionCall) otto.Value {
 		message := call.Argument(0).String()
 
-		signal.Send(signal.Envelope{
-			Type: EventSignal,
-			Event: struct {
-				ChatID string `json:"chat_id"`
-				Data   string `json:"data"`
-			}{
-				ChatID: cell.id,
-				Data:   message,
-			},
-		})
+		signal.SendJailSignal(cell.id, message)
 
 		// As it's a sync call, it's called already from a thread-safe context,
 		// thus using otto.Otto directly. Otherwise, it would try to acquire a lock again

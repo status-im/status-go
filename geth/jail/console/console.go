@@ -6,19 +6,17 @@ import (
 	"strings"
 
 	"github.com/robertkrimen/otto"
-	"github.com/status-im/status-go/geth/signal"
+	"github.com/status-im/status-go/signal"
 )
 
 // Write provides the base function to write data to the underline writer
 // for the underline otto vm.
-func Write(fn otto.FunctionCall, w io.Writer, consoleEventName string) otto.Value {
-	signal.Send(signal.Envelope{
-		Type:  consoleEventName,
-		Event: convertArgs(fn.ArgumentList),
-	})
+func Write(fn otto.FunctionCall, w io.Writer) otto.Value {
+	args := convertArgs(fn.ArgumentList)
+	signal.SendConsole(args)
 
 	// Next print out the giving values.
-	fmt.Fprintf(w, "%s: %s", consoleEventName, formatForConsole(fn.ArgumentList))
+	fmt.Fprintf(w, "%s: %s", signal.EventVmConsole, formatForConsole(fn.ArgumentList))
 
 	return otto.UndefinedValue()
 }
