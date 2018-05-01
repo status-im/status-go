@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 
 	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/signal"
 )
 
 var (
@@ -87,7 +88,7 @@ func (p *PeerPool) Start(server *p2p.Server) error {
 		}
 		p.topics = append(p.topics, topicPool)
 	}
-	SendDiscoveryStarted() // discovery must be started when pool is started
+	signal.SendDiscoveryStarted() // discovery must be started when pool is started
 
 	events := make(chan *p2p.PeerEvent, 20)
 	p.serverSubscription = server.SubscribeEvents(events)
@@ -109,7 +110,7 @@ func (p *PeerPool) restartDiscovery(server *p2p.Server) error {
 		}
 		log.Debug("restarted discovery from peer pool")
 		server.DiscV5 = ntab
-		SendDiscoveryStarted()
+		signal.SendDiscoveryStarted()
 	}
 	for _, t := range p.topics {
 		if !t.BelowMin() || t.SearchRunning() {
@@ -162,7 +163,7 @@ func (p *PeerPool) handleAddedEvent(server *p2p.Server, event *p2p.PeerEvent) {
 		log.Debug("closing discv5 connection", "server", server.Self())
 		server.DiscV5.Close()
 		server.DiscV5 = nil
-		SendDiscoveryStopped()
+		signal.SendDiscoveryStopped()
 	}
 }
 
