@@ -138,7 +138,7 @@ ignored = [ "github.com/ethereum/go-ethereum/ethapi" ]
 
 [[override]]
   name = "github.com/syndtr/goleveldb"
-  revision = "34011bf325bce385408353a30b101fe5e923eb6e"
+  revision = "169b1b37be738edb2813dab48c97a549bcf99bb5"
 
 [[constraint]]
   branch = "master"

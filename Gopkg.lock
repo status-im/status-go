@@ -345,7 +345,7 @@
     "leveldb/table",
     "leveldb/util"
   ]
-  revision = "34011bf325bce385408353a30b101fe5e923eb6e"
+  revision = "169b1b37be738edb2813dab48c97a549bcf99bb5"
 
 [[projects]]
   branch = "master"
@@ -483,6 +483,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "749bac1b2eea5afcdd2fdca30c2d1b68763378c463f7c409742de028c4fe8402"
+  inputs-digest = "760ef0bfdecf48e51bf8a9e4409c04d46d1c74c8c42a8ca75447d5fd197f5095"
   solver-name = "gps-cdcl"
   solver-version = 1
