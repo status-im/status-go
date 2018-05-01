@@ -15,22 +15,6 @@ import (
 )
 
 const (
-	// EventNodeStarted is triggered when underlying node is started
-	EventNodeStarted = "node.started"
-
-	// EventNodeReady is triggered when underlying node is fully ready
-	// (consider backend to be fully registered)
-	EventNodeReady = "node.ready"
-
-	// EventNodeStopped is triggered when underlying node is fully stopped
-	EventNodeStopped = "node.stopped"
-
-	// EventNodeCrashed is triggered when node crashes
-	EventNodeCrashed = "node.crashed"
-
-	// EventChainDataRemoved is triggered when node's chain data is removed
-	EventChainDataRemoved = "chaindata.removed"
-
 	// EventEnvelopeSent is triggered when envelope was sent atleast to a one peer.
 	EventEnvelopeSent = "envelope.sent"
 
@@ -46,25 +30,6 @@ var logger = log.New("package", "status-go/geth/signal")
 type Envelope struct {
 	Type  string      `json:"type"`
 	Event interface{} `json:"event"`
-}
-
-// NodeCrashEvent is special kind of error, used to report node crashes
-type NodeCrashEvent struct {
-	Error error `json:"error"`
-}
-
-// MarshalJSON implements the json.Marshaller interface.
-//
-// This is needed because error type may not have exported
-// fields (it just need to satisfy 'error' interface), but
-// json marshaller will only marshal exported fields.
-// See https://github.com/golang/go/issues/5161
-func (e NodeCrashEvent) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
-		Error string `json:"error"`
-	}{
-		Error: e.Error.Error(),
-	})
 }
 
 // NodeNotificationHandler defines a handler able to process incoming node events.

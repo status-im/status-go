@@ -17,10 +17,10 @@ import (
 	"github.com/status-im/status-go/geth/notifications/push/fcm"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/rpc"
-	"github.com/status-im/status-go/geth/signal"
 	"github.com/status-im/status-go/geth/transactions"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/sign"
+	"github.com/status-im/status-go/signal"
 )
 
 const (
@@ -114,12 +114,7 @@ func (b *StatusBackend) StartNode(config *params.NodeConfig) error {
 	defer b.mu.Unlock()
 
 	if err := b.startNode(config); err != nil {
-		signal.Send(signal.Envelope{
-			Type: signal.EventNodeCrashed,
-			Event: signal.NodeCrashEvent{
-				Error: err,
-			},
-		})
+		signal.SendNodeCrashed(err)
 
 		return err
 	}
@@ -137,7 +132,7 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 	if err = b.statusNode.Start(config); err != nil {
 		return
 	}
-	signal.Send(signal.Envelope{Type: signal.EventNodeStarted})
+	signal.SendNodeStarted()
 
 	b.transactor.SetNetworkID(config.NetworkID)
 	b.transactor.SetRPC(b.statusNode.RPCClient(), rpc.DefaultCallTimeout)
@@ -155,7 +150,7 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 	}
 	b.log.Info("Account reselected")
 
-	signal.Send(signal.Envelope{Type: signal.EventNodeReady})
+	signal.SendNodeReady()
 
 	return nil
 }
@@ -172,7 +167,7 @@ func (b *StatusBackend) stopNode() error {
 		return node.ErrNoRunningNode
 	}
 	b.jailManager.Stop()
-	defer signal.Send(signal.Envelope{Type: signal.EventNodeStopped})
+	defer signal.SendNodeStopped()
 	return b.statusNode.Stop()
 }
 
@@ -205,7 +200,7 @@ func (b *StatusBackend) ResetChainData() error {
 	if err := b.statusNode.ResetChainData(&newcfg); err != nil {
 		return err
 	}
-	signal.Send(signal.Envelope{Type: signal.EventChainDataRemoved})
+	signal.SendChainDataRemoved()
 	return b.startNode(&newcfg)
 }
 
