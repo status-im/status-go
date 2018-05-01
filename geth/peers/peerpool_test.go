@@ -257,7 +257,7 @@ func TestPeerPoolDiscV5Timeout(t *testing.T) {
 
 	// start PeerPool
 	pool := NewPeerPool(nil, DefaultFastSync, DefaultSlowSync, nil, true)
-	pool.discServerTimeout = time.Millisecond * 10
+	pool.discServerTimeout = time.Millisecond * 100
 	require.NoError(t, pool.Start(server))
 	require.Equal(t, DiscoveryStarted, <-signals)
 
