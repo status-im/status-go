@@ -156,7 +156,7 @@ lint:
 	@echo "lint"
 	@gometalinter ./...
 
-ci: lint mock test-unit test-e2e ##@tests Run all linters and tests at once
+ci: lint mock dep-ensure test-unit test-e2e ##@tests Run all linters and tests at once
 
 clean: ##@other Cleanup
 	rm -fr build/bin/*

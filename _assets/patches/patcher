@@ -182,7 +182,7 @@ for ((i=0; i<${#patches[@]}; i++)); do
 		echo "Failed and reverting: $f"
 		gitApplyReverse "$f" "$basepath"
 		echo -en "\\n"
-		exit
+		exit 1
 	fi
 done
 
