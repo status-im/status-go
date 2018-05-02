@@ -41,11 +41,12 @@ func statusNode() *node.StatusNode {
 
 // makeNodeConfig : generates the config for a whisper based node
 func makeNodeConfig() (*params.NodeConfig, error) {
-	devMode := !*prodMode
 	nodeConfig, err := params.NewNodeConfig(*dataDir, *clusterConfigFile, uint64(*networkID), devMode)
 	if err != nil {
 		return nil, err
 	}
+
+	nodeConfig.LightEthConfig.Enabled = false
 
 	whisperConfig := nodeConfig.WhisperConfig
 	whisperConfig.Enabled = true

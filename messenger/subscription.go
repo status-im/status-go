@@ -108,7 +108,7 @@ func messageFromPayload(payload string) (*Msg, error) {
 	properties := msg[1].([]interface{})
 
 	return &Msg{
-		Type:      msg[0].(string),
+		Type:      msgType,
 		From:      "TODO : someone",
 		Text:      properties[0].(string),
 		Timestamp: int64(properties[3].(float64)),

@@ -20,7 +20,7 @@ var (
 
 	messagePayloadMsg          = `["~#c4",["%s","text/plain","~:public-group-user-message",%d,%d]]`
 	newContactKeyMsg           = `["~#c1",["%s","%s",%s]`
-	contactRequestMsg          = `["~#c2",["%s","%s","%s","%s”]]]`
+	contactRequestMsg          = `["~#c2",["%s","%s","%s","%s"]]]`
 	confirmedContactRequestMsg = `["~#c3",["%s","%s","%s","%s"]]`
 	contactUpdateMsg           = `["~#c6",["%s","%s"]]`
 	seenMsg                    = `["~#c5",["%s","%s"]]`
