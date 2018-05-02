@@ -2,7 +2,6 @@ package params
 
 type cluster struct {
 	NetworkID   int      `json:"networkID"`
-	Discovery   bool     `json:"discovery"`
 	StaticNodes []string `json:"staticnodes"`
 	BootNodes   []string `json:"bootnodes"`
 }
@@ -17,7 +16,6 @@ var ropstenCluster = cluster{
 
 var rinkebyCluster = cluster{
 	NetworkID: 4,
-	Discovery: true,
 	BootNodes: []string{
 		"enode://1b843c7697f6fc42a1f606fb3cfaac54e025f06789dc20ad9278be3388967cf21e3a1b1e4be51faecd66c2c3adef12e942b4fcdeb8727657abe60636efb6224f@206.189.6.46:30404",
 		"enode://b29100c8468e3e6604817174a15e4d71627458b0dcdbeea169ab2eb4ab2bbc6f24adbb175826726cec69db8fdba6c0dd60b3da598e530ede562180d300728659@206.189.6.48:30404",

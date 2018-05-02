@@ -302,7 +302,7 @@ var loadConfigTestCases = []struct {
 		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
 			require.NoError(t, err)
 			require.True(t, nodeConfig.ClusterConfig.Enabled, "cluster configuration is expected to be enabled by default")
-			require.True(t, nodeConfig.Discovery)
+			require.False(t, nodeConfig.NoDiscovery)
 			require.True(t, len(nodeConfig.ClusterConfig.BootNodes) >= 2)
 		},
 	},
@@ -343,9 +343,21 @@ var loadConfigTestCases = []struct {
 		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
 			require.NoError(t, err)
 			require.NotNil(t, nodeConfig.RequireTopics)
-			require.True(t, nodeConfig.Discovery)
+			require.False(t, nodeConfig.NoDiscovery)
 			require.Contains(t, nodeConfig.RequireTopics, params.WhisperDiscv5Topic)
 			require.Equal(t, params.WhisperDiscv5Limits, nodeConfig.RequireTopics[params.WhisperDiscv5Topic])
+		},
+	},
+	{
+		`no discovery preserved`,
+		`{
+			"NetworkId": 4,
+			"DataDir": "$TMPDIR",
+			"NoDiscovery": true
+		}`,
+		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
+			require.NoError(t, err)
+			require.True(t, nodeConfig.NoDiscovery)
 		},
 	},
 }

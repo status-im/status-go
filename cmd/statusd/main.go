@@ -253,7 +253,7 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 		nodeConfig.ClusterConfig.BootNodes = nil
 	}
 
-	nodeConfig.Discovery = *discovery
+	nodeConfig.NoDiscovery = !(*discovery)
 	nodeConfig.RequireTopics = map[discv5.Topic]params.Limits(searchTopics)
 	nodeConfig.RegisterTopics = []discv5.Topic(registerTopics)
 
