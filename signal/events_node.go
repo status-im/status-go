@@ -23,7 +23,7 @@ type NodeCrashEvent struct {
 	Error string `json:"error"`
 }
 
-// SendNodeStarted emits a signal when status node has crashed, and
+// SendNodeCrashed emits a signal when status node has crashed, and
 // provides error description.
 func SendNodeCrashed(err error) {
 	send(EventNodeCrashed,

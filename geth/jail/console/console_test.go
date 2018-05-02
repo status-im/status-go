@@ -70,7 +70,7 @@ func (s *ConsoleTestSuite) TestObjectLogging() {
 		err := json.Unmarshal([]byte(event), &eventReceived)
 		require.NoError(err)
 
-		require.Equal(eventReceived.Type, signal.EventVmConsole)
+		require.Equal(eventReceived.Type, signal.EventVMConsole)
 		require.NotEmpty(eventReceived.Event)
 
 		objectReceived := eventReceived.Event[0]

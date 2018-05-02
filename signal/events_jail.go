@@ -1,13 +1,14 @@
 package signal
 
+// Jail related event names
 const (
-	EventVmConsole  = "vm.console"
+	EventVMConsole  = "vm.console"
 	EventJailSignal = "jail.signal"
 )
 
 // SendConsole is a signal sent when jail writes anything to console.
 func SendConsole(args interface{}) {
-	send(EventVmConsole, args)
+	send(EventVMConsole, args)
 }
 
 // SendJailSignal is nobody knows what.
