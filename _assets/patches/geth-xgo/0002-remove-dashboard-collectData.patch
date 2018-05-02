@@ -1,11 +1,11 @@
-diff --git a/vendor/github.com/ethereum/go-ethereum/dashboard/dashboard.go b/vendor/github.com/ethereum/go-ethereum/dashboard/dashboard.go
-index 09038638..070ecca3 100644
---- a/vendor/github.com/ethereum/go-ethereum/dashboard/dashboard.go
-+++ b/vendor/github.com/ethereum/go-ethereum/dashboard/dashboard.go
-@@ -29,17 +29,14 @@ import (
+diff --git i/vendor/github.com/ethereum/go-ethereum/dashboard/dashboard.go w/vendor/github.com/ethereum/go-ethereum/dashboard/dashboard.go
+index 399fa34c0..711dc8c34 100644
+--- i/vendor/github.com/ethereum/go-ethereum/dashboard/dashboard.go
++++ w/vendor/github.com/ethereum/go-ethereum/dashboard/dashboard.go
+@@ -27,14 +27,11 @@ import (
+ 	"fmt"
  	"net"
  	"net/http"
- 	"path/filepath"
 -	"runtime"
  	"sync"
  	"sync/atomic"
@@ -13,26 +13,25 @@ index 09038638..070ecca3 100644
  
 -	"github.com/elastic/gosigar"
  	"github.com/ethereum/go-ethereum/log"
+-	"github.com/ethereum/go-ethereum/metrics"
  	"github.com/ethereum/go-ethereum/p2p"
  	"github.com/ethereum/go-ethereum/params"
  	"github.com/ethereum/go-ethereum/rpc"
--	"github.com/rcrowley/go-metrics"
- 	"golang.org/x/net/websocket"
- )
- 
-@@ -274,108 +271,6 @@ func (db *Dashboard) apiHandler(conn *websocket.Conn) {
+@@ -261,109 +258,6 @@ func (db *Dashboard) apiHandler(conn *websocket.Conn) {
  // collectData collects the required data to plot on the dashboard.
  func (db *Dashboard) collectData() {
  	defer db.wg.Done()
 -	systemCPUUsage := gosigar.Cpu{}
 -	systemCPUUsage.Get()
 -	var (
+-		mem runtime.MemStats
+-
 -		prevNetworkIngress = metrics.DefaultRegistry.Get("p2p/InboundTraffic").(metrics.Meter).Count()
 -		prevNetworkEgress  = metrics.DefaultRegistry.Get("p2p/OutboundTraffic").(metrics.Meter).Count()
 -		prevProcessCPUTime = getProcessCPUTime()
 -		prevSystemCPUUsage = systemCPUUsage
--		prevDiskRead       = metrics.DefaultRegistry.Get("eth/db/chaindata/compact/input").(metrics.Meter).Count()
--		prevDiskWrite      = metrics.DefaultRegistry.Get("eth/db/chaindata/compact/output").(metrics.Meter).Count()
+-		prevDiskRead       = metrics.DefaultRegistry.Get("eth/db/chaindata/disk/read").(metrics.Meter).Count()
+-		prevDiskWrite      = metrics.DefaultRegistry.Get("eth/db/chaindata/disk/write").(metrics.Meter).Count()
 -
 -		frequency = float64(db.config.Refresh / time.Second)
 -		numCPU    = float64(runtime.NumCPU())
@@ -50,13 +49,13 @@ index 09038638..070ecca3 100644
 -				curNetworkEgress  = metrics.DefaultRegistry.Get("p2p/OutboundTraffic").(metrics.Meter).Count()
 -				curProcessCPUTime = getProcessCPUTime()
 -				curSystemCPUUsage = systemCPUUsage
--				curDiskRead       = metrics.DefaultRegistry.Get("eth/db/chaindata/compact/input").(metrics.Meter).Count()
--				curDiskWrite      = metrics.DefaultRegistry.Get("eth/db/chaindata/compact/output").(metrics.Meter).Count()
+-				curDiskRead       = metrics.DefaultRegistry.Get("eth/db/chaindata/disk/read").(metrics.Meter).Count()
+-				curDiskWrite      = metrics.DefaultRegistry.Get("eth/db/chaindata/disk/write").(metrics.Meter).Count()
 -
 -				deltaNetworkIngress = float64(curNetworkIngress - prevNetworkIngress)
 -				deltaNetworkEgress  = float64(curNetworkEgress - prevNetworkEgress)
 -				deltaProcessCPUTime = curProcessCPUTime - prevProcessCPUTime
--				deltaSystemCPUUsage = systemCPUUsage.Delta(prevSystemCPUUsage)
+-				deltaSystemCPUUsage = curSystemCPUUsage.Delta(prevSystemCPUUsage)
 -				deltaDiskRead       = curDiskRead - prevDiskRead
 -				deltaDiskWrite      = curDiskWrite - prevDiskWrite
 -			)
@@ -69,7 +68,6 @@ index 09038638..070ecca3 100644
 -
 -			now := time.Now()
 -
--			var mem runtime.MemStats
 -			runtime.ReadMemStats(&mem)
 -			activeMemory := &ChartEntry{
 -				Time:  now,
@@ -113,7 +111,7 @@ index 09038638..070ecca3 100644
 -			db.charts.DiskWrite = append(db.charts.DiskRead[1:], diskWrite)
 -
 -			db.sendToAll(&Message{
--				Home: &HomeMessage{
+-				System: &SystemMessage{
 -					ActiveMemory:   ChartEntries{activeMemory},
 -					VirtualMemory:  ChartEntries{virtualMemory},
 -					NetworkIngress: ChartEntries{networkIngress},
