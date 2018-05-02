@@ -13,22 +13,15 @@ const (
 
 // SendDiscoveryStarted sends discovery.started signal.
 func SendDiscoveryStarted() {
-	sendSignal(Envelope{
-		Type: EventDiscoveryStarted,
-	})
+	send(EventDiscoveryStarted, nil)
 }
 
 // SendDiscoveryStopped sends discovery.stopped signal.
 func SendDiscoveryStopped() {
-	sendSignal(Envelope{
-		Type: EventDiscoveryStopped,
-	})
+	send(EventDiscoveryStopped, nil)
 }
 
 // SendDiscoverySummary sends discovery.summary signal.
 func SendDiscoverySummary(summary map[string]int) {
-	sendSignal(Envelope{
-		Type:  EventDiscoverySummary,
-		Event: summary,
-	})
+	send(EventDiscoverySummary, nil)
 }

@@ -17,10 +17,7 @@ type PendingRequestEvent struct {
 
 // SendSignRequestAdded sends a signal when a sign request is added.
 func SendSignRequestAdded(event PendingRequestEvent) {
-	sendSignal(Envelope{
-		Type:  EventSignRequestAdded,
-		Event: event,
-	})
+	send(EventSignRequestAdded, event)
 }
 
 // PendingRequestErrorEvent is a signal sent when sign request has failed
@@ -32,12 +29,10 @@ type PendingRequestErrorEvent struct {
 
 // SendSignRequestFailed sends a signal of failed sign request.
 func SendSignRequestFailed(event PendingRequestEvent, err error, errCode int) {
-	sendSignal(Envelope{
-		Type: EventSignRequestFailed,
-		Event: PendingRequestErrorEvent{
+	send(EventSignRequestFailed,
+		PendingRequestErrorEvent{
 			PendingRequestEvent: event,
 			ErrorMessage:        err.Error(),
 			ErrorCode:           errCode,
-		},
-	})
+		})
 }

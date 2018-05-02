@@ -23,6 +23,24 @@ type Envelope struct {
 	Event interface{} `json:"event"`
 }
 
+// NewEnvelope creates new envlope of given type and event payload.
+func NewEnvelope(typ string, event interface{}) *Envelope {
+	return &Envelope{
+		Type:  typ,
+		Event: event,
+	}
+}
+
+// send sends application signal (in JSON) upwards to application (via default notification handler)
+func send(typ string, event interface{}) {
+	signal := NewEnvelope(typ, event)
+	data, err := json.Marshal(&signal)
+	if err != nil {
+		logger.Error("Marshalling signal envelope", "error", err)
+	}
+	C.StatusServiceSignalEvent(C.CString(string(data)))
+}
+
 // NodeNotificationHandler defines a handler able to process incoming node events.
 // Events are encoded as JSON strings.
 type NodeNotificationHandler func(jsonEvent string)
@@ -49,18 +67,6 @@ func ResetDefaultNodeNotificationHandler() {
 // TriggerDefaultNodeNotificationHandler triggers default notification handler (helpful in tests)
 func TriggerDefaultNodeNotificationHandler(jsonEvent string) {
 	logger.Info("Notification received", "event", jsonEvent)
-}
-
-// TODO: remove this after refactoring
-func Send(e Envelope) { sendSignal(e) }
-
-// sendSignal sends application signal (JSON, normally) upwards to application (via default notification handler)
-func sendSignal(signal Envelope) {
-	data, err := json.Marshal(&signal)
-	if err != nil {
-		logger.Error("Marshalling signal envelope", "error", err)
-	}
-	C.StatusServiceSignalEvent(C.CString(string(data)))
 }
 
 //export NotifyNode

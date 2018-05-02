@@ -26,40 +26,30 @@ type NodeCrashEvent struct {
 // SendNodeStarted emits a signal when status node has crashed, and
 // provides error description.
 func SendNodeCrashed(err error) {
-	sendSignal(Envelope{
-		Type: EventNodeCrashed,
-		Event: NodeCrashEvent{
+	send(EventNodeCrashed,
+		NodeCrashEvent{
 			Error: err.Error(),
-		},
-	})
+		})
 }
 
 // SendNodeStarted emits a signal when status node has just started (but not
 // finished startup yet).
 func SendNodeStarted() {
-	sendSignal(Envelope{
-		Type: EventNodeStarted,
-	})
+	send(EventNodeStarted, nil)
 }
 
 // SendNodeReady emits a signal when status node has started and successfully
 // completed startup.
 func SendNodeReady() {
-	sendSignal(Envelope{
-		Type: EventNodeReady,
-	})
+	send(EventNodeReady, nil)
 }
 
 // SendNodeStopped emits a signal when underlying node has stopped.
 func SendNodeStopped() {
-	sendSignal(Envelope{
-		Type: EventNodeStopped,
-	})
+	send(EventNodeStopped, nil)
 }
 
 // SendChainDataRemoved emits a signal when node's chain data has been removed.
 func SendChainDataRemoved() {
-	sendSignal(Envelope{
-		Type: EventChainDataRemoved,
-	})
+	send(EventChainDataRemoved, nil)
 }

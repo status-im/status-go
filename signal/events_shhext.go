@@ -18,16 +18,10 @@ type EnvelopeSignal struct {
 
 // SendEnvelopeSent triggered when envelope delivered at least to 1 peer.
 func SendEnvelopeSent(hash common.Hash) {
-	sendSignal(Envelope{
-		Type:  EventEnvelopeSent,
-		Event: EnvelopeSignal{hash},
-	})
+	send(EventEnvelopeSent, EnvelopeSignal{hash})
 }
 
 // SendEnvelopeExpired triggered when envelope delivered at least to 1 peer.
 func SendEnvelopeExpired(hash common.Hash) {
-	sendSignal(Envelope{
-		Type:  EventEnvelopeExpired,
-		Event: EnvelopeSignal{hash},
-	})
+	send(EventEnvelopeExpired, EnvelopeSignal{hash})
 }
