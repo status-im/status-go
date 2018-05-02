@@ -19,27 +19,18 @@ type Deduplicator struct {
 }
 
 // NewDeduplicator creates a new deduplicator
-func NewDeduplicator(keyPairProvider keyPairProvider) *Deduplicator {
+func NewDeduplicator(keyPairProvider keyPairProvider, db *leveldb.DB) *Deduplicator {
 	return &Deduplicator{
 		log:             log.New("package", "status-go/services/sshext.deduplicator"),
 		keyPairProvider: keyPairProvider,
+		cache:           newCache(db),
 	}
-}
-
-// Start enabled deduplication.
-func (d *Deduplicator) Start(db *leveldb.DB) error {
-	d.cache = newCache(db)
-	return nil
 }
 
 // Deduplicate receives a list of whisper messages and
 // returns the list of the messages that weren't filtered previously for the
 // specified filter.
 func (d *Deduplicator) Deduplicate(messages []*whisper.Message) []*whisper.Message {
-	if d.cache == nil {
-		d.log.Info("Deduplication wasn't started. Returning all the messages.")
-		return messages
-	}
 	result := make([]*whisper.Message, 0)
 
 	for _, message := range messages {
@@ -51,13 +42,11 @@ func (d *Deduplicator) Deduplicate(messages []*whisper.Message) []*whisper.Messa
 		}
 	}
 
-	// Put all the messages there, for simplicity.
-	// That way, we will always have repeating messages in the current day.
-	// Performance implications seem negligible on 30000 messages/day
-	err := d.cache.Put(d.keyPairProvider.SelectedKeyPairID(), messages)
-	if err != nil {
-		d.log.Error("error while deduplicating messages: cache update failed", "err", err)
-	}
-
 	return result
+}
+
+// AddMessages adds a message to the deduplicator DB, so it will be filtered
+// out.
+func (d *Deduplicator) AddMessages(messages []*whisper.Message) error {
+	return d.cache.Put(d.keyPairProvider.SelectedKeyPairID(), messages)
 }

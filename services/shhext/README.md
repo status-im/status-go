@@ -4,9 +4,34 @@ Whisper API Extension
 API
 ---
 
+
+#### shhext_getNewFilterMessages
+
+Accepts the same input as [`shh_getFilterMessages`](https://github.com/ethereum/wiki/wiki/JSON-RPC#shh_getFilterChanges).
+
+##### Returns
+
+Returns a list of whisper messages matching the specified filter. Filters out
+the messages already confirmed received by [`shhext_confirmMessagesProcessed`](#shhextconfirmmessagesprocessed)
+
+Deduplication is made using the whisper envelope content and topic only, so the
+same content received in different whisper envelopes will be deduplicated.
+
+
+#### shhext_confirmMessagesProcessed
+
+Confirms whisper messages received and processed on the client side. These
+messages won't appear anymore when [`shhext_getNewFilterMessages`](#shhextgetnewfiltermessages) 
+is called.
+
+##### Parameters
+
+Gets a list of whisper envelopes.
+
+
 #### shhext_post
 
-Accepts same input as shh_post (see https://github.com/ethereum/wiki/wiki/JSON-RPC#shh_post)
+Accepts same input as [`shh_post`](https://github.com/ethereum/wiki/wiki/JSON-RPC#shh_post).
 
 ##### Returns
 

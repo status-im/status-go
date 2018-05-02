@@ -66,7 +66,7 @@ func (s *ShhExtSuite) SetupTest() {
 		s.NoError(stack.Register(func(n *node.ServiceContext) (node.Service, error) {
 			return s.whisper[i], nil
 		}))
-		s.services[i] = New(s.whisper[i], nil)
+		s.services[i] = New(s.whisper[i], nil, nil)
 		s.NoError(stack.Register(func(n *node.ServiceContext) (node.Service, error) {
 			return s.services[i], nil
 		}))
@@ -159,7 +159,7 @@ func (s *ShhExtSuite) TestRequestMessages() {
 	}()
 
 	mock := newHandlerMock(1)
-	service := New(shh, mock)
+	service := New(shh, mock, nil)
 	api := NewPublicAPI(service)
 
 	const (

@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/storage"
@@ -39,10 +40,7 @@ func BenchmarkDeduplicate30000MessagesADay(b *testing.B) {
 		panic(err)
 	}
 
-	d := NewDeduplicator(dummyKeyPairProvider{})
-	if err := d.Start(db); err != nil {
-		panic(err)
-	}
+	d := NewDeduplicator(dummyKeyPairProvider{}, db)
 
 	b.Log("generating messages")
 	messagesOld := generateMessages(100000)
@@ -65,6 +63,7 @@ func BenchmarkDeduplicate30000MessagesADay(b *testing.B) {
 		messages := messagesOld[start:(start + length)]
 		start += length
 		d.Deduplicate(messages)
+		assert.NoError(b, d.AddMessages(messages))
 	}
 }
 
@@ -84,8 +83,7 @@ func (s *DeduplicatorTestSuite) SetupTest() {
 		panic(err)
 	}
 	s.db = db
-	s.d = NewDeduplicator(dummyKeyPairProvider{})
-	s.NoError(s.d.Start(db))
+	s.d = NewDeduplicator(dummyKeyPairProvider{}, db)
 }
 
 func (s *DeduplicatorTestSuite) TearDownTest() {
@@ -99,12 +97,14 @@ func (s *DeduplicatorTestSuite) TestDeduplicateSingleFilter() {
 
 	result := s.d.Deduplicate(messages1)
 	s.Equal(len(messages1), len(result))
+	s.NoError(s.d.AddMessages(messages1))
 
 	result = s.d.Deduplicate(messages1)
 	s.Equal(0, len(result))
 
 	result = s.d.Deduplicate(messages2)
 	s.Equal(len(messages2), len(result))
+	s.NoError(s.d.AddMessages(messages2))
 
 	messages3 := append(messages2, generateMessages(11)...)
 
@@ -118,6 +118,8 @@ func (s *DeduplicatorTestSuite) TestDeduplicateMultipleFilters() {
 	s.d.keyPairProvider = dummyKeyPairProvider{"acc1"}
 	result := s.d.Deduplicate(messages1)
 	s.Equal(len(messages1), len(result))
+
+	s.NoError(s.d.AddMessages(messages1))
 
 	result = s.d.Deduplicate(messages1)
 	s.Equal(0, len(result))

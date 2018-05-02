@@ -124,7 +124,13 @@ func (api *PublicAPI) GetNewFilterMessages(filterID string) ([]*whisper.Message,
 	if err != nil {
 		return nil, err
 	}
-	return api.service.Deduplicator.Deduplicate(msgs), err
+	return api.service.deduplicator.Deduplicate(msgs), err
+}
+
+// ConfirmMessagesProcessed is a method to confirm that messages was consumed by
+// the client side.
+func (api *PublicAPI) ConfirmMessagesProcessed(messages []*whisper.Message) error {
+	return api.service.deduplicator.AddMessages(messages)
 }
 
 // -----
