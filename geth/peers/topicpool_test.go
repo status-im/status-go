@@ -40,15 +40,19 @@ func (s *TopicPoolSuite) SetupTest() {
 	topic := discv5.Topic("cap=cap1")
 	limits := params.NewLimits(1, 2)
 	s.topicPool = NewTopicPool(topic, limits, 100*time.Millisecond, 200*time.Millisecond)
-	s.topicPool.period = make(chan time.Duration, 2)
 	s.topicPool.running = 1
+	// This is a buffered channel to simplify testing.
+	// If your test generates more than 10 mode changes,
+	// override this `period` field or consume from it
+	// using `AssertConsumed()`.
+	s.topicPool.period = make(chan time.Duration, 10)
 }
 
 func (s *TopicPoolSuite) TearDown() {
 	s.peer.Stop()
 }
 
-func (s *TopicPoolSuite) AssertConsumed(channel chan time.Duration, expected time.Duration, timeout time.Duration) {
+func (s *TopicPoolSuite) AssertConsumed(channel <-chan time.Duration, expected time.Duration, timeout time.Duration) {
 	select {
 	case received := <-channel:
 		s.Equal(expected, received)
@@ -61,10 +65,59 @@ func (s *TopicPoolSuite) TestSyncSwitches() {
 	testPeer := discv5.NewNode(discv5.NodeID{1}, s.peer.Self().IP, 32311, 32311)
 	s.topicPool.processFoundNode(s.peer, testPeer)
 	s.topicPool.ConfirmAdded(s.peer, discover.NodeID(testPeer.ID))
-	s.AssertConsumed(s.topicPool.period, s.topicPool.slowSync, time.Second)
+	s.AssertConsumed(s.topicPool.period, s.topicPool.slowMode, time.Second)
 	s.NotNil(s.topicPool.connectedPeers[testPeer.ID])
 	s.topicPool.ConfirmDropped(s.peer, discover.NodeID(testPeer.ID))
-	s.AssertConsumed(s.topicPool.period, s.topicPool.fastSync, time.Second)
+	s.AssertConsumed(s.topicPool.period, s.topicPool.fastMode, time.Second)
+}
+
+func (s *TopicPoolSuite) TestTimeoutFastMode() {
+	s.topicPool.fastModeTimeout = time.Millisecond * 50
+
+	// set fast mode
+	s.topicPool.mu.Lock()
+	s.topicPool.setSyncMode(s.topicPool.fastMode)
+	s.topicPool.mu.Unlock()
+	s.Equal(s.topicPool.fastMode, <-s.topicPool.period)
+
+	// switch to slow mode after `fastModeTimeout`
+	select {
+	case mode := <-s.topicPool.period:
+		s.Equal(s.topicPool.slowMode, mode)
+	case <-time.After(s.topicPool.fastModeTimeout * 2):
+		s.FailNow("timed out")
+	}
+}
+
+func (s *TopicPoolSuite) TestSetSyncMode() {
+	s.topicPool.fastModeTimeout = 0
+
+	// set fast mode
+	s.topicPool.setSyncMode(s.topicPool.fastMode)
+	s.Equal(s.topicPool.fastMode, <-s.topicPool.period)
+	s.Equal(s.topicPool.fastMode, s.topicPool.currentMode)
+
+	// skip setting the same mode
+	s.topicPool.setSyncMode(s.topicPool.fastMode)
+	select {
+	case <-s.topicPool.period:
+		s.FailNow("should not have update the mode")
+	default:
+		// pass
+	}
+
+	// switch to slow mode
+	cancel := make(chan struct{})
+	s.topicPool.fastModeTimeoutCancel = cancel // should be set to nil
+	s.topicPool.setSyncMode(s.topicPool.slowMode)
+	s.Equal(s.topicPool.slowMode, <-s.topicPool.period)
+	s.Equal(s.topicPool.slowMode, s.topicPool.currentMode)
+	select {
+	case <-cancel:
+		s.Nil(s.topicPool.fastModeTimeoutCancel)
+	default:
+		s.FailNow("cancel should be closed")
+	}
 }
 
 func (s *TopicPoolSuite) TestNewPeerSelectedOnDrop() {
