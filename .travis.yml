@@ -13,6 +13,7 @@ jobs:
   include:
   - stage: Lint & Vendor Check
     sudo: required
+    before_script: make dep-ensure
     script:
       - make lint
       - make vendor-check
