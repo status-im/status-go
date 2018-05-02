@@ -47,6 +47,9 @@ func (e multiRPCError) Error() string {
 }
 
 func computeOffset(timeQuery ntpQuery, server string, attempts int) (time.Duration, error) {
+	if attempts == 0 {
+		return 0, nil
+	}
 	responses := make(chan queryResponse, attempts)
 	for i := 0; i < attempts; i++ {
 		go func() {
@@ -81,7 +84,11 @@ func computeOffset(timeQuery ntpQuery, server string, attempts int) (time.Durati
 	sort.SliceStable(offsets, func(i, j int) bool {
 		return offsets[i] > offsets[j]
 	})
-	return offsets[attempts/2], nil
+	mid := attempts / 2
+	if len(offsets)%2 == 0 {
+		return (offsets[mid-1] + offsets[mid]) / 2, nil
+	}
+	return offsets[mid], nil
 }
 
 // Default initializes time source with default config values.

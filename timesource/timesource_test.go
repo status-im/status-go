@@ -60,6 +60,15 @@ func newTestCases() []*testCase {
 			expected: 20 * time.Second,
 		},
 		{
+			description: "EvenMedian",
+			attempts:    2,
+			responses: []queryResponse{
+				{Offset: 10 * time.Second},
+				{Offset: 20 * time.Second},
+			},
+			expected: 15 * time.Second,
+		},
+		{
 			description: "Error",
 			attempts:    3,
 			responses: []queryResponse{
