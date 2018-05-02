@@ -1,58 +1,64 @@
 diff --git c/whisper/whisperv6/api.go w/whisper/whisperv6/api.go
-index 2de99f293..28086e75e 100644
+index 2de99f293..e0c3284b6 100644
 --- c/whisper/whisperv6/api.go
 +++ w/whisper/whisperv6/api.go
-@@ -289,6 +289,10 @@ func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (hexutil.
+@@ -285,7 +285,7 @@ func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (hexutil.
+ 	}
+ 
+ 	var result []byte
+-	env, err := whisperMsg.Wrap(params)
++	env, err := whisperMsg.Wrap(params, api.w.GetCurrentTime())
  	if err != nil {
  		return nil, err
  	}
-+	env.Expiry = uint32(api.w.GetCurrentTime().Add(time.Second * time.Duration(params.TTL)).Unix())
-+	if err := env.Seal(params); err != nil {
-+		return nil, err
-+	}
- 
- 	// send to specific node (skip PoW check)
- 	if len(req.TargetPeer) > 0 {
 diff --git c/whisper/whisperv6/envelope.go w/whisper/whisperv6/envelope.go
-index c42d1fa8a..bcab5b5ea 100644
+index c42d1fa8a..3b65fdba0 100644
 --- c/whisper/whisperv6/envelope.go
 +++ w/whisper/whisperv6/envelope.go
-@@ -64,11 +64,10 @@ func (e *Envelope) rlpWithoutNonce() []byte {
+@@ -62,9 +62,9 @@ func (e *Envelope) rlpWithoutNonce() []byte {
+ 
+ // NewEnvelope wraps a Whisper message with expiration and destination data
  // included into an envelope for network forwarding.
- func NewEnvelope(ttl uint32, topic TopicType, msg *sentMessage) *Envelope {
+-func NewEnvelope(ttl uint32, topic TopicType, msg *sentMessage) *Envelope {
++func NewEnvelope(ttl uint32, topic TopicType, msg *sentMessage, now time.Time) *Envelope {
  	env := Envelope{
 -		Expiry: uint32(time.Now().Add(time.Second * time.Duration(ttl)).Unix()),
--		TTL:    ttl,
--		Topic:  topic,
--		Data:   msg.Raw,
--		Nonce:  0,
-+		TTL:   ttl,
-+		Topic: topic,
-+		Data:  msg.Raw,
-+		Nonce: 0,
- 	}
- 
- 	return &env
++		Expiry: uint32(now.Add(time.Second * time.Duration(ttl)).Unix()),
+ 		TTL:    ttl,
+ 		Topic:  topic,
+ 		Data:   msg.Raw,
 diff --git c/whisper/whisperv6/message.go w/whisper/whisperv6/message.go
-index 2d4e86244..c91496820 100644
+index 2d4e86244..a12b445e2 100644
 --- c/whisper/whisperv6/message.go
 +++ w/whisper/whisperv6/message.go
-@@ -253,12 +253,7 @@ func (msg *sentMessage) Wrap(options *MessageParams) (envelope *Envelope, err er
- 	if err != nil {
- 		return nil, err
- 	}
--
--	envelope = NewEnvelope(options.TTL, options.Topic, msg)
--	if err = envelope.Seal(options); err != nil {
--		return nil, err
--	}
--	return envelope, nil
-+	return NewEnvelope(options.TTL, options.Topic, msg), nil
+@@ -27,6 +27,7 @@ import (
+ 	"errors"
+ 	mrand "math/rand"
+ 	"strconv"
++	"time"
+ 
+ 	"github.com/ethereum/go-ethereum/common"
+ 	"github.com/ethereum/go-ethereum/crypto"
+@@ -234,7 +235,7 @@ func generateSecureRandomData(length int) ([]byte, error) {
  }
  
- // decryptSymmetric decrypts a message with a topic key, using AES-GCM-256.
+ // Wrap bundles the message into an Envelope to transmit over the network.
+-func (msg *sentMessage) Wrap(options *MessageParams) (envelope *Envelope, err error) {
++func (msg *sentMessage) Wrap(options *MessageParams, now time.Time) (envelope *Envelope, err error) {
+ 	if options.TTL == 0 {
+ 		options.TTL = DefaultTTL
+ 	}
+@@ -254,7 +255,7 @@ func (msg *sentMessage) Wrap(options *MessageParams) (envelope *Envelope, err er
+ 		return nil, err
+ 	}
+ 
+-	envelope = NewEnvelope(options.TTL, options.Topic, msg)
++	envelope = NewEnvelope(options.TTL, options.Topic, msg, now)
+ 	if err = envelope.Seal(options); err != nil {
+ 		return nil, err
+ 	}
 diff --git c/whisper/whisperv6/whisper.go w/whisper/whisperv6/whisper.go
-index eb637b4ca..2be6a8c0f 100644
+index 8d56ece64..2bccfec33 100644
 --- c/whisper/whisperv6/whisper.go
 +++ w/whisper/whisperv6/whisper.go
 @@ -92,6 +92,8 @@ type Whisper struct {
