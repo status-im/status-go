@@ -110,11 +110,10 @@ func (n *StatusNode) Start(config *params.NodeConfig, services ...node.ServiceCo
 	if err := n.setupDeduplicator(); err != nil {
 		return err
 	}
-
-	if n.config.Discovery {
-		return n.startPeerPool()
+	if n.config.NoDiscovery {
+		return nil
 	}
-	return nil
+	return n.startPeerPool()
 }
 
 func (n *StatusNode) setupDeduplicator() error {
@@ -224,7 +223,7 @@ func (n *StatusNode) stop() error {
 }
 
 func (n *StatusNode) stopPeerPool() error {
-	if !n.config.Discovery {
+	if n.config.NoDiscovery {
 		return nil
 	}
 
