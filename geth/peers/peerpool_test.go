@@ -210,10 +210,10 @@ func TestPeerPoolMaxPeersOverflow(t *testing.T) {
 
 	pool := NewPeerPool(nil, DefaultFastSync, DefaultSlowSync, nil, true)
 	require.NoError(t, pool.Start(peer))
-	require.Equal(t, DiscoveryStarted, <-signals)
+	require.Equal(t, signal.EventDiscoveryStarted, <-signals)
 	// without config, it will stop the discovery because all topic pools are satisfied
 	pool.events <- &p2p.PeerEvent{Type: p2p.PeerEventTypeAdd}
-	require.Equal(t, DiscoveryStopped, <-signals)
+	require.Equal(t, signal.EventDiscoveryStopped, <-signals)
 	require.Nil(t, peer.DiscV5)
 	// another peer added after discovery is stopped should not panic
 	pool.events <- &p2p.PeerEvent{Type: p2p.PeerEventTypeAdd}
@@ -234,7 +234,7 @@ func TestPeerPoolDiscV5Timeout(t *testing.T) {
 		// In this case, a strange PeerEventTypeDrop event was emitted.
 		go func() {
 			switch typ := envelope.Type; typ {
-			case DiscoveryStarted, DiscoveryStopped:
+			case signal.EventDiscoveryStarted, signal.EventDiscoveryStopped:
 				signals <- envelope.Type
 			}
 		}()
@@ -259,12 +259,12 @@ func TestPeerPoolDiscV5Timeout(t *testing.T) {
 	pool := NewPeerPool(nil, DefaultFastSync, DefaultSlowSync, nil, true)
 	pool.discServerTimeout = time.Millisecond * 100
 	require.NoError(t, pool.Start(server))
-	require.Equal(t, DiscoveryStarted, <-signals)
+	require.Equal(t, signal.EventDiscoveryStarted, <-signals)
 
 	// timeout after finding no peers
 	select {
 	case sig := <-signals:
-		require.Equal(t, DiscoveryStopped, sig)
+		require.Equal(t, signal.EventDiscoveryStopped, sig)
 	case <-time.After(pool.discServerTimeout * 2):
 		t.Fatal("timed out")
 	}
@@ -272,12 +272,12 @@ func TestPeerPoolDiscV5Timeout(t *testing.T) {
 
 	// timeout after discovery restart
 	require.NoError(t, pool.restartDiscovery(server))
-	require.Equal(t, DiscoveryStarted, <-signals)
+	require.Equal(t, signal.EventDiscoveryStarted, <-signals)
 	require.NotNil(t, server.DiscV5)
 	pool.events <- &p2p.PeerEvent{Type: p2p.PeerEventTypeDrop} // required to turn the loop and pick up new timeout
 	select {
 	case sig := <-signals:
-		require.Equal(t, DiscoveryStopped, sig)
+		require.Equal(t, signal.EventDiscoveryStopped, sig)
 	case <-time.After(pool.discServerTimeout * 2):
 		t.Fatal("timed out")
 	}
