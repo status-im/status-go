@@ -40,15 +40,15 @@ func main() {
 	}
 
 	t := *discoveryTopic
-	m := notifier.NewMessenger(newRPCClient(backend), n, t, 5*time.Second)
+	m, err := notifier.NewMessenger(newRPCClient(backend), n, t, 5*time.Second)
 	if m == nil {
-		panic("Error while creating the PN server")
+		panic(err)
 	}
-	if err := m.BroadcastAvailability(); err != nil {
+	if err = m.BroadcastAvailability(); err != nil {
 		panic(err)
 	}
 	// TODO (adriacidre) : uncomment this
-	go m.ManageRegistrations()
+	go func() { _ = m.ManageRegistrations() }()
 
 	if backend.StatusNode().GethNode() != nil {
 		backend.StatusNode().GethNode().Wait()

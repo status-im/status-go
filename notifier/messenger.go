@@ -32,20 +32,21 @@ type NotificationRequestMsg struct {
 	// TODO (adriacidre) : Check @PombeirP what fields are needed here
 }
 
+// NotificationProvider represents the Push Notification Provider microservice,
+// which is capable of forwarding the actual Push Notifications to devices
 type NotificationProvider interface {
 	Send(tokens []string, message string) error
 }
 
 // NewMessenger Creates a new Messenger
-func NewMessenger(rpc sdk.RPCClient, n NotificationProvider, discoveryTopic string, pollInterval time.Duration) *Messenger {
+func NewMessenger(rpc sdk.RPCClient, n NotificationProvider, discoveryTopic string, pollInterval time.Duration) (*Messenger, error) {
 	password := "password"
 
-	client := sdk.New("")
-	client.RPCClient = rpc
+	client := sdk.New(rpc)
 	address, _, _, err := client.SignupAndLogin(password)
 	if err != nil {
 		log.Println(err.Error())
-		return nil
+		return nil, err
 	}
 
 	return &Messenger{
@@ -55,7 +56,7 @@ func NewMessenger(rpc sdk.RPCClient, n NotificationProvider, discoveryTopic stri
 		pollInterval:   pollInterval,
 		discoveryTopic: discoveryTopic,
 		client:         client,
-	}
+	}, nil
 }
 
 // BroadcastAvailability : Broadcasts its availability to serve as
@@ -71,7 +72,7 @@ func (m *Messenger) BroadcastAvailability() error {
 		for range time.Tick(m.pollInterval) {
 			// TODO (pombeirp): Listen to channel to determine when is time to exit
 			log.Println("Broadcasting availability on", m.discoveryTopic)
-			ch.PNBroadcastAvailabilityRequest()
+			_ = ch.PNBroadcastAvailabilityRequest()
 		}
 	}()
 
@@ -81,16 +82,18 @@ func (m *Messenger) BroadcastAvailability() error {
 // ManageRegistrations clients will be sending registration requests to the
 // messenger topic, this method retrieves those messages and stores its
 // information to allow push notifications
-func (m *Messenger) ManageRegistrations() {
+func (m *Messenger) ManageRegistrations() error {
 	log.Println("Subscribed to discovery topic :", m.discoveryTopic)
 	ch, err := m.client.JoinPublicChannel(m.discoveryTopic)
 	if err != nil {
 		log.Println("Can't manage registrations")
 		log.Println(err.Error())
-		return
+		return err
 	}
 
-	ch.Subscribe(m.processRegistration)
+	_, err = ch.Subscribe(m.processRegistration)
+
+	return err
 }
 
 // processRegistration : processes an input string to get the underlying
@@ -108,9 +111,10 @@ func (m *Messenger) processRegistration(msg *sdk.Msg) {
 		return
 	}
 	// TODO (adriacidre) send a registration confirmation with a new public key
-	ch.PNRegistrationConfirmationRequest(pubkey)
-	ch.Subscribe(m.manageNotificationRequests)
-
+	err = ch.PNRegistrationConfirmationRequest(pubkey)
+	if err == nil {
+		_, _ = ch.Subscribe(m.manageNotificationRequests)
+	}
 }
 
 func (m *Messenger) manageNotificationRequests(msg *sdk.Msg) {

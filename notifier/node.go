@@ -45,6 +45,7 @@ func makeNodeConfig(dataDir string, clusterConfigFile string, networkID uint64) 
 		return nil, err
 	}
 
+	nodeConfig.StatusServiceEnabled = true
 	nodeConfig.LightEthConfig.Enabled = false
 
 	whisperConfig := nodeConfig.WhisperConfig

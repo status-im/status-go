@@ -337,6 +337,12 @@
   version = "0.20.1"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/status-im/status-go-sdk"
+  packages = ["."]
+  revision = "2259b20eabbd9604f46f678440b2694f56e08ce6"
+
+[[projects]]
   name = "github.com/stretchr/testify"
   packages = [
     "assert",
@@ -545,6 +551,10 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
+<<<<<<< HEAD
   inputs-digest = "c82f110ad74f6540b5ba89202a3e4e6cca24a7ec9eedd35248a3aa1e6d626275"
+=======
+  inputs-digest = "132f0663ef3c6f78c5e0007ef8c9232496ed2fc7997019fe78c2039c0df4c605"
+>>>>>>> Add initial test for PN subscription process
   solver-name = "gps-cdcl"
   solver-version = 1
