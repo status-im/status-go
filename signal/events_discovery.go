@@ -23,5 +23,5 @@ func SendDiscoveryStopped() {
 
 // SendDiscoverySummary sends discovery.summary signal.
 func SendDiscoverySummary(summary map[string]int) {
-	send(EventDiscoverySummary, nil)
+	send(EventDiscoverySummary, summary)
 }
