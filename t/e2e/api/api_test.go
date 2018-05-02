@@ -16,6 +16,8 @@ import (
 	"github.com/status-im/status-go/signal"
 	. "github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/suite"
+	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/syndtr/goleveldb/leveldb/storage"
 )
 
 const (
@@ -253,8 +255,12 @@ func (s *APITestSuite) TestNodeStartCrash() {
 	nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
 
+	db, err := leveldb.Open(storage.NewMemStorage(), nil)
+	s.NoError(err)
+	defer func() { s.NoError(db.Close()) }()
+
 	// start node outside the manager (on the same port), so that manager node.Start() method fails
-	outsideNode, err := node.MakeNode(nodeConfig)
+	outsideNode, err := node.MakeNode(nodeConfig, db)
 	s.NoError(err)
 	err = outsideNode.Start()
 	s.NoError(err)

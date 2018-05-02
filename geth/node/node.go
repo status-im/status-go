@@ -27,6 +27,7 @@ import (
 	"github.com/status-im/status-go/services/shhext"
 	"github.com/status-im/status-go/services/status"
 	"github.com/status-im/status-go/timesource"
+	"github.com/syndtr/goleveldb/leveldb"
 )
 
 // Errors related to node and services creation.
@@ -42,7 +43,7 @@ var (
 var logger = log.New("package", "status-go/geth/node")
 
 // MakeNode create a geth node entity
-func MakeNode(config *params.NodeConfig) (*node.Node, error) {
+func MakeNode(config *params.NodeConfig, db *leveldb.DB) (*node.Node, error) {
 	// If DataDir is empty, it means we want to create an ephemeral node
 	// keeping data only in memory.
 	if config.DataDir != "" {
@@ -92,7 +93,7 @@ func MakeNode(config *params.NodeConfig) (*node.Node, error) {
 	}
 
 	// start Whisper service.
-	if err := activateShhService(stack, config); err != nil {
+	if err := activateShhService(stack, config, db); err != nil {
 		return nil, fmt.Errorf("%v: %v", ErrWhisperServiceRegistrationFailure, err)
 	}
 
@@ -188,7 +189,7 @@ func activateStatusService(stack *node.Node, config *params.NodeConfig) error {
 }
 
 // activateShhService configures Whisper and adds it to the given node.
-func activateShhService(stack *node.Node, config *params.NodeConfig) (err error) {
+func activateShhService(stack *node.Node, config *params.NodeConfig, db *leveldb.DB) (err error) {
 	if config.WhisperConfig == nil || !config.WhisperConfig.Enabled {
 		logger.Info("SHH protocol is disabled")
 		return nil
@@ -254,7 +255,7 @@ func activateShhService(stack *node.Node, config *params.NodeConfig) (err error)
 			return nil, err
 		}
 
-		svc := shhext.New(whisper, shhext.EnvelopeSignalHandler{})
+		svc := shhext.New(whisper, shhext.EnvelopeSignalHandler{}, db)
 		return svc, nil
 	})
 }

@@ -22,7 +22,6 @@ import (
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/geth/peers"
 	"github.com/status-im/status-go/geth/rpc"
-	"github.com/status-im/status-go/services/shhext"
 	"github.com/status-im/status-go/services/status"
 )
 
@@ -78,16 +77,8 @@ func (n *StatusNode) GethNode() *node.Node {
 	return n.gethNode
 }
 
-// Start starts current StatusNode, will fail if it's already started.
-func (n *StatusNode) Start(config *params.NodeConfig, services ...node.ServiceConstructor) error {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-
-	if n.isRunning() {
-		return ErrNodeRunning
-	}
-
-	if err := n.createNode(config); err != nil {
+func (n *StatusNode) startWithDB(config *params.NodeConfig, db *leveldb.DB, services []node.ServiceConstructor) error {
+	if err := n.createNode(config, db); err != nil {
 		return err
 	}
 	n.config = config
@@ -100,39 +91,44 @@ func (n *StatusNode) Start(config *params.NodeConfig, services ...node.ServiceCo
 		return err
 	}
 
-	statusDB, err := db.Create(n.config.DataDir, params.StatusDatabase)
-	if err != nil {
-		return err
-	}
+	n.db = db
 
-	n.db = statusDB
-
-	if err := n.setupDeduplicator(); err != nil {
-		return err
-	}
 	if n.config.NoDiscovery {
 		return nil
 	}
 	return n.startPeerPool()
 }
 
-func (n *StatusNode) setupDeduplicator() error {
-	var s shhext.Service
+// Start starts current StatusNode, will fail if it's already started.
+func (n *StatusNode) Start(config *params.NodeConfig, services ...node.ServiceConstructor) error {
+	n.mu.Lock()
+	defer n.mu.Unlock()
 
-	err := n.gethService(&s)
-	if err == node.ErrServiceUnknown {
-		return nil
+	if n.isRunning() {
+		return ErrNodeRunning
 	}
+
+	db, err := db.Create(config.DataDir, params.StatusDatabase)
 	if err != nil {
 		return err
 	}
 
-	return s.Deduplicator.Start(n.db)
+	err = n.startWithDB(config, db, services)
+
+	if err != nil {
+		if dberr := db.Close(); dberr != nil {
+			n.log.Error("error while closing leveldb after node crash", "error", dberr)
+		}
+		n.db = nil
+		return err
+	}
+
+	return nil
 }
 
-func (n *StatusNode) createNode(config *params.NodeConfig) (err error) {
-	n.gethNode, err = MakeNode(config)
-	return
+func (n *StatusNode) createNode(config *params.NodeConfig, db *leveldb.DB) (err error) {
+	n.gethNode, err = MakeNode(config, n.db)
+	return err
 }
 
 // start starts current StatusNode, will fail if it's already started.
@@ -214,16 +210,19 @@ func (n *StatusNode) stop() error {
 	n.gethNode = nil
 	n.config = nil
 
-	if err := n.db.Close(); err != nil {
+	if n.db != nil {
+		err := n.db.Close()
+
+		n.db = nil
+
 		return err
 	}
-	n.db = nil
 
 	return nil
 }
 
 func (n *StatusNode) stopPeerPool() error {
-	if n.config.NoDiscovery {
+	if n.config == nil || n.config.NoDiscovery {
 		return nil
 	}
 

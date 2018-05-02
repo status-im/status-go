@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"github.com/status-im/status-go/services/shhext/dedup"
+	"github.com/syndtr/goleveldb/leveldb"
 )
 
 // EnvelopeState in local tracker
@@ -34,14 +35,14 @@ type Service struct {
 	w            *whisper.Whisper
 	tracker      *tracker
 	nodeID       *ecdsa.PrivateKey
-	Deduplicator *dedup.Deduplicator
+	deduplicator *dedup.Deduplicator
 }
 
 // Make sure that Service implements node.Service interface.
 var _ node.Service = (*Service)(nil)
 
 // New returns a new Service.
-func New(w *whisper.Whisper, handler EnvelopeEventsHandler) *Service {
+func New(w *whisper.Whisper, handler EnvelopeEventsHandler, db *leveldb.DB) *Service {
 	track := &tracker{
 		w:       w,
 		handler: handler,
@@ -50,7 +51,7 @@ func New(w *whisper.Whisper, handler EnvelopeEventsHandler) *Service {
 	return &Service{
 		w:            w,
 		tracker:      track,
-		Deduplicator: dedup.NewDeduplicator(w),
+		deduplicator: dedup.NewDeduplicator(w, db),
 	}
 }
 
