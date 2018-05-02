@@ -27,6 +27,7 @@ import (
 	"errors"
 	mrand "math/rand"
 	"strconv"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -234,7 +235,7 @@ func generateSecureRandomData(length int) ([]byte, error) {
 }
 
 // Wrap bundles the message into an Envelope to transmit over the network.
-func (msg *sentMessage) Wrap(options *MessageParams) (envelope *Envelope, err error) {
+func (msg *sentMessage) Wrap(options *MessageParams, now time.Time) (envelope *Envelope, err error) {
 	if options.TTL == 0 {
 		options.TTL = DefaultTTL
 	}
@@ -253,7 +254,12 @@ func (msg *sentMessage) Wrap(options *MessageParams) (envelope *Envelope, err er
 	if err != nil {
 		return nil, err
 	}
-	return NewEnvelope(options.TTL, options.Topic, msg), nil
+
+	envelope = NewEnvelope(options.TTL, options.Topic, msg, now)
+	if err = envelope.Seal(options); err != nil {
+		return nil, err
+	}
+	return envelope, nil
 }
 
 // decryptSymmetric decrypts a message with a topic key, using AES-GCM-256.

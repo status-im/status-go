@@ -52,11 +52,11 @@ type MessagesRequest struct {
 	SymKeyID string `json:"symKeyID"`
 }
 
-func (r *MessagesRequest) setDefaults() {
+func (r *MessagesRequest) setDefaults(now time.Time) {
 	// set From and To defaults
 	if r.From == 0 && r.To == 0 {
-		r.From = uint32(time.Now().UTC().Add(-24 * time.Hour).Unix())
-		r.To = uint32(time.Now().UTC().Unix())
+		r.From = uint32(now.UTC().Add(-24 * time.Hour).Unix())
+		r.To = uint32(now.UTC().Unix())
 	}
 }
 
@@ -94,11 +94,9 @@ func (api *PublicAPI) Post(ctx context.Context, req whisper.NewMessage) (hash he
 // RequestMessages sends a request for historic messages to a MailServer.
 func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (bool, error) {
 	api.log.Info("RequestMessages", "request", r)
-
-	r.setDefaults()
-
 	shh := api.service.w
-
+	now := api.service.w.GetCurrentTime()
+	r.setDefaults(now)
 	mailServerNode, err := discover.ParseNode(r.MailServerPeer)
 	if err != nil {
 		return false, fmt.Errorf("%v: %v", ErrInvalidMailServerPeer, err)
@@ -109,11 +107,10 @@ func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (boo
 		return false, fmt.Errorf("%v: %v", ErrInvalidSymKeyID, err)
 	}
 
-	envelope, err := makeEnvelop(makePayload(r), symKey, api.service.nodeID, shh.MinPow())
+	envelope, err := makeEnvelop(makePayload(r), symKey, api.service.nodeID, shh.MinPow(), now)
 	if err != nil {
 		return false, err
 	}
-
 	if err := shh.RequestHistoricMessages(mailServerNode.ID[:], envelope); err != nil {
 		return false, err
 	}
@@ -137,7 +134,7 @@ func (api *PublicAPI) GetNewFilterMessages(filterID string) ([]*whisper.Message,
 // makeEnvelop makes an envelop for a historic messages request.
 // Symmetric key is used to authenticate to MailServer.
 // PK is the current node ID.
-func makeEnvelop(payload []byte, symKey []byte, nodeID *ecdsa.PrivateKey, pow float64) (*whisper.Envelope, error) {
+func makeEnvelop(payload []byte, symKey []byte, nodeID *ecdsa.PrivateKey, pow float64, now time.Time) (*whisper.Envelope, error) {
 	params := whisper.MessageParams{
 		PoW:      pow,
 		Payload:  payload,
@@ -149,7 +146,7 @@ func makeEnvelop(payload []byte, symKey []byte, nodeID *ecdsa.PrivateKey, pow fl
 	if err != nil {
 		return nil, err
 	}
-	return message.Wrap(&params)
+	return message.Wrap(&params, now)
 }
 
 // makePayload makes a specific payload for MailServer to request historic messages.
