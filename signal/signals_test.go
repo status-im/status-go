@@ -2,7 +2,6 @@ package signal
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"testing"
 
@@ -13,7 +12,7 @@ func TestNodeCrashEventJSONMarshalling(t *testing.T) {
 	errorMsg := "TestNodeCrashEventJSONMarshallingError"
 	expectedJSON := fmt.Sprintf(`{"error":"%s"}`, errorMsg)
 	nodeCrashEvent := &NodeCrashEvent{
-		Error: errors.New(errorMsg),
+		Error: errorMsg,
 	}
 	marshalled, err := json.Marshal(nodeCrashEvent)
 	require.NoError(t, err)

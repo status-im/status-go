@@ -38,7 +38,7 @@ func (rs *PendingRequests) Add(ctx context.Context, method string, meta Meta, co
 	rs.requests[request.ID] = request
 	rs.log.Info("signing request is created", "ID", request.ID)
 
-	go NotifyOnEnqueue(request)
+	go SendSignRequestAdded(request)
 
 	return request, nil
 }
@@ -160,7 +160,10 @@ func (rs *PendingRequests) complete(request *Request, response Response, err err
 
 	request.locked = false
 
-	go NotifyIfError(request, err)
+	if err != nil {
+		// TODO(divan): do we need the goroutine here?
+		go SendSignRequestFailed(request, err)
+	}
 
 	if err != nil && isTransient(err) {
 		return

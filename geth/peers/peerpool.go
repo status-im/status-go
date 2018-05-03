@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 
 	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/signal"
 )
 
 var (
@@ -95,8 +96,7 @@ func (p *PeerPool) Start(server *p2p.Server) error {
 		p.topics = append(p.topics, topicPool)
 	}
 
-	// discovery must be already started when pool is started
-	SendDiscoveryStarted()
+	signal.SendDiscoveryStarted() // discovery must be already started when pool is started
 
 	p.events = make(chan *p2p.PeerEvent, 20)
 	p.serverSubscription = server.SubscribeEvents(p.events)
@@ -120,7 +120,7 @@ func (p *PeerPool) startDiscovery(server *p2p.Server) error {
 	p.timeout = time.After(p.discServerTimeout)
 	p.mu.Unlock()
 
-	SendDiscoveryStarted()
+	signal.SendDiscoveryStarted()
 
 	return nil
 }
@@ -140,7 +140,7 @@ func (p *PeerPool) stopDiscovery(server *p2p.Server) {
 		t.StopSearch()
 	}
 
-	SendDiscoveryStopped()
+	signal.SendDiscoveryStopped()
 }
 
 // restartDiscovery and search for topics that have peer count below min

@@ -13,7 +13,7 @@ import (
 	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
-	"github.com/status-im/status-go/geth/signal"
+	"github.com/status-im/status-go/signal"
 	. "github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/suite"
 )

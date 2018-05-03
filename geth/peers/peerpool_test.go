@@ -18,7 +18,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/geth/params"
-	"github.com/status-im/status-go/geth/signal"
+	"github.com/status-im/status-go/signal"
 )
 
 type PeerPoolSimulationSuite struct {
@@ -114,11 +114,11 @@ func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailover() {
 		}
 		s.NoError(json.Unmarshal([]byte(jsonEvent), &envelope))
 		switch envelope.Type {
-		case DiscoveryStarted:
+		case signal.EventDiscoveryStarted:
 			poolEvents <- envelope.Type
-		case DiscoveryStopped:
+		case signal.EventDiscoveryStopped:
 			poolEvents <- envelope.Type
-		case DiscoverySummary:
+		case signal.EventDiscoverySummary:
 			poolEvents <- envelope.Type
 			var summary map[string]int
 			s.NoError(json.Unmarshal(envelope.Event, &summary))
@@ -142,13 +142,13 @@ func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailover() {
 	defer subscription.Unsubscribe()
 	s.NoError(peerPool.Start(s.peers[1]))
 	defer peerPool.Stop()
-	s.Equal(DiscoveryStarted, s.getPoolEvent(poolEvents))
+	s.Equal(signal.EventDiscoveryStarted, s.getPoolEvent(poolEvents))
 	connected := s.getPeerFromEvent(events, p2p.PeerEventTypeAdd)
 	s.Equal(s.peers[0].Self().ID, connected)
-	s.Equal(DiscoveryStopped, s.getPoolEvent(poolEvents))
+	s.Equal(signal.EventDiscoveryStopped, s.getPoolEvent(poolEvents))
 	s.Require().Nil(s.peers[1].DiscV5)
 
-	s.Require().Equal(DiscoverySummary, s.getPoolEvent(poolEvents))
+	s.Require().Equal(signal.EventDiscoverySummary, s.getPoolEvent(poolEvents))
 	summary := <-summaries
 	s.Len(summary, 1)
 	s.Contains(summary, "shh/6")
@@ -159,19 +159,19 @@ func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailover() {
 	disconnected := s.getPeerFromEvent(events, p2p.PeerEventTypeDrop)
 	s.Equal(connected, disconnected)
 
-	s.Require().Equal(DiscoverySummary, s.getPoolEvent(poolEvents))
+	s.Require().Equal(signal.EventDiscoverySummary, s.getPoolEvent(poolEvents))
 	summary = <-summaries
 	s.Len(summary, 0)
 
-	s.Equal(DiscoveryStarted, s.getPoolEvent(poolEvents))
+	s.Equal(signal.EventDiscoveryStarted, s.getPoolEvent(poolEvents))
 	s.Require().NotNil(s.peers[1].DiscV5)
 	register = NewRegister(topic)
 	s.Require().NoError(register.Start(s.peers[2]))
 	defer register.Stop()
 	s.Equal(s.peers[2].Self().ID, s.getPeerFromEvent(events, p2p.PeerEventTypeAdd))
 
-	s.Equal(DiscoveryStopped, s.getPoolEvent(poolEvents))
-	s.Require().Equal(DiscoverySummary, s.getPoolEvent(poolEvents))
+	s.Equal(signal.EventDiscoveryStopped, s.getPoolEvent(poolEvents))
+	s.Require().Equal(signal.EventDiscoverySummary, s.getPoolEvent(poolEvents))
 	summary = <-summaries
 	s.Len(summary, 1)
 	s.Contains(summary, "shh/6")
@@ -210,10 +210,10 @@ func TestPeerPoolMaxPeersOverflow(t *testing.T) {
 
 	pool := NewPeerPool(nil, DefaultFastSync, DefaultSlowSync, nil, true)
 	require.NoError(t, pool.Start(peer))
-	require.Equal(t, DiscoveryStarted, <-signals)
+	require.Equal(t, signal.EventDiscoveryStarted, <-signals)
 	// without config, it will stop the discovery because all topic pools are satisfied
 	pool.events <- &p2p.PeerEvent{Type: p2p.PeerEventTypeAdd}
-	require.Equal(t, DiscoveryStopped, <-signals)
+	require.Equal(t, signal.EventDiscoveryStopped, <-signals)
 	require.Nil(t, peer.DiscV5)
 	// another peer added after discovery is stopped should not panic
 	pool.events <- &p2p.PeerEvent{Type: p2p.PeerEventTypeAdd}
@@ -234,7 +234,7 @@ func TestPeerPoolDiscV5Timeout(t *testing.T) {
 		// In this case, a strange PeerEventTypeDrop event was emitted.
 		go func() {
 			switch typ := envelope.Type; typ {
-			case DiscoveryStarted, DiscoveryStopped:
+			case signal.EventDiscoveryStarted, signal.EventDiscoveryStopped:
 				signals <- envelope.Type
 			}
 		}()
@@ -259,12 +259,12 @@ func TestPeerPoolDiscV5Timeout(t *testing.T) {
 	pool := NewPeerPool(nil, DefaultFastSync, DefaultSlowSync, nil, true)
 	pool.discServerTimeout = time.Millisecond * 100
 	require.NoError(t, pool.Start(server))
-	require.Equal(t, DiscoveryStarted, <-signals)
+	require.Equal(t, signal.EventDiscoveryStarted, <-signals)
 
 	// timeout after finding no peers
 	select {
 	case sig := <-signals:
-		require.Equal(t, DiscoveryStopped, sig)
+		require.Equal(t, signal.EventDiscoveryStopped, sig)
 	case <-time.After(pool.discServerTimeout * 2):
 		t.Fatal("timed out")
 	}
@@ -272,12 +272,12 @@ func TestPeerPoolDiscV5Timeout(t *testing.T) {
 
 	// timeout after discovery restart
 	require.NoError(t, pool.restartDiscovery(server))
-	require.Equal(t, DiscoveryStarted, <-signals)
+	require.Equal(t, signal.EventDiscoveryStarted, <-signals)
 	require.NotNil(t, server.DiscV5)
 	pool.events <- &p2p.PeerEvent{Type: p2p.PeerEventTypeDrop} // required to turn the loop and pick up new timeout
 	select {
 	case sig := <-signals:
-		require.Equal(t, DiscoveryStopped, sig)
+		require.Equal(t, signal.EventDiscoveryStopped, sig)
 	case <-time.After(pool.discServerTimeout * 2):
 		t.Fatal("timed out")
 	}

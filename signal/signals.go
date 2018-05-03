@@ -14,30 +14,8 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
-const (
-	// EventNodeStarted is triggered when underlying node is started
-	EventNodeStarted = "node.started"
-
-	// EventNodeReady is triggered when underlying node is fully ready
-	// (consider backend to be fully registered)
-	EventNodeReady = "node.ready"
-
-	// EventNodeStopped is triggered when underlying node is fully stopped
-	EventNodeStopped = "node.stopped"
-
-	// EventNodeCrashed is triggered when node crashes
-	EventNodeCrashed = "node.crashed"
-
-	// EventChainDataRemoved is triggered when node's chain data is removed
-	EventChainDataRemoved = "chaindata.removed"
-
-	// EventEnvelopeSent is triggered when envelope was sent atleast to a one peer.
-	EventEnvelopeSent = "envelope.sent"
-
-	// EventEnvelopeExpired is triggered when envelop was dropped by a whisper without being sent
-	// to any peer
-	EventEnvelopeExpired = "envelope.expired"
-)
+// All general log messages in this package should be routed through this logger.
+var logger = log.New("package", "status-go/signal")
 
 // Envelope is a general signal sent upward from node to RN app
 type Envelope struct {
@@ -45,21 +23,22 @@ type Envelope struct {
 	Event interface{} `json:"event"`
 }
 
-// NodeCrashEvent is special kind of error, used to report node crashes
-type NodeCrashEvent struct {
-	Error error `json:"error"`
+// NewEnvelope creates new envlope of given type and event payload.
+func NewEnvelope(typ string, event interface{}) *Envelope {
+	return &Envelope{
+		Type:  typ,
+		Event: event,
+	}
 }
 
-// All general log messages in this package should be routed through this logger.
-var logger = log.New("package", "status-go/geth/signal")
-
-// MarshalJSON implements the json.Marshaller interface.
-func (e NodeCrashEvent) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
-		Error string `json:"error"`
-	}{
-		Error: e.Error.Error(),
-	})
+// send sends application signal (in JSON) upwards to application (via default notification handler)
+func send(typ string, event interface{}) {
+	signal := NewEnvelope(typ, event)
+	data, err := json.Marshal(&signal)
+	if err != nil {
+		logger.Error("Marshalling signal envelope", "error", err)
+	}
+	C.StatusServiceSignalEvent(C.CString(string(data)))
 }
 
 // NodeNotificationHandler defines a handler able to process incoming node events.
@@ -88,12 +67,6 @@ func ResetDefaultNodeNotificationHandler() {
 // TriggerDefaultNodeNotificationHandler triggers default notification handler (helpful in tests)
 func TriggerDefaultNodeNotificationHandler(jsonEvent string) {
 	logger.Info("Notification received", "event", jsonEvent)
-}
-
-// Send sends application signal (JSON, normally) upwards to application (via default notification handler)
-func Send(signal Envelope) {
-	data, _ := json.Marshal(&signal)
-	C.StatusServiceSignalEvent(C.CString(string(data)))
 }
 
 //export NotifyNode
