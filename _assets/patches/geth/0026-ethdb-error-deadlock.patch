@@ -35,9 +35,20 @@ index 001d8f0bb..4c9b1412c 100644
 -	go db.meter(3 * time.Second)
 +	db.wg.Add(1)
 +	go func() {
-+		db.wg.Done()
++		defer db.wg.Done()
 +		db.meter(3 * time.Second)
 +	}()
  }
  
  // meter periodically retrieves internal leveldb counters and reports them to
+@@ -345,9 +347,8 @@ func (db *LDBDatabase) meter(refresh tim
+ 
+ 		// Sleep a bit, then repeat the stats collection
+ 		select {
+-		case errc := <-db.quitChan:
++		case <-db.quitChan:
+ 			// Quit requesting, stop hammering the database
+-			errc <- nil
+ 			return
+ 
+ 		case <-time.After(refresh):

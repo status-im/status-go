@@ -173,7 +173,7 @@ func (db *LDBDatabase) Meter(prefix string) {
 
 	db.wg.Add(1)
 	go func() {
-		db.wg.Done()
+		defer db.wg.Done()
 		db.meter(3 * time.Second)
 	}()
 }
@@ -347,9 +347,8 @@ func (db *LDBDatabase) meter(refresh time.Duration) {
 
 		// Sleep a bit, then repeat the stats collection
 		select {
-		case errc := <-db.quitChan:
+		case <-db.quitChan:
 			// Quit requesting, stop hammering the database
-			errc <- nil
 			return
 
 		case <-time.After(refresh):
