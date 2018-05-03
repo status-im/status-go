@@ -5,8 +5,8 @@ import (
 	"log"
 	"time"
 
+	sdk "github.com/status-im/status-go-sdk"
 	"github.com/status-im/status-go/geth/node"
-	"github.com/status-im/status-go/messenger"
 )
 
 // RegistrationRequestMsg : peers wanting to use this notification server will
@@ -24,7 +24,7 @@ type Messenger struct {
 	pollInterval   time.Duration
 	addressKey     string
 	password       string
-	client         *messenger.Messenger
+	client         *sdk.SDK
 }
 
 // NotificationRequestMsg : a registered contact requests sending a push
@@ -36,18 +36,16 @@ type NotificationRequestMsg struct {
 // NewMessenger Creates a new Messenger
 func NewMessenger(sn *node.StatusNode, discoveryTopic string, pollInterval time.Duration) *Messenger {
 	password := "password"
-	client := messenger.New(sn)
-	addr := client.Signup(password)
-	log.Println("ADDRESS :", addr)
-	addressKey, err := client.Login(addr, password)
-	log.Println("ADDRESS KEY :", addressKey)
+	client := sdk.New("")
+	address, _, _, err := client.SignupAndLogin(password)
 	if err != nil {
-		log.Println("An error logging in")
+		log.Println(err.Error())
+		return nil
 	}
 
 	return &Messenger{
 		password:       password,
-		addressKey:     addressKey,
+		addressKey:     address,
 		pollInterval:   pollInterval,
 		discoveryTopic: discoveryTopic,
 		client:         client,
@@ -58,16 +56,16 @@ func NewMessenger(sn *node.StatusNode, discoveryTopic string, pollInterval time.
 // notification server
 func (m *Messenger) BroadcastAvailability() error {
 	// TODO (pombeirp): Use a different method so that an asym key is exchanged, not a sym key
-	_, topicID, channelKey := m.client.JoinPublicChannel(m.discoveryTopic)
+	ch, err := m.client.JoinPublicChannel(m.discoveryTopic)
+	if err != nil {
+		return err
+	}
 
 	go func() {
 		for range time.Tick(m.pollInterval) {
 			// TODO (pombeirp): Listen to channel to determine when is time to exit
 			log.Println("Broadcasting availability on", m.discoveryTopic)
-			err := m.client.NewContactKeyRequest(m.addressKey, topicID, channelKey, "me")
-			if err != nil {
-				log.Println(err.Error())
-			}
+			ch.NewContactKeyRequest(m.addressKey)
 		}
 	}()
 
@@ -79,8 +77,14 @@ func (m *Messenger) BroadcastAvailability() error {
 // information to allow push notifications
 func (m *Messenger) ManageRegistrations() {
 	log.Println("Subscribed to discovery topic :", m.discoveryTopic)
-	filterID, _, _ := m.client.JoinPublicChannel(m.discoveryTopic)
-	m.client.Subscribe([]string{filterID}, func(msg *messenger.Msg) {
+	ch, err := m.client.JoinPublicChannel(m.discoveryTopic)
+	if err != nil {
+		log.Println("Can't manage registrations")
+		log.Println(err.Error())
+		return
+	}
+
+	ch.Subscribe(func(msg *sdk.Msg) {
 		if err := m.processRegistration(msg.Text); err != nil {
 			log.Println("Error processing registration : " + err.Error())
 		}
@@ -104,8 +108,14 @@ func (m *Messenger) processRegistration(r string) error {
 func (m *Messenger) subscribeSecureChannel(registration RegistrationRequestMsg) {
 	log.Println("Subscribed to secure channel", registration.SecureChannel)
 	// TODO (adriacidre) : this is likely to not work as its not a public channel
-	filterID, _, _ := m.client.JoinPublicChannel(m.discoveryTopic)
-	m.client.Subscribe([]string{filterID}, func(msg *messenger.Msg) {
+	ch, err := m.client.JoinPublicChannel(m.discoveryTopic)
+	if err != nil {
+		log.Println("Can't manage registrations")
+		log.Println(err.Error())
+		return
+	}
+
+	ch.Subscribe(func(msg *sdk.Msg) {
 		if err := m.notify(registration.DeviceRegistrationToken, msg.Text); err != nil {
 			log.Println("Error notifying over a secure channel : " + err.Error())
 		}
