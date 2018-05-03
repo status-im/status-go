@@ -150,6 +150,10 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 	}
 	b.log.Info("Account reselected")
 
+	if st, err := b.statusNode.StatusService(); err == nil {
+		st.SetAccountManager(b.AccountManager())
+	}
+
 	signal.SendNodeReady()
 
 	return nil

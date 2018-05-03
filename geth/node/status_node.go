@@ -23,6 +23,7 @@ import (
 	"github.com/status-im/status-go/geth/peers"
 	"github.com/status-im/status-go/geth/rpc"
 	"github.com/status-im/status-go/services/shhext"
+	"github.com/status-im/status-go/services/status"
 )
 
 // tickerResolution is the delta to check blockchain sync progress.
@@ -386,6 +387,19 @@ func (n *StatusNode) LightEthereumService() (l *les.LightEthereum, err error) {
 	defer n.mu.RUnlock()
 
 	err = n.gethService(&l)
+	if err == node.ErrServiceUnknown {
+		err = ErrServiceUnknown
+	}
+
+	return
+}
+
+// StatusService exposes reference to status service running on top of the node
+func (n *StatusNode) StatusService() (st *status.Service, err error) {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+
+	err = n.gethService(&st)
 	if err == node.ErrServiceUnknown {
 		err = ErrServiceUnknown
 	}

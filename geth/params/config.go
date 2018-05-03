@@ -306,6 +306,9 @@ type NodeConfig struct {
 
 	RegisterTopics []discv5.Topic          `json:"RegisterTopics"`
 	RequireTopics  map[discv5.Topic]Limits `json:"RequireTopics"`
+
+	// StatusServiceEnabled enables status service api
+	StatusServiceEnabled bool
 }
 
 // NewNodeConfig creates new node configuration object
