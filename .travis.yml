@@ -5,10 +5,7 @@ go:
 - 1.9.x
 sudo: false
 dist: trusty
-install:
-- make mock-install
-- make lint-install
-- make dep-install
+install: make setup
 jobs:
   include:
   - stage: Lint & Vendor Check
