@@ -8,6 +8,7 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
+	gethnode "github.com/ethereum/go-ethereum/node"
 
 	fcmlib "github.com/NaySoftware/go-fcm"
 
@@ -19,6 +20,7 @@ import (
 	"github.com/status-im/status-go/geth/rpc"
 	"github.com/status-im/status-go/geth/transactions"
 	"github.com/status-im/status-go/services/personal"
+	"github.com/status-im/status-go/services/rpcfilters"
 	"github.com/status-im/status-go/sign"
 	"github.com/status-im/status-go/signal"
 )
@@ -122,6 +124,12 @@ func (b *StatusBackend) StartNode(config *params.NodeConfig) error {
 	return nil
 }
 
+func (b *StatusBackend) rpcFiltersService() gethnode.ServiceConstructor {
+	return func(*gethnode.ServiceContext) (gethnode.Service, error) {
+		return rpcfilters.New(b.statusNode), nil
+	}
+}
+
 func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -129,7 +137,10 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 		}
 	}()
 
-	if err = b.statusNode.Start(config); err != nil {
+	services := []gethnode.ServiceConstructor{}
+	services = appendIf(config.UpstreamConfig.Enabled, services, b.rpcFiltersService())
+
+	if err = b.statusNode.Start(config, services...); err != nil {
 		return
 	}
 	signal.SendNodeStarted()
@@ -422,4 +433,11 @@ func (b *StatusBackend) NotifyUsers(message string, payload fcmlib.NotificationP
 	}
 
 	return err
+}
+
+func appendIf(condition bool, services []gethnode.ServiceConstructor, service gethnode.ServiceConstructor) []gethnode.ServiceConstructor {
+	if !condition {
+		return services
+	}
+	return append(services, service)
 }
