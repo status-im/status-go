@@ -201,6 +201,12 @@ func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
 	charliePubkey := hexutil.Bytes(crypto.FromECDSAPub(&charlieKey.PublicKey))
 	charlieAliceKeySendTopic := whisper.BytesToTopic([]byte("charlieAliceKeySendTopic "))
 
+	// Alice must add peers topics into her own bloom filter.
+	aliceKeyID, err := aliceWhisperService.NewKeyPair()
+	s.Require().NoError(err)
+	s.createPrivateChatMessageFilter(aliceRPCClient, aliceKeyID, bobAliceKeySendTopic.String())
+	s.createPrivateChatMessageFilter(aliceRPCClient, aliceKeyID, charlieAliceKeySendTopic.String())
+
 	// Bob and charlie create message filter.
 	bobMessageFilterID := s.createPrivateChatMessageFilter(bobRPCClient, bobKeyID, bobAliceKeySendTopic.String())
 	charlieMessageFilterID := s.createPrivateChatMessageFilter(charlieRPCClient, charlieKeyID, charlieAliceKeySendTopic.String())
