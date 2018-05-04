@@ -22,7 +22,7 @@ type Messenger struct {
 	pollInterval   time.Duration
 	addressKey     string
 	password       string
-	notifier       *Notifier
+	notifier       NotificationProvider
 	client         *sdk.SDK
 }
 
@@ -32,8 +32,12 @@ type NotificationRequestMsg struct {
 	// TODO (adriacidre) : Check @PombeirP what fields are needed here
 }
 
+type NotificationProvider interface {
+	Send(tokens []string, message string) error
+}
+
 // NewMessenger Creates a new Messenger
-func NewMessenger(rpc sdk.RPCClient, n *Notifier, discoveryTopic string, pollInterval time.Duration) *Messenger {
+func NewMessenger(rpc sdk.RPCClient, n NotificationProvider, discoveryTopic string, pollInterval time.Duration) *Messenger {
 	password := "password"
 
 	client := sdk.New("")
