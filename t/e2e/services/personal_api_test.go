@@ -206,10 +206,12 @@ func (s *PersonalSignSuite) testPersonalSign(testParams testParams) string {
 		s.NoError(s.Backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 	}
 
+	// Parameters ordering here is MetaMask-compatible, not geth-compatible.
+	// account *PRECEDES* data
 	basicCall := fmt.Sprintf(
 		`{"jsonrpc":"2.0","method":"personal_sign","params":["%s", "%s"],"id":67}`,
-		signDataString,
-		testParams.Account)
+		testParams.Account,
+		signDataString)
 
 	result := s.Backend.CallRPC(basicCall)
 	if testParams.ExpectedError == nil {

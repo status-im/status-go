@@ -79,15 +79,15 @@ func MakeNode(config *params.NodeConfig) (*node.Node, error) {
 		if err := activateLightEthService(stack, config); err != nil {
 			return nil, fmt.Errorf("%v: %v", ErrLightEthRegistrationFailure, err)
 		}
-	} else {
-		// `personal_sign` and `personal_ecRecover` methods are important to
-		// keep DApps working.
-		// Usually, they are provided by an ETH or a LES service, but when using
-		// upstream, we don't start any of these, so we need to start our own
-		// implementation.
-		if err := activatePersonalService(stack, config); err != nil {
-			return nil, fmt.Errorf("%v: %v", ErrPersonalServiceRegistrationFailure, err)
-		}
+	}
+
+	// `personal_sign` and `personal_ecRecover` methods are important to
+	// keep DApps working.
+	// Usually, they are provided by an ETH or a LES service.
+	// Unfortunately, the parameters of `personal_sign` used in DApps
+	// are different from what LES provides, so we start this service always.
+	if err := activatePersonalService(stack, config); err != nil {
+		return nil, fmt.Errorf("%v: %v", ErrPersonalServiceRegistrationFailure, err)
 	}
 
 	// start Whisper service.
