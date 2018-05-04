@@ -96,7 +96,7 @@ func (s *ShhExtSuite) TestPostMessageWithConfirmation() {
 	select {
 	case confirmed := <-mock.confirmations:
 		s.Equal(hash, confirmed)
-	case <-time.After(time.Second):
+	case <-time.After(5 * time.Second):
 		s.Fail("timed out while waiting for confirmation")
 	}
 }
@@ -123,7 +123,7 @@ func (s *ShhExtSuite) TestWaitMessageExpired() {
 		s.Equal(hash, expired)
 	case confirmed := <-mock.confirmations:
 		s.Fail("unexpected confirmation for hash", confirmed)
-	case <-time.After(2 * time.Second):
+	case <-time.After(10 * time.Second):
 		s.Fail("timed out while waiting for confirmation")
 	}
 }
