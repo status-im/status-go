@@ -103,7 +103,7 @@ xgo:
 	docker pull $(XGOIMAGE)
 	go get github.com/karalabe/xgo
 
-setup: lint-install mock-install ##@other Prepare project for first build
+setup: dep-install lint-install mock-install ##@other Prepare project for first build
 
 generate: ##@other Regenerate assets and other auto-generated stuff
 	go generate ./static
