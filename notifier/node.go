@@ -6,12 +6,11 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/geth/api"
-	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
 )
 
-// NewStatusNode : setup a status node with an active whisper service
-func NewStatusNode(dataDir string, clusterConfigFile string, networkID uint64) *node.StatusNode {
+// NewStatusBackend : setup a status nodebackend with an active whisper service
+func NewStatusBackend(dataDir string, clusterConfigFile string, networkID uint64) *api.StatusBackend {
 	config, err := makeNodeConfig(dataDir, clusterConfigFile, networkID)
 	if err != nil {
 		stdlog.Fatalf("Making config failed %s", err)
@@ -36,7 +35,7 @@ func NewStatusNode(dataDir string, clusterConfigFile string, networkID uint64) *
 		return nil
 	}
 
-	return backend.StatusNode()
+	return backend
 }
 
 // makeNodeConfig : generates the config for a whisper based node

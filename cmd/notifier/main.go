@@ -5,7 +5,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/status-im/status-go/geth/node"
+	sdk "github.com/status-im/status-go-sdk"
+	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/notifier"
 )
@@ -20,7 +21,7 @@ var (
 
 func main() {
 	var n *notifier.Notifier
-	var node *node.StatusNode
+	var backend *api.StatusBackend
 
 	flag.Parse()
 
@@ -34,12 +35,12 @@ func main() {
 		}
 	}()
 
-	if node = notifier.NewStatusNode(*dataDir, *clusterConfigFile, uint64(*networkID)); node == nil {
+	if backend = notifier.NewStatusBackend(*dataDir, *clusterConfigFile, uint64(*networkID)); backend == nil {
 		panic("Couldn't setup the node")
 	}
 
 	t := *discoveryTopic
-	m := notifier.NewMessenger(node, t, 5*time.Second)
+	m := notifier.NewMessenger(newRPCClient(backend), n, t, 5*time.Second)
 	if m == nil {
 		panic("Error while creating the PN server")
 	}
@@ -47,9 +48,22 @@ func main() {
 		panic(err)
 	}
 	// TODO (adriacidre) : uncomment this
-	// go m.ManageRegistrations()
+	go m.ManageRegistrations()
 
-	if node.GethNode() != nil {
-		node.GethNode().Wait()
+	if backend.StatusNode().GethNode() != nil {
+		backend.StatusNode().GethNode().Wait()
 	}
+}
+
+type rpcClient struct {
+	b *api.StatusBackend
+}
+
+func newRPCClient(b *api.StatusBackend) sdk.RPCClient {
+	return &rpcClient{b: b}
+}
+
+func (c *rpcClient) Call(request interface{}) (response interface{}, err error) {
+	response = c.b.CallPrivateRPC(request.(string))
+	return
 }
