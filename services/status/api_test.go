@@ -19,14 +19,14 @@ func TestStatusSuite(t *testing.T) {
 type StatusSuite struct {
 	suite.Suite
 	am  *MockAccountManager
-	w   *MockWhisper
+	w   *MockWhisperService
 	api *PublicAPI
 }
 
 func (s *StatusSuite) SetupTest() {
 	ctrl := gomock.NewController(s.T())
 	s.am = NewMockAccountManager(ctrl)
-	s.w = NewMockWhisper(ctrl)
+	s.w = NewMockWhisperService(ctrl)
 	service := New(s.w)
 	service.SetAccountManager(s.am)
 
