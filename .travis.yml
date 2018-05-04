@@ -9,6 +9,7 @@ install:
 - make mock-install
 - make lint-install
 - make dep-install
+- make mock 
 jobs:
   include:
   - stage: Lint & Vendor Check
