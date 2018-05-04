@@ -481,13 +481,16 @@ func (d *Downloader) syncWithPeer(p *peerConnection, hash common.Hash, td *big.I
 // spawnSync runs d.process and all given fetcher functions to completion in
 // separate goroutines, returning the first error that appears.
 func (d *Downloader) spawnSync(errCancel error, fetchers []func() error) error {
+	d.cancelLock.Lock()
 	select {
 	case <-d.cancelCh:
+		d.cancelLock.Unlock()
 		return errCancel
 	default:
 	}
 	errc := make(chan error, len(fetchers))
 	d.cancelWg.Add(len(fetchers))
+	d.cancelLock.Unlock()
 	for _, fn := range fetchers {
 		fn := fn
 		go func() { defer d.cancelWg.Done(); errc <- fn() }()
