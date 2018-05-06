@@ -631,3 +631,8 @@ func (c *NodeConfig) FormatAPIModules() []string {
 
 	return strings.Split(c.APIModules, ",")
 }
+
+// AddAPIModule adds a module to the APIModules field
+func (c *NodeConfig) AddAPIModule(m string) {
+	c.APIModules = fmt.Sprintf("%s,%s", c.APIModules, m)
+}

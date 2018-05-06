@@ -240,7 +240,6 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 
 	nodeConfig.RPCEnabled = *httpEnabled
 	nodeConfig.WhisperConfig.Enabled = *whisperEnabled
-	nodeConfig.StatusServiceEnabled = *statusServiceEnabled
 	nodeConfig.MaxPeers = *maxPeers
 
 	nodeConfig.HTTPHost = *httpHost
@@ -249,6 +248,11 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 
 	nodeConfig.LightEthConfig.Enabled = *lesEnabled
 	nodeConfig.SwarmConfig.Enabled = *swarmEnabled
+
+	nodeConfig.StatusServiceEnabled = *statusServiceEnabled
+	if nodeConfig.StatusServiceEnabled {
+		nodeConfig.AddAPIModule("status")
+	}
 
 	if *standalone {
 		nodeConfig.ClusterConfig.Enabled = false
