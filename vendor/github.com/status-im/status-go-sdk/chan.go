@@ -9,7 +9,7 @@ import (
 
 // Channel : ...
 type Channel struct {
-	account       *Account
+	conn          *SDK
 	name          string
 	filterID      string
 	channelKey    string
@@ -52,7 +52,7 @@ func (c *Channel) NewContactKeyRequest(username string) error {
 	contactRequest := fmt.Sprintf(format, ContactRequestType, username, "", "", "")
 
 	format = `["%s",["%s","%s",%s]`
-	msg := fmt.Sprintf(format, NewContactKeyType, c.account.Address, c.topicID, contactRequest)
+	msg := fmt.Sprintf(format, NewContactKeyType, c.conn.address, c.topicID, contactRequest)
 
 	return c.SendPostRawMsg(msg)
 }
@@ -60,7 +60,7 @@ func (c *Channel) NewContactKeyRequest(username string) error {
 // ContactRequest wrapped in a NewContactKey message when initiating a contact request.
 func (c *Channel) ContactRequest(username, image string) error {
 	format := `["%s",["%s","%s","%s","%s"]]]`
-	msg := fmt.Sprintf(format, ContactRequestType, username, image, c.account.Address, "")
+	msg := fmt.Sprintf(format, ContactRequestType, username, image, c.conn.address, "")
 
 	return c.SendPostRawMsg(msg)
 }
@@ -71,7 +71,7 @@ func (c *Channel) ContactRequest(username, image string) error {
 // Both users will therefore have the same filter.
 func (c *Channel) ConfirmedContactRequest(username, image string) error {
 	format := `["%s",["%s","%s","%s","%s"]]`
-	msg := fmt.Sprintf(format, ConfirmedContactRequestType, username, image, c.account.Address, "")
+	msg := fmt.Sprintf(format, ConfirmedContactRequestType, username, image, c.conn.address, "")
 
 	return c.SendPostRawMsg(msg)
 }
@@ -117,16 +117,16 @@ func (c *Channel) ContactUpdateRequest(username, image string) error {
 // SendPostRawMsg sends a shh_post message with the given body.
 func (c *Channel) SendPostRawMsg(body string) error {
 	param := shhPostParam{
-		Signature: c.account.Address,
+		Signature: c.conn.address,
 		SymKeyID:  c.channelKey,
 		Payload:   rawrChatMessage(body),
 		Topic:     c.topicID,
 		TTL:       10,
-		PowTarget: c.account.conn.minimumPoW,
+		PowTarget: c.conn.minimumPoW,
 		PowTime:   1,
 	}
 
-	_, err := shhPostRequest(c.account.conn, []*shhPostParam{&param})
+	_, err := shhPostRequest(c.conn, []*shhPostParam{&param})
 	if err != nil {
 		log.Println(err.Error())
 	}
@@ -139,7 +139,7 @@ func (c *Channel) SendPostRawMsg(body string) error {
 // push notification server Public Key.
 func (c *Channel) PNBroadcastAvailabilityRequest() error {
 	format := `["%s",["%s"]]`
-	msg := fmt.Sprintf(format, PNBroadcastAvailabilityType, c.account.PubKey)
+	msg := fmt.Sprintf(format, PNBroadcastAvailabilityType, c.conn.pubkey)
 
 	return c.SendPostRawMsg(msg)
 }
@@ -177,13 +177,8 @@ func (c *Channel) removeSubscription(sub *Subscription) {
 	c.subscriptions = subs
 }
 
-// PubKey return the channel's associated publike key
-func (c *Channel) PubKey() string {
-	return c.account.PubKey
-}
-
 func (c *Channel) pollMessages() (msg *Msg) {
-	res, err := shhGetFilterMessagesRequest(c.account.conn, []string{c.filterID})
+	res, err := shhGetFilterMessagesRequest(c.conn, []string{c.filterID})
 	if err != nil {
 		log.Fatalf("Error when sending request to server: %s", err)
 		return
@@ -194,7 +189,6 @@ func (c *Channel) pollMessages() (msg *Msg) {
 		for _, u := range vv {
 			msg, err = messageFromEnvelope(u)
 			if err == nil && supportedMessage(msg.Type) {
-				msg.Channel = c
 				msg.ChannelName = c.name
 				return
 			}

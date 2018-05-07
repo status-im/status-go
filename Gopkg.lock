@@ -403,9 +403,15 @@
     "html",
     "html/atom",
     "html/charset",
+    "http2",
+    "http2/hpack",
+    "idna",
     "internal/iana",
     "internal/socket",
+    "internal/timeseries",
     "ipv4",
+    "lex/httplex",
+    "trace",
     "websocket"
   ]
   revision = "5ccada7d0a7ba9aeb5d3aca8d3501b4c2a509fec"
@@ -551,6 +557,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "c82f110ad74f6540b5ba89202a3e4e6cca24a7ec9eedd35248a3aa1e6d626275"
+  inputs-digest = "87151f1c94ecf36531714eb5e8768495eccaba5530ffeed723b00dc52ce2e17e"
   solver-name = "gps-cdcl"
   solver-version = 1
