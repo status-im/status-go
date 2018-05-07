@@ -1,4 +1,13 @@
-FROM statusteam/xgo:1.9.2
+FROM statusteam/xgo:1.10.x
+
+# ios installer doesn't work with the default tar binary in Docker
+# (divan: I stole this solution here: https://github.com/coreos/bugs/issues/1095#issuecomment-350574389)
+# https://github.com/moby/moby/issues/19647
+RUN apt-get update \
+	&& apt-get install -y --no-install-recommends bsdtar \
+	&& apt-get clean \
+	&& cp $(which tar) $(which tar)~ \
+    && ln -sf $(which bsdtar) $(which tar)
 
 ADD update_ios.sh /update_ios.sh
 ENV UPDATE_IOS /update_ios.sh
