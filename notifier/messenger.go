@@ -24,12 +24,10 @@ type Messenger struct {
 	password       string
 	notifier       NotificationProvider
 	client         *sdk.SDK
-}
-
-// NotificationRequestMsg : a registered contact requests sending a push
-// notification to one of its contacts
-type NotificationRequestMsg struct {
-	// TODO (adriacidre) : Check @PombeirP what fields are needed here
+	baseAccount    *sdk.Account
+	// TODO(adriacidre) this is only in memory key pair db to store all
+	// `pubkey/device tokens`, should be moved to something persistant
+	tokenDB map[string]string
 }
 
 // NotificationProvider represents the Push Notification Provider microservice,
@@ -43,7 +41,7 @@ func NewMessenger(rpc sdk.RPCClient, n NotificationProvider, discoveryTopic stri
 	password := "password"
 
 	client := sdk.New(rpc)
-	address, _, _, err := client.SignupAndLogin(password)
+	ac, err := client.SignupAndLogin(password)
 	if err != nil {
 		log.Println(err.Error())
 		return nil, err
@@ -52,10 +50,11 @@ func NewMessenger(rpc sdk.RPCClient, n NotificationProvider, discoveryTopic stri
 	return &Messenger{
 		notifier:       n,
 		password:       password,
-		addressKey:     address,
+		baseAccount:    ac,
 		pollInterval:   pollInterval,
 		discoveryTopic: discoveryTopic,
 		client:         client,
+		tokenDB:        make(map[string]string, 0),
 	}, nil
 }
 
@@ -63,7 +62,7 @@ func NewMessenger(rpc sdk.RPCClient, n NotificationProvider, discoveryTopic stri
 // notification server
 func (m *Messenger) BroadcastAvailability() error {
 	// TODO (pombeirp): Use a different method so that an asym key is exchanged, not a sym key
-	ch, err := m.client.JoinPublicChannel(m.discoveryTopic)
+	ch, err := m.baseAccount.JoinPublicChannel(m.discoveryTopic)
 	if err != nil {
 		return err
 	}
@@ -84,7 +83,7 @@ func (m *Messenger) BroadcastAvailability() error {
 // information to allow push notifications
 func (m *Messenger) ManageRegistrations() error {
 	log.Println("Subscribed to discovery topic :", m.discoveryTopic)
-	ch, err := m.client.JoinPublicChannel(m.discoveryTopic)
+	ch, err := m.baseAccount.JoinPublicChannel(m.discoveryTopic)
 	if err != nil {
 		log.Println("Can't manage registrations")
 		log.Println(err.Error())
@@ -100,30 +99,44 @@ func (m *Messenger) ManageRegistrations() error {
 // RegistrationRequestMsg and stores the result
 func (m *Messenger) processRegistration(msg *sdk.Msg) {
 	req := msg.Properties.(sdk.PNRegistrationMsg)
-	// TODO (adriacidre) generate a new asymetric key (AK2)
-	pubkey := "..."
-	// TODO (adriacidre) store locally the AK2 / device token key pair
-	// TODO (adriacidre) subscribe to proposed topic with given symkey
+
+	// Generate a new asymetric key (AK2)
+	user, err := m.client.SignupAndLogin("randompassword")
+	if err != nil {
+		log.Println("Cant't signup as new user ", err.Error())
+		return
+	}
+
+	// Store locally the AK2 / device token key pair
+	m.tokenDB[user.PubKey] = req.DeviceToken
+
+	// Subscribe to proposed topic with given symkey
 	log.Println("Subscribed to secure channel", req.Topic)
-	ch, err := m.client.Join("isThisNameNeededAtAll?", req.Topic, req.Symkey)
+	ch, err := user.Join("isThisNameNeededAtAll?", req.Topic, req.Symkey)
 	if err != nil {
 		log.Println(err.Error())
 		return
 	}
-	// TODO (adriacidre) send a registration confirmation with a new public key
-	err = ch.PNRegistrationConfirmationRequest(pubkey)
+
+	// Send a registration confirmation with the new public key
+	err = ch.PNRegistrationConfirmationRequest(user.PubKey)
 	if err == nil {
 		_, _ = ch.Subscribe(m.manageNotificationRequests)
 	}
 }
 
 func (m *Messenger) manageNotificationRequests(msg *sdk.Msg) {
-	// TODO (adriacidre) get device token based on the provided AK2
-	tokens := []string{"FAKE_TOKEN"}
-	// TODO (adriacidre) get the text from the input request
-	text := "Ping!"
+	// Get persisted device token based on the provided AK2
+	token, ok := m.tokenDB[msg.Channel.PubKey()]
+	if !ok {
+		log.Println("Could not retrieve existing token for this channel")
+	}
 
-	if err := m.notifier.Send(tokens, text); err != nil {
-		log.Println("Error notifying over a secure channel : " + err.Error())
+	// Get the text from the input request
+	properties := msg.Properties.(sdk.PublishMsg)
+
+	// Send notification to notifier
+	if err := m.notifier.Send([]string{token}, properties.Text); err != nil {
+		log.Println("Error notifying : " + err.Error())
 	}
 }

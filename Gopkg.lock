@@ -551,10 +551,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-<<<<<<< HEAD
   inputs-digest = "c82f110ad74f6540b5ba89202a3e4e6cca24a7ec9eedd35248a3aa1e6d626275"
-=======
-  inputs-digest = "132f0663ef3c6f78c5e0007ef8c9232496ed2fc7997019fe78c2039c0df4c605"
->>>>>>> Add initial test for PN subscription process
   solver-name = "gps-cdcl"
   solver-version = 1

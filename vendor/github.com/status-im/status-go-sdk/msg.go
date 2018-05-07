@@ -52,10 +52,11 @@ func supportedMessage(msgType string) bool {
 
 // Msg is a structure used by Subscribers and Publish().
 type Msg struct {
-	From        string `json:"from"`
-	ChannelName string `json:"channel"`
-	Raw         string `json:"-"`
-	Type        string `json:"-"`
+	From        string   `json:"from"`
+	ChannelName string   `json:"channel"`
+	Channel     *Channel `json:"-"`
+	Raw         string   `json:"-"`
+	Type        string   `json:"-"`
 	Properties  interface{}
 }
 
