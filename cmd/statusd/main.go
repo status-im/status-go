@@ -250,9 +250,6 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 	nodeConfig.SwarmConfig.Enabled = *swarmEnabled
 
 	nodeConfig.StatusServiceEnabled = *statusServiceEnabled
-	if nodeConfig.StatusServiceEnabled {
-		nodeConfig.AddAPIModule("status")
-	}
 
 	if *standalone {
 		nodeConfig.ClusterConfig.Enabled = false
