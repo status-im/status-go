@@ -16,18 +16,19 @@ const (
 )
 
 type testCase struct {
-	description string
-	attempts    int
-	responses   []queryResponse
-	expected    time.Duration
-	expectError bool
+	description    string
+	attempts       int
+	tolerateErrors int
+	responses      []queryResponse
+	expected       time.Duration
+	expectError    bool
 
 	// actual attempts are mutable
 	mu             sync.Mutex
 	actualAttempts int
 }
 
-func (tc *testCase) query(string) (*ntp.Response, error) {
+func (tc *testCase) query(string, ntp.QueryOptions) (*ntp.Response, error) {
 	tc.mu.Lock()
 	defer func() {
 		tc.actualAttempts++
@@ -90,13 +91,48 @@ func newTestCases() []*testCase {
 			expected:    time.Duration(0),
 			expectError: true,
 		},
+		{
+			description:    "TolerableError",
+			attempts:       3,
+			tolerateErrors: 1,
+			responses: []queryResponse{
+				{Offset: 10 * time.Second},
+				{Error: errors.New("test")},
+				{Offset: 30 * time.Second},
+			},
+			expected: 20 * time.Second,
+		},
+		{
+			description:    "NonTolerableError",
+			attempts:       3,
+			tolerateErrors: 1,
+			responses: []queryResponse{
+				{Offset: 10 * time.Second},
+				{Error: errors.New("test")},
+				{Error: errors.New("test")},
+			},
+			expected:    time.Duration(0),
+			expectError: true,
+		},
+		{
+			description:    "AllFailed",
+			attempts:       3,
+			tolerateErrors: 3,
+			responses: []queryResponse{
+				{Error: errors.New("test")},
+				{Error: errors.New("test")},
+				{Error: errors.New("test")},
+			},
+			expected:    time.Duration(0),
+			expectError: true,
+		},
 	}
 }
 
 func TestComputeOffset(t *testing.T) {
 	for _, tc := range newTestCases() {
 		t.Run(tc.description, func(t *testing.T) {
-			offset, err := computeOffset(tc.query, "", tc.attempts)
+			offset, err := computeOffset(tc.query, "", tc.attempts, tc.tolerateErrors)
 			if tc.expectError {
 				assert.Error(t, err)
 			} else {
@@ -111,8 +147,9 @@ func TestNTPTimeSource(t *testing.T) {
 	for _, tc := range newTestCases() {
 		t.Run(tc.description, func(t *testing.T) {
 			source := &NTPTimeSource{
-				attempts:  tc.attempts,
-				timeQuery: tc.query,
+				attempts:       tc.attempts,
+				tolerateErrors: tc.tolerateErrors,
+				timeQuery:      tc.query,
 			}
 			assert.WithinDuration(t, time.Now(), source.Now(), clockCompareDelta)
 			source.updateOffset()
