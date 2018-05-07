@@ -12,31 +12,31 @@ import (
 	reflect "reflect"
 )
 
-// MockWhisper is a mock of Whisper interface
-type MockWhisper struct {
+// MockWhisperService is a mock of WhisperService interface
+type MockWhisperService struct {
 	ctrl     *gomock.Controller
-	recorder *MockWhisperMockRecorder
+	recorder *MockWhisperServiceMockRecorder
 }
 
-// MockWhisperMockRecorder is the mock recorder for MockWhisper
-type MockWhisperMockRecorder struct {
-	mock *MockWhisper
+// MockWhisperServiceMockRecorder is the mock recorder for MockWhisperService
+type MockWhisperServiceMockRecorder struct {
+	mock *MockWhisperService
 }
 
-// NewMockWhisper creates a new mock instance
-func NewMockWhisper(ctrl *gomock.Controller) *MockWhisper {
-	mock := &MockWhisper{ctrl: ctrl}
-	mock.recorder = &MockWhisperMockRecorder{mock}
+// NewMockWhisperService creates a new mock instance
+func NewMockWhisperService(ctrl *gomock.Controller) *MockWhisperService {
+	mock := &MockWhisperService{ctrl: ctrl}
+	mock.recorder = &MockWhisperServiceMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use
-func (m *MockWhisper) EXPECT() *MockWhisperMockRecorder {
+func (m *MockWhisperService) EXPECT() *MockWhisperServiceMockRecorder {
 	return m.recorder
 }
 
 // AddKeyPair mocks base method
-func (m *MockWhisper) AddKeyPair(key *ecdsa.PrivateKey) (string, error) {
+func (m *MockWhisperService) AddKeyPair(key *ecdsa.PrivateKey) (string, error) {
 	ret := m.ctrl.Call(m, "AddKeyPair", key)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
@@ -44,8 +44,8 @@ func (m *MockWhisper) AddKeyPair(key *ecdsa.PrivateKey) (string, error) {
 }
 
 // AddKeyPair indicates an expected call of AddKeyPair
-func (mr *MockWhisperMockRecorder) AddKeyPair(key interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddKeyPair", reflect.TypeOf((*MockWhisper)(nil).AddKeyPair), key)
+func (mr *MockWhisperServiceMockRecorder) AddKeyPair(key interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddKeyPair", reflect.TypeOf((*MockWhisperService)(nil).AddKeyPair), key)
 }
 
 // MockAccountManager is a mock of AccountManager interface
@@ -110,41 +110,4 @@ func (m *MockAccountManager) CreateAccount(password string) (string, string, str
 // CreateAccount indicates an expected call of CreateAccount
 func (mr *MockAccountManagerMockRecorder) CreateAccount(password interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateAccount", reflect.TypeOf((*MockAccountManager)(nil).CreateAccount), password)
-}
-
-// MockWhisperService is a mock of WhisperService interface
-type MockWhisperService struct {
-	ctrl     *gomock.Controller
-	recorder *MockWhisperServiceMockRecorder
-}
-
-// MockWhisperServiceMockRecorder is the mock recorder for MockWhisperService
-type MockWhisperServiceMockRecorder struct {
-	mock *MockWhisperService
-}
-
-// NewMockWhisperService creates a new mock instance
-func NewMockWhisperService(ctrl *gomock.Controller) *MockWhisperService {
-	mock := &MockWhisperService{ctrl: ctrl}
-	mock.recorder = &MockWhisperServiceMockRecorder{mock}
-	return mock
-}
-
-// EXPECT returns an object that allows the caller to indicate expected use
-func (m *MockWhisperService) EXPECT() *MockWhisperServiceMockRecorder {
-	return m.recorder
-}
-
-// AddressToDecryptedAccount mocks base method
-func (m *MockWhisperService) AddressToDecryptedAccount(arg0, arg1 string) (accounts.Account, *keystore.Key, error) {
-	ret := m.ctrl.Call(m, "AddressToDecryptedAccount", arg0, arg1)
-	ret0, _ := ret[0].(accounts.Account)
-	ret1, _ := ret[1].(*keystore.Key)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
-}
-
-// AddressToDecryptedAccount indicates an expected call of AddressToDecryptedAccount
-func (mr *MockWhisperServiceMockRecorder) AddressToDecryptedAccount(arg0, arg1 interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddressToDecryptedAccount", reflect.TypeOf((*MockWhisperService)(nil).AddressToDecryptedAccount), arg0, arg1)
 }
