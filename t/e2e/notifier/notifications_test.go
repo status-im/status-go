@@ -63,10 +63,11 @@ func (s *NotifierTestSuite) TestPushNotificationServerSubscriptionProcess() {
 	s.Require().NoError(err)
 
 	aliceClient := sdk.New(newRPCClient(aliceBackend))
-	_, _, _, err = aliceClient.SignupAndLogin("")
+	aliceAccount, err := aliceClient.SignupAndLogin("")
 	s.Require().NoError(err)
+	s.Require().NotNil(aliceAccount)
 
-	pubChannel, err := aliceClient.JoinPublicChannel(discoveryTopic)
+	pubChannel, err := aliceAccount.JoinPublicChannel(discoveryTopic)
 	s.Require().NoError(err)
 	defer pubChannel.Close()
 	msgArrivedCh := make(chan *sdk.Msg)
