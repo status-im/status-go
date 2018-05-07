@@ -32,6 +32,7 @@ func (c *SDK) Login(addr, pwd string) (a *Account, err error) {
 		return a, err
 	}
 	return &Account{
+		conn:    c,
 		Address: res.Result.AddressKeyID,
 	}, err
 }
@@ -43,6 +44,7 @@ func (c *SDK) Signup(pwd string) (a *Account, err error) {
 		return a, err
 	}
 	return &Account{
+		conn:     c,
 		Address:  res.Result.Address,
 		PubKey:   res.Result.Pubkey,
 		Mnemonic: res.Result.Mnemonic,

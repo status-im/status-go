@@ -1,6 +1,8 @@
 package notifier
 
 import (
+	"crypto/rand"
+	b64 "encoding/base64"
 	"log"
 	"time"
 
@@ -101,25 +103,26 @@ func (m *Messenger) processRegistration(msg *sdk.Msg) {
 	req := msg.Properties.(sdk.PNRegistrationMsg)
 
 	// Generate a new asymetric key (AK2)
-	user, err := m.client.SignupAndLogin("randompassword")
+	key := make([]byte, 64)
+	_, err := rand.Read(key)
 	if err != nil {
-		log.Println("Cant't signup as new user ", err.Error())
-		return
+		log.Println("Error generating random key")
 	}
+	ak2 := b64.StdEncoding.EncodeToString(key)
 
 	// Store locally the AK2 / device token key pair
-	m.tokenDB[user.PubKey] = req.DeviceToken
+	m.tokenDB[ak2] = req.DeviceToken
 
 	// Subscribe to proposed topic with given symkey
 	log.Println("Subscribed to secure channel", req.Topic)
-	ch, err := user.Join("isThisNameNeededAtAll?", req.Topic, req.Symkey)
+	ch, err := m.baseAccount.Join("isThisNameNeededAtAll?", req.Topic, req.Symkey)
 	if err != nil {
 		log.Println(err.Error())
 		return
 	}
 
 	// Send a registration confirmation with the new public key
-	err = ch.PNRegistrationConfirmationRequest(user.PubKey)
+	err = ch.PNRegistrationConfirmationRequest(ak2)
 	if err == nil {
 		_, _ = ch.Subscribe(m.manageNotificationRequests)
 	}
