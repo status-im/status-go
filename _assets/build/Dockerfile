@@ -1,5 +1,5 @@
 # Build status-go in a Go builder container
-FROM golang:1.9-alpine as builder
+FROM golang:1.10-alpine as builder
 
 ARG build_tags
 

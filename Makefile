@@ -16,7 +16,7 @@ GIT_COMMIT := $(shell git rev-parse --short HEAD)
 BUILD_FLAGS := $(shell echo "-ldflags '-X main.buildStamp=`date -u '+%Y-%m-%d.%H:%M:%S'` -X main.gitCommit=$(GIT_COMMIT)  -X github.com/status-im/status-go/geth/params.VersionMeta=$(GIT_COMMIT)'")
 
 GO ?= latest
-XGOVERSION ?= 1.9.2
+XGOVERSION ?= 1.10.x
 XGOIMAGE = statusteam/xgo:$(XGOVERSION)
 XGOIMAGEIOSSIM = statusteam/xgo-ios-simulator:$(XGOVERSION)
 
@@ -26,7 +26,7 @@ gotest_extraflags =
 DOCKER_IMAGE_NAME ?= statusteam/status-go
 
 DOCKER_TEST_WORKDIR = /go/src/github.com/status-im/status-go/
-DOCKER_TEST_IMAGE = golang:1.9
+DOCKER_TEST_IMAGE = golang:1.10
 
 UNIT_TEST_PACKAGES := $(shell go list ./...  | grep -v /vendor | grep -v /t/e2e | grep -v /t/destructive | grep -v /lib)
 
