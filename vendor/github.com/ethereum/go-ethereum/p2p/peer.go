@@ -120,14 +120,7 @@ func NewPeer(id discover.NodeID, name string, caps []Cap) *Peer {
 	return peer
 }
 
-func (p *Peer) SetFlaky() {
-	atomic.StoreInt32(&p.flaky, 1)
-}
-
-func (p *Peer) SetNonFlaky() {
-	atomic.StoreInt32(&p.flaky, 0)
-}
-
+// IsFlaky returns true if there was no incoming traffic recently.
 func (p *Peer) IsFlaky() bool {
 	return atomic.LoadInt32(&p.flaky) == 1
 }
@@ -205,7 +198,7 @@ func (p *Peer) run() (remoteRequested bool, err error) {
 	p.wg.Add(3)
 	reads := make(chan struct{}, 10) // channel for reads
 	go p.readLoop(readErr, reads)
-	go p.heartbeatLoop(reads)
+	go p.watchdogLoop(reads)
 	go p.pingLoop()
 
 	// Start all protocol handlers.
@@ -264,20 +257,20 @@ func (p *Peer) pingLoop() {
 	}
 }
 
-func (p *Peer) heartbeatLoop(reads <-chan struct{}) {
+func (p *Peer) watchdogLoop(reads <-chan struct{}) {
 	defer p.wg.Done()
-	hb := time.NewTimer(2 * pingInterval)
+	hb := time.NewTimer(pingInterval)
 	defer hb.Stop()
 	for {
 		select {
 		case <-reads:
-			p.SetNonFlaky()
+			atomic.StoreInt32(&p.flaky, 0)
 		case <-hb.C:
-			p.SetFlaky()
-			hb.Reset(2 * pingInterval)
+			atomic.StoreInt32(&p.flaky, 1)
 		case <-p.closed:
 			return
 		}
+		hb.Reset(pingInterval)
 	}
 }
 
