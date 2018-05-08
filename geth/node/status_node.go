@@ -24,7 +24,6 @@ import (
 	"github.com/status-im/status-go/geth/rpc"
 	"github.com/status-im/status-go/services/shhext"
 	"github.com/status-im/status-go/services/status"
-	"github.com/status-im/status-go/timesource"
 )
 
 // tickerResolution is the delta to check blockchain sync progress.
@@ -52,8 +51,6 @@ type StatusNode struct {
 	register *peers.Register
 	peerPool *peers.PeerPool
 	db       *leveldb.DB // used as a cache for PeerPool
-
-	timeManager *timesource.NTPTimeSource
 
 	log log.Logger
 }
