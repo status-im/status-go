@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	stdlog "log"
@@ -31,26 +32,26 @@ var (
 )
 
 var (
-	clusterConfigFile    = flag.String("clusterconfig", "", "Cluster configuration file")
-	nodeKeyFile          = flag.String("nodekey", "", "P2P node key file (private key)")
-	dataDir              = flag.String("datadir", params.DataDir, "Data directory for the databases and keystore")
-	networkID            = flag.Int("networkid", params.RopstenNetworkID, "Network identifier (integer, 1=Homestead, 3=Ropsten, 4=Rinkeby, 777=StatusChain)")
-	lesEnabled           = flag.Bool("les", false, "Enable LES protocol")
-	whisperEnabled       = flag.Bool("shh", false, "Enable Whisper protocol")
-	statusServiceEnabled = flag.Bool("status", false, "Enable Status service")
-	swarmEnabled         = flag.Bool("swarm", false, "Enable Swarm protocol")
-	maxPeers             = flag.Int("maxpeers", 25, "maximum number of p2p peers (including all protocols)")
-	httpEnabled          = flag.Bool("http", false, "Enable HTTP RPC endpoint")
-	httpHost             = flag.String("httphost", "127.0.0.1", "HTTP RPC host of the listening socket")
-	httpPort             = flag.Int("httpport", params.HTTPPort, "HTTP RPC server's listening port")
-	ipcEnabled           = flag.Bool("ipc", false, "Enable IPC RPC endpoint")
-	cliEnabled           = flag.Bool("cli", false, "Enable debugging CLI server")
-	cliPort              = flag.String("cliport", debug.CLIPort, "CLI server's listening port")
-	pprofEnabled         = flag.Bool("pprof", false, "Enable runtime profiling via pprof")
-	pprofPort            = flag.Int("pprofport", 52525, "Port for runtime profiling via pprof")
-	logLevel             = flag.String("log", "INFO", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
-	logFile              = flag.String("logfile", "", "Path to the log file")
-	version              = flag.Bool("version", false, "Print version")
+	clusterConfigFile = flag.String("clusterconfig", "", "Cluster configuration file")
+	nodeKeyFile       = flag.String("nodekey", "", "P2P node key file (private key)")
+	dataDir           = flag.String("datadir", params.DataDir, "Data directory for the databases and keystore")
+	networkID         = flag.Int("networkid", params.RopstenNetworkID, "Network identifier (integer, 1=Homestead, 3=Ropsten, 4=Rinkeby, 777=StatusChain)")
+	lesEnabled        = flag.Bool("les", false, "Enable LES protocol")
+	whisperEnabled    = flag.Bool("shh", false, "Enable Whisper protocol")
+	statusService     = flag.String("status", "", `Enable StatusService, possible values: "ipc", "http"`)
+	swarmEnabled      = flag.Bool("swarm", false, "Enable Swarm protocol")
+	maxPeers          = flag.Int("maxpeers", 25, "maximum number of p2p peers (including all protocols)")
+	httpEnabled       = flag.Bool("http", false, "Enable HTTP RPC endpoint")
+	httpHost          = flag.String("httphost", "127.0.0.1", "HTTP RPC host of the listening socket")
+	httpPort          = flag.Int("httpport", params.HTTPPort, "HTTP RPC server's listening port")
+	ipcEnabled        = flag.Bool("ipc", false, "Enable IPC RPC endpoint")
+	cliEnabled        = flag.Bool("cli", false, "Enable debugging CLI server")
+	cliPort           = flag.String("cliport", debug.CLIPort, "CLI server's listening port")
+	pprofEnabled      = flag.Bool("pprof", false, "Enable runtime profiling via pprof")
+	pprofPort         = flag.Int("pprofport", 52525, "Port for runtime profiling via pprof")
+	logLevel          = flag.String("log", "INFO", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
+	logFile           = flag.String("logfile", "", "Path to the log file")
+	version           = flag.Bool("version", false, "Print version")
 
 	listenAddr = flag.String("listenaddr", ":30303", "IP address and port of this node (e.g. 127.0.0.1:30303)")
 	standalone = flag.Bool("standalone", true, "Don't actively connect to peers, wait for incoming connections")
@@ -94,7 +95,7 @@ func main() {
 
 	config, err := makeNodeConfig()
 	if err != nil {
-		stdlog.Fatalf("Making config failed %s", err)
+		stdlog.Fatalf("Making config failed, %s", err)
 	}
 
 	if *version {
@@ -249,8 +250,6 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 	nodeConfig.LightEthConfig.Enabled = *lesEnabled
 	nodeConfig.SwarmConfig.Enabled = *swarmEnabled
 
-	nodeConfig.StatusServiceEnabled = *statusServiceEnabled
-
 	if *standalone {
 		nodeConfig.ClusterConfig.Enabled = false
 		nodeConfig.ClusterConfig.BootNodes = nil
@@ -266,6 +265,11 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 		nodeConfig.ClusterConfig.BootNodes = strings.Split(*bootnodes, ",")
 	}
 
+	nodeConfig, err = configureStatusService(*statusService, nodeConfig)
+	if err != nil {
+		return nil, err
+	}
+
 	if *whisperEnabled {
 		return whisperConfig(nodeConfig)
 	}
@@ -273,6 +277,32 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 	// RPC configuration
 	if !*httpEnabled {
 		nodeConfig.HTTPHost = "" // HTTP RPC is disabled
+	}
+
+	return nodeConfig, nil
+}
+
+var errStatusServiceRequiresIPC = errors.New("to enable the StatusService on IPC, -ipc flag must be set")
+var errStatusServiceRequiresHTTP = errors.New("to enable the StatusService on HTTP, -http flag must be set")
+var errStatusServiceInvalidFlag = errors.New("-status flag valid values are: ipc, http")
+
+func configureStatusService(flagValue string, nodeConfig *params.NodeConfig) (*params.NodeConfig, error) {
+	switch flagValue {
+	case "ipc":
+		if !nodeConfig.IPCEnabled {
+			return nil, errStatusServiceRequiresIPC
+		}
+		nodeConfig.StatusServiceEnabled = true
+	case "http":
+		if !nodeConfig.RPCEnabled {
+			return nil, errStatusServiceRequiresHTTP
+		}
+		nodeConfig.StatusServiceEnabled = true
+		nodeConfig.AddAPIModule("status")
+	case "":
+		nodeConfig.StatusServiceEnabled = false
+	default:
+		return nil, errStatusServiceInvalidFlag
 	}
 
 	return nodeConfig, nil
