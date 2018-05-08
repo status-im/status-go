@@ -47,8 +47,10 @@ func main() {
 	if err = m.BroadcastAvailability(); err != nil {
 		panic(err)
 	}
-	// TODO (adriacidre) : uncomment this
+
 	go func() { _ = m.ManageRegistrations() }()
+
+	// TODO(adriacidre) this is only for debugging
 
 	if backend.StatusNode().GethNode() != nil {
 		backend.StatusNode().GethNode().Wait()
