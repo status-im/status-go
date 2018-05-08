@@ -16,6 +16,7 @@ import (
 	"github.com/status-im/status-go/signal"
 	e2e "github.com/status-im/status-go/t/e2e"
 	. "github.com/status-im/status-go/t/utils"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -107,16 +108,34 @@ func (s *JailRPCTestSuite) TestRegressionGetTransactionReceipt() {
 	expected := `{"jsonrpc":"2.0","id":7,"result":null}`
 	s.Equal(expected, got)
 }
+func (s *JailRPCTestSuite) TestContractDeploymentLES() {
+	s.testContractDeployment(false)
+}
+func (s *JailRPCTestSuite) TestContractDeploymentRPC() {
+	s.testContractDeployment(true)
+}
 
-func (s *JailRPCTestSuite) TestContractDeployment() {
+func (s *JailRPCTestSuite) testContractDeployment(upstream bool) {
 	CheckTestSkipForNetworks(s.T(), params.MainNetworkID)
+	if upstream && GetNetworkID() == params.StatusChainNetworkID {
+		// only testing RPC on rinkeby
+		s.T().Skip()
+	}
 
-	s.StartTestBackend()
+	testContractMining := true
+	if GetNetworkID() == params.StatusChainNetworkID {
+		// we don't do mining on our chain
+		testContractMining = false
+	}
+
+	s.StartTestBackend(setUpstreamOption(s.T(), upstream))
 	defer s.StopTestBackend()
 
 	s.NoError(s.Backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 
-	EnsureNodeSync(s.Backend.StatusNode().EnsureSync)
+	if !upstream {
+		EnsureNodeSync(s.Backend.StatusNode().EnsureSync)
+	}
 
 	// obtain VM for a given chat (to send custom JS to jailed version of Send())
 	s.jail.CreateAndInitCell(testChatID)
@@ -140,7 +159,7 @@ func (s *JailRPCTestSuite) TestContractDeployment() {
 			result := s.Backend.ApproveSignRequest(txID, TestConfig.Account1.Password)
 			txHash.SetBytes(result.Response.Bytes())
 			if s.NoError(result.Error, event["id"]) {
-				s.T().Logf("contract transaction complete, URL: %s", "https://ropsten.etherscan.io/tx/"+txHash.Hex())
+				s.T().Logf("contract transaction complete, URL: %s", "https://rinkeby.etherscan.io/tx/"+txHash.Hex())
 			}
 
 			close(completeQueuedTransaction)
@@ -150,6 +169,8 @@ func (s *JailRPCTestSuite) TestContractDeployment() {
 	_, err = cell.Run(`
 		var responseValue = null;
 		var errorValue = null;
+		var wasMined = false;
+		var wasSent = false;
 		var testContract = web3.eth.contract([{"constant":true,"inputs":[{"name":"a","type":"int256"}],"name":"double","outputs":[{"name":"","type":"int256"}],"payable":false,"type":"function"}]);
 		var test = testContract.new(
 		{
@@ -165,6 +186,10 @@ func (s *JailRPCTestSuite) TestContractDeployment() {
 			// Once the contract has the transactionHash property set and once its deployed on an address.
 			if (!contract.address) {
 				responseValue = contract.transactionHash;
+				wasSent = true;
+			}
+			if (contract.address) {
+				wasMined = true;
 			}
 		})
 	`)
@@ -176,8 +201,7 @@ func (s *JailRPCTestSuite) TestContractDeployment() {
 		s.FailNow("test timed out")
 	}
 
-	// Wait until callback is fired and `responseValue` is set. Hacky but simple.
-	time.Sleep(5 * time.Second)
+	s.waitForBoolValue(cell, "wasSent", true, 30*time.Second, "timeout while waiting for the contract tx to be sent")
 
 	errorValue, err := cell.Get("errorValue")
 	s.NoError(err)
@@ -191,6 +215,30 @@ func (s *JailRPCTestSuite) TestContractDeployment() {
 
 	expectedResponse := txHash.Hex()
 	s.Equal(expectedResponse, response)
+
+	if testContractMining {
+		s.waitForBoolValue(cell, "wasMined", true, 3*time.Minute, "timeout while waiting for the contract to be mined")
+	}
+}
+
+func (s *JailRPCTestSuite) waitForBoolValue(cell jail.JSCell, name string, expected bool, timeout time.Duration, msg string) {
+	deadline := time.Now().Add(timeout)
+
+	s.T().Logf("waiting for the variable '%s' to be '%v' with timeout of '%v'", name, expected, timeout)
+
+	for time.Now().Before(deadline) {
+		boolValue, err := cell.Get(name)
+		s.NoError(err)
+		actualValue, err := boolValue.Value().ToBoolean()
+		s.NoError(err)
+		if actualValue == expected {
+			return
+		}
+
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	s.Fail(msg)
 }
 
 func (s *JailRPCTestSuite) TestJailVMPersistence() {
@@ -301,7 +349,7 @@ func (s *JailRPCTestSuite) TestJailVMPersistence() {
 
 			txHash.SetBytes(result.Response.Bytes())
 
-			s.T().Logf("Transaction complete: https://ropsten.etherscan.io/tx/%s", txHash.Hex())
+			s.T().Logf("Transaction complete: https://rinkeby.etherscan.io/tx/%s", txHash.Hex())
 		}
 	})
 
@@ -348,4 +396,15 @@ func (s *JailRPCTestSuite) TestJailVMPersistence() {
 
 	s.T().Log(total)
 	s.InDelta(0.840003, total, 0.0000001)
+}
+
+func setUpstreamOption(t *testing.T, upstream bool) e2e.TestNodeOption {
+	return func(config *params.NodeConfig) {
+		if upstream {
+			networkURL, err := GetRemoteURL()
+			assert.NoError(t, err)
+			config.UpstreamConfig.Enabled = true
+			config.UpstreamConfig.URL = networkURL
+		}
+	}
 }
