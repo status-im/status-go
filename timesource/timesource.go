@@ -8,6 +8,8 @@ import (
 
 	"github.com/beevik/ntp"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/p2p"
+	"github.com/ethereum/go-ethereum/rpc"
 )
 
 const (
@@ -136,7 +138,7 @@ func (s *NTPTimeSource) updateOffset() {
 }
 
 // Start runs a goroutine that updates local offset every updatePeriod.
-func (s *NTPTimeSource) Start() {
+func (s *NTPTimeSource) Start(*p2p.Server) error {
 	s.quit = make(chan struct{})
 	ticker := time.NewTicker(s.updatePeriod)
 	// we try to do it synchronously so that user can have reliable messages right away
@@ -153,13 +155,25 @@ func (s *NTPTimeSource) Start() {
 			}
 		}
 	}()
+	return nil
 }
 
 // Stop goroutine that updates time source.
-func (s *NTPTimeSource) Stop() {
+func (s *NTPTimeSource) Stop() error {
 	if s.quit == nil {
-		return
+		return nil
 	}
 	close(s.quit)
 	s.wg.Wait()
+	return nil
+}
+
+// APIs used to be conformant with service interface
+func (s *NTPTimeSource) APIs() []rpc.API {
+	return nil
+}
+
+// Protocols used to conformant with service interface
+func (s *NTPTimeSource) Protocols() []p2p.Protocol {
+	return nil
 }

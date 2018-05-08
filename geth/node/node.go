@@ -26,6 +26,7 @@ import (
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/shhext"
 	"github.com/status-im/status-go/services/status"
+	"github.com/status-im/status-go/timesource"
 )
 
 // Errors related to node and services creation.
@@ -192,11 +193,21 @@ func activateShhService(stack *node.Node, config *params.NodeConfig) (err error)
 		logger.Info("SHH protocol is disabled")
 		return nil
 	}
+	if err := stack.Register(func(*node.ServiceContext) (node.Service, error) {
+		return timesource.Default(), nil
+	}); err != nil {
+		return err
+	}
 
-	err = stack.Register(func(*node.ServiceContext) (node.Service, error) {
+	err = stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
+		var timeSource *timesource.NTPTimeSource
+		if err := ctx.Service(&timeSource); err != nil {
+			return nil, err
+		}
 		whisperServiceConfig := &whisper.Config{
 			MaxMessageSize:     whisper.DefaultMaxMessageSize,
 			MinimumAcceptedPOW: 0.001,
+			TimeSource:         timeSource.Now,
 		}
 		whisperService := whisper.New(whisperServiceConfig)
 
