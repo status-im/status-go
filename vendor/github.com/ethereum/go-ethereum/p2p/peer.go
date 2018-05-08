@@ -22,6 +22,7 @@ import (
 	"net"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common/mclock"
@@ -38,7 +39,7 @@ const (
 
 	snappyProtocolVersion = 5
 
-	pingInterval = 15 * time.Second
+	pingInterval = 1 * time.Second
 )
 
 const (
@@ -100,6 +101,7 @@ type Peer struct {
 	log     log.Logger
 	created mclock.AbsTime
 
+	flaky    int32
 	wg       sync.WaitGroup
 	protoErr chan error
 	closed   chan struct{}
@@ -116,6 +118,18 @@ func NewPeer(id discover.NodeID, name string, caps []Cap) *Peer {
 	peer := newPeer(conn, nil)
 	close(peer.closed) // ensures Disconnect doesn't block
 	return peer
+}
+
+func (p *Peer) SetFlaky() {
+	atomic.StoreInt32(&p.flaky, 1)
+}
+
+func (p *Peer) SetNonFlaky() {
+	atomic.StoreInt32(&p.flaky, 0)
+}
+
+func (p *Peer) IsFlaky() bool {
+	return atomic.LoadInt32(&p.flaky) == 1
 }
 
 // ID returns the node's public key.
@@ -188,8 +202,10 @@ func (p *Peer) run() (remoteRequested bool, err error) {
 		readErr    = make(chan error, 1)
 		reason     DiscReason // sent to the peer
 	)
-	p.wg.Add(2)
-	go p.readLoop(readErr)
+	p.wg.Add(3)
+	reads := make(chan struct{}, 10) // channel for reads
+	go p.readLoop(readErr, reads)
+	go p.heartbeatLoop(reads)
 	go p.pingLoop()
 
 	// Start all protocol handlers.
@@ -248,7 +264,24 @@ func (p *Peer) pingLoop() {
 	}
 }
 
-func (p *Peer) readLoop(errc chan<- error) {
+func (p *Peer) heartbeatLoop(reads <-chan struct{}) {
+	defer p.wg.Done()
+	hb := time.NewTimer(2 * pingInterval)
+	defer hb.Stop()
+	for {
+		select {
+		case <-reads:
+			p.SetNonFlaky()
+		case <-hb.C:
+			p.SetFlaky()
+			hb.Reset(2 * pingInterval)
+		case <-p.closed:
+			return
+		}
+	}
+}
+
+func (p *Peer) readLoop(errc chan<- error, reads chan<- struct{}) {
 	defer p.wg.Done()
 	for {
 		msg, err := p.rw.ReadMsg()
@@ -261,6 +294,7 @@ func (p *Peer) readLoop(errc chan<- error) {
 			errc <- err
 			return
 		}
+		reads <- struct{}{}
 	}
 }
 
