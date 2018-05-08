@@ -112,7 +112,7 @@ func New(cfg *Config) *Whisper {
 		p2pMsgQueue:   make(chan *Envelope, messageQueueLimit),
 		quit:          make(chan struct{}),
 		syncAllowance: DefaultSyncAllowance,
-		timeSource:    time.Now,
+		timeSource:    cfg.TimeSource,
 	}
 
 	whisper.filters = NewFilters(whisper)
@@ -216,11 +216,6 @@ func (whisper *Whisper) APIs() []rpc.API {
 			Public:    true,
 		},
 	}
-}
-
-// SetTimeSource sets time source used by whisper for envelopes time and expiration logic.
-func (whisper *Whisper) SetTimeSource(timeSource func() time.Time) {
-	whisper.timeSource = timeSource
 }
 
 // GetCurrentTime returns current time.
