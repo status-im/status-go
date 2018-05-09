@@ -145,7 +145,8 @@ func testEvent(t *testing.T, event *latestBlockChangedEvent, expectedHashes []co
 
 func TestEventReceivedBlocksOutOfOrders(t *testing.T) {
 	// We are sending blocks out of order (simulating load balancing on RPC
-	// nodes). We should still receive them in order and not have the event
+	// nodes). Note that hashes are the same.
+	// We should still receive them in order and not have the event
 	// fired for out-of-order events.
 	expectedHashes := []common.Hash{common.HexToHash("0xAA"), common.HexToHash("0xBB"), common.HexToHash("0xCC")}
 	sentHashes := []common.Hash{common.HexToHash("0xAA"), common.HexToHash("0xBB"), common.HexToHash("0xAA"), common.HexToHash("0xCC")}
@@ -154,12 +155,31 @@ func TestEventReceivedBlocksOutOfOrders(t *testing.T) {
 	counter := 0
 	f := func() (blockInfo, error) {
 		counter++
-		number := big.NewInt(sentBlockNumbers[counter-1])
 		if counter > len(sentHashes) {
 			counter = len(sentHashes)
 		}
+		number := big.NewInt(sentBlockNumbers[counter-1])
 		return blockInfo{sentHashes[counter-1], hexutil.Bytes(number.Bytes())}, nil
 	}
 
 	testEventSubscribe(t, f, expectedHashes)
+}
+
+func TestEventDivergedChain(t *testing.T) {
+	// We are sending blocks out of order (simulating chain diverges).
+	// Note that every hash is unique. We should still receive them all.
+	hashes := []common.Hash{common.HexToHash("0xC11"), common.HexToHash("0xC12"), common.HexToHash("0xC21"), common.HexToHash("0xC22"), common.HexToHash("0xC23")}
+	blockNumbers := []int64{1, 2, 1, 2, 3}
+
+	counter := 0
+	f := func() (blockInfo, error) {
+		counter++
+		if counter > len(hashes) {
+			counter = len(hashes)
+		}
+		number := big.NewInt(blockNumbers[counter-1])
+		return blockInfo{hashes[counter-1], hexutil.Bytes(number.Bytes())}, nil
+	}
+
+	testEventSubscribe(t, f, hashes)
 }
