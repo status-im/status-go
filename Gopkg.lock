@@ -14,12 +14,6 @@
   revision = "5d049714c4a64225c3c79a7cf7d02f7fb5b96338"
 
 [[projects]]
-  name = "github.com/appleboy/gorush"
-  packages = ["rpc/proto"]
-  revision = "5ed2f75c17d6151977fa0dc2ab5183428af80491"
-  version = "1.10.0"
-
-[[projects]]
   name = "github.com/aristanetworks/goarista"
   packages = ["monotime"]
   revision = "ea17b1a17847fb6e4c0a91de0b674704693469b0"
@@ -185,11 +179,7 @@
   name = "github.com/golang/protobuf"
   packages = [
     "proto",
-    "protoc-gen-go/descriptor",
-    "ptypes",
-    "ptypes/any",
-    "ptypes/duration",
-    "ptypes/timestamp"
+    "protoc-gen-go/descriptor"
   ]
   revision = "748d386b5c1ea99658fd69fe9f03991ce86a90c1"
 
@@ -403,15 +393,9 @@
     "html",
     "html/atom",
     "html/charset",
-    "http2",
-    "http2/hpack",
-    "idna",
     "internal/iana",
     "internal/socket",
-    "internal/timeseries",
     "ipv4",
-    "lex/httplex",
-    "trace",
     "websocket"
   ]
   revision = "5ccada7d0a7ba9aeb5d3aca8d3501b4c2a509fec"
@@ -435,8 +419,6 @@
   branch = "master"
   name = "golang.org/x/text"
   packages = [
-    "collate",
-    "collate/build",
     "encoding",
     "encoding/charmap",
     "encoding/htmlindex",
@@ -447,7 +429,6 @@
     "encoding/simplifiedchinese",
     "encoding/traditionalchinese",
     "encoding/unicode",
-    "internal/colltab",
     "internal/gen",
     "internal/tag",
     "internal/triegen",
@@ -455,12 +436,9 @@
     "internal/utf8internal",
     "language",
     "runes",
-    "secure/bidirule",
     "transform",
-    "unicode/bidi",
     "unicode/cldr",
-    "unicode/norm",
-    "unicode/rangetable"
+    "unicode/norm"
   ]
   revision = "e19ae1496984b1c655b8044a65c0300a3c878dd3"
 
@@ -472,42 +450,6 @@
     "imports"
   ]
   revision = "ac136b6c2db7c4d43955e4bc7174db36dc0539c0"
-
-[[projects]]
-  branch = "master"
-  name = "google.golang.org/genproto"
-  packages = ["googleapis/rpc/status"]
-  revision = "86e600f69ee4704c6efbf6a2a40a5c10700e76c2"
-
-[[projects]]
-  name = "google.golang.org/grpc"
-  packages = [
-    ".",
-    "balancer",
-    "balancer/base",
-    "balancer/roundrobin",
-    "codes",
-    "connectivity",
-    "credentials",
-    "encoding",
-    "encoding/proto",
-    "grpclb/grpc_lb_v1/messages",
-    "grpclog",
-    "internal",
-    "keepalive",
-    "metadata",
-    "naming",
-    "peer",
-    "resolver",
-    "resolver/dns",
-    "resolver/passthrough",
-    "stats",
-    "status",
-    "tap",
-    "transport"
-  ]
-  revision = "d11072e7ca9811b1100b80ca0269ac831f06d024"
-  version = "v1.11.3"
 
 [[projects]]
   branch = "v0.1.1"
@@ -557,6 +499,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "87151f1c94ecf36531714eb5e8768495eccaba5530ffeed723b00dc52ce2e17e"
+  inputs-digest = "7d6594ceb6f29dd4ed9de76d44c88d68b3350630a3831545a19db9c16d43aeb2"
   solver-name = "gps-cdcl"
   solver-version = 1
