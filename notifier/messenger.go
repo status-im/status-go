@@ -94,13 +94,34 @@ func (m *Messenger) ManageRegistrations() error {
 
 	_, err = ch.Subscribe(m.processRegistration)
 
+	// TODO(adriacidre) CLIENT genreates a symkey and topicID
+	/*
+		time.Sleep(time.Second * 3)
+		func() {
+			pnPubKey := "random"
+			println("CLIENT subscribes to private channel genreates a symkey and topicID")
+			privateChannel, err := m.baseAccount.CreatePrivateChannel("isThisNameNeededAtAll?", pnPubKey)
+			if err != nil {
+				panic(err.Error())
+			}
+			println("[ client ] SENT REGISTRATION REQUEST ]")
+			ch.PNRegistrationRequest(privateChannel.ChannelKey, privateChannel.TopicID, "token", 1)
+			println("[ end ]")
+		}()
+	*/
+	// ---------- END OF CLIENT SIDE
+
 	return err
 }
 
 // processRegistration : processes an input string to get the underlying
 // RegistrationRequestMsg and stores the result
 func (m *Messenger) processRegistration(msg *sdk.Msg) {
-	req := msg.Properties.(sdk.PNRegistrationMsg)
+	if msg.Type != sdk.PNRegistrationType {
+		log.Println("Invalid message type", msg.Type)
+		return
+	}
+	req := msg.Properties.(*sdk.PNRegistrationMsg)
 
 	// Generate a new asymetric key (AK2)
 	key := make([]byte, 64)
@@ -120,6 +141,26 @@ func (m *Messenger) processRegistration(msg *sdk.Msg) {
 		log.Println(err.Error())
 		return
 	}
+
+	// TODO(adriacidre) CLIENT subscribes to the secure channel
+	/*
+		println("CLIENT subscribes to the secure channel")
+		ch.Subscribe(func(msg *sdk.Msg) {
+			if msg.Type != sdk.PNRegistrationConfirmationType {
+				println("Invalid message type")
+				return
+			}
+			println("RECEIVED")
+			println("RECEIVED")
+			println("RECEIVED")
+			spew.Dump(msg.Properties)
+			println("RECEIVED")
+			println("RECEIVED")
+			println("RECEIVED")
+		})
+		time.Sleep(time.Second * 2)
+	*/
+	// ---------- END OF CLIENT SIDE
 
 	// Send a registration confirmation with the new public key
 	err = ch.PNRegistrationConfirmationRequest(ak2)

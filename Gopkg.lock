@@ -340,7 +340,7 @@
   branch = "master"
   name = "github.com/status-im/status-go-sdk"
   packages = ["."]
-  revision = "2e09479c694ee277b3131053f5ab2b8c491829b9"
+  revision = "8cbd6ec4423b6a88c11df85cae7540b1c0ae86dc"
 
 [[projects]]
   name = "github.com/stretchr/testify"

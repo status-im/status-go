@@ -12,8 +12,8 @@ type Channel struct {
 	account       *Account
 	name          string
 	filterID      string
-	channelKey    string
-	topicID       string
+	ChannelKey    string
+	TopicID       string
 	visibility    string
 	subscriptions []*Subscription
 }
@@ -52,7 +52,7 @@ func (c *Channel) NewContactKeyRequest(username string) error {
 	contactRequest := fmt.Sprintf(format, ContactRequestType, username, "", "", "")
 
 	format = `["%s",["%s","%s",%s]`
-	msg := fmt.Sprintf(format, NewContactKeyType, c.account.Address, c.topicID, contactRequest)
+	msg := fmt.Sprintf(format, NewContactKeyType, c.account.Address, c.TopicID, contactRequest)
 
 	return c.SendPostRawMsg(msg)
 }
@@ -118,9 +118,9 @@ func (c *Channel) ContactUpdateRequest(username, image string) error {
 func (c *Channel) SendPostRawMsg(body string) error {
 	param := shhPostParam{
 		Signature: c.account.Address,
-		SymKeyID:  c.channelKey,
+		SymKeyID:  c.ChannelKey,
 		Payload:   rawrChatMessage(body),
-		Topic:     c.topicID,
+		Topic:     c.TopicID,
 		TTL:       10,
 		PowTarget: c.account.conn.minimumPoW,
 		PowTime:   1,
@@ -151,7 +151,7 @@ func (c *Channel) PNBroadcastAvailabilityRequest() error {
 // Additionally a device token will identify the device on the push notification
 // provider.
 func (c *Channel) PNRegistrationRequest(symkey, topic, deviceToken string, slotAvailabilityRatio float32) error {
-	format := `["%s",["%s","%s","%s"]]]`
+	format := `["%s",["%s","%s","%s", %g]]`
 	msg := fmt.Sprintf(format, PNRegistrationType, symkey, topic, deviceToken, slotAvailabilityRatio)
 
 	return c.SendPostRawMsg(msg)
@@ -161,7 +161,7 @@ func (c *Channel) PNRegistrationRequest(symkey, topic, deviceToken string, slotA
 // server to let a client know what's the pubkey associated with its registered
 // token.
 func (c *Channel) PNRegistrationConfirmationRequest(pubkey string) error {
-	format := `["%s",["%s"]]]`
+	format := `["%s",["%s"]]`
 	msg := fmt.Sprintf(format, PNRegistrationConfirmationType, pubkey)
 
 	return c.SendPostRawMsg(msg)
@@ -197,6 +197,11 @@ func (c *Channel) pollMessages() (msg *Msg) {
 				msg.Channel = c
 				msg.ChannelName = c.name
 				return
+			} else if err != nil {
+				log.Println("[ ERROR ]", err.Error())
+				return
+			} else {
+				log.Println("[ ERROR ]", "Invalid message type", msg.Type)
 			}
 			return nil
 		}

@@ -15,19 +15,28 @@ type Account struct {
 }
 
 // JoinPublicChannel joins a status public channel
-func (a *Account) JoinPublicChannel(channelName string) (*Channel, error) {
-	symkeyResponse, err := shhGenerateSymKeyFromPasswordRequest(a.conn, []string{channelName})
+func (a *Account) JoinPublicChannel(name string) (*Channel, error) {
+	return a.createAndJoin(name, name)
+}
+
+// CreatePrivateChannel creates and joins a private channel
+func (a *Account) CreatePrivateChannel(name, password string) (*Channel, error) {
+	return a.createAndJoin(name, password)
+}
+
+func (a *Account) createAndJoin(name, password string) (*Channel, error) {
+	symkeyResponse, err := shhGenerateSymKeyFromPasswordRequest(a.conn, []string{password})
 	if err != nil {
 		return nil, err
 	}
 	symKey := symkeyResponse.Key
 
-	topicID, err := a.calculatePublicChannelTopicID(channelName, symkeyResponse.ID)
+	topicID, err := a.calculatePublicChannelTopicID(name, symkeyResponse.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	return a.Join(channelName, topicID, symKey)
+	return a.Join(name, topicID, symKey)
 }
 
 // Join joins a status channel
@@ -43,8 +52,8 @@ func (a *Account) Join(channelName, topicID, symKey string) (*Channel, error) {
 		account:    a,
 		name:       channelName,
 		filterID:   filterID,
-		topicID:    topicID,
-		channelKey: symKey,
+		TopicID:    topicID,
+		ChannelKey: symKey,
 	}
 	a.channels = append(a.channels, ch)
 

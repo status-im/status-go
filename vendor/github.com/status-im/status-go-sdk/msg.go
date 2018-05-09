@@ -87,7 +87,6 @@ func messageFromPayload(payload string) (*Msg, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	if err = json.Unmarshal(rawMsg, &msg); err != nil {
 		return nil, err
 	}
@@ -126,7 +125,7 @@ func messageFromPayload(payload string) (*Msg, error) {
 	case PNRegistrationType:
 		message.Properties = pnRegistrationMsgFromProperties(properties)
 	case PNRegistrationConfirmationType:
-		// message.Properties = newPublishMessageFromProperties(properties)
+		message.Properties = pnRegistrationConfirmationMsgFromProperties(properties)
 	default:
 		return nil, errors.New("unsupported message type")
 	}
@@ -248,7 +247,7 @@ type PNRegistrationMsg struct {
 	Symkey           string
 	Topic            string
 	DeviceToken      string
-	SlotAvailability float32
+	SlotAvailability float64
 }
 
 func pnRegistrationMsgFromProperties(properties []interface{}) *PNRegistrationMsg {
@@ -256,7 +255,7 @@ func pnRegistrationMsgFromProperties(properties []interface{}) *PNRegistrationMs
 		Symkey:           properties[0].(string),
 		Topic:            properties[1].(string),
 		DeviceToken:      properties[2].(string),
-		SlotAvailability: properties[3].(float32),
+		SlotAvailability: properties[3].(float64),
 	}
 }
 

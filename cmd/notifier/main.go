@@ -44,13 +44,15 @@ func main() {
 	if m == nil {
 		panic(err)
 	}
-	if err = m.BroadcastAvailability(); err != nil {
-		panic(err)
-	}
+	/*
+		if err = m.BroadcastAvailability(); err != nil {
+			panic(err)
+		}
+	*/
 
-	go func() { _ = m.ManageRegistrations() }()
-
-	// TODO(adriacidre) this is only for debugging
+	// go func() {
+	_ = m.ManageRegistrations()
+	//}()
 
 	if backend.StatusNode().GethNode() != nil {
 		backend.StatusNode().GethNode().Wait()
