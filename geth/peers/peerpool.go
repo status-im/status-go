@@ -75,6 +75,7 @@ type PeerPool struct {
 	serverSubscription event.Subscription
 	events             chan *p2p.PeerEvent
 	quit               chan struct{}
+	wg                 sync.WaitGroup
 	timeout            <-chan time.Time
 }
 
@@ -100,8 +101,10 @@ func (p *PeerPool) Start(server *p2p.Server) error {
 
 	p.events = make(chan *p2p.PeerEvent, 20)
 	p.serverSubscription = server.SubscribeEvents(p.events)
+	p.wg.Add(1)
 	go func() {
 		p.handleServerPeers(server, p.events)
+		p.wg.Done()
 	}()
 	return nil
 }
@@ -262,4 +265,5 @@ func (p *PeerPool) Stop() {
 		close(p.quit)
 	}
 	p.serverSubscription.Unsubscribe()
+	p.wg.Wait()
 }
