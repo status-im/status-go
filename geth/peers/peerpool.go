@@ -133,15 +133,15 @@ func (p *PeerPool) stopDiscovery(server *p2p.Server) {
 		return
 	}
 
+	for _, t := range p.topics {
+		t.StopSearch()
+	}
+
 	p.mu.Lock()
 	server.DiscV5.Close()
 	server.DiscV5 = nil
 	p.timeout = nil
 	p.mu.Unlock()
-
-	for _, t := range p.topics {
-		t.StopSearch()
-	}
 
 	signal.SendDiscoveryStopped()
 }
