@@ -145,6 +145,7 @@ test-e2e: ##@tests Run e2e tests
 	go test -timeout 10m ./t/e2e/services/... -network=$(networkid) $(gotest_extraflags)
 	# e2e_test tag is required to include some files from ./lib without _test suffix
 	go test -timeout 40m -tags e2e_test ./lib -network=$(networkid) $(gotest_extraflags)
+	go test -timeout 5m ./t/e2e/notifier/... -network=$(networkid) $(gotest_extraflags)
 
 test-e2e-race: gotest_extraflags=-race
 test-e2e-race: test-e2e ##@tests Run e2e tests with -race flag

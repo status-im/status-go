@@ -327,6 +327,12 @@
   version = "0.20.1"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/status-im/status-go-sdk"
+  packages = ["."]
+  revision = "8cbd6ec4423b6a88c11df85cae7540b1c0ae86dc"
+
+[[projects]]
   name = "github.com/stretchr/testify"
   packages = [
     "assert",
@@ -493,6 +499,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "c82f110ad74f6540b5ba89202a3e4e6cca24a7ec9eedd35248a3aa1e6d626275"
+  inputs-digest = "7d6594ceb6f29dd4ed9de76d44c88d68b3350630a3831545a19db9c16d43aeb2"
   solver-name = "gps-cdcl"
   solver-version = 1
