@@ -18,8 +18,8 @@ const (
 	// DefaultAttempts defines how many servers we will query
 	DefaultAttempts = 5
 
-	// DefaultTolerateErrors defines how many failures will be tolerated.
-	DefaultTolerateErrors = 2
+	// DefaultMaxAllowedFailures defines how many failures will be tolerated.
+	DefaultMaxAllowedFailures = 2
 
 	// DefaultUpdatePeriod defines how often time will be queried from ntp.
 	DefaultUpdatePeriod = 2 * time.Minute
@@ -52,7 +52,7 @@ func (e multiRPCError) Error() string {
 	return b.String()
 }
 
-func computeOffset(timeQuery ntpQuery, server string, attempts, tolerateErrors int) (time.Duration, error) {
+func computeOffset(timeQuery ntpQuery, server string, attempts, allowedFailures int) (time.Duration, error) {
 	if attempts == 0 {
 		return 0, nil
 	}
@@ -85,7 +85,7 @@ func computeOffset(timeQuery ntpQuery, server string, attempts, tolerateErrors i
 			break
 		}
 	}
-	if lth := len(rpcErrors); lth > tolerateErrors {
+	if lth := len(rpcErrors); lth > allowedFailures {
 		return 0, rpcErrors
 	} else if lth == attempts {
 		return 0, rpcErrors
@@ -103,22 +103,22 @@ func computeOffset(timeQuery ntpQuery, server string, attempts, tolerateErrors i
 // Default initializes time source with default config values.
 func Default() *NTPTimeSource {
 	return &NTPTimeSource{
-		server:         DefaultServer,
-		attempts:       DefaultAttempts,
-		tolerateErrors: DefaultTolerateErrors,
-		updatePeriod:   DefaultUpdatePeriod,
-		timeQuery:      ntp.QueryWithOptions,
+		server:          DefaultServer,
+		attempts:        DefaultAttempts,
+		allowedFailures: DefaultMaxAllowedFailures,
+		updatePeriod:    DefaultUpdatePeriod,
+		timeQuery:       ntp.QueryWithOptions,
 	}
 }
 
 // NTPTimeSource provides source of time that tries to be resistant to time skews.
 // It does so by periodically querying time offset from ntp servers.
 type NTPTimeSource struct {
-	server         string
-	attempts       int
-	tolerateErrors int
-	updatePeriod   time.Duration
-	timeQuery      ntpQuery // for ease of testing
+	server          string
+	attempts        int
+	allowedFailures int
+	updatePeriod    time.Duration
+	timeQuery       ntpQuery // for ease of testing
 
 	quit chan struct{}
 	wg   sync.WaitGroup
@@ -135,7 +135,7 @@ func (s *NTPTimeSource) Now() time.Time {
 }
 
 func (s *NTPTimeSource) updateOffset() {
-	offset, err := computeOffset(s.timeQuery, s.server, s.attempts, s.tolerateErrors)
+	offset, err := computeOffset(s.timeQuery, s.server, s.attempts, s.allowedFailures)
 	if err != nil {
 		log.Error("failed to compute offset", "error", err)
 		return
