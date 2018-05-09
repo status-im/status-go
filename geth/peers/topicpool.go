@@ -410,6 +410,8 @@ func (t *TopicPool) StopSearch() {
 		return
 	default:
 		log.Debug("stoping search", "topic", t.topic)
+		close(t.quit)
+		t.mu.Lock()
 		if t.fastModeTimeoutCancel != nil {
 			close(t.fastModeTimeoutCancel)
 			t.fastModeTimeoutCancel = nil
@@ -417,7 +419,7 @@ func (t *TopicPool) StopSearch() {
 		close(t.period)
 		t.period = nil
 		t.currentMode = 0
-		close(t.quit)
+		t.mu.Unlock()
 	}
 	t.wg.Wait()
 }
