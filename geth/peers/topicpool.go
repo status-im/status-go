@@ -41,9 +41,10 @@ type TopicPool struct {
 	slowMode        time.Duration
 	fastModeTimeout time.Duration
 
-	mu   sync.RWMutex
-	wg   sync.WaitGroup // wait group for all goroutines spawn during TopicPool operation
-	quit chan struct{}
+	mu     sync.RWMutex
+	discWG sync.WaitGroup
+	poolWG sync.WaitGroup
+	quit   chan struct{}
 
 	running int32
 
@@ -159,9 +160,9 @@ func (t *TopicPool) limitFastMode(timeout time.Duration) chan struct{} {
 
 	cancel := make(chan struct{})
 
-	t.wg.Add(1)
+	t.poolWG.Add(1)
 	go func() {
-		defer t.wg.Done()
+		defer t.poolWG.Done()
 
 		select {
 		case <-time.After(timeout):
@@ -318,15 +319,15 @@ func (t *TopicPool) StartSearch(server *p2p.Server) error {
 		}
 	}
 
-	t.wg.Add(1)
+	t.discWG.Add(1)
 	go func() {
 		server.DiscV5.SearchTopic(t.topic, t.period, found, lookup)
-		t.wg.Done()
+		t.discWG.Done()
 	}()
-	t.wg.Add(1)
+	t.poolWG.Add(1)
 	go func() {
 		t.handleFoundPeers(server, found, lookup)
-		t.wg.Done()
+		t.poolWG.Done()
 	}()
 
 	return nil
@@ -409,16 +410,18 @@ func (t *TopicPool) StopSearch() {
 	case <-t.quit:
 		return
 	default:
-		log.Debug("stoping search", "topic", t.topic)
-		close(t.quit)
-		close(t.period)
-		t.mu.Lock()
-		if t.fastModeTimeoutCancel != nil {
-			close(t.fastModeTimeoutCancel)
-			t.fastModeTimeoutCancel = nil
-		}
-		t.currentMode = 0
-		t.mu.Unlock()
 	}
-	t.wg.Wait()
+	log.Debug("stoping search", "topic", t.topic)
+	close(t.quit)
+	t.mu.Lock()
+	if t.fastModeTimeoutCancel != nil {
+		close(t.fastModeTimeoutCancel)
+		t.fastModeTimeoutCancel = nil
+	}
+	t.currentMode = 0
+	t.mu.Unlock()
+	// wait for poolWG to exit because it writes to period channel
+	t.poolWG.Wait()
+	close(t.period)
+	t.discWG.Wait()
 }
