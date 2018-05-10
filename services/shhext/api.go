@@ -59,7 +59,12 @@ func (r *MessagesRequest) setDefaults(now time.Time) {
 	}
 
 	if r.From == 0 {
-		r.From = r.To - 86400 // -24 hours
+		oneDay := uint32(86400) // -24 hours
+		if r.To < oneDay {
+			r.From = 0
+		} else {
+			r.From = r.To - oneDay
+		}
 	}
 }
 

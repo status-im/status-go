@@ -33,11 +33,15 @@ func TestMessagesRequest_setDefaults(t *testing.T) {
 			&MessagesRequest{From: 0, To: yesterday},
 			&MessagesRequest{From: daysAgo(tnow, 2), To: yesterday},
 		},
+		// 100 - 1 day would be invalid, so we set From to 0
+		{
+			&MessagesRequest{From: 0, To: 100},
+			&MessagesRequest{From: 0, To: 100},
+		},
 	}
 
 	for i, s := range scenarios {
 		t.Run(fmt.Sprintf("Scenario %d", i), func(t *testing.T) {
-			require.NotEqual(t, s.expected, s.given)
 			s.given.setDefaults(tnow)
 			require.Equal(t, s.expected, s.given)
 		})
