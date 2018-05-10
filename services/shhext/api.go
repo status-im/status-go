@@ -54,9 +54,12 @@ type MessagesRequest struct {
 
 func (r *MessagesRequest) setDefaults(now time.Time) {
 	// set From and To defaults
-	if r.From == 0 && r.To == 0 {
-		r.From = uint32(now.UTC().Add(-24 * time.Hour).Unix())
+	if r.To == 0 {
 		r.To = uint32(now.UTC().Unix())
+	}
+
+	if r.From == 0 {
+		r.From = r.To - 86400 // -24 hours
 	}
 }
 
