@@ -1,6 +1,7 @@
 package shhext
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -34,9 +35,11 @@ func TestMessagesRequest_setDefaults(t *testing.T) {
 		},
 	}
 
-	for _, s := range scenarios {
-		require.NotEqual(t, s.expected, s.given)
-		s.given.setDefaults(tnow)
-		require.Equal(t, s.expected, s.given)
+	for i, s := range scenarios {
+		t.Run(fmt.Sprintf("Scenario %d", i), func(t *testing.T) {
+			require.NotEqual(t, s.expected, s.given)
+			s.given.setDefaults(tnow)
+			require.Equal(t, s.expected, s.given)
+		})
 	}
 }
