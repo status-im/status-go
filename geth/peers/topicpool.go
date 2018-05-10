@@ -411,13 +411,12 @@ func (t *TopicPool) StopSearch() {
 	default:
 		log.Debug("stoping search", "topic", t.topic)
 		close(t.quit)
+		close(t.period)
 		t.mu.Lock()
 		if t.fastModeTimeoutCancel != nil {
 			close(t.fastModeTimeoutCancel)
 			t.fastModeTimeoutCancel = nil
 		}
-		close(t.period)
-		t.period = nil
 		t.currentMode = 0
 		t.mu.Unlock()
 	}
