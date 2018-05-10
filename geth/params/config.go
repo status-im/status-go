@@ -228,8 +228,8 @@ type NodeConfig struct {
 	// remote peer identification as well as network traffic encryption.
 	NodeKeyFile string
 
-	// Discovery set to true will enabled discovery protocol.
-	Discovery bool
+	// NoDiscovery set to true will disable discovery protocol.
+	NoDiscovery bool
 
 	// ListenAddr is an IP address and port of this node (e.g. 127.0.0.1:30303).
 	ListenAddr string
@@ -576,9 +576,13 @@ func (c *NodeConfig) updateClusterConfig() error {
 
 	for _, cluster := range clusters {
 		if cluster.NetworkID == int(c.NetworkID) {
-			c.Discovery = cluster.Discovery
 			c.ClusterConfig.BootNodes = cluster.BootNodes
 			c.ClusterConfig.StaticNodes = cluster.StaticNodes
+			// no point in running discovery if we don't have bootnodes.
+			// but in case if we do have nodes and NoDiscovery=true we will preserve that value
+			if len(cluster.BootNodes) == 0 {
+				c.NoDiscovery = true
+			}
 			break
 		}
 	}
@@ -608,7 +612,7 @@ func (c *NodeConfig) updateRelativeDirsConfig() error {
 
 // updatePeerLimits will set default peer limits expectations based on enabled services.
 func (c *NodeConfig) updatePeerLimits() {
-	if !c.Discovery {
+	if c.NoDiscovery {
 		return
 	}
 	if c.WhisperConfig.Enabled {
