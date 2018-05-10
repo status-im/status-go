@@ -185,8 +185,10 @@ func (p *PeerPool) handleServerPeers(server *p2p.Server, events <-chan *p2p.Peer
 			p.stopDiscovery(server)
 			return
 		case <-timeout:
-			log.Debug("DiscV5 timed out", "server", server.Self())
-			p.stopDiscovery(server)
+			if p.stopOnMax {
+				log.Debug("DiscV5 timed out", "server", server.Self())
+				p.stopDiscovery(server)
+			}
 		case <-retryDiscv5:
 			if err := p.restartDiscovery(server); err != nil {
 				retryDiscv5 = time.After(discoveryRestartTimeout)
