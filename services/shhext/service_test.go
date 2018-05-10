@@ -128,13 +128,6 @@ func (s *ShhExtSuite) TestWaitMessageExpired() {
 	}
 }
 
-func (s *ShhExtSuite) TestRequestMessagesDefaults() {
-	r := MessagesRequest{}
-	r.setDefaults(time.Now())
-	s.NotZero(r.From)
-	s.InEpsilon(uint32(time.Now().UTC().Unix()), r.To, 1.0)
-}
-
 func (s *ShhExtSuite) TestRequestMessages() {
 	var err error
 
