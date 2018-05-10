@@ -134,11 +134,12 @@ func (s *StatusAPISuite) testStatusLogin(testParams statusTestParams) *status.Lo
 
 	result := s.Backend.CallPrivateRPC(basicCall)
 	if testParams.ExpectedError == nil {
-		s.NotContains(result, "error")
 		var r struct {
+			Error  string                `json:"error"`
 			Result *status.LoginResponse `json:"result"`
 		}
 		s.NoError(json.Unmarshal([]byte(result), &r))
+		s.Empty(r.Error)
 
 		return r.Result
 	}
@@ -179,11 +180,12 @@ func (s *StatusAPISuite) testStatusSignup(testParams statusTestParams) *status.S
 	result := s.Backend.CallPrivateRPC(basicCall)
 
 	if testParams.ExpectedError == nil {
-		s.NotContains(result, "error")
 		var r struct {
+			Error  string                 `json:"error"`
 			Result *status.SignupResponse `json:"result"`
 		}
 		s.NoError(json.Unmarshal([]byte(result), &r))
+		s.Empty(r.Error)
 
 		return r.Result
 	}
