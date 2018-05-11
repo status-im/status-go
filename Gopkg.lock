@@ -134,7 +134,6 @@
     "rlp",
     "rpc",
     "trie",
-    "whisper/mailserver",
     "whisper/whisperv6"
   ]
   revision = "cbdaa0ca2a955012274bd2c47bd52b24b2beb66c"
@@ -493,6 +492,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "c82f110ad74f6540b5ba89202a3e4e6cca24a7ec9eedd35248a3aa1e6d626275"
+  inputs-digest = "ff4c41f1c4ead97b79745e6c6e3609107e68d4d3536ad3b793a82bf746bc35d1"
   solver-name = "gps-cdcl"
   solver-version = 1

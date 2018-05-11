@@ -20,7 +20,6 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
@@ -30,6 +29,7 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
+// WMailServer whisper mailserver
 type WMailServer struct {
 	db  *leveldb.DB
 	w   *whisper.Whisper
@@ -37,12 +37,14 @@ type WMailServer struct {
 	key []byte
 }
 
+// DBKey key to be stored on db
 type DBKey struct {
 	timestamp uint32
 	hash      common.Hash
 	raw       []byte
 }
 
+// NewDbKey creates a new DBKey with the given values
 func NewDbKey(t uint32, h common.Hash) *DBKey {
 	const sz = common.HashLength + 4
 	var k DBKey
@@ -54,19 +56,20 @@ func NewDbKey(t uint32, h common.Hash) *DBKey {
 	return &k
 }
 
-func (s *WMailServer) Init(shh *whisper.Whisper, path string, password string, pow float64) {
+// Init initializes mailServer
+func (s *WMailServer) Init(shh *whisper.Whisper, path string, password string, pow float64) error {
 	var err error
 	if len(path) == 0 {
-		utils.Fatalf("DB file is not specified")
+		return fmt.Errorf("DB file is not specified")
 	}
 
 	if len(password) == 0 {
-		utils.Fatalf("Password is not specified for MailServer")
+		return fmt.Errorf("password is not specified")
 	}
 
 	s.db, err = leveldb.OpenFile(path, nil)
 	if err != nil {
-		utils.Fatalf("Failed to open DB file: %s", err)
+		return fmt.Errorf("open DB file: %s", err)
 	}
 
 	s.w = shh
@@ -74,20 +77,27 @@ func (s *WMailServer) Init(shh *whisper.Whisper, path string, password string, p
 
 	MailServerKeyID, err := s.w.AddSymKeyFromPassword(password)
 	if err != nil {
-		utils.Fatalf("Failed to create symmetric key for MailServer: %s", err)
+		return fmt.Errorf("create symmetric key: %s", err)
 	}
 	s.key, err = s.w.GetSymKey(MailServerKeyID)
 	if err != nil {
-		utils.Fatalf("Failed to save symmetric key for MailServer")
+		return fmt.Errorf("save symmetric key: %s", err)
 	}
+	return nil
 }
 
+// Close the mailserver and its associated db connection
 func (s *WMailServer) Close() {
 	if s.db != nil {
-		s.db.Close()
+		func() {
+			if err := s.db.Close(); err != nil {
+				log.Error(fmt.Sprintf("s.db.Close failed: %s", err))
+			}
+		}()
 	}
 }
 
+// Archive a whisper envelope
 func (s *WMailServer) Archive(env *whisper.Envelope) {
 	key := NewDbKey(env.Expiry-env.TTL, env.Hash())
 	rawEnvelope, err := rlp.EncodeToBytes(env)
@@ -101,6 +111,7 @@ func (s *WMailServer) Archive(env *whisper.Envelope) {
 	}
 }
 
+// DeliverMail sends mail to specified whisper peer
 func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope) {
 	if peer == nil {
 		log.Error("Whisper peer is nil")
@@ -175,8 +186,8 @@ func (s *WMailServer) validateRequest(peerID []byte, request *whisper.Envelope) 
 		return false, 0, 0, nil
 	}
 
-	var bloom []byte
 	payloadSize := len(decrypted.Payload)
+	bloom := decrypted.Payload[8 : 8+whisper.BloomFilterSize]
 	if payloadSize < 8 {
 		log.Warn(fmt.Sprintf("Undersized p2p request"))
 		return false, 0, 0, nil
@@ -185,8 +196,6 @@ func (s *WMailServer) validateRequest(peerID []byte, request *whisper.Envelope) 
 	} else if payloadSize < 8+whisper.BloomFilterSize {
 		log.Warn(fmt.Sprintf("Undersized bloom filter in p2p request"))
 		return false, 0, 0, nil
-	} else {
-		bloom = decrypted.Payload[8 : 8+whisper.BloomFilterSize]
 	}
 
 	lower := binary.BigEndian.Uint32(decrypted.Payload[:4])
