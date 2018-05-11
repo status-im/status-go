@@ -107,7 +107,7 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 					"to":` + strconv.FormatInt(senderWhisperService.GetCurrentTime().Unix(), 10) + `
 		}]
 	}`
-	resp := rpcClient.CallRaw(reqMessagesBody)
+	resp := rpcClient.CallRaw(reqMessagesBody, false)
 	reqMessagesResp := baseRPCResponse{}
 	err = json.Unmarshal([]byte(resp), &reqMessagesResp)
 	s.Require().NoError(err)
@@ -379,10 +379,10 @@ func (s *WhisperMailboxSuite) createPrivateChatMessageFilter(rpcCli *rpc.Client,
 	resp := rpcCli.CallRaw(`{
 			"jsonrpc": "2.0",
 			"method": "shh_newMessageFilter", "params": [
-				{"privateKeyID": "` + privateKeyID + `", "topics": [ "` + topic + `"], "allowP2P":true}
+				{"privateKeyID": "`+privateKeyID+`", "topics": [ "`+topic+`"], "allowP2P":true}
 			],
 			"id": 1
-		}`)
+		}`, false)
 
 	msgFilterResp := returnedIDResponse{}
 	err := json.Unmarshal([]byte(resp), &msgFilterResp)
@@ -398,10 +398,10 @@ func (s *WhisperMailboxSuite) createGroupChatMessageFilter(rpcCli *rpc.Client, s
 	resp := rpcCli.CallRaw(`{
 			"jsonrpc": "2.0",
 			"method": "shh_newMessageFilter", "params": [
-				{"symKeyID": "` + symkeyID + `", "topics": [ "` + topic + `"], "allowP2P":true}
+				{"symKeyID": "`+symkeyID+`", "topics": [ "`+topic+`"], "allowP2P":true}
 			],
 			"id": 1
-		}`)
+		}`, false)
 
 	msgFilterResp := returnedIDResponse{}
 	err := json.Unmarshal([]byte(resp), &msgFilterResp)
@@ -418,14 +418,14 @@ func (s *WhisperMailboxSuite) postMessageToPrivate(rpcCli *rpc.Client, bobPubkey
 		"method": "shh_post",
 		"params": [
 			{
-			"pubKey": "` + bobPubkey + `",
-			"topic": "` + topic + `",
-			"payload": "` + payload + `",
+			"pubKey": "`+bobPubkey+`",
+			"topic": "`+topic+`",
+			"payload": "`+payload+`",
 			"powTarget": 0.001,
 			"powTime": 2
 			}
 		],
-		"id": 1}`)
+		"id": 1}`, false)
 	postResp := baseRPCResponse{}
 	err := json.Unmarshal([]byte(resp), &postResp)
 	s.Require().NoError(err)
@@ -438,14 +438,14 @@ func (s *WhisperMailboxSuite) postMessageToGroup(rpcCli *rpc.Client, groupChatKe
 		"method": "shh_post",
 		"params": [
 			{
-			"symKeyID": "` + groupChatKeyID + `",
-			"topic": "` + topic + `",
-			"payload": "` + payload + `",
+			"symKeyID": "`+groupChatKeyID+`",
+			"topic": "`+topic+`",
+			"payload": "`+payload+`",
 			"powTarget": 0.001,
 			"powTime": 2
 			}
 		],
-		"id": 1}`)
+		"id": 1}`, false)
 	postResp := baseRPCResponse{}
 	err := json.Unmarshal([]byte(resp), &postResp)
 	s.Require().NoError(err)
@@ -457,8 +457,8 @@ func (s *WhisperMailboxSuite) getMessagesByMessageFilterID(rpcCli *rpc.Client, m
 	resp := rpcCli.CallRaw(`{
 		"jsonrpc": "2.0",
 		"method": "shh_getFilterMessages",
-		"params": ["` + messageFilterID + `"],
-		"id": 1}`)
+		"params": ["`+messageFilterID+`"],
+		"id": 1}`, false)
 	messages := getFilterMessagesResponse{}
 	err := json.Unmarshal([]byte(resp), &messages)
 	s.Require().NoError(err)
@@ -469,8 +469,8 @@ func (s *WhisperMailboxSuite) getMessagesByMessageFilterID(rpcCli *rpc.Client, m
 // addSymKey added symkey to node and return symkeyID.
 func (s *WhisperMailboxSuite) addSymKey(rpcCli *rpc.Client, symkey string) string {
 	resp := rpcCli.CallRaw(`{"jsonrpc":"2.0","method":"shh_addSymKey",
-			"params":["` + symkey + `"],
-			"id":1}`)
+			"params":["`+symkey+`"],
+			"id":1}`, false)
 	symkeyAddResp := returnedIDResponse{}
 	err := json.Unmarshal([]byte(resp), &symkeyAddResp)
 	s.Require().NoError(err)
@@ -487,13 +487,13 @@ func (s *WhisperMailboxSuite) requestHistoricMessages(w *whisper.Whisper, rpcCli
 		"id": 2,
 		"method": "shhext_requestMessages",
 		"params": [{
-					"mailServerPeer":"` + mailboxEnode + `",
-					"topic":"` + topic + `",
-					"symKeyID":"` + mailServerKeyID + `",
+					"mailServerPeer":"`+mailboxEnode+`",
+					"topic":"`+topic+`",
+					"symKeyID":"`+mailServerKeyID+`",
 					"from":0,
-					"to":` + strconv.FormatInt(w.GetCurrentTime().Unix(), 10) + `
+					"to":`+strconv.FormatInt(w.GetCurrentTime().Unix(), 10)+`
 		}]
-	}`)
+	}`, false)
 	reqMessagesResp := baseRPCResponse{}
 	err := json.Unmarshal([]byte(resp), &reqMessagesResp)
 	s.Require().NoError(err)

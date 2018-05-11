@@ -3,6 +3,7 @@ package rpc
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 )
@@ -10,6 +11,7 @@ import (
 const (
 	jsonrpcVersion        = "2.0"
 	errInvalidMessageCode = -32700 // from go-ethereum/rpc/errors.go
+	externalRPCContextKey = contextKey("externalRPCRequest")
 )
 
 // for JSON-RPC responses obtained via CallRaw(), we have no way
@@ -20,10 +22,21 @@ const (
 // thus, we will use zero ID as a workaround of this limitation
 var defaultMsgID = json.RawMessage(`0`)
 
+var externalRPCMethodWhitelist = []string{
+	"personal_sign",
+	"personal_ecRecover",
+	"web3_clientVersion",
+	"eth_syncing",
+}
+
 // CallRaw performs a JSON-RPC call with already crafted JSON-RPC body. It
 // returns string in JSON format with response (successul or error).
-func (c *Client) CallRaw(body string) string {
+// The 'body' param is the json rpc request itself and  the
+// 'external' param denotes whether the request is being made internally
+// by status or externally by a dapp.
+func (c *Client) CallRaw(body string, external bool) string {
 	ctx := context.Background()
+	ctx = context.WithValue(ctx, externalRPCContextKey, external)
 	return c.callRawContext(ctx, json.RawMessage(body))
 }
 
@@ -56,6 +69,8 @@ type jsonError struct {
 	Data    interface{} `json:"data,omitempty"`
 }
 
+type contextKey string
+
 // callRawContext performs a JSON-RPC call with already crafted JSON-RPC body and
 // given context. It returns string in JSON format with response (successul or error).
 //
@@ -70,7 +85,6 @@ func (c *Client) callRawContext(ctx context.Context, body json.RawMessage) strin
 	if isBatch(body) {
 		return c.callBatchMethods(ctx, body)
 	}
-
 	return c.callSingleMethod(ctx, body)
 }
 
@@ -112,6 +126,12 @@ func (c *Client) callSingleMethod(ctx context.Context, msg json.RawMessage) stri
 	// unmarshal JSON body into json-rpc request
 	method, params, id, err := methodAndParamsFromBody(msg)
 	if err != nil {
+		return newErrorResponse(errInvalidMessageCode, err, id)
+	}
+
+	// If the req is external, check the whitelist
+	if ctx.Value(externalRPCContextKey) == true && !methodInWhitelist(method) {
+		err = fmt.Errorf("The method %s does not exist/is not available", method)
 		return newErrorResponse(errInvalidMessageCode, err, id)
 	}
 
@@ -211,6 +231,15 @@ func isBatch(msg json.RawMessage) bool {
 			continue
 		}
 		return c == '['
+	}
+	return false
+}
+
+func methodInWhitelist(method string) bool {
+	for _, whitelistedMethod := range externalRPCMethodWhitelist {
+		if whitelistedMethod == method {
+			return true
+		}
 	}
 	return false
 }
