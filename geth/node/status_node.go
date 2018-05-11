@@ -91,8 +91,6 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig, db *leveldb.DB, serv
 		return err
 	}
 
-	n.db = db
-
 	if n.config.NoDiscovery {
 		return nil
 	}
@@ -113,6 +111,8 @@ func (n *StatusNode) Start(config *params.NodeConfig, services ...node.ServiceCo
 		return err
 	}
 
+	n.db = db
+
 	err = n.startWithDB(config, db, services)
 
 	if err != nil {
@@ -127,7 +127,7 @@ func (n *StatusNode) Start(config *params.NodeConfig, services ...node.ServiceCo
 }
 
 func (n *StatusNode) createNode(config *params.NodeConfig, db *leveldb.DB) (err error) {
-	n.gethNode, err = MakeNode(config, n.db)
+	n.gethNode, err = MakeNode(config, db)
 	return err
 }
 
