@@ -206,10 +206,12 @@ func Logout() *C.char {
 	return makeJSONResponse(err)
 }
 
-//ApproveSignRequest instructs backend to complete sending of a given transaction
+//ApproveSignRequest instructs backend to complete sending of a given transaction,
+// empty values for gas or gasPrice will preserve values for these properties
+// as they were defined on the transaction initialization.
 //export ApproveSignRequest
-func ApproveSignRequest(id, password *C.char) *C.char {
-	result := statusAPI.ApproveSignRequest(C.GoString(id), C.GoString(password))
+func ApproveSignRequest(id, password *C.char, gas, gasPrice C.int) *C.char {
+	result := statusAPI.ApproveSignRequest(C.GoString(id), C.GoString(password), int64(gas), int64(gasPrice))
 
 	errString := ""
 	if result.Error != nil {

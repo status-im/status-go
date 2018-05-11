@@ -76,24 +76,30 @@ func (s *TxQueueTestSuite) TearDownTest() {
 }
 
 var (
-	testGas      = hexutil.Uint64(defaultGas + 1)
-	testGasPrice = (*hexutil.Big)(big.NewInt(10))
-	testNonce    = hexutil.Uint64(10)
+	testGas               = hexutil.Uint64(defaultGas + 1)
+	testGasPrice          = (*hexutil.Big)(big.NewInt(10))
+	testOverridenGas      = hexutil.Uint64(defaultGas + 2)
+	testOverridenGasPrice = (*hexutil.Big)(big.NewInt(20))
+	testNonce             = hexutil.Uint64(10)
 )
 
-func (s *TxQueueTestSuite) setupTransactionPoolAPI(args SendTxArgs, returnNonce, resultNonce hexutil.Uint64, account *account.SelectedExtKey, txErr error) {
+func (s *TxQueueTestSuite) setupTransactionPoolAPI(args SendTxArgs, returnNonce, resultNonce hexutil.Uint64, account *account.SelectedExtKey, txErr error, signArgs *sign.TxArgs) {
 	// Expect calls to gas functions only if there are no user defined values.
 	// And also set the expected gas and gas price for RLP encoding the expected tx.
 	var usedGas hexutil.Uint64
 	var usedGasPrice *big.Int
 	s.txServiceMock.EXPECT().GetTransactionCount(gomock.Any(), account.Address, gethrpc.PendingBlockNumber).Return(&returnNonce, nil)
-	if args.GasPrice == nil {
+	if signArgs != nil && signArgs.GasPrice != nil {
+		usedGasPrice = (*big.Int)(signArgs.GasPrice)
+	} else if args.GasPrice == nil {
 		usedGasPrice = (*big.Int)(testGasPrice)
 		s.txServiceMock.EXPECT().GasPrice(gomock.Any()).Return(usedGasPrice, nil)
 	} else {
 		usedGasPrice = (*big.Int)(args.GasPrice)
 	}
-	if args.Gas == nil {
+	if signArgs != nil && signArgs.Gas != nil {
+		usedGas = *signArgs.Gas
+	} else if args.Gas == nil {
 		s.txServiceMock.EXPECT().EstimateGas(gomock.Any(), gomock.Any()).Return(testGas, nil)
 		usedGas = testGas
 	} else {
@@ -129,29 +135,80 @@ func (s *TxQueueTestSuite) TestCompleteTransaction() {
 		AccountKey: &keystore.Key{PrivateKey: key},
 	}
 	testCases := []struct {
-		name     string
-		gas      *hexutil.Uint64
-		gasPrice *hexutil.Big
+		name       string
+		gas        *hexutil.Uint64
+		gasPrice   *hexutil.Big
+		signTxArgs *sign.TxArgs
 	}{
 		{
 			"noGasDef",
 			nil,
 			nil,
+			s.defaultSignTxArgs(),
 		},
 		{
 			"gasDefined",
 			&testGas,
 			nil,
+			s.defaultSignTxArgs(),
 		},
 		{
 			"gasPriceDefined",
 			nil,
 			testGasPrice,
+			s.defaultSignTxArgs(),
 		},
 		{
 			"inputPassedInLegacyDataField",
 			nil,
 			testGasPrice,
+			s.defaultSignTxArgs(),
+		},
+		{
+			"overrideGas",
+			nil,
+			nil,
+			&sign.TxArgs{
+				Gas: &testGas,
+			},
+		},
+		{
+			"overridePreExistingGas",
+			&testGas,
+			nil,
+			&sign.TxArgs{
+				Gas: &testOverridenGas,
+			},
+		},
+		{
+			"overridePreExistingGasPrice",
+			nil,
+			testGasPrice,
+			&sign.TxArgs{
+				GasPrice: testOverridenGasPrice,
+			},
+		},
+		{
+			"nilSignTransactionSpecificArgs",
+			nil,
+			nil,
+			nil,
+		},
+		{
+			"overridePreExistingGasWithNil",
+			&testGas,
+			nil,
+			&sign.TxArgs{
+				Gas: nil,
+			},
+		},
+		{
+			"overridePreExistingGasPriceWithNil",
+			nil,
+			testGasPrice,
+			&sign.TxArgs{
+				GasPrice: nil,
+			},
 		},
 	}
 
@@ -164,7 +221,7 @@ func (s *TxQueueTestSuite) TestCompleteTransaction() {
 				Gas:      testCase.gas,
 				GasPrice: testCase.gasPrice,
 			}
-			s.setupTransactionPoolAPI(args, testNonce, testNonce, selectedAccount, nil)
+			s.setupTransactionPoolAPI(args, testNonce, testNonce, selectedAccount, nil, testCase.signTxArgs)
 
 			w := make(chan struct{})
 			var sendHash gethcommon.Hash
@@ -184,7 +241,7 @@ func (s *TxQueueTestSuite) TestCompleteTransaction() {
 
 			req := s.manager.pendingSignRequests.First()
 			s.NotNil(req)
-			approveResult := s.manager.pendingSignRequests.Approve(req.ID, "", simpleVerifyFunc(selectedAccount))
+			approveResult := s.manager.pendingSignRequests.Approve(req.ID, "", testCase.signTxArgs, simpleVerifyFunc(selectedAccount))
 			s.NoError(approveResult.Error)
 			s.NoError(WaitClosed(w, time.Second))
 
@@ -193,6 +250,10 @@ func (s *TxQueueTestSuite) TestCompleteTransaction() {
 			s.Equal(sendHash.Bytes(), approveResult.Response.Bytes())
 		})
 	}
+}
+
+func (s *TxQueueTestSuite) defaultSignTxArgs() *sign.TxArgs {
+	return &sign.TxArgs{}
 }
 
 func (s *TxQueueTestSuite) TestAccountMismatch() {
@@ -218,7 +279,7 @@ func (s *TxQueueTestSuite) TestAccountMismatch() {
 
 	req := s.manager.pendingSignRequests.First()
 	s.NotNil(req)
-	result := s.manager.pendingSignRequests.Approve(req.ID, "", simpleVerifyFunc(selectedAccount))
+	result := s.manager.pendingSignRequests.Approve(req.ID, "", s.defaultSignTxArgs(), simpleVerifyFunc(selectedAccount))
 	s.EqualError(result.Error, ErrInvalidCompleteTxSender.Error())
 
 	// Transaction should stay in the queue as mismatched accounts
@@ -279,7 +340,7 @@ func (s *TxQueueTestSuite) TestLocalNonce() {
 			if req == nil {
 				time.Sleep(time.Millisecond)
 			} else {
-				s.manager.pendingSignRequests.Approve(req.ID, "", simpleVerifyFunc(selectedAccount)) // nolint: errcheck
+				s.manager.pendingSignRequests.Approve(req.ID, "", s.defaultSignTxArgs(), simpleVerifyFunc(selectedAccount)) // nolint: errcheck
 			}
 		}
 	}()
@@ -289,7 +350,7 @@ func (s *TxQueueTestSuite) TestLocalNonce() {
 			From: account.FromAddress(TestConfig.Account1.Address),
 			To:   account.ToAddress(TestConfig.Account2.Address),
 		}
-		s.setupTransactionPoolAPI(args, nonce, hexutil.Uint64(i), selectedAccount, nil)
+		s.setupTransactionPoolAPI(args, nonce, hexutil.Uint64(i), selectedAccount, nil, nil)
 
 		_, err := s.manager.SendTransaction(context.Background(), args)
 		s.NoError(err)
@@ -303,7 +364,7 @@ func (s *TxQueueTestSuite) TestLocalNonce() {
 		To:   account.ToAddress(TestConfig.Account2.Address),
 	}
 
-	s.setupTransactionPoolAPI(args, nonce, nonce, selectedAccount, nil)
+	s.setupTransactionPoolAPI(args, nonce, nonce, selectedAccount, nil, nil)
 
 	_, err := s.manager.SendTransaction(context.Background(), args)
 	s.NoError(err)
@@ -349,7 +410,7 @@ func (s *TxQueueTestSuite) TestContractCreation() {
 			if req == nil {
 				time.Sleep(time.Millisecond)
 			} else {
-				s.manager.pendingSignRequests.Approve(req.ID, "", simpleVerifyFunc(selectedAccount)) // nolint: errcheck
+				s.manager.pendingSignRequests.Approve(req.ID, "", s.defaultSignTxArgs(), simpleVerifyFunc(selectedAccount)) // nolint: errcheck
 				break
 			}
 		}

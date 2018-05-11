@@ -168,8 +168,8 @@ func (cs *commandSet) Logout() error {
 }
 
 // ApproveSignRequest instructs API to complete sending of a given transaction.
-func (cs *commandSet) ApproveSignRequest(id, password string) (string, error) {
-	result := cs.statusAPI.ApproveSignRequest(id, password)
+func (cs *commandSet) ApproveSignRequest(id, password string, gas, gasPrice int64) (string, error) {
+	result := cs.statusAPI.ApproveSignRequest(id, password, gas, gasPrice)
 	if result.Error != nil {
 		return "", result.Error
 	}

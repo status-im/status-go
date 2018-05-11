@@ -169,7 +169,7 @@ func (s *PersonalSignSuite) notificationHandler(account string, pass string, exp
 			s.Equal(signDataString, args["data"].(string))
 			s.Equal(account, args["account"].(string))
 
-			e := s.Backend.ApproveSignRequest(id, pass).Error
+			e := s.Backend.ApproveSignRequest(id, pass, 0, 0).Error
 			s.T().Logf("Sign request approved. {id: %s, acc: %s, err: %v}", id, account, e)
 			if expectedError == nil {
 				s.NoError(e, "cannot complete sign reauest[%v]: %v", id, e)

@@ -830,7 +830,7 @@ func testCompleteTransaction(t *testing.T) bool {
 			t.Logf("transaction queued (will be completed shortly): {id: %s}\n", event["id"].(string))
 
 			completeTxResponse := SignRequestResult{}
-			rawResponse := ApproveSignRequest(C.CString(event["id"].(string)), C.CString(TestConfig.Account1.Password))
+			rawResponse := ApproveSignRequest(C.CString(event["id"].(string)), C.CString(TestConfig.Account1.Password), C.int(0), C.int(0))
 
 			if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &completeTxResponse); err != nil {
 				t.Errorf("cannot decode RecoverAccount response (%s): %v", C.GoString(rawResponse), err)
@@ -1058,7 +1058,7 @@ func testDiscardTransaction(t *testing.T) bool { //nolint: gocyclo
 			}
 
 			// try completing discarded transaction
-			err := statusAPI.ApproveSignRequest(string(txID), TestConfig.Account1.Password).Error
+			err := statusAPI.ApproveSignRequest(string(txID), TestConfig.Account1.Password, 0, 0).Error
 			if err != sign.ErrSignReqNotFound {
 				t.Error("expects tx not found, but call to CompleteTransaction succeeded")
 				return
