@@ -8,7 +8,6 @@ type cluster struct {
 
 var ropstenCluster = cluster{
 	NetworkID: 3,
-	Discovery: true,
 	BootNodes: []string{
 		"enode://f32efef2739e5135a0f9a80600b321ba4d13393a5f1d3f5f593df85919262f06c70bfa66d38507b9d79a91021f5e200ec20150592e72934c66248e87014c4317@167.99.209.79:30404",
 		"enode://90d7e7e34f588b44e1e07adfc6453b0d27946883420a012a837f6acfa66cbb28e6e8b5df3c0e26615ed82b32273453b1b003e4aa5c0d357ada30bde8f666db47@167.99.46.141:30404",
@@ -33,7 +32,6 @@ var rinkebyCluster = cluster{
 
 var mainnetCluster = cluster{
 	NetworkID: 1,
-	Discovery: true,
 	BootNodes: []string{
 		"enode://f32efef2739e5135a0f9a80600b321ba4d13393a5f1d3f5f593df85919262f06c70bfa66d38507b9d79a91021f5e200ec20150592e72934c66248e87014c4317@167.99.209.79:30404",
 		"enode://90d7e7e34f588b44e1e07adfc6453b0d27946883420a012a837f6acfa66cbb28e6e8b5df3c0e26615ed82b32273453b1b003e4aa5c0d357ada30bde8f666db47@167.99.46.141:30404",
