@@ -94,6 +94,12 @@ func NewPeerPool(config map[discv5.Topic]params.Limits, cache *Cache, options *O
 	}
 }
 
+func (p *PeerPool) setDiscoveryTimeout() {
+	if p.opts.AllowStop && p.opts.DiscServerTimeout > 0 {
+		p.timeout = time.After(p.opts.DiscServerTimeout)
+	}
+}
+
 // Start creates topic pool for each topic in config and subscribes to server events.
 func (p *PeerPool) Start(server *p2p.Server) error {
 	if server.DiscV5 == nil {
@@ -103,10 +109,9 @@ func (p *PeerPool) Start(server *p2p.Server) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
+	// init channels
 	p.quit = make(chan struct{})
-	if p.opts.AllowStop && p.opts.DiscServerTimeout > 0 {
-		p.timeout = time.After(p.opts.DiscServerTimeout)
-	}
+	p.setDiscoveryTimeout()
 
 	// collect topics and start searching for nodes
 	p.topics = make([]*TopicPool, 0, len(p.config))
@@ -145,9 +150,7 @@ func (p *PeerPool) startDiscovery(server *p2p.Server) error {
 
 	p.mu.Lock()
 	server.DiscV5 = ntab
-	if p.opts.AllowStop && p.opts.DiscServerTimeout > 0 {
-		p.timeout = time.After(p.opts.DiscServerTimeout)
-	}
+	p.setDiscoveryTimeout()
 	p.mu.Unlock()
 
 	signal.SendDiscoveryStarted()
@@ -225,7 +228,7 @@ func (p *PeerPool) handleServerPeers(server *p2p.Server, events <-chan *p2p.Peer
 			if hasTopicBelowMin {
 				log.Info("Not stopping DiscV5 because at least one topic has fewer peers than the lower limit")
 				p.mu.Lock()
-				p.timeout = time.After(p.opts.DiscServerTimeout)
+				p.setDiscoveryTimeout()
 				p.mu.Unlock()
 				continue
 			}
