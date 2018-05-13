@@ -326,14 +326,15 @@ func TestPeerPoolDiscV5TimeoutWithLimits(t *testing.T) {
 			pool := NewPeerPool(poolConfig, nil, poolOpts)
 			require.NoError(t, pool.Start(server))
 
-			// wait 2x timeout duration
-			<-time.After(pool.opts.DiscServerTimeout * 2)
+			<-time.After(pool.opts.DiscServerTimeout * 4)
 
+			pool.mu.RLock()
 			if tc.ExpectTimeout {
 				require.Nil(t, server.DiscV5)
 			} else {
 				require.NotNil(t, server.DiscV5)
 			}
+			pool.mu.RUnlock()
 		})
 	}
 }
