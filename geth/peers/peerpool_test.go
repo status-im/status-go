@@ -132,7 +132,8 @@ func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailover() {
 	config := map[discv5.Topic]params.Limits{
 		topic: params.NewLimits(1, 1), // limits are chosen for simplicity of the simulation
 	}
-	peerPool := NewPeerPool(config, 100*time.Millisecond, 100*time.Millisecond, nil, true)
+	peerPoolOpts := &Options{100 * time.Millisecond, 100 * time.Millisecond, 0, true}
+	peerPool := NewPeerPool(config, nil, peerPoolOpts)
 	register := NewRegister(topic)
 	s.Require().NoError(register.Start(s.peers[0]))
 	// need to wait for topic to get registered, discv5 can query same node
@@ -208,7 +209,8 @@ func TestPeerPoolMaxPeersOverflow(t *testing.T) {
 	defer peer.Stop()
 	require.NotNil(t, peer.DiscV5)
 
-	pool := NewPeerPool(nil, DefaultFastSync, DefaultSlowSync, nil, true)
+	poolOpts := &Options{DefaultFastSync, DefaultSlowSync, 0, true}
+	pool := NewPeerPool(nil, nil, poolOpts)
 	require.NoError(t, pool.Start(peer))
 	require.Equal(t, signal.EventDiscoveryStarted, <-signals)
 	// without config, it will stop the discovery because all topic pools are satisfied
@@ -256,8 +258,8 @@ func TestPeerPoolDiscV5Timeout(t *testing.T) {
 	require.NotNil(t, server.DiscV5)
 
 	// start PeerPool
-	pool := NewPeerPool(nil, DefaultFastSync, DefaultSlowSync, nil, true)
-	pool.discServerTimeout = time.Millisecond * 100
+	poolOpts := &Options{DefaultFastSync, DefaultSlowSync, time.Millisecond * 100, true}
+	pool := NewPeerPool(nil, nil, poolOpts)
 	require.NoError(t, pool.Start(server))
 	require.Equal(t, signal.EventDiscoveryStarted, <-signals)
 
@@ -265,7 +267,7 @@ func TestPeerPoolDiscV5Timeout(t *testing.T) {
 	select {
 	case sig := <-signals:
 		require.Equal(t, signal.EventDiscoveryStopped, sig)
-	case <-time.After(pool.discServerTimeout * 2):
+	case <-time.After(pool.opts.DiscServerTimeout * 2):
 		t.Fatal("timed out")
 	}
 	require.Nil(t, server.DiscV5)
@@ -278,8 +280,85 @@ func TestPeerPoolDiscV5Timeout(t *testing.T) {
 	select {
 	case sig := <-signals:
 		require.Equal(t, signal.EventDiscoveryStopped, sig)
-	case <-time.After(pool.discServerTimeout * 2):
+	case <-time.After(pool.opts.DiscServerTimeout * 2):
 		t.Fatal("timed out")
 	}
 	require.Nil(t, server.DiscV5)
+}
+
+func TestPeerPoolDiscV5TimeoutWithLimits(t *testing.T) {
+	testCases := []struct {
+		Name          string
+		Limits        params.Limits
+		ExpectTimeout bool
+	}{
+		{
+			Name:          "The lower limit is zero",
+			Limits:        params.Limits{Min: 0, Max: 1},
+			ExpectTimeout: true,
+		},
+		{
+			Name:          "The lower limit is above zero",
+			Limits:        params.Limits{Min: 1, Max: 1},
+			ExpectTimeout: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			// create and start server
+			key, err := crypto.GenerateKey()
+			require.NoError(t, err)
+			server := &p2p.Server{
+				Config: p2p.Config{
+					PrivateKey:  key,
+					DiscoveryV5: true,
+					NoDiscovery: true,
+				},
+			}
+			require.NoError(t, server.Start())
+			defer server.Stop()
+			require.NotNil(t, server.DiscV5)
+
+			// start PeerPool
+			poolOpts := &Options{DefaultFastSync, DefaultSlowSync, time.Millisecond * 100, true}
+			poolConfig := map[discv5.Topic]params.Limits{"test": tc.Limits}
+			pool := NewPeerPool(poolConfig, nil, poolOpts)
+			require.NoError(t, pool.Start(server))
+
+			// wait 2x timeout duration
+			<-time.After(pool.opts.DiscServerTimeout * 2)
+
+			if tc.ExpectTimeout {
+				require.Nil(t, server.DiscV5)
+			} else {
+				require.NotNil(t, server.DiscV5)
+			}
+		})
+	}
+}
+
+func TestPeerPoolNotAllowedStopping(t *testing.T) {
+	// create and start server
+	key, err := crypto.GenerateKey()
+	require.NoError(t, err)
+	server := &p2p.Server{
+		Config: p2p.Config{
+			PrivateKey:  key,
+			DiscoveryV5: true,
+			NoDiscovery: true,
+		},
+	}
+	require.NoError(t, server.Start())
+	defer server.Stop()
+	require.NotNil(t, server.DiscV5)
+
+	// start PeerPool
+	poolOpts := &Options{DefaultFastSync, DefaultSlowSync, time.Millisecond * 100, false}
+	pool := NewPeerPool(nil, nil, poolOpts)
+	require.NoError(t, pool.Start(server))
+
+	// wait 2x timeout duration
+	<-time.After(pool.opts.DiscServerTimeout * 2)
+	require.NotNil(t, server.DiscV5)
 }
