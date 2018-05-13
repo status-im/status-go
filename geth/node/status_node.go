@@ -165,13 +165,13 @@ func (n *StatusNode) setupRPCClient() (err error) {
 
 func (n *StatusNode) startPeerPool() error {
 	n.register = peers.NewRegister(n.config.RegisterTopics...)
+	options := peers.NewDefaultOptions()
 	// TODO(dshulyak) consider adding a flag to define this behaviour
-	allowStop := len(n.config.RegisterTopics) == 0
-	n.peerPool = peers.NewPeerPool(n.config.RequireTopics,
-		peers.DefaultFastSync,
-		peers.DefaultSlowSync,
+	options.AllowStop = len(n.config.RegisterTopics) == 0
+	n.peerPool = peers.NewPeerPool(
+		n.config.RequireTopics,
 		peers.NewCache(n.db),
-		allowStop,
+		options,
 	)
 	if err := n.register.Start(n.gethNode.Server()); err != nil {
 		return err
