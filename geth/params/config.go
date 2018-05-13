@@ -105,6 +105,12 @@ type WhisperConfig struct {
 	// MinimumPoW minimum PoW for Whisper messages
 	MinimumPoW float64
 
+	// RateLimit minimum time between queries to mail server per peer
+	MailServerRateLimit int
+
+	// MailServerCleanupPeriod time in seconds to wait to run mail server cleanup
+	MailServerCleanupPeriod int
+
 	// TTL time to live for messages, in seconds
 	TTL int
 
