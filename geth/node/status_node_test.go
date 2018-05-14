@@ -166,9 +166,7 @@ func TestStatusNodeAddPeer(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.NoError(t, peer.Start())
-	defer func() {
-		require.NoError(t, peer.Stop())
-	}()
+	defer func() { require.NoError(t, peer.Stop()) }()
 	peerURL := peer.Server().Self().String()
 
 	n := New()
@@ -181,11 +179,9 @@ func TestStatusNodeAddPeer(t *testing.T) {
 		MaxPeers: math.MaxInt32,
 	}
 	require.NoError(t, n.Start(&config))
-	defer func() {
-		require.NoError(t, n.Stop())
-	}()
+	defer func() { require.NoError(t, n.Stop()) }()
 
-	errCh := waitForPeerAsync(n, peerURL, time.Second*5)
+	errCh := waitForPeerAsync(n, peerURL, p2p.PeerEventTypeAdd, time.Second*5)
 
 	// checks after node is started
 	require.NoError(t, n.AddPeer(peerURL))
@@ -205,14 +201,12 @@ func TestStatusNodeReconnectStaticPeers(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.NoError(t, peer.Start())
-	defer func() {
-		require.NoError(t, peer.Stop())
-	}()
-	peerURL := peer.Server().Self().String()
-
-	n := New()
+	defer func() { require.NoError(t, peer.Stop()) }()
 
 	var errCh <-chan error
+
+	peerURL := peer.Server().Self().String()
+	n := New()
 
 	// checks before node is started
 	require.EqualError(t, n.ReconnectStaticPeers(), ErrNoRunningNode.Error())
@@ -225,25 +219,54 @@ func TestStatusNodeReconnectStaticPeers(t *testing.T) {
 			StaticNodes: []string{peerURL},
 		},
 	}
-	errCh = waitForPeerAsync(n, peerURL, time.Second*30)
 	require.NoError(t, n.Start(&config))
-	defer func() {
-		require.NoError(t, n.Stop())
-	}()
+	defer func() { require.NoError(t, n.Stop()) }()
 
 	// checks after node is started
-	require.NoError(t, <-errCh)
+	// it may happen that the peer is already connected
+	// because it was already added to `StaticNodes`
+	connected, err := isPeerConnected(n, peerURL)
+	require.NoError(t, err)
+	if !connected {
+		errCh = waitForPeerAsync(n, peerURL, p2p.PeerEventTypeAdd, time.Second*30)
+		require.NoError(t, <-errCh)
+	}
 	require.Equal(t, 1, n.PeerCount())
 
 	// reconnect static peers
+	require.NoError(t, n.ReconnectStaticPeers())
+	// first check if a peer gets disconnected
+	errCh = waitForPeerAsync(n, peerURL, p2p.PeerEventTypeDrop, time.Second*30)
+	require.NoError(t, <-errCh)
+	require.Equal(t, 0, n.PeerCount())
 	// it takes at least 30 seconds to bring back previously connected peer
-	errCh = waitForPeerAsync(n, peerURL, time.Second*60)
-	require.NoError(t, n.ReconnectStaticPeers(), ErrNoRunningNode.Error())
+	errCh = waitForPeerAsync(n, peerURL, p2p.PeerEventTypeAdd, time.Second*60)
 	require.NoError(t, <-errCh)
 	require.Equal(t, 1, n.PeerCount())
 }
 
-func waitForPeer(node *StatusNode, peerURL string, timeout time.Duration) error {
+func isPeerConnected(node *StatusNode, peerURL string) (bool, error) {
+	if !node.IsRunning() {
+		return false, ErrNoRunningNode
+	}
+
+	parsedPeer, err := discover.ParseNode(peerURL)
+	if err != nil {
+		return false, err
+	}
+
+	server := node.GethNode().Server()
+
+	for _, peer := range server.PeersInfo() {
+		if peer.ID == parsedPeer.ID.String() {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+func waitForPeer(node *StatusNode, peerURL string, eventType p2p.PeerEventType, timeout time.Duration) error {
 	if !node.IsRunning() {
 		return ErrNoRunningNode
 	}
@@ -261,7 +284,7 @@ func waitForPeer(node *StatusNode, peerURL string, timeout time.Duration) error 
 	for {
 		select {
 		case ev := <-ch:
-			if ev.Type == p2p.PeerEventTypeAdd && ev.Peer == parsedPeer.ID {
+			if ev.Type == eventType && ev.Peer == parsedPeer.ID {
 				return nil
 			}
 		case err := <-subscription.Err():
@@ -269,23 +292,15 @@ func waitForPeer(node *StatusNode, peerURL string, timeout time.Duration) error 
 				return err
 			}
 		case <-time.After(timeout):
-			// it may happen that the peer is already connected
-			// but even was not received
-			for _, p := range node.GethNode().Server().Peers() {
-				if p.ID() == parsedPeer.ID {
-					return nil
-				}
-			}
-
 			return errors.New("wait for peer: timeout")
 		}
 	}
 }
 
-func waitForPeerAsync(node *StatusNode, peerURL string, timeout time.Duration) <-chan error {
+func waitForPeerAsync(node *StatusNode, peerURL string, eventType p2p.PeerEventType, timeout time.Duration) <-chan error {
 	errCh := make(chan error)
 	go func() {
-		errCh <- waitForPeer(node, peerURL, timeout)
+		errCh <- waitForPeer(node, peerURL, eventType, timeout)
 	}()
 
 	return errCh
