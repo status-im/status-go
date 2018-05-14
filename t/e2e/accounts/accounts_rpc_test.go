@@ -35,7 +35,7 @@ func (s *AccountsTestSuite) TestRPCEthAccounts() {
 		"id": 1,
 		"method": "eth_accounts",
 		"params": []
-    }`)
+    }`, false)
 	s.Equal(expectedResponse, resp)
 }
 
@@ -62,6 +62,6 @@ func (s *AccountsTestSuite) TestRPCEthAccountsWithUpstream() {
     	"id": 1,
     	"method": "eth_accounts",
     	"params": []
-    }`)
+    }`, false)
 	s.Equal(expectedResponse, resp)
 }

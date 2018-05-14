@@ -102,7 +102,7 @@ func (s *RPCTestSuite) TestCallRPC() {
 			wg.Add(1)
 			go func(r rpcCall) {
 				defer wg.Done()
-				resultJSON := rpcClient.CallRaw(r.inputJSON)
+				resultJSON := rpcClient.CallRaw(r.inputJSON, false)
 				r.validator(resultJSON)
 			}(r)
 		}
@@ -133,7 +133,7 @@ func (s *RPCTestSuite) TestCallRawResult() {
 	client := s.StatusNode.RPCClient()
 	s.NotNil(client)
 
-	jsonResult := client.CallRaw(`{"jsonrpc":"2.0","method":"shh_version","params":[],"id":67}`)
+	jsonResult := client.CallRaw(`{"jsonrpc":"2.0","method":"shh_version","params":[],"id":67}`, false)
 	s.Equal(`{"jsonrpc":"2.0","id":67,"result":"6.0"}`, jsonResult)
 
 	s.NoError(s.StatusNode.Stop())
@@ -151,7 +151,7 @@ func (s *RPCTestSuite) TestCallRawResultGetTransactionReceipt() {
 	client := s.StatusNode.RPCClient()
 	s.NotNil(client)
 
-	jsonResult := client.CallRaw(`{"jsonrpc":"2.0","method":"eth_getTransactionReceipt","params":["0x0ca0d8f2422f62bea77e24ed17db5711a77fa72064cccbb8e53c53b699cd3b34"],"id":5}`)
+	jsonResult := client.CallRaw(`{"jsonrpc":"2.0","method":"eth_getTransactionReceipt","params":["0x0ca0d8f2422f62bea77e24ed17db5711a77fa72064cccbb8e53c53b699cd3b34"],"id":5}`, false)
 	s.Equal(`{"jsonrpc":"2.0","id":5,"result":null}`, jsonResult)
 
 	s.NoError(s.StatusNode.Stop())

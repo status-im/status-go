@@ -268,7 +268,8 @@ func (j *Jail) sendRPCCall(request string) (interface{}, error) {
 		return nil, ErrNoRPCClient
 	}
 
-	rawResponse := client.CallRaw(request)
+	isExternal := true
+	rawResponse := client.CallRaw(request, isExternal)
 
 	var response interface{}
 	if err := json.Unmarshal([]byte(rawResponse), &response); err != nil {

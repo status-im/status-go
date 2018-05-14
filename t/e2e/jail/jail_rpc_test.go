@@ -104,7 +104,7 @@ func (s *JailRPCTestSuite) TestRegressionGetTransactionReceipt() {
 	s.NotNil(rpcClient)
 
 	// note: transaction hash is assumed to be invalid
-	got := rpcClient.CallRaw(`{"jsonrpc":"2.0","method":"eth_getTransactionReceipt","params":["0xbbebf28d0a3a3cbb38e6053a5b21f08f82c62b0c145a17b1c4313cac3f68ae7c"],"id":7}`)
+	got := rpcClient.CallRaw(`{"jsonrpc":"2.0","method":"eth_getTransactionReceipt","params":["0xbbebf28d0a3a3cbb38e6053a5b21f08f82c62b0c145a17b1c4313cac3f68ae7c"],"id":7}`, false)
 	expected := `{"jsonrpc":"2.0","id":7,"result":null}`
 	s.Equal(expected, got)
 }
