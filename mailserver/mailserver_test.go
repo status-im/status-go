@@ -66,7 +66,7 @@ func TestMailServer(t *testing.T) {
 	setupServer(t, &server)
 	defer server.Close()
 
-	env := generateEnvelope(t)
+	env := generateEnvelope(t, time.Now())
 	server.Archive(env)
 	deliverTest(t, &server, env)
 }
@@ -93,7 +93,7 @@ func TestRemoveExpiredRateLimits(t *testing.T) {
 	assert(ok, "Non expired peer should exist, but it doesn't", t)
 }
 
-func generateEnvelope(t *testing.T) *whisper.Envelope {
+func generateEnvelope(t *testing.T, now time.Time) *whisper.Envelope {
 	h := crypto.Keccak256Hash([]byte("test sample data"))
 	params := &whisper.MessageParams{
 		KeySym:   h[:],
@@ -107,7 +107,7 @@ func generateEnvelope(t *testing.T) *whisper.Envelope {
 	if err != nil {
 		t.Fatalf("failed to create new message with seed %d: %s.", seed, err)
 	}
-	env, err := msg.Wrap(params, time.Now())
+	env, err := msg.Wrap(params, now)
 	if err != nil {
 		t.Fatalf("failed to wrap with seed %d: %s.", seed, err)
 	}
