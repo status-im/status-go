@@ -216,23 +216,6 @@ func (p *PeerPool) handleServerPeers(server *p2p.Server, events <-chan *p2p.Peer
 			return
 		case <-timeout:
 			log.Info("DiscV5 timed out", "server", server.Self())
-
-			hasTopicBelowMin := false
-			for _, topicPool := range p.topics {
-				if topicPool.BelowMin() {
-					hasTopicBelowMin = true
-					break
-				}
-			}
-
-			if hasTopicBelowMin {
-				log.Info("Not stopping DiscV5 because at least one topic has fewer peers than the lower limit")
-				p.mu.Lock()
-				p.setDiscoveryTimeout()
-				p.mu.Unlock()
-				continue
-			}
-
 			p.stopDiscovery(server)
 		case <-retryDiscv5:
 			if err := p.restartDiscovery(server); err != nil {
