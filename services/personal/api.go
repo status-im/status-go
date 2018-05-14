@@ -29,15 +29,15 @@ type metadata struct {
 
 func newMetadata(rpcParams []interface{}) (*metadata, error) {
 	// personal_sign can be called with the following parameters
-	// 1) data to sign
-	// 2) account
-	// 3) (optional) password
+	//
+	// 1) account (from)
+	// 2) data to sign
 	// here, we always ignore (3) because we send a confirmation for the password to UI
-	if len(rpcParams) < 2 || len(rpcParams) > 3 {
+	if len(rpcParams) != 2 {
 		return nil, ErrSignInvalidNumberOfParameters
 	}
-	data := rpcParams[0]
-	address := rpcParams[1].(string)
+	address := rpcParams[0].(string)
+	data := rpcParams[1]
 
 	return &metadata{data, address}, nil
 }
@@ -62,7 +62,7 @@ func (api *PublicAPI) SetRPC(rpcClient *rpc.Client, timeout time.Duration) {
 	api.rpcTimeout = timeout
 }
 
-// Recover is an implementation of `personal_ecRecover` or `web3.personal.ecRecover` API
+// Recover is an implementation of `personal_ecRecover` or `web3.eth.personal_ecRecover` API
 func (api *PublicAPI) Recover(context context.Context, rpcParams ...interface{}) (interface{}, error) {
 	var response interface{}
 
@@ -72,7 +72,13 @@ func (api *PublicAPI) Recover(context context.Context, rpcParams ...interface{})
 	return response, err
 }
 
-// Sign is an implementation of `personal_sign` or `web3.personal.sign` API
+// Sign is a *MetaMask-compatible* implementation of `personal_sign` or `web3.eth.personal_sign` API
+// The main difference between MetaMask's and geth implementations of `personal_sign`
+// is the argument ordering.
+// The geth version uses (data, address, [password])
+// (see https://github.com/ethereum/go-ethereum/wiki/Management-APIs#personal_sign)
+// The MetaMask version uses (address, data).
+// (see https://medium.com/metamask/the-new-secure-way-to-sign-data-in-your-browser-6af9dd2a1527)
 func (api *PublicAPI) Sign(context context.Context, rpcParams ...interface{}) (interface{}, error) {
 	metadata, err := newMetadata(rpcParams)
 	if err != nil {
