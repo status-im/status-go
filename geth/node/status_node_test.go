@@ -234,9 +234,9 @@ func TestStatusNodeReconnectStaticPeers(t *testing.T) {
 	require.Equal(t, 1, n.PeerCount())
 
 	// reconnect static peers
+	errCh = waitForPeerAsync(n, peerURL, p2p.PeerEventTypeDrop, time.Second*30)
 	require.NoError(t, n.ReconnectStaticPeers())
 	// first check if a peer gets disconnected
-	errCh = waitForPeerAsync(n, peerURL, p2p.PeerEventTypeDrop, time.Second*30)
 	require.NoError(t, <-errCh)
 	require.Equal(t, 0, n.PeerCount())
 	// it takes at least 30 seconds to bring back previously connected peer
