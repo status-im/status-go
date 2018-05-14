@@ -286,59 +286,6 @@ func TestPeerPoolDiscV5Timeout(t *testing.T) {
 	require.Nil(t, server.DiscV5)
 }
 
-func TestPeerPoolDiscV5TimeoutWithLimits(t *testing.T) {
-	testCases := []struct {
-		Name          string
-		Limits        params.Limits
-		ExpectTimeout bool
-	}{
-		{
-			Name:          "The lower limit is zero",
-			Limits:        params.Limits{Min: 0, Max: 1},
-			ExpectTimeout: true,
-		},
-		{
-			Name:          "The lower limit is above zero",
-			Limits:        params.Limits{Min: 1, Max: 1},
-			ExpectTimeout: false,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.Name, func(t *testing.T) {
-			// create and start server
-			key, err := crypto.GenerateKey()
-			require.NoError(t, err)
-			server := &p2p.Server{
-				Config: p2p.Config{
-					PrivateKey:  key,
-					DiscoveryV5: true,
-					NoDiscovery: true,
-				},
-			}
-			require.NoError(t, server.Start())
-			defer server.Stop()
-			require.NotNil(t, server.DiscV5)
-
-			// start PeerPool
-			poolOpts := &Options{DefaultFastSync, DefaultSlowSync, time.Millisecond * 100, true}
-			poolConfig := map[discv5.Topic]params.Limits{"test": tc.Limits}
-			pool := NewPeerPool(poolConfig, nil, poolOpts)
-			require.NoError(t, pool.Start(server))
-
-			<-time.After(pool.opts.DiscServerTimeout * 4)
-
-			pool.mu.RLock()
-			if tc.ExpectTimeout {
-				require.Nil(t, server.DiscV5)
-			} else {
-				require.NotNil(t, server.DiscV5)
-			}
-			pool.mu.RUnlock()
-		})
-	}
-}
-
 func TestPeerPoolNotAllowedStopping(t *testing.T) {
 	// create and start server
 	key, err := crypto.GenerateKey()
