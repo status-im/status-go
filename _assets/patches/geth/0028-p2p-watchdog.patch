@@ -1,5 +1,5 @@
 diff --git c/p2p/peer.go w/p2p/peer.go
-index 73e33418e..d08371135 100644
+index 73e33418e..322268b28 100644
 --- c/p2p/peer.go
 +++ w/p2p/peer.go
 @@ -22,6 +22,7 @@ import (
@@ -10,16 +10,19 @@ index 73e33418e..d08371135 100644
  	"time"
  
  	"github.com/ethereum/go-ethereum/common/mclock"
-@@ -38,7 +39,7 @@ const (
+@@ -38,7 +39,10 @@ const (
  
  	snappyProtocolVersion = 5
  
 -	pingInterval = 15 * time.Second
-+	pingInterval = 100 * time.Millisecond
++	pingInterval = 1 * time.Second
++	// watchdogInterval intentionally lower than ping interval.
++	// this way we reduce potential flaky window size.
++	watchdogInterval = 200 * time.Millisecond
  )
  
  const (
-@@ -100,6 +101,7 @@ type Peer struct {
+@@ -100,6 +104,7 @@ type Peer struct {
  	log     log.Logger
  	created mclock.AbsTime
  
@@ -27,7 +30,7 @@ index 73e33418e..d08371135 100644
  	wg       sync.WaitGroup
  	protoErr chan error
  	closed   chan struct{}
-@@ -118,6 +120,11 @@ func NewPeer(id discover.NodeID, name string, caps []Cap) *Peer {
+@@ -118,6 +123,11 @@ func NewPeer(id discover.NodeID, name string, caps []Cap) *Peer {
  	return peer
  }
  
@@ -39,7 +42,7 @@ index 73e33418e..d08371135 100644
  // ID returns the node's public key.
  func (p *Peer) ID() discover.NodeID {
  	return p.rw.id
-@@ -188,8 +195,10 @@ func (p *Peer) run() (remoteRequested bool, err error) {
+@@ -188,8 +198,10 @@ func (p *Peer) run() (remoteRequested bool, err error) {
  		readErr    = make(chan error, 1)
  		reason     DiscReason // sent to the peer
  	)
@@ -52,14 +55,14 @@ index 73e33418e..d08371135 100644
  	go p.pingLoop()
  
  	// Start all protocol handlers.
-@@ -248,7 +257,24 @@ func (p *Peer) pingLoop() {
+@@ -248,7 +260,24 @@ func (p *Peer) pingLoop() {
  	}
  }
  
 -func (p *Peer) readLoop(errc chan<- error) {
 +func (p *Peer) watchdogLoop(reads <-chan struct{}) {
 +	defer p.wg.Done()
-+	hb := time.NewTimer(pingInterval)
++	hb := time.NewTimer(watchdogInterval)
 +	defer hb.Stop()
 +	for {
 +		select {
@@ -70,7 +73,7 @@ index 73e33418e..d08371135 100644
 +		case <-p.closed:
 +			return
 +		}
-+		hb.Reset(pingInterval)
++		hb.Reset(watchdogInterval)
 +	}
 +}
 +
@@ -78,7 +81,7 @@ index 73e33418e..d08371135 100644
  	defer p.wg.Done()
  	for {
  		msg, err := p.rw.ReadMsg()
-@@ -261,6 +287,7 @@ func (p *Peer) readLoop(errc chan<- error) {
+@@ -261,6 +290,7 @@ func (p *Peer) readLoop(errc chan<- error) {
  			errc <- err
  			return
  		}
