@@ -2,7 +2,6 @@ package destructive
 
 import (
 	"errors"
-	"fmt"
 	"testing"
 	"time"
 
@@ -73,14 +72,14 @@ func (s *PeersTestSuite) TestSentEnvelope() {
 		SymKeyID:  symID,
 		PowTarget: whisperv6.DefaultMinimumPoW,
 		PowTime:   200,
-		TTL:       1,
+		TTL:       10,
 		Topic:     whisperv6.TopicType{0x01, 0x01, 0x01, 0x01},
 		Payload:   []byte("hello"),
 	}
 	stop := make(chan struct{})
 	defer close(stop)
 	go func() {
-		ticker := time.NewTicker(1 * time.Second)
+		ticker := time.NewTicker(2 * time.Second)
 		for {
 			select {
 			case <-stop:
@@ -88,7 +87,6 @@ func (s *PeersTestSuite) TestSentEnvelope() {
 			case <-ticker.C:
 				var hash common.Hash
 				s.NoError(client.Call(&hash, "shhext_post", msg))
-				fmt.Println("POST", hash)
 			}
 		}
 	}()
@@ -112,13 +110,15 @@ func (s *PeersTestSuite) TestSentEnvelope() {
 	}
 	waitAtleastOneSent(60 * time.Second)
 	s.Require().NoError(s.controller.Enable())
-	waitNoSentEnvelopes := func(timelimit time.Duration) {
+	waitEnvelopes := func(timelimit time.Duration, expect bool) {
 		timeout := time.After(timelimit)
 		for {
 			select {
 			case ev := <-events:
 				if ev.Event == whisperv6.EventEnvelopeSent {
-					fmt.Println("UNEXPECTED", ev.Event, ev.Hash)
+					if !expect {
+						s.FailNow("Unpexpected SENT for the envelope")
+					}
 				}
 			case <-timeout:
 				return
@@ -127,7 +127,7 @@ func (s *PeersTestSuite) TestSentEnvelope() {
 	}
 	// we verify that during this time no SENT events were fired
 	// must be less then 10s (current read socket deadline) to avoid reconnect
-	waitNoSentEnvelopes(8 * time.Second)
+	waitEnvelopes(9*time.Second, false)
 	s.Require().NoError(s.controller.Disable())
 	waitAtleastOneSent(3 * time.Second)
 }

@@ -39,7 +39,10 @@ const (
 
 	snappyProtocolVersion = 5
 
-	pingInterval = 100 * time.Millisecond
+	pingInterval = 1 * time.Second
+	// watchdogInterval intentionally lower than ping interval.
+	// this way we reduce potential flaky window size.
+	watchdogInterval = 200 * time.Millisecond
 )
 
 const (
@@ -259,7 +262,7 @@ func (p *Peer) pingLoop() {
 
 func (p *Peer) watchdogLoop(reads <-chan struct{}) {
 	defer p.wg.Done()
-	hb := time.NewTimer(pingInterval)
+	hb := time.NewTimer(watchdogInterval)
 	defer hb.Stop()
 	for {
 		select {
@@ -270,7 +273,7 @@ func (p *Peer) watchdogLoop(reads <-chan struct{}) {
 		case <-p.closed:
 			return
 		}
-		hb.Reset(pingInterval)
+		hb.Reset(watchdogInterval)
 	}
 }
 
