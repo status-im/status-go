@@ -266,7 +266,7 @@ func isPeerConnected(node *StatusNode, peerURL string) (bool, error) {
 	return false, nil
 }
 
-func waitForPeer(node *StatusNode, peerURL string, eventType p2p.PeerEventType, timeout time.Duration) error {
+func waitForPeer(node *StatusNode, peerURL string, eventType p2p.PeerEventType, timeout time.Duration, subscribed chan struct{}) error {
 	if !node.IsRunning() {
 		return ErrNoRunningNode
 	}
@@ -280,6 +280,8 @@ func waitForPeer(node *StatusNode, peerURL string, eventType p2p.PeerEventType, 
 	ch := make(chan *p2p.PeerEvent)
 	subscription := server.SubscribeEvents(ch)
 	defer subscription.Unsubscribe()
+
+	close(subscribed)
 
 	for {
 		select {
@@ -298,10 +300,13 @@ func waitForPeer(node *StatusNode, peerURL string, eventType p2p.PeerEventType, 
 }
 
 func waitForPeerAsync(node *StatusNode, peerURL string, eventType p2p.PeerEventType, timeout time.Duration) <-chan error {
+	subscribed := make(chan struct{})
 	errCh := make(chan error)
 	go func() {
-		errCh <- waitForPeer(node, peerURL, eventType, timeout)
+		errCh <- waitForPeer(node, peerURL, eventType, timeout, subscribed)
 	}()
+
+	<-subscribed
 
 	return errCh
 }
