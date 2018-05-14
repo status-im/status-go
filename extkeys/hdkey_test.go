@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 func TestBIP32Vectors(t *testing.T) {
@@ -114,7 +116,7 @@ tests:
 			continue
 		}
 
-		extKey, err := NewMaster(seed, []byte("Bitcoin seed"))
+		extKey, err := NewMaster(seed)
 		if err != nil {
 			t.Errorf("NewMasterKey #%d (%s): %v", i, test.name, err)
 			continue
@@ -380,21 +382,21 @@ func TestChildDerivation(t *testing.T) {
 
 func TestErrors(t *testing.T) {
 	// Should get an error when seed has too few bytes.
-	_, err := NewMaster(bytes.Repeat([]byte{0x00}, 15), []byte{0x00})
+	_, err := NewMaster(bytes.Repeat([]byte{0x00}, 15))
 	if err != ErrInvalidSeedLen {
 		t.Errorf("NewMaster: mismatched error -- got: %v, want: %v",
 			err, ErrInvalidSeedLen)
 	}
 
 	// Should get an error when seed has too many bytes.
-	_, err = NewMaster(bytes.Repeat([]byte{0x00}, 65), []byte{0x00})
+	_, err = NewMaster(bytes.Repeat([]byte{0x00}, 65))
 	if err != ErrInvalidSeedLen {
 		t.Errorf("NewMaster: mismatched error -- got: %v, want: %v",
 			err, ErrInvalidSeedLen)
 	}
 
 	// Generate a new key and neuter it to a public extended key.
-	mnemonic := NewMnemonic(Salt)
+	mnemonic := NewMnemonic()
 
 	phrase, err := mnemonic.MnemonicPhrase(128, EnglishLanguage)
 	if err != nil {
@@ -402,7 +404,7 @@ func TestErrors(t *testing.T) {
 	}
 
 	password := "badpassword"
-	extKey, err := NewMaster(mnemonic.MnemonicSeed(phrase, password), []byte(Salt))
+	extKey, err := NewMaster(mnemonic.MnemonicSeed(phrase, password))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 		return
@@ -533,6 +535,68 @@ func TestBIP44ChildDerivation(t *testing.T) {
 	t.Logf("Account 1 key: %s", accounKey2.String())
 }
 
+func TestHDWalletCompatibility(t *testing.T) {
+	password := "TREZOR"
+	mnemonic := NewMnemonic()
+	mnemonicPhrase := "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
+	seed := mnemonic.MnemonicSeed(mnemonicPhrase, password)
+	rootKey, err := NewMaster(seed)
+	if err != nil {
+		t.Errorf("couldn't create master extended key: %v", err)
+	}
+
+	expectedAddresses := []struct {
+		address string
+		pubKey  string
+		privKey string
+	}{
+		{
+			address: "0x9c32F71D4DB8Fb9e1A58B0a80dF79935e7256FA6",
+			pubKey:  "0x03986dee3b8afe24cb8ccb2ac23dac3f8c43d22850d14b809b26d6b8aa5a1f4778",
+			privKey: "0x62f1d86b246c81bdd8f6c166d56896a4a5e1eddbcaebe06480e5c0bc74c28224",
+		},
+		{
+			address: "0x7AF7283bd1462C3b957e8FAc28Dc19cBbF2FAdfe",
+			pubKey:  "0x03462e7b95dab24fe8a57ac897d9026545ec4327c9c5e4a772e5d14cc5422f9489",
+			privKey: "0x49ee230b1605382ac1c40079191bca937fc30e8c2fa845b7de27a96ffcc4ddbf",
+		},
+		{
+			address: "0x05f48E30fCb69ADcd2A591Ebc7123be8BE72D7a1",
+			pubKey:  "0x036650e4b2b8e731a0ef12cda892b70cb95e78ea6e576ba995019b5e9aa7d9c0f5",
+			privKey: "0xeef2c0702151930b84cffcaa642af58e692956314519114e78f3211a6465f28b",
+		},
+		{
+			address: "0xbfE91Bc05cE66013660D7Eb742F74BD324DA5F92",
+			pubKey:  "0x0201d1c12e8fcea03a68ad5fd0d02fd0a4bfe0339618f949e2e30cf311e8b83c46",
+			privKey: "0xbca51d1d3529a0e0787933a2293cf46d9b973ea3ea00e28d3bd33590bc7f7156",
+		},
+	}
+
+	for i := 0; i < len(expectedAddresses); i++ {
+		key, err := rootKey.BIP44Child(CoinTypeETH, uint32(i))
+		if err != nil {
+			t.Errorf("Error deriving BIP44-compliant key: %s", err)
+		}
+
+		privateKeyECDSA := key.ToECDSA()
+		address := crypto.PubkeyToAddress(privateKeyECDSA.PublicKey).Hex()
+
+		if address != expectedAddresses[i].address {
+			t.Errorf("wrong address generated. expected %s, got %s", expectedAddresses[i].address, address)
+		}
+
+		pubKey := fmt.Sprintf("0x%x", (crypto.CompressPubkey(&privateKeyECDSA.PublicKey)))
+		if pubKey != expectedAddresses[i].pubKey {
+			t.Errorf("wrong public key generated. expected %s, got %s", expectedAddresses[i].pubKey, pubKey)
+		}
+
+		privKey := fmt.Sprintf("0x%x", crypto.FromECDSA(privateKeyECDSA))
+		if privKey != expectedAddresses[i].privKey {
+			t.Errorf("wrong private key generated. expected %s, got %s", expectedAddresses[i].privKey, privKey)
+		}
+	}
+}
+
 //func TestNewKey(t *testing.T) {
 //	mnemonic := NewMnemonic()
 //
@@ -543,7 +607,7 @@ func TestBIP44ChildDerivation(t *testing.T) {
 //
 //	password := "badpassword"
 //	mnemonic.salt = "Bitcoin seed"
-//	key, err := NewMaster(mnemonic.MnemonicSeed(phrase, password), []byte(mnemonic.salt))
+//	key, err := NewMaster(mnemonic.MnemonicSeed(phrase, password))
 //	if err != nil {
 //		t.Error(err)
 //	}

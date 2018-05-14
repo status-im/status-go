@@ -51,14 +51,18 @@ func NewManager(geth GethServiceProvider) *Manager {
 // sub-account derivations)
 func (m *Manager) CreateAccount(password string) (address, pubKey, mnemonic string, err error) {
 	// generate mnemonic phrase
-	mn := extkeys.NewMnemonic(extkeys.Salt)
+	mn := extkeys.NewMnemonic()
 	mnemonic, err = mn.MnemonicPhrase(extkeys.EntropyStrength128, extkeys.EnglishLanguage)
 	if err != nil {
 		return "", "", "", fmt.Errorf("can not create mnemonic seed: %v", err)
 	}
 
-	// generate extended master key (see BIP32)
-	extKey, err := extkeys.NewMaster(mn.MnemonicSeed(mnemonic, password), []byte(extkeys.Salt))
+	// Generate extended master key (see BIP32)
+	// We call extkeys.NewMaster with a seed generated with the 12 mnemonic words
+	// but without using the optional password as an extra entropy as described in BIP39.
+	// Future ideas/iterations in Status can add an an advanced options
+	// for expert users, to be able to add a passphrase to the generation of the seed.
+	extKey, err := extkeys.NewMaster(mn.MnemonicSeed(mnemonic, ""))
 	if err != nil {
 		return "", "", "", fmt.Errorf("can not create master extended key: %v", err)
 	}
@@ -136,8 +140,8 @@ func (m *Manager) CreateChildAccount(parentAddress, password string) (address, p
 // Once master key is re-generated, it is inserted into keystore (if not already there).
 func (m *Manager) RecoverAccount(password, mnemonic string) (address, pubKey string, err error) {
 	// re-create extended key (see BIP32)
-	mn := extkeys.NewMnemonic(extkeys.Salt)
-	extKey, err := extkeys.NewMaster(mn.MnemonicSeed(mnemonic, password), []byte(extkeys.Salt))
+	mn := extkeys.NewMnemonic()
+	extKey, err := extkeys.NewMaster(mn.MnemonicSeed(mnemonic, ""))
 	if err != nil {
 		return "", "", ErrInvalidMasterKeyCreated
 	}
