@@ -106,7 +106,7 @@ func (s *PeerPoolSimulationSuite) getPoolEvent(events <-chan string) string {
 
 func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailover() {
 	poolEvents := make(chan string, 1)
-	summaries := make(chan map[string]int, 1)
+	summaries := make(chan []*p2p.PeerInfo, 1)
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var envelope struct {
 			Type  string
@@ -120,7 +120,7 @@ func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailover() {
 			poolEvents <- envelope.Type
 		case signal.EventDiscoverySummary:
 			poolEvents <- envelope.Type
-			var summary map[string]int
+			var summary []*p2p.PeerInfo
 			s.NoError(json.Unmarshal(envelope.Event, &summary))
 			summaries <- summary
 		}
@@ -151,8 +151,6 @@ func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailover() {
 	s.Require().Equal(signal.EventDiscoverySummary, s.getPoolEvent(poolEvents))
 	summary := <-summaries
 	s.Len(summary, 1)
-	s.Contains(summary, "shh/6")
-	s.Equal(summary["shh/6"], 1)
 
 	register.Stop()
 	s.peers[0].Stop()
@@ -174,8 +172,6 @@ func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailover() {
 	s.Require().Equal(signal.EventDiscoverySummary, s.getPoolEvent(poolEvents))
 	summary = <-summaries
 	s.Len(summary, 1)
-	s.Contains(summary, "shh/6")
-	s.Equal(summary["shh/6"], 1)
 }
 
 // TestPeerPoolMaxPeersOverflow verifies that following scenario will not occur:
