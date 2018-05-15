@@ -94,7 +94,7 @@ func (s *PeersTestSuite) TestSentEnvelope() {
 	events := make(chan whisperv6.EnvelopeEvent, 100)
 	sub := w.SubscribeEnvelopeEvents(events)
 	defer sub.Unsubscribe()
-	waitAtleastOneSent := func(timelimit time.Duration) {
+	waitAtLeastOneSent := func(timelimit time.Duration) {
 		timeout := time.After(timelimit)
 		for {
 			select {
@@ -103,12 +103,12 @@ func (s *PeersTestSuite) TestSentEnvelope() {
 					return
 				}
 			case <-timeout:
-				s.FailNow("failed waiting for atleast one envelope SENT")
+				s.FailNow("failed waiting for at least one envelope SENT")
 				return
 			}
 		}
 	}
-	waitAtleastOneSent(60 * time.Second)
+	waitAtLeastOneSent(60 * time.Second)
 	s.Require().NoError(s.controller.Enable())
 	waitEnvelopes := func(timelimit time.Duration, expect bool) {
 		timeout := time.After(timelimit)
@@ -117,7 +117,7 @@ func (s *PeersTestSuite) TestSentEnvelope() {
 			case ev := <-events:
 				if ev.Event == whisperv6.EventEnvelopeSent {
 					if !expect {
-						s.FailNow("Unpexpected SENT for the envelope")
+						s.FailNow("Unexpected SENT event")
 					}
 				}
 			case <-timeout:
@@ -129,7 +129,7 @@ func (s *PeersTestSuite) TestSentEnvelope() {
 	// must be less then 10s (current read socket deadline) to avoid reconnect
 	waitEnvelopes(9*time.Second, false)
 	s.Require().NoError(s.controller.Disable())
-	waitAtleastOneSent(3 * time.Second)
+	waitAtLeastOneSent(3 * time.Second)
 }
 
 // TestStaticPeersReconnect : it tests how long it takes to reconnect with
