@@ -5,7 +5,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"github.com/status-im/status-go/geth/api"
 	. "github.com/status-im/status-go/t/utils"
 
@@ -55,6 +57,79 @@ func consumeUntil(events <-chan *p2p.PeerEvent, f func(ev *p2p.PeerEvent) bool, 
 			return errors.New("timeout")
 		}
 	}
+}
+
+func (s *PeersTestSuite) TestSentEnvelope() {
+	node := s.backend.StatusNode()
+	w, err := node.WhisperService()
+	s.NoError(err)
+
+	client, _ := node.GethNode().Attach()
+	s.NotNil(client)
+	var symID string
+	s.NoError(client.Call(&symID, "shh_newSymKey"))
+	msg := whisperv6.NewMessage{
+		SymKeyID:  symID,
+		PowTarget: whisperv6.DefaultMinimumPoW,
+		PowTime:   200,
+		TTL:       10,
+		Topic:     whisperv6.TopicType{0x01, 0x01, 0x01, 0x01},
+		Payload:   []byte("hello"),
+	}
+	stop := make(chan struct{})
+	defer close(stop)
+	go func() {
+		ticker := time.NewTicker(2 * time.Second)
+		for {
+			select {
+			case <-stop:
+				return
+			case <-ticker.C:
+				var hash common.Hash
+				s.NoError(client.Call(&hash, "shhext_post", msg))
+			}
+		}
+	}()
+
+	events := make(chan whisperv6.EnvelopeEvent, 100)
+	sub := w.SubscribeEnvelopeEvents(events)
+	defer sub.Unsubscribe()
+	waitAtLeastOneSent := func(timelimit time.Duration) {
+		timeout := time.After(timelimit)
+		for {
+			select {
+			case ev := <-events:
+				if ev.Event == whisperv6.EventEnvelopeSent {
+					return
+				}
+			case <-timeout:
+				s.FailNow("failed waiting for at least one envelope SENT")
+				return
+			}
+		}
+	}
+	waitAtLeastOneSent(60 * time.Second)
+	s.Require().NoError(s.controller.Enable())
+	waitEnvelopes := func(timelimit time.Duration, expect bool) {
+		timeout := time.After(timelimit)
+		for {
+			select {
+			case ev := <-events:
+				if ev.Event == whisperv6.EventEnvelopeSent {
+					if !expect {
+						s.FailNow("Unexpected SENT event")
+					}
+				}
+			case <-timeout:
+				return
+			}
+		}
+	}
+	// we verify that during this time no SENT events were fired
+	// must be less then 10s (current read socket deadline) to avoid reconnect
+	waitEnvelopes(9*time.Second, false)
+	s.Require().NoError(s.controller.Disable())
+	waitAtLeastOneSent(3 * time.Second)
 }
 
 // TestStaticPeersReconnect : it tests how long it takes to reconnect with

@@ -61,6 +61,7 @@ func (s *WhisperExtensionSuite) TestSentSignal() {
 			confirmed <- event.Hash
 		}
 	})
+	defer signal.ResetDefaultNodeNotificationHandler()
 	client := s.nodes[0].RPCClient()
 	s.NotNil(client)
 	var symID string
@@ -71,6 +72,7 @@ func (s *WhisperExtensionSuite) TestSentSignal() {
 		PowTime:   200,
 		Topic:     whisper.TopicType{0x01, 0x01, 0x01, 0x01},
 		Payload:   []byte("hello"),
+		TTL:       5,
 	}
 	var hash common.Hash
 	s.NoError(client.Call(&hash, "shhext_post", msg))
@@ -78,7 +80,7 @@ func (s *WhisperExtensionSuite) TestSentSignal() {
 	select {
 	case conf := <-confirmed:
 		s.Equal(hash, conf)
-	case <-time.After(time.Second):
+	case <-time.After(5 * time.Second):
 		s.Fail("timed out while waiting for confirmation")
 	}
 }
@@ -99,6 +101,7 @@ func (s *WhisperExtensionSuite) TestExpiredSignal() {
 			expired <- event.Hash
 		}
 	})
+	defer signal.ResetDefaultNodeNotificationHandler()
 	client := s.nodes[0].RPCClient()
 	s.NotNil(client)
 	var symID string
@@ -117,7 +120,7 @@ func (s *WhisperExtensionSuite) TestExpiredSignal() {
 	select {
 	case exp := <-expired:
 		s.Equal(hash, exp)
-	case <-time.After(3 * time.Second):
+	case <-time.After(5 * time.Second):
 		s.Fail("timed out while waiting for expiration")
 	}
 }
