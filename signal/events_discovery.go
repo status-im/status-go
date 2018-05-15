@@ -22,6 +22,6 @@ func SendDiscoveryStopped() {
 }
 
 // SendDiscoverySummary sends discovery.summary signal.
-func SendDiscoverySummary(summary map[string]int) {
+func SendDiscoverySummary(summary interface{}) {
 	send(EventDiscoverySummary, summary)
 }
