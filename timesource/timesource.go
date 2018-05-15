@@ -97,7 +97,7 @@ func computeOffset(timeQuery ntpQuery, servers []string, allowedFailures int) (t
 	sort.SliceStable(offsets, func(i, j int) bool {
 		return offsets[i] > offsets[j]
 	})
-	mid := len(servers) / 2
+	mid := len(offsets) / 2
 	if len(offsets)%2 == 0 {
 		return (offsets[mid-1] + offsets[mid]) / 2, nil
 	}
