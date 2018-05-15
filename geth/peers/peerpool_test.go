@@ -133,7 +133,7 @@ func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailover() {
 		topic: params.NewLimits(1, 1), // limits are chosen for simplicity of the simulation
 	}
 	peerPoolOpts := &Options{100 * time.Millisecond, 100 * time.Millisecond, 0, true}
-	peerPool := NewPeerPool(config, nil, peerPoolOpts)
+	peerPool := NewPeerPool(config, newInMemoryCache(), peerPoolOpts)
 	register := NewRegister(topic)
 	s.Require().NoError(register.Start(s.peers[0]))
 	// need to wait for topic to get registered, discv5 can query same node
@@ -173,6 +173,11 @@ func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailover() {
 	s.Require().Equal(signal.EventDiscoverySummary, s.getPoolEvent(poolEvents))
 	summary = <-summaries
 	s.Len(summary, 1)
+
+	// verify that we are actually using cache
+	cachedPeers := peerPool.cache.GetPeersRange(topic, 1)
+	s.Len(cachedPeers, 1)
+	s.Equal(s.peers[2].Self().ID, discover.NodeID(cachedPeers[0].ID))
 }
 
 // TestPeerPoolMaxPeersOverflow verifies that following scenario will not occur:
