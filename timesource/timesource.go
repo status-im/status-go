@@ -13,13 +13,6 @@ import (
 )
 
 const (
-	// DefaultServer will be internally resolved to the closest available.
-	// also it rarely queries same server more than once.
-	DefaultServer = "pool.ntp.org"
-
-	// DefaultAttempts defines how many servers we will query
-	DefaultAttempts = 5
-
 	// DefaultMaxAllowedFailures defines how many failures will be tolerated.
 	DefaultMaxAllowedFailures = 2
 
@@ -29,6 +22,15 @@ const (
 	// DefaultRPCTimeout defines write deadline for single ntp server request.
 	DefaultRPCTimeout = 2 * time.Second
 )
+
+// defaultServers will be resolved to the closest available,
+// and with high probability resolved to the different IPs
+var defaultServers = []string{
+	"0.pool.ntp.org",
+	"1.pool.ntp.org",
+	"2.pool.ntp.org",
+	"3.pool.ntp.org",
+}
 
 type ntpQuery func(string, ntp.QueryOptions) (*ntp.Response, error)
 
@@ -54,13 +56,13 @@ func (e multiRPCError) Error() string {
 	return b.String()
 }
 
-func computeOffset(timeQuery ntpQuery, server string, attempts, allowedFailures int) (time.Duration, error) {
-	if attempts == 0 {
+func computeOffset(timeQuery ntpQuery, servers []string, allowedFailures int) (time.Duration, error) {
+	if len(servers) == 0 {
 		return 0, nil
 	}
-	responses := make(chan queryResponse, attempts)
-	for i := 0; i < attempts; i++ {
-		go func() {
+	responses := make(chan queryResponse, len(servers))
+	for _, server := range servers {
+		go func(server string) {
 			response, err := timeQuery(server, ntp.QueryOptions{
 				Timeout: DefaultRPCTimeout,
 			})
@@ -69,7 +71,7 @@ func computeOffset(timeQuery ntpQuery, server string, attempts, allowedFailures 
 				return
 			}
 			responses <- queryResponse{Offset: response.ClockOffset}
-		}()
+		}(server)
 	}
 	var (
 		rpcErrors multiRPCError
@@ -83,19 +85,19 @@ func computeOffset(timeQuery ntpQuery, server string, attempts, allowedFailures 
 			offsets = append(offsets, response.Offset)
 		}
 		collected++
-		if collected == attempts {
+		if collected == len(servers) {
 			break
 		}
 	}
 	if lth := len(rpcErrors); lth > allowedFailures {
 		return 0, rpcErrors
-	} else if lth == attempts {
+	} else if lth == len(servers) {
 		return 0, rpcErrors
 	}
 	sort.SliceStable(offsets, func(i, j int) bool {
 		return offsets[i] > offsets[j]
 	})
-	mid := attempts / 2
+	mid := len(servers) / 2
 	if len(offsets)%2 == 0 {
 		return (offsets[mid-1] + offsets[mid]) / 2, nil
 	}
@@ -105,8 +107,7 @@ func computeOffset(timeQuery ntpQuery, server string, attempts, allowedFailures 
 // Default initializes time source with default config values.
 func Default() *NTPTimeSource {
 	return &NTPTimeSource{
-		server:          DefaultServer,
-		attempts:        DefaultAttempts,
+		servers:         defaultServers,
 		allowedFailures: DefaultMaxAllowedFailures,
 		updatePeriod:    DefaultUpdatePeriod,
 		timeQuery:       ntp.QueryWithOptions,
@@ -116,8 +117,7 @@ func Default() *NTPTimeSource {
 // NTPTimeSource provides source of time that tries to be resistant to time skews.
 // It does so by periodically querying time offset from ntp servers.
 type NTPTimeSource struct {
-	server          string
-	attempts        int
+	servers         []string
 	allowedFailures int
 	updatePeriod    time.Duration
 	timeQuery       ntpQuery // for ease of testing
@@ -137,7 +137,7 @@ func (s *NTPTimeSource) Now() time.Time {
 }
 
 func (s *NTPTimeSource) updateOffset() {
-	offset, err := computeOffset(s.timeQuery, s.server, s.attempts, s.allowedFailures)
+	offset, err := computeOffset(s.timeQuery, s.servers, s.allowedFailures)
 	if err != nil {
 		log.Error("failed to compute offset", "error", err)
 		return

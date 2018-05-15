@@ -15,9 +15,13 @@ const (
 	clockCompareDelta = 30 * time.Microsecond
 )
 
+// we don't user real servers for tests, but logic depends on
+// actual number of involved NTP servers.
+var mockedServers = []string{"ntp1", "ntp2", "ntp3"}
+
 type testCase struct {
 	description     string
-	attempts        int
+	servers         []string
 	allowedFailures int
 	responses       []queryResponse
 	expected        time.Duration
@@ -42,7 +46,7 @@ func newTestCases() []*testCase {
 	return []*testCase{
 		{
 			description: "SameResponse",
-			attempts:    3,
+			servers:     mockedServers,
 			responses: []queryResponse{
 				{Offset: 10 * time.Second},
 				{Offset: 10 * time.Second},
@@ -52,7 +56,7 @@ func newTestCases() []*testCase {
 		},
 		{
 			description: "Median",
-			attempts:    3,
+			servers:     mockedServers,
 			responses: []queryResponse{
 				{Offset: 10 * time.Second},
 				{Offset: 20 * time.Second},
@@ -62,7 +66,7 @@ func newTestCases() []*testCase {
 		},
 		{
 			description: "EvenMedian",
-			attempts:    2,
+			servers:     mockedServers[:2],
 			responses: []queryResponse{
 				{Offset: 10 * time.Second},
 				{Offset: 20 * time.Second},
@@ -71,7 +75,7 @@ func newTestCases() []*testCase {
 		},
 		{
 			description: "Error",
-			attempts:    3,
+			servers:     mockedServers,
 			responses: []queryResponse{
 				{Offset: 10 * time.Second},
 				{Error: errors.New("test")},
@@ -82,7 +86,7 @@ func newTestCases() []*testCase {
 		},
 		{
 			description: "MultiError",
-			attempts:    3,
+			servers:     mockedServers,
 			responses: []queryResponse{
 				{Error: errors.New("test 1")},
 				{Error: errors.New("test 2")},
@@ -93,7 +97,7 @@ func newTestCases() []*testCase {
 		},
 		{
 			description:     "TolerableError",
-			attempts:        3,
+			servers:         mockedServers,
 			allowedFailures: 1,
 			responses: []queryResponse{
 				{Offset: 10 * time.Second},
@@ -104,7 +108,7 @@ func newTestCases() []*testCase {
 		},
 		{
 			description:     "NonTolerableError",
-			attempts:        3,
+			servers:         mockedServers,
 			allowedFailures: 1,
 			responses: []queryResponse{
 				{Offset: 10 * time.Second},
@@ -116,7 +120,7 @@ func newTestCases() []*testCase {
 		},
 		{
 			description:     "AllFailed",
-			attempts:        3,
+			servers:         mockedServers,
 			allowedFailures: 3,
 			responses: []queryResponse{
 				{Error: errors.New("test")},
@@ -132,7 +136,7 @@ func newTestCases() []*testCase {
 func TestComputeOffset(t *testing.T) {
 	for _, tc := range newTestCases() {
 		t.Run(tc.description, func(t *testing.T) {
-			offset, err := computeOffset(tc.query, "", tc.attempts, tc.allowedFailures)
+			offset, err := computeOffset(tc.query, tc.servers, tc.allowedFailures)
 			if tc.expectError {
 				assert.Error(t, err)
 			} else {
@@ -147,7 +151,7 @@ func TestNTPTimeSource(t *testing.T) {
 	for _, tc := range newTestCases() {
 		t.Run(tc.description, func(t *testing.T) {
 			source := &NTPTimeSource{
-				attempts:        tc.attempts,
+				servers:         tc.servers,
 				allowedFailures: tc.allowedFailures,
 				timeQuery:       tc.query,
 			}
