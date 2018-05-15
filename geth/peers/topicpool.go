@@ -15,7 +15,7 @@ import (
 )
 
 // NewTopicPool returns instance of TopicPool
-func NewTopicPool(topic discv5.Topic, limits params.Limits, slowMode, fastMode time.Duration) *TopicPool {
+func NewTopicPool(topic discv5.Topic, limits params.Limits, slowMode, fastMode time.Duration, cache *Cache) *TopicPool {
 	pool := TopicPool{
 		topic:           topic,
 		limits:          limits,
@@ -25,6 +25,7 @@ func NewTopicPool(topic discv5.Topic, limits params.Limits, slowMode, fastMode t
 		peerPool:        make(map[discv5.NodeID]*peerInfoItem),
 		peerPoolQueue:   make(peerPriorityQueue, 0),
 		connectedPeers:  make(map[discv5.NodeID]*peerInfo),
+		cache:           cache,
 	}
 
 	heap.Init(&pool.peerPoolQueue)
@@ -198,10 +199,8 @@ func (t *TopicPool) ConfirmAdded(server *p2p.Server, nodeID discover.NodeID) {
 
 	// established connection means that the node
 	// is a viable candidate for a connection and can be cached
-	if t.cache != nil {
-		if err := t.cache.AddPeer(peer.node, t.topic); err != nil {
-			log.Error("failed to persist a peer", "error", err)
-		}
+	if err := t.cache.AddPeer(peer.node, t.topic); err != nil {
+		log.Error("failed to persist a peer", "error", err)
 	}
 
 	// if the upper limit is already reached, drop this peer
@@ -256,10 +255,8 @@ func (t *TopicPool) ConfirmDropped(server *p2p.Server, nodeID discover.NodeID) b
 	t.removeServerPeer(server, peer)
 
 	delete(t.connectedPeers, discV5NodeID)
-	if t.cache != nil {
-		if err := t.cache.RemovePeer(discV5NodeID, t.topic); err != nil {
-			log.Error("failed to remove peer from cache", "error", err)
-		}
+	if err := t.cache.RemovePeer(discV5NodeID, t.topic); err != nil {
+		log.Error("failed to remove peer from cache", "error", err)
 	}
 
 	// As we removed a peer, update a sync strategy if needed.
@@ -312,11 +309,9 @@ func (t *TopicPool) StartSearch(server *p2p.Server) error {
 	found := make(chan *discv5.Node, 5) // 5 reasonable number for concurrently found nodes
 	lookup := make(chan bool, 10)       // sufficiently buffered channel, just prevents blocking because of lookup
 
-	if t.cache != nil {
-		for _, peer := range t.cache.GetPeersRange(t.topic, 5) {
-			log.Debug("adding a peer from cache", "peer", peer)
-			found <- peer
-		}
+	for _, peer := range t.cache.GetPeersRange(t.topic, 5) {
+		log.Debug("adding a peer from cache", "peer", peer)
+		found <- peer
 	}
 
 	t.discWG.Add(1)

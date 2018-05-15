@@ -116,7 +116,7 @@ func (p *PeerPool) Start(server *p2p.Server) error {
 	// collect topics and start searching for nodes
 	p.topics = make([]*TopicPool, 0, len(p.config))
 	for topic, limits := range p.config {
-		topicPool := NewTopicPool(topic, limits, p.opts.SlowSync, p.opts.FastSync)
+		topicPool := NewTopicPool(topic, limits, p.opts.SlowSync, p.opts.FastSync, p.cache)
 		if err := topicPool.StartSearch(server); err != nil {
 			return err
 		}

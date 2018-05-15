@@ -5,19 +5,24 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/p2p/discv5"
-	"github.com/status-im/status-go/geth/db"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/syndtr/goleveldb/leveldb/storage"
 )
 
-func TestPeersRange(t *testing.T) {
-	rootDB, err := db.Create("", "status-peers-test")
-	require.NoError(t, err)
-	defer func() {
-		assert.NoError(t, rootDB.Close())
-	}()
+// newInMemoryCache creates a cache for tests
+func newInMemoryCache() (*Cache, error) {
+	memdb, err := leveldb.Open(storage.NewMemStorage(), nil)
+	if err != nil {
+		return nil, err
+	}
+	return NewCache(memdb), nil
+}
 
-	peersDB := Cache{db: rootDB}
+func TestPeersRange(t *testing.T) {
+	peersDB, err := newInMemoryCache()
+	require.NoError(t, err)
 	topic := discv5.Topic("test")
 	peers := [3]*discv5.Node{
 		discv5.NewNode(discv5.NodeID{3}, net.IPv4(100, 100, 0, 3), 32311, 32311),
