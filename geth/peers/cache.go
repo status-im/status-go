@@ -5,22 +5,12 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/status-im/status-go/geth/db"
 	"github.com/syndtr/goleveldb/leveldb"
-	"github.com/syndtr/goleveldb/leveldb/storage"
 	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
 // NewCache returns instance of PeersDatabase
 func NewCache(db *leveldb.DB) *Cache {
 	return &Cache{db: db}
-}
-
-// newInMemoryCache creates a cache for tests
-func newInMemoryCache() (*Cache, error) {
-	memdb, err := leveldb.Open(storage.NewMemStorage(), nil)
-	if err != nil {
-		return nil, err
-	}
-	return NewCache(memdb), nil
 }
 
 // Cache maintains list of peers that were discovered.
