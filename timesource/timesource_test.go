@@ -17,7 +17,7 @@ const (
 
 // we don't user real servers for tests, but logic depends on
 // actual number of involved NTP servers.
-var mockedServers = []string{"ntp1", "ntp2", "ntp3"}
+var mockedServers = []string{"ntp1", "ntp2", "ntp3", "ntp4"}
 
 type testCase struct {
 	description     string
@@ -51,6 +51,7 @@ func newTestCases() []*testCase {
 				{Offset: 10 * time.Second},
 				{Offset: 10 * time.Second},
 				{Offset: 10 * time.Second},
+				{Offset: 10 * time.Second},
 			},
 			expected: 10 * time.Second,
 		},
@@ -59,6 +60,7 @@ func newTestCases() []*testCase {
 			servers:     mockedServers,
 			responses: []queryResponse{
 				{Offset: 10 * time.Second},
+				{Offset: 20 * time.Second},
 				{Offset: 20 * time.Second},
 				{Offset: 30 * time.Second},
 			},
@@ -80,6 +82,7 @@ func newTestCases() []*testCase {
 				{Offset: 10 * time.Second},
 				{Error: errors.New("test")},
 				{Offset: 30 * time.Second},
+				{Offset: 30 * time.Second},
 			},
 			expected:    time.Duration(0),
 			expectError: true,
@@ -90,6 +93,7 @@ func newTestCases() []*testCase {
 			responses: []queryResponse{
 				{Error: errors.New("test 1")},
 				{Error: errors.New("test 2")},
+				{Error: errors.New("test 3")},
 				{Error: errors.New("test 3")},
 			},
 			expected:    time.Duration(0),
@@ -102,6 +106,7 @@ func newTestCases() []*testCase {
 			responses: []queryResponse{
 				{Offset: 10 * time.Second},
 				{Error: errors.New("test")},
+				{Offset: 20 * time.Second},
 				{Offset: 30 * time.Second},
 			},
 			expected: 20 * time.Second,
@@ -114,6 +119,7 @@ func newTestCases() []*testCase {
 				{Offset: 10 * time.Second},
 				{Error: errors.New("test")},
 				{Error: errors.New("test")},
+				{Error: errors.New("test")},
 			},
 			expected:    time.Duration(0),
 			expectError: true,
@@ -121,14 +127,27 @@ func newTestCases() []*testCase {
 		{
 			description:     "AllFailed",
 			servers:         mockedServers,
-			allowedFailures: 3,
+			allowedFailures: 4,
 			responses: []queryResponse{
+				{Error: errors.New("test")},
 				{Error: errors.New("test")},
 				{Error: errors.New("test")},
 				{Error: errors.New("test")},
 			},
 			expected:    time.Duration(0),
 			expectError: true,
+		},
+		{
+			description:     "HalfTolerable",
+			servers:         mockedServers,
+			allowedFailures: 2,
+			responses: []queryResponse{
+				{Offset: 10 * time.Second},
+				{Offset: 20 * time.Second},
+				{Error: errors.New("test")},
+				{Error: errors.New("test")},
+			},
+			expected: 15 * time.Second,
 		},
 	}
 }
