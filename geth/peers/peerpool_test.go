@@ -133,7 +133,9 @@ func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailover() {
 		topic: params.NewLimits(1, 1), // limits are chosen for simplicity of the simulation
 	}
 	peerPoolOpts := &Options{100 * time.Millisecond, 100 * time.Millisecond, 0, true}
-	peerPool := NewPeerPool(config, newInMemoryCache(), peerPoolOpts)
+	cache, err := newInMemoryCache()
+	s.Require().NoError(err)
+	peerPool := NewPeerPool(config, cache, peerPoolOpts)
 	register := NewRegister(topic)
 	s.Require().NoError(register.Start(s.peers[0]))
 	// need to wait for topic to get registered, discv5 can query same node

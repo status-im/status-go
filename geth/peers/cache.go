@@ -15,9 +15,12 @@ func NewCache(db *leveldb.DB) *Cache {
 }
 
 // newInMemoryCache creates a cache for tests
-func newInMemoryCache() *Cache {
-	memdb, _ := leveldb.Open(storage.NewMemStorage(), nil)
-	return NewCache(memdb)
+func newInMemoryCache() (*Cache, error) {
+	memdb, err := leveldb.Open(storage.NewMemStorage(), nil)
+	if err != nil {
+		return nil, err
+	}
+	return NewCache(memdb), nil
 }
 
 // Cache maintains list of peers that were discovered.

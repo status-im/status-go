@@ -39,7 +39,9 @@ func (s *TopicPoolSuite) SetupTest() {
 	s.Require().NoError(s.peer.Start())
 	topic := discv5.Topic("cap=cap1")
 	limits := params.NewLimits(1, 2)
-	s.topicPool = NewTopicPool(topic, limits, 100*time.Millisecond, 200*time.Millisecond, newInMemoryCache())
+	cache, err := newInMemoryCache()
+	s.Require().NoError(err)
+	s.topicPool = NewTopicPool(topic, limits, 100*time.Millisecond, 200*time.Millisecond, cache)
 	s.topicPool.running = 1
 	// This is a buffered channel to simplify testing.
 	// If your test generates more than 10 mode changes,
