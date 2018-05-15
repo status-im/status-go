@@ -59,7 +59,7 @@ func (e multiRPCError) Error() string {
 func computeOffset(timeQuery ntpQuery, servers []string, allowedFailures int) (time.Duration, error) {
 	responses := make(chan queryResponse, len(servers))
 	for _, server := range servers {
-		go func() {
+		go func(server string) {
 			response, err := timeQuery(server, ntp.QueryOptions{
 				Timeout: DefaultRPCTimeout,
 			})
@@ -68,7 +68,7 @@ func computeOffset(timeQuery ntpQuery, servers []string, allowedFailures int) (t
 				return
 			}
 			responses <- queryResponse{Offset: response.ClockOffset}
-		}()
+		}(server)
 	}
 	var (
 		rpcErrors multiRPCError
