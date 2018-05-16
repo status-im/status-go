@@ -11,10 +11,10 @@ We try to minimize number and amount of changes in those patches as much as poss
 
 Instructions for creating a patch from the command line:
 
-1. Enter the command line at the go-ethereum dependency root in vendor folder.
-1. Create the patch:
-    1. If you already have a commit that represents the change, find its SHA1 (e.g. `$COMMIT_SHA1`) and do `git diff $COMMIT_SHA1 > file.patch`
-    1. If the files are staged, do `git diff --cached > file.patch`
+1. Do changes in `vendor/github.com/ethereum/go-ethereum/`,
+1. Go to the root `stsatus-go` directory,
+1. Create a patch `git diff --relative=vendor/github.com/ethereum/go-ethereum > _assets/patches/geth/0000-name-of-the-patch.patch`
+1. Commit changes.
 
 # Updating patches
 
