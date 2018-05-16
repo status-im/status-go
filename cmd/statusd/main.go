@@ -93,6 +93,11 @@ func main() {
 
 	flag.Usage = printUsage
 	flag.Parse()
+	if flag.NArg() > 0 {
+		stdlog.Printf("Extra args in command line: %v", flag.Args())
+		printUsage()
+		os.Exit(1)
+	}
 
 	config, err := makeNodeConfig()
 	if err != nil {
