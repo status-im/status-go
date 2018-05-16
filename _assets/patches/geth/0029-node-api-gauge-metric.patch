@@ -1,0 +1,28 @@
+diff --git a/node/api.go b/node/api.go
+index a3b8bc0b..a151147c 100644
+--- a/node/api.go
++++ b/node/api.go
+@@ -313,6 +313,11 @@ func (api *PublicDebugAPI) Metrics(raw bool) (map[string]interface{}, error) {
+ 					"Overall": float64(metric.Count()),
+ 				}
+ 
++			case metrics.Gauge:
++				root[name] = map[string]interface{}{
++					"Value": float64(metric.Value()),
++				}
++
+ 			case metrics.Meter:
+ 				root[name] = map[string]interface{}{
+ 					"AvgRate01Min": metric.Rate1(),
+@@ -348,6 +353,11 @@ func (api *PublicDebugAPI) Metrics(raw bool) (map[string]interface{}, error) {
+ 					"Overall": float64(metric.Count()),
+ 				}
+ 
++			case metrics.Gauge:
++				root[name] = map[string]interface{}{
++					"Value": float64(metric.Value()),
++				}
++
+ 			case metrics.Meter:
+ 				root[name] = map[string]interface{}{
+ 					"Avg01Min": format(metric.Rate1()*60, metric.Rate1()),
