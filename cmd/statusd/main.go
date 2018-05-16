@@ -6,7 +6,6 @@ import (
 	"flag"
 	"fmt"
 	stdlog "log"
-	"net/http"
 	"os"
 	"os/signal"
 	"runtime"
@@ -21,7 +20,6 @@ import (
 	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
-	"github.com/status-im/status-go/metrics"
 	nodemetrics "github.com/status-im/status-go/metrics/node"
 	"github.com/status-im/status-go/profiling"
 )
@@ -59,12 +57,8 @@ var (
 	bootnodes  = flag.String("bootnodes", "", "A list of bootnodes separated by comma")
 	discovery  = flag.Bool("discovery", false, "Enable discovery protocol")
 
-	// stats
-	statsEnabled = flag.Bool("stats", false, "Expose node stats via /debug/vars expvar endpoint or Prometheus")
-	statsAddr    = flag.String("stats.addr", "0.0.0.0:8080", "HTTP address with /debug/vars endpoint")
-
 	// don't change the name of this flag, https://github.com/ethereum/go-ethereum/blob/master/metrics/metrics.go#L41
-	_ = flag.Bool("metrics", false, "Expose ethereum metrics with debug_metrics jsonrpc call.")
+	metrics = flag.Bool("metrics", false, "Expose ethereum metrics with debug_metrics jsonrpc call.")
 	// shh stuff
 	passwordFile = flag.String("shh.passwordfile", "", "Password file (password is used for symmetric encryption)")
 	minPow       = flag.Float64("shh.pow", params.WhisperMinimumPoW, "PoW for messages to be added to queue, in float format")
@@ -133,8 +127,8 @@ func main() {
 	}
 
 	// Run stats server.
-	if *statsEnabled {
-		go startCollectingStats(interruptCh, backend.StatusNode())
+	if *metrics {
+		go startCollectingNodeMetrics(interruptCh, backend.StatusNode())
 	}
 
 	// Sync blockchain and stop.
@@ -166,9 +160,8 @@ func startDebug(backend *api.StatusBackend) error {
 }
 
 // startCollectingStats collects various stats about the node and other protocols like Whisper.
-func startCollectingStats(interruptCh <-chan struct{}, statusNode *node.StatusNode) {
-
-	logger.Info("Starting stats", "stats", *statsAddr)
+func startCollectingNodeMetrics(interruptCh <-chan struct{}, statusNode *node.StatusNode) {
+	logger.Info("Starting collecting node metrics")
 
 	node := statusNode.GethNode()
 	if node == nil {
@@ -181,33 +174,6 @@ func startCollectingStats(interruptCh <-chan struct{}, statusNode *node.StatusNo
 	go func() {
 		if err := nodemetrics.SubscribeServerEvents(ctx, node); err != nil {
 			logger.Error("Failed to subscribe server events", "error", err)
-		}
-	}()
-
-	server := metrics.NewMetricsServer(*statsAddr)
-	defer func() {
-		// server may be nil if `-stats` flag is used
-		// but the binary is compiled without metrics enabled
-		if server == nil {
-			return
-		}
-
-		if err := server.Shutdown(context.TODO()); err != nil {
-			logger.Error("Failed to shutdown metrics server", "error", err)
-		}
-	}()
-	go func() {
-		// server may be nil if `-stats` flag is used
-		// but the binary is compiled without metrics enabled
-		if server == nil {
-			return
-		}
-
-		err := server.ListenAndServe()
-		switch err {
-		case http.ErrServerClosed:
-		default:
-			logger.Error("Metrics server failed", "error", err)
 		}
 	}()
 
