@@ -12,7 +12,7 @@ We try to minimize number and amount of changes in those patches as much as poss
 Instructions for creating a patch from the command line:
 
 1. Do changes in `vendor/github.com/ethereum/go-ethereum/`,
-1. Go to the root `stsatus-go` directory,
+1. Go to the root `status-go` directory,
 1. Create a patch `git diff --relative=vendor/github.com/ethereum/go-ethereum > _assets/patches/geth/0000-name-of-the-patch.patch`
 1. Commit changes.
 
