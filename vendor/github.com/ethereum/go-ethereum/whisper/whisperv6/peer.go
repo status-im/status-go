@@ -188,7 +188,7 @@ func (peer *Peer) expire() {
 // ones over the network.
 func (peer *Peer) broadcast() error {
 	if peer.peer.IsFlaky() {
-		log.Debug("Waiting for a peer to restore communication", "ID", peer.peer.ID())
+		log.Trace("Waiting for a peer to restore communication", "ID", peer.peer.ID())
 		return nil
 	}
 	envelopes := peer.host.Envelopes()
