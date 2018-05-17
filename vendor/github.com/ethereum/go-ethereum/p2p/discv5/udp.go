@@ -32,7 +32,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
-const Version = 4
+const Version = 5
 
 // Errors
 var (
