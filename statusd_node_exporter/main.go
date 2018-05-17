@@ -41,7 +41,7 @@ func requiredFlag(f string) {
 	usage()
 }
 
-func init() {
+func parseFlags() {
 	flag.Var(&filters, "filter", "regular expression, can be used multiple times")
 	flag.Parse()
 
@@ -56,6 +56,7 @@ func init() {
 }
 
 func main() {
+	parseFlags()
 	c, err := newCollector(*ipcPath, filters)
 	if err != nil {
 		log.Fatal(err)

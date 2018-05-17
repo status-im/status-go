@@ -1,5 +1,7 @@
 # statusd_node_exporter
 
+The `statusd_node_exporter` can be use to expose metrics consumed by [Prometheus](https://github.com/prometheus/prometheus).
+
 ## Usage
 
 ```

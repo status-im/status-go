@@ -2,22 +2,13 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"regexp"
 )
 
 type collector struct {
-	c       *client
-	filters []*regexp.Regexp
-}
-
-func compileFilters(rawFilters []string) []*regexp.Regexp {
-	var filters []*regexp.Regexp
-	for _, raw := range rawFilters {
-		s := fmt.Sprintf("^%s", raw)
-		filters = append(filters, regexp.MustCompile(s))
-	}
-
-	return filters
+	c  *client
+	fs []*regexp.Regexp
 }
 
 func newCollector(ipcPath string, rawFilters []string) (*collector, error) {
@@ -26,13 +17,23 @@ func newCollector(ipcPath string, rawFilters []string) (*collector, error) {
 		return nil, err
 	}
 
-	filters := compileFilters(rawFilters)
-	collector := &collector{
-		c:       c,
-		filters: filters,
-	}
+	collector := &collector{c: c}
+	collector.compileFilters(rawFilters)
 
 	return collector, nil
+}
+
+func (c *collector) compileFilters(rawFilters []string) {
+	for _, raw := range rawFilters {
+		s := fmt.Sprintf("^%s", raw)
+		f, err := regexp.Compile(s)
+		if err != nil {
+			log.Printf("error adding filter %s, %v", s, err)
+			continue
+		}
+
+		c.fs = append(c.fs, f)
+	}
 }
 
 func (c *collector) collect() (string, error) {
@@ -53,11 +54,11 @@ func (c *collector) collect() (string, error) {
 }
 
 func (c *collector) match(key string) bool {
-	if len(c.filters) == 0 {
+	if len(c.fs) == 0 {
 		return true
 	}
 
-	for _, filter := range c.filters {
+	for _, filter := range c.fs {
 		if filter.MatchString(key) {
 			return true
 		}
