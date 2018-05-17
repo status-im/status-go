@@ -15,7 +15,7 @@ func (fm flatMetrics) String() string {
 	var s string
 	keys := make([]string, 0)
 
-	for k, _ := range fm {
+	for k := range fm {
 		keys = append(keys, k)
 	}
 

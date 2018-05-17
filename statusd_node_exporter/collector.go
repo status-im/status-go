@@ -44,7 +44,7 @@ func (c *collector) collect() (string, error) {
 
 	all := transformMetrics(m)
 
-	for k, _ := range all {
+	for k := range all {
 		if !c.match(k) {
 			delete(all, k)
 		}
