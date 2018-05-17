@@ -24,6 +24,7 @@ networkid ?= StatusChain
 gotest_extraflags =
 
 DOCKER_IMAGE_NAME ?= statusteam/status-go
+BOOTNODE_IMAGE_NAME ?= statusteam/bootnode
 
 DOCKER_TEST_WORKDIR = /go/src/github.com/status-im/status-go/
 DOCKER_TEST_IMAGE = golang:1.10
@@ -55,6 +56,10 @@ statusgo: ##@build Build status-go as statusd server
 	go build -i -o $(GOBIN)/statusd -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/statusd
 	@echo "Compilation done."
 	@echo "Run \"build/bin/statusd -h\" to view available commands."
+
+bootnode: ##@build Build discovery v5 bootnode using status-go deps
+	go build -i -o $(GOBIN)/bootnode -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/bootnode/
+	@echo "Compilation done."
 
 statusgo-cross: statusgo-android statusgo-ios
 	@echo "Full cross compilation done."
@@ -89,6 +94,10 @@ docker-image: BUILD_TAGS ?= metrics prometheus
 docker-image: ##@docker Build docker image (use DOCKER_IMAGE_NAME to set the image name)
 	@echo "Building docker image..."
 	docker build --file _assets/build/Dockerfile --build-arg "build_tags=$(BUILD_TAGS)" . -t $(DOCKER_IMAGE_NAME):latest
+
+bootnode-image:
+	@echo "Building docker image for bootnode..."
+	docker build --file _assets/build/Bootfile . -t $(BOOTNODE_IMAGE_NAME):latest
 
 docker-image-tag: ##@docker Tag DOCKER_IMAGE_NAME:latest with a tag following pattern $GIT_SHA[:8]-$BUILD_TAGS
 	@echo "Tagging docker image..."

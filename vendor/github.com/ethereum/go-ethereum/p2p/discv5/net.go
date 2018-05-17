@@ -40,7 +40,7 @@ var (
 
 const (
 	autoRefreshInterval   = 1 * time.Hour
-	bucketRefreshInterval = 1 * time.Minute
+	bucketRefreshInterval = 10 * time.Second
 	seedCount             = 30
 	seedMaxAge            = 5 * 24 * time.Hour
 	lowPort               = 1024
