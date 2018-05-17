@@ -18,8 +18,9 @@ package mailserver
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
-	"sync"
+
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -36,7 +37,12 @@ const (
 	maxQueryRange = 24 * time.Hour
 )
 
-// WMailServer whisper mailserver
+var (
+	errDirectoryNotProvided = errors.New("data directory not provided")
+	errPasswordNotProvided  = errors.New("password is not specified")
+)
+
+// WMailServer whisper mailserver.
 type WMailServer struct {
 	db    *leveldb.DB
 	w     *whisper.Whisper
@@ -46,14 +52,14 @@ type WMailServer struct {
 	tick  *ticker
 }
 
-// DBKey key to be stored on db
+// DBKey key to be stored on db.
 type DBKey struct {
 	timestamp uint32
 	hash      common.Hash
 	raw       []byte
 }
 
-// NewDbKey creates a new DBKey with the given values
+// NewDbKey creates a new DBKey with the given values.
 func NewDbKey(t uint32, h common.Hash) *DBKey {
 	const sz = common.HashLength + 4
 	var k DBKey
@@ -65,16 +71,16 @@ func NewDbKey(t uint32, h common.Hash) *DBKey {
 	return &k
 }
 
-// Init initializes mailServer
+// Init initializes mailServer.
 func (s *WMailServer) Init(shh *whisper.Whisper, config *params.WhisperConfig) error {
 	var err error
 
 	if len(config.DataDir) == 0 {
-		return fmt.Errorf("data directory not provided")
+		return errDirectoryNotProvided
 	}
 
 	if len(config.Password) == 0 {
-		return fmt.Errorf("password is not specified")
+		return errPasswordNotProvided
 	}
 
 	s.db, err = leveldb.OpenFile(config.DataDir, nil)
@@ -85,34 +91,50 @@ func (s *WMailServer) Init(shh *whisper.Whisper, config *params.WhisperConfig) e
 	s.w = shh
 	s.pow = config.MinimumPoW
 
+	if err := s.setupWhisperIdentity(config); err != nil {
+		return err
+	}
+	s.setupLimiter(time.Duration(config.MailServerRateLimit) * time.Second)
+
+	return nil
+}
+
+// setupLimiter in case limit is bigger than 0 it will setup an automated
+// limit db cleanup.
+func (s *WMailServer) setupLimiter(rateLimit time.Duration) {
+	limit := rateLimit * time.Second
+	if limit > 0 {
+		s.limit = newLimiter(limit)
+		s.setupMailServerCleanup(limit)
+	}
+}
+
+// setupWhisperIdentity setup the whisper identity (symkey) for the current mail
+// server.
+func (s *WMailServer) setupWhisperIdentity(config *params.WhisperConfig) error {
 	MailServerKeyID, err := s.w.AddSymKeyFromPassword(config.Password)
 	if err != nil {
 		return fmt.Errorf("create symmetric key: %s", err)
 	}
+
 	s.key, err = s.w.GetSymKey(MailServerKeyID)
 	if err != nil {
 		return fmt.Errorf("save symmetric key: %s", err)
-	}
-	limit := time.Duration(config.MailServerRateLimit) * time.Second
-	if limit > 0 {
-		s.limit = newLimiter(limit)
-		s.setupMailServerCleanup(limit)
 	}
 
 	return nil
 }
 
+// setupMailServerCleanup periodically runs an expired entries deleteion for
+// stored limits.
 func (s *WMailServer) setupMailServerCleanup(period time.Duration) {
-	if period <= 0 {
-		return
-	}
 	if s.tick == nil {
 		s.tick = &ticker{}
 	}
 	go s.tick.run(period, s.limit.deleteExpired)
 }
 
-// Close the mailserver and its associated db connection
+// Close the mailserver and its associated db connection.
 func (s *WMailServer) Close() {
 	if s.db != nil {
 		if err := s.db.Close(); err != nil {
@@ -124,41 +146,47 @@ func (s *WMailServer) Close() {
 	}
 }
 
-// Archive a whisper envelope
+// Archive a whisper envelope.
 func (s *WMailServer) Archive(env *whisper.Envelope) {
 	key := NewDbKey(env.Expiry-env.TTL, env.Hash())
 	rawEnvelope, err := rlp.EncodeToBytes(env)
 	if err != nil {
 		log.Error(fmt.Sprintf("rlp.EncodeToBytes failed: %s", err))
 	} else {
-		err = s.db.Put(key.raw, rawEnvelope, nil)
-		if err != nil {
+		if err = s.db.Put(key.raw, rawEnvelope, nil); err != nil {
 			log.Error(fmt.Sprintf("Writing to DB failed: %s", err))
 		}
 	}
 }
 
-// DeliverMail sends mail to specified whisper peer
+// DeliverMail sends mail to specified whisper peer.
 func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope) {
 	if peer == nil {
 		log.Error("Whisper peer is nil")
 		return
 	}
+	s.managePeerLimits(peer.ID())
+
+	if ok, lower, upper, bloom := s.validateRequest(peer.ID(), request); ok {
+		s.processRequest(peer, lower, upper, bloom)
+	}
+}
+
+// managePeerLimits in case limit its been setup on the current server and limit
+// allows the query, it will store/update new query time for the current peer.
+func (s *WMailServer) managePeerLimits(peer []byte) {
 	if s.limit != nil {
-		peerID := string(peer.ID())
+		peerID := string(peer)
 		if !s.limit.isAllowed(peerID) {
 			log.Info("peerID exceeded the number of requests per second")
 			return
 		}
 		s.limit.add(peerID)
 	}
-
-	ok, lower, upper, bloom := s.validateRequest(peer.ID(), request)
-	if ok {
-		s.processRequest(peer, lower, upper, bloom)
-	}
 }
 
+// processRequest processes the current request and re-sends all stored messages
+// accomplishing lower and upper limits.
 func (s *WMailServer) processRequest(peer *whisper.Peer, lower, upper uint32, bloom []byte) []*whisper.Envelope {
 	ret := make([]*whisper.Envelope, 0)
 	var err error
@@ -197,6 +225,7 @@ func (s *WMailServer) processRequest(peer *whisper.Peer, lower, upper uint32, bl
 	return ret
 }
 
+// validateRequest runs different validations on the current request.
 func (s *WMailServer) validateRequest(peerID []byte, request *whisper.Envelope) (bool, uint32, uint32, []byte) {
 	if s.pow > 0.0 && request.PoW() < s.pow {
 		return false, 0, 0, nil
@@ -209,27 +238,14 @@ func (s *WMailServer) validateRequest(peerID []byte, request *whisper.Envelope) 
 		return false, 0, 0, nil
 	}
 
-	src := crypto.FromECDSAPub(decrypted.Src)
-	if len(src)-len(peerID) == 1 {
-		src = src[1:]
-	}
-
-	// if you want to check the signature, you can do it here. e.g.:
-	// if !bytes.Equal(peerID, src) {
-	if src == nil {
-		log.Warn(fmt.Sprintf("Wrong signature of p2p request"))
+	if err := s.checkMsgSignature(decrypted, peerID); err != nil {
+		log.Warn(err.Error())
 		return false, 0, 0, nil
 	}
 
-	payloadSize := len(decrypted.Payload)
-	bloom := decrypted.Payload[8 : 8+whisper.BloomFilterSize]
-	if payloadSize < 8 {
-		log.Warn(fmt.Sprintf("Undersized p2p request"))
-		return false, 0, 0, nil
-	} else if payloadSize == 8 {
-		bloom = whisper.MakeFullNodeBloom()
-	} else if payloadSize < 8+whisper.BloomFilterSize {
-		log.Warn(fmt.Sprintf("Undersized bloom filter in p2p request"))
+	bloom, err := s.bloomFromReceivedMessage(decrypted)
+	if err != nil {
+		log.Warn(err.Error())
 		return false, 0, 0, nil
 	}
 
@@ -246,46 +262,34 @@ func (s *WMailServer) validateRequest(peerID []byte, request *whisper.Envelope) 
 	return true, lower, upper, bloom
 }
 
-type limiter struct {
-	mu sync.RWMutex
-
-	timeout time.Duration
-	db      map[string]time.Time
-}
-
-func newLimiter(timeout time.Duration) *limiter {
-	return &limiter{
-		timeout: timeout,
-		db:      make(map[string]time.Time),
-	}
-}
-
-func (l *limiter) add(id string) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	l.db[id] = time.Now()
-}
-
-func (l *limiter) isAllowed(id string) bool {
-	l.mu.RLock()
-	defer l.mu.RUnlock()
-
-	if lastRequestTime, ok := l.db[id]; ok {
-		return lastRequestTime.Add(l.timeout).Before(time.Now())
+// checkMsgSignature returns an error in case the message is not correcly signed
+func (s *WMailServer) checkMsgSignature(msg *whisper.ReceivedMessage, id []byte) error {
+	src := crypto.FromECDSAPub(msg.Src)
+	if len(src)-len(id) == 1 {
+		src = src[1:]
 	}
 
-	return true
+	// if you want to check the signature, you can do it here. e.g.:
+	// if !bytes.Equal(peerID, src) {
+	if src == nil {
+		return errors.New("Wrong signature of p2p request")
+	}
+
+	return nil
 }
 
-func (l *limiter) deleteExpired() {
-	l.mu.Lock()
-	defer l.mu.Unlock()
+// bloomFromReceivedMessage gor a given whisper.ReceivedMessage it extracts the
+// used bloom filter
+func (s *WMailServer) bloomFromReceivedMessage(msg *whisper.ReceivedMessage) ([]byte, error) {
+	payloadSize := len(msg.Payload)
 
-	now := time.Now()
-	for id, lastRequestTime := range l.db {
-		if lastRequestTime.Add(l.timeout).Before(now) {
-			delete(l.db, id)
-		}
+	if payloadSize < 8 {
+		return nil, errors.New("Undersized p2p request")
+	} else if payloadSize == 8 {
+		return whisper.MakeFullNodeBloom(), nil
+	} else if payloadSize < 8+whisper.BloomFilterSize {
+		return nil, errors.New("Undersized bloom filter in p2p request")
 	}
+
+	return msg.Payload[8 : 8+whisper.BloomFilterSize], nil
 }
