@@ -19,22 +19,32 @@ package mailserver
 import (
 	"encoding/binary"
 	"fmt"
+	"path/filepath"
+	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
+	"github.com/status-im/status-go/geth/params"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
+const (
+	maxQueryRange = 24 * time.Hour
+)
+
 // WMailServer whisper mailserver
 type WMailServer struct {
-	db  *leveldb.DB
-	w   *whisper.Whisper
-	pow float64
-	key []byte
+	db    *leveldb.DB
+	w     *whisper.Whisper
+	pow   float64
+	key   []byte
+	limit *limiter
+	tick  *ticker
 }
 
 // DBKey key to be stored on db
@@ -57,25 +67,27 @@ func NewDbKey(t uint32, h common.Hash) *DBKey {
 }
 
 // Init initializes mailServer
-func (s *WMailServer) Init(shh *whisper.Whisper, path string, password string, pow float64) error {
+func (s *WMailServer) Init(shh *whisper.Whisper, config *params.WhisperConfig) error {
 	var err error
-	if len(path) == 0 {
-		return fmt.Errorf("DB file is not specified")
+
+	if len(config.DataDir) == 0 {
+		return fmt.Errorf("data directory not provided")
 	}
 
-	if len(password) == 0 {
+	path := filepath.Join(config.DataDir, "mailserver", "data")
+	if len(config.Password) == 0 {
 		return fmt.Errorf("password is not specified")
 	}
 
 	s.db, err = leveldb.OpenFile(path, nil)
 	if err != nil {
-		return fmt.Errorf("open DB file: %s", err)
+		return fmt.Errorf("open DB: %s", err)
 	}
 
 	s.w = shh
-	s.pow = pow
+	s.pow = config.MinimumPoW
 
-	MailServerKeyID, err := s.w.AddSymKeyFromPassword(password)
+	MailServerKeyID, err := s.w.AddSymKeyFromPassword(config.Password)
 	if err != nil {
 		return fmt.Errorf("create symmetric key: %s", err)
 	}
@@ -83,17 +95,34 @@ func (s *WMailServer) Init(shh *whisper.Whisper, path string, password string, p
 	if err != nil {
 		return fmt.Errorf("save symmetric key: %s", err)
 	}
+	limit := time.Duration(config.MailServerRateLimit) * time.Second
+	if limit > 0 {
+		s.limit = newLimiter(limit)
+		s.setupMailServerCleanup(limit)
+	}
+
 	return nil
+}
+
+func (s *WMailServer) setupMailServerCleanup(period time.Duration) {
+	if period <= 0 {
+		return
+	}
+	if s.tick == nil {
+		s.tick = &ticker{}
+	}
+	go s.tick.run(period, s.limit.deleteExpired)
 }
 
 // Close the mailserver and its associated db connection
 func (s *WMailServer) Close() {
 	if s.db != nil {
-		func() {
-			if err := s.db.Close(); err != nil {
-				log.Error(fmt.Sprintf("s.db.Close failed: %s", err))
-			}
-		}()
+		if err := s.db.Close(); err != nil {
+			log.Error(fmt.Sprintf("s.db.Close failed: %s", err))
+		}
+	}
+	if s.tick != nil {
+		s.tick.stop()
 	}
 }
 
@@ -116,6 +145,14 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 	if peer == nil {
 		log.Error("Whisper peer is nil")
 		return
+	}
+	if s.limit != nil {
+		peerID := string(peer.ID())
+		if !s.limit.isAllowed(peerID) {
+			log.Info("peerID exceeded the number of requests per second")
+			return
+		}
+		s.limit.add(peerID)
 	}
 
 	ok, lower, upper, bloom := s.validateRequest(peer.ID(), request)
@@ -200,5 +237,57 @@ func (s *WMailServer) validateRequest(peerID []byte, request *whisper.Envelope) 
 
 	lower := binary.BigEndian.Uint32(decrypted.Payload[:4])
 	upper := binary.BigEndian.Uint32(decrypted.Payload[4:8])
+
+	lowerTime := time.Unix(int64(lower), 0)
+	upperTime := time.Unix(int64(upper), 0)
+	if upperTime.Sub(lowerTime) > maxQueryRange {
+		log.Warn(fmt.Sprintf("Query range too big for peer %s", string(peerID)))
+		return false, 0, 0, nil
+	}
+
 	return true, lower, upper, bloom
+}
+
+type limiter struct {
+	mu sync.RWMutex
+
+	timeout time.Duration
+	db      map[string]time.Time
+}
+
+func newLimiter(timeout time.Duration) *limiter {
+	return &limiter{
+		timeout: timeout,
+		db:      make(map[string]time.Time),
+	}
+}
+
+func (l *limiter) add(id string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	l.db[id] = time.Now()
+}
+
+func (l *limiter) isAllowed(id string) bool {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+
+	if lastRequestTime, ok := l.db[id]; ok {
+		return lastRequestTime.Add(l.timeout).Before(time.Now())
+	}
+
+	return true
+}
+
+func (l *limiter) deleteExpired() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	now := time.Now()
+	for id, lastRequestTime := range l.db {
+		if lastRequestTime.Add(l.timeout).Before(now) {
+			delete(l.db, id)
+		}
+	}
 }
