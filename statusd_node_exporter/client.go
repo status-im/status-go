@@ -19,10 +19,5 @@ func newClient(ipcPath string) (*client, error) {
 
 func (c *client) metrics() (metrics, error) {
 	var res metrics
-	err := c.rpcClient.Call(&res, "debug_metrics", true)
-	if err != nil {
-		return res, err
-	}
-
-	return res, nil
+	return res, c.rpcClient.Call(&res, "debug_metrics", true)
 }
