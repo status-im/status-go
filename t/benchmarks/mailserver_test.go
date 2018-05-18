@@ -19,12 +19,15 @@ import (
 
 const (
 	mailServerRawURL = "enode://767808076b264cda39fb28156e1c6b92d3d527be41a5af8cd24c809f44137fadd4b9e4397f6a1e621582ce7b951d85a9ff8e7c53aca52168df696f9436b9dadc@127.0.0.1:30303"
+	messagesCount    = 1000           // number of messages to send to Mail Server first
+	messagePassword  = "message-pass" // password to decrypt a message
+	numberOfPeers    = 10             // number of peers requesting messages concurrently
 )
 
 var (
-	mailServerEnode     = discover.MustParseNode(mailServerRawURL)
-	payload             = make([]byte, whisper.DefaultMaxMessageSize/1024/8)
-	sentMessagesCounter = 1000
+	mailServerEnode = discover.MustParseNode(mailServerRawURL)
+	payload         = make([]byte, whisper.DefaultMaxMessageSize/1024/8)
+	topic           = whisper.TopicType{0x01, 0x02, 0x03, 0x04}
 )
 
 func init() {
@@ -32,33 +35,42 @@ func init() {
 }
 
 func TestConcurrentMailserverPeers(t *testing.T) {
-	// sent Whisper messages first
+	testSendingMessages(t)
+
+	// Request for messages from mail server
+	for i := 0; i < numberOfPeers; i++ {
+		t.Run(fmt.Sprintf("Peer #%d", i), testMailserverPeer)
+	}
+}
+
+func testSendingMessages(t *testing.T) {
+	shhService := createWhisperService()
+	shhAPI := whisper.NewPublicWhisperAPI(shhService)
+
+	// create node with services
 	n, err := createNode()
 	require.NoError(t, err)
-
-	shhService := createWhisperService()
-
 	err = n.Register(func(ctx *node.ServiceContext) (node.Service, error) {
 		return shhService, nil
 	})
 	require.NoError(t, err)
 
-	// start node and add mail server as peer
+	// start node
 	require.NoError(t, n.Start())
+
+	// add mail server as a peer
 	require.NoError(t, addPeerWithConfirmation(n.Server(), mailServerEnode))
 	// wait until peer is handled by Whisper service
 	time.Sleep(time.Second)
 
-	symKeyID, err := shhService.AddSymKeyFromPassword("message-pass")
+	symKeyID, err := shhService.AddSymKeyFromPassword(messagePassword)
 	require.NoError(t, err)
 
-	shhAPI := whisper.NewPublicWhisperAPI(shhService)
-
-	for i := 0; i < sentMessagesCounter; i++ {
+	for i := 0; i < messagesCount; i++ {
 		_, err := shhAPI.Post(nil, whisper.NewMessage{
 			SymKeyID:  symKeyID,
 			TTL:       30,
-			Topic:     whisper.TopicType{0x01, 0x02, 0x03, 0x04},
+			Topic:     topic,
 			Payload:   payload,
 			PowTime:   10,
 			PowTarget: 0.005,
@@ -69,104 +81,61 @@ func TestConcurrentMailserverPeers(t *testing.T) {
 	// wait untill Whisper messages are propagated
 	time.Sleep(time.Second * 5)
 	require.NoError(t, n.Stop())
-
-	// Request for messages from mail server
-	for i := 0; i < 10; i++ {
-		t.Run(fmt.Sprintf("Peer #%d", i), testMailserverPeer)
-	}
 }
 
 func testMailserverPeer(t *testing.T) {
 	t.Parallel()
 
+	shhService := createWhisperService()
+	shhAPI := whisper.NewPublicWhisperAPI(shhService)
+	mailService := shhext.New(shhService, nil, nil)
+	shhextAPI := shhext.NewPublicAPI(mailService)
+
+	// create node with services
 	n, err := createNode()
 	require.NoError(t, err)
-
-	shhService := createWhisperService()
-
 	err = n.Register(func(ctx *node.ServiceContext) (node.Service, error) {
 		return shhService, nil
 	})
 	require.NoError(t, err)
-
-	mailService := shhext.New(shhService, nil, nil)
-
+	// register mail service as well
 	err = n.Register(func(_ *node.ServiceContext) (node.Service, error) {
 		return mailService, nil
 	})
 	require.NoError(t, err)
 
+	// start node
 	require.NoError(t, n.Start())
 	defer func() { require.NoError(t, n.Stop()) }()
 
-	server := n.Server()
+	// add mail server as a peer
+	require.NoError(t, addPeerWithConfirmation(n.Server(), mailServerEnode))
 
-	ch := make(chan *p2p.PeerEvent, server.MaxPeers)
-	subscription := n.Server().SubscribeEvents(ch)
-	defer subscription.Unsubscribe()
-
-	server.AddPeer(mailServerEnode)
-
-	select {
-	case ev := <-ch:
-		// t.Logf("received event: %+v", ev)
-		if ev.Type == p2p.PeerEventTypeAdd && ev.Peer == mailServerEnode.ID {
-			break
-		} else {
-			t.Errorf("got unexpected event: %+v", ev)
-		}
-	}
-
-	symKeyID, err := shhService.AddSymKeyFromPassword("status-offline-inbox")
+	// sym key to decrypt messages
+	msgSymKeyID, err := shhService.AddSymKeyFromPassword(messagePassword)
 	require.NoError(t, err)
 
-	err = shhService.AllowP2PMessagesFromPeer(mailServerEnode.ID[:])
-	require.NoError(t, err)
-
-	shhAPI := whisper.NewPublicWhisperAPI(shhService)
-
-	ok, err := shhAPI.MarkTrustedPeer(nil, mailServerRawURL)
-	require.NoError(t, err)
-	require.True(t, ok)
-
-	msgSymKeyID, err := shhService.AddSymKeyFromPassword("message-pass")
-	require.NoError(t, err)
-
+	// load messages to cache
 	filterID, err := shhAPI.NewMessageFilter(whisper.Criteria{
 		SymKeyID: msgSymKeyID,
-		Topics:   []whisper.TopicType{whisper.TopicType{0x01, 0x02, 0x03, 0x04}},
+		Topics:   []whisper.TopicType{topic},
 	})
 	require.NoError(t, err)
 	messages, err := shhAPI.GetFilterMessages(filterID)
 	require.NoError(t, err)
 	require.Len(t, messages, 0)
+	// wait for messages
+	require.NoError(t, waitForMessages(messagesCount, shhAPI, filterID))
 
-	shhextAPI := shhext.NewPublicAPI(mailService)
-
-	counter := 0
-FOR_LOOP:
-	for {
-		select {
-		case <-time.After(time.Second):
-			messages, err := shhAPI.GetFilterMessages(filterID)
-			require.NoError(t, err)
-
-			fmt.Println("received messages", len(messages))
-
-			counter += len(messages)
-			if counter >= sentMessagesCounter {
-				break FOR_LOOP
-			}
-		}
-	}
-
-	ok, err = shhAPI.DeleteMessageFilter(filterID)
+	// clean up old filter
+	ok, err := shhAPI.DeleteMessageFilter(filterID)
 	require.NoError(t, err)
 	require.True(t, ok)
 
+	// prepare new filter for messages from mail server
 	filterID, err = shhAPI.NewMessageFilter(whisper.Criteria{
 		SymKeyID: msgSymKeyID,
-		Topics:   []whisper.TopicType{whisper.TopicType{0x01, 0x02, 0x03, 0x04}},
+		Topics:   []whisper.TopicType{topic},
 		AllowP2P: true,
 	})
 	require.NoError(t, err)
@@ -174,6 +143,12 @@ FOR_LOOP:
 	require.NoError(t, err)
 	require.Len(t, messages, 0)
 
+	// request messages from mail server
+	symKeyID, err := shhService.AddSymKeyFromPassword("status-offline-inbox")
+	require.NoError(t, err)
+	ok, err = shhAPI.MarkTrustedPeer(nil, mailServerRawURL)
+	require.NoError(t, err)
+	require.True(t, ok)
 	ok, err = shhextAPI.RequestMessages(nil, shhext.MessagesRequest{
 		MailServerPeer: mailServerRawURL,
 		SymKeyID:       symKeyID,
@@ -181,22 +156,8 @@ FOR_LOOP:
 	})
 	require.NoError(t, err)
 	require.True(t, ok)
-
-	counter = 0
-	for {
-		select {
-		case <-time.After(time.Second):
-			messages, err := shhAPI.GetFilterMessages(filterID)
-			require.NoError(t, err)
-
-			fmt.Println("received messages #2", len(messages))
-
-			counter += len(messages)
-			if counter >= sentMessagesCounter {
-				return
-			}
-		}
-	}
+	// wait for all messages
+	require.NoError(t, waitForMessages(messagesCount, shhAPI, filterID))
 }
 
 func createNode() (*node.Node, error) {
@@ -240,5 +201,24 @@ func addPeerWithConfirmation(server *p2p.Server, node *discover.Node) error {
 		}
 
 		return fmt.Errorf("got unexpected event: %+v", ev)
+	}
+}
+
+func waitForMessages(messagesCount int, shhAPI *whisper.PublicWhisperAPI, filterID string) error {
+	received := 0
+
+	for {
+		select {
+		case <-time.After(time.Second):
+			messages, err := shhAPI.GetFilterMessages(filterID)
+			if err != nil {
+				return err
+			}
+
+			received += len(messages)
+			if received >= messagesCount {
+				return nil
+			}
+		}
 	}
 }
