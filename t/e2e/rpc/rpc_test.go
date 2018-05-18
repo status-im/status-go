@@ -10,6 +10,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/status-im/status-go/geth/api"
 	"github.com/status-im/status-go/geth/node"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/t/e2e"
@@ -137,6 +138,59 @@ func (s *RPCTestSuite) TestCallRawResult() {
 	s.Equal(`{"jsonrpc":"2.0","id":67,"result":"6.0"}`, jsonResult)
 
 	s.NoError(s.StatusNode.Stop())
+}
+
+// TestCallRawExternalWhitelist checks if the whitelist for external
+// RPC requests is excluding methods as expected
+func (s *RPCTestSuite) TestCallRawExternalWhitelist() {
+	backend := api.NewStatusBackend()
+	// Set up nodeConfig so that we can use shh_version
+	// to test a whitelisted namespace
+	nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
+	s.NoError(err)
+
+	err = backend.StartNode(nodeConfig)
+	s.NoError(err)
+	defer func() {
+		s.NoError(backend.StopNode())
+	}()
+
+	type rpcCall struct {
+		inputJSON string
+		validator func(resultJSON string)
+	}
+	var rpcCalls = []rpcCall{
+		{
+			// Test whitelisted method in non-whitelisted namespace
+			`{"jsonrpc":"2.0","method":"personal_sign","params":[],"id":1}`,
+			func(resultJSON string) {
+				expected := `{"jsonrpc":"2.0","id":1,"error":{"code":-32700,"message":"invalid number of parameters for personal_sign (2 or 3 expected)"}}`
+				s.Equal(expected, resultJSON)
+			},
+		},
+		{
+			// Test non-whitelisted method in non-whitelisted namespace
+			`{"jsonrpc":"2.0","method":"personal_importRawKey","params":[],"id":2}`,
+			func(resultJSON string) {
+				expected := `{"jsonrpc":"2.0","id":2,"error":{"code":-32700,"message":"The method personal_importRawKey does not exist/is not available"}}`
+				s.Equal(expected, resultJSON)
+			},
+		},
+		{
+			// Test whitelisted namespace
+			`{"jsonrpc":"2.0","method":"shh_version","params":[],"id":3}`,
+			func(resultJSON string) {
+				expected := `{"jsonrpc":"2.0","id":3,"result":"6.0"}`
+				s.Equal(expected, resultJSON)
+			},
+		},
+	}
+
+	for _, rpcCall := range rpcCalls {
+		// backend.CallRPC uses external=true by default
+		resultJSON := backend.CallRPC(rpcCall.inputJSON)
+		rpcCall.validator(resultJSON)
+	}
 }
 
 // TestCallRawResultGetTransactionReceipt checks if returned response

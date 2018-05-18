@@ -3,13 +3,20 @@ package rpc
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"strings"
 
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
+	"github.com/status-im/status-go/geth/params"
 )
 
+type contextKey string
+
 const (
-	jsonrpcVersion        = "2.0"
-	errInvalidMessageCode = -32700 // from go-ethereum/rpc/errors.go
+	jsonrpcVersion          = "2.0"
+	errInvalidMessageCode   = -32700 // from go-ethereum/rpc/errors.go
+	methodNotFoundErrorCode = -32601 // from go-ethereum/rpc/errors.go:L27
+	externalRPCContextKey   = contextKey("externalRPCRequest")
 )
 
 // for JSON-RPC responses obtained via CallRaw(), we have no way
@@ -20,10 +27,26 @@ const (
 // thus, we will use zero ID as a workaround of this limitation
 var defaultMsgID = json.RawMessage(`0`)
 
+// All methods from the namespaces in this whitelist are
+// allowed in external RPCs
+var externalRPCNamespaceWhitelist = strings.Split(params.APIModules, ",")
+
+// All methods in this whitelist are allowed in external RPCs
+// even if their namespace isn't whitelisted in the
+// externalRPCNamespaceWhitelist above
+var externalRPCMethodWhitelist = []string{
+	"personal_ecRecover",
+	"personal_sign",
+}
+
 // CallRaw performs a JSON-RPC call with already crafted JSON-RPC body. It
 // returns string in JSON format with response (successul or error).
+// The 'body' param is the json rpc request itself and  the
+// 'external' param denotes whether the request is being made internally
+// by status or externally by a dapp.
 func (c *Client) CallRaw(body string, external bool) string {
 	ctx := context.Background()
+	ctx = context.WithValue(ctx, externalRPCContextKey, external)
 	return c.callRawContext(ctx, json.RawMessage(body))
 }
 
@@ -70,7 +93,6 @@ func (c *Client) callRawContext(ctx context.Context, body json.RawMessage) strin
 	if isBatch(body) {
 		return c.callBatchMethods(ctx, body)
 	}
-
 	return c.callSingleMethod(ctx, body)
 }
 
@@ -113,6 +135,12 @@ func (c *Client) callSingleMethod(ctx context.Context, msg json.RawMessage) stri
 	method, params, id, err := methodAndParamsFromBody(msg)
 	if err != nil {
 		return newErrorResponse(errInvalidMessageCode, err, id)
+	}
+
+	// If the req is external, check the whitelist
+	if ctx.Value(externalRPCContextKey) == true && !methodInWhitelist(method) {
+		err = fmt.Errorf("The method %s does not exist/is not available", method)
+		return newErrorResponse(methodNotFoundErrorCode, err, id)
 	}
 
 	// route and execute
@@ -211,6 +239,28 @@ func isBatch(msg json.RawMessage) bool {
 			continue
 		}
 		return c == '['
+	}
+	return false
+}
+
+// methodInWhitelist checks whether or not the method from
+// an external RPC is allowed
+func methodInWhitelist(method string) bool {
+	// Check if the whole namespace is whitelisted
+	methodComponents := strings.Split(method, "_")
+	if len(methodComponents) > 0 {
+		namespace := methodComponents[0]
+		for _, whitelistedNamespace := range externalRPCNamespaceWhitelist {
+			if whitelistedNamespace == namespace {
+				return true
+			}
+		}
+	}
+	// Check if the method itself is whitelisted
+	for _, whitelistedMethod := range externalRPCMethodWhitelist {
+		if whitelistedMethod == method {
+			return true
+		}
 	}
 	return false
 }
