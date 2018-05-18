@@ -113,12 +113,14 @@ func (s *WMailServer) Archive(env *whisper.Envelope) {
 
 // DeliverMail sends mail to specified whisper peer
 func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope) {
+	log.Info("Delivering mail", "peer", peer.ID)
 	if peer == nil {
 		log.Error("Whisper peer is nil")
 		return
 	}
 
 	ok, lower, upper, bloom := s.validateRequest(peer.ID(), request)
+	log.Info("Request validation", "ok", ok, "lower", lower, "upper", upper)
 	if ok {
 		s.processRequest(peer, lower, upper, bloom)
 	}
