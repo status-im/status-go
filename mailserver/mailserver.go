@@ -19,7 +19,6 @@ package mailserver
 import (
 	"encoding/binary"
 	"fmt"
-	"path/filepath"
 	"sync"
 	"time"
 
@@ -74,12 +73,11 @@ func (s *WMailServer) Init(shh *whisper.Whisper, config *params.WhisperConfig) e
 		return fmt.Errorf("data directory not provided")
 	}
 
-	path := filepath.Join(config.DataDir, "mailserver", "data")
 	if len(config.Password) == 0 {
 		return fmt.Errorf("password is not specified")
 	}
 
-	s.db, err = leveldb.OpenFile(path, nil)
+	s.db, err = leveldb.OpenFile(config.DataDir, nil)
 	if err != nil {
 		return fmt.Errorf("open DB: %s", err)
 	}
