@@ -1,0 +1,64 @@
+diff --git c/p2p/discv5/net.go w/p2p/discv5/net.go
+index 9b0bd0c80..d0eae28f9 100644
+--- c/p2p/discv5/net.go
++++ w/p2p/discv5/net.go
+@@ -40,7 +40,7 @@ var (
+ 
+ const (
+ 	autoRefreshInterval   = 1 * time.Hour
+-	bucketRefreshInterval = 1 * time.Minute
++	bucketRefreshInterval = 10 * time.Second
+ 	seedCount             = 30
+ 	seedMaxAge            = 5 * 24 * time.Hour
+ 	lowPort               = 1024
+@@ -1055,7 +1055,11 @@ func (net *Network) handle(n *Node, ev nodeEvent, pkt *ingressPacket) error {
+ func (net *Network) checkPacket(n *Node, ev nodeEvent, pkt *ingressPacket) error {
+ 	// Replay prevention checks.
+ 	switch ev {
+-	case pingPacket, findnodeHashPacket, neighborsPacket:
++	case pingPacket:
++		if pkt.data.(*ping).Version != Version {
++			return fmt.Errorf("version mismatch")
++		}
++	case findnodeHashPacket, neighborsPacket:
+ 		// TODO: check date is > last date seen
+ 		// TODO: check ping version
+ 	case pongPacket:
+diff --git c/p2p/discv5/table.go w/p2p/discv5/table.go
+index c8d234b93..42311e1db 100644
+--- c/p2p/discv5/table.go
++++ w/p2p/discv5/table.go
+@@ -38,7 +38,7 @@ const (
+ 	hashBits   = len(common.Hash{}) * 8
+ 	nBuckets   = hashBits + 1 // Number of buckets
+ 
+-	maxFindnodeFailures = 5
++	maxFindnodeFailures = 1
+ )
+ 
+ type Table struct {
+@@ -177,6 +177,11 @@ func (tab *Table) closest(target common.Hash, nresults int) *nodesByDistance {
+ 	close := &nodesByDistance{target: target}
+ 	for _, b := range tab.buckets {
+ 		for _, n := range b.entries {
++			// node can be in table only in two states
++			// known and contested
++			if n.state != known {
++				continue
++			}
+ 			close.push(n, nresults)
+ 		}
+ 	}
+diff --git c/p2p/discv5/udp.go w/p2p/discv5/udp.go
+index 49e1cb811..0ead22753 100644
+--- c/p2p/discv5/udp.go
++++ w/p2p/discv5/udp.go
+@@ -32,7 +32,7 @@ import (
+ 	"github.com/ethereum/go-ethereum/rlp"
+ )
+ 
+-const Version = 4
++const Version = 55
+ 
+ // Errors
+ var (
