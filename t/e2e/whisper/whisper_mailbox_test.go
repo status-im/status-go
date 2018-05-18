@@ -95,6 +95,7 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	// Act.
 
 	// Request messages (including the previous one, expired) from mailbox.
+	from := senderWhisperService.GetCurrentTime().Add(-12 * time.Hour)
 	reqMessagesBody := `{
 		"jsonrpc": "2.0",
 		"id": 1,
@@ -103,7 +104,7 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 					"mailServerPeer":"` + mailboxPeerStr + `",
 					"topic":"` + topic.String() + `",
 					"symKeyID":"` + MailServerKeyID + `",
-					"from":0,
+					"from":` + strconv.FormatInt(from.Unix(), 10) + `,
 					"to":` + strconv.FormatInt(senderWhisperService.GetCurrentTime().Unix(), 10) + `
 		}]
 	}`
@@ -482,6 +483,7 @@ func (s *WhisperMailboxSuite) addSymKey(rpcCli *rpc.Client, symkey string) strin
 
 // requestHistoricMessages asks a mailnode to resend messages.
 func (s *WhisperMailboxSuite) requestHistoricMessages(w *whisper.Whisper, rpcCli *rpc.Client, mailboxEnode, mailServerKeyID, topic string) {
+	from := w.GetCurrentTime().Add(-12 * time.Hour)
 	resp := rpcCli.CallRaw(`{
 		"jsonrpc": "2.0",
 		"id": 2,
@@ -490,7 +492,7 @@ func (s *WhisperMailboxSuite) requestHistoricMessages(w *whisper.Whisper, rpcCli
 					"mailServerPeer":"` + mailboxEnode + `",
 					"topic":"` + topic + `",
 					"symKeyID":"` + mailServerKeyID + `",
-					"from":0,
+					"from":` + strconv.FormatInt(from.Unix(), 10) + `,
 					"to":` + strconv.FormatInt(w.GetCurrentTime().Unix(), 10) + `
 		}]
 	}`)

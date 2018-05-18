@@ -227,12 +227,7 @@ func activateShhService(stack *node.Node, config *params.NodeConfig, db *leveldb
 
 			var mailServer mailserver.WMailServer
 			whisperService.RegisterServer(&mailServer)
-			err := mailServer.Init(
-				whisperService,
-				config.WhisperConfig.DataDir,
-				config.WhisperConfig.Password,
-				config.WhisperConfig.MinimumPoW,
-			)
+			err := mailServer.Init(whisperService, config.WhisperConfig)
 			if err != nil {
 				return nil, err
 			}

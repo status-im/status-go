@@ -21,16 +21,17 @@ import (
 	"crypto/ecdsa"
 	"encoding/binary"
 	"io/ioutil"
-	"math/rand"
 	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
+	"github.com/status-im/status-go/geth/params"
 )
 
 const powRequirement = 0.00001
+const peerID = "peerID"
 
 var keyID string
 var shh *whisper.Whisper
@@ -38,6 +39,7 @@ var seed = time.Now().Unix()
 
 type ServerTestParams struct {
 	topic whisper.TopicType
+	birth uint32
 	low   uint32
 	upp   uint32
 	key   *ecdsa.PrivateKey
@@ -58,7 +60,40 @@ func TestDBKey(t *testing.T) {
 	assert(byte(i/0x1000000) == k.raw[0], "big endian expected", t)
 }
 
-func generateEnvelope(t *testing.T) *whisper.Envelope {
+func TestMailServer(t *testing.T) {
+	var server WMailServer
+
+	setupServer(t, &server)
+	defer server.Close()
+
+	env := generateEnvelope(t, time.Now())
+	server.Archive(env)
+	deliverTest(t, &server, env)
+}
+
+func TestRateLimits(t *testing.T) {
+	l := newLimiter(time.Duration(5 * time.Millisecond))
+	assert(l.isAllowed(peerID), "Expected limiter not to allow with empty db", t)
+
+	l.db[peerID] = time.Now().Add(time.Duration(-10 * time.Millisecond))
+	assert(l.isAllowed(peerID), "Expected limiter to allow with peer on its db", t)
+
+	l.db[peerID] = time.Now().Add(time.Duration(-1 * time.Millisecond))
+	assert(!l.isAllowed(peerID), "Expected limiter to not allow with peer on its db", t)
+}
+
+func TestRemoveExpiredRateLimits(t *testing.T) {
+	l := newLimiter(time.Duration(10) * time.Second)
+	l.db[peerID] = time.Now().Add(time.Duration(-10) * time.Second)
+	l.db[peerID+"A"] = time.Now().Add(time.Duration(10) * time.Second)
+	l.deleteExpired()
+	_, ok := l.db[peerID]
+	assert(!ok, "Expired peer should not exist, but it does ", t)
+	_, ok = l.db[peerID+"A"]
+	assert(ok, "Non expired peer should exist, but it doesn't", t)
+}
+
+func generateEnvelope(t *testing.T, now time.Time) *whisper.Envelope {
 	h := crypto.Keccak256Hash([]byte("test sample data"))
 	params := &whisper.MessageParams{
 		KeySym:   h[:],
@@ -72,44 +107,14 @@ func generateEnvelope(t *testing.T) *whisper.Envelope {
 	if err != nil {
 		t.Fatalf("failed to create new message with seed %d: %s.", seed, err)
 	}
-	env, err := msg.Wrap(params, time.Now())
+	env, err := msg.Wrap(params, now)
 	if err != nil {
 		t.Fatalf("failed to wrap with seed %d: %s.", seed, err)
 	}
 	return env
 }
 
-func TestMailServer(t *testing.T) {
-	const password = "password_for_this_test"
-	const dbPath = "whisper-server-test"
-
-	dir, err := ioutil.TempDir("", dbPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	var server WMailServer
-	shh = whisper.New(&whisper.DefaultConfig)
-	shh.RegisterServer(&server)
-
-	err = server.Init(shh, dir, password, powRequirement)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer server.Close()
-
-	keyID, err = shh.AddSymKeyFromPassword(password)
-	if err != nil {
-		t.Fatalf("Failed to create symmetric key for mail request: %s", err)
-	}
-
-	rand.Seed(seed)
-	env := generateEnvelope(t)
-	server.Archive(env)
-	deliverTest(t, &server, env)
-}
-
-func deliverTest(t *testing.T, server *WMailServer, env *whisper.Envelope) {
+func serverParams(t *testing.T, env *whisper.Envelope) *ServerTestParams {
 	id, err := shh.NewKeyPair()
 	if err != nil {
 		t.Fatalf("failed to generate new key pair with seed %d: %s.", seed, err)
@@ -119,25 +124,44 @@ func deliverTest(t *testing.T, server *WMailServer, env *whisper.Envelope) {
 		t.Fatalf("failed to retrieve new key pair with seed %d: %s.", seed, err)
 	}
 	birth := env.Expiry - env.TTL
-	p := &ServerTestParams{
+
+	return &ServerTestParams{
 		topic: env.Topic,
+		birth: birth,
 		low:   birth - 1,
 		upp:   birth + 1,
 		key:   testPeerID,
 	}
-
+}
+func deliverTest(t *testing.T, server *WMailServer, env *whisper.Envelope) {
+	p := serverParams(t, env)
 	singleRequest(t, server, env, p, true)
 
-	p.low, p.upp = birth+1, 0xffffffff
+	p.low = p.birth + 1
+	p.upp = p.birth + 1
 	singleRequest(t, server, env, p, false)
 
-	p.low, p.upp = 0, birth-1
-	singleRequest(t, server, env, p, false)
-
-	p.low = birth - 1
-	p.upp = birth + 1
+	p.low = p.birth
+	p.upp = p.birth + 1
 	p.topic[0] = 0xFF
 	singleRequest(t, server, env, p, false)
+
+	p.low = 0
+	p.upp = p.birth - 1
+	failRequest(t, server, p, "validation should fail due to negative query time range")
+
+	p.low = 0
+	p.upp = p.birth + 24
+	failRequest(t, server, p, "validation should fail due to query big time range")
+}
+
+func failRequest(t *testing.T, server *WMailServer, p *ServerTestParams, err string) {
+	request := createRequest(t, p)
+	src := crypto.FromECDSAPub(&p.key.PublicKey)
+	ok, _, _, _ := server.validateRequest(src, request)
+	if ok {
+		t.Fatalf(err)
+	}
 }
 
 func singleRequest(t *testing.T, server *WMailServer, env *whisper.Envelope, p *ServerTestParams, expect bool) {
@@ -209,4 +233,27 @@ func createRequest(t *testing.T, p *ServerTestParams) *whisper.Envelope {
 		t.Fatalf("failed to wrap with seed %d: %s.", seed, err)
 	}
 	return env
+}
+
+func setupServer(t *testing.T, server *WMailServer) {
+	const password = "password_for_this_test"
+	const dbPath = "whisper-server-test"
+
+	dir, err := ioutil.TempDir("", dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	shh = whisper.New(&whisper.DefaultConfig)
+	shh.RegisterServer(server)
+
+	err = server.Init(shh, &params.WhisperConfig{DataDir: dir, Password: password, MinimumPoW: powRequirement})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	keyID, err = shh.AddSymKeyFromPassword(password)
+	if err != nil {
+		t.Fatalf("Failed to create symmetric key for mail request: %s", err)
+	}
 }
