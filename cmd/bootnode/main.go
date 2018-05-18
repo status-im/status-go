@@ -22,7 +22,9 @@ func main() {
 
 	glogger := log.NewGlogHandler(log.StreamHandler(os.Stderr, log.TerminalFormat(false)))
 	glogger.Verbosity(log.Lvl(*verbosity))
-	glogger.Vmodule(*vmodule)
+	if err := glogger.Vmodule(*vmodule); err != nil {
+		log.Crit("Failed to set glog verbosity", "value", *vmodule, "err", err)
+	}
 	log.Root().SetHandler(glogger)
 
 	nodeKey, err := crypto.LoadECDSA(*nodeKeyFile)
