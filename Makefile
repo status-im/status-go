@@ -97,7 +97,7 @@ docker-image: ##@docker Build docker image (use DOCKER_IMAGE_NAME to set the ima
 
 bootnode-image:
 	@echo "Building docker image for bootnode..."
-	docker build --file _assets/build/Bootfile . -t $(BOOTNODE_IMAGE_NAME):latest
+	docker build --file _assets/build/Dockerfile-bootnode . -t $(BOOTNODE_IMAGE_NAME):latest
 
 docker-image-tag: ##@docker Tag DOCKER_IMAGE_NAME:latest with a tag following pattern $GIT_SHA[:8]-$BUILD_TAGS
 	@echo "Tagging docker image..."
