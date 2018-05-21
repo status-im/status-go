@@ -16,7 +16,7 @@ var (
 
 func init() {
 	// When running tests, we want metrics to be enabled.
-	// Having init() in metrics_test does not work because
+	// Having init() in metrics_test.go does not work because
 	// this init() is executed first.
 	if flag.Lookup("test.v") != nil {
 		metrics.Enabled = true
