@@ -8,6 +8,7 @@ import (
 
 	"github.com/beevik/ntp"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -175,8 +176,68 @@ func TestNTPTimeSource(t *testing.T) {
 				timeQuery:       tc.query,
 			}
 			assert.WithinDuration(t, time.Now(), source.Now(), clockCompareDelta)
-			source.updateOffset()
+			err := source.updateOffset()
+			if tc.expectError {
+				assert.Equal(t, errUpdateOffset, err)
+			} else {
+				assert.NoError(t, err)
+			}
 			assert.WithinDuration(t, time.Now().Add(tc.expected), source.Now(), clockCompareDelta)
 		})
 	}
+}
+
+func TestRunningPeriodically(t *testing.T) {
+	var hits int
+	var mu sync.RWMutex
+	periods := make([]time.Duration, 0)
+
+	tc := newTestCases()[0]
+	fastHits := 3
+	slowHits := 1
+
+	t.Run(tc.description, func(t *testing.T) {
+		source := &NTPTimeSource{
+			servers:           tc.servers,
+			allowedFailures:   tc.allowedFailures,
+			timeQuery:         tc.query,
+			fastNTPSyncPeriod: time.Duration(fastHits*10) * time.Millisecond,
+			slowNTPSyncPeriod: time.Duration(slowHits*10) * time.Millisecond,
+		}
+		lastCall := time.Now()
+		// we're simulating a calls to updateOffset, testing ntp calls happens
+		// on NTPTimeSource specified periods (fastNTPSyncPeriod & slowNTPSyncPeriod)
+		err := source.runPeriodically(func() error {
+			mu.Lock()
+			periods = append(periods, time.Since(lastCall))
+			mu.Unlock()
+			hits++
+			if hits < 3 {
+				return errUpdateOffset
+			}
+			if hits == 6 {
+				source.wg.Done()
+			}
+			return nil
+		})
+
+		source.wg.Wait()
+		require.NoError(t, err)
+
+		mu.Lock()
+		require.Len(t, periods, 6)
+		defer mu.Unlock()
+		prev := 0
+		for _, period := range periods[1:3] {
+			p := int(period.Seconds() * 100)
+			require.True(t, fastHits <= (p-prev))
+			prev = p
+		}
+
+		for _, period := range periods[3:] {
+			p := int(period.Seconds() * 100)
+			require.True(t, slowHits <= (p-prev))
+			prev = p
+		}
+	})
 }
