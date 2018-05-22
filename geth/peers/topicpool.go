@@ -65,7 +65,7 @@ type TopicPool struct {
 	cache *Cache
 }
 
-func (t *TopicPool) addToPeerPool(peer *peerInfo) {
+func (t *TopicPool) addToPendingPeers(peer *peerInfo) {
 	if _, ok := t.pendingPeers[peer.node.ID]; ok {
 		return
 	}
@@ -75,7 +75,7 @@ func (t *TopicPool) addToPeerPool(peer *peerInfo) {
 	}
 }
 
-// addToQueue cannot be called if peer is no the pool
+// addToQueue adds the passed peer to the queue if it is already pending.
 func (t *TopicPool) addToQueue(peer *peerInfo) {
 	if p, ok := t.pendingPeers[peer.node.ID]; ok {
 		heap.Push(&t.discoveredPeersQueue, p)
@@ -91,7 +91,7 @@ func (t *TopicPool) popFromQueue() *peerInfo {
 	return item.peerInfo
 }
 
-func (t *TopicPool) removeFromPeerPool(nodeID discv5.NodeID) {
+func (t *TopicPool) removeFromPendingPeers(nodeID discv5.NodeID) {
 	peer, ok := t.pendingPeers[nodeID]
 	if !ok {
 		return
@@ -102,7 +102,7 @@ func (t *TopicPool) removeFromPeerPool(nodeID discv5.NodeID) {
 	}
 }
 
-func (t *TopicPool) updatePeerInPool(nodeID discv5.NodeID, time mclock.AbsTime) {
+func (t *TopicPool) updatePendingPeer(nodeID discv5.NodeID, time mclock.AbsTime) {
 	peer, ok := t.pendingPeers[nodeID]
 	if !ok {
 		return
@@ -118,7 +118,7 @@ func (t *TopicPool) movePeerFromPoolToConnected(nodeID discv5.NodeID) {
 	if !ok {
 		return
 	}
-	t.removeFromPeerPool(nodeID)
+	t.removeFromPendingPeers(nodeID)
 	t.connectedPeers[nodeID] = peer.peerInfo
 }
 
@@ -209,8 +209,8 @@ func (t *TopicPool) ConfirmAdded(server *p2p.Server, nodeID discover.NodeID) {
 	discV5NodeID := discv5.NodeID(nodeID)
 
 	// inbound connection
-	peerInfoItem, exist := t.pendingPeers[discV5NodeID]
-	if !exist {
+	peerInfoItem, ok := t.pendingPeers[discV5NodeID]
+	if !ok {
 		return
 	}
 	peer := peerInfoItem.peerInfo // get explicit reference
@@ -264,7 +264,7 @@ func (t *TopicPool) ConfirmDropped(server *p2p.Server, nodeID discover.NodeID) b
 	// Peer was removed by us because exceeded the limit.
 	// Add it back to the pool as it can be useful in the future.
 	if peer.dismissed {
-		t.addToPeerPool(peer)
+		t.addToPendingPeers(peer)
 		// use queue for peers that weren't added to p2p server
 		t.addToQueue(peer)
 		return false
@@ -381,9 +381,9 @@ func (t *TopicPool) processFoundNode(server *p2p.Server, node *discv5.Node) {
 	}
 
 	if _, ok := t.pendingPeers[node.ID]; ok {
-		t.updatePeerInPool(node.ID, mclock.Now())
+		t.updatePendingPeer(node.ID, mclock.Now())
 	} else {
-		t.addToPeerPool(&peerInfo{
+		t.addToPendingPeers(&peerInfo{
 			discoveredTime: mclock.Now(),
 			node:           node,
 		})
