@@ -221,14 +221,16 @@ func (b *StatusBackend) ResetChainData() error {
 
 // CallRPC executes public RPC requests on node's in-proc RPC server.
 func (b *StatusBackend) CallRPC(inputJSON string) string {
+	isExternal := true
 	client := b.statusNode.RPCClient()
-	return client.CallRaw(inputJSON)
+	return client.CallRaw(inputJSON, isExternal)
 }
 
 // CallPrivateRPC executes public and private RPC requests on node's in-proc RPC server.
 func (b *StatusBackend) CallPrivateRPC(inputJSON string) string {
+	isExternal := false
 	client := b.statusNode.RPCPrivateClient()
-	return client.CallRaw(inputJSON)
+	return client.CallRaw(inputJSON, isExternal)
 }
 
 // SendTransaction creates a new transaction and waits until it's complete.
