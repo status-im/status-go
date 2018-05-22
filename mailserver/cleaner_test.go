@@ -8,7 +8,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
-	"github.com/stretchr/testify/require"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/storage"
 	"github.com/syndtr/goleveldb/leveldb/util"
@@ -74,8 +73,7 @@ func setupTestServer(t *testing.T) *WMailServer {
 }
 
 func archiveEnvelope(t *testing.T, sentTime time.Time, server *WMailServer) *whisper.Envelope {
-	env, err := generateEnvelope(sentTime)
-	require.NoError(t, err)
+	env := generateEnvelope(t, sentTime)
 	server.Archive(env)
 
 	return env
@@ -84,15 +82,14 @@ func archiveEnvelope(t *testing.T, sentTime time.Time, server *WMailServer) *whi
 func testPrune(t *testing.T, u time.Time, expected int, c *Cleaner, s *WMailServer) {
 	upper := uint32(u.Unix())
 	_, err := c.Prune(0, upper)
-	require.NoError(t, err)
-
+	assert(err == nil, "", t)
 	count := countMessages(t, s.db)
-	require.Equal(t, expected, count, fmt.Sprintf("expected %d message, got: %d", expected, count))
+	assert(count == expected, fmt.Sprintf("expected %d message, got: %d", expected, count), t)
 }
 
 func testMessagesCount(t *testing.T, expected int, s *WMailServer) {
 	count := countMessages(t, s.db)
-	require.Equal(t, expected, count, fmt.Sprintf("expected %d message, got: %d", expected, count))
+	assert(count == expected, fmt.Sprintf("expected %d message, got: %d", expected, count), t)
 }
 
 func countMessages(t *testing.T, db *leveldb.DB) int {
