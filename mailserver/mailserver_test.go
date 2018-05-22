@@ -17,7 +17,6 @@
 package mailserver
 
 import (
-	"bytes"
 	"crypto/ecdsa"
 	"encoding/binary"
 	"errors"
@@ -144,12 +143,12 @@ func (s *MailserverSuite) TestArchive() {
 
 func (s *MailserverSuite) TestManageLimits() {
 	s.server.limit = newLimiter(time.Duration(5) * time.Millisecond)
-	s.server.managePeerLimits([]byte("peerID"))
+	s.False(s.server.exceedsPeerRequests([]byte("peerID")))
 	s.Equal(1, len(s.server.limit.db))
 	firstSaved := s.server.limit.db["peerID"]
 
 	// second call when limit is not accomplished does not store a new limit
-	s.server.managePeerLimits([]byte("peerID"))
+	s.True(s.server.exceedsPeerRequests([]byte("peerID")))
 	s.Equal(1, len(s.server.limit.db))
 	s.Equal(firstSaved, s.server.limit.db["peerID"])
 }
@@ -164,126 +163,102 @@ func (s *MailserverSuite) TestDBKey() {
 }
 
 func (s *MailserverSuite) TestMailServer() {
-	var server WMailServer
-
-	s.setupServer(&server)
-	defer server.Close()
+	s.setupServer(s.server)
+	defer s.server.Close()
 
 	env, err := generateEnvelope(time.Now())
 	s.NoError(err)
 
-	server.Archive(env)
+	s.server.Archive(env)
 	testCases := []struct {
-		params      *ServerTestParams
-		emptyLow    bool
-		lowModifier int32
-		uppModifier int32
-		topic       byte
-		expect      bool
-		shouldFail  bool
-		info        string
+		params *ServerTestParams
+		expect bool
+		isOK   bool
+		info   string
 	}{
 		{
-			params:      s.defaultServerParams(env),
-			lowModifier: 0,
-			uppModifier: 0,
-			expect:      true,
-			shouldFail:  false,
-			info:        "Processing a request where from and to are equals to an existing register, should provide results",
+			params: s.defaultServerParams(env),
+			expect: true,
+			isOK:   true,
+			info:   "Processing a request where from and to are equal to an existing register, should provide results",
 		},
 		{
-			params:      s.defaultServerParams(env),
-			lowModifier: 1,
-			uppModifier: 1,
-			expect:      false,
-			shouldFail:  false,
-			info:        "Processing a request where from and to are great than any existing register, should not provide results",
+			params: func() *ServerTestParams {
+				params := s.defaultServerParams(env)
+				params.low = params.birth + 1
+				params.upp = params.birth + 1
+
+				return params
+			}(),
+			expect: false,
+			isOK:   true,
+			info:   "Processing a request where from and to are greater than any existing register, should not provide results",
 		},
 		{
-			params:      s.defaultServerParams(env),
-			lowModifier: 0,
-			uppModifier: 1,
-			topic:       0xFF,
-			expect:      false,
-			shouldFail:  false,
-			info:        "Processing a request where to is grat than any existing register and with a specific topic, should not provide results",
+			params: func() *ServerTestParams {
+				params := s.defaultServerParams(env)
+				params.upp = params.birth + 1
+				params.topic[0] = 0xFF
+
+				return params
+			}(),
+			expect: false,
+			isOK:   true,
+			info:   "Processing a request where to is greater than any existing register and with a specific topic, should not provide results",
 		},
 		{
-			params:      s.defaultServerParams(env),
-			emptyLow:    true,
-			lowModifier: 4,
-			uppModifier: -1,
-			shouldFail:  true,
-			info:        "Processing a request where to is lower than from should fail",
+			params: func() *ServerTestParams {
+				params := s.defaultServerParams(env)
+				params.low = 0
+				params.upp = params.birth - 1
+
+				return params
+			}(),
+			isOK: false,
+			info: "Processing a request where to is lower than from should fail",
 		},
 		{
-			params:      s.defaultServerParams(env),
-			emptyLow:    true,
-			lowModifier: 0,
-			uppModifier: 24,
-			shouldFail:  true,
-			info:        "Processing a request where difference between from and to is > 24 should fail",
+			params: func() *ServerTestParams {
+				params := s.defaultServerParams(env)
+				params.low = 0
+				params.upp = params.birth + 24
+
+				return params
+			}(),
+			isOK: false,
+			info: "Processing a request where difference between from and to is > 24 should fail",
 		},
 	}
 	for _, tc := range testCases {
 		s.T().Run(tc.info, func(*testing.T) {
-			if tc.lowModifier != 0 {
-				tc.params.low = tc.params.birth + uint32(tc.lowModifier)
-			}
-			if tc.uppModifier != 0 {
-				tc.params.upp = tc.params.birth + uint32(tc.uppModifier)
-			}
-			if tc.emptyLow {
-				tc.params.low = 0
-			}
-			if tc.topic == 0xFF {
-				tc.params.topic[0] = tc.topic
-			}
-
 			request := s.createRequest(tc.params)
 			src := crypto.FromECDSAPub(&tc.params.key.PublicKey)
-			ok, lower, upper, bloom := server.validateRequest(src, request)
-			if tc.shouldFail {
-				if ok {
-					s.T().Fatal(err)
-				}
-				return
-			}
-			if !ok {
-				s.T().Fatalf("request validation failed, seed: %d.", seed)
-			}
-			if lower != tc.params.low {
-				s.T().Fatalf("request validation failed (lower bound), seed: %d.", seed)
-			}
-			if upper != tc.params.upp {
-				s.T().Fatalf("request validation failed (upper bound), seed: %d.", seed)
-			}
-			expectedBloom := whisper.TopicToBloom(tc.params.topic)
-			if !bytes.Equal(bloom, expectedBloom) {
-				s.T().Fatalf("request validation failed (topic), seed: %d.", seed)
-			}
+			ok, lower, upper, bloom := s.server.validateRequest(src, request)
+			s.Equal(tc.isOK, ok)
+			if ok {
+				s.Equal(tc.params.low, lower)
+				s.Equal(tc.params.upp, upper)
+				s.Equal(whisper.TopicToBloom(tc.params.topic), bloom)
+				s.Equal(tc.expect, s.messageExists(env, tc.params.low, tc.params.upp, bloom))
 
-			var exist bool
-			mail := server.processRequest(nil, tc.params.low, tc.params.upp, bloom)
-			for _, msg := range mail {
-				if msg.Hash() == env.Hash() {
-					exist = true
-					break
-				}
-			}
-
-			if exist != tc.expect {
-				s.T().Fatalf("error: exist = %v, seed: %d.", exist, seed)
-			}
-
-			src[0]++
-			ok, lower, upper, _ = server.validateRequest(src, request)
-			if !ok {
-				// request should be valid regardless of signature
-				s.T().Fatalf("request validation false negative, seed: %d (lower: %d, upper: %d).", seed, lower, upper)
+				src[0]++
+				ok, _, _, _ = s.server.validateRequest(src, request)
+				s.True(ok)
 			}
 		})
 	}
+}
+
+func (s *MailserverSuite) messageExists(envelope *whisper.Envelope, low, upp uint32, bloom []byte) bool {
+	var exist bool
+	mail := s.server.processRequest(nil, low, upp, bloom)
+	for _, msg := range mail {
+		if msg.Hash() == envelope.Hash() {
+			exist = true
+			break
+		}
+	}
+	return exist
 }
 
 func (s *MailserverSuite) TestBloomFromReceivedMessage() {

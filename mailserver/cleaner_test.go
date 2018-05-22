@@ -87,7 +87,7 @@ func testPrune(t *testing.T, u time.Time, expected int, c *Cleaner, s *WMailServ
 	require.NoError(t, err)
 
 	count := countMessages(t, s.db)
-	require.Equal(t, expected, count, fmt.Sprintf("expected %d message, got: %d", expected, count))
+	require.Equal(t, expected, count)
 }
 
 func testMessagesCount(t *testing.T, expected int, s *WMailServer) {

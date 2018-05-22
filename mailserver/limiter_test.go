@@ -14,7 +14,6 @@ func TestIsAllowed(t *testing.T) {
 		t               time.Duration
 		shouldBeAllowed bool
 		db              func() map[string]time.Time
-		errMsg          string
 		info            string
 	}{
 		{
@@ -23,8 +22,7 @@ func TestIsAllowed(t *testing.T) {
 			db: func() map[string]time.Time {
 				return make(map[string]time.Time)
 			},
-			errMsg: "Expected limiter not to allow with empty db",
-			info:   "Expecting limiter.isAllowed to not allow with an empty db",
+			info: "Expecting limiter.isAllowed to allow with an empty db",
 		},
 		{
 			t:               5 * time.Millisecond,
@@ -34,8 +32,7 @@ func TestIsAllowed(t *testing.T) {
 				db[peerID] = time.Now().Add(time.Duration(-10) * time.Millisecond)
 				return db
 			},
-			errMsg: "Expected limiter to allow with peer on its db",
-			info:   "Expecting limiter.isAllowed to allow with an expired peer on its db",
+			info: "Expecting limiter.isAllowed to allow with an expired peer on its db",
 		},
 		{
 			t:               5 * time.Millisecond,
@@ -45,8 +42,7 @@ func TestIsAllowed(t *testing.T) {
 				db[peerID] = time.Now().Add(time.Duration(-1) * time.Millisecond)
 				return db
 			},
-			errMsg: "Expected limiter to not allow with peer on its db",
-			info:   "Expecting limiter.isAllowed to not allow with a non expired peer on its db",
+			info: "Expecting limiter.isAllowed to not allow with a non expired peer on its db",
 		},
 	}
 
@@ -54,7 +50,7 @@ func TestIsAllowed(t *testing.T) {
 		t.Run(tc.info, func(*testing.T) {
 			l := newLimiter(tc.t)
 			l.db = tc.db()
-			assert.Equal(t, tc.shouldBeAllowed, l.isAllowed(peerID), tc.errMsg)
+			assert.Equal(t, tc.shouldBeAllowed, l.isAllowed(peerID))
 		})
 	}
 }
