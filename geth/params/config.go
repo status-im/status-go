@@ -277,6 +277,12 @@ type NodeConfig struct {
 	// handshake phase, counted separately for inbound and outbound connections.
 	MaxPendingPeers int
 
+	// InboundPercent controls percent of inbound connections in group
+	// Since we don't use dialing we have to introduce another config
+	// for limiting inbound connections.
+	// inboundConns = (maxpeers * inbound percent) / 100
+	InboundPercent int
+
 	log log.Logger
 
 	// LogEnabled enables the logger
@@ -331,6 +337,7 @@ func NewNodeConfig(dataDir string, clstrCfgFile string, networkID uint64) (*Node
 		APIModules:        APIModules,
 		MaxPeers:          MaxPeers,
 		MaxPendingPeers:   MaxPendingPeers,
+		InboundPercent:    InboundPercent,
 		IPCFile:           IPCFile,
 		log:               log.New("package", "status-go/geth/params.NodeConfig"),
 		LogFile:           LogFile,

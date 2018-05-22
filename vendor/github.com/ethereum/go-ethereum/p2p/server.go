@@ -72,6 +72,12 @@ type Config struct {
 	// Setting DialRatio to zero defaults it to 3.
 	DialRatio int `toml:",omitempty"`
 
+	// InboundPercent controls percent of inbound connections in group
+	// Since we don't use dialing we have to introduce another config
+	// for limiting inbound connections.
+	// inboundConns = (maxpeers * inbound percent) / 100
+	InboundPercent int
+
 	// NoDiscovery can be used to disable the peer discovery mechanism.
 	// Disabling is useful for protocol debugging (manual topology).
 	NoDiscovery bool
@@ -717,7 +723,7 @@ func (srv *Server) encHandshakeChecks(peers map[discover.NodeID]*Peer, inboundCo
 }
 
 func (srv *Server) maxInboundConns() int {
-	return srv.MaxPeers - srv.maxDialedConns()
+	return (srv.MaxPeers * srv.InboundPercent) / 100
 }
 
 func (srv *Server) maxDialedConns() int {
