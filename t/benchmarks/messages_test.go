@@ -1,9 +1,9 @@
 package benchmarks
 
 import (
+	"fmt"
 	"math/rand"
 	"testing"
-	"time"
 
 	"github.com/ethereum/go-ethereum/node"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
@@ -54,17 +54,19 @@ func TestSendMessages(t *testing.T) {
 		for {
 			select {
 			case ev := <-envelopeEvents:
-				if ev.Event == whisper.EventEnvelopeSent {
-					envelopesSent++
+				if ev.Event != whisper.EventEnvelopeSent {
+					continue
 				}
 
+				envelopesSent++
+
 				if envelopesSent%(*msgBatchSize) == 0 {
-					t.Logf("Sent a batch")
+					fmt.Printf("Sent a batch and %d messages\n", envelopesSent)
 					batchSent <- struct{}{}
 				}
 
 				if envelopesSent == *msgCount {
-					t.Logf("Sent all messages")
+					fmt.Println("Sent all messages")
 					close(batchSent)
 					return
 				}
@@ -84,13 +86,12 @@ func TestSendMessages(t *testing.T) {
 		require.NoError(t, err)
 
 		if i%(*msgBatchSize) == 0 {
-			t.Logf("Waiting for a batch")
+			fmt.Println("Waiting for a batch")
 			<-batchSent
-			time.Sleep(time.Second)
 		}
 	}
 
-	t.Logf("Waiting for all messages to be sent")
+	fmt.Println("Waiting for all messages to be sent")
 	<-batchSent
 	require.Equal(t, *msgCount, envelopesSent)
 }

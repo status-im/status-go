@@ -11,6 +11,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	mailServerPass = "status-offline-inbox"
+)
+
 // TestConcurrentMailserverPeers runs `ccyPeers` tests in parallel
 // that require messages from a MailServer.
 //
@@ -57,52 +61,35 @@ func testMailserverPeer(t *testing.T) {
 	msgSymKeyID, err := shhService.AddSymKeyFromPassword(*msgPass)
 	require.NoError(t, err)
 
-	// load messages to cache
-	filterID, err := shhAPI.NewMessageFilter(whisper.Criteria{
-		SymKeyID: msgSymKeyID,
-		Topics:   []whisper.TopicType{topic},
-	})
-	require.NoError(t, err)
-	messages, err := shhAPI.GetFilterMessages(filterID)
-	require.NoError(t, err)
-	require.Len(t, messages, 0)
-	// wait for messages
-	require.NoError(t, waitForMessages(*msgCount, shhAPI, filterID))
-
-	// clean up old filter
-	ok, err := shhAPI.DeleteMessageFilter(filterID)
-	require.NoError(t, err)
-	require.True(t, ok)
-
 	// prepare new filter for messages from mail server
-	filterID, err = shhAPI.NewMessageFilter(whisper.Criteria{
+	filterID, err := shhAPI.NewMessageFilter(whisper.Criteria{
 		SymKeyID: msgSymKeyID,
 		Topics:   []whisper.TopicType{topic},
 		AllowP2P: true,
 	})
 	require.NoError(t, err)
-	messages, err = shhAPI.GetFilterMessages(filterID)
+	messages, err := shhAPI.GetFilterMessages(filterID)
 	require.NoError(t, err)
 	require.Len(t, messages, 0)
 
 	// request messages from mail server
-	symKeyID, err := shhService.AddSymKeyFromPassword("status-offline-inbox")
+	symKeyID, err := shhService.AddSymKeyFromPassword(mailServerPass)
 	require.NoError(t, err)
-	ok, err = shhAPI.MarkTrustedPeer(nil, *peerURL)
+	ok, err := shhAPI.MarkTrustedPeer(nil, *peerURL)
 	require.NoError(t, err)
 	require.True(t, ok)
 	ok, err = shhextAPI.RequestMessages(nil, shhext.MessagesRequest{
 		MailServerPeer: *peerURL,
 		SymKeyID:       symKeyID,
-		Topic:          whisper.TopicType{0x01, 0x02, 0x03, 0x04},
+		Topic:          topic,
 	})
 	require.NoError(t, err)
 	require.True(t, ok)
 	// wait for all messages
-	require.NoError(t, waitForMessages(*msgCount, shhAPI, filterID))
+	require.NoError(t, waitForMessages(t, *msgCount, shhAPI, filterID))
 }
 
-func waitForMessages(messagesCount int64, shhAPI *whisper.PublicWhisperAPI, filterID string) error {
+func waitForMessages(t *testing.T, messagesCount int64, shhAPI *whisper.PublicWhisperAPI, filterID string) error {
 	received := int64(0)
 	for {
 		select {
@@ -113,6 +100,9 @@ func waitForMessages(messagesCount int64, shhAPI *whisper.PublicWhisperAPI, filt
 			}
 
 			received += int64(len(messages))
+
+			fmt.Printf("Received %d messages so far\n", received)
+
 			if received >= messagesCount {
 				return nil
 			}

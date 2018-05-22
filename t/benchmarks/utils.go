@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	topic = whisper.TopicType{0x01, 0x02, 0x03, 0x04}
+	topic = whisper.TopicType{0xfa, 0xfb, 0xfc, 0xfd}
 )
 
 func createNode() (*node.Node, error) {
