@@ -30,11 +30,13 @@ func SubscribeServerEvents(ctx context.Context, node *node.Node) error {
 		select {
 		case event := <-ch:
 			if isAddDropPeerEvent(event.Type) {
-				updateNodeMetrics(node)
+				if err := updateNodeMetrics(node, event.Type); err != nil {
+					log.Error("failed to update node metrics", "err", err)
+				}
 			}
 		case err := <-subscription.Err():
 			if err != nil {
-				logger.Warn("Subscription failed", "err", err)
+				logger.Error("Subscription failed", "err", err)
 			}
 			subscription.Unsubscribe()
 			return err

@@ -12,7 +12,7 @@ import (
 
 const (
 	// clockCompareDelta declares time required between multiple calls to time.Now
-	clockCompareDelta = 30 * time.Microsecond
+	clockCompareDelta = 100 * time.Microsecond
 )
 
 // we don't user real servers for tests, but logic depends on

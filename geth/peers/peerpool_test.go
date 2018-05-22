@@ -166,13 +166,13 @@ func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailover() {
 
 	s.Equal(signal.EventDiscoveryStarted, s.getPoolEvent(poolEvents))
 	s.Require().NotNil(s.peers[1].DiscV5)
-	register = NewRegister(topic)
 	s.Require().NoError(register.Start(s.peers[2]))
 	defer register.Stop()
 	s.Equal(s.peers[2].Self().ID, s.getPeerFromEvent(events, p2p.PeerEventTypeAdd))
 
 	s.Equal(signal.EventDiscoveryStopped, s.getPoolEvent(poolEvents))
 	s.Require().Equal(signal.EventDiscoverySummary, s.getPoolEvent(poolEvents))
+
 	summary = <-summaries
 	s.Len(summary, 1)
 
