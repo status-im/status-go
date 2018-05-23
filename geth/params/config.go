@@ -582,7 +582,9 @@ func (c *NodeConfig) updateClusterConfig() error {
 
 	for _, cluster := range clusters {
 		if cluster.NetworkID == int(c.NetworkID) {
-			c.ClusterConfig.BootNodes = cluster.BootNodes
+			if len(c.ClusterConfig.BootNodes) == 0 {
+				c.ClusterConfig.BootNodes = cluster.BootNodes
+			}
 			c.ClusterConfig.StaticNodes = cluster.StaticNodes
 			// no point in running discovery if we don't have bootnodes.
 			// but in case if we do have nodes and NoDiscovery=true we will preserve that value
