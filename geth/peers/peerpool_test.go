@@ -90,7 +90,8 @@ func (s *PeerPoolSimulationSuite) getPeerFromEvent(events <-chan *p2p.PeerEvent,
 		if ev.Type == etype {
 			return ev.Peer
 		}
-	case <-time.After(5 * time.Second):
+		s.Failf("invalid event", "expected %s but got %s for peer %s", etype, ev.Type, ev.Peer)
+	case <-time.After(10 * time.Second):
 		s.Fail("timed out waiting for a peer")
 		return
 	}
@@ -101,7 +102,7 @@ func (s *PeerPoolSimulationSuite) getPoolEvent(events <-chan string) string {
 	select {
 	case ev := <-events:
 		return ev
-	case <-time.After(time.Second):
+	case <-time.After(10 * time.Second):
 		s.FailNow("timed out waiting a pool event")
 		return ""
 	}
