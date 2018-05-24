@@ -1,6 +1,6 @@
 /*
 	Package benchmarks contains tests that can be used
-	to benchmark cluster components.
+	to run benchmarks and stress tests of our cluster components.
 
 
 	Example usage:
@@ -19,10 +19,21 @@
 				-peerurl=$ENODE_ADDR \
 				-msgcount=200 \
 				-msgbatchsize=50
-		3. Retrieve them from mail server:
-			go test -v -timeout=30s -run TestConcurrentMailserverPeers ./t/benchmarks \
+		3. Retrieve them from the mail server:
+			go test -v -timeout=30s -parallel 20 \
+				-run TestConcurrentMailserverPeers
+				./t/benchmarks \
 				-peerurl=$ENODE_ADDR \
 				-msgcount=200
+
+		The result of the last command will tell you how long it took to
+		retrieve 200 messages with 20 concurrent peers (20 * 200 messages
+		in total).
+
+		The result may be affected due to limitations of the host
+		on which it was called. It's recommended running mail server
+		on a different machine and running the third command
+		from some beefy server.
 */
 
 package benchmarks
