@@ -123,9 +123,6 @@ func (p *PeerPool) Start(server *p2p.Server) error {
 		p.topics = append(p.topics, topicPool)
 	}
 
-	// discovery must be already started when pool is started
-	signal.SendDiscoveryStarted()
-
 	// subscribe to peer events
 	p.events = make(chan *p2p.PeerEvent, 20)
 	p.serverSubscription = server.SubscribeEvents(p.events)
@@ -134,6 +131,9 @@ func (p *PeerPool) Start(server *p2p.Server) error {
 		p.handleServerPeers(server, p.events)
 		p.wg.Done()
 	}()
+
+	// discovery must be already started when pool is started
+	signal.SendDiscoveryStarted()
 
 	return nil
 }

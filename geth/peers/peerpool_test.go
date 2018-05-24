@@ -19,6 +19,9 @@ import (
 
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/signal"
+
+	// to access logs in the test with `-log` flag
+	_ "github.com/status-im/status-go/t/utils"
 )
 
 type PeerPoolSimulationSuite struct {
@@ -99,34 +102,37 @@ func (s *PeerPoolSimulationSuite) getPoolEvent(events <-chan string) string {
 	case ev := <-events:
 		return ev
 	case <-time.After(time.Second):
-		s.FailNow("timed out waiting for a peer")
+		s.FailNow("timed out waiting a pool event")
 		return ""
 	}
 }
 
 func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailover() {
-	poolEvents := make(chan string, 1)
-	summaries := make(chan []*p2p.PeerInfo, 1)
+	var err error
+
+	poolEvents := make(chan string)
+	summaries := make(chan []*p2p.PeerInfo)
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var envelope struct {
 			Type  string
 			Event json.RawMessage
 		}
 		s.NoError(json.Unmarshal([]byte(jsonEvent), &envelope))
-		switch envelope.Type {
-		case signal.EventDiscoveryStarted:
-			poolEvents <- envelope.Type
-		case signal.EventDiscoveryStopped:
-			poolEvents <- envelope.Type
-		case signal.EventDiscoverySummary:
-			poolEvents <- envelope.Type
-			var summary []*p2p.PeerInfo
-			s.NoError(json.Unmarshal(envelope.Event, &summary))
-			summaries <- summary
-		}
 
+		go func() {
+			switch typ := envelope.Type; typ {
+			case signal.EventDiscoveryStarted, signal.EventDiscoveryStopped:
+				poolEvents <- envelope.Type
+			case signal.EventDiscoverySummary:
+				poolEvents <- envelope.Type
+				var summary []*p2p.PeerInfo
+				s.NoError(json.Unmarshal(envelope.Event, &summary))
+				summaries <- summary
+			}
+		}()
 	})
 	defer signal.ResetDefaultNodeNotificationHandler()
+
 	topic := discv5.Topic("cap=test")
 	// simulation should only rely on fast sync
 	config := map[discv5.Topic]params.Limits{
@@ -136,50 +142,48 @@ func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailover() {
 	cache, err := newInMemoryCache()
 	s.Require().NoError(err)
 	peerPool := NewPeerPool(config, cache, peerPoolOpts)
+
+	// create and start topic registry
 	register := NewRegister(topic)
-	s.Require().NoError(register.Start(s.peers[0]))
-	// need to wait for topic to get registered, discv5 can query same node
-	// for a topic only once a minute
+	err = register.Start(s.peers[0])
+	s.Require().NoError(err)
+
+	// subscribe for peer events before starting the peer pool
 	events := make(chan *p2p.PeerEvent, 20)
 	subscription := s.peers[1].SubscribeEvents(events)
 	defer subscription.Unsubscribe()
-	s.NoError(peerPool.Start(s.peers[1]))
+
+	// start the peer pool
+	s.Require().NoError(peerPool.Start(s.peers[1]))
 	defer peerPool.Stop()
 	s.Equal(signal.EventDiscoveryStarted, s.getPoolEvent(poolEvents))
-	connected := s.getPeerFromEvent(events, p2p.PeerEventTypeAdd)
-	s.Equal(s.peers[0].Self().ID, connected)
+	connectedPeer := s.getPeerFromEvent(events, p2p.PeerEventTypeAdd)
+	s.Equal(s.peers[0].Self().ID, connectedPeer)
+	// as the upper limit was reached, Discovery should be stoped
 	s.Equal(signal.EventDiscoveryStopped, s.getPoolEvent(poolEvents))
-	s.Require().Nil(s.peers[1].DiscV5)
+	s.Equal(signal.EventDiscoverySummary, s.getPoolEvent(poolEvents))
+	s.Len(<-summaries, 1)
 
-	s.Require().Equal(signal.EventDiscoverySummary, s.getPoolEvent(poolEvents))
-	summary := <-summaries
-	s.Len(summary, 1)
-
+	// stop topic register and the connected peer
 	register.Stop()
 	s.peers[0].Stop()
-	disconnected := s.getPeerFromEvent(events, p2p.PeerEventTypeDrop)
-	s.Equal(connected, disconnected)
-
-	s.Require().Equal(signal.EventDiscoverySummary, s.getPoolEvent(poolEvents))
-	summary = <-summaries
-	s.Len(summary, 0)
-
+	disconnectedPeer := s.getPeerFromEvent(events, p2p.PeerEventTypeDrop)
+	s.Equal(connectedPeer, disconnectedPeer)
+	s.Equal(signal.EventDiscoverySummary, s.getPoolEvent(poolEvents))
+	s.Len(<-summaries, 0)
+	// Discovery should be restarted because the number of peers dropped
+	// below the lower limit.
 	s.Equal(signal.EventDiscoveryStarted, s.getPoolEvent(poolEvents))
-	s.Require().NotNil(s.peers[1].DiscV5)
-	s.Require().NoError(register.Start(s.peers[2]))
+
+	// register the second peer
+	err = register.Start(s.peers[2])
+	s.Require().NoError(err)
 	defer register.Stop()
 	s.Equal(s.peers[2].Self().ID, s.getPeerFromEvent(events, p2p.PeerEventTypeAdd))
-
+	// Discovery can be stopped again.
 	s.Equal(signal.EventDiscoveryStopped, s.getPoolEvent(poolEvents))
 	s.Require().Equal(signal.EventDiscoverySummary, s.getPoolEvent(poolEvents))
-
-	summary = <-summaries
-	s.Len(summary, 1)
-
-	// verify that we are actually using cache
-	cachedPeers := peerPool.cache.GetPeersRange(topic, 1)
-	s.Len(cachedPeers, 1)
-	s.Equal(s.peers[2].Self().ID, discover.NodeID(cachedPeers[0].ID))
+	s.Len(<-summaries, 1)
 }
 
 // TestPeerPoolMaxPeersOverflow verifies that following scenario will not occur:

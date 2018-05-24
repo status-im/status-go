@@ -1,0 +1,24 @@
+diff --git a/p2p/discv5/net.go b/p2p/discv5/net.go
+index d0eae28f..25e75d50 100644
+--- a/p2p/discv5/net.go
++++ b/p2p/discv5/net.go
+@@ -641,7 +641,18 @@ loop:
+ 				}()
+ 			} else {
+ 				refreshDone = make(chan struct{})
+-				net.refresh(refreshDone)
++
++				done := make(chan struct{})
++				net.refresh(done)
++				<-done
++
++				// Refresh again only if there are no seeds.
++				// Also, sleep for some time to prevent from
++				// executing too often.
++				go func() {
++					time.Sleep(time.Millisecond * 20)
++					close(refreshDone)
++				}()
+ 			}
+ 		}
+ 	}
