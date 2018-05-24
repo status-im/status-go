@@ -15,7 +15,7 @@ import (
 
 const (
 	// DefaultMaxAllowedFailures defines how many failures will be tolerated.
-	DefaultMaxAllowedFailures = 2
+	DefaultMaxAllowedFailures = 1
 
 	// FastNTPSyncPeriod period between ntp synchronizations before the first
 	// successful connection.
