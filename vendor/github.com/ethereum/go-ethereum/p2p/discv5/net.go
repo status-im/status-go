@@ -650,7 +650,7 @@ loop:
 				// Also, sleep for some time to prevent from
 				// executing too often.
 				go func() {
-					time.Sleep(time.Millisecond * 20)
+					time.Sleep(time.Millisecond * 100)
 					close(refreshDone)
 				}()
 			}

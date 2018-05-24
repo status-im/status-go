@@ -113,15 +113,8 @@ func (p *PeerPool) Start(server *p2p.Server) error {
 	p.quit = make(chan struct{})
 	p.setDiscoveryTimeout()
 
-	// collect topics and start searching for nodes
-	p.topics = make([]*TopicPool, 0, len(p.config))
-	for topic, limits := range p.config {
-		topicPool := NewTopicPool(topic, limits, p.opts.SlowSync, p.opts.FastSync, p.cache)
-		if err := topicPool.StartSearch(server); err != nil {
-			return err
-		}
-		p.topics = append(p.topics, topicPool)
-	}
+	// discovery must be already started when pool is started
+	signal.SendDiscoveryStarted()
 
 	// subscribe to peer events
 	p.events = make(chan *p2p.PeerEvent, 20)
@@ -132,8 +125,15 @@ func (p *PeerPool) Start(server *p2p.Server) error {
 		p.wg.Done()
 	}()
 
-	// discovery must be already started when pool is started
-	signal.SendDiscoveryStarted()
+	// collect topics and start searching for nodes
+	p.topics = make([]*TopicPool, 0, len(p.config))
+	for topic, limits := range p.config {
+		topicPool := NewTopicPool(topic, limits, p.opts.SlowSync, p.opts.FastSync, p.cache)
+		if err := topicPool.StartSearch(server); err != nil {
+			return err
+		}
+		p.topics = append(p.topics, topicPool)
+	}
 
 	return nil
 }
