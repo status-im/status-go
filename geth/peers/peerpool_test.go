@@ -110,8 +110,11 @@ func (s *PeerPoolSimulationSuite) getPoolEvent(events <-chan string) string {
 func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailover() {
 	var err error
 
-	poolEvents := make(chan string)
-	summaries := make(chan []*p2p.PeerInfo)
+	// Buffered channels must be used because we expect the events
+	// to be in the same order. Use a buffer length greater than
+	// the expected number of events to avoid deadlock.
+	poolEvents := make(chan string, 10)
+	summaries := make(chan []*p2p.PeerInfo, 10)
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var envelope struct {
 			Type  string
@@ -119,17 +122,15 @@ func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailover() {
 		}
 		s.NoError(json.Unmarshal([]byte(jsonEvent), &envelope))
 
-		go func() {
-			switch typ := envelope.Type; typ {
-			case signal.EventDiscoveryStarted, signal.EventDiscoveryStopped:
-				poolEvents <- envelope.Type
-			case signal.EventDiscoverySummary:
-				poolEvents <- envelope.Type
-				var summary []*p2p.PeerInfo
-				s.NoError(json.Unmarshal(envelope.Event, &summary))
-				summaries <- summary
-			}
-		}()
+		switch typ := envelope.Type; typ {
+		case signal.EventDiscoveryStarted, signal.EventDiscoveryStopped:
+			poolEvents <- envelope.Type
+		case signal.EventDiscoverySummary:
+			poolEvents <- envelope.Type
+			var summary []*p2p.PeerInfo
+			s.NoError(json.Unmarshal(envelope.Event, &summary))
+			summaries <- summary
+		}
 	})
 	defer signal.ResetDefaultNodeNotificationHandler()
 
