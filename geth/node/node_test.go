@@ -6,7 +6,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -16,7 +15,6 @@ func TestInboundConnections(t *testing.T) {
 		max     int
 		percent int
 	}
-
 	for _, tc := range []testCase{
 		{
 			name:    "All",
@@ -40,6 +38,7 @@ func TestInboundConnections(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			key, _ := crypto.GenerateKey()
 			main := p2p.Server{
 				Config: p2p.Config{
@@ -68,7 +67,7 @@ func TestInboundConnections(t *testing.T) {
 						ListenAddr:  "127.0.0.1:0",
 					},
 				}
-				assert.NoError(t, peer.Start())
+				require.NoError(t, peer.Start())
 				peers = append(peers, peer)
 				peer.AddPeer(main.Self())
 			}
