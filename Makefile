@@ -10,13 +10,13 @@ ifndef GOPATH
 endif
 
 
-EXPECTED_PATH=$(GOPATH)/src/github.com/status-im/status-go
+EXPECTED_PATH=$(shell go env GOPATH)/src/github.com/status-im/status-go
 ifneq ($(CURDIR),$(EXPECTED_PATH))
 define NOT_IN_GOPATH_ERROR
 
 Current dir is $(CURDIR), which seems to be different from your GOPATH.
 Please, build status-go from GOPATH for proper build.
-  GOPATH       = $(GOPATH) 
+  GOPATH       = $(shell go env GOPATH) 
   Current dir  = $(CURDIR) 
   Expected dir = $(EXPECTED_PATH))
 See https://golang.org/doc/code.html#GOPATH for more info
