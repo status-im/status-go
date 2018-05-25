@@ -9,6 +9,22 @@ ifndef GOPATH
 	For more information about the GOPATH environment variable, see https://golang.org/doc/code.html#GOPATH)
 endif
 
+
+EXPECTED_PATH=$(GOPATH)/src/github.com/status-im/status-go
+ifneq ($(CURDIR),$(EXPECTED_PATH))
+define NOT_IN_GOPATH_ERROR
+
+Current dir is $(CURDIR), which seems to be different from your GOPATH.
+Please, build status-go from GOPATH for proper build.
+  GOPATH       = $(GOPATH) 
+  Current dir  = $(CURDIR) 
+  Expected dir = $(EXPECTED_PATH))
+See see https://golang.org/doc/code.html#GOPATH for more info
+
+endef
+$(error $(NOT_IN_GOPATH_ERROR))
+endif
+
 CGO_CFLAGS=-I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
 GOBIN=$(dir $(realpath $(firstword $(MAKEFILE_LIST))))build/bin
 GIT_COMMIT := $(shell git rev-parse --short HEAD)
