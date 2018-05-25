@@ -42,6 +42,7 @@ var (
 	httpEnabled       = flag.Bool("http", false, "Enable HTTP RPC endpoint")
 	httpHost          = flag.String("httphost", "127.0.0.1", "HTTP RPC host of the listening socket")
 	httpPort          = flag.Int("httpport", params.HTTPPort, "HTTP RPC server's listening port")
+	httpModules       = flag.String("httpmodules", params.APIModules, "Comma separated list of HTTP RPC APIs")
 	ipcEnabled        = flag.Bool("ipc", false, "Enable IPC RPC endpoint")
 	ipcFile           = flag.String("ipcfile", "", "Set IPC file path")
 	cliEnabled        = flag.Bool("cli", false, "Enable debugging CLI server")
@@ -217,6 +218,7 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 
 	nodeConfig.HTTPHost = *httpHost
 	nodeConfig.HTTPPort = *httpPort
+	nodeConfig.APIModules = *httpModules
 	nodeConfig.IPCEnabled = *ipcEnabled
 
 	if *ipcFile != "" {

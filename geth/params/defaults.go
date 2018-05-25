@@ -25,7 +25,7 @@ const (
 	// HTTPHost is host interface for the HTTP RPC server
 	HTTPHost = "localhost"
 
-	// HTTPPort is HTTP-RPC port (replaced in unit tests)
+	// HTTPPort is HTTP RPC port (replaced in unit tests)
 	HTTPPort = 8545
 
 	// ListenAddr is an IP address and port of this node (e.g. 127.0.0.1:30303).
