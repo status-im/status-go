@@ -108,6 +108,28 @@ func (s *PeerPoolSimulationSuite) getPoolEvent(events <-chan string) string {
 	}
 }
 
+func (s *PeerPoolSimulationSuite) TestPeerPoolCache() {
+	var err error
+
+	topic := discv5.Topic("cap=test")
+	config := map[discv5.Topic]params.Limits{
+		topic: params.NewLimits(1, 1),
+	}
+	peerPoolOpts := &Options{100 * time.Millisecond, 100 * time.Millisecond, 0, true}
+	cache, err := newInMemoryCache()
+	s.Require().NoError(err)
+	peerPool := NewPeerPool(config, cache, peerPoolOpts)
+
+	// start peer pool
+	s.Require().NoError(peerPool.Start(s.peers[1]))
+	defer peerPool.Stop()
+
+	// check if cache is passed to topic pools
+	for _, topicPool := range peerPool.topics {
+		s.Equal(cache, topicPool.cache)
+	}
+}
+
 func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailover() {
 	var err error
 

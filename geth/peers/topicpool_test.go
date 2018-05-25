@@ -63,6 +63,29 @@ func (s *TopicPoolSuite) AssertConsumed(channel <-chan time.Duration, expected t
 	}
 }
 
+func (s *TopicPoolSuite) TestUsingCache() {
+	s.topicPool.limits = params.NewLimits(1, 1)
+
+	peer1 := discv5.NewNode(discv5.NodeID{1}, s.peer.Self().IP, 32311, 32311)
+	s.topicPool.processFoundNode(s.peer, peer1)
+	s.topicPool.ConfirmAdded(s.peer, discover.NodeID(peer1.ID))
+	s.Equal([]*discv5.Node{peer1}, s.topicPool.cache.GetPeersRange(s.topicPool.topic, 10))
+
+	// Add a new peer which exceeds the upper limit.
+	// It should still be added to the cache and
+	// not removed when dropped.
+	peer2 := discv5.NewNode(discv5.NodeID{2}, s.peer.Self().IP, 32311, 32311)
+	s.topicPool.processFoundNode(s.peer, peer2)
+	s.topicPool.ConfirmAdded(s.peer, discover.NodeID(peer2.ID))
+	s.Equal([]*discv5.Node{peer1, peer2}, s.topicPool.cache.GetPeersRange(s.topicPool.topic, 10))
+	s.topicPool.ConfirmDropped(s.peer, discover.NodeID(peer2.ID))
+	s.Equal([]*discv5.Node{peer1, peer2}, s.topicPool.cache.GetPeersRange(s.topicPool.topic, 10))
+
+	// A peer that drops by itself, should be removed from the cache.
+	s.topicPool.ConfirmDropped(s.peer, discover.NodeID(peer1.ID))
+	s.Equal([]*discv5.Node{peer2}, s.topicPool.cache.GetPeersRange(s.topicPool.topic, 10))
+}
+
 func (s *TopicPoolSuite) TestSyncSwitches() {
 	testPeer := discv5.NewNode(discv5.NodeID{1}, s.peer.Self().IP, 32311, 32311)
 	s.topicPool.processFoundNode(s.peer, testPeer)
