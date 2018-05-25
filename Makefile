@@ -96,6 +96,12 @@ statusgo-cross: statusgo-android statusgo-ios
 	@echo "Full cross compilation done."
 	@ls -ld $(GOBIN)/statusgo-*
 
+statusgo-linux: xgo ##@cross-compile Build status-go for Linux
+	./_assets/patches/patcher -b . -p geth-xgo
+	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=linux/amd64 -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/statusd
+	./_assets/patches/patcher -b . -p geth-xgo -r
+	@echo "Android cross compilation done."
+
 statusgo-android: xgo ##@cross-compile Build status-go for Android
 	./_assets/patches/patcher -b . -p geth-xgo
 	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=android-16/aar -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./lib
