@@ -19,7 +19,7 @@ Please, build status-go from GOPATH for proper build.
   GOPATH       = $(GOPATH) 
   Current dir  = $(CURDIR) 
   Expected dir = $(EXPECTED_PATH))
-See see https://golang.org/doc/code.html#GOPATH for more info
+See https://golang.org/doc/code.html#GOPATH for more info
 
 endef
 $(error $(NOT_IN_GOPATH_ERROR))
