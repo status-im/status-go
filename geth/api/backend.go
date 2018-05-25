@@ -354,6 +354,9 @@ func (b *StatusBackend) AppStateChange(state string) {
 
 // Logout clears whisper identities.
 func (b *StatusBackend) Logout() error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
 	// FIXME(oleg-raev): This method doesn't make stop, it rather resets its cells to an initial state
 	// and should be properly renamed, for example: ResetCells
 	b.jailManager.Stop()
@@ -398,6 +401,9 @@ func (b *StatusBackend) ReSelectAccount() error {
 // using provided password. Once verification is done, decrypted key is injected into Whisper (as a single identity,
 // all previous identities are removed).
 func (b *StatusBackend) SelectAccount(address, password string) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
 	// FIXME(oleg-raev): This method doesn't make stop, it rather resets its cells to an initial state
 	// and should be properly renamed, for example: ResetCells
 	b.jailManager.Stop()
