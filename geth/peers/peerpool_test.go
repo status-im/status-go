@@ -223,7 +223,7 @@ func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailover() {
 // - process peer B
 // - panic because discv5 is nil!!!
 func TestPeerPoolMaxPeersOverflow(t *testing.T) {
-	signals := make(chan string, 1)
+	signals := make(chan string, 10)
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var envelope struct {
 			Type string
