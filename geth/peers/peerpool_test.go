@@ -29,14 +29,22 @@ type PeerPoolSimulationSuite struct {
 
 	bootnode *p2p.Server
 	peers    []*p2p.Server
+	port     uint16
 }
 
 func TestPeerPoolSimulationSuite(t *testing.T) {
-	suite.Run(t, new(PeerPoolSimulationSuite))
+	s := new(PeerPoolSimulationSuite)
+	s.port = 33731
+	suite.Run(t, s)
+}
+
+func (s *PeerPoolSimulationSuite) nextPort() uint16 {
+	s.port++
+	return s.port
 }
 
 func (s *PeerPoolSimulationSuite) SetupTest() {
-	port := 33731
+	bootnodePort := s.nextPort()
 	key, _ := crypto.GenerateKey()
 	name := common.MakeName("bootnode", "1.0")
 	// 127.0.0.1 is invalidated by discovery v5
@@ -44,15 +52,14 @@ func (s *PeerPoolSimulationSuite) SetupTest() {
 		Config: p2p.Config{
 			MaxPeers:    10,
 			Name:        name,
-			ListenAddr:  fmt.Sprintf("0.0.0.0:%d", 33731),
+			ListenAddr:  fmt.Sprintf("0.0.0.0:%d", bootnodePort),
 			PrivateKey:  key,
 			DiscoveryV5: true,
 			NoDiscovery: true,
 		},
 	}
-	port++
 	s.Require().NoError(s.bootnode.Start())
-	bootnodeV5 := discv5.NewNode(s.bootnode.DiscV5.Self().ID, net.ParseIP("127.0.0.1"), uint16(port), uint16(port))
+	bootnodeV5 := discv5.NewNode(s.bootnode.DiscV5.Self().ID, net.ParseIP("127.0.0.1"), bootnodePort, bootnodePort)
 
 	// 1 peer to initiate connection, 1 peer as a first candidate, 1 peer - for failover
 	s.peers = make([]*p2p.Server, 3)
@@ -63,7 +70,7 @@ func (s *PeerPoolSimulationSuite) SetupTest() {
 			Config: p2p.Config{
 				MaxPeers:         10,
 				Name:             common.MakeName("peer-"+strconv.Itoa(i), "1.0"),
-				ListenAddr:       fmt.Sprintf("0.0.0.0:%d", port),
+				ListenAddr:       fmt.Sprintf("0.0.0.0:%d", s.nextPort()),
 				PrivateKey:       key,
 				DiscoveryV5:      true,
 				NoDiscovery:      true,
@@ -71,7 +78,6 @@ func (s *PeerPoolSimulationSuite) SetupTest() {
 				Protocols:        whisper.Protocols(),
 			},
 		}
-		port++
 		s.NoError(peer.Start())
 		s.peers[i] = peer
 	}
