@@ -37,6 +37,8 @@ const (
 	DefaultDiscV5Timeout = 3 * time.Minute
 	// DefaultTopicFastModeTimeout is a timeout after which sync mode is switched to slow mode.
 	DefaultTopicFastModeTimeout = 30 * time.Second
+	// DefaultTopicStopSearchDelay is the default delay when stopping a topic search.
+	DefaultTopicStopSearchDelay = 10 * time.Second
 )
 
 // Options is a struct with PeerPool configuration.
@@ -47,15 +49,19 @@ type Options struct {
 	DiscServerTimeout time.Duration
 	// AllowStop allows stopping Discovery when reaching max peers or after timeout.
 	AllowStop bool
+	// TopicStopSearchDelay time stopSearch will be waiting for max cached peers to be
+	// filled before really stopping the search.
+	TopicStopSearchDelay time.Duration
 }
 
-// NewDefaultOptions return a struct with default Options.
+// NewDefaultOptions returns a struct with default Options.
 func NewDefaultOptions() *Options {
 	return &Options{
-		FastSync:          DefaultFastSync,
-		SlowSync:          DefaultSlowSync,
-		DiscServerTimeout: DefaultDiscV5Timeout,
-		AllowStop:         false,
+		FastSync:             DefaultFastSync,
+		SlowSync:             DefaultSlowSync,
+		DiscServerTimeout:    DefaultDiscV5Timeout,
+		AllowStop:            false,
+		TopicStopSearchDelay: DefaultTopicStopSearchDelay,
 	}
 }
 
@@ -203,6 +209,7 @@ func (p *PeerPool) restartDiscovery(server *p2p.Server) error {
 // simplify the whole logic and allow to remove `timeout` field from `PeerPool`.
 func (p *PeerPool) handleServerPeers(server *p2p.Server, events <-chan *p2p.PeerEvent) {
 	var retryDiscv5 <-chan time.Time
+	var stopDiscv5 <-chan time.Time
 
 	for {
 		p.mu.RLock()
@@ -222,6 +229,8 @@ func (p *PeerPool) handleServerPeers(server *p2p.Server, events <-chan *p2p.Peer
 				retryDiscv5 = time.After(discoveryRestartTimeout)
 				log.Error("starting discv5 failed", "error", err, "retry", discoveryRestartTimeout)
 			}
+		case <-stopDiscv5:
+			p.handleStopTopics(server)
 		case event := <-events:
 			switch event.Type {
 			case p2p.PeerEventTypeDrop:
@@ -229,13 +238,11 @@ func (p *PeerPool) handleServerPeers(server *p2p.Server, events <-chan *p2p.Peer
 				if p.handleDroppedPeer(server, event.Peer) {
 					retryDiscv5 = time.After(0)
 				}
-			case p2p.PeerEventTypeAdd:
+			case p2p.PeerEventTypeAdd: // skip other events
 				log.Debug("confirm peer added", "ID", event.Peer)
-				if p.opts.AllowStop && p.handleAddedPeer(server, event.Peer) {
-					log.Debug("closing discv5 connection because all topics reached max limit", "server", server.Self())
-					p.stopDiscovery(server)
-				}
-			default: // skip other events
+				p.handleAddedPeer(server, event.Peer)
+				stopDiscv5 = time.After(p.opts.TopicStopSearchDelay)
+			default:
 				continue
 			}
 			SendDiscoverySummary(server.PeersInfo())
@@ -243,16 +250,44 @@ func (p *PeerPool) handleServerPeers(server *p2p.Server, events <-chan *p2p.Peer
 	}
 }
 
-// handleAddedPeer notifies all topics about added peer and return true if all topics has max limit of connections
-func (p *PeerPool) handleAddedPeer(server *p2p.Server, nodeID discover.NodeID) (all bool) {
+// handleAddedPeer notifies all topics about added peer.
+func (p *PeerPool) handleAddedPeer(server *p2p.Server, nodeID discover.NodeID) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	all = true
 	for _, t := range p.topics {
 		t.ConfirmAdded(server, nodeID)
 		if p.opts.AllowStop && t.MaxReached() {
+			t.setStopSearchTimeout(p.opts.TopicStopSearchDelay)
+		}
+	}
+}
+
+// handleStopTopics stops the search on any topics having reached its max cached
+// limit or its delay stop is expired, additionally will stop discovery if all
+// peers are stopped.
+func (p *PeerPool) handleStopTopics(server *p2p.Server) {
+	if !p.opts.AllowStop {
+		return
+	}
+	for _, t := range p.topics {
+		if t.readyToStopSearch() {
 			t.StopSearch()
-		} else {
+		}
+	}
+	if p.allTopicsStopped() {
+		log.Debug("closing discv5 connection because all topics reached max limit", "server", server.Self())
+		p.stopDiscovery(server)
+	}
+}
+
+// allTopicsStopped returns true if all topics are stopped.
+func (p *PeerPool) allTopicsStopped() (all bool) {
+	if !p.opts.AllowStop {
+		return false
+	}
+	all = true
+	for _, t := range p.topics {
+		if !t.isStopped() {
 			all = false
 		}
 	}

@@ -121,7 +121,7 @@ func (s *PeerPoolSimulationSuite) TestPeerPoolCache() {
 	config := map[discv5.Topic]params.Limits{
 		topic: params.NewLimits(1, 1),
 	}
-	peerPoolOpts := &Options{100 * time.Millisecond, 100 * time.Millisecond, 0, true}
+	peerPoolOpts := &Options{100 * time.Millisecond, 100 * time.Millisecond, 0, true, 100 * time.Millisecond}
 	cache, err := newInMemoryCache()
 	s.Require().NoError(err)
 	peerPool := NewPeerPool(config, cache, peerPoolOpts)
@@ -168,7 +168,7 @@ func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailover() {
 	config := map[discv5.Topic]params.Limits{
 		topic: params.NewLimits(1, 1), // limits are chosen for simplicity of the simulation
 	}
-	peerPoolOpts := &Options{100 * time.Millisecond, 100 * time.Millisecond, 0, true}
+	peerPoolOpts := &Options{100 * time.Millisecond, 100 * time.Millisecond, 0, true, 0}
 	cache, err := newInMemoryCache()
 	s.Require().NoError(err)
 	peerPool := NewPeerPool(config, cache, peerPoolOpts)
@@ -192,8 +192,8 @@ func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailover() {
 	connectedPeer := s.getPeerFromEvent(events, p2p.PeerEventTypeAdd)
 	s.Equal(s.peers[0].Self().ID, connectedPeer)
 	// as the upper limit was reached, Discovery should be stoped
-	s.Equal(signal.EventDiscoveryStopped, s.getPoolEvent(poolEvents))
 	s.Equal(signal.EventDiscoverySummary, s.getPoolEvent(poolEvents))
+	s.Equal(signal.EventDiscoveryStopped, s.getPoolEvent(poolEvents))
 	s.Len(<-summaries, 1)
 
 	// stop topic register and the connected peer
@@ -213,8 +213,8 @@ func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailover() {
 	defer register.Stop()
 	s.Equal(s.peers[2].Self().ID, s.getPeerFromEvent(events, p2p.PeerEventTypeAdd))
 	// Discovery can be stopped again.
-	s.Equal(signal.EventDiscoveryStopped, s.getPoolEvent(poolEvents))
 	s.Require().Equal(signal.EventDiscoverySummary, s.getPoolEvent(poolEvents))
+	s.Equal(signal.EventDiscoveryStopped, s.getPoolEvent(poolEvents))
 	s.Len(<-summaries, 1)
 }
 
@@ -225,6 +225,7 @@ func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailover() {
 // - process peer B
 // - panic because discv5 is nil!!!
 func TestPeerPoolMaxPeersOverflow(t *testing.T) {
+	maxCachedPeersMultiplier = 0
 	signals := make(chan string, 10)
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var envelope struct {
@@ -248,12 +249,13 @@ func TestPeerPoolMaxPeersOverflow(t *testing.T) {
 	defer peer.Stop()
 	require.NotNil(t, peer.DiscV5)
 
-	poolOpts := &Options{DefaultFastSync, DefaultSlowSync, 0, true}
+	poolOpts := &Options{DefaultFastSync, DefaultSlowSync, 0, true, 100 * time.Millisecond}
 	pool := NewPeerPool(nil, nil, poolOpts)
 	require.NoError(t, pool.Start(peer))
 	require.Equal(t, signal.EventDiscoveryStarted, <-signals)
 	// without config, it will stop the discovery because all topic pools are satisfied
 	pool.events <- &p2p.PeerEvent{Type: p2p.PeerEventTypeAdd}
+	require.Equal(t, signal.EventDiscoverySummary, <-signals)
 	require.Equal(t, signal.EventDiscoveryStopped, <-signals)
 	require.Nil(t, peer.DiscV5)
 	// another peer added after discovery is stopped should not panic
@@ -297,7 +299,7 @@ func TestPeerPoolDiscV5Timeout(t *testing.T) {
 	require.NotNil(t, server.DiscV5)
 
 	// start PeerPool
-	poolOpts := &Options{DefaultFastSync, DefaultSlowSync, time.Millisecond * 100, true}
+	poolOpts := &Options{DefaultFastSync, DefaultSlowSync, time.Millisecond * 100, true, 100 * time.Millisecond}
 	pool := NewPeerPool(nil, nil, poolOpts)
 	require.NoError(t, pool.Start(server))
 	require.Equal(t, signal.EventDiscoveryStarted, <-signals)
@@ -341,7 +343,7 @@ func TestPeerPoolNotAllowedStopping(t *testing.T) {
 	require.NotNil(t, server.DiscV5)
 
 	// start PeerPool
-	poolOpts := &Options{DefaultFastSync, DefaultSlowSync, time.Millisecond * 100, false}
+	poolOpts := &Options{DefaultFastSync, DefaultSlowSync, time.Millisecond * 100, false, 100 * time.Millisecond}
 	pool := NewPeerPool(nil, nil, poolOpts)
 	require.NoError(t, pool.Start(server))
 
