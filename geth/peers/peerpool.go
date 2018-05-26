@@ -113,6 +113,15 @@ func (p *PeerPool) Start(server *p2p.Server) error {
 	p.quit = make(chan struct{})
 	p.setDiscoveryTimeout()
 
+	// subscribe to peer events
+	p.events = make(chan *p2p.PeerEvent, 20)
+	p.serverSubscription = server.SubscribeEvents(p.events)
+	p.wg.Add(1)
+	go func() {
+		p.handleServerPeers(server, p.events)
+		p.wg.Done()
+	}()
+
 	// collect topics and start searching for nodes
 	p.topics = make([]*TopicPool, 0, len(p.config))
 	for topic, limits := range p.config {
@@ -125,15 +134,6 @@ func (p *PeerPool) Start(server *p2p.Server) error {
 
 	// discovery must be already started when pool is started
 	signal.SendDiscoveryStarted()
-
-	// subscribe to peer events
-	p.events = make(chan *p2p.PeerEvent, 20)
-	p.serverSubscription = server.SubscribeEvents(p.events)
-	p.wg.Add(1)
-	go func() {
-		p.handleServerPeers(server, p.events)
-		p.wg.Done()
-	}()
 
 	return nil
 }
