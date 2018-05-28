@@ -101,8 +101,7 @@ func (s *WMailServer) Init(shh *whisper.Whisper, config *params.WhisperConfig) e
 
 // setupLimiter in case limit is bigger than 0 it will setup an automated
 // limit db cleanup.
-func (s *WMailServer) setupLimiter(rateLimit time.Duration) {
-	limit := rateLimit * time.Second
+func (s *WMailServer) setupLimiter(limit time.Duration) {
 	if limit > 0 {
 		s.limit = newLimiter(limit)
 		s.setupMailServerCleanup(limit)
@@ -166,24 +165,27 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 		log.Error("Whisper peer is nil")
 		return
 	}
-	s.managePeerLimits(peer.ID())
+	if s.exceedsPeerRequests(peer.ID()) {
+		return
+	}
 
 	if ok, lower, upper, bloom := s.validateRequest(peer.ID(), request); ok {
 		s.processRequest(peer, lower, upper, bloom)
 	}
 }
 
-// managePeerLimits in case limit its been setup on the current server and limit
+// exceedsPeerRequests in case limit its been setup on the current server and limit
 // allows the query, it will store/update new query time for the current peer.
-func (s *WMailServer) managePeerLimits(peer []byte) {
+func (s *WMailServer) exceedsPeerRequests(peer []byte) bool {
 	if s.limit != nil {
 		peerID := string(peer)
 		if !s.limit.isAllowed(peerID) {
 			log.Info("peerID exceeded the number of requests per second")
-			return
+			return true
 		}
 		s.limit.add(peerID)
 	}
+	return false
 }
 
 // processRequest processes the current request and re-sends all stored messages

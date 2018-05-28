@@ -19,6 +19,9 @@ import (
 
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/signal"
+
+	// to access logs in the test with `-log` flag
+	_ "github.com/status-im/status-go/t/utils"
 )
 
 type PeerPoolSimulationSuite struct {
@@ -26,14 +29,22 @@ type PeerPoolSimulationSuite struct {
 
 	bootnode *p2p.Server
 	peers    []*p2p.Server
+	port     uint16
 }
 
 func TestPeerPoolSimulationSuite(t *testing.T) {
-	suite.Run(t, new(PeerPoolSimulationSuite))
+	s := new(PeerPoolSimulationSuite)
+	s.port = 33731
+	suite.Run(t, s)
+}
+
+func (s *PeerPoolSimulationSuite) nextPort() uint16 {
+	s.port++
+	return s.port
 }
 
 func (s *PeerPoolSimulationSuite) SetupTest() {
-	port := 33731
+	bootnodePort := s.nextPort()
 	key, _ := crypto.GenerateKey()
 	name := common.MakeName("bootnode", "1.0")
 	// 127.0.0.1 is invalidated by discovery v5
@@ -41,15 +52,14 @@ func (s *PeerPoolSimulationSuite) SetupTest() {
 		Config: p2p.Config{
 			MaxPeers:    10,
 			Name:        name,
-			ListenAddr:  fmt.Sprintf("0.0.0.0:%d", 33731),
+			ListenAddr:  fmt.Sprintf("0.0.0.0:%d", bootnodePort),
 			PrivateKey:  key,
 			DiscoveryV5: true,
 			NoDiscovery: true,
 		},
 	}
-	port++
 	s.Require().NoError(s.bootnode.Start())
-	bootnodeV5 := discv5.NewNode(s.bootnode.DiscV5.Self().ID, net.ParseIP("127.0.0.1"), uint16(port), uint16(port))
+	bootnodeV5 := discv5.NewNode(s.bootnode.DiscV5.Self().ID, net.ParseIP("127.0.0.1"), bootnodePort, bootnodePort)
 
 	// 1 peer to initiate connection, 1 peer as a first candidate, 1 peer - for failover
 	s.peers = make([]*p2p.Server, 3)
@@ -60,7 +70,7 @@ func (s *PeerPoolSimulationSuite) SetupTest() {
 			Config: p2p.Config{
 				MaxPeers:         10,
 				Name:             common.MakeName("peer-"+strconv.Itoa(i), "1.0"),
-				ListenAddr:       fmt.Sprintf("0.0.0.0:%d", port),
+				ListenAddr:       fmt.Sprintf("0.0.0.0:%d", s.nextPort()),
 				PrivateKey:       key,
 				DiscoveryV5:      true,
 				NoDiscovery:      true,
@@ -68,7 +78,6 @@ func (s *PeerPoolSimulationSuite) SetupTest() {
 				Protocols:        whisper.Protocols(),
 			},
 		}
-		port++
 		s.NoError(peer.Start())
 		s.peers[i] = peer
 	}
@@ -87,7 +96,8 @@ func (s *PeerPoolSimulationSuite) getPeerFromEvent(events <-chan *p2p.PeerEvent,
 		if ev.Type == etype {
 			return ev.Peer
 		}
-	case <-time.After(5 * time.Second):
+		s.Failf("invalid event", "expected %s but got %s for peer %s", etype, ev.Type, ev.Peer)
+	case <-time.After(10 * time.Second):
 		s.Fail("timed out waiting for a peer")
 		return
 	}
@@ -98,25 +108,51 @@ func (s *PeerPoolSimulationSuite) getPoolEvent(events <-chan string) string {
 	select {
 	case ev := <-events:
 		return ev
-	case <-time.After(time.Second):
-		s.FailNow("timed out waiting for a peer")
+	case <-time.After(10 * time.Second):
+		s.FailNow("timed out waiting a pool event")
 		return ""
 	}
 }
 
+func (s *PeerPoolSimulationSuite) TestPeerPoolCache() {
+	var err error
+
+	topic := discv5.Topic("cap=test")
+	config := map[discv5.Topic]params.Limits{
+		topic: params.NewLimits(1, 1),
+	}
+	peerPoolOpts := &Options{100 * time.Millisecond, 100 * time.Millisecond, 0, true}
+	cache, err := newInMemoryCache()
+	s.Require().NoError(err)
+	peerPool := NewPeerPool(config, cache, peerPoolOpts)
+
+	// start peer pool
+	s.Require().NoError(peerPool.Start(s.peers[1]))
+	defer peerPool.Stop()
+
+	// check if cache is passed to topic pools
+	for _, topicPool := range peerPool.topics {
+		s.Equal(cache, topicPool.cache)
+	}
+}
+
 func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailover() {
-	poolEvents := make(chan string, 1)
-	summaries := make(chan []*p2p.PeerInfo, 1)
+	var err error
+
+	// Buffered channels must be used because we expect the events
+	// to be in the same order. Use a buffer length greater than
+	// the expected number of events to avoid deadlock.
+	poolEvents := make(chan string, 10)
+	summaries := make(chan []*p2p.PeerInfo, 10)
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var envelope struct {
 			Type  string
 			Event json.RawMessage
 		}
 		s.NoError(json.Unmarshal([]byte(jsonEvent), &envelope))
-		switch envelope.Type {
-		case signal.EventDiscoveryStarted:
-			poolEvents <- envelope.Type
-		case signal.EventDiscoveryStopped:
+
+		switch typ := envelope.Type; typ {
+		case signal.EventDiscoveryStarted, signal.EventDiscoveryStopped:
 			poolEvents <- envelope.Type
 		case signal.EventDiscoverySummary:
 			poolEvents <- envelope.Type
@@ -124,9 +160,9 @@ func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailover() {
 			s.NoError(json.Unmarshal(envelope.Event, &summary))
 			summaries <- summary
 		}
-
 	})
 	defer signal.ResetDefaultNodeNotificationHandler()
+
 	topic := discv5.Topic("cap=test")
 	// simulation should only rely on fast sync
 	config := map[discv5.Topic]params.Limits{
@@ -136,50 +172,48 @@ func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailover() {
 	cache, err := newInMemoryCache()
 	s.Require().NoError(err)
 	peerPool := NewPeerPool(config, cache, peerPoolOpts)
+
+	// create and start topic registry
 	register := NewRegister(topic)
-	s.Require().NoError(register.Start(s.peers[0]))
-	// need to wait for topic to get registered, discv5 can query same node
-	// for a topic only once a minute
+	err = register.Start(s.peers[0])
+	s.Require().NoError(err)
+
+	// subscribe for peer events before starting the peer pool
 	events := make(chan *p2p.PeerEvent, 20)
 	subscription := s.peers[1].SubscribeEvents(events)
 	defer subscription.Unsubscribe()
-	s.NoError(peerPool.Start(s.peers[1]))
+
+	// start the peer pool
+	s.Require().NoError(peerPool.Start(s.peers[1]))
 	defer peerPool.Stop()
 	s.Equal(signal.EventDiscoveryStarted, s.getPoolEvent(poolEvents))
-	connected := s.getPeerFromEvent(events, p2p.PeerEventTypeAdd)
-	s.Equal(s.peers[0].Self().ID, connected)
+	connectedPeer := s.getPeerFromEvent(events, p2p.PeerEventTypeAdd)
+	s.Equal(s.peers[0].Self().ID, connectedPeer)
+	// as the upper limit was reached, Discovery should be stoped
 	s.Equal(signal.EventDiscoveryStopped, s.getPoolEvent(poolEvents))
-	s.Require().Nil(s.peers[1].DiscV5)
+	s.Equal(signal.EventDiscoverySummary, s.getPoolEvent(poolEvents))
+	s.Len(<-summaries, 1)
 
-	s.Require().Equal(signal.EventDiscoverySummary, s.getPoolEvent(poolEvents))
-	summary := <-summaries
-	s.Len(summary, 1)
-
+	// stop topic register and the connected peer
 	register.Stop()
 	s.peers[0].Stop()
-	disconnected := s.getPeerFromEvent(events, p2p.PeerEventTypeDrop)
-	s.Equal(connected, disconnected)
-
-	s.Require().Equal(signal.EventDiscoverySummary, s.getPoolEvent(poolEvents))
-	summary = <-summaries
-	s.Len(summary, 0)
-
+	disconnectedPeer := s.getPeerFromEvent(events, p2p.PeerEventTypeDrop)
+	s.Equal(connectedPeer, disconnectedPeer)
+	s.Equal(signal.EventDiscoverySummary, s.getPoolEvent(poolEvents))
+	s.Len(<-summaries, 0)
+	// Discovery should be restarted because the number of peers dropped
+	// below the lower limit.
 	s.Equal(signal.EventDiscoveryStarted, s.getPoolEvent(poolEvents))
-	s.Require().NotNil(s.peers[1].DiscV5)
-	s.Require().NoError(register.Start(s.peers[2]))
+
+	// register the second peer
+	err = register.Start(s.peers[2])
+	s.Require().NoError(err)
 	defer register.Stop()
 	s.Equal(s.peers[2].Self().ID, s.getPeerFromEvent(events, p2p.PeerEventTypeAdd))
-
+	// Discovery can be stopped again.
 	s.Equal(signal.EventDiscoveryStopped, s.getPoolEvent(poolEvents))
 	s.Require().Equal(signal.EventDiscoverySummary, s.getPoolEvent(poolEvents))
-
-	summary = <-summaries
-	s.Len(summary, 1)
-
-	// verify that we are actually using cache
-	cachedPeers := peerPool.cache.GetPeersRange(topic, 1)
-	s.Len(cachedPeers, 1)
-	s.Equal(s.peers[2].Self().ID, discover.NodeID(cachedPeers[0].ID))
+	s.Len(<-summaries, 1)
 }
 
 // TestPeerPoolMaxPeersOverflow verifies that following scenario will not occur:
@@ -189,7 +223,7 @@ func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailover() {
 // - process peer B
 // - panic because discv5 is nil!!!
 func TestPeerPoolMaxPeersOverflow(t *testing.T) {
-	signals := make(chan string, 1)
+	signals := make(chan string, 10)
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var envelope struct {
 			Type string

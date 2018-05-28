@@ -240,6 +240,24 @@ var loadConfigTestCases = []struct {
 		},
 	},
 	{
+		`custom boot nodes`,
+		`{
+			"NetworkId": 3,
+			"DataDir": "$TMPDIR",
+                        "ClusterConfig": {
+                          "BootNodes": ["a", "b", "c"]
+                        }
+		}`,
+		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
+			require.NoError(t, err)
+
+			enodes := nodeConfig.ClusterConfig.BootNodes
+			expectedEnodes := []string{"a", "b", "c"}
+
+			require.Equal(t, enodes, expectedEnodes)
+		},
+	},
+	{
 		`illegal cluster configuration file`,
 		`{
 			"NetworkId": 3,

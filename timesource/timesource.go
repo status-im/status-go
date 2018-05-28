@@ -2,6 +2,7 @@ package timesource
 
 import (
 	"bytes"
+	"errors"
 	"sort"
 	"sync"
 	"time"
@@ -14,10 +15,15 @@ import (
 
 const (
 	// DefaultMaxAllowedFailures defines how many failures will be tolerated.
-	DefaultMaxAllowedFailures = 2
+	DefaultMaxAllowedFailures = 1
 
-	// DefaultUpdatePeriod defines how often time will be queried from ntp.
-	DefaultUpdatePeriod = 2 * time.Minute
+	// FastNTPSyncPeriod period between ntp synchronizations before the first
+	// successful connection.
+	FastNTPSyncPeriod = 2 * time.Minute
+
+	// SlowNTPSyncPeriod period between ntp synchronizations after the first
+	// successful connection.
+	SlowNTPSyncPeriod = 1 * time.Hour
 
 	// DefaultRPCTimeout defines write deadline for single ntp server request.
 	DefaultRPCTimeout = 2 * time.Second
@@ -31,6 +37,7 @@ var defaultServers = []string{
 	"2.pool.ntp.org",
 	"3.pool.ntp.org",
 }
+var errUpdateOffset = errors.New("failed to compute offset")
 
 type ntpQuery func(string, ntp.QueryOptions) (*ntp.Response, error)
 
@@ -107,20 +114,22 @@ func computeOffset(timeQuery ntpQuery, servers []string, allowedFailures int) (t
 // Default initializes time source with default config values.
 func Default() *NTPTimeSource {
 	return &NTPTimeSource{
-		servers:         defaultServers,
-		allowedFailures: DefaultMaxAllowedFailures,
-		updatePeriod:    DefaultUpdatePeriod,
-		timeQuery:       ntp.QueryWithOptions,
+		servers:           defaultServers,
+		allowedFailures:   DefaultMaxAllowedFailures,
+		fastNTPSyncPeriod: FastNTPSyncPeriod,
+		slowNTPSyncPeriod: SlowNTPSyncPeriod,
+		timeQuery:         ntp.QueryWithOptions,
 	}
 }
 
 // NTPTimeSource provides source of time that tries to be resistant to time skews.
 // It does so by periodically querying time offset from ntp servers.
 type NTPTimeSource struct {
-	servers         []string
-	allowedFailures int
-	updatePeriod    time.Duration
-	timeQuery       ntpQuery // for ease of testing
+	servers           []string
+	allowedFailures   int
+	fastNTPSyncPeriod time.Duration
+	slowNTPSyncPeriod time.Duration
+	timeQuery         ntpQuery // for ease of testing
 
 	quit chan struct{}
 	wg   sync.WaitGroup
@@ -136,37 +145,49 @@ func (s *NTPTimeSource) Now() time.Time {
 	return time.Now().Add(s.latestOffset)
 }
 
-func (s *NTPTimeSource) updateOffset() {
+func (s *NTPTimeSource) updateOffset() error {
 	offset, err := computeOffset(s.timeQuery, s.servers, s.allowedFailures)
 	if err != nil {
 		log.Error("failed to compute offset", "error", err)
-		return
+		return errUpdateOffset
 	}
 	log.Info("Difference with ntp servers", "offset", offset)
 	s.mu.Lock()
 	s.latestOffset = offset
 	s.mu.Unlock()
+	return nil
 }
 
-// Start runs a goroutine that updates local offset every updatePeriod.
-func (s *NTPTimeSource) Start(*p2p.Server) error {
+// runPeriodically runs periodically the given function based on NTPTimeSource
+// synchronization limits (fastNTPSyncPeriod / slowNTPSyncPeriod)
+func (s *NTPTimeSource) runPeriodically(fn func() error) error {
+	var period time.Duration
 	s.quit = make(chan struct{})
-	ticker := time.NewTicker(s.updatePeriod)
 	// we try to do it synchronously so that user can have reliable messages right away
-	s.updateOffset()
 	s.wg.Add(1)
 	go func() {
 		for {
 			select {
-			case <-ticker.C:
-				s.updateOffset()
+			case <-time.After(period):
+				if err := fn(); err == nil {
+					period = s.slowNTPSyncPeriod
+				} else if period != s.slowNTPSyncPeriod {
+					period = s.fastNTPSyncPeriod
+				}
+
 			case <-s.quit:
 				s.wg.Done()
 				return
 			}
 		}
 	}()
+
 	return nil
+}
+
+// Start runs a goroutine that updates local offset every updatePeriod.
+func (s *NTPTimeSource) Start(*p2p.Server) error {
+	return s.runPeriodically(s.updateOffset)
 }
 
 // Stop goroutine that updates time source.
