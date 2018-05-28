@@ -1,6 +1,7 @@
 package benchmarks
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"testing"
@@ -51,31 +52,28 @@ func TestSendMessages(t *testing.T) {
 	batchSent := make(chan struct{})
 	envelopesSent := int64(0)
 	go func() {
-		for {
-			select {
-			case ev := <-envelopeEvents:
-				if ev.Event != whisper.EventEnvelopeSent {
-					continue
-				}
+		for ev := range envelopeEvents {
+			if ev.Event != whisper.EventEnvelopeSent {
+				continue
+			}
 
-				envelopesSent++
+			envelopesSent++
 
-				if envelopesSent%(*msgBatchSize) == 0 {
-					fmt.Printf("Sent a batch and %d messages\n", envelopesSent)
-					batchSent <- struct{}{}
-				}
+			if envelopesSent%(*msgBatchSize) == 0 {
+				fmt.Printf("Sent a batch and %d messages\n", envelopesSent)
+				batchSent <- struct{}{}
+			}
 
-				if envelopesSent == *msgCount {
-					fmt.Println("Sent all messages")
-					close(batchSent)
-					return
-				}
+			if envelopesSent == *msgCount {
+				fmt.Println("Sent all messages")
+				close(batchSent)
+				return
 			}
 		}
 	}()
 
 	for i := int64(1); i <= *msgCount; i++ {
-		_, err := shhAPI.Post(nil, whisper.NewMessage{
+		_, err := shhAPI.Post(context.TODO(), whisper.NewMessage{
 			SymKeyID:  symKeyID,
 			TTL:       30,
 			Topic:     topic,

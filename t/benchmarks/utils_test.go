@@ -41,14 +41,12 @@ func addPeerWithConfirmation(server *p2p.Server, node *discover.Node) error {
 
 	server.AddPeer(node)
 
-	select {
-	case ev := <-ch:
-		if ev.Type == p2p.PeerEventTypeAdd && ev.Peer == node.ID {
-			return nil
-		}
-
+	ev := <-ch
+	if ev.Type != p2p.PeerEventTypeAdd || ev.Peer != node.ID {
 		return fmt.Errorf("got unexpected event: %+v", ev)
 	}
+
+	return nil
 }
 
 func createWhisperService() *whisper.Whisper {

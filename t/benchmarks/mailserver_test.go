@@ -1,6 +1,7 @@
 package benchmarks
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -75,10 +76,10 @@ func testMailserverPeer(t *testing.T) {
 	// request messages from mail server
 	symKeyID, err := shhService.AddSymKeyFromPassword(mailServerPass)
 	require.NoError(t, err)
-	ok, err := shhAPI.MarkTrustedPeer(nil, *peerURL)
+	ok, err := shhAPI.MarkTrustedPeer(context.TODO(), *peerURL)
 	require.NoError(t, err)
 	require.True(t, ok)
-	ok, err = shhextAPI.RequestMessages(nil, shhext.MessagesRequest{
+	ok, err = shhextAPI.RequestMessages(context.TODO(), shhext.MessagesRequest{
 		MailServerPeer: *peerURL,
 		SymKeyID:       symKeyID,
 		Topic:          topic,
@@ -91,21 +92,20 @@ func testMailserverPeer(t *testing.T) {
 
 func waitForMessages(t *testing.T, messagesCount int64, shhAPI *whisper.PublicWhisperAPI, filterID string) error {
 	received := int64(0)
-	for {
-		select {
-		case <-time.After(time.Second):
-			messages, err := shhAPI.GetFilterMessages(filterID)
-			if err != nil {
-				return err
-			}
+	for range time.After(time.Second) {
+		messages, err := shhAPI.GetFilterMessages(filterID)
+		if err != nil {
+			return err
+		}
 
-			received += int64(len(messages))
+		received += int64(len(messages))
 
-			fmt.Printf("Received %d messages so far\n", received)
+		fmt.Printf("Received %d messages so far\n", received)
 
-			if received >= messagesCount {
-				return nil
-			}
+		if received >= messagesCount {
+			return nil
 		}
 	}
+
+	return nil
 }
