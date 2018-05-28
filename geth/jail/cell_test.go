@@ -92,8 +92,8 @@ func (s *CellTestSuite) TestCellFetchRace() {
 	defer server.Close()
 
 	cell := s.cell
-	dataCh := make(chan otto.Value, 1)
-	errCh := make(chan otto.Value, 1)
+	dataCh := make(chan otto.Value, requestCount)
+	errCh := make(chan otto.Value, requestCount)
 
 	err := cell.Set("__captureSuccess", func(res otto.Value) { dataCh <- res })
 	s.NoError(err)
