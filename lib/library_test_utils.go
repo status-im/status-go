@@ -1099,7 +1099,7 @@ func testDiscardTransaction(t *testing.T) bool { //nolint: gocyclo
 		To:    account.ToAddress(TestConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 	})
-	time.Sleep(5 * time.Second)
+
 	if err != sign.ErrSignReqDiscarded {
 		t.Errorf("expected error not thrown: %v", err)
 		return false
