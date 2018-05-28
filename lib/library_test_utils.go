@@ -1074,7 +1074,7 @@ func testDiscardTransaction(t *testing.T) bool { //nolint: gocyclo
 
 		if envelope.Type == signal.EventSignRequestFailed {
 			event := envelope.Event.(map[string]interface{})
-			t.Logf("transaction return event received: {id: %s}\n", event["id"].(string))
+			t.Logf("transaction return event received: %+v\n", event)
 
 			receivedErrMessage := event["error_message"].(string)
 			expectedErrMessage := sign.ErrSignReqDiscarded.Error()
@@ -1099,7 +1099,7 @@ func testDiscardTransaction(t *testing.T) bool { //nolint: gocyclo
 		To:    account.ToAddress(TestConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 	})
-	time.Sleep(1 * time.Second)
+	time.Sleep(5 * time.Second)
 	if err != sign.ErrSignReqDiscarded {
 		t.Errorf("expected error not thrown: %v", err)
 		return false
