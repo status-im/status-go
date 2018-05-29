@@ -173,6 +173,11 @@ func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailover() {
 	s.Require().NoError(err)
 	peerPool := NewPeerPool(config, cache, peerPoolOpts)
 
+	// create and start topic registry
+	register := NewRegister(topic)
+	err = register.Start(s.peers[0])
+	s.Require().NoError(err)
+
 	// subscribe for peer events before starting the peer pool
 	events := make(chan *p2p.PeerEvent, 20)
 	subscription := s.peers[1].SubscribeEvents(events)
@@ -182,11 +187,6 @@ func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailover() {
 	s.Require().NoError(peerPool.Start(s.peers[1]))
 	defer peerPool.Stop()
 	s.Equal(signal.EventDiscoveryStarted, s.getPoolEvent(poolEvents))
-
-	// create and start topic registry
-	register := NewRegister(topic)
-	err = register.Start(s.peers[0])
-	s.Require().NoError(err)
 
 	// wait for the peer to be found and connected
 	connectedPeer := s.getPeerFromEvent(events, p2p.PeerEventTypeAdd)

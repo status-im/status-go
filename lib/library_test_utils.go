@@ -1102,7 +1102,6 @@ func testDiscardTransaction(t *testing.T) bool { //nolint: gocyclo
 
 	select {
 	case <-txFailedEventCalled:
-		return true
 	case <-time.After(time.Second * 10):
 		t.Error("expected tx failure signal is not received")
 		return false
@@ -1122,6 +1121,8 @@ func testDiscardTransaction(t *testing.T) bool { //nolint: gocyclo
 		t.Error("tx queue must be empty at this point")
 		return false
 	}
+
+	return true
 }
 
 func testDiscardMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocyclo
