@@ -187,6 +187,8 @@ func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailover() {
 	s.Require().NoError(peerPool.Start(s.peers[1]))
 	defer peerPool.Stop()
 	s.Equal(signal.EventDiscoveryStarted, s.getPoolEvent(poolEvents))
+
+	// wait for the peer to be found and connected
 	connectedPeer := s.getPeerFromEvent(events, p2p.PeerEventTypeAdd)
 	s.Equal(s.peers[0].Self().ID, connectedPeer)
 	// as the upper limit was reached, Discovery should be stoped

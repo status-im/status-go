@@ -232,16 +232,16 @@ func TestStatusNodeReconnectStaticPeers(t *testing.T) {
 		require.NoError(t, <-errCh)
 	}
 	require.Equal(t, 1, n.PeerCount())
+	require.Equal(t, peer.Server().Self().ID.String(), n.GethNode().Server().PeersInfo()[0].ID)
 
 	// reconnect static peers
-	errCh = waitForPeerAsync(n, peerURL, p2p.PeerEventTypeDrop, time.Second*30)
+	errDropCh := waitForPeerAsync(n, peerURL, p2p.PeerEventTypeDrop, time.Second*30)
+	// it takes at least 30 seconds to bring back previously connected peer
+	errAddCh := waitForPeerAsync(n, peerURL, p2p.PeerEventTypeAdd, time.Second*60)
 	require.NoError(t, n.ReconnectStaticPeers())
 	// first check if a peer gets disconnected
-	require.NoError(t, <-errCh)
-	// it takes at least 30 seconds to bring back previously connected peer
-	errCh = waitForPeerAsync(n, peerURL, p2p.PeerEventTypeAdd, time.Second*60)
-	require.NoError(t, <-errCh)
-	require.Equal(t, 1, n.PeerCount())
+	require.NoError(t, <-errDropCh)
+	require.NoError(t, <-errAddCh)
 }
 
 func isPeerConnected(node *StatusNode, peerURL string) (bool, error) {

@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/robertkrimen/otto"
+
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
 	"github.com/status-im/status-go/geth/jail"
@@ -253,6 +255,10 @@ func (s *JailRPCTestSuite) TestJailVMPersistence() {
 	err := s.Backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	s.NoError(err, "cannot select account: %v", TestConfig.Account1.Address)
 
+	// there are two `sendTestTx` calls in `testCases`
+	var wgTransctions sync.WaitGroup
+	wgTransctions.Add(2)
+
 	type testCase struct {
 		command   string
 		params    string
@@ -323,6 +329,7 @@ func (s *JailRPCTestSuite) TestJailVMPersistence() {
 		  web3.eth.sendTransaction(transaction, function (error, result) {
 			 if(!error) {
 				total += Number(amount);
+				_done();
 			 }
 		  });
 		}
@@ -331,7 +338,17 @@ func (s *JailRPCTestSuite) TestJailVMPersistence() {
 	`)
 	s.NotContains(parseResult, "error", "further will fail if initial parsing failed")
 
-	var wg sync.WaitGroup
+	cell, err := jail.Cell(testChatID)
+	s.NoError(err)
+
+	// create a bridge between JS code and Go
+	// to notify when the tx callback is called
+	err = cell.Set("_done", func(call otto.FunctionCall) otto.Value {
+		wgTransctions.Done()
+		return otto.UndefinedValue()
+	})
+	s.NoError(err)
+
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var envelope signal.Envelope
 		if e := json.Unmarshal([]byte(jsonEvent), &envelope); e != nil {
@@ -348,12 +365,12 @@ func (s *JailRPCTestSuite) TestJailVMPersistence() {
 			s.NoError(result.Error, "cannot complete queued transaction[%v]: %v", event["id"], result.Error)
 
 			txHash.SetBytes(result.Response.Bytes())
-
-			s.T().Logf("Transaction complete: https://rinkeby.etherscan.io/tx/%s", txHash.Hex())
+			s.T().Logf("Transaction complete: %s", txHash.Hex())
 		}
 	})
 
 	// run commands concurrently
+	var wg sync.WaitGroup
 	for _, tc := range testCases {
 		wg.Add(1)
 		go func(tc testCase) {
@@ -371,6 +388,7 @@ func (s *JailRPCTestSuite) TestJailVMPersistence() {
 	finishTestCases := make(chan struct{})
 	go func() {
 		wg.Wait()
+		wgTransctions.Wait()
 		close(finishTestCases)
 	}()
 
@@ -380,14 +398,7 @@ func (s *JailRPCTestSuite) TestJailVMPersistence() {
 		s.FailNow("some tests failed to finish in time")
 	}
 
-	// Wait till eth_sendTransaction callbacks have been executed.
-	// FIXME(tiabc): more reliable means of testing that.
-	time.Sleep(5 * time.Second)
-
 	// Validate total.
-	cell, err := jail.Cell(testChatID)
-	s.NoError(err)
-
 	totalOtto, err := cell.Get("total")
 	s.NoError(err)
 
