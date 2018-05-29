@@ -343,10 +343,11 @@ func (s *JailRPCTestSuite) TestJailVMPersistence() {
 
 	// create a bridge between JS code and Go
 	// to notify when the tx callback is called
-	cell.Set("_done", func(call otto.FunctionCall) otto.Value {
+	err = cell.Set("_done", func(call otto.FunctionCall) otto.Value {
 		wgTransctions.Done()
 		return otto.UndefinedValue()
 	})
+	s.NoError(err)
 
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var envelope signal.Envelope
