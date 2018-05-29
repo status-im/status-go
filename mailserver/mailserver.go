@@ -235,7 +235,7 @@ func (s *WMailServer) processRequest(peer *whisper.Peer, lower, upper uint32, bl
 				}
 			}
 			sentEnvelopes++
-			sentEnvelopesSize = whisper.EnvelopeHeaderLength + int64(len(envelope.Data))
+			sentEnvelopesSize += whisper.EnvelopeHeaderLength + int64(len(envelope.Data))
 		}
 	}
 
