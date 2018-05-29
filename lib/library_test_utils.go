@@ -1100,6 +1100,14 @@ func testDiscardTransaction(t *testing.T) bool { //nolint: gocyclo
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 	})
 
+	select {
+	case <-txFailedEventCalled:
+		return true
+	case <-time.After(time.Second * 10):
+		t.Error("expected tx failure signal is not received")
+		return false
+	}
+
 	if err != sign.ErrSignReqDiscarded {
 		t.Errorf("expected error not thrown: %v", err)
 		return false
@@ -1112,14 +1120,6 @@ func testDiscardTransaction(t *testing.T) bool { //nolint: gocyclo
 
 	if signRequests.Count() != 0 {
 		t.Error("tx queue must be empty at this point")
-		return false
-	}
-
-	select {
-	case <-txFailedEventCalled:
-		return true
-	default:
-		t.Error("expected tx failure signal is not received")
 		return false
 	}
 }
