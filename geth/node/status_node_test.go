@@ -159,9 +159,10 @@ func TestStatusNodeAddPeer(t *testing.T) {
 
 	peer, err := gethnode.New(&gethnode.Config{
 		P2P: p2p.Config{
-			MaxPeers:    math.MaxInt32,
-			NoDiscovery: true,
-			ListenAddr:  ":0",
+			MaxPeers:       math.MaxInt32,
+			NoDiscovery:    true,
+			ListenAddr:     ":0",
+			InboundPercent: 50,
 		},
 	})
 	require.NoError(t, err)
@@ -194,9 +195,10 @@ func TestStatusNodeReconnectStaticPeers(t *testing.T) {
 
 	peer, err := gethnode.New(&gethnode.Config{
 		P2P: p2p.Config{
-			MaxPeers:    math.MaxInt32,
-			NoDiscovery: true,
-			ListenAddr:  ":0",
+			MaxPeers:       math.MaxInt32,
+			NoDiscovery:    true,
+			ListenAddr:     ":0",
+			InboundPercent: 50,
 		},
 	})
 	require.NoError(t, err)
