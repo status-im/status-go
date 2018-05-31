@@ -69,6 +69,7 @@ func (s *PeerPoolSimulationSuite) SetupTest() {
 		peer := &p2p.Server{
 			Config: p2p.Config{
 				MaxPeers:         10,
+				InboundPercent:   50,
 				Name:             common.MakeName("peer-"+strconv.Itoa(i), "1.0"),
 				ListenAddr:       fmt.Sprintf("0.0.0.0:%d", s.nextPort()),
 				PrivateKey:       key,

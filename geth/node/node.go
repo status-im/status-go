@@ -18,7 +18,6 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
-	"github.com/ethereum/go-ethereum/p2p/nat"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/mailserver"
@@ -118,8 +117,8 @@ func defaultEmbeddedNodeConfig(config *params.NodeConfig) *node.Config {
 			NoDiscovery:     true, // we always use only v5 server
 			DiscoveryV5:     !config.NoDiscovery,
 			ListenAddr:      config.ListenAddr,
-			NAT:             nat.Any(),
 			MaxPeers:        config.MaxPeers,
+			InboundPercent:  config.InboundPercent,
 			MaxPendingPeers: config.MaxPendingPeers,
 		},
 		IPCPath:          makeIPCPath(config),
