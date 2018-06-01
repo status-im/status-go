@@ -4,11 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/big"
 	"sync"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
 	gethnode "github.com/ethereum/go-ethereum/node"
 
@@ -253,24 +251,16 @@ func (b *StatusBackend) getVerifiedAccount(password string) (*account.SelectedEx
 	return selectedAccount, nil
 }
 
-// prepareTxArgs given gas and gasPrice will prepare a valid sign.TxArgs.
-func (b *StatusBackend) prepareTxArgs(gas, gasPrice int64) (args sign.TxArgs) {
-	if gas > 0 {
-		g := hexutil.Uint64(gas)
-		args.Gas = &g
-	}
-	if gasPrice > 0 {
-		gp := (*hexutil.Big)(big.NewInt(gasPrice))
-		args.GasPrice = gp
-	}
-	return
+// ApproveSignRequest instructs backend to complete sending of a given transaction.
+func (b *StatusBackend) ApproveSignRequest(id, password string) sign.Result {
+	return b.pendingSignRequests.Approve(id, password, nil, b.getVerifiedAccount)
 }
 
-// ApproveSignRequest instructs backend to complete sending of a given transaction.
-// Empty values for gas or gasPrice will preserve values for these properties
-// as they were defined on the transaction initialization.
-func (b *StatusBackend) ApproveSignRequest(id, password string, gas, gasPrice int64) sign.Result {
-	args := b.prepareTxArgs(gas, gasPrice)
+// ApproveSignRequestWithArgs instructs backend to complete sending of a given transaction.
+// gas and gasPrice will be overrided with the given values before signing the
+// transaction.
+func (b *StatusBackend) ApproveSignRequestWithArgs(id, password string, gas, gasPrice int64) sign.Result {
+	args := prepareTxArgs(gas, gasPrice)
 	return b.pendingSignRequests.Approve(id, password, &args, b.getVerifiedAccount)
 }
 
@@ -278,7 +268,7 @@ func (b *StatusBackend) ApproveSignRequest(id, password string, gas, gasPrice in
 func (b *StatusBackend) ApproveSignRequests(ids []string, password string) map[string]sign.Result {
 	results := make(map[string]sign.Result)
 	for _, txID := range ids {
-		results[txID] = b.ApproveSignRequest(txID, password, 0, 0)
+		results[txID] = b.ApproveSignRequest(txID, password)
 	}
 	return results
 }

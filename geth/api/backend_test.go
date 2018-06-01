@@ -246,7 +246,6 @@ func TestBackendCallRPCConcurrently(t *testing.T) {
 }
 
 func TestPrepareTxArgs(t *testing.T) {
-	b := NewStatusBackend()
 	var flagtests = []struct {
 		description      string
 		gas              int64
@@ -291,7 +290,7 @@ func TestPrepareTxArgs(t *testing.T) {
 	}
 	for _, tt := range flagtests {
 		t.Run(tt.description, func(t *testing.T) {
-			args := b.prepareTxArgs(tt.gas, tt.gasPrice)
+			args := prepareTxArgs(tt.gas, tt.gasPrice)
 			assert.Equal(t, tt.expectedGas, args.Gas)
 			assert.Equal(t, tt.expectedGasPrice, args.GasPrice)
 		})

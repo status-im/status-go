@@ -158,7 +158,7 @@ func (s *JailRPCTestSuite) testContractDeployment(upstream bool) {
 			s.T().Logf("transaction queued and will be completed shortly, id: %v", event["id"])
 
 			txID := event["id"].(string)
-			result := s.Backend.ApproveSignRequest(txID, TestConfig.Account1.Password, 0, 0)
+			result := s.Backend.ApproveSignRequest(txID, TestConfig.Account1.Password)
 			txHash.SetBytes(result.Response.Bytes())
 			if s.NoError(result.Error, event["id"]) {
 				s.T().Logf("contract transaction complete, URL: %s", "https://rinkeby.etherscan.io/tx/"+txHash.Hex())
@@ -361,7 +361,7 @@ func (s *JailRPCTestSuite) TestJailVMPersistence() {
 
 			var txHash gethcommon.Hash
 			txID := event["id"].(string)
-			result := s.Backend.ApproveSignRequest(txID, TestConfig.Account1.Password, 0, 0)
+			result := s.Backend.ApproveSignRequest(txID, TestConfig.Account1.Password)
 			s.NoError(result.Error, "cannot complete queued transaction[%v]: %v", event["id"], result.Error)
 
 			txHash.SetBytes(result.Response.Bytes())

@@ -73,7 +73,7 @@ func (t *Transactor) SendTransaction(ctx context.Context, args SendTxArgs) (geth
 	}
 
 	completeFunc := func(acc *account.SelectedExtKey, password string, signArgs *sign.TxArgs) (sign.Response, error) {
-		t.overrideSignTxArgs(signArgs, &args)
+		t.mergeSignTxArgsOntoSendTxArgs(signArgs, &args)
 		hash, err := t.validateAndPropagate(acc, args)
 		return sign.Response(hash.Bytes()), err
 	}
@@ -205,7 +205,7 @@ func (t *Transactor) validateAndPropagate(selectedAccount *account.SelectedExtKe
 	return signedTx.Hash(), nil
 }
 
-func (t *Transactor) overrideSignTxArgs(signArgs *sign.TxArgs, args *SendTxArgs) {
+func (t *Transactor) mergeSignTxArgsOntoSendTxArgs(signArgs *sign.TxArgs, args *SendTxArgs) {
 	if signArgs == nil {
 		return
 	}

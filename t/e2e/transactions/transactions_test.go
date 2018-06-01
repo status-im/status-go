@@ -64,7 +64,7 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransaction() {
 			s.Equal(params.SendTransactionMethodName, method)
 
 			txID := event["id"].(string)
-			signResult = s.Backend.ApproveSignRequest(string(txID), TestConfig.Account1.Password, 0, 0)
+			signResult = s.Backend.ApproveSignRequest(string(txID), TestConfig.Account1.Password)
 			s.NoError(signResult.Error, "cannot complete queued transaction %s", txID)
 			close(transactionCompleted)
 		}
@@ -115,11 +115,11 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransactionUpstream() {
 			txID := event["id"].(string)
 
 			// Complete with a wrong passphrase.
-			signResult = s.Backend.ApproveSignRequest(string(txID), "some-invalid-passphrase", 0, 0)
+			signResult = s.Backend.ApproveSignRequest(string(txID), "some-invalid-passphrase")
 			s.EqualError(signResult.Error, keystore.ErrDecrypt.Error(), "should return an error as the passphrase was invalid")
 
 			// Complete with a correct passphrase.
-			signResult = s.Backend.ApproveSignRequest(string(txID), TestConfig.Account2.Password, 0, 0)
+			signResult = s.Backend.ApproveSignRequest(string(txID), TestConfig.Account2.Password)
 			s.NoError(signResult.Error, "cannot complete queued transaction %s", txID)
 
 			close(transactionCompleted)
@@ -171,7 +171,7 @@ func (s *TransactionsTestSuite) TestEmptyToFieldPreserved() {
 			args := event.Args.(map[string]interface{})
 			s.NotNil(args["from"])
 			s.Nil(args["to"])
-			signResult := s.Backend.ApproveSignRequest(event.ID, TestConfig.Account1.Password, 0, 0)
+			signResult := s.Backend.ApproveSignRequest(event.ID, TestConfig.Account1.Password)
 			s.NoError(signResult.Error)
 			close(transactionCompleted)
 		}
@@ -259,8 +259,6 @@ func (s *TransactionsTestSuite) setDefaultNodeNotificationHandler(signRequestRes
 			err = s.Backend.ApproveSignRequest(
 				string(event["id"].(string)),
 				TestConfig.Account1.Password,
-				0,
-				0,
 			).Error
 			s.EqualError(
 				err,
@@ -275,8 +273,6 @@ func (s *TransactionsTestSuite) setDefaultNodeNotificationHandler(signRequestRes
 			err = s.Backend.ApproveSignRequest(
 				string(event["id"].(string)),
 				TestConfig.Account1.Password,
-				0,
-				0,
 			).Error
 			s.EqualError(
 				err,
@@ -290,8 +286,6 @@ func (s *TransactionsTestSuite) setDefaultNodeNotificationHandler(signRequestRes
 			result := s.Backend.ApproveSignRequest(
 				string(event["id"].(string)),
 				TestConfig.Account1.Password,
-				0,
-				0,
 			)
 			if expectedError != nil {
 				s.Equal(expectedError, result.Error)
@@ -421,8 +415,6 @@ func (s *TransactionsTestSuite) TestSendEtherTxUpstream() {
 			signResult := s.Backend.ApproveSignRequest(
 				string(event["id"].(string)),
 				TestConfig.Account1.Password,
-				0,
-				0,
 			)
 			s.NoError(signResult.Error, "cannot complete queued transaction[%v]", event["id"])
 
@@ -480,13 +472,13 @@ func (s *TransactionsTestSuite) TestDoubleCompleteQueuedTransactions() {
 
 			// try with wrong password
 			// make sure that tx is NOT removed from the queue (by re-trying with the correct password)
-			err = s.Backend.ApproveSignRequest(txID, TestConfig.Account1.Password+"wrong", 0, 0).Error
+			err = s.Backend.ApproveSignRequest(txID, TestConfig.Account1.Password+"wrong").Error
 			s.EqualError(err, keystore.ErrDecrypt.Error())
 
 			s.Equal(1, s.PendingSignRequests().Count(), "txqueue cannot be empty, as tx has failed")
 
 			// now try to complete transaction, but with the correct password
-			signResult := s.Backend.ApproveSignRequest(txID, TestConfig.Account1.Password, 0, 0)
+			signResult := s.Backend.ApproveSignRequest(txID, TestConfig.Account1.Password)
 			s.NoError(signResult.Error)
 
 			log.Info("transaction complete", "URL", txURLString(signResult))
@@ -563,7 +555,7 @@ func (s *TransactionsTestSuite) TestDiscardQueuedTransaction() {
 			s.NoError(err, "cannot discard tx")
 
 			// try completing discarded transaction
-			err = s.Backend.ApproveSignRequest(txID, TestConfig.Account1.Password, 0, 0).Error
+			err = s.Backend.ApproveSignRequest(txID, TestConfig.Account1.Password).Error
 			s.EqualError(err, sign.ErrSignReqNotFound.Error(), "expects tx not found, but call to ApproveSignRequest succeeded")
 
 			time.Sleep(1 * time.Second) // make sure that tx complete signal propagates
@@ -747,7 +739,7 @@ func (s *TransactionsTestSuite) TestNonExistentQueuedTransactions() {
 	signal.SetDefaultNodeNotificationHandler(func(string) {})
 
 	// try completing non-existing transaction
-	err := s.Backend.ApproveSignRequest("some-bad-transaction-id", TestConfig.Account1.Password, 0, 0).Error
+	err := s.Backend.ApproveSignRequest("some-bad-transaction-id", TestConfig.Account1.Password).Error
 	s.Error(err, "error expected and not received")
 	s.EqualError(err, sign.ErrSignReqNotFound.Error())
 }
