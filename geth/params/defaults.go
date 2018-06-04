@@ -31,9 +31,9 @@ const (
 	// ListenAddr is an IP address and port of this node (e.g. 127.0.0.1:30303).
 	ListenAddr = ":0"
 
-	// APIModules is a list of modules to expose via any type of RPC (HTTP, IPC, in-proc)
-	// we also expose 2 limited personal APIs by overriding them in `api/backend.go`
-	APIModules = "eth,net,web3,shh,shhext"
+	// APIModules is a list of modules to expose via HTTP and `CallRPC()` binding.
+	// We also expose all handlers registered with `rpc.Client.RegisterHandler` to `CallRPC()` binding.
+	APIModules = "eth,net,web3"
 
 	// SendTransactionMethodName defines the name for a giving transaction.
 	SendTransactionMethodName = "eth_sendTransaction"
