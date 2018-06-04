@@ -2,6 +2,8 @@
 package main
 
 import (
+	"crypto/ecdsa"
+	"encoding/hex"
 	"flag"
 	"net"
 	"os"
@@ -31,6 +33,7 @@ func main() {
 	var (
 		listenAddr  = flag.String("addr", ":30301", "listen address")
 		nodeKeyFile = flag.String("nodekey", "", "private key filename")
+		keydata     = flag.String("keydata", "", "hex encoded private key")
 		verbosity   = flag.Int("verbosity", int(log.LvlInfo), "log verbosity (0-9)")
 		vmodule     = flag.String("vmodule", "", "log verbosity pattern")
 		nursery     = bootnodes{}
@@ -45,9 +48,28 @@ func main() {
 	}
 	log.Root().SetHandler(glogger)
 
-	nodeKey, err := crypto.LoadECDSA(*nodeKeyFile)
-	if err != nil {
-		log.Crit("Failed to load ecdsa key from", "file", *nodeKeyFile, "error", err)
+	if len(*nodeKeyFile) == 0 && len(*keydata) == 0 {
+		log.Crit("either `nodekey` or `keydata` must be provided")
+	}
+	var (
+		nodeKey *ecdsa.PrivateKey
+		err     error
+	)
+	if len(*nodeKeyFile) != 0 {
+		nodeKey, err = crypto.LoadECDSA(*nodeKeyFile)
+		if err != nil {
+			log.Crit("Failed to load ecdsa key from", "file", *nodeKeyFile, "error", err)
+		}
+	} else if len(*keydata) != 0 {
+		log.Warn("key will be visible in process list. should be used only for tests")
+		key, err := hex.DecodeString(*keydata)
+		if err != nil {
+			log.Crit("unable to decode hex", "data", keydata, "error", err)
+		}
+		nodeKey, err = crypto.ToECDSA(key)
+		if err != nil {
+			log.Crit("unable to convert decoded hex into ecdsa.PrivateKey", "data", key, "error", err)
+		}
 	}
 
 	addr, err := net.ResolveUDPAddr("udp", *listenAddr)
