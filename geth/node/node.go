@@ -269,18 +269,30 @@ func makeIPCPath(config *params.NodeConfig) string {
 
 // parseNodes creates list of discover.Node out of enode strings.
 func parseNodes(enodes []string) []*discover.Node {
-	nodes := make([]*discover.Node, len(enodes))
-	for i, enode := range enodes {
-		nodes[i] = discover.MustParseNode(enode)
+	var nodes []*discover.Node
+	for _, enode := range enodes {
+		parsedPeer, err := discover.ParseNode(enode)
+		if err == nil {
+			nodes = append(nodes, parsedPeer)
+		} else {
+			logger.Error("Failed to parse enode", "enode", enode, "err", err)
+		}
+
 	}
 	return nodes
 }
 
 // parseNodesV5 creates list of discv5.Node out of enode strings.
 func parseNodesV5(enodes []string) []*discv5.Node {
-	nodes := make([]*discv5.Node, len(enodes))
-	for i, enode := range enodes {
-		nodes[i] = discv5.MustParseNode(enode)
+	var nodes []*discv5.Node
+	for _, enode := range enodes {
+		parsedPeer, err := discv5.ParseNode(enode)
+
+		if err == nil {
+			nodes = append(nodes, parsedPeer)
+		} else {
+			logger.Error("Failed to parse enode", "enode", enode, "err", err)
+		}
 	}
 	return nodes
 }
