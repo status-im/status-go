@@ -64,7 +64,7 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	MailServerKeyID, err := senderWhisperService.AddSymKeyFromPassword(password)
 	s.Require().NoError(err)
 
-	rpcClient := sender.StatusNode().RPCClient()
+	rpcClient := sender.StatusNode().RPCPrivateClient()
 	s.Require().NotNil(rpcClient)
 
 	// Create topic.
@@ -163,9 +163,9 @@ func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
 	charlieWhisperService, err := charlieBackend.StatusNode().WhisperService()
 	s.Require().NoError(err)
 	// Get rpc client.
-	aliceRPCClient := aliceBackend.StatusNode().RPCClient()
-	bobRPCClient := bobBackend.StatusNode().RPCClient()
-	charlieRPCClient := charlieBackend.StatusNode().RPCClient()
+	aliceRPCClient := aliceBackend.StatusNode().RPCPrivateClient()
+	bobRPCClient := bobBackend.StatusNode().RPCPrivateClient()
+	charlieRPCClient := charlieBackend.StatusNode().RPCPrivateClient()
 
 	// Bob and charlie add the mailserver key.
 	password := "status-offline-inbox"
