@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/status-im/status-go/geth/account"
-	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/status"
 	"github.com/status-im/status-go/signal"
 	"github.com/stretchr/testify/suite"

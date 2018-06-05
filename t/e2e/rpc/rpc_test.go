@@ -10,8 +10,8 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/status-im/status-go/geth/node"
-	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/node"
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/t/e2e"
 	. "github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/suite"

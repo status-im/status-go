@@ -4,8 +4,8 @@ import (
 	"context"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/status-im/status-go/geth/node"
-	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/node"
+	"github.com/status-im/status-go/params"
 )
 
 // TestNodeOption is a callback passed to StartTestNode which alters its config.

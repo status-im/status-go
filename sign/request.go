@@ -5,7 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pborman/uuid"
-	"github.com/status-im/status-go/geth/account"
+	"github.com/status-im/status-go/account"
 )
 
 // CompleteFunc is a function that is called after the sign request is approved.

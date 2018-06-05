@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
-	acc "github.com/status-im/status-go/geth/account"
-	"github.com/status-im/status-go/geth/params"
+	acc "github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/signal"
 	"github.com/stretchr/testify/suite"

@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/status-im/status-go/geth/account"
+	"github.com/status-im/status-go/account"
 )
 
 type verifyFunc func(string) (*account.SelectedExtKey, error)

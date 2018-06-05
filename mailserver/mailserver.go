@@ -29,7 +29,7 @@ import (
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/rlp"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
-	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/params"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/util"
 )

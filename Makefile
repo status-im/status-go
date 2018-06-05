@@ -13,7 +13,7 @@ CGO_CFLAGS=-I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
 GOBIN=$(dir $(realpath $(firstword $(MAKEFILE_LIST))))build/bin
 GIT_COMMIT := $(shell git rev-parse --short HEAD)
 
-BUILD_FLAGS ?= $(shell echo "-ldflags '-X main.buildStamp=`date -u '+%Y-%m-%d.%H:%M:%S'` -X github.com/status-im/status-go/geth/params.VersionMeta=$(GIT_COMMIT)'")
+BUILD_FLAGS ?= $(shell echo "-ldflags '-X main.buildStamp=`date -u '+%Y-%m-%d.%H:%M:%S'` -X github.com/status-im/status-go/params.VersionMeta=$(GIT_COMMIT)'")
 
 GO ?= latest
 XGOVERSION ?= 1.10.x
@@ -130,10 +130,10 @@ mock-install: ##@other Install mocking tools
 	go get -u github.com/golang/mock/mockgen
 
 mock: ##@other Regenerate mocks
-	mockgen -package=fcm          -destination=geth/notifications/push/fcm/client_mock.go -source=geth/notifications/push/fcm/client.go
-	mockgen -package=fake         -destination=geth/transactions/fake/mock.go             -source=geth/transactions/fake/txservice.go
-	mockgen -package=account      -destination=geth/account/accounts_mock.go              -source=geth/account/accounts.go
-	mockgen -package=jail         -destination=geth/jail/cell_mock.go                     -source=geth/jail/cell.go
+	mockgen -package=fcm          -destination=notifications/push/fcm/client_mock.go -source=notifications/push/fcm/client.go
+	mockgen -package=fake         -destination=transactions/fake/mock.go             -source=transactions/fake/txservice.go
+	mockgen -package=account      -destination=account/accounts_mock.go              -source=account/accounts.go
+	mockgen -package=jail         -destination=jail/cell_mock.go                     -source=jail/cell.go
 	mockgen -package=status       -destination=services/status/account_mock.go            -source=services/status/service.go
 
 docker-test: ##@tests Run tests in a docker container with golang.

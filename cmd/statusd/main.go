@@ -15,12 +15,12 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
+	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/cmd/statusd/debug"
 	"github.com/status-im/status-go/cmd/statusd/topics"
-	"github.com/status-im/status-go/geth/api"
-	"github.com/status-im/status-go/geth/node"
-	"github.com/status-im/status-go/geth/params"
 	nodemetrics "github.com/status-im/status-go/metrics/node"
+	"github.com/status-im/status-go/node"
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/profiling"
 )
 

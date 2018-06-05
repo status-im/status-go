@@ -8,8 +8,8 @@ import (
 
 	"github.com/NaySoftware/go-fcm"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/profiling"
 	"github.com/status-im/status-go/sign"
 	"gopkg.in/go-playground/validator.v9"
