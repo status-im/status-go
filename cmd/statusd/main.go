@@ -294,8 +294,8 @@ func configureStatusService(flagValue string, nodeConfig *params.NodeConfig) (*p
 
 // printVersion prints verbose output about version and config.
 func printVersion(config *params.NodeConfig, buildStamp string) {
-	fmt.Println(strings.Title(params.ClientIdentifier))
-	fmt.Println("Version:", params.Version)
+	fmt.Println(strings.Title(config.Name))
+	fmt.Println("Version:", config.Version)
 
 	if buildStamp != "" {
 		fmt.Println("Build Stamp:", buildStamp)
