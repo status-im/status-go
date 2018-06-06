@@ -211,7 +211,7 @@ func Logout() *C.char {
 // gas and gasPrice will be overrided with the given values before signing the
 // transaction.
 //export ApproveSignRequestWithArgs
-func ApproveSignRequestWithArgs(id, password *C.char, gas, gasPrice C.int) *C.char {
+func ApproveSignRequestWithArgs(id, password *C.char, gas, gasPrice C.longlong) *C.char {
 	result := statusAPI.ApproveSignRequestWithArgs(C.GoString(id), C.GoString(password), int64(gas), int64(gasPrice))
 
 	return prepareApproveSignRequestResponse(result, id)
