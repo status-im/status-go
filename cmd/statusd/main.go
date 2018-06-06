@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	serverClientName = "statusd"
+	serverClientName = "Statusd"
 )
 
 var (
