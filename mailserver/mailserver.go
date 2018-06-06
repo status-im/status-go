@@ -239,6 +239,12 @@ func (s *WMailServer) processRequest(peer *whisper.Peer, lower, upper uint32, bl
 		}
 	}
 
+	resp := &whisper.Envelope{}
+	err = s.w.SendHistoricMessageResponse(peer, resp)
+	if err != nil {
+		log.Error(fmt.Sprintf("SendHistoricMessageResponse error: %s", err))
+	}
+
 	requestProcessTimer.UpdateSince(start)
 	sentEnvelopesMeter.Mark(sentEnvelopes)
 	sentEnvelopesSizeMeter.Mark(sentEnvelopesSize)

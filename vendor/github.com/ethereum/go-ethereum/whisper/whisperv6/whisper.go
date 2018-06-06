@@ -378,6 +378,10 @@ func (whisper *Whisper) RequestHistoricMessages(peerID []byte, envelope *Envelop
 	return p2p.Send(p.ws, p2pRequestCode, envelope)
 }
 
+func (whisper *Whisper) SendHistoricMessageResponse(peer *Peer, envelope *Envelope) error {
+	return p2p.Send(peer.ws, p2pRequestResponseCode, envelope)
+}
+
 // SendP2PMessage sends a peer-to-peer message to a specific peer.
 func (whisper *Whisper) SendP2PMessage(peerID []byte, envelope *Envelope) error {
 	p, err := whisper.getPeer(peerID)
@@ -822,6 +826,15 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 					return errors.New("invalid p2p request")
 				}
 				whisper.mailServer.DeliverMail(p, &request)
+			}
+		case p2pRequestResponseCode:
+			if p.trusted {
+				var envelope Envelope
+				if err := packet.Decode(&envelope); err != nil {
+					log.Warn("failed to decode response message, peer will be disconnected", "peer", p.peer.ID(), "err", err)
+					return errors.New("invalid request response message")
+				}
+				log.Info("mailserver response", envelope)
 			}
 		default:
 			// New message types might be implemented in the future versions of Whisper.
