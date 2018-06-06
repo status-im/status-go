@@ -95,24 +95,7 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	// Act.
 
 	// Request messages (including the previous one, expired) from mailbox.
-	from := senderWhisperService.GetCurrentTime().Add(-12 * time.Hour)
-	reqMessagesBody := `{
-		"jsonrpc": "2.0",
-		"id": 1,
-		"method": "shhext_requestMessages",
-		"params": [{
-					"mailServerPeer":"` + mailboxPeerStr + `",
-					"topic":"` + topic.String() + `",
-					"symKeyID":"` + MailServerKeyID + `",
-					"from":` + strconv.FormatInt(from.Unix(), 10) + `,
-					"to":` + strconv.FormatInt(senderWhisperService.GetCurrentTime().Unix(), 10) + `
-		}]
-	}`
-	resp := rpcClient.CallRaw(reqMessagesBody)
-	reqMessagesResp := baseRPCResponse{}
-	err = json.Unmarshal([]byte(resp), &reqMessagesResp)
-	s.Require().NoError(err)
-	s.Require().Nil(reqMessagesResp.Error)
+	s.requestHistoricMessages(senderWhisperService, rpcClient, mailboxPeerStr, MailServerKeyID, topic.String())
 
 	// Wait to receive message.
 	time.Sleep(time.Second)
