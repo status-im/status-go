@@ -158,8 +158,15 @@ func (api *StatusAPI) SendTransaction(ctx context.Context, args transactions.Sen
 }
 
 // ApproveSignRequest instructs backend to complete sending of a given transaction
-func (api *StatusAPI) ApproveSignRequest(id string, password string) sign.Result {
+func (api *StatusAPI) ApproveSignRequest(id, password string) sign.Result {
 	return api.b.ApproveSignRequest(id, password)
+}
+
+// ApproveSignRequestWithArgs instructs backend to complete sending of a given transaction
+// gas and gasPrice will be overrided with the given values before signing the
+// transaction.
+func (api *StatusAPI) ApproveSignRequestWithArgs(id, password string, gas, gasPrice int64) sign.Result {
+	return api.b.ApproveSignRequestWithArgs(id, password, gas, gasPrice)
 }
 
 // ApproveSignRequests instructs backend to complete sending of multiple transactions

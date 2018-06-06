@@ -251,9 +251,17 @@ func (b *StatusBackend) getVerifiedAccount(password string) (*account.SelectedEx
 	return selectedAccount, nil
 }
 
-// ApproveSignRequest instructs backend to complete sending of a given transaction
-func (b *StatusBackend) ApproveSignRequest(id string, password string) sign.Result {
-	return b.pendingSignRequests.Approve(id, password, b.getVerifiedAccount)
+// ApproveSignRequest instructs backend to complete sending of a given transaction.
+func (b *StatusBackend) ApproveSignRequest(id, password string) sign.Result {
+	return b.pendingSignRequests.Approve(id, password, nil, b.getVerifiedAccount)
+}
+
+// ApproveSignRequestWithArgs instructs backend to complete sending of a given transaction.
+// gas and gasPrice will be overrided with the given values before signing the
+// transaction.
+func (b *StatusBackend) ApproveSignRequestWithArgs(id, password string, gas, gasPrice int64) sign.Result {
+	args := prepareTxArgs(gas, gasPrice)
+	return b.pendingSignRequests.Approve(id, password, &args, b.getVerifiedAccount)
 }
 
 // ApproveSignRequests instructs backend to complete sending of multiple transactions

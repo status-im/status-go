@@ -175,3 +175,14 @@ func (cs *commandSet) ApproveSignRequest(id, password string) (string, error) {
 	}
 	return result.Response.Hex(), nil
 }
+
+// ApproveSignRequest instructs API to complete sending of a given transaction.
+// gas and gasPrice will be overrided with the given values before signing the
+// transaction.
+func (cs *commandSet) ApproveSignRequestWithArgs(id, password string, gas, gasPrice int64) (string, error) {
+	result := cs.statusAPI.ApproveSignRequestWithArgs(id, password, gas, gasPrice)
+	if result.Error != nil {
+		return "", result.Error
+	}
+	return result.Response.Hex(), nil
+}

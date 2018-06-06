@@ -72,7 +72,8 @@ func (t *Transactor) SendTransaction(ctx context.Context, args SendTxArgs) (geth
 		ctx = context.Background()
 	}
 
-	completeFunc := func(acc *account.SelectedExtKey, password string) (sign.Response, error) {
+	completeFunc := func(acc *account.SelectedExtKey, password string, signArgs *sign.TxArgs) (sign.Response, error) {
+		t.mergeSignTxArgsOntoSendTxArgs(signArgs, &args)
 		hash, err := t.validateAndPropagate(acc, args)
 		return sign.Response(hash.Bytes()), err
 	}
@@ -197,8 +198,21 @@ func (t *Transactor) validateAndPropagate(selectedAccount *account.SelectedExtKe
 	}
 	ctx, cancel = context.WithTimeout(context.Background(), t.rpcCallTimeout)
 	defer cancel()
+
 	if err := t.sender.SendTransaction(ctx, signedTx); err != nil {
 		return hash, err
 	}
 	return signedTx.Hash(), nil
+}
+
+func (t *Transactor) mergeSignTxArgsOntoSendTxArgs(signArgs *sign.TxArgs, args *SendTxArgs) {
+	if signArgs == nil {
+		return
+	}
+	if signArgs.Gas != nil {
+		args.Gas = signArgs.Gas
+	}
+	if signArgs.GasPrice != nil {
+		args.GasPrice = signArgs.GasPrice
+	}
 }
