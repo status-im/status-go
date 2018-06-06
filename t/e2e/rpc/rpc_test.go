@@ -40,8 +40,7 @@ func (s *RPCTestSuite) TestCallRPC() {
 		s.NoError(err)
 
 		nodeConfig.IPCEnabled = false
-		nodeConfig.HTTPHost = ""        // to make sure that no HTTP interface is started
-		nodeConfig.APIModules += ",shh" // shh_version normally wouldn't be callable with RPCClient
+		nodeConfig.HTTPHost = "" // to make sure that no HTTP interface is started
 
 		if upstreamEnabled {
 			networkURL, err := GetRemoteURL()
@@ -131,7 +130,7 @@ func (s *RPCTestSuite) TestCallRawResult() {
 
 	s.NoError(s.StatusNode.Start(nodeConfig))
 
-	client := s.StatusNode.RPCPrivateClient()
+	client := s.StatusNode.RPCClient()
 	s.NotNil(client)
 
 	jsonResult := client.CallRaw(`{"jsonrpc":"2.0","method":"shh_version","params":[],"id":67}`)

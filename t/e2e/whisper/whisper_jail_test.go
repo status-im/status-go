@@ -7,7 +7,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"github.com/status-im/status-go/geth/jail"
-	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/static"
 	"github.com/status-im/status-go/t/e2e"
 	. "github.com/status-im/status-go/t/utils"
@@ -61,9 +60,7 @@ func (s *WhisperJailTestSuite) AddKeyPair(address, password string) (string, err
 }
 
 func (s *WhisperJailTestSuite) TestJailWhisper() {
-	s.StartTestBackend(func(config *params.NodeConfig) {
-		config.APIModules = "shh"
-	})
+	s.StartTestBackend()
 	defer s.StopTestBackend()
 
 	r := s.Require()
