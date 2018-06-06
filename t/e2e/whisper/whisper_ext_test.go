@@ -62,7 +62,7 @@ func (s *WhisperExtensionSuite) TestSentSignal() {
 		}
 	})
 	defer signal.ResetDefaultNodeNotificationHandler()
-	client := s.nodes[0].RPCPrivateClient()
+	client := s.nodes[0].RPCClient()
 	s.NotNil(client)
 	var symID string
 	s.NoError(client.Call(&symID, "shh_newSymKey"))
@@ -102,7 +102,7 @@ func (s *WhisperExtensionSuite) TestExpiredSignal() {
 		}
 	})
 	defer signal.ResetDefaultNodeNotificationHandler()
-	client := s.nodes[0].RPCPrivateClient()
+	client := s.nodes[0].RPCClient()
 	s.NotNil(client)
 	var symID string
 	s.NoError(client.Call(&symID, "shh_newSymKey"))
