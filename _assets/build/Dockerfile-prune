@@ -14,4 +14,4 @@ RUN apk add --no-cache ca-certificates bash
 
 COPY --from=builder /go/src/github.com/status-im/status-go/build/bin/statusd-prune /usr/local/bin/
 
-ENTRYPOINT ["statusd-prune"]
+CMD ["statusd-prune"]
