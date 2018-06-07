@@ -3,6 +3,7 @@ package whisper
 import (
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -111,6 +112,9 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	// And we receive the response from the mailbox
 	messages = s.getMessagesByMessageFilterID(rpcClient, respFilterID)
 	s.Require().Equal(1, len(messages))
+	// The payload of the message should be the hash of the request message previously sent
+	expectedPayload := fmt.Sprintf("0x%x", hash)
+	s.Require().Equal(expectedPayload, messages[0]["payload"])
 
 	// Check that there are no messages.
 	messages = s.getMessagesByMessageFilterID(rpcClient, messageFilterID)
