@@ -39,7 +39,10 @@ func (tc *testCase) query(string, ntp.QueryOptions) (*ntp.Response, error) {
 		tc.actualAttempts++
 		tc.mu.Unlock()
 	}()
-	response := &ntp.Response{ClockOffset: tc.responses[tc.actualAttempts].Offset}
+	response := &ntp.Response{
+		ClockOffset: tc.responses[tc.actualAttempts].Offset,
+		Stratum:     1,
+	}
 	return response, tc.responses[tc.actualAttempts].Error
 }
 
