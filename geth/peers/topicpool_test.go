@@ -25,6 +25,7 @@ func TestTopicPoolSuite(t *testing.T) {
 }
 
 func (s *TopicPoolSuite) SetupTest() {
+	maxCachedPeersMultiplier = 1
 	key, _ := crypto.GenerateKey()
 	name := common.MakeName("peer", "1.0")
 	s.peer = &p2p.Server{
@@ -65,6 +66,7 @@ func (s *TopicPoolSuite) AssertConsumed(channel <-chan time.Duration, expected t
 
 func (s *TopicPoolSuite) TestUsingCache() {
 	s.topicPool.limits = params.NewLimits(1, 1)
+	s.topicPool.maxCachedPeers = 1
 
 	peer1 := discv5.NewNode(discv5.NodeID{1}, s.peer.Self().IP, 32311, 32311)
 	s.topicPool.processFoundNode(s.peer, peer1)
@@ -177,6 +179,7 @@ func (s *TopicPoolSuite) TestRequestedDoesntRemove() {
 	// max limit is 1 because we test that 2nd peer will stay in local table
 	// when we request to drop it
 	s.topicPool.limits = params.NewLimits(1, 1)
+	s.topicPool.maxCachedPeers = 1
 	peer1 := discv5.NewNode(discv5.NodeID{1}, s.peer.Self().IP, 32311, 32311)
 	peer2 := discv5.NewNode(discv5.NodeID{2}, s.peer.Self().IP, 32311, 32311)
 	s.topicPool.processFoundNode(s.peer, peer1)
@@ -195,6 +198,7 @@ func (s *TopicPoolSuite) TestRequestedDoesntRemove() {
 
 func (s *TopicPoolSuite) TestTheMostRecentPeerIsSelected() {
 	s.topicPool.limits = params.NewLimits(1, 1)
+	s.topicPool.maxCachedPeers = 1
 
 	peer1 := discv5.NewNode(discv5.NodeID{1}, s.peer.Self().IP, 32311, 32311)
 	peer2 := discv5.NewNode(discv5.NodeID{2}, s.peer.Self().IP, 32311, 32311)
@@ -220,6 +224,7 @@ func (s *TopicPoolSuite) TestTheMostRecentPeerIsSelected() {
 
 func (s *TopicPoolSuite) TestSelectPeerAfterMaxLimit() {
 	s.topicPool.limits = params.NewLimits(1, 1)
+	s.topicPool.maxCachedPeers = 1
 
 	peer1 := discv5.NewNode(discv5.NodeID{1}, s.peer.Self().IP, 32311, 32311)
 	peer2 := discv5.NewNode(discv5.NodeID{2}, s.peer.Self().IP, 32311, 32311)
@@ -240,6 +245,7 @@ func (s *TopicPoolSuite) TestSelectPeerAfterMaxLimit() {
 
 func (s *TopicPoolSuite) TestReplacementPeerIsCounted() {
 	s.topicPool.limits = params.NewLimits(1, 1)
+	s.topicPool.maxCachedPeers = 1
 
 	peer1 := discv5.NewNode(discv5.NodeID{1}, s.peer.Self().IP, 32311, 32311)
 	peer2 := discv5.NewNode(discv5.NodeID{2}, s.peer.Self().IP, 32311, 32311)
@@ -259,6 +265,7 @@ func (s *TopicPoolSuite) TestReplacementPeerIsCounted() {
 
 func (s *TopicPoolSuite) TestPeerDontAddTwice() {
 	s.topicPool.limits = params.NewLimits(1, 1)
+	s.topicPool.maxCachedPeers = 1
 
 	peer1 := discv5.NewNode(discv5.NodeID{1}, s.peer.Self().IP, 32311, 32311)
 	peer2 := discv5.NewNode(discv5.NodeID{2}, s.peer.Self().IP, 32311, 32311)
@@ -267,4 +274,43 @@ func (s *TopicPoolSuite) TestPeerDontAddTwice() {
 	s.topicPool.ConfirmAdded(s.peer, discover.NodeID(peer1.ID))
 	// peer2 already added to p2p server no reason to add it again
 	s.Nil(s.topicPool.AddPeerFromTable(s.peer))
+}
+
+func (s *TopicPoolSuite) TestMaxCachedPeers() {
+	s.topicPool.limits = params.NewLimits(1, 1)
+	s.topicPool.maxCachedPeers = 3
+	peer1 := discv5.NewNode(discv5.NodeID{1}, s.peer.Self().IP, 32311, 32311)
+	peer2 := discv5.NewNode(discv5.NodeID{2}, s.peer.Self().IP, 32311, 32311)
+	peer3 := discv5.NewNode(discv5.NodeID{3}, s.peer.Self().IP, 32311, 32311)
+	s.topicPool.processFoundNode(s.peer, peer1)
+	s.topicPool.processFoundNode(s.peer, peer2)
+	s.topicPool.processFoundNode(s.peer, peer3)
+	s.topicPool.ConfirmAdded(s.peer, discover.NodeID(peer1.ID))
+	s.topicPool.ConfirmAdded(s.peer, discover.NodeID(peer2.ID))
+	s.topicPool.ConfirmAdded(s.peer, discover.NodeID(peer3.ID))
+
+	s.Equal(3, len(s.topicPool.connectedPeers))
+	s.False(s.topicPool.connectedPeers[peer1.ID].dismissed)
+	s.True(s.topicPool.connectedPeers[peer2.ID].dismissed)
+	s.True(s.topicPool.connectedPeers[peer3.ID].dismissed)
+
+	cached := s.topicPool.cache.GetPeersRange(s.topicPool.topic, 5)
+	s.Equal(3, len(cached))
+
+	s.topicPool.ConfirmDropped(s.peer, discover.NodeID(peer2.ID))
+	s.topicPool.ConfirmDropped(s.peer, discover.NodeID(peer3.ID))
+
+	s.Equal(peer1.ID, cached[0].ID)
+	s.Equal(peer2.ID, cached[1].ID)
+	s.Equal(peer3.ID, cached[2].ID)
+	s.Contains(s.topicPool.connectedPeers, peer1.ID)
+	s.NotContains(s.topicPool.connectedPeers, peer2.ID)
+	s.NotContains(s.topicPool.connectedPeers, peer3.ID)
+	s.NotContains(s.topicPool.pendingPeers, peer1.ID)
+	s.Contains(s.topicPool.pendingPeers, peer2.ID)
+	s.Contains(s.topicPool.pendingPeers, peer3.ID)
+
+	s.True(s.topicPool.maxCachedPeersReached())
+	cached = s.topicPool.cache.GetPeersRange(s.topicPool.topic, 5)
+	s.Equal(3, len(cached))
 }

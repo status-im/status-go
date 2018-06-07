@@ -1,4 +1,4 @@
-.PHONY: statusgo all test xgo clean help
+.PHONY: statusgo statusd-prune all test xgo clean help
 .PHONY: statusgo-android statusgo-ios
 
 help: ##@other Show this help
@@ -25,6 +25,7 @@ gotest_extraflags =
 
 DOCKER_IMAGE_NAME ?= statusteam/status-go
 BOOTNODE_IMAGE_NAME ?= statusteam/bootnode
+STATUSD_PRUNE_IMAGE_NAME ?= statusteam/statusd-prune
 
 DOCKER_TEST_WORKDIR = /go/src/github.com/status-im/status-go/
 DOCKER_TEST_IMAGE = golang:1.10
@@ -56,6 +57,15 @@ statusgo: ##@build Build status-go as statusd server
 	go build -i -o $(GOBIN)/statusd -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/statusd
 	@echo "Compilation done."
 	@echo "Run \"build/bin/statusd -h\" to view available commands."
+
+statusd-prune: ##@statusd-prune Build statusd-prune
+	go build -o $(GOBIN)/statusd-prune -v ./cmd/statusd-prune
+	@echo "Compilation done."
+	@echo "Run \"build/bin/statusd-prune -h\" to view available commands."
+
+statusd-prune-docker-image: ##@statusd-prune Build statusd-prune docker image
+	@echo "Building docker image..."
+	docker build --file _assets/build/Dockerfile-prune . -t $(STATUSD_PRUNE_IMAGE_NAME):latest
 
 bootnode: ##@build Build discovery v5 bootnode using status-go deps
 	go build -i -o $(GOBIN)/bootnode -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/bootnode/
