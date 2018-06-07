@@ -100,30 +100,32 @@ func (api *PublicAPI) Post(ctx context.Context, req whisper.NewMessage) (hash he
 }
 
 // RequestMessages sends a request for historic messages to a MailServer.
-func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (bool, error) {
+func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (hexutil.Bytes, error) {
 	api.log.Info("RequestMessages", "request", r)
 	shh := api.service.w
 	now := api.service.w.GetCurrentTime()
 	r.setDefaults(now)
 	mailServerNode, err := discover.ParseNode(r.MailServerPeer)
 	if err != nil {
-		return false, fmt.Errorf("%v: %v", ErrInvalidMailServerPeer, err)
+		return nil, fmt.Errorf("%v: %v", ErrInvalidMailServerPeer, err)
 	}
 
 	symKey, err := shh.GetSymKey(r.SymKeyID)
 	if err != nil {
-		return false, fmt.Errorf("%v: %v", ErrInvalidSymKeyID, err)
+		return nil, fmt.Errorf("%v: %v", ErrInvalidSymKeyID, err)
 	}
 
 	envelope, err := makeEnvelop(makePayload(r), symKey, api.service.nodeID, shh.MinPow(), now)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 	if err := shh.RequestHistoricMessages(mailServerNode.ID[:], envelope); err != nil {
-		return false, err
+		return nil, err
 	}
 
-	return true, nil
+	hash := envelope.Hash()
+
+	return hash[:], nil
 }
 
 // GetNewFilterMessages is a prototype method with deduplication

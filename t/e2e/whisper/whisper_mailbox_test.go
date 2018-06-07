@@ -1,9 +1,11 @@
 package whisper
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -95,12 +97,19 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	// Act.
 
 	// Request messages (including the previous one, expired) from mailbox.
-	s.requestHistoricMessages(senderWhisperService, rpcClient, mailboxPeerStr, MailServerKeyID, topic.String())
+	hash := s.requestHistoricMessages(senderWhisperService, rpcClient, mailboxPeerStr, MailServerKeyID, topic.String())
+	respTopic := whisper.BytesToTopic(hash)
+	respFilterID := s.createGroupChatMessageFilter(rpcClient, MailServerKeyID, respTopic.String())
+	respFilterID = respFilterID
 
 	// Wait to receive message.
 	time.Sleep(time.Second)
 	// And we receive message, it comes from mailbox.
 	messages = s.getMessagesByMessageFilterID(rpcClient, messageFilterID)
+	s.Require().Equal(1, len(messages))
+
+	// And we receive the response from the mailbox
+	messages = s.getMessagesByMessageFilterID(rpcClient, respFilterID)
 	s.Require().Equal(1, len(messages))
 
 	// Check that there are no messages.
@@ -465,7 +474,7 @@ func (s *WhisperMailboxSuite) addSymKey(rpcCli *rpc.Client, symkey string) strin
 }
 
 // requestHistoricMessages asks a mailnode to resend messages.
-func (s *WhisperMailboxSuite) requestHistoricMessages(w *whisper.Whisper, rpcCli *rpc.Client, mailboxEnode, mailServerKeyID, topic string) {
+func (s *WhisperMailboxSuite) requestHistoricMessages(w *whisper.Whisper, rpcCli *rpc.Client, mailboxEnode, mailServerKeyID, topic string) []byte {
 	from := w.GetCurrentTime().Add(-12 * time.Hour)
 	resp := rpcCli.CallRaw(`{
 		"jsonrpc": "2.0",
@@ -483,6 +492,18 @@ func (s *WhisperMailboxSuite) requestHistoricMessages(w *whisper.Whisper, rpcCli
 	err := json.Unmarshal([]byte(resp), &reqMessagesResp)
 	s.Require().NoError(err)
 	s.Require().Nil(reqMessagesResp.Error)
+
+	switch hash := reqMessagesResp.Result.(type) {
+	case string:
+		s.Require().True(strings.HasPrefix(hash, "0x"))
+		b, err := hex.DecodeString(hash[2:])
+		s.Require().NoError(err)
+		return b
+	}
+
+	s.Failf("failed reading shh_newMessageFilter result", "expected a hash, got: %+v", reqMessagesResp.Result)
+
+	return nil
 }
 
 type getFilterMessagesResponse struct {

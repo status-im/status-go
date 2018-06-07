@@ -181,6 +181,9 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 
 	if ok, lower, upper, bloom := s.validateRequest(peer.ID(), request); ok {
 		s.processRequest(peer, lower, upper, bloom)
+		if err := s.sendHistoricMessageResponse(peer, request); err != nil {
+			log.Error(fmt.Sprintf("SendHistoricMessageResponse error: %s", err))
+		}
 	}
 }
 
@@ -239,12 +242,6 @@ func (s *WMailServer) processRequest(peer *whisper.Peer, lower, upper uint32, bl
 		}
 	}
 
-	resp := &whisper.Envelope{}
-	err = s.w.SendHistoricMessageResponse(peer, resp)
-	if err != nil {
-		log.Error(fmt.Sprintf("SendHistoricMessageResponse error: %s", err))
-	}
-
 	requestProcessTimer.UpdateSince(start)
 	sentEnvelopesMeter.Mark(sentEnvelopes)
 	sentEnvelopesSizeMeter.Mark(sentEnvelopesSize)
@@ -255,6 +252,16 @@ func (s *WMailServer) processRequest(peer *whisper.Peer, lower, upper uint32, bl
 	}
 
 	return ret
+}
+
+func (s *WMailServer) sendHistoricMessageResponse(peer *whisper.Peer, request *whisper.Envelope) error {
+	hash := request.Hash().Bytes()
+	envelope := &whisper.Envelope{
+		Data:  hash,
+		Topic: whisper.BytesToTopic(hash),
+	}
+
+	return s.w.SendHistoricMessageResponse(peer, envelope)
 }
 
 // validateRequest runs different validations on the current request.
