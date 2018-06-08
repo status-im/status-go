@@ -13,7 +13,7 @@ CGO_CFLAGS=-I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
 GOBIN=$(dir $(realpath $(firstword $(MAKEFILE_LIST))))build/bin
 GIT_COMMIT := $(shell git rev-parse --short HEAD)
 
-BUILD_FLAGS := $(shell echo "-ldflags '-X main.buildStamp=`date -u '+%Y-%m-%d.%H:%M:%S'` -X main.gitCommit=$(GIT_COMMIT)  -X github.com/status-im/status-go/geth/params.VersionMeta=$(GIT_COMMIT)'")
+BUILD_FLAGS ?= $(shell echo "-ldflags '-X main.buildStamp=`date -u '+%Y-%m-%d.%H:%M:%S'` -X github.com/status-im/status-go/geth/params.VersionMeta=$(GIT_COMMIT)'")
 
 GO ?= latest
 XGOVERSION ?= 1.10.x
@@ -100,10 +100,9 @@ statusgo-library: ##@cross-compile Build status-go as static library for current
 	@echo "Static library built:"
 	@ls -la $(GOBIN)/libstatus.*
 
-docker-image: BUILD_TAGS ?= metrics prometheus
 docker-image: ##@docker Build docker image (use DOCKER_IMAGE_NAME to set the image name)
 	@echo "Building docker image..."
-	docker build --file _assets/build/Dockerfile --build-arg "build_tags=$(BUILD_TAGS)" . -t $(DOCKER_IMAGE_NAME):latest
+	docker build --file _assets/build/Dockerfile --build-arg "build_tags=$(BUILD_TAGS)" --build-arg "build_flags=$(BUILD_FLAGS)" . -t $(DOCKER_IMAGE_NAME):latest
 
 bootnode-image:
 	@echo "Building docker image for bootnode..."

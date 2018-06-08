@@ -137,6 +137,8 @@ func (s *PeerPoolSimulationSuite) TestPeerPoolCache() {
 }
 
 func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailover() {
+	s.T().Skip("Skipping due to being flaky")
+
 	var err error
 
 	// Buffered channels must be used because we expect the events
