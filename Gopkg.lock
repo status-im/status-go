@@ -387,7 +387,7 @@
   branch = "v3"
   name = "gopkg.in/olebedev/go-duktape.v3"
   packages = ["."]
-  revision = "3c4db4ad4f2db84859454dc805d6eb7d8051a8ce"
+  revision = "abf0ba0be5d5d36b1f9266463cc320b9a5ab224e"
 
 [[projects]]
   name = "gopkg.in/sourcemap.v1"
