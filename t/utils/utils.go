@@ -297,7 +297,12 @@ func loadTestConfig() (*testConfig, error) {
 			return nil, err
 		}
 
-		pass := os.Getenv(passphraseEnvName)
+		pass, ok := os.LookupEnv(passphraseEnvName)
+		if !ok {
+			err := fmt.Errorf("Missing %s environment variable", passphraseEnvName)
+			return nil, err
+		}
+
 		config.Account1.Password = pass
 		config.Account2.Password = pass
 	}
