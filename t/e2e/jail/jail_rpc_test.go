@@ -13,8 +13,8 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
-	"github.com/status-im/status-go/geth/jail"
-	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/jail"
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/signal"
 	e2e "github.com/status-im/status-go/t/e2e"
 	. "github.com/status-im/status-go/t/utils"

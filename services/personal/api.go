@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/status-im/status-go/geth/account"
-	"github.com/status-im/status-go/geth/params"
-	"github.com/status-im/status-go/geth/rpc"
+	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/sign"
 )
 

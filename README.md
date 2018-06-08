@@ -85,7 +85,7 @@ If you have problems running tests on public network we suggest reading [e2e gui
 If you want to launch specific test, for instance `RPCSendTransactions`, use the following command:
 
 ```shell
-go test -v ./geth/api/ -testify.m ^RPCSendTransaction$
+go test -v ./api/ -testify.m ^RPCSendTransaction$
 ```
 
 Note `-testify.m` as [testify/suite](https://godoc.org/github.com/stretchr/testify/suite) is used to group individual tests.

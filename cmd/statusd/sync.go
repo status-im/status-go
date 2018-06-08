@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/status-im/status-go/geth/node"
+	"github.com/status-im/status-go/node"
 )
 
 func createContextFromTimeout(timeout int) (context.Context, context.CancelFunc) {

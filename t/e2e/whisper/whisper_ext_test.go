@@ -10,8 +10,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
-	"github.com/status-im/status-go/geth/node"
-	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/node"
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/signal"
 	"github.com/stretchr/testify/suite"
 )

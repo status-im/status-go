@@ -1,6 +1,6 @@
 package main
 
-import "github.com/status-im/status-go/geth/api"
+import "github.com/status-im/status-go/api"
 
 var statusAPI = api.NewStatusAPI()
 

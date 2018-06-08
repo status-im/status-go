@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/status-im/status-go/geth/api"
-	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/api"
+	"github.com/status-im/status-go/params"
 )
 
 // command contains the result of a parsed command line and

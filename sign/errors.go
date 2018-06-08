@@ -4,7 +4,7 @@ import (
 	"errors"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
-	"github.com/status-im/status-go/geth/account"
+	"github.com/status-im/status-go/account"
 )
 
 var (

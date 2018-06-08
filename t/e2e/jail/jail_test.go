@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/status-im/status-go/geth/jail"
-	"github.com/status-im/status-go/geth/node"
+	"github.com/status-im/status-go/jail"
+	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/static"
 	"github.com/status-im/status-go/t/e2e"

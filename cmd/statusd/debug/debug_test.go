@@ -11,9 +11,9 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/cmd/statusd/debug"
-	"github.com/status-im/status-go/geth/api"
-	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/params"
 	"github.com/stretchr/testify/assert"
 )
 

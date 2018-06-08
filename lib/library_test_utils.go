@@ -31,13 +31,13 @@ import (
 	gethparams "github.com/ethereum/go-ethereum/params"
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/geth/account"
-	"github.com/status-im/status-go/geth/params"
-	"github.com/status-im/status-go/geth/transactions"
+	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/sign"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/static"
 	. "github.com/status-im/status-go/t/utils" //nolint: golint
+	"github.com/status-im/status-go/transactions"
 )
 
 const initJS = `
