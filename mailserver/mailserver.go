@@ -168,7 +168,9 @@ func (s *WMailServer) Archive(env *whisper.Envelope) {
 
 // DeliverMail sends mail to specified whisper peer.
 func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope) {
+	log.Info("Delivering mail", "peer", peer.ID)
 	requestsCounter.Inc(1)
+
 	if peer == nil {
 		requestErrorsCounter.Inc(1)
 		log.Error("Whisper peer is nil")

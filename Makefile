@@ -30,7 +30,12 @@ STATUSD_PRUNE_IMAGE_NAME ?= statusteam/statusd-prune
 DOCKER_TEST_WORKDIR = /go/src/github.com/status-im/status-go/
 DOCKER_TEST_IMAGE = golang:1.10
 
-UNIT_TEST_PACKAGES := $(shell go list ./...  | grep -v /vendor | grep -v /t/e2e | grep -v /t/destructive | grep -v /lib)
+UNIT_TEST_PACKAGES := $(shell go list ./...  | \
+	grep -v /vendor | \
+	grep -v /t/e2e | \
+	grep -v /t/destructive | \
+	grep -v /t/benchmarks | \
+	grep -v /lib)
 
 # This is a code for automatic help generator.
 # It supports ANSI colors and categories.
