@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/status-im/status-go/geth/node"
-	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/node"
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/t/e2e"
 	"github.com/stretchr/testify/suite"
 )

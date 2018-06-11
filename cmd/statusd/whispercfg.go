@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 
-	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/params"
 )
 
 // whisperConfig creates node configuration object from flags

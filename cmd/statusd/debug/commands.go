@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/status-im/status-go/geth/api"
-	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/api"
+	"github.com/status-im/status-go/params"
 )
 
 // command contains the result of a parsed command line and
@@ -170,6 +170,17 @@ func (cs *commandSet) Logout() error {
 // ApproveSignRequest instructs API to complete sending of a given transaction.
 func (cs *commandSet) ApproveSignRequest(id, password string) (string, error) {
 	result := cs.statusAPI.ApproveSignRequest(id, password)
+	if result.Error != nil {
+		return "", result.Error
+	}
+	return result.Response.Hex(), nil
+}
+
+// ApproveSignRequest instructs API to complete sending of a given transaction.
+// gas and gasPrice will be overrided with the given values before signing the
+// transaction.
+func (cs *commandSet) ApproveSignRequestWithArgs(id, password string, gas, gasPrice int64) (string, error) {
+	result := cs.statusAPI.ApproveSignRequestWithArgs(id, password, gas, gasPrice)
 	if result.Error != nil {
 		return "", result.Error
 	}

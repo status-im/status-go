@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/status-im/status-go/geth/account"
-	"github.com/status-im/status-go/geth/params"
-	"github.com/status-im/status-go/geth/rpc"
+	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/sign"
 )
 
@@ -88,7 +88,7 @@ func (api *PublicAPI) Sign(context context.Context, rpcParams ...interface{}) (i
 }
 
 func (api *PublicAPI) completeFunc(context context.Context, metadata metadata) sign.CompleteFunc {
-	return func(acc *account.SelectedExtKey, password string) (response sign.Response, err error) {
+	return func(acc *account.SelectedExtKey, password string, signArgs *sign.TxArgs) (response sign.Response, err error) {
 		response = sign.EmptyResponse
 
 		err = api.validateAccount(metadata, acc)

@@ -8,7 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/whisper/whisperv6"
-	"github.com/status-im/status-go/geth/api"
+	"github.com/status-im/status-go/api"
 	. "github.com/status-im/status-go/t/utils"
 
 	"github.com/ethereum/go-ethereum/p2p"

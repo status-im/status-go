@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/t/e2e"
 	. "github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/suite"
@@ -19,7 +19,7 @@ type APIBackendTestSuite struct {
 	e2e.BackendTestSuite
 }
 
-// FIXME(tiabc): There's also a test with the same name in geth/node/manager_test.go
+// FIXME(tiabc): There's also a test with the same name in node/manager_test.go
 // so this test should only check StatusBackend logic with a mocked version of the underlying StatusNode.
 func (s *APIBackendTestSuite) TestNetworkSwitching() {
 	// Get test node configuration.
@@ -78,7 +78,7 @@ func (s *APIBackendTestSuite) TestResetChainData() {
 	s.Equal(GetHeadHash(), firstHash)
 }
 
-// FIXME(tiabc): There's also a test with the same name in geth/node/manager_test.go
+// FIXME(tiabc): There's also a test with the same name in node/manager_test.go
 // so this test should only check StatusBackend logic with a mocked version of the underlying StatusNode.
 func (s *APIBackendTestSuite) TestRestartNode() {
 	require := s.Require()

@@ -3,6 +3,7 @@ package rpcfilters
 import (
 	"math/big"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -37,11 +38,11 @@ func TestEventSubscribe(t *testing.T) {
 }
 
 func TestZeroSubsciptionsOptimization(t *testing.T) {
-	counter := 0
+	counter := int64(0)
 	hash := common.HexToHash("0xFF")
 
 	f := func() (blockInfo, error) {
-		counter++
+		atomic.AddInt64(&counter, 1)
 		number := big.NewInt(1)
 		return blockInfo{hash, hexutil.Bytes(number.Bytes())}, nil
 	}
@@ -56,7 +57,7 @@ func TestZeroSubsciptionsOptimization(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	// check that our provider function wasn't called when there are no subscribers to it
-	assert.Equal(t, 0, counter)
+	assert.Equal(t, int64(0), atomic.LoadInt64(&counter))
 
 	// subscribing an event, checking that it works
 	id, channel := event.Subscribe()
@@ -72,14 +73,14 @@ func TestZeroSubsciptionsOptimization(t *testing.T) {
 	event.Unsubscribe(id)
 
 	// check that our function was called multiple times
-	assert.True(t, counter > 0)
-	counterValue := counter
+	counterValue := atomic.LoadInt64(&counter)
+	assert.True(t, counterValue > 0)
 
 	// let the ticker to call ~10 times
 	time.Sleep(10 * time.Millisecond)
 
 	// check that our provider function wasn't called when there are no subscribers to it
-	assert.Equal(t, counterValue, counter)
+	assert.Equal(t, counterValue, atomic.LoadInt64(&counter))
 }
 
 func TestMultipleSubscribe(t *testing.T) {

@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/status-im/status-go/geth/account"
+	"github.com/status-im/status-go/account"
 )
 
 type verifyFunc func(string) (*account.SelectedExtKey, error)
@@ -67,7 +67,7 @@ func (rs *PendingRequests) First() *Request {
 }
 
 // Approve a signing request by it's ID. Requires a valid password and a verification function.
-func (rs *PendingRequests) Approve(id string, password string, verify verifyFunc) Result {
+func (rs *PendingRequests) Approve(id string, password string, args *TxArgs, verify verifyFunc) Result {
 	rs.log.Info("complete sign request", "id", id)
 	request, err := rs.tryLock(id)
 	if err != nil {
@@ -81,7 +81,7 @@ func (rs *PendingRequests) Approve(id string, password string, verify verifyFunc
 		return newErrResult(err)
 	}
 
-	response, err := request.completeFunc(selectedAccount, password)
+	response, err := request.completeFunc(selectedAccount, password, args)
 	rs.log.Info("completed sign request ", "id", request.ID, "response", response, "err", err)
 
 	rs.complete(request, response, err)

@@ -5,7 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto/sha3"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
-	"github.com/status-im/status-go/geth/db"
+	"github.com/status-im/status-go/db"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/util"
 )

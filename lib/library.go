@@ -8,9 +8,10 @@ import (
 
 	"github.com/NaySoftware/go-fcm"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/status-im/status-go/geth/params"
 	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/profiling"
+	"github.com/status-im/status-go/sign"
 	"gopkg.in/go-playground/validator.v9"
 )
 
@@ -206,11 +207,27 @@ func Logout() *C.char {
 	return makeJSONResponse(err)
 }
 
-//ApproveSignRequest instructs backend to complete sending of a given transaction
+//ApproveSignRequestWithArgs instructs backend to complete sending of a given transaction.
+// gas and gasPrice will be overrided with the given values before signing the
+// transaction.
+//export ApproveSignRequestWithArgs
+func ApproveSignRequestWithArgs(id, password *C.char, gas, gasPrice C.longlong) *C.char {
+	result := statusAPI.ApproveSignRequestWithArgs(C.GoString(id), C.GoString(password), int64(gas), int64(gasPrice))
+
+	return prepareApproveSignRequestResponse(result, id)
+}
+
+//ApproveSignRequest instructs backend to complete sending of a given transaction.
 //export ApproveSignRequest
 func ApproveSignRequest(id, password *C.char) *C.char {
 	result := statusAPI.ApproveSignRequest(C.GoString(id), C.GoString(password))
 
+	return prepareApproveSignRequestResponse(result, id)
+}
+
+// prepareApproveSignRequestResponse based on a sign.Result prepares the binding
+// response.
+func prepareApproveSignRequestResponse(result sign.Result, id *C.char) *C.char {
 	errString := ""
 	if result.Error != nil {
 		fmt.Fprintln(os.Stderr, result.Error)

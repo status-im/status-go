@@ -31,13 +31,13 @@ import (
 	gethparams "github.com/ethereum/go-ethereum/params"
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/geth/account"
-	"github.com/status-im/status-go/geth/params"
-	"github.com/status-im/status-go/geth/transactions"
+	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/sign"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/static"
 	. "github.com/status-im/status-go/t/utils" //nolint: golint
+	"github.com/status-im/status-go/transactions"
 )
 
 const initJS = `
@@ -1074,7 +1074,7 @@ func testDiscardTransaction(t *testing.T) bool { //nolint: gocyclo
 
 		if envelope.Type == signal.EventSignRequestFailed {
 			event := envelope.Event.(map[string]interface{})
-			t.Logf("transaction return event received: {id: %s}\n", event["id"].(string))
+			t.Logf("transaction return event received: %+v\n", event)
 
 			receivedErrMessage := event["error_message"].(string)
 			expectedErrMessage := sign.ErrSignReqDiscarded.Error()
@@ -1099,7 +1099,14 @@ func testDiscardTransaction(t *testing.T) bool { //nolint: gocyclo
 		To:    account.ToAddress(TestConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 	})
-	time.Sleep(1 * time.Second)
+
+	select {
+	case <-txFailedEventCalled:
+	case <-time.After(time.Second * 10):
+		t.Error("expected tx failure signal is not received")
+		return false
+	}
+
 	if err != sign.ErrSignReqDiscarded {
 		t.Errorf("expected error not thrown: %v", err)
 		return false
@@ -1115,13 +1122,7 @@ func testDiscardTransaction(t *testing.T) bool { //nolint: gocyclo
 		return false
 	}
 
-	select {
-	case <-txFailedEventCalled:
-		return true
-	default:
-		t.Error("expected tx failure signal is not received")
-		return false
-	}
+	return true
 }
 
 func testDiscardMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocyclo

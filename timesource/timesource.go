@@ -73,6 +73,9 @@ func computeOffset(timeQuery ntpQuery, servers []string, allowedFailures int) (t
 			response, err := timeQuery(server, ntp.QueryOptions{
 				Timeout: DefaultRPCTimeout,
 			})
+			if err == nil {
+				err = response.Validate()
+			}
 			if err != nil {
 				responses <- queryResponse{Error: err}
 				return

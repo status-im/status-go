@@ -3,20 +3,27 @@ package sign
 import (
 	"context"
 	"errors"
+	"math/big"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	"github.com/status-im/status-go/geth/account"
+	"github.com/status-im/status-go/account"
 	"github.com/stretchr/testify/suite"
 )
 
 const (
 	correctPassword = "password-correct"
 	wrongPassword   = "password-wrong"
+)
+
+var (
+	overridenGas      = hexutil.Uint64(90002)
+	overridenGasPrice = (*hexutil.Big)(big.NewInt(20))
 )
 
 func testVerifyFunc(password string) (*account.SelectedExtKey, error) {
@@ -40,9 +47,13 @@ func (s *PendingRequestsSuite) SetupTest() {
 	s.pendingRequests = NewPendingRequests()
 }
 
+func (s *PendingRequestsSuite) defaultSignTxArgs() *TxArgs {
+	return &TxArgs{}
+}
+
 func (s *PendingRequestsSuite) defaultCompleteFunc() CompleteFunc {
 	hash := gethcommon.Hash{1}
-	return func(acc *account.SelectedExtKey, password string) (Response, error) {
+	return func(acc *account.SelectedExtKey, password string, args *TxArgs) (Response, error) {
 		s.Nil(acc, "account should be `nil`")
 		s.Equal(correctPassword, password)
 		return hash.Bytes(), nil
@@ -51,7 +62,7 @@ func (s *PendingRequestsSuite) defaultCompleteFunc() CompleteFunc {
 
 func (s *PendingRequestsSuite) delayedCompleteFunc() CompleteFunc {
 	hash := gethcommon.Hash{1}
-	return func(acc *account.SelectedExtKey, password string) (Response, error) {
+	return func(acc *account.SelectedExtKey, password string, args *TxArgs) (Response, error) {
 		time.Sleep(10 * time.Millisecond)
 		s.Nil(acc, "account should be `nil`")
 		s.Equal(correctPassword, password)
@@ -59,9 +70,20 @@ func (s *PendingRequestsSuite) delayedCompleteFunc() CompleteFunc {
 	}
 }
 
+func (s *PendingRequestsSuite) overridenCompleteFunc() CompleteFunc {
+	hash := gethcommon.Hash{1}
+	return func(acc *account.SelectedExtKey, password string, args *TxArgs) (Response, error) {
+		s.Nil(acc, "account should be `nil`")
+		s.Equal(correctPassword, password)
+		s.Equal(&overridenGas, args.Gas)
+		s.Equal(overridenGasPrice, args.GasPrice)
+		return hash.Bytes(), nil
+	}
+}
+
 func (s *PendingRequestsSuite) errorCompleteFunc(err error) CompleteFunc {
 	hash := gethcommon.Hash{1}
-	return func(acc *account.SelectedExtKey, password string) (Response, error) {
+	return func(acc *account.SelectedExtKey, password string, args *TxArgs) (Response, error) {
 		s.Nil(acc, "account should be `nil`")
 		return hash.Bytes(), err
 	}
@@ -77,13 +99,13 @@ func (s *PendingRequestsSuite) TestGet() {
 	}
 }
 
-func (s *PendingRequestsSuite) testComplete(password string, hash gethcommon.Hash, completeFunc CompleteFunc) (string, error) {
+func (s *PendingRequestsSuite) testComplete(password string, hash gethcommon.Hash, completeFunc CompleteFunc, signArgs *TxArgs) (string, error) {
 	req, err := s.pendingRequests.Add(context.Background(), "", nil, completeFunc)
 	s.NoError(err)
 
 	s.True(s.pendingRequests.Has(req.ID), "sign request should exist")
 
-	result := s.pendingRequests.Approve(req.ID, password, testVerifyFunc)
+	result := s.pendingRequests.Approve(req.ID, password, signArgs, testVerifyFunc)
 
 	if s.pendingRequests.Has(req.ID) {
 		// transient error
@@ -96,7 +118,7 @@ func (s *PendingRequestsSuite) testComplete(password string, hash gethcommon.Has
 }
 
 func (s *PendingRequestsSuite) TestCompleteSuccess() {
-	id, err := s.testComplete(correctPassword, gethcommon.Hash{1}, s.defaultCompleteFunc())
+	id, err := s.testComplete(correctPassword, gethcommon.Hash{1}, s.defaultCompleteFunc(), s.defaultSignTxArgs())
 	s.NoError(err, "no errors should be there")
 
 	s.False(s.pendingRequests.Has(id), "sign request should not exist")
@@ -104,7 +126,7 @@ func (s *PendingRequestsSuite) TestCompleteSuccess() {
 
 func (s *PendingRequestsSuite) TestCompleteTransientError() {
 	hash := gethcommon.Hash{}
-	id, err := s.testComplete(wrongPassword, hash, s.errorCompleteFunc(keystore.ErrDecrypt))
+	id, err := s.testComplete(wrongPassword, hash, s.errorCompleteFunc(keystore.ErrDecrypt), s.defaultSignTxArgs())
 	s.Equal(keystore.ErrDecrypt, err, "error value should be preserved")
 
 	s.True(s.pendingRequests.Has(id))
@@ -117,7 +139,7 @@ func (s *PendingRequestsSuite) TestCompleteError() {
 	hash := gethcommon.Hash{1}
 	expectedError := errors.New("test")
 
-	id, err := s.testComplete(correctPassword, hash, s.errorCompleteFunc(expectedError))
+	id, err := s.testComplete(correctPassword, hash, s.errorCompleteFunc(expectedError), s.defaultSignTxArgs())
 
 	s.Equal(expectedError, err, "error value should be preserved")
 
@@ -125,10 +147,10 @@ func (s *PendingRequestsSuite) TestCompleteError() {
 }
 
 func (s PendingRequestsSuite) TestMultipleComplete() {
-	id, err := s.testComplete(correctPassword, gethcommon.Hash{1}, s.defaultCompleteFunc())
+	id, err := s.testComplete(correctPassword, gethcommon.Hash{1}, s.defaultCompleteFunc(), s.defaultSignTxArgs())
 	s.NoError(err, "no errors should be there")
 
-	result := s.pendingRequests.Approve(id, correctPassword, testVerifyFunc)
+	result := s.pendingRequests.Approve(id, correctPassword, s.defaultSignTxArgs(), testVerifyFunc)
 
 	s.Equal(ErrSignReqNotFound, result.Error)
 }
@@ -144,7 +166,7 @@ func (s PendingRequestsSuite) TestConcurrentComplete() {
 
 	for i := 10; i > 0; i-- {
 		go func() {
-			result := s.pendingRequests.Approve(req.ID, correctPassword, testVerifyFunc)
+			result := s.pendingRequests.Approve(req.ID, correctPassword, s.defaultSignTxArgs(), testVerifyFunc)
 			if result.Error == nil {
 				atomic.AddInt32(&approved, 1)
 			}
@@ -167,7 +189,7 @@ func (s PendingRequestsSuite) TestWaitSuccess() {
 	s.True(s.pendingRequests.Has(req.ID), "sign request should exist")
 
 	go func() {
-		result := s.pendingRequests.Approve(req.ID, correctPassword, testVerifyFunc)
+		result := s.pendingRequests.Approve(req.ID, correctPassword, s.defaultSignTxArgs(), testVerifyFunc)
 		s.NoError(result.Error)
 	}()
 
@@ -201,7 +223,7 @@ func (s PendingRequestsSuite) TestWaitFail() {
 	s.True(s.pendingRequests.Has(req.ID), "sign request should exist")
 
 	go func() {
-		result := s.pendingRequests.Approve(req.ID, correctPassword, testVerifyFunc)
+		result := s.pendingRequests.Approve(req.ID, correctPassword, s.defaultSignTxArgs(), testVerifyFunc)
 		s.Equal(expectedError, result.Error)
 	}()
 
@@ -218,7 +240,18 @@ func (s PendingRequestsSuite) TestWaitTimeout() {
 	result := s.pendingRequests.Wait(req.ID, 0*time.Second)
 	s.Equal(ErrSignReqTimedOut, result.Error)
 
-	// Try approving the timeouted request, it will fail
-	result = s.pendingRequests.Approve(req.ID, correctPassword, testVerifyFunc)
+	// Try approving the timed out request, it will fail
+	result = s.pendingRequests.Approve(req.ID, correctPassword, s.defaultSignTxArgs(), testVerifyFunc)
 	s.NotNil(result.Error)
+}
+
+func (s *PendingRequestsSuite) TestCompleteSuccessWithOverridenGas() {
+	txArgs := TxArgs{
+		Gas:      &overridenGas,
+		GasPrice: overridenGasPrice,
+	}
+	id, err := s.testComplete(correctPassword, gethcommon.Hash{1}, s.overridenCompleteFunc(), &txArgs)
+	s.NoError(err, "no errors should be there")
+
+	s.False(s.pendingRequests.Has(id), "sign request should not exist")
 }

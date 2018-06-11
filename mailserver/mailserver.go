@@ -26,9 +26,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/rlp"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
-	"github.com/status-im/status-go/geth/params"
+	"github.com/status-im/status-go/params"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/util"
 )
@@ -40,6 +41,13 @@ const (
 var (
 	errDirectoryNotProvided = errors.New("data directory not provided")
 	errPasswordNotProvided  = errors.New("password is not specified")
+	// By default go-ethereum/metrics creates dummy metrics that don't register anything.
+	// Real metrics are collected only if -metrics flag is set
+	requestProcessTimer    = metrics.NewRegisteredTimer("mailserver/processTime", nil)
+	requestsCounter        = metrics.NewRegisteredCounter("mailserver/requests", nil)
+	requestErrorsCounter   = metrics.NewRegisteredCounter("mailserver/requestErrors", nil)
+	sentEnvelopesMeter     = metrics.NewRegisteredMeter("mailserver/envelopes", nil)
+	sentEnvelopesSizeMeter = metrics.NewRegisteredMeter("mailserver/envelopesSize", nil)
 )
 
 // WMailServer whisper mailserver.
@@ -161,11 +169,15 @@ func (s *WMailServer) Archive(env *whisper.Envelope) {
 // DeliverMail sends mail to specified whisper peer.
 func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope) {
 	log.Info("Delivering mail", "peer", peer.ID)
+	requestsCounter.Inc(1)
+
 	if peer == nil {
+		requestErrorsCounter.Inc(1)
 		log.Error("Whisper peer is nil")
 		return
 	}
 	if s.exceedsPeerRequests(peer.ID()) {
+		requestErrorsCounter.Inc(1)
 		return
 	}
 
@@ -199,6 +211,13 @@ func (s *WMailServer) processRequest(peer *whisper.Peer, lower, upper uint32, bl
 	i := s.db.NewIterator(&util.Range{Start: kl.raw, Limit: ku.raw}, nil)
 	defer i.Release()
 
+	var (
+		sentEnvelopes     int64
+		sentEnvelopesSize int64
+	)
+
+	start := time.Now()
+
 	for i.Next() {
 		var envelope whisper.Envelope
 		err = rlp.DecodeBytes(i.Value(), &envelope)
@@ -217,8 +236,14 @@ func (s *WMailServer) processRequest(peer *whisper.Peer, lower, upper uint32, bl
 					return nil
 				}
 			}
+			sentEnvelopes++
+			sentEnvelopesSize += whisper.EnvelopeHeaderLength + int64(len(envelope.Data))
 		}
 	}
+
+	requestProcessTimer.UpdateSince(start)
+	sentEnvelopesMeter.Mark(sentEnvelopes)
+	sentEnvelopesSizeMeter.Mark(sentEnvelopesSize)
 
 	err = i.Error()
 	if err != nil {

@@ -7,7 +7,7 @@ import (
 	"reflect"
 
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/status-im/status-go/geth/api"
+	"github.com/status-im/status-go/api"
 )
 
 const (

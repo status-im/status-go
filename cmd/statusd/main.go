@@ -15,17 +15,20 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
+	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/cmd/statusd/debug"
 	"github.com/status-im/status-go/cmd/statusd/topics"
-	"github.com/status-im/status-go/geth/api"
-	"github.com/status-im/status-go/geth/node"
-	"github.com/status-im/status-go/geth/params"
 	nodemetrics "github.com/status-im/status-go/metrics/node"
+	"github.com/status-im/status-go/node"
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/profiling"
 )
 
+const (
+	serverClientName = "Statusd"
+)
+
 var (
-	gitCommit  = "N/A" // rely on linker: -ldflags -X main.GitCommit"
 	buildStamp = "N/A" // rely on linker: -ldflags -X main.buildStamp"
 )
 
@@ -42,6 +45,7 @@ var (
 	httpEnabled       = flag.Bool("http", false, "Enable HTTP RPC endpoint")
 	httpHost          = flag.String("httphost", "127.0.0.1", "HTTP RPC host of the listening socket")
 	httpPort          = flag.Int("httpport", params.HTTPPort, "HTTP RPC server's listening port")
+	httpModules       = flag.String("httpmodules", params.APIModules, "Comma separated list of HTTP RPC APIs")
 	ipcEnabled        = flag.Bool("ipc", false, "Enable IPC RPC endpoint")
 	ipcFile           = flag.String("ipcfile", "", "Set IPC file path")
 	cliEnabled        = flag.Bool("cli", false, "Enable debugging CLI server")
@@ -97,9 +101,11 @@ func main() {
 	if err != nil {
 		stdlog.Fatalf("Making config failed, %s", err)
 	}
+	// We want statusd to be distinct from StatusIM client.
+	config.Name = serverClientName
 
 	if *version {
-		printVersion(config, gitCommit, buildStamp)
+		printVersion(config, buildStamp)
 		return
 	}
 
@@ -217,6 +223,7 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 
 	nodeConfig.HTTPHost = *httpHost
 	nodeConfig.HTTPPort = *httpPort
+	nodeConfig.APIModules = *httpModules
 	nodeConfig.IPCEnabled = *ipcEnabled
 
 	if *ipcFile != "" {
@@ -286,16 +293,10 @@ func configureStatusService(flagValue string, nodeConfig *params.NodeConfig) (*p
 }
 
 // printVersion prints verbose output about version and config.
-func printVersion(config *params.NodeConfig, gitCommit, buildStamp string) {
-	if gitCommit != "" && len(gitCommit) > 8 {
-		params.Version += "-" + gitCommit[:8]
-	}
+func printVersion(config *params.NodeConfig, buildStamp string) {
+	fmt.Println(strings.Title(config.Name))
+	fmt.Println("Version:", config.Version)
 
-	fmt.Println(strings.Title(params.ClientIdentifier))
-	fmt.Println("Version:", params.Version)
-	if gitCommit != "" {
-		fmt.Println("Git Commit:", gitCommit)
-	}
 	if buildStamp != "" {
 		fmt.Println("Build Stamp:", buildStamp)
 	}

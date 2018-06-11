@@ -1,4 +1,4 @@
-.PHONY: statusgo all test xgo clean help
+.PHONY: statusgo statusd-prune all test xgo clean help
 .PHONY: statusgo-android statusgo-ios
 
 help: ##@other Show this help
@@ -13,7 +13,7 @@ CGO_CFLAGS=-I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
 GOBIN=$(dir $(realpath $(firstword $(MAKEFILE_LIST))))build/bin
 GIT_COMMIT := $(shell git rev-parse --short HEAD)
 
-BUILD_FLAGS := $(shell echo "-ldflags '-X main.buildStamp=`date -u '+%Y-%m-%d.%H:%M:%S'` -X main.gitCommit=$(GIT_COMMIT)  -X github.com/status-im/status-go/geth/params.VersionMeta=$(GIT_COMMIT)'")
+BUILD_FLAGS ?= $(shell echo "-ldflags '-X main.buildStamp=`date -u '+%Y-%m-%d.%H:%M:%S'` -X github.com/status-im/status-go/params.VersionMeta=$(GIT_COMMIT)'")
 
 GO ?= latest
 XGOVERSION ?= 1.10.x
@@ -25,6 +25,7 @@ gotest_extraflags =
 
 DOCKER_IMAGE_NAME ?= statusteam/status-go
 BOOTNODE_IMAGE_NAME ?= statusteam/bootnode
+STATUSD_PRUNE_IMAGE_NAME ?= statusteam/statusd-prune
 
 DOCKER_TEST_WORKDIR = /go/src/github.com/status-im/status-go/
 DOCKER_TEST_IMAGE = golang:1.10
@@ -62,6 +63,15 @@ statusgo: ##@build Build status-go as statusd server
 	@echo "Compilation done."
 	@echo "Run \"build/bin/statusd -h\" to view available commands."
 
+statusd-prune: ##@statusd-prune Build statusd-prune
+	go build -o $(GOBIN)/statusd-prune -v ./cmd/statusd-prune
+	@echo "Compilation done."
+	@echo "Run \"build/bin/statusd-prune -h\" to view available commands."
+
+statusd-prune-docker-image: ##@statusd-prune Build statusd-prune docker image
+	@echo "Building docker image..."
+	docker build --file _assets/build/Dockerfile-prune . -t $(STATUSD_PRUNE_IMAGE_NAME):latest
+
 bootnode: ##@build Build discovery v5 bootnode using status-go deps
 	go build -i -o $(GOBIN)/bootnode -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/bootnode/
 	@echo "Compilation done."
@@ -95,10 +105,9 @@ statusgo-library: ##@cross-compile Build status-go as static library for current
 	@echo "Static library built:"
 	@ls -la $(GOBIN)/libstatus.*
 
-docker-image: BUILD_TAGS ?= metrics prometheus
 docker-image: ##@docker Build docker image (use DOCKER_IMAGE_NAME to set the image name)
 	@echo "Building docker image..."
-	docker build --file _assets/build/Dockerfile --build-arg "build_tags=$(BUILD_TAGS)" . -t $(DOCKER_IMAGE_NAME):latest
+	docker build --file _assets/build/Dockerfile --build-arg "build_tags=$(BUILD_TAGS)" --build-arg "build_flags=$(BUILD_FLAGS)" . -t $(DOCKER_IMAGE_NAME):latest
 
 bootnode-image:
 	@echo "Building docker image for bootnode..."
@@ -126,10 +135,10 @@ mock-install: ##@other Install mocking tools
 	go get -u github.com/golang/mock/mockgen
 
 mock: ##@other Regenerate mocks
-	mockgen -package=fcm          -destination=geth/notifications/push/fcm/client_mock.go -source=geth/notifications/push/fcm/client.go
-	mockgen -package=fake         -destination=geth/transactions/fake/mock.go             -source=geth/transactions/fake/txservice.go
-	mockgen -package=account      -destination=geth/account/accounts_mock.go              -source=geth/account/accounts.go
-	mockgen -package=jail         -destination=geth/jail/cell_mock.go                     -source=geth/jail/cell.go
+	mockgen -package=fcm          -destination=notifications/push/fcm/client_mock.go -source=notifications/push/fcm/client.go
+	mockgen -package=fake         -destination=transactions/fake/mock.go             -source=transactions/fake/txservice.go
+	mockgen -package=account      -destination=account/accounts_mock.go              -source=account/accounts.go
+	mockgen -package=jail         -destination=jail/cell_mock.go                     -source=jail/cell.go
 	mockgen -package=status       -destination=services/status/account_mock.go            -source=services/status/service.go
 
 docker-test: ##@tests Run tests in a docker container with golang.
