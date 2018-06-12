@@ -291,7 +291,8 @@
   packages = [
     "pbkdf2",
     "ripemd160",
-    "scrypt"
+    "scrypt",
+    "ssh/terminal"
   ]
   revision = "13931e22f9e72ea58bb73048bc752b48c6d4d4ac"
 
@@ -320,7 +321,10 @@
 [[projects]]
   branch = "master"
   name = "golang.org/x/sys"
-  packages = ["unix"]
+  packages = [
+    "unix",
+    "windows"
+  ]
   revision = "2c42eef0765b9837fbdab12011af7830f55f88f0"
 
 [[projects]]
@@ -407,6 +411,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "ae9e87f81c4bfcd1c190314d52248c8851a58936c149947a9e1bbad8b53a542c"
+  inputs-digest = "7af71825062ab2d5a534251f37b163ad375a08e4b2790ae8f8d910d0b7e7f81f"
   solver-name = "gps-cdcl"
   solver-version = 1

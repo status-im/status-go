@@ -22,6 +22,7 @@ import (
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/profiling"
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 const (
@@ -54,6 +55,7 @@ var (
 	pprofPort         = flag.Int("pprofport", 52525, "Port for runtime profiling via pprof")
 	logLevel          = flag.String("log", "INFO", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
 	logFile           = flag.String("logfile", "", "Path to the log file")
+	logWithoutColors  = flag.Bool("log-without-color", false, "Disables log colors")
 	version           = flag.Bool("version", false, "Print version")
 
 	listenAddr = flag.String("listenaddr", ":30303", "IP address and port of this node (e.g. 127.0.0.1:30303)")
@@ -109,7 +111,12 @@ func main() {
 		return
 	}
 
-	if err := logutils.OverrideRootLog(config.LogEnabled, config.LogLevel, config.LogFile, true); err != nil {
+	colors := !(*logWithoutColors)
+	if colors {
+		colors = terminal.IsTerminal(int(os.Stdin.Fd()))
+	}
+
+	if err := logutils.OverrideRootLog(config.LogEnabled, config.LogLevel, config.LogFile, colors); err != nil {
 		stdlog.Fatalf("Error initializing logger: %s", err)
 	}
 
