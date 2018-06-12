@@ -255,6 +255,8 @@ func MakeTestNodeConfig(networkID int) (*params.NodeConfig, error) {
 	if err != nil {
 		return nil, err
 	}
+	nodeConfig.WhisperConfig.EnableNTPSync = false
+
 	return nodeConfig, nil
 }
 
