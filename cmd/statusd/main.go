@@ -156,8 +156,8 @@ func main() {
 		exitCode := syncAndStopNode(interruptCh, backend.StatusNode(), *syncAndExit)
 		// Call was interrupted. Wait for graceful shutdown.
 		if exitCode == -1 {
-			if node := backend.StatusNode().GethNode(); node != nil {
-				node.Wait()
+			if gethNode := backend.StatusNode().GethNode(); gethNode != nil {
+				gethNode.Wait()
 			}
 			return
 		}
@@ -165,10 +165,10 @@ func main() {
 		os.Exit(exitCode)
 	}
 
-	node := backend.StatusNode().GethNode()
-	if node != nil {
+	gethNode := backend.StatusNode().GethNode()
+	if gethNode != nil {
 		// wait till node has been stopped
-		node.Wait()
+		gethNode.Wait()
 	}
 }
 
@@ -183,8 +183,8 @@ func startDebug(backend *api.StatusBackend) error {
 func startCollectingNodeMetrics(interruptCh <-chan struct{}, statusNode *node.StatusNode) {
 	logger.Info("Starting collecting node metrics")
 
-	node := statusNode.GethNode()
-	if node == nil {
+	gethNode := statusNode.GethNode()
+	if gethNode == nil {
 		logger.Error("Failed to run metrics because it could not get the node")
 		return
 	}
@@ -192,7 +192,7 @@ func startCollectingNodeMetrics(interruptCh <-chan struct{}, statusNode *node.St
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go func() {
-		if err := nodemetrics.SubscribeServerEvents(ctx, node); err != nil {
+		if err := nodemetrics.SubscribeServerEvents(ctx, gethNode); err != nil {
 			logger.Error("Failed to subscribe server events", "error", err)
 		}
 	}()

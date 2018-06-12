@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// nolint: deadcode
 func TestStatusFlag(t *testing.T) {
 	service := "status"
 

@@ -92,7 +92,7 @@ func (s *WhisperExtensionSuite) TestExpiredSignal() {
 			Type  string
 			Event json.RawMessage
 		}
-		fmt.Println(string(rawSignal))
+		fmt.Println(rawSignal)
 		s.NoError(json.Unmarshal([]byte(rawSignal), &sg))
 
 		if sg.Type == signal.EventEnvelopeExpired {

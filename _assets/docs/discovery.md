@@ -26,7 +26,6 @@ from them nodes that are registered as a topic provider.
 
 We can control how often this loop wil run, more about it in the next section.
 
-
 Peer pool in status-go
 ----------------------
 
@@ -35,12 +34,15 @@ without using a lot of resources in the long run. It achieves it by introducing
 two modes of synchronization:
 
 1. Fast mode.
+
 Peer will run search loop quite often (every 500ms at the time of writing) with the
 goal to visit as much nodes as possible and once it will find minimum amount of
 peers with required capability it will swich to slow mode.
-2. Slow mode.
+
+1. Slow mode.
+
 This mode might be useful to get information about new peers that can be used
-later if initial set of peers will dissapear. Should run once in a 10m-30m.
+later if initial set of peers disappears. Should run once in a 10m-30m.
 
 However finding peers even with fast mode can take noticeable amount of time,
 which is fine if node is a long-running, but will be a huge problem on a mobile
@@ -48,5 +50,6 @@ device. To workaround such problem we will introduce a leveldb cache that will
 maintain a list of peers that was used by a device before it went offline.
 
 Another important detail of a peer pool is a support of min and max amount of peers:
+
 - min is required to switch from fast to slow sync mode
 - max is an upper limit that can be used by a single node

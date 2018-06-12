@@ -19,6 +19,8 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
+const mailboxPassword = "status-offline-inbox"
+
 type WhisperMailboxSuite struct {
 	suite.Suite
 }
@@ -60,7 +62,7 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	s.Require().NoError(err)
 
 	// Generate mailbox symkey.
-	password := "status-offline-inbox"
+	password := mailboxPassword
 	MailServerKeyID, err := senderWhisperService.AddSymKeyFromPassword(password)
 	s.Require().NoError(err)
 
@@ -168,7 +170,7 @@ func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
 	charlieRPCClient := charlieBackend.StatusNode().RPCClient()
 
 	// Bob and charlie add the mailserver key.
-	password := "status-offline-inbox"
+	password := mailboxPassword
 	bobMailServerKeyID, err := bobWhisperService.AddSymKeyFromPassword(password)
 	s.Require().NoError(err)
 	charlieMailServerKeyID, err := charlieWhisperService.AddSymKeyFromPassword(password)

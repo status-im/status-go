@@ -46,7 +46,7 @@ function extension {
   fi
 }
 
-# Either set a local build environemnt, or pull any remote imports
+# Either set a local build environment, or pull any remote imports
 if [ "$EXT_GOPATH" != "" ]; then
   # If local builds are requested, inject the sources
   echo "Building locally $1..."

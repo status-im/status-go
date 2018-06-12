@@ -262,7 +262,7 @@ func (s *WMailServer) validateRequest(peerID []byte, request *whisper.Envelope) 
 	f := whisper.Filter{KeySym: s.key}
 	decrypted := request.Open(&f)
 	if decrypted == nil {
-		log.Warn(fmt.Sprintf("Failed to decrypt p2p request"))
+		log.Warn("Failed to decrypt p2p request")
 		return false, 0, 0, nil
 	}
 

@@ -2,8 +2,8 @@ package benchmarks
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
-	"math/rand"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/node"
@@ -43,7 +43,7 @@ func TestSendMessages(t *testing.T) {
 	require.NoError(t, err)
 
 	payload := make([]byte, *msgSize)
-	rand.Read(payload)
+	_, _ = rand.Read(payload)
 
 	envelopeEvents := make(chan whisper.EnvelopeEvent, 100)
 	sub := shhService.SubscribeEnvelopeEvents(envelopeEvents)

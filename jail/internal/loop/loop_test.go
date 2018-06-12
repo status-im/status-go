@@ -48,8 +48,8 @@ type LoopSuite struct {
 func (s *LoopSuite) SetupTest() {
 	s.task = &DummyTask{}
 
-	vm := vm.New()
-	s.loop = New(vm)
+	newVM := vm.New()
+	s.loop = New(newVM)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel

@@ -104,6 +104,7 @@ type ExtendedKey struct {
 	CachedPubKeyData []byte // (non-serialized) used for memoization of public key (calculated from a private key)
 }
 
+// nolint: gas
 const masterSecret = "Bitcoin seed"
 
 // NewMaster creates new master node, root of HD chain/tree.

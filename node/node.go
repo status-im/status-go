@@ -196,10 +196,10 @@ func activateShhService(stack *node.Node, config *params.NodeConfig, db *leveldb
 		return nil
 	}
 	if config.WhisperConfig.EnableNTPSync {
-		if err := stack.Register(func(*node.ServiceContext) (node.Service, error) {
+		if err = stack.Register(func(*node.ServiceContext) (node.Service, error) {
 			return timesource.Default(), nil
 		}); err != nil {
-			return err
+			return
 		}
 	}
 

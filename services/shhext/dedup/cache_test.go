@@ -35,9 +35,11 @@ func (s *DedupCacheTestSuite) TearDownTest() {
 }
 
 func (s *DedupCacheTestSuite) TestMultipleFilterIDs() {
-	filterID1 := "filter-id1"
-	filterID2 := "filter-id2"
-	filterID3 := "filter-id"
+	const (
+		filterID1 = "filter-id1"
+		filterID2 = "filter-id2"
+		filterID3 = "filter-id"
+	)
 	messagesFilter1 := generateMessages(10)
 	s.NoError(s.c.Put(filterID1, messagesFilter1))
 
@@ -74,7 +76,7 @@ func (s *DedupCacheTestSuite) TestMultipleFilterIDs() {
 }
 
 func (s *DedupCacheTestSuite) TestCleaningUp() {
-	filterID := "filter-id"
+	const filterID = "filter1-id"
 	// - 2 days
 	s.c.now = func() time.Time { return time.Now().Add(-48 * time.Hour) }
 	messages2DaysOld := generateMessages(10)

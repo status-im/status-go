@@ -34,7 +34,7 @@ func (s *NotifierTestSuite) TestNotifySuccess() {
 	ids := []string{"1"}
 	payload := fcmPayload
 	msg := make(map[string]string)
-	body := "body"
+	body := "body1"
 	msg["msg"] = body
 
 	s.fcmClientMock.EXPECT().SetNotificationPayload(&fcmPayload).Times(1)
@@ -53,7 +53,7 @@ func (s *NotifierTestSuite) TestNotifyError() {
 	ids := []string{"1"}
 	payload := fcmPayload
 	msg := make(map[string]string)
-	body := "body"
+	body := "body2"
 	msg["msg"] = body
 
 	s.fcmClientMock.EXPECT().SetNotificationPayload(&fcmPayload).Times(1)
