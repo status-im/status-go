@@ -173,12 +173,14 @@ test-e2e-race: gotest_extraflags=-race
 test-e2e-race: test-e2e ##@tests Run e2e tests with -race flag
 
 lint-install:
-	go get -u github.com/alecthomas/gometalinter
-	gometalinter --install
+	go get -u github.com/client9/misspell/cmd/misspell
+	@# The following installs a specific version of golangci-lint, which is appropriate for a CI server to avoid different results from build to build
+	curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | bash -s -- -b $(GOPATH)/bin v1.6.1
 
 lint:
 	@echo "lint"
-	@gometalinter ./...
+	@golangci-lint run ./...
+	@find . -type f -not -path "./.ethereumtest/*" -not -path "./vendor/*" -not -path "./extkeys/mnemonic.go" -not -path "./extkeys/mnemonic_vectors.json" -print0 | xargs -0 misspell
 
 ci: lint mock dep-ensure test-unit test-e2e ##@tests Run all linters and tests at once
 
