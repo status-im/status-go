@@ -114,7 +114,7 @@ func (s *TxQueueTestSuite) setupTransactionPoolAPI(args SendTxArgs, returnNonce,
 func (s *TxQueueTestSuite) rlpEncodeTx(args SendTxArgs, config *params.NodeConfig, account *account.SelectedExtKey, nonce *hexutil.Uint64, gas hexutil.Uint64, gasPrice *big.Int) hexutil.Bytes {
 	newTx := types.NewTransaction(
 		uint64(*nonce),
-		gethcommon.Address(*args.To),
+		*args.To,
 		args.Value.ToInt(),
 		uint64(gas),
 		gasPrice,

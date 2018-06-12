@@ -21,12 +21,19 @@ type ConnectionState struct {
 // other types are also may be used.
 type ConnectionType byte
 
+const (
+	offline  = "offline"
+	wifi     = "wifi"
+	cellular = "cellular"
+	unknown  = "unknown"
+)
+
 // NewConnectionType creates new ConnectionType from string.
 func NewConnectionType(s string) ConnectionType {
 	switch s {
-	case "cellular":
+	case cellular:
 		return ConnectionCellular
-	case "wifi":
+	case wifi:
 		return ConnectionWifi
 	}
 
@@ -43,17 +50,17 @@ const (
 // String formats ConnectionState for logs. Implements Stringer.
 func (c ConnectionState) String() string {
 	if c.Offline {
-		return "offline"
+		return offline
 	}
 
 	var typ string
 	switch c.Type {
 	case ConnectionWifi:
-		typ = "wifi"
+		typ = wifi
 	case ConnectionCellular:
-		typ = "cellular"
+		typ = cellular
 	default:
-		typ = "unknown"
+		typ = unknown
 	}
 
 	if c.Expensive {

@@ -84,10 +84,10 @@ type Cell struct {
 // NewCell encapsulates what we need to create a new jailCell from the
 // provided vm and eventloop instance.
 func NewCell(id string) (*Cell, error) {
-	vm := vm.New()
-	lo := loop.New(vm)
+	newVM := vm.New()
+	lo := loop.New(newVM)
 
-	err := registerVMHandlers(vm, lo)
+	err := registerVMHandlers(newVM, lo)
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +95,7 @@ func NewCell(id string) (*Cell, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	loopStopped := make(chan struct{})
 	cell := Cell{
-		jsvm:        vm,
+		jsvm:        newVM,
 		id:          id,
 		cancel:      cancel,
 		loop:        lo,
@@ -180,8 +180,8 @@ func (c *Cell) Get(key string) (JSValue, error) {
 	if err != nil {
 		return JSValue{}, err
 	}
-	JSValue := JSValue{value: v}
-	return JSValue, nil
+	value := JSValue{value: v}
+	return value, nil
 }
 
 // GetObjectValue calls GetObjectValue on the underlying JavaScript VM and returns
@@ -191,8 +191,8 @@ func (c *Cell) GetObjectValue(v otto.Value, name string) (JSValue, error) {
 	if err != nil {
 		return JSValue{}, err
 	}
-	JSValue := JSValue{value: v}
-	return JSValue, nil
+	value := JSValue{value: v}
+	return value, nil
 }
 
 // Run calls Run on the underlying JavaScript VM and returns
@@ -202,8 +202,8 @@ func (c *Cell) Run(src interface{}) (JSValue, error) {
 	if err != nil {
 		return JSValue{}, err
 	}
-	JSValue := JSValue{value: v}
-	return JSValue, nil
+	value := JSValue{value: v}
+	return value, nil
 }
 
 // Call calls Call on the underlying JavaScript VM and returns
@@ -213,6 +213,6 @@ func (c *Cell) Call(item string, this interface{}, args ...interface{}) (JSValue
 	if err != nil {
 		return JSValue{}, err
 	}
-	JSValue := JSValue{value: v}
-	return JSValue, nil
+	value := JSValue{value: v}
+	return value, nil
 }

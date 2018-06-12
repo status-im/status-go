@@ -24,6 +24,8 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
+const invalidTxID = "invalid-tx-id"
+
 type initFunc func([]byte, *transactions.SendTxArgs)
 
 func txURLString(result sign.Result) string {
@@ -64,7 +66,7 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransaction() {
 			s.Equal(params.SendTransactionMethodName, method)
 
 			txID := event["id"].(string)
-			signResult = s.Backend.ApproveSignRequest(string(txID), TestConfig.Account1.Password)
+			signResult = s.Backend.ApproveSignRequest(txID, TestConfig.Account1.Password)
 			s.NoError(signResult.Error, "cannot complete queued transaction %s", txID)
 			close(transactionCompleted)
 		}
@@ -115,11 +117,11 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransactionUpstream() {
 			txID := event["id"].(string)
 
 			// Complete with a wrong passphrase.
-			signResult = s.Backend.ApproveSignRequest(string(txID), "some-invalid-passphrase")
+			signResult = s.Backend.ApproveSignRequest(txID, "some-invalid-passphrase")
 			s.EqualError(signResult.Error, keystore.ErrDecrypt.Error(), "should return an error as the passphrase was invalid")
 
 			// Complete with a correct passphrase.
-			signResult = s.Backend.ApproveSignRequest(string(txID), TestConfig.Account2.Password)
+			signResult = s.Backend.ApproveSignRequest(txID, TestConfig.Account2.Password)
 			s.NoError(signResult.Error, "cannot complete queued transaction %s", txID)
 
 			close(transactionCompleted)
@@ -257,7 +259,7 @@ func (s *TransactionsTestSuite) setDefaultNodeNotificationHandler(signRequestRes
 			// the first call will fail (we are not logged in, but trying to complete tx)
 			log.Info("trying to complete with no user logged in")
 			err = s.Backend.ApproveSignRequest(
-				string(event["id"].(string)),
+				event["id"].(string),
 				TestConfig.Account1.Password,
 			).Error
 			s.EqualError(
@@ -271,7 +273,7 @@ func (s *TransactionsTestSuite) setDefaultNodeNotificationHandler(signRequestRes
 			err = s.Backend.SelectAccount(sampleAddress, TestConfig.Account1.Password)
 			s.NoError(err)
 			err = s.Backend.ApproveSignRequest(
-				string(event["id"].(string)),
+				event["id"].(string),
 				TestConfig.Account1.Password,
 			).Error
 			s.EqualError(
@@ -284,7 +286,7 @@ func (s *TransactionsTestSuite) setDefaultNodeNotificationHandler(signRequestRes
 			log.Info("trying to complete with correct user, this should succeed")
 			s.NoError(s.Backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
 			result := s.Backend.ApproveSignRequest(
-				string(event["id"].(string)),
+				event["id"].(string),
 				TestConfig.Account1.Password,
 			)
 			if expectedError != nil {
@@ -413,7 +415,7 @@ func (s *TransactionsTestSuite) TestSendEtherTxUpstream() {
 			log.Info("transaction queued (will be completed shortly)", "id", event["id"].(string))
 
 			signResult := s.Backend.ApproveSignRequest(
-				string(event["id"].(string)),
+				event["id"].(string),
 				TestConfig.Account1.Password,
 			)
 			s.NoError(signResult.Error, "cannot complete queued transaction[%v]", event["id"])
@@ -467,7 +469,7 @@ func (s *TransactionsTestSuite) TestDoubleCompleteQueuedTransactions() {
 
 		if envelope.Type == signal.EventSignRequestAdded {
 			event := envelope.Event.(map[string]interface{})
-			txID := string(event["id"].(string))
+			txID := event["id"].(string)
 			log.Info("transaction queued (will be failed and completed on the second call)", "id", txID)
 
 			// try with wrong password
@@ -545,7 +547,7 @@ func (s *TransactionsTestSuite) TestDiscardQueuedTransaction() {
 
 		if envelope.Type == signal.EventSignRequestAdded {
 			event := envelope.Event.(map[string]interface{})
-			txID := string(event["id"].(string))
+			txID := event["id"].(string)
 			log.Info("transaction queued (will be discarded soon)", "id", txID)
 
 			s.True(s.Backend.PendingSignRequests().Has(txID), "txqueue should still have test tx")
@@ -635,7 +637,7 @@ func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
 		s.NoError(err)
 		if envelope.Type == signal.EventSignRequestAdded {
 			event := envelope.Event.(map[string]interface{})
-			txID := string(event["id"].(string))
+			txID := event["id"].(string)
 			log.Info("transaction queued (will be discarded soon)", "id", txID)
 
 			s.True(s.Backend.PendingSignRequests().Has(txID),
@@ -678,12 +680,12 @@ func (s *TransactionsTestSuite) TestDiscardMultipleQueuedTransactions() {
 
 	// wait for transactions, and discard immediately
 	discardTxs := func(txIDs []string) {
-		txIDs = append(txIDs, "invalid-tx-id")
+		txIDs = append(txIDs, invalidTxID)
 
 		// discard
 		discardResults := s.Backend.DiscardSignRequests(txIDs)
 		require.Len(discardResults, 1, "cannot discard txs: %v", discardResults)
-		require.Error(discardResults["invalid-tx-id"], sign.ErrSignReqNotFound, "cannot discard txs: %v", discardResults)
+		require.Error(discardResults[invalidTxID], sign.ErrSignReqNotFound, "cannot discard txs: %v", discardResults)
 
 		// try completing discarded transaction
 		completeResults := s.Backend.ApproveSignRequests(txIDs, TestConfig.Account1.Password)
@@ -787,7 +789,7 @@ func (s *TransactionsTestSuite) sendConcurrentTransactions(testTxCount int) {
 
 		if envelope.Type == signal.EventSignRequestAdded {
 			event := envelope.Event.(map[string]interface{})
-			txID := string(event["id"].(string))
+			txID := event["id"].(string)
 			log.Info("transaction queued (will be completed in a single call, once aggregated)", "id", txID)
 
 			txIDs <- txID
@@ -807,18 +809,18 @@ func (s *TransactionsTestSuite) sendConcurrentTransactions(testTxCount int) {
 
 	// wait for transactions, and complete them in a single call
 	completeTxs := func(txIDs []string) {
-		txIDs = append(txIDs, "invalid-tx-id")
+		txIDs = append(txIDs, invalidTxID)
 		results := s.Backend.ApproveSignRequests(txIDs, TestConfig.Account1.Password)
 		s.Len(results, testTxCount+1)
-		s.EqualError(results["invalid-tx-id"].Error, sign.ErrSignReqNotFound.Error())
+		s.EqualError(results[invalidTxID].Error, sign.ErrSignReqNotFound.Error())
 
 		for txID, txResult := range results {
 			s.False(
-				txResult.Error != nil && txID != "invalid-tx-id",
+				txResult.Error != nil && txID != invalidTxID,
 				"invalid error for %s", txID,
 			)
 			s.False(
-				len(txResult.Response.Bytes()) < 1 && txID != "invalid-tx-id",
+				len(txResult.Response.Bytes()) < 1 && txID != invalidTxID,
 				"invalid hash (expected non empty hash): %s", txID,
 			)
 			log.Info("transaction complete", "URL", txURLString(txResult))

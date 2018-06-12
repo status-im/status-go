@@ -19,7 +19,8 @@ import (
 )
 
 const (
-	testChatID = "testChat"
+	testChatID  = "testChat"
+	successJSON = `{"result":true}`
 )
 
 var (
@@ -98,7 +99,6 @@ func (s *JailTestSuite) TestCreateAndInitCell() {
 	// Reinitialization preserves the JS environment, so the 'test' variable exists
 	// even though we didn't initialize it here (in the second room).
 	response = s.Jail.CreateAndInitCell("newChat2", "a")
-	expectedResponse = `{"result":2}`
 	s.Equal(expectedResponse, response)
 
 	// But this variable doesn't leak into other rooms.
@@ -121,8 +121,8 @@ func (s *JailTestSuite) TestFunctionCall() {
 	s.Equal(expectedError, response)
 
 	// call extraFunc()
-	response = s.Jail.Call(testChatID, `["commands", "testCommand"]`, `{"val":12}`)
-	expectedResponse := `{"result":144}`
+	response = s.Jail.Call(testChatID, `["commands", "testCommand"]`, `{"val":11}`)
+	expectedResponse := `{"result":121}`
 	s.Equal(expectedResponse, response)
 }
 
@@ -136,7 +136,7 @@ func (s *JailTestSuite) TestFunctionCallTrue() {
 
 	// call extraFunc()
 	response := s.Jail.Call(testChatID, `["commands", "testCommandTrue"]`, `{"val":12}`)
-	expectedResponse := `{"result":true}`
+	expectedResponse := successJSON
 	s.Equal(expectedResponse, response)
 }
 
@@ -194,7 +194,7 @@ func (s *JailTestSuite) TestEventSignal() {
 	response, err := responseValue.Value().ToString()
 	s.NoError(err, "cannot parse result")
 
-	expectedResponse := `{"result":true}`
+	expectedResponse := successJSON
 	s.Equal(expectedResponse, response)
 }
 
@@ -234,7 +234,7 @@ func (s *JailTestSuite) TestSendSyncResponseOrder() {
 		go func(i int) {
 			defer wg.Done()
 			res := s.Jail.Call(testChatID, `["commands", "testCommand"]`, fmt.Sprintf(`{"val":%d}`, i))
-			if !strings.Contains(string(res), fmt.Sprintf("result\":%d", i*i)) {
+			if !strings.Contains(res, fmt.Sprintf("result\":%d", i*i)) {
 				errCh <- fmt.Errorf("result should be '%d', got %s", i*i, res)
 			}
 		}(i)
@@ -243,7 +243,7 @@ func (s *JailTestSuite) TestSendSyncResponseOrder() {
 		go func(i int) {
 			defer wg.Done()
 			res := s.Jail.Call(testChatID, `["commands", "calculateGasPrice"]`, fmt.Sprintf(`%d`, i))
-			if strings.Contains(string(res), "error") {
+			if strings.Contains(res, "error") {
 				errCh <- fmt.Errorf("result should not contain 'error', got %s", res)
 			}
 		}(i)

@@ -119,7 +119,7 @@ func (s *APITestSuite) TestRaceConditions() {
 	}
 
 	for range progress {
-		cnt -= 1
+		cnt--
 		if cnt <= 0 {
 			break
 		}
@@ -134,7 +134,7 @@ func (s *APITestSuite) TestCellsRemovedAfterSwitchAccount() {
 	const itersCount = 5
 	var (
 		require   = s.Require()
-		getChatId = func(id int) string {
+		getChatID = func(id int) string {
 			return testChatID + strconv.Itoa(id)
 		}
 	)
@@ -155,7 +155,7 @@ func (s *APITestSuite) TestCellsRemovedAfterSwitchAccount() {
 	require.NoError(err)
 
 	for i := 0; i < itersCount; i++ {
-		_, e := s.api.JailManager().CreateCell(getChatId(i))
+		_, e := s.api.JailManager().CreateCell(getChatID(i))
 		require.NoError(e)
 	}
 
@@ -163,7 +163,7 @@ func (s *APITestSuite) TestCellsRemovedAfterSwitchAccount() {
 	require.NoError(err)
 
 	for i := 0; i < itersCount; i++ {
-		_, e := s.api.JailManager().Cell(getChatId(i))
+		_, e := s.api.JailManager().Cell(getChatID(i))
 		require.Error(e)
 	}
 }

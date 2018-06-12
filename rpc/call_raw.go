@@ -57,7 +57,7 @@ type jsonError struct {
 }
 
 // callRawContext performs a JSON-RPC call with already crafted JSON-RPC body and
-// given context. It returns string in JSON format with response (successul or error).
+// given context. It returns string in JSON format with response (successful or error).
 //
 // TODO(divan): this function exists for compatibility and uses default
 // go-ethereum's RPC client under the hood. It adds some unnecessary overhead

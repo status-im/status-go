@@ -24,6 +24,7 @@ const (
 	// EmptyResponse is returned when cell is successfully created and initialized
 	// but no additional JS was provided to the initialization method.
 	EmptyResponse = `{"result": ""}`
+	undefinedText = "undefined"
 )
 
 var (
@@ -299,7 +300,7 @@ func newJailErrorResponse(err error) string {
 func formatOttoValue(result otto.Value) otto.Value {
 	val := result.String()
 	if result.IsString() {
-		if val != "undefined" {
+		if val != undefinedText {
 			val = fmt.Sprintf(`"%s"`, strings.Replace(val, `"`, `\"`, -1))
 			result, _ = otto.ToValue(val)
 		}
@@ -312,7 +313,7 @@ func formatOttoValue(result otto.Value) otto.Value {
 // that is a valid JavaScript code.
 func newJailResultResponse(value otto.Value) string {
 	res := value.String()
-	if res == "undefined" {
+	if res == undefinedText {
 		res = "null"
 	}
 	return `{"result":` + res + `}`

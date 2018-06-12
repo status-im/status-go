@@ -9,25 +9,25 @@ import (
 )
 
 func TestSubscribeServerEventsWithoutServer(t *testing.T) {
-	node, err := node.New(&node.Config{})
+	gethNode, err := node.New(&node.Config{})
 	require.NoError(t, err)
-	require.EqualError(t, SubscribeServerEvents(context.TODO(), node), "server is unavailable")
+	require.EqualError(t, SubscribeServerEvents(context.TODO(), gethNode), "server is unavailable")
 }
 
 func TestSubscribeServerEvents(t *testing.T) {
-	node, err := node.New(&node.Config{})
+	gethNode, err := node.New(&node.Config{})
 	require.NoError(t, err)
-	err = node.Start()
+	err = gethNode.Start()
 	require.NoError(t, err)
 	defer func() {
-		err := node.Stop()
+		err := gethNode.Stop()
 		require.NoError(t, err)
 	}()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	go func() {
-		err := SubscribeServerEvents(ctx, node)
+		err := SubscribeServerEvents(ctx, gethNode)
 		require.NoError(t, err)
 		close(done)
 	}()

@@ -104,7 +104,7 @@ func (t *Transactor) validateAccount(args SendTxArgs, selectedAccount *account.S
 }
 
 func (t *Transactor) validateAndPropagate(selectedAccount *account.SelectedExtKey, args SendTxArgs) (hash gethcommon.Hash, err error) {
-	if err := t.validateAccount(args, selectedAccount); err != nil {
+	if err = t.validateAccount(args, selectedAccount); err != nil {
 		return hash, err
 	}
 	if !args.Valid() {
