@@ -159,18 +159,18 @@ func (s *ShhExtSuite) TestRequestMessages() {
 		mailServerPeer = "enode://b7e65e1bedc2499ee6cbd806945af5e7df0e59e4070c96821570bd581473eade24a489f5ec95d060c0db118c879403ab88d827d3766978f28708989d35474f87@[::]:51920"
 	)
 
-	var result bool
+	var result []byte
 
 	// invalid MailServer enode address
 	result, err = api.RequestMessages(context.TODO(), MessagesRequest{MailServerPeer: "invalid-address"})
-	s.False(result)
+	s.Nil(result)
 	s.EqualError(err, "invalid mailServerPeer value: invalid URL scheme, want \"enode\"")
 
 	// non-existent symmetric key
 	result, err = api.RequestMessages(context.TODO(), MessagesRequest{
 		MailServerPeer: mailServerPeer,
 	})
-	s.False(result)
+	s.Nil(result)
 	s.EqualError(err, "invalid symKeyID value: non-existent key ID")
 
 	// with a symmetric key
@@ -181,7 +181,7 @@ func (s *ShhExtSuite) TestRequestMessages() {
 		SymKeyID:       symKeyID,
 	})
 	s.Contains(err.Error(), "Could not find peer with ID")
-	s.False(result)
+	s.Nil(result)
 
 	// with a peer acting as a mailserver
 	// prepare a node first
@@ -214,7 +214,7 @@ func (s *ShhExtSuite) TestRequestMessages() {
 		SymKeyID:       symKeyID,
 	})
 	s.NoError(err)
-	s.True(result)
+	s.NotNil(result)
 }
 
 func (s *ShhExtSuite) TearDown() {

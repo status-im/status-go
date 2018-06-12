@@ -10,7 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
-	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/services/shhext/dedup"
 	"github.com/syndtr/goleveldb/leveldb"
 )
@@ -23,12 +22,15 @@ const (
 	EnvelopePosted EnvelopeState = iota
 	// EnvelopeSent is set when envelope is sent to atleast one peer.
 	EnvelopeSent
+	// MailServerRequestSent is set when p2p request is sent to the mailserver
+	MailServerRequestSent
 )
 
 // EnvelopeEventsHandler used for two different event types.
 type EnvelopeEventsHandler interface {
 	EnvelopeSent(common.Hash)
 	EnvelopeExpired(common.Hash)
+	MailServerAckReceived(common.Hash)
 }
 
 // Service is a service that provides some additional Whisper API.
@@ -37,14 +39,13 @@ type Service struct {
 	tracker      *tracker
 	nodeID       *ecdsa.PrivateKey
 	deduplicator *dedup.Deduplicator
-	mc           *mailserver.Client
 }
 
 // Make sure that Service implements node.Service interface.
 var _ node.Service = (*Service)(nil)
 
 // New returns a new Service.
-func New(w *whisper.Whisper, mc *mailserver.Client, handler EnvelopeEventsHandler, db *leveldb.DB) *Service {
+func New(w *whisper.Whisper, handler EnvelopeEventsHandler, db *leveldb.DB) *Service {
 	track := &tracker{
 		w:       w,
 		handler: handler,
@@ -54,7 +55,6 @@ func New(w *whisper.Whisper, mc *mailserver.Client, handler EnvelopeEventsHandle
 		w:            w,
 		tracker:      track,
 		deduplicator: dedup.NewDeduplicator(w, db),
-		mc:           mc,
 	}
 }
 
@@ -126,6 +126,13 @@ func (t *tracker) Add(hash common.Hash) {
 	t.cache[hash] = EnvelopePosted
 }
 
+// Add request hash to a tracker.
+func (t *tracker) AddRequest(hash common.Hash) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.cache[hash] = MailServerRequestSent
+}
+
 // handleEnvelopeEvents processes whisper envelope events
 func (t *tracker) handleEnvelopeEvents() {
 	events := make(chan whisper.EnvelopeEvent, 100) // must be buffered to prevent blocking whisper
@@ -169,6 +176,16 @@ func (t *tracker) handleEvent(event whisper.EnvelopeEvent) {
 			if t.handler != nil {
 				t.handler.EnvelopeExpired(event.Hash)
 			}
+		}
+	case whisper.EventMailServerAck:
+		state, ok := t.cache[event.Hash]
+		if !ok || state != MailServerRequestSent {
+			return
+		}
+		log.Debug("mailserver ack received", "hash", event.Hash)
+		delete(t.cache, event.Hash)
+		if t.handler != nil {
+			t.handler.MailServerAckReceived(event.Hash)
 		}
 	}
 }

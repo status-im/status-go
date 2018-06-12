@@ -61,9 +61,8 @@ const (
 // Whisper represents a dark communication interface through the Ethereum
 // network, using its very own P2P communication layer.
 type Whisper struct {
-	protocol    p2p.Protocol // Protocol description and parameters
-	filters     *Filters     // Message filters installed with Subscribe function
-	ackWatchers []chan *Envelope
+	protocol p2p.Protocol // Protocol description and parameters
+	filters  *Filters     // Message filters installed with Subscribe function
 
 	privateKeys map[string]*ecdsa.PrivateKey // Private key storage
 	symKeys     map[string][]byte            // Symmetric key storage
@@ -78,7 +77,6 @@ type Whisper struct {
 
 	messageQueue chan *Envelope // Message queue for normal whisper messages
 	p2pMsgQueue  chan *Envelope // Message queue for peer-to-peer messages (not to be forwarded any further)
-	p2pAckQueue  chan *Envelope // TODO: @pilu add comments
 	quit         chan struct{}  // Channel used for graceful exit
 
 	settings syncmap.Map // holds configuration settings that can be dynamically changed
@@ -112,7 +110,6 @@ func New(cfg *Config) *Whisper {
 		peers:         make(map[*Peer]struct{}),
 		messageQueue:  make(chan *Envelope, messageQueueLimit),
 		p2pMsgQueue:   make(chan *Envelope, messageQueueLimit),
-		p2pAckQueue:   make(chan *Envelope, messageQueueLimit),
 		quit:          make(chan struct{}),
 		syncAllowance: DefaultSyncAllowance,
 		timeSource:    cfg.TimeSource,
@@ -839,7 +836,11 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 					return errors.New("invalid request response message")
 				}
 
-				whisper.postAck(&envelope)
+				hash := common.BytesToHash(envelope.Data)
+				whisper.envelopeFeed.Send(EnvelopeEvent{
+					Hash:  hash,
+					Event: EventMailServerAck,
+				})
 				whisper.traceEnvelope(&envelope, false, p2pSource, p)
 			}
 		default:
@@ -954,10 +955,6 @@ func (whisper *Whisper) postEvent(envelope *Envelope, isP2P bool) {
 	}
 }
 
-func (whisper *Whisper) postAck(envelope *Envelope) {
-	whisper.p2pAckQueue <- envelope
-}
-
 // checkOverflow checks if message queue overflow occurs and reports it if necessary.
 func (whisper *Whisper) checkOverflow() {
 	queueSize := len(whisper.messageQueue)
@@ -988,16 +985,7 @@ func (whisper *Whisper) processQueue() {
 
 		case e = <-whisper.p2pMsgQueue:
 			whisper.filters.NotifyWatchers(e, true)
-
-		case e = <-whisper.p2pAckQueue:
-			whisper.NotifyAckWatchers(e)
 		}
-	}
-}
-
-func (whisper *Whisper) NotifyAckWatchers(envelope *Envelope) {
-	for _, w := range whisper.ackWatchers {
-		w <- envelope
 	}
 }
 
@@ -1228,8 +1216,4 @@ func (whisper *Whisper) SelectedKeyPairID() string {
 		return id
 	}
 	return ""
-}
-
-func (whisper *Whisper) AddAckWatcher(watcher chan *Envelope) {
-	whisper.ackWatchers = append(whisper.ackWatchers, watcher)
 }

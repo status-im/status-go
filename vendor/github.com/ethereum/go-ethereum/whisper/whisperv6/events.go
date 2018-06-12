@@ -1,23 +1,25 @@
 package whisperv6
 
 import (
-       "github.com/ethereum/go-ethereum/common"
-       "github.com/ethereum/go-ethereum/p2p/discover"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/p2p/discover"
 )
 
 // EventType used to define known envelope events.
 type EventType string
 
 const (
-       // EventEnvelopeSent fires when envelope was sent to a peer.
-       EventEnvelopeSent EventType = "envelope.sent"
-       // EventEnvelopeExpired fires when envelop expired
-       EventEnvelopeExpired EventType = "envelope.expired"
+	// EventEnvelopeSent fires when envelope was sent to a peer.
+	EventEnvelopeSent EventType = "envelope.sent"
+	// EventEnvelopeExpired fires when envelop expired
+	EventEnvelopeExpired EventType = "envelope.expired"
+	// EventMailServerAck fires after mailserver sends all the requested messages
+	EventMailServerAck EventType = "mailserver.ack"
 )
 
 // EnvelopeEvent used for envelopes events.
 type EnvelopeEvent struct {
-       Event EventType
-       Hash  common.Hash
-       Peer  discover.NodeID
+	Event EventType
+	Hash  common.Hash
+	Peer  discover.NodeID
 }

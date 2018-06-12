@@ -255,20 +255,9 @@ func (s *WMailServer) processRequest(peer *whisper.Peer, lower, upper uint32, bl
 }
 
 func (s *WMailServer) sendHistoricMessageAck(peer *whisper.Peer, request *whisper.Envelope) error {
-	requestID := request.Hash().Bytes()
-	params := whisper.MessageParams{
-		Payload: requestID,
-		KeySym:  s.key,
-	}
-	message, err := whisper.NewSentMessage(&params)
-	if err != nil {
-		return err
-	}
-
-	now := s.w.GetCurrentTime()
-	envelope, err := message.Wrap(&params, now)
-	if err != nil {
-		return err
+	hash := request.Hash()
+	envelope := &whisper.Envelope{
+		Data: hash[:],
 	}
 
 	return s.w.SendHistoricMessageAck(peer, envelope)
