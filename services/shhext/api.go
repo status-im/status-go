@@ -100,32 +100,40 @@ func (api *PublicAPI) Post(ctx context.Context, req whisper.NewMessage) (hash he
 }
 
 // RequestMessages sends a request for historic messages to a MailServer.
-func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (hexutil.Bytes, error) {
+func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (bool, error) {
 	api.log.Info("RequestMessages", "request", r)
 	shh := api.service.w
 	now := api.service.w.GetCurrentTime()
 	r.setDefaults(now)
 	mailServerNode, err := discover.ParseNode(r.MailServerPeer)
 	if err != nil {
-		return nil, fmt.Errorf("%v: %v", ErrInvalidMailServerPeer, err)
+		return false, fmt.Errorf("%v: %v", ErrInvalidMailServerPeer, err)
 	}
 
 	symKey, err := shh.GetSymKey(r.SymKeyID)
 	if err != nil {
-		return nil, fmt.Errorf("%v: %v", ErrInvalidSymKeyID, err)
+		return false, fmt.Errorf("%v: %v", ErrInvalidSymKeyID, err)
 	}
 
 	envelope, err := makeEnvelop(makePayload(r), symKey, api.service.nodeID, shh.MinPow(), now)
 	if err != nil {
-		return nil, err
-	}
-	if err := shh.RequestHistoricMessages(mailServerNode.ID[:], envelope); err != nil {
-		return nil, err
+		return false, err
 	}
 
-	hash := envelope.Hash()
+	watcher, err := api.service.mc.RequestHistoricMessages(mailServerNode.ID[:], envelope, symKey)
+	if err != nil {
+		return false, err
+	}
 
-	return hash[:], nil
+	select {
+	case <-watcher.Done:
+		return true, nil
+	case <-time.After(10 * time.Second):
+		api.service.mc.RemoveWatcher(watcher)
+		return false, errors.New("timeout")
+	}
+
+	return true, nil
 }
 
 // GetNewFilterMessages is a prototype method with deduplication

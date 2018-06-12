@@ -181,7 +181,7 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 
 	if ok, lower, upper, bloom := s.validateRequest(peer.ID(), request); ok {
 		s.processRequest(peer, lower, upper, bloom)
-		if err := s.sendHistoricMessageResponse(peer, request); err != nil {
+		if err := s.sendHistoricMessageAck(peer, request); err != nil {
 			log.Error(fmt.Sprintf("SendHistoricMessageResponse error: %s", err))
 		}
 	}
@@ -254,12 +254,11 @@ func (s *WMailServer) processRequest(peer *whisper.Peer, lower, upper uint32, bl
 	return ret
 }
 
-func (s *WMailServer) sendHistoricMessageResponse(peer *whisper.Peer, request *whisper.Envelope) error {
-	hash := request.Hash().Bytes()
+func (s *WMailServer) sendHistoricMessageAck(peer *whisper.Peer, request *whisper.Envelope) error {
+	requestID := request.Hash().Bytes()
 	params := whisper.MessageParams{
-		Payload: hash,
+		Payload: requestID,
 		KeySym:  s.key,
-		Topic:   whisper.BytesToTopic(hash),
 	}
 	message, err := whisper.NewSentMessage(&params)
 	if err != nil {
@@ -272,7 +271,7 @@ func (s *WMailServer) sendHistoricMessageResponse(peer *whisper.Peer, request *w
 		return err
 	}
 
-	return s.w.SendHistoricMessageResponse(peer, envelope)
+	return s.w.SendHistoricMessageAck(peer, envelope)
 }
 
 // validateRequest runs different validations on the current request.

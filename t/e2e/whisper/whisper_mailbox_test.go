@@ -1,12 +1,9 @@
 package whisper
 
 import (
-	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -98,23 +95,13 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	// Act.
 
 	// Request messages (including the previous one, expired) from mailbox.
-	hash := s.requestHistoricMessages(senderWhisperService, rpcClient, mailboxPeerStr, MailServerKeyID, topic.String())
-	respTopic := whisper.BytesToTopic(hash)
-	respFilterID := s.createGroupChatMessageFilter(rpcClient, MailServerKeyID, respTopic.String())
-	respFilterID = respFilterID
+	s.requestHistoricMessages(senderWhisperService, rpcClient, mailboxPeerStr, MailServerKeyID, topic.String())
 
 	// Wait to receive message.
 	time.Sleep(time.Second)
 	// And we receive message, it comes from mailbox.
 	messages = s.getMessagesByMessageFilterID(rpcClient, messageFilterID)
 	s.Require().Equal(1, len(messages))
-
-	// And we receive the response from the mailbox
-	messages = s.getMessagesByMessageFilterID(rpcClient, respFilterID)
-	s.Require().Equal(1, len(messages))
-	// The payload of the message should be the hash of the request message previously sent
-	expectedPayload := fmt.Sprintf("0x%x", hash)
-	s.Require().Equal(expectedPayload, messages[0]["payload"])
 
 	// Check that there are no messages.
 	messages = s.getMessagesByMessageFilterID(rpcClient, messageFilterID)
@@ -478,7 +465,7 @@ func (s *WhisperMailboxSuite) addSymKey(rpcCli *rpc.Client, symkey string) strin
 }
 
 // requestHistoricMessages asks a mailnode to resend messages.
-func (s *WhisperMailboxSuite) requestHistoricMessages(w *whisper.Whisper, rpcCli *rpc.Client, mailboxEnode, mailServerKeyID, topic string) []byte {
+func (s *WhisperMailboxSuite) requestHistoricMessages(w *whisper.Whisper, rpcCli *rpc.Client, mailboxEnode, mailServerKeyID, topic string) {
 	from := w.GetCurrentTime().Add(-12 * time.Hour)
 	resp := rpcCli.CallRaw(`{
 		"jsonrpc": "2.0",
@@ -496,18 +483,6 @@ func (s *WhisperMailboxSuite) requestHistoricMessages(w *whisper.Whisper, rpcCli
 	err := json.Unmarshal([]byte(resp), &reqMessagesResp)
 	s.Require().NoError(err)
 	s.Require().Nil(reqMessagesResp.Error)
-
-	switch hash := reqMessagesResp.Result.(type) {
-	case string:
-		s.Require().True(strings.HasPrefix(hash, "0x"))
-		b, err := hex.DecodeString(hash[2:])
-		s.Require().NoError(err)
-		return b
-	}
-
-	s.Failf("failed reading shh_newMessageFilter result", "expected a hash, got: %+v", reqMessagesResp.Result)
-
-	return nil
 }
 
 type getFilterMessagesResponse struct {

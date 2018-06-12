@@ -253,7 +253,8 @@ func activateShhService(stack *node.Node, config *params.NodeConfig, db *leveldb
 			return nil, err
 		}
 
-		svc := shhext.New(whisper, shhext.EnvelopeSignalHandler{}, db)
+		inboxClient := mailserver.NewClient(whisper)
+		svc := shhext.New(whisper, inboxClient, shhext.EnvelopeSignalHandler{}, db)
 		return svc, nil
 	})
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
+	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/services/shhext/dedup"
 	"github.com/syndtr/goleveldb/leveldb"
 )
@@ -36,13 +37,14 @@ type Service struct {
 	tracker      *tracker
 	nodeID       *ecdsa.PrivateKey
 	deduplicator *dedup.Deduplicator
+	mc           *mailserver.Client
 }
 
 // Make sure that Service implements node.Service interface.
 var _ node.Service = (*Service)(nil)
 
 // New returns a new Service.
-func New(w *whisper.Whisper, handler EnvelopeEventsHandler, db *leveldb.DB) *Service {
+func New(w *whisper.Whisper, mc *mailserver.Client, handler EnvelopeEventsHandler, db *leveldb.DB) *Service {
 	track := &tracker{
 		w:       w,
 		handler: handler,
@@ -52,6 +54,7 @@ func New(w *whisper.Whisper, handler EnvelopeEventsHandler, db *leveldb.DB) *Ser
 		w:            w,
 		tracker:      track,
 		deduplicator: dedup.NewDeduplicator(w, db),
+		mc:           mc,
 	}
 }
 
