@@ -13,8 +13,8 @@ const (
 	EventEnvelopeSent EventType = "envelope.sent"
 	// EventEnvelopeExpired fires when envelop expired
 	EventEnvelopeExpired EventType = "envelope.expired"
-	// EventMailServerAck fires after mailserver sends all the requested messages
-	EventMailServerAck EventType = "mailserver.ack"
+	// EventMailServerRequestCompleted fires after mailserver sends all the requested messages
+	EventMailServerRequestCompleted EventType = "mailserver.request.completed"
 )
 
 // EnvelopeEvent used for envelopes events.

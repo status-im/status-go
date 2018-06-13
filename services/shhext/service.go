@@ -30,7 +30,7 @@ const (
 type EnvelopeEventsHandler interface {
 	EnvelopeSent(common.Hash)
 	EnvelopeExpired(common.Hash)
-	MailServerAckReceived(common.Hash)
+	MailServerRequestCompleted(common.Hash)
 }
 
 // Service is a service that provides some additional Whisper API.
@@ -177,7 +177,7 @@ func (t *tracker) handleEvent(event whisper.EnvelopeEvent) {
 				t.handler.EnvelopeExpired(event.Hash)
 			}
 		}
-	case whisper.EventMailServerAck:
+	case whisper.EventMailServerRequestCompleted:
 		state, ok := t.cache[event.Hash]
 		if !ok || state != MailServerRequestSent {
 			return
@@ -185,7 +185,7 @@ func (t *tracker) handleEvent(event whisper.EnvelopeEvent) {
 		log.Debug("mailserver ack received", "hash", event.Hash)
 		delete(t.cache, event.Hash)
 		if t.handler != nil {
-			t.handler.MailServerAckReceived(event.Hash)
+			t.handler.MailServerRequestCompleted(event.Hash)
 		}
 	}
 }

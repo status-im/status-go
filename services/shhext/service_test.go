@@ -36,7 +36,7 @@ func (t handlerMock) EnvelopeExpired(hash common.Hash) {
 	t.expirations <- hash
 }
 
-func (t handlerMock) MailServerAckReceived(hash common.Hash) {
+func (t handlerMock) MailServerRequestCompleted(hash common.Hash) {
 	t.requestsCompleted <- hash
 }
 
@@ -286,7 +286,7 @@ func (s *TrackerSuite) TestRequestCompleted() {
 	s.Contains(s.tracker.cache, testHash)
 	s.Equal(MailServerRequestSent, s.tracker.cache[testHash])
 	s.tracker.handleEvent(whisper.EnvelopeEvent{
-		Event: whisper.EventMailServerAck,
+		Event: whisper.EventMailServerRequestCompleted,
 		Hash:  testHash,
 	})
 	s.NotContains(s.tracker.cache, testHash)

@@ -379,7 +379,7 @@ func (whisper *Whisper) RequestHistoricMessages(peerID []byte, envelope *Envelop
 }
 
 func (whisper *Whisper) SendHistoricMessageAck(peer *Peer, envelope *Envelope) error {
-	return p2p.Send(peer.ws, p2pRequestAckCode, envelope)
+	return p2p.Send(peer.ws, p2pRequestCompleteCode, envelope)
 }
 
 // SendP2PMessage sends a peer-to-peer message to a specific peer.
@@ -828,7 +828,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 
 				whisper.mailServer.DeliverMail(p, &request)
 			}
-		case p2pRequestAckCode:
+		case p2pRequestCompleteCode:
 			if p.trusted {
 				var envelope Envelope
 				if err := packet.Decode(&envelope); err != nil {
@@ -839,7 +839,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 				hash := common.BytesToHash(envelope.Data)
 				whisper.envelopeFeed.Send(EnvelopeEvent{
 					Hash:  hash,
-					Event: EventMailServerAck,
+					Event: EventMailServerRequestCompleted,
 				})
 				whisper.traceEnvelope(&envelope, false, p2pSource, p)
 			}

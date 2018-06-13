@@ -12,8 +12,8 @@ const (
 	// to any peer
 	EventEnvelopeExpired = "envelope.expired"
 
-	// EventMailServerAck is triggered when whisper receives a message ack from the mailserver
-	EventMailServerAck = "mailserver.ack"
+	// EventMailServerRequestCompleted is triggered when whisper receives a message ack from the mailserver
+	EventMailServerRequestCompleted = "mailserver.request.completed"
 )
 
 // EnvelopeSignal includes hash of the envelope.
@@ -32,6 +32,6 @@ func SendEnvelopeExpired(hash common.Hash) {
 }
 
 // SendEnvelopeExpired triggered when envelope delivered at least to 1 peer.
-func SendMailServerAck(hash common.Hash) {
-	send(EventMailServerAck, EnvelopeSignal{hash})
+func SendMailServerRequestCompleted(hash common.Hash) {
+	send(EventMailServerRequestCompleted, EnvelopeSignal{hash})
 }
