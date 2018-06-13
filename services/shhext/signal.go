@@ -22,3 +22,8 @@ func (h EnvelopeSignalHandler) EnvelopeExpired(hash common.Hash) {
 func (h EnvelopeSignalHandler) MailServerRequestCompleted(hash common.Hash) {
 	signal.SendMailServerRequestCompleted(hash)
 }
+
+// MailServerRequestExpired triggered when mail server request expires
+func (h EnvelopeSignalHandler) MailServerRequestExpired(hash common.Hash) {
+	signal.SendMailServerRequestExpired(hash)
+}

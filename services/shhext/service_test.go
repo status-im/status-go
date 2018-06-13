@@ -19,6 +19,7 @@ func newHandlerMock(buf int) handlerMock {
 		confirmations:     make(chan common.Hash, buf),
 		expirations:       make(chan common.Hash, buf),
 		requestsCompleted: make(chan common.Hash, buf),
+		requestsExpired:   make(chan common.Hash, buf),
 	}
 }
 
@@ -26,6 +27,7 @@ type handlerMock struct {
 	confirmations     chan common.Hash
 	expirations       chan common.Hash
 	requestsCompleted chan common.Hash
+	requestsExpired   chan common.Hash
 }
 
 func (t handlerMock) EnvelopeSent(hash common.Hash) {
@@ -38,6 +40,10 @@ func (t handlerMock) EnvelopeExpired(hash common.Hash) {
 
 func (t handlerMock) MailServerRequestCompleted(hash common.Hash) {
 	t.requestsCompleted <- hash
+}
+
+func (t handlerMock) MailServerRequestExpired(hash common.Hash) {
+	t.requestsExpired <- hash
 }
 
 func TestShhExtSuite(t *testing.T) {
@@ -282,11 +288,23 @@ func (s *TrackerSuite) TestRemoved() {
 }
 
 func (s *TrackerSuite) TestRequestCompleted() {
-	s.tracker.AddRequest(testHash)
+	s.tracker.AddRequest(testHash, time.After(defaultRequestTTL))
 	s.Contains(s.tracker.cache, testHash)
 	s.Equal(MailServerRequestSent, s.tracker.cache[testHash])
 	s.tracker.handleEvent(whisper.EnvelopeEvent{
 		Event: whisper.EventMailServerRequestCompleted,
+		Hash:  testHash,
+	})
+	s.NotContains(s.tracker.cache, testHash)
+}
+
+func (s *TrackerSuite) TestRequestExpiration() {
+	c := make(chan time.Time)
+	s.tracker.AddRequest(testHash, c)
+	s.Contains(s.tracker.cache, testHash)
+	s.Equal(MailServerRequestSent, s.tracker.cache[testHash])
+	s.tracker.handleEvent(whisper.EnvelopeEvent{
+		Event: whisper.EventMailServerRequestExpired,
 		Hash:  testHash,
 	})
 	s.NotContains(s.tracker.cache, testHash)

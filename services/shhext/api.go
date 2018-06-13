@@ -17,7 +17,8 @@ import (
 
 const (
 	// defaultWorkTime is a work time reported in messages sent to MailServer nodes.
-	defaultWorkTime = 5
+	defaultWorkTime   = 5
+	defaultRequestTTL = 10 * time.Second
 )
 
 var (
@@ -125,7 +126,7 @@ func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (hex
 		return nil, err
 	}
 
-	api.service.tracker.AddRequest(hash)
+	api.service.tracker.AddRequest(hash, time.After(defaultRequestTTL))
 
 	return hash[:], nil
 }

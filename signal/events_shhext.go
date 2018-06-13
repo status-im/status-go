@@ -14,6 +14,9 @@ const (
 
 	// EventMailServerRequestCompleted is triggered when whisper receives a message ack from the mailserver
 	EventMailServerRequestCompleted = "mailserver.request.completed"
+
+	// EventMailServerRequestExpired is triggered when request TTL ends
+	EventMailServerRequestExpired = "mailserver.request.expired"
 )
 
 // EnvelopeSignal includes hash of the envelope.
@@ -34,4 +37,9 @@ func SendEnvelopeExpired(hash common.Hash) {
 // SendMailServerRequestCompleted triggered when mail server response has been received
 func SendMailServerRequestCompleted(hash common.Hash) {
 	send(EventMailServerRequestCompleted, EnvelopeSignal{hash})
+}
+
+// SendMailServerRequestExpired triggered when mail server request expires
+func SendMailServerRequestExpired(hash common.Hash) {
+	send(EventMailServerRequestExpired, EnvelopeSignal{hash})
 }

@@ -3,6 +3,7 @@ package shhext
 import (
 	"crypto/ecdsa"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
@@ -31,6 +32,7 @@ type EnvelopeEventsHandler interface {
 	EnvelopeSent(common.Hash)
 	EnvelopeExpired(common.Hash)
 	MailServerRequestCompleted(common.Hash)
+	MailServerRequestExpired(common.Hash)
 }
 
 // Service is a service that provides some additional Whisper API.
@@ -127,10 +129,23 @@ func (t *tracker) Add(hash common.Hash) {
 }
 
 // Add request hash to a tracker.
-func (t *tracker) AddRequest(hash common.Hash) {
+func (t *tracker) AddRequest(hash common.Hash, timerC <-chan time.Time) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.cache[hash] = MailServerRequestSent
+	go t.expireRequest(hash, timerC)
+}
+
+func (t *tracker) expireRequest(hash common.Hash, timerC <-chan time.Time) {
+	select {
+	case <-t.quit:
+		return
+	case <-timerC:
+		t.handleEvent(whisper.EnvelopeEvent{
+			Event: whisper.EventMailServerRequestExpired,
+			Hash:  hash,
+		})
+	}
 }
 
 // handleEnvelopeEvents processes whisper envelope events
@@ -182,7 +197,17 @@ func (t *tracker) handleEvent(event whisper.EnvelopeEvent) {
 		if !ok || state != MailServerRequestSent {
 			return
 		}
-		log.Debug("mailserver ack received", "hash", event.Hash)
+		log.Debug("mailserver response received", "hash", event.Hash)
+		delete(t.cache, event.Hash)
+		if t.handler != nil {
+			t.handler.MailServerRequestCompleted(event.Hash)
+		}
+	case whisper.EventMailServerRequestExpired:
+		state, ok := t.cache[event.Hash]
+		if !ok || state != MailServerRequestSent {
+			return
+		}
+		log.Debug("mailserver response expired", "hash", event.Hash)
 		delete(t.cache, event.Hash)
 		if t.handler != nil {
 			t.handler.MailServerRequestCompleted(event.Hash)
