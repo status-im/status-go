@@ -378,7 +378,7 @@ func (whisper *Whisper) RequestHistoricMessages(peerID []byte, envelope *Envelop
 	return p2p.Send(p.ws, p2pRequestCode, envelope)
 }
 
-func (whisper *Whisper) SendHistoricMessageAck(peer *Peer, envelope *Envelope) error {
+func (whisper *Whisper) SendHistoricMessageResponse(peer *Peer, envelope *Envelope) error {
 	return p2p.Send(peer.ws, p2pRequestCompleteCode, envelope)
 }
 
