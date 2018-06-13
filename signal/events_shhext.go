@@ -31,7 +31,7 @@ func SendEnvelopeExpired(hash common.Hash) {
 	send(EventEnvelopeExpired, EnvelopeSignal{hash})
 }
 
-// SendEnvelopeExpired triggered when envelope delivered at least to 1 peer.
+// SendMailServerRequestCompleted triggered when mail server response has been received
 func SendMailServerRequestCompleted(hash common.Hash) {
 	send(EventMailServerRequestCompleted, EnvelopeSignal{hash})
 }
