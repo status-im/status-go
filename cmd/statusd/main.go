@@ -79,6 +79,8 @@ var (
 
 	syncAndExit = flag.Int("sync-and-exit", -1, "Timeout in minutes for blockchain sync and exit, zero means no timeout unless sync is finished")
 
+	ntpSyncEnabled = flag.Bool("ntp-sync-enabled", true, "Enable/disable whisper NTP synchronization")
+
 	// Topics that will be search and registered by discovery v5.
 	searchTopics   = topics.TopicLimitsFlag{}
 	registerTopics = topics.TopicFlag{}
@@ -249,6 +251,8 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 	nodeConfig.NoDiscovery = !(*discovery)
 	nodeConfig.RequireTopics = map[discv5.Topic]params.Limits(searchTopics)
 	nodeConfig.RegisterTopics = []discv5.Topic(registerTopics)
+
+	nodeConfig.WhisperConfig.EnableNTPSync = *ntpSyncEnabled
 
 	// Even if standalone is true and discovery is disabled,
 	// it's possible to use bootnodes.
