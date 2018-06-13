@@ -1,14 +1,17 @@
 package whisper
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
 	"os"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p/discover"
@@ -94,8 +97,12 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 
 	// Act.
 
+	events := make(chan whisper.EnvelopeEvent)
+	senderWhisperService.SubscribeEnvelopeEvents(events)
+
 	// Request messages (including the previous one, expired) from mailbox.
-	s.requestHistoricMessages(senderWhisperService, rpcClient, mailboxPeerStr, MailServerKeyID, topic.String())
+	result := s.requestHistoricMessages(senderWhisperService, rpcClient, mailboxPeerStr, MailServerKeyID, topic.String())
+	requestID := common.BytesToHash(result)
 
 	// Wait to receive message.
 	time.Sleep(time.Second)
@@ -106,6 +113,14 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	// Check that there are no messages.
 	messages = s.getMessagesByMessageFilterID(rpcClient, messageFilterID)
 	s.Require().Equal(0, len(messages))
+
+	select {
+	case e := <-events:
+		s.Equal(whisper.EventMailServerRequestCompleted, e.Event)
+		s.Equal(requestID, e.Hash)
+	case <-time.After(time.Second):
+		s.Fail("timed out while waiting for request completed event")
+	}
 }
 
 func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
@@ -465,7 +480,7 @@ func (s *WhisperMailboxSuite) addSymKey(rpcCli *rpc.Client, symkey string) strin
 }
 
 // requestHistoricMessages asks a mailnode to resend messages.
-func (s *WhisperMailboxSuite) requestHistoricMessages(w *whisper.Whisper, rpcCli *rpc.Client, mailboxEnode, mailServerKeyID, topic string) {
+func (s *WhisperMailboxSuite) requestHistoricMessages(w *whisper.Whisper, rpcCli *rpc.Client, mailboxEnode, mailServerKeyID, topic string) []byte {
 	from := w.GetCurrentTime().Add(-12 * time.Hour)
 	resp := rpcCli.CallRaw(`{
 		"jsonrpc": "2.0",
@@ -483,6 +498,18 @@ func (s *WhisperMailboxSuite) requestHistoricMessages(w *whisper.Whisper, rpcCli
 	err := json.Unmarshal([]byte(resp), &reqMessagesResp)
 	s.Require().NoError(err)
 	s.Require().Nil(reqMessagesResp.Error)
+
+	switch hash := reqMessagesResp.Result.(type) {
+	case string:
+		s.Require().True(strings.HasPrefix(hash, "0x"))
+		b, err := hex.DecodeString(hash[2:])
+		s.Require().NoError(err)
+		return b
+	default:
+		s.Failf("failed reading shh_newMessageFilter result", "expected a hash, got: %+v", reqMessagesResp.Result)
+	}
+
+	return nil
 }
 
 type getFilterMessagesResponse struct {
