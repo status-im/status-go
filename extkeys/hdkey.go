@@ -70,6 +70,10 @@ const (
 
 	// EmptyExtendedKeyString marker string for zero extended key
 	EmptyExtendedKeyString = "Zeroed extended key"
+
+	// MaxDepth is the maximum depth of an extended key.
+	// Extended keys with depth MaxDepth cannot derive child keys.
+	MaxDepth = 255
 )
 
 // errors
@@ -82,6 +86,7 @@ var (
 	ErrInvalidKeyLen              = errors.New("serialized extended key length is invalid")
 	ErrDerivingChild              = errors.New("error deriving child key")
 	ErrInvalidMasterKey           = errors.New("invalid master key supplied")
+	ErrMaxDepthExceeded           = errors.New("max depth exceeded")
 )
 
 var (
@@ -95,7 +100,7 @@ var (
 // ExtendedKey represents BIP44-compliant HD key
 type ExtendedKey struct {
 	Version          []byte // 4 bytes, mainnet: 0x0488B21E public, 0x0488ADE4 private; testnet: 0x043587CF public, 0x04358394 private
-	Depth            uint16 // 1 byte,  depth: 0x00 for master nodes, 0x01 for level-1 derived keys, ....
+	Depth            uint8  // 1 byte,  depth: 0x00 for master nodes, 0x01 for level-1 derived keys, ....
 	FingerPrint      []byte // 4 bytes, fingerprint of the parent's key (0x00000000 if master key)
 	ChildNumber      uint32 // 4 bytes, This is ser32(i) for i in xi = xpar/i, with xi the key being serialized. (0x00000000 if master key)
 	KeyData          []byte // 33 bytes, the public key or private key data (serP(K) for public keys, 0x00 || ser256(k) for private keys)
@@ -146,6 +151,10 @@ func NewMaster(seed []byte) (*ExtendedKey, error) {
 // 3) Public extended key -> Non-hardened child public extended key
 // 4) Public extended key -> Hardened child public extended key (INVALID!)
 func (k *ExtendedKey) Child(i uint32) (*ExtendedKey, error) {
+	if k.Depth == MaxDepth {
+		return nil, ErrMaxDepthExceeded
+	}
+
 	// A hardened child may not be created from a public extended key (Case #4).
 	isChildHardened := i >= HardenedKeyStart
 	if !k.IsPrivate && isChildHardened {
@@ -285,7 +294,6 @@ func (k *ExtendedKey) String() string {
 	}
 
 	var childNumBytes [4]byte
-	depthByte := byte(k.Depth % 256)
 	binary.BigEndian.PutUint32(childNumBytes[:], k.ChildNumber)
 
 	// The serialized format is:
@@ -293,7 +301,7 @@ func (k *ExtendedKey) String() string {
 	//   child num (4) || chain code (32) || key data (33) || checksum (4)
 	serializedBytes := make([]byte, 0, serializedKeyLen+4)
 	serializedBytes = append(serializedBytes, k.Version...)
-	serializedBytes = append(serializedBytes, depthByte)
+	serializedBytes = append(serializedBytes, k.Depth)
 	serializedBytes = append(serializedBytes, k.FingerPrint...)
 	serializedBytes = append(serializedBytes, childNumBytes[:]...)
 	serializedBytes = append(serializedBytes, k.ChainCode...)
@@ -362,7 +370,7 @@ func NewKeyFromString(key string) (*ExtendedKey, error) {
 
 	// Deserialize each of the payload fields.
 	version := payload[:4]
-	depth := uint16(payload[4:5][0])
+	depth := payload[4:5][0]
 	fingerPrint := payload[5:9]
 	childNumber := binary.BigEndian.Uint32(payload[9:13])
 	chainCode := payload[13:45]
