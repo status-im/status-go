@@ -28,7 +28,7 @@ jobs:
     # ACCOUNT_PASSWORD environment variable anyway.
     if: ((type != push) OR (branch = "develop")) AND (fork = false)
     script:
-      # Sync the chain first. It will time out after 30 minutes. Used network: Rinkeby.
+      # Sync the chain first. It will time out after 45 minutes. Used network: Rinkeby.
       - make statusgo
       - ./build/bin/statusd -datadir=.ethereumtest/Rinkeby -les -networkid=4 -sync-and-exit=45 -log=WARN -standalone=false -discovery=false -ntp=false
       - make test-e2e networkid=4
