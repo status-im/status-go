@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"time"
 
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -194,22 +195,27 @@ func activateShhService(stack *node.Node, config *params.NodeConfig, db *leveldb
 		logger.Info("SHH protocol is disabled")
 		return nil
 	}
-	if err := stack.Register(func(*node.ServiceContext) (node.Service, error) {
-		return timesource.Default(), nil
-	}); err != nil {
-		return err
+	if config.WhisperConfig.EnableNTPSync {
+		if err := stack.Register(func(*node.ServiceContext) (node.Service, error) {
+			return timesource.Default(), nil
+		}); err != nil {
+			return err
+		}
 	}
 
 	err = stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-		var timeSource *timesource.NTPTimeSource
-		if err := ctx.Service(&timeSource); err != nil {
-			return nil, err
-		}
 		whisperServiceConfig := &whisper.Config{
 			MaxMessageSize:     whisper.DefaultMaxMessageSize,
 			MinimumAcceptedPOW: 0.001,
-			TimeSource:         timeSource.Now,
+			TimeSource:         time.Now,
 		}
+
+		if config.WhisperConfig.EnableNTPSync {
+			if whisperServiceConfig.TimeSource, err = whisperTimeSource(ctx); err != nil {
+				return nil, err
+			}
+		}
+
 		whisperService := whisper.New(whisperServiceConfig)
 
 		// enable metrics
@@ -295,4 +301,13 @@ func parseNodesV5(enodes []string) []*discv5.Node {
 		}
 	}
 	return nodes
+}
+
+// whisperTimeSource get timeSource to be used by whisper
+func whisperTimeSource(ctx *node.ServiceContext) (func() time.Time, error) {
+	var timeSource *timesource.NTPTimeSource
+	if err := ctx.Service(&timeSource); err != nil {
+		return nil, err
+	}
+	return timeSource.Now, nil
 }

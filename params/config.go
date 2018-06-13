@@ -116,6 +116,9 @@ type WhisperConfig struct {
 
 	// FirebaseConfig extra configuration for Firebase Cloud Messaging
 	FirebaseConfig *FirebaseConfig `json:"FirebaseConfig,"`
+
+	// EnableNTPSync enables NTP synchronizations
+	EnableNTPSync bool
 }
 
 // ReadPasswordFile reads and returns content of the password file
@@ -353,6 +356,7 @@ func NewNodeConfig(dataDir string, clstrCfgFile string, networkID uint64) (*Node
 			FirebaseConfig: &FirebaseConfig{
 				NotificationTriggerURL: FirebaseNotificationTriggerURL,
 			},
+			EnableNTPSync: true,
 		},
 		SwarmConfig:    &SwarmConfig{},
 		RegisterTopics: []discv5.Topic{},
