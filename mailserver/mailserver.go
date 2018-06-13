@@ -255,12 +255,7 @@ func (s *WMailServer) processRequest(peer *whisper.Peer, lower, upper uint32, bl
 }
 
 func (s *WMailServer) sendHistoricMessageResponse(peer *whisper.Peer, request *whisper.Envelope) error {
-	hash := request.Hash()
-	envelope := &whisper.Envelope{
-		Data: hash[:],
-	}
-
-	return s.w.SendHistoricMessageResponse(peer, envelope)
+	return s.w.SendHistoricMessageResponse(peer, request.Hash())
 }
 
 // validateRequest runs different validations on the current request.
