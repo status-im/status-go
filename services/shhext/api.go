@@ -124,6 +124,7 @@ func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) ([]b
 	if err := shh.RequestHistoricMessages(mailServerNode.ID[:], envelope); err != nil {
 		return nil, err
 	}
+
 	api.service.tracker.AddRequest(hash)
 
 	return hash[:], nil
