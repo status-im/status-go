@@ -1,6 +1,6 @@
 package api
 
-func runAsync(f func() error) <-chan error {
+func RunAsync(f func() error) <-chan error {
 	resp := make(chan error, 1)
 	go func() {
 		err := f()

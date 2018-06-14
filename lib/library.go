@@ -8,6 +8,7 @@ import (
 
 	"github.com/NaySoftware/go-fcm"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/profiling"
@@ -46,7 +47,7 @@ func StartNode(configJSON *C.char) *C.char {
 		return makeJSONResponse(err)
 	}
 
-	statusAPI.StartNodeAsync(config)
+	api.RunAsync(func() error { return statusBackend.StartNode(config) })
 
 	return makeJSONResponse(nil)
 }
@@ -54,7 +55,7 @@ func StartNode(configJSON *C.char) *C.char {
 //StopNode - stop status node
 //export StopNode
 func StopNode() *C.char {
-	statusAPI.StopNodeAsync()
+	api.RunAsync(statusBackend.StopNode)
 	return makeJSONResponse(nil)
 }
 
@@ -104,21 +105,21 @@ func ValidateNodeConfig(configJSON *C.char) *C.char {
 //ResetChainData remove chain data from data directory
 //export ResetChainData
 func ResetChainData() *C.char {
-	statusAPI.ResetChainDataAsync()
+	api.RunAsync(statusBackend.ResetChainData)
 	return makeJSONResponse(nil)
 }
 
 //CallRPC calls public APIs via RPC
 //export CallRPC
 func CallRPC(inputJSON *C.char) *C.char {
-	outputJSON := statusAPI.CallRPC(C.GoString(inputJSON))
+	outputJSON := statusBackend.CallRPC(C.GoString(inputJSON))
 	return C.CString(outputJSON)
 }
 
 //CallPrivateRPC calls both public and private APIs via RPC
 //export CallPrivateRPC
 func CallPrivateRPC(inputJSON *C.char) *C.char {
-	outputJSON := statusAPI.CallPrivateRPC(C.GoString(inputJSON))
+	outputJSON := statusBackend.CallPrivateRPC(C.GoString(inputJSON))
 	return C.CString(outputJSON)
 }
 
@@ -126,7 +127,7 @@ func CallPrivateRPC(inputJSON *C.char) *C.char {
 // just modified to handle the function arg passing
 //export CreateAccount
 func CreateAccount(password *C.char) *C.char {
-	address, pubKey, mnemonic, err := statusAPI.CreateAccount(C.GoString(password))
+	address, pubKey, mnemonic, err := statusBackend.AccountManager().CreateAccount(C.GoString(password))
 
 	errString := ""
 	if err != nil {
@@ -147,7 +148,7 @@ func CreateAccount(password *C.char) *C.char {
 //CreateChildAccount creates sub-account
 //export CreateChildAccount
 func CreateChildAccount(parentAddress, password *C.char) *C.char {
-	address, pubKey, err := statusAPI.CreateChildAccount(C.GoString(parentAddress), C.GoString(password))
+	address, pubKey, err := statusBackend.AccountManager().CreateChildAccount(C.GoString(parentAddress), C.GoString(password))
 
 	errString := ""
 	if err != nil {
@@ -167,7 +168,7 @@ func CreateChildAccount(parentAddress, password *C.char) *C.char {
 //RecoverAccount re-creates master key using given details
 //export RecoverAccount
 func RecoverAccount(password, mnemonic *C.char) *C.char {
-	address, pubKey, err := statusAPI.RecoverAccount(C.GoString(password), C.GoString(mnemonic))
+	address, pubKey, err := statusBackend.AccountManager().RecoverAccount(C.GoString(password), C.GoString(mnemonic))
 
 	errString := ""
 	if err != nil {
@@ -188,7 +189,7 @@ func RecoverAccount(password, mnemonic *C.char) *C.char {
 //VerifyAccountPassword verifies account password
 //export VerifyAccountPassword
 func VerifyAccountPassword(keyStoreDir, address, password *C.char) *C.char {
-	_, err := statusAPI.VerifyAccountPassword(C.GoString(keyStoreDir), C.GoString(address), C.GoString(password))
+	_, err := statusBackend.AccountManager().VerifyAccountPassword(C.GoString(keyStoreDir), C.GoString(address), C.GoString(password))
 	return makeJSONResponse(err)
 }
 
@@ -196,14 +197,14 @@ func VerifyAccountPassword(keyStoreDir, address, password *C.char) *C.char {
 // if verified, purges all the previous identities from Whisper, and injects verified key as shh identity
 //export Login
 func Login(address, password *C.char) *C.char {
-	err := statusAPI.SelectAccount(C.GoString(address), C.GoString(password))
+	err := statusBackend.SelectAccount(C.GoString(address), C.GoString(password))
 	return makeJSONResponse(err)
 }
 
 //Logout is equivalent to clearing whisper identities
 //export Logout
 func Logout() *C.char {
-	err := statusAPI.Logout()
+	err := statusBackend.Logout()
 	return makeJSONResponse(err)
 }
 
@@ -212,7 +213,7 @@ func Logout() *C.char {
 // transaction.
 //export ApproveSignRequestWithArgs
 func ApproveSignRequestWithArgs(id, password *C.char, gas, gasPrice C.longlong) *C.char {
-	result := statusAPI.ApproveSignRequestWithArgs(C.GoString(id), C.GoString(password), int64(gas), int64(gasPrice))
+	result := statusBackend.ApproveSignRequestWithArgs(C.GoString(id), C.GoString(password), int64(gas), int64(gasPrice))
 
 	return prepareApproveSignRequestResponse(result, id)
 }
@@ -220,7 +221,7 @@ func ApproveSignRequestWithArgs(id, password *C.char, gas, gasPrice C.longlong) 
 //ApproveSignRequest instructs backend to complete sending of a given transaction.
 //export ApproveSignRequest
 func ApproveSignRequest(id, password *C.char) *C.char {
-	result := statusAPI.ApproveSignRequest(C.GoString(id), C.GoString(password))
+	result := statusBackend.ApproveSignRequest(C.GoString(id), C.GoString(password))
 
 	return prepareApproveSignRequestResponse(result, id)
 }
@@ -265,7 +266,7 @@ func ApproveSignRequests(ids, password *C.char) *C.char {
 			txIDs[i] = id
 		}
 
-		results := statusAPI.ApproveSignRequests(txIDs, C.GoString(password))
+		results := statusBackend.ApproveSignRequests(txIDs, C.GoString(password))
 		for txID, result := range results {
 			txResult := SignRequestResult{
 				ID:   txID,
@@ -290,7 +291,7 @@ func ApproveSignRequests(ids, password *C.char) *C.char {
 //DiscardSignRequest discards a given transaction from transaction queue
 //export DiscardSignRequest
 func DiscardSignRequest(id *C.char) *C.char {
-	err := statusAPI.DiscardSignRequest(C.GoString(id))
+	err := statusBackend.DiscardSignRequest(C.GoString(id))
 
 	errString := ""
 	if err != nil {
@@ -328,7 +329,7 @@ func DiscardSignRequests(ids *C.char) *C.char {
 			txIDs[i] = id
 		}
 
-		results := statusAPI.DiscardSignRequests(txIDs)
+		results := statusBackend.DiscardSignRequests(txIDs)
 		for txID, err := range results {
 			out.Results[txID] = DiscardSignRequestResult{
 				ID:    txID,
@@ -349,35 +350,35 @@ func DiscardSignRequests(ids *C.char) *C.char {
 //InitJail setup initial JavaScript
 //export InitJail
 func InitJail(js *C.char) {
-	statusAPI.SetJailBaseJS(C.GoString(js))
+	statusBackend.JailManager().SetBaseJS(C.GoString(js))
 }
 
 //Parse creates a new jail cell context and executes provided JavaScript code.
 //DEPRECATED in favour of CreateAndInitCell.
 //export Parse
 func Parse(chatID *C.char, js *C.char) *C.char {
-	res := statusAPI.CreateAndInitCell(C.GoString(chatID), C.GoString(js))
+	res := statusBackend.JailManager().CreateAndInitCell(C.GoString(chatID), C.GoString(js))
 	return C.CString(res)
 }
 
 //CreateAndInitCell creates a new jail cell context and executes provided JavaScript code.
 //export CreateAndInitCell
 func CreateAndInitCell(chatID *C.char, js *C.char) *C.char {
-	res := statusAPI.CreateAndInitCell(C.GoString(chatID), C.GoString(js))
+	res := statusBackend.JailManager().CreateAndInitCell(C.GoString(chatID), C.GoString(js))
 	return C.CString(res)
 }
 
 //ExecuteJS allows to run arbitrary JS code within a cell.
 //export ExecuteJS
 func ExecuteJS(chatID *C.char, code *C.char) *C.char {
-	res := statusAPI.JailExecute(C.GoString(chatID), C.GoString(code))
+	res := statusBackend.JailManager().Execute(C.GoString(chatID), C.GoString(code))
 	return C.CString(res)
 }
 
 //Call executes given JavaScript function
 //export Call
 func Call(chatID *C.char, path *C.char, params *C.char) *C.char {
-	res := statusAPI.JailCall(C.GoString(chatID), C.GoString(path), C.GoString(params))
+	res := statusBackend.JailManager().Call(C.GoString(chatID), C.GoString(path), C.GoString(params))
 	return C.CString(res)
 }
 
@@ -455,7 +456,7 @@ func NotifyUsers(message, payloadJSON, tokensArray *C.char) (outCBytes *C.char) 
 		return
 	}
 
-	err = statusAPI.NotifyUsers(C.GoString(message), payload, tokens...)
+	err = statusBackend.NotifyUsers(C.GoString(message), payload, tokens...)
 	if err != nil {
 		errString = err.Error()
 		return
@@ -467,7 +468,7 @@ func NotifyUsers(message, payloadJSON, tokensArray *C.char) (outCBytes *C.char) 
 // AddPeer adds an enode as a peer.
 //export AddPeer
 func AddPeer(enode *C.char) *C.char {
-	err := statusAPI.StatusNode().AddPeer(C.GoString(enode))
+	err := statusBackend.StatusNode().AddPeer(C.GoString(enode))
 	return makeJSONResponse(err)
 }
 
@@ -475,11 +476,11 @@ func AddPeer(enode *C.char) *C.char {
 // by ReactNative (see https://facebook.github.io/react-native/docs/netinfo.html)
 //export ConnectionChange
 func ConnectionChange(typ *C.char, expensive C.int) {
-	statusAPI.ConnectionChange(C.GoString(typ), expensive == 1)
+	statusBackend.ConnectionChange(C.GoString(typ), expensive == 1)
 }
 
 // AppStateChange handles app state changes (background/foreground).
 //export AppStateChange
 func AppStateChange(state *C.char) {
-	statusAPI.AppStateChange(C.GoString(state))
+	statusBackend.AppStateChange(C.GoString(state))
 }

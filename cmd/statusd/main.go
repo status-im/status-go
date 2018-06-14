@@ -174,8 +174,7 @@ func main() {
 
 // startDebug starts the debugging API server.
 func startDebug(backend *api.StatusBackend) error {
-	statusAPI := api.NewStatusAPIWithBackend(backend)
-	_, err := debug.New(statusAPI, *cliPort)
+	_, err := debug.New(backend, *cliPort)
 	return err
 }
 

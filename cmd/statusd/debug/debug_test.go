@@ -161,8 +161,8 @@ func startDebugging(assert *testifyAssert.Assertions) {
 	defer mu.Unlock()
 	if d == nil {
 		var err error
-		api := api.NewStatusAPI()
-		d, err = debug.New(api, debug.CLIPort)
+		backend := api.NewStatusBackend()
+		d, err = debug.New(backend, debug.CLIPort)
 		assert.NoError(err)
 	}
 }

@@ -27,13 +27,13 @@ type Server struct {
 
 // New creates a debug server using the passed Status API.
 // It also starts the server.
-func New(statusAPI *api.StatusAPI, port string) (*Server, error) {
+func New(statusBackend *api.StatusBackend, port string) (*Server, error) {
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%s", port)) // nolint
 	if err != nil {
 		return nil, err
 	}
 	s := Server{
-		commandSetValue: reflect.ValueOf(newCommandSet(statusAPI)),
+		commandSetValue: reflect.ValueOf(newCommandSet(statusBackend)),
 		listener:        listener,
 		log:             log.New("package", "status-go/cmd/statusd/debug.Server"),
 	}
