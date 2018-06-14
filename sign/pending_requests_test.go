@@ -174,7 +174,8 @@ func (s PendingRequestsSuite) TestConcurrentComplete() {
 		}()
 	}
 
-	s.pendingRequests.Wait(req.ID, 10*time.Second)
+	rst := s.pendingRequests.Wait(req.ID, 10*time.Second)
+	s.Require().NoError(rst.Error)
 
 	s.False(s.pendingRequests.Has(req.ID), "sign request should exist")
 
