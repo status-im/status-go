@@ -166,51 +166,77 @@ func (t *tracker) handleEnvelopeEvents() {
 // handleEvent based on type of the event either triggers
 // confirmation handler or removes hash from tracker
 func (t *tracker) handleEvent(event whisper.EnvelopeEvent) {
+	handlers := map[whisper.EventType]func(whisper.EnvelopeEvent){
+		whisper.EventEnvelopeSent:               t.handleEventEnvelopeSent,
+		whisper.EventEnvelopeExpired:            t.handleEventEnvelopeExpired,
+		whisper.EventMailServerRequestCompleted: t.handleEventMailServerRequestCompleted,
+		whisper.EventMailServerRequestExpired:   t.handleEventMailServerRequestExpired,
+	}
+
+	if handler, ok := handlers[event.Event]; ok {
+		handler(event)
+	}
+}
+
+func (t *tracker) handleEventEnvelopeSent(event whisper.EnvelopeEvent) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	switch event.Event {
-	case whisper.EventEnvelopeSent:
-		state, ok := t.cache[event.Hash]
-		// if we didn't send a message using extension - skip it
-		// if message was already confirmed - skip it
-		if !ok || state == EnvelopeSent {
-			return
-		}
-		log.Debug("envelope is sent", "hash", event.Hash, "peer", event.Peer)
-		t.cache[event.Hash] = EnvelopeSent
-		if t.handler != nil {
-			t.handler.EnvelopeSent(event.Hash)
-		}
-	case whisper.EventEnvelopeExpired:
-		if state, ok := t.cache[event.Hash]; ok {
-			log.Debug("envelope expired", "hash", event.Hash, "state", state)
-			delete(t.cache, event.Hash)
-			if state == EnvelopeSent {
-				return
-			}
-			if t.handler != nil {
-				t.handler.EnvelopeExpired(event.Hash)
-			}
-		}
-	case whisper.EventMailServerRequestCompleted:
-		state, ok := t.cache[event.Hash]
-		if !ok || state != MailServerRequestSent {
-			return
-		}
-		log.Debug("mailserver response received", "hash", event.Hash)
+
+	state, ok := t.cache[event.Hash]
+	// if we didn't send a message using extension - skip it
+	// if message was already confirmed - skip it
+	if !ok || state == EnvelopeSent {
+		return
+	}
+	log.Debug("envelope is sent", "hash", event.Hash, "peer", event.Peer)
+	t.cache[event.Hash] = EnvelopeSent
+	if t.handler != nil {
+		t.handler.EnvelopeSent(event.Hash)
+	}
+}
+
+func (t *tracker) handleEventEnvelopeExpired(event whisper.EnvelopeEvent) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if state, ok := t.cache[event.Hash]; ok {
+		log.Debug("envelope expired", "hash", event.Hash, "state", state)
 		delete(t.cache, event.Hash)
-		if t.handler != nil {
-			t.handler.MailServerRequestCompleted(event.Hash)
-		}
-	case whisper.EventMailServerRequestExpired:
-		state, ok := t.cache[event.Hash]
-		if !ok || state != MailServerRequestSent {
+		if state == EnvelopeSent {
 			return
 		}
-		log.Debug("mailserver response expired", "hash", event.Hash)
-		delete(t.cache, event.Hash)
 		if t.handler != nil {
-			t.handler.MailServerRequestExpired(event.Hash)
+			t.handler.EnvelopeExpired(event.Hash)
 		}
+	}
+}
+
+func (t *tracker) handleEventMailServerRequestCompleted(event whisper.EnvelopeEvent) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	state, ok := t.cache[event.Hash]
+	if !ok || state != MailServerRequestSent {
+		return
+	}
+	log.Debug("mailserver response received", "hash", event.Hash)
+	delete(t.cache, event.Hash)
+	if t.handler != nil {
+		t.handler.MailServerRequestCompleted(event.Hash)
+	}
+}
+
+func (t *tracker) handleEventMailServerRequestExpired(event whisper.EnvelopeEvent) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	state, ok := t.cache[event.Hash]
+	if !ok || state != MailServerRequestSent {
+		return
+	}
+	log.Debug("mailserver response expired", "hash", event.Hash)
+	delete(t.cache, event.Hash)
+	if t.handler != nil {
+		t.handler.MailServerRequestExpired(event.Hash)
 	}
 }
