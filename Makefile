@@ -9,6 +9,22 @@ ifndef GOPATH
 	For more information about the GOPATH environment variable, see https://golang.org/doc/code.html#GOPATH)
 endif
 
+
+EXPECTED_PATH=$(shell go env GOPATH)/src/github.com/status-im/status-go
+ifneq ($(CURDIR),$(EXPECTED_PATH))
+define NOT_IN_GOPATH_ERROR
+
+Current dir is $(CURDIR), which seems to be different from your GOPATH.
+Please, build status-go from GOPATH for proper build.
+  GOPATH       = $(shell go env GOPATH) 
+  Current dir  = $(CURDIR) 
+  Expected dir = $(EXPECTED_PATH))
+See https://golang.org/doc/code.html#GOPATH for more info
+
+endef
+$(error $(NOT_IN_GOPATH_ERROR))
+endif
+
 CGO_CFLAGS=-I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
 GOBIN=$(dir $(realpath $(firstword $(MAKEFILE_LIST))))build/bin
 GIT_COMMIT := $(shell git rev-parse --short HEAD)
@@ -79,6 +95,12 @@ bootnode: ##@build Build discovery v5 bootnode using status-go deps
 statusgo-cross: statusgo-android statusgo-ios
 	@echo "Full cross compilation done."
 	@ls -ld $(GOBIN)/statusgo-*
+
+statusgo-linux: xgo ##@cross-compile Build status-go for Linux
+	./_assets/patches/patcher -b . -p geth-xgo
+	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=linux/amd64 -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/statusd
+	./_assets/patches/patcher -b . -p geth-xgo -r
+	@echo "Android cross compilation done."
 
 statusgo-android: xgo ##@cross-compile Build status-go for Android
 	./_assets/patches/patcher -b . -p geth-xgo
