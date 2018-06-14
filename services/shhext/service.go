@@ -210,7 +210,7 @@ func (t *tracker) handleEvent(event whisper.EnvelopeEvent) {
 		log.Debug("mailserver response expired", "hash", event.Hash)
 		delete(t.cache, event.Hash)
 		if t.handler != nil {
-			t.handler.MailServerRequestCompleted(event.Hash)
+			t.handler.MailServerRequestExpired(event.Hash)
 		}
 	}
 }

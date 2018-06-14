@@ -299,6 +299,8 @@ func (s *TrackerSuite) TestRequestCompleted() {
 }
 
 func (s *TrackerSuite) TestRequestExpiration() {
+	mock := newHandlerMock(1)
+	s.tracker.handler = mock
 	c := make(chan time.Time)
 	s.tracker.AddRequest(testHash, c)
 	s.Contains(s.tracker.cache, testHash)
@@ -307,5 +309,11 @@ func (s *TrackerSuite) TestRequestExpiration() {
 		Event: whisper.EventMailServerRequestExpired,
 		Hash:  testHash,
 	})
-	s.NotContains(s.tracker.cache, testHash)
+	select {
+	case requestID := <-mock.requestsExpired:
+		s.Equal(testHash, requestID)
+		s.NotContains(s.tracker.cache, testHash)
+	case <-time.After(10 * time.Second):
+		s.Fail("timed out while waiting for request expiration")
+	}
 }
