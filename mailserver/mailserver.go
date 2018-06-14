@@ -44,11 +44,11 @@ var (
 	// By default go-ethereum/metrics creates dummy metrics that don't register anything.
 	// Real metrics are collected only if -metrics flag is set
 	requestProcessTimer    = metrics.NewRegisteredTimer("mailserver/requestProcessTime", nil)
-	requestsCounter        = metrics.NewRegisteredCounter("mailserver/requests", nil)
+	requestsMeter          = metrics.NewRegisteredMeter("mailserver/requests", nil)
 	requestErrorsCounter   = metrics.NewRegisteredCounter("mailserver/requestErrors", nil)
-	sentEnvelopesCounter   = metrics.NewRegisteredCounter("mailserver/sentEnvelopes", nil)
+	sentEnvelopesMeter     = metrics.NewRegisteredMeter("mailserver/sentEnvelopes", nil)
 	sentEnvelopesSizeMeter = metrics.NewRegisteredMeter("mailserver/sentEnvelopesSize", nil)
-	archivedCounter        = metrics.NewRegisteredCounter("mailserver/archivedEnvelopes", nil)
+	archivedMeter          = metrics.NewRegisteredMeter("mailserver/archivedEnvelopes", nil)
 	archivedSizeMeter      = metrics.NewRegisteredMeter("mailserver/archivedEnvelopesSize", nil)
 	archivedErrorsCounter  = metrics.NewRegisteredCounter("mailserver/archiveErrors", nil)
 )
@@ -168,7 +168,7 @@ func (s *WMailServer) Archive(env *whisper.Envelope) {
 			log.Error(fmt.Sprintf("Writing to DB failed: %s", err))
 			archivedErrorsCounter.Inc(1)
 		}
-		archivedCounter.Inc(1)
+		archivedMeter.Mark(1)
 		archivedSizeMeter.Mark(int64(whisper.EnvelopeHeaderLength + len(env.Data)))
 	}
 }
@@ -176,7 +176,7 @@ func (s *WMailServer) Archive(env *whisper.Envelope) {
 // DeliverMail sends mail to specified whisper peer.
 func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope) {
 	log.Info("Delivering mail", "peer", peer.ID)
-	requestsCounter.Inc(1)
+	requestsMeter.Mark(1)
 
 	if peer == nil {
 		requestErrorsCounter.Inc(1)
@@ -249,7 +249,7 @@ func (s *WMailServer) processRequest(peer *whisper.Peer, lower, upper uint32, bl
 	}
 
 	requestProcessTimer.UpdateSince(start)
-	sentEnvelopesCounter.Inc(sentEnvelopes)
+	sentEnvelopesMeter.Mark(sentEnvelopes)
 	sentEnvelopesSizeMeter.Mark(sentEnvelopesSize)
 
 	err = i.Error()
