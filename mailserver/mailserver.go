@@ -43,11 +43,14 @@ var (
 	errPasswordNotProvided  = errors.New("password is not specified")
 	// By default go-ethereum/metrics creates dummy metrics that don't register anything.
 	// Real metrics are collected only if -metrics flag is set
-	requestProcessTimer    = metrics.NewRegisteredTimer("mailserver/processTime", nil)
+	requestProcessTimer    = metrics.NewRegisteredTimer("mailserver/requestProcessTime", nil)
 	requestsCounter        = metrics.NewRegisteredCounter("mailserver/requests", nil)
 	requestErrorsCounter   = metrics.NewRegisteredCounter("mailserver/requestErrors", nil)
-	sentEnvelopesMeter     = metrics.NewRegisteredMeter("mailserver/envelopes", nil)
-	sentEnvelopesSizeMeter = metrics.NewRegisteredMeter("mailserver/envelopesSize", nil)
+	sentEnvelopesCounter   = metrics.NewRegisteredCounter("mailserver/sentEnvelopes", nil)
+	sentEnvelopesSizeMeter = metrics.NewRegisteredMeter("mailserver/sentEnvelopesSize", nil)
+	archivedCounter        = metrics.NewRegisteredCounter("mailserver/archivedEnvelopes", nil)
+	archivedSizeMeter      = metrics.NewRegisteredMeter("mailserver/archivedEnvelopesSize", nil)
+	archivedErrorsCounter  = metrics.NewRegisteredCounter("mailserver/archiveErrors", nil)
 )
 
 // WMailServer whisper mailserver.
@@ -159,10 +162,14 @@ func (s *WMailServer) Archive(env *whisper.Envelope) {
 	rawEnvelope, err := rlp.EncodeToBytes(env)
 	if err != nil {
 		log.Error(fmt.Sprintf("rlp.EncodeToBytes failed: %s", err))
+		archivedErrorsCounter.Inc(1)
 	} else {
 		if err = s.db.Put(key.raw, rawEnvelope, nil); err != nil {
 			log.Error(fmt.Sprintf("Writing to DB failed: %s", err))
+			archivedErrorsCounter.Inc(1)
 		}
+		archivedCounter.Inc(1)
+		archivedSizeMeter.Mark(int64(whisper.EnvelopeHeaderLength + len(env.Data)))
 	}
 }
 
@@ -242,7 +249,7 @@ func (s *WMailServer) processRequest(peer *whisper.Peer, lower, upper uint32, bl
 	}
 
 	requestProcessTimer.UpdateSince(start)
-	sentEnvelopesMeter.Mark(sentEnvelopes)
+	sentEnvelopesCounter.Inc(sentEnvelopes)
 	sentEnvelopesSizeMeter.Mark(sentEnvelopesSize)
 
 	err = i.Error()
