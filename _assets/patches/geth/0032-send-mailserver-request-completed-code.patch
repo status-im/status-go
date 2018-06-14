@@ -1,0 +1,110 @@
+diff --git a/whisper/whisperv6/doc.go b/whisper/whisperv6/doc.go
+index 4bbf554..2fcc9e6 100644
+--- a/whisper/whisperv6/doc.go
++++ b/whisper/whisperv6/doc.go
+@@ -44,13 +44,14 @@ const (
+ 	ProtocolName       = "shh"     // Nickname of the protocol in geth
+ 
+ 	// whisper protocol message codes, according to EIP-627
+-	statusCode           = 0   // used by whisper protocol
+-	messagesCode         = 1   // normal whisper message
+-	powRequirementCode   = 2   // PoW requirement
+-	bloomFilterExCode    = 3   // bloom filter exchange
+-	p2pRequestCode       = 126 // peer-to-peer message, used by Dapp protocol
+-	p2pMessageCode       = 127 // peer-to-peer message (to be consumed by the peer, but not forwarded any further)
+-	NumberOfMessageCodes = 128
++	statusCode             = 0   // used by whisper protocol
++	messagesCode           = 1   // normal whisper message
++	powRequirementCode     = 2   // PoW requirement
++	bloomFilterExCode      = 3   // bloom filter exchange
++	p2pRequestCompleteCode = 125 // peer-to-peer message, used by Dapp protocol
++	p2pRequestCode         = 126 // peer-to-peer message, used by Dapp protocol
++	p2pMessageCode         = 127 // peer-to-peer message (to be consumed by the peer, but not forwarded any further)
++	NumberOfMessageCodes   = 128
+ 
+ 	SizeMask      = byte(3) // mask used to extract the size of payload size field from the flags
+ 	signatureFlag = byte(4)
+diff --git a/whisper/whisperv6/events.go b/whisper/whisperv6/events.go
+index e03ec9d..1665539 100644
+--- a/whisper/whisperv6/events.go
++++ b/whisper/whisperv6/events.go
+@@ -1,23 +1,27 @@
+ package whisperv6
+ 
+ import (
+-       "github.com/ethereum/go-ethereum/common"
+-       "github.com/ethereum/go-ethereum/p2p/discover"
++	"github.com/ethereum/go-ethereum/common"
++	"github.com/ethereum/go-ethereum/p2p/discover"
+ )
+ 
+ // EventType used to define known envelope events.
+ type EventType string
+ 
+ const (
+-       // EventEnvelopeSent fires when envelope was sent to a peer.
+-       EventEnvelopeSent EventType = "envelope.sent"
+-       // EventEnvelopeExpired fires when envelop expired
+-       EventEnvelopeExpired EventType = "envelope.expired"
++	// EventEnvelopeSent fires when envelope was sent to a peer.
++	EventEnvelopeSent EventType = "envelope.sent"
++	// EventEnvelopeExpired fires when envelop expired
++	EventEnvelopeExpired EventType = "envelope.expired"
++	// EventMailServerRequestCompleted fires after mailserver sends all the requested messages
++	EventMailServerRequestCompleted EventType = "mailserver.request.completed"
++	// EventMailServerRequestExpired fires after mailserver the request TTL ends
++	EventMailServerRequestExpired EventType = "mailserver.request.expired"
+ )
+ 
+ // EnvelopeEvent used for envelopes events.
+ type EnvelopeEvent struct {
+-       Event EventType
+-       Hash  common.Hash
+-       Peer  discover.NodeID
++	Event EventType
++	Hash  common.Hash
++	Peer  discover.NodeID
+ }
+diff --git a/whisper/whisperv6/whisper.go b/whisper/whisperv6/whisper.go
+index 697f0ec..4a7b006 100644
+--- a/whisper/whisperv6/whisper.go
++++ b/whisper/whisperv6/whisper.go
+@@ -378,6 +378,15 @@ func (whisper *Whisper) RequestHistoricMessages(peerID []byte, envelope *Envelop
+ 	return p2p.Send(p.ws, p2pRequestCode, envelope)
+ }
+ 
++func (whisper *Whisper) SendHistoricMessageResponse(peer *Peer, requestID common.Hash) error {
++	size, r, err := rlp.EncodeToReader(requestID)
++	if err != nil {
++		return err
++	}
++
++	return peer.ws.WriteMsg(p2p.Msg{Code: p2pRequestCompleteCode, Size: uint32(size), Payload: r})
++}
++
+ // SendP2PMessage sends a peer-to-peer message to a specific peer.
+ func (whisper *Whisper) SendP2PMessage(peerID []byte, envelope *Envelope) error {
+ 	p, err := whisper.getPeer(peerID)
+@@ -821,8 +830,22 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
+ 					log.Warn("failed to decode p2p request message, peer will be disconnected", "peer", p.peer.ID(), "err", err)
+ 					return errors.New("invalid p2p request")
+ 				}
++
+ 				whisper.mailServer.DeliverMail(p, &request)
+ 			}
++		case p2pRequestCompleteCode:
++			if p.trusted {
++				var requestID common.Hash
++				if err := packet.Decode(&requestID); err != nil {
++					log.Warn("failed to decode response message, peer will be disconnected", "peer", p.peer.ID(), "err", err)
++					return errors.New("invalid request response message")
++				}
++
++				whisper.envelopeFeed.Send(EnvelopeEvent{
++					Hash:  requestID,
++					Event: EventMailServerRequestCompleted,
++				})
++			}
+ 		default:
+ 			// New message types might be implemented in the future versions of Whisper.
+ 			// For forward compatibility, just ignore.
