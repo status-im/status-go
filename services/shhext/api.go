@@ -18,8 +18,8 @@ import (
 const (
 	// defaultWorkTime is a work time reported in messages sent to MailServer nodes.
 	defaultWorkTime = 5
-	// default is the default request TTL in seconds
-	defaultRequestTTL = 10
+	// defaultRequestTimeout is the default request timeout in seconds
+	defaultRequestTimeout = 10
 )
 
 var (
@@ -53,9 +53,9 @@ type MessagesRequest struct {
 	// It's derived from MailServer password.
 	SymKeyID string `json:"symKeyID"`
 
-	// TTL is the time to live of the request specified in seconds.
+	// Timeout is the time to live of the request specified in seconds.
 	// Default is 10 seconds
-	TTL uint64 `json:"ttl"`
+	Timeout time.Duration `json:"timeout"`
 }
 
 func (r *MessagesRequest) setDefaults(now time.Time) {
@@ -73,8 +73,8 @@ func (r *MessagesRequest) setDefaults(now time.Time) {
 		}
 	}
 
-	if r.TTL == 0 {
-		r.TTL = defaultRequestTTL
+	if r.Timeout == 0 {
+		r.Timeout = defaultRequestTimeout
 	}
 }
 
@@ -135,7 +135,7 @@ func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (hex
 		return nil, err
 	}
 
-	api.service.tracker.AddRequest(hash, time.After(defaultRequestTTL*time.Second))
+	api.service.tracker.AddRequest(hash, time.After(r.Timeout*time.Second))
 
 	return hash[:], nil
 }

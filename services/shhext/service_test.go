@@ -288,7 +288,7 @@ func (s *TrackerSuite) TestRemoved() {
 }
 
 func (s *TrackerSuite) TestRequestCompleted() {
-	s.tracker.AddRequest(testHash, time.After(defaultRequestTTL*time.Second))
+	s.tracker.AddRequest(testHash, time.After(defaultRequestTimeout*time.Second))
 	s.Contains(s.tracker.cache, testHash)
 	s.Equal(MailServerRequestSent, s.tracker.cache[testHash])
 	s.tracker.handleEvent(whisper.EnvelopeEvent{
