@@ -72,7 +72,8 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	rpcClient := sender.StatusNode().RPCClient()
 	s.Require().NotNil(rpcClient)
 
-	mailboxWhisperService, _ := mailboxBackend.StatusNode().WhisperService()
+	mailboxWhisperService, err := mailboxBackend.StatusNode().WhisperService()
+	s.Require().NoError(err)
 	s.Require().NotNil(mailboxWhisperService)
 	mailboxTracer := newTracer()
 	mailboxWhisperService.RegisterEnvelopeTracer(mailboxTracer)
@@ -98,10 +99,10 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	s.Require().Empty(messages)
 
 	// Post message matching with filter (key and topic).
-	s.postMessageToPrivate(rpcClient, pubkey.String(), topic.String(), hexutil.Encode([]byte("Hello world!")))
+	messageHash := s.postMessageToPrivate(rpcClient, pubkey.String(), topic.String(), hexutil.Encode([]byte("Hello world!")))
 
 	// Get message to make sure that it will come from the mailbox later.
-	messages = s.getMessagesByMessageFilterIDWithTracer(rpcClient, messageFilterID, mailboxTracer)
+	messages = s.getMessagesByMessageFilterIDWithTracer(rpcClient, messageFilterID, mailboxTracer, messageHash)
 	s.Require().Equal(1, len(messages))
 
 	// Act.
@@ -114,7 +115,7 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	requestID := common.BytesToHash(result)
 
 	// And we receive message, it comes from mailbox.
-	messages = s.getMessagesByMessageFilterIDWithTracer(rpcClient, messageFilterID, tracer)
+	messages = s.getMessagesByMessageFilterIDWithTracer(rpcClient, messageFilterID, tracer, messageHash)
 	s.Require().Equal(1, len(messages))
 
 	// Check that there are no messages.
@@ -225,12 +226,12 @@ func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
 	charlieMessageFilterID := s.createPrivateChatMessageFilter(charlieRPCClient, charlieKeyID, charlieAliceKeySendTopic.String())
 
 	// Alice send message with symkey and topic to Bob and Charlie.
-	s.postMessageToPrivate(aliceRPCClient, bobPubkey.String(), bobAliceKeySendTopic.String(), payloadStr)
-	s.postMessageToPrivate(aliceRPCClient, charliePubkey.String(), charlieAliceKeySendTopic.String(), payloadStr)
+	aliceToBobMessageHash := s.postMessageToPrivate(aliceRPCClient, bobPubkey.String(), bobAliceKeySendTopic.String(), payloadStr)
+	aliceToCharlieMessageHash := s.postMessageToPrivate(aliceRPCClient, charliePubkey.String(), charlieAliceKeySendTopic.String(), payloadStr)
 
 	// Bob receive group chat data and add it to his node.
 	// Bob get group chat details.
-	messages := s.getMessagesByMessageFilterIDWithTracer(bobRPCClient, bobMessageFilterID, bobTracer)
+	messages := s.getMessagesByMessageFilterIDWithTracer(bobRPCClient, bobMessageFilterID, bobTracer, aliceToBobMessageHash)
 	s.Require().Equal(1, len(messages))
 	bobGroupChatData := groupChatParams{}
 	err = bobGroupChatData.Decode(messages[0]["payload"].(string))
@@ -246,7 +247,7 @@ func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
 
 	// Charlie receive group chat data and add it to his node.
 	// Charlie get group chat details.
-	messages = s.getMessagesByMessageFilterIDWithTracer(charlieRPCClient, charlieMessageFilterID, charlieTracer)
+	messages = s.getMessagesByMessageFilterIDWithTracer(charlieRPCClient, charlieMessageFilterID, charlieTracer, aliceToCharlieMessageHash)
 	s.Require().Equal(1, len(messages))
 	charlieGroupChatData := groupChatParams{}
 	err = charlieGroupChatData.Decode(messages[0]["payload"].(string))
@@ -262,15 +263,15 @@ func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
 
 	// Alice send message to group chat.
 	helloWorldMessage := hexutil.Encode([]byte("Hello world!"))
-	s.postMessageToGroup(aliceRPCClient, groupChatKeyID, groupChatTopic.String(), helloWorldMessage)
+	groupChatMessageHash := s.postMessageToGroup(aliceRPCClient, groupChatKeyID, groupChatTopic.String(), helloWorldMessage)
 
 	// Bob receive group chat message.
-	messages = s.getMessagesByMessageFilterIDWithTracer(bobRPCClient, bobGroupChatMessageFilterID, bobTracer)
+	messages = s.getMessagesByMessageFilterIDWithTracer(bobRPCClient, bobGroupChatMessageFilterID, bobTracer, groupChatMessageHash)
 	s.Require().Equal(1, len(messages))
 	s.Require().Equal(helloWorldMessage, messages[0]["payload"].(string))
 
 	// Charlie receive group chat message.
-	messages = s.getMessagesByMessageFilterIDWithTracer(charlieRPCClient, charlieGroupChatMessageFilterID, charlieTracer)
+	messages = s.getMessagesByMessageFilterIDWithTracer(charlieRPCClient, charlieGroupChatMessageFilterID, charlieTracer, groupChatMessageHash)
 	s.Require().Equal(1, len(messages))
 	s.Require().Equal(helloWorldMessage, messages[0]["payload"].(string))
 
@@ -285,12 +286,12 @@ func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
 	s.requestHistoricMessages(charlieWhisperService, charlieRPCClient, mailboxEnode, charlieMailServerKeyID, groupChatTopic.String())
 
 	// Bob receive p2p message from group chat filter.
-	messages = s.getMessagesByMessageFilterIDWithTracer(bobRPCClient, bobGroupChatMessageFilterID, bobTracer)
+	messages = s.getMessagesByMessageFilterIDWithTracer(bobRPCClient, bobGroupChatMessageFilterID, bobTracer, groupChatMessageHash)
 	s.Require().Equal(1, len(messages))
 	s.Require().Equal(helloWorldMessage, messages[0]["payload"].(string))
 
 	// Charlie receive p2p message from group chat filter.
-	messages = s.getMessagesByMessageFilterIDWithTracer(charlieRPCClient, charlieGroupChatMessageFilterID, charlieTracer)
+	messages = s.getMessagesByMessageFilterIDWithTracer(charlieRPCClient, charlieGroupChatMessageFilterID, charlieTracer, groupChatMessageHash)
 	s.Require().Equal(1, len(messages))
 	s.Require().Equal(helloWorldMessage, messages[0]["payload"].(string))
 }
@@ -418,7 +419,7 @@ func (s *WhisperMailboxSuite) createGroupChatMessageFilter(rpcCli *rpc.Client, s
 	return messageFilterID
 }
 
-func (s *WhisperMailboxSuite) postMessageToPrivate(rpcCli *rpc.Client, bobPubkey string, topic string, payload string) {
+func (s *WhisperMailboxSuite) postMessageToPrivate(rpcCli *rpc.Client, bobPubkey string, topic string, payload string) string {
 	resp := rpcCli.CallRaw(`{
 		"jsonrpc": "2.0",
 		"method": "shh_post",
@@ -436,9 +437,11 @@ func (s *WhisperMailboxSuite) postMessageToPrivate(rpcCli *rpc.Client, bobPubkey
 	err := json.Unmarshal([]byte(resp), &postResp)
 	s.Require().NoError(err)
 	s.Require().Nil(postResp.Error)
+
+	return postResp.Result.(string)
 }
 
-func (s *WhisperMailboxSuite) postMessageToGroup(rpcCli *rpc.Client, groupChatKeyID string, topic string, payload string) {
+func (s *WhisperMailboxSuite) postMessageToGroup(rpcCli *rpc.Client, groupChatKeyID string, topic string, payload string) string {
 	resp := rpcCli.CallRaw(`{
 		"jsonrpc": "2.0",
 		"method": "shh_post",
@@ -456,6 +459,8 @@ func (s *WhisperMailboxSuite) postMessageToGroup(rpcCli *rpc.Client, groupChatKe
 	err := json.Unmarshal([]byte(resp), &postResp)
 	s.Require().NoError(err)
 	s.Require().Nil(postResp.Error)
+
+	return postResp.Result.(string)
 }
 
 // getMessagesByMessageFilterID gets received messages by messageFilterID.
@@ -472,9 +477,10 @@ func (s *WhisperMailboxSuite) getMessagesByMessageFilterID(rpcCli *rpc.Client, m
 	return messages.Result
 }
 
-func (s *WhisperMailboxSuite) getMessagesByMessageFilterIDWithTracer(rpcCli *rpc.Client, messageFilterID string, tracer *envelopeTracer) (messages []map[string]interface{}) {
+func (s *WhisperMailboxSuite) getMessagesByMessageFilterIDWithTracer(rpcCli *rpc.Client, messageFilterID string, tracer *envelopeTracer, messageHash string) (messages []map[string]interface{}) {
 	select {
-	case <-tracer.envelopChan:
+	case envelope := <-tracer.envelopChan:
+		s.Require().Equal(envelope.Hash, messageHash)
 	case <-time.After(5 * time.Second):
 		s.Fail("Timed out waiting for new messages after 5 seconds")
 	}
