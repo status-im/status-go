@@ -216,14 +216,11 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 
 	if *logLevel != "" {
 		nodeConfig.LogLevel = *logLevel
+		nodeConfig.LogEnabled = true
 	}
 
 	if *logFile != "" {
 		nodeConfig.LogFile = *logFile
-	}
-
-	if *logLevel != "" || *logFile != "" {
-		nodeConfig.LogEnabled = true
 	}
 
 	nodeConfig.RPCEnabled = *httpEnabled
