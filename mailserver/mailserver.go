@@ -43,11 +43,14 @@ var (
 	errPasswordNotProvided  = errors.New("password is not specified")
 	// By default go-ethereum/metrics creates dummy metrics that don't register anything.
 	// Real metrics are collected only if -metrics flag is set
-	requestProcessTimer    = metrics.NewRegisteredTimer("mailserver/processTime", nil)
-	requestsCounter        = metrics.NewRegisteredCounter("mailserver/requests", nil)
+	requestProcessTimer    = metrics.NewRegisteredTimer("mailserver/requestProcessTime", nil)
+	requestsMeter          = metrics.NewRegisteredMeter("mailserver/requests", nil)
 	requestErrorsCounter   = metrics.NewRegisteredCounter("mailserver/requestErrors", nil)
-	sentEnvelopesMeter     = metrics.NewRegisteredMeter("mailserver/envelopes", nil)
-	sentEnvelopesSizeMeter = metrics.NewRegisteredMeter("mailserver/envelopesSize", nil)
+	sentEnvelopesMeter     = metrics.NewRegisteredMeter("mailserver/sentEnvelopes", nil)
+	sentEnvelopesSizeMeter = metrics.NewRegisteredMeter("mailserver/sentEnvelopesSize", nil)
+	archivedMeter          = metrics.NewRegisteredMeter("mailserver/archivedEnvelopes", nil)
+	archivedSizeMeter      = metrics.NewRegisteredMeter("mailserver/archivedEnvelopesSize", nil)
+	archivedErrorsCounter  = metrics.NewRegisteredCounter("mailserver/archiveErrors", nil)
 )
 
 // WMailServer whisper mailserver.
@@ -159,17 +162,21 @@ func (s *WMailServer) Archive(env *whisper.Envelope) {
 	rawEnvelope, err := rlp.EncodeToBytes(env)
 	if err != nil {
 		log.Error(fmt.Sprintf("rlp.EncodeToBytes failed: %s", err))
+		archivedErrorsCounter.Inc(1)
 	} else {
 		if err = s.db.Put(key.raw, rawEnvelope, nil); err != nil {
 			log.Error(fmt.Sprintf("Writing to DB failed: %s", err))
+			archivedErrorsCounter.Inc(1)
 		}
+		archivedMeter.Mark(1)
+		archivedSizeMeter.Mark(int64(whisper.EnvelopeHeaderLength + len(env.Data)))
 	}
 }
 
 // DeliverMail sends mail to specified whisper peer.
 func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope) {
 	log.Info("Delivering mail", "peer", peer.ID)
-	requestsCounter.Inc(1)
+	requestsMeter.Mark(1)
 
 	if peer == nil {
 		requestErrorsCounter.Inc(1)
