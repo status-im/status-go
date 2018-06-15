@@ -17,3 +17,13 @@ func (h EnvelopeSignalHandler) EnvelopeSent(hash common.Hash) {
 func (h EnvelopeSignalHandler) EnvelopeExpired(hash common.Hash) {
 	signal.SendEnvelopeExpired(hash)
 }
+
+// MailServerRequestCompleted triggered when mailserver send a ack with a requesID sent previously
+func (h EnvelopeSignalHandler) MailServerRequestCompleted(hash common.Hash) {
+	signal.SendMailServerRequestCompleted(hash)
+}
+
+// MailServerRequestExpired triggered when mail server request expires
+func (h EnvelopeSignalHandler) MailServerRequestExpired(hash common.Hash) {
+	signal.SendMailServerRequestExpired(hash)
+}

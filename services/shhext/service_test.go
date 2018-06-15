@@ -16,14 +16,18 @@ import (
 
 func newHandlerMock(buf int) handlerMock {
 	return handlerMock{
-		confirmations: make(chan common.Hash, buf),
-		expirations:   make(chan common.Hash, buf),
+		confirmations:     make(chan common.Hash, buf),
+		expirations:       make(chan common.Hash, buf),
+		requestsCompleted: make(chan common.Hash, buf),
+		requestsExpired:   make(chan common.Hash, buf),
 	}
 }
 
 type handlerMock struct {
-	confirmations chan common.Hash
-	expirations   chan common.Hash
+	confirmations     chan common.Hash
+	expirations       chan common.Hash
+	requestsCompleted chan common.Hash
+	requestsExpired   chan common.Hash
 }
 
 func (t handlerMock) EnvelopeSent(hash common.Hash) {
@@ -32,6 +36,14 @@ func (t handlerMock) EnvelopeSent(hash common.Hash) {
 
 func (t handlerMock) EnvelopeExpired(hash common.Hash) {
 	t.expirations <- hash
+}
+
+func (t handlerMock) MailServerRequestCompleted(hash common.Hash) {
+	t.requestsCompleted <- hash
+}
+
+func (t handlerMock) MailServerRequestExpired(hash common.Hash) {
+	t.requestsExpired <- hash
 }
 
 func TestShhExtSuite(t *testing.T) {
@@ -159,29 +171,29 @@ func (s *ShhExtSuite) TestRequestMessages() {
 		mailServerPeer = "enode://b7e65e1bedc2499ee6cbd806945af5e7df0e59e4070c96821570bd581473eade24a489f5ec95d060c0db118c879403ab88d827d3766978f28708989d35474f87@[::]:51920"
 	)
 
-	var result bool
+	var hash []byte
 
 	// invalid MailServer enode address
-	result, err = api.RequestMessages(context.TODO(), MessagesRequest{MailServerPeer: "invalid-address"})
-	s.False(result)
+	hash, err = api.RequestMessages(context.TODO(), MessagesRequest{MailServerPeer: "invalid-address"})
+	s.Nil(hash)
 	s.EqualError(err, "invalid mailServerPeer value: invalid URL scheme, want \"enode\"")
 
 	// non-existent symmetric key
-	result, err = api.RequestMessages(context.TODO(), MessagesRequest{
+	hash, err = api.RequestMessages(context.TODO(), MessagesRequest{
 		MailServerPeer: mailServerPeer,
 	})
-	s.False(result)
+	s.Nil(hash)
 	s.EqualError(err, "invalid symKeyID value: non-existent key ID")
 
 	// with a symmetric key
 	symKeyID, symKeyErr := shh.AddSymKeyFromPassword("some-pass")
 	s.NoError(symKeyErr)
-	result, err = api.RequestMessages(context.TODO(), MessagesRequest{
+	hash, err = api.RequestMessages(context.TODO(), MessagesRequest{
 		MailServerPeer: mailServerPeer,
 		SymKeyID:       symKeyID,
 	})
 	s.Contains(err.Error(), "Could not find peer with ID")
-	s.False(result)
+	s.Nil(hash)
 
 	// with a peer acting as a mailserver
 	// prepare a node first
@@ -209,12 +221,14 @@ func (s *ShhExtSuite) TestRequestMessages() {
 	time.Sleep(time.Second) // wait for the peer to be added
 
 	// send a request
-	result, err = api.RequestMessages(context.TODO(), MessagesRequest{
+	hash, err = api.RequestMessages(context.TODO(), MessagesRequest{
 		MailServerPeer: mailNode.Server().Self().String(),
 		SymKeyID:       symKeyID,
 	})
 	s.NoError(err)
-	s.True(result)
+	s.NotNil(hash)
+
+	s.Contains(api.service.tracker.cache, common.BytesToHash(hash))
 }
 
 func (s *ShhExtSuite) TearDown() {
@@ -271,4 +285,35 @@ func (s *TrackerSuite) TestRemoved() {
 		Hash:  testHash,
 	})
 	s.NotContains(s.tracker.cache, testHash)
+}
+
+func (s *TrackerSuite) TestRequestCompleted() {
+	s.tracker.AddRequest(testHash, time.After(defaultRequestTimeout*time.Second))
+	s.Contains(s.tracker.cache, testHash)
+	s.Equal(MailServerRequestSent, s.tracker.cache[testHash])
+	s.tracker.handleEvent(whisper.EnvelopeEvent{
+		Event: whisper.EventMailServerRequestCompleted,
+		Hash:  testHash,
+	})
+	s.NotContains(s.tracker.cache, testHash)
+}
+
+func (s *TrackerSuite) TestRequestExpiration() {
+	mock := newHandlerMock(1)
+	s.tracker.handler = mock
+	c := make(chan time.Time)
+	s.tracker.AddRequest(testHash, c)
+	s.Contains(s.tracker.cache, testHash)
+	s.Equal(MailServerRequestSent, s.tracker.cache[testHash])
+	s.tracker.handleEvent(whisper.EnvelopeEvent{
+		Event: whisper.EventMailServerRequestExpired,
+		Hash:  testHash,
+	})
+	select {
+	case requestID := <-mock.requestsExpired:
+		s.Equal(testHash, requestID)
+		s.NotContains(s.tracker.cache, testHash)
+	case <-time.After(10 * time.Second):
+		s.Fail("timed out while waiting for request expiration")
+	}
 }

@@ -18,6 +18,8 @@ import (
 const (
 	// defaultWorkTime is a work time reported in messages sent to MailServer nodes.
 	defaultWorkTime = 5
+	// defaultRequestTimeout is the default request timeout in seconds
+	defaultRequestTimeout = 10
 )
 
 var (
@@ -50,6 +52,10 @@ type MessagesRequest struct {
 	// SymKeyID is an ID of a symmetric key to authenticate to MailServer.
 	// It's derived from MailServer password.
 	SymKeyID string `json:"symKeyID"`
+
+	// Timeout is the time to live of the request specified in seconds.
+	// Default is 10 seconds
+	Timeout time.Duration `json:"timeout"`
 }
 
 func (r *MessagesRequest) setDefaults(now time.Time) {
@@ -65,6 +71,10 @@ func (r *MessagesRequest) setDefaults(now time.Time) {
 		} else {
 			r.From = r.To - oneDay
 		}
+	}
+
+	if r.Timeout == 0 {
+		r.Timeout = defaultRequestTimeout
 	}
 }
 
@@ -100,30 +110,34 @@ func (api *PublicAPI) Post(ctx context.Context, req whisper.NewMessage) (hash he
 }
 
 // RequestMessages sends a request for historic messages to a MailServer.
-func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (bool, error) {
+func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (hexutil.Bytes, error) {
 	api.log.Info("RequestMessages", "request", r)
 	shh := api.service.w
 	now := api.service.w.GetCurrentTime()
 	r.setDefaults(now)
 	mailServerNode, err := discover.ParseNode(r.MailServerPeer)
 	if err != nil {
-		return false, fmt.Errorf("%v: %v", ErrInvalidMailServerPeer, err)
+		return nil, fmt.Errorf("%v: %v", ErrInvalidMailServerPeer, err)
 	}
 
 	symKey, err := shh.GetSymKey(r.SymKeyID)
 	if err != nil {
-		return false, fmt.Errorf("%v: %v", ErrInvalidSymKeyID, err)
+		return nil, fmt.Errorf("%v: %v", ErrInvalidSymKeyID, err)
 	}
 
 	envelope, err := makeEnvelop(makePayload(r), symKey, api.service.nodeID, shh.MinPow(), now)
 	if err != nil {
-		return false, err
-	}
-	if err := shh.RequestHistoricMessages(mailServerNode.ID[:], envelope); err != nil {
-		return false, err
+		return nil, err
 	}
 
-	return true, nil
+	hash := envelope.Hash()
+	if err := shh.RequestHistoricMessages(mailServerNode.ID[:], envelope); err != nil {
+		return nil, err
+	}
+
+	api.service.tracker.AddRequest(hash, time.After(r.Timeout*time.Second))
+
+	return hash[:], nil
 }
 
 // GetNewFilterMessages is a prototype method with deduplication

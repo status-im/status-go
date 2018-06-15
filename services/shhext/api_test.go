@@ -23,20 +23,25 @@ func TestMessagesRequest_setDefaults(t *testing.T) {
 	}{
 		{
 			&MessagesRequest{From: 0, To: 0},
-			&MessagesRequest{From: yesterday, To: now},
+			&MessagesRequest{From: yesterday, To: now, Timeout: defaultRequestTimeout},
 		},
 		{
 			&MessagesRequest{From: 1, To: 0},
-			&MessagesRequest{From: uint32(1), To: now},
+			&MessagesRequest{From: uint32(1), To: now, Timeout: defaultRequestTimeout},
 		},
 		{
 			&MessagesRequest{From: 0, To: yesterday},
-			&MessagesRequest{From: daysAgo(tnow, 2), To: yesterday},
+			&MessagesRequest{From: daysAgo(tnow, 2), To: yesterday, Timeout: defaultRequestTimeout},
 		},
 		// 100 - 1 day would be invalid, so we set From to 0
 		{
 			&MessagesRequest{From: 0, To: 100},
-			&MessagesRequest{From: 0, To: 100},
+			&MessagesRequest{From: 0, To: 100, Timeout: defaultRequestTimeout},
+		},
+		// set Timeout
+		{
+			&MessagesRequest{From: 0, To: 0, Timeout: 100},
+			&MessagesRequest{From: yesterday, To: now, Timeout: 100},
 		},
 	}
 
