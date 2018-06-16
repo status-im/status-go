@@ -43,6 +43,7 @@ type ServerTestParams struct {
 	birth uint32
 	low   uint32
 	upp   uint32
+	limit uint32
 	key   *ecdsa.PrivateKey
 }
 
@@ -166,7 +167,7 @@ func (s *MailserverSuite) TestRequestPaginationLimit() {
 	s.setupServer(s.server)
 	defer s.server.Close()
 
-	count := 5
+	count := 10
 
 	var (
 		sentEnvelopes     []*whisper.Envelope
@@ -189,9 +190,10 @@ func (s *MailserverSuite) TestRequestPaginationLimit() {
 	params := s.defaultServerParams(sentEnvelopes[0])
 	params.low = uint32(now.Add(time.Duration(-count) * time.Second).Unix())
 	params.upp = uint32(now.Unix())
+	params.limit = 5
 	request := s.createRequest(params)
 	src := crypto.FromECDSAPub(&params.key.PublicKey)
-	ok, lower, upper, bloom := s.server.validateRequest(src, request)
+	ok, lower, upper, bloom, _ := s.server.validateRequest(src, request)
 	s.True(ok)
 
 	for _, env := range s.server.processRequest(nil, lower, upper, bloom) {
@@ -276,16 +278,17 @@ func (s *MailserverSuite) TestMailServer() {
 		s.T().Run(tc.info, func(*testing.T) {
 			request := s.createRequest(tc.params)
 			src := crypto.FromECDSAPub(&tc.params.key.PublicKey)
-			ok, lower, upper, bloom := s.server.validateRequest(src, request)
+			ok, lower, upper, bloom, limit := s.server.validateRequest(src, request)
 			s.Equal(tc.isOK, ok)
 			if ok {
 				s.Equal(tc.params.low, lower)
 				s.Equal(tc.params.upp, upper)
+				s.Equal(tc.params.limit, limit)
 				s.Equal(whisper.TopicToBloom(tc.params.topic), bloom)
 				s.Equal(tc.expect, s.messageExists(env, tc.params.low, tc.params.upp, bloom))
 
 				src[0]++
-				ok, _, _, _ = s.server.validateRequest(src, request)
+				ok, _, _, _, _ = s.server.validateRequest(src, request)
 				s.True(ok)
 			}
 		})
@@ -379,6 +382,7 @@ func (s *MailserverSuite) defaultServerParams(env *whisper.Envelope) *ServerTest
 		birth: birth,
 		low:   birth - 1,
 		upp:   birth + 1,
+		limit: 0,
 		key:   testPeerID,
 	}
 }
@@ -389,6 +393,12 @@ func (s *MailserverSuite) createRequest(p *ServerTestParams) *whisper.Envelope {
 	binary.BigEndian.PutUint32(data, p.low)
 	binary.BigEndian.PutUint32(data[4:], p.upp)
 	data = append(data, bloom...)
+
+	if p.limit != 0 {
+		limitData := make([]byte, 4)
+		binary.BigEndian.PutUint32(limitData, p.limit)
+		data = append(data, limitData...)
+	}
 
 	key, err := s.shh.GetSymKey(keyID)
 	if err != nil {

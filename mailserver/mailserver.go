@@ -188,7 +188,7 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 		return
 	}
 
-	if ok, lower, upper, bloom := s.validateRequest(peer.ID(), request); ok {
+	if ok, lower, upper, bloom, _ := s.validateRequest(peer.ID(), request); ok {
 		s.processRequest(peer, lower, upper, bloom)
 		if err := s.sendHistoricMessageResponse(peer, request); err != nil {
 			log.Error(fmt.Sprintf("SendHistoricMessageResponse error: %s", err))
@@ -269,27 +269,27 @@ func (s *WMailServer) sendHistoricMessageResponse(peer *whisper.Peer, request *w
 }
 
 // validateRequest runs different validations on the current request.
-func (s *WMailServer) validateRequest(peerID []byte, request *whisper.Envelope) (bool, uint32, uint32, []byte) {
+func (s *WMailServer) validateRequest(peerID []byte, request *whisper.Envelope) (bool, uint32, uint32, []byte, uint32) {
 	if s.pow > 0.0 && request.PoW() < s.pow {
-		return false, 0, 0, nil
+		return false, 0, 0, nil, 0
 	}
 
 	f := whisper.Filter{KeySym: s.key}
 	decrypted := request.Open(&f)
 	if decrypted == nil {
 		log.Warn("Failed to decrypt p2p request")
-		return false, 0, 0, nil
+		return false, 0, 0, nil, 0
 	}
 
 	if err := s.checkMsgSignature(decrypted, peerID); err != nil {
 		log.Warn(err.Error())
-		return false, 0, 0, nil
+		return false, 0, 0, nil, 0
 	}
 
 	bloom, err := s.bloomFromReceivedMessage(decrypted)
 	if err != nil {
 		log.Warn(err.Error())
-		return false, 0, 0, nil
+		return false, 0, 0, nil, 0
 	}
 
 	lower := binary.BigEndian.Uint32(decrypted.Payload[:4])
@@ -299,10 +299,15 @@ func (s *WMailServer) validateRequest(peerID []byte, request *whisper.Envelope) 
 	upperTime := time.Unix(int64(upper), 0)
 	if upperTime.Sub(lowerTime) > maxQueryRange {
 		log.Warn(fmt.Sprintf("Query range too big for peer %s", string(peerID)))
-		return false, 0, 0, nil
+		return false, 0, 0, nil, 0
 	}
 
-	return true, lower, upper, bloom
+	var limit uint32
+	if len(decrypted.Payload) == 8+whisper.BloomFilterSize+4 {
+		limit = binary.BigEndian.Uint32(decrypted.Payload[8+whisper.BloomFilterSize:])
+	}
+
+	return true, lower, upper, bloom, limit
 }
 
 // checkMsgSignature returns an error in case the message is not correcly signed
