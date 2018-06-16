@@ -219,6 +219,7 @@ func (s *WMailServer) processRequest(peer *whisper.Peer, lower, upper uint32, bl
 	kl := NewDbKey(lower, zero)
 	ku := NewDbKey(upper+1, zero) // LevelDB is exclusive, while the Whisper API is inclusive
 	i := s.db.NewIterator(&util.Range{Start: kl.raw, Limit: ku.raw}, nil)
+	i.Seek(ku.raw)
 	defer i.Release()
 
 	var (
@@ -228,7 +229,7 @@ func (s *WMailServer) processRequest(peer *whisper.Peer, lower, upper uint32, bl
 
 	start := time.Now()
 
-	for i.Next() {
+	for i.Prev() {
 		var envelope whisper.Envelope
 		err = rlp.DecodeBytes(i.Value(), &envelope)
 		if err != nil {

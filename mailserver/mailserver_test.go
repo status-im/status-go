@@ -162,6 +162,49 @@ func (s *MailserverSuite) TestDBKey() {
 	s.Equal(byte(i/0x1000000), k.raw[0], "big endian expected")
 }
 
+func (s *MailserverSuite) TestRequestPaginationLimit() {
+	s.setupServer(s.server)
+	defer s.server.Close()
+
+	count := 5
+
+	var (
+		sentEnvelopes     []*whisper.Envelope
+		sentHashes        []common.Hash
+		reverseSentHashes []common.Hash
+		receivedHashes    []common.Hash
+	)
+	now := time.Now()
+
+	for i := count; i > 0; i-- {
+		sentTime := now.Add(time.Duration(-i) * time.Second)
+		env, err := generateEnvelope(sentTime)
+		s.NoError(err)
+		s.server.Archive(env)
+		sentEnvelopes = append(sentEnvelopes, env)
+		sentHashes = append(sentHashes, env.Hash())
+		reverseSentHashes = append([]common.Hash{env.Hash()}, reverseSentHashes...)
+	}
+
+	params := s.defaultServerParams(sentEnvelopes[0])
+	params.low = uint32(now.Add(time.Duration(-count) * time.Second).Unix())
+	params.upp = uint32(now.Unix())
+	request := s.createRequest(params)
+	src := crypto.FromECDSAPub(&params.key.PublicKey)
+	ok, lower, upper, bloom := s.server.validateRequest(src, request)
+	s.True(ok)
+
+	for _, env := range s.server.processRequest(nil, lower, upper, bloom) {
+		receivedHashes = append(receivedHashes, env.Hash())
+	}
+
+	// it should receive 5 envelopes
+	s.Equal(count, len(receivedHashes))
+
+	// envelopes should be sent in descending order
+	s.Equal(reverseSentHashes, receivedHashes)
+}
+
 func (s *MailserverSuite) TestMailServer() {
 	s.setupServer(s.server)
 	defer s.server.Close()
