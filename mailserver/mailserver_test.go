@@ -134,8 +134,11 @@ func (s *MailserverSuite) TestArchive() {
 	rawEnvelope, err := rlp.EncodeToBytes(env)
 	s.NoError(err)
 
-	s.server.Archive(env)
 	key := NewDbKey(env.Expiry-env.TTL, env.Hash())
+	returnedRawKey, err := s.server.Archive(env)
+	s.NoError(err)
+	s.Equal(key.raw, returnedRawKey)
+
 	archivedEnvelope, err := s.server.db.Get(key.raw, nil)
 	s.NoError(err)
 

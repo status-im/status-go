@@ -157,20 +157,27 @@ func (s *WMailServer) Close() {
 }
 
 // Archive a whisper envelope.
-func (s *WMailServer) Archive(env *whisper.Envelope) {
+func (s *WMailServer) Archive(env *whisper.Envelope) ([]byte, error) {
 	key := NewDbKey(env.Expiry-env.TTL, env.Hash())
 	rawEnvelope, err := rlp.EncodeToBytes(env)
 	if err != nil {
-		log.Error(fmt.Sprintf("rlp.EncodeToBytes failed: %s", err))
+		err := fmt.Errorf("rlp.EncodeToBytes failed: %s", err)
+		log.Error(err.Error())
 		archivedErrorsCounter.Inc(1)
-	} else {
-		if err = s.db.Put(key.raw, rawEnvelope, nil); err != nil {
-			log.Error(fmt.Sprintf("Writing to DB failed: %s", err))
-			archivedErrorsCounter.Inc(1)
-		}
-		archivedMeter.Mark(1)
-		archivedSizeMeter.Mark(int64(whisper.EnvelopeHeaderLength + len(env.Data)))
+		return nil, err
 	}
+
+	if err = s.db.Put(key.raw, rawEnvelope, nil); err != nil {
+		err := fmt.Errorf("Writing to DB failed: %s", err)
+		log.Error(err.Error())
+		archivedErrorsCounter.Inc(1)
+		return nil, err
+	}
+
+	archivedMeter.Mark(1)
+	archivedSizeMeter.Mark(int64(whisper.EnvelopeHeaderLength + len(env.Data)))
+
+	return key.raw, nil
 }
 
 // DeliverMail sends mail to specified whisper peer.

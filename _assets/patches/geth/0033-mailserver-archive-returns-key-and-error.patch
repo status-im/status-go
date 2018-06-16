@@ -1,0 +1,47 @@
+diff --git a/whisper/mailserver/mailserver.go b/whisper/mailserver/mailserver.go
+index 57e6505..77727ef 100644
+--- a/whisper/mailserver/mailserver.go
++++ b/whisper/mailserver/mailserver.go
+@@ -88,17 +88,22 @@ func (s *WMailServer) Close() {
+ 	}
+ }
+ 
+-func (s *WMailServer) Archive(env *whisper.Envelope) {
++func (s *WMailServer) Archive(env *whisper.Envelope) ([]byte, error) {
+ 	key := NewDbKey(env.Expiry-env.TTL, env.Hash())
+ 	rawEnvelope, err := rlp.EncodeToBytes(env)
+ 	if err != nil {
+-		log.Error(fmt.Sprintf("rlp.EncodeToBytes failed: %s", err))
+-	} else {
+-		err = s.db.Put(key.raw, rawEnvelope, nil)
+-		if err != nil {
+-			log.Error(fmt.Sprintf("Writing to DB failed: %s", err))
+-		}
++		err := fmt.Errorf("rlp.EncodeToBytes failed: %s", err)
++		log.Error(err.Error())
++		return nil, err
+ 	}
++
++	if err = s.db.Put(key.raw, rawEnvelope, nil); err != nil {
++		err := fmt.Errorf("Writing to DB failed: %s", err)
++		log.Error(err.Error())
++		return nil, err
++	}
++
++	return key.raw, nil
+ }
+ 
+ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope) {
+diff --git a/whisper/whisperv6/doc.go b/whisper/whisperv6/doc.go
+index 2fcc9e6..df7b063 100644
+--- a/whisper/whisperv6/doc.go
++++ b/whisper/whisperv6/doc.go
+@@ -93,7 +93,7 @@ func (e unknownVersionError) Error() string {
+ // DeliverMail should use directMessagesCode for delivery,
+ // in order to bypass the expiry checks.
+ type MailServer interface {
+-	Archive(env *Envelope)
++	Archive(env *Envelope) ([]byte, error)
+ 	DeliverMail(whisperPeer *Peer, request *Envelope)
+ }
+ 
