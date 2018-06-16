@@ -39,12 +39,13 @@ var keyID string
 var seed = time.Now().Unix()
 
 type ServerTestParams struct {
-	topic whisper.TopicType
-	birth uint32
-	low   uint32
-	upp   uint32
-	limit uint32
-	key   *ecdsa.PrivateKey
+	topic  whisper.TopicType
+	birth  uint32
+	low    uint32
+	upp    uint32
+	limit  uint32
+	cursor []byte
+	key    *ecdsa.PrivateKey
 }
 
 func TestMailserverSuite(t *testing.T) {
@@ -199,11 +200,12 @@ func (s *MailserverSuite) TestRequestPaginationLimit() {
 	params.limit = 6
 	request := s.createRequest(params)
 	src := crypto.FromECDSAPub(&params.key.PublicKey)
-	ok, lower, upper, bloom, limit := s.server.validateRequest(src, request)
+	ok, lower, upper, bloom, limit, cursor := s.server.validateRequest(src, request)
 	s.True(ok)
+	s.Nil(cursor)
 	s.Equal(params.limit, limit)
 
-	envelopes, cursor := s.server.processRequest(nil, lower, upper, bloom, limit)
+	envelopes, cursor := s.server.processRequest(nil, lower, upper, bloom, limit, nil)
 	for _, env := range envelopes {
 		receivedHashes = append(receivedHashes, env.Hash())
 	}
@@ -215,7 +217,19 @@ func (s *MailserverSuite) TestRequestPaginationLimit() {
 	// the 6 envelopes received should be in descending order
 	s.Equal(reverseSentHashes[:limit], receivedHashes)
 	// cursor should be the key of the first envelope of the next page
-	s.Equal(archiveKeys[count-limit-1], fmt.Sprintf("%x", cursor))
+	s.Equal(archiveKeys[count-limit], fmt.Sprintf("%x", cursor))
+
+	// second page
+	receivedHashes = []common.Hash{}
+	envelopes, cursor = s.server.processRequest(nil, lower, upper, bloom, limit, cursor)
+	for _, env := range envelopes {
+		receivedHashes = append(receivedHashes, env.Hash())
+	}
+
+	// 4 envelopes received
+	s.Equal(count-limit, uint32(len(receivedHashes)))
+	// cursor is nil because there are no other pages
+	s.Nil(cursor)
 }
 
 func (s *MailserverSuite) TestMailServer() {
@@ -289,7 +303,7 @@ func (s *MailserverSuite) TestMailServer() {
 		s.T().Run(tc.info, func(*testing.T) {
 			request := s.createRequest(tc.params)
 			src := crypto.FromECDSAPub(&tc.params.key.PublicKey)
-			ok, lower, upper, bloom, limit := s.server.validateRequest(src, request)
+			ok, lower, upper, bloom, limit, _ := s.server.validateRequest(src, request)
 			s.Equal(tc.isOK, ok)
 			if ok {
 				s.Equal(tc.params.low, lower)
@@ -299,7 +313,7 @@ func (s *MailserverSuite) TestMailServer() {
 				s.Equal(tc.expect, s.messageExists(env, tc.params.low, tc.params.upp, bloom, tc.params.limit))
 
 				src[0]++
-				ok, _, _, _, _ = s.server.validateRequest(src, request)
+				ok, _, _, _, _, _ = s.server.validateRequest(src, request)
 				s.True(ok)
 			}
 		})
@@ -308,7 +322,7 @@ func (s *MailserverSuite) TestMailServer() {
 
 func (s *MailserverSuite) messageExists(envelope *whisper.Envelope, low, upp uint32, bloom []byte, limit uint32) bool {
 	var exist bool
-	mail, _ := s.server.processRequest(nil, low, upp, bloom, limit)
+	mail, _ := s.server.processRequest(nil, low, upp, bloom, limit, nil)
 	for _, msg := range mail {
 		if msg.Hash() == envelope.Hash() {
 			exist = true
