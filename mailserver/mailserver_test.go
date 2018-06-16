@@ -167,7 +167,7 @@ func (s *MailserverSuite) TestRequestPaginationLimit() {
 	s.setupServer(s.server)
 	defer s.server.Close()
 
-	count := 10
+	count := uint32(10)
 
 	var (
 		sentEnvelopes     []*whisper.Envelope
@@ -190,21 +190,23 @@ func (s *MailserverSuite) TestRequestPaginationLimit() {
 	params := s.defaultServerParams(sentEnvelopes[0])
 	params.low = uint32(now.Add(time.Duration(-count) * time.Second).Unix())
 	params.upp = uint32(now.Unix())
-	params.limit = 5
+	params.limit = 6
 	request := s.createRequest(params)
 	src := crypto.FromECDSAPub(&params.key.PublicKey)
-	ok, lower, upper, bloom, _ := s.server.validateRequest(src, request)
+	ok, lower, upper, bloom, limit := s.server.validateRequest(src, request)
 	s.True(ok)
+	s.Equal(params.limit, limit)
 
-	for _, env := range s.server.processRequest(nil, lower, upper, bloom) {
+	for _, env := range s.server.processRequest(nil, lower, upper, bloom, limit) {
 		receivedHashes = append(receivedHashes, env.Hash())
 	}
 
-	// it should receive 5 envelopes
-	s.Equal(count, len(receivedHashes))
-
-	// envelopes should be sent in descending order
-	s.Equal(reverseSentHashes, receivedHashes)
+	// 10 envelopes sent
+	s.Equal(count, uint32(len(sentEnvelopes)))
+	// 6 envelopes received
+	s.Equal(limit, uint32(len(receivedHashes)))
+	// the 6 envelopes received should be in descending order
+	s.Equal(reverseSentHashes[:limit], receivedHashes)
 }
 
 func (s *MailserverSuite) TestMailServer() {
@@ -285,7 +287,7 @@ func (s *MailserverSuite) TestMailServer() {
 				s.Equal(tc.params.upp, upper)
 				s.Equal(tc.params.limit, limit)
 				s.Equal(whisper.TopicToBloom(tc.params.topic), bloom)
-				s.Equal(tc.expect, s.messageExists(env, tc.params.low, tc.params.upp, bloom))
+				s.Equal(tc.expect, s.messageExists(env, tc.params.low, tc.params.upp, bloom, tc.params.limit))
 
 				src[0]++
 				ok, _, _, _, _ = s.server.validateRequest(src, request)
@@ -295,9 +297,9 @@ func (s *MailserverSuite) TestMailServer() {
 	}
 }
 
-func (s *MailserverSuite) messageExists(envelope *whisper.Envelope, low, upp uint32, bloom []byte) bool {
+func (s *MailserverSuite) messageExists(envelope *whisper.Envelope, low, upp uint32, bloom []byte, limit uint32) bool {
 	var exist bool
-	mail := s.server.processRequest(nil, low, upp, bloom)
+	mail := s.server.processRequest(nil, low, upp, bloom, limit)
 	for _, msg := range mail {
 		if msg.Hash() == envelope.Hash() {
 			exist = true

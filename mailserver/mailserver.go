@@ -188,8 +188,8 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 		return
 	}
 
-	if ok, lower, upper, bloom, _ := s.validateRequest(peer.ID(), request); ok {
-		s.processRequest(peer, lower, upper, bloom)
+	if ok, lower, upper, bloom, limit := s.validateRequest(peer.ID(), request); ok {
+		s.processRequest(peer, lower, upper, bloom, limit)
 		if err := s.sendHistoricMessageResponse(peer, request); err != nil {
 			log.Error(fmt.Sprintf("SendHistoricMessageResponse error: %s", err))
 		}
@@ -212,7 +212,7 @@ func (s *WMailServer) exceedsPeerRequests(peer []byte) bool {
 
 // processRequest processes the current request and re-sends all stored messages
 // accomplishing lower and upper limits.
-func (s *WMailServer) processRequest(peer *whisper.Peer, lower, upper uint32, bloom []byte) []*whisper.Envelope {
+func (s *WMailServer) processRequest(peer *whisper.Peer, lower, upper uint32, bloom []byte, limit uint32) []*whisper.Envelope {
 	ret := make([]*whisper.Envelope, 0)
 	var err error
 	var zero common.Hash
@@ -223,13 +223,14 @@ func (s *WMailServer) processRequest(peer *whisper.Peer, lower, upper uint32, bl
 	defer i.Release()
 
 	var (
-		sentEnvelopes     int64
+		sentEnvelopes     uint32
 		sentEnvelopesSize int64
+		limitReached      bool
 	)
 
 	start := time.Now()
 
-	for i.Prev() {
+	for !limitReached && i.Prev() {
 		var envelope whisper.Envelope
 		err = rlp.DecodeBytes(i.Value(), &envelope)
 		if err != nil {
@@ -237,6 +238,11 @@ func (s *WMailServer) processRequest(peer *whisper.Peer, lower, upper uint32, bl
 		}
 
 		if whisper.BloomFilterMatch(bloom, envelope.Bloom()) {
+			if limit != 0 && sentEnvelopes == limit {
+				limitReached = true
+				break
+			}
+
 			if peer == nil {
 				// used for test purposes
 				ret = append(ret, &envelope)
@@ -253,7 +259,7 @@ func (s *WMailServer) processRequest(peer *whisper.Peer, lower, upper uint32, bl
 	}
 
 	requestProcessTimer.UpdateSince(start)
-	sentEnvelopesMeter.Mark(sentEnvelopes)
+	sentEnvelopesMeter.Mark(int64(sentEnvelopes))
 	sentEnvelopesSizeMeter.Mark(sentEnvelopesSize)
 
 	err = i.Error()
