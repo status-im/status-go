@@ -219,7 +219,7 @@ func (s *WMailServer) exceedsPeerRequests(peer []byte) bool {
 
 // processRequest processes the current request and re-sends all stored messages
 // accomplishing lower and upper limits.
-func (s *WMailServer) processRequest(peer *whisper.Peer, lower, upper uint32, bloom []byte, limit uint32) []*whisper.Envelope {
+func (s *WMailServer) processRequest(peer *whisper.Peer, lower, upper uint32, bloom []byte, limit uint32) ([]*whisper.Envelope, []byte) {
 	ret := make([]*whisper.Envelope, 0)
 	var err error
 	var zero common.Hash
@@ -233,6 +233,7 @@ func (s *WMailServer) processRequest(peer *whisper.Peer, lower, upper uint32, bl
 		sentEnvelopes     uint32
 		sentEnvelopesSize int64
 		limitReached      bool
+		cursor            []byte
 	)
 
 	start := time.Now()
@@ -247,6 +248,7 @@ func (s *WMailServer) processRequest(peer *whisper.Peer, lower, upper uint32, bl
 		if whisper.BloomFilterMatch(bloom, envelope.Bloom()) {
 			if limit != 0 && sentEnvelopes == limit {
 				limitReached = true
+				cursor = i.Key()
 				break
 			}
 
@@ -257,7 +259,7 @@ func (s *WMailServer) processRequest(peer *whisper.Peer, lower, upper uint32, bl
 				err = s.w.SendP2PDirect(peer, &envelope)
 				if err != nil {
 					log.Error(fmt.Sprintf("Failed to send direct message to peer: %s", err))
-					return nil
+					return nil, cursor
 				}
 			}
 			sentEnvelopes++
@@ -274,7 +276,7 @@ func (s *WMailServer) processRequest(peer *whisper.Peer, lower, upper uint32, bl
 		log.Error(fmt.Sprintf("Level DB iterator error: %s", err))
 	}
 
-	return ret
+	return ret, cursor
 }
 
 func (s *WMailServer) sendHistoricMessageResponse(peer *whisper.Peer, request *whisper.Envelope) error {
