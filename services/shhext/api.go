@@ -201,7 +201,7 @@ func makePayload(r MessagesRequest) []byte {
 	// bloom
 	copy(data[8:], whisper.TopicToBloom(r.Topic))
 	// limit
-	binary.BigEndian.PutUint32(data, r.Limit)
+	binary.BigEndian.PutUint32(data[4+whisper.BloomFilterSize:], r.Limit)
 
 	// cursor is the key of an envelope in leveldb.
 	// it's 36 bytes. 4 bytes for the timestamp + 32 bytes for the envelope hash
