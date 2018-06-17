@@ -378,8 +378,8 @@ func (whisper *Whisper) RequestHistoricMessages(peerID []byte, envelope *Envelop
 	return p2p.Send(p.ws, p2pRequestCode, envelope)
 }
 
-func (whisper *Whisper) SendHistoricMessageResponse(peer *Peer, requestID common.Hash) error {
-	size, r, err := rlp.EncodeToReader(requestID)
+func (whisper *Whisper) SendHistoricMessageResponse(peer *Peer, payload []byte) error {
+	size, r, err := rlp.EncodeToReader(payload)
 	if err != nil {
 		return err
 	}
@@ -927,6 +927,10 @@ func (whisper *Whisper) add(envelope *Envelope, isP2P bool) (bool, error) {
 		whisper.postEvent(envelope, isP2P) // notify the local node about the new message
 		if whisper.mailServer != nil {
 			whisper.mailServer.Archive(envelope)
+			whisper.envelopeFeed.Send(EnvelopeEvent{
+				Hash:  envelope.Hash(),
+				Event: EventMailServerEnvelopeArchived,
+			})
 		}
 	}
 	return true, nil

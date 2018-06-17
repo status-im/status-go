@@ -17,6 +17,8 @@ const (
 	EventMailServerRequestCompleted EventType = "mailserver.request.completed"
 	// EventMailServerRequestExpired fires after mailserver the request TTL ends
 	EventMailServerRequestExpired EventType = "mailserver.request.expired"
+	// EventMailServerEnvelopeArchived fires after an envelope has been archived
+	EventMailServerEnvelopeArchived EventType = "mailserver.envelope.archived"
 )
 
 // EnvelopeEvent used for envelopes events.

@@ -14,9 +14,12 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/crypto/sha3"
+	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"github.com/status-im/status-go/api"
+	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/rpc"
 	. "github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/suite"
@@ -296,6 +299,80 @@ func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
 	s.Require().Equal(helloWorldMessage, messages[0]["payload"].(string))
 }
 
+func (s *WhisperMailboxSuite) TestRequestMessagesWithPagination() {
+	// Start mailbox and status node.
+	mailbox, stop := s.startMailboxBackend()
+	defer stop()
+	s.Require().True(mailbox.IsNodeRunning())
+
+	client, stop := s.startBackend("sender")
+	defer stop()
+	s.Require().True(client.IsNodeRunning())
+
+	// Add mailbox to client's peers
+	s.addPeerAndWait(client.StatusNode(), mailbox.StatusNode())
+
+	// Whisper service
+	mailboxWhisperService, err := mailbox.StatusNode().WhisperService()
+	s.Require().NoError(err)
+	clientWhisperService, err := client.StatusNode().WhisperService()
+	s.Require().NoError(err)
+
+	// nodeWhisperService.APIs()
+	rpcClient := client.StatusNode().RPCClient()
+
+	// public chat
+	keyID, topic := s.createPublicChat(clientWhisperService, "test public chat")
+
+	// watch mailserver envelopeFeed
+	ch := make(chan whisper.EnvelopeEvent)
+	mailboxWhisperService.SubscribeEnvelopeEvents(ch)
+
+	sentHashes := make([]common.Hash, 0)
+	count := 10
+
+	for i := 0; i < count; i++ {
+		hash := s.postMessageToGroup(rpcClient, keyID, topic.String(), "")
+		sentHashes = append(sentHashes, hash)
+		select {
+		case event := <-ch:
+			if event.Event != whisper.EventMailServerEnvelopeArchived || event.Hash != hash {
+				s.FailNow("error archiving", "expected envelope archived (%x), got: %+v", event)
+			}
+		case <-time.After(5 * time.Second):
+			s.FailNow("timed out while waiting for an envelope to be archived")
+		}
+	}
+
+	//TODO: WIP, test paginated requests
+}
+
+func (s *WhisperMailboxSuite) addPeerAndWait(node, other *node.StatusNode) {
+	nodeInfo := node.GethNode().Server().NodeInfo()
+	nodeID := nodeInfo.ID
+	nodeEnode := nodeInfo.Enode
+	otherEnode := other.GethNode().Server().NodeInfo().Enode
+	s.Require().NotEqual(nodeEnode, otherEnode)
+
+	ch := make(chan *p2p.PeerEvent)
+	subscription := other.GethNode().Server().SubscribeEvents(ch)
+	defer subscription.Unsubscribe()
+
+	err := node.AddPeer(otherEnode)
+	s.Require().NoError(err)
+
+	select {
+	case event := <-ch:
+		if event.Type == p2p.PeerEventTypeAdd && event.Peer.String() == nodeID {
+			return
+		}
+
+		s.Failf("failed connecting to peer", "expected p2p.PeerEventTypeAdd with nodeID (%s), got: %+v", nodeID, event)
+	case <-time.After(time.Second):
+		s.Fail("timed out while waiting for a peer to be added")
+	}
+}
+
 func newGroupChatParams(symkey []byte, topic whisper.TopicType) groupChatParams {
 	groupChatKeyStr := hexutil.Bytes(symkey).String()
 	return groupChatParams{
@@ -441,7 +518,7 @@ func (s *WhisperMailboxSuite) postMessageToPrivate(rpcCli *rpc.Client, bobPubkey
 	return postResp.Result.(string)
 }
 
-func (s *WhisperMailboxSuite) postMessageToGroup(rpcCli *rpc.Client, groupChatKeyID string, topic string, payload string) string {
+func (s *WhisperMailboxSuite) postMessageToGroup(rpcCli *rpc.Client, groupChatKeyID string, topic string, payload string) common.Hash {
 	resp := rpcCli.CallRaw(`{
 		"jsonrpc": "2.0",
 		"method": "shh_post",
@@ -460,7 +537,18 @@ func (s *WhisperMailboxSuite) postMessageToGroup(rpcCli *rpc.Client, groupChatKe
 	s.Require().NoError(err)
 	s.Require().Nil(postResp.Error)
 
-	return postResp.Result.(string)
+	hashString, ok := postResp.Result.(string)
+	if !ok {
+		s.FailNow("error decoding result", "expected string, got: %+v", postResp.Result)
+	}
+
+	if !strings.HasPrefix(hashString, "0x") {
+		s.FailNow("error decoding envelope hash", "expected hex string, got: %+v", hashString)
+	}
+
+	hash := common.HexToHash(hashString)
+
+	return hash
 }
 
 // getMessagesByMessageFilterID gets received messages by messageFilterID.
@@ -548,6 +636,18 @@ func (s *WhisperMailboxSuite) requestHistoricMessages(w *whisper.Whisper, rpcCli
 	}
 
 	return nil
+}
+
+func (s *WhisperMailboxSuite) createPublicChat(w *whisper.Whisper, name string) (string, whisper.TopicType) {
+	keyID, err := w.AddSymKeyFromPassword(name)
+	s.Require().NoError(err)
+
+	h := sha3.NewKeccak256()
+	h.Write([]byte(name))
+	fullTopic := h.Sum(nil)
+	topic := whisper.BytesToTopic(fullTopic)
+
+	return keyID, topic
 }
 
 type getFilterMessagesResponse struct {

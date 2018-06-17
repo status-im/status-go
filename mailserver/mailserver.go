@@ -53,6 +53,13 @@ var (
 	archivedErrorsCounter  = metrics.NewRegisteredCounter("mailserver/archiveErrors", nil)
 )
 
+const (
+	dbKeyLength  = common.HashLength + 4
+	cursorLength = common.HashLength + dbKeyLength
+)
+
+type cursorType []byte
+
 // WMailServer whisper mailserver.
 type WMailServer struct {
 	db    *leveldb.DB
@@ -72,11 +79,10 @@ type DBKey struct {
 
 // NewDbKey creates a new DBKey with the given values.
 func NewDbKey(t uint32, h common.Hash) *DBKey {
-	const sz = common.HashLength + 4
 	var k DBKey
 	k.timestamp = t
 	k.hash = h
-	k.raw = make([]byte, sz)
+	k.raw = make([]byte, dbKeyLength)
 	binary.BigEndian.PutUint32(k.raw, k.timestamp)
 	copy(k.raw[4:], k.hash[:])
 	return &k
@@ -196,8 +202,8 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 	}
 
 	if ok, lower, upper, bloom, limit, cursor := s.validateRequest(peer.ID(), request); ok {
-		s.processRequest(peer, lower, upper, bloom, limit, cursor)
-		if err := s.sendHistoricMessageResponse(peer, request); err != nil {
+		_, lastCursor := s.processRequest(peer, lower, upper, bloom, limit, cursor)
+		if err := s.sendHistoricMessageResponse(peer, request, lastCursor); err != nil {
 			log.Error(fmt.Sprintf("SendHistoricMessageResponse error: %s", err))
 		}
 	}
@@ -219,7 +225,7 @@ func (s *WMailServer) exceedsPeerRequests(peer []byte) bool {
 
 // processRequest processes the current request and re-sends all stored messages
 // accomplishing lower and upper limits.
-func (s *WMailServer) processRequest(peer *whisper.Peer, lower, upper uint32, bloom []byte, limit uint32, cursor []byte) ([]*whisper.Envelope, []byte) {
+func (s *WMailServer) processRequest(peer *whisper.Peer, lower, upper uint32, bloom []byte, limit uint32, cursor cursorType) ([]*whisper.Envelope, cursorType) {
 	ret := make([]*whisper.Envelope, 0)
 	var err error
 	var zero common.Hash
@@ -239,7 +245,7 @@ func (s *WMailServer) processRequest(peer *whisper.Peer, lower, upper uint32, bl
 		sentEnvelopes     uint32
 		sentEnvelopesSize int64
 		limitReached      bool
-		lastCursor        []byte
+		lastCursor        cursorType
 	)
 
 	start := time.Now()
@@ -285,12 +291,14 @@ func (s *WMailServer) processRequest(peer *whisper.Peer, lower, upper uint32, bl
 	return ret, lastCursor
 }
 
-func (s *WMailServer) sendHistoricMessageResponse(peer *whisper.Peer, request *whisper.Envelope) error {
-	return s.w.SendHistoricMessageResponse(peer, request.Hash())
+func (s *WMailServer) sendHistoricMessageResponse(peer *whisper.Peer, request *whisper.Envelope, cursor cursorType) error {
+	hash := request.Hash()
+	payload := append(hash[:], cursor...)
+	return s.w.SendHistoricMessageResponse(peer, payload)
 }
 
 // validateRequest runs different validations on the current request.
-func (s *WMailServer) validateRequest(peerID []byte, request *whisper.Envelope) (bool, uint32, uint32, []byte, uint32, []byte) {
+func (s *WMailServer) validateRequest(peerID []byte, request *whisper.Envelope) (bool, uint32, uint32, []byte, uint32, cursorType) {
 	if s.pow > 0.0 && request.PoW() < s.pow {
 		return false, 0, 0, nil, 0, nil
 	}
@@ -328,9 +336,8 @@ func (s *WMailServer) validateRequest(peerID []byte, request *whisper.Envelope) 
 		limit = binary.BigEndian.Uint32(decrypted.Payload[8+whisper.BloomFilterSize:])
 	}
 
-	var cursor []byte
-	cursorSize := common.HashLength + 4
-	if len(decrypted.Payload) == 8+whisper.BloomFilterSize+4+cursorSize {
+	var cursor cursorType
+	if len(decrypted.Payload) == 8+whisper.BloomFilterSize+4+cursorLength {
 		cursor = decrypted.Payload[8+whisper.BloomFilterSize+4:]
 	}
 
