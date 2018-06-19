@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"time"
@@ -191,7 +192,7 @@ func makePayload(r MessagesRequest) []byte {
 	// 4  bytes for upper
 	// 64 bytes for the bloom filter
 	// 4  bytes for limit
-	// 36 bytes for the cursori. optional.
+	// 36 bytes for the cursor. optional.
 	data := make([]byte, 12+whisper.BloomFilterSize)
 
 	// from
@@ -201,14 +202,15 @@ func makePayload(r MessagesRequest) []byte {
 	// bloom
 	copy(data[8:], whisper.TopicToBloom(r.Topic))
 	// limit
-	binary.BigEndian.PutUint32(data[4+whisper.BloomFilterSize:], r.Limit)
+	binary.BigEndian.PutUint32(data[8+whisper.BloomFilterSize:], r.Limit)
 
 	// cursor is the key of an envelope in leveldb.
 	// it's 36 bytes. 4 bytes for the timestamp + 32 bytes for the envelope hash
-	cursorSize := common.HashLength + 4
-	if len(r.Cursor) == cursorSize {
-		data = append(data, []byte(r.Cursor)...)
+	expectedCursorSize := common.HashLength + 4
+	cursorBytes, err := hex.DecodeString(r.Cursor)
+	if err != nil || len(cursorBytes) != expectedCursorSize {
+		return data
 	}
 
-	return data
+	return append(data, []byte(cursorBytes)...)
 }
