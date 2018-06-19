@@ -212,5 +212,5 @@ func makePayload(r MessagesRequest) []byte {
 		return data
 	}
 
-	return append(data, []byte(cursorBytes)...)
+	return append(data, cursorBytes...)
 }

@@ -323,8 +323,13 @@ func (s *WhisperMailboxSuite) TestRequestMessagesWithPagination() {
 	senderRPCClient := sender.StatusNode().RPCClient()
 
 	// public chat
+	var (
+		keyID    string
+		topic    whisper.TopicType
+		filterID string
+	)
 	publicChatName := "test public chat"
-	keyID, topic, filterID := s.joinPublicChat(senderWhisperService, senderRPCClient, publicChatName)
+	keyID, topic, _ = s.joinPublicChat(senderWhisperService, senderRPCClient, publicChatName)
 
 	envelopesCount := 5
 
