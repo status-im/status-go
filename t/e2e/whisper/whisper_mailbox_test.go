@@ -341,7 +341,7 @@ func (s *WhisperMailboxSuite) TestRequestMessagesWithPagination() {
 		archived  bool
 		retrieved bool
 	}
-	sentEnvelopes := make(map[common.Hash]*check)
+	sentEnvelopes := make(map[string]*check)
 
 	// send envelopes
 	for i := 0; i < envelopesCount; i++ {
@@ -356,7 +356,7 @@ func (s *WhisperMailboxSuite) TestRequestMessagesWithPagination() {
 			if event.Event != whisper.EventMailServerEnvelopeArchived {
 				s.FailNow("error archiving", "expected envelope archived event, got: %v", event)
 			}
-			check, found := sentEnvelopes[event.Hash]
+			check, found := sentEnvelopes[event.Hash.String()]
 			if !found {
 				s.FailNow("error archiving", "archived envelope is not in the sent envelopes")
 			}
@@ -383,7 +383,7 @@ func (s *WhisperMailboxSuite) TestRequestMessagesWithPagination() {
 	s.addPeerAndWait(receiver.StatusNode(), mailbox.StatusNode())
 	receiverRPCClient := receiver.StatusNode().RPCClient()
 	// public chat
-	keyID, topic, filterID = s.joinPublicChat(receiverWhisperService, receiverRPCClient, publicChatName)
+	_, topic, filterID = s.joinPublicChat(receiverWhisperService, receiverRPCClient, publicChatName)
 
 	// watch receiver envelopeFeed
 	receiverEvents := make(chan whisper.EnvelopeEvent, envelopesCount)
@@ -602,7 +602,7 @@ func (s *WhisperMailboxSuite) postMessageToPrivate(rpcCli *rpc.Client, bobPubkey
 	return postResp.Result.(string)
 }
 
-func (s *WhisperMailboxSuite) postMessageToGroup(rpcCli *rpc.Client, groupChatKeyID string, topic string, payload string) common.Hash {
+func (s *WhisperMailboxSuite) postMessageToGroup(rpcCli *rpc.Client, groupChatKeyID string, topic string, payload string) string {
 	resp := rpcCli.CallRaw(`{
 		"jsonrpc": "2.0",
 		"method": "shh_post",
@@ -621,16 +621,14 @@ func (s *WhisperMailboxSuite) postMessageToGroup(rpcCli *rpc.Client, groupChatKe
 	s.Require().NoError(err)
 	s.Require().Nil(postResp.Error)
 
-	hashString, ok := postResp.Result.(string)
+	hash, ok := postResp.Result.(string)
 	if !ok {
 		s.FailNow("error decoding result", "expected string, got: %+v", postResp.Result)
 	}
 
-	if !strings.HasPrefix(hashString, "0x") {
-		s.FailNow("error decoding envelope hash", "expected hex string, got: %+v", hashString)
+	if !strings.HasPrefix(hash, "0x") {
+		s.FailNow("hash format error", "expected hex string, got: %s", hash)
 	}
-
-	hash := common.HexToHash(hashString)
 
 	return hash
 }
@@ -701,7 +699,7 @@ func (s *WhisperMailboxSuite) requestHistoricMessages(w *whisper.Whisper, rpcCli
 					"topic":"` + topic + `",
 					"symKeyID":"` + mailServerKeyID + `",
 					"from":` + strconv.FormatInt(from.Unix(), 10) + `,
-					"to":` + strconv.FormatInt(to.Unix(), 10) + `
+					"to":` + strconv.FormatInt(to.Unix(), 10) + `,
 					"limit": ` + fmt.Sprintf("%d", limit) + `,
 					"cursor": "` + cursor + `"
 		}]
