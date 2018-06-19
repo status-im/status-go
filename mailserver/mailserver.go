@@ -243,13 +243,12 @@ func (s *WMailServer) processRequest(peer *whisper.Peer, lower, upper uint32, bl
 	var (
 		sentEnvelopes     uint32
 		sentEnvelopesSize int64
-		limitReached      bool
 		lastCursor        cursorType
 	)
 
 	start := time.Now()
 
-	for !limitReached && i.Prev() {
+	for i.Prev() {
 		var envelope whisper.Envelope
 		err = rlp.DecodeBytes(i.Value(), &envelope)
 		if err != nil {
@@ -271,7 +270,6 @@ func (s *WMailServer) processRequest(peer *whisper.Peer, lower, upper uint32, bl
 			sentEnvelopesSize += whisper.EnvelopeHeaderLength + int64(len(envelope.Data))
 
 			if limit != 0 && sentEnvelopes == limit {
-				limitReached = true
 				lastCursor = i.Key()
 				break
 			}
