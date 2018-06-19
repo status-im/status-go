@@ -267,7 +267,7 @@ func testResetChainData(t *testing.T) bool {
 		return false
 	}
 
-	EnsureNodeSync(statusAPI.StatusNode().EnsureSync)
+	EnsureNodeSync(statusBackend.StatusNode().EnsureSync)
 	testCompleteTransaction(t)
 
 	return true
@@ -275,17 +275,17 @@ func testResetChainData(t *testing.T) bool {
 
 func testStopResumeNode(t *testing.T) bool { //nolint: gocyclo
 	// to make sure that we start with empty account (which might have gotten populated during previous tests)
-	if err := statusAPI.Logout(); err != nil {
+	if err := statusBackend.Logout(); err != nil {
 		t.Fatal(err)
 	}
 
-	whisperService, err := statusAPI.StatusNode().WhisperService()
+	whisperService, err := statusBackend.StatusNode().WhisperService()
 	if err != nil {
 		t.Errorf("whisper service not running: %v", err)
 	}
 
 	// create an account
-	address1, pubKey1, _, err := statusAPI.CreateAccount(TestConfig.Account1.Password)
+	address1, pubKey1, _, err := statusBackend.AccountManager().CreateAccount(TestConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("could not create account: %v", err)
 		return false
@@ -366,7 +366,7 @@ func testStopResumeNode(t *testing.T) bool { //nolint: gocyclo
 	time.Sleep(10 * time.Second) // allow to start (instead of using blocking version of start, of filter event)
 
 	// now, verify that we still have account logged in
-	whisperService, err = statusAPI.StatusNode().WhisperService()
+	whisperService, err = statusBackend.StatusNode().WhisperService()
 	if err != nil {
 		t.Errorf("whisper service not running: %v", err)
 	}
@@ -417,11 +417,11 @@ func testCallPrivateRPCWithPrivateAPI(t *testing.T) bool {
 
 func testCreateChildAccount(t *testing.T) bool { //nolint: gocyclo
 	// to make sure that we start with empty account (which might get populated during previous tests)
-	if err := statusAPI.Logout(); err != nil {
+	if err := statusBackend.Logout(); err != nil {
 		t.Fatal(err)
 	}
 
-	keyStore, err := statusAPI.StatusNode().AccountKeyStore()
+	keyStore, err := statusBackend.StatusNode().AccountKeyStore()
 	if err != nil {
 		t.Error(err)
 		return false
@@ -475,7 +475,7 @@ func testCreateChildAccount(t *testing.T) bool { //nolint: gocyclo
 		return false
 	}
 
-	err = statusAPI.SelectAccount(address, TestConfig.Account1.Password)
+	err = statusBackend.SelectAccount(address, TestConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("Test failed: could not select account: %v", err)
 		return false
@@ -552,10 +552,10 @@ func testCreateChildAccount(t *testing.T) bool { //nolint: gocyclo
 }
 
 func testRecoverAccount(t *testing.T) bool { //nolint: gocyclo
-	keyStore, _ := statusAPI.StatusNode().AccountKeyStore()
+	keyStore, _ := statusBackend.StatusNode().AccountKeyStore()
 
 	// create an account
-	address, pubKey, mnemonic, err := statusAPI.CreateAccount(TestConfig.Account1.Password)
+	address, pubKey, mnemonic, err := statusBackend.AccountManager().CreateAccount(TestConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("could not create account: %v", err)
 		return false
@@ -643,7 +643,7 @@ func testRecoverAccount(t *testing.T) bool { //nolint: gocyclo
 	}
 
 	// time to login with recovered data
-	whisperService, err := statusAPI.StatusNode().WhisperService()
+	whisperService, err := statusBackend.StatusNode().WhisperService()
 	if err != nil {
 		t.Errorf("whisper service not running: %v", err)
 	}
@@ -652,7 +652,7 @@ func testRecoverAccount(t *testing.T) bool { //nolint: gocyclo
 	if whisperService.HasKeyPair(pubKeyCheck) {
 		t.Error("identity already present in whisper")
 	}
-	err = statusAPI.SelectAccount(addressCheck, TestConfig.Account1.Password)
+	err = statusBackend.SelectAccount(addressCheck, TestConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("Test failed: could not select account: %v", err)
 		return false
@@ -666,20 +666,20 @@ func testRecoverAccount(t *testing.T) bool { //nolint: gocyclo
 
 func testAccountSelect(t *testing.T) bool { //nolint: gocyclo
 	// test to see if the account was injected in whisper
-	whisperService, err := statusAPI.StatusNode().WhisperService()
+	whisperService, err := statusBackend.StatusNode().WhisperService()
 	if err != nil {
 		t.Errorf("whisper service not running: %v", err)
 	}
 
 	// create an account
-	address1, pubKey1, _, err := statusAPI.CreateAccount(TestConfig.Account1.Password)
+	address1, pubKey1, _, err := statusBackend.AccountManager().CreateAccount(TestConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("could not create account: %v", err)
 		return false
 	}
 	t.Logf("Account created: {address: %s, key: %s}", address1, pubKey1)
 
-	address2, pubKey2, _, err := statusAPI.CreateAccount(TestConfig.Account1.Password)
+	address2, pubKey2, _, err := statusBackend.AccountManager().CreateAccount(TestConfig.Account1.Password)
 	if err != nil {
 		t.Error("Test failed: could not create account")
 		return false
@@ -749,14 +749,14 @@ func testAccountSelect(t *testing.T) bool { //nolint: gocyclo
 }
 
 func testAccountLogout(t *testing.T) bool {
-	whisperService, err := statusAPI.StatusNode().WhisperService()
+	whisperService, err := statusBackend.StatusNode().WhisperService()
 	if err != nil {
 		t.Errorf("whisper service not running: %v", err)
 		return false
 	}
 
 	// create an account
-	address, pubKey, _, err := statusAPI.CreateAccount(TestConfig.Account1.Password)
+	address, pubKey, _, err := statusBackend.AccountManager().CreateAccount(TestConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("could not create account: %v", err)
 		return false
@@ -769,7 +769,7 @@ func testAccountLogout(t *testing.T) bool {
 	}
 
 	// select/login
-	err = statusAPI.SelectAccount(address, TestConfig.Account1.Password)
+	err = statusBackend.SelectAccount(address, TestConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("Test failed: could not select account: %v", err)
 		return false
@@ -802,12 +802,12 @@ func testAccountLogout(t *testing.T) bool {
 }
 
 func testCompleteTransaction(t *testing.T) bool {
-	signRequests := statusAPI.PendingSignRequests()
+	signRequests := statusBackend.PendingSignRequests()
 
-	EnsureNodeSync(statusAPI.StatusNode().EnsureSync)
+	EnsureNodeSync(statusBackend.StatusNode().EnsureSync)
 
 	// log into account from which transactions will be sent
-	if err := statusAPI.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password); err != nil {
+	if err := statusBackend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password); err != nil {
 		t.Errorf("cannot select account: %v. Error %q", TestConfig.Account1.Address, err)
 		return false
 	}
@@ -849,7 +849,7 @@ func testCompleteTransaction(t *testing.T) bool {
 	})
 
 	// this call blocks, up until Complete Transaction is called
-	txCheckHash, err := statusAPI.SendTransaction(context.TODO(), transactions.SendTxArgs{
+	txCheckHash, err := statusBackend.SendTransaction(context.TODO(), transactions.SendTxArgs{
 		From:  account.FromAddress(TestConfig.Account1.Address),
 		To:    account.ToAddress(TestConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
@@ -881,10 +881,10 @@ func testCompleteTransaction(t *testing.T) bool {
 }
 
 func testCompleteMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocyclo
-	signRequests := statusAPI.PendingSignRequests()
+	signRequests := statusBackend.PendingSignRequests()
 
 	// log into account from which transactions will be sent
-	if err := statusAPI.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password); err != nil {
+	if err := statusBackend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password); err != nil {
 		t.Errorf("cannot select account: %v", TestConfig.Account1.Address)
 		return false
 	}
@@ -913,7 +913,7 @@ func testCompleteMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocyc
 
 	//  this call blocks, and should return when DiscardQueuedTransaction() for a given tx id is called
 	sendTx := func() {
-		txHashCheck, err := statusAPI.SendTransaction(context.TODO(), transactions.SendTxArgs{
+		txHashCheck, err := statusBackend.SendTransaction(context.TODO(), transactions.SendTxArgs{
 			From:  account.FromAddress(TestConfig.Account1.Address),
 			To:    account.ToAddress(TestConfig.Account2.Address),
 			Value: (*hexutil.Big)(big.NewInt(1000000000000)),
@@ -1013,10 +1013,10 @@ func testCompleteMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocyc
 }
 
 func testDiscardTransaction(t *testing.T) bool { //nolint: gocyclo
-	signRequests := statusAPI.PendingSignRequests()
+	signRequests := statusBackend.PendingSignRequests()
 
 	// log into account from which transactions will be sent
-	if err := statusAPI.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password); err != nil {
+	if err := statusBackend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password); err != nil {
 		t.Errorf("cannot select account: %v", TestConfig.Account1.Address)
 		return false
 	}
@@ -1058,7 +1058,7 @@ func testDiscardTransaction(t *testing.T) bool { //nolint: gocyclo
 			}
 
 			// try completing discarded transaction
-			err := statusAPI.ApproveSignRequest(string(txID), TestConfig.Account1.Password).Error
+			err := statusBackend.ApproveSignRequest(string(txID), TestConfig.Account1.Password).Error
 			if err != sign.ErrSignReqNotFound {
 				t.Error("expects tx not found, but call to CompleteTransaction succeeded")
 				return
@@ -1094,7 +1094,7 @@ func testDiscardTransaction(t *testing.T) bool { //nolint: gocyclo
 	})
 
 	// this call blocks, and should return when DiscardQueuedTransaction() is called
-	txHashCheck, err := statusAPI.SendTransaction(context.TODO(), transactions.SendTxArgs{
+	txHashCheck, err := statusBackend.SendTransaction(context.TODO(), transactions.SendTxArgs{
 		From:  account.FromAddress(TestConfig.Account1.Address),
 		To:    account.ToAddress(TestConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
@@ -1126,10 +1126,10 @@ func testDiscardTransaction(t *testing.T) bool { //nolint: gocyclo
 }
 
 func testDiscardMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocyclo
-	signRequests := statusAPI.PendingSignRequests()
+	signRequests := statusBackend.PendingSignRequests()
 
 	// log into account from which transactions will be sent
-	if err := statusAPI.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password); err != nil {
+	if err := statusBackend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password); err != nil {
 		t.Errorf("cannot select account: %v", TestConfig.Account1.Address)
 		return false
 	}
@@ -1185,7 +1185,7 @@ func testDiscardMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocycl
 
 	// this call blocks, and should return when DiscardQueuedTransaction() for a given tx id is called
 	sendTx := func() {
-		txHashCheck, err := statusAPI.SendTransaction(context.TODO(), transactions.SendTxArgs{
+		txHashCheck, err := statusBackend.SendTransaction(context.TODO(), transactions.SendTxArgs{
 			From:  account.FromAddress(TestConfig.Account1.Address),
 			To:    account.ToAddress(TestConfig.Account2.Address),
 			Value: (*hexutil.Big)(big.NewInt(1000000000000)),
@@ -1472,7 +1472,7 @@ func startTestNode(t *testing.T) <-chan struct{} {
 			// sync
 			if syncRequired {
 				t.Logf("Sync is required")
-				EnsureNodeSync(statusAPI.StatusNode().EnsureSync)
+				EnsureNodeSync(statusBackend.StatusNode().EnsureSync)
 			} else {
 				time.Sleep(5 * time.Second)
 			}

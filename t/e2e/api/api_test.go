@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/params"
@@ -30,18 +29,18 @@ func TestAPI(t *testing.T) {
 
 type APITestSuite struct {
 	suite.Suite
-	api *api.StatusAPI
+	backend *api.StatusBackend
 }
 
 func (s *APITestSuite) ensureNodeStopped() {
-	if err := s.api.StopNode(); err != node.ErrNoRunningNode && err != nil {
+	if err := s.backend.StopNode(); err != node.ErrNoRunningNode && err != nil {
 		s.NoError(err, "unexpected error")
 	}
 }
 
 func (s *APITestSuite) SetupTest() {
-	s.api = api.NewStatusAPI()
-	s.NotNil(s.api)
+	s.backend = api.NewStatusBackend()
+	s.NotNil(s.backend)
 }
 
 func (s *APITestSuite) TestCHTUpdate() {
@@ -76,29 +75,25 @@ func (s *APITestSuite) TestRaceConditions() {
 
 	var funcsToTest = []func(*params.NodeConfig){
 		func(config *params.NodeConfig) {
-			log.Info("StartNodeAsync()")
-			s.api.StartNodeAsync(config)
-			s.T().Logf("StartNodeAsync() for network: %d", config.NetworkID)
+			s.T().Logf("async call to StartNode() for network: %d", config.NetworkID)
+			api.RunAsync(func() error { return s.backend.StartNode(config) })
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
-			log.Info("StopNodeAsync()")
-			s.api.StopNodeAsync()
-			s.T().Logf("StopNodeAsync()")
+			s.T().Logf("async call to StopNode() for network: %d", config.NetworkID)
+			api.RunAsync(s.backend.StopNode)
 			progress <- struct{}{}
 		},
 		func(config *params.NodeConfig) {
-			log.Info("RestartNodeAsync()")
-			s.api.RestartNodeAsync()
-			s.T().Logf("RestartNodeAsync()")
+			s.T().Logf("async call to RestartNode() for network: %d", config.NetworkID)
+			api.RunAsync(s.backend.RestartNode)
 			progress <- struct{}{}
 		},
 		// TODO(adam): quarantined until it uses a different datadir
 		// as otherwise it wipes out cached blockchain data.
 		// func(config *params.NodeConfig) {
-		//	log.Info("ResetChainDataAsync()")
-		//	_, err := s.api.ResetChainDataAsync()
-		//	s.T().Logf("ResetChainDataAsync(), error: %v", err)
+		// s.T().Logf("async call to ResetChainData() for network: %d", config.NetworkID)
+		//	_, err := s.api.ResetChainData()
 		//	progress <- struct{}{}
 		// },
 	}
@@ -141,29 +136,29 @@ func (s *APITestSuite) TestCellsRemovedAfterSwitchAccount() {
 
 	config, err := MakeTestNodeConfig(GetNetworkID())
 	require.NoError(err)
-	err = s.api.StartNode(config)
+	err = s.backend.StartNode(config)
 	require.NoError(err)
-	defer s.api.StopNode() //nolint: errcheck
+	defer s.backend.StopNode() //nolint: errcheck
 
-	address1, _, _, err := s.api.AccountManager().CreateAccount(TestConfig.Account1.Password)
-	require.NoError(err)
-
-	address2, _, _, err := s.api.AccountManager().CreateAccount(TestConfig.Account2.Password)
+	address1, _, _, err := s.backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
 	require.NoError(err)
 
-	err = s.api.SelectAccount(address1, TestConfig.Account1.Password)
+	address2, _, _, err := s.backend.AccountManager().CreateAccount(TestConfig.Account2.Password)
+	require.NoError(err)
+
+	err = s.backend.SelectAccount(address1, TestConfig.Account1.Password)
 	require.NoError(err)
 
 	for i := 0; i < itersCount; i++ {
-		_, e := s.api.JailManager().CreateCell(getChatID(i))
+		_, e := s.backend.JailManager().CreateCell(getChatID(i))
 		require.NoError(e)
 	}
 
-	err = s.api.SelectAccount(address2, TestConfig.Account2.Password)
+	err = s.backend.SelectAccount(address2, TestConfig.Account2.Password)
 	require.NoError(err)
 
 	for i := 0; i < itersCount; i++ {
-		_, e := s.api.JailManager().Cell(getChatID(i))
+		_, e := s.backend.JailManager().Cell(getChatID(i))
 		require.Error(e)
 	}
 }
@@ -178,22 +173,22 @@ func (s *APITestSuite) TestLogoutRemovesCells() {
 
 	config, err := MakeTestNodeConfig(GetNetworkID())
 	require.NoError(err)
-	err = s.api.StartNode(config)
+	err = s.backend.StartNode(config)
 	require.NoError(err)
-	defer s.api.StopNode() //nolint: errcheck
+	defer s.backend.StopNode() //nolint: errcheck
 
-	address1, _, _, err := s.api.AccountManager().CreateAccount(TestConfig.Account1.Password)
-	require.NoError(err)
-
-	err = s.api.SelectAccount(address1, TestConfig.Account1.Password)
+	address1, _, _, err := s.backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
 	require.NoError(err)
 
-	s.api.JailManager().CreateAndInitCell(testChatID)
-
-	err = s.api.Logout()
+	err = s.backend.SelectAccount(address1, TestConfig.Account1.Password)
 	require.NoError(err)
 
-	_, err = s.api.JailManager().Cell(testChatID)
+	s.backend.JailManager().CreateAndInitCell(testChatID)
+
+	err = s.backend.Logout()
+	require.NoError(err)
+
+	_, err = s.backend.JailManager().Cell(testChatID)
 	require.Error(err, "Expected that cells was removed")
 }
 
@@ -216,14 +211,14 @@ func (s *APITestSuite) TestEventsNodeStartStop() {
 
 	nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
-	s.NoError(s.api.StartNode(nodeConfig))
-	s.NoError(s.api.StopNode())
+	s.NoError(s.backend.StartNode(nodeConfig))
+	s.NoError(s.backend.StopNode())
 	s.verifyEnvelopes(envelopes, signal.EventNodeStarted, signal.EventNodeReady, signal.EventNodeStopped)
-	s.NoError(s.api.StartNode(nodeConfig))
+	s.NoError(s.backend.StartNode(nodeConfig))
 	s.verifyEnvelopes(envelopes, signal.EventNodeStarted, signal.EventNodeReady)
-	s.NoError(s.api.RestartNode())
+	s.NoError(s.backend.RestartNode())
 	s.verifyEnvelopes(envelopes, signal.EventNodeStopped, signal.EventNodeStarted, signal.EventNodeReady)
-	s.NoError(s.api.StopNode())
+	s.NoError(s.backend.StopNode())
 	s.verifyEnvelopes(envelopes, signal.EventNodeStopped)
 }
 
@@ -266,7 +261,7 @@ func (s *APITestSuite) TestNodeStartCrash() {
 	s.NoError(err)
 
 	// now try starting using node manager, it should fail (error is irrelevant as it is implementation detail)
-	s.Error(<-s.api.StartNodeAsync(nodeConfig))
+	s.Error(<-api.RunAsync(func() error { return s.backend.StartNode(nodeConfig) }))
 
 	select {
 	case <-time.After(500 * time.Millisecond):
@@ -277,7 +272,7 @@ func (s *APITestSuite) TestNodeStartCrash() {
 	// stop outside node, and re-try
 	s.NoError(outsideNode.Stop())
 	signalReceived = make(chan struct{})
-	s.NoError(<-s.api.StartNodeAsync(nodeConfig))
+	s.NoError(<-api.RunAsync(func() error { return s.backend.StartNode(nodeConfig) }))
 
 	select {
 	case <-time.After(500 * time.Millisecond):
@@ -286,5 +281,5 @@ func (s *APITestSuite) TestNodeStartCrash() {
 	}
 
 	// cleanup
-	s.NoError(s.api.StopNode())
+	s.NoError(s.backend.StopNode())
 }
