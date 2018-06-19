@@ -54,8 +54,7 @@ var (
 )
 
 const (
-	dbKeyLength  = common.HashLength + 4
-	cursorLength = common.HashLength + dbKeyLength
+	dbKeyLength = common.HashLength + 4
 )
 
 type cursorType []byte
@@ -337,7 +336,7 @@ func (s *WMailServer) validateRequest(peerID []byte, request *whisper.Envelope) 
 	}
 
 	var cursor cursorType
-	if len(decrypted.Payload) == 8+whisper.BloomFilterSize+4+cursorLength {
+	if len(decrypted.Payload) == 8+whisper.BloomFilterSize+4+dbKeyLength {
 		cursor = decrypted.Payload[8+whisper.BloomFilterSize+4:]
 	}
 

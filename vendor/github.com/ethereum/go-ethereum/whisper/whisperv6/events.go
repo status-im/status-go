@@ -26,4 +26,5 @@ type EnvelopeEvent struct {
 	Event EventType
 	Hash  common.Hash
 	Peer  discover.NodeID
+	Data  interface{}
 }

@@ -835,15 +835,19 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 			}
 		case p2pRequestCompleteCode:
 			if p.trusted {
-				var requestID common.Hash
-				if err := packet.Decode(&requestID); err != nil {
+				var payload []byte
+				if err := packet.Decode(&payload); err != nil {
 					log.Warn("failed to decode response message, peer will be disconnected", "peer", p.peer.ID(), "err", err)
 					return errors.New("invalid request response message")
 				}
 
+				requestID := common.BytesToHash(payload[:common.HashLength])
+				cursor := payload[common.HashLength:]
+
 				whisper.envelopeFeed.Send(EnvelopeEvent{
 					Hash:  requestID,
 					Event: EventMailServerRequestCompleted,
+					Data:  cursor,
 				})
 			}
 		default:
