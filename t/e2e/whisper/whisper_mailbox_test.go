@@ -394,21 +394,42 @@ func (s *WhisperMailboxSuite) TestRequestMessagesWithPagination() {
 	s.Require().NoError(err)
 	mailboxEnode := mailbox.StatusNode().GethNode().Server().NodeInfo().Enode
 
+	getMessages := func() int {
+		messages := s.getMessagesByMessageFilterID(receiverRPCClient, filterID)
+		for _, msg := range messages {
+			check, ok := sentEnvelopes[msg["hash"].(string)]
+			if !ok {
+				s.FailNow("error receiving messages", "unexpected message received", msg)
+			}
+
+			check.retrieved = true
+		}
+
+		return len(messages)
+	}
+
 	// first page
 	limit := 3
 	s.requestHistoricMessages(receiverWhisperService, receiverRPCClient, mailboxEnode, mailServerKeyID, topic.String(), limit, "")
 	cursor := s.waitForMailServerResponse(receiverEvents)
-	messages := s.getMessagesByMessageFilterID(receiverRPCClient, filterID)
-	s.Equal(3, len(messages))
+	receivedCount := getMessages()
+	s.Equal(3, receivedCount)
 	s.NotEmpty(cursor)
 
 	// second page
 	cursorHex := fmt.Sprintf("%x", cursor)
 	s.requestHistoricMessages(receiverWhisperService, receiverRPCClient, mailboxEnode, mailServerKeyID, topic.String(), limit, cursorHex)
 	cursor = s.waitForMailServerResponse(receiverEvents)
-	messages = s.getMessagesByMessageFilterID(receiverRPCClient, filterID)
-	s.Equal(2, len(messages))
+	receivedCount = getMessages()
+	s.Equal(2, receivedCount)
 	s.Empty(cursor)
+
+	// check that all envelopes have been retrieved
+	for hash, check := range sentEnvelopes {
+		if !check.retrieved {
+			s.FailNow("error retrieving messages", "envelope %x has not been retrieved", hash)
+		}
+	}
 }
 
 func (s *WhisperMailboxSuite) waitForMailServerResponse(events chan whisper.EnvelopeEvent) []byte {
