@@ -58,6 +58,7 @@ linters:
     - megacheck
     #- misspell
     - structcheck
+    - typecheck
     - unconvert
     - varcheck
   fast: false
