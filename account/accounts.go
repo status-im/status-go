@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/status-im/status-go/extkeys"
 )
@@ -287,7 +288,7 @@ func (m *Manager) importExtendedKey(extKey *extkeys.ExtendedKey, password string
 	if err != nil {
 		return address, "", err
 	}
-	pubKey = gethcommon.ToHex(crypto.FromECDSAPub(&key.PrivateKey.PublicKey))
+	pubKey = hexutil.Encode(crypto.FromECDSAPub(&key.PrivateKey.PublicKey))
 
 	return
 }

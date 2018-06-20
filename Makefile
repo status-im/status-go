@@ -226,6 +226,11 @@ dep-install: ##@dependencies Install vendoring tool
 
 update-geth: ##@dependencies Update geth (use GETH_BRANCH to optionally set the geth branch name)
 	./_assets/ci/update-geth.sh $(GETH_BRANCH)
+	@echo "**************************************************************"
+	@echo "NOTE: Don't forget to:"
+	@echo "- update the goleveldb dependency revision in Gopkg.toml to match the version used in go-ethereum"
+	@echo "- reconcile any changes to interfaces in transactions/fake (such as PublicTransactionPoolAPI), which are copies from internal geth interfaces"
+	@echo "**************************************************************"
 
 patch: ##@patching Revert and apply all patches
 	./_assets/patches/patcher

@@ -432,13 +432,11 @@ func (api *SignerAPI) EcRecover(ctx context.Context, data, sig hexutil.Bytes) (c
 	}
 	sig[64] -= 27 // Transform yellow paper V from 27/28 to 0/1
 	hash, _ := SignHash(data)
-	rpk, err := crypto.Ecrecover(hash, sig)
+	rpk, err := crypto.SigToPub(hash, sig)
 	if err != nil {
 		return common.Address{}, err
 	}
-	pubKey := crypto.ToECDSAPub(rpk)
-	recoveredAddr := crypto.PubkeyToAddress(*pubKey)
-	return recoveredAddr, nil
+	return crypto.PubkeyToAddress(*rpk), nil
 }
 
 // SignHash is a helper function that calculates a hash for the given message that can be
@@ -474,7 +472,7 @@ func (api *SignerAPI) Export(ctx context.Context, addr common.Address) (json.Raw
 	return ioutil.ReadFile(wallet.URL().Path)
 }
 
-// Imports tries to import the given keyJSON in the local keystore. The keyJSON data is expected to be
+// Import tries to import the given keyJSON in the local keystore. The keyJSON data is expected to be
 // in web3 keystore format. It will decrypt the keyJSON with the given passphrase and on successful
 // decryption it will encrypt the key with the given newPassphrase and store it in the keystore.
 func (api *SignerAPI) Import(ctx context.Context, keyJSON json.RawMessage) (Account, error) {

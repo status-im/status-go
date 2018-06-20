@@ -1,8 +1,8 @@
 diff --git a/whisper/whisperv5/whisper.go b/whisper/whisperv5/whisper.go
-index 85849ccc..3b75e53a 100644
+index 62bd1ce17..cec233cb0 100644
 --- a/whisper/whisperv5/whisper.go
 +++ b/whisper/whisperv5/whisper.go
-@@ -499,7 +499,7 @@ func (wh *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
+@@ -499,7 +499,7 @@ func (w *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
  		// fetch the next packet
  		packet, err := rw.ReadMsg()
  		if err != nil {
@@ -10,12 +10,12 @@ index 85849ccc..3b75e53a 100644
 +			log.Info("message loop", "peer", p.peer.ID(), "err", err)
  			return err
  		}
- 		if packet.Size > wh.MaxMessageSize() {
+ 		if packet.Size > w.MaxMessageSize() {
 diff --git a/whisper/whisperv6/whisper.go b/whisper/whisperv6/whisper.go
-index 4a7b0065..91d44821 100644
+index 880cced09..91d448217 100644
 --- a/whisper/whisperv6/whisper.go
 +++ b/whisper/whisperv6/whisper.go
-@@ -747,7 +747,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
+@@ -650,7 +747,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
  		// fetch the next packet
  		packet, err := rw.ReadMsg()
  		if err != nil {

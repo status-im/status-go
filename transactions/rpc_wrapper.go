@@ -62,7 +62,7 @@ func (w *rpcWrapper) SendTransaction(ctx context.Context, tx *types.Transaction)
 	if err != nil {
 		return err
 	}
-	return w.rpcClient.CallContext(ctx, nil, "eth_sendRawTransaction", common.ToHex(data))
+	return w.rpcClient.CallContext(ctx, nil, "eth_sendRawTransaction", hexutil.Encode(data))
 }
 
 func toCallArg(msg ethereum.CallMsg) interface{} {

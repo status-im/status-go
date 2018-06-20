@@ -25,6 +25,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/bitutil"
 	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
@@ -58,18 +59,18 @@ type trustedCheckpoint struct {
 var (
 	mainnetCheckpoint = trustedCheckpoint{
 		name:          "mainnet",
-		sectionIdx:    165,
-		sectionHead:   common.HexToHash("21028acf9cd9ce80257221adc437c3c58ce046c4d43c21c3e9b1d1349059ec73"),
-		chtRoot:       common.HexToHash("26b2458cb7d0080d3a39311c914be92c368777a65ec074e1893b8bdc79e3910a"),
-		bloomTrieRoot: common.HexToHash("5d06908769179186165a72db7fc3473b25c28ed27efe78a392a9ff2c3fa67f84"),
+		sectionIdx:    174,
+		sectionHead:   common.HexToHash("a3ef48cd8f1c3a08419f0237fc7763491fe89497b3144b17adf87c1c43664613"),
+		chtRoot:       common.HexToHash("dcbeed9f4dea1b3cb75601bb27c51b9960c28e5850275402ac49a150a667296e"),
+		bloomTrieRoot: common.HexToHash("6b7497a4a03e33870a2383cb6f5e70570f12b1bf5699063baf8c71d02ca90b02"),
 	}
 
 	ropstenCheckpoint = trustedCheckpoint{
 		name:          "ropsten",
-		sectionIdx:    92,
-		sectionHead:   common.HexToHash("21a158f9cc643da13a237cafceb37381072649f7278cf98c5820bfbced7cfcec"),
-		chtRoot:       common.HexToHash("1a8ddb8b086d7a33ca90eea90730225948fa504ae0283b15aff3c15c0e089bf9"),
-		bloomTrieRoot: common.HexToHash("fd192f92afbcdd0020c81ca0625116b5995509659653b10123bd986fe5129cc1"),
+		sectionIdx:    102,
+		sectionHead:   common.HexToHash("9017ab08465cb2b2dee035ee5b817bbd7fa28e2c8d2cd903e0aed1cccb249e89"),
+		chtRoot:       common.HexToHash("f61c10a7a787a5ef15f0ae1ae6c13c64331e57e79d0466d2bd9b0c06833fe956"),
+		bloomTrieRoot: common.HexToHash("69f2ad19aa46d5213a90137b3d2c9bff8a7c9483f7170f0125096ff450c9a873"),
 	}
 )
 
@@ -161,7 +162,7 @@ func (c *ChtIndexerBackend) Process(header *types.Header) {
 	hash, num := header.Hash(), header.Number.Uint64()
 	c.lastHash = hash
 
-	td := core.GetTd(c.diskdb, hash, num)
+	td := rawdb.ReadTd(c.diskdb, hash, num)
 	if td == nil {
 		panic(nil)
 	}
@@ -272,7 +273,7 @@ func (b *BloomTrieIndexerBackend) Commit() error {
 		binary.BigEndian.PutUint64(encKey[2:10], b.section)
 		var decomp []byte
 		for j := uint64(0); j < b.bloomTrieRatio; j++ {
-			data, err := core.GetBloomBits(b.diskdb, i, b.section*b.bloomTrieRatio+j, b.sectionHeads[j])
+			data, err := rawdb.ReadBloomBits(b.diskdb, i, b.section*b.bloomTrieRatio+j, b.sectionHeads[j])
 			if err != nil {
 				return err
 			}
