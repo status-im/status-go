@@ -2,6 +2,7 @@ package transactions
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"sync"
 	"time"
@@ -164,7 +165,7 @@ func (t *Transactor) validateAndPropagate(selectedAccount *account.SelectedExtKe
 			return hash, err
 		}
 		if gas < defaultGas {
-			t.log.Info("default gas will be used. estimated gas", gas, "is lower than", defaultGas)
+			t.log.Info(fmt.Sprintf("default gas will be used. estimated gas %v is lower than %v", gas, defaultGas))
 			gas = defaultGas
 		}
 	} else {
