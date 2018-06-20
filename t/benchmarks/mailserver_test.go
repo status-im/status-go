@@ -79,13 +79,13 @@ func testMailserverPeer(t *testing.T) {
 	ok, err := shhAPI.MarkTrustedPeer(context.TODO(), *peerURL)
 	require.NoError(t, err)
 	require.True(t, ok)
-	ok, err = shhextAPI.RequestMessages(context.TODO(), shhext.MessagesRequest{
+	hash, err := shhextAPI.RequestMessages(context.TODO(), shhext.MessagesRequest{
 		MailServerPeer: *peerURL,
 		SymKeyID:       symKeyID,
 		Topic:          topic,
 	})
 	require.NoError(t, err)
-	require.True(t, ok)
+	require.NotNil(t, hash)
 	// wait for all messages
 	require.NoError(t, waitForMessages(t, *msgCount, shhAPI, filterID))
 }
