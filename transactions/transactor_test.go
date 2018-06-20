@@ -58,7 +58,7 @@ func (s *TxQueueTestSuite) SetupTest() {
 	s.client = gethrpc.DialInProc(s.server)
 	rpcClient, _ := rpc.NewClient(s.client, params.UpstreamRPCConfig{})
 	// expected by simulated backend
-	chainID := gethparams.AllEthashProtocolChanges.ChainId.Uint64()
+	chainID := gethparams.AllEthashProtocolChanges.ChainID.Uint64()
 	nodeConfig, err := params.NewNodeConfig("/tmp", "", chainID)
 	s.Require().NoError(err)
 	s.nodeConfig = nodeConfig
@@ -93,7 +93,7 @@ func (s *TxQueueTestSuite) setupTransactionPoolAPI(args SendTxArgs, returnNonce,
 		usedGasPrice = (*big.Int)(signArgs.GasPrice)
 	} else if args.GasPrice == nil {
 		usedGasPrice = (*big.Int)(testGasPrice)
-		s.txServiceMock.EXPECT().GasPrice(gomock.Any()).Return(usedGasPrice, nil)
+		s.txServiceMock.EXPECT().GasPrice(gomock.Any()).Return(testGasPrice, nil)
 	} else {
 		usedGasPrice = (*big.Int)(args.GasPrice)
 	}

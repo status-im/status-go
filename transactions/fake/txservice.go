@@ -2,7 +2,6 @@ package fake
 
 import (
 	"context"
-	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -34,7 +33,7 @@ type CallArgs struct {
 // This was done because PublicTransactionPoolAPI is located in internal/ethapi module
 // and there is no easy way to generate mocks from internal modules.
 type PublicTransactionPoolAPI interface {
-	GasPrice(ctx context.Context) (*big.Int, error)
+	GasPrice(ctx context.Context) (*hexutil.Big, error)
 	EstimateGas(ctx context.Context, args CallArgs) (hexutil.Uint64, error)
 	GetTransactionCount(ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (*hexutil.Uint64, error)
 	SendRawTransaction(ctx context.Context, encodedTx hexutil.Bytes) (common.Hash, error)

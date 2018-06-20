@@ -69,6 +69,7 @@
     "contracts/ens/contract",
     "core",
     "core/bloombits",
+    "core/rawdb",
     "core/state",
     "core/types",
     "core/vm",
@@ -111,8 +112,17 @@
     "trie",
     "whisper/whisperv6"
   ]
-  revision = "cbdaa0ca2a955012274bd2c47bd52b24b2beb66c"
-  version = "v1.8.5"
+  revision = "dea1ce052a10cd7d401a5c04f83f371a06fe293c"
+  version = "v1.8.11"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/fjl/memsize"
+  packages = [
+    ".",
+    "memsizeui"
+  ]
+  revision = "f6d5545993d68e9e42df43eb57958f898dea3623"
 
 [[projects]]
   name = "github.com/go-playground/locales"
@@ -268,7 +278,7 @@
     "leveldb/table",
     "leveldb/util"
   ]
-  revision = "169b1b37be738edb2813dab48c97a549bcf99bb5"
+  revision = "5d6fca44a948d2be89a9702de7717f0168403d3d"
 
 [[projects]]
   branch = "master"
@@ -411,6 +421,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "7af71825062ab2d5a534251f37b163ad375a08e4b2790ae8f8d910d0b7e7f81f"
+  inputs-digest = "4bb7fa15b76f4e97c720c5d161faaa6594cd846bb24271009239dbb87d3399bf"
   solver-name = "gps-cdcl"
   solver-version = 1

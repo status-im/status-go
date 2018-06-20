@@ -10,7 +10,6 @@ import (
 	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
 	rpc "github.com/ethereum/go-ethereum/rpc"
 	gomock "github.com/golang/mock/gomock"
-	big "math/big"
 	reflect "reflect"
 )
 
@@ -38,9 +37,9 @@ func (m *MockPublicTransactionPoolAPI) EXPECT() *MockPublicTransactionPoolAPIMoc
 }
 
 // GasPrice mocks base method
-func (m *MockPublicTransactionPoolAPI) GasPrice(ctx context.Context) (*big.Int, error) {
+func (m *MockPublicTransactionPoolAPI) GasPrice(ctx context.Context) (*hexutil.Big, error) {
 	ret := m.ctrl.Call(m, "GasPrice", ctx)
-	ret0, _ := ret[0].(*big.Int)
+	ret0, _ := ret[0].(*hexutil.Big)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

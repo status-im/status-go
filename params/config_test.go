@@ -174,7 +174,7 @@ var loadConfigTestCases = []struct {
 
 			require.Empty(t, chainConfig.EIP155Block.Cmp(refChainConfig.EIP155Block))
 			require.Empty(t, chainConfig.EIP158Block.Cmp(refChainConfig.EIP158Block))
-			require.Empty(t, chainConfig.ChainId.Cmp(refChainConfig.ChainId))
+			require.Empty(t, chainConfig.ChainID.Cmp(refChainConfig.ChainID))
 		},
 	},
 	{
@@ -206,7 +206,7 @@ var loadConfigTestCases = []struct {
 			require.Equal(t, gethparams.MainnetChainConfig.EIP150Hash, chainConfig.EIP150Hash)
 			require.Empty(t, chainConfig.EIP155Block.Cmp(gethparams.MainnetChainConfig.EIP155Block))
 			require.Empty(t, chainConfig.EIP158Block.Cmp(gethparams.MainnetChainConfig.EIP158Block))
-			require.Empty(t, chainConfig.ChainId.Cmp(gethparams.MainnetChainConfig.ChainId))
+			require.Empty(t, chainConfig.ChainID.Cmp(gethparams.MainnetChainConfig.ChainID))
 		},
 	},
 	{
