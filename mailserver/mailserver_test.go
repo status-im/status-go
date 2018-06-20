@@ -170,16 +170,15 @@ func (s *MailserverSuite) TestRequestPaginationLimit() {
 	s.setupServer(s.server)
 	defer s.server.Close()
 
-	count := uint32(10)
-
 	var (
 		sentEnvelopes     []*whisper.Envelope
-		sentHashes        []common.Hash
 		reverseSentHashes []common.Hash
 		receivedHashes    []common.Hash
 		archiveKeys       []string
 	)
+
 	now := time.Now()
+	count := uint32(10)
 
 	for i := count; i > 0; i-- {
 		sentTime := now.Add(time.Duration(-i) * time.Second)
@@ -189,7 +188,6 @@ func (s *MailserverSuite) TestRequestPaginationLimit() {
 		s.NoError(err)
 		archiveKeys = append(archiveKeys, fmt.Sprintf("%x", key))
 		sentEnvelopes = append(sentEnvelopes, env)
-		sentHashes = append(sentHashes, env.Hash())
 		reverseSentHashes = append([]common.Hash{env.Hash()}, reverseSentHashes...)
 	}
 
@@ -238,7 +236,7 @@ func (s *MailserverSuite) TestMailServer() {
 	env, err := generateEnvelope(time.Now())
 	s.NoError(err)
 
-	_, err := s.server.Archive(env)
+	_, err = s.server.Archive(env)
 	s.NoError(err)
 
 	testCases := []struct {
