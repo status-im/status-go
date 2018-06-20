@@ -39,13 +39,12 @@ var keyID string
 var seed = time.Now().Unix()
 
 type ServerTestParams struct {
-	topic  whisper.TopicType
-	birth  uint32
-	low    uint32
-	upp    uint32
-	limit  uint32
-	cursor []byte
-	key    *ecdsa.PrivateKey
+	topic whisper.TopicType
+	birth uint32
+	low   uint32
+	upp   uint32
+	limit uint32
+	key   *ecdsa.PrivateKey
 }
 
 func TestMailserverSuite(t *testing.T) {
@@ -239,7 +238,9 @@ func (s *MailserverSuite) TestMailServer() {
 	env, err := generateEnvelope(time.Now())
 	s.NoError(err)
 
-	s.server.Archive(env)
+	_, err := s.server.Archive(env)
+	s.NoError(err)
+
 	testCases := []struct {
 		params *ServerTestParams
 		expect bool

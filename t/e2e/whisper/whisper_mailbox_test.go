@@ -727,7 +727,10 @@ func (s *WhisperMailboxSuite) joinPublicChat(w *whisper.Whisper, rpcClient *rpc.
 	s.Require().NoError(err)
 
 	h := sha3.NewKeccak256()
-	h.Write([]byte(name))
+	_, err = h.Write([]byte(name))
+	if err != nil {
+		s.Fail("error generating topic", "failed gerating topic from chat name, %+v", err)
+	}
 	fullTopic := h.Sum(nil)
 	topic := whisper.BytesToTopic(fullTopic)
 
