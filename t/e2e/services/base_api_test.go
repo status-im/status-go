@@ -56,7 +56,7 @@ func (s *BaseJSONRPCSuite) isMethodExported(method string, private bool) bool {
 	return !(response.Error != nil && response.Error.Code == methodNotFoundErrorCode)
 }
 
-func (s *BaseJSONRPCSuite) SetupTest(upstreamEnabled, statusServiceEnabled, debugServiceEnabled bool) error {
+func (s *BaseJSONRPCSuite) SetupTest(upstreamEnabled, statusServiceEnabled, debugAPIEnabled bool) error {
 	s.Backend = api.NewStatusBackend()
 	s.NotNil(s.Backend)
 
@@ -65,7 +65,10 @@ func (s *BaseJSONRPCSuite) SetupTest(upstreamEnabled, statusServiceEnabled, debu
 
 	nodeConfig.IPCEnabled = false
 	nodeConfig.StatusServiceEnabled = statusServiceEnabled
-	nodeConfig.DebugServiceEnabled = debugServiceEnabled
+	nodeConfig.DebugAPIEnabled = debugAPIEnabled
+	if nodeConfig.DebugAPIEnabled {
+		nodeConfig.AddAPIModule("debug")
+	}
 	nodeConfig.HTTPHost = "" // to make sure that no HTTP interface is started
 
 	if upstreamEnabled {

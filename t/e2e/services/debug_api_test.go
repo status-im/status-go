@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -32,26 +33,30 @@ type DebugAPISuite struct {
 	upstream bool
 }
 
-func (s *DebugAPISuite) TestAccessibleDebugAPIs() {
+func (s *DebugAPISuite) TestAccessibleDebugAPIsUnexported() {
 	if s.upstream && GetNetworkID() == params.StatusChainNetworkID {
 		s.T().Skip()
 		return
 	}
 
-	err := s.SetupTest(s.upstream, false, true)
+	err := s.SetupTest(s.upstream, false, false)
+	s.NoError(err)
+	// Debug APIs should be unavailable
+	s.AssertAPIMethodUnexported("debug_postSync")
+	err = s.Backend.StopNode()
+	s.NoError(err)
+
+	err = s.SetupTest(s.upstream, false, true)
 	s.NoError(err)
 	defer func() {
 		err := s.Backend.StopNode()
 		s.NoError(err)
 	}()
-	// Debug APIs should be unavailable
-	s.AssertAPIMethodUnexported("debug_postSync")
-
-	// Debug  APIs should be available only for IPC
-	s.AssertAPIMethodExportedPrivately("debug_postSync")
+	// Debug APIs should be available
+	s.AssertAPIMethodExported("debug_postSync")
 }
 
-func (s *DebugAPISuite) TestDebugPostconfirmSuccess() {
+func (s *DebugAPISuite) TestDebugPostSyncSuccess() {
 	// Test upstream if that's not StatusChain
 	if s.upstream && GetNetworkID() == params.StatusChainNetworkID {
 		s.T().Skip()
@@ -65,7 +70,11 @@ func (s *DebugAPISuite) TestDebugPostconfirmSuccess() {
 		s.NoError(err)
 	}()
 
-	s.addPeerToCurrentNode()
+	dir, err := ioutil.TempDir("", "test-debug")
+	s.NoError(err)
+	defer os.RemoveAll(dir) //nolint: errcheck
+	s.addPeerToCurrentNode(dir)
+
 	symID := s.generateSymKey()
 	result := s.sendPostConfirmMessage(symID)
 
@@ -87,17 +96,6 @@ func (s *DebugAPISuite) generateSymKey() string {
 	symID, err := w.GenerateSymKey()
 	s.Require().NoError(err)
 
-	resp := s.Backend.CallRPC(`{"jsonrpc":"2.0","method":"shh_addSymKey",
-			"params":["` + symID + `"],
-			"id":1}`)
-	type returnedIDResponse struct {
-		Result string
-		Error  interface{}
-	}
-	symkeyAddResp := returnedIDResponse{}
-	err = json.Unmarshal([]byte(resp), &symkeyAddResp)
-	s.NoError(err)
-
 	return symID
 }
 
@@ -111,7 +109,8 @@ func (s *DebugAPISuite) sendPostConfirmMessage(symID string) string {
 		Topic:     whisper.TopicType{0x01, 0x01, 0x01, 0x01},
 		Payload:   []byte("hello"),
 	}
-	body, _ := json.Marshal(req)
+	body, err := json.Marshal(req)
+	s.NoError(err)
 
 	basicCall := fmt.Sprintf(
 		`{"jsonrpc":"2.0","method":"debug_postSync","params":[%s],"id":67}`,
@@ -121,20 +120,18 @@ func (s *DebugAPISuite) sendPostConfirmMessage(symID string) string {
 }
 
 // addPeers adds a peer to the running node
-func (s *DebugAPISuite) addPeerToCurrentNode() {
+func (s *DebugAPISuite) addPeerToCurrentNode(dir string) {
 	s.Require().NotNil(s.Backend)
 	node1 := s.Backend.StatusNode().GethNode()
 	s.NotNil(node1)
-	node2 := s.newPeer("test2").GethNode()
+	node2 := s.newPeer("test2", dir).GethNode()
 	s.NotNil(node2)
 
 	node1.Server().AddPeer(node2.Server().Self())
 }
 
 // newNode creates, configures and starts a new peer.
-func (s *DebugAPISuite) newPeer(name string) *node.StatusNode {
-	dir, err := ioutil.TempDir("", "test-shhext-")
-	s.NoError(err)
+func (s *DebugAPISuite) newPeer(name, dir string) *node.StatusNode {
 	// network id is irrelevant
 	cfg, err := params.NewNodeConfig(dir, "", 777)
 	cfg.LightEthConfig.Enabled = false

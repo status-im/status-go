@@ -319,8 +319,8 @@ type NodeConfig struct {
 	// StatusServiceEnabled enables status service api
 	StatusServiceEnabled bool
 
-	// DebugServiceEnabled enables debug service api
-	DebugServiceEnabled bool
+	// DebugAPIEnabled enables debug api
+	DebugAPIEnabled bool
 }
 
 // NewNodeConfig creates new node configuration object
