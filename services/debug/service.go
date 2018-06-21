@@ -1,38 +1,37 @@
-package status
+package debug
 
 import (
-	"crypto/ecdsa"
+	"context"
 
-	"github.com/ethereum/go-ethereum/accounts"
-	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
+	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 )
 
 // Make sure that Service implements node.Service interface.
 var _ node.Service = (*Service)(nil)
 
-// WhisperService whisper interface to add key pairs
-type WhisperService interface {
-	AddKeyPair(key *ecdsa.PrivateKey) (string, error)
+// Subscriber whisper interface to add key pairs
+type Subscriber interface {
+	SubscribeEnvelopeEvents(events chan<- whisper.EnvelopeEvent) event.Subscription
 }
 
-// AccountManager interface to manage account actions
-type AccountManager interface {
-	AddressToDecryptedAccount(string, string) (accounts.Account, *keystore.Key, error)
-	SelectAccount(address, password string) error
-	CreateAccount(password string) (address, pubKey, mnemonic string, err error)
+// Poster interface for a posting shh messages.
+type Poster interface {
+	Post(context.Context, whisper.NewMessage) (hexutil.Bytes, error)
 }
 
-// Service represents our own implementation of status status operations.
+// Service represents provides some debugging specific endpoints.
 type Service struct {
-	am AccountManager
-	w  WhisperService
+	w Subscriber
+	p Poster // *shhext.PublicAPI
 }
 
 // New returns a new Service.
-func New(w WhisperService) *Service {
+func New(w Subscriber) *Service {
 	return &Service{w: w}
 }
 
@@ -46,17 +45,18 @@ func (s *Service) APIs() []rpc.API {
 
 	return []rpc.API{
 		{
-			Namespace: "status",
+			Namespace: "debug",
 			Version:   "1.0",
 			Service:   NewAPI(s),
-			Public:    false,
+			Public:    true,
 		},
 	}
 }
 
-// SetAccountManager sets account manager for the API calls.
-func (s *Service) SetAccountManager(a AccountManager) {
-	s.am = a
+// SetPoster sets the poster to be used generally shhext.PublicAPI to manage
+// API calls.
+func (s *Service) SetPoster(p Poster) {
+	s.p = p
 }
 
 // Start is run when a service is started.

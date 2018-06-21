@@ -22,6 +22,8 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/peers"
 	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/services/debug"
+	"github.com/status-im/status-go/services/shhext"
 	"github.com/status-im/status-go/services/status"
 )
 
@@ -401,6 +403,49 @@ func (n *StatusNode) StatusService() (st *status.Service, err error) {
 		err = ErrServiceUnknown
 	}
 
+	return
+}
+
+// DebugService exposes reference to debug service running on top of the node.
+func (n *StatusNode) DebugService() (st *debug.Service, err error) {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+
+	err = n.gethService(&st)
+	if err == node.ErrServiceUnknown {
+		err = ErrServiceUnknown
+	}
+
+	return
+}
+
+// shhextService exposes reference to sshext service running on top of the node.
+func (n *StatusNode) shhextService() (st *shhext.Service, err error) {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+
+	err = n.gethService(&st)
+	if err == node.ErrServiceUnknown {
+		err = ErrServiceUnknown
+	}
+
+	return
+}
+
+// ShhextServiceAPI exposes reference to shhext service api.
+func (n *StatusNode) ShhextServiceAPI() (api *shhext.PublicAPI, err error) {
+	st, err := n.shhextService()
+	if err != nil {
+		return
+	}
+
+	apis := st.APIs()
+	if len(apis) == 0 {
+		err = ErrServiceUnknown
+		return
+	}
+
+	api = apis[0].Service.(*shhext.PublicAPI)
 	return
 }
 

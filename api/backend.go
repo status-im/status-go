@@ -165,6 +165,12 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 		st.SetAccountManager(b.AccountManager())
 	}
 
+	if ds, err := b.statusNode.DebugService(); err == nil {
+		if api, err := b.statusNode.ShhextServiceAPI(); err == nil {
+			ds.SetPoster(api)
+		}
+	}
+
 	signal.SendNodeReady()
 
 	return nil

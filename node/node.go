@@ -24,6 +24,7 @@ import (
 	"github.com/status-im/status-go/mailserver"
 	shhmetrics "github.com/status-im/status-go/metrics/whisper"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/services/debug"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/shhext"
 	"github.com/status-im/status-go/services/status"
@@ -38,6 +39,7 @@ var (
 	ErrLightEthRegistrationFailure        = errors.New("failed to register the LES service")
 	ErrPersonalServiceRegistrationFailure = errors.New("failed to register the personal api service")
 	ErrStatusServiceRegistrationFailure   = errors.New("failed to register the Status service")
+	ErrDebugServiceRegistrationFailure    = errors.New("failed to register the Debug service")
 )
 
 // All general log messages in this package should be routed through this logger.
@@ -101,6 +103,11 @@ func MakeNode(config *params.NodeConfig, db *leveldb.DB) (*node.Node, error) {
 	// start status service.
 	if err := activateStatusService(stack, config); err != nil {
 		return nil, fmt.Errorf("%v: %v", ErrStatusServiceRegistrationFailure, err)
+	}
+
+	// start debug service.
+	if err := activateDebugService(stack, config); err != nil {
+		return nil, fmt.Errorf("%v: %v", ErrDebugServiceRegistrationFailure, err)
 	}
 
 	return stack, nil
@@ -186,6 +193,22 @@ func activateStatusService(stack *node.Node, config *params.NodeConfig) error {
 		}
 		svc := status.New(whisper)
 		return svc, nil
+	})
+}
+
+// activateDebugService configures and registers debug service.
+func activateDebugService(stack *node.Node, config *params.NodeConfig) error {
+	if !config.DebugServiceEnabled {
+		logger.Info("Debug service api is disabled")
+		return nil
+	}
+
+	return stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
+		var whisper *whisper.Whisper
+		if err := ctx.Service(&whisper); err != nil {
+			return nil, err
+		}
+		return debug.New(whisper), nil
 	})
 }
 
