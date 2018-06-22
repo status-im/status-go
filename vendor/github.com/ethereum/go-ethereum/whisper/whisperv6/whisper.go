@@ -49,6 +49,11 @@ type Statistics struct {
 	totalMessagesCleared int
 }
 
+type MailServerResponse struct {
+	LastEnvelopeHash common.Hash
+	Cursor           []byte
+}
+
 const (
 	maxMsgSizeIdx           = iota // Maximal message length allowed by the whisper node
 	overflowIdx                    // Indicator of message queue overflow
@@ -841,22 +846,43 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 					return errors.New("invalid request response message")
 				}
 
-				// check if payload is the requestID or requestID + cursor
+				// check if payload is
+				// - requestID or
+				// - requestID + lastEnvelopeHash or
+				// - requestID + lastEnvelopeHash + cursor
 				// requestID is the hash of the request envelope.
+				// lastEnvelopeHash is the last envelope sent by the mail server
 				// cursor is the db key, 36 bytes: 4 for the timestamp + 32 for the envelope hash.
-				length := len(payload)
-				if length != common.HashLength && length != common.HashLength+36 {
-					log.Warn("invalid response message, peer will be disconnected", "peer", p.peer.ID(), "err", err, "payload size", length)
+				// length := len(payload)
+
+				if len(payload) < common.HashLength || len(payload) > common.HashLength*3+4 {
+					log.Warn("invalid response message, peer will be disconnected", "peer", p.peer.ID(), "err", err, "payload size", len(payload))
 					return errors.New("invalid response size")
 				}
 
-				requestID := common.BytesToHash(payload[:common.HashLength])
-				cursor := payload[common.HashLength:]
+				var (
+					requestID        common.Hash
+					lastEnvelopeHash common.Hash
+					cursor           []byte
+				)
+
+				requestID = common.BytesToHash(payload[:common.HashLength])
+
+				if len(payload) >= common.HashLength*2 {
+					lastEnvelopeHash = common.BytesToHash(payload[common.HashLength : common.HashLength*2])
+				}
+
+				if len(payload) >= common.HashLength*2+36 {
+					cursor = payload[common.HashLength*2 : common.HashLength*2+36]
+				}
 
 				whisper.envelopeFeed.Send(EnvelopeEvent{
 					Hash:  requestID,
 					Event: EventMailServerRequestCompleted,
-					Data:  cursor,
+					Data: &MailServerResponse{
+						LastEnvelopeHash: lastEnvelopeHash,
+						Cursor:           cursor,
+					},
 				})
 			}
 		default:
@@ -1002,9 +1028,17 @@ func (whisper *Whisper) processQueue() {
 
 		case e = <-whisper.messageQueue:
 			whisper.filters.NotifyWatchers(e, false)
+			whisper.envelopeFeed.Send(EnvelopeEvent{
+				Hash:  e.Hash(),
+				Event: EventEnvelopeAvailable,
+			})
 
 		case e = <-whisper.p2pMsgQueue:
 			whisper.filters.NotifyWatchers(e, true)
+			whisper.envelopeFeed.Send(EnvelopeEvent{
+				Hash:  e.Hash(),
+				Event: EventEnvelopeAvailable,
+			})
 		}
 	}
 }

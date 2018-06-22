@@ -13,6 +13,8 @@ const (
 	EventEnvelopeSent EventType = "envelope.sent"
 	// EventEnvelopeExpired fires when envelop expired
 	EventEnvelopeExpired EventType = "envelope.expired"
+	// EventEnvelopeAvailable fires when envelop is available for filters
+	EventEnvelopeAvailable EventType = "envelope.available"
 	// EventMailServerRequestCompleted fires after mailserver sends all the requested messages
 	EventMailServerRequestCompleted EventType = "mailserver.request.completed"
 	// EventMailServerRequestExpired fires after mailserver the request TTL ends
