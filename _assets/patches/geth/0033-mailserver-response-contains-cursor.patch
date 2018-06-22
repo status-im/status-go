@@ -46,10 +46,16 @@ index 2fcc9e6..df7b063 100644
  }
  
 diff --git a/whisper/whisperv6/events.go b/whisper/whisperv6/events.go
-index 1665539..6021b4a 100644
+index 1665539..fe7570e 100644
 --- a/whisper/whisperv6/events.go
 +++ b/whisper/whisperv6/events.go
-@@ -17,6 +17,8 @@ const (
+@@ -13,10 +13,14 @@ const (
+ 	EventEnvelopeSent EventType = "envelope.sent"
+ 	// EventEnvelopeExpired fires when envelop expired
+ 	EventEnvelopeExpired EventType = "envelope.expired"
++	// EventEnvelopeAvailable fires when envelop is available for filters
++	EventEnvelopeAvailable EventType = "envelope.available"
+ 	// EventMailServerRequestCompleted fires after mailserver sends all the requested messages
  	EventMailServerRequestCompleted EventType = "mailserver.request.completed"
  	// EventMailServerRequestExpired fires after mailserver the request TTL ends
  	EventMailServerRequestExpired EventType = "mailserver.request.expired"
@@ -58,17 +64,29 @@ index 1665539..6021b4a 100644
  )
  
  // EnvelopeEvent used for envelopes events.
-@@ -24,4 +26,5 @@ type EnvelopeEvent struct {
+@@ -24,4 +28,5 @@ type EnvelopeEvent struct {
  	Event EventType
  	Hash  common.Hash
  	Peer  discover.NodeID
 +	Data  interface{}
  }
 diff --git a/whisper/whisperv6/whisper.go b/whisper/whisperv6/whisper.go
-index 4a7b006..ae4e058 100644
+index 4a7b006..1f5b4cd 100644
 --- a/whisper/whisperv6/whisper.go
 +++ b/whisper/whisperv6/whisper.go
-@@ -378,8 +378,8 @@ func (whisper *Whisper) RequestHistoricMessages(peerID []byte, envelope *Envelop
+@@ -49,6 +49,11 @@ type Statistics struct {
+ 	totalMessagesCleared int
+ }
+ 
++type MailServerResponse struct {
++	LastEnvelopeHash common.Hash
++	Cursor           []byte
++}
++
+ const (
+ 	maxMsgSizeIdx           = iota // Maximal message length allowed by the whisper node
+ 	overflowIdx                    // Indicator of message queue overflow
+@@ -378,8 +383,8 @@ func (whisper *Whisper) RequestHistoricMessages(peerID []byte, envelope *Envelop
  	return p2p.Send(p.ws, p2pRequestCode, envelope)
  }
  
@@ -79,7 +97,7 @@ index 4a7b006..ae4e058 100644
  	if err != nil {
  		return err
  	}
-@@ -835,15 +835,28 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
+@@ -835,15 +840,49 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
  			}
  		case p2pRequestCompleteCode:
  			if p.trusted {
@@ -91,26 +109,47 @@ index 4a7b006..ae4e058 100644
  					return errors.New("invalid request response message")
  				}
  
-+				// check if payload is the requestID or requestID + cursor
++				// check if payload is
++				// - requestID or
++				// - requestID + lastEnvelopeHash or
++				// - requestID + lastEnvelopeHash + cursor
 +				// requestID is the hash of the request envelope.
++				// lastEnvelopeHash is the last envelope sent by the mail server
 +				// cursor is the db key, 36 bytes: 4 for the timestamp + 32 for the envelope hash.
-+				length := len(payload)
-+				if length != common.HashLength && length != common.HashLength+36 {
-+					log.Warn("invalid response message, peer will be disconnected", "peer", p.peer.ID(), "err", err, "payload size", length)
++				// length := len(payload)
++
++				if len(payload) < common.HashLength || len(payload) > common.HashLength*3+4 {
++					log.Warn("invalid response message, peer will be disconnected", "peer", p.peer.ID(), "err", err, "payload size", len(payload))
 +					return errors.New("invalid response size")
 +				}
 +
-+				requestID := common.BytesToHash(payload[:common.HashLength])
-+				cursor := payload[common.HashLength:]
++				var (
++					requestID        common.Hash
++					lastEnvelopeHash common.Hash
++					cursor           []byte
++				)
++
++				requestID = common.BytesToHash(payload[:common.HashLength])
++
++				if len(payload) >= common.HashLength*2 {
++					lastEnvelopeHash = common.BytesToHash(payload[common.HashLength : common.HashLength*2])
++				}
++
++				if len(payload) >= common.HashLength*2+36 {
++					cursor = payload[common.HashLength*2 : common.HashLength*2+36]
++				}
 +
  				whisper.envelopeFeed.Send(EnvelopeEvent{
  					Hash:  requestID,
  					Event: EventMailServerRequestCompleted,
-+					Data:  cursor,
++					Data: &MailServerResponse{
++						LastEnvelopeHash: lastEnvelopeHash,
++						Cursor:           cursor,
++					},
  				})
  			}
  		default:
-@@ -927,6 +940,10 @@ func (whisper *Whisper) add(envelope *Envelope, isP2P bool) (bool, error) {
+@@ -927,6 +966,10 @@ func (whisper *Whisper) add(envelope *Envelope, isP2P bool) (bool, error) {
  		whisper.postEvent(envelope, isP2P) // notify the local node about the new message
  		if whisper.mailServer != nil {
  			whisper.mailServer.Archive(envelope)
@@ -121,3 +160,21 @@ index 4a7b006..ae4e058 100644
  		}
  	}
  	return true, nil
+@@ -985,9 +1028,17 @@ func (whisper *Whisper) processQueue() {
+ 
+ 		case e = <-whisper.messageQueue:
+ 			whisper.filters.NotifyWatchers(e, false)
++			whisper.envelopeFeed.Send(EnvelopeEvent{
++				Hash:  e.Hash(),
++				Event: EventEnvelopeAvailable,
++			})
+ 
+ 		case e = <-whisper.p2pMsgQueue:
+ 			whisper.filters.NotifyWatchers(e, true)
++			whisper.envelopeFeed.Send(EnvelopeEvent{
++				Hash:  e.Hash(),
++				Event: EventEnvelopeAvailable,
++			})
+ 		}
+ 	}
+ }
