@@ -71,13 +71,14 @@ index 1665539..fe7570e 100644
 +	Data  interface{}
  }
 diff --git a/whisper/whisperv6/whisper.go b/whisper/whisperv6/whisper.go
-index 4a7b006..1f5b4cd 100644
+index 4a7b006..d9a3656 100644
 --- a/whisper/whisperv6/whisper.go
 +++ b/whisper/whisperv6/whisper.go
-@@ -49,6 +49,11 @@ type Statistics struct {
+@@ -49,6 +49,12 @@ type Statistics struct {
  	totalMessagesCleared int
  }
  
++// MailServerResponse is the response payload sent by the mailserver
 +type MailServerResponse struct {
 +	LastEnvelopeHash common.Hash
 +	Cursor           []byte
@@ -86,7 +87,7 @@ index 4a7b006..1f5b4cd 100644
  const (
  	maxMsgSizeIdx           = iota // Maximal message length allowed by the whisper node
  	overflowIdx                    // Indicator of message queue overflow
-@@ -378,8 +383,8 @@ func (whisper *Whisper) RequestHistoricMessages(peerID []byte, envelope *Envelop
+@@ -378,8 +384,8 @@ func (whisper *Whisper) RequestHistoricMessages(peerID []byte, envelope *Envelop
  	return p2p.Send(p.ws, p2pRequestCode, envelope)
  }
  
@@ -97,7 +98,7 @@ index 4a7b006..1f5b4cd 100644
  	if err != nil {
  		return err
  	}
-@@ -835,15 +840,49 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
+@@ -835,15 +841,49 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
  			}
  		case p2pRequestCompleteCode:
  			if p.trusted {
@@ -149,7 +150,7 @@ index 4a7b006..1f5b4cd 100644
  				})
  			}
  		default:
-@@ -927,6 +966,10 @@ func (whisper *Whisper) add(envelope *Envelope, isP2P bool) (bool, error) {
+@@ -927,6 +967,10 @@ func (whisper *Whisper) add(envelope *Envelope, isP2P bool) (bool, error) {
  		whisper.postEvent(envelope, isP2P) // notify the local node about the new message
  		if whisper.mailServer != nil {
  			whisper.mailServer.Archive(envelope)
@@ -160,7 +161,7 @@ index 4a7b006..1f5b4cd 100644
  		}
  	}
  	return true, nil
-@@ -985,9 +1028,17 @@ func (whisper *Whisper) processQueue() {
+@@ -985,9 +1029,17 @@ func (whisper *Whisper) processQueue() {
  
  		case e = <-whisper.messageQueue:
  			whisper.filters.NotifyWatchers(e, false)
