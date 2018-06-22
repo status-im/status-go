@@ -296,6 +296,7 @@ func (s *TrackerSuite) TestRequestCompleted() {
 	s.tracker.handleEvent(whisper.EnvelopeEvent{
 		Event: whisper.EventMailServerRequestCompleted,
 		Hash:  testHash,
+		Data:  &whisper.MailServerResponse{},
 	})
 	select {
 	case requestID := <-mock.requestsCompleted:
