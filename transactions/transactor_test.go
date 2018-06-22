@@ -4,11 +4,14 @@ import (
 	"context"
 	"errors"
 	"math/big"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/ethereum/go-ethereum/common"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/contracts/ens/contract"
@@ -34,6 +37,10 @@ func simpleVerifyFunc(acc *account.SelectedExtKey) func(string) (*account.Select
 	return func(string) (*account.SelectedExtKey, error) {
 		return acc, nil
 	}
+}
+
+func (s *TxQueueTestSuite) defaultSignTxArgs() *sign.TxArgs {
+	return &sign.TxArgs{}
 }
 
 func TestTxQueueTestSuite(t *testing.T) {
@@ -252,10 +259,6 @@ func (s *TxQueueTestSuite) TestCompleteTransaction() {
 	}
 }
 
-func (s *TxQueueTestSuite) defaultSignTxArgs() *sign.TxArgs {
-	return &sign.TxArgs{}
-}
-
 func (s *TxQueueTestSuite) TestAccountMismatch() {
 	selectedAccount := &account.SelectedExtKey{
 		Address: account.FromAddress(TestConfig.Account2.Address),
@@ -329,9 +332,22 @@ func (s *TxQueueTestSuite) TestLocalNonce() {
 	}
 	nonce := hexutil.Uint64(0)
 
+	waiter := make(chan struct{})
+	defer func() {
+		<-waiter
+	}()
+	closer := make(chan struct{})
+	defer close(closer)
+
 	go func() {
 		approved := 0
 		for {
+			select {
+			case <-closer:
+				close(waiter)
+				return
+			default:
+			}
 			// 3 in a cycle, then 2
 			if approved >= txCount+2 {
 				return
@@ -385,41 +401,152 @@ func (s *TxQueueTestSuite) TestLocalNonce() {
 	s.Equal(uint64(nonce)+1, resultNonce.(uint64))
 }
 
-func (s *TxQueueTestSuite) TestContractCreation() {
-	key, _ := crypto.GenerateKey()
-	testaddr := crypto.PubkeyToAddress(key.PublicKey)
-	genesis := core.GenesisAlloc{
-		testaddr: {Balance: big.NewInt(100000000000)},
-	}
-	backend := backends.NewSimulatedBackend(genesis)
-	selectedAccount := &account.SelectedExtKey{
-		Address:    testaddr,
-		AccountKey: &keystore.Key{PrivateKey: key},
-	}
-	s.manager.sender = backend
-	s.manager.gasCalculator = backend
-	s.manager.pendingNonceProvider = backend
-	tx := SendTxArgs{
-		From:  testaddr,
-		Input: hexutil.Bytes(gethcommon.FromHex(contract.ENSBin)),
+func (s *TxQueueTestSuite) TestTransactionsWithSimulatedBackend() {
+
+	testCases := []struct {
+		name             string
+		getTransactions  func(testaddr common.Address) []SendTxArgs
+		receiptValidator func(receipt *types.Receipt, finalResult sign.Result, testaddr common.Address)
+	}{
+		{
+			"EthTransfer",
+			func(testaddr common.Address) []SendTxArgs {
+				return []SendTxArgs{
+					{
+						Value: (*hexutil.Big)(big.NewInt(10)),
+					},
+				}
+			},
+			func(receipt *types.Receipt, finalResult sign.Result, testaddr common.Address) {
+				successStatus := uint(1)
+				s.Equal(successStatus, receipt.Status)
+			},
+		},
+		{
+			"ContractCreation",
+			func(testaddr common.Address) []SendTxArgs {
+				return []SendTxArgs{
+					{
+						Input: hexutil.Bytes(gethcommon.FromHex(contract.ENSBin)),
+					},
+				}
+			},
+			func(receipt *types.Receipt, finalResult sign.Result, testaddr common.Address) {
+				s.Equal(crypto.CreateAddress(testaddr, 0), receipt.ContractAddress)
+			},
+		},
+		{
+			"ContractStateTransfer",
+			func(testaddr common.Address) []SendTxArgs {
+				// method ID: web3.utils.sha3('setOwner(bytes32,address)').substring(0, 8)
+				setOwnerMethodID := "0x5b0fc9"
+				node := make([]byte, 32)
+				// Give the node a value so that we are reassigning ownership of something
+				// other than the 0 node, which already belongs to the current owner
+				node[0] = []byte("1")[0]
+				ensParsed, _ := abi.JSON(strings.NewReader(contract.ENSABI))
+				secondOwnerAddress := account.FromAddress(TestConfig.Account1.Address)
+				setOwnerMethodData, _ := ensParsed.Pack("setOwner", setOwnerMethodID, node, secondOwnerAddress)
+
+				// method ID: web3.utils.sha3('owner(bytes32)').substring(0, 8)
+				ownerMethodID := "0x02571b"
+				getOwnerMethodData, _ := ensParsed.Pack("owner", ownerMethodID, node)
+
+				return []SendTxArgs{
+					{
+						// Create contract
+						Input: hexutil.Bytes(gethcommon.FromHex(contract.ENSBin)),
+					},
+					{
+						// Change contract owner
+						Input: hexutil.Bytes(setOwnerMethodData),
+					},
+					{
+						// Check that the contract owner is correct
+						Input: hexutil.Bytes(getOwnerMethodData),
+					},
+				}
+			},
+			func(receipt *types.Receipt, finalResult sign.Result, testaddr common.Address) {
+				successStatus := uint(1)
+				s.Equal(successStatus, receipt.Status)
+				// secondOwnerAddress := account.FromAddress(TestConfig.Account1.Address)
+				// s.Equal(finalResult.Response.Hex(), secondOwnerAddress.Hex())
+			},
+		},
 	}
 
-	go func() {
-		for i := 1000; i > 0; i-- {
-			req := s.manager.pendingSignRequests.First()
-			if req == nil {
-				time.Sleep(time.Millisecond)
-			} else {
-				s.manager.pendingSignRequests.Approve(req.ID, "", s.defaultSignTxArgs(), simpleVerifyFunc(selectedAccount)) // nolint: errcheck
-				break
+	for _, testCase := range testCases {
+		s.T().Run(testCase.name, func(t *testing.T) {
+
+			key, _ := crypto.GenerateKey()
+			testaddr := crypto.PubkeyToAddress(key.PublicKey)
+			genesis := core.GenesisAlloc{
+				testaddr: {Balance: big.NewInt(100000000000)},
 			}
-		}
-	}()
+			backend := backends.NewSimulatedBackend(genesis)
+			selectedAccount := &account.SelectedExtKey{
+				Address:    testaddr,
+				AccountKey: &keystore.Key{PrivateKey: key},
+			}
 
-	hash, err := s.manager.SendTransaction(context.Background(), tx)
-	s.NoError(err)
-	backend.Commit()
-	receipt, err := backend.TransactionReceipt(context.TODO(), hash)
-	s.NoError(err)
-	s.Equal(crypto.CreateAddress(testaddr, 0), receipt.ContractAddress)
+			s.manager.sender = backend
+			s.manager.gasCalculator = backend
+			s.manager.pendingNonceProvider = backend
+
+			waiter := make(chan struct{})
+			defer func() {
+				<-waiter
+			}()
+			closer := make(chan struct{})
+			defer close(closer)
+
+			// finalResult corresponds to the last transaction
+			getFinalResult := make(chan sign.Result)
+			transactions := testCase.getTransactions(testaddr)
+			go func() {
+				numTransactions := 0
+				for {
+					select {
+					case <-closer:
+						close(waiter)
+						return
+					default:
+					}
+					req := s.manager.pendingSignRequests.First()
+					if req == nil {
+						time.Sleep(time.Millisecond)
+					} else {
+						numTransactions++
+						if numTransactions == len(transactions) {
+							go func() {
+								getFinalResult <- s.manager.pendingSignRequests.Wait(req.ID, time.Second*1)
+							}()
+						}
+						s.manager.pendingSignRequests.Approve(req.ID, "", s.defaultSignTxArgs(), simpleVerifyFunc(selectedAccount)) // nolint: errcheck
+					}
+				}
+			}()
+
+			// The receipt from the last transaction in the testcase
+			var finalReceipt *types.Receipt
+			var finalResult sign.Result
+			for i, tx := range transactions {
+				tx.From = testaddr
+				hash, err := s.manager.SendTransaction(context.Background(), tx)
+				s.NoError(err)
+				backend.Commit()
+				receipt, err := backend.TransactionReceipt(context.TODO(), hash)
+				s.NoError(err)
+				// if its the last transaction, keep the receipt
+				if i == len(transactions)-1 {
+					finalReceipt = receipt
+					// finalResult = <-getFinalResult
+					// s.NoError(finalResult.Error)
+				}
+			}
+
+			testCase.receiptValidator(finalReceipt, finalResult, testaddr)
+		})
+	}
 }
