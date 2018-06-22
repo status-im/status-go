@@ -38,8 +38,8 @@ func (t handlerMock) EnvelopeExpired(hash common.Hash) {
 	t.expirations <- hash
 }
 
-func (t handlerMock) MailServerRequestCompleted(hash common.Hash) {
-	t.requestsCompleted <- hash
+func (t handlerMock) MailServerRequestCompleted(requestID common.Hash, lastEnvelopeHash common.Hash, cursor []byte) {
+	t.requestsCompleted <- requestID
 }
 
 func (t handlerMock) MailServerRequestExpired(hash common.Hash) {
