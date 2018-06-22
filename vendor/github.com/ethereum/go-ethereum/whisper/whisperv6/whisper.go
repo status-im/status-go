@@ -49,6 +49,7 @@ type Statistics struct {
 	totalMessagesCleared int
 }
 
+// MailServerResponse is the response payload sent by the mailserver
 type MailServerResponse struct {
 	LastEnvelopeHash common.Hash
 	Cursor           []byte
