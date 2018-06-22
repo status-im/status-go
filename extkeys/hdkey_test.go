@@ -511,6 +511,26 @@ func TestErrors(t *testing.T) {
 	}
 }
 
+func TestMaxDepth(t *testing.T) {
+	mnemonic := NewMnemonic()
+	phrase, err := mnemonic.MnemonicPhrase(128, EnglishLanguage)
+	if err != nil {
+		t.Errorf("Test failed: could not create mnemonic phrase: %v", err)
+	}
+
+	lastParentKey, err := NewMaster(mnemonic.MnemonicSeed(phrase, "test-password"))
+	if err != nil {
+		t.Errorf("couldn't create master extended key: %v", err)
+	}
+
+	lastParentKey.Depth = 255
+
+	_, err = lastParentKey.Child(0)
+	if err != ErrMaxDepthExceeded {
+		t.Errorf("Expected ErrMaxDepthExceeded, got %+v", err)
+	}
+}
+
 func TestBIP44ChildDerivation(t *testing.T) {
 	keyString := masterPrivKey1
 	derivedKey1String := "xprvA38t8tFW4vbuB7WJXEqMFmZqRrcZUKWqqMcGjjKjr2hbfvPhRtLLJGL4ayWG8shF1VkuUikVGodGshLiKRS7WrdsrGSVDQCY33qoPBxG2Kp"
