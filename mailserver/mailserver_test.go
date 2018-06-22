@@ -202,7 +202,7 @@ func (s *MailserverSuite) TestRequestPaginationLimit() {
 	s.Nil(cursor)
 	s.Equal(params.limit, limit)
 
-	envelopes, cursor := s.server.processRequest(nil, lower, upper, bloom, limit, nil)
+	envelopes, _, cursor := s.server.processRequest(nil, lower, upper, bloom, limit, nil)
 	for _, env := range envelopes {
 		receivedHashes = append(receivedHashes, env.Hash())
 	}
@@ -218,7 +218,7 @@ func (s *MailserverSuite) TestRequestPaginationLimit() {
 
 	// second page
 	receivedHashes = []common.Hash{}
-	envelopes, cursor = s.server.processRequest(nil, lower, upper, bloom, limit, cursor)
+	envelopes, _, cursor = s.server.processRequest(nil, lower, upper, bloom, limit, cursor)
 	for _, env := range envelopes {
 		receivedHashes = append(receivedHashes, env.Hash())
 	}
@@ -321,7 +321,7 @@ func (s *MailserverSuite) TestMailServer() {
 
 func (s *MailserverSuite) messageExists(envelope *whisper.Envelope, low, upp uint32, bloom []byte, limit uint32) bool {
 	var exist bool
-	mail, _ := s.server.processRequest(nil, low, upp, bloom, limit, nil)
+	mail, _, _ := s.server.processRequest(nil, low, upp, bloom, limit, nil)
 	for _, msg := range mail {
 		if msg.Hash() == envelope.Hash() {
 			exist = true

@@ -458,11 +458,9 @@ func (s *WhisperMailboxSuite) waitForMailServerResponse(events chan whisper.Enve
 				return resp
 			}
 		case <-timeout.C:
-			s.FailNow("timed out while waiting for mailserver reponse")
+			s.FailNow("timed out while waiting for mailserver response")
 		}
 	}
-
-	return &whisper.MailServerResponse{}
 }
 
 func (s *WhisperMailboxSuite) addPeerAndWait(node, other *node.StatusNode) {
