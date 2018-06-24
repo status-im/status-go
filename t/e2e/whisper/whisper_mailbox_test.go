@@ -126,7 +126,7 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 
 	// wait for mail server response
 	resp := s.waitForMailServerResponse(mailServerResponseWatcher, requestID)
-	s.NotEmpty(resp.LastEnvelopeHash)
+	s.Equal(messageHash, resp.LastEnvelopeHash.String())
 	s.Empty(resp.Cursor)
 
 	// wait for last envelope sent by the mailserver to be available for filters
