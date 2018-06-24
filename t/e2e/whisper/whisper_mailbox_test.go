@@ -356,10 +356,7 @@ func (s *WhisperMailboxSuite) TestRequestMessagesWithPagination() {
 		sentEnvelopesHashes = append(sentEnvelopesHashes, hash)
 	}
 
-	// wait for mailserver to archive all the envelopes
-	s.waitForEnvelopesEvents(envelopeArchivedWatcher, sentEnvelopesHashes, whisper.EventMailServerEnvelopeArchived)
-
-	// get messages before requesting them to mailserver
+	// get messages from filter before requesting them to mailserver
 	lastEnvelopeHash := sentEnvelopesHashes[len(sentEnvelopesHashes)-1]
 	s.waitForEnvelopesEvents(envelopeAvailableWatcher, []string{lastEnvelopeHash}, whisper.EventEnvelopeAvailable)
 	messages := s.getMessagesByMessageFilterID(clientRPCClient, filterID)
@@ -383,6 +380,9 @@ func (s *WhisperMailboxSuite) TestRequestMessagesWithPagination() {
 	requestMessages := func(cursor string) common.Hash {
 		return s.requestHistoricMessages(clientWhisperService, clientRPCClient, mailboxEnode, mailServerKeyID, topic.String(), limit, cursor)
 	}
+
+	// wait for mailserver to archive all the envelopes
+	s.waitForEnvelopesEvents(envelopeArchivedWatcher, sentEnvelopesHashes, whisper.EventMailServerEnvelopeArchived)
 
 	// first page
 	// send request
