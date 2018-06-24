@@ -53,10 +53,8 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 
 	s.Require().NotEqual(mailboxEnode, node.Server().NodeInfo().Enode)
 
-	err = sender.StatusNode().AddPeer(mailboxEnode)
-	s.Require().NoError(err)
-	// Wait async processes on adding peer.
-	time.Sleep(500 * time.Millisecond)
+	// Add mailbox to clients's peers
+	s.addPeerAndWait(sender.StatusNode(), mailboxBackend.StatusNode())
 
 	senderWhisperService, err := sender.StatusNode().WhisperService()
 	s.Require().NoError(err)
@@ -80,11 +78,18 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	mailboxWhisperService, err := mailboxBackend.StatusNode().WhisperService()
 	s.Require().NoError(err)
 	s.Require().NotNil(mailboxWhisperService)
-	mailboxTracer := newTracer()
-	mailboxWhisperService.RegisterEnvelopeTracer(mailboxTracer)
 
-	tracer := newTracer()
-	senderWhisperService.RegisterEnvelopeTracer(tracer)
+	// watch envelopes to be archived on mailserver
+	envelopeArchivedWatcher := make(chan whisper.EnvelopeEvent, 1024)
+	mailboxWhisperService.SubscribeEnvelopeEvents(envelopeArchivedWatcher)
+
+	// watch envelopes to be available for filters in the client
+	envelopeAvailableWatcher := make(chan whisper.EnvelopeEvent, 1024)
+	senderWhisperService.SubscribeEnvelopeEvents(envelopeAvailableWatcher)
+
+	// watch mailserver responses in the client
+	mailServerResponseWatcher := make(chan whisper.EnvelopeEvent, 1024)
+	senderWhisperService.SubscribeEnvelopeEvents(mailServerResponseWatcher)
 
 	// Create topic.
 	topic := whisper.BytesToTopic([]byte("topic name"))
@@ -107,32 +112,33 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	messageHash := s.postMessageToPrivate(rpcClient, pubkey.String(), topic.String(), hexutil.Encode([]byte("Hello world!")))
 
 	// Get message to make sure that it will come from the mailbox later.
-	messages = s.getMessagesByMessageFilterIDWithTracer(rpcClient, messageFilterID, mailboxTracer, messageHash)
+	s.waitForEnvelopesEvents(envelopeAvailableWatcher, []string{messageHash}, whisper.EventEnvelopeAvailable)
+	messages = s.getMessagesByMessageFilterID(rpcClient, messageFilterID)
 	s.Require().Equal(1, len(messages))
 
 	// Act.
 
-	events := make(chan whisper.EnvelopeEvent)
-	senderWhisperService.SubscribeEnvelopeEvents(events)
+	// wait for mailserver to archive all the envelopes
+	s.waitForEnvelopesEvents(envelopeArchivedWatcher, []string{messageHash}, whisper.EventMailServerEnvelopeArchived)
 
 	// Request messages (including the previous one, expired) from mailbox.
 	requestID := s.requestHistoricMessages(senderWhisperService, rpcClient, mailboxPeerStr, MailServerKeyID, topic.String(), 0, "")
 
+	// wait for mail server response
+	resp := s.waitForMailServerResponse(mailServerResponseWatcher, requestID)
+	s.NotEmpty(resp.LastEnvelopeHash)
+	s.Empty(resp.Cursor)
+
+	// wait for last envelope sent by the mailserver to be available for filters
+	s.waitForEnvelopesEvents(envelopeAvailableWatcher, []string{resp.LastEnvelopeHash.String()}, whisper.EventEnvelopeAvailable)
+
 	// And we receive message, it comes from mailbox.
-	messages = s.getMessagesByMessageFilterIDWithTracer(rpcClient, messageFilterID, tracer, messageHash)
+	messages = s.getMessagesByMessageFilterID(rpcClient, messageFilterID)
 	s.Require().Equal(1, len(messages))
 
 	// Check that there are no messages.
 	messages = s.getMessagesByMessageFilterID(rpcClient, messageFilterID)
 	s.Require().Empty(messages)
-
-	select {
-	case e := <-events:
-		s.Equal(whisper.EventMailServerRequestCompleted, e.Event)
-		s.Equal(requestID, e.Hash)
-	case <-time.After(time.Second):
-		s.Fail("timed out while waiting for request completed event")
-	}
 }
 
 func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
@@ -156,14 +162,10 @@ func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
 	mailboxNode := mailboxBackend.StatusNode().GethNode()
 	mailboxEnode := mailboxNode.Server().NodeInfo().Enode
 
-	err = aliceBackend.StatusNode().AddPeer(mailboxEnode)
-	s.Require().NoError(err)
-	err = bobBackend.StatusNode().AddPeer(mailboxEnode)
-	s.Require().NoError(err)
-	err = charlieBackend.StatusNode().AddPeer(mailboxEnode)
-	s.Require().NoError(err)
-	// Wait async processes on adding peer.
-	time.Sleep(500 * time.Millisecond)
+	// Add mailbox to clients's peers
+	s.addPeerAndWait(aliceBackend.StatusNode(), mailboxBackend.StatusNode())
+	s.addPeerAndWait(bobBackend.StatusNode(), mailboxBackend.StatusNode())
+	s.addPeerAndWait(charlieBackend.StatusNode(), mailboxBackend.StatusNode())
 
 	// Get whisper service.
 	aliceWhisperService, err := aliceBackend.StatusNode().WhisperService()
