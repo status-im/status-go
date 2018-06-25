@@ -47,7 +47,7 @@ type MessagesRequest struct {
 	// Default is now.
 	To uint32 `json:"to"`
 
-	// Limit limits the number of messages sent by the mail server
+	// Limit determines the number of messages sent by the mail server
 	// for the current paginated request
 	Limit uint32 `json:"limit"`
 

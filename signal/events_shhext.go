@@ -24,7 +24,7 @@ type EnvelopeSignal struct {
 	Hash common.Hash `json:"hash"`
 }
 
-// MailServerResponseSignal includes the data received in the response from the mailserver.
+// MailServerResponseSignal holds the data received in the response from the mailserver.
 type MailServerResponseSignal struct {
 	RequestID        common.Hash `json:"requestID"`
 	LastEnvelopeHash common.Hash `json:"lastEnvelopeHash"`

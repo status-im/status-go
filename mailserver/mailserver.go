@@ -226,10 +226,11 @@ func (s *WMailServer) processRequest(peer *whisper.Peer, lower, upper uint32, bl
 		err               error
 		zero              common.Hash
 		ku                []byte
+		kl                []byte
 	)
 
 	ret := make([]*whisper.Envelope, 0)
-	kl := NewDbKey(lower, zero).raw
+	kl = NewDbKey(lower, zero).raw
 	if cursor != nil {
 		ku = cursor
 	} else {

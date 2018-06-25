@@ -358,7 +358,7 @@ func (s *WhisperMailboxSuite) TestRequestMessagesWithPagination() {
 
 	// get messages from filter before requesting them to mailserver
 	lastEnvelopeHash := sentEnvelopesHashes[len(sentEnvelopesHashes)-1]
-	s.waitForEnvelopesEvents(envelopeAvailableWatcher, []string{lastEnvelopeHash}, whisper.EventEnvelopeAvailable)
+	s.waitForEnvelopeEvents(envelopeAvailableWatcher, []string{lastEnvelopeHash}, whisper.EventEnvelopeAvailable)
 	messages := s.getMessagesByMessageFilterID(clientRPCClient, filterID)
 	s.Equal(envelopesCount, len(messages))
 
@@ -382,7 +382,7 @@ func (s *WhisperMailboxSuite) TestRequestMessagesWithPagination() {
 	}
 
 	// wait for mailserver to archive all the envelopes
-	s.waitForEnvelopesEvents(envelopeArchivedWatcher, sentEnvelopesHashes, whisper.EventMailServerEnvelopeArchived)
+	s.waitForEnvelopeEvents(envelopeArchivedWatcher, sentEnvelopesHashes, whisper.EventMailServerEnvelopeArchived)
 
 	// first page
 	// send request
@@ -392,7 +392,7 @@ func (s *WhisperMailboxSuite) TestRequestMessagesWithPagination() {
 	s.NotEmpty(resp.LastEnvelopeHash)
 	s.NotEmpty(resp.Cursor)
 	// wait for last envelope sent by the mailserver to be available for filters
-	s.waitForEnvelopesEvents(envelopeAvailableWatcher, []string{resp.LastEnvelopeHash.String()}, whisper.EventEnvelopeAvailable)
+	s.waitForEnvelopeEvents(envelopeAvailableWatcher, []string{resp.LastEnvelopeHash.String()}, whisper.EventEnvelopeAvailable)
 	// get messages
 	firstPageHashes := getMessages()
 	s.Equal(3, len(firstPageHashes))
@@ -406,7 +406,7 @@ func (s *WhisperMailboxSuite) TestRequestMessagesWithPagination() {
 	// all messages have been sent, no more pages available
 	s.Empty(resp.Cursor)
 	// wait for last envelope sent by the mailserver to be available for filters
-	s.waitForEnvelopesEvents(envelopeAvailableWatcher, []string{resp.LastEnvelopeHash.String()}, whisper.EventEnvelopeAvailable)
+	s.waitForEnvelopeEvents(envelopeAvailableWatcher, []string{resp.LastEnvelopeHash.String()}, whisper.EventEnvelopeAvailable)
 	// get messages
 	secondPageHashes := getMessages()
 	s.Equal(2, len(secondPageHashes))
@@ -420,7 +420,7 @@ func (s *WhisperMailboxSuite) TestRequestMessagesWithPagination() {
 	s.Equal(sentEnvelopesHashes, allReceivedHashes)
 }
 
-func (s *WhisperMailboxSuite) waitForEnvelopesEvents(events chan whisper.EnvelopeEvent, hashes []string, event whisper.EventType) {
+func (s *WhisperMailboxSuite) waitForEnvelopeEvents(events chan whisper.EnvelopeEvent, hashes []string, event whisper.EventType) {
 	check := make(map[string]struct{})
 	for _, hash := range hashes {
 		check[hash] = struct{}{}
