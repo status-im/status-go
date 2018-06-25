@@ -53,8 +53,34 @@ type TxQueueTestSuite struct {
 	txServiceMockCtrl *gomock.Controller
 	txServiceMock     *fake.MockPublicTransactionPoolAPI
 	nodeConfig        *params.NodeConfig
+	waiter            chan struct{}
+	closer            chan struct{}
 
 	manager *Transactor
+}
+
+func (s *TxQueueTestSuite) setupWaiter() {
+	s.waiter = make(chan struct{})
+	s.closer = make(chan struct{})
+}
+
+func (s *TxQueueTestSuite) teardownWaiter() {
+	// Return the closer so that the waiting goRoutines
+	// know when to stop.
+	close(s.closer)
+	// block on the waiter so the test doesn't end until
+	// the waiting goRoutines have ended.
+	<-s.waiter
+}
+
+func (s *TxQueueTestSuite) endWaitingGoRoutine() bool {
+	select {
+	case <-s.closer:
+		close(s.waiter)
+		return true
+	default:
+		return false
+	}
 }
 
 func (s *TxQueueTestSuite) SetupTest() {
@@ -438,15 +464,12 @@ func (s *TxQueueTestSuite) sendTransactions(backend *backends.SimulatedBackend, 
 	return finalReceipt
 }
 
-func (s *TxQueueTestSuite) approveSignRequests(selectedAccount *account.SelectedExtKey, totalTransactions int, closer chan struct{}, waiter chan struct{}) {
+func (s *TxQueueTestSuite) approveSignRequests(selectedAccount *account.SelectedExtKey, totalTransactions int) {
 	go func() {
 		numTransactions := 0
 		for {
-			select {
-			case <-closer:
-				close(waiter)
+			if s.endWaitingGoRoutine() {
 				return
-			default:
 			}
 			req := s.manager.pendingSignRequests.First()
 
@@ -474,16 +497,10 @@ func (s *TxQueueTestSuite) TestEthTransferWithSimulatedBackend() {
 		},
 	}
 
-	waiter := make(chan struct{})
-	defer func() {
-		<-waiter
-	}()
-	closer := make(chan struct{})
-	defer close(closer)
-
-	s.approveSignRequests(selectedAccount, len(transactions), closer, waiter)
-
+	s.setupWaiter()
+	s.approveSignRequests(selectedAccount, len(transactions))
 	s.sendTransactions(backend, transactions)
+	s.teardownWaiter()
 }
 
 func (s *TxQueueTestSuite) TestContractCreationWithSimulatedBackend() {
@@ -494,17 +511,12 @@ func (s *TxQueueTestSuite) TestContractCreationWithSimulatedBackend() {
 			From:  selectedAccount.Address,
 		},
 	}
-	waiter := make(chan struct{})
-	defer func() {
-		<-waiter
-	}()
-	closer := make(chan struct{})
-	defer close(closer)
 
-	s.approveSignRequests(selectedAccount, len(transactions), closer, waiter)
-
+	s.setupWaiter()
+	s.approveSignRequests(selectedAccount, len(transactions))
 	receipt := s.sendTransactions(backend, transactions)
 	s.Equal(crypto.CreateAddress(selectedAccount.Address, 0), receipt.ContractAddress)
+	s.teardownWaiter()
 }
 
 func (s *TxQueueTestSuite) TestContractStateTransferWithSimulatedBackend() {
@@ -540,14 +552,8 @@ func (s *TxQueueTestSuite) TestContractStateTransferWithSimulatedBackend() {
 		},
 	}
 
-	waiter := make(chan struct{})
-	defer func() {
-		<-waiter
-	}()
-	closer := make(chan struct{})
-	defer close(closer)
-
-	s.approveSignRequests(selectedAccount, len(transactions), closer, waiter)
-
+	s.setupWaiter()
+	s.approveSignRequests(selectedAccount, len(transactions))
 	s.sendTransactions(backend, transactions)
+	s.teardownWaiter()
 }
