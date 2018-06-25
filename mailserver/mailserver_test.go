@@ -134,11 +134,8 @@ func (s *MailserverSuite) TestArchive() {
 	rawEnvelope, err := rlp.EncodeToBytes(env)
 	s.NoError(err)
 
+	s.server.Archive(env)
 	key := NewDbKey(env.Expiry-env.TTL, env.Hash())
-	returnedRawKey, err := s.server.Archive(env)
-	s.NoError(err)
-	s.Equal(key.raw, returnedRawKey)
-
 	archivedEnvelope, err := s.server.db.Get(key.raw, nil)
 	s.NoError(err)
 
@@ -184,9 +181,9 @@ func (s *MailserverSuite) TestRequestPaginationLimit() {
 		sentTime := now.Add(time.Duration(-i) * time.Second)
 		env, err := generateEnvelope(sentTime)
 		s.NoError(err)
-		key, err := s.server.Archive(env)
-		s.NoError(err)
-		archiveKeys = append(archiveKeys, fmt.Sprintf("%x", key))
+		s.server.Archive(env)
+		key := NewDbKey(env.Expiry-env.TTL, env.Hash())
+		archiveKeys = append(archiveKeys, fmt.Sprintf("%x", key.raw))
 		sentEnvelopes = append(sentEnvelopes, env)
 		reverseSentHashes = append([]common.Hash{env.Hash()}, reverseSentHashes...)
 	}
@@ -236,8 +233,7 @@ func (s *MailserverSuite) TestMailServer() {
 	env, err := generateEnvelope(time.Now())
 	s.NoError(err)
 
-	_, err = s.server.Archive(env)
-	s.NoError(err)
+	s.server.Archive(env)
 
 	testCases := []struct {
 		params *ServerTestParams

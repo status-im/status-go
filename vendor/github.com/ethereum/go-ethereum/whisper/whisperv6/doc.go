@@ -93,7 +93,7 @@ func (e unknownVersionError) Error() string {
 // DeliverMail should use directMessagesCode for delivery,
 // in order to bypass the expiry checks.
 type MailServer interface {
-	Archive(env *Envelope) ([]byte, error)
+	Archive(env *Envelope)
 	DeliverMail(whisperPeer *Peer, request *Envelope)
 }
 

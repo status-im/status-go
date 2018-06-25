@@ -88,22 +88,17 @@ func (s *WMailServer) Close() {
 	}
 }
 
-func (s *WMailServer) Archive(env *whisper.Envelope) ([]byte, error) {
+func (s *WMailServer) Archive(env *whisper.Envelope) {
 	key := NewDbKey(env.Expiry-env.TTL, env.Hash())
 	rawEnvelope, err := rlp.EncodeToBytes(env)
 	if err != nil {
-		err := fmt.Errorf("rlp.EncodeToBytes failed: %s", err)
-		log.Error(err.Error())
-		return nil, err
+		log.Error(fmt.Sprintf("rlp.EncodeToBytes failed: %s", err))
+	} else {
+		err = s.db.Put(key.raw, rawEnvelope, nil)
+		if err != nil {
+			log.Error(fmt.Sprintf("Writing to DB failed: %s", err))
+		}
 	}
-
-	if err = s.db.Put(key.raw, rawEnvelope, nil); err != nil {
-		err := fmt.Errorf("Writing to DB failed: %s", err)
-		log.Error(err.Error())
-		return nil, err
-	}
-
-	return key.raw, nil
 }
 
 func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope) {

@@ -76,10 +76,7 @@ func setupTestServer(t *testing.T) *WMailServer {
 func archiveEnvelope(t *testing.T, sentTime time.Time, server *WMailServer) *whisper.Envelope {
 	env, err := generateEnvelope(sentTime)
 	require.NoError(t, err)
-	_, err = server.Archive(env)
-	if err != nil {
-		t.Errorf("error archive enveloped, %+v", err)
-	}
+	server.Archive(env)
 
 	return env
 }
