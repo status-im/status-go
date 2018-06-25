@@ -103,7 +103,7 @@ func TestBackendGettersConcurrently(t *testing.T) {
 
 	wg.Add(1)
 	go func() {
-		assert.NotNil(t, backend.PersonalAPI())
+		assert.NotNil(t, backend.personalAPI)
 		wg.Done()
 	}()
 
@@ -174,7 +174,7 @@ func TestBackendAccountsConcurrently(t *testing.T) {
 
 		wg.Add(1)
 		go func() {
-			assert.NoError(t, backend.ReSelectAccount())
+			assert.NoError(t, backend.reSelectAccount())
 			wg.Done()
 		}()
 
@@ -189,7 +189,7 @@ func TestBackendAccountsConcurrently(t *testing.T) {
 }
 
 func TestBackendConnectionChangesConcurrently(t *testing.T) {
-	connections := [...]string{"wifi", "cellular"}
+	connections := [...]string{wifi, cellular, unknown}
 	backend := NewStatusBackend()
 	count := 3
 
@@ -205,6 +205,18 @@ func TestBackendConnectionChangesConcurrently(t *testing.T) {
 	}
 
 	wg.Wait()
+}
+
+func TestBackendConnectionChangesToOffline(t *testing.T) {
+	b := NewStatusBackend()
+	b.ConnectionChange(none, false)
+	assert.True(t, b.connectionState.Offline)
+
+	b.ConnectionChange(wifi, false)
+	assert.False(t, b.connectionState.Offline)
+
+	b.ConnectionChange("unknown-state", false)
+	assert.False(t, b.connectionState.Offline)
 }
 
 func TestBackendCallRPCConcurrently(t *testing.T) {
@@ -243,6 +255,38 @@ func TestBackendCallRPCConcurrently(t *testing.T) {
 	}
 
 	wg.Wait()
+}
+
+func TestAppStateChange(t *testing.T) {
+	backend := NewStatusBackend()
+
+	var testCases = []struct {
+		name          string
+		fromState     appState
+		toState       appState
+		expectedState appState
+	}{
+		{
+			name:          "success",
+			fromState:     appStateInactive,
+			toState:       appStateBackground,
+			expectedState: appStateBackground,
+		},
+		{
+			name:          "invalid state",
+			fromState:     appStateInactive,
+			toState:       "unexisting",
+			expectedState: appStateInactive,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			backend.appState = tc.fromState
+			backend.AppStateChange(tc.toState.String())
+			assert.Equal(t, tc.expectedState.String(), backend.appState.String())
+		})
+	}
 }
 
 func TestPrepareTxArgs(t *testing.T) {
