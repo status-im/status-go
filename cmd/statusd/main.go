@@ -151,7 +151,7 @@ func main() {
 	// Run stats server.
 	if *metrics {
 		go startCollectingNodeMetrics(interruptCh, backend.StatusNode())
-		gethmetrics.CollectProcessMetrics(3 * time.Second)
+		go gethmetrics.CollectProcessMetrics(3 * time.Second)
 	}
 
 	// Sync blockchain and stop.
