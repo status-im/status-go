@@ -326,7 +326,7 @@ func (s *WMailServer) validateRequest(peerID []byte, request *whisper.Envelope) 
 	}
 
 	var limit uint32
-	if len(decrypted.Payload) == 8+whisper.BloomFilterSize+4 {
+	if len(decrypted.Payload) >= 8+whisper.BloomFilterSize+4 {
 		limit = binary.BigEndian.Uint32(decrypted.Payload[8+whisper.BloomFilterSize:])
 	}
 
