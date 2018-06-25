@@ -25,7 +25,7 @@ type AccountManager interface {
 	CreateAccount(password string) (address, pubKey, mnemonic string, err error)
 }
 
-// Service represents out own implementation of status status operations.
+// Service represents our own implementation of status status operations.
 type Service struct {
 	am AccountManager
 	w  WhisperService

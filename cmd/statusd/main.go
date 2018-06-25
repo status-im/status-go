@@ -41,6 +41,7 @@ var (
 	lesEnabled        = flag.Bool("les", false, "Enable LES protocol")
 	whisperEnabled    = flag.Bool("shh", false, "Enable Whisper protocol")
 	statusService     = flag.String("status", "", `Enable StatusService, possible values: "ipc", "http"`)
+	debugAPI          = flag.Bool("debug", false, `Enable debug API endpoints under "debug_" namespace`)
 	swarmEnabled      = flag.Bool("swarm", false, "Enable Swarm protocol")
 	maxPeers          = flag.Int("maxpeers", 25, "maximum number of p2p peers (including all protocols)")
 	httpEnabled       = flag.Bool("http", false, "Enable HTTP RPC endpoint")
@@ -259,9 +260,13 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 		nodeConfig.ClusterConfig.BootNodes = strings.Split(*bootnodes, ",")
 	}
 
-	nodeConfig, err = configureStatusService(*statusService, nodeConfig)
-	if err != nil {
+	if nodeConfig, err = configureStatusService(*statusService, nodeConfig); err != nil {
 		return nil, err
+	}
+
+	nodeConfig.DebugAPIEnabled = *debugAPI
+	if nodeConfig.DebugAPIEnabled {
+		nodeConfig.AddAPIModule("debug")
 	}
 
 	if *whisperEnabled {
