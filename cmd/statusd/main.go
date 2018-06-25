@@ -10,10 +10,12 @@ import (
 	"os/signal"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/status-im/status-go/logutils"
 
 	"github.com/ethereum/go-ethereum/log"
+	gethmetrics "github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/cmd/statusd/debug"
@@ -150,6 +152,7 @@ func main() {
 	// Run stats server.
 	if *metrics {
 		go startCollectingNodeMetrics(interruptCh, backend.StatusNode())
+		go gethmetrics.CollectProcessMetrics(3 * time.Second)
 	}
 
 	// Sync blockchain and stop.
