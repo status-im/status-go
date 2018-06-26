@@ -6,13 +6,17 @@ import (
 	"io/ioutil"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/p2p"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/params"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/status-im/status-go/t/helpers"
 	. "github.com/status-im/status-go/t/utils"
 )
 
@@ -127,7 +131,13 @@ func (s *DebugAPISuite) addPeerToCurrentNode(dir string) {
 	node2 := s.newPeer("test2", dir).GethNode()
 	s.NotNil(node2)
 
+	errCh := helpers.WaitForPeerAsync(s.Backend.StatusNode(),
+		node2.Server().Self().String(),
+		p2p.PeerEventTypeAdd,
+		time.Second*5)
+
 	node1.Server().AddPeer(node2.Server().Self())
+	require.NoError(s.T(), <-errCh)
 }
 
 // newNode creates, configures and starts a new peer.

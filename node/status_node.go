@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/les"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
+	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"github.com/syndtr/goleveldb/leveldb"
@@ -75,6 +76,14 @@ func (n *StatusNode) GethNode() *node.Node {
 	defer n.mu.RUnlock()
 
 	return n.gethNode
+}
+
+// Server retrieves the currently running P2P network layer.
+func (n *StatusNode) Server() *p2p.Server {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+
+	return n.gethNode.Server()
 }
 
 func (n *StatusNode) startWithDB(config *params.NodeConfig, db *leveldb.DB, services []node.ServiceConstructor) error {
