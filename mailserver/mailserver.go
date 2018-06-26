@@ -294,6 +294,11 @@ func (s *WMailServer) validateRequest(peerID []byte, request *whisper.Envelope) 
 	lower := binary.BigEndian.Uint32(decrypted.Payload[:4])
 	upper := binary.BigEndian.Uint32(decrypted.Payload[4:8])
 
+	if upper < lower {
+		log.Error(fmt.Sprintf("Query range is invalid: from > to (%d > %d)", lower, upper))
+		return false, 0, 0, nil
+	}
+
 	lowerTime := time.Unix(int64(lower), 0)
 	upperTime := time.Unix(int64(upper), 0)
 	if upperTime.Sub(lowerTime) > maxQueryRange {

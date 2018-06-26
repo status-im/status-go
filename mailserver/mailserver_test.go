@@ -209,7 +209,7 @@ func (s *MailserverSuite) TestMailServer() {
 		{
 			params: func() *ServerTestParams {
 				params := s.defaultServerParams(env)
-				params.low = 0
+				params.low = params.birth
 				params.upp = params.birth - 1
 
 				return params
