@@ -95,7 +95,7 @@ func testMessagesCount(t *testing.T, expected int, s *WMailServer) {
 	require.Equal(t, expected, count, fmt.Sprintf("expected %d message, got: %d", expected, count))
 }
 
-func countMessages(t *testing.T, db *leveldb.DB) int {
+func countMessages(t *testing.T, db DB) int {
 	var (
 		count int
 		zero  common.Hash

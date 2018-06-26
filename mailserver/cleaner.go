@@ -11,12 +11,12 @@ const batchSize = 1000
 
 // Cleaner removes old messages from a db
 type Cleaner struct {
-	db        *leveldb.DB
+	db        DB
 	batchSize int
 }
 
 // NewCleanerWithDB returns a new Cleaner for db
-func NewCleanerWithDB(db *leveldb.DB) *Cleaner {
+func NewCleanerWithDB(db DB) *Cleaner {
 	return &Cleaner{
 		db:        db,
 		batchSize: batchSize,
