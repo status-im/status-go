@@ -49,7 +49,6 @@ DOCKER_TEST_IMAGE = golang:1.10
 UNIT_TEST_PACKAGES := $(shell go list ./...  | \
 	grep -v /vendor | \
 	grep -v /t/e2e | \
-	grep -v /t/destructive | \
 	grep -v /t/benchmarks | \
 	grep -v /lib)
 
