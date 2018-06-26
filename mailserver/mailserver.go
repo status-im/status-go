@@ -156,8 +156,19 @@ func (s *WMailServer) Close() {
 	}
 }
 
+func recoverLevelDBPanics(calleMethodName string) {
+	// Recover from possible goleveldb panics
+	if r := recover(); r != nil {
+		if errString, ok := r.(string); ok {
+			log.Error(fmt.Sprintf("recovered from panic in %s: %s", calleMethodName, errString))
+		}
+	}
+}
+
 // Archive a whisper envelope.
 func (s *WMailServer) Archive(env *whisper.Envelope) {
+	defer recoverLevelDBPanics("Archive")
+
 	key := NewDbKey(env.Expiry-env.TTL, env.Hash())
 	rawEnvelope, err := rlp.EncodeToBytes(env)
 	if err != nil {
@@ -187,6 +198,8 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 		requestErrorsCounter.Inc(1)
 		return
 	}
+
+	defer recoverLevelDBPanics("DeliverMail")
 
 	if ok, lower, upper, bloom := s.validateRequest(peer.ID(), request); ok {
 		s.processRequest(peer, lower, upper, bloom)
