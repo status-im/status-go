@@ -111,7 +111,7 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	senderWhisperService.SubscribeEnvelopeEvents(events)
 
 	// Request messages (including the previous one, expired) from mailbox.
-	result := s.requestHistoricMessages(senderWhisperService, rpcClient, mailboxPeerStr, MailServerKeyID, topic.String())
+	result := s.requestHistoricMessagesFromLast12Hours(senderWhisperService, rpcClient, mailboxPeerStr, MailServerKeyID, topic.String())
 	requestID := common.BytesToHash(result)
 
 	// And we receive message, it comes from mailbox.
@@ -282,8 +282,8 @@ func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
 	s.Require().Empty(messages)
 
 	// Request each one messages from mailbox using enode.
-	s.requestHistoricMessages(bobWhisperService, bobRPCClient, mailboxEnode, bobMailServerKeyID, groupChatTopic.String())
-	s.requestHistoricMessages(charlieWhisperService, charlieRPCClient, mailboxEnode, charlieMailServerKeyID, groupChatTopic.String())
+	s.requestHistoricMessagesFromLast12Hours(bobWhisperService, bobRPCClient, mailboxEnode, bobMailServerKeyID, groupChatTopic.String())
+	s.requestHistoricMessagesFromLast12Hours(charlieWhisperService, charlieRPCClient, mailboxEnode, charlieMailServerKeyID, groupChatTopic.String())
 
 	// Bob receive p2p message from group chat filter.
 	messages = s.getMessagesByMessageFilterIDWithTracer(bobRPCClient, bobGroupChatMessageFilterID, bobTracer, groupChatMessageHash)
@@ -515,11 +515,16 @@ func (s *WhisperMailboxSuite) addSymKey(rpcCli *rpc.Client, symkey string) strin
 	return symkeyID
 }
 
-// requestHistoricMessages asks a mailnode to resend messages.
-func (s *WhisperMailboxSuite) requestHistoricMessages(w *whisper.Whisper, rpcCli *rpc.Client, mailboxEnode, mailServerKeyID, topic string) []byte {
+// requestHistoricMessagesFromLast12Hours asks a mailnode to resend messages from last 12 hours.
+func (s *WhisperMailboxSuite) requestHistoricMessagesFromLast12Hours(w *whisper.Whisper, rpcCli *rpc.Client, mailboxEnode, mailServerKeyID, topic string) []byte {
 	currentTime := w.GetCurrentTime()
 	from := currentTime.Add(-12 * time.Hour)
 	to := currentTime
+	return s.requestHistoricMessages(w, rpcCli, mailboxEnode, mailServerKeyID, topic, from, to)
+}
+
+// requestHistoricMessages asks a mailnode to resend messages.
+func (s *WhisperMailboxSuite) requestHistoricMessages(w *whisper.Whisper, rpcCli *rpc.Client, mailboxEnode, mailServerKeyID, topic string, from, to time.Time) []byte {
 	resp := rpcCli.CallRaw(`{
 		"jsonrpc": "2.0",
 		"id": 2,
