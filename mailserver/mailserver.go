@@ -55,7 +55,13 @@ var (
 	archivedErrorsCounter  = metrics.NewRegisteredCounter("mailserver/archiveErrors", nil)
 )
 
-type DB interface {
+// dbImpl is an interface introduced to be able to test some unexpected
+// panics from leveldb that are difficult to reproduce.
+// normally the db implementation is leveldb.DB, but in TestMailServerDBPanicSuite
+// we use panicDB to test panics from the db.
+// more info about the panic errors:
+// https://github.com/syndtr/goleveldb/issues/224
+type dbImpl interface {
 	Close() error
 	Write(*leveldb.Batch, *opt.WriteOptions) error
 	Put([]byte, []byte, *opt.WriteOptions) error
@@ -65,7 +71,7 @@ type DB interface {
 
 // WMailServer whisper mailserver.
 type WMailServer struct {
-	db    DB
+	db    dbImpl
 	w     *whisper.Whisper
 	pow   float64
 	key   []byte
