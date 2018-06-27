@@ -251,7 +251,8 @@ func (s *MailserverSuite) TestMailServer() {
 
 func (s *MailserverSuite) messageExists(envelope *whisper.Envelope, low, upp uint32, bloom []byte) bool {
 	var exist bool
-	mail := s.server.processRequest(nil, low, upp, bloom)
+	mail, err := s.server.processRequest(nil, low, upp, bloom)
+	s.NoError(err)
 	for _, msg := range mail {
 		if msg.Hash() == envelope.Hash() {
 			exist = true

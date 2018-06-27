@@ -31,6 +31,8 @@ import (
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"github.com/status-im/status-go/params"
 	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/syndtr/goleveldb/leveldb/iterator"
+	"github.com/syndtr/goleveldb/leveldb/opt"
 	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
@@ -53,9 +55,23 @@ var (
 	archivedErrorsCounter  = metrics.NewRegisteredCounter("mailserver/archiveErrors", nil)
 )
 
+// dbImpl is an interface introduced to be able to test some unexpected
+// panics from leveldb that are difficult to reproduce.
+// normally the db implementation is leveldb.DB, but in TestMailServerDBPanicSuite
+// we use panicDB to test panics from the db.
+// more info about the panic errors:
+// https://github.com/syndtr/goleveldb/issues/224
+type dbImpl interface {
+	Close() error
+	Write(*leveldb.Batch, *opt.WriteOptions) error
+	Put([]byte, []byte, *opt.WriteOptions) error
+	Get([]byte, *opt.ReadOptions) ([]byte, error)
+	NewIterator(*util.Range, *opt.ReadOptions) iterator.Iterator
+}
+
 // WMailServer whisper mailserver.
 type WMailServer struct {
-	db    *leveldb.DB
+	db    dbImpl
 	w     *whisper.Whisper
 	pow   float64
 	key   []byte
@@ -94,11 +110,12 @@ func (s *WMailServer) Init(shh *whisper.Whisper, config *params.WhisperConfig) e
 		return errPasswordNotProvided
 	}
 
-	s.db, err = leveldb.OpenFile(config.DataDir, nil)
+	db, err := leveldb.OpenFile(config.DataDir, nil)
 	if err != nil {
 		return fmt.Errorf("open DB: %s", err)
 	}
 
+	s.db = db
 	s.w = shh
 	s.pow = config.MinimumPoW
 
@@ -202,7 +219,12 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 	defer recoverLevelDBPanics("DeliverMail")
 
 	if ok, lower, upper, bloom := s.validateRequest(peer.ID(), request); ok {
-		s.processRequest(peer, lower, upper, bloom)
+		_, err := s.processRequest(peer, lower, upper, bloom)
+		if err != nil {
+			log.Error(fmt.Sprintf("error in DeliverMail: %s", err))
+			return
+		}
+
 		if err := s.sendHistoricMessageResponse(peer, request); err != nil {
 			log.Error(fmt.Sprintf("SendHistoricMessageResponse error: %s", err))
 		}
@@ -225,9 +247,14 @@ func (s *WMailServer) exceedsPeerRequests(peer []byte) bool {
 
 // processRequest processes the current request and re-sends all stored messages
 // accomplishing lower and upper limits.
-func (s *WMailServer) processRequest(peer *whisper.Peer, lower, upper uint32, bloom []byte) []*whisper.Envelope {
-	ret := make([]*whisper.Envelope, 0)
-	var err error
+func (s *WMailServer) processRequest(peer *whisper.Peer, lower, upper uint32, bloom []byte) (ret []*whisper.Envelope, err error) {
+	// Recover from possible goleveldb panics
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("recovered from panic in processRequest: %v", r)
+		}
+	}()
+
 	var zero common.Hash
 	kl := NewDbKey(lower, zero)
 	ku := NewDbKey(upper+1, zero) // LevelDB is exclusive, while the Whisper API is inclusive
@@ -243,9 +270,10 @@ func (s *WMailServer) processRequest(peer *whisper.Peer, lower, upper uint32, bl
 
 	for i.Next() {
 		var envelope whisper.Envelope
-		err = rlp.DecodeBytes(i.Value(), &envelope)
-		if err != nil {
-			log.Error(fmt.Sprintf("RLP decoding failed: %s", err))
+		decodeErr := rlp.DecodeBytes(i.Value(), &envelope)
+		if decodeErr != nil {
+			log.Error(fmt.Sprintf("RLP decoding failed: %s", decodeErr))
+			continue
 		}
 
 		if whisper.BloomFilterMatch(bloom, envelope.Bloom()) {
@@ -256,7 +284,7 @@ func (s *WMailServer) processRequest(peer *whisper.Peer, lower, upper uint32, bl
 				err = s.w.SendP2PDirect(peer, &envelope)
 				if err != nil {
 					log.Error(fmt.Sprintf("Failed to send direct message to peer: %s", err))
-					return nil
+					return
 				}
 			}
 			sentEnvelopes++
@@ -273,7 +301,7 @@ func (s *WMailServer) processRequest(peer *whisper.Peer, lower, upper uint32, bl
 		log.Error(fmt.Sprintf("Level DB iterator error: %s", err))
 	}
 
-	return ret
+	return
 }
 
 func (s *WMailServer) sendHistoricMessageResponse(peer *whisper.Peer, request *whisper.Envelope) error {
