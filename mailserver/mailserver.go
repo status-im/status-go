@@ -245,9 +245,7 @@ func (s *WMailServer) processRequest(peer *whisper.Peer, lower, upper uint32, bl
 	// Recover from possible goleveldb panics
 	defer func() {
 		if r := recover(); r != nil {
-			if errString, ok := r.(string); ok {
-				err = fmt.Errorf("recovered from panic in processRequest: %s", errString)
-			}
+			err = fmt.Errorf("recovered from panic in processRequest: %v", r)
 		}
 	}()
 
@@ -269,6 +267,7 @@ func (s *WMailServer) processRequest(peer *whisper.Peer, lower, upper uint32, bl
 		decodeErr := rlp.DecodeBytes(i.Value(), &envelope)
 		if decodeErr != nil {
 			log.Error(fmt.Sprintf("RLP decoding failed: %s", decodeErr))
+			continue
 		}
 
 		if whisper.BloomFilterMatch(bloom, envelope.Bloom()) {

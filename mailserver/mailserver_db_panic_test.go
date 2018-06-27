@@ -30,7 +30,7 @@ func (db *panicDB) Get(k []byte, opts *opt.ReadOptions) ([]byte, error) {
 }
 
 func (db *panicDB) NewIterator(r *util.Range, opts *opt.ReadOptions) iterator.Iterator {
-	panic("panicDB panic on Get")
+	panic("panicDB panic on NewIterator")
 }
 
 func TestMailServerDBPanicSuite(t *testing.T) {
@@ -56,7 +56,7 @@ func (s *MailServerDBPanicSuite) TestDeliverMail() {
 	defer s.testPanicRecover("DeliverMail")
 	_, err := s.server.processRequest(nil, 10, 20, []byte{})
 	s.Error(err)
-	s.Equal("recovered from panic in processRequest: panicDB panic on Get", err.Error())
+	s.Equal("recovered from panic in processRequest: panicDB panic on NewIterator", err.Error())
 }
 
 func (s *MailServerDBPanicSuite) testPanicRecover(method string) {
