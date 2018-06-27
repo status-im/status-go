@@ -181,7 +181,7 @@ func TestStatusNodeAddPeer(t *testing.T) {
 	require.NoError(t, n.Start(&config))
 	defer func() { require.NoError(t, n.Stop()) }()
 
-	errCh := helpers.WaitForPeerAsync(n, peerURL, p2p.PeerEventTypeAdd, time.Second*5)
+	errCh := helpers.WaitForPeerAsync(n.Server(), peerURL, p2p.PeerEventTypeAdd, time.Second*5)
 
 	// checks after node is started
 	require.NoError(t, n.AddPeer(peerURL))
@@ -228,17 +228,17 @@ func TestStatusNodeReconnectStaticPeers(t *testing.T) {
 	connected, err := isPeerConnected(n, peerURL)
 	require.NoError(t, err)
 	if !connected {
-		errCh = helpers.WaitForPeerAsync(n, peerURL, p2p.PeerEventTypeAdd, time.Second*30)
+		errCh = helpers.WaitForPeerAsync(n.Server(), peerURL, p2p.PeerEventTypeAdd, time.Second*30)
 		require.NoError(t, <-errCh)
 	}
 	require.Equal(t, 1, n.PeerCount())
 	require.Equal(t, peer.Server().Self().ID.String(), n.GethNode().Server().PeersInfo()[0].ID)
 
 	// reconnect static peers
-	errDropCh := helpers.WaitForPeerAsync(n, peerURL, p2p.PeerEventTypeDrop, time.Second*30)
+	errDropCh := helpers.WaitForPeerAsync(n.Server(), peerURL, p2p.PeerEventTypeDrop, time.Second*30)
 
 	// it takes at least 30 seconds to bring back previously connected peer
-	errAddCh := helpers.WaitForPeerAsync(n, peerURL, p2p.PeerEventTypeAdd, time.Second*60)
+	errAddCh := helpers.WaitForPeerAsync(n.Server(), peerURL, p2p.PeerEventTypeAdd, time.Second*60)
 	require.NoError(t, n.ReconnectStaticPeers())
 	// first check if a peer gets disconnected
 	require.NoError(t, <-errDropCh)

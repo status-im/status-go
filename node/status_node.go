@@ -83,6 +83,10 @@ func (n *StatusNode) Server() *p2p.Server {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 
+	if n.gethNode == nil {
+		return nil
+	}
+
 	return n.gethNode.Server()
 }
 

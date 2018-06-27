@@ -131,7 +131,7 @@ func (s *DebugAPISuite) addPeerToCurrentNode(dir string) {
 	node2 := s.newPeer("test2", dir).GethNode()
 	s.NotNil(node2)
 
-	errCh := helpers.WaitForPeerAsync(s.Backend.StatusNode(),
+	errCh := helpers.WaitForPeerAsync(s.Backend.StatusNode().Server(),
 		node2.Server().Self().String(),
 		p2p.PeerEventTypeAdd,
 		time.Second*5)
