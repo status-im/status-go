@@ -251,7 +251,11 @@ func (s *WMailServer) exceedsPeerRequests(peer []byte) bool {
 }
 
 // processRequest processes the current request and re-sends all stored messages
-// accomplishing lower and upper limits.
+// accomplishing lower and upper limits. The limit parameter determines the maximum number of
+// messages to be sent back for the current request.
+// The cursor parameter is used for pagination.
+// After sending all the messages, a message of type p2pRequestCompleteCode is sent by the mailserver to
+// the peer.
 func (s *WMailServer) processRequest(peer *whisper.Peer, lower, upper uint32, bloom []byte, limit uint32, cursor cursorType) (ret []*whisper.Envelope, lastEnvelopeHash common.Hash, nextPageCursor cursorType, err error) {
 	// Recover from possible goleveldb panics
 	defer func() {

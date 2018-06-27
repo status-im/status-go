@@ -18,7 +18,7 @@ func (h EnvelopeSignalHandler) EnvelopeExpired(hash common.Hash) {
 	signal.SendEnvelopeExpired(hash)
 }
 
-// MailServerRequestCompleted triggered when ithe mailserver sends a message to notify that the request has been completed
+// MailServerRequestCompleted triggered when the mailserver sends a message to notify that the request has been completed
 func (h EnvelopeSignalHandler) MailServerRequestCompleted(requestID common.Hash, lastEnvelopeHash common.Hash, cursor []byte) {
 	signal.SendMailServerRequestCompleted(requestID, lastEnvelopeHash, cursor)
 }
