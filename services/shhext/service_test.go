@@ -2,6 +2,7 @@ package shhext
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"testing"
@@ -78,7 +79,7 @@ func (s *ShhExtSuite) SetupTest() {
 		s.NoError(stack.Register(func(n *node.ServiceContext) (node.Service, error) {
 			return s.whisper[i], nil
 		}))
-		s.services[i] = New(s.whisper[i], nil, nil)
+		s.services[i] = New(s.whisper[i], nil, nil, true)
 		s.NoError(stack.Register(func(n *node.ServiceContext) (node.Service, error) {
 			return s.services[i], nil
 		}))
@@ -164,7 +165,7 @@ func (s *ShhExtSuite) TestRequestMessages() {
 	}()
 
 	mock := newHandlerMock(1)
-	service := New(shh, mock, nil)
+	service := New(shh, mock, nil, false)
 	api := NewPublicAPI(service)
 
 	const (
@@ -193,6 +194,14 @@ func (s *ShhExtSuite) TestRequestMessages() {
 		SymKeyID:       symKeyID,
 	})
 	s.Contains(err.Error(), "Could not find peer with ID")
+	s.Nil(hash)
+
+	// from is greater than to
+	hash, err = api.RequestMessages(context.TODO(), MessagesRequest{
+		From: 10,
+		To:   5,
+	})
+	s.Contains(err.Error(), "Query range is invalid: from > to (10 > 5)")
 	s.Nil(hash)
 
 	// with a peer acting as a mailserver
@@ -229,6 +238,98 @@ func (s *ShhExtSuite) TestRequestMessages() {
 	s.NotNil(hash)
 
 	s.Contains(api.service.tracker.cache, common.BytesToHash(hash))
+}
+
+func (s *ShhExtSuite) TestDebugPostSync() {
+	mock := newHandlerMock(1)
+	s.services[0].tracker.handler = mock
+	symID, err := s.whisper[0].GenerateSymKey()
+	s.NoError(err)
+	s.nodes[0].Server().AddPeer(s.nodes[1].Server().Self())
+	client, err := s.nodes[0].Attach()
+	s.NoError(err)
+	var hash common.Hash
+
+	var testCases = []struct {
+		name            string
+		msg             whisper.NewMessage
+		postSyncTimeout time.Duration
+		expectedErr     error
+	}{
+		{
+			name: "timeout",
+			msg: whisper.NewMessage{
+				SymKeyID:  symID,
+				PowTarget: whisper.DefaultMinimumPoW,
+				PowTime:   200,
+				Topic:     whisper.TopicType{0x01, 0x01, 0x01, 0x01},
+				Payload:   []byte("hello"),
+			},
+			postSyncTimeout: postSyncTimeout,
+			expectedErr:     nil,
+		},
+		{
+			name: "invalid message",
+			msg: whisper.NewMessage{
+				PowTarget: whisper.DefaultMinimumPoW,
+				PowTime:   200,
+				Topic:     whisper.TopicType{0x01, 0x01, 0x01, 0x01},
+				Payload:   []byte("hello"),
+			},
+			postSyncTimeout: postSyncTimeout,
+			expectedErr:     whisper.ErrSymAsym,
+		},
+		{
+			name: "context deadline exceeded",
+			msg: whisper.NewMessage{
+				SymKeyID:  symID,
+				PowTarget: whisper.DefaultMinimumPoW,
+				PowTime:   10,
+				Topic:     whisper.TopicType{0x01, 0x01, 0x01, 0x01},
+				TTL:       100,
+				Payload:   []byte("hello"),
+			},
+			postSyncTimeout: 1 * time.Millisecond,
+			expectedErr:     errors.New("context deadline exceeded"),
+		},
+	}
+
+	for _, tc := range testCases {
+		s.T().Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), tc.postSyncTimeout)
+			defer cancel()
+			err := client.CallContext(ctx, &hash, "debug_postSync", tc.msg)
+
+			if tc.expectedErr != nil {
+				s.Equal(tc.expectedErr.Error(), err.Error())
+			} else {
+				s.NoError(err)
+			}
+		})
+	}
+}
+
+func (s *ShhExtSuite) TestEnvelopeExpiredOnDebugPostSync() {
+	mock := newHandlerMock(1)
+	s.services[0].tracker.handler = mock
+	symID, err := s.whisper[0].GenerateSymKey()
+	s.NoError(err)
+	client, err := s.nodes[0].Attach()
+	s.NoError(err)
+	var hash common.Hash
+
+	ctx, cancel := context.WithTimeout(context.Background(), postSyncTimeout)
+	defer cancel()
+	err = client.CallContext(ctx, &hash, "debug_postSync", whisper.NewMessage{
+		SymKeyID:  symID,
+		PowTarget: whisper.DefaultMinimumPoW,
+		PowTime:   200,
+		Topic:     whisper.TopicType{0x01, 0x01, 0x01, 0x01},
+		Payload:   []byte("hello"),
+		TTL:       1,
+	})
+
+	s.Equal(errEnvelopeExpired.Error(), err.Error())
 }
 
 func (s *ShhExtSuite) TearDown() {

@@ -46,7 +46,7 @@ func (s *StatusAPISuite) TestAccessibleStatusAPIs() {
 		return
 	}
 
-	err := s.SetupTest(s.upstream, true)
+	err := s.SetupTest(s.upstream, true, false)
 	s.NoError(err)
 	defer func() {
 		err := s.Backend.StopNode()
@@ -113,7 +113,7 @@ func (s *StatusAPISuite) testStatusLogin(testParams statusTestParams) *status.Lo
 		testParams.HandlerFactory = s.notificationHandlerSuccess
 	}
 
-	err := s.SetupTest(s.upstream, true)
+	err := s.SetupTest(s.upstream, true, false)
 	s.NoError(err)
 	defer func() {
 		err := s.Backend.StopNode()
@@ -159,7 +159,7 @@ func (s *StatusAPISuite) testStatusSignup(testParams statusTestParams) *status.S
 		testParams.HandlerFactory = s.notificationHandlerSuccess
 	}
 
-	err := s.SetupTest(s.upstream, true)
+	err := s.SetupTest(s.upstream, true, false)
 	s.NoError(err)
 	defer func() {
 		err := s.Backend.StopNode()

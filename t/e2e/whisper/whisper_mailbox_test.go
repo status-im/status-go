@@ -116,7 +116,7 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	senderWhisperService.SubscribeEnvelopeEvents(events)
 
 	// Request messages (including the previous one, expired) from mailbox.
-	requestID := s.requestHistoricMessages(senderWhisperService, rpcClient, mailboxPeerStr, MailServerKeyID, topic.String(), 0, "")
+	requestID := s.requestHistoricMessagesFromLast12Hours(senderWhisperService, rpcClient, mailboxPeerStr, MailServerKeyID, topic.String(), 0, "")
 
 	// And we receive message, it comes from mailbox.
 	messages = s.getMessagesByMessageFilterIDWithTracer(rpcClient, messageFilterID, tracer, messageHash)
@@ -286,8 +286,8 @@ func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
 	s.Require().Empty(messages)
 
 	// Request each one messages from mailbox using enode.
-	s.requestHistoricMessages(bobWhisperService, bobRPCClient, mailboxEnode, bobMailServerKeyID, groupChatTopic.String(), 0, "")
-	s.requestHistoricMessages(charlieWhisperService, charlieRPCClient, mailboxEnode, charlieMailServerKeyID, groupChatTopic.String(), 0, "")
+	s.requestHistoricMessagesFromLast12Hours(bobWhisperService, bobRPCClient, mailboxEnode, bobMailServerKeyID, groupChatTopic.String(), 0, "")
+	s.requestHistoricMessagesFromLast12Hours(charlieWhisperService, charlieRPCClient, mailboxEnode, charlieMailServerKeyID, groupChatTopic.String(), 0, "")
 
 	// Bob receive p2p message from group chat filter.
 	messages = s.getMessagesByMessageFilterIDWithTracer(bobRPCClient, bobGroupChatMessageFilterID, bobTracer, groupChatMessageHash)
@@ -378,7 +378,7 @@ func (s *WhisperMailboxSuite) TestRequestMessagesWithPagination() {
 	}
 
 	requestMessages := func(cursor string) common.Hash {
-		return s.requestHistoricMessages(clientWhisperService, clientRPCClient, mailboxEnode, mailServerKeyID, topic.String(), limit, cursor)
+		return s.requestHistoricMessagesFromLast12Hours(clientWhisperService, clientRPCClient, mailboxEnode, mailServerKeyID, topic.String(), limit, cursor)
 	}
 
 	// wait for mailserver to archive all the envelopes
@@ -717,11 +717,16 @@ func (s *WhisperMailboxSuite) addSymKey(rpcCli *rpc.Client, symkey string) strin
 	return symkeyID
 }
 
-// requestHistoricMessages asks a mailnode to resend messages.
-func (s *WhisperMailboxSuite) requestHistoricMessages(w *whisper.Whisper, rpcCli *rpc.Client, mailboxEnode, mailServerKeyID, topic string, limit int, cursor string) common.Hash {
+// requestHistoricMessagesFromLast12Hours asks a mailnode to resend messages from last 12 hours.
+func (s *WhisperMailboxSuite) requestHistoricMessagesFromLast12Hours(w *whisper.Whisper, rpcCli *rpc.Client, mailboxEnode, mailServerKeyID, topic string, limit int, cursor string) common.Hash {
 	currentTime := w.GetCurrentTime()
 	from := currentTime.Add(-12 * time.Hour)
 	to := currentTime
+	return s.requestHistoricMessages(w, rpcCli, mailboxEnode, mailServerKeyID, topic, from, to, limit, cursor)
+}
+
+// requestHistoricMessages asks a mailnode to resend messages.
+func (s *WhisperMailboxSuite) requestHistoricMessages(w *whisper.Whisper, rpcCli *rpc.Client, mailboxEnode, mailServerKeyID, topic string, from, to time.Time, limit int, cursor string) common.Hash {
 	resp := rpcCli.CallRaw(`{
 		"jsonrpc": "2.0",
 		"id": 2,

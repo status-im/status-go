@@ -35,7 +35,7 @@ func testMailserverPeer(t *testing.T) {
 
 	shhService := createWhisperService()
 	shhAPI := whisper.NewPublicWhisperAPI(shhService)
-	mailService := shhext.New(shhService, nil, nil)
+	mailService := shhext.New(shhService, nil, nil, false)
 	shhextAPI := shhext.NewPublicAPI(mailService)
 
 	// create node with services

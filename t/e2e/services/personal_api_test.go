@@ -61,7 +61,7 @@ func (s *PersonalSignSuite) TestRestrictedPersonalAPIs() {
 		return
 	}
 
-	err := s.SetupTest(s.upstream, false)
+	err := s.SetupTest(s.upstream, false, false)
 	s.NoError(err)
 	defer func() {
 		err := s.Backend.StopNode()
@@ -191,7 +191,7 @@ func (s *PersonalSignSuite) testPersonalSign(testParams testParams) string {
 		testParams.HandlerFactory = s.notificationHandlerSuccess
 	}
 
-	err := s.SetupTest(s.upstream, false)
+	err := s.SetupTest(s.upstream, false, false)
 	s.NoError(err)
 	defer func() {
 		err := s.Backend.StopNode()
@@ -252,7 +252,7 @@ func (s *PersonalSignSuite) TestPersonalRecoverSuccess() {
 		return
 	}
 
-	err := s.SetupTest(s.upstream, false)
+	err := s.SetupTest(s.upstream, false, false)
 	s.NoError(err)
 	defer func() {
 		err := s.Backend.StopNode()

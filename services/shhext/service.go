@@ -41,13 +41,14 @@ type Service struct {
 	tracker      *tracker
 	nodeID       *ecdsa.PrivateKey
 	deduplicator *dedup.Deduplicator
+	debug        bool
 }
 
 // Make sure that Service implements node.Service interface.
 var _ node.Service = (*Service)(nil)
 
 // New returns a new Service.
-func New(w *whisper.Whisper, handler EnvelopeEventsHandler, db *leveldb.DB) *Service {
+func New(w *whisper.Whisper, handler EnvelopeEventsHandler, db *leveldb.DB, debug bool) *Service {
 	track := &tracker{
 		w:       w,
 		handler: handler,
@@ -57,6 +58,7 @@ func New(w *whisper.Whisper, handler EnvelopeEventsHandler, db *leveldb.DB) *Ser
 		w:            w,
 		tracker:      track,
 		deduplicator: dedup.NewDeduplicator(w, db),
+		debug:        debug,
 	}
 }
 
@@ -67,7 +69,7 @@ func (s *Service) Protocols() []p2p.Protocol {
 
 // APIs returns a list of new APIs.
 func (s *Service) APIs() []rpc.API {
-	return []rpc.API{
+	apis := []rpc.API{
 		{
 			Namespace: "shhext",
 			Version:   "1.0",
@@ -75,6 +77,17 @@ func (s *Service) APIs() []rpc.API {
 			Public:    true,
 		},
 	}
+
+	if s.debug {
+		apis = append(apis, rpc.API{
+			Namespace: "debug",
+			Version:   "1.0",
+			Service:   NewDebugAPI(s),
+			Public:    true,
+		})
+	}
+
+	return apis
 }
 
 // Start is run when a service is started.

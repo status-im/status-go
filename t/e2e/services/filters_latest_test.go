@@ -36,7 +36,7 @@ type FiltersAPISuite struct {
 }
 
 func (s *FiltersAPISuite) TestFilters() {
-	err := s.SetupTest(s.upstream, false)
+	err := s.SetupTest(s.upstream, false, false)
 	s.NoError(err)
 	defer func() {
 		err := s.Backend.StopNode()

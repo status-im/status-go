@@ -1,7 +1,6 @@
 package node
 
 import (
-	"errors"
 	"io/ioutil"
 	"math"
 	"os"
@@ -17,6 +16,7 @@ import (
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/t/helpers"
 	"github.com/stretchr/testify/require"
 )
 
@@ -181,7 +181,7 @@ func TestStatusNodeAddPeer(t *testing.T) {
 	require.NoError(t, n.Start(&config))
 	defer func() { require.NoError(t, n.Stop()) }()
 
-	errCh := waitForPeerAsync(n, peerURL, p2p.PeerEventTypeAdd, time.Second*5)
+	errCh := helpers.WaitForPeerAsync(n.Server(), peerURL, p2p.PeerEventTypeAdd, time.Second*5)
 
 	// checks after node is started
 	require.NoError(t, n.AddPeer(peerURL))
@@ -228,16 +228,17 @@ func TestStatusNodeReconnectStaticPeers(t *testing.T) {
 	connected, err := isPeerConnected(n, peerURL)
 	require.NoError(t, err)
 	if !connected {
-		errCh = waitForPeerAsync(n, peerURL, p2p.PeerEventTypeAdd, time.Second*30)
+		errCh = helpers.WaitForPeerAsync(n.Server(), peerURL, p2p.PeerEventTypeAdd, time.Second*30)
 		require.NoError(t, <-errCh)
 	}
 	require.Equal(t, 1, n.PeerCount())
 	require.Equal(t, peer.Server().Self().ID.String(), n.GethNode().Server().PeersInfo()[0].ID)
 
 	// reconnect static peers
-	errDropCh := waitForPeerAsync(n, peerURL, p2p.PeerEventTypeDrop, time.Second*30)
+	errDropCh := helpers.WaitForPeerAsync(n.Server(), peerURL, p2p.PeerEventTypeDrop, time.Second*30)
+
 	// it takes at least 30 seconds to bring back previously connected peer
-	errAddCh := waitForPeerAsync(n, peerURL, p2p.PeerEventTypeAdd, time.Second*60)
+	errAddCh := helpers.WaitForPeerAsync(n.Server(), peerURL, p2p.PeerEventTypeAdd, time.Second*60)
 	require.NoError(t, n.ReconnectStaticPeers())
 	// first check if a peer gets disconnected
 	require.NoError(t, <-errDropCh)
@@ -263,49 +264,4 @@ func isPeerConnected(node *StatusNode, peerURL string) (bool, error) {
 	}
 
 	return false, nil
-}
-
-func waitForPeer(node *StatusNode, peerURL string, eventType p2p.PeerEventType, timeout time.Duration, subscribed chan struct{}) error {
-	if !node.IsRunning() {
-		return ErrNoRunningNode
-	}
-
-	parsedPeer, err := discover.ParseNode(peerURL)
-	if err != nil {
-		return err
-	}
-
-	server := node.GethNode().Server()
-	ch := make(chan *p2p.PeerEvent)
-	subscription := server.SubscribeEvents(ch)
-	defer subscription.Unsubscribe()
-
-	close(subscribed)
-
-	for {
-		select {
-		case ev := <-ch:
-			if ev.Type == eventType && ev.Peer == parsedPeer.ID {
-				return nil
-			}
-		case err := <-subscription.Err():
-			if err != nil {
-				return err
-			}
-		case <-time.After(timeout):
-			return errors.New("wait for peer: timeout")
-		}
-	}
-}
-
-func waitForPeerAsync(node *StatusNode, peerURL string, eventType p2p.PeerEventType, timeout time.Duration) <-chan error {
-	subscribed := make(chan struct{})
-	errCh := make(chan error)
-	go func() {
-		errCh <- waitForPeer(node, peerURL, eventType, timeout, subscribed)
-	}()
-
-	<-subscribed
-
-	return errCh
 }

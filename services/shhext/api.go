@@ -123,6 +123,11 @@ func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (hex
 	shh := api.service.w
 	now := api.service.w.GetCurrentTime()
 	r.setDefaults(now)
+
+	if r.From > r.To {
+		return nil, fmt.Errorf("Query range is invalid: from > to (%d > %d)", r.From, r.To)
+	}
+
 	mailServerNode, err := discover.ParseNode(r.MailServerPeer)
 	if err != nil {
 		return nil, fmt.Errorf("%v: %v", ErrInvalidMailServerPeer, err)

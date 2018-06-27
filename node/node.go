@@ -259,7 +259,7 @@ func activateShhService(stack *node.Node, config *params.NodeConfig, db *leveldb
 			return nil, err
 		}
 
-		svc := shhext.New(whisper, shhext.EnvelopeSignalHandler{}, db)
+		svc := shhext.New(whisper, shhext.EnvelopeSignalHandler{}, db, config.DebugAPIEnabled)
 		return svc, nil
 	})
 }
