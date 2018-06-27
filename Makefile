@@ -28,6 +28,7 @@ endif
 CGO_CFLAGS=-I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
 GOBIN=$(dir $(realpath $(firstword $(MAKEFILE_LIST))))build/bin
 GIT_COMMIT := $(shell git rev-parse --short HEAD)
+GIT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
 
 BUILD_FLAGS ?= $(shell echo "-ldflags '-X main.buildStamp=`date -u '+%Y-%m-%d.%H:%M:%S'` -X github.com/status-im/status-go/params.VersionMeta=$(GIT_COMMIT)'")
 
@@ -145,8 +146,14 @@ bootnode-image:
 
 push-docker-images: docker-image bootnode-image
 	docker push $(BOOTNODE_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG)
-	docker push $(BOOTNODE_IMAGE_NAME):latest 
 	docker push $(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG)
+
+push-docker-images-latest: docker-image bootnode-image
+ifneq ("$(GIT_BRANCH)", "develop")
+	echo "You should only use develop branch to push the latest tag!"
+	exit 1
+endif
+	docker push $(BOOTNODE_IMAGE_NAME):latest 
 	docker push $(DOCKER_IMAGE_NAME):latest
 
 xgo-docker-images: ##@docker Build xgo docker images
