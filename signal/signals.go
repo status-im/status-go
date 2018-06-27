@@ -4,10 +4,13 @@ package signal
 #include <stddef.h>
 #include <stdbool.h>
 extern bool StatusServiceSignalEvent(const char *jsonEvent);
+extern void SetEventCallback(void *cb);
 */
 import "C"
 import (
 	"encoding/json"
+
+	"unsafe"
 
 	"sync"
 
@@ -81,4 +84,9 @@ func NotifyNode(jsonEvent *C.char) {
 //nolint: golint
 func TriggerTestSignal() {
 	C.StatusServiceSignalEvent(C.CString(`{"answer": 42}`))
+}
+
+// SetSignalEventCallback set callback
+func SetSignalEventCallback(cb unsafe.Pointer) {
+	C.SetEventCallback(cb)
 }

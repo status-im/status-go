@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"unsafe"
 
 	"github.com/NaySoftware/go-fcm"
 	"github.com/ethereum/go-ethereum/log"
@@ -14,6 +15,7 @@ import (
 	"github.com/status-im/status-go/profiling"
 	"github.com/status-im/status-go/sign"
 	"gopkg.in/go-playground/validator.v9"
+	"github.com/status-im/status-go/signal"
 )
 
 // All general log messages in this package should be routed through this logger.
@@ -483,4 +485,10 @@ func ConnectionChange(typ *C.char, expensive C.int) {
 //export AppStateChange
 func AppStateChange(state *C.char) {
 	statusBackend.AppStateChange(C.GoString(state))
+}
+
+// SetSignalEventCallback setup geth callback to notify about new jail signal
+//export SetSignalEventCallback
+func SetSignalEventCallback(cb unsafe.Pointer) {
+	signal.SetSignalEventCallback(cb)
 }
