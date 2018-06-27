@@ -47,7 +47,8 @@ type StatusBackend struct {
 	transactor          *transactions.Transactor
 	jailManager         jail.Manager
 	newNotification     fcm.NotificationConstructor
-	connectionState     ConnectionState
+	connectionState     connectionState
+	appState            appState
 	log                 log.Logger
 }
 
@@ -88,11 +89,6 @@ func (b *StatusBackend) AccountManager() *account.Manager {
 // JailManager returns reference to jail
 func (b *StatusBackend) JailManager() jail.Manager {
 	return b.jailManager
-}
-
-// PersonalAPI returns reference to personal APIs
-func (b *StatusBackend) PersonalAPI() *personal.PublicAPI {
-	return b.personalAPI
 }
 
 // Transactor returns reference to a status transactor
@@ -155,7 +151,7 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 	}
 	b.log.Info("Handlers registered")
 
-	if err = b.ReSelectAccount(); err != nil {
+	if err = b.reSelectAccount(); err != nil {
 		b.log.Error("Reselect account failed", "err", err)
 		return
 	}
@@ -316,24 +312,22 @@ func (b *StatusBackend) registerHandlers() error {
 		return hash.Hex(), err
 	})
 
-	rpcClient.RegisterHandler(params.PersonalSignMethodName, b.PersonalAPI().Sign)
-	rpcClient.RegisterHandler(params.PersonalRecoverMethodName, b.PersonalAPI().Recover)
+	rpcClient.RegisterHandler(params.PersonalSignMethodName, b.personalAPI.Sign)
+	rpcClient.RegisterHandler(params.PersonalRecoverMethodName, b.personalAPI.Recover)
 
 	return nil
 }
-
-//
 
 // ConnectionChange handles network state changes logic.
 func (b *StatusBackend) ConnectionChange(typ string, expensive bool) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	state := ConnectionState{
-		Type:      NewConnectionType(typ),
+	state := connectionState{
+		Type:      newConnectionType(typ),
 		Expensive: expensive,
 	}
-	if typ == "none" {
+	if typ == none {
 		state.Offline = true
 	}
 
@@ -348,13 +342,14 @@ func (b *StatusBackend) ConnectionChange(typ string, expensive bool) {
 // AppStateChange handles app state changes (background/foreground).
 // state values: see https://facebook.github.io/react-native/docs/appstate.html
 func (b *StatusBackend) AppStateChange(state string) {
-	appState, err := ParseAppState(state)
+	s, err := parseAppState(state)
 	if err != nil {
 		log.Error("AppStateChange failed, ignoring", "error", err)
 		return // and do nothing
 	}
 
-	b.log.Info("App State changed", "new-state", appState)
+	b.log.Info("App State changed", "new-state", s)
+	b.appState = s
 
 	// TODO: put node in low-power mode if the app is in background (or inactive)
 	// and normal mode if the app is in foreground.
@@ -385,8 +380,8 @@ func (b *StatusBackend) Logout() error {
 	return nil
 }
 
-// ReSelectAccount selects previously selected account, often, after node restart.
-func (b *StatusBackend) ReSelectAccount() error {
+// reSelectAccount selects previously selected account, often, after node restart.
+func (b *StatusBackend) reSelectAccount() error {
 	selectedAccount, err := b.AccountManager().SelectedAccount()
 	if selectedAccount == nil || err == account.ErrNoAccountSelected {
 		return nil
