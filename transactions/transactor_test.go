@@ -223,31 +223,8 @@ func (s *TxQueueTestSuite) TestCompleteTransaction() {
 			}
 			s.setupTransactionPoolAPI(args, testNonce, testNonce, selectedAccount, nil, testCase.signTxArgs)
 
-			w := make(chan struct{})
-			var sendHash gethcommon.Hash
-			go func() {
-				var sendErr error
-				sendHash, sendErr = s.manager.SendTransaction(context.Background(), args)
-				s.NoError(sendErr)
-				close(w)
-			}()
-
-			for i := 10; i > 0; i-- {
-				if s.manager.pendingSignRequests.Count() > 0 {
-					break
-				}
-				time.Sleep(time.Millisecond)
-			}
-
-			req := s.manager.pendingSignRequests.First()
-			s.NotNil(req)
-			approveResult := s.manager.pendingSignRequests.Approve(req.ID, "", testCase.signTxArgs, simpleVerifyFunc(selectedAccount))
-			s.NoError(approveResult.Error)
-			s.NoError(WaitClosed(w, time.Second))
-
-			// Transaction should be already removed from the queue.
-			s.False(s.manager.pendingSignRequests.Has(req.ID))
-			s.Equal(sendHash.Bytes(), approveResult.Response.Bytes())
+			result := s.manager.SendTransaction(context.Background(), args, "", testCase.signTxArgs, simpleVerifyFunc(selectedAccount))
+			s.NoError(result.Error)
 		})
 	}
 }

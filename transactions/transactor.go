@@ -68,25 +68,33 @@ func (t *Transactor) SetRPC(rpcClient *rpc.Client, timeout time.Duration) {
 }
 
 // SendTransaction is an implementation of eth_sendTransaction. It queues the tx to the sign queue.
-func (t *Transactor) SendTransaction(ctx context.Context, args SendTxArgs) (gethcommon.Hash, error) {
+func (t *Transactor) SendTransaction(ctx context.Context, sendArgs SendTxArgs, password string, signArgs *sign.TxArgs, verify sign.VerifyFunc) sign.Result {
 	if ctx == nil {
 		ctx = context.Background()
 	}
 
 	completeFunc := func(acc *account.SelectedExtKey, password string, signArgs *sign.TxArgs) (sign.Response, error) {
-		t.mergeSignTxArgsOntoSendTxArgs(signArgs, &args)
-		hash, err := t.validateAndPropagate(acc, args)
+		t.mergeSignTxArgsOntoSendTxArgs(signArgs, &sendArgs)
+		hash, err := t.validateAndPropagate(acc, sendArgs)
 		return sign.Response(hash.Bytes()), err
 	}
 
-	request, err := t.pendingSignRequests.Add(ctx, params.SendTransactionMethodName, args, completeFunc)
-
+	request, err := t.pendingSignRequests.Add(ctx, params.SendTransactionMethodName, sendArgs, completeFunc)
 	if err != nil {
-		return gethcommon.Hash{}, err
+		return sign.Result{
+			Response: sign.Response([]byte{}),
+			Error:    err,
+		}
 	}
 
-	result := t.pendingSignRequests.Wait(request.ID, t.sendTxTimeout)
-	return result.Response.Hash(), result.Error
+	result := make(chan sign.Result)
+	go func() {
+		result <- t.pendingSignRequests.Wait(request.ID, t.sendTxTimeout)
+	}()
+
+	t.pendingSignRequests.Approve(request.ID, password, signArgs, verify)
+
+	return <-result
 }
 
 // make sure that only account which created the tx can complete it

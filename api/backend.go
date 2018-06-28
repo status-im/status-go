@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"sync"
 
-	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	gethnode "github.com/ethereum/go-ethereum/node"
 
@@ -228,8 +227,11 @@ func (b *StatusBackend) CallPrivateRPC(inputJSON string) string {
 }
 
 // SendTransaction creates a new transaction and waits until it's complete.
-func (b *StatusBackend) SendTransaction(ctx context.Context, args transactions.SendTxArgs) (hash gethcommon.Hash, err error) {
-	return b.transactor.SendTransaction(ctx, args)
+func (b *StatusBackend) SendTransaction(ctx context.Context, sendArgs transactions.SendTxArgs, password string, verifyFunc sign.VerifyFunc) sign.Result {
+	if verifyFunc == nil {
+		verifyFunc = b.getVerifiedAccount
+	}
+	return b.transactor.SendTransaction(ctx, sendArgs, password, nil, verifyFunc)
 }
 
 func (b *StatusBackend) getVerifiedAccount(password string) (*account.SelectedExtKey, error) {
@@ -304,12 +306,12 @@ func (b *StatusBackend) registerHandlers() error {
 			return nil, err
 		}
 
-		hash, err := b.SendTransaction(ctx, txArgs)
-		if err != nil {
-			return nil, err
+		result := b.SendTransaction(ctx, txArgs, "", nil)
+		if result.Error != nil {
+			return nil, result.Error
 		}
 
-		return hash.Hex(), err
+		return result, result.Error
 	})
 
 	rpcClient.RegisterHandler(params.PersonalSignMethodName, b.personalAPI.Sign)
