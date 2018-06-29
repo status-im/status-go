@@ -45,14 +45,15 @@ func Create(path, dbName string) (*leveldb.DB, error) {
 	}
 
 	path = filepath.Join(path, dbName)
-	opts := &opt.Options{OpenFilesCacheCapacity: 5}
-	db, err := leveldb.OpenFile(path, opts)
+	return Open(path, &opt.Options{OpenFilesCacheCapacity: 5})
+}
+
+// Open opens an existing leveldb database
+func Open(path string, opts *opt.Options) (db *leveldb.DB, err error) {
+	db, err = leveldb.OpenFile(path, opts)
 	if _, iscorrupted := err.(*errors.ErrCorrupted); iscorrupted {
 		log.Info("database is corrupted trying to recover", "path", path)
 		db, err = leveldb.RecoverFile(path, nil)
 	}
-	if err != nil {
-		return nil, err
-	}
-	return db, err
+	return
 }
