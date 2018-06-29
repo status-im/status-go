@@ -56,7 +56,10 @@ var (
 )
 
 const (
-	dbKeyLength = common.HashLength + 4
+	timestampLength        = 4
+	dbKeyLength            = common.HashLength + timestampLength
+	requestLimitLength     = 4
+	requestTimeRangeLength = timestampLength * 2
 )
 
 type cursorType []byte
@@ -374,13 +377,13 @@ func (s *WMailServer) validateRequest(peerID []byte, request *whisper.Envelope) 
 	}
 
 	var limit uint32
-	if len(decrypted.Payload) >= 8+whisper.BloomFilterSize+4 {
-		limit = binary.BigEndian.Uint32(decrypted.Payload[8+whisper.BloomFilterSize:])
+	if len(decrypted.Payload) >= requestTimeRangeLength+whisper.BloomFilterSize+requestLimitLength {
+		limit = binary.BigEndian.Uint32(decrypted.Payload[requestTimeRangeLength+whisper.BloomFilterSize:])
 	}
 
 	var cursor cursorType
-	if len(decrypted.Payload) == 8+whisper.BloomFilterSize+4+dbKeyLength {
-		cursor = decrypted.Payload[8+whisper.BloomFilterSize+4:]
+	if len(decrypted.Payload) == requestTimeRangeLength+whisper.BloomFilterSize+requestLimitLength+dbKeyLength {
+		cursor = decrypted.Payload[requestTimeRangeLength+whisper.BloomFilterSize+requestLimitLength:]
 	}
 
 	return true, lower, upper, bloom, limit, cursor
