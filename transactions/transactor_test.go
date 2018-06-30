@@ -30,12 +30,6 @@ import (
 	. "github.com/status-im/status-go/t/utils"
 )
 
-func simpleVerifyFunc(acc *account.SelectedExtKey) func(string) (*account.SelectedExtKey, error) {
-	return func(string) (*account.SelectedExtKey, error) {
-		return acc, nil
-	}
-}
-
 func TestTxQueueTestSuite(t *testing.T) {
 	suite.Run(t, new(TxQueueTestSuite))
 }
@@ -63,7 +57,7 @@ func (s *TxQueueTestSuite) SetupTest() {
 	s.Require().NoError(err)
 	s.nodeConfig = nodeConfig
 
-	s.manager = NewTransactor(sign.NewPendingRequests())
+	s.manager = NewTransactor()
 	s.manager.sendTxTimeout = time.Second
 	s.manager.SetNetworkID(chainID)
 	s.manager.SetRPC(rpcClient, time.Second)
@@ -223,7 +217,7 @@ func (s *TxQueueTestSuite) TestCompleteTransaction() {
 			}
 			s.setupTransactionPoolAPI(args, testNonce, testNonce, selectedAccount, nil, testCase.signTxArgs)
 
-			result := s.manager.SendTransaction(context.Background(), args, "", testCase.signTxArgs, simpleVerifyFunc(selectedAccount))
+			result := s.manager.SendTransaction(args, testCase.signTxArgs, selectedAccount)
 			s.NoError(result.Error)
 		})
 	}
@@ -243,51 +237,8 @@ func (s *TxQueueTestSuite) TestAccountMismatch() {
 		To:   account.ToAddress(TestConfig.Account2.Address),
 	}
 
-	go func() {
-		s.manager.SendTransaction(context.Background(), args) // nolint: errcheck
-	}()
-
-	for i := 10; i > 0; i-- {
-		if s.manager.pendingSignRequests.Count() > 0 {
-			break
-		}
-		time.Sleep(time.Millisecond)
-	}
-
-	req := s.manager.pendingSignRequests.First()
-	s.NotNil(req)
-	result := s.manager.pendingSignRequests.Approve(req.ID, "", s.defaultSignTxArgs(), simpleVerifyFunc(selectedAccount))
+	result := s.manager.SendTransaction(args, s.defaultSignTxArgs(), selectedAccount) // nolint: errcheck
 	s.EqualError(result.Error, ErrInvalidCompleteTxSender.Error())
-
-	// Transaction should stay in the queue as mismatched accounts
-	// is a recoverable error.
-	s.True(s.manager.pendingSignRequests.Has(req.ID))
-}
-
-func (s *TxQueueTestSuite) TestDiscardTransaction() {
-	args := SendTxArgs{
-		From: account.FromAddress(TestConfig.Account1.Address),
-		To:   account.ToAddress(TestConfig.Account2.Address),
-	}
-	w := make(chan struct{})
-	go func() {
-		_, err := s.manager.SendTransaction(context.Background(), args)
-		s.Equal(sign.ErrSignReqDiscarded, err)
-		close(w)
-	}()
-
-	for i := 10; i > 0; i-- {
-		if s.manager.pendingSignRequests.Count() > 0 {
-			break
-		}
-		time.Sleep(time.Millisecond)
-	}
-
-	req := s.manager.pendingSignRequests.First()
-	s.NotNil(req)
-	err := s.manager.pendingSignRequests.Discard(req.ID)
-	s.NoError(err)
-	s.NoError(WaitClosed(w, time.Second))
 }
 
 // TestLocalNonce verifies that local nonce will be used unless
@@ -306,22 +257,6 @@ func (s *TxQueueTestSuite) TestLocalNonce() {
 	}
 	nonce := hexutil.Uint64(0)
 
-	go func() {
-		approved := 0
-		for {
-			// 3 in a cycle, then 2
-			if approved >= txCount+2 {
-				return
-			}
-			req := s.manager.pendingSignRequests.First()
-			if req == nil {
-				time.Sleep(time.Millisecond)
-			} else {
-				s.manager.pendingSignRequests.Approve(req.ID, "", s.defaultSignTxArgs(), simpleVerifyFunc(selectedAccount)) // nolint: errcheck
-			}
-		}
-	}()
-
 	for i := 0; i < txCount; i++ {
 		args := SendTxArgs{
 			From: account.FromAddress(TestConfig.Account1.Address),
@@ -329,8 +264,8 @@ func (s *TxQueueTestSuite) TestLocalNonce() {
 		}
 		s.setupTransactionPoolAPI(args, nonce, hexutil.Uint64(i), selectedAccount, nil, nil)
 
-		_, err := s.manager.SendTransaction(context.Background(), args)
-		s.NoError(err)
+		result := s.manager.SendTransaction(args, s.defaultSignTxArgs(), selectedAccount)
+		s.NoError(result.Error)
 		resultNonce, _ := s.manager.localNonce.Load(args.From)
 		s.Equal(uint64(i)+1, resultNonce.(uint64))
 	}
@@ -343,8 +278,8 @@ func (s *TxQueueTestSuite) TestLocalNonce() {
 
 	s.setupTransactionPoolAPI(args, nonce, nonce, selectedAccount, nil, nil)
 
-	_, err := s.manager.SendTransaction(context.Background(), args)
-	s.NoError(err)
+	result := s.manager.SendTransaction(args, s.defaultSignTxArgs(), selectedAccount)
+	s.NoError(result.Error)
 
 	resultNonce, _ := s.manager.localNonce.Load(args.From)
 	s.Equal(uint64(nonce)+1, resultNonce.(uint64))
@@ -356,8 +291,8 @@ func (s *TxQueueTestSuite) TestLocalNonce() {
 		To:   account.ToAddress(TestConfig.Account2.Address),
 	}
 
-	_, err = s.manager.SendTransaction(context.Background(), args)
-	s.EqualError(testErr, err.Error())
+	result = s.manager.SendTransaction(args, s.defaultSignTxArgs(), selectedAccount)
+	s.EqualError(testErr, result.Error.Error())
 	resultNonce, _ = s.manager.localNonce.Load(args.From)
 	s.Equal(uint64(nonce)+1, resultNonce.(uint64))
 }
@@ -381,21 +316,10 @@ func (s *TxQueueTestSuite) TestContractCreation() {
 		Input: hexutil.Bytes(gethcommon.FromHex(contract.ENSBin)),
 	}
 
-	go func() {
-		for i := 1000; i > 0; i-- {
-			req := s.manager.pendingSignRequests.First()
-			if req == nil {
-				time.Sleep(time.Millisecond)
-			} else {
-				s.manager.pendingSignRequests.Approve(req.ID, "", s.defaultSignTxArgs(), simpleVerifyFunc(selectedAccount)) // nolint: errcheck
-				break
-			}
-		}
-	}()
-
-	hash, err := s.manager.SendTransaction(context.Background(), tx)
-	s.NoError(err)
+	result := s.manager.SendTransaction(tx, s.defaultSignTxArgs(), selectedAccount)
+	s.NoError(result.Error)
 	backend.Commit()
+	hash := result.Response.Hash()
 	receipt, err := backend.TransactionReceipt(context.TODO(), hash)
 	s.NoError(err)
 	s.Equal(crypto.CreateAddress(testaddr, 0), receipt.ContractAddress)

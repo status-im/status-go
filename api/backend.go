@@ -58,7 +58,7 @@ func NewStatusBackend() *StatusBackend {
 	statusNode := node.New()
 	pendingSignRequests := sign.NewPendingRequests()
 	accountManager := account.NewManager(statusNode)
-	transactor := transactions.NewTransactor(pendingSignRequests)
+	transactor := transactions.NewTransactor()
 	personalAPI := personal.NewAPI(pendingSignRequests)
 	jailManager := jail.New(statusNode)
 	notificationManager := fcm.NewNotification(fcmServerKey)
@@ -227,11 +227,15 @@ func (b *StatusBackend) CallPrivateRPC(inputJSON string) string {
 }
 
 // SendTransaction creates a new transaction and waits until it's complete.
-func (b *StatusBackend) SendTransaction(ctx context.Context, sendArgs transactions.SendTxArgs, password string, verifyFunc sign.VerifyFunc) sign.Result {
-	if verifyFunc == nil {
-		verifyFunc = b.getVerifiedAccount
+func (b *StatusBackend) SendTransaction(sendArgs transactions.SendTxArgs, password string) sign.Result {
+	verifiedAccount, err := b.getVerifiedAccount(password)
+	if err != nil {
+		return sign.Result{
+			Response: sign.Response([]byte{}),
+			Error:    err,
+		}
 	}
-	return b.transactor.SendTransaction(ctx, sendArgs, password, nil, verifyFunc)
+	return b.transactor.SendTransaction(sendArgs, nil, verifiedAccount)
 }
 
 func (b *StatusBackend) getVerifiedAccount(password string) (*account.SelectedExtKey, error) {
@@ -306,7 +310,7 @@ func (b *StatusBackend) registerHandlers() error {
 			return nil, err
 		}
 
-		result := b.SendTransaction(ctx, txArgs, "", nil)
+		result := b.SendTransaction(txArgs, "")
 		if result.Error != nil {
 			return nil, result.Error
 		}

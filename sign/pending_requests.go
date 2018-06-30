@@ -9,7 +9,7 @@ import (
 	"github.com/status-im/status-go/account"
 )
 
-type VerifyFunc func(string) (*account.SelectedExtKey, error)
+type verifyFunc func(string) (*account.SelectedExtKey, error)
 
 // PendingRequests is a capped container that holds pending signing requests.
 type PendingRequests struct {
@@ -67,7 +67,7 @@ func (rs *PendingRequests) First() *Request {
 }
 
 // Approve a signing request by it's ID. Requires a valid password and a verification function.
-func (rs *PendingRequests) Approve(id string, password string, args *TxArgs, verify VerifyFunc) Result {
+func (rs *PendingRequests) Approve(id string, password string, args *TxArgs, verify verifyFunc) Result {
 	rs.log.Info("complete sign request", "id", id)
 	request, err := rs.tryLock(id)
 	if err != nil {

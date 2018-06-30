@@ -312,6 +312,8 @@ func (s *TransactionsTestSuite) testSendContractTx(setInputAndDataValue initFunc
 
 	sampleAddress, _, _, err := s.Backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
 	s.NoError(err)
+	err = s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
+	s.NoError(err)
 
 	completeQueuedTransaction := make(chan struct{})
 
@@ -332,23 +334,16 @@ func (s *TransactionsTestSuite) testSendContractTx(setInputAndDataValue initFunc
 	}
 
 	setInputAndDataValue(byteCode, &args)
-	txHashCheck, err := s.Backend.SendTransaction(context.TODO(), args)
+	result := s.Backend.SendTransaction(args, TestConfig.Account1.Password)
 
 	if expectedError != nil {
-		s.Equal(expectedError, err, expectedErrorDescription)
+		s.Equal(expectedError, result.Error, expectedErrorDescription)
 		return
 	}
-	s.NoError(err, "cannot send transaction")
+	s.NoError(result.Error, "cannot send transaction")
 
-	select {
-	case <-completeQueuedTransaction:
-	case <-time.After(2 * time.Minute):
-		s.FailNow("completing transaction timed out")
-	}
-
-	s.Equal(txHashCheck.Bytes(), signRequestResult, "transaction hash returned from SendTransaction is invalid")
-	s.False(reflect.DeepEqual(txHashCheck, gethcommon.Hash{}), "transaction was never queued or completed")
-	s.Zero(s.PendingSignRequests().Count(), "tx queue must be empty at this point")
+	s.Equal(result.Response.Bytes(), signRequestResult, "transaction hash returned from SendTransaction is invalid")
+	s.False(reflect.DeepEqual(result.Response.Hash(), gethcommon.Hash{}), "transaction was never queued or completed")
 
 	s.NoError(s.Backend.Logout())
 }
