@@ -54,7 +54,8 @@ type MessagesRequest struct {
 
 	// SymKeyID is an ID of a symmetric key to authenticate to MailServer.
 	// It's derived from MailServer password.
-	// DEPRECATED: it's possible to authenticate request with MailServerPeer
+	//
+	// It's also possible to authenticate request with MailServerPeer
 	// public key.
 	SymKeyID string `json:"symKeyID"`
 
