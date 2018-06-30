@@ -2,6 +2,7 @@ package params
 
 import (
 	"bytes"
+	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,8 +12,10 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
+
 	"github.com/status-im/status-go/static"
 )
 
@@ -92,6 +95,12 @@ type WhisperConfig struct {
 	// (if no account file selected, then this password is used for symmetric encryption).
 	Password string
 
+	// AsymKeyFile is a file with an asymmetric key to decrypt messages sent to MailServer.
+	AsymKeyFile string
+
+	// AsymKey is an asymmetric key to decrypt messages sent to MailServer.
+	AsymKey *ecdsa.PrivateKey
+
 	// LightClient should be true if the node should start with an empty bloom filter and not forward messages from other nodes
 	LightClient bool
 
@@ -140,6 +149,12 @@ func (c *WhisperConfig) ReadPasswordFile() error {
 	c.Password = string(password)
 
 	return nil
+}
+
+// ReadAsymKeyFile reads and returns a private key from a given file.
+func (c *WhisperConfig) ReadAsymKeyFile() (err error) {
+	c.AsymKey, err = crypto.LoadECDSA(c.AsymKeyFile)
+	return
 }
 
 // String dumps config object as nicely indented JSON

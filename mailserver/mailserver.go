@@ -41,8 +41,8 @@ const (
 )
 
 var (
-	errDirectoryNotProvided = errors.New("data directory not provided")
-	errPasswordNotProvided  = errors.New("password is not specified")
+	errDirectoryNotProvided        = errors.New("data directory not provided")
+	errDecryptionMethodNotProvided = errors.New("decryption method is not provided")
 	// By default go-ethereum/metrics creates dummy metrics that don't register anything.
 	// Real metrics are collected only if -metrics flag is set
 	requestProcessTimer    = metrics.NewRegisteredTimer("mailserver/requestProcessTime", nil)
@@ -71,12 +71,12 @@ type dbImpl interface {
 
 // WMailServer whisper mailserver.
 type WMailServer struct {
-	db    dbImpl
-	w     *whisper.Whisper
-	pow   float64
-	key   []byte
-	limit *limiter
-	tick  *ticker
+	db     dbImpl
+	w      *whisper.Whisper
+	pow    float64
+	filter *whisper.Filter
+	limit  *limiter
+	tick   *ticker
 }
 
 // DBKey key to be stored on db.
@@ -106,23 +106,25 @@ func (s *WMailServer) Init(shh *whisper.Whisper, config *params.WhisperConfig) e
 		return errDirectoryNotProvided
 	}
 
-	if len(config.Password) == 0 {
-		return errPasswordNotProvided
+	if len(config.Password) == 0 && config.AsymKey == nil {
+		return errDecryptionMethodNotProvided
 	}
 
+	s.w = shh
+	s.pow = config.MinimumPoW
+
+	if err := s.setupRequestMessageDecryptor(config); err != nil {
+		return err
+	}
+	s.setupLimiter(time.Duration(config.MailServerRateLimit) * time.Second)
+
+	// Open database in the last step in order not to init with error
+	// and leave the database open by accident.
 	db, err := leveldb.OpenFile(config.DataDir, nil)
 	if err != nil {
 		return fmt.Errorf("open DB: %s", err)
 	}
-
 	s.db = db
-	s.w = shh
-	s.pow = config.MinimumPoW
-
-	if err := s.setupWhisperIdentity(config); err != nil {
-		return err
-	}
-	s.setupLimiter(time.Duration(config.MailServerRateLimit) * time.Second)
 
 	return nil
 }
@@ -136,18 +138,28 @@ func (s *WMailServer) setupLimiter(limit time.Duration) {
 	}
 }
 
-// setupWhisperIdentity setup the whisper identity (symkey) for the current mail
-// server.
-func (s *WMailServer) setupWhisperIdentity(config *params.WhisperConfig) error {
-	MailServerKeyID, err := s.w.AddSymKeyFromPassword(config.Password)
-	if err != nil {
-		return fmt.Errorf("create symmetric key: %s", err)
+// setupRequestMessageDecryptor setup a Whisper filter to decrypt
+// incoming Whisper requests.
+func (s *WMailServer) setupRequestMessageDecryptor(config *params.WhisperConfig) error {
+	var filter whisper.Filter
+
+	if config.Password != "" {
+		keyID, err := s.w.AddSymKeyFromPassword(config.Password)
+		if err != nil {
+			return fmt.Errorf("create symmetric key: %v", err)
+		}
+
+		symKey, err := s.w.GetSymKey(keyID)
+		if err != nil {
+			return fmt.Errorf("save symmetric key: %v", err)
+		}
+
+		filter = whisper.Filter{KeySym: symKey}
+	} else if config.AsymKey != nil {
+		filter = whisper.Filter{KeyAsym: config.AsymKey}
 	}
 
-	s.key, err = s.w.GetSymKey(MailServerKeyID)
-	if err != nil {
-		return fmt.Errorf("save symmetric key: %s", err)
-	}
+	s.filter = &filter
 
 	return nil
 }
@@ -314,8 +326,7 @@ func (s *WMailServer) validateRequest(peerID []byte, request *whisper.Envelope) 
 		return false, 0, 0, nil
 	}
 
-	f := whisper.Filter{KeySym: s.key}
-	decrypted := request.Open(&f)
+	decrypted := request.Open(s.filter)
 	if decrypted == nil {
 		log.Warn("Failed to decrypt p2p request")
 		return false, 0, 0, nil

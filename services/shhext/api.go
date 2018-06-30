@@ -27,6 +27,9 @@ var (
 	ErrInvalidMailServerPeer = errors.New("invalid mailServerPeer value")
 	// ErrInvalidSymKeyID is returned when it fails to get a symmetric key.
 	ErrInvalidSymKeyID = errors.New("invalid symKeyID value")
+	// ErrInvalidPublicKey is returned when public key can't be extracted
+	// from MailServer's nodeID.
+	ErrInvalidPublicKey = errors.New("can't extract public key")
 )
 
 // -----
@@ -51,6 +54,8 @@ type MessagesRequest struct {
 
 	// SymKeyID is an ID of a symmetric key to authenticate to MailServer.
 	// It's derived from MailServer password.
+	// DEPRECATED: it's possible to authenticate request with MailServerPeer
+	// public key.
 	SymKeyID string `json:"symKeyID"`
 
 	// Timeout is the time to live of the request specified in seconds.
@@ -120,17 +125,38 @@ func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (hex
 		return nil, fmt.Errorf("Query range is invalid: from > to (%d > %d)", r.From, r.To)
 	}
 
+	var err error
+
 	mailServerNode, err := discover.ParseNode(r.MailServerPeer)
 	if err != nil {
 		return nil, fmt.Errorf("%v: %v", ErrInvalidMailServerPeer, err)
 	}
 
-	symKey, err := shh.GetSymKey(r.SymKeyID)
-	if err != nil {
-		return nil, fmt.Errorf("%v: %v", ErrInvalidSymKeyID, err)
+	var (
+		symKey    []byte
+		publicKey *ecdsa.PublicKey
+	)
+
+	if r.SymKeyID != "" {
+		symKey, err = shh.GetSymKey(r.SymKeyID)
+		if err != nil {
+			return nil, fmt.Errorf("%v: %v", ErrInvalidSymKeyID, err)
+		}
+	} else {
+		publicKey, err = mailServerNode.ID.Pubkey()
+		if err != nil {
+			return nil, fmt.Errorf("%v: %v", ErrInvalidPublicKey, err)
+		}
 	}
 
-	envelope, err := makeEnvelop(makePayload(r), symKey, api.service.nodeID, shh.MinPow(), now)
+	envelope, err := makeEnvelop(
+		makePayload(r),
+		symKey,
+		publicKey,
+		api.service.nodeID,
+		shh.MinPow(),
+		now,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -167,13 +193,26 @@ func (api *PublicAPI) ConfirmMessagesProcessed(messages []*whisper.Message) erro
 // makeEnvelop makes an envelop for a historic messages request.
 // Symmetric key is used to authenticate to MailServer.
 // PK is the current node ID.
-func makeEnvelop(payload []byte, symKey []byte, nodeID *ecdsa.PrivateKey, pow float64, now time.Time) (*whisper.Envelope, error) {
+func makeEnvelop(
+	payload []byte,
+	symKey []byte,
+	publicKey *ecdsa.PublicKey,
+	nodeID *ecdsa.PrivateKey,
+	pow float64,
+	now time.Time,
+) (*whisper.Envelope, error) {
 	params := whisper.MessageParams{
 		PoW:      pow,
 		Payload:  payload,
-		KeySym:   symKey,
 		WorkTime: defaultWorkTime,
 		Src:      nodeID,
+	}
+	// Either symKey or public key is required.
+	// This condition is verified in `message.Wrap()` method.
+	if len(symKey) > 0 {
+		params.KeySym = symKey
+	} else if publicKey != nil {
+		params.Dst = publicKey
 	}
 	message, err := whisper.NewSentMessage(&params)
 	if err != nil {

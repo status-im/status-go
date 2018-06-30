@@ -223,9 +223,15 @@ func activateShhService(stack *node.Node, config *params.NodeConfig, db *leveldb
 
 		// enable mail service
 		if config.WhisperConfig.EnableMailServer {
-			if config.WhisperConfig.Password == "" {
+			if config.WhisperConfig.Password == "" && config.WhisperConfig.PasswordFile != "" {
 				if err := config.WhisperConfig.ReadPasswordFile(); err != nil {
 					return nil, err
+				}
+			}
+
+			if config.WhisperConfig.AsymKeyFile != "" {
+				if err := config.WhisperConfig.ReadAsymKeyFile(); err != nil {
+					return nil, fmt.Errorf("shh service setup error: %v", err)
 				}
 			}
 

@@ -22,6 +22,8 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -61,65 +63,141 @@ func (s *MailserverSuite) SetupTest() {
 	s.server = &WMailServer{}
 	s.shh = whisper.New(&whisper.DefaultConfig)
 	s.shh.RegisterServer(s.server)
+
+	tmpDir, err := ioutil.TempDir("", "mailserver-test")
+	s.Require().NoError(err)
+
+	// required files to validate mail server decryption method
+	asymKeyFile := filepath.Join(tmpDir, "asymkey")
+	passwordFile := filepath.Join(tmpDir, "password")
+	privateKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	err = crypto.SaveECDSA(asymKeyFile, privateKey)
+	s.Require().NoError(err)
+	err = ioutil.WriteFile(passwordFile, []byte("testpassword"), os.ModePerm)
+	s.Require().NoError(err)
+
 	s.config = &params.WhisperConfig{
-		DataDir:             "/tmp/",
-		Password:            "pwd",
-		MailServerRateLimit: 5,
+		DataDir:      tmpDir,
+		AsymKeyFile:  asymKeyFile,
+		PasswordFile: passwordFile,
 	}
 }
 
+func (s *MailserverSuite) TearDownTest() {
+	s.Require().NoError(os.RemoveAll(s.config.DataDir))
+}
+
 func (s *MailserverSuite) TestInit() {
+	asymKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
 	testCases := []struct {
 		config        params.WhisperConfig
 		expectedError error
-		limiterActive bool
 		info          string
 	}{
 		{
 			config:        params.WhisperConfig{DataDir: ""},
 			expectedError: errDirectoryNotProvided,
-			limiterActive: false,
-			info:          "Initializing a mail server with a config with empty DataDir",
+			info:          "config with empty DataDir",
 		},
 		{
-			config:        params.WhisperConfig{DataDir: "/tmp/", Password: ""},
-			expectedError: errPasswordNotProvided,
-			limiterActive: false,
-			info:          "Initializing a mail server with a config with an empty password",
-		},
-		{
-			config:        params.WhisperConfig{DataDir: "/invalid-path", Password: "pwd"},
+			config:        params.WhisperConfig{DataDir: "/invalid-path"},
 			expectedError: errors.New("open DB: mkdir /invalid-path: permission denied"),
-			limiterActive: false,
-			info:          "Initializing a mail server with a config with an unexisting DataDir",
-		},
-		{
-			config:        *s.config,
-			expectedError: nil,
-			limiterActive: true,
-			info:          "Initializing a mail server with a config with correct config and active limiter",
+			info:          "config with an unexisting DataDir",
 		},
 		{
 			config: params.WhisperConfig{
-				DataDir:  "/tmp/",
+				DataDir:  s.config.DataDir,
+				Password: "",
+				AsymKey:  nil,
+			},
+			expectedError: errDecryptionMethodNotProvided,
+			info:          "config with an empty password and empty asym key",
+		},
+		{
+			config:        params.WhisperConfig{DataDir: s.config.DataDir},
+			expectedError: nil,
+			info:          "config with correct DataDir",
+		},
+		{
+			config: params.WhisperConfig{
+				DataDir: s.config.DataDir,
+				AsymKey: asymKey,
+			},
+			expectedError: nil,
+			info:          "config with only asym key file",
+		},
+		{
+			config: params.WhisperConfig{
+				DataDir:  s.config.DataDir,
+				AsymKey:  asymKey,
 				Password: "pwd",
 			},
 			expectedError: nil,
-			limiterActive: false,
-			info:          "Initializing a mail server with a config with empty DataDir and inactive limiter",
+			info:          "config with both asym key and password",
+		},
+		{
+			config: params.WhisperConfig{
+				DataDir:             s.config.DataDir,
+				MailServerRateLimit: 5,
+			},
+			expectedError: nil,
+			info:          "config witih rate limit",
 		},
 	}
 
 	for _, tc := range testCases {
 		s.T().Run(tc.info, func(*testing.T) {
-			s.server.limit = nil
-			err := s.server.Init(s.shh, &tc.config)
-			s.server.tick = nil
-			s.server.Close()
+			mailServer := &WMailServer{}
+			shh := whisper.New(&whisper.DefaultConfig)
+			shh.RegisterServer(mailServer)
+
+			err := mailServer.Init(shh, &tc.config)
 			s.Equal(tc.expectedError, err)
-			s.Equal(tc.limiterActive, (s.server.limit != nil))
+			defer mailServer.Close()
+
+			s.NotNil(mailServer.db)
+			s.NotNil(mailServer.filter)
+			if tc.config.MailServerRateLimit > 0 {
+				s.NotNil(mailServer.limit)
+			}
 		})
 	}
+}
+
+func (s *MailserverSuite) TestSetupRequestMessageDecryptor() {
+	var config params.WhisperConfig
+
+	// without configured Password and AsymKey
+	config = *s.config
+	s.Error(errDecryptionMethodNotProvided, s.server.Init(s.shh, &config))
+
+	// Password should work ok
+	config = *s.config
+	s.NoError(config.ReadPasswordFile())
+	s.NoError(s.server.Init(s.shh, &config))
+	s.NotNil(s.server.filter.KeySym)
+	s.Nil(s.server.filter.KeyAsym)
+	s.server.Close()
+
+	// AsymKey can also be used
+	config = *s.config
+	s.NoError(config.ReadAsymKeyFile())
+	s.NoError(s.server.Init(s.shh, &config))
+	s.Nil(s.server.filter.KeySym) // important: symmetric key should be nil
+	s.Equal(config.AsymKey, s.server.filter.KeyAsym)
+	s.server.Close()
+
+	// when both Password and AsymKey are set, Password has a preference
+	config = *s.config
+	s.NoError(config.ReadPasswordFile())
+	s.NoError(config.ReadAsymKeyFile())
+	s.NoError(s.server.Init(s.shh, &config))
+	s.NotNil(s.server.filter.KeySym)
+	s.Nil(s.server.filter.KeyAsym)
+	s.server.Close()
 }
 
 func (s *MailserverSuite) TestArchive() {
