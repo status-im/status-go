@@ -29,8 +29,8 @@ CGO_CFLAGS=-I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
 GOBIN=$(dir $(realpath $(firstword $(MAKEFILE_LIST))))build/bin
 GIT_COMMIT := $(shell git rev-parse --short HEAD)
 GIT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
-GIT_LOCAL  := $(git rev-parse @)
-GIT_REMOTE := $(git rev-parse origin)
+GIT_LOCAL  := $(shell git rev-parse @)
+GIT_REMOTE := $(shell git fetch -q && git rev-parse origin)
 
 BUILD_FLAGS ?= $(shell echo "-ldflags '-X main.buildStamp=`date -u '+%Y-%m-%d.%H:%M:%S'` -X github.com/status-im/status-go/params.VersionMeta=$(GIT_COMMIT)'")
 
