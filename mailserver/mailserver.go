@@ -38,6 +38,7 @@ import (
 
 const (
 	maxQueryRange = 24 * time.Hour
+	noLimits      = 0
 )
 
 var (
@@ -311,7 +312,7 @@ func (s *WMailServer) processRequest(peer *whisper.Peer, lower, upper uint32, bl
 			sentEnvelopes++
 			sentEnvelopesSize += whisper.EnvelopeHeaderLength + int64(len(envelope.Data))
 
-			if limit != 0 && sentEnvelopes == limit {
+			if limit != noLimits && sentEnvelopes == limit {
 				nextPageCursor = i.Key()
 				break
 			}
