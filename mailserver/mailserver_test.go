@@ -43,6 +43,7 @@ type ServerTestParams struct {
 	birth uint32
 	low   uint32
 	upp   uint32
+	limit uint32
 	key   *ecdsa.PrivateKey
 }
 
@@ -162,6 +163,71 @@ func (s *MailserverSuite) TestDBKey() {
 	s.Equal(byte(i/0x1000000), k.raw[0], "big endian expected")
 }
 
+func (s *MailserverSuite) TestRequestPaginationLimit() {
+	s.setupServer(s.server)
+	defer s.server.Close()
+
+	var (
+		sentEnvelopes     []*whisper.Envelope
+		reverseSentHashes []common.Hash
+		receivedHashes    []common.Hash
+		archiveKeys       []string
+	)
+
+	now := time.Now()
+	count := uint32(10)
+
+	for i := count; i > 0; i-- {
+		sentTime := now.Add(time.Duration(-i) * time.Second)
+		env, err := generateEnvelope(sentTime)
+		s.NoError(err)
+		s.server.Archive(env)
+		key := NewDbKey(env.Expiry-env.TTL, env.Hash())
+		archiveKeys = append(archiveKeys, fmt.Sprintf("%x", key.raw))
+		sentEnvelopes = append(sentEnvelopes, env)
+		reverseSentHashes = append([]common.Hash{env.Hash()}, reverseSentHashes...)
+	}
+
+	params := s.defaultServerParams(sentEnvelopes[0])
+	params.low = uint32(now.Add(time.Duration(-count) * time.Second).Unix())
+	params.upp = uint32(now.Unix())
+	params.limit = 6
+	request := s.createRequest(params)
+	src := crypto.FromECDSAPub(&params.key.PublicKey)
+	ok, lower, upper, bloom, limit, cursor := s.server.validateRequest(src, request)
+	s.True(ok)
+	s.Nil(cursor)
+	s.Equal(params.limit, limit)
+
+	envelopes, _, cursor, err := s.server.processRequest(nil, lower, upper, bloom, limit, nil)
+	s.NoError(err)
+	for _, env := range envelopes {
+		receivedHashes = append(receivedHashes, env.Hash())
+	}
+
+	// 10 envelopes sent
+	s.Equal(count, uint32(len(sentEnvelopes)))
+	// 6 envelopes received
+	s.Equal(limit, uint32(len(receivedHashes)))
+	// the 6 envelopes received should be in descending order
+	s.Equal(reverseSentHashes[:limit], receivedHashes)
+	// cursor should be the key of the first envelope of the next page
+	s.Equal(archiveKeys[count-limit], fmt.Sprintf("%x", cursor))
+
+	// second page
+	receivedHashes = []common.Hash{}
+	envelopes, _, cursor, err = s.server.processRequest(nil, lower, upper, bloom, limit, cursor)
+	s.NoError(err)
+	for _, env := range envelopes {
+		receivedHashes = append(receivedHashes, env.Hash())
+	}
+
+	// 4 envelopes received
+	s.Equal(count-limit, uint32(len(receivedHashes)))
+	// cursor is nil because there are no other pages
+	s.Nil(cursor)
+}
+
 func (s *MailserverSuite) TestMailServer() {
 	s.setupServer(s.server)
 	defer s.server.Close()
@@ -170,6 +236,7 @@ func (s *MailserverSuite) TestMailServer() {
 	s.NoError(err)
 
 	s.server.Archive(env)
+
 	testCases := []struct {
 		params *ServerTestParams
 		expect bool
@@ -233,25 +300,26 @@ func (s *MailserverSuite) TestMailServer() {
 		s.T().Run(tc.info, func(*testing.T) {
 			request := s.createRequest(tc.params)
 			src := crypto.FromECDSAPub(&tc.params.key.PublicKey)
-			ok, lower, upper, bloom := s.server.validateRequest(src, request)
+			ok, lower, upper, bloom, limit, _ := s.server.validateRequest(src, request)
 			s.Equal(tc.isOK, ok)
 			if ok {
 				s.Equal(tc.params.low, lower)
 				s.Equal(tc.params.upp, upper)
+				s.Equal(tc.params.limit, limit)
 				s.Equal(whisper.TopicToBloom(tc.params.topic), bloom)
-				s.Equal(tc.expect, s.messageExists(env, tc.params.low, tc.params.upp, bloom))
+				s.Equal(tc.expect, s.messageExists(env, tc.params.low, tc.params.upp, bloom, tc.params.limit))
 
 				src[0]++
-				ok, _, _, _ = s.server.validateRequest(src, request)
+				ok, _, _, _, _, _ = s.server.validateRequest(src, request)
 				s.True(ok)
 			}
 		})
 	}
 }
 
-func (s *MailserverSuite) messageExists(envelope *whisper.Envelope, low, upp uint32, bloom []byte) bool {
+func (s *MailserverSuite) messageExists(envelope *whisper.Envelope, low, upp uint32, bloom []byte, limit uint32) bool {
 	var exist bool
-	mail, err := s.server.processRequest(nil, low, upp, bloom)
+	mail, _, _, err := s.server.processRequest(nil, low, upp, bloom, limit, nil)
 	s.NoError(err)
 	for _, msg := range mail {
 		if msg.Hash() == envelope.Hash() {
@@ -337,6 +405,7 @@ func (s *MailserverSuite) defaultServerParams(env *whisper.Envelope) *ServerTest
 		birth: birth,
 		low:   birth - 1,
 		upp:   birth + 1,
+		limit: 0,
 		key:   testPeerID,
 	}
 }
@@ -347,6 +416,12 @@ func (s *MailserverSuite) createRequest(p *ServerTestParams) *whisper.Envelope {
 	binary.BigEndian.PutUint32(data, p.low)
 	binary.BigEndian.PutUint32(data[4:], p.upp)
 	data = append(data, bloom...)
+
+	if p.limit != 0 {
+		limitData := make([]byte, 4)
+		binary.BigEndian.PutUint32(limitData, p.limit)
+		data = append(data, limitData...)
+	}
 
 	key, err := s.shh.GetSymKey(keyID)
 	if err != nil {

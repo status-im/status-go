@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"time"
@@ -45,6 +46,13 @@ type MessagesRequest struct {
 	// To is a upper bound of time range (optional).
 	// Default is now.
 	To uint32 `json:"to"`
+
+	// Limit determines the number of messages sent by the mail server
+	// for the current paginated request
+	Limit uint32 `json:"limit"`
+
+	// Cursor is used as starting point for paginated requests
+	Cursor string `json:"cursor"`
 
 	// Topic is a regular Whisper topic.
 	Topic whisper.TopicType `json:"topic"`
@@ -184,10 +192,30 @@ func makeEnvelop(payload []byte, symKey []byte, nodeID *ecdsa.PrivateKey, pow fl
 
 // makePayload makes a specific payload for MailServer to request historic messages.
 func makePayload(r MessagesRequest) []byte {
-	// first 8 bytes are lowed and upper bounds as uint32
-	data := make([]byte, 8+whisper.BloomFilterSize)
+	// Payload format:
+	// 4  bytes for lower
+	// 4  bytes for upper
+	// 64 bytes for the bloom filter
+	// 4  bytes for limit
+	// 36 bytes for the cursor. optional.
+	data := make([]byte, 12+whisper.BloomFilterSize)
+
+	// from
 	binary.BigEndian.PutUint32(data, r.From)
+	// to
 	binary.BigEndian.PutUint32(data[4:], r.To)
+	// bloom
 	copy(data[8:], whisper.TopicToBloom(r.Topic))
-	return data
+	// limit
+	binary.BigEndian.PutUint32(data[8+whisper.BloomFilterSize:], r.Limit)
+
+	// cursor is the key of an envelope in leveldb.
+	// it's 36 bytes. 4 bytes for the timestamp + 32 bytes for the envelope hash
+	expectedCursorSize := common.HashLength + 4
+	cursorBytes, err := hex.DecodeString(r.Cursor)
+	if err != nil || len(cursorBytes) != expectedCursorSize {
+		return data
+	}
+
+	return append(data, cursorBytes...)
 }

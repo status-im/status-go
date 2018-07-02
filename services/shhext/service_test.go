@@ -39,8 +39,8 @@ func (t handlerMock) EnvelopeExpired(hash common.Hash) {
 	t.expirations <- hash
 }
 
-func (t handlerMock) MailServerRequestCompleted(hash common.Hash) {
-	t.requestsCompleted <- hash
+func (t handlerMock) MailServerRequestCompleted(requestID common.Hash, lastEnvelopeHash common.Hash, cursor []byte) {
+	t.requestsCompleted <- requestID
 }
 
 func (t handlerMock) MailServerRequestExpired(hash common.Hash) {
@@ -389,14 +389,23 @@ func (s *TrackerSuite) TestRemoved() {
 }
 
 func (s *TrackerSuite) TestRequestCompleted() {
+	mock := newHandlerMock(1)
+	s.tracker.handler = mock
 	s.tracker.AddRequest(testHash, time.After(defaultRequestTimeout*time.Second))
 	s.Contains(s.tracker.cache, testHash)
 	s.Equal(MailServerRequestSent, s.tracker.cache[testHash])
 	s.tracker.handleEvent(whisper.EnvelopeEvent{
 		Event: whisper.EventMailServerRequestCompleted,
 		Hash:  testHash,
+		Data:  &whisper.MailServerResponse{},
 	})
-	s.NotContains(s.tracker.cache, testHash)
+	select {
+	case requestID := <-mock.requestsCompleted:
+		s.Equal(testHash, requestID)
+		s.NotContains(s.tracker.cache, testHash)
+	case <-time.After(10 * time.Second):
+		s.Fail("timed out while waiting for a request to be completed")
+	}
 }
 
 func (s *TrackerSuite) TestRequestExpiration() {

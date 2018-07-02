@@ -24,6 +24,13 @@ type EnvelopeSignal struct {
 	Hash common.Hash `json:"hash"`
 }
 
+// MailServerResponseSignal holds the data received in the response from the mailserver.
+type MailServerResponseSignal struct {
+	RequestID        common.Hash `json:"requestID"`
+	LastEnvelopeHash common.Hash `json:"lastEnvelopeHash"`
+	Cursor           string      `json:"cursor"`
+}
+
 // SendEnvelopeSent triggered when envelope delivered at least to 1 peer.
 func SendEnvelopeSent(hash common.Hash) {
 	send(EventEnvelopeSent, EnvelopeSignal{hash})
@@ -35,8 +42,13 @@ func SendEnvelopeExpired(hash common.Hash) {
 }
 
 // SendMailServerRequestCompleted triggered when mail server response has been received
-func SendMailServerRequestCompleted(hash common.Hash) {
-	send(EventMailServerRequestCompleted, EnvelopeSignal{hash})
+func SendMailServerRequestCompleted(requestID common.Hash, lastEnvelopeHash common.Hash, cursor []byte) {
+	sig := MailServerResponseSignal{
+		RequestID:        requestID,
+		LastEnvelopeHash: lastEnvelopeHash,
+		Cursor:           string(cursor),
+	}
+	send(EventMailServerRequestCompleted, sig)
 }
 
 // SendMailServerRequestExpired triggered when mail server request expires
