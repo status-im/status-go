@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"testing"
 	"time"
 
@@ -47,26 +48,45 @@ type ServerTestParams struct {
 	key   *ecdsa.PrivateKey
 }
 
+const dataDirPrefix = "whisper-server-test"
+
 func TestMailserverSuite(t *testing.T) {
 	suite.Run(t, new(MailserverSuite))
 }
 
 type MailserverSuite struct {
 	suite.Suite
-	server *WMailServer
-	shh    *whisper.Whisper
-	config *params.WhisperConfig
+	server  *WMailServer
+	shh     *whisper.Whisper
+	config  *params.WhisperConfig
+	dataDir string
 }
 
 func (s *MailserverSuite) SetupTest() {
 	s.server = &WMailServer{}
 	s.shh = whisper.New(&whisper.DefaultConfig)
 	s.shh.RegisterServer(s.server)
+
+	var err error
+	s.dataDir, err = ioutil.TempDir("/tmp", dataDirPrefix)
+	if err != nil {
+		s.FailNow("failed creating tmp data dir", err)
+	}
+
 	s.config = &params.WhisperConfig{
-		DataDir:             "/tmp/",
+		DataDir:             s.dataDir,
 		Password:            "pwd",
 		MailServerRateLimit: 5,
 	}
+}
+
+func (s *MailserverSuite) TearDownTest() {
+	if s.dataDir != "" {
+		if err := os.RemoveAll(s.dataDir); err != nil {
+			fmt.Printf("couldn't remove temporary data dir %s: %v", s.dataDir, err)
+		}
+	}
+
 }
 
 func (s *MailserverSuite) TestInit() {
@@ -83,7 +103,7 @@ func (s *MailserverSuite) TestInit() {
 			info:          "Initializing a mail server with a config with empty DataDir",
 		},
 		{
-			config:        params.WhisperConfig{DataDir: "/tmp/", Password: ""},
+			config:        params.WhisperConfig{DataDir: s.dataDir, Password: ""},
 			expectedError: errPasswordNotProvided,
 			limiterActive: false,
 			info:          "Initializing a mail server with a config with an empty password",
@@ -102,7 +122,7 @@ func (s *MailserverSuite) TestInit() {
 		},
 		{
 			config: params.WhisperConfig{
-				DataDir:  "/tmp/",
+				DataDir:  s.dataDir,
 				Password: "pwd",
 			},
 			expectedError: nil,
@@ -368,17 +388,11 @@ func (s *MailserverSuite) TestBloomFromReceivedMessage() {
 
 func (s *MailserverSuite) setupServer(server *WMailServer) {
 	const password = "password_for_this_test"
-	const dbPath = "whisper-server-test"
-
-	dir, err := ioutil.TempDir("", dbPath)
-	if err != nil {
-		s.T().Fatal(err)
-	}
 
 	s.shh = whisper.New(&whisper.DefaultConfig)
 	s.shh.RegisterServer(server)
 
-	err = server.Init(s.shh, &params.WhisperConfig{DataDir: dir, Password: password, MinimumPoW: powRequirement})
+	err := server.Init(s.shh, &params.WhisperConfig{DataDir: s.dataDir, Password: password, MinimumPoW: powRequirement})
 	if err != nil {
 		s.T().Fatal(err)
 	}
