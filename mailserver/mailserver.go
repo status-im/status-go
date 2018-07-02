@@ -29,6 +29,7 @@ import (
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/rlp"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
+	"github.com/status-im/status-go/db"
 	"github.com/status-im/status-go/params"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
@@ -119,7 +120,7 @@ func (s *WMailServer) Init(shh *whisper.Whisper, config *params.WhisperConfig) e
 		return errPasswordNotProvided
 	}
 
-	db, err := leveldb.OpenFile(config.DataDir, nil)
+	db, err := db.Open(config.DataDir, nil)
 	if err != nil {
 		return fmt.Errorf("open DB: %s", err)
 	}

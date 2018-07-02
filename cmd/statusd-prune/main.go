@@ -6,8 +6,8 @@ import (
 	"log"
 	"os"
 
+	"github.com/status-im/status-go/db"
 	"github.com/status-im/status-go/mailserver"
-	"github.com/syndtr/goleveldb/leveldb"
 )
 
 var (
@@ -47,7 +47,7 @@ func init() {
 }
 
 func main() {
-	db, err := leveldb.OpenFile(*dbPath, nil)
+	db, err := db.Open(*dbPath, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
