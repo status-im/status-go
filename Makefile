@@ -29,6 +29,8 @@ CGO_CFLAGS=-I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
 GOBIN=$(dir $(realpath $(firstword $(MAKEFILE_LIST))))build/bin
 GIT_COMMIT := $(shell git rev-parse --short HEAD)
 GIT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
+GIT_LOCAL  := $(git rev-parse @)
+GIT_REMOTE := $(git rev-parse origin)
 
 BUILD_FLAGS ?= $(shell echo "-ldflags '-X main.buildStamp=`date -u '+%Y-%m-%d.%H:%M:%S'` -X github.com/status-im/status-go/params.VersionMeta=$(GIT_COMMIT)'")
 
@@ -151,6 +153,10 @@ push-docker-images: docker-image bootnode-image
 push-docker-images-latest: docker-image bootnode-image
 ifneq ("$(GIT_BRANCH)", "develop")
 	echo "You should only use develop branch to push the latest tag!"
+	exit 1
+endif
+ifneq ("$(GIT_LOCAL)", "$(GIT_REMOTE)")
+	echo "The local git commit does not match the remote origin!"
 	exit 1
 endif
 	docker push $(BOOTNODE_IMAGE_NAME):latest 
