@@ -24,8 +24,9 @@ const (
 var maxCachedPeersMultiplier = 2
 
 // NewTopicPool returns instance of TopicPool
-func NewTopicPool(topic discv5.Topic, limits params.Limits, slowMode, fastMode time.Duration, cache *Cache) *TopicPool {
+func NewTopicPool(discovery Discovery, topic discv5.Topic, limits params.Limits, slowMode, fastMode time.Duration, cache *Cache) *TopicPool {
 	pool := TopicPool{
+		discovery:            discovery,
 		topic:                topic,
 		limits:               limits,
 		fastMode:             fastMode,
@@ -44,6 +45,8 @@ func NewTopicPool(topic discv5.Topic, limits params.Limits, slowMode, fastMode t
 
 // TopicPool manages peers for topic.
 type TopicPool struct {
+	discovery Discovery
+
 	// configuration
 	topic           discv5.Topic
 	limits          params.Limits
@@ -351,7 +354,7 @@ func (t *TopicPool) StartSearch(server *p2p.Server) error {
 	if atomic.LoadInt32(&t.running) == 1 {
 		return nil
 	}
-	if server.DiscV5 == nil {
+	if !t.discovery.Running() {
 		return ErrDiscv5NotRunning
 	}
 	atomic.StoreInt32(&t.running, 1)
@@ -378,7 +381,9 @@ func (t *TopicPool) StartSearch(server *p2p.Server) error {
 
 	t.discWG.Add(1)
 	go func() {
-		server.DiscV5.SearchTopic(t.topic, t.period, found, lookup)
+		if err := t.discovery.Discover(string(t.topic), t.period, found, lookup); err != nil {
+			log.Error("error searching foro", "topic", t.topic, "err", err)
+		}
 		t.discWG.Done()
 	}()
 	t.poolWG.Add(1)

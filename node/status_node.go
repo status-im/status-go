@@ -48,9 +48,10 @@ type StatusNode struct {
 	rpcClient        *rpc.Client        // reference to public RPC client
 	rpcPrivateClient *rpc.Client        // reference to private RPC client (can call private APIs)
 
-	register *peers.Register
-	peerPool *peers.PeerPool
-	db       *leveldb.DB // used as a cache for PeerPool
+	discovery peers.Discovery
+	register  *peers.Register
+	peerPool  *peers.PeerPool
+	db        *leveldb.DB // used as a cache for PeerPool
 
 	log log.Logger
 }
@@ -104,10 +105,10 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig, db *leveldb.DB, serv
 		return err
 	}
 
-	if n.config.NoDiscovery {
-		return nil
+	if n.discoveryEnabled() {
+		return n.startDiscovery()
 	}
-	return n.startPeerPool()
+	return nil
 }
 
 // Start starts current StatusNode, will fail if it's already started.
@@ -176,17 +177,29 @@ func (n *StatusNode) setupRPCClient() (err error) {
 	return
 }
 
-func (n *StatusNode) startPeerPool() error {
-	n.register = peers.NewRegister(n.config.RegisterTopics...)
+func (n *StatusNode) discoveryEnabled() bool {
+	return n.config != nil && !n.config.NoDiscovery && n.config.ClusterConfig != nil
+}
+
+func (n *StatusNode) startDiscovery() error {
+	n.discovery = peers.NewDiscV5(
+		n.gethNode.Server().PrivateKey,
+		n.config.ListenAddr,
+		parseNodesV5(n.config.ClusterConfig.BootNodes))
+	n.register = peers.NewRegister(n.discovery, n.config.RegisterTopics...)
 	options := peers.NewDefaultOptions()
 	// TODO(dshulyak) consider adding a flag to define this behaviour
 	options.AllowStop = len(n.config.RegisterTopics) == 0
 	n.peerPool = peers.NewPeerPool(
+		n.discovery,
 		n.config.RequireTopics,
 		peers.NewCache(n.db),
 		options,
 	)
-	if err := n.register.Start(n.gethNode.Server()); err != nil {
+	if err := n.discovery.Start(); err != nil {
+		return err
+	}
+	if err := n.register.Start(); err != nil {
 		return err
 	}
 	return n.peerPool.Start(n.gethNode.Server())
@@ -206,11 +219,13 @@ func (n *StatusNode) Stop() error {
 
 // stop will stop current StatusNode. A stopped node cannot be resumed.
 func (n *StatusNode) stop() error {
-	if err := n.stopPeerPool(); err != nil {
-		n.log.Error("Error stopping the PeerPool", "error", err)
+	if n.discoveryEnabled() {
+		if err := n.stopDiscovery(); err != nil {
+			n.log.Error("Error stopping the PeerPool", "error", err)
+		}
+		n.register = nil
+		n.peerPool = nil
 	}
-	n.register = nil
-	n.peerPool = nil
 
 	if err := n.gethNode.Stop(); err != nil {
 		return err
@@ -234,14 +249,10 @@ func (n *StatusNode) stop() error {
 	return nil
 }
 
-func (n *StatusNode) stopPeerPool() error {
-	if n.config == nil || n.config.NoDiscovery {
-		return nil
-	}
-
+func (n *StatusNode) stopDiscovery() error {
 	n.register.Stop()
 	n.peerPool.Stop()
-	return nil
+	return n.discovery.Stop()
 }
 
 // ResetChainData removes chain data if node is not running.
