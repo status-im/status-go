@@ -116,7 +116,7 @@ func (s *WMailServer) Init(shh *whisper.Whisper, config *params.WhisperConfig) e
 		return errDirectoryNotProvided
 	}
 
-	if len(config.Password) == 0 && config.AsymKey == nil {
+	if len(config.MailServerPassword) == 0 && config.MailServerAsymKey == nil {
 		return errDecryptionMethodNotProvided
 	}
 
@@ -153,8 +153,8 @@ func (s *WMailServer) setupLimiter(limit time.Duration) {
 func (s *WMailServer) setupRequestMessageDecryptor(config *params.WhisperConfig) error {
 	var filter whisper.Filter
 
-	if config.Password != "" {
-		keyID, err := s.w.AddSymKeyFromPassword(config.Password)
+	if config.MailServerPassword != "" {
+		keyID, err := s.w.AddSymKeyFromPassword(config.MailServerPassword)
 		if err != nil {
 			return fmt.Errorf("create symmetric key: %v", err)
 		}
@@ -165,8 +165,8 @@ func (s *WMailServer) setupRequestMessageDecryptor(config *params.WhisperConfig)
 		}
 
 		filter = whisper.Filter{KeySym: symKey}
-	} else if config.AsymKey != nil {
-		filter = whisper.Filter{KeyAsym: config.AsymKey}
+	} else if config.MailServerAsymKey != nil {
+		filter = whisper.Filter{KeyAsym: config.MailServerAsymKey}
 	}
 
 	s.filter = &filter

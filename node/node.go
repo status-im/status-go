@@ -191,15 +191,15 @@ func activateStatusService(stack *node.Node, config *params.NodeConfig) error {
 
 func registerMailServer(whisperService *whisper.Whisper, config *params.WhisperConfig) (err error) {
 	// if the Password is already set, do not override it
-	if config.Password == "" && config.PasswordFile != "" {
-		err = config.ReadPasswordFile()
+	if config.MailServerPassword == "" && config.MailServerPasswordFile != "" {
+		err = config.ReadMailServerPasswordFile()
 		if err != nil {
 			return
 		}
 	}
 	// similarly, do not override already configured AsymKey
-	if config.AsymKey == nil && config.AsymKeyFile != "" {
-		err = config.ReadAsymKeyFile()
+	if config.MailServerAsymKey == nil && config.MailServerAsymKeyFile != "" {
+		err = config.ReadMailServerAsymKeyFile()
 		if err != nil {
 			return
 		}

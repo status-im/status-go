@@ -88,19 +88,6 @@ type WhisperConfig struct {
 	// Enabled flag specifies whether protocol is enabled
 	Enabled bool
 
-	// PasswordFile contains a password for symmetric encryption with MailServer.
-	PasswordFile string
-
-	// Password for symmetric encryption with MailServer.
-	// (if no account file selected, then this password is used for symmetric encryption).
-	Password string
-
-	// AsymKeyFile is a file with an asymmetric key to decrypt messages sent to MailServer.
-	AsymKeyFile string
-
-	// AsymKey is an asymmetric key to decrypt messages sent to MailServer.
-	AsymKey *ecdsa.PrivateKey
-
 	// LightClient should be true if the node should start with an empty bloom filter and not forward messages from other nodes
 	LightClient bool
 
@@ -113,6 +100,19 @@ type WhisperConfig struct {
 
 	// MinimumPoW minimum PoW for Whisper messages
 	MinimumPoW float64
+
+	// MailServerPasswordFile contains a password for symmetric encryption with MailServer.
+	MailServerPasswordFile string
+
+	// MailServerPassword for symmetric encryption with MailServer.
+	// (if no account file selected, then this password is used for symmetric encryption).
+	MailServerPassword string
+
+	// MailServerAsymKeyFile is a file with an asymmetric key to decrypt messages sent to MailServer.
+	MailServerAsymKeyFile string
+
+	// MailServerAsymKey is an asymmetric key to decrypt messages sent to MailServer.
+	MailServerAsymKey *ecdsa.PrivateKey
 
 	// RateLimit minimum time between queries to mail server per peer
 	MailServerRateLimit int
@@ -130,13 +130,13 @@ type WhisperConfig struct {
 	EnableNTPSync bool
 }
 
-// ReadPasswordFile reads and returns content of the password file
-func (c *WhisperConfig) ReadPasswordFile() error {
-	if len(c.PasswordFile) == 0 {
+// ReadMailServerPasswordFile reads and returns content of the password file
+func (c *WhisperConfig) ReadMailServerPasswordFile() error {
+	if len(c.MailServerPasswordFile) == 0 {
 		return ErrNoPasswordFileValueSet
 	}
 
-	password, err := ioutil.ReadFile(c.PasswordFile)
+	password, err := ioutil.ReadFile(c.MailServerPasswordFile)
 	if err != nil {
 		return err
 	}
@@ -146,14 +146,14 @@ func (c *WhisperConfig) ReadPasswordFile() error {
 		return ErrEmptyPasswordFile
 	}
 
-	c.Password = string(password)
+	c.MailServerPassword = string(password)
 
 	return nil
 }
 
-// ReadAsymKeyFile reads and returns a private key from a given file.
-func (c *WhisperConfig) ReadAsymKeyFile() (err error) {
-	c.AsymKey, err = crypto.LoadECDSA(c.AsymKeyFile)
+// ReadMailServerAsymKeyFile reads and returns a private key from a given file.
+func (c *WhisperConfig) ReadMailServerAsymKeyFile() (err error) {
+	c.MailServerAsymKey, err = crypto.LoadECDSA(c.MailServerAsymKeyFile)
 	return
 }
 

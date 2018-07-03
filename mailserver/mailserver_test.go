@@ -81,9 +81,9 @@ func (s *MailserverSuite) SetupTest() {
 	s.Require().NoError(err)
 
 	s.config = &params.WhisperConfig{
-		DataDir:      tmpDir,
-		AsymKeyFile:  asymKeyFile,
-		PasswordFile: passwordFile,
+		DataDir:                tmpDir,
+		MailServerAsymKeyFile:  asymKeyFile,
+		MailServerPasswordFile: passwordFile,
 	}
 }
 
@@ -106,37 +106,43 @@ func (s *MailserverSuite) TestInit() {
 			info:          "config with empty DataDir",
 		},
 		{
-			config:        params.WhisperConfig{DataDir: "/invalid-path", Password: "pwd"},
+			config: params.WhisperConfig{
+				DataDir:            "/invalid-path",
+				MailServerPassword: "pwd",
+			},
 			expectedError: errors.New("open DB: mkdir /invalid-path: permission denied"),
 			info:          "config with an unexisting DataDir",
 		},
 		{
 			config: params.WhisperConfig{
-				DataDir:  s.config.DataDir,
-				Password: "",
-				AsymKey:  nil,
+				DataDir:            s.config.DataDir,
+				MailServerPassword: "",
+				MailServerAsymKey:  nil,
 			},
 			expectedError: errDecryptionMethodNotProvided,
 			info:          "config with an empty password and empty asym key",
 		},
 		{
-			config:        params.WhisperConfig{DataDir: s.config.DataDir, Password: "pwd"},
+			config: params.WhisperConfig{
+				DataDir:            s.config.DataDir,
+				MailServerPassword: "pwd",
+			},
 			expectedError: nil,
 			info:          "config with correct DataDir and Password",
 		},
 		{
 			config: params.WhisperConfig{
-				DataDir: s.config.DataDir,
-				AsymKey: asymKey,
+				DataDir:           s.config.DataDir,
+				MailServerAsymKey: asymKey,
 			},
 			expectedError: nil,
 			info:          "config with correct DataDir and AsymKey",
 		},
 		{
 			config: params.WhisperConfig{
-				DataDir:  s.config.DataDir,
-				AsymKey:  asymKey,
-				Password: "pwd",
+				DataDir:            s.config.DataDir,
+				MailServerAsymKey:  asymKey,
+				MailServerPassword: "pwd",
 			},
 			expectedError: nil,
 			info:          "config with both asym key and password",
@@ -144,7 +150,7 @@ func (s *MailserverSuite) TestInit() {
 		{
 			config: params.WhisperConfig{
 				DataDir:             s.config.DataDir,
-				Password:            "pwd",
+				MailServerPassword:  "pwd",
 				MailServerRateLimit: 5,
 			},
 			expectedError: nil,
@@ -183,7 +189,7 @@ func (s *MailserverSuite) TestSetupRequestMessageDecryptor() {
 
 	// Password should work ok
 	config = *s.config
-	s.NoError(config.ReadPasswordFile())
+	s.NoError(config.ReadMailServerPasswordFile())
 	s.NoError(s.server.Init(s.shh, &config))
 	s.NotNil(s.server.filter.KeySym)
 	s.Nil(s.server.filter.KeyAsym)
@@ -191,16 +197,16 @@ func (s *MailserverSuite) TestSetupRequestMessageDecryptor() {
 
 	// AsymKey can also be used
 	config = *s.config
-	s.NoError(config.ReadAsymKeyFile())
+	s.NoError(config.ReadMailServerAsymKeyFile())
 	s.NoError(s.server.Init(s.shh, &config))
 	s.Nil(s.server.filter.KeySym) // important: symmetric key should be nil
-	s.Equal(config.AsymKey, s.server.filter.KeyAsym)
+	s.Equal(config.MailServerAsymKey, s.server.filter.KeyAsym)
 	s.server.Close()
 
 	// when both Password and AsymKey are set, Password has a preference
 	config = *s.config
-	s.NoError(config.ReadPasswordFile())
-	s.NoError(config.ReadAsymKeyFile())
+	s.NoError(config.ReadMailServerPasswordFile())
+	s.NoError(config.ReadMailServerAsymKeyFile())
 	s.NoError(s.server.Init(s.shh, &config))
 	s.NotNil(s.server.filter.KeySym)
 	s.Nil(s.server.filter.KeyAsym)
@@ -208,7 +214,7 @@ func (s *MailserverSuite) TestSetupRequestMessageDecryptor() {
 }
 
 func (s *MailserverSuite) TestArchive() {
-	err := s.config.ReadPasswordFile()
+	err := s.config.ReadMailServerPasswordFile()
 	s.Require().NoError(err)
 
 	err = s.server.Init(s.shh, s.config)
@@ -458,7 +464,11 @@ func (s *MailserverSuite) setupServer(server *WMailServer) {
 	s.shh = whisper.New(&whisper.DefaultConfig)
 	s.shh.RegisterServer(server)
 
-	err := server.Init(s.shh, &params.WhisperConfig{DataDir: s.dataDir, Password: password, MinimumPoW: powRequirement})
+	err := server.Init(s.shh, &params.WhisperConfig{
+		DataDir:            s.dataDir,
+		MailServerPassword: password,
+		MinimumPoW:         powRequirement,
+	})
 	if err != nil {
 		s.T().Fatal(err)
 	}
