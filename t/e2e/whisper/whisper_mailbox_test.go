@@ -168,17 +168,22 @@ func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
 
 	err = aliceBackend.StatusNode().AddPeer(mailboxEnode)
 	s.Require().NoError(err)
-	err = bobBackend.StatusNode().AddPeer(mailboxEnode)
-	s.Require().NoError(err)
-	err = charlieBackend.StatusNode().AddPeer(mailboxEnode)
-	s.Require().NoError(err)
-
 	waitErr := helpers.WaitForPeerAsync(aliceBackend.StatusNode().GethNode().Server(), mailboxEnode, p2p.PeerEventTypeAdd, time.Second)
 	s.NoError(<-waitErr)
+
+	err = bobBackend.StatusNode().AddPeer(mailboxEnode)
+	s.Require().NoError(err)
 	waitErr = helpers.WaitForPeerAsync(bobBackend.StatusNode().GethNode().Server(), mailboxEnode, p2p.PeerEventTypeAdd, time.Second)
 	s.NoError(<-waitErr)
 
+	err = charlieBackend.StatusNode().AddPeer(mailboxEnode)
+	s.Require().NoError(err)
+	waitErr = helpers.WaitForPeerAsync(charlieBackend.StatusNode().GethNode().Server(), mailboxEnode, p2p.PeerEventTypeAdd, time.Second)
+	s.NoError(<-waitErr)
+
 	// Get whisper service.
+	mailboxWhisperService, err := mailboxBackend.StatusNode().WhisperService()
+	s.Require().NoError(err)
 	aliceWhisperService, err := aliceBackend.StatusNode().WhisperService()
 	s.Require().NoError(err)
 	bobWhisperService, err := bobBackend.StatusNode().WhisperService()
@@ -196,6 +201,16 @@ func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
 	bobWhisperService.RegisterEnvelopeTracer(bobTracer)
 	charlieTracer := newTracer()
 	charlieWhisperService.RegisterEnvelopeTracer(charlieTracer)
+
+	// watchers
+	envelopeArchivedWatcher := make(chan whisper.EnvelopeEvent, 1024)
+	mailboxWhisperService.SubscribeEnvelopeEvents(envelopeArchivedWatcher)
+
+	bobEnvelopeAvailableWatcher := make(chan whisper.EnvelopeEvent, 1024)
+	bobWhisperService.SubscribeEnvelopeEvents(bobEnvelopeAvailableWatcher)
+
+	charlieEnvelopeAvailableWatcher := make(chan whisper.EnvelopeEvent, 1024)
+	charlieWhisperService.SubscribeEnvelopeEvents(charlieEnvelopeAvailableWatcher)
 
 	// Bob and charlie add the mailserver key.
 	password := mailboxPassword
@@ -248,7 +263,8 @@ func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
 
 	// Bob receive group chat data and add it to his node.
 	// Bob get group chat details.
-	messages := s.getMessagesByMessageFilterIDWithTracer(bobRPCClient, bobMessageFilterID, bobTracer, aliceToBobMessageHash)
+	s.waitForEnvelopeEvents(bobEnvelopeAvailableWatcher, []string{aliceToBobMessageHash}, whisper.EventEnvelopeAvailable)
+	messages := s.getMessagesByMessageFilterID(bobRPCClient, bobMessageFilterID)
 	s.Require().Equal(1, len(messages))
 	bobGroupChatData := groupChatParams{}
 	err = bobGroupChatData.Decode(messages[0]["payload"].(string))
@@ -264,7 +280,8 @@ func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
 
 	// Charlie receive group chat data and add it to his node.
 	// Charlie get group chat details.
-	messages = s.getMessagesByMessageFilterIDWithTracer(charlieRPCClient, charlieMessageFilterID, charlieTracer, aliceToCharlieMessageHash)
+	s.waitForEnvelopeEvents(charlieEnvelopeAvailableWatcher, []string{aliceToCharlieMessageHash}, whisper.EventEnvelopeAvailable)
+	messages = s.getMessagesByMessageFilterID(charlieRPCClient, charlieMessageFilterID)
 	s.Require().Equal(1, len(messages))
 	charlieGroupChatData := groupChatParams{}
 	err = charlieGroupChatData.Decode(messages[0]["payload"].(string))
@@ -283,12 +300,14 @@ func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
 	groupChatMessageHash := s.postMessageToGroup(aliceRPCClient, groupChatKeyID, groupChatTopic.String(), helloWorldMessage)
 
 	// Bob receive group chat message.
-	messages = s.getMessagesByMessageFilterIDWithTracer(bobRPCClient, bobGroupChatMessageFilterID, bobTracer, groupChatMessageHash)
+	s.waitForEnvelopeEvents(bobEnvelopeAvailableWatcher, []string{groupChatMessageHash}, whisper.EventEnvelopeAvailable)
+	messages = s.getMessagesByMessageFilterID(bobRPCClient, bobGroupChatMessageFilterID)
 	s.Require().Equal(1, len(messages))
 	s.Require().Equal(helloWorldMessage, messages[0]["payload"].(string))
 
 	// Charlie receive group chat message.
-	messages = s.getMessagesByMessageFilterIDWithTracer(charlieRPCClient, charlieGroupChatMessageFilterID, charlieTracer, groupChatMessageHash)
+	s.waitForEnvelopeEvents(charlieEnvelopeAvailableWatcher, []string{groupChatMessageHash}, whisper.EventEnvelopeAvailable)
+	messages = s.getMessagesByMessageFilterID(charlieRPCClient, charlieGroupChatMessageFilterID)
 	s.Require().Equal(1, len(messages))
 	s.Require().Equal(helloWorldMessage, messages[0]["payload"].(string))
 
@@ -298,17 +317,22 @@ func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
 	messages = s.getMessagesByMessageFilterID(charlieRPCClient, charlieGroupChatMessageFilterID)
 	s.Require().Empty(messages)
 
+	// be sure that message has been archived
+	s.waitForEnvelopeEvents(envelopeArchivedWatcher, []string{groupChatMessageHash}, whisper.EventMailServerEnvelopeArchived)
+
 	// Request each one messages from mailbox using enode.
 	s.requestHistoricMessagesFromLast12Hours(bobWhisperService, bobRPCClient, mailboxEnode, bobMailServerKeyID, groupChatTopic.String(), 0, "")
 	s.requestHistoricMessagesFromLast12Hours(charlieWhisperService, charlieRPCClient, mailboxEnode, charlieMailServerKeyID, groupChatTopic.String(), 0, "")
 
 	// Bob receive p2p message from group chat filter.
-	messages = s.getMessagesByMessageFilterIDWithTracer(bobRPCClient, bobGroupChatMessageFilterID, bobTracer, groupChatMessageHash)
+	s.waitForEnvelopeEvents(bobEnvelopeAvailableWatcher, []string{groupChatMessageHash}, whisper.EventEnvelopeAvailable)
+	messages = s.getMessagesByMessageFilterID(bobRPCClient, bobGroupChatMessageFilterID)
 	s.Require().Equal(1, len(messages))
 	s.Require().Equal(helloWorldMessage, messages[0]["payload"].(string))
 
 	// Charlie receive p2p message from group chat filter.
-	messages = s.getMessagesByMessageFilterIDWithTracer(charlieRPCClient, charlieGroupChatMessageFilterID, charlieTracer, groupChatMessageHash)
+	s.waitForEnvelopeEvents(charlieEnvelopeAvailableWatcher, []string{groupChatMessageHash}, whisper.EventEnvelopeAvailable)
+	messages = s.getMessagesByMessageFilterID(charlieRPCClient, charlieGroupChatMessageFilterID)
 	s.Require().Equal(1, len(messages))
 	s.Require().Equal(helloWorldMessage, messages[0]["payload"].(string))
 }
@@ -625,13 +649,13 @@ func (s *WhisperMailboxSuite) createGroupChatMessageFilter(rpcCli *rpc.Client, s
 	return messageFilterID
 }
 
-func (s *WhisperMailboxSuite) postMessageToPrivate(rpcCli *rpc.Client, bobPubkey string, topic string, payload string) string {
+func (s *WhisperMailboxSuite) postMessageToPrivate(rpcCli *rpc.Client, recipientPubkey string, topic string, payload string) string {
 	resp := rpcCli.CallRaw(`{
 		"jsonrpc": "2.0",
 		"method": "shh_post",
 		"params": [
 			{
-			"pubKey": "` + bobPubkey + `",
+			"pubKey": "` + recipientPubkey + `",
 			"topic": "` + topic + `",
 			"payload": "` + payload + `",
 			"powTarget": 0.001,
@@ -690,30 +714,6 @@ func (s *WhisperMailboxSuite) getMessagesByMessageFilterID(rpcCli *rpc.Client, m
 	s.Require().NoError(err)
 	s.Require().Nil(messages.Error)
 	return messages.Result
-}
-
-func (s *WhisperMailboxSuite) getMessagesByMessageFilterIDWithTracer(rpcCli *rpc.Client, messageFilterID string, tracer *envelopeTracer, messageHash string) (messages []map[string]interface{}) {
-	select {
-	case envelope := <-tracer.envelopChan:
-		s.Require().Equal(envelope.Hash, messageHash)
-	case <-time.After(5 * time.Second):
-		s.Fail("Timed out waiting for new messages after 5 seconds")
-	}
-
-	// Attempt to retrieve messages up to 3 times, 1 second apart
-	// TODO: There is a lag between the time when the envelope is traced by EventTracer
-	// and when it is decoded and actually available. Ideally this would be event-driven as well
-	// I.e. instead of signing up for EnvelopeTracer, we'd sign up for an event happening later
-	// which tells us that a call to shh_getFilterMessages will return some messages
-	for i := 0; i < 3; i++ {
-		messages = s.getMessagesByMessageFilterID(rpcCli, messageFilterID)
-		if len(messages) > 0 {
-			break
-		}
-		time.Sleep(1 * time.Second)
-	}
-
-	return
 }
 
 // addSymKey added symkey to node and return symkeyID.
