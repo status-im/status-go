@@ -195,13 +195,6 @@ func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
 	bobRPCClient := bobBackend.StatusNode().RPCClient()
 	charlieRPCClient := charlieBackend.StatusNode().RPCClient()
 
-	aliceTracer := newTracer()
-	aliceWhisperService.RegisterEnvelopeTracer(aliceTracer)
-	bobTracer := newTracer()
-	bobWhisperService.RegisterEnvelopeTracer(bobTracer)
-	charlieTracer := newTracer()
-	charlieWhisperService.RegisterEnvelopeTracer(charlieTracer)
-
 	// watchers
 	envelopeArchivedWatcher := make(chan whisper.EnvelopeEvent, 1024)
 	mailboxWhisperService.SubscribeEnvelopeEvents(envelopeArchivedWatcher)
@@ -801,20 +794,4 @@ type returnedIDResponse struct {
 type baseRPCResponse struct {
 	Result interface{}
 	Error  interface{}
-}
-
-// envelopeTracer traces incoming envelopes. We leverage it to know when a peer has received an envelope
-// so we rely less on timeouts for the tests
-type envelopeTracer struct {
-	envelopChan chan *whisper.EnvelopeMeta
-}
-
-func newTracer() *envelopeTracer {
-	return &envelopeTracer{make(chan *whisper.EnvelopeMeta, 1)}
-}
-
-// Trace is called for every incoming envelope.
-func (t *envelopeTracer) Trace(envelope *whisper.EnvelopeMeta) {
-	// Do not block notifier
-	go func() { t.envelopChan <- envelope }()
 }
