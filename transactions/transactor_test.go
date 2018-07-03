@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"math/big"
+	"reflect"
 	"testing"
 	"time"
 
@@ -70,11 +71,9 @@ func (s *TxQueueTestSuite) TearDownTest() {
 }
 
 var (
-	testGas               = hexutil.Uint64(defaultGas + 1)
-	testGasPrice          = (*hexutil.Big)(big.NewInt(10))
-	testOverridenGas      = hexutil.Uint64(defaultGas + 2)
-	testOverridenGasPrice = (*hexutil.Big)(big.NewInt(20))
-	testNonce             = hexutil.Uint64(10)
+	testGas      = hexutil.Uint64(defaultGas + 1)
+	testGasPrice = (*hexutil.Big)(big.NewInt(10))
+	testNonce    = hexutil.Uint64(10)
 )
 
 func (s *TxQueueTestSuite) setupTransactionPoolAPI(args SendTxArgs, returnNonce, resultNonce hexutil.Uint64, account *account.SelectedExtKey, txErr error, signArgs *sign.TxArgs) {
@@ -129,80 +128,29 @@ func (s *TxQueueTestSuite) TestCompleteTransaction() {
 		AccountKey: &keystore.Key{PrivateKey: key},
 	}
 	testCases := []struct {
-		name       string
-		gas        *hexutil.Uint64
-		gasPrice   *hexutil.Big
-		signTxArgs *sign.TxArgs
+		name     string
+		gas      *hexutil.Uint64
+		gasPrice *hexutil.Big
 	}{
 		{
 			"noGasDef",
 			nil,
 			nil,
-			s.defaultSignTxArgs(),
 		},
 		{
 			"gasDefined",
 			&testGas,
 			nil,
-			s.defaultSignTxArgs(),
 		},
 		{
 			"gasPriceDefined",
 			nil,
 			testGasPrice,
-			s.defaultSignTxArgs(),
-		},
-		{
-			"inputPassedInLegacyDataField",
-			nil,
-			testGasPrice,
-			s.defaultSignTxArgs(),
-		},
-		{
-			"overrideGas",
-			nil,
-			nil,
-			&sign.TxArgs{
-				Gas: &testGas,
-			},
-		},
-		{
-			"overridePreExistingGas",
-			&testGas,
-			nil,
-			&sign.TxArgs{
-				Gas: &testOverridenGas,
-			},
-		},
-		{
-			"overridePreExistingGasPrice",
-			nil,
-			testGasPrice,
-			&sign.TxArgs{
-				GasPrice: testOverridenGasPrice,
-			},
 		},
 		{
 			"nilSignTransactionSpecificArgs",
 			nil,
 			nil,
-			nil,
-		},
-		{
-			"overridePreExistingGasWithNil",
-			&testGas,
-			nil,
-			&sign.TxArgs{
-				Gas: nil,
-			},
-		},
-		{
-			"overridePreExistingGasPriceWithNil",
-			nil,
-			testGasPrice,
-			&sign.TxArgs{
-				GasPrice: nil,
-			},
 		},
 	}
 
@@ -215,16 +163,13 @@ func (s *TxQueueTestSuite) TestCompleteTransaction() {
 				Gas:      testCase.gas,
 				GasPrice: testCase.gasPrice,
 			}
-			s.setupTransactionPoolAPI(args, testNonce, testNonce, selectedAccount, nil, testCase.signTxArgs)
+			s.setupTransactionPoolAPI(args, testNonce, testNonce, selectedAccount, nil, &sign.TxArgs{})
 
-			result := s.manager.SendTransaction(args, testCase.signTxArgs, selectedAccount)
+			result := s.manager.SendTransaction(args, selectedAccount)
 			s.NoError(result.Error)
+			s.False(reflect.DeepEqual(result.Response.Hash(), gethcommon.Hash{}), "transaction was never queued or completed")
 		})
 	}
-}
-
-func (s *TxQueueTestSuite) defaultSignTxArgs() *sign.TxArgs {
-	return &sign.TxArgs{}
 }
 
 func (s *TxQueueTestSuite) TestAccountMismatch() {
@@ -237,7 +182,7 @@ func (s *TxQueueTestSuite) TestAccountMismatch() {
 		To:   account.ToAddress(TestConfig.Account2.Address),
 	}
 
-	result := s.manager.SendTransaction(args, s.defaultSignTxArgs(), selectedAccount) // nolint: errcheck
+	result := s.manager.SendTransaction(args, selectedAccount) // nolint: errcheck
 	s.EqualError(result.Error, ErrInvalidCompleteTxSender.Error())
 }
 
@@ -264,7 +209,7 @@ func (s *TxQueueTestSuite) TestLocalNonce() {
 		}
 		s.setupTransactionPoolAPI(args, nonce, hexutil.Uint64(i), selectedAccount, nil, nil)
 
-		result := s.manager.SendTransaction(args, s.defaultSignTxArgs(), selectedAccount)
+		result := s.manager.SendTransaction(args, selectedAccount)
 		s.NoError(result.Error)
 		resultNonce, _ := s.manager.localNonce.Load(args.From)
 		s.Equal(uint64(i)+1, resultNonce.(uint64))
@@ -278,7 +223,7 @@ func (s *TxQueueTestSuite) TestLocalNonce() {
 
 	s.setupTransactionPoolAPI(args, nonce, nonce, selectedAccount, nil, nil)
 
-	result := s.manager.SendTransaction(args, s.defaultSignTxArgs(), selectedAccount)
+	result := s.manager.SendTransaction(args, selectedAccount)
 	s.NoError(result.Error)
 
 	resultNonce, _ := s.manager.localNonce.Load(args.From)
@@ -291,7 +236,7 @@ func (s *TxQueueTestSuite) TestLocalNonce() {
 		To:   account.ToAddress(TestConfig.Account2.Address),
 	}
 
-	result = s.manager.SendTransaction(args, s.defaultSignTxArgs(), selectedAccount)
+	result = s.manager.SendTransaction(args, selectedAccount)
 	s.EqualError(testErr, result.Error.Error())
 	resultNonce, _ = s.manager.localNonce.Load(args.From)
 	s.Equal(uint64(nonce)+1, resultNonce.(uint64))
@@ -316,7 +261,7 @@ func (s *TxQueueTestSuite) TestContractCreation() {
 		Input: hexutil.Bytes(gethcommon.FromHex(contract.ENSBin)),
 	}
 
-	result := s.manager.SendTransaction(tx, s.defaultSignTxArgs(), selectedAccount)
+	result := s.manager.SendTransaction(tx, selectedAccount)
 	s.NoError(result.Error)
 	backend.Commit()
 	hash := result.Response.Hash()

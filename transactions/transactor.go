@@ -65,10 +65,8 @@ func (t *Transactor) SetRPC(rpcClient *rpc.Client, timeout time.Duration) {
 }
 
 // SendTransaction is an implementation of eth_sendTransaction. It queues the tx to the sign queue.
-func (t *Transactor) SendTransaction(sendArgs SendTxArgs,
-	signArgs *sign.TxArgs, verifiedAccount *account.SelectedExtKey) sign.Result {
+func (t *Transactor) SendTransaction(sendArgs SendTxArgs, verifiedAccount *account.SelectedExtKey) sign.Result {
 
-	t.mergeSignTxArgsOntoSendTxArgs(signArgs, &sendArgs)
 	hash, err := t.validateAndPropagate(verifiedAccount, sendArgs)
 	response := sign.Response(hash.Bytes())
 
@@ -197,16 +195,4 @@ func (t *Transactor) validateAndPropagate(selectedAccount *account.SelectedExtKe
 		return hash, err
 	}
 	return signedTx.Hash(), nil
-}
-
-func (t *Transactor) mergeSignTxArgsOntoSendTxArgs(signArgs *sign.TxArgs, args *SendTxArgs) {
-	if signArgs == nil {
-		return
-	}
-	if signArgs.Gas != nil {
-		args.Gas = signArgs.Gas
-	}
-	if signArgs.GasPrice != nil {
-		args.GasPrice = signArgs.GasPrice
-	}
 }

@@ -144,7 +144,7 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 	b.transactor.SetRPC(b.statusNode.RPCClient(), rpc.DefaultCallTimeout)
 	b.personalAPI.SetRPC(b.statusNode.RPCPrivateClient(), rpc.DefaultCallTimeout)
 
-	if err = b.registerHandlers(""); err != nil {
+	if err = b.registerHandlers(); err != nil {
 		b.log.Error("Handler registration failed", "err", err)
 		return
 	}
@@ -235,7 +235,7 @@ func (b *StatusBackend) SendTransaction(sendArgs transactions.SendTxArgs, passwo
 			Error:    err,
 		}
 	}
-	return b.transactor.SendTransaction(sendArgs, nil, verifiedAccount)
+	return b.transactor.SendTransaction(sendArgs, verifiedAccount)
 }
 
 func (b *StatusBackend) getVerifiedAccount(password string) (*account.SelectedExtKey, error) {
@@ -294,7 +294,7 @@ func (b *StatusBackend) DiscardSignRequests(ids []string) map[string]error {
 }
 
 // registerHandlers attaches Status callback handlers to running node
-func (b *StatusBackend) registerHandlers(password string) error {
+func (b *StatusBackend) registerHandlers() error {
 	rpcClient := b.StatusNode().RPCClient()
 	if rpcClient == nil {
 		return errors.New("RPC client unavailable")
@@ -302,20 +302,6 @@ func (b *StatusBackend) registerHandlers(password string) error {
 
 	rpcClient.RegisterHandler(params.AccountsMethodName, func(context.Context, ...interface{}) (interface{}, error) {
 		return b.AccountManager().Accounts()
-	})
-
-	rpcClient.RegisterHandler(params.SendTransactionMethodName, func(ctx context.Context, rpcParams ...interface{}) (interface{}, error) {
-		txArgs, err := transactions.RPCCalltoSendTxArgs(rpcParams...)
-		if err != nil {
-			return nil, err
-		}
-
-		result := b.SendTransaction(txArgs, password)
-		if result.Error != nil {
-			return nil, result.Error
-		}
-
-		return result, result.Error
 	})
 
 	rpcClient.RegisterHandler(params.PersonalSignMethodName, b.personalAPI.Sign)
@@ -419,12 +405,6 @@ func (b *StatusBackend) SelectAccount(address, password string) error {
 
 	err := b.accountManager.SelectAccount(address, password)
 	if err != nil {
-		return err
-	}
-	// Re-register the SendTransaction RPC handler so that it uses the
-	// selected accounts password when calling b.SendTransaction()
-	if err = b.registerHandlers(password); err != nil {
-		b.log.Error("Handler registration failed", "err", err)
 		return err
 	}
 	acc, err := b.accountManager.SelectedAccount()
