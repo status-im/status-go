@@ -20,6 +20,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"sync"
 
 	"time"
 
@@ -86,8 +87,10 @@ type WMailServer struct {
 	w      *whisper.Whisper
 	pow    float64
 	filter *whisper.Filter
-	limit  *limiter
-	tick   *ticker
+
+	muLimiter sync.RWMutex
+	limiter   *limiter
+	tick      *ticker
 }
 
 // DBKey key to be stored on db.
@@ -143,7 +146,7 @@ func (s *WMailServer) Init(shh *whisper.Whisper, config *params.WhisperConfig) e
 // limit db cleanup.
 func (s *WMailServer) setupLimiter(limit time.Duration) {
 	if limit > 0 {
-		s.limit = newLimiter(limit)
+		s.limiter = newLimiter(limit)
 		s.setupMailServerCleanup(limit)
 	}
 }
@@ -180,7 +183,7 @@ func (s *WMailServer) setupMailServerCleanup(period time.Duration) {
 	if s.tick == nil {
 		s.tick = &ticker{}
 	}
-	go s.tick.run(period, s.limit.deleteExpired)
+	go s.tick.run(period, s.limiter.deleteExpired)
 }
 
 // Close the mailserver and its associated db connection.
@@ -256,13 +259,16 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 // exceedsPeerRequests in case limit its been setup on the current server and limit
 // allows the query, it will store/update new query time for the current peer.
 func (s *WMailServer) exceedsPeerRequests(peer []byte) bool {
-	if s.limit != nil {
+	s.muLimiter.RLock()
+	defer s.muLimiter.RUnlock()
+
+	if s.limiter != nil {
 		peerID := string(peer)
-		if !s.limit.isAllowed(peerID) {
+		if !s.limiter.isAllowed(peerID) {
 			log.Info("peerID exceeded the number of requests per second")
 			return true
 		}
-		s.limit.add(peerID)
+		s.limiter.add(peerID)
 	}
 	return false
 }
