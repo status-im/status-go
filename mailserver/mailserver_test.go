@@ -49,8 +49,6 @@ type ServerTestParams struct {
 	key   *ecdsa.PrivateKey
 }
 
-const dataDirPrefix = "whisper-server-test"
-
 func TestMailserverSuite(t *testing.T) {
 	suite.Run(t, new(MailserverSuite))
 }
@@ -179,10 +177,8 @@ func (s *MailserverSuite) TestInit() {
 }
 
 func (s *MailserverSuite) TestSetupRequestMessageDecryptor() {
-	var config params.WhisperConfig
-
 	// without configured Password and AsymKey
-	config = *s.config
+	config := *s.config
 	s.Error(errDecryptionMethodNotProvided, s.server.Init(s.shh, &config))
 
 	// Password should work ok
@@ -212,9 +208,7 @@ func (s *MailserverSuite) TestSetupRequestMessageDecryptor() {
 }
 
 func (s *MailserverSuite) TestArchive() {
-	var err error
-
-	err = s.config.ReadPasswordFile()
+	err := s.config.ReadPasswordFile()
 	s.Require().NoError(err)
 
 	err = s.server.Init(s.shh, s.config)

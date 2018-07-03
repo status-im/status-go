@@ -226,10 +226,6 @@ func (s *ShhExtSuite) TestRequestMessagesSuccess() {
 	service := New(shh, mock, nil, false)
 	api := NewPublicAPI(service)
 
-	const (
-		mailServerPeer = "enode://b7e65e1bedc2499ee6cbd806945af5e7df0e59e4070c96821570bd581473eade24a489f5ec95d060c0db118c879403ab88d827d3766978f28708989d35474f87@[::]:51920"
-	)
-
 	// with a peer acting as a mailserver
 	// prepare a node first
 	mailNode, err := node.New(&node.Config{
