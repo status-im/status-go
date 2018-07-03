@@ -54,7 +54,7 @@ func (s *MailServerDBPanicSuite) TestArchive() {
 
 func (s *MailServerDBPanicSuite) TestDeliverMail() {
 	defer s.testPanicRecover("DeliverMail")
-	_, err := s.server.processRequest(nil, 10, 20, []byte{})
+	_, _, _, err := s.server.processRequest(nil, 10, 20, []byte{}, 0, nil)
 	s.Error(err)
 	s.Equal("recovered from panic in processRequest: panicDB panic on NewIterator", err.Error())
 }

@@ -56,16 +56,16 @@ linters:
     - ineffassign
     - interfacer
     - megacheck
-    #- misspell
+    - misspell
     - structcheck
     - typecheck
     - unconvert
     - varcheck
   fast: false
 
-# issues:
-#   exclude:
-#     - abcdef
+issues:
+  exclude:
+    - "composite literal uses unkeyed fields" # govet
 #   exclude-use-default: true
 #   max-per-linter: 0
 #   max-same: 0

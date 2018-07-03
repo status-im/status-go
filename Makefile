@@ -28,6 +28,9 @@ endif
 CGO_CFLAGS=-I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
 GOBIN=$(dir $(realpath $(firstword $(MAKEFILE_LIST))))build/bin
 GIT_COMMIT := $(shell git rev-parse --short HEAD)
+GIT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
+GIT_LOCAL  := $(shell git rev-parse @)
+GIT_REMOTE := $(shell git fetch -q && git rev-parse origin)
 
 BUILD_FLAGS ?= $(shell echo "-ldflags '-X main.buildStamp=`date -u '+%Y-%m-%d.%H:%M:%S'` -X github.com/status-im/status-go/params.VersionMeta=$(GIT_COMMIT)'")
 
@@ -43,13 +46,14 @@ DOCKER_IMAGE_NAME ?= statusteam/status-go
 BOOTNODE_IMAGE_NAME ?= statusteam/bootnode
 STATUSD_PRUNE_IMAGE_NAME ?= statusteam/statusd-prune
 
+DOCKER_IMAGE_CUSTOM_TAG ?= $(shell BUILD_TAGS="$(BUILD_TAGS)" ./_assets/ci/get-docker-image-tag.sh)
+
 DOCKER_TEST_WORKDIR = /go/src/github.com/status-im/status-go/
 DOCKER_TEST_IMAGE = golang:1.10
 
 UNIT_TEST_PACKAGES := $(shell go list ./...  | \
 	grep -v /vendor | \
 	grep -v /t/e2e | \
-	grep -v /t/destructive | \
 	grep -v /t/benchmarks | \
 	grep -v /lib)
 
@@ -129,15 +133,33 @@ statusgo-library: ##@cross-compile Build status-go as static library for current
 
 docker-image: ##@docker Build docker image (use DOCKER_IMAGE_NAME to set the image name)
 	@echo "Building docker image..."
-	docker build --file _assets/build/Dockerfile --build-arg "build_tags=$(BUILD_TAGS)" --build-arg "build_flags=$(BUILD_FLAGS)" . -t $(DOCKER_IMAGE_NAME):latest
+	docker build --file _assets/build/Dockerfile . \
+		--build-arg "build_tags=$(BUILD_TAGS)" \
+		--build-arg "build_flags=$(BUILD_FLAGS)" \
+		-t $(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG) \
+		-t $(DOCKER_IMAGE_NAME):latest
 
 bootnode-image:
 	@echo "Building docker image for bootnode..."
-	docker build --file _assets/build/Dockerfile-bootnode . -t $(BOOTNODE_IMAGE_NAME):latest
+	docker build --file _assets/build/Dockerfile-bootnode . \
+		-t $(BOOTNODE_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG) \
+		-t $(BOOTNODE_IMAGE_NAME):latest
 
-docker-image-tag: ##@docker Tag DOCKER_IMAGE_NAME:latest with a tag following pattern $GIT_SHA[:8]-$BUILD_TAGS
-	@echo "Tagging docker image..."
-	docker tag $(DOCKER_IMAGE_NAME):latest $(DOCKER_IMAGE_NAME):$(shell BUILD_TAGS="$(BUILD_TAGS)" ./_assets/ci/get-docker-image-tag.sh)
+push-docker-images: docker-image bootnode-image
+	docker push $(BOOTNODE_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG)
+	docker push $(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG)
+
+push-docker-images-latest: docker-image bootnode-image
+ifneq ("$(GIT_BRANCH)", "develop")
+	echo "You should only use develop branch to push the latest tag!"
+	exit 1
+endif
+ifneq ("$(GIT_LOCAL)", "$(GIT_REMOTE)")
+	echo "The local git commit does not match the remote origin!"
+	exit 1
+endif
+	docker push $(BOOTNODE_IMAGE_NAME):latest 
+	docker push $(DOCKER_IMAGE_NAME):latest
 
 xgo-docker-images: ##@docker Build xgo docker images
 	@echo "Building xgo docker images..."
@@ -195,14 +217,12 @@ test-e2e-race: gotest_extraflags=-race
 test-e2e-race: test-e2e ##@tests Run e2e tests with -race flag
 
 lint-install:
-	go get -u github.com/client9/misspell/cmd/misspell
 	@# The following installs a specific version of golangci-lint, which is appropriate for a CI server to avoid different results from build to build
-	curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | bash -s -- -b $(GOPATH)/bin v1.6.1
+	curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | bash -s -- -b $(GOPATH)/bin v1.9.1
 
 lint:
 	@echo "lint"
 	@golangci-lint run ./...
-	@find . -type f -not -path "./.ethereumtest/*" -not -path "./vendor/*" -not -path "./extkeys/mnemonic.go" -not -path "./extkeys/mnemonic_vectors.json" -print0 | xargs -0 misspell
 
 ci: lint mock dep-ensure test-unit test-e2e ##@tests Run all linters and tests at once
 

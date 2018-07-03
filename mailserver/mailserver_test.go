@@ -45,8 +45,11 @@ type ServerTestParams struct {
 	birth uint32
 	low   uint32
 	upp   uint32
+	limit uint32
 	key   *ecdsa.PrivateKey
 }
+
+const dataDirPrefix = "whisper-server-test"
 
 func TestMailserverSuite(t *testing.T) {
 	suite.Run(t, new(MailserverSuite))
@@ -54,9 +57,10 @@ func TestMailserverSuite(t *testing.T) {
 
 type MailserverSuite struct {
 	suite.Suite
-	server *WMailServer
-	shh    *whisper.Whisper
-	config *params.WhisperConfig
+	server  *WMailServer
+	shh     *whisper.Whisper
+	config  *params.WhisperConfig
+	dataDir string
 }
 
 func (s *MailserverSuite) SetupTest() {
@@ -66,6 +70,7 @@ func (s *MailserverSuite) SetupTest() {
 
 	tmpDir, err := ioutil.TempDir("", "mailserver-test")
 	s.Require().NoError(err)
+	s.dataDir = tmpDir
 
 	// required files to validate mail server decryption method
 	asymKeyFile := filepath.Join(tmpDir, "asymkey")
@@ -103,7 +108,7 @@ func (s *MailserverSuite) TestInit() {
 			info:          "config with empty DataDir",
 		},
 		{
-			config:        params.WhisperConfig{DataDir: "/invalid-path"},
+			config:        params.WhisperConfig{DataDir: "/invalid-path", Password: "pwd"},
 			expectedError: errors.New("open DB: mkdir /invalid-path: permission denied"),
 			info:          "config with an unexisting DataDir",
 		},
@@ -117,9 +122,9 @@ func (s *MailserverSuite) TestInit() {
 			info:          "config with an empty password and empty asym key",
 		},
 		{
-			config:        params.WhisperConfig{DataDir: s.config.DataDir},
+			config:        params.WhisperConfig{DataDir: s.config.DataDir, Password: "pwd"},
 			expectedError: nil,
-			info:          "config with correct DataDir",
+			info:          "config with correct DataDir and Password",
 		},
 		{
 			config: params.WhisperConfig{
@@ -127,7 +132,7 @@ func (s *MailserverSuite) TestInit() {
 				AsymKey: asymKey,
 			},
 			expectedError: nil,
-			info:          "config with only asym key file",
+			info:          "config with correct DataDir and AsymKey",
 		},
 		{
 			config: params.WhisperConfig{
@@ -141,10 +146,11 @@ func (s *MailserverSuite) TestInit() {
 		{
 			config: params.WhisperConfig{
 				DataDir:             s.config.DataDir,
+				Password:            "pwd",
 				MailServerRateLimit: 5,
 			},
 			expectedError: nil,
-			info:          "config witih rate limit",
+			info:          "config with rate limit",
 		},
 	}
 
@@ -158,8 +164,13 @@ func (s *MailserverSuite) TestInit() {
 			s.Equal(tc.expectedError, err)
 			defer mailServer.Close()
 
-			s.NotNil(mailServer.db)
-			s.NotNil(mailServer.filter)
+			// db should be open only if there was no error
+			if tc.expectedError == nil {
+				s.NotNil(mailServer.db)
+			} else {
+				s.Nil(mailServer.db)
+			}
+
 			if tc.config.MailServerRateLimit > 0 {
 				s.NotNil(mailServer.limit)
 			}
@@ -201,9 +212,13 @@ func (s *MailserverSuite) TestSetupRequestMessageDecryptor() {
 }
 
 func (s *MailserverSuite) TestArchive() {
-	err := s.server.Init(s.shh, s.config)
-	s.server.tick = nil
-	s.NoError(err)
+	var err error
+
+	err = s.config.ReadPasswordFile()
+	s.Require().NoError(err)
+
+	err = s.server.Init(s.shh, s.config)
+	s.Require().NoError(err)
 	defer s.server.Close()
 
 	env, err := generateEnvelope(time.Now())
@@ -240,6 +255,71 @@ func (s *MailserverSuite) TestDBKey() {
 	s.Equal(byte(i/0x1000000), k.raw[0], "big endian expected")
 }
 
+func (s *MailserverSuite) TestRequestPaginationLimit() {
+	s.setupServer(s.server)
+	defer s.server.Close()
+
+	var (
+		sentEnvelopes     []*whisper.Envelope
+		reverseSentHashes []common.Hash
+		receivedHashes    []common.Hash
+		archiveKeys       []string
+	)
+
+	now := time.Now()
+	count := uint32(10)
+
+	for i := count; i > 0; i-- {
+		sentTime := now.Add(time.Duration(-i) * time.Second)
+		env, err := generateEnvelope(sentTime)
+		s.NoError(err)
+		s.server.Archive(env)
+		key := NewDbKey(env.Expiry-env.TTL, env.Hash())
+		archiveKeys = append(archiveKeys, fmt.Sprintf("%x", key.raw))
+		sentEnvelopes = append(sentEnvelopes, env)
+		reverseSentHashes = append([]common.Hash{env.Hash()}, reverseSentHashes...)
+	}
+
+	params := s.defaultServerParams(sentEnvelopes[0])
+	params.low = uint32(now.Add(time.Duration(-count) * time.Second).Unix())
+	params.upp = uint32(now.Unix())
+	params.limit = 6
+	request := s.createRequest(params)
+	src := crypto.FromECDSAPub(&params.key.PublicKey)
+	ok, lower, upper, bloom, limit, cursor := s.server.validateRequest(src, request)
+	s.True(ok)
+	s.Nil(cursor)
+	s.Equal(params.limit, limit)
+
+	envelopes, _, cursor, err := s.server.processRequest(nil, lower, upper, bloom, limit, nil)
+	s.NoError(err)
+	for _, env := range envelopes {
+		receivedHashes = append(receivedHashes, env.Hash())
+	}
+
+	// 10 envelopes sent
+	s.Equal(count, uint32(len(sentEnvelopes)))
+	// 6 envelopes received
+	s.Equal(limit, uint32(len(receivedHashes)))
+	// the 6 envelopes received should be in descending order
+	s.Equal(reverseSentHashes[:limit], receivedHashes)
+	// cursor should be the key of the first envelope of the next page
+	s.Equal(archiveKeys[count-limit], fmt.Sprintf("%x", cursor))
+
+	// second page
+	receivedHashes = []common.Hash{}
+	envelopes, _, cursor, err = s.server.processRequest(nil, lower, upper, bloom, limit, cursor)
+	s.NoError(err)
+	for _, env := range envelopes {
+		receivedHashes = append(receivedHashes, env.Hash())
+	}
+
+	// 4 envelopes received
+	s.Equal(count-limit, uint32(len(receivedHashes)))
+	// cursor is nil because there are no other pages
+	s.Nil(cursor)
+}
+
 func (s *MailserverSuite) TestMailServer() {
 	s.setupServer(s.server)
 	defer s.server.Close()
@@ -248,6 +328,7 @@ func (s *MailserverSuite) TestMailServer() {
 	s.NoError(err)
 
 	s.server.Archive(env)
+
 	testCases := []struct {
 		params *ServerTestParams
 		expect bool
@@ -311,25 +392,26 @@ func (s *MailserverSuite) TestMailServer() {
 		s.T().Run(tc.info, func(*testing.T) {
 			request := s.createRequest(tc.params)
 			src := crypto.FromECDSAPub(&tc.params.key.PublicKey)
-			ok, lower, upper, bloom := s.server.validateRequest(src, request)
+			ok, lower, upper, bloom, limit, _ := s.server.validateRequest(src, request)
 			s.Equal(tc.isOK, ok)
 			if ok {
 				s.Equal(tc.params.low, lower)
 				s.Equal(tc.params.upp, upper)
+				s.Equal(tc.params.limit, limit)
 				s.Equal(whisper.TopicToBloom(tc.params.topic), bloom)
-				s.Equal(tc.expect, s.messageExists(env, tc.params.low, tc.params.upp, bloom))
+				s.Equal(tc.expect, s.messageExists(env, tc.params.low, tc.params.upp, bloom, tc.params.limit))
 
 				src[0]++
-				ok, _, _, _ = s.server.validateRequest(src, request)
+				ok, _, _, _, _, _ = s.server.validateRequest(src, request)
 				s.True(ok)
 			}
 		})
 	}
 }
 
-func (s *MailserverSuite) messageExists(envelope *whisper.Envelope, low, upp uint32, bloom []byte) bool {
+func (s *MailserverSuite) messageExists(envelope *whisper.Envelope, low, upp uint32, bloom []byte, limit uint32) bool {
 	var exist bool
-	mail, err := s.server.processRequest(nil, low, upp, bloom)
+	mail, _, _, err := s.server.processRequest(nil, low, upp, bloom, limit, nil)
 	s.NoError(err)
 	for _, msg := range mail {
 		if msg.Hash() == envelope.Hash() {
@@ -378,17 +460,11 @@ func (s *MailserverSuite) TestBloomFromReceivedMessage() {
 
 func (s *MailserverSuite) setupServer(server *WMailServer) {
 	const password = "password_for_this_test"
-	const dbPath = "whisper-server-test"
-
-	dir, err := ioutil.TempDir("", dbPath)
-	if err != nil {
-		s.T().Fatal(err)
-	}
 
 	s.shh = whisper.New(&whisper.DefaultConfig)
 	s.shh.RegisterServer(server)
 
-	err = server.Init(s.shh, &params.WhisperConfig{DataDir: dir, Password: password, MinimumPoW: powRequirement})
+	err := server.Init(s.shh, &params.WhisperConfig{DataDir: s.dataDir, Password: password, MinimumPoW: powRequirement})
 	if err != nil {
 		s.T().Fatal(err)
 	}
@@ -415,6 +491,7 @@ func (s *MailserverSuite) defaultServerParams(env *whisper.Envelope) *ServerTest
 		birth: birth,
 		low:   birth - 1,
 		upp:   birth + 1,
+		limit: 0,
 		key:   testPeerID,
 	}
 }
@@ -425,6 +502,12 @@ func (s *MailserverSuite) createRequest(p *ServerTestParams) *whisper.Envelope {
 	binary.BigEndian.PutUint32(data, p.low)
 	binary.BigEndian.PutUint32(data[4:], p.upp)
 	data = append(data, bloom...)
+
+	if p.limit != 0 {
+		limitData := make([]byte, 4)
+		binary.BigEndian.PutUint32(limitData, p.limit)
+		data = append(data, limitData...)
+	}
 
 	key, err := s.shh.GetSymKey(keyID)
 	if err != nil {
