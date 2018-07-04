@@ -1,4 +1,4 @@
-package peers
+package discovery
 
 import (
 	"crypto/ecdsa"
@@ -9,15 +9,6 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 )
-
-// Discovery is an abstract interface for using different discovery providers.
-type Discovery interface {
-	Running() bool
-	Start() error
-	Stop() error
-	Register(topic string, stop chan struct{}) error
-	Discover(topic string, period <-chan time.Duration, found chan<- *discv5.Node, lookup chan<- bool) error
-}
 
 // NewDiscV5 creates instances of discovery v5 facade.
 func NewDiscV5(prv *ecdsa.PrivateKey, laddr string, bootnodes []*discv5.Node) *DiscV5 {
