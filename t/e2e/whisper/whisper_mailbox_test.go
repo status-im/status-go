@@ -23,7 +23,6 @@ import (
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/t/helpers"
 	. "github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/suite"
 )
@@ -54,11 +53,7 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 
 	s.Require().NotEqual(mailboxEnode, node.Server().NodeInfo().Enode)
 
-	err = sender.StatusNode().AddPeer(mailboxEnode)
-	s.Require().NoError(err)
-
-	waitErr := helpers.WaitForPeerAsync(node.Server(), mailboxEnode, p2p.PeerEventTypeAdd, time.Second)
-	s.NoError(<-waitErr)
+	s.addPeerSync(sender.StatusNode(), mailboxBackend.StatusNode())
 
 	senderWhisperService, err := sender.StatusNode().WhisperService()
 	s.Require().NoError(err)
@@ -169,20 +164,9 @@ func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
 	mailboxNode := mailboxBackend.StatusNode().GethNode()
 	mailboxEnode := mailboxNode.Server().NodeInfo().Enode
 
-	err = aliceBackend.StatusNode().AddPeer(mailboxEnode)
-	s.Require().NoError(err)
-	waitErr := helpers.WaitForPeerAsync(aliceBackend.StatusNode().GethNode().Server(), mailboxEnode, p2p.PeerEventTypeAdd, time.Second)
-	s.NoError(<-waitErr)
-
-	err = bobBackend.StatusNode().AddPeer(mailboxEnode)
-	s.Require().NoError(err)
-	waitErr = helpers.WaitForPeerAsync(bobBackend.StatusNode().GethNode().Server(), mailboxEnode, p2p.PeerEventTypeAdd, time.Second)
-	s.NoError(<-waitErr)
-
-	err = charlieBackend.StatusNode().AddPeer(mailboxEnode)
-	s.Require().NoError(err)
-	waitErr = helpers.WaitForPeerAsync(charlieBackend.StatusNode().GethNode().Server(), mailboxEnode, p2p.PeerEventTypeAdd, time.Second)
-	s.NoError(<-waitErr)
+	s.addPeerSync(aliceBackend.StatusNode(), mailboxBackend.StatusNode())
+	s.addPeerSync(bobBackend.StatusNode(), mailboxBackend.StatusNode())
+	s.addPeerSync(charlieBackend.StatusNode(), mailboxBackend.StatusNode())
 
 	// Get whisper service.
 	mailboxWhisperService, err := mailboxBackend.StatusNode().WhisperService()
@@ -350,7 +334,7 @@ func (s *WhisperMailboxSuite) TestRequestMessagesWithPagination() {
 	clientRPCClient := client.StatusNode().RPCClient()
 
 	// Add mailbox to clients's peers
-	s.addPeerAndWait(client.StatusNode(), mailbox.StatusNode())
+	s.addPeerSync(client.StatusNode(), mailbox.StatusNode())
 
 	// Whisper services
 	mailboxWhisperService, err := mailbox.StatusNode().WhisperService()
@@ -502,7 +486,7 @@ func (s *WhisperMailboxSuite) waitForMailServerResponse(events chan whisper.Enve
 	}
 }
 
-func (s *WhisperMailboxSuite) addPeerAndWait(node, other *node.StatusNode) {
+func (s *WhisperMailboxSuite) addPeerSync(node, other *node.StatusNode) {
 	nodeInfo := node.GethNode().Server().NodeInfo()
 	nodeID := nodeInfo.ID
 	nodeEnode := nodeInfo.Enode
