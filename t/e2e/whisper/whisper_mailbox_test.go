@@ -85,15 +85,18 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 
 	// watch envelopes to be archived on mailserver
 	envelopeArchivedWatcher := make(chan whisper.EnvelopeEvent, 1024)
-	mailboxWhisperService.SubscribeEnvelopeEvents(envelopeArchivedWatcher)
+	sub := mailboxWhisperService.SubscribeEnvelopeEvents(envelopeArchivedWatcher)
+	defer sub.Unsubscribe()
 
 	// watch envelopes to be available for filters in the client
 	envelopeAvailableWatcher := make(chan whisper.EnvelopeEvent, 1024)
-	senderWhisperService.SubscribeEnvelopeEvents(envelopeAvailableWatcher)
+	sub = senderWhisperService.SubscribeEnvelopeEvents(envelopeAvailableWatcher)
+	defer sub.Unsubscribe()
 
 	// watch mailserver responses in the client
 	mailServerResponseWatcher := make(chan whisper.EnvelopeEvent, 1024)
-	senderWhisperService.SubscribeEnvelopeEvents(mailServerResponseWatcher)
+	sub = senderWhisperService.SubscribeEnvelopeEvents(mailServerResponseWatcher)
+	defer sub.Unsubscribe()
 
 	// Create topic.
 	topic := whisper.BytesToTopic([]byte("topic name"))
@@ -197,13 +200,16 @@ func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
 
 	// watchers
 	envelopeArchivedWatcher := make(chan whisper.EnvelopeEvent, 1024)
-	mailboxWhisperService.SubscribeEnvelopeEvents(envelopeArchivedWatcher)
+	sub := mailboxWhisperService.SubscribeEnvelopeEvents(envelopeArchivedWatcher)
+	defer sub.Unsubscribe()
 
 	bobEnvelopeAvailableWatcher := make(chan whisper.EnvelopeEvent, 1024)
-	bobWhisperService.SubscribeEnvelopeEvents(bobEnvelopeAvailableWatcher)
+	sub = bobWhisperService.SubscribeEnvelopeEvents(bobEnvelopeAvailableWatcher)
+	defer sub.Unsubscribe()
 
 	charlieEnvelopeAvailableWatcher := make(chan whisper.EnvelopeEvent, 1024)
-	charlieWhisperService.SubscribeEnvelopeEvents(charlieEnvelopeAvailableWatcher)
+	sub = charlieWhisperService.SubscribeEnvelopeEvents(charlieEnvelopeAvailableWatcher)
+	defer sub.Unsubscribe()
 
 	// Bob and charlie add the mailserver key.
 	password := mailboxPassword
@@ -370,15 +376,18 @@ func (s *WhisperMailboxSuite) TestRequestMessagesWithPagination() {
 
 	// watch envelopes to be archived on mailserver
 	envelopeArchivedWatcher := make(chan whisper.EnvelopeEvent, 1024)
-	mailboxWhisperService.SubscribeEnvelopeEvents(envelopeArchivedWatcher)
+	sub := mailboxWhisperService.SubscribeEnvelopeEvents(envelopeArchivedWatcher)
+	defer sub.Unsubscribe()
 
 	// watch envelopes to be available for filters in the client
 	envelopeAvailableWatcher := make(chan whisper.EnvelopeEvent, 1024)
-	clientWhisperService.SubscribeEnvelopeEvents(envelopeAvailableWatcher)
+	sub = clientWhisperService.SubscribeEnvelopeEvents(envelopeAvailableWatcher)
+	defer sub.Unsubscribe()
 
 	// watch mailserver responses in the client
 	mailServerResponseWatcher := make(chan whisper.EnvelopeEvent, 1024)
-	clientWhisperService.SubscribeEnvelopeEvents(mailServerResponseWatcher)
+	sub = clientWhisperService.SubscribeEnvelopeEvents(mailServerResponseWatcher)
+	defer sub.Unsubscribe()
 
 	// send envelopes
 	for i := 0; i < envelopesCount; i++ {
