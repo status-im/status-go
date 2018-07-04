@@ -138,7 +138,8 @@ func (s *PeerPoolSimulationSuite) TestPeerPoolCache() {
 
 	// check if cache is passed to topic pools
 	for _, topicPool := range peerPool.topics {
-		s.Equal(cache, topicPool.cache)
+		tp := topicPool.(*TopicPool)
+		s.Equal(cache, tp.cache)
 	}
 }
 

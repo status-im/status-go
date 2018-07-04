@@ -13,6 +13,7 @@ import (
 	gethnode "github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discover"
+	"github.com/ethereum/go-ethereum/p2p/discv5"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 
 	"github.com/status-im/status-go/params"
@@ -264,4 +265,71 @@ func isPeerConnected(node *StatusNode, peerURL string) (bool, error) {
 	}
 
 	return false, nil
+}
+
+func TestStatusNodeDiscoveryTopics(t *testing.T) {
+	preExisting := make(map[discv5.Topic]params.Limits)
+	preExisting["a"] = params.Limits{Max: 3, Min: 2}
+	var testCases = []struct {
+		name             string
+		config           params.NodeConfig
+		expectedRequired int
+		expectedRegister int
+	}{
+		{
+			name: "happy path",
+			config: params.NodeConfig{
+				RegisterTopics: make([]discv5.Topic, 0),
+				RequireTopics:  make(map[discv5.Topic]params.Limits),
+			},
+			expectedRequired: 1,
+			expectedRegister: 1,
+		},
+		{
+			name: "nil required topics",
+			config: params.NodeConfig{
+				RegisterTopics: make([]discv5.Topic, 0),
+				RequireTopics:  nil,
+			},
+			expectedRequired: 1,
+			expectedRegister: 1,
+		},
+		{
+			name: "nil register topics",
+			config: params.NodeConfig{
+				RegisterTopics: nil,
+				RequireTopics:  make(map[discv5.Topic]params.Limits),
+			},
+			expectedRequired: 1,
+			expectedRegister: 1,
+		},
+		{
+			name: "pre-existing require",
+			config: params.NodeConfig{
+				RegisterTopics: make([]discv5.Topic, 0),
+				RequireTopics:  preExisting,
+			},
+			expectedRequired: 2,
+			expectedRegister: 1,
+		},
+		{
+			name: "pre-existing register",
+			config: params.NodeConfig{
+				RegisterTopics: []discv5.Topic{"lol"},
+				RequireTopics:  make(map[discv5.Topic]params.Limits),
+			},
+			expectedRequired: 1,
+			expectedRegister: 2,
+		},
+	}
+
+	n := New()
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			n.config = &tc.config
+			reg, req := n.discoveryTopics()
+			require.Equal(t, tc.expectedRegister, len(reg))
+			require.Equal(t, tc.expectedRequired, len(req))
+		})
+	}
 }

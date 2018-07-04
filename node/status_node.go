@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discover"
+	"github.com/ethereum/go-ethereum/p2p/discv5"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"github.com/syndtr/goleveldb/leveldb"
 
@@ -186,13 +187,14 @@ func (n *StatusNode) startDiscovery() error {
 		n.gethNode.Server().PrivateKey,
 		n.config.ListenAddr,
 		parseNodesV5(n.config.ClusterConfig.BootNodes))
-	n.register = peers.NewRegister(n.discovery, n.config.RegisterTopics...)
 	options := peers.NewDefaultOptions()
+	topics, requiredTopics := n.discoveryTopics()
+	n.register = peers.NewRegister(n.discovery, topics...)
 	// TODO(dshulyak) consider adding a flag to define this behaviour
-	options.AllowStop = len(n.config.RegisterTopics) == 0
+	options.AllowStop = len(topics) == 0
 	n.peerPool = peers.NewPeerPool(
 		n.discovery,
-		n.config.RequireTopics,
+		requiredTopics,
 		peers.NewCache(n.db),
 		options,
 	)
@@ -550,4 +552,15 @@ func (n *StatusNode) ensureSync(ctx context.Context) error {
 			n.log.Warn("Synchronization is not finished", "current", progress.CurrentBlock, "highest", progress.HighestBlock)
 		}
 	}
+}
+
+// discoveryTopics calculates the discovery topics to be acrive based on the
+// different features active on the node.
+func (n *StatusNode) discoveryTopics() ([]discv5.Topic, map[discv5.Topic]params.Limits) {
+	topics := append(n.config.RegisterTopics, peers.MailServerDiscoveryTopic)
+	if n.config.RequireTopics == nil {
+		n.config.RequireTopics = make(map[discv5.Topic]params.Limits)
+	}
+	n.config.RequireTopics[peers.MailServerDiscoveryTopic] = peers.MailServerDiscoveryLimits
+	return topics, n.config.RequireTopics
 }

@@ -85,7 +85,7 @@ type PeerPool struct {
 	cache  *Cache
 
 	mu                 sync.RWMutex
-	topics             []*TopicPool
+	topics             []TopicPoolInterface
 	serverSubscription event.Subscription
 	events             chan *p2p.PeerEvent
 	quit               chan struct{}
@@ -132,9 +132,14 @@ func (p *PeerPool) Start(server *p2p.Server) error {
 	}()
 
 	// collect topics and start searching for nodes
-	p.topics = make([]*TopicPool, 0, len(p.config))
+	p.topics = make([]TopicPoolInterface, 0, len(p.config))
 	for topic, limits := range p.config {
-		topicPool := NewTopicPool(p.discovery, topic, limits, p.opts.SlowSync, p.opts.FastSync, p.cache)
+		var topicPool TopicPoolInterface
+		if topic == MailServerDiscoveryTopic {
+			topicPool = newCacheOnlyTopicPool(p.discovery, topic, limits, p.opts.SlowSync, p.opts.FastSync, p.cache)
+		} else {
+			topicPool = newTopicPool(p.discovery, topic, limits, p.opts.SlowSync, p.opts.FastSync, p.cache)
+		}
 		if err := topicPool.StartSearch(server); err != nil {
 			return err
 		}
@@ -309,7 +314,7 @@ func (p *PeerPool) handleDroppedPeer(server *p2p.Server, nodeID discover.NodeID)
 				log.Debug("added peer from local table", "ID", newPeer.ID)
 			}
 		}
-		log.Debug("search", "topic", t.topic, "below min", t.BelowMin())
+		log.Debug("search", "topic", t.Topic(), "below min", t.BelowMin())
 		if t.BelowMin() && !t.SearchRunning() {
 			any = true
 		}

@@ -17,6 +17,9 @@ const (
 
 	// EventMailServerRequestExpired is triggered when request TTL ends
 	EventMailServerRequestExpired = "mailserver.request.expired"
+
+	// EventEnodeDiscoveryCompleted is tiggered when enode discovery has been completed.
+	EventEnodeDiscoveryCompleted = "enode.discovery.completed"
 )
 
 // EnvelopeSignal includes hash of the envelope.
@@ -54,4 +57,19 @@ func SendMailServerRequestCompleted(requestID common.Hash, lastEnvelopeHash comm
 // SendMailServerRequestExpired triggered when mail server request expires
 func SendMailServerRequestExpired(hash common.Hash) {
 	send(EventMailServerRequestExpired, EnvelopeSignal{hash})
+}
+
+// EnodeDiscoveredSignal includes enode address and topic
+type EnodeDiscoveredSignal struct {
+	Enode string `json:"enode"`
+	Topic string `json:"topic"`
+}
+
+// SendEnodeDiscoveredCompleted tiggered when discovery process successfully
+// finds a new enode.
+func SendEnodeDiscoveredCompleted(enode, topic string) {
+	send(EventEnodeDiscoveryCompleted, EnodeDiscoveredSignal{
+		Enode: enode,
+		Topic: topic,
+	})
 }

@@ -42,7 +42,7 @@ func (s *TopicPoolSuite) SetupTest() {
 	limits := params.NewLimits(1, 2)
 	cache, err := newInMemoryCache()
 	s.Require().NoError(err)
-	s.topicPool = NewTopicPool(&DiscV5{}, topic, limits, 100*time.Millisecond, 200*time.Millisecond, cache)
+	s.topicPool = newTopicPool(&DiscV5{}, topic, limits, 100*time.Millisecond, 200*time.Millisecond, cache)
 	s.topicPool.running = 1
 	// This is a buffered channel to simplify testing.
 	// If your test generates more than 10 mode changes,
@@ -313,4 +313,17 @@ func (s *TopicPoolSuite) TestMaxCachedPeers() {
 	s.True(s.topicPool.maxCachedPeersReached())
 	cached = s.topicPool.cache.GetPeersRange(s.topicPool.topic, 5)
 	s.Equal(3, len(cached))
+}
+
+func (s *TopicPoolSuite) TestNewTopicPoolInterface() {
+	limits := params.NewLimits(1, 2)
+	cache, err := newInMemoryCache()
+	s.Require().NoError(err)
+
+	topic := discv5.Topic("cap=cap1")
+	t := newTopicPool(&DiscV5{}, topic, limits, 100*time.Millisecond, 200*time.Millisecond, cache)
+	s.IsType(&TopicPool{}, t)
+
+	mst := newCacheOnlyTopicPool(&DiscV5{}, MailServerDiscoveryTopic, limits, 100*time.Millisecond, 200*time.Millisecond, cache)
+	s.IsType(&CacheOnlyTopicPool{}, mst)
 }
