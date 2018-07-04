@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 
+	"github.com/status-im/status-go/discovery"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/stretchr/testify/require"
@@ -264,4 +265,21 @@ func isPeerConnected(node *StatusNode, peerURL string) (bool, error) {
 	}
 
 	return false, nil
+}
+
+func TestStatusNodeRendezvousDiscovery(t *testing.T) {
+	config := params.NodeConfig{
+		Rendezvous:  true,
+		NoDiscovery: true,
+		ClusterConfig: &params.ClusterConfig{
+			Enabled: true,
+			// not necessarily with id, just valid multiaddr
+			RendezvousNodes: []string{"/ip4/127.0.0.1/tcp/34012", "/ip4/127.0.0.1/tcp/34011"},
+		},
+	}
+	n := New()
+	require.NoError(t, n.Start(&config))
+	require.NotNil(t, n.discovery)
+	require.True(t, n.discovery.Running())
+	require.IsType(t, &discovery.Rendezvous{}, n.discovery)
 }

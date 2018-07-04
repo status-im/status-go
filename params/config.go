@@ -196,6 +196,9 @@ type ClusterConfig struct {
 	// BootNodes list of cluster peer nodes for a given network (Mainnet, Ropsten, Rinkeby, Homestead),
 	// for a given mode (production vs development)
 	BootNodes []string
+
+	// RendezvousNodes is a rendezvous discovery server.
+	RendezvousNodes []string
 }
 
 // String dumps config object as nicely indented JSON
@@ -254,6 +257,9 @@ type NodeConfig struct {
 
 	// NoDiscovery set to true will disable discovery protocol.
 	NoDiscovery bool
+
+	// Rendezvous enables discovery protocol.
+	Rendezvous bool
 
 	// ListenAddr is an IP address and port of this node (e.g. 127.0.0.1:30303).
 	ListenAddr string

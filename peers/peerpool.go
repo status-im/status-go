@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 
+	"github.com/status-im/status-go/discovery"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/signal"
 )
@@ -78,7 +79,7 @@ type peerInfo struct {
 type PeerPool struct {
 	opts *Options
 
-	discovery Discovery
+	discovery discovery.Discovery
 
 	// config can be set only once per pool life cycle
 	config map[discv5.Topic]params.Limits
@@ -95,7 +96,7 @@ type PeerPool struct {
 }
 
 // NewPeerPool creates instance of PeerPool
-func NewPeerPool(discovery Discovery, config map[discv5.Topic]params.Limits, cache *Cache, options *Options) *PeerPool {
+func NewPeerPool(discovery discovery.Discovery, config map[discv5.Topic]params.Limits, cache *Cache, options *Options) *PeerPool {
 	return &PeerPool{
 		opts:      options,
 		discovery: discovery,

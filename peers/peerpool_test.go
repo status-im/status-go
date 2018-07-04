@@ -14,10 +14,16 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/whisper/whisperv6"
+	lcrypto "github.com/libp2p/go-libp2p-crypto"
+	ma "github.com/multiformats/go-multiaddr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/syndtr/goleveldb/leveldb/storage"
 
+	"github.com/status-im/rendezvous/server"
+	"github.com/status-im/status-go/discovery"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/signal"
 
@@ -28,10 +34,11 @@ import (
 type PeerPoolSimulationSuite struct {
 	suite.Suite
 
-	bootnode  *p2p.Server
-	peers     []*p2p.Server
-	discovery []Discovery
-	port      uint16
+	bootnode         *p2p.Server
+	peers            []*p2p.Server
+	discovery        []discovery.Discovery
+	port             uint16
+	rendezvousServer *server.Server
 }
 
 func TestPeerPoolSimulationSuite(t *testing.T) {
@@ -65,7 +72,7 @@ func (s *PeerPoolSimulationSuite) SetupTest() {
 
 	// 1 peer to initiate connection, 1 peer as a first candidate, 1 peer - for failover
 	s.peers = make([]*p2p.Server, 3)
-	s.discovery = make([]Discovery, 3)
+	s.discovery = make([]discovery.Discovery, 3)
 	for i := range s.peers {
 		key, _ := crypto.GenerateKey()
 		whisper := whisperv6.New(nil)
@@ -82,7 +89,31 @@ func (s *PeerPoolSimulationSuite) SetupTest() {
 		}
 		s.NoError(peer.Start())
 		s.peers[i] = peer
-		d := NewDiscV5(key, peer.ListenAddr, peer.BootstrapNodesV5)
+	}
+}
+
+func (s *PeerPoolSimulationSuite) setupEthV5() {
+	for i := range s.peers {
+		peer := s.peers[i]
+		d := discovery.NewDiscV5(peer.PrivateKey, peer.ListenAddr, peer.BootstrapNodesV5)
+		s.NoError(d.Start())
+		s.discovery[i] = d
+	}
+}
+
+func (s *PeerPoolSimulationSuite) setupRendezvous() {
+	priv, _, err := lcrypto.GenerateKeyPair(lcrypto.Secp256k1, 0)
+	s.Require().NoError(err)
+	laddr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/127.0.0.1/tcp/7777"))
+	s.Require().NoError(err)
+	db, err := leveldb.Open(storage.NewMemStorage(), nil)
+	s.Require().NoError(err)
+	s.rendezvousServer = server.NewServer(laddr, priv, server.NewStorage(db))
+	s.Require().NoError(s.rendezvousServer.Start())
+	for i := range s.peers {
+		peer := s.peers[i]
+		d, err := discovery.NewRendezvous([]ma.Multiaddr{s.rendezvousServer.Addr()}, peer.PrivateKey, peer.Self())
+		s.NoError(err)
 		s.NoError(d.Start())
 		s.discovery[i] = d
 	}
@@ -93,6 +124,9 @@ func (s *PeerPoolSimulationSuite) TearDown() {
 	for i := range s.peers {
 		s.peers[i].Stop()
 		s.NoError(s.discovery[i].Stop())
+	}
+	if s.rendezvousServer != nil {
+		s.rendezvousServer.Stop()
 	}
 }
 
@@ -120,7 +154,8 @@ func (s *PeerPoolSimulationSuite) getPoolEvent(events <-chan string) string {
 	}
 }
 
-func (s *PeerPoolSimulationSuite) TestPeerPoolCache() {
+func (s *PeerPoolSimulationSuite) TestPeerPoolCacheEthV5() {
+	s.setupEthV5()
 	var err error
 
 	topic := discv5.Topic("cap=test")
@@ -143,11 +178,19 @@ func (s *PeerPoolSimulationSuite) TestPeerPoolCache() {
 	}
 }
 
-func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailover() {
+func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailoverEthV5() {
 	s.T().Skip("Skipping due to being flaky")
+	s.setupEthV5()
+	s.singleTopicDiscoveryWithFailover()
+}
 
+func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailoverRendezvous() {
+	s.setupRendezvous()
+	s.singleTopicDiscoveryWithFailover()
+}
+
+func (s *PeerPoolSimulationSuite) singleTopicDiscoveryWithFailover() {
 	var err error
-
 	// Buffered channels must be used because we expect the events
 	// to be in the same order. Use a buffer length greater than
 	// the expected number of events to avoid deadlock.
@@ -254,7 +297,7 @@ func TestPeerPoolMaxPeersOverflow(t *testing.T) {
 	}
 	require.NoError(t, peer.Start())
 	defer peer.Stop()
-	discovery := NewDiscV5(key, peer.ListenAddr, nil)
+	discovery := discovery.NewDiscV5(key, peer.ListenAddr, nil)
 	require.NoError(t, discovery.Start())
 	defer func() { assert.NoError(t, discovery.Stop()) }()
 	require.True(t, discovery.Running())
@@ -306,7 +349,7 @@ func TestPeerPoolDiscV5Timeout(t *testing.T) {
 	require.NoError(t, server.Start())
 	defer server.Stop()
 
-	discovery := NewDiscV5(key, server.ListenAddr, nil)
+	discovery := discovery.NewDiscV5(key, server.ListenAddr, nil)
 	require.NoError(t, discovery.Start())
 	defer func() { assert.NoError(t, discovery.Stop()) }()
 	require.True(t, discovery.Running())
@@ -353,7 +396,7 @@ func TestPeerPoolNotAllowedStopping(t *testing.T) {
 	require.NoError(t, server.Start())
 	defer server.Stop()
 
-	discovery := NewDiscV5(key, server.ListenAddr, nil)
+	discovery := discovery.NewDiscV5(key, server.ListenAddr, nil)
 	require.NoError(t, discovery.Start())
 	defer func() { assert.NoError(t, discovery.Stop()) }()
 	require.True(t, discovery.Running())
@@ -369,6 +412,7 @@ func TestPeerPoolNotAllowedStopping(t *testing.T) {
 }
 
 func (s *PeerPoolSimulationSuite) TestUpdateTopicLimits() {
+	s.setupEthV5()
 	var err error
 
 	topic := discv5.Topic("cap=test")
