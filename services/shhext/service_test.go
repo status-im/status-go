@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
+	"github.com/status-im/status-go/t/helpers"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -141,7 +142,7 @@ func (s *ShhExtSuite) TestWaitMessageExpired() {
 	}
 }
 
-func (s *ShhExtSuite) TestRequestMessages() {
+func (s *ShhExtSuite) TestRequestMessagesErrors() {
 	var err error
 
 	shh := whisper.New(nil)
@@ -152,17 +153,14 @@ func (s *ShhExtSuite) TestRequestMessages() {
 		},
 	}) // in-memory node as no data dir
 	s.NoError(err)
-	err = aNode.Register(func(_ *node.ServiceContext) (node.Service, error) {
+	err = aNode.Register(func(*node.ServiceContext) (node.Service, error) {
 		return shh, nil
 	})
 	s.NoError(err)
 
 	err = aNode.Start()
 	s.NoError(err)
-	defer func() {
-		err := aNode.Stop()
-		s.NoError(err)
-	}()
+	defer func() { s.NoError(aNode.Stop()) }()
 
 	mock := newHandlerMock(1)
 	service := New(shh, mock, nil, false)
@@ -182,6 +180,7 @@ func (s *ShhExtSuite) TestRequestMessages() {
 	// non-existent symmetric key
 	hash, err = api.RequestMessages(context.TODO(), MessagesRequest{
 		MailServerPeer: mailServerPeer,
+		SymKeyID:       "invalid-sym-key-id",
 	})
 	s.Nil(hash)
 	s.EqualError(err, "invalid symKeyID value: non-existent key ID")
@@ -193,16 +192,39 @@ func (s *ShhExtSuite) TestRequestMessages() {
 		MailServerPeer: mailServerPeer,
 		SymKeyID:       symKeyID,
 	})
-	s.Contains(err.Error(), "Could not find peer with ID")
 	s.Nil(hash)
+	s.Contains(err.Error(), "Could not find peer with ID")
 
 	// from is greater than to
 	hash, err = api.RequestMessages(context.TODO(), MessagesRequest{
 		From: 10,
 		To:   5,
 	})
-	s.Contains(err.Error(), "Query range is invalid: from > to (10 > 5)")
 	s.Nil(hash)
+	s.Contains(err.Error(), "Query range is invalid: from > to (10 > 5)")
+}
+
+func (s *ShhExtSuite) TestRequestMessagesSuccess() {
+	var err error
+
+	shh := whisper.New(nil)
+	aNode, err := node.New(&node.Config{
+		P2P: p2p.Config{
+			MaxPeers:    math.MaxInt32,
+			NoDiscovery: true,
+		},
+	}) // in-memory node as no data dir
+	s.NoError(err)
+	err = aNode.Register(func(*node.ServiceContext) (node.Service, error) { return shh, nil })
+	s.NoError(err)
+
+	err = aNode.Start()
+	s.NoError(err)
+	defer func() { err := aNode.Stop(); s.NoError(err) }()
+
+	mock := newHandlerMock(1)
+	service := New(shh, mock, nil, false)
+	api := NewPublicAPI(service)
 
 	// with a peer acting as a mailserver
 	// prepare a node first
@@ -214,29 +236,39 @@ func (s *ShhExtSuite) TestRequestMessages() {
 		},
 	}) // in-memory node as no data dir
 	s.NoError(err)
-	err = mailNode.Register(func(_ *node.ServiceContext) (node.Service, error) {
+	err = mailNode.Register(func(*node.ServiceContext) (node.Service, error) {
 		return whisper.New(nil), nil
 	})
 	s.NoError(err)
 	err = mailNode.Start()
 	s.NoError(err)
-	defer func() {
-		err := mailNode.Stop()
-		s.NoError(err)
-	}()
+	defer func() { s.NoError(mailNode.Stop()) }()
 
 	// add mailPeer as a peer
 	aNode.Server().AddPeer(mailNode.Server().Self())
-	time.Sleep(time.Second) // wait for the peer to be added
+	waitErr := helpers.WaitForPeerAsync(aNode.Server(), mailNode.Server().Self().String(), p2p.PeerEventTypeAdd, time.Second)
+	s.NoError(<-waitErr)
 
-	// send a request
+	var hash []byte
+
+	// send a request with a symmetric key
+	symKeyID, symKeyErr := shh.AddSymKeyFromPassword("some-pass")
+	s.NoError(symKeyErr)
 	hash, err = api.RequestMessages(context.TODO(), MessagesRequest{
 		MailServerPeer: mailNode.Server().Self().String(),
 		SymKeyID:       symKeyID,
 	})
 	s.NoError(err)
 	s.NotNil(hash)
+	s.Contains(api.service.tracker.cache, common.BytesToHash(hash))
 
+	// Send a request without a symmetric key. In this case,
+	// a public key extracted from MailServerPeer will be used.
+	hash, err = api.RequestMessages(context.TODO(), MessagesRequest{
+		MailServerPeer: mailNode.Server().Self().String(),
+	})
+	s.NoError(err)
+	s.NotNil(hash)
 	s.Contains(api.service.tracker.cache, common.BytesToHash(hash))
 }
 

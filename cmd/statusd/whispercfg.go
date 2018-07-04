@@ -28,7 +28,7 @@ func whisperConfig(nodeConfig *params.NodeConfig) (*params.NodeConfig, error) {
 			return nil, fmt.Errorf("password file: %v", err)
 		}
 
-		whisperConfig.Password = string(password)
+		whisperConfig.MailServerPassword = string(password)
 	}
 
 	// firebase configuration

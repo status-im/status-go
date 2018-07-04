@@ -189,6 +189,28 @@ func activateStatusService(stack *node.Node, config *params.NodeConfig) error {
 	})
 }
 
+func registerMailServer(whisperService *whisper.Whisper, config *params.WhisperConfig) (err error) {
+	// if the Password is already set, do not override it
+	if config.MailServerPassword == "" && config.MailServerPasswordFile != "" {
+		err = config.ReadMailServerPasswordFile()
+		if err != nil {
+			return
+		}
+	}
+	// similarly, do not override already configured AsymKey
+	if config.MailServerAsymKey == nil && config.MailServerAsymKeyFile != "" {
+		err = config.ReadMailServerAsymKeyFile()
+		if err != nil {
+			return
+		}
+	}
+
+	var mailServer mailserver.WMailServer
+	whisperService.RegisterServer(&mailServer)
+
+	return mailServer.Init(whisperService, config)
+}
+
 // activateShhService configures Whisper and adds it to the given node.
 func activateShhService(stack *node.Node, config *params.NodeConfig, db *leveldb.DB) (err error) {
 	if config.WhisperConfig == nil || !config.WhisperConfig.Enabled {
@@ -223,19 +245,8 @@ func activateShhService(stack *node.Node, config *params.NodeConfig, db *leveldb
 
 		// enable mail service
 		if config.WhisperConfig.EnableMailServer {
-			if config.WhisperConfig.Password == "" {
-				if err := config.WhisperConfig.ReadPasswordFile(); err != nil {
-					return nil, err
-				}
-			}
-
-			logger.Info("Register MailServer")
-
-			var mailServer mailserver.WMailServer
-			whisperService.RegisterServer(&mailServer)
-			err := mailServer.Init(whisperService, config.WhisperConfig)
-			if err != nil {
-				return nil, err
+			if err := registerMailServer(whisperService, config.WhisperConfig); err != nil {
+				return nil, fmt.Errorf("failed to register MailServer: %v", err)
 			}
 		}
 

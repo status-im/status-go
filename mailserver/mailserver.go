@@ -20,6 +20,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"sync"
 
 	"time"
 
@@ -43,8 +44,8 @@ const (
 )
 
 var (
-	errDirectoryNotProvided = errors.New("data directory not provided")
-	errPasswordNotProvided  = errors.New("password is not specified")
+	errDirectoryNotProvided        = errors.New("data directory not provided")
+	errDecryptionMethodNotProvided = errors.New("decryption method is not provided")
 	// By default go-ethereum/metrics creates dummy metrics that don't register anything.
 	// Real metrics are collected only if -metrics flag is set
 	requestProcessTimer    = metrics.NewRegisteredTimer("mailserver/requestProcessTime", nil)
@@ -82,12 +83,14 @@ type dbImpl interface {
 
 // WMailServer whisper mailserver.
 type WMailServer struct {
-	db    dbImpl
-	w     *whisper.Whisper
-	pow   float64
-	key   []byte
-	limit *limiter
-	tick  *ticker
+	db     dbImpl
+	w      *whisper.Whisper
+	pow    float64
+	filter *whisper.Filter
+
+	muLimiter sync.RWMutex
+	limiter   *limiter
+	tick      *ticker
 }
 
 // DBKey key to be stored on db.
@@ -116,23 +119,25 @@ func (s *WMailServer) Init(shh *whisper.Whisper, config *params.WhisperConfig) e
 		return errDirectoryNotProvided
 	}
 
-	if len(config.Password) == 0 {
-		return errPasswordNotProvided
+	if len(config.MailServerPassword) == 0 && config.MailServerAsymKey == nil {
+		return errDecryptionMethodNotProvided
 	}
 
-	db, err := db.Open(config.DataDir, nil)
-	if err != nil {
-		return fmt.Errorf("open DB: %s", err)
-	}
-
-	s.db = db
 	s.w = shh
 	s.pow = config.MinimumPoW
 
-	if err := s.setupWhisperIdentity(config); err != nil {
+	if err := s.setupRequestMessageDecryptor(config); err != nil {
 		return err
 	}
 	s.setupLimiter(time.Duration(config.MailServerRateLimit) * time.Second)
+
+	// Open database in the last step in order not to init with error
+	// and leave the database open by accident.
+	database, err := db.Open(config.DataDir, nil)
+	if err != nil {
+		return fmt.Errorf("open DB: %s", err)
+	}
+	s.db = database
 
 	return nil
 }
@@ -141,23 +146,33 @@ func (s *WMailServer) Init(shh *whisper.Whisper, config *params.WhisperConfig) e
 // limit db cleanup.
 func (s *WMailServer) setupLimiter(limit time.Duration) {
 	if limit > 0 {
-		s.limit = newLimiter(limit)
+		s.limiter = newLimiter(limit)
 		s.setupMailServerCleanup(limit)
 	}
 }
 
-// setupWhisperIdentity setup the whisper identity (symkey) for the current mail
-// server.
-func (s *WMailServer) setupWhisperIdentity(config *params.WhisperConfig) error {
-	MailServerKeyID, err := s.w.AddSymKeyFromPassword(config.Password)
-	if err != nil {
-		return fmt.Errorf("create symmetric key: %s", err)
+// setupRequestMessageDecryptor setup a Whisper filter to decrypt
+// incoming Whisper requests.
+func (s *WMailServer) setupRequestMessageDecryptor(config *params.WhisperConfig) error {
+	var filter whisper.Filter
+
+	if config.MailServerPassword != "" {
+		keyID, err := s.w.AddSymKeyFromPassword(config.MailServerPassword)
+		if err != nil {
+			return fmt.Errorf("create symmetric key: %v", err)
+		}
+
+		symKey, err := s.w.GetSymKey(keyID)
+		if err != nil {
+			return fmt.Errorf("save symmetric key: %v", err)
+		}
+
+		filter = whisper.Filter{KeySym: symKey}
+	} else if config.MailServerAsymKey != nil {
+		filter = whisper.Filter{KeyAsym: config.MailServerAsymKey}
 	}
 
-	s.key, err = s.w.GetSymKey(MailServerKeyID)
-	if err != nil {
-		return fmt.Errorf("save symmetric key: %s", err)
-	}
+	s.filter = &filter
 
 	return nil
 }
@@ -168,7 +183,7 @@ func (s *WMailServer) setupMailServerCleanup(period time.Duration) {
 	if s.tick == nil {
 		s.tick = &ticker{}
 	}
-	go s.tick.run(period, s.limit.deleteExpired)
+	go s.tick.run(period, s.limiter.deleteExpired)
 }
 
 // Close the mailserver and its associated db connection.
@@ -244,13 +259,16 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 // exceedsPeerRequests in case limit its been setup on the current server and limit
 // allows the query, it will store/update new query time for the current peer.
 func (s *WMailServer) exceedsPeerRequests(peer []byte) bool {
-	if s.limit != nil {
+	s.muLimiter.RLock()
+	defer s.muLimiter.RUnlock()
+
+	if s.limiter != nil {
 		peerID := string(peer)
-		if !s.limit.isAllowed(peerID) {
+		if !s.limiter.isAllowed(peerID) {
 			log.Info("peerID exceeded the number of requests per second")
 			return true
 		}
-		s.limit.add(peerID)
+		s.limiter.add(peerID)
 	}
 	return false
 }
@@ -345,8 +363,7 @@ func (s *WMailServer) validateRequest(peerID []byte, request *whisper.Envelope) 
 		return false, 0, 0, nil, 0, nil
 	}
 
-	f := whisper.Filter{KeySym: s.key}
-	decrypted := request.Open(&f)
+	decrypted := request.Open(s.filter)
 	if decrypted == nil {
 		log.Warn("Failed to decrypt p2p request")
 		return false, 0, 0, nil, 0, nil
