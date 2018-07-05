@@ -117,7 +117,6 @@ func defaultEmbeddedNodeConfig(config *params.NodeConfig) *node.Config {
 		Version:           config.Version,
 		P2P: p2p.Config{
 			NoDiscovery:     true, // we always use only v5 server
-			DiscoveryV5:     !config.NoDiscovery,
 			ListenAddr:      config.ListenAddr,
 			NAT:             nat.Any(),
 			MaxPeers:        config.MaxPeers,
