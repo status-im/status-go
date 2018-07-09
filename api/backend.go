@@ -230,10 +230,7 @@ func (b *StatusBackend) CallPrivateRPC(inputJSON string) string {
 func (b *StatusBackend) SendTransaction(sendArgs transactions.SendTxArgs, password string) sign.Result {
 	verifiedAccount, err := b.getVerifiedAccount(password)
 	if err != nil {
-		return sign.Result{
-			Response: sign.Response([]byte{}),
-			Error:    err,
-		}
+		return sign.NewErrResult(err)
 	}
 	return b.transactor.SendTransaction(sendArgs, verifiedAccount)
 }
