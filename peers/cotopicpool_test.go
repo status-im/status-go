@@ -17,7 +17,7 @@ type CacheOnlyTopicPoolSuite struct {
 	suite.Suite
 
 	peer      *p2p.Server
-	topicPool *CacheOnlyTopicPool
+	topicPool *cacheOnlyTopicPool
 }
 
 func TestCacheOnlyTopicPoolSuite(t *testing.T) {
@@ -41,7 +41,8 @@ func (s *CacheOnlyTopicPoolSuite) SetupTest() {
 	limits := params.NewLimits(1, 2)
 	cache, err := newInMemoryCache()
 	s.Require().NoError(err)
-	s.topicPool = newCacheOnlyTopicPool(&DiscV5{}, MailServerDiscoveryTopic, limits, 100*time.Millisecond, 200*time.Millisecond, cache)
+	t := newTopicPool(&DiscV5{}, MailServerDiscoveryTopic, limits, 100*time.Millisecond, 200*time.Millisecond, cache)
+	s.topicPool = newCacheOnlyTopicPool(t)
 	s.topicPool.running = 1
 	// This is a buffered channel to simplify testing.
 	// If your test generates more than 10 mode changes,
@@ -64,20 +65,32 @@ func (s *CacheOnlyTopicPoolSuite) TestReplacementPeerIsCounted() {
 	s.topicPool.processFoundNode(s.peer, peer2)
 	s.topicPool.ConfirmAdded(s.peer, discover.NodeID(peer1.ID))
 	s.topicPool.ConfirmAdded(s.peer, discover.NodeID(peer2.ID))
-	s.topicPool.connectedPeers = map[discv5.NodeID]*peerInfo{}
 	s.True(s.topicPool.MaxReached())
+
+	// When we stop searching for peers (when Max limit is reached)
+	s.topicPool.StopSearch(s.peer)
+	s.True(s.topicPool.MaxReached())
+	s.Equal(s.topicPool.limits.Max, 0)
+	s.Equal(s.topicPool.limits.Min, 0)
+
+	// Then we should drop all connected peers
+	s.Equal(len(s.topicPool.connectedPeers), 0)
+
+	// And cached peers should remain
+	cachedPeers := s.topicPool.cache.GetPeersRange(s.topicPool.topic, s.topicPool.maxCachedPeers)
+	s.Equal(len(cachedPeers), 1)
 }
 
 func (s *CacheOnlyTopicPoolSuite) TestConfirmAddedSignals() {
 	sentNodeID := ""
 	sentTopic := ""
-	sendEnodeDiscoveryCompleted = func(enode, topic string) {
+	sendEnodeDiscovered = func(enode, topic string) {
 		sentNodeID = enode
 		sentTopic = topic
 	}
 
 	peer1 := discv5.NewNode(discv5.NodeID{1}, s.peer.Self().IP, 32311, 32311)
 	s.topicPool.ConfirmAdded(s.peer, discover.NodeID(peer1.ID))
-	s.Equal("01000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", sentNodeID)
+	s.Equal((discv5.NodeID{1}).String(), sentNodeID)
 	s.Equal(MailServerDiscoveryTopic, sentTopic)
 }

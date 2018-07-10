@@ -16,7 +16,6 @@ import (
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discover"
-	"github.com/ethereum/go-ethereum/p2p/discv5"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"github.com/syndtr/goleveldb/leveldb"
 
@@ -24,6 +23,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/peers"
 	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/services/peer"
 	"github.com/status-im/status-go/services/status"
 )
 
@@ -187,14 +187,13 @@ func (n *StatusNode) startDiscovery() error {
 		n.gethNode.Server().PrivateKey,
 		n.config.ListenAddr,
 		parseNodesV5(n.config.ClusterConfig.BootNodes))
+	n.register = peers.NewRegister(n.discovery, n.config.RegisterTopics...)
 	options := peers.NewDefaultOptions()
-	topics, requiredTopics := n.discoveryTopics()
-	n.register = peers.NewRegister(n.discovery, topics...)
 	// TODO(dshulyak) consider adding a flag to define this behaviour
-	options.AllowStop = len(topics) == 0
+	options.AllowStop = len(n.config.RegisterTopics) == 0
 	n.peerPool = peers.NewPeerPool(
 		n.discovery,
-		requiredTopics,
+		n.config.RequireTopics,
 		peers.NewCache(n.db),
 		options,
 	)
@@ -430,6 +429,19 @@ func (n *StatusNode) StatusService() (st *status.Service, err error) {
 	return
 }
 
+// PeerService exposes reference to peer service running on top of the node.
+func (n *StatusNode) PeerService() (st *peer.Service, err error) {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+
+	err = n.gethService(&st)
+	if err == node.ErrServiceUnknown {
+		err = ErrServiceUnknown
+	}
+
+	return
+}
+
 // WhisperService exposes reference to Whisper service running on top of the node
 func (n *StatusNode) WhisperService() (w *whisper.Whisper, err error) {
 	n.mu.RLock()
@@ -554,13 +566,13 @@ func (n *StatusNode) ensureSync(ctx context.Context) error {
 	}
 }
 
-// discoveryTopics calculates the discovery topics to be acrive based on the
-// different features active on the node.
-func (n *StatusNode) discoveryTopics() ([]discv5.Topic, map[discv5.Topic]params.Limits) {
-	topics := append(n.config.RegisterTopics, peers.MailServerDiscoveryTopic)
-	if n.config.RequireTopics == nil {
-		n.config.RequireTopics = make(map[discv5.Topic]params.Limits)
+// Discover sets up the discovery for a specific topic.
+func (n *StatusNode) Discover(topic string, max, min int) (err error) {
+	if n.peerPool == nil {
+		return errors.New("peerPool not running")
 	}
-	n.config.RequireTopics[peers.MailServerDiscoveryTopic] = peers.MailServerDiscoveryLimits
-	return topics, n.config.RequireTopics
+	return n.peerPool.UpdateTopic(topic, params.Limits{
+		Max: max,
+		Min: min,
+	})
 }

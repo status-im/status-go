@@ -18,8 +18,8 @@ const (
 	// EventMailServerRequestExpired is triggered when request TTL ends
 	EventMailServerRequestExpired = "mailserver.request.expired"
 
-	// EventEnodeDiscoveryCompleted is tiggered when enode discovery has been completed.
-	EventEnodeDiscoveryCompleted = "enode.discovery.completed"
+	// EventEnodeDiscovered is tiggered when enode has been discovered.
+	EventEnodeDiscovered = "enode.discovered"
 )
 
 // EnvelopeSignal includes hash of the envelope.
@@ -65,10 +65,10 @@ type EnodeDiscoveredSignal struct {
 	Topic string `json:"topic"`
 }
 
-// SendEnodeDiscoveredCompleted tiggered when discovery process successfully
+// SendEnodeDiscovered tiggered when an enode is discovered.
 // finds a new enode.
-func SendEnodeDiscoveredCompleted(enode, topic string) {
-	send(EventEnodeDiscoveryCompleted, EnodeDiscoveredSignal{
+func SendEnodeDiscovered(enode, topic string) {
+	send(EventEnodeDiscovered, EnodeDiscoveredSignal{
 		Enode: enode,
 		Topic: topic,
 	})

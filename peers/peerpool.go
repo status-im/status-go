@@ -91,6 +91,7 @@ type PeerPool struct {
 	quit               chan struct{}
 	wg                 sync.WaitGroup
 	timeout            <-chan time.Time
+	updateTopic        chan *updateTopicRequest
 }
 
 // NewPeerPool creates instance of PeerPool
@@ -120,6 +121,7 @@ func (p *PeerPool) Start(server *p2p.Server) error {
 
 	// init channels
 	p.quit = make(chan struct{})
+	p.updateTopic = make(chan *updateTopicRequest)
 	p.setDiscoveryTimeout()
 
 	// subscribe to peer events
@@ -135,10 +137,11 @@ func (p *PeerPool) Start(server *p2p.Server) error {
 	p.topics = make([]TopicPoolInterface, 0, len(p.config))
 	for topic, limits := range p.config {
 		var topicPool TopicPoolInterface
+		t := newTopicPool(p.discovery, topic, limits, p.opts.SlowSync, p.opts.FastSync, p.cache)
 		if topic == MailServerDiscoveryTopic {
-			topicPool = newCacheOnlyTopicPool(p.discovery, topic, limits, p.opts.SlowSync, p.opts.FastSync, p.cache)
+			topicPool = newCacheOnlyTopicPool(t)
 		} else {
-			topicPool = newTopicPool(p.discovery, topic, limits, p.opts.SlowSync, p.opts.FastSync, p.cache)
+			topicPool = t
 		}
 		if err := topicPool.StartSearch(server); err != nil {
 			return err
@@ -170,13 +173,13 @@ func (p *PeerPool) startDiscovery() error {
 	return nil
 }
 
-func (p *PeerPool) stopDiscovery() {
+func (p *PeerPool) stopDiscovery(server *p2p.Server) {
 	if !p.discovery.Running() {
 		return
 	}
 
 	for _, t := range p.topics {
-		t.StopSearch()
+		t.StopSearch(server)
 	}
 	if err := p.discovery.Stop(); err != nil {
 		log.Error("discovery errored when was closed", "err", err)
@@ -226,18 +229,24 @@ func (p *PeerPool) handleServerPeers(server *p2p.Server, events <-chan *p2p.Peer
 		select {
 		case <-p.quit:
 			log.Debug("stopping DiscV5 because of quit")
-			p.stopDiscovery()
+			p.stopDiscovery(server)
 			return
 		case <-timeout:
 			log.Info("DiscV5 timed out")
-			p.stopDiscovery()
+			p.stopDiscovery(server)
 		case <-retryDiscv5:
 			if err := p.restartDiscovery(server); err != nil {
 				retryDiscv5 = time.After(discoveryRestartTimeout)
 				log.Error("starting discv5 failed", "error", err, "retry", discoveryRestartTimeout)
 			}
 		case <-stopDiscv5:
-			p.handleStopTopics()
+			p.handleStopTopics(server)
+		case req := <-p.updateTopic:
+			if p.updateTopicLimits(server, req) == nil {
+				if !p.discovery.Running() {
+					retryDiscv5 = time.After(0)
+				}
+			}
 		case event := <-events:
 			switch event.Type {
 			case p2p.PeerEventTypeDrop:
@@ -272,18 +281,18 @@ func (p *PeerPool) handleAddedPeer(server *p2p.Server, nodeID discover.NodeID) {
 // handleStopTopics stops the search on any topics having reached its max cached
 // limit or its delay stop is expired, additionally will stop discovery if all
 // peers are stopped.
-func (p *PeerPool) handleStopTopics() {
+func (p *PeerPool) handleStopTopics(server *p2p.Server) {
 	if !p.opts.AllowStop {
 		return
 	}
 	for _, t := range p.topics {
 		if t.readyToStopSearch() {
-			t.StopSearch()
+			t.StopSearch(server)
 		}
 	}
 	if p.allTopicsStopped() {
 		log.Debug("closing discv5 connection because all topics reached max limit")
-		p.stopDiscovery()
+		p.stopDiscovery(server)
 	}
 }
 
@@ -338,4 +347,41 @@ func (p *PeerPool) Stop() {
 	}
 	p.serverSubscription.Unsubscribe()
 	p.wg.Wait()
+}
+
+type updateTopicRequest struct {
+	Topic  string
+	Limits params.Limits
+}
+
+// UpdateTopic updates the pre-existing TopicPool limits.
+func (p *PeerPool) UpdateTopic(topic string, limits params.Limits) error {
+	if _, err := p.getTopic(topic); err != nil {
+		return err
+	}
+
+	p.updateTopic <- &updateTopicRequest{
+		Topic:  topic,
+		Limits: limits,
+	}
+
+	return nil
+}
+
+func (p *PeerPool) updateTopicLimits(server *p2p.Server, req *updateTopicRequest) error {
+	t, err := p.getTopic(req.Topic)
+	if err != nil {
+		return err
+	}
+	t.SetLimits(req.Limits)
+	return nil
+}
+
+func (p *PeerPool) getTopic(topic string) (TopicPoolInterface, error) {
+	for _, t := range p.topics {
+		if t.Topic() == discv5.Topic(topic) {
+			return t, nil
+		}
+	}
+	return nil, errors.New("topic not found")
 }

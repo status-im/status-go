@@ -25,7 +25,7 @@ var maxCachedPeersMultiplier = 2
 
 // TopicPoolInterface the TopicPool interface.
 type TopicPoolInterface interface {
-	StopSearch()
+	StopSearch(server *p2p.Server)
 	BelowMin() bool
 	SearchRunning() bool
 	StartSearch(server *p2p.Server) error
@@ -35,6 +35,7 @@ type TopicPoolInterface interface {
 	ConfirmAdded(server *p2p.Server, nodeID discover.NodeID)
 	isStopped() bool
 	Topic() discv5.Topic
+	SetLimits(limits params.Limits)
 	setStopSearchTimeout(delay time.Duration)
 	readyToStopSearch() bool
 }
@@ -485,7 +486,7 @@ func (t *TopicPool) isStopped() bool {
 }
 
 // StopSearch stops the closes stop
-func (t *TopicPool) StopSearch() {
+func (t *TopicPool) StopSearch(server *p2p.Server) {
 	if !atomic.CompareAndSwapInt32(&t.running, 1, 0) {
 		return
 	}
@@ -515,4 +516,12 @@ func (t *TopicPool) StopSearch() {
 // Topic exposes the internal discovery topic.
 func (t *TopicPool) Topic() discv5.Topic {
 	return t.topic
+}
+
+// SetLimits set the limits for the current TopicPool.
+func (t *TopicPool) SetLimits(limits params.Limits) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	t.limits = limits
 }

@@ -1,8 +1,6 @@
 package peers
 
 import (
-	"time"
-
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
@@ -11,20 +9,20 @@ import (
 )
 
 // MailServerDiscoveryTopic topic name for mailserver discovery.
-const MailServerDiscoveryTopic = "mailserver.discovery"
+const MailServerDiscoveryTopic = "mailserver"
 
 // MailServerDiscoveryLimits default mailserver discovery limits.
 var MailServerDiscoveryLimits = params.Limits{Min: 3, Max: 3}
 
 // newCacheOnlyTopicPool returns instance of CacheOnlyTopicPool.
-func newCacheOnlyTopicPool(discovery Discovery, topic discv5.Topic, limits params.Limits, slowMode, fastMode time.Duration, cache *Cache) *CacheOnlyTopicPool {
-	return &CacheOnlyTopicPool{
-		TopicPool: newTopicPool(discovery, topic, limits, slowMode, fastMode, cache),
+func newCacheOnlyTopicPool(t *TopicPool) *cacheOnlyTopicPool {
+	return &cacheOnlyTopicPool{
+		TopicPool: t,
 	}
 }
 
-// CacheOnlyTopicPool handles a mail server topic pool.
-type CacheOnlyTopicPool struct {
+// cacheOnlyTopicPool handles a mail server topic pool.
+type cacheOnlyTopicPool struct {
 	*TopicPool
 }
 
@@ -32,7 +30,7 @@ type CacheOnlyTopicPool struct {
 // peerpool will stop the discovery process on this TopicPool.
 // Main difference with basic TopicPool is we want to stop discovery process
 // when the number of cached peers eq/exceeds the max limit.
-func (t *CacheOnlyTopicPool) MaxReached() bool {
+func (t *cacheOnlyTopicPool) MaxReached() bool {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 	if t.limits.Max == 0 {
@@ -42,11 +40,31 @@ func (t *CacheOnlyTopicPool) MaxReached() bool {
 	return len(peers) >= t.limits.Max
 }
 
-var sendEnodeDiscoveryCompleted = signal.SendEnodeDiscoveredCompleted
+var sendEnodeDiscovered = signal.SendEnodeDiscovered
 
 // ConfirmAdded calls base TopicPool ConfirmAdded method and sends a signal
 // confirming the enode has been discovered.
-func (t *CacheOnlyTopicPool) ConfirmAdded(server *p2p.Server, nodeID discover.NodeID) {
+func (t *cacheOnlyTopicPool) ConfirmAdded(server *p2p.Server, nodeID discover.NodeID) {
 	t.TopicPool.ConfirmAdded(server, nodeID)
-	sendEnodeDiscoveryCompleted(nodeID.String(), string(t.topic))
+	sendEnodeDiscovered(nodeID.String(), string(t.topic))
+
+	id := discv5.NodeID(nodeID)
+	if peer, ok := t.connectedPeers[id]; ok {
+		t.removeServerPeer(server, peer)
+		delete(t.connectedPeers, id)
+		t.subtractToLimits()
+	}
+}
+
+// subtractToLimits subtracts one to topic pool limits.
+func (t *cacheOnlyTopicPool) subtractToLimits() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if t.limits.Max > 0 {
+		t.limits.Max = t.limits.Max - 1
+	}
+	if t.limits.Min > 0 {
+		t.limits.Min = t.limits.Min - 1
+	}
 }

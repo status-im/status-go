@@ -367,3 +367,39 @@ func TestPeerPoolNotAllowedStopping(t *testing.T) {
 	<-time.After(pool.opts.DiscServerTimeout * 2)
 	require.True(t, discovery.Running())
 }
+
+func (s *PeerPoolSimulationSuite) TestUpdateTopicLimits() {
+	var err error
+
+	topic := discv5.Topic("cap=test")
+	config := map[discv5.Topic]params.Limits{
+		topic: params.NewLimits(1, 1),
+	}
+	peerPoolOpts := &Options{100 * time.Millisecond, 100 * time.Millisecond, 0, true, 100 * time.Millisecond}
+	cache, err := newInMemoryCache()
+	s.Require().NoError(err)
+	peerPool := NewPeerPool(s.discovery[1], config, cache, peerPoolOpts)
+
+	// start peer pool
+	s.Require().NoError(peerPool.Start(s.peers[1]))
+	defer peerPool.Stop()
+
+	for _, topicPool := range peerPool.topics {
+		tp := topicPool.(*TopicPool)
+		s.Equal(1, tp.limits.Max)
+		s.Equal(1, tp.limits.Min)
+	}
+
+	// Updating TopicPool's limits
+	err = peerPool.UpdateTopic("cap=test", params.NewLimits(5, 10))
+	s.Require().NoError(err)
+	time.Sleep(1 * time.Millisecond)
+	for _, topicPool := range peerPool.topics {
+		tp := topicPool.(*TopicPool)
+		tp.mu.RLock()
+		defer tp.mu.RUnlock()
+
+		s.Equal(10, tp.limits.Max)
+		s.Equal(5, tp.limits.Min)
+	}
+}
