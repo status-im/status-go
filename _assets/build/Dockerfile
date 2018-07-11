@@ -30,4 +30,5 @@ COPY --from=builder /go/src/github.com/status-im/status-go/static/keys/* /static
 # 30304 is used for Discovery v5
 EXPOSE 8080 8545 30303 30303/udp 30304/udp
 
-ENTRYPOINT /usr/local/bin/statusd
+ENTRYPOINT ["/usr/local/bin/statusd"]
+CMD ["--help"]
