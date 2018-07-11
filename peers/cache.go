@@ -39,7 +39,9 @@ func (d *Cache) RemovePeer(peerID discv5.NodeID, topic discv5.Topic) error {
 // GetPeersRange returns peers for a given topic with a limit.
 func (d *Cache) GetPeersRange(topic discv5.Topic, limit int) (nodes []*discv5.Node) {
 	key := db.Key(db.PeersCache, []byte(topic))
-	iterator := d.db.NewIterator(&util.Range{Start: key}, nil)
+	// it is important to set Limit on the range passed to iterator, so that
+	// we limit reads only to particular topic.
+	iterator := d.db.NewIterator(util.BytesPrefix(key), nil)
 	defer iterator.Release()
 	count := 0
 	for iterator.Next() && count < limit {
