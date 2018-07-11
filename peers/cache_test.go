@@ -44,3 +44,25 @@ func TestPeersRange(t *testing.T) {
 	assert.NoError(t, peersDB.RemovePeer(peers[1].ID, topic))
 	require.Len(t, peersDB.GetPeersRange(topic, 3), 2)
 }
+
+func TestMultipleTopics(t *testing.T) {
+	peersDB, err := newInMemoryCache()
+	require.NoError(t, err)
+	topics := []discv5.Topic{discv5.Topic("first"), discv5.Topic("second")}
+	for i := range topics {
+		peers := [3]*discv5.Node{
+			discv5.NewNode(discv5.NodeID{byte(i), 1}, net.IPv4(100, 100, 0, 3), 32311, 32311),
+			discv5.NewNode(discv5.NodeID{byte(i), 2}, net.IPv4(100, 100, 0, 4), 32311, 32311),
+			discv5.NewNode(discv5.NodeID{byte(i), 3}, net.IPv4(100, 100, 0, 2), 32311, 32311)}
+		for _, peer := range peers {
+			assert.NoError(t, peersDB.AddPeer(peer, topics[i]))
+		}
+	}
+	for i := range topics {
+		nodes := peersDB.GetPeersRange(topics[i], 10)
+		assert.Len(t, nodes, 3)
+		for _, n := range nodes {
+			assert.Equal(t, byte(i), n.ID[0])
+		}
+	}
+}
