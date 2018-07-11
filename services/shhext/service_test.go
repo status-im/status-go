@@ -245,8 +245,8 @@ func (s *ShhExtSuite) TestRequestMessagesSuccess() {
 	defer func() { s.NoError(mailNode.Stop()) }()
 
 	// add mailPeer as a peer
-	aNode.Server().AddPeer(mailNode.Server().Self())
 	waitErr := helpers.WaitForPeerAsync(aNode.Server(), mailNode.Server().Self().String(), p2p.PeerEventTypeAdd, time.Second)
+	aNode.Server().AddPeer(mailNode.Server().Self())
 	s.NoError(<-waitErr)
 
 	var hash []byte
