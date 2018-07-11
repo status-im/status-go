@@ -30,7 +30,7 @@ GOBIN=$(dir $(realpath $(firstword $(MAKEFILE_LIST))))build/bin
 GIT_COMMIT := $(shell git rev-parse --short HEAD)
 GIT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
 GIT_LOCAL  := $(shell git rev-parse @)
-GIT_REMOTE := $(shell git fetch -q && git rev-parse origin)
+GIT_REMOTE := $(shell git fetch -q && git rev-parse remotes/origin/develop)
 
 BUILD_FLAGS ?= $(shell echo "-ldflags '-X main.buildStamp=`date -u '+%Y-%m-%d.%H:%M:%S'` -X github.com/status-im/status-go/params.VersionMeta=$(GIT_COMMIT)'")
 
@@ -158,7 +158,7 @@ ifneq ("$(GIT_LOCAL)", "$(GIT_REMOTE)")
 	echo "The local git commit does not match the remote origin!"
 	exit 1
 endif
-	docker push $(BOOTNODE_IMAGE_NAME):latest 
+	docker push $(BOOTNODE_IMAGE_NAME):latest
 	docker push $(DOCKER_IMAGE_NAME):latest
 
 xgo-docker-images: ##@docker Build xgo docker images
