@@ -49,7 +49,7 @@ Sends a request for historic messages to a mail server.
 - `from`:`QUANTITY` - (optional) Lower bound of time range as unix timestamp, default is 24 hours back from now
 - `to`:`QUANTITY`- (optional) Upper bound of time range as unix timestamp, default is now
 - `topic`:`DATA`, 4 Bytes - Regular whisper topic
-- `symKeyID`:`DATA`- ID of a symmetric key to authenticate to mail server, derived form mail server password
+- `symKeyID`:`DATA`- ID of a symmetric key to authenticate to mail server, derived from mail server password
 
 ##### Returns
 
