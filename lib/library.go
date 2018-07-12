@@ -13,9 +13,11 @@ import (
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/profiling"
+	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/sign"
-	"gopkg.in/go-playground/validator.v9"
 	"github.com/status-im/status-go/signal"
+	"github.com/status-im/status-go/transactions"
+	"gopkg.in/go-playground/validator.v9"
 )
 
 // All general log messages in this package should be routed through this logger.
@@ -210,27 +212,31 @@ func Logout() *C.char {
 	return makeJSONResponse(err)
 }
 
-//ApproveSignRequestWithArgs instructs backend to complete sending of a given transaction.
-// gas and gasPrice will be overrided with the given values before signing the
-// transaction.
-//export ApproveSignRequestWithArgs
-func ApproveSignRequestWithArgs(id, password *C.char, gas, gasPrice C.longlong) *C.char {
-	result := statusBackend.ApproveSignRequestWithArgs(C.GoString(id), C.GoString(password), int64(gas), int64(gasPrice))
-
-	return prepareApproveSignRequestResponse(result, id)
+// SendTransaction converts RPC args and calls backend.SendTransaction
+func SendTransaction(txArgsJSON, password *C.char) *C.char {
+	txArgs, err := transactions.UnmarshalSendTxRPCParams(C.GoString(txArgsJSON))
+	if err != nil {
+		return prepareSignResponse(sign.NewErrResult(err))
+	}
+	result := statusBackend.SendTransaction(txArgs, C.GoString(password))
+	return prepareSignResponse(result)
 }
 
-//ApproveSignRequest instructs backend to complete sending of a given transaction.
-//export ApproveSignRequest
-func ApproveSignRequest(id, password *C.char) *C.char {
-	result := statusBackend.ApproveSignRequest(C.GoString(id), C.GoString(password))
-
-	return prepareApproveSignRequestResponse(result, id)
+// SignMessage takes unmarshals rpc params {data, address, password} and passes
+// them onto backend.SignMessage
+func SignMessage(rpcParams *C.char) *C.char {
+	params, err := personal.UnmarshalSignRPCParams(C.GoString(rpcParams))
+	if err != nil {
+		result := sign.NewErrResult(err)
+		return prepareSignResponse(result)
+	}
+	result := statusBackend.SignMessage(params)
+	return prepareSignResponse(result)
 }
 
-// prepareApproveSignRequestResponse based on a sign.Result prepares the binding
+// prepareSignResponse based on a sign.Result prepares the binding
 // response.
-func prepareApproveSignRequestResponse(result sign.Result, id *C.char) *C.char {
+func prepareSignResponse(result sign.Result) *C.char {
 	errString := ""
 	if result.Error != nil {
 		fmt.Fprintln(os.Stderr, result.Error)
@@ -238,13 +244,12 @@ func prepareApproveSignRequestResponse(result sign.Result, id *C.char) *C.char {
 	}
 
 	out := SignRequestResult{
-		ID:    C.GoString(id),
 		Hash:  result.Response.Hex(),
 		Error: errString,
 	}
 	outBytes, err := json.Marshal(out)
 	if err != nil {
-		logger.Error("failed to marshal ApproveSignRequest output", "error", err)
+		logger.Error("failed to marshal Sign output", "error", err)
 		return makeJSONResponse(err)
 	}
 

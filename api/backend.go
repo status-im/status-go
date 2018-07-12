@@ -59,7 +59,7 @@ func NewStatusBackend() *StatusBackend {
 	pendingSignRequests := sign.NewPendingRequests()
 	accountManager := account.NewManager(statusNode)
 	transactor := transactions.NewTransactor()
-	personalAPI := personal.NewAPI(pendingSignRequests)
+	personalAPI := personal.NewAPI()
 	jailManager := jail.New(statusNode)
 	notificationManager := fcm.NewNotification(fcmServerKey)
 
@@ -235,6 +235,16 @@ func (b *StatusBackend) SendTransaction(sendArgs transactions.SendTxArgs, passwo
 	return b.transactor.SendTransaction(sendArgs, verifiedAccount)
 }
 
+// SignMessage checks the pwd vs the selected account and passes on the metadata
+// to personalAPI for message signature
+func (b *StatusBackend) SignMessage(rpcParams personal.Metadata) sign.Result {
+	_, err := b.getVerifiedAccount(rpcParams.Password)
+	if err != nil {
+		return sign.NewErrResult(err)
+	}
+	return b.personalAPI.Sign(context.Background(), rpcParams)
+}
+
 func (b *StatusBackend) getVerifiedAccount(password string) (*account.SelectedExtKey, error) {
 	selectedAccount, err := b.accountManager.SelectedAccount()
 	if err != nil {
@@ -301,7 +311,6 @@ func (b *StatusBackend) registerHandlers() error {
 		return b.AccountManager().Accounts()
 	})
 
-	rpcClient.RegisterHandler(params.PersonalSignMethodName, b.personalAPI.Sign)
 	rpcClient.RegisterHandler(params.PersonalRecoverMethodName, b.personalAPI.Recover)
 
 	return nil
