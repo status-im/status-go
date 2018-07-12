@@ -344,7 +344,7 @@ func (s *WhisperMailboxSuite) TestRequestMessagesWithPagination() {
 	s.Require().True(client.IsNodeRunning())
 	clientRPCClient := client.StatusNode().RPCClient()
 
-	// Add mailbox to clients's peers
+	// Add mailbox to client's peers
 	errCh := helpers.WaitForPeerAsync(client.StatusNode().Server(), mailboxEnode, p2p.PeerEventTypeAdd, time.Second)
 	s.Require().NoError(client.StatusNode().AddPeer(mailboxEnode))
 	s.Require().NoError(<-errCh)
