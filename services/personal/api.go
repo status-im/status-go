@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
+	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/sign"
@@ -43,7 +45,9 @@ type PublicAPI struct {
 
 // NewAPI creates an instance of the personal API.
 func NewAPI() *PublicAPI {
-	return &PublicAPI{}
+	return &PublicAPI{
+		rpcTimeout: 300 * time.Second,
+	}
 }
 
 // SetRPC sets RPC params (client and timeout) for the API calls.
@@ -63,10 +67,15 @@ func (api *PublicAPI) Recover(context context.Context, rpcParams ...interface{})
 }
 
 // Sign is an implementation of `personal_sign` or `web3.personal.sign` API
-func (api *PublicAPI) Sign(context context.Context, rpcParams Metadata) sign.Result {
+func (api *PublicAPI) Sign(rpcParams Metadata, verifiedAccount *account.SelectedExtKey) sign.Result {
+	if !strings.EqualFold(rpcParams.Address, verifiedAccount.Address.Hex()) {
+		return sign.NewErrResult(ErrInvalidPersonalSignAccount)
+	}
 	response := sign.EmptyResponse
+	ctx, cancel := context.WithTimeout(context.Background(), api.rpcTimeout)
+	defer cancel()
 	err := api.rpcClient.CallContextIgnoringLocalHandlers(
-		context,
+		ctx,
 		&response,
 		params.PersonalSignMethodName,
 		rpcParams.Data, rpcParams.Address, rpcParams.Password)

@@ -238,11 +238,11 @@ func (b *StatusBackend) SendTransaction(sendArgs transactions.SendTxArgs, passwo
 // SignMessage checks the pwd vs the selected account and passes on the metadata
 // to personalAPI for message signature
 func (b *StatusBackend) SignMessage(rpcParams personal.Metadata) sign.Result {
-	_, err := b.getVerifiedAccount(rpcParams.Password)
+	verifiedAccount, err := b.getVerifiedAccount(rpcParams.Password)
 	if err != nil {
 		return sign.NewErrResult(err)
 	}
-	return b.personalAPI.Sign(context.Background(), rpcParams)
+	return b.personalAPI.Sign(rpcParams, verifiedAccount)
 }
 
 func (b *StatusBackend) getVerifiedAccount(password string) (*account.SelectedExtKey, error) {

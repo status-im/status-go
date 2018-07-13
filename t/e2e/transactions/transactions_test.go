@@ -25,6 +25,74 @@ type TransactionsTestSuite struct {
 	e2e.BackendTestSuite
 }
 
+func (s *TransactionsTestSuite) TestCallRPCSendTransaction() {
+	CheckTestSkipForNetworks(s.T(), params.MainNetworkID)
+
+	s.StartTestBackend()
+	defer s.StopTestBackend()
+
+	EnsureNodeSync(s.Backend.StatusNode().EnsureSync)
+
+	err := s.Backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
+	s.NoError(err)
+
+	result := s.Backend.CallRPC(`{
+				"jsonrpc": "2.0",
+		"id": 1,
+		"method": "eth_sendTransaction",
+		"params": [{
+			"from": "` + TestConfig.Account1.Address + `",
+			"to": "0xd46e8dd67c5d32be8058bb8eb970870f07244567",
+			"value": "0x9184e72a"
+		}]
+	}`)
+	s.Contains(result, `"error":{"code":-32000,"message":"authentication needed: password or unlock"}`)
+}
+
+func (s *TransactionsTestSuite) TestCallRPCSendTransactionUpstream() {
+	CheckTestSkipForNetworks(s.T(), params.MainNetworkID, params.StatusChainNetworkID)
+
+	addr, err := GetRemoteURL()
+	s.NoError(err)
+	s.StartTestBackend(e2e.WithUpstream(addr))
+	defer s.StopTestBackend()
+
+	err = s.Backend.SelectAccount(TestConfig.Account2.Address, TestConfig.Account2.Password)
+	s.NoError(err)
+
+	result := s.Backend.CallRPC(`{
+		"jsonrpc": "2.0",
+		"id": 1,
+		"method": "eth_sendTransaction",
+		"params": [{
+			"from": "` + TestConfig.Account2.Address + `",
+			"to": "` + TestConfig.Account1.Address + `",
+			"value": "0x9184e72a"
+		}]
+	}`)
+	s.Contains(result, `"error":{"code":-32000,"message":"authentication needed: password or unlock"}`)
+}
+
+func (s *TransactionsTestSuite) TestEmptyToFieldPreserved() {
+	CheckTestSkipForNetworks(s.T(), params.MainNetworkID)
+
+	s.StartTestBackend()
+	defer s.StopTestBackend()
+
+	EnsureNodeSync(s.Backend.StatusNode().EnsureSync)
+	err := s.Backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
+	s.NoError(err)
+
+	args := transactions.SendTxArgs{
+		From: account.FromAddress(TestConfig.Account1.Address),
+	}
+
+	result := s.Backend.SendTransaction(args, TestConfig.Account1.Password)
+
+	s.NoError(result.Error)
+	s.NotNil(result.Response)
+}
+
 // TestSendContractCompat tries to send transaction using the legacy "Data"
 // field, which is supported for backward compatibility reasons.
 func (s *TransactionsTestSuite) TestSendContractTxCompat() {

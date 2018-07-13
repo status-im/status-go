@@ -126,9 +126,13 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 			testAccountLogout,
 		},
 		{
-			"complete single queued transaction",
+			"complete single transaction",
 			testCompleteTransaction,
 		},
+		{
+			"failed single transaction",
+			testFailedTransaction,
+		}
 		{
 			"test jail invalid initialization",
 			testJailInitInvalid,
@@ -797,10 +801,6 @@ func testCompleteTransaction(t *testing.T) bool {
 		return false
 	}
 
-	// make sure you panic if transaction complete doesn't return
-	// abortPanic := make(chan struct{}, 1)
-	// PanicAfter(10*time.Second, abortPanic, "testCompleteTransaction")
-
 	// this call blocks, up until Complete Transaction is called
 	result := statusBackend.SendTransaction(transactions.SendTxArgs{
 		From:  account.FromAddress(TestConfig.Account1.Address),
@@ -818,6 +818,36 @@ func testCompleteTransaction(t *testing.T) bool {
 	}
 
 	return true
+}
+
+func testFailedTransaction(t *testing.T) bool {
+	EnsureNodeSync(statusBackend.StatusNode().EnsureSync)
+
+	// log into wrong account in order to get selectedAccount error
+	if err := statusBackend.SelectAccount(TestConfig.Account2.Address, TestConfig.Account2.Password); err != nil {
+		t.Errorf("cannot select account: %v. Error %q", TestConfig.Account1.Address, err)
+		return false
+	}
+
+	// this call blocks, up until Complete Transaction is called
+	result := statusBackend.SendTransaction(transactions.SendTxArgs{
+		From:  account.FromAddress(TestConfig.Account1.Address),
+		To:    account.ToAddress(TestConfig.Account2.Address),
+		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
+	}, TestConfig.Account1.Password)
+
+	if result.Error != transactions.ErrInvalidCompleteTxSender {
+		t.Errorf("Test failed: expected result.Error == ErrInvalidCompleteTxSender")
+		return false
+	}
+
+	if result.Response != nil {
+		t.Errorf("Test failed: expected result.Response == nil")
+		return false
+	}
+
+	return true
+	
 }
 
 func testJailInitInvalid(t *testing.T) bool {
