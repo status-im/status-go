@@ -469,9 +469,9 @@ func (srv *Server) Start() (err error) {
 			err  error
 		)
 		if sconn != nil {
-			ntab, err = discv5.ListenUDP(srv.PrivateKey, sconn, realaddr, "", srv.NetRestrict) //srv.NodeDatabase)
+			ntab, err = discv5.ListenUDP(srv.PrivateKey, sconn, realaddr, "", discv5.StatusVersion, srv.NetRestrict) //srv.NodeDatabase)
 		} else {
-			ntab, err = discv5.ListenUDP(srv.PrivateKey, conn, realaddr, "", srv.NetRestrict) //srv.NodeDatabase)
+			ntab, err = discv5.ListenUDP(srv.PrivateKey, conn, realaddr, "", discv5.StatusVersion, srv.NetRestrict) //srv.NodeDatabase)
 		}
 		if err != nil {
 			return err

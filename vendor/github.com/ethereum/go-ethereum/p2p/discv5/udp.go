@@ -32,7 +32,8 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
-const Version = 55
+const Version = 4
+const StatusVersion = 55
 
 // Errors
 var (
@@ -227,15 +228,16 @@ type udp struct {
 	ourEndpoint rpcEndpoint
 	nat         nat.Interface
 	net         *Network
+	version     int
 }
 
 // ListenUDP returns a new table that listens for UDP packets on laddr.
-func ListenUDP(priv *ecdsa.PrivateKey, conn conn, realaddr *net.UDPAddr, nodeDBPath string, netrestrict *netutil.Netlist) (*Network, error) {
-	transport, err := listenUDP(priv, conn, realaddr)
+func ListenUDP(priv *ecdsa.PrivateKey, conn conn, realaddr *net.UDPAddr, nodeDBPath string, version int, netrestrict *netutil.Netlist) (*Network, error) {
+	transport, err := listenUDP(priv, conn, realaddr, version)
 	if err != nil {
 		return nil, err
 	}
-	net, err := newNetwork(transport, priv.PublicKey, nodeDBPath, netrestrict)
+	net, err := newNetwork(transport, priv.PublicKey, nodeDBPath, version, netrestrict)
 	if err != nil {
 		return nil, err
 	}
@@ -245,8 +247,8 @@ func ListenUDP(priv *ecdsa.PrivateKey, conn conn, realaddr *net.UDPAddr, nodeDBP
 	return net, nil
 }
 
-func listenUDP(priv *ecdsa.PrivateKey, conn conn, realaddr *net.UDPAddr) (*udp, error) {
-	return &udp{conn: conn, priv: priv, ourEndpoint: makeEndpoint(realaddr, uint16(realaddr.Port))}, nil
+func listenUDP(priv *ecdsa.PrivateKey, conn conn, realaddr *net.UDPAddr, version int) (*udp, error) {
+	return &udp{conn: conn, priv: priv, ourEndpoint: makeEndpoint(realaddr, uint16(realaddr.Port)), version: version}, nil
 }
 
 func (t *udp) localAddr() *net.UDPAddr {
@@ -263,8 +265,9 @@ func (t *udp) send(remote *Node, ptype nodeEvent, data interface{}) (hash []byte
 }
 
 func (t *udp) sendPing(remote *Node, toaddr *net.UDPAddr, topics []Topic) (hash []byte) {
+	log.Info("discv5 sending ping", "self", t.ourEndpoint, "to", makeEndpoint(toaddr, uint16(toaddr.Port)), "version", t.version)
 	hash, _ = t.sendPacket(remote.ID, toaddr, byte(pingPacket), ping{
-		Version:    Version,
+		Version:    uint(t.version),
 		From:       t.ourEndpoint,
 		To:         makeEndpoint(toaddr, uint16(toaddr.Port)), // TODO: maybe use known TCP port from DB
 		Expiration: uint64(time.Now().Add(expiration).Unix()),

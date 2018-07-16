@@ -57,6 +57,7 @@ type Network struct {
 	db          *nodeDB // database of known nodes
 	conn        transport
 	netrestrict *netutil.Netlist
+	version     int
 
 	closed           chan struct{}          // closed when loop is done
 	closeReq         chan struct{}          // 'request to close'
@@ -132,13 +133,13 @@ type timeoutEvent struct {
 	node *Node
 }
 
-func newNetwork(conn transport, ourPubkey ecdsa.PublicKey, dbPath string, netrestrict *netutil.Netlist) (*Network, error) {
+func newNetwork(conn transport, ourPubkey ecdsa.PublicKey, dbPath string, version int, netrestrict *netutil.Netlist) (*Network, error) {
 	ourID := PubkeyID(&ourPubkey)
 
 	var db *nodeDB
 	if dbPath != "<no database>" {
 		var err error
-		if db, err = newNodeDB(dbPath, Version, ourID); err != nil {
+		if db, err = newNodeDB(dbPath, version, ourID); err != nil {
 			return nil, err
 		}
 	}
@@ -1067,7 +1068,7 @@ func (net *Network) checkPacket(n *Node, ev nodeEvent, pkt *ingressPacket) error
 	// Replay prevention checks.
 	switch ev {
 	case pingPacket:
-		if pkt.data.(*ping).Version != Version {
+		if pkt.data.(*ping).Version != uint(net.version) {
 			return fmt.Errorf("version mismatch")
 		}
 	case findnodeHashPacket, neighborsPacket:
