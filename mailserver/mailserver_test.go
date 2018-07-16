@@ -39,6 +39,7 @@ const powRequirement = 0.00001
 
 var keyID string
 var seed = time.Now().Unix()
+var testPayload = []byte("test payload")
 
 type ServerTestParams struct {
 	topic whisper.TopicType
@@ -191,25 +192,66 @@ func (s *MailserverSuite) TestSetupRequestMessageDecryptor() {
 	config = *s.config
 	s.NoError(config.ReadMailServerPasswordFile())
 	s.NoError(s.server.Init(s.shh, &config))
-	s.NotNil(s.server.filter.KeySym)
-	s.Nil(s.server.filter.KeyAsym)
+	s.Require().NotNil(s.server.symFilter)
+	s.NotNil(s.server.symFilter.KeySym)
+	s.Nil(s.server.asymFilter)
 	s.server.Close()
 
 	// AsymKey can also be used
 	config = *s.config
 	s.NoError(config.ReadMailServerAsymKeyFile())
 	s.NoError(s.server.Init(s.shh, &config))
-	s.Nil(s.server.filter.KeySym) // important: symmetric key should be nil
-	s.Equal(config.MailServerAsymKey, s.server.filter.KeyAsym)
+	s.Nil(s.server.symFilter) // important: symmetric filter should be nil
+	s.Require().NotNil(s.server.asymFilter)
+	s.Equal(config.MailServerAsymKey, s.server.asymFilter.KeyAsym)
 	s.server.Close()
 
-	// when both Password and AsymKey are set, Password has a preference
+	// when Password and AsymKey are set, both are supported
 	config = *s.config
 	s.NoError(config.ReadMailServerPasswordFile())
 	s.NoError(config.ReadMailServerAsymKeyFile())
 	s.NoError(s.server.Init(s.shh, &config))
-	s.NotNil(s.server.filter.KeySym)
-	s.Nil(s.server.filter.KeyAsym)
+	s.Require().NotNil(s.server.symFilter)
+	s.NotNil(s.server.symFilter.KeySym)
+	s.NotNil(s.server.asymFilter.KeyAsym)
+	s.server.Close()
+}
+
+func (s *MailserverSuite) TestOpenEnvelopeWithSymKey() {
+	// Setup the server with a sym key
+	config := *s.config
+	s.NoError(config.ReadMailServerPasswordFile())
+	s.NoError(s.server.Init(s.shh, &config))
+
+	// Prepare a valid envelope
+	s.Require().NotNil(s.server.symFilter)
+	symKey := s.server.symFilter.KeySym
+	env, err := generateEnvelopeWithKeys(time.Now(), symKey, nil)
+	s.Require().NoError(err)
+
+	// Test openEnvelope with a valid envelope
+	d := s.server.openEnvelope(env)
+	s.NotNil(d)
+	s.Equal(testPayload, d.Payload)
+	s.server.Close()
+}
+
+func (s *MailserverSuite) TestOpenEnvelopeWithAsymKey() {
+	// Setup the server with an asymetric key
+	config := *s.config
+	s.NoError(config.ReadMailServerAsymKeyFile())
+	s.NoError(s.server.Init(s.shh, &config))
+
+	// Prepare a valid envelope
+	s.Require().NotNil(s.server.asymFilter)
+	pubKey := s.server.asymFilter.KeyAsym.PublicKey
+	env, err := generateEnvelopeWithKeys(time.Now(), nil, &pubKey)
+	s.Require().NoError(err)
+
+	// Test openEnvelope with a valid asymetric key
+	d := s.server.openEnvelope(env)
+	s.NotNil(d)
+	s.Equal(testPayload, d.Payload)
 	s.server.Close()
 }
 
@@ -538,14 +580,18 @@ func (s *MailserverSuite) createRequest(p *ServerTestParams) *whisper.Envelope {
 	return env
 }
 
-func generateEnvelope(sentTime time.Time) (*whisper.Envelope, error) {
-	h := crypto.Keccak256Hash([]byte("test sample data"))
+func generateEnvelopeWithKeys(sentTime time.Time, keySym []byte, keyAsym *ecdsa.PublicKey) (*whisper.Envelope, error) {
 	params := &whisper.MessageParams{
-		KeySym:   h[:],
 		Topic:    whisper.TopicType{0x1F, 0x7E, 0xA1, 0x7F},
-		Payload:  []byte("test payload"),
+		Payload:  testPayload,
 		PoW:      powRequirement,
 		WorkTime: 2,
+	}
+
+	if len(keySym) > 0 {
+		params.KeySym = keySym
+	} else if keyAsym != nil {
+		params.Dst = keyAsym
 	}
 
 	msg, err := whisper.NewSentMessage(params)
@@ -558,4 +604,9 @@ func generateEnvelope(sentTime time.Time) (*whisper.Envelope, error) {
 	}
 
 	return env, nil
+}
+
+func generateEnvelope(sentTime time.Time) (*whisper.Envelope, error) {
+	h := crypto.Keccak256Hash([]byte("test sample data"))
+	return generateEnvelopeWithKeys(sentTime, h[:], nil)
 }
