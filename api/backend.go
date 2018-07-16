@@ -161,6 +161,10 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 		st.SetAccountManager(b.AccountManager())
 	}
 
+	if st, err := b.statusNode.PeerService(); err == nil {
+		st.SetDiscoverer(b.StatusNode())
+	}
+
 	signal.SendNodeReady()
 
 	return nil

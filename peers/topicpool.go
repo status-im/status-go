@@ -23,8 +23,25 @@ const (
 // to get the maximum number of cached peers allowed.
 var maxCachedPeersMultiplier = 2
 
-// NewTopicPool returns instance of TopicPool
-func NewTopicPool(discovery Discovery, topic discv5.Topic, limits params.Limits, slowMode, fastMode time.Duration, cache *Cache) *TopicPool {
+// TopicPoolInterface the TopicPool interface.
+type TopicPoolInterface interface {
+	StopSearch(server *p2p.Server)
+	BelowMin() bool
+	SearchRunning() bool
+	StartSearch(server *p2p.Server) error
+	ConfirmDropped(server *p2p.Server, nodeID discover.NodeID) bool
+	AddPeerFromTable(server *p2p.Server) *discv5.Node
+	MaxReached() bool
+	ConfirmAdded(server *p2p.Server, nodeID discover.NodeID)
+	isStopped() bool
+	Topic() discv5.Topic
+	SetLimits(limits params.Limits)
+	setStopSearchTimeout(delay time.Duration)
+	readyToStopSearch() bool
+}
+
+// newTopicPool returns instance of TopicPool.
+func newTopicPool(discovery Discovery, topic discv5.Topic, limits params.Limits, slowMode, fastMode time.Duration, cache *Cache) *TopicPool {
 	pool := TopicPool{
 		discovery:            discovery,
 		topic:                topic,
@@ -469,7 +486,7 @@ func (t *TopicPool) isStopped() bool {
 }
 
 // StopSearch stops the closes stop
-func (t *TopicPool) StopSearch() {
+func (t *TopicPool) StopSearch(server *p2p.Server) {
 	if !atomic.CompareAndSwapInt32(&t.running, 1, 0) {
 		return
 	}
@@ -494,4 +511,17 @@ func (t *TopicPool) StopSearch() {
 	t.poolWG.Wait()
 	close(t.period)
 	t.discWG.Wait()
+}
+
+// Topic exposes the internal discovery topic.
+func (t *TopicPool) Topic() discv5.Topic {
+	return t.topic
+}
+
+// SetLimits set the limits for the current TopicPool.
+func (t *TopicPool) SetLimits(limits params.Limits) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	t.limits = limits
 }

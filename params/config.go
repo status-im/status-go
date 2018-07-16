@@ -328,8 +328,13 @@ type NodeConfig struct {
 	// SwarmConfig extra configuration for Swarm and ENS
 	SwarmConfig *SwarmConfig `json:"SwarmConfig," validate:"structonly"`
 
-	RegisterTopics []discv5.Topic          `json:"RegisterTopics"`
-	RequireTopics  map[discv5.Topic]Limits `json:"RequireTopics"`
+	// RegisterTopics a list of specific topics where the peer wants to be
+	// discoverable.
+	RegisterTopics []discv5.Topic `json:"RegisterTopics"`
+
+	// RequiredTopics list of topics where a client wants to search for
+	// discoverable peers with the discovery limits.
+	RequireTopics map[discv5.Topic]Limits `json:"RequireTopics"`
 
 	// StatusServiceEnabled enables status service api
 	StatusServiceEnabled bool

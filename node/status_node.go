@@ -23,6 +23,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/peers"
 	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/services/peer"
 	"github.com/status-im/status-go/services/status"
 )
 
@@ -428,6 +429,19 @@ func (n *StatusNode) StatusService() (st *status.Service, err error) {
 	return
 }
 
+// PeerService exposes reference to peer service running on top of the node.
+func (n *StatusNode) PeerService() (st *peer.Service, err error) {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+
+	err = n.gethService(&st)
+	if err == node.ErrServiceUnknown {
+		err = ErrServiceUnknown
+	}
+
+	return
+}
+
 // WhisperService exposes reference to Whisper service running on top of the node
 func (n *StatusNode) WhisperService() (w *whisper.Whisper, err error) {
 	n.mu.RLock()
@@ -550,4 +564,15 @@ func (n *StatusNode) ensureSync(ctx context.Context) error {
 			n.log.Warn("Synchronization is not finished", "current", progress.CurrentBlock, "highest", progress.HighestBlock)
 		}
 	}
+}
+
+// Discover sets up the discovery for a specific topic.
+func (n *StatusNode) Discover(topic string, max, min int) (err error) {
+	if n.peerPool == nil {
+		return errors.New("peerPool not running")
+	}
+	return n.peerPool.UpdateTopic(topic, params.Limits{
+		Max: max,
+		Min: min,
+	})
 }

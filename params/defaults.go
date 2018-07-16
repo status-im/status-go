@@ -33,7 +33,7 @@ const (
 
 	// APIModules is a list of modules to expose via any type of RPC (HTTP, IPC, in-proc)
 	// we also expose 2 limited personal APIs by overriding them in `api/backend.go`
-	APIModules = "eth,net,web3,shh,shhext"
+	APIModules = "eth,net,web3,shh,shhext,peer"
 
 	// SendTransactionMethodName defines the name for a giving transaction.
 	SendTransactionMethodName = "eth_sendTransaction"
