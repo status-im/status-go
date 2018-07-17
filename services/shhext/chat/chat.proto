@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package chat;
+
+// What is sent through the wire
+// Rename to ChatMessagePayload?
+message OneToOnePayload {
+  string content = 1;
+  string content_type = 2;
+  string message_type = 3;
+  double clock_value = 4;
+}
+
+message ContactUpdatePayload {
+  string name = 1;
+  string profile_image = 2;
+  string address = 3;
+  string fcm_token = 4;
+}
+
+// Incoming RPC messages
+message OneToOneRPC {
+  string src = 1;
+  string dst = 2;
+  bytes payload = 3;
+  //OneToOnePayload payload = 3;
+}
+
+message ContactUpdateRPC {
+  string src = 1;
+  string dst = 2;
+  ContactUpdatePayload payload = 3;
+}
+
+// Incoming messages
+message ChatProtocolMessage {
+  bytes payload = 1;
+  //oneof payload {
+  //  OneToOnePayload one_to_one_payload = 1;
+  //  ContactUpdatePayload contact_updated_payload = 2;
+  //}
+}

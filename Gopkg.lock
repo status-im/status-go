@@ -224,14 +224,17 @@
   version = "v1.0.0"
 
 [[projects]]
-  digest = "1:cc9139958eb44c66d156bc76bde34a8202c6a4b837cc569299d916fa2f9290d5"
+  digest = "1:48bc31380e5a67f9a512db18bb6b6c28cf56ed98fe23832c32149e3c76f9d545"
   name = "github.com/golang/protobuf"
   packages = [
+    "jsonpb",
     "proto",
     "protoc-gen-go/descriptor",
+    "ptypes/struct",
   ]
   pruneopts = "NUT"
-  revision = "748d386b5c1ea99658fd69fe9f03991ce86a90c1"
+  revision = "b4deda0973fb4c70b50d226b1af49f3da59f5265"
+  version = "v1.1.0"
 
 [[projects]]
   digest = "1:9413ddbde906f91f062fda0dfa9a7cff43458cd1b2282c0fa25c61d89300b116"
@@ -689,6 +692,14 @@
   version = "v0.3.7"
 
 [[projects]]
+  branch = "master"
+  digest = "1:95dadf033e1fccc1644f78f743119ec9d2dbaea508cb827ed7057bc0da003178"
+  name = "github.com/mutecomm/go-sqlcipher"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "f799951b4ab269c2ce24913961af2cb5d681cc43"
+
+[[projects]]
   digest = "1:7da29c22bcc5c2ffb308324377dc00b5084650348c2799e573ed226d8cc9faf0"
   name = "github.com/opentracing/opentracing-go"
   packages = [
@@ -756,6 +767,14 @@
   pruneopts = "NUT"
   revision = "9f5d223c60793748f04a9d5b4b4eacddfc1f755d"
   version = "v1.1"
+
+[[projects]]
+  branch = "master"
+  digest = "1:855621dedfedd0d13e9e48e8206e351322b20eca0ac440516f83fb94d4b9f665"
+  name = "github.com/status-im/doubleratchet"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "9d7f37c630e2bf368f380032c57186efe4230bbe"
 
 [[projects]]
   branch = "master"
@@ -882,11 +901,13 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:79bdbbb437f8640442f7d785772ac901fb546c4487f6b822bde082b52152f5c1"
+  digest = "1:6c51a2b380a1d068c83cf96857c7657673dfb8dfbeb00779283ad428fa9eef2a"
   name = "golang.org/x/crypto"
   packages = [
     "blake2s",
     "blowfish",
+    "curve25519",
+    "hkdf",
     "pbkdf2",
     "ripemd160",
     "scrypt",
@@ -1038,6 +1059,7 @@
     "github.com/ethereum/go-ethereum/core",
     "github.com/ethereum/go-ethereum/core/types",
     "github.com/ethereum/go-ethereum/crypto",
+    "github.com/ethereum/go-ethereum/crypto/ecies",
     "github.com/ethereum/go-ethereum/crypto/sha3",
     "github.com/ethereum/go-ethereum/eth",
     "github.com/ethereum/go-ethereum/eth/downloader",
@@ -1056,9 +1078,13 @@
     "github.com/ethereum/go-ethereum/rpc",
     "github.com/ethereum/go-ethereum/whisper/whisperv6",
     "github.com/golang/mock/gomock",
+    "github.com/golang/protobuf/jsonpb",
+    "github.com/golang/protobuf/proto",
     "github.com/libp2p/go-libp2p-crypto",
     "github.com/multiformats/go-multiaddr",
+    "github.com/mutecomm/go-sqlcipher",
     "github.com/pborman/uuid",
+    "github.com/status-im/doubleratchet",
     "github.com/status-im/rendezvous",
     "github.com/status-im/rendezvous/server",
     "github.com/stretchr/testify/assert",
@@ -1070,6 +1096,7 @@
     "github.com/syndtr/goleveldb/leveldb/opt",
     "github.com/syndtr/goleveldb/leveldb/storage",
     "github.com/syndtr/goleveldb/leveldb/util",
+    "golang.org/x/crypto/hkdf",
     "golang.org/x/crypto/pbkdf2",
     "golang.org/x/crypto/ssh/terminal",
     "golang.org/x/text/unicode/norm",

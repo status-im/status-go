@@ -1,5 +1,6 @@
 package main
 
+// #include <stdlib.h>
 import "C"
 import (
 	"encoding/json"
@@ -44,6 +45,20 @@ func StartNode(configJSON *C.char) *C.char {
 func StopNode() *C.char {
 	api.RunAsync(statusBackend.StopNode)
 	return makeJSONResponse(nil)
+}
+
+// Create an X3DH bundle
+//export CreateX3DHBundle
+func CreateX3DHBundle() *C.char {
+	bundle, err := statusBackend.CreateX3DHBundle()
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	cstr := C.CString(bundle)
+
+	defer C.free(unsafe.Pointer(cstr))
+	return cstr
 }
 
 //ValidateNodeConfig validates config for status node

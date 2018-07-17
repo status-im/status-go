@@ -20,6 +20,7 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/rpcfilters"
+	"github.com/status-im/status-go/services/shhext/chat"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
 )
@@ -412,7 +413,14 @@ func (b *StatusBackend) SelectAccount(address, password string) error {
 		return err
 	}
 
-	return nil
+	st, err := b.statusNode.ShhExtService()
+	if err != nil {
+		return err
+	}
+
+	err = st.InitProtocol(address, password)
+
+	return err
 }
 
 // NotifyUsers sends push notifications to users.
@@ -430,4 +438,20 @@ func appendIf(condition bool, services []gethnode.ServiceConstructor, service ge
 		return services
 	}
 	return append(services, service)
+}
+
+func (b *StatusBackend) CreateX3DHBundle() (string, error) {
+	selectedAccount, err := b.AccountManager().SelectedAccount()
+	if selectedAccount == nil || err == account.ErrNoAccountSelected {
+		return "", nil
+	}
+
+	bundle, err := chat.NewBundleContainer(selectedAccount.AccountKey.PrivateKey)
+	if err != nil {
+		return "", err
+	}
+
+	jsonBundle, err := bundle.ToJSON()
+
+	return jsonBundle, err
 }

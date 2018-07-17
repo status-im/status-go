@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package chat;
+
+message Bundle {
+  bytes identity = 1;
+  bytes signed_pre_key = 2;
+  bytes signature = 3;
+}
+
+message BundleContainer {
+  Bundle bundle = 1;
+  bytes private_signed_pre_key = 2;
+}
+
+message DRHeader {
+  bytes key = 1;
+  uint32 n = 2;
+  uint32 pn = 3;
+}
+
+message X3DHHeader {
+  // Which ephemeral key has been used
+  oneof ephemeral_key {
+    bytes bundle_key = 1;
+    bytes dh_key = 2;
+    bytes sym_key = 3;
+  }
+  // The bundle used in case of x3dh
+  bytes bundle_id = 4;
+}
+
+message DirectMessageProtocol {
+  oneof encryption {
+    X3DHHeader X3DH_header = 1;
+    DRHeader DR_header = 2;
+  }
+  bytes payload = 3;
+}
+
+message ProtocolMessage {
+  // An optional bundle is exchanged with each message
+  Bundle bundle = 1;
+
+  oneof message_type {
+    // One to one message encrypted
+    DirectMessageProtocol direct_message = 101;
+
+    // Public chats, not encrypted
+    bytes public_message = 102;
+  }
+}

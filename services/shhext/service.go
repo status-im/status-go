@@ -2,6 +2,7 @@ package shhext
 
 import (
 	"crypto/ecdsa"
+	"fmt"
 	"sync"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
+	"github.com/status-im/status-go/services/shhext/chat"
 	"github.com/status-im/status-go/services/shhext/dedup"
 	"github.com/syndtr/goleveldb/leveldb"
 )
@@ -41,6 +43,7 @@ type Service struct {
 	tracker      *tracker
 	nodeID       *ecdsa.PrivateKey
 	deduplicator *dedup.Deduplicator
+	protocol     *chat.ProtocolService
 	debug        bool
 }
 
@@ -65,6 +68,15 @@ func New(w *whisper.Whisper, handler EnvelopeEventsHandler, db *leveldb.DB, debu
 // Protocols returns a new protocols list. In this case, there are none.
 func (s *Service) Protocols() []p2p.Protocol {
 	return []p2p.Protocol{}
+}
+
+func (s *Service) InitProtocol(address string, password string) error {
+	persistence, err := chat.NewSqlLitePersistence(fmt.Sprintf("/data/user/0/im.status.ethereum.debug/%x.db", address), password)
+	if err != nil {
+		return err
+	}
+	s.protocol = chat.NewProtocolService(chat.NewEncryptionService(persistence))
+	return nil
 }
 
 // APIs returns a list of new APIs.
