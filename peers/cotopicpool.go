@@ -9,7 +9,7 @@ import (
 )
 
 // MailServerDiscoveryTopic topic name for mailserver discovery.
-const MailServerDiscoveryTopic = "mailserver"
+const MailServerDiscoveryTopic = "whispermail"
 
 // MailServerDiscoveryLimits default mailserver discovery limits.
 var MailServerDiscoveryLimits = params.Limits{Min: 3, Max: 3}
