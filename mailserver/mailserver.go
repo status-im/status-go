@@ -83,10 +83,11 @@ type dbImpl interface {
 
 // WMailServer whisper mailserver.
 type WMailServer struct {
-	db     dbImpl
-	w      *whisper.Whisper
-	pow    float64
-	filter *whisper.Filter
+	db         dbImpl
+	w          *whisper.Whisper
+	pow        float64
+	symFilter  *whisper.Filter
+	asymFilter *whisper.Filter
 
 	muLimiter sync.RWMutex
 	limiter   *limiter
@@ -154,7 +155,8 @@ func (s *WMailServer) setupLimiter(limit time.Duration) {
 // setupRequestMessageDecryptor setup a Whisper filter to decrypt
 // incoming Whisper requests.
 func (s *WMailServer) setupRequestMessageDecryptor(config *params.WhisperConfig) error {
-	var filter whisper.Filter
+	s.symFilter = nil
+	s.asymFilter = nil
 
 	if config.MailServerPassword != "" {
 		keyID, err := s.w.AddSymKeyFromPassword(config.MailServerPassword)
@@ -167,12 +169,12 @@ func (s *WMailServer) setupRequestMessageDecryptor(config *params.WhisperConfig)
 			return fmt.Errorf("save symmetric key: %v", err)
 		}
 
-		filter = whisper.Filter{KeySym: symKey}
-	} else if config.MailServerAsymKey != nil {
-		filter = whisper.Filter{KeyAsym: config.MailServerAsymKey}
+		s.symFilter = &whisper.Filter{KeySym: symKey}
 	}
 
-	s.filter = &filter
+	if config.MailServerAsymKey != nil {
+		s.asymFilter = &whisper.Filter{KeyAsym: config.MailServerAsymKey}
+	}
 
 	return nil
 }
@@ -357,13 +359,29 @@ func (s *WMailServer) sendHistoricMessageResponse(peer *whisper.Peer, request *w
 	return s.w.SendHistoricMessageResponse(peer, payload)
 }
 
+// openEnvelope tries to decrypt an envelope, first based on asymetric key (if
+// provided) and second on the symetric key (if provided)
+func (s *WMailServer) openEnvelope(request *whisper.Envelope) *whisper.ReceivedMessage {
+	if s.asymFilter != nil {
+		if d := request.Open(s.asymFilter); d != nil {
+			return d
+		}
+	}
+	if s.symFilter != nil {
+		if d := request.Open(s.symFilter); d != nil {
+			return d
+		}
+	}
+	return nil
+}
+
 // validateRequest runs different validations on the current request.
 func (s *WMailServer) validateRequest(peerID []byte, request *whisper.Envelope) (bool, uint32, uint32, []byte, uint32, cursorType) {
 	if s.pow > 0.0 && request.PoW() < s.pow {
 		return false, 0, 0, nil, 0, nil
 	}
 
-	decrypted := request.Open(s.filter)
+	decrypted := s.openEnvelope(request)
 	if decrypted == nil {
 		log.Warn("Failed to decrypt p2p request")
 		return false, 0, 0, nil, 0, nil

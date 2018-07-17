@@ -24,6 +24,7 @@ import (
 	"github.com/status-im/status-go/mailserver"
 	shhmetrics "github.com/status-im/status-go/metrics/whisper"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/services/peer"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/shhext"
 	"github.com/status-im/status-go/services/status"
@@ -38,6 +39,7 @@ var (
 	ErrLightEthRegistrationFailure        = errors.New("failed to register the LES service")
 	ErrPersonalServiceRegistrationFailure = errors.New("failed to register the personal api service")
 	ErrStatusServiceRegistrationFailure   = errors.New("failed to register the Status service")
+	ErrPeerServiceRegistrationFailure     = errors.New("failed to register the Peer service")
 )
 
 // All general log messages in this package should be routed through this logger.
@@ -101,6 +103,11 @@ func MakeNode(config *params.NodeConfig, db *leveldb.DB) (*node.Node, error) {
 	// start status service.
 	if err := activateStatusService(stack, config); err != nil {
 		return nil, fmt.Errorf("%v: %v", ErrStatusServiceRegistrationFailure, err)
+	}
+
+	// start peer service
+	if err := activatePeerService(stack); err != nil {
+		return nil, fmt.Errorf("%v: %v", ErrPeerServiceRegistrationFailure, err)
 	}
 
 	return stack, nil
@@ -184,6 +191,13 @@ func activateStatusService(stack *node.Node, config *params.NodeConfig) error {
 			return nil, err
 		}
 		svc := status.New(whisper)
+		return svc, nil
+	})
+}
+
+func activatePeerService(stack *node.Node) error {
+	return stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
+		svc := peer.New()
 		return svc, nil
 	})
 }
