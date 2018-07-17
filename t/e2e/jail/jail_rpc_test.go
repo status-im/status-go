@@ -1,24 +1,15 @@
 package jail
 
 import (
-	"encoding/json"
 	"fmt"
-	"strconv"
-	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/robertkrimen/otto"
-
-	gethcommon "github.com/ethereum/go-ethereum/common"
-
 	"github.com/status-im/status-go/jail"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/signal"
 	e2e "github.com/status-im/status-go/t/e2e"
 	. "github.com/status-im/status-go/t/utils"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -110,138 +101,6 @@ func (s *JailRPCTestSuite) TestRegressionGetTransactionReceipt() {
 	expected := `{"jsonrpc":"2.0","id":7,"result":null}`
 	s.Equal(expected, got)
 }
-func (s *JailRPCTestSuite) TestContractDeploymentLES() {
-	s.testContractDeployment(false)
-}
-func (s *JailRPCTestSuite) TestContractDeploymentRPC() {
-	s.testContractDeployment(true)
-}
-
-func (s *JailRPCTestSuite) testContractDeployment(upstream bool) {
-	CheckTestSkipForNetworks(s.T(), params.MainNetworkID)
-	if upstream && GetNetworkID() == params.StatusChainNetworkID {
-		// only testing RPC on rinkeby
-		s.T().Skip()
-	}
-
-	testContractMining := true
-	if GetNetworkID() == params.StatusChainNetworkID {
-		// we don't do mining on our chain
-		testContractMining = false
-	}
-
-	s.StartTestBackend(setUpstreamOption(s.T(), upstream))
-	defer s.StopTestBackend()
-
-	s.NoError(s.Backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password))
-
-	if !upstream {
-		EnsureNodeSync(s.Backend.StatusNode().EnsureSync)
-	}
-
-	// obtain VM for a given chat (to send custom JS to jailed version of Send())
-	s.jail.CreateAndInitCell(testChatID)
-
-	cell, err := s.jail.Cell(testChatID)
-	s.NoError(err)
-
-	completeQueuedTransaction := make(chan struct{})
-
-	var txHash gethcommon.Hash
-	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var envelope signal.Envelope
-		unmarshalErr := json.Unmarshal([]byte(jsonEvent), &envelope)
-		s.NoError(unmarshalErr, "cannot unmarshal JSON: %s", jsonEvent)
-
-		if envelope.Type == signal.EventSignRequestAdded {
-			event := envelope.Event.(map[string]interface{})
-			s.T().Logf("transaction queued and will be completed shortly, id: %v", event["id"])
-
-			txID := event["id"].(string)
-			result := s.Backend.ApproveSignRequest(txID, TestConfig.Account1.Password)
-			txHash.SetBytes(result.Response.Bytes())
-			if s.NoError(result.Error, event["id"]) {
-				s.T().Logf("contract transaction complete, URL: %s", "https://rinkeby.etherscan.io/tx/"+txHash.Hex())
-			}
-
-			close(completeQueuedTransaction)
-		}
-	})
-
-	_, err = cell.Run(`
-		var responseValue = null;
-		var errorValue = null;
-		var wasMined = false;
-		var wasSent = false;
-		var testContract = web3.eth.contract([{"constant":true,"inputs":[{"name":"a","type":"int256"}],"name":"double","outputs":[{"name":"","type":"int256"}],"payable":false,"type":"function"}]);
-		var test = testContract.new(
-		{
-			from: '` + TestConfig.Account1.Address + `',
-			data: '0x6060604052341561000c57fe5b5b60a58061001b6000396000f30060606040526000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff1680636ffa1caa14603a575bfe5b3415604157fe5b60556004808035906020019091905050606b565b6040518082815260200191505060405180910390f35b60008160020290505b9190505600a165627a7a72305820ccdadd737e4ac7039963b54cee5e5afb25fa859a275252bdcf06f653155228210029',
-			gas: '` + strconv.Itoa(params.DefaultGas) + `'
-		}, function (e, contract) {
-			// NOTE: The callback will fire twice!
-			if (e) {
-				errorValue = e;
-				return;
-			}
-			// Once the contract has the transactionHash property set and once its deployed on an address.
-			if (!contract.address) {
-				responseValue = contract.transactionHash;
-				wasSent = true;
-			}
-			if (contract.address) {
-				wasMined = true;
-			}
-		})
-	`)
-	s.NoError(err)
-
-	select {
-	case <-completeQueuedTransaction:
-	case <-time.After(time.Minute):
-		s.FailNow("test timed out")
-	}
-
-	s.waitForBoolValue(cell, "wasSent", true, 30*time.Second, "timeout while waiting for the contract tx to be sent")
-
-	errorValue, err := cell.Get("errorValue")
-	s.NoError(err)
-	s.Equal("null", errorValue.Value().String())
-
-	responseValue, err := cell.Get("responseValue")
-	s.NoError(err)
-
-	response, err := responseValue.Value().ToString()
-	s.NoError(err)
-
-	expectedResponse := txHash.Hex()
-	s.Equal(expectedResponse, response)
-
-	if testContractMining {
-		s.waitForBoolValue(cell, "wasMined", true, 3*time.Minute, "timeout while waiting for the contract to be mined")
-	}
-}
-
-func (s *JailRPCTestSuite) waitForBoolValue(cell jail.JSCell, name string, expected bool, timeout time.Duration, msg string) {
-	deadline := time.Now().Add(timeout)
-
-	s.T().Logf("waiting for the variable '%s' to be '%v' with timeout of '%v'", name, expected, timeout)
-
-	for time.Now().Before(deadline) {
-		boolValue, err := cell.Get(name)
-		s.NoError(err)
-		actualValue, err := boolValue.Value().ToBoolean()
-		s.NoError(err)
-		if actualValue == expected {
-			return
-		}
-
-		time.Sleep(100 * time.Millisecond)
-	}
-
-	s.Fail(msg)
-}
 
 func (s *JailRPCTestSuite) TestJailVMPersistence() {
 	CheckTestSkipForNetworks(s.T(), params.MainNetworkID)
@@ -255,36 +114,12 @@ func (s *JailRPCTestSuite) TestJailVMPersistence() {
 	err := s.Backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	s.NoError(err, "cannot select account: %v", TestConfig.Account1.Address)
 
-	// there are two `sendTestTx` calls in `testCases`
-	var wgTransctions sync.WaitGroup
-	wgTransctions.Add(2)
-
 	type testCase struct {
 		command   string
 		params    string
 		validator func(response string) error
 	}
 	var testCases = []testCase{
-		{
-			`["sendTestTx"]`,
-			`{"amount": "0.000001", "from": "` + TestConfig.Account1.Address + `"}`,
-			func(response string) error {
-				if strings.Contains(response, "error") {
-					return fmt.Errorf("unexpected response: %v", response)
-				}
-				return nil
-			},
-		},
-		{
-			`["sendTestTx"]`,
-			`{"amount": "0.000002", "from": "` + TestConfig.Account1.Address + `"}`,
-			func(response string) error {
-				if strings.Contains(response, "error") {
-					return fmt.Errorf("unexpected response: %v", response)
-				}
-				return nil
-			},
-		},
 		{
 			`["ping"]`,
 			`{"pong": "Ping1", "amount": 0.42}`,
@@ -319,55 +154,12 @@ func (s *JailRPCTestSuite) TestJailVMPersistence() {
 			return params.pong;
 		}
 
-		_status_catalog['sendTestTx'] = function(params) {
-		  var amount = params.amount;
-		  var transaction = {
-			"from": params.from,
-			"to": "`+TestConfig.Account2.Address+`",
-			"value": web3.toWei(amount, "ether")
-		  };
-		  web3.eth.sendTransaction(transaction, function (error, result) {
-			 if(!error) {
-				total += Number(amount);
-				_done();
-			 }
-		  });
-		}
-
 		_status_catalog;
 	`)
 	s.NotContains(parseResult, "error", "further will fail if initial parsing failed")
 
 	cell, err := jail.Cell(testChatID)
 	s.NoError(err)
-
-	// create a bridge between JS code and Go
-	// to notify when the tx callback is called
-	err = cell.Set("_done", func(call otto.FunctionCall) otto.Value {
-		wgTransctions.Done()
-		return otto.UndefinedValue()
-	})
-	s.NoError(err)
-
-	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var envelope signal.Envelope
-		if e := json.Unmarshal([]byte(jsonEvent), &envelope); e != nil {
-			s.T().Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
-			return
-		}
-		if envelope.Type == signal.EventSignRequestAdded {
-			event := envelope.Event.(map[string]interface{})
-			s.T().Logf("Transaction queued (will be completed shortly): {id: %s}\n", event["id"].(string))
-
-			var txHash gethcommon.Hash
-			txID := event["id"].(string)
-			result := s.Backend.ApproveSignRequest(txID, TestConfig.Account1.Password)
-			s.NoError(result.Error, "cannot complete queued transaction[%v]: %v", event["id"], result.Error)
-
-			txHash.SetBytes(result.Response.Bytes())
-			s.T().Logf("Transaction complete: %s", txHash.Hex())
-		}
-	})
 
 	// run commands concurrently
 	var wg sync.WaitGroup
@@ -388,7 +180,6 @@ func (s *JailRPCTestSuite) TestJailVMPersistence() {
 	finishTestCases := make(chan struct{})
 	go func() {
 		wg.Wait()
-		wgTransctions.Wait()
 		close(finishTestCases)
 	}()
 
@@ -406,16 +197,6 @@ func (s *JailRPCTestSuite) TestJailVMPersistence() {
 	s.NoError(err)
 
 	s.T().Log(total)
-	s.InDelta(0.840003, total, 0.0000001)
-}
-
-func setUpstreamOption(t *testing.T, upstream bool) e2e.TestNodeOption {
-	return func(config *params.NodeConfig) {
-		if upstream {
-			networkURL, err := GetRemoteURL()
-			assert.NoError(t, err)
-			config.UpstreamConfig.Enabled = true
-			config.UpstreamConfig.URL = networkURL
-		}
-	}
+	// Should not have changed
+	s.InDelta(0.840000, total, 0.0)
 }
