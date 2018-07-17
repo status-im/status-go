@@ -6,17 +6,23 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/les"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discover"
+	"github.com/ethereum/go-ethereum/p2p/discv5"
+	gethparams "github.com/ethereum/go-ethereum/params"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
+
 	"github.com/syndtr/goleveldb/leveldb"
 
 	"github.com/status-im/status-go/db"
@@ -106,7 +112,78 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig, db *leveldb.DB, serv
 	}
 
 	if n.discoveryEnabled() {
-		return n.startDiscovery()
+		if err := n.startDiscovery(); err != nil {
+			return err
+		}
+
+		log.Info("Is LES enabled?", "enabled", config.LightEthConfig != nil && config.LightEthConfig.Enabled)
+		if config.LightEthConfig != nil && config.LightEthConfig.Enabled {
+			log.Info("Get LES service")
+
+			var les *les.LightEthereum
+			if err := n.gethService(&les); err != nil {
+				log.Error("failed to get LES service")
+				return err
+			}
+
+			log.Info("LES retrieved", "service", les)
+
+			genesisHash := les.BlockChain().Genesis().Hash()
+			log.Info("LES genesis hash", "hash", genesisHash)
+
+			// TODO(adam): start Discovery V5 for LES
+			// 1. Remember to start it on a different port
+			listenAddr := strings.Split(n.config.ListenAddr, ":")
+			log.Info("listenAddr", "addr", listenAddr)
+			port, err := strconv.ParseInt(listenAddr[1], 10, 0)
+			if err != nil {
+				return err
+			}
+
+			lesDiscAddr := listenAddr[0] + ":" + strconv.Itoa(int(port+1))
+			log.Info("LES discovery address", "address", lesDiscAddr)
+
+			discovery := peers.NewDiscV5(
+				n.gethNode.Server().PrivateKey,
+				lesDiscAddr,
+				discv5.Version,
+				parseNodesV5(gethparams.MainnetBootnodes))
+			options := peers.NewDefaultOptions()
+			lesTopic := discv5.Topic("LES@" + common.Bytes2Hex(genesisHash.Bytes()[0:8]))
+			les2Topic := discv5.Topic("LES2@" + common.Bytes2Hex(genesisHash.Bytes()[0:8]))
+			peerPool := peers.NewPeerPool(
+				discovery,
+				map[discv5.Topic]params.Limits{
+					lesTopic:  params.Limits{Min: 1, Max: 3},
+					les2Topic: params.Limits{Min: 1, Max: 3},
+				},
+				peers.NewCache(n.db),
+				options,
+			)
+			if err := discovery.Start(); err != nil {
+				return err
+			}
+
+			if err := peerPool.Start(n.gethNode.Server()); err != nil {
+				return err
+			}
+
+			go func() {
+				for {
+					<-time.After(time.Second * 5)
+					if peers, ok := peerPool.PeersForTopic(lesTopic); ok {
+						log.Info("Inserting nodes into the Status Network", "count", len(peers), "peers", peers, "topic", lesTopic)
+						n.discovery.InsertNodes(peers)
+					}
+					if peers, ok := peerPool.PeersForTopic(les2Topic); ok {
+						log.Info("Inserting nodes into the Status Network", "count", len(peers), "peers", peers, "topic", les2Topic)
+						n.discovery.InsertNodes(peers)
+					}
+				}
+			}()
+
+			log.Info("Discovery for LES servers started")
+		}
 	}
 	return nil
 }
@@ -185,11 +262,12 @@ func (n *StatusNode) startDiscovery() error {
 	n.discovery = peers.NewDiscV5(
 		n.gethNode.Server().PrivateKey,
 		n.config.ListenAddr,
+		55,
 		parseNodesV5(n.config.ClusterConfig.BootNodes))
 	n.register = peers.NewRegister(n.discovery, n.config.RegisterTopics...)
 	options := peers.NewDefaultOptions()
 	// TODO(dshulyak) consider adding a flag to define this behaviour
-	options.AllowStop = len(n.config.RegisterTopics) == 0
+	options.AllowStop = false
 	n.peerPool = peers.NewPeerPool(
 		n.discovery,
 		n.config.RequireTopics,

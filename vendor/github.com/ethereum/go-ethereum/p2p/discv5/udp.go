@@ -265,7 +265,6 @@ func (t *udp) send(remote *Node, ptype nodeEvent, data interface{}) (hash []byte
 }
 
 func (t *udp) sendPing(remote *Node, toaddr *net.UDPAddr, topics []Topic) (hash []byte) {
-	log.Info("discv5 sending ping", "self", t.ourEndpoint, "to", makeEndpoint(toaddr, uint16(toaddr.Port)), "version", t.version)
 	hash, _ = t.sendPacket(remote.ID, toaddr, byte(pingPacket), ping{
 		Version:    uint(t.version),
 		From:       t.ourEndpoint,

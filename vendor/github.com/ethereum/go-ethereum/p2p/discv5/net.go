@@ -165,6 +165,7 @@ func newNetwork(conn transport, ourPubkey ecdsa.PublicKey, dbPath string, versio
 		topicRegisterReq: make(chan topicRegisterReq),
 		topicSearchReq:   make(chan topicSearchReq),
 		nodes:            make(map[NodeID]*Node),
+		version:          version,
 	}
 	go net.loop()
 	return net, nil
@@ -777,6 +778,16 @@ func (net *Network) internNodeFromNeighbours(sender *net.UDPAddr, rn rpcNode) (n
 	return n, err
 }
 
+func (net *Network) InsertNode(aNode *Node) *Node {
+	if n := net.nodes[aNode.ID]; n != nil {
+		return n
+	}
+	n := NewNode(aNode.ID, aNode.IP, aNode.UDP, aNode.TCP)
+	n.state = unknown
+	net.nodes[n.ID] = n
+	return n
+}
+
 // nodeNetGuts is embedded in Node and contains fields.
 type nodeNetGuts struct {
 	// This is a cached copy of sha3(ID) which is used for node
@@ -1068,9 +1079,9 @@ func (net *Network) checkPacket(n *Node, ev nodeEvent, pkt *ingressPacket) error
 	// Replay prevention checks.
 	switch ev {
 	case pingPacket:
-		if pkt.data.(*ping).Version != uint(net.version) {
-			return fmt.Errorf("version mismatch")
-		}
+		// if pkt.data.(*ping).Version != uint(net.version) {
+		// 	return fmt.Errorf("version mismatch")
+		// }
 	case findnodeHashPacket, neighborsPacket:
 		// TODO: check date is > last date seen
 		// TODO: check ping version

@@ -17,11 +17,13 @@ type Discovery interface {
 	Stop() error
 	Register(topic string, stop chan struct{}) error
 	Discover(topic string, period <-chan time.Duration, found chan<- *discv5.Node, lookup chan<- bool) error
+	InsertNodes(nodes []*discv5.Node)
 }
 
 // NewDiscV5 creates instances of discovery v5 facade.
-func NewDiscV5(prv *ecdsa.PrivateKey, laddr string, bootnodes []*discv5.Node) *DiscV5 {
+func NewDiscV5(prv *ecdsa.PrivateKey, laddr string, version int, bootnodes []*discv5.Node) *DiscV5 {
 	return &DiscV5{
+		version:   version,
 		prv:       prv,
 		laddr:     laddr,
 		bootnodes: bootnodes,
@@ -30,8 +32,9 @@ func NewDiscV5(prv *ecdsa.PrivateKey, laddr string, bootnodes []*discv5.Node) *D
 
 // DiscV5 is a facade for ethereum discv5 implementation.
 type DiscV5 struct {
-	mu  sync.Mutex
-	net *discv5.Network
+	mu      sync.Mutex
+	net     *discv5.Network
+	version int
 
 	prv       *ecdsa.PrivateKey
 	laddr     string
@@ -59,7 +62,7 @@ func (d *DiscV5) Start() error {
 		return err
 	}
 	realaddr := conn.LocalAddr().(*net.UDPAddr)
-	ntab, err := discv5.ListenUDP(d.prv, conn, realaddr, "", discv5.StatusVersion, nil)
+	ntab, err := discv5.ListenUDP(d.prv, conn, realaddr, "", d.version, nil)
 	if err != nil {
 		return err
 	}
@@ -94,4 +97,11 @@ func (d *DiscV5) Register(topic string, stop chan struct{}) error {
 func (d *DiscV5) Discover(topic string, period <-chan time.Duration, found chan<- *discv5.Node, lookup chan<- bool) error {
 	d.net.SearchTopic(discv5.Topic(topic), period, found, lookup)
 	return nil
+}
+
+// InsertNodes inserts givens peers as nodes into Discovery V5 table.
+func (d *DiscV5) InsertNodes(nodes []*discv5.Node) {
+	for _, node := range nodes {
+		d.net.InsertNode(node)
+	}
 }

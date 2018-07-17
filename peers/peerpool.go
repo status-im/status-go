@@ -248,6 +248,10 @@ func (p *PeerPool) handleServerPeers(server *p2p.Server, events <-chan *p2p.Peer
 				continue
 			}
 			SendDiscoverySummary(server.PeersInfo())
+
+			for _, t := range p.topics {
+				log.Debug("PeerPool summary", "topic", t.topic, "connectedPeers", len(t.connectedPeers), "pendingPeers", len(t.pendingPeers))
+			}
 		}
 	}
 }
@@ -309,7 +313,7 @@ func (p *PeerPool) handleDroppedPeer(server *p2p.Server, nodeID discover.NodeID)
 				log.Debug("added peer from local table", "ID", newPeer.ID)
 			}
 		}
-		log.Debug("search", "topic", t.topic, "below min", t.BelowMin())
+		log.Debug("search", "topic", t.topic, "belowMin", t.BelowMin(), "connected", len(t.connectedPeers))
 		if t.BelowMin() && !t.SearchRunning() {
 			any = true
 		}
@@ -333,4 +337,26 @@ func (p *PeerPool) Stop() {
 	}
 	p.serverSubscription.Unsubscribe()
 	p.wg.Wait()
+}
+
+// PeersForTopic returns a list of currently connected nodes for a given topic.
+func (p *PeerPool) PeersForTopic(topic discv5.Topic) ([]*discv5.Node, bool) {
+	var topicPool *TopicPool
+	for _, t := range p.topics {
+		if t.topic == topic {
+			topicPool = t
+			break
+		}
+	}
+
+	if topicPool == nil {
+		return nil, false
+	}
+
+	peers := make([]*discv5.Node, 0, len(topicPool.connectedPeers))
+	for _, peerInfo := range topicPool.connectedPeers {
+		peers = append(peers, peerInfo.node)
+	}
+
+	return peers, true
 }
