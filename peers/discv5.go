@@ -7,14 +7,13 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 )
 
 // Discovery is an abstract interface for using different discovery providers.
 type Discovery interface {
 	Running() bool
-	Start(*p2p.Server) error
+	Start() error
 	Stop() error
 	Register(topic string, stop chan struct{}) error
 	Discover(topic string, period <-chan time.Duration, found chan<- *discv5.Node, lookup chan<- bool) error
@@ -24,11 +23,10 @@ type Discovery interface {
 // NewDiscV5 creates instances of discovery v5 facade.
 func NewDiscV5(prv *ecdsa.PrivateKey, laddr string, version int, bootnodes []*discv5.Node) *DiscV5 {
 	return &DiscV5{
-		version:              version,
-		prv:                  prv,
-		laddr:                laddr,
-		bootnodes:            bootnodes,
-		overrideServerDiscV5: false,
+		version:   version,
+		prv:       prv,
+		laddr:     laddr,
+		bootnodes: bootnodes,
 	}
 }
 
@@ -52,7 +50,7 @@ func (d *DiscV5) Running() bool {
 }
 
 // Start creates v5 server and stores pointer to it.
-func (d *DiscV5) Start(server *p2p.Server) error {
+func (d *DiscV5) Start() error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	log.Debug("Starting discovery", "listen address", d.laddr)
@@ -73,11 +71,6 @@ func (d *DiscV5) Start(server *p2p.Server) error {
 		return err
 	}
 	d.net = ntab
-
-	if d.overrideServerDiscV5 && server != nil {
-		server.DiscV5 = ntab
-	}
-
 	return nil
 }
 

@@ -55,6 +55,9 @@ type Options struct {
 	// ProxyTopic is a set of topics that should be proxied. It means that found nodes
 	// won't be added as peers.
 	ProxyTopics []discv5.Topic
+	// ProxyDestDiscovery is a Discovery to which peers from ProxyTopics
+	// should be proxied.
+	ProxyDestDiscovery Discovery
 }
 
 // NewDefaultOptions returns a struct with default Options.
@@ -118,7 +121,7 @@ func NewPeerPool(discovery Discovery, config map[discv5.Topic]params.Limits, cac
 		if topic == MailServerDiscoveryTopic {
 			topicPool = newCacheOnlyTopicPool(t)
 		} else if containsTopic(options.ProxyTopics, topic) {
-			topicPool = NewProxyTopicPool(t)
+			topicPool = NewProxyTopicPool(t, options.ProxyDestDiscovery)
 		} else {
 			topicPool = t
 		}
@@ -170,12 +173,12 @@ func (p *PeerPool) Start(server *p2p.Server) error {
 	return nil
 }
 
-func (p *PeerPool) startDiscovery(server *p2p.Server) error {
+func (p *PeerPool) startDiscovery() error {
 	if p.discovery.Running() {
 		return nil
 	}
 
-	if err := p.discovery.Start(server); err != nil {
+	if err := p.discovery.Start(); err != nil {
 		return err
 	}
 
@@ -210,7 +213,7 @@ func (p *PeerPool) stopDiscovery(server *p2p.Server) {
 // restartDiscovery and search for topics that have peer count below min
 func (p *PeerPool) restartDiscovery(server *p2p.Server) error {
 	if !p.discovery.Running() {
-		if err := p.startDiscovery(server); err != nil {
+		if err := p.startDiscovery(); err != nil {
 			return err
 		}
 		log.Debug("restarted discovery from peer pool")

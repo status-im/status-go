@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -134,60 +135,8 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig, db *leveldb.DB, serv
 			return err
 		}
 
-		// If LES is enabled, setup discovery proxy because in Status network
-		// there are no LES peers available.
-		// The idea is to start another Discovery V5 which is connected to
-		// Ethereum network and proxy found peers to our Status network.
-		if config.LightEthConfig != nil && config.LightEthConfig.Enabled {
-			var les *les.LightEthereum
-			if err := n.gethService(&les); err != nil {
-				log.Error("failed to get LES service")
-				return err
-			}
-
-			genesisHash := les.BlockChain().Genesis().Hash()
-			les1Topic := discv5.Topic("LES@" + common.Bytes2Hex(genesisHash.Bytes()[0:8]))
-			les2Topic := discv5.Topic("LES2@" + common.Bytes2Hex(genesisHash.Bytes()[0:8]))
-
-			listenAddr := strings.Split(n.config.ListenAddr, ":")
-			port, err := strconv.ParseInt(listenAddr[1], 10, 0)
-			if err != nil {
-				return err
-			}
-			proxyDiscAddr := listenAddr[0] + ":" + strconv.Itoa(int(port+1))
-			log.Debug("Proxy Discovery address", "addr", proxyDiscAddr)
-
-			discovery := peers.NewDiscV5(
-				n.gethNode.Server().PrivateKey,
-				proxyDiscAddr,
-				discv5.Version,
-				parseNodesV5(gethparams.MainnetBootnodes), // TODO(adam): select a proper bootnodes
-			)
-			peerPoolOpts := peers.NewDefaultOptions()
-			peerPoolOpts.ProxyTopics = []discv5.Topic{les1Topic, les2Topic}
-			peerPool := peers.NewPeerPool(
-				discovery,
-				map[discv5.Topic]params.Limits{
-					les1Topic: params.Limits{Min: 1, Max: 3},
-					les2Topic: params.Limits{Min: 1, Max: 3},
-				},
-				peers.NewCache(n.db),
-				peerPoolOpts,
-			)
-			// TODO(adam): This is a hack to pass Status Discovery to ProxyTopicPool.
-			// I don't see a better solution without refactoring a large part of the code.
-			for _, topic := range peerPool.Topics() {
-				if t, ok := topic.(*peers.ProxyTopicPool); ok {
-					t.SetDestDiscovery(n.discovery)
-				}
-			}
-			if err := discovery.Start(n.gethNode.Server()); err != nil {
-				return err
-			}
-			if err := peerPool.Start(n.gethNode.Server()); err != nil {
-				return err
-			}
-			log.Debug("Discovery for LES servers started")
+		if err := n.proxyTopics(config.ProxyTopics); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -280,13 +229,68 @@ func (n *StatusNode) startDiscovery() error {
 		peers.NewCache(n.db),
 		options,
 	)
-	if err := n.discovery.Start(nil); err != nil {
+	if err := n.discovery.Start(); err != nil {
 		return err
 	}
 	if err := n.register.Start(); err != nil {
 		return err
 	}
 	return n.peerPool.Start(n.gethNode.Server())
+}
+
+// proxyTopics starts a new Discovery that connects to the Ethereum network.
+// It proxies peers found in the Ethereum network to Status network.
+func (n *StatusNode) proxyTopics(topics []discv5.Topic) error {
+	if len(n.config.ProxyTopics) == 0 {
+		return nil
+	}
+
+	listenAddr := strings.Split(n.config.ListenAddr, ":")
+	port, err := strconv.ParseInt(listenAddr[1], 10, 0)
+	if err != nil {
+		return err
+	}
+	proxyDiscAddr := listenAddr[0] + ":" + strconv.Itoa(int(port+1))
+	n.log.Debug("Proxy Discovery", "addr", proxyDiscAddr, "proxyTopics", topics)
+
+	var bootnodes []*discv5.Node
+	switch n.config.NetworkID {
+	case params.MainNetworkID:
+		bootnodes = parseNodesV5(gethparams.MainnetBootnodes)
+	case params.RopstenNetworkID:
+		bootnodes = parseNodesV5(gethparams.TestnetBootnodes)
+	case params.RinkebyNetworkID:
+		bootnodes = parseNodesV5(gethparams.RinkebyBootnodes)
+	}
+
+	discovery := peers.NewDiscV5(
+		n.gethNode.Server().PrivateKey,
+		proxyDiscAddr,
+		discv5.Version,
+		bootnodes,
+	)
+
+	limits := map[discv5.Topic]params.Limits{}
+	for _, topic := range topics {
+		// only Min limit is used
+		limits[topic] = params.Limits{Min: 1, Max: math.MaxInt32}
+	}
+
+	peerPoolOpts := peers.NewDefaultOptions()
+	peerPoolOpts.ProxyTopics = topics
+	peerPoolOpts.ProxyDestDiscovery = n.discovery
+	peerPool := peers.NewPeerPool(
+		discovery,
+		limits,
+		peers.NewCache(n.db),
+		peerPoolOpts,
+	)
+
+	if err := discovery.Start(); err != nil {
+		return err
+	}
+
+	return peerPool.Start(n.gethNode.Server())
 }
 
 // Stop will stop current StatusNode. A stopped node cannot be resumed.

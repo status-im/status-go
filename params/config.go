@@ -336,6 +336,10 @@ type NodeConfig struct {
 	// discoverable peers with the discovery limits.
 	RequireTopics map[discv5.Topic]Limits `json:"RequireTopics"`
 
+	// ProxyTopics is a list of topics that will be proxied
+	// from Ethereum network to Status network.
+	ProxyTopics []discv5.Topic `json:"ProxyTopics"`
+
 	// StatusServiceEnabled enables status service api
 	StatusServiceEnabled bool
 

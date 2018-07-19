@@ -19,17 +19,11 @@ type ProxyTopicPool struct {
 }
 
 // NewProxyTopicPool creates a new ProxyTopicPool.
-func NewProxyTopicPool(t *TopicPool) *ProxyTopicPool {
+func NewProxyTopicPool(t *TopicPool, d Discovery) *ProxyTopicPool {
 	return &ProxyTopicPool{
-		TopicPool: t,
+		TopicPool:     t,
+		destDiscovery: d,
 	}
-}
-
-// SetDestDiscovery sets a Discovery which will receive found peers.
-func (t *ProxyTopicPool) SetDestDiscovery(d Discovery) {
-	t.mu.Lock()
-	t.destDiscovery = d
-	t.mu.Unlock()
 }
 
 // StartSearch creates discv5 queries and runs a loop to consume found peers.
