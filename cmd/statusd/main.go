@@ -87,6 +87,8 @@ var (
 	// Topics that will be search and registered by discovery v5.
 	searchTopics   = topics.TopicLimitsFlag{}
 	registerTopics = topics.TopicFlag{}
+	// Topics that will be proxied from Ethereum network to Status network.
+	proxyTopics = topics.TopicFlag{}
 )
 
 // All general log messages in this package should be routed through this logger.
@@ -95,6 +97,7 @@ var logger = log.New("package", "status-go/cmd/statusd")
 func main() {
 	flag.Var(&searchTopics, "topic.search", "Topic that will be searched in discovery v5, e.g (mailserver=1,1)")
 	flag.Var(&registerTopics, "topic.register", "Topic that will be registered using discovery v5.")
+	flag.Var(&proxyTopics, "topic.proxy", "Topic that will be proxied from Ethereum network.")
 
 	flag.Usage = printUsage
 	flag.Parse()
@@ -254,6 +257,7 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 	nodeConfig.NoDiscovery = !(*discovery)
 	nodeConfig.RequireTopics = map[discv5.Topic]params.Limits(searchTopics)
 	nodeConfig.RegisterTopics = []discv5.Topic(registerTopics)
+	nodeConfig.ProxyTopics = []discv5.Topic(proxyTopics)
 
 	nodeConfig.WhisperConfig.EnableNTPSync = *ntpSyncEnabled
 

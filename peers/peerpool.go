@@ -2,6 +2,7 @@ package peers
 
 import (
 	"errors"
+	"math"
 	"sync"
 	"time"
 
@@ -120,12 +121,16 @@ func NewPeerPool(discovery Discovery, config map[discv5.Topic]params.Limits, cac
 		t := newTopicPool(p.discovery, topic, limits, p.opts.SlowSync, p.opts.FastSync, p.cache)
 		if topic == MailServerDiscoveryTopic {
 			topicPool = newCacheOnlyTopicPool(t)
-		} else if containsTopic(options.ProxyTopics, topic) {
-			topicPool = NewProxyTopicPool(t, options.ProxyDestDiscovery)
 		} else {
 			topicPool = t
 		}
 		p.topics = append(p.topics, topicPool)
+	}
+
+	for _, topic := range options.ProxyTopics {
+		limits := params.Limits{Min: 1, Max: math.MaxInt32}
+		t := newTopicPool(p.discovery, topic, limits, p.opts.SlowSync, p.opts.FastSync, p.cache)
+		p.topics = append(p.topics, NewProxyTopicPool(t, options.ProxyDestDiscovery))
 	}
 
 	return &p

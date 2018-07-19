@@ -1084,9 +1084,9 @@ func (net *Network) checkPacket(n *Node, ev nodeEvent, pkt *ingressPacket) error
 	// Replay prevention checks.
 	switch ev {
 	case pingPacket:
-		if pkt.data.(*ping).Version != uint(net.version) {
-			return fmt.Errorf("version mismatch")
-		}
+		// if pkt.data.(*ping).Version != uint(net.version) {
+		// 	return fmt.Errorf("version mismatch")
+		// }
 	case findnodeHashPacket, neighborsPacket:
 		// TODO: check date is > last date seen
 		// TODO: check ping version

@@ -90,7 +90,7 @@ func (s *ProxyPoolSimulationSuite) createAndStartPeerAndDiscV5(aName string, ver
 
 	discV5 := NewDiscV5(key, peer.ListenAddr, version, bootnodes)
 
-	return peer, discV5, discV5.Start(peer)
+	return peer, discV5, discV5.Start()
 }
 
 func (s *ProxyPoolSimulationSuite) SetupTest() {
@@ -143,7 +143,7 @@ func (s *ProxyPoolSimulationSuite) TestDiscoveryWithBootnode() {
 		seekerDiscV5,
 		map[discv5.Topic]params.Limits{s.topic: params.Limits{Min: 1, Max: 1}},
 		seekerCache,
-		&Options{100 * time.Millisecond, 100 * time.Millisecond, 0, true, 100 * time.Millisecond, nil},
+		&Options{100 * time.Millisecond, 100 * time.Millisecond, 0, true, 100 * time.Millisecond, nil, nil},
 	)
 	s.Require().NoError(seekerPool.Start(seekerPeer))
 
@@ -171,23 +171,16 @@ func (s *ProxyPoolSimulationSuite) TestDiscoveryProxy() {
 
 	proxyKey, _ := crypto.GenerateKey()
 	proxyDiscV5 := NewDiscV5(proxyKey, fmt.Sprintf("0.0.0.0:%d", s.nextPort()), discv5.Version, []*discv5.Node{s.bootnodeEthereumV5})
-	s.Require().NoError(proxyDiscV5.Start(nil))
+	s.Require().NoError(proxyDiscV5.Start())
 
 	proxyCache, err := newInMemoryCache()
 	s.Require().NoError(err)
 	proxyPool := NewPeerPool(
 		proxyDiscV5,
-		map[discv5.Topic]params.Limits{
-			s.topic: params.Limits{Min: 1, Max: 5},
-		},
+		nil,
 		proxyCache,
-		&Options{100 * time.Millisecond, 100 * time.Millisecond, 0, true, 100 * time.Millisecond, []discv5.Topic{s.topic}},
+		&Options{100 * time.Millisecond, 100 * time.Millisecond, 0, true, 100 * time.Millisecond, []discv5.Topic{s.topic}, serverDiscV5},
 	)
-	for _, topic := range proxyPool.Topics() {
-		if t, ok := topic.(*ProxyTopicPool); ok {
-			t.SetDestDiscovery(serverDiscV5)
-		}
-	}
 	s.Require().NoError(proxyPool.Start(serverPeer))
 
 	// Create an equivalent of mobile node that connects to the network B (Status network).
@@ -205,7 +198,7 @@ func (s *ProxyPoolSimulationSuite) TestDiscoveryProxy() {
 		seekerDiscV5,
 		map[discv5.Topic]params.Limits{s.topic: params.Limits{Min: 1, Max: 1}},
 		seekerCache,
-		&Options{100 * time.Millisecond, 100 * time.Millisecond, 0, true, 100 * time.Millisecond, nil},
+		&Options{100 * time.Millisecond, 100 * time.Millisecond, 0, true, 100 * time.Millisecond, nil, nil},
 	)
 	s.Require().NoError(seekerPool.Start(seekerPeer))
 
