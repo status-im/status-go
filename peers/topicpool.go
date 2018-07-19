@@ -38,7 +38,6 @@ type TopicPoolInterface interface {
 	SetLimits(limits params.Limits)
 	setStopSearchTimeout(delay time.Duration)
 	readyToStopSearch() bool
-	ConnectedPeers() []*discv5.Node
 }
 
 // newTopicPool returns instance of TopicPool.
@@ -167,19 +166,6 @@ func (t *TopicPool) BelowMin() bool {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 	return len(t.connectedPeers) < t.limits.Min
-}
-
-// ConnectedPeers returns a number of currently connected peers.
-func (t *TopicPool) ConnectedPeers() []*discv5.Node {
-	t.mu.RLock()
-	defer t.mu.RUnlock()
-
-	var peers []*discv5.Node
-	for _, peer := range t.connectedPeers {
-		peers = append(peers, peer.node)
-	}
-
-	return peers
 }
 
 // maxCachedPeersReached returns true if max number of cached peers is reached.
@@ -426,7 +412,7 @@ func (t *TopicPool) StartSearch(server *p2p.Server) error {
 	return nil
 }
 
-func (t *ProxyTopicPool) handleFoundPeers(server *p2p.Server, found <-chan *discv5.Node, lookup <-chan bool) {
+func (t *TopicPool) handleFoundPeers(server *p2p.Server, found <-chan *discv5.Node, lookup <-chan bool) {
 	selfID := discv5.NodeID(server.Self().ID)
 	for {
 		select {

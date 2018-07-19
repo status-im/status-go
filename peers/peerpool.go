@@ -366,33 +366,9 @@ func (p *PeerPool) Stop() {
 	p.wg.Wait()
 }
 
-// PeersForTopic returns a list of currently connected nodes for a given topic.
-func (p *PeerPool) PeersForTopic(topic discv5.Topic) ([]*discv5.Node, bool) {
-	var topicPool TopicPoolInterface
-	for _, t := range p.topics {
-		if t.Topic() == topic {
-			topicPool = t
-			break
-		}
-	}
-
-	if topicPool == nil {
-		return nil, false
-	}
-
-	return topicPool.ConnectedPeers(), true
-}
-
 type updateTopicRequest struct {
 	Topic  string
 	Limits params.Limits
-}
-
-// Topics returns all TopicPools.
-func (p *PeerPool) Topics() []TopicPoolInterface {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-	return p.topics
 }
 
 // UpdateTopic updates the pre-existing TopicPool limits.

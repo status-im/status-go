@@ -222,7 +222,7 @@ func (n *StatusNode) startDiscovery() error {
 	n.register = peers.NewRegister(n.discovery, n.config.RegisterTopics...)
 	options := peers.NewDefaultOptions()
 	// TODO(dshulyak) consider adding a flag to define this behaviour
-	options.AllowStop = false
+	options.AllowStop = len(n.config.RegisterTopics) == 0 && len(n.config.ProxyTopics) == 0
 	n.peerPool = peers.NewPeerPool(
 		n.discovery,
 		n.config.RequireTopics,

@@ -66,7 +66,7 @@ func (t *ProxyTopicPool) StartSearch(server *p2p.Server) error {
 	return nil
 }
 
-func (t *TopicPool) handleFoundPeers(server *p2p.Server, found <-chan *discv5.Node, lookup <-chan bool) {
+func (t *ProxyTopicPool) handleFoundPeers(server *p2p.Server, found <-chan *discv5.Node, lookup <-chan bool) {
 	selfID := discv5.NodeID(server.Self().ID)
 	for {
 		select {
@@ -87,7 +87,7 @@ func (t *ProxyTopicPool) processFoundNode(server *p2p.Server, node *discv5.Node)
 	t.foundNodes++
 	if t.destDiscovery != nil {
 		log.Debug("ProxyTopicPool inserts node", "topic", t.topic)
-		t.destDiscovery.InsertNodes(t.topic, []*discv5.Node{node})
+		t.destDiscovery.InsertNodes(t.topic, node)
 	}
 	t.mu.Unlock()
 }

@@ -17,7 +17,7 @@ type Discovery interface {
 	Stop() error
 	Register(topic string, stop chan struct{}) error
 	Discover(topic string, period <-chan time.Duration, found chan<- *discv5.Node, lookup chan<- bool) error
-	InsertNodes(discv5.Topic, []*discv5.Node)
+	InsertNodes(discv5.Topic, ...*discv5.Node)
 }
 
 // NewDiscV5 creates instances of discovery v5 facade.
@@ -101,7 +101,7 @@ func (d *DiscV5) Discover(topic string, period <-chan time.Duration, found chan<
 }
 
 // InsertNodes inserts givens peers as nodes into Discovery V5 table.
-func (d *DiscV5) InsertNodes(topic discv5.Topic, nodes []*discv5.Node) {
+func (d *DiscV5) InsertNodes(topic discv5.Topic, nodes ...*discv5.Node) {
 	for _, node := range nodes {
 		d.net.InsertNode(topic, node)
 	}
