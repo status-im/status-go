@@ -13,7 +13,6 @@ import (
 	fcmlib "github.com/NaySoftware/go-fcm"
 
 	"github.com/status-im/status-go/account"
-	"github.com/status-im/status-go/jail"
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/notifications/push/fcm"
 	"github.com/status-im/status-go/params"
@@ -45,7 +44,6 @@ type StatusBackend struct {
 	personalAPI         *personal.PublicAPI
 	accountManager      *account.Manager
 	transactor          *transactions.Transactor
-	jailManager         jail.Manager
 	newNotification     fcm.NotificationConstructor
 	connectionState     connectionState
 	appState            appState
@@ -61,14 +59,12 @@ func NewStatusBackend() *StatusBackend {
 	accountManager := account.NewManager(statusNode)
 	transactor := transactions.NewTransactor(pendingSignRequests)
 	personalAPI := personal.NewAPI(pendingSignRequests)
-	jailManager := jail.New(statusNode)
 	notificationManager := fcm.NewNotification(fcmServerKey)
 
 	return &StatusBackend{
 		pendingSignRequests: pendingSignRequests,
 		statusNode:          statusNode,
 		accountManager:      accountManager,
-		jailManager:         jailManager,
 		transactor:          transactor,
 		personalAPI:         personalAPI,
 		newNotification:     notificationManager,
@@ -84,11 +80,6 @@ func (b *StatusBackend) StatusNode() *node.StatusNode {
 // AccountManager returns reference to account manager
 func (b *StatusBackend) AccountManager() *account.Manager {
 	return b.accountManager
-}
-
-// JailManager returns reference to jail
-func (b *StatusBackend) JailManager() jail.Manager {
-	return b.jailManager
 }
 
 // Transactor returns reference to a status transactor
@@ -181,7 +172,6 @@ func (b *StatusBackend) stopNode() error {
 	if !b.IsNodeRunning() {
 		return node.ErrNoRunningNode
 	}
-	b.jailManager.Stop()
 	defer signal.SendNodeStopped()
 	return b.statusNode.Stop()
 }
@@ -364,10 +354,6 @@ func (b *StatusBackend) Logout() error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	// FIXME(oleg-raev): This method doesn't make stop, it rather resets its cells to an initial state
-	// and should be properly renamed, for example: ResetCells
-	b.jailManager.Stop()
-
 	whisperService, err := b.statusNode.WhisperService()
 	switch err {
 	case node.ErrServiceUnknown: // Whisper was never registered
@@ -410,10 +396,6 @@ func (b *StatusBackend) reSelectAccount() error {
 func (b *StatusBackend) SelectAccount(address, password string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-
-	// FIXME(oleg-raev): This method doesn't make stop, it rather resets its cells to an initial state
-	// and should be properly renamed, for example: ResetCells
-	b.jailManager.Stop()
 
 	err := b.accountManager.SelectAccount(address, password)
 	if err != nil {
