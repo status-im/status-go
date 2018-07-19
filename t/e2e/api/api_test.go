@@ -19,10 +19,6 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/storage"
 )
 
-const (
-	testChatID = "testChat"
-)
-
 func TestAPI(t *testing.T) {
 	suite.Run(t, new(APITestSuite))
 }
