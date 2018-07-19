@@ -26,9 +26,6 @@ type ProxyPoolSimulationSuite struct {
 	bootnodeEthereumV5 *discv5.Node
 	bootnodeStatus     *p2p.Server
 	bootnodeStatusV5   *discv5.Node
-
-	destinationPeer *p2p.Server
-	destinationDisc Discovery
 }
 
 func TestProxyPoolSimulationSuite(t *testing.T) {
@@ -141,7 +138,7 @@ func (s *ProxyPoolSimulationSuite) TestDiscoveryWithBootnode() {
 	s.Require().NoError(err)
 	seekerPool := NewPeerPool(
 		seekerDiscV5,
-		map[discv5.Topic]params.Limits{s.topic: params.Limits{Min: 1, Max: 1}},
+		map[discv5.Topic]params.Limits{s.topic: {Min: 1, Max: 1}},
 		seekerCache,
 		&Options{100 * time.Millisecond, 100 * time.Millisecond, 0, true, 100 * time.Millisecond, nil, nil},
 	)
@@ -196,7 +193,7 @@ func (s *ProxyPoolSimulationSuite) TestDiscoveryProxy() {
 	s.Require().NoError(err)
 	seekerPool := NewPeerPool(
 		seekerDiscV5,
-		map[discv5.Topic]params.Limits{s.topic: params.Limits{Min: 1, Max: 1}},
+		map[discv5.Topic]params.Limits{s.topic: {Min: 1, Max: 1}},
 		seekerCache,
 		&Options{100 * time.Millisecond, 100 * time.Millisecond, 0, true, 100 * time.Millisecond, nil, nil},
 	)

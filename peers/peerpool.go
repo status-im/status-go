@@ -72,15 +72,6 @@ func NewDefaultOptions() *Options {
 	}
 }
 
-func containsTopic(topics []discv5.Topic, topic discv5.Topic) bool {
-	for i := 0; i < len(topics); i++ {
-		if topics[i] == topic {
-			return true
-		}
-	}
-	return false
-}
-
 type peerInfo struct {
 	// discoveredTime last time when node was found by v5
 	discoveredTime mclock.AbsTime

@@ -80,7 +80,7 @@ func main() {
 	}
 
 	realaddr := conn.LocalAddr().(*net.UDPAddr)
-	tab, err := discv5.ListenUDP(nodeKey, conn, realaddr, "", nil)
+	tab, err := discv5.ListenUDP(nodeKey, conn, realaddr, "", discv5.StatusVersion, nil)
 	if err != nil {
 		log.Crit("Failed to create discovery v5 table:", "error", err)
 	}

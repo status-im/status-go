@@ -93,9 +93,7 @@ func (t *ProxyTopicPool) processFoundNode(server *p2p.Server, node *discv5.Node)
 }
 
 // ConfirmAdded overrides default TopicPool behavior and acts like noop.
-func (t *ProxyTopicPool) ConfirmAdded(server *p2p.Server, nodeID discover.NodeID) {
-	return
-}
+func (t *ProxyTopicPool) ConfirmAdded(server *p2p.Server, nodeID discover.NodeID) {}
 
 // ConfirmDropped overrides default TopicPool behavior and acts like noop.
 func (t *ProxyTopicPool) ConfirmDropped(server *p2p.Server, nodeID discover.NodeID) bool {

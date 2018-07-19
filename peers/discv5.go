@@ -32,10 +32,9 @@ func NewDiscV5(prv *ecdsa.PrivateKey, laddr string, version int, bootnodes []*di
 
 // DiscV5 is a facade for ethereum discv5 implementation.
 type DiscV5 struct {
-	mu                   sync.Mutex
-	net                  *discv5.Network
-	version              int
-	overrideServerDiscV5 bool
+	mu      sync.Mutex
+	net     *discv5.Network
+	version int
 
 	prv       *ecdsa.PrivateKey
 	laddr     string
