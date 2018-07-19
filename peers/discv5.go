@@ -7,34 +7,37 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 )
 
 // Discovery is an abstract interface for using different discovery providers.
 type Discovery interface {
 	Running() bool
-	Start() error
+	Start(*p2p.Server) error
 	Stop() error
 	Register(topic string, stop chan struct{}) error
 	Discover(topic string, period <-chan time.Duration, found chan<- *discv5.Node, lookup chan<- bool) error
-	InsertNodes(nodes []*discv5.Node)
+	InsertNodes(discv5.Topic, []*discv5.Node)
 }
 
 // NewDiscV5 creates instances of discovery v5 facade.
 func NewDiscV5(prv *ecdsa.PrivateKey, laddr string, version int, bootnodes []*discv5.Node) *DiscV5 {
 	return &DiscV5{
-		version:   version,
-		prv:       prv,
-		laddr:     laddr,
-		bootnodes: bootnodes,
+		version:              version,
+		prv:                  prv,
+		laddr:                laddr,
+		bootnodes:            bootnodes,
+		overrideServerDiscV5: false,
 	}
 }
 
 // DiscV5 is a facade for ethereum discv5 implementation.
 type DiscV5 struct {
-	mu      sync.Mutex
-	net     *discv5.Network
-	version int
+	mu                   sync.Mutex
+	net                  *discv5.Network
+	version              int
+	overrideServerDiscV5 bool
 
 	prv       *ecdsa.PrivateKey
 	laddr     string
@@ -49,7 +52,7 @@ func (d *DiscV5) Running() bool {
 }
 
 // Start creates v5 server and stores pointer to it.
-func (d *DiscV5) Start() error {
+func (d *DiscV5) Start(server *p2p.Server) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	log.Debug("Starting discovery", "listen address", d.laddr)
@@ -70,6 +73,11 @@ func (d *DiscV5) Start() error {
 		return err
 	}
 	d.net = ntab
+
+	if d.overrideServerDiscV5 && server != nil {
+		server.DiscV5 = ntab
+	}
+
 	return nil
 }
 
@@ -100,8 +108,8 @@ func (d *DiscV5) Discover(topic string, period <-chan time.Duration, found chan<
 }
 
 // InsertNodes inserts givens peers as nodes into Discovery V5 table.
-func (d *DiscV5) InsertNodes(nodes []*discv5.Node) {
+func (d *DiscV5) InsertNodes(topic discv5.Topic, nodes []*discv5.Node) {
 	for _, node := range nodes {
-		d.net.InsertNode(node)
+		d.net.InsertNode(topic, node)
 	}
 }

@@ -778,13 +778,18 @@ func (net *Network) internNodeFromNeighbours(sender *net.UDPAddr, rn rpcNode) (n
 	return n, err
 }
 
-func (net *Network) InsertNode(aNode *Node) *Node {
+func (net *Network) InsertNode(topic Topic, aNode *Node) *Node {
+	log.Info("Insert node into the network", "topic", topic, "exists", net.nodes[aNode.ID] != nil, "node", aNode)
+
 	if n := net.nodes[aNode.ID]; n != nil {
 		return n
 	}
 	n := NewNode(aNode.ID, aNode.IP, aNode.UDP, aNode.TCP)
 	n.state = unknown
 	net.nodes[n.ID] = n
+
+	net.ping(n, n.addr())
+
 	return n
 }
 

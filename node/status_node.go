@@ -113,77 +113,81 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig, db *leveldb.DB, serv
 	}
 
 	if n.discoveryEnabled() {
-		if err := n.startDiscovery(); err != nil {
-			return err
-		}
-
-		log.Info("Is LES enabled?", "enabled", config.LightEthConfig != nil && config.LightEthConfig.Enabled)
+		// Check if LES is enabled before starting Discovery.
+		// If so, add LES topics to required topics.
 		if config.LightEthConfig != nil && config.LightEthConfig.Enabled {
-			log.Info("Get LES service")
-
 			var les *les.LightEthereum
 			if err := n.gethService(&les); err != nil {
 				log.Error("failed to get LES service")
 				return err
 			}
 
-			log.Info("LES retrieved", "service", les)
+			genesisHash := les.BlockChain().Genesis().Hash()
+			les1Topic := discv5.Topic("LES@" + common.Bytes2Hex(genesisHash.Bytes()[0:8]))
+			les2Topic := discv5.Topic("LES2@" + common.Bytes2Hex(genesisHash.Bytes()[0:8]))
+
+			n.config.RequireTopics[les1Topic] = params.Limits{Min: 1, Max: 2}
+			n.config.RequireTopics[les2Topic] = params.Limits{Min: 1, Max: 2}
+		}
+
+		if err := n.startDiscovery(); err != nil {
+			return err
+		}
+
+		// If LES is enabled, setup discovery proxy because in Status network
+		// there are no LES peers available.
+		// The idea is to start another Discovery V5 which is connected to
+		// Ethereum network and proxy found peers to our Status network.
+		if config.LightEthConfig != nil && config.LightEthConfig.Enabled {
+			var les *les.LightEthereum
+			if err := n.gethService(&les); err != nil {
+				log.Error("failed to get LES service")
+				return err
+			}
 
 			genesisHash := les.BlockChain().Genesis().Hash()
-			log.Info("LES genesis hash", "hash", genesisHash)
+			les1Topic := discv5.Topic("LES@" + common.Bytes2Hex(genesisHash.Bytes()[0:8]))
+			les2Topic := discv5.Topic("LES2@" + common.Bytes2Hex(genesisHash.Bytes()[0:8]))
 
-			// TODO(adam): start Discovery V5 for LES
-			// 1. Remember to start it on a different port
 			listenAddr := strings.Split(n.config.ListenAddr, ":")
-			log.Info("listenAddr", "addr", listenAddr)
 			port, err := strconv.ParseInt(listenAddr[1], 10, 0)
 			if err != nil {
 				return err
 			}
-
-			lesDiscAddr := listenAddr[0] + ":" + strconv.Itoa(int(port+1))
-			log.Info("LES discovery address", "address", lesDiscAddr)
+			proxyDiscAddr := listenAddr[0] + ":" + strconv.Itoa(int(port+1))
+			log.Debug("Proxy Discovery address", "addr", proxyDiscAddr)
 
 			discovery := peers.NewDiscV5(
 				n.gethNode.Server().PrivateKey,
-				lesDiscAddr,
+				proxyDiscAddr,
 				discv5.Version,
-				parseNodesV5(gethparams.MainnetBootnodes))
-			options := peers.NewDefaultOptions()
-			lesTopic := discv5.Topic("LES@" + common.Bytes2Hex(genesisHash.Bytes()[0:8]))
-			les2Topic := discv5.Topic("LES2@" + common.Bytes2Hex(genesisHash.Bytes()[0:8]))
+				parseNodesV5(gethparams.MainnetBootnodes), // TODO(adam): select a proper bootnodes
+			)
+			peerPoolOpts := peers.NewDefaultOptions()
+			peerPoolOpts.ProxyTopics = []discv5.Topic{les1Topic, les2Topic}
 			peerPool := peers.NewPeerPool(
 				discovery,
 				map[discv5.Topic]params.Limits{
-					lesTopic:  params.Limits{Min: 1, Max: 3},
+					les1Topic: params.Limits{Min: 1, Max: 3},
 					les2Topic: params.Limits{Min: 1, Max: 3},
 				},
 				peers.NewCache(n.db),
-				options,
+				peerPoolOpts,
 			)
-			if err := discovery.Start(); err != nil {
+			// TODO(adam): This is a hack to pass Status Discovery to ProxyTopicPool.
+			// I don't see a better solution without refactoring a large part of the code.
+			for _, topic := range peerPool.Topics() {
+				if t, ok := topic.(*peers.ProxyTopicPool); ok {
+					t.SetDestDiscovery(n.discovery)
+				}
+			}
+			if err := discovery.Start(n.gethNode.Server()); err != nil {
 				return err
 			}
-
 			if err := peerPool.Start(n.gethNode.Server()); err != nil {
 				return err
 			}
-
-			go func() {
-				for {
-					<-time.After(time.Second * 5)
-					if peers, ok := peerPool.PeersForTopic(lesTopic); ok {
-						log.Info("Inserting nodes into the Status Network", "count", len(peers), "peers", peers, "topic", lesTopic)
-						n.discovery.InsertNodes(peers)
-					}
-					if peers, ok := peerPool.PeersForTopic(les2Topic); ok {
-						log.Info("Inserting nodes into the Status Network", "count", len(peers), "peers", peers, "topic", les2Topic)
-						n.discovery.InsertNodes(peers)
-					}
-				}
-			}()
-
-			log.Info("Discovery for LES servers started")
+			log.Debug("Discovery for LES servers started")
 		}
 	}
 	return nil
@@ -263,8 +267,9 @@ func (n *StatusNode) startDiscovery() error {
 	n.discovery = peers.NewDiscV5(
 		n.gethNode.Server().PrivateKey,
 		n.config.ListenAddr,
-		55,
-		parseNodesV5(n.config.ClusterConfig.BootNodes))
+		discv5.StatusVersion,
+		parseNodesV5(n.config.ClusterConfig.BootNodes),
+	)
 	n.register = peers.NewRegister(n.discovery, n.config.RegisterTopics...)
 	options := peers.NewDefaultOptions()
 	// TODO(dshulyak) consider adding a flag to define this behaviour
@@ -275,7 +280,7 @@ func (n *StatusNode) startDiscovery() error {
 		peers.NewCache(n.db),
 		options,
 	)
-	if err := n.discovery.Start(); err != nil {
+	if err := n.discovery.Start(nil); err != nil {
 		return err
 	}
 	if err := n.register.Start(); err != nil {

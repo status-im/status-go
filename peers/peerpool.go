@@ -52,6 +52,9 @@ type Options struct {
 	// TopicStopSearchDelay time stopSearch will be waiting for max cached peers to be
 	// filled before really stopping the search.
 	TopicStopSearchDelay time.Duration
+	// ProxyTopic is a set of topics that should be proxied. It means that found nodes
+	// won't be added as peers.
+	ProxyTopics []discv5.Topic
 }
 
 // NewDefaultOptions returns a struct with default Options.
@@ -63,6 +66,15 @@ func NewDefaultOptions() *Options {
 		AllowStop:            false,
 		TopicStopSearchDelay: DefaultTopicStopSearchDelay,
 	}
+}
+
+func containsTopic(topics []discv5.Topic, topic discv5.Topic) bool {
+	for i := 0; i < len(topics); i++ {
+		if topics[i] == topic {
+			return true
+		}
+	}
+	return false
 }
 
 type peerInfo struct {
@@ -79,10 +91,7 @@ type PeerPool struct {
 	opts *Options
 
 	discovery Discovery
-
-	// config can be set only once per pool life cycle
-	config map[discv5.Topic]params.Limits
-	cache  *Cache
+	cache     *Cache
 
 	mu                 sync.RWMutex
 	topics             []TopicPoolInterface
@@ -96,12 +105,27 @@ type PeerPool struct {
 
 // NewPeerPool creates instance of PeerPool
 func NewPeerPool(discovery Discovery, config map[discv5.Topic]params.Limits, cache *Cache, options *Options) *PeerPool {
-	return &PeerPool{
+	p := PeerPool{
 		opts:      options,
 		discovery: discovery,
-		config:    config,
 		cache:     cache,
 	}
+
+	p.topics = make([]TopicPoolInterface, 0, len(config))
+	for topic, limits := range config {
+		var topicPool TopicPoolInterface
+		t := newTopicPool(p.discovery, topic, limits, p.opts.SlowSync, p.opts.FastSync, p.cache)
+		if topic == MailServerDiscoveryTopic {
+			topicPool = newCacheOnlyTopicPool(t)
+		} else if containsTopic(options.ProxyTopics, topic) {
+			topicPool = NewProxyTopicPool(t)
+		} else {
+			topicPool = t
+		}
+		p.topics = append(p.topics, topicPool)
+	}
+
+	return &p
 }
 
 func (p *PeerPool) setDiscoveryTimeout() {
@@ -133,20 +157,11 @@ func (p *PeerPool) Start(server *p2p.Server) error {
 		p.wg.Done()
 	}()
 
-	// collect topics and start searching for nodes
-	p.topics = make([]TopicPoolInterface, 0, len(p.config))
-	for topic, limits := range p.config {
-		var topicPool TopicPoolInterface
-		t := newTopicPool(p.discovery, topic, limits, p.opts.SlowSync, p.opts.FastSync, p.cache)
-		if topic == MailServerDiscoveryTopic {
-			topicPool = newCacheOnlyTopicPool(t)
-		} else {
-			topicPool = t
-		}
-		if err := topicPool.StartSearch(server); err != nil {
+	// start topics
+	for _, topic := range p.topics {
+		if err := topic.StartSearch(server); err != nil {
 			return err
 		}
-		p.topics = append(p.topics, topicPool)
 	}
 
 	// discovery must be already started when pool is started
@@ -155,12 +170,12 @@ func (p *PeerPool) Start(server *p2p.Server) error {
 	return nil
 }
 
-func (p *PeerPool) startDiscovery() error {
+func (p *PeerPool) startDiscovery(server *p2p.Server) error {
 	if p.discovery.Running() {
 		return nil
 	}
 
-	if err := p.discovery.Start(); err != nil {
+	if err := p.discovery.Start(server); err != nil {
 		return err
 	}
 
@@ -195,7 +210,7 @@ func (p *PeerPool) stopDiscovery(server *p2p.Server) {
 // restartDiscovery and search for topics that have peer count below min
 func (p *PeerPool) restartDiscovery(server *p2p.Server) error {
 	if !p.discovery.Running() {
-		if err := p.startDiscovery(); err != nil {
+		if err := p.startDiscovery(server); err != nil {
 			return err
 		}
 		log.Debug("restarted discovery from peer pool")
@@ -262,10 +277,6 @@ func (p *PeerPool) handleServerPeers(server *p2p.Server, events <-chan *p2p.Peer
 				continue
 			}
 			SendDiscoverySummary(server.PeersInfo())
-
-			for _, t := range p.topics {
-				log.Debug("PeerPool summary", "topic", t.Topic(), "connectedPeers", len(t.ConnectedPeers()))
-			}
 		}
 	}
 }
@@ -327,7 +338,6 @@ func (p *PeerPool) handleDroppedPeer(server *p2p.Server, nodeID discover.NodeID)
 				log.Debug("added peer from local table", "ID", newPeer.ID)
 			}
 		}
-		log.Debug("search", "topic", t.Topic(), "belowMin", t.BelowMin(), "connected", len(t.ConnectedPeers()))
 		if t.BelowMin() && !t.SearchRunning() {
 			any = true
 		}
@@ -373,6 +383,13 @@ func (p *PeerPool) PeersForTopic(topic discv5.Topic) ([]*discv5.Node, bool) {
 type updateTopicRequest struct {
 	Topic  string
 	Limits params.Limits
+}
+
+// Topics returns all TopicPools.
+func (p *PeerPool) Topics() []TopicPoolInterface {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.topics
 }
 
 // UpdateTopic updates the pre-existing TopicPool limits.

@@ -80,6 +80,10 @@ type Config struct {
 	// protocol should be started or not.
 	DiscoveryV5 bool `toml:",omitempty"`
 
+	// DiscoveryV5Network allows to specify a version of the network
+	// and isolate them effectively.
+	DiscoveryV5Network int
+
 	// Name sets the node name of this server.
 	// Use common.MakeName to create a name that follows existing conventions.
 	Name string `toml:"-"`
@@ -468,10 +472,14 @@ func (srv *Server) Start() (err error) {
 			ntab *discv5.Network
 			err  error
 		)
+		version := discv5.StatusVersion
+		if srv.Config.DiscoveryV5Network != 0 {
+			version = srv.Config.DiscoveryV5Network
+		}
 		if sconn != nil {
-			ntab, err = discv5.ListenUDP(srv.PrivateKey, sconn, realaddr, "", discv5.StatusVersion, srv.NetRestrict) //srv.NodeDatabase)
+			ntab, err = discv5.ListenUDP(srv.PrivateKey, sconn, realaddr, "", version, srv.NetRestrict) //srv.NodeDatabase)
 		} else {
-			ntab, err = discv5.ListenUDP(srv.PrivateKey, conn, realaddr, "", discv5.StatusVersion, srv.NetRestrict) //srv.NodeDatabase)
+			ntab, err = discv5.ListenUDP(srv.PrivateKey, conn, realaddr, "", version, srv.NetRestrict) //srv.NodeDatabase)
 		}
 		if err != nil {
 			return err
