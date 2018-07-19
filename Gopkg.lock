@@ -304,14 +304,6 @@
   revision = "ed27b6fd65218132ee50cd95f38474a3d8a2cd12"
 
 [[projects]]
-  digest = "1:a90e401e8487588e082ef4a5600c9bddf8fbd5d5dbc8f85f44cf902d892c6a58"
-  name = "github.com/status-im/go-web3js"
-  packages = ["."]
-  pruneopts = "NUT"
-  revision = "a136c82b1e1f30b5b24118eeff1caa71924e4e3a"
-  version = "0.20.1"
-
-[[projects]]
   digest = "1:4af54ea5146ed59dbc4161a41044e396c1df4786eabe07858d2017e201348a8d"
   name = "github.com/stretchr/testify"
   packages = [
@@ -532,7 +524,6 @@
     "github.com/golang/mock/gomock",
     "github.com/pborman/uuid",
     "github.com/robertkrimen/otto",
-    "github.com/status-im/go-web3js",
     "github.com/stretchr/testify/assert",
     "github.com/stretchr/testify/require",
     "github.com/stretchr/testify/suite",

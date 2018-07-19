@@ -29,11 +29,6 @@ ignored = [ "github.com/ethereum/go-ethereum/ethapi" ]
   name = "github.com/ethereum/go-ethereum"
   version = "v1.8.5"
 
-[[constraint]]
-  # used only to embed web3js code with particular version
-  name = "github.com/status-im/go-web3js"
-  version = "0.20.1"
-
 # * * * * * `go-ethereum` dependencies * * * * *
 # Pinned down SHAs from `go-ethereum/vendor/vendor.json`
 # When upgrading upstream, upgrade these values too.
