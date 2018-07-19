@@ -45,6 +45,9 @@ bool StatusServiceSignalEvent(const char *jsonEvent) {
     return true;
 }
 
+void SetEventCallback(void *cb) {
+}
+
 #elif defined(ANDROID_DEPLOYMENT)
 // ======================================================================================
 // Android archive compilation using xgo
@@ -194,6 +197,9 @@ bool StatusServiceSignalEvent(const char *jsonEvent) {
 	}
 
 	return true;
+}
+
+void SetEventCallback(void *cb) {
 }
 
 #else
