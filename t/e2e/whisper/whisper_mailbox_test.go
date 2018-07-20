@@ -18,7 +18,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/sha3"
 	"github.com/ethereum/go-ethereum/p2p"
-	"github.com/ethereum/go-ethereum/p2p/discover"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/rpc"
@@ -60,12 +59,14 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	senderWhisperService, err := sender.StatusNode().WhisperService()
 	s.Require().NoError(err)
 
+	// This sleep still is required because there is still a race condition
+	// when adding a peer to p2p.Server and to Whisper service.
+	// It may happen that the event about the added peer
+	// was emitted by p2p.Server but Whisper service is not aware of it yet.
+	time.Sleep(time.Second)
+
 	// Mark mailbox node trusted.
-	parsedNode, err := discover.ParseNode(mailboxNode.Server().NodeInfo().Enode)
-	s.Require().NoError(err)
-	mailboxPeer := parsedNode.ID[:]
-	mailboxPeerStr := parsedNode.ID.String()
-	err = senderWhisperService.AllowP2PMessagesFromPeer(mailboxPeer)
+	err = senderWhisperService.AllowP2PMessagesFromPeer(mailboxNode.Server().Self().ID[:])
 	s.Require().NoError(err)
 
 	// Generate mailbox symkey.
@@ -126,7 +127,7 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	s.waitForEnvelopeEvents(envelopeArchivedWatcher, []string{messageHash}, whisper.EventMailServerEnvelopeArchived)
 
 	// Request messages (including the previous one, expired) from mailbox.
-	requestID := s.requestHistoricMessagesFromLast12Hours(senderWhisperService, rpcClient, mailboxPeerStr, MailServerKeyID, topic.String(), 0, "")
+	requestID := s.requestHistoricMessagesFromLast12Hours(senderWhisperService, rpcClient, mailboxNode.Server().Self().String(), MailServerKeyID, topic.String(), 0, "")
 
 	// wait for mail server response
 	resp := s.waitForMailServerResponse(mailServerResponseWatcher, requestID)
