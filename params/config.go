@@ -196,6 +196,9 @@ type ClusterConfig struct {
 	// BootNodes list of cluster peer nodes for a given network (Mainnet, Ropsten, Rinkeby, Homestead),
 	// for a given mode (production vs development)
 	BootNodes []string
+
+	// TrustedMailServers is a list of verified Mail Servers.
+	TrustedMailServers []string
 }
 
 // String dumps config object as nicely indented JSON
@@ -613,6 +616,7 @@ func (c *NodeConfig) updateClusterConfig() error {
 				c.ClusterConfig.BootNodes = cluster.BootNodes
 			}
 			c.ClusterConfig.StaticNodes = cluster.StaticNodes
+			c.ClusterConfig.TrustedMailServers = cluster.MailServers
 			// no point in running discovery if we don't have bootnodes.
 			// but in case if we do have nodes and NoDiscovery=true we will preserve that value
 			if len(cluster.BootNodes) == 0 {

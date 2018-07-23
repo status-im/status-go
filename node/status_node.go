@@ -183,6 +183,12 @@ func (n *StatusNode) discoveryEnabled() bool {
 }
 
 func (n *StatusNode) startDiscovery() error {
+	trustedMailServersLen := len(n.config.ClusterConfig.TrustedMailServers)
+	trustedMailServerIDs := make([]discover.NodeID, 0, trustedMailServersLen)
+	for _, node := range parseNodes(n.config.ClusterConfig.TrustedMailServers) {
+		trustedMailServerIDs = append(trustedMailServerIDs, node.ID)
+	}
+
 	n.discovery = peers.NewDiscV5(
 		n.gethNode.Server().PrivateKey,
 		n.config.ListenAddr,
@@ -191,6 +197,7 @@ func (n *StatusNode) startDiscovery() error {
 	options := peers.NewDefaultOptions()
 	// TODO(dshulyak) consider adding a flag to define this behaviour
 	options.AllowStop = len(n.config.RegisterTopics) == 0
+	options.TrustedMailServers = trustedMailServerIDs
 	n.peerPool = peers.NewPeerPool(
 		n.discovery,
 		n.config.RequireTopics,

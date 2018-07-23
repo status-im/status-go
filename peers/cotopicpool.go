@@ -1,6 +1,8 @@
 package peers
 
 import (
+	"context"
+
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
@@ -8,22 +10,29 @@ import (
 	"github.com/status-im/status-go/signal"
 )
 
+// Verifier verifies if a give node is trusted.
+type Verifier interface {
+	VerifyNode(context.Context, discover.NodeID) bool
+}
+
 // MailServerDiscoveryTopic topic name for mailserver discovery.
 const MailServerDiscoveryTopic = "whispermail"
 
 // MailServerDiscoveryLimits default mailserver discovery limits.
 var MailServerDiscoveryLimits = params.Limits{Min: 3, Max: 3}
 
-// newCacheOnlyTopicPool returns instance of CacheOnlyTopicPool.
-func newCacheOnlyTopicPool(t *TopicPool) *cacheOnlyTopicPool {
-	return &cacheOnlyTopicPool{
-		TopicPool: t,
-	}
-}
-
 // cacheOnlyTopicPool handles a mail server topic pool.
 type cacheOnlyTopicPool struct {
 	*TopicPool
+	verifier Verifier
+}
+
+// newCacheOnlyTopicPool returns instance of CacheOnlyTopicPool.
+func newCacheOnlyTopicPool(t *TopicPool, verifier Verifier) *cacheOnlyTopicPool {
+	return &cacheOnlyTopicPool{
+		TopicPool: t,
+		verifier:  verifier,
+	}
 }
 
 // MaxReached checks if the max allowed peers is reached or not. When true
@@ -45,14 +54,24 @@ var sendEnodeDiscovered = signal.SendEnodeDiscovered
 // ConfirmAdded calls base TopicPool ConfirmAdded method and sends a signal
 // confirming the enode has been discovered.
 func (t *cacheOnlyTopicPool) ConfirmAdded(server *p2p.Server, nodeID discover.NodeID) {
-	t.TopicPool.ConfirmAdded(server, nodeID)
-	sendEnodeDiscovered(nodeID.String(), string(t.topic))
+	trusted := t.verifier.VerifyNode(context.TODO(), nodeID)
+	if trusted {
+		// add to cache only if trusted
+		t.TopicPool.ConfirmAdded(server, nodeID)
+		sendEnodeDiscovered(nodeID.String(), string(t.topic))
+	}
 
 	id := discv5.NodeID(nodeID)
 	if peer, ok := t.connectedPeers[id]; ok {
-		t.removeServerPeer(server, peer)
+		// Delete it from `connectedPeers` immediately to
+		// prevent removing it from the cache which logic is
+		// implemented in TopicPool.
 		delete(t.connectedPeers, id)
-		t.subtractToLimits()
+		t.removeServerPeer(server, peer)
+
+		if trusted {
+			t.subtractToLimits()
+		}
 	}
 }
 
