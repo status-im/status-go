@@ -601,7 +601,11 @@ func (c *NodeConfig) updateClusterConfig() error {
 		"configFile", c.ClusterConfigFile,
 		"fleet", c.ClusterConfig.Fleet)
 
-	var clusters []cluster
+	var (
+		clusters []cluster
+		err      error
+	)
+
 	if c.ClusterConfigFile != "" {
 		// Load cluster configuration from external file.
 		configFile, err := ioutil.ReadFile(c.ClusterConfigFile)
@@ -613,11 +617,9 @@ func (c *NodeConfig) updateClusterConfig() error {
 			return fmt.Errorf("failed to unmarshal cluster configuration file: %s", err)
 		}
 	} else {
-		switch c.ClusterConfig.Fleet {
-		case fleetStaging:
-			clusters = stagingFleet.Cluster
-		default:
-			clusters = defaultFleet.Cluster
+		clusters, err = clusterForFleet(c.ClusterConfig.Fleet)
+		if err != nil {
+			return fmt.Errorf("getting fleet '%s' failed: %v", c.ClusterConfig.Fleet, err)
 		}
 	}
 

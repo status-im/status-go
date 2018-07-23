@@ -65,7 +65,7 @@ var (
 	standalone = flag.Bool("standalone", true, "Don't actively connect to peers, wait for incoming connections")
 	bootnodes  = flag.String("bootnodes", "", "A list of bootnodes separated by comma")
 	discovery  = flag.Bool("discovery", false, "Enable discovery protocol")
-	fleet      = flag.String("fleet", "", "Name of the fleet like 'eth.staging' (default to 'eth.beta')")
+	fleet      = flag.String("fleet", params.FleetBeta, "Name of the fleet like 'eth.staging' (default to 'eth.beta')")
 
 	// don't change the name of this flag, https://github.com/ethereum/go-ethereum/blob/master/metrics/metrics.go#L41
 	metrics = flag.Bool("metrics", false, "Expose ethereum metrics with debug_metrics jsonrpc call.")
