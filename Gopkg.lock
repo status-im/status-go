@@ -275,21 +275,6 @@
   revision = "9d5aa0c3b735c3340018a4627446c3ea5a04a097"
 
 [[projects]]
-  digest = "1:63f4882e392b4a485a30a8cd4477b8f2d61dac45f113f98df77b1c4d6c8c30e1"
-  name = "github.com/robertkrimen/otto"
-  packages = [
-    ".",
-    "ast",
-    "dbg",
-    "file",
-    "parser",
-    "registry",
-    "token",
-  ]
-  pruneopts = "NUT"
-  revision = "9c716adcc8cedb0c0e3c02be549f4ad20e0b216c"
-
-[[projects]]
   digest = "1:c5741d3d03a06220bcca801547f28de803103249b739eb5537e54b77e89f435a"
   name = "github.com/rs/cors"
   packages = ["."]
@@ -465,17 +450,6 @@
   revision = "abf0ba0be5d5d36b1f9266463cc320b9a5ab224e"
 
 [[projects]]
-  digest = "1:941fef6d105353bf7b951eb3c7c2c0fac209e0a561b68684b428ea5beb1b4c4d"
-  name = "gopkg.in/sourcemap.v1"
-  packages = [
-    ".",
-    "base64vlq",
-  ]
-  pruneopts = "NUT"
-  revision = "6e83acea0053641eff084973fee085f0c193c61a"
-  version = "v1.0.5"
-
-[[projects]]
   digest = "1:5dba68a1600a235630e208cb7196b24e58fcbb77bb7a6bec08fcd23f081b0a58"
   name = "gopkg.in/urfave/cli.v1"
   packages = ["."]
@@ -523,7 +497,6 @@
     "github.com/ethereum/go-ethereum/whisper/whisperv6",
     "github.com/golang/mock/gomock",
     "github.com/pborman/uuid",
-    "github.com/robertkrimen/otto",
     "github.com/stretchr/testify/assert",
     "github.com/stretchr/testify/require",
     "github.com/stretchr/testify/suite",
