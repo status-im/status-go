@@ -143,7 +143,7 @@ func (s *DebugAPISuite) addPeerToCurrentNode(dir string) {
 // newNode creates, configures and starts a new peer.
 func (s *DebugAPISuite) newPeer(name, dir string) *node.StatusNode {
 	// network id is irrelevant
-	cfg, err := params.NewNodeConfig(dir, "", 777)
+	cfg, err := params.NewNodeConfig(dir, "", "", 777)
 	cfg.LightEthConfig.Enabled = false
 	cfg.Name = name
 	cfg.NetworkID = uint64(GetNetworkID())

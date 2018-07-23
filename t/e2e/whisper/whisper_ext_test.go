@@ -32,7 +32,7 @@ func (s *WhisperExtensionSuite) SetupTest() {
 		dir, err := ioutil.TempDir("", "test-shhext-")
 		s.NoError(err)
 		// network id is irrelevant
-		cfg, err := params.NewNodeConfig(dir, "", 777)
+		cfg, err := params.NewNodeConfig(dir, "", "", 777)
 		cfg.LightEthConfig.Enabled = false
 		cfg.Name = fmt.Sprintf("test-shhext-%d", i)
 		s.Require().NoError(err)
