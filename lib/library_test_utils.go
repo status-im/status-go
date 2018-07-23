@@ -35,7 +35,6 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/sign"
 	"github.com/status-im/status-go/signal"
-	"github.com/status-im/status-go/static"
 	. "github.com/status-im/status-go/t/utils" //nolint: golint
 	"github.com/status-im/status-go/transactions"
 )
