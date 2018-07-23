@@ -65,6 +65,7 @@ var (
 	standalone = flag.Bool("standalone", true, "Don't actively connect to peers, wait for incoming connections")
 	bootnodes  = flag.String("bootnodes", "", "A list of bootnodes separated by comma")
 	discovery  = flag.Bool("discovery", false, "Enable discovery protocol")
+	fleet      = flag.String("fleet", "", "Name of the fleet like 'eth.staging' (default to 'eth.beta')")
 
 	// don't change the name of this flag, https://github.com/ethereum/go-ethereum/blob/master/metrics/metrics.go#L41
 	metrics = flag.Bool("metrics", false, "Expose ethereum metrics with debug_metrics jsonrpc call.")
@@ -92,7 +93,7 @@ var (
 // All general log messages in this package should be routed through this logger.
 var logger = log.New("package", "status-go/cmd/statusd")
 
-func main() {
+func init() {
 	flag.Var(&searchTopics, "topic.search", "Topic that will be searched in discovery v5, e.g (mailserver=1,1)")
 	flag.Var(&registerTopics, "topic.register", "Topic that will be registered using discovery v5.")
 
@@ -102,6 +103,13 @@ func main() {
 		stdlog.Printf("Extra args in command line: %v", flag.Args())
 		printUsage()
 		os.Exit(1)
+	}
+}
+
+func main() {
+	colors := !(*logWithoutColors) && terminal.IsTerminal(int(os.Stdin.Fd()))
+	if err := logutils.OverrideRootLog(logEnabled(), *logLevel, *logFile, colors); err != nil {
+		stdlog.Fatalf("Error initializing logger: %s", err)
 	}
 
 	config, err := makeNodeConfig()
@@ -114,15 +122,6 @@ func main() {
 	if *version {
 		printVersion(config, buildStamp)
 		return
-	}
-
-	colors := !(*logWithoutColors)
-	if colors {
-		colors = terminal.IsTerminal(int(os.Stdin.Fd()))
-	}
-
-	if err := logutils.OverrideRootLog(config.LogEnabled, config.LogLevel, config.LogFile, colors); err != nil {
-		stdlog.Fatalf("Error initializing logger: %s", err)
 	}
 
 	backend := api.NewStatusBackend()
@@ -203,9 +202,13 @@ func startCollectingNodeMetrics(interruptCh <-chan struct{}, statusNode *node.St
 	<-interruptCh
 }
 
+func logEnabled() bool {
+	return *logLevel != "" || *logFile != ""
+}
+
 // makeNodeConfig parses incoming CLI options and returns node configuration object
 func makeNodeConfig() (*params.NodeConfig, error) {
-	nodeConfig, err := params.NewNodeConfig(*dataDir, *clusterConfigFile, uint64(*networkID))
+	nodeConfig, err := params.NewNodeConfig(*dataDir, *clusterConfigFile, *fleet, uint64(*networkID))
 	if err != nil {
 		return nil, err
 	}
@@ -225,9 +228,7 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 		nodeConfig.LogFile = *logFile
 	}
 
-	if *logLevel != "" || *logFile != "" {
-		nodeConfig.LogEnabled = true
-	}
+	nodeConfig.LogEnabled = logEnabled()
 
 	nodeConfig.RPCEnabled = *httpEnabled
 	nodeConfig.WhisperConfig.Enabled = *whisperEnabled
@@ -254,8 +255,6 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 	nodeConfig.NoDiscovery = !(*discovery)
 	nodeConfig.RequireTopics = map[discv5.Topic]params.Limits(searchTopics)
 	nodeConfig.RegisterTopics = []discv5.Topic(registerTopics)
-
-	nodeConfig.WhisperConfig.EnableNTPSync = *ntpSyncEnabled
 
 	// Even if standalone is true and discovery is disabled,
 	// it's possible to use bootnodes.

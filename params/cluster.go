@@ -1,13 +1,23 @@
 package params
 
+const (
+	fleetBeta    = "eth.beta"
+	fleetStaging = "eth.staging"
+)
+
 type cluster struct {
 	NetworkID   int      `json:"networkID"`
 	StaticNodes []string `json:"staticnodes"`
 	BootNodes   []string `json:"bootnodes"`
 }
 
+type fleet struct {
+	Name    string
+	Cluster []cluster
+}
+
 var ropstenCluster = cluster{
-	NetworkID: 3,
+	NetworkID: RopstenNetworkID,
 	BootNodes: []string{
 		"enode://436cc6f674928fdc9a9f7990f2944002b685d1c37f025c1be425185b5b1f0900feaf1ccc2a6130268f9901be4a7d252f37302c8335a2c1a62736e9232691cc3a@174.138.105.243:30404", // boot-01.do-ams3.eth.beta
 		"enode://5395aab7833f1ecb671b59bf0521cf20224fe8162fc3d2675de4ee4d5636a75ec32d13268fc184df8d1ddfa803943906882da62a4df42d4fccf6d17808156a87@206.189.243.57:30404",  // boot-02.do-ams3.eth.beta
@@ -21,7 +31,7 @@ var ropstenCluster = cluster{
 }
 
 var rinkebyCluster = cluster{
-	NetworkID: 4,
+	NetworkID: RinkebyNetworkID,
 	BootNodes: []string{
 		"enode://1b843c7697f6fc42a1f606fb3cfaac54e025f06789dc20ad9278be3388967cf21e3a1b1e4be51faecd66c2c3adef12e942b4fcdeb8727657abe60636efb6224f@206.189.6.46:30404",
 		"enode://b29100c8468e3e6604817174a15e4d71627458b0dcdbeea169ab2eb4ab2bbc6f24adbb175826726cec69db8fdba6c0dd60b3da598e530ede562180d300728659@206.189.6.48:30404",
@@ -35,7 +45,7 @@ var rinkebyCluster = cluster{
 }
 
 var mainnetCluster = cluster{
-	NetworkID: 1,
+	NetworkID: MainNetworkID,
 	BootNodes: []string{
 		"enode://436cc6f674928fdc9a9f7990f2944002b685d1c37f025c1be425185b5b1f0900feaf1ccc2a6130268f9901be4a7d252f37302c8335a2c1a62736e9232691cc3a@174.138.105.243:30404", // boot-01.do-ams3.eth.beta
 		"enode://5395aab7833f1ecb671b59bf0521cf20224fe8162fc3d2675de4ee4d5636a75ec32d13268fc184df8d1ddfa803943906882da62a4df42d4fccf6d17808156a87@206.189.243.57:30404",  // boot-02.do-ams3.eth.beta
@@ -48,4 +58,27 @@ var mainnetCluster = cluster{
 	},
 }
 
-var defaultClusters = []cluster{ropstenCluster, rinkebyCluster, mainnetCluster}
+var defaultFleet = fleet{
+	Name:    fleetBeta,
+	Cluster: []cluster{ropstenCluster, rinkebyCluster, mainnetCluster},
+}
+
+var stagingFleet = fleet{
+	Name: fleetStaging,
+	Cluster: []cluster{
+		{
+			NetworkID: MainNetworkID,
+			BootNodes: []string{
+				"enode://10a78c17929a7019ef4aa2249d7302f76ae8a06f40b2dc88b7b31ebff4a623fbb44b4a627acba296c1ced3775d91fbe18463c15097a6a36fdb2c804ff3fc5b35@35.238.97.234:30404",   // boot-01.gc-us-central1-a.eth.staging
+				"enode://f79fb3919f72ca560ad0434dcc387abfe41e0666201ebdada8ede0462454a13deb05cda15f287d2c4bd85da81f0eb25d0a486bbbc8df427b971ac51533bd00fe@174.138.107.239:30404", // boot-01.do-ams3.eth.staging
+			},
+		},
+		{
+			NetworkID: RopstenNetworkID,
+			BootNodes: []string{
+				"enode://10a78c17929a7019ef4aa2249d7302f76ae8a06f40b2dc88b7b31ebff4a623fbb44b4a627acba296c1ced3775d91fbe18463c15097a6a36fdb2c804ff3fc5b35@35.238.97.234:30404",   // boot-01.gc-us-central1-a.eth.staging
+				"enode://f79fb3919f72ca560ad0434dcc387abfe41e0666201ebdada8ede0462454a13deb05cda15f287d2c4bd85da81f0eb25d0a486bbbc8df427b971ac51533bd00fe@174.138.107.239:30404", // boot-01.do-ams3.eth.staging
+			},
+		},
+	},
+}

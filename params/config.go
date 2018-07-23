@@ -190,6 +190,9 @@ type ClusterConfig struct {
 	// Enabled flag specifies whether feature is enabled
 	Enabled bool
 
+	// Fleet is a type of selected fleet.
+	Fleet string
+
 	// StaticNodes lists the static nodes taken from compiled or passed cluster.json
 	StaticNodes []string
 
@@ -344,7 +347,7 @@ type NodeConfig struct {
 }
 
 // NewNodeConfig creates new node configuration object
-func NewNodeConfig(dataDir string, clstrCfgFile string, networkID uint64) (*NodeConfig, error) {
+func NewNodeConfig(dataDir, clstrCfgFile, fleet string, networkID uint64) (*NodeConfig, error) {
 	nodeConfig := &NodeConfig{
 		NetworkID:         networkID,
 		DataDir:           dataDir,
@@ -365,6 +368,7 @@ func NewNodeConfig(dataDir string, clstrCfgFile string, networkID uint64) (*Node
 		ClusterConfigFile: clstrCfgFile,
 		ClusterConfig: &ClusterConfig{
 			Enabled:     true,
+			Fleet:       fleet,
 			StaticNodes: []string{},
 			BootNodes:   []string{},
 		},
@@ -409,7 +413,7 @@ func LoadNodeConfig(configJSON string) (*NodeConfig, error) {
 }
 
 func loadNodeConfig(configJSON string) (*NodeConfig, error) {
-	nodeConfig, err := NewNodeConfig("", "", 0)
+	nodeConfig, err := NewNodeConfig("", "", "", 0)
 	if err != nil {
 		return nil, err
 	}
@@ -592,6 +596,11 @@ func (c *NodeConfig) updateClusterConfig() error {
 		return nil
 	}
 
+	c.log.Debug(
+		"update cluster config",
+		"configFile", c.ClusterConfigFile,
+		"fleet", c.ClusterConfig.Fleet)
+
 	var clusters []cluster
 	if c.ClusterConfigFile != "" {
 		// Load cluster configuration from external file.
@@ -604,15 +613,24 @@ func (c *NodeConfig) updateClusterConfig() error {
 			return fmt.Errorf("failed to unmarshal cluster configuration file: %s", err)
 		}
 	} else {
-		clusters = defaultClusters
+		switch c.ClusterConfig.Fleet {
+		case fleetStaging:
+			clusters = stagingFleet.Cluster
+		default:
+			clusters = defaultFleet.Cluster
+		}
 	}
 
 	for _, cluster := range clusters {
 		if cluster.NetworkID == int(c.NetworkID) {
+			// allow to override bootnodes only if they were not defined earlier
 			if len(c.ClusterConfig.BootNodes) == 0 {
 				c.ClusterConfig.BootNodes = cluster.BootNodes
 			}
-			c.ClusterConfig.StaticNodes = cluster.StaticNodes
+			// allow to override static nodes only if they were not defined earlier
+			if len(c.ClusterConfig.StaticNodes) == 0 {
+				c.ClusterConfig.StaticNodes = cluster.StaticNodes
+			}
 			// no point in running discovery if we don't have bootnodes.
 			// but in case if we do have nodes and NoDiscovery=true we will preserve that value
 			if len(cluster.BootNodes) == 0 {
