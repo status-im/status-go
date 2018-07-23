@@ -223,7 +223,9 @@ func (b *StatusBackend) CallPrivateRPC(inputJSON string) string {
 
 // SendTransaction creates a new transaction and waits until it's complete.
 func (b *StatusBackend) SendTransaction(ctx context.Context, args transactions.SendTxArgs) (hash gethcommon.Hash, err error) {
-	return b.transactor.SendTransaction(ctx, args)
+	hash, err = b.transactor.SendTransaction(ctx, args)
+	// TODO (seb): trigger the newPendingTransaction event here.
+	return hash, err
 }
 
 func (b *StatusBackend) getVerifiedAccount(password string) (*account.SelectedExtKey, error) {
