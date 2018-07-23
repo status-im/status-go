@@ -42,6 +42,7 @@ type StatusBackend struct {
 	statusNode          *node.StatusNode
 	pendingSignRequests *sign.PendingRequests
 	personalAPI         *personal.PublicAPI
+	rpcFilters          *rpcfilters.Service
 	accountManager      *account.Manager
 	transactor          *transactions.Transactor
 	newNotification     fcm.NotificationConstructor
@@ -60,6 +61,7 @@ func NewStatusBackend() *StatusBackend {
 	transactor := transactions.NewTransactor(pendingSignRequests)
 	personalAPI := personal.NewAPI(pendingSignRequests)
 	notificationManager := fcm.NewNotification(fcmServerKey)
+	rpcFilters := rpcfilters.New(statusNode)
 
 	return &StatusBackend{
 		pendingSignRequests: pendingSignRequests,
@@ -67,6 +69,7 @@ func NewStatusBackend() *StatusBackend {
 		accountManager:      accountManager,
 		transactor:          transactor,
 		personalAPI:         personalAPI,
+		rpcFilters:          rpcFilters,
 		newNotification:     notificationManager,
 		log:                 log.New("package", "status-go/api.StatusBackend"),
 	}
@@ -111,12 +114,6 @@ func (b *StatusBackend) StartNode(config *params.NodeConfig) error {
 	return nil
 }
 
-func (b *StatusBackend) rpcFiltersService() gethnode.ServiceConstructor {
-	return func(*gethnode.ServiceContext) (gethnode.Service, error) {
-		return rpcfilters.New(b.statusNode), nil
-	}
-}
-
 func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -125,8 +122,6 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 	}()
 
 	services := []gethnode.ServiceConstructor{}
-	services = appendIf(config.UpstreamConfig.Enabled, services, b.rpcFiltersService())
-
 	if err = b.statusNode.Start(config, services...); err != nil {
 		return
 	}
@@ -224,7 +219,7 @@ func (b *StatusBackend) CallPrivateRPC(inputJSON string) string {
 // SendTransaction creates a new transaction and waits until it's complete.
 func (b *StatusBackend) SendTransaction(ctx context.Context, args transactions.SendTxArgs) (hash gethcommon.Hash, err error) {
 	hash, err = b.transactor.SendTransaction(ctx, args)
-	// TODO (seb): trigger the newPendingTransaction event here.
+	b.rpcFilters.TriggerTransactionSentToUpstreamEvent()
 	return hash, err
 }
 
@@ -430,11 +425,4 @@ func (b *StatusBackend) NotifyUsers(message string, payload fcmlib.NotificationP
 	}
 
 	return err
-}
-
-func appendIf(condition bool, services []gethnode.ServiceConstructor, service gethnode.ServiceConstructor) []gethnode.ServiceConstructor {
-	if !condition {
-		return services
-	}
-	return append(services, service)
 }

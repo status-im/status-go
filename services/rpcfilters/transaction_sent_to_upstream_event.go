@@ -86,8 +86,8 @@ func (e *transactionSentToUpstreamEvent) Unsubscribe(id int) {
 	delete(e.sx, id)
 }
 
-// TransactionSentToUpstream gets called in order to trigger the event
-func (e *transactionSentToUpstreamEvent) TransactionSentToUpstream() {
+// Trigger gets called in order to trigger the event
+func (e *transactionSentToUpstreamEvent) Trigger() {
 	e.listener <- true
 }
 

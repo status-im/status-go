@@ -60,3 +60,9 @@ func (s *Service) Stop() error {
 	s.latestBlockChangedEvent.Stop()
 	return nil
 }
+
+// TriggerTransactionSentToUpstreamEvent notifies the subscribers
+// of the TransactionSentToUpstream event
+func (s *Service) TriggerTransactionSentToUpstreamEvent() {
+	s.transactionSentToUpstreamEvent.Trigger()
+}
