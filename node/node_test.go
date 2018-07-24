@@ -1,8 +1,10 @@
 package node
 
 import (
+	"fmt"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/p2p/discover"
 	. "github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/require"
 	"github.com/syndtr/goleveldb/leveldb"
@@ -56,4 +58,13 @@ func TestMakeNodeMalformedBootnodes(t *testing.T) {
 
 	_, err = MakeNode(config, db)
 	require.NoError(t, err)
+}
+
+func TestParseNodesToNodeID(t *testing.T) {
+	nodeIDs := parseNodesToNodeID([]string{
+		"enode://badkey@127.0.0.1:30303",
+		fmt.Sprintf("enode://%s@127.0.0.1:30303", discover.NodeID{1}),
+	})
+	require.Len(t, nodeIDs, 1)
+	require.Equal(t, discover.NodeID{1}, nodeIDs[0])
 }
