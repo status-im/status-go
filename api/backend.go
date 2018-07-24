@@ -114,6 +114,12 @@ func (b *StatusBackend) StartNode(config *params.NodeConfig) error {
 	return nil
 }
 
+func (b *StatusBackend) rpcFiltersService() gethnode.ServiceConstructor {
+	return func(*gethnode.ServiceContext) (gethnode.Service, error) {
+		return rpcfilters.New(b.statusNode), nil
+	}
+}
+
 func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -122,6 +128,8 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 	}()
 
 	services := []gethnode.ServiceConstructor{}
+	services = appendIf(config.UpstreamConfig.Enabled, services, b.rpcFiltersService())
+
 	if err = b.statusNode.Start(config, services...); err != nil {
 		return
 	}
@@ -218,9 +226,11 @@ func (b *StatusBackend) CallPrivateRPC(inputJSON string) string {
 
 // SendTransaction creates a new transaction and waits until it's complete.
 func (b *StatusBackend) SendTransaction(ctx context.Context, args transactions.SendTxArgs) (hash gethcommon.Hash, err error) {
-	hash, err = b.transactor.SendTransaction(ctx, args)
-	b.rpcFilters.TriggerTransactionSentToUpstreamEvent()
-	return hash, err
+	transactionHash, err := b.transactor.SendTransaction(ctx, args)
+	if err == nil {
+		b.rpcFilters.TriggerTransactionSentToUpstreamEvent(transactionHash)
+	}
+	return transactionHash, err
 }
 
 func (b *StatusBackend) getVerifiedAccount(password string) (*account.SelectedExtKey, error) {
@@ -425,4 +435,11 @@ func (b *StatusBackend) NotifyUsers(message string, payload fcmlib.NotificationP
 	}
 
 	return err
+}
+
+func appendIf(condition bool, services []gethnode.ServiceConstructor, service gethnode.ServiceConstructor) []gethnode.ServiceConstructor {
+	if !condition {
+		return services
+	}
+	return append(services, service)
 }

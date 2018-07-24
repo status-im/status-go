@@ -11,8 +11,14 @@ import (
 type transactionSentToUpstreamEvent struct {
 	sxMu     sync.Mutex
 	sx       map[int]chan common.Hash
-	listener chan bool
+	listener chan common.Hash
 	quit     chan struct{}
+}
+
+func newTransactionSentToUpstreamEvent() *transactionSentToUpstreamEvent {
+	return &transactionSentToUpstreamEvent{
+		sx: make(map[int]chan common.Hash),
+	}
 }
 
 func (e *transactionSentToUpstreamEvent) Start() error {
@@ -25,11 +31,11 @@ func (e *transactionSentToUpstreamEvent) Start() error {
 	go func() {
 		for {
 			select {
-			case <-e.listener:
+			case transactionHash := <-e.listener:
 				if e.numberOfSubscriptions() == 0 {
 					continue
 				}
-				e.processTransactionSentToUpstream()
+				e.processTransactionSentToUpstream(transactionHash)
 			case <-e.quit:
 				return
 			}
@@ -45,14 +51,13 @@ func (e *transactionSentToUpstreamEvent) numberOfSubscriptions() int {
 	return len(e.sx)
 }
 
-func (e *transactionSentToUpstreamEvent) processTransactionSentToUpstream() {
+func (e *transactionSentToUpstreamEvent) processTransactionSentToUpstream(transactionHash common.Hash) {
 
 	e.sxMu.Lock()
 	defer e.sxMu.Unlock()
 
 	for _, channel := range e.sx {
-		// Send in an empty hash for now.
-		channel <- common.Hash{}
+		channel <- transactionHash
 	}
 }
 
@@ -87,12 +92,6 @@ func (e *transactionSentToUpstreamEvent) Unsubscribe(id int) {
 }
 
 // Trigger gets called in order to trigger the event
-func (e *transactionSentToUpstreamEvent) Trigger() {
-	e.listener <- true
-}
-
-func newTransactionSentToUpstreamEvent() *transactionSentToUpstreamEvent {
-	return &transactionSentToUpstreamEvent{
-		sx: make(map[int]chan common.Hash),
-	}
+func (e *transactionSentToUpstreamEvent) Trigger(transactionHash common.Hash) {
+	e.listener <- transactionHash
 }

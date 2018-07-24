@@ -1,6 +1,7 @@
 package rpcfilters
 
 import (
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -63,6 +64,6 @@ func (s *Service) Stop() error {
 
 // TriggerTransactionSentToUpstreamEvent notifies the subscribers
 // of the TransactionSentToUpstream event
-func (s *Service) TriggerTransactionSentToUpstreamEvent() {
-	s.transactionSentToUpstreamEvent.Trigger()
+func (s *Service) TriggerTransactionSentToUpstreamEvent(transactionHash common.Hash) {
+	s.transactionSentToUpstreamEvent.Trigger(transactionHash)
 }
