@@ -403,3 +403,62 @@ func (s *PeerPoolSimulationSuite) TestUpdateTopicLimits() {
 		s.Equal(5, tp.limits.Min)
 	}
 }
+
+func (s *PeerPoolSimulationSuite) TestMailServerPeersDiscovery() {
+	// Buffered channels must be used because we expect the events
+	// to be in the same order. Use a buffer length greater than
+	// the expected number of events to avoid deadlock.
+	poolEvents := make(chan string, 10)
+	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+		var envelope struct {
+			Type  string
+			Event json.RawMessage
+		}
+		s.NoError(json.Unmarshal([]byte(jsonEvent), &envelope))
+
+		switch typ := envelope.Type; typ {
+		case signal.EventDiscoverySummary:
+			poolEvents <- envelope.Type
+		}
+	})
+	defer signal.ResetDefaultNodeNotificationHandler()
+
+	// subscribe for peer events before starting the peer pool
+	events := make(chan *p2p.PeerEvent, 20)
+	subscription := s.peers[1].SubscribeEvents(events)
+	defer subscription.Unsubscribe()
+
+	// create and start topic registry
+	register := NewRegister(s.discovery[0], MailServerDiscoveryTopic)
+	s.Require().NoError(register.Start())
+
+	// create and start peer pool
+	config := map[discv5.Topic]params.Limits{
+		MailServerDiscoveryTopic: params.NewLimits(1, 1),
+	}
+	cache, err := newInMemoryCache()
+	s.Require().NoError(err)
+	peerPoolOpts := &Options{
+		100 * time.Millisecond,
+		100 * time.Millisecond,
+		0,
+		true,
+		100 * time.Millisecond,
+		[]discover.NodeID{s.peers[0].Self().ID},
+	}
+	peerPool := NewPeerPool(s.discovery[1], config, cache, peerPoolOpts)
+	s.Require().NoError(peerPool.Start(s.peers[1]))
+	defer peerPool.Stop()
+
+	// wait for and verify the mail server peer
+	connectedPeer := s.getPeerFromEvent(events, p2p.PeerEventTypeAdd)
+	s.Equal(s.peers[0].Self().ID, connectedPeer)
+
+	// wait for a summary event to be sure that ConfirmAdded() was called
+	s.Equal(signal.EventDiscoverySummary, s.getPoolEvent(poolEvents))
+
+	// check cache
+	cachedPeers := peerPool.cache.GetPeersRange(MailServerDiscoveryTopic, 5)
+	s.Require().Len(cachedPeers, 1)
+	s.Equal(s.peers[0].Self().ID[:], cachedPeers[0].ID[:])
+}
