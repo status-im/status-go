@@ -3,6 +3,7 @@ package signal
 /*
 #include <stddef.h>
 #include <stdbool.h>
+#include <stdlib.h>
 extern bool StatusServiceSignalEvent(const char *jsonEvent);
 extern void SetEventCallback(void *cb);
 */
@@ -41,7 +42,10 @@ func send(typ string, event interface{}) {
 	if err != nil {
 		logger.Error("Marshalling signal envelope", "error", err)
 	}
-	C.StatusServiceSignalEvent(C.CString(string(data)))
+
+	str := C.CString(string(data))
+	C.StatusServiceSignalEvent(str)
+	C.free(unsafe.Pointer(str))
 }
 
 // NodeNotificationHandler defines a handler able to process incoming node events.
@@ -83,7 +87,9 @@ func NotifyNode(jsonEvent *C.char) {
 //export TriggerTestSignal
 //nolint: golint
 func TriggerTestSignal() {
-	C.StatusServiceSignalEvent(C.CString(`{"answer": 42}`))
+	str := C.CString(`{"answer": 42}`)
+	C.StatusServiceSignalEvent(str)
+	C.free(unsafe.Pointer(str))
 }
 
 // SetSignalEventCallback set callback
