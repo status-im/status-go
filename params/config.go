@@ -413,7 +413,7 @@ func LoadNodeConfig(configJSON string) (*NodeConfig, error) {
 }
 
 func loadNodeConfig(configJSON string) (*NodeConfig, error) {
-	nodeConfig, err := NewNodeConfig("", "", "", 0)
+	nodeConfig, err := NewNodeConfig("", "", FleetBeta, 0)
 	if err != nil {
 		return nil, err
 	}

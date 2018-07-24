@@ -407,7 +407,7 @@ func TestConfigWriteRead(t *testing.T) {
 	require.Nil(t, err)
 	defer os.RemoveAll(tmpDir) // nolint: errcheck
 
-	nodeConfig, err := params.NewNodeConfig(tmpDir, "", "", params.RopstenNetworkID)
+	nodeConfig, err := params.NewNodeConfig(tmpDir, "", params.FleetBeta, params.RopstenNetworkID)
 	require.Nil(t, err, "cannot create new config object")
 
 	err = nodeConfig.Save()
