@@ -41,6 +41,7 @@ func send(typ string, event interface{}) {
 	data, err := json.Marshal(&signal)
 	if err != nil {
 		logger.Error("Marshalling signal envelope", "error", err)
+		return
 	}
 
 	str := C.CString(string(data))
