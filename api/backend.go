@@ -34,6 +34,8 @@ var (
 	ErrWhisperClearIdentitiesFailure = errors.New("failed to clear whisper identities")
 	// ErrWhisperIdentityInjectionFailure injecting whisper identities has failed.
 	ErrWhisperIdentityInjectionFailure = errors.New("failed to inject identity into Whisper")
+	// ErrUnsupportedRPCMethod is for methods not supported by the RPC interface
+	ErrUnsupportedRPCMethod = errors.New("method is unsupported by RPC interface")
 )
 
 // StatusBackend implements Status.im service
@@ -59,7 +61,7 @@ func NewStatusBackend() *StatusBackend {
 	pendingSignRequests := sign.NewPendingRequests()
 	accountManager := account.NewManager(statusNode)
 	transactor := transactions.NewTransactor(pendingSignRequests)
-	personalAPI := personal.NewAPI(pendingSignRequests)
+	personalAPI := personal.NewAPI()
 	notificationManager := fcm.NewNotification(fcmServerKey)
 	rpcFilters := rpcfilters.New(statusNode)
 
@@ -233,6 +235,22 @@ func (b *StatusBackend) SendTransaction(ctx context.Context, args transactions.S
 	return transactionHash, err
 }
 
+// SignMessage checks the pwd vs the selected account and passes on the signParams
+// to personalAPI for message signature
+func (b *StatusBackend) SignMessage(rpcParams personal.SignParams, password string) sign.Result {
+	verifiedAccount, err := b.getVerifiedAccount(password)
+	if err != nil {
+		return sign.NewErrResult(err)
+	}
+	return b.personalAPI.Sign(rpcParams, verifiedAccount)
+}
+
+// Recover calls the personalAPI to return address associated with the private
+// key that was used to calculate the signature in the message
+func (b *StatusBackend) Recover(rpcParams personal.RecoverParams) sign.Result {
+	return b.personalAPI.Recover(rpcParams)
+}
+
 func (b *StatusBackend) getVerifiedAccount(password string) (*account.SelectedExtKey, error) {
 	selectedAccount, err := b.accountManager.SelectedAccount()
 	if err != nil {
@@ -313,10 +331,14 @@ func (b *StatusBackend) registerHandlers() error {
 		return hash.Hex(), err
 	})
 
-	rpcClient.RegisterHandler(params.PersonalSignMethodName, b.personalAPI.Sign)
-	rpcClient.RegisterHandler(params.PersonalRecoverMethodName, b.personalAPI.Recover)
+	rpcClient.RegisterHandler(params.PersonalSignMethodName, unsupportedMethodHandler)
+	rpcClient.RegisterHandler(params.PersonalRecoverMethodName, unsupportedMethodHandler)
 
 	return nil
+}
+
+func unsupportedMethodHandler(ctx context.Context, rpcParams ...interface{}) (interface{}, error) {
+	return nil, ErrUnsupportedRPCMethod
 }
 
 // ConnectionChange handles network state changes logic.

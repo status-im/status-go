@@ -72,13 +72,13 @@ func (rs *PendingRequests) Approve(id string, password string, args *TxArgs, ver
 	request, err := rs.tryLock(id)
 	if err != nil {
 		rs.log.Warn("can't process transaction", "err", err)
-		return newErrResult(err)
+		return NewErrResult(err)
 	}
 
 	selectedAccount, err := verify(password)
 	if err != nil {
 		rs.complete(request, EmptyResponse, err)
-		return newErrResult(err)
+		return NewErrResult(err)
 	}
 
 	response, err := request.completeFunc(selectedAccount, password, args)
@@ -107,7 +107,7 @@ func (rs *PendingRequests) Discard(id string) error {
 func (rs *PendingRequests) Wait(id string, timeout time.Duration) Result {
 	request, err := rs.Get(id)
 	if err != nil {
-		return newErrResult(err)
+		return NewErrResult(err)
 	}
 	for {
 		select {

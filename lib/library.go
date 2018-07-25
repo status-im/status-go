@@ -13,6 +13,7 @@ import (
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/profiling"
+	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/sign"
 	"github.com/status-im/status-go/signal"
 	"gopkg.in/go-playground/validator.v9"
@@ -226,6 +227,54 @@ func ApproveSignRequest(id, password *C.char) *C.char {
 	result := statusBackend.ApproveSignRequest(C.GoString(id), C.GoString(password))
 
 	return prepareApproveSignRequestResponse(result, id)
+}
+
+// SignMessage unmarshals rpc params {data, address, password} and passes
+// them onto backend.SignMessage
+// nolint: deadcode
+func SignMessage(rpcParams *C.char) *C.char {
+	params, err := personal.UnmarshalSignRPCParams(C.GoString(rpcParams))
+	if err != nil {
+		result := sign.NewErrResult(err)
+		return prepareSignResponse(result)
+	}
+	result := statusBackend.SignMessage(params, params.Password)
+	return prepareSignResponse(result)
+}
+
+// Recover unmarshals rpc params {signDataString, signedData} and passes
+// them onto backend.
+// nolint: deadcode
+func Recover(rpcParams *C.char) *C.char {
+	params, err := personal.UnmarshalRecoverRPCParams(C.GoString(rpcParams))
+	if err != nil {
+		result := sign.NewErrResult(err)
+		return prepareSignResponse(result)
+	}
+	result := statusBackend.Recover(params)
+	return prepareSignResponse(result)
+}
+
+// prepareSignResponse based on a sign.Result prepares the binding
+// response.
+func prepareSignResponse(result sign.Result) *C.char {
+	errString := ""
+	if result.Error != nil {
+		fmt.Fprintln(os.Stderr, result.Error)
+		errString = result.Error.Error()
+	}
+
+	out := SignRequestResult{
+		Hash:  result.Response.Hex(),
+		Error: errString,
+	}
+	outBytes, err := json.Marshal(out)
+	if err != nil {
+		logger.Error("failed to marshal Sign output", "error", err)
+		return makeJSONResponse(err)
+	}
+
+	return C.CString(string(outBytes))
 }
 
 // prepareApproveSignRequestResponse based on a sign.Result prepares the binding
