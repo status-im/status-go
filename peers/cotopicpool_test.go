@@ -42,7 +42,7 @@ func (s *CacheOnlyTopicPoolSuite) SetupTest() {
 	limits := params.NewLimits(1, 2)
 	cache, err := newInMemoryCache()
 	s.Require().NoError(err)
-	t := newTopicPool(&DiscV5{}, MailServerDiscoveryTopic, limits, 100*time.Millisecond, 200*time.Millisecond, cache)
+	t := newTopicPool(nil, MailServerDiscoveryTopic, limits, 100*time.Millisecond, 200*time.Millisecond, cache)
 	s.topicPool = newCacheOnlyTopicPool(t, &testTrueVerifier{})
 	s.topicPool.running = 1
 	// This is a buffered channel to simplify testing.

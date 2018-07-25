@@ -97,12 +97,6 @@ func TestBackendGettersConcurrently(t *testing.T) {
 
 	wg.Add(1)
 	go func() {
-		assert.NotNil(t, backend.JailManager())
-		wg.Done()
-	}()
-
-	wg.Add(1)
-	go func() {
 		assert.NotNil(t, backend.personalAPI)
 		wg.Done()
 	}()

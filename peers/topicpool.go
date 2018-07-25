@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
+	"github.com/status-im/status-go/discovery"
 	"github.com/status-im/status-go/params"
 )
 
@@ -41,7 +42,7 @@ type TopicPoolInterface interface {
 }
 
 // newTopicPool returns instance of TopicPool.
-func newTopicPool(discovery Discovery, topic discv5.Topic, limits params.Limits, slowMode, fastMode time.Duration, cache *Cache) *TopicPool {
+func newTopicPool(discovery discovery.Discovery, topic discv5.Topic, limits params.Limits, slowMode, fastMode time.Duration, cache *Cache) *TopicPool {
 	pool := TopicPool{
 		discovery:            discovery,
 		topic:                topic,
@@ -62,7 +63,7 @@ func newTopicPool(discovery Discovery, topic discv5.Topic, limits params.Limits,
 
 // TopicPool manages peers for topic.
 type TopicPool struct {
-	discovery Discovery
+	discovery discovery.Discovery
 
 	// configuration
 	topic           discv5.Topic

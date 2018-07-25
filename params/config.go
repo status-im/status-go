@@ -199,6 +199,9 @@ type ClusterConfig struct {
 
 	// TrustedMailServers is a list of verified Mail Servers.
 	TrustedMailServers []string
+
+	// RendezvousNodes is a rendezvous discovery server.
+	RendezvousNodes []string
 }
 
 // String dumps config object as nicely indented JSON
@@ -257,6 +260,9 @@ type NodeConfig struct {
 
 	// NoDiscovery set to true will disable discovery protocol.
 	NoDiscovery bool
+
+	// Rendezvous enables discovery protocol.
+	Rendezvous bool
 
 	// ListenAddr is an IP address and port of this node (e.g. 127.0.0.1:30303).
 	ListenAddr string

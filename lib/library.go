@@ -14,8 +14,8 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/profiling"
 	"github.com/status-im/status-go/sign"
-	"gopkg.in/go-playground/validator.v9"
 	"github.com/status-im/status-go/signal"
+	"gopkg.in/go-playground/validator.v9"
 )
 
 // All general log messages in this package should be routed through this logger.
@@ -349,41 +349,6 @@ func DiscardSignRequests(ids *C.char) *C.char {
 	return C.CString(string(outBytes))
 }
 
-//InitJail setup initial JavaScript
-//export InitJail
-func InitJail(js *C.char) {
-	statusBackend.JailManager().SetBaseJS(C.GoString(js))
-}
-
-//Parse creates a new jail cell context and executes provided JavaScript code.
-//DEPRECATED in favour of CreateAndInitCell.
-//export Parse
-func Parse(chatID *C.char, js *C.char) *C.char {
-	res := statusBackend.JailManager().CreateAndInitCell(C.GoString(chatID), C.GoString(js))
-	return C.CString(res)
-}
-
-//CreateAndInitCell creates a new jail cell context and executes provided JavaScript code.
-//export CreateAndInitCell
-func CreateAndInitCell(chatID *C.char, js *C.char) *C.char {
-	res := statusBackend.JailManager().CreateAndInitCell(C.GoString(chatID), C.GoString(js))
-	return C.CString(res)
-}
-
-//ExecuteJS allows to run arbitrary JS code within a cell.
-//export ExecuteJS
-func ExecuteJS(chatID *C.char, code *C.char) *C.char {
-	res := statusBackend.JailManager().Execute(C.GoString(chatID), C.GoString(code))
-	return C.CString(res)
-}
-
-//Call executes given JavaScript function
-//export Call
-func Call(chatID *C.char, path *C.char, params *C.char) *C.char {
-	res := statusBackend.JailManager().Call(C.GoString(chatID), C.GoString(path), C.GoString(params))
-	return C.CString(res)
-}
-
 //StartCPUProfile runs pprof for cpu
 //export StartCPUProfile
 func StartCPUProfile(dataDir *C.char) *C.char {
@@ -487,7 +452,7 @@ func AppStateChange(state *C.char) {
 	statusBackend.AppStateChange(C.GoString(state))
 }
 
-// SetSignalEventCallback setup geth callback to notify about new jail signal
+// SetSignalEventCallback setup geth callback to notify about new signal
 //export SetSignalEventCallback
 func SetSignalEventCallback(cb unsafe.Pointer) {
 	signal.SetSignalEventCallback(cb)
