@@ -32,8 +32,8 @@ type Result struct {
 	Error    error
 }
 
-// newErrResult creates a result based on an empty response and an error
-func newErrResult(err error) Result {
+// NewErrResult creates a result based on an empty response and an error
+func NewErrResult(err error) Result {
 	return Result{
 		Response: EmptyResponse,
 		Error:    err,
