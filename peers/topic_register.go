@@ -5,11 +5,12 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
+	"github.com/status-im/status-go/discovery"
 )
 
 // Register manages register topic queries
 type Register struct {
-	discovery Discovery
+	discovery discovery.Discovery
 	topics    []discv5.Topic
 
 	wg   sync.WaitGroup
@@ -17,7 +18,7 @@ type Register struct {
 }
 
 // NewRegister creates instance of topic register
-func NewRegister(discovery Discovery, topics ...discv5.Topic) *Register {
+func NewRegister(discovery discovery.Discovery, topics ...discv5.Topic) *Register {
 	return &Register{discovery: discovery, topics: topics}
 }
 

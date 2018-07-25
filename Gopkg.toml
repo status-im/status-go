@@ -29,11 +29,6 @@ ignored = [ "github.com/ethereum/go-ethereum/ethapi" ]
   name = "github.com/ethereum/go-ethereum"
   version = "v1.8.5"
 
-[[constraint]]
-  # used only to embed web3js code with particular version
-  name = "github.com/status-im/go-web3js"
-  version = "0.20.1"
-
 # * * * * * `go-ethereum` dependencies * * * * *
 # Pinned down SHAs from `go-ethereum/vendor/vendor.json`
 # When upgrading upstream, upgrade these values too.
@@ -139,3 +134,20 @@ ignored = [ "github.com/ethereum/go-ethereum/ethapi" ]
 [[constraint]]
   name = "github.com/beevik/ntp"
   version = "0.2.0"
+
+[[override]]
+  name = "github.com/multiformats/go-multiaddr"
+  revision = "f36800afeb9c141e1adb7da099e6f010dfd4c419"
+
+# 1.0.8
+[[override]]
+  name = "github.com/multiformats/go-multihash"
+  revision = "8be2a682ab9f254311de1375145a2f78a809b07d"
+
+[[override]]
+  name = "github.com/satori/go.uuid"
+  revision = "36e9d2ebbde5e3f13ab2e25625fd453271d6522e"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/status-im/rendezvous"

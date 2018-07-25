@@ -182,7 +182,6 @@ mock: ##@other Regenerate mocks
 	mockgen -package=fcm          -destination=notifications/push/fcm/client_mock.go -source=notifications/push/fcm/client.go
 	mockgen -package=fake         -destination=transactions/fake/mock.go             -source=transactions/fake/txservice.go
 	mockgen -package=account      -destination=account/accounts_mock.go              -source=account/accounts.go
-	mockgen -package=jail         -destination=jail/cell_mock.go                     -source=jail/cell.go
 	mockgen -package=status       -destination=services/status/account_mock.go       -source=services/status/service.go
 	mockgen -package=peer         -destination=services/peer/discoverer_mock.go      -source=services/peer/service.go
 
@@ -206,7 +205,6 @@ test-e2e: ##@tests Run e2e tests
 	go test -timeout 5m ./t/e2e/accounts/... -network=$(networkid) $(gotest_extraflags)
 	go test -timeout 5m ./t/e2e/api/... -network=$(networkid) $(gotest_extraflags)
 	go test -timeout 5m ./t/e2e/node/... -network=$(networkid) $(gotest_extraflags)
-	go test -timeout 50m ./t/e2e/jail/... -network=$(networkid) $(gotest_extraflags)
 	go test -timeout 20m ./t/e2e/rpc/... -network=$(networkid) $(gotest_extraflags)
 	go test -timeout 20m ./t/e2e/whisper/... -network=$(networkid) $(gotest_extraflags)
 	go test -timeout 10m ./t/e2e/transactions/... -network=$(networkid) $(gotest_extraflags)

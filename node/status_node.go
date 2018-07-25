@@ -17,9 +17,11 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
+	ma "github.com/multiformats/go-multiaddr"
 	"github.com/syndtr/goleveldb/leveldb"
 
 	"github.com/status-im/status-go/db"
+	"github.com/status-im/status-go/discovery"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/peers"
 	"github.com/status-im/status-go/rpc"
@@ -49,7 +51,7 @@ type StatusNode struct {
 	rpcClient        *rpc.Client        // reference to public RPC client
 	rpcPrivateClient *rpc.Client        // reference to private RPC client (can call private APIs)
 
-	discovery peers.Discovery
+	discovery discovery.Discovery
 	register  *peers.Register
 	peerPool  *peers.PeerPool
 	db        *leveldb.DB // used as a cache for PeerPool
@@ -179,14 +181,44 @@ func (n *StatusNode) setupRPCClient() (err error) {
 }
 
 func (n *StatusNode) discoveryEnabled() bool {
-	return n.config != nil && !n.config.NoDiscovery && n.config.ClusterConfig != nil
+	return n.config != nil && (!n.config.NoDiscovery || n.config.Rendezvous) && n.config.ClusterConfig != nil
+}
+
+func (n *StatusNode) startRendezvous() error {
+	if !n.config.Rendezvous {
+		return errors.New("rendezvous is not enabled")
+	}
+	if len(n.config.ClusterConfig.RendezvousNodes) == 0 {
+		return errors.New("rendezvous node must be provided if rendezvous discovery is enabled")
+	}
+	maddrs := make([]ma.Multiaddr, len(n.config.ClusterConfig.RendezvousNodes))
+	for i, addr := range n.config.ClusterConfig.RendezvousNodes {
+		var err error
+		maddrs[i], err = ma.NewMultiaddr(addr)
+		if err != nil {
+			return fmt.Errorf("failed to parse rendezvous node %s: %v", n.config.ClusterConfig.RendezvousNodes[0], err)
+		}
+	}
+	srv := n.gethNode.Server()
+	var err error
+	n.discovery, err = discovery.NewRendezvous(maddrs, srv.PrivateKey, srv.Self())
+	return err
 }
 
 func (n *StatusNode) startDiscovery() error {
-	n.discovery = peers.NewDiscV5(
-		n.gethNode.Server().PrivateKey,
-		n.config.ListenAddr,
-		parseNodesV5(n.config.ClusterConfig.BootNodes))
+	if !n.config.NoDiscovery && n.config.Rendezvous {
+		return errors.New("only one discovery can be used (will be allowed to use more in next change)")
+	}
+	if !n.config.NoDiscovery {
+		n.discovery = discovery.NewDiscV5(
+			n.gethNode.Server().PrivateKey,
+			n.config.ListenAddr,
+			parseNodesV5(n.config.ClusterConfig.BootNodes))
+	} else if n.config.Rendezvous {
+		if err := n.startRendezvous(); err != nil {
+			return err
+		}
+	}
 	n.register = peers.NewRegister(n.discovery, n.config.RegisterTopics...)
 	options := peers.NewDefaultOptions()
 	// TODO(dshulyak) consider adding a flag to define this behaviour
