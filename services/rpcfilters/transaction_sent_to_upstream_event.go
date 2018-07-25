@@ -17,7 +17,8 @@ type transactionSentToUpstreamEvent struct {
 
 func newTransactionSentToUpstreamEvent() *transactionSentToUpstreamEvent {
 	return &transactionSentToUpstreamEvent{
-		sx: make(map[int]chan common.Hash),
+		sx:       make(map[int]chan common.Hash),
+		listener: make(chan common.Hash),
 	}
 }
 
@@ -57,7 +58,12 @@ func (e *transactionSentToUpstreamEvent) processTransactionSentToUpstream(transa
 	defer e.sxMu.Unlock()
 
 	for _, channel := range e.sx {
-		channel <- transactionHash
+		// send hash into channel inside goroutine so that new hashes can be sent
+		// even when not all subscribers have received the previous hash
+		ch := channel
+		go func() {
+			ch <- transactionHash
+		}()
 	}
 }
 
@@ -93,5 +99,7 @@ func (e *transactionSentToUpstreamEvent) Unsubscribe(id int) {
 
 // Trigger gets called in order to trigger the event
 func (e *transactionSentToUpstreamEvent) Trigger(transactionHash common.Hash) {
-	e.listener <- transactionHash
+	go func() {
+		e.listener <- transactionHash
+	}()
 }
