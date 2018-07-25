@@ -16,6 +16,7 @@ import (
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/sign"
 	"github.com/status-im/status-go/signal"
+	"github.com/status-im/status-go/transactions"
 	"gopkg.in/go-playground/validator.v9"
 )
 
@@ -255,12 +256,23 @@ func Recover(rpcParams *C.char) *C.char {
 	return prepareSignResponse(result)
 }
 
+// SendTransaction converts RPC args and calls backend.SendTransaction
+// nolint: deadcode
+func SendTransaction(txArgsJSON, password *C.char) *C.char {
+	txArgs, err := transactions.UnmarshalSendTxRPCParams(C.GoString(txArgsJSON))
+	if err != nil {
+		return prepareSignResponse(sign.NewErrResult(err))
+	}
+	result := statusBackend.SendTransaction(txArgs, C.GoString(password))
+	return prepareSignResponse(result)
+}
+
 // prepareSignResponse based on a sign.Result prepares the binding
 // response.
 func prepareSignResponse(result sign.Result) *C.char {
 	errString := ""
 	if result.Error != nil {
-		fmt.Fprintln(os.Stderr, result.Error)
+		logger.Error("Sign result contains error", "error", result.Error)
 		errString = result.Error.Error()
 	}
 

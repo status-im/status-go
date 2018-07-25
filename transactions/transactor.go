@@ -14,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/status-im/status-go/account"
-	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/sign"
 )
@@ -29,7 +28,6 @@ const (
 // Transactor validates, signs transactions.
 // It uses upstream to propagate transactions to the Ethereum network.
 type Transactor struct {
-	pendingSignRequests  *sign.PendingRequests
 	sender               ethereum.TransactionSender
 	pendingNonceProvider PendingNonceProvider
 	gasCalculator        GasCalculator
@@ -43,13 +41,12 @@ type Transactor struct {
 }
 
 // NewTransactor returns a new Manager.
-func NewTransactor(signRequests *sign.PendingRequests) *Transactor {
+func NewTransactor() *Transactor {
 	return &Transactor{
-		pendingSignRequests: signRequests,
-		addrLock:            &AddrLocker{},
-		sendTxTimeout:       sendTxTimeout,
-		localNonce:          sync.Map{},
-		log:                 log.New("package", "status-go/transactions.Manager"),
+		addrLock:      &AddrLocker{},
+		sendTxTimeout: sendTxTimeout,
+		localNonce:    sync.Map{},
+		log:           log.New("package", "status-go/transactions.Manager"),
 	}
 }
 
@@ -68,25 +65,19 @@ func (t *Transactor) SetRPC(rpcClient *rpc.Client, timeout time.Duration) {
 }
 
 // SendTransaction is an implementation of eth_sendTransaction. It queues the tx to the sign queue.
-func (t *Transactor) SendTransaction(ctx context.Context, args SendTxArgs) (gethcommon.Hash, error) {
-	if ctx == nil {
-		ctx = context.Background()
+func (t *Transactor) SendTransaction(sendArgs SendTxArgs, verifiedAccount *account.SelectedExtKey) sign.Result {
+
+	hash, err := t.validateAndPropagate(verifiedAccount, sendArgs)
+	response := sign.Response(hash.Bytes())
+
+	result := sign.Result{Error: err}
+	if err == nil {
+		result.Response = response
 	}
 
-	completeFunc := func(acc *account.SelectedExtKey, password string, signArgs *sign.TxArgs) (sign.Response, error) {
-		t.mergeSignTxArgsOntoSendTxArgs(signArgs, &args)
-		hash, err := t.validateAndPropagate(acc, args)
-		return sign.Response(hash.Bytes()), err
-	}
+	t.log.Info("completed signing with ", "response", response, "err", err)
 
-	request, err := t.pendingSignRequests.Add(ctx, params.SendTransactionMethodName, args, completeFunc)
-
-	if err != nil {
-		return gethcommon.Hash{}, err
-	}
-
-	result := t.pendingSignRequests.Wait(request.ID, t.sendTxTimeout)
-	return result.Response.Hash(), result.Error
+	return result
 }
 
 // make sure that only account which created the tx can complete it
@@ -204,16 +195,4 @@ func (t *Transactor) validateAndPropagate(selectedAccount *account.SelectedExtKe
 		return hash, err
 	}
 	return signedTx.Hash(), nil
-}
-
-func (t *Transactor) mergeSignTxArgsOntoSendTxArgs(signArgs *sign.TxArgs, args *SendTxArgs) {
-	if signArgs == nil {
-		return
-	}
-	if signArgs.Gas != nil {
-		args.Gas = signArgs.Gas
-	}
-	if signArgs.GasPrice != nil {
-		args.GasPrice = signArgs.GasPrice
-	}
 }

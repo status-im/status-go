@@ -89,3 +89,10 @@ func RPCCalltoSendTxArgs(args ...interface{}) (SendTxArgs, error) {
 
 	return txArgs, nil
 }
+
+// UnmarshalSendTxRPCParams creates SendTxArgs based on RPC JSON
+func UnmarshalSendTxRPCParams(rpcParamsJSON string) (SendTxArgs, error) {
+	var params SendTxArgs
+	err := json.Unmarshal([]byte(rpcParamsJSON), &params)
+	return params, err
+}
