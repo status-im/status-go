@@ -12,11 +12,13 @@ import (
 // whisperConfig creates node configuration object from flags
 func whisperConfig(nodeConfig *params.NodeConfig) (*params.NodeConfig, error) {
 	whisperConfig := nodeConfig.WhisperConfig
+
 	whisperConfig.Enabled = true
 	whisperConfig.EnableMailServer = *enableMailServer
 	whisperConfig.LightClient = *lightClient
 	whisperConfig.MinimumPoW = *minPow
 	whisperConfig.TTL = *ttl
+	whisperConfig.EnableNTPSync = *ntpSyncEnabled
 
 	if whisperConfig.EnableMailServer {
 		if *passwordFile == "" {
