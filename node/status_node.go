@@ -223,6 +223,7 @@ func (n *StatusNode) startDiscovery() error {
 	options := peers.NewDefaultOptions()
 	// TODO(dshulyak) consider adding a flag to define this behaviour
 	options.AllowStop = len(n.config.RegisterTopics) == 0
+	options.TrustedMailServers = parseNodesToNodeID(n.config.ClusterConfig.TrustedMailServers)
 	n.peerPool = peers.NewPeerPool(
 		n.discovery,
 		n.config.RequireTopics,

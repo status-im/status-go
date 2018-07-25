@@ -1,6 +1,7 @@
 package peers
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -42,7 +43,7 @@ func (s *CacheOnlyTopicPoolSuite) SetupTest() {
 	cache, err := newInMemoryCache()
 	s.Require().NoError(err)
 	t := newTopicPool(nil, MailServerDiscoveryTopic, limits, 100*time.Millisecond, 200*time.Millisecond, cache)
-	s.topicPool = newCacheOnlyTopicPool(t)
+	s.topicPool = newCacheOnlyTopicPool(t, &testTrueVerifier{})
 	s.topicPool.running = 1
 	// This is a buffered channel to simplify testing.
 	// If your test generates more than 10 mode changes,
@@ -70,15 +71,15 @@ func (s *CacheOnlyTopicPoolSuite) TestReplacementPeerIsCounted() {
 	// When we stop searching for peers (when Max limit is reached)
 	s.topicPool.StopSearch(s.peer)
 	s.True(s.topicPool.MaxReached())
-	s.Equal(s.topicPool.limits.Max, 0)
-	s.Equal(s.topicPool.limits.Min, 0)
+	s.Equal(0, s.topicPool.limits.Max)
+	s.Equal(0, s.topicPool.limits.Min)
 
 	// Then we should drop all connected peers
 	s.Equal(len(s.topicPool.connectedPeers), 0)
 
 	// And cached peers should remain
 	cachedPeers := s.topicPool.cache.GetPeersRange(s.topicPool.topic, s.topicPool.maxCachedPeers)
-	s.Equal(len(cachedPeers), 1)
+	s.Equal(1, len(cachedPeers))
 }
 
 func (s *CacheOnlyTopicPoolSuite) TestConfirmAddedSignals() {
@@ -93,4 +94,36 @@ func (s *CacheOnlyTopicPoolSuite) TestConfirmAddedSignals() {
 	s.topicPool.ConfirmAdded(s.peer, discover.NodeID(peer1.ID))
 	s.Equal((discv5.NodeID{1}).String(), sentNodeID)
 	s.Equal(MailServerDiscoveryTopic, sentTopic)
+}
+
+func (s *CacheOnlyTopicPoolSuite) TestNotTrustedPeer() {
+	var signalCalled bool
+	sendEnodeDiscovered = func(_, _ string) { signalCalled = true }
+
+	s.topicPool.limits = params.NewLimits(1, 1)
+	s.topicPool.maxCachedPeers = 1
+	s.topicPool.verifier = &testFalseVerifier{}
+
+	foundPeer := discv5.NewNode(discv5.NodeID{1}, s.peer.Self().IP, 32311, 32311)
+	s.topicPool.processFoundNode(s.peer, foundPeer)
+	s.topicPool.ConfirmAdded(s.peer, discover.NodeID(foundPeer.ID))
+
+	s.False(signalCalled)
+	// limits should not change
+	s.Equal(1, s.topicPool.limits.Max)
+	s.Equal(1, s.topicPool.limits.Min)
+	// not verified peer shoud not be added to the cache
+	s.Equal(0, len(s.topicPool.cache.GetPeersRange(s.topicPool.topic, s.topicPool.limits.Max)))
+}
+
+type testTrueVerifier struct{}
+
+func (v *testTrueVerifier) VerifyNode(context.Context, discover.NodeID) bool {
+	return true
+}
+
+type testFalseVerifier struct{}
+
+func (v *testFalseVerifier) VerifyNode(context.Context, discover.NodeID) bool {
+	return false
 }

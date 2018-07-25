@@ -325,6 +325,6 @@ func (s *TopicPoolSuite) TestNewTopicPoolInterface() {
 	s.IsType(&TopicPool{}, t)
 
 	tp := newTopicPool(nil, MailServerDiscoveryTopic, limits, 100*time.Millisecond, 200*time.Millisecond, cache)
-	cacheTP := newCacheOnlyTopicPool(tp)
+	cacheTP := newCacheOnlyTopicPool(tp, &testTrueVerifier{})
 	s.IsType(&cacheOnlyTopicPool{}, cacheTP)
 }

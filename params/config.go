@@ -200,6 +200,9 @@ type ClusterConfig struct {
 	// for a given mode (production vs development)
 	BootNodes []string
 
+	// TrustedMailServers is a list of verified Mail Servers.
+	TrustedMailServers []string
+
 	// RendezvousNodes is a rendezvous discovery server.
 	RendezvousNodes []string
 }
@@ -644,6 +647,7 @@ func (c *NodeConfig) updateClusterConfig() error {
 			if len(cluster.BootNodes) == 0 {
 				c.NoDiscovery = true
 			}
+			c.ClusterConfig.TrustedMailServers = cluster.MailServers
 			break
 		}
 	}

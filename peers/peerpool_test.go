@@ -162,7 +162,7 @@ func (s *PeerPoolSimulationSuite) TestPeerPoolCacheEthV5() {
 	config := map[discv5.Topic]params.Limits{
 		topic: params.NewLimits(1, 1),
 	}
-	peerPoolOpts := &Options{100 * time.Millisecond, 100 * time.Millisecond, 0, true, 100 * time.Millisecond}
+	peerPoolOpts := &Options{100 * time.Millisecond, 100 * time.Millisecond, 0, true, 100 * time.Millisecond, nil}
 	cache, err := newInMemoryCache()
 	s.Require().NoError(err)
 	peerPool := NewPeerPool(s.discovery[1], config, cache, peerPoolOpts)
@@ -220,7 +220,7 @@ func (s *PeerPoolSimulationSuite) singleTopicDiscoveryWithFailover() {
 	config := map[discv5.Topic]params.Limits{
 		topic: params.NewLimits(1, 1), // limits are chosen for simplicity of the simulation
 	}
-	peerPoolOpts := &Options{100 * time.Millisecond, 100 * time.Millisecond, 0, true, 0}
+	peerPoolOpts := &Options{100 * time.Millisecond, 100 * time.Millisecond, 0, true, 0, nil}
 	cache, err := newInMemoryCache()
 	s.Require().NoError(err)
 	peerPool := NewPeerPool(s.discovery[1], config, cache, peerPoolOpts)
@@ -302,7 +302,7 @@ func TestPeerPoolMaxPeersOverflow(t *testing.T) {
 	defer func() { assert.NoError(t, discovery.Stop()) }()
 	require.True(t, discovery.Running())
 
-	poolOpts := &Options{DefaultFastSync, DefaultSlowSync, 0, true, 100 * time.Millisecond}
+	poolOpts := &Options{DefaultFastSync, DefaultSlowSync, 0, true, 100 * time.Millisecond, nil}
 	pool := NewPeerPool(discovery, nil, nil, poolOpts)
 	require.NoError(t, pool.Start(peer))
 	require.Equal(t, signal.EventDiscoveryStarted, <-signals)
@@ -355,7 +355,7 @@ func TestPeerPoolDiscV5Timeout(t *testing.T) {
 	require.True(t, discovery.Running())
 
 	// start PeerPool
-	poolOpts := &Options{DefaultFastSync, DefaultSlowSync, time.Millisecond * 100, true, 100 * time.Millisecond}
+	poolOpts := &Options{DefaultFastSync, DefaultSlowSync, time.Millisecond * 100, true, 100 * time.Millisecond, nil}
 	pool := NewPeerPool(discovery, nil, nil, poolOpts)
 	require.NoError(t, pool.Start(server))
 	require.Equal(t, signal.EventDiscoveryStarted, <-signals)
@@ -402,7 +402,7 @@ func TestPeerPoolNotAllowedStopping(t *testing.T) {
 	require.True(t, discovery.Running())
 
 	// start PeerPool
-	poolOpts := &Options{DefaultFastSync, DefaultSlowSync, time.Millisecond * 100, false, 100 * time.Millisecond}
+	poolOpts := &Options{DefaultFastSync, DefaultSlowSync, time.Millisecond * 100, false, 100 * time.Millisecond, nil}
 	pool := NewPeerPool(discovery, nil, nil, poolOpts)
 	require.NoError(t, pool.Start(server))
 
@@ -419,7 +419,7 @@ func (s *PeerPoolSimulationSuite) TestUpdateTopicLimits() {
 	config := map[discv5.Topic]params.Limits{
 		topic: params.NewLimits(1, 1),
 	}
-	peerPoolOpts := &Options{100 * time.Millisecond, 100 * time.Millisecond, 0, true, 100 * time.Millisecond}
+	peerPoolOpts := &Options{100 * time.Millisecond, 100 * time.Millisecond, 0, true, 100 * time.Millisecond, nil}
 	cache, err := newInMemoryCache()
 	s.Require().NoError(err)
 	peerPool := NewPeerPool(s.discovery[1], config, cache, peerPoolOpts)
@@ -446,4 +446,74 @@ func (s *PeerPoolSimulationSuite) TestUpdateTopicLimits() {
 		s.Equal(10, tp.limits.Max)
 		s.Equal(5, tp.limits.Min)
 	}
+}
+
+func (s *PeerPoolSimulationSuite) TestMailServerPeersDiscovery() {
+	s.setupEthV5()
+
+	// Buffered channels must be used because we expect the events
+	// to be in the same order. Use a buffer length greater than
+	// the expected number of events to avoid deadlock.
+	poolEvents := make(chan string, 10)
+	summaries := make(chan []*p2p.PeerInfo, 10)
+	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+		var envelope struct {
+			Type  string
+			Event json.RawMessage
+		}
+		s.NoError(json.Unmarshal([]byte(jsonEvent), &envelope))
+
+		switch typ := envelope.Type; typ {
+		case signal.EventDiscoverySummary:
+			poolEvents <- envelope.Type
+			var summary []*p2p.PeerInfo
+			s.NoError(json.Unmarshal(envelope.Event, &summary))
+			summaries <- summary
+		}
+	})
+	defer signal.ResetDefaultNodeNotificationHandler()
+
+	// subscribe for peer events before starting the peer pool
+	events := make(chan *p2p.PeerEvent, 20)
+	subscription := s.peers[1].SubscribeEvents(events)
+	defer subscription.Unsubscribe()
+
+	// create and start topic registry
+	register := NewRegister(s.discovery[0], MailServerDiscoveryTopic)
+	s.Require().NoError(register.Start())
+
+	// create and start peer pool
+	config := map[discv5.Topic]params.Limits{
+		MailServerDiscoveryTopic: params.NewLimits(1, 1),
+	}
+	cache, err := newInMemoryCache()
+	s.Require().NoError(err)
+	peerPoolOpts := &Options{
+		100 * time.Millisecond,
+		100 * time.Millisecond,
+		0,
+		true,
+		100 * time.Millisecond,
+		[]discover.NodeID{s.peers[0].Self().ID},
+	}
+	peerPool := NewPeerPool(s.discovery[1], config, cache, peerPoolOpts)
+	s.Require().NoError(peerPool.Start(s.peers[1]))
+	defer peerPool.Stop()
+
+	// wait for and verify the mail server peer
+	connectedPeer := s.getPeerFromEvent(events, p2p.PeerEventTypeAdd)
+	s.Equal(s.peers[0].Self().ID, connectedPeer)
+
+	// wait for a summary event to be sure that ConfirmAdded() was called
+	s.Equal(signal.EventDiscoverySummary, s.getPoolEvent(poolEvents))
+	s.Equal(s.peers[0].Self().ID.String(), (<-summaries)[0].ID)
+
+	// check cache
+	cachedPeers := peerPool.cache.GetPeersRange(MailServerDiscoveryTopic, 5)
+	s.Require().Len(cachedPeers, 1)
+	s.Equal(s.peers[0].Self().ID[:], cachedPeers[0].ID[:])
+
+	// wait for another summary event as the peer should be removed
+	s.Equal(signal.EventDiscoverySummary, s.getPoolEvent(poolEvents))
+	s.Len(<-summaries, 0)
 }

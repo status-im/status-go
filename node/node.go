@@ -327,6 +327,14 @@ func parseNodesV5(enodes []string) []*discv5.Node {
 	return nodes
 }
 
+func parseNodesToNodeID(enodes []string) []discover.NodeID {
+	nodeIDs := make([]discover.NodeID, 0, len(enodes))
+	for _, node := range parseNodes(enodes) {
+		nodeIDs = append(nodeIDs, node.ID)
+	}
+	return nodeIDs
+}
+
 // whisperTimeSource get timeSource to be used by whisper
 func whisperTimeSource(ctx *node.ServiceContext) (func() time.Time, error) {
 	var timeSource *timesource.NTPTimeSource
