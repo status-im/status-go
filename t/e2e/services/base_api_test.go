@@ -12,6 +12,15 @@ import (
 	. "github.com/status-im/status-go/t/utils"
 )
 
+const (
+	// see vendor/github.com/ethereum/go-ethereum/rpc/errors.go:L27
+	methodNotFoundErrorCode = -32601
+)
+
+type rpcError struct {
+	Code int `json:"code"`
+}
+
 type BaseJSONRPCSuite struct {
 	e2e.BackendTestSuite
 }
@@ -106,5 +115,19 @@ func (s *BaseJSONRPCSuite) notificationHandler(account string, pass string, expe
 				s.EqualError(e, expectedError.Error())
 			}
 		}
+	}
+}
+
+func unmarshalEnvelope(jsonEvent string) signal.Envelope {
+	var envelope signal.Envelope
+	if e := json.Unmarshal([]byte(jsonEvent), &envelope); e != nil {
+		panic(e)
+	}
+	return envelope
+}
+
+func (s *BaseJSONRPCSuite) notificationHandlerSuccess(account string, pass string) func(string) {
+	return func(jsonEvent string) {
+		s.notificationHandler(account, pass, nil)(jsonEvent)
 	}
 }
