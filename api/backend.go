@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"sync"
 
-	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	gethnode "github.com/ethereum/go-ethereum/node"
 
@@ -60,7 +59,7 @@ func NewStatusBackend() *StatusBackend {
 	statusNode := node.New()
 	pendingSignRequests := sign.NewPendingRequests()
 	accountManager := account.NewManager(statusNode)
-	transactor := transactions.NewTransactor(pendingSignRequests)
+	transactor := transactions.NewTransactor()
 	personalAPI := personal.NewAPI()
 	notificationManager := fcm.NewNotification(fcmServerKey)
 	rpcFilters := rpcfilters.New(statusNode)
@@ -227,12 +226,17 @@ func (b *StatusBackend) CallPrivateRPC(inputJSON string) string {
 }
 
 // SendTransaction creates a new transaction and waits until it's complete.
-func (b *StatusBackend) SendTransaction(ctx context.Context, args transactions.SendTxArgs) (hash gethcommon.Hash, err error) {
-	transactionHash, err := b.transactor.SendTransaction(ctx, args)
-	if err == nil {
-		go b.rpcFilters.TriggerTransactionSentToUpstreamEvent(transactionHash)
+func (b *StatusBackend) SendTransaction(sendArgs transactions.SendTxArgs, password string) sign.Result {
+	verifiedAccount, err := b.getVerifiedAccount(password)
+	if err != nil {
+		return sign.NewErrResult(err)
 	}
-	return transactionHash, err
+	result := b.transactor.SendTransaction(sendArgs, verifiedAccount)
+	if result.Error != nil {
+		return sign.NewErrResult(result.Error)
+	}
+	go b.rpcFilters.TriggerTransactionSentToUpstreamEvent(result.Response.Hash())
+	return result
 }
 
 // SignMessage checks the pwd vs the selected account and passes on the signParams
@@ -317,19 +321,7 @@ func (b *StatusBackend) registerHandlers() error {
 		return b.AccountManager().Accounts()
 	})
 
-	rpcClient.RegisterHandler(params.SendTransactionMethodName, func(ctx context.Context, rpcParams ...interface{}) (interface{}, error) {
-		txArgs, err := transactions.RPCCalltoSendTxArgs(rpcParams...)
-		if err != nil {
-			return nil, err
-		}
-
-		hash, err := b.SendTransaction(ctx, txArgs)
-		if err != nil {
-			return nil, err
-		}
-
-		return hash.Hex(), err
-	})
+	rpcClient.RegisterHandler(params.SendTransactionMethodName, unsupportedMethodHandler)
 
 	rpcClient.RegisterHandler(params.PersonalSignMethodName, unsupportedMethodHandler)
 	rpcClient.RegisterHandler(params.PersonalRecoverMethodName, unsupportedMethodHandler)
