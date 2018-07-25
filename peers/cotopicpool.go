@@ -59,19 +59,29 @@ func (t *cacheOnlyTopicPool) ConfirmAdded(server *p2p.Server, nodeID discover.No
 		// add to cache only if trusted
 		t.TopicPool.ConfirmAdded(server, nodeID)
 		sendEnodeDiscovered(nodeID.String(), string(t.topic))
+		t.subtractToLimits()
 	}
 
 	id := discv5.NodeID(nodeID)
+
+	// If a peer was trusted, it was moved to connectedPeers,
+	// signal was sent and we can safely remove it.
 	if peer, ok := t.connectedPeers[id]; ok {
+		t.removeServerPeer(server, peer)
 		// Delete it from `connectedPeers` immediately to
 		// prevent removing it from the cache which logic is
 		// implemented in TopicPool.
 		delete(t.connectedPeers, id)
-		t.removeServerPeer(server, peer)
+	}
 
-		if trusted {
-			t.subtractToLimits()
-		}
+	// It a peer was not trusted, it is still in pendingPeers.
+	// We should remove it from the p2p.Server.
+	if peer, ok := t.pendingPeers[id]; ok {
+		t.removeServerPeer(server, peer.peerInfo)
+		// Delete it from `connectedPeers` immediately to
+		// prevent removing it from the cache which logic is
+		// implemented in TopicPool.
+		delete(t.pendingPeers, id)
 	}
 }
 

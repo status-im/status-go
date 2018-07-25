@@ -409,6 +409,7 @@ func (s *PeerPoolSimulationSuite) TestMailServerPeersDiscovery() {
 	// to be in the same order. Use a buffer length greater than
 	// the expected number of events to avoid deadlock.
 	poolEvents := make(chan string, 10)
+	summaries := make(chan []*p2p.PeerInfo, 10)
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		var envelope struct {
 			Type  string
@@ -419,6 +420,9 @@ func (s *PeerPoolSimulationSuite) TestMailServerPeersDiscovery() {
 		switch typ := envelope.Type; typ {
 		case signal.EventDiscoverySummary:
 			poolEvents <- envelope.Type
+			var summary []*p2p.PeerInfo
+			s.NoError(json.Unmarshal(envelope.Event, &summary))
+			summaries <- summary
 		}
 	})
 	defer signal.ResetDefaultNodeNotificationHandler()
@@ -456,9 +460,14 @@ func (s *PeerPoolSimulationSuite) TestMailServerPeersDiscovery() {
 
 	// wait for a summary event to be sure that ConfirmAdded() was called
 	s.Equal(signal.EventDiscoverySummary, s.getPoolEvent(poolEvents))
+	s.Equal(s.peers[0].Self().ID.String(), (<-summaries)[0].ID)
 
 	// check cache
 	cachedPeers := peerPool.cache.GetPeersRange(MailServerDiscoveryTopic, 5)
 	s.Require().Len(cachedPeers, 1)
 	s.Equal(s.peers[0].Self().ID[:], cachedPeers[0].ID[:])
+
+	// wait for another summary event as the peer should be removed
+	s.Equal(signal.EventDiscoverySummary, s.getPoolEvent(poolEvents))
+	s.Len(<-summaries, 0)
 }

@@ -104,9 +104,9 @@ func (s *CacheOnlyTopicPoolSuite) TestNotTrustedPeer() {
 	s.topicPool.maxCachedPeers = 1
 	s.topicPool.verifier = &testFalseVerifier{}
 
-	peer1 := discv5.NewNode(discv5.NodeID{1}, s.peer.Self().IP, 32311, 32311)
-	s.topicPool.processFoundNode(s.peer, peer1)
-	s.topicPool.ConfirmAdded(s.peer, discover.NodeID(peer1.ID))
+	foundPeer := discv5.NewNode(discv5.NodeID{1}, s.peer.Self().IP, 32311, 32311)
+	s.topicPool.processFoundNode(s.peer, foundPeer)
+	s.topicPool.ConfirmAdded(s.peer, discover.NodeID(foundPeer.ID))
 
 	s.False(signalCalled)
 	// limits should not change
