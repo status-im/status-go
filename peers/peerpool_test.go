@@ -449,6 +449,8 @@ func (s *PeerPoolSimulationSuite) TestUpdateTopicLimits() {
 }
 
 func (s *PeerPoolSimulationSuite) TestMailServerPeersDiscovery() {
+	s.setupEthV5()
+
 	// Buffered channels must be used because we expect the events
 	// to be in the same order. Use a buffer length greater than
 	// the expected number of events to avoid deadlock.
