@@ -1,18 +1,20 @@
 package rpcfilters
 
 import (
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var transactionHashes = []common.Hash{common.HexToHash("0xAA"), common.HexToHash("0xBB"), common.HexToHash("0xCC")}
 
 func TestTransactionSentToUpstreamEventSubscribe(t *testing.T) {
 	event := newTransactionSentToUpstreamEvent()
-	assert.NoError(t, event.Start())
+	require.NoError(t, event.Start())
 	defer event.Stop()
 
 	_, channel := event.Subscribe()
@@ -42,40 +44,41 @@ func TestTransactionSentToUpstreamEventSubscribe(t *testing.T) {
 
 func TestTransactionSentToUpstreamEventMultipleSubscribe(t *testing.T) {
 	event := newTransactionSentToUpstreamEvent()
-	assert.NoError(t, event.Start())
+	require.NoError(t, event.Start())
 	defer event.Stop()
 
-	subscriptionChannels := [](chan common.Hash){}
+	var subscriptionChannels []chan common.Hash
 	for i := 0; i < 3; i++ {
 		id, channel := event.Subscribe()
 		// test id assignment
-		assert.Equal(t, i, id)
+		require.Equal(t, i, id)
 		// test numberOfSubscriptions
-		assert.Equal(t, event.numberOfSubscriptions(), i+1)
+		require.Equal(t, event.numberOfSubscriptions(), i+1)
 		subscriptionChannels = append(subscriptionChannels, channel)
 	}
 
-	done := make(chan struct{})
+	var wg sync.WaitGroup
+
+	wg.Add(9)
 	go func() {
-		for i, channel := range subscriptionChannels {
-			for _, expectedHash := range transactionHashes {
-				select {
-				case receivedHash := <-channel:
-					assert.Equal(t, expectedHash, receivedHash)
-				case <-time.After(1 * time.Second):
-					assert.Fail(t, "timeout")
+		for _, channel := range subscriptionChannels {
+			ch := channel
+			go func() {
+				for _, expectedHash := range transactionHashes {
+					select {
+					case receivedHash := <-ch:
+						require.Equal(t, expectedHash, receivedHash)
+					case <-time.After(1 * time.Second):
+						assert.Fail(t, "timeout")
+					}
+					wg.Done()
 				}
-			}
-			if i == len(subscriptionChannels)-1 {
-				close(done)
-			}
+			}()
 		}
 	}()
 
 	for _, hashToTrigger := range transactionHashes {
-		// sleep in order to ensure those hashes come in order
-		time.Sleep(10 * time.Millisecond)
 		event.Trigger(hashToTrigger)
 	}
-	<-done
+	wg.Wait()
 }

@@ -228,7 +228,7 @@ func (b *StatusBackend) CallPrivateRPC(inputJSON string) string {
 func (b *StatusBackend) SendTransaction(ctx context.Context, args transactions.SendTxArgs) (hash gethcommon.Hash, err error) {
 	transactionHash, err := b.transactor.SendTransaction(ctx, args)
 	if err == nil {
-		b.rpcFilters.TriggerTransactionSentToUpstreamEvent(transactionHash)
+		go b.rpcFilters.TriggerTransactionSentToUpstreamEvent(transactionHash)
 	}
 	return transactionHash, err
 }

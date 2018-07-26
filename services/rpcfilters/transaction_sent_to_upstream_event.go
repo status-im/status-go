@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/log"
 )
 
 // transactionSentToUpstreamEvent represents an event that one can subscribe to
@@ -57,13 +58,12 @@ func (e *transactionSentToUpstreamEvent) processTransactionSentToUpstream(transa
 	e.sxMu.Lock()
 	defer e.sxMu.Unlock()
 
-	for _, channel := range e.sx {
-		// send hash into channel inside goroutine so that new hashes can be sent
-		// even when not all subscribers have received the previous hash
-		ch := channel
-		go func() {
-			ch <- transactionHash
-		}()
+	for id, channel := range e.sx {
+		select {
+		case channel <- transactionHash:
+		default:
+			log.Error("dropping messages %s for subscriotion %d because the channel is full", transactionHash, id)
+		}
 	}
 }
 
@@ -84,7 +84,7 @@ func (e *transactionSentToUpstreamEvent) Subscribe() (int, chan common.Hash) {
 	e.sxMu.Lock()
 	defer e.sxMu.Unlock()
 
-	channel := make(chan common.Hash)
+	channel := make(chan common.Hash, 512)
 	id := len(e.sx)
 	e.sx[id] = channel
 	return id, channel
@@ -99,7 +99,5 @@ func (e *transactionSentToUpstreamEvent) Unsubscribe(id int) {
 
 // Trigger gets called in order to trigger the event
 func (e *transactionSentToUpstreamEvent) Trigger(transactionHash common.Hash) {
-	go func() {
-		e.listener <- transactionHash
-	}()
+	e.listener <- transactionHash
 }
