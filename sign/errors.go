@@ -2,9 +2,6 @@ package sign
 
 import (
 	"errors"
-
-	"github.com/ethereum/go-ethereum/accounts/keystore"
-	"github.com/status-im/status-go/account"
 )
 
 var (
@@ -33,20 +30,4 @@ func (e TransientError) Error() string {
 // NewTransientError wraps an error into a TransientError structure.
 func NewTransientError(reason error) TransientError {
 	return TransientError{reason}
-}
-
-// remove from queue on any error (except for transient ones) and propagate
-// defined as map[string]bool because errors from ethclient returned wrapped as jsonError
-var transientErrs = map[string]bool{
-	keystore.ErrDecrypt.Error():          true, // wrong password
-	account.ErrNoAccountSelected.Error(): true, // account not selected
-}
-
-func isTransient(err error) bool {
-	_, ok := err.(TransientError)
-	if ok {
-		return true
-	}
-	_, transient := transientErrs[err.Error()]
-	return transient
 }

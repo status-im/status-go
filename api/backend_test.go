@@ -109,12 +109,6 @@ func TestBackendGettersConcurrently(t *testing.T) {
 
 	wg.Add(1)
 	go func() {
-		assert.NotNil(t, backend.PendingSignRequests())
-		wg.Done()
-	}()
-
-	wg.Add(1)
-	go func() {
 		assert.True(t, backend.IsNodeRunning())
 		wg.Done()
 	}()
@@ -335,4 +329,4 @@ func TestPrepareTxArgs(t *testing.T) {
 	}
 }
 
-// TODO(adam): add concurrent tests for: SendTransaction, ApproveSignRequest, DiscardSignRequest
+// TODO(adam): add concurrent tests for: SendTransaction

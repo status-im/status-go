@@ -39,17 +39,16 @@ var (
 
 // StatusBackend implements Status.im service
 type StatusBackend struct {
-	mu                  sync.Mutex
-	statusNode          *node.StatusNode
-	pendingSignRequests *sign.PendingRequests
-	personalAPI         *personal.PublicAPI
-	rpcFilters          *rpcfilters.Service
-	accountManager      *account.Manager
-	transactor          *transactions.Transactor
-	newNotification     fcm.NotificationConstructor
-	connectionState     connectionState
-	appState            appState
-	log                 log.Logger
+	mu              sync.Mutex
+	statusNode      *node.StatusNode
+	personalAPI     *personal.PublicAPI
+	rpcFilters      *rpcfilters.Service
+	accountManager  *account.Manager
+	transactor      *transactions.Transactor
+	newNotification fcm.NotificationConstructor
+	connectionState connectionState
+	appState        appState
+	log             log.Logger
 }
 
 // NewStatusBackend create a new NewStatusBackend instance
@@ -57,7 +56,6 @@ func NewStatusBackend() *StatusBackend {
 	defer log.Info("Status backend initialized")
 
 	statusNode := node.New()
-	pendingSignRequests := sign.NewPendingRequests()
 	accountManager := account.NewManager(statusNode)
 	transactor := transactions.NewTransactor()
 	personalAPI := personal.NewAPI()
@@ -65,14 +63,13 @@ func NewStatusBackend() *StatusBackend {
 	rpcFilters := rpcfilters.New(statusNode)
 
 	return &StatusBackend{
-		pendingSignRequests: pendingSignRequests,
-		statusNode:          statusNode,
-		accountManager:      accountManager,
-		transactor:          transactor,
-		personalAPI:         personalAPI,
-		rpcFilters:          rpcFilters,
-		newNotification:     notificationManager,
-		log:                 log.New("package", "status-go/api.StatusBackend"),
+		statusNode:      statusNode,
+		accountManager:  accountManager,
+		transactor:      transactor,
+		personalAPI:     personalAPI,
+		rpcFilters:      rpcFilters,
+		newNotification: notificationManager,
+		log:             log.New("package", "status-go/api.StatusBackend"),
 	}
 }
 
@@ -89,11 +86,6 @@ func (b *StatusBackend) AccountManager() *account.Manager {
 // Transactor returns reference to a status transactor
 func (b *StatusBackend) Transactor() *transactions.Transactor {
 	return b.transactor
-}
-
-// PendingSignRequests returns reference to a list of current sign requests
-func (b *StatusBackend) PendingSignRequests() *sign.PendingRequests {
-	return b.pendingSignRequests
 }
 
 // IsNodeRunning confirm that node is running
@@ -268,46 +260,6 @@ func (b *StatusBackend) getVerifiedAccount(password string) (*account.SelectedEx
 		return nil, err
 	}
 	return selectedAccount, nil
-}
-
-// ApproveSignRequest instructs backend to complete sending of a given transaction.
-func (b *StatusBackend) ApproveSignRequest(id, password string) sign.Result {
-	return b.pendingSignRequests.Approve(id, password, nil, b.getVerifiedAccount)
-}
-
-// ApproveSignRequestWithArgs instructs backend to complete sending of a given transaction.
-// gas and gasPrice will be overrided with the given values before signing the
-// transaction.
-func (b *StatusBackend) ApproveSignRequestWithArgs(id, password string, gas, gasPrice int64) sign.Result {
-	args := prepareTxArgs(gas, gasPrice)
-	return b.pendingSignRequests.Approve(id, password, &args, b.getVerifiedAccount)
-}
-
-// ApproveSignRequests instructs backend to complete sending of multiple transactions
-func (b *StatusBackend) ApproveSignRequests(ids []string, password string) map[string]sign.Result {
-	results := make(map[string]sign.Result)
-	for _, txID := range ids {
-		results[txID] = b.ApproveSignRequest(txID, password)
-	}
-	return results
-}
-
-// DiscardSignRequest discards a given transaction from transaction queue
-func (b *StatusBackend) DiscardSignRequest(id string) error {
-	return b.pendingSignRequests.Discard(id)
-}
-
-// DiscardSignRequests discards given multiple transactions from transaction queue
-func (b *StatusBackend) DiscardSignRequests(ids []string) map[string]error {
-	results := make(map[string]error)
-	for _, txID := range ids {
-		err := b.DiscardSignRequest(txID)
-		if err != nil {
-			results[txID] = err
-		}
-	}
-
-	return results
 }
 
 // registerHandlers attaches Status callback handlers to running node
