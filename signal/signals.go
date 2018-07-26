@@ -4,6 +4,7 @@ package signal
 
 import (
 	"encoding/json"
+	"unsafe"
 
 	"sync"
 
@@ -76,3 +77,6 @@ func TriggerTestSignal() {
 	notificationHandler(str)
 	notificationHandlerMutex.Unlock()
 }
+
+//nolint: golint
+func SetSignalEventCallback(cb unsafe.Pointer) {}
