@@ -12,36 +12,6 @@ import (
 
 var transactionHashes = []common.Hash{common.HexToHash("0xAA"), common.HexToHash("0xBB"), common.HexToHash("0xCC")}
 
-func TestTransactionSentToUpstreamEventSubscribe(t *testing.T) {
-	event := newTransactionSentToUpstreamEvent()
-	require.NoError(t, event.Start())
-	defer event.Stop()
-
-	_, channel := event.Subscribe()
-
-	done := make(chan struct{})
-	go func() {
-		for i, expectedHash := range transactionHashes {
-			select {
-			case receivedHash := <-channel:
-				assert.Equal(t, expectedHash, receivedHash)
-			case <-time.After(1 * time.Second):
-				assert.Fail(t, "timeout")
-			}
-			if i == len(transactionHashes)-1 {
-				close(done)
-			}
-		}
-	}()
-
-	for _, hashToTrigger := range transactionHashes {
-		// sleep in order to ensure those hashes come in order
-		time.Sleep(10 * time.Millisecond)
-		event.Trigger(hashToTrigger)
-	}
-	<-done
-}
-
 func TestTransactionSentToUpstreamEventMultipleSubscribe(t *testing.T) {
 	event := newTransactionSentToUpstreamEvent()
 	require.NoError(t, event.Start())
