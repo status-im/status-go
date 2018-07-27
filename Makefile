@@ -185,7 +185,7 @@ mock: ##@other Regenerate mocks
 docker-test: ##@tests Run tests in a docker container with golang.
 	docker run --privileged --rm -it -v "$(shell pwd):$(DOCKER_TEST_WORKDIR)" -w "$(DOCKER_TEST_WORKDIR)" $(DOCKER_TEST_IMAGE) go test ${ARGS}
 
-test: test-unit-coverage ##@tests Run basic, short tests during development
+test: test-unit ##@tests Run basic, short tests during development
 
 test-unit: UNIT_TEST_PACKAGES = $(shell go list ./...  | \
 	grep -v /vendor | \
@@ -194,9 +194,6 @@ test-unit: UNIT_TEST_PACKAGES = $(shell go list ./...  | \
 	grep -v /lib)
 test-unit: ##@tests Run unit and integration tests
 	go test -v $(UNIT_TEST_PACKAGES) $(gotest_extraflags)
-
-test-unit-coverage: ##@tests Run unit and integration tests with coverage
-	go test -coverpkg= $(UNIT_TEST_PACKAGES) $(gotest_extraflags)
 
 test-unit-race: gotest_extraflags=-race
 test-unit-race: test-unit ##@tests Run unit and integration tests with -race flag
@@ -229,7 +226,6 @@ ci: lint mock dep-ensure test-unit test-e2e ##@tests Run all linters and tests a
 
 clean: ##@other Cleanup
 	rm -fr build/bin/*
-	rm -f coverage.out coverage-all.out coverage.html
 
 deep-clean: clean
 	rm -Rdf .ethereumtest/StatusChain
