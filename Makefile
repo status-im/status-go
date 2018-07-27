@@ -48,12 +48,6 @@ DOCKER_IMAGE_CUSTOM_TAG ?= $(shell BUILD_TAGS="$(BUILD_TAGS)" ./_assets/ci/get-d
 DOCKER_TEST_WORKDIR = /go/src/github.com/status-im/status-go/
 DOCKER_TEST_IMAGE = golang:1.10
 
-UNIT_TEST_PACKAGES := $(shell go list ./...  | \
-	grep -v /vendor | \
-	grep -v /t/e2e | \
-	grep -v /t/benchmarks | \
-	grep -v /lib)
-
 # This is a code for automatic help generator.
 # It supports ANSI colors and categories.
 # To add new item into help output, simply add comments
@@ -193,6 +187,11 @@ docker-test: ##@tests Run tests in a docker container with golang.
 
 test: test-unit-coverage ##@tests Run basic, short tests during development
 
+test-unit: UNIT_TEST_PACKAGES = $(shell go list ./...  | \
+	grep -v /vendor | \
+	grep -v /t/e2e | \
+	grep -v /t/benchmarks | \
+	grep -v /lib)
 test-unit: ##@tests Run unit and integration tests
 	go test -v $(UNIT_TEST_PACKAGES) $(gotest_extraflags)
 
