@@ -146,16 +146,19 @@ push-docker-images: docker-image bootnode-image
 	docker push $(BOOTNODE_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG)
 	docker push $(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG)
 
-push-docker-images-latest: docker-image bootnode-image
-	GIT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
-	GIT_LOCAL  := $(shell git rev-parse @)
-	GIT_REMOTE := $(shell git fetch -q && git rev-parse remotes/origin/develop || echo 'NO_DEVELOP')
+# See https://www.gnu.org/software/make/manual/html_node/Target_002dspecific.html to understand this magic.
+push-docker-images-latest: GIT_BRANCH = $(shell git rev-parse --abbrev-ref HEAD)
+push-docker-images-latest: GIT_LOCAL  = $(shell git rev-parse @)
+push-docker-images-latest: GIT_REMOTE = $(shell git fetch -q && git rev-parse remotes/origin/develop || echo 'NO_DEVELOP')
+push-docker-images-latest:
+	@echo "Pushing latest docker images..."
+	@echo "Checking git branch..."
 ifneq ("$(GIT_BRANCH)", "develop")
-	echo "You should only use develop branch to push the latest tag!"
+	$(error You should only use develop branch to push the latest tag!)
 	exit 1
 endif
 ifneq ("$(GIT_LOCAL)", "$(GIT_REMOTE)")
-	echo "The local git commit does not match the remote origin!"
+	$(error The local git commit does not match the remote origin!)
 	exit 1
 endif
 	docker push $(BOOTNODE_IMAGE_NAME):latest
