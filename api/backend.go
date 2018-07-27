@@ -225,7 +225,7 @@ func (b *StatusBackend) SendTransaction(sendArgs transactions.SendTxArgs, passwo
 	}
 	result := b.transactor.SendTransaction(sendArgs, verifiedAccount)
 	if result.Error != nil {
-		return sign.NewErrResult(result.Error)
+		return result
 	}
 	go b.rpcFilters.TriggerTransactionSentToUpstreamEvent(result.Response.Hash())
 	return result

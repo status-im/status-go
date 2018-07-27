@@ -99,6 +99,7 @@ func (t *Transactor) validateAndPropagate(selectedAccount *account.SelectedExtKe
 	if err = t.validateAccount(args, selectedAccount); err != nil {
 		return hash, err
 	}
+
 	if !args.Valid() {
 		return hash, ErrInvalidSendTxArgs
 	}
