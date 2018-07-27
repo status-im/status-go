@@ -513,7 +513,9 @@ func (s *PeerPoolSimulationSuite) TestMailServerPeersDiscovery() {
 	s.Require().Len(cachedPeers, 1)
 	s.Equal(s.peers[0].Self().ID[:], cachedPeers[0].ID[:])
 
-	// wait for another summary event as the peer should be removed
+	// wait for another event as the peer should be removed
+	disconnectedPeer := s.getPeerFromEvent(events, p2p.PeerEventTypeDrop)
+	s.Equal(s.peers[0].Self().ID, disconnectedPeer)
 	s.Equal(signal.EventDiscoverySummary, s.getPoolEvent(poolEvents))
 	s.Len(<-summaries, 0)
 }
