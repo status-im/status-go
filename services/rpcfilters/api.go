@@ -39,16 +39,19 @@ func newFilter() *filter {
 
 // PublicAPI represents filter API that is exported to `eth` namespace
 type PublicAPI struct {
-	filters   map[rpc.ID]*filter
-	filtersMu sync.Mutex
-	event     *latestBlockChangedEvent
+	filters                        map[rpc.ID]*filter
+	filtersMu                      sync.Mutex
+	latestBlockChangedEvent        *latestBlockChangedEvent
+	transactionSentToUpstreamEvent *transactionSentToUpstreamEvent
 }
 
 // NewPublicAPI returns a reference to the PublicAPI object
-func NewPublicAPI(event *latestBlockChangedEvent) *PublicAPI {
+func NewPublicAPI(latestBlockChangedEvent *latestBlockChangedEvent,
+	transactionSentToUpstreamEvent *transactionSentToUpstreamEvent) *PublicAPI {
 	return &PublicAPI{
-		filters: make(map[rpc.ID]*filter),
-		event:   event,
+		filters:                        make(map[rpc.ID]*filter),
+		latestBlockChangedEvent:        latestBlockChangedEvent,
+		transactionSentToUpstreamEvent: transactionSentToUpstreamEvent,
 	}
 }
 
@@ -64,8 +67,8 @@ func (api *PublicAPI) NewBlockFilter() rpc.ID {
 	api.filters[id] = f
 
 	go func() {
-		id, s := api.event.Subscribe()
-		defer api.event.Unsubscribe(id)
+		id, s := api.latestBlockChangedEvent.Subscribe()
+		defer api.latestBlockChangedEvent.Unsubscribe(id)
 
 		for {
 			select {
@@ -79,6 +82,36 @@ func (api *PublicAPI) NewBlockFilter() rpc.ID {
 	}()
 
 	return id
+}
+
+// NewPendingTransactionFilter is an implementation of `eth_newPendingTransactionFilter` API
+// https://github.com/ethereum/wiki/wiki/JSON-RPC#eth_newpendingtransactionfilter
+func (api *PublicAPI) NewPendingTransactionFilter() rpc.ID {
+	api.filtersMu.Lock()
+	defer api.filtersMu.Unlock()
+
+	f := newFilter()
+	id := rpc.ID(uuid.New())
+
+	api.filters[id] = f
+
+	go func() {
+		id, s := api.transactionSentToUpstreamEvent.Subscribe()
+		defer api.transactionSentToUpstreamEvent.Unsubscribe(id)
+
+		for {
+			select {
+			case hash := <-s:
+				f.AddHash(hash)
+			case <-f.done:
+				return
+			}
+		}
+
+	}()
+
+	return id
+
 }
 
 // UninstallFilter is an implemenation of `eth_uninstallFilter` API

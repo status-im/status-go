@@ -42,6 +42,7 @@ type StatusBackend struct {
 	statusNode          *node.StatusNode
 	pendingSignRequests *sign.PendingRequests
 	personalAPI         *personal.PublicAPI
+	rpcFilters          *rpcfilters.Service
 	accountManager      *account.Manager
 	transactor          *transactions.Transactor
 	newNotification     fcm.NotificationConstructor
@@ -60,6 +61,7 @@ func NewStatusBackend() *StatusBackend {
 	transactor := transactions.NewTransactor(pendingSignRequests)
 	personalAPI := personal.NewAPI(pendingSignRequests)
 	notificationManager := fcm.NewNotification(fcmServerKey)
+	rpcFilters := rpcfilters.New(statusNode)
 
 	return &StatusBackend{
 		pendingSignRequests: pendingSignRequests,
@@ -67,6 +69,7 @@ func NewStatusBackend() *StatusBackend {
 		accountManager:      accountManager,
 		transactor:          transactor,
 		personalAPI:         personalAPI,
+		rpcFilters:          rpcFilters,
 		newNotification:     notificationManager,
 		log:                 log.New("package", "status-go/api.StatusBackend"),
 	}
@@ -223,7 +226,11 @@ func (b *StatusBackend) CallPrivateRPC(inputJSON string) string {
 
 // SendTransaction creates a new transaction and waits until it's complete.
 func (b *StatusBackend) SendTransaction(ctx context.Context, args transactions.SendTxArgs) (hash gethcommon.Hash, err error) {
-	return b.transactor.SendTransaction(ctx, args)
+	transactionHash, err := b.transactor.SendTransaction(ctx, args)
+	if err == nil {
+		go b.rpcFilters.TriggerTransactionSentToUpstreamEvent(transactionHash)
+	}
+	return transactionHash, err
 }
 
 func (b *StatusBackend) getVerifiedAccount(password string) (*account.SelectedExtKey, error) {
