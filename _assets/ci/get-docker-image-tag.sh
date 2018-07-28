@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
 #
-# Creates a string in a format: $GIT_SHA[:8][-$BUILD_TAGS]
-# where $BUILD_TAGS is optional and if present all spaces
-# are replaced by a hyphen (-).
-
+# Returns a tag for a docker image. It tries to get a tag first if availalbe,
+# otherwise the first 8 characters of the HEAD git SHA is returned.
 
 set -e -o pipefail
 
