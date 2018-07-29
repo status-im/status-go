@@ -37,9 +37,9 @@ func send(typ string, event interface{}) {
 		return
 	}
 
-	notificationHandlerMutex.Lock()
+	notificationHandlerMutex.RLock()
 	notificationHandler(string(data))
-	notificationHandlerMutex.Unlock()
+	notificationHandlerMutex.RUnlock()
 }
 
 // NodeNotificationHandler defines a handler able to process incoming node events.
@@ -73,9 +73,9 @@ func TriggerDefaultNodeNotificationHandler(jsonEvent string) {
 //nolint: golint
 func TriggerTestSignal() {
 	str := `{"answer": 42}`
-	notificationHandlerMutex.Lock()
+	notificationHandlerMutex.RLock()
 	notificationHandler(str)
-	notificationHandlerMutex.Unlock()
+	notificationHandlerMutex.RUnlock()
 }
 
 //nolint: golint
