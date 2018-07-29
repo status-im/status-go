@@ -53,6 +53,7 @@ var notificationHandlerMutex sync.RWMutex
 
 // SetDefaultNodeNotificationHandler sets notification handler to invoke on Send
 func SetDefaultNodeNotificationHandler(fn NodeNotificationHandler) {
+	logger.Warn("[DEBUG] Overriding notification handler")
 	notificationHandlerMutex.Lock()
 	notificationHandler = fn
 	notificationHandlerMutex.Unlock()
