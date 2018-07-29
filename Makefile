@@ -144,7 +144,7 @@ push-docker-images: docker-image bootnode-image
 push-docker-images-latest: GIT_BRANCH = $(shell git rev-parse --abbrev-ref HEAD)
 push-docker-images-latest: GIT_LOCAL  = $(shell git rev-parse @)
 push-docker-images-latest: GIT_REMOTE = $(shell git fetch -q && git rev-parse remotes/origin/develop || echo 'NO_DEVELOP')
-push-docker-images-latest:
+push-docker-images-latest: docker-image bootnode-image
 	@echo "Pushing latest docker images..."
 	@echo "Checking git branch..."
 ifneq ("$(GIT_BRANCH)", "develop")
