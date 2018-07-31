@@ -11,6 +11,9 @@ import (
 	"github.com/status-im/status-go/discovery"
 )
 
+// DiscoveryContainer is an utility structure that wrapps
+// discovery related objects. It provides an interface to
+// control the whole discovery system.
 type DiscoveryContainer struct {
 	discovery discovery.Discovery
 	peerPool  *PeerPool
@@ -22,6 +25,7 @@ type DiscoveryContainer struct {
 	quit chan struct{}
 }
 
+// NewDiscoveryContainer returns a new DiscoveryContainer instance.
 func NewDiscoveryContainer(
 	d discovery.Discovery, topics []TopicPool, cache *peers.Cache,
 ) *DiscoveryContainer {
@@ -32,6 +36,9 @@ func NewDiscoveryContainer(
 	}
 }
 
+// Start starts all discovery related structures.
+// If timeout is larger than 0, the system times out
+// after this duration.
 func (c *DiscoveryContainer) Start(server *p2p.Server, timeout time.Duration) (err error) {
 	if c.quit != nil {
 		return nil
@@ -44,7 +51,7 @@ func (c *DiscoveryContainer) Start(server *p2p.Server, timeout time.Duration) (e
 		}
 	}()
 
-	err = c.startDiscovery()
+	err = c.startDiscoveryAndTopics()
 	if err != nil {
 		return
 	}
@@ -59,7 +66,8 @@ func (c *DiscoveryContainer) Start(server *p2p.Server, timeout time.Duration) (e
 	return nil
 }
 
-func (c *DiscoveryContainer) Stop() error {
+// Stop stops all peers discovery system components.
+func (c *DiscoveryContainer) Stop() (err error) {
 	if c.quit == nil {
 		return nil
 	}
@@ -67,10 +75,13 @@ func (c *DiscoveryContainer) Stop() error {
 	close(c.quit)
 	c.wg.Wait()
 
-	return c.stopDiscovery()
+	err = c.stopDiscoveryAndTopics()
+	c.peerPool.Stop()
+
+	return
 }
 
-func (c *DiscoveryContainer) startDiscovery() error {
+func (c *DiscoveryContainer) startDiscoveryAndTopics() error {
 	if c.discoveryRunning {
 		return nil
 	}
@@ -88,7 +99,7 @@ func (c *DiscoveryContainer) startDiscovery() error {
 	return nil
 }
 
-func (c *DiscoveryContainer) stopDiscovery() (err error) {
+func (c *DiscoveryContainer) stopDiscoveryAndTopics() (err error) {
 	for _, t := range c.topics {
 		t.Stop()
 	}
@@ -114,6 +125,9 @@ func (c *DiscoveryContainer) handleTimeout(t <-chan time.Time) {
 	}
 }
 
+// checkTopicSatisfaction monitors if Discovery and TopicPools should be active
+// or can be stopped.
+// PeerPool should not be stopped as it watches the peers.
 func (c *DiscoveryContainer) checkTopicSatisfaction(period time.Duration) {
 	c.wg.Add(1)
 	defer c.wg.Done()
@@ -128,10 +142,10 @@ func (c *DiscoveryContainer) checkTopicSatisfaction(period time.Duration) {
 		case <-t.C:
 			if IsAllTopicsSatisfied(c.peerPool.Topics()) {
 				log.Debug("all topics are satisfied")
-				c.stopDiscovery()
+				c.stopDiscoveryAndTopics()
 			} else {
 				log.Debug("not all topics are satisfied")
-				c.startDiscovery()
+				c.startDiscoveryAndTopics()
 			}
 		}
 	}

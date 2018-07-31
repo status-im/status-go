@@ -12,11 +12,6 @@ import (
 	"github.com/status-im/status-go/peers"
 )
 
-var (
-	ErrPeerPoolStarted    = errors.New("PeerPool is already started")
-	ErrPeerPoolNotStarted = errors.New("PeerPool is not started")
-)
-
 type p2pServer interface {
 	SubscribeEvents(chan *p2p.PeerEvent) event.Subscription
 	Self() *discover.Node
@@ -36,10 +31,12 @@ type peerInfo struct {
 	dismissed bool
 }
 
+// PeerPool manages found peers by `TopicPool`s and calls appropriate methods
+// when founds peers are connected or dropped.PeerPool
+// It also manages peers caching.
 type PeerPool struct {
 	sync.RWMutex
 
-	topics           []TopicPool
 	topicToTopicPool map[discv5.Topic]TopicPool
 	nodeIDToPeerInfo map[discover.NodeID]*peerInfo
 
@@ -54,6 +51,7 @@ type PeerPool struct {
 	quit chan struct{}
 }
 
+// NewPeerPool returns a new PeerPool instance.
 func NewPeerPool(topics []TopicPool, cache *peers.Cache) *PeerPool {
 	topicToTopicPool := make(map[discv5.Topic]TopicPool)
 	for _, t := range topics {
@@ -61,20 +59,28 @@ func NewPeerPool(topics []TopicPool, cache *peers.Cache) *PeerPool {
 	}
 
 	return &PeerPool{
-		topics:           topics,
 		topicToTopicPool: topicToTopicPool,
 		nodeIDToPeerInfo: make(map[discover.NodeID]*peerInfo),
 		cache:            cache,
 	}
 }
 
+// Topics returns a list of followed `TopicPool`s.
 func (p *PeerPool) Topics() []TopicPool {
 	p.RLock()
 	defer p.RUnlock()
 
-	return p.topics
+	topics := make([]TopicPool, 0, len(p.topicToTopicPool))
+	for _, t := range p.topicToTopicPool {
+		topics = append(topics, t)
+	}
+
+	return topics
 }
 
+// Start starts the `PeerPool` mechanics.
+// This method is idempotent and if the `PeerPool`
+// is already started, it returns immediatelly.
 func (p *PeerPool) Start(server p2pServer) {
 	p.Lock()
 	defer p.Unlock()
@@ -82,7 +88,6 @@ func (p *PeerPool) Start(server p2pServer) {
 	if p.quit != nil {
 		return
 	}
-
 	p.quit = make(chan struct{})
 
 	// subscribe to peer events
@@ -92,9 +97,13 @@ func (p *PeerPool) Start(server p2pServer) {
 	p.addPeerReq = make(chan addPeerReq)
 	go p.handleServerPeers(server, p.events, p.addPeerReq)
 
+	// load initial peers from cache
+	p.loadInitialPeersFromCache()
+
 	return
 }
 
+// Stop stops the `PeerPool`.
 func (p *PeerPool) Stop() {
 	p.Lock()
 	defer p.Unlock()
@@ -116,6 +125,7 @@ func (p *PeerPool) Stop() {
 	p.quit = nil
 }
 
+// RequestToAddPeer passes along a request to add a node as a peer.
 func (p *PeerPool) RequestToAddPeer(t discv5.Topic, node *discv5.Node) {
 	p.RLock()
 	p.addPeerReq <- addPeerReq{t, node}
@@ -156,6 +166,7 @@ func (p *PeerPool) handleServerPeers(
 			if _, ok := p.nodeIDToPeerInfo[nodeID]; !ok {
 				p.nodeIDToPeerInfo[nodeID] = &peerInfo{}
 			}
+
 			peerInfo := p.nodeIDToPeerInfo[nodeID]
 			peerInfo.topics = append(peerInfo.topics, t)
 			peerInfo.node = node
@@ -169,7 +180,7 @@ func (p *PeerPool) handleServerPeers(
 func (p *PeerPool) handleAddedPeer(server p2pServer, nodeID discover.NodeID) {
 	peerInfo, ok := p.nodeIDToPeerInfo[nodeID]
 	if !ok {
-		log.Debug("PeerPool handling unknown peer", "nodeID", nodeID)
+		log.Debug("PeerPool adding an unknown peer", "nodeID", nodeID)
 		return
 	}
 
@@ -177,6 +188,8 @@ func (p *PeerPool) handleAddedPeer(server p2pServer, nodeID discover.NodeID) {
 		log.Error("failed to add peer to cache", "nodeID", nodeID, "err", err)
 	}
 
+	// Check if a given peer gets confirmed. It must receive at least one confirmation
+	// from a `TopicPool` in order not to be dropped.
 	var confirmed bool
 
 	for _, topic := range peerInfo.topics {
@@ -188,9 +201,10 @@ func (p *PeerPool) handleAddedPeer(server p2pServer, nodeID discover.NodeID) {
 		}
 	}
 
-	log.Debug("PeerPool handling a peer", "nodeID", nodeID, "confirmed", confirmed)
+	log.Debug("PeerPool adding a peer", "nodeID", nodeID, "confirmed", confirmed)
 
 	if !confirmed {
+		// indicate that the `PeerPool` dropped this peer deliberetly
 		peerInfo.dismissed = true
 
 		node := peerInfo.node
@@ -201,9 +215,12 @@ func (p *PeerPool) handleAddedPeer(server p2pServer, nodeID discover.NodeID) {
 func (p *PeerPool) handleDroppedPeer(server p2pServer, nodeID discover.NodeID) {
 	peerInfo, ok := p.nodeIDToPeerInfo[nodeID]
 	if !ok {
+		log.Debug("PeerPool dropping an unknown peer", "nodeID", nodeID)
 		return
 	}
 
+	// Peer is not removed from the cache if it was dropped by the `PeerPool` deliberetly.
+	// It means that the peer is ok but no topic is interested in it anymore.
 	if !peerInfo.dismissed {
 		if err := p.removePeerFromCache(nodeID); err != nil {
 			log.Error("failed to remove peer from cache", "nodeID", nodeID, "err", err)
@@ -218,6 +235,28 @@ func (p *PeerPool) handleDroppedPeer(server p2pServer, nodeID discover.NodeID) {
 	}
 
 	delete(p.nodeIDToPeerInfo, nodeID)
+}
+
+func (p *PeerPool) loadInitialPeersFromCache() {
+	for topic, topicPool := range p.topicToTopicPool {
+		limit := 5
+		if tp, ok := topicPool.(limited); ok {
+			limit = tp.UpperLimit()
+		}
+
+		nodes := p.getPeersFromCache(topic, limit)
+		for _, node := range nodes {
+			p.addPeerReq <- addPeerReq{topic, node}
+		}
+	}
+}
+
+func (p *PeerPool) getPeersFromCache(topic discv5.Topic, limit int) []*discv5.Node {
+	if p.cache == nil {
+		return nil
+	}
+
+	return p.cache.GetPeersRange(topic, limit)
 }
 
 func (p *PeerPool) addPeerToCache(nodeID discover.NodeID) error {
