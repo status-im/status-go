@@ -73,6 +73,6 @@ func TestBlockedRoutesRawCall(t *testing.T) {
 			"method": "%s",
 			"params": ["0xc862bf3cf4565d46abcbadaf4712a8940bfea729a91b9b0e338eab5166341ab5"]
 		}`, m))
-		require.Contains(t, rawResult, `{"code":-32700,"message":"The method does not exist/is not available"}`)
+		require.Contains(t, rawResult, fmt.Sprintf(`{"code":-32700,"message":"%s"}`, ErrMethodNotFound))
 	}
 }

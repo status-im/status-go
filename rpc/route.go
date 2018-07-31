@@ -50,6 +50,7 @@ var blockedMethods = [...]string{
 }
 
 // BlockedMethods returns a list of methods that are not allowed to be called.
+// A copy of a slice is returned in order to prevent from changing it from outside.
 func BlockedMethods() []string {
 	return append([]string(nil), blockedMethods[:]...)
 }
