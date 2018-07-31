@@ -20,6 +20,11 @@ const (
 	DefaultCallTimeout = time.Minute
 )
 
+// List of RPC client errors.
+var (
+	ErrMethodNotFound = fmt.Errorf("The method does not exist/is not available")
+)
+
 // Handler defines handler for RPC methods.
 type Handler func(context.Context, ...interface{}) (interface{}, error)
 
@@ -89,6 +94,10 @@ func (c *Client) Call(result interface{}, method string, args ...interface{}) er
 // It uses custom routing scheme for calls.
 // If there are any local handlers registered for this call, they will handle it.
 func (c *Client) CallContext(ctx context.Context, result interface{}, method string, args ...interface{}) error {
+	if c.router.routeBlocked(method) {
+		return ErrMethodNotFound
+	}
+
 	// check locally registered handlers first
 	if handler, ok := c.handler(method); ok {
 		return c.callMethod(ctx, result, handler, args...)
