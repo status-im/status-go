@@ -34,7 +34,7 @@ func (s *MailServiceSuite) TestShhextRequestMessagesRPCMethodAvailability() {
 	})
 	defer s.StopTestNode()
 
-	client := s.StatusNode.RPCClient()
+	client := s.StatusNode.RPCPrivateClient()
 	r.NotNil(client)
 
 	// This error means that the method is available through inproc communication
