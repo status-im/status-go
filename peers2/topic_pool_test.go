@@ -17,7 +17,7 @@ func (d *discoveryMock) Running() bool                                   { retur
 func (d *discoveryMock) Start() error                                    { d.running = true; return nil }
 func (d *discoveryMock) Stop() error                                     { d.running = false; return nil }
 func (d *discoveryMock) Register(topic string, stop chan struct{}) error { return nil }
-func (d *discoveryMock) Discover(topic string, period <-chan time.Duration, found chan<- *discv5.Node, lookup chan<- bool) error {
+func (d *discoveryMock) Discover(_ string, period <-chan time.Duration, _ chan<- *discv5.Node, _ chan<- bool) error {
 	for {
 		select {
 		case _, ok := <-period:
@@ -68,9 +68,14 @@ func TestTopicPoolProperStopSequence(t *testing.T) {
 		}
 	}()
 
+	// finally call Stop()
 	time.Sleep(time.Millisecond * 50)
 	topicPool.Stop()
 
 	// make sure some found nodes were handled by TopicPool
 	assert.NotEqual(t, 0, handler.nodes)
+}
+
+func TestTopicPoolWithLimits(t *testing.T) {
+	// TODO
 }
