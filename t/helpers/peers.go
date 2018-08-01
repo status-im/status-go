@@ -2,6 +2,7 @@ package helpers
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/ethereum/go-ethereum/p2p"
@@ -58,4 +59,17 @@ func WaitForPeerAsync(p *p2p.Server, u string, e p2p.PeerEventType, t time.Durat
 	}()
 	<-subscribed
 	return errCh
+}
+
+// PeerFromEvent returns a NodeID of the first peer that match the criteria.
+func PeerFromEvent(events <-chan *p2p.PeerEvent, etype p2p.PeerEventType) (nodeID discover.NodeID, err error) {
+	select {
+	case ev := <-events:
+		if ev.Type == etype {
+			return ev.Peer, nil
+		}
+		return nodeID, fmt.Errorf("invalid event '%s' when expected '%s'", ev.Type, etype)
+	case <-time.After(5 * time.Second):
+		return nodeID, fmt.Errorf("timed out")
+	}
 }

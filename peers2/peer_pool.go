@@ -25,6 +25,8 @@ type addPeerReq struct {
 	node *discv5.Node
 }
 
+type removePeerReq = *discover.Node
+
 type peerInfo struct {
 	topics    []discv5.Topic
 	node      *discv5.Node
@@ -43,6 +45,7 @@ type PeerPool struct {
 	cache *peers.Cache
 
 	addPeerReq chan addPeerReq
+	peerFeed   event.Feed
 
 	serverSubscription event.Subscription
 	events             chan *p2p.PeerEvent
@@ -78,9 +81,15 @@ func (p *PeerPool) Topics() []TopicPool {
 	return topics
 }
 
+// SubscribePeerEvents subscribes the given channel to peer events.
+// Events are sent after the peer is handled by topic pools.
+func (p *PeerPool) SubscribePeerEvents(ch chan *p2p.PeerEvent) event.Subscription {
+	return p.peerFeed.Subscribe(ch)
+}
+
 // Start starts the `PeerPool` mechanics.
 // This method is idempotent and if the `PeerPool`
-// is already started, it returns immediatelly.
+// is already started, it returns immediately.
 func (p *PeerPool) Start(server p2pServer) {
 	p.Lock()
 	defer p.Unlock()
@@ -99,8 +108,6 @@ func (p *PeerPool) Start(server p2pServer) {
 
 	// load initial peers from cache
 	p.loadInitialPeersFromCache()
-
-	return
 }
 
 // Stop stops the `PeerPool`.
@@ -148,8 +155,12 @@ func (p *PeerPool) handleServerPeers(
 			switch event.Type {
 			case p2p.PeerEventTypeAdd:
 				p.handleAddedPeer(server, event.Peer)
+				p.peerFeed.Send(event)
 			case p2p.PeerEventTypeDrop:
 				p.handleDroppedPeer(server, event.Peer)
+				// remove the peer reference
+				delete(p.nodeIDToPeerInfo, event.Peer)
+				p.peerFeed.Send(event)
 			default:
 				continue
 			}
@@ -204,7 +215,7 @@ func (p *PeerPool) handleAddedPeer(server p2pServer, nodeID discover.NodeID) {
 	log.Debug("PeerPool adding a peer", "nodeID", nodeID, "confirmed", confirmed)
 
 	if !confirmed {
-		// indicate that the `PeerPool` dropped this peer deliberetly
+		// indicate that the `PeerPool` dropped this peer deliberately
 		peerInfo.dismissed = true
 
 		node := peerInfo.node
@@ -219,7 +230,7 @@ func (p *PeerPool) handleDroppedPeer(server p2pServer, nodeID discover.NodeID) {
 		return
 	}
 
-	// Peer is not removed from the cache if it was dropped by the `PeerPool` deliberetly.
+	// Peer is not removed from the cache if it was dropped by the `PeerPool` deliberately.
 	// It means that the peer is ok but no topic is interested in it anymore.
 	if !peerInfo.dismissed {
 		if err := p.removePeerFromCache(nodeID); err != nil {
@@ -233,8 +244,6 @@ func (p *PeerPool) handleDroppedPeer(server p2pServer, nodeID discover.NodeID) {
 			log.Error("failed to confirm dropped peer", "topic", topic, "err", err)
 		}
 	}
-
-	delete(p.nodeIDToPeerInfo, nodeID)
 }
 
 func (p *PeerPool) loadInitialPeersFromCache() {

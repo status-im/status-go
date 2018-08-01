@@ -137,8 +137,6 @@ func (t *TopicPoolBase) Start(pool *PeerPool) {
 	)
 	found, lookup, t.discoverDone = t.discover(t.period)
 	t.handlerDone = t.handleFoundPeers(pool, found, lookup)
-
-	return
 }
 
 // Stop stops discovering a given topic.
@@ -304,5 +302,12 @@ func NewTopicPoolEphemeral(base *TopicPoolWithLimits) *TopicPoolEphemeral {
 
 // ConfirmAdded always returns an error that indicates that a peer can be dropped.
 func (t *TopicPoolEphemeral) ConfirmAdded(peer peerID) error {
+	t.Lock()
+	defer t.Unlock()
+
+	// In case of TopicPoolEphemeral, `connectedPeers` contains a number of found peers
+	// with confirmed connectivity. Peers are never removed.
+	t.connectedPeers[peer] = struct{}{}
+
 	return errors.New("ephemeral topic pool")
 }

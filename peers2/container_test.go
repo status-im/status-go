@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/status-im/status-go/discovery"
 	"github.com/status-im/status-go/peers"
+	"github.com/status-im/status-go/t/helpers"
 )
 
 func TestDiscoveryContainer(t *testing.T) {
@@ -65,7 +66,7 @@ func TestDiscoveryContainer(t *testing.T) {
 	require.NoError(t, register.Start())
 
 	// check peers
-	peerID, err := getPeerFromEvent(events, p2p.PeerEventTypeAdd)
+	peerID, err := helpers.PeerFromEvent(events, p2p.PeerEventTypeAdd)
 	require.NoError(t, err)
 	require.Equal(t, registerServer.Self().ID[:], peerID[:])
 

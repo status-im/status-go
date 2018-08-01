@@ -61,7 +61,7 @@ func (c *DiscoveryContainer) Start(server *p2p.Server, timeout time.Duration) (e
 	if timeout > 0 {
 		go c.handleTimeout(time.After(timeout))
 	}
-	go c.checkTopicSatisfaction(time.Second)
+	go c.checkTopicsSatisfaction(time.Second)
 
 	return nil
 }
@@ -125,10 +125,10 @@ func (c *DiscoveryContainer) handleTimeout(t <-chan time.Time) {
 	}
 }
 
-// checkTopicSatisfaction monitors if Discovery and TopicPools should be active
+// checkTopicsSatisfaction monitors if Discovery and TopicPools should be active
 // or can be stopped.
 // PeerPool should not be stopped as it watches the peers.
-func (c *DiscoveryContainer) checkTopicSatisfaction(period time.Duration) {
+func (c *DiscoveryContainer) checkTopicsSatisfaction(period time.Duration) {
 	c.wg.Add(1)
 	defer c.wg.Done()
 
@@ -142,10 +142,14 @@ func (c *DiscoveryContainer) checkTopicSatisfaction(period time.Duration) {
 		case <-t.C:
 			if IsAllTopicsSatisfied(c.peerPool.Topics()) {
 				log.Debug("all topics are satisfied")
-				c.stopDiscoveryAndTopics()
+				if err := c.stopDiscoveryAndTopics(); err != nil {
+					log.Error("failed to stop discovery and topics", "err", err)
+				}
 			} else {
 				log.Debug("not all topics are satisfied")
-				c.startDiscoveryAndTopics()
+				if err := c.startDiscoveryAndTopics(); err != nil {
+					log.Error("failed to start discovery and topics", "err", err)
+				}
 			}
 		}
 	}

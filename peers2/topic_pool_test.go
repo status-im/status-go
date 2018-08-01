@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/stretchr/testify/assert"
 )
@@ -19,11 +20,9 @@ func (d *discoveryMock) Stop() error                                     { d.run
 func (d *discoveryMock) Register(topic string, stop chan struct{}) error { return nil }
 func (d *discoveryMock) Discover(_ string, period <-chan time.Duration, _ chan<- *discv5.Node, _ chan<- bool) error {
 	for {
-		select {
-		case _, ok := <-period:
-			if !ok {
-				return nil
-			}
+		_, ok := <-period
+		if !ok {
+			return nil
 		}
 	}
 }
@@ -77,5 +76,29 @@ func TestTopicPoolProperStopSequence(t *testing.T) {
 }
 
 func TestTopicPoolWithLimits(t *testing.T) {
-	// TODO
+	var err error
+
+	topicPool := NewTopicPoolWithLimits(NewTopicPoolBase(&discoveryMock{}, discv5.Topic("test-topic")), 1, 3)
+
+	// add the same peer twice
+	err = topicPool.ConfirmAdded(discover.NodeID{0x01})
+	assert.NoError(t, err)
+	assert.Len(t, topicPool.connectedPeers, 1)
+
+	err = topicPool.ConfirmAdded(discover.NodeID{0x01})
+	assert.NoError(t, err)
+	assert.Len(t, topicPool.connectedPeers, 1)
+
+	// check satisfaction
+	assert.True(t, topicPool.Satisfied())
+
+	// add a new peer
+	err = topicPool.ConfirmAdded(discover.NodeID{0x02})
+	assert.NoError(t, err)
+	assert.Len(t, topicPool.connectedPeers, 2)
+
+	// remove a peer
+	err = topicPool.ConfirmDropped(discover.NodeID{0x02})
+	assert.NoError(t, err)
+	assert.Len(t, topicPool.connectedPeers, 1)
 }
