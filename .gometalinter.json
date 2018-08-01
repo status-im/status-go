@@ -16,7 +16,6 @@
     "Enable": [
         "deadcode",
         "errcheck",
-        "gasv2",
         "goconst",
         "gocyclo",
         "gofmt",
