@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/rpc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -332,6 +333,22 @@ func TestPrepareTxArgs(t *testing.T) {
 			assert.Equal(t, tt.expectedGas, args.Gas)
 			assert.Equal(t, tt.expectedGasPrice, args.GasPrice)
 		})
+	}
+}
+
+func TestBlockedRPCMethods(t *testing.T) {
+	backend := NewStatusBackend()
+	err := backend.StartNode(&params.NodeConfig{})
+	require.NoError(t, err)
+	defer func() { require.NoError(t, backend.StopNode()) }()
+
+	for idx, m := range rpc.BlockedMethods() {
+		result := backend.CallRPC(fmt.Sprintf(
+			`{"jsonrpc":"2.0","method":"%s","params":[],"id":%d}`,
+			m,
+			idx+1,
+		))
+		assert.Contains(t, result, fmt.Sprintf(`{"code":-32700,"message":"%s"}`, rpc.ErrMethodNotFound))
 	}
 }
 
