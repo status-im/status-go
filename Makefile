@@ -178,7 +178,7 @@ lint-install:
 
 lint:
 	@echo "lint"
-	@gometalinter ./...
+	@gometalinter ./... --disable=gas
 
 ci: lint mock dep-ensure test-unit test-e2e ##@tests Run all linters and tests at once
 
