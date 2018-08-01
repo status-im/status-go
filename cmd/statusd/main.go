@@ -330,7 +330,7 @@ Examples:
 
 Options:
 `
-	fmt.Fprintf(os.Stderr, usage)
+	fmt.Fprintf(os.Stderr, usage) // nolint: errcheck
 	flag.PrintDefaults()
 }
 

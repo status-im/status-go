@@ -16,11 +16,12 @@ import (
 
 func TestBlockedRoutesCall(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, `{
+		response := `{
 			"id": 1,
 			"jsonrpc": "2.0",
 			"result": "0x234234e22b9ffc2387e18636e0534534a3d0c56b0243567432453264c16e78a2adc"
-		}`)
+		}`
+		fmt.Fprintln(w, response) // nolint: errcheck
 	}))
 	defer ts.Close()
 
@@ -52,11 +53,12 @@ func TestBlockedRoutesCall(t *testing.T) {
 
 func TestBlockedRoutesRawCall(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, `{
+		response := `{
 			"id": 1,
 			"jsonrpc": "2.0",
 			"result": "0x234234e22b9ffc2387e18636e0534534a3d0c56b0243567432453264c16e78a2adc"
-		}`)
+		}`
+		fmt.Fprintln(w, response) // nolint: errcheck
 	}))
 	defer ts.Close()
 

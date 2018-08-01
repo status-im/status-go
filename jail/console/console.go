@@ -16,7 +16,7 @@ func Write(fn otto.FunctionCall, w io.Writer) otto.Value {
 	signal.SendConsole(args)
 
 	// Next print out the giving values.
-	fmt.Fprintf(w, "%s: %s", signal.EventVMConsole, formatForConsole(fn.ArgumentList))
+	fmt.Fprintf(w, "%s: %s", signal.EventVMConsole, formatForConsole(fn.ArgumentList)) // nolint: errcheck
 
 	return otto.UndefinedValue()
 }

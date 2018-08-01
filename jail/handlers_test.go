@@ -34,7 +34,7 @@ func (s *HandlersTestSuite) SetupTest() {
 	s.responseFixture = `{"json-rpc":"2.0","id":10,"result":true}`
 	s.ts = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		atomic.AddInt32(&s.tsCalls, 1)
-		fmt.Fprintln(w, s.responseFixture)
+		fmt.Fprintln(w, s.responseFixture) // nolint: errcheck
 	}))
 
 	client, err := gethrpc.Dial(s.ts.URL)

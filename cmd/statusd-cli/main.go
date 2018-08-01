@@ -33,12 +33,15 @@ func main() {
 
 // printUsage prints a little help for statusd-cli.
 func printUsage() {
-	fmt.Fprintln(os.Stderr, "Usage: statusd-cli [options]")
-	fmt.Fprintf(os.Stderr, `
+	fmt.Fprintln(os.Stderr, "Usage: statusd-cli [options]") // nolint: errcheck
+
+	usage := `
 Examples:
   statusd-cli -addr=<address> # connect statusd on <address>
   
 Options:
-`)
+`
+
+	fmt.Fprintf(os.Stderr, usage) // nolint: errcheck
 	flag.PrintDefaults()
 }

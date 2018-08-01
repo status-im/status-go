@@ -130,7 +130,7 @@ func CreateAccount(password *C.char) *C.char {
 
 	errString := ""
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, err) // nolint: errcheck
 		errString = err.Error()
 	}
 
@@ -151,7 +151,7 @@ func CreateChildAccount(parentAddress, password *C.char) *C.char {
 
 	errString := ""
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, err) // nolint: errcheck
 		errString = err.Error()
 	}
 
@@ -171,7 +171,7 @@ func RecoverAccount(password, mnemonic *C.char) *C.char {
 
 	errString := ""
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, err) // nolint: errcheck
 		errString = err.Error()
 	}
 
@@ -230,7 +230,7 @@ func ApproveSignRequest(id, password *C.char) *C.char {
 func prepareApproveSignRequestResponse(result sign.Result, id *C.char) *C.char {
 	errString := ""
 	if result.Error != nil {
-		fmt.Fprintln(os.Stderr, result.Error)
+		fmt.Fprintln(os.Stderr, result.Error) // nolint: errcheck
 		errString = result.Error.Error()
 	}
 
@@ -294,7 +294,7 @@ func DiscardSignRequest(id *C.char) *C.char {
 
 	errString := ""
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, err) // nolint: errcheck
 		errString = err.Error()
 	}
 
@@ -405,7 +405,7 @@ func WriteHeapProfile(dataDir *C.char) *C.char { //nolint: deadcode
 func makeJSONResponse(err error) *C.char {
 	errString := ""
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, err) // nolint: errcheck
 		errString = err.Error()
 	}
 
