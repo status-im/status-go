@@ -114,6 +114,10 @@ func (c *Client) CallContext(ctx context.Context, result interface{}, method str
 // handler itself.
 // Upstream calls routing will be used anyway.
 func (c *Client) CallContextIgnoringLocalHandlers(ctx context.Context, result interface{}, method string, args ...interface{}) error {
+	if c.router.routeBlocked(method) {
+		return ErrMethodNotFound
+	}
+
 	if c.router.routeRemote(method) {
 		return c.upstream.CallContext(ctx, result, method, args...)
 	}
