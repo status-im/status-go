@@ -2,7 +2,6 @@ package personal
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"strings"
 	"time"
@@ -32,23 +31,8 @@ type SignParams struct {
 
 // RecoverParams are for calling `personal_ecRecover`
 type RecoverParams struct {
-	Message   string
-	Signature string
-}
-
-// UnmarshalSignRPCParams puts the RPC params for `personal_sign` or `web3.personal.sign`
-// into SignParams
-func UnmarshalSignRPCParams(rpcParamsJSON string) (SignParams, error) {
-	var params SignParams
-	err := json.Unmarshal([]byte(rpcParamsJSON), &params)
-	return params, err
-}
-
-// UnmarshalRecoverRPCParams
-func UnmarshalRecoverRPCParams(rpcParamsJSON string) (RecoverParams, error) {
-	var params RecoverParams
-	err := json.Unmarshal([]byte(rpcParamsJSON), &params)
-	return params, err
+	Message   string `json:"message"`
+	Signature string `json:"signature"`
 }
 
 // PublicAPI represents a set of APIs from the `web3.personal` namespace.
