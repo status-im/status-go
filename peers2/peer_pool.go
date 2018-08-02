@@ -45,8 +45,9 @@ type PeerPool struct {
 	cache *peers.Cache
 
 	addPeerReq chan addPeerReq
-	peerFeed   event.Feed
 
+	// peerFeed sends peer events after peers go through PeerPool logic
+	peerFeed           event.Feed
 	serverSubscription event.Subscription
 	events             chan *p2p.PeerEvent
 

@@ -48,11 +48,17 @@ func TestDiscoveryContainer(t *testing.T) {
 	// prepare container elements
 	disc := discovery.NewDiscV5(server.PrivateKey, server.ListenAddr, []*discv5.Node{bootnodeV5})
 	topic := discv5.Topic("test-topic")
+	period := newFastSlowDiscoverPeriod(100*time.Millisecond, time.Second)
 	topicPool := NewTopicPoolWithLimits(
-		NewTopicPoolBase(disc, topic, SetPeersHandler(&SkipSelfPeersHandler{server.Self().ID})),
+		NewTopicPoolBase(
+			disc,
+			topic,
+			SetPeersHandler(&SkipSelfPeersHandler{server.Self().ID}),
+			SetDiscoverPeriodChannel(period.channel()),
+		),
 		1, 1,
 	)
-	container := NewDiscoveryContainer(disc, []TopicPool{topicPool}, nil)
+	container := NewDiscoveryContainer(disc, []TopicPool{topicPool}, nil, period)
 	require.NoError(t, container.Start(server, 0))
 	defer func() { require.NoError(t, container.Stop()) }()
 

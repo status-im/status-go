@@ -65,6 +65,13 @@ func SetDiscoverPeriod(p time.Duration) func(*TopicPoolBase) {
 	}
 }
 
+// SetDiscoverPeriodChannel sets a period channel.
+func SetDiscoverPeriodChannel(period chan time.Duration) func(*TopicPoolBase) {
+	return func(t *TopicPoolBase) {
+		t.period = period
+	}
+}
+
 // SetPeersHandler sets a handler which verifies each found peer.
 func SetPeersHandler(h FoundPeersHandler) func(*TopicPoolBase) {
 	return func(t *TopicPoolBase) {

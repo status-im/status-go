@@ -18,6 +18,7 @@ type DiscoveryContainer struct {
 	discovery discovery.Discovery
 	peerPool  *PeerPool
 	topics    []TopicPool
+	period    *fastSlowDiscoverPeriod
 
 	discoveryRunning bool
 
@@ -27,12 +28,13 @@ type DiscoveryContainer struct {
 
 // NewDiscoveryContainer returns a new DiscoveryContainer instance.
 func NewDiscoveryContainer(
-	d discovery.Discovery, topics []TopicPool, cache *peers.Cache,
+	d discovery.Discovery, topics []TopicPool, cache *peers.Cache, period *fastSlowDiscoverPeriod,
 ) *DiscoveryContainer {
 	return &DiscoveryContainer{
 		discovery: d,
 		peerPool:  NewPeerPool(topics, cache),
 		topics:    topics,
+		period:    period,
 	}
 }
 
@@ -55,6 +57,7 @@ func (c *DiscoveryContainer) Start(server *p2p.Server, timeout time.Duration) (e
 	if err != nil {
 		return
 	}
+	go c.switchToSlowMode()
 
 	c.quit = make(chan struct{})
 
@@ -77,6 +80,8 @@ func (c *DiscoveryContainer) Stop() (err error) {
 
 	err = c.stopDiscoveryAndTopics()
 	c.peerPool.Stop()
+
+	c.quit = nil
 
 	return
 }
@@ -147,10 +152,28 @@ func (c *DiscoveryContainer) checkTopicsSatisfaction(period time.Duration) {
 				}
 			} else {
 				log.Debug("not all topics are satisfied")
+
+				// When transitioning from stopped to running,
+				// we should switch to fast mode.
+				if !c.discoveryRunning {
+					c.period.transFast()
+				}
+
 				if err := c.startDiscoveryAndTopics(); err != nil {
 					log.Error("failed to start discovery and topics", "err", err)
+				} else {
+					go c.switchToSlowMode()
 				}
 			}
 		}
+	}
+}
+
+func (c *DiscoveryContainer) switchToSlowMode() {
+	select {
+	case <-c.quit:
+		return
+	case <-time.After(time.Second):
+		c.period.transSlow()
 	}
 }

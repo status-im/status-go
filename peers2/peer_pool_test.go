@@ -127,6 +127,10 @@ func TestPeerPoolCache(t *testing.T) {
 	require.Len(t, cache.GetPeersRange(topic, 10), 0)
 }
 
+func TestPeerPoolLoadInitialPeersFromCache(t *testing.T) {
+	// TODO
+}
+
 func TestPeerPoolWithTopicPoolWithLimits(t *testing.T) {
 	var err error
 
