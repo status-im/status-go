@@ -5,6 +5,7 @@ package rpc
 // Local node.
 type router struct {
 	methods         map[string]bool
+	blockedMethods  map[string]struct{}
 	upstreamEnabled bool
 }
 
@@ -12,11 +13,16 @@ type router struct {
 func newRouter(upstreamEnabled bool) *router {
 	r := &router{
 		methods:         make(map[string]bool),
+		blockedMethods:  make(map[string]struct{}),
 		upstreamEnabled: upstreamEnabled,
 	}
 
 	for _, m := range remoteMethods {
 		r.methods[m] = true
+	}
+
+	for _, m := range blockedMethods {
+		r.blockedMethods[m] = struct{}{}
 	}
 
 	return r
@@ -30,6 +36,23 @@ func (r *router) routeRemote(method string) bool {
 
 	// else check route using the methods list
 	return r.methods[method]
+}
+
+func (r *router) routeBlocked(method string) bool {
+	_, ok := r.blockedMethods[method]
+	return ok
+}
+
+// blockedMethods is a list of dangerous or having security implications JSON-RPC methods
+// that are not allowed to be called.
+var blockedMethods = [...]string{
+	"shh_getPrivateKey",
+}
+
+// BlockedMethods returns a list of methods that are not allowed to be called.
+// A copy of a slice is returned in order to prevent from changing it from outside.
+func BlockedMethods() []string {
+	return append([]string(nil), blockedMethods[:]...)
 }
 
 // remoteMethods contains methods that should be routed to
