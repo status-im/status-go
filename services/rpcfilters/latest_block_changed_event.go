@@ -65,7 +65,7 @@ type latestBlockChangedEvent struct {
 
 	reportedBlocks *ringArray
 
-	provider     latestBlockProvider
+	provider     blockProvider
 	quit         chan struct{}
 	tickerPeriod time.Duration
 }
@@ -151,7 +151,7 @@ func (e *latestBlockChangedEvent) Unsubscribe(id int) {
 	delete(e.sx, id)
 }
 
-func newLatestBlockChangedEvent(provider latestBlockProvider) *latestBlockChangedEvent {
+func newLatestBlockChangedEvent(provider blockProvider) *latestBlockChangedEvent {
 	return &latestBlockChangedEvent{
 		sx:             make(map[int]chan common.Hash),
 		provider:       provider,

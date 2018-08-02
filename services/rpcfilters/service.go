@@ -14,16 +14,18 @@ var _ node.Service = (*Service)(nil)
 type Service struct {
 	latestBlockChangedEvent        *latestBlockChangedEvent
 	transactionSentToUpstreamEvent *transactionSentToUpstreamEvent
+	blockProvider                  *blockProviderRPC
 }
 
 // New returns a new Service.
 func New(rpc rpcProvider) *Service {
-	provider := &latestBlockProviderRPC{rpc}
+	provider := &blockProviderRPC{rpc}
 	latestBlockChangedEvent := newLatestBlockChangedEvent(provider)
 	transactionSentToUpstreamEvent := newTransactionSentToUpstreamEvent()
 	return &Service{
 		latestBlockChangedEvent,
 		transactionSentToUpstreamEvent,
+		provider,
 	}
 }
 
@@ -40,7 +42,8 @@ func (s *Service) APIs() []rpc.API {
 			Version:   "1.0",
 			Service: NewPublicAPI(
 				s.latestBlockChangedEvent,
-				s.transactionSentToUpstreamEvent),
+				s.transactionSentToUpstreamEvent,
+				s.blockProvider),
 			Public: true,
 		},
 	}
