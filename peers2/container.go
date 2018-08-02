@@ -11,16 +11,35 @@ import (
 	"github.com/status-im/status-go/discovery"
 )
 
+// SetFastSlowDiscoverPeriod sets an instance of `fastSlowDiscoverPeriod`.
+func SetFastSlowDiscoverPeriod(p *fastSlowDiscoverPeriod) func(*DiscoveryContainer) {
+	return func(c *DiscoveryContainer) {
+		c.period = p
+	}
+}
+
+// SetFastSyncTimeout sets a timeout after which DiscoveryContainer switches to slow peers discovery mode.
+func SetFastSyncTimeout(t time.Duration) func(*DiscoveryContainer) {
+	return func(c *DiscoveryContainer) {
+		c.fastSyncTimeout = t
+	}
+}
+
 // DiscoveryContainer is an utility structure that wrapps
 // discovery related objects. It provides an interface to
 // control the whole discovery system.
 type DiscoveryContainer struct {
-	discovery discovery.Discovery
-	peerPool  *PeerPool
-	topics    []TopicPool
-	period    *fastSlowDiscoverPeriod
+	sync.RWMutex
 
-	discoveryRunning bool
+	discovery       discovery.Discovery
+	peerPool        *PeerPool
+	topics          []TopicPool
+	period          *fastSlowDiscoverPeriod
+	fastSyncTimeout time.Duration
+
+	// to prevent running multiple goroutines
+	// switching to slow sync
+	switchSlowSyncCancel chan struct{}
 
 	wg   sync.WaitGroup
 	quit chan struct{}
@@ -28,14 +47,21 @@ type DiscoveryContainer struct {
 
 // NewDiscoveryContainer returns a new DiscoveryContainer instance.
 func NewDiscoveryContainer(
-	d discovery.Discovery, topics []TopicPool, cache *peers.Cache, period *fastSlowDiscoverPeriod,
+	d discovery.Discovery, topics []TopicPool, cache *peers.Cache, opts ...func(*DiscoveryContainer),
 ) *DiscoveryContainer {
-	return &DiscoveryContainer{
-		discovery: d,
-		peerPool:  NewPeerPool(topics, cache),
-		topics:    topics,
-		period:    period,
+	c := &DiscoveryContainer{
+		discovery:       d,
+		peerPool:        NewPeerPool(topics, cache),
+		topics:          topics,
+		period:          defaultFastSlowDiscoverPeriod(),
+		fastSyncTimeout: defaultFastSyncTimeout,
 	}
+
+	for _, opt := range opts {
+		opt(c)
+	}
+
+	return c
 }
 
 // Start starts all discovery related structures.
@@ -46,25 +72,30 @@ func (c *DiscoveryContainer) Start(server *p2p.Server, timeout time.Duration) (e
 		return nil
 	}
 
+	// The order is important: PeerPool, Discovery, Topics.
 	c.peerPool.Start(server)
 	defer func() {
 		if err != nil {
 			c.peerPool.Stop()
 		}
 	}()
-
-	err = c.startDiscoveryAndTopics()
+	err = c.startDiscovery()
 	if err != nil {
 		return
 	}
-	go c.switchToSlowMode()
+	c.startTopics()
 
 	c.quit = make(chan struct{})
 
+	// transition to slow mode after a while
+	go c.switchToSlowSync(c.fastSyncTimeout, c.quit)
+	// stop Discovery after some time
 	if timeout > 0 {
-		go c.handleTimeout(time.After(timeout))
+		go c.handleDiscoveryTimeout(timeout, c.quit)
 	}
-	go c.checkTopicsSatisfaction(time.Second)
+	// Periodically check satisfaction of TopicPools.
+	// It might be possible to switch to slower mode faster.
+	go c.checkTopicsSatisfaction(time.Second, c.quit)
 
 	return nil
 }
@@ -78,7 +109,10 @@ func (c *DiscoveryContainer) Stop() (err error) {
 	close(c.quit)
 	c.wg.Wait()
 
-	err = c.stopDiscoveryAndTopics()
+	c.period.close()
+
+	err = c.stopDiscovery()
+	c.stopTopics()
 	c.peerPool.Stop()
 
 	c.quit = nil
@@ -86,54 +120,52 @@ func (c *DiscoveryContainer) Stop() (err error) {
 	return
 }
 
-func (c *DiscoveryContainer) startDiscoveryAndTopics() error {
-	if c.discoveryRunning {
+func (c *DiscoveryContainer) startDiscovery() (err error) {
+	if c.discovery.Running() {
 		return nil
 	}
-
-	// TODO(adam): can Discovery.Start() be idempotent?
-	if err := c.discovery.Start(); err != nil {
-		return err
-	}
-	c.discoveryRunning = true
-
-	for _, t := range c.topics {
-		t.Start(c.peerPool)
-	}
-
-	return nil
+	return c.discovery.Start()
 }
 
-func (c *DiscoveryContainer) stopDiscoveryAndTopics() (err error) {
+func (c *DiscoveryContainer) stopDiscovery() error {
+	if !c.discovery.Running() {
+		return nil
+	}
+	return c.discovery.Stop()
+}
+
+func (c *DiscoveryContainer) startTopics() {
+	for _, t := range c.topics {
+		t.Start(c.peerPool, c.period.channel())
+	}
+}
+
+func (c *DiscoveryContainer) stopTopics() {
 	for _, t := range c.topics {
 		t.Stop()
 	}
-
-	err = c.discovery.Stop()
-	if err == nil {
-		c.discoveryRunning = false
-	}
-
-	return
 }
 
-func (c *DiscoveryContainer) handleTimeout(t <-chan time.Time) {
+func (c *DiscoveryContainer) handleDiscoveryTimeout(timeout time.Duration, quit <-chan struct{}) {
 	c.wg.Add(1)
 	defer c.wg.Done()
 
 	select {
-	case <-c.quit:
-	case <-t:
-		if err := c.Stop(); err != nil {
+	case <-quit:
+	case <-time.After(timeout):
+		c.RLock()
+		if err := c.stopDiscovery(); err != nil {
 			log.Error("failed to stop peers discovery container", "err", err)
 		}
+		c.stopTopics()
+		c.RUnlock()
 	}
 }
 
-// checkTopicsSatisfaction monitors if Discovery and TopicPools should be active
-// or can be stopped.
-// PeerPool should not be stopped as it watches the peers.
-func (c *DiscoveryContainer) checkTopicsSatisfaction(period time.Duration) {
+// checkTopicsSatisfaction monitors if Discovery and
+// TopicPools should be active or can be stopped.
+// PeerPool should never be stopped as it watches the peers.
+func (c *DiscoveryContainer) checkTopicsSatisfaction(period time.Duration, quit <-chan struct{}) {
 	c.wg.Add(1)
 	defer c.wg.Done()
 
@@ -142,38 +174,57 @@ func (c *DiscoveryContainer) checkTopicsSatisfaction(period time.Duration) {
 
 	for {
 		select {
-		case <-c.quit:
+		case <-quit:
 			return
 		case <-t.C:
+			c.RLock()
 			if IsAllTopicsSatisfied(c.peerPool.Topics()) {
 				log.Debug("all topics are satisfied")
-				if err := c.stopDiscoveryAndTopics(); err != nil {
+				if err := c.stopDiscovery(); err != nil {
 					log.Error("failed to stop discovery and topics", "err", err)
 				}
+				c.stopTopics()
 			} else {
 				log.Debug("not all topics are satisfied")
 
-				// When transitioning from stopped to running,
+				// When transitioning from stopped to running Discovery,
 				// we should switch to fast mode.
-				if !c.discoveryRunning {
+				if !c.discovery.Running() {
 					c.period.transFast()
 				}
 
-				if err := c.startDiscoveryAndTopics(); err != nil {
+				if err := c.startDiscovery(); err != nil {
 					log.Error("failed to start discovery and topics", "err", err)
 				} else {
-					go c.switchToSlowMode()
+					c.startTopics()
+					go c.switchToSlowSync(c.fastSyncTimeout, c.quit)
 				}
 			}
+			c.RUnlock()
 		}
 	}
 }
 
-func (c *DiscoveryContainer) switchToSlowMode() {
+func (c *DiscoveryContainer) switchToSlowSync(timeout time.Duration, quit <-chan struct{}) {
+	c.Lock()
+	c.wg.Add(1)
+	defer c.wg.Done()
+
+	// cancel the previous schedule switching to slow sync
+	if c.switchSlowSyncCancel != nil {
+		close(c.switchSlowSyncCancel)
+	}
+	cancel := make(chan struct{})
+	c.switchSlowSyncCancel = cancel
+
+	c.Unlock()
+
 	select {
-	case <-c.quit:
-		return
-	case <-time.After(time.Second):
+	case <-quit:
+	case <-cancel:
+	case <-time.After(timeout):
+		c.RLock()
 		c.period.transSlow()
+		c.RUnlock()
 	}
 }

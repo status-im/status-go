@@ -29,6 +29,7 @@ func TestDiscoveryContainer(t *testing.T) {
 		},
 	}
 	require.NoError(t, bootnode.Start())
+	defer bootnode.Stop()
 	bootnodeV5 := discv5.NewNode(
 		bootnode.DiscV5.Self().ID,
 		net.ParseIP("127.0.0.1"),
@@ -39,6 +40,7 @@ func TestDiscoveryContainer(t *testing.T) {
 	server, err := createServer()
 	require.NoError(t, err)
 	require.NoError(t, server.Start())
+	defer server.Stop()
 
 	// subscribe to server events
 	events := make(chan *p2p.PeerEvent, 20)
@@ -48,17 +50,16 @@ func TestDiscoveryContainer(t *testing.T) {
 	// prepare container elements
 	disc := discovery.NewDiscV5(server.PrivateKey, server.ListenAddr, []*discv5.Node{bootnodeV5})
 	topic := discv5.Topic("test-topic")
-	period := newFastSlowDiscoverPeriod(100*time.Millisecond, time.Second)
 	topicPool := NewTopicPoolWithLimits(
 		NewTopicPoolBase(
 			disc,
 			topic,
 			SetPeersHandler(&SkipSelfPeersHandler{server.Self().ID}),
-			SetDiscoverPeriodChannel(period.channel()),
 		),
 		1, 1,
 	)
-	container := NewDiscoveryContainer(disc, []TopicPool{topicPool}, nil, period)
+	period := newFastSlowDiscoverPeriod(100*time.Millisecond, time.Second)
+	container := NewDiscoveryContainer(disc, []TopicPool{topicPool}, nil, SetFastSlowDiscoverPeriod(period))
 	require.NoError(t, container.Start(server, 0))
 	defer func() { require.NoError(t, container.Stop()) }()
 
@@ -75,7 +76,46 @@ func TestDiscoveryContainer(t *testing.T) {
 	peerID, err := helpers.PeerFromEvent(events, p2p.PeerEventTypeAdd)
 	require.NoError(t, err)
 	require.Equal(t, registerServer.Self().ID[:], peerID[:])
+}
 
-	time.Sleep(time.Second * 2)
-	require.False(t, container.discoveryRunning)
+func TestContainerDiscoveryTimeout(t *testing.T) {
+	server, err := createServer()
+	require.NoError(t, err)
+	require.NoError(t, server.Start())
+	defer server.Stop()
+
+	disc := &discoveryMock{}
+	container := NewDiscoveryContainer(disc, nil, nil)
+	require.NoError(t, container.Start(server, time.Millisecond*50))
+	defer func() { require.NoError(t, container.Stop()) }()
+
+	require.True(t, disc.Running())
+	time.Sleep(time.Millisecond * 100)
+	require.False(t, disc.Running())
+}
+
+func TestContainerDiscoverySwitchToSlowSync(t *testing.T) {
+	server, err := createServer()
+	require.NoError(t, err)
+	require.NoError(t, server.Start())
+	defer server.Stop()
+
+	fastSyncTimeout := time.Millisecond * 50
+
+	disc := &discoveryMock{}
+	topic := discv5.Topic("test-topic")
+	topicPool := NewTopicPoolWithLimits(
+		NewTopicPoolBase(
+			disc,
+			topic,
+			SetPeersHandler(&SkipSelfPeersHandler{server.Self().ID}),
+		),
+		1, 1,
+	)
+	container := NewDiscoveryContainer(disc, []TopicPool{topicPool}, nil, SetFastSyncTimeout(fastSyncTimeout))
+	require.NoError(t, container.Start(server, time.Second))
+	defer func() { require.NoError(t, container.Stop()) }()
+
+	time.Sleep(fastSyncTimeout * 2)
+	require.Equal(t, time.Duration(defaultSlowSync), disc.period)
 }

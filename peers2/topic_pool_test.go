@@ -12,6 +12,7 @@ import (
 
 type discoveryMock struct {
 	running bool
+	period  time.Duration
 }
 
 func (d *discoveryMock) Running() bool                                   { return d.running }
@@ -20,7 +21,8 @@ func (d *discoveryMock) Stop() error                                     { d.run
 func (d *discoveryMock) Register(topic string, stop chan struct{}) error { return nil }
 func (d *discoveryMock) Discover(_ string, period <-chan time.Duration, _ chan<- *discv5.Node, _ chan<- bool) error {
 	for {
-		_, ok := <-period
+		var ok bool
+		d.period, ok = <-period
 		if !ok {
 			return nil
 		}
@@ -28,8 +30,9 @@ func (d *discoveryMock) Discover(_ string, period <-chan time.Duration, _ chan<-
 }
 
 func TestTopicPoolBaseStartAndStop(t *testing.T) {
+	period := make(chan time.Duration)
 	topicPool := NewTopicPoolBase(&discoveryMock{}, discv5.Topic("test-topic"))
-	topicPool.Start(nil)
+	topicPool.Start(nil, period)
 
 	assert.NotNil(t, topicPool.quit)
 	// use defaults

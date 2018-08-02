@@ -19,7 +19,7 @@ type peerID = discover.NodeID
 // `ConfirmAdded` can return an error if a peer is not valid anymore.
 type TopicPool interface {
 	Topic() discv5.Topic
-	Start(*PeerPool)
+	Start(*PeerPool, <-chan time.Duration)
 	Stop()
 	ConfirmAdded(peerID) error
 	ConfirmDropped(peerID) error
@@ -65,13 +65,6 @@ func SetDiscoverPeriod(p time.Duration) func(*TopicPoolBase) {
 	}
 }
 
-// SetDiscoverPeriodChannel sets a period channel.
-func SetDiscoverPeriodChannel(period chan time.Duration) func(*TopicPoolBase) {
-	return func(t *TopicPoolBase) {
-		t.period = period
-	}
-}
-
 // SetPeersHandler sets a handler which verifies each found peer.
 func SetPeersHandler(h FoundPeersHandler) func(*TopicPoolBase) {
 	return func(t *TopicPoolBase) {
@@ -85,7 +78,7 @@ type TopicPoolBase struct {
 
 	discovery    discovery.Discovery
 	topic        discv5.Topic
-	period       chan time.Duration
+	period       <-chan time.Duration
 	peersHandler FoundPeersHandler
 
 	handlerDone  <-chan struct{}
@@ -108,10 +101,6 @@ func NewTopicPoolBase(
 		opt(topicPool)
 	}
 
-	if topicPool.period == nil {
-		topicPool.period = make(chan time.Duration, 1)
-		topicPool.period <- time.Second
-	}
 	if topicPool.peersHandler == nil {
 		topicPool.peersHandler = &AcceptAllPeersHandler{}
 	}
@@ -129,7 +118,7 @@ func (t *TopicPoolBase) Topic() discv5.Topic {
 // Start starts discovering peers for a given topic.
 // It also checks if all required parameters are set and
 // if not, it will set defaults.
-func (t *TopicPoolBase) Start(pool *PeerPool) {
+func (t *TopicPoolBase) Start(pool *PeerPool, period <-chan time.Duration) {
 	t.Lock()
 	defer t.Unlock()
 
@@ -137,6 +126,8 @@ func (t *TopicPoolBase) Start(pool *PeerPool) {
 		return
 	}
 	t.quit = make(chan struct{})
+
+	t.period = period
 
 	var (
 		found  chan *discv5.Node
@@ -158,10 +149,10 @@ func (t *TopicPoolBase) Stop() {
 	default:
 	}
 
-	// Wait for the discover method to exit first. Otherwise,
+	// Wait for the `discover` method to exit first. Otherwise,
 	// it may still be returning nodes while the found peers handler
 	// is stopped.
-	close(t.period)
+	// `discover` can be cloed only by closing `period`.
 	<-t.discoverDone
 
 	close(t.quit)
