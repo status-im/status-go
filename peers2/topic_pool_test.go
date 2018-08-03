@@ -39,6 +39,7 @@ func TestTopicPoolBaseStartAndStop(t *testing.T) {
 	assert.NotNil(t, topicPool.period)
 	assert.NotNil(t, topicPool.peersHandler)
 
+	close(period)
 	topicPool.Stop()
 	assert.Nil(t, topicPool.quit)
 }
@@ -56,6 +57,9 @@ func TestTopicPoolProperStopSequence(t *testing.T) {
 	topicPool := NewTopicPoolBase(&discoveryMock{}, discv5.Topic("test-topic"), SetPeersHandler(handler))
 	topicPool.quit = make(chan struct{})
 
+	period := make(chan time.Duration)
+	topicPool.period = period
+
 	var (
 		found  chan *discv5.Node
 		lookup <-chan bool
@@ -72,6 +76,7 @@ func TestTopicPoolProperStopSequence(t *testing.T) {
 
 	// finally call Stop()
 	time.Sleep(time.Millisecond * 50)
+	close(period)
 	topicPool.Stop()
 
 	// make sure some found nodes were handled by TopicPool
