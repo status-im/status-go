@@ -17,51 +17,76 @@ const (
 type fastSlowDiscoverPeriod struct {
 	sync.RWMutex
 
-	fast time.Duration
-	slow time.Duration
+	fast        time.Duration
+	slow        time.Duration
+	fastTimeout time.Duration
 
-	cs []chan time.Duration
+	currentValue    time.Duration
+	cs              []chan time.Duration
+	csTimeoutCancel []chan struct{}
 }
 
-func newFastSlowDiscoverPeriod(fast, slow time.Duration) *fastSlowDiscoverPeriod {
+func newFastSlowDiscoverPeriod(fast, slow, fastTimeout time.Duration) *fastSlowDiscoverPeriod {
 	return &fastSlowDiscoverPeriod{
-		fast: fast,
-		slow: slow,
+		fast:        fast,
+		slow:        slow,
+		fastTimeout: fastTimeout,
 	}
 }
 
 func defaultFastSlowDiscoverPeriod() *fastSlowDiscoverPeriod {
-	return newFastSlowDiscoverPeriod(defaultFastSync, defaultSlowSync)
+	return newFastSlowDiscoverPeriod(defaultFastSync, defaultSlowSync, defaultFastSyncTimeout)
 }
 
 func (p *fastSlowDiscoverPeriod) channel() <-chan time.Duration {
-	// we don't expect the period to be changed more than 10x
-	ch := make(chan time.Duration, 10)
+	ch := make(chan time.Duration, 1)
 	ch <- p.fast
+	cancel := make(chan struct{})
 
 	p.Lock()
 	p.cs = append(p.cs, ch)
+	p.csTimeoutCancel = append(p.csTimeoutCancel, cancel)
 	p.Unlock()
+
+	// timeout fast mode
+	go func(val, timeout time.Duration) {
+		select {
+		case <-cancel:
+		case <-time.After(timeout):
+			ch <- val
+		}
+	}(p.slow, p.fastTimeout)
 
 	return ch
 }
 
 func (p *fastSlowDiscoverPeriod) transSlow() { p.trans(p.slow) }
 
-func (p *fastSlowDiscoverPeriod) transFast() { p.trans(p.fast) }
+func (p *fastSlowDiscoverPeriod) trans(val time.Duration) {
+	p.RLock()
+	defer p.RUnlock()
+
+	if p.currentValue == val {
+		return
+	}
+	p.currentValue = val
+
+	for _, c := range p.cs {
+		c <- val
+	}
+}
 
 func (p *fastSlowDiscoverPeriod) close() {
-	p.RLock()
+	p.Lock()
+	defer p.Unlock()
+
+	for _, c := range p.csTimeoutCancel {
+		close(c)
+	}
+	p.csTimeoutCancel = nil
+
 	for _, c := range p.cs {
 		close(c)
 	}
-	p.RUnlock()
-}
-
-func (p *fastSlowDiscoverPeriod) trans(d time.Duration) {
-	p.RLock()
-	for _, c := range p.cs {
-		c <- d
-	}
-	p.RUnlock()
+	p.cs = nil
 }

@@ -1,6 +1,7 @@
 package peers2
 
 import (
+	"net"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -54,15 +55,17 @@ func TestPeerPoolRequestToAddPeer(t *testing.T) {
 	peer, err := createServer()
 	require.NoError(t, err)
 	require.NoError(t, peer.Start())
+	defer peer.Stop()
 
 	// start a server
 	server, err := createServer()
 	require.NoError(t, err)
 	require.NoError(t, server.Start())
+	defer server.Stop()
 
 	// creat TopicPool and PeerPool
 	topic := discv5.Topic("test-topic")
-	topicPool := NewTopicPoolBase(nil, topic)
+	topicPool := NewTopicPoolBase(&discoveryMock{}, topic)
 	peerPool := NewPeerPool([]TopicPool{topicPool}, nil)
 	peerPool.Start(server)
 
@@ -92,6 +95,7 @@ func TestPeerPoolCache(t *testing.T) {
 	peer, err := createServer()
 	require.NoError(t, err)
 	require.NoError(t, peer.Start())
+	defer peer.Stop()
 
 	peerV5 := discv5.NewNode(discv5.NodeID(peer.Self().ID), peer.Self().IP, peer.Self().TCP, peer.Self().UDP)
 
@@ -99,10 +103,11 @@ func TestPeerPoolCache(t *testing.T) {
 	server, err := createServer()
 	require.NoError(t, err)
 	require.NoError(t, server.Start())
+	defer server.Stop()
 
 	// create TopicPool and PeerPool
 	topic := discv5.Topic("test-topic")
-	topicPool := NewTopicPoolBase(nil, topic)
+	topicPool := NewTopicPoolBase(&discoveryMock{}, topic)
 	cache, err := newInMemoryCache()
 	require.NoError(t, err)
 	peerPool := NewPeerPool([]TopicPool{topicPool}, cache)
@@ -128,7 +133,31 @@ func TestPeerPoolCache(t *testing.T) {
 }
 
 func TestPeerPoolLoadInitialPeersFromCache(t *testing.T) {
-	// TODO
+	// start a server
+	server, err := createServer()
+	require.NoError(t, err)
+	require.NoError(t, server.Start())
+	defer server.Stop()
+
+	// create topic
+	topic := discv5.Topic("test-topic")
+	topicPool := NewTopicPoolWithLimits(NewTopicPoolBase(&discoveryMock{}, topic), 1, 3)
+
+	// create cache
+	cache, err := newInMemoryCache()
+	require.NoError(t, err)
+
+	// put some nodes into cache
+	for i := 0; i < 10; i++ {
+		cache.AddPeer(discv5.NewNode(discv5.NodeID{byte(i)}, net.IPv4(10, 0, 0, 1), 30303, 30303), topic)
+	}
+
+	peerPool := NewPeerPool([]TopicPool{topicPool}, cache)
+	peerPool.Start(server)
+	peerPool.Stop()
+
+	// check if initial peers from cache were loaded
+	require.Len(t, peerPool.nodeIDToPeerInfo, topicPool.maxPeers)
 }
 
 func TestPeerPoolWithTopicPoolWithLimits(t *testing.T) {
@@ -140,6 +169,7 @@ func TestPeerPoolWithTopicPoolWithLimits(t *testing.T) {
 		peer, err := createServer()
 		require.NoError(t, err)
 		require.NoError(t, peer.Start())
+		defer peer.Stop()
 		peers = append(peers, peer)
 	}
 
@@ -147,10 +177,11 @@ func TestPeerPoolWithTopicPoolWithLimits(t *testing.T) {
 	server, err := createServer()
 	require.NoError(t, err)
 	require.NoError(t, server.Start())
+	defer server.Stop()
 
 	// create TopicPool and PeerPool
 	topic := discv5.Topic("test-topic")
-	topicPool := NewTopicPoolWithLimits(NewTopicPoolBase(nil, topic), 1, 1)
+	topicPool := NewTopicPoolWithLimits(NewTopicPoolBase(&discoveryMock{}, topic), 1, 1)
 	cache, err := newInMemoryCache()
 	require.NoError(t, err)
 	peerPool := NewPeerPool([]TopicPool{topicPool}, cache)
@@ -170,15 +201,16 @@ func TestPeerPoolWithTopicPoolWithLimits(t *testing.T) {
 	}
 
 	// verify the peer was added and the PeerPool state
-	_, err = helpers.PeerFromEvent(events, p2p.PeerEventTypeAdd)
-	require.NoError(t, err)
-	_, err = helpers.PeerFromEvent(events, p2p.PeerEventTypeAdd)
-	require.NoError(t, err)
-	// because the max limit is reached
+	for range peers {
+		_, err = helpers.PeerFromEvent(events, p2p.PeerEventTypeAdd)
+		require.NoError(t, err)
+	}
+
+	// immediately, one peer is dropped because the max limit is reached
 	_, err = helpers.PeerFromEvent(events, p2p.PeerEventTypeDrop)
 	require.NoError(t, err)
 
-	// verify cache
+	// as a peer was dropped due to the limit, it should not be removed from the cache
 	require.Len(t, cache.GetPeersRange(topic, 10), 2)
 }
 
@@ -191,6 +223,7 @@ func TestPeerPoolWithTopicPoolEphemeral(t *testing.T) {
 		peer, err := createServer()
 		require.NoError(t, err)
 		require.NoError(t, peer.Start())
+		defer peer.Stop()
 		peers = append(peers, peer)
 	}
 
@@ -198,11 +231,12 @@ func TestPeerPoolWithTopicPoolEphemeral(t *testing.T) {
 	server, err := createServer()
 	require.NoError(t, err)
 	require.NoError(t, server.Start())
+	defer server.Stop()
 
 	// create TopicPool and PeerPool
 	topic := discv5.Topic("test-topic")
 	topicPool := NewTopicPoolEphemeral(
-		NewTopicPoolWithLimits(NewTopicPoolBase(nil, topic), 1, 2),
+		NewTopicPoolWithLimits(NewTopicPoolBase(&discoveryMock{}, topic), 1, 2),
 	)
 	cache, err := newInMemoryCache()
 	require.NoError(t, err)

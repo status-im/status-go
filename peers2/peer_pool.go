@@ -107,6 +107,11 @@ func (p *PeerPool) Start(server p2pServer) {
 	p.addPeerReq = make(chan addPeerReq)
 	go p.handleServerPeers(server, p.events, p.addPeerReq)
 
+	// make sure TopicPools are started
+	for _, t := range p.topicToTopicPool {
+		t.Start(p)
+	}
+
 	// load initial peers from cache
 	p.loadInitialPeersFromCache()
 }
@@ -118,6 +123,11 @@ func (p *PeerPool) Stop() {
 
 	if p.quit == nil {
 		return
+	}
+
+	// make sure TopicPools are stopped
+	for _, t := range p.topicToTopicPool {
+		t.Stop()
 	}
 
 	select {
@@ -140,9 +150,7 @@ func (p *PeerPool) RequestToAddPeer(t discv5.Topic, node *discv5.Node) {
 	p.RUnlock()
 }
 
-func (p *PeerPool) handleServerPeers(
-	server p2pServer, events <-chan *p2p.PeerEvent, addPeerReq <-chan addPeerReq,
-) {
+func (p *PeerPool) handleServerPeers(server p2pServer, events <-chan *p2p.PeerEvent, addPeerReq <-chan addPeerReq) {
 	p.wg.Add(1)
 	defer p.wg.Done()
 
@@ -165,7 +173,7 @@ func (p *PeerPool) handleServerPeers(
 			default:
 				continue
 			}
-			peers.SendDiscoverySummary(server.PeersInfo())
+			sendDiscoverySummary(server.PeersInfo(), p.nodeIDToPeerInfo)
 		case req := <-addPeerReq:
 			t := req.t
 			node := req.node

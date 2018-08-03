@@ -19,7 +19,7 @@ type peerID = discover.NodeID
 // `ConfirmAdded` can return an error if a peer is not valid anymore.
 type TopicPool interface {
 	Topic() discv5.Topic
-	Start(*PeerPool, <-chan time.Duration)
+	Start(*PeerPool)
 	Stop()
 	ConfirmAdded(peerID) error
 	ConfirmDropped(peerID) error
@@ -56,19 +56,17 @@ func IsAllTopicsSatisfied(topics []TopicPool) bool {
 	return true
 }
 
-// SetDiscoverPeriod sets a period for sending a discover peers request.
-func SetDiscoverPeriod(p time.Duration) func(*TopicPoolBase) {
-	return func(t *TopicPoolBase) {
-		periodCh := make(chan time.Duration, 1)
-		periodCh <- p
-		t.period = periodCh
-	}
-}
-
 // SetPeersHandler sets a handler which verifies each found peer.
 func SetPeersHandler(h FoundPeersHandler) func(*TopicPoolBase) {
 	return func(t *TopicPoolBase) {
 		t.peersHandler = h
+	}
+}
+
+// SetPeriod sets a period between discovery requests.
+func SetPeriod(p *fastSlowDiscoverPeriod) func(*TopicPoolBase) {
+	return func(t *TopicPoolBase) {
+		t.period = p
 	}
 }
 
@@ -78,7 +76,7 @@ type TopicPoolBase struct {
 
 	discovery    discovery.Discovery
 	topic        discv5.Topic
-	period       <-chan time.Duration
+	period       *fastSlowDiscoverPeriod
 	peersHandler FoundPeersHandler
 
 	handlerDone  <-chan struct{}
@@ -101,8 +99,12 @@ func NewTopicPoolBase(
 		opt(topicPool)
 	}
 
+	if topicPool.period == nil {
+		topicPool.period = defaultFastSlowDiscoverPeriod()
+	}
+
 	if topicPool.peersHandler == nil {
-		topicPool.peersHandler = &AcceptAllPeersHandler{}
+		topicPool.peersHandler = &AcceptAllPeers{}
 	}
 
 	return topicPool
@@ -118,7 +120,7 @@ func (t *TopicPoolBase) Topic() discv5.Topic {
 // Start starts discovering peers for a given topic.
 // It also checks if all required parameters are set and
 // if not, it will set defaults.
-func (t *TopicPoolBase) Start(pool *PeerPool, period <-chan time.Duration) {
+func (t *TopicPoolBase) Start(pool *PeerPool) {
 	t.Lock()
 	defer t.Unlock()
 
@@ -127,13 +129,11 @@ func (t *TopicPoolBase) Start(pool *PeerPool, period <-chan time.Duration) {
 	}
 	t.quit = make(chan struct{})
 
-	t.period = period
-
 	var (
 		found  chan *discv5.Node
 		lookup <-chan bool
 	)
-	found, lookup, t.discoverDone = t.discover(t.period)
+	found, lookup, t.discoverDone = t.discover(t.period.channel())
 	t.handlerDone = t.handleFoundPeers(pool, found, lookup)
 }
 
@@ -152,7 +152,8 @@ func (t *TopicPoolBase) Stop() {
 	// Wait for the `discover` method to exit first. Otherwise,
 	// it may still be returning nodes while the found peers handler
 	// is stopped.
-	// `discover` can be cloed only by closing `period`.
+	// `discover` can be closed only by closing `period`.
+	t.period.close()
 	<-t.discoverDone
 
 	close(t.quit)
@@ -210,7 +211,9 @@ func (t *TopicPoolBase) handleFoundPeers(
 				return
 			case <-lookup:
 			case node := <-found:
-				if t.peersHandler.Handle(node) {
+				accepted := t.peersHandler.Handle(node)
+				log.Debug("found node", "node", node.ID, "accepted", accepted)
+				if accepted {
 					pool.RequestToAddPeer(t.topic, node)
 				}
 			}
@@ -252,9 +255,14 @@ func (t *TopicPoolWithLimits) ConfirmAdded(peer peerID) error {
 	t.Lock()
 	defer t.Unlock()
 
-	log.Debug("TopicPoolWithLimits confirming peer added", "topic", t.topic, "peerID", peer)
+	log.Debug("TopicPoolWithLimits confirms peer added", "topic", t.topic, "peerID", peer)
 
 	t.connectedPeers[peer] = struct{}{}
+
+	if len(t.connectedPeers) >= t.minPeers {
+		log.Debug("TopicPoolWithLimits transitions to slow period")
+		t.period.transSlow()
+	}
 
 	if len(t.connectedPeers) > t.maxPeers {
 		return errors.New("the upper limit was reached")
@@ -285,7 +293,7 @@ func (t *TopicPoolWithLimits) Satisfied() bool {
 	t.RLock()
 	defer t.RUnlock()
 
-	return len(t.connectedPeers) >= t.minPeers
+	return len(t.connectedPeers) >= t.maxPeers
 }
 
 // TopicPoolEphemeral discards the connected peer immediately.
@@ -306,6 +314,11 @@ func (t *TopicPoolEphemeral) ConfirmAdded(peer peerID) error {
 	// In case of TopicPoolEphemeral, `connectedPeers` contains a number of found peers
 	// with confirmed connectivity. Peers are never removed.
 	t.connectedPeers[peer] = struct{}{}
+
+	if len(t.connectedPeers) >= t.minPeers {
+		log.Debug("TopicPoolEphemeral transitions to slow period")
+		t.period.transSlow()
+	}
 
 	return errors.New("ephemeral topic pool")
 }

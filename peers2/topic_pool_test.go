@@ -2,6 +2,7 @@ package peers2
 
 import (
 	"net"
+	"sync"
 	"testing"
 	"time"
 
@@ -11,35 +12,50 @@ import (
 )
 
 type discoveryMock struct {
+	sync.Mutex
+
 	running bool
 	period  time.Duration
 }
 
-func (d *discoveryMock) Running() bool                                   { return d.running }
-func (d *discoveryMock) Start() error                                    { d.running = true; return nil }
-func (d *discoveryMock) Stop() error                                     { d.running = false; return nil }
+func (d *discoveryMock) Running() bool {
+	d.Lock()
+	defer d.Unlock()
+	return d.running
+}
+func (d *discoveryMock) Start() error {
+	d.Lock()
+	d.running = true
+	d.Unlock()
+	return nil
+}
+func (d *discoveryMock) Stop() error {
+	d.Lock()
+	d.running = false
+	d.Unlock()
+	return nil
+}
 func (d *discoveryMock) Register(topic string, stop chan struct{}) error { return nil }
 func (d *discoveryMock) Discover(_ string, period <-chan time.Duration, _ chan<- *discv5.Node, _ chan<- bool) error {
 	for {
-		var ok bool
-		d.period, ok = <-period
+		p, ok := <-period
 		if !ok {
 			return nil
 		}
+		d.Lock()
+		d.period = p
+		d.Unlock()
 	}
 }
 
 func TestTopicPoolBaseStartAndStop(t *testing.T) {
-	period := make(chan time.Duration)
 	topicPool := NewTopicPoolBase(&discoveryMock{}, discv5.Topic("test-topic"))
-	topicPool.Start(nil, period)
-
-	assert.NotNil(t, topicPool.quit)
-	// use defaults
-	assert.NotNil(t, topicPool.period)
 	assert.NotNil(t, topicPool.peersHandler)
 
-	close(period)
+	topicPool.Start(nil)
+	assert.NotNil(t, topicPool.quit)
+	assert.NotNil(t, topicPool.period)
+
 	topicPool.Stop()
 	assert.Nil(t, topicPool.quit)
 }
@@ -57,26 +73,21 @@ func TestTopicPoolProperStopSequence(t *testing.T) {
 	topicPool := NewTopicPoolBase(&discoveryMock{}, discv5.Topic("test-topic"), SetPeersHandler(handler))
 	topicPool.quit = make(chan struct{})
 
-	period := make(chan time.Duration)
-	topicPool.period = period
-
 	var (
 		found  chan *discv5.Node
 		lookup <-chan bool
 	)
-	found, lookup, topicPool.discoverDone = topicPool.discover(topicPool.period)
+	topicPool.period = defaultFastSlowDiscoverPeriod()
+	found, lookup, topicPool.discoverDone = topicPool.discover(topicPool.period.channel())
 	topicPool.handlerDone = topicPool.handleFoundPeers(nil, found, lookup)
 
 	// spam with found nodes
 	go func() {
-		for {
-			found <- discv5.NewNode(discv5.NodeID{0x01}, net.IPv4(10, 0, 0, 1), 30303, 30303)
-		}
+		found <- discv5.NewNode(discv5.NodeID{0x01}, net.IPv4(10, 0, 0, 1), 30303, 30303)
 	}()
 
 	// finally call Stop()
 	time.Sleep(time.Millisecond * 50)
-	close(period)
 	topicPool.Stop()
 
 	// make sure some found nodes were handled by TopicPool
@@ -86,27 +97,36 @@ func TestTopicPoolProperStopSequence(t *testing.T) {
 func TestTopicPoolWithLimits(t *testing.T) {
 	var err error
 
-	topicPool := NewTopicPoolWithLimits(NewTopicPoolBase(&discoveryMock{}, discv5.Topic("test-topic")), 1, 3)
+	topicPool := NewTopicPoolWithLimits(NewTopicPoolBase(&discoveryMock{}, discv5.Topic("test-topic")), 1, 2)
+	period := topicPool.period.channel()
+	topicPool.Start(nil)
+	defer topicPool.Stop()
 
-	// add the same peer twice
+	// use fast sync by default
+	assert.Equal(t, defaultFastSync, <-period)
+
+	// add a peer
 	err = topicPool.ConfirmAdded(discover.NodeID{0x01})
 	assert.NoError(t, err)
 	assert.Len(t, topicPool.connectedPeers, 1)
+	assert.Equal(t, defaultSlowSync, <-period)
+	assert.False(t, topicPool.Satisfied())
 
+	// add the same peer
 	err = topicPool.ConfirmAdded(discover.NodeID{0x01})
 	assert.NoError(t, err)
 	assert.Len(t, topicPool.connectedPeers, 1)
-
-	// check satisfaction
-	assert.True(t, topicPool.Satisfied())
+	assert.False(t, topicPool.Satisfied())
 
 	// add a new peer
 	err = topicPool.ConfirmAdded(discover.NodeID{0x02})
 	assert.NoError(t, err)
 	assert.Len(t, topicPool.connectedPeers, 2)
+	assert.True(t, topicPool.Satisfied())
 
-	// remove a peer
+	// remove the last peer
 	err = topicPool.ConfirmDropped(discover.NodeID{0x02})
 	assert.NoError(t, err)
 	assert.Len(t, topicPool.connectedPeers, 1)
+	assert.False(t, topicPool.Satisfied())
 }

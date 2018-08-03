@@ -69,7 +69,7 @@ func PeerFromEvent(events <-chan *p2p.PeerEvent, etype p2p.PeerEventType) (nodeI
 			return ev.Peer, nil
 		}
 		return nodeID, fmt.Errorf("invalid event '%s' when expected '%s'", ev.Type, etype)
-	case <-time.After(5 * time.Second):
+	case <-time.After(10 * time.Second):
 		return nodeID, fmt.Errorf("timed out")
 	}
 }
