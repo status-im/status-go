@@ -45,9 +45,44 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransaction() {
 
 	s.StartTestBackend()
 	defer s.StopTestBackend()
-
 	EnsureNodeSync(s.Backend.StatusNode().EnsureSync)
 
+	s.sendTransactionUsingRPCClient(s.Backend.CallRPC)
+}
+
+func (s *TransactionsTestSuite) TestCallUpstreamRPCSendTransaction() {
+	CheckTestSkipForNetworks(s.T(), params.MainNetworkID, params.StatusChainNetworkID)
+
+	addr, err := GetRemoteURL()
+	s.NoError(err)
+	s.StartTestBackend(e2e.WithUpstream(addr))
+	defer s.StopTestBackend()
+
+	s.sendTransactionUsingRPCClient(s.Backend.CallRPC)
+}
+
+func (s *TransactionsTestSuite) TestCallPrivateRPCSendTransaction() {
+	CheckTestSkipForNetworks(s.T(), params.MainNetworkID)
+
+	s.StartTestBackend()
+	defer s.StopTestBackend()
+	EnsureNodeSync(s.Backend.StatusNode().EnsureSync)
+
+	s.sendTransactionUsingRPCClient(s.Backend.CallPrivateRPC)
+}
+
+func (s *TransactionsTestSuite) TestCallUpstreamPrivateRPCSendTransaction() {
+	CheckTestSkipForNetworks(s.T(), params.MainNetworkID, params.StatusChainNetworkID)
+
+	addr, err := GetRemoteURL()
+	s.NoError(err)
+	s.StartTestBackend(e2e.WithUpstream(addr))
+	defer s.StopTestBackend()
+
+	s.sendTransactionUsingRPCClient(s.Backend.CallPrivateRPC)
+}
+
+func (s *TransactionsTestSuite) sendTransactionUsingRPCClient(callRPCFn func(string) string) {
 	err := s.Backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	s.NoError(err)
 
@@ -61,59 +96,10 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransaction() {
 
 		if sg.Type == signal.EventSignRequestAdded {
 			event := sg.Event.(map[string]interface{})
-			//check for the correct method name
+			// check for the correct method name
 			method := event["method"].(string)
 			s.Equal(params.SendTransactionMethodName, method)
 
-			txID := event["id"].(string)
-			signResult = s.Backend.ApproveSignRequest(txID, TestConfig.Account1.Password)
-			s.NoError(signResult.Error, "cannot complete queued transaction %s", txID)
-			close(transactionCompleted)
-		}
-	})
-
-	result := s.Backend.CallRPC(`{
-		"jsonrpc": "2.0",
-		"id": 1,
-		"method": "eth_sendTransaction",
-		"params": [{
-			"from": "` + TestConfig.Account1.Address + `",
-			"to": "0xd46e8dd67c5d32be8058bb8eb970870f07244567",
-			"value": "0x9184e72a"
-		}]
-	}`)
-	s.NotContains(result, "error")
-
-	select {
-	case <-transactionCompleted:
-	case <-time.After(time.Minute):
-		s.FailNow("sending transaction timed out")
-	}
-
-	s.Equal(`{"jsonrpc":"2.0","id":1,"result":"`+signResult.Response.Hash().Hex()+`"}`, result)
-}
-
-func (s *TransactionsTestSuite) TestCallRPCSendTransactionUpstream() {
-	CheckTestSkipForNetworks(s.T(), params.MainNetworkID, params.StatusChainNetworkID)
-
-	addr, err := GetRemoteURL()
-	s.NoError(err)
-	s.StartTestBackend(e2e.WithUpstream(addr))
-	defer s.StopTestBackend()
-
-	err = s.Backend.SelectAccount(TestConfig.Account2.Address, TestConfig.Account2.Password)
-	s.NoError(err)
-
-	transactionCompleted := make(chan struct{})
-
-	var signResult sign.Result
-	signal.SetDefaultNodeNotificationHandler(func(rawSignal string) {
-		var signalEnvelope signal.Envelope
-		err := json.Unmarshal([]byte(rawSignal), &signalEnvelope)
-		s.NoError(err)
-
-		if signalEnvelope.Type == signal.EventSignRequestAdded {
-			event := signalEnvelope.Event.(map[string]interface{})
 			txID := event["id"].(string)
 
 			// Complete with a wrong passphrase.
@@ -128,13 +114,13 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransactionUpstream() {
 		}
 	})
 
-	result := s.Backend.CallRPC(`{
+	result := callRPCFn(`{
 		"jsonrpc": "2.0",
 		"id": 1,
 		"method": "eth_sendTransaction",
 		"params": [{
-			"from": "` + TestConfig.Account2.Address + `",
-			"to": "` + TestConfig.Account1.Address + `",
+			"from": "` + TestConfig.Account1.Address + `",
+			"to": "` + TestConfig.Account2.Address + `",
 			"value": "0x9184e72a"
 		}]
 	}`)

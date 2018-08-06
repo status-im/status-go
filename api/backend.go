@@ -290,31 +290,48 @@ func (b *StatusBackend) DiscardSignRequests(ids []string) map[string]error {
 
 // registerHandlers attaches Status callback handlers to running node
 func (b *StatusBackend) registerHandlers() error {
-	rpcClient := b.StatusNode().RPCClient()
-	if rpcClient == nil {
+	var rpcClients []*rpc.Client
+
+	if c := b.StatusNode().RPCClient(); c == nil {
 		return errors.New("RPC client unavailable")
+	} else {
+		rpcClients = append(rpcClients, c)
 	}
 
-	rpcClient.RegisterHandler(params.AccountsMethodName, func(context.Context, ...interface{}) (interface{}, error) {
-		return b.AccountManager().Accounts()
-	})
+	if c := b.StatusNode().RPCPrivateClient(); c == nil {
+		return errors.New("RPC private client unavailable")
+	} else {
+		rpcClients = append(rpcClients, c)
+	}
 
-	rpcClient.RegisterHandler(params.SendTransactionMethodName, func(ctx context.Context, rpcParams ...interface{}) (interface{}, error) {
-		txArgs, err := transactions.RPCCalltoSendTxArgs(rpcParams...)
-		if err != nil {
-			return nil, err
-		}
+	for _, client := range rpcClients {
+		client.RegisterHandler(
+			params.AccountsMethodName,
+			func(context.Context, ...interface{}) (interface{}, error) {
+				return b.AccountManager().Accounts()
+			},
+		)
 
-		hash, err := b.SendTransaction(ctx, txArgs)
-		if err != nil {
-			return nil, err
-		}
+		client.RegisterHandler(
+			params.SendTransactionMethodName,
+			func(ctx context.Context, rpcParams ...interface{}) (interface{}, error) {
+				txArgs, err := transactions.RPCCalltoSendTxArgs(rpcParams...)
+				if err != nil {
+					return nil, err
+				}
 
-		return hash.Hex(), err
-	})
+				hash, err := b.SendTransaction(ctx, txArgs)
+				if err != nil {
+					return nil, err
+				}
 
-	rpcClient.RegisterHandler(params.PersonalSignMethodName, b.personalAPI.Sign)
-	rpcClient.RegisterHandler(params.PersonalRecoverMethodName, b.personalAPI.Recover)
+				return hash.Hex(), err
+			},
+		)
+
+		client.RegisterHandler(params.PersonalSignMethodName, b.personalAPI.Sign)
+		client.RegisterHandler(params.PersonalRecoverMethodName, b.personalAPI.Recover)
+	}
 
 	return nil
 }
