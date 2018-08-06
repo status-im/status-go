@@ -290,21 +290,21 @@ func (b *StatusBackend) DiscardSignRequests(ids []string) map[string]error {
 
 // registerHandlers attaches Status callback handlers to running node
 func (b *StatusBackend) registerHandlers() error {
-	var rpcClients []*rpc.Client
+	var clients []*rpc.Client
 
-	if c := b.StatusNode().RPCClient(); c == nil {
+	if c := b.StatusNode().RPCClient(); c != nil {
+		clients = append(clients, c)
+	} else {
 		return errors.New("RPC client unavailable")
-	} else {
-		rpcClients = append(rpcClients, c)
 	}
 
-	if c := b.StatusNode().RPCPrivateClient(); c == nil {
+	if c := b.StatusNode().RPCPrivateClient(); c != nil {
+		clients = append(clients, c)
+	} else {
 		return errors.New("RPC private client unavailable")
-	} else {
-		rpcClients = append(rpcClients, c)
 	}
 
-	for _, client := range rpcClients {
+	for _, client := range clients {
 		client.RegisterHandler(
 			params.AccountsMethodName,
 			func(context.Context, ...interface{}) (interface{}, error) {
