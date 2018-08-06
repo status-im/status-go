@@ -43,8 +43,6 @@ func (s *VerifierTestSuite) setupBackendAndContract() {
 	alloc[auth.From] = core.GenesisAccount{Balance: big.NewInt(133700000)}
 	s.backend = backends.NewSimulatedBackend(alloc)
 
-	auth = s.newKeyedTransactor()
-
 	s.contractAddress, _, s.registry, err = DeployRegistry(auth, s.backend)
 	s.Require().NoError(err)
 	s.backend.Commit()
@@ -64,26 +62,10 @@ func (s *VerifierTestSuite) setupAccount() {
 }
 
 func (s *VerifierTestSuite) add(nodeID discover.NodeID) {
-	auth := s.newKeyedTransactor()
+	auth := bind.NewKeyedTransactor(s.privKey)
 	_, err := s.registry.Add(auth, nodeID[:])
 	s.Require().NoError(err)
 	s.backend.Commit()
-}
-
-func (s *VerifierTestSuite) newKeyedTransactor() *bind.TransactOpts {
-	nonce, err := s.backend.PendingNonceAt(context.Background(), s.from)
-	s.Require().NoError(err)
-
-	gasPrice, err := s.backend.SuggestGasPrice(context.Background())
-	s.Require().NoError(err)
-
-	auth := bind.NewKeyedTransactor(s.privKey)
-	auth.Nonce = big.NewInt(int64(nonce))
-	auth.Value = big.NewInt(0)
-	auth.GasLimit = uint64(600000)
-	auth.GasPrice = gasPrice
-
-	return auth
 }
 
 func (s *VerifierTestSuite) generateNodeID() discover.NodeID {
