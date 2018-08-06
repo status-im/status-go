@@ -194,7 +194,13 @@ func (k *ExtendedKey) Child(i uint32) (*ExtendedKey, error) {
 		keyBigInt.Add(keyBigInt, parentKeyBigInt)
 		keyBigInt.Mod(keyBigInt, btcec.S256().N)
 
-		child.KeyData = keyBigInt.Bytes()
+		keyData := keyBigInt.Bytes()
+		if len(keyData) < 32 {
+			extra := make([]byte, 32-len(keyData))
+			keyData = append(extra, keyData...)
+		}
+
+		child.KeyData = keyData
 		child.Version = PrivateKeyVersion
 	} else {
 		// Case #3: childKey = serP(point(parse256(IL)) + parentKey)
