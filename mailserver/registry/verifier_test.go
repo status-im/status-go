@@ -23,7 +23,7 @@ type VerifierTestSuite struct {
 	from            common.Address
 	contractAddress common.Address
 	registry        *Registry
-	verifier        *RegistryVerifier
+	verifier        *Verifier
 }
 
 func (s *VerifierTestSuite) SetupTest() {

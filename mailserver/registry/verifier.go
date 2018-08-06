@@ -8,22 +8,25 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discover"
 )
 
-type RegistryVerifier struct {
+// Verifier verifies nodes based on a smart contract.
+type Verifier struct {
 	rc *RegistryCaller
 }
 
-func NewVerifier(contractCaller bind.ContractCaller, contractAddress common.Address) (*RegistryVerifier, error) {
+// NewVerifier returns a new Verifier instance.
+func NewVerifier(contractCaller bind.ContractCaller, contractAddress common.Address) (*Verifier, error) {
 	rc, err := NewRegistryCaller(contractAddress, contractCaller)
 	if err != nil {
 		return nil, err
 	}
 
-	return &RegistryVerifier{
+	return &Verifier{
 		rc: rc,
 	}, nil
 }
 
-func (v *RegistryVerifier) VerifyNode(_ context.Context, nodeID discover.NodeID) bool {
+// VerifyNode checks if a given node is trusted using a smart contract.
+func (v *Verifier) VerifyNode(_ context.Context, nodeID discover.NodeID) bool {
 	res, err := v.rc.Exists(nil, nodeID.Bytes())
 	if err != nil {
 		return false
