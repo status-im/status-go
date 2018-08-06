@@ -18,7 +18,7 @@ import (
 
 type VerifierTestSuite struct {
 	suite.Suite
-	backend         bind.ContractBackend
+	backend         *backends.SimulatedBackend
 	privKey         *ecdsa.PrivateKey
 	from            common.Address
 	contractAddress common.Address
@@ -33,7 +33,6 @@ func (s *VerifierTestSuite) SetupTest() {
 	var err error
 	s.verifier, err = NewVerifier(s.backend, s.contractAddress)
 	s.Require().NoError(err)
-	s.verifier.pendingOpt = true
 }
 
 func (s *VerifierTestSuite) setupBackendAndContract() {
@@ -48,6 +47,7 @@ func (s *VerifierTestSuite) setupBackendAndContract() {
 
 	s.contractAddress, _, s.registry, err = DeployRegistry(auth, s.backend)
 	s.Require().NoError(err)
+	s.backend.Commit()
 }
 
 func (s *VerifierTestSuite) setupAccount() {
@@ -67,6 +67,7 @@ func (s *VerifierTestSuite) add(nodeID discover.NodeID) {
 	auth := s.newKeyedTransactor()
 	_, err := s.registry.Add(auth, nodeID[:])
 	s.Require().NoError(err)
+	s.backend.Commit()
 }
 
 func (s *VerifierTestSuite) newKeyedTransactor() *bind.TransactOpts {

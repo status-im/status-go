@@ -9,8 +9,7 @@ import (
 )
 
 type RegistryVerifier struct {
-	rc         *RegistryCaller
-	pendingOpt bool
+	rc *RegistryCaller
 }
 
 func NewVerifier(contractCaller bind.ContractCaller, contractAddress common.Address) (*RegistryVerifier, error) {
@@ -25,7 +24,7 @@ func NewVerifier(contractCaller bind.ContractCaller, contractAddress common.Addr
 }
 
 func (v *RegistryVerifier) VerifyNode(_ context.Context, nodeID discover.NodeID) bool {
-	res, err := v.rc.Exists(&bind.CallOpts{Pending: v.pendingOpt}, nodeID.Bytes())
+	res, err := v.rc.Exists(nil, nodeID.Bytes())
 	if err != nil {
 		return false
 	}
