@@ -87,7 +87,8 @@ type Whisper struct {
 	statsMu sync.Mutex // guard stats
 	stats   Statistics // Statistics of whisper node
 
-	mailServer MailServer // MailServer interface
+	mailServer     MailServer     // MailServer interface
+	envelopeTracer EnvelopeTracer // Service collecting envelopes metadata
 }
 
 // New creates a Whisper client ready to communicate through the Ethereum P2P network.
@@ -209,6 +210,12 @@ func (whisper *Whisper) APIs() []rpc.API {
 // MailServer will process all the incoming messages with p2pRequestCode.
 func (whisper *Whisper) RegisterServer(server MailServer) {
 	whisper.mailServer = server
+}
+
+// RegisterEnvelopeTracer registers an EnveloperTracer to collect information
+// about received envelopes.
+func (whisper *Whisper) RegisterEnvelopeTracer(tracer EnvelopeTracer) {
+	whisper.envelopeTracer = tracer
 }
 
 // Protocols returns the whisper sub-protocols ran by this particular client.
@@ -736,6 +743,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 
 			trouble := false
 			for _, env := range envelopes {
+				whisper.traceEnvelope(env, !whisper.isEnvelopeCached(env.Hash()), peerSource, p)
 				cached, err := whisper.add(env, whisper.lightClient)
 				if err != nil {
 					trouble = true
@@ -786,6 +794,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 					return errors.New("invalid direct message")
 				}
 				whisper.postEvent(&envelope, true)
+				whisper.traceEnvelope(&envelope, false, p2pSource, p)
 			}
 		case p2pRequestCode:
 			// Must be processed if mail server is implemented. Otherwise ignore.
@@ -881,6 +890,22 @@ func (whisper *Whisper) add(envelope *Envelope, isP2P bool) (bool, error) {
 		}
 	}
 	return true, nil
+}
+
+// traceEnvelope collects basic metadata about an envelope and sender peer.
+func (whisper *Whisper) traceEnvelope(envelope *Envelope, isNew bool, source envelopeSource, peer *Peer) {
+	if whisper.envelopeTracer == nil {
+		return
+	}
+
+	whisper.envelopeTracer.Trace(&EnvelopeMeta{
+		Hash:   envelope.Hash().String(),
+		Topic:  BytesToTopic(envelope.Topic[:]),
+		Size:   uint32(envelope.size()),
+		Source: source,
+		IsNew:  isNew,
+		Peer:   peer.peer.Info().ID,
+	})
 }
 
 // postEvent queues the message for further processing.
