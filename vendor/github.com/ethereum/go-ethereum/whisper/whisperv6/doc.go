@@ -44,14 +44,13 @@ const (
 	ProtocolName       = "shh"     // Nickname of the protocol in geth
 
 	// whisper protocol message codes, according to EIP-627
-	statusCode             = 0   // used by whisper protocol
-	messagesCode           = 1   // normal whisper message
-	powRequirementCode     = 2   // PoW requirement
-	bloomFilterExCode      = 3   // bloom filter exchange
-	p2pRequestCompleteCode = 125 // peer-to-peer message, used by Dapp protocol
-	p2pRequestCode         = 126 // peer-to-peer message, used by Dapp protocol
-	p2pMessageCode         = 127 // peer-to-peer message (to be consumed by the peer, but not forwarded any further)
-	NumberOfMessageCodes   = 128
+	statusCode           = 0   // used by whisper protocol
+	messagesCode         = 1   // normal whisper message
+	powRequirementCode   = 2   // PoW requirement
+	bloomFilterExCode    = 3   // bloom filter exchange
+	p2pRequestCode       = 126 // peer-to-peer message, used by Dapp protocol
+	p2pMessageCode       = 127 // peer-to-peer message (to be consumed by the peer, but not forwarded any further)
+	NumberOfMessageCodes = 128
 
 	SizeMask      = byte(3) // mask used to extract the size of payload size field from the flags
 	signatureFlag = byte(4)
@@ -95,41 +94,4 @@ func (e unknownVersionError) Error() string {
 type MailServer interface {
 	Archive(env *Envelope)
 	DeliverMail(whisperPeer *Peer, request *Envelope)
-}
-
-type envelopeSource int
-
-const (
-	_ = iota
-	// peerSource indicates a source as a regular peer.
-	peerSource envelopeSource = iota
-	// p2pSource indicates that envelop was received from a trusted peer.
-	p2pSource
-)
-
-// EnvelopeMeta keeps metadata of received envelopes.
-type EnvelopeMeta struct {
-	Hash   string
-	Topic  TopicType
-	Size   uint32
-	Source envelopeSource
-	IsNew  bool
-	Peer   string
-}
-
-// SourceString converts source to string.
-func (m *EnvelopeMeta) SourceString() string {
-	switch m.Source {
-	case peerSource:
-		return "peer"
-	case p2pSource:
-		return "p2p"
-	default:
-		return "unknown"
-	}
-}
-
-// EnvelopeTracer tracks received envelopes.
-type EnvelopeTracer interface {
-	Trace(*EnvelopeMeta)
 }

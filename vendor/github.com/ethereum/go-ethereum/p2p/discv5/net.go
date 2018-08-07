@@ -40,7 +40,7 @@ var (
 
 const (
 	autoRefreshInterval   = 1 * time.Hour
-	bucketRefreshInterval = 10 * time.Second
+	bucketRefreshInterval = 1 * time.Minute
 	seedCount             = 30
 	seedMaxAge            = 5 * 24 * time.Hour
 	lowPort               = 1024
@@ -641,18 +641,7 @@ loop:
 				}()
 			} else {
 				refreshDone = make(chan struct{})
-
-				done := make(chan struct{})
-				net.refresh(done)
-				<-done
-
-				// Refresh again only if there are no seeds.
-				// Also, sleep for some time to prevent from
-				// executing too often.
-				go func() {
-					time.Sleep(time.Millisecond * 100)
-					close(refreshDone)
-				}()
+				net.refresh(refreshDone)
 			}
 		}
 	}
@@ -1066,11 +1055,7 @@ func (net *Network) handle(n *Node, ev nodeEvent, pkt *ingressPacket) error {
 func (net *Network) checkPacket(n *Node, ev nodeEvent, pkt *ingressPacket) error {
 	// Replay prevention checks.
 	switch ev {
-	case pingPacket:
-		if pkt.data.(*ping).Version != Version {
-			return fmt.Errorf("version mismatch")
-		}
-	case findnodeHashPacket, neighborsPacket:
+	case pingPacket, findnodeHashPacket, neighborsPacket:
 		// TODO: check date is > last date seen
 		// TODO: check ping version
 	case pongPacket:

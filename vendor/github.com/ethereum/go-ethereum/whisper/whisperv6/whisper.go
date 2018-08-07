@@ -26,9 +26,9 @@ import (
 	"sync"
 	"time"
 
+	mapset "github.com/deckarep/golang-set"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -36,7 +36,6 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/errors"
 	"golang.org/x/crypto/pbkdf2"
 	"golang.org/x/sync/syncmap"
-	set "gopkg.in/fatih/set.v0"
 )
 
 // Statistics holds several message-related counter for analytics
@@ -47,12 +46,6 @@ type Statistics struct {
 	memoryUsed           int
 	cycles               int
 	totalMessagesCleared int
-}
-
-// MailServerResponse is the response payload sent by the mailserver
-type MailServerResponse struct {
-	LastEnvelopeHash common.Hash
-	Cursor           []byte
 }
 
 const (
@@ -76,7 +69,7 @@ type Whisper struct {
 
 	poolMu      sync.RWMutex              // Mutex to sync the message and expiration pools
 	envelopes   map[common.Hash]*Envelope // Pool of envelopes currently tracked by this node
-	expirations map[uint32]*set.SetNonTS  // Message expiration pool
+	expirations map[uint32]mapset.Set     // Message expiration pool
 
 	peerMu sync.RWMutex       // Mutex to sync the active peer set
 	peers  map[*Peer]struct{} // Set of currently active peers
@@ -94,12 +87,7 @@ type Whisper struct {
 	statsMu sync.Mutex // guard stats
 	stats   Statistics // Statistics of whisper node
 
-	mailServer     MailServer     // MailServer interface
-	envelopeTracer EnvelopeTracer // Service collecting envelopes metadata
-
-	envelopeFeed event.Feed
-
-	timeSource func() time.Time // source of time for whisper
+	mailServer MailServer // MailServer interface
 }
 
 // New creates a Whisper client ready to communicate through the Ethereum P2P network.
@@ -112,13 +100,12 @@ func New(cfg *Config) *Whisper {
 		privateKeys:   make(map[string]*ecdsa.PrivateKey),
 		symKeys:       make(map[string][]byte),
 		envelopes:     make(map[common.Hash]*Envelope),
-		expirations:   make(map[uint32]*set.SetNonTS),
+		expirations:   make(map[uint32]mapset.Set),
 		peers:         make(map[*Peer]struct{}),
 		messageQueue:  make(chan *Envelope, messageQueueLimit),
 		p2pMsgQueue:   make(chan *Envelope, messageQueueLimit),
 		quit:          make(chan struct{}),
 		syncAllowance: DefaultSyncAllowance,
-		timeSource:    cfg.TimeSource,
 	}
 
 	whisper.filters = NewFilters(whisper)
@@ -143,12 +130,6 @@ func New(cfg *Config) *Whisper {
 	}
 
 	return whisper
-}
-
-// SubscribeEnvelopeEvents subscribes to envelopes feed.
-// In order to prevent blocking whisper producers events must be amply buffered.
-func (whisper *Whisper) SubscribeEnvelopeEvents(events chan<- EnvelopeEvent) event.Subscription {
-	return whisper.envelopeFeed.Subscribe(events)
 }
 
 // MinPow returns the PoW value required by this node.
@@ -224,21 +205,10 @@ func (whisper *Whisper) APIs() []rpc.API {
 	}
 }
 
-// GetCurrentTime returns current time.
-func (whisper *Whisper) GetCurrentTime() time.Time {
-	return whisper.timeSource()
-}
-
 // RegisterServer registers MailServer interface.
 // MailServer will process all the incoming messages with p2pRequestCode.
 func (whisper *Whisper) RegisterServer(server MailServer) {
 	whisper.mailServer = server
-}
-
-// RegisterEnvelopeTracer registers an EnveloperTracer to collect information
-// about received envelopes.
-func (whisper *Whisper) RegisterEnvelopeTracer(tracer EnvelopeTracer) {
-	whisper.envelopeTracer = tracer
 }
 
 // Protocols returns the whisper sub-protocols ran by this particular client.
@@ -384,15 +354,6 @@ func (whisper *Whisper) RequestHistoricMessages(peerID []byte, envelope *Envelop
 	return p2p.Send(p.ws, p2pRequestCode, envelope)
 }
 
-func (whisper *Whisper) SendHistoricMessageResponse(peer *Peer, payload []byte) error {
-	size, r, err := rlp.EncodeToReader(payload)
-	if err != nil {
-		return err
-	}
-
-	return peer.ws.WriteMsg(p2p.Msg{Code: p2pRequestCompleteCode, Size: uint32(size), Payload: r})
-}
-
 // SendP2PMessage sends a peer-to-peer message to a specific peer.
 func (whisper *Whisper) SendP2PMessage(peerID []byte, envelope *Envelope) error {
 	p, err := whisper.getPeer(peerID)
@@ -421,9 +382,9 @@ func (whisper *Whisper) NewKeyPair() (string, error) {
 		return "", fmt.Errorf("failed to generate valid key")
 	}
 
-	id, err := toDeterministicID(common.ToHex(crypto.FromECDSAPub(&key.PublicKey)), keyIDSize)
+	id, err := GenerateRandomID()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to generate ID: %s", err)
 	}
 
 	whisper.keyMu.Lock()
@@ -438,16 +399,11 @@ func (whisper *Whisper) NewKeyPair() (string, error) {
 
 // DeleteKeyPair deletes the specified key if it exists.
 func (whisper *Whisper) DeleteKeyPair(key string) bool {
-	deterministicID, err := toDeterministicID(key, keyIDSize)
-	if err != nil {
-		return false
-	}
-
 	whisper.keyMu.Lock()
 	defer whisper.keyMu.Unlock()
 
-	if whisper.privateKeys[deterministicID] != nil {
-		delete(whisper.privateKeys, deterministicID)
+	if whisper.privateKeys[key] != nil {
+		delete(whisper.privateKeys, key)
 		return true
 	}
 	return false
@@ -455,73 +411,31 @@ func (whisper *Whisper) DeleteKeyPair(key string) bool {
 
 // AddKeyPair imports a asymmetric private key and returns it identifier.
 func (whisper *Whisper) AddKeyPair(key *ecdsa.PrivateKey) (string, error) {
-	id, err := makeDeterministicID(common.ToHex(crypto.FromECDSAPub(&key.PublicKey)), keyIDSize)
+	id, err := GenerateRandomID()
 	if err != nil {
-		return "", err
-	}
-	if whisper.HasKeyPair(id) {
-		return id, nil // no need to re-inject
+		return "", fmt.Errorf("failed to generate ID: %s", err)
 	}
 
 	whisper.keyMu.Lock()
 	whisper.privateKeys[id] = key
 	whisper.keyMu.Unlock()
-	log.Info("Whisper identity added", "id", id, "pubkey", common.ToHex(crypto.FromECDSAPub(&key.PublicKey)))
 
 	return id, nil
-}
-
-// SelectKeyPair adds cryptographic identity, and makes sure
-// that it is the only private key known to the node.
-func (whisper *Whisper) SelectKeyPair(key *ecdsa.PrivateKey) error {
-	id, err := makeDeterministicID(common.ToHex(crypto.FromECDSAPub(&key.PublicKey)), keyIDSize)
-	if err != nil {
-		return err
-	}
-
-	whisper.keyMu.Lock()
-	defer whisper.keyMu.Unlock()
-
-	whisper.privateKeys = make(map[string]*ecdsa.PrivateKey) // reset key store
-	whisper.privateKeys[id] = key
-
-	log.Info("Whisper identity selected", "id", id, "key", common.ToHex(crypto.FromECDSAPub(&key.PublicKey)))
-	return nil
-}
-
-// DeleteKeyPairs removes all cryptographic identities known to the node
-func (whisper *Whisper) DeleteKeyPairs() error {
-	whisper.keyMu.Lock()
-	defer whisper.keyMu.Unlock()
-
-	whisper.privateKeys = make(map[string]*ecdsa.PrivateKey)
-
-	return nil
 }
 
 // HasKeyPair checks if the the whisper node is configured with the private key
 // of the specified public pair.
 func (whisper *Whisper) HasKeyPair(id string) bool {
-	deterministicID, err := toDeterministicID(id, keyIDSize)
-	if err != nil {
-		return false
-	}
-
 	whisper.keyMu.RLock()
 	defer whisper.keyMu.RUnlock()
-	return whisper.privateKeys[deterministicID] != nil
+	return whisper.privateKeys[id] != nil
 }
 
 // GetPrivateKey retrieves the private key of the specified identity.
 func (whisper *Whisper) GetPrivateKey(id string) (*ecdsa.PrivateKey, error) {
-	deterministicID, err := toDeterministicID(id, keyIDSize)
-	if err != nil {
-		return nil, err
-	}
-
 	whisper.keyMu.RLock()
 	defer whisper.keyMu.RUnlock()
-	key := whisper.privateKeys[deterministicID]
+	key := whisper.privateKeys[id]
 	if key == nil {
 		return nil, fmt.Errorf("invalid id")
 	}
@@ -551,23 +465,6 @@ func (whisper *Whisper) GenerateSymKey() (string, error) {
 	}
 	whisper.symKeys[id] = key
 	return id, nil
-}
-
-// AddSymKey stores the key with a given id.
-func (whisper *Whisper) AddSymKey(id string, key []byte) (string, error) {
-	deterministicID, err := toDeterministicID(id, keyIDSize)
-	if err != nil {
-		return "", err
-	}
-
-	whisper.keyMu.Lock()
-	defer whisper.keyMu.Unlock()
-
-	if whisper.symKeys[deterministicID] != nil {
-		return "", fmt.Errorf("key already exists: %v", id)
-	}
-	whisper.symKeys[deterministicID] = key
-	return deterministicID, nil
 }
 
 // AddSymKeyDirect stores the key, and returns its id.
@@ -775,7 +672,6 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 
 			trouble := false
 			for _, env := range envelopes {
-				whisper.traceEnvelope(env, !whisper.isEnvelopeCached(env.Hash()), peerSource, p)
 				cached, err := whisper.add(env, whisper.lightClient)
 				if err != nil {
 					trouble = true
@@ -826,7 +722,6 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 					return errors.New("invalid direct message")
 				}
 				whisper.postEvent(&envelope, true)
-				whisper.traceEnvelope(&envelope, false, p2pSource, p)
 			}
 		case p2pRequestCode:
 			// Must be processed if mail server is implemented. Otherwise ignore.
@@ -836,55 +731,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 					log.Warn("failed to decode p2p request message, peer will be disconnected", "peer", p.peer.ID(), "err", err)
 					return errors.New("invalid p2p request")
 				}
-
 				whisper.mailServer.DeliverMail(p, &request)
-			}
-		case p2pRequestCompleteCode:
-			if p.trusted {
-				var payload []byte
-				if err := packet.Decode(&payload); err != nil {
-					log.Warn("failed to decode response message, peer will be disconnected", "peer", p.peer.ID(), "err", err)
-					return errors.New("invalid request response message")
-				}
-
-				// check if payload is
-				// - requestID or
-				// - requestID + lastEnvelopeHash or
-				// - requestID + lastEnvelopeHash + cursor
-				// requestID is the hash of the request envelope.
-				// lastEnvelopeHash is the last envelope sent by the mail server
-				// cursor is the db key, 36 bytes: 4 for the timestamp + 32 for the envelope hash.
-				// length := len(payload)
-
-				if len(payload) < common.HashLength || len(payload) > common.HashLength*3+4 {
-					log.Warn("invalid response message, peer will be disconnected", "peer", p.peer.ID(), "err", err, "payload size", len(payload))
-					return errors.New("invalid response size")
-				}
-
-				var (
-					requestID        common.Hash
-					lastEnvelopeHash common.Hash
-					cursor           []byte
-				)
-
-				requestID = common.BytesToHash(payload[:common.HashLength])
-
-				if len(payload) >= common.HashLength*2 {
-					lastEnvelopeHash = common.BytesToHash(payload[common.HashLength : common.HashLength*2])
-				}
-
-				if len(payload) >= common.HashLength*2+36 {
-					cursor = payload[common.HashLength*2 : common.HashLength*2+36]
-				}
-
-				whisper.envelopeFeed.Send(EnvelopeEvent{
-					Hash:  requestID,
-					Event: EventMailServerRequestCompleted,
-					Data: &MailServerResponse{
-						LastEnvelopeHash: lastEnvelopeHash,
-						Cursor:           cursor,
-					},
-				})
 			}
 		default:
 			// New message types might be implemented in the future versions of Whisper.
@@ -900,7 +747,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 // appropriate time-stamp. In case of error, connection should be dropped.
 // param isP2P indicates whether the message is peer-to-peer (should not be forwarded).
 func (whisper *Whisper) add(envelope *Envelope, isP2P bool) (bool, error) {
-	now := uint32(whisper.timeSource().Unix())
+	now := uint32(time.Now().Unix())
 	sent := envelope.Expiry - envelope.TTL
 
 	if sent > now {
@@ -949,9 +796,9 @@ func (whisper *Whisper) add(envelope *Envelope, isP2P bool) (bool, error) {
 	if !alreadyCached {
 		whisper.envelopes[hash] = envelope
 		if whisper.expirations[envelope.Expiry] == nil {
-			whisper.expirations[envelope.Expiry] = set.NewNonTS()
+			whisper.expirations[envelope.Expiry] = mapset.NewThreadUnsafeSet()
 		}
-		if !whisper.expirations[envelope.Expiry].Has(hash) {
+		if !whisper.expirations[envelope.Expiry].Contains(hash) {
 			whisper.expirations[envelope.Expiry].Add(hash)
 		}
 	}
@@ -967,29 +814,9 @@ func (whisper *Whisper) add(envelope *Envelope, isP2P bool) (bool, error) {
 		whisper.postEvent(envelope, isP2P) // notify the local node about the new message
 		if whisper.mailServer != nil {
 			whisper.mailServer.Archive(envelope)
-			whisper.envelopeFeed.Send(EnvelopeEvent{
-				Hash:  envelope.Hash(),
-				Event: EventMailServerEnvelopeArchived,
-			})
 		}
 	}
 	return true, nil
-}
-
-// traceEnvelope collects basic metadata about an envelope and sender peer.
-func (whisper *Whisper) traceEnvelope(envelope *Envelope, isNew bool, source envelopeSource, peer *Peer) {
-	if whisper.envelopeTracer == nil {
-		return
-	}
-
-	whisper.envelopeTracer.Trace(&EnvelopeMeta{
-		Hash:   envelope.Hash().String(),
-		Topic:  BytesToTopic(envelope.Topic[:]),
-		Size:   uint32(envelope.size()),
-		Source: source,
-		IsNew:  isNew,
-		Peer:   peer.peer.Info().ID,
-	})
 }
 
 // postEvent queues the message for further processing.
@@ -1029,17 +856,9 @@ func (whisper *Whisper) processQueue() {
 
 		case e = <-whisper.messageQueue:
 			whisper.filters.NotifyWatchers(e, false)
-			whisper.envelopeFeed.Send(EnvelopeEvent{
-				Hash:  e.Hash(),
-				Event: EventEnvelopeAvailable,
-			})
 
 		case e = <-whisper.p2pMsgQueue:
 			whisper.filters.NotifyWatchers(e, true)
-			whisper.envelopeFeed.Send(EnvelopeEvent{
-				Hash:  e.Hash(),
-				Event: EventEnvelopeAvailable,
-			})
 		}
 	}
 }
@@ -1071,17 +890,13 @@ func (whisper *Whisper) expire() {
 	whisper.statsMu.Lock()
 	defer whisper.statsMu.Unlock()
 	whisper.stats.reset()
-	now := uint32(whisper.timeSource().Unix())
+	now := uint32(time.Now().Unix())
 	for expiry, hashSet := range whisper.expirations {
 		if expiry < now {
 			// Dump all expired messages and remove timestamp
 			hashSet.Each(func(v interface{}) bool {
 				sz := whisper.envelopes[v.(common.Hash)].size()
 				delete(whisper.envelopes, v.(common.Hash))
-				whisper.envelopeFeed.Send(EnvelopeEvent{
-					Hash:  v.(common.Hash),
-					Event: EventEnvelopeExpired,
-				})
 				whisper.stats.messagesCleared++
 				whisper.stats.memoryCleared += sz
 				whisper.stats.memoryUsed -= sz
@@ -1198,33 +1013,6 @@ func GenerateRandomID() (id string, err error) {
 	return id, err
 }
 
-// makeDeterministicID generates a deterministic ID, based on a given input
-func makeDeterministicID(input string, keyLen int) (id string, err error) {
-	buf := pbkdf2.Key([]byte(input), nil, 4096, keyLen, sha256.New)
-	if !validateDataIntegrity(buf, keyIDSize) {
-		return "", fmt.Errorf("error in GenerateDeterministicID: failed to generate key")
-	}
-	id = common.Bytes2Hex(buf)
-	return id, err
-}
-
-// toDeterministicID reviews incoming id, and transforms it to format
-// expected internally be private key store. Originally, public keys
-// were used as keys, now random keys are being used. And in order to
-// make it easier to consume, we now allow both random IDs and public
-// keys to be passed.
-func toDeterministicID(id string, expectedLen int) (string, error) {
-	if len(id) != (expectedLen * 2) { // we received hex key, so number of chars in id is doubled
-		var err error
-		id, err = makeDeterministicID(id, expectedLen)
-		if err != nil {
-			return "", err
-		}
-	}
-
-	return id, nil
-}
-
 func isFullNode(bloom []byte) bool {
 	if bloom == nil {
 		return true
@@ -1259,16 +1047,4 @@ func addBloom(a, b []byte) []byte {
 		c[i] = a[i] | b[i]
 	}
 	return c
-}
-
-// SelectedKeyPairID returns the id of currently selected key pair.
-// It helps distinguish between different users w/o exposing the user identity itself.
-func (whisper *Whisper) SelectedKeyPairID() string {
-	whisper.keyMu.RLock()
-	defer whisper.keyMu.RUnlock()
-
-	for id := range whisper.privateKeys {
-		return id
-	}
-	return ""
 }

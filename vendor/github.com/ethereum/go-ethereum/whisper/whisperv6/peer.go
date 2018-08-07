@@ -22,11 +22,11 @@ import (
 	"sync"
 	"time"
 
+	mapset "github.com/deckarep/golang-set"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rlp"
-	set "gopkg.in/fatih/set.v0"
 )
 
 // Peer represents a whisper protocol peer connection.
@@ -41,7 +41,7 @@ type Peer struct {
 	bloomFilter    []byte
 	fullNode       bool
 
-	known *set.Set // Messages already known by the peer to avoid wasting bandwidth
+	known mapset.Set // Messages already known by the peer to avoid wasting bandwidth
 
 	quit chan struct{}
 }
@@ -54,7 +54,7 @@ func newPeer(host *Whisper, remote *p2p.Peer, rw p2p.MsgReadWriter) *Peer {
 		ws:             rw,
 		trusted:        false,
 		powRequirement: 0.0,
-		known:          set.New(),
+		known:          mapset.NewSet(),
 		quit:           make(chan struct{}),
 		bloomFilter:    MakeFullNodeBloom(),
 		fullNode:       true,
@@ -165,7 +165,7 @@ func (peer *Peer) mark(envelope *Envelope) {
 
 // marked checks if an envelope is already known to the remote peer.
 func (peer *Peer) marked(envelope *Envelope) bool {
-	return peer.known.Has(envelope.Hash())
+	return peer.known.Contains(envelope.Hash())
 }
 
 // expire iterates over all the known envelopes in the host and removes all
@@ -187,10 +187,6 @@ func (peer *Peer) expire() {
 // broadcast iterates over the collection of envelopes and transmits yet unknown
 // ones over the network.
 func (peer *Peer) broadcast() error {
-	if peer.peer.IsFlaky() {
-		log.Trace("Waiting for a peer to restore communication", "ID", peer.peer.ID())
-		return nil
-	}
 	envelopes := peer.host.Envelopes()
 	bundle := make([]*Envelope, 0, len(envelopes))
 	for _, envelope := range envelopes {
@@ -208,11 +204,6 @@ func (peer *Peer) broadcast() error {
 		// mark envelopes only if they were successfully sent
 		for _, e := range bundle {
 			peer.mark(e)
-			peer.host.envelopeFeed.Send(EnvelopeEvent{
-				Event: EventEnvelopeSent,
-				Hash:  e.Hash(),
-				Peer:  peer.peer.ID(), // specifically discover.NodeID because it can be pretty printed
-			})
 		}
 
 		log.Trace("broadcast", "num. messages", len(bundle))

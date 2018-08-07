@@ -17,12 +17,12 @@
 package p2p
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net"
 	"sort"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common/mclock"
@@ -32,6 +32,10 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
+var (
+	ErrShuttingDown = errors.New("shutting down")
+)
+
 const (
 	baseProtocolVersion    = 5
 	baseProtocolLength     = uint64(16)
@@ -39,10 +43,7 @@ const (
 
 	snappyProtocolVersion = 5
 
-	pingInterval = 1 * time.Second
-	// watchdogInterval intentionally lower than ping interval.
-	// this way we reduce potential flaky window size.
-	watchdogInterval = 200 * time.Millisecond
+	pingInterval = 15 * time.Second
 )
 
 const (
@@ -104,7 +105,6 @@ type Peer struct {
 	log     log.Logger
 	created mclock.AbsTime
 
-	flaky    int32
 	wg       sync.WaitGroup
 	protoErr chan error
 	closed   chan struct{}
@@ -121,11 +121,6 @@ func NewPeer(id discover.NodeID, name string, caps []Cap) *Peer {
 	peer := newPeer(conn, nil)
 	close(peer.closed) // ensures Disconnect doesn't block
 	return peer
-}
-
-// IsFlaky returns true if there was no incoming traffic recently.
-func (p *Peer) IsFlaky() bool {
-	return atomic.LoadInt32(&p.flaky) == 1
 }
 
 // ID returns the node's public key.
@@ -198,10 +193,8 @@ func (p *Peer) run() (remoteRequested bool, err error) {
 		readErr    = make(chan error, 1)
 		reason     DiscReason // sent to the peer
 	)
-	p.wg.Add(3)
-	reads := make(chan struct{}, 10) // channel for reads
-	go p.readLoop(readErr, reads)
-	go p.watchdogLoop(reads)
+	p.wg.Add(2)
+	go p.readLoop(readErr)
 	go p.pingLoop()
 
 	// Start all protocol handlers.
@@ -261,24 +254,7 @@ func (p *Peer) pingLoop() {
 	}
 }
 
-func (p *Peer) watchdogLoop(reads <-chan struct{}) {
-	defer p.wg.Done()
-	hb := time.NewTimer(watchdogInterval)
-	defer hb.Stop()
-	for {
-		select {
-		case <-reads:
-			atomic.StoreInt32(&p.flaky, 0)
-		case <-hb.C:
-			atomic.StoreInt32(&p.flaky, 1)
-		case <-p.closed:
-			return
-		}
-		hb.Reset(watchdogInterval)
-	}
-}
-
-func (p *Peer) readLoop(errc chan<- error, reads chan<- struct{}) {
+func (p *Peer) readLoop(errc chan<- error) {
 	defer p.wg.Done()
 	for {
 		msg, err := p.rw.ReadMsg()
@@ -291,7 +267,6 @@ func (p *Peer) readLoop(errc chan<- error, reads chan<- struct{}) {
 			errc <- err
 			return
 		}
-		reads <- struct{}{}
 	}
 }
 
@@ -401,7 +376,7 @@ func (p *Peer) getProto(code uint64) (*protoRW, error) {
 
 type protoRW struct {
 	Protocol
-	in     chan Msg        // receices read messages
+	in     chan Msg        // receives read messages
 	closed <-chan struct{} // receives when peer is shutting down
 	wstart <-chan struct{} // receives when write may start
 	werr   chan<- error    // for write results
@@ -423,7 +398,7 @@ func (rw *protoRW) WriteMsg(msg Msg) (err error) {
 		// as well but we don't want to rely on that.
 		rw.werr <- err
 	case <-rw.closed:
-		err = fmt.Errorf("shutting down")
+		err = ErrShuttingDown
 	}
 	return err
 }

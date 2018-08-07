@@ -244,9 +244,6 @@ func (pm *ProtocolManager) Stop() {
 
 	close(pm.quitSync) // quits syncer, fetcher
 
-	// Stop downloader and make sure that all the running downloads are complete.
-	pm.downloader.Terminate()
-
 	// Disconnect existing sessions.
 	// This also closes the gate for any new registrations on the peer set.
 	// sessions which are already established but not added to pm.peers yet
@@ -1161,8 +1158,7 @@ func (pm *ProtocolManager) getHelperTrie(id uint, idx uint64) (common.Hash, stri
 
 // getHelperTrieAuxData returns requested auxiliary data for the given HelperTrie request
 func (pm *ProtocolManager) getHelperTrieAuxData(req HelperTrieReq) []byte {
-	switch {
-	case req.Type == htCanonical && req.AuxReq == auxHeader && len(req.Key) == 8:
+	if req.Type == htCanonical && req.AuxReq == auxHeader && len(req.Key) == 8 {
 		blockNum := binary.BigEndian.Uint64(req.Key)
 		hash := rawdb.ReadCanonicalHash(pm.chainDb, blockNum)
 		return rawdb.ReadHeaderRLP(pm.chainDb, hash, blockNum)

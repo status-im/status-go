@@ -20,6 +20,7 @@ package les
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
@@ -250,6 +251,7 @@ func (s *LightEthereum) Stop() error {
 
 	s.eventMux.Stop()
 
+	time.Sleep(time.Millisecond * 200)
 	s.chainDb.Close()
 	close(s.shutdownChan)
 

@@ -74,6 +74,14 @@
   revision = "346938d642f2ec3594ed81d874461961cd0faa76"
 
 [[projects]]
+  digest = "1:0a01235d10db170711644e673745cc881e1a1087ca95bfdc0aedd5cc57d3f71a"
+  name = "github.com/deckarep/golang-set"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "1d4478f51bed434f1dadf96dcd9b43aabac66795"
+  version = "v1.7"
+
+[[projects]]
   digest = "1:e72bf8962d37cf1dccf27a58ad0b9545fb4c8ea3b9e3bb0319de627d13b8a8d9"
   name = "github.com/edsrzf/mmap-go"
   packages = ["."]
@@ -81,7 +89,7 @@
   revision = "935e0e8a636ca4ba70b713f3e38a19e1b77739e8"
 
 [[projects]]
-  digest = "1:3238a0c355a81640974751f7d3bab21bf91035165f75c2c457959425c0422a4b"
+  digest = "1:b2f36e5422bda96da299f9e48c7dcdd3177b18477297f84ff1a45ec3032c2994"
   name = "github.com/ethereum/go-ethereum"
   packages = [
     ".",
@@ -113,7 +121,6 @@
     "crypto/bn256/cloudflare",
     "crypto/bn256/google",
     "crypto/ecies",
-    "crypto/randentropy",
     "crypto/secp256k1",
     "crypto/sha3",
     "eth",
@@ -149,8 +156,8 @@
     "whisper/whisperv6",
   ]
   pruneopts = "T"
-  revision = "dea1ce052a10cd7d401a5c04f83f371a06fe293c"
-  version = "v1.8.11"
+  revision = "225171a4bfcc16bd12a1906b1e0d43d0b18c353b"
+  version = "v1.8.13"
 
 [[projects]]
   digest = "1:5ac7ecd476a2355a5201229081df2e5f57333ecf703e1f69dde699ae34169c1b"
@@ -965,14 +972,6 @@
   ]
   pruneopts = "NUT"
   revision = "ac136b6c2db7c4d43955e4bc7174db36dc0539c0"
-
-[[projects]]
-  branch = "v0.1.1"
-  digest = "1:0d0b6541386224b81c732450e5d6e28ece856ec5ba17f693ffbbb38c02ed93b9"
-  name = "gopkg.in/fatih/set.v0"
-  packages = ["."]
-  pruneopts = "NUT"
-  revision = "27c40922c40b43fe04554d8223a402af3ea333f3"
 
 [[projects]]
   digest = "1:6aba14c40a7d987288b30c37893238d136e027788f27f8bb9c7ad98b15d30040"
