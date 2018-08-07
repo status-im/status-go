@@ -1,16 +1,9 @@
+// +build !library
+
 package signal
 
-/*
-#include <stddef.h>
-#include <stdbool.h>
-#include <stdlib.h>
-extern bool StatusServiceSignalEvent(const char *jsonEvent);
-extern void SetEventCallback(void *cb);
-*/
-import "C"
 import (
 	"encoding/json"
-
 	"unsafe"
 
 	"sync"
@@ -44,9 +37,9 @@ func send(typ string, event interface{}) {
 		return
 	}
 
-	str := C.CString(string(data))
-	C.StatusServiceSignalEvent(str)
-	C.free(unsafe.Pointer(str))
+	notificationHandlerMutex.RLock()
+	notificationHandler(string(data))
+	notificationHandlerMutex.RUnlock()
 }
 
 // NodeNotificationHandler defines a handler able to process incoming node events.
@@ -60,6 +53,7 @@ var notificationHandlerMutex sync.RWMutex
 
 // SetDefaultNodeNotificationHandler sets notification handler to invoke on Send
 func SetDefaultNodeNotificationHandler(fn NodeNotificationHandler) {
+	logger.Warn("[DEBUG] Overriding notification handler")
 	notificationHandlerMutex.Lock()
 	notificationHandler = fn
 	notificationHandlerMutex.Unlock()
@@ -77,23 +71,13 @@ func TriggerDefaultNodeNotificationHandler(jsonEvent string) {
 	logger.Trace("Notification received", "event", jsonEvent)
 }
 
-//export NotifyNode
-//nolint: golint
-func NotifyNode(jsonEvent *C.char) {
-	notificationHandlerMutex.RLock()
-	defer notificationHandlerMutex.RUnlock()
-	notificationHandler(C.GoString(jsonEvent))
-}
-
-//export TriggerTestSignal
 //nolint: golint
 func TriggerTestSignal() {
-	str := C.CString(`{"answer": 42}`)
-	C.StatusServiceSignalEvent(str)
-	C.free(unsafe.Pointer(str))
+	str := `{"answer": 42}`
+	notificationHandlerMutex.RLock()
+	notificationHandler(str)
+	notificationHandlerMutex.RUnlock()
 }
 
-// SetSignalEventCallback set callback
-func SetSignalEventCallback(cb unsafe.Pointer) {
-	C.SetEventCallback(cb)
-}
+//nolint: golint
+func SetSignalEventCallback(cb unsafe.Pointer) {}

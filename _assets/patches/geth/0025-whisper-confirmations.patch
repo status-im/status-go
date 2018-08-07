@@ -1,8 +1,8 @@
-diff --git c/whisper/whisperv6/events.go w/whisper/whisperv6/events.go
+diff --git a/whisper/whisperv6/events.go b/whisper/whisperv6/events.go
 new file mode 100644
-index 000000000..4f204ab5d
+index 00000000..e03ec9de
 --- /dev/null
-+++ w/whisper/whisperv6/events.go
++++ b/whisper/whisperv6/events.go
 @@ -0,0 +1,23 @@
 +package whisperv6
 +
@@ -27,10 +27,10 @@ index 000000000..4f204ab5d
 +       Hash  common.Hash
 +       Peer  discover.NodeID
 +}
-diff --git i/whisper/whisperv6/peer.go w/whisper/whisperv6/peer.go
-index 2bf1c905b..427127290 100644
---- i/whisper/whisperv6/peer.go
-+++ w/whisper/whisperv6/peer.go
+diff --git a/whisper/whisperv6/peer.go b/whisper/whisperv6/peer.go
+index 79cc2127..018d8f82 100644
+--- a/whisper/whisperv6/peer.go
++++ b/whisper/whisperv6/peer.go
 @@ -204,6 +204,11 @@ func (peer *Peer) broadcast() error {
  		// mark envelopes only if they were successfully sent
  		for _, e := range bundle {
@@ -43,12 +43,12 @@ index 2bf1c905b..427127290 100644
  		}
  
  		log.Trace("broadcast", "num. messages", len(bundle))
-diff --git i/whisper/whisperv6/whisper.go w/whisper/whisperv6/whisper.go
-index 9aaf5687c..eb637b4ca 100644
---- i/whisper/whisperv6/whisper.go
-+++ w/whisper/whisperv6/whisper.go
-@@ -28,6 +28,7 @@ import (
- 
+diff --git a/whisper/whisperv6/whisper.go b/whisper/whisperv6/whisper.go
+index 414aa788..3c3c66ad 100644
+--- a/whisper/whisperv6/whisper.go
++++ b/whisper/whisperv6/whisper.go
+@@ -29,6 +29,7 @@ import (
+ 	mapset "github.com/deckarep/golang-set"
  	"github.com/ethereum/go-ethereum/common"
  	"github.com/ethereum/go-ethereum/crypto"
 +	"github.com/ethereum/go-ethereum/event"
