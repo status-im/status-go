@@ -1,8 +1,8 @@
-diff --git i/vendor/github.com/ethereum/go-ethereum/dashboard/dashboard.go w/vendor/github.com/ethereum/go-ethereum/dashboard/dashboard.go
-index 399fa34c0..711dc8c34 100644
---- i/vendor/github.com/ethereum/go-ethereum/dashboard/dashboard.go
-+++ w/vendor/github.com/ethereum/go-ethereum/dashboard/dashboard.go
-@@ -27,14 +27,11 @@ import (
+diff --git a/vendor/github.com/ethereum/go-ethereum/dashboard/dashboard.go b/vendor/github.com/ethereum/go-ethereum/dashboard/dashboard.go
+index 3ba92ac7..d89a1e94 100644
+--- a/vendor/github.com/ethereum/go-ethereum/dashboard/dashboard.go
++++ b/vendor/github.com/ethereum/go-ethereum/dashboard/dashboard.go
+@@ -27,20 +27,17 @@ import (
  	"fmt"
  	"net"
  	"net/http"
@@ -11,27 +11,48 @@ index 399fa34c0..711dc8c34 100644
  	"sync/atomic"
  	"time"
  
+ 	"io"
+ 
 -	"github.com/elastic/gosigar"
  	"github.com/ethereum/go-ethereum/log"
--	"github.com/ethereum/go-ethereum/metrics"
+ 	"github.com/ethereum/go-ethereum/metrics"
  	"github.com/ethereum/go-ethereum/p2p"
  	"github.com/ethereum/go-ethereum/params"
  	"github.com/ethereum/go-ethereum/rpc"
-@@ -261,109 +258,6 @@ func (db *Dashboard) apiHandler(conn *websocket.Conn) {
+-	"github.com/mohae/deepcopy"
+ 	"golang.org/x/net/websocket"
+ )
+ 
+@@ -235,7 +232,7 @@ func (db *Dashboard) apiHandler(conn *websocket.Conn) {
+ 
+ 	db.lock.Lock()
+ 	// Send the past data.
+-	client.msg <- deepcopy.Copy(db.history).(*Message)
++	client.msg <- db.history
+ 	// Start tracking the connection and drop at connection loss.
+ 	db.conns[id] = client
+ 	db.lock.Unlock()
+@@ -275,118 +272,6 @@ func meterCollector(name string) func() int64 {
  // collectData collects the required data to plot on the dashboard.
  func (db *Dashboard) collectData() {
  	defer db.wg.Done()
+-
 -	systemCPUUsage := gosigar.Cpu{}
 -	systemCPUUsage.Get()
 -	var (
 -		mem runtime.MemStats
 -
--		prevNetworkIngress = metrics.DefaultRegistry.Get("p2p/InboundTraffic").(metrics.Meter).Count()
--		prevNetworkEgress  = metrics.DefaultRegistry.Get("p2p/OutboundTraffic").(metrics.Meter).Count()
+-		collectNetworkIngress = meterCollector("p2p/InboundTraffic")
+-		collectNetworkEgress  = meterCollector("p2p/OutboundTraffic")
+-		collectDiskRead       = meterCollector("eth/db/chaindata/disk/read")
+-		collectDiskWrite      = meterCollector("eth/db/chaindata/disk/write")
+-
+-		prevNetworkIngress = collectNetworkIngress()
+-		prevNetworkEgress  = collectNetworkEgress()
 -		prevProcessCPUTime = getProcessCPUTime()
 -		prevSystemCPUUsage = systemCPUUsage
--		prevDiskRead       = metrics.DefaultRegistry.Get("eth/db/chaindata/disk/read").(metrics.Meter).Count()
--		prevDiskWrite      = metrics.DefaultRegistry.Get("eth/db/chaindata/disk/write").(metrics.Meter).Count()
+-		prevDiskRead       = collectDiskRead()
+-		prevDiskWrite      = collectDiskWrite()
 -
 -		frequency = float64(db.config.Refresh / time.Second)
 -		numCPU    = float64(runtime.NumCPU())
@@ -45,12 +66,12 @@ index 399fa34c0..711dc8c34 100644
 -		case <-time.After(db.config.Refresh):
 -			systemCPUUsage.Get()
 -			var (
--				curNetworkIngress = metrics.DefaultRegistry.Get("p2p/InboundTraffic").(metrics.Meter).Count()
--				curNetworkEgress  = metrics.DefaultRegistry.Get("p2p/OutboundTraffic").(metrics.Meter).Count()
+-				curNetworkIngress = collectNetworkIngress()
+-				curNetworkEgress  = collectNetworkEgress()
 -				curProcessCPUTime = getProcessCPUTime()
 -				curSystemCPUUsage = systemCPUUsage
--				curDiskRead       = metrics.DefaultRegistry.Get("eth/db/chaindata/disk/read").(metrics.Meter).Count()
--				curDiskWrite      = metrics.DefaultRegistry.Get("eth/db/chaindata/disk/write").(metrics.Meter).Count()
+-				curDiskRead       = collectDiskRead()
+-				curDiskWrite      = collectDiskWrite()
 -
 -				deltaNetworkIngress = float64(curNetworkIngress - prevNetworkIngress)
 -				deltaNetworkEgress  = float64(curNetworkEgress - prevNetworkEgress)
@@ -101,14 +122,17 @@ index 399fa34c0..711dc8c34 100644
 -				Time:  now,
 -				Value: float64(deltaDiskWrite) / frequency,
 -			}
--			db.charts.ActiveMemory = append(db.charts.ActiveMemory[1:], activeMemory)
--			db.charts.VirtualMemory = append(db.charts.VirtualMemory[1:], virtualMemory)
--			db.charts.NetworkIngress = append(db.charts.NetworkIngress[1:], networkIngress)
--			db.charts.NetworkEgress = append(db.charts.NetworkEgress[1:], networkEgress)
--			db.charts.ProcessCPU = append(db.charts.ProcessCPU[1:], processCPU)
--			db.charts.SystemCPU = append(db.charts.SystemCPU[1:], systemCPU)
--			db.charts.DiskRead = append(db.charts.DiskRead[1:], diskRead)
--			db.charts.DiskWrite = append(db.charts.DiskRead[1:], diskWrite)
+-			sys := db.history.System
+-			db.lock.Lock()
+-			sys.ActiveMemory = append(sys.ActiveMemory[1:], activeMemory)
+-			sys.VirtualMemory = append(sys.VirtualMemory[1:], virtualMemory)
+-			sys.NetworkIngress = append(sys.NetworkIngress[1:], networkIngress)
+-			sys.NetworkEgress = append(sys.NetworkEgress[1:], networkEgress)
+-			sys.ProcessCPU = append(sys.ProcessCPU[1:], processCPU)
+-			sys.SystemCPU = append(sys.SystemCPU[1:], systemCPU)
+-			sys.DiskRead = append(sys.DiskRead[1:], diskRead)
+-			sys.DiskWrite = append(sys.DiskWrite[1:], diskWrite)
+-			db.lock.Unlock()
 -
 -			db.sendToAll(&Message{
 -				System: &SystemMessage{
@@ -126,4 +150,4 @@ index 399fa34c0..711dc8c34 100644
 -	}
  }
  
- // collectLogs collects and sends the logs to the active dashboards.
+ // sendToAll sends the given message to the active dashboards.
