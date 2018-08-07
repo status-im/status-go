@@ -5,5 +5,5 @@
 
 set -e -o pipefail
 
-tag="$(git describe --always --tag || git rev-parse HEAD | cut -c 1-8)"
+tag="$(git describe --exact-match --tag 2>/dev/null || git rev-parse HEAD | cut -c 1-8)"
 echo $tag
