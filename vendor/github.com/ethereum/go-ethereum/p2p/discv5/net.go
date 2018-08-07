@@ -641,7 +641,18 @@ loop:
 				}()
 			} else {
 				refreshDone = make(chan struct{})
-				net.refresh(refreshDone)
+
+				done := make(chan struct{})
+				net.refresh(done)
+				<-done
+
+				// Refresh again only if there are no seeds.
+				// Also, sleep for some time to prevent from
+				// executing too often.
+				go func() {
+					time.Sleep(time.Millisecond * 100)
+					close(refreshDone)
+				}()
 			}
 		}
 	}
