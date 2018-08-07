@@ -151,3 +151,7 @@ ignored = [ "github.com/ethereum/go-ethereum/ethapi" ]
 [[constraint]]
   branch = "master"
   name = "github.com/status-im/rendezvous"
+
+[[override]]
+  name = "github.com/deckarep/golang-set"
+  revision = "504e848d77ea4752b3057b8fb46da0e7f746ccf3"
