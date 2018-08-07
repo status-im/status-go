@@ -1,9 +1,20 @@
-// +build !library
+// +build library,darwin
 
 package signal
 
+/*
+#cgo CFLAGS: -x objective-c
+#cgo LDFLAGS: -framework Foundation
+#include <stddef.h>
+#include <stdbool.h>
+#include <stdlib.h>
+extern bool StatusServiceSignalEvent(const char *jsonEvent);
+extern void SetEventCallback(void *cb);
+*/
+import "C"
 import (
 	"encoding/json"
+
 	"unsafe"
 
 	"sync"
@@ -37,9 +48,9 @@ func send(typ string, event interface{}) {
 		return
 	}
 
-	notificationHandlerMutex.RLock()
-	notificationHandler(string(data))
-	notificationHandlerMutex.RUnlock()
+	str := C.CString(string(data))
+	C.StatusServiceSignalEvent(str)
+	C.free(unsafe.Pointer(str))
 }
 
 // NodeNotificationHandler defines a handler able to process incoming node events.
@@ -53,7 +64,6 @@ var notificationHandlerMutex sync.RWMutex
 
 // SetDefaultNodeNotificationHandler sets notification handler to invoke on Send
 func SetDefaultNodeNotificationHandler(fn NodeNotificationHandler) {
-	logger.Warn("[DEBUG] Overriding notification handler")
 	notificationHandlerMutex.Lock()
 	notificationHandler = fn
 	notificationHandlerMutex.Unlock()
@@ -71,13 +81,23 @@ func TriggerDefaultNodeNotificationHandler(jsonEvent string) {
 	logger.Trace("Notification received", "event", jsonEvent)
 }
 
+//export NotifyNode
 //nolint: golint
-func TriggerTestSignal() {
-	str := `{"answer": 42}`
+func NotifyNode(jsonEvent *C.char) {
 	notificationHandlerMutex.RLock()
-	notificationHandler(str)
-	notificationHandlerMutex.RUnlock()
+	defer notificationHandlerMutex.RUnlock()
+	notificationHandler(C.GoString(jsonEvent))
 }
 
+//export TriggerTestSignal
 //nolint: golint
-func SetSignalEventCallback(cb unsafe.Pointer) {}
+func TriggerTestSignal() {
+	str := C.CString(`{"answer": 42}`)
+	C.StatusServiceSignalEvent(str)
+	C.free(unsafe.Pointer(str))
+}
+
+// SetSignalEventCallback set callback
+func SetSignalEventCallback(cb unsafe.Pointer) {
+	C.SetEventCallback(cb)
+}
