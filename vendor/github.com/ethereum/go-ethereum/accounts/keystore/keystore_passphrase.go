@@ -178,7 +178,10 @@ func EncryptExtendedKey(extKey *extkeys.ExtendedKey, auth string, scryptN, scryp
 		return cryptoJSON{}, nil
 	}
 	authArray := []byte(auth)
-	salt := randentropy.GetEntropyCSPRNG(32)
+	salt := make([]byte, 32)
+	if _, err := io.ReadFull(rand.Reader, salt); err != nil {
+		panic("reading from crypto/rand failed: " + err.Error())
+	}
 	derivedKey, err := scrypt.Key(authArray, salt, scryptN, scryptR, scryptP, scryptDKLen)
 	if err != nil {
 		return cryptoJSON{}, err
@@ -186,7 +189,10 @@ func EncryptExtendedKey(extKey *extkeys.ExtendedKey, auth string, scryptN, scryp
 	encryptKey := derivedKey[:16]
 	keyBytes := []byte(extKey.String())
 
-	iv := randentropy.GetEntropyCSPRNG(aes.BlockSize) // 16
+	iv := make([]byte, aes.BlockSize) // 16
+	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
+		panic("reading from crypto/rand failed: " + err.Error())
+	}
 	cipherText, err := aesCTRXOR(encryptKey, keyBytes, iv)
 	if err != nil {
 		return cryptoJSON{}, err
