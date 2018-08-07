@@ -313,6 +313,11 @@ func (api *PublicDebugAPI) Metrics(raw bool) (map[string]interface{}, error) {
 					"Overall": float64(metric.Count()),
 				}
 
+			case metrics.Gauge:
+				root[name] = map[string]interface{}{
+					"Value": float64(metric.Value()),
+				}
+
 			case metrics.Meter:
 				root[name] = map[string]interface{}{
 					"AvgRate01Min": metric.Rate1(),
@@ -361,6 +366,11 @@ func (api *PublicDebugAPI) Metrics(raw bool) (map[string]interface{}, error) {
 			case metrics.Counter:
 				root[name] = map[string]interface{}{
 					"Overall": float64(metric.Count()),
+				}
+
+			case metrics.Gauge:
+				root[name] = map[string]interface{}{
+					"Value": float64(metric.Value()),
 				}
 
 			case metrics.Meter:
