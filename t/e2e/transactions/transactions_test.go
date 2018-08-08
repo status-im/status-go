@@ -30,26 +30,12 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransaction() {
 
 	s.StartTestBackend()
 	defer s.StopTestBackend()
-
 	EnsureNodeSync(s.Backend.StatusNode().EnsureSync)
 
-	err := s.Backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
-	s.NoError(err)
-
-	result := s.Backend.CallRPC(`{
-				"jsonrpc": "2.0",
-		"id": 1,
-		"method": "eth_sendTransaction",
-		"params": [{
-			"from": "` + TestConfig.Account1.Address + `",
-			"to": "0xd46e8dd67c5d32be8058bb8eb970870f07244567",
-			"value": "0x9184e72a"
-		}]
-	}`)
-	s.Contains(result, `"error":{"code":-32700,"message":"method is unsupported by RPC interface"}`)
+	s.sendTransactionUsingRPCClient(s.Backend.CallRPC)
 }
 
-func (s *TransactionsTestSuite) TestCallRPCSendTransactionUpstream() {
+func (s *TransactionsTestSuite) TestCallUpstreamRPCSendTransaction() {
 	CheckTestSkipForNetworks(s.T(), params.MainNetworkID, params.StatusChainNetworkID)
 
 	addr, err := GetRemoteURL()
@@ -57,16 +43,41 @@ func (s *TransactionsTestSuite) TestCallRPCSendTransactionUpstream() {
 	s.StartTestBackend(e2e.WithUpstream(addr))
 	defer s.StopTestBackend()
 
-	err = s.Backend.SelectAccount(TestConfig.Account2.Address, TestConfig.Account2.Password)
+	s.sendTransactionUsingRPCClient(s.Backend.CallRPC)
+}
+
+func (s *TransactionsTestSuite) TestCallPrivateRPCSendTransaction() {
+	CheckTestSkipForNetworks(s.T(), params.MainNetworkID)
+
+	s.StartTestBackend()
+	defer s.StopTestBackend()
+	EnsureNodeSync(s.Backend.StatusNode().EnsureSync)
+
+	s.sendTransactionUsingRPCClient(s.Backend.CallPrivateRPC)
+}
+
+func (s *TransactionsTestSuite) TestCallUpstreamPrivateRPCSendTransaction() {
+	CheckTestSkipForNetworks(s.T(), params.MainNetworkID, params.StatusChainNetworkID)
+
+	addr, err := GetRemoteURL()
+	s.NoError(err)
+	s.StartTestBackend(e2e.WithUpstream(addr))
+	defer s.StopTestBackend()
+
+	s.sendTransactionUsingRPCClient(s.Backend.CallPrivateRPC)
+}
+
+func (s *TransactionsTestSuite) sendTransactionUsingRPCClient(callRPCFn func(string) string) {
+	err := s.Backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	s.NoError(err)
 
-	result := s.Backend.CallRPC(`{
+	result := callRPCFn(`{
 		"jsonrpc": "2.0",
 		"id": 1,
 		"method": "eth_sendTransaction",
 		"params": [{
-			"from": "` + TestConfig.Account2.Address + `",
-			"to": "` + TestConfig.Account1.Address + `",
+			"from": "` + TestConfig.Account1.Address + `",
+			"to": "0xd46e8dd67c5d32be8058bb8eb970870f07244567",
 			"value": "0x9184e72a"
 		}]
 	}`)

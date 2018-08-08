@@ -1,5 +1,5 @@
 diff --git a/metrics/metrics.go b/metrics/metrics.go
-index 2356f2b1..802f1363 100644
+index 2a2b804e..d4d703df 100644
 --- a/metrics/metrics.go
 +++ b/metrics/metrics.go
 @@ -56,6 +56,7 @@ func CollectProcessMetrics(refresh time.Duration) {
@@ -9,10 +9,10 @@ index 2356f2b1..802f1363 100644
 +	goroutines := GetOrRegisterGauge("system/goroutines", DefaultRegistry)
  
  	var diskReads, diskReadBytes, diskWrites, diskWriteBytes Meter
- 	if err := ReadDiskStats(diskstats[0]); err == nil {
-@@ -83,6 +84,10 @@ func CollectProcessMetrics(refresh time.Duration) {
- 			diskWrites.Mark(diskstats[location1].WriteCount - diskstats[location2].WriteCount)
- 			diskWriteBytes.Mark(diskstats[location1].WriteBytes - diskstats[location2].WriteBytes)
+ 	var diskReadBytesCounter, diskWriteBytesCounter Counter
+@@ -89,6 +90,10 @@ func CollectProcessMetrics(refresh time.Duration) {
+ 			diskReadBytesCounter.Inc(diskstats[location1].ReadBytes - diskstats[location2].ReadBytes)
+ 			diskWriteBytesCounter.Inc(diskstats[location1].WriteBytes - diskstats[location2].WriteBytes)
  		}
 +
 +		goroutines.Update(int64(runtime.NumGoroutine()))

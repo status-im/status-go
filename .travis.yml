@@ -17,7 +17,7 @@ jobs:
   - stage: Test unit and integration
     script:
       - make test-unit-race
-      - make test-unit-coverage
+      - make test-unit
   - stage: Test e2e on private network
     script:
       - make test-e2e-race

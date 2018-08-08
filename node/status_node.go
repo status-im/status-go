@@ -26,6 +26,7 @@ import (
 	"github.com/status-im/status-go/peers"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/peer"
+	"github.com/status-im/status-go/services/shhext"
 	"github.com/status-im/status-go/services/status"
 )
 
@@ -487,6 +488,19 @@ func (n *StatusNode) WhisperService() (w *whisper.Whisper, err error) {
 	defer n.mu.RUnlock()
 
 	err = n.gethService(&w)
+	if err == node.ErrServiceUnknown {
+		err = ErrServiceUnknown
+	}
+
+	return
+}
+
+// ShhExtService exposes reference to shh extension service running on top of the node
+func (n *StatusNode) ShhExtService() (s *shhext.Service, err error) {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+
+	err = n.gethService(&s)
 	if err == node.ErrServiceUnknown {
 		err = ErrServiceUnknown
 	}

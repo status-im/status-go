@@ -1,7 +1,7 @@
-diff --git i/node/node.go w/node/node.go
-index 83b6c4c07..fe42b8bbd 100644
---- i/node/node.go
-+++ w/node/node.go
+diff --git a/node/node.go b/node/node.go
+index ada38372..5ea58e13 100644
+--- a/node/node.go
++++ b/node/node.go
 @@ -51,8 +51,9 @@ type Node struct {
  	serviceFuncs []ServiceConstructor     // Service constructors (in dependency order)
  	services     map[reflect.Type]Service // Currently running services
@@ -27,7 +27,7 @@ index 83b6c4c07..fe42b8bbd 100644
  		n.stopInProc()
  		return err
  	}
- 	if err := n.startHTTP(n.httpEndpoint, apis, n.config.HTTPModules, n.config.HTTPCors, n.config.HTTPVirtualHosts); err != nil {
+ 	if err := n.startHTTP(n.httpEndpoint, apis, n.config.HTTPModules, n.config.HTTPCors, n.config.HTTPVirtualHosts, n.config.HTTPTimeouts); err != nil {
  		n.stopIPC()
 +		n.stopPublicInProc()
  		n.stopInProc()

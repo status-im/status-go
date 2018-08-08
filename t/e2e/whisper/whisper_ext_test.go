@@ -11,8 +11,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"github.com/status-im/status-go/node"
-	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/signal"
+	"github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -32,10 +32,8 @@ func (s *WhisperExtensionSuite) SetupTest() {
 		dir, err := ioutil.TempDir("", "test-shhext-")
 		s.NoError(err)
 		// network id is irrelevant
-		cfg, err := params.NewNodeConfig(dir, "", params.FleetBeta, 777)
+		cfg, err := utils.MakeTestNodeConfigWithDataDir(fmt.Sprintf("test-shhext-%d", i), dir, 777)
 		s.Require().NoError(err)
-		cfg.LightEthConfig.Enabled = false
-		cfg.Name = fmt.Sprintf("test-shhext-%d", i)
 		s.nodes[i] = node.New()
 		s.Require().NoError(s.nodes[i].Start(cfg))
 	}
@@ -62,7 +60,7 @@ func (s *WhisperExtensionSuite) TestSentSignal() {
 		}
 	})
 	defer signal.ResetDefaultNodeNotificationHandler()
-	client := s.nodes[0].RPCClient()
+	client := s.nodes[0].RPCPrivateClient()
 	s.NotNil(client)
 	var symID string
 	s.NoError(client.Call(&symID, "shh_newSymKey"))
@@ -102,7 +100,7 @@ func (s *WhisperExtensionSuite) TestExpiredSignal() {
 		}
 	})
 	defer signal.ResetDefaultNodeNotificationHandler()
-	client := s.nodes[0].RPCClient()
+	client := s.nodes[0].RPCPrivateClient()
 	s.NotNil(client)
 	var symID string
 	s.NoError(client.Call(&symID, "shh_newSymKey"))

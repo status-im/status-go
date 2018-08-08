@@ -264,20 +264,32 @@ func (b *StatusBackend) getVerifiedAccount(password string) (*account.SelectedEx
 
 // registerHandlers attaches Status callback handlers to running node
 func (b *StatusBackend) registerHandlers() error {
-	rpcClient := b.StatusNode().RPCClient()
-	if rpcClient == nil {
+	var clients []*rpc.Client
+
+	if c := b.StatusNode().RPCClient(); c != nil {
+		clients = append(clients, c)
+	} else {
 		return errors.New("RPC client unavailable")
 	}
 
-	rpcClient.RegisterHandler(params.AccountsMethodName, func(context.Context, ...interface{}) (interface{}, error) {
-		return b.AccountManager().Accounts()
-	})
+	if c := b.StatusNode().RPCPrivateClient(); c != nil {
+		clients = append(clients, c)
+	} else {
+		return errors.New("RPC private client unavailable")
+	}
 
-	// These methods are unsupported because we want to guard calling them with a password.
-	// They're not supported to be called directly, only via a binding.
-	rpcClient.RegisterHandler(params.SendTransactionMethodName, unsupportedMethodHandler)
-	rpcClient.RegisterHandler(params.PersonalSignMethodName, unsupportedMethodHandler)
-	rpcClient.RegisterHandler(params.PersonalRecoverMethodName, unsupportedMethodHandler)
+	for _, client := range clients {
+		client.RegisterHandler(
+			params.AccountsMethodName,
+			func(context.Context, ...interface{}) (interface{}, error) {
+				return b.AccountManager().Accounts()
+			},
+		)
+
+		client.RegisterHandler(params.SendTransactionMethodName, unsupportedMethodHandler)
+		client.RegisterHandler(params.PersonalSignMethodName, unsupportedMethodHandler)
+		client.RegisterHandler(params.PersonalRecoverMethodName, unsupportedMethodHandler)
+	}
 
 	return nil
 }

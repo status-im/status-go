@@ -28,9 +28,6 @@ endif
 CGO_CFLAGS=-I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
 GOBIN=$(dir $(realpath $(firstword $(MAKEFILE_LIST))))build/bin
 GIT_COMMIT := $(shell git rev-parse --short HEAD)
-GIT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
-GIT_LOCAL  := $(shell git rev-parse @)
-GIT_REMOTE := $(shell git fetch -q && git rev-parse remotes/origin/develop || echo 'NO_DEVELOP')
 
 BUILD_FLAGS ?= $(shell echo "-ldflags '-X main.buildStamp=`date -u '+%Y-%m-%d.%H:%M:%S'` -X github.com/status-im/status-go/params.VersionMeta=$(GIT_COMMIT)'")
 
@@ -50,12 +47,6 @@ DOCKER_IMAGE_CUSTOM_TAG ?= $(shell BUILD_TAGS="$(BUILD_TAGS)" ./_assets/ci/get-d
 
 DOCKER_TEST_WORKDIR = /go/src/github.com/status-im/status-go/
 DOCKER_TEST_IMAGE = golang:1.10
-
-UNIT_TEST_PACKAGES := $(shell go list ./...  | \
-	grep -v /vendor | \
-	grep -v /t/e2e | \
-	grep -v /t/benchmarks | \
-	grep -v /lib)
 
 # This is a code for automatic help generator.
 # It supports ANSI colors and categories.
@@ -96,38 +87,42 @@ bootnode: ##@build Build discovery v5 bootnode using status-go deps
 	go build -i -o $(GOBIN)/bootnode -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/bootnode/
 	@echo "Compilation done."
 
+mailserver-canary: ##@build Build mailserver canary using status-go deps
+	go build -i -o $(GOBIN)/mailserver-canary -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/mailserver-canary/
+	@echo "Compilation done."
+
 statusgo-cross: statusgo-android statusgo-ios
 	@echo "Full cross compilation done."
 	@ls -ld $(GOBIN)/statusgo-*
 
 statusgo-linux: xgo ##@cross-compile Build status-go for Linux
 	./_assets/patches/patcher -b . -p geth-xgo
-	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=linux/amd64 -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/statusd
+	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=linux/amd64 -v -tags 'library $(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/statusd
 	./_assets/patches/patcher -b . -p geth-xgo -r
 	@echo "Android cross compilation done."
 
 statusgo-android: xgo ##@cross-compile Build status-go for Android
 	./_assets/patches/patcher -b . -p geth-xgo
-	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=android-16/aar -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./lib
+	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=android-16/aar -v -tags 'library $(BUILD_TAGS)' $(BUILD_FLAGS) ./lib
 	./_assets/patches/patcher -b . -p geth-xgo -r
 	@echo "Android cross compilation done."
 
 statusgo-ios: xgo	##@cross-compile Build status-go for iOS
 	./_assets/patches/patcher -b . -p geth-xgo
-	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./lib
+	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -tags 'library $(BUILD_TAGS)' $(BUILD_FLAGS) ./lib
 	./_assets/patches/patcher -b . -p geth-xgo -r
 	@echo "iOS framework cross compilation done."
 
 statusgo-ios-simulator: xgo	##@cross-compile Build status-go for iOS Simulator
 	@docker pull $(XGOIMAGEIOSSIM)
 	./_assets/patches/patcher -b . -p geth-xgo
-	$(GOPATH)/bin/xgo --image $(XGOIMAGEIOSSIM) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./lib
+	$(GOPATH)/bin/xgo --image $(XGOIMAGEIOSSIM) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v -tags 'library $(BUILD_TAGS)' $(BUILD_FLAGS) ./lib
 	./_assets/patches/patcher -b . -p geth-xgo -r
 	@echo "iOS framework cross compilation done."
 
 statusgo-library: ##@cross-compile Build status-go as static library for current platform
 	@echo "Building static library..."
-	go build -buildmode=c-archive -o $(GOBIN)/libstatus.a ./lib
+	go build -buildmode=c-archive -tags library -o $(GOBIN)/libstatus.a ./lib
 	@echo "Static library built:"
 	@ls -la $(GOBIN)/libstatus.*
 
@@ -149,13 +144,19 @@ push-docker-images: docker-image bootnode-image
 	docker push $(BOOTNODE_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG)
 	docker push $(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG)
 
+# See https://www.gnu.org/software/make/manual/html_node/Target_002dspecific.html to understand this magic.
+push-docker-images-latest: GIT_BRANCH = $(shell git rev-parse --abbrev-ref HEAD)
+push-docker-images-latest: GIT_LOCAL  = $(shell git rev-parse @)
+push-docker-images-latest: GIT_REMOTE = $(shell git fetch -q && git rev-parse remotes/origin/develop || echo 'NO_DEVELOP')
 push-docker-images-latest: docker-image bootnode-image
+	@echo "Pushing latest docker images..."
+	@echo "Checking git branch..."
 ifneq ("$(GIT_BRANCH)", "develop")
-	echo "You should only use develop branch to push the latest tag!"
+	$(error You should only use develop branch to push the latest tag!)
 	exit 1
 endif
 ifneq ("$(GIT_LOCAL)", "$(GIT_REMOTE)")
-	echo "The local git commit does not match the remote origin!"
+	$(error The local git commit does not match the remote origin!)
 	exit 1
 endif
 	docker push $(BOOTNODE_IMAGE_NAME):latest
@@ -188,13 +189,15 @@ mock: ##@other Regenerate mocks
 docker-test: ##@tests Run tests in a docker container with golang.
 	docker run --privileged --rm -it -v "$(shell pwd):$(DOCKER_TEST_WORKDIR)" -w "$(DOCKER_TEST_WORKDIR)" $(DOCKER_TEST_IMAGE) go test ${ARGS}
 
-test: test-unit-coverage ##@tests Run basic, short tests during development
+test: test-unit ##@tests Run basic, short tests during development
 
+test-unit: UNIT_TEST_PACKAGES = $(shell go list ./...  | \
+	grep -v /vendor | \
+	grep -v /t/e2e | \
+	grep -v /t/benchmarks | \
+	grep -v /lib)
 test-unit: ##@tests Run unit and integration tests
-	go test -v $(UNIT_TEST_PACKAGES) $(gotest_extraflags)
-
-test-unit-coverage: ##@tests Run unit and integration tests with coverage
-	go test -coverpkg= $(UNIT_TEST_PACKAGES) $(gotest_extraflags)
+	go test $(UNIT_TEST_PACKAGES) $(gotest_extraflags)
 
 test-unit-race: gotest_extraflags=-race
 test-unit-race: test-unit ##@tests Run unit and integration tests with -race flag
@@ -227,7 +230,6 @@ ci: lint mock dep-ensure test-unit test-e2e ##@tests Run all linters and tests a
 
 clean: ##@other Cleanup
 	rm -fr build/bin/*
-	rm -f coverage.out coverage-all.out coverage.html
 
 deep-clean: clean
 	rm -Rdf .ethereumtest/StatusChain
