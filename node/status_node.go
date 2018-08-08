@@ -224,6 +224,9 @@ func (n *StatusNode) startDiscovery() error {
 	// TODO(dshulyak) consider adding a flag to define this behaviour
 	options.AllowStop = len(n.config.RegisterTopics) == 0
 	options.TrustedMailServers = parseNodesToNodeID(n.config.ClusterConfig.TrustedMailServers)
+
+	options.MailServerRegistryAddress = n.config.MailServerRegistryAddress
+
 	n.peerPool = peers.NewPeerPool(
 		n.discovery,
 		n.config.RequireTopics,
@@ -236,7 +239,7 @@ func (n *StatusNode) startDiscovery() error {
 	if err := n.register.Start(); err != nil {
 		return err
 	}
-	return n.peerPool.Start(n.gethNode.Server())
+	return n.peerPool.Start(n.gethNode.Server(), n.rpcClient)
 }
 
 // Stop will stop current StatusNode. A stopped node cannot be resumed.
@@ -525,8 +528,8 @@ func (n *StatusNode) AccountKeyStore() (*keystore.KeyStore, error) {
 
 // RPCClient exposes reference to RPC client connected to the running node.
 func (n *StatusNode) RPCClient() *rpc.Client {
-	n.mu.Lock()
-	defer n.mu.Unlock()
+	n.mu.RLock()
+	defer n.mu.RUnlock()
 	return n.rpcClient
 }
 

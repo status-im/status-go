@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/mclock"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
@@ -12,9 +13,12 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 
+	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/discovery"
+	"github.com/status-im/status-go/mailserver/registry"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/peers/verifier"
+	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/signal"
 )
 
@@ -56,6 +60,8 @@ type Options struct {
 	TopicStopSearchDelay time.Duration
 	// TrustedMailServers is a list of trusted nodes.
 	TrustedMailServers []discover.NodeID
+	// MailServerRegistryAddress is the MailServerRegistry contract address
+	MailServerRegistryAddress string
 }
 
 // NewDefaultOptions returns a struct with default Options.
@@ -115,7 +121,7 @@ func (p *PeerPool) setDiscoveryTimeout() {
 }
 
 // Start creates topic pool for each topic in config and subscribes to server events.
-func (p *PeerPool) Start(server *p2p.Server) error {
+func (p *PeerPool) Start(server *p2p.Server, rpcClient *rpc.Client) error {
 	if !p.discovery.Running() {
 		return ErrDiscv5NotRunning
 	}
@@ -143,7 +149,11 @@ func (p *PeerPool) Start(server *p2p.Server) error {
 		var topicPool TopicPoolInterface
 		t := newTopicPool(p.discovery, topic, limits, p.opts.SlowSync, p.opts.FastSync, p.cache)
 		if topic == MailServerDiscoveryTopic {
-			topicPool = newCacheOnlyTopicPool(t, verifier.NewLocalVerifier(p.opts.TrustedMailServers))
+			v, err := p.initVerifier(rpcClient)
+			if err != nil {
+				return err
+			}
+			topicPool = newCacheOnlyTopicPool(t, v)
 		} else {
 			topicPool = t
 		}
@@ -157,6 +167,16 @@ func (p *PeerPool) Start(server *p2p.Server) error {
 	signal.SendDiscoveryStarted()
 
 	return nil
+}
+
+func (p *PeerPool) initVerifier(rpcClient *rpc.Client) (v Verifier, err error) {
+	if addr := p.opts.MailServerRegistryAddress; addr != "" {
+		caller := contracts.NewContractCaller(rpcClient)
+		addrBytes := common.FromHex(addr)
+		return registry.NewVerifier(caller, common.BytesToAddress(addrBytes))
+	}
+
+	return verifier.NewLocalVerifier(p.opts.TrustedMailServers), nil
 }
 
 func (p *PeerPool) startDiscovery() error {
