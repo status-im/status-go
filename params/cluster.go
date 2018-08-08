@@ -4,8 +4,9 @@ import "errors"
 
 // Define available fleets.
 const (
-	FleetBeta    = "eth.beta"
-	FleetStaging = "eth.staging"
+	FleetUndefined = ""
+	FleetBeta      = "eth.beta"
+	FleetStaging   = "eth.staging"
 )
 
 type cluster struct {
