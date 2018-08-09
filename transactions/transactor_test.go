@@ -199,7 +199,7 @@ func (s *TransactorSuite) TestAccountMismatch() {
 		Address: account.FromAddress(TestConfig.Account2.Address),
 	}
 	_, err = s.manager.SendTransaction(args, selectedAccount)
-	s.EqualError(err, ErrInvalidCompleteTxSender.Error())
+	s.EqualError(err, ErrInvalidTxSender.Error())
 }
 
 // TestLocalNonce verifies that local nonce will be used unless

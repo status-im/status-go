@@ -1,6 +1,7 @@
 package transactions
 
 import (
+	"bytes"
 	"context"
 	"math/big"
 	"sync"
@@ -74,8 +75,8 @@ func (t *Transactor) validateAccount(args SendTxArgs, selectedAccount *account.S
 		return account.ErrNoAccountSelected
 	}
 
-	if args.From.Hex() != selectedAccount.Address.Hex() {
-		return ErrInvalidCompleteTxSender
+	if !bytes.Equal(args.From.Bytes(), selectedAccount.Address.Bytes()) {
+		return ErrInvalidTxSender
 	}
 
 	return nil

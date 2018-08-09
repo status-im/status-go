@@ -2,7 +2,25 @@ package main
 
 import (
 	"encoding/json"
+
+	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/transactions"
 )
+
+const (
+	codeUnknown int = iota
+	// special codes
+	codeFailedParseResponse
+	codeFailedParseParams
+	// account related codes
+	codeErrNoAccountSelected
+	codeErrInvalidTxSender
+)
+
+var errToCodeMap = map[error]int{
+	account.ErrNoAccountSelected:    codeErrNoAccountSelected,
+	transactions.ErrInvalidTxSender: codeErrInvalidTxSender,
+}
 
 type jsonrpcSuccessfulResponse struct {
 	Result interface{} `json:"result"`
@@ -17,18 +35,27 @@ type jsonError struct {
 	Message string `json:"message"`
 }
 
-func prepareJSONResponse(result interface{}, err error) []byte {
+func prepareJSONResponse(result interface{}, err error) string {
+	code := codeUnknown
+	if c, ok := errToCodeMap[err]; ok {
+		code = c
+	}
+
+	return prepareJSONResponseWithCode(result, err, code)
+}
+
+func prepareJSONResponseWithCode(result interface{}, err error, code int) string {
 	if err != nil {
 		errResponse := jsonrpcErrorResponse{
-			Error: jsonError{Message: err.Error()},
+			Error: jsonError{Code: code, Message: err.Error()},
 		}
 		response, _ := json.Marshal(&errResponse)
-		return response
+		return string(response)
 	}
 
 	data, err := json.Marshal(jsonrpcSuccessfulResponse{result})
 	if err != nil {
-		return prepareJSONResponse(nil, err)
+		return prepareJSONResponseWithCode(nil, err, codeFailedParseResponse)
 	}
-	return data
+	return string(data)
 }

@@ -12,12 +12,11 @@ import (
 
 var (
 	// ErrInvalidSendTxArgs is returned when the structure of SendTxArgs is ambigious.
-	ErrInvalidSendTxArgs = errors.New("Transaction arguments are invalid (are both 'input' and 'data' fields used?)")
-	// ErrUnexpectedArgs returned when args are of unexpected length.
+	ErrInvalidSendTxArgs = errors.New("transaction arguments are invalid")
+	// ErrUnexpectedArgs is returned when args are of unexpected length.
 	ErrUnexpectedArgs = errors.New("unexpected args")
-
-	//ErrInvalidCompleteTxSender - error transaction with invalid sender
-	ErrInvalidCompleteTxSender = errors.New("transaction can only be completed by its creator")
+	//ErrInvalidTxSender is returned when selected account is different tham From field.
+	ErrInvalidTxSender = errors.New("transaction can only be send by its creator")
 )
 
 // PendingNonceProvider provides information about nonces.

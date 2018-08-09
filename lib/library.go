@@ -218,12 +218,10 @@ func SignMessage(rpcParams *C.char) *C.char {
 	var params personal.SignParams
 	err := json.Unmarshal([]byte(C.GoString(rpcParams)), &params)
 	if err != nil {
-		return C.CString(string(prepareJSONResponse(nil, err)))
+		return C.CString(prepareJSONResponseWithCode(nil, err, codeFailedParseParams))
 	}
 	result, err := statusBackend.SignMessage(params)
-	return C.CString(string(
-		prepareJSONResponse(json.RawMessage(result.String()), err),
-	))
+	return C.CString(prepareJSONResponse(result.String(), err))
 }
 
 // Recover unmarshals rpc params {signDataString, signedData} and passes
@@ -233,12 +231,10 @@ func Recover(rpcParams *C.char) *C.char {
 	var params personal.RecoverParams
 	err := json.Unmarshal([]byte(C.GoString(rpcParams)), &params)
 	if err != nil {
-		return C.CString(string(prepareJSONResponse(nil, err)))
+		return C.CString(prepareJSONResponseWithCode(nil, err, codeFailedParseParams))
 	}
 	addr, err := statusBackend.Recover(params)
-	return C.CString(string(
-		prepareJSONResponse(json.RawMessage(addr.String()), err),
-	))
+	return C.CString(prepareJSONResponse(addr.String(), err))
 }
 
 // SendTransaction converts RPC args and calls backend.SendTransaction
@@ -247,10 +243,14 @@ func SendTransaction(txArgsJSON, password *C.char) *C.char {
 	var params transactions.SendTxArgs
 	err := json.Unmarshal([]byte(C.GoString(txArgsJSON)), &params)
 	if err != nil {
-		return C.CString(string(prepareJSONResponse(nil, err)))
+		return C.CString(prepareJSONResponseWithCode(nil, err, codeFailedParseParams))
 	}
 	hash, err := statusBackend.SendTransaction(params, C.GoString(password))
-	return C.CString(string(prepareJSONResponse(hash.Bytes(), err)))
+	code := codeUnknown
+	if c, ok := errToCodeMap[err]; ok {
+		code = c
+	}
+	return C.CString(prepareJSONResponseWithCode(hash.String(), err, code))
 }
 
 //StartCPUProfile runs pprof for cpu

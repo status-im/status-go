@@ -14,16 +14,14 @@ func (*nonJSON) MarshalJSON() ([]byte, error) {
 }
 
 func TestPrepareJSONResponseErrorWithResult(t *testing.T) {
-	var data []byte
-
-	data = prepareJSONResponse("0x123", nil)
-	require.Equal(t, `{"result":"0x123"}`, string(data))
+	data := prepareJSONResponse("0x123", nil)
+	require.Equal(t, `{"result":"0x123"}`, data)
 
 	data = prepareJSONResponse(&nonJSON{}, nil)
-	require.Contains(t, string(data), `{"error":{"message":`)
+	require.Contains(t, data, `{"error":{"code":1,"message":`)
 }
 
 func TestPrepareJSONResponseErrorWithError(t *testing.T) {
 	data := prepareJSONResponse("0x123", errors.New("some error"))
-	require.Contains(t, string(data), `{"error":{"message":"some error"}}`)
+	require.Contains(t, data, `{"error":{"message":"some error"}}`)
 }

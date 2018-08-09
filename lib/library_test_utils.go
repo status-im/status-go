@@ -31,7 +31,6 @@ import (
 
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/sign"
 	"github.com/status-im/status-go/signal"
 	. "github.com/status-im/status-go/t/utils" //nolint: golint
 	"github.com/status-im/status-go/transactions"
@@ -43,7 +42,7 @@ const initJS = `
 	};`
 
 var (
-	zeroHash       = sign.EmptyResponse.Hex()
+	zeroHash       = gethcommon.Hash{}
 	testChainDir   string
 	nodeConfigJSON string
 )
@@ -125,8 +124,8 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 			testAccountLogout,
 		},
 		{
-			"complete single transaction",
-			testCompleteTransaction,
+			"send transaction",
+			testSendTransaction,
 		},
 		{
 			"failed single transaction",
@@ -233,7 +232,7 @@ func testResetChainData(t *testing.T) bool {
 	}
 
 	EnsureNodeSync(statusBackend.StatusNode().EnsureSync)
-	testCompleteTransaction(t)
+	testSendTransaction(t)
 
 	return true
 }
@@ -340,7 +339,7 @@ func testStopResumeNode(t *testing.T) bool { //nolint: gocyclo
 	}
 
 	// additionally, let's complete transaction (just to make sure that node lives through pause/resume w/o issues)
-	testCompleteTransaction(t)
+	testSendTransaction(t)
 
 	return true
 }
@@ -766,8 +765,12 @@ func testAccountLogout(t *testing.T) bool {
 	return true
 }
 
-func testCompleteTransaction(t *testing.T) bool {
+type jsonrpcAnyResponse struct {
+	Result json.RawMessage `json:"result"`
+	jsonrpcErrorResponse
+}
 
+func testSendTransaction(t *testing.T) bool {
 	EnsureNodeSync(statusBackend.StatusNode().EnsureSync)
 
 	// log into account from which transactions will be sent
@@ -776,19 +779,31 @@ func testCompleteTransaction(t *testing.T) bool {
 		return false
 	}
 
-	// this call blocks, up until Complete Transaction is called
-	result := statusBackend.SendTransaction(transactions.SendTxArgs{
+	args, err := json.Marshal(transactions.SendTxArgs{
 		From:  account.FromAddress(TestConfig.Account1.Address),
 		To:    account.ToAddress(TestConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
-	}, TestConfig.Account1.Password)
-	if result.Error != nil {
-		t.Errorf("Failed to SendTransaction: %s", result.Error)
+	})
+	if err != nil {
+		t.Errorf("failed to marshal errors: %v", err)
+		return false
+	}
+	rawResult := SendTransaction(C.CString(string(args)), C.CString(TestConfig.Account1.Password))
+
+	var result jsonrpcAnyResponse
+	if err := json.Unmarshal([]byte(C.GoString(rawResult)), &result); err != nil {
+		t.Errorf("failed to unmarshal rawResult '%s': %v", C.GoString(rawResult), err)
 		return false
 	}
 
-	if reflect.DeepEqual(result.Response.Hash(), gethcommon.Hash{}) {
-		t.Error("Test failed: transaction was never queued or completed")
+	if result.Error.Message != "" {
+		t.Errorf("failed to send transaction: %v", result.Error)
+		return false
+	}
+
+	hash := gethcommon.BytesToHash(result.Result)
+	if reflect.DeepEqual(hash, gethcommon.Hash{}) {
+		t.Errorf("response hash empty: %s", hash.Hex())
 		return false
 	}
 
@@ -804,20 +819,30 @@ func testFailedTransaction(t *testing.T) bool {
 		return false
 	}
 
-	// this call blocks, up until Complete Transaction is called
-	result := statusBackend.SendTransaction(transactions.SendTxArgs{
+	args, err := json.Marshal(transactions.SendTxArgs{
 		From:  account.FromAddress(TestConfig.Account1.Address),
 		To:    account.ToAddress(TestConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
-	}, TestConfig.Account1.Password)
+	})
+	if err != nil {
+		t.Errorf("failed to marshal errors: %v", err)
+		return false
+	}
+	rawResult := SendTransaction(C.CString(string(args)), C.CString(TestConfig.Account1.Password))
 
-	if result.Error == nil || result.Error.Error() != transactions.ErrInvalidCompleteTxSender.Error() {
-		t.Errorf("Test failed: expected result.Error == ErrInvalidCompleteTxSender, got result.Error=%s", result.Error)
+	var result jsonrpcAnyResponse
+	if err := json.Unmarshal([]byte(C.GoString(rawResult)), &result); err != nil {
+		t.Errorf("failed to unmarshal rawResult '%s': %v", C.GoString(rawResult), err)
 		return false
 	}
 
-	if result.Response != nil {
-		t.Errorf("Test failed: expected result.Response == nil")
+	if result.Error.Message != transactions.ErrInvalidTxSender.Error() {
+		t.Errorf("expected error to be ErrInvalidTxSender, got %s", result.Error.Message)
+		return false
+	}
+
+	if result.Result != nil {
+		t.Errorf("expected result to be nil")
 		return false
 	}
 
