@@ -195,6 +195,8 @@ func (k *ExtendedKey) Child(i uint32) (*ExtendedKey, error) {
 		keyBigInt.Mod(keyBigInt, btcec.S256().N)
 
 		keyData := keyBigInt.Bytes()
+		// make sure that KeyData is 32 bytes of data even if
+		// the value is represented with less bytes
 		if len(keyData) < 32 {
 			extra := make([]byte, 32-len(keyData))
 			keyData = append(extra, keyData...)
