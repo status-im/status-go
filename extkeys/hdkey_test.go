@@ -637,6 +637,34 @@ func TestHDWalletCompatibility(t *testing.T) {
 	}
 }
 
+func TestPrivateKeyDataWithLeadingZeros(t *testing.T) {
+	mn := NewMnemonic()
+	words := "radar blur cabbage chef fix engine embark joy scheme fiction master release"
+	key, _ := NewMaster(mn.MnemonicSeed(words, ""))
+
+	path := []uint32{
+		HardenedKeyStart + 44, // purpose
+		HardenedKeyStart + 60, // cointype
+		HardenedKeyStart + 0,  // account
+		0,                     // change
+		0,                     // index
+	}
+
+	for _, part := range path {
+		key, _ = key.Child(part)
+		if length := len(key.KeyData); length != 32 {
+			t.Errorf("expected key length to be 32, got: %d", length)
+		}
+	}
+
+	expectedAddress := "0xaC39b311DCEb2A4b2f5d8461c1cdaF756F4F7Ae9"
+	address := crypto.PubkeyToAddress(key.ToECDSA().PublicKey).Hex()
+
+	if address != expectedAddress {
+		t.Errorf("expected address %s, got: %s", expectedAddress, address)
+	}
+}
+
 //func TestNewKey(t *testing.T) {
 //	mnemonic := NewMnemonic()
 //
