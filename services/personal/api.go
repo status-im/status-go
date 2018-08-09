@@ -6,20 +6,17 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/sign"
 )
 
 var (
 	// ErrInvalidPersonalSignAccount is returned when the account passed to
 	// personal_sign isn't equal to the currently selected account.
 	ErrInvalidPersonalSignAccount = errors.New("invalid account as only the selected one can generate a signature")
-
-	// ErrSignInvalidNumberOfParameters is returned when the number of parameters for personal_sign
-	// is not valid.
-	ErrSignInvalidNumberOfParameters = errors.New("invalid number of parameters for personal_sign (2 or 3 expected)")
 )
 
 // SignParams required to sign messages
@@ -55,41 +52,32 @@ func (api *PublicAPI) SetRPC(rpcClient *rpc.Client, timeout time.Duration) {
 }
 
 // Recover is an implementation of `personal_ecRecover` or `web3.personal.ecRecover` API
-func (api *PublicAPI) Recover(rpcParams RecoverParams) sign.Result {
-	var response sign.Response
+func (api *PublicAPI) Recover(rpcParams RecoverParams) (addr common.Address, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), api.rpcTimeout)
 	defer cancel()
-	err := api.rpcClient.CallContextIgnoringLocalHandlers(
+	err = api.rpcClient.CallContextIgnoringLocalHandlers(
 		ctx,
-		&response,
+		&addr,
 		params.PersonalRecoverMethodName,
 		rpcParams.Message, rpcParams.Signature)
 
-	result := sign.Result{Error: err}
-	if err == nil {
-		result.Response = response
-	}
-	return result
+	return
 }
 
 // Sign is an implementation of `personal_sign` or `web3.personal.sign` API
-func (api *PublicAPI) Sign(rpcParams SignParams, verifiedAccount *account.SelectedExtKey) sign.Result {
+func (api *PublicAPI) Sign(rpcParams SignParams, verifiedAccount *account.SelectedExtKey) (result hexutil.Bytes, err error) {
 	if !strings.EqualFold(rpcParams.Address, verifiedAccount.Address.Hex()) {
-		return sign.NewErrResult(ErrInvalidPersonalSignAccount)
+		err = ErrInvalidPersonalSignAccount
+		return
 	}
-	response := sign.EmptyResponse
+
 	ctx, cancel := context.WithTimeout(context.Background(), api.rpcTimeout)
 	defer cancel()
-	err := api.rpcClient.CallContextIgnoringLocalHandlers(
+	err = api.rpcClient.CallContextIgnoringLocalHandlers(
 		ctx,
-		&response,
+		&result,
 		params.PersonalSignMethodName,
 		rpcParams.Data, rpcParams.Address, rpcParams.Password)
 
-	result := sign.Result{Error: err}
-	if err == nil {
-		result.Response = response
-	}
-
-	return result
+	return
 }

@@ -2,7 +2,6 @@ package transactions
 
 import (
 	"context"
-	"fmt"
 	"math/big"
 	"sync"
 	"time"
@@ -15,7 +14,6 @@ import (
 
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/sign"
 )
 
 const (
@@ -65,19 +63,9 @@ func (t *Transactor) SetRPC(rpcClient *rpc.Client, timeout time.Duration) {
 }
 
 // SendTransaction is an implementation of eth_sendTransaction. It queues the tx to the sign queue.
-func (t *Transactor) SendTransaction(sendArgs SendTxArgs, verifiedAccount *account.SelectedExtKey) sign.Result {
-
-	hash, err := t.validateAndPropagate(verifiedAccount, sendArgs)
-	response := sign.Response(hash.Bytes())
-
-	result := sign.Result{Error: err}
-	if err == nil {
-		result.Response = response
-	}
-
-	t.log.Info("completed signing with ", "response", response, "err", err)
-
-	return result
+func (t *Transactor) SendTransaction(sendArgs SendTxArgs, verifiedAccount *account.SelectedExtKey) (hash gethcommon.Hash, err error) {
+	hash, err = t.validateAndPropagate(verifiedAccount, sendArgs)
+	return
 }
 
 // make sure that only account which created the tx can complete it
@@ -87,9 +75,7 @@ func (t *Transactor) validateAccount(args SendTxArgs, selectedAccount *account.S
 	}
 
 	if args.From.Hex() != selectedAccount.Address.Hex() {
-		err := sign.NewTransientError(ErrInvalidCompleteTxSender)
-		t.log.Error("queued transaction does not belong to the selected account", "err", err)
-		return err
+		return ErrInvalidCompleteTxSender
 	}
 
 	return nil
@@ -157,7 +143,7 @@ func (t *Transactor) validateAndPropagate(selectedAccount *account.SelectedExtKe
 			return hash, err
 		}
 		if gas < defaultGas {
-			t.log.Info(fmt.Sprintf("default gas will be used. estimated gas %v is lower than %v", gas, defaultGas))
+			t.log.Info("default gas will be used because estimated is lower", "estimated", gas, "default", defaultGas)
 			gas = defaultGas
 		}
 	} else {

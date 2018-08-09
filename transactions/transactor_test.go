@@ -25,17 +25,16 @@ import (
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/sign"
 	"github.com/status-im/status-go/transactions/fake"
 
 	. "github.com/status-im/status-go/t/utils"
 )
 
-func TestTxQueueTestSuite(t *testing.T) {
-	suite.Run(t, new(TxQueueTestSuite))
+func TestTransactorSuite(t *testing.T) {
+	suite.Run(t, new(TransactorSuite))
 }
 
-type TxQueueTestSuite struct {
+type TransactorSuite struct {
 	suite.Suite
 	server            *gethrpc.Server
 	client            *gethrpc.Client
@@ -46,7 +45,7 @@ type TxQueueTestSuite struct {
 	manager *Transactor
 }
 
-func (s *TxQueueTestSuite) SetupTest() {
+func (s *TransactorSuite) SetupTest() {
 	s.txServiceMockCtrl = gomock.NewController(s.T())
 
 	s.server, s.txServiceMock = fake.NewTestServer(s.txServiceMockCtrl)
@@ -64,7 +63,7 @@ func (s *TxQueueTestSuite) SetupTest() {
 	s.manager.SetRPC(rpcClient, time.Second)
 }
 
-func (s *TxQueueTestSuite) TearDownTest() {
+func (s *TransactorSuite) TearDownTest() {
 	s.txServiceMockCtrl.Finish()
 	s.server.Stop()
 	s.client.Close()
@@ -76,35 +75,31 @@ var (
 	testNonce    = hexutil.Uint64(10)
 )
 
-func (s *TxQueueTestSuite) setupTransactionPoolAPI(args SendTxArgs, returnNonce, resultNonce hexutil.Uint64, account *account.SelectedExtKey, txErr error, signArgs *sign.TxArgs) {
+func (s *TransactorSuite) setupTransactionPoolAPI(args SendTxArgs, returnNonce, resultNonce hexutil.Uint64, account *account.SelectedExtKey, txErr error) {
 	// Expect calls to gas functions only if there are no user defined values.
 	// And also set the expected gas and gas price for RLP encoding the expected tx.
 	var usedGas hexutil.Uint64
 	var usedGasPrice *big.Int
 	s.txServiceMock.EXPECT().GetTransactionCount(gomock.Any(), account.Address, gethrpc.PendingBlockNumber).Return(&returnNonce, nil)
-	if signArgs != nil && signArgs.GasPrice != nil {
-		usedGasPrice = (*big.Int)(signArgs.GasPrice)
-	} else if args.GasPrice == nil {
+	if args.GasPrice == nil {
 		usedGasPrice = (*big.Int)(testGasPrice)
 		s.txServiceMock.EXPECT().GasPrice(gomock.Any()).Return(testGasPrice, nil)
 	} else {
 		usedGasPrice = (*big.Int)(args.GasPrice)
 	}
-	if signArgs != nil && signArgs.Gas != nil {
-		usedGas = *signArgs.Gas
-	} else if args.Gas == nil {
+	if args.Gas == nil {
 		s.txServiceMock.EXPECT().EstimateGas(gomock.Any(), gomock.Any()).Return(testGas, nil)
 		usedGas = testGas
 	} else {
 		usedGas = *args.Gas
 	}
-	// Prepare the transaction anD RLP encode it.
+	// Prepare the transaction and RLP encode it.
 	data := s.rlpEncodeTx(args, s.nodeConfig, account, &resultNonce, usedGas, usedGasPrice)
 	// Expect the RLP encoded transaction.
 	s.txServiceMock.EXPECT().SendRawTransaction(gomock.Any(), data).Return(gethcommon.Hash{}, txErr)
 }
 
-func (s *TxQueueTestSuite) rlpEncodeTx(args SendTxArgs, config *params.NodeConfig, account *account.SelectedExtKey, nonce *hexutil.Uint64, gas hexutil.Uint64, gasPrice *big.Int) hexutil.Bytes {
+func (s *TransactorSuite) rlpEncodeTx(args SendTxArgs, config *params.NodeConfig, account *account.SelectedExtKey, nonce *hexutil.Uint64, gas hexutil.Uint64, gasPrice *big.Int) hexutil.Bytes {
 	newTx := types.NewTransaction(
 		uint64(*nonce),
 		*args.To,
@@ -121,7 +116,7 @@ func (s *TxQueueTestSuite) rlpEncodeTx(args SendTxArgs, config *params.NodeConfi
 	return hexutil.Bytes(data)
 }
 
-func (s *TxQueueTestSuite) TestCompleteTransaction() {
+func (s *TransactorSuite) TestGasValues() {
 	key, _ := crypto.GenerateKey()
 	selectedAccount := &account.SelectedExtKey{
 		Address:    account.FromAddress(TestConfig.Account1.Address),
@@ -163,27 +158,48 @@ func (s *TxQueueTestSuite) TestCompleteTransaction() {
 				Gas:      testCase.gas,
 				GasPrice: testCase.gasPrice,
 			}
-			s.setupTransactionPoolAPI(args, testNonce, testNonce, selectedAccount, nil, &sign.TxArgs{})
+			s.setupTransactionPoolAPI(args, testNonce, testNonce, selectedAccount, nil)
 
-			result := s.manager.SendTransaction(args, selectedAccount)
-			s.NoError(result.Error)
-			s.False(reflect.DeepEqual(result.Response.Hash(), gethcommon.Hash{}), "transaction was never queued or completed")
+			hash, err := s.manager.SendTransaction(args, selectedAccount)
+			s.NoError(err)
+			s.False(reflect.DeepEqual(hash, gethcommon.Hash{}))
 		})
 	}
 }
 
-func (s *TxQueueTestSuite) TestAccountMismatch() {
-	selectedAccount := &account.SelectedExtKey{
-		Address: account.FromAddress(TestConfig.Account2.Address),
+func (s *TransactorSuite) TestArgsValidation() {
+	args := SendTxArgs{
+		From:  account.FromAddress(TestConfig.Account1.Address),
+		To:    account.ToAddress(TestConfig.Account2.Address),
+		Data:  hexutil.Bytes([]byte{0x01, 0x02}),
+		Input: hexutil.Bytes([]byte{0x02, 0x01}),
 	}
+	s.False(args.Valid())
+	selectedAccount := &account.SelectedExtKey{
+		Address: account.FromAddress(TestConfig.Account1.Address),
+	}
+	_, err := s.manager.SendTransaction(args, selectedAccount)
+	s.EqualError(err, ErrInvalidSendTxArgs.Error())
+}
 
+func (s *TransactorSuite) TestAccountMismatch() {
 	args := SendTxArgs{
 		From: account.FromAddress(TestConfig.Account1.Address),
 		To:   account.ToAddress(TestConfig.Account2.Address),
 	}
 
-	result := s.manager.SendTransaction(args, selectedAccount) // nolint: errcheck
-	s.EqualError(result.Error, ErrInvalidCompleteTxSender.Error())
+	var err error
+
+	// missing account
+	_, err = s.manager.SendTransaction(args, nil)
+	s.EqualError(err, account.ErrNoAccountSelected.Error())
+
+	// mismatched accounts
+	selectedAccount := &account.SelectedExtKey{
+		Address: account.FromAddress(TestConfig.Account2.Address),
+	}
+	_, err = s.manager.SendTransaction(args, selectedAccount)
+	s.EqualError(err, ErrInvalidCompleteTxSender.Error())
 }
 
 // TestLocalNonce verifies that local nonce will be used unless
@@ -193,7 +209,7 @@ func (s *TxQueueTestSuite) TestAccountMismatch() {
 // then, we return higher nonce, as if another node was used to send 2 transactions
 // upstream nonce will be equal to 5, we update our local counter to 5+1
 // as the last step, we verify that if tx failed nonce is not updated
-func (s *TxQueueTestSuite) TestLocalNonce() {
+func (s *TransactorSuite) TestLocalNonce() {
 	txCount := 3
 	key, _ := crypto.GenerateKey()
 	selectedAccount := &account.SelectedExtKey{
@@ -207,10 +223,10 @@ func (s *TxQueueTestSuite) TestLocalNonce() {
 			From: account.FromAddress(TestConfig.Account1.Address),
 			To:   account.ToAddress(TestConfig.Account2.Address),
 		}
-		s.setupTransactionPoolAPI(args, nonce, hexutil.Uint64(i), selectedAccount, nil, nil)
+		s.setupTransactionPoolAPI(args, nonce, hexutil.Uint64(i), selectedAccount, nil)
 
-		result := s.manager.SendTransaction(args, selectedAccount)
-		s.NoError(result.Error)
+		_, err := s.manager.SendTransaction(args, selectedAccount)
+		s.NoError(err)
 		resultNonce, _ := s.manager.localNonce.Load(args.From)
 		s.Equal(uint64(i)+1, resultNonce.(uint64))
 	}
@@ -221,10 +237,10 @@ func (s *TxQueueTestSuite) TestLocalNonce() {
 		To:   account.ToAddress(TestConfig.Account2.Address),
 	}
 
-	s.setupTransactionPoolAPI(args, nonce, nonce, selectedAccount, nil, nil)
+	s.setupTransactionPoolAPI(args, nonce, nonce, selectedAccount, nil)
 
-	result := s.manager.SendTransaction(args, selectedAccount)
-	s.NoError(result.Error)
+	_, err := s.manager.SendTransaction(args, selectedAccount)
+	s.NoError(err)
 
 	resultNonce, _ := s.manager.localNonce.Load(args.From)
 	s.Equal(uint64(nonce)+1, resultNonce.(uint64))
@@ -236,13 +252,13 @@ func (s *TxQueueTestSuite) TestLocalNonce() {
 		To:   account.ToAddress(TestConfig.Account2.Address),
 	}
 
-	result = s.manager.SendTransaction(args, selectedAccount)
-	s.EqualError(testErr, result.Error.Error())
+	_, err = s.manager.SendTransaction(args, selectedAccount)
+	s.EqualError(err, testErr.Error())
 	resultNonce, _ = s.manager.localNonce.Load(args.From)
 	s.Equal(uint64(nonce)+1, resultNonce.(uint64))
 }
 
-func (s *TxQueueTestSuite) TestContractCreation() {
+func (s *TransactorSuite) TestContractCreation() {
 	key, _ := crypto.GenerateKey()
 	testaddr := crypto.PubkeyToAddress(key.PublicKey)
 	genesis := core.GenesisAlloc{
@@ -261,10 +277,9 @@ func (s *TxQueueTestSuite) TestContractCreation() {
 		Input: hexutil.Bytes(gethcommon.FromHex(contract.ENSBin)),
 	}
 
-	result := s.manager.SendTransaction(tx, selectedAccount)
-	s.NoError(result.Error)
+	hash, err := s.manager.SendTransaction(tx, selectedAccount)
+	s.NoError(err)
 	backend.Commit()
-	hash := result.Response.Hash()
 	receipt, err := backend.TransactionReceipt(context.TODO(), hash)
 	s.NoError(err)
 	s.Equal(crypto.CreateAddress(testaddr, 0), receipt.ContractAddress)

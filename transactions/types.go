@@ -3,7 +3,6 @@ package transactions
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 
 	ethereum "github.com/ethereum/go-ethereum"
@@ -71,21 +70,4 @@ func (args SendTxArgs) GetInput() hexutil.Bytes {
 
 func isNilOrEmpty(bytes hexutil.Bytes) bool {
 	return bytes == nil || len(bytes) == 0
-}
-
-// RPCCalltoSendTxArgs creates SendTxArgs based on RPC parameters
-func RPCCalltoSendTxArgs(args ...interface{}) (SendTxArgs, error) {
-	var txArgs SendTxArgs
-	if len(args) != 1 {
-		return txArgs, ErrUnexpectedArgs
-	}
-	data, err := json.Marshal(args[0])
-	if err != nil {
-		return txArgs, err
-	}
-	if err := json.Unmarshal(data, &txArgs); err != nil {
-		return txArgs, err
-	}
-
-	return txArgs, nil
 }

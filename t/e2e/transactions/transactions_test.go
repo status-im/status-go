@@ -98,10 +98,9 @@ func (s *TransactionsTestSuite) TestEmptyToFieldPreserved() {
 		From: account.FromAddress(TestConfig.Account1.Address),
 	}
 
-	result := s.Backend.SendTransaction(args, TestConfig.Account1.Password)
-
-	s.NoError(result.Error)
-	s.NotNil(result.Response)
+	hash, err := s.Backend.SendTransaction(args, TestConfig.Account1.Password)
+	s.NoError(err)
+	s.NotNil(hash)
 }
 
 // TestSendContractCompat tries to send transaction using the legacy "Data"
@@ -176,14 +175,13 @@ func (s *TransactionsTestSuite) testSendContractTx(setInputAndDataValue initFunc
 	}
 
 	setInputAndDataValue(byteCode, &args)
-	result := s.Backend.SendTransaction(args, TestConfig.Account1.Password)
-
+	hash, err := s.Backend.SendTransaction(args, TestConfig.Account1.Password)
 	if expectedError != nil {
-		s.Equal(expectedError, result.Error, expectedErrorDescription)
+		s.Equal(expectedError, err, expectedErrorDescription)
 		return
 	}
-	s.NoError(result.Error, "cannot send transaction")
-	s.False(reflect.DeepEqual(result.Response.Hash(), gethcommon.Hash{}))
+	s.NoError(err)
+	s.False(reflect.DeepEqual(hash, gethcommon.Hash{}))
 	s.NoError(s.Backend.Logout())
 }
 
@@ -198,15 +196,13 @@ func (s *TransactionsTestSuite) TestSendEther() {
 	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	s.NoError(err)
 
-	result := s.Backend.SendTransaction(transactions.SendTxArgs{
+	hash, err := s.Backend.SendTransaction(transactions.SendTxArgs{
 		From:  account.FromAddress(TestConfig.Account1.Address),
 		To:    account.ToAddress(TestConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 	}, TestConfig.Account1.Password)
-
-	s.NoError(result.Error, "cannot send transaction")
-
-	s.False(reflect.DeepEqual(result.Response.Hash(), gethcommon.Hash{}))
+	s.NoError(err)
+	s.False(reflect.DeepEqual(hash, gethcommon.Hash{}))
 }
 
 func (s *TransactionsTestSuite) TestSendEtherTxUpstream() {
@@ -220,14 +216,12 @@ func (s *TransactionsTestSuite) TestSendEtherTxUpstream() {
 	err = s.Backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	s.NoError(err)
 
-	result := s.Backend.SendTransaction(transactions.SendTxArgs{
+	hash, err := s.Backend.SendTransaction(transactions.SendTxArgs{
 		From:     account.FromAddress(TestConfig.Account1.Address),
 		To:       account.ToAddress(TestConfig.Account2.Address),
 		GasPrice: (*hexutil.Big)(big.NewInt(28000000000)),
 		Value:    (*hexutil.Big)(big.NewInt(1000000000000)),
 	}, TestConfig.Account1.Password)
-
-	s.NoError(result.Error, "cannot send transaction")
-
-	s.False(reflect.DeepEqual(result.Response.Hash(), gethcommon.Hash{}), "transaction was never queued or completed")
+	s.NoError(err)
+	s.False(reflect.DeepEqual(hash, gethcommon.Hash{}))
 }

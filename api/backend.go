@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"sync"
 
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
 	gethnode "github.com/ethereum/go-ethereum/node"
 
@@ -18,7 +20,6 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/rpcfilters"
-	"github.com/status-im/status-go/sign"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
 )
@@ -218,32 +219,35 @@ func (b *StatusBackend) CallPrivateRPC(inputJSON string) string {
 }
 
 // SendTransaction creates a new transaction and waits until it's complete.
-func (b *StatusBackend) SendTransaction(sendArgs transactions.SendTxArgs, password string) sign.Result {
+func (b *StatusBackend) SendTransaction(sendArgs transactions.SendTxArgs, password string) (hash gethcommon.Hash, err error) {
 	verifiedAccount, err := b.getVerifiedAccount(password)
 	if err != nil {
-		return sign.NewErrResult(err)
+		return hash, err
 	}
-	result := b.transactor.SendTransaction(sendArgs, verifiedAccount)
-	if result.Error != nil {
-		return result
+
+	hash, err = b.transactor.SendTransaction(sendArgs, verifiedAccount)
+	if err != nil {
+		return
 	}
-	go b.rpcFilters.TriggerTransactionSentToUpstreamEvent(result.Response.Hash())
-	return result
+
+	go b.rpcFilters.TriggerTransactionSentToUpstreamEvent(hash)
+
+	return
 }
 
 // SignMessage checks the pwd vs the selected account and passes on the signParams
 // to personalAPI for message signature
-func (b *StatusBackend) SignMessage(rpcParams personal.SignParams, password string) sign.Result {
-	verifiedAccount, err := b.getVerifiedAccount(password)
+func (b *StatusBackend) SignMessage(rpcParams personal.SignParams) (hexutil.Bytes, error) {
+	verifiedAccount, err := b.getVerifiedAccount(rpcParams.Password)
 	if err != nil {
-		return sign.NewErrResult(err)
+		return hexutil.Bytes{}, err
 	}
 	return b.personalAPI.Sign(rpcParams, verifiedAccount)
 }
 
 // Recover calls the personalAPI to return address associated with the private
 // key that was used to calculate the signature in the message
-func (b *StatusBackend) Recover(rpcParams personal.RecoverParams) sign.Result {
+func (b *StatusBackend) Recover(rpcParams personal.RecoverParams) (gethcommon.Address, error) {
 	return b.personalAPI.Recover(rpcParams)
 }
 

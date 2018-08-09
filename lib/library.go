@@ -14,7 +14,6 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/profiling"
 	"github.com/status-im/status-go/services/personal"
-	"github.com/status-im/status-go/sign"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
 	"gopkg.in/go-playground/validator.v9"
@@ -215,15 +214,16 @@ func Logout() *C.char {
 // SignMessage unmarshals rpc params {data, address, password} and passes
 // them onto backend.SignMessage
 //export SignMessage
-func SignMessage(rpcParams *C.char, password *C.char) *C.char {
+func SignMessage(rpcParams *C.char) *C.char {
 	var params personal.SignParams
 	err := json.Unmarshal([]byte(C.GoString(rpcParams)), &params)
 	if err != nil {
-		result := sign.NewErrResult(err)
-		return prepareSignResponse(result)
+		return C.CString(string(prepareJSONResponse(nil, err)))
 	}
-	result := statusBackend.SignMessage(params, C.GoString(password))
-	return prepareSignResponse(result)
+	result, err := statusBackend.SignMessage(params)
+	return C.CString(string(
+		prepareJSONResponse(json.RawMessage(result.String()), err),
+	))
 }
 
 // Recover unmarshals rpc params {signDataString, signedData} and passes
@@ -233,11 +233,12 @@ func Recover(rpcParams *C.char) *C.char {
 	var params personal.RecoverParams
 	err := json.Unmarshal([]byte(C.GoString(rpcParams)), &params)
 	if err != nil {
-		result := sign.NewErrResult(err)
-		return prepareSignResponse(result)
+		return C.CString(string(prepareJSONResponse(nil, err)))
 	}
-	result := statusBackend.Recover(params)
-	return prepareSignResponse(result)
+	addr, err := statusBackend.Recover(params)
+	return C.CString(string(
+		prepareJSONResponse(json.RawMessage(addr.String()), err),
+	))
 }
 
 // SendTransaction converts RPC args and calls backend.SendTransaction
@@ -246,32 +247,10 @@ func SendTransaction(txArgsJSON, password *C.char) *C.char {
 	var params transactions.SendTxArgs
 	err := json.Unmarshal([]byte(C.GoString(txArgsJSON)), &params)
 	if err != nil {
-		return prepareSignResponse(sign.NewErrResult(err))
+		return C.CString(string(prepareJSONResponse(nil, err)))
 	}
-	result := statusBackend.SendTransaction(params, C.GoString(password))
-	return prepareSignResponse(result)
-}
-
-// prepareSignResponse based on a sign.Result prepares the binding
-// response.
-func prepareSignResponse(result sign.Result) *C.char {
-	errString := ""
-	if result.Error != nil {
-		logger.Error("Sign result contains error", "error", result.Error)
-		errString = result.Error.Error()
-	}
-
-	out := SignRequestResult{
-		Hash:  result.Response.Hex(),
-		Error: errString,
-	}
-	outBytes, err := json.Marshal(out)
-	if err != nil {
-		logger.Error("failed to marshal Sign output", "error", err)
-		return makeJSONResponse(err)
-	}
-
-	return C.CString(string(outBytes))
+	hash, err := statusBackend.SendTransaction(params, C.GoString(password))
+	return C.CString(string(prepareJSONResponse(hash.Bytes(), err)))
 }
 
 //StartCPUProfile runs pprof for cpu

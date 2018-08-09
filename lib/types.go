@@ -75,10 +75,3 @@ type NotifyResult struct {
 	Status bool   `json:"status"`
 	Error  string `json:"error,omitempty"`
 }
-
-// SignRequestResult is a JSON returned from transaction complete function (used in exposed method)
-type SignRequestResult struct {
-	ID    string `json:"id"`
-	Hash  string `json:"hash"`
-	Error string `json:"error"`
-}
