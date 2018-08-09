@@ -39,6 +39,15 @@ func NewRendezvous(servers []ma.Multiaddr, identity *ecdsa.PrivateKey, node *dis
 	return r, nil
 }
 
+func NewRendezvousWithENR(servers []ma.Multiaddr, record enr.Record) *Rendezvous {
+	r := new(Rendezvous)
+	r.servers = servers
+	r.registrationPeriod = registrationPeriod
+	r.bucketSize = bucketSize
+	r.record = record
+	return r
+}
+
 // Rendezvous is an implementation of discovery interface that uses
 // rendezvous client.
 type Rendezvous struct {
