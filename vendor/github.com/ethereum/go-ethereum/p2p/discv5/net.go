@@ -40,7 +40,7 @@ var (
 
 const (
 	autoRefreshInterval   = 1 * time.Hour
-	bucketRefreshInterval = 10 * time.Second
+	bucketRefreshInterval = 1 * time.Minute
 	seedCount             = 30
 	seedMaxAge            = 5 * 24 * time.Hour
 	lowPort               = 1024
@@ -1055,11 +1055,7 @@ func (net *Network) handle(n *Node, ev nodeEvent, pkt *ingressPacket) error {
 func (net *Network) checkPacket(n *Node, ev nodeEvent, pkt *ingressPacket) error {
 	// Replay prevention checks.
 	switch ev {
-	case pingPacket:
-		if pkt.data.(*ping).Version != Version {
-			return fmt.Errorf("version mismatch")
-		}
-	case findnodeHashPacket, neighborsPacket:
+	case pingPacket, findnodeHashPacket, neighborsPacket:
 		// TODO: check date is > last date seen
 		// TODO: check ping version
 	case pongPacket:
