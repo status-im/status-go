@@ -18,6 +18,8 @@ const (
 )
 
 func TestBIP32Vectors(t *testing.T) {
+	// Test vectors 1, 2, and 3 are taken from the BIP32 specs:
+	// https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki#test-vectors
 	tests := []struct {
 		name    string
 		seed    string
@@ -637,6 +639,22 @@ func TestHDWalletCompatibility(t *testing.T) {
 	}
 }
 
+// TestPrivateKeyDataWithLeadingZeros is a regression test that checks
+// we don't re-introduce a bug we had in the past.
+// For a specific mnemonic phrase, we were deriving a wrong key/address
+// at path m/44'/60'/0'/0/0 compared to other wallets.
+// In this specific case, the second child key is represented in 31 bytes.
+// The problem raises when deriving its child key.
+// One of the step to derive the child key is calling our splitHMAC
+// that returns a secretKey and a chainCode.
+// Inside this function we make a sha512 of a seed that is a 37 bytes with:
+// 1 byte with 0x00
+// 32 bytes for the key data
+// 4 bytes for the child key index
+// In our case, if the key was less then 32 bytes, it was shifted to the left of that 32 bytes space,
+// resulting in a different seed, and a different data returned from the sha512 call.
+// https://medium.com/@alexberegszaszi/why-do-my-bip32-wallets-disagree-6f3254cc5846#.86inuifuq
+// https://github.com/iancoleman/bip39/issues/58
 func TestPrivateKeyDataWithLeadingZeros(t *testing.T) {
 	mn := NewMnemonic()
 	words := "radar blur cabbage chef fix engine embark joy scheme fiction master release"
