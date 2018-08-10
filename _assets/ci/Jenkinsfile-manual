@@ -20,7 +20,7 @@ node('linux') {
     env.PATH = "${env.PATH}:${env.GOPATH}/bin"
 
     cloneDir = 'src/github.com/status-im/status-go'
-    paramBranch = env.branch ? ('*/' + env.branch) : '*/develop'
+    paramBranch = env.branch ? env.branch : '*/develop'
 
     dir(cloneDir) {
         try {
