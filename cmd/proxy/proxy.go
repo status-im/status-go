@@ -16,7 +16,7 @@ import (
 
 var (
 	laddr           = flag.String("laddr", "0.0.0.0:31143", "Listening address for discovery v5.")
-	verbosity       = flag.String("v", "debug", "Logger verbosity")
+	verbosity       = flag.String("v", "info", "Logger verbosity")
 	rendezvousNodes = StringSlice{}
 	bootnodes       = StringSlice{}
 	topics          = StringSlice{}
@@ -57,7 +57,7 @@ func main() {
 	stop := make(chan struct{})
 	defer close(stop)
 	for _, t := range topics {
-		log.Debug("proxying records for", "topic", t, "bootnodes", bootnodes, "rendezvous servers", rendezvousNodes)
+		log.Info("proxying records for", "topic", t, "bootnodes", rst, "rendezvous servers", rendezvousNodes)
 		t := t
 		go proxy.Run(t, stop)
 	}

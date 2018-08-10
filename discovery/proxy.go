@@ -43,7 +43,7 @@ func (proxy *V5ToRendezvousProxy) Run(topic string, stop chan struct{}) error {
 			if _, exist := proxy.identities[n.ID]; exist {
 				continue
 			}
-			log.Debug("proxying new record", "topic", topic, "identity", n.String())
+			log.Info("proxying new record", "topic", topic, "identity", n.String())
 			record := enr.Record{}
 			record.Set(enr.IP(n.IP))
 			record.Set(enr.TCP(n.TCP))
