@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 
+	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/transactions"
 )
@@ -15,11 +16,13 @@ const (
 	// account related codes
 	codeErrNoAccountSelected
 	codeErrInvalidTxSender
+	codeErrDecrypt
 )
 
 var errToCodeMap = map[error]int{
 	account.ErrNoAccountSelected:    codeErrNoAccountSelected,
 	transactions.ErrInvalidTxSender: codeErrInvalidTxSender,
+	keystore.ErrDecrypt:             codeErrDecrypt,
 }
 
 type jsonrpcSuccessfulResponse struct {

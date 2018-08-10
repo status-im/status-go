@@ -23,10 +23,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/keystore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core"
 	gethparams "github.com/ethereum/go-ethereum/params"
+
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/account"
@@ -126,6 +128,10 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 		{
 			"send transaction",
 			testSendTransaction,
+		},
+		{
+			"send transaction with invalid password",
+			testSendTransactionInvalidPassword,
 		},
 		{
 			"failed single transaction",
@@ -795,15 +801,49 @@ func testSendTransaction(t *testing.T) bool {
 		t.Errorf("failed to unmarshal rawResult '%s': %v", C.GoString(rawResult), err)
 		return false
 	}
-
 	if result.Error.Message != "" {
 		t.Errorf("failed to send transaction: %v", result.Error)
 		return false
 	}
-
 	hash := gethcommon.BytesToHash(result.Result)
 	if reflect.DeepEqual(hash, gethcommon.Hash{}) {
 		t.Errorf("response hash empty: %s", hash.Hex())
+		return false
+	}
+
+	return true
+}
+
+func testSendTransactionInvalidPassword(t *testing.T) bool {
+	EnsureNodeSync(statusBackend.StatusNode().EnsureSync)
+
+	// log into account from which transactions will be sent
+	if err := statusBackend.SelectAccount(
+		TestConfig.Account1.Address,
+		TestConfig.Account1.Password,
+	); err != nil {
+		t.Errorf("cannot select account: %v. Error %q", TestConfig.Account1.Address, err)
+		return false
+	}
+
+	args, err := json.Marshal(transactions.SendTxArgs{
+		From:  account.FromAddress(TestConfig.Account1.Address),
+		To:    account.ToAddress(TestConfig.Account2.Address),
+		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
+	})
+	if err != nil {
+		t.Errorf("failed to marshal errors: %v", err)
+		return false
+	}
+	rawResult := SendTransaction(C.CString(string(args)), C.CString("invalid password"))
+
+	var result jsonrpcAnyResponse
+	if err := json.Unmarshal([]byte(C.GoString(rawResult)), &result); err != nil {
+		t.Errorf("failed to unmarshal rawResult '%s': %v", C.GoString(rawResult), err)
+		return false
+	}
+	if result.Error.Message != keystore.ErrDecrypt.Error() {
+		t.Errorf("invalid result: %q", result)
 		return false
 	}
 
