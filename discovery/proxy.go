@@ -28,7 +28,7 @@ func NewProxy(original *DiscV5, servers []ma.Multiaddr) V5ToRendezvousProxy {
 
 func (proxy *V5ToRendezvousProxy) Run(topic string, stop chan struct{}) error {
 	period := make(chan time.Duration, 1)
-	period <- 30 * time.Second
+	period <- 1 * time.Second
 	found := make(chan *discv5.Node, 10)
 	lookup := make(chan bool)
 	go proxy.original.Discover(topic, period, found, lookup)
@@ -61,6 +61,9 @@ func (proxy *V5ToRendezvousProxy) Run(topic string, stop chan struct{}) error {
 
 			r := NewRendezvousWithENR(proxy.servers, record)
 			proxy.identities[n.ID] = r
+			if err := r.Start(); err != nil {
+				log.Error("unable to start rendezvous proxying", "servers", proxy.servers, "error", err)
+			}
 			go r.Register(topic, stop)
 		}
 	}

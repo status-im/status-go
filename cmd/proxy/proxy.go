@@ -21,6 +21,7 @@ var (
 	bootnodes       = StringSlice{}
 	topics          = StringSlice{}
 	les             = flag.Int("les", 0, "Proxy les topic for a given network.")
+	useEthereum     = flag.Bool("use-ethereum-boot", false, "If true ethereum bootnodes will be used")
 )
 
 func main() {
@@ -44,11 +45,15 @@ func main() {
 	if err != nil {
 		log.Crit("unable to generate a key", "error", err)
 	}
-	v5 := discovery.NewDiscV5(key, *laddr, parseNodesV5([]string(bootnodes)))
+	rst := []string(bootnodes)
+	if *useEthereum {
+		rst = append(rst, params.DiscoveryV5Bootnodes...)
+	}
+	v5 := discovery.NewDiscV5(key, *laddr, parseNodesV5(rst))
 	if err := v5.Start(); err != nil {
 		log.Crit("unable to start discovery v5", "address", *laddr, "error", err)
 	}
-	proxy := discovery.NewProxy(v5, nil)
+	proxy := discovery.NewProxy(v5, parseMultiaddrs(rendezvousNodes))
 	stop := make(chan struct{})
 	defer close(stop)
 	for _, t := range topics {
