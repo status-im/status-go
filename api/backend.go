@@ -413,14 +413,18 @@ func (b *StatusBackend) SelectAccount(address, password string) error {
 		return err
 	}
 
-	st, err := b.statusNode.ShhExtService()
-	if err != nil {
+	if whisperService != nil {
+		st, err := b.statusNode.ShhExtService()
+		if err != nil {
+			return err
+		}
+
+		err = st.InitProtocol(address, password)
+
 		return err
 	}
 
-	err = st.InitProtocol(address, password)
-
-	return err
+	return nil
 }
 
 // NotifyUsers sends push notifications to users.
@@ -440,18 +444,52 @@ func appendIf(condition bool, services []gethnode.ServiceConstructor, service ge
 	return append(services, service)
 }
 
-func (b *StatusBackend) CreateX3DHBundle() (string, error) {
+func (b *StatusBackend) CreateContactCode() (string, error) {
 	selectedAccount, err := b.AccountManager().SelectedAccount()
 	if selectedAccount == nil || err == account.ErrNoAccountSelected {
-		return "", nil
+		return "", err
 	}
 
-	bundle, err := chat.NewBundleContainer(selectedAccount.AccountKey.PrivateKey)
+	st, err := b.statusNode.ShhExtService()
 	if err != nil {
 		return "", err
 	}
 
-	jsonBundle, err := bundle.ToJSON()
+	bundle, err := st.GetBundle(selectedAccount.AccountKey.PrivateKey)
+	if err != nil {
+		return "", err
+	}
 
-	return jsonBundle, err
+	base64Bundle, err := bundle.ToBase64()
+
+	return base64Bundle, err
+}
+
+func (b *StatusBackend) ProcessContactCode(contactCode string) error {
+	st, err := b.statusNode.ShhExtService()
+	if err != nil {
+		return err
+	}
+
+	bundle, err := chat.FromBase64(contactCode)
+	if err != nil {
+		b.log.Error("error decoding base64", "err", err)
+		return err
+	}
+
+	if err := st.ProcessPublicBundle(bundle); err != nil {
+		b.log.Error("error adding bundle", "err", err)
+		return err
+	}
+
+	return nil
+}
+
+func (b *StatusBackend) ExtractIdentityFromContactCode(contactCode string) (string, error) {
+	bundle, err := chat.FromBase64(contactCode)
+	if err != nil {
+		return "", err
+	}
+
+	return chat.ExtractIdentity(bundle)
 }

@@ -2,11 +2,12 @@ package chat
 
 import (
 	"database/sql"
+	"os"
+	"testing"
+
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/suite"
-	"os"
-	"testing"
 )
 
 const (
@@ -14,107 +15,200 @@ const (
 	key    = "blahblahblah"
 )
 
-func TestSqlLitePersistenceTestSuite(t *testing.T) {
-	suite.Run(t, new(SqlLitePersistenceTestSuite))
+func TestSQLLitePersistenceTestSuite(t *testing.T) {
+	suite.Run(t, new(SQLLitePersistenceTestSuite))
 }
 
-type SqlLitePersistenceTestSuite struct {
+type SQLLitePersistenceTestSuite struct {
 	suite.Suite
+	// nolint: structcheck, megacheck
 	db      *sql.DB
 	service PersistenceServiceInterface
 }
 
-func (s *SqlLitePersistenceTestSuite) SetupTest() {
+func (s *SQLLitePersistenceTestSuite) SetupTest() {
 	os.Remove(dbPath)
 
-	p, err := NewSqlLitePersistence(dbPath, key)
-	if err != nil {
-		panic(err)
-	}
+	p, err := NewSQLLitePersistence(dbPath, key)
+	s.Require().NoError(err)
 	s.service = p
 }
 
-func (s *SqlLitePersistenceTestSuite) TestPrivateBundle() {
+func (s *SQLLitePersistenceTestSuite) TestPrivateBundle() {
 	key, err := crypto.GenerateKey()
-	s.NoError(err)
+	s.Require().NoError(err)
 
 	actualBundle, err := s.service.GetPrivateBundle([]byte("non-existing"))
-	s.NoErrorf(err, "It does not return an error if the bundle is not there")
+	s.Require().NoError(err, "It does not return an error if the bundle is not there")
 	s.Nil(actualBundle)
 
 	anyPrivateBundle, err := s.service.GetAnyPrivateBundle()
-	s.NoError(err)
+	s.Require().NoError(err)
 	s.Nil(anyPrivateBundle)
 
 	bundle, err := NewBundleContainer(key)
-	s.NoError(err)
+	s.Require().NoError(err)
 
 	err = s.service.AddPrivateBundle(bundle)
-	s.NoError(err)
+	s.Require().NoError(err)
 
 	bundleID := bundle.GetBundle().GetSignedPreKey()
 
 	actualBundle, err = s.service.GetPrivateBundle(bundleID)
-	s.NoError(err)
-
-	s.Equalf(true, proto.Equal(bundle, actualBundle), "It returns the same bundle")
+	s.Require().NoError(err)
+	s.True(proto.Equal(bundle.GetBundle(), actualBundle.GetBundle()), "It returns the same bundle")
 
 	anyPrivateBundle, err = s.service.GetAnyPrivateBundle()
-	s.NoError(err)
-
-	s.Equalf(true, proto.Equal(bundle.GetBundle(), anyPrivateBundle), "It returns the same bundle")
-
+	s.Require().NoError(err)
+	s.NotNil(anyPrivateBundle)
+	s.True(proto.Equal(bundle.GetBundle(), anyPrivateBundle.GetBundle()), "It returns the same bundle")
 }
 
-func (s *SqlLitePersistenceTestSuite) TestPublicBundle() {
+func (s *SQLLitePersistenceTestSuite) TestPublicBundle() {
 	key, err := crypto.GenerateKey()
-	s.NoError(err)
+	s.Require().NoError(err)
 
 	actualBundle, err := s.service.GetPublicBundle(&key.PublicKey)
-	s.NoErrorf(err, "It does not return an error if the bundle is not there")
+	s.Require().NoError(err, "It does not return an error if the bundle is not there")
 	s.Nil(actualBundle)
 
 	bundleContainer, err := NewBundleContainer(key)
-	bundle := bundleContainer.GetBundle()
-	s.NoError(err)
+	s.Require().NoError(err)
 
+	bundle := bundleContainer.GetBundle()
 	err = s.service.AddPublicBundle(bundle)
-	s.NoError(err)
+	s.Require().NoError(err)
 
 	actualBundle, err = s.service.GetPublicBundle(&key.PublicKey)
-	s.NoError(err)
-
-	s.Equalf(true, proto.Equal(bundle, actualBundle), "It returns the same bundle")
+	s.Require().NoError(err)
+	s.True(proto.Equal(bundle, actualBundle), "It returns the same bundle")
 }
 
-func (s *SqlLitePersistenceTestSuite) TestSymmetricKey() {
-	identityKey, err := crypto.GenerateKey()
-	s.NoError(err)
+func (s *SQLLitePersistenceTestSuite) TestMultiplePublicBundle() {
+	key, err := crypto.GenerateKey()
+	s.Require().NoError(err)
 
-	ephemeralKey, err := crypto.GenerateKey()
-	s.NoError(err)
-	symKey := []byte("hello")
+	actualBundle, err := s.service.GetPublicBundle(&key.PublicKey)
+	s.Require().NoError(err, "It does not return an error if the bundle is not there")
+	s.Nil(actualBundle)
 
-	actualKey, err := s.service.GetSymmetricKey(&identityKey.PublicKey, &ephemeralKey.PublicKey)
-	s.NoErrorf(err, "It does not return an error if the key is not there")
-	s.Nil(actualKey)
+	bundleContainer, err := NewBundleContainer(key)
+	s.Require().NoError(err)
 
-	actualKey, actualEphemeralKey, err := s.service.GetAnySymmetricKey(&identityKey.PublicKey)
-	s.NoError(err)
-	s.Nil(actualKey)
-	s.Nil(actualEphemeralKey)
+	bundle := bundleContainer.GetBundle()
+	err = s.service.AddPublicBundle(bundle)
+	s.Require().NoError(err)
 
-	err = s.service.AddSymmetricKey(&identityKey.PublicKey, &ephemeralKey.PublicKey, symKey)
-	s.NoError(err)
+	// Adding it again does not throw an error
+	err = s.service.AddPublicBundle(bundle)
+	s.Require().NoError(err)
 
-	actualKey, err = s.service.GetSymmetricKey(&identityKey.PublicKey, &ephemeralKey.PublicKey)
-	s.NoError(err)
+	// Adding a different bundle
+	bundleContainer, err = NewBundleContainer(key)
+	s.Require().NoError(err)
 
-	s.Equalf(symKey, actualKey, "It returns the same key")
+	bundle = bundleContainer.GetBundle()
+	err = s.service.AddPublicBundle(bundle)
+	s.Require().NoError(err)
 
-	actualKey, actualEphemeralKey, err = s.service.GetAnySymmetricKey(&identityKey.PublicKey)
-	s.NoError(err)
+	// Returns the most recent bundle
+	actualBundle, err = s.service.GetPublicBundle(&key.PublicKey)
+	s.Require().NoError(err)
 
-	s.Equalf(symKey, actualKey, "It returns the same key")
-	s.Equalf(ephemeralKey.PublicKey, *actualEphemeralKey, "It returns the same ephemeral key")
+	s.Equal(bundle, actualBundle)
+
 }
+
+func (s *SQLLitePersistenceTestSuite) TestRatchetInfoPrivateBundle() {
+	key, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	// Add a private bundle
+	bundle, err := NewBundleContainer(key)
+	s.Require().NoError(err)
+
+	err = s.service.AddPrivateBundle(bundle)
+	s.Require().NoError(err)
+
+	err = s.service.AddRatchetInfo(
+		[]byte("symmetric-key"),
+		[]byte("their-public-key"),
+		bundle.GetBundle().GetSignedPreKey(),
+		[]byte("ephemeral-public-key"),
+	)
+	s.Require().NoError(err)
+
+	ratchetInfo, err := s.service.GetRatchetInfo(bundle.GetBundle().GetSignedPreKey(), []byte("their-public-key"))
+
+	s.Require().NoError(err)
+	s.NotNil(ratchetInfo.ID, "It adds an id")
+	s.Equal(ratchetInfo.PrivateKey, bundle.GetPrivateSignedPreKey(), "It returns the private key")
+	s.Equal(ratchetInfo.Sk, []byte("symmetric-key"), "It returns the symmetric key")
+	s.Equal(ratchetInfo.Identity, []byte("their-public-key"), "It returns the identity of the contact")
+	s.Equal(ratchetInfo.PublicKey, bundle.GetBundle().GetSignedPreKey(), "It  returns the public key of the bundle")
+	s.Equal(bundle.GetBundle().GetSignedPreKey(), ratchetInfo.BundleID, "It returns the bundle id")
+	s.Equal([]byte("ephemeral-public-key"), ratchetInfo.EphemeralKey, "It returns the ratchet ephemeral key")
+}
+
+func (s *SQLLitePersistenceTestSuite) TestRatchetInfoPublicBundle() {
+	key, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	// Add a private bundle
+	bundle, err := NewBundleContainer(key)
+	s.Require().NoError(err)
+
+	err = s.service.AddPublicBundle(bundle.GetBundle())
+	s.Require().NoError(err)
+
+	err = s.service.AddRatchetInfo(
+		[]byte("symmetric-key"),
+		[]byte("their-public-key"),
+		bundle.GetBundle().GetSignedPreKey(),
+		[]byte("public-ephemeral-key"),
+	)
+	s.Require().NoError(err)
+
+	ratchetInfo, err := s.service.GetRatchetInfo(bundle.GetBundle().GetSignedPreKey(), []byte("their-public-key"))
+
+	s.Require().NoError(err)
+	s.Require().NotNil(ratchetInfo, "It returns the ratchet info")
+
+	s.NotNil(ratchetInfo.ID, "It adds an id")
+	s.Nil(ratchetInfo.PrivateKey, "It does not return the private key")
+	s.Equal(ratchetInfo.Sk, []byte("symmetric-key"), "It returns the symmetric key")
+	s.Equal(ratchetInfo.Identity, []byte("their-public-key"), "It returns the identity of the contact")
+	s.Equal(ratchetInfo.PublicKey, bundle.GetBundle().GetSignedPreKey(), "It  returns the public key of the bundle")
+	s.Nilf(ratchetInfo.PrivateKey, "It does not return the private key")
+
+	ratchetInfo, err = s.service.GetAnyRatchetInfo([]byte("their-public-key"))
+	s.Require().NoError(err)
+	s.Require().NotNil(ratchetInfo, "It returns the ratchet info")
+	s.NotNil(ratchetInfo.ID, "It adds an id")
+	s.Nil(ratchetInfo.PrivateKey, "It does not return the private key")
+	s.Equal(ratchetInfo.Sk, []byte("symmetric-key"), "It returns the symmetric key")
+	s.Equal(ratchetInfo.Identity, []byte("their-public-key"), "It returns the identity of the contact")
+	s.Equal(ratchetInfo.PublicKey, bundle.GetBundle().GetSignedPreKey(), "It  returns the public key of the bundle")
+	s.Equal(bundle.GetBundle().GetSignedPreKey(), ratchetInfo.BundleID, "It returns the bundle id")
+}
+
+func (s *SQLLitePersistenceTestSuite) TestRatchetInfoNoBundle() {
+	err := s.service.AddRatchetInfo(
+		[]byte("symmetric-key"),
+		[]byte("their-public-key"),
+		[]byte("non-existing-bundle"),
+		[]byte("non-existing-ephemeral-key"),
+	)
+
+	s.Error(err, "It returns an error")
+
+	_, err = s.service.GetRatchetInfo([]byte("non-existing-bundle"), []byte("their-public-key"))
+	s.Require().NoError(err)
+
+	ratchetInfo, err := s.service.GetAnyRatchetInfo([]byte("their-public-key"))
+	s.Require().NoError(err)
+	s.Nil(ratchetInfo, "It returns nil when no bundle is there")
+}
+
+// TODO: Add test for MarkBundleExpired
+// TODO: Add test for AddPublicBundle checking that it expires previous bundles

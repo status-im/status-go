@@ -3,135 +3,300 @@ package chat
 import (
 	"crypto/ecdsa"
 	"database/sql"
-	"fmt"
+	"time"
+
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/golang/protobuf/proto"
-	_ "github.com/mutecomm/go-sqlcipher"
+	_ "github.com/mutecomm/go-sqlcipher" // TODO: justify why this is required
+	dr "github.com/status-im/doubleratchet"
+	ecrypto "github.com/status-im/status-go/services/shhext/chat/crypto"
 )
 
-type SqlLitePersistence struct {
+// SQLLitePersistence represents a persistence service tied to an SQLite database
+type SQLLitePersistence struct {
+	db             *sql.DB
+	keysStorage    dr.KeysStorage
+	sessionStorage dr.SessionStorage
+}
+
+// SQLLiteKeysStorage represents a keys persistence service tied to an SQLite database
+type SQLLiteKeysStorage struct {
 	db *sql.DB
 }
 
-func createPublicBundleTableStatement() string {
-	return `CREATE TABLE IF NOT EXISTS public_bundles (id BLOB NOT NULL PRIMARY KEY, bundle BLOB NOT NULL)`
+// SQLLiteSessionStorage represents a session persistence service tied to an SQLite database
+type SQLLiteSessionStorage struct {
+	db *sql.DB
 }
 
-func createPrivateBundleTableStatement() string {
-	return `CREATE TABLE IF NOT EXISTS private_bundles (id BLOB NOT NULL PRIMARY KEY, bundle BLOB NOT NULL)`
+func createSessionStorageTableStatement() string {
+	return `CREATE TABLE IF NOT EXISTS sessions (
+    dhr BLOB,
+    dhs_public BLOB,
+    dhs_private BLOB,
+    root_chain_key BLOB,
+    send_chain_key BLOB,
+    send_chain_n INTEGER,
+    recv_chain_key BLOB,
+    recv_chain_n INTEGER,
+    step INTEGER,
+    pn  INTEGER,
+    id BLOB NOT NULL PRIMARY KEY,
+    UNIQUE(id) ON CONFLICT REPLACE
+  )`
 }
 
-func createSymmetricKeyTableStatement() string {
-	return `CREATE TABLE IF NOT EXISTS symmetric_keys (id BLOB NOT NULL PRIMARY KEY, identity BLOB NOT NULL, ephemeral BLOB NOT NULL)`
+func createKeysStorageTableStatement() string {
+	return `CREATE TABLE IF NOT EXISTS keys (
+    public_key BLOB NOT NULL,
+    msg_num INTEGER,
+    message_key BLOB NOT NULL,
+    UNIQUE (msg_num, message_key) ON CONFLICT REPLACE
+  )`
 }
 
-func (p *SqlLitePersistence) setup() error {
-	_, err := p.db.Exec(createPublicBundleTableStatement())
-	if err != nil {
+func createBundleTableStatement() string {
+	return `CREATE TABLE IF NOT EXISTS bundles (
+    identity BLOB NOT NULL,
+    private_key BLOB,
+    signed_pre_key BLOB NOT NULL PRIMARY KEY,
+    signature BLOB NOT NULL,
+    timestamp UNSIGNED BIG INT NOT NULL,
+    expired BOOLEAN DEFAULT 0,
+    UNIQUE(signed_pre_key, identity) ON CONFLICT IGNORE
+  )`
+}
+
+func createRatchetInfoTableStatement() string {
+	return `CREATE TABLE IF NOT EXISTS ratchet_info (
+    bundle_id BLOB NOT NULL,
+    ephemeral_key BLOB,
+    identity BLOB NOT NULL,
+    symmetric_key BLOB NOT NULL,
+    UNIQUE(bundle_id, identity) ON CONFLICT REPLACE,
+    FOREIGN KEY (bundle_id) REFERENCES bundles(signed_pre_key))`
+}
+
+func (s *SQLLitePersistence) setup() error {
+	if _, err := s.db.Exec(createBundleTableStatement()); err != nil {
 		return err
 	}
 
-	_, err = p.db.Exec(createPrivateBundleTableStatement())
-	if err != nil {
+	if _, err := s.db.Exec(createRatchetInfoTableStatement()); err != nil {
 		return err
 	}
 
-	_, err = p.db.Exec(createSymmetricKeyTableStatement())
-	if err != nil {
+	if _, err := s.db.Exec(createKeysStorageTableStatement()); err != nil {
+		return err
+	}
+
+	if _, err := s.db.Exec(createSessionStorageTableStatement()); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func NewSqlLitePersistence(path string, key string) (*SqlLitePersistence, error) {
-	p := &SqlLitePersistence{}
-	err := p.Open(path, key)
-	if err != nil {
+// NewSQLLitePersistence creates a new SQLLitePersistence instance, given a path and a key
+func NewSQLLitePersistence(path string, key string) (*SQLLitePersistence, error) {
+	s := &SQLLitePersistence{}
+
+	if err := s.Open(path, key); err != nil {
 		return nil, err
 	}
 
-	return p, nil
+	s.keysStorage = NewSQLLiteKeysStorage(s.db)
+
+	s.sessionStorage = NewSQLLiteSessionStorage(s.db)
+
+	return s, nil
 }
 
-func (p *SqlLitePersistence) Open(path string, key string) error {
-
-	dbname := fmt.Sprintf("%s?_pragma_key=x'%s'&_pragma_cipher_page_size=4096", path, key)
-	db, err := sql.Open("sqlite3", dbname)
+// Open opens a file at the specified path
+func (s *SQLLitePersistence) Open(path string, key string) error {
+	db, err := sql.Open("sqlite3", path)
 	if err != nil {
 		return err
 	}
-	p.db = db
 
-	p.setup()
+	// Disable concurrent access as not supported by the driver
+	db.SetMaxOpenConns(1)
 
-	return nil
+	if _, err = db.Exec("PRAGMA foreign_keys=ON"); err != nil {
+		return err
+	}
+
+	if _, err = db.Exec("PRAGMA key=ON"); err != nil {
+		return err
+	}
+
+	if _, err = db.Exec("PRAGMA cypher_page_size=4096"); err != nil {
+		return err
+	}
+
+	s.db = db
+
+	return s.setup()
 }
 
-func (p *SqlLitePersistence) AddPrivateBundle(b *BundleContainer) error {
-	stmt, err := p.db.Prepare("insert into private_bundles(id, bundle) values(?, ?)")
+// AddPrivateBundle adds the specified BundleContainer to the database
+func (s *SQLLitePersistence) AddPrivateBundle(b *BundleContainer) error {
+	stmt, err := s.db.Prepare("insert into bundles(identity, private_key, signed_pre_key, signature, timestamp) values(?, ?, ?, ?, ?)")
 	if err != nil {
 		return err
 	}
 	defer stmt.Close()
 
-	marshaledBundle, err := proto.Marshal(b)
-	if err != nil {
-		return err
-	}
-
-	id := b.GetBundle().GetSignedPreKey()
-
-	_, err = stmt.Exec(id, marshaledBundle)
+	_, err = stmt.Exec(
+		b.GetBundle().GetIdentity(),
+		b.GetPrivateSignedPreKey(),
+		b.GetBundle().GetSignedPreKey(),
+		b.GetBundle().GetSignature(),
+		time.Now().UnixNano(),
+	)
 
 	return err
 }
 
-func (p *SqlLitePersistence) GetAnyPrivateBundle() (*Bundle, error) {
-	stmt := "SELECT bundle FROM private_bundles LIMIT 1"
+// AddPublicBundle adds the specified Bundle to the database
+func (s *SQLLitePersistence) AddPublicBundle(b *Bundle) error {
+	tx, err := s.db.Begin()
 
-	var bundleBytes []byte
-	bundle := &BundleContainer{}
+	if err != nil {
+		return err
+	}
 
-	err := p.db.QueryRow(stmt).Scan(&bundleBytes)
+	insertStmt, err := tx.Prepare("INSERT INTO bundles(identity, signed_pre_key, signature, timestamp) VALUES(?, ?, ?, ?)")
+	if err != nil {
+		return err
+	}
+	defer insertStmt.Close()
 
-	if err == sql.ErrNoRows {
+	// Mark old bundles as expired
+	updateStmt, err := tx.Prepare("UPDATE bundles SET expired = 1 where identity = ? AND signed_pre_key != ?")
+	if err != nil {
+		return err
+	}
+	defer updateStmt.Close()
+
+	_, err = insertStmt.Exec(
+		b.GetIdentity(),
+		b.GetSignedPreKey(),
+		b.GetSignature(),
+		time.Now().UnixNano(),
+	)
+	if err != nil {
+		return tx.Rollback()
+	}
+
+	_, err = updateStmt.Exec(
+		b.GetIdentity(),
+		b.GetSignedPreKey(),
+	)
+	if err != nil {
+		return tx.Rollback()
+	}
+
+	err = tx.Commit()
+
+	return err
+}
+
+// GetAnyPrivateBundle retrieves any bundle from the database containing a private key
+func (s *SQLLitePersistence) GetAnyPrivateBundle() (*BundleContainer, error) {
+	stmt, err := s.db.Prepare("SELECT identity, private_key, signed_pre_key, signature, timestamp FROM bundles WHERE expired = 0 AND private_key IS NOT NULL ORDER BY timestamp DESC LIMIT 1")
+	if err != nil {
+		return nil, err
+	}
+	defer stmt.Close()
+
+	var privateKey []byte
+	var timestamp int64
+	bundle := &Bundle{}
+
+	err = stmt.QueryRow().Scan(&bundle.Identity, &privateKey, &bundle.SignedPreKey, &bundle.Signature, &timestamp)
+	switch err {
+	case sql.ErrNoRows:
 		return nil, nil
-	}
-
-	if err != nil {
+	case nil:
+		return &BundleContainer{
+			Bundle:    bundle,
+			Timestamp: timestamp,
+		}, nil
+	default:
 		return nil, err
 	}
-
-	err = proto.Unmarshal(bundleBytes, bundle)
-	if err != nil {
-		return nil, err
-	}
-
-	return bundle.GetBundle(), nil
 }
 
-func (p *SqlLitePersistence) AddPublicBundle(b *Bundle) error {
-	stmt, err := p.db.Prepare("insert into public_bundles(id, bundle) values(?, ?)")
+// GetPrivateBundle retrieves a BundleContainer with the specified signed prekey from the database
+func (s *SQLLitePersistence) GetPrivateBundle(bundleID []byte) (*BundleContainer, error) {
+	stmt, err := s.db.Prepare("SELECT identity, private_key, signed_pre_key, signature FROM bundles WHERE expired = 0 AND signed_pre_key = ? LIMIT 1")
+	if err != nil {
+		return nil, err
+	}
+	defer stmt.Close()
+
+	bundle := &Bundle{}
+	bundleContainer := &BundleContainer{
+		Bundle: bundle,
+	}
+
+	err = stmt.QueryRow(bundleID).Scan(&bundle.Identity, &bundleContainer.PrivateSignedPreKey, &bundle.SignedPreKey, &bundle.Signature)
+	switch err {
+	case sql.ErrNoRows:
+		return nil, nil
+	case nil:
+		return bundleContainer, nil
+	default:
+		return nil, err
+	}
+}
+
+// RatchetInfoConfirmed clears the ephemeral key in the RatchetInfo
+// associated with the specified bundle ID and interlocutor identity public key
+func (s *SQLLitePersistence) MarkBundleExpired(bundleID []byte, identity []byte) error {
+	stmt, err := s.db.Prepare("UPDATE bundles SET expired = 1 WHERE identity = ? AND bundle_id = ?")
 	if err != nil {
 		return err
 	}
 	defer stmt.Close()
 
-	marshaledBundle, err := proto.Marshal(b)
-	if err != nil {
-		return err
-	}
-
-	id := b.GetIdentity()
-
-	_, err = stmt.Exec(id, marshaledBundle)
+	_, err = stmt.Exec(
+		identity,
+		bundleID,
+	)
 
 	return err
 }
 
-func (p *SqlLitePersistence) AddSymmetricKey(identity *ecdsa.PublicKey, ephemeral *ecdsa.PublicKey, key []byte) error {
-	stmt, err := p.db.Prepare("insert into symmetric_keys(id, identity, ephemeral) values(?, ?, ?)")
+// GetPublicBundle retrieves an existing Bundle for the specified public key from the database
+func (s *SQLLitePersistence) GetPublicBundle(publicKey *ecdsa.PublicKey) (*Bundle, error) {
+
+	bundleID := crypto.CompressPubkey(publicKey)
+	stmt, err := s.db.Prepare("SELECT identity,signed_pre_key,signature FROM bundles WHERE expired = 0 AND identity = ? ORDER BY timestamp DESC LIMIT 1")
+	if err != nil {
+		return nil, err
+	}
+	defer stmt.Close()
+
+	bundle := &Bundle{}
+	err = stmt.QueryRow(bundleID).Scan(
+		&bundle.Identity,
+		&bundle.SignedPreKey,
+		&bundle.Signature,
+	)
+	switch err {
+	case sql.ErrNoRows:
+		return nil, nil
+	case nil:
+		return bundle, nil
+	default:
+		return nil, err
+	}
+}
+
+// AddRatchetInfo persists the specified ratchet info into the database
+func (s *SQLLitePersistence) AddRatchetInfo(key []byte, identity []byte, bundleID []byte, ephemeralKey []byte) error {
+	stmt, err := s.db.Prepare("INSERT INTO ratchet_info(symmetric_key, identity, bundle_id, ephemeral_key) VALUES(?, ?, ?, ?)")
 	if err != nil {
 		return err
 	}
@@ -139,125 +304,311 @@ func (p *SqlLitePersistence) AddSymmetricKey(identity *ecdsa.PublicKey, ephemera
 
 	_, err = stmt.Exec(
 		key,
-		crypto.CompressPubkey(identity),
-		crypto.CompressPubkey(ephemeral),
+		identity,
+		bundleID,
+		ephemeralKey,
 	)
 
 	return err
 }
 
-func (s *SqlLitePersistence) GetAnySymmetricKey(identityKey *ecdsa.PublicKey) ([]byte, *ecdsa.PublicKey, error) {
-	stmt, err := s.db.Prepare("SELECT id, ephemeral FROM symmetric_keys WHERE identity = ? LIMIT 1")
-	if err != nil {
-		return nil, nil, err
-	}
-	defer stmt.Close()
-
-	var key []byte
-	var ephemeralBytes []byte
-
-	err = stmt.QueryRow(
-		crypto.CompressPubkey(identityKey),
-	).Scan(&key, &ephemeralBytes)
-
-	if err == sql.ErrNoRows {
-		return nil, nil, nil
-	}
-
-	if err != nil {
-		return nil, nil, err
-	}
-
-	ephemeral, err := crypto.DecompressPubkey(ephemeralBytes)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return key, ephemeral, nil
-
-}
-
-func (s *SqlLitePersistence) GetSymmetricKey(identityKey *ecdsa.PublicKey, ephemeralKey *ecdsa.PublicKey) ([]byte, error) {
-	stmt, err := s.db.Prepare("SELECT id FROM symmetric_keys WHERE identity = ? AND ephemeral = ? LIMIT 1")
+// GetRatchetInfo retrieves the existing RatchetInfo for a specified bundle ID and interlocutor public key from the database
+func (s *SQLLitePersistence) GetRatchetInfo(bundleID []byte, theirIdentity []byte) (*RatchetInfo, error) {
+	stmt, err := s.db.Prepare("SELECT ratchet_info.rowid, ratchet_info.identity, ratchet_info.symmetric_key, bundles.private_key, bundles.signed_pre_key, ratchet_info.ephemeral_key FROM ratchet_info JOIN bundles ON bundle_id = signed_pre_key WHERE ratchet_info.identity = ? AND bundle_id = ? LIMIT 1")
 	if err != nil {
 		return nil, err
 	}
 	defer stmt.Close()
 
-	var key []byte
+	ratchetInfo := &RatchetInfo{
+		BundleID: bundleID,
+	}
 
-	err = stmt.QueryRow(
-		crypto.CompressPubkey(identityKey),
-		crypto.CompressPubkey(ephemeralKey),
-	).Scan(&key)
-
-	if err == sql.ErrNoRows {
+	err = stmt.QueryRow(theirIdentity, bundleID).Scan(
+		&ratchetInfo.ID,
+		&ratchetInfo.Identity,
+		&ratchetInfo.Sk,
+		&ratchetInfo.PrivateKey,
+		&ratchetInfo.PublicKey,
+		&ratchetInfo.EphemeralKey,
+	)
+	switch err {
+	case sql.ErrNoRows:
 		return nil, nil
-	}
-
-	if err != nil {
+	case nil:
+		return ratchetInfo, nil
+	default:
 		return nil, err
 	}
-
-	return key, nil
-
 }
 
-func (s *SqlLitePersistence) GetPrivateBundle(bundleID []byte) (*BundleContainer, error) {
-	stmt, err := s.db.Prepare("SELECT bundle FROM private_bundles WHERE id = ? LIMIT 1")
+// GetAnyRatchetInfo retrieves any existing RatchetInfo for a specified interlocutor public key from the database
+func (s *SQLLitePersistence) GetAnyRatchetInfo(identity []byte) (*RatchetInfo, error) {
+	stmt, err := s.db.Prepare("SELECT ratchet_info.rowid, symmetric_key, bundles.private_key, signed_pre_key, bundle_id, ephemeral_key FROM ratchet_info JOIN bundles ON bundle_id = signed_pre_key WHERE expired = 0 AND ratchet_info.identity = ? LIMIT 1")
 	if err != nil {
 		return nil, err
 	}
 	defer stmt.Close()
 
-	var bundleBytes []byte
-	bundle := &BundleContainer{}
+	ratchetInfo := &RatchetInfo{
+		Identity: identity,
+	}
 
-	err = stmt.QueryRow(bundleID).Scan(&bundleBytes)
-	if err == sql.ErrNoRows {
+	err = stmt.QueryRow(identity).Scan(
+		&ratchetInfo.ID,
+		&ratchetInfo.Sk,
+		&ratchetInfo.PrivateKey,
+		&ratchetInfo.PublicKey,
+		&ratchetInfo.BundleID,
+		&ratchetInfo.EphemeralKey,
+	)
+	switch err {
+	case sql.ErrNoRows:
 		return nil, nil
-	}
-
-	if err != nil {
+	case nil:
+		return ratchetInfo, nil
+	default:
 		return nil, err
 	}
-
-	err = proto.Unmarshal(bundleBytes, bundle)
-	if err != nil {
-		return nil, err
-	}
-
-	return bundle, nil
 }
 
-func (s *SqlLitePersistence) GetPublicBundle(publicKey *ecdsa.PublicKey) (*Bundle, error) {
-	bundleID := crypto.CompressPubkey(publicKey)
-	stmt, err := s.db.Prepare("SELECT bundle FROM public_bundles WHERE id = ? LIMIT 1")
+// RatchetInfoConfirmed clears the ephemeral key in the RatchetInfo
+// associated with the specified bundle ID and interlocutor identity public key
+func (s *SQLLitePersistence) RatchetInfoConfirmed(bundleID []byte, theirIdentity []byte) error {
+	stmt, err := s.db.Prepare("UPDATE ratchet_info SET ephemeral_key = NULL WHERE identity = ? AND bundle_id = ?")
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer stmt.Close()
 
-	var bundleBytes []byte
-	bundle := &Bundle{}
+	_, err = stmt.Exec(
+		theirIdentity,
+		bundleID,
+	)
 
-	err = stmt.QueryRow(bundleID).Scan(&bundleBytes)
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
-
-	if err != nil {
-		return nil, err
-	}
-
-	err = proto.Unmarshal(bundleBytes, bundle)
-	if err != nil {
-		return nil, err
-	}
-
-	return bundle, nil
+	return err
 }
 
-func (s *SqlLitePersistence) GetRatchetInfo(*ecdsa.PublicKey) (*RatchetInfo, error) {
+// NewSQLLiteKeysStorage creates a new SQLLiteKeysStorage instance associated with the specified database
+func NewSQLLiteKeysStorage(db *sql.DB) *SQLLiteKeysStorage {
+	return &SQLLiteKeysStorage{
+		db: db,
+	}
+}
+
+// NewSQLLiteSessionStorage creates a new SQLLiteSessionStorage instance associated with the specified database
+func NewSQLLiteSessionStorage(db *sql.DB) *SQLLiteSessionStorage {
+	return &SQLLiteSessionStorage{
+		db: db,
+	}
+}
+
+// GetKeysStorage returns the associated double ratchet KeysStorage object
+func (s *SQLLitePersistence) GetKeysStorage() dr.KeysStorage {
+	return s.keysStorage
+}
+
+// GetSessionStorage returns the associated double ratchet SessionStorage object
+func (s *SQLLitePersistence) GetSessionStorage() dr.SessionStorage {
+	return s.sessionStorage
+}
+
+// Get retrieves the message key for a specified public key and message number
+func (s *SQLLiteKeysStorage) Get(pubKey dr.Key, msgNum uint) (dr.Key, bool, error) {
+	var keyBytes []byte
+	var key [32]byte
+	stmt, err := s.db.Prepare("SELECT message_key FROM keys WHERE public_key = ? AND msg_num = ? LIMIT 1")
+
+	if err != nil {
+		return key, false, err
+	}
+	defer stmt.Close()
+
+	err = stmt.QueryRow(pubKey[:], msgNum).Scan(&keyBytes)
+	switch err {
+	case sql.ErrNoRows:
+		return key, false, nil
+	case nil:
+		copy(key[:], keyBytes)
+		return key, true, nil
+	default:
+		return key, false, err
+	}
+}
+
+// Put stores a key with the specified public key, message number and message key
+func (s *SQLLiteKeysStorage) Put(pubKey dr.Key, msgNum uint, mk dr.Key) error {
+	stmt, err := s.db.Prepare("insert into keys(public_key, msg_num, message_key) values(?, ?, ?)")
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	_, err = stmt.Exec(
+		pubKey[:],
+		msgNum,
+		mk[:],
+	)
+
+	return err
+}
+
+// DeleteMk deletes the key with the specified public key and message key
+func (s *SQLLiteKeysStorage) DeleteMk(pubKey dr.Key, msgNum uint) error {
+	stmt, err := s.db.Prepare("DELETE FROM keys WHERE public_key = ? AND msg_num = ?")
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	_, err = stmt.Exec(
+		pubKey[:],
+		msgNum,
+	)
+
+	return err
+}
+
+// DeletePk deletes the keys with the specified public key
+func (s *SQLLiteKeysStorage) DeletePk(pubKey dr.Key) error {
+	stmt, err := s.db.Prepare("DELETE FROM keys WHERE public_key = ?")
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	_, err = stmt.Exec(
+		pubKey[:],
+	)
+
+	return err
+}
+
+// Count returns the count of keys with the specified public key
+func (s *SQLLiteKeysStorage) Count(pubKey dr.Key) (uint, error) {
+	stmt, err := s.db.Prepare("SELECT COUNT(1) FROM keys WHERE public_key = ?")
+	if err != nil {
+		return 0, err
+	}
+	defer stmt.Close()
+
+	var count uint
+	err = stmt.QueryRow(pubKey[:]).Scan(&count)
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+// All returns nil
+func (s *SQLLiteKeysStorage) All() (map[dr.Key]map[uint]dr.Key, error) {
 	return nil, nil
+}
+
+// Save persists the specified double ratchet state
+func (s *SQLLiteSessionStorage) Save(id []byte, state *dr.State) error {
+	dhr := state.DHr[:]
+	dhs := state.DHs
+	dhsPublic := dhs.PublicKey()
+	dhsPrivate := dhs.PrivateKey()
+	pn := state.PN
+	step := state.Step
+
+	rootChainKey := state.RootCh.CK[:]
+
+	sendChainKey := state.SendCh.CK[:]
+	sendChainN := state.SendCh.N
+
+	recvChainKey := state.RecvCh.CK[:]
+	recvChainN := state.RecvCh.N
+
+	stmt, err := s.db.Prepare("insert into sessions(id, dhr, dhs_public, dhs_private, root_chain_key, send_chain_key, send_chain_n, recv_chain_key, recv_chain_n, pn, step) values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	_, err = stmt.Exec(
+		id,
+		dhr,
+		dhsPublic[:],
+		dhsPrivate[:],
+		rootChainKey,
+		sendChainKey,
+		sendChainN,
+		recvChainKey,
+		recvChainN,
+		pn,
+		step,
+	)
+	return err
+}
+
+func toKey(a []byte) dr.Key {
+	var k [32]byte
+	copy(k[:], a)
+	return k
+}
+
+// Load retrieves the double ratchet state for a given ID
+func (s *SQLLiteSessionStorage) Load(id []byte) (*dr.State, error) {
+	stmt, err := s.db.Prepare("SELECT dhr, dhs_public, dhs_private, root_chain_key, send_chain_key, send_chain_n, recv_chain_key, recv_chain_n, pn, step FROM sessions WHERE id = ?")
+	if err != nil {
+		return nil, err
+	}
+
+	defer stmt.Close()
+
+	var (
+		dhr          []byte
+		dhsPublic    []byte
+		dhsPrivate   []byte
+		rootChainKey []byte
+		sendChainKey []byte
+		sendChainN   uint
+		recvChainKey []byte
+		recvChainN   uint
+		pn           uint
+		step         uint
+	)
+
+	err = stmt.QueryRow(id).Scan(
+		&dhr,
+		&dhsPublic,
+		&dhsPrivate,
+		&rootChainKey,
+		&sendChainKey,
+		&sendChainN,
+		&recvChainKey,
+		&recvChainN,
+		&pn,
+		&step,
+	)
+	switch err {
+	case sql.ErrNoRows:
+		return nil, nil
+	case nil:
+		state := dr.DefaultState(toKey(rootChainKey))
+
+		state.PN = uint32(pn)
+		state.Step = step
+
+		state.DHs = ecrypto.DHPair{
+			PrvKey: toKey(dhsPrivate),
+			PubKey: toKey(dhsPublic),
+		}
+
+		state.DHr = toKey(dhr)
+
+		state.SendCh.CK = toKey(sendChainKey)
+		state.SendCh.N = uint32(sendChainN)
+
+		state.RecvCh.CK = toKey(recvChainKey)
+		state.RecvCh.N = uint32(recvChainN)
+
+		return &state, nil
+	default:
+		return nil, err
+	}
 }

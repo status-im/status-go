@@ -2,7 +2,10 @@ package shhext
 
 import (
 	"crypto/ecdsa"
+	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -45,13 +48,14 @@ type Service struct {
 	deduplicator *dedup.Deduplicator
 	protocol     *chat.ProtocolService
 	debug        bool
+	dataDir      string
 }
 
 // Make sure that Service implements node.Service interface.
 var _ node.Service = (*Service)(nil)
 
-// New returns a new Service.
-func New(w *whisper.Whisper, handler EnvelopeEventsHandler, db *leveldb.DB, debug bool) *Service {
+// New returns a new Service. dataDir is a folder path to a network-independent location
+func New(w *whisper.Whisper, handler EnvelopeEventsHandler, db *leveldb.DB, dataDir string, debug bool) *Service {
 	track := &tracker{
 		w:       w,
 		handler: handler,
@@ -62,6 +66,7 @@ func New(w *whisper.Whisper, handler EnvelopeEventsHandler, db *leveldb.DB, debu
 		tracker:      track,
 		deduplicator: dedup.NewDeduplicator(w, db),
 		debug:        debug,
+		dataDir:      dataDir,
 	}
 }
 
@@ -71,12 +76,31 @@ func (s *Service) Protocols() []p2p.Protocol {
 }
 
 func (s *Service) InitProtocol(address string, password string) error {
-	persistence, err := chat.NewSqlLitePersistence(fmt.Sprintf("/data/user/0/im.status.ethereum.debug/%x.db", address), password)
+	if err := os.MkdirAll(filepath.Clean(s.dataDir), os.ModePerm); err != nil {
+		return err
+	}
+	persistence, err := chat.NewSQLLitePersistence(filepath.Join(s.dataDir, fmt.Sprintf("%x.db", address)), password)
 	if err != nil {
 		return err
 	}
 	s.protocol = chat.NewProtocolService(chat.NewEncryptionService(persistence))
 	return nil
+}
+
+func (s *Service) ProcessPublicBundle(bundle *chat.Bundle) error {
+	if s.protocol == nil {
+		return errors.New("Procotol is not initialized")
+	}
+
+	return s.protocol.ProcessPublicBundle(bundle)
+}
+
+func (s *Service) GetBundle(myIdentityKey *ecdsa.PrivateKey) (*chat.Bundle, error) {
+	if s.protocol == nil {
+		return nil, errors.New("Procotol is not initialized")
+	}
+
+	return s.protocol.GetBundle(myIdentityKey)
 }
 
 // APIs returns a list of new APIs.

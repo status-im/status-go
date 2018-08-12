@@ -48,15 +48,43 @@ func StopNode() *C.char {
 }
 
 // Create an X3DH bundle
-//export CreateX3DHBundle
-func CreateX3DHBundle() *C.char {
-	bundle, err := statusBackend.CreateX3DHBundle()
+//export CreateContactCode
+func CreateContactCode() *C.char {
+	bundle, err := statusBackend.CreateContactCode()
 	if err != nil {
 		return makeJSONResponse(err)
 	}
 
 	cstr := C.CString(bundle)
 
+	defer C.free(unsafe.Pointer(cstr))
+	return cstr
+}
+
+//export ProcessContactCode
+func ProcessContactCode(bundleString *C.char) *C.char {
+	err := statusBackend.ProcessContactCode(C.GoString(bundleString))
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return nil
+}
+
+//export ExtractIdentityFromContactCode
+func ExtractIdentityFromContactCode(bundleString *C.char) *C.char {
+	bundle := C.GoString(bundleString)
+
+	identity, err := statusBackend.ExtractIdentityFromContactCode(bundle)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	if err := statusBackend.ProcessContactCode(bundle); err != nil {
+		return makeJSONResponse(err)
+	}
+
+	cstr := C.CString(fmt.Sprintf("{\"identity\": \"%s\"}", identity))
 	defer C.free(unsafe.Pointer(cstr))
 	return cstr
 }

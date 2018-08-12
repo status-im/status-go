@@ -2,48 +2,65 @@ syntax = "proto3";
 
 package chat;
 
+// X3DH prekey bundle
 message Bundle {
+  // Identity key
   bytes identity = 1;
+  // Signed prekey
   bytes signed_pre_key = 2;
+  // Prekey signature
   bytes signature = 3;
 }
 
 message BundleContainer {
+  // X3DH prekey bundle
   Bundle bundle = 1;
+  // Private signed prekey
   bytes private_signed_pre_key = 2;
+
+  // Local time creation
+  int64 timestamp = 3;
 }
 
 message DRHeader {
+  // Current ratchet public key
   bytes key = 1;
+  // Number of the message in the sending chain
   uint32 n = 2;
+  // Length of the previous sending chain
   uint32 pn = 3;
+  // Bundle ID
+  bytes id = 4;
+}
+
+message DHHeader {
+  // Compressed ephemeral public key
+  bytes key = 1;
 }
 
 message X3DHHeader {
-  // Which ephemeral key has been used
-  oneof ephemeral_key {
-    bytes bundle_key = 1;
-    bytes dh_key = 2;
-    bytes sym_key = 3;
-  }
-  // The bundle used in case of x3dh
-  bytes bundle_id = 4;
+  // Ephemeral key used
+  bytes key = 1;
+  // Used bundle's signed prekey
+  bytes id = 4;
 }
 
+// Direct message value
 message DirectMessageProtocol {
-  oneof encryption {
-    X3DHHeader X3DH_header = 1;
-    DRHeader DR_header = 2;
-  }
+  X3DHHeader X3DH_header = 1;
+  DRHeader DR_header = 2;
+  DHHeader DH_header = 101;
+  // Encrypted payload
   bytes payload = 3;
 }
 
+// Top-level protocol message
 message ProtocolMessage {
   // An optional bundle is exchanged with each message
   Bundle bundle = 1;
 
   oneof message_type {
-    // One to one message encrypted
+    // One to one message, encrypted
     DirectMessageProtocol direct_message = 101;
 
     // Public chats, not encrypted

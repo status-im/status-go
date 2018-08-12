@@ -13,6 +13,7 @@ type ProtocolService struct {
 	encryption *EncryptionService
 }
 
+// NewProtocolService creates a new ProtocolService instance
 func NewProtocolService(encryption *EncryptionService) *ProtocolService {
 	return &ProtocolService{
 		log:        log.New("package", "status-go/services/sshext.chat"),
@@ -40,8 +41,8 @@ func (p *ProtocolService) addBundleAndMarshal(myIdentityKey *ecdsa.PrivateKey, m
 	return marshaledMessage, nil
 }
 
+// BuildPublicMessage marshals a public chat message given the user identity private key and a payload
 func (p *ProtocolService) BuildPublicMessage(myIdentityKey *ecdsa.PrivateKey, payload []byte) ([]byte, error) {
-
 	// Build message not encrypted
 	protocolMessage := &ProtocolMessage{
 		MessageType: &ProtocolMessage_PublicMessage{
@@ -52,8 +53,8 @@ func (p *ProtocolService) BuildPublicMessage(myIdentityKey *ecdsa.PrivateKey, pa
 	return p.addBundleAndMarshal(myIdentityKey, protocolMessage)
 }
 
+// BuildDirectMessage marshals a 1:1 chat message given the user identity private key, the recipient's public key, and a payload
 func (p *ProtocolService) BuildDirectMessage(myIdentityKey *ecdsa.PrivateKey, theirPublicKey *ecdsa.PublicKey, payload []byte) ([]byte, error) {
-
 	// Encrypt payload
 	encryptionResponse, err := p.encryption.EncryptPayload(theirPublicKey, myIdentityKey, payload)
 	if err != nil {
@@ -67,23 +68,29 @@ func (p *ProtocolService) BuildDirectMessage(myIdentityKey *ecdsa.PrivateKey, th
 	}
 
 	return p.addBundleAndMarshal(myIdentityKey, protocolMessage)
-
 }
 
+// ProcessPublicBundle processes a received X3DH bundle
+func (p *ProtocolService) ProcessPublicBundle(bundle *Bundle) error {
+	return p.encryption.ProcessPublicBundle(bundle)
+}
+
+// GetBundle retrieves or creates a X3DH bundle, given a private identity key
+func (p *ProtocolService) GetBundle(myIdentityKey *ecdsa.PrivateKey) (*Bundle, error) {
+	return p.encryption.CreateBundle(myIdentityKey)
+}
+
+// HandleMessage unmarshals a message and processes it, decrypting it if it is a 1:1 message
 func (p *ProtocolService) HandleMessage(myIdentityKey *ecdsa.PrivateKey, theirPublicKey *ecdsa.PublicKey, payload []byte) ([]byte, error) {
 	// Unmarshal message
 	protocolMessage := &ProtocolMessage{}
 
-	err := proto.Unmarshal(payload, protocolMessage)
-
-	if err != nil {
+	if err := proto.Unmarshal(payload, protocolMessage); err != nil {
 		return nil, err
 	}
 
 	// Process bundle
-	bundle := protocolMessage.GetBundle()
-
-	if bundle != nil {
+	if bundle := protocolMessage.GetBundle(); bundle != nil {
 		// Should we stop processing if the bundle cannot be verified?
 		err := p.encryption.ProcessPublicBundle(bundle)
 		if err != nil {
@@ -92,19 +99,16 @@ func (p *ProtocolService) HandleMessage(myIdentityKey *ecdsa.PrivateKey, theirPu
 	}
 
 	// Check if it's a public message
-	publicMessage := protocolMessage.GetPublicMessage()
-	if publicMessage != nil {
+	if publicMessage := protocolMessage.GetPublicMessage(); publicMessage != nil {
 		// Nothing to do, as already in cleartext
 		return publicMessage, nil
 	}
 
 	// Decrypt message
-	directMessage := protocolMessage.GetDirectMessage()
-	if directMessage != nil {
+	if directMessage := protocolMessage.GetDirectMessage(); directMessage != nil {
 		return p.encryption.DecryptPayload(myIdentityKey, theirPublicKey, directMessage)
 	}
 
 	// Return error
-	return nil, errors.New("No payload")
-
+	return nil, errors.New("no payload")
 }

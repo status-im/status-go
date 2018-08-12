@@ -20,6 +20,9 @@ const (
 
 	// EventEnodeDiscovered is tiggered when enode has been discovered.
 	EventEnodeDiscovered = "enode.discovered"
+
+	// CouldNotDecrypt is triggered when we receive a message from a bundle we don't have
+	EventDecryptMessageFailed = "messages.decrypt.failed"
 )
 
 // EnvelopeSignal includes hash of the envelope.
@@ -32,6 +35,11 @@ type MailServerResponseSignal struct {
 	RequestID        common.Hash `json:"requestID"`
 	LastEnvelopeHash common.Hash `json:"lastEnvelopeHash"`
 	Cursor           string      `json:"cursor"`
+}
+
+// DecryptFailedSignal holds the sender of the message that could not be decrypted
+type DecryptMessageFailedSignal struct {
+	Sender string `json:"sender"`
 }
 
 // SendEnvelopeSent triggered when envelope delivered at least to 1 peer.
@@ -72,4 +80,8 @@ func SendEnodeDiscovered(enode, topic string) {
 		Enode: enode,
 		Topic: topic,
 	})
+}
+
+func SendDecryptMessageFailed(sender string) {
+	send(EventDecryptMessageFailed, DecryptMessageFailedSignal{sender})
 }

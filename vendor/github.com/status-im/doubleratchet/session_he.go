@@ -13,7 +13,7 @@ type SessionHE interface {
 }
 
 type sessionHE struct {
-	state
+	State
 }
 
 // NewHE creates session with the shared keys.
@@ -79,7 +79,7 @@ func (s *sessionHE) RatchetDecrypt(m MessageHE, ad []byte) ([]byte, error) {
 
 	var (
 		// All changes must be applied on a different session object, so that this session won't be modified nor left in a dirty session.
-		sc state = s.state
+		sc = s.State
 
 		skippedKeys1 []skippedKey
 		skippedKeys2 []skippedKey
@@ -103,9 +103,11 @@ func (s *sessionHE) RatchetDecrypt(m MessageHE, ad []byte) ([]byte, error) {
 		return nil, fmt.Errorf("can't decrypt: %s", err)
 	}
 
-	s.applyChanges(sc, append(skippedKeys1, skippedKeys2...))
+	if err = s.applyChanges(sc, append(skippedKeys1, skippedKeys2...)); err != nil {
+		return nil, fmt.Errorf("failed to apply changes: %s", err)
+	}
 	if step {
-		s.deleteSkippedKeys(s.HKr)
+		_ = s.deleteSkippedKeys(s.HKr)
 	}
 
 	return plaintext, nil
@@ -124,7 +126,12 @@ func (s *sessionHE) decryptHeader(encHeader []byte) (MessageHeader, bool, error)
 }
 
 func (s *sessionHE) trySkippedMessages(m MessageHE, ad []byte) ([]byte, error) {
-	for hk, keys := range s.MkSkipped.All() {
+	allMessages, err := s.MkSkipped.All()
+	if err != nil {
+		return nil, err
+	}
+
+	for hk, keys := range allMessages {
 		for n, mk := range keys {
 			hEnc, err := s.Crypto.Decrypt(hk, m.Header, nil)
 			if err != nil {
@@ -141,7 +148,7 @@ func (s *sessionHE) trySkippedMessages(m MessageHE, ad []byte) ([]byte, error) {
 			if err != nil {
 				return nil, fmt.Errorf("can't decrypt skipped message: %s", err)
 			}
-			s.MkSkipped.DeleteMk(hk, n)
+			_ = s.MkSkipped.DeleteMk(hk, n)
 			return plaintext, nil
 		}
 	}

@@ -224,17 +224,15 @@
   version = "v1.0.0"
 
 [[projects]]
-  digest = "1:48bc31380e5a67f9a512db18bb6b6c28cf56ed98fe23832c32149e3c76f9d545"
+  digest = "1:ac761a089c90c1399e2fd0a0aacfe63bd7b4ecd01141c98ca9cf18059f938ea4"
   name = "github.com/golang/protobuf"
   packages = [
-    "jsonpb",
     "proto",
     "protoc-gen-go/descriptor",
-    "ptypes/struct",
   ]
   pruneopts = "NUT"
-  revision = "b4deda0973fb4c70b50d226b1af49f3da59f5265"
-  version = "v1.1.0"
+  revision = "aa810b61a9c79d51363740d207bb46cf8e620ed5"
+  version = "v1.2.0"
 
 [[projects]]
   digest = "1:9413ddbde906f91f062fda0dfa9a7cff43458cd1b2282c0fa25c61d89300b116"
@@ -769,12 +767,11 @@
   version = "v1.1"
 
 [[projects]]
-  branch = "master"
-  digest = "1:855621dedfedd0d13e9e48e8206e351322b20eca0ac440516f83fb94d4b9f665"
+  digest = "1:ddf6655191071c4510e39bf66dfc541e9e0a3ee054191e022e5712bcdc1a1bd5"
   name = "github.com/status-im/doubleratchet"
   packages = ["."]
   pruneopts = "NUT"
-  revision = "9d7f37c630e2bf368f380032c57186efe4230bbe"
+  revision = "c243ae5a661dafa86438b55034ae7f4fc2eec31e"
 
 [[projects]]
   branch = "master"
@@ -1078,7 +1075,6 @@
     "github.com/ethereum/go-ethereum/rpc",
     "github.com/ethereum/go-ethereum/whisper/whisperv6",
     "github.com/golang/mock/gomock",
-    "github.com/golang/protobuf/jsonpb",
     "github.com/golang/protobuf/proto",
     "github.com/libp2p/go-libp2p-crypto",
     "github.com/multiformats/go-multiaddr",

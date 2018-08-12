@@ -28,12 +28,12 @@ func (s *ProtocolServiceTestSuite) SetupTest() {
 	os.Remove(aliceDBPath)
 	os.Remove(bobDBPath)
 
-	alicePersistence, err := NewSqlLitePersistence(aliceDBPath, aliceDBKey)
+	alicePersistence, err := NewSQLLitePersistence(aliceDBPath, aliceDBKey)
 	if err != nil {
 		panic(err)
 	}
 
-	bobPersistence, err := NewSqlLitePersistence(bobDBPath, bobDBKey)
+	bobPersistence, err := NewSQLLitePersistence(bobDBPath, bobDBKey)
 	if err != nil {
 		panic(err)
 	}
@@ -48,7 +48,7 @@ func (s *ProtocolServiceTestSuite) TestBuildDirectMessage() {
 	aliceKey, err := crypto.GenerateKey()
 	s.NoError(err)
 
-	payload, err := proto.Marshal(&OneToOnePayload{
+	payload, err := proto.Marshal(&ChatMessagePayload{
 		Content:     "Test content",
 		ClockValue:  1,
 		ContentType: "a",
@@ -85,7 +85,7 @@ func (s *ProtocolServiceTestSuite) TestBuildAndReadDirectMessage() {
 	aliceKey, err := crypto.GenerateKey()
 	s.NoError(err)
 
-	payload := OneToOnePayload{
+	payload := ChatMessagePayload{
 		Content:     "Test content",
 		ClockValue:  1,
 		ContentType: "a",
@@ -106,7 +106,7 @@ func (s *ProtocolServiceTestSuite) TestBuildAndReadDirectMessage() {
 
 	s.NotNil(unmarshaledMsg)
 
-	recoveredPayload := OneToOnePayload{}
+	recoveredPayload := ChatMessagePayload{}
 	err = proto.Unmarshal(unmarshaledMsg, &recoveredPayload)
 
 	s.NoError(err)

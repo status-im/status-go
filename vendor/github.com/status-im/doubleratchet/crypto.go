@@ -27,7 +27,7 @@ type DHPair interface {
 	PublicKey() Key
 }
 
-// Keys is any 32-byte key. It's created for the possibility of pretty hex output.
+// Key is any 32-byte key. It's created for the possibility of pretty hex output.
 type Key [32]byte
 
 // Stringer interface compliance.

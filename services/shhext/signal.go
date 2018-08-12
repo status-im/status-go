@@ -27,3 +27,7 @@ func (h EnvelopeSignalHandler) MailServerRequestCompleted(requestID common.Hash,
 func (h EnvelopeSignalHandler) MailServerRequestExpired(hash common.Hash) {
 	signal.SendMailServerRequestExpired(hash)
 }
+
+func (h EnvelopeSignalHandler) DecryptMessageFailed(pubKey string) {
+	signal.SendDecryptMessageFailed(pubKey)
+}

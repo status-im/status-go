@@ -1,57 +1,81 @@
-package doubleratchet
+package crypto
 
 import (
 	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/hmac"
-	"crypto/rand"
 	"crypto/sha256"
 	"fmt"
 	"io"
 
-	"golang.org/x/crypto/curve25519"
+	"github.com/ethereum/go-ethereum/crypto/ecies"
+
+	"github.com/ethereum/go-ethereum/crypto"
+	dr "github.com/status-im/doubleratchet"
 	"golang.org/x/crypto/hkdf"
 )
 
-// DefaultCrypto is an implementation of Crypto with cryptographic primitives recommended
+// EthereumCrypto is an implementation of Crypto with cryptographic primitives recommended
 // by the Double Ratchet Algorithm specification. However, some details are different,
 // see function comments for details.
-type DefaultCrypto struct{}
+type EthereumCrypto struct{}
 
-// GenerateDH creates a new Diffie-Hellman key pair.
-func (c DefaultCrypto) GenerateDH() (DHPair, error) {
-	var privKey [32]byte
-	if _, err := io.ReadFull(rand.Reader, privKey[:]); err != nil {
-		return dhPair{}, fmt.Errorf("couldn't generate privKey: %s", err)
+// See the Crypto interface.
+func (c EthereumCrypto) GenerateDH() (dr.DHPair, error) {
+	keys, err := crypto.GenerateKey()
+	if err != nil {
+		return nil, err
 	}
-	privKey[0] &= 248
-	privKey[31] &= 127
-	privKey[31] |= 64
 
-	var pubKey [32]byte
-	curve25519.ScalarBaseMult(&pubKey, &privKey)
-	return dhPair{
-		privateKey: privKey,
-		publicKey:  pubKey,
+	var publicKey [32]byte
+	copy(publicKey[:], crypto.CompressPubkey(&keys.PublicKey)[:32])
+
+	var privateKey [32]byte
+	copy(privateKey[:], crypto.FromECDSA(keys))
+
+	return DHPair{
+		PrvKey: privateKey,
+		PubKey: publicKey,
 	}, nil
+
 }
 
-// DH returns the output from the Diffie-Hellman calculation between
-// the private key from the DH key pair dhPair and the DH public key dbPub.
-func (c DefaultCrypto) DH(dhPair DHPair, dhPub Key) Key {
-	var (
-		dhOut   [32]byte
-		privKey [32]byte = dhPair.PrivateKey()
-		pubKey  [32]byte = dhPub
+// See the Crypto interface.
+func (c EthereumCrypto) DH(dhPair dr.DHPair, dhPub dr.Key) dr.Key {
+	tmpKey := dhPair.PrivateKey()
+	privateKey, err := crypto.ToECDSA(tmpKey[:])
+	eciesPrivate := ecies.ImportECDSA(privateKey)
+	var a [32]byte
+	if err != nil {
+
+		return a
+	}
+
+	publicKey, err := crypto.DecompressPubkey(dhPub[:])
+	if err != nil {
+
+		return a
+	}
+	eciesPublic := ecies.ImportECDSAPublic(publicKey)
+
+	key, err := eciesPrivate.GenerateShared(
+		eciesPublic,
+		16,
+		16,
 	)
-	curve25519.ScalarMult(&dhOut, &privKey, &pubKey)
-	return dhOut
+
+	if err != nil {
+		return a
+	}
+
+	copy(a[:], key)
+	return a
+
 }
 
-// KdfRK returns a pair (32-byte root key, 32-byte chain key) as the output of applying
-// a KDF keyed by a 32-byte root key rk to a Diffie-Hellman output dhOut.
-func (c DefaultCrypto) KdfRK(rk, dhOut Key) (rootKey, chainKey, headerKey Key) {
+// See the Crypto interface.
+func (c EthereumCrypto) KdfRK(rk, dhOut dr.Key) (rootKey, chainKey, headerKey dr.Key) {
 	var (
 		r   = hkdf.New(sha256.New, dhOut[:], rk[:], []byte("rsZUpEuXUqqwXBvSy3EcievAh4cMj6QL"))
 		buf = make([]byte, 96)
@@ -66,9 +90,8 @@ func (c DefaultCrypto) KdfRK(rk, dhOut Key) (rootKey, chainKey, headerKey Key) {
 	return
 }
 
-// KdfCK returns a pair (32-byte chain key, 32-byte message key) as the output of applying
-// a KDF keyed by a 32-byte chain key ck to some constant.
-func (c DefaultCrypto) KdfCK(ck Key) (chainKey Key, msgKey Key) {
+// See the Crypto interface.
+func (c EthereumCrypto) KdfCK(ck dr.Key) (chainKey dr.Key, msgKey dr.Key) {
 	const (
 		ckInput = 15
 		mkInput = 16
@@ -89,7 +112,7 @@ func (c DefaultCrypto) KdfCK(ck Key) (chainKey Key, msgKey Key) {
 // Encrypt uses a slightly different approach than in the algorithm specification:
 // it uses AES-256-CTR instead of AES-256-CBC for security, ciphertext length and implementation
 // complexity considerations.
-func (c DefaultCrypto) Encrypt(mk Key, plaintext, ad []byte) []byte {
+func (c EthereumCrypto) Encrypt(mk dr.Key, plaintext, ad []byte) []byte {
 	encKey, authKey, iv := c.deriveEncKeys(mk)
 
 	ciphertext := make([]byte, aes.BlockSize+len(plaintext))
@@ -104,8 +127,8 @@ func (c DefaultCrypto) Encrypt(mk Key, plaintext, ad []byte) []byte {
 	return append(ciphertext, c.computeSignature(authKey[:], ciphertext, ad)...)
 }
 
-// Decrypt returns the AEAD decryption of ciphertext with message key mk.
-func (c DefaultCrypto) Decrypt(mk Key, authCiphertext, ad []byte) ([]byte, error) {
+// See the Crypto interface.
+func (c EthereumCrypto) Decrypt(mk dr.Key, authCiphertext, ad []byte) ([]byte, error) {
 	var (
 		l          = len(authCiphertext)
 		ciphertext = authCiphertext[:l-sha256.Size]
@@ -131,7 +154,7 @@ func (c DefaultCrypto) Decrypt(mk Key, authCiphertext, ad []byte) ([]byte, error
 }
 
 // deriveEncKeys derive keys for message encryption and decryption. Returns (encKey, authKey, iv, err).
-func (c DefaultCrypto) deriveEncKeys(mk Key) (encKey Key, authKey Key, iv [16]byte) {
+func (c EthereumCrypto) deriveEncKeys(mk dr.Key) (encKey dr.Key, authKey dr.Key, iv [16]byte) {
 	// First, derive encryption and authentication key out of mk.
 	salt := make([]byte, 32)
 	var (
@@ -148,26 +171,26 @@ func (c DefaultCrypto) deriveEncKeys(mk Key) (encKey Key, authKey Key, iv [16]by
 	return
 }
 
-func (c DefaultCrypto) computeSignature(authKey, ciphertext, associatedData []byte) []byte {
+func (c EthereumCrypto) computeSignature(authKey, ciphertext, associatedData []byte) []byte {
 	h := hmac.New(sha256.New, authKey)
 	_, _ = h.Write(associatedData)
 	_, _ = h.Write(ciphertext)
 	return h.Sum(nil)
 }
 
-type dhPair struct {
-	privateKey Key
-	publicKey  Key
+type DHPair struct {
+	PrvKey dr.Key
+	PubKey dr.Key
 }
 
-func (p dhPair) PrivateKey() Key {
-	return p.privateKey
+func (p DHPair) PrivateKey() dr.Key {
+	return p.PrvKey
 }
 
-func (p dhPair) PublicKey() Key {
-	return p.publicKey
+func (p DHPair) PublicKey() dr.Key {
+	return p.PubKey
 }
 
-func (p dhPair) String() string {
-	return fmt.Sprintf("{privateKey: %s publicKey: %s}", p.privateKey, p.publicKey)
+func (p DHPair) String() string {
+	return fmt.Sprintf("{privateKey: %s publicKey: %s}", p.PrvKey, p.PubKey)
 }

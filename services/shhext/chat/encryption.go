@@ -3,7 +3,7 @@ package chat
 import (
 	"crypto/ecdsa"
 	"errors"
-	"fmt"
+	"time"
 
 	ecrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
@@ -13,13 +13,16 @@ import (
 	"github.com/status-im/status-go/services/shhext/chat/crypto"
 )
 
-var ErrKeyNotFound = errors.New("Key not found")
+// EncryptionService defines a service that is responsible for the encryption aspect of the protocol
+
+var ErrSessionNotFound = errors.New("Bundle not found")
 
 type EncryptionService struct {
 	log         log.Logger
 	persistence PersistenceServiceInterface
 }
 
+// NewEncryptionService creates a new EncryptionService instance
 func NewEncryptionService(p PersistenceServiceInterface) *EncryptionService {
 	return &EncryptionService{
 		log:         log.New("package", "status-go/services/sshext.chat"),
@@ -27,66 +30,48 @@ func NewEncryptionService(p PersistenceServiceInterface) *EncryptionService {
 	}
 }
 
-func (s *EncryptionService) keyFromX3DH(theirPublicKey *ecdsa.PublicKey, myIdentityKey *ecdsa.PrivateKey) ([]byte, []byte, *ecdsa.PublicKey, error) {
-
-	bundle, err := s.persistence.GetPublicBundle(theirPublicKey)
-
+func (s *EncryptionService) keyFromActiveX3DH(theirPublicKey *ecdsa.PublicKey, myIdentityKey *ecdsa.PrivateKey, theirBundle *Bundle) ([]byte, []byte, *ecdsa.PublicKey, error) {
+	sharedKey, ephemeralPubKey, err := PerformActiveX3DH(theirBundle, myIdentityKey)
 	if err != nil {
 		return nil, nil, nil, err
 	}
 
-	if bundle == nil {
-		return nil, nil, nil, nil
-	}
-
-	key, ephemeralKey, err := PerformActiveX3DH(bundle, myIdentityKey)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	return key, bundle.GetSignedPreKey(), ephemeralKey, nil
+	return sharedKey, theirBundle.GetSignedPreKey(), ephemeralPubKey, nil
 }
 
+// CreateBundle retrieves or creates an X3DH bundle given a private key
 func (s *EncryptionService) CreateBundle(privateKey *ecdsa.PrivateKey) (*Bundle, error) {
-	bundle, err := s.persistence.GetAnyPrivateBundle()
+	bundleContainer, err := s.persistence.GetAnyPrivateBundle()
 	if err != nil {
 		return nil, err
 	}
 
-	if bundle != nil {
-		return bundle, nil
+	// If the bundle has expired we create a new one
+	if bundleContainer != nil && bundleContainer.Timestamp < time.Now().AddDate(0, 0, -14).UnixNano() {
+		// Mark sessions has expired
+		if err := s.persistence.MarkBundleExpired(bundleContainer.GetBundle().GetSignedPreKey(), bundleContainer.GetBundle().GetIdentity()); err != nil {
+			return nil, err
+		}
+
+	} else if bundleContainer != nil {
+		return bundleContainer.GetBundle(), nil
 	}
 
 	// needs transaction/mutex to avoid creating multiple bundles
 	// although not a problem
-	bundleContainer, err := NewBundleContainer(privateKey)
+	bundleContainer, err = NewBundleContainer(privateKey)
 	if err != nil {
 		return nil, err
 	}
 
-	err = s.persistence.AddPrivateBundle(bundleContainer)
-	if err != nil {
+	if err = s.persistence.AddPrivateBundle(bundleContainer); err != nil {
 		return nil, err
 	}
 
 	return bundleContainer.GetBundle(), nil
 }
 
-func (s *EncryptionService) DecryptSymmetricPayload(src *ecdsa.PublicKey, ephemeralKey *ecdsa.PublicKey, payload []byte) ([]byte, error) {
-
-	symmetricKey, err := s.persistence.GetSymmetricKey(src, ephemeralKey)
-	if err != nil {
-		return nil, err
-	}
-
-	if symmetricKey == nil {
-		return nil, ErrKeyNotFound
-	}
-
-	return crypto.DecryptSymmetric(symmetricKey, payload)
-}
-
-// Decrypt message sent with a DH key exchange, throw away the key after decryption
+// DecryptWithDH decrypts message sent with a DH key exchange, and throws away the key after decryption
 func (s *EncryptionService) DecryptWithDH(myIdentityKey *ecdsa.PrivateKey, theirEphemeralKey *ecdsa.PublicKey, payload []byte) ([]byte, error) {
 	key, err := PerformDH(
 		ecies.ImportECDSA(myIdentityKey),
@@ -100,15 +85,21 @@ func (s *EncryptionService) DecryptWithDH(myIdentityKey *ecdsa.PrivateKey, their
 
 }
 
-// Decrypt message sent with a X3DH key exchange, store the key for future exchanges
-func (s *EncryptionService) DecryptWithX3DH(myIdentityKey *ecdsa.PrivateKey, theirIdentityKey *ecdsa.PublicKey, theirEphemeralKey *ecdsa.PublicKey, ourBundleID []byte, payload []byte) ([]byte, error) {
+// keyFromPassiveX3DH decrypts message sent with a X3DH key exchange, storing the key for future exchanges
+func (s *EncryptionService) keyFromPassiveX3DH(myIdentityKey *ecdsa.PrivateKey, theirIdentityKey *ecdsa.PublicKey, theirEphemeralKey *ecdsa.PublicKey, ourBundleID []byte) ([]byte, error) {
 	myBundle, err := s.persistence.GetPrivateBundle(ourBundleID)
 	if err != nil {
+		s.log.Error("Could not get private bundle", "err", err)
 		return nil, err
+	}
+
+	if myBundle == nil {
+		return nil, ErrSessionNotFound
 	}
 
 	signedPreKey, err := ecrypto.ToECDSA(myBundle.GetPrivateSignedPreKey())
 	if err != nil {
+		s.log.Error("Could not convert to ecdsa", "err", err)
 		return nil, err
 	}
 
@@ -119,40 +110,13 @@ func (s *EncryptionService) DecryptWithX3DH(myIdentityKey *ecdsa.PrivateKey, the
 		myIdentityKey,
 	)
 	if err != nil {
+		s.log.Error("Could not perform passive x3dh", "err", err)
 		return nil, err
 	}
-
-	// We encrypt the payload
-	encryptedPayload, err := crypto.DecryptSymmetric(key, payload)
-	if err != nil {
-		return nil, err
-	}
-
-	// And we store the key for later use
-	err = s.persistence.AddSymmetricKey(
-		theirIdentityKey,
-		theirEphemeralKey,
-		key)
-
-	if err != nil {
-		return nil, err
-	}
-	return encryptedPayload, nil
+	return key, nil
 }
 
-const (
-	EncryptionTypeDH   = "dh"
-	EncryptionTypeSym  = "sym"
-	EncryptionTypeX3DH = "x3dh"
-)
-
-type EncryptionResponse struct {
-	EphemeralKey     *ecdsa.PublicKey
-	EncryptionType   string
-	EncryptedPayload []byte
-	BundleID         []byte
-}
-
+// ProcessPublicBundle persists a bundle
 func (s *EncryptionService) ProcessPublicBundle(b *Bundle) error {
 	// Make sure the bundle belongs to who signed it
 	err := VerifyBundle(b)
@@ -163,114 +127,287 @@ func (s *EncryptionService) ProcessPublicBundle(b *Bundle) error {
 	return s.persistence.AddPublicBundle(b)
 }
 
-func buildX3DHHeader(e *EncryptionResponse) *X3DHHeader {
-	ephemeralKey := ecrypto.CompressPubkey(e.EphemeralKey)
-	message := &X3DHHeader{}
-	switch e.EncryptionType {
-	case EncryptionTypeDH:
-		message.EphemeralKey = &X3DHHeader_DhKey{
-			ephemeralKey,
-		}
-	case EncryptionTypeX3DH:
-		message.EphemeralKey = &X3DHHeader_BundleKey{
-			ephemeralKey,
-		}
-		message.BundleId = e.BundleID
-		m, _ := dr.DefaultCrypto{}.GenerateDH()
-		fmt.Printf("%x\n", m)
-	case EncryptionTypeSym:
-		message.EphemeralKey = &X3DHHeader_SymKey{
-			ephemeralKey,
-		}
-
-	}
-
-	return message
-}
-
-func (p *EncryptionService) DecryptPayload(myIdentityKey *ecdsa.PrivateKey, theirIdentityKey *ecdsa.PublicKey, msg *DirectMessageProtocol) ([]byte, error) {
+// DecryptPayload decrypts the payload of a DirectMessageProtocol, given an identity private key and the sender's public key
+func (s *EncryptionService) DecryptPayload(myIdentityKey *ecdsa.PrivateKey, theirIdentityKey *ecdsa.PublicKey, msg *DirectMessageProtocol) ([]byte, error) {
 	payload := msg.GetPayload()
-	header := msg.GetX3DHHeader()
-	// Try Sym Key
-	symKeyID := header.GetSymKey()
-	if symKeyID != nil {
-		decompressedKey, err := ecrypto.DecompressPubkey(symKeyID)
+
+	if x3dhHeader := msg.GetX3DHHeader(); x3dhHeader != nil {
+		bundleID := x3dhHeader.GetId()
+		theirEphemeralKey, err := ecrypto.DecompressPubkey(x3dhHeader.GetKey())
+
 		if err != nil {
 			return nil, err
 		}
-		return p.DecryptSymmetricPayload(theirIdentityKey, decompressedKey, payload)
+
+		symmetricKey, err := s.keyFromPassiveX3DH(myIdentityKey, theirIdentityKey, theirEphemeralKey, bundleID)
+		if err != nil {
+			return nil, err
+		}
+
+		theirIdentityKeyC := ecrypto.CompressPubkey(theirIdentityKey)
+		err = s.persistence.AddRatchetInfo(symmetricKey, theirIdentityKeyC, bundleID, nil)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	// Try X3DH
-	x3dhKey := header.GetBundleKey()
-	bundleID := header.GetBundleId()
-	if x3dhKey != nil {
-		decompressedKey, err := ecrypto.DecompressPubkey(x3dhKey)
+	if drHeader := msg.GetDRHeader(); drHeader != nil {
+		var dh [32]byte
+		copy(dh[:], drHeader.GetKey())
+
+		drMessage := &dr.Message{
+			Header: dr.MessageHeader{
+				N:  drHeader.GetN(),
+				PN: drHeader.GetPn(),
+				DH: dh,
+			},
+			Ciphertext: msg.GetPayload(),
+		}
+
+		theirIdentityKeyC := ecrypto.CompressPubkey(theirIdentityKey)
+
+		drInfo, err := s.persistence.GetRatchetInfo(drHeader.GetId(), theirIdentityKeyC)
 		if err != nil {
+			s.log.Error("Could not get ratchet info", "err", err)
 			return nil, err
 		}
-		return p.DecryptWithX3DH(myIdentityKey, theirIdentityKey, decompressedKey, bundleID, payload)
 
+		// We mark the exchange as successful so we stop sending x3dh header
+		if err = s.persistence.RatchetInfoConfirmed(drHeader.GetId(), theirIdentityKeyC); err != nil {
+			s.log.Error("Could not confirm ratchet info", "err", err)
+			return nil, err
+		}
+
+		if drInfo == nil {
+			s.log.Error("Could not find a session")
+			return nil, ErrSessionNotFound
+		}
+
+		return s.decryptUsingDR(theirIdentityKey, drInfo, drMessage)
 	}
 
 	// Try DH
-	dhKey := header.GetDhKey()
-	if dhKey != nil {
-		decompressedKey, err := ecrypto.DecompressPubkey(dhKey)
+	if header := msg.GetDHHeader(); header != nil {
+		decompressedKey, err := ecrypto.DecompressPubkey(header.GetKey())
 		if err != nil {
 			return nil, err
 		}
-		return p.DecryptWithDH(myIdentityKey, decompressedKey, payload)
-
+		return s.DecryptWithDH(myIdentityKey, decompressedKey, payload)
 	}
 
-	return nil, errors.New("No key specified")
+	return nil, errors.New("no key specified")
 }
 
-func (s *EncryptionService) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, myIdentityKey *ecdsa.PrivateKey, payload []byte) (*DirectMessageProtocol, error) {
-	var symmetricKey []byte
-	// The ephemeral key used to encrypt the payload
-	var ourEphemeralKey *ecdsa.PublicKey
-	// The bundle used
-	var bundleID []byte
+func (s *EncryptionService) encryptUsingDR(theirIdentityKey *ecdsa.PublicKey, drInfo *RatchetInfo, payload []byte) ([]byte, *DRHeader, error) {
+	var err error
 
-	encryptionType := EncryptionTypeSym
+	var session dr.Session
+	var sk [32]byte
+	copy(sk[:], drInfo.Sk)
 
-	// This should be in a transaction or similar
+	var publicKey [32]byte
+	copy(publicKey[:], drInfo.PublicKey[:32])
 
-	// Check if we have already a key established
-	symmetricKey, ourEphemeralKey, err := s.persistence.GetAnySymmetricKey(theirIdentityKey)
+	var privateKey [32]byte
+	copy(privateKey[:], drInfo.PrivateKey[:])
+
+	keyPair := crypto.DHPair{
+		PrvKey: privateKey,
+		PubKey: publicKey,
+	}
+
+	sessionStorage := s.persistence.GetSessionStorage()
+	// Load session from store first
+	session, err = dr.Load(
+		drInfo.ID,
+		sessionStorage,
+		dr.WithKeysStorage(s.persistence.GetKeysStorage()),
+		dr.WithCrypto(crypto.EthereumCrypto{}),
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Create a new one
+	if session == nil {
+
+		if drInfo.PrivateKey != nil {
+			session, err = dr.New(
+				drInfo.ID,
+				sk,
+				keyPair,
+				sessionStorage,
+				dr.WithKeysStorage(s.persistence.GetKeysStorage()),
+				dr.WithCrypto(crypto.EthereumCrypto{}))
+		} else {
+			session, err = dr.NewWithRemoteKey(
+				drInfo.ID,
+				sk,
+				publicKey,
+				sessionStorage,
+				dr.WithKeysStorage(s.persistence.GetKeysStorage()),
+				dr.WithCrypto(crypto.EthereumCrypto{}))
+		}
+	}
+
+	if err != nil {
+		return nil, nil, err
+	}
+
+	response, err := session.RatchetEncrypt(payload, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	header := &DRHeader{
+		Id:  drInfo.BundleID,
+		Key: response.Header.DH[:],
+		N:   response.Header.N,
+		Pn:  response.Header.PN,
+	}
+
+	return response.Ciphertext, header, nil
+}
+
+func (s *EncryptionService) decryptUsingDR(theirIdentityKey *ecdsa.PublicKey, drInfo *RatchetInfo, payload *dr.Message) ([]byte, error) {
+	var err error
+
+	var session dr.Session
+	var sk [32]byte
+	copy(sk[:], drInfo.Sk)
+
+	var publicKey [32]byte
+	copy(publicKey[:], drInfo.PublicKey[:32])
+
+	var privateKey [32]byte
+	copy(privateKey[:], drInfo.PrivateKey[:])
+
+	keyPair := crypto.DHPair{
+		PrvKey: privateKey,
+		PubKey: publicKey,
+	}
+
+	sessionStorage := s.persistence.GetSessionStorage()
+	session, err = dr.Load(
+		drInfo.ID,
+		sessionStorage,
+		dr.WithKeysStorage(s.persistence.GetKeysStorage()),
+		dr.WithCrypto(crypto.EthereumCrypto{}),
+	)
+
 	if err != nil {
 		return nil, err
 	}
 
-	// If not there try with a bundle and store the key
-	if symmetricKey == nil {
-		encryptionType = EncryptionTypeX3DH
-		symmetricKey, bundleID, ourEphemeralKey, err = s.keyFromX3DH(theirIdentityKey, myIdentityKey)
+	if session == nil {
+		if drInfo.PrivateKey != nil {
+			session, err = dr.New(
+				drInfo.ID,
+				sk,
+				keyPair,
+				sessionStorage,
+				dr.WithKeysStorage(s.persistence.GetKeysStorage()),
+				dr.WithCrypto(crypto.EthereumCrypto{}))
+		} else {
+			session, err = dr.NewWithRemoteKey(
+				drInfo.ID,
+				sk,
+				publicKey,
+				sessionStorage,
+				dr.WithKeysStorage(s.persistence.GetKeysStorage()),
+				dr.WithCrypto(crypto.EthereumCrypto{}))
+		}
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	plaintext, err := session.RatchetDecrypt(*payload, nil)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return plaintext, nil
+}
+
+// EncryptPayload returns a new DirectMessageProtocol with a given payload encrypted, given a recipient's public key and the sender private identity key
+func (s *EncryptionService) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, myIdentityKey *ecdsa.PrivateKey, payload []byte) (*DirectMessageProtocol, error) {
+	theirIdentityKeyC := ecrypto.CompressPubkey(theirIdentityKey)
+
+	// See if a session is there already
+	drInfo, err := s.persistence.GetAnyRatchetInfo(theirIdentityKeyC)
+	if err != nil {
+		return nil, err
+	}
+
+	if drInfo != nil {
+		encryptedPayload, drHeader, err := s.encryptUsingDR(theirIdentityKey, drInfo, payload)
 		if err != nil {
 			return nil, err
 		}
 
-		if ourEphemeralKey != nil {
-			err = s.persistence.AddSymmetricKey(theirIdentityKey, ourEphemeralKey, symmetricKey)
+		dmp := DirectMessageProtocol{
+			Payload:  encryptedPayload,
+			DRHeader: drHeader,
+		}
+
+		if drInfo.EphemeralKey != nil {
+			dmp.X3DHHeader = &X3DHHeader{
+				Key: drInfo.EphemeralKey,
+				Id:  drInfo.BundleID,
+			}
+		}
+
+		return &dmp, nil
+	}
+
+	// check if a bundle is there
+	theirBundle, err := s.persistence.GetPublicBundle(theirIdentityKey)
+	if err != nil {
+		return nil, err
+	}
+
+	if theirBundle != nil {
+		sharedKey, theirBundleSignedPreKey, ourEphemeralKey, err := s.keyFromActiveX3DH(theirIdentityKey, myIdentityKey, theirBundle)
+		if err != nil {
+			return nil, err
+		}
+		theirIdentityKeyC := ecrypto.CompressPubkey(theirIdentityKey)
+		ourEphemeralKeyC := ecrypto.CompressPubkey(ourEphemeralKey)
+
+		err = s.persistence.AddRatchetInfo(sharedKey, theirIdentityKeyC, theirBundle.GetSignedPreKey(), ourEphemeralKeyC)
+		if err != nil {
+			return nil, err
+		}
+
+		x3dhHeader := &X3DHHeader{
+			Key: ourEphemeralKeyC,
+			Id:  theirBundleSignedPreKey,
+		}
+
+		drInfo, err := s.persistence.GetAnyRatchetInfo(theirIdentityKeyC)
+		if err != nil {
+			return nil, err
+		}
+
+		if drInfo != nil {
+			encryptedPayload, drHeader, err := s.encryptUsingDR(theirIdentityKey, drInfo, payload)
 			if err != nil {
 				return nil, err
 			}
+
+			return &DirectMessageProtocol{
+				Payload:    encryptedPayload,
+				X3DHHeader: x3dhHeader,
+				DRHeader:   drHeader,
+			}, nil
 		}
-	}
-	if err != nil {
-		return nil, err
 	}
 
 	// keys from DH should not be re-used, so we don't store them
-	if symmetricKey == nil {
-		encryptionType = EncryptionTypeDH
-		symmetricKey, ourEphemeralKey, err = PerformActiveDH(theirIdentityKey)
-		if err != nil {
-			return nil, err
-		}
-	}
+	symmetricKey, ourEphemeralKey, err := PerformActiveDH(theirIdentityKey)
 	if err != nil {
 		return nil, err
 	}
@@ -280,16 +417,9 @@ func (s *EncryptionService) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, my
 		return nil, err
 	}
 
-	encryptionResponse := &EncryptionResponse{
-		EncryptedPayload: encryptedPayload,
-		EphemeralKey:     ourEphemeralKey,
-		EncryptionType:   encryptionType,
-		BundleID:         bundleID,
-	}
-
 	return &DirectMessageProtocol{
-		Encryption: &DirectMessageProtocol_X3DHHeader{
-			buildX3DHHeader(encryptionResponse),
+		DHHeader: &DHHeader{
+			Key: ecrypto.CompressPubkey(ourEphemeralKey),
 		},
 		Payload: encryptedPayload,
 	}, nil

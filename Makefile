@@ -202,9 +202,13 @@ setup: dep-install lint-install mock-install update-fleet-config ##@other Prepar
 generate: ##@other Regenerate assets and other auto-generated stuff
 	go generate ./static
 
+protoc-install:
+	apt install -y protobuf-compiler
+
 mock-install: ##@other Install mocking tools
 	go get -u github.com/kevinburke/go-bindata/go-bindata
 	go get -u github.com/golang/mock/mockgen
+	go get -u github.com/golang/protobuf/protoc-gen-go
 
 mock: ##@other Regenerate mocks
 	mockgen -package=fcm          -destination=notifications/push/fcm/client_mock.go -source=notifications/push/fcm/client.go
@@ -212,6 +216,7 @@ mock: ##@other Regenerate mocks
 	mockgen -package=account      -destination=account/accounts_mock.go              -source=account/accounts.go
 	mockgen -package=status       -destination=services/status/account_mock.go       -source=services/status/service.go
 	mockgen -package=peer         -destination=services/peer/discoverer_mock.go      -source=services/peer/service.go
+	$(shell cd ./services/shhext/chat && exec protoc --go_out=. ./*.proto)
 
 docker-test: ##@tests Run tests in a docker container with golang.
 	docker run --privileged --rm -it -v "$(shell pwd):$(DOCKER_TEST_WORKDIR)" -w "$(DOCKER_TEST_WORKDIR)" $(DOCKER_TEST_IMAGE) go test ${ARGS}
@@ -253,8 +258,10 @@ lint:
 	@echo "lint"
 	@golangci-lint run ./...
 
-ci: lint mock dep-ensure test-unit test-e2e ##@tests Run all linters and tests at once
+ci: clean-vendor lint mock dep-ensure test-unit test-e2e ##@tests Run all linters and tests at once
 
+clean-vendor:
+	rm -fr .vendor-new
 clean: ##@other Cleanup
 	rm -fr build/bin/*
 

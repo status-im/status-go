@@ -3,18 +3,26 @@ syntax = "proto3";
 package chat;
 
 // What is sent through the wire
-// Rename to ChatMessagePayload?
-message OneToOnePayload {
+message ChatMessagePayload {
+  // Message content
   string content = 1;
+  // MIME type
   string content_type = 2;
+  // Message type
   string message_type = 3;
+  // Sender's clock value for message ordering
   double clock_value = 4;
 }
 
+// ContactUpdatePayload is sent when a user updates its profile
 message ContactUpdatePayload {
+  // Contact display name
   string name = 1;
+  // Contact profile image, using the data URI scheme (e.g. "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACgAAAAoCAMAAAC7IEhfAAA...")
   string profile_image = 2;
+  // Contact address
   string address = 3;
+  // Contact Firebase Cloud Messaging token
   string fcm_token = 4;
 }
 
@@ -23,7 +31,7 @@ message OneToOneRPC {
   string src = 1;
   string dst = 2;
   bytes payload = 3;
-  //OneToOnePayload payload = 3;
+  //ChatMessagePayload payload = 3;
 }
 
 message ContactUpdateRPC {
@@ -36,7 +44,7 @@ message ContactUpdateRPC {
 message ChatProtocolMessage {
   bytes payload = 1;
   //oneof payload {
-  //  OneToOnePayload one_to_one_payload = 1;
+  //  ChatMessagePayload one_to_one_payload = 1;
   //  ContactUpdatePayload contact_updated_payload = 2;
   //}
 }

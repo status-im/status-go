@@ -3,11 +3,9 @@ package chat
 import (
 	"testing"
 
-	"encoding/hex"
-
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -15,9 +13,7 @@ const (
 	aliceEphemeralKey = "11111111111111111111111111111111"
 	bobPrivateKey     = "22222222222222222222222222222222"
 	bobSignedPreKey   = "33333333333333333333333333333333"
-
-	jsonBundle          = "{\"identity\":\"ApCZnbv0MDS/+x3VPqwetMM6TqHE9Iulhc/eODCEDwVV\",\"signedPreKey\":\"AjxyrdtP3wmvlPDJTX/pKjhqfnDPih2FkWOGuyU1x7Gx\",\"signature\":\"P1ax7dSQmCjr/UfPFB8dxk0FowfSP7R7KV8F/WuimwtnvJkz3yT+oNDdlbm4ddDjOFjwTVDscPK2qbraTkkg9gA=\"}"
-	jsonBundleContainer = "{\"bundle\":{\"identity\":\"ApCZnbv0MDS/+x3VPqwetMM6TqHE9Iulhc/eODCEDwVV\",\"signedPreKey\":\"AjxyrdtP3wmvlPDJTX/pKjhqfnDPih2FkWOGuyU1x7Gx\",\"signature\":\"P1ax7dSQmCjr/UfPFB8dxk0FowfSP7R7KV8F/WuimwtnvJkz3yT+oNDdlbm4ddDjOFjwTVDscPK2qbraTkkg9gA=\"},\"privateSignedPreKey\":\"MzAzMDMwMzAzMDMwMzAzMDMwMzAzMDMwMzAzMDMwMzAzMDMwMzAzMDMwMzAzMDMwMzAzMDMwMzAzMDMwMzAzMA==\"}"
+	base64Bundle      = "CiECkJmdu/QwNL/7HdU+rB60wzpOocT0i6WFz944MIQPBVUSIQI8cq3bT98Jr5TwyU1/6So4an5wz4odhZFjhrslNcexsRpBP1ax7dSQmCjr/UfPFB8dxk0FowfSP7R7KV8F/WuimwtnvJkz3yT+oNDdlbm4ddDjOFjwTVDscPK2qbraTkkg9gA="
 )
 
 var sharedKey = []byte{0xa4, 0xe9, 0x23, 0xd0, 0xaf, 0x8f, 0xe7, 0x8a, 0x5, 0x63, 0x63, 0xbe, 0x20, 0xe7, 0x1c, 0xa, 0x58, 0xe5, 0x69, 0xea, 0x8f, 0xc1, 0xf7, 0x92, 0x89, 0xec, 0xa1, 0xd, 0x9f, 0x68, 0x13, 0x3a}
@@ -51,24 +47,22 @@ func bobBundle() (*Bundle, error) {
 
 func TestNewBundleContainer(t *testing.T) {
 	privateKey, err := crypto.ToECDSA([]byte(alicePrivateKey))
-
-	assert.Nil(t, err, "Private key should be generated without errors")
+	require.NoError(t, err, "Private key should be generated without errors")
 
 	bundleContainer, err := NewBundleContainer(privateKey)
-	assert.Nil(t, err, "Bundle container should be created successfully")
+	require.NoError(t, err, "Bundle container should be created successfully")
 
 	bundle := bundleContainer.Bundle
-
-	assert.Nil(t, err, "Bundle should be generated without errors")
+	require.NotNil(t, bundle, "Bundle should be generated without errors")
 
 	recoveredPublicKey, err := crypto.SigToPub(
 		crypto.Keccak256(bundle.GetSignedPreKey()),
 		bundle.Signature,
 	)
 
-	assert.Nil(t, err, "Public key should be recovered from the bundle successfully")
+	require.NoError(t, err, "Public key should be recovered from the bundle successfully")
 
-	assert.Equalf(
+	require.Equal(
 		t,
 		&privateKey.PublicKey,
 		recoveredPublicKey,
@@ -76,42 +70,27 @@ func TestNewBundleContainer(t *testing.T) {
 	)
 }
 
-func TestToJSON(t *testing.T) {
-	privateKey, err := crypto.ToECDSA([]byte(alicePrivateKey))
-	assert.Nil(t, err, "Key should be generated without errors")
-
-	encodedKey := []byte(hex.EncodeToString(crypto.FromECDSA(privateKey)))
-
+func TestToBase64(t *testing.T) {
 	bundle, err := bobBundle()
-	assert.Nil(t, err, "Test bundle should be generated without errors")
+	require.NoError(t, err, "Test bundle should be generated without errors")
 
-	bundleContainer := BundleContainer{
-		Bundle:              bundle,
-		PrivateSignedPreKey: encodedKey,
-	}
-
-	actualJSONBundleContainer, err := bundleContainer.ToJSON()
-
-	assert.Nil(t, err, "no error should be reported")
-
-	assert.Equalf(
+	actualBase64Bundle, err := bundle.ToBase64()
+	require.NoError(t, err, "No error should be reported")
+	require.Equal(
 		t,
-		jsonBundleContainer,
-		actualJSONBundleContainer,
+		base64Bundle,
+		actualBase64Bundle,
 		"The correct bundle should be generated",
 	)
 }
 
-func TestFromJSON(t *testing.T) {
-
+func TestFromBase64(t *testing.T) {
 	expectedBundle, err := bobBundle()
-	assert.Nil(t, err, "Test bundle should be generated without errors")
+	require.NoError(t, err, "Test bundle should be generated without errors")
 
-	actualBundle, err := FromJSON(jsonBundle)
-
-	assert.Nil(t, err, "Bundle should be unmarshaled without errors")
-
-	assert.Equalf(
+	actualBundle, err := FromBase64(base64Bundle)
+	require.NoError(t, err, "Bundle should be unmarshaled without errors")
+	require.Equal(
 		t,
 		expectedBundle,
 		actualBundle,
@@ -119,20 +98,41 @@ func TestFromJSON(t *testing.T) {
 	)
 }
 
+func TestExtractIdentity(t *testing.T) {
+	privateKey, err := crypto.ToECDSA([]byte(alicePrivateKey))
+	require.NoError(t, err, "Private key should be generated without errors")
+
+	bundleContainer, err := NewBundleContainer(privateKey)
+	require.NoError(t, err, "Bundle container should be created successfully")
+
+	bundle := bundleContainer.Bundle
+	require.NotNil(t, bundle, "Bundle should be generated without errors")
+
+	recoveredPublicKey, err := ExtractIdentity(bundle)
+
+	require.NoError(t, err, "Public key should be recovered from the bundle successfully")
+
+	require.Equal(
+		t,
+		"0x042ed557f5ad336b31a49857e4e9664954ac33385aa20a93e2d64bfe7f08f51277bcb27c1259f802a52ed3ea7ac939043f0cc864e27400294bf121f23877995852",
+		recoveredPublicKey,
+		"The correct public key should be recovered",
+	)
+}
+
 // Alice wants to send a message to Bob
 func TestX3dhActive(t *testing.T) {
-
 	bobIdentityKey, err := crypto.ToECDSA([]byte(bobPrivateKey))
-	assert.Nil(t, err, "Bundle identity key should be generated without errors")
+	require.NoError(t, err, "Bundle identity key should be generated without errors")
 
 	bobSignedPreKey, err := crypto.ToECDSA([]byte(bobSignedPreKey))
-	assert.Nil(t, err, "Bundle signed pre key should be generated without errors")
+	require.NoError(t, err, "Bundle signed pre key should be generated without errors")
 
 	aliceIdentityKey, err := crypto.ToECDSA([]byte(alicePrivateKey))
-	assert.Nil(t, err, "private key should be generated without errors")
+	require.NoError(t, err, "Private key should be generated without errors")
 
 	aliceEphemeralKey, err := crypto.ToECDSA([]byte(aliceEphemeralKey))
-	assert.Nil(t, err, "ephemeral key should be generated without errors")
+	require.NoError(t, err, "Ephemeral key should be generated without errors")
 
 	x3dh, err := x3dhActive(
 		ecies.ImportECDSA(aliceIdentityKey),
@@ -140,25 +140,23 @@ func TestX3dhActive(t *testing.T) {
 		ecies.ImportECDSA(aliceEphemeralKey),
 		ecies.ImportECDSAPublic(&bobIdentityKey.PublicKey),
 	)
-
-	assert.Nil(t, err, "Shared key should be generated without errors")
-	assert.Equalf(t, sharedKey, x3dh, "Should generate the correct key")
+	require.NoError(t, err, "Shared key should be generated without errors")
+	require.Equal(t, sharedKey, x3dh, "Should generate the correct key")
 }
 
 // Bob receives a message from Alice
-func TestPerformX3DHPassive(t *testing.T) {
-
+func TestPerformPassiveX3DH(t *testing.T) {
 	alicePrivateKey, err := crypto.ToECDSA([]byte(alicePrivateKey))
-	assert.Nil(t, err, "Private key should be generated without errors")
+	require.NoError(t, err, "Private key should be generated without errors")
 
 	bobSignedPreKey, err := crypto.ToECDSA([]byte(bobSignedPreKey))
-	assert.Nil(t, err, "Private key should be generated without errors")
+	require.NoError(t, err, "Private key should be generated without errors")
 
 	aliceEphemeralKey, err := crypto.ToECDSA([]byte(aliceEphemeralKey))
-	assert.Nil(t, err, "ephemeral key should be generated without errors")
+	require.NoError(t, err, "Ephemeral key should be generated without errors")
 
 	bobPrivateKey, err := crypto.ToECDSA([]byte(bobPrivateKey))
-	assert.Nil(t, err, "Private key should be generated without errors")
+	require.NoError(t, err, "Private key should be generated without errors")
 
 	x3dh, err := PerformPassiveX3DH(
 		&alicePrivateKey.PublicKey,
@@ -166,23 +164,19 @@ func TestPerformX3DHPassive(t *testing.T) {
 		&aliceEphemeralKey.PublicKey,
 		bobPrivateKey,
 	)
-
-	assert.Nil(t, err, "Shared key should be generated without errors")
-	assert.Equalf(t, sharedKey, x3dh, "Should generate the correct key")
+	require.NoError(t, err, "Shared key should be generated without errors")
+	require.Equal(t, sharedKey, x3dh, "Should generate the correct key")
 }
 
 func TestPerformActiveX3DH(t *testing.T) {
 	bundle, err := bobBundle()
-
-	assert.Nil(t, err, "Test bundle should be generated without errors")
+	require.NoError(t, err, "Test bundle should be generated without errors")
 
 	privateKey, err := crypto.ToECDSA([]byte(bobPrivateKey))
-
-	assert.Nil(t, err, "Private key should be imported without errors")
+	require.NoError(t, err, "Private key should be imported without errors")
 
 	actualSharedSecret, actualEphemeralKey, err := PerformActiveX3DH(bundle, privateKey)
-
-	assert.Nil(t, err, "no error should be reported")
-	assert.NotNil(t, actualEphemeralKey, "An ephemeral key-pair should be generated")
-	assert.NotNil(t, actualSharedSecret, "A shared key should be generated")
+	require.NoError(t, err, "No error should be reported")
+	require.NotNil(t, actualEphemeralKey, "An ephemeral key-pair should be generated")
+	require.NotNil(t, actualSharedSecret, "A shared key should be generated")
 }

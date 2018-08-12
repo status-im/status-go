@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"os"
 	"testing"
 	"time"
 
@@ -80,7 +81,7 @@ func (s *ShhExtSuite) SetupTest() {
 		s.NoError(stack.Register(func(n *node.ServiceContext) (node.Service, error) {
 			return s.whisper[i], nil
 		}))
-		s.services[i] = New(s.whisper[i], nil, nil, true)
+		s.services[i] = New(s.whisper[i], nil, nil, os.TempDir(), true)
 		s.NoError(stack.Register(func(n *node.ServiceContext) (node.Service, error) {
 			return s.services[i], nil
 		}))
@@ -163,7 +164,7 @@ func (s *ShhExtSuite) TestRequestMessagesErrors() {
 	defer func() { s.NoError(aNode.Stop()) }()
 
 	mock := newHandlerMock(1)
-	service := New(shh, mock, nil, false)
+	service := New(shh, mock, nil, os.TempDir(), false)
 	api := NewPublicAPI(service)
 
 	const (
@@ -223,7 +224,7 @@ func (s *ShhExtSuite) TestRequestMessagesSuccess() {
 	defer func() { err := aNode.Stop(); s.NoError(err) }()
 
 	mock := newHandlerMock(1)
-	service := New(shh, mock, nil, false)
+	service := New(shh, mock, nil, os.TempDir(), false)
 	api := NewPublicAPI(service)
 
 	// with a peer acting as a mailserver

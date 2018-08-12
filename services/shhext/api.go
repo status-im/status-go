@@ -218,6 +218,18 @@ func (api *PublicAPI) GetNewFilterMessages(filterID string) ([]*whisper.Message,
 
 		payload, err := api.service.protocol.HandleMessage(privateKey, publicKey, msg.Payload)
 
+		if err != nil {
+			api.log.Error("Failed handling message with error", "err", err)
+		}
+
+		// Notify that someone tried to contact us using an invalid bundle
+		if err == chat.ErrSessionNotFound {
+			api.log.Warn("Session not found, sending signal", "err", err)
+			keyString := fmt.Sprintf("0x%x", crypto.FromECDSAPub(publicKey))
+			handler := EnvelopeSignalHandler{}
+			handler.DecryptMessageFailed(keyString)
+		}
+
 		// Ignore errors for now
 		if err == nil {
 			msg.Payload = payload
@@ -234,10 +246,9 @@ func (api *PublicAPI) ConfirmMessagesProcessed(messages []*whisper.Message) erro
 	return api.service.deduplicator.AddMessages(messages)
 }
 
+// SendPublicMessage sends a public chat message to the underlying transport
 func (api *PublicAPI) SendPublicMessage(ctx context.Context, msg chat.SendPublicMessageRPC) (hexutil.Bytes, error) {
-	fmt.Printf("%s\n", msg.Sig)
 	privateKey, err := api.service.w.GetPrivateKey(msg.Sig)
-	fmt.Printf("%s\n", privateKey)
 	if err != nil {
 		return nil, err
 	}
@@ -249,19 +260,19 @@ func (api *PublicAPI) SendPublicMessage(ctx context.Context, msg chat.SendPublic
 	}
 
 	symKeyID, err := api.service.w.AddSymKeyFromPassword(msg.Chat)
-
-	// Enrich with transport layer info
-	whisperMessage := chat.PublicMessageToWhisper(&msg, protocolMessage)
 	if err != nil {
 		return nil, err
 	}
 
+	// Enrich with transport layer info
+	whisperMessage := chat.PublicMessageToWhisper(&msg, protocolMessage)
 	whisperMessage.SymKeyID = symKeyID
 
 	// And dispatch
 	return api.Post(ctx, *whisperMessage)
 }
 
+// SendDirectMessage sends a 1:1 chat message to the underlying transport
 func (api *PublicAPI) SendDirectMessage(ctx context.Context, msg chat.SendDirectMessageRPC) (hexutil.Bytes, error) {
 
 	// To be completely agnostic from whisper we should not be using whisper to store the key
@@ -275,7 +286,7 @@ func (api *PublicAPI) SendDirectMessage(ctx context.Context, msg chat.SendDirect
 		return nil, err
 	}
 
-	// This is transport layer agnostic
+	// This is transport layer-agnostic
 	protocolMessage, err := api.service.protocol.BuildDirectMessage(privateKey, publicKey, msg.Payload)
 	if err != nil {
 		return nil, err

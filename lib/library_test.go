@@ -39,6 +39,7 @@ func TestValidateNodeConfig(t *testing.T) {
 			Config: `{
 				"NetworkId": 1,
 				"DataDir": "/tmp",
+				"NoBackupDataDir": "/tmp",
 				"KeyStoreDir": "/tmp",
 				"NoDiscovery": true,
 				"WhisperConfig": {
@@ -76,10 +77,29 @@ func TestValidateNodeConfig(t *testing.T) {
 			},
 		},
 		{
+			Name: "response for config missing NoBackupDataDir",
+			Config: `{
+				"NetworkId": 3,
+				"DataDir": "/tmp",
+				"KeyStoreDir": "/tmp",
+				"NoDiscovery": true,
+				"WhisperConfig": {
+					"Enabled": false
+				}
+			}`,
+			Callback: func(resp APIDetailedResponse) {
+				require.False(t, resp.Status)
+				require.Equal(t, 1, len(resp.FieldErrors))
+				require.Equal(t, resp.FieldErrors[0].Parameter, "NodeConfig.NoBackupDataDir")
+				require.Contains(t, resp.Message, "validation: validation failed")
+			},
+		},
+		{
 			Name: "response for config missing KeyStoreDir",
 			Config: `{
 				"NetworkId": 3,
 				"DataDir": "/tmp",
+				"NoBackupDataDir": "/tmp",
 				"NoDiscovery": true,
 				"WhisperConfig": {
 					"Enabled": false
@@ -97,6 +117,7 @@ func TestValidateNodeConfig(t *testing.T) {
 			Config: `{
 				"NetworkId": 3,
 				"DataDir": "/tmp",
+				"NoBackupDataDir": "/tmp",
 				"KeyStoreDir": "/tmp",
 				"NoDiscovery": true,
 				"WhisperConfig": {
@@ -115,6 +136,7 @@ func TestValidateNodeConfig(t *testing.T) {
 			Config: `{
 				"NetworkId": 3,
 				"DataDir": "/tmp",
+				"NoBackupDataDir": "/tmp",
 				"KeyStoreDir": "/tmp",
 				"NoDiscovery": true,
 				"WhisperConfig": {
