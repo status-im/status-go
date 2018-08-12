@@ -1,5 +1,8 @@
 package main
 
+/*
+#include <stdlib.h>
+*/
 import "C"
 import (
 	"encoding/json"
@@ -34,7 +37,9 @@ func GenerateConfig(datadir *C.char, networkID C.int) *C.char {
 		return makeJSONResponse(err)
 	}
 
-	return C.CString(string(outBytes))
+	str := C.CString(string(outBytes))
+	C.free(unsafe.Pointer(str))
+	return str
 }
 
 //StartNode - start Status node
@@ -101,7 +106,9 @@ func ValidateNodeConfig(configJSON *C.char) *C.char {
 		return makeJSONResponse(err)
 	}
 
-	return C.CString(string(respJSON))
+	str := C.CString(string(respJSON))
+	C.free(unsafe.Pointer(str))
+	return str
 }
 
 //ResetChainData remove chain data from data directory
@@ -115,14 +122,18 @@ func ResetChainData() *C.char {
 //export CallRPC
 func CallRPC(inputJSON *C.char) *C.char {
 	outputJSON := statusBackend.CallRPC(C.GoString(inputJSON))
-	return C.CString(outputJSON)
+	str := C.CString(outputJSON)
+	C.free(unsafe.Pointer(str))
+	return str
 }
 
 //CallPrivateRPC calls both public and private APIs via RPC
 //export CallPrivateRPC
 func CallPrivateRPC(inputJSON *C.char) *C.char {
 	outputJSON := statusBackend.CallPrivateRPC(C.GoString(inputJSON))
-	return C.CString(outputJSON)
+	str := C.CString(outputJSON)
+	C.free(unsafe.Pointer(str))
+	return str
 }
 
 //CreateAccount is equivalent to creating an account from the command line,
@@ -144,7 +155,9 @@ func CreateAccount(password *C.char) *C.char {
 		Error:    errString,
 	}
 	outBytes, _ := json.Marshal(out)
-	return C.CString(string(outBytes))
+	str := C.CString(string(outBytes))
+	C.free(unsafe.Pointer(str))
+	return str
 }
 
 //CreateChildAccount creates sub-account
@@ -164,7 +177,9 @@ func CreateChildAccount(parentAddress, password *C.char) *C.char {
 		Error:   errString,
 	}
 	outBytes, _ := json.Marshal(out)
-	return C.CString(string(outBytes))
+	str := C.CString(string(outBytes))
+	C.free(unsafe.Pointer(str))
+	return str
 }
 
 //RecoverAccount re-creates master key using given details
@@ -185,7 +200,9 @@ func RecoverAccount(password, mnemonic *C.char) *C.char {
 		Error:    errString,
 	}
 	outBytes, _ := json.Marshal(out)
-	return C.CString(string(outBytes))
+	str := C.CString(string(outBytes))
+	C.free(unsafe.Pointer(str))
+	return str
 }
 
 //VerifyAccountPassword verifies account password
@@ -248,7 +265,9 @@ func prepareApproveSignRequestResponse(result sign.Result, id *C.char) *C.char {
 		return makeJSONResponse(err)
 	}
 
-	return C.CString(string(outBytes))
+	str := C.CString(string(outBytes))
+	C.free(unsafe.Pointer(str))
+	return str
 }
 
 //ApproveSignRequests instructs backend to complete sending of multiple transactions
@@ -287,7 +306,9 @@ func ApproveSignRequests(ids, password *C.char) *C.char {
 		return makeJSONResponse(err)
 	}
 
-	return C.CString(string(outBytes))
+	str := C.CString(string(outBytes))
+	C.free(unsafe.Pointer(str))
+	return str
 }
 
 //DiscardSignRequest discards a given transaction from transaction queue
@@ -311,7 +332,9 @@ func DiscardSignRequest(id *C.char) *C.char {
 		return makeJSONResponse(err)
 	}
 
-	return C.CString(string(outBytes))
+	str := C.CString(string(outBytes))
+	C.free(unsafe.Pointer(str))
+	return str
 }
 
 //DiscardSignRequests discards given multiple transactions from transaction queue
@@ -346,7 +369,9 @@ func DiscardSignRequests(ids *C.char) *C.char {
 		return makeJSONResponse(err)
 	}
 
-	return C.CString(string(outBytes))
+	str := C.CString(string(outBytes))
+	C.free(unsafe.Pointer(str))
+	return str
 }
 
 //StartCPUProfile runs pprof for cpu
@@ -382,7 +407,9 @@ func makeJSONResponse(err error) *C.char {
 	}
 	outBytes, _ := json.Marshal(out)
 
-	return C.CString(string(outBytes))
+	str := C.CString(string(outBytes))
+	C.free(unsafe.Pointer(str))
+	return str
 }
 
 // NotifyUsers sends push notifications by given tokens.
@@ -408,6 +435,7 @@ func NotifyUsers(message, payloadJSON, tokensArray *C.char) (outCBytes *C.char) 
 		}
 
 		outCBytes = C.CString(string(outBytes))
+		C.free(unsafe.Pointer(outCBytes))
 	}()
 
 	tokens, err := ParseJSONArray(C.GoString(tokensArray))
