@@ -18,7 +18,7 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/storage"
 )
 
-func TestRendezvousDiscovery(t *testing.T) {
+func makeTestRendezvousServer(t *testing.T) *server.Server {
 	priv, _, err := lcrypto.GenerateKeyPair(lcrypto.Secp256k1, 0)
 	require.NoError(t, err)
 	laddr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/127.0.0.1/tcp/7777"))
@@ -27,8 +27,12 @@ func TestRendezvousDiscovery(t *testing.T) {
 	require.NoError(t, err)
 	srv := server.NewServer(laddr, priv, server.NewStorage(db))
 	require.NoError(t, srv.Start())
-	defer srv.Stop()
+	return srv
+}
 
+func TestRendezvousDiscovery(t *testing.T) {
+	srv := makeTestRendezvousServer(t)
+	defer srv.Stop()
 	identity, err := crypto.GenerateKey()
 	require.NoError(t, err)
 	node := discover.NewNode(discover.PubkeyID(&identity.PublicKey), net.IP{10, 10, 10, 10}, 10, 20)
