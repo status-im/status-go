@@ -19,7 +19,7 @@ type Verifier struct {
 
 // NewVerifier returns a new Verifier instance.
 func NewVerifier(contractCaller bind.ContractCaller, contractAddress common.Address) (*Verifier, error) {
-	logger.Debug("initializing mailserver registry verifier", "address", fmt.Sprintf("%x", contractAddress))
+	logger.Debug("initializing mailserver registry verifier", "address", contractAddress.Hash())
 	rc, err := NewRegistryCaller(contractAddress, contractCaller)
 	if err != nil {
 		logger.Debug("error initializing mailserver registry verifier", "address", fmt.Sprintf("%x", contractAddress))
