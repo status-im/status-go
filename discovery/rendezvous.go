@@ -104,8 +104,8 @@ func (r *Rendezvous) Register(topic string, stop chan struct{}) error {
 
 // Discover will search for new records every time period fetched from period channel.
 func (r *Rendezvous) Discover(
-	topic string, period <-chan time.Duration,
-	found chan<- *discv5.Node, lookup chan<- bool) error {
+	topic string, period <-chan time.Duration, found chan<- *discv5.Node, lookup chan<- bool,
+) error {
 	ticker := time.NewTicker(<-period)
 	for {
 		select {
@@ -117,6 +117,17 @@ func (r *Rendezvous) Discover(
 			ticker = time.NewTicker(newPeriod)
 		case <-ticker.C:
 			srv := r.servers[rand.Intn(len(r.servers))]
+			// Having a deadline longer than `ticker` period may lead to a situation
+			// when other cases are never checked. Hence, make sure that `period`
+			// is still open.
+			select {
+			case _, ok := <-period:
+				if !ok {
+					ticker.Stop()
+					return nil
+				}
+			default:
+			}
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			r.mu.RLock()
 			records, err := r.client.Discover(ctx, srv, topic, r.bucketSize)

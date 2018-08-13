@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sync"
 	"time"
 
@@ -226,6 +227,12 @@ func (n *StatusNode) startDiscovery() error {
 	} else {
 		n.discovery = discoveries[0]
 	}
+	log.Debug(
+		"using discovery",
+		"instance", reflect.TypeOf(n.discovery),
+		"registerTopics", n.config.RegisterTopics,
+		"requireTopics", n.config.RequireTopics,
+	)
 	n.register = peers.NewRegister(n.discovery, n.config.RegisterTopics...)
 	options := peers.NewDefaultOptions()
 	// TODO(dshulyak) consider adding a flag to define this behaviour
