@@ -689,12 +689,15 @@ func (c *NodeConfig) updateRelativeDirsConfig() error {
 
 // updatePeerLimits will set default peer limits expectations based on enabled services.
 func (c *NodeConfig) updatePeerLimits() {
-	if c.NoDiscovery {
+	if c.NoDiscovery && !c.Rendezvous {
 		return
 	}
 	if c.WhisperConfig.Enabled {
 		c.RequireTopics[WhisperDiscv5Topic] = WhisperDiscv5Limits
 		// TODO(dshulyak) register mailserver limits when we will change how they are handled.
+	}
+	if c.LightEthConfig.Enabled {
+		c.RequireTopics[discv5.Topic(LesTopic(int(c.NetworkID)))] = LesDiscoveryLimits
 	}
 }
 
