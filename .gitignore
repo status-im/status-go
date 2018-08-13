@@ -66,3 +66,4 @@ Session.vim
 .undodir/*
 /.idea/
 /.vscode/
+/cmd/*/.ethereum/

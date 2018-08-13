@@ -87,6 +87,10 @@ bootnode: ##@build Build discovery v5 bootnode using status-go deps
 	go build -i -o $(GOBIN)/bootnode -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/bootnode/
 	@echo "Compilation done."
 
+mailserver-canary: ##@build Build mailserver canary using status-go deps
+	go build -i -o $(GOBIN)/mailserver-canary -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/mailserver-canary/
+	@echo "Compilation done."
+
 statusgo-cross: statusgo-android statusgo-ios
 	@echo "Full cross compilation done."
 	@ls -ld $(GOBIN)/statusgo-*

@@ -131,8 +131,8 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 
 	// wait for mail server response
 	resp := s.waitForMailServerResponse(mailServerResponseWatcher, requestID)
-	s.Equal(messageHash, resp.LastEnvelopeHash.String())
-	s.Empty(resp.Cursor)
+	s.Require().Equal(messageHash, resp.LastEnvelopeHash.String())
+	s.Require().Empty(resp.Cursor)
 
 	// wait for last envelope sent by the mailserver to be available for filters
 	s.waitForEnvelopeEvents(envelopeAvailableWatcher, []string{resp.LastEnvelopeHash.String()}, whisper.EventEnvelopeAvailable)
@@ -344,7 +344,7 @@ func (s *WhisperMailboxSuite) TestRequestMessagesWithPagination() {
 	s.Require().True(client.IsNodeRunning())
 	clientRPCClient := client.StatusNode().RPCPrivateClient()
 
-	// Add mailbox to clients's peers
+	// Add mailbox to client's peers
 	errCh := helpers.WaitForPeerAsync(client.StatusNode().Server(), mailboxEnode, p2p.PeerEventTypeAdd, time.Second)
 	s.Require().NoError(client.StatusNode().AddPeer(mailboxEnode))
 	s.Require().NoError(<-errCh)

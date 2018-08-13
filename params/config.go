@@ -376,7 +376,7 @@ func NewNodeConfig(dataDir, clstrCfgFile, fleet string, networkID uint64) (*Node
 		LogToStderr:       LogToStderr,
 		ClusterConfigFile: clstrCfgFile,
 		ClusterConfig: &ClusterConfig{
-			Enabled:     true,
+			Enabled:     fleet != FleetUndefined,
 			Fleet:       fleet,
 			StaticNodes: []string{},
 			BootNodes:   []string{},
@@ -646,6 +646,12 @@ func (c *NodeConfig) updateClusterConfig() error {
 			// but in case if we do have nodes and NoDiscovery=true we will preserve that value
 			if len(cluster.BootNodes) == 0 {
 				c.NoDiscovery = true
+			}
+			if len(c.ClusterConfig.RendezvousNodes) == 0 {
+				c.ClusterConfig.RendezvousNodes = cluster.RendezvousNodes
+			}
+			if len(c.ClusterConfig.RendezvousNodes) != 0 {
+				c.Rendezvous = true
 			}
 			c.ClusterConfig.TrustedMailServers = cluster.MailServers
 			break
