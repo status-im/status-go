@@ -4,14 +4,15 @@ import (
 	"flag"
 	"fmt"
 	"strings"
+	"sync"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/params"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/status-im/status-go/discovery"
+	sparams "github.com/status-im/status-go/params"
 )
 
 var (
@@ -37,10 +38,9 @@ func main() {
 	filteredHandler := log.LvlFilterHandler(level, log.StderrHandler)
 	log.Root().SetHandler(filteredHandler)
 
-	if t := lesTopic(*les); len(t) != 0 {
+	if t := sparams.LesTopic(*les); len(t) != 0 {
 		topics = append(topics, t)
 	}
-
 	key, err := crypto.GenerateKey()
 	if err != nil {
 		log.Crit("unable to generate a key", "error", err)
@@ -53,32 +53,30 @@ func main() {
 	if err := v5.Start(); err != nil {
 		log.Crit("unable to start discovery v5", "address", *laddr, "error", err)
 	}
-	proxy := discovery.NewProxy(v5, parseMultiaddrs(rendezvousNodes))
+	rendezvousServers := parseMultiaddrs(rendezvousNodes)
+	var wg sync.WaitGroup
 	stop := make(chan struct{})
 	defer close(stop)
 	for _, t := range topics {
 		log.Info("proxying records for", "topic", t, "bootnodes", rst, "rendezvous servers", rendezvousNodes)
 		t := t
-		go proxy.Run(t, stop)
+		wg.Add(1)
+		go func() {
+			if err := discovery.ProxyToRendezvous(v5, rendezvousServers, t, stop); err != nil {
+				log.Error("proxying to rendezvous servers failed", "servers", rendezvousNodes, "topic", t, "error", err)
+			}
+			wg.Done()
+		}()
 	}
-	select {}
-}
-
-func lesTopic(netid int) string {
-	switch netid {
-	case 1:
-		return "LES2@" + common.Bytes2Hex(params.MainnetGenesisHash.Bytes()[:8])
-	case 4:
-		return "LES2@" + common.Bytes2Hex(params.TestnetGenesisHash.Bytes()[:8])
-	default:
-		return ""
-	}
+	wg.Wait()
 }
 
 func parseMultiaddrs(nodes []string) []ma.Multiaddr {
-	rst := make([]ma.Multiaddr, len(nodes))
+	var (
+		rst = make([]ma.Multiaddr, len(nodes))
+		err error
+	)
 	for i := range nodes {
-		var err error
 		rst[i], err = ma.NewMultiaddr(nodes[i])
 		if err != nil {
 			log.Crit("unable to parse mutliaddr", "source", nodes[i], "error", err)
@@ -87,15 +85,16 @@ func parseMultiaddrs(nodes []string) []ma.Multiaddr {
 	return rst
 }
 
-func parseNodesV5(enodes []string) []*discv5.Node {
-	var nodes []*discv5.Node
-	for _, enode := range enodes {
-		parsedPeer, err := discv5.ParseNode(enode)
-		if err == nil {
-			nodes = append(nodes, parsedPeer)
-		} else {
-			log.Crit("Failed to parse enode", "enode", enode, "err", err)
+func parseNodesV5(nodes []string) []*discv5.Node {
+	var (
+		rst = make([]*discv5.Node, len(nodes))
+		err error
+	)
+	for i := range nodes {
+		rst[i], err = discv5.ParseNode(nodes[i])
+		if err != nil {
+			log.Crit("Failed to parse enode", "source", nodes[i], "err", err)
 		}
 	}
-	return nodes
+	return rst
 }
