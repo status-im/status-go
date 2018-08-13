@@ -24,7 +24,9 @@ func ProxyToRendezvous(original Discovery, servers []ma.Multiaddr, topic string,
 	period <- 1 * time.Second
 	wg.Add(1)
 	go func() {
-		original.Discover(topic, period, found, lookup)
+		if err := original.Discover(topic, period, found, lookup); err != nil {
+			log.Error("discover request failed", "topic", topic, "error", err)
+		}
 		wg.Done()
 	}()
 	for {
