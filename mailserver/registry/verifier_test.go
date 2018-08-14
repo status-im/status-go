@@ -3,7 +3,6 @@ package registry
 import (
 	"context"
 	"crypto/ecdsa"
-	"crypto/elliptic"
 	"math/big"
 	"testing"
 
@@ -24,6 +23,10 @@ type VerifierTestSuite struct {
 	contractAddress common.Address
 	registry        *Registry
 	verifier        *Verifier
+}
+
+func TestVerifierTestSuite(t *testing.T) {
+	suite.Run(t, &VerifierTestSuite{})
 }
 
 func (s *VerifierTestSuite) SetupTest() {
@@ -54,11 +57,7 @@ func (s *VerifierTestSuite) setupAccount() {
 	s.privKey, err = crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	pubKey := s.privKey.Public()
-	publicKeyECDSA, ok := pubKey.(*ecdsa.PublicKey)
-	s.Require().True(ok)
-
-	s.from = crypto.PubkeyToAddress(*publicKeyECDSA)
+	s.from = crypto.PubkeyToAddress(s.privKey.PublicKey)
 }
 
 func (s *VerifierTestSuite) add(nodeID discover.NodeID) {
@@ -72,14 +71,7 @@ func (s *VerifierTestSuite) generateNodeID() discover.NodeID {
 	k, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	pub := k.PublicKey
-
-	var nodeID discover.NodeID
-	pbytes := elliptic.Marshal(pub.Curve, pub.X, pub.Y)
-	s.Require().Equal(len(nodeID), len(pbytes)-1)
-	copy(nodeID[:], pbytes[1:])
-
-	return nodeID
+	return discover.PubkeyID(&k.PublicKey)
 }
 
 func (s *VerifierTestSuite) TestVerifyNode() {
@@ -91,8 +83,4 @@ func (s *VerifierTestSuite) TestVerifyNode() {
 
 	res = s.verifier.VerifyNode(context.Background(), id)
 	s.Require().True(res)
-}
-
-func TestVerifierTestSuite(t *testing.T) {
-	suite.Run(t, &VerifierTestSuite{})
 }

@@ -32,11 +32,11 @@ func NewVerifier(contractCaller bind.ContractCaller, contractAddress common.Addr
 }
 
 // VerifyNode checks if a given node is trusted using a smart contract.
-func (v *Verifier) VerifyNode(_ context.Context, nodeID discover.NodeID) bool {
-	res, err := v.rc.Exists(nil, nodeID.Bytes())
-	logger.Debug("verifying node", "id", fmt.Sprintf("%x", nodeID.Bytes()), "verified", res)
+func (v *Verifier) VerifyNode(ctx context.Context, nodeID discover.NodeID) bool {
+	res, err := v.rc.Exists(&bind.CallOpts{Context: ctx}, nodeID.Bytes())
+	logger.Debug("verifying node", "id", nodeID, "verified", res)
 	if err != nil {
-		logger.Error("error verifying node", "id", fmt.Sprintf("%x", nodeID.Bytes()), "error", err)
+		logger.Error("error verifying node", "id", nodeID, "error", err)
 		return false
 	}
 
