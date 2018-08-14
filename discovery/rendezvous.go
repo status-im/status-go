@@ -157,7 +157,7 @@ func (r *Rendezvous) Discover(
 			}
 			for i := range records {
 				n, err := enrToNode(records[i])
-				log.Info("converted enr to", "ENODE", n.String())
+				log.Debug("converted enr to", "ENODE", n.String())
 				if err != nil {
 					log.Warn("error converting enr record to node", "err", err)
 				}
