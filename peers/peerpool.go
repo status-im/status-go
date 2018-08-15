@@ -18,7 +18,6 @@ import (
 	"github.com/status-im/status-go/mailserver/registry"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/peers/verifier"
-	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/signal"
 )
 
@@ -121,7 +120,7 @@ func (p *PeerPool) setDiscoveryTimeout() {
 }
 
 // Start creates topic pool for each topic in config and subscribes to server events.
-func (p *PeerPool) Start(server *p2p.Server, rpcClient *rpc.Client) error {
+func (p *PeerPool) Start(server *p2p.Server, rpcClient contracts.RPCClient) error {
 	if !p.discovery.Running() {
 		return ErrDiscv5NotRunning
 	}
@@ -169,7 +168,7 @@ func (p *PeerPool) Start(server *p2p.Server, rpcClient *rpc.Client) error {
 	return nil
 }
 
-func (p *PeerPool) initVerifier(rpcClient *rpc.Client) (v Verifier, err error) {
+func (p *PeerPool) initVerifier(rpcClient contracts.RPCClient) (v Verifier, err error) {
 	if addr := p.opts.MailServerRegistryAddress; addr != "" {
 		caller := contracts.NewContractCaller(rpcClient)
 		addrBytes := common.FromHex(addr)

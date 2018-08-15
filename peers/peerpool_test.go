@@ -162,13 +162,13 @@ func (s *PeerPoolSimulationSuite) TestPeerPoolCacheEthV5() {
 	config := map[discv5.Topic]params.Limits{
 		topic: params.NewLimits(1, 1),
 	}
-	peerPoolOpts := &Options{100 * time.Millisecond, 100 * time.Millisecond, 0, true, 100 * time.Millisecond, nil}
+	peerPoolOpts := &Options{100 * time.Millisecond, 100 * time.Millisecond, 0, true, 100 * time.Millisecond, nil, ""}
 	cache, err := newInMemoryCache()
 	s.Require().NoError(err)
 	peerPool := NewPeerPool(s.discovery[1], config, cache, peerPoolOpts)
 
 	// start peer pool
-	s.Require().NoError(peerPool.Start(s.peers[1]))
+	s.Require().NoError(peerPool.Start(s.peers[1], nil))
 	defer peerPool.Stop()
 
 	// check if cache is passed to topic pools
@@ -220,7 +220,7 @@ func (s *PeerPoolSimulationSuite) singleTopicDiscoveryWithFailover() {
 	config := map[discv5.Topic]params.Limits{
 		topic: params.NewLimits(1, 1), // limits are chosen for simplicity of the simulation
 	}
-	peerPoolOpts := &Options{100 * time.Millisecond, 100 * time.Millisecond, 0, true, 0, nil}
+	peerPoolOpts := &Options{100 * time.Millisecond, 100 * time.Millisecond, 0, true, 0, nil, ""}
 	cache, err := newInMemoryCache()
 	s.Require().NoError(err)
 	peerPool := NewPeerPool(s.discovery[1], config, cache, peerPoolOpts)
@@ -235,7 +235,7 @@ func (s *PeerPoolSimulationSuite) singleTopicDiscoveryWithFailover() {
 	defer subscription.Unsubscribe()
 
 	// start the peer pool
-	s.Require().NoError(peerPool.Start(s.peers[1]))
+	s.Require().NoError(peerPool.Start(s.peers[1], nil))
 	defer peerPool.Stop()
 	s.Equal(signal.EventDiscoveryStarted, s.getPoolEvent(poolEvents))
 
@@ -302,9 +302,9 @@ func TestPeerPoolMaxPeersOverflow(t *testing.T) {
 	defer func() { assert.NoError(t, discovery.Stop()) }()
 	require.True(t, discovery.Running())
 
-	poolOpts := &Options{DefaultFastSync, DefaultSlowSync, 0, true, 100 * time.Millisecond, nil}
+	poolOpts := &Options{DefaultFastSync, DefaultSlowSync, 0, true, 100 * time.Millisecond, nil, ""}
 	pool := NewPeerPool(discovery, nil, nil, poolOpts)
-	require.NoError(t, pool.Start(peer))
+	require.NoError(t, pool.Start(peer, nil))
 	require.Equal(t, signal.EventDiscoveryStarted, <-signals)
 	// without config, it will stop the discovery because all topic pools are satisfied
 	pool.events <- &p2p.PeerEvent{Type: p2p.PeerEventTypeAdd}
@@ -355,9 +355,9 @@ func TestPeerPoolDiscV5Timeout(t *testing.T) {
 	require.True(t, discovery.Running())
 
 	// start PeerPool
-	poolOpts := &Options{DefaultFastSync, DefaultSlowSync, time.Millisecond * 100, true, 100 * time.Millisecond, nil}
+	poolOpts := &Options{DefaultFastSync, DefaultSlowSync, time.Millisecond * 100, true, 100 * time.Millisecond, nil, ""}
 	pool := NewPeerPool(discovery, nil, nil, poolOpts)
-	require.NoError(t, pool.Start(server))
+	require.NoError(t, pool.Start(server, nil))
 	require.Equal(t, signal.EventDiscoveryStarted, <-signals)
 
 	// timeout after finding no peers
@@ -402,9 +402,9 @@ func TestPeerPoolNotAllowedStopping(t *testing.T) {
 	require.True(t, discovery.Running())
 
 	// start PeerPool
-	poolOpts := &Options{DefaultFastSync, DefaultSlowSync, time.Millisecond * 100, false, 100 * time.Millisecond, nil}
+	poolOpts := &Options{DefaultFastSync, DefaultSlowSync, time.Millisecond * 100, false, 100 * time.Millisecond, nil, ""}
 	pool := NewPeerPool(discovery, nil, nil, poolOpts)
-	require.NoError(t, pool.Start(server))
+	require.NoError(t, pool.Start(server, nil))
 
 	// wait 2x timeout duration
 	<-time.After(pool.opts.DiscServerTimeout * 2)
@@ -419,13 +419,13 @@ func (s *PeerPoolSimulationSuite) TestUpdateTopicLimits() {
 	config := map[discv5.Topic]params.Limits{
 		topic: params.NewLimits(1, 1),
 	}
-	peerPoolOpts := &Options{100 * time.Millisecond, 100 * time.Millisecond, 0, true, 100 * time.Millisecond, nil}
+	peerPoolOpts := &Options{100 * time.Millisecond, 100 * time.Millisecond, 0, true, 100 * time.Millisecond, nil, ""}
 	cache, err := newInMemoryCache()
 	s.Require().NoError(err)
 	peerPool := NewPeerPool(s.discovery[1], config, cache, peerPoolOpts)
 
 	// start peer pool
-	s.Require().NoError(peerPool.Start(s.peers[1]))
+	s.Require().NoError(peerPool.Start(s.peers[1], nil))
 	defer peerPool.Stop()
 
 	for _, topicPool := range peerPool.topics {
@@ -495,9 +495,10 @@ func (s *PeerPoolSimulationSuite) TestMailServerPeersDiscovery() {
 		true,
 		100 * time.Millisecond,
 		[]discover.NodeID{s.peers[0].Self().ID},
+		"",
 	}
 	peerPool := NewPeerPool(s.discovery[1], config, cache, peerPoolOpts)
-	s.Require().NoError(peerPool.Start(s.peers[1]))
+	s.Require().NoError(peerPool.Start(s.peers[1], nil))
 	defer peerPool.Stop()
 
 	// wait for and verify the mail server peer
