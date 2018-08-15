@@ -17,21 +17,10 @@ jobs:
   - stage: Test unit and integration
     script:
       - make test-unit-race
-      - make test-unit-coverage
+      - make test-unit
   - stage: Test e2e on private network
     script:
       - make test-e2e-race
-  - stage: Test e2e on public network
-    # Disable running this stage for pushes as it's not needed to run it twice.
-    # We only want to check if tests on public testnet pass in a merge build.
-    # Also, disable for fork builds as they do not have access to
-    # ACCOUNT_PASSWORD environment variable anyway.
-    if: ((type != push) OR (branch = "develop")) AND (fork = false)
-    script:
-      # Sync the chain first. It will time out after 45 minutes. Used network: Rinkeby.
-      - make statusgo
-      - ./build/bin/statusd -datadir=.ethereumtest/Rinkeby -les -networkid=4 -sync-and-exit=45 -log=WARN -standalone=false -discovery=false -ntp=false
-      - make test-e2e networkid=4
 cache:
   directories:
   - ".ethereumtest/Mainnet"

@@ -74,7 +74,7 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	MailServerKeyID, err := senderWhisperService.AddSymKeyFromPassword(password)
 	s.Require().NoError(err)
 
-	rpcClient := sender.StatusNode().RPCClient()
+	rpcClient := sender.StatusNode().RPCPrivateClient()
 	s.Require().NotNil(rpcClient)
 
 	mailboxWhisperService, err := mailboxBackend.StatusNode().WhisperService()
@@ -131,8 +131,8 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 
 	// wait for mail server response
 	resp := s.waitForMailServerResponse(mailServerResponseWatcher, requestID)
-	s.Equal(messageHash, resp.LastEnvelopeHash.String())
-	s.Empty(resp.Cursor)
+	s.Require().Equal(messageHash, resp.LastEnvelopeHash.String())
+	s.Require().Empty(resp.Cursor)
 
 	// wait for last envelope sent by the mailserver to be available for filters
 	s.waitForEnvelopeEvents(envelopeAvailableWatcher, []string{resp.LastEnvelopeHash.String()}, whisper.EventEnvelopeAvailable)
@@ -189,9 +189,9 @@ func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
 	charlieWhisperService, err := charlieBackend.StatusNode().WhisperService()
 	s.Require().NoError(err)
 	// Get rpc client.
-	aliceRPCClient := aliceBackend.StatusNode().RPCClient()
-	bobRPCClient := bobBackend.StatusNode().RPCClient()
-	charlieRPCClient := charlieBackend.StatusNode().RPCClient()
+	aliceRPCClient := aliceBackend.StatusNode().RPCPrivateClient()
+	bobRPCClient := bobBackend.StatusNode().RPCPrivateClient()
+	charlieRPCClient := charlieBackend.StatusNode().RPCPrivateClient()
 
 	// watchers
 	envelopeArchivedWatcher := make(chan whisper.EnvelopeEvent, 1024)
@@ -342,9 +342,9 @@ func (s *WhisperMailboxSuite) TestRequestMessagesWithPagination() {
 	client, stop := s.startBackend("client")
 	defer stop()
 	s.Require().True(client.IsNodeRunning())
-	clientRPCClient := client.StatusNode().RPCClient()
+	clientRPCClient := client.StatusNode().RPCPrivateClient()
 
-	// Add mailbox to clients's peers
+	// Add mailbox to client's peers
 	errCh := helpers.WaitForPeerAsync(client.StatusNode().Server(), mailboxEnode, p2p.PeerEventTypeAdd, time.Second)
 	s.Require().NoError(client.StatusNode().AddPeer(mailboxEnode))
 	s.Require().NoError(<-errCh)

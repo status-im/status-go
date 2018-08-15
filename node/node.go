@@ -34,7 +34,7 @@ import (
 
 // Errors related to node and services creation.
 var (
-	ErrNodeMakeFailure                    = errors.New("error creating p2p node")
+	ErrNodeMakeFailureFormat              = "error creating p2p node: %s"
 	ErrWhisperServiceRegistrationFailure  = errors.New("failed to register the Whisper service")
 	ErrLightEthRegistrationFailure        = errors.New("failed to register the LES service")
 	ErrPersonalServiceRegistrationFailure = errors.New("failed to register the personal api service")
@@ -76,7 +76,7 @@ func MakeNode(config *params.NodeConfig, db *leveldb.DB) (*node.Node, error) {
 
 	stack, err := node.New(stackConfig)
 	if err != nil {
-		return nil, ErrNodeMakeFailure
+		return nil, fmt.Errorf(ErrNodeMakeFailureFormat, err.Error())
 	}
 
 	// start Ethereum service if we are not expected to use an upstream server

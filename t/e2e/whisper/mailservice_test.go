@@ -31,10 +31,11 @@ func (s *MailServiceSuite) TestShhextRequestMessagesRPCMethodAvailability() {
 
 	s.StartTestNode(func(config *params.NodeConfig) {
 		config.RPCEnabled = true
+		config.AddAPIModule("shhext")
 	})
 	defer s.StopTestNode()
 
-	client := s.StatusNode.RPCClient()
+	client := s.StatusNode.RPCPrivateClient()
 	r.NotNil(client)
 
 	// This error means that the method is available through inproc communication

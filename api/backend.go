@@ -42,6 +42,7 @@ type StatusBackend struct {
 	statusNode          *node.StatusNode
 	pendingSignRequests *sign.PendingRequests
 	personalAPI         *personal.PublicAPI
+	rpcFilters          *rpcfilters.Service
 	accountManager      *account.Manager
 	transactor          *transactions.Transactor
 	newNotification     fcm.NotificationConstructor
@@ -60,6 +61,7 @@ func NewStatusBackend() *StatusBackend {
 	transactor := transactions.NewTransactor(pendingSignRequests)
 	personalAPI := personal.NewAPI(pendingSignRequests)
 	notificationManager := fcm.NewNotification(fcmServerKey)
+	rpcFilters := rpcfilters.New(statusNode)
 
 	return &StatusBackend{
 		pendingSignRequests: pendingSignRequests,
@@ -67,6 +69,7 @@ func NewStatusBackend() *StatusBackend {
 		accountManager:      accountManager,
 		transactor:          transactor,
 		personalAPI:         personalAPI,
+		rpcFilters:          rpcFilters,
 		newNotification:     notificationManager,
 		log:                 log.New("package", "status-go/api.StatusBackend"),
 	}
@@ -223,7 +226,11 @@ func (b *StatusBackend) CallPrivateRPC(inputJSON string) string {
 
 // SendTransaction creates a new transaction and waits until it's complete.
 func (b *StatusBackend) SendTransaction(ctx context.Context, args transactions.SendTxArgs) (hash gethcommon.Hash, err error) {
-	return b.transactor.SendTransaction(ctx, args)
+	transactionHash, err := b.transactor.SendTransaction(ctx, args)
+	if err == nil {
+		go b.rpcFilters.TriggerTransactionSentToUpstreamEvent(transactionHash)
+	}
+	return transactionHash, err
 }
 
 func (b *StatusBackend) getVerifiedAccount(password string) (*account.SelectedExtKey, error) {
@@ -283,31 +290,48 @@ func (b *StatusBackend) DiscardSignRequests(ids []string) map[string]error {
 
 // registerHandlers attaches Status callback handlers to running node
 func (b *StatusBackend) registerHandlers() error {
-	rpcClient := b.StatusNode().RPCClient()
-	if rpcClient == nil {
+	var clients []*rpc.Client
+
+	if c := b.StatusNode().RPCClient(); c != nil {
+		clients = append(clients, c)
+	} else {
 		return errors.New("RPC client unavailable")
 	}
 
-	rpcClient.RegisterHandler(params.AccountsMethodName, func(context.Context, ...interface{}) (interface{}, error) {
-		return b.AccountManager().Accounts()
-	})
+	if c := b.StatusNode().RPCPrivateClient(); c != nil {
+		clients = append(clients, c)
+	} else {
+		return errors.New("RPC private client unavailable")
+	}
 
-	rpcClient.RegisterHandler(params.SendTransactionMethodName, func(ctx context.Context, rpcParams ...interface{}) (interface{}, error) {
-		txArgs, err := transactions.RPCCalltoSendTxArgs(rpcParams...)
-		if err != nil {
-			return nil, err
-		}
+	for _, client := range clients {
+		client.RegisterHandler(
+			params.AccountsMethodName,
+			func(context.Context, ...interface{}) (interface{}, error) {
+				return b.AccountManager().Accounts()
+			},
+		)
 
-		hash, err := b.SendTransaction(ctx, txArgs)
-		if err != nil {
-			return nil, err
-		}
+		client.RegisterHandler(
+			params.SendTransactionMethodName,
+			func(ctx context.Context, rpcParams ...interface{}) (interface{}, error) {
+				txArgs, err := transactions.RPCCalltoSendTxArgs(rpcParams...)
+				if err != nil {
+					return nil, err
+				}
 
-		return hash.Hex(), err
-	})
+				hash, err := b.SendTransaction(ctx, txArgs)
+				if err != nil {
+					return nil, err
+				}
 
-	rpcClient.RegisterHandler(params.PersonalSignMethodName, b.personalAPI.Sign)
-	rpcClient.RegisterHandler(params.PersonalRecoverMethodName, b.personalAPI.Recover)
+				return hash.Hex(), err
+			},
+		)
+
+		client.RegisterHandler(params.PersonalSignMethodName, b.personalAPI.Sign)
+		client.RegisterHandler(params.PersonalRecoverMethodName, b.personalAPI.Recover)
+	}
 
 	return nil
 }

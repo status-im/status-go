@@ -26,6 +26,7 @@ import (
 	"github.com/status-im/status-go/peers"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/peer"
+	"github.com/status-im/status-go/services/shhext"
 	"github.com/status-im/status-go/services/status"
 )
 
@@ -184,40 +185,46 @@ func (n *StatusNode) discoveryEnabled() bool {
 	return n.config != nil && (!n.config.NoDiscovery || n.config.Rendezvous) && n.config.ClusterConfig != nil
 }
 
-func (n *StatusNode) startRendezvous() error {
+func (n *StatusNode) startRendezvous() (discovery.Discovery, error) {
 	if !n.config.Rendezvous {
-		return errors.New("rendezvous is not enabled")
+		return nil, errors.New("rendezvous is not enabled")
 	}
 	if len(n.config.ClusterConfig.RendezvousNodes) == 0 {
-		return errors.New("rendezvous node must be provided if rendezvous discovery is enabled")
+		return nil, errors.New("rendezvous node must be provided if rendezvous discovery is enabled")
 	}
 	maddrs := make([]ma.Multiaddr, len(n.config.ClusterConfig.RendezvousNodes))
 	for i, addr := range n.config.ClusterConfig.RendezvousNodes {
 		var err error
 		maddrs[i], err = ma.NewMultiaddr(addr)
 		if err != nil {
-			return fmt.Errorf("failed to parse rendezvous node %s: %v", n.config.ClusterConfig.RendezvousNodes[0], err)
+			return nil, fmt.Errorf("failed to parse rendezvous node %s: %v", n.config.ClusterConfig.RendezvousNodes[0], err)
 		}
 	}
 	srv := n.gethNode.Server()
-	var err error
-	n.discovery, err = discovery.NewRendezvous(maddrs, srv.PrivateKey, srv.Self())
-	return err
+	return discovery.NewRendezvous(maddrs, srv.PrivateKey, srv.Self())
 }
 
 func (n *StatusNode) startDiscovery() error {
-	if !n.config.NoDiscovery && n.config.Rendezvous {
-		return errors.New("only one discovery can be used (will be allowed to use more in next change)")
-	}
+	discoveries := []discovery.Discovery{}
 	if !n.config.NoDiscovery {
-		n.discovery = discovery.NewDiscV5(
+		discoveries = append(discoveries, discovery.NewDiscV5(
 			n.gethNode.Server().PrivateKey,
 			n.config.ListenAddr,
-			parseNodesV5(n.config.ClusterConfig.BootNodes))
-	} else if n.config.Rendezvous {
-		if err := n.startRendezvous(); err != nil {
+			parseNodesV5(n.config.ClusterConfig.BootNodes)))
+	}
+	if n.config.Rendezvous {
+		d, err := n.startRendezvous()
+		if err != nil {
 			return err
 		}
+		discoveries = append(discoveries, d)
+	}
+	if len(discoveries) == 0 {
+		return errors.New("wasn't able to register any discovery")
+	} else if len(discoveries) > 1 {
+		n.discovery = discovery.NewMultiplexer(discoveries)
+	} else {
+		n.discovery = discoveries[0]
 	}
 	n.register = peers.NewRegister(n.discovery, n.config.RegisterTopics...)
 	options := peers.NewDefaultOptions()
@@ -484,6 +491,19 @@ func (n *StatusNode) WhisperService() (w *whisper.Whisper, err error) {
 	defer n.mu.RUnlock()
 
 	err = n.gethService(&w)
+	if err == node.ErrServiceUnknown {
+		err = ErrServiceUnknown
+	}
+
+	return
+}
+
+// ShhExtService exposes reference to shh extension service running on top of the node
+func (n *StatusNode) ShhExtService() (s *shhext.Service, err error) {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+
+	err = n.gethService(&s)
 	if err == node.ErrServiceUnknown {
 		err = ErrServiceUnknown
 	}

@@ -227,7 +227,7 @@ func WaitClosed(c <-chan struct{}, d time.Duration) error {
 	}
 }
 
-// MakeTestNodeConfig defines a function to return a giving params.NodeConfig
+// MakeTestNodeConfig defines a function to return a params.NodeConfig
 // where specific network addresses are assigned based on provided network id.
 func MakeTestNodeConfig(networkID int) (*params.NodeConfig, error) {
 	testDir := filepath.Join(TestDataDir, TestNetworkNames[networkID])
@@ -258,6 +258,22 @@ func MakeTestNodeConfig(networkID int) (*params.NodeConfig, error) {
 	nodeConfig.WhisperConfig.EnableNTPSync = false
 
 	return nodeConfig, nil
+}
+
+// MakeTestNodeConfigWithDataDir defines a function to return a params.NodeConfig
+// where specific network addresses are assigned based on provided network id, and assigns
+// a given name and data dir.
+func MakeTestNodeConfigWithDataDir(name, dataDir string, networkID uint64) (*params.NodeConfig, error) {
+	cfg, err := params.NewNodeConfig(dataDir, "", params.FleetBeta, networkID)
+	if err != nil {
+		return nil, err
+	}
+	cfg.Name = name
+	cfg.NetworkID = uint64(GetNetworkID())
+	cfg.LightEthConfig.Enabled = false
+	cfg.WhisperConfig.EnableNTPSync = false
+
+	return cfg, nil
 }
 
 type account struct {
