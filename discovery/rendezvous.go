@@ -125,17 +125,6 @@ func (r *Rendezvous) Discover(
 			ticker = time.NewTicker(newPeriod)
 		case <-ticker.C:
 			srv := r.servers[rand.Intn(len(r.servers))]
-			// Having a deadline longer than `ticker` period may lead to a situation
-			// when other cases are never checked. Hence, make sure that `period`
-			// is still open.
-			select {
-			case _, ok := <-period:
-				if !ok {
-					ticker.Stop()
-					return nil
-				}
-			default:
-			}
 			ctx, cancel := context.WithTimeout(r.rootCtx, requestTimeout)
 			r.mu.RLock()
 			records, err := r.client.Discover(ctx, srv, topic, r.bucketSize)
