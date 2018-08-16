@@ -13,4 +13,3 @@ FROM alpine:latest
 RUN apk add --no-cache ca-certificates bash
 
 COPY --from=builder /go/src/github.com/status-im/status-go/build/bin/proxy /usr/local/bin/
-ENTRYPOINT /usr/local/bin/proxy
