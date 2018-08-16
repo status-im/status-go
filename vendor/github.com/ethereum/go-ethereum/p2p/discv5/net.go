@@ -641,18 +641,7 @@ loop:
 				}()
 			} else {
 				refreshDone = make(chan struct{})
-
-				done := make(chan struct{})
-				net.refresh(done)
-				<-done
-
-				// Refresh again only if there are no seeds.
-				// Also, sleep for some time to prevent from
-				// executing too often.
-				go func() {
-					time.Sleep(time.Millisecond * 100)
-					close(refreshDone)
-				}()
+				net.refresh(refreshDone)
 			}
 		}
 	}
@@ -689,7 +678,7 @@ func (net *Network) refresh(done chan<- struct{}) {
 	}
 	if len(seeds) == 0 {
 		log.Trace("no seed nodes found")
-		close(done)
+		time.AfterFunc(time.Second*10, func() { close(done) })
 		return
 	}
 	for _, n := range seeds {

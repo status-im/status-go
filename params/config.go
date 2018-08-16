@@ -647,6 +647,12 @@ func (c *NodeConfig) updateClusterConfig() error {
 			if len(cluster.BootNodes) == 0 {
 				c.NoDiscovery = true
 			}
+			if len(c.ClusterConfig.RendezvousNodes) == 0 {
+				c.ClusterConfig.RendezvousNodes = cluster.RendezvousNodes
+			}
+			if len(c.ClusterConfig.RendezvousNodes) != 0 {
+				c.Rendezvous = true
+			}
 			c.ClusterConfig.TrustedMailServers = cluster.MailServers
 			break
 		}
