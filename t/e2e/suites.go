@@ -7,7 +7,6 @@ import (
 
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/node"
-	"github.com/status-im/status-go/sign"
 	"github.com/status-im/status-go/signal"
 	. "github.com/status-im/status-go/t/utils" //nolint: golint
 	"github.com/status-im/status-go/transactions"
@@ -127,11 +126,6 @@ func (s *BackendTestSuite) WhisperService() *whisper.Whisper {
 // Transactor returns a reference to the Transactor.
 func (s *BackendTestSuite) Transactor() *transactions.Transactor {
 	return s.Backend.Transactor()
-}
-
-// PendingSignRequests returns a reference to PendingSignRequests.
-func (s *BackendTestSuite) PendingSignRequests() *sign.PendingRequests {
-	return s.Backend.PendingSignRequests()
 }
 
 func importTestAccounts(keyStoreDir string) (err error) {

@@ -9,7 +9,6 @@ import (
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/status"
-	"github.com/status-im/status-go/signal"
 	"github.com/stretchr/testify/suite"
 
 	. "github.com/status-im/status-go/t/utils"
@@ -109,18 +108,12 @@ func (s *StatusAPISuite) testStatusLogin(testParams statusTestParams) *status.Lo
 		return nil
 	}
 
-	if testParams.HandlerFactory == nil {
-		testParams.HandlerFactory = s.notificationHandlerSuccess
-	}
-
 	err := s.SetupTest(s.upstream, true, false)
 	s.NoError(err)
 	defer func() {
 		err := s.Backend.StopNode()
 		s.NoError(err)
 	}()
-
-	signal.SetDefaultNodeNotificationHandler(testParams.HandlerFactory(testParams.Address, testParams.Password))
 
 	req := status.LoginRequest{
 		Addr:     testParams.Address,
@@ -155,18 +148,12 @@ func (s *StatusAPISuite) testStatusSignup(testParams statusTestParams) *status.S
 		return nil
 	}
 
-	if testParams.HandlerFactory == nil {
-		testParams.HandlerFactory = s.notificationHandlerSuccess
-	}
-
 	err := s.SetupTest(s.upstream, true, false)
 	s.NoError(err)
 	defer func() {
 		err := s.Backend.StopNode()
 		s.NoError(err)
 	}()
-
-	signal.SetDefaultNodeNotificationHandler(testParams.HandlerFactory(testParams.Address, testParams.Password))
 
 	req := status.SignupRequest{
 		Password: testParams.Password,

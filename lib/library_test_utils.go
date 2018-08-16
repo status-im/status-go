@@ -11,7 +11,6 @@ package main
 
 import "C"
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -21,19 +20,19 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/keystore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core"
 	gethparams "github.com/ethereum/go-ethereum/params"
+
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/sign"
 	"github.com/status-im/status-go/signal"
 	. "github.com/status-im/status-go/t/utils" //nolint: golint
 	"github.com/status-im/status-go/transactions"
@@ -45,7 +44,7 @@ const initJS = `
 	};`
 
 var (
-	zeroHash       = sign.EmptyResponse.Hex()
+	zeroHash       = gethcommon.Hash{}
 	testChainDir   string
 	nodeConfigJSON string
 )
@@ -127,20 +126,16 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 			testAccountLogout,
 		},
 		{
-			"complete single queued transaction",
-			testCompleteTransaction,
+			"send transaction",
+			testSendTransaction,
 		},
 		{
-			"test complete multiple queued transactions",
-			testCompleteMultipleQueuedTransactions,
+			"send transaction with invalid password",
+			testSendTransactionInvalidPassword,
 		},
 		{
-			"discard single queued transaction",
-			testDiscardTransaction,
-		},
-		{
-			"test discard multiple queued transactions",
-			testDiscardMultipleQueuedTransactions,
+			"failed single transaction",
+			testFailedTransaction,
 		},
 	}
 
@@ -243,7 +238,7 @@ func testResetChainData(t *testing.T) bool {
 	}
 
 	EnsureNodeSync(statusBackend.StatusNode().EnsureSync)
-	testCompleteTransaction(t)
+	testSendTransaction(t)
 
 	return true
 }
@@ -350,7 +345,7 @@ func testStopResumeNode(t *testing.T) bool { //nolint: gocyclo
 	}
 
 	// additionally, let's complete transaction (just to make sure that node lives through pause/resume w/o issues)
-	testCompleteTransaction(t)
+	testSendTransaction(t)
 
 	return true
 }
@@ -776,9 +771,12 @@ func testAccountLogout(t *testing.T) bool {
 	return true
 }
 
-func testCompleteTransaction(t *testing.T) bool {
-	signRequests := statusBackend.PendingSignRequests()
+type jsonrpcAnyResponse struct {
+	Result json.RawMessage `json:"result"`
+	jsonrpcErrorResponse
+}
 
+func testSendTransaction(t *testing.T) bool {
 	EnsureNodeSync(statusBackend.StatusNode().EnsureSync)
 
 	// log into account from which transactions will be sent
@@ -787,487 +785,109 @@ func testCompleteTransaction(t *testing.T) bool {
 		return false
 	}
 
-	// make sure you panic if transaction complete doesn't return
-	queuedTxCompleted := make(chan struct{}, 1)
-	abortPanic := make(chan struct{}, 1)
-	PanicAfter(10*time.Second, abortPanic, "testCompleteTransaction")
-
-	// replace transaction notification handler
-	var txHash = ""
-	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var envelope signal.Envelope
-		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
-			t.Errorf("cannot unmarshal event's JSON: %s. Error %q", jsonEvent, err)
-			return
-		}
-		if envelope.Type == signal.EventSignRequestAdded {
-			event := envelope.Event.(map[string]interface{})
-			t.Logf("transaction queued (will be completed shortly): {id: %s}\n", event["id"].(string))
-
-			completeTxResponse := SignRequestResult{}
-			rawResponse := ApproveSignRequest(C.CString(event["id"].(string)), C.CString(TestConfig.Account1.Password))
-
-			if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &completeTxResponse); err != nil {
-				t.Errorf("cannot decode RecoverAccount response (%s): %v", C.GoString(rawResponse), err)
-			}
-
-			if completeTxResponse.Error != "" {
-				t.Errorf("cannot complete queued transaction[%v]: %v", event["id"], completeTxResponse.Error)
-			}
-
-			txHash = completeTxResponse.Hash
-
-			t.Logf("transaction complete: https://testnet.etherscan.io/tx/%s", txHash)
-			abortPanic <- struct{}{} // so that timeout is aborted
-			queuedTxCompleted <- struct{}{}
-		}
-	})
-
-	// this call blocks, up until Complete Transaction is called
-	txCheckHash, err := statusBackend.SendTransaction(context.TODO(), transactions.SendTxArgs{
+	args, err := json.Marshal(transactions.SendTxArgs{
 		From:  account.FromAddress(TestConfig.Account1.Address),
 		To:    account.ToAddress(TestConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 	})
 	if err != nil {
-		t.Errorf("Failed to SendTransaction: %s", err)
+		t.Errorf("failed to marshal errors: %v", err)
 		return false
 	}
+	rawResult := SendTransaction(C.CString(string(args)), C.CString(TestConfig.Account1.Password))
 
-	<-queuedTxCompleted // make sure that complete transaction handler completes its magic, before we proceed
-
-	if txHash != txCheckHash.Hex() {
-		t.Errorf("Transaction hash returned from SendTransaction is invalid: expected %s, got %s",
-			txCheckHash.Hex(), txHash)
+	var result jsonrpcAnyResponse
+	if err := json.Unmarshal([]byte(C.GoString(rawResult)), &result); err != nil {
+		t.Errorf("failed to unmarshal rawResult '%s': %v", C.GoString(rawResult), err)
 		return false
 	}
-
-	if reflect.DeepEqual(txCheckHash, gethcommon.Hash{}) {
-		t.Error("Test failed: transaction was never queued or completed")
+	if result.Error.Message != "" {
+		t.Errorf("failed to send transaction: %v", result.Error)
 		return false
 	}
-
-	if signRequests.Count() != 0 {
-		t.Error("tx queue must be empty at this point")
-		return false
-	}
-
-	return true
-}
-
-func testCompleteMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocyclo
-	signRequests := statusBackend.PendingSignRequests()
-
-	// log into account from which transactions will be sent
-	if err := statusBackend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password); err != nil {
-		t.Errorf("cannot select account: %v", TestConfig.Account1.Address)
-		return false
-	}
-
-	// make sure you panic if transaction complete doesn't return
-	testTxCount := 3
-	txIDs := make(chan string, testTxCount)
-	allTestTxCompleted := make(chan struct{}, 1)
-
-	// replace transaction notification handler
-	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var txID string
-		var envelope signal.Envelope
-		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
-			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
-			return
-		}
-		if envelope.Type == signal.EventSignRequestAdded {
-			event := envelope.Event.(map[string]interface{})
-			txID = event["id"].(string)
-			t.Logf("transaction queued (will be completed in a single call, once aggregated): {id: %s}\n", txID)
-
-			txIDs <- txID
-		}
-	})
-
-	//  this call blocks, and should return when DiscardQueuedTransaction() for a given tx id is called
-	sendTx := func() {
-		txHashCheck, err := statusBackend.SendTransaction(context.TODO(), transactions.SendTxArgs{
-			From:  account.FromAddress(TestConfig.Account1.Address),
-			To:    account.ToAddress(TestConfig.Account2.Address),
-			Value: (*hexutil.Big)(big.NewInt(1000000000000)),
-		})
-		if err != nil {
-			t.Errorf("unexpected error thrown: %v", err)
-			return
-		}
-
-		if reflect.DeepEqual(txHashCheck, gethcommon.Hash{}) {
-			t.Error("transaction returned empty hash")
-			return
-		}
-	}
-
-	// wait for transactions, and complete them in a single call
-	completeTxs := func(txIDStrings string) {
-		var parsedIDs []string
-		if err := json.Unmarshal([]byte(txIDStrings), &parsedIDs); err != nil {
-			t.Error(err)
-			return
-		}
-
-		parsedIDs = append(parsedIDs, "invalid-tx-id")
-		updatedTxIDStrings, _ := json.Marshal(parsedIDs)
-
-		// complete
-		resultsString := ApproveSignRequests(C.CString(string(updatedTxIDStrings)), C.CString(TestConfig.Account1.Password))
-		resultsStruct := SignRequestsResult{}
-		if err := json.Unmarshal([]byte(C.GoString(resultsString)), &resultsStruct); err != nil {
-			t.Error(err)
-			return
-		}
-		results := resultsStruct.Results
-
-		if len(results) != (testTxCount+1) || results["invalid-tx-id"].Error != sign.ErrSignReqNotFound.Error() {
-			t.Errorf("cannot complete txs: %v", results)
-			return
-		}
-		for txID, txResult := range results {
-			if txID != txResult.ID {
-				t.Errorf("tx id not set in result: expected id is %s", txID)
-				return
-			}
-			if txResult.Error != "" && txID != "invalid-tx-id" {
-				t.Errorf("invalid error for %s", txID)
-				return
-			}
-			if txResult.Hash == zeroHash && txID != "invalid-tx-id" {
-				t.Errorf("invalid hash (expected non empty hash): %s", txID)
-				return
-			}
-
-			if txResult.Hash != zeroHash {
-				t.Logf("transaction complete: https://testnet.etherscan.io/tx/%s", txResult.Hash)
-			}
-		}
-
-		time.Sleep(1 * time.Second) // make sure that tx complete signal propagates
-		for _, txID := range parsedIDs {
-			if signRequests.Has(string(txID)) {
-				t.Errorf("txqueue should not have test tx at this point (it should be completed): %s", txID)
-				return
-			}
-		}
-	}
-	go func() {
-		var txIDStrings []string
-		for i := 0; i < testTxCount; i++ {
-			txIDStrings = append(txIDStrings, <-txIDs)
-		}
-
-		txIDJSON, _ := json.Marshal(txIDStrings)
-		completeTxs(string(txIDJSON))
-		allTestTxCompleted <- struct{}{}
-	}()
-
-	// send multiple transactions
-	for i := 0; i < testTxCount; i++ {
-		go sendTx()
-	}
-
-	select {
-	case <-allTestTxCompleted:
-		// pass
-	case <-time.After(20 * time.Second):
-		t.Error("test timed out")
-		return false
-	}
-
-	if signRequests.Count() != 0 {
-		t.Error("tx queue must be empty at this point")
+	hash := gethcommon.BytesToHash(result.Result)
+	if reflect.DeepEqual(hash, gethcommon.Hash{}) {
+		t.Errorf("response hash empty: %s", hash.Hex())
 		return false
 	}
 
 	return true
 }
 
-func testDiscardTransaction(t *testing.T) bool { //nolint: gocyclo
-	signRequests := statusBackend.PendingSignRequests()
+func testSendTransactionInvalidPassword(t *testing.T) bool {
+	EnsureNodeSync(statusBackend.StatusNode().EnsureSync)
 
 	// log into account from which transactions will be sent
-	if err := statusBackend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password); err != nil {
-		t.Errorf("cannot select account: %v", TestConfig.Account1.Address)
+	if err := statusBackend.SelectAccount(
+		TestConfig.Account1.Address,
+		TestConfig.Account1.Password,
+	); err != nil {
+		t.Errorf("cannot select account: %v. Error %q", TestConfig.Account1.Address, err)
 		return false
 	}
 
-	// make sure you panic if transaction complete doesn't return
-	completeQueuedTransaction := make(chan struct{}, 1)
-	PanicAfter(20*time.Second, completeQueuedTransaction, "testDiscardTransaction")
-
-	// replace transaction notification handler
-	var txID string
-	txFailedEventCalled := make(chan struct{})
-	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var envelope signal.Envelope
-		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
-			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
-			return
-		}
-		if envelope.Type == signal.EventSignRequestAdded {
-			event := envelope.Event.(map[string]interface{})
-			txID = event["id"].(string)
-			t.Logf("transaction queued (will be discarded soon): {id: %s}\n", txID)
-
-			if !signRequests.Has(string(txID)) {
-				t.Errorf("txqueue should still have test tx: %s", txID)
-				return
-			}
-
-			// discard
-			discardResponse := DiscardSignRequestResult{}
-			rawResponse := DiscardSignRequest(C.CString(txID))
-
-			if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &discardResponse); err != nil {
-				t.Errorf("cannot decode RecoverAccount response (%s): %v", C.GoString(rawResponse), err)
-			}
-
-			if discardResponse.Error != "" {
-				t.Errorf("cannot discard tx: %v", discardResponse.Error)
-				return
-			}
-
-			// try completing discarded transaction
-			err := statusBackend.ApproveSignRequest(string(txID), TestConfig.Account1.Password).Error
-			if err != sign.ErrSignReqNotFound {
-				t.Error("expects tx not found, but call to CompleteTransaction succeeded")
-				return
-			}
-
-			if signRequests.Has(string(txID)) {
-				t.Errorf("txqueue should not have test tx at this point (it should be discarded): %s", txID)
-				return
-			}
-
-			completeQueuedTransaction <- struct{}{} // so that timeout is aborted
-		}
-
-		if envelope.Type == signal.EventSignRequestFailed {
-			event := envelope.Event.(map[string]interface{})
-			t.Logf("transaction return event received: %+v\n", event)
-
-			receivedErrMessage := event["error_message"].(string)
-			expectedErrMessage := sign.ErrSignReqDiscarded.Error()
-			if receivedErrMessage != expectedErrMessage {
-				t.Errorf("unexpected error message received: got %v", receivedErrMessage)
-				return
-			}
-
-			receivedErrCode := event["error_code"].(string)
-			if receivedErrCode != strconv.Itoa(sign.SignRequestDiscardedErrorCode) {
-				t.Errorf("unexpected error code received: got %v", receivedErrCode)
-				return
-			}
-
-			close(txFailedEventCalled)
-		}
-	})
-
-	// this call blocks, and should return when DiscardQueuedTransaction() is called
-	txHashCheck, err := statusBackend.SendTransaction(context.TODO(), transactions.SendTxArgs{
+	args, err := json.Marshal(transactions.SendTxArgs{
 		From:  account.FromAddress(TestConfig.Account1.Address),
 		To:    account.ToAddress(TestConfig.Account2.Address),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 	})
-
-	select {
-	case <-txFailedEventCalled:
-	case <-time.After(time.Second * 10):
-		t.Error("expected tx failure signal is not received")
+	if err != nil {
+		t.Errorf("failed to marshal errors: %v", err)
 		return false
 	}
+	rawResult := SendTransaction(C.CString(string(args)), C.CString("invalid password"))
 
-	if err != sign.ErrSignReqDiscarded {
-		t.Errorf("expected error not thrown: %v", err)
+	var result jsonrpcAnyResponse
+	if err := json.Unmarshal([]byte(C.GoString(rawResult)), &result); err != nil {
+		t.Errorf("failed to unmarshal rawResult '%s': %v", C.GoString(rawResult), err)
 		return false
 	}
-
-	if !reflect.DeepEqual(txHashCheck, gethcommon.Hash{}) {
-		t.Error("transaction returned hash, while it shouldn't")
-		return false
-	}
-
-	if signRequests.Count() != 0 {
-		t.Error("tx queue must be empty at this point")
+	if result.Error.Message != keystore.ErrDecrypt.Error() {
+		t.Errorf("invalid result: %q", result)
 		return false
 	}
 
 	return true
 }
 
-func testDiscardMultipleQueuedTransactions(t *testing.T) bool { //nolint: gocyclo
-	signRequests := statusBackend.PendingSignRequests()
+func testFailedTransaction(t *testing.T) bool {
+	EnsureNodeSync(statusBackend.StatusNode().EnsureSync)
 
-	// log into account from which transactions will be sent
-	if err := statusBackend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password); err != nil {
-		t.Errorf("cannot select account: %v", TestConfig.Account1.Address)
+	// log into wrong account in order to get selectedAccount error
+	if err := statusBackend.SelectAccount(TestConfig.Account2.Address, TestConfig.Account2.Password); err != nil {
+		t.Errorf("cannot select account: %v. Error %q", TestConfig.Account1.Address, err)
 		return false
 	}
 
-	// make sure you panic if transaction complete doesn't return
-	testTxCount := 3
-	txIDs := make(chan string, testTxCount)
-
-	var testTxDiscarded sync.WaitGroup
-	testTxDiscarded.Add(testTxCount)
-
-	// replace transaction notification handler
-	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var txID string
-		var envelope signal.Envelope
-		if err := json.Unmarshal([]byte(jsonEvent), &envelope); err != nil {
-			t.Errorf("cannot unmarshal event's JSON: %s", jsonEvent)
-			return
-		}
-		if envelope.Type == signal.EventSignRequestAdded {
-			event := envelope.Event.(map[string]interface{})
-			txID = event["id"].(string)
-			t.Logf("transaction queued (will be discarded soon): {id: %s}\n", txID)
-
-			if !signRequests.Has(string(txID)) {
-				t.Errorf("txqueue should still have test tx: %s", txID)
-				return
-			}
-
-			txIDs <- txID
-		}
-
-		if envelope.Type == signal.EventSignRequestFailed {
-			event := envelope.Event.(map[string]interface{})
-			t.Logf("transaction return event received: {id: %s}\n", event["id"].(string))
-
-			receivedErrMessage := event["error_message"].(string)
-			expectedErrMessage := sign.ErrSignReqDiscarded.Error()
-			if receivedErrMessage != expectedErrMessage {
-				t.Errorf("unexpected error message received: got %v", receivedErrMessage)
-				return
-			}
-
-			receivedErrCode := event["error_code"].(string)
-			if receivedErrCode != strconv.Itoa(sign.SignRequestDiscardedErrorCode) {
-				t.Errorf("unexpected error code received: got %v", receivedErrCode)
-				return
-			}
-
-			testTxDiscarded.Done()
-		}
+	args, err := json.Marshal(transactions.SendTxArgs{
+		From:  account.FromAddress(TestConfig.Account1.Address),
+		To:    account.ToAddress(TestConfig.Account2.Address),
+		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 	})
-
-	// this call blocks, and should return when DiscardQueuedTransaction() for a given tx id is called
-	sendTx := func() {
-		txHashCheck, err := statusBackend.SendTransaction(context.TODO(), transactions.SendTxArgs{
-			From:  account.FromAddress(TestConfig.Account1.Address),
-			To:    account.ToAddress(TestConfig.Account2.Address),
-			Value: (*hexutil.Big)(big.NewInt(1000000000000)),
-		})
-		if err != sign.ErrSignReqDiscarded {
-			t.Errorf("expected error not thrown: %v", err)
-			return
-		}
-
-		if !reflect.DeepEqual(txHashCheck, gethcommon.Hash{}) {
-			t.Error("transaction returned hash, while it shouldn't")
-			return
-		}
+	if err != nil {
+		t.Errorf("failed to marshal errors: %v", err)
+		return false
 	}
+	rawResult := SendTransaction(C.CString(string(args)), C.CString(TestConfig.Account1.Password))
 
-	// wait for transactions, and discard immediately
-	discardTxs := func(txIDStrings string) {
-		var parsedIDs []string
-		if err := json.Unmarshal([]byte(txIDStrings), &parsedIDs); err != nil {
-			t.Error(err)
-			return
-		}
-
-		parsedIDs = append(parsedIDs, "invalid-tx-id")
-		updatedTxIDStrings, _ := json.Marshal(parsedIDs)
-
-		// discard
-		discardResultsString := DiscardSignRequests(C.CString(string(updatedTxIDStrings)))
-		discardResultsStruct := DiscardSignRequestsResult{}
-		if err := json.Unmarshal([]byte(C.GoString(discardResultsString)), &discardResultsStruct); err != nil {
-			t.Error(err)
-			return
-		}
-		discardResults := discardResultsStruct.Results
-
-		if len(discardResults) != 1 || discardResults["invalid-tx-id"].Error != sign.ErrSignReqNotFound.Error() {
-			t.Errorf("cannot discard txs: %v", discardResults)
-			return
-		}
-
-		// try completing discarded transaction
-		completeResultsString := ApproveSignRequests(C.CString(string(updatedTxIDStrings)), C.CString(TestConfig.Account1.Password))
-		completeResultsStruct := SignRequestsResult{}
-		if err := json.Unmarshal([]byte(C.GoString(completeResultsString)), &completeResultsStruct); err != nil {
-			t.Error(err)
-			return
-		}
-		completeResults := completeResultsStruct.Results
-
-		if len(completeResults) != (testTxCount + 1) {
-			t.Error("unexpected number of errors (call to ApproveSignRequest should not succeed)")
-		}
-		for txID, txResult := range completeResults {
-			if txID != txResult.ID {
-				t.Errorf("tx id not set in result: expected id is %s", txID)
-				return
-			}
-			if txResult.Error != sign.ErrSignReqNotFound.Error() {
-				t.Errorf("invalid error for %s", txResult.Hash)
-				return
-			}
-			if txResult.Hash != zeroHash {
-				t.Errorf("invalid hash (expected zero): '%s'", txResult.Hash)
-				return
-			}
-		}
-
-		time.Sleep(1 * time.Second) // make sure that tx complete signal propagates
-		for _, txID := range parsedIDs {
-			if signRequests.Has(string(txID)) {
-				t.Errorf("txqueue should not have test tx at this point (it should be discarded): %s", txID)
-				return
-			}
-		}
-	}
-	go func() {
-		var txIDStrings []string
-		for i := 0; i < testTxCount; i++ {
-			txIDStrings = append(txIDStrings, <-txIDs)
-		}
-
-		txIDJSON, _ := json.Marshal(txIDStrings)
-		discardTxs(string(txIDJSON))
-	}()
-
-	// send multiple transactions
-	for i := 0; i < testTxCount; i++ {
-		go sendTx()
-	}
-
-	done := make(chan struct{})
-	go func() { testTxDiscarded.Wait(); close(done) }()
-
-	select {
-	case <-done:
-		// pass
-	case <-time.After(20 * time.Second):
-		t.Error("test timed out")
+	var result jsonrpcAnyResponse
+	if err := json.Unmarshal([]byte(C.GoString(rawResult)), &result); err != nil {
+		t.Errorf("failed to unmarshal rawResult '%s': %v", C.GoString(rawResult), err)
 		return false
 	}
 
-	if signRequests.Count() != 0 {
-		t.Error("tx queue must be empty at this point")
+	if result.Error.Message != transactions.ErrInvalidTxSender.Error() {
+		t.Errorf("expected error to be ErrInvalidTxSender, got %s", result.Error.Message)
+		return false
+	}
+
+	if result.Result != nil {
+		t.Errorf("expected result to be nil")
 		return false
 	}
 
 	return true
+
 }
 
 func startTestNode(t *testing.T) <-chan struct{} {

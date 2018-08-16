@@ -3,7 +3,6 @@ package transactions
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 
 	ethereum "github.com/ethereum/go-ethereum"
@@ -13,12 +12,11 @@ import (
 
 var (
 	// ErrInvalidSendTxArgs is returned when the structure of SendTxArgs is ambigious.
-	ErrInvalidSendTxArgs = errors.New("Transaction arguments are invalid (are both 'input' and 'data' fields used?)")
-	// ErrUnexpectedArgs returned when args are of unexpected length.
+	ErrInvalidSendTxArgs = errors.New("transaction arguments are invalid")
+	// ErrUnexpectedArgs is returned when args are of unexpected length.
 	ErrUnexpectedArgs = errors.New("unexpected args")
-
-	//ErrInvalidCompleteTxSender - error transaction with invalid sender
-	ErrInvalidCompleteTxSender = errors.New("transaction can only be completed by its creator")
+	//ErrInvalidTxSender is returned when selected account is different tham From field.
+	ErrInvalidTxSender = errors.New("transaction can only be send by its creator")
 )
 
 // PendingNonceProvider provides information about nonces.
@@ -71,21 +69,4 @@ func (args SendTxArgs) GetInput() hexutil.Bytes {
 
 func isNilOrEmpty(bytes hexutil.Bytes) bool {
 	return bytes == nil || len(bytes) == 0
-}
-
-// RPCCalltoSendTxArgs creates SendTxArgs based on RPC parameters
-func RPCCalltoSendTxArgs(args ...interface{}) (SendTxArgs, error) {
-	var txArgs SendTxArgs
-	if len(args) != 1 {
-		return txArgs, ErrUnexpectedArgs
-	}
-	data, err := json.Marshal(args[0])
-	if err != nil {
-		return txArgs, err
-	}
-	if err := json.Unmarshal(data, &txArgs); err != nil {
-		return txArgs, err
-	}
-
-	return txArgs, nil
 }

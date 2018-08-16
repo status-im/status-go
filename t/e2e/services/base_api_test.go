@@ -5,12 +5,19 @@ import (
 	"fmt"
 
 	"github.com/status-im/status-go/api"
-	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/t/e2e"
 
 	. "github.com/status-im/status-go/t/utils"
 )
+
+const (
+	// see vendor/github.com/ethereum/go-ethereum/rpc/errors.go:L27
+	methodNotFoundErrorCode = -32601
+)
+
+type rpcError struct {
+	Code int `json:"code"`
+}
 
 type BaseJSONRPCSuite struct {
 	e2e.BackendTestSuite
@@ -80,31 +87,4 @@ func (s *BaseJSONRPCSuite) SetupTest(upstreamEnabled, statusServiceEnabled, debu
 	}
 
 	return s.Backend.StartNode(nodeConfig)
-}
-
-func (s *BaseJSONRPCSuite) notificationHandler(account string, pass string, expectedError error) func(string) {
-	return func(jsonEvent string) {
-		envelope := unmarshalEnvelope(jsonEvent)
-		if envelope.Type == signal.EventSignRequestAdded {
-			event := envelope.Event.(map[string]interface{})
-			id := event["id"].(string)
-			s.T().Logf("Sign request added (will be completed shortly): {id: %s}\n", id)
-
-			//check for the correct method name
-			method := event["method"].(string)
-			s.Equal(params.PersonalSignMethodName, method)
-			//check the event data
-			args := event["args"].(map[string]interface{})
-			s.Equal(signDataString, args["data"].(string))
-			s.Equal(account, args["account"].(string))
-
-			e := s.Backend.ApproveSignRequest(id, pass).Error
-			s.T().Logf("Sign request approved. {id: %s, acc: %s, err: %v}", id, account, e)
-			if expectedError == nil {
-				s.NoError(e, "cannot complete sign reauest[%v]: %v", id, e)
-			} else {
-				s.EqualError(e, expectedError.Error())
-			}
-		}
-	}
 }

@@ -13,8 +13,9 @@ import (
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/profiling"
-	"github.com/status-im/status-go/sign"
+	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/signal"
+	"github.com/status-im/status-go/transactions"
 	"gopkg.in/go-playground/validator.v9"
 )
 
@@ -210,143 +211,46 @@ func Logout() *C.char {
 	return makeJSONResponse(err)
 }
 
-//ApproveSignRequestWithArgs instructs backend to complete sending of a given transaction.
-// gas and gasPrice will be overrided with the given values before signing the
-// transaction.
-//export ApproveSignRequestWithArgs
-func ApproveSignRequestWithArgs(id, password *C.char, gas, gasPrice C.longlong) *C.char {
-	result := statusBackend.ApproveSignRequestWithArgs(C.GoString(id), C.GoString(password), int64(gas), int64(gasPrice))
-
-	return prepareApproveSignRequestResponse(result, id)
+// SignMessage unmarshals rpc params {data, address, password} and passes
+// them onto backend.SignMessage
+//export SignMessage
+func SignMessage(rpcParams *C.char) *C.char {
+	var params personal.SignParams
+	err := json.Unmarshal([]byte(C.GoString(rpcParams)), &params)
+	if err != nil {
+		return C.CString(prepareJSONResponseWithCode(nil, err, codeFailedParseParams))
+	}
+	result, err := statusBackend.SignMessage(params)
+	return C.CString(prepareJSONResponse(result.String(), err))
 }
 
-//ApproveSignRequest instructs backend to complete sending of a given transaction.
-//export ApproveSignRequest
-func ApproveSignRequest(id, password *C.char) *C.char {
-	result := statusBackend.ApproveSignRequest(C.GoString(id), C.GoString(password))
-
-	return prepareApproveSignRequestResponse(result, id)
+// Recover unmarshals rpc params {signDataString, signedData} and passes
+// them onto backend.
+//export Recover
+func Recover(rpcParams *C.char) *C.char {
+	var params personal.RecoverParams
+	err := json.Unmarshal([]byte(C.GoString(rpcParams)), &params)
+	if err != nil {
+		return C.CString(prepareJSONResponseWithCode(nil, err, codeFailedParseParams))
+	}
+	addr, err := statusBackend.Recover(params)
+	return C.CString(prepareJSONResponse(addr.String(), err))
 }
 
-// prepareApproveSignRequestResponse based on a sign.Result prepares the binding
-// response.
-func prepareApproveSignRequestResponse(result sign.Result, id *C.char) *C.char {
-	errString := ""
-	if result.Error != nil {
-		fmt.Fprintln(os.Stderr, result.Error)
-		errString = result.Error.Error()
-	}
-
-	out := SignRequestResult{
-		ID:    C.GoString(id),
-		Hash:  result.Response.Hex(),
-		Error: errString,
-	}
-	outBytes, err := json.Marshal(out)
+// SendTransaction converts RPC args and calls backend.SendTransaction
+//export SendTransaction
+func SendTransaction(txArgsJSON, password *C.char) *C.char {
+	var params transactions.SendTxArgs
+	err := json.Unmarshal([]byte(C.GoString(txArgsJSON)), &params)
 	if err != nil {
-		logger.Error("failed to marshal ApproveSignRequest output", "error", err)
-		return makeJSONResponse(err)
+		return C.CString(prepareJSONResponseWithCode(nil, err, codeFailedParseParams))
 	}
-
-	return C.CString(string(outBytes))
-}
-
-//ApproveSignRequests instructs backend to complete sending of multiple transactions
-//export ApproveSignRequests
-func ApproveSignRequests(ids, password *C.char) *C.char {
-	out := SignRequestsResult{}
-	out.Results = make(map[string]SignRequestResult)
-
-	parsedIDs, err := ParseJSONArray(C.GoString(ids))
-	if err != nil {
-		out.Results["none"] = SignRequestResult{
-			Error: err.Error(),
-		}
-	} else {
-		txIDs := make([]string, len(parsedIDs))
-		for i, id := range parsedIDs {
-			txIDs[i] = id
-		}
-
-		results := statusBackend.ApproveSignRequests(txIDs, C.GoString(password))
-		for txID, result := range results {
-			txResult := SignRequestResult{
-				ID:   txID,
-				Hash: result.Response.Hex(),
-			}
-			if result.Error != nil {
-				txResult.Error = result.Error.Error()
-			}
-			out.Results[txID] = txResult
-		}
+	hash, err := statusBackend.SendTransaction(params, C.GoString(password))
+	code := codeUnknown
+	if c, ok := errToCodeMap[err]; ok {
+		code = c
 	}
-
-	outBytes, err := json.Marshal(out)
-	if err != nil {
-		logger.Error("failed to marshal ApproveSignRequests output", "error", err)
-		return makeJSONResponse(err)
-	}
-
-	return C.CString(string(outBytes))
-}
-
-//DiscardSignRequest discards a given transaction from transaction queue
-//export DiscardSignRequest
-func DiscardSignRequest(id *C.char) *C.char {
-	err := statusBackend.DiscardSignRequest(C.GoString(id))
-
-	errString := ""
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		errString = err.Error()
-	}
-
-	out := DiscardSignRequestResult{
-		ID:    C.GoString(id),
-		Error: errString,
-	}
-	outBytes, err := json.Marshal(out)
-	if err != nil {
-		log.Error("failed to marshal DiscardSignRequest output", "error", err)
-		return makeJSONResponse(err)
-	}
-
-	return C.CString(string(outBytes))
-}
-
-//DiscardSignRequests discards given multiple transactions from transaction queue
-//export DiscardSignRequests
-func DiscardSignRequests(ids *C.char) *C.char {
-	out := DiscardSignRequestsResult{}
-	out.Results = make(map[string]DiscardSignRequestResult)
-
-	parsedIDs, err := ParseJSONArray(C.GoString(ids))
-	if err != nil {
-		out.Results["none"] = DiscardSignRequestResult{
-			Error: err.Error(),
-		}
-	} else {
-		txIDs := make([]string, len(parsedIDs))
-		for i, id := range parsedIDs {
-			txIDs[i] = id
-		}
-
-		results := statusBackend.DiscardSignRequests(txIDs)
-		for txID, err := range results {
-			out.Results[txID] = DiscardSignRequestResult{
-				ID:    txID,
-				Error: err.Error(),
-			}
-		}
-	}
-
-	outBytes, err := json.Marshal(out)
-	if err != nil {
-		logger.Error("failed to marshal DiscardSignRequests output", "error", err)
-		return makeJSONResponse(err)
-	}
-
-	return C.CString(string(outBytes))
+	return C.CString(prepareJSONResponseWithCode(hash.String(), err, code))
 }
 
 //StartCPUProfile runs pprof for cpu

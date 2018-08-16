@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
 	gethnode "github.com/ethereum/go-ethereum/node"
 
@@ -19,7 +20,6 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/rpcfilters"
-	"github.com/status-im/status-go/sign"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
 )
@@ -34,21 +34,22 @@ var (
 	ErrWhisperClearIdentitiesFailure = errors.New("failed to clear whisper identities")
 	// ErrWhisperIdentityInjectionFailure injecting whisper identities has failed.
 	ErrWhisperIdentityInjectionFailure = errors.New("failed to inject identity into Whisper")
+	// ErrUnsupportedRPCMethod is for methods not supported by the RPC interface
+	ErrUnsupportedRPCMethod = errors.New("method is unsupported by RPC interface")
 )
 
 // StatusBackend implements Status.im service
 type StatusBackend struct {
-	mu                  sync.Mutex
-	statusNode          *node.StatusNode
-	pendingSignRequests *sign.PendingRequests
-	personalAPI         *personal.PublicAPI
-	rpcFilters          *rpcfilters.Service
-	accountManager      *account.Manager
-	transactor          *transactions.Transactor
-	newNotification     fcm.NotificationConstructor
-	connectionState     connectionState
-	appState            appState
-	log                 log.Logger
+	mu              sync.Mutex
+	statusNode      *node.StatusNode
+	personalAPI     *personal.PublicAPI
+	rpcFilters      *rpcfilters.Service
+	accountManager  *account.Manager
+	transactor      *transactions.Transactor
+	newNotification fcm.NotificationConstructor
+	connectionState connectionState
+	appState        appState
+	log             log.Logger
 }
 
 // NewStatusBackend create a new NewStatusBackend instance
@@ -56,22 +57,20 @@ func NewStatusBackend() *StatusBackend {
 	defer log.Info("Status backend initialized")
 
 	statusNode := node.New()
-	pendingSignRequests := sign.NewPendingRequests()
 	accountManager := account.NewManager(statusNode)
-	transactor := transactions.NewTransactor(pendingSignRequests)
-	personalAPI := personal.NewAPI(pendingSignRequests)
+	transactor := transactions.NewTransactor()
+	personalAPI := personal.NewAPI()
 	notificationManager := fcm.NewNotification(fcmServerKey)
 	rpcFilters := rpcfilters.New(statusNode)
 
 	return &StatusBackend{
-		pendingSignRequests: pendingSignRequests,
-		statusNode:          statusNode,
-		accountManager:      accountManager,
-		transactor:          transactor,
-		personalAPI:         personalAPI,
-		rpcFilters:          rpcFilters,
-		newNotification:     notificationManager,
-		log:                 log.New("package", "status-go/api.StatusBackend"),
+		statusNode:      statusNode,
+		accountManager:  accountManager,
+		transactor:      transactor,
+		personalAPI:     personalAPI,
+		rpcFilters:      rpcFilters,
+		newNotification: notificationManager,
+		log:             log.New("package", "status-go/api.StatusBackend"),
 	}
 }
 
@@ -88,11 +87,6 @@ func (b *StatusBackend) AccountManager() *account.Manager {
 // Transactor returns reference to a status transactor
 func (b *StatusBackend) Transactor() *transactions.Transactor {
 	return b.transactor
-}
-
-// PendingSignRequests returns reference to a list of current sign requests
-func (b *StatusBackend) PendingSignRequests() *sign.PendingRequests {
-	return b.pendingSignRequests
 }
 
 // IsNodeRunning confirm that node is running
@@ -225,12 +219,36 @@ func (b *StatusBackend) CallPrivateRPC(inputJSON string) string {
 }
 
 // SendTransaction creates a new transaction and waits until it's complete.
-func (b *StatusBackend) SendTransaction(ctx context.Context, args transactions.SendTxArgs) (hash gethcommon.Hash, err error) {
-	transactionHash, err := b.transactor.SendTransaction(ctx, args)
-	if err == nil {
-		go b.rpcFilters.TriggerTransactionSentToUpstreamEvent(transactionHash)
+func (b *StatusBackend) SendTransaction(sendArgs transactions.SendTxArgs, password string) (hash gethcommon.Hash, err error) {
+	verifiedAccount, err := b.getVerifiedAccount(password)
+	if err != nil {
+		return hash, err
 	}
-	return transactionHash, err
+
+	hash, err = b.transactor.SendTransaction(sendArgs, verifiedAccount)
+	if err != nil {
+		return
+	}
+
+	go b.rpcFilters.TriggerTransactionSentToUpstreamEvent(hash)
+
+	return
+}
+
+// SignMessage checks the pwd vs the selected account and passes on the signParams
+// to personalAPI for message signature
+func (b *StatusBackend) SignMessage(rpcParams personal.SignParams) (hexutil.Bytes, error) {
+	verifiedAccount, err := b.getVerifiedAccount(rpcParams.Password)
+	if err != nil {
+		return hexutil.Bytes{}, err
+	}
+	return b.personalAPI.Sign(rpcParams, verifiedAccount)
+}
+
+// Recover calls the personalAPI to return address associated with the private
+// key that was used to calculate the signature in the message
+func (b *StatusBackend) Recover(rpcParams personal.RecoverParams) (gethcommon.Address, error) {
+	return b.personalAPI.Recover(rpcParams)
 }
 
 func (b *StatusBackend) getVerifiedAccount(password string) (*account.SelectedExtKey, error) {
@@ -246,46 +264,6 @@ func (b *StatusBackend) getVerifiedAccount(password string) (*account.SelectedEx
 		return nil, err
 	}
 	return selectedAccount, nil
-}
-
-// ApproveSignRequest instructs backend to complete sending of a given transaction.
-func (b *StatusBackend) ApproveSignRequest(id, password string) sign.Result {
-	return b.pendingSignRequests.Approve(id, password, nil, b.getVerifiedAccount)
-}
-
-// ApproveSignRequestWithArgs instructs backend to complete sending of a given transaction.
-// gas and gasPrice will be overrided with the given values before signing the
-// transaction.
-func (b *StatusBackend) ApproveSignRequestWithArgs(id, password string, gas, gasPrice int64) sign.Result {
-	args := prepareTxArgs(gas, gasPrice)
-	return b.pendingSignRequests.Approve(id, password, &args, b.getVerifiedAccount)
-}
-
-// ApproveSignRequests instructs backend to complete sending of multiple transactions
-func (b *StatusBackend) ApproveSignRequests(ids []string, password string) map[string]sign.Result {
-	results := make(map[string]sign.Result)
-	for _, txID := range ids {
-		results[txID] = b.ApproveSignRequest(txID, password)
-	}
-	return results
-}
-
-// DiscardSignRequest discards a given transaction from transaction queue
-func (b *StatusBackend) DiscardSignRequest(id string) error {
-	return b.pendingSignRequests.Discard(id)
-}
-
-// DiscardSignRequests discards given multiple transactions from transaction queue
-func (b *StatusBackend) DiscardSignRequests(ids []string) map[string]error {
-	results := make(map[string]error)
-	for _, txID := range ids {
-		err := b.DiscardSignRequest(txID)
-		if err != nil {
-			results[txID] = err
-		}
-	}
-
-	return results
 }
 
 // registerHandlers attaches Status callback handlers to running node
@@ -312,28 +290,16 @@ func (b *StatusBackend) registerHandlers() error {
 			},
 		)
 
-		client.RegisterHandler(
-			params.SendTransactionMethodName,
-			func(ctx context.Context, rpcParams ...interface{}) (interface{}, error) {
-				txArgs, err := transactions.RPCCalltoSendTxArgs(rpcParams...)
-				if err != nil {
-					return nil, err
-				}
-
-				hash, err := b.SendTransaction(ctx, txArgs)
-				if err != nil {
-					return nil, err
-				}
-
-				return hash.Hex(), err
-			},
-		)
-
-		client.RegisterHandler(params.PersonalSignMethodName, b.personalAPI.Sign)
-		client.RegisterHandler(params.PersonalRecoverMethodName, b.personalAPI.Recover)
+		client.RegisterHandler(params.SendTransactionMethodName, unsupportedMethodHandler)
+		client.RegisterHandler(params.PersonalSignMethodName, unsupportedMethodHandler)
+		client.RegisterHandler(params.PersonalRecoverMethodName, unsupportedMethodHandler)
 	}
 
 	return nil
+}
+
+func unsupportedMethodHandler(ctx context.Context, rpcParams ...interface{}) (interface{}, error) {
+	return nil, ErrUnsupportedRPCMethod
 }
 
 // ConnectionChange handles network state changes logic.

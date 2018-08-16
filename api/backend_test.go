@@ -2,12 +2,10 @@ package api
 
 import (
 	"fmt"
-	"math/big"
 	"math/rand"
 	"sync"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
@@ -105,12 +103,6 @@ func TestBackendGettersConcurrently(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		assert.NotNil(t, backend.Transactor())
-		wg.Done()
-	}()
-
-	wg.Add(1)
-	go func() {
-		assert.NotNil(t, backend.PendingSignRequests())
 		wg.Done()
 	}()
 
@@ -284,58 +276,6 @@ func TestAppStateChange(t *testing.T) {
 	}
 }
 
-func TestPrepareTxArgs(t *testing.T) {
-	var flagtests = []struct {
-		description      string
-		gas              int64
-		gasPrice         int64
-		expectedGas      *hexutil.Uint64
-		expectedGasPrice *hexutil.Big
-	}{
-		{
-			description:      "Empty gas and gas price",
-			gas:              0,
-			gasPrice:         0,
-			expectedGas:      nil,
-			expectedGasPrice: nil,
-		},
-		{
-			description: "Non empty gas and gas price",
-			gas:         1,
-			gasPrice:    2,
-			expectedGas: func() *hexutil.Uint64 {
-				x := hexutil.Uint64(1)
-				return &x
-			}(),
-			expectedGasPrice: (*hexutil.Big)(big.NewInt(2)),
-		},
-		{
-			description: "Empty gas price",
-			gas:         1,
-			gasPrice:    0,
-			expectedGas: func() *hexutil.Uint64 {
-				x := hexutil.Uint64(1)
-				return &x
-			}(),
-			expectedGasPrice: nil,
-		},
-		{
-			description:      "Empty gas",
-			gas:              0,
-			gasPrice:         2,
-			expectedGas:      nil,
-			expectedGasPrice: (*hexutil.Big)(big.NewInt(2)),
-		},
-	}
-	for _, tt := range flagtests {
-		t.Run(tt.description, func(t *testing.T) {
-			args := prepareTxArgs(tt.gas, tt.gasPrice)
-			assert.Equal(t, tt.expectedGas, args.Gas)
-			assert.Equal(t, tt.expectedGasPrice, args.GasPrice)
-		})
-	}
-}
-
 func TestBlockedRPCMethods(t *testing.T) {
 	backend := NewStatusBackend()
 	err := backend.StartNode(&params.NodeConfig{})
@@ -352,4 +292,4 @@ func TestBlockedRPCMethods(t *testing.T) {
 	}
 }
 
-// TODO(adam): add concurrent tests for: SendTransaction, ApproveSignRequest, DiscardSignRequest
+// TODO(adam): add concurrent tests for: SendTransaction

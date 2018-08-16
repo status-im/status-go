@@ -1,8 +1,8 @@
 package transactions
 
 import (
+	"bytes"
 	"context"
-	"fmt"
 	"math/big"
 	"sync"
 	"time"
@@ -14,9 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/status-im/status-go/account"
-	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/sign"
 )
 
 const (
@@ -29,7 +27,6 @@ const (
 // Transactor validates, signs transactions.
 // It uses upstream to propagate transactions to the Ethereum network.
 type Transactor struct {
-	pendingSignRequests  *sign.PendingRequests
 	sender               ethereum.TransactionSender
 	pendingNonceProvider PendingNonceProvider
 	gasCalculator        GasCalculator
@@ -43,13 +40,12 @@ type Transactor struct {
 }
 
 // NewTransactor returns a new Manager.
-func NewTransactor(signRequests *sign.PendingRequests) *Transactor {
+func NewTransactor() *Transactor {
 	return &Transactor{
-		pendingSignRequests: signRequests,
-		addrLock:            &AddrLocker{},
-		sendTxTimeout:       sendTxTimeout,
-		localNonce:          sync.Map{},
-		log:                 log.New("package", "status-go/transactions.Manager"),
+		addrLock:      &AddrLocker{},
+		sendTxTimeout: sendTxTimeout,
+		localNonce:    sync.Map{},
+		log:           log.New("package", "status-go/transactions.Manager"),
 	}
 }
 
@@ -68,25 +64,9 @@ func (t *Transactor) SetRPC(rpcClient *rpc.Client, timeout time.Duration) {
 }
 
 // SendTransaction is an implementation of eth_sendTransaction. It queues the tx to the sign queue.
-func (t *Transactor) SendTransaction(ctx context.Context, args SendTxArgs) (gethcommon.Hash, error) {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-
-	completeFunc := func(acc *account.SelectedExtKey, password string, signArgs *sign.TxArgs) (sign.Response, error) {
-		t.mergeSignTxArgsOntoSendTxArgs(signArgs, &args)
-		hash, err := t.validateAndPropagate(acc, args)
-		return sign.Response(hash.Bytes()), err
-	}
-
-	request, err := t.pendingSignRequests.Add(ctx, params.SendTransactionMethodName, args, completeFunc)
-
-	if err != nil {
-		return gethcommon.Hash{}, err
-	}
-
-	result := t.pendingSignRequests.Wait(request.ID, t.sendTxTimeout)
-	return result.Response.Hash(), result.Error
+func (t *Transactor) SendTransaction(sendArgs SendTxArgs, verifiedAccount *account.SelectedExtKey) (hash gethcommon.Hash, err error) {
+	hash, err = t.validateAndPropagate(verifiedAccount, sendArgs)
+	return
 }
 
 // make sure that only account which created the tx can complete it
@@ -95,10 +75,8 @@ func (t *Transactor) validateAccount(args SendTxArgs, selectedAccount *account.S
 		return account.ErrNoAccountSelected
 	}
 
-	if args.From.Hex() != selectedAccount.Address.Hex() {
-		err := sign.NewTransientError(ErrInvalidCompleteTxSender)
-		t.log.Error("queued transaction does not belong to the selected account", "err", err)
-		return err
+	if !bytes.Equal(args.From.Bytes(), selectedAccount.Address.Bytes()) {
+		return ErrInvalidTxSender
 	}
 
 	return nil
@@ -108,6 +86,7 @@ func (t *Transactor) validateAndPropagate(selectedAccount *account.SelectedExtKe
 	if err = t.validateAccount(args, selectedAccount); err != nil {
 		return hash, err
 	}
+
 	if !args.Valid() {
 		return hash, ErrInvalidSendTxArgs
 	}
@@ -165,7 +144,7 @@ func (t *Transactor) validateAndPropagate(selectedAccount *account.SelectedExtKe
 			return hash, err
 		}
 		if gas < defaultGas {
-			t.log.Info(fmt.Sprintf("default gas will be used. estimated gas %v is lower than %v", gas, defaultGas))
+			t.log.Info("default gas will be used because estimated is lower", "estimated", gas, "default", defaultGas)
 			gas = defaultGas
 		}
 	} else {
@@ -204,16 +183,4 @@ func (t *Transactor) validateAndPropagate(selectedAccount *account.SelectedExtKe
 		return hash, err
 	}
 	return signedTx.Hash(), nil
-}
-
-func (t *Transactor) mergeSignTxArgsOntoSendTxArgs(signArgs *sign.TxArgs, args *SendTxArgs) {
-	if signArgs == nil {
-		return
-	}
-	if signArgs.Gas != nil {
-		args.Gas = signArgs.Gas
-	}
-	if signArgs.GasPrice != nil {
-		args.GasPrice = signArgs.GasPrice
-	}
 }
