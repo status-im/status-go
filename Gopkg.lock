@@ -1041,7 +1041,6 @@
     "github.com/ethereum/go-ethereum/eth/downloader",
     "github.com/ethereum/go-ethereum/event",
     "github.com/ethereum/go-ethereum/les",
-    "github.com/ethereum/go-ethereum/light",
     "github.com/ethereum/go-ethereum/log",
     "github.com/ethereum/go-ethereum/metrics",
     "github.com/ethereum/go-ethereum/node",
