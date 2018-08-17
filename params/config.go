@@ -270,6 +270,10 @@ type NodeConfig struct {
 	// ListenAddr is an IP address and port of this node (e.g. 127.0.0.1:30303).
 	ListenAddr string
 
+	// AdvertiseAddr is a public IP address the node wants to be found with.
+	// It is especially useful when using floating IPs attached to a server.
+	AdvertiseAddr string
+
 	// Name sets the instance name of the node. It must not contain the / character.
 	Name string `validate:"excludes=/"`
 

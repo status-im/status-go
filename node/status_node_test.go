@@ -3,6 +3,7 @@ package node
 import (
 	"io/ioutil"
 	"math"
+	"net"
 	"os"
 	"path"
 	"reflect"
@@ -282,4 +283,23 @@ func TestStatusNodeRendezvousDiscovery(t *testing.T) {
 	require.NotNil(t, n.discovery)
 	require.True(t, n.discovery.Running())
 	require.IsType(t, &discovery.Rendezvous{}, n.discovery)
+}
+
+func TestStatusNodeDiscoverNode(t *testing.T) {
+	config := params.NodeConfig{
+		NoDiscovery: true,
+		ListenAddr:  "127.0.0.1:0",
+	}
+	n := New()
+	require.NoError(t, n.Start(&config))
+	require.Equal(t, net.ParseIP("127.0.0.1").To4(), n.discoverNode().IP)
+
+	config = params.NodeConfig{
+		NoDiscovery:   true,
+		AdvertiseAddr: "127.0.0.2",
+		ListenAddr:    "127.0.0.1:0",
+	}
+	n = New()
+	require.NoError(t, n.Start(&config))
+	require.Equal(t, net.ParseIP("127.0.0.2"), n.discoverNode().IP)
 }

@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sync"
 	"time"
 
@@ -185,6 +187,19 @@ func (n *StatusNode) discoveryEnabled() bool {
 	return n.config != nil && (!n.config.NoDiscovery || n.config.Rendezvous) && n.config.ClusterConfig != nil
 }
 
+func (n *StatusNode) discoverNode() *discover.Node {
+	if !n.isRunning() {
+		return nil
+	}
+
+	discNode := n.gethNode.Server().Self()
+	if n.config.AdvertiseAddr != "" {
+		n.log.Info("using AdvertiseAddr for rendezvous", "addr", n.config.AdvertiseAddr)
+		discNode.IP = net.ParseIP(n.config.AdvertiseAddr)
+	}
+	return discNode
+}
+
 func (n *StatusNode) startRendezvous() (discovery.Discovery, error) {
 	if !n.config.Rendezvous {
 		return nil, errors.New("rendezvous is not enabled")
@@ -200,8 +215,7 @@ func (n *StatusNode) startRendezvous() (discovery.Discovery, error) {
 			return nil, fmt.Errorf("failed to parse rendezvous node %s: %v", n.config.ClusterConfig.RendezvousNodes[0], err)
 		}
 	}
-	srv := n.gethNode.Server()
-	return discovery.NewRendezvous(maddrs, srv.PrivateKey, srv.Self())
+	return discovery.NewRendezvous(maddrs, n.gethNode.Server().PrivateKey, n.discoverNode())
 }
 
 func (n *StatusNode) startDiscovery() error {
@@ -226,6 +240,12 @@ func (n *StatusNode) startDiscovery() error {
 	} else {
 		n.discovery = discoveries[0]
 	}
+	log.Debug(
+		"using discovery",
+		"instance", reflect.TypeOf(n.discovery),
+		"registerTopics", n.config.RegisterTopics,
+		"requireTopics", n.config.RequireTopics,
+	)
 	n.register = peers.NewRegister(n.discovery, n.config.RegisterTopics...)
 	options := peers.NewDefaultOptions()
 	// TODO(dshulyak) consider adding a flag to define this behaviour

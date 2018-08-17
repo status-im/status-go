@@ -18,6 +18,7 @@ import (
 
 const (
 	registrationPeriod = 10 * time.Second
+	requestTimeout     = 5 * time.Second
 	bucketSize         = 10
 )
 
@@ -44,6 +45,11 @@ type Rendezvous struct {
 	mu     sync.RWMutex
 	client *rendezvous.Client
 
+	// Root context is used to cancel running requests
+	// when Rendezvous is stopped.
+	rootCtx       context.Context
+	cancelRootCtx context.CancelFunc
+
 	servers            []ma.Multiaddr
 	registrationPeriod time.Duration
 	bucketSize         int
@@ -65,6 +71,7 @@ func (r *Rendezvous) Start() error {
 		return err
 	}
 	r.client = &client
+	r.rootCtx, r.cancelRootCtx = context.WithCancel(context.Background())
 	return nil
 }
 
@@ -72,13 +79,14 @@ func (r *Rendezvous) Start() error {
 func (r *Rendezvous) Stop() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	r.cancelRootCtx()
 	r.client = nil
 	return nil
 }
 
 func (r *Rendezvous) register(topic string) {
 	srv := r.servers[rand.Intn(len(r.servers))]
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.rootCtx, requestTimeout)
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	defer cancel()
@@ -104,8 +112,8 @@ func (r *Rendezvous) Register(topic string, stop chan struct{}) error {
 
 // Discover will search for new records every time period fetched from period channel.
 func (r *Rendezvous) Discover(
-	topic string, period <-chan time.Duration,
-	found chan<- *discv5.Node, lookup chan<- bool) error {
+	topic string, period <-chan time.Duration, found chan<- *discv5.Node, lookup chan<- bool,
+) error {
 	ticker := time.NewTicker(<-period)
 	for {
 		select {
@@ -117,7 +125,7 @@ func (r *Rendezvous) Discover(
 			ticker = time.NewTicker(newPeriod)
 		case <-ticker.C:
 			srv := r.servers[rand.Intn(len(r.servers))]
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			ctx, cancel := context.WithTimeout(r.rootCtx, requestTimeout)
 			r.mu.RLock()
 			records, err := r.client.Discover(ctx, srv, topic, r.bucketSize)
 			r.mu.RUnlock()
