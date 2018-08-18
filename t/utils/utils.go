@@ -7,7 +7,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"go/build"
 	"io"
 	"io/ioutil"
 	"os"
@@ -299,7 +298,7 @@ const passphraseEnvName = "ACCOUNT_PASSWORD"
 func loadTestConfig() (*testConfig, error) {
 	var config testConfig
 
-	pathOfStatic := getStatusHome() + "static/"
+	pathOfStatic := params.GetStatusHome() + "static/"
 	err := gettestConfigFromFile(pathOfStatic+"config/test-data.json", &config)
 	if err != nil {
 		return nil, err
@@ -337,7 +336,7 @@ func ImportTestAccount(keystoreDir, accountFile string) error {
 	}
 
 	dst := filepath.Join(keystoreDir, accountFile)
-	err := copyFile(dst, (getStatusHome() + "static/keys/" + accountFile))
+	err := copyFile(dst, (params.GetStatusHome() + "static/keys/" + accountFile))
 	if err != nil {
 		logger.Warn("cannot copy test account PK", "error", err)
 	}
@@ -350,6 +349,7 @@ func gettestConfigFromFile(fileName string, config *testConfig) error {
 	if err != nil {
 		return err
 	}
+
 	if err := json.Unmarshal(configData, &config); err != nil {
 		return err
 	}
@@ -368,12 +368,4 @@ func copyFile(sourceFile string, destinationFile string) error {
 		return err
 	}
 	return nil
-}
-
-func getStatusHome() string {
-	gopath := os.Getenv("GOPATH")
-	if gopath == "" {
-		gopath = build.Default.GOPATH
-	}
-	return gopath + "/src/github.com/status-im/status-go/"
 }

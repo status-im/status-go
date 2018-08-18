@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"go/build"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -15,8 +16,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
-
-	"github.com/status-im/status-go/static"
 )
 
 // errors
@@ -570,7 +569,7 @@ func (c *NodeConfig) updateGenesisConfig() error {
 
 // DefaultStatusChainGenesisBlock returns the StatusChain network genesis block.
 func (c *NodeConfig) DefaultStatusChainGenesisBlock() (*core.Genesis, error) {
-	genesisJSON, err := static.Asset("config/status-chain-genesis.json")
+	genesisJSON, err := ioutil.ReadFile(GetStatusHome() + "config/status-chain-genesis.json")
 	if err != nil {
 		return nil, fmt.Errorf("status-chain-genesis.json could not be loaded: %s", err)
 	}
@@ -717,4 +716,13 @@ func (c *NodeConfig) FormatAPIModules() []string {
 // AddAPIModule adds a mobule to APIModules
 func (c *NodeConfig) AddAPIModule(m string) {
 	c.APIModules = fmt.Sprintf("%s,%s", c.APIModules, m)
+}
+
+// GetStatusHome gets home directory of status-go
+func GetStatusHome() string {
+	gopath := os.Getenv("GOPATH")
+	if gopath == "" {
+		gopath = build.Default.GOPATH
+	}
+	return gopath + "/src/github.com/status-im/status-go/"
 }
