@@ -21,7 +21,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/static"
 
 	_ "github.com/stretchr/testify/suite" // required to register testify flags
 )
@@ -299,19 +298,19 @@ const passphraseEnvName = "ACCOUNT_PASSWORD"
 func loadTestConfig() (*testConfig, error) {
 	var config testConfig
 
-	configData := static.MustAsset("config/test-data.json")
-	if err := json.Unmarshal(configData, &config); err != nil {
+	err := gettestConfigFromFile("config/test-data.json", &config)
+	if err != nil {
 		return nil, err
 	}
 
 	if GetNetworkID() == params.StatusChainNetworkID {
-		accountsData := static.MustAsset("config/status-chain-accounts.json")
-		if err := json.Unmarshal(accountsData, &config); err != nil {
+		err := gettestConfigFromFile("config/status-chain-accounts.json", &config)
+		if err != nil {
 			return nil, err
 		}
 	} else {
-		accountsData := static.MustAsset("config/public-chain-accounts.json")
-		if err := json.Unmarshal(accountsData, &config); err != nil {
+		err := gettestConfigFromFile("config/public-chain-accounts.json", &config)
+		if err != nil {
 			return nil, err
 		}
 
@@ -336,10 +335,35 @@ func ImportTestAccount(keystoreDir, accountFile string) error {
 	}
 
 	dst := filepath.Join(keystoreDir, accountFile)
-	err := ioutil.WriteFile(dst, static.MustAsset("keys/"+accountFile), 0644)
+	err := copyFile(dst, ("keys/" + accountFile))
 	if err != nil {
 		logger.Warn("cannot copy test account PK", "error", err)
 	}
 
 	return err
+}
+
+func gettestConfigFromFile(fileName string, config *testConfig) error {
+	configData, err := ioutil.ReadFile(fileName)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(configData, &config); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func copyFile(sourceFile string, destinationFile string) error {
+	input, err := ioutil.ReadFile(sourceFile)
+	if err != nil {
+		return err
+	}
+
+	err = ioutil.WriteFile(destinationFile, input, 0644)
+	if err != nil {
+		return err
+	}
+	return nil
 }
