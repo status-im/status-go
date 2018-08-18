@@ -1,4 +1,2 @@
-// Package static embeds static (JS, HTML) resources right into the binaries
+// Package static contains JSON config files and keys
 package static
-
-//go:generate go-bindata -pkg static -o bindata.go config/ keys/ testdata/...
