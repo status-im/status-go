@@ -10,6 +10,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -298,19 +299,19 @@ const passphraseEnvName = "ACCOUNT_PASSWORD"
 func loadTestConfig() (*testConfig, error) {
 	var config testConfig
 
-	pathOfStatic := params.GetStatusHome() + "static/"
-	err := gettestConfigFromFile(pathOfStatic+"config/test-data.json", &config)
+	pathOfStatic := path.Join(params.GetStatusHome(), "/static")
+	err := gettestConfigFromFile(path.Join(pathOfStatic, "config/test-data.json"), &config)
 	if err != nil {
 		return nil, err
 	}
 
 	if GetNetworkID() == params.StatusChainNetworkID {
-		err := gettestConfigFromFile(pathOfStatic+"config/status-chain-accounts.json", &config)
+		err := gettestConfigFromFile(path.Join(pathOfStatic, "config/status-chain-accounts.json"), &config)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		err := gettestConfigFromFile(pathOfStatic+"config/public-chain-accounts.json", &config)
+		err := gettestConfigFromFile(path.Join(pathOfStatic, "config/public-chain-accounts.json"), &config)
 		if err != nil {
 			return nil, err
 		}
@@ -336,7 +337,7 @@ func ImportTestAccount(keystoreDir, accountFile string) error {
 	}
 
 	dst := filepath.Join(keystoreDir, accountFile)
-	err := copyFile(dst, (params.GetStatusHome() + "static/keys/" + accountFile))
+	err := copyFile(dst, path.Join(params.GetStatusHome(), "static/keys/", accountFile))
 	if err != nil {
 		logger.Warn("cannot copy test account PK", "error", err)
 	}

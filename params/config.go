@@ -9,6 +9,7 @@ import (
 	"go/build"
 	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -569,7 +570,7 @@ func (c *NodeConfig) updateGenesisConfig() error {
 
 // DefaultStatusChainGenesisBlock returns the StatusChain network genesis block.
 func (c *NodeConfig) DefaultStatusChainGenesisBlock() (*core.Genesis, error) {
-	genesisJSON, err := ioutil.ReadFile(GetStatusHome() + "config/status-chain-genesis.json")
+	genesisJSON, err := ioutil.ReadFile(path.Join(GetStatusHome(), "static/config/status-chain-genesis.json"))
 	if err != nil {
 		return nil, fmt.Errorf("status-chain-genesis.json could not be loaded: %s", err)
 	}
@@ -724,5 +725,6 @@ func GetStatusHome() string {
 	if gopath == "" {
 		gopath = build.Default.GOPATH
 	}
-	return gopath + "/src/github.com/status-im/status-go/"
+
+	return path.Join(gopath, "/src/github.com/status-im/status-go/")
 }
