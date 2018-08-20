@@ -27,6 +27,7 @@ func TestRendezvousDiscovery(t *testing.T) {
 	require.NoError(t, err)
 	srv := server.NewServer(laddr, priv, server.NewStorage(db))
 	require.NoError(t, srv.Start())
+	defer srv.Stop()
 
 	identity, err := crypto.GenerateKey()
 	require.NoError(t, err)
@@ -54,5 +55,4 @@ func TestRendezvousDiscovery(t *testing.T) {
 	}
 	close(stop)
 	close(period)
-
 }
