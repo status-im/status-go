@@ -1,0 +1,47 @@
+#!/usr/bin/env groovy
+
+parameters {
+  string(
+    name: 'DOCKER_TAG',
+    defaultValue: "deploy-staging",
+    description: 'Under what tag to push the docker image.'
+  )
+}
+
+properties([disableConcurrentBuilds()])
+
+node('linux') {
+
+  def image_name = 'statusteam/status-go'
+  def commit image build_flags
+  def tstamp = Calendar.getInstance().getTime().format(
+    'YYYYMMdd-hhmmss',TimeZone.getTimeZone('UTC')
+  )
+
+  stage('Git Prep') {
+    checkout scm
+    commit = sh(
+      returnStdout: true,
+      script: 'git rev-parse --short HEAD'
+    ).trim()
+    build_flags = "-ldflags '-X main.buildStamp=${tstamp}\
+    build_flags += "-X github.com/status-im/status-go/params.VersionMeta=${commit}'"
+  }
+
+  stage('Build') {
+    image = docker.build(
+      image_name + ':' + commit,
+      "--build-arg git_commit=${commit} " +
+      "_assets/build/Dockerfile-bootnode"
+    )
+  }
+
+  stage('Publish') {
+    withDockerRegistry([
+      credentialsId: "dockerhub-statusteam-auto", url: ""
+    ]) {
+      image.push()
+      image.push(params.DOCKER_TAG)
+    }
+  }
+}

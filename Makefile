@@ -131,12 +131,14 @@ docker-image: ##@docker Build docker image (use DOCKER_IMAGE_NAME to set the ima
 	docker build --file _assets/build/Dockerfile . \
 		--build-arg "build_tags=$(BUILD_TAGS)" \
 		--build-arg "build_flags=$(BUILD_FLAGS)" \
+		--build-arg "git_commit=$(GIT_COMMIT)" \
 		-t $(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG) \
 		-t $(DOCKER_IMAGE_NAME):latest
 
 bootnode-image:
 	@echo "Building docker image for bootnode..."
 	docker build --file _assets/build/Dockerfile-bootnode . \
+		--build-arg "git_commit=$(GIT_COMMIT)" \
 		-t $(BOOTNODE_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG) \
 		-t $(BOOTNODE_IMAGE_NAME):latest
 

@@ -1,6 +1,7 @@
 # Build status-go in a Go builder container
 FROM golang:1.10-alpine as builder
 
+ARG git_commit
 ARG build_tags
 ARG build_flags
 
@@ -19,6 +20,7 @@ FROM alpine:latest
 LABEL source="https://github.com/status-im/status-go"
 LABEL description="status-go is an underlying part of Status - a browser, messenger, and gateway to a decentralized world."
 LABEL maintainer="support@status.im"
+LABEL commit="$git_commit"
 
 RUN apk add --no-cache ca-certificates bash
 
