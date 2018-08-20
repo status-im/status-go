@@ -357,6 +357,9 @@ type NodeConfig struct {
 
 	// DebugAPIEnabled enables debug api
 	DebugAPIEnabled bool
+
+	// MailServerRegistryAddress is the MailServerRegistry contract address
+	MailServerRegistryAddress string
 }
 
 // NewNodeConfig creates new node configuration object
