@@ -260,7 +260,9 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 	nodeConfig.ClusterConfig.RendezvousNodes = []string(rendezvousNodes)
 	nodeConfig.NoDiscovery = !(*discoveryFlag)
 	nodeConfig.Rendezvous = *rendezvous
-	nodeConfig.RequireTopics = map[discv5.Topic]params.Limits(searchTopics)
+	if len(searchTopics) > 0 {
+		nodeConfig.RequireTopics = map[discv5.Topic]params.Limits(searchTopics)
+	}
 	nodeConfig.RegisterTopics = []discv5.Topic(registerTopics)
 
 	// Even if standalone is true and discovery is disabled,
