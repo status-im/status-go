@@ -390,19 +390,14 @@ var loadConfigTestCases = []struct {
 			}
 		}`,
 		func(t *testing.T, _ string, nodeConfig *params.NodeConfig, loadConfErr error) {
-			stagingClusters, err := params.ClusterForFleet("eth.staging")
+			staging, err := params.ClusterForFleet("eth.staging")
 			require.NoError(t, err)
-			staging, ok := params.ClusterForNetwork(stagingClusters, params.RopstenNetworkID)
-			require.True(t, ok)
-
-			betaClusters, err := params.ClusterForFleet("eth.beta")
+			beta, err := params.ClusterForFleet("eth.beta")
 			require.NoError(t, err)
-			beta, ok := params.ClusterForNetwork(betaClusters, params.RopstenNetworkID)
-			require.True(t, ok)
 
 			require.NotEqual(t, staging, beta)
 
-			// assert
+			// test case asserts
 			require.NoError(t, loadConfErr)
 			require.Equal(t, "eth.staging", nodeConfig.ClusterConfig.Fleet)
 			require.Equal(t, staging.BootNodes, nodeConfig.ClusterConfig.BootNodes)
