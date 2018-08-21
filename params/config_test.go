@@ -389,7 +389,7 @@ var loadConfigTestCases = []struct {
 				"Fleet": "eth.staging"
 			}
 		}`,
-		func(t *testing.T, _ string, nodeConfig *params.NodeConfig, err error) {
+		func(t *testing.T, _ string, nodeConfig *params.NodeConfig, loadConfErr error) {
 			stagingClusters, err := params.ClusterForFleet("eth.staging")
 			require.NoError(t, err)
 			staging, ok := params.ClusterForNetwork(stagingClusters, params.RopstenNetworkID)
@@ -403,7 +403,7 @@ var loadConfigTestCases = []struct {
 			require.NotEqual(t, staging, beta)
 
 			// assert
-			require.NoError(t, err)
+			require.NoError(t, loadConfErr)
 			require.Equal(t, "eth.staging", nodeConfig.ClusterConfig.Fleet)
 			require.Equal(t, staging.BootNodes, nodeConfig.ClusterConfig.BootNodes)
 		},
