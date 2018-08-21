@@ -21,13 +21,14 @@ var (
 	rendezvousNodes = StringSlice{}
 	bootnodes       = StringSlice{}
 	topics          = StringSlice{}
-	les             = flag.Int("les", 0, "Proxy les topic for a given network.")
+	les             = IntSlice{}
 	useEthereum     = flag.Bool("use-ethereum-boot", false, "If true ethereum bootnodes will be used")
 )
 
 func main() {
 	flag.Var(&rendezvousNodes, "rendezvous-node", "Rendezvous server.")
 	flag.Var(&bootnodes, "bootnode", "Discovery v5 node.")
+	flag.Var(&les, "les", "Proxy les topic for a given network.")
 	flag.Var(&topics, "topic", "Topic that will be proxied")
 	flag.Parse()
 
@@ -38,8 +39,10 @@ func main() {
 	filteredHandler := log.LvlFilterHandler(level, log.StderrHandler)
 	log.Root().SetHandler(filteredHandler)
 
-	if t := sparams.LesTopic(*les); len(t) != 0 {
-		topics = append(topics, t)
+	for _, net := range les {
+		if t := sparams.LesTopic(net); len(t) != 0 {
+			topics = append(topics, t)
+		}
 	}
 	key, err := crypto.GenerateKey()
 	if err != nil {

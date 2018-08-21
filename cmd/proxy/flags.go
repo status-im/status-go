@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"strconv"
 	"strings"
 )
 
@@ -22,5 +23,22 @@ func (s *StringSlice) Set(value string) error {
 		return ErrorEmpty
 	}
 	*s = append(*s, trimmed)
+	return nil
+}
+
+// IntSlice is a type of flag that allows setting multiple int values.
+type IntSlice []int
+
+func (s *IntSlice) String() string {
+	return "int slice"
+}
+
+// Set trims space from string and stores it.
+func (s *IntSlice) Set(value string) error {
+	val, err := strconv.Atoi(value)
+	if err != nil {
+		return err
+	}
+	*s = append(*s, val)
 	return nil
 }
