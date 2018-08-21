@@ -10,6 +10,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -21,7 +22,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/static"
 
 	_ "github.com/stretchr/testify/suite" // required to register testify flags
 )
@@ -299,19 +299,20 @@ const passphraseEnvName = "ACCOUNT_PASSWORD"
 func loadTestConfig() (*testConfig, error) {
 	var config testConfig
 
-	configData := static.MustAsset("config/test-data.json")
-	if err := json.Unmarshal(configData, &config); err != nil {
+	pathOfStatic := path.Join(params.GetStatusHome(), "/static")
+	err := getTestConfigFromFile(path.Join(pathOfStatic, "config/test-data.json"), &config)
+	if err != nil {
 		return nil, err
 	}
 
 	if GetNetworkID() == params.StatusChainNetworkID {
-		accountsData := static.MustAsset("config/status-chain-accounts.json")
-		if err := json.Unmarshal(accountsData, &config); err != nil {
+		err := getTestConfigFromFile(path.Join(pathOfStatic, "config/status-chain-accounts.json"), &config)
+		if err != nil {
 			return nil, err
 		}
 	} else {
-		accountsData := static.MustAsset("config/public-chain-accounts.json")
-		if err := json.Unmarshal(accountsData, &config); err != nil {
+		err := getTestConfigFromFile(path.Join(pathOfStatic, "config/public-chain-accounts.json"), &config)
+		if err != nil {
 			return nil, err
 		}
 
@@ -336,10 +337,43 @@ func ImportTestAccount(keystoreDir, accountFile string) error {
 	}
 
 	dst := filepath.Join(keystoreDir, accountFile)
-	err := ioutil.WriteFile(dst, static.MustAsset("keys/"+accountFile), 0644)
+	err := copyFile(path.Join(params.GetStatusHome(), "static/keys/", accountFile), dst)
 	if err != nil {
 		logger.Warn("cannot copy test account PK", "error", err)
 	}
 
 	return err
+}
+
+func getTestConfigFromFile(fileName string, config *testConfig) error {
+	configData, err := ioutil.ReadFile(fileName)
+	if err != nil {
+		return err
+	}
+
+	if err := json.Unmarshal(configData, &config); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, in)
+	if err != nil {
+		return err
+	}
+	return nil
 }
