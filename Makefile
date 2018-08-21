@@ -43,7 +43,7 @@ DOCKER_IMAGE_NAME ?= statusteam/status-go
 BOOTNODE_IMAGE_NAME ?= statusteam/bootnode
 STATUSD_PRUNE_IMAGE_NAME ?= statusteam/statusd-prune
 
-DOCKER_IMAGE_CUSTOM_TAG ?= $(shell BUILD_TAGS="$(BUILD_TAGS)" ./_assets/ci/get-docker-image-tag.sh)
+DOCKER_IMAGE_CUSTOM_TAG ?= $(shell ./_assets/ci/get-docker-image-tag.sh)
 
 DOCKER_TEST_WORKDIR = /go/src/github.com/status-im/status-go/
 DOCKER_TEST_IMAGE = golang:1.10
