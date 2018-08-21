@@ -25,13 +25,14 @@ endef
 $(error $(NOT_IN_GOPATH_ERROR))
 endif
 
-CGO_CFLAGS=-I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
-GOBIN=$(dir $(realpath $(firstword $(MAKEFILE_LIST))))build/bin
-GIT_COMMIT := $(shell git rev-parse --short HEAD)
+CGO_CFLAGS = -I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
+GOBIN = $(dir $(realpath $(firstword $(MAKEFILE_LIST))))build/bin
+GIT_COMMIT = $(shell git describe --exact-match --tag 2>/dev/null || git rev-parse --short HEAD)
+AUTHOR = $(shell echo $$USER)
 
-BUILD_FLAGS ?= $(shell echo "-ldflags '-X main.buildStamp=`date -u '+%Y-%m-%d.%H:%M:%S'` -X github.com/status-im/status-go/params.VersionMeta=$(GIT_COMMIT)'")
+BUILD_FLAGS ?= $(shell echo "-ldflags '-X main.buildStamp=`date -u '+%Y-%m-%d.%H:%M:%S'` -X github.com/status-im/status-go/params.Version=$(GIT_COMMIT)'")
 
-GO ?= latest
+XGO_GO ?= latest
 XGOVERSION ?= 1.10.x
 XGOIMAGE = statusteam/xgo:$(XGOVERSION)
 XGOIMAGEIOSSIM = statusteam/xgo-ios-simulator:$(XGOVERSION)
@@ -43,7 +44,7 @@ DOCKER_IMAGE_NAME ?= statusteam/status-go
 BOOTNODE_IMAGE_NAME ?= statusteam/bootnode
 STATUSD_PRUNE_IMAGE_NAME ?= statusteam/statusd-prune
 
-DOCKER_IMAGE_CUSTOM_TAG ?= $(shell BUILD_TAGS="$(BUILD_TAGS)" ./_assets/ci/get-docker-image-tag.sh)
+DOCKER_IMAGE_CUSTOM_TAG ?= $(GIT_COMMIT)
 
 DOCKER_TEST_WORKDIR = /go/src/github.com/status-im/status-go/
 DOCKER_TEST_IMAGE = golang:1.10
@@ -80,8 +81,12 @@ statusd-prune: ##@statusd-prune Build statusd-prune
 	@echo "Run \"build/bin/statusd-prune -h\" to view available commands."
 
 statusd-prune-docker-image: ##@statusd-prune Build statusd-prune docker image
-	@echo "Building docker image..."
-	docker build --file _assets/build/Dockerfile-prune . -t $(STATUSD_PRUNE_IMAGE_NAME):latest
+	@echo "Building docker image for ststusd-prune..."
+	docker build --file _assets/build/Dockerfile-prune . \
+		--label "commit=$(GIT_COMMIT)" \
+		--label "author=$(AUTHOR)" \
+		-t $(BOOTNODE_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG) \
+		-t $(STATUSD_PRUNE_IMAGE_NAME):latest
 
 bootnode: ##@build Build discovery v5 bootnode using status-go deps
 	go build -i -o $(GOBIN)/bootnode -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/bootnode/
@@ -97,26 +102,26 @@ statusgo-cross: statusgo-android statusgo-ios
 
 statusgo-linux: xgo ##@cross-compile Build status-go for Linux
 	./_assets/patches/patcher -b . -p geth-xgo
-	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=linux/amd64 -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/statusd
+	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(XGO_GO) -out statusgo --dest=$(GOBIN) --targets=linux/amd64 -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/statusd
 	./_assets/patches/patcher -b . -p geth-xgo -r
 	@echo "Android cross compilation done."
 
 statusgo-android: xgo ##@cross-compile Build status-go for Android
 	./_assets/patches/patcher -b . -p geth-xgo
-	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=android-16/aar -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./lib
+	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(XGO_GO) -out statusgo --dest=$(GOBIN) --targets=android-16/aar -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./lib
 	./_assets/patches/patcher -b . -p geth-xgo -r
 	@echo "Android cross compilation done."
 
 statusgo-ios: xgo	##@cross-compile Build status-go for iOS
 	./_assets/patches/patcher -b . -p geth-xgo
-	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./lib
+	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(XGO_GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./lib
 	./_assets/patches/patcher -b . -p geth-xgo -r
 	@echo "iOS framework cross compilation done."
 
 statusgo-ios-simulator: xgo	##@cross-compile Build status-go for iOS Simulator
 	@docker pull $(XGOIMAGEIOSSIM)
 	./_assets/patches/patcher -b . -p geth-xgo
-	$(GOPATH)/bin/xgo --image $(XGOIMAGEIOSSIM) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./lib
+	$(GOPATH)/bin/xgo --image $(XGOIMAGEIOSSIM) --go=$(XGO_GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./lib
 	./_assets/patches/patcher -b . -p geth-xgo -r
 	@echo "iOS framework cross compilation done."
 
@@ -131,14 +136,16 @@ docker-image: ##@docker Build docker image (use DOCKER_IMAGE_NAME to set the ima
 	docker build --file _assets/build/Dockerfile . \
 		--build-arg "build_tags=$(BUILD_TAGS)" \
 		--build-arg "build_flags=$(BUILD_FLAGS)" \
-		--build-arg "git_commit=$(GIT_COMMIT)" \
+		--label "commit=$(GIT_COMMIT)" \
+		--label "author=$(AUTHOR)" \
 		-t $(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG) \
 		-t $(DOCKER_IMAGE_NAME):latest
 
 bootnode-image:
 	@echo "Building docker image for bootnode..."
 	docker build --file _assets/build/Dockerfile-bootnode . \
-		--build-arg "git_commit=$(GIT_COMMIT)" \
+		--label "commit=$(GIT_COMMIT)" \
+		--label "author=$(AUTHOR)" \
 		-t $(BOOTNODE_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG) \
 		-t $(BOOTNODE_IMAGE_NAME):latest
 
