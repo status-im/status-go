@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -376,6 +377,35 @@ var loadConfigTestCases = []struct {
 		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
 			require.NoError(t, err)
 			require.True(t, nodeConfig.NoDiscovery)
+		},
+	},
+	{
+		`eth.staging fleet`,
+		`{
+			"NetworkId": ` + strconv.Itoa(params.RopstenNetworkID) + `,
+			"DataDir": "$TMPDIR",
+			"NoDiscovery": true,
+			"ClusterConfig": {
+				"Fleet": "eth.staging"
+			}
+		}`,
+		func(t *testing.T, _ string, nodeConfig *params.NodeConfig, err error) {
+			stagingClusters, err := params.ClusterForFleet("eth.staging")
+			require.NoError(t, err)
+			staging, ok := params.ClusterForNetwork(stagingClusters, params.RopstenNetworkID)
+			require.True(t, ok)
+
+			betaClusters, err := params.ClusterForFleet("eth.beta")
+			require.NoError(t, err)
+			beta, ok := params.ClusterForNetwork(betaClusters, params.RopstenNetworkID)
+			require.True(t, ok)
+
+			require.NotEqual(t, staging, beta)
+
+			// assert
+			require.NoError(t, err)
+			require.Equal(t, "eth.staging", nodeConfig.ClusterConfig.Fleet)
+			require.Equal(t, staging.BootNodes, nodeConfig.ClusterConfig.BootNodes)
 		},
 	},
 }

@@ -612,13 +612,10 @@ func (c *NodeConfig) updateClusterConfig() error {
 		return nil
 	}
 
-	c.log.Debug(
-		"update cluster config",
-		"configFile", c.ClusterConfigFile,
-		"fleet", c.ClusterConfig.Fleet)
+	c.log.Info("update cluster config", "configFile", c.ClusterConfigFile, "fleet", c.ClusterConfig.Fleet)
 
 	var (
-		clusters []cluster
+		clusters []Cluster
 		err      error
 	)
 
@@ -633,7 +630,7 @@ func (c *NodeConfig) updateClusterConfig() error {
 			return fmt.Errorf("failed to unmarshal cluster configuration file: %s", err)
 		}
 	} else {
-		clusters, err = clusterForFleet(c.ClusterConfig.Fleet)
+		clusters, err = ClusterForFleet(c.ClusterConfig.Fleet)
 		if err != nil {
 			return fmt.Errorf("getting fleet '%s' failed: %v", c.ClusterConfig.Fleet, err)
 		}
