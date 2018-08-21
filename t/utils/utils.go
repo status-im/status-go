@@ -300,18 +300,18 @@ func loadTestConfig() (*testConfig, error) {
 	var config testConfig
 
 	pathOfStatic := path.Join(params.GetStatusHome(), "/static")
-	err := gettestConfigFromFile(path.Join(pathOfStatic, "config/test-data.json"), &config)
+	err := getTestConfigFromFile(path.Join(pathOfStatic, "config/test-data.json"), &config)
 	if err != nil {
 		return nil, err
 	}
 
 	if GetNetworkID() == params.StatusChainNetworkID {
-		err := gettestConfigFromFile(path.Join(pathOfStatic, "config/status-chain-accounts.json"), &config)
+		err := getTestConfigFromFile(path.Join(pathOfStatic, "config/status-chain-accounts.json"), &config)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		err := gettestConfigFromFile(path.Join(pathOfStatic, "config/public-chain-accounts.json"), &config)
+		err := getTestConfigFromFile(path.Join(pathOfStatic, "config/public-chain-accounts.json"), &config)
 		if err != nil {
 			return nil, err
 		}
@@ -345,7 +345,7 @@ func ImportTestAccount(keystoreDir, accountFile string) error {
 	return err
 }
 
-func gettestConfigFromFile(fileName string, config *testConfig) error {
+func getTestConfigFromFile(fileName string, config *testConfig) error {
 	configData, err := ioutil.ReadFile(fileName)
 	if err != nil {
 		return err
@@ -358,15 +358,22 @@ func gettestConfigFromFile(fileName string, config *testConfig) error {
 	return nil
 }
 
-func copyFile(sourceFile string, destinationFile string) error {
-	input, err := ioutil.ReadFile(sourceFile)
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
 	if err != nil {
 		return err
 	}
+	defer in.Close()
 
-	err = ioutil.WriteFile(destinationFile, input, 0644)
+	out, err := os.Create(dst)
 	if err != nil {
 		return err
 	}
-	return nil
+	defer out.Close()
+
+	_, err = io.Copy(out, in)
+	if err != nil {
+		return err
+	}
+	return out.Close()
 }
