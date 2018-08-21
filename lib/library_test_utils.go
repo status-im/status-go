@@ -203,7 +203,7 @@ func testGetDefaultConfig(t *testing.T) bool {
 		t.Run(fmt.Sprintf("networkID=%d", network.chainID), func(t *testing.T) {
 			var (
 				nodeConfig  = params.NodeConfig{}
-				rawResponse = GenerateConfig(C.CString("/tmp/data-folder"), C.int(network.chainID))
+				rawResponse = GenerateConfig(C.CString("/tmp/data-folder"), C.CString("eth.staging"), C.int(network.chainID))
 			)
 			if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &nodeConfig); err != nil {
 				t.Errorf("cannot decode response (%s): %v", C.GoString(rawResponse), err)
