@@ -337,7 +337,7 @@ func ImportTestAccount(keystoreDir, accountFile string) error {
 	}
 
 	dst := filepath.Join(keystoreDir, accountFile)
-	err := copyFile(dst, path.Join(params.GetStatusHome(), "static/keys/", accountFile))
+	err := copyFile(path.Join(params.GetStatusHome(), "static/keys/", accountFile), dst)
 	if err != nil {
 		logger.Warn("cannot copy test account PK", "error", err)
 	}
