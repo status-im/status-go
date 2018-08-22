@@ -383,7 +383,7 @@ func NewNodeConfig(dataDir, clstrCfgFile, fleet string, networkID uint64) (*Node
 		LogToStderr:       LogToStderr,
 		ClusterConfigFile: clstrCfgFile,
 		ClusterConfig: &ClusterConfig{
-			Enabled:     true,
+			Enabled:     true, // cluster must be enabled by default
 			Fleet:       fleet,
 			StaticNodes: []string{},
 			BootNodes:   []string{},
