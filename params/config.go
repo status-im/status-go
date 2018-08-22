@@ -383,7 +383,7 @@ func NewNodeConfig(dataDir, clstrCfgFile, fleet string, networkID uint64) (*Node
 		LogToStderr:       LogToStderr,
 		ClusterConfigFile: clstrCfgFile,
 		ClusterConfig: &ClusterConfig{
-			Enabled:     fleet != FleetUndefined,
+			Enabled:     true,
 			Fleet:       fleet,
 			StaticNodes: []string{},
 			BootNodes:   []string{},
@@ -429,7 +429,7 @@ func LoadNodeConfig(configJSON string) (*NodeConfig, error) {
 }
 
 func loadNodeConfig(configJSON string) (*NodeConfig, error) {
-	nodeConfig, err := NewNodeConfig("", "", FleetBeta, 0)
+	nodeConfig, err := NewNodeConfig("", "", FleetUndefined, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -614,10 +614,7 @@ func (c *NodeConfig) updateClusterConfig() error {
 
 	c.log.Info("update cluster config", "configFile", c.ClusterConfigFile, "fleet", c.ClusterConfig.Fleet)
 
-	var (
-		cluster Cluster
-		err     error
-	)
+	var cluster Cluster
 
 	if c.ClusterConfigFile != "" {
 		// Load cluster configuration from external file.
@@ -630,10 +627,7 @@ func (c *NodeConfig) updateClusterConfig() error {
 			return fmt.Errorf("failed to unmarshal cluster configuration file: %s", err)
 		}
 	} else {
-		cluster, err = ClusterForFleet(c.ClusterConfig.Fleet)
-		if err != nil {
-			return fmt.Errorf("getting fleet '%s' failed: %v", c.ClusterConfig.Fleet, err)
-		}
+		cluster, _ = ClusterForFleet(c.ClusterConfig.Fleet)
 	}
 
 	// allow to override bootnodes only if they were not defined earlier
