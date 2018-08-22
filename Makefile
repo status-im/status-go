@@ -1,4 +1,4 @@
-.PHONY: statusgo statusd-prune all test xgo clean help
+.PHONY: statusgo statusd-prune all test xgo gomobile clean help
 .PHONY: statusgo-android statusgo-ios
 
 help: ##@other Show this help
@@ -101,24 +101,17 @@ statusgo-linux: xgo ##@cross-compile Build status-go for Linux
 	./_assets/patches/patcher -b . -p geth-xgo -r
 	@echo "Android cross compilation done."
 
-statusgo-android: xgo ##@cross-compile Build status-go for Android
-	./_assets/patches/patcher -b . -p geth-xgo
-	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=android-16/aar -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./lib
-	./_assets/patches/patcher -b . -p geth-xgo -r
-	@echo "Android cross compilation done."
+## TODO(divan): rename statusgo-android-16.aar to Statusgo.aar
+statusgo-android: gomobile ##@cross-compile Build status-go for Android
+	@echo "Building status-go for Android..."
+	@gomobile bind -target=android/arm -ldflags="-s -w" -o build/bin/statusgo-android-16.aar github.com/status-im/status-go/mobile
+	@echo "Android cross compilation done in build/bin/statusgo-android-16.aar"
 
-statusgo-ios: xgo	##@cross-compile Build status-go for iOS
-	./_assets/patches/patcher -b . -p geth-xgo
-	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./lib
-	./_assets/patches/patcher -b . -p geth-xgo -r
-	@echo "iOS framework cross compilation done."
-
-statusgo-ios-simulator: xgo	##@cross-compile Build status-go for iOS Simulator
-	@docker pull $(XGOIMAGEIOSSIM)
-	./_assets/patches/patcher -b . -p geth-xgo
-	$(GOPATH)/bin/xgo --image $(XGOIMAGEIOSSIM) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./lib
-	./_assets/patches/patcher -b . -p geth-xgo -r
-	@echo "iOS framework cross compilation done."
+## TODO(divan): rename statusgo-ios-9.3-framework to Statusgo.framework/
+statusgo-ios: gomobile	##@cross-compile Build status-go for iOS
+	@echo "Building status-go for iOS..."
+	@gomobile bind -target=ios -ldflags="-s -w" -o build/bin/statusgo-ios-9.3-framework github.com/status-im/status-go/mobile
+	@echo "iOS framework cross compilation done in build/bin/statusgo-ios-9.3-framework"
 
 statusgo-library: ##@cross-compile Build status-go as static library for current platform
 	@echo "Building static library..."
@@ -171,7 +164,11 @@ xgo:
 	docker pull $(XGOIMAGE)
 	go get github.com/karalabe/xgo
 
-setup: dep-install lint-install mock-install ##@other Prepare project for first build
+gomobile:
+	@echo "Installing gomobile..."
+	@go get -u golang.org/x/mobile/cmd/gomobile
+
+setup: dep-install lint-install mock-install gomobile ##@other Prepare project for first build
 
 mock-install: ##@other Install mocking tools
 	go get -u github.com/golang/mock/mockgen

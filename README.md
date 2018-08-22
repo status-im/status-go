@@ -29,8 +29,8 @@ There are two main modes status-go can be built:
 Use following Makefile commands:
 
 - `make statusgo` (builds binary into `build/bin/statusd`)
-- `make statusgo-android` (builds .aar file `build/android-16/aar`)
-- `make statusgo-ios` and `make statusgo-ios-simulator` (builds iOS related artifacts in `build/os-9.3/framework`)
+- `make statusgo-android` (builds .aar file `build/bin/Statusgo.aar`)
+- `make statusgo-ios` (builds iOS framework in `build/bin/Statusgo.framework`)
 
 In order to build and use `status-go` directly from `status-react`, follow the instructions in https://wiki.status.im/Building_Status, under the '**Building Status with the checked-out version of status-go**' section.
 
