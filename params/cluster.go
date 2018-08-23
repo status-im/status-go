@@ -93,12 +93,20 @@ var stagingCluster = []Cluster{
 			"enode://10a78c17929a7019ef4aa2249d7302f76ae8a06f40b2dc88b7b31ebff4a623fbb44b4a627acba296c1ced3775d91fbe18463c15097a6a36fdb2c804ff3fc5b35@35.238.97.234:30404",   // boot-01.gc-us-central1-a.eth.staging
 			"enode://f79fb3919f72ca560ad0434dcc387abfe41e0666201ebdada8ede0462454a13deb05cda15f287d2c4bd85da81f0eb25d0a486bbbc8df427b971ac51533bd00fe@174.138.107.239:30404", // boot-01.do-ams3.eth.staging
 		},
+		RendezvousNodes: []string{
+			"/ip4/174.138.107.239/tcp/30703/ethv4/16Uiu2HAkyJHeetQ4DNpd4NZ2ntzxMo25zcdpvGQRqkD5pB9BE6RU",
+			"/ip4/35.238.97.234/tcp/30703/ethv4/16Uiu2HAm1sVyXmkMNjdeDWqK2urbyC3oBHi8MDpCdYkns1nYafqz",
+		},
 	},
 	{
 		NetworkID: RopstenNetworkID,
 		BootNodes: []string{
 			"enode://10a78c17929a7019ef4aa2249d7302f76ae8a06f40b2dc88b7b31ebff4a623fbb44b4a627acba296c1ced3775d91fbe18463c15097a6a36fdb2c804ff3fc5b35@35.238.97.234:30404",   // boot-01.gc-us-central1-a.eth.staging
 			"enode://f79fb3919f72ca560ad0434dcc387abfe41e0666201ebdada8ede0462454a13deb05cda15f287d2c4bd85da81f0eb25d0a486bbbc8df427b971ac51533bd00fe@174.138.107.239:30404", // boot-01.do-ams3.eth.staging
+		},
+		RendezvousNodes: []string{
+			"/ip4/174.138.107.239/tcp/30703/ethv4/16Uiu2HAkyJHeetQ4DNpd4NZ2ntzxMo25zcdpvGQRqkD5pB9BE6RU",
+			"/ip4/35.238.97.234/tcp/30703/ethv4/16Uiu2HAm1sVyXmkMNjdeDWqK2urbyC3oBHi8MDpCdYkns1nYafqz",
 		},
 	},
 }
