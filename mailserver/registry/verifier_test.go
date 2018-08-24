@@ -3,6 +3,7 @@ package registry
 import (
 	"context"
 	"crypto/ecdsa"
+	"math"
 	"math/big"
 	"testing"
 
@@ -44,7 +45,7 @@ func (s *VerifierTestSuite) setupBackendAndContract() {
 	auth := bind.NewKeyedTransactor(s.privKey)
 	alloc := make(core.GenesisAlloc)
 	alloc[auth.From] = core.GenesisAccount{Balance: big.NewInt(133700000)}
-	s.backend = backends.NewSimulatedBackend(alloc)
+	s.backend = backends.NewSimulatedBackend(alloc, math.MaxInt64)
 
 	s.contractAddress, _, s.registry, err = DeployRegistry(auth, s.backend)
 	s.Require().NoError(err)

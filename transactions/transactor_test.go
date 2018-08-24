@@ -3,6 +3,7 @@ package transactions
 import (
 	"context"
 	"errors"
+	"math"
 	"math/big"
 	"reflect"
 	"testing"
@@ -264,7 +265,7 @@ func (s *TransactorSuite) TestContractCreation() {
 	genesis := core.GenesisAlloc{
 		testaddr: {Balance: big.NewInt(100000000000)},
 	}
-	backend := backends.NewSimulatedBackend(genesis)
+	backend := backends.NewSimulatedBackend(genesis, math.MaxInt64)
 	selectedAccount := &account.SelectedExtKey{
 		Address:    testaddr,
 		AccountKey: &keystore.Key{PrivateKey: key},
