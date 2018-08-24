@@ -56,7 +56,6 @@ func CollectProcessMetrics(refresh time.Duration) {
 	memFrees := GetOrRegisterMeter("system/memory/frees", DefaultRegistry)
 	memInuse := GetOrRegisterMeter("system/memory/inuse", DefaultRegistry)
 	memPauses := GetOrRegisterMeter("system/memory/pauses", DefaultRegistry)
-	goroutines := GetOrRegisterGauge("system/goroutines", DefaultRegistry)
 
 	var diskReads, diskReadBytes, diskWrites, diskWriteBytes Meter
 	var diskReadBytesCounter, diskWriteBytesCounter Counter
@@ -90,10 +89,6 @@ func CollectProcessMetrics(refresh time.Duration) {
 			diskReadBytesCounter.Inc(diskstats[location1].ReadBytes - diskstats[location2].ReadBytes)
 			diskWriteBytesCounter.Inc(diskstats[location1].WriteBytes - diskstats[location2].WriteBytes)
 		}
-
-		goroutines.Update(int64(runtime.NumGoroutine()))
-
 		time.Sleep(refresh)
 	}
-
 }

@@ -284,7 +284,7 @@ func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (hexutil.
 	}
 
 	var result []byte
-	env, err := whisperMsg.Wrap(params, api.w.GetCurrentTime())
+	env, err := whisperMsg.Wrap(params)
 	if err != nil {
 		return nil, err
 	}
@@ -314,16 +314,6 @@ func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (hexutil.
 		result = hash[:]
 	}
 	return result, err
-}
-
-// UninstallFilter is alias for Unsubscribe
-func (api *PublicWhisperAPI) UninstallFilter(id string) {
-	api.w.Unsubscribe(id)
-}
-
-// Unsubscribe disables and removes an existing filter.
-func (api *PublicWhisperAPI) Unsubscribe(id string) {
-	api.w.Unsubscribe(id)
 }
 
 //go:generate gencodec -type Criteria -field-override criteriaOverride -out gen_criteria_json.go
