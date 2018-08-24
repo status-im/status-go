@@ -1,10 +1,10 @@
 # Build status-go in a Go builder container
 FROM golang:1.10-alpine as builder
 
+RUN apk add --no-cache make gcc musl-dev linux-headers
+
 ARG build_tags
 ARG build_flags
-
-RUN apk add --no-cache make gcc musl-dev linux-headers
 
 RUN mkdir -p /go/src/github.com/status-im/status-go
 ADD . /go/src/github.com/status-im/status-go
@@ -16,15 +16,14 @@ RUN cd /go/src/github.com/status-im/status-go && \
 # Copy the binary to the second image
 FROM alpine:latest
 
+LABEL maintainer="support@status.im"
 LABEL source="https://github.com/status-im/status-go"
 LABEL description="status-go is an underlying part of Status - a browser, messenger, and gateway to a decentralized world."
-LABEL maintainer="support@status.im"
 
 RUN apk add --no-cache ca-certificates bash
+RUN mkdir -p /static/keys
 
 COPY --from=builder /go/src/github.com/status-im/status-go/build/bin/statusd /usr/local/bin/
-
-RUN mkdir -p /static/keys
 COPY --from=builder /go/src/github.com/status-im/status-go/static/keys/* /static/keys/
 
 # 30304 is used for Discovery v5

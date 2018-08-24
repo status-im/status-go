@@ -31,6 +31,10 @@ var clusters = map[string]func() Cluster{
 				"enode://69f72baa7f1722d111a8c9c68c39a31430e9d567695f6108f31ccb6cd8f0adff4991e7fdca8fa770e75bc8a511a87d24690cbc80e008175f40c157d6f6788d48@206.189.240.16:30504", // mail-01.do-ams3.eth.staging
 				"enode://e4fc10c1f65c8aed83ac26bc1bfb21a45cc1a8550a58077c8d2de2a0e0cd18e40fd40f7e6f7d02dc6cd06982b014ce88d6e468725ffe2c138e958788d0002a7f@35.239.193.41:30504",  // mail-01.gc-us-central1-a.eth.staging
 			},
+			RendezvousNodes: []string{
+				"/ip4/174.138.107.239/tcp/30703/ethv4/16Uiu2HAkyJHeetQ4DNpd4NZ2ntzxMo25zcdpvGQRqkD5pB9BE6RU",
+				"/ip4/35.238.97.234/tcp/30703/ethv4/16Uiu2HAm1sVyXmkMNjdeDWqK2urbyC3oBHi8MDpCdYkns1nYafqz",
+			},
 		}
 	},
 	FleetBeta: func() Cluster {

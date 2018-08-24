@@ -119,4 +119,6 @@ const (
 var (
 	// WhisperDiscv5Limits declares min and max limits for peers with whisper topic.
 	WhisperDiscv5Limits = Limits{2, 2}
+	// LesDiscoveryLimits default limits used if LES and discovery are enabled.
+	LesDiscoveryLimits = Limits{2, 2}
 )

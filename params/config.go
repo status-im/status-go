@@ -13,10 +13,12 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
+	"github.com/ethereum/go-ethereum/params"
 )
 
 // errors
@@ -676,12 +678,15 @@ func (c *NodeConfig) updateRelativeDirsConfig() error {
 
 // updatePeerLimits will set default peer limits expectations based on enabled services.
 func (c *NodeConfig) updatePeerLimits() {
-	if c.NoDiscovery {
+	if c.NoDiscovery && !c.Rendezvous {
 		return
 	}
 	if c.WhisperConfig.Enabled {
 		c.RequireTopics[WhisperDiscv5Topic] = WhisperDiscv5Limits
 		// TODO(dshulyak) register mailserver limits when we will change how they are handled.
+	}
+	if c.LightEthConfig.Enabled {
+		c.RequireTopics[discv5.Topic(LesTopic(int(c.NetworkID)))] = LesDiscoveryLimits
 	}
 }
 
@@ -711,6 +716,18 @@ func GetStatusHome() string {
 	if gopath == "" {
 		gopath = build.Default.GOPATH
 	}
-
 	return path.Join(gopath, "/src/github.com/status-im/status-go/")
+}
+
+// LesTopic returns discovery v5 topic derived from genesis of the provided network.
+// 1 - mainnet, 4 - ropsten
+func LesTopic(netid int) string {
+	switch netid {
+	case 1:
+		return "LES2@" + common.Bytes2Hex(params.MainnetGenesisHash.Bytes()[:8])
+	case 3:
+		return "LES2@" + common.Bytes2Hex(params.TestnetGenesisHash.Bytes()[:8])
+	default:
+		return ""
+	}
 }
