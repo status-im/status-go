@@ -39,6 +39,15 @@ func NewRendezvous(servers []ma.Multiaddr, identity *ecdsa.PrivateKey, node *dis
 	return r, nil
 }
 
+func NewRendezvousWithENR(servers []ma.Multiaddr, record enr.Record) *Rendezvous {
+	r := new(Rendezvous)
+	r.servers = servers
+	r.registrationPeriod = registrationPeriod
+	r.bucketSize = bucketSize
+	r.record = record
+	return r
+}
+
 // Rendezvous is an implementation of discovery interface that uses
 // rendezvous client.
 type Rendezvous struct {
@@ -148,6 +157,7 @@ func (r *Rendezvous) Discover(
 			}
 			for i := range records {
 				n, err := enrToNode(records[i])
+				log.Debug("converted enr to", "ENODE", n.String())
 				if err != nil {
 					log.Warn("error converting enr record to node", "err", err)
 				}
@@ -159,13 +169,21 @@ func (r *Rendezvous) Discover(
 
 func enrToNode(record enr.Record) (*discv5.Node, error) {
 	var (
-		key   enr.Secp256k1
-		ip    enr.IP
-		tport enr.TCP
-		uport enr.UDP
+		key     enr.Secp256k1
+		ip      enr.IP
+		tport   enr.TCP
+		uport   enr.UDP
+		proxied Proxied
+		nodeID  discv5.NodeID
 	)
-	if err := record.Load(&key); err != nil {
-		return nil, err
+	if err := record.Load(&proxied); err == nil {
+		nodeID = discv5.NodeID(proxied)
+	} else {
+		if err := record.Load(&key); err != nil {
+			return nil, err
+		}
+		ecdsaKey := ecdsa.PublicKey(key)
+		nodeID = discv5.PubkeyID(&ecdsaKey)
 	}
 	if err := record.Load(&ip); err != nil {
 		return nil, err
@@ -175,6 +193,5 @@ func enrToNode(record enr.Record) (*discv5.Node, error) {
 	}
 	// ignore absence of udp port, as it is optional
 	_ = record.Load(&uport)
-	ecdsaKey := ecdsa.PublicKey(key)
-	return discv5.NewNode(discv5.PubkeyID(&ecdsaKey), net.IP(ip), uint16(uport), uint16(tport)), nil
+	return discv5.NewNode(nodeID, net.IP(ip), uint16(uport), uint16(tport)), nil
 }
