@@ -696,6 +696,9 @@ func (c *NodeConfig) updatePeerLimits() {
 		c.RequireTopics[WhisperDiscv5Topic] = WhisperDiscv5Limits
 		// TODO(dshulyak) register mailserver limits when we will change how they are handled.
 	}
+	if c.LightEthConfig.Enabled {
+		c.RequireTopics[discv5.Topic(LesTopic(int(c.NetworkID)))] = LesDiscoveryLimits
+	}
 }
 
 // String dumps config object as nicely indented JSON
