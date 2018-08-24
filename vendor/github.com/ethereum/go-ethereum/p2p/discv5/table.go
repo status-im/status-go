@@ -38,7 +38,7 @@ const (
 	hashBits   = len(common.Hash{}) * 8
 	nBuckets   = hashBits + 1 // Number of buckets
 
-	maxFindnodeFailures = 1
+	maxFindnodeFailures = 5
 )
 
 type Table struct {
@@ -177,11 +177,6 @@ func (tab *Table) closest(target common.Hash, nresults int) *nodesByDistance {
 	close := &nodesByDistance{target: target}
 	for _, b := range tab.buckets {
 		for _, n := range b.entries {
-			// node can be in table only in two states
-			// known and contested
-			if n.state != known {
-				continue
-			}
 			close.push(n, nresults)
 		}
 	}
