@@ -43,13 +43,14 @@ const (
 	ProtocolName       = "shh"     // Nickname of the protocol in geth
 
 	// whisper protocol message codes, according to EIP-627
-	statusCode           = 0   // used by whisper protocol
-	messagesCode         = 1   // normal whisper message
-	powRequirementCode   = 2   // PoW requirement
-	bloomFilterExCode    = 3   // bloom filter exchange
-	p2pRequestCode       = 126 // peer-to-peer message, used by Dapp protocol
-	p2pMessageCode       = 127 // peer-to-peer message (to be consumed by the peer, but not forwarded any further)
-	NumberOfMessageCodes = 128
+	statusCode             = 0   // used by whisper protocol
+	messagesCode           = 1   // normal whisper message
+	powRequirementCode     = 2   // PoW requirement
+	bloomFilterExCode      = 3   // bloom filter exchange
+	p2pRequestCompleteCode = 125 // peer-to-peer message, used by Dapp protocol
+	p2pRequestCode         = 126 // peer-to-peer message, used by Dapp protocol
+	p2pMessageCode         = 127 // peer-to-peer message (to be consumed by the peer, but not forwarded any further)
+	NumberOfMessageCodes   = 128
 
 	SizeMask      = byte(3) // mask used to extract the size of payload size field from the flags
 	signatureFlag = byte(4)

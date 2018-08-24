@@ -29,6 +29,7 @@ import (
 	mapset "github.com/deckarep/golang-set"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -46,6 +47,12 @@ type Statistics struct {
 	memoryUsed           int
 	cycles               int
 	totalMessagesCleared int
+}
+
+// MailServerResponse is the response payload sent by the mailserver
+type MailServerResponse struct {
+	LastEnvelopeHash common.Hash
+	Cursor           []byte
 }
 
 const (
@@ -89,6 +96,10 @@ type Whisper struct {
 
 	mailServer     MailServer     // MailServer interface
 	envelopeTracer EnvelopeTracer // Service collecting envelopes metadata
+
+	envelopeFeed event.Feed
+
+	timeSource func() time.Time // source of time for whisper
 }
 
 // New creates a Whisper client ready to communicate through the Ethereum P2P network.
@@ -107,6 +118,7 @@ func New(cfg *Config) *Whisper {
 		p2pMsgQueue:   make(chan *Envelope, messageQueueLimit),
 		quit:          make(chan struct{}),
 		syncAllowance: DefaultSyncAllowance,
+		timeSource:    cfg.TimeSource,
 	}
 
 	whisper.filters = NewFilters(whisper)
@@ -131,6 +143,12 @@ func New(cfg *Config) *Whisper {
 	}
 
 	return whisper
+}
+
+// SubscribeEnvelopeEvents subscribes to envelopes feed.
+// In order to prevent blocking whisper producers events must be amply buffered.
+func (whisper *Whisper) SubscribeEnvelopeEvents(events chan<- EnvelopeEvent) event.Subscription {
+	return whisper.envelopeFeed.Subscribe(events)
 }
 
 // MinPow returns the PoW value required by this node.
@@ -204,6 +222,11 @@ func (whisper *Whisper) APIs() []rpc.API {
 			Public:    true,
 		},
 	}
+}
+
+// GetCurrentTime returns current time.
+func (whisper *Whisper) GetCurrentTime() time.Time {
+	return whisper.timeSource()
 }
 
 // RegisterServer registers MailServer interface.
@@ -359,6 +382,15 @@ func (whisper *Whisper) RequestHistoricMessages(peerID []byte, envelope *Envelop
 	}
 	p.trusted = true
 	return p2p.Send(p.ws, p2pRequestCode, envelope)
+}
+
+func (whisper *Whisper) SendHistoricMessageResponse(peer *Peer, payload []byte) error {
+	size, r, err := rlp.EncodeToReader(payload)
+	if err != nil {
+		return err
+	}
+
+	return peer.ws.WriteMsg(p2p.Msg{Code: p2pRequestCompleteCode, Size: uint32(size), Payload: r})
 }
 
 // SendP2PMessage sends a peer-to-peer message to a specific peer.
@@ -804,7 +836,55 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 					log.Warn("failed to decode p2p request message, peer will be disconnected", "peer", p.peer.ID(), "err", err)
 					return errors.New("invalid p2p request")
 				}
+
 				whisper.mailServer.DeliverMail(p, &request)
+			}
+		case p2pRequestCompleteCode:
+			if p.trusted {
+				var payload []byte
+				if err := packet.Decode(&payload); err != nil {
+					log.Warn("failed to decode response message, peer will be disconnected", "peer", p.peer.ID(), "err", err)
+					return errors.New("invalid request response message")
+				}
+
+				// check if payload is
+				// - requestID or
+				// - requestID + lastEnvelopeHash or
+				// - requestID + lastEnvelopeHash + cursor
+				// requestID is the hash of the request envelope.
+				// lastEnvelopeHash is the last envelope sent by the mail server
+				// cursor is the db key, 36 bytes: 4 for the timestamp + 32 for the envelope hash.
+				// length := len(payload)
+
+				if len(payload) < common.HashLength || len(payload) > common.HashLength*3+4 {
+					log.Warn("invalid response message, peer will be disconnected", "peer", p.peer.ID(), "err", err, "payload size", len(payload))
+					return errors.New("invalid response size")
+				}
+
+				var (
+					requestID        common.Hash
+					lastEnvelopeHash common.Hash
+					cursor           []byte
+				)
+
+				requestID = common.BytesToHash(payload[:common.HashLength])
+
+				if len(payload) >= common.HashLength*2 {
+					lastEnvelopeHash = common.BytesToHash(payload[common.HashLength : common.HashLength*2])
+				}
+
+				if len(payload) >= common.HashLength*2+36 {
+					cursor = payload[common.HashLength*2 : common.HashLength*2+36]
+				}
+
+				whisper.envelopeFeed.Send(EnvelopeEvent{
+					Hash:  requestID,
+					Event: EventMailServerRequestCompleted,
+					Data: &MailServerResponse{
+						LastEnvelopeHash: lastEnvelopeHash,
+						Cursor:           cursor,
+					},
+				})
 			}
 		default:
 			// New message types might be implemented in the future versions of Whisper.
@@ -820,7 +900,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 // appropriate time-stamp. In case of error, connection should be dropped.
 // param isP2P indicates whether the message is peer-to-peer (should not be forwarded).
 func (whisper *Whisper) add(envelope *Envelope, isP2P bool) (bool, error) {
-	now := uint32(time.Now().Unix())
+	now := uint32(whisper.timeSource().Unix())
 	sent := envelope.Expiry - envelope.TTL
 
 	if sent > now {
@@ -887,6 +967,10 @@ func (whisper *Whisper) add(envelope *Envelope, isP2P bool) (bool, error) {
 		whisper.postEvent(envelope, isP2P) // notify the local node about the new message
 		if whisper.mailServer != nil {
 			whisper.mailServer.Archive(envelope)
+			whisper.envelopeFeed.Send(EnvelopeEvent{
+				Hash:  envelope.Hash(),
+				Event: EventMailServerEnvelopeArchived,
+			})
 		}
 	}
 	return true, nil
@@ -945,9 +1029,17 @@ func (whisper *Whisper) processQueue() {
 
 		case e = <-whisper.messageQueue:
 			whisper.filters.NotifyWatchers(e, false)
+			whisper.envelopeFeed.Send(EnvelopeEvent{
+				Hash:  e.Hash(),
+				Event: EventEnvelopeAvailable,
+			})
 
 		case e = <-whisper.p2pMsgQueue:
 			whisper.filters.NotifyWatchers(e, true)
+			whisper.envelopeFeed.Send(EnvelopeEvent{
+				Hash:  e.Hash(),
+				Event: EventEnvelopeAvailable,
+			})
 		}
 	}
 }
@@ -979,13 +1071,17 @@ func (whisper *Whisper) expire() {
 	whisper.statsMu.Lock()
 	defer whisper.statsMu.Unlock()
 	whisper.stats.reset()
-	now := uint32(time.Now().Unix())
+	now := uint32(whisper.timeSource().Unix())
 	for expiry, hashSet := range whisper.expirations {
 		if expiry < now {
 			// Dump all expired messages and remove timestamp
 			hashSet.Each(func(v interface{}) bool {
 				sz := whisper.envelopes[v.(common.Hash)].size()
 				delete(whisper.envelopes, v.(common.Hash))
+				whisper.envelopeFeed.Send(EnvelopeEvent{
+					Hash:  v.(common.Hash),
+					Event: EventEnvelopeExpired,
+				})
 				whisper.stats.messagesCleared++
 				whisper.stats.memoryCleared += sz
 				whisper.stats.memoryUsed -= sz
