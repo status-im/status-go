@@ -6,8 +6,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
 	"testing"
 
 	"gopkg.in/go-playground/validator.v9"
@@ -18,417 +16,227 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var clusterConfigData = []byte(`
-[
-  {
-    "networkID": 3,
-    "staticnodes": [
-      "enode://7ab298cedc4185a894d21d8a4615262ec6bdce66c9b6783878258e0d5b31013d30c9038932432f70e5b2b6a5cd323bf820554fcb22fbc7b45367889522e9c449@10.1.1.1:30303",
-      "enode://f59e8701f18c79c5cbc7618dc7bb928d44dc2f5405c7d693dad97da2d8585975942ec6fd36d3fe608bfdc7270a34a4dd00f38cfe96b2baa24f7cd0ac28d382a1@10.1.1.2:30303"
-    ]
-  }
-]
-`)
+var clusterConfigData = []byte(`{
+	"staticnodes": [
+		"enode://7ab298cedc4185a894d21d8a4615262ec6bdce66c9b6783878258e0d5b31013d30c9038932432f70e5b2b6a5cd323bf820554fcb22fbc7b45367889522e9c449@10.1.1.1:30303",
+		"enode://f59e8701f18c79c5cbc7618dc7bb928d44dc2f5405c7d693dad97da2d8585975942ec6fd36d3fe608bfdc7270a34a4dd00f38cfe96b2baa24f7cd0ac28d382a1@10.1.1.2:30303"
+	]
+}`)
 
-var loadConfigTestCases = []struct {
-	name       string
-	configJSON string
-	validator  func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error)
-}{
-	{
-		`invalid input JSON (missing comma at the end of key:value pair)`,
-		`{
-			"NetworkId": 3
-			"DataDir": "$TMPDIR"
-		}`,
-		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
-			require.Error(t, err, "error is expected, not thrown")
-		},
-	},
-	{
-		`check static DataDir passing`,
-		`{
-			"NetworkId": 3,
-			"DataDir": "/storage/emulated/0/ethereum/"
-		}`,
-		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
-			require.NoError(t, err)
-			require.Equal(t, "/storage/emulated/0/ethereum/", nodeConfig.DataDir)
-		},
-	},
-	{
-		`use default KeyStoreDir`,
-		`{
-			"NetworkId": 3,
-			"DataDir": "$TMPDIR"
-		}`,
-		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
-			require.NoError(t, err)
-
-			_, err = os.Stat(dataDir)
-			require.False(t, os.IsNotExist(err), "data directory doesn't exist")
-			require.Equal(t, dataDir, nodeConfig.DataDir)
-
-			require.Equal(t, filepath.Join(dataDir, params.KeyStoreDir), filepath.Join(dataDir, params.KeyStoreDir))
-		},
-	},
-	{
-		`use non-default KeyStoreDir`,
-		`{
-			"NetworkId": 3,
-			"DataDir": "$TMPDIR",
-			"KeyStoreDir": "/foo/bar"
-		}`,
-		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
-			require.NoError(t, err)
-			require.Equal(t, dataDir, nodeConfig.DataDir)
-			require.Equal(t, "/foo/bar", nodeConfig.KeyStoreDir)
-		},
-	},
-	{
-		`test Upstream config setting`,
-		`{
-			"NetworkId": 3,
-			"DataDir": "$TMPDIR",
-			"Name": "TestStatusNode",
-			"WSPort": 4242,
-			"IPCEnabled": true,
-			"WSEnabled": false,
-			"UpstreamConfig": {
-				"Enabled": true,
-				"URL": "http://upstream.loco.net/nodes"
-			}
-		}`,
-		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
-			if nodeConfig.NetworkID != 3 {
-				t.Fatal("wrong NetworkId")
-			}
-
-			if !nodeConfig.UpstreamConfig.Enabled {
-				t.Fatal("wrong UpstreamConfig.Enabled state")
-			}
-
-			if nodeConfig.UpstreamConfig.URL != "http://upstream.loco.net/nodes" {
-				t.Fatal("wrong UpstreamConfig.URL value")
-			}
-		},
-	},
-	{
-		`test parameter overriding`,
-		`{
-			"NetworkId": 3,
-			"DataDir": "$TMPDIR",
-			"Name": "TestStatusNode",
-			"WSPort": 4242,
-			"IPCEnabled": true,
-			"WSEnabled": false,
-			"RPCEnabled": true,
-			"LightEthConfig": {
-				"DatabaseCache": 64
-			}
-		}`,
-		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
-			require.NoError(t, err)
-
-			require.EqualValues(t, 3, nodeConfig.NetworkID)
-			require.Equal(t, "TestStatusNode", nodeConfig.Name)
-			require.Equal(t, params.HTTPPort, nodeConfig.HTTPPort)
-			require.Equal(t, params.HTTPHost, nodeConfig.HTTPHost)
-			require.True(t, nodeConfig.RPCEnabled)
-			require.True(t, nodeConfig.IPCEnabled)
-			require.Equal(t, 64, nodeConfig.LightEthConfig.DatabaseCache)
-		},
-	},
-	{
-		`test loading Testnet config`,
-		`{
-			"NetworkId": 3,
-			"DataDir": "$TMPDIR",
-			"Name": "TestStatusNode",
-			"WSPort": 8546,
-			"IPCEnabled": true,
-			"WSEnabled": false,
-			"LightEthConfig": {
-				"DatabaseCache": 64
-			}
-		}`,
-		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
-			require.NoError(t, err)
-
-			genesis := new(core.Genesis)
-			err = json.Unmarshal([]byte(nodeConfig.LightEthConfig.Genesis), genesis)
-			require.NoError(t, err)
-
-			chainConfig := genesis.Config
-			refChainConfig := gethparams.TestnetChainConfig
-
-			require.Empty(t, chainConfig.HomesteadBlock.Cmp(refChainConfig.HomesteadBlock), "invalid chainConfig.HomesteadBlock")
-			require.Nil(t, chainConfig.DAOForkBlock)
-			require.Equal(t, refChainConfig.DAOForkSupport, chainConfig.DAOForkSupport)
-
-			require.Empty(t, chainConfig.EIP150Block.Cmp(refChainConfig.EIP150Block))
-			require.Equal(t, refChainConfig.EIP150Hash, chainConfig.EIP150Hash)
-
-			require.Empty(t, chainConfig.EIP155Block.Cmp(refChainConfig.EIP155Block))
-			require.Empty(t, chainConfig.EIP158Block.Cmp(refChainConfig.EIP158Block))
-			require.Empty(t, chainConfig.ChainID.Cmp(refChainConfig.ChainID))
-		},
-	},
-	{
-		`test loading Mainnet config`,
-		`{
-			"NetworkId": 1,
-			"DataDir": "$TMPDIR",
-			"Name": "TestStatusNode",
-			"WSPort": 8546,
-			"IPCEnabled": true,
-			"WSEnabled": false,
-			"LightEthConfig": {
-				"DatabaseCache": 64
-			}
-		}`,
-		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
-			require.NoError(t, err)
-
-			genesis := new(core.Genesis)
-			err = json.Unmarshal([]byte(nodeConfig.LightEthConfig.Genesis), genesis)
-			require.NoError(t, err)
-
-			chainConfig := genesis.Config
-
-			require.Empty(t, chainConfig.HomesteadBlock.Cmp(gethparams.MainnetChainConfig.HomesteadBlock))
-			require.Empty(t, chainConfig.DAOForkBlock.Cmp(gethparams.MainnetChainConfig.DAOForkBlock))
-			require.True(t, chainConfig.DAOForkSupport)
-			require.Empty(t, chainConfig.EIP150Block.Cmp(gethparams.MainnetChainConfig.EIP150Block))
-			require.Equal(t, gethparams.MainnetChainConfig.EIP150Hash, chainConfig.EIP150Hash)
-			require.Empty(t, chainConfig.EIP155Block.Cmp(gethparams.MainnetChainConfig.EIP155Block))
-			require.Empty(t, chainConfig.EIP158Block.Cmp(gethparams.MainnetChainConfig.EIP158Block))
-			require.Empty(t, chainConfig.ChainID.Cmp(gethparams.MainnetChainConfig.ChainID))
-		},
-	},
-	{
-		`test loading Privatenet config`,
-		`{
-			"NetworkId": 311,
-			"DataDir": "$TMPDIR",
-			"Name": "TestStatusNode",
-			"WSPort": 8546,
-			"IPCEnabled": true,
-			"WSEnabled": false
-		}`,
-		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
-			require.NoError(t, err)
-			require.EqualValues(t, 311, nodeConfig.NetworkID)
-		},
-	},
-	{
-		`default static nodes (Ropsten Dev)`,
-		`{
-			"NetworkId": 3,
-			"DataDir": "$TMPDIR"
-		}`,
-		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
-			require.NoError(t, err)
-			require.True(t, nodeConfig.ClusterConfig.Enabled, "static nodes are expected to be enabled by default")
-
-			enodes := nodeConfig.ClusterConfig.StaticNodes
-			t.Logf("LEN SN %d", len(enodes))
-			require.Len(t, enodes, 2)
-		},
-	},
-	{
-		`custom boot nodes`,
-		`{
-			"NetworkId": 3,
-			"DataDir": "$TMPDIR",
-                        "ClusterConfig": {
-                          "BootNodes": ["a", "b", "c"]
-                        }
-		}`,
-		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
-			require.NoError(t, err)
-
-			enodes := nodeConfig.ClusterConfig.BootNodes
-			expectedEnodes := []string{"a", "b", "c"}
-
-			require.Equal(t, enodes, expectedEnodes)
-		},
-	},
-	{
-		`illegal cluster configuration file`,
-		`{
-			"NetworkId": 3,
-			"DataDir": "$TMPDIR",
-			"ClusterConfigFile": "/file/does/not.exist"
-		}`,
-		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
-			require.Error(t, err, "error is expected, not thrown")
-		},
-	},
-	{
-		`valid cluster configuration file`,
-		`{
-			"NetworkId": 3,
-			"DataDir": "$TMPDIR",
-			"ClusterConfigFile": "$TMPDIR/cluster.json"
-		}`,
-		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
-			require.NoError(t, err)
-			require.True(t, nodeConfig.ClusterConfig.Enabled, "cluster configuration is expected to be enabled after loading file")
-
-			enodes := nodeConfig.ClusterConfig.StaticNodes
-			require.Len(t, enodes, 2)
-		},
-	},
-	{
-		`default cluster configuration (Ropsten Prod)`,
-		`{
-			"NetworkId": 3,
-			"DataDir": "$TMPDIR"
-		}`,
-		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
-			require.NoError(t, err)
-			require.True(t, nodeConfig.ClusterConfig.Enabled, "cluster configuration is expected to be enabled by default")
-
-			enodes := nodeConfig.ClusterConfig.StaticNodes
-			require.Len(t, enodes, 2)
-		},
-	},
-	{
-		`disabled cluster configuration`,
-		`{
-			"NetworkId": 311,
-			"DataDir": "$TMPDIR",
-			"ClusterConfig": {
-				"Enabled": false
-			}
-		}`,
-		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
-			require.NoError(t, err)
-			require.False(t, nodeConfig.ClusterConfig.Enabled, "cluster configuration is expected to be disabled")
-		},
-	},
-	{
-		`select cluster configuration (Rinkeby Dev)`,
-		`{
-			"NetworkId": 4,
-			"DataDir": "$TMPDIR"
-		}`,
-		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
-			require.NoError(t, err)
-			require.True(t, nodeConfig.ClusterConfig.Enabled, "cluster configuration is expected to be enabled by default")
-			require.False(t, nodeConfig.NoDiscovery)
-			require.True(t, len(nodeConfig.ClusterConfig.BootNodes) >= 2)
-		},
-	},
-	{
-		`select cluster configuration (Mainnet dev)`,
-		`{
-			"NetworkId": 1,
-			"DataDir": "$TMPDIR"
-		}`,
-		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
-			require.NoError(t, err)
-			require.True(t, nodeConfig.ClusterConfig.Enabled, "cluster configuration is expected to be enabled by default")
-
-			enodes := nodeConfig.ClusterConfig.StaticNodes
-			require.True(t, len(enodes) >= 2)
-		},
-	},
-	{
-		`explicit WhisperConfig.LightClient = true`,
-		`{
-			"NetworkId": 3,
-			"DataDir": "$TMPDIR",
-			"WhisperConfig": {
-				"LightClient": true
-			}
-		}`,
-		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
-			require.NoError(t, err)
-			require.True(t, nodeConfig.WhisperConfig.LightClient)
-		},
-	},
-	{
-		`default peer limits`,
-		`{
-			"NetworkId": 4,
-			"DataDir": "$TMPDIR"
-		}`,
-		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
-			require.NoError(t, err)
-			require.NotNil(t, nodeConfig.RequireTopics)
-			require.False(t, nodeConfig.NoDiscovery)
-			require.Contains(t, nodeConfig.RequireTopics, params.WhisperDiscv5Topic)
-			require.Equal(t, params.WhisperDiscv5Limits, nodeConfig.RequireTopics[params.WhisperDiscv5Topic])
-		},
-	},
-	{
-		`no discovery preserved`,
-		`{
-			"NetworkId": 4,
-			"DataDir": "$TMPDIR",
-			"NoDiscovery": true
-		}`,
-		func(t *testing.T, dataDir string, nodeConfig *params.NodeConfig, err error) {
-			require.NoError(t, err)
-			require.True(t, nodeConfig.NoDiscovery)
-		},
-	},
-	{
-		`eth.staging fleet`,
-		`{
-			"NetworkId": ` + strconv.Itoa(params.RopstenNetworkID) + `,
-			"DataDir": "$TMPDIR",
-			"NoDiscovery": true,
-			"ClusterConfig": {
-				"Fleet": "eth.staging"
-			}
-		}`,
-		func(t *testing.T, _ string, nodeConfig *params.NodeConfig, loadConfErr error) {
-			stagingClusters, err := params.ClusterForFleet("eth.staging")
-			require.NoError(t, err)
-			staging, ok := params.ClusterForNetwork(stagingClusters, params.RopstenNetworkID)
-			require.True(t, ok)
-
-			betaClusters, err := params.ClusterForFleet("eth.beta")
-			require.NoError(t, err)
-			beta, ok := params.ClusterForNetwork(betaClusters, params.RopstenNetworkID)
-			require.True(t, ok)
-
-			require.NotEqual(t, staging, beta)
-
-			// assert
-			require.NoError(t, loadConfErr)
-			require.Equal(t, "eth.staging", nodeConfig.ClusterConfig.Fleet)
-			require.Equal(t, staging.BootNodes, nodeConfig.ClusterConfig.BootNodes)
-		},
-	},
+func TestLoadNodeConfigFromNonExistingFile(t *testing.T) {
+	_, err := params.LoadNodeConfig(`{
+		"NetworkId": 3,
+		"DataDir": "/tmp/statusgo",
+		"ClusterConfigFile": "/file/does/not.exist"
+	}`)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "no such file or directory")
 }
 
-// TestLoadNodeConfig tests loading JSON configuration and setting default values.
-func TestLoadNodeConfig(t *testing.T) {
+func TestLoadNodeConfigFromFile(t *testing.T) {
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "geth-config-tests")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(tmpDir) // nolint: errcheck
 
-	// create sample bootnodes config
-	err = ioutil.WriteFile(filepath.Join(tmpDir, "cluster.json"), clusterConfigData, os.ModePerm)
+	// create cluster config file
+	clusterFile := filepath.Join(tmpDir, "cluster.json")
+	err = ioutil.WriteFile(clusterFile, clusterConfigData, os.ModePerm)
 	require.NoError(t, err)
-	t.Log(tmpDir)
 
-	for _, testCase := range loadConfigTestCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			testCase.configJSON = strings.Replace(testCase.configJSON, "$TMPDIR", tmpDir, -1)
-			nodeConfig, err := params.LoadNodeConfig(testCase.configJSON)
-			testCase.validator(t, tmpDir, nodeConfig, err)
-		})
+	c, err := params.LoadNodeConfig(`{
+		"NetworkId": 3,
+		"DataDir": "` + tmpDir + `",
+		"ClusterConfigFile": "` + clusterFile + `"
+	}`)
+	require.NoError(t, err)
+	require.True(t, c.ClusterConfig.Enabled)
+	require.Len(t, c.ClusterConfig.StaticNodes, 2)
+}
+
+// TestGenerateAndLoadNodeConfig tests creating and loading config
+// exactly as it's done by status-react.
+func TestGenerateAndLoadNodeConfig(t *testing.T) {
+	tmpDir, err := ioutil.TempDir(os.TempDir(), "geth-config-tests")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir) // nolint: errcheck
+
+	var testCases = []struct {
+		Name      string
+		Fleet     string // optional; if omitted all fleets will be tested
+		NetworkID int    // optional; if omitted all networks will be checked
+		Update    func(*params.NodeConfig)
+		Validate  func(t *testing.T, dataDir string, c *params.NodeConfig)
+	}{
+		{
+			Name:   "default KeyStoreDir",
+			Update: func(config *params.NodeConfig) {},
+			Validate: func(t *testing.T, dataDir string, c *params.NodeConfig) {
+				require.Equal(t, dataDir, c.DataDir)
+				keyStoreDir := filepath.Join(dataDir, params.KeyStoreDir)
+				require.Equal(t, keyStoreDir, c.KeyStoreDir)
+			},
+		},
+		{
+			Name: "non-default KeyStoreDir",
+			Update: func(c *params.NodeConfig) {
+				c.KeyStoreDir = "/foo/bar"
+			},
+			Validate: func(t *testing.T, dataDir string, c *params.NodeConfig) {
+				require.Equal(t, "/foo/bar", c.KeyStoreDir)
+			},
+		},
+		{
+			Name:      "custom network and upstream",
+			NetworkID: 333,
+			Update: func(c *params.NodeConfig) {
+				c.UpstreamConfig.Enabled = true
+				c.UpstreamConfig.URL = "http://custom.local"
+			},
+			Validate: func(t *testing.T, dataDir string, c *params.NodeConfig) {
+				require.Equal(t, uint64(333), c.NetworkID)
+				require.True(t, c.UpstreamConfig.Enabled)
+				require.Equal(t, "http://custom.local", c.UpstreamConfig.URL)
+			},
+		},
+		{
+			Name:      "upstream config",
+			NetworkID: params.RopstenNetworkID,
+			Update: func(c *params.NodeConfig) {
+				c.UpstreamConfig.Enabled = true
+				c.UpstreamConfig.URL = params.RopstenEthereumNetworkURL
+			},
+			Validate: func(t *testing.T, dataDir string, c *params.NodeConfig) {
+				require.True(t, c.UpstreamConfig.Enabled)
+				require.Equal(t, params.RopstenEthereumNetworkURL, c.UpstreamConfig.URL)
+			},
+		},
+		{
+			Name:      "loading LES config",
+			NetworkID: params.MainNetworkID,
+			Update:    func(c *params.NodeConfig) {},
+			Validate: func(t *testing.T, dataDir string, c *params.NodeConfig) {
+				var genesis core.Genesis
+				err := json.Unmarshal([]byte(c.LightEthConfig.Genesis), &genesis)
+				require.NoError(t, err)
+
+				require.Zero(t, genesis.Config.ChainID.Cmp(gethparams.MainnetChainConfig.ChainID))
+				require.Zero(t, genesis.Config.HomesteadBlock.Cmp(gethparams.MainnetChainConfig.HomesteadBlock))
+				require.Zero(t, genesis.Config.EIP150Block.Cmp(gethparams.MainnetChainConfig.EIP150Block))
+				require.Zero(t, genesis.Config.EIP155Block.Cmp(gethparams.MainnetChainConfig.EIP155Block))
+				require.Zero(t, genesis.Config.EIP158Block.Cmp(gethparams.MainnetChainConfig.EIP158Block))
+			},
+		},
+		{
+			Name:   "cluster nodes setup",
+			Update: func(c *params.NodeConfig) {},
+			Validate: func(t *testing.T, dataDir string, c *params.NodeConfig) {
+				require.True(t, c.ClusterConfig.Enabled)
+				require.NotEmpty(t, c.ClusterConfig.BootNodes)
+				require.NotEmpty(t, c.ClusterConfig.StaticNodes)
+				require.NotEmpty(t, c.ClusterConfig.TrustedMailServers)
+			},
+		},
+		{
+			Name: "custom bootnodes",
+			Update: func(c *params.NodeConfig) {
+				c.ClusterConfig.BootNodes = []string{"a", "b", "c"}
+			},
+			Validate: func(t *testing.T, dataDir string, c *params.NodeConfig) {
+				require.True(t, c.ClusterConfig.Enabled)
+				require.Equal(t, []string{"a", "b", "c"}, c.ClusterConfig.BootNodes)
+			},
+		},
+		{
+			Name: "disabled ClusterConfiguration",
+			Update: func(c *params.NodeConfig) {
+				c.ClusterConfig.Enabled = false
+			},
+			Validate: func(t *testing.T, dataDir string, c *params.NodeConfig) {
+				require.False(t, c.ClusterConfig.Enabled)
+			},
+		},
+		{
+			Name:   "peers discovery and topics",
+			Update: func(c *params.NodeConfig) {},
+			Validate: func(t *testing.T, dataDir string, c *params.NodeConfig) {
+				require.NotNil(t, c.RequireTopics)
+				require.False(t, c.NoDiscovery)
+				require.Contains(t, c.RequireTopics, params.WhisperDiscv5Topic)
+				require.Equal(t, params.WhisperDiscv5Limits, c.RequireTopics[params.WhisperDiscv5Topic])
+			},
+		},
+		{
+			Name: "verify NoDiscovery preserved",
+			Update: func(c *params.NodeConfig) {
+				c.NoDiscovery = true
+			},
+			Validate: func(t *testing.T, dataDir string, c *params.NodeConfig) {
+				require.True(t, c.NoDiscovery)
+			},
+		},
+		{
+			Name:   "staging fleet",
+			Fleet:  params.FleetStaging,
+			Update: func(c *params.NodeConfig) {},
+			Validate: func(t *testing.T, dataDir string, c *params.NodeConfig) {
+				staging, ok := params.ClusterForFleet("eth.staging")
+				require.True(t, ok)
+				beta, ok := params.ClusterForFleet("eth.beta")
+				require.True(t, ok)
+
+				require.NotEqual(t, staging, beta)
+
+				// test case asserts
+				require.Equal(t, "eth.staging", c.ClusterConfig.Fleet)
+				require.Equal(t, staging.BootNodes, c.ClusterConfig.BootNodes)
+			},
+		},
+		{
+			Name: "Whisper light client",
+			Update: func(c *params.NodeConfig) {
+				c.WhisperConfig.LightClient = true
+			},
+			Validate: func(t *testing.T, dataDir string, c *params.NodeConfig) {
+				require.True(t, c.WhisperConfig.LightClient)
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		fleets := []string{params.FleetBeta, params.FleetStaging}
+		if tc.Fleet != params.FleetUndefined {
+			fleets = []string{tc.Fleet}
+		}
+
+		networks := []int{params.MainNetworkID, params.RinkebyNetworkID, params.RopstenNetworkID}
+		if tc.NetworkID != 0 {
+			networks = []int{tc.NetworkID}
+		}
+
+		for _, fleet := range fleets {
+			for _, networkID := range networks {
+				name := fmt.Sprintf("%s_%s_%d", tc.Name, fleet, networkID)
+				t.Run(name, func(t *testing.T) {
+					// Corresponds to GenerateConfig() binding.
+					config, err := params.NewNodeConfig(tmpDir, "", fleet, uint64(networkID))
+					require.NoError(t, err)
+
+					// Corresponds to config update in status-react.
+					tc.Update(config)
+					configBytes, err := json.Marshal(config)
+					require.NoError(t, err)
+
+					// Corresponds to starting node and loading config from JSON blob.
+					loadedConfig, err := params.LoadNodeConfig(string(configBytes))
+					require.NoError(t, err)
+					tc.Validate(t, tmpDir, loadedConfig)
+				})
+			}
+		}
 	}
 }
 

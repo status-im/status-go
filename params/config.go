@@ -385,7 +385,7 @@ func NewNodeConfig(dataDir, clstrCfgFile, fleet string, networkID uint64) (*Node
 		LogToStderr:       LogToStderr,
 		ClusterConfigFile: clstrCfgFile,
 		ClusterConfig: &ClusterConfig{
-			Enabled:     fleet != FleetUndefined,
+			Enabled:     true, // cluster must be enabled by default
 			Fleet:       fleet,
 			StaticNodes: []string{},
 			BootNodes:   []string{},
@@ -431,7 +431,7 @@ func LoadNodeConfig(configJSON string) (*NodeConfig, error) {
 }
 
 func loadNodeConfig(configJSON string) (*NodeConfig, error) {
-	nodeConfig, err := NewNodeConfig("", "", FleetBeta, 0)
+	nodeConfig, err := NewNodeConfig("", "", FleetUndefined, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -616,10 +616,7 @@ func (c *NodeConfig) updateClusterConfig() error {
 
 	c.log.Info("update cluster config", "configFile", c.ClusterConfigFile, "fleet", c.ClusterConfig.Fleet)
 
-	var (
-		clusters []Cluster
-		err      error
-	)
+	var cluster Cluster
 
 	if c.ClusterConfigFile != "" {
 		// Load cluster configuration from external file.
@@ -627,42 +624,34 @@ func (c *NodeConfig) updateClusterConfig() error {
 		if err != nil {
 			return fmt.Errorf("cluster configuration file '%s' could not be loaded: %s", c.ClusterConfigFile, err)
 		}
-		err = json.Unmarshal(configFile, &clusters)
+		err = json.Unmarshal(configFile, &cluster)
 		if err != nil {
 			return fmt.Errorf("failed to unmarshal cluster configuration file: %s", err)
 		}
 	} else {
-		clusters, err = ClusterForFleet(c.ClusterConfig.Fleet)
-		if err != nil {
-			return fmt.Errorf("getting fleet '%s' failed: %v", c.ClusterConfig.Fleet, err)
-		}
+		cluster, _ = ClusterForFleet(c.ClusterConfig.Fleet)
 	}
 
-	for _, cluster := range clusters {
-		if cluster.NetworkID == int(c.NetworkID) {
-			// allow to override bootnodes only if they were not defined earlier
-			if len(c.ClusterConfig.BootNodes) == 0 {
-				c.ClusterConfig.BootNodes = cluster.BootNodes
-			}
-			// allow to override static nodes only if they were not defined earlier
-			if len(c.ClusterConfig.StaticNodes) == 0 {
-				c.ClusterConfig.StaticNodes = cluster.StaticNodes
-			}
-			// no point in running discovery if we don't have bootnodes.
-			// but in case if we do have nodes and NoDiscovery=true we will preserve that value
-			if len(cluster.BootNodes) == 0 {
-				c.NoDiscovery = true
-			}
-			if len(c.ClusterConfig.RendezvousNodes) == 0 {
-				c.ClusterConfig.RendezvousNodes = cluster.RendezvousNodes
-			}
-			if len(c.ClusterConfig.RendezvousNodes) != 0 {
-				c.Rendezvous = true
-			}
-			c.ClusterConfig.TrustedMailServers = cluster.MailServers
-			break
-		}
+	// allow to override bootnodes only if they were not defined earlier
+	if len(c.ClusterConfig.BootNodes) == 0 {
+		c.ClusterConfig.BootNodes = cluster.BootNodes
 	}
+	// allow to override static nodes only if they were not defined earlier
+	if len(c.ClusterConfig.StaticNodes) == 0 {
+		c.ClusterConfig.StaticNodes = cluster.StaticNodes
+	}
+	// No point in running discovery if we don't have bootnodes.
+	// In a case when we do have bootnodes, NoDiscovery=true is preserved.
+	if len(cluster.BootNodes) == 0 {
+		c.NoDiscovery = true
+	}
+	if len(c.ClusterConfig.RendezvousNodes) == 0 {
+		c.ClusterConfig.RendezvousNodes = cluster.RendezvousNodes
+	}
+	if len(c.ClusterConfig.RendezvousNodes) != 0 {
+		c.Rendezvous = true
+	}
+	c.ClusterConfig.TrustedMailServers = cluster.MailServers
 
 	return nil
 }
