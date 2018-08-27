@@ -122,6 +122,8 @@ func (n *StatusNode) Start(config *params.NodeConfig, services ...node.ServiceCo
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
+	n.log.Debug("starting with NodeConfig", "ClusterConfig", config.ClusterConfig)
+
 	if n.isRunning() {
 		return ErrNodeRunning
 	}

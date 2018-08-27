@@ -257,7 +257,9 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 		nodeConfig.ClusterConfig.BootNodes = nil
 	}
 
-	nodeConfig.ClusterConfig.RendezvousNodes = []string(rendezvousNodes)
+	if len(rendezvousNodes) > 0 {
+		nodeConfig.ClusterConfig.RendezvousNodes = []string(rendezvousNodes)
+	}
 	nodeConfig.NoDiscovery = !(*discoveryFlag)
 	nodeConfig.Rendezvous = *rendezvous
 	nodeConfig.RequireTopics = map[discv5.Topic]params.Limits(searchTopics)
