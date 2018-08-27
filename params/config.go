@@ -720,13 +720,15 @@ func GetStatusHome() string {
 }
 
 // LesTopic returns discovery v5 topic derived from genesis of the provided network.
-// 1 - mainnet, 4 - ropsten
+// 1 - mainnet, 3 - ropsten, 4 - rinkeby
 func LesTopic(netid int) string {
 	switch netid {
 	case 1:
-		return "LES2@" + common.Bytes2Hex(params.MainnetGenesisHash.Bytes()[:8])
+		return LESDiscoveryIdentifier + common.Bytes2Hex(params.MainnetGenesisHash.Bytes()[:8])
 	case 3:
-		return "LES2@" + common.Bytes2Hex(params.TestnetGenesisHash.Bytes()[:8])
+		return LESDiscoveryIdentifier + common.Bytes2Hex(params.TestnetGenesisHash.Bytes()[:8])
+	case 4:
+		return LESDiscoveryIdentifier + common.Bytes2Hex(params.RinkebyGenesisHash.Bytes()[:8])
 	default:
 		return ""
 	}
