@@ -1,7 +1,7 @@
-diff --git i/eth/downloader/downloader.go w/eth/downloader/downloader.go
-index 43f0e3db9..b337f95c9 100644
---- i/eth/downloader/downloader.go
-+++ w/eth/downloader/downloader.go
+diff --git a/eth/downloader/downloader.go b/eth/downloader/downloader.go
+index fbde9c6c..c0013a11 100644
+--- a/eth/downloader/downloader.go
++++ b/eth/downloader/downloader.go
 @@ -143,6 +143,8 @@ type Downloader struct {
  	quitCh   chan struct{} // Quit channel to signal termination
  	quitLock sync.RWMutex  // Lock to prevent double closes
@@ -57,10 +57,10 @@ index 43f0e3db9..b337f95c9 100644
  }
  
  // fetchHeight retrieves the head header of the remote peer to aid in estimating
-diff --git i/eth/handler.go w/eth/handler.go
-index 4069359c9..da9ebb243 100644
---- i/eth/handler.go
-+++ w/eth/handler.go
+diff --git a/eth/handler.go b/eth/handler.go
+index f89f68c9..5522b0d9 100644
+--- a/eth/handler.go
++++ b/eth/handler.go
 @@ -230,6 +230,9 @@ func (pm *ProtocolManager) Stop() {
  	// Quit fetcher, txsyncLoop.
  	close(pm.quitSync)
@@ -71,10 +71,10 @@ index 4069359c9..da9ebb243 100644
  	// Disconnect existing sessions.
  	// This also closes the gate for any new registrations on the peer set.
  	// sessions which are already established but not added to pm.peers yet
-diff --git i/eth/sync.go w/eth/sync.go
-index e49e40087..4367434a6 100644
---- i/eth/sync.go
-+++ w/eth/sync.go
+diff --git a/eth/sync.go b/eth/sync.go
+index e49e4008..4367434a 100644
+--- a/eth/sync.go
++++ b/eth/sync.go
 @@ -135,7 +135,6 @@ func (pm *ProtocolManager) syncer() {
  	// Start and ensure cleanup of sync mechanisms
  	pm.fetcher.Start()
@@ -83,10 +83,10 @@ index e49e40087..4367434a6 100644
  
  	// Wait for different events to fire synchronisation operations
  	forceSync := time.NewTicker(forceSyncCycle)
-diff --git i/les/backend.go w/les/backend.go
-index 6a324cb04..e3844bf84 100644
---- i/les/backend.go
-+++ w/les/backend.go
+diff --git a/les/backend.go b/les/backend.go
+index 00025ba6..38c36da6 100644
+--- a/les/backend.go
++++ b/les/backend.go
 @@ -20,7 +20,6 @@ package les
  import (
  	"fmt"
@@ -95,7 +95,7 @@ index 6a324cb04..e3844bf84 100644
  
  	"github.com/ethereum/go-ethereum/accounts"
  	"github.com/ethereum/go-ethereum/common"
-@@ -250,7 +249,6 @@ func (s *LightEthereum) Stop() error {
+@@ -253,7 +252,6 @@ func (s *LightEthereum) Stop() error {
  
  	s.eventMux.Stop()
  
@@ -103,13 +103,13 @@ index 6a324cb04..e3844bf84 100644
  	s.chainDb.Close()
  	close(s.shutdownChan)
  
-diff --git i/les/handler.go w/les/handler.go
-index 9627f392b..f2bbe899f 100644
---- i/les/handler.go
-+++ w/les/handler.go
-@@ -241,6 +241,9 @@ func (pm *ProtocolManager) Stop() {
- 
- 	close(pm.quitSync) // quits syncer, fetcher
+diff --git a/les/handler.go b/les/handler.go
+index ca40eaab..cc15d68c 100644
+--- a/les/handler.go
++++ b/les/handler.go
+@@ -194,6 +194,9 @@ func (pm *ProtocolManager) Stop() {
+ 		pm.clientPool.stop()
+ 	}
  
 +	// Stop downloader and make sure that all the running downloads are complete.
 +	pm.downloader.Terminate()
@@ -117,10 +117,10 @@ index 9627f392b..f2bbe899f 100644
  	// Disconnect existing sessions.
  	// This also closes the gate for any new registrations on the peer set.
  	// sessions which are already established but not added to pm.peers yet
-diff --git i/les/sync.go w/les/sync.go
-index c3d37e2f3..fc1f076c7 100644
---- i/les/sync.go
-+++ w/les/sync.go
+diff --git a/les/sync.go b/les/sync.go
+index 1ac64558..eb155377 100644
+--- a/les/sync.go
++++ b/les/sync.go
 @@ -31,7 +31,6 @@ func (pm *ProtocolManager) syncer() {
  	// Start and ensure cleanup of sync mechanisms
  	//pm.fetcher.Start()

@@ -27,7 +27,7 @@ ignored = [ "github.com/ethereum/go-ethereum/ethapi" ]
 
 [[constraint]]
   name = "github.com/ethereum/go-ethereum"
-  version = "v1.8.13"
+  version = "=v1.8.14"
 
 # * * * * * `go-ethereum` dependencies * * * * *
 # Pinned down SHAs from `go-ethereum/vendor/vendor.json`

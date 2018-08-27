@@ -88,7 +88,7 @@
   revision = "935e0e8a636ca4ba70b713f3e38a19e1b77739e8"
 
 [[projects]]
-  digest = "1:b2f36e5422bda96da299f9e48c7dcdd3177b18477297f84ff1a45ec3032c2994"
+  digest = "1:d670c508dc01984c721d0d968936412e3edcd8ca58caf82fcfd0df9044013a0f"
   name = "github.com/ethereum/go-ethereum"
   packages = [
     ".",
@@ -104,6 +104,7 @@
     "common/hexutil",
     "common/math",
     "common/mclock",
+    "common/prque",
     "consensus",
     "consensus/clique",
     "consensus/ethash",
@@ -155,8 +156,8 @@
     "whisper/whisperv6",
   ]
   pruneopts = "T"
-  revision = "225171a4bfcc16bd12a1906b1e0d43d0b18c353b"
-  version = "v1.8.13"
+  revision = "316fc7ecfc10d06603f1358c1f4c1020ec36dd2a"
+  version = "v1.8.14"
 
 [[projects]]
   digest = "1:5ac7ecd476a2355a5201229081df2e5f57333ecf703e1f69dde699ae34169c1b"
@@ -923,14 +924,15 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:13e050f402d48dc1e296490a9b354c78ab283e0f287531286ec08d33ad604067"
+  digest = "1:40800a1a379be16c1ecc68d1c8cc912f6e468f95238117be9b54979d0cbb6819"
   name = "golang.org/x/sys"
   packages = [
+    "cpu",
     "unix",
     "windows",
   ]
   pruneopts = "NUT"
-  revision = "2c42eef0765b9837fbdab12011af7830f55f88f0"
+  revision = "11551d06cbcc94edc80a0facaccbda56473c19c1"
 
 [[projects]]
   branch = "master"
