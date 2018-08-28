@@ -73,7 +73,7 @@ node('linux') {
         dir(cloneDir) {
             // For branch builds, replace the old artifact. For develop keep all of them.
             def version = sh(
-                script: "git describe --exact-match --tag 2>/dev/null || git rev-parse --short HEAD",
+                script: "git describe --exact-match --tag 2>/dev/null || git describe --always",
                 returnStdout: true
             ).trim()
             def server = Artifactory.server 'artifacts'
