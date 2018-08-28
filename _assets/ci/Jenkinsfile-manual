@@ -75,7 +75,7 @@ node('linux') {
             def version = sh(
                 script: "git describe --exact-match --tag 2>/dev/null || git rev-parse --short HEAD",
                 returnStdout: true
-            )
+            ).trim()
             def server = Artifactory.server 'artifacts'
             def uploadSpec = """{
                 "files": [
