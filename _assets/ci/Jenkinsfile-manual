@@ -72,9 +72,10 @@ node('linux') {
     stage('Deploy') {
         dir(cloneDir) {
             // For branch builds, replace the old artifact. For develop keep all of them.
-            def version = sh("""
-                git describe --exact-match --tag 2>/dev/null || git rev-parse --short HEAD
-            """, returnStdout: true)
+            def version = sh(
+                script: "git describe --exact-match --tag 2>/dev/null || git rev-parse --short HEAD",
+                returnStdout: true
+            )
             def server = Artifactory.server 'artifacts'
             def uploadSpec = """{
                 "files": [
