@@ -894,8 +894,11 @@ func (whisper *Whisper) add(envelope *Envelope, isP2P bool) (bool, error) {
 	now := uint32(whisper.timeSource().Unix())
 	sent := envelope.Expiry - envelope.TTL
 
+	envelopeAddedCounter.Inc(1)
+
 	if sent > now {
 		if sent-DefaultSyncAllowance > now {
+			envelopeErrFromFutureCounter.Inc(1)
 			return false, fmt.Errorf("envelope created in the future [%x]", envelope.Hash())
 		}
 		// recalculate PoW, adjusted for the time difference, plus one second for latency
@@ -904,13 +907,16 @@ func (whisper *Whisper) add(envelope *Envelope, isP2P bool) (bool, error) {
 
 	if envelope.Expiry < now {
 		if envelope.Expiry+DefaultSyncAllowance*2 < now {
+			envelopeErrVeryOldCounter.Inc(1)
 			return false, fmt.Errorf("very old message")
 		}
 		log.Debug("expired envelope dropped", "hash", envelope.Hash().Hex())
+		envelopeErrExpiredCounter.Inc(1)
 		return false, nil // drop envelope without error
 	}
 
 	if uint32(envelope.size()) > whisper.MaxMessageSize() {
+		envelopeErrOversizedCounter.Inc(1)
 		return false, fmt.Errorf("huge messages are not allowed [%x]", envelope.Hash())
 	}
 
@@ -919,6 +925,7 @@ func (whisper *Whisper) add(envelope *Envelope, isP2P bool) (bool, error) {
 		// in this case the previous value is retrieved by MinPowTolerance()
 		// for a short period of peer synchronization.
 		if envelope.PoW() < whisper.MinPowTolerance() {
+			envelopeErrLowPowCounter.Inc(1)
 			return false, fmt.Errorf("envelope with low PoW received: PoW=%f, hash=[%v]", envelope.PoW(), envelope.Hash().Hex())
 		}
 	}
@@ -928,6 +935,7 @@ func (whisper *Whisper) add(envelope *Envelope, isP2P bool) (bool, error) {
 		// in this case the previous value is retrieved by BloomFilterTolerance()
 		// for a short period of peer synchronization.
 		if !BloomFilterMatch(whisper.BloomFilterTolerance(), envelope.Bloom()) {
+			envelopeErrNoBloomMatchCounter.Inc(1)
 			return false, fmt.Errorf("envelope does not match bloom filter, hash=[%v], bloom: \n%x \n%x \n%x",
 				envelope.Hash().Hex(), whisper.BloomFilter(), envelope.Bloom(), envelope.Topic)
 		}
@@ -952,6 +960,8 @@ func (whisper *Whisper) add(envelope *Envelope, isP2P bool) (bool, error) {
 		log.Trace("whisper envelope already cached", "hash", envelope.Hash().Hex())
 	} else {
 		log.Trace("cached whisper envelope", "hash", envelope.Hash().Hex())
+		envelopeNewAddedCounter.Inc(1)
+		envelopeSizeMeter.Mark(int64(envelope.size()))
 		whisper.statsMu.Lock()
 		whisper.stats.memoryUsed += envelope.size()
 		whisper.statsMu.Unlock()
@@ -1053,6 +1063,7 @@ func (whisper *Whisper) expire() {
 			hashSet.Each(func(v interface{}) bool {
 				sz := whisper.envelopes[v.(common.Hash)].size()
 				delete(whisper.envelopes, v.(common.Hash))
+				envelopeClearedCounter.Inc(1)
 				whisper.envelopeFeed.Send(EnvelopeEvent{
 					Hash:  v.(common.Hash),
 					Event: EventEnvelopeExpired,
