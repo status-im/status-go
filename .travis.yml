@@ -16,7 +16,6 @@ jobs:
       - make vendor-check
   - stage: Test unit and integration
     script:
-      - make test-unit-race
       - make test-unit
   - stage: Test e2e on private network
     script:
