@@ -22,7 +22,6 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/nat"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"github.com/status-im/status-go/mailserver"
-	shhmetrics "github.com/status-im/status-go/metrics/whisper"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/peer"
 	"github.com/status-im/status-go/services/personal"
@@ -252,9 +251,6 @@ func activateShhService(stack *node.Node, config *params.NodeConfig, db *leveldb
 		}
 
 		whisperService := whisper.New(whisperServiceConfig)
-
-		// enable metrics
-		whisperService.RegisterEnvelopeTracer(&shhmetrics.EnvelopeTracer{})
 
 		// enable mail service
 		if config.WhisperConfig.EnableMailServer {

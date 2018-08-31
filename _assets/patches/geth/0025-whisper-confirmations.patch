@@ -41,7 +41,7 @@ index 79cc2127..018d8f82 100644
 +				Peer:  peer.peer.ID(), // specifically discover.NodeID because it can be pretty printed
 +			})
  		}
- 
+
  		log.Trace("broadcast", "num. messages", len(bundle))
 diff --git a/whisper/whisperv6/whisper.go b/whisper/whisperv6/whisper.go
 index 414aa788..3c3c66ad 100644
@@ -55,19 +55,18 @@ index 414aa788..3c3c66ad 100644
  	"github.com/ethereum/go-ethereum/log"
  	"github.com/ethereum/go-ethereum/p2p"
  	"github.com/ethereum/go-ethereum/rlp"
-@@ -89,6 +90,8 @@ type Whisper struct {
- 
- 	mailServer     MailServer     // MailServer interface
- 	envelopeTracer EnvelopeTracer // Service collecting envelopes metadata
+@@ -89,5 +90,7 @@ type Whisper struct {
+
+ 	mailServer MailServer // MailServer interface
 +
 +	envelopeFeed event.Feed
  }
- 
+
  // New creates a Whisper client ready to communicate through the Ethereum P2P network.
 @@ -133,6 +136,12 @@ func New(cfg *Config) *Whisper {
  	return whisper
  }
- 
+
 +// SubscribeEnvelopeEvents subscribes to envelopes feed.
 +// In order to prevent blocking whisper producers events must be amply buffered.
 +func (whisper *Whisper) SubscribeEnvelopeEvents(events chan<- EnvelopeEvent) event.Subscription {
