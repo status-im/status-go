@@ -64,7 +64,7 @@ var (
 	listenAddr      = flag.String("listenaddr", ":30303", "IP address and port of this node (e.g. 127.0.0.1:30303)")
 	advertiseAddr   = flag.String("advertiseaddr", "", "IP address the node wants to reached with (useful if floating IP is used)")
 	fleet           = flag.String("fleet", params.FleetBeta, "Name of the fleet like 'eth.staging' (default to 'eth.beta')")
-	standalone      = flag.Bool("standalone", true, "Don't actively connect to peers, wait for incoming connections")
+	standalone      = flag.Bool("standalone", false, "Don't actively connect to peers, wait for incoming connections")
 	bootnodes       = flag.String("bootnodes", "", "A list of bootnodes separated by comma")
 	discoveryFlag   = flag.Bool("discovery", false, "Enable discovery protocol")
 	rendezvous      = flag.Bool("rendezvous", false, "Enable rendezvous protocol")
