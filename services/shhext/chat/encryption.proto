@@ -2,14 +2,19 @@ syntax = "proto3";
 
 package chat;
 
+message SignedPreKey {
+  bytes signed_pre_key = 1;
+  uint32 version = 2;
+}
+
 // X3DH prekey bundle
 message Bundle {
   // Identity key
   bytes identity = 1;
-  // Signed prekey
-  bytes signed_pre_key = 2;
+  // Installation id
+  map<string,SignedPreKey> signed_pre_keys = 2;
   // Prekey signature
-  bytes signature = 3;
+  bytes signature = 4;
 }
 
 message BundleContainer {
@@ -43,6 +48,8 @@ message X3DHHeader {
   bytes key = 1;
   // Used bundle's signed prekey
   bytes id = 4;
+  // The device id
+  string installation_id = 3;
 }
 
 // Direct message value
@@ -59,11 +66,9 @@ message ProtocolMessage {
   // An optional bundle is exchanged with each message
   Bundle bundle = 1;
 
-  oneof message_type {
-    // One to one message, encrypted
-    DirectMessageProtocol direct_message = 101;
+  // One to one message, encrypted, indexed by installation_id
+  map<string,DirectMessageProtocol> direct_message = 101;
 
-    // Public chats, not encrypted
-    bytes public_message = 102;
-  }
+  // Public chats, not encrypted
+  bytes public_message = 102;
 }

@@ -18,14 +18,60 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
 
+type SignedPreKey struct {
+	SignedPreKey         []byte   `protobuf:"bytes,1,opt,name=signed_pre_key,json=signedPreKey,proto3" json:"signed_pre_key,omitempty"`
+	Version              uint32   `protobuf:"varint,2,opt,name=version,proto3" json:"version,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *SignedPreKey) Reset()         { *m = SignedPreKey{} }
+func (m *SignedPreKey) String() string { return proto.CompactTextString(m) }
+func (*SignedPreKey) ProtoMessage()    {}
+func (*SignedPreKey) Descriptor() ([]byte, []int) {
+	return fileDescriptor_8293a649ce9418c6, []int{0}
+}
+func (m *SignedPreKey) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_SignedPreKey.Unmarshal(m, b)
+}
+func (m *SignedPreKey) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_SignedPreKey.Marshal(b, m, deterministic)
+}
+func (m *SignedPreKey) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_SignedPreKey.Merge(m, src)
+}
+func (m *SignedPreKey) XXX_Size() int {
+	return xxx_messageInfo_SignedPreKey.Size(m)
+}
+func (m *SignedPreKey) XXX_DiscardUnknown() {
+	xxx_messageInfo_SignedPreKey.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_SignedPreKey proto.InternalMessageInfo
+
+func (m *SignedPreKey) GetSignedPreKey() []byte {
+	if m != nil {
+		return m.SignedPreKey
+	}
+	return nil
+}
+
+func (m *SignedPreKey) GetVersion() uint32 {
+	if m != nil {
+		return m.Version
+	}
+	return 0
+}
+
 // X3DH prekey bundle
 type Bundle struct {
 	// Identity key
 	Identity []byte `protobuf:"bytes,1,opt,name=identity,proto3" json:"identity,omitempty"`
-	// Signed prekey
-	SignedPreKey []byte `protobuf:"bytes,2,opt,name=signed_pre_key,json=signedPreKey,proto3" json:"signed_pre_key,omitempty"`
+	// Installation id
+	SignedPreKeys map[string]*SignedPreKey `protobuf:"bytes,2,rep,name=signed_pre_keys,json=signedPreKeys,proto3" json:"signed_pre_keys,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 	// Prekey signature
-	Signature            []byte   `protobuf:"bytes,3,opt,name=signature,proto3" json:"signature,omitempty"`
+	Signature            []byte   `protobuf:"bytes,4,opt,name=signature,proto3" json:"signature,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -35,7 +81,7 @@ func (m *Bundle) Reset()         { *m = Bundle{} }
 func (m *Bundle) String() string { return proto.CompactTextString(m) }
 func (*Bundle) ProtoMessage()    {}
 func (*Bundle) Descriptor() ([]byte, []int) {
-	return fileDescriptor_encryption_a35d9f7c683dd9c2, []int{0}
+	return fileDescriptor_8293a649ce9418c6, []int{1}
 }
 func (m *Bundle) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Bundle.Unmarshal(m, b)
@@ -43,8 +89,8 @@ func (m *Bundle) XXX_Unmarshal(b []byte) error {
 func (m *Bundle) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_Bundle.Marshal(b, m, deterministic)
 }
-func (dst *Bundle) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Bundle.Merge(dst, src)
+func (m *Bundle) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Bundle.Merge(m, src)
 }
 func (m *Bundle) XXX_Size() int {
 	return xxx_messageInfo_Bundle.Size(m)
@@ -62,9 +108,9 @@ func (m *Bundle) GetIdentity() []byte {
 	return nil
 }
 
-func (m *Bundle) GetSignedPreKey() []byte {
+func (m *Bundle) GetSignedPreKeys() map[string]*SignedPreKey {
 	if m != nil {
-		return m.SignedPreKey
+		return m.SignedPreKeys
 	}
 	return nil
 }
@@ -92,7 +138,7 @@ func (m *BundleContainer) Reset()         { *m = BundleContainer{} }
 func (m *BundleContainer) String() string { return proto.CompactTextString(m) }
 func (*BundleContainer) ProtoMessage()    {}
 func (*BundleContainer) Descriptor() ([]byte, []int) {
-	return fileDescriptor_encryption_a35d9f7c683dd9c2, []int{1}
+	return fileDescriptor_8293a649ce9418c6, []int{2}
 }
 func (m *BundleContainer) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_BundleContainer.Unmarshal(m, b)
@@ -100,8 +146,8 @@ func (m *BundleContainer) XXX_Unmarshal(b []byte) error {
 func (m *BundleContainer) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_BundleContainer.Marshal(b, m, deterministic)
 }
-func (dst *BundleContainer) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_BundleContainer.Merge(dst, src)
+func (m *BundleContainer) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_BundleContainer.Merge(m, src)
 }
 func (m *BundleContainer) XXX_Size() int {
 	return xxx_messageInfo_BundleContainer.Size(m)
@@ -151,7 +197,7 @@ func (m *DRHeader) Reset()         { *m = DRHeader{} }
 func (m *DRHeader) String() string { return proto.CompactTextString(m) }
 func (*DRHeader) ProtoMessage()    {}
 func (*DRHeader) Descriptor() ([]byte, []int) {
-	return fileDescriptor_encryption_a35d9f7c683dd9c2, []int{2}
+	return fileDescriptor_8293a649ce9418c6, []int{3}
 }
 func (m *DRHeader) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_DRHeader.Unmarshal(m, b)
@@ -159,8 +205,8 @@ func (m *DRHeader) XXX_Unmarshal(b []byte) error {
 func (m *DRHeader) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_DRHeader.Marshal(b, m, deterministic)
 }
-func (dst *DRHeader) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_DRHeader.Merge(dst, src)
+func (m *DRHeader) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_DRHeader.Merge(m, src)
 }
 func (m *DRHeader) XXX_Size() int {
 	return xxx_messageInfo_DRHeader.Size(m)
@@ -211,7 +257,7 @@ func (m *DHHeader) Reset()         { *m = DHHeader{} }
 func (m *DHHeader) String() string { return proto.CompactTextString(m) }
 func (*DHHeader) ProtoMessage()    {}
 func (*DHHeader) Descriptor() ([]byte, []int) {
-	return fileDescriptor_encryption_a35d9f7c683dd9c2, []int{3}
+	return fileDescriptor_8293a649ce9418c6, []int{4}
 }
 func (m *DHHeader) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_DHHeader.Unmarshal(m, b)
@@ -219,8 +265,8 @@ func (m *DHHeader) XXX_Unmarshal(b []byte) error {
 func (m *DHHeader) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_DHHeader.Marshal(b, m, deterministic)
 }
-func (dst *DHHeader) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_DHHeader.Merge(dst, src)
+func (m *DHHeader) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_DHHeader.Merge(m, src)
 }
 func (m *DHHeader) XXX_Size() int {
 	return xxx_messageInfo_DHHeader.Size(m)
@@ -242,7 +288,9 @@ type X3DHHeader struct {
 	// Ephemeral key used
 	Key []byte `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
 	// Used bundle's signed prekey
-	Id                   []byte   `protobuf:"bytes,4,opt,name=id,proto3" json:"id,omitempty"`
+	Id []byte `protobuf:"bytes,4,opt,name=id,proto3" json:"id,omitempty"`
+	// The device id
+	InstallationId       string   `protobuf:"bytes,3,opt,name=installation_id,json=installationId,proto3" json:"installation_id,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -252,7 +300,7 @@ func (m *X3DHHeader) Reset()         { *m = X3DHHeader{} }
 func (m *X3DHHeader) String() string { return proto.CompactTextString(m) }
 func (*X3DHHeader) ProtoMessage()    {}
 func (*X3DHHeader) Descriptor() ([]byte, []int) {
-	return fileDescriptor_encryption_a35d9f7c683dd9c2, []int{4}
+	return fileDescriptor_8293a649ce9418c6, []int{5}
 }
 func (m *X3DHHeader) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_X3DHHeader.Unmarshal(m, b)
@@ -260,8 +308,8 @@ func (m *X3DHHeader) XXX_Unmarshal(b []byte) error {
 func (m *X3DHHeader) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_X3DHHeader.Marshal(b, m, deterministic)
 }
-func (dst *X3DHHeader) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_X3DHHeader.Merge(dst, src)
+func (m *X3DHHeader) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_X3DHHeader.Merge(m, src)
 }
 func (m *X3DHHeader) XXX_Size() int {
 	return xxx_messageInfo_X3DHHeader.Size(m)
@@ -286,11 +334,18 @@ func (m *X3DHHeader) GetId() []byte {
 	return nil
 }
 
+func (m *X3DHHeader) GetInstallationId() string {
+	if m != nil {
+		return m.InstallationId
+	}
+	return ""
+}
+
 // Direct message value
 type DirectMessageProtocol struct {
-	X3DHHeader *X3DHHeader `protobuf:"bytes,1,opt,name=X3DH_header,json=X3DHHeader,proto3" json:"X3DH_header,omitempty"`
-	DRHeader   *DRHeader   `protobuf:"bytes,2,opt,name=DR_header,json=DRHeader,proto3" json:"DR_header,omitempty"`
-	DHHeader   *DHHeader   `protobuf:"bytes,101,opt,name=DH_header,json=DHHeader,proto3" json:"DH_header,omitempty"`
+	X3DHHeader *X3DHHeader `protobuf:"bytes,1,opt,name=X3DH_header,json=x3DHHeader,proto3" json:"X3DH_header,omitempty"`
+	DRHeader   *DRHeader   `protobuf:"bytes,2,opt,name=DR_header,json=dRHeader,proto3" json:"DR_header,omitempty"`
+	DHHeader   *DHHeader   `protobuf:"bytes,101,opt,name=DH_header,json=dHHeader,proto3" json:"DH_header,omitempty"`
 	// Encrypted payload
 	Payload              []byte   `protobuf:"bytes,3,opt,name=payload,proto3" json:"payload,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
@@ -302,7 +357,7 @@ func (m *DirectMessageProtocol) Reset()         { *m = DirectMessageProtocol{} }
 func (m *DirectMessageProtocol) String() string { return proto.CompactTextString(m) }
 func (*DirectMessageProtocol) ProtoMessage()    {}
 func (*DirectMessageProtocol) Descriptor() ([]byte, []int) {
-	return fileDescriptor_encryption_a35d9f7c683dd9c2, []int{5}
+	return fileDescriptor_8293a649ce9418c6, []int{6}
 }
 func (m *DirectMessageProtocol) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_DirectMessageProtocol.Unmarshal(m, b)
@@ -310,8 +365,8 @@ func (m *DirectMessageProtocol) XXX_Unmarshal(b []byte) error {
 func (m *DirectMessageProtocol) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_DirectMessageProtocol.Marshal(b, m, deterministic)
 }
-func (dst *DirectMessageProtocol) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_DirectMessageProtocol.Merge(dst, src)
+func (m *DirectMessageProtocol) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_DirectMessageProtocol.Merge(m, src)
 }
 func (m *DirectMessageProtocol) XXX_Size() int {
 	return xxx_messageInfo_DirectMessageProtocol.Size(m)
@@ -354,20 +409,20 @@ func (m *DirectMessageProtocol) GetPayload() []byte {
 type ProtocolMessage struct {
 	// An optional bundle is exchanged with each message
 	Bundle *Bundle `protobuf:"bytes,1,opt,name=bundle,proto3" json:"bundle,omitempty"`
-	// Types that are valid to be assigned to MessageType:
-	//	*ProtocolMessage_DirectMessage
-	//	*ProtocolMessage_PublicMessage
-	MessageType          isProtocolMessage_MessageType `protobuf_oneof:"message_type"`
-	XXX_NoUnkeyedLiteral struct{}                      `json:"-"`
-	XXX_unrecognized     []byte                        `json:"-"`
-	XXX_sizecache        int32                         `json:"-"`
+	// One to one message, encrypted, indexed by installation_id
+	DirectMessage map[string]*DirectMessageProtocol `protobuf:"bytes,101,rep,name=direct_message,json=directMessage,proto3" json:"direct_message,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	// Public chats, not encrypted
+	PublicMessage        []byte   `protobuf:"bytes,102,opt,name=public_message,json=publicMessage,proto3" json:"public_message,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
 }
 
 func (m *ProtocolMessage) Reset()         { *m = ProtocolMessage{} }
 func (m *ProtocolMessage) String() string { return proto.CompactTextString(m) }
 func (*ProtocolMessage) ProtoMessage()    {}
 func (*ProtocolMessage) Descriptor() ([]byte, []int) {
-	return fileDescriptor_encryption_a35d9f7c683dd9c2, []int{6}
+	return fileDescriptor_8293a649ce9418c6, []int{7}
 }
 func (m *ProtocolMessage) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_ProtocolMessage.Unmarshal(m, b)
@@ -375,8 +430,8 @@ func (m *ProtocolMessage) XXX_Unmarshal(b []byte) error {
 func (m *ProtocolMessage) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_ProtocolMessage.Marshal(b, m, deterministic)
 }
-func (dst *ProtocolMessage) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ProtocolMessage.Merge(dst, src)
+func (m *ProtocolMessage) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ProtocolMessage.Merge(m, src)
 }
 func (m *ProtocolMessage) XXX_Size() int {
 	return xxx_messageInfo_ProtocolMessage.Size(m)
@@ -387,27 +442,6 @@ func (m *ProtocolMessage) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_ProtocolMessage proto.InternalMessageInfo
 
-type isProtocolMessage_MessageType interface {
-	isProtocolMessage_MessageType()
-}
-
-type ProtocolMessage_DirectMessage struct {
-	DirectMessage *DirectMessageProtocol `protobuf:"bytes,101,opt,name=direct_message,json=directMessage,proto3,oneof"`
-}
-type ProtocolMessage_PublicMessage struct {
-	PublicMessage []byte `protobuf:"bytes,102,opt,name=public_message,json=publicMessage,proto3,oneof"`
-}
-
-func (*ProtocolMessage_DirectMessage) isProtocolMessage_MessageType() {}
-func (*ProtocolMessage_PublicMessage) isProtocolMessage_MessageType() {}
-
-func (m *ProtocolMessage) GetMessageType() isProtocolMessage_MessageType {
-	if m != nil {
-		return m.MessageType
-	}
-	return nil
-}
-
 func (m *ProtocolMessage) GetBundle() *Bundle {
 	if m != nil {
 		return m.Bundle
@@ -415,128 +449,69 @@ func (m *ProtocolMessage) GetBundle() *Bundle {
 	return nil
 }
 
-func (m *ProtocolMessage) GetDirectMessage() *DirectMessageProtocol {
-	if x, ok := m.GetMessageType().(*ProtocolMessage_DirectMessage); ok {
-		return x.DirectMessage
+func (m *ProtocolMessage) GetDirectMessage() map[string]*DirectMessageProtocol {
+	if m != nil {
+		return m.DirectMessage
 	}
 	return nil
 }
 
 func (m *ProtocolMessage) GetPublicMessage() []byte {
-	if x, ok := m.GetMessageType().(*ProtocolMessage_PublicMessage); ok {
-		return x.PublicMessage
+	if m != nil {
+		return m.PublicMessage
 	}
 	return nil
-}
-
-// XXX_OneofFuncs is for the internal use of the proto package.
-func (*ProtocolMessage) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
-	return _ProtocolMessage_OneofMarshaler, _ProtocolMessage_OneofUnmarshaler, _ProtocolMessage_OneofSizer, []interface{}{
-		(*ProtocolMessage_DirectMessage)(nil),
-		(*ProtocolMessage_PublicMessage)(nil),
-	}
-}
-
-func _ProtocolMessage_OneofMarshaler(msg proto.Message, b *proto.Buffer) error {
-	m := msg.(*ProtocolMessage)
-	// message_type
-	switch x := m.MessageType.(type) {
-	case *ProtocolMessage_DirectMessage:
-		b.EncodeVarint(101<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.DirectMessage); err != nil {
-			return err
-		}
-	case *ProtocolMessage_PublicMessage:
-		b.EncodeVarint(102<<3 | proto.WireBytes)
-		b.EncodeRawBytes(x.PublicMessage)
-	case nil:
-	default:
-		return fmt.Errorf("ProtocolMessage.MessageType has unexpected type %T", x)
-	}
-	return nil
-}
-
-func _ProtocolMessage_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error) {
-	m := msg.(*ProtocolMessage)
-	switch tag {
-	case 101: // message_type.direct_message
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(DirectMessageProtocol)
-		err := b.DecodeMessage(msg)
-		m.MessageType = &ProtocolMessage_DirectMessage{msg}
-		return true, err
-	case 102: // message_type.public_message
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeRawBytes(true)
-		m.MessageType = &ProtocolMessage_PublicMessage{x}
-		return true, err
-	default:
-		return false, nil
-	}
-}
-
-func _ProtocolMessage_OneofSizer(msg proto.Message) (n int) {
-	m := msg.(*ProtocolMessage)
-	// message_type
-	switch x := m.MessageType.(type) {
-	case *ProtocolMessage_DirectMessage:
-		s := proto.Size(x.DirectMessage)
-		n += 2 // tag and wire
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case *ProtocolMessage_PublicMessage:
-		n += 2 // tag and wire
-		n += proto.SizeVarint(uint64(len(x.PublicMessage)))
-		n += len(x.PublicMessage)
-	case nil:
-	default:
-		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
-	}
-	return n
 }
 
 func init() {
+	proto.RegisterType((*SignedPreKey)(nil), "chat.SignedPreKey")
 	proto.RegisterType((*Bundle)(nil), "chat.Bundle")
+	proto.RegisterMapType((map[string]*SignedPreKey)(nil), "chat.Bundle.SignedPreKeysEntry")
 	proto.RegisterType((*BundleContainer)(nil), "chat.BundleContainer")
 	proto.RegisterType((*DRHeader)(nil), "chat.DRHeader")
 	proto.RegisterType((*DHHeader)(nil), "chat.DHHeader")
 	proto.RegisterType((*X3DHHeader)(nil), "chat.X3DHHeader")
 	proto.RegisterType((*DirectMessageProtocol)(nil), "chat.DirectMessageProtocol")
 	proto.RegisterType((*ProtocolMessage)(nil), "chat.ProtocolMessage")
+	proto.RegisterMapType((map[string]*DirectMessageProtocol)(nil), "chat.ProtocolMessage.DirectMessageEntry")
 }
 
-func init() { proto.RegisterFile("encryption.proto", fileDescriptor_encryption_a35d9f7c683dd9c2) }
+func init() { proto.RegisterFile("encryption.proto", fileDescriptor_8293a649ce9418c6) }
 
-var fileDescriptor_encryption_a35d9f7c683dd9c2 = []byte{
-	// 409 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x8c, 0x93, 0xcf, 0x8a, 0xd4, 0x40,
-	0x10, 0xc6, 0x4d, 0x66, 0x19, 0x67, 0x6b, 0x33, 0xd9, 0xa1, 0x45, 0x09, 0xba, 0x07, 0x09, 0x0b,
-	0x0a, 0x42, 0x40, 0xe7, 0x0d, 0xd6, 0x1c, 0x82, 0x22, 0x2c, 0xed, 0xc5, 0x5b, 0xe8, 0x49, 0x97,
-	0x3b, 0x8d, 0x99, 0x4e, 0xd3, 0xe9, 0x11, 0xf2, 0x0a, 0x3e, 0x90, 0x47, 0x9f, 0x4d, 0xfa, 0x4f,
-	0x92, 0x55, 0x77, 0xc0, 0x5b, 0xaa, 0xea, 0xab, 0x5f, 0x7d, 0x55, 0x4d, 0x60, 0x83, 0xb2, 0xd1,
-	0x83, 0x32, 0xa2, 0x93, 0x85, 0xd2, 0x9d, 0xe9, 0xc8, 0x59, 0xb3, 0x67, 0x26, 0xdf, 0xc3, 0xf2,
-	0xe6, 0x28, 0x79, 0x8b, 0xe4, 0x39, 0xac, 0x04, 0x47, 0x69, 0x84, 0x19, 0xb2, 0xe8, 0x65, 0xf4,
-	0x3a, 0xa1, 0x53, 0x4c, 0xae, 0x21, 0xed, 0xc5, 0x9d, 0x44, 0x5e, 0x2b, 0x8d, 0xf5, 0x37, 0x1c,
-	0xb2, 0xd8, 0x29, 0x12, 0x9f, 0xbd, 0xd5, 0xf8, 0x11, 0x07, 0x72, 0x05, 0xe7, 0x36, 0x66, 0xe6,
-	0xa8, 0x31, 0x5b, 0x38, 0xc1, 0x9c, 0xc8, 0x7f, 0x44, 0x70, 0xe9, 0x47, 0xbd, 0xef, 0xa4, 0x61,
-	0x42, 0xa2, 0x26, 0xd7, 0xb0, 0xdc, 0xb9, 0x94, 0x9b, 0x78, 0xf1, 0x2e, 0x29, 0xac, 0xa9, 0xc2,
-	0xcb, 0x68, 0xa8, 0x91, 0x2d, 0x3c, 0x53, 0x5a, 0x7c, 0x67, 0x06, 0xeb, 0x07, 0x5d, 0x3c, 0x09,
-	0xd5, 0xcf, 0x7f, 0x99, 0x31, 0xe2, 0x80, 0xbd, 0x61, 0x07, 0xe5, 0xcc, 0x2c, 0xe8, 0x9c, 0xc8,
-	0x3f, 0xc0, 0xaa, 0xa4, 0x15, 0x32, 0x8e, 0x9a, 0x6c, 0x60, 0x61, 0x59, 0x7e, 0x67, 0xfb, 0x49,
-	0x12, 0x88, 0xa4, 0x63, 0xaf, 0x69, 0x24, 0x49, 0x0a, 0xb1, 0x92, 0x0e, 0xb1, 0xa6, 0xb1, 0x72,
-	0xb1, 0xe0, 0xd9, 0x99, 0x93, 0xc7, 0x82, 0xe7, 0x57, 0xb0, 0x2a, 0xab, 0x53, 0xac, 0xbc, 0x00,
-	0xf8, 0xb2, 0x3d, 0x5d, 0xff, 0x87, 0xf6, 0x2b, 0x82, 0xa7, 0xa5, 0xd0, 0xd8, 0x98, 0x4f, 0xd8,
-	0xf7, 0xec, 0x0e, 0x6f, 0xed, 0x6b, 0x35, 0x5d, 0x4b, 0xde, 0xc2, 0x85, 0x25, 0xd5, 0x7b, 0x87,
-	0x0a, 0x17, 0xdb, 0xf8, 0x8b, 0xcd, 0x23, 0xe8, 0xfd, 0x71, 0x6f, 0xe0, 0xbc, 0xa4, 0x63, 0x43,
-	0xec, 0x1a, 0x52, 0xdf, 0x30, 0x6e, 0x4f, 0xe7, 0x3b, 0x58, 0xf1, 0x44, 0xc7, 0x3f, 0xc4, 0xd5,
-	0x24, 0x1e, 0xc9, 0x19, 0x3c, 0x56, 0x6c, 0x68, 0x3b, 0xc6, 0xc3, 0x4b, 0x8f, 0x61, 0xfe, 0x33,
-	0x82, 0xcb, 0xd1, 0x73, 0x58, 0xe1, 0x3f, 0xdf, 0xb9, 0x84, 0x94, 0xbb, 0xcd, 0xeb, 0x83, 0xef,
-	0x0b, 0x2e, 0x5e, 0x04, 0x17, 0x0f, 0x5d, 0xa5, 0x7a, 0x44, 0xd7, 0xfc, 0x7e, 0x81, 0xbc, 0x82,
-	0x54, 0x1d, 0x77, 0xad, 0x68, 0x26, 0xca, 0x57, 0x6b, 0xd0, 0x0a, 0x7d, 0x3e, 0x08, 0x6f, 0x52,
-	0x48, 0x82, 0xa2, 0x36, 0x83, 0xc2, 0xdd, 0xd2, 0xfd, 0x17, 0xdb, 0xdf, 0x01, 0x00, 0x00, 0xff,
-	0xff, 0xd0, 0x08, 0xb6, 0x41, 0x2b, 0x03, 0x00, 0x00,
+var fileDescriptor_8293a649ce9418c6 = []byte{
+	// 535 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x8c, 0x54, 0x51, 0x8b, 0xd3, 0x40,
+	0x10, 0x26, 0xe9, 0xd9, 0x6b, 0xa7, 0x69, 0x5a, 0x56, 0x94, 0x50, 0x0b, 0x96, 0x70, 0x62, 0x40,
+	0x28, 0x5c, 0xfb, 0x22, 0x3e, 0x6a, 0xc5, 0xaa, 0xa8, 0xc7, 0x2a, 0xe8, 0x8b, 0x84, 0x6d, 0x77,
+	0xbc, 0x5b, 0x4c, 0x37, 0x61, 0xb3, 0x2d, 0xf6, 0x2f, 0xf8, 0xe0, 0x4f, 0xf2, 0xbf, 0xf8, 0x4f,
+	0x24, 0xbb, 0x49, 0x9b, 0xf6, 0xee, 0xe0, 0xde, 0x32, 0xb3, 0xb3, 0xdf, 0x7c, 0xdf, 0x37, 0x3b,
+	0x81, 0x3e, 0xca, 0xa5, 0xda, 0x66, 0x5a, 0xa4, 0x72, 0x9c, 0xa9, 0x54, 0xa7, 0xe4, 0x64, 0x79,
+	0xc5, 0x74, 0xf8, 0x11, 0xbc, 0xcf, 0xe2, 0x52, 0x22, 0xbf, 0x50, 0xf8, 0x1e, 0xb7, 0xe4, 0x0c,
+	0xfc, 0xdc, 0xc4, 0x71, 0xa6, 0x30, 0xfe, 0x89, 0xdb, 0xc0, 0x19, 0x39, 0x91, 0x47, 0xbd, 0xbc,
+	0x5e, 0x15, 0xc0, 0xe9, 0x06, 0x55, 0x2e, 0x52, 0x19, 0xb8, 0x23, 0x27, 0xea, 0xd2, 0x2a, 0x0c,
+	0xff, 0x39, 0xd0, 0x7c, 0xb9, 0x96, 0x3c, 0x41, 0x32, 0x80, 0x96, 0xe0, 0x28, 0xb5, 0xd0, 0x15,
+	0xc8, 0x2e, 0x26, 0x6f, 0xa0, 0x77, 0xd8, 0x26, 0x0f, 0xdc, 0x51, 0x23, 0xea, 0x4c, 0x1e, 0x8f,
+	0x0b, 0x5a, 0x63, 0x0b, 0x31, 0xae, 0x53, 0xcb, 0x5f, 0x4b, 0xad, 0xb6, 0xb4, 0x5b, 0x27, 0x92,
+	0x93, 0x21, 0xb4, 0x8b, 0x04, 0xd3, 0x6b, 0x85, 0xc1, 0x89, 0xe9, 0xb2, 0x4f, 0x0c, 0xbe, 0x00,
+	0xb9, 0x0e, 0x41, 0xfa, 0xd0, 0xa8, 0x84, 0xb5, 0x69, 0xf1, 0x49, 0x22, 0xb8, 0xb7, 0x61, 0xc9,
+	0x1a, 0x8d, 0x9a, 0xce, 0x84, 0x58, 0x12, 0xf5, 0xab, 0xd4, 0x16, 0xbc, 0x70, 0x9f, 0x3b, 0xe1,
+	0x6f, 0x07, 0x7a, 0x96, 0xe0, 0xab, 0x54, 0x6a, 0x26, 0x24, 0x2a, 0x72, 0x06, 0xcd, 0x85, 0x49,
+	0x19, 0xd8, 0xce, 0xc4, 0xab, 0xeb, 0xa0, 0xe5, 0x19, 0x99, 0xc2, 0xc3, 0x4c, 0x89, 0x0d, 0xd3,
+	0x18, 0x1f, 0xb9, 0xec, 0x1a, 0xea, 0xf7, 0xcb, 0xd3, 0x83, 0x91, 0x0c, 0xa1, 0xad, 0xc5, 0x0a,
+	0x73, 0xcd, 0x56, 0x59, 0xd0, 0x18, 0x39, 0x51, 0x83, 0xee, 0x13, 0xe1, 0x3b, 0x68, 0xcd, 0xe8,
+	0x1c, 0x19, 0x47, 0x55, 0x17, 0xe6, 0x59, 0x61, 0x1e, 0x38, 0xd5, 0x88, 0x1c, 0x49, 0x7c, 0x70,
+	0x33, 0x69, 0x20, 0xba, 0xd4, 0xcd, 0x4c, 0x2c, 0x78, 0xe9, 0x9a, 0x2b, 0x78, 0x38, 0x84, 0xd6,
+	0x6c, 0x7e, 0x1b, 0x56, 0xf8, 0x15, 0xe0, 0xdb, 0xf4, 0xf6, 0xf3, 0x63, 0x34, 0xf2, 0x14, 0x7a,
+	0x42, 0xe6, 0x9a, 0x25, 0x09, 0x2b, 0x9e, 0x5d, 0x2c, 0xb8, 0x69, 0xdd, 0xa6, 0x7e, 0x3d, 0xfd,
+	0x96, 0x87, 0x7f, 0x1d, 0x78, 0x30, 0x13, 0x0a, 0x97, 0xfa, 0x03, 0xe6, 0x39, 0xbb, 0xc4, 0x8b,
+	0xe2, 0x81, 0x2e, 0xd3, 0x84, 0x9c, 0x43, 0xa7, 0x68, 0x19, 0x5f, 0x99, 0x9e, 0xa5, 0xb5, 0x7d,
+	0x6b, 0xed, 0x9e, 0x0b, 0x85, 0x5f, 0x7b, 0x5e, 0xcf, 0xa0, 0x3d, 0xa3, 0xd5, 0x05, 0x3b, 0x4e,
+	0xdf, 0x5e, 0xa8, 0x6c, 0xa2, 0x2d, 0x4e, 0x6b, 0xc5, 0x3b, 0x74, 0x3c, 0x28, 0x9e, 0xef, 0x8a,
+	0x2b, 0xe4, 0x00, 0x4e, 0x33, 0xb6, 0x4d, 0x52, 0x66, 0x75, 0x78, 0xb4, 0x0a, 0xc3, 0x3f, 0x2e,
+	0xf4, 0x2a, 0xce, 0xa5, 0x84, 0x3b, 0x3e, 0x88, 0x4f, 0xe0, 0x73, 0xa3, 0x3c, 0x5e, 0xd9, 0x7b,
+	0x01, 0x9a, 0x35, 0x88, 0x6c, 0xf5, 0x11, 0xe8, 0xf8, 0xc0, 0xa5, 0x72, 0x1f, 0x78, 0x3d, 0x47,
+	0x9e, 0x80, 0x9f, 0xad, 0x17, 0x89, 0x58, 0xee, 0x00, 0x7f, 0x18, 0xae, 0x5d, 0x9b, 0x2d, 0xcb,
+	0x06, 0xdf, 0x81, 0x5c, 0xc7, 0xba, 0x61, 0x31, 0xce, 0x0f, 0x17, 0xe3, 0x51, 0x69, 0xce, 0x4d,
+	0xc3, 0xaa, 0x6d, 0xc8, 0xa2, 0x69, 0x7e, 0x31, 0xd3, 0xff, 0x01, 0x00, 0x00, 0xff, 0xff, 0x23,
+	0x4b, 0xe1, 0x7c, 0x76, 0x04, 0x00, 0x00,
 }

@@ -13,7 +13,7 @@ const (
 	aliceEphemeralKey = "11111111111111111111111111111111"
 	bobPrivateKey     = "22222222222222222222222222222222"
 	bobSignedPreKey   = "33333333333333333333333333333333"
-	base64Bundle      = "CiECkJmdu/QwNL/7HdU+rB60wzpOocT0i6WFz944MIQPBVUSIQI8cq3bT98Jr5TwyU1/6So4an5wz4odhZFjhrslNcexsRpBP1ax7dSQmCjr/UfPFB8dxk0FowfSP7R7KV8F/WuimwtnvJkz3yT+oNDdlbm4ddDjOFjwTVDscPK2qbraTkkg9gA="
+	base64Bundle      = "CiECkJmdu/QwNL/7HdU+rB60wzpOocT0i6WFz944MIQPBVUSKAoBMhIjCiECPHKt20/fCa+U8MlNf+kqOGp+cM+KHYWRY4a7JTXHsbEiQT9Wse3UkJgo6/1HzxQfHcZNBaMH0j+0eylfBf1ropsLZ7yZM98k/qDQ3ZW5uHXQ4zhY8E1Q7HDytqm62k5JIPYA"
 )
 
 var sharedKey = []byte{0xa4, 0xe9, 0x23, 0xd0, 0xaf, 0x8f, 0xe7, 0x8a, 0x5, 0x63, 0x63, 0xbe, 0x20, 0xe7, 0x1c, 0xa, 0x58, 0xe5, 0x69, 0xea, 0x8f, 0xc1, 0xf7, 0x92, 0x89, 0xec, 0xa1, 0xd, 0x9f, 0x68, 0x13, 0x3a}
@@ -36,10 +36,13 @@ func bobBundle() (*Bundle, error) {
 		return nil, err
 	}
 
+	signedPreKeys := make(map[string]*SignedPreKey)
+	signedPreKeys[bobInstallationID] = &SignedPreKey{SignedPreKey: compressedPreKey}
+
 	bundle := Bundle{
-		Identity:     crypto.CompressPubkey(&privateKey.PublicKey),
-		SignedPreKey: compressedPreKey,
-		Signature:    signature,
+		Identity:      crypto.CompressPubkey(&privateKey.PublicKey),
+		SignedPreKeys: signedPreKeys,
+		Signature:     signature,
 	}
 
 	return &bundle, nil
@@ -49,15 +52,57 @@ func TestNewBundleContainer(t *testing.T) {
 	privateKey, err := crypto.ToECDSA([]byte(alicePrivateKey))
 	require.NoError(t, err, "Private key should be generated without errors")
 
-	bundleContainer, err := NewBundleContainer(privateKey)
+	bundleContainer, err := NewBundleContainer(privateKey, bobInstallationID)
+	require.NoError(t, err, "Bundle container should be created successfully")
+
+	err = SignBundle(privateKey, bundleContainer)
+	require.NoError(t, err, "Bundle container should be signed successfully")
+
 	require.NoError(t, err, "Bundle container should be created successfully")
 
 	bundle := bundleContainer.Bundle
 	require.NotNil(t, bundle, "Bundle should be generated without errors")
 
+	signatureMaterial := append([]byte(bobInstallationID), bundle.GetSignedPreKeys()[bobInstallationID].GetSignedPreKey()...)
 	recoveredPublicKey, err := crypto.SigToPub(
-		crypto.Keccak256(bundle.GetSignedPreKey()),
+		crypto.Keccak256(signatureMaterial),
 		bundle.Signature,
+	)
+
+	require.NoError(t, err, "Public key should be recovered from the bundle successfully")
+
+	require.Equal(
+		t,
+		&privateKey.PublicKey,
+		recoveredPublicKey,
+		"The correct public key should be recovered",
+	)
+}
+
+func TestSignBundle(t *testing.T) {
+	privateKey, err := crypto.ToECDSA([]byte(alicePrivateKey))
+	require.NoError(t, err, "Private key should be generated without errors")
+
+	bundleContainer1, err := NewBundleContainer(privateKey, "1")
+	require.NoError(t, err, "Bundle container should be created successfully")
+
+	bundle1 := bundleContainer1.Bundle
+	require.NotNil(t, bundle1, "Bundle should be generated without errors")
+
+	// We add a signed pre key
+	signedPreKeys := bundle1.GetSignedPreKeys()
+	signedPreKeys["2"] = &SignedPreKey{SignedPreKey: []byte("key")}
+
+	err = SignBundle(privateKey, bundleContainer1)
+	require.NoError(t, err)
+
+	signatureMaterial := append([]byte("1"), bundle1.GetSignedPreKeys()["1"].GetSignedPreKey()...)
+	signatureMaterial = append(signatureMaterial, []byte("2")...)
+	signatureMaterial = append(signatureMaterial, []byte("key")...)
+
+	recoveredPublicKey, err := crypto.SigToPub(
+		crypto.Keccak256(signatureMaterial),
+		bundleContainer1.GetBundle().Signature,
 	)
 
 	require.NoError(t, err, "Public key should be recovered from the bundle successfully")
@@ -102,8 +147,11 @@ func TestExtractIdentity(t *testing.T) {
 	privateKey, err := crypto.ToECDSA([]byte(alicePrivateKey))
 	require.NoError(t, err, "Private key should be generated without errors")
 
-	bundleContainer, err := NewBundleContainer(privateKey)
+	bundleContainer, err := NewBundleContainer(privateKey, "1")
 	require.NoError(t, err, "Bundle container should be created successfully")
+
+	err = SignBundle(privateKey, bundleContainer)
+	require.NoError(t, err, "Bundle container should be signed successfully")
 
 	bundle := bundleContainer.Bundle
 	require.NotNil(t, bundle, "Bundle should be generated without errors")
@@ -175,7 +223,9 @@ func TestPerformActiveX3DH(t *testing.T) {
 	privateKey, err := crypto.ToECDSA([]byte(bobPrivateKey))
 	require.NoError(t, err, "Private key should be imported without errors")
 
-	actualSharedSecret, actualEphemeralKey, err := PerformActiveX3DH(bundle, privateKey)
+	signedPreKey := bundle.GetSignedPreKeys()[bobInstallationID].GetSignedPreKey()
+
+	actualSharedSecret, actualEphemeralKey, err := PerformActiveX3DH(bundle.GetIdentity(), signedPreKey, privateKey)
 	require.NoError(t, err, "No error should be reported")
 	require.NotNil(t, actualEphemeralKey, "An ephemeral key-pair should be generated")
 	require.NotNil(t, actualSharedSecret, "A shared key should be generated")

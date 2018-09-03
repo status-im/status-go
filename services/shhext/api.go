@@ -273,7 +273,7 @@ func (api *PublicAPI) SendPublicMessage(ctx context.Context, msg chat.SendPublic
 }
 
 // SendDirectMessage sends a 1:1 chat message to the underlying transport
-func (api *PublicAPI) SendDirectMessage(ctx context.Context, msg chat.SendDirectMessageRPC) (hexutil.Bytes, error) {
+func (api *PublicAPI) SendDirectMessage(ctx context.Context, msg chat.SendDirectMessageRPC) ([]hexutil.Bytes, error) {
 
 	// To be completely agnostic from whisper we should not be using whisper to store the key
 	privateKey, err := api.service.w.GetPrivateKey(msg.Sig)
@@ -286,17 +286,79 @@ func (api *PublicAPI) SendDirectMessage(ctx context.Context, msg chat.SendDirect
 		return nil, err
 	}
 
+	keys := []*ecdsa.PublicKey{publicKey}
 	// This is transport layer-agnostic
-	protocolMessage, err := api.service.protocol.BuildDirectMessage(privateKey, publicKey, msg.Payload)
+	protocolMessages, err := api.service.protocol.BuildDirectMessage(privateKey, keys, msg.Payload)
 	if err != nil {
 		return nil, err
 	}
 
-	// Enrich with transport layer info
-	whisperMessage := chat.DirectMessageToWhisper(&msg, protocolMessage)
+	var response []hexutil.Bytes
 
-	// And dispatch
-	return api.Post(ctx, *whisperMessage)
+	for key, message := range *protocolMessages {
+
+		msg.PubKey = crypto.FromECDSAPub(key)
+		// Enrich with transport layer info
+		whisperMessage := chat.DirectMessageToWhisper(&msg, message)
+
+		// And dispatch
+		hash, err := api.Post(ctx, *whisperMessage)
+		if err != nil {
+			return nil, err
+		}
+		response = append(response, hash)
+
+	}
+	api.log.Info("response", "response", response)
+	return response, nil
+}
+
+// SendGroupMessage sends a group messag chat message to the underlying transport
+func (api *PublicAPI) SendGroupMessage(ctx context.Context, msg chat.SendGroupMessageRPC) ([]hexutil.Bytes, error) {
+
+	// To be completely agnostic from whisper we should not be using whisper to store the key
+	privateKey, err := api.service.w.GetPrivateKey(msg.Sig)
+	if err != nil {
+		return nil, err
+	}
+
+	var keys []*ecdsa.PublicKey
+
+	for _, k := range msg.PubKeys {
+		publicKey, err := crypto.UnmarshalPubkey(k)
+		if err != nil {
+			return nil, err
+		}
+		keys = append(keys, publicKey)
+	}
+
+	// This is transport layer-agnostic
+	protocolMessages, err := api.service.protocol.BuildDirectMessage(privateKey, keys, msg.Payload)
+	if err != nil {
+		return nil, err
+	}
+
+	var response []hexutil.Bytes
+
+	for key, message := range *protocolMessages {
+		directMessage := chat.SendDirectMessageRPC{
+			PubKey:  crypto.FromECDSAPub(key),
+			Payload: msg.Payload,
+			Sig:     msg.Sig,
+		}
+
+		// Enrich with transport layer info
+		whisperMessage := chat.DirectMessageToWhisper(&directMessage, message)
+
+		// And dispatch
+		hash, err := api.Post(ctx, *whisperMessage)
+		if err != nil {
+			return nil, err
+		}
+		response = append(response, hash)
+
+	}
+	return response, nil
 }
 
 // -----

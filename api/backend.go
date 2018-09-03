@@ -466,6 +466,11 @@ func (b *StatusBackend) CreateContactCode() (string, error) {
 }
 
 func (b *StatusBackend) ProcessContactCode(contactCode string) error {
+	selectedAccount, err := b.AccountManager().SelectedAccount()
+	if selectedAccount == nil || err == account.ErrNoAccountSelected {
+		return err
+	}
+
 	st, err := b.statusNode.ShhExtService()
 	if err != nil {
 		return err
@@ -477,7 +482,7 @@ func (b *StatusBackend) ProcessContactCode(contactCode string) error {
 		return err
 	}
 
-	if err := st.ProcessPublicBundle(bundle); err != nil {
+	if err := st.ProcessPublicBundle(selectedAccount.AccountKey.PrivateKey, bundle); err != nil {
 		b.log.Error("error adding bundle", "err", err)
 		return err
 	}

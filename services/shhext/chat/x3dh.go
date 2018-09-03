@@ -1,11 +1,11 @@
 package chat
 
 import (
-	"errors"
-	"fmt"
-
 	"crypto/ecdsa"
 	"encoding/base64"
+	"errors"
+	"fmt"
+	"sort"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
@@ -43,8 +43,38 @@ func FromBase64(str string) (*Bundle, error) {
 	return bundle, nil
 }
 
+func buildSignatureMaterial(signedPreKeys *map[string]*SignedPreKey) []byte {
+	var keys []string
+	for k := range *signedPreKeys {
+		keys = append(keys, k)
+	}
+	var signatureMaterial []byte
+
+	sort.Strings(keys)
+
+	for _, installationID := range keys {
+		signedPreKey := (*signedPreKeys)[installationID]
+		signatureMaterial = append(signatureMaterial, []byte(installationID)...)
+		signatureMaterial = append(signatureMaterial, signedPreKey.SignedPreKey...)
+	}
+	return signatureMaterial
+
+}
+
+func SignBundle(identity *ecdsa.PrivateKey, bundleContainer *BundleContainer) error {
+	signedPreKeys := bundleContainer.GetBundle().GetSignedPreKeys()
+	signatureMaterial := buildSignatureMaterial(&signedPreKeys)
+
+	signature, err := crypto.Sign(crypto.Keccak256(signatureMaterial), identity)
+	if err != nil {
+		return err
+	}
+	bundleContainer.Bundle.Signature = signature
+	return nil
+}
+
 // NewBundleContainer creates a new BundleContainer from an identity private key
-func NewBundleContainer(identity *ecdsa.PrivateKey) (*BundleContainer, error) {
+func NewBundleContainer(identity *ecdsa.PrivateKey, installationID string) (*BundleContainer, error) {
 	preKey, err := crypto.GenerateKey()
 	if err != nil {
 		return nil, err
@@ -53,17 +83,13 @@ func NewBundleContainer(identity *ecdsa.PrivateKey) (*BundleContainer, error) {
 	compressedPreKey := crypto.CompressPubkey(&preKey.PublicKey)
 	compressedIdentityKey := crypto.CompressPubkey(&identity.PublicKey)
 
-	signature, err := crypto.Sign(crypto.Keccak256(compressedPreKey), identity)
-	if err != nil {
-		return nil, err
-	}
-
 	encodedPreKey := crypto.FromECDSA(preKey)
+	signedPreKeys := make(map[string]*SignedPreKey)
+	signedPreKeys[installationID] = &SignedPreKey{SignedPreKey: compressedPreKey}
 
 	bundle := Bundle{
-		Identity:     compressedIdentityKey,
-		SignedPreKey: compressedPreKey,
-		Signature:    signature,
+		Identity:      compressedIdentityKey,
+		SignedPreKeys: signedPreKeys,
 	}
 
 	return &BundleContainer{
@@ -85,8 +111,11 @@ func ExtractIdentity(bundle *Bundle) (string, error) {
 		return "", err
 	}
 
+	signedPreKeys := bundle.GetSignedPreKeys()
+	signatureMaterial := buildSignatureMaterial(&signedPreKeys)
+
 	recoveredKey, err := crypto.SigToPub(
-		crypto.Keccak256(bundle.GetSignedPreKey()),
+		crypto.Keccak256(signatureMaterial),
 		bundle.GetSignature(),
 	)
 	if err != nil {
@@ -186,18 +215,14 @@ func PerformActiveDH(publicKey *ecdsa.PublicKey) ([]byte, *ecdsa.PublicKey, erro
 
 // PerformActiveX3DH takes someone else's bundle and calculates shared secret.
 // Returns the shared secret and the ephemeral key used.
-func PerformActiveX3DH(bundle *Bundle, prv *ecdsa.PrivateKey) ([]byte, *ecdsa.PublicKey, error) {
-	bundleIdentityKey, err := crypto.DecompressPubkey(bundle.GetIdentity())
+func PerformActiveX3DH(identity []byte, signedPreKey []byte, prv *ecdsa.PrivateKey) ([]byte, *ecdsa.PublicKey, error) {
+	bundleIdentityKey, err := crypto.DecompressPubkey(identity)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	bundleSignedPreKey, err := crypto.DecompressPubkey(bundle.GetSignedPreKey())
+	bundleSignedPreKey, err := crypto.DecompressPubkey(signedPreKey)
 	if err != nil {
-		return nil, nil, err
-	}
-
-	if err = VerifyBundle(bundle); err != nil {
 		return nil, nil, err
 	}
 

@@ -198,9 +198,12 @@ xgo:
 	go get github.com/karalabe/xgo
 
 setup: dep-install lint-install mock-install update-fleet-config ##@other Prepare project for first build
+	go get -u github.com/jteeuwen/go-bindata/...
 
 generate: ##@other Regenerate assets and other auto-generated stuff
 	go generate ./static
+	$(shell cd ./services/shhext/chat && exec protoc --go_out=. ./*.proto)
+	$(shell cd ./services/shhext/chat/migrations && exec go-bindata -pkg migrations .)
 
 protoc-install:
 	apt install -y protobuf-compiler
@@ -216,7 +219,6 @@ mock: ##@other Regenerate mocks
 	mockgen -package=account      -destination=account/accounts_mock.go              -source=account/accounts.go
 	mockgen -package=status       -destination=services/status/account_mock.go       -source=services/status/service.go
 	mockgen -package=peer         -destination=services/peer/discoverer_mock.go      -source=services/peer/service.go
-	$(shell cd ./services/shhext/chat && exec protoc --go_out=. ./*.proto)
 
 docker-test: ##@tests Run tests in a docker container with golang.
 	docker run --privileged --rm -it -v "$(shell pwd):$(DOCKER_TEST_WORKDIR)" -w "$(DOCKER_TEST_WORKDIR)" $(DOCKER_TEST_IMAGE) go test ${ARGS}

@@ -37,7 +37,7 @@ func (m *ChatMessagePayload) Reset()         { *m = ChatMessagePayload{} }
 func (m *ChatMessagePayload) String() string { return proto.CompactTextString(m) }
 func (*ChatMessagePayload) ProtoMessage()    {}
 func (*ChatMessagePayload) Descriptor() ([]byte, []int) {
-	return fileDescriptor_chat_c943adffe4bfa5e0, []int{0}
+	return fileDescriptor_8c585a45e2093e54, []int{0}
 }
 func (m *ChatMessagePayload) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_ChatMessagePayload.Unmarshal(m, b)
@@ -45,8 +45,8 @@ func (m *ChatMessagePayload) XXX_Unmarshal(b []byte) error {
 func (m *ChatMessagePayload) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_ChatMessagePayload.Marshal(b, m, deterministic)
 }
-func (dst *ChatMessagePayload) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ChatMessagePayload.Merge(dst, src)
+func (m *ChatMessagePayload) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ChatMessagePayload.Merge(m, src)
 }
 func (m *ChatMessagePayload) XXX_Size() int {
 	return xxx_messageInfo_ChatMessagePayload.Size(m)
@@ -89,7 +89,7 @@ func (m *ChatMessagePayload) GetClockValue() float64 {
 type ContactUpdatePayload struct {
 	// Contact display name
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	// Contact profile image, base64-encoded (e.g. "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACgAAAAoCAMAAAC7IEhfAAA...")
+	// Contact profile image, using the data URI scheme (e.g. "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACgAAAAoCAMAAAC7IEhfAAA...")
 	ProfileImage string `protobuf:"bytes,2,opt,name=profile_image,json=profileImage,proto3" json:"profile_image,omitempty"`
 	// Contact address
 	Address string `protobuf:"bytes,3,opt,name=address,proto3" json:"address,omitempty"`
@@ -104,7 +104,7 @@ func (m *ContactUpdatePayload) Reset()         { *m = ContactUpdatePayload{} }
 func (m *ContactUpdatePayload) String() string { return proto.CompactTextString(m) }
 func (*ContactUpdatePayload) ProtoMessage()    {}
 func (*ContactUpdatePayload) Descriptor() ([]byte, []int) {
-	return fileDescriptor_chat_c943adffe4bfa5e0, []int{1}
+	return fileDescriptor_8c585a45e2093e54, []int{1}
 }
 func (m *ContactUpdatePayload) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_ContactUpdatePayload.Unmarshal(m, b)
@@ -112,8 +112,8 @@ func (m *ContactUpdatePayload) XXX_Unmarshal(b []byte) error {
 func (m *ContactUpdatePayload) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_ContactUpdatePayload.Marshal(b, m, deterministic)
 }
-func (dst *ContactUpdatePayload) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ContactUpdatePayload.Merge(dst, src)
+func (m *ContactUpdatePayload) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ContactUpdatePayload.Merge(m, src)
 }
 func (m *ContactUpdatePayload) XXX_Size() int {
 	return xxx_messageInfo_ContactUpdatePayload.Size(m)
@@ -166,7 +166,7 @@ func (m *OneToOneRPC) Reset()         { *m = OneToOneRPC{} }
 func (m *OneToOneRPC) String() string { return proto.CompactTextString(m) }
 func (*OneToOneRPC) ProtoMessage()    {}
 func (*OneToOneRPC) Descriptor() ([]byte, []int) {
-	return fileDescriptor_chat_c943adffe4bfa5e0, []int{2}
+	return fileDescriptor_8c585a45e2093e54, []int{2}
 }
 func (m *OneToOneRPC) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_OneToOneRPC.Unmarshal(m, b)
@@ -174,8 +174,8 @@ func (m *OneToOneRPC) XXX_Unmarshal(b []byte) error {
 func (m *OneToOneRPC) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_OneToOneRPC.Marshal(b, m, deterministic)
 }
-func (dst *OneToOneRPC) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_OneToOneRPC.Merge(dst, src)
+func (m *OneToOneRPC) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_OneToOneRPC.Merge(m, src)
 }
 func (m *OneToOneRPC) XXX_Size() int {
 	return xxx_messageInfo_OneToOneRPC.Size(m)
@@ -220,7 +220,7 @@ func (m *ContactUpdateRPC) Reset()         { *m = ContactUpdateRPC{} }
 func (m *ContactUpdateRPC) String() string { return proto.CompactTextString(m) }
 func (*ContactUpdateRPC) ProtoMessage()    {}
 func (*ContactUpdateRPC) Descriptor() ([]byte, []int) {
-	return fileDescriptor_chat_c943adffe4bfa5e0, []int{3}
+	return fileDescriptor_8c585a45e2093e54, []int{3}
 }
 func (m *ContactUpdateRPC) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_ContactUpdateRPC.Unmarshal(m, b)
@@ -228,8 +228,8 @@ func (m *ContactUpdateRPC) XXX_Unmarshal(b []byte) error {
 func (m *ContactUpdateRPC) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_ContactUpdateRPC.Marshal(b, m, deterministic)
 }
-func (dst *ContactUpdateRPC) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ContactUpdateRPC.Merge(dst, src)
+func (m *ContactUpdateRPC) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ContactUpdateRPC.Merge(m, src)
 }
 func (m *ContactUpdateRPC) XXX_Size() int {
 	return xxx_messageInfo_ContactUpdateRPC.Size(m)
@@ -273,7 +273,7 @@ func (m *ChatProtocolMessage) Reset()         { *m = ChatProtocolMessage{} }
 func (m *ChatProtocolMessage) String() string { return proto.CompactTextString(m) }
 func (*ChatProtocolMessage) ProtoMessage()    {}
 func (*ChatProtocolMessage) Descriptor() ([]byte, []int) {
-	return fileDescriptor_chat_c943adffe4bfa5e0, []int{4}
+	return fileDescriptor_8c585a45e2093e54, []int{4}
 }
 func (m *ChatProtocolMessage) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_ChatProtocolMessage.Unmarshal(m, b)
@@ -281,8 +281,8 @@ func (m *ChatProtocolMessage) XXX_Unmarshal(b []byte) error {
 func (m *ChatProtocolMessage) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_ChatProtocolMessage.Marshal(b, m, deterministic)
 }
-func (dst *ChatProtocolMessage) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ChatProtocolMessage.Merge(dst, src)
+func (m *ChatProtocolMessage) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ChatProtocolMessage.Merge(m, src)
 }
 func (m *ChatProtocolMessage) XXX_Size() int {
 	return xxx_messageInfo_ChatProtocolMessage.Size(m)
@@ -308,9 +308,9 @@ func init() {
 	proto.RegisterType((*ChatProtocolMessage)(nil), "chat.ChatProtocolMessage")
 }
 
-func init() { proto.RegisterFile("chat.proto", fileDescriptor_chat_c943adffe4bfa5e0) }
+func init() { proto.RegisterFile("chat.proto", fileDescriptor_8c585a45e2093e54) }
 
-var fileDescriptor_chat_c943adffe4bfa5e0 = []byte{
+var fileDescriptor_8c585a45e2093e54 = []byte{
 	// 314 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x8c, 0x92, 0xcf, 0x4a, 0xc3, 0x40,
 	0x10, 0xc6, 0x59, 0x5b, 0xd4, 0x4e, 0x2a, 0x94, 0xd5, 0x43, 0xd0, 0x83, 0x35, 0x5e, 0x7a, 0xaa,

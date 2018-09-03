@@ -42,31 +42,33 @@ type EnvelopeEventsHandler interface {
 
 // Service is a service that provides some additional Whisper API.
 type Service struct {
-	w            *whisper.Whisper
-	tracker      *tracker
-	nodeID       *ecdsa.PrivateKey
-	deduplicator *dedup.Deduplicator
-	protocol     *chat.ProtocolService
-	debug        bool
-	dataDir      string
+	w              *whisper.Whisper
+	tracker        *tracker
+	nodeID         *ecdsa.PrivateKey
+	deduplicator   *dedup.Deduplicator
+	protocol       *chat.ProtocolService
+	debug          bool
+	dataDir        string
+	installationID string
 }
 
 // Make sure that Service implements node.Service interface.
 var _ node.Service = (*Service)(nil)
 
 // New returns a new Service. dataDir is a folder path to a network-independent location
-func New(w *whisper.Whisper, handler EnvelopeEventsHandler, db *leveldb.DB, dataDir string, debug bool) *Service {
+func New(w *whisper.Whisper, handler EnvelopeEventsHandler, db *leveldb.DB, dataDir string, installationID string, debug bool) *Service {
 	track := &tracker{
 		w:       w,
 		handler: handler,
 		cache:   map[common.Hash]EnvelopeState{},
 	}
 	return &Service{
-		w:            w,
-		tracker:      track,
-		deduplicator: dedup.NewDeduplicator(w, db),
-		debug:        debug,
-		dataDir:      dataDir,
+		w:              w,
+		tracker:        track,
+		deduplicator:   dedup.NewDeduplicator(w, db),
+		debug:          debug,
+		dataDir:        dataDir,
+		installationID: installationID,
 	}
 }
 
@@ -83,16 +85,16 @@ func (s *Service) InitProtocol(address string, password string) error {
 	if err != nil {
 		return err
 	}
-	s.protocol = chat.NewProtocolService(chat.NewEncryptionService(persistence))
+	s.protocol = chat.NewProtocolService(chat.NewEncryptionService(persistence, s.installationID))
 	return nil
 }
 
-func (s *Service) ProcessPublicBundle(bundle *chat.Bundle) error {
+func (s *Service) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, bundle *chat.Bundle) error {
 	if s.protocol == nil {
 		return errors.New("Procotol is not initialized")
 	}
 
-	return s.protocol.ProcessPublicBundle(bundle)
+	return s.protocol.ProcessPublicBundle(myIdentityKey, bundle)
 }
 
 func (s *Service) GetBundle(myIdentityKey *ecdsa.PrivateKey) (*chat.Bundle, error) {

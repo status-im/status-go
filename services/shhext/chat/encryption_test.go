@@ -16,6 +16,8 @@ import (
 )
 
 var cleartext = []byte("hello")
+var aliceInstallationID = "1"
+var bobInstallationID = "2"
 
 func TestEncryptionServiceTestSuite(t *testing.T) {
 	suite.Run(t, new(EncryptionServiceTestSuite))
@@ -27,16 +29,13 @@ type EncryptionServiceTestSuite struct {
 	bob   *EncryptionService
 }
 
-func (s *EncryptionServiceTestSuite) SetupTest() {
+func (s *EncryptionServiceTestSuite) initDatabases() {
 	const (
 		aliceDBPath = "/tmp/alice.db"
 		aliceDBKey  = "alice"
 		bobDBPath   = "/tmp/bob.db"
 		bobDBKey    = "bob"
 	)
-
-	os.Remove(aliceDBPath)
-	os.Remove(bobDBPath)
 
 	alicePersistence, err := NewSQLLitePersistence(aliceDBPath, aliceDBKey)
 	if err != nil {
@@ -48,8 +47,14 @@ func (s *EncryptionServiceTestSuite) SetupTest() {
 		panic(err)
 	}
 
-	s.alice = NewEncryptionService(alicePersistence)
-	s.bob = NewEncryptionService(bobPersistence)
+	s.alice = NewEncryptionService(alicePersistence, aliceInstallationID)
+	s.bob = NewEncryptionService(bobPersistence, bobInstallationID)
+}
+
+func (s *EncryptionServiceTestSuite) SetupTest() {
+	os.Remove("/tmp/alice.db")
+	os.Remove("/tmp/bob.db")
+	s.initDatabases()
 }
 
 func (s *EncryptionServiceTestSuite) TestCreateBundle() {
@@ -78,8 +83,12 @@ func (s *EncryptionServiceTestSuite) TestEncryptPayloadNoBundle() {
 	encryptionResponse1, err := s.alice.EncryptPayload(&bobKey.PublicKey, aliceKey, cleartext)
 	s.Require().NoError(err)
 
-	cyphertext1 := encryptionResponse1.Payload
-	ephemeralKey1 := encryptionResponse1.GetDHHeader().GetKey()
+	installationResponse1 := (*encryptionResponse1)["none"]
+	// That's for any device
+	s.Require().NotNil(installationResponse1)
+
+	cyphertext1 := installationResponse1.Payload
+	ephemeralKey1 := installationResponse1.GetDHHeader().GetKey()
 	s.NotNil(ephemeralKey1, "It generates an ephemeral key for DH exchange")
 	s.NotNil(cyphertext1, "It generates an encrypted payload")
 	s.NotEqual(cyphertext1, cleartext, "It encrypts the payload correctly")
@@ -93,8 +102,10 @@ func (s *EncryptionServiceTestSuite) TestEncryptPayloadNoBundle() {
 	encryptionResponse2, err := s.alice.EncryptPayload(&bobKey.PublicKey, aliceKey, cleartext)
 	s.Require().NoError(err)
 
-	cyphertext2 := encryptionResponse2.GetPayload()
-	ephemeralKey2 := encryptionResponse2.GetDHHeader().GetKey()
+	installationResponse2 := (*encryptionResponse2)[aliceInstallationID]
+
+	cyphertext2 := installationResponse2.GetPayload()
+	ephemeralKey2 := installationResponse2.GetDHHeader().GetKey()
 	s.NotEqual(cyphertext1, cyphertext2, "It does not re-use the symmetric key")
 	s.NotEqual(ephemeralKey1, ephemeralKey2, "It does not re-use the ephemeral key")
 
@@ -118,22 +129,25 @@ func (s *EncryptionServiceTestSuite) TestEncryptPayloadBundle() {
 	s.Require().NoError(err)
 
 	// We add bob bundle
-	err = s.alice.ProcessPublicBundle(bobBundle)
+	err = s.alice.ProcessPublicBundle(aliceKey, bobBundle)
 	s.Require().NoError(err)
 
 	// We send a message using the bundle
 	encryptionResponse1, err := s.alice.EncryptPayload(&bobKey.PublicKey, aliceKey, cleartext)
 	s.Require().NoError(err)
 
-	cyphertext1 := encryptionResponse1.GetPayload()
-	x3dhHeader := encryptionResponse1.GetX3DHHeader()
-	drHeader := encryptionResponse1.GetDRHeader()
+	installationResponse1 := (*encryptionResponse1)[bobInstallationID]
+	s.Require().NotNil(installationResponse1)
+
+	cyphertext1 := installationResponse1.GetPayload()
+	x3dhHeader := installationResponse1.GetX3DHHeader()
+	drHeader := installationResponse1.GetDRHeader()
 
 	s.NotNil(cyphertext1, "It generates an encrypted payload")
 	s.NotEqual(cyphertext1, cleartext, "It encrypts the payload correctly")
 
 	// Check X3DH Header
-	bundleID := bobBundle.GetSignedPreKey()
+	bundleID := bobBundle.GetSignedPreKeys()[bobInstallationID].GetSignedPreKey()
 
 	s.NotNil(x3dhHeader, "It adds an x3dh header")
 	s.NotNil(x3dhHeader.GetKey(), "It adds an ephemeral key")
@@ -174,7 +188,7 @@ func (s *EncryptionServiceTestSuite) TestConsequentMessagesBundle() {
 	s.Require().NoError(err)
 
 	// We add bob bundle
-	err = s.alice.ProcessPublicBundle(bobBundle)
+	err = s.alice.ProcessPublicBundle(aliceKey, bobBundle)
 	s.Require().NoError(err)
 
 	// We send a message using the bundle
@@ -185,15 +199,18 @@ func (s *EncryptionServiceTestSuite) TestConsequentMessagesBundle() {
 	encryptionResponse, err := s.alice.EncryptPayload(&bobKey.PublicKey, aliceKey, cleartext2)
 	s.Require().NoError(err)
 
-	cyphertext1 := encryptionResponse.GetPayload()
-	x3dhHeader := encryptionResponse.GetX3DHHeader()
-	drHeader := encryptionResponse.GetDRHeader()
+	installationResponse := (*encryptionResponse)[bobInstallationID]
+	s.Require().NotNil(installationResponse)
+
+	cyphertext1 := installationResponse.GetPayload()
+	x3dhHeader := installationResponse.GetX3DHHeader()
+	drHeader := installationResponse.GetDRHeader()
 
 	s.NotNil(cyphertext1, "It generates an encrypted payload")
 	s.NotEqual(cyphertext1, cleartext2, "It encrypts the payload correctly")
 
 	// Check X3DH Header
-	bundleID := bobBundle.GetSignedPreKey()
+	bundleID := bobBundle.GetSignedPreKeys()[bobInstallationID].GetSignedPreKey()
 
 	s.NotNil(x3dhHeader, "It adds an x3dh header")
 	s.NotNil(x3dhHeader.GetKey(), "It adds an ephemeral key")
@@ -235,8 +252,16 @@ func (s *EncryptionServiceTestSuite) TestConversation() {
 	bobBundle, err := s.bob.CreateBundle(bobKey)
 	s.Require().NoError(err)
 
+	// Create a bundle
+	aliceBundle, err := s.alice.CreateBundle(aliceKey)
+	s.Require().NoError(err)
+
 	// We add bob bundle
-	err = s.alice.ProcessPublicBundle(bobBundle)
+	err = s.alice.ProcessPublicBundle(aliceKey, bobBundle)
+	s.Require().NoError(err)
+
+	// We add alice bundle
+	err = s.bob.ProcessPublicBundle(bobKey, aliceBundle)
 	s.Require().NoError(err)
 
 	// Alice sends a message
@@ -259,9 +284,12 @@ func (s *EncryptionServiceTestSuite) TestConversation() {
 	encryptionResponse, err = s.alice.EncryptPayload(&bobKey.PublicKey, aliceKey, cleartext2)
 	s.Require().NoError(err)
 
-	cyphertext1 := encryptionResponse.GetPayload()
-	x3dhHeader := encryptionResponse.GetX3DHHeader()
-	drHeader := encryptionResponse.GetDRHeader()
+	installationResponse := (*encryptionResponse)[bobInstallationID]
+	s.Require().NotNil(installationResponse)
+
+	cyphertext1 := installationResponse.GetPayload()
+	x3dhHeader := installationResponse.GetX3DHHeader()
+	drHeader := installationResponse.GetDRHeader()
 
 	s.NotNil(cyphertext1, "It generates an encrypted payload")
 	s.NotEqual(cyphertext1, cleartext2, "It encrypts the payload correctly")
@@ -270,7 +298,7 @@ func (s *EncryptionServiceTestSuite) TestConversation() {
 	s.Nil(x3dhHeader, "It does not add an x3dh header")
 
 	// Check DR Header
-	bundleID := bobBundle.GetSignedPreKey()
+	bundleID := bobBundle.GetSignedPreKeys()[bobInstallationID].GetSignedPreKey()
 
 	s.NotNil(drHeader, "It adds a DR header")
 	s.NotNil(drHeader.GetKey(), "It adds a key to the DR header")
@@ -311,7 +339,7 @@ func (s *EncryptionServiceTestSuite) TestConcurrentBundles() {
 	s.Require().NoError(err)
 
 	// We add bob bundle
-	err = s.alice.ProcessPublicBundle(bobBundle)
+	err = s.alice.ProcessPublicBundle(aliceKey, bobBundle)
 	s.Require().NoError(err)
 
 	// Create a bundle
@@ -319,7 +347,7 @@ func (s *EncryptionServiceTestSuite) TestConcurrentBundles() {
 	s.Require().NoError(err)
 
 	// We add alice bundle
-	err = s.bob.ProcessPublicBundle(aliceBundle)
+	err = s.bob.ProcessPublicBundle(bobKey, aliceBundle)
 	s.Require().NoError(err)
 
 	// Alice sends a message
@@ -356,29 +384,29 @@ func (s *EncryptionServiceTestSuite) TestConcurrentBundles() {
 }
 
 func publisher(
-	s *EncryptionService,
+	e *EncryptionService,
 	privateKey *ecdsa.PrivateKey,
 	publicKey *ecdsa.PublicKey,
 	errChan chan error,
-	output chan *DirectMessageProtocol,
+	output chan *map[string]*DirectMessageProtocol,
 ) {
 	var wg sync.WaitGroup
 
-	for i := 0; i < 100; i++ {
+	for i := 0; i < 200; i++ {
 
 		// Simulate 5% of the messages dropped
 		if rand.Intn(100) <= 95 {
-			response, err := s.EncryptPayload(publicKey, privateKey, cleartext)
-			if err != nil {
-				errChan <- err
-				return
-			}
-
 			wg.Add(1)
 			// Simulate out of order messages
 			go func() {
 				defer wg.Done()
 				time.Sleep(time.Duration(rand.Intn(50)) * time.Millisecond)
+				response, err := e.EncryptPayload(publicKey, privateKey, cleartext)
+				if err != nil {
+					errChan <- err
+					return
+				}
+
 				output <- response
 			}()
 		}
@@ -393,7 +421,7 @@ func receiver(
 	privateKey *ecdsa.PrivateKey,
 	publicKey *ecdsa.PublicKey,
 	errChan chan error,
-	input chan *DirectMessageProtocol,
+	input chan *map[string]*DirectMessageProtocol,
 ) {
 	i := 0
 
@@ -431,7 +459,7 @@ func (s *EncryptionServiceTestSuite) TestRandomised() {
 	s.Require().NoError(err)
 
 	// We add bob bundle
-	err = s.alice.ProcessPublicBundle(bobBundle)
+	err = s.alice.ProcessPublicBundle(aliceKey, bobBundle)
 	s.Require().NoError(err)
 
 	// Create a bundle
@@ -439,11 +467,11 @@ func (s *EncryptionServiceTestSuite) TestRandomised() {
 	s.Require().NoError(err)
 
 	// We add alice bundle
-	err = s.bob.ProcessPublicBundle(aliceBundle)
+	err = s.bob.ProcessPublicBundle(bobKey, aliceBundle)
 	s.Require().NoError(err)
 
-	aliceChan := make(chan *DirectMessageProtocol, 100)
-	bobChan := make(chan *DirectMessageProtocol, 100)
+	aliceChan := make(chan *map[string]*DirectMessageProtocol, 100)
+	bobChan := make(chan *map[string]*DirectMessageProtocol, 100)
 
 	alicePublisherErrChan := make(chan error, 1)
 	bobPublisherErrChan := make(chan error, 1)
@@ -488,13 +516,16 @@ func (s *EncryptionServiceTestSuite) TestBundleNotExisting() {
 	s.Require().NoError(err)
 
 	// Create a bundle without saving it
-	bobBundleContainer, err := NewBundleContainer(bobKey)
+	bobBundleContainer, err := NewBundleContainer(bobKey, bobInstallationID)
+	s.Require().NoError(err)
+
+	err = SignBundle(bobKey, bobBundleContainer)
 	s.Require().NoError(err)
 
 	bobBundle := bobBundleContainer.GetBundle()
 
 	// We add bob bundle
-	err = s.alice.ProcessPublicBundle(bobBundle)
+	err = s.alice.ProcessPublicBundle(aliceKey, bobBundle)
 	s.Require().NoError(err)
 
 	// Alice sends a message
@@ -517,38 +548,50 @@ func (s *EncryptionServiceTestSuite) TestRefreshedBundle() {
 	s.Require().NoError(err)
 
 	// Create bundles
-	bobBundle1, err := NewBundleContainer(bobKey)
+	bobBundle1, err := NewBundleContainer(bobKey, bobInstallationID)
 	s.Require().NoError(err)
 
-	bobBundle2, err := NewBundleContainer(bobKey)
+	err = SignBundle(bobKey, bobBundle1)
+	s.Require().NoError(err)
+
+	bobBundle2, err := NewBundleContainer(bobKey, bobInstallationID)
+	s.Require().NoError(err)
+
+	err = SignBundle(bobKey, bobBundle2)
 	s.Require().NoError(err)
 
 	// We add the first bob bundle
-	err = s.alice.ProcessPublicBundle(bobBundle1.GetBundle())
+	err = s.alice.ProcessPublicBundle(aliceKey, bobBundle1.GetBundle())
 	s.Require().NoError(err)
 
 	// Alice sends a message
 	encryptionResponse1, err := s.alice.EncryptPayload(&bobKey.PublicKey, aliceKey, []byte("anything"))
 	s.Require().NoError(err)
 
+	installationResponse1 := (*encryptionResponse1)[bobInstallationID]
+	s.Require().NotNil(installationResponse1)
+
 	// This message is using bobBundle1
 
-	x3dhHeader1 := encryptionResponse1.GetX3DHHeader()
+	x3dhHeader1 := installationResponse1.GetX3DHHeader()
 	s.NotNil(x3dhHeader1)
-	s.Equal(bobBundle1.GetBundle().GetSignedPreKey(), x3dhHeader1.GetId())
+	s.Equal(bobBundle1.GetBundle().GetSignedPreKeys()[bobInstallationID].GetSignedPreKey(), x3dhHeader1.GetId())
 
 	// We add the second bob bundle
-	err = s.alice.ProcessPublicBundle(bobBundle2.GetBundle())
+	err = s.alice.ProcessPublicBundle(aliceKey, bobBundle2.GetBundle())
 	s.Require().NoError(err)
 
 	// Alice sends a message
 	encryptionResponse2, err := s.alice.EncryptPayload(&bobKey.PublicKey, aliceKey, []byte("anything"))
 	s.Require().NoError(err)
 
+	installationResponse2 := (*encryptionResponse2)[bobInstallationID]
+	s.Require().NotNil(installationResponse2)
+
 	// This message is using bobBundle2
 
-	x3dhHeader2 := encryptionResponse2.GetX3DHHeader()
+	x3dhHeader2 := installationResponse2.GetX3DHHeader()
 	s.NotNil(x3dhHeader2)
-	s.Equal(bobBundle2.GetBundle().GetSignedPreKey(), x3dhHeader2.GetId())
+	s.Equal(bobBundle2.GetBundle().GetSignedPreKeys()[bobInstallationID].GetSignedPreKey(), x3dhHeader2.GetId())
 
 }

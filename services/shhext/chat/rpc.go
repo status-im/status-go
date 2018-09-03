@@ -20,3 +20,10 @@ type SendDirectMessageRPC struct {
 	Payload hexutil.Bytes
 	PubKey  hexutil.Bytes
 }
+
+// SendGroupMessageRPC represents the RPC payload for the SendGroupMessage RPC method
+type SendGroupMessageRPC struct {
+	Sig     string
+	Payload hexutil.Bytes
+	PubKeys []hexutil.Bytes
+}

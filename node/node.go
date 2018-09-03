@@ -309,7 +309,7 @@ func activateShhService(stack *node.Node, config *params.NodeConfig, db *leveldb
 			return nil, err
 		}
 
-		svc := shhext.New(whisper, shhext.EnvelopeSignalHandler{}, db, config.NoBackupDataDir, config.DebugAPIEnabled)
+		svc := shhext.New(whisper, shhext.EnvelopeSignalHandler{}, db, config.NoBackupDataDir, config.InstallationID, config.DebugAPIEnabled)
 		return svc, nil
 	})
 }

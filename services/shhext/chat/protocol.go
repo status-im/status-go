@@ -45,34 +45,43 @@ func (p *ProtocolService) addBundleAndMarshal(myIdentityKey *ecdsa.PrivateKey, m
 func (p *ProtocolService) BuildPublicMessage(myIdentityKey *ecdsa.PrivateKey, payload []byte) ([]byte, error) {
 	// Build message not encrypted
 	protocolMessage := &ProtocolMessage{
-		MessageType: &ProtocolMessage_PublicMessage{
-			payload,
-		},
+		PublicMessage: payload,
 	}
 
 	return p.addBundleAndMarshal(myIdentityKey, protocolMessage)
 }
 
 // BuildDirectMessage marshals a 1:1 chat message given the user identity private key, the recipient's public key, and a payload
-func (p *ProtocolService) BuildDirectMessage(myIdentityKey *ecdsa.PrivateKey, theirPublicKey *ecdsa.PublicKey, payload []byte) ([]byte, error) {
-	// Encrypt payload
-	encryptionResponse, err := p.encryption.EncryptPayload(theirPublicKey, myIdentityKey, payload)
-	if err != nil {
-		p.log.Error("encryption-service", "error encrypting payload", err)
-		return nil, err
-	}
+func (p *ProtocolService) BuildDirectMessage(myIdentityKey *ecdsa.PrivateKey, theirPublicKeys []*ecdsa.PublicKey, payload []byte) (*map[*ecdsa.PublicKey][]byte, error) {
+	response := make(map[*ecdsa.PublicKey][]byte)
+	for _, publicKey := range append(theirPublicKeys, &myIdentityKey.PublicKey) {
+		// Encrypt payload
+		encryptionResponse, err := p.encryption.EncryptPayload(publicKey, myIdentityKey, payload)
+		if err != nil {
+			p.log.Error("encryption-service", "error encrypting payload", err)
+			return nil, err
+		}
 
-	// Build message
-	protocolMessage := &ProtocolMessage{
-		MessageType: &ProtocolMessage_DirectMessage{encryptionResponse},
-	}
+		// Build message
+		protocolMessage := &ProtocolMessage{
+			DirectMessage: *encryptionResponse,
+		}
 
-	return p.addBundleAndMarshal(myIdentityKey, protocolMessage)
+		payload, err := p.addBundleAndMarshal(myIdentityKey, protocolMessage)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(payload) != 0 {
+			response[publicKey] = payload
+		}
+	}
+	return &response, nil
 }
 
 // ProcessPublicBundle processes a received X3DH bundle
-func (p *ProtocolService) ProcessPublicBundle(bundle *Bundle) error {
-	return p.encryption.ProcessPublicBundle(bundle)
+func (p *ProtocolService) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, bundle *Bundle) error {
+	return p.encryption.ProcessPublicBundle(myIdentityKey, bundle)
 }
 
 // GetBundle retrieves or creates a X3DH bundle, given a private identity key
@@ -92,7 +101,7 @@ func (p *ProtocolService) HandleMessage(myIdentityKey *ecdsa.PrivateKey, theirPu
 	// Process bundle
 	if bundle := protocolMessage.GetBundle(); bundle != nil {
 		// Should we stop processing if the bundle cannot be verified?
-		err := p.encryption.ProcessPublicBundle(bundle)
+		err := p.encryption.ProcessPublicBundle(myIdentityKey, bundle)
 		if err != nil {
 			return nil, err
 		}
@@ -106,7 +115,7 @@ func (p *ProtocolService) HandleMessage(myIdentityKey *ecdsa.PrivateKey, theirPu
 
 	// Decrypt message
 	if directMessage := protocolMessage.GetDirectMessage(); directMessage != nil {
-		return p.encryption.DecryptPayload(myIdentityKey, theirPublicKey, directMessage)
+		return p.encryption.DecryptPayload(myIdentityKey, theirPublicKey, &directMessage)
 	}
 
 	// Return error

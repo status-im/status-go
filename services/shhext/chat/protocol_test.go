@@ -1,6 +1,7 @@
 package chat
 
 import (
+	"crypto/ecdsa"
 	"os"
 	"testing"
 
@@ -38,8 +39,8 @@ func (s *ProtocolServiceTestSuite) SetupTest() {
 		panic(err)
 	}
 
-	s.alice = NewProtocolService(NewEncryptionService(alicePersistence))
-	s.bob = NewProtocolService(NewEncryptionService(bobPersistence))
+	s.alice = NewProtocolService(NewEncryptionService(alicePersistence, "1"))
+	s.bob = NewProtocolService(NewEncryptionService(bobPersistence, "2"))
 }
 
 func (s *ProtocolServiceTestSuite) TestBuildDirectMessage() {
@@ -56,13 +57,15 @@ func (s *ProtocolServiceTestSuite) TestBuildDirectMessage() {
 	})
 	s.NoError(err)
 
-	marshaledMsg, err := s.alice.BuildDirectMessage(aliceKey, &bobKey.PublicKey, payload)
+	keys := []*ecdsa.PublicKey{&bobKey.PublicKey}
+	marshaledMsg, err := s.alice.BuildDirectMessage(aliceKey, keys, payload)
 
 	s.NoError(err)
-	s.NotNilf(marshaledMsg, "It creates a message")
+	s.NotNil(marshaledMsg, "It creates a message")
+	s.NotNil((*marshaledMsg)[&aliceKey.PublicKey], "It creates a single message")
 
 	unmarshaledMsg := &ProtocolMessage{}
-	err = proto.Unmarshal(marshaledMsg, unmarshaledMsg)
+	err = proto.Unmarshal((*marshaledMsg)[&bobKey.PublicKey], unmarshaledMsg)
 
 	s.NoError(err)
 
@@ -72,7 +75,7 @@ func (s *ProtocolServiceTestSuite) TestBuildDirectMessage() {
 
 	s.NotNilf(directMessage, "It sets the direct message")
 
-	encryptedPayload := directMessage.GetPayload()
+	encryptedPayload := directMessage["none"].GetPayload()
 
 	s.NotNilf(encryptedPayload, "It sets the payload of the message")
 
@@ -95,13 +98,15 @@ func (s *ProtocolServiceTestSuite) TestBuildAndReadDirectMessage() {
 	marshaledPayload, err := proto.Marshal(&payload)
 	s.NoError(err)
 
+	keys := []*ecdsa.PublicKey{&bobKey.PublicKey}
+
 	// Message is sent with DH
-	marshaledMsg, err := s.alice.BuildDirectMessage(aliceKey, &bobKey.PublicKey, marshaledPayload)
+	marshaledMsg, err := s.alice.BuildDirectMessage(aliceKey, keys, marshaledPayload)
 
 	s.NoError(err)
 
 	// Bob is able to decrypt the message
-	unmarshaledMsg, err := s.bob.HandleMessage(bobKey, &aliceKey.PublicKey, marshaledMsg)
+	unmarshaledMsg, err := s.bob.HandleMessage(bobKey, &aliceKey.PublicKey, (*marshaledMsg)[&bobKey.PublicKey])
 	s.NoError(err)
 
 	s.NotNil(unmarshaledMsg)

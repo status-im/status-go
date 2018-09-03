@@ -267,6 +267,9 @@ type NodeConfig struct {
 	// StatusServiceEnabled enables status service api
 	StatusServiceEnabled bool
 
+	// InstallationId id of the current installation
+	InstallationID string `json:"InstallationID"`
+
 	// DebugAPIEnabled enables debug api
 	DebugAPIEnabled bool
 
