@@ -9,13 +9,15 @@ import (
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestBackendStartNodeConcurrently(t *testing.T) {
 	backend := NewStatusBackend()
-	config := params.NodeConfig{}
+	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
+	require.NoError(t, err)
 	count := 2
 	resultCh := make(chan error)
 
@@ -24,7 +26,7 @@ func TestBackendStartNodeConcurrently(t *testing.T) {
 
 	for i := 0; i < count; i++ {
 		go func() {
-			resultCh <- backend.StartNode(&config)
+			resultCh <- backend.StartNode(config)
 			wg.Done()
 		}()
 	}
@@ -40,16 +42,17 @@ func TestBackendStartNodeConcurrently(t *testing.T) {
 	require.Contains(t, results, nil)
 	require.Contains(t, results, node.ErrNodeRunning)
 
-	err := backend.StopNode()
+	err = backend.StopNode()
 	require.NoError(t, err)
 }
 
 func TestBackendRestartNodeConcurrently(t *testing.T) {
 	backend := NewStatusBackend()
-	config := params.NodeConfig{}
+	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
+	require.NoError(t, err)
 	count := 3
 
-	err := backend.StartNode(&config)
+	err = backend.StartNode(config)
 	require.NoError(t, err)
 	defer func() {
 		require.NoError(t, backend.StopNode())
@@ -72,9 +75,10 @@ func TestBackendRestartNodeConcurrently(t *testing.T) {
 
 func TestBackendGettersConcurrently(t *testing.T) {
 	backend := NewStatusBackend()
-	config := params.NodeConfig{}
+	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
+	require.NoError(t, err)
 
-	err := backend.StartNode(&config)
+	err = backend.StartNode(config)
 	require.NoError(t, err)
 	defer func() {
 		require.NoError(t, backend.StopNode())
@@ -123,9 +127,10 @@ func TestBackendGettersConcurrently(t *testing.T) {
 
 func TestBackendAccountsConcurrently(t *testing.T) {
 	backend := NewStatusBackend()
-	config := params.NodeConfig{}
+	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
+	require.NoError(t, err)
 
-	err := backend.StartNode(&config)
+	err = backend.StartNode(config)
 	require.NoError(t, err)
 	defer func() {
 		require.NoError(t, backend.StopNode())
@@ -208,10 +213,11 @@ func TestBackendConnectionChangesToOffline(t *testing.T) {
 
 func TestBackendCallRPCConcurrently(t *testing.T) {
 	backend := NewStatusBackend()
-	config := params.NodeConfig{}
+	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
+	require.NoError(t, err)
 	count := 3
 
-	err := backend.StartNode(&config)
+	err = backend.StartNode(config)
 	require.NoError(t, err)
 	defer func() {
 		require.NoError(t, backend.StopNode())
@@ -278,7 +284,9 @@ func TestAppStateChange(t *testing.T) {
 
 func TestBlockedRPCMethods(t *testing.T) {
 	backend := NewStatusBackend()
-	err := backend.StartNode(&params.NodeConfig{})
+	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
+	require.NoError(t, err)
+	err = backend.StartNode(config)
 	require.NoError(t, err)
 	defer func() { require.NoError(t, backend.StopNode()) }()
 

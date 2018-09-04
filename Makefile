@@ -198,6 +198,10 @@ xgo:
 	go get github.com/karalabe/xgo
 
 setup: dep-install lint-install mock-install ##@other Prepare project for first build
+	go get -u github.com/kevinburke/go-bindata/go-bindata
+
+generate: ##@other Regenerate assets and other auto-generated stuff
+	go generate ./static
 
 mock-install: ##@other Install mocking tools
 	go get -u github.com/golang/mock/mockgen

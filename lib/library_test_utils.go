@@ -12,10 +12,10 @@ package main
 import "C"
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"math/big"
 	"os"
+	"path"
 	"path/filepath"
 	"reflect"
 	"strconv"
@@ -26,13 +26,10 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/core"
-	gethparams "github.com/ethereum/go-ethereum/params"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/account"
-	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/signal"
 	. "github.com/status-im/status-go/t/utils" //nolint: golint
 	"github.com/status-im/status-go/transactions"
@@ -55,9 +52,18 @@ func init() {
 	nodeConfigJSON = `{
 	"NetworkId": ` + strconv.Itoa(GetNetworkID()) + `,
 	"DataDir": "` + testChainDir + `",
+	"KeyStoreDir": "` + filepath.Join(testChainDir, "keystore") + `",
 	"HTTPPort": ` + strconv.Itoa(TestConfig.Node.HTTPPort) + `,
-	"WSPort": ` + strconv.Itoa(TestConfig.Node.WSPort) + `,
-	"LogLevel": "INFO"
+	"LogLevel": "INFO",
+	"NoDiscovery": true,
+	"LightEthConfig": {
+		"Enabled": true
+	},
+	"WhisperConfig": {
+		"Enabled": true,
+		"DataDir": "` + path.Join(testChainDir, "wnode") + `",
+		"EnableNTPSync": false
+	}
 }`
 }
 
@@ -85,10 +91,6 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 		name string
 		fn   func(t *testing.T) bool
 	}{
-		{
-			"check default configuration",
-			testGetDefaultConfig,
-		},
 		{
 			"stop/resume node",
 			testStopResumeNode,
@@ -184,39 +186,6 @@ func testVerifyAccountPassword(t *testing.T) bool {
 		return false
 	}
 
-	return true
-}
-
-func testGetDefaultConfig(t *testing.T) bool {
-	networks := []struct {
-		chainID        int
-		refChainConfig *gethparams.ChainConfig
-	}{
-		{params.MainNetworkID, gethparams.MainnetChainConfig},
-		{params.RopstenNetworkID, gethparams.TestnetChainConfig},
-		{params.RinkebyNetworkID, gethparams.RinkebyChainConfig},
-		// TODO(tiabc): The same for params.StatusChainNetworkID
-	}
-	for i := range networks {
-		network := networks[i]
-
-		t.Run(fmt.Sprintf("networkID=%d", network.chainID), func(t *testing.T) {
-			var (
-				nodeConfig  = params.NodeConfig{}
-				rawResponse = GenerateConfig(C.CString("/tmp/data-folder"), C.CString("eth.staging"), C.int(network.chainID))
-			)
-			if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &nodeConfig); err != nil {
-				t.Errorf("cannot decode response (%s): %v", C.GoString(rawResponse), err)
-			}
-
-			genesis := new(core.Genesis)
-			if err := json.Unmarshal([]byte(nodeConfig.LightEthConfig.Genesis), genesis); err != nil {
-				t.Error(err)
-			}
-
-			require.Equal(t, network.refChainConfig, genesis.Config)
-		})
-	}
 	return true
 }
 

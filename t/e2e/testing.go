@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"context"
+	"path"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/node"
@@ -20,9 +21,11 @@ func WithUpstream(url string) TestNodeOption {
 }
 
 // WithDataDir returns TestNodeOption that allows to set another data dir.
-func WithDataDir(path string) TestNodeOption {
+func WithDataDir(dataDir string) TestNodeOption {
 	return func(config *params.NodeConfig) {
-		config.DataDir = path
+		config.DataDir = dataDir
+		config.KeyStoreDir = path.Join(dataDir, "keystore")
+		config.WhisperConfig.DataDir = path.Join(dataDir, "wnode")
 	}
 }
 

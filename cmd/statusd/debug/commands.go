@@ -120,7 +120,7 @@ func newCommandSet(statusBackend *api.StatusBackend) *commandSet {
 // StartNode loads the configuration out of the passed string and
 // starts a node with it.
 func (cs *commandSet) StartNode(config string) error {
-	nodeConfig, err := params.LoadNodeConfig(config)
+	nodeConfig, err := params.NewConfigFromJSON(config)
 	if err != nil {
 		return err
 	}

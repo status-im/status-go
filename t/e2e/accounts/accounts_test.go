@@ -231,7 +231,7 @@ func (s *AccountsTestSuite) TestSelectedAccountOnRestart() {
 	s.Equal(selectedAccount.Address.Hex(), address2, "incorrect address selected")
 
 	// resume node
-	s.NoError(s.Backend.StartNode(&preservedNodeConfig))
+	s.Require().NoError(s.Backend.StartNode(&preservedNodeConfig))
 
 	// re-check selected account (account2 MUST be selected)
 	selectedAccount, err = s.Backend.AccountManager().SelectedAccount()

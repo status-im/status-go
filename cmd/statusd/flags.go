@@ -1,26 +1,37 @@
 package main
 
 import (
-	"errors"
+	"fmt"
+	"os"
+	"path"
 	"strings"
 )
 
-// ErrorEmpty returned when value is empty.
-var ErrorEmpty = errors.New("empty value not allowed")
+// configFlags represents an array of JSON configuration files passed to a command line utility
+type configFlags []string
 
-// StringSlice is a type of flag that allows setting multiple string values.
-type StringSlice []string
-
-func (s *StringSlice) String() string {
-	return "string slice"
+func (f *configFlags) String() string {
+	return strings.Join(*f, ", ")
 }
 
-// Set trims space from string and stores it.
-func (s *StringSlice) Set(value string) error {
-	trimmed := strings.TrimSpace(value)
-	if len(trimmed) == 0 {
-		return ErrorEmpty
+func (f *configFlags) Set(value string) error {
+	if !path.IsAbs(value) {
+		// Convert to absolute path
+		cwd, err := os.Getwd()
+		if err != nil {
+			return err
+		}
+		value = path.Join(cwd, value)
 	}
-	*s = append(*s, trimmed)
+
+	// Check that the file exists
+	stat, err := os.Stat(value)
+	if err != nil {
+		return err
+	}
+	if stat.IsDir() {
+		return fmt.Errorf("path does not represent a file: %s", value)
+	}
+	*f = append(*f, value)
 	return nil
 }

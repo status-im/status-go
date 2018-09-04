@@ -19,13 +19,13 @@ import (
 	"github.com/status-im/status-go/discovery"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/require"
 )
 
 func TestStatusNodeStart(t *testing.T) {
-	var err error
-
-	config := params.NodeConfig{}
+	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
+	require.NoError(t, err)
 	n := New()
 
 	// checks before node is started
@@ -39,7 +39,7 @@ func TestStatusNodeStart(t *testing.T) {
 	require.EqualError(t, err, ErrNoGethNode.Error())
 
 	// start node
-	require.NoError(t, n.Start(&config))
+	require.NoError(t, n.Start(config))
 
 	// checks after node is started
 	require.True(t, n.IsRunning())
@@ -54,7 +54,7 @@ func TestStatusNodeStart(t *testing.T) {
 	require.Nil(t, err)
 	require.NotNil(t, keyStore)
 	// try to start already started node
-	require.EqualError(t, n.Start(&config), ErrNodeRunning.Error())
+	require.EqualError(t, n.Start(config), ErrNodeRunning.Error())
 
 	// stop node
 	require.NoError(t, n.Stop())
@@ -97,10 +97,10 @@ func TestStatusNodeWithDataDir(t *testing.T) {
 
 func TestStatusNodeServiceGetters(t *testing.T) {
 	config := params.NodeConfig{
-		WhisperConfig: &params.WhisperConfig{
+		WhisperConfig: params.WhisperConfig{
 			Enabled: true,
 		},
-		LightEthConfig: &params.LightEthConfig{
+		LightEthConfig: params.LightEthConfig{
 			Enabled: true,
 		},
 	}
@@ -216,7 +216,7 @@ func TestStatusNodeReconnectStaticPeers(t *testing.T) {
 	// start status node
 	config := params.NodeConfig{
 		MaxPeers: math.MaxInt32,
-		ClusterConfig: &params.ClusterConfig{
+		ClusterConfig: params.ClusterConfig{
 			Enabled:     true,
 			StaticNodes: []string{peerURL},
 		},
@@ -272,7 +272,7 @@ func TestStatusNodeRendezvousDiscovery(t *testing.T) {
 	config := params.NodeConfig{
 		Rendezvous:  true,
 		NoDiscovery: true,
-		ClusterConfig: &params.ClusterConfig{
+		ClusterConfig: params.ClusterConfig{
 			Enabled: true,
 			// not necessarily with id, just valid multiaddr
 			RendezvousNodes: []string{"/ip4/127.0.0.1/tcp/34012", "/ip4/127.0.0.1/tcp/34011"},

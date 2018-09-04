@@ -11,7 +11,7 @@ import (
 
 func TestWhisperLightModeEnabledSetsEmptyBloomFilter(t *testing.T) {
 	config := params.NodeConfig{
-		WhisperConfig: &params.WhisperConfig{
+		WhisperConfig: params.WhisperConfig{
 			Enabled:     true,
 			LightClient: true,
 		},
@@ -33,7 +33,7 @@ func TestWhisperLightModeEnabledSetsEmptyBloomFilter(t *testing.T) {
 
 func TestWhisperLightModeEnabledSetsNilBloomFilter(t *testing.T) {
 	config := params.NodeConfig{
-		WhisperConfig: &params.WhisperConfig{
+		WhisperConfig: params.WhisperConfig{
 			Enabled:     true,
 			LightClient: false,
 		},

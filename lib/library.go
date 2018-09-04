@@ -22,26 +22,10 @@ import (
 // All general log messages in this package should be routed through this logger.
 var logger = log.New("package", "status-go/lib")
 
-//GenerateConfig for status node
-//export GenerateConfig
-func GenerateConfig(datadir *C.char, fleet *C.char, networkID C.int) *C.char {
-	config, err := params.NewNodeConfig(C.GoString(datadir), "", C.GoString(fleet), uint64(networkID))
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	outBytes, err := json.Marshal(config)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	return C.CString(string(outBytes))
-}
-
 //StartNode - start Status node
 //export StartNode
 func StartNode(configJSON *C.char) *C.char {
-	config, err := params.LoadNodeConfig(C.GoString(configJSON))
+	config, err := params.NewConfigFromJSON(C.GoString(configJSON))
 	if err != nil {
 		return makeJSONResponse(err)
 	}
@@ -67,7 +51,7 @@ func StopNode() *C.char {
 func ValidateNodeConfig(configJSON *C.char) *C.char {
 	var resp APIDetailedResponse
 
-	_, err := params.LoadNodeConfig(C.GoString(configJSON))
+	_, err := params.NewConfigFromJSON(C.GoString(configJSON))
 
 	// Convert errors to APIDetailedResponse
 	switch err := err.(type) {

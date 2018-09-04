@@ -120,7 +120,7 @@ func (s *WMailServer) Init(shh *whisper.Whisper, config *params.WhisperConfig) e
 		return errDirectoryNotProvided
 	}
 
-	if len(config.MailServerPassword) == 0 && config.MailServerAsymKey == nil {
+	if len(config.MailServerPassword) == 0 && len(config.MailServerAsymKey) == 0 {
 		return errDecryptionMethodNotProvided
 	}
 
@@ -172,8 +172,12 @@ func (s *WMailServer) setupRequestMessageDecryptor(config *params.WhisperConfig)
 		s.symFilter = &whisper.Filter{KeySym: symKey}
 	}
 
-	if config.MailServerAsymKey != nil {
-		s.asymFilter = &whisper.Filter{KeyAsym: config.MailServerAsymKey}
+	if config.MailServerAsymKey != "" {
+		keyAsym, err := crypto.HexToECDSA(config.MailServerAsymKey)
+		if err != nil {
+			return err
+		}
+		s.asymFilter = &whisper.Filter{KeyAsym: keyAsym}
 	}
 
 	return nil
