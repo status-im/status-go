@@ -18,6 +18,8 @@ const (
 )
 
 func TestBIP32Vectors(t *testing.T) {
+	// Test vectors 1, 2, and 3 are taken from the BIP32 specs:
+	// https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki#test-vectors
 	tests := []struct {
 		name    string
 		seed    string
@@ -110,6 +112,21 @@ func TestBIP32Vectors(t *testing.T) {
 			[]uint32{0, HardenedKeyStart + 2147483647, 1, HardenedKeyStart + 2147483646, 2},
 			"xpub6FnCn6nSzZAw5Tw7cgR9bi15UV96gLZhjDstkXXxvCLsUXBGXPdSnLFbdpq8p9HmGsApME5hQTZ3emM2rnY5agb9rXpVGyy3bdW6EEgAtqt",
 			"xprvA2nrNbFZABcdryreWet9Ea4LvTJcGsqrMzxHx98MMrotbir7yrKCEXw7nadnHM8Dq38EGfSh6dqA9QWTyefMLEcBYJUuekgW4BYPJcr9E7j",
+		},
+		// Test vector 3
+		{
+			"test vector 3 chain m",
+			"4b381541583be4423346c643850da4b320e46a87ae3d2a4e6da11eba819cd4acba45d239319ac14f863b8d5ab5a0d0c64d2e8a1e7d1457df2e5a3c51c73235be",
+			[]uint32{},
+			"xpub661MyMwAqRbcEZVB4dScxMAdx6d4nFc9nvyvH3v4gJL378CSRZiYmhRoP7mBy6gSPSCYk6SzXPTf3ND1cZAceL7SfJ1Z3GC8vBgp2epUt13",
+			"xprv9s21ZrQH143K25QhxbucbDDuQ4naNntJRi4KUfWT7xo4EKsHt2QJDu7KXp1A3u7Bi1j8ph3EGsZ9Xvz9dGuVrtHHs7pXeTzjuxBrCmmhgC6",
+		},
+		{
+			"test vector 3 chain m/0H",
+			"4b381541583be4423346c643850da4b320e46a87ae3d2a4e6da11eba819cd4acba45d239319ac14f863b8d5ab5a0d0c64d2e8a1e7d1457df2e5a3c51c73235be",
+			[]uint32{HardenedKeyStart},
+			"xpub68NZiKmJWnxxS6aaHmn81bvJeTESw724CRDs6HbuccFQN9Ku14VQrADWgqbhhTHBaohPX4CjNLf9fq9MYo6oDaPPLPxSb7gwQN3ih19Zm4Y",
+			"xprv9uPDJpEQgRQfDcW7BkF7eTya6RPxXeJCqCJGHuCJ4GiRVLzkTXBAJMu2qaMWPrS7AANYqdq6vcBcBUdJCVVFceUvJFjaPdGZ2y9WACViL4L",
 		},
 	}
 
@@ -619,6 +636,50 @@ func TestHDWalletCompatibility(t *testing.T) {
 		if privKey != expectedAddresses[i].privKey {
 			t.Errorf("wrong private key generated. expected %s, got %s", expectedAddresses[i].privKey, privKey)
 		}
+	}
+}
+
+// TestPrivateKeyDataWithLeadingZeros is a regression test that checks
+// we don't re-introduce a bug we had in the past.
+// For a specific mnemonic phrase, we were deriving a wrong key/address
+// at path m/44'/60'/0'/0/0 compared to other wallets.
+// In this specific case, the second child key is represented in 31 bytes.
+// The problem raises when deriving its child key.
+// One of the step to derive the child key is calling our splitHMAC
+// that returns a secretKey and a chainCode.
+// Inside this function we make a sha512 of a seed that is a 37 bytes with:
+// 1 byte with 0x00
+// 32 bytes for the key data
+// 4 bytes for the child key index
+// In our case, if the key was less then 32 bytes, it was shifted to the left of that 32 bytes space,
+// resulting in a different seed, and a different data returned from the sha512 call.
+// https://medium.com/@alexberegszaszi/why-do-my-bip32-wallets-disagree-6f3254cc5846#.86inuifuq
+// https://github.com/iancoleman/bip39/issues/58
+func TestPrivateKeyDataWithLeadingZeros(t *testing.T) {
+	mn := NewMnemonic()
+	words := "radar blur cabbage chef fix engine embark joy scheme fiction master release"
+	key, _ := NewMaster(mn.MnemonicSeed(words, ""))
+
+	path := []uint32{
+		HardenedKeyStart + 44, // purpose
+		HardenedKeyStart + 60, // cointype
+		HardenedKeyStart + 0,  // account
+		0,                     // change
+		0,                     // index
+	}
+
+	for _, part := range path {
+		key, _ = key.Child(part)
+		if length := len(key.KeyData); length != 32 {
+			t.Errorf("expected key length to be 32, got: %d", length)
+		}
+	}
+
+	expectedAddress := "0xaC39b311DCEb2A4b2f5d8461c1cdaF756F4F7Ae9"
+	address := crypto.PubkeyToAddress(key.ToECDSA().PublicKey).Hex()
+
+	if address != expectedAddress {
+		t.Errorf("expected address %s, got: %s", expectedAddress, address)
 	}
 }
 

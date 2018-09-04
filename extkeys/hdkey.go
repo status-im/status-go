@@ -194,7 +194,22 @@ func (k *ExtendedKey) Child(i uint32) (*ExtendedKey, error) {
 		keyBigInt.Add(keyBigInt, parentKeyBigInt)
 		keyBigInt.Mod(keyBigInt, btcec.S256().N)
 
-		child.KeyData = keyBigInt.Bytes()
+		// Make sure that child.KeyData is 32 bytes of data even if the value is represented with less bytes.
+		// When we derive a child of this key, we call splitHMAC that does a sha512 of a seed that is:
+		// - 1 byte with 0x00
+		// - 32 bytes for the key data
+		// - 4 bytes for the child key index
+		// If we don't padd the KeyData, it will be shifted to left in that 32 bytes space
+		// generating a different seed and different child key.
+		// This part fixes a bug we had previously and described at:
+		// https://medium.com/@alexberegszaszi/why-do-my-bip32-wallets-disagree-6f3254cc5846#.86inuifuq
+		keyData := keyBigInt.Bytes()
+		if len(keyData) < 32 {
+			extra := make([]byte, 32-len(keyData))
+			keyData = append(extra, keyData...)
+		}
+
+		child.KeyData = keyData
 		child.Version = PrivateKeyVersion
 	} else {
 		// Case #3: childKey = serP(point(parse256(IL)) + parentKey)
