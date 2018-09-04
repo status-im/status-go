@@ -27,8 +27,9 @@ endif
 
 CGO_CFLAGS = -I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
 GOBIN = $(dir $(realpath $(firstword $(MAKEFILE_LIST))))build/bin
-GIT_COMMIT = $(shell git describe --exact-match --tag 2>/dev/null | sed 's/^v\(.*\)$$/\1/' \
-	|| git rev-parse --short HEAD)
+GIT_COMMIT = $(shell tag=`git describe --exact-match --tag 2>/dev/null`; \
+	if [ $$? -eq 0 ]; then echo $$tag | sed 's/^v\(.*\)$$/\1/'; \
+	else git rev-parse --short HEAD; fi)
 AUTHOR = $(shell echo $$USER)
 
 BUILD_FLAGS ?= $(shell echo "-ldflags '-X main.buildStamp=`date -u '+%Y-%m-%d.%H:%M:%S'` -X github.com/status-im/status-go/params.Version=$(GIT_COMMIT)'")
