@@ -57,6 +57,10 @@ var clusters = map[string]func() Cluster{
 				"enode://015e22f6cd2b44c8a51bd7a23555e271e0759c7d7f52432719665a74966f2da456d28e154e836bee6092b4d686fe67e331655586c57b718be3997c1629d24167@35.226.21.19:30504",    // mail-02.gc-us-central1-a.eth.beta
 				"enode://531e252ec966b7e83f5538c19bf1cde7381cc7949026a6e499b6e998e695751aadf26d4c98d5a4eabfb7cefd31c3c88d600a775f14ed5781520a88ecd25da3c6@35.225.227.79:30504",   // mail-03.gc-us-central1-a.eth.beta
 			},
+			RendezvousNodes: []string{
+				"/ip4/174.138.105.243/tcp/30703/ethv4/16Uiu2HAmRHPzF3rQg55PgYPcQkyvPVH9n2hWsYPhUJBZ6kVjJgdV", // boot-01.do-ams3.eth.beta
+				"/ip4/206.189.243.57/tcp/30703/ethv4/16Uiu2HAmLqTXuY4Sb6G28HNooaFUXUKzpzKXCcgyJxgaEE2i5vnf",  // boot-02.do-ams3.eth.beta
+			},
 		}
 	},
 }
