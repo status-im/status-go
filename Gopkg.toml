@@ -1,6 +1,3 @@
-# These packages are introduced by patching go-ethereum, so there isn't any point in forcing dep to find them.
-ignored = [ "github.com/ethereum/go-ethereum/ethapi" ]
-
 [prune]
   unused-packages = true
   go-tests = true
@@ -28,6 +25,7 @@ ignored = [ "github.com/ethereum/go-ethereum/ethapi" ]
 [[constraint]]
   name = "github.com/ethereum/go-ethereum"
   version = "=v1.8.14"
+  source = "github.com/status-im/go-ethereum"
 
 # * * * * * `go-ethereum` dependencies * * * * *
 # Pinned down SHAs from `go-ethereum/vendor/vendor.json`

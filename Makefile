@@ -262,7 +262,6 @@ vendor-check: ##@dependencies Require all new patches and disallow other changes
 
 dep-ensure: ##@dependencies Dep ensure and apply all patches
 	@dep ensure
-	./_assets/patches/patcher
 
 dep-install: ##@dependencies Install vendoring tool
 	go get -u github.com/golang/dep/cmd/dep

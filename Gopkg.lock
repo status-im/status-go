@@ -88,7 +88,7 @@
   revision = "935e0e8a636ca4ba70b713f3e38a19e1b77739e8"
 
 [[projects]]
-  digest = "1:d670c508dc01984c721d0d968936412e3edcd8ca58caf82fcfd0df9044013a0f"
+  digest = "1:34fa5a5d444765a1360983211916c4d2e65a3be75186277142d6aef5c21192db"
   name = "github.com/ethereum/go-ethereum"
   packages = [
     ".",
@@ -130,6 +130,7 @@
     "eth/gasprice",
     "eth/tracers",
     "eth/tracers/internal/tracers",
+    "ethapi",
     "ethdb",
     "event",
     "internal/debug",
@@ -156,7 +157,8 @@
     "whisper/whisperv6",
   ]
   pruneopts = "T"
-  revision = "316fc7ecfc10d06603f1358c1f4c1020ec36dd2a"
+  revision = "13115e12870cb2ebc1c8dfe55bc976d94efbeb90"
+  source = "github.com/status-im/go-ethereum"
   version = "v1.8.14"
 
 [[projects]]
@@ -1041,6 +1043,7 @@
     "github.com/ethereum/go-ethereum/crypto/sha3",
     "github.com/ethereum/go-ethereum/eth",
     "github.com/ethereum/go-ethereum/eth/downloader",
+    "github.com/ethereum/go-ethereum/ethapi",
     "github.com/ethereum/go-ethereum/event",
     "github.com/ethereum/go-ethereum/les",
     "github.com/ethereum/go-ethereum/log",
