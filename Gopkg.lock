@@ -347,6 +347,14 @@
   revision = "b497e2f366b8624394fb2e89c10ab607bebdde0b"
 
 [[projects]]
+  digest = "1:8b3234b10eacd5edea45bf0c13a585b608749da23f94aaf29b46d9ef8a8babf4"
+  name = "github.com/juju/ratelimit"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "59fac5042749a5afb9af70e813da1dd5474f0167"
+  version = "1.0.1"
+
+[[projects]]
   digest = "1:cdf2acbea0cf5514bc9a548836d007e379a42b4224813649ed9d98757c527172"
   name = "github.com/karalabe/hid"
   packages = ["."]
@@ -1056,6 +1064,7 @@
     "github.com/ethereum/go-ethereum/rpc",
     "github.com/ethereum/go-ethereum/whisper/whisperv6",
     "github.com/golang/mock/gomock",
+    "github.com/juju/ratelimit",
     "github.com/libp2p/go-libp2p-crypto",
     "github.com/multiformats/go-multiaddr",
     "github.com/pborman/uuid",
