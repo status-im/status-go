@@ -18,11 +18,20 @@ package whisperv6
 
 import "time"
 
+// RateLimitConfig defines configuration for actual rate limiter.
+type RateLimitConfig struct {
+	Interval time.Duration
+	Capacity int64
+	Quantum  int64
+}
+
 // Config represents the configuration state of a whisper node.
 type Config struct {
 	MaxMessageSize     uint32  `toml:",omitempty"`
 	MinimumAcceptedPOW float64 `toml:",omitempty"`
 	TimeSource         func() time.Time
+	IngressRateLimit   RateLimitConfig
+	EgressRateLimit    RateLimitConfig
 }
 
 // DefaultConfig represents (shocker!) the default configuration.
@@ -30,4 +39,6 @@ var DefaultConfig = Config{
 	MaxMessageSize:     DefaultMaxMessageSize,
 	MinimumAcceptedPOW: DefaultMinimumPoW,
 	TimeSource:         time.Now,
+	IngressRateLimit:   RateLimitConfig{1 * time.Minute, 1 << (10 * 3), 10 << (10 * 2)},
+	EgressRateLimit:    RateLimitConfig{500 * time.Millisecond, 1 << (10 * 3), 10 << (10 * 2)},
 }

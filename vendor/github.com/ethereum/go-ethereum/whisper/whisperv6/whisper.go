@@ -34,6 +34,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/juju/ratelimit"
 	"github.com/syndtr/goleveldb/leveldb/errors"
 	"golang.org/x/crypto/pbkdf2"
 	"golang.org/x/sync/syncmap"
@@ -125,6 +126,8 @@ func New(cfg *Config) *Whisper {
 	whisper.settings.Store(minPowIdx, cfg.MinimumAcceptedPOW)
 	whisper.settings.Store(maxMsgSizeIdx, cfg.MaxMessageSize)
 	whisper.settings.Store(overflowIdx, false)
+	whisper.settings.Store("ingress", cfg.IngressRateLimit)
+	whisper.settings.Store("egress", cfg.EgressRateLimit)
 
 	// p2p whisper sub protocol handler
 	whisper.protocol = p2p.Protocol{
@@ -706,6 +709,18 @@ func (whisper *Whisper) Start(*p2p.Server) error {
 	return nil
 }
 
+func (whisper *Whisper) newIngressRateLimit() *ratelimit.Bucket {
+	setting, _ := whisper.settings.Load("ingress")
+	rlConfig := setting.(RateLimitConfig)
+	return ratelimit.NewBucketWithQuantum(rlConfig.Interval, rlConfig.Capacity, rlConfig.Quantum)
+}
+
+func (whisper *Whisper) newEgressRateLimit() *ratelimit.Bucket {
+	setting, _ := whisper.settings.Load("egress")
+	rlConfig := setting.(RateLimitConfig)
+	return ratelimit.NewBucketWithQuantum(rlConfig.Interval, rlConfig.Capacity, rlConfig.Quantum)
+}
+
 // Stop implements node.Service, stopping the background data propagation thread
 // of the Whisper protocol.
 func (whisper *Whisper) Stop() error {
@@ -742,6 +757,7 @@ func (whisper *Whisper) HandlePeer(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
 
 // runMessageLoop reads and processes inbound messages directly to merge into client-global state.
 func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
+	rl := whisper.newIngressRateLimit()
 	for {
 		// fetch the next packet
 		packet, err := rw.ReadMsg()
@@ -883,6 +899,12 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 		}
 
 		packet.Discard()
+
+		if packet.Code != p2pMessageCode {
+			if rl.TakeAvailable(int64(packet.Size)) < int64(packet.Size) {
+				return fmt.Errorf("peer %x reached rate limit with capacity %d and rate %f", p.ID(), rl.Capacity(), rl.Rate())
+			}
+		}
 	}
 }
 
