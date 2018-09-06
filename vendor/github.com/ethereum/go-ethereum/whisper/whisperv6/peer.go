@@ -19,6 +19,7 @@ package whisperv6
 import (
 	"fmt"
 	"math"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -27,13 +28,15 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/juju/ratelimit"
 )
 
 // Peer represents a whisper protocol peer connection.
 type Peer struct {
-	host *Whisper
-	peer *p2p.Peer
-	ws   p2p.MsgReadWriter
+	host            *Whisper
+	peer            *p2p.Peer
+	ws              p2p.MsgReadWriter
+	egressRateLimit *ratelimit.Bucket
 
 	trusted        bool
 	powRequirement float64
@@ -49,15 +52,16 @@ type Peer struct {
 // newPeer creates a new whisper peer object, but does not run the handshake itself.
 func newPeer(host *Whisper, remote *p2p.Peer, rw p2p.MsgReadWriter) *Peer {
 	return &Peer{
-		host:           host,
-		peer:           remote,
-		ws:             rw,
-		trusted:        false,
-		powRequirement: 0.0,
-		known:          mapset.NewSet(),
-		quit:           make(chan struct{}),
-		bloomFilter:    MakeFullNodeBloom(),
-		fullNode:       true,
+		host:            host,
+		peer:            remote,
+		ws:              rw,
+		trusted:         false,
+		powRequirement:  0.0,
+		known:           mapset.NewSet(),
+		quit:            make(chan struct{}),
+		bloomFilter:     MakeFullNodeBloom(),
+		fullNode:        true,
+		egressRateLimit: host.newEgressRateLimit(),
 	}
 }
 
@@ -193,10 +197,30 @@ func (peer *Peer) broadcast() error {
 	}
 	envelopes := peer.host.Envelopes()
 	bundle := make([]*Envelope, 0, len(envelopes))
+	var totalSize int64
 	for _, envelope := range envelopes {
 		if !peer.marked(envelope) && envelope.PoW() >= peer.powRequirement && peer.bloomMatch(envelope) {
 			bundle = append(bundle, envelope)
+			totalSize += int64(envelope.size())
 		}
+	}
+	available := peer.egressRateLimit.TakeAvailable(totalSize)
+	if available < totalSize {
+		rand.Shuffle(len(bundle), func(i, j int) {
+			bundle[i], bundle[j] = bundle[j], bundle[i]
+		})
+		var (
+			partialSize int64
+			idx         int
+		)
+		for i := range bundle {
+			partialSize += int64(bundle[i].size())
+			if partialSize > available {
+				break
+			}
+			idx = i
+		}
+		bundle = bundle[:idx]
 	}
 
 	if len(bundle) > 0 {
