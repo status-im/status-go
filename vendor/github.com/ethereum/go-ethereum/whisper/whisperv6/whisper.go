@@ -844,6 +844,8 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 					return errors.New("invalid direct message")
 				}
 				whisper.postEvent(&envelope, true)
+			} else {
+				return fmt.Errorf("peer %x sent us %d, while connection is not marked as trusted.", p.ID(), p2pMessageCode)
 			}
 		case p2pRequestCode:
 			// Must be processed if mail server is implemented. Otherwise ignore.
