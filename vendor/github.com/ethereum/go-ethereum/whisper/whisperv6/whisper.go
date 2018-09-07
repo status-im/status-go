@@ -711,7 +711,7 @@ func (whisper *Whisper) Start(*p2p.Server) error {
 
 func (whisper *Whisper) newIngressRateLimit() *ratelimit.Bucket {
 	conf := whisper.ingressRateLimitConfig()
-	return ratelimit.NewBucketWithQuantum(conf.Interval, conf.Capacity, conf.Quantum)
+	return ratelimit.NewBucketWithQuantum(conf.IntervalDuration(), int64(conf.Capacity), int64(conf.Quantum))
 }
 
 func (whisper *Whisper) ingressRateLimitConfig() RateLimitConfig {
@@ -722,7 +722,7 @@ func (whisper *Whisper) ingressRateLimitConfig() RateLimitConfig {
 func (whisper *Whisper) defaultEgressRateLimit() *ratelimit.Bucket {
 	setting, _ := whisper.settings.Load("egress")
 	conf := setting.(RateLimitConfig)
-	return ratelimit.NewBucketWithQuantum(conf.Interval, conf.Capacity, conf.Quantum)
+	return ratelimit.NewBucketWithQuantum(conf.IntervalDuration(), int64(conf.Capacity), int64(conf.Quantum))
 }
 
 // Stop implements node.Service, stopping the background data propagation thread
@@ -764,7 +764,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 	// future whisper upgrades. e.g. we could append rate limit conf to list of rlp items in hanshake.
 	// but in upstream that list could be extended with any other option. so we will fail to read that option.
 	if err := p2p.Send(rw, peerRateLimitCode, whisper.ingressRateLimitConfig()); err != nil {
-		return fmt.Errorf("failed to send ingress rate limit to a peer %x", p)
+		return fmt.Errorf("failed to send ingress rate limit to a peer %x: %v", p, err)
 	}
 	// TODO wait for some time for a peer to deliver our ingress to a remote peer.
 	rl := whisper.newIngressRateLimit()

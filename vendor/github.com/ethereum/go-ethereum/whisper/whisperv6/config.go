@@ -20,9 +20,13 @@ import "time"
 
 // RateLimitConfig defines configuration for actual rate limiter.
 type RateLimitConfig struct {
-	Interval time.Duration
-	Capacity int64
-	Quantum  int64
+	Interval uint64
+	Capacity uint64
+	Quantum  uint64
+}
+
+func (conf RateLimitConfig) IntervalDuration() time.Duration {
+	return time.Duration(conf.Interval)
 }
 
 // Config represents the configuration state of a whisper node.
@@ -39,6 +43,6 @@ var DefaultConfig = Config{
 	MaxMessageSize:     DefaultMaxMessageSize,
 	MinimumAcceptedPOW: DefaultMinimumPoW,
 	TimeSource:         time.Now,
-	IngressRateLimit:   RateLimitConfig{1 * time.Minute, 1 << (10 * 3), 10 << (10 * 2)},
-	EgressRateLimit:    RateLimitConfig{500 * time.Millisecond, 1 << (10 * 3), 10 << (10 * 2)},
+	IngressRateLimit:   RateLimitConfig{uint64(1 * time.Minute), 1 << (10 * 3), 10 << (10 * 2)},
+	EgressRateLimit:    RateLimitConfig{uint64(500 * time.Millisecond), 1 << (10 * 3), 10 << (10 * 2)},
 }
