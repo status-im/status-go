@@ -192,7 +192,7 @@ func (peer *Peer) expire() {
 func (peer *Peer) updateEgressRateLimit(conf RateLimitConfig) {
 	peer.egressMu.Lock()
 	defer peer.egressMu.Unlock()
-	peer.egressRateLimit = ratelimit.NewBucketWithQuantum(conf.Interval, conf.Capacity, conf.Quantum)
+	peer.egressRateLimit = ratelimit.NewBucketWithQuantum(conf.IntervalDuration(), int64(conf.Capacity), int64(conf.Quantum))
 }
 
 // broadcast iterates over the collection of envelopes and transmits yet unknown
