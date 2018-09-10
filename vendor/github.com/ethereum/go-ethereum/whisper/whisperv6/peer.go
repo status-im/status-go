@@ -213,26 +213,25 @@ func (peer *Peer) broadcast() error {
 			totalSize += int64(envelope.size())
 		}
 	}
-	available := peer.egressRateLimit.TakeAvailable(totalSize)
+	available := peer.egressRateLimit.Available()
+	var partialSize int64
 	if available < totalSize {
 		rand.Shuffle(len(bundle), func(i, j int) {
 			bundle[i], bundle[j] = bundle[j], bundle[i]
 		})
-		var (
-			partialSize int64
-			idx         int
-		)
+		idx := 0
 		for i := range bundle {
-			partialSize += int64(bundle[i].size())
-			if partialSize > available {
+			itemSize := int64(bundle[i].size())
+			if partialSize+itemSize > available {
 				break
 			}
-			idx = i
+			partialSize += itemSize
+			idx = i + 1
 		}
 		bundle = bundle[:idx]
 	}
-
 	if len(bundle) > 0 {
+		peer.egressRateLimit.TakeAvailable(partialSize)
 		// transmit the batch of envelopes
 		if err := p2p.Send(peer.ws, messagesCode, bundle); err != nil {
 			return err
