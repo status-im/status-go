@@ -1,11 +1,9 @@
-# Status Patches for geth (go-ethereum)
----
+Status Patches for geth (go-ethereum)
+=====================================
 
-Status-go uses [go-ethereum](https://github.com/ethereum/go-ethereum) (**upstream**) as its dependency. As any other Go dependency `go-ethereum` code is vendored and stored in `vendor/` folder.
+Status-go uses Status' fork of [go-ethereum](https://github.com/status-im/go-ethereum) as its dependency. As any other Go dependency `go-ethereum` code is vendored and stored in `vendor/` folder.
 
-However, there are a few changes has been made to the upstream, that are specific to Status and should not be merged to the upstream. We keep those changes as a set of patches, that can be applied upon each next release of `go-ethereum`. Patched version of `go-ethereum` is available in vendor folder.
-
-We try to minimize number and amount of changes in those patches as much as possible, and whereas possible, to contribute changes into the upstream.
+The reason why we use a fork is because we introduced a couple of differences that make it work better on mobile devices but not necessarily are suitable for all cases.
 
 # Creating patches
 
@@ -16,23 +14,25 @@ Instructions for creating a patch from the command line:
 1. Create a patch `git diff --relative=vendor/github.com/ethereum/go-ethereum > _assets/patches/geth/0000-name-of-the-patch.patch`
 1. Commit changes.
 
-# Updating patches
+# Testing patches
 
-1. Tweak the patch file.
-1. Run `make dep-ensure` to re-apply patches.
+To test a newly created patch, run:
 
-# Removing patches
+```
+$ git apply _assets/patches/geth/0000-name-of-the-patch.patch --directory vendor/github.com/ethereum/go-ethereum
+```
 
-1. Remove the patch file
-1. Remove the link from [this README] (./README.md)
-1. Run `make dep-ensure` to re-apply patches.
+And run `make statusgo` to compile it and `make test` to run unit tests.
 
-# Updating
+# Updating fork with a patch
 
-When a new stable release of `go-ethereum` comes out, we need to upgrade our vendored copy. We use `dep` for vendoring, so for upgrading:
+To make the patch available for everyone, it needs to be applied and pushed to remote git repository.
 
-- Change target branch for `go-ethereum` in `Gopkg.toml`.
-- `dep ensure -update github.com/ethereum/go-ethereum`
-- `make dep-ensure`
-
-This will ensure that dependency is upgraded and fully patched. Upon success, you can do `make vendor-check` after committing all the changes, in order to ensure that all changes are valid.
+1. Clone [github.com/status-im/go-ethereum](https://github.com/status-im/go-ethereum) to `$GOPATH` and pull all changes,
+1. From `github.com/status-im/status-go` run `GETH_VERSION=v1.8.14 ./_assets/patches/update-fork-with-patches.sh`,
+1. Go to `github.com/status-im/go-ethereum` and verify the latest commit and tag `v1.8.14`,
+1. If all is good push changes to the upstream:
+```
+$ git push origin patched/v1.8.14
+$ git push -f v1.8.14
+```

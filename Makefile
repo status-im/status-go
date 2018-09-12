@@ -256,26 +256,17 @@ clean: ##@other Cleanup
 deep-clean: clean
 	rm -Rdf .ethereumtest/StatusChain
 
-vendor-check: ##@dependencies Require all new patches and disallow other changes
-	./_assets/patches/patcher -c
-	./_assets/ci/isolate-vendor-check.sh
-
 dep-ensure: ##@dependencies Dep ensure and apply all patches
 	@dep ensure
 
 dep-install: ##@dependencies Install vendoring tool
 	go get -u github.com/golang/dep/cmd/dep
 
-update-geth: ##@dependencies Update geth (use GETH_BRANCH to optionally set the geth branch name)
-	./_assets/ci/update-geth.sh $(GETH_BRANCH)
-	@echo "**************************************************************"
-	@echo "NOTE: Don't forget to:"
-	@echo "- update the goleveldb dependency revision in Gopkg.toml to match the version used in go-ethereum"
-	@echo "- reconcile any changes to interfaces in transactions/fake (such as PublicTransactionPoolAPI), which are copies from internal geth interfaces"
-	@echo "**************************************************************"
-
-patch: ##@patching Revert and apply all patches
+patch-geth-vendor: ##@patching Apply all patches on ethereum in vendor/
 	./_assets/patches/patcher
 
-patch-revert: ##@patching Revert all patches only
+patch-geth-vendor-revert: ##@patching Revert all patches from ethereum in vendor/
 	./_assets/patches/patcher -r
+
+patch-geth-fork: ##@patching Apply patches to Status' go-ethereum fork
+	./_assets/patches/update-fork-with-patches.sh
