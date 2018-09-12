@@ -14,25 +14,22 @@ Instructions for creating a patch from the command line:
 1. Create a patch `git diff --relative=vendor/github.com/ethereum/go-ethereum > _assets/patches/geth/0000-name-of-the-patch.patch`
 1. Commit changes.
 
-# Testing patches
-
-To test a newly created patch, run:
-
-```
-$ git apply _assets/patches/geth/0000-name-of-the-patch.patch --directory vendor/github.com/ethereum/go-ethereum
-```
-
-And run `make statusgo` to compile it and `make test` to run unit tests.
-
 # Updating fork with a patch
 
 To make the patch available for everyone, it needs to be applied and pushed to remote git repository.
 
 1. Clone [github.com/status-im/go-ethereum](https://github.com/status-im/go-ethereum) to `$GOPATH` and pull all changes,
 1. From `github.com/status-im/status-go` run `GETH_VERSION=v1.8.14 ./_assets/patches/update-fork-with-patches.sh`,
-1. Go to `github.com/status-im/go-ethereum` and verify the latest commit and tag `v1.8.14`,
-1. If all is good push changes to the upstream:
+1. Go to `github.com/status-im/go-ethereum` and verify if the latest commit and tag `v1.8.14` are correct. If so, push changes to the upstream:
 ```
 $ git push origin patched/v1.8.14
 $ git push -f v1.8.14
 ```
+
+# Testing patches
+
+Assumming that your patch is included in the fork and the updated tag is pushed:
+
+1. Make sure that the `vendor/` directory is clean: `make dep-ensure`,
+1. Run `make statusgo` to compile `statusd`,
+1. Run `make test` to run unit tests.

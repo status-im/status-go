@@ -13,7 +13,7 @@
 
 status-go is an underlying part of [Status](https://status.im/) - a browser, messenger, and gateway to a decentralized world.
 
-It's written in Go and requires Go 1.8 or above.
+It's written in Go and requires Go 1.10 or above.
 
 It uses Makefile to do most common actions. See `make help` output for available commands.
 
