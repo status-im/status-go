@@ -13,6 +13,8 @@ import (
 
 const (
 	RecordsPrefix byte = 1 + iota
+
+	TopicBodyDelimiter = 0xff
 )
 
 type StorageRecord struct {
@@ -20,13 +22,24 @@ type StorageRecord struct {
 	Time time.Time
 }
 
+// TopicPart looks for TopicBodyDelimiter and returns topic prefix from the same key.
+// It doesn't allocate memory for topic prefix.
+func TopicPart(key []byte) []byte {
+	idx := bytes.IndexByte(key, TopicBodyDelimiter)
+	if idx == -1 {
+		return nil
+	}
+	return key[1:idx] // first byte is RecordsPrefix
+}
+
 type RecordsKey []byte
 
 func NewRecordsKey(topic string, record enr.Record) RecordsKey {
-	key := make(RecordsKey, 1+len([]byte(topic))+len(record.NodeAddr()))
+	key := make(RecordsKey, 2+len([]byte(topic))+len(record.NodeAddr()))
 	key[0] = RecordsPrefix
 	copy(key[1:], []byte(topic))
-	copy(key[1+len([]byte(topic)):], record.NodeAddr())
+	key[1+len([]byte(topic))] = TopicBodyDelimiter
+	copy(key[2+len([]byte(topic)):], record.NodeAddr())
 	return key
 }
 
@@ -88,6 +101,8 @@ func (s *Storage) GetRandom(topic string, limit uint) (rst []enr.Record, err err
 	key := make(RecordsKey, prefixlen+32)
 	key[0] = RecordsPrefix
 	copy(key[1:], []byte(topic))
+	key[prefixlen] = TopicBodyDelimiter
+	prefixlen++
 
 	iter := s.db.NewIterator(util.BytesPrefix(key[:prefixlen]), nil)
 	defer iter.Release()
