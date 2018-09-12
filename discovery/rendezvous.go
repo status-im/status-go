@@ -101,7 +101,7 @@ func (r *Rendezvous) register(topic string) error {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	err := r.client.Register(ctx, srv, topic, r.record)
+	err := r.client.Register(ctx, srv, topic, r.record, r.registrationPeriod)
 	if err != nil {
 		log.Error("error registering", "topic", topic, "rendezvous server", srv, "err", err)
 	}
@@ -110,7 +110,9 @@ func (r *Rendezvous) register(topic string) error {
 
 // Register renews registration in the specified server.
 func (r *Rendezvous) Register(topic string, stop chan struct{}) error {
-	ticker := time.NewTicker(r.registrationPeriod)
+	// sending registration more often than the whole registraton period
+	// will ensure that it won't be accidentally removed
+	ticker := time.NewTicker(r.registrationPeriod / 2)
 	defer ticker.Stop()
 
 	if err := r.register(topic); err == context.Canceled {
