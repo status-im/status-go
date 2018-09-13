@@ -419,9 +419,9 @@ func (b *StatusBackend) SelectAccount(address, password string) error {
 			return err
 		}
 
-		err = st.InitProtocol(address, password)
-
-		return err
+		if err := st.InitProtocol(address, password); err != nil {
+			return nil
+		}
 	}
 
 	return nil
@@ -444,9 +444,10 @@ func appendIf(condition bool, services []gethnode.ServiceConstructor, service ge
 	return append(services, service)
 }
 
+// CreateContactCode create or return the latest contact code
 func (b *StatusBackend) CreateContactCode() (string, error) {
 	selectedAccount, err := b.AccountManager().SelectedAccount()
-	if selectedAccount == nil || err == account.ErrNoAccountSelected {
+	if err != nil {
 		return "", err
 	}
 
@@ -460,14 +461,13 @@ func (b *StatusBackend) CreateContactCode() (string, error) {
 		return "", err
 	}
 
-	base64Bundle, err := bundle.ToBase64()
-
-	return base64Bundle, err
+	return bundle.ToBase64()
 }
 
+// ProcessContactCode process and adds the someone else's bundle
 func (b *StatusBackend) ProcessContactCode(contactCode string) error {
 	selectedAccount, err := b.AccountManager().SelectedAccount()
-	if selectedAccount == nil || err == account.ErrNoAccountSelected {
+	if err != nil {
 		return err
 	}
 
@@ -490,6 +490,7 @@ func (b *StatusBackend) ProcessContactCode(contactCode string) error {
 	return nil
 }
 
+// ExtractIdentityFromContactCode extract the identity of the user generating the contact code
 func (b *StatusBackend) ExtractIdentityFromContactCode(contactCode string) (string, error) {
 	bundle, err := chat.FromBase64(contactCode)
 	if err != nil {

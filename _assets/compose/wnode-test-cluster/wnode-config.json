@@ -1,7 +1,7 @@
 {
     "NetworkId": 777,
     "DataDir": "/data/ethereumtest/status",
-    "NoBackupDataDir": "/data/ethereumtest/status",
+    "BackupDisabledDataDir": "/data/ethereumtest/status",
     "KeyStoreDir": "/data/ethereumtest/keystore",
     "NoDiscovery": false,
     "Rendezvous": false,

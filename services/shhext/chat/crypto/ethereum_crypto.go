@@ -48,13 +48,11 @@ func (c EthereumCrypto) DH(dhPair dr.DHPair, dhPub dr.Key) dr.Key {
 	eciesPrivate := ecies.ImportECDSA(privateKey)
 	var a [32]byte
 	if err != nil {
-
 		return a
 	}
 
 	publicKey, err := crypto.DecompressPubkey(dhPub[:])
 	if err != nil {
-
 		return a
 	}
 	eciesPublic := ecies.ImportECDSAPublic(publicKey)
@@ -77,6 +75,7 @@ func (c EthereumCrypto) DH(dhPair dr.DHPair, dhPub dr.Key) dr.Key {
 // See the Crypto interface.
 func (c EthereumCrypto) KdfRK(rk, dhOut dr.Key) (rootKey, chainKey, headerKey dr.Key) {
 	var (
+		// We can use a non-secret constant as the last argument
 		r   = hkdf.New(sha256.New, dhOut[:], rk[:], []byte("rsZUpEuXUqqwXBvSy3EcievAh4cMj6QL"))
 		buf = make([]byte, 96)
 	)
@@ -189,8 +188,4 @@ func (p DHPair) PrivateKey() dr.Key {
 
 func (p DHPair) PublicKey() dr.Key {
 	return p.PubKey
-}
-
-func (p DHPair) String() string {
-	return fmt.Sprintf("{privateKey: %s publicKey: %s}", p.PrvKey, p.PubKey)
 }

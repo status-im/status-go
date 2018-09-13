@@ -158,7 +158,7 @@ ignored = [ "github.com/ethereum/go-ethereum/ethapi" ]
   
 [[constraint]]
   name = "github.com/status-im/doubleratchet"
-  revision = "c243ae5a661dafa86438b55034ae7f4fc2eec31e"
+  revision = "321788dbb6eac36f7dab04e631db139e13bb280b"
 
 [[constraint]]
   name = "github.com/status-im/migrate"

@@ -197,21 +197,21 @@ xgo:
 	docker pull $(XGOIMAGE)
 	go get github.com/karalabe/xgo
 
-setup: dep-install lint-install mock-install update-fleet-config ##@other Prepare project for first build
-	go get -u github.com/jteeuwen/go-bindata/...
+install-os-dependencies:
+	_assets/scripts/install_deps.sh
+
+setup: install-os-dependencies dep-install lint-install mock-install gen-install update-fleet-config ##@other Prepare project for first build
 
 generate: ##@other Regenerate assets and other auto-generated stuff
-	go generate ./static
+	go generate ./static ./static/migrations
 	$(shell cd ./services/shhext/chat && exec protoc --go_out=. ./*.proto)
-	$(shell cd ./services/shhext/chat/migrations && exec go-bindata -pkg migrations .)
 
-protoc-install:
-	apt install -y protobuf-compiler
+gen-install:
+	go get -u github.com/jteeuwen/go-bindata/...
+	go get -u github.com/golang/protobuf/protoc-gen-go
 
 mock-install: ##@other Install mocking tools
-	go get -u github.com/kevinburke/go-bindata/go-bindata
 	go get -u github.com/golang/mock/mockgen
-	go get -u github.com/golang/protobuf/protoc-gen-go
 
 mock: ##@other Regenerate mocks
 	mockgen -package=fcm          -destination=notifications/push/fcm/client_mock.go -source=notifications/push/fcm/client.go
@@ -260,10 +260,8 @@ lint:
 	@echo "lint"
 	@golangci-lint run ./...
 
-ci: clean-vendor lint mock dep-ensure test-unit test-e2e ##@tests Run all linters and tests at once
+ci: lint mock dep-ensure test-unit test-e2e ##@tests Run all linters and tests at once
 
-clean-vendor:
-	rm -fr .vendor-new
 clean: ##@other Cleanup
 	rm -fr build/bin/*
 

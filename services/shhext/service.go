@@ -20,6 +20,8 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
+var errProtocolNotInitialized = errors.New("procotol is not initialized")
+
 // EnvelopeState in local tracker
 type EnvelopeState int
 
@@ -50,13 +52,21 @@ type Service struct {
 	debug          bool
 	dataDir        string
 	installationID string
+	pfsEnabled     bool
+}
+
+type ServiceConfig struct {
+	DataDir        string
+	InstallationID string
+	Debug          bool
+	PFSEnabled     bool
 }
 
 // Make sure that Service implements node.Service interface.
 var _ node.Service = (*Service)(nil)
 
 // New returns a new Service. dataDir is a folder path to a network-independent location
-func New(w *whisper.Whisper, handler EnvelopeEventsHandler, db *leveldb.DB, dataDir string, installationID string, debug bool) *Service {
+func New(w *whisper.Whisper, handler EnvelopeEventsHandler, db *leveldb.DB, config *ServiceConfig) *Service {
 	track := &tracker{
 		w:       w,
 		handler: handler,
@@ -66,9 +76,10 @@ func New(w *whisper.Whisper, handler EnvelopeEventsHandler, db *leveldb.DB, data
 		w:              w,
 		tracker:        track,
 		deduplicator:   dedup.NewDeduplicator(w, db),
-		debug:          debug,
-		dataDir:        dataDir,
-		installationID: installationID,
+		debug:          config.Debug,
+		dataDir:        config.DataDir,
+		installationID: config.InstallationID,
+		pfsEnabled:     config.PFSEnabled,
 	}
 }
 
@@ -77,7 +88,12 @@ func (s *Service) Protocols() []p2p.Protocol {
 	return []p2p.Protocol{}
 }
 
+// InitProtocol create an instance of ProtocolService given an address and password
 func (s *Service) InitProtocol(address string, password string) error {
+	if !s.pfsEnabled {
+		return nil
+	}
+
 	if err := os.MkdirAll(filepath.Clean(s.dataDir), os.ModePerm); err != nil {
 		return err
 	}
@@ -86,12 +102,13 @@ func (s *Service) InitProtocol(address string, password string) error {
 		return err
 	}
 	s.protocol = chat.NewProtocolService(chat.NewEncryptionService(persistence, s.installationID))
+
 	return nil
 }
 
 func (s *Service) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, bundle *chat.Bundle) error {
 	if s.protocol == nil {
-		return errors.New("Procotol is not initialized")
+		return errProtocolNotInitialized
 	}
 
 	return s.protocol.ProcessPublicBundle(myIdentityKey, bundle)
@@ -99,7 +116,7 @@ func (s *Service) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, bundle *c
 
 func (s *Service) GetBundle(myIdentityKey *ecdsa.PrivateKey) (*chat.Bundle, error) {
 	if s.protocol == nil {
-		return nil, errors.New("Procotol is not initialized")
+		return nil, errProtocolNotInitialized
 	}
 
 	return s.protocol.GetBundle(myIdentityKey)

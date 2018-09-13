@@ -62,10 +62,10 @@ func (s *ProtocolServiceTestSuite) TestBuildDirectMessage() {
 
 	s.NoError(err)
 	s.NotNil(marshaledMsg, "It creates a message")
-	s.NotNil((*marshaledMsg)[&aliceKey.PublicKey], "It creates a single message")
+	s.NotNil(marshaledMsg[&aliceKey.PublicKey], "It creates a single message")
 
 	unmarshaledMsg := &ProtocolMessage{}
-	err = proto.Unmarshal((*marshaledMsg)[&bobKey.PublicKey], unmarshaledMsg)
+	err = proto.Unmarshal(marshaledMsg[&bobKey.PublicKey], unmarshaledMsg)
 
 	s.NoError(err)
 
@@ -106,7 +106,7 @@ func (s *ProtocolServiceTestSuite) TestBuildAndReadDirectMessage() {
 	s.NoError(err)
 
 	// Bob is able to decrypt the message
-	unmarshaledMsg, err := s.bob.HandleMessage(bobKey, &aliceKey.PublicKey, (*marshaledMsg)[&bobKey.PublicKey])
+	unmarshaledMsg, err := s.bob.HandleMessage(bobKey, &aliceKey.PublicKey, marshaledMsg[&bobKey.PublicKey])
 	s.NoError(err)
 
 	s.NotNil(unmarshaledMsg)

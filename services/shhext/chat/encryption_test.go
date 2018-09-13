@@ -83,7 +83,7 @@ func (s *EncryptionServiceTestSuite) TestEncryptPayloadNoBundle() {
 	encryptionResponse1, err := s.alice.EncryptPayload(&bobKey.PublicKey, aliceKey, cleartext)
 	s.Require().NoError(err)
 
-	installationResponse1 := (*encryptionResponse1)["none"]
+	installationResponse1 := encryptionResponse1["none"]
 	// That's for any device
 	s.Require().NotNil(installationResponse1)
 
@@ -102,7 +102,7 @@ func (s *EncryptionServiceTestSuite) TestEncryptPayloadNoBundle() {
 	encryptionResponse2, err := s.alice.EncryptPayload(&bobKey.PublicKey, aliceKey, cleartext)
 	s.Require().NoError(err)
 
-	installationResponse2 := (*encryptionResponse2)[aliceInstallationID]
+	installationResponse2 := encryptionResponse2[aliceInstallationID]
 
 	cyphertext2 := installationResponse2.GetPayload()
 	ephemeralKey2 := installationResponse2.GetDHHeader().GetKey()
@@ -136,7 +136,7 @@ func (s *EncryptionServiceTestSuite) TestEncryptPayloadBundle() {
 	encryptionResponse1, err := s.alice.EncryptPayload(&bobKey.PublicKey, aliceKey, cleartext)
 	s.Require().NoError(err)
 
-	installationResponse1 := (*encryptionResponse1)[bobInstallationID]
+	installationResponse1 := encryptionResponse1[bobInstallationID]
 	s.Require().NotNil(installationResponse1)
 
 	cyphertext1 := installationResponse1.GetPayload()
@@ -199,7 +199,7 @@ func (s *EncryptionServiceTestSuite) TestConsequentMessagesBundle() {
 	encryptionResponse, err := s.alice.EncryptPayload(&bobKey.PublicKey, aliceKey, cleartext2)
 	s.Require().NoError(err)
 
-	installationResponse := (*encryptionResponse)[bobInstallationID]
+	installationResponse := encryptionResponse[bobInstallationID]
 	s.Require().NotNil(installationResponse)
 
 	cyphertext1 := installationResponse.GetPayload()
@@ -284,7 +284,7 @@ func (s *EncryptionServiceTestSuite) TestConversation() {
 	encryptionResponse, err = s.alice.EncryptPayload(&bobKey.PublicKey, aliceKey, cleartext2)
 	s.Require().NoError(err)
 
-	installationResponse := (*encryptionResponse)[bobInstallationID]
+	installationResponse := encryptionResponse[bobInstallationID]
 	s.Require().NotNil(installationResponse)
 
 	cyphertext1 := installationResponse.GetPayload()
@@ -388,7 +388,7 @@ func publisher(
 	privateKey *ecdsa.PrivateKey,
 	publicKey *ecdsa.PublicKey,
 	errChan chan error,
-	output chan *map[string]*DirectMessageProtocol,
+	output chan map[string]*DirectMessageProtocol,
 ) {
 	var wg sync.WaitGroup
 
@@ -421,7 +421,7 @@ func receiver(
 	privateKey *ecdsa.PrivateKey,
 	publicKey *ecdsa.PublicKey,
 	errChan chan error,
-	input chan *map[string]*DirectMessageProtocol,
+	input chan map[string]*DirectMessageProtocol,
 ) {
 	i := 0
 
@@ -470,8 +470,8 @@ func (s *EncryptionServiceTestSuite) TestRandomised() {
 	err = s.bob.ProcessPublicBundle(bobKey, aliceBundle)
 	s.Require().NoError(err)
 
-	aliceChan := make(chan *map[string]*DirectMessageProtocol, 100)
-	bobChan := make(chan *map[string]*DirectMessageProtocol, 100)
+	aliceChan := make(chan map[string]*DirectMessageProtocol, 100)
+	bobChan := make(chan map[string]*DirectMessageProtocol, 100)
 
 	alicePublisherErrChan := make(chan error, 1)
 	bobPublisherErrChan := make(chan error, 1)
@@ -568,7 +568,7 @@ func (s *EncryptionServiceTestSuite) TestRefreshedBundle() {
 	encryptionResponse1, err := s.alice.EncryptPayload(&bobKey.PublicKey, aliceKey, []byte("anything"))
 	s.Require().NoError(err)
 
-	installationResponse1 := (*encryptionResponse1)[bobInstallationID]
+	installationResponse1 := encryptionResponse1[bobInstallationID]
 	s.Require().NotNil(installationResponse1)
 
 	// This message is using bobBundle1
@@ -585,7 +585,7 @@ func (s *EncryptionServiceTestSuite) TestRefreshedBundle() {
 	encryptionResponse2, err := s.alice.EncryptPayload(&bobKey.PublicKey, aliceKey, []byte("anything"))
 	s.Require().NoError(err)
 
-	installationResponse2 := (*encryptionResponse2)[bobInstallationID]
+	installationResponse2 := encryptionResponse2[bobInstallationID]
 	s.Require().NotNil(installationResponse2)
 
 	// This message is using bobBundle2

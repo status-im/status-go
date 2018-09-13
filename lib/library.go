@@ -57,7 +57,6 @@ func CreateContactCode() *C.char {
 
 	cstr := C.CString(bundle)
 
-	defer C.free(unsafe.Pointer(cstr))
 	return cstr
 }
 
@@ -84,9 +83,14 @@ func ExtractIdentityFromContactCode(bundleString *C.char) *C.char {
 		return makeJSONResponse(err)
 	}
 
-	cstr := C.CString(fmt.Sprintf("{\"identity\": \"%s\"}", identity))
-	defer C.free(unsafe.Pointer(cstr))
-	return cstr
+	data, err := json.Marshal(struct {
+		Identity string `json:"identity"`
+	}{Identity: identity})
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return C.CString(string(data))
 }
 
 //ValidateNodeConfig validates config for status node

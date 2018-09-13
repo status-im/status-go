@@ -52,7 +52,7 @@ func init() {
 	nodeConfigJSON = `{
 	"NetworkId": ` + strconv.Itoa(GetNetworkID()) + `,
 	"DataDir": "` + testChainDir + `",
-	"NoBackupDataDir": "` + testChainDir + `",
+	"BackupDisabledDataDir": "` + testChainDir + `",
 	"KeyStoreDir": "` + filepath.Join(testChainDir, "keystore") + `",
 	"HTTPPort": ` + strconv.Itoa(TestConfig.Node.HTTPPort) + `,
 	"LogLevel": "INFO",

@@ -33,37 +33,6 @@ type SQLLiteSessionStorage struct {
 	db *sql.DB
 }
 
-func (s *SQLLitePersistence) setup() error {
-	resources := bindata.Resource(
-		migrations.AssetNames(),
-		func(name string) ([]byte, error) {
-			return migrations.Asset(name)
-		},
-	)
-
-	source, err := bindata.WithInstance(resources)
-	if err != nil {
-		return err
-	}
-
-	driver, err := sqlcipher.WithInstance(s.db, &sqlcipher.Config{})
-	if err != nil {
-		return err
-	}
-
-	m, err := migrate.NewWithInstance(
-		"go-bindata",
-		source,
-		"sqlcipher",
-		driver)
-
-	if err != nil {
-		return err
-	}
-
-	return m.Steps(1)
-}
-
 // NewSQLLitePersistence creates a new SQLLitePersistence instance, given a path and a key
 func NewSQLLitePersistence(path string, key string) (*SQLLitePersistence, error) {
 	s := &SQLLitePersistence{}
@@ -77,6 +46,30 @@ func NewSQLLitePersistence(path string, key string) (*SQLLitePersistence, error)
 	s.sessionStorage = NewSQLLiteSessionStorage(s.db)
 
 	return s, nil
+}
+
+// NewSQLLiteKeysStorage creates a new SQLLiteKeysStorage instance associated with the specified database
+func NewSQLLiteKeysStorage(db *sql.DB) *SQLLiteKeysStorage {
+	return &SQLLiteKeysStorage{
+		db: db,
+	}
+}
+
+// NewSQLLiteSessionStorage creates a new SQLLiteSessionStorage instance associated with the specified database
+func NewSQLLiteSessionStorage(db *sql.DB) *SQLLiteSessionStorage {
+	return &SQLLiteSessionStorage{
+		db: db,
+	}
+}
+
+// GetKeysStorage returns the associated double ratchet KeysStorage object
+func (s *SQLLitePersistence) GetKeysStorage() dr.KeysStorage {
+	return s.keysStorage
+}
+
+// GetSessionStorage returns the associated double ratchet SessionStorage object
+func (s *SQLLitePersistence) GetSessionStorage() dr.SessionStorage {
+	return s.sessionStorage
 }
 
 // Open opens a file at the specified path
@@ -114,7 +107,7 @@ func (s *SQLLitePersistence) AddPrivateBundle(b *BundleContainer) error {
 	}
 
 	for installationID, signedPreKey := range b.GetBundle().GetSignedPreKeys() {
-		stmt, err := tx.Prepare("insert into bundles(identity, private_key, signed_pre_key, installation_id, timestamp) values(?, ?, ?, ?, ?)")
+		stmt, err := tx.Prepare("INSERT INTO bundles(identity, private_key, signed_pre_key, installation_id, timestamp) VALUES(?, ?, ?, ?, ?)")
 		if err != nil {
 			return err
 		}
@@ -167,7 +160,7 @@ func (s *SQLLitePersistence) AddPublicBundle(b *Bundle) error {
 			return err
 		}
 		// Mark old bundles as expired
-		updateStmt, err := tx.Prepare("UPDATE bundles SET expired = 1 where identity = ? AND installation_id = ? AND signed_pre_key != ?")
+		updateStmt, err := tx.Prepare("UPDATE bundles SET expired = 1 WHERE identity = ? AND installation_id = ? AND signed_pre_key != ?")
 		if err != nil {
 			return err
 		}
@@ -421,30 +414,6 @@ func (s *SQLLitePersistence) RatchetInfoConfirmed(bundleID []byte, theirIdentity
 	return err
 }
 
-// NewSQLLiteKeysStorage creates a new SQLLiteKeysStorage instance associated with the specified database
-func NewSQLLiteKeysStorage(db *sql.DB) *SQLLiteKeysStorage {
-	return &SQLLiteKeysStorage{
-		db: db,
-	}
-}
-
-// NewSQLLiteSessionStorage creates a new SQLLiteSessionStorage instance associated with the specified database
-func NewSQLLiteSessionStorage(db *sql.DB) *SQLLiteSessionStorage {
-	return &SQLLiteSessionStorage{
-		db: db,
-	}
-}
-
-// GetKeysStorage returns the associated double ratchet KeysStorage object
-func (s *SQLLitePersistence) GetKeysStorage() dr.KeysStorage {
-	return s.keysStorage
-}
-
-// GetSessionStorage returns the associated double ratchet SessionStorage object
-func (s *SQLLitePersistence) GetSessionStorage() dr.SessionStorage {
-	return s.sessionStorage
-}
-
 // Get retrieves the message key for a specified public key and message number
 func (s *SQLLiteKeysStorage) Get(pubKey dr.Key, msgNum uint) (dr.Key, bool, error) {
 	var keyBytes []byte
@@ -578,12 +547,6 @@ func (s *SQLLiteSessionStorage) Save(id []byte, state *dr.State) error {
 	return err
 }
 
-func toKey(a []byte) dr.Key {
-	var k [32]byte
-	copy(k[:], a)
-	return k
-}
-
 // Load retrieves the double ratchet state for a given ID
 func (s *SQLLiteSessionStorage) Load(id []byte) (*dr.State, error) {
 	stmt, err := s.db.Prepare("SELECT dhr, dhs_public, dhs_private, root_chain_key, send_chain_key, send_chain_n, recv_chain_key, recv_chain_n, pn, step FROM sessions WHERE id = ?")
@@ -644,4 +607,44 @@ func (s *SQLLiteSessionStorage) Load(id []byte) (*dr.State, error) {
 	default:
 		return nil, err
 	}
+}
+
+func toKey(a []byte) dr.Key {
+	var k [32]byte
+	copy(k[:], a)
+	return k
+}
+
+func (s *SQLLitePersistence) setup() error {
+	resources := bindata.Resource(
+		migrations.AssetNames(),
+		func(name string) ([]byte, error) {
+			return migrations.Asset(name)
+		},
+	)
+
+	source, err := bindata.WithInstance(resources)
+	if err != nil {
+		return err
+	}
+
+	driver, err := sqlcipher.WithInstance(s.db, &sqlcipher.Config{})
+	if err != nil {
+		return err
+	}
+
+	m, err := migrate.NewWithInstance(
+		"go-bindata",
+		source,
+		"sqlcipher",
+		driver)
+	if err != nil {
+		return err
+	}
+
+	if err = m.Up(); err != migrate.ErrNoChange {
+		return err
+	}
+
+	return nil
 }

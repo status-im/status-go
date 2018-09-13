@@ -11,39 +11,7 @@ const (
 	aesNonceLength = 12
 )
 
-func containsOnlyZeros(data []byte) bool {
-	for _, b := range data {
-		if b != 0 {
-			return false
-		}
-	}
-	return true
-}
-
-func validateDataIntegrity(k []byte, expectedSize int) bool {
-	if len(k) != expectedSize {
-		return false
-	}
-	if expectedSize > 3 && containsOnlyZeros(k) {
-		return false
-	}
-	return true
-}
-
-func generateSecureRandomData(length int) ([]byte, error) {
-	res := make([]byte, length)
-
-	_, err := rand.Read(res)
-	if err != nil {
-		return nil, err
-	} else if !validateDataIntegrity(res, length) {
-		return nil, errors.New("crypto/rand failed to generate secure random data")
-	}
-	return res, nil
-}
-
-func EncryptSymmetric(key []byte, plaintext []byte) ([]byte, error) {
-
+func EncryptSymmetric(key, plaintext []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
@@ -89,4 +57,38 @@ func DecryptSymmetric(key []byte, cyphertext []byte) ([]byte, error) {
 	}
 
 	return decrypted, nil
+}
+
+func containsOnlyZeros(data []byte) bool {
+	for _, b := range data {
+		if b != 0 {
+			return false
+		}
+	}
+	return true
+}
+
+func validateDataIntegrity(k []byte, expectedSize int) bool {
+	if len(k) != expectedSize {
+		return false
+	}
+	if containsOnlyZeros(k) {
+		return false
+	}
+	return true
+}
+
+func generateSecureRandomData(length int) ([]byte, error) {
+	res := make([]byte, length)
+
+	_, err := rand.Read(res)
+	if err != nil {
+		return nil, err
+	}
+
+	if !validateDataIntegrity(res, length) {
+		return nil, errors.New("crypto/rand failed to generate secure random data")
+	}
+
+	return res, nil
 }

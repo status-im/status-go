@@ -23,7 +23,7 @@ type SQLLitePersistenceTestSuite struct {
 	suite.Suite
 	// nolint: structcheck, megacheck
 	db      *sql.DB
-	service PersistenceServiceInterface
+	service PersistenceService
 }
 
 func (s *SQLLitePersistenceTestSuite) SetupTest() {
@@ -32,6 +32,16 @@ func (s *SQLLitePersistenceTestSuite) SetupTest() {
 	p, err := NewSQLLitePersistence(dbPath, key)
 	s.Require().NoError(err)
 	s.service = p
+}
+
+func (s *SQLLitePersistenceTestSuite) TestMultipleInit() {
+	os.Remove(dbPath)
+
+	_, err := NewSQLLitePersistence(dbPath, key)
+	s.Require().NoError(err)
+
+	_, err = NewSQLLitePersistence(dbPath, key)
+	s.Require().NoError(err)
 }
 
 func (s *SQLLitePersistenceTestSuite) TestPrivateBundle() {

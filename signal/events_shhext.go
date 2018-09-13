@@ -21,7 +21,7 @@ const (
 	// EventEnodeDiscovered is tiggered when enode has been discovered.
 	EventEnodeDiscovered = "enode.discovered"
 
-	// CouldNotDecrypt is triggered when we receive a message from a bundle we don't have
+	// EventDecryptMessageFailed is triggered when we receive a message from a bundle we don't have
 	EventDecryptMessageFailed = "messages.decrypt.failed"
 )
 
@@ -37,7 +37,7 @@ type MailServerResponseSignal struct {
 	Cursor           string      `json:"cursor"`
 }
 
-// DecryptFailedSignal holds the sender of the message that could not be decrypted
+// DecryptMessageFailedSignal holds the sender of the message that could not be decrypted
 type DecryptMessageFailedSignal struct {
 	Sender string `json:"sender"`
 }
