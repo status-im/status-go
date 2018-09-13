@@ -68,7 +68,7 @@ func TestStatusFlag(t *testing.T) {
 	for i, s := range scenarios {
 		msg := fmt.Sprintf("scenario %d", i)
 
-		c, err := params.NewNodeConfig("", "", params.FleetBeta, 0)
+		c, err := params.NewNodeConfig("", params.FleetBeta, 0)
 		require.Nil(t, err, msg)
 
 		c.IPCEnabled = s.ipcEnabled

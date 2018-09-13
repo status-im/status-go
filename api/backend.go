@@ -121,6 +121,11 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 		}
 	}()
 
+	// Start by validating configuration
+	if err := config.Validate(); err != nil {
+		return err
+	}
+
 	services := []gethnode.ServiceConstructor{}
 	services = appendIf(config.UpstreamConfig.Enabled, services, b.rpcFiltersService())
 

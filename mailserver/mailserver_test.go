@@ -19,11 +19,11 @@ package mailserver
 import (
 	"crypto/ecdsa"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -72,19 +72,13 @@ func (s *MailserverSuite) SetupTest() {
 	s.dataDir = tmpDir
 
 	// required files to validate mail server decryption method
-	asymKeyFile := filepath.Join(tmpDir, "asymkey")
-	passwordFile := filepath.Join(tmpDir, "password")
 	privateKey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-	err = crypto.SaveECDSA(asymKeyFile, privateKey)
-	s.Require().NoError(err)
-	err = ioutil.WriteFile(passwordFile, []byte("testpassword"), os.ModePerm)
 	s.Require().NoError(err)
 
 	s.config = &params.WhisperConfig{
-		DataDir:                tmpDir,
-		MailServerAsymKeyFile:  asymKeyFile,
-		MailServerPasswordFile: passwordFile,
+		DataDir:            tmpDir,
+		MailServerAsymKey:  hex.EncodeToString(crypto.FromECDSA(privateKey)),
+		MailServerPassword: "testpassword",
 	}
 }
 
@@ -118,7 +112,7 @@ func (s *MailserverSuite) TestInit() {
 			config: params.WhisperConfig{
 				DataDir:            s.config.DataDir,
 				MailServerPassword: "",
-				MailServerAsymKey:  nil,
+				MailServerAsymKey:  "",
 			},
 			expectedError: errDecryptionMethodNotProvided,
 			info:          "config with an empty password and empty asym key",
@@ -134,7 +128,7 @@ func (s *MailserverSuite) TestInit() {
 		{
 			config: params.WhisperConfig{
 				DataDir:           s.config.DataDir,
-				MailServerAsymKey: asymKey,
+				MailServerAsymKey: hex.EncodeToString(crypto.FromECDSA(asymKey)),
 			},
 			expectedError: nil,
 			info:          "config with correct DataDir and AsymKey",
@@ -142,7 +136,7 @@ func (s *MailserverSuite) TestInit() {
 		{
 			config: params.WhisperConfig{
 				DataDir:            s.config.DataDir,
-				MailServerAsymKey:  asymKey,
+				MailServerAsymKey:  hex.EncodeToString(crypto.FromECDSA(asymKey)),
 				MailServerPassword: "pwd",
 			},
 			expectedError: nil,
@@ -186,11 +180,13 @@ func (s *MailserverSuite) TestInit() {
 func (s *MailserverSuite) TestSetupRequestMessageDecryptor() {
 	// without configured Password and AsymKey
 	config := *s.config
+	config.MailServerAsymKey = ""
+	config.MailServerPassword = ""
 	s.Error(errDecryptionMethodNotProvided, s.server.Init(s.shh, &config))
 
 	// Password should work ok
 	config = *s.config
-	s.NoError(config.ReadMailServerPasswordFile())
+	config.MailServerAsymKey = "" // clear asym key field
 	s.NoError(s.server.Init(s.shh, &config))
 	s.Require().NotNil(s.server.symFilter)
 	s.NotNil(s.server.symFilter.KeySym)
@@ -199,17 +195,15 @@ func (s *MailserverSuite) TestSetupRequestMessageDecryptor() {
 
 	// AsymKey can also be used
 	config = *s.config
-	s.NoError(config.ReadMailServerAsymKeyFile())
+	config.MailServerPassword = "" // clear password field
 	s.NoError(s.server.Init(s.shh, &config))
 	s.Nil(s.server.symFilter) // important: symmetric filter should be nil
 	s.Require().NotNil(s.server.asymFilter)
-	s.Equal(config.MailServerAsymKey, s.server.asymFilter.KeyAsym)
+	s.Equal(config.MailServerAsymKey, hex.EncodeToString(crypto.FromECDSA(s.server.asymFilter.KeyAsym)))
 	s.server.Close()
 
 	// when Password and AsymKey are set, both are supported
 	config = *s.config
-	s.NoError(config.ReadMailServerPasswordFile())
-	s.NoError(config.ReadMailServerAsymKeyFile())
 	s.NoError(s.server.Init(s.shh, &config))
 	s.Require().NotNil(s.server.symFilter)
 	s.NotNil(s.server.symFilter.KeySym)
@@ -220,7 +214,7 @@ func (s *MailserverSuite) TestSetupRequestMessageDecryptor() {
 func (s *MailserverSuite) TestOpenEnvelopeWithSymKey() {
 	// Setup the server with a sym key
 	config := *s.config
-	s.NoError(config.ReadMailServerPasswordFile())
+	config.MailServerAsymKey = "" // clear asym key
 	s.NoError(s.server.Init(s.shh, &config))
 
 	// Prepare a valid envelope
@@ -239,7 +233,7 @@ func (s *MailserverSuite) TestOpenEnvelopeWithSymKey() {
 func (s *MailserverSuite) TestOpenEnvelopeWithAsymKey() {
 	// Setup the server with an asymetric key
 	config := *s.config
-	s.NoError(config.ReadMailServerAsymKeyFile())
+	config.MailServerPassword = "" // clear password field
 	s.NoError(s.server.Init(s.shh, &config))
 
 	// Prepare a valid envelope
@@ -256,10 +250,10 @@ func (s *MailserverSuite) TestOpenEnvelopeWithAsymKey() {
 }
 
 func (s *MailserverSuite) TestArchive() {
-	err := s.config.ReadMailServerPasswordFile()
-	s.Require().NoError(err)
+	config := *s.config
+	config.MailServerAsymKey = "" // clear asym key
 
-	err = s.server.Init(s.shh, s.config)
+	err := s.server.Init(s.shh, &config)
 	s.Require().NoError(err)
 	defer s.server.Close()
 

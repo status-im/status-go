@@ -1,34 +1,23 @@
 package params
 
 import (
-	"bytes"
-	"crypto/ecdsa"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"go/build"
 	"io/ioutil"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/params"
-)
-
-// errors
-var (
-	ErrMissingDataDir             = errors.New("missing required 'DataDir' parameter")
-	ErrMissingNetworkID           = errors.New("missing required 'NetworkID' parameter")
-	ErrEmptyPasswordFile          = errors.New("password file cannot be empty")
-	ErrNoPasswordFileValueSet     = errors.New("password file path not set")
-	ErrEmptyAuthorizationKeyFile  = errors.New("authorization key file cannot be empty")
-	ErrAuthorizationKeyFileNotSet = errors.New("authorization key file is not set")
+	"github.com/status-im/status-go/static"
+	validator "gopkg.in/go-playground/validator.v9"
 )
 
 // ----------
@@ -41,44 +30,8 @@ type LightEthConfig struct {
 	// Enabled flag specifies whether protocol is enabled
 	Enabled bool
 
-	// Genesis is JSON to seed the chain database with
-	Genesis string
-
 	// DatabaseCache is memory (in MBs) allocated to internal caching (min 16MB / database forced)
 	DatabaseCache int
-}
-
-// ----------
-// FirebaseConfig
-// ----------
-
-// FirebaseConfig holds FCM-related configuration
-type FirebaseConfig struct {
-	// AuthorizationKeyFile file path that contains FCM authorization key
-	AuthorizationKeyFile string
-
-	// NotificationTriggerURL URL used to send push notification requests to
-	NotificationTriggerURL string
-}
-
-// ReadAuthorizationKeyFile reads and loads FCM authorization key
-func (c *FirebaseConfig) ReadAuthorizationKeyFile() ([]byte, error) {
-	if len(c.AuthorizationKeyFile) == 0 {
-		return nil, ErrAuthorizationKeyFileNotSet
-	}
-
-	key, err := ioutil.ReadFile(c.AuthorizationKeyFile)
-	if err != nil {
-		return nil, err
-	}
-
-	key = bytes.TrimRight(key, "\n")
-
-	if len(key) == 0 {
-		return nil, ErrEmptyAuthorizationKeyFile
-	}
-
-	return key, nil
 }
 
 // ----------
@@ -103,18 +56,12 @@ type WhisperConfig struct {
 	// MinimumPoW minimum PoW for Whisper messages
 	MinimumPoW float64
 
-	// MailServerPasswordFile contains a password for symmetric encryption with MailServer.
-	MailServerPasswordFile string
-
 	// MailServerPassword for symmetric encryption with MailServer.
 	// (if no account file selected, then this password is used for symmetric encryption).
 	MailServerPassword string
 
-	// MailServerAsymKeyFile is a file with an asymmetric key to decrypt messages sent to MailServer.
-	MailServerAsymKeyFile string
-
-	// MailServerAsymKey is an asymmetric key to decrypt messages sent to MailServer.
-	MailServerAsymKey *ecdsa.PrivateKey
+	// MailServerAsymKey is an hex-encoded asymmetric key to decrypt messages sent to MailServer.
+	MailServerAsymKey string
 
 	// RateLimit minimum time between queries to mail server per peer
 	MailServerRateLimit int
@@ -125,38 +72,8 @@ type WhisperConfig struct {
 	// TTL time to live for messages, in seconds
 	TTL int
 
-	// FirebaseConfig extra configuration for Firebase Cloud Messaging
-	FirebaseConfig *FirebaseConfig `json:"FirebaseConfig,"`
-
 	// EnableNTPSync enables NTP synchronizations
 	EnableNTPSync bool
-}
-
-// ReadMailServerPasswordFile reads and returns content of the password file
-func (c *WhisperConfig) ReadMailServerPasswordFile() error {
-	if len(c.MailServerPasswordFile) == 0 {
-		return ErrNoPasswordFileValueSet
-	}
-
-	password, err := ioutil.ReadFile(c.MailServerPasswordFile)
-	if err != nil {
-		return err
-	}
-	password = bytes.TrimRight(password, "\n")
-
-	if len(password) == 0 {
-		return ErrEmptyPasswordFile
-	}
-
-	c.MailServerPassword = string(password)
-
-	return nil
-}
-
-// ReadMailServerAsymKeyFile reads and returns a private key from a given file.
-func (c *WhisperConfig) ReadMailServerAsymKeyFile() (err error) {
-	c.MailServerAsymKey, err = crypto.LoadECDSA(c.MailServerAsymKeyFile)
-	return
 }
 
 // String dumps config object as nicely indented JSON
@@ -195,17 +112,16 @@ type ClusterConfig struct {
 	// Fleet is a type of selected fleet.
 	Fleet string
 
-	// StaticNodes lists the static nodes taken from compiled or passed cluster.json
+	// StaticNodes is a list of static nodes for this fleet.
 	StaticNodes []string
 
-	// BootNodes list of cluster peer nodes for a given network (Mainnet, Ropsten, Rinkeby, Homestead),
-	// for a given mode (production vs development)
+	// BootNodes is a list of cluster peer nodes for this fleet.
 	BootNodes []string
 
-	// TrustedMailServers is a list of verified Mail Servers.
+	// TrustedMailServers is a list of verified Mail Servers for this fleet.
 	TrustedMailServers []string
 
-	// RendezvousNodes is a rendezvous discovery server.
+	// RendezvousNodes is a list rendezvous discovery nodes.
 	RendezvousNodes []string
 }
 
@@ -255,13 +171,11 @@ type NodeConfig struct {
 	DataDir string `validate:"required"`
 
 	// KeyStoreDir is the file system folder that contains private keys.
-	// If KeyStoreDir is empty, the default location is the "keystore" subdirectory of DataDir.
-	KeyStoreDir string
+	KeyStoreDir string `validate:"required"`
 
-	// NodeKeyFile is a filename with node ID (private key)
-	// This file should contain a valid secp256k1 private key that will be used for both
+	// NodeKey is the hex-encoded node ID (private key). Should be a valid secp256k1 private key that will be used for both
 	// remote peer identification as well as network traffic encryption.
-	NodeKeyFile string
+	NodeKey string
 
 	// NoDiscovery set to true will disable discovery protocol.
 	NoDiscovery bool
@@ -330,21 +244,17 @@ type NodeConfig struct {
 	// UpstreamConfig extra config for providing upstream infura server.
 	UpstreamConfig UpstreamRPCConfig `json:"UpstreamConfig"`
 
-	// ClusterConfigFile contains the file name of the cluster configuration. If
-	// empty the statical configuration data will be taken.
-	ClusterConfigFile string `json:"ClusterConfigFile"`
-
 	// ClusterConfig extra configuration for supporting cluster peers.
-	ClusterConfig *ClusterConfig `json:"ClusterConfig," validate:"structonly"`
+	ClusterConfig ClusterConfig `json:"ClusterConfig," validate:"structonly"`
 
 	// LightEthConfig extra configuration for LES
-	LightEthConfig *LightEthConfig `json:"LightEthConfig," validate:"structonly"`
+	LightEthConfig LightEthConfig `json:"LightEthConfig," validate:"structonly"`
 
 	// WhisperConfig extra configuration for SHH
-	WhisperConfig *WhisperConfig `json:"WhisperConfig," validate:"structonly"`
+	WhisperConfig WhisperConfig `json:"WhisperConfig," validate:"structonly"`
 
 	// SwarmConfig extra configuration for Swarm and ENS
-	SwarmConfig *SwarmConfig `json:"SwarmConfig," validate:"structonly"`
+	SwarmConfig SwarmConfig `json:"SwarmConfig," validate:"structonly"`
 
 	// RegisterTopics a list of specific topics where the peer wants to be
 	// discoverable.
@@ -364,91 +274,144 @@ type NodeConfig struct {
 	MailServerRegistryAddress string
 }
 
-// NewNodeConfig creates new node configuration object
-func NewNodeConfig(dataDir, clstrCfgFile, fleet string, networkID uint64) (*NodeConfig, error) {
+// NewNodeConfigWithDefaults creates new node configuration object with some defaults suitable for adhoc use
+func NewNodeConfigWithDefaults(dataDir, fleet string, networkID uint64) (*NodeConfig, error) {
+	nodeConfig, err := NewNodeConfig(dataDir, fleet, networkID)
+	if err != nil {
+		return nil, err
+	}
+
+	if dataDir != "" {
+		nodeConfig.KeyStoreDir = path.Join(dataDir, "keystore")
+		nodeConfig.WhisperConfig.DataDir = path.Join(dataDir, "wnode")
+	}
+
+	if fleet != FleetUndefined {
+		statusConfigJSON, err := static.Asset(fmt.Sprintf("../config/cli/fleet-%s.json", fleet))
+		if err == nil {
+			err = LoadConfigFromJSON(string(statusConfigJSON), nodeConfig)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("default config could not be loaded: %s", err)
+		}
+	}
+
+	nodeConfig.HTTPHost = ""
+	nodeConfig.ListenAddr = ":30303"
+	nodeConfig.LogEnabled = true
+	nodeConfig.LogLevel = "INFO"
+	nodeConfig.LogToStderr = true
+	nodeConfig.WhisperConfig.Enabled = true
+	nodeConfig.WhisperConfig.EnableNTPSync = true
+
+	return nodeConfig, nil
+}
+
+// NewNodeConfig creates new node configuration object with bare-minimum defaults
+func NewNodeConfig(dataDir, fleet string, networkID uint64) (*NodeConfig, error) {
 	nodeConfig := &NodeConfig{
-		NetworkID:         networkID,
-		DataDir:           dataDir,
-		Name:              ClientIdentifier,
-		Version:           Version,
-		RPCEnabled:        RPCEnabledDefault,
-		HTTPHost:          HTTPHost,
-		HTTPPort:          HTTPPort,
-		ListenAddr:        ListenAddr,
-		APIModules:        APIModules,
-		MaxPeers:          MaxPeers,
-		MaxPendingPeers:   MaxPendingPeers,
-		IPCFile:           IPCFile,
-		log:               log.New("package", "status-go/params.NodeConfig"),
-		LogFile:           LogFile,
-		LogLevel:          LogLevel,
-		LogToStderr:       LogToStderr,
-		ClusterConfigFile: clstrCfgFile,
-		ClusterConfig: &ClusterConfig{
-			Enabled:     true, // cluster must be enabled by default
+		NetworkID:       networkID,
+		DataDir:         dataDir,
+		Version:         Version,
+		RPCEnabled:      false,
+		HTTPHost:        "localhost",
+		HTTPPort:        8545,
+		ListenAddr:      ":0",
+		APIModules:      "eth,net,web3,peer",
+		MaxPeers:        25,
+		MaxPendingPeers: 0,
+		IPCFile:         "geth.ipc",
+		log:             log.New("package", "status-go/params.NodeConfig"),
+		LogFile:         "",
+		LogLevel:        "ERROR",
+		UpstreamConfig: UpstreamRPCConfig{
+			URL: getUpstreamURL(networkID),
+		},
+		ClusterConfig: ClusterConfig{
+			Enabled:     fleet != FleetUndefined,
 			Fleet:       fleet,
 			StaticNodes: []string{},
 			BootNodes:   []string{},
 		},
-		LightEthConfig: &LightEthConfig{
-			Enabled:       true,
-			DatabaseCache: DatabaseCache,
+		LightEthConfig: LightEthConfig{
+			Enabled:       false,
+			DatabaseCache: 16,
 		},
-		WhisperConfig: &WhisperConfig{
-			Enabled:    true,
-			MinimumPoW: WhisperMinimumPoW,
-			TTL:        WhisperTTL,
-			FirebaseConfig: &FirebaseConfig{
-				NotificationTriggerURL: FirebaseNotificationTriggerURL,
-			},
-			EnableNTPSync: true,
+		WhisperConfig: WhisperConfig{
+			Enabled:       false,
+			MinimumPoW:    WhisperMinimumPoW,
+			TTL:           WhisperTTL,
+			EnableNTPSync: false,
 		},
-		SwarmConfig:    &SwarmConfig{},
+		SwarmConfig:    SwarmConfig{},
 		RegisterTopics: []discv5.Topic{},
 		RequireTopics:  map[discv5.Topic]Limits{},
 	}
 
-	// adjust dependent values
-	if err := nodeConfig.updateConfig(); err != nil {
+	return nodeConfig, nil
+}
+
+// NewConfigFromJSON parses incoming JSON and returned it as Config
+func NewConfigFromJSON(configJSON string) (*NodeConfig, error) {
+	nodeConfig, err := NewNodeConfig("", FleetUndefined, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := LoadConfigFromJSON(configJSON, nodeConfig); err != nil {
 		return nil, err
 	}
 
 	return nodeConfig, nil
 }
 
-// LoadNodeConfig parses incoming JSON and returned it as Config
-func LoadNodeConfig(configJSON string) (*NodeConfig, error) {
-	nodeConfig, err := loadNodeConfig(configJSON)
-	if err != nil {
-		return nil, err
+// LoadConfigFromJSON parses incoming JSON and returned it as Config
+func LoadConfigFromJSON(configJSON string, nodeConfig *NodeConfig) error {
+	if err := loadNodeConfig(configJSON, nodeConfig); err != nil {
+		return err
 	}
 
 	if err := nodeConfig.Validate(); err != nil {
-		return nil, err
+		return err
 	}
 
-	return nodeConfig, nil
+	return nil
 }
 
-func loadNodeConfig(configJSON string) (*NodeConfig, error) {
-	nodeConfig, err := NewNodeConfig("", "", FleetUndefined, 0)
-	if err != nil {
-		return nil, err
-	}
-
+func loadNodeConfig(configJSON string, nodeConfig *NodeConfig) error {
 	decoder := json.NewDecoder(strings.NewReader(configJSON))
 
 	// override default configuration with values by JSON input
 	if err := decoder.Decode(&nodeConfig); err != nil {
-		return nil, err
+		return err
 	}
 
-	// repopulate
-	if err := nodeConfig.updateConfig(); err != nil {
-		return nil, err
+	return nil
+}
+
+func loadConfigConfigFromFile(path string, config *NodeConfig) error {
+	jsonConfig, err := ioutil.ReadFile(path)
+	if err != nil {
+		return err
 	}
 
-	return nodeConfig, nil
+	if err = loadNodeConfig(string(jsonConfig), config); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// LoadConfigFromFiles reads the configuration files specified in configFilePaths,
+// merging the values in order in the config argument
+func LoadConfigFromFiles(configFilePaths []string, config *NodeConfig) error {
+	for _, path := range configFilePaths {
+		if err := loadConfigConfigFromFile(path, config); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // Validate checks if NodeConfig fields have valid values.
@@ -473,31 +436,157 @@ func (c *NodeConfig) Validate() error {
 		return err
 	}
 
-	if c.ClusterConfig.Enabled {
-		if err := validate.Struct(c.ClusterConfig); err != nil {
-			return err
+	if c.NodeKey != "" {
+		if _, err := crypto.HexToECDSA(c.NodeKey); err != nil {
+			return fmt.Errorf("NodeKey is invalid (%s): %v", c.NodeKey, err)
 		}
 	}
 
-	if c.LightEthConfig.Enabled {
-		if err := validate.Struct(c.LightEthConfig); err != nil {
-			return err
-		}
+	if c.UpstreamConfig.Enabled && c.LightEthConfig.Enabled {
+		return fmt.Errorf("both UpstreamConfig and LightEthConfig are enabled, but they are mutually exclusive")
 	}
 
-	if c.WhisperConfig.Enabled {
-		if err := validate.Struct(c.WhisperConfig); err != nil {
-			return err
-		}
+	if err := c.validateChildStructs(validate); err != nil {
+		return err
 	}
 
-	if c.SwarmConfig.Enabled {
-		if err := validate.Struct(c.SwarmConfig); err != nil {
-			return err
+	if !c.NoDiscovery && len(c.ClusterConfig.BootNodes) == 0 {
+		// No point in running discovery if we don't have bootnodes.
+		// In case we do have bootnodes, NoDiscovery should be true.
+		return fmt.Errorf("NoDiscovery is false, but ClusterConfig.BootNodes is empty")
+	}
+
+	if len(c.ClusterConfig.RendezvousNodes) == 0 {
+		if c.Rendezvous {
+			return fmt.Errorf("Rendezvous is enabled, but ClusterConfig.RendezvousNodes is empty")
+		}
+	} else if !c.Rendezvous {
+		return fmt.Errorf("Rendezvous is disabled, but ClusterConfig.RendezvousNodes is not empty")
+	}
+
+	return nil
+}
+
+func (c *NodeConfig) validateChildStructs(validate *validator.Validate) error {
+	// Validate child structs
+	if err := c.UpstreamConfig.Validate(validate); err != nil {
+		return err
+	}
+	if err := c.ClusterConfig.Validate(validate); err != nil {
+		return err
+	}
+	if err := c.LightEthConfig.Validate(validate); err != nil {
+		return err
+	}
+	if err := c.WhisperConfig.Validate(validate); err != nil {
+		return err
+	}
+	if err := c.SwarmConfig.Validate(validate); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Validate validates the UpstreamRPCConfig struct and returns an error if inconsistent values are found
+func (c *UpstreamRPCConfig) Validate(validate *validator.Validate) error {
+	if !c.Enabled {
+		return nil
+	}
+
+	if err := validate.Struct(c); err != nil {
+		return err
+	}
+
+	if _, err := url.ParseRequestURI(c.URL); err != nil {
+		return fmt.Errorf("UpstreamRPCConfig.URL '%s' is invalid: %v", c.URL, err.Error())
+	}
+
+	return nil
+}
+
+// Validate validates the ClusterConfig struct and returns an error if inconsistent values are found
+func (c *ClusterConfig) Validate(validate *validator.Validate) error {
+	if !c.Enabled {
+		return nil
+	}
+
+	if err := validate.Struct(c); err != nil {
+		return err
+	}
+
+	if c.Fleet == "" {
+		return fmt.Errorf("ClusterConfig.Fleet is empty")
+	}
+
+	return nil
+}
+
+// Validate validates the LightEthConfig struct and returns an error if inconsistent values are found
+func (c *LightEthConfig) Validate(validate *validator.Validate) error {
+	if !c.Enabled {
+		return nil
+	}
+
+	if err := validate.Struct(c); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Validate validates the WhisperConfig struct and returns an error if inconsistent values are found
+func (c *WhisperConfig) Validate(validate *validator.Validate) error {
+	if !c.Enabled {
+		return nil
+	}
+
+	if err := validate.Struct(c); err != nil {
+		return err
+	}
+
+	if c.EnableMailServer {
+		if c.DataDir == "" {
+			return fmt.Errorf("WhisperConfig.DataDir must be specified when WhisperConfig.EnableMailServer is true")
+		}
+		if c.MailServerPassword == "" && c.MailServerAsymKey == "" {
+			return fmt.Errorf("WhisperConfig.MailServerPassword or WhisperConfig.MailServerAsymKey must be specified when WhisperConfig.EnableMailServer is true")
+		}
+
+		if c.MailServerAsymKey != "" {
+			if _, err := crypto.HexToECDSA(c.MailServerAsymKey); err != nil {
+				return fmt.Errorf("WhisperConfig.MailServerAsymKey is invalid: %s", c.MailServerAsymKey)
+			}
 		}
 	}
 
 	return nil
+}
+
+// Validate validates the SwarmConfig struct and returns an error if inconsistent values are found
+func (c *SwarmConfig) Validate(validate *validator.Validate) error {
+	if !c.Enabled {
+		return nil
+	}
+
+	if err := validate.Struct(c); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func getUpstreamURL(networkID uint64) string {
+	switch networkID {
+	case MainNetworkID:
+		return MainnetEthereumNetworkURL
+	case RopstenNetworkID:
+		return RopstenEthereumNetworkURL
+	case RinkebyNetworkID:
+		return RinkebyEthereumNetworkURL
+	}
+
+	return ""
 }
 
 // Save dumps configuration to the disk
@@ -518,176 +607,6 @@ func (c *NodeConfig) Save() error {
 
 	c.log.Info("config file saved", "path", configFilePath)
 	return nil
-}
-
-// updateConfig traverses configuration and adjusts dependent fields
-// (we have a development/production and mobile/full node dependent configurations)
-func (c *NodeConfig) updateConfig() error {
-	// Update separate configurations.
-	if err := c.updateGenesisConfig(); err != nil {
-		return err
-	}
-
-	if err := c.updateUpstreamConfig(); err != nil {
-		return err
-	}
-
-	if err := c.updateClusterConfig(); err != nil {
-		return err
-	}
-	c.updatePeerLimits()
-	return c.updateRelativeDirsConfig()
-}
-
-// updateGenesisConfig does necessary adjustments to config object (depending on network node will be running on)
-func (c *NodeConfig) updateGenesisConfig() error {
-	var genesis *core.Genesis
-
-	switch c.NetworkID {
-	case MainNetworkID:
-		genesis = core.DefaultGenesisBlock()
-	case RopstenNetworkID:
-		genesis = core.DefaultTestnetGenesisBlock()
-	case RinkebyNetworkID:
-		genesis = core.DefaultRinkebyGenesisBlock()
-	case StatusChainNetworkID:
-		var err error
-		genesis, err = c.DefaultStatusChainGenesisBlock()
-		if err != nil {
-			return err
-		}
-	default:
-		return nil
-	}
-
-	// encode the genesis into JSON
-	enc, err := json.Marshal(genesis)
-	if err != nil {
-		return err
-	}
-	c.LightEthConfig.Genesis = string(enc)
-
-	return nil
-}
-
-// DefaultStatusChainGenesisBlock returns the StatusChain network genesis block.
-func (c *NodeConfig) DefaultStatusChainGenesisBlock() (*core.Genesis, error) {
-	genesisJSON, err := ioutil.ReadFile(path.Join(GetStatusHome(), "static/config/status-chain-genesis.json"))
-	if err != nil {
-		return nil, fmt.Errorf("status-chain-genesis.json could not be loaded: %s", err)
-	}
-
-	var genesis *core.Genesis
-	err = json.Unmarshal(genesisJSON, &genesis)
-	if err != nil {
-		return nil, fmt.Errorf("cannot unmarshal status-chain-genesis.json: %s", err)
-	}
-	return genesis, nil
-}
-
-// updateUpstreamConfig sets the proper UpstreamConfig.URL for the network id being used.
-func (c *NodeConfig) updateUpstreamConfig() error {
-
-	// If we have a URL already set then keep URL incase
-	// of custom server.
-	if c.UpstreamConfig.URL != "" {
-		return nil
-	}
-
-	switch c.NetworkID {
-	case MainNetworkID:
-		c.UpstreamConfig.URL = MainnetEthereumNetworkURL
-	case RopstenNetworkID:
-		c.UpstreamConfig.URL = RopstenEthereumNetworkURL
-	case RinkebyNetworkID:
-		c.UpstreamConfig.URL = RinkebyEthereumNetworkURL
-	}
-
-	return nil
-}
-
-// updateClusterConfig loads static peer nodes and CHT for a given network and mode.
-// This is necessary until we have LES protocol support CHT sync, and better node
-// discovery on mobile devices)
-func (c *NodeConfig) updateClusterConfig() error {
-	if !c.ClusterConfig.Enabled {
-		return nil
-	}
-
-	c.log.Info("update cluster config", "configFile", c.ClusterConfigFile, "fleet", c.ClusterConfig.Fleet)
-
-	var cluster Cluster
-
-	if c.ClusterConfigFile != "" {
-		// Load cluster configuration from external file.
-		configFile, err := ioutil.ReadFile(c.ClusterConfigFile)
-		if err != nil {
-			return fmt.Errorf("cluster configuration file '%s' could not be loaded: %s", c.ClusterConfigFile, err)
-		}
-		err = json.Unmarshal(configFile, &cluster)
-		if err != nil {
-			return fmt.Errorf("failed to unmarshal cluster configuration file: %s", err)
-		}
-	} else {
-		cluster, _ = ClusterForFleet(c.ClusterConfig.Fleet)
-	}
-
-	// allow to override bootnodes only if they were not defined earlier
-	if len(c.ClusterConfig.BootNodes) == 0 {
-		c.ClusterConfig.BootNodes = cluster.BootNodes
-	}
-	// allow to override static nodes only if they were not defined earlier
-	if len(c.ClusterConfig.StaticNodes) == 0 {
-		c.ClusterConfig.StaticNodes = cluster.StaticNodes
-	}
-	// No point in running discovery if we don't have bootnodes.
-	// In a case when we do have bootnodes, NoDiscovery=true is preserved.
-	if len(cluster.BootNodes) == 0 {
-		c.NoDiscovery = true
-	}
-	if len(c.ClusterConfig.RendezvousNodes) == 0 {
-		c.ClusterConfig.RendezvousNodes = cluster.RendezvousNodes
-	}
-	if len(c.ClusterConfig.RendezvousNodes) != 0 {
-		c.Rendezvous = true
-	}
-	c.ClusterConfig.TrustedMailServers = cluster.MailServers
-
-	return nil
-}
-
-// updateRelativeDirsConfig updates directories that should be wrt to DataDir
-func (c *NodeConfig) updateRelativeDirsConfig() error {
-	makeSubDirPath := func(baseDir, subDir string) string {
-		if len(baseDir) == 0 {
-			return ""
-		}
-
-		return filepath.Join(baseDir, subDir)
-	}
-	if len(c.KeyStoreDir) == 0 {
-		c.KeyStoreDir = makeSubDirPath(c.DataDir, KeyStoreDir)
-	}
-
-	if len(c.WhisperConfig.DataDir) == 0 {
-		c.WhisperConfig.DataDir = makeSubDirPath(c.DataDir, WhisperDataDir)
-	}
-
-	return nil
-}
-
-// updatePeerLimits will set default peer limits expectations based on enabled services.
-func (c *NodeConfig) updatePeerLimits() {
-	if c.NoDiscovery && !c.Rendezvous {
-		return
-	}
-	if c.WhisperConfig.Enabled {
-		c.RequireTopics[WhisperDiscv5Topic] = WhisperDiscv5Limits
-		// TODO(dshulyak) register mailserver limits when we will change how they are handled.
-	}
-	if c.LightEthConfig.Enabled {
-		c.RequireTopics[discv5.Topic(LesTopic(int(c.NetworkID)))] = LesDiscoveryLimits
-	}
 }
 
 // String dumps config object as nicely indented JSON

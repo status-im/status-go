@@ -27,7 +27,7 @@ func (s *APIBackendTestSuite) TestNetworkSwitching() {
 	s.NoError(err)
 
 	s.False(s.Backend.IsNodeRunning())
-	s.NoError(s.Backend.StartNode(nodeConfig))
+	s.Require().NoError(s.Backend.StartNode(nodeConfig))
 	s.True(s.Backend.IsNodeRunning())
 
 	firstHash, err := e2e.FirstBlockHash(s.Backend.StatusNode())
@@ -42,7 +42,7 @@ func (s *APIBackendTestSuite) TestNetworkSwitching() {
 	s.NoError(err)
 
 	s.False(s.Backend.IsNodeRunning())
-	s.NoError(s.Backend.StartNode(nodeConfig))
+	s.Require().NoError(s.Backend.StartNode(nodeConfig))
 	s.True(s.Backend.IsNodeRunning())
 
 	// make sure we are on another network indeed
@@ -89,7 +89,7 @@ func (s *APIBackendTestSuite) TestRestartNode() {
 	s.NoError(err)
 
 	s.False(s.Backend.IsNodeRunning())
-	s.NoError(s.Backend.StartNode(nodeConfig))
+	require.NoError(s.Backend.StartNode(nodeConfig))
 	s.True(s.Backend.IsNodeRunning())
 
 	firstHash, err := e2e.FirstBlockHash(s.Backend.StatusNode())

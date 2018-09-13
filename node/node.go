@@ -27,24 +27,26 @@ import (
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/shhext"
 	"github.com/status-im/status-go/services/status"
+	"github.com/status-im/status-go/static"
 	"github.com/status-im/status-go/timesource"
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
 // Errors related to node and services creation.
 var (
-	ErrNodeMakeFailureFormat              = "error creating p2p node: %s"
-	ErrWhisperServiceRegistrationFailure  = errors.New("failed to register the Whisper service")
-	ErrLightEthRegistrationFailure        = errors.New("failed to register the LES service")
-	ErrPersonalServiceRegistrationFailure = errors.New("failed to register the personal api service")
-	ErrStatusServiceRegistrationFailure   = errors.New("failed to register the Status service")
-	ErrPeerServiceRegistrationFailure     = errors.New("failed to register the Peer service")
+	ErrNodeMakeFailureFormat                      = "error creating p2p node: %s"
+	ErrWhisperServiceRegistrationFailure          = errors.New("failed to register the Whisper service")
+	ErrLightEthRegistrationFailure                = errors.New("failed to register the LES service")
+	ErrLightEthRegistrationFailureUpstreamEnabled = errors.New("failed to register the LES service, upstream is also configured")
+	ErrPersonalServiceRegistrationFailure         = errors.New("failed to register the personal api service")
+	ErrStatusServiceRegistrationFailure           = errors.New("failed to register the Status service")
+	ErrPeerServiceRegistrationFailure             = errors.New("failed to register the Peer service")
 )
 
 // All general log messages in this package should be routed through this logger.
 var logger = log.New("package", "status-go/node")
 
-// MakeNode create a geth node entity
+// MakeNode creates a geth node entity
 func MakeNode(config *params.NodeConfig, db *leveldb.DB) (*node.Node, error) {
 	// If DataDir is empty, it means we want to create an ephemeral node
 	// keeping data only in memory.
@@ -60,17 +62,9 @@ func MakeNode(config *params.NodeConfig, db *leveldb.DB) (*node.Node, error) {
 		}
 	}
 
-	stackConfig := defaultEmbeddedNodeConfig(config)
-
-	if len(config.NodeKeyFile) > 0 {
-		logger.Info("Loading private key file", "file", config.NodeKeyFile)
-		pk, err := crypto.LoadECDSA(config.NodeKeyFile)
-		if err != nil {
-			logger.Error("Failed loading private key file", "file", config.NodeKeyFile, "error", err)
-		}
-
-		// override node's private key
-		stackConfig.P2P.PrivateKey = pk
+	stackConfig, err := newGethNodeConfig(config)
+	if err != nil {
+		return nil, err
 	}
 
 	stack, err := node.New(stackConfig)
@@ -84,6 +78,10 @@ func MakeNode(config *params.NodeConfig, db *leveldb.DB) (*node.Node, error) {
 			return nil, fmt.Errorf("%v: %v", ErrLightEthRegistrationFailure, err)
 		}
 	} else {
+		if config.LightEthConfig.Enabled {
+			return nil, fmt.Errorf("%v: %v", ErrLightEthRegistrationFailureUpstreamEnabled, err)
+		}
+
 		// `personal_sign` and `personal_ecRecover` methods are important to
 		// keep DApps working.
 		// Usually, they are provided by an ETH or a LES service, but when using
@@ -112,8 +110,8 @@ func MakeNode(config *params.NodeConfig, db *leveldb.DB) (*node.Node, error) {
 	return stack, nil
 }
 
-// defaultEmbeddedNodeConfig returns default stack configuration for mobile client node
-func defaultEmbeddedNodeConfig(config *params.NodeConfig) *node.Config {
+// newGethNodeConfig returns default stack configuration for mobile client node
+func newGethNodeConfig(config *params.NodeConfig) (*node.Config, error) {
 	nc := &node.Config{
 		DataDir:           config.DataDir,
 		KeyStoreDir:       config.KeyStoreDir,
@@ -139,26 +137,71 @@ func defaultEmbeddedNodeConfig(config *params.NodeConfig) *node.Config {
 		nc.HTTPPort = config.HTTPPort
 	}
 
-	if config.ClusterConfig != nil && config.ClusterConfig.Enabled {
+	if config.ClusterConfig.Enabled {
 		nc.P2P.BootstrapNodesV5 = parseNodesV5(config.ClusterConfig.BootNodes)
 		nc.P2P.StaticNodes = parseNodes(config.ClusterConfig.StaticNodes)
 	}
-	return nc
+
+	if config.NodeKey != "" {
+		sk, err := crypto.HexToECDSA(config.NodeKey)
+		if err != nil {
+			return nil, err
+		}
+		// override node's private key
+		nc.P2P.PrivateKey = sk
+	}
+
+	return nc, nil
+}
+
+// calculateGenesis retrieves genesis value for given network
+func calculateGenesis(networkID uint64) (*core.Genesis, error) {
+	var genesis *core.Genesis
+
+	switch networkID {
+	case params.MainNetworkID:
+		genesis = core.DefaultGenesisBlock()
+	case params.RopstenNetworkID:
+		genesis = core.DefaultTestnetGenesisBlock()
+	case params.RinkebyNetworkID:
+		genesis = core.DefaultRinkebyGenesisBlock()
+	case params.StatusChainNetworkID:
+		var err error
+		if genesis, err = defaultStatusChainGenesisBlock(); err != nil {
+			return nil, err
+		}
+	default:
+		return nil, nil
+	}
+
+	return genesis, nil
+}
+
+// defaultStatusChainGenesisBlock returns the StatusChain network genesis block.
+func defaultStatusChainGenesisBlock() (*core.Genesis, error) {
+	genesisJSON, err := static.ConfigStatusChainGenesisJsonBytes()
+	if err != nil {
+		return nil, fmt.Errorf("status-chain-genesis.json could not be loaded: %s", err)
+	}
+
+	var genesis *core.Genesis
+	err = json.Unmarshal(genesisJSON, &genesis)
+	if err != nil {
+		return nil, fmt.Errorf("cannot unmarshal status-chain-genesis.json: %s", err)
+	}
+	return genesis, nil
 }
 
 // activateLightEthService configures and registers the eth.Ethereum service with a given node.
 func activateLightEthService(stack *node.Node, config *params.NodeConfig) error {
-	if config.LightEthConfig == nil || !config.LightEthConfig.Enabled {
+	if !config.LightEthConfig.Enabled {
 		logger.Info("LES protocol is disabled")
 		return nil
 	}
 
-	var genesis *core.Genesis
-	if config.LightEthConfig.Genesis != "" {
-		genesis = new(core.Genesis)
-		if err := json.Unmarshal([]byte(config.LightEthConfig.Genesis), genesis); err != nil {
-			return fmt.Errorf("invalid genesis spec: %v", err)
-		}
+	genesis, err := calculateGenesis(config.NetworkID)
+	if err != nil {
+		return err
 	}
 
 	ethConf := eth.DefaultConfig
@@ -202,21 +245,6 @@ func activatePeerService(stack *node.Node) error {
 }
 
 func registerMailServer(whisperService *whisper.Whisper, config *params.WhisperConfig) (err error) {
-	// if the Password is already set, do not override it
-	if config.MailServerPassword == "" && config.MailServerPasswordFile != "" {
-		err = config.ReadMailServerPasswordFile()
-		if err != nil {
-			return
-		}
-	}
-	// similarly, do not override already configured AsymKey
-	if config.MailServerAsymKey == nil && config.MailServerAsymKeyFile != "" {
-		err = config.ReadMailServerAsymKeyFile()
-		if err != nil {
-			return
-		}
-	}
-
 	var mailServer mailserver.WMailServer
 	whisperService.RegisterServer(&mailServer)
 
@@ -225,7 +253,7 @@ func registerMailServer(whisperService *whisper.Whisper, config *params.WhisperC
 
 // activateShhService configures Whisper and adds it to the given node.
 func activateShhService(stack *node.Node, config *params.NodeConfig, db *leveldb.DB) (err error) {
-	if config.WhisperConfig == nil || !config.WhisperConfig.Enabled {
+	if !config.WhisperConfig.Enabled {
 		logger.Info("SHH protocol is disabled")
 		return nil
 	}
@@ -254,7 +282,7 @@ func activateShhService(stack *node.Node, config *params.NodeConfig, db *leveldb
 
 		// enable mail service
 		if config.WhisperConfig.EnableMailServer {
-			if err := registerMailServer(whisperService, config.WhisperConfig); err != nil {
+			if err := registerMailServer(whisperService, &config.WhisperConfig); err != nil {
 				return nil, fmt.Errorf("failed to register MailServer: %v", err)
 			}
 		}
