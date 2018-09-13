@@ -685,6 +685,14 @@ func (whisper *Whisper) Unsubscribe(id string) error {
 	if !ok {
 		return fmt.Errorf("Unsubscribe: Invalid ID")
 	}
+	topics := whisper.filters.GetTopics()
+	aggregate := make([]byte, BloomFilterSize)
+	for i := range topics {
+		aggregate = addBloom(aggregate, TopicToBloom(topics[i]))
+	}
+	if !BloomFilterMatch(whisper.BloomFilter(), aggregate) {
+		whisper.SetBloomFilter(aggregate)
+	}
 	return nil
 }
 

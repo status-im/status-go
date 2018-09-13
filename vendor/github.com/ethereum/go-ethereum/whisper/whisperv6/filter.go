@@ -152,6 +152,24 @@ func (fs *Filters) Get(id string) *Filter {
 	return fs.watchers[id]
 }
 
+func (fs *Filters) GetTopics() []TopicType {
+	unique := map[TopicType]struct{}{}
+	rst := []TopicType{}
+	fs.mutex.RLock()
+	defer fs.mutex.RUnlock()
+	for idx, f := range fs.watchers {
+		for _, t := range f.Topics {
+			tt := TopicType{}
+			copy(tt[:], t)
+			if _, exist := unique[tt]; exist {
+				continue
+			}
+			rst = append(rst, tt)
+		}
+	}
+	return rst
+}
+
 // NotifyWatchers notifies any filter that has declared interest
 // for the envelope's topic.
 func (fs *Filters) NotifyWatchers(env *Envelope, p2pMessage bool) {
