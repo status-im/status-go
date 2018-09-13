@@ -20,6 +20,8 @@ pushd $GOPATH/src/github.com/status-im/go-ethereum
 rm -r ./patches
 
 git commit -am "add new patches to $GETH_VERSION"
+
+# remove already existing tag as we will replace it with a patched commit
 git tag -d $GETH_VERSION
 git tag -a $GETH_VERSION -m "Patched release $GETH_VERSION"
 
