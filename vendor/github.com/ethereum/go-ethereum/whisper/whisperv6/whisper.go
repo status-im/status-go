@@ -71,6 +71,8 @@ type Whisper struct {
 	protocol p2p.Protocol // Protocol description and parameters
 	filters  *Filters     // Message filters installed with Subscribe function
 
+	trafficObserver *TopicTrafficObserver
+
 	privateKeys map[string]*ecdsa.PrivateKey // Private key storage
 	symKeys     map[string][]byte            // Symmetric key storage
 	keyMu       sync.RWMutex                 // Mutex associated with key storages
@@ -122,6 +124,7 @@ func New(cfg *Config) *Whisper {
 	}
 
 	whisper.filters = NewFilters(whisper)
+	whisper.trafficObserver = NewTopicTrafficObserver(cfg.TopicRateLimitConfig)
 
 	whisper.settings.Store(minPowIdx, cfg.MinimumAcceptedPOW)
 	whisper.settings.Store(maxMsgSizeIdx, cfg.MaxMessageSize)
@@ -794,6 +797,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 
 			trouble := false
 			for _, env := range envelopes {
+				whisper.trafficObserver.Observe(env.Topic, int64(env.size()))
 				cached, err := whisper.add(env, whisper.lightClient)
 				if err != nil {
 					trouble = true
@@ -843,6 +847,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 					log.Warn("failed to decode direct message, peer will be disconnected", "peer", p.peer.ID(), "err", err)
 					return errors.New("invalid direct message")
 				}
+				whisper.trafficObserver.Observe(envelope.Topic, int64(envelope.size()))
 				whisper.postEvent(&envelope, true)
 			} else {
 				return fmt.Errorf("peer %x sent us %d, while connection is not marked as trusted.", p.ID(), p2pMessageCode)

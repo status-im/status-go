@@ -36,6 +36,7 @@ type Config struct {
 	TimeSource         func() time.Time
 	IngressRateLimit   RateLimitConfig
 	EgressRateLimit    RateLimitConfig
+	TopicRateLimit     RateLimitConfig
 }
 
 // DefaultConfig represents (shocker!) the default configuration.
@@ -45,4 +46,5 @@ var DefaultConfig = Config{
 	TimeSource:         time.Now,
 	IngressRateLimit:   RateLimitConfig{uint64(1 * time.Minute), 1 << (10 * 3), 10 << (10 * 2)},
 	EgressRateLimit:    RateLimitConfig{uint64(500 * time.Millisecond), 1 << (10 * 3), 10 << (10 * 2)},
+	TopicRateLimit:     RateLimitConfig{uint64(500 * time.Millisecond), 50 << (10 * 2), 5 << (10 * 2)},
 }
