@@ -24,7 +24,7 @@ import (
 )
 
 func TestStatusNodeStart(t *testing.T) {
-	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
+	config, err := utils.MakeTestNodeConfigWithDataDir("", "", params.FleetUndefined, params.StatusChainNetworkID)
 	require.NoError(t, err)
 	n := New()
 
