@@ -197,13 +197,13 @@ xgo:
 	docker pull $(XGOIMAGE)
 	go get github.com/karalabe/xgo
 
-setup: dep-install lint-install mock-install ##@other Prepare project for first build
-	go get -u github.com/kevinburke/go-bindata/go-bindata
+setup: dep-install lint-install mock-install update-fleet-config ##@other Prepare project for first build
 
 generate: ##@other Regenerate assets and other auto-generated stuff
 	go generate ./static
 
 mock-install: ##@other Install mocking tools
+	go get -u github.com/kevinburke/go-bindata/go-bindata
 	go get -u github.com/golang/mock/mockgen
 
 mock: ##@other Regenerate mocks
@@ -285,3 +285,9 @@ patch: ##@patching Revert and apply all patches
 
 patch-revert: ##@patching Revert all patches only
 	./_assets/patches/patcher -r
+
+update-fleet-config: ##@other Update fleets configuration from fleets.status.im
+	./_assets/ci/update-fleet-config.sh
+	@echo "Updating static assets..."
+	@go generate ./static
+	@echo "Done"
