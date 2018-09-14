@@ -304,7 +304,23 @@ func NewNodeConfigWithDefaults(dataDir, fleet string, networkID uint64) (*NodeCo
 	nodeConfig.WhisperConfig.Enabled = true
 	nodeConfig.WhisperConfig.EnableNTPSync = true
 
+	nodeConfig.updatePeerLimits()
+
 	return nodeConfig, nil
+}
+
+// updatePeerLimits will set default peer limits expectations based on enabled services.
+func (c *NodeConfig) updatePeerLimits() {
+	if c.NoDiscovery && !c.Rendezvous {
+		return
+	}
+	if c.WhisperConfig.Enabled {
+		c.RequireTopics[WhisperDiscv5Topic] = WhisperDiscv5Limits
+		// TODO(dshulyak) register mailserver limits when we will change how they are handled.
+	}
+	if c.LightEthConfig.Enabled {
+		c.RequireTopics[discv5.Topic(LesTopic(int(c.NetworkID)))] = LesDiscoveryLimits
+	}
 }
 
 // NewNodeConfig creates new node configuration object with bare-minimum defaults
