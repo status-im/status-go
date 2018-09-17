@@ -124,7 +124,7 @@ func New(cfg *Config) *Whisper {
 	}
 
 	whisper.filters = NewFilters(whisper)
-	whisper.trafficObserver = NewTopicTrafficObserver(cfg.TopicRateLimitConfig)
+	whisper.trafficObserver = NewTopicTrafficObserver(&cfg.TopicRateLimit)
 
 	whisper.settings.Store(minPowIdx, cfg.MinimumAcceptedPOW)
 	whisper.settings.Store(maxMsgSizeIdx, cfg.MaxMessageSize)
@@ -267,10 +267,8 @@ func (whisper *Whisper) SetBloomFilter(bloom []byte) error {
 
 	b := make([]byte, BloomFilterSize)
 	copy(b, bloom)
-
 	whisper.settings.Store(bloomFilterIdx, b)
 	whisper.notifyPeersAboutBloomFilterChange(b)
-
 	go func() {
 		// allow some time before all the peers have processed the notification
 		time.Sleep(time.Duration(whisper.syncAllowance) * time.Second)
@@ -666,7 +664,6 @@ func (whisper *Whisper) updateBloomFilter(f *Filter) {
 		b := TopicToBloom(top)
 		aggregate = addBloom(aggregate, b)
 	}
-
 	if !BloomFilterMatch(whisper.BloomFilter(), aggregate) {
 		// existing bloom filter must be updated
 		aggregate = addBloom(whisper.BloomFilter(), aggregate)
@@ -677,6 +674,11 @@ func (whisper *Whisper) updateBloomFilter(f *Filter) {
 // GetFilter returns the filter by id.
 func (whisper *Whisper) GetFilter(id string) *Filter {
 	return whisper.filters.Get(id)
+}
+
+// Drained returns true if topic received more traffic than was expected.
+func (whisper *Whisper) Drained(t TopicType) bool {
+	return whisper.trafficObserver.Drained(t)
 }
 
 // Unsubscribe removes an installed message handler.
@@ -690,8 +692,8 @@ func (whisper *Whisper) Unsubscribe(id string) error {
 	for i := range topics {
 		aggregate = addBloom(aggregate, TopicToBloom(topics[i]))
 	}
-	if !BloomFilterMatch(whisper.BloomFilter(), aggregate) {
-		whisper.SetBloomFilter(aggregate)
+	if !BloomFilterMatch(aggregate, whisper.BloomFilter()) {
+		return whisper.SetBloomFilter(aggregate)
 	}
 	return nil
 }

@@ -157,7 +157,7 @@ func (fs *Filters) GetTopics() []TopicType {
 	rst := []TopicType{}
 	fs.mutex.RLock()
 	defer fs.mutex.RUnlock()
-	for idx, f := range fs.watchers {
+	for _, f := range fs.watchers {
 		for _, t := range f.Topics {
 			tt := TopicType{}
 			copy(tt[:], t)

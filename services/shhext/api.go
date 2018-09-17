@@ -195,6 +195,11 @@ func (api *PublicAPI) ConfirmMessagesProcessed(messages []*whisper.Message) erro
 	return api.service.deduplicator.AddMessages(messages)
 }
 
+// Drained returns true if topic received more traffic than it was expected.
+func (api *PublicAPI) Drained(t whisper.TopicType) bool {
+	return api.service.w.Drained(t)
+}
+
 // -----
 // HELPER
 // -----

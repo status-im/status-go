@@ -8,7 +8,7 @@ import (
 )
 
 // NewTopicTrafficObserver creates new instance.
-func NewTopicTrafficObserver(cfg RateLimitConfig) *TopicTrafficObserver {
+func NewTopicTrafficObserver(cfg *RateLimitConfig) *TopicTrafficObserver {
 	return &TopicTrafficObserver{
 		cfg:            cfg,
 		trafficByTopic: map[TopicType]*ratelimit.Bucket{},
@@ -17,13 +17,16 @@ func NewTopicTrafficObserver(cfg RateLimitConfig) *TopicTrafficObserver {
 
 // TopicTrafficObserver provides instrumentation for accounting traffic usage by topic.
 type TopicTrafficObserver struct {
-	cfg            RateLimitConfig
+	cfg            *RateLimitConfig
 	mu             sync.RWMutex
 	trafficByTopic map[TopicType]*ratelimit.Bucket
 }
 
 // Observe consumes traffic from a rate limiter associated with a given topic.
 func (t *TopicTrafficObserver) Observe(topic TopicType, size int64) {
+	if t.cfg == nil {
+		return
+	}
 	t.mu.Lock()
 	rl, exist := t.trafficByTopic[topic]
 	if !exist {
@@ -35,7 +38,10 @@ func (t *TopicTrafficObserver) Observe(topic TopicType, size int64) {
 }
 
 // Drained returns true if topic doesn't have available capacity for new tokens.
-func (t *TopicTrafficObserver) Drained(topic TopicType) (rst bool) {
+func (t *TopicTrafficObserver) Drained(topic TopicType) bool {
+	if t.cfg == nil {
+		return false
+	}
 	t.mu.RLock()
 	rl, exist := t.trafficByTopic[topic]
 	t.mu.RUnlock()

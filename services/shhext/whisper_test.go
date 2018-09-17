@@ -1,6 +1,7 @@
 package shhext
 
 import (
+	"fmt"
 	"math"
 	"math/rand"
 	"sync"
@@ -177,4 +178,106 @@ func TestRandomizedDelivery(t *testing.T) {
 		assert.True(t, sent[h] > 0, "every envelope(%s) should be sent atleat 1", h.String())
 	}
 	require.Equal(t, 30, total)
+}
+
+func TestTopicDrained(t *testing.T) {
+	conf := &whisper.Config{
+		MinimumAcceptedPOW: 0,
+		MaxMessageSize:     100 << 10,
+		IngressRateLimit:   whisper.RateLimitConfig{uint64(time.Hour), 10 << 10, 1},
+		EgressRateLimit:    whisper.RateLimitConfig{uint64(time.Hour), 10 << 10, 1},
+		TopicRateLimit:     whisper.RateLimitConfig{uint64(time.Hour), 1024, 1},
+		TimeSource:         time.Now,
+	}
+	w1, rw1, errc := setupOneConnection(t, conf)
+	topic := whisper.TopicType{1}
+	require.False(t, w1.Drained(topic))
+	envs := []*whisper.Envelope{}
+	for i := uint64(1); i <= 4; i++ {
+		envs = append(envs, &whisper.Envelope{
+			Expiry: uint32(time.Now().Add(10 * time.Second).Unix()),
+			TTL:    10,
+			Topic:  topic,
+			Data:   make([]byte, 300),
+			Nonce:  i,
+		})
+	}
+	require.NoError(t, p2p.Send(rw1, 1, envs))
+	timer := time.After(time.Second)
+	for {
+		select {
+		case <-timer:
+			require.FailNow(t, "expected topic wasn't drained during allowed period")
+		case err := <-errc:
+			require.NoError(t, err, "whisper handler returned unexpected error")
+		default:
+			if w1.Drained(topic) {
+				return
+			}
+		}
+	}
+}
+
+func TestBloomFilterUpdatedOnUnsub(t *testing.T) {
+	conf := &whisper.Config{
+		MinimumAcceptedPOW: 0,
+		MaxMessageSize:     100 << 10,
+		IngressRateLimit:   whisper.RateLimitConfig{uint64(time.Hour), 10 << 10, 1},
+		EgressRateLimit:    whisper.RateLimitConfig{uint64(time.Hour), 10 << 10, 1},
+		TimeSource:         time.Now,
+	}
+	w1, rw1, _ := setupOneConnection(t, conf)
+	go func() {
+		assert.NoError(t, w1.SetBloomFilter(make([]byte, whisper.BloomFilterSize)))
+	}()
+	require.NoError(t, errorOnTimeout(time.Second, func() error {
+		return p2p.ExpectMsg(rw1, 3, make([]byte, whisper.BloomFilterSize))
+	}))
+	bloomTopics := []whisper.TopicType{{1, 1, 1, 1}, {255, 255, 255, 255}}
+	go func() {
+		_, err := w1.Subscribe(&whisper.Filter{
+			Topics: [][]byte{bloomTopics[0][:]},
+			KeySym: []byte{1, 2, 3},
+		})
+		assert.NoError(t, err)
+	}()
+	topic1Bloom := whisper.TopicToBloom(bloomTopics[0])
+	require.NoError(t, errorOnTimeout(time.Second, func() error {
+		return p2p.ExpectMsg(rw1, 3, topic1Bloom)
+	}))
+	topic2Id := make(chan string, 1)
+	go func() {
+		id, err := w1.Subscribe(&whisper.Filter{
+			Topics: [][]byte{bloomTopics[1][:]},
+			KeySym: []byte{3, 4, 5},
+		})
+		assert.NoError(t, err)
+		topic2Id <- id
+	}()
+	topic2Bloom := whisper.TopicToBloom(bloomTopics[1])
+	for i := 0; i < whisper.BloomFilterSize; i++ { // update in place, no need for removal
+		topic2Bloom[i] = topic1Bloom[i] | topic2Bloom[i]
+	}
+	require.NoError(t, errorOnTimeout(time.Second, func() error {
+		return p2p.ExpectMsg(rw1, 3, topic2Bloom)
+	}))
+	go func() {
+		require.NoError(t, w1.Unsubscribe(<-topic2Id))
+	}()
+	require.NoError(t, errorOnTimeout(time.Second, func() error {
+		return p2p.ExpectMsg(rw1, 3, topic1Bloom)
+	}))
+}
+
+func errorOnTimeout(timeout time.Duration, f func() error) error {
+	errc := make(chan error, 1)
+	go func() {
+		errc <- f()
+	}()
+	select {
+	case <-time.After(timeout):
+		return fmt.Errorf("function didn't complete in timeout %v", timeout)
+	case err := <-errc:
+		return err
+	}
 }
