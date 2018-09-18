@@ -1,6 +1,4 @@
 {
-  "NoDiscovery": true,
-  "Rendezvous": false,
   "LogLevel": "DEBUG",
   "ClusterConfig": {
     "Enabled": true,

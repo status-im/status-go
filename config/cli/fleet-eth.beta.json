@@ -1,5 +1,4 @@
 {
-  "NoDiscovery": true,
   "Rendezvous": true,
   "ClusterConfig": {
     "Enabled": true,
