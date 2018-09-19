@@ -37,7 +37,7 @@ func TestNewCommand(t *testing.T) {
 	cmd := NewCommand(cla, ins, p1, p2, data)
 	expected := "80 50 01 02 08 84 76 23 36 C5 18 7F E8 00"
 
-	result, err := cmd.serialize()
+	result, err := cmd.Serialize()
 	assert.NoError(t, err)
 	assert.Equal(t, expected, bytesToHexWithSpaces(result))
 }

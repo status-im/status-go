@@ -24,7 +24,7 @@ func NewCommand(cla, ins, p1, p2 uint8, data []byte) *Command {
 	}
 }
 
-func (c *Command) serialize() ([]byte, error) {
+func (c *Command) Serialize() ([]byte, error) {
 	buf := new(bytes.Buffer)
 
 	if err := binary.Write(buf, binary.BigEndian, c.Cla); err != nil {
