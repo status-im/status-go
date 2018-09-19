@@ -75,9 +75,10 @@ type WhisperConfig struct {
 	// EnableNTPSync enables NTP synchronizations
 	EnableNTPSync bool
 
-	TopicRateLimit   RateLimitConfig
-	IngressRateLimit RateLimitConfig
-	EgressRateLimit  RateLimitConfig
+	TopicRateLimit    RateLimitConfig
+	IngressRateLimit  RateLimitConfig
+	EgressRateLimit   RateLimitConfig
+	IgnoreEgressLimit bool
 }
 
 // RateLimitConfig is a copy of whisperv6.RateLimitConfig.

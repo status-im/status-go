@@ -71,6 +71,7 @@ type Whisper struct {
 	protocol p2p.Protocol // Protocol description and parameters
 	filters  *Filters     // Message filters installed with Subscribe function
 
+	ignoreEgress    bool
 	trafficObserver *TopicTrafficObserver
 
 	privateKeys map[string]*ecdsa.PrivateKey // Private key storage
@@ -121,6 +122,7 @@ func New(cfg *Config) *Whisper {
 		quit:          make(chan struct{}),
 		syncAllowance: DefaultSyncAllowance,
 		timeSource:    cfg.TimeSource,
+		ignoreEgress:  cfg.IgnoreEgressLimit,
 	}
 
 	whisper.filters = NewFilters(whisper)
@@ -874,11 +876,13 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 				whisper.mailServer.DeliverMail(p, &request)
 			}
 		case peerRateLimitCode:
-			var conf RateLimitConfig
-			if err := packet.Decode(&conf); err != nil {
-				return fmt.Errorf("peer %x sent wrong payload for a rate limiter config", p.ID())
+			if !whisper.ignoreEgress {
+				var conf RateLimitConfig
+				if err := packet.Decode(&conf); err != nil {
+					return fmt.Errorf("peer %x sent wrong payload for a rate limiter config", p.ID())
+				}
+				p.updateEgressRateLimit(conf)
 			}
-			p.updateEgressRateLimit(conf)
 		case p2pRequestCompleteCode:
 			if p.trusted {
 				var payload []byte

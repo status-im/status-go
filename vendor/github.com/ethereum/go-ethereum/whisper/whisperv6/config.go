@@ -37,6 +37,7 @@ type Config struct {
 	IngressRateLimit   RateLimitConfig
 	EgressRateLimit    RateLimitConfig
 	TopicRateLimit     RateLimitConfig
+	IgnoreEgressLimit  bool // used to make a peer generate more traffic that the other peer can handle
 }
 
 // DefaultConfig represents (shocker!) the default configuration.
