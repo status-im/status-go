@@ -18,8 +18,9 @@
       "enode://2d897c6e846949f9dcf10279f00e9b8325c18fe7fa52d658520ad7be9607c83008b42b06aefd97cfe1fdab571f33a2a9383ff97c5909ed51f63300834913237e@35.192.0.86:30305"
     ],
     "RendezvousNodes": [
-      "/ip4/174.138.107.239/tcp/30703/ethv4/16Uiu2HAkyJHeetQ4DNpd4NZ2ntzxMo25zcdpvGQRqkD5pB9BE6RU",
-      "/ip4/35.238.97.234/tcp/30703/ethv4/16Uiu2HAm1sVyXmkMNjdeDWqK2urbyC3oBHi8MDpCdYkns1nYafqz"
+      "/ip4/35.238.97.234/tcp/30703/ethv4/16Uiu2HAm6G9sDMkrB4Xa5EH3Zx2dysCxFgBTSRzghic3Z9tRFRNE",
+      "/ip4/174.138.107.239/tcp/30703/ethv4/16Uiu2HAm8UZXUHEPZrpJbcQ3yVFH6UtKrwsG6jH4ai72PsbLfVFb",
+      "/ip4/47.91.229.44/tcp/30703/ethv4/16Uiu2HAmRnt2Eyoknh3auxh4fJwkRgqkH1gqrWGes8Pk1k3MV4xu"
     ]
   }
 }
