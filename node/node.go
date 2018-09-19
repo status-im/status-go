@@ -270,9 +270,9 @@ func activateShhService(stack *node.Node, config *params.NodeConfig, db *leveldb
 			MaxMessageSize:     whisper.DefaultMaxMessageSize,
 			MinimumAcceptedPOW: 0.001,
 			TimeSource:         time.Now,
-			TopicRateLimit:     config.WhisperConfig.TopicRateLimit,
-			IngressRateLimit:   config.WhisperConfig.IngressRateLimit,
-			EgressRateLimit:    config.WhisperConfig.EgressRateLimit,
+			TopicRateLimit:     whisper.RateLimitConfig(config.WhisperConfig.TopicRateLimit),
+			IngressRateLimit:   whisper.RateLimitConfig(config.WhisperConfig.IngressRateLimit),
+			EgressRateLimit:    whisper.RateLimitConfig(config.WhisperConfig.EgressRateLimit),
 		}
 
 		if config.WhisperConfig.EnableNTPSync {
