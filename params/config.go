@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/params"
+	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"github.com/status-im/status-go/static"
 	validator "gopkg.in/go-playground/validator.v9"
 )
@@ -74,6 +75,10 @@ type WhisperConfig struct {
 
 	// EnableNTPSync enables NTP synchronizations
 	EnableNTPSync bool
+
+	TopicRateLimit   whisper.RateLimitConfig
+	IngressRateLimit whisper.RateLimitConfig
+	EgressRateLimit  whisper.RateLimitConfig
 }
 
 // String dumps config object as nicely indented JSON
