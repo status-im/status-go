@@ -12,7 +12,13 @@ for fleet in ${fleets[@]}; do
     fleetJSON=$(echo $json | jq ".fleets.\"$fleet\"")
     boot=$(echo $fleetJSON | jq ".boot | map(.)" -r)
     mail=$(echo $fleetJSON | jq ".mail | map(.)" -r)
-    whisper=$(echo $fleetJSON | jq ".whisper | map(.)" -r)
+
+    # Get random nodes from whisper node list
+    maxStaticNodeCount=2
+    staticNodeCount=$(echo $fleetJSON | jq ".whisper | length")
+    index=$(($RANDOM % ($staticNodeCount - ($maxStaticNodeCount - 1))))
+    whisper=$(echo $fleetJSON | jq ".whisper | map(.) | .[$index:($index + $maxStaticNodeCount)]" -r)
+
     git checkout $DIR/fleet-$fleet.json \
         && jq ".ClusterConfig.BootNodes = $boot | .ClusterConfig.TrustedMailServers = $mail | .ClusterConfig.StaticNodes = $whisper" $DIR/fleet-$fleet.json \
         | tee "$DIR/tmp.json" >/dev/null \
