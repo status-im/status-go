@@ -206,6 +206,7 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 		nodeConfig.LogFile = *logFile
 	}
 
+	nodeConfig.ListenAddr = ""
 	nodeConfig.NoDiscovery = true
 
 	return whisperConfig(nodeConfig)
