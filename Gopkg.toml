@@ -155,3 +155,7 @@ ignored = [ "github.com/ethereum/go-ethereum/ethapi" ]
 [[override]]
   name = "github.com/deckarep/golang-set"
   revision = "504e848d77ea4752b3057b8fb46da0e7f746ccf3"
+
+[[constraint]]
+  name = "github.com/juju/ratelimit"
+  version = "1.0.1"
