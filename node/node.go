@@ -82,6 +82,8 @@ func MakeNode(config *params.NodeConfig, db *leveldb.DB) (*node.Node, error) {
 			return nil, fmt.Errorf("%v: %v", ErrLightEthRegistrationFailureUpstreamEnabled, err)
 		}
 
+		logger.Info("LES protocol is disabled")
+
 		// `personal_sign` and `personal_ecRecover` methods are important to
 		// keep DApps working.
 		// Usually, they are provided by an ETH or a LES service, but when using
