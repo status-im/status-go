@@ -69,10 +69,12 @@ func init() {
 }
 
 func main() {
-	config, err := params.NewNodeConfigWithDefaults("statusd-data", params.FleetBeta, params.RopstenNetworkID)
-	if err == nil {
-		err = parseConfig(configFiles, config)
-	}
+	config, err := params.NewNodeConfigWithDefaultsAndFiles(
+		"statusd-data",
+		params.FleetBeta,
+		params.RopstenNetworkID,
+		configFiles...,
+	)
 	if err != nil {
 		printUsage()
 		if err != nil {
@@ -81,8 +83,17 @@ func main() {
 		os.Exit(1)
 	}
 
+	if *logLevel != "" {
+		config.LogLevel = *logLevel
+	}
+
 	colors := !(*logWithoutColors) && terminal.IsTerminal(int(os.Stdin.Fd()))
-	if err = logutils.OverrideRootLog(logEnabled(config), config.LogLevel, config.LogFile, colors); err != nil {
+	if err := logutils.OverrideRootLog(
+		logEnabled(config),
+		config.LogLevel,
+		config.LogFile,
+		colors,
+	); err != nil {
 		stdlog.Fatalf("Error initializing logger: %v", err)
 	}
 
@@ -202,19 +213,6 @@ func configureStatusService(flagValue string, nodeConfig *params.NodeConfig) (*p
 	}
 
 	return nodeConfig, nil
-}
-
-func parseConfig(configFiles configFlags, config *params.NodeConfig) error {
-	// Merge specified configuration files, in order
-	if err := params.LoadConfigFromFiles(configFiles, config); err != nil {
-		return err
-	}
-
-	if *logLevel != "" {
-		config.LogLevel = *logLevel
-	}
-
-	return nil
 }
 
 // printVersion prints verbose output about version and config.

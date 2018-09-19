@@ -274,7 +274,8 @@ type NodeConfig struct {
 	MailServerRegistryAddress string
 }
 
-// NewNodeConfigWithDefaults creates new node configuration object with some defaults suitable for adhoc use
+// NewNodeConfigWithDefaults creates new node configuration object
+// with some defaults suitable for adhoc use.
 func NewNodeConfigWithDefaults(dataDir, fleet string, networkID uint64) (*NodeConfig, error) {
 	nodeConfig, err := NewNodeConfig(dataDir, fleet, networkID)
 	if err != nil {
@@ -307,6 +308,27 @@ func NewNodeConfigWithDefaults(dataDir, fleet string, networkID uint64) (*NodeCo
 	nodeConfig.updatePeerLimits()
 
 	return nodeConfig, nil
+}
+
+// NewNodeConfigWithDefaultsAndFiles creates new node configuration object
+// with some defaults suitable for adhoc use and applies config files on top.
+func NewNodeConfigWithDefaultsAndFiles(
+	dataDir, fleet string, networkID uint64, files ...string,
+) (*NodeConfig, error) {
+	c, err := NewNodeConfigWithDefaults(dataDir, fleet, networkID)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, file := range files {
+		if err := loadConfigConfigFromFile(file, c); err != nil {
+			return nil, err
+		}
+	}
+
+	c.updatePeerLimits()
+
+	return c, nil
 }
 
 // updatePeerLimits will set default peer limits expectations based on enabled services.
