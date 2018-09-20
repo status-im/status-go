@@ -134,7 +134,7 @@ func newGethNodeConfig(config *params.NodeConfig) (*node.Config, error) {
 		HTTPVirtualHosts: []string{"localhost"},
 	}
 
-	if config.RPCEnabled {
+	if config.HTTPEnabled {
 		nc.HTTPHost = config.HTTPHost
 		nc.HTTPPort = config.HTTPPort
 	}

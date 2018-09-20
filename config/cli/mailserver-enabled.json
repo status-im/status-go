@@ -1,0 +1,6 @@
+{
+    "WhisperConfig": {
+        "EnableMailServer": true,
+        "MailServerPassword": "status-offline-inbox"
+    }
+}

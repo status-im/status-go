@@ -3,7 +3,6 @@ package params
 import (
 	"encoding/json"
 	"fmt"
-	"go/build"
 	"io/ioutil"
 	"net/url"
 	"os"
@@ -199,21 +198,21 @@ type NodeConfig struct {
 	// APIModules is a comma-separated list of API modules exposed via *any* (HTTP/WS/IPC) RPC interface.
 	APIModules string
 
+	// HTTPEnabled specifies whether the http RPC server is to be enabled by default.
+	HTTPEnabled bool
+
 	// HTTPHost is the host interface on which to start the HTTP RPC server.
 	// Pass empty string if no HTTP RPC interface needs to be started.
 	HTTPHost string
 
-	// RPCEnabled specifies whether the http RPC server is to be enabled by default.
-	RPCEnabled bool
-
 	// HTTPPort is the TCP port number on which to start the Geth's HTTP RPC server.
 	HTTPPort int
 
-	// IPCFile is filename of exposed IPC RPC Server
-	IPCFile string
-
 	// IPCEnabled specifies whether IPC-RPC Server is enabled or not
 	IPCEnabled bool
+
+	// IPCFile is filename of exposed IPC RPC Server
+	IPCFile string
 
 	// TLSEnabled specifies whether TLS support should be enabled on node or not
 	// TLS support is only planned in go-ethereum, so we are using our own patch.
@@ -274,6 +273,34 @@ type NodeConfig struct {
 	MailServerRegistryAddress string
 }
 
+// Option is an additional setting when creating a NodeConfig
+// using NewNodeConfigWithDefaults.
+type Option func(*NodeConfig) error
+
+// WithFleet loads one of the preconfigured Status fleets.
+func WithFleet(fleet string) Option {
+	return func(c *NodeConfig) error {
+		if fleet == FleetUndefined {
+			return nil
+		}
+		return loadConfigFromAsset(fmt.Sprintf("../config/cli/fleet-%s.json", fleet), c)
+	}
+}
+
+// WithLES enabled LES protocol.
+func WithLES() Option {
+	return func(c *NodeConfig) error {
+		return loadConfigFromAsset("../config/cli/les-enabled.json", c)
+	}
+}
+
+// WithMailserver enables MailServer.
+func WithMailserver() Option {
+	return func(c *NodeConfig) error {
+		return loadConfigFromAsset("../config/cli/mailserver-enabled.json", c)
+	}
+}
+
 // NewNodeConfigWithDefaults creates new node configuration object
 // with some defaults suitable for adhoc use.
 func NewNodeConfigWithDefaults(dataDir, fleet string, networkID uint64) (*NodeConfig, error) {
@@ -290,7 +317,7 @@ func NewNodeConfigWithDefaults(dataDir, fleet string, networkID uint64) (*NodeCo
 	if fleet != FleetUndefined {
 		statusConfigJSON, err := static.Asset(fmt.Sprintf("../config/cli/fleet-%s.json", fleet))
 		if err == nil {
-			err = LoadConfigFromJSON(string(statusConfigJSON), nodeConfig)
+			err = loadNodeConfig(string(statusConfigJSON), nodeConfig)
 		}
 		if err != nil {
 			return nil, fmt.Errorf("default config could not be loaded: %s", err)
@@ -328,6 +355,10 @@ func NewNodeConfigWithDefaultsAndFiles(
 
 	c.updatePeerLimits()
 
+	if err := c.Validate(); err != nil {
+		return nil, err
+	}
+
 	return c, nil
 }
 
@@ -351,7 +382,6 @@ func NewNodeConfig(dataDir, fleet string, networkID uint64) (*NodeConfig, error)
 		NetworkID:       networkID,
 		DataDir:         dataDir,
 		Version:         Version,
-		RPCEnabled:      false,
 		HTTPHost:        "localhost",
 		HTTPPort:        8545,
 		ListenAddr:      ":0",
@@ -391,53 +421,34 @@ func NewNodeConfig(dataDir, fleet string, networkID uint64) (*NodeConfig, error)
 
 // NewConfigFromJSON parses incoming JSON and returned it as Config
 func NewConfigFromJSON(configJSON string) (*NodeConfig, error) {
-	nodeConfig, err := NewNodeConfig("", FleetUndefined, 0)
+	config, err := NewNodeConfig("", FleetUndefined, 0)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := LoadConfigFromJSON(configJSON, nodeConfig); err != nil {
+	if err := loadConfigFromJSON(configJSON, config); err != nil {
 		return nil, err
 	}
 
-	return nodeConfig, nil
-}
-
-// LoadConfigFromJSON parses incoming JSON and returned it as Config
-func LoadConfigFromJSON(configJSON string, nodeConfig *NodeConfig) error {
-	if err := loadNodeConfig(configJSON, nodeConfig); err != nil {
-		return err
+	if err := config.Validate(); err != nil {
+		return nil, err
 	}
 
-	if err := nodeConfig.Validate(); err != nil {
-		return err
-	}
-
-	return nil
+	return config, nil
 }
 
-func loadNodeConfig(configJSON string, nodeConfig *NodeConfig) error {
+// LoadAndValidateConfigFromJSON parses incoming JSON and returned it as Config
+func LoadAndValidateConfigFromJSON(configJSON string, config *NodeConfig) error {
+	if err := loadConfigFromJSON(configJSON, config); err != nil {
+		return err
+	}
+	return config.Validate()
+}
+
+func loadConfigFromJSON(configJSON string, nodeConfig *NodeConfig) error {
 	decoder := json.NewDecoder(strings.NewReader(configJSON))
-
 	// override default configuration with values by JSON input
-	if err := decoder.Decode(&nodeConfig); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func loadConfigConfigFromFile(path string, config *NodeConfig) error {
-	jsonConfig, err := ioutil.ReadFile(path)
-	if err != nil {
-		return err
-	}
-
-	if err = loadNodeConfig(string(jsonConfig), config); err != nil {
-		return err
-	}
-
-	return nil
+	return decoder.Decode(&nodeConfig)
 }
 
 // LoadConfigFromFiles reads the configuration files specified in configFilePaths,
@@ -449,7 +460,27 @@ func LoadConfigFromFiles(configFilePaths []string, config *NodeConfig) error {
 		}
 	}
 
+	if err := config.Validate(); err != nil {
+		return err
+	}
+
 	return nil
+}
+
+func loadConfigConfigFromFile(path string, config *NodeConfig) error {
+	jsonConfig, err := ioutil.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	return loadConfigFromJSON(string(jsonConfig), config)
+}
+
+func loadConfigFromAsset(name string, config *NodeConfig) error {
+	data, err := static.Asset(name)
+	if err != nil {
+		return err
+	}
+	return loadConfigFromJSON(string(data), config)
 }
 
 // Validate checks if NodeConfig fields have valid values.
@@ -665,15 +696,6 @@ func (c *NodeConfig) FormatAPIModules() []string {
 // AddAPIModule adds a mobule to APIModules
 func (c *NodeConfig) AddAPIModule(m string) {
 	c.APIModules = fmt.Sprintf("%s,%s", c.APIModules, m)
-}
-
-// GetStatusHome gets home directory of status-go
-func GetStatusHome() string {
-	gopath := os.Getenv("GOPATH")
-	if gopath == "" {
-		gopath = build.Default.GOPATH
-	}
-	return path.Join(gopath, "/src/github.com/status-im/status-go/")
 }
 
 // LesTopic returns discovery v5 topic derived from genesis of the provided network.

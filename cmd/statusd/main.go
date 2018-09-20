@@ -8,6 +8,7 @@ import (
 	stdlog "log"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -35,12 +36,17 @@ var (
 var (
 	configFiles      configFlags
 	logLevel         = flag.String("log", "", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
+	logWithoutColors = flag.Bool("log-without-color", false, "Disables log colors")
 	cliEnabled       = flag.Bool("cli", false, "Enable debugging CLI server")
 	cliPort          = flag.String("cli-port", debug.CLIPort, "CLI server's listening port")
 	pprofEnabled     = flag.Bool("pprof", false, "Enable runtime profiling via pprof")
 	pprofPort        = flag.Int("pprof-port", 52525, "Port for runtime profiling via pprof")
-	logWithoutColors = flag.Bool("log-without-color", false, "Disables log colors")
 	version          = flag.Bool("version", false, "Print version and dump configuration")
+
+	dataDir    = flag.String("dir", getDefaultDataDir(), "Directory used by node to store data")
+	networkID  = flag.Int("network-id", params.MainNetworkID, "Ethereum network to use")
+	les        = flag.Bool("les", false, "Enable LES")
+	mailserver = flag.Bool("mailserver", false, "Enable Mail Server")
 
 	// don't change the name of this flag, https://github.com/ethereum/go-ethereum/blob/master/metrics/metrics.go#L41
 	metrics = flag.Bool("metrics", false, "Expose ethereum metrics with debug_metrics jsonrpc call")
@@ -70,9 +76,9 @@ func init() {
 
 func main() {
 	config, err := params.NewNodeConfigWithDefaultsAndFiles(
-		"statusd-data",
+		*dataDir,
 		params.FleetBeta,
-		params.RopstenNetworkID,
+		uint64(*networkID),
 		configFiles...,
 	)
 	if err != nil {
@@ -156,6 +162,13 @@ func main() {
 	}
 }
 
+func getDefaultDataDir() string {
+	if home := os.Getenv("HOME"); home != "" {
+		return filepath.Join(home, ".statusd")
+	}
+	return "./statusd-data"
+}
+
 // startDebug starts the debugging API server.
 func startDebug(backend *api.StatusBackend) error {
 	_, err := debug.New(backend, *cliPort)
@@ -237,6 +250,7 @@ func printUsage() {
 	usage := `
 Usage: statusd [options]
 Examples:
+  statusd                                        # run regular Whisper node that joins Status network
   statusd -c ./default.json                      # run node with configuration specified in ./default.json file
   statusd -c ./default.json -c ./standalone.json # run node with configuration specified in ./default.json file, after merging ./standalone.json file
   statusd -c ./default.json -metrics             # run node with configuration specified in ./default.json file, and expose ethereum metrics with debug_metrics jsonrpc call
