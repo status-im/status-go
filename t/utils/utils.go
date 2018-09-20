@@ -274,8 +274,8 @@ func MakeTestNodeConfig(networkID int) (*params.NodeConfig, error) {
 // MakeTestNodeConfigWithDataDir defines a function to return a params.NodeConfig
 // where specific network addresses are assigned based on provided network id, and assigns
 // a given name and data dir.
-func MakeTestNodeConfigWithDataDir(name, dataDir, fleet string, networkID uint64) (*params.NodeConfig, error) {
-	cfg, err := params.NewNodeConfig(dataDir, fleet, networkID)
+func MakeTestNodeConfigWithDataDir(name, dataDir string, networkID uint64) (*params.NodeConfig, error) {
+	cfg, err := params.NewNodeConfig(dataDir, networkID)
 	if err != nil {
 		return nil, err
 	}

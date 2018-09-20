@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"net/url"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 
@@ -303,46 +302,41 @@ func WithMailserver() Option {
 
 // NewNodeConfigWithDefaults creates new node configuration object
 // with some defaults suitable for adhoc use.
-func NewNodeConfigWithDefaults(dataDir, fleet string, networkID uint64) (*NodeConfig, error) {
-	nodeConfig, err := NewNodeConfig(dataDir, fleet, networkID)
+func NewNodeConfigWithDefaults(dataDir string, networkID uint64, opts ...Option) (*NodeConfig, error) {
+	c, err := NewNodeConfig(dataDir, networkID)
 	if err != nil {
 		return nil, err
 	}
 
-	if dataDir != "" {
-		nodeConfig.KeyStoreDir = path.Join(dataDir, "keystore")
-		nodeConfig.WhisperConfig.DataDir = path.Join(dataDir, "wnode")
+	c.HTTPHost = ""
+	c.ListenAddr = ":30303"
+	c.LogEnabled = true
+	c.LogLevel = "INFO"
+	c.LogToStderr = true
+	c.WhisperConfig.Enabled = true
+	c.WhisperConfig.EnableNTPSync = true
+
+	for _, opt := range opts {
+		if err := opt(c); err != nil {
+			return nil, err
+		}
 	}
 
-	if fleet != FleetUndefined {
-		statusConfigJSON, err := static.Asset(fmt.Sprintf("../config/cli/fleet-%s.json", fleet))
-		if err == nil {
-			err = loadNodeConfig(string(statusConfigJSON), nodeConfig)
-		}
-		if err != nil {
-			return nil, fmt.Errorf("default config could not be loaded: %s", err)
-		}
+	c.updatePeerLimits()
+
+	if err := c.Validate(); err != nil {
+		return nil, err
 	}
 
-	nodeConfig.HTTPHost = ""
-	nodeConfig.ListenAddr = ":30303"
-	nodeConfig.LogEnabled = true
-	nodeConfig.LogLevel = "INFO"
-	nodeConfig.LogToStderr = true
-	nodeConfig.WhisperConfig.Enabled = true
-	nodeConfig.WhisperConfig.EnableNTPSync = true
-
-	nodeConfig.updatePeerLimits()
-
-	return nodeConfig, nil
+	return c, nil
 }
 
 // NewNodeConfigWithDefaultsAndFiles creates new node configuration object
 // with some defaults suitable for adhoc use and applies config files on top.
 func NewNodeConfigWithDefaultsAndFiles(
-	dataDir, fleet string, networkID uint64, files ...string,
+	dataDir string, networkID uint64, opts []Option, files []string,
 ) (*NodeConfig, error) {
-	c, err := NewNodeConfigWithDefaults(dataDir, fleet, networkID)
+	c, err := NewNodeConfigWithDefaults(dataDir, networkID, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -377,10 +371,20 @@ func (c *NodeConfig) updatePeerLimits() {
 }
 
 // NewNodeConfig creates new node configuration object with bare-minimum defaults
-func NewNodeConfig(dataDir, fleet string, networkID uint64) (*NodeConfig, error) {
-	nodeConfig := &NodeConfig{
+func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
+	var keyStoreDir, wnodeDir string
+
+	if dataDir != "" {
+		keyStoreDir = filepath.Join(dataDir, "keystore")
+	}
+	if dataDir != "" {
+		wnodeDir = filepath.Join(dataDir, "wnode")
+	}
+
+	config := &NodeConfig{
 		NetworkID:       networkID,
 		DataDir:         dataDir,
+		KeyStoreDir:     keyStoreDir,
 		Version:         Version,
 		HTTPHost:        "localhost",
 		HTTPPort:        8545,
@@ -395,33 +399,25 @@ func NewNodeConfig(dataDir, fleet string, networkID uint64) (*NodeConfig, error)
 		UpstreamConfig: UpstreamRPCConfig{
 			URL: getUpstreamURL(networkID),
 		},
-		ClusterConfig: ClusterConfig{
-			Enabled:     fleet != FleetUndefined,
-			Fleet:       fleet,
-			StaticNodes: []string{},
-			BootNodes:   []string{},
-		},
 		LightEthConfig: LightEthConfig{
-			Enabled:       false,
 			DatabaseCache: 16,
 		},
 		WhisperConfig: WhisperConfig{
-			Enabled:       false,
-			MinimumPoW:    WhisperMinimumPoW,
-			TTL:           WhisperTTL,
-			EnableNTPSync: false,
+			DataDir:    wnodeDir,
+			MinimumPoW: WhisperMinimumPoW,
+			TTL:        WhisperTTL,
 		},
 		SwarmConfig:    SwarmConfig{},
 		RegisterTopics: []discv5.Topic{},
 		RequireTopics:  map[discv5.Topic]Limits{},
 	}
 
-	return nodeConfig, nil
+	return config, nil
 }
 
 // NewConfigFromJSON parses incoming JSON and returned it as Config
 func NewConfigFromJSON(configJSON string) (*NodeConfig, error) {
-	config, err := NewNodeConfig("", FleetUndefined, 0)
+	config, err := NewNodeConfig("", 0)
 	if err != nil {
 		return nil, err
 	}
@@ -437,34 +433,10 @@ func NewConfigFromJSON(configJSON string) (*NodeConfig, error) {
 	return config, nil
 }
 
-// LoadAndValidateConfigFromJSON parses incoming JSON and returned it as Config
-func LoadAndValidateConfigFromJSON(configJSON string, config *NodeConfig) error {
-	if err := loadConfigFromJSON(configJSON, config); err != nil {
-		return err
-	}
-	return config.Validate()
-}
-
 func loadConfigFromJSON(configJSON string, nodeConfig *NodeConfig) error {
 	decoder := json.NewDecoder(strings.NewReader(configJSON))
 	// override default configuration with values by JSON input
 	return decoder.Decode(&nodeConfig)
-}
-
-// LoadConfigFromFiles reads the configuration files specified in configFilePaths,
-// merging the values in order in the config argument
-func LoadConfigFromFiles(configFilePaths []string, config *NodeConfig) error {
-	for _, path := range configFilePaths {
-		if err := loadConfigConfigFromFile(path, config); err != nil {
-			return err
-		}
-	}
-
-	if err := config.Validate(); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func loadConfigConfigFromFile(path string, config *NodeConfig) error {

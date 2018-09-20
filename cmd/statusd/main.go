@@ -44,9 +44,7 @@ var (
 	version          = flag.Bool("version", false, "Print version and dump configuration")
 
 	dataDir    = flag.String("dir", getDefaultDataDir(), "Directory used by node to store data")
-	networkID  = flag.Int("network-id", params.MainNetworkID, "Ethereum network to use")
-	les        = flag.Bool("les", false, "Enable LES")
-	mailserver = flag.Bool("mailserver", false, "Enable Mail Server")
+	mailserver = flag.Bool("mailserver", false, "Enable Mail Server with default configuration")
 
 	// don't change the name of this flag, https://github.com/ethereum/go-ethereum/blob/master/metrics/metrics.go#L41
 	metrics = flag.Bool("metrics", false, "Expose ethereum metrics with debug_metrics jsonrpc call")
@@ -75,11 +73,16 @@ func init() {
 }
 
 func main() {
+	opts := []params.Option{params.WithFleet(params.FleetBeta)}
+	if *mailserver {
+		opts = append(opts, params.WithMailserver())
+	}
+
 	config, err := params.NewNodeConfigWithDefaultsAndFiles(
 		*dataDir,
-		params.FleetBeta,
-		uint64(*networkID),
-		configFiles...,
+		uint64(params.RopstenNetworkID),
+		opts,
+		configFiles,
 	)
 	if err != nil {
 		printUsage()
@@ -214,7 +217,7 @@ func configureStatusService(flagValue string, nodeConfig *params.NodeConfig) (*p
 		}
 		nodeConfig.StatusServiceEnabled = true
 	case "http":
-		if !nodeConfig.RPCEnabled {
+		if !nodeConfig.HTTPEnabled {
 			return nil, errStatusServiceRequiresHTTP
 		}
 		nodeConfig.StatusServiceEnabled = true

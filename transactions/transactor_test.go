@@ -54,7 +54,7 @@ func (s *TransactorSuite) SetupTest() {
 	rpcClient, _ := rpc.NewClient(s.client, params.UpstreamRPCConfig{})
 	// expected by simulated backend
 	chainID := gethparams.AllEthashProtocolChanges.ChainID.Uint64()
-	nodeConfig, err := MakeTestNodeConfigWithDataDir("", "/tmp", params.FleetBeta, chainID)
+	nodeConfig, err := MakeTestNodeConfigWithDataDir("", "/tmp", chainID)
 	s.Require().NoError(err)
 	s.nodeConfig = nodeConfig
 

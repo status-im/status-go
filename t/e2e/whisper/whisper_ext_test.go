@@ -11,7 +11,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"github.com/status-im/status-go/node"
-	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/suite"
@@ -33,7 +32,7 @@ func (s *WhisperExtensionSuite) SetupTest() {
 		dir, err := ioutil.TempDir("", "test-shhext-")
 		s.NoError(err)
 		// network id is irrelevant
-		cfg, err := utils.MakeTestNodeConfigWithDataDir(fmt.Sprintf("test-shhext-%d", i), dir, params.FleetUndefined, 777)
+		cfg, err := utils.MakeTestNodeConfigWithDataDir(fmt.Sprintf("test-shhext-%d", i), dir, 777)
 		s.Require().NoError(err)
 		s.nodes[i] = node.New()
 		s.Require().NoError(s.nodes[i].Start(cfg))
