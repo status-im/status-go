@@ -195,7 +195,8 @@ xgo-docker-images: ##@docker Build xgo docker images
 
 xgo:
 	docker pull $(XGOIMAGE)
-	go get github.com/karalabe/xgo
+	go get github.com/status-im/xgo
+	mkdir -p $(GOBIN)
 
 setup: dep-install lint-install mock-install update-fleet-config ##@other Prepare project for first build
 

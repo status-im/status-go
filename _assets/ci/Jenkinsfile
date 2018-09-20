@@ -36,7 +36,7 @@ node('linux') {
     // }
 
     stage('Build') {
-        sh 'go get github.com/karalabe/xgo'
+        sh 'go get github.com/status-im/xgo'
 
         parallel (
             'statusgo-android': {
