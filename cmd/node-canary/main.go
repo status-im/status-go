@@ -32,7 +32,7 @@ const (
 )
 
 // All general log messages in this package should be routed through this logger.
-var logger = log.New("package", "status-go/cmd/mailserver-canary")
+var logger = log.New("package", "status-go/cmd/node-canary")
 
 var (
 	staticEnodeAddr     = flag.String("staticnode", "", "static node enode address to test (e.g. enode://3f04db09bedc8d85a198de94c84da73aa7782fafc61b28c525ec5cca5a6cc16be7ebbb5cd001780f71d8408d35a2f6326faa1e524d9d8875294172ebec988743@172.16.238.10:30303)")
@@ -257,6 +257,7 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 	nodeConfig.NoDiscovery = true
 	if *staticEnodeAddr != "" {
 		nodeConfig.ClusterConfig.Enabled = true
+		nodeConfig.ClusterConfig.Fleet = "none"
 		nodeConfig.ClusterConfig.StaticNodes = []string{
 			*staticEnodeAddr,
 		}
