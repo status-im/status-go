@@ -41,15 +41,19 @@ node('linux') {
         println(gitSHA)
     }
 
-    stage('Test') {
+    stage('Build and test') {
         dir(cloneDir) {
             sh 'make setup'
             sh 'make ci'
         }
     }
 
-    stage('Build') {
+    stage('Build packages') {
         sh 'go get github.com/status-im/xgo'
+        dir(cloneDir) {
+            // Ensure folders are created with correct owner (otherwise xgo will create files owned by root)
+            sh 'mkdir -p build/lib/'
+        }
 
         parallel (
             'statusgo-android': {
@@ -64,6 +68,48 @@ node('linux') {
                         cd build/bin/statusgo-ios-9.3-framework/
                         zip -r status-go-ios.zip Statusgo.framework
                     '''
+                }
+            }
+        )
+
+        parallel (
+            'statusgo-linux': {
+                dir(cloneDir) {
+                    sh """
+                        make statusgo-linux
+                        mkdir -p build/lib/linux
+                        cd build/lib/linux
+                        mkdir -p include lib
+                        mv ../statusgo-linux-amd64.a lib/libstatus.a
+                        mv ../statusgo-linux-amd64.h include/libstatus.h
+                        zip status-go-linux.zip lib/* include/*
+                    """
+                }
+            },
+            'statusgo-windows': {
+                dir(cloneDir) {
+                    sh """
+                        make statusgo-windows
+                        mkdir -p build/lib/windows
+                        cd build/lib/windows
+                        mkdir -p include lib
+                        mv ../statusgo-windows-4.0-amd64.lib lib/status.lib
+                        mv ../statusgo-windows-4.0-amd64.h include/status.h
+                        zip status-go-win-x86-64.zip lib/* include/*
+                    """
+                }
+            },
+            'statusgo-macos': {
+                dir(cloneDir) {
+                    sh """
+                        make statusgo-macos
+                        mkdir -p build/lib/darwin
+                        cd build/lib/darwin
+                        mkdir -p include lib
+                        mv ../statusgo-darwin-10.6-amd64.a lib/libstatus.a
+                        mv ../statusgo-darwin-10.6-amd64.h include/libstatus.h
+                        zip status-go-darwin.zip lib/* include/*
+                    """
                 }
             }
         )

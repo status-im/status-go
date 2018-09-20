@@ -32,6 +32,7 @@ endif
 
 CGO_CFLAGS = -I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
 GOBIN = $(dir $(realpath $(firstword $(MAKEFILE_LIST))))build/bin
+GOLIB = $(dir $(realpath $(firstword $(MAKEFILE_LIST))))build/lib
 GIT_COMMIT = $(shell git rev-parse --short HEAD)
 AUTHOR = $(shell echo $$USER)
 
@@ -111,40 +112,53 @@ node-canary: ##@build Build P2P node canary using status-go deps
 	go build -i -o $(GOBIN)/node-canary -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/node-canary/
 	@echo "Compilation done."
 
-statusgo-cross: statusgo-android statusgo-ios
+statusgo-cross: statusgo-linux statusgo-macos statusgo-windows statusgo-android statusgo-ios
 	@echo "Full cross compilation done."
-	@ls -ld $(GOBIN)/statusgo-*
+	@ls -ld $(GOLIB)/statusgo-*
 
 statusgo-linux: xgo ##@cross-compile Build status-go for Linux
 	./_assets/patches/patcher -b . -p geth-xgo
-	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(XGO_GO) -out statusgo --dest=$(GOBIN) --targets=linux/amd64 -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/statusd
+	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(XGO_GO) -buildmode=c-archive -out statusgo --dest=$(GOLIB) --targets=linux/amd64 -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./lib
 	./_assets/patches/patcher -b . -p geth-xgo -r
-	@echo "Android cross compilation done."
+	@echo "Linux cross compilation done."
+
+statusgo-windows: xgo ##@cross-compile Build status-go for Windows
+	# NOTE: This could be achieved without xgo by leveraging the MXE mingw64 toolchain hosted in conan.status.im
+	./_assets/patches/patcher -b . -p geth-xgo
+	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(XGO_GO) -buildmode=c-archive -out statusgo --dest=$(GOLIB) --targets=windows/amd64 -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./lib
+	./_assets/patches/patcher -b . -p geth-xgo -r
+	@echo "Windows cross compilation done."
+
+statusgo-macos: xgo ##@cross-compile Build status-go for MacOS
+	./_assets/patches/patcher -b . -p geth-xgo
+	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(XGO_GO) -buildmode=c-archive -out statusgo --dest=$(GOLIB) --targets=darwin/amd64 -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./lib
+	./_assets/patches/patcher -b . -p geth-xgo -r
+	@echo "MacOS cross compilation done."
 
 statusgo-android: xgo ##@cross-compile Build status-go for Android
 	./_assets/patches/patcher -b . -p geth-xgo
-	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(XGO_GO) -out statusgo --dest=$(GOBIN) --targets=android-16/aar -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./lib
+	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(XGO_GO) -out statusgo --dest=$(GOLIB) --targets=android-16/aar -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./lib
 	./_assets/patches/patcher -b . -p geth-xgo -r
 	@echo "Android cross compilation done."
 
 statusgo-ios: xgo	##@cross-compile Build status-go for iOS
 	./_assets/patches/patcher -b . -p geth-xgo
-	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(XGO_GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./lib
+	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(XGO_GO) -out statusgo --dest=$(GOLIB) --targets=ios-9.3/framework -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./lib
 	./_assets/patches/patcher -b . -p geth-xgo -r
 	@echo "iOS framework cross compilation done."
 
 statusgo-ios-simulator: xgo	##@cross-compile Build status-go for iOS Simulator
 	@docker pull $(XGOIMAGEIOSSIM)
 	./_assets/patches/patcher -b . -p geth-xgo
-	$(GOPATH)/bin/xgo --image $(XGOIMAGEIOSSIM) --go=$(XGO_GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./lib
+	$(GOPATH)/bin/xgo --image $(XGOIMAGEIOSSIM) --go=$(XGO_GO) -out statusgo --dest=$(GOLIB) --targets=ios-9.3/framework -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./lib
 	./_assets/patches/patcher -b . -p geth-xgo -r
 	@echo "iOS framework cross compilation done."
 
 statusgo-library: ##@cross-compile Build status-go as static library for current platform
 	@echo "Building static library..."
-	go build -buildmode=c-archive -o $(GOBIN)/libstatus.a ./lib
+	go build -buildmode=c-archive -o $(GOLIB)/libstatus.a ./lib
 	@echo "Static library built:"
-	@ls -la $(GOBIN)/libstatus.*
+	@ls -la $(GOLIB)/libstatus.*
 
 docker-image: ##@docker Build docker image (use DOCKER_IMAGE_NAME to set the image name)
 	@echo "Building docker image..."
@@ -219,6 +233,9 @@ prepare-release: clean-release
 	mkdir -p $(RELEASE_DIRECTORY)
 	mv build/bin/statusgo-android-16.aar $(RELEASE_DIRECTORY)/status-go-android.aar
 	mv build/bin/statusgo-ios-9.3-framework/status-go-ios.zip $(RELEASE_DIRECTORY)/status-go-ios.zip
+	mv build/lib/linux/status-go-linux.zip $(RELEASE_DIRECTORY)/status-go-linux.zip
+	mv build/lib/darwin/status-go-darwin.zip $(RELEASE_DIRECTORY)/status-go-darwin.zip
+	mv build/lib/windows/status-go-win-x86-64.zip $(RELEASE_DIRECTORY)/status-go-win-x86-64.zip
 	${MAKE} clean
 	zip -r $(RELEASE_DIRECTORY)/status-go-desktop.zip . -x *.git*
 
@@ -300,10 +317,10 @@ lint:
 ci: lint mock dep-ensure canary-test test-unit test-e2e ##@tests Run all linters and tests at once
 
 clean: ##@other Cleanup
-	rm -fr build/bin/*
+	rm -rf build/bin/* build/lib/*
 
 deep-clean: clean
-	rm -Rdf .ethereumtest/StatusChain
+	git clean -qdxf
 
 dep-ensure: ##@dependencies Ensure all dependencies are in place with dep
 	@dep ensure

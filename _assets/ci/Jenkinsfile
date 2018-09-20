@@ -36,44 +36,85 @@ node('linux') {
         sh 'make canary-test'
     }
 
-    stage('Build') {
+    stage('Build packages') {
         sh 'go get github.com/status-im/xgo'
+        dir(cloneDir) {
+            // Ensure folders are created with correct owner (otherwise xgo will create files owned by root)
+            sh 'mkdir -p build/lib/'
+        }
 
         parallel (
             'statusgo-android': {
                 sh 'make statusgo-android'
             },
             'statusgo-ios-simulator': {
-                sh '''
-                    make statusgo-ios-simulator
-                    cd build/bin/statusgo-ios-9.3-framework/
-                    zip -r status-go-ios.zip Statusgo.framework
-                '''
+                dir(cloneDir) {
+                    sh """
+                        make statusgo-ios-simulator
+                        cd build/lib/
+                        zip -r status-go-ios.zip statusgo-ios-9.3-framework/Statusgo.framework
+                    """
+                }
+            }
+        )
+
+        parallel (
+            'statusgo-linux': {
+                dir(cloneDir) {
+                    sh """
+                        make statusgo-linux
+                        mkdir -p build/lib/linux
+                        cd build/lib/linux
+                        mkdir -p include lib
+                        mv ../statusgo-linux-amd64.a lib/libstatus.a
+                        mv ../statusgo-linux-amd64.h include/libstatus.h
+                        zip status-go-linux.zip lib/* include/*
+                    """
+                }
+            },
+            'statusgo-windows': {
+                dir(cloneDir) {
+                    sh """
+                        make statusgo-windows
+                        mkdir -p build/lib/windows
+                        cd build/lib/windows
+                        mkdir -p include lib
+                        mv ../statusgo-windows-4.0-amd64.lib lib/status.lib
+                        mv ../statusgo-windows-4.0-amd64.h include/status.h
+                        zip status-go-win-x86-64.zip lib/* include/*
+                    """
+                }
+            },
+            'statusgo-macos': {
+                dir(cloneDir) {
+                    sh """
+                        make statusgo-macos
+                        mkdir -p build/lib/darwin
+                        cd build/lib/darwin
+                        mkdir -p include lib
+                        mv ../statusgo-darwin-10.6-amd64.a lib/libstatus.a
+                        mv ../statusgo-darwin-10.6-amd64.h include/libstatus.h
+                        zip status-go-darwin.zip lib/* include/*
+                    """
+                }
             }
         )
     }
 
     stage('Deploy') {
-        // For branch builds, replace the old artifact. For develop keep all of them.
-        def version = gitBranch == 'develop' ? getVersion(gitBranch, gitShortSHA, '') : getVersion(gitBranch, gitShortSHA, env.BUILD_ID)
-        def server = Artifactory.server 'artifactory'
-        def uploadSpec = """{
-            "files": [
-                {
-                    "pattern": "build/bin/statusgo-android-16.aar",
-                    "target": "libs-release-local/status-im/status-go/${version}/status-go-${version}.aar"
-                },
-                {
-                    "pattern": "build/bin/statusgo-ios-9.3-framework/status-go-ios.zip",
-                    "target": "libs-release-local/status-im/status-go-ios-simulator/${version}/status-go-ios-simulator-${version}.zip"
-                }
-            ]
-        }"""
-
-        def buildInfo = Artifactory.newBuildInfo()
-        buildInfo.env.capture = false
-        buildInfo.name = 'status-go (' + gitBranch + '-' + gitShortSHA + ')'
-        server.upload(uploadSpec, buildInfo)
-        server.publishBuildInfo(buildInfo)
+        dir(cloneDir) {
+            sh "make prepare-release"
+            withCredentials([[
+                $class: 'UsernamePasswordMultiBinding',
+                credentialsId: 'status-im-auto',
+                usernameVariable: 'GITHUB_USER',
+                passwordVariable: 'GITHUB_TOKEN'
+            ]]) {
+              sh """
+                yes | make release release_branch=${gitBranch}
+              """
+            }
+            sh "make clean-release"
+        }
     }
 }

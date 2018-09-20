@@ -34,8 +34,7 @@ tags
 .settings
 
 # used by the Makefile
-/build/_workspace/
-/build/bin/
+/build/
 /vendor/github.com/status-im/xgo
 
 # travis
