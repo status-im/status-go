@@ -36,6 +36,10 @@ node('linux') {
         sh 'make canary-test'
     }
 
+    stage('Build and test') {
+        sh 'make ci'
+    }
+
     stage('Build packages') {
         sh 'go get github.com/status-im/xgo'
         dir(cloneDir) {
