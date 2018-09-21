@@ -34,6 +34,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/juju/ratelimit"
 	"github.com/syndtr/goleveldb/leveldb/errors"
 	"golang.org/x/crypto/pbkdf2"
 	"golang.org/x/sync/syncmap"
@@ -125,6 +126,8 @@ func New(cfg *Config) *Whisper {
 	whisper.settings.Store(minPowIdx, cfg.MinimumAcceptedPOW)
 	whisper.settings.Store(maxMsgSizeIdx, cfg.MaxMessageSize)
 	whisper.settings.Store(overflowIdx, false)
+	whisper.settings.Store("ingress", cfg.IngressRateLimit)
+	whisper.settings.Store("egress", cfg.EgressRateLimit)
 
 	// p2p whisper sub protocol handler
 	whisper.protocol = p2p.Protocol{
@@ -706,6 +709,22 @@ func (whisper *Whisper) Start(*p2p.Server) error {
 	return nil
 }
 
+func (whisper *Whisper) newIngressRateLimit() *ratelimit.Bucket {
+	conf := whisper.ingressRateLimitConfig()
+	return ratelimit.NewBucketWithQuantum(conf.IntervalDuration(), int64(conf.Capacity), int64(conf.Quantum))
+}
+
+func (whisper *Whisper) ingressRateLimitConfig() RateLimitConfig {
+	setting, _ := whisper.settings.Load("ingress")
+	return setting.(RateLimitConfig)
+}
+
+func (whisper *Whisper) defaultEgressRateLimit() *ratelimit.Bucket {
+	setting, _ := whisper.settings.Load("egress")
+	conf := setting.(RateLimitConfig)
+	return ratelimit.NewBucketWithQuantum(conf.IntervalDuration(), int64(conf.Capacity), int64(conf.Quantum))
+}
+
 // Stop implements node.Service, stopping the background data propagation thread
 // of the Whisper protocol.
 func (whisper *Whisper) Stop() error {
@@ -736,12 +755,19 @@ func (whisper *Whisper) HandlePeer(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
 	}
 	whisperPeer.start()
 	defer whisperPeer.stop()
-
 	return whisper.runMessageLoop(whisperPeer, rw)
 }
 
 // runMessageLoop reads and processes inbound messages directly to merge into client-global state.
 func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
+	// it is not sent as a part of handshake because then we won't be compatible with possible
+	// future whisper upgrades. e.g. we could append rate limit conf to list of rlp items in hanshake.
+	// but in upstream that list could be extended with any other option. so we will fail to read that option.
+	if err := p2p.Send(rw, peerRateLimitCode, whisper.ingressRateLimitConfig()); err != nil {
+		return fmt.Errorf("failed to send ingress rate limit to a peer %x: %v", p, err)
+	}
+	// TODO wait for some time for a peer to deliver our ingress to a remote peer.
+	rl := whisper.newIngressRateLimit()
 	for {
 		// fetch the next packet
 		packet, err := rw.ReadMsg()
@@ -818,6 +844,8 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 					return errors.New("invalid direct message")
 				}
 				whisper.postEvent(&envelope, true)
+			} else {
+				return fmt.Errorf("peer %x sent us %d, while connection is not marked as trusted.", p.ID(), p2pMessageCode)
 			}
 		case p2pRequestCode:
 			// Must be processed if mail server is implemented. Otherwise ignore.
@@ -830,6 +858,12 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 
 				whisper.mailServer.DeliverMail(p, &request)
 			}
+		case peerRateLimitCode:
+			var conf RateLimitConfig
+			if err := packet.Decode(&conf); err != nil {
+				return fmt.Errorf("peer %x sent wrong payload for a rate limiter config", p.ID())
+			}
+			p.updateEgressRateLimit(conf)
 		case p2pRequestCompleteCode:
 			if p.trusted {
 				var payload []byte
@@ -883,6 +917,12 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 		}
 
 		packet.Discard()
+
+		if packet.Code != p2pMessageCode {
+			if rl.TakeAvailable(int64(packet.Size)) < int64(packet.Size) {
+				return fmt.Errorf("peer %x reached rate limit with capacity %d and rate %f", p.ID(), rl.Capacity(), rl.Rate())
+			}
+		}
 	}
 }
 
