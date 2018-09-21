@@ -46,6 +46,14 @@ var (
 	dataDir    = flag.String("dir", getDefaultDataDir(), "Directory used by node to store data")
 	register   = flag.Bool("register", false, "Register and make the node discoverable by other nodes")
 	mailserver = flag.Bool("mailserver", false, "Enable Mail Server with default configuration")
+	networkID  = flag.Int(
+		"network-id",
+		params.RopstenNetworkID,
+		fmt.Sprintf(
+			"A network ID: %d (Mainnet), %d (Ropsten), %d (Rinkeby)",
+			params.MainNetworkID, params.RopstenNetworkID, params.RinkebyNetworkID,
+		),
+	)
 
 	// don't change the name of this flag, https://github.com/ethereum/go-ethereum/blob/master/metrics/metrics.go#L41
 	metrics = flag.Bool("metrics", false, "Expose ethereum metrics with debug_metrics jsonrpc call")
@@ -82,7 +90,7 @@ func main() {
 
 	config, err := params.NewNodeConfigWithDefaultsAndFiles(
 		*dataDir,
-		uint64(params.RopstenNetworkID),
+		uint64(*networkID),
 		opts,
 		configFiles,
 	)
