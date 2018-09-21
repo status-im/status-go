@@ -30,7 +30,7 @@ func (s *MailServiceSuite) TestShhextRequestMessagesRPCMethodAvailability() {
 	r := s.Require()
 
 	s.StartTestNode(func(config *params.NodeConfig) {
-		config.RPCEnabled = true
+		config.HTTPEnabled = true
 		config.AddAPIModule("shhext")
 	})
 	defer s.StopTestNode()

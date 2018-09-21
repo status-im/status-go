@@ -92,19 +92,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	if *logLevel != "" {
-		config.LogLevel = *logLevel
-	}
-
-	colors := !(*logWithoutColors) && terminal.IsTerminal(int(os.Stdin.Fd()))
-	if err := logutils.OverrideRootLog(
-		logEnabled(config),
-		config.LogLevel,
-		config.LogFile,
-		colors,
-	); err != nil {
-		stdlog.Fatalf("Error initializing logger: %v", err)
-	}
+	// set up logging options
+	setupLogging(config)
 
 	// We want statusd to be distinct from StatusIM client.
 	config.Name = serverClientName
@@ -170,6 +159,22 @@ func getDefaultDataDir() string {
 		return filepath.Join(home, ".statusd")
 	}
 	return "./statusd-data"
+}
+
+func setupLogging(config *params.NodeConfig) {
+	if *logLevel != "" {
+		config.LogLevel = *logLevel
+	}
+
+	colors := !(*logWithoutColors) && terminal.IsTerminal(int(os.Stdin.Fd()))
+	if err := logutils.OverrideRootLog(
+		logEnabled(config),
+		config.LogLevel,
+		config.LogFile,
+		colors,
+	); err != nil {
+		stdlog.Fatalf("Error initializing logger: %v", err)
+	}
 }
 
 // startDebug starts the debugging API server.
