@@ -8,6 +8,7 @@ import (
 	stdlog "log"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -35,12 +36,16 @@ var (
 var (
 	configFiles      configFlags
 	logLevel         = flag.String("log", "", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
+	logWithoutColors = flag.Bool("log-without-color", false, "Disables log colors")
 	cliEnabled       = flag.Bool("cli", false, "Enable debugging CLI server")
 	cliPort          = flag.String("cli-port", debug.CLIPort, "CLI server's listening port")
 	pprofEnabled     = flag.Bool("pprof", false, "Enable runtime profiling via pprof")
 	pprofPort        = flag.Int("pprof-port", 52525, "Port for runtime profiling via pprof")
-	logWithoutColors = flag.Bool("log-without-color", false, "Disables log colors")
 	version          = flag.Bool("version", false, "Print version and dump configuration")
+
+	dataDir    = flag.String("dir", getDefaultDataDir(), "Directory used by node to store data")
+	register   = flag.Bool("register", false, "Register and make the node discoverable by other nodes")
+	mailserver = flag.Bool("mailserver", false, "Enable Mail Server with default configuration")
 
 	// don't change the name of this flag, https://github.com/ethereum/go-ethereum/blob/master/metrics/metrics.go#L41
 	metrics = flag.Bool("metrics", false, "Expose ethereum metrics with debug_metrics jsonrpc call")
@@ -68,12 +73,18 @@ func init() {
 	}
 }
 
+// nolint:gocyclo
 func main() {
+	opts := []params.Option{params.WithFleet(params.FleetBeta)}
+	if *mailserver {
+		opts = append(opts, params.WithMailserver())
+	}
+
 	config, err := params.NewNodeConfigWithDefaultsAndFiles(
-		"statusd-data",
-		params.FleetBeta,
-		params.RopstenNetworkID,
-		configFiles...,
+		*dataDir,
+		uint64(params.RopstenNetworkID),
+		opts,
+		configFiles,
 	)
 	if err != nil {
 		printUsage()
@@ -83,19 +94,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	if *logLevel != "" {
-		config.LogLevel = *logLevel
+	if *register && *mailserver {
+		config.RegisterTopics = append(config.RegisterTopics, params.MailServerDiscv5Topic)
+	} else if *register {
+		config.RegisterTopics = append(config.RegisterTopics, params.WhisperDiscv5Topic)
 	}
 
-	colors := !(*logWithoutColors) && terminal.IsTerminal(int(os.Stdin.Fd()))
-	if err := logutils.OverrideRootLog(
-		logEnabled(config),
-		config.LogLevel,
-		config.LogFile,
-		colors,
-	); err != nil {
-		stdlog.Fatalf("Error initializing logger: %v", err)
-	}
+	// set up logging options
+	setupLogging(config)
 
 	// We want statusd to be distinct from StatusIM client.
 	config.Name = serverClientName
@@ -156,6 +162,29 @@ func main() {
 	}
 }
 
+func getDefaultDataDir() string {
+	if home := os.Getenv("HOME"); home != "" {
+		return filepath.Join(home, ".statusd")
+	}
+	return "./statusd-data"
+}
+
+func setupLogging(config *params.NodeConfig) {
+	if *logLevel != "" {
+		config.LogLevel = *logLevel
+	}
+
+	colors := !(*logWithoutColors) && terminal.IsTerminal(int(os.Stdin.Fd()))
+	if err := logutils.OverrideRootLog(
+		logEnabled(config),
+		config.LogLevel,
+		config.LogFile,
+		colors,
+	); err != nil {
+		stdlog.Fatalf("Error initializing logger: %v", err)
+	}
+}
+
 // startDebug starts the debugging API server.
 func startDebug(backend *api.StatusBackend) error {
 	_, err := debug.New(backend, *cliPort)
@@ -201,7 +230,7 @@ func configureStatusService(flagValue string, nodeConfig *params.NodeConfig) (*p
 		}
 		nodeConfig.StatusServiceEnabled = true
 	case "http":
-		if !nodeConfig.RPCEnabled {
+		if !nodeConfig.HTTPEnabled {
 			return nil, errStatusServiceRequiresHTTP
 		}
 		nodeConfig.StatusServiceEnabled = true
@@ -237,6 +266,7 @@ func printUsage() {
 	usage := `
 Usage: statusd [options]
 Examples:
+  statusd                                        # run regular Whisper node that joins Status network
   statusd -c ./default.json                      # run node with configuration specified in ./default.json file
   statusd -c ./default.json -c ./standalone.json # run node with configuration specified in ./default.json file, after merging ./standalone.json file
   statusd -c ./default.json -metrics             # run node with configuration specified in ./default.json file, and expose ethereum metrics with debug_metrics jsonrpc call

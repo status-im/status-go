@@ -3,11 +3,9 @@ package params
 import (
 	"encoding/json"
 	"fmt"
-	"go/build"
 	"io/ioutil"
 	"net/url"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 
@@ -199,21 +197,21 @@ type NodeConfig struct {
 	// APIModules is a comma-separated list of API modules exposed via *any* (HTTP/WS/IPC) RPC interface.
 	APIModules string
 
+	// HTTPEnabled specifies whether the http RPC server is to be enabled by default.
+	HTTPEnabled bool
+
 	// HTTPHost is the host interface on which to start the HTTP RPC server.
 	// Pass empty string if no HTTP RPC interface needs to be started.
 	HTTPHost string
 
-	// RPCEnabled specifies whether the http RPC server is to be enabled by default.
-	RPCEnabled bool
-
 	// HTTPPort is the TCP port number on which to start the Geth's HTTP RPC server.
 	HTTPPort int
 
-	// IPCFile is filename of exposed IPC RPC Server
-	IPCFile string
-
 	// IPCEnabled specifies whether IPC-RPC Server is enabled or not
 	IPCEnabled bool
+
+	// IPCFile is filename of exposed IPC RPC Server
+	IPCFile string
 
 	// TLSEnabled specifies whether TLS support should be enabled on node or not
 	// TLS support is only planned in go-ethereum, so we are using our own patch.
@@ -274,48 +272,71 @@ type NodeConfig struct {
 	MailServerRegistryAddress string
 }
 
+// Option is an additional setting when creating a NodeConfig
+// using NewNodeConfigWithDefaults.
+type Option func(*NodeConfig) error
+
+// WithFleet loads one of the preconfigured Status fleets.
+func WithFleet(fleet string) Option {
+	return func(c *NodeConfig) error {
+		if fleet == FleetUndefined {
+			return nil
+		}
+		return loadConfigFromAsset(fmt.Sprintf("../config/cli/fleet-%s.json", fleet), c)
+	}
+}
+
+// WithLES enabled LES protocol.
+func WithLES() Option {
+	return func(c *NodeConfig) error {
+		return loadConfigFromAsset("../config/cli/les-enabled.json", c)
+	}
+}
+
+// WithMailserver enables MailServer.
+func WithMailserver() Option {
+	return func(c *NodeConfig) error {
+		return loadConfigFromAsset("../config/cli/mailserver-enabled.json", c)
+	}
+}
+
 // NewNodeConfigWithDefaults creates new node configuration object
 // with some defaults suitable for adhoc use.
-func NewNodeConfigWithDefaults(dataDir, fleet string, networkID uint64) (*NodeConfig, error) {
-	nodeConfig, err := NewNodeConfig(dataDir, fleet, networkID)
+func NewNodeConfigWithDefaults(dataDir string, networkID uint64, opts ...Option) (*NodeConfig, error) {
+	c, err := NewNodeConfig(dataDir, networkID)
 	if err != nil {
 		return nil, err
 	}
 
-	if dataDir != "" {
-		nodeConfig.KeyStoreDir = path.Join(dataDir, "keystore")
-		nodeConfig.WhisperConfig.DataDir = path.Join(dataDir, "wnode")
+	c.HTTPHost = ""
+	c.ListenAddr = ":30303"
+	c.LogEnabled = true
+	c.LogLevel = "INFO"
+	c.LogToStderr = true
+	c.WhisperConfig.Enabled = true
+	c.WhisperConfig.EnableNTPSync = true
+
+	for _, opt := range opts {
+		if err := opt(c); err != nil {
+			return nil, err
+		}
 	}
 
-	if fleet != FleetUndefined {
-		statusConfigJSON, err := static.Asset(fmt.Sprintf("../config/cli/fleet-%s.json", fleet))
-		if err == nil {
-			err = LoadConfigFromJSON(string(statusConfigJSON), nodeConfig)
-		}
-		if err != nil {
-			return nil, fmt.Errorf("default config could not be loaded: %s", err)
-		}
+	c.updatePeerLimits()
+
+	if err := c.Validate(); err != nil {
+		return nil, err
 	}
 
-	nodeConfig.HTTPHost = ""
-	nodeConfig.ListenAddr = ":30303"
-	nodeConfig.LogEnabled = true
-	nodeConfig.LogLevel = "INFO"
-	nodeConfig.LogToStderr = true
-	nodeConfig.WhisperConfig.Enabled = true
-	nodeConfig.WhisperConfig.EnableNTPSync = true
-
-	nodeConfig.updatePeerLimits()
-
-	return nodeConfig, nil
+	return c, nil
 }
 
 // NewNodeConfigWithDefaultsAndFiles creates new node configuration object
 // with some defaults suitable for adhoc use and applies config files on top.
 func NewNodeConfigWithDefaultsAndFiles(
-	dataDir, fleet string, networkID uint64, files ...string,
+	dataDir string, networkID uint64, opts []Option, files []string,
 ) (*NodeConfig, error) {
-	c, err := NewNodeConfigWithDefaults(dataDir, fleet, networkID)
+	c, err := NewNodeConfigWithDefaults(dataDir, networkID, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -327,6 +348,10 @@ func NewNodeConfigWithDefaultsAndFiles(
 	}
 
 	c.updatePeerLimits()
+
+	if err := c.Validate(); err != nil {
+		return nil, err
+	}
 
 	return c, nil
 }
@@ -346,12 +371,21 @@ func (c *NodeConfig) updatePeerLimits() {
 }
 
 // NewNodeConfig creates new node configuration object with bare-minimum defaults
-func NewNodeConfig(dataDir, fleet string, networkID uint64) (*NodeConfig, error) {
-	nodeConfig := &NodeConfig{
+func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
+	var keyStoreDir, wnodeDir string
+
+	if dataDir != "" {
+		keyStoreDir = filepath.Join(dataDir, "keystore")
+	}
+	if dataDir != "" {
+		wnodeDir = filepath.Join(dataDir, "wnode")
+	}
+
+	config := &NodeConfig{
 		NetworkID:       networkID,
 		DataDir:         dataDir,
+		KeyStoreDir:     keyStoreDir,
 		Version:         Version,
-		RPCEnabled:      false,
 		HTTPHost:        "localhost",
 		HTTPPort:        8545,
 		ListenAddr:      ":0",
@@ -365,66 +399,44 @@ func NewNodeConfig(dataDir, fleet string, networkID uint64) (*NodeConfig, error)
 		UpstreamConfig: UpstreamRPCConfig{
 			URL: getUpstreamURL(networkID),
 		},
-		ClusterConfig: ClusterConfig{
-			Enabled:     fleet != FleetUndefined,
-			Fleet:       fleet,
-			StaticNodes: []string{},
-			BootNodes:   []string{},
-		},
 		LightEthConfig: LightEthConfig{
-			Enabled:       false,
 			DatabaseCache: 16,
 		},
 		WhisperConfig: WhisperConfig{
-			Enabled:       false,
-			MinimumPoW:    WhisperMinimumPoW,
-			TTL:           WhisperTTL,
-			EnableNTPSync: false,
+			DataDir:    wnodeDir,
+			MinimumPoW: WhisperMinimumPoW,
+			TTL:        WhisperTTL,
 		},
 		SwarmConfig:    SwarmConfig{},
 		RegisterTopics: []discv5.Topic{},
 		RequireTopics:  map[discv5.Topic]Limits{},
 	}
 
-	return nodeConfig, nil
+	return config, nil
 }
 
 // NewConfigFromJSON parses incoming JSON and returned it as Config
 func NewConfigFromJSON(configJSON string) (*NodeConfig, error) {
-	nodeConfig, err := NewNodeConfig("", FleetUndefined, 0)
+	config, err := NewNodeConfig("", 0)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := LoadConfigFromJSON(configJSON, nodeConfig); err != nil {
+	if err := loadConfigFromJSON(configJSON, config); err != nil {
 		return nil, err
 	}
 
-	return nodeConfig, nil
-}
-
-// LoadConfigFromJSON parses incoming JSON and returned it as Config
-func LoadConfigFromJSON(configJSON string, nodeConfig *NodeConfig) error {
-	if err := loadNodeConfig(configJSON, nodeConfig); err != nil {
-		return err
+	if err := config.Validate(); err != nil {
+		return nil, err
 	}
 
-	if err := nodeConfig.Validate(); err != nil {
-		return err
-	}
-
-	return nil
+	return config, nil
 }
 
-func loadNodeConfig(configJSON string, nodeConfig *NodeConfig) error {
+func loadConfigFromJSON(configJSON string, nodeConfig *NodeConfig) error {
 	decoder := json.NewDecoder(strings.NewReader(configJSON))
-
 	// override default configuration with values by JSON input
-	if err := decoder.Decode(&nodeConfig); err != nil {
-		return err
-	}
-
-	return nil
+	return decoder.Decode(&nodeConfig)
 }
 
 func loadConfigConfigFromFile(path string, config *NodeConfig) error {
@@ -432,24 +444,15 @@ func loadConfigConfigFromFile(path string, config *NodeConfig) error {
 	if err != nil {
 		return err
 	}
-
-	if err = loadNodeConfig(string(jsonConfig), config); err != nil {
-		return err
-	}
-
-	return nil
+	return loadConfigFromJSON(string(jsonConfig), config)
 }
 
-// LoadConfigFromFiles reads the configuration files specified in configFilePaths,
-// merging the values in order in the config argument
-func LoadConfigFromFiles(configFilePaths []string, config *NodeConfig) error {
-	for _, path := range configFilePaths {
-		if err := loadConfigConfigFromFile(path, config); err != nil {
-			return err
-		}
+func loadConfigFromAsset(name string, config *NodeConfig) error {
+	data, err := static.Asset(name)
+	if err != nil {
+		return err
 	}
-
-	return nil
+	return loadConfigFromJSON(string(data), config)
 }
 
 // Validate checks if NodeConfig fields have valid values.
@@ -665,15 +668,6 @@ func (c *NodeConfig) FormatAPIModules() []string {
 // AddAPIModule adds a mobule to APIModules
 func (c *NodeConfig) AddAPIModule(m string) {
 	c.APIModules = fmt.Sprintf("%s,%s", c.APIModules, m)
-}
-
-// GetStatusHome gets home directory of status-go
-func GetStatusHome() string {
-	gopath := os.Getenv("GOPATH")
-	if gopath == "" {
-		gopath = build.Default.GOPATH
-	}
-	return path.Join(gopath, "/src/github.com/status-im/status-go/")
 }
 
 // LesTopic returns discovery v5 topic derived from genesis of the provided network.

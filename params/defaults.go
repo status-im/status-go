@@ -54,6 +54,9 @@ const (
 	// WhisperDiscv5Topic used to register and search for whisper peers using discovery v5.
 	WhisperDiscv5Topic = discv5.Topic("whisper")
 
+	// MailServerDiscv5Topic used to register and search for mail server peers using discovery v5.
+	MailServerDiscv5Topic = discv5.Topic("whispermail")
+
 	// LESDiscoveryIdentifier is a prefix for topic used for LES peers discovery.
 	LESDiscoveryIdentifier = "LES2@"
 )
