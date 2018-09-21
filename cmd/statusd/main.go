@@ -44,6 +44,7 @@ var (
 	version          = flag.Bool("version", false, "Print version and dump configuration")
 
 	dataDir    = flag.String("dir", getDefaultDataDir(), "Directory used by node to store data")
+	register   = flag.Bool("register", false, "Register and make the node discoverable by other nodes")
 	mailserver = flag.Bool("mailserver", false, "Enable Mail Server with default configuration")
 
 	// don't change the name of this flag, https://github.com/ethereum/go-ethereum/blob/master/metrics/metrics.go#L41
@@ -90,6 +91,12 @@ func main() {
 			logger.Error(err.Error())
 		}
 		os.Exit(1)
+	}
+
+	if *register && *mailserver {
+		config.RegisterTopics = append(config.RegisterTopics, params.MailServerDiscv5Topic)
+	} else if *register {
+		config.RegisterTopics = append(config.RegisterTopics, params.WhisperDiscv5Topic)
 	}
 
 	// set up logging options
