@@ -99,8 +99,8 @@ proxy: ##@build Build proxy for rendezvous servers using status-go deps
 	go build -i -o $(GOBIN)/proxy -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/proxy/
 	@echo "Compilation done."
 
-mailserver-canary: ##@build Build mailserver canary using status-go deps
-	go build -i -o $(GOBIN)/mailserver-canary -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/mailserver-canary/
+node-canary: ##@build Build P2P node canary using status-go deps
+	go build -i -o $(GOBIN)/node-canary -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/node-canary/
 	@echo "Compilation done."
 
 statusgo-cross: statusgo-android statusgo-ios

@@ -1,4 +1,4 @@
-// mailserver-canary tests whether a mailserver enode responds to a historic messages request.
+// node-canary tests whether a P2P peer is responding correctly.
 package main
 
 import (
@@ -32,35 +32,54 @@ const (
 )
 
 // All general log messages in this package should be routed through this logger.
-var logger = log.New("package", "status-go/cmd/mailserver-canary")
+var logger = log.New("package", "status-go/cmd/node-canary")
 
 var (
-	enodeAddr        = flag.String("mailserver", "", "mailserver enode address (e.g. enode://1da276e34126e93babf24ec88aac1a7602b4cbb2e11b0961d0ab5e989ca9c261aa7f7c1c85f15550a5f1e5a5ca2305b53b9280cf5894d5ecf7d257b173136d40@167.99.209.61:30504)")
-	publicChannel    = flag.String("channel", "status", "The public channel name to retrieve historic messages from")
-	period           = flag.Int("period", 24*60*60, "How far in the past to request messages from mailserver, in seconds")
-	minPow           = flag.Float64("shh.pow", params.WhisperMinimumPoW, "PoW for messages to be added to queue, in float format")
-	ttl              = flag.Int("shh.ttl", params.WhisperTTL, "Time to live for messages, in seconds")
-	homePath         = flag.String("home-dir", ".", "Home directory where state is stored")
-	logLevel         = flag.String("log", "INFO", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
-	logFile          = flag.String("logfile", "", "Path to the log file")
-	logWithoutColors = flag.Bool("log-without-color", false, "Disables log colors")
+	staticEnodeAddr     = flag.String("staticnode", "", "static node enode address to test (e.g. enode://3f04db09bedc8d85a198de94c84da73aa7782fafc61b28c525ec5cca5a6cc16be7ebbb5cd001780f71d8408d35a2f6326faa1e524d9d8875294172ebec988743@172.16.238.10:30303)")
+	mailserverEnodeAddr = flag.String("mailserver", "", "mailserver enode address to test (e.g. enode://1da276e34126e93babf24ec88aac1a7602b4cbb2e11b0961d0ab5e989ca9c261aa7f7c1c85f15550a5f1e5a5ca2305b53b9280cf5894d5ecf7d257b173136d40@167.99.209.61:30504)")
+	publicChannel       = flag.String("channel", "status", "The public channel name to retrieve historic messages from (used with 'mailserver' flag)")
+	period              = flag.Int("period", 24*60*60, "How far in the past to request messages from mailserver, in seconds")
+	minPow              = flag.Float64("shh.pow", params.WhisperMinimumPoW, "PoW for messages to be added to queue, in float format")
+	ttl                 = flag.Int("shh.ttl", params.WhisperTTL, "Time to live for messages, in seconds")
+	homePath            = flag.String("home-dir", ".", "Home directory where state is stored")
+	logLevel            = flag.String("log", "INFO", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
+	logFile             = flag.String("logfile", "", "Path to the log file")
+	logWithoutColors    = flag.Bool("log-without-color", false, "Disables log colors")
 )
 
 func main() {
-	if enodeAddr == nil {
-		logger.Crit("No mailserver address specified", "enodeAddr", *enodeAddr)
-		os.Exit(1)
+	var err error
+	var staticParsedNode, mailserverParsedNode *discv5.Node
+	if *staticEnodeAddr != "" {
+		staticParsedNode, err = discv5.ParseNode(*staticEnodeAddr)
+		if err != nil {
+			logger.Crit("Invalid static address specified", "staticEnodeAddr", *staticEnodeAddr, "error", err)
+			os.Exit(1)
+		}
 	}
 
-	mailserverParsedNode, err := discv5.ParseNode(*enodeAddr)
-	if err != nil {
-		logger.Crit("Invalid mailserver address specified", "enodeAddr", *enodeAddr, "error", err)
-		os.Exit(1)
+	if *mailserverEnodeAddr != "" {
+		mailserverParsedNode, err = discv5.ParseNode(*mailserverEnodeAddr)
+		if err != nil {
+			logger.Crit("Invalid mailserver address specified", "mailserverEnodeAddr", *mailserverEnodeAddr, "error", err)
+			os.Exit(1)
+		}
 	}
 
-	verifyMailserverBehavior(mailserverParsedNode)
-	logger.Info("Mailserver responded correctly", "address", enodeAddr)
-	os.Exit(0)
+	if staticParsedNode != nil {
+		verifyStaticNodeBehavior(staticParsedNode)
+		logger.Info("Connected to static node correctly", "address", *staticEnodeAddr)
+		os.Exit(0)
+	}
+
+	if mailserverParsedNode != nil {
+		verifyMailserverBehavior(mailserverParsedNode)
+		logger.Info("Mailserver responded correctly", "address", *mailserverEnodeAddr)
+		os.Exit(0)
+	}
+
+	logger.Crit("No address specified")
+	os.Exit(1)
 }
 
 func init() {
@@ -97,8 +116,8 @@ func verifyMailserverBehavior(mailserverNode *discv5.Node) {
 	}
 
 	// add mailserver peer to client
-	clientErrCh := helpers.WaitForPeerAsync(clientNode.Server(), *enodeAddr, p2p.PeerEventTypeAdd, 5*time.Second)
-	err = clientNode.AddPeer(*enodeAddr)
+	clientErrCh := helpers.WaitForPeerAsync(clientNode.Server(), *mailserverEnodeAddr, p2p.PeerEventTypeAdd, 5*time.Second)
+	err = clientNode.AddPeer(*mailserverEnodeAddr)
 	if err != nil {
 		logger.Error("Failed to add mailserver peer to client", "error", err)
 		os.Exit(1)
@@ -175,6 +194,34 @@ func verifyMailserverBehavior(mailserverNode *discv5.Node) {
 	}
 }
 
+func verifyStaticNodeBehavior(staticNode *discv5.Node) {
+	clientBackend, err := startClientNode()
+	if err != nil {
+		logger.Error("Node start failed", "error", err)
+		os.Exit(1)
+	}
+	defer func() { _ = clientBackend.StopNode() }()
+
+	clientNode := clientBackend.StatusNode()
+
+	// wait for peer to be added to client
+	clientErrCh := helpers.WaitForPeerAsync(clientNode.Server(), *staticEnodeAddr, p2p.PeerEventTypeAdd, 5*time.Second)
+	err = <-clientErrCh
+	if err != nil {
+		logger.Error("Error detected while waiting for static peer to be added", "error", err)
+		os.Exit(1)
+	}
+
+	// wait to check if peer remains connected to client
+	clientErrCh = helpers.WaitForPeerAsync(clientNode.Server(), *staticEnodeAddr, p2p.PeerEventTypeDrop, 5*time.Second)
+	err = <-clientErrCh
+	peers := clientNode.GethNode().Server().Peers()
+	if len(peers) != 1 {
+		logger.Error("Failed to add static peer", "error", err)
+		os.Exit(1)
+	}
+}
+
 // makeNodeConfig parses incoming CLI options and returns node configuration object
 func makeNodeConfig() (*params.NodeConfig, error) {
 	err := error(nil)
@@ -208,13 +255,20 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 
 	nodeConfig.ListenAddr = ""
 	nodeConfig.NoDiscovery = true
+	if *staticEnodeAddr != "" {
+		nodeConfig.ClusterConfig.Enabled = true
+		nodeConfig.ClusterConfig.Fleet = "none"
+		nodeConfig.ClusterConfig.StaticNodes = []string{
+			*staticEnodeAddr,
+		}
+	}
 
 	return whisperConfig(nodeConfig)
 }
 
 // whisperConfig creates node configuration object from flags
 func whisperConfig(nodeConfig *params.NodeConfig) (*params.NodeConfig, error) {
-	whisperConfig := nodeConfig.WhisperConfig
+	whisperConfig := &nodeConfig.WhisperConfig
 	whisperConfig.Enabled = true
 	whisperConfig.LightClient = true
 	whisperConfig.MinimumPoW = *minPow
