@@ -73,6 +73,7 @@ func init() {
 	}
 }
 
+// nolint:gocyclo
 func main() {
 	opts := []params.Option{params.WithFleet(params.FleetBeta)}
 	if *mailserver {
