@@ -195,7 +195,8 @@ xgo-docker-images: ##@docker Build xgo docker images
 
 xgo:
 	docker pull $(XGOIMAGE)
-	go get github.com/karalabe/xgo
+	go get github.com/status-im/xgo
+	mkdir -p $(GOBIN)
 
 install-os-dependencies:
 	_assets/scripts/install_deps.sh
