@@ -296,7 +296,8 @@ func (b *SimulatedBackend) callContract(ctx context.Context, call ethereum.CallM
 func (b *SimulatedBackend) SendTransaction(ctx context.Context, tx *types.Transaction) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	sender, err := types.Sender(types.NewEIP155Signer(tx.ChainId()), tx)
+
+	sender, err := types.Sender(types.HomesteadSigner{}, tx)
 	if err != nil {
 		panic(fmt.Errorf("invalid transaction: %v", err))
 	}

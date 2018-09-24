@@ -47,7 +47,7 @@ import (
 )
 
 const (
-	defaultGasPrice = 50 * params.Shannon
+	defaultGasPrice = params.GWei
 )
 
 // PublicEthereumAPI provides an API to access Ethereum related information.
@@ -214,14 +214,6 @@ func NewPrivateAccountAPI(b Backend, nonceLock *AddrLocker) *PrivateAccountAPI {
 		am:        b.AccountManager(),
 		nonceLock: nonceLock,
 		b:         b,
-	}
-}
-
-func NewSubsetOfPrivateAccountAPI(am *accounts.Manager) *PrivateAccountAPI {
-	return &PrivateAccountAPI{
-		am:        am,
-		nonceLock: nil,
-		b:         nil,
 	}
 }
 
@@ -437,7 +429,7 @@ func (s *PrivateAccountAPI) Sign(ctx context.Context, data hexutil.Bytes, addr c
 	// Look up the wallet containing the requested signer
 	account := accounts.Account{Address: addr}
 
-	wallet, err := s.am.Find(account)
+	wallet, err := s.b.AccountManager().Find(account)
 	if err != nil {
 		return nil, err
 	}
