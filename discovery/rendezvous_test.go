@@ -59,3 +59,18 @@ func TestRendezvousDiscovery(t *testing.T) {
 	close(stop)
 	close(period)
 }
+
+func BenchmarkRendezvousStart(b *testing.B) {
+	identity, err := crypto.GenerateKey()
+	require.NoError(b, err)
+	addr, err := ma.NewMultiaddr("/ip4/127.0.0.1/tcp/7777")
+	require.NoError(b, err)
+	node := discover.NewNode(discover.PubkeyID(&identity.PublicKey), net.IP{10, 10, 10, 10}, 10, 20)
+
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		c, err := NewRendezvous([]ma.Multiaddr{addr}, identity, node)
+		require.NoError(b, err)
+		require.NoError(b, c.Start())
+	}
+}

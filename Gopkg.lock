@@ -767,7 +767,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:b9b4aaa95bb880c345f400d7de8d5023731f71a9dfd4ff62ec77a74acfda529e"
+  digest = "1:b88d64c27ed467659fa0ee1806bc790b88c37bcbff0b8fcd1b97d6a3ee7f9703"
   name = "github.com/status-im/rendezvous"
   packages = [
     ".",
@@ -775,7 +775,7 @@
     "server",
   ]
   pruneopts = "NUT"
-  revision = "7fe5bc0fd1c58bb7f7bec64656d8b821bec8338f"
+  revision = "55370cdfd9f288059b03c04e23784bb8829a894c"
 
 [[projects]]
   digest = "1:572c783a763db6383aca3179976eb80e4c900f52eba56cba8bb2e3cea7ce720e"
