@@ -21,8 +21,8 @@ import (
 
 var logger = log.New("package", "rendezvous/client")
 
-func NewTemporary() (c Client, err error) {
-	priv, _, err := crypto.GenerateKeyPairWithReader(crypto.RSA, 2048, rand.Reader)
+func NewEphemeral() (c Client, err error) {
+	priv, _, err := crypto.GenerateKeyPairWithReader(crypto.Secp256k1, 0, rand.Reader) // bits are ignored with edwards or secp251k1
 	if err != nil {
 		return Client{}, err
 	}

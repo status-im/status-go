@@ -75,7 +75,7 @@ func (r *Rendezvous) Running() bool {
 func (r *Rendezvous) Start() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	client, err := rendezvous.NewTemporary()
+	client, err := rendezvous.NewEphemeral()
 	if err != nil {
 		return err
 	}
