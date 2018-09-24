@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
+	"github.com/ethereum/go-ethereum/p2p/enr"
 	lcrypto "github.com/libp2p/go-libp2p-crypto"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/status-im/rendezvous/server"
@@ -58,6 +59,18 @@ func TestRendezvousDiscovery(t *testing.T) {
 	}
 	close(stop)
 	close(period)
+}
+
+func TestMakeRecordReturnsCachedRecord(t *testing.T) {
+	identity, err := crypto.GenerateKey()
+	require.NoError(t, err)
+	record := enr.Record{}
+	require.NoError(t, enr.SignV4(&record, identity))
+	c := NewRendezvousWithENR(nil, record)
+	rst, err := c.MakeRecord()
+	require.NoError(t, err)
+	require.NotNil(t, rst.NodeAddr())
+	require.Equal(t, record.NodeAddr(), rst.NodeAddr())
 }
 
 func BenchmarkRendezvousStart(b *testing.B) {
