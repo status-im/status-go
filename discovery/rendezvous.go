@@ -162,8 +162,18 @@ func (r *Rendezvous) Discover(
 				log.Debug("converted enr to", "ENODE", n.String())
 				if err != nil {
 					log.Warn("error converting enr record to node", "err", err)
+					continue
 				}
-				found <- n
+				select {
+				case found <- n:
+				case newPeriod, ok := <-period:
+					// closing a period channel is a signal to producer that consumer exited
+					ticker.Stop()
+					if !ok {
+						return nil
+					}
+					ticker = time.NewTicker(newPeriod)
+				}
 			}
 		}
 	}
