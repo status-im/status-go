@@ -20,6 +20,7 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/rpcfilters"
+	"github.com/status-im/status-go/services/shhext/chat"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
 )
@@ -412,6 +413,17 @@ func (b *StatusBackend) SelectAccount(address, password string) error {
 		return err
 	}
 
+	if whisperService != nil {
+		st, err := b.statusNode.ShhExtService()
+		if err != nil {
+			return err
+		}
+
+		if err := st.InitProtocol(address, password); err != nil {
+			return nil
+		}
+	}
+
 	return nil
 }
 
@@ -430,4 +442,60 @@ func appendIf(condition bool, services []gethnode.ServiceConstructor, service ge
 		return services
 	}
 	return append(services, service)
+}
+
+// CreateContactCode create or return the latest contact code
+func (b *StatusBackend) CreateContactCode() (string, error) {
+	selectedAccount, err := b.AccountManager().SelectedAccount()
+	if err != nil {
+		return "", err
+	}
+
+	st, err := b.statusNode.ShhExtService()
+	if err != nil {
+		return "", err
+	}
+
+	bundle, err := st.GetBundle(selectedAccount.AccountKey.PrivateKey)
+	if err != nil {
+		return "", err
+	}
+
+	return bundle.ToBase64()
+}
+
+// ProcessContactCode process and adds the someone else's bundle
+func (b *StatusBackend) ProcessContactCode(contactCode string) error {
+	selectedAccount, err := b.AccountManager().SelectedAccount()
+	if err != nil {
+		return err
+	}
+
+	st, err := b.statusNode.ShhExtService()
+	if err != nil {
+		return err
+	}
+
+	bundle, err := chat.FromBase64(contactCode)
+	if err != nil {
+		b.log.Error("error decoding base64", "err", err)
+		return err
+	}
+
+	if err := st.ProcessPublicBundle(selectedAccount.AccountKey.PrivateKey, bundle); err != nil {
+		b.log.Error("error adding bundle", "err", err)
+		return err
+	}
+
+	return nil
+}
+
+// ExtractIdentityFromContactCode extract the identity of the user generating the contact code
+func (b *StatusBackend) ExtractIdentityFromContactCode(contactCode string) (string, error) {
+	bundle, err := chat.FromBase64(contactCode)
+	if err != nil {
+		return "", err
+	}
+
+	return chat.ExtractIdentity(bundle)
 }

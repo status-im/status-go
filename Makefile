@@ -197,13 +197,20 @@ xgo:
 	docker pull $(XGOIMAGE)
 	go get github.com/karalabe/xgo
 
-setup: dep-install lint-install mock-install update-fleet-config ##@other Prepare project for first build
+install-os-dependencies:
+	_assets/scripts/install_deps.sh
+
+setup: install-os-dependencies dep-install lint-install mock-install gen-install update-fleet-config ##@other Prepare project for first build
 
 generate: ##@other Regenerate assets and other auto-generated stuff
-	go generate ./static
+	go generate ./static ./static/migrations
+	$(shell cd ./services/shhext/chat && exec protoc --go_out=. ./*.proto)
+
+gen-install:
+	go get -u github.com/jteeuwen/go-bindata/...
+	go get -u github.com/golang/protobuf/protoc-gen-go
 
 mock-install: ##@other Install mocking tools
-	go get -u github.com/kevinburke/go-bindata/go-bindata
 	go get -u github.com/golang/mock/mockgen
 
 mock: ##@other Regenerate mocks

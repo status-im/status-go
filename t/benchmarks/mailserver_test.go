@@ -3,6 +3,7 @@ package benchmarks
 import (
 	"context"
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
@@ -35,7 +36,13 @@ func testMailserverPeer(t *testing.T) {
 
 	shhService := createWhisperService()
 	shhAPI := whisper.NewPublicWhisperAPI(shhService)
-	mailService := shhext.New(shhService, nil, nil, false)
+	config := &shhext.ServiceConfig{
+		DataDir:        os.TempDir(),
+		InstallationID: "1",
+		Debug:          false,
+		PFSEnabled:     false,
+	}
+	mailService := shhext.New(shhService, nil, nil, config)
 	shhextAPI := shhext.NewPublicAPI(mailService)
 
 	// create node with services

@@ -2,6 +2,10 @@ package shhext
 
 import (
 	"crypto/ecdsa"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -11,9 +15,12 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
+	"github.com/status-im/status-go/services/shhext/chat"
 	"github.com/status-im/status-go/services/shhext/dedup"
 	"github.com/syndtr/goleveldb/leveldb"
 )
+
+var errProtocolNotInitialized = errors.New("procotol is not initialized")
 
 // EnvelopeState in local tracker
 type EnvelopeState int
@@ -37,34 +44,82 @@ type EnvelopeEventsHandler interface {
 
 // Service is a service that provides some additional Whisper API.
 type Service struct {
-	w            *whisper.Whisper
-	tracker      *tracker
-	nodeID       *ecdsa.PrivateKey
-	deduplicator *dedup.Deduplicator
-	debug        bool
+	w              *whisper.Whisper
+	tracker        *tracker
+	nodeID         *ecdsa.PrivateKey
+	deduplicator   *dedup.Deduplicator
+	protocol       *chat.ProtocolService
+	debug          bool
+	dataDir        string
+	installationID string
+	pfsEnabled     bool
+}
+
+type ServiceConfig struct {
+	DataDir        string
+	InstallationID string
+	Debug          bool
+	PFSEnabled     bool
 }
 
 // Make sure that Service implements node.Service interface.
 var _ node.Service = (*Service)(nil)
 
-// New returns a new Service.
-func New(w *whisper.Whisper, handler EnvelopeEventsHandler, db *leveldb.DB, debug bool) *Service {
+// New returns a new Service. dataDir is a folder path to a network-independent location
+func New(w *whisper.Whisper, handler EnvelopeEventsHandler, db *leveldb.DB, config *ServiceConfig) *Service {
 	track := &tracker{
 		w:       w,
 		handler: handler,
 		cache:   map[common.Hash]EnvelopeState{},
 	}
 	return &Service{
-		w:            w,
-		tracker:      track,
-		deduplicator: dedup.NewDeduplicator(w, db),
-		debug:        debug,
+		w:              w,
+		tracker:        track,
+		deduplicator:   dedup.NewDeduplicator(w, db),
+		debug:          config.Debug,
+		dataDir:        config.DataDir,
+		installationID: config.InstallationID,
+		pfsEnabled:     config.PFSEnabled,
 	}
 }
 
 // Protocols returns a new protocols list. In this case, there are none.
 func (s *Service) Protocols() []p2p.Protocol {
 	return []p2p.Protocol{}
+}
+
+// InitProtocol create an instance of ProtocolService given an address and password
+func (s *Service) InitProtocol(address string, password string) error {
+	if !s.pfsEnabled {
+		return nil
+	}
+
+	if err := os.MkdirAll(filepath.Clean(s.dataDir), os.ModePerm); err != nil {
+		return err
+	}
+	persistence, err := chat.NewSQLLitePersistence(filepath.Join(s.dataDir, fmt.Sprintf("%x.db", address)), password)
+	if err != nil {
+		return err
+	}
+	s.protocol = chat.NewProtocolService(chat.NewEncryptionService(persistence, s.installationID))
+
+	return nil
+}
+
+func (s *Service) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, bundle *chat.Bundle) error {
+	if s.protocol == nil {
+		return errProtocolNotInitialized
+	}
+
+	return s.protocol.ProcessPublicBundle(myIdentityKey, bundle)
+}
+
+func (s *Service) GetBundle(myIdentityKey *ecdsa.PrivateKey) (*chat.Bundle, error) {
+	if s.protocol == nil {
+		return nil, errProtocolNotInitialized
+	}
+
+	return s.protocol.GetBundle(myIdentityKey)
 }
 
 // APIs returns a list of new APIs.

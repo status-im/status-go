@@ -1,5 +1,6 @@
 package main
 
+// #include <stdlib.h>
 import "C"
 import (
 	"encoding/json"
@@ -44,6 +45,52 @@ func StartNode(configJSON *C.char) *C.char {
 func StopNode() *C.char {
 	api.RunAsync(statusBackend.StopNode)
 	return makeJSONResponse(nil)
+}
+
+// Create an X3DH bundle
+//export CreateContactCode
+func CreateContactCode() *C.char {
+	bundle, err := statusBackend.CreateContactCode()
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	cstr := C.CString(bundle)
+
+	return cstr
+}
+
+//export ProcessContactCode
+func ProcessContactCode(bundleString *C.char) *C.char {
+	err := statusBackend.ProcessContactCode(C.GoString(bundleString))
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return nil
+}
+
+//export ExtractIdentityFromContactCode
+func ExtractIdentityFromContactCode(bundleString *C.char) *C.char {
+	bundle := C.GoString(bundleString)
+
+	identity, err := statusBackend.ExtractIdentityFromContactCode(bundle)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	if err := statusBackend.ProcessContactCode(bundle); err != nil {
+		return makeJSONResponse(err)
+	}
+
+	data, err := json.Marshal(struct {
+		Identity string `json:"identity"`
+	}{Identity: identity})
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return C.CString(string(data))
 }
 
 //ValidateNodeConfig validates config for status node

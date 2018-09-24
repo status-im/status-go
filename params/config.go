@@ -167,6 +167,9 @@ type NodeConfig struct {
 
 	// DataDir is the file system folder the node should use for any data storage needs.
 	DataDir string `validate:"required"`
+	// BackupDisabledDataDir is the file system folder the node should use for any data storage needs that it doesn't want backed up.
+	BackupDisabledDataDir string `validate:"required"`
+	PFSEnabled            bool
 
 	// KeyStoreDir is the file system folder that contains private keys.
 	KeyStoreDir string `validate:"required"`
@@ -264,6 +267,9 @@ type NodeConfig struct {
 
 	// StatusServiceEnabled enables status service api
 	StatusServiceEnabled bool
+
+	// InstallationId id of the current installation
+	InstallationID string
 
 	// DebugAPIEnabled enables debug api
 	DebugAPIEnabled bool
@@ -382,20 +388,21 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 	}
 
 	config := &NodeConfig{
-		NetworkID:       networkID,
-		DataDir:         dataDir,
-		KeyStoreDir:     keyStoreDir,
-		Version:         Version,
-		HTTPHost:        "localhost",
-		HTTPPort:        8545,
-		ListenAddr:      ":0",
-		APIModules:      "eth,net,web3,peer",
-		MaxPeers:        25,
-		MaxPendingPeers: 0,
-		IPCFile:         "geth.ipc",
-		log:             log.New("package", "status-go/params.NodeConfig"),
-		LogFile:         "",
-		LogLevel:        "ERROR",
+		NetworkID:             networkID,
+		DataDir:               dataDir,
+		KeyStoreDir:           keyStoreDir,
+		BackupDisabledDataDir: dataDir,
+		Version:               Version,
+		HTTPHost:              "localhost",
+		HTTPPort:              8545,
+		ListenAddr:            ":0",
+		APIModules:            "eth,net,web3,peer",
+		MaxPeers:              25,
+		MaxPendingPeers:       0,
+		IPCFile:               "geth.ipc",
+		log:                   log.New("package", "status-go/params.NodeConfig"),
+		LogFile:               "",
+		LogLevel:              "ERROR",
 		UpstreamConfig: UpstreamRPCConfig{
 			URL: getUpstreamURL(networkID),
 		},
@@ -495,6 +502,10 @@ func (c *NodeConfig) Validate() error {
 		// No point in running discovery if we don't have bootnodes.
 		// In case we do have bootnodes, NoDiscovery should be true.
 		return fmt.Errorf("NoDiscovery is false, but ClusterConfig.BootNodes is empty")
+	}
+
+	if c.PFSEnabled && len(c.InstallationID) == 0 {
+		return fmt.Errorf("PFSEnabled is true, but InstallationID is empty")
 	}
 
 	if len(c.ClusterConfig.RendezvousNodes) == 0 {

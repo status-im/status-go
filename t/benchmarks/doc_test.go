@@ -13,6 +13,7 @@
 			{
 				"NetworkId": 4,
 				"DataDir": "./ethereumtest/rinkeby_rpc",
+				"BackupDisabledDataDir": "./ethereumtest/rinkeby_rpc",
 				"KeyStoreDir": "./ethereumtest/keystore",
 				"MaxPeers": 100,
 				"LogLevel": "DEBUG",
