@@ -6,6 +6,8 @@ import (
 	"errors"
 )
 
+const respOK = 36864 // 0x9000
+
 type Response struct {
 	Data []byte
 	Sw1  uint8
@@ -43,4 +45,8 @@ func (r *Response) deserialize(data []byte) error {
 	r.Sw = (uint16(r.Sw1) << 8) | uint16(r.Sw2)
 
 	return nil
+}
+
+func (r *Response) IsOK() bool {
+	return r.Sw == respOK
 }

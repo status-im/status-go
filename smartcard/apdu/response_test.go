@@ -24,3 +24,10 @@ func TestParseResponse_BadData(t *testing.T) {
 	_, err := ParseResponse(raw)
 	assert.Equal(t, ErrBadRawResponse, err)
 }
+
+func TestResp_IsOK(t *testing.T) {
+	raw := hexToBytes("01029000")
+	resp, err := ParseResponse(raw)
+	assert.NoError(t, err)
+	assert.True(t, resp.IsOK())
+}
