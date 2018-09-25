@@ -4,12 +4,14 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
+	"regexp"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func hexToBytes(s string) []byte {
+	s = regexp.MustCompile(" ").ReplaceAllString(s, "")
 	b := make([]byte, hex.DecodedLen(len(s)))
 	_, err := hex.Decode(b, []byte(s))
 	if err != nil {
