@@ -821,6 +821,14 @@
   revision = "55370cdfd9f288059b03c04e23784bb8829a894c"
 
 [[projects]]
+  branch = "master"
+  digest = "1:a2075e4e314cff4aadaf3ffe18b77659d259b1a46be9d2bdb0d5b9f8222f420c"
+  name = "github.com/status-im/whisper"
+  packages = ["whisperv6"]
+  pruneopts = "NUT"
+  revision = "f41584950703450b0370e85560ba8d9322794ead"
+
+[[projects]]
   digest = "1:572c783a763db6383aca3179976eb80e4c900f52eba56cba8bb2e3cea7ce720e"
   name = "github.com/stretchr/testify"
   packages = [
@@ -1106,6 +1114,7 @@
     "github.com/status-im/migrate/source/go_bindata",
     "github.com/status-im/rendezvous",
     "github.com/status-im/rendezvous/server",
+    "github.com/status-im/whisper/whisperv6",
     "github.com/stretchr/testify/assert",
     "github.com/stretchr/testify/require",
     "github.com/stretchr/testify/suite",

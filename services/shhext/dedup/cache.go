@@ -4,8 +4,8 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto/sha3"
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"github.com/status-im/status-go/db"
+	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/util"
 )

@@ -18,8 +18,8 @@ import (
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discover"
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	ma "github.com/multiformats/go-multiaddr"
+	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/syndtr/goleveldb/leveldb"
 
 	"github.com/status-im/status-go/db"

@@ -6,10 +6,10 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"github.com/status-im/status-go/account"
 	e2e "github.com/status-im/status-go/t/e2e"
 	. "github.com/status-im/status-go/t/utils"
+	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/stretchr/testify/suite"
 )
 

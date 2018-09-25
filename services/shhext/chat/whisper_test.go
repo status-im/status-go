@@ -1,10 +1,11 @@
 package chat
 
 import (
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
+	whisper "github.com/status-im/whisper/whisperv6"
+
+	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestPublicMessageToWhisper(t *testing.T) {

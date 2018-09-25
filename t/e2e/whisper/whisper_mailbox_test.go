@@ -18,11 +18,11 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/sha3"
 	"github.com/ethereum/go-ethereum/p2p"
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/t/helpers"
 	. "github.com/status-im/status-go/t/utils"
+	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/stretchr/testify/suite"
 )
 

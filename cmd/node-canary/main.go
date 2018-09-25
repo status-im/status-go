@@ -17,13 +17,13 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/shhext"
 	"github.com/status-im/status-go/t/helpers"
+	whisper "github.com/status-im/whisper/whisperv6"
 	"golang.org/x/crypto/ssh/terminal"
 )
 

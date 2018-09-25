@@ -20,7 +20,6 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/p2p/nat"
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/peer"
@@ -29,6 +28,7 @@ import (
 	"github.com/status-im/status-go/services/status"
 	"github.com/status-im/status-go/static"
 	"github.com/status-im/status-go/timesource"
+	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
@@ -271,16 +271,17 @@ func activateShhService(stack *node.Node, config *params.NodeConfig, db *leveldb
 		whisperServiceConfig := &whisper.Config{
 			MaxMessageSize:     whisper.DefaultMaxMessageSize,
 			MinimumAcceptedPOW: 0.001,
-			TimeSource:         time.Now,
-		}
-
-		if config.WhisperConfig.EnableNTPSync {
-			if whisperServiceConfig.TimeSource, err = whisperTimeSource(ctx); err != nil {
-				return nil, err
-			}
 		}
 
 		whisperService := whisper.New(whisperServiceConfig)
+
+		if config.WhisperConfig.EnableNTPSync {
+			timesource, err := whisperTimeSource(ctx)
+			if err != nil {
+				return nil, err
+			}
+			whisperService.SetTimeSource(timesource)
+		}
 
 		// enable mail service
 		if config.WhisperConfig.EnableMailServer {

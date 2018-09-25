@@ -2,7 +2,7 @@ package chat
 
 import (
 	"github.com/ethereum/go-ethereum/crypto"
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
+	whisper "github.com/status-im/whisper/whisperv6"
 )
 
 var discoveryTopic = "contact-discovery"
