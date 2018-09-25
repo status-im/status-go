@@ -14,8 +14,8 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discover"
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"github.com/status-im/status-go/services/shhext/chat"
+	whisper "github.com/status-im/whisper/whisperv6"
 )
 
 const (

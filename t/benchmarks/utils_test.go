@@ -2,14 +2,13 @@ package benchmarks
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/nat"
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
+	whisper "github.com/status-im/whisper/whisperv6"
 )
 
 var (
@@ -53,7 +52,6 @@ func createWhisperService() *whisper.Whisper {
 	whisperServiceConfig := &whisper.Config{
 		MaxMessageSize:     whisper.DefaultMaxMessageSize,
 		MinimumAcceptedPOW: 0.005,
-		TimeSource:         func() time.Time { return time.Now().UTC() },
 	}
 	return whisper.New(whisperServiceConfig)
 }

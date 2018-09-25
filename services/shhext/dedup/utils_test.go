@@ -3,7 +3,7 @@ package dedup
 import (
 	"crypto/rand"
 
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
+	whisper "github.com/status-im/whisper/whisperv6"
 )
 
 func generateMessages(count int) []*whisper.Message {

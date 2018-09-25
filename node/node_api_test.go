@@ -3,7 +3,7 @@ package node
 import (
 	"testing"
 
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
+	whisper "github.com/status-im/whisper/whisperv6"
 
 	"github.com/status-im/status-go/params"
 	"github.com/stretchr/testify/require"

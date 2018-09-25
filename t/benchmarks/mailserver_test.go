@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/node"
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"github.com/status-im/status-go/services/shhext"
+	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/stretchr/testify/require"
 )
 

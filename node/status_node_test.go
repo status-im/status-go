@@ -14,7 +14,7 @@ import (
 	gethnode "github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discover"
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
+	whisper "github.com/status-im/whisper/whisperv6"
 
 	"github.com/status-im/status-go/discovery"
 	"github.com/status-im/status-go/params"

@@ -10,9 +10,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/p2p"
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/params"
+	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
