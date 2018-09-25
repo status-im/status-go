@@ -15,6 +15,11 @@ type Response struct {
 
 var ErrBadRawResponse = errors.New("response data must be at least 2 bytes")
 
+func ParseResponse(data []byte) (*Response, error) {
+	r := &Response{}
+	return r, r.deserialize(data)
+}
+
 func (r *Response) deserialize(data []byte) error {
 	if len(data) < 2 {
 		return ErrBadRawResponse
@@ -38,9 +43,4 @@ func (r *Response) deserialize(data []byte) error {
 	r.Sw = (uint16(r.Sw1) << 8) | uint16(r.Sw2)
 
 	return nil
-}
-
-func ParseResponse(data []byte) (*Response, error) {
-	r := &Response{}
-	return r, r.deserialize(data)
 }
