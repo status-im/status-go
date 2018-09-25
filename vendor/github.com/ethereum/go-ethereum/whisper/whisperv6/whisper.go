@@ -492,7 +492,7 @@ func (whisper *Whisper) DeleteKeyPairs() error {
 	return nil
 }
 
-// HasKeyPair checks if the the whisper node is configured with the private key
+// HasKeyPair checks if the whisper node is configured with the private key
 // of the specified public pair.
 func (whisper *Whisper) HasKeyPair(id string) bool {
 	deterministicID, err := toDeterministicID(id, keyIDSize)

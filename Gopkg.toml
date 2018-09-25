@@ -27,7 +27,7 @@ ignored = [ "github.com/ethereum/go-ethereum/ethapi" ]
 
 [[constraint]]
   name = "github.com/ethereum/go-ethereum"
-  version = "=v1.8.14"
+  version = "=v1.8.15"
 
 [[override]]
   name = "github.com/golang/protobuf"
