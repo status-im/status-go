@@ -9,7 +9,7 @@ import (
 var (
 	DerivationPurposeEnc = []byte{0x01, 0x82}
 	DerivationPurposeMac = []byte{0x01, 0x01}
-	nullBytes8           = []byte{0, 0, 0, 0, 0, 0, 0, 0}
+	NullBytes8           = []byte{0, 0, 0, 0, 0, 0, 0, 0}
 )
 
 func DeriveKey(cardKey []byte, seq []byte, purpose []byte) ([]byte, error) {
@@ -26,7 +26,7 @@ func DeriveKey(cardKey []byte, seq []byte, purpose []byte) ([]byte, error) {
 
 	ciphertext := make([]byte, 16)
 
-	mode := cipher.NewCBCEncrypter(block, nullBytes8)
+	mode := cipher.NewCBCEncrypter(block, NullBytes8)
 	mode.CryptBlocks(ciphertext, derivation)
 
 	return ciphertext, nil
@@ -37,7 +37,7 @@ func VerifyCryptogram(encKey, hostChallenge, cardChallenge, cardCryptogram []byt
 	data = append(data, hostChallenge...)
 	data = append(data, cardChallenge...)
 	paddedData := appendDESPadding(data)
-	calculated, err := mac3des(encKey, paddedData, nullBytes8)
+	calculated, err := mac3des(encKey, paddedData, NullBytes8)
 	if err != nil {
 		return false, err
 	}
@@ -72,6 +72,19 @@ func MacFull3DES(key, data, iv []byte) ([]byte, error) {
 
 	mode := cipher.NewCBCEncrypter(des3Block, des3IV)
 	mode.CryptBlocks(ciphertext, data[len(data)-8:])
+
+	return ciphertext, nil
+}
+
+func EncryptICV(macKey, mac []byte) ([]byte, error) {
+	block, err := des.NewCipher(resizeKey8(macKey))
+	if err != nil {
+		return nil, err
+	}
+
+	ciphertext := make([]byte, 16)
+	mode := cipher.NewCBCEncrypter(block, NullBytes8)
+	mode.CryptBlocks(ciphertext, mac)
 
 	return ciphertext, nil
 }

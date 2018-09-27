@@ -46,7 +46,7 @@ func TestVerifyCryptogram(t *testing.T) {
 func TestMac3des(t *testing.T) {
 	key := hexutils.HexToBytes("16B5867FF50BE7239C2BF1245B83A362")
 	data := hexutils.HexToBytes("32DA078D7AAC1CFF007284F64A7D64658000000000000000")
-	result, err := mac3des(key, data, nullBytes8)
+	result, err := mac3des(key, data, NullBytes8)
 	assert.NoError(t, err)
 
 	expected := "05C4BB8A86014E22"
@@ -56,7 +56,7 @@ func TestMac3des(t *testing.T) {
 func TestMacFull3DES(t *testing.T) {
 	key := hexutils.HexToBytes("5b02e75ad63190aece0622936f11abab")
 	data := hexutils.HexToBytes("8482010010810b098a8fbb88da")
-	result, err := MacFull3DES(key, data, nullBytes8)
+	result, err := MacFull3DES(key, data, NullBytes8)
 	assert.NoError(t, err)
 	expected := "5271D7174A5A166A"
 	assert.Equal(t, expected, hexutils.BytesToHex(result))
