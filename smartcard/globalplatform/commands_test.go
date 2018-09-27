@@ -1,31 +1,11 @@
 package globalplatform
 
 import (
-	"encoding/hex"
-	"fmt"
-	"log"
 	"testing"
 
+	"github.com/status-im/status-go/smartcard/hexutils"
 	"github.com/stretchr/testify/assert"
 )
-
-func hexToBytes(s string) []byte {
-	b := make([]byte, hex.DecodedLen(len(s)))
-	_, err := hex.Decode(b, []byte(s))
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return b[:]
-}
-
-func bytesToHexWithSpaces(b []byte) string {
-	return fmt.Sprintf("% X", b)
-}
-
-func bytesToHex(b []byte) string {
-	return fmt.Sprintf("%X", b)
-}
 
 func TestCommandSelect(t *testing.T) {
 	aid := []byte{}
@@ -38,7 +18,7 @@ func TestCommandSelect(t *testing.T) {
 }
 
 func TestCommandInitializeUpdate(t *testing.T) {
-	challenge := hexToBytes("010203")
+	challenge := hexutils.HexToBytes("010203")
 	cmd := NewCommandInitializeUpdate(challenge)
 
 	assert.Equal(t, uint8(0x80), cmd.Cla)
