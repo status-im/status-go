@@ -3,13 +3,62 @@ package crypto
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/ecdsa"
 	"crypto/rand"
+	"encoding/hex"
 	"errors"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 const (
 	aesNonceLength = 12
 )
+
+// Sign signs the hash of an arbitrary string
+func Sign(content string, identity *ecdsa.PrivateKey) (string, error) {
+	signature, err := crypto.Sign(crypto.Keccak256([]byte(content)), identity)
+	if err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(signature), nil
+}
+
+// VerifySignatures verifys tuples of signatures content/hash/public key
+func VerifySignatures(signaturePairs [][3]string) error {
+	for _, signaturePair := range signaturePairs {
+		content := crypto.Keccak256([]byte(signaturePair[0]))
+
+		signature, err := hex.DecodeString(signaturePair[1])
+		if err != nil {
+			return err
+		}
+
+		publicKeyBytes, err := hex.DecodeString(signaturePair[2])
+		if err != nil {
+			return err
+		}
+
+		publicKey, err := crypto.UnmarshalPubkey(publicKeyBytes)
+		if err != nil {
+			return err
+		}
+
+		recoveredKey, err := crypto.SigToPub(
+			content,
+			signature,
+		)
+		if err != nil {
+			return err
+		}
+
+		if crypto.PubkeyToAddress(*recoveredKey) != crypto.PubkeyToAddress(*publicKey) {
+			return errors.New("identity key and signature mismatch")
+		}
+	}
+
+	return nil
+}
 
 func EncryptSymmetric(key, plaintext []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)

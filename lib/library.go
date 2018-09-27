@@ -93,6 +93,40 @@ func ExtractIdentityFromContactCode(bundleString *C.char) *C.char {
 	return C.CString(string(data))
 }
 
+// VerifyGroupMembershipSignatures ensure the signature pairs are valid
+//export VerifyGroupMembershipSignatures
+func VerifyGroupMembershipSignatures(signaturePairsStr *C.char) *C.char {
+	var signaturePairs [][3]string
+
+	if err := json.Unmarshal([]byte(C.GoString(signaturePairsStr)), &signaturePairs); err != nil {
+		return makeJSONResponse(err)
+	}
+
+	if err := statusBackend.VerifyGroupMembershipSignatures(signaturePairs); err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return nil
+}
+
+// Sign signs a string containing group membership information
+//export SignGroupMembership
+func SignGroupMembership(content *C.char) *C.char {
+	signature, err := statusBackend.SignGroupMembership(C.GoString(content))
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	data, err := json.Marshal(struct {
+		Signature string `json:"signature"`
+	}{Signature: signature})
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return C.CString(string(data))
+}
+
 //ValidateNodeConfig validates config for status node
 //export ValidateNodeConfig
 func ValidateNodeConfig(configJSON *C.char) *C.char {
