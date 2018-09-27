@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
+	"github.com/ethereum/go-ethereum/p2p/enr"
 	lcrypto "github.com/libp2p/go-libp2p-crypto"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/status-im/rendezvous/server"
@@ -58,4 +59,31 @@ func TestRendezvousDiscovery(t *testing.T) {
 	}
 	close(stop)
 	close(period)
+}
+
+func TestMakeRecordReturnsCachedRecord(t *testing.T) {
+	identity, err := crypto.GenerateKey()
+	require.NoError(t, err)
+	record := enr.Record{}
+	require.NoError(t, enr.SignV4(&record, identity))
+	c := NewRendezvousWithENR(nil, record)
+	rst, err := c.MakeRecord()
+	require.NoError(t, err)
+	require.NotNil(t, rst.NodeAddr())
+	require.Equal(t, record.NodeAddr(), rst.NodeAddr())
+}
+
+func BenchmarkRendezvousStart(b *testing.B) {
+	identity, err := crypto.GenerateKey()
+	require.NoError(b, err)
+	addr, err := ma.NewMultiaddr("/ip4/127.0.0.1/tcp/7777")
+	require.NoError(b, err)
+	node := discover.NewNode(discover.PubkeyID(&identity.PublicKey), net.IP{10, 10, 10, 10}, 10, 20)
+
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		c, err := NewRendezvous([]ma.Multiaddr{addr}, identity, node)
+		require.NoError(b, err)
+		require.NoError(b, c.Start())
+	}
 }

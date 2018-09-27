@@ -3,37 +3,8 @@ package params
 import "github.com/ethereum/go-ethereum/p2p/discv5"
 
 const (
-	// ClientIdentifier is client identifier to advertise over the network
-	ClientIdentifier = "StatusIM"
-
-	// DataDir is default data directory used by statusd executable
-	DataDir = "statusd-data"
-
 	// StatusDatabase path relative to DataDir.
 	StatusDatabase = "status-db"
-
-	// KeyStoreDir is default directory where private keys are stored, relative to DataDir
-	KeyStoreDir = "keystore"
-
-	// IPCFile is filename of exposed IPC RPC Server
-	IPCFile = "geth.ipc"
-
-	// RPCEnabledDefault is the default state of whether the http rpc server is supposed
-	// to be started along with a node.
-	RPCEnabledDefault = false
-
-	// HTTPHost is host interface for the HTTP RPC server
-	HTTPHost = "localhost"
-
-	// HTTPPort is HTTP RPC port (replaced in unit tests)
-	HTTPPort = 8545
-
-	// ListenAddr is an IP address and port of this node (e.g. 127.0.0.1:30303).
-	ListenAddr = ":0"
-
-	// APIModules is a list of modules to expose via HTTP and `CallRPC()` binding.
-	// We also expose all handlers registered with `rpc.Client.RegisterHandler` to `CallRPC()` binding.
-	APIModules = "eth,net,web3,peer"
 
 	// SendTransactionMethodName defines the name for a giving transaction.
 	SendTransactionMethodName = "eth_sendTransaction"
@@ -47,46 +18,14 @@ const (
 	// PersonalRecoverMethodName defines the name for `personal.recover` API.
 	PersonalRecoverMethodName = "personal_ecRecover"
 
-	// MaxPeers is the maximum number of global peers
-	MaxPeers = 25
-
-	// MaxPendingPeers is the maximum number of peers that can be pending in the
-	// handshake phase, counted separately for inbound and outbound connections.
-	MaxPendingPeers = 0
-
 	// DefaultGas default amount of gas used for transactions
 	DefaultGas = 180000
-
-	// DefaultFileDescriptorLimit is fd limit that database can use
-	DefaultFileDescriptorLimit = uint64(2048)
-
-	// DatabaseCache is memory (in MBs) allocated to internal caching (min 16MB / database forced)
-	DatabaseCache = 16
-
-	// LogFile defines where to write logs to
-	LogFile = ""
-
-	// LogLevel defines the minimum log level to report
-	LogLevel = "ERROR"
-
-	// LogLevelSuccinct defines the log level when only errors are reported.
-	// Useful when the default INFO level becomes too verbose.
-	LogLevelSuccinct = "ERROR"
-
-	// LogToStderr defines whether logged info should also be output to os.Stderr
-	LogToStderr = true
-
-	// WhisperDataDir is directory where Whisper data is stored, relative to DataDir
-	WhisperDataDir = "wnode"
 
 	// WhisperMinimumPoW amount of work for Whisper message to be added to sending queue
 	WhisperMinimumPoW = 0.001
 
 	// WhisperTTL is time to live for messages, in seconds
 	WhisperTTL = 120
-
-	// FirebaseNotificationTriggerURL is URL where FCM notification requests are sent to
-	FirebaseNotificationTriggerURL = "https://fcm.googleapis.com/fcm/send"
 
 	// MainnetEthereumNetworkURL is URL where the upstream ethereum network is loaded to
 	// allow us avoid syncing node.
@@ -114,6 +53,9 @@ const (
 
 	// WhisperDiscv5Topic used to register and search for whisper peers using discovery v5.
 	WhisperDiscv5Topic = discv5.Topic("whisper")
+
+	// MailServerDiscv5Topic used to register and search for mail server peers using discovery v5.
+	MailServerDiscv5Topic = discv5.Topic("whispermail")
 
 	// LESDiscoveryIdentifier is a prefix for topic used for LES peers discovery.
 	LESDiscoveryIdentifier = "LES2@"

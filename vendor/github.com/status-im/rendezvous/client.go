@@ -21,8 +21,8 @@ import (
 
 var logger = log.New("package", "rendezvous/client")
 
-func NewTemporary() (c Client, err error) {
-	priv, _, err := crypto.GenerateKeyPairWithReader(crypto.RSA, 2048, rand.Reader)
+func NewEphemeral() (c Client, err error) {
+	priv, _, err := crypto.GenerateKeyPairWithReader(crypto.Secp256k1, 0, rand.Reader) // bits are ignored with edwards or secp251k1
 	if err != nil {
 		return Client{}, err
 	}
@@ -50,7 +50,7 @@ type Client struct {
 	h host.Host
 }
 
-func (c Client) Register(ctx context.Context, srv ma.Multiaddr, topic string, record enr.Record) error {
+func (c Client) Register(ctx context.Context, srv ma.Multiaddr, topic string, record enr.Record, ttl time.Duration) error {
 	s, err := c.newStream(ctx, srv)
 	if err != nil {
 		return err
@@ -59,7 +59,7 @@ func (c Client) Register(ctx context.Context, srv ma.Multiaddr, topic string, re
 	if err = rlp.Encode(s, protocol.REGISTER); err != nil {
 		return err
 	}
-	if err = rlp.Encode(s, protocol.Register{Topic: topic, Record: record, TTL: uint64(5 * time.Second)}); err != nil {
+	if err = rlp.Encode(s, protocol.Register{Topic: topic, Record: record, TTL: uint64(ttl)}); err != nil {
 		return err
 	}
 	rs := rlp.NewStream(s, 0)

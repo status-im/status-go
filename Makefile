@@ -27,8 +27,9 @@ endif
 
 CGO_CFLAGS = -I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
 GOBIN = $(dir $(realpath $(firstword $(MAKEFILE_LIST))))build/bin
-GIT_COMMIT = $(shell git describe --exact-match --tag 2>/dev/null | sed 's/^v\(.*\)$$/\1/' \
-	|| git rev-parse --short HEAD)
+GIT_COMMIT = $(shell tag=`git describe --exact-match --tag 2>/dev/null`; \
+	if [ $$? -eq 0 ]; then echo $$tag | sed 's/^v\(.*\)$$/\1/'; \
+	else git rev-parse --short HEAD; fi)
 AUTHOR = $(shell echo $$USER)
 
 BUILD_FLAGS ?= $(shell echo "-ldflags '-X main.buildStamp=`date -u '+%Y-%m-%d.%H:%M:%S'` -X github.com/status-im/status-go/params.Version=$(GIT_COMMIT)'")
@@ -98,8 +99,8 @@ proxy: ##@build Build proxy for rendezvous servers using status-go deps
 	go build -i -o $(GOBIN)/proxy -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/proxy/
 	@echo "Compilation done."
 
-mailserver-canary: ##@build Build mailserver canary using status-go deps
-	go build -i -o $(GOBIN)/mailserver-canary -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/mailserver-canary/
+node-canary: ##@build Build P2P node canary using status-go deps
+	go build -i -o $(GOBIN)/node-canary -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/node-canary/
 	@echo "Compilation done."
 
 statusgo-cross: statusgo-android statusgo-ios
@@ -194,9 +195,21 @@ xgo-docker-images: ##@docker Build xgo docker images
 
 xgo:
 	docker pull $(XGOIMAGE)
-	go get github.com/karalabe/xgo
+	go get github.com/status-im/xgo
+	mkdir -p $(GOBIN)
 
-setup: dep-install lint-install mock-install ##@other Prepare project for first build
+install-os-dependencies:
+	_assets/scripts/install_deps.sh
+
+setup: install-os-dependencies dep-install lint-install mock-install gen-install update-fleet-config ##@other Prepare project for first build
+
+generate: ##@other Regenerate assets and other auto-generated stuff
+	go generate ./static ./static/migrations
+	$(shell cd ./services/shhext/chat && exec protoc --go_out=. ./*.proto)
+
+gen-install:
+	go get -u github.com/jteeuwen/go-bindata/...
+	go get -u github.com/golang/protobuf/protoc-gen-go
 
 mock-install: ##@other Install mocking tools
 	go get -u github.com/golang/mock/mockgen
@@ -270,3 +283,9 @@ patch-geth-vendor-revert: ##@patching Revert all patches from ethereum in vendor
 
 patch-geth-fork: ##@patching Apply patches to Status' go-ethereum fork
 	./_assets/patches/update-fork-with-patches.sh
+
+update-fleet-config: ##@other Update fleets configuration from fleets.status.im
+	./_assets/ci/update-fleet-config.sh
+	@echo "Updating static assets..."
+	@go generate ./static
+	@echo "Done"

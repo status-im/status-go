@@ -1,5 +1,6 @@
 package main
 
+// #include <stdlib.h>
 import "C"
 import (
 	"encoding/json"
@@ -22,26 +23,10 @@ import (
 // All general log messages in this package should be routed through this logger.
 var logger = log.New("package", "status-go/lib")
 
-//GenerateConfig for status node
-//export GenerateConfig
-func GenerateConfig(datadir *C.char, fleet *C.char, networkID C.int) *C.char {
-	config, err := params.NewNodeConfig(C.GoString(datadir), "", C.GoString(fleet), uint64(networkID))
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	outBytes, err := json.Marshal(config)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	return C.CString(string(outBytes))
-}
-
 //StartNode - start Status node
 //export StartNode
 func StartNode(configJSON *C.char) *C.char {
-	config, err := params.LoadNodeConfig(C.GoString(configJSON))
+	config, err := params.NewConfigFromJSON(C.GoString(configJSON))
 	if err != nil {
 		return makeJSONResponse(err)
 	}
@@ -62,12 +47,92 @@ func StopNode() *C.char {
 	return makeJSONResponse(nil)
 }
 
+// Create an X3DH bundle
+//export CreateContactCode
+func CreateContactCode() *C.char {
+	bundle, err := statusBackend.CreateContactCode()
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	cstr := C.CString(bundle)
+
+	return cstr
+}
+
+//export ProcessContactCode
+func ProcessContactCode(bundleString *C.char) *C.char {
+	err := statusBackend.ProcessContactCode(C.GoString(bundleString))
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return nil
+}
+
+//export ExtractIdentityFromContactCode
+func ExtractIdentityFromContactCode(bundleString *C.char) *C.char {
+	bundle := C.GoString(bundleString)
+
+	identity, err := statusBackend.ExtractIdentityFromContactCode(bundle)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	if err := statusBackend.ProcessContactCode(bundle); err != nil {
+		return makeJSONResponse(err)
+	}
+
+	data, err := json.Marshal(struct {
+		Identity string `json:"identity"`
+	}{Identity: identity})
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return C.CString(string(data))
+}
+
+// VerifyGroupMembershipSignatures ensure the signature pairs are valid
+//export VerifyGroupMembershipSignatures
+func VerifyGroupMembershipSignatures(signaturePairsStr *C.char) *C.char {
+	var signaturePairs [][3]string
+
+	if err := json.Unmarshal([]byte(C.GoString(signaturePairsStr)), &signaturePairs); err != nil {
+		return makeJSONResponse(err)
+	}
+
+	if err := statusBackend.VerifyGroupMembershipSignatures(signaturePairs); err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return nil
+}
+
+// Sign signs a string containing group membership information
+//export SignGroupMembership
+func SignGroupMembership(content *C.char) *C.char {
+	signature, err := statusBackend.SignGroupMembership(C.GoString(content))
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	data, err := json.Marshal(struct {
+		Signature string `json:"signature"`
+	}{Signature: signature})
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return C.CString(string(data))
+}
+
 //ValidateNodeConfig validates config for status node
 //export ValidateNodeConfig
 func ValidateNodeConfig(configJSON *C.char) *C.char {
 	var resp APIDetailedResponse
 
-	_, err := params.LoadNodeConfig(C.GoString(configJSON))
+	_, err := params.NewConfigFromJSON(C.GoString(configJSON))
 
 	// Convert errors to APIDetailedResponse
 	switch err := err.(type) {

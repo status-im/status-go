@@ -201,11 +201,11 @@ func (p *PeerPool) stopDiscovery(server *p2p.Server) {
 		return
 	}
 
+	if err := p.discovery.Stop(); err != nil {
+		log.Error("discovery errored when stopping", "err", err)
+	}
 	for _, t := range p.topics {
 		t.StopSearch(server)
-	}
-	if err := p.discovery.Stop(); err != nil {
-		log.Error("discovery errored when was closed", "err", err)
 	}
 
 	p.mu.Lock()

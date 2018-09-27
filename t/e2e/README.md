@@ -54,7 +54,7 @@ mv UTC--2018-01-26T13-47-49.289567120Z--9f04dc05c4c3ec3b8b1f36f7d7d153f3934b1f07
 popd
 ```
 
-Update config for tests with new accounts `static/config/public-chain-accounts.json`:
+Update config for tests with new accounts `t/config/public-chain-accounts.json`:
 
 ```json
 {

@@ -59,10 +59,23 @@ func (c *Cleaner) Add(deadline time.Time, key string) {
 	heap.Push(c, key)
 }
 
+func (c *Cleaner) Exist(key string) bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	_, exist := c.deadlines[key]
+	return exist
+}
+
 func (c *Cleaner) PopOneSince(now time.Time) (rst string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if len(c.heap) == 0 {
+		return
+	}
+	// same key can be inserted multiple times into the heap,
+	// deadline for a key is removed when it was popped the first time
+	if _, exist := c.deadlines[c.heap[0]]; !exist {
+		heap.Pop(c)
 		return
 	}
 	if now.After(c.deadlines[c.heap[0]]) {

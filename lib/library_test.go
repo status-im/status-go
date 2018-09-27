@@ -9,6 +9,7 @@ package main
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -23,9 +24,9 @@ func TestExportedAPI(t *testing.T) {
 
 func TestValidateNodeConfig(t *testing.T) {
 	noErrorsCallback := func(resp APIDetailedResponse) {
+		assert.Empty(t, resp.FieldErrors)
+		assert.Empty(t, resp.Message)
 		require.True(t, resp.Status, "expected status equal true")
-		require.Empty(t, resp.FieldErrors)
-		require.Empty(t, resp.Message)
 	}
 
 	testCases := []struct {
@@ -37,7 +38,16 @@ func TestValidateNodeConfig(t *testing.T) {
 			Name: "response for valid config",
 			Config: `{
 				"NetworkId": 1,
-				"DataDir": "/tmp"
+				"DataDir": "/tmp",
+				"BackupDisabledDataDir": "/tmp",
+				"KeyStoreDir": "/tmp",
+				"NoDiscovery": true,
+				"WhisperConfig": {
+					"Enabled": true,
+					"EnableMailServer": true,
+					"DataDir": "/tmp",
+					"MailServerPassword": "status-offline-inbox"
+				}
 			}`,
 			Callback: noErrorsCallback,
 		},
@@ -50,17 +60,107 @@ func TestValidateNodeConfig(t *testing.T) {
 			},
 		},
 		{
+			Name: "response for config missing DataDir",
+			Config: `{
+				"NetworkId": 3,
+				"BackupDisabledDataDir": "/tmp",
+				"KeyStoreDir": "/tmp",
+				"NoDiscovery": true,
+				"WhisperConfig": {
+					"Enabled": false
+				}
+			}`,
+			Callback: func(resp APIDetailedResponse) {
+				require.False(t, resp.Status)
+				require.Equal(t, 1, len(resp.FieldErrors))
+				require.Equal(t, resp.FieldErrors[0].Parameter, "NodeConfig.DataDir")
+				require.Contains(t, resp.Message, "validation: validation failed")
+			},
+		},
+		{
+			Name: "response for config missing BackupDisabledDataDir",
+			Config: `{
+				"NetworkId": 3,
+				"DataDir": "/tmp",
+				"KeyStoreDir": "/tmp",
+				"NoDiscovery": true,
+				"WhisperConfig": {
+					"Enabled": false
+				}
+			}`,
+			Callback: func(resp APIDetailedResponse) {
+				require.False(t, resp.Status)
+				require.Equal(t, 1, len(resp.FieldErrors))
+				require.Equal(t, resp.FieldErrors[0].Parameter, "NodeConfig.BackupDisabledDataDir")
+				require.Contains(t, resp.Message, "validation: validation failed")
+			},
+		},
+		{
+			Name: "response for config missing KeyStoreDir",
+			Config: `{
+				"NetworkId": 3,
+				"DataDir": "/tmp",
+				"BackupDisabledDataDir": "/tmp",
+				"NoDiscovery": true,
+				"WhisperConfig": {
+					"Enabled": false
+				}
+			}`,
+			Callback: func(resp APIDetailedResponse) {
+				require.False(t, resp.Status)
+				require.Equal(t, 1, len(resp.FieldErrors))
+				require.Equal(t, resp.FieldErrors[0].Parameter, "NodeConfig.KeyStoreDir")
+				require.Contains(t, resp.Message, "validation: validation failed")
+			},
+		},
+		{
+			Name: "response for config missing WhisperConfig.DataDir",
+			Config: `{
+				"NetworkId": 3,
+				"DataDir": "/tmp",
+				"BackupDisabledDataDir": "/tmp",
+				"KeyStoreDir": "/tmp",
+				"NoDiscovery": true,
+				"WhisperConfig": {
+					"Enabled": true,
+					"EnableMailServer": true
+				}
+			}`,
+			Callback: func(resp APIDetailedResponse) {
+				require.False(t, resp.Status)
+				require.Empty(t, resp.FieldErrors)
+				require.Contains(t, resp.Message, "WhisperConfig.DataDir must be specified when WhisperConfig.EnableMailServer is true")
+			},
+		},
+		{
+			Name: "response for config missing WhisperConfig.DataDir with WhisperConfig.EnableMailServer set to false",
+			Config: `{
+				"NetworkId": 3,
+				"DataDir": "/tmp",
+				"BackupDisabledDataDir": "/tmp",
+				"KeyStoreDir": "/tmp",
+				"NoDiscovery": true,
+				"WhisperConfig": {
+					"Enabled": true,
+					"EnableMailServer": false
+				}
+			}`,
+			Callback: noErrorsCallback,
+		},
+		{
 			Name:   "response for config with multiple errors",
 			Config: `{}`,
 			Callback: func(resp APIDetailedResponse) {
 				required := map[string]string{
-					"NodeConfig.NetworkID": "required",
-					"NodeConfig.DataDir":   "required",
+					"NodeConfig.NetworkID":             "required",
+					"NodeConfig.DataDir":               "required",
+					"NodeConfig.BackupDisabledDataDir": "required",
+					"NodeConfig.KeyStoreDir":           "required",
 				}
 
 				require.False(t, resp.Status)
 				require.Contains(t, resp.Message, "validation: validation failed")
-				require.Equal(t, 2, len(resp.FieldErrors))
+				require.Equal(t, 4, len(resp.FieldErrors), resp.FieldErrors)
 
 				for _, err := range resp.FieldErrors {
 					require.Contains(t, required, err.Parameter)

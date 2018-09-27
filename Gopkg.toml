@@ -24,8 +24,12 @@
 
 [[constraint]]
   name = "github.com/ethereum/go-ethereum"
-  version = "=v1.8.14"
+  version = "=v1.8.16"
   source = "github.com/status-im/go-ethereum"
+
+[[override]]
+  name = "github.com/golang/protobuf"
+  version = "1.1.0"
 
 # * * * * * `go-ethereum` dependencies * * * * *
 # Pinned down SHAs from `go-ethereum/vendor/vendor.json`
@@ -49,10 +53,6 @@
 [[override]]
   name = "github.com/go-stack/stack"
   revision = "54be5f394ed2c3e19dac9134a40a95ba5a017f7b"
-
-[[override]]
-  name = "github.com/golang/protobuf"
-  revision = "748d386b5c1ea99658fd69fe9f03991ce86a90c1"
 
 [[override]]
   name = "github.com/golang/snappy"
@@ -153,3 +153,11 @@
 [[override]]
   name = "github.com/deckarep/golang-set"
   revision = "504e848d77ea4752b3057b8fb46da0e7f746ccf3"
+
+[[constraint]]
+  name = "github.com/status-im/doubleratchet"
+  revision = "321788dbb6eac36f7dab04e631db139e13bb280b"
+
+[[constraint]]
+  name = "github.com/status-im/migrate"
+  branch = "master"

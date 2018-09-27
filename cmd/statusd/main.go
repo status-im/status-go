@@ -8,18 +8,16 @@ import (
 	stdlog "log"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
 
-	"github.com/status-im/status-go/logutils"
-
 	"github.com/ethereum/go-ethereum/log"
 	gethmetrics "github.com/ethereum/go-ethereum/metrics"
-	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/cmd/statusd/debug"
-	"github.com/status-im/status-go/cmd/statusd/topics"
+	"github.com/status-im/status-go/logutils"
 	nodemetrics "github.com/status-im/status-go/metrics/node"
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/params"
@@ -36,90 +34,83 @@ var (
 )
 
 var (
-	clusterConfigFile = flag.String("clusterconfig", "", "Cluster configuration file")
-	nodeKeyFile       = flag.String("nodekey", "", "P2P node key file (private key)")
-	dataDir           = flag.String("datadir", params.DataDir, "Data directory for the databases and keystore")
-	networkID         = flag.Int("networkid", params.RopstenNetworkID, "Network identifier (integer, 1=Homestead, 3=Ropsten, 4=Rinkeby, 777=StatusChain)")
-	lesEnabled        = flag.Bool("les", false, "Enable LES protocol")
-	whisperEnabled    = flag.Bool("shh", false, "Enable Whisper protocol")
-	statusService     = flag.String("status", "", `Enable StatusService, possible values: "ipc", "http"`)
-	debugAPI          = flag.Bool("debug", false, `Enable debug API endpoints under "debug_" namespace`)
-	swarmEnabled      = flag.Bool("swarm", false, "Enable Swarm protocol")
-	maxPeers          = flag.Int("maxpeers", 25, "maximum number of p2p peers (including all protocols)")
-	httpEnabled       = flag.Bool("http", false, "Enable HTTP RPC endpoint")
-	httpHost          = flag.String("httphost", "127.0.0.1", "HTTP RPC host of the listening socket")
-	httpPort          = flag.Int("httpport", params.HTTPPort, "HTTP RPC server's listening port")
-	httpModules       = flag.String("httpmodules", params.APIModules, "Comma separated list of HTTP RPC APIs")
-	ipcEnabled        = flag.Bool("ipc", false, "Enable IPC RPC endpoint")
-	ipcFile           = flag.String("ipcfile", "", "Set IPC file path")
-	cliEnabled        = flag.Bool("cli", false, "Enable debugging CLI server")
-	cliPort           = flag.String("cliport", debug.CLIPort, "CLI server's listening port")
-	pprofEnabled      = flag.Bool("pprof", false, "Enable runtime profiling via pprof")
-	pprofPort         = flag.Int("pprofport", 52525, "Port for runtime profiling via pprof")
-	logLevel          = flag.String("log", "INFO", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
-	logFile           = flag.String("logfile", "", "Path to the log file")
-	logWithoutColors  = flag.Bool("log-without-color", false, "Disables log colors")
-	version           = flag.Bool("version", false, "Print version")
+	configFiles      configFlags
+	logLevel         = flag.String("log", "", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
+	logWithoutColors = flag.Bool("log-without-color", false, "Disables log colors")
+	cliEnabled       = flag.Bool("cli", false, "Enable debugging CLI server")
+	cliPort          = flag.String("cli-port", debug.CLIPort, "CLI server's listening port")
+	pprofEnabled     = flag.Bool("pprof", false, "Enable runtime profiling via pprof")
+	pprofPort        = flag.Int("pprof-port", 52525, "Port for runtime profiling via pprof")
+	version          = flag.Bool("version", false, "Print version and dump configuration")
 
-	listenAddr      = flag.String("listenaddr", ":30303", "IP address and port of this node (e.g. 127.0.0.1:30303)")
-	advertiseAddr   = flag.String("advertiseaddr", "", "IP address the node wants to reached with (useful if floating IP is used)")
-	fleet           = flag.String("fleet", params.FleetBeta, "Name of the fleet like 'eth.staging' (default to 'eth.beta')")
-	standalone      = flag.Bool("standalone", false, "Don't actively connect to peers, wait for incoming connections")
-	bootnodes       = flag.String("bootnodes", "", "A list of bootnodes separated by comma")
-	discoveryFlag   = flag.Bool("discovery", false, "Enable discovery protocol")
-	rendezvous      = flag.Bool("rendezvous", false, "Enable rendezvous protocol")
-	rendezvousNodes = StringSlice{}
+	dataDir    = flag.String("dir", getDefaultDataDir(), "Directory used by node to store data")
+	register   = flag.Bool("register", false, "Register and make the node discoverable by other nodes")
+	mailserver = flag.Bool("mailserver", false, "Enable Mail Server with default configuration")
+	networkID  = flag.Int(
+		"network-id",
+		params.RopstenNetworkID,
+		fmt.Sprintf(
+			"A network ID: %d (Mainnet), %d (Ropsten), %d (Rinkeby)",
+			params.MainNetworkID, params.RopstenNetworkID, params.RinkebyNetworkID,
+		),
+	)
 
 	// don't change the name of this flag, https://github.com/ethereum/go-ethereum/blob/master/metrics/metrics.go#L41
-	metrics = flag.Bool("metrics", false, "Expose ethereum metrics with debug_metrics jsonrpc call.")
-	// shh stuff
-	passwordFile = flag.String("shh.passwordfile", "", "Password file (password is used for symmetric encryption)")
-	minPow       = flag.Float64("shh.pow", params.WhisperMinimumPoW, "PoW for messages to be added to queue, in float format")
-	ttl          = flag.Int("shh.ttl", params.WhisperTTL, "Time to live for messages, in seconds")
-	lightClient  = flag.Bool("shh.lightclient", false, "Start with empty bloom filter, and don't forward messages")
-
-	// MailServer
-	enableMailServer = flag.Bool("shh.mailserver", false, "Delivers expired messages on demand")
-
-	// Push Notification
-	firebaseAuth = flag.String("shh.firebaseauth", "", "FCM Authorization Key used for sending Push Notifications")
+	metrics = flag.Bool("metrics", false, "Expose ethereum metrics with debug_metrics jsonrpc call")
 
 	syncAndExit = flag.Int("sync-and-exit", -1, "Timeout in minutes for blockchain sync and exit, zero means no timeout unless sync is finished")
-
-	ntpSyncEnabled = flag.Bool("ntp", true, "Enable/disable whisper NTP synchronization")
-
-	// Topics that will be search and registered by discovery v5.
-	searchTopics   = topics.TopicLimitsFlag{}
-	registerTopics = topics.TopicFlag{}
 )
 
 // All general log messages in this package should be routed through this logger.
 var logger = log.New("package", "status-go/cmd/statusd")
 
 func init() {
-	flag.Var(&searchTopics, "topic.search", "Topic that will be searched in discovery v5, e.g (mailserver=1,1)")
-	flag.Var(&registerTopics, "topic.register", "Topic that will be registered using discovery v5.")
-	flag.Var(&rendezvousNodes, "rendezvous-node", "Rendezvous server.")
+	flag.Var(&configFiles, "c", "JSON configuration file(s). Multiple configuration files can be specified, and will be merged in occurrence order")
+
+	colors := terminal.IsTerminal(int(os.Stdin.Fd()))
+	if err := logutils.OverrideRootLog(true, "ERROR", "", colors); err != nil {
+		stdlog.Fatalf("Error initializing logger: %v", err)
+	}
 
 	flag.Usage = printUsage
 	flag.Parse()
 	if flag.NArg() > 0 {
-		stdlog.Printf("Extra args in command line: %v", flag.Args())
 		printUsage()
+		logger.Error("Extra args in command line: %v", flag.Args())
 		os.Exit(1)
 	}
 }
 
+// nolint:gocyclo
 func main() {
-	colors := !(*logWithoutColors) && terminal.IsTerminal(int(os.Stdin.Fd()))
-	if err := logutils.OverrideRootLog(logEnabled(), *logLevel, *logFile, colors); err != nil {
-		stdlog.Fatalf("Error initializing logger: %s", err)
+	opts := []params.Option{params.WithFleet(params.FleetBeta)}
+	if *mailserver {
+		opts = append(opts, params.WithMailserver())
 	}
 
-	config, err := makeNodeConfig()
+	config, err := params.NewNodeConfigWithDefaultsAndFiles(
+		*dataDir,
+		uint64(*networkID),
+		opts,
+		configFiles,
+	)
 	if err != nil {
-		stdlog.Fatalf("Making config failed, %s", err)
+		printUsage()
+		if err != nil {
+			logger.Error(err.Error())
+		}
+		os.Exit(1)
 	}
+
+	if *register && *mailserver {
+		config.RegisterTopics = append(config.RegisterTopics, params.MailServerDiscv5Topic)
+	} else if *register {
+		config.RegisterTopics = append(config.RegisterTopics, params.WhisperDiscv5Topic)
+	}
+
+	// set up logging options
+	setupLogging(config)
+
 	// We want statusd to be distinct from StatusIM client.
 	config.Name = serverClientName
 
@@ -179,6 +170,29 @@ func main() {
 	}
 }
 
+func getDefaultDataDir() string {
+	if home := os.Getenv("HOME"); home != "" {
+		return filepath.Join(home, ".statusd")
+	}
+	return "./statusd-data"
+}
+
+func setupLogging(config *params.NodeConfig) {
+	if *logLevel != "" {
+		config.LogLevel = *logLevel
+	}
+
+	colors := !(*logWithoutColors) && terminal.IsTerminal(int(os.Stdin.Fd()))
+	if err := logutils.OverrideRootLog(
+		logEnabled(config),
+		config.LogLevel,
+		config.LogFile,
+		colors,
+	); err != nil {
+		stdlog.Fatalf("Error initializing logger: %v", err)
+	}
+}
+
 // startDebug starts the debugging API server.
 func startDebug(backend *api.StatusBackend) error {
 	_, err := debug.New(backend, *cliPort)
@@ -206,95 +220,15 @@ func startCollectingNodeMetrics(interruptCh <-chan struct{}, statusNode *node.St
 	<-interruptCh
 }
 
-func logEnabled() bool {
-	return *logLevel != "" || *logFile != ""
+func logEnabled(config *params.NodeConfig) bool {
+	return config.LogLevel != "" || config.LogFile != ""
 }
 
-// makeNodeConfig parses incoming CLI options and returns node configuration object
-func makeNodeConfig() (*params.NodeConfig, error) {
-	nodeConfig, err := params.NewNodeConfig(*dataDir, *clusterConfigFile, *fleet, uint64(*networkID))
-	if err != nil {
-		return nil, err
-	}
-
-	nodeConfig.ListenAddr = *listenAddr
-	nodeConfig.AdvertiseAddr = *advertiseAddr
-
-	// TODO(divan): move this logic into params package
-	if *nodeKeyFile != "" {
-		nodeConfig.NodeKeyFile = *nodeKeyFile
-	}
-
-	if *logLevel != "" {
-		nodeConfig.LogLevel = *logLevel
-	}
-
-	if *logFile != "" {
-		nodeConfig.LogFile = *logFile
-	}
-
-	nodeConfig.LogEnabled = logEnabled()
-
-	nodeConfig.RPCEnabled = *httpEnabled
-	nodeConfig.WhisperConfig.Enabled = *whisperEnabled
-	nodeConfig.MaxPeers = *maxPeers
-
-	nodeConfig.HTTPHost = *httpHost
-	nodeConfig.HTTPPort = *httpPort
-	nodeConfig.APIModules = *httpModules
-	nodeConfig.IPCEnabled = *ipcEnabled
-
-	if *ipcFile != "" {
-		nodeConfig.IPCEnabled = true
-		nodeConfig.IPCFile = *ipcFile
-	}
-
-	nodeConfig.LightEthConfig.Enabled = *lesEnabled
-	nodeConfig.SwarmConfig.Enabled = *swarmEnabled
-
-	if *standalone {
-		nodeConfig.ClusterConfig.Enabled = false
-		nodeConfig.ClusterConfig.BootNodes = nil
-	}
-
-	if len(rendezvousNodes) > 0 {
-		nodeConfig.ClusterConfig.RendezvousNodes = []string(rendezvousNodes)
-	}
-	nodeConfig.NoDiscovery = !(*discoveryFlag)
-	nodeConfig.Rendezvous = *rendezvous
-	nodeConfig.RequireTopics = map[discv5.Topic]params.Limits(searchTopics)
-	nodeConfig.RegisterTopics = []discv5.Topic(registerTopics)
-
-	// Even if standalone is true and discovery is disabled,
-	// it's possible to use bootnodes.
-	if *bootnodes != "" {
-		nodeConfig.ClusterConfig.BootNodes = strings.Split(*bootnodes, ",")
-	}
-
-	if nodeConfig, err = configureStatusService(*statusService, nodeConfig); err != nil {
-		return nil, err
-	}
-
-	nodeConfig.DebugAPIEnabled = *debugAPI
-	if nodeConfig.DebugAPIEnabled {
-		nodeConfig.AddAPIModule("debug")
-	}
-
-	if *whisperEnabled {
-		return whisperConfig(nodeConfig)
-	}
-
-	// RPC configuration
-	if !*httpEnabled {
-		nodeConfig.HTTPHost = "" // HTTP RPC is disabled
-	}
-
-	return nodeConfig, nil
-}
-
-var errStatusServiceRequiresIPC = errors.New("to enable the StatusService on IPC, -ipc flag must be set")
-var errStatusServiceRequiresHTTP = errors.New("to enable the StatusService on HTTP, -http flag must be set")
-var errStatusServiceInvalidFlag = errors.New("-status flag valid values are: ipc, http")
+var (
+	errStatusServiceRequiresIPC  = errors.New("to enable the StatusService on IPC, -ipc flag must be set")
+	errStatusServiceRequiresHTTP = errors.New("to enable the StatusService on HTTP, -http flag must be set")
+	errStatusServiceInvalidFlag  = errors.New("-status flag valid values are: ipc, http")
+)
 
 func configureStatusService(flagValue string, nodeConfig *params.NodeConfig) (*params.NodeConfig, error) {
 	switch flagValue {
@@ -304,7 +238,7 @@ func configureStatusService(flagValue string, nodeConfig *params.NodeConfig) (*p
 		}
 		nodeConfig.StatusServiceEnabled = true
 	case "http":
-		if !nodeConfig.RPCEnabled {
+		if !nodeConfig.HTTPEnabled {
 			return nil, errStatusServiceRequiresHTTP
 		}
 		nodeConfig.StatusServiceEnabled = true
@@ -333,7 +267,6 @@ func printVersion(config *params.NodeConfig, buildStamp string) {
 	fmt.Printf("GOPATH=%s\n", os.Getenv("GOPATH"))
 	fmt.Printf("GOROOT=%s\n", runtime.GOROOT())
 
-	config.LightEthConfig.Genesis = "SKIP"
 	fmt.Println("Loaded Config: ", config)
 }
 
@@ -341,11 +274,11 @@ func printUsage() {
 	usage := `
 Usage: statusd [options]
 Examples:
-  statusd               # run status node with defaults
-  statusd -networkid 4  # run node on Rinkeby network
-  statusd -datadir /dir # specify different dir for data
-  statusd -ipc          # enable IPC for usage with "geth attach"
-  statusd -cli          # enable connection by statusd-cli on default port
+  statusd                                        # run regular Whisper node that joins Status network
+  statusd -c ./default.json                      # run node with configuration specified in ./default.json file
+  statusd -c ./default.json -c ./standalone.json # run node with configuration specified in ./default.json file, after merging ./standalone.json file
+  statusd -c ./default.json -metrics             # run node with configuration specified in ./default.json file, and expose ethereum metrics with debug_metrics jsonrpc call
+  statusd -c ./default.json -cli                 # run node with configuration specified in ./default.json file, and enable connection by statusd-cli on default port
 
 Options:
 `

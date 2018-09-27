@@ -1,0 +1,8 @@
+{
+    "WhisperConfig": {
+        "Enabled": true,
+        "EnableNTPSync": true,
+        "EnableMailServer": true,
+        "MailServerPassword": "status-offline-inbox"
+    }
+}

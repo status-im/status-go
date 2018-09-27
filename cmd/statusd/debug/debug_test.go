@@ -180,7 +180,10 @@ func mkConfigJSON(name string) (string, func(), error) {
 	configJSON := `{
 		"NetworkId": ` + strconv.Itoa(params.RopstenNetworkID) + `,
 		"DataDir": "` + tmpDir + `",
+		"BackupDisabledDataDir": "` + tmpDir + `",
+		"KeyStoreDir": "` + tmpDir + `/keystore",
 		"LogLevel": "INFO",
+		"NoDiscovery": true,
 		"RPCEnabled": true
 	}`
 	return configJSON, cleanup, nil

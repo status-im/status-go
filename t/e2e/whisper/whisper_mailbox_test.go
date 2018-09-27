@@ -568,7 +568,7 @@ func (s *WhisperMailboxSuite) startMailboxBackend() (*api.StatusBackend, func())
 	mailboxConfig.WhisperConfig.Enabled = true
 	mailboxConfig.KeyStoreDir = datadir
 	mailboxConfig.WhisperConfig.EnableMailServer = true
-	mailboxConfig.WhisperConfig.MailServerPasswordFile = filepath.Join(RootDir, "/static/keys/wnodepassword")
+	mailboxConfig.WhisperConfig.MailServerPassword = "status-offline-inbox"
 	mailboxConfig.WhisperConfig.DataDir = filepath.Join(datadir, "data")
 	mailboxConfig.DataDir = datadir
 

@@ -21,7 +21,7 @@ func TestProxyToRendezvous(t *testing.T) {
 		stop     = make(chan struct{})
 		wg       sync.WaitGroup
 	)
-	client, err := rendezvous.NewTemporary()
+	client, err := rendezvous.NewEphemeral()
 	require.NoError(t, err)
 	reg.Add(topic, id)
 	wg.Add(1)

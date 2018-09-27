@@ -14,7 +14,7 @@
             "host": "127.0.0.1",
             "program": "${workspaceRoot}/cmd/statusd",
             "env": {},
-            "args": ["-shh", "-les", "-discovery=true"],
+            "args": ["-c", "${workspaceRoot}/config/cli/fleet-eth.test.json"],
             "showLog": true,
             "output": "${workspaceRoot}/build/bin/statusd.debug"
         }

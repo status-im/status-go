@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -21,6 +22,7 @@ var logger = log.New("package", "rendezvous/server")
 
 const (
 	longestTTL          = 20 * time.Second
+	networkDelay        = 500 * time.Millisecond
 	cleanerPeriod       = 2 * time.Second
 	maxLimit       uint = 10
 	maxTopicLength      = 50
@@ -36,6 +38,7 @@ func NewServer(laddr ma.Multiaddr, identity crypto.PrivKey, s Storage) *Server {
 		writeTimeout:  10 * time.Second,
 		readTimeout:   10 * time.Second,
 		cleanerPeriod: cleanerPeriod,
+		networkDelay:  networkDelay,
 	}
 	return &srv
 }
@@ -51,6 +54,7 @@ type Server struct {
 	storage       Storage
 	cleaner       *Cleaner
 	cleanerPeriod time.Duration
+	networkDelay  time.Duration
 
 	h    host.Host
 	addr ma.Multiaddr
@@ -74,6 +78,11 @@ func (srv *Server) Start() error {
 	}
 	// once server is restarted all cleaner info is lost. so we need to rebuild it
 	return srv.storage.IterateAllKeys(func(key RecordsKey, ttl time.Time) error {
+		if !srv.cleaner.Exist(key.String()) {
+			topic := TopicPart(key)
+			log.Debug("active registration with", "topic", string(topic))
+			metrics.AddActiveRegistration(string(topic))
+		}
 		srv.cleaner.Add(ttl, key.String())
 		return nil
 	})
@@ -162,6 +171,9 @@ func (srv *Server) purgeOutdated() {
 	if len(key) == 0 {
 		return
 	}
+	topic := TopicPart([]byte(key))
+	log.Debug("Removing record with", "topic", string(topic))
+	metrics.RemoveActiveRegistration(string(topic))
 	if err := srv.storage.RemoveByKey(key); err != nil {
 		logger.Error("error removing key from storage", "key", key, "error", err)
 	}
@@ -178,6 +190,7 @@ func (srv *Server) msgParser(typ protocol.MessageType, d Decoder) (resptype prot
 		var msg protocol.Register
 		resptype = protocol.REGISTER_RESPONSE
 		if err = d.Decode(&msg); err != nil {
+			metrics.CountError("register")
 			return resptype, protocol.RegisterResponse{Status: protocol.E_INVALID_CONTENT}, nil
 		}
 		resp, err = srv.register(msg)
@@ -186,18 +199,24 @@ func (srv *Server) msgParser(typ protocol.MessageType, d Decoder) (resptype prot
 		var msg protocol.Discover
 		resptype = protocol.DISCOVER_RESPONSE
 		if err = d.Decode(&msg); err != nil {
+			metrics.CountError("discover")
 			return resptype, protocol.DiscoverResponse{Status: protocol.E_INVALID_CONTENT}, nil
 		}
 		limit := msg.Limit
 		if msg.Limit > maxLimit {
 			limit = maxLimit
 		}
+		start := time.Now()
 		records, err := srv.storage.GetRandom(msg.Topic, limit)
 		if err != nil {
+			metrics.CountError("discover")
 			return resptype, protocol.DiscoverResponse{Status: protocol.E_INTERNAL_ERROR}, err
 		}
+		metrics.ObserveDiscoveryDuration(time.Since(start).Seconds(), msg.Topic)
+		metrics.ObserveDiscoverSize(float64(len(records)), msg.Topic)
 		return resptype, protocol.DiscoverResponse{Status: protocol.OK, Records: records}, nil
 	default:
+		metrics.CountError("unknown")
 		// don't send the response
 		return 0, nil, errors.New("unknown request type")
 	}
@@ -210,14 +229,22 @@ func (srv *Server) register(msg protocol.Register) (protocol.RegisterResponse, e
 	if time.Duration(msg.TTL) > longestTTL {
 		return protocol.RegisterResponse{Status: protocol.E_INVALID_TTL}, nil
 	}
+	if bytes.IndexByte([]byte(msg.Topic), TopicBodyDelimiter) != -1 {
+		return protocol.RegisterResponse{Status: protocol.E_INVALID_NAMESPACE}, nil
+	}
 	if !msg.Record.Signed() {
 		return protocol.RegisterResponse{Status: protocol.E_INVALID_ENR}, nil
 	}
-	ttl := time.Now().Add(time.Duration(msg.TTL))
-	key, err := srv.storage.Add(msg.Topic, msg.Record, ttl)
+	deadline := time.Now().Add(time.Duration(msg.TTL)).Add(srv.networkDelay)
+	key, err := srv.storage.Add(msg.Topic, msg.Record, deadline)
 	if err != nil {
 		return protocol.RegisterResponse{Status: protocol.E_INTERNAL_ERROR}, err
 	}
-	srv.cleaner.Add(ttl, key)
+	if !srv.cleaner.Exist(key) {
+		log.Debug("active registration with", "topic", msg.Topic)
+		metrics.AddActiveRegistration(msg.Topic)
+	}
+	log.Debug("updating record in the cleaner", "deadline", deadline, "topic", msg.Topic)
+	srv.cleaner.Add(deadline, key)
 	return protocol.RegisterResponse{Status: protocol.OK}, nil
 }

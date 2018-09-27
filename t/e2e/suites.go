@@ -84,7 +84,7 @@ func (s *BackendTestSuite) TearDownTest() {
 // StartTestBackend imports some keys and starts a node.
 func (s *BackendTestSuite) StartTestBackend(opts ...TestNodeOption) {
 	nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
-	s.NoError(err)
+	s.Require().NoError(err)
 
 	// Apply any options altering node config.
 	for i := range opts {
@@ -96,7 +96,7 @@ func (s *BackendTestSuite) StartTestBackend(opts ...TestNodeOption) {
 
 	// start node
 	s.False(s.Backend.IsNodeRunning())
-	s.NoError(s.Backend.StartNode(nodeConfig))
+	s.Require().NoError(s.Backend.StartNode(nodeConfig))
 	s.True(s.Backend.IsNodeRunning())
 }
 
@@ -110,7 +110,7 @@ func (s *BackendTestSuite) StopTestBackend() {
 // RestartTestNode restarts a currently running node.
 func (s *BackendTestSuite) RestartTestNode() {
 	s.True(s.Backend.IsNodeRunning())
-	s.NoError(s.Backend.RestartNode())
+	s.Require().NoError(s.Backend.RestartNode())
 	s.True(s.Backend.IsNodeRunning())
 }
 

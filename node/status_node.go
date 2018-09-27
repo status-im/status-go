@@ -117,16 +117,17 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig, db *leveldb.DB, serv
 	return nil
 }
 
-// Start starts current StatusNode, will fail if it's already started.
+// Start starts current StatusNode, failing if it's already started.
 func (n *StatusNode) Start(config *params.NodeConfig, services ...node.ServiceConstructor) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	n.log.Debug("starting with NodeConfig", "ClusterConfig", config.ClusterConfig)
-
 	if n.isRunning() {
+		n.log.Debug("cannot start, node already running")
 		return ErrNodeRunning
 	}
+
+	n.log.Debug("starting with NodeConfig", "ClusterConfig", config.ClusterConfig)
 
 	db, err := db.Create(config.DataDir, params.StatusDatabase)
 	if err != nil {
@@ -186,7 +187,7 @@ func (n *StatusNode) setupRPCClient() (err error) {
 }
 
 func (n *StatusNode) discoveryEnabled() bool {
-	return n.config != nil && (!n.config.NoDiscovery || n.config.Rendezvous) && n.config.ClusterConfig != nil
+	return n.config != nil && (!n.config.NoDiscovery || n.config.Rendezvous) && n.config.ClusterConfig.Enabled
 }
 
 func (n *StatusNode) discoverNode() *discover.Node {
@@ -355,7 +356,7 @@ func (n *StatusNode) isRunning() bool {
 
 // populateStaticPeers connects current node with our publicly available LES/SHH/Swarm cluster
 func (n *StatusNode) populateStaticPeers() error {
-	if n.config.ClusterConfig == nil || !n.config.ClusterConfig.Enabled {
+	if !n.config.ClusterConfig.Enabled {
 		n.log.Info("Static peers are disabled")
 		return nil
 	}
@@ -372,7 +373,7 @@ func (n *StatusNode) populateStaticPeers() error {
 }
 
 func (n *StatusNode) removeStaticPeers() error {
-	if n.config.ClusterConfig == nil || !n.config.ClusterConfig.Enabled {
+	if !n.config.ClusterConfig.Enabled {
 		n.log.Info("Static peers are disabled")
 		return nil
 	}

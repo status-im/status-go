@@ -3,6 +3,7 @@ package discovery
 import (
 	"context"
 	"crypto/ecdsa"
+	"errors"
 	"math/rand"
 	"net"
 	"sync"
@@ -22,20 +23,18 @@ const (
 	bucketSize         = 10
 )
 
+var (
+	errNodeIsNil     = errors.New("node cannot be nil")
+	errIdentityIsNil = errors.New("identity cannot be nil")
+)
+
 func NewRendezvous(servers []ma.Multiaddr, identity *ecdsa.PrivateKey, node *discover.Node) (*Rendezvous, error) {
 	r := new(Rendezvous)
+	r.node = node
+	r.identity = identity
 	r.servers = servers
 	r.registrationPeriod = registrationPeriod
 	r.bucketSize = bucketSize
-
-	r.record = enr.Record{}
-	r.record.Set(enr.IP(node.IP))
-	r.record.Set(enr.TCP(node.TCP))
-	r.record.Set(enr.UDP(node.UDP))
-	// public key is added to ENR when ENR is signed
-	if err := enr.SignV4(&r.record, identity); err != nil {
-		return nil, err
-	}
 	return r, nil
 }
 
@@ -44,7 +43,7 @@ func NewRendezvousWithENR(servers []ma.Multiaddr, record enr.Record) *Rendezvous
 	r.servers = servers
 	r.registrationPeriod = registrationPeriod
 	r.bucketSize = bucketSize
-	r.record = record
+	r.record = &record
 	return r
 }
 
@@ -62,7 +61,11 @@ type Rendezvous struct {
 	servers            []ma.Multiaddr
 	registrationPeriod time.Duration
 	bucketSize         int
-	record             enr.Record
+	node               *discover.Node
+	identity           *ecdsa.PrivateKey
+
+	recordMu sync.Mutex
+	record   *enr.Record // record is set directly if rendezvous is used in proxy mode
 }
 
 func (r *Rendezvous) Running() bool {
@@ -75,7 +78,7 @@ func (r *Rendezvous) Running() bool {
 func (r *Rendezvous) Start() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	client, err := rendezvous.NewTemporary()
+	client, err := rendezvous.NewEphemeral()
 	if err != nil {
 		return err
 	}
@@ -93,7 +96,30 @@ func (r *Rendezvous) Stop() error {
 	return nil
 }
 
-func (r *Rendezvous) register(topic string) error {
+func (r *Rendezvous) MakeRecord() (record enr.Record, err error) {
+	r.recordMu.Lock()
+	defer r.recordMu.Unlock()
+	if r.record != nil {
+		return *r.record, nil
+	}
+	if r.node == nil {
+		return record, errNodeIsNil
+	}
+	if r.identity == nil {
+		return record, errIdentityIsNil
+	}
+	record.Set(enr.IP(r.node.IP))
+	record.Set(enr.TCP(r.node.TCP))
+	record.Set(enr.UDP(r.node.UDP))
+	// public key is added to ENR when ENR is signed
+	if err := enr.SignV4(&record, r.identity); err != nil {
+		return record, err
+	}
+	r.record = &record
+	return record, nil
+}
+
+func (r *Rendezvous) register(topic string, record enr.Record) error {
 	srv := r.servers[rand.Intn(len(r.servers))]
 	ctx, cancel := context.WithTimeout(r.rootCtx, requestTimeout)
 	defer cancel()
@@ -101,7 +127,7 @@ func (r *Rendezvous) register(topic string) error {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	err := r.client.Register(ctx, srv, topic, r.record)
+	err := r.client.Register(ctx, srv, topic, record, r.registrationPeriod)
 	if err != nil {
 		log.Error("error registering", "topic", topic, "rendezvous server", srv, "err", err)
 	}
@@ -110,10 +136,16 @@ func (r *Rendezvous) register(topic string) error {
 
 // Register renews registration in the specified server.
 func (r *Rendezvous) Register(topic string, stop chan struct{}) error {
-	ticker := time.NewTicker(r.registrationPeriod)
+	record, err := r.MakeRecord()
+	if err != nil {
+		return err
+	}
+	// sending registration more often than the whole registraton period
+	// will ensure that it won't be accidentally removed
+	ticker := time.NewTicker(r.registrationPeriod / 2)
 	defer ticker.Stop()
 
-	if err := r.register(topic); err == context.Canceled {
+	if err := r.register(topic, record); err == context.Canceled {
 		return err
 	}
 
@@ -122,7 +154,7 @@ func (r *Rendezvous) Register(topic string, stop chan struct{}) error {
 		case <-stop:
 			return nil
 		case <-ticker.C:
-			if err := r.register(topic); err == context.Canceled {
+			if err := r.register(topic, record); err == context.Canceled {
 				return err
 			}
 		}
@@ -160,8 +192,18 @@ func (r *Rendezvous) Discover(
 				log.Debug("converted enr to", "ENODE", n.String())
 				if err != nil {
 					log.Warn("error converting enr record to node", "err", err)
+					continue
 				}
-				found <- n
+				select {
+				case found <- n:
+				case newPeriod, ok := <-period:
+					// closing a period channel is a signal to producer that consumer exited
+					ticker.Stop()
+					if !ok {
+						return nil
+					}
+					ticker = time.NewTicker(newPeriod)
+				}
 			}
 		}
 	}

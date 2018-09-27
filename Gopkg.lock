@@ -88,7 +88,11 @@
   revision = "935e0e8a636ca4ba70b713f3e38a19e1b77739e8"
 
 [[projects]]
+<<<<<<< HEAD
   digest = "1:34fa5a5d444765a1360983211916c4d2e65a3be75186277142d6aef5c21192db"
+=======
+  digest = "1:ba11b65320bfa1a5e8e43b050833bca23490e508a67c45d7e430156cefc2ab7f"
+>>>>>>> develop
   name = "github.com/ethereum/go-ethereum"
   packages = [
     ".",
@@ -101,6 +105,7 @@
     "accounts/usbwallet/internal/trezor",
     "common",
     "common/bitutil",
+    "common/fdlimit",
     "common/hexutil",
     "common/math",
     "common/mclock",
@@ -157,9 +162,14 @@
     "whisper/whisperv6",
   ]
   pruneopts = "T"
+<<<<<<< HEAD
   revision = "13115e12870cb2ebc1c8dfe55bc976d94efbeb90"
   source = "github.com/status-im/go-ethereum"
   version = "v1.8.14"
+=======
+  revision = "89451f7c382ad2185987ee369f16416f89c28a7d"
+  version = "v1.8.15"
+>>>>>>> develop
 
 [[projects]]
   digest = "1:5ac7ecd476a2355a5201229081df2e5f57333ecf703e1f69dde699ae34169c1b"
@@ -218,6 +228,18 @@
   version = "v1.0.0"
 
 [[projects]]
+  digest = "1:c07364982714a51c3ea074babf4a6695a7ce981eec0b3d5102c503f7f590a0ec"
+  name = "github.com/golang-migrate/migrate"
+  packages = [
+    ".",
+    "database",
+    "source",
+  ]
+  pruneopts = "NUT"
+  revision = "93d53a5ae84d81945eedadfe8f6865530d61d51c"
+  version = "v3.5.1"
+
+[[projects]]
   digest = "1:a62049a8fa554d688c8db4845c65ddcd5986b75f3a851e4fb563c6893d292e38"
   name = "github.com/golang/mock"
   packages = ["gomock"]
@@ -226,14 +248,15 @@
   version = "v1.0.0"
 
 [[projects]]
-  digest = "1:cc9139958eb44c66d156bc76bde34a8202c6a4b837cc569299d916fa2f9290d5"
+  digest = "1:ac761a089c90c1399e2fd0a0aacfe63bd7b4ecd01141c98ca9cf18059f938ea4"
   name = "github.com/golang/protobuf"
   packages = [
     "proto",
     "protoc-gen-go/descriptor",
   ]
   pruneopts = "NUT"
-  revision = "748d386b5c1ea99658fd69fe9f03991ce86a90c1"
+  revision = "aa810b61a9c79d51363740d207bb46cf8e620ed5"
+  version = "v1.2.0"
 
 [[projects]]
   digest = "1:9413ddbde906f91f062fda0dfa9a7cff43458cd1b2282c0fa25c61d89300b116"
@@ -691,6 +714,14 @@
   version = "v0.3.7"
 
 [[projects]]
+  branch = "master"
+  digest = "1:95dadf033e1fccc1644f78f743119ec9d2dbaea508cb827ed7057bc0da003178"
+  name = "github.com/mutecomm/go-sqlcipher"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "f799951b4ab269c2ce24913961af2cb5d681cc43"
+
+[[projects]]
   digest = "1:7da29c22bcc5c2ffb308324377dc00b5084650348c2799e573ed226d8cc9faf0"
   name = "github.com/opentracing/opentracing-go"
   packages = [
@@ -760,6 +791,13 @@
   version = "v1.1"
 
 [[projects]]
+  digest = "1:b80bfc6278c27edcb1946fc38bc61f4c3a1cd50978083a4a79b7c875c70ed9d8"
+  name = "github.com/status-im/doubleratchet"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "321788dbb6eac36f7dab04e631db139e13bb280b"
+
+[[projects]]
   branch = "master"
   digest = "1:5d3c51d0f96ff0b228582e5e36295a33da8e16d106cd9dc31538096bd35dce1e"
   name = "github.com/status-im/go-multiaddr-ethv4"
@@ -769,7 +807,19 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:0a0848f018c29e4db5d941c2a8dbbbcaf1ea74f294c4759b69e8664b0a242040"
+  digest = "1:7607ae0e3b67bdf37a65dc42f866a90bcbe543308e92184c51e33a4cca842ecb"
+  name = "github.com/status-im/migrate"
+  packages = [
+    ".",
+    "database/sqlcipher",
+    "source/go_bindata",
+  ]
+  pruneopts = "NUT"
+  revision = "57d2e2abe46f80680b96640a8ce62d8187bee7e8"
+
+[[projects]]
+  branch = "master"
+  digest = "1:b88d64c27ed467659fa0ee1806bc790b88c37bcbff0b8fcd1b97d6a3ee7f9703"
   name = "github.com/status-im/rendezvous"
   packages = [
     ".",
@@ -777,7 +827,7 @@
     "server",
   ]
   pruneopts = "NUT"
-  revision = "444e3eda4a281ca36d61df8a2a0832265d09511d"
+  revision = "55370cdfd9f288059b03c04e23784bb8829a894c"
 
 [[projects]]
   digest = "1:572c783a763db6383aca3179976eb80e4c900f52eba56cba8bb2e3cea7ce720e"
@@ -884,11 +934,13 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:79bdbbb437f8640442f7d785772ac901fb546c4487f6b822bde082b52152f5c1"
+  digest = "1:6c51a2b380a1d068c83cf96857c7657673dfb8dfbeb00779283ad428fa9eef2a"
   name = "golang.org/x/crypto"
   packages = [
     "blake2s",
     "blowfish",
+    "curve25519",
+    "hkdf",
     "pbkdf2",
     "ripemd160",
     "scrypt",
@@ -1040,6 +1092,7 @@
     "github.com/ethereum/go-ethereum/core",
     "github.com/ethereum/go-ethereum/core/types",
     "github.com/ethereum/go-ethereum/crypto",
+    "github.com/ethereum/go-ethereum/crypto/ecies",
     "github.com/ethereum/go-ethereum/crypto/sha3",
     "github.com/ethereum/go-ethereum/eth",
     "github.com/ethereum/go-ethereum/eth/downloader",
@@ -1059,9 +1112,15 @@
     "github.com/ethereum/go-ethereum/rpc",
     "github.com/ethereum/go-ethereum/whisper/whisperv6",
     "github.com/golang/mock/gomock",
+    "github.com/golang/protobuf/proto",
     "github.com/libp2p/go-libp2p-crypto",
     "github.com/multiformats/go-multiaddr",
+    "github.com/mutecomm/go-sqlcipher",
     "github.com/pborman/uuid",
+    "github.com/status-im/doubleratchet",
+    "github.com/status-im/migrate",
+    "github.com/status-im/migrate/database/sqlcipher",
+    "github.com/status-im/migrate/source/go_bindata",
     "github.com/status-im/rendezvous",
     "github.com/status-im/rendezvous/server",
     "github.com/stretchr/testify/assert",
@@ -1073,6 +1132,7 @@
     "github.com/syndtr/goleveldb/leveldb/opt",
     "github.com/syndtr/goleveldb/leveldb/storage",
     "github.com/syndtr/goleveldb/leveldb/util",
+    "golang.org/x/crypto/hkdf",
     "golang.org/x/crypto/pbkdf2",
     "golang.org/x/crypto/ssh/terminal",
     "golang.org/x/text/unicode/norm",
