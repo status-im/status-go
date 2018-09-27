@@ -52,3 +52,12 @@ func TestMac3des(t *testing.T) {
 	expected := "05C4BB8A86014E22"
 	assert.Equal(t, expected, hexutils.BytesToHex(result))
 }
+
+func TestMacFull3DES(t *testing.T) {
+	key := hexutils.HexToBytes("5b02e75ad63190aece0622936f11abab")
+	data := hexutils.HexToBytes("8482010010810b098a8fbb88da")
+	result, err := MacFull3DES(key, data, nullBytes8)
+	assert.NoError(t, err)
+	expected := "5271D7174A5A166A"
+	assert.Equal(t, expected, hexutils.BytesToHex(result))
+}
