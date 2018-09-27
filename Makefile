@@ -269,30 +269,11 @@ clean: ##@other Cleanup
 deep-clean: clean
 	rm -Rdf .ethereumtest/StatusChain
 
-vendor-check: ##@dependencies Require all new patches and disallow other changes
-	./_assets/patches/patcher -c
-	./_assets/ci/isolate-vendor-check.sh
-
-dep-ensure: ##@dependencies Dep ensure and apply all patches
+dep-ensure: ##@dependencies Ensure all dependencies are in place with dep
 	@dep ensure
-	./_assets/patches/patcher
 
 dep-install: ##@dependencies Install vendoring tool
 	go get -u github.com/golang/dep/cmd/dep
-
-update-geth: ##@dependencies Update geth (use GETH_BRANCH to optionally set the geth branch name)
-	./_assets/ci/update-geth.sh $(GETH_BRANCH)
-	@echo "**************************************************************"
-	@echo "NOTE: Don't forget to:"
-	@echo "- update the goleveldb dependency revision in Gopkg.toml to match the version used in go-ethereum"
-	@echo "- reconcile any changes to interfaces in transactions/fake (such as PublicTransactionPoolAPI), which are copies from internal geth interfaces"
-	@echo "**************************************************************"
-
-patch: ##@patching Revert and apply all patches
-	./_assets/patches/patcher
-
-patch-revert: ##@patching Revert all patches only
-	./_assets/patches/patcher -r
 
 update-fleet-config: ##@other Update fleets configuration from fleets.status.im
 	./_assets/ci/update-fleet-config.sh
