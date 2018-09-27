@@ -1,6 +1,7 @@
 package crypto
 
 import (
+	"bytes"
 	"crypto/cipher"
 	"crypto/des"
 )
@@ -28,6 +29,35 @@ func DeriveKey(cardKey []byte, seq []byte, purpose []byte) ([]byte, error) {
 	mode.CryptBlocks(ciphertext, derivation)
 
 	return ciphertext, nil
+}
+
+func VerifyCryptogram(encKey, hostChallenge, cardChallenge, cardCryptogram []byte) (bool, error) {
+	data := make([]byte, 0)
+	data = append(data, hostChallenge...)
+	data = append(data, cardChallenge...)
+	paddedData := appendDESPadding(data)
+	calculated, err := mac3des(encKey, paddedData, nullBytes8)
+	if err != nil {
+		return false, err
+	}
+
+	return bytes.Equal(calculated, cardCryptogram), nil
+}
+
+func mac3des(key, data, iv []byte) ([]byte, error) {
+	key24 := resizeKey24(key)
+
+	block, err := des.NewTripleDESCipher(key24)
+	if err != nil {
+		return nil, err
+	}
+
+	ciphertext := make([]byte, 24)
+
+	mode := cipher.NewCBCEncrypter(block, iv)
+	mode.CryptBlocks(ciphertext, data)
+
+	return ciphertext[16:], nil
 }
 
 func resizeKey24(key []byte) []byte {
