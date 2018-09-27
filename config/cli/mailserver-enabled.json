@@ -1,5 +1,4 @@
 {
-    "RegisterTopics": ["whispermail"],
     "WhisperConfig": {
         "Enabled": true,
         "EnableNTPSync": true,
