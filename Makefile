@@ -269,20 +269,11 @@ clean: ##@other Cleanup
 deep-clean: clean
 	rm -Rdf .ethereumtest/StatusChain
 
-dep-ensure: ##@dependencies Dep ensure and apply all patches
+dep-ensure: ##@dependencies Ensure all dependencies are in place with dep
 	@dep ensure
 
 dep-install: ##@dependencies Install vendoring tool
 	go get -u github.com/golang/dep/cmd/dep
-
-patch-geth-vendor: ##@patching Apply all patches on ethereum in vendor/
-	./_assets/patches/patcher
-
-patch-geth-vendor-revert: ##@patching Revert all patches from ethereum in vendor/
-	./_assets/patches/patcher -r
-
-patch-geth-fork: ##@patching Apply patches to Status' go-ethereum fork
-	./_assets/patches/update-fork-with-patches.sh
 
 update-fleet-config: ##@other Update fleets configuration from fleets.status.im
 	./_assets/ci/update-fleet-config.sh
