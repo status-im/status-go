@@ -4,9 +4,30 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 )
 
-const respOK = 36864 // 0x9000
+const (
+	SwOK                            = 0x9000
+	SwSecurityConditionNotSatisfied = 0x6982
+	SwAuthenticationMethodBlocked   = 0x6983
+)
+
+type ErrBadResponse struct {
+	sw      uint16
+	message string
+}
+
+func NewErrBadResponse(sw uint16, message string) *ErrBadResponse {
+	return &ErrBadResponse{
+		sw:      sw,
+		message: message,
+	}
+}
+
+func (e *ErrBadResponse) Error() string {
+	return fmt.Sprintf("bad response %x: %s", e.sw, e.message)
+}
 
 type Response struct {
 	Data []byte
@@ -48,5 +69,5 @@ func (r *Response) deserialize(data []byte) error {
 }
 
 func (r *Response) IsOK() bool {
-	return r.Sw == respOK
+	return r.Sw == SwOK
 }

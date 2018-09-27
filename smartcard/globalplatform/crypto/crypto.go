@@ -8,6 +8,7 @@ import (
 
 var (
 	DerivationPurposeEnc = []byte{0x01, 0x82}
+	DerivationPurposeMac = []byte{0x01, 0x01}
 	nullBytes8           = []byte{0, 0, 0, 0, 0, 0, 0, 0}
 )
 
