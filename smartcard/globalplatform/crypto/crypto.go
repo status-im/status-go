@@ -37,3 +37,15 @@ func resizeKey24(key []byte) []byte {
 
 	return data
 }
+
+func appendDESPadding(data []byte) []byte {
+	length := len(data) + 1
+	for ; length%8 != 0; length++ {
+	}
+
+	newData := make([]byte, length)
+	copy(newData, data)
+	copy(newData[len(data):], []byte{0x80})
+
+	return newData
+}

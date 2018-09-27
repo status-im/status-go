@@ -24,3 +24,10 @@ func TestResizeKey24(t *testing.T) {
 	expected := "404142434445464748494A4B4C4D4E4F4041424344454647"
 	assert.Equal(t, expected, hexutils.BytesToHex(resized))
 }
+
+func TestAppendDESPadding(t *testing.T) {
+	data := hexutils.HexToBytes("AABB")
+	result := appendDESPadding(data)
+	expected := "AABB800000000000"
+	assert.Equal(t, expected, hexutils.BytesToHex(result))
+}
