@@ -1,0 +1,135 @@
+diff --git a/whisper/whisperv6/api.go b/whisper/whisperv6/api.go
+index 16b79c7fd..1df3b73dd 100644
+--- a/whisper/whisperv6/api.go
++++ b/whisper/whisperv6/api.go
+@@ -284,7 +284,7 @@ func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (hexutil.
+ 	}
+ 
+ 	var result []byte
+-	env, err := whisperMsg.Wrap(params)
++	env, err := whisperMsg.Wrap(params, api.w.GetCurrentTime())
+ 	if err != nil {
+ 		return nil, err
+ 	}
+diff --git a/whisper/whisperv6/config.go b/whisper/whisperv6/config.go
+index 38eb9551c..213b83698 100644
+--- a/whisper/whisperv6/config.go
++++ b/whisper/whisperv6/config.go
+@@ -16,11 +16,14 @@
+ 
+ package whisperv6
+ 
++import "time"
++
+ // Config represents the configuration state of a whisper node.
+ type Config struct {
+ 	MaxMessageSize                        uint32  `toml:",omitempty"`
+ 	MinimumAcceptedPOW                    float64 `toml:",omitempty"`
+ 	RestrictConnectionBetweenLightClients bool    `toml:",omitempty"`
++	TimeSource                            func() time.Time
+ }
+ 
+ // DefaultConfig represents (shocker!) the default configuration.
+@@ -28,4 +31,5 @@ var DefaultConfig = Config{
+ 	MaxMessageSize:                        DefaultMaxMessageSize,
+ 	MinimumAcceptedPOW:                    DefaultMinimumPoW,
+ 	RestrictConnectionBetweenLightClients: true,
++	TimeSource:                            time.Now,
+ }
+diff --git a/whisper/whisperv6/envelope.go b/whisper/whisperv6/envelope.go
+index c42d1fa8a..3b65fdba0 100644
+--- a/whisper/whisperv6/envelope.go
++++ b/whisper/whisperv6/envelope.go
+@@ -62,9 +62,9 @@ func (e *Envelope) rlpWithoutNonce() []byte {
+ 
+ // NewEnvelope wraps a Whisper message with expiration and destination data
+ // included into an envelope for network forwarding.
+-func NewEnvelope(ttl uint32, topic TopicType, msg *sentMessage) *Envelope {
++func NewEnvelope(ttl uint32, topic TopicType, msg *sentMessage, now time.Time) *Envelope {
+ 	env := Envelope{
+-		Expiry: uint32(time.Now().Add(time.Second * time.Duration(ttl)).Unix()),
++		Expiry: uint32(now.Add(time.Second * time.Duration(ttl)).Unix()),
+ 		TTL:    ttl,
+ 		Topic:  topic,
+ 		Data:   msg.Raw,
+diff --git a/whisper/whisperv6/message.go b/whisper/whisperv6/message.go
+index 2d4e86244..a12b445e2 100644
+--- a/whisper/whisperv6/message.go
++++ b/whisper/whisperv6/message.go
+@@ -27,6 +27,7 @@ import (
+ 	"errors"
+ 	mrand "math/rand"
+ 	"strconv"
++	"time"
+ 
+ 	"github.com/ethereum/go-ethereum/common"
+ 	"github.com/ethereum/go-ethereum/crypto"
+@@ -234,7 +235,7 @@ func generateSecureRandomData(length int) ([]byte, error) {
+ }
+ 
+ // Wrap bundles the message into an Envelope to transmit over the network.
+-func (msg *sentMessage) Wrap(options *MessageParams) (envelope *Envelope, err error) {
++func (msg *sentMessage) Wrap(options *MessageParams, now time.Time) (envelope *Envelope, err error) {
+ 	if options.TTL == 0 {
+ 		options.TTL = DefaultTTL
+ 	}
+@@ -254,7 +255,7 @@ func (msg *sentMessage) Wrap(options *MessageParams) (envelope *Envelope, err er
+ 		return nil, err
+ 	}
+ 
+-	envelope = NewEnvelope(options.TTL, options.Topic, msg)
++	envelope = NewEnvelope(options.TTL, options.Topic, msg, now)
+ 	if err = envelope.Seal(options); err != nil {
+ 		return nil, err
+ 	}
+diff --git a/whisper/whisperv6/whisper.go b/whisper/whisperv6/whisper.go
+index 014e93c12..a57ff6428 100644
+--- a/whisper/whisperv6/whisper.go
++++ b/whisper/whisperv6/whisper.go
+@@ -91,6 +91,8 @@ type Whisper struct {
+ 	mailServer MailServer // MailServer interface
+ 
+ 	envelopeFeed event.Feed
++
++	timeSource func() time.Time // source of time for whisper
+ }
+ 
+ // New creates a Whisper client ready to communicate through the Ethereum P2P network.
+@@ -109,6 +111,7 @@ func New(cfg *Config) *Whisper {
+ 		p2pMsgQueue:   make(chan *Envelope, messageQueueLimit),
+ 		quit:          make(chan struct{}),
+ 		syncAllowance: DefaultSyncAllowance,
++		timeSource:    cfg.TimeSource,
+ 	}
+ 
+ 	whisper.filters = NewFilters(whisper)
+@@ -215,6 +218,11 @@ func (whisper *Whisper) APIs() []rpc.API {
+ 	}
+ }
+ 
++// GetCurrentTime returns current time.
++func (whisper *Whisper) GetCurrentTime() time.Time {
++	return whisper.timeSource()
++}
++
+ // RegisterServer registers MailServer interface.
+ // MailServer will process all the incoming messages with p2pRequestCode.
+ func (whisper *Whisper) RegisterServer(server MailServer) {
+@@ -846,7 +854,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
+ // appropriate time-stamp. In case of error, connection should be dropped.
+ // param isP2P indicates whether the message is peer-to-peer (should not be forwarded).
+ func (whisper *Whisper) add(envelope *Envelope, isP2P bool) (bool, error) {
+-	now := uint32(time.Now().Unix())
++	now := uint32(whisper.timeSource().Unix())
+ 	sent := envelope.Expiry - envelope.TTL
+ 
+ 	if sent > now {
+@@ -989,7 +997,7 @@ func (whisper *Whisper) expire() {
+ 	whisper.statsMu.Lock()
+ 	defer whisper.statsMu.Unlock()
+ 	whisper.stats.reset()
+-	now := uint32(time.Now().Unix())
++	now := uint32(whisper.timeSource().Unix())
+ 	for expiry, hashSet := range whisper.expirations {
+ 		if expiry < now {
+ 			// Dump all expired messages and remove timestamp

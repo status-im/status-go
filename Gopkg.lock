@@ -88,11 +88,7 @@
   revision = "935e0e8a636ca4ba70b713f3e38a19e1b77739e8"
 
 [[projects]]
-<<<<<<< HEAD
-  digest = "1:34fa5a5d444765a1360983211916c4d2e65a3be75186277142d6aef5c21192db"
-=======
-  digest = "1:ba11b65320bfa1a5e8e43b050833bca23490e508a67c45d7e430156cefc2ab7f"
->>>>>>> develop
+  digest = "1:cf53a6be6cf3d947c0c7fb678237a7b34e06e4102411ecb843eedacb46759995"
   name = "github.com/ethereum/go-ethereum"
   packages = [
     ".",
@@ -162,14 +158,9 @@
     "whisper/whisperv6",
   ]
   pruneopts = "T"
-<<<<<<< HEAD
-  revision = "13115e12870cb2ebc1c8dfe55bc976d94efbeb90"
+  revision = "56c2fa69e0224e8f939a092b3aba20b23bb95c26"
   source = "github.com/status-im/go-ethereum"
-  version = "v1.8.14"
-=======
-  revision = "89451f7c382ad2185987ee369f16416f89c28a7d"
-  version = "v1.8.15"
->>>>>>> develop
+  version = "v1.8.16"
 
 [[projects]]
   digest = "1:5ac7ecd476a2355a5201229081df2e5f57333ecf703e1f69dde699ae34169c1b"
@@ -1035,14 +1026,6 @@
   pruneopts = "NUT"
   revision = "48a433ba4bcadc5be9aa16d4bdcb383d3f57a741"
   version = "v9.9.3"
-
-[[projects]]
-  branch = "v2"
-  digest = "1:0a2f4b974a413866afa1b41130d756643841fb9ad661b81c9a6dd9f1364ed19f"
-  name = "gopkg.in/karalabe/cookiejar.v2"
-  packages = ["collections/prque"]
-  pruneopts = "NUT"
-  revision = "8dcd6a7f4951f6ff3ee9cbb919a06d8925822e57"
 
 [[projects]]
   branch = "v2"
