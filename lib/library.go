@@ -106,7 +106,14 @@ func VerifyGroupMembershipSignatures(signaturePairsStr *C.char) *C.char {
 		return makeJSONResponse(err)
 	}
 
-	return nil
+	data, err := json.Marshal(struct {
+		Success bool `json:"success"`
+	}{Success: true})
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return C.CString(string(data))
 }
 
 // Sign signs a string containing group membership information
