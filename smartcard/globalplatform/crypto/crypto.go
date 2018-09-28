@@ -82,7 +82,7 @@ func EncryptICV(macKey, mac []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	ciphertext := make([]byte, 16)
+	ciphertext := make([]byte, 8)
 	mode := cipher.NewCBCEncrypter(block, NullBytes8)
 	mode.CryptBlocks(ciphertext, mac)
 

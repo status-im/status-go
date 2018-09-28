@@ -71,5 +71,12 @@ func (w *APDUWrapper) Wrap(cmd *apdu.Command) (*apdu.Command, error) {
 	newData = append(newData, cmd.Data...)
 	newData = append(newData, mac...)
 
-	return apdu.NewCommand(cla, cmd.Ins, cmd.P1, cmd.P2, newData), nil
+	w.icv = mac
+
+	newCmd := apdu.NewCommand(cla, cmd.Ins, cmd.P1, cmd.P2, newData)
+	if ok, le := cmd.Le(); ok {
+		newCmd.SetLe(le)
+	}
+
+	return newCmd, nil
 }

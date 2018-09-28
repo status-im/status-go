@@ -21,7 +21,7 @@ func TestNewCommand(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, expected, hexutils.BytesToHexWithSpaces(result))
 
-	cmd.SetLE(uint8(0x77))
+	cmd.SetLe(uint8(0x77))
 	expected = "80 50 01 02 08 84 76 23 36 C5 18 7F E8 77"
 	result, err = cmd.Serialize()
 	assert.NoError(t, err)

@@ -11,7 +11,7 @@ type Command struct {
 	P1         uint8
 	P2         uint8
 	Data       []byte
-	Le         uint8
+	le         uint8
 	requiresLe bool
 }
 
@@ -26,9 +26,13 @@ func NewCommand(cla, ins, p1, p2 uint8, data []byte) *Command {
 	}
 }
 
-func (c *Command) SetLE(le uint8) {
+func (c *Command) SetLe(le uint8) {
 	c.requiresLe = true
-	c.Le = le
+	c.le = le
+}
+
+func (c *Command) Le() (bool, uint8) {
+	return c.requiresLe, c.le
 }
 
 func (c *Command) Serialize() ([]byte, error) {
@@ -60,7 +64,7 @@ func (c *Command) Serialize() ([]byte, error) {
 	}
 
 	if c.requiresLe {
-		if err := binary.Write(buf, binary.BigEndian, c.Le); err != nil {
+		if err := binary.Write(buf, binary.BigEndian, c.le); err != nil {
 			return nil, err
 		}
 	}
