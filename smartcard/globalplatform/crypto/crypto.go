@@ -36,8 +36,8 @@ func VerifyCryptogram(encKey, hostChallenge, cardChallenge, cardCryptogram []byt
 	data := make([]byte, 0)
 	data = append(data, hostChallenge...)
 	data = append(data, cardChallenge...)
-	paddedData := appendDESPadding(data)
-	calculated, err := mac3des(encKey, paddedData, NullBytes8)
+	paddedData := AppendDESPadding(data)
+	calculated, err := Mac3DES(encKey, paddedData, NullBytes8)
 	if err != nil {
 		return false, err
 	}
@@ -46,7 +46,7 @@ func VerifyCryptogram(encKey, hostChallenge, cardChallenge, cardCryptogram []byt
 }
 
 func MacFull3DES(key, data, iv []byte) ([]byte, error) {
-	data = appendDESPadding(data)
+	data = AppendDESPadding(data)
 
 	desBlock, err := des.NewCipher(resizeKey8(key))
 	if err != nil {
@@ -89,7 +89,7 @@ func EncryptICV(macKey, mac []byte) ([]byte, error) {
 	return ciphertext, nil
 }
 
-func mac3des(key, data, iv []byte) ([]byte, error) {
+func Mac3DES(key, data, iv []byte) ([]byte, error) {
 	key24 := resizeKey24(key)
 
 	block, err := des.NewTripleDESCipher(key24)
@@ -117,7 +117,7 @@ func resizeKey8(key []byte) []byte {
 	return key[:8]
 }
 
-func appendDESPadding(data []byte) []byte {
+func AppendDESPadding(data []byte) []byte {
 	length := len(data) + 1
 	for ; length%8 != 0; length++ {
 	}
