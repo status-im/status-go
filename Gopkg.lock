@@ -155,7 +155,6 @@
     "rlp",
     "rpc",
     "trie",
-    "whisper/whisperv6",
   ]
   pruneopts = "T"
   revision = "56c2fa69e0224e8f939a092b3aba20b23bb95c26"
@@ -361,6 +360,14 @@
   ]
   pruneopts = "NUT"
   revision = "b497e2f366b8624394fb2e89c10ab607bebdde0b"
+
+[[projects]]
+  digest = "1:8b3234b10eacd5edea45bf0c13a585b608749da23f94aaf29b46d9ef8a8babf4"
+  name = "github.com/juju/ratelimit"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "59fac5042749a5afb9af70e813da1dd5474f0167"
+  version = "1.0.1"
 
 [[projects]]
   digest = "1:cdf2acbea0cf5514bc9a548836d007e379a42b4224813649ed9d98757c527172"
@@ -821,12 +828,15 @@
   revision = "55370cdfd9f288059b03c04e23784bb8829a894c"
 
 [[projects]]
-  branch = "master"
-  digest = "1:a2075e4e314cff4aadaf3ffe18b77659d259b1a46be9d2bdb0d5b9f8222f420c"
+  branch = "ratelimiter"
+  digest = "1:ff8c192ca10ca52ec5ffc2c63667551ac4b0c919bc5f8cfca39a912986b49d7a"
   name = "github.com/status-im/whisper"
-  packages = ["whisperv6"]
+  packages = [
+    "ratelimiter",
+    "whisperv6",
+  ]
   pruneopts = "NUT"
-  revision = "f41584950703450b0370e85560ba8d9322794ead"
+  revision = "ffcf1b3cc04a2a3cad6b56bfca987fdee935d473"
 
 [[projects]]
   digest = "1:572c783a763db6383aca3179976eb80e4c900f52eba56cba8bb2e3cea7ce720e"
@@ -1101,7 +1111,6 @@
     "github.com/ethereum/go-ethereum/params",
     "github.com/ethereum/go-ethereum/rlp",
     "github.com/ethereum/go-ethereum/rpc",
-    "github.com/ethereum/go-ethereum/whisper/whisperv6",
     "github.com/golang/mock/gomock",
     "github.com/golang/protobuf/proto",
     "github.com/libp2p/go-libp2p-crypto",

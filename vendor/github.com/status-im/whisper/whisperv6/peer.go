@@ -19,6 +19,7 @@ package whisperv6
 import (
 	"fmt"
 	"math"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -192,6 +193,23 @@ func (peer *Peer) expire() {
 	}
 }
 
+func (peer *Peer) reduceBundle(bundle []*Envelope) []*Envelope {
+	if peer.host.ratelimiter == nil {
+		return bundle
+	}
+	rand.Shuffle(len(bundle), func(i, j int) {
+		bundle[i], bundle[j] = bundle[j], bundle[i]
+	})
+	for i := range bundle {
+		size := int64(bundle[i].size())
+		if peer.host.ratelimiter.E().Available(peer.peer) < size {
+			return bundle[:i]
+		}
+		peer.host.ratelimiter.E().TakeAvailable(peer.peer, size)
+	}
+	return bundle
+}
+
 // broadcast iterates over the collection of envelopes and transmits yet unknown
 // ones over the network.
 func (peer *Peer) broadcast() error {
@@ -199,13 +217,14 @@ func (peer *Peer) broadcast() error {
 		log.Trace("Waiting for a peer to restore communication", "ID", peer.peer.ID())
 		return nil
 	}
-	envelopes := peer.host.Envelopes()
+	envelopes := peer.host.Envelopes() // envelopes are read from hash map, so access is already randomized
 	bundle := make([]*Envelope, 0, len(envelopes))
 	for _, envelope := range envelopes {
 		if !peer.marked(envelope) && envelope.PoW() >= peer.powRequirement && peer.bloomMatch(envelope) {
 			bundle = append(bundle, envelope)
 		}
 	}
+	bundle = peer.reduceBundle(bundle)
 
 	if len(bundle) > 0 {
 		// transmit the batch of envelopes

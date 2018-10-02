@@ -34,6 +34,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/status-im/whisper/ratelimiter"
 	"github.com/syndtr/goleveldb/leveldb/errors"
 	"golang.org/x/crypto/pbkdf2"
 	"golang.org/x/sync/syncmap"
@@ -98,6 +99,8 @@ type Whisper struct {
 
 	envelopeFeed event.Feed
 
+	ratelimiter *ratelimiter.Whisper
+
 	timeSource func() time.Time // source of time for whisper
 }
 
@@ -148,6 +151,11 @@ func New(cfg *Config) *Whisper {
 // SetTimeSource assigns a particular source of time to a whisper object.
 func (whisper *Whisper) SetTimeSource(timesource func() time.Time) {
 	whisper.timeSource = timesource
+}
+
+// UseRateLimiter makes whisper to use a specific implementation of the rate limiter
+func (whisper *Whisper) UseRateLimiter(ratelimiter ratelimiter.Whisper) {
+	whisper.ratelimiter = &ratelimiter
 }
 
 // SubscribeEnvelopeEvents subscribes to envelopes feed.
@@ -767,12 +775,32 @@ func (whisper *Whisper) HandlePeer(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
 	}
 	whisperPeer.start()
 	defer whisperPeer.stop()
-
+	if whisper.ratelimiter != nil {
+		if err := whisper.ratelimiter.I().Create(whisperPeer.peer); err != nil {
+			return err
+		}
+		defer whisper.ratelimiter.I().Remove(whisperPeer.peer, 0)
+		whisper.ratelimiter.E().Create(whisperPeer.peer)
+		defer whisper.ratelimiter.E().Remove(whisperPeer.peer, 0)
+	}
 	return whisper.runMessageLoop(whisperPeer, rw)
+}
+
+func (whisper *Whisper) advertiseEgressLimit(p *Peer, rw p2p.MsgReadWriter) error {
+	if whisper.ratelimiter == nil {
+		return nil
+	}
+	if err := p2p.Send(rw, peerRateLimitCode, whisper.ratelimiter.I().Config()); err != nil {
+		return fmt.Errorf("failed to send ingress rate limit to a peer %v: %v", p.peer.ID(), err)
+	}
+	return nil
 }
 
 // runMessageLoop reads and processes inbound messages directly to merge into client-global state.
 func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
+	if err := whisper.advertiseEgressLimit(p, rw); err != nil {
+		return err
+	}
 	for {
 		// fetch the next packet
 		packet, err := rw.ReadMsg()
@@ -861,6 +889,17 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 
 				whisper.mailServer.DeliverMail(p, &request)
 			}
+		case peerRateLimitCode:
+			if whisper.ratelimiter == nil {
+				continue
+			}
+			var conf ratelimiter.Config
+			if err := packet.Decode(&conf); err != nil {
+				return fmt.Errorf("peer %v sent wrong payload for a rate limiter config", p.peer.ID())
+			}
+			if err := whisper.ratelimiter.E().UpdateConfig(p.peer, conf); err != nil {
+				log.Error("error updaing rate limiter config", "peer", p.peer)
+			}
 		case p2pRequestCompleteCode:
 			if p.trusted {
 				var payload []byte
@@ -914,6 +953,13 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 		}
 
 		packet.Discard()
+
+		if packet.Code != p2pMessageCode && whisper.ratelimiter != nil {
+			if whisper.ratelimiter.I().TakeAvailable(p.peer, int64(packet.Size)) < int64(packet.Size) {
+				whisper.ratelimiter.I().Remove(p.peer, 10*time.Minute)
+				return fmt.Errorf("peer %v reached traffic limit capacity", p.peer.ID())
+			}
+		}
 	}
 }
 
