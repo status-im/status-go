@@ -6,23 +6,30 @@ import (
 )
 
 const (
-	Cla    = uint8(0x00)
-	ClaGp  = uint8(0x80)
-	ClaMac = uint8(0x84)
+	ClaISO7816 = uint8(0x00)
+	ClaGp      = uint8(0x80)
+	ClaMac     = uint8(0x84)
 
 	InsSelect               = uint8(0xA4)
 	InsInitializeUpdate     = uint8(0x50)
 	InsExternalAuthenticate = uint8(0x82)
+	InsGetResponse          = uint8(0xC0)
+
+	Sw1ResponseDataIncomplete = uint8(0x61)
 )
 
 func NewCommandSelect(aid []byte) *apdu.Command {
-	return apdu.NewCommand(
-		Cla,
+	c := apdu.NewCommand(
+		ClaISO7816,
 		InsSelect,
 		uint8(0x04),
 		uint8(0x00),
 		aid,
 	)
+
+	c.SetLe(0x00)
+
+	return c
 }
 
 func NewCommandInitializeUpdate(challenge []byte) *apdu.Command {
@@ -48,6 +55,20 @@ func NewCommandExternalAuthenticate(encKey, cardChallenge, hostChallenge []byte)
 		uint8(0x00),
 		hostCryptogram,
 	), nil
+}
+
+func NewCommandGetResponse(length uint8) *apdu.Command {
+	c := apdu.NewCommand(
+		ClaISO7816,
+		InsGetResponse,
+		uint8(0),
+		uint8(0),
+		nil,
+	)
+
+	c.SetLe(length)
+
+	return c
 }
 
 func calculateHostCryptogram(encKey, cardChallenge, hostChallenge []byte) ([]byte, error) {

@@ -59,3 +59,11 @@ func NewSession(cardKeys *KeyProvider, resp *apdu.Response, hostChallenge []byte
 
 	return s, nil
 }
+
+func (s *Session) KeyProvider() *KeyProvider {
+	return s.keyProvider
+}
+
+func (s *Session) CardChallenge() []byte {
+	return s.cardChallenge
+}
