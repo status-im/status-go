@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/status-im/status-go/static"
+	"github.com/status-im/whisper/ratelimiter"
 	validator "gopkg.in/go-playground/validator.v9"
 )
 
@@ -72,6 +73,10 @@ type WhisperConfig struct {
 
 	// EnableNTPSync enables NTP synchronizations
 	EnableNTPSync bool
+
+	// IngressConfig
+	IngressConfig *ratelimiter.Config
+	EgressConfig  *ratelimiter.Config
 }
 
 // String dumps config object as nicely indented JSON
@@ -610,6 +615,10 @@ func (c *WhisperConfig) Validate(validate *validator.Validate) error {
 				return fmt.Errorf("WhisperConfig.MailServerAsymKey is invalid: %s", c.MailServerAsymKey)
 			}
 		}
+	}
+
+	if (c.EgressConfig == nil) != (c.IngressConfig == nil) {
+		return fmt.Errorf("both egress and ingerss config should be defined or not")
 	}
 
 	return nil

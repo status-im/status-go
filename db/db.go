@@ -18,6 +18,8 @@ const (
 	// DeduplicatorCache is used for the db entries used for messages
 	// deduplication cache
 	DeduplicatorCache
+	// RateLimiterBucket specifies bucket for whisper rate limiter.
+	RateLimiterBucket
 )
 
 // Key creates a DB key for a specified service with specified data

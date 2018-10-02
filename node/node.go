@@ -20,6 +20,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/p2p/nat"
+	dblib "github.com/status-im/status-go/db"
 	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/peer"
@@ -28,6 +29,7 @@ import (
 	"github.com/status-im/status-go/services/status"
 	"github.com/status-im/status-go/static"
 	"github.com/status-im/status-go/timesource"
+	"github.com/status-im/whisper/ratelimiter"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/syndtr/goleveldb/leveldb"
 )
@@ -274,6 +276,13 @@ func activateShhService(stack *node.Node, config *params.NodeConfig, db *leveldb
 		}
 
 		whisperService := whisper.New(whisperServiceConfig)
+
+		if config.WhisperConfig.IngressConfig != nil && config.WhisperConfig.EgressConfig != nil {
+			whisperService.UseRateLimiter(
+				ratelimiter.ForWhisper(
+					ratelimiter.IDMode, ratelimiter.WithPrefix(db, []byte{byte(dblib.RateLimiterBucket)}),
+					*config.WhisperConfig.IngressConfig, *config.WhisperConfig.EgressConfig))
+		}
 
 		if config.WhisperConfig.EnableNTPSync {
 			timesource, err := whisperTimeSource(ctx)
