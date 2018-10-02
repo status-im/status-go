@@ -18,6 +18,11 @@ const (
 
 	Sw1ResponseDataIncomplete = uint8(0x61)
 
+	SwOK                            = uint16(0x9000)
+	SwReferencedDataNotFound        = uint16(0x6A88)
+	SwSecurityConditionNotSatisfied = uint16(0x6982)
+	SwAuthenticationMethodBlocked   = uint16(0x6983)
+
 	tagDeleteAID = byte(0x4F)
 )
 

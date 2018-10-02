@@ -16,11 +16,11 @@ type Session struct {
 var errBadCryptogram = errors.New("bad card cryptogram")
 
 func NewSession(cardKeys *KeyProvider, resp *apdu.Response, hostChallenge []byte) (*Session, error) {
-	if resp.Sw == apdu.SwSecurityConditionNotSatisfied {
+	if resp.Sw == SwSecurityConditionNotSatisfied {
 		return nil, apdu.NewErrBadResponse(resp.Sw, "security condition not satisfied")
 	}
 
-	if resp.Sw == apdu.SwAuthenticationMethodBlocked {
+	if resp.Sw == SwAuthenticationMethodBlocked {
 		return nil, apdu.NewErrBadResponse(resp.Sw, "authentication method blocked")
 	}
 

@@ -8,9 +8,7 @@ import (
 )
 
 const (
-	SwOK                            = 0x9000
-	SwSecurityConditionNotSatisfied = 0x6982
-	SwAuthenticationMethodBlocked   = 0x6983
+	SwOK = 0x9000
 )
 
 type ErrBadResponse struct {
