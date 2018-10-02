@@ -27,7 +27,7 @@ func TestResizeKey24(t *testing.T) {
 
 func TestAppendDESPadding(t *testing.T) {
 	data := hexutils.HexToBytes("AABB")
-	result := appendDESPadding(data)
+	result := AppendDESPadding(data)
 	expected := "AABB800000000000"
 	assert.Equal(t, expected, hexutils.BytesToHex(result))
 }
@@ -46,7 +46,7 @@ func TestVerifyCryptogram(t *testing.T) {
 func TestMac3des(t *testing.T) {
 	key := hexutils.HexToBytes("16B5867FF50BE7239C2BF1245B83A362")
 	data := hexutils.HexToBytes("32DA078D7AAC1CFF007284F64A7D64658000000000000000")
-	result, err := mac3des(key, data, NullBytes8)
+	result, err := Mac3DES(key, data, NullBytes8)
 	assert.NoError(t, err)
 
 	expected := "05C4BB8A86014E22"
