@@ -17,6 +17,7 @@ const (
 	InsDelete               = uint8(0xE4)
 	InsInstall              = uint8(0xE6)
 
+	P1ExternalAuthenticateCMAC = uint8(0x01)
 	P1InstallForLoad           = uint8(0x02)
 	P1InstallForInstall        = uint8(0x04)
 	P1InstallForMakeSelectable = uint8(0x08)
@@ -64,7 +65,7 @@ func NewCommandExternalAuthenticate(encKey, cardChallenge, hostChallenge []byte)
 	return apdu.NewCommand(
 		ClaMac,
 		InsExternalAuthenticate,
-		uint8(0x01), // C-MAC
+		P1ExternalAuthenticateCMAC, // C-MAC
 		uint8(0x00),
 		hostCryptogram,
 	), nil
