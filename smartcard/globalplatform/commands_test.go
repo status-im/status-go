@@ -61,5 +61,7 @@ func TestNewCommandDelete(t *testing.T) {
 	assert.Equal(t, uint8(0xE4), cmd.Ins)
 	assert.Equal(t, uint8(0x00), cmd.P1)
 	assert.Equal(t, uint8(0x00), cmd.P2)
-	assert.Equal(t, aid, cmd.Data)
+
+	expected := "4F050102030405"
+	assert.Equal(t, expected, hexutils.BytesToHex(cmd.Data))
 }

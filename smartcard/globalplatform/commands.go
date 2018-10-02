@@ -17,6 +17,8 @@ const (
 	InsDelete               = uint8(0xE4)
 
 	Sw1ResponseDataIncomplete = uint8(0x61)
+
+	tagDeleteAID = byte(0x4F)
 )
 
 func NewCommandSelect(aid []byte) *apdu.Command {
@@ -73,12 +75,15 @@ func NewCommandGetResponse(length uint8) *apdu.Command {
 }
 
 func NewCommandDelete(aid []byte) *apdu.Command {
+	data := []byte{tagDeleteAID, byte(len(aid))}
+	data = append(data, aid...)
+
 	return apdu.NewCommand(
 		ClaGp,
 		InsDelete,
 		uint8(0x00),
 		uint8(0x00),
-		aid,
+		data,
 	)
 }
 
