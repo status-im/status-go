@@ -15,6 +15,9 @@ const (
 	InsExternalAuthenticate = uint8(0x82)
 	InsGetResponse          = uint8(0xC0)
 	InsDelete               = uint8(0xE4)
+	InsInstall              = uint8(0xE6)
+
+	P1InstallForLoad = uint8(0x02)
 
 	Sw1ResponseDataIncomplete = uint8(0x61)
 
@@ -87,6 +90,23 @@ func NewCommandDelete(aid []byte) *apdu.Command {
 		ClaGp,
 		InsDelete,
 		uint8(0x00),
+		uint8(0x00),
+		data,
+	)
+}
+
+func NewCommandInstallForLoad(aid, sdaid []byte) *apdu.Command {
+	data := []byte{byte(len(aid))}
+	data = append(data, aid...)
+	data = append(data, byte(len(sdaid)))
+	data = append(data, sdaid...)
+	// empty hash length and hash
+	data = append(data, []byte{0x00, 0x00, 0x00}...)
+
+	return apdu.NewCommand(
+		ClaGp,
+		InsInstall,
+		P1InstallForLoad,
 		uint8(0x00),
 		data,
 	)

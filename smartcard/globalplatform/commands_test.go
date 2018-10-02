@@ -65,3 +65,16 @@ func TestNewCommandDelete(t *testing.T) {
 	expected := "4F050102030405"
 	assert.Equal(t, expected, hexutils.BytesToHex(cmd.Data))
 }
+
+func TestNewCommandInstallForLoad(t *testing.T) {
+	aid := hexutils.HexToBytes("53746174757357616C6C6574")
+	sdaid := hexutils.HexToBytes("A000000151000000")
+	cmd := NewCommandInstallForLoad(aid, sdaid)
+	assert.Equal(t, uint8(0x80), cmd.Cla)
+	assert.Equal(t, uint8(0xE6), cmd.Ins)
+	assert.Equal(t, uint8(0x02), cmd.P1)
+	assert.Equal(t, uint8(0x00), cmd.P2)
+
+	expected := "0C53746174757357616C6C657408A000000151000000000000"
+	assert.Equal(t, expected, hexutils.BytesToHex(cmd.Data))
+}
