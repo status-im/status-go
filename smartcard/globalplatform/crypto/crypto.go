@@ -65,7 +65,7 @@ func MacFull3DES(key, data, iv []byte) ([]byte, error) {
 		tmp := make([]byte, length)
 		mode := cipher.NewCBCEncrypter(desBlock, iv)
 		mode.CryptBlocks(tmp, data[:length])
-		des3IV = tmp
+		des3IV = tmp[length-8:]
 	}
 
 	ciphertext := make([]byte, 8)
