@@ -17,7 +17,9 @@ const (
 	InsDelete               = uint8(0xE4)
 	InsInstall              = uint8(0xE6)
 
-	P1InstallForLoad = uint8(0x02)
+	P1InstallForLoad           = uint8(0x02)
+	P1InstallForInstall        = uint8(0x04)
+	P1InstallForMakeSelectable = uint8(0x08)
 
 	Sw1ResponseDataIncomplete = uint8(0x61)
 
@@ -107,6 +109,38 @@ func NewCommandInstallForLoad(aid, sdaid []byte) *apdu.Command {
 		ClaGp,
 		InsInstall,
 		P1InstallForLoad,
+		uint8(0x00),
+		data,
+	)
+}
+
+func NewCommandInstallForInstall(pkgAID, appletAID, instanceAID, params []byte) *apdu.Command {
+	data := []byte{byte(len(pkgAID))}
+	data = append(data, pkgAID...)
+	data = append(data, byte(len(appletAID)))
+	data = append(data, appletAID...)
+	data = append(data, byte(len(instanceAID)))
+	data = append(data, instanceAID...)
+
+	// privileges
+	priv := []byte{0x00}
+	data = append(data, byte(len(priv)))
+	data = append(data, priv...)
+
+	// params
+	fullParams := []byte{byte(0xC9), byte(len(params))}
+	fullParams = append(fullParams, params...)
+
+	data = append(data, byte(len(fullParams)))
+	data = append(data, fullParams...)
+
+	// empty perform token
+	data = append(data, byte(0x00))
+
+	return apdu.NewCommand(
+		ClaGp,
+		InsInstall,
+		P1InstallForInstall|P1InstallForMakeSelectable,
 		uint8(0x00),
 		data,
 	)

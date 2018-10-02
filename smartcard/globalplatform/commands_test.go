@@ -78,3 +78,19 @@ func TestNewCommandInstallForLoad(t *testing.T) {
 	expected := "0C53746174757357616C6C657408A000000151000000000000"
 	assert.Equal(t, expected, hexutils.BytesToHex(cmd.Data))
 }
+
+func TestNewCommandInstallForInstall(t *testing.T) {
+	pkgAID := hexutils.HexToBytes("53746174757357616C6C6574")
+	appletAID := hexutils.HexToBytes("53746174757357616C6C6574417070")
+	instanceAID := hexutils.HexToBytes("53746174757357616C6C6574417070")
+	params := hexutils.HexToBytes("AABBCC")
+
+	cmd := NewCommandInstallForInstall(pkgAID, appletAID, instanceAID, params)
+	assert.Equal(t, uint8(0x80), cmd.Cla)
+	assert.Equal(t, uint8(0xE6), cmd.Ins)
+	assert.Equal(t, uint8(0x0C), cmd.P1)
+	assert.Equal(t, uint8(0x00), cmd.P2)
+
+	expected := "0C53746174757357616C6C65740F53746174757357616C6C65744170700F53746174757357616C6C6574417070010005C903AABBCC00"
+	assert.Equal(t, expected, hexutils.BytesToHex(cmd.Data))
+}
