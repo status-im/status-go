@@ -53,3 +53,13 @@ func TestNewCommandExternalAuthenticate(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, expected, hexutils.BytesToHexWithSpaces(raw))
 }
+
+func TestNewCommandDelete(t *testing.T) {
+	aid := hexutils.HexToBytes("0102030405")
+	cmd := NewCommandDelete(aid)
+	assert.Equal(t, uint8(0x80), cmd.Cla)
+	assert.Equal(t, uint8(0xE4), cmd.Ins)
+	assert.Equal(t, uint8(0x00), cmd.P1)
+	assert.Equal(t, uint8(0x00), cmd.P2)
+	assert.Equal(t, aid, cmd.Data)
+}

@@ -14,6 +14,7 @@ const (
 	InsInitializeUpdate     = uint8(0x50)
 	InsExternalAuthenticate = uint8(0x82)
 	InsGetResponse          = uint8(0xC0)
+	InsDelete               = uint8(0xE4)
 
 	Sw1ResponseDataIncomplete = uint8(0x61)
 )
@@ -69,6 +70,16 @@ func NewCommandGetResponse(length uint8) *apdu.Command {
 	c.SetLe(length)
 
 	return c
+}
+
+func NewCommandDelete(aid []byte) *apdu.Command {
+	return apdu.NewCommand(
+		ClaGp,
+		InsDelete,
+		uint8(0x00),
+		uint8(0x00),
+		aid,
+	)
 }
 
 func calculateHostCryptogram(encKey, cardChallenge, hostChallenge []byte) ([]byte, error) {
