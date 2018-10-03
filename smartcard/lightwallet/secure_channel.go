@@ -34,12 +34,5 @@ func (c *SecureChannel) Send(cmd *apdu.Command) (*apdu.Response, error) {
 		return nil, err
 	}
 
-	rawWrappedCmd, err := wrappedCmd.Serialize()
-	if err != nil {
-		return nil, err
-	}
-
-	fmt.Printf("WRAPPED  %s\n", hexutils.BytesToHexWithSpaces(rawWrappedCmd))
-
 	return c.c.Send(wrappedCmd)
 }
