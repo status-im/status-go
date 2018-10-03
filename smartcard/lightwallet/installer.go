@@ -1,4 +1,4 @@
-package smartcard
+package lightwallet
 
 import (
 	"crypto/rand"

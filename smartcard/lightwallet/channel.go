@@ -1,4 +1,4 @@
-package smartcard
+package lightwallet
 
 import "github.com/status-im/status-go/smartcard/apdu"
 
