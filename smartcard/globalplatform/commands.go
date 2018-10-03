@@ -15,12 +15,15 @@ const (
 	InsExternalAuthenticate = uint8(0x82)
 	InsGetResponse          = uint8(0xC0)
 	InsDelete               = uint8(0xE4)
+	InsLoad                 = uint8(0xE8)
 	InsInstall              = uint8(0xE6)
 
 	P1ExternalAuthenticateCMAC = uint8(0x01)
 	P1InstallForLoad           = uint8(0x02)
 	P1InstallForInstall        = uint8(0x04)
 	P1InstallForMakeSelectable = uint8(0x08)
+	P1LoadMoreBlocks           = uint8(0x00)
+	P1LoadLastBlock            = uint8(0x80)
 
 	Sw1ResponseDataIncomplete = uint8(0x61)
 
@@ -29,7 +32,8 @@ const (
 	SwSecurityConditionNotSatisfied = uint16(0x6982)
 	SwAuthenticationMethodBlocked   = uint16(0x6983)
 
-	tagDeleteAID = byte(0x4F)
+	tagDeleteAID         = byte(0x4F)
+	tagLoadFileDataBlock = byte(0xC4)
 )
 
 func NewCommandSelect(aid []byte) *apdu.Command {
@@ -65,7 +69,7 @@ func NewCommandExternalAuthenticate(encKey, cardChallenge, hostChallenge []byte)
 	return apdu.NewCommand(
 		ClaMac,
 		InsExternalAuthenticate,
-		P1ExternalAuthenticateCMAC, // C-MAC
+		P1ExternalAuthenticateCMAC,
 		uint8(0x00),
 		hostCryptogram,
 	), nil
