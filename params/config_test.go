@@ -197,20 +197,6 @@ func TestNodeConfigValidate(t *testing.T) {
 			}`,
 		},
 		{
-			Name: "Validate that ClusterConfig.Fleet is verified to not be empty if ClusterConfig is enabled",
-			Config: `{
-				"NetworkId": 1,
-				"DataDir": "/some/dir",
-				"BackupDisabledDataDir": "/some/dir",
-				"KeyStoreDir": "/some/dir",
-				"NoDiscovery": true,
-				"ClusterConfig": {
-					"Enabled": true
-				}
-			}`,
-			Error: "ClusterConfig.Fleet is empty",
-		},
-		{
 			Name: "Validate that ClusterConfig.BootNodes is verified to not be empty if discovery is disabled",
 			Config: `{
 				"NetworkId": 1,

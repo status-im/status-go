@@ -288,6 +288,7 @@ func WithFleet(fleet string) Option {
 		if fleet == FleetUndefined {
 			return nil
 		}
+		c.ClusterConfig.Enabled = true
 		return loadConfigFromAsset(fmt.Sprintf("../config/cli/fleet-%s.json", fleet), c)
 	}
 }
@@ -314,6 +315,7 @@ func NewNodeConfigWithDefaults(dataDir string, networkID uint64, opts ...Option)
 		return nil, err
 	}
 
+	c.NoDiscovery = false
 	c.HTTPHost = ""
 	c.ListenAddr = ":30303"
 	c.LogEnabled = true
