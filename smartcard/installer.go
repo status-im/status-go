@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"os"
 
 	"github.com/status-im/status-go/smartcard/apdu"
 	"github.com/status-im/status-go/smartcard/globalplatform"
@@ -28,7 +29,7 @@ func NewInstaller(t Transmitter) *Installer {
 	}
 }
 
-func (i *Installer) Install() error {
+func (i *Installer) Install(capFile *os.File) error {
 	sel := globalplatform.NewCommandSelect(sdaid)
 	resp, err := i.send("select", sel)
 	if err != nil {
@@ -80,6 +81,35 @@ func (i *Installer) Install() error {
 		if err != nil {
 			return nil
 		}
+	}
+
+	// install for load
+	preLoad := globalplatform.NewCommandInstallForLoad(statusPkgAID, sdaid)
+	resp, err = i.send("install for load", preLoad)
+	if err != nil {
+		return err
+	}
+
+	// load
+	load, err := globalplatform.NewLoadCommandStream(capFile)
+	if err != nil {
+		return err
+	}
+
+	for load.Next() {
+		cmd := load.GetCommand()
+		resp, err = i.send(fmt.Sprintf("load %d", load.Index()), cmd)
+		if err != nil {
+			return err
+		}
+	}
+
+	// install for install
+	params := []byte{0xAA, 0xBB}
+	install := globalplatform.NewCommandInstallForInstall(statusPkgAID, statusAppletAID, statusAppletAID, params)
+	resp, err = i.send("install for install", install)
+	if err != nil {
+		return err
 	}
 
 	return nil
