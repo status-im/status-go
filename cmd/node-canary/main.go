@@ -254,10 +254,9 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 	}
 
 	nodeConfig.ListenAddr = ""
-	nodeConfig.NoDiscovery = true
 	if *staticEnodeAddr != "" {
 		nodeConfig.ClusterConfig.Enabled = true
-		nodeConfig.ClusterConfig.Fleet = "none"
+		nodeConfig.ClusterConfig.Fleet = params.FleetUndefined
 		nodeConfig.ClusterConfig.StaticNodes = []string{
 			*staticEnodeAddr,
 		}

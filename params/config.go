@@ -403,6 +403,7 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 		log:                   log.New("package", "status-go/params.NodeConfig"),
 		LogFile:               "",
 		LogLevel:              "ERROR",
+		NoDiscovery:           true,
 		UpstreamConfig: UpstreamRPCConfig{
 			URL: getUpstreamURL(networkID),
 		},
@@ -565,10 +566,6 @@ func (c *ClusterConfig) Validate(validate *validator.Validate) error {
 
 	if err := validate.Struct(c); err != nil {
 		return err
-	}
-
-	if c.Fleet == "" {
-		return fmt.Errorf("ClusterConfig.Fleet is empty")
 	}
 
 	return nil
