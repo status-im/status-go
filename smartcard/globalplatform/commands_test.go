@@ -94,3 +94,15 @@ func TestNewCommandInstallForInstall(t *testing.T) {
 	expected := "0C53746174757357616C6C65740F53746174757357616C6C65744170700F53746174757357616C6C6574417070010005C903AABBCC00"
 	assert.Equal(t, expected, hexutils.BytesToHex(cmd.Data))
 }
+
+func TestNewCommandStatus(t *testing.T) {
+	aid := hexutils.HexToBytes("AABBCC")
+	cmd := NewCommandGetStatus(aid, P1GetStatusApplications)
+	assert.Equal(t, uint8(0x80), cmd.Cla)
+	assert.Equal(t, uint8(0xF2), cmd.Ins)
+	assert.Equal(t, uint8(0x40), cmd.P1)
+	assert.Equal(t, uint8(0x02), cmd.P2)
+
+	expected := "4F03AABBCC"
+	assert.Equal(t, expected, hexutils.BytesToHex(cmd.Data))
+}

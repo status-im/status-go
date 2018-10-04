@@ -11,6 +11,7 @@ import (
 type Session struct {
 	keyProvider   *KeyProvider
 	cardChallenge []byte
+	hostChallenge []byte
 }
 
 var errBadCryptogram = errors.New("bad card cryptogram")
@@ -55,6 +56,7 @@ func NewSession(cardKeys *KeyProvider, resp *apdu.Response, hostChallenge []byte
 	s := &Session{
 		keyProvider:   sessionKeys,
 		cardChallenge: cardChallenge,
+		hostChallenge: hostChallenge,
 	}
 
 	return s, nil
@@ -66,4 +68,8 @@ func (s *Session) KeyProvider() *KeyProvider {
 
 func (s *Session) CardChallenge() []byte {
 	return s.cardChallenge
+}
+
+func (s *Session) HostChallenge() []byte {
+	return s.hostChallenge
 }

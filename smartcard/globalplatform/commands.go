@@ -17,13 +17,20 @@ const (
 	InsDelete               = uint8(0xE4)
 	InsLoad                 = uint8(0xE8)
 	InsInstall              = uint8(0xE6)
+	InsGetStatus            = uint8(0xF2)
 
-	P1ExternalAuthenticateCMAC = uint8(0x01)
-	P1InstallForLoad           = uint8(0x02)
-	P1InstallForInstall        = uint8(0x04)
-	P1InstallForMakeSelectable = uint8(0x08)
-	P1LoadMoreBlocks           = uint8(0x00)
-	P1LoadLastBlock            = uint8(0x80)
+	P1ExternalAuthenticateCMAC         = uint8(0x01)
+	P1InstallForLoad                   = uint8(0x02)
+	P1InstallForInstall                = uint8(0x04)
+	P1InstallForMakeSelectable         = uint8(0x08)
+	P1LoadMoreBlocks                   = uint8(0x00)
+	P1LoadLastBlock                    = uint8(0x80)
+	P1GetStatusIssuerSecurityDomain    = uint8(0x80)
+	P1GetStatusApplications            = uint8(0x40)
+	P1GetStatusExecLoadFiles           = uint8(0x20)
+	P1GetStatusExecLoadFilesAndModules = uint8(0x10)
+
+	P2GetStatusTLVData = uint8(0x02)
 
 	Sw1ResponseDataIncomplete = uint8(0x61)
 
@@ -34,6 +41,7 @@ const (
 
 	tagDeleteAID         = byte(0x4F)
 	tagLoadFileDataBlock = byte(0xC4)
+	tagGetStatusAID      = byte(0x4F)
 )
 
 func NewCommandSelect(aid []byte) *apdu.Command {
@@ -155,6 +163,20 @@ func NewCommandInstallForInstall(pkgAID, appletAID, instanceAID, params []byte) 
 		InsInstall,
 		P1InstallForInstall|P1InstallForMakeSelectable,
 		uint8(0x00),
+		data,
+	)
+}
+
+func NewCommandGetStatus(aid []byte, p1 uint8) *apdu.Command {
+	data := []byte{tagGetStatusAID}
+	data = append(data, byte(len(aid)))
+	data = append(data, aid...)
+
+	return apdu.NewCommand(
+		ClaGp,
+		InsGetStatus,
+		p1,
+		P2GetStatusTLVData,
 		data,
 	)
 }

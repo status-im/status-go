@@ -65,7 +65,7 @@ func main() {
 	defer f.Close()
 
 	i := lightwallet.NewInstaller(card)
-	secrets, err := i.Install(f)
+	secrets, err := i.Install(f, false)
 	if err != nil {
 		log.Fatal("installation error: ", err)
 	}

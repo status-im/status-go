@@ -29,10 +29,19 @@ func NewInstaller(t Transmitter) *Installer {
 	}
 }
 
-func (i *Installer) Install(capFile *os.File) (*Secrets, error) {
+func (i *Installer) Install(capFile *os.File, overwriteApplet bool) (*Secrets, error) {
 	err := i.initSecureChannel(cardManagerAID)
 	if err != nil {
 		return nil, err
+	}
+
+	installed, err := i.IsAppletInstalled()
+	if err != nil {
+		return nil, err
+	}
+
+	if installed && !overwriteApplet {
+		return nil, errors.New("applet already installed")
 	}
 
 	err = i.deleteAID(statusAppletAID, statusPkgAID)
@@ -48,8 +57,18 @@ func (i *Installer) Install(capFile *os.File) (*Secrets, error) {
 	return secrets, nil
 }
 
-func (i *Installer) Info() (*Secrets, error) {
+func (i *Installer) IsAppletInstalled() (bool, error) {
+	cmd := globalplatform.NewCommandGetStatus(statusAppletAID, globalplatform.P1GetStatusApplications)
+	resp, err := i.send("get status", cmd, globalplatform.SwOK, globalplatform.SwReferencedDataNotFound)
+	if err != nil {
+		return false, err
+	}
 
+	if resp.Sw == globalplatform.SwReferencedDataNotFound {
+		return false, nil
+	}
+
+	return true, nil
 }
 
 func (i *Installer) initSecureChannel(sdaid []byte) error {
