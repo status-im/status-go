@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
@@ -58,6 +59,31 @@ func VerifySignatures(signaturePairs [][3]string) error {
 	}
 
 	return nil
+}
+
+// ExtractSignatures extract from tuples of signatures content a public key
+func ExtractSignatures(signaturePairs [][2]string) ([]string, error) {
+	response := make([]string, len(signaturePairs))
+	for i, signaturePair := range signaturePairs {
+		content := crypto.Keccak256([]byte(signaturePair[0]))
+
+		signature, err := hex.DecodeString(signaturePair[1])
+		if err != nil {
+			return nil, err
+		}
+
+		recoveredKey, err := crypto.SigToPub(
+			content,
+			signature,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		response[i] = fmt.Sprintf("%x", crypto.FromECDSAPub(recoveredKey))
+	}
+
+	return response, nil
 }
 
 func EncryptSymmetric(key, plaintext []byte) ([]byte, error) {
