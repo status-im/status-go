@@ -44,6 +44,20 @@ func main() {
 	}
 	defer card.Disconnect(scard.ResetCard)
 
+	status, err := card.Status()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	switch status.ActiveProtocol {
+	case scard.ProtocolT0:
+		fmt.Printf("Protocol T0\n")
+	case scard.ProtocolT1:
+		fmt.Printf("Protocol T1\n")
+	default:
+		fmt.Printf("Unknown protocol\n")
+	}
+
 	f, err := os.Open(capFilePath)
 	if err != nil {
 		log.Fatal(err)

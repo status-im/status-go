@@ -45,19 +45,27 @@ func NewCommandSelect(aid []byte) *apdu.Command {
 		aid,
 	)
 
-	c.SetLe(0x00)
+	// with T=0 we can both set or not the Le value
+	// with T=1 it works only without Le
+	// c.SetLe(0x00)
 
 	return c
 }
 
 func NewCommandInitializeUpdate(challenge []byte) *apdu.Command {
-	return apdu.NewCommand(
+	c := apdu.NewCommand(
 		ClaGp,
 		InsInitializeUpdate,
 		uint8(0x00),
 		uint8(0x00),
 		challenge,
 	)
+
+	// with T=0 we can both set or not the Le value
+	// with T=1 it works only if Le is set
+	c.SetLe(0x00)
+
+	return c
 }
 
 func NewCommandExternalAuthenticate(encKey, cardChallenge, hostChallenge []byte) (*apdu.Command, error) {
