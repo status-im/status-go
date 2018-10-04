@@ -116,6 +116,30 @@ func VerifyGroupMembershipSignatures(signaturePairsStr *C.char) *C.char {
 	return C.CString(string(data))
 }
 
+// ExtractGroupMembershipSignatures extract public keys from tuples of content/signature
+//export ExtractGroupMembershipSignatures
+func ExtractGroupMembershipSignatures(signaturePairsStr *C.char) *C.char {
+	var signaturePairs [][2]string
+
+	if err := json.Unmarshal([]byte(C.GoString(signaturePairsStr)), &signaturePairs); err != nil {
+		return makeJSONResponse(err)
+	}
+
+	identities, err := statusBackend.ExtractGroupMembershipSignatures(signaturePairs)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	data, err := json.Marshal(struct {
+		Identities []string `json:"identities"`
+	}{Identities: identities})
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return C.CString(string(data))
+}
+
 // Sign signs a string containing group membership information
 //export SignGroupMembership
 func SignGroupMembership(content *C.char) *C.char {

@@ -501,9 +501,15 @@ func (b *StatusBackend) ExtractIdentityFromContactCode(contactCode string) (stri
 	return chat.ExtractIdentity(bundle)
 }
 
+// DEPRECATED
 // VerifyGroupMembershipSignatures verifies that the signatures are valid
 func (b *StatusBackend) VerifyGroupMembershipSignatures(signaturePairs [][3]string) error {
 	return crypto.VerifySignatures(signaturePairs)
+}
+
+// ExtractGroupMembershipSignatures extract signatures from tuples of content/signature
+func (b *StatusBackend) ExtractGroupMembershipSignatures(signaturePairs [][2]string) ([]string, error) {
+	return crypto.ExtractSignatures(signaturePairs)
 }
 
 // SignGroupMembership signs a piece of data containing membership information
