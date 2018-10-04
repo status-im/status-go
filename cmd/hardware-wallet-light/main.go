@@ -3,23 +3,32 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
+	stdlog "log"
 	"os"
 
 	"github.com/ebfe/scard"
+	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/smartcard/lightwallet"
 )
 
 type commandFunc func(*lightwallet.Installer) error
 
 var (
+	logger = log.New("package", "status-go/cmd/hardware-wallet-light")
+
 	commands map[string]commandFunc
 
-	flagCapFile   = flag.String("f", "", "cap file path")
-	flagOverwrite = flag.Bool("o", false, "overwrite applet if already installed")
+	flagCapFile   = flag.String("file", "", "cap file path")
+	flagOverwrite = flag.Bool("force", false, "overwrite applet if already installed")
+	logLevel      = flag.String("log", "", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
 )
 
 func init() {
+	if err := logutils.OverrideRootLog(true, "ERROR", "", true); err != nil {
+		stdlog.Fatalf("Error initializing logger: %v", err)
+	}
+
 	commands = map[string]commandFunc{
 		"install": commandInstall,
 		"status":  commandStatus,
@@ -28,7 +37,17 @@ func init() {
 }
 
 func usage() {
+	fmt.Println("\nUsage: hardware-wallet-light COMMAND [FLAGS]\n\nValid commands:\n")
+	for name, _ := range commands {
+		fmt.Printf("- %s\n", name)
+	}
+	fmt.Print("\nFlags:\n\n")
 	flag.PrintDefaults()
+	os.Exit(1)
+}
+
+func fail(msg string, ctx ...interface{}) {
+	logger.Error(msg, ctx...)
 	os.Exit(1)
 }
 
@@ -36,50 +55,50 @@ func main() {
 	flag.Parse()
 	cmd := flag.Arg(0)
 	if cmd == "" {
-		log.Printf("you must specify a command (install, status, delete).\n")
+		logger.Error("you must specify a command (install, status, delete).")
 		usage()
 	}
 
 	ctx, err := scard.EstablishContext()
 	if err != nil {
-		log.Fatal(err)
+		fail("error establishing card context", err)
 	}
 	defer ctx.Release()
 
 	readers, err := ctx.ListReaders()
 	if err != nil {
-		log.Fatal(err)
+		fail("error getting readers", err)
 	}
 
 	if len(readers) == 0 {
-		log.Fatal("couldn't find any reader")
+		fail("couldn't find any reader")
 	}
 
 	if len(readers) > 1 {
-		log.Fatal("too many readers found")
+		fail("too many readers found")
 	}
 
 	reader := readers[0]
-	fmt.Printf("using reader %s:\n", reader)
-	fmt.Printf("connecting to card in %s\n", reader)
+	logger.Debug("using reader %s:\n", reader)
+	logger.Debug("connecting to card in %s\n", reader)
 	card, err := ctx.Connect(reader, scard.ShareShared, scard.ProtocolAny)
 	if err != nil {
-		log.Fatal(err)
+		fail("error connecting to card", err)
 	}
 	defer card.Disconnect(scard.ResetCard)
 
 	status, err := card.Status()
 	if err != nil {
-		log.Fatal(err)
+		fail("error getting card status", err)
 	}
 
 	switch status.ActiveProtocol {
 	case scard.ProtocolT0:
-		fmt.Printf("Protocol T0\n")
+		logger.Debug("Protocol T0\n")
 	case scard.ProtocolT1:
-		fmt.Printf("Protocol T1\n")
+		logger.Debug("Protocol T1\n")
 	default:
-		fmt.Printf("Unknown protocol\n")
+		logger.Debug("Unknown protocol\n")
 	}
 
 	i := lightwallet.NewInstaller(card)
@@ -88,24 +107,25 @@ func main() {
 		os.Exit(0)
 	}
 
-	fmt.Printf("unknown command %s\n", cmd)
+	fail("unknown command %s\n", cmd)
 	usage()
 }
 
 func commandInstall(i *lightwallet.Installer) error {
 	if *flagCapFile == "" {
-		log.Printf("you must specify a cap file path with the -f flag\n")
+		logger.Error("you must specify a cap file path with the -f flag\n")
+		usage()
 	}
 
 	f, err := os.Open(*flagCapFile)
 	if err != nil {
-		log.Fatal(err)
+		fail("error opening cap file", err)
 	}
 	defer f.Close()
 
 	secrets, err := i.Install(f, *flagOverwrite)
 	if err != nil {
-		log.Fatal("installation error: ", err)
+		fail("installation error: ", err)
 	}
 
 	fmt.Printf("PUK %s\n", secrets.Puk())
