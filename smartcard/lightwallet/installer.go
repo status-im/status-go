@@ -35,7 +35,7 @@ func (i *Installer) Install(capFile *os.File, overwriteApplet bool) (*Secrets, e
 		return nil, err
 	}
 
-	installed, err := i.IsAppletInstalled()
+	installed, err := i.isAppletInstalled()
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +57,25 @@ func (i *Installer) Install(capFile *os.File, overwriteApplet bool) (*Secrets, e
 	return secrets, nil
 }
 
-func (i *Installer) IsAppletInstalled() (bool, error) {
+func (i *Installer) Info() (bool, error) {
+	err := i.initSecureChannel(cardManagerAID)
+	if err != nil {
+		return false, err
+	}
+
+	return i.isAppletInstalled()
+}
+
+func (i *Installer) Delete() error {
+	err := i.initSecureChannel(cardManagerAID)
+	if err != nil {
+		return err
+	}
+
+	return i.deleteAID(statusAppletAID, statusPkgAID)
+}
+
+func (i *Installer) isAppletInstalled() (bool, error) {
 	cmd := globalplatform.NewCommandGetStatus(statusAppletAID, globalplatform.P1GetStatusApplications)
 	resp, err := i.send("get status", cmd, globalplatform.SwOK, globalplatform.SwReferencedDataNotFound)
 	if err != nil {
