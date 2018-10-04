@@ -100,7 +100,7 @@
 
 [[override]]
   name = "github.com/rjeczalik/notify"
-  revision = "9d5aa0c3b735c3340018a4627446c3ea5a04a097"
+  version="=v0.9.2"
 
 [[override]]
   name = "github.com/robertkrimen/otto"
