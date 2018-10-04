@@ -104,19 +104,21 @@ func (c *SwarmConfig) String() string {
 // means for mobile devices to get connected to Ethereum network (UDP-based discovery
 // may not be available, so we need means to discover the network manually).
 type ClusterConfig struct {
-	// Enabled flag specifies whether feature is enabled
+	// Enabled flag specifies that nodes in this configuration are taken into account.
 	Enabled bool
 
-	// Fleet is a type of selected fleet.
+	// Fleet is a name of a selected fleet. If it has a value, nodes are loaded
+	// from a file, namely `fleet-*.{{ .Fleet }}.json`. Nodes can be added to any list
+	// in `ClusterConfig`.
 	Fleet string
 
-	// StaticNodes is a list of static nodes for this fleet.
+	// StaticNodes is a list of static nodes.
 	StaticNodes []string
 
-	// BootNodes is a list of cluster peer nodes for this fleet.
+	// BootNodes is a list of bootnodes.
 	BootNodes []string
 
-	// TrustedMailServers is a list of verified Mail Servers for this fleet.
+	// TrustedMailServers is a list of verified and trusted Mail Server nodes.
 	TrustedMailServers []string
 
 	// RendezvousNodes is a list rendezvous discovery nodes.
@@ -288,6 +290,7 @@ func WithFleet(fleet string) Option {
 		if fleet == FleetUndefined {
 			return nil
 		}
+		c.ClusterConfig.Enabled = true
 		return loadConfigFromAsset(fmt.Sprintf("../config/cli/fleet-%s.json", fleet), c)
 	}
 }
@@ -314,6 +317,7 @@ func NewNodeConfigWithDefaults(dataDir string, networkID uint64, opts ...Option)
 		return nil, err
 	}
 
+	c.NoDiscovery = false
 	c.HTTPHost = ""
 	c.ListenAddr = ":30303"
 	c.LogEnabled = true
@@ -403,6 +407,7 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 		log:                   log.New("package", "status-go/params.NodeConfig"),
 		LogFile:               "",
 		LogLevel:              "ERROR",
+		NoDiscovery:           true,
 		UpstreamConfig: UpstreamRPCConfig{
 			URL: getUpstreamURL(networkID),
 		},
@@ -565,10 +570,6 @@ func (c *ClusterConfig) Validate(validate *validator.Validate) error {
 
 	if err := validate.Struct(c); err != nil {
 		return err
-	}
-
-	if c.Fleet == "" {
-		return fmt.Errorf("ClusterConfig.Fleet is empty")
 	}
 
 	return nil
