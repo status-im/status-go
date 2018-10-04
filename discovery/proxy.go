@@ -13,13 +13,17 @@ import (
 )
 
 // ProxyToRendezvous proxies records discovered using original to rendezvous servers for specified topic.
-func ProxyToRendezvous(original Discovery, servers []ma.Multiaddr, topic string, stop chan struct{}) error {
+func ProxyToRendezvous(original Discovery, servers []ma.Multiaddr, topic string, stop chan struct{}, limit int, timeWindow time.Duration) error {
 	var (
-		identities = map[discv5.NodeID]*Rendezvous{}
-		period     = make(chan time.Duration, 1)
-		found      = make(chan *discv5.Node, 10)
-		lookup     = make(chan bool)
-		wg         sync.WaitGroup
+		identities   = map[discv5.NodeID]*Rendezvous{}
+		lastSeen     = map[discv5.NodeID]time.Time{}
+		closers      = map[discv5.NodeID]chan struct{}{}
+		period       = make(chan time.Duration, 1)
+		found        = make(chan *discv5.Node, 10)
+		closeRequest = make(chan discv5.NodeID, 10)
+		lookup       = make(chan bool)
+		total        = 0
+		wg           sync.WaitGroup
 	)
 	period <- 1 * time.Second
 	wg.Add(1)
@@ -36,23 +40,50 @@ func ProxyToRendezvous(original Discovery, servers []ma.Multiaddr, topic string,
 			wg.Wait()
 			return nil
 		case <-lookup:
-		case n := <-found:
-			if _, exist := identities[n.ID]; exist {
+		case n := <-closeRequest:
+			if _, exist := lastSeen[n]; !exist {
 				continue
 			}
-			log.Info("proxying new record", "topic", topic, "identity", n.String())
+			// closeRequest is sent every time window after record was seen.
+			// record must be discovered again during same time window otherwise it will be removed.
+			if time.Since(lastSeen[n]) >= timeWindow {
+				close(closers[n])
+				_ = identities[n].Stop()
+				delete(identities, n)
+				delete(lastSeen, n)
+				delete(closers, n)
+				total--
+				log.Info("proxy for a record was removed", "identity", n.String(), "total", total)
+			}
+		case n := <-found:
+			_, exist := identities[n.ID]
+			// skip new record if we reached a limit.
+			if !exist && total == limit {
+				continue
+			}
+			lastSeen[n.ID] = time.Now()
+			go time.AfterFunc(timeWindow, func() {
+				closeRequest <- n.ID
+			})
+			if exist {
+				log.Debug("received an update for existing identity", "identity", n.String())
+				continue
+			}
+			total++
+			log.Info("proxying new record", "topic", topic, "identity", n.String(), "total", total)
 			record, err := makeProxiedENR(n)
 			if err != nil {
 				log.Error("error converting discovered node to ENR", "node", n.String(), "error", err)
 			}
 			r := NewRendezvousWithENR(servers, record)
 			identities[n.ID] = r
+			closers[n.ID] = make(chan struct{})
 			if err := r.Start(); err != nil {
 				log.Error("unable to start rendezvous proxying", "servers", servers, "error", err)
 			}
 			wg.Add(1)
 			go func() {
-				if err := r.Register(topic, stop); err != nil {
+				if err := r.Register(topic, closers[n.ID]); err != nil {
 					log.Error("register error", "topic", topic, "error", err)
 				}
 				wg.Done()

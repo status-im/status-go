@@ -15,6 +15,8 @@ func TestProxyToRendezvous(t *testing.T) {
 	var (
 		topic    = "test"
 		id       = 101
+		limited  = 102
+		limit    = 1
 		reg      = newRegistry()
 		original = &fake{id: 110, registry: reg, started: true}
 		srv      = makeTestRendezvousServer(t, "/ip4/127.0.0.1/tcp/7788")
@@ -24,10 +26,11 @@ func TestProxyToRendezvous(t *testing.T) {
 	client, err := rendezvous.NewEphemeral()
 	require.NoError(t, err)
 	reg.Add(topic, id)
+	reg.Add(topic, limited)
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		require.NoError(t, ProxyToRendezvous(original, []ma.Multiaddr{srv.Addr()}, topic, stop))
+		require.NoError(t, ProxyToRendezvous(original, []ma.Multiaddr{srv.Addr()}, topic, stop, limit, 100*time.Millisecond))
 	}()
 	timer := time.After(3 * time.Second)
 	ticker := time.Tick(100 * time.Millisecond)
@@ -39,10 +42,7 @@ func TestProxyToRendezvous(t *testing.T) {
 			require.FailNow(t, "failed waiting for record to be proxied")
 		case <-ticker:
 			records, err := client.Discover(context.TODO(), srv.Addr(), topic, 10)
-			if err != nil {
-				continue
-			}
-			if len(records) != 1 {
+			if err != nil && len(records) != limit {
 				continue
 			}
 			var proxied Proxied
