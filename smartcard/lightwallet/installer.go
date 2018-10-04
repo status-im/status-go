@@ -12,8 +12,8 @@ import (
 )
 
 var (
-	sdaid   = []byte{0xa0, 0x00, 0x00, 0x01, 0x51, 0x00, 0x00, 0x00}
-	testKey = []byte{0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f}
+	cardManagerAID = []byte{0xa0, 0x00, 0x00, 0x01, 0x51, 0x00, 0x00, 0x00}
+	testKey        = []byte{0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f}
 
 	statusPkgAID    = []byte{0x53, 0x74, 0x61, 0x74, 0x75, 0x73, 0x57, 0x61, 0x6C, 0x6C, 0x65, 0x74}
 	statusAppletAID = []byte{0x53, 0x74, 0x61, 0x74, 0x75, 0x73, 0x57, 0x61, 0x6C, 0x6C, 0x65, 0x74, 0x41, 0x70, 0x70}
@@ -30,20 +30,62 @@ func NewInstaller(t Transmitter) *Installer {
 }
 
 func (i *Installer) Install(capFile *os.File) (*Secrets, error) {
-	sel := globalplatform.NewCommandSelect(sdaid)
-	resp, err := i.send("select", sel)
+	err := i.initSecureChannel(cardManagerAID)
 	if err != nil {
 		return nil, err
 	}
 
+	err = i.deleteAID(statusAppletAID, statusPkgAID)
+	if err != nil {
+		return nil, err
+	}
+
+	secrets, err := i.installApplet(capFile)
+	if err != nil {
+		return nil, err
+	}
+
+	return secrets, nil
+}
+
+func (i *Installer) Info() (*Secrets, error) {
+
+}
+
+func (i *Installer) initSecureChannel(sdaid []byte) error {
+	// select card manager
+	err := i.selectAID(sdaid)
+	if err != nil {
+		return err
+	}
+
 	// initialize update
+	session, err := i.initializeUpdate()
+	if err != nil {
+		return err
+	}
+
+	i.c = NewSecureChannel(session, i.c)
+
+	// external authenticate
+	return i.externalAuthenticate(session)
+}
+
+func (i *Installer) selectAID(aid []byte) error {
+	sel := globalplatform.NewCommandSelect(cardManagerAID)
+	_, err := i.send("select", sel)
+
+	return err
+}
+
+func (i *Installer) initializeUpdate() (*globalplatform.Session, error) {
 	hostChallenge, err := generateHostChallenge()
 	if err != nil {
 		return nil, err
 	}
 
 	init := globalplatform.NewCommandInitializeUpdate(hostChallenge)
-	resp, err = i.send("initialize update", init)
+	resp, err := i.send("initialize update", init)
 	if err != nil {
 		return nil, err
 	}
@@ -51,41 +93,38 @@ func (i *Installer) Install(capFile *os.File) (*Secrets, error) {
 	// verify cryptogram and initialize session keys
 	keys := globalplatform.NewKeyProvider(testKey, testKey)
 	session, err := globalplatform.NewSession(keys, resp, hostChallenge)
-	if err != nil {
-		return nil, err
-	}
 
-	i.c = NewSecureChannel(session, i.c)
+	return session, err
+}
 
-	// external authenticate
+func (i *Installer) externalAuthenticate(session *globalplatform.Session) error {
 	encKey := session.KeyProvider().Enc()
-	extAuth, err := globalplatform.NewCommandExternalAuthenticate(encKey, session.CardChallenge(), hostChallenge)
+	extAuth, err := globalplatform.NewCommandExternalAuthenticate(encKey, session.CardChallenge(), session.HostChallenge())
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	resp, err = i.send("external authenticate", extAuth)
-	if err != nil {
-		return nil, err
-	}
+	_, err = i.send("external authenticate", extAuth)
 
-	// delete current pkg and applet
-	aids := [][]byte{
-		statusAppletAID,
-		statusPkgAID,
-	}
+	return err
+}
 
+func (i *Installer) deleteAID(aids ...[]byte) error {
 	for _, aid := range aids {
 		del := globalplatform.NewCommandDelete(aid)
-		resp, err = i.send("delete", del, globalplatform.SwOK, globalplatform.SwReferencedDataNotFound)
+		_, err := i.send("delete", del, globalplatform.SwOK, globalplatform.SwReferencedDataNotFound)
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
 
+	return nil
+}
+
+func (i *Installer) installApplet(capFile *os.File) (*Secrets, error) {
 	// install for load
-	preLoad := globalplatform.NewCommandInstallForLoad(statusPkgAID, sdaid)
-	resp, err = i.send("install for load", preLoad)
+	preLoad := globalplatform.NewCommandInstallForLoad(statusPkgAID, cardManagerAID)
+	_, err := i.send("install for load", preLoad)
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +137,7 @@ func (i *Installer) Install(capFile *os.File) (*Secrets, error) {
 
 	for load.Next() {
 		cmd := load.GetCommand()
-		resp, err = i.send(fmt.Sprintf("load %d", load.Index()), cmd)
+		_, err = i.send(fmt.Sprintf("load %d", load.Index()), cmd)
 		if err != nil {
 			return nil, err
 		}
@@ -114,7 +153,7 @@ func (i *Installer) Install(capFile *os.File) (*Secrets, error) {
 	params = append(params, secrets.PairingToken()...)
 
 	install := globalplatform.NewCommandInstallForInstall(statusPkgAID, statusAppletAID, statusAppletAID, params)
-	resp, err = i.send("install for install", install)
+	_, err = i.send("install for install", install)
 	if err != nil {
 		return nil, err
 	}
