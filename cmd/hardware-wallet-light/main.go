@@ -65,8 +65,11 @@ func main() {
 	defer f.Close()
 
 	i := lightwallet.NewInstaller(card)
-	err = i.Install(f)
+	secrets, err := i.Install(f)
 	if err != nil {
 		log.Fatal("installation error: ", err)
 	}
+
+	fmt.Printf("PUK %s\n", secrets.Puk())
+	fmt.Printf("Pairing password: %s\n", secrets.PairingPass())
 }
