@@ -19,13 +19,16 @@ var (
 
 	commands map[string]commandFunc
 
-	flagCapFile   = flag.String("file", "", "cap file path")
-	flagOverwrite = flag.Bool("force", false, "overwrite applet if already installed")
-	logLevel      = flag.String("log", "", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
+	flagCommand   = flag.String("c", "", "command")
+	flagCapFile   = flag.String("f", "", "cap file path")
+	flagOverwrite = flag.Bool("o", false, "overwrite applet if already installed")
+	flagLogLevel  = flag.String("l", "", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
 )
 
 func init() {
-	if err := logutils.OverrideRootLog(true, "ERROR", "", true); err != nil {
+	flag.Parse()
+
+	if err := logutils.OverrideRootLog(true, *flagLogLevel, "", true); err != nil {
 		stdlog.Fatalf("Error initializing logger: %v", err)
 	}
 
@@ -52,22 +55,20 @@ func fail(msg string, ctx ...interface{}) {
 }
 
 func main() {
-	flag.Parse()
-	cmd := flag.Arg(0)
-	if cmd == "" {
-		logger.Error("you must specify a command (install, status, delete).")
+	if *flagCommand == "" {
+		logger.Error("you must specify a command")
 		usage()
 	}
 
 	ctx, err := scard.EstablishContext()
 	if err != nil {
-		fail("error establishing card context", err)
+		fail("error establishing card context", "error", err)
 	}
 	defer ctx.Release()
 
 	readers, err := ctx.ListReaders()
 	if err != nil {
-		fail("error getting readers", err)
+		fail("error getting readers", "error", err)
 	}
 
 	if len(readers) == 0 {
@@ -79,35 +80,35 @@ func main() {
 	}
 
 	reader := readers[0]
-	logger.Debug("using reader %s:\n", reader)
-	logger.Debug("connecting to card in %s\n", reader)
+	logger.Debug("using reader", "name", reader)
+	logger.Debug("connecting to card", "reader", reader)
 	card, err := ctx.Connect(reader, scard.ShareShared, scard.ProtocolAny)
 	if err != nil {
-		fail("error connecting to card", err)
+		fail("error connecting to card", "error", err)
 	}
 	defer card.Disconnect(scard.ResetCard)
 
 	status, err := card.Status()
 	if err != nil {
-		fail("error getting card status", err)
+		fail("error getting card status", "error", err)
 	}
 
 	switch status.ActiveProtocol {
 	case scard.ProtocolT0:
-		logger.Debug("Protocol T0\n")
+		logger.Debug("card protocol", "T", "0")
 	case scard.ProtocolT1:
-		logger.Debug("Protocol T1\n")
+		logger.Debug("card protocol", "T", "1")
 	default:
-		logger.Debug("Unknown protocol\n")
+		logger.Debug("card protocol", "T", "unknown")
 	}
 
 	i := lightwallet.NewInstaller(card)
-	if f, ok := commands[cmd]; ok {
+	if f, ok := commands[*flagCommand]; ok {
 		err = f(i)
 		os.Exit(0)
 	}
 
-	fail("unknown command %s\n", cmd)
+	fail("unknown command", "command", *flagCommand)
 	usage()
 }
 
@@ -119,16 +120,16 @@ func commandInstall(i *lightwallet.Installer) error {
 
 	f, err := os.Open(*flagCapFile)
 	if err != nil {
-		fail("error opening cap file", err)
+		fail("error opening cap file", "error", err)
 	}
 	defer f.Close()
 
 	secrets, err := i.Install(f, *flagOverwrite)
 	if err != nil {
-		fail("installation error: ", err)
+		fail("installation error", "error", err)
 	}
 
-	fmt.Printf("PUK %s\n", secrets.Puk())
+	fmt.Printf("\n\nPUK %s\n", secrets.Puk())
 	fmt.Printf("Pairing password: %s\n", secrets.PairingPass())
 
 	return nil

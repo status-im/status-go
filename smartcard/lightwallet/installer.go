@@ -8,7 +8,6 @@ import (
 
 	"github.com/status-im/status-go/smartcard/apdu"
 	"github.com/status-im/status-go/smartcard/globalplatform"
-	"github.com/status-im/status-go/smartcard/hexutils"
 )
 
 var (
@@ -174,7 +173,7 @@ func (i *Installer) installApplet(capFile *os.File) (*Secrets, error) {
 
 	for load.Next() {
 		cmd := load.GetCommand()
-		_, err = i.send(fmt.Sprintf("load %d", load.Index()), cmd)
+		_, err = i.send(fmt.Sprintf("load %d of 32", load.Index()), cmd)
 		if err != nil {
 			return nil, err
 		}
@@ -199,7 +198,7 @@ func (i *Installer) installApplet(capFile *os.File) (*Secrets, error) {
 }
 
 func (i *Installer) send(description string, cmd *apdu.Command, allowedResponses ...uint16) (*apdu.Response, error) {
-	fmt.Printf("-------------------------\nsending %s\n", description)
+	logger.Debug("sending apdu command", "name", description)
 	resp, err := i.c.Send(cmd)
 	if err != nil {
 		return nil, err
@@ -224,8 +223,4 @@ func generateHostChallenge() ([]byte, error) {
 	c := make([]byte, 8)
 	_, err := rand.Read(c)
 	return c, err
-}
-
-func l(message string, raw []byte) {
-	fmt.Printf("%s %s\n", message, hexutils.BytesToHexWithSpaces(raw))
 }

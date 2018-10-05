@@ -1,8 +1,6 @@
 package lightwallet
 
 import (
-	"fmt"
-
 	"github.com/status-im/status-go/smartcard/apdu"
 	"github.com/status-im/status-go/smartcard/globalplatform"
 	"github.com/status-im/status-go/smartcard/hexutils"
@@ -28,7 +26,7 @@ func (c *SecureChannel) Send(cmd *apdu.Command) (*apdu.Response, error) {
 		return nil, err
 	}
 
-	fmt.Printf("WRAPPING  %s\n", hexutils.BytesToHexWithSpaces(rawCmd))
+	logger.Debug("wrapping apdu command", "hex", hexutils.BytesToHexWithSpaces(rawCmd))
 	wrappedCmd, err := c.w.Wrap(cmd)
 	if err != nil {
 		return nil, err

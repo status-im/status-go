@@ -1,8 +1,6 @@
 package lightwallet
 
 import (
-	"fmt"
-
 	"github.com/status-im/status-go/smartcard/apdu"
 	"github.com/status-im/status-go/smartcard/globalplatform"
 	"github.com/status-im/status-go/smartcard/hexutils"
@@ -26,12 +24,12 @@ func (c *NormalChannel) Send(cmd *apdu.Command) (*apdu.Response, error) {
 		return nil, err
 	}
 
-	fmt.Printf("COMMAND  %s\n", hexutils.BytesToHexWithSpaces(rawCmd))
+	logger.Debug("apdu command", "hex", hexutils.BytesToHexWithSpaces(rawCmd))
 	rawResp, err := c.t.Transmit(rawCmd)
 	if err != nil {
 		return nil, err
 	}
-	fmt.Printf("RESPONSE %s\n", hexutils.BytesToHexWithSpaces(rawResp))
+	logger.Debug("apdu response", "hex", hexutils.BytesToHexWithSpaces(rawResp))
 
 	resp, err := apdu.ParseResponse(rawResp)
 	if err != nil {
