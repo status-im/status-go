@@ -165,3 +165,7 @@
 [[constraint]]
   branch = "master"
   name = "github.com/status-im/whisper"
+
+[[constraint]]
+  name = "github.com/ebfe/scard"
+  revision = "7c31d2fd1987d889c45d4af2301538dafb1c3fb1"
