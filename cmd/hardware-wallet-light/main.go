@@ -64,7 +64,11 @@ func main() {
 	if err != nil {
 		fail("error establishing card context", "error", err)
 	}
-	defer ctx.Release()
+	defer func() {
+		if err := ctx.Release(); err != nil {
+			logger.Error("error releasing context", "error", err)
+		}
+	}()
 
 	readers, err := ctx.ListReaders()
 	if err != nil {
@@ -105,6 +109,10 @@ func main() {
 	i := lightwallet.NewInstaller(card)
 	if f, ok := commands[*flagCommand]; ok {
 		err = f(i)
+		if err != nil {
+			logger.Error("error executing command", "command", *flagCommand, "error", err)
+			os.Exit(1)
+		}
 		os.Exit(0)
 	}
 
