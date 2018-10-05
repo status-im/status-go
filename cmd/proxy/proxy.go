@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/params"
@@ -25,7 +26,7 @@ var (
 	les             = IntSlice{}
 	useEthereum     = flag.Bool("use-ethereum-boot", false, "If true ethereum bootnodes will be used.")
 	limit           = flag.Int("limit", 100, "Limit the number of proxied nodes.")
-	livenessWindow  = flag.Duration("liveness-window", 10*time.Minute, "Stop proxying record if it wasn't foudn again during specified window.")
+	livenessWindow  = flag.Duration("liveness-window", 10*time.Minute, "Stop proxying record if it wasn't found again during specified window.")
 )
 
 func main() {
@@ -68,7 +69,12 @@ func main() {
 		t := t
 		wg.Add(1)
 		go func() {
-			if err := discovery.ProxyToRendezvous(v5, rendezvousServers, t, stop, *limit, *livenessWindow); err != nil {
+			if err := discovery.ProxyToRendezvous(v5, stop, &event.Feed{}, discovery.ProxyOptions{
+				Topic:          t,
+				Servers:        rendezvousServers,
+				Limit:          *limit,
+				LivenessWindow: *livenessWindow,
+			}); err != nil {
 				log.Error("proxying to rendezvous servers failed", "servers", rendezvousNodes, "topic", t, "error", err)
 			}
 			wg.Done()
