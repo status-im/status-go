@@ -5,18 +5,24 @@ import (
 	"github.com/status-im/status-go/smartcard/hexutils"
 )
 
+// Transmitter defines an interface with one method to transmit raw commands and receive raw responses.
 type Transmitter interface {
 	Transmit([]byte) ([]byte, error)
 }
 
+// NormalChannel implements a normal channel to send apdu commands and receive apdu responses.
 type NormalChannel struct {
 	t Transmitter
 }
 
+// NewNormalChannel returns a new NormalChannel that sends commands to Transmitter t.
 func NewNormalChannel(t Transmitter) *NormalChannel {
 	return &NormalChannel{t}
 }
 
+// Send sends apdu commands to the current Transmitter.
+// Based on the smartcard transport protocol (T=0, T=1), it checks responses and sends a Get Response
+// command in case of T=0.
 func (c *NormalChannel) Send(cmd *apdu.Command) (*apdu.Response, error) {
 	rawCmd, err := cmd.Serialize()
 	if err != nil {

@@ -15,6 +15,7 @@ var internalFiles = []string{
 	"Method", "StaticField", "Export", "ConstantPool", "RefLocation",
 }
 
+// LoadCommandStream implement a struct that generates multiple Load commands used to load files to smartcards.
 type LoadCommandStream struct {
 	data         *bytes.Reader
 	currentIndex uint8
@@ -22,6 +23,7 @@ type LoadCommandStream struct {
 	p1           uint8
 }
 
+// NewLoadCommandStream returns a new LoadCommandStream to load the specified file.
 func NewLoadCommandStream(file *os.File) (*LoadCommandStream, error) {
 	files, err := loadFiles(file)
 	if err != nil {
@@ -39,6 +41,7 @@ func NewLoadCommandStream(file *os.File) (*LoadCommandStream, error) {
 	}, nil
 }
 
+// Next returns initialize the data for the next Load command.
 // TODO:@pilu update blockSize when using encrypted data
 func (lcs *LoadCommandStream) Next() bool {
 	if lcs.data.Len() == 0 {
@@ -62,10 +65,12 @@ func (lcs *LoadCommandStream) Next() bool {
 	return true
 }
 
+// Index returns the command index.
 func (lcs *LoadCommandStream) Index() uint8 {
 	return lcs.currentIndex - 1
 }
 
+// GetCommand returns the current apdu command.
 func (lcs *LoadCommandStream) GetCommand() *apdu.Command {
 	return apdu.NewCommand(ClaGp, InsLoad, lcs.p1, lcs.Index(), lcs.currentData)
 }

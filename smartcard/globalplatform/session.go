@@ -8,6 +8,7 @@ import (
 	"github.com/status-im/status-go/smartcard/globalplatform/crypto"
 )
 
+// Session is a struct containing the keys and challenges used in the current communication with a card.
 type Session struct {
 	keyProvider   *KeyProvider
 	cardChallenge []byte
@@ -16,6 +17,7 @@ type Session struct {
 
 var errBadCryptogram = errors.New("bad card cryptogram")
 
+// NewSession returns a new session after validating the cryptogram received from the card.
 func NewSession(cardKeys *KeyProvider, resp *apdu.Response, hostChallenge []byte) (*Session, error) {
 	if resp.Sw == SwSecurityConditionNotSatisfied {
 		return nil, apdu.NewErrBadResponse(resp.Sw, "security condition not satisfied")
@@ -62,14 +64,17 @@ func NewSession(cardKeys *KeyProvider, resp *apdu.Response, hostChallenge []byte
 	return s, nil
 }
 
+// KeyProvider return the current KeyProvider.
 func (s *Session) KeyProvider() *KeyProvider {
 	return s.keyProvider
 }
 
+// CardChallenge returns the current card challenge.
 func (s *Session) CardChallenge() []byte {
 	return s.cardChallenge
 }
 
+// HostChallenge returns the current host challenge.
 func (s *Session) HostChallenge() []byte {
 	return s.hostChallenge
 }

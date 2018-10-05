@@ -18,16 +18,19 @@ var (
 	statusAppletAID = []byte{0x53, 0x74, 0x61, 0x74, 0x75, 0x73, 0x57, 0x61, 0x6C, 0x6C, 0x65, 0x74, 0x41, 0x70, 0x70}
 )
 
+// Installer defines a struct with methods to install an applet to a smartcard.
 type Installer struct {
 	c globalplatform.Channel
 }
 
+// NewInstaller returns a new Installer that communicates to Transmitter t.
 func NewInstaller(t globalplatform.Transmitter) *Installer {
 	return &Installer{
 		c: globalplatform.NewNormalChannel(t),
 	}
 }
 
+// Install installs the applet from the specified capFile.
 func (i *Installer) Install(capFile *os.File, overwriteApplet bool) (*Secrets, error) {
 	err := i.initSecureChannel(cardManagerAID)
 	if err != nil {
@@ -56,6 +59,7 @@ func (i *Installer) Install(capFile *os.File, overwriteApplet bool) (*Secrets, e
 	return secrets, nil
 }
 
+// Info returns if the applet is already installed in the card.
 func (i *Installer) Info() (bool, error) {
 	err := i.initSecureChannel(cardManagerAID)
 	if err != nil {
@@ -65,6 +69,7 @@ func (i *Installer) Info() (bool, error) {
 	return i.isAppletInstalled()
 }
 
+// Delete deletes the applet and related package from the card.
 func (i *Installer) Delete() error {
 	err := i.initSecureChannel(cardManagerAID)
 	if err != nil {
@@ -214,7 +219,7 @@ func (i *Installer) send(description string, cmd *apdu.Command, allowedResponses
 		}
 	}
 
-	err = errors.New(fmt.Sprintf("unexpected response from command %s: %x", description, resp.Sw))
+	err = fmt.Errorf("unexpected response from command %s: %x", description, resp.Sw)
 
 	return nil, err
 }

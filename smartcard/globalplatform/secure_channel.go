@@ -5,12 +5,14 @@ import (
 	"github.com/status-im/status-go/smartcard/hexutils"
 )
 
+// SecureChannel wraps another channel and sends wrapped commands using APDUWrapper.
 type SecureChannel struct {
 	session *Session
 	c       Channel
 	w       *APDUWrapper
 }
 
+// NewSecureChannel returns a new SecureChannel based on a session and wrapping a Channel c.
 func NewSecureChannel(session *Session, c Channel) *SecureChannel {
 	return &SecureChannel{
 		session: session,
@@ -19,6 +21,7 @@ func NewSecureChannel(session *Session, c Channel) *SecureChannel {
 	}
 }
 
+// Send sends wrapped commands to the inner channel.
 func (c *SecureChannel) Send(cmd *apdu.Command) (*apdu.Response, error) {
 	rawCmd, err := cmd.Serialize()
 	if err != nil {
