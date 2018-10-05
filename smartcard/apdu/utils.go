@@ -6,14 +6,17 @@ import (
 	"io"
 )
 
+// ErrTagNotFound is an error returned if a tag is not found in a TLV sequence.
 type ErrTagNotFound struct {
 	tag uint8
 }
 
+// Error implements the error interface
 func (e *ErrTagNotFound) Error() string {
 	return fmt.Sprintf("tag %x not found", e.tag)
 }
 
+// FindTag searches for a tag value within a TLV sequence.
 func FindTag(raw []byte, tags ...uint8) ([]byte, error) {
 	if len(tags) == 0 {
 		return raw, nil

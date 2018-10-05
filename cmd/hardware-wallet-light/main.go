@@ -40,8 +40,8 @@ func init() {
 }
 
 func usage() {
-	fmt.Println("\nUsage: hardware-wallet-light COMMAND [FLAGS]\n\nValid commands:\n")
-	for name, _ := range commands {
+	fmt.Printf("\nUsage: hardware-wallet-light COMMAND [FLAGS]\n\nValid commands:\n\n")
+	for name := range commands {
 		fmt.Printf("- %s\n", name)
 	}
 	fmt.Print("\nFlags:\n\n")

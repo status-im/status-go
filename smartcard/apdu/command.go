@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 )
 
+// Command struct represent the data sent as an APDU command with CLA, Ins, P1, P2, Lc, Data, and Le.
 type Command struct {
 	Cla        uint8
 	Ins        uint8
@@ -15,6 +16,7 @@ type Command struct {
 	requiresLe bool
 }
 
+// NewCommand returns a new apdu Command.
 func NewCommand(cla, ins, p1, p2 uint8, data []byte) *Command {
 	return &Command{
 		Cla:        cla,
@@ -26,15 +28,18 @@ func NewCommand(cla, ins, p1, p2 uint8, data []byte) *Command {
 	}
 }
 
+// SetLe sets the expected Le value and makes sure the Le value is sent in the apdu Command.
 func (c *Command) SetLe(le uint8) {
 	c.requiresLe = true
 	c.le = le
 }
 
+// Le returns if Le is set and its value.
 func (c *Command) Le() (bool, uint8) {
 	return c.requiresLe, c.le
 }
 
+// Serialize serielizes the command into a raw bytes sequence.
 func (c *Command) Serialize() ([]byte, error) {
 	buf := new(bytes.Buffer)
 
