@@ -8,11 +8,13 @@ import (
 	"github.com/status-im/status-go/smartcard/globalplatform/crypto"
 )
 
+// APDUWrapper is a wrapper for apdu commands inside a global platform secure channel.
 type APDUWrapper struct {
 	macKey []byte
 	icv    []byte
 }
 
+// NewAPDUWrapper returns a new APDUWrapper using the specified key for MAC generation.
 func NewAPDUWrapper(macKey []byte) *APDUWrapper {
 	return &APDUWrapper{
 		macKey: macKey,
@@ -20,6 +22,8 @@ func NewAPDUWrapper(macKey []byte) *APDUWrapper {
 	}
 }
 
+// Wrap wraps the apdu command adding the MAC to the end of the command.
+// Future implementations will encrypt the message when needed.
 func (w *APDUWrapper) Wrap(cmd *apdu.Command) (*apdu.Command, error) {
 	macData := new(bytes.Buffer)
 

@@ -5,6 +5,7 @@ import (
 	"github.com/status-im/status-go/smartcard/globalplatform/crypto"
 )
 
+// Constants used in apdu commands and responses as defined by iso7816 and globalplatform.
 const (
 	ClaISO7816 = uint8(0x00)
 	ClaGp      = uint8(0x80)
@@ -44,6 +45,7 @@ const (
 	tagGetStatusAID      = byte(0x4F)
 )
 
+// NewCommandSelect returns a Select command as defined in the globalplatform specifications.
 func NewCommandSelect(aid []byte) *apdu.Command {
 	c := apdu.NewCommand(
 		ClaISO7816,
@@ -60,6 +62,7 @@ func NewCommandSelect(aid []byte) *apdu.Command {
 	return c
 }
 
+// NewCommandSelect returns an Initialize Update command as defined in the globalplatform specifications.
 func NewCommandInitializeUpdate(challenge []byte) *apdu.Command {
 	c := apdu.NewCommand(
 		ClaGp,
@@ -76,6 +79,7 @@ func NewCommandInitializeUpdate(challenge []byte) *apdu.Command {
 	return c
 }
 
+// NewCommandSelect returns an External Authenticate command as defined in the globalplatform specifications.
 func NewCommandExternalAuthenticate(encKey, cardChallenge, hostChallenge []byte) (*apdu.Command, error) {
 	hostCryptogram, err := calculateHostCryptogram(encKey, cardChallenge, hostChallenge)
 	if err != nil {
@@ -91,6 +95,7 @@ func NewCommandExternalAuthenticate(encKey, cardChallenge, hostChallenge []byte)
 	), nil
 }
 
+// NewCommandSelect returns a Get Response command as defined in the globalplatform specifications.
 func NewCommandGetResponse(length uint8) *apdu.Command {
 	c := apdu.NewCommand(
 		ClaISO7816,
@@ -105,6 +110,7 @@ func NewCommandGetResponse(length uint8) *apdu.Command {
 	return c
 }
 
+// NewCommandSelect returns a Delete command as defined in the globalplatform specifications.
 func NewCommandDelete(aid []byte) *apdu.Command {
 	data := []byte{tagDeleteAID, byte(len(aid))}
 	data = append(data, aid...)
@@ -118,6 +124,7 @@ func NewCommandDelete(aid []byte) *apdu.Command {
 	)
 }
 
+// NewCommandSelect returns an Install command with the install-for-load parameter as defined in the globalplatform specifications.
 func NewCommandInstallForLoad(aid, sdaid []byte) *apdu.Command {
 	data := []byte{byte(len(aid))}
 	data = append(data, aid...)
@@ -135,6 +142,7 @@ func NewCommandInstallForLoad(aid, sdaid []byte) *apdu.Command {
 	)
 }
 
+// NewCommandSelect returns an Install command with the install-for-instalp parameter as defined in the globalplatform specifications.
 func NewCommandInstallForInstall(pkgAID, appletAID, instanceAID, params []byte) *apdu.Command {
 	data := []byte{byte(len(pkgAID))}
 	data = append(data, pkgAID...)
@@ -167,6 +175,7 @@ func NewCommandInstallForInstall(pkgAID, appletAID, instanceAID, params []byte) 
 	)
 }
 
+// NewCommandSelect returns a Get Status command as defined in the globalplatform specifications.
 func NewCommandGetStatus(aid []byte, p1 uint8) *apdu.Command {
 	data := []byte{tagGetStatusAID}
 	data = append(data, byte(len(aid)))
