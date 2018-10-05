@@ -1,8 +1,7 @@
-package lightwallet
+package globalplatform
 
 import (
 	"github.com/status-im/status-go/smartcard/apdu"
-	"github.com/status-im/status-go/smartcard/globalplatform"
 	"github.com/status-im/status-go/smartcard/hexutils"
 )
 
@@ -36,8 +35,8 @@ func (c *NormalChannel) Send(cmd *apdu.Command) (*apdu.Response, error) {
 		return nil, err
 	}
 
-	if resp.Sw1 == globalplatform.Sw1ResponseDataIncomplete && (cmd.Cla != globalplatform.ClaISO7816 || cmd.Ins != globalplatform.InsGetResponse) {
-		getResponse := globalplatform.NewCommandGetResponse(resp.Sw2)
+	if resp.Sw1 == Sw1ResponseDataIncomplete && (cmd.Cla != ClaISO7816 || cmd.Ins != InsGetResponse) {
+		getResponse := NewCommandGetResponse(resp.Sw2)
 		return c.Send(getResponse)
 	}
 

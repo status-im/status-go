@@ -19,12 +19,12 @@ var (
 )
 
 type Installer struct {
-	c Channel
+	c globalplatform.Channel
 }
 
-func NewInstaller(t Transmitter) *Installer {
+func NewInstaller(t globalplatform.Transmitter) *Installer {
 	return &Installer{
-		c: NewNormalChannel(t),
+		c: globalplatform.NewNormalChannel(t),
 	}
 }
 
@@ -101,7 +101,7 @@ func (i *Installer) initSecureChannel(sdaid []byte) error {
 		return err
 	}
 
-	i.c = NewSecureChannel(session, i.c)
+	i.c = globalplatform.NewSecureChannel(session, i.c)
 
 	// external authenticate
 	return i.externalAuthenticate(session)

@@ -1,22 +1,21 @@
-package lightwallet
+package globalplatform
 
 import (
 	"github.com/status-im/status-go/smartcard/apdu"
-	"github.com/status-im/status-go/smartcard/globalplatform"
 	"github.com/status-im/status-go/smartcard/hexutils"
 )
 
 type SecureChannel struct {
-	session *globalplatform.Session
+	session *Session
 	c       Channel
-	w       *globalplatform.APDUWrapper
+	w       *APDUWrapper
 }
 
-func NewSecureChannel(session *globalplatform.Session, c Channel) *SecureChannel {
+func NewSecureChannel(session *Session, c Channel) *SecureChannel {
 	return &SecureChannel{
 		session: session,
 		c:       c,
-		w:       globalplatform.NewAPDUWrapper(session.KeyProvider().Mac()),
+		w:       NewAPDUWrapper(session.KeyProvider().Mac()),
 	}
 }
 
