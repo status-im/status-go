@@ -1,7 +1,7 @@
 #!/bin/bash
 
 if [ -x "$(command -v apt)" ]; then
-  apt install -y protobuf-compiler
+  apt install -y protobuf-compiler libpcsclite-dev
 fi
 
 if [ -x "$(command -v pacman)" ]; then
