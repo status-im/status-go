@@ -1,4 +1,4 @@
-.PHONY: statusgo statusd-prune all test xgo clean help
+.PHONY: statusgo statusd-prune hardware-wallet-light all test xgo clean help
 .PHONY: statusgo-android statusgo-ios
 
 help: ##@other Show this help
@@ -82,6 +82,11 @@ statusd-prune: ##@statusd-prune Build statusd-prune
 	go build -o $(GOBIN)/statusd-prune -v ./cmd/statusd-prune
 	@echo "Compilation done."
 	@echo "Run \"build/bin/statusd-prune -h\" to view available commands."
+
+hardware-wallet-light: ##@hardware-wallet-light Build hardware-wallet-light
+	go build -o $(GOBIN)/hardware-wallet-light -v ./cmd/hardware-wallet-light
+	@echo "Compilation done."
+	@echo "Run \"build/bin/hardware-wallet-light -h\" to view available commands."
 
 statusd-prune-docker-image: ##@statusd-prune Build statusd-prune docker image
 	@echo "Building docker image for ststusd-prune..."
