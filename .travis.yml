@@ -3,9 +3,9 @@ notifications:
 language: go
 go:
 - 1.10.x
-sudo: false
+sudo: required
 dist: trusty
-install: make setup
+install: env CI_SUDO_REQUIRED=true make setup
 jobs:
   include:
   - stage: Lint
