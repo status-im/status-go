@@ -3,9 +3,11 @@ notifications:
 language: go
 go:
 - 1.10.x
-sudo: required
+sudo: false
 dist: trusty
-install: env CI_SUDO_REQUIRED=true make setup
+before_install:
+  sudo apt-get install -y libpcsclite-dev
+install: make setup
 jobs:
   include:
   - stage: Lint
