@@ -90,7 +90,11 @@ func main() {
 	if err != nil {
 		fail("error connecting to card", "error", err)
 	}
-	defer card.Disconnect(scard.ResetCard)
+	defer func() {
+		if err := card.Disconnect(scard.ResetCard); err != nil {
+			logger.Error("error disconnecting card", "error", err)
+		}
+	}()
 
 	status, err := card.Status()
 	if err != nil {
