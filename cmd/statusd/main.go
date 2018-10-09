@@ -36,6 +36,8 @@ var (
 	configFiles      configFlags
 	logLevel         = flag.String("log", "", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
 	logWithoutColors = flag.Bool("log-without-color", false, "Disables log colors")
+	ipcEnabled       = flag.Bool("ipc", false, "Enable IPC RPC endpoint")
+	ipcFile          = flag.String("ipcfile", "", "Set IPC file path")
 	pprofEnabled     = flag.Bool("pprof", false, "Enable runtime profiling via pprof")
 	pprofPort        = flag.Int("pprof-port", 52525, "Port for runtime profiling via pprof")
 	version          = flag.Bool("version", false, "Print version and dump configuration")
@@ -103,6 +105,12 @@ func main() {
 		config.RegisterTopics = append(config.RegisterTopics, params.MailServerDiscv5Topic)
 	} else if *register {
 		config.RegisterTopics = append(config.RegisterTopics, params.WhisperDiscv5Topic)
+	}
+
+	// enable IPC RPC
+	if *ipcEnabled {
+		config.IPCEnabled = true
+		config.IPCFile = *ipcFile
 	}
 
 	// set up logging options
