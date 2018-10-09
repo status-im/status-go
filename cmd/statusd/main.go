@@ -16,7 +16,6 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	gethmetrics "github.com/ethereum/go-ethereum/metrics"
 	"github.com/status-im/status-go/api"
-	"github.com/status-im/status-go/cmd/statusd/debug"
 	"github.com/status-im/status-go/logutils"
 	nodemetrics "github.com/status-im/status-go/metrics/node"
 	"github.com/status-im/status-go/node"
@@ -37,8 +36,6 @@ var (
 	configFiles      configFlags
 	logLevel         = flag.String("log", "", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
 	logWithoutColors = flag.Bool("log-without-color", false, "Disables log colors")
-	cliEnabled       = flag.Bool("cli", false, "Enable debugging CLI server")
-	cliPort          = flag.String("cli-port", debug.CLIPort, "CLI server's listening port")
 	pprofEnabled     = flag.Bool("pprof", false, "Enable runtime profiling via pprof")
 	pprofPort        = flag.Int("pprof-port", 52525, "Port for runtime profiling via pprof")
 	version          = flag.Bool("version", false, "Print version and dump configuration")
@@ -129,15 +126,6 @@ func main() {
 	// handle interrupt signals
 	interruptCh := haltOnInterruptSignal(backend.StatusNode())
 
-	// Check if debugging CLI connection shall be enabled.
-	if *cliEnabled {
-		err := startDebug(backend)
-		if err != nil {
-			logger.Error("Starting debugging CLI server failed", "error", err)
-			return
-		}
-	}
-
 	// Check if profiling shall be enabled.
 	if *pprofEnabled {
 		profiling.NewProfiler(*pprofPort).Go()
@@ -191,12 +179,6 @@ func setupLogging(config *params.NodeConfig) {
 	); err != nil {
 		stdlog.Fatalf("Error initializing logger: %v", err)
 	}
-}
-
-// startDebug starts the debugging API server.
-func startDebug(backend *api.StatusBackend) error {
-	_, err := debug.New(backend, *cliPort)
-	return err
 }
 
 // startCollectingStats collects various stats about the node and other protocols like Whisper.
@@ -278,7 +260,6 @@ Examples:
   statusd -c ./default.json                      # run node with configuration specified in ./default.json file
   statusd -c ./default.json -c ./standalone.json # run node with configuration specified in ./default.json file, after merging ./standalone.json file
   statusd -c ./default.json -metrics             # run node with configuration specified in ./default.json file, and expose ethereum metrics with debug_metrics jsonrpc call
-  statusd -c ./default.json -cli                 # run node with configuration specified in ./default.json file, and enable connection by statusd-cli on default port
 
 Options:
 `
