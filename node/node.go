@@ -127,15 +127,18 @@ func newGethNodeConfig(config *params.NodeConfig) (*node.Config, error) {
 			MaxPeers:        config.MaxPeers,
 			MaxPendingPeers: config.MaxPendingPeers,
 		},
-		IPCPath:          config.IPCFile,
 		HTTPCors:         nil,
 		HTTPModules:      config.FormatAPIModules(),
 		HTTPVirtualHosts: []string{"localhost"},
 	}
 
 	if config.IPCEnabled {
-		// resolve relative/absolute path for IPC endpoint
-		nc.IPCPath = nc.IPCEndpoint()
+		// use well-known defaults
+		if config.IPCFile == "" {
+			config.IPCFile = "geth.ipc"
+		}
+
+		nc.IPCPath = config.IPCFile
 	}
 
 	if config.HTTPEnabled {
