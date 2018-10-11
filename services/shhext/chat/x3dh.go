@@ -56,6 +56,7 @@ func buildSignatureMaterial(signedPreKeys *map[string]*SignedPreKey) []byte {
 		signedPreKey := (*signedPreKeys)[installationID]
 		signatureMaterial = append(signatureMaterial, []byte(installationID)...)
 		signatureMaterial = append(signatureMaterial, signedPreKey.SignedPreKey...)
+		signatureMaterial = append(signatureMaterial, []byte(fmt.Sprint(signedPreKey.Version))...)
 	}
 	return signatureMaterial
 

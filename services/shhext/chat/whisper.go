@@ -12,8 +12,8 @@ func toTopic(s string) whisper.TopicType {
 	return whisper.BytesToTopic(crypto.Keccak256([]byte(s)))
 }
 
-func defaultWhisperMessage() *whisper.NewMessage {
-	msg := &whisper.NewMessage{}
+func defaultWhisperMessage() whisper.NewMessage {
+	msg := whisper.NewMessage{}
 
 	msg.TTL = 10
 	msg.PowTarget = 0.002
@@ -22,7 +22,7 @@ func defaultWhisperMessage() *whisper.NewMessage {
 	return msg
 }
 
-func PublicMessageToWhisper(rpcMsg *SendPublicMessageRPC, payload []byte) *whisper.NewMessage {
+func PublicMessageToWhisper(rpcMsg SendPublicMessageRPC, payload []byte) whisper.NewMessage {
 	msg := defaultWhisperMessage()
 
 	msg.Topic = toTopic(rpcMsg.Chat)
@@ -33,7 +33,7 @@ func PublicMessageToWhisper(rpcMsg *SendPublicMessageRPC, payload []byte) *whisp
 	return msg
 }
 
-func DirectMessageToWhisper(rpcMsg *SendDirectMessageRPC, payload []byte) *whisper.NewMessage {
+func DirectMessageToWhisper(rpcMsg SendDirectMessageRPC, payload []byte) whisper.NewMessage {
 
 	msg := defaultWhisperMessage()
 
