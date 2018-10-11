@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"time"
 
@@ -128,10 +127,18 @@ func newGethNodeConfig(config *params.NodeConfig) (*node.Config, error) {
 			MaxPeers:        config.MaxPeers,
 			MaxPendingPeers: config.MaxPendingPeers,
 		},
-		IPCPath:          makeIPCPath(config),
 		HTTPCors:         nil,
 		HTTPModules:      config.FormatAPIModules(),
 		HTTPVirtualHosts: []string{"localhost"},
+	}
+
+	if config.IPCEnabled {
+		// use well-known defaults
+		if config.IPCFile == "" {
+			config.IPCFile = "geth.ipc"
+		}
+
+		nc.IPCPath = config.IPCFile
 	}
 
 	if config.HTTPEnabled {
@@ -320,15 +327,6 @@ func activateShhService(stack *node.Node, config *params.NodeConfig, db *leveldb
 		svc := shhext.New(whisper, shhext.EnvelopeSignalHandler{}, db, config)
 		return svc, nil
 	})
-}
-
-// makeIPCPath returns IPC-RPC filename
-func makeIPCPath(config *params.NodeConfig) string {
-	if !config.IPCEnabled {
-		return ""
-	}
-
-	return path.Join(config.DataDir, config.IPCFile)
 }
 
 // parseNodes creates list of discover.Node out of enode strings.
