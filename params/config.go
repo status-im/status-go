@@ -212,6 +212,20 @@ type NodeConfig struct {
 	// HTTPPort is the TCP port number on which to start the Geth's HTTP RPC server.
 	HTTPPort int
 
+	// HTTPVirtualHosts is the list of virtual hostnames which are allowed on incoming requests.
+	// This is by default {'localhost'}. Using this prevents attacks like
+	// DNS rebinding, which bypasses SOP by simply masquerading as being within the same
+	// origin. These attacks do not utilize CORS, since they are not cross-domain.
+	// By explicitly checking the Host-header, the server will not allow requests
+	// made against the server with a malicious host domain.
+	// Requests using an IP address directly are not affected.
+	HTTPVirtualHosts []string
+
+	// HTTPCors is the Cross-Origin Resource Sharing header to send to requesting
+	// clients. Please be aware that CORS is a browser enforced security, it's fully
+	// useless for custom HTTP clients.
+	HTTPCors []string
+
 	// IPCEnabled specifies whether IPC-RPC Server is enabled or not
 	IPCEnabled bool
 
@@ -399,6 +413,7 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 		Version:               Version,
 		HTTPHost:              "localhost",
 		HTTPPort:              8545,
+		HTTPVirtualHosts:      []string{"localhost"},
 		ListenAddr:            ":0",
 		APIModules:            "eth,net,web3,peer",
 		MaxPeers:              25,

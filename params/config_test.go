@@ -353,6 +353,34 @@ func TestNodeConfigValidate(t *testing.T) {
 			}`,
 			Error: "PFSEnabled is true, but InstallationID is empty",
 		},
+		{
+			Name: "Default HTTP virtual hosts is localhost and CORS is empty",
+			Config: `{
+				"NetworkId": 1,
+				"DataDir": "/some/dir",
+				"KeyStoreDir": "/some/dir",
+				"BackupDisabledDataDir": "/some/dir"
+			}`,
+			CheckFunc: func(t *testing.T, config *params.NodeConfig) {
+				require.Equal(t, []string{"localhost"}, config.HTTPVirtualHosts)
+				require.Nil(t, config.HTTPCors)
+			},
+		},
+		{
+			Name: "Set HTTP virtual hosts and CORS",
+			Config: `{
+				"NetworkId": 1,
+				"DataDir": "/some/dir",
+				"KeyStoreDir": "/some/dir",
+				"BackupDisabledDataDir": "/some/dir",
+				"HTTPVirtualHosts": ["my.domain.com"],
+				"HTTPCors": ["http://my.domain.com:8080"]
+			}`,
+			CheckFunc: func(t *testing.T, config *params.NodeConfig) {
+				require.Equal(t, []string{"my.domain.com"}, config.HTTPVirtualHosts)
+				require.Equal(t, []string{"http://my.domain.com:8080"}, config.HTTPCors)
+			},
+		},
 	}
 
 	for _, tc := range testCases {

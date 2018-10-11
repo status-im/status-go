@@ -127,9 +127,7 @@ func newGethNodeConfig(config *params.NodeConfig) (*node.Config, error) {
 			MaxPeers:        config.MaxPeers,
 			MaxPendingPeers: config.MaxPendingPeers,
 		},
-		HTTPCors:         nil,
-		HTTPModules:      config.FormatAPIModules(),
-		HTTPVirtualHosts: []string{"localhost"},
+		HTTPModules: config.FormatAPIModules(),
 	}
 
 	if config.IPCEnabled {
@@ -144,6 +142,8 @@ func newGethNodeConfig(config *params.NodeConfig) (*node.Config, error) {
 	if config.HTTPEnabled {
 		nc.HTTPHost = config.HTTPHost
 		nc.HTTPPort = config.HTTPPort
+		nc.HTTPVirtualHosts = config.HTTPVirtualHosts
+		nc.HTTPCors = config.HTTPCors
 	}
 
 	if config.ClusterConfig.Enabled {

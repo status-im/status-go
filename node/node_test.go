@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/p2p/discover"
+	"github.com/status-im/status-go/params"
 	. "github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/require"
 	"github.com/syndtr/goleveldb/leveldb"
@@ -67,4 +68,17 @@ func TestParseNodesToNodeID(t *testing.T) {
 	})
 	require.Len(t, nodeIDs, 1)
 	require.Equal(t, discover.NodeID{1}, nodeIDs[0])
+}
+
+func TestNewGethNodeConfig(t *testing.T) {
+	config, err := params.NewNodeConfig("", params.RopstenNetworkID)
+	require.NoError(t, err)
+	config.HTTPEnabled = true
+	config.HTTPVirtualHosts = []string{"my.domain.com"}
+	config.HTTPCors = []string{"http://my.domain.com"}
+
+	nc, err := newGethNodeConfig(config)
+	require.NoError(t, err)
+	require.Equal(t, []string{"my.domain.com"}, nc.HTTPVirtualHosts)
+	require.Equal(t, []string{"http://my.domain.com"}, nc.HTTPCors)
 }
