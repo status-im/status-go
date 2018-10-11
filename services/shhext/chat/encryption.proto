@@ -48,7 +48,7 @@ message X3DHHeader {
   bytes key = 1;
   // Used bundle's signed prekey
   bytes id = 4;
-  // The device id
+  // DEPRECATED: The device id
   string installation_id = 3;
 }
 
@@ -66,9 +66,13 @@ message ProtocolMessage {
   // An optional bundle is exchanged with each message
   Bundle bundle = 1;
 
+  // The device id of the sender
+  string installation_id = 2;
+
   // One to one message, encrypted, indexed by installation_id
   map<string,DirectMessageProtocol> direct_message = 101;
 
   // Public chats, not encrypted
   bytes public_message = 102;
+
 }
