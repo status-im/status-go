@@ -455,20 +455,15 @@ func createBloomFilter(r MessagesRequest) []byte {
 }
 
 func topicsToBloom(topics ...whisper.TopicType) []byte {
-	combined := make([]byte, whisper.BloomFilterSize)
-
-	for _, t := range topics {
-		bloom := whisper.TopicToBloom(t)
-
-		i := new(big.Int).SetBytes(combined)
+	i := new(big.Int)
+	for _, topic := range topics {
+		bloom := whisper.TopicToBloom(topic)
 		i.Or(i, new(big.Int).SetBytes(bloom[:]))
-
-		data := i.Bytes()
-		newCombined := make([]byte, whisper.BloomFilterSize)
-		copy(newCombined[whisper.BloomFilterSize-len(data):], data[:])
-
-		combined = newCombined
 	}
+
+	combined := make([]byte, whisper.BloomFilterSize)
+	data := i.Bytes()
+	copy(combined[whisper.BloomFilterSize-len(data):], data[:])
 
 	return combined
 }
