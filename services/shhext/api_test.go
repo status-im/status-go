@@ -2,11 +2,9 @@ package shhext
 
 import (
 	"fmt"
-	"log"
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/crypto/sha3"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -95,13 +93,5 @@ func TestCreateBloomFilter(t *testing.T) {
 }
 
 func stringToTopic(s string) whisper.TopicType {
-	h := sha3.NewKeccak256()
-	_, err := h.Write([]byte(s))
-	if err != nil {
-		log.Fatal(err)
-	}
-	fullTopic := h.Sum(nil)
-	topic := whisper.BytesToTopic(fullTopic)
-
-	return topic
+	return whisper.BytesToTopic([]byte(s))
 }
