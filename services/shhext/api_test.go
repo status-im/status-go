@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	whisper "github.com/status-im/whisper/whisperv6"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -51,4 +53,45 @@ func TestMessagesRequest_setDefaults(t *testing.T) {
 			require.Equal(t, s.expected, s.given)
 		})
 	}
+}
+
+func TestTopicsToBloom(t *testing.T) {
+	t1 := stringToTopic("t1")
+	b1 := whisper.TopicToBloom(t1)
+	t2 := stringToTopic("t2")
+	b2 := whisper.TopicToBloom(t2)
+	t3 := stringToTopic("t3")
+	b3 := whisper.TopicToBloom(t3)
+
+	reqBloom := topicsToBloom(t1)
+	assert.True(t, whisper.BloomFilterMatch(reqBloom, b1))
+	assert.False(t, whisper.BloomFilterMatch(reqBloom, b2))
+	assert.False(t, whisper.BloomFilterMatch(reqBloom, b3))
+
+	reqBloom = topicsToBloom(t1, t2)
+	assert.True(t, whisper.BloomFilterMatch(reqBloom, b1))
+	assert.True(t, whisper.BloomFilterMatch(reqBloom, b2))
+	assert.False(t, whisper.BloomFilterMatch(reqBloom, b3))
+
+	reqBloom = topicsToBloom(t1, t2, t3)
+	assert.True(t, whisper.BloomFilterMatch(reqBloom, b1))
+	assert.True(t, whisper.BloomFilterMatch(reqBloom, b2))
+	assert.True(t, whisper.BloomFilterMatch(reqBloom, b3))
+}
+
+func TestCreateBloomFilter(t *testing.T) {
+	t1 := stringToTopic("t1")
+	t2 := stringToTopic("t2")
+
+	req := MessagesRequest{Topic: t1}
+	bloom := createBloomFilter(req)
+	assert.Equal(t, topicsToBloom(t1), bloom)
+
+	req = MessagesRequest{Topics: []whisper.TopicType{t1, t2}}
+	bloom = createBloomFilter(req)
+	assert.Equal(t, topicsToBloom(t1, t2), bloom)
+}
+
+func stringToTopic(s string) whisper.TopicType {
+	return whisper.BytesToTopic([]byte(s))
 }

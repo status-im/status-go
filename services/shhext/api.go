@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -63,7 +64,11 @@ type MessagesRequest struct {
 	Cursor string `json:"cursor"`
 
 	// Topic is a regular Whisper topic.
+	// DEPRECATED
 	Topic whisper.TopicType `json:"topic"`
+
+	// Topics is a list of Whisper topics.
+	Topics []whisper.TopicType `json:"topics"`
 
 	// SymKeyID is an ID of a symmetric key to authenticate to MailServer.
 	// It's derived from MailServer password.
@@ -427,7 +432,7 @@ func makePayload(r MessagesRequest) []byte {
 	// to
 	binary.BigEndian.PutUint32(data[4:], r.To)
 	// bloom
-	copy(data[8:], whisper.TopicToBloom(r.Topic))
+	copy(data[8:], createBloomFilter(r))
 	// limit
 	binary.BigEndian.PutUint32(data[8+whisper.BloomFilterSize:], r.Limit)
 
@@ -440,4 +445,26 @@ func makePayload(r MessagesRequest) []byte {
 	}
 
 	return append(data, cursorBytes...)
+}
+
+func createBloomFilter(r MessagesRequest) []byte {
+	if len(r.Topics) > 0 {
+		return topicsToBloom(r.Topics...)
+	}
+
+	return whisper.TopicToBloom(r.Topic)
+}
+
+func topicsToBloom(topics ...whisper.TopicType) []byte {
+	i := new(big.Int)
+	for _, topic := range topics {
+		bloom := whisper.TopicToBloom(topic)
+		i.Or(i, new(big.Int).SetBytes(bloom[:]))
+	}
+
+	combined := make([]byte, whisper.BloomFilterSize)
+	data := i.Bytes()
+	copy(combined[whisper.BloomFilterSize-len(data):], data[:])
+
+	return combined
 }
