@@ -64,6 +64,7 @@ type MessagesRequest struct {
 	Cursor string `json:"cursor"`
 
 	// Topic is a regular Whisper topic.
+	// DEPRECATED
 	Topic whisper.TopicType `json:"topic"`
 
 	// Topics is a list of Whisper topics.
