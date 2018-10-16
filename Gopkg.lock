@@ -88,7 +88,7 @@
   revision = "935e0e8a636ca4ba70b713f3e38a19e1b77739e8"
 
 [[projects]]
-  digest = "1:cf53a6be6cf3d947c0c7fb678237a7b34e06e4102411ecb843eedacb46759995"
+  digest = "1:1dc638d013f2a6f6ae13568584e8fee7e172cbf295e82064ded18bcf6d63c04c"
   name = "github.com/ethereum/go-ethereum"
   packages = [
     ".",
@@ -155,10 +155,9 @@
     "rlp",
     "rpc",
     "trie",
-    "whisper/whisperv6",
   ]
   pruneopts = "T"
-  revision = "56c2fa69e0224e8f939a092b3aba20b23bb95c26"
+  revision = "31f0afca344c53678e98032d6306e0e4ff7b9be1"
   source = "github.com/status-im/go-ethereum"
   version = "v1.8.16"
 
@@ -1102,7 +1101,6 @@
     "github.com/ethereum/go-ethereum/params",
     "github.com/ethereum/go-ethereum/rlp",
     "github.com/ethereum/go-ethereum/rpc",
-    "github.com/ethereum/go-ethereum/whisper/whisperv6",
     "github.com/golang/mock/gomock",
     "github.com/golang/protobuf/proto",
     "github.com/libp2p/go-libp2p-crypto",
