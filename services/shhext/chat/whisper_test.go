@@ -9,7 +9,7 @@ import (
 )
 
 func TestPublicMessageToWhisper(t *testing.T) {
-	rpcMessage := &SendPublicMessageRPC{
+	rpcMessage := SendPublicMessageRPC{
 		Chat: "test-chat",
 		Sig:  "test",
 	}
@@ -24,7 +24,7 @@ func TestPublicMessageToWhisper(t *testing.T) {
 }
 
 func TestDirectMessageToWhisper(t *testing.T) {
-	rpcMessage := &SendDirectMessageRPC{
+	rpcMessage := SendDirectMessageRPC{
 		PubKey: []byte("some pubkey"),
 		Sig:    "test",
 	}

@@ -42,10 +42,10 @@ type PersistenceService interface {
 	// AddRatchetInfo persists the specified ratchet info
 	AddRatchetInfo([]byte, []byte, []byte, []byte, string) error
 	// GetRatchetInfo retrieves the existing RatchetInfo for a specified bundle ID and interlocutor public key
-	GetRatchetInfo([]byte, []byte) (*RatchetInfo, error)
+	GetRatchetInfo([]byte, []byte, string) (*RatchetInfo, error)
 	// GetAnyRatchetInfo retrieves any existing RatchetInfo for a specified interlocutor public key
 	GetAnyRatchetInfo([]byte, string) (*RatchetInfo, error)
 	// RatchetInfoConfirmed clears the ephemeral key in the RatchetInfo
 	// associated with the specified bundle ID and interlocutor identity public key
-	RatchetInfoConfirmed([]byte, []byte) error
+	RatchetInfoConfirmed([]byte, []byte, string) error
 }

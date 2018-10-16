@@ -23,6 +23,9 @@ const (
 
 	// EventDecryptMessageFailed is triggered when we receive a message from a bundle we don't have
 	EventDecryptMessageFailed = "messages.decrypt.failed"
+
+	// EventBundleAdded is triggered when we receive a bundle
+	EventBundleAdded = "bundles.added"
 )
 
 // EnvelopeSignal includes hash of the envelope.
@@ -40,6 +43,12 @@ type MailServerResponseSignal struct {
 // DecryptMessageFailedSignal holds the sender of the message that could not be decrypted
 type DecryptMessageFailedSignal struct {
 	Sender string `json:"sender"`
+}
+
+// BundleAddedSignal holds the identity and installation id of the user
+type BundleAddedSignal struct {
+	Identity       string `json:"identity"`
+	InstallationID string `json:"installationID"`
 }
 
 // SendEnvelopeSent triggered when envelope delivered at least to 1 peer.
@@ -84,4 +93,8 @@ func SendEnodeDiscovered(enode, topic string) {
 
 func SendDecryptMessageFailed(sender string) {
 	send(EventDecryptMessageFailed, DecryptMessageFailedSignal{sender})
+}
+
+func SendBundleAdded(identity string, installationID string) {
+	send(EventBundleAdded, BundleAddedSignal{Identity: identity, InstallationID: installationID})
 }

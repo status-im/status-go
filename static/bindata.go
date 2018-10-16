@@ -88,7 +88,7 @@ func ConfigCliFleetEthBetaJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "../config/cli/fleet-eth.beta.json", size: 3237, mode: os.FileMode(420), modTime: time.Unix(1537450683, 0)}
+	info := bindataFileInfo{name: "../config/cli/fleet-eth.beta.json", size: 3237, mode: os.FileMode(420), modTime: time.Unix(1537514234, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -108,7 +108,7 @@ func ConfigCliFleetEthStagingJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "../config/cli/fleet-eth.staging.json", size: 1838, mode: os.FileMode(420), modTime: time.Unix(1537450683, 0)}
+	info := bindataFileInfo{name: "../config/cli/fleet-eth.staging.json", size: 1838, mode: os.FileMode(420), modTime: time.Unix(1537514234, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -128,7 +128,7 @@ func ConfigCliFleetEthTestJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "../config/cli/fleet-eth.test.json", size: 1519, mode: os.FileMode(420), modTime: time.Unix(1537450683, 0)}
+	info := bindataFileInfo{name: "../config/cli/fleet-eth.test.json", size: 1519, mode: os.FileMode(420), modTime: time.Unix(1537514234, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -148,12 +148,12 @@ func ConfigCliLesEnabledJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "../config/cli/les-enabled.json", size: 58, mode: os.FileMode(420), modTime: time.Unix(1537450683, 0)}
+	info := bindataFileInfo{name: "../config/cli/les-enabled.json", size: 58, mode: os.FileMode(420), modTime: time.Unix(1536858252, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _ConfigCliMailserverEnabledJson = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\xaa\xe6\x52\x50\x50\x50\x50\x0a\xcf\xc8\x2c\x2e\x48\x2d\x72\xce\xcf\x4b\xcb\x4c\x57\xb2\x52\x80\x08\x83\xa5\x5c\xf3\x12\x93\x72\x52\x7d\x13\x33\x73\x82\x53\x8b\xca\x52\x8b\x94\xac\x14\x4a\x8a\x4a\x53\x75\x10\x2a\x10\x72\x01\x89\xc5\xc5\xe5\xf9\x45\x29\x4a\x56\x0a\x4a\xc5\x25\x89\x25\xa5\xc5\xba\xf9\x69\x69\x39\x99\x79\xa9\xba\x99\x79\x49\xf9\x15\x4a\x60\x4d\xb5\x5c\xb5\x5c\x80\x00\x00\x00\xff\xff\x84\xf6\x09\xc4\x78\x00\x00\x00")
+var _ConfigCliMailserverEnabledJson = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\xaa\xe6\x52\x50\x50\x50\x50\x0a\xcf\xc8\x2c\x2e\x48\x2d\x72\xce\xcf\x4b\xcb\x4c\x57\xb2\x52\x80\x08\x83\xa5\x5c\xf3\x12\x93\x72\x52\x53\x94\xac\x14\x4a\x8a\x4a\x53\x75\xd0\x25\xfc\x42\x02\x82\x2b\xf3\x92\x71\x49\xfb\x26\x66\xe6\x04\xa7\x16\x95\xa5\x16\x61\xaa\x40\xc8\x05\x24\x16\x17\x97\xe7\x17\x81\x2c\x51\x2a\x2e\x49\x2c\x29\x2d\xd6\xcd\x4f\x4b\xcb\xc9\xcc\x4b\xd5\xcd\xcc\x4b\xca\xaf\x50\x02\x6b\xaa\xe5\xaa\xe5\x02\x04\x00\x00\xff\xff\x7c\x73\xee\xbb\xb0\x00\x00\x00")
 
 func ConfigCliMailserverEnabledJsonBytes() ([]byte, error) {
 	return bindataRead(
@@ -168,7 +168,7 @@ func ConfigCliMailserverEnabledJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "../config/cli/mailserver-enabled.json", size: 120, mode: os.FileMode(420), modTime: time.Unix(1537450683, 0)}
+	info := bindataFileInfo{name: "../config/cli/mailserver-enabled.json", size: 176, mode: os.FileMode(420), modTime: time.Unix(1538032850, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -188,7 +188,7 @@ func ConfigStatusChainGenesisJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "../config/status-chain-genesis.json", size: 612, mode: os.FileMode(420), modTime: time.Unix(1537450683, 0)}
+	info := bindataFileInfo{name: "../config/status-chain-genesis.json", size: 612, mode: os.FileMode(420), modTime: time.Unix(1536858252, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }

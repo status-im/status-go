@@ -183,7 +183,7 @@ func (s *SQLLitePersistence) AddPublicBundle(b *Bundle) error {
 
 // GetAnyPrivateBundle retrieves any bundle from the database containing a private key
 func (s *SQLLitePersistence) GetAnyPrivateBundle(myIdentityKey []byte) (*BundleContainer, error) {
-	stmt, err := s.db.Prepare("SELECT identity, signed_pre_key, installation_id, timestamp FROM bundles WHERE identity = ? AND expired = 0")
+	stmt, err := s.db.Prepare("SELECT identity, private_key, signed_pre_key, installation_id, timestamp FROM bundles WHERE identity = ? AND expired = 0")
 	if err != nil {
 		return nil, err
 	}
@@ -191,6 +191,7 @@ func (s *SQLLitePersistence) GetAnyPrivateBundle(myIdentityKey []byte) (*BundleC
 
 	var timestamp int64
 	var identity []byte
+	var privateKey []byte
 
 	rows, err := stmt.Query(myIdentityKey)
 	rowCount := 0
@@ -205,12 +206,17 @@ func (s *SQLLitePersistence) GetAnyPrivateBundle(myIdentityKey []byte) (*BundleC
 		SignedPreKeys: make(map[string]*SignedPreKey),
 	}
 
+	bundleContainer := &BundleContainer{
+		Bundle: bundle,
+	}
+
 	for rows.Next() {
 		var signedPreKey []byte
 		var installationID string
 		rowCount++
 		err = rows.Scan(
 			&identity,
+			&privateKey,
 			&signedPreKey,
 			&installationID,
 			&timestamp,
@@ -218,18 +224,21 @@ func (s *SQLLitePersistence) GetAnyPrivateBundle(myIdentityKey []byte) (*BundleC
 		if err != nil {
 			return nil, err
 		}
+		// If there is a private key, we set the timestamp of the bundle container
+		if privateKey != nil {
+			bundleContainer.Timestamp = timestamp
+		}
 
 		bundle.SignedPreKeys[installationID] = &SignedPreKey{SignedPreKey: signedPreKey}
 		bundle.Identity = identity
 	}
 
-	if rowCount == 0 {
+	// If no records are found or no record with private key, return nil
+	if rowCount == 0 || bundleContainer.Timestamp == 0 {
 		return nil, nil
 	}
-	return &BundleContainer{
-		Bundle:    bundle,
-		Timestamp: timestamp,
-	}, nil
+
+	return bundleContainer, nil
 
 }
 
@@ -318,7 +327,7 @@ func (s *SQLLitePersistence) GetPublicBundle(publicKey *ecdsa.PublicKey) (*Bundl
 
 // AddRatchetInfo persists the specified ratchet info into the database
 func (s *SQLLitePersistence) AddRatchetInfo(key []byte, identity []byte, bundleID []byte, ephemeralKey []byte, installationID string) error {
-	stmt, err := s.db.Prepare("INSERT INTO ratchet_info(symmetric_key, identity, bundle_id, ephemeral_key, installation_id) VALUES(?, ?, ?, ?, ?)")
+	stmt, err := s.db.Prepare("INSERT INTO ratchet_info_v2(symmetric_key, identity, bundle_id, ephemeral_key, installation_id) VALUES(?, ?, ?, ?, ?)")
 	if err != nil {
 		return err
 	}
@@ -336,8 +345,8 @@ func (s *SQLLitePersistence) AddRatchetInfo(key []byte, identity []byte, bundleI
 }
 
 // GetRatchetInfo retrieves the existing RatchetInfo for a specified bundle ID and interlocutor public key from the database
-func (s *SQLLitePersistence) GetRatchetInfo(bundleID []byte, theirIdentity []byte) (*RatchetInfo, error) {
-	stmt, err := s.db.Prepare("SELECT ratchet_info.identity, ratchet_info.symmetric_key, bundles.private_key, bundles.signed_pre_key, ratchet_info.ephemeral_key, ratchet_info.installation_id FROM ratchet_info JOIN bundles ON bundle_id = signed_pre_key WHERE ratchet_info.identity = ? AND bundle_id = ? LIMIT 1")
+func (s *SQLLitePersistence) GetRatchetInfo(bundleID []byte, theirIdentity []byte, installationID string) (*RatchetInfo, error) {
+	stmt, err := s.db.Prepare("SELECT ratchet_info_v2.identity, ratchet_info_v2.symmetric_key, bundles.private_key, bundles.signed_pre_key, ratchet_info_v2.ephemeral_key, ratchet_info_v2.installation_id FROM ratchet_info_v2 JOIN bundles ON bundle_id = signed_pre_key WHERE ratchet_info_v2.identity = ? AND ratchet_info_v2.installation_id = ? AND bundle_id = ? LIMIT 1")
 	if err != nil {
 		return nil, err
 	}
@@ -347,7 +356,7 @@ func (s *SQLLitePersistence) GetRatchetInfo(bundleID []byte, theirIdentity []byt
 		BundleID: bundleID,
 	}
 
-	err = stmt.QueryRow(theirIdentity, bundleID).Scan(
+	err = stmt.QueryRow(theirIdentity, installationID, bundleID).Scan(
 		&ratchetInfo.Identity,
 		&ratchetInfo.Sk,
 		&ratchetInfo.PrivateKey,
@@ -368,7 +377,7 @@ func (s *SQLLitePersistence) GetRatchetInfo(bundleID []byte, theirIdentity []byt
 
 // GetAnyRatchetInfo retrieves any existing RatchetInfo for a specified interlocutor public key from the database
 func (s *SQLLitePersistence) GetAnyRatchetInfo(identity []byte, installationID string) (*RatchetInfo, error) {
-	stmt, err := s.db.Prepare("SELECT symmetric_key, bundles.private_key, signed_pre_key, bundle_id, ephemeral_key FROM ratchet_info JOIN bundles ON bundle_id = signed_pre_key WHERE expired = 0 AND ratchet_info.identity = ? AND ratchet_info.installation_id = ? LIMIT 1")
+	stmt, err := s.db.Prepare("SELECT symmetric_key, bundles.private_key, signed_pre_key, bundle_id, ephemeral_key FROM ratchet_info_v2 JOIN bundles ON bundle_id = signed_pre_key WHERE expired = 0 AND ratchet_info_v2.identity = ? AND ratchet_info_v2.installation_id = ? LIMIT 1")
 	if err != nil {
 		return nil, err
 	}
@@ -399,8 +408,8 @@ func (s *SQLLitePersistence) GetAnyRatchetInfo(identity []byte, installationID s
 
 // RatchetInfoConfirmed clears the ephemeral key in the RatchetInfo
 // associated with the specified bundle ID and interlocutor identity public key
-func (s *SQLLitePersistence) RatchetInfoConfirmed(bundleID []byte, theirIdentity []byte) error {
-	stmt, err := s.db.Prepare("UPDATE ratchet_info SET ephemeral_key = NULL WHERE identity = ? AND bundle_id = ?")
+func (s *SQLLitePersistence) RatchetInfoConfirmed(bundleID []byte, theirIdentity []byte, installationID string) error {
+	stmt, err := s.db.Prepare("UPDATE ratchet_info_v2 SET ephemeral_key = NULL WHERE identity = ? AND bundle_id = ? AND installation_id = ?")
 	if err != nil {
 		return err
 	}
@@ -409,6 +418,7 @@ func (s *SQLLitePersistence) RatchetInfoConfirmed(bundleID []byte, theirIdentity
 	_, err = stmt.Exec(
 		theirIdentity,
 		bundleID,
+		installationID,
 	)
 
 	return err
