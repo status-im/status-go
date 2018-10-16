@@ -1,7 +1,6 @@
 package chat
 
 import (
-	"crypto/ecdsa"
 	"os"
 	"testing"
 
