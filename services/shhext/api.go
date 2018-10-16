@@ -260,9 +260,8 @@ func (api *PublicAPI) SendDirectMessage(ctx context.Context, msg chat.SendDirect
 		return nil, err
 	}
 
-	keys := []*ecdsa.PublicKey{publicKey}
 	// This is transport layer-agnostic
-	protocolMessages, err := api.service.protocol.BuildDirectMessage(privateKey, keys, msg.Payload)
+	protocolMessages, err := api.service.protocol.BuildDirectMessage(privateKey, msg.Payload, publicKey)
 	if err != nil {
 		return nil, err
 	}
@@ -344,7 +343,7 @@ func (api *PublicAPI) SendGroupMessage(ctx context.Context, msg chat.SendGroupMe
 	}
 
 	// This is transport layer-agnostic
-	protocolMessages, err := api.service.protocol.BuildDirectMessage(privateKey, keys, msg.Payload)
+	protocolMessages, err := api.service.protocol.BuildDirectMessage(privateKey, msg.Payload, keys...)
 	if err != nil {
 		return nil, err
 	}

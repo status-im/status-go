@@ -59,9 +59,10 @@ func (p *ProtocolService) BuildPublicMessage(myIdentityKey *ecdsa.PrivateKey, pa
 }
 
 // BuildDirectMessage marshals a 1:1 chat message given the user identity private key, the recipient's public key, and a payload
-func (p *ProtocolService) BuildDirectMessage(myIdentityKey *ecdsa.PrivateKey, theirPublicKeys []*ecdsa.PublicKey, payload []byte) (map[*ecdsa.PublicKey][]byte, error) {
+func (p *ProtocolService) BuildDirectMessage(myIdentityKey *ecdsa.PrivateKey, payload []byte, theirPublicKeys ...*ecdsa.PublicKey) (map[*ecdsa.PublicKey][]byte, error) {
 	response := make(map[*ecdsa.PublicKey][]byte)
-	for _, publicKey := range append(theirPublicKeys, &myIdentityKey.PublicKey) {
+	publicKeys := append(theirPublicKeys, &myIdentityKey.PublicKey)
+	for _, publicKey := range publicKeys {
 		// Encrypt payload
 		encryptionResponse, err := p.encryption.EncryptPayload(publicKey, myIdentityKey, payload)
 		if err != nil {

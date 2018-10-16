@@ -1,7 +1,6 @@
 package chat
 
 import (
-	"crypto/ecdsa"
 	"os"
 	"testing"
 
@@ -57,8 +56,7 @@ func (s *ProtocolServiceTestSuite) TestBuildDirectMessage() {
 	})
 	s.NoError(err)
 
-	keys := []*ecdsa.PublicKey{&bobKey.PublicKey}
-	marshaledMsg, err := s.alice.BuildDirectMessage(aliceKey, keys, payload)
+	marshaledMsg, err := s.alice.BuildDirectMessage(aliceKey, payload, &bobKey.PublicKey)
 
 	s.NoError(err)
 	s.NotNil(marshaledMsg, "It creates a message")
@@ -98,10 +96,8 @@ func (s *ProtocolServiceTestSuite) TestBuildAndReadDirectMessage() {
 	marshaledPayload, err := proto.Marshal(&payload)
 	s.NoError(err)
 
-	keys := []*ecdsa.PublicKey{&bobKey.PublicKey}
-
 	// Message is sent with DH
-	marshaledMsg, err := s.alice.BuildDirectMessage(aliceKey, keys, marshaledPayload)
+	marshaledMsg, err := s.alice.BuildDirectMessage(aliceKey, marshaledPayload, &bobKey.PublicKey)
 
 	s.NoError(err)
 
