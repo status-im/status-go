@@ -2,7 +2,8 @@ package rpcfilters
 
 import (
 	"context"
-	"errors"
+	"fmt"
+	"math/big"
 	"sync"
 	"time"
 
@@ -13,13 +14,13 @@ import (
 )
 
 type logsFilter struct {
-	mu                  sync.Mutex
-	logs                []types.Log
-	lastSeenBlockNumber uint64
-	lastSeenBlockHash   common.Hash
+	mu   sync.RWMutex
+	logs []types.Log
+	crit ethereum.FilterQuery
+
+	logsCache *cache
 
 	id    rpc.ID
-	crit  ethereum.FilterQuery
 	timer *time.Timer
 
 	ctx    context.Context
@@ -27,17 +28,43 @@ type logsFilter struct {
 	done   chan struct{}
 }
 
+func (f *logsFilter) criteria() ethereum.FilterQuery {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+	return f.crit
+}
+
 func (f *logsFilter) add(data interface{}) error {
 	logs, ok := data.([]types.Log)
 	if !ok {
-		return errors.New("provided value is not a []types.Log")
+		return fmt.Errorf("can't cast %v to types.Log", data)
 	}
-	filtered, num, hash := filterLogs(logs, f.crit, f.lastSeenBlockNumber, f.lastSeenBlockHash)
-	f.mu.Lock()
-	f.lastSeenBlockNumber = num
-	f.lastSeenBlockHash = hash
-	f.logs = append(f.logs, filtered...)
-	f.mu.Unlock()
+	filtered := filterLogs(logs, f.crit)
+	if len(filtered) > 0 {
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		added, replaced, err := f.logsCache.add(filtered)
+		if err != nil {
+			return err
+		}
+		for _, log := range replaced {
+			log.Removed = true
+			f.logs = append(f.logs, log)
+		}
+		if len(added) > 0 {
+			f.logs = append(f.logs, added...)
+		}
+		// if there was no replaced logs - keep polling only latest logs
+		if len(replaced) == 0 {
+			adjustFromBlock(&f.crit)
+		} else {
+			// otherwise poll earliest known block in cache
+			earliest := f.logsCache.earliestBlockNum()
+			if earliest != 0 {
+				f.crit.FromBlock = new(big.Int).SetUint64(earliest)
+			}
+		}
+	}
 	return nil
 }
 
@@ -65,6 +92,20 @@ func (f *logsFilter) deadline() *time.Timer {
 	return f.timer
 }
 
+// adjustFromBlock adjusts crit.FromBlock to latest to avoid querying same logs.
+func adjustFromBlock(crit *ethereum.FilterQuery) {
+	latest := big.NewInt(rpc.LatestBlockNumber.Int64())
+	// don't adjust if filter is not interested in newer blocks
+	if crit.ToBlock != nil && crit.ToBlock.Cmp(latest) == 1 {
+		return
+	}
+	// don't adjust if from block is already pending
+	if crit.FromBlock != nil && crit.FromBlock.Cmp(latest) == -1 {
+		return
+	}
+	crit.FromBlock = latest
+}
+
 func includes(addresses []common.Address, a common.Address) bool {
 	for _, addr := range addresses {
 		if addr == a {
@@ -75,31 +116,17 @@ func includes(addresses []common.Address, a common.Address) bool {
 }
 
 // filterLogs creates a slice of logs matching the given criteria.
-func filterLogs(logs []types.Log, crit ethereum.FilterQuery, blockNum uint64, blockHash common.Hash) (
-	ret []types.Log, num uint64, hash common.Hash) {
-	num = blockNum
-	hash = blockHash
+func filterLogs(logs []types.Log, crit ethereum.FilterQuery) (
+	ret []types.Log) {
 	for _, log := range logs {
-		// skip logs from seen blocks
-		// find highest block number that we didnt see before
-		if log.BlockNumber >= num {
-			num = log.BlockNumber
-			hash = log.BlockHash
-		}
-		if matchLog(log, crit, blockNum, blockHash) {
+		if matchLog(log, crit) {
 			ret = append(ret, log)
 		}
 	}
 	return
 }
 
-func matchLog(log types.Log, crit ethereum.FilterQuery, blockNum uint64, blockHash common.Hash) bool {
-	// skip logs from seen blocks
-	if log.BlockNumber < blockNum {
-		return false
-	} else if log.BlockNumber == blockNum && log.BlockHash == blockHash {
-		return false
-	}
+func matchLog(log types.Log, crit ethereum.FilterQuery) bool {
 	if crit.FromBlock != nil && crit.FromBlock.Int64() >= 0 && crit.FromBlock.Uint64() > log.BlockNumber {
 		return false
 	}

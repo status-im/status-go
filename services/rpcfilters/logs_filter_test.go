@@ -33,93 +33,90 @@ func TestFilterLogs(t *testing.T) {
 	}
 
 	type testCase struct {
-		description string
-
-		blockNum  uint64
-		blockHash common.Hash
-		crit      ethereum.FilterQuery
-
-		expectedLogs  []types.Log
-		expectedBlock uint64
-		expectedHash  common.Hash
+		description  string
+		crit         ethereum.FilterQuery
+		expectedLogs []types.Log
 	}
 
 	for _, tc := range []testCase{
 		{
-			description:   "All",
-			crit:          ethereum.FilterQuery{},
-			expectedLogs:  []types.Log{logs[0], logs[1]},
-			expectedBlock: logs[1].BlockNumber,
-			expectedHash:  logs[1].BlockHash,
+			description:  "All",
+			crit:         ethereum.FilterQuery{},
+			expectedLogs: []types.Log{logs[0], logs[1]},
 		},
 		{
-			description:   "LimitedByBlock",
-			crit:          ethereum.FilterQuery{ToBlock: big.NewInt(1)},
-			expectedLogs:  []types.Log{logs[0]},
-			expectedBlock: logs[1].BlockNumber,
-			expectedHash:  logs[1].BlockHash,
+			description:  "LimitedByBlock",
+			crit:         ethereum.FilterQuery{ToBlock: big.NewInt(1)},
+			expectedLogs: []types.Log{logs[0]},
 		},
 		{
-			description:   "LimitedByAddress",
-			crit:          ethereum.FilterQuery{Addresses: []common.Address{logs[1].Address}},
-			expectedLogs:  []types.Log{logs[1]},
-			expectedBlock: logs[1].BlockNumber,
-			expectedHash:  logs[1].BlockHash,
+			description:  "LimitedByAddress",
+			crit:         ethereum.FilterQuery{Addresses: []common.Address{logs[1].Address}},
+			expectedLogs: []types.Log{logs[1]},
 		},
 		{
-			description:   "LimitedByAddress",
-			crit:          ethereum.FilterQuery{Addresses: []common.Address{logs[1].Address}},
-			expectedLogs:  []types.Log{logs[1]},
-			expectedBlock: logs[1].BlockNumber,
-			expectedHash:  logs[1].BlockHash,
+			description:  "LimitedByAddress",
+			crit:         ethereum.FilterQuery{Addresses: []common.Address{logs[1].Address}},
+			expectedLogs: []types.Log{logs[1]},
 		},
 		{
-			description:   "MoreTopicsThanInLogs",
-			crit:          ethereum.FilterQuery{Topics: make([][]common.Hash, 3)},
-			expectedBlock: logs[1].BlockNumber,
-			expectedHash:  logs[1].BlockHash,
+			description: "MoreTopicsThanInLogs",
+			crit:        ethereum.FilterQuery{Topics: make([][]common.Hash, 3)},
 		},
 		{
-			description:   "Wildcard",
-			crit:          ethereum.FilterQuery{Topics: make([][]common.Hash, 1)},
-			expectedLogs:  []types.Log{logs[0], logs[1]},
-			expectedBlock: logs[1].BlockNumber,
-			expectedHash:  logs[1].BlockHash,
+			description:  "Wildcard",
+			crit:         ethereum.FilterQuery{Topics: make([][]common.Hash, 1)},
+			expectedLogs: []types.Log{logs[0], logs[1]},
 		},
 		{
-			description: "LimitedBySecondTopic",
-			crit: ethereum.FilterQuery{Topics: [][]common.Hash{
-				{}, logs[1].Topics}},
-			expectedLogs:  []types.Log{logs[1]},
-			expectedBlock: logs[1].BlockNumber,
-			expectedHash:  logs[1].BlockHash,
-		},
-		{
-			blockNum:      logs[1].BlockNumber,
-			blockHash:     logs[1].BlockHash,
-			description:   "LimitedBySeenBlock",
-			crit:          ethereum.FilterQuery{},
-			expectedBlock: logs[1].BlockNumber,
-			expectedHash:  logs[1].BlockHash,
-		},
-		{
-			blockNum:      logs[1].BlockNumber,
-			blockHash:     common.Hash{7, 7, 7},
-			description:   "SeenBlockDifferenthash",
-			crit:          ethereum.FilterQuery{},
-			expectedLogs:  []types.Log{logs[1]},
-			expectedBlock: logs[1].BlockNumber,
-			expectedHash:  logs[1].BlockHash,
+			description:  "LimitedBySecondTopic",
+			crit:         ethereum.FilterQuery{Topics: [][]common.Hash{{}, logs[1].Topics}},
+			expectedLogs: []types.Log{logs[1]},
 		},
 	} {
 		tc := tc
 		t.Run(tc.description, func(t *testing.T) {
 			t.Parallel()
-			rst, num, hash := filterLogs(logs, tc.crit, tc.blockNum, tc.blockHash)
+			rst := filterLogs(logs, tc.crit)
 			require.Equal(t, tc.expectedLogs, rst)
-			require.Equal(t, tc.expectedBlock, num)
-			require.Equal(t, tc.expectedHash, hash)
 		})
 	}
+}
 
+func TestAdjustFromBlock(t *testing.T) {
+	type testCase struct {
+		description string
+		initial     ethereum.FilterQuery
+		result      ethereum.FilterQuery
+	}
+
+	for _, tc := range []testCase{
+		{
+			"ToBlockHigherThenLatest",
+			ethereum.FilterQuery{ToBlock: big.NewInt(10)},
+			ethereum.FilterQuery{ToBlock: big.NewInt(10)},
+		},
+		{
+			"FromBlockIsPending",
+			ethereum.FilterQuery{FromBlock: big.NewInt(-2)},
+			ethereum.FilterQuery{FromBlock: big.NewInt(-2)},
+		},
+		{
+			"FromBlockIsOlderThenLatest",
+			ethereum.FilterQuery{FromBlock: big.NewInt(10)},
+			ethereum.FilterQuery{FromBlock: big.NewInt(-1)},
+		},
+		{
+			"NotInterestedInLatestBlocks",
+			ethereum.FilterQuery{FromBlock: big.NewInt(10), ToBlock: big.NewInt(15)},
+			ethereum.FilterQuery{FromBlock: big.NewInt(10), ToBlock: big.NewInt(15)},
+		},
+	} {
+		tc := tc
+		t.Run(tc.description, func(t *testing.T) {
+			t.Parallel()
+			adjustFromBlock(&tc.initial)
+			require.Equal(t, tc.result, tc.initial)
+		})
+	}
 }
