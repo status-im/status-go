@@ -3,12 +3,13 @@ package shhext
 import (
 	"context"
 	"crypto/ecdsa"
-	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
 	"time"
+
+	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -80,6 +81,11 @@ type MessagesRequest struct {
 	// Timeout is the time to live of the request specified in seconds.
 	// Default is 10 seconds
 	Timeout time.Duration `json:"timeout"`
+
+	// Batch set to true indicates that the client supports batched response
+	// from the Mail Server. It means that the Mail Server can send envelopes
+	// in batches instead of one-by-one.
+	Batch bool
 }
 
 func (r *MessagesRequest) setDefaults(now time.Time) {
@@ -100,6 +106,22 @@ func (r *MessagesRequest) setDefaults(now time.Time) {
 	if r.Timeout == 0 {
 		r.Timeout = defaultRequestTimeout
 	}
+}
+
+// MessagesRequestPayload is a payload sent to the Mail Server.
+type MessagesRequestPayload struct {
+	// Lower is a lower bound of time range for which messages are requested.
+	Lower uint32
+	// Upper is a lower bound of time range for which messages are requested.
+	Upper uint32
+	// Bloom is a bloom filter to filter envelopes.
+	Bloom []byte
+	// Limit is the max number of envelopes to return.
+	Limit uint32
+	// Cursor is used for pagination of the results.
+	Cursor []byte
+	// Batch set to true indicates that the client supports batched response.
+	Batch bool
 }
 
 // -----
@@ -168,8 +190,13 @@ func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (hex
 		}
 	}
 
+	payload, err := makePayload(r)
+	if err != nil {
+		return nil, err
+	}
+
 	envelope, err := makeEnvelop(
-		makePayload(r),
+		payload,
 		symKey,
 		publicKey,
 		api.service.nodeID,
@@ -418,33 +445,23 @@ func makeEnvelop(
 }
 
 // makePayload makes a specific payload for MailServer to request historic messages.
-func makePayload(r MessagesRequest) []byte {
-	// Payload format:
-	// 4  bytes for lower
-	// 4  bytes for upper
-	// 64 bytes for the bloom filter
-	// 4  bytes for limit
-	// 36 bytes for the cursor. optional.
-	data := make([]byte, 12+whisper.BloomFilterSize)
-
-	// from
-	binary.BigEndian.PutUint32(data, r.From)
-	// to
-	binary.BigEndian.PutUint32(data[4:], r.To)
-	// bloom
-	copy(data[8:], createBloomFilter(r))
-	// limit
-	binary.BigEndian.PutUint32(data[8+whisper.BloomFilterSize:], r.Limit)
-
-	// cursor is the key of an envelope in leveldb.
-	// it's 36 bytes. 4 bytes for the timestamp + 32 bytes for the envelope hash
+func makePayload(r MessagesRequest) ([]byte, error) {
 	expectedCursorSize := common.HashLength + 4
-	cursorBytes, err := hex.DecodeString(r.Cursor)
-	if err != nil || len(cursorBytes) != expectedCursorSize {
-		return data
+	cursor, err := hex.DecodeString(r.Cursor)
+	if err != nil || len(cursor) != expectedCursorSize {
+		cursor = nil
 	}
 
-	return append(data, cursorBytes...)
+	payload := MessagesRequestPayload{
+		Lower:  r.From,
+		Upper:  r.To,
+		Bloom:  createBloomFilter(r),
+		Limit:  r.Limit,
+		Cursor: cursor,
+		Batch:  r.Batch,
+	}
+
+	return rlp.EncodeToBytes(payload)
 }
 
 func createBloomFilter(r MessagesRequest) []byte {

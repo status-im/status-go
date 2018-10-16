@@ -155,7 +155,6 @@
     "rlp",
     "rpc",
     "trie",
-    "whisper/whisperv6",
   ]
   pruneopts = "T"
   revision = "56c2fa69e0224e8f939a092b3aba20b23bb95c26"
@@ -822,12 +821,12 @@
   revision = "55370cdfd9f288059b03c04e23784bb8829a894c"
 
 [[projects]]
-  branch = "master"
-  digest = "1:a2075e4e314cff4aadaf3ffe18b77659d259b1a46be9d2bdb0d5b9f8222f420c"
+  digest = "1:6c0c1b4f558efb74c466066cab8524bcc9b6fdd61f7ebfb126a3ce42f9b4453f"
   name = "github.com/status-im/whisper"
   packages = ["whisperv6"]
   pruneopts = "NUT"
-  revision = "f41584950703450b0370e85560ba8d9322794ead"
+  revision = "ca91ec35f6df325bfaf66053422ae0d207becdff"
+  version = "v1.1.0"
 
 [[projects]]
   digest = "1:572c783a763db6383aca3179976eb80e4c900f52eba56cba8bb2e3cea7ce720e"
@@ -1102,7 +1101,6 @@
     "github.com/ethereum/go-ethereum/params",
     "github.com/ethereum/go-ethereum/rlp",
     "github.com/ethereum/go-ethereum/rpc",
-    "github.com/ethereum/go-ethereum/whisper/whisperv6",
     "github.com/golang/mock/gomock",
     "github.com/golang/protobuf/proto",
     "github.com/libp2p/go-libp2p-crypto",

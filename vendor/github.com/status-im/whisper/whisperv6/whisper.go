@@ -21,6 +21,8 @@ import (
 	"crypto/ecdsa"
 	"crypto/sha256"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"math"
 	"runtime"
 	"sync"
@@ -418,17 +420,23 @@ func (whisper *Whisper) SendHistoricMessageResponse(peer *Peer, payload []byte) 
 }
 
 // SendP2PMessage sends a peer-to-peer message to a specific peer.
-func (whisper *Whisper) SendP2PMessage(peerID []byte, envelope *Envelope) error {
+func (whisper *Whisper) SendP2PMessage(peerID []byte, envelopes ...*Envelope) error {
 	p, err := whisper.getPeer(peerID)
 	if err != nil {
 		return err
 	}
-	return whisper.SendP2PDirect(p, envelope)
+	return whisper.SendP2PDirect(p, envelopes...)
 }
 
 // SendP2PDirect sends a peer-to-peer message to a specific peer.
-func (whisper *Whisper) SendP2PDirect(peer *Peer, envelope *Envelope) error {
-	return p2p.Send(peer.ws, p2pMessageCode, envelope)
+// If only a single envelope is given, data is sent as a single object
+// rather than a slice. This is important to keep this method backward compatible
+// as it used to send only single envelopes.
+func (whisper *Whisper) SendP2PDirect(peer *Peer, envelopes ...*Envelope) error {
+	if len(envelopes) == 1 {
+		return p2p.Send(peer.ws, p2pMessageCode, envelopes[0])
+	}
+	return p2p.Send(peer.ws, p2pMessageCode, envelopes)
 }
 
 // NewKeyPair generates a new cryptographic identity for the client, and injects
@@ -843,12 +851,46 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 			// therefore might not satisfy the PoW, expiry and other requirements.
 			// these messages are only accepted from the trusted peer.
 			if p.trusted {
-				var envelope Envelope
-				if err := packet.Decode(&envelope); err != nil {
-					log.Warn("failed to decode direct message, peer will be disconnected", "peer", p.peer.ID(), "err", err)
-					return errors.New("invalid direct message")
+				var (
+					envelope  *Envelope
+					envelopes []*Envelope
+					err       error
+				)
+
+				// Read all data as we will try to decode it possibly twice
+				// to keep backward compatibility.
+				data, err := ioutil.ReadAll(packet.Payload)
+				if err != nil {
+					return fmt.Errorf("invalid direct messages: %v", err)
 				}
-				whisper.postEvent(&envelope, true)
+				r := bytes.NewReader(data)
+
+				packet.Payload = r
+
+				if err = packet.Decode(&envelopes); err == nil {
+					for _, envelope := range envelopes {
+						whisper.postEvent(envelope, true)
+					}
+					continue
+				}
+
+				// As we failed to decode envelopes, let's set the offset
+				// to the beginning and try decode data again.
+				// Decoding to a single Envelope is required
+				// to be backward compatible.
+				if _, err := r.Seek(0, io.SeekStart); err != nil {
+					return fmt.Errorf("invalid direct messages: %v", err)
+				}
+
+				if err = packet.Decode(&envelope); err == nil {
+					whisper.postEvent(envelope, true)
+					continue
+				}
+
+				if err != nil {
+					log.Warn("failed to decode direct message, peer will be disconnected", "peer", p.peer.ID(), "err", err)
+					return fmt.Errorf("invalid direct message: %v", err)
+				}
 			}
 		case p2pRequestCode:
 			// Must be processed if mail server is implemented. Otherwise ignore.
