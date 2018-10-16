@@ -73,6 +73,16 @@ func TestMakeRecordReturnsCachedRecord(t *testing.T) {
 	require.Equal(t, record.NodeAddr(), rst.NodeAddr())
 }
 
+func TestRendezvousRegisterAndDiscoverExitGracefully(t *testing.T) {
+	r, err := NewRendezvous(make([]ma.Multiaddr, 1), nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, r.Start())
+	require.NoError(t, r.Stop())
+	require.EqualError(t, errDiscoveryIsStopped, r.register("", enr.Record{}).Error())
+	_, err = r.discoverRequest(nil, "")
+	require.EqualError(t, errDiscoveryIsStopped, err.Error())
+}
+
 func BenchmarkRendezvousStart(b *testing.B) {
 	identity, err := crypto.GenerateKey()
 	require.NoError(b, err)
