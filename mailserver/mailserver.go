@@ -64,7 +64,6 @@ const (
 	dbKeyLength            = common.HashLength + timestampLength
 	requestLimitLength     = 4
 	requestTimeRangeLength = timestampLength * 2
-	requestFlagsLength     = 2
 )
 
 type cursorType []byte
@@ -271,7 +270,6 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 		log.Info("failed to decode request", "err", err, "peerID", peer.ID())
 		log.Info("fallback to old request payload")
 		ok, lower, upper, bloom, limit, cursor = s.validateRequest(peer.ID(), request)
-		batch = false
 	}
 
 	if !ok {
@@ -365,7 +363,8 @@ func (s *WMailServer) processRequest(
 		}
 
 		newSize := bundleSize + whisper.EnvelopeHeaderLength + uint32(len(envelope.Data))
-		if newSize < s.w.MaxMessageSize() {
+		limitReached := limit != noLimits && (int(sentEnvelopes)+len(bundle)) == int(limit)
+		if newSize < s.w.MaxMessageSize() && !limitReached {
 			bundle = append(bundle, &envelope)
 			bundleSize = newSize
 			continue
@@ -375,34 +374,49 @@ func (s *WMailServer) processRequest(
 			// used for test purposes
 			ret = append(ret, bundle...)
 		} else {
-			if batch {
-				err = s.w.SendP2PDirect(peer, bundle...)
-				if err != nil {
-					log.Error(fmt.Sprintf("Failed to send direct message to peer: %s", err))
-					return
-				}
-			} else {
-				for _, env := range bundle {
-					err = s.w.SendP2PDirect(peer, env)
-					if err != nil {
-						log.Error(fmt.Sprintf("Failed to send direct message to peer: %s", err))
-						return
-					}
-				}
+			err = s.sendEnvelopes(peer, bundle, batch)
+			if err != nil {
+				log.Error(fmt.Sprintf("Failed to send direct message to peer: %s", err))
+				return
 			}
 		}
 
 		sentEnvelopes += uint32(len(bundle))
 		sentEnvelopesSize += int64(bundleSize)
 
-		if limit != noLimits && sentEnvelopes == limit {
+		if limitReached {
+			bundle = nil
+			bundleSize = 0
+
+			// When the limit is reached, the current retrieved envelope
+			// is not included in the response.
+			// The nextPageCursor is a key used as a limit in a range and
+			// is not included in the range, hence, we need to get
+			// the previous iterator key.
+			i.Next()
 			nextPageCursor = i.Key()
 			break
+		} else {
+			// Reset bundle information and adding the last read envelope
+			// which did not make in the last batch.
+			bundle = []*whisper.Envelope{&envelope}
+			bundleSize = whisper.EnvelopeHeaderLength + uint32(len(envelope.Data))
 		}
 
-		bundle = nil
-		bundleSize = 0
 		lastEnvelopeHash = envelope.Hash()
+	}
+
+	// Send any outstanding envelopes.
+	if len(bundle) > 0 {
+		if peer == nil {
+			ret = append(ret, bundle...)
+		} else {
+			err = s.sendEnvelopes(peer, bundle, batch)
+			if err != nil {
+				log.Error(fmt.Sprintf("Failed to send direct message to peer: %s", err))
+				return
+			}
+		}
 	}
 
 	requestProcessTimer.UpdateSince(start)
@@ -415,6 +429,20 @@ func (s *WMailServer) processRequest(
 	}
 
 	return
+}
+
+func (s *WMailServer) sendEnvelopes(peer *whisper.Peer, envelopes []*whisper.Envelope, batch bool) error {
+	if batch {
+		return s.w.SendP2PDirect(peer, envelopes...)
+	}
+
+	for _, env := range envelopes {
+		if err := s.w.SendP2PDirect(peer, env); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (s *WMailServer) sendHistoricMessageResponse(peer *whisper.Peer, request *whisper.Envelope, lastEnvelopeHash common.Hash, cursor cursorType) error {

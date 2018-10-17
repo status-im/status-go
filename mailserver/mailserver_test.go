@@ -327,7 +327,7 @@ func (s *MailserverSuite) TestRequestPaginationLimit() {
 	s.Nil(cursor)
 	s.Equal(params.limit, limit)
 
-	envelopes, _, cursor, err := s.server.processRequest(nil, lower, upper, bloom, limit, nil)
+	envelopes, _, cursor, err := s.server.processRequest(nil, lower, upper, bloom, limit, nil, false)
 	s.NoError(err)
 	for _, env := range envelopes {
 		receivedHashes = append(receivedHashes, env.Hash())
@@ -339,12 +339,12 @@ func (s *MailserverSuite) TestRequestPaginationLimit() {
 	s.Equal(limit, uint32(len(receivedHashes)))
 	// the 6 envelopes received should be in descending order
 	s.Equal(reverseSentHashes[:limit], receivedHashes)
-	// cursor should be the key of the first envelope of the next page
+	// cursor should be the key of the last envelope of the last page
 	s.Equal(archiveKeys[count-limit], fmt.Sprintf("%x", cursor))
 
 	// second page
 	receivedHashes = []common.Hash{}
-	envelopes, _, cursor, err = s.server.processRequest(nil, lower, upper, bloom, limit, cursor)
+	envelopes, _, cursor, err = s.server.processRequest(nil, lower, upper, bloom, limit, cursor, false)
 	s.NoError(err)
 	for _, env := range envelopes {
 		receivedHashes = append(receivedHashes, env.Hash())
@@ -447,7 +447,7 @@ func (s *MailserverSuite) TestMailServer() {
 
 func (s *MailserverSuite) messageExists(envelope *whisper.Envelope, low, upp uint32, bloom []byte, limit uint32) bool {
 	var exist bool
-	mail, _, _, err := s.server.processRequest(nil, low, upp, bloom, limit, nil)
+	mail, _, _, err := s.server.processRequest(nil, low, upp, bloom, limit, nil, false)
 	s.NoError(err)
 	for _, msg := range mail {
 		if msg.Hash() == envelope.Hash() {
