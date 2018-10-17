@@ -221,6 +221,8 @@ func recoverLevelDBPanics(calleMethodName string) {
 func (s *WMailServer) Archive(env *whisper.Envelope) {
 	defer recoverLevelDBPanics("Archive")
 
+	log.Debug("Archiving envelope", "hash", env.Hash().Hex())
+
 	key := NewDbKey(env.Expiry-env.TTL, env.Hash())
 	rawEnvelope, err := rlp.EncodeToBytes(env)
 	if err != nil {
@@ -238,7 +240,7 @@ func (s *WMailServer) Archive(env *whisper.Envelope) {
 
 // DeliverMail sends mail to specified whisper peer.
 func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope) {
-	log.Info("Delivering mail", "peer", peer.ID)
+	log.Info("Delivering mail", "peer", string(peer.ID()))
 	requestsMeter.Mark(1)
 
 	if peer == nil {
@@ -248,6 +250,7 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 	}
 	if s.exceedsPeerRequests(peer.ID()) {
 		requestErrorsCounter.Inc(1)
+		log.Error("Peer requests limit exceeded")
 		return
 	}
 
@@ -270,15 +273,23 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 		limit = payload.Limit
 		batch = payload.Batch
 	} else {
-		log.Info("failed to decode request", "err", err, "peerID", peer.ID())
-		log.Info("fallback to old request payload")
+		log.Debug("Failed to decode request", "err", err, "peerID", peer.ID())
+		log.Debug("Fallback to old request payload")
 		ok, lower, upper, bloom, limit, cursor = s.validateRequest(peer.ID(), request)
 	}
 
 	if !ok {
 		requestValidationErrorsCounter.Inc(1)
+		log.Error("Failed to validate request")
 		return
 	}
+
+	log.Debug("Processing request",
+		"lower", lower, "upper", upper,
+		"bloom", bloom,
+		"limit", limit,
+		"cursor", cursor,
+		"batch", batch)
 
 	_, lastEnvelopeHash, nextPageCursor, err := s.processRequest(
 		peer,
@@ -292,6 +303,10 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 		log.Error("Error while processing mail server request", "err", err)
 		return
 	}
+
+	log.Debug("Processed request successfully")
+	log.Debug("Sending historic message response", "last", lastEnvelopeHash, "next", nextPageCursor)
+
 	if err := s.sendHistoricMessageResponse(peer, request, lastEnvelopeHash, nextPageCursor); err != nil {
 		historicResponseErrorsCounter.Inc(1)
 		log.Error("SendHistoricMessageResponse failed", "err", err)
@@ -323,7 +338,7 @@ func (s *WMailServer) createIterator(lower, upper uint32, cursor cursorType) ite
 	)
 
 	kl = NewDbKey(lower, emptyHash).raw
-	if cursor != nil {
+	if len(cursor) == dbKeyLength {
 		ku = cursor
 	} else {
 		ku = NewDbKey(upper+1, emptyHash).raw
@@ -389,6 +404,7 @@ func (s *WMailServer) processRequest(
 		if newSize < s.w.MaxMessageSize() && !limitReached {
 			bundle = append(bundle, &envelope)
 			bundleSize = newSize
+			lastEnvelopeHash = envelope.Hash()
 			continue
 		}
 
