@@ -3,8 +3,6 @@ run:
   deadline: 1m
   issues-exit-code: 1
   tests: true
-  # build-tags:
-  #   - mytag
   skip-dirs:
     - static
   skip-files:
@@ -35,19 +33,13 @@ linters-settings:
   goconst:
     min-len: 3
     min-occurrences: 2
-  # depguard:
-  #   list-type: blacklist
-  #   include-go-root: false
-  #   packages:
-  #     - github.com/davecgh/go-spew/spew
 
 linters:
   disable-all: true
   enable:
     - deadcode
-    #- depguard
     - errcheck
-    - gas
+    - gosec
     - goconst
     - gocyclo
     - gofmt
@@ -66,9 +58,5 @@ linters:
 issues:
   exclude:
     - "composite literal uses unkeyed fields" # govet
-#   exclude-use-default: true
-#   max-per-linter: 0
-#   max-same: 0
-#   new: false
-#   new-from-rev: ""
-#   new-from-patch: ""
+    - "G304: Potential file inclusion via variable" # gosec
+    - "G104: Errors unhandled." #gosec
