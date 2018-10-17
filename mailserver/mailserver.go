@@ -508,7 +508,7 @@ func (s *WMailServer) decodeRequest(peerID []byte, request *whisper.Envelope) (s
 		return payload, fmt.Errorf("check message signature failed: %v", err)
 	}
 
-	if err := rlp.DecodeBytes(request.Data, &payload); err != nil {
+	if err := rlp.DecodeBytes(decrypted.Payload, &payload); err != nil {
 		return payload, fmt.Errorf("failed to decode data: %v", err)
 	}
 
