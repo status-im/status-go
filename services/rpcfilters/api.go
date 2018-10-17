@@ -43,15 +43,18 @@ type PublicAPI struct {
 	filtersMu                      sync.Mutex
 	latestBlockChangedEvent        *latestBlockChangedEvent
 	transactionSentToUpstreamEvent *transactionSentToUpstreamEvent
+	blockProvider                  *blockProviderRPC
 }
 
 // NewPublicAPI returns a reference to the PublicAPI object
 func NewPublicAPI(latestBlockChangedEvent *latestBlockChangedEvent,
-	transactionSentToUpstreamEvent *transactionSentToUpstreamEvent) *PublicAPI {
+	transactionSentToUpstreamEvent *transactionSentToUpstreamEvent,
+	blockProvider *blockProviderRPC) *PublicAPI {
 	return &PublicAPI{
 		filters:                        make(map[rpc.ID]*filter),
 		latestBlockChangedEvent:        latestBlockChangedEvent,
 		transactionSentToUpstreamEvent: transactionSentToUpstreamEvent,
+		blockProvider:                  blockProvider,
 	}
 }
 
@@ -111,6 +114,51 @@ func (api *PublicAPI) NewPendingTransactionFilter() rpc.ID {
 	}()
 
 	return id
+
+}
+
+// NewFilter creates a new filter and returns the filter id. It can be
+// used to retrieve logs when the state changes. This method cannot be
+// used to fetch logs that are already stored in the state.
+//
+// Default criteria for the from and to block are "latest".
+// Using "latest" as block number will return logs for mined blocks.
+// Using "pending" as block number returns logs for not yet mined (pending) blocks.
+// In case logs are removed (chain reorg) previously returned logs are returned
+// again but with the removed property set to true.
+//
+// In case "fromBlock" > "toBlock" an error is returned.
+//
+// https://github.com/ethereum/wiki/wiki/JSON-RPC#eth_newfilter
+func (api *PublicAPI) NewFilter(crit FilterCriteria) (rpc.ID, error) {
+	api.filtersMu.Lock()
+	defer api.filtersMu.Unlock()
+
+	f := newFilter()
+	id := rpc.ID(uuid.New())
+
+	api.filters[id] = f
+
+	logFilter, err := NewLogFilter(api.blockProvider, &crit)
+
+	go func() {
+		id, s := logFilter.Subscribe()
+		defer logFilter.Unsubscribe(id)
+
+		for {
+			select {
+			case hash := <-s:
+				f.AddHash(hash)
+			case <-f.done:
+				return
+			}
+		}
+
+	}()
+
+	logFilter.Log()
+
+	return id, err
 
 }
 

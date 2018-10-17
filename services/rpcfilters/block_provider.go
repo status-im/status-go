@@ -26,19 +26,19 @@ func (i blockInfo) Number() *big.Int {
 	return number
 }
 
-// latestBlockProvider provides the latest block info from the blockchain
-type latestBlockProvider interface {
+// blockProvider provides the latest block info from the blockchain
+type blockProvider interface {
 	GetLatestBlock() (blockInfo, error)
 }
 
-// latestBlockProviderRPC is an implementation of latestBlockProvider interface
+// blockProviderRPC is an implementation of blockProvider interface
 // that requests a block using an RPC client provided
-type latestBlockProviderRPC struct {
+type blockProviderRPC struct {
 	rpc rpcProvider
 }
 
 // GetLatestBlock returns the block info
-func (p *latestBlockProviderRPC) GetLatestBlock() (blockInfo, error) {
+func (p *blockProviderRPC) GetLatestBlock() (blockInfo, error) {
 	rpcClient := p.rpc.RPCClient()
 
 	if rpcClient == nil {
@@ -54,4 +54,8 @@ func (p *latestBlockProviderRPC) GetLatestBlock() (blockInfo, error) {
 	}
 
 	return result, nil
+}
+
+func (p *blockProviderRPC) GetBlocksInRange(start int64, end int64) ([]blockInfo, error) {
+	return []blockInfo{}, nil
 }
