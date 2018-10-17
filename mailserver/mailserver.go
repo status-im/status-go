@@ -303,6 +303,27 @@ func (s *WMailServer) exceedsPeerRequests(peer []byte) bool {
 	return false
 }
 
+func (s *WMailServer) createIterator(lower, upper uint32, cursor cursorType) iterator.Iterator {
+	var (
+		emptyHash common.Hash
+		ku        []byte
+		kl        []byte
+	)
+
+	kl = NewDbKey(lower, emptyHash).raw
+	if cursor != nil {
+		ku = cursor
+	} else {
+		ku = NewDbKey(upper+1, emptyHash).raw
+	}
+
+	i := s.db.NewIterator(&util.Range{Start: kl, Limit: ku}, nil)
+	// seek to the end as we want to return envelopes in a descending order
+	i.Seek(ku)
+
+	return i
+}
+
 // processRequest processes the current request and re-sends all stored messages
 // accomplishing lower and upper limits. The limit parameter determines the maximum number of
 // messages to be sent back for the current request.
@@ -327,20 +348,9 @@ func (s *WMailServer) processRequest(
 	var (
 		sentEnvelopes     uint32
 		sentEnvelopesSize int64
-		zero              common.Hash
-		ku                []byte
-		kl                []byte
 	)
 
-	kl = NewDbKey(lower, zero).raw
-	if cursor != nil {
-		ku = cursor
-	} else {
-		ku = NewDbKey(upper+1, zero).raw
-	}
-
-	i := s.db.NewIterator(&util.Range{Start: kl, Limit: ku}, nil)
-	i.Seek(ku)
+	i := s.createIterator(lower, upper, cursor)
 	defer i.Release()
 
 	var (
@@ -407,7 +417,7 @@ func (s *WMailServer) processRequest(
 	}
 
 	// Send any outstanding envelopes.
-	if len(bundle) > 0 {
+	if len(bundle) > 0 && bundleSize > 0 {
 		if peer == nil {
 			ret = append(ret, bundle...)
 		} else {
