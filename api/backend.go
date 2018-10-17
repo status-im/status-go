@@ -483,7 +483,7 @@ func (b *StatusBackend) ProcessContactCode(contactCode string) error {
 		return err
 	}
 
-	if err := st.ProcessPublicBundle(selectedAccount.AccountKey.PrivateKey, bundle); err != nil {
+	if _, err := st.ProcessPublicBundle(selectedAccount.AccountKey.PrivateKey, bundle); err != nil {
 		b.log.Error("error adding bundle", "err", err)
 		return err
 	}

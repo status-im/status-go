@@ -49,14 +49,17 @@ var (
 	errDecryptionMethodNotProvided = errors.New("decryption method is not provided")
 	// By default go-ethereum/metrics creates dummy metrics that don't register anything.
 	// Real metrics are collected only if -metrics flag is set
-	requestProcessTimer    = metrics.NewRegisteredTimer("mailserver/requestProcessTime", nil)
-	requestsMeter          = metrics.NewRegisteredMeter("mailserver/requests", nil)
-	requestErrorsCounter   = metrics.NewRegisteredCounter("mailserver/requestErrors", nil)
-	sentEnvelopesMeter     = metrics.NewRegisteredMeter("mailserver/sentEnvelopes", nil)
-	sentEnvelopesSizeMeter = metrics.NewRegisteredMeter("mailserver/sentEnvelopesSize", nil)
-	archivedMeter          = metrics.NewRegisteredMeter("mailserver/archivedEnvelopes", nil)
-	archivedSizeMeter      = metrics.NewRegisteredMeter("mailserver/archivedEnvelopesSize", nil)
-	archivedErrorsCounter  = metrics.NewRegisteredCounter("mailserver/archiveErrors", nil)
+	requestProcessTimer            = metrics.NewRegisteredTimer("mailserver/requestProcessTime", nil)
+	requestsMeter                  = metrics.NewRegisteredMeter("mailserver/requests", nil)
+	requestErrorsCounter           = metrics.NewRegisteredCounter("mailserver/requestErrors", nil)
+	sentEnvelopesMeter             = metrics.NewRegisteredMeter("mailserver/sentEnvelopes", nil)
+	sentEnvelopesSizeMeter         = metrics.NewRegisteredMeter("mailserver/sentEnvelopesSize", nil)
+	archivedMeter                  = metrics.NewRegisteredMeter("mailserver/archivedEnvelopes", nil)
+	archivedSizeMeter              = metrics.NewRegisteredMeter("mailserver/archivedEnvelopesSize", nil)
+	archivedErrorsCounter          = metrics.NewRegisteredCounter("mailserver/archiveErrors", nil)
+	requestValidationErrorsCounter = metrics.NewRegisteredCounter("mailserver/requestValidationErrors", nil)
+	processRequestErrorsCounter    = metrics.NewRegisteredCounter("mailserver/processRequestErrors", nil)
+	historicResponseErrorsCounter  = metrics.NewRegisteredCounter("mailserver/historicResponseErrors", nil)
 )
 
 const (
@@ -273,16 +276,25 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 	}
 
 	if !ok {
+		requestValidationErrorsCounter.Inc(1)
 		return
 	}
 
-	_, lastEnvelopeHash, nextPageCursor, err := s.processRequest(peer, lower, upper, bloom, limit, cursor, batch)
+	_, lastEnvelopeHash, nextPageCursor, err := s.processRequest(
+		peer,
+		lower, upper,
+		bloom,
+		limit,
+		cursor,
+		batch)
 	if err != nil {
-		log.Error(fmt.Sprintf("error in DeliverMail: %s", err))
+		processRequestErrorsCounter.Inc(1)
+		log.Error("Error while processing mail server request", "err", err)
 		return
 	}
 	if err := s.sendHistoricMessageResponse(peer, request, lastEnvelopeHash, nextPageCursor); err != nil {
-		log.Error(fmt.Sprintf("SendHistoricMessageResponse error: %s", err))
+		historicResponseErrorsCounter.Inc(1)
+		log.Error("SendHistoricMessageResponse failed", "err", err)
 	}
 }
 

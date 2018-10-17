@@ -94,7 +94,7 @@ func (s *EncryptionServiceTestSuite) TestEncryptPayloadNoBundle() {
 	s.NotEqual(cyphertext1, cleartext, "It encrypts the payload correctly")
 
 	// On the receiver side, we should be able to decrypt using our private key and the ephemeral just sent
-	decryptedPayload1, err := s.bob.DecryptPayload(bobKey, &aliceKey.PublicKey, encryptionResponse1)
+	decryptedPayload1, err := s.bob.DecryptPayload(bobKey, &aliceKey.PublicKey, aliceInstallationID, encryptionResponse1)
 	s.Require().NoError(err)
 	s.Equal(cleartext, decryptedPayload1, "It correctly decrypts the payload using DH")
 
@@ -109,7 +109,7 @@ func (s *EncryptionServiceTestSuite) TestEncryptPayloadNoBundle() {
 	s.NotEqual(cyphertext1, cyphertext2, "It does not re-use the symmetric key")
 	s.NotEqual(ephemeralKey1, ephemeralKey2, "It does not re-use the ephemeral key")
 
-	decryptedPayload2, err := s.bob.DecryptPayload(bobKey, &aliceKey.PublicKey, encryptionResponse2)
+	decryptedPayload2, err := s.bob.DecryptPayload(bobKey, &aliceKey.PublicKey, aliceInstallationID, encryptionResponse2)
 	s.Require().NoError(err)
 	s.Equal(cleartext, decryptedPayload2, "It correctly decrypts the payload using DH")
 }
@@ -129,7 +129,7 @@ func (s *EncryptionServiceTestSuite) TestEncryptPayloadBundle() {
 	s.Require().NoError(err)
 
 	// We add bob bundle
-	err = s.alice.ProcessPublicBundle(aliceKey, bobBundle)
+	_, err = s.alice.ProcessPublicBundle(aliceKey, bobBundle)
 	s.Require().NoError(err)
 
 	// We send a message using the bundle
@@ -161,7 +161,7 @@ func (s *EncryptionServiceTestSuite) TestEncryptPayloadBundle() {
 	s.Equal(uint32(0), drHeader.GetPn(), "It adds the correct length of the message chain")
 
 	// Bob is able to decrypt it using the bundle
-	decryptedPayload1, err := s.bob.DecryptPayload(bobKey, &aliceKey.PublicKey, encryptionResponse1)
+	decryptedPayload1, err := s.bob.DecryptPayload(bobKey, &aliceKey.PublicKey, aliceInstallationID, encryptionResponse1)
 	s.Require().NoError(err)
 	s.Equal(cleartext, decryptedPayload1, "It correctly decrypts the payload using X3DH")
 }
@@ -188,7 +188,7 @@ func (s *EncryptionServiceTestSuite) TestConsequentMessagesBundle() {
 	s.Require().NoError(err)
 
 	// We add bob bundle
-	err = s.alice.ProcessPublicBundle(aliceKey, bobBundle)
+	_, err = s.alice.ProcessPublicBundle(aliceKey, bobBundle)
 	s.Require().NoError(err)
 
 	// We send a message using the bundle
@@ -225,7 +225,7 @@ func (s *EncryptionServiceTestSuite) TestConsequentMessagesBundle() {
 	s.Equal(uint32(0), drHeader.GetPn(), "It adds the correct length of the message chain")
 
 	// Bob is able to decrypt it using the bundle
-	decryptedPayload1, err := s.bob.DecryptPayload(bobKey, &aliceKey.PublicKey, encryptionResponse)
+	decryptedPayload1, err := s.bob.DecryptPayload(bobKey, &aliceKey.PublicKey, aliceInstallationID, encryptionResponse)
 	s.Require().NoError(err)
 
 	s.Equal(cleartext2, decryptedPayload1, "It correctly decrypts the payload using X3DH")
@@ -257,11 +257,11 @@ func (s *EncryptionServiceTestSuite) TestConversation() {
 	s.Require().NoError(err)
 
 	// We add bob bundle
-	err = s.alice.ProcessPublicBundle(aliceKey, bobBundle)
+	_, err = s.alice.ProcessPublicBundle(aliceKey, bobBundle)
 	s.Require().NoError(err)
 
 	// We add alice bundle
-	err = s.bob.ProcessPublicBundle(bobKey, aliceBundle)
+	_, err = s.bob.ProcessPublicBundle(bobKey, aliceBundle)
 	s.Require().NoError(err)
 
 	// Alice sends a message
@@ -269,7 +269,7 @@ func (s *EncryptionServiceTestSuite) TestConversation() {
 	s.Require().NoError(err)
 
 	// Bob receives the message
-	_, err = s.bob.DecryptPayload(bobKey, &aliceKey.PublicKey, encryptionResponse)
+	_, err = s.bob.DecryptPayload(bobKey, &aliceKey.PublicKey, aliceInstallationID, encryptionResponse)
 	s.Require().NoError(err)
 
 	// Bob replies to the message
@@ -277,7 +277,7 @@ func (s *EncryptionServiceTestSuite) TestConversation() {
 	s.Require().NoError(err)
 
 	// Alice receives the message
-	_, err = s.alice.DecryptPayload(aliceKey, &bobKey.PublicKey, encryptionResponse)
+	_, err = s.alice.DecryptPayload(aliceKey, &bobKey.PublicKey, bobInstallationID, encryptionResponse)
 	s.Require().NoError(err)
 
 	// We send another message using the bundle
@@ -308,7 +308,7 @@ func (s *EncryptionServiceTestSuite) TestConversation() {
 	s.Equal(uint32(1), drHeader.GetPn(), "It adds the correct length of the message chain")
 
 	// Bob is able to decrypt it using the bundle
-	decryptedPayload1, err := s.bob.DecryptPayload(bobKey, &aliceKey.PublicKey, encryptionResponse)
+	decryptedPayload1, err := s.bob.DecryptPayload(bobKey, &aliceKey.PublicKey, aliceInstallationID, encryptionResponse)
 	s.Require().NoError(err)
 
 	s.Equal(cleartext2, decryptedPayload1, "It correctly decrypts the payload using X3DH")
@@ -339,7 +339,7 @@ func (s *EncryptionServiceTestSuite) TestConcurrentBundles() {
 	s.Require().NoError(err)
 
 	// We add bob bundle
-	err = s.alice.ProcessPublicBundle(aliceKey, bobBundle)
+	_, err = s.alice.ProcessPublicBundle(aliceKey, bobBundle)
 	s.Require().NoError(err)
 
 	// Create a bundle
@@ -347,7 +347,7 @@ func (s *EncryptionServiceTestSuite) TestConcurrentBundles() {
 	s.Require().NoError(err)
 
 	// We add alice bundle
-	err = s.bob.ProcessPublicBundle(bobKey, aliceBundle)
+	_, err = s.bob.ProcessPublicBundle(bobKey, aliceBundle)
 	s.Require().NoError(err)
 
 	// Alice sends a message
@@ -359,11 +359,11 @@ func (s *EncryptionServiceTestSuite) TestConcurrentBundles() {
 	s.Require().NoError(err)
 
 	// Bob receives the message
-	_, err = s.bob.DecryptPayload(bobKey, &aliceKey.PublicKey, aliceMessage1)
+	_, err = s.bob.DecryptPayload(bobKey, &aliceKey.PublicKey, aliceInstallationID, aliceMessage1)
 	s.Require().NoError(err)
 
 	// Alice receives the message
-	_, err = s.alice.DecryptPayload(aliceKey, &bobKey.PublicKey, bobMessage1)
+	_, err = s.alice.DecryptPayload(aliceKey, &bobKey.PublicKey, bobInstallationID, bobMessage1)
 	s.Require().NoError(err)
 
 	// Bob replies to the message
@@ -375,11 +375,11 @@ func (s *EncryptionServiceTestSuite) TestConcurrentBundles() {
 	s.Require().NoError(err)
 
 	// Alice receives the message
-	_, err = s.alice.DecryptPayload(aliceKey, &bobKey.PublicKey, bobMessage2)
+	_, err = s.alice.DecryptPayload(aliceKey, &bobKey.PublicKey, bobInstallationID, bobMessage2)
 	s.Require().NoError(err)
 
 	// Bob receives the message
-	_, err = s.bob.DecryptPayload(bobKey, &aliceKey.PublicKey, aliceMessage2)
+	_, err = s.bob.DecryptPayload(bobKey, &aliceKey.PublicKey, aliceInstallationID, aliceMessage2)
 	s.Require().NoError(err)
 }
 
@@ -420,13 +420,14 @@ func receiver(
 	s *EncryptionService,
 	privateKey *ecdsa.PrivateKey,
 	publicKey *ecdsa.PublicKey,
+	installationID string,
 	errChan chan error,
 	input chan map[string]*DirectMessageProtocol,
 ) {
 	i := 0
 
 	for payload := range input {
-		actualCleartext, err := s.DecryptPayload(privateKey, publicKey, payload)
+		actualCleartext, err := s.DecryptPayload(privateKey, publicKey, installationID, payload)
 		if err != nil {
 			errChan <- err
 			return
@@ -459,7 +460,7 @@ func (s *EncryptionServiceTestSuite) TestRandomised() {
 	s.Require().NoError(err)
 
 	// We add bob bundle
-	err = s.alice.ProcessPublicBundle(aliceKey, bobBundle)
+	_, err = s.alice.ProcessPublicBundle(aliceKey, bobBundle)
 	s.Require().NoError(err)
 
 	// Create a bundle
@@ -467,7 +468,7 @@ func (s *EncryptionServiceTestSuite) TestRandomised() {
 	s.Require().NoError(err)
 
 	// We add alice bundle
-	err = s.bob.ProcessPublicBundle(bobKey, aliceBundle)
+	_, err = s.bob.ProcessPublicBundle(bobKey, aliceBundle)
 	s.Require().NoError(err)
 
 	aliceChan := make(chan map[string]*DirectMessageProtocol, 100)
@@ -485,10 +486,10 @@ func (s *EncryptionServiceTestSuite) TestRandomised() {
 	go publisher(s.bob, bobKey, &aliceKey.PublicKey, bobPublisherErrChan, aliceChan)
 
 	// Set up bob receiver
-	go receiver(s.bob, bobKey, &aliceKey.PublicKey, bobReceiverErrChan, bobChan)
+	go receiver(s.bob, bobKey, &aliceKey.PublicKey, aliceInstallationID, bobReceiverErrChan, bobChan)
 
 	// Set up alice receiver
-	go receiver(s.alice, aliceKey, &bobKey.PublicKey, aliceReceiverErrChan, aliceChan)
+	go receiver(s.alice, aliceKey, &bobKey.PublicKey, bobInstallationID, aliceReceiverErrChan, aliceChan)
 
 	aliceErr := <-alicePublisherErrChan
 	s.Require().NoError(aliceErr)
@@ -525,7 +526,7 @@ func (s *EncryptionServiceTestSuite) TestBundleNotExisting() {
 	bobBundle := bobBundleContainer.GetBundle()
 
 	// We add bob bundle
-	err = s.alice.ProcessPublicBundle(aliceKey, bobBundle)
+	_, err = s.alice.ProcessPublicBundle(aliceKey, bobBundle)
 	s.Require().NoError(err)
 
 	// Alice sends a message
@@ -533,7 +534,7 @@ func (s *EncryptionServiceTestSuite) TestBundleNotExisting() {
 	s.Require().NoError(err)
 
 	// Bob receives the message, and returns a bundlenotfound error
-	_, err = s.bob.DecryptPayload(bobKey, &aliceKey.PublicKey, aliceMessage)
+	_, err = s.bob.DecryptPayload(bobKey, &aliceKey.PublicKey, aliceInstallationID, aliceMessage)
 	s.Require().Error(err)
 	s.Equal(ErrSessionNotFound, err)
 }
@@ -561,7 +562,7 @@ func (s *EncryptionServiceTestSuite) TestRefreshedBundle() {
 	s.Require().NoError(err)
 
 	// We add the first bob bundle
-	err = s.alice.ProcessPublicBundle(aliceKey, bobBundle1.GetBundle())
+	_, err = s.alice.ProcessPublicBundle(aliceKey, bobBundle1.GetBundle())
 	s.Require().NoError(err)
 
 	// Alice sends a message
@@ -578,7 +579,7 @@ func (s *EncryptionServiceTestSuite) TestRefreshedBundle() {
 	s.Equal(bobBundle1.GetBundle().GetSignedPreKeys()[bobInstallationID].GetSignedPreKey(), x3dhHeader1.GetId())
 
 	// We add the second bob bundle
-	err = s.alice.ProcessPublicBundle(aliceKey, bobBundle2.GetBundle())
+	_, err = s.alice.ProcessPublicBundle(aliceKey, bobBundle2.GetBundle())
 	s.Require().NoError(err)
 
 	// Alice sends a message

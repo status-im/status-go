@@ -4,6 +4,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/suite"
 	"os"
+	"sort"
 	"testing"
 )
 
@@ -68,16 +69,55 @@ func (s *EncryptionServiceMultiDeviceSuite) TestProcessPublicBundle() {
 	aliceKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	_, err = s.alice1.CreateBundle(aliceKey)
+	alice1Bundle, err := s.alice1.CreateBundle(aliceKey)
+	s.Require().NoError(err)
+
+	alice1Identity, err := ExtractIdentity(alice1Bundle)
 	s.Require().NoError(err)
 
 	alice2Bundle, err := s.alice2.CreateBundle(aliceKey)
 	s.Require().NoError(err)
 
-	err = s.alice1.ProcessPublicBundle(aliceKey, alice2Bundle)
+	alice2Identity, err := ExtractIdentity(alice2Bundle)
 	s.Require().NoError(err)
 
+	response, err := s.alice1.ProcessPublicBundle(aliceKey, alice2Bundle)
+	s.Require().NoError(err)
+	s.Require().Equal(IdentityAndIDPair{alice2Identity, "alice2"}, response[0])
+
 	alice1MergedBundle1, err := s.alice1.CreateBundle(aliceKey)
+	s.Require().NoError(err)
+
+	s.Require().NotNil(alice1MergedBundle1.GetSignedPreKeys()["alice1"])
+	s.Require().NotNil(alice1MergedBundle1.GetSignedPreKeys()["alice2"])
+
+	response, err = s.alice1.ProcessPublicBundle(aliceKey, alice1MergedBundle1)
+	s.Require().NoError(err)
+	sort.Slice(response, func(i, j int) bool {
+		return response[i][1] < response[j][1]
+	})
+	s.Require().Equal(IdentityAndIDPair{alice1Identity, "alice1"}, response[0])
+	s.Require().Equal(IdentityAndIDPair{alice2Identity, "alice2"}, response[1])
+}
+
+func (s *EncryptionServiceMultiDeviceSuite) TestProcessPublicBundleOutOfOrder() {
+	aliceKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	// Alice1 creates a bundle
+	alice1Bundle, err := s.alice1.CreateBundle(aliceKey)
+	s.Require().NoError(err)
+
+	// Alice2 Receives the bundle
+	_, err = s.alice2.ProcessPublicBundle(aliceKey, alice1Bundle)
+	s.Require().NoError(err)
+
+	// Alice2 Creates a Bundle
+	_, err = s.alice2.CreateBundle(aliceKey)
+	s.Require().NoError(err)
+
+	// It should contain both bundles
+	alice1MergedBundle1, err := s.alice2.CreateBundle(aliceKey)
 	s.Require().NoError(err)
 
 	s.Require().NotNil(alice1MergedBundle1.GetSignedPreKeys()["alice1"])

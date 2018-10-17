@@ -64,6 +64,7 @@ func TestNewBundleContainer(t *testing.T) {
 	require.NotNil(t, bundle, "Bundle should be generated without errors")
 
 	signatureMaterial := append([]byte(bobInstallationID), bundle.GetSignedPreKeys()[bobInstallationID].GetSignedPreKey()...)
+	signatureMaterial = append(signatureMaterial, []byte("0")...)
 	recoveredPublicKey, err := crypto.SigToPub(
 		crypto.Keccak256(signatureMaterial),
 		bundle.Signature,
@@ -97,8 +98,10 @@ func TestSignBundle(t *testing.T) {
 	require.NoError(t, err)
 
 	signatureMaterial := append([]byte("1"), bundle1.GetSignedPreKeys()["1"].GetSignedPreKey()...)
+	signatureMaterial = append(signatureMaterial, []byte("0")...)
 	signatureMaterial = append(signatureMaterial, []byte("2")...)
 	signatureMaterial = append(signatureMaterial, []byte("key")...)
+	signatureMaterial = append(signatureMaterial, []byte("0")...)
 
 	recoveredPublicKey, err := crypto.SigToPub(
 		crypto.Keccak256(signatureMaterial),

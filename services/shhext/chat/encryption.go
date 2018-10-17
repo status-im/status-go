@@ -18,6 +18,9 @@ import (
 
 var ErrSessionNotFound = errors.New("session not found")
 
+// If we have no bundles, we use a constant so that the message can reach any device
+const noInstallationID = "none"
+
 // EncryptionService defines a service that is responsible for the encryption aspect of the protocol
 type EncryptionService struct {
 	log            log.Logger
@@ -25,6 +28,8 @@ type EncryptionService struct {
 	installationID string
 	mutex          sync.Mutex
 }
+
+type IdentityAndIDPair [2]string
 
 // NewEncryptionService creates a new EncryptionService instance
 func NewEncryptionService(p PersistenceService, installationID string) *EncryptionService {
@@ -129,26 +134,40 @@ func (s *EncryptionService) keyFromPassiveX3DH(myIdentityKey *ecdsa.PrivateKey, 
 	return key, nil
 }
 
-// ProcessPublicBundle persists a bundle
-func (s *EncryptionService) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, b *Bundle) error {
+// ProcessPublicBundle persists a bundle and returns a list of tuples identity/installationID
+func (s *EncryptionService) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, b *Bundle) ([]IdentityAndIDPair, error) {
 	// Make sure the bundle belongs to who signed it
-	err := VerifyBundle(b)
+	identity, err := ExtractIdentity(b)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return s.persistence.AddPublicBundle(b)
+	signedPreKeys := b.GetSignedPreKeys()
+	response := make([]IdentityAndIDPair, len(signedPreKeys))
+
+	if err = s.persistence.AddPublicBundle(b); err != nil {
+		return nil, err
+	}
+
+	index := 0
+	for installationID := range signedPreKeys {
+		response[index] = IdentityAndIDPair{identity, installationID}
+		index++
+	}
+
+	return response, nil
 }
 
 // DecryptPayload decrypts the payload of a DirectMessageProtocol, given an identity private key and the sender's public key
-func (s *EncryptionService) DecryptPayload(myIdentityKey *ecdsa.PrivateKey, theirIdentityKey *ecdsa.PublicKey, msgs map[string]*DirectMessageProtocol) ([]byte, error) {
+func (s *EncryptionService) DecryptPayload(myIdentityKey *ecdsa.PrivateKey, theirIdentityKey *ecdsa.PublicKey, theirInstallationID string, msgs map[string]*DirectMessageProtocol) ([]byte, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
 	msg := msgs[s.installationID]
 	if msg == nil {
-		msg = msgs["none"]
+		msg = msgs[noInstallationID]
 	}
 
+	// We should not be sending a signal if it's coming from us, as we receive our own messages
 	if msg == nil {
 		return nil, ErrSessionNotFound
 	}
@@ -168,7 +187,7 @@ func (s *EncryptionService) DecryptPayload(myIdentityKey *ecdsa.PrivateKey, thei
 		}
 
 		theirIdentityKeyC := ecrypto.CompressPubkey(theirIdentityKey)
-		err = s.persistence.AddRatchetInfo(symmetricKey, theirIdentityKeyC, bundleID, nil, x3dhHeader.GetInstallationId())
+		err = s.persistence.AddRatchetInfo(symmetricKey, theirIdentityKeyC, bundleID, nil, theirInstallationID)
 		if err != nil {
 			return nil, err
 		}
@@ -189,14 +208,14 @@ func (s *EncryptionService) DecryptPayload(myIdentityKey *ecdsa.PrivateKey, thei
 
 		theirIdentityKeyC := ecrypto.CompressPubkey(theirIdentityKey)
 
-		drInfo, err := s.persistence.GetRatchetInfo(drHeader.GetId(), theirIdentityKeyC)
+		drInfo, err := s.persistence.GetRatchetInfo(drHeader.GetId(), theirIdentityKeyC, theirInstallationID)
 		if err != nil {
 			s.log.Error("Could not get ratchet info", "err", err)
 			return nil, err
 		}
 
 		// We mark the exchange as successful so we stop sending x3dh header
-		if err = s.persistence.RatchetInfoConfirmed(drHeader.GetId(), theirIdentityKeyC); err != nil {
+		if err = s.persistence.RatchetInfoConfirmed(drHeader.GetId(), theirIdentityKeyC, theirInstallationID); err != nil {
 			s.log.Error("Could not confirm ratchet info", "err", err)
 			return nil, err
 		}
@@ -354,6 +373,17 @@ func (s *EncryptionService) encryptWithDH(theirIdentityKey *ecdsa.PublicKey, pay
 	}, nil
 }
 
+func (s *EncryptionService) EncryptPayloadWithDH(theirIdentityKey *ecdsa.PublicKey, payload []byte) (map[string]*DirectMessageProtocol, error) {
+	response := make(map[string]*DirectMessageProtocol)
+	dmp, err := s.encryptWithDH(theirIdentityKey, payload)
+	if err != nil {
+		return nil, err
+	}
+
+	response[noInstallationID] = dmp
+	return response, nil
+}
+
 // EncryptPayload returns a new DirectMessageProtocol with a given payload encrypted, given a recipient's public key and the sender private identity key
 // TODO: refactor this
 // nolint: gocyclo
@@ -361,7 +391,6 @@ func (s *EncryptionService) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, my
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	response := make(map[string]*DirectMessageProtocol)
 	theirIdentityKeyC := ecrypto.CompressPubkey(theirIdentityKey)
 
 	// Get their latest bundle
@@ -372,14 +401,10 @@ func (s *EncryptionService) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, my
 
 	// We don't have any, send a message with DH
 	if theirBundle == nil && !bytes.Equal(theirIdentityKeyC, ecrypto.CompressPubkey(&myIdentityKey.PublicKey)) {
-		dmp, err := s.encryptWithDH(theirIdentityKey, payload)
-		if err != nil {
-			return nil, err
-		}
-
-		response["none"] = dmp
-		return response, nil
+		return s.EncryptPayloadWithDH(theirIdentityKey, payload)
 	}
+
+	response := make(map[string]*DirectMessageProtocol)
 
 	for installationID, signedPreKeyContainer := range theirBundle.GetSignedPreKeys() {
 		if s.installationID == installationID {
@@ -413,8 +438,7 @@ func (s *EncryptionService) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, my
 			}
 
 			response[drInfo.InstallationID] = &dmp
-
-			return response, nil
+			continue
 		}
 
 		// check if a bundle is there

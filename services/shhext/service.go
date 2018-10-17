@@ -106,9 +106,9 @@ func (s *Service) InitProtocol(address string, password string) error {
 	return nil
 }
 
-func (s *Service) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, bundle *chat.Bundle) error {
+func (s *Service) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, bundle *chat.Bundle) ([]chat.IdentityAndIDPair, error) {
 	if s.protocol == nil {
-		return errProtocolNotInitialized
+		return nil, errProtocolNotInitialized
 	}
 
 	return s.protocol.ProcessPublicBundle(myIdentityKey, bundle)
