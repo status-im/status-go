@@ -1,6 +1,7 @@
 package rpcfilters
 
 import (
+	"errors"
 	"sync"
 	"time"
 
@@ -15,11 +16,15 @@ type hashFilter struct {
 }
 
 // add adds a hash to the hashFilter
-func (f *hashFilter) add(data interface{}) {
-	hash := data.(common.Hash)
+func (f *hashFilter) add(data interface{}) error {
+	hash, ok := data.(common.Hash)
+	if !ok {
+		return errors.New("provided data is not a common.Hash")
+	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.hashes = append(f.hashes, hash)
+	return nil
 }
 
 // pop returns all the hashes stored in the hashFilter and clears the hashFilter contents
@@ -32,7 +37,12 @@ func (f *hashFilter) pop() interface{} {
 }
 
 func (f *hashFilter) stop() {
-	close(f.done)
+	select {
+	case <-f.done:
+		return
+	default:
+		close(f.done)
+	}
 }
 
 func (f *hashFilter) deadline() *time.Timer {

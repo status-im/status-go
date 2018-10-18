@@ -17,7 +17,7 @@ import (
 
 type callTracker struct {
 	mu        sync.Mutex
-	number    int
+	calls     int
 	reply     [][]types.Log
 	criterias []map[string]interface{}
 }
@@ -25,7 +25,7 @@ type callTracker struct {
 func (c *callTracker) CallContext(ctx context.Context, result interface{}, method string, args ...interface{}) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.number++
+	c.calls++
 	if len(args) != 1 {
 		return errors.New("unexpected length of args")
 	}
@@ -36,9 +36,9 @@ func (c *callTracker) CallContext(ctx context.Context, result interface{}, metho
 		return errors.New("context canceled")
 	default:
 	}
-	if c.number <= len(c.reply) {
+	if c.calls <= len(c.reply) {
 		rst := result.(*[]types.Log)
-		*rst = c.reply[c.number-1]
+		*rst = c.reply[c.calls-1]
 	}
 	return nil
 }
@@ -64,7 +64,7 @@ func runLogsFetcherTest(t *testing.T, f *logsFilter) *callTracker {
 				return
 			case <-tick:
 				c.mu.Lock()
-				num := c.number
+				num := c.calls
 				c.mu.Unlock()
 				if num >= 2 {
 					f.stop()

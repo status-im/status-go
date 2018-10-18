@@ -52,10 +52,16 @@ func (s *LogsSuite) TestLogsNewFilter() {
 		ftopic, stopic = [32]byte{1}, [32]byte{2}
 	)
 	s.Require().NoError(s.Local.Call(&fid, "eth_newFilter", map[string]interface{}{
-		"topics": [][]common.Hash{[]common.Hash{}, []common.Hash{common.BytesToHash(ftopic[:])}},
+		"topics": [][]common.Hash{
+			{},
+			{common.BytesToHash(ftopic[:])},
+		},
 	}))
 	s.Require().NoError(s.Local.Call(&sid, "eth_newFilter", map[string]interface{}{
-		"topics": [][]common.Hash{[]common.Hash{}, []common.Hash{common.BytesToHash(stopic[:])}},
+		"topics": [][]common.Hash{
+			{},
+			{common.BytesToHash(stopic[:])},
+		},
 	}))
 	s.Require().NoError(s.Local.Call(&tid, "eth_newFilter", map[string]interface{}{}))
 

@@ -19,32 +19,27 @@ type ContextCaller interface {
 
 func pollLogs(client ContextCaller, f *logsFilter, timeout, period time.Duration) {
 	adjusted := false
-	ctx, cancel := context.WithTimeout(f.ctx, timeout)
-	logs, err := getLogs(ctx, client, f.crit)
-	cancel()
-	if err != nil {
-		log.Error("failed to get logs", "criteria", f.crit, "error", err)
-	} else {
-		adjustFromBlock(&f.crit)
-		adjusted = true
-		f.add(logs)
+	query := func() {
+		ctx, cancel := context.WithTimeout(f.ctx, timeout)
+		logs, err := getLogs(ctx, client, f.crit)
+		cancel()
+		if err != nil {
+			log.Error("failed to get logs", "criteria", f.crit, "error", err)
+		} else if !adjusted {
+			adjustFromBlock(&f.crit)
+			adjusted = true
+		}
+		if err := f.add(logs); err != nil {
+			log.Error("error adding logs", "logs", logs, "error", err)
+		}
 	}
+	query()
 	latest := time.NewTicker(period)
 	defer latest.Stop()
 	for {
 		select {
 		case <-latest.C:
-			ctx, cancel := context.WithTimeout(f.ctx, timeout)
-			logs, err := getLogs(ctx, client, f.crit)
-			cancel()
-			if err != nil {
-				log.Error("failed to get logs", "criteria", f.crit, "error", err)
-				continue
-			} else if !adjusted {
-				adjustFromBlock(&f.crit)
-				adjusted = true
-			}
-			f.add(logs)
+			query()
 		case <-f.done:
 			log.Debug("filter was stopped", "ID", f.id, "crit", f.crit)
 			return

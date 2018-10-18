@@ -424,7 +424,7 @@ func Eventually(f func() error, timeout, period time.Duration) (err error) {
 	for {
 		select {
 		case <-timer.C:
-			return err
+			return
 		case <-ticker.C:
 			err = f()
 			if err == nil {

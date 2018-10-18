@@ -9,18 +9,19 @@ import (
 	ethereum "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/eth/filters"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/pborman/uuid"
 )
 
 const (
-	filterLivenessPeriod = 5 * time.Minute
-	logsPeriod           = 10 * time.Second
-	logsQueryTimeout     = 10 * time.Second
+	defaultFilterLivenessPeriod = 5 * time.Minute
+	defaultLogsPeriod           = 10 * time.Second
+	defaultLogsQueryTimeout     = 10 * time.Second
 )
 
 type filter interface {
-	add(interface{})
+	add(interface{}) error
 	pop() interface{}
 	stop()
 	deadline() *time.Timer
@@ -31,7 +32,9 @@ type PublicAPI struct {
 	filtersMu sync.Mutex
 	filters   map[rpc.ID]filter
 
-	filterLivenessLoop   time.Duration
+	// filterLivenessLoop defines how often timeout loop is executed
+	filterLivenessLoop time.Duration
+	// filter liveness increased by this period when changes are requested
 	filterLivenessPeriod time.Duration
 
 	client func() ContextCaller
@@ -47,12 +50,10 @@ func NewPublicAPI(s *Service) *PublicAPI {
 		latestBlockChangedEvent:        s.latestBlockChangedEvent,
 		transactionSentToUpstreamEvent: s.transactionSentToUpstreamEvent,
 		client:               func() ContextCaller { return s.rpc.RPCClient() },
-		filterLivenessLoop:   filterLivenessPeriod,
-		filterLivenessPeriod: filterLivenessPeriod + 10*time.Second,
+		filterLivenessLoop:   defaultFilterLivenessPeriod,
+		filterLivenessPeriod: defaultFilterLivenessPeriod + 10*time.Second,
 	}
-	go func() {
-		api.timeoutLoop(s.quit)
-	}()
+	go api.timeoutLoop(s.quit)
 	return api
 }
 
@@ -61,24 +62,23 @@ func (api *PublicAPI) timeoutLoop(quit chan struct{}) {
 		select {
 		case <-quit:
 			return
-		default:
-		}
-		time.Sleep(api.filterLivenessLoop)
-		api.filtersMu.Lock()
-		for id, f := range api.filters {
-			deadline := f.deadline()
-			if deadline == nil {
-				continue
+		case <-time.After(api.filterLivenessLoop):
+			api.filtersMu.Lock()
+			for id, f := range api.filters {
+				deadline := f.deadline()
+				if deadline == nil {
+					continue
+				}
+				select {
+				case <-deadline.C:
+					delete(api.filters, id)
+					f.stop()
+				default:
+					continue
+				}
 			}
-			select {
-			case <-deadline.C:
-				delete(api.filters, id)
-				f.stop()
-			default:
-				continue
-			}
+			api.filtersMu.Unlock()
 		}
-		api.filtersMu.Unlock()
 	}
 }
 
@@ -96,10 +96,7 @@ func (api *PublicAPI) NewFilter(crit filters.FilterCriteria) (rpc.ID, error) {
 	api.filtersMu.Lock()
 	api.filters[id] = f
 	api.filtersMu.Unlock()
-
-	go func() {
-		pollLogs(api.client(), f, logsQueryTimeout, logsPeriod)
-	}()
+	go pollLogs(api.client(), f, defaultLogsQueryTimeout, defaultLogsPeriod)
 	return id, nil
 }
 
@@ -121,7 +118,9 @@ func (api *PublicAPI) NewBlockFilter() rpc.ID {
 		for {
 			select {
 			case hash := <-s:
-				f.add(hash)
+				if err := f.add(hash); err != nil {
+					log.Error("error adding value to filter", "hash", hash, "error", err)
+				}
 			case <-f.done:
 				return
 			}
@@ -150,7 +149,9 @@ func (api *PublicAPI) NewPendingTransactionFilter() rpc.ID {
 		for {
 			select {
 			case hash := <-s:
-				f.add(hash)
+				if err := f.add(hash); err != nil {
+					log.Error("error adding value to filter", "hash", hash, "error", err)
+				}
 			case <-f.done:
 				return
 			}
@@ -193,6 +194,7 @@ func (api *PublicAPI) GetFilterChanges(id rpc.ID) (interface{}, error) {
 			if !deadline.Stop() {
 				// timer expired but filter is not yet removed in timeout loop
 				// receive timer value and reset timer
+				// see https://golang.org/pkg/time/#Timer.Reset
 				<-deadline.C
 			}
 			deadline.Reset(api.filterLivenessPeriod)

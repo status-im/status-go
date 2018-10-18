@@ -16,13 +16,19 @@ func TestFilterLogs(t *testing.T) {
 			BlockNumber: 1,
 			BlockHash:   common.Hash{1, 1},
 			Address:     common.Address{1, 1, 1},
-			Topics:      []common.Hash{common.Hash{1}, common.Hash{1, 1}},
+			Topics: []common.Hash{
+				{1},
+				{1, 1},
+			},
 		},
 		{
 			BlockNumber: 2,
 			BlockHash:   common.Hash{2, 2},
 			Address:     common.Address{2, 2, 2},
-			Topics:      []common.Hash{common.Hash{1}, common.Hash{2, 2}},
+			Topics: []common.Hash{
+				{1},
+				{2, 2},
+			},
 		},
 	}
 
@@ -83,7 +89,7 @@ func TestFilterLogs(t *testing.T) {
 		{
 			description: "LimitedBySecondTopic",
 			crit: ethereum.FilterQuery{Topics: [][]common.Hash{
-				[]common.Hash{}, logs[1].Topics}},
+				{}, logs[1].Topics}},
 			expectedLogs:  []types.Log{logs[1]},
 			expectedBlock: logs[1].BlockNumber,
 			expectedHash:  logs[1].BlockHash,

@@ -2,6 +2,7 @@ package rpcfilters
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"time"
 
@@ -26,16 +27,18 @@ type logsFilter struct {
 	done   chan struct{}
 }
 
-func (f *logsFilter) add(data interface{}) {
-	logs := data.([]types.Log)
+func (f *logsFilter) add(data interface{}) error {
+	logs, ok := data.([]types.Log)
+	if !ok {
+		return errors.New("provided value is not a []types.Log")
+	}
 	filtered, num, hash := filterLogs(logs, f.crit, f.lastSeenBlockNumber, f.lastSeenBlockHash)
 	f.mu.Lock()
 	f.lastSeenBlockNumber = num
 	f.lastSeenBlockHash = hash
-	if len(filtered) > 0 {
-		f.logs = append(f.logs, filtered...)
-	}
+	f.logs = append(f.logs, filtered...)
 	f.mu.Unlock()
+	return nil
 }
 
 func (f *logsFilter) pop() interface{} {
@@ -50,9 +53,14 @@ func (f *logsFilter) pop() interface{} {
 }
 
 func (f *logsFilter) stop() {
-	close(f.done)
-	if f.cancel != nil {
-		f.cancel()
+	select {
+	case <-f.done:
+		return
+	default:
+		close(f.done)
+		if f.cancel != nil {
+			f.cancel()
+		}
 	}
 }
 
@@ -66,7 +74,6 @@ func includes(addresses []common.Address, a common.Address) bool {
 			return true
 		}
 	}
-
 	return false
 }
 
@@ -75,46 +82,54 @@ func filterLogs(logs []types.Log, crit ethereum.FilterQuery, blockNum uint64, bl
 	ret []types.Log, num uint64, hash common.Hash) {
 	num = blockNum
 	hash = blockHash
-Logs:
 	for _, log := range logs {
 		// skip logs from seen blocks
-		if log.BlockNumber < blockNum {
-			continue
-		} else if log.BlockNumber == blockNum && log.BlockHash == blockHash {
-			continue
-		}
 		// find highest block number that we didnt see before
 		if log.BlockNumber >= num {
 			num = log.BlockNumber
 			hash = log.BlockHash
 		}
-		if crit.FromBlock != nil && crit.FromBlock.Int64() >= 0 && crit.FromBlock.Uint64() > log.BlockNumber {
-			continue
+		if matchLog(log, crit, blockNum, blockHash) {
+			ret = append(ret, log)
 		}
-		if crit.ToBlock != nil && crit.ToBlock.Int64() >= 0 && crit.ToBlock.Uint64() < log.BlockNumber {
-			continue
-		}
-
-		if len(crit.Addresses) > 0 && !includes(crit.Addresses, log.Address) {
-			continue
-		}
-		// If the to filtered topics is greater than the amount of topics in logs, skip.
-		if len(crit.Topics) > len(log.Topics) {
-			continue Logs
-		}
-		for i, sub := range crit.Topics {
-			match := len(sub) == 0 // empty rule set == wildcard
-			for _, topic := range sub {
-				if log.Topics[i] == topic {
-					match = true
-					break
-				}
-			}
-			if !match {
-				continue Logs
-			}
-		}
-		ret = append(ret, log)
 	}
 	return
+}
+
+func matchLog(log types.Log, crit ethereum.FilterQuery, blockNum uint64, blockHash common.Hash) bool {
+	// skip logs from seen blocks
+	if log.BlockNumber < blockNum {
+		return false
+	} else if log.BlockNumber == blockNum && log.BlockHash == blockHash {
+		return false
+	}
+	if crit.FromBlock != nil && crit.FromBlock.Int64() >= 0 && crit.FromBlock.Uint64() > log.BlockNumber {
+		return false
+	}
+	if crit.ToBlock != nil && crit.ToBlock.Int64() >= 0 && crit.ToBlock.Uint64() < log.BlockNumber {
+		return false
+	}
+	if len(crit.Addresses) > 0 && !includes(crit.Addresses, log.Address) {
+		return false
+	}
+	if len(crit.Topics) > len(log.Topics) {
+		return false
+	}
+	return matchTopics(log, crit.Topics)
+}
+
+func matchTopics(log types.Log, topics [][]common.Hash) bool {
+	for i, sub := range topics {
+		match := len(sub) == 0 // empty rule set == wildcard
+		for _, topic := range sub {
+			if log.Topics[i] == topic {
+				match = true
+				break
+			}
+		}
+		if !match {
+			return false
+		}
+	}
+	return true
 }
