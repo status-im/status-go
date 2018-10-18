@@ -304,7 +304,6 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 		return
 	}
 
-	log.Debug("Processed request successfully")
 	log.Debug("Sending historic message response", "last", lastEnvelopeHash, "next", nextPageCursor)
 
 	if err := s.sendHistoricMessageResponse(peer, request, lastEnvelopeHash, nextPageCursor); err != nil {

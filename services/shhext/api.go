@@ -81,11 +81,6 @@ type MessagesRequest struct {
 	// Timeout is the time to live of the request specified in seconds.
 	// Default is 10 seconds
 	Timeout time.Duration `json:"timeout"`
-
-	// Batch set to true indicates that the client supports batched response
-	// from the Mail Server. It means that the Mail Server can send envelopes
-	// in batches instead of one-by-one.
-	Batch bool
 }
 
 func (r *MessagesRequest) setDefaults(now time.Time) {
@@ -501,7 +496,9 @@ func makePayload(r MessagesRequest) ([]byte, error) {
 		Bloom:  createBloomFilter(r),
 		Limit:  r.Limit,
 		Cursor: cursor,
-		Batch:  r.Batch,
+		// Client must tell the MailServer if it supports batch responses.
+		// This can be removed in the future.
+		Batch: true,
 	}
 
 	return rlp.EncodeToBytes(payload)
