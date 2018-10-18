@@ -19,7 +19,7 @@ func TestLogsSuite(t *testing.T) {
 }
 
 type LogsSuite struct {
-	utils.DevNodeSuite
+	DevNodeSuite
 }
 
 func (s *LogsSuite) testEmit(event *eventer.Eventer, opts *bind.TransactOpts, id string, topic [32]byte, expect int) {

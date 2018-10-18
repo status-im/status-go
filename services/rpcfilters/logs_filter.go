@@ -44,9 +44,6 @@ func (f *logsFilter) add(data interface{}) error {
 func (f *logsFilter) pop() interface{} {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if f.logs == nil {
-		return []types.Log{}
-	}
 	rst := f.logs
 	f.logs = nil
 	return rst

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	ethereum "github.com/ethereum/go-ethereum"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/eth/filters"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -16,7 +15,7 @@ import (
 
 const (
 	defaultFilterLivenessPeriod = 5 * time.Minute
-	defaultLogsPeriod           = 10 * time.Second
+	defaultLogsPeriod           = 3 * time.Second
 	defaultLogsQueryTimeout     = 10 * time.Second
 )
 
@@ -199,16 +198,11 @@ func (api *PublicAPI) GetFilterChanges(id rpc.ID) (interface{}, error) {
 			}
 			deadline.Reset(api.filterLivenessPeriod)
 		}
-		return f.pop(), nil
+		rst := f.pop()
+		if rst == nil {
+			return []interface{}{}, nil
+		}
+		return rst, nil
 	}
 	return []interface{}{}, errors.New("filter not found")
-}
-
-// returnHashes is a helper that will return an empty hash array case the given hash array is nil,
-// otherwise the given hashes array is returned.
-func returnHashes(hashes []common.Hash) []common.Hash {
-	if hashes == nil {
-		return []common.Hash{}
-	}
-	return hashes
 }

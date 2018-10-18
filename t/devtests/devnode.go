@@ -1,11 +1,9 @@
-package utils
+package devtests
 
 import (
 	"crypto/ecdsa"
-	"fmt"
 	"io/ioutil"
 	"math/big"
-	"math/rand"
 	"os"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
@@ -25,8 +23,11 @@ import (
 // NewDevNode returns node with clieque engine and prefunded accounts.
 func NewDevNode(faucet common.Address) (*node.Node, error) {
 	cfg := node.DefaultConfig
-	cfg.HTTPHost = node.DefaultHTTPHost
-	cfg.HTTPPort = node.DefaultHTTPPort + rand.Intn(10000)
+	ipc, err := ioutil.TempFile("", "devnode-ipc-")
+	if err != nil {
+		return nil, err
+	}
+	cfg.IPCPath = ipc.Name()
 	cfg.HTTPModules = []string{"eth"}
 	cfg.DataDir = ""
 	cfg.P2P.MaxPeers = 0
@@ -121,7 +122,7 @@ func (s *DevNodeSuite) SetupTest() {
 	config.WhisperConfig.Enabled = false
 	config.LightEthConfig.Enabled = false
 	config.UpstreamConfig.Enabled = true
-	config.UpstreamConfig.URL = fmt.Sprintf("http://%s", s.miner.HTTPEndpoint())
+	config.UpstreamConfig.URL = s.miner.IPCEndpoint()
 	s.backend = api.NewStatusBackend()
 	s.Require().NoError(s.backend.StartNode(config))
 

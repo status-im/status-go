@@ -33,7 +33,7 @@ func (f *hashFilter) pop() interface{} {
 	defer f.mu.Unlock()
 	hashes := f.hashes
 	f.hashes = nil
-	return returnHashes(hashes)
+	return hashes
 }
 
 func (f *hashFilter) stop() {

@@ -47,6 +47,7 @@ func pollLogs(client ContextCaller, f *logsFilter, timeout, period time.Duration
 	}
 }
 
+// adjustFromBlock adjusts crit.FromBlock to the latest to avoid querying same logs multiple times.
 func adjustFromBlock(crit *ethereum.FilterQuery) {
 	latest := big.NewInt(rpc.LatestBlockNumber.Int64())
 	// don't adjust if filter is not interested in newer blocks
