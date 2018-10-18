@@ -21,6 +21,8 @@ import (
 	"crypto/ecdsa"
 	"crypto/sha256"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"math"
 	"runtime"
 	"sync"
@@ -64,6 +66,7 @@ const (
 type MailServerResponse struct {
 	LastEnvelopeHash common.Hash
 	Cursor           []byte
+	Error            error
 }
 
 // Whisper represents a dark communication interface through the Ethereum
@@ -418,17 +421,23 @@ func (whisper *Whisper) SendHistoricMessageResponse(peer *Peer, payload []byte) 
 }
 
 // SendP2PMessage sends a peer-to-peer message to a specific peer.
-func (whisper *Whisper) SendP2PMessage(peerID []byte, envelope *Envelope) error {
+func (whisper *Whisper) SendP2PMessage(peerID []byte, envelopes ...*Envelope) error {
 	p, err := whisper.getPeer(peerID)
 	if err != nil {
 		return err
 	}
-	return whisper.SendP2PDirect(p, envelope)
+	return whisper.SendP2PDirect(p, envelopes...)
 }
 
 // SendP2PDirect sends a peer-to-peer message to a specific peer.
-func (whisper *Whisper) SendP2PDirect(peer *Peer, envelope *Envelope) error {
-	return p2p.Send(peer.ws, p2pMessageCode, envelope)
+// If only a single envelope is given, data is sent as a single object
+// rather than a slice. This is important to keep this method backward compatible
+// as it used to send only single envelopes.
+func (whisper *Whisper) SendP2PDirect(peer *Peer, envelopes ...*Envelope) error {
+	if len(envelopes) == 1 {
+		return p2p.Send(peer.ws, p2pMessageCode, envelopes[0])
+	}
+	return p2p.Send(peer.ws, p2pMessageCode, envelopes)
 }
 
 // NewKeyPair generates a new cryptographic identity for the client, and injects
@@ -843,12 +852,46 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 			// therefore might not satisfy the PoW, expiry and other requirements.
 			// these messages are only accepted from the trusted peer.
 			if p.trusted {
-				var envelope Envelope
-				if err := packet.Decode(&envelope); err != nil {
-					log.Warn("failed to decode direct message, peer will be disconnected", "peer", p.peer.ID(), "err", err)
-					return errors.New("invalid direct message")
+				var (
+					envelope  *Envelope
+					envelopes []*Envelope
+					err       error
+				)
+
+				// Read all data as we will try to decode it possibly twice
+				// to keep backward compatibility.
+				data, err := ioutil.ReadAll(packet.Payload)
+				if err != nil {
+					return fmt.Errorf("invalid direct messages: %v", err)
 				}
-				whisper.postEvent(&envelope, true)
+				r := bytes.NewReader(data)
+
+				packet.Payload = r
+
+				if err = packet.Decode(&envelopes); err == nil {
+					for _, envelope := range envelopes {
+						whisper.postEvent(envelope, true)
+					}
+					continue
+				}
+
+				// As we failed to decode envelopes, let's set the offset
+				// to the beginning and try decode data again.
+				// Decoding to a single Envelope is required
+				// to be backward compatible.
+				if _, err := r.Seek(0, io.SeekStart); err != nil {
+					return fmt.Errorf("invalid direct messages: %v", err)
+				}
+
+				if err = packet.Decode(&envelope); err == nil {
+					whisper.postEvent(envelope, true)
+					continue
+				}
+
+				if err != nil {
+					log.Warn("failed to decode direct message, peer will be disconnected", "peer", p.peer.ID(), "err", err)
+					return fmt.Errorf("invalid direct message: %v", err)
+				}
 			}
 		case p2pRequestCode:
 			// Must be processed if mail server is implemented. Otherwise ignore.
@@ -869,44 +912,17 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 					return errors.New("invalid request response message")
 				}
 
-				// check if payload is
-				// - requestID or
-				// - requestID + lastEnvelopeHash or
-				// - requestID + lastEnvelopeHash + cursor
-				// requestID is the hash of the request envelope.
-				// lastEnvelopeHash is the last envelope sent by the mail server
-				// cursor is the db key, 36 bytes: 4 for the timestamp + 32 for the envelope hash.
-				// length := len(payload)
+				event, err := CreateMailServerEvent(payload)
 
-				if len(payload) < common.HashLength || len(payload) > common.HashLength*3+4 {
-					log.Warn("invalid response message, peer will be disconnected", "peer", p.peer.ID(), "err", err, "payload size", len(payload))
-					return errors.New("invalid response size")
+				if err != nil {
+					log.Warn("error while parsing request complete code, peer will be disconnected", "peer", p.peer.ID(), "err", err)
+					return err
 				}
 
-				var (
-					requestID        common.Hash
-					lastEnvelopeHash common.Hash
-					cursor           []byte
-				)
-
-				requestID = common.BytesToHash(payload[:common.HashLength])
-
-				if len(payload) >= common.HashLength*2 {
-					lastEnvelopeHash = common.BytesToHash(payload[common.HashLength : common.HashLength*2])
+				if event != nil {
+					whisper.envelopeFeed.Send(*event)
 				}
 
-				if len(payload) >= common.HashLength*2+36 {
-					cursor = payload[common.HashLength*2 : common.HashLength*2+36]
-				}
-
-				whisper.envelopeFeed.Send(EnvelopeEvent{
-					Hash:  requestID,
-					Event: EventMailServerRequestCompleted,
-					Data: &MailServerResponse{
-						LastEnvelopeHash: lastEnvelopeHash,
-						Cursor:           cursor,
-					},
-				})
 			}
 		default:
 			// New message types might be implemented in the future versions of Whisper.

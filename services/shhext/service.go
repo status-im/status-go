@@ -38,7 +38,7 @@ const (
 type EnvelopeEventsHandler interface {
 	EnvelopeSent(common.Hash)
 	EnvelopeExpired(common.Hash)
-	MailServerRequestCompleted(common.Hash, common.Hash, []byte)
+	MailServerRequestCompleted(common.Hash, common.Hash, []byte, error)
 	MailServerRequestExpired(common.Hash)
 }
 
@@ -291,7 +291,7 @@ func (t *tracker) handleEventMailServerRequestCompleted(event whisper.EnvelopeEv
 	delete(t.cache, event.Hash)
 	if t.handler != nil {
 		if resp, ok := event.Data.(*whisper.MailServerResponse); ok {
-			t.handler.MailServerRequestCompleted(event.Hash, resp.LastEnvelopeHash, resp.Cursor)
+			t.handler.MailServerRequestCompleted(event.Hash, resp.LastEnvelopeHash, resp.Cursor, resp.Error)
 		}
 	}
 }

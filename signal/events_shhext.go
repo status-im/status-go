@@ -38,6 +38,7 @@ type MailServerResponseSignal struct {
 	RequestID        common.Hash `json:"requestID"`
 	LastEnvelopeHash common.Hash `json:"lastEnvelopeHash"`
 	Cursor           string      `json:"cursor"`
+	ErrorMsg         string      `json:"errorMessage"`
 }
 
 // DecryptMessageFailedSignal holds the sender of the message that could not be decrypted
@@ -62,11 +63,16 @@ func SendEnvelopeExpired(hash common.Hash) {
 }
 
 // SendMailServerRequestCompleted triggered when mail server response has been received
-func SendMailServerRequestCompleted(requestID common.Hash, lastEnvelopeHash common.Hash, cursor []byte) {
+func SendMailServerRequestCompleted(requestID common.Hash, lastEnvelopeHash common.Hash, cursor []byte, err error) {
+	errorMsg := ""
+	if err != nil {
+		errorMsg = err.Error()
+	}
 	sig := MailServerResponseSignal{
 		RequestID:        requestID,
 		LastEnvelopeHash: lastEnvelopeHash,
 		Cursor:           string(cursor),
+		ErrorMsg:         errorMsg,
 	}
 	send(EventMailServerRequestCompleted, sig)
 }
