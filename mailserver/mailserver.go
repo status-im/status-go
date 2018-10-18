@@ -254,7 +254,7 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 
 	defer recoverLevelDBPanics("DeliverMail")
 
-	if err, lower, upper, bloom, limit, cursor := s.validateRequest(peer.ID(), request); err != nil {
+	if lower, upper, bloom, limit, cursor, err := s.validateRequest(peer.ID(), request); err != nil {
 		requestValidationErrorsCounter.Inc(1)
 		log.Error("Mailserver request failed validaton", "peerID", peer.ID())
 		s.trySendHistoricMessageErrorResponse(peer, request, err)
@@ -405,23 +405,23 @@ func (s *WMailServer) openEnvelope(request *whisper.Envelope) *whisper.ReceivedM
 }
 
 // validateRequest runs different validations on the current request.
-func (s *WMailServer) validateRequest(peerID []byte, request *whisper.Envelope) (error, uint32, uint32, []byte, uint32, cursorType) {
+func (s *WMailServer) validateRequest(peerID []byte, request *whisper.Envelope) (uint32, uint32, []byte, uint32, cursorType, error) {
 	if s.pow > 0.0 && request.PoW() < s.pow {
-		return fmt.Errorf("PoW() is too low"), 0, 0, nil, 0, nil
+		return 0, 0, nil, 0, nil, fmt.Errorf("PoW() is too low")
 	}
 
 	decrypted := s.openEnvelope(request)
 	if decrypted == nil {
-		return fmt.Errorf("failed to decrypt p2p request"), 0, 0, nil, 0, nil
+		return 0, 0, nil, 0, nil, fmt.Errorf("failed to decrypt p2p request")
 	}
 
 	if err := s.checkMsgSignature(decrypted, peerID); err != nil {
-		return err, 0, 0, nil, 0, nil
+		return 0, 0, nil, 0, nil, err
 	}
 
 	bloom, err := s.bloomFromReceivedMessage(decrypted)
 	if err != nil {
-		return err, 0, 0, nil, 0, nil
+		return 0, 0, nil, 0, nil, err
 	}
 
 	lower := binary.BigEndian.Uint32(decrypted.Payload[:4])
@@ -429,14 +429,14 @@ func (s *WMailServer) validateRequest(peerID []byte, request *whisper.Envelope) 
 
 	if upper < lower {
 		err := fmt.Errorf("query range is invalid: from > to (%d > %d)", lower, upper)
-		return err, 0, 0, nil, 0, nil
+		return 0, 0, nil, 0, nil, err
 	}
 
 	lowerTime := time.Unix(int64(lower), 0)
 	upperTime := time.Unix(int64(upper), 0)
 	if upperTime.Sub(lowerTime) > maxQueryRange {
 		err := fmt.Errorf("query range too big for peer %s", string(peerID))
-		return err, 0, 0, nil, 0, nil
+		return 0, 0, nil, 0, nil, err
 	}
 
 	var limit uint32
@@ -449,7 +449,8 @@ func (s *WMailServer) validateRequest(peerID []byte, request *whisper.Envelope) 
 		cursor = decrypted.Payload[requestTimeRangeLength+whisper.BloomFilterSize+requestLimitLength:]
 	}
 
-	return nil, lower, upper, bloom, limit, cursor
+	err = nil
+	return lower, upper, bloom, limit, cursor, err
 }
 
 // checkMsgSignature returns an error in case the message is not correcly signed
