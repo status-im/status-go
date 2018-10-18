@@ -322,8 +322,8 @@ func (s *MailserverSuite) TestRequestPaginationLimit() {
 	params.limit = 6
 	request := s.createRequest(params)
 	src := crypto.FromECDSAPub(&params.key.PublicKey)
-	ok, lower, upper, bloom, limit, cursor := s.server.validateRequest(src, request)
-	s.True(ok)
+	lower, upper, bloom, limit, cursor, err := s.server.validateRequest(src, request)
+	s.True(err == nil)
 	s.Nil(cursor)
 	s.Equal(params.limit, limit)
 
@@ -428,9 +428,9 @@ func (s *MailserverSuite) TestMailServer() {
 		s.T().Run(tc.info, func(*testing.T) {
 			request := s.createRequest(tc.params)
 			src := crypto.FromECDSAPub(&tc.params.key.PublicKey)
-			ok, lower, upper, bloom, limit, _ := s.server.validateRequest(src, request)
-			s.Equal(tc.isOK, ok)
-			if ok {
+			lower, upper, bloom, limit, _, err := s.server.validateRequest(src, request)
+			s.Equal(tc.isOK, err == nil)
+			if err == nil {
 				s.Equal(tc.params.low, lower)
 				s.Equal(tc.params.upp, upper)
 				s.Equal(tc.params.limit, limit)
@@ -438,8 +438,8 @@ func (s *MailserverSuite) TestMailServer() {
 				s.Equal(tc.expect, s.messageExists(env, tc.params.low, tc.params.upp, bloom, tc.params.limit))
 
 				src[0]++
-				ok, _, _, _, _, _ = s.server.validateRequest(src, request)
-				s.True(ok)
+				_, _, _, _, _, err = s.server.validateRequest(src, request)
+				s.True(err == nil)
 			}
 		})
 	}

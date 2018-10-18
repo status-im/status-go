@@ -163,5 +163,5 @@
   branch = "master"
 
 [[constraint]]
-  branch = "master"
+  version = "v1.2.0"
   name = "github.com/status-im/whisper"
