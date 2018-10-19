@@ -23,6 +23,7 @@ func newHandlerMock(buf int) handlerMock {
 		expirations:       make(chan common.Hash, buf),
 		requestsCompleted: make(chan common.Hash, buf),
 		requestsExpired:   make(chan common.Hash, buf),
+		requestsFailed:    make(chan common.Hash, buf),
 	}
 }
 
@@ -31,6 +32,7 @@ type handlerMock struct {
 	expirations       chan common.Hash
 	requestsCompleted chan common.Hash
 	requestsExpired   chan common.Hash
+	requestsFailed    chan common.Hash
 }
 
 func (t handlerMock) EnvelopeSent(hash common.Hash) {
@@ -41,8 +43,12 @@ func (t handlerMock) EnvelopeExpired(hash common.Hash) {
 	t.expirations <- hash
 }
 
-func (t handlerMock) MailServerRequestCompleted(requestID common.Hash, lastEnvelopeHash common.Hash, cursor []byte) {
-	t.requestsCompleted <- requestID
+func (t handlerMock) MailServerRequestCompleted(requestID common.Hash, lastEnvelopeHash common.Hash, cursor []byte, err error) {
+	if err == nil {
+		t.requestsCompleted <- requestID
+	} else {
+		t.requestsFailed <- requestID
+	}
 }
 
 func (t handlerMock) MailServerRequestExpired(hash common.Hash) {
@@ -456,6 +462,26 @@ func (s *TrackerSuite) TestRequestCompleted() {
 		s.NotContains(s.tracker.cache, testHash)
 	case <-time.After(10 * time.Second):
 		s.Fail("timed out while waiting for a request to be completed")
+	}
+}
+
+func (s *TrackerSuite) TestRequestFailed() {
+	mock := newHandlerMock(1)
+	s.tracker.handler = mock
+	s.tracker.AddRequest(testHash, time.After(defaultRequestTimeout*time.Second))
+	s.Contains(s.tracker.cache, testHash)
+	s.Equal(MailServerRequestSent, s.tracker.cache[testHash])
+	s.tracker.handleEvent(whisper.EnvelopeEvent{
+		Event: whisper.EventMailServerRequestCompleted,
+		Hash:  testHash,
+		Data:  &whisper.MailServerResponse{Error: errors.New("test error")},
+	})
+	select {
+	case requestID := <-mock.requestsFailed:
+		s.Equal(testHash, requestID)
+		s.NotContains(s.tracker.cache, testHash)
+	case <-time.After(10 * time.Second):
+		s.Fail("timed out while waiting for a request to be failed")
 	}
 }
 

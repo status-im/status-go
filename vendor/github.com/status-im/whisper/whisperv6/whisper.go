@@ -66,6 +66,7 @@ const (
 type MailServerResponse struct {
 	LastEnvelopeHash common.Hash
 	Cursor           []byte
+	Error            error
 }
 
 // Whisper represents a dark communication interface through the Ethereum
@@ -911,44 +912,17 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 					return errors.New("invalid request response message")
 				}
 
-				// check if payload is
-				// - requestID or
-				// - requestID + lastEnvelopeHash or
-				// - requestID + lastEnvelopeHash + cursor
-				// requestID is the hash of the request envelope.
-				// lastEnvelopeHash is the last envelope sent by the mail server
-				// cursor is the db key, 36 bytes: 4 for the timestamp + 32 for the envelope hash.
-				// length := len(payload)
+				event, err := CreateMailServerEvent(payload)
 
-				if len(payload) < common.HashLength || len(payload) > common.HashLength*3+4 {
-					log.Warn("invalid response message, peer will be disconnected", "peer", p.peer.ID(), "err", err, "payload size", len(payload))
-					return errors.New("invalid response size")
+				if err != nil {
+					log.Warn("error while parsing request complete code, peer will be disconnected", "peer", p.peer.ID(), "err", err)
+					return err
 				}
 
-				var (
-					requestID        common.Hash
-					lastEnvelopeHash common.Hash
-					cursor           []byte
-				)
-
-				requestID = common.BytesToHash(payload[:common.HashLength])
-
-				if len(payload) >= common.HashLength*2 {
-					lastEnvelopeHash = common.BytesToHash(payload[common.HashLength : common.HashLength*2])
+				if event != nil {
+					whisper.envelopeFeed.Send(*event)
 				}
 
-				if len(payload) >= common.HashLength*2+36 {
-					cursor = payload[common.HashLength*2 : common.HashLength*2+36]
-				}
-
-				whisper.envelopeFeed.Send(EnvelopeEvent{
-					Hash:  requestID,
-					Event: EventMailServerRequestCompleted,
-					Data: &MailServerResponse{
-						LastEnvelopeHash: lastEnvelopeHash,
-						Cursor:           cursor,
-					},
-				})
 			}
 		default:
 			// New message types might be implemented in the future versions of Whisper.
