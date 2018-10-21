@@ -190,7 +190,7 @@ func TestEncodeData(t *testing.T) {
 	} {
 		tc := tc
 		t.Run(tc.description, func(t *testing.T) {
-			encoded, err := encodeData(tc.target, tc.message, tc.types)
+			encoded, err := hashStruct(tc.target, tc.message, tc.types)
 			require.NoError(t, err)
 			require.Equal(t, tc.result(tc), encoded)
 		})
@@ -253,7 +253,7 @@ func TestEncodeDataErrors(t *testing.T) {
 	} {
 		tc := tc
 		t.Run(tc.description, func(t *testing.T) {
-			encoded, err := encodeData(tc.target, tc.message, tc.types)
+			encoded, err := hashStruct(tc.target, tc.message, tc.types)
 			require.Error(t, err)
 			require.Equal(t, common.Hash{}, encoded)
 		})

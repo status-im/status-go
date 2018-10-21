@@ -3,10 +3,12 @@ package typeddata
 import (
 	"errors"
 	"fmt"
+	"math/big"
 )
 
 const (
 	eip712Domain = "EIP712Domain"
+	chainIDKey   = "chainId"
 )
 
 // Types define fields for each composite type.
@@ -63,6 +65,21 @@ func (t TypedData) Validate() error {
 				return err
 			}
 		}
+	}
+	return nil
+}
+
+// ValidateChainID accept chain as big integer and verifies if typed data belongs to the same chain.
+func (t TypedData) ValidateChainID(chain *big.Int) error {
+	if _, exist := t.Domain[chainIDKey]; !exist {
+		return fmt.Errorf("domain misses chain key %s", chainIDKey)
+	}
+	chainID, ok := t.Domain[chainIDKey].(int)
+	if !ok {
+		return errors.New("chainId is not an int")
+	}
+	if int64(chainID) != chain.Int64() {
+		return fmt.Errorf("chainId %d doesn't match selected chain %s", chainID, chain)
 	}
 	return nil
 }

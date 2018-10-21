@@ -105,11 +105,11 @@ func TestInteroparableWithSolidity(t *testing.T) {
 		Message:     msg,
 	}
 
-	domainHash, err := encodeData(eip712Domain, typed.Domain, typed.Types)
+	domainHash, err := hashStruct(eip712Domain, typed.Domain, typed.Types)
 	require.NoError(t, err)
 	require.Equal(t, domainSol[:], domainHash[:])
 
-	mailHash, err := encodeData(typed.PrimaryType, typed.Message, typed.Types)
+	mailHash, err := hashStruct(typed.PrimaryType, typed.Message, typed.Types)
 	require.NoError(t, err)
 	require.Equal(t, mailSol[:], mailHash[:])
 
@@ -121,7 +121,7 @@ func TestInteroparableWithSolidity(t *testing.T) {
 	copy(r[:], signature[:32])
 	s := [32]byte{}
 	copy(s[:], signature[32:64])
-	v := uint8(signature[64] + 27)
+	v := signature[64]
 	tx, err := example.Verify(opts, v, r, s)
 	require.NoError(t, err)
 	backend.Commit()
